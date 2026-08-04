@@ -5,6 +5,7 @@
  * エンジン側の関数はすべて BalanceConfig を引数で受け取り、この既定値に依存しない。
  */
 
+import { ABILITY_KEYS } from './types.js';
 import type { GrowthType, NumericTraitKey, SkillGene, Strategy } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -166,10 +167,23 @@ export interface BalanceConfig {
   REGRESSION_CENTER_RATIO: number;
 
   /**
-   * 形質ごとの変異・回帰パラメータ（正典 §6.4 の表・§13.1・D-009）。
-   * 品種中心はここで形質ごとに与える。`buildTraitMutation()` が創始定義から導出する。
+   * 形質ごとの変異・回帰パラメータ（正典 §6.4 の表・§13.1・D-009/D-012）。
+   * 品種中心と sd はここで形質ごとに与える。`buildTraitMutation()` が創始定義から導出する。
    */
   traitMutation: Readonly<Partial<Record<NumericTraitKey, TraitMutationSpec>>>;
+
+  /**
+   * 大物覚醒（§6.3）の適用対象形質。**能力5種のみ**（正典 §6.3・D-011）。
+   *
+   * 「大物」= 能力の高い名馬という意味なので、能力以外の形質に
+   * 「祖先の最大値を引く」単調ラチェットをかけると設計意図と食い違う。
+   * 特に**気性は「高いほど気性難」**（§5.3）なので、覚醒するたびに馬が扱いにくくなる
+   * という逆向きの効果になっていた。距離適性への適用は distance_range を押し上げて
+   * 全馬を万能型に近づけ、§5.2 の分化を損なっていた（実測: 非能力6形質すべてが上方向へ）。
+   *
+   * 通常の隔世遺伝（6%・ランダムな祖父母のアレル）は**全形質に適用したまま**。
+   */
+  BIG_ATAVISM_TRAITS: readonly NumericTraitKey[];
 
   /**
    * 素質値の発現ウェイト。potential = 高い方のアレル×w + 低い方×(1-w)。
@@ -288,9 +302,9 @@ function uniformSd(range: readonly [number, number]): number {
  * （FOUNDERS.DURABILITY_MEAN を変えたら回帰中心も自動で追随する）。
  * 実際の値は正典 §13.1 の表とリテラル一致することをテストで固定している。
  *
- * ★距離系で上書きするのは **sd だけ**（回帰率・clamp比は全形質共通の 0.20 / 1.67）。
+ * ★上書きするのは **sd（と比例する clamp）と品種中心だけ**。回帰率・clamp比は全形質共通（0.20 / 1.67）。
  *
- * 距離系は2条件を同時に満たす必要があり、sd は回帰率から従属的に決まる:
+ * 非能力形質は2条件を同時に満たす必要があり、sd は回帰率から従属的に決まる:
  *   1. 集団平均が創始水準から動かない（V-2d: ±10%）
  *      → 大物覚醒（§6.3）が単調上昇ラチェットとして押し上げる。平衡時のずれ ∝ 押し上げ量 / 回帰率
  *        （実測: BIG_ATAVISM_RATE=0 にすると距離のずれは -1.7%/-3.0% まで消える）
@@ -306,6 +320,12 @@ function uniformSd(range: readonly [number, number]): number {
  * ⚠️ P0-fix では「回帰0.20 では距離SDが 0.4倍に収縮する」と報告したが、
  *    あれは sd を値域比（=小さすぎる値）のままにしていたためで、回帰率0.20 自体は問題ない。
  *    sd を上式で追随させれば 0.20 でも分散は保たれる（実測 0.92倍）。
+ *
+ * ⚠️ 同じ問題は距離系以外でも起きていた（D-012・レビュー側監査）。値域比スケールのままだと
+ *    芝/ダート適性は平衡SDが創始の 0.71倍に**収縮**（馬場適性の個性が消える）、
+ *    丈夫さは 1.41倍に**拡大**（故障率のばらつきが広がる）していた。
+ *    平均は ±10% 内に収まったままだったため V-2d では捕まらず、V-2e は距離しか見ていなかった。
+ *    → 非能力形質はすべて同じ導出に従わせ、V-2e も全非能力形質へ一般化した。
  */
 export function buildTraitMutation(
   f: FoundersConfig,
@@ -313,31 +333,36 @@ export function buildTraitMutation(
   clampRatio: number = BALANCE.MUTATION_CLAMP_RATIO,
 ): Readonly<Record<NumericTraitKey, TraitMutationSpec>> {
   const abilityCenter = { center: f.ABILITY_MEAN };
-  // 距離系の sd は回帰率から従属的に決まる（下のコメント参照）。
-  // 定数を別々に持つと片方だけ変えたときに壊れるので、必ずここで一緒に導出する
-  const distanceSd = (range: readonly [number, number]): number =>
-    Math.round(uniformSd(range) * Math.sqrt(2 * regressionRate - regressionRate * regressionRate));
-  const centerSd = distanceSd(f.DISTANCE_CENTER_RANGE);
-  const rangeSd = distanceSd(f.DISTANCE_RANGE_RANGE);
+
+  /**
+   * 非能力形質の変異幅を創始アレルSDから導出する（正典 §6.4・D-012）。
+   *   平衡SD = sd / √(2r − r²)  →  sd = 創始アレルSD × √(2r − r²)
+   * 定数を別々に持つと片方だけ変えたときに平衡が壊れるので、必ずここで一緒に導出する。
+   */
+  const derive = (founderAlleleSd: number): { sd: number; clamp: number } => {
+    const sd = Math.round(
+      founderAlleleSd * Math.sqrt(2 * regressionRate - regressionRate * regressionRate),
+    );
+    return { sd, clamp: Math.round(sd * clampRatio) };
+  };
+
   return {
+    // 能力5種だけは例外。sd は V-1（同一配合のばらつき12〜18%）から較正する
     sp: abilityCenter,
     st: abilityCenter,
     pw: abilityCenter,
     gt: abilityCenter,
     iq: abilityCenter,
-    durability: { center: f.DURABILITY_MEAN },
-    temper: { center: f.TEMPER_MEAN },
-    'surface.turf': { center: uniformMean(f.SURFACE_RANGE) },
-    'surface.dirt': { center: uniformMean(f.SURFACE_RANGE) },
-    // 距離系は回帰率も clamp 比も他形質と共通。**sd だけ**を絶対値で与える
+    durability: { ...derive(f.DURABILITY_SD), center: f.DURABILITY_MEAN },
+    temper: { ...derive(f.TEMPER_SD), center: f.TEMPER_MEAN },
+    'surface.turf': { ...derive(uniformSd(f.SURFACE_RANGE)), center: uniformMean(f.SURFACE_RANGE) },
+    'surface.dirt': { ...derive(uniformSd(f.SURFACE_RANGE)), center: uniformMean(f.SURFACE_RANGE) },
     distance_center: {
-      sd: centerSd,
-      clamp: Math.round(centerSd * clampRatio),
+      ...derive(uniformSd(f.DISTANCE_CENTER_RANGE)),
       center: uniformMean(f.DISTANCE_CENTER_RANGE),
     },
     distance_range: {
-      sd: rangeSd,
-      clamp: Math.round(rangeSd * clampRatio),
+      ...derive(uniformSd(f.DISTANCE_RANGE_RANGE)),
       center: uniformMean(f.DISTANCE_RANGE_RANGE),
     },
   };
@@ -377,6 +402,8 @@ export const DEFAULT_BALANCE: BalanceConfig = {
   REGRESSION_RATE: BALANCE.REGRESSION_RATE,
   REGRESSION_CENTER_RATIO: BALANCE.REGRESSION_CENTER_RATIO,
   traitMutation: TRAIT_MUTATION,
+  // 大物覚醒は能力5種のみ（正典 §6.3・D-011）
+  BIG_ATAVISM_TRAITS: ABILITY_KEYS,
 
   DOMINANT_WEIGHT: BALANCE.DOMINANT_WEIGHT,
 

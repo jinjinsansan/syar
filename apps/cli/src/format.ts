@@ -233,10 +233,19 @@ export function formatReport(result: SimulationResult): string {
   lines.push('');
 
   lines.push(
-    `V-2e 距離適性の分化: distance_center の集団SD  目標 創始比 ${v2e.target[0]}〜${v2e.target[1]}倍`,
+    `V-2e 非能力形質の分化: 集団SD  目標 創始比 ${v2e.target[0]}〜${v2e.target[1]}倍` +
+      `（平均が保たれていても分散だけ壊れることがあるため別ゲート）`,
   );
-  lines.push(`    創始 SD${v2e.founderSd.toFixed(0)} → 最終 SD${v2e.finalSd.toFixed(0)}`);
-  lines.push(`    → ${verdict(v2e.pass)}  実測 ${v2e.ratio.toFixed(2)}倍`);
+  for (const t of v2e.traits) {
+    lines.push(
+      `    ${pad(t.key, 16)}: 創始 SD${pad(t.founderSd.toFixed(1), 8)} → 最終 SD${pad(t.finalSd.toFixed(1), 8)}` +
+        `  ${t.ratio.toFixed(2)}倍  ${verdict(t.pass)}`,
+    );
+  }
+  lines.push(
+    `    → ${verdict(v2e.pass)}` +
+      `${v2e.worstKey === null ? '' : `  最大乖離 ${v2e.worstKey} ${v2e.worstRatio.toFixed(2)}倍`}`,
+  );
   lines.push('');
 
   lines.push(

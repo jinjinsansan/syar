@@ -8,12 +8,38 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, DEFAULT_BALANCE, FOUNDERS, buildTraitMutation } from '../src/balance.js';
 import { breed } from '../src/breeding.js';
-import { resolveMutation } from '../src/genetics.js';
+import { mutateAllele, resolveMutation } from '../src/genetics.js';
 import type { NicksTable } from '../src/nicks.js';
 import { NUMERIC_TRAITS } from '../src/types.js';
 import { Herd } from './helpers.js';
 
 const NO_NICKS: NicksTable = new Map();
+
+/**
+ * 変異ノイズを**全形質で**止めた balance（回帰項だけを観察するため）。
+ *
+ * ⚠️ `genetics.MUTATION_SD = 0` だけでは非能力形質は止まらない。D-012 以降、
+ *    非能力形質は `traitMutation[key].sd` に絶対値を持つため、共通の MUTATION_SD を
+ *    0 にしても効かない。この落とし穴を踏んだので、意図を関数名で明示しておく。
+ */
+function silenceMutation(base: typeof DEFAULT_BALANCE = DEFAULT_BALANCE): typeof DEFAULT_BALANCE {
+  const traitMutation: Record<string, unknown> = {};
+  for (const key of NUMERIC_TRAITS) {
+    traitMutation[key] = { ...base.traitMutation[key], sd: 0, clamp: 0 };
+  }
+  return {
+    ...base,
+    genetics: {
+      ...base.genetics,
+      MUTATION_SD: 0,
+      BIG_MUTATION_SD: 0,
+      BIG_MUTATION_RATE: 0,
+      ATAVISM_RATE: 0,
+      BIG_ATAVISM_RATE: 0,
+    },
+    traitMutation: traitMutation as typeof base.traitMutation,
+  };
+}
 
 describe('正典 §13.1 の定数（D-008 反映）', () => {
   it('平均回帰が既定で有効になっている', () => {
@@ -136,24 +162,40 @@ describe('形質別の変異・回帰パラメータ（正典 §6.4 の表・D-0
     }
   });
 
-  it('丈夫さ: 値域比スケール / 回帰 0.20 / 中心 650（★値域45%の450ではない）', () => {
+  it('丈夫さ: sd 60 / clamp 100 / 回帰 0.20 / 中心 650（★値域45%の450ではない）', () => {
     const m = resolveMutation(DEFAULT_BALANCE, 'durability');
     expect(m.center).toBe(650);
     expect(m.regressionRate).toBe(0.2);
-    expect(m.sd).toBe(90); // 値域 0〜1000 なので係数1
-    expect(m.clamp).toBe(150);
+    // 値域比スケール（=90）ではなく創始アレルSD 100 × √0.36 から導出（D-012）
+    expect(m.sd).toBe(60);
+    expect(m.clamp).toBe(100);
   });
 
-  it('気性: 中心 50 / 値域比で 1/10 に縮尺', () => {
+  it('気性: sd 9 / clamp 15 / 中心 50', () => {
     const m = resolveMutation(DEFAULT_BALANCE, 'temper');
     expect(m.center).toBe(50);
-    expect(m.sd).toBeCloseTo(9, 10);
-    expect(m.clamp).toBeCloseTo(15, 10);
+    expect(m.sd).toBe(9);
+    expect(m.clamp).toBe(15);
   });
 
-  it('芝/ダート適性: 中心 55（★値域45%の45ではない）', () => {
-    expect(resolveMutation(DEFAULT_BALANCE, 'surface.turf').center).toBe(55);
-    expect(resolveMutation(DEFAULT_BALANCE, 'surface.dirt').center).toBe(55);
+  it('芝/ダート適性: sd 12 / clamp 20 / 中心 55（★値域45%の45ではない）', () => {
+    for (const key of ['surface.turf', 'surface.dirt'] as const) {
+      const m = resolveMutation(DEFAULT_BALANCE, key);
+      expect(m.center).toBe(55);
+      expect(m.sd).toBe(12);
+      expect(m.clamp).toBe(20);
+    }
+  });
+
+  it('非能力形質の sd はすべて創始アレルSDから導出される（D-012）', () => {
+    // 値域比スケールのままだと芝適性は平衡SDが 0.71倍に収縮、丈夫さは 1.41倍に拡大していた
+    const built = buildTraitMutation(FOUNDERS, 0.2);
+    const factor = Math.sqrt(2 * 0.2 - 0.2 * 0.2); // = 0.6
+    expect(built.durability.sd).toBe(Math.round(FOUNDERS.DURABILITY_SD * factor));
+    expect(built.temper.sd).toBe(Math.round(FOUNDERS.TEMPER_SD * factor));
+    expect(built['surface.turf'].sd).toBe(Math.round((90 - 20) / Math.sqrt(12) * factor));
+    // 能力5種だけは例外（V-1 から較正するため上書きしない）
+    expect(built.sp.sd).toBeUndefined();
   });
 
   it('distance_center: sd 312 / clamp 520 / 回帰 0.20（共通） / 中心 2100', () => {
@@ -223,20 +265,156 @@ describe('形質別の変異・回帰パラメータ（正典 §6.4 の表・D-0
   });
 });
 
-describe('回帰中心の誤りが再発しないこと（D-009 の回帰テスト）', () => {
-  it('丈夫さは 650 へ引き戻される（450 ではない）', () => {
-    // 変異を止めて回帰項だけを見る。創始水準 650 の馬は動かないのが正しい。
-    // 値域45%（=450）を中心にしていた頃は 650 → 610 と毎世代下がっていた。
+/**
+ * 変異＋回帰の**式の形そのもの**を固定する（正典 §6.4・D-012）。
+ *
+ * ⚠️ このテスト群が無かったために、clamp の位置を取り違えたまま P0-fix2 を通してしまった。
+ *    既存の回帰テストはすべて `MUTATION_SD = 0` で走っており、その条件では
+ *    `clamp(N) − 回帰項` と `clamp(N − 回帰項)` が同値になるため、
+ *    式を入れ替えても全件 PASS してしまう（レビュー側監査で判明）。
+ *    ノイズを引数で注入できる純関数にして、**両形式が異なる値になる入力**で固定する。
+ */
+describe('変異＋回帰の式（正典 §6.4・D-012）', () => {
+  const mutation = {
+    sd: 90,
+    bigSd: 180,
+    clamp: 150,
+    regressionRate: 0.2,
+    center: 450,
+  };
+
+  it('clamp は変異ノイズのみにかかる（合計にかけてはいけない）', () => {
+    // アレル値900・中心450 → 引き戻し = 450 × 0.2 = 90
+    // ノイズ +200 は clamp 幅150 で切られる
+    //   正: 900 + clamp(200)=150 − 90 = 960
+    //   誤（合計にclamp）: 900 + clamp(200 − 90 = 110) = 1010
+    expect(mutateAllele(900, 200, mutation, false)).toBe(960);
+
+    //   正: 900 + clamp(-300)=-150 − 90 = 660
+    //   誤（合計にclamp）: 900 + clamp(-300 − 90 = -390) = -150 → 750
+    expect(mutateAllele(900, -300, mutation, false)).toBe(660);
+  });
+
+  it('引き戻し量は clamp で頭打ちにならない（極端なアレルほど強く引く）', () => {
+    // ノイズ0 のとき、引き戻しはそのまま効く
+    expect(mutateAllele(900, 0, mutation, false)).toBe(810); // −90.0
+    expect(mutateAllele(1000, 0, mutation, false)).toBe(890); // −110.0
+    // 合計に clamp する式だと −76.5 / −90.6 に弱まってしまう
+  });
+
+  it('ノイズが clamp 内なら両形式は同値（＝ここだけ見ても式は固定できない）', () => {
+    // MUTATION_SD=0 の回帰テストがすべてこの領域にいたため、式の誤りを検出できなかった
+    expect(mutateAllele(900, 50, mutation, false)).toBe(860);
+    expect(mutateAllele(900, 0, mutation, false)).toBe(810);
+  });
+
+  it('大突然変異には通常の clamp 幅を適用しない（値域clampのみ）', () => {
+    // ノイズ +400 は切られない: 900 + 400 − 90 = 1210（値域clampは呼び出し側）
+    expect(mutateAllele(900, 400, mutation, true)).toBe(1210);
+  });
+
+  it('回帰率0 なら引き戻しは起きない', () => {
+    expect(mutateAllele(900, 50, { ...mutation, regressionRate: 0 }, false)).toBe(950);
+  });
+
+  it('品種中心ちょうどならノイズだけが効く', () => {
+    expect(mutateAllele(450, 30, mutation, false)).toBe(480);
+  });
+});
+
+describe('大物覚醒の適用範囲（正典 §6.3・D-011）', () => {
+  it('対象は能力5種のみ', () => {
+    expect([...DEFAULT_BALANCE.BIG_ATAVISM_TRAITS].sort()).toEqual(
+      ['sp', 'st', 'pw', 'gt', 'iq'].sort(),
+    );
+  });
+
+  it('非能力形質では発動しない（発動率100%でも記録されない）', () => {
     const balance = {
       ...DEFAULT_BALANCE,
       genetics: {
         ...DEFAULT_BALANCE.genetics,
         MUTATION_SD: 0,
         BIG_MUTATION_SD: 0,
+        BIG_MUTATION_RATE: 0,
         ATAVISM_RATE: 0,
+        BIG_ATAVISM_RATE: 1, // 必ず当たる設定
+      },
+    };
+    const herd = new Herd();
+    const opts = { birthYear: 0 };
+    const ss = herd.add('SS', 'male', null, null, { ...opts, ability: 900 });
+    const sdm = herd.add('SD', 'female', null, null, opts);
+    const ds = herd.add('DS', 'male', null, null, opts);
+    const dd = herd.add('DD', 'female', null, null, opts);
+    const sire = herd.add('S', 'male', ss, sdm, opts);
+    const dam = herd.add('D', 'female', ds, dd, opts);
+
+    const foal = breed({
+      id: 'F',
+      sire,
+      dam,
+      seed: 7,
+      generation: 2,
+      birthYear: 10,
+      lookup: herd.lookup,
+      balance,
+      nicks: NO_NICKS,
+    });
+    const fired = foal.breedingRecord?.bigAtavismTraits ?? [];
+    expect(fired.length).toBeGreaterThan(0); // 能力5種では発動している
+    for (const key of fired) {
+      expect(['sp', 'st', 'pw', 'gt', 'iq']).toContain(key);
+    }
+    // 非能力形質は1つも含まれない
+    expect(fired).not.toContain('temper');
+    expect(fired).not.toContain('durability');
+    expect(fired).not.toContain('distance_range');
+    expect(fired).not.toContain('surface.turf');
+  });
+
+  it('通常の隔世遺伝（6%）は全形質に適用したまま', () => {
+    const balance = {
+      ...DEFAULT_BALANCE,
+      genetics: {
+        ...DEFAULT_BALANCE.genetics,
+        MUTATION_SD: 0,
+        BIG_MUTATION_SD: 0,
+        BIG_MUTATION_RATE: 0,
+        ATAVISM_RATE: 1, // 必ず当たる設定
         BIG_ATAVISM_RATE: 0,
       },
     };
+    const herd = new Herd();
+    const opts = { birthYear: 0 };
+    const ss = herd.add('SS', 'male', null, null, opts);
+    const sdm = herd.add('SD', 'female', null, null, opts);
+    const ds = herd.add('DS', 'male', null, null, opts);
+    const dd = herd.add('DD', 'female', null, null, opts);
+    const sire = herd.add('S', 'male', ss, sdm, opts);
+    const dam = herd.add('D', 'female', ds, dd, opts);
+
+    const foal = breed({
+      id: 'F',
+      sire,
+      dam,
+      seed: 7,
+      generation: 2,
+      birthYear: 10,
+      lookup: herd.lookup,
+      balance,
+      nicks: NO_NICKS,
+    });
+    // 11形質すべてで隔世遺伝のロールが当たっている
+    expect(foal.breedingRecord?.atavismTraits.length).toBe(NUMERIC_TRAITS.length);
+  });
+});
+
+describe('回帰中心の誤りが再発しないこと（D-009 の回帰テスト）', () => {
+  it('丈夫さは 650 へ引き戻される（450 ではない）', () => {
+    // 変異を止めて回帰項だけを見る。創始水準 650 の馬は動かないのが正しい。
+    // 値域45%（=450）を中心にしていた頃は 650 → 610 と毎世代下がっていた。
+    const balance = silenceMutation();
     const herd = new Herd();
     const sire = herd.add('S', 'male', null, null, { birthYear: 0 });
     const dam = herd.add('D', 'female', null, null, { birthYear: 0 });
@@ -262,22 +440,7 @@ describe('回帰中心の誤りが再発しないこと（D-009 の回帰テス�
   it('気性50・適性55・距離2100/700 も創始水準で不動', () => {
     // 距離系は絶対値 sd を持つので、共通の MUTATION_SD を 0 にしても止まらない。
     // 上書き側も 0 にして回帰項だけを見る
-    const balance = {
-      ...DEFAULT_BALANCE,
-      genetics: {
-        ...DEFAULT_BALANCE.genetics,
-        MUTATION_SD: 0,
-        BIG_MUTATION_SD: 0,
-        BIG_MUTATION_RATE: 0,
-        ATAVISM_RATE: 0,
-        BIG_ATAVISM_RATE: 0,
-      },
-      traitMutation: {
-        ...DEFAULT_BALANCE.traitMutation,
-        distance_center: { center: 2100, sd: 0, clamp: 0 },
-        distance_range: { center: 700, sd: 0, clamp: 0 },
-      },
-    };
+    const balance = silenceMutation();
     const herd = new Herd();
     const sire = herd.add('S', 'male', null, null, { birthYear: 0 });
     const dam = herd.add('D', 'female', null, null, { birthYear: 0 });

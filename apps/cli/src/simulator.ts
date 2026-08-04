@@ -172,6 +172,12 @@ export interface CohortStat {
    */
   traitMeans: Record<NumericTraitKey, number>;
   /**
+   * 全数値形質の集団SD（genotype の発現値ベース）。V-2e の測定源。
+   * 平均（traitMeans）が創始水準に収まっていても、分散だけが静かに壊れることがある
+   * （実測: 芝適性は平均±10%内のまま SD が 0.71倍へ収縮していた）。
+   */
+  traitSds: Record<NumericTraitKey, number>;
+  /**
    * 中間親（父母の能力合計の平均）と産駒の能力合計のピアソン相関。
    * 「血のつながりの強さ」の実測値。正典 §1.1「血をつなぐことが唯一の進行軸」／
    * §1.4-3「蓄積感」が成立しているかの健全性指標であり、
@@ -265,11 +271,22 @@ export interface Verification {
     targetAbsMax: number;
     pass: boolean;
   };
-  /** V-2e 距離適性の分化（正典 §13.2・D-009）。P0-fix の合格基準4を機械ゲート化したもの */
+  /**
+   * V-2e 非能力形質の分化（正典 §13.2・D-012 で距離のみから全非能力形質へ一般化）。
+   *
+   * 分化は「拡散」でも「収縮」でも失われる。**平均（V-2d）だけ見ても捕まらない** —
+   * 実測で芝適性は平均が ±10% 内に収まったまま SD が 0.71倍へ収縮していた。
+   */
   v2e: {
-    founderSd: number;
-    finalSd: number;
-    ratio: number;
+    traits: {
+      key: NumericTraitKey;
+      founderSd: number;
+      finalSd: number;
+      ratio: number;
+      pass: boolean;
+    }[];
+    worstKey: NumericTraitKey | null;
+    worstRatio: number;
     target: readonly [number, number];
     pass: boolean;
   };
@@ -347,19 +364,21 @@ function abilityAlleles(horse: HorseRecord): number[] {
   return out;
 }
 
-/** 全数値形質の集団平均を機械的に取る（V-2d の測定源） */
-function traitMeansOf(
+/** 全数値形質の集団平均とSDを機械的に取る（V-2d / V-2e の測定源） */
+function traitStatsOf(
   horses: readonly HorseRecord[],
   dominantWeight: number,
-): Record<NumericTraitKey, number> {
-  const out = {} as Record<NumericTraitKey, number>;
+): { means: Record<NumericTraitKey, number>; sds: Record<NumericTraitKey, number> } {
+  const means = {} as Record<NumericTraitKey, number>;
+  const sds = {} as Record<NumericTraitKey, number>;
   for (const key of NUMERIC_TRAITS) {
-    out[key] = round(
-      mean(horses.map((h) => expressNumeric(getAllelePair(h.genotype, key), dominantWeight))),
-      2,
+    const values = horses.map((h) =>
+      expressNumeric(getAllelePair(h.genotype, key), dominantWeight),
     );
+    means[key] = round(mean(values), 2);
+    sds[key] = round(sd(values), 3);
   }
-  return out;
+  return { means, sds };
 }
 
 function summarizeCohort(
@@ -377,6 +396,7 @@ function summarizeCohort(
     midParent?: readonly number[];
   },
 ): CohortStat {
+  const traitStats = traitStatsOf(horses, dominantWeight);
   const totals = horses.map(abilityTotal);
   const alleles: number[] = [];
   for (const h of horses) alleles.push(...abilityAlleles(h));
@@ -425,7 +445,8 @@ function summarizeCohort(
       mean: round(mean(horses.map((h) => h.distanceRange)), 1),
       sd: round(sd(horses.map((h) => h.distanceRange)), 1),
     },
-    traitMeans: traitMeansOf(horses, dominantWeight),
+    traitMeans: traitStats.means,
+    traitSds: traitStats.sds,
     parentOffspringCorrelation:
       extra.midParent === undefined ? 0 : round(correlation(extra.midParent, totals), 4),
   };
@@ -901,10 +922,26 @@ export function runSimulation(
     null,
   );
 
-  // --- V-2e 距離適性の分化: distance_center の集団SDが創始の 0.8〜1.4倍 ---
-  const founderDistSd = founderCohort.distanceCenter.sd;
-  const finalDistSd = finalCohort?.distanceCenter.sd ?? 0;
-  const distSdRatio = founderDistSd === 0 ? 0 : finalDistSd / founderDistSd;
+  // --- V-2e 非能力形質の分化: 集団SDが創始の 0.8〜1.4倍（D-012 で全非能力形質へ一般化） ---
+  const founderTraitSds = founderCohort.traitSds;
+  const finalTraitSds = finalCohort?.traitSds;
+  const v2eTraits = V2D_TRAITS.map((key) => {
+    const founderSd = founderTraitSds[key];
+    const finalSd = finalTraitSds?.[key] ?? 0;
+    const ratio = founderSd === 0 ? 0 : finalSd / founderSd;
+    return {
+      key,
+      founderSd,
+      finalSd,
+      ratio: round(ratio, 4),
+      pass: ratio >= V2E_TARGET[0] && ratio <= V2E_TARGET[1],
+    };
+  });
+  const worstSd = v2eTraits.reduce<(typeof v2eTraits)[number] | null>(
+    (acc, t) => (acc === null || Math.abs(t.ratio - 1) > Math.abs(acc.ratio - 1) ? t : acc),
+    null,
+  );
+  const v2ePass = v2eTraits.every((t) => t.pass);
 
   // --- V-2c 長期健全性: 300ゲーム内年でも V-1 が 12〜18% に留まる ---
   // 本編とは別に長期シミュレーションを内部で回す（再帰は1段だけ）
@@ -966,11 +1003,11 @@ export function runSimulation(
       pass: v2dTraits.every((t) => t.pass),
     },
     v2e: {
-      founderSd: founderDistSd,
-      finalSd: finalDistSd,
-      ratio: round(distSdRatio, 4),
+      traits: v2eTraits,
+      worstKey: worstSd?.key ?? null,
+      worstRatio: worstSd?.ratio ?? 0,
       target: V2E_TARGET,
-      pass: distSdRatio >= V2E_TARGET[0] && distSdRatio <= V2E_TARGET[1],
+      pass: v2ePass,
     },
     legacyRatio: {
       initialMeanAbilityTotal: round(initialMean, 2),
@@ -993,8 +1030,7 @@ export function runSimulation(
       v2aPass &&
       v2bPass &&
       v2dTraits.every((t) => t.pass) &&
-      distSdRatio >= V2E_TARGET[0] &&
-      distSdRatio <= V2E_TARGET[1] &&
+      v2ePass &&
       v3Pass &&
       (!v2c.evaluated || v2c.pass),
   };

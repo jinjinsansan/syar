@@ -80,9 +80,9 @@ for (const horizon of HORIZONS) {
   console.log(
     `${pad('seed', 7)} | ${pad('V-1', 8)} ${pad('判定', 5)} | ${pad('V-2a %/世代', 12)} ${pad('判定', 5)} | ` +
       `${pad('V-2b 天井', 9)} ${pad('判定', 5)} | ${pad('V-2d 最大乖離', 18)} ${pad('判定', 5)} | ` +
-      `${pad('V-2e 距離SD', 11)} ${pad('判定', 5)} | ${pad('V-3', 5)} | ${pad('丈夫さ', 8)} | ${pad('親子相関', 8)}`,
+      `${pad('V-2e 最悪SD比', 22)} ${pad('判定', 5)} | ${pad('V-3', 5)} | ${pad('丈夫さ', 8)} | ${pad('親子相関', 8)}`,
   );
-  console.log('-'.repeat(140));
+  console.log('-'.repeat(152));
 
   const v1s: number[] = [];
   const distRatios: number[] = [];
@@ -101,7 +101,7 @@ for (const horizon of HORIZONS) {
     const durability = last?.traitMeans.durability ?? 0;
 
     v1s.push(v.v1.primaryMeanCv);
-    distRatios.push(v.v2e.ratio);
+    distRatios.push(v.v2e.worstRatio);
     durabilities.push(durability);
 
     const seedPass = v.v1.pass && v.v2a.pass && v.v2b.pass && v.v2d.pass && v.v2e.pass && v.v3.pass;
@@ -112,7 +112,7 @@ for (const horizon of HORIZONS) {
         `${pad(v.v2a.slopePctPerGeneration.toFixed(4), 12)} ${pad(mark(v.v2a.pass), 5)} | ` +
         `${pad(`${round(v.v2b.ceilingRatio * 100, 2)}%`, 9)} ${pad(mark(v.v2b.pass), 5)} | ` +
         `${pad(`${v.v2d.worstKey ?? '-'} ${(v.v2d.worstDeviation * 100).toFixed(2)}%`, 18)} ${pad(mark(v.v2d.pass), 5)} | ` +
-        `${pad(`${v.v2e.ratio.toFixed(2)}x`, 11)} ${pad(mark(v.v2e.pass), 5)} | ` +
+        `${pad(`${v.v2e.worstKey ?? '-'} ${v.v2e.worstRatio.toFixed(2)}x`, 22)} ${pad(mark(v.v2e.pass), 5)} | ` +
         `${pad(mark(v.v3.pass), 5)} | ${pad(durability.toFixed(1), 8)} | ${pad(corr.toFixed(3), 8)}`,
     );
   }
@@ -120,7 +120,7 @@ for (const horizon of HORIZONS) {
   console.log(
     `${pad('平均', 7)} | ${pad(`${round(mean(v1s) * 100, 2)}%`, 8)} ${pad('', 5)} | ${pad('', 12)} ${pad('', 5)} | ` +
       `${pad('', 9)} ${pad('', 5)} | ${pad('', 18)} ${pad('', 5)} | ` +
-      `${pad(`${mean(distRatios).toFixed(2)}x`, 11)} ${pad('', 5)} | ${pad('', 5)} | ${pad(mean(durabilities).toFixed(1), 8)} |`,
+      `${pad(`${mean(distRatios).toFixed(2)}x`, 22)} ${pad('', 5)} | ${pad('', 5)} | ${pad(mean(durabilities).toFixed(1), 8)} |`,
   );
 
   if (horizon === LONG_HORIZON) {

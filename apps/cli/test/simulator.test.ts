@@ -144,14 +144,29 @@ describe('シミュレータの決定論（指示書 §3.5-1）', () => {
     expect(durability?.finalMean ?? 0).toBeGreaterThan(600);
   });
 
-  it('V-2e は distance_center の集団SDを創始比で判定する', () => {
+  it('V-2e は非能力形質すべての集団SDを創始比で判定する（D-012 で一般化）', () => {
     const result = runSimulation({ ...SMALL, seed: 42 }, DEFAULT_BALANCE, FOUNDERS, NICKS_GEN);
     const v2e = result.verification.v2e;
     const last = result.cohorts[result.cohorts.length - 1];
-    expect(v2e.founderSd).toBe(result.founderCohort.distanceCenter.sd);
-    expect(v2e.finalSd).toBe(last?.distanceCenter.sd);
+
+    // 距離だけでなく V-2d と同じ6形質を見る（芝適性の収縮を見逃した反省）
+    expect(v2e.traits.map((t) => t.key).sort()).toEqual(
+      [
+        'durability',
+        'temper',
+        'surface.turf',
+        'surface.dirt',
+        'distance_center',
+        'distance_range',
+      ].sort(),
+    );
     expect(v2e.target).toEqual([0.8, 1.4]);
-    expect(v2e.pass).toBe(v2e.ratio >= 0.8 && v2e.ratio <= 1.4);
+    for (const t of v2e.traits) {
+      expect(t.founderSd).toBe(result.founderCohort.traitSds[t.key]);
+      expect(t.finalSd).toBe(last?.traitSds[t.key]);
+      expect(t.pass).toBe(t.ratio >= 0.8 && t.ratio <= 1.4);
+    }
+    expect(v2e.pass).toBe(v2e.traits.every((t) => t.pass));
   });
 
   it('総合判定に V-2d と V-2e が含まれている', () => {

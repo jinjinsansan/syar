@@ -78,6 +78,37 @@ export function resolveMutation(balance: BalanceConfig, key: NumericTraitKey): R
   };
 }
 
+/**
+ * 正典 §6.4 の変異＋平均回帰を1アレルに適用する（純関数）。
+ *
+ * ```
+ * 通常変異  : clamp(N(0, sd), ±clamp幅) − (アレル値 − 品種中心) × 回帰率
+ * 大突然変異: N(0, sd×2)               − (アレル値 − 品種中心) × 回帰率   ← 通常のclamp幅は適用しない
+ * ```
+ *
+ * ★**clamp は変異ノイズのみにかける**（正典 §6.4・D-012）。回帰項を含めた合計に clamp を
+ * かけてはいけない。理由:
+ *   1. sd の導出に使う平衡式 `平衡SD = sd/√(2r−r²)` は AR(1) 過程を前提としており、
+ *      合計に clamp をかけると裾で線形性が崩れて導出の根拠が失われる
+ *   2. clamp の目的は乱数の暴れを抑えることで、決定論的な引き戻しを抑えることではない
+ *   3. 合計に clamp すると**最も引き戻したい極端なアレルほど引き戻しが弱くなる**
+ *      （アレル値900で −90.0 → −76.5）。血統インフレ抑制という回帰の目的に逆行する
+ *
+ * 乱数を引数で受け取る純関数にしてあるのは、**式の形そのものをテストで固定する**ため。
+ * `MUTATION_SD = 0` の条件では両形式が同値になり、テストが式の違いを検出できない。
+ */
+export function mutateAllele(
+  value: number,
+  gaussianDraw: number,
+  mutation: ResolvedMutation,
+  isBig: boolean,
+): number {
+  const noise = isBig ? gaussianDraw : clamp(gaussianDraw, -mutation.clamp, mutation.clamp);
+  const pull =
+    mutation.regressionRate === 0 ? 0 : (value - mutation.center) * mutation.regressionRate;
+  return value + noise - pull;
+}
+
 export interface InheritOutcome {
   genotype: Genotype;
   atavismTraits: NumericTraitKey[];
@@ -178,7 +209,9 @@ export function inheritGenotype(params: {
     }
 
     // --- §6.3 大物覚醒（1.5%・別枠）: 5代以内で最も高いアレル値を持つ祖先を参照 ---
-    if (ancestors.length > 0) {
+    // ★適用は能力5種のみ（正典 §6.3・D-011）。気性は「高いほど気性難」なので
+    //   覚醒が悪化として働き、距離適性では全馬が万能型へ寄ってしまうため。
+    if (ancestors.length > 0 && balance.BIG_ATAVISM_TRAITS.includes(key)) {
       bigAtavismEligibleRolls++;
       if (rng.bool(g.BIG_ATAVISM_RATE)) {
         let best = Number.NEGATIVE_INFINITY;
@@ -202,23 +235,11 @@ export function inheritGenotype(params: {
     // --- §6.4 突然変異 + 平均回帰 ---
     const isBig = rng.bool(g.BIG_MUTATION_RATE);
     if (isBig) bigMutationTraits.push(key);
-    // 品種平均への回帰（正典 §6.4・D-008/D-009）。分散は変異が供給し、平均だけが平衡点に落ち着く。
-    // 引き戻し先は形質ごとの創始水準（値域比ではない）
-    const regressionCenter = mutation.center;
+    // 変異と平均回帰は mutateAllele() に集約（式の形をテストで固定するため純関数に切り出してある）
     for (const slot of ['a1', 'a2'] as const) {
       mutationRolls++;
-      // 正典 §6.4 の式:
-      //   noise = N(0, sd) - (アレル値 - 品種中心) × 回帰率
-      //   通常変異  : clamp(noise, ±clamp幅)      ← ★回帰項を含めた合計に clamp をかける
-      //   大突然変異: N(0, sd×2) に置き換え（値域clampのみ・通常のclamp幅は適用しない）
-      const pull =
-        mutation.regressionRate === 0
-          ? 0
-          : (pair[slot] - regressionCenter) * mutation.regressionRate;
-      const noise = isBig
-        ? rng.gaussian(0, mutation.bigSd) - pull
-        : clamp(rng.gaussian(0, mutation.sd) - pull, -mutation.clamp, mutation.clamp);
-      pair[slot] = pair[slot] + noise;
+      const draw = rng.gaussian(0, isBig ? mutation.bigSd : mutation.sd);
+      pair[slot] = mutateAllele(pair[slot], draw, mutation, isBig);
     }
 
     // --- 値域 clamp（アレル値上限。§13.3 抑制の三本柱の1つ） ---
