@@ -1,0 +1,30 @@
+# --- 憲法 §1-3: 認証情報を含むファイルは絶対にコミットしない ---
+git.txt
+files.zip
+
+# --- 依存・ビルド生成物 ---
+node_modules/
+dist/
+*.tsbuildinfo
+
+# --- シミュレータ出力 ---
+out/
+*.out.json
+
+# --- OS / エディタ ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 別プロジェクト（独自の git リポジトリを持つ）
+image-cockpit-for-codex-workflows/
+
+# --- 廃棄済み文書（正典 §0 冒頭）---
+# 実在馬名・他社固有名称を含むため、本リポジトリでは追跡しない。
+# ファイル自体はローカルに残してある。
+SPEC.md
+CLAUDE.md
+AI_PROMPT.md
+# 別プロジェクトの参考資料（正典ではない）
+GORILLA_STABLE_SPEC_v1.2_infra.md

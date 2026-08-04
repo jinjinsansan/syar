@@ -1,0 +1,23 @@
+{
+  "name": "star",
+  "private": true,
+  "version": "0.0.0",
+  "description": "STAR - P0: genetics engine + 100-generation simulator",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "simulate": "tsx apps/cli/simulate.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

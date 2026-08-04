@@ -1,0 +1,10 @@
+{
+  "name": "@star/cli",
+  "private": true,
+  "version": "0.0.0",
+  "description": "STAR P0 CLI: 100-generation genetics simulator",
+  "type": "module",
+  "dependencies": {
+    "@star/sim-engine": "*"
+  }
+}
