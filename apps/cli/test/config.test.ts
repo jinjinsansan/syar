@@ -5,7 +5,7 @@
  *    P0-fix の誤結論（「回帰0.20 では距離SDが0.4倍に収縮する」）を生んだのと同じ経路。
  */
 
-import { DEFAULT_BALANCE, FOUNDERS } from '@star/sim-engine';
+import { DEFAULT_BALANCE, FOUNDERS, clampTruncationFactor } from '@star/sim-engine';
 import { describe, expect, it } from 'vitest';
 import { resolveRuntimeConfig } from '../src/config.js';
 
@@ -47,13 +47,39 @@ describe('CLI の上書きと形質別パラメータの再導出（I-4）', () 
     expect(balance.traitMutation['durability']?.center).toBe(700);
   });
 
-  it('MUTATION_SD を上書きすると clamp 比が変わり sd の clamp も追随する', () => {
+  it('MUTATION_SD を上書きすると clamp 比・切断係数・導出 sd がすべて追随する（J-1）', () => {
+    // ⚠️ 以前はここで `clamp/sd ≈ ratio` しか見ておらず、**切断係数が古いままでも緑になった**。
+    //    比が変われば係数も sd も変わるので、sd の実値まで固定する。
     const { balance } = resolveRuntimeConfig({}, { MUTATION_SD: 45 });
-    // clamp比 = MUTATION_CLAMP / MUTATION_SD = 150/45 = 3.33
-    const ratio = DEFAULT_BALANCE.MUTATION_CLAMP / 45;
+    const ratio = DEFAULT_BALANCE.MUTATION_CLAMP / 45; // = 3.333
+    const factor = clampTruncationFactor(ratio); // ≒ 0.9992（既定の 0.9156 ではない）
+    expect(factor).toBeGreaterThan(0.99);
+
+    const expectedSd = Math.round((100 * Math.sqrt(2 * 0.2 - 0.04)) / factor);
+    expect(balance.traitMutation['durability']?.sd).toBe(expectedSd);
+    // ★係数がリテラル固定のままなら 66 が返る。それを検出する
+    expect(balance.traitMutation['durability']?.sd).toBe(60);
+    expect(balance.traitMutation['durability']?.sd).not.toBe(66);
+
     const sd = balance.traitMutation['durability']?.sd ?? 0;
     const clamp = balance.traitMutation['durability']?.clamp ?? 0;
     expect(clamp / sd).toBeCloseTo(ratio, 1);
+  });
+
+  it('切断係数は clamp 比の関数である（J-1・指示書の表と一致）', () => {
+    // 既定 k=150/90 では正典 §6.4 の 0.9156
+    expect(clampTruncationFactor(150 / 90)).toBeCloseTo(0.9156, 4);
+    // 指示書 J-1 の表
+    expect(clampTruncationFactor(150 / 45)).toBeCloseTo(0.9992, 3);
+    expect(clampTruncationFactor(2)).toBeCloseTo(0.9594, 3);
+    expect(clampTruncationFactor(1.5)).toBeCloseTo(0.8823, 3);
+    // 比が大きいほど切断の影響が小さくなる（単調）
+    expect(clampTruncationFactor(3)).toBeGreaterThan(clampTruncationFactor(1.5));
+  });
+
+  it('回帰率0の上書きは例外にする（無言で変異が止まるのを防ぐ・J-3）', () => {
+    expect(() => resolveRuntimeConfig({ REGRESSION_RATE: 0 })).toThrow(/回帰率は正の数/);
+    expect(() => resolveRuntimeConfig({ REGRESSION_RATE: -0.1 })).toThrow(/回帰率は正の数/);
   });
 
   it('存在しない定数の上書きは例外にする（タイプミスを黙って無視しない）', () => {

@@ -274,8 +274,10 @@ export interface Verification {
       /** basis=ratio なら finalMean/founderMean−1、basis=sd なら (finalMean−founderMean)/創始SD */
       deviation: number;
       /**
-       * 判定の物差し（I-2b）。創始平均が0の形質は比率で測れないため創始SD基準に切り替える。
-       * none = 創始平均もSDも0で判定不能 → PASS させない（静かに素通りさせない）
+       * 判定の物差し（I-2b）。
+       * ratio = 創始平均比（|平均| > 創始SD のとき。既定の6形質はすべてこちら）
+       * sd    = 創始SDを単位とした差（平均が散らばりに対して小さく、比率が不安定なとき）
+       * none  = 創始平均もSDも0で判定不能 → **PASS させない**（静かに素通りさせない）
        */
       basis: 'ratio' | 'sd' | 'none';
       pass: boolean;
@@ -928,11 +930,15 @@ export function runSimulation(
   const v2dTraits = V2D_TRAITS.map((key) => {
     const founderMean = founderTraitMeans[key];
     const finalMean = finalTraitMeans?.[key] ?? 0;
-    // ★創始平均が0の形質は比率で判定できない（I-2b）。
+    // ★創始平均が0（に近い）形質は比率で判定できない（I-2b）。
     //   ゼロ割を「乖離0 = 無条件 PASS」で握り潰すと、将来 0 中心の形質が入ったときに
     //   静かに素通りする。創始SDを物差しにした絶対差へ切り替え、basis で明示する。
-    const usesRatio = Math.abs(founderMean) > 1e-9;
+    //
+    //   切替の判定は「平均が0か」ではなく「**平均が散らばりに対して十分大きいか**」で行う。
+    //   `!== 0` だけを見ると、平均1・SD19 のような分布でも比率判定になってしまい、
+    //   ほぼ0の値で割った不安定な乖離が出る（J-2 のテストを書いていて判明）。
     const founderSd = founderTraitSds[key];
+    const usesRatio = Math.abs(founderMean) > founderSd;
     const deviation = usesRatio
       ? finalMean / founderMean - 1
       : founderSd > 1e-9

@@ -120,6 +120,50 @@ describe('シミュレータの決定論（指示書 §3.5-1）', () => {
     expect(result.verification.v2d.targetAbsMax).toBe(0.1);
   });
 
+  /**
+   * 【J-2】V-2d の物差し切替（`basis`）を**本番経路**で固定する。
+   *
+   * I-2b で「創始平均0の形質は創始SD基準へ切替、両方0なら pass:false」と決めたが、
+   * それを固定するテストが1本も無かった（I-3 で受け入れた「経路を固定せよ」がそのまま当てはまる）。
+   * 3分岐とも `runSimulation()` を通して確認する。
+   */
+  describe('V-2d の物差し切替（basis・J-2）', () => {
+    it('通常の形質は ratio（創始平均比）で判定する', () => {
+      const result = runSimulation({ ...SMALL, seed: 42 }, DEFAULT_BALANCE, FOUNDERS, NICKS_GEN);
+      for (const t of result.verification.v2d.traits) {
+        expect(t.basis).toBe('ratio');
+        // deviation は小数4桁に丸めて出力している
+        expect(t.deviation).toBeCloseTo(t.finalMean / t.founderMean - 1, 4);
+      }
+    });
+
+    it('創始平均が0でSDがある形質は sd（創始SD単位の差）へ切り替わる', () => {
+      // 芝/ダート適性の創始分布を [-50, 50] にすると平均0・SD>0 になる
+      const founders = { ...FOUNDERS, SURFACE_RANGE: [-50, 50] as const };
+      const result = runSimulation({ ...SMALL, seed: 42 }, DEFAULT_BALANCE, founders, NICKS_GEN);
+      const turf = result.verification.v2d.traits.find((t) => t.key === 'surface.turf');
+      expect(turf).toBeDefined();
+      expect(Math.abs(turf?.founderMean ?? 99)).toBeLessThan(2); // ほぼ0
+      expect(turf?.basis).toBe('sd');
+      // 創始SDを単位とした差なので有限値であること（比率だとゼロ割で壊れる）
+      expect(Number.isFinite(turf?.deviation ?? Number.NaN)).toBe(true);
+    });
+
+    it('創始平均もSDも0の形質は判定不能として必ず FAIL する', () => {
+      // 芝/ダート適性の創始分布を [0, 0] にすると平均もSDも0（変異幅も0になり凍結する）
+      const founders = { ...FOUNDERS, SURFACE_RANGE: [0, 0] as const };
+      const result = runSimulation({ ...SMALL, seed: 42 }, DEFAULT_BALANCE, founders, NICKS_GEN);
+      const turf = result.verification.v2d.traits.find((t) => t.key === 'surface.turf');
+      expect(turf).toBeDefined();
+      expect(turf?.founderMean).toBe(0);
+      expect(turf?.basis).toBe('none');
+      // ★「乖離0だから PASS」で静かに素通りさせない
+      expect(turf?.pass).toBe(false);
+      expect(result.verification.v2d.pass).toBe(false);
+      expect(result.verification.pass).toBe(false);
+    });
+  });
+
   it('V-2d の乖離は創始世代との比で測る', () => {
     const result = runSimulation({ ...SMALL, seed: 42 }, DEFAULT_BALANCE, FOUNDERS, NICKS_GEN);
     const last = result.cohorts[result.cohorts.length - 1];

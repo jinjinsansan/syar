@@ -48,6 +48,19 @@ function pad(s: string | number, w: number): string {
   return str.length >= w ? str : ' '.repeat(w - str.length) + str;
 }
 
+/**
+ * D-012 以前の形質別パラメータ（品種中心だけを与え、sd/clamp は値域比スケールに任せる）。
+ * 回帰率0の歴史的構成を再現するためだけに使う。
+ */
+function legacyCentersOnly(): BalanceConfig['traitMutation'] {
+  const base = buildTraitMutation(FOUNDERS);
+  const out: Record<string, { center: number }> = {};
+  for (const [key, spec] of Object.entries(base)) {
+    if (spec.center !== undefined) out[key] = { center: spec.center };
+  }
+  return out as BalanceConfig['traitMutation'];
+}
+
 console.log(
   `${pad('config', 20)} | ${pad('V-2 平均', 9)} ${pad('最悪', 8)} | ${pad('V-1 平均', 9)} ${pad('最小', 7)} ${pad('最大', 7)} | ${pad('親子相関', 8)} | 判定`,
 );
@@ -55,16 +68,23 @@ console.log('-'.repeat(97));
 
 for (const cfg of CONFIGS) {
   const regressionRate = cfg.regression ?? 0;
+  const clampRatio = DEFAULT_BALANCE.MUTATION_CLAMP / cfg.mutationSd;
+  /**
+   * 回帰率0の構成（①②③）は **D-008 より前の状態**を再現するためのもので、
+   * 平衡式 sd = 創始アレルSD × √(2r−r²) ÷ 切断係数 が定義されない（r=0 で sd も 0 になる）。
+   *
+   * buildTraitMutation() は r=0 を例外にする（J-3。無言で変異を止めないため）ので、
+   * ここでは当時の挙動＝**sd 上書きなし（値域比スケール）+ 品種中心だけ**を明示的に組む。
+   */
+  const traitMutation =
+    regressionRate > 0
+      ? buildTraitMutation(FOUNDERS, regressionRate, clampRatio)
+      : legacyCentersOnly();
   const balance: BalanceConfig = {
     ...DEFAULT_BALANCE,
     genetics: { ...DEFAULT_BALANCE.genetics, MUTATION_SD: cfg.mutationSd },
     REGRESSION_RATE: regressionRate,
-    // 回帰率/変異SDを振ったら形質別 sd も導出し直す（I-4。据え置くと平衡がずれる）
-    traitMutation: buildTraitMutation(
-      FOUNDERS,
-      regressionRate,
-      DEFAULT_BALANCE.MUTATION_CLAMP / cfg.mutationSd,
-    ),
+    traitMutation,
   };
   const v2s: number[] = [];
   const v1s: number[] = [];

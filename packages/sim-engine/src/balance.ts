@@ -300,6 +300,56 @@ export const FOUNDERS: FoundersConfig = {
  */
 export const MUTATION_CLAMP_RATIO = BALANCE.MUTATION_CLAMP / BALANCE.MUTATION_SD;
 
+// ---------------------------------------------------------------------------
+// clamp 切断補正（正典 §6.4・D-013）
+// ---------------------------------------------------------------------------
+
+/** 標準正規分布の確率密度 */
+function normalPdf(z: number): number {
+  return Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI);
+}
+
+/** 誤差関数（Abramowitz & Stegun 7.1.26・絶対誤差 1.5e-7） */
+function erf(x: number): number {
+  const sign = x < 0 ? -1 : 1;
+  const ax = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * ax);
+  const y =
+    1 -
+    ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) *
+      t *
+      Math.exp(-ax * ax);
+  return sign * y;
+}
+
+/** 標準正規分布の累積分布 */
+function normalCdf(z: number): number {
+  return 0.5 * (1 + erf(z / Math.SQRT2));
+}
+
+/**
+ * clamp による切断で失われる分散の補正係数を **clamp比 k から解析的に**求める。
+ *
+ *   X ~ N(0, σ²), Y = clamp(X, ±kσ) のとき
+ *   E[Y²]/σ² = (2Φ(k) − 1) − 2k·φ(k) + 2k²(1 − Φ(k))
+ *   実効SD = √(E[Y²]/σ²) × sd
+ *
+ * ★**係数は k の関数である。**リテラルで固定すると、CLI 上書き等で k が変わったときに
+ *   追随せず、導出 sd が静かに誤る（k=3.33 なら係数 0.999 で丈夫さ sd は 66 ではなく 60）。
+ *   これは I-4（CLI が導出をバイパスする）と同じクラスの事故なので、関数にしてある。
+ *
+ * 既定 k = 150/90 では 0.915604 を返し、正典 §6.4 の 0.9156 と一致する（テストで固定）。
+ */
+export function clampTruncationFactor(clampRatio: number): number {
+  if (!(clampRatio > 0)) {
+    throw new Error(`clampTruncationFactor: clamp比は正の数である必要があります (${clampRatio})`);
+  }
+  const k = clampRatio;
+  const variance =
+    2 * normalCdf(k) - 1 - 2 * k * normalPdf(k) + 2 * k * k * (1 - normalCdf(k));
+  return Math.sqrt(variance);
+}
+
 /** 一様分布 [a, b] の期待値 */
 function uniformMean(range: readonly [number, number]): number {
   return (range[0] + range[1]) / 2;
@@ -353,8 +403,19 @@ export function buildTraitMutation(
   f: FoundersConfig,
   regressionRate: number = BALANCE.REGRESSION_RATE,
   clampRatio: number = MUTATION_CLAMP_RATIO,
-  truncationFactor: number = BALANCE.CLAMP_TRUNCATION_FACTOR,
 ): Readonly<Record<NumericTraitKey, TraitMutationSpec>> {
+  // ★回帰率0を静かに受け入れない（J-3）。
+  //   平衡SD = sd/√(2r−r²) は r>0 でしか定義されず、r=0 だと sd も clamp も 0 になって
+  //   **非能力6形質の変異が無言で停止**する（創始値で凍結）。数値には出ないので気づけない。
+  if (!(regressionRate > 0)) {
+    throw new Error(
+      `buildTraitMutation: 回帰率は正の数である必要があります (${regressionRate})。` +
+        'r=0 では平衡式が定義されず、非能力形質の変異が無言で停止します。' +
+        '回帰を使わない比較をしたい場合は sd 上書きなしの traitMutation を明示的に構築してください。',
+    );
+  }
+  // 切断係数は clamp比の関数（J-1）。比が変われば係数も追随する
+  const truncationFactor = clampTruncationFactor(clampRatio);
   const abilityCenter = { center: f.ABILITY_MEAN };
 
   /**
