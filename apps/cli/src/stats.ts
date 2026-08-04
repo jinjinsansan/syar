@@ -44,6 +44,23 @@ export function coefficientOfVariation(values: readonly number[]): number {
   return sd(values) / m;
 }
 
+/** 最小二乗法による回帰直線の傾き（xs 1単位あたりの ys の変化量） */
+export function linearSlope(xs: readonly number[], ys: readonly number[]): number {
+  const n = Math.min(xs.length, ys.length);
+  if (n < 2) return 0;
+  const mx = mean(xs.slice(0, n));
+  const my = mean(ys.slice(0, n));
+  let sxy = 0;
+  let sxx = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = (xs[i] ?? 0) - mx;
+    sxy += dx * ((ys[i] ?? 0) - my);
+    sxx += dx * dx;
+  }
+  if (sxx === 0) return 0;
+  return sxy / sxx;
+}
+
 /** ピアソン相関係数 */
 export function correlation(xs: readonly number[], ys: readonly number[]): number {
   const n = Math.min(xs.length, ys.length);

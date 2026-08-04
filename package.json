@@ -10,6 +10,8 @@
   ],
   "scripts": {
     "simulate": "tsx apps/cli/simulate.ts",
+    "verify": "tsx apps/cli/src/verify.ts",
+    "verify:distance": "tsx apps/cli/src/sweep-distance.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

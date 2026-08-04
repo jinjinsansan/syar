@@ -29,6 +29,8 @@ function cohortRow(c: CohortStat): string {
     pad(c.allele.sd.toFixed(1), 7),
     pad(c.allele.p95.toFixed(0), 6),
     pad(c.meanF.toFixed(4), 8),
+    pad(c.distanceCenter.mean.toFixed(0), 7),
+    pad(c.distanceCenter.sd.toFixed(0), 7),
     pad(c.atavism.hits, 6),
     pad(c.bigAtavism.hits, 6),
     pad(c.bigMutation.hits, 6),
@@ -55,11 +57,13 @@ export function formatReport(result: SimulationResult): string {
   const { options, founderCohort, cohorts, verification, totals } = result;
   const lines: string[] = [];
 
-  lines.push('='.repeat(112));
-  lines.push('STAR P0 — 遺伝エンジン 100世代シミュレータ');
-  lines.push('='.repeat(112));
+  lines.push('='.repeat(126));
+  lines.push('STAR P0 — 遺伝エンジン 世代シミュレータ');
+  lines.push('='.repeat(126));
   lines.push(
-    `seed=${options.seed}  generations=${options.generations}  繁殖牝馬=${options.population}  ` +
+    `seed=${options.seed}  ${options.generations}ゲーム内年` +
+      `（血統深度 約${(cohorts[cohorts.length - 1]?.meanGenerationDepth ?? 0).toFixed(1)}世代・実時間 約${((options.generations * 52 * 4) / 24 / 365).toFixed(1)}年相当）  ` +
+      `繁殖牝馬=${options.population}  ` +
       `種牡馬プール=${options.stallionPool}  種付候補=上位${pct(options.stallionTopRatio, 0)}  ` +
       `成熟=${options.maturityYears}歳  補充=${options.recruit}  選抜h2=${options.selectionH2}`,
   );
@@ -68,7 +72,7 @@ export function formatReport(result: SimulationResult): string {
   );
   lines.push(
     `MUTATION_SD=${result.balanceDigest.genetics.MUTATION_SD}  REGRESSION_RATE=${result.balanceDigest.regressionRate}` +
-      `${result.balanceDigest.regressionRate === 0 ? '（正典どおり=無効）' : '（★正典外の提案機構が有効）'}`,
+      `${result.balanceDigest.regressionRate === 0 ? '（★無効。血統インフレを抑える機構が働きません・正典 §6.4）' : '（正典 §6.4・D-008 の平均回帰が有効）'}`,
   );
   if (options.selectionH2 !== 1) {
     lines.push(
@@ -91,6 +95,8 @@ export function formatReport(result: SimulationResult): string {
       pad('SD', 7),
       pad('p95', 6),
       pad('平均F', 8),
+      pad('距離中心', 7),
+      pad('距離SD', 7),
       pad('隔世', 6),
       pad('覚醒', 6),
       pad('大変異', 6),
@@ -131,6 +137,28 @@ export function formatReport(result: SimulationResult): string {
     lines.push('');
   }
 
+  // 距離適性の分化（F-3・正典 §5.2）
+  if (last !== undefined) {
+    lines.push('--- 距離適性の分化（正典 §5.2・P0-fix F-3）---');
+    lines.push(
+      `  distance_center: 創始 平均${founderCohort.distanceCenter.mean.toFixed(0)}m / SD${founderCohort.distanceCenter.sd.toFixed(0)}` +
+        `  →  最終 平均${last.distanceCenter.mean.toFixed(0)}m / SD${last.distanceCenter.sd.toFixed(0)}`,
+    );
+    lines.push(
+      `  distance_range : 創始 平均${founderCohort.distanceRange.mean.toFixed(0)} / SD${founderCohort.distanceRange.sd.toFixed(0)}` +
+        `  →  最終 平均${last.distanceRange.mean.toFixed(0)} / SD${last.distanceRange.sd.toFixed(0)}`,
+    );
+    const sdRatio =
+      founderCohort.distanceCenter.sd === 0
+        ? 0
+        : last.distanceCenter.sd / founderCohort.distanceCenter.sd;
+    lines.push(
+      `  ※ 集団SDが創始水準の何倍か: ${sdRatio.toFixed(2)}倍` +
+        `（大きく広がるとマイラー／ステイヤーの分化が消え、縮むと全馬が同じ距離型になる）`,
+    );
+    lines.push('');
+  }
+
   lines.push('--- 検証結果（正典 §13.2）---');
 
   // V-1
@@ -155,17 +183,37 @@ export function formatReport(result: SimulationResult): string {
   lines.push(`    → ${verdict(v1.pass)}  実測 ${pct(v1.primaryMeanCv)}`);
   lines.push('');
 
-  // V-2
-  const v2 = verification.v2;
-  lines.push(`V-2 100世代後の平均能力（血統インフレ）  目標 初期比 +${pct(v2.targetMax, 0)} 以内`);
+  // V-2 系（D-008 で3基準に再定義）
+  const { v2a, v2b, v2c, legacyRatio } = verification;
+
+  lines.push(`V-2a 平坦化: 最終${v2a.windowGenerations}世代の平均能力の傾き  目標 ±${v2a.targetAbsMax}%/世代 未満`);
   lines.push(
-    `    初期(創始世代)=${v2.initialMeanAbilityTotal.toFixed(1)}  ` +
-      `最終=${v2.finalMeanAbilityTotal.toFixed(1)}  ` +
-      `最終5世代平均=${v2.finalMeanAbilityTotalSmoothed.toFixed(1)}`,
+    `    → ${verdict(v2a.pass)}  実測 ${v2a.slopePctPerGeneration >= 0 ? '+' : ''}${v2a.slopePctPerGeneration.toFixed(4)}%/世代`,
   );
+  lines.push('');
+
+  lines.push(`V-2b 天井余裕: 集団平均能力 ÷ アレル上限  目標 ${pct(v2b.targetMax, 0)} 以下`);
   lines.push(
-    `    → ${verdict(v2.pass)}  実測 ${v2.ratio >= 0 ? '+' : ''}${pct(v2.ratio)}  ` +
-      `(平滑後 ${v2.ratioSmoothed >= 0 ? '+' : ''}${pct(v2.ratioSmoothed)})`,
+    `    平均能力(1種あたり)=${v2b.meanAbilityPerKey.toFixed(1)} / 上限=${v2b.alleleMax}`,
+  );
+  lines.push(`    → ${verdict(v2b.pass)}  実測 ${pct(v2b.ceilingRatio)}`);
+  lines.push('');
+
+  lines.push(
+    `V-2c 長期健全性: ${v2c.evaluated ? v2c.generations : 300}ゲーム内年での V-1  ` +
+      `目標 ${pct(v2c.target[0], 0)}〜${pct(v2c.target[1], 0)}`,
+  );
+  if (v2c.evaluated) {
+    lines.push(`    → ${verdict(v2c.pass)}  実測 ${pct(v2c.v1MeanCv)}（${v2c.note}）`);
+  } else {
+    lines.push(`    → 未実行  ${v2c.note}`);
+  }
+  lines.push('');
+
+  lines.push(
+    `[参考・判定外] 旧基準の初期比: ${legacyRatio.ratio >= 0 ? '+' : ''}${pct(legacyRatio.ratio)}` +
+      `（初期 ${legacyRatio.initialMeanAbilityTotal.toFixed(1)} → 最終 ${legacyRatio.finalMeanAbilityTotal.toFixed(1)}）` +
+      `  ※ ${legacyRatio.note}`,
   );
   lines.push('');
 
@@ -185,9 +233,12 @@ export function formatReport(result: SimulationResult): string {
   lines.push(`    → ${verdict(v3.pass)}`);
   lines.push('');
 
-  lines.push('='.repeat(112));
-  lines.push(`総合判定: ${verdict(verification.pass)}`);
-  lines.push('='.repeat(112));
+  lines.push('='.repeat(126));
+  lines.push(
+    `総合判定: ${verdict(verification.pass)}` +
+      `${v2c.evaluated ? '' : '  ※ V-2c は別実行で確認すること（--long-horizon 300）'}`,
+  );
+  lines.push('='.repeat(126));
 
   return lines.join('\n');
 }

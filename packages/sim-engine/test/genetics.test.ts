@@ -87,9 +87,11 @@ describe('隔世遺伝・突然変異の発生率（正典 §6.3 / §6.4）', ()
     expect(foal.breedingRecord?.atavismTraits).toEqual([]);
   });
 
-  it('突然変異・隔世遺伝を止めると子のアレルは必ず両親のどちらかの値になる（§6.2 の確認）', () => {
+  it('突然変異・隔世遺伝・回帰を止めると子のアレルは必ず両親のどちらかの値になる（§6.2 の確認）', () => {
     const balance = {
       ...BALANCE,
+      // 平均回帰（§6.4）も止める。有効なままだとアレルが品種中心へ引かれて素の継承が見えない
+      REGRESSION_RATE: 0,
       genetics: {
         ...BALANCE.genetics,
         MUTATION_SD: 0,
@@ -129,6 +131,7 @@ describe('大物覚醒（正典 §6.3）', () => {
     // 祖父 SS が 900 を持つので、子の低い方のアレルは 900 になるはず。
     const balance = {
       ...BALANCE,
+      REGRESSION_RATE: 0,
       genetics: {
         ...BALANCE.genetics,
         MUTATION_SD: 0,

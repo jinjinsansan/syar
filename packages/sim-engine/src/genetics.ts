@@ -36,13 +36,34 @@ function pickAllele(rng: Rng, pair: AllelePair): number {
 }
 
 /**
- * 形質ごとの突然変異スケール。
- * 正典 §6.4 の N(0,45) / clamp±150 は 0〜1000 スケール（能力5種）を前提とした値なので、
- * 値域の異なる形質には値域比で縮尺して適用する（surface は 0〜100 なので 1/10）。
+ * 形質ごとの変異パラメータを解決する。
+ *
+ * 既定は値域比スケール: 正典 §6.4 の N(0,90) / clamp±150 は 0〜1000 スケール（能力5種）
+ * を前提とした値なので、値域の異なる形質には値域比で縮尺する（surface は 0〜100 なので 1/10）。
+ * ただし距離系形質は値域が広く、この機械的な縮尺だと世代を経て分化が消えるため、
+ * `balance.traitMutation` で絶対値による上書きができる（正典 §5.2 の警告・P0-fix F-3）。
  */
-function mutationScale(balance: BalanceConfig, key: NumericTraitKey): number {
+export interface ResolvedMutation {
+  sd: number;
+  bigSd: number;
+  clamp: number;
+  regressionRate: number;
+}
+
+export function resolveMutation(balance: BalanceConfig, key: NumericTraitKey): ResolvedMutation {
   const bounds = balance.traitBounds[key];
-  return (bounds.max - bounds.min) / balance.MUTATION_SCALE_BASE;
+  const scale = (bounds.max - bounds.min) / balance.MUTATION_SCALE_BASE;
+  const override = balance.traitMutation[key];
+  return {
+    sd: override?.sd ?? balance.genetics.MUTATION_SD * scale,
+    // 大突然変異も同じ縮尺に従う。絶対値指定がある形質は通常変異との比を保つ
+    bigSd:
+      override?.sd === undefined
+        ? balance.genetics.BIG_MUTATION_SD * scale
+        : (override.sd * balance.genetics.BIG_MUTATION_SD) / balance.genetics.MUTATION_SD,
+    clamp: override?.clamp ?? balance.MUTATION_CLAMP * scale,
+    regressionRate: override?.regressionRate ?? balance.REGRESSION_RATE,
+  };
 }
 
 export interface InheritOutcome {
@@ -121,7 +142,7 @@ export function inheritGenotype(params: {
 
   for (const key of NUMERIC_TRAITS) {
     const bounds = balance.traitBounds[key];
-    const scale = mutationScale(balance, key);
+    const mutation = resolveMutation(balance, key);
 
     // --- §6.2 アレル継承 ---
     const pair: AllelePair = {
@@ -166,26 +187,23 @@ export function inheritGenotype(params: {
       }
     }
 
-    // --- §6.4 突然変異 ---
+    // --- §6.4 突然変異 + 平均回帰 ---
     const isBig = rng.bool(g.BIG_MUTATION_RATE);
     if (isBig) bigMutationTraits.push(key);
-    // 【正典外・既定無効】品種平均への回帰（balance.REGRESSION_RATE の説明を参照）
-    const regressionCenter = bounds.min + (bounds.max - bounds.min) * balance.REGRESSION_CENTER_RATIO;
+    // 品種平均への回帰（正典 §6.4・D-008）。分散は変異が供給し、平均だけが平衡点に落ち着く
+    const regressionCenter =
+      bounds.min + (bounds.max - bounds.min) * balance.REGRESSION_CENTER_RATIO;
     for (const slot of ['a1', 'a2'] as const) {
       mutationRolls++;
       let noise: number;
       if (isBig) {
-        // 大突然変異は N(0,180) に「置き換え」。負にも振れる（血統インフレ抑制・§13.3）
-        noise = rng.gaussian(0, g.BIG_MUTATION_SD * scale);
+        // 大突然変異は N(0,180) に「置き換え」。負にも振れる（怪物も駄馬も生まれる）
+        noise = rng.gaussian(0, mutation.bigSd);
       } else {
-        noise = clamp(
-          rng.gaussian(0, g.MUTATION_SD * scale),
-          -balance.MUTATION_CLAMP * scale,
-          balance.MUTATION_CLAMP * scale,
-        );
+        noise = clamp(rng.gaussian(0, mutation.sd), -mutation.clamp, mutation.clamp);
       }
-      if (balance.REGRESSION_RATE !== 0) {
-        noise -= (pair[slot] - regressionCenter) * balance.REGRESSION_RATE;
+      if (mutation.regressionRate !== 0) {
+        noise -= (pair[slot] - regressionCenter) * mutation.regressionRate;
       }
       pair[slot] = pair[slot] + noise;
     }

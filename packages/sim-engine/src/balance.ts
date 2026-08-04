@@ -32,10 +32,13 @@ export interface BalanceGenetics {
 export const BALANCE = {
   // 遺伝 (§6) —— P0 で使用
   ATAVISM_RATE: 0.06,
-  BIG_ATAVISM_RATE: 0.015,
-  MUTATION_SD: 45,
+  BIG_ATAVISM_RATE: 0.015, // ★単調上昇ラチェット・§6.3 の警告参照
+  MUTATION_SD: 90, // D-008 で 45→90（回帰で削られる分散を補償する）
   BIG_MUTATION_RATE: 0.008,
   BIG_MUTATION_SD: 180,
+  REGRESSION_RATE: 0.2, // ★平均回帰（D-008・§6.4）血統インフレの唯一の実効抑制
+  REGRESSION_CENTER_RATIO: 0.45, // 回帰先＝値域の45%（0〜1000形質なら450）
+  DOMINANT_WEIGHT: 0.5, // 素質発現＝2アレルの相加平均。★0.5超は系統的な上げ要因になる
   INBREED_BOOST_MAX: 0.3,
   INBREED_BOOST_SLOPE: 4.0,
   INBREED_DEPRESSION_THRESHOLD: 0.25,
@@ -92,6 +95,45 @@ export const TRAIT_BOUNDS: Readonly<Record<NumericTraitKey, TraitBound>> = {
   durability: { min: 0, max: 1000 },
 };
 
+/**
+ * 形質別の変異挙動の上書き。未指定の項目は既定（値域比スケール・共通の回帰率）に従う。
+ */
+export interface TraitMutationSpec {
+  /** 変異SDを絶対値で指定する（形質の単位そのまま）。省略時は値域比スケール */
+  sd?: number;
+  /** 変異の clamp 幅を絶対値で指定する。省略時は値域比スケール */
+  clamp?: number;
+  /** この形質にだけ適用する回帰率。省略時は共通の REGRESSION_RATE */
+  regressionRate?: number;
+}
+
+/**
+ * 距離系形質の変異幅（P0-fix F-3・正典 §5.2 の警告への対応）。
+ *
+ * 値は開発側が 4シード × 100/300/600 ゲーム内年で実測して決めた（根拠は REPORT_P0FIX §4）。
+ *
+ * 設計目標は「集団SDを創始世代の水準（distance_center で約359）に**平衡**させる」こと。
+ * 広がり続けても（万能型ばかりになる）縮み続けても（全馬が同じ距離型になる）
+ * §5.2 が意図する「マイラー／ステイヤー／万能型の分化」が失われる。
+ *
+ * 平衡時のアレルSD = sd / sqrt(2r - r²) から逆算している:
+ *   distance_center: 創始アレルSD 520（一様1200〜3000）→ r=0.01 なら sd=73
+ *   distance_range : 創始アレルSD 173（一様400〜1000） → r=0.01 なら sd=24
+ *
+ * 実測（4シード平均・distance_center の集団SD / 創始は359）:
+ *   値域比スケール（旧）+ 回帰0.20 → 157 / 137 / 141   ← 収縮して分化が消える
+ *   sd35 + 回帰0        → 429 / 426 / 391   ← SDは保つが平均が漂移し続ける
+ *   sd73 + 回帰0.01     → 430 / 416 / 377   ← 創始水準へ収束（採用）
+ *   sd73 + 回帰0.02     → 393 / 350 / 308   ← 縮み続ける
+ *
+ * clamp は sd の 3.33倍にしている。能力5種の比（150/90 = 1.67倍）より緩いのは、
+ * 距離系は sd 自体が小さく、そこへ更に 1.67σ で切ると平衡SDが創始水準を下回るため。
+ */
+export const TRAIT_MUTATION: Readonly<Partial<Record<NumericTraitKey, TraitMutationSpec>>> = {
+  distance_center: { sd: 73, clamp: 243, regressionRate: 0.01 },
+  distance_range: { sd: 24, clamp: 80, regressionRate: 0.01 },
+};
+
 export interface BalanceConfig {
   genetics: BalanceGenetics;
   traitBounds: Readonly<Record<NumericTraitKey, TraitBound>>;
@@ -119,25 +161,29 @@ export interface BalanceConfig {
   PEDIGREE_DEPTH: number;
 
   /**
-   * 【正典外・提案機構】平均回帰率。既定 0 = 完全に無効（正典どおりの挙動）。
+   * 平均回帰率（正典 §6.4 の機構・D-008 で採択）。
    *
-   * 正典 §13.3 は血統インフレ抑制の三本柱を「アレル値上限1000 / 突然変異が負にも振れる /
-   * headroom」としているが、P0 の実測ではこの3つでは V-2（+50%以内）を満たせない:
-   *   - 上限1000 は +122% の位置にある「壁」であって抑制力ではない
-   *   - 平均0の対称な突然変異は、方向性選抜と組み合わさると毎世代その正の裾が選ばれるため
-   *     抑制どころかインフレの燃料になる
-   *   - headroom は current（調教）側の頭打ちであり potential には効かない
-   * 実在サラブレッドが強い選抜下でも能力が頭打ちになるのは選抜停滞（selection plateau）
-   * によるもので、それを表現する機構が正典に存在しない。
+   * 突然変異ノイズに `-(アレル値 - 品種中心) × REGRESSION_RATE` のドリフトを加える。
+   * 分散（= V-1 のばらつき）は突然変異で維持したまま、平均だけが平衡点に落ち着く。
+   * 実在サラブレッドの**選抜停滞（selection plateau）**を表現するもので、
+   * 正典 §13.3 が明記するとおり**血統インフレの唯一の実効的な抑制機構**である
+   * （アレル値上限・対称な突然変異・headroom はいずれも平均の上昇を止めないことが P0 で実証済み）。
    *
-   * 本定数はその候補として用意した「品種平均への回帰」で、突然変異ノイズに
-   *   -(アレル値 - 品種中心) × REGRESSION_RATE
-   * のドリフトを加える。分散（= V-1 のばらつき）は維持したまま平均だけが平衡点に落ち着く。
-   * **採否はレビュー側/オーナーの判断事項（QUESTIONS_P0 Q1）。承認まで既定 0 のまま。**
+   * ⚠️ 本定数を弱める/外す場合は、単調上昇ラチェットである大物覚醒（§6.3）の
+   *    発生率も併せて見直すこと。回帰がこれを相殺する前提で機構が残されている。
    */
   REGRESSION_RATE: number;
   /** 回帰先の中心（形質値域内の比率）。0.45 なら 0〜1000 の形質で 450 */
   REGRESSION_CENTER_RATIO: number;
+
+  /**
+   * 形質ごとの変異挙動の上書き（正典 §5.2 の警告への対応・P0-fix F-3）。
+   *
+   * 既定では変異SDを値域比で機械的に縮尺するが、距離系形質は値域が広いため
+   * そのままだと SD が大きくなりすぎ、世代を経て距離適性の分化が失われる。
+   * 距離系だけ変異幅を**絶対値で固定**し、回帰率も個別に与えて平衡させる。
+   */
+  traitMutation: Readonly<Partial<Record<NumericTraitKey, TraitMutationSpec>>>;
 
   /**
    * 素質値の発現ウェイト。potential = 高い方のアレル×w + 低い方×(1-w)。
@@ -204,11 +250,12 @@ export const DEFAULT_BALANCE: BalanceConfig = {
 
   PEDIGREE_DEPTH: 5,
 
-  // 正典外の提案機構。承認まで無効（0）
-  REGRESSION_RATE: 0,
-  REGRESSION_CENTER_RATIO: 0.45,
+  // 平均回帰（正典 §6.4・D-008 で採択）
+  REGRESSION_RATE: BALANCE.REGRESSION_RATE,
+  REGRESSION_CENTER_RATIO: BALANCE.REGRESSION_CENTER_RATIO,
+  traitMutation: TRAIT_MUTATION,
 
-  DOMINANT_WEIGHT: 0.5,
+  DOMINANT_WEIGHT: BALANCE.DOMINANT_WEIGHT,
 
   STRATEGY_PRIMARY: 85,
   STRATEGY_SECONDARY: 70,

@@ -40,6 +40,8 @@ const USAGE = `
                            1 を指定すると真の素質値による完全情報選抜になる）
   --v1-pairs <n>           V-1 で試す配合の組数（既定 ${DEFAULT_OPTIONS.v1Pairs}）
   --v1-repeats <n>         V-1 の反復回数（既定 ${DEFAULT_OPTIONS.v1Repeats}）
+  --long-horizon [n]       V-2c（長期健全性）を同一実行内で判定する。既定 300ゲーム内年。
+                           指定しない場合 V-2c は「別実行で確認」となる
   --no-prune               祖先レコードの破棄を無効化（メモリと引き換えの検証用）
   --json <path>            機械可読な JSON を書き出す
   --quiet                  人間可読の表を出さない
@@ -142,6 +144,17 @@ function parseArgs(argv: readonly string[]): CliArgs {
         options.v1Repeats = num(i);
         i++;
         break;
+      case '--long-horizon': {
+        // 値は省略可（省略時は正典 §13.2 の 300ゲーム内年）
+        const raw = argv[i + 1];
+        if (raw !== undefined && !raw.startsWith('-') && Number.isFinite(Number(raw))) {
+          options.longHorizonGenerations = Number(raw);
+          i++;
+        } else {
+          options.longHorizonGenerations = 300;
+        }
+        break;
+      }
       case '--no-prune':
         options.prune = false;
         break;

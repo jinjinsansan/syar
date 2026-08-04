@@ -23,7 +23,17 @@ import {
   type NicksGenConfig,
   type NicksTable,
 } from '@star/sim-engine';
-import { correlation, max, mean, min, quantileSorted, round, sd } from './stats.js';
+import { correlation, linearSlope, max, mean, min, quantileSorted, round, sd } from './stats.js';
+
+// --- 正典 §13.2 の合格基準（D-008 で再定義） ---
+/** V-2a: 傾きを見る世代数 */
+const V2A_WINDOW = 20;
+/** V-2a: 許容する傾き（%/世代） */
+const V2A_TARGET_ABS_MAX = 0.5;
+/** V-2b: 集団平均能力 ÷ アレル上限 の上限 */
+const V2B_TARGET_MAX = 0.8;
+/** V-1: 能力別CVの平均の許容範囲 */
+const V1_TARGET: readonly [number, number] = [0.12, 0.18];
 
 // ---------------------------------------------------------------------------
 // オプション
@@ -63,6 +73,11 @@ export interface SimulationOptions {
   v1Repeats: number;
   /** 到達不能になった祖先レコードを破棄してメモリを抑える */
   prune: boolean;
+  /**
+   * V-2c（長期健全性）を測るために、本編とは別に回す長期シミュレーションの年数。
+   * 0 なら実行しない（判定は「別実行で確認」となる）。正典 §13.2 の既定は 300ゲーム内年。
+   */
+  longHorizonGenerations: number;
 }
 
 export const DEFAULT_OPTIONS: SimulationOptions = {
@@ -80,6 +95,7 @@ export const DEFAULT_OPTIONS: SimulationOptions = {
   v1Pairs: 5,
   v1Repeats: 100,
   prune: true,
+  longHorizonGenerations: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -124,6 +140,13 @@ export interface CohortStat {
   frailCount: number;
   nicksHits: number;
   /**
+   * 距離適性の分布（正典 §5.2・P0-fix F-3）。
+   * 集団SDが創始水準から広がると「マイラー／ステイヤーの分化」が消え、
+   * 逆に縮むと全馬が同じ距離型になる。どちらも §5.2 の意図に反する。
+   */
+  distanceCenter: { mean: number; sd: number };
+  distanceRange: { mean: number; sd: number };
+  /**
    * 中間親（父母の能力合計の平均）と産駒の能力合計のピアソン相関。
    * 「血のつながりの強さ」の実測値。正典 §1.1「血をつなぐことが唯一の進行軸」／
    * §1.4-3「蓄積感」が成立しているかの健全性指標であり、
@@ -158,18 +181,46 @@ export interface Verification {
     /** 判定に使う値 = 最終世代のチェックポイント */
     primaryGeneration: number;
     primaryMeanCv: number;
-    target: [number, number];
+    target: readonly [number, number];
     pass: boolean;
   };
-  v2: {
+  /**
+   * V-2 系（血統インフレ）— 正典 §13.2・D-008 で3基準に再定義。
+   * 旧「100世代後 +50% 以内」は廃止。守るべきは「平均が上がらないこと」ではなく
+   * 「上がり続けて天井に張り付き、個体差が消えないこと」（正典 §13.3）。
+   */
+  v2a: {
+    /** 最終20世代の平均能力の傾き（%/世代） */
+    slopePctPerGeneration: number;
+    windowGenerations: number;
+    targetAbsMax: number;
+    pass: boolean;
+  };
+  v2b: {
+    /** 集団平均能力（能力1種あたり）÷ アレル上限 */
+    ceilingRatio: number;
+    meanAbilityPerKey: number;
+    alleleMax: number;
+    targetMax: number;
+    pass: boolean;
+  };
+  v2c: {
+    /** 長期シミュレーションを実行したか。false なら別実行での確認が必要 */
+    evaluated: boolean;
+    generations: number;
+    v1MeanCv: number;
+    target: readonly [number, number];
+    pass: boolean;
+    note: string;
+  };
+  /** 旧基準の実測値。比較の連続性のために残すが**合否判定には使わない**（正典 §13.2） */
+  legacyRatio: {
     initialMeanAbilityTotal: number;
     finalMeanAbilityTotal: number;
-    /** 直近5世代平均（単年のブレを均した参考値） */
     finalMeanAbilityTotalSmoothed: number;
     ratio: number;
     ratioSmoothed: number;
-    targetMax: number;
-    pass: boolean;
+    note: string;
   };
   v3: {
     atavism: RateStat & { target: number; deviationPt: number; pass: boolean };
@@ -197,6 +248,8 @@ export interface SimulationResult {
   founderCohort: CohortStat;
   cohorts: CohortStat[];
   verification: Verification;
+  /** V-2c 用の長期シミュレーション結果（--long-horizon 指定時のみ） */
+  longHorizon: SimulationResult | null;
   totals: {
     matings: number;
     foals: number;
@@ -286,6 +339,14 @@ function summarizeCohort(
     bigMutation: extra.bigMutation,
     frailCount: horses.filter((h) => h.frail).length,
     nicksHits: horses.filter((h) => h.nicksMultiplier > 1).length,
+    distanceCenter: {
+      mean: round(mean(horses.map((h) => h.distanceCenter)), 1),
+      sd: round(sd(horses.map((h) => h.distanceCenter)), 1),
+    },
+    distanceRange: {
+      mean: round(mean(horses.map((h) => h.distanceRange)), 1),
+      sd: round(sd(horses.map((h) => h.distanceRange)), 1),
+    },
     parentOffspringCorrelation:
       extra.midParent === undefined ? 0 : round(correlation(extra.midParent, totals), 4),
   };
@@ -473,6 +534,7 @@ export function runSimulation(
   // --- 年ループ -------------------------------------------------------------
   const cohorts: CohortStat[] = [];
   const v1Checkpoints: V1Checkpoint[] = [];
+  let longHorizon: SimulationResult | null = null;
   const totalAtavism = emptyRate();
   const totalBigAtavism = emptyRate();
   const totalBigMutation = emptyRate();
@@ -710,26 +772,84 @@ export function runSimulation(
   const ratio = initialMean === 0 ? 0 : finalMean / initialMean - 1;
   const ratioSmoothed = initialMean === 0 ? 0 : finalMeanSmoothed / initialMean - 1;
 
-  const v1Pass = primaryMeanCv >= 0.12 && primaryMeanCv <= 0.18;
-  const v2Pass = ratio <= 0.5;
+  const v1Pass = primaryMeanCv >= V1_TARGET[0] && primaryMeanCv <= V1_TARGET[1];
   const v3Pass = v3Atavism.pass && v3BigAtavism.pass && v3BigMutation.pass;
+
+  // --- V-2a 平坦化: 最終20世代の平均能力の傾きが 0.5%/世代 未満 ---
+  const slopeWindow = cohorts.slice(-V2A_WINDOW);
+  const windowLevel = mean(slopeWindow.map((c) => c.meanAbilityTotal));
+  const slopePerGeneration = linearSlope(
+    slopeWindow.map((c) => c.generation),
+    slopeWindow.map((c) => c.meanAbilityTotal),
+  );
+  const slopePct = windowLevel === 0 ? 0 : (slopePerGeneration / windowLevel) * 100;
+  // 「平坦化」の判定なので絶対値で見る（急落も平坦ではないため。REPORT に解釈として明記）
+  const v2aPass = slopeWindow.length >= 2 && Math.abs(slopePct) < V2A_TARGET_ABS_MAX;
+
+  // --- V-2b 天井余裕: 集団平均能力 ÷ アレル上限 が 80% 以下 ---
+  const alleleMax = balance.traitBounds['sp'].max;
+  const meanAbilityPerKey = finalMean / ABILITY_KEYS.length;
+  const ceilingRatio = alleleMax === 0 ? 0 : meanAbilityPerKey / alleleMax;
+  const v2bPass = ceilingRatio <= V2B_TARGET_MAX;
+
+  // --- V-2c 長期健全性: 300ゲーム内年でも V-1 が 12〜18% に留まる ---
+  // 本編とは別に長期シミュレーションを内部で回す（再帰は1段だけ）
+  let v2c: Verification['v2c'] = {
+    evaluated: false,
+    generations: 0,
+    v1MeanCv: 0,
+    target: V1_TARGET,
+    pass: false,
+    note: 'V-2c は別実行で確認すること（--long-horizon 300 を付けるとこの実行内で判定します）',
+  };
+  if (opts.longHorizonGenerations > 0) {
+    const longRun = runSimulation(
+      { ...opts, generations: opts.longHorizonGenerations, longHorizonGenerations: 0 },
+      balance,
+      founders,
+      nicksGen,
+    );
+    const longCv = longRun.verification.v1.primaryMeanCv;
+    v2c = {
+      evaluated: true,
+      generations: opts.longHorizonGenerations,
+      v1MeanCv: longCv,
+      target: V1_TARGET,
+      pass: longCv >= V1_TARGET[0] && longCv <= V1_TARGET[1],
+      note: `同一シードで ${opts.longHorizonGenerations} ゲーム内年を別途実行して判定`,
+    };
+    longHorizon = longRun;
+  }
 
   const verification: Verification = {
     v1: {
       checkpoints: v1Checkpoints,
       primaryGeneration: primaryV1?.generation ?? 0,
       primaryMeanCv,
-      target: [0.12, 0.18],
+      target: V1_TARGET,
       pass: v1Pass,
     },
-    v2: {
+    v2a: {
+      slopePctPerGeneration: round(slopePct, 4),
+      windowGenerations: slopeWindow.length,
+      targetAbsMax: V2A_TARGET_ABS_MAX,
+      pass: v2aPass,
+    },
+    v2b: {
+      ceilingRatio: round(ceilingRatio, 4),
+      meanAbilityPerKey: round(meanAbilityPerKey, 2),
+      alleleMax,
+      targetMax: V2B_TARGET_MAX,
+      pass: v2bPass,
+    },
+    v2c,
+    legacyRatio: {
       initialMeanAbilityTotal: round(initialMean, 2),
       finalMeanAbilityTotal: round(finalMean, 2),
       finalMeanAbilityTotalSmoothed: round(finalMeanSmoothed, 2),
       ratio: round(ratio, 5),
       ratioSmoothed: round(ratioSmoothed, 5),
-      targetMax: 0.5,
-      pass: v2Pass,
+      note: '旧基準（+50%以内）の実測値。D-008 で廃止済みのため合否判定には使わない',
     },
     v3: {
       atavism: v3Atavism,
@@ -738,7 +858,8 @@ export function runSimulation(
       tolerancePt,
       pass: v3Pass,
     },
-    pass: v1Pass && v2Pass && v3Pass,
+    // V-2c は未実行なら判定に含めない（別実行で確認する運用・正典 §13.2）
+    pass: v1Pass && v2aPass && v2bPass && v3Pass && (!v2c.evaluated || v2c.pass),
   };
 
   return {
@@ -756,6 +877,7 @@ export function runSimulation(
     founderCohort,
     cohorts,
     verification,
+    longHorizon,
     totals: {
       matings: totalMatings,
       foals: totalMatings,

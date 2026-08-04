@@ -1,9 +1,14 @@
 /**
- * 定数チューニング用のスイープ（P0 の検証補助・納品物ではない開発用ツール）
+ * 【P0 当時の記録・現行の検証には使わない】定数チューニング用のスイープ。
  *
  *   npx tsx apps/cli/src/sweep.ts
  *
- * 「たまたま通った」を排除するため（正典 §13.3）、複数シードで V-1 / V-2 を測る。
+ * QUESTIONS_P0 Q1（平均回帰を採るべきか）の判断材料を作るために書いたもので、
+ * D-008 で回帰の採用が決まったため役目を終えている。V-2 列は**廃止された旧基準**
+ * （+50%以内）の実測値なので、判定列も現行基準とは一致しない。
+ *
+ * 現行の検証は `verify.ts`（4シード × 100/300年で V-1/V-2a/V-2b/V-3 と距離分化を見る）を使うこと。
+ * 本ファイルは P0 報告書の数値を再現できるように残している。
  */
 
 import { DEFAULT_BALANCE, FOUNDERS, NICKS_GEN, type BalanceConfig } from '@star/sim-engine';
@@ -58,7 +63,7 @@ for (const cfg of CONFIGS) {
       FOUNDERS,
       NICKS_GEN,
     );
-    v2s.push(r.verification.v2.ratio);
+    v2s.push(r.verification.legacyRatio.ratio);
     v1s.push(r.verification.v1.primaryMeanCv);
     corrs.push(mean(r.cohorts.slice(-20).map((c) => c.parentOffspringCorrelation)));
   }
