@@ -7,13 +7,16 @@
 
 import {
   ABILITY_KEYS,
+  NUMERIC_TRAITS,
   applyMatingCounters,
   breed,
   canMate,
   createFounder,
   deriveRng,
   deriveSeed,
+  expressNumeric,
   generateNicksTable,
+  getAllelePair,
   makeLineIds,
   type AbilityKey,
   type BalanceConfig,
@@ -22,6 +25,7 @@ import {
   type HorseRecord,
   type NicksGenConfig,
   type NicksTable,
+  type NumericTraitKey,
 } from '@star/sim-engine';
 import { correlation, linearSlope, max, mean, min, quantileSorted, round, sd } from './stats.js';
 
@@ -34,6 +38,22 @@ const V2A_TARGET_ABS_MAX = 0.5;
 const V2B_TARGET_MAX = 0.8;
 /** V-1: 能力別CVの平均の許容範囲 */
 const V1_TARGET: readonly [number, number] = [0.12, 0.18];
+/** V-2d: 全形質の集団平均が創始水準から許容される乖離 */
+const V2D_TARGET_ABS_MAX = 0.1;
+/** V-2e: distance_center の集団SDの許容倍率（創始比） */
+const V2E_TARGET: readonly [number, number] = [0.8, 1.4];
+
+/**
+ * V-2d の監視対象 = 能力5種を**除く**全数値形質。
+ *
+ * 能力5種は方向性選抜がかかって水準が上がるのが正常な挙動であり（V-2a/V-2b が担当）、
+ * ±10% ゲートに掛けると V-2a/V-2b と矛盾する。V-2d が守るのは
+ * 「選抜圧がかからないのに水準がずれる」形質（丈夫さ・気性・適性・距離）。
+ * NUMERIC_TRAITS からの差分で定義しているので、**新しい形質を追加すれば自動で監視対象に入る**。
+ */
+const V2D_TRAITS: readonly NumericTraitKey[] = NUMERIC_TRAITS.filter(
+  (key): key is NumericTraitKey => !(ABILITY_KEYS as readonly string[]).includes(key),
+);
 
 // ---------------------------------------------------------------------------
 // オプション
@@ -147,6 +167,11 @@ export interface CohortStat {
   distanceCenter: { mean: number; sd: number };
   distanceRange: { mean: number; sd: number };
   /**
+   * 全数値形質の集団平均（genotype の発現値ベース）。V-2d の測定源。
+   * NUMERIC_TRAITS を機械的に走査しているので、形質を追加すれば自動で監視対象に入る。
+   */
+  traitMeans: Record<NumericTraitKey, number>;
+  /**
    * 中間親（父母の能力合計の平均）と産駒の能力合計のピアソン相関。
    * 「血のつながりの強さ」の実測値。正典 §1.1「血をつなぐことが唯一の進行軸」／
    * §1.4-3「蓄積感」が成立しているかの健全性指標であり、
@@ -213,6 +238,41 @@ export interface Verification {
     pass: boolean;
     note: string;
   };
+  /**
+   * V-2d 全形質の水準維持（正典 §13.2・D-009）。
+   *
+   * V-1/V-2a〜c/V-3 はいずれも能力5種しか見ていないため、丈夫さ 650→450 のような
+   * 非能力形質の恒久的な水準ずれを検出できなかった。全形質を機械的に測って塞ぐ。
+   */
+  v2d: {
+    traits: {
+      key: NumericTraitKey;
+      founderMean: number;
+      finalMean: number;
+      /** finalMean / founderMean - 1 */
+      deviation: number;
+      pass: boolean;
+    }[];
+    /** 参考: 能力5種（方向性選抜で上がるのが正常なので判定対象外） */
+    abilityReference: {
+      key: NumericTraitKey;
+      founderMean: number;
+      finalMean: number;
+      deviation: number;
+    }[];
+    worstKey: NumericTraitKey | null;
+    worstDeviation: number;
+    targetAbsMax: number;
+    pass: boolean;
+  };
+  /** V-2e 距離適性の分化（正典 §13.2・D-009）。P0-fix の合格基準4を機械ゲート化したもの */
+  v2e: {
+    founderSd: number;
+    finalSd: number;
+    ratio: number;
+    target: readonly [number, number];
+    pass: boolean;
+  };
   /** 旧基準の実測値。比較の連続性のために残すが**合否判定には使わない**（正典 §13.2） */
   legacyRatio: {
     initialMeanAbilityTotal: number;
@@ -240,6 +300,8 @@ export interface SimulationResult {
     dominantWeight: number;
     /** 正典外の提案機構（既定 0 = 無効。QUESTIONS_P0 Q1） */
     regressionRate: number;
+    /** 形質別の変異・回帰パラメータ（正典 §6.4 の表・D-009）。どの定数で出た数字かを JSON に残す */
+    traitMutation: BalanceConfig["traitMutation"];
     pedigreeDepth: number;
     mareLifetimeFoals: number;
     stallionBaseCoverings: number;
@@ -285,9 +347,25 @@ function abilityAlleles(horse: HorseRecord): number[] {
   return out;
 }
 
+/** 全数値形質の集団平均を機械的に取る（V-2d の測定源） */
+function traitMeansOf(
+  horses: readonly HorseRecord[],
+  dominantWeight: number,
+): Record<NumericTraitKey, number> {
+  const out = {} as Record<NumericTraitKey, number>;
+  for (const key of NUMERIC_TRAITS) {
+    out[key] = round(
+      mean(horses.map((h) => expressNumeric(getAllelePair(h.genotype, key), dominantWeight))),
+      2,
+    );
+  }
+  return out;
+}
+
 function summarizeCohort(
   generation: number,
   horses: readonly HorseRecord[],
+  dominantWeight: number,
   extra: {
     marePool: number;
     stallionPool: number;
@@ -347,6 +425,7 @@ function summarizeCohort(
       mean: round(mean(horses.map((h) => h.distanceRange)), 1),
       sd: round(sd(horses.map((h) => h.distanceRange)), 1),
     },
+    traitMeans: traitMeansOf(horses, dominantWeight),
     parentOffspringCorrelation:
       extra.midParent === undefined ? 0 : round(correlation(extra.midParent, totals), 4),
   };
@@ -521,7 +600,7 @@ export function runSimulation(
     }
   }
 
-  const founderCohort = summarizeCohort(0, founderHorses, {
+  const founderCohort = summarizeCohort(0, founderHorses, effectiveBalance.DOMINANT_WEIGHT, {
     marePool: mares.length,
     stallionPool: stallions.length,
     sireCandidates: 0,
@@ -679,7 +758,7 @@ export function runSimulation(
     }
 
     cohorts.push(
-      summarizeCohort(year, foals, {
+      summarizeCohort(year, foals, effectiveBalance.DOMINANT_WEIGHT, {
         marePool: mares.length,
         stallionPool: stallions.length,
         sireCandidates: candidates.length,
@@ -792,6 +871,41 @@ export function runSimulation(
   const ceilingRatio = alleleMax === 0 ? 0 : meanAbilityPerKey / alleleMax;
   const v2bPass = ceilingRatio <= V2B_TARGET_MAX;
 
+  // --- V-2d 全形質の水準維持: 集団平均が創始水準 ±10% 以内 ---
+  const founderTraitMeans = founderCohort.traitMeans;
+  const finalTraitMeans = finalCohort?.traitMeans;
+  const v2dTraits = V2D_TRAITS.map((key) => {
+    const founderMean = founderTraitMeans[key];
+    const finalMean = finalTraitMeans?.[key] ?? 0;
+    const deviation = founderMean === 0 ? 0 : finalMean / founderMean - 1;
+    return {
+      key,
+      founderMean,
+      finalMean,
+      deviation: round(deviation, 4),
+      pass: Math.abs(deviation) <= V2D_TARGET_ABS_MAX,
+    };
+  });
+  const abilityReference = ABILITY_KEYS.map((key) => {
+    const founderMean = founderTraitMeans[key];
+    const finalMean = finalTraitMeans?.[key] ?? 0;
+    return {
+      key: key as NumericTraitKey,
+      founderMean,
+      finalMean,
+      deviation: round(founderMean === 0 ? 0 : finalMean / founderMean - 1, 4),
+    };
+  });
+  const worst = v2dTraits.reduce<(typeof v2dTraits)[number] | null>(
+    (acc, t) => (acc === null || Math.abs(t.deviation) > Math.abs(acc.deviation) ? t : acc),
+    null,
+  );
+
+  // --- V-2e 距離適性の分化: distance_center の集団SDが創始の 0.8〜1.4倍 ---
+  const founderDistSd = founderCohort.distanceCenter.sd;
+  const finalDistSd = finalCohort?.distanceCenter.sd ?? 0;
+  const distSdRatio = founderDistSd === 0 ? 0 : finalDistSd / founderDistSd;
+
   // --- V-2c 長期健全性: 300ゲーム内年でも V-1 が 12〜18% に留まる ---
   // 本編とは別に長期シミュレーションを内部で回す（再帰は1段だけ）
   let v2c: Verification['v2c'] = {
@@ -843,6 +957,21 @@ export function runSimulation(
       pass: v2bPass,
     },
     v2c,
+    v2d: {
+      traits: v2dTraits,
+      abilityReference,
+      worstKey: worst?.key ?? null,
+      worstDeviation: worst?.deviation ?? 0,
+      targetAbsMax: V2D_TARGET_ABS_MAX,
+      pass: v2dTraits.every((t) => t.pass),
+    },
+    v2e: {
+      founderSd: founderDistSd,
+      finalSd: finalDistSd,
+      ratio: round(distSdRatio, 4),
+      target: V2E_TARGET,
+      pass: distSdRatio >= V2E_TARGET[0] && distSdRatio <= V2E_TARGET[1],
+    },
     legacyRatio: {
       initialMeanAbilityTotal: round(initialMean, 2),
       finalMeanAbilityTotal: round(finalMean, 2),
@@ -859,7 +988,15 @@ export function runSimulation(
       pass: v3Pass,
     },
     // V-2c は未実行なら判定に含めない（別実行で確認する運用・正典 §13.2）
-    pass: v1Pass && v2aPass && v2bPass && v3Pass && (!v2c.evaluated || v2c.pass),
+    pass:
+      v1Pass &&
+      v2aPass &&
+      v2bPass &&
+      v2dTraits.every((t) => t.pass) &&
+      distSdRatio >= V2E_TARGET[0] &&
+      distSdRatio <= V2E_TARGET[1] &&
+      v3Pass &&
+      (!v2c.evaluated || v2c.pass),
   };
 
   return {
@@ -869,6 +1006,7 @@ export function runSimulation(
       founders,
       dominantWeight: balance.DOMINANT_WEIGHT,
       regressionRate: balance.REGRESSION_RATE,
+      traitMutation: balance.traitMutation,
       pedigreeDepth: balance.PEDIGREE_DEPTH,
       mareLifetimeFoals: balance.MARE_LIFETIME_FOALS,
       stallionBaseCoverings: balance.STALLION_BASE_COVERINGS,

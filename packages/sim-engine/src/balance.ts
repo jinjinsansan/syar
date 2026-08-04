@@ -39,6 +39,7 @@ export const BALANCE = {
   REGRESSION_RATE: 0.2, // ★平均回帰（D-008・§6.4）血統インフレの唯一の実効抑制
   REGRESSION_CENTER_RATIO: 0.45, // 回帰先＝値域の45%（0〜1000形質なら450）
   DOMINANT_WEIGHT: 0.5, // 素質発現＝2アレルの相加平均。★0.5超は系統的な上げ要因になる
+  MUTATION_CLAMP_RATIO: 150 / 90, // clamp幅 ÷ sd（正典 §6.4: ±150 と N(0,90) の比）
   INBREED_BOOST_MAX: 0.3,
   INBREED_BOOST_SLOPE: 4.0,
   INBREED_DEPRESSION_THRESHOLD: 0.25,
@@ -48,6 +49,10 @@ export const BALANCE = {
   // 育成 (§7) —— P3 で使用（P0 では未使用）
   BASE_GAIN: 12,
   HEADROOM_EXP: 0.7,
+  // ⚠️ INJURY_BASE は §7.5 で `1000 / durability` を掛ける前提であり、
+  //    **丈夫さの集団水準が創始値 650 近傍にあること**を暗黙の基準にしている。
+  //    回帰中心を誤って 450 にしていた間は故障率が約1.44倍になっていた（D-009 で是正）。
+  //    丈夫さの水準を動かす変更をするときは、この定数の較正もやり直すこと（P1 への申し送り）。
   INJURY_BASE: 0.0018,
 
   // レース (§8) —— P1 で使用（P0 では未使用）
@@ -105,34 +110,13 @@ export interface TraitMutationSpec {
   clamp?: number;
   /** この形質にだけ適用する回帰率。省略時は共通の REGRESSION_RATE */
   regressionRate?: number;
+  /**
+   * 品種中心（回帰の引き戻し先）。**その形質の創始分布の期待値**を使う（正典 §6.4・D-009）。
+   * 省略時は値域比（REGRESSION_CENTER_RATIO）にフォールバックするが、
+   * それは正典から参照されない保険であり、全形質に center を与えるのが正しい。
+   */
+  center?: number;
 }
-
-/**
- * 距離系形質の変異幅（P0-fix F-3・正典 §5.2 の警告への対応）。
- *
- * 値は開発側が 4シード × 100/300/600 ゲーム内年で実測して決めた（根拠は REPORT_P0FIX §4）。
- *
- * 設計目標は「集団SDを創始世代の水準（distance_center で約359）に**平衡**させる」こと。
- * 広がり続けても（万能型ばかりになる）縮み続けても（全馬が同じ距離型になる）
- * §5.2 が意図する「マイラー／ステイヤー／万能型の分化」が失われる。
- *
- * 平衡時のアレルSD = sd / sqrt(2r - r²) から逆算している:
- *   distance_center: 創始アレルSD 520（一様1200〜3000）→ r=0.01 なら sd=73
- *   distance_range : 創始アレルSD 173（一様400〜1000） → r=0.01 なら sd=24
- *
- * 実測（4シード平均・distance_center の集団SD / 創始は359）:
- *   値域比スケール（旧）+ 回帰0.20 → 157 / 137 / 141   ← 収縮して分化が消える
- *   sd35 + 回帰0        → 429 / 426 / 391   ← SDは保つが平均が漂移し続ける
- *   sd73 + 回帰0.01     → 430 / 416 / 377   ← 創始水準へ収束（採用）
- *   sd73 + 回帰0.02     → 393 / 350 / 308   ← 縮み続ける
- *
- * clamp は sd の 3.33倍にしている。能力5種の比（150/90 = 1.67倍）より緩いのは、
- * 距離系は sd 自体が小さく、そこへ更に 1.67σ で切ると平衡SDが創始水準を下回るため。
- */
-export const TRAIT_MUTATION: Readonly<Partial<Record<NumericTraitKey, TraitMutationSpec>>> = {
-  distance_center: { sd: 73, clamp: 243, regressionRate: 0.01 },
-  distance_range: { sd: 24, clamp: 80, regressionRate: 0.01 },
-};
 
 export interface BalanceConfig {
   genetics: BalanceGenetics;
@@ -173,15 +157,17 @@ export interface BalanceConfig {
    *    発生率も併せて見直すこと。回帰がこれを相殺する前提で機構が残されている。
    */
   REGRESSION_RATE: number;
-  /** 回帰先の中心（形質値域内の比率）。0.45 なら 0〜1000 の形質で 450 */
+  /**
+   * 【役目を終えた定数・フォールバック専用】回帰先を値域比で決める旧方式（値域の45%）。
+   *
+   * D-009 で回帰中心は形質ごとの創始水準（`traitMutation[key].center`）に変わった。
+   * **正典からは参照されない。** `center` が未指定の形質が現れた場合の保険としてのみ残す。
+   */
   REGRESSION_CENTER_RATIO: number;
 
   /**
-   * 形質ごとの変異挙動の上書き（正典 §5.2 の警告への対応・P0-fix F-3）。
-   *
-   * 既定では変異SDを値域比で機械的に縮尺するが、距離系形質は値域が広いため
-   * そのままだと SD が大きくなりすぎ、世代を経て距離適性の分化が失われる。
-   * 距離系だけ変異幅を**絶対値で固定**し、回帰率も個別に与えて平衡させる。
+   * 形質ごとの変異・回帰パラメータ（正典 §6.4 の表・§13.1・D-009）。
+   * 品種中心はここで形質ごとに与える。`buildTraitMutation()` が創始定義から導出する。
    */
   traitMutation: Readonly<Partial<Record<NumericTraitKey, TraitMutationSpec>>>;
 
@@ -221,6 +207,143 @@ export const SKILL_GENE_POOL: readonly SkillGene[] = [
   'G_INNER', // 内枠強者
   'G_STAYER', // 長距離砲
 ];
+
+// ---------------------------------------------------------------------------
+// 創始世代（指示書 §3.3 で新規定義された定数。チューニング対象）
+// 回帰中心をここから導出するため、DEFAULT_BALANCE より前に定義する
+// ---------------------------------------------------------------------------
+
+export interface FoundersConfig {
+  ABILITY_MEAN: number;
+  ABILITY_SD: number;
+  ABILITY_MIN: number;
+  ABILITY_MAX: number;
+  TEMPER_MEAN: number;
+  TEMPER_SD: number;
+  TEMPER_MIN: number;
+  TEMPER_MAX: number;
+  DURABILITY_MEAN: number;
+  DURABILITY_SD: number;
+  DURABILITY_MIN: number;
+  DURABILITY_MAX: number;
+  DISTANCE_CENTER_RANGE: readonly [number, number];
+  DISTANCE_RANGE_RANGE: readonly [number, number];
+  /** 正典・指示書ともに未定義。P0 で定義（芝/ダート適性アレルの一様範囲） */
+  SURFACE_RANGE: readonly [number, number];
+  SKILL_GENE_COUNT: readonly [number, number];
+  /** 血統ライン数（指示書 §3.3: LINE_A〜LINE_T の20系統） */
+  LINE_COUNT: number;
+  /** 脚質バイアス / 成長型の創始分布。指示書に指定がないため一様分布とする */
+  STRATEGY_POOL: readonly Strategy[];
+  GROWTH_POOL: readonly GrowthType[];
+}
+
+export const FOUNDERS: FoundersConfig = {
+  ABILITY_MEAN: 450,
+  ABILITY_SD: 110,
+  ABILITY_MIN: 100,
+  ABILITY_MAX: 850,
+  TEMPER_MEAN: 50,
+  TEMPER_SD: 15,
+  TEMPER_MIN: 5,
+  TEMPER_MAX: 95,
+  DURABILITY_MEAN: 650,
+  DURABILITY_SD: 100,
+  DURABILITY_MIN: 300,
+  DURABILITY_MAX: 950,
+  DISTANCE_CENTER_RANGE: [1200, 3000],
+  DISTANCE_RANGE_RANGE: [400, 1000],
+  SURFACE_RANGE: [20, 90],
+  SKILL_GENE_COUNT: [0, 2],
+  LINE_COUNT: 20,
+  STRATEGY_POOL: ['nige', 'senko', 'sashi', 'oikomi'],
+  GROWTH_POOL: ['early', 'normal', 'late', 'late_bloomer'],
+};
+
+// ---------------------------------------------------------------------------
+// 形質別の変異・回帰パラメータ（正典 §6.4 の表・§13.1 TRAIT_MUTATION・D-009）
+// ---------------------------------------------------------------------------
+
+/** 一様分布 [a, b] の期待値 */
+function uniformMean(range: readonly [number, number]): number {
+  return (range[0] + range[1]) / 2;
+}
+
+/** 一様分布 [a, b] の標準偏差 */
+function uniformSd(range: readonly [number, number]): number {
+  return (range[1] - range[0]) / Math.sqrt(12);
+}
+
+/**
+ * 形質別の変異・回帰パラメータを**創始定義から導出**する（正典 §6.4・D-009）。
+ *
+ * ★品種中心は「値域の45%」ではなく、その形質の**創始分布の期待値**を使う。
+ *   値域から機械的に算出すると創始中心と一致するのは能力5種だけで、
+ *   丈夫さ（創始650 / 値域中心450）のように選抜圧のかからない形質は
+ *   引き戻しに対抗できず、世代とともに恒久的な水準ずれになる。
+ *   実測（P0-fix2 レビュー側監査）: 丈夫さが 20ゲーム内年で 650 → 449 へ収束していた。
+ *   丈夫さは §7.5 の故障率の分母なので、これは INJURY_BASE の較正を丸ごと無効化する。
+ *
+ * FOUNDERS から導出しているのは、創始定義と回帰中心が将来ずれないようにするため
+ * （FOUNDERS.DURABILITY_MEAN を変えたら回帰中心も自動で追随する）。
+ * 実際の値は正典 §13.1 の表とリテラル一致することをテストで固定している。
+ *
+ * ★距離系で上書きするのは **sd だけ**（回帰率・clamp比は全形質共通の 0.20 / 1.67）。
+ *
+ * 距離系は2条件を同時に満たす必要があり、sd は回帰率から従属的に決まる:
+ *   1. 集団平均が創始水準から動かない（V-2d: ±10%）
+ *      → 大物覚醒（§6.3）が単調上昇ラチェットとして押し上げる。平衡時のずれ ∝ 押し上げ量 / 回帰率
+ *        （実測: BIG_ATAVISM_RATE=0 にすると距離のずれは -1.7%/-3.0% まで消える）
+ *   2. 集団SDが創始水準を保つ（V-2e: 0.8〜1.4倍）
+ *      → 平衡SD = sd / sqrt(2r - r²)。よって **sd = 創始アレルSD × sqrt(2r - r²)**
+ * 値域比スケールだとこの関係を満たさないため、距離系だけ sd を絶対値で与える。
+ *
+ * 実測（800頭・300ゲーム内年・4シードの**最悪値**。REPORT_P0FIX2 §3-1）:
+ *   r=0.05 sd162/54  → center +14.3% / range +19.9%  FAIL
+ *   r=0.10 sd226/75  → center  +8.6% / range +12.8%  FAIL
+ *   r=0.20 sd312/104 → center  +4.5% / range  +6.7%  PASS（採用）
+ *
+ * ⚠️ P0-fix では「回帰0.20 では距離SDが 0.4倍に収縮する」と報告したが、
+ *    あれは sd を値域比（=小さすぎる値）のままにしていたためで、回帰率0.20 自体は問題ない。
+ *    sd を上式で追随させれば 0.20 でも分散は保たれる（実測 0.92倍）。
+ */
+export function buildTraitMutation(
+  f: FoundersConfig,
+  regressionRate: number = BALANCE.REGRESSION_RATE,
+  clampRatio: number = BALANCE.MUTATION_CLAMP_RATIO,
+): Readonly<Record<NumericTraitKey, TraitMutationSpec>> {
+  const abilityCenter = { center: f.ABILITY_MEAN };
+  // 距離系の sd は回帰率から従属的に決まる（下のコメント参照）。
+  // 定数を別々に持つと片方だけ変えたときに壊れるので、必ずここで一緒に導出する
+  const distanceSd = (range: readonly [number, number]): number =>
+    Math.round(uniformSd(range) * Math.sqrt(2 * regressionRate - regressionRate * regressionRate));
+  const centerSd = distanceSd(f.DISTANCE_CENTER_RANGE);
+  const rangeSd = distanceSd(f.DISTANCE_RANGE_RANGE);
+  return {
+    sp: abilityCenter,
+    st: abilityCenter,
+    pw: abilityCenter,
+    gt: abilityCenter,
+    iq: abilityCenter,
+    durability: { center: f.DURABILITY_MEAN },
+    temper: { center: f.TEMPER_MEAN },
+    'surface.turf': { center: uniformMean(f.SURFACE_RANGE) },
+    'surface.dirt': { center: uniformMean(f.SURFACE_RANGE) },
+    // 距離系は回帰率も clamp 比も他形質と共通。**sd だけ**を絶対値で与える
+    distance_center: {
+      sd: centerSd,
+      clamp: Math.round(centerSd * clampRatio),
+      center: uniformMean(f.DISTANCE_CENTER_RANGE),
+    },
+    distance_range: {
+      sd: rangeSd,
+      clamp: Math.round(rangeSd * clampRatio),
+      center: uniformMean(f.DISTANCE_RANGE_RANGE),
+    },
+  };
+}
+
+export const TRAIT_MUTATION = buildTraitMutation(FOUNDERS);
 
 export const DEFAULT_BALANCE: BalanceConfig = {
   genetics: {
@@ -271,57 +394,6 @@ export const DEFAULT_BALANCE: BalanceConfig = {
   STALLION_BASE_COVERINGS: 20,
   STALLION_COVERINGS_PER_G1: 10,
   MIN_BREEDING_AGE_YEARS: 6,
-};
-
-// ---------------------------------------------------------------------------
-// 創始世代（指示書 §3.3 で新規定義された定数。チューニング対象）
-// ---------------------------------------------------------------------------
-
-export interface FoundersConfig {
-  ABILITY_MEAN: number;
-  ABILITY_SD: number;
-  ABILITY_MIN: number;
-  ABILITY_MAX: number;
-  TEMPER_MEAN: number;
-  TEMPER_SD: number;
-  TEMPER_MIN: number;
-  TEMPER_MAX: number;
-  DURABILITY_MEAN: number;
-  DURABILITY_SD: number;
-  DURABILITY_MIN: number;
-  DURABILITY_MAX: number;
-  DISTANCE_CENTER_RANGE: readonly [number, number];
-  DISTANCE_RANGE_RANGE: readonly [number, number];
-  /** 正典・指示書ともに未定義。P0 で定義（芝/ダート適性アレルの一様範囲） */
-  SURFACE_RANGE: readonly [number, number];
-  SKILL_GENE_COUNT: readonly [number, number];
-  /** 血統ライン数（指示書 §3.3: LINE_A〜LINE_T の20系統） */
-  LINE_COUNT: number;
-  /** 脚質バイアス / 成長型の創始分布。指示書に指定がないため一様分布とする */
-  STRATEGY_POOL: readonly Strategy[];
-  GROWTH_POOL: readonly GrowthType[];
-}
-
-export const FOUNDERS: FoundersConfig = {
-  ABILITY_MEAN: 450,
-  ABILITY_SD: 110,
-  ABILITY_MIN: 100,
-  ABILITY_MAX: 850,
-  TEMPER_MEAN: 50,
-  TEMPER_SD: 15,
-  TEMPER_MIN: 5,
-  TEMPER_MAX: 95,
-  DURABILITY_MEAN: 650,
-  DURABILITY_SD: 100,
-  DURABILITY_MIN: 300,
-  DURABILITY_MAX: 950,
-  DISTANCE_CENTER_RANGE: [1200, 3000],
-  DISTANCE_RANGE_RANGE: [400, 1000],
-  SURFACE_RANGE: [20, 90],
-  SKILL_GENE_COUNT: [0, 2],
-  LINE_COUNT: 20,
-  STRATEGY_POOL: ['nige', 'senko', 'sashi', 'oikomi'],
-  GROWTH_POOL: ['early', 'normal', 'late', 'late_bloomer'],
 };
 
 // ---------------------------------------------------------------------------

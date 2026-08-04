@@ -48,21 +48,33 @@ export interface ResolvedMutation {
   bigSd: number;
   clamp: number;
   regressionRate: number;
+  /** 回帰の引き戻し先（品種中心）。正典 §6.4・D-009 */
+  center: number;
 }
 
 export function resolveMutation(balance: BalanceConfig, key: NumericTraitKey): ResolvedMutation {
   const bounds = balance.traitBounds[key];
   const scale = (bounds.max - bounds.min) / balance.MUTATION_SCALE_BASE;
   const override = balance.traitMutation[key];
+  // 絶対値指定の形質では通常変異との比を保つ。MUTATION_SD=0（変異を止めたテスト等）では
+  // ゼロ除算で NaN が genotype に流れ込むため 0 に倒す
+  const bigRatio =
+    balance.genetics.MUTATION_SD === 0
+      ? 0
+      : balance.genetics.BIG_MUTATION_SD / balance.genetics.MUTATION_SD;
+
   return {
     sd: override?.sd ?? balance.genetics.MUTATION_SD * scale,
-    // 大突然変異も同じ縮尺に従う。絶対値指定がある形質は通常変異との比を保つ
+    // 大突然変異も同じ縮尺に従う
     bigSd:
-      override?.sd === undefined
-        ? balance.genetics.BIG_MUTATION_SD * scale
-        : (override.sd * balance.genetics.BIG_MUTATION_SD) / balance.genetics.MUTATION_SD,
+      override?.sd === undefined ? balance.genetics.BIG_MUTATION_SD * scale : override.sd * bigRatio,
     clamp: override?.clamp ?? balance.MUTATION_CLAMP * scale,
     regressionRate: override?.regressionRate ?? balance.REGRESSION_RATE,
+    // ★形質ごとの創始水準。未指定なら旧方式（値域比）へフォールバックするが、
+    //   それは保険であって正典の規定ではない（正典 §6.4・D-009）
+    center:
+      override?.center ??
+      bounds.min + (bounds.max - bounds.min) * balance.REGRESSION_CENTER_RATIO,
   };
 }
 
@@ -190,21 +202,22 @@ export function inheritGenotype(params: {
     // --- §6.4 突然変異 + 平均回帰 ---
     const isBig = rng.bool(g.BIG_MUTATION_RATE);
     if (isBig) bigMutationTraits.push(key);
-    // 品種平均への回帰（正典 §6.4・D-008）。分散は変異が供給し、平均だけが平衡点に落ち着く
-    const regressionCenter =
-      bounds.min + (bounds.max - bounds.min) * balance.REGRESSION_CENTER_RATIO;
+    // 品種平均への回帰（正典 §6.4・D-008/D-009）。分散は変異が供給し、平均だけが平衡点に落ち着く。
+    // 引き戻し先は形質ごとの創始水準（値域比ではない）
+    const regressionCenter = mutation.center;
     for (const slot of ['a1', 'a2'] as const) {
       mutationRolls++;
-      let noise: number;
-      if (isBig) {
-        // 大突然変異は N(0,180) に「置き換え」。負にも振れる（怪物も駄馬も生まれる）
-        noise = rng.gaussian(0, mutation.bigSd);
-      } else {
-        noise = clamp(rng.gaussian(0, mutation.sd), -mutation.clamp, mutation.clamp);
-      }
-      if (mutation.regressionRate !== 0) {
-        noise -= (pair[slot] - regressionCenter) * mutation.regressionRate;
-      }
+      // 正典 §6.4 の式:
+      //   noise = N(0, sd) - (アレル値 - 品種中心) × 回帰率
+      //   通常変異  : clamp(noise, ±clamp幅)      ← ★回帰項を含めた合計に clamp をかける
+      //   大突然変異: N(0, sd×2) に置き換え（値域clampのみ・通常のclamp幅は適用しない）
+      const pull =
+        mutation.regressionRate === 0
+          ? 0
+          : (pair[slot] - regressionCenter) * mutation.regressionRate;
+      const noise = isBig
+        ? rng.gaussian(0, mutation.bigSd) - pull
+        : clamp(rng.gaussian(0, mutation.sd) - pull, -mutation.clamp, mutation.clamp);
       pair[slot] = pair[slot] + noise;
     }
 

@@ -54,6 +54,10 @@
 ```bash
 npm test                                        # ユニットテスト
 npm run typecheck                               # strict 型チェック
-npm run simulate -- --generations 100 --seed 42 # 100世代シミュレータ（V-1/V-2/V-3 判定）
+npm run verify                                  # ★受け入れ判定（複数シード × 100/300ゲーム内年）
+npm run simulate -- --generations 100 --seed 42 --long-horizon 300  # 単発（V-2c も同一実行内で判定）
+npm run verify:distance                         # 距離適性の候補比較（長時間）
 npm run simulate -- --help                      # 全オプション
 ```
+
+検証基準は **V-1 / V-2a（平坦化）/ V-2b（天井余裕）/ V-2c（長期健全性）/ V-2d（全形質の水準維持）/ V-2e（距離の分化）/ V-3** です（正典 §13.2）。旧「V-2 = +50%以内」は D-008 で廃止されました。

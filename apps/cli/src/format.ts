@@ -183,8 +183,8 @@ export function formatReport(result: SimulationResult): string {
   lines.push(`    → ${verdict(v1.pass)}  実測 ${pct(v1.primaryMeanCv)}`);
   lines.push('');
 
-  // V-2 系（D-008 で3基準に再定義）
-  const { v2a, v2b, v2c, legacyRatio } = verification;
+  // V-2 系（D-008 で3基準に再定義 / D-009 で V-2d・V-2e を追加）
+  const { v2a, v2b, v2c, v2d, v2e, legacyRatio } = verification;
 
   lines.push(`V-2a 平坦化: 最終${v2a.windowGenerations}世代の平均能力の傾き  目標 ±${v2a.targetAbsMax}%/世代 未満`);
   lines.push(
@@ -208,6 +208,35 @@ export function formatReport(result: SimulationResult): string {
   } else {
     lines.push(`    → 未実行  ${v2c.note}`);
   }
+  lines.push('');
+
+  lines.push(
+    `V-2d 全形質の水準維持: 集団平均が創始水準 ±${pct(v2d.targetAbsMax, 0)} 以内` +
+      `（能力5種は方向性選抜で上がるのが正常なため判定対象外・参考表示）`,
+  );
+  for (const t of v2d.traits) {
+    lines.push(
+      `    ${pad(t.key, 16)}: 創始 ${pad(t.founderMean.toFixed(1), 8)} → 最終 ${pad(t.finalMean.toFixed(1), 8)}` +
+        `  乖離 ${t.deviation >= 0 ? '+' : ''}${(t.deviation * 100).toFixed(2)}%  ${verdict(t.pass)}`,
+    );
+  }
+  for (const t of v2d.abilityReference) {
+    lines.push(
+      `    ${pad(t.key, 16)}: 創始 ${pad(t.founderMean.toFixed(1), 8)} → 最終 ${pad(t.finalMean.toFixed(1), 8)}` +
+        `  乖離 ${t.deviation >= 0 ? '+' : ''}${(t.deviation * 100).toFixed(2)}%  [参考]`,
+    );
+  }
+  lines.push(
+    `    → ${verdict(v2d.pass)}` +
+      `${v2d.worstKey === null ? '' : `  最大乖離 ${v2d.worstKey} ${v2d.worstDeviation >= 0 ? '+' : ''}${(v2d.worstDeviation * 100).toFixed(2)}%`}`,
+  );
+  lines.push('');
+
+  lines.push(
+    `V-2e 距離適性の分化: distance_center の集団SD  目標 創始比 ${v2e.target[0]}〜${v2e.target[1]}倍`,
+  );
+  lines.push(`    創始 SD${v2e.founderSd.toFixed(0)} → 最終 SD${v2e.finalSd.toFixed(0)}`);
+  lines.push(`    → ${verdict(v2e.pass)}  実測 ${v2e.ratio.toFixed(2)}倍`);
   lines.push('');
 
   lines.push(

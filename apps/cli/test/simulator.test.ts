@@ -99,6 +99,69 @@ describe('シミュレータの決定論（指示書 §3.5-1）', () => {
     expect(result.verification.legacyRatio).not.toHaveProperty('pass');
   });
 
+  it('V-2d は能力5種を除く全形質を自動で監視対象にする', () => {
+    const result = runSimulation({ ...SMALL, seed: 42 }, DEFAULT_BALANCE, FOUNDERS, NICKS_GEN);
+    const keys = result.verification.v2d.traits.map((t) => t.key).sort();
+    // NUMERIC_TRAITS から能力5種を除いた6形質。形質を足せば自動で増える
+    expect(keys).toEqual(
+      [
+        'durability',
+        'temper',
+        'surface.turf',
+        'surface.dirt',
+        'distance_center',
+        'distance_range',
+      ].sort(),
+    );
+    // 能力5種は判定対象外だが参考値として必ず併記する
+    expect(result.verification.v2d.abilityReference.map((t) => t.key).sort()).toEqual(
+      ['sp', 'st', 'pw', 'gt', 'iq'].sort(),
+    );
+    expect(result.verification.v2d.targetAbsMax).toBe(0.1);
+  });
+
+  it('V-2d の乖離は創始世代との比で測る', () => {
+    const result = runSimulation({ ...SMALL, seed: 42 }, DEFAULT_BALANCE, FOUNDERS, NICKS_GEN);
+    const last = result.cohorts[result.cohorts.length - 1];
+    for (const t of result.verification.v2d.traits) {
+      expect(t.founderMean).toBe(result.founderCohort.traitMeans[t.key]);
+      expect(t.finalMean).toBe(last?.traitMeans[t.key]);
+      expect(t.pass).toBe(Math.abs(t.deviation) <= 0.1);
+    }
+  });
+
+  it('V-2d: 丈夫さが創始水準(650)を保つ（D-009 の回帰テスト）', () => {
+    const result = runSimulation(
+      { ...SMALL, seed: 42, generations: 24 },
+      DEFAULT_BALANCE,
+      FOUNDERS,
+      NICKS_GEN,
+    );
+    const durability = result.verification.v2d.traits.find((t) => t.key === 'durability');
+    expect(durability).toBeDefined();
+    // 回帰中心が値域45%(=450)だった頃はここが -30% 付近まで落ちていた
+    expect(Math.abs(durability?.deviation ?? 1)).toBeLessThan(0.1);
+    expect(durability?.finalMean ?? 0).toBeGreaterThan(600);
+  });
+
+  it('V-2e は distance_center の集団SDを創始比で判定する', () => {
+    const result = runSimulation({ ...SMALL, seed: 42 }, DEFAULT_BALANCE, FOUNDERS, NICKS_GEN);
+    const v2e = result.verification.v2e;
+    const last = result.cohorts[result.cohorts.length - 1];
+    expect(v2e.founderSd).toBe(result.founderCohort.distanceCenter.sd);
+    expect(v2e.finalSd).toBe(last?.distanceCenter.sd);
+    expect(v2e.target).toEqual([0.8, 1.4]);
+    expect(v2e.pass).toBe(v2e.ratio >= 0.8 && v2e.ratio <= 1.4);
+  });
+
+  it('総合判定に V-2d と V-2e が含まれている', () => {
+    const result = runSimulation({ ...SMALL, seed: 42 }, DEFAULT_BALANCE, FOUNDERS, NICKS_GEN);
+    const v = result.verification;
+    const expected =
+      v.v1.pass && v.v2a.pass && v.v2b.pass && v.v2d.pass && v.v2e.pass && v.v3.pass;
+    expect(v.pass).toBe(expected);
+  });
+
   it('距離適性の分布を毎世代記録している（F-3 の検証材料）', () => {
     const result = runSimulation({ ...SMALL, seed: 42 }, DEFAULT_BALANCE, FOUNDERS, NICKS_GEN);
     for (const cohort of result.cohorts) {
