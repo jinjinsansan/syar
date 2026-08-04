@@ -35,12 +35,27 @@ export const BALANCE = {
   ATAVISM_RATE: 0.06,
   BIG_ATAVISM_RATE: 0.015, // ★単調上昇ラチェット・§6.3 の警告参照
   MUTATION_SD: 90, // D-008 で 45→90（回帰で削られる分散を補償する）
+  MUTATION_CLAMP: 150, // 通常変異の clamp 幅（正典 §6.4: ±150）
   BIG_MUTATION_RATE: 0.008,
   BIG_MUTATION_SD: 180,
   REGRESSION_RATE: 0.2, // ★平均回帰（D-008・§6.4）血統インフレの唯一の実効抑制
   REGRESSION_CENTER_RATIO: 0.45, // 回帰先＝値域の45%（0〜1000形質なら450）
   DOMINANT_WEIGHT: 0.5, // 素質発現＝2アレルの相加平均。★0.5超は系統的な上げ要因になる
-  MUTATION_CLAMP_RATIO: 150 / 90, // clamp幅 ÷ sd（正典 §6.4: ±150 と N(0,90) の比）
+  /**
+   * clamp による切断で失われる分散の補正係数（正典 §6.4・D-013）。
+   *
+   *   X ~ N(0, σ²), Y = clamp(X, ±kσ) のとき
+   *   E[Y²]/σ² = (2Φ(k) − 1) − 2k·φ(k) + 2k²(1 − Φ(k))
+   *   k = MUTATION_CLAMP / MUTATION_SD = 150/90 = 1.6667 → E[Y²]/σ² = 0.8383
+   *   ∴ 実効SD = √0.8383 × sd = 0.9156 × sd
+   *
+   * つまり clamp をかけた時点で分散が 8.4% 目減りするので、平衡SDを創始水準に
+   * 合わせるには sd をこの分だけ割り増す必要がある。
+   *
+   * ⚠️ **この値は clamp/sd 比（= MUTATION_CLAMP_RATIO）に依存する。**
+   *    比を変えたら上式で再計算すること（比を変えて係数を据え置くと平衡がずれる）。
+   */
+  CLAMP_TRUNCATION_FACTOR: 0.9156,
   INBREED_BOOST_MAX: 0.3,
   INBREED_BOOST_SLOPE: 4.0,
   INBREED_DEPRESSION_THRESHOLD: 0.25,
@@ -278,6 +293,13 @@ export const FOUNDERS: FoundersConfig = {
 // 形質別の変異・回帰パラメータ（正典 §6.4 の表・§13.1 TRAIT_MUTATION・D-009）
 // ---------------------------------------------------------------------------
 
+/**
+ * clamp幅 ÷ sd の比（正典 §6.4: ±150 と N(0,90)）。
+ * リテラルで二重管理せず §13.1 の定数から導出する（I-2a）。
+ * この比を変えたら `CLAMP_TRUNCATION_FACTOR` の再計算も必要。
+ */
+export const MUTATION_CLAMP_RATIO = BALANCE.MUTATION_CLAMP / BALANCE.MUTATION_SD;
+
 /** 一様分布 [a, b] の期待値 */
 function uniformMean(range: readonly [number, number]): number {
   return (range[0] + range[1]) / 2;
@@ -330,20 +352,25 @@ function uniformSd(range: readonly [number, number]): number {
 export function buildTraitMutation(
   f: FoundersConfig,
   regressionRate: number = BALANCE.REGRESSION_RATE,
-  clampRatio: number = BALANCE.MUTATION_CLAMP_RATIO,
+  clampRatio: number = MUTATION_CLAMP_RATIO,
+  truncationFactor: number = BALANCE.CLAMP_TRUNCATION_FACTOR,
 ): Readonly<Record<NumericTraitKey, TraitMutationSpec>> {
   const abilityCenter = { center: f.ABILITY_MEAN };
 
   /**
-   * 非能力形質の変異幅を創始アレルSDから導出する（正典 §6.4・D-012）。
-   *   平衡SD = sd / √(2r − r²)  →  sd = 創始アレルSD × √(2r − r²)
+   * 非能力形質の変異幅を創始アレルSDから導出する（正典 §6.4・D-012/D-013）。
+   *
+   *   平衡SD = 実効sd / √(2r − r²)   かつ   実効sd = sd × 0.9156（clamp 切断）
+   *   → sd = 創始アレルSD × √(2r − r²) ÷ 0.9156
+   *
    * 定数を別々に持つと片方だけ変えたときに平衡が壊れるので、必ずここで一緒に導出する。
+   * clamp は**丸める前の sd** から算出する（丸めた sd から出すと比が崩れる）。
    */
   const derive = (founderAlleleSd: number): { sd: number; clamp: number } => {
-    const sd = Math.round(
-      founderAlleleSd * Math.sqrt(2 * regressionRate - regressionRate * regressionRate),
-    );
-    return { sd, clamp: Math.round(sd * clampRatio) };
+    const raw =
+      (founderAlleleSd * Math.sqrt(2 * regressionRate - regressionRate * regressionRate)) /
+      truncationFactor;
+    return { sd: Math.round(raw), clamp: Math.round(raw * clampRatio) };
   };
 
   return {
@@ -385,7 +412,7 @@ export const DEFAULT_BALANCE: BalanceConfig = {
   },
   traitBounds: TRAIT_BOUNDS,
 
-  MUTATION_CLAMP: 150,
+  MUTATION_CLAMP: BALANCE.MUTATION_CLAMP,
   MUTATION_SCALE_BASE: 1000,
 
   INBREED_CONCENTRATION_SLOPE: 1.2,

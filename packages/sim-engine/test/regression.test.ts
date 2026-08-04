@@ -6,7 +6,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { BALANCE, DEFAULT_BALANCE, FOUNDERS, buildTraitMutation } from '../src/balance.js';
+import {
+  BALANCE,
+  DEFAULT_BALANCE,
+  FOUNDERS,
+  MUTATION_CLAMP_RATIO,
+  buildTraitMutation,
+} from '../src/balance.js';
 import { breed } from '../src/breeding.js';
 import { mutateAllele, resolveMutation } from '../src/genetics.js';
 import type { NicksTable } from '../src/nicks.js';
@@ -162,54 +168,82 @@ describe('形質別の変異・回帰パラメータ（正典 §6.4 の表・D-0
     }
   });
 
-  it('丈夫さ: sd 60 / clamp 100 / 回帰 0.20 / 中心 650（★値域45%の450ではない）', () => {
+  it('丈夫さ: sd 66 / clamp 109 / 回帰 0.20 / 中心 650（★値域45%の450ではない）', () => {
     const m = resolveMutation(DEFAULT_BALANCE, 'durability');
     expect(m.center).toBe(650);
     expect(m.regressionRate).toBe(0.2);
-    // 値域比スケール（=90）ではなく創始アレルSD 100 × √0.36 から導出（D-012）
-    expect(m.sd).toBe(60);
-    expect(m.clamp).toBe(100);
+    // 値域比スケール（=90）ではなく 創始アレルSD 100 × √0.36 ÷ 0.9156 から導出（D-012/D-013）
+    expect(m.sd).toBe(66);
+    expect(m.clamp).toBe(109);
   });
 
-  it('気性: sd 9 / clamp 15 / 中心 50', () => {
+  it('気性: sd 10 / clamp 16 / 中心 50', () => {
     const m = resolveMutation(DEFAULT_BALANCE, 'temper');
     expect(m.center).toBe(50);
-    expect(m.sd).toBe(9);
-    expect(m.clamp).toBe(15);
+    expect(m.sd).toBe(10);
+    expect(m.clamp).toBe(16);
   });
 
-  it('芝/ダート適性: sd 12 / clamp 20 / 中心 55（★値域45%の45ではない）', () => {
+  it('芝/ダート適性: sd 13 / clamp 22 / 中心 55（★値域45%の45ではない）', () => {
     for (const key of ['surface.turf', 'surface.dirt'] as const) {
       const m = resolveMutation(DEFAULT_BALANCE, key);
       expect(m.center).toBe(55);
-      expect(m.sd).toBe(12);
-      expect(m.clamp).toBe(20);
+      expect(m.sd).toBe(13);
+      expect(m.clamp).toBe(22);
     }
   });
 
-  it('非能力形質の sd はすべて創始アレルSDから導出される（D-012）', () => {
+  it('clamp 切断補正の係数がリテラル固定されている（D-013）', () => {
+    // clamp/sd 比 1.6667 での実効SD係数。比を変えたら再計算が必要
+    expect(BALANCE.CLAMP_TRUNCATION_FACTOR).toBe(0.9156);
+    expect(MUTATION_CLAMP_RATIO).toBeCloseTo(150 / 90, 10);
+  });
+
+  it('非能力形質の sd はすべて創始アレルSDから導出される（D-012/D-013）', () => {
     // 値域比スケールのままだと芝適性は平衡SDが 0.71倍に収縮、丈夫さは 1.41倍に拡大していた
     const built = buildTraitMutation(FOUNDERS, 0.2);
-    const factor = Math.sqrt(2 * 0.2 - 0.2 * 0.2); // = 0.6
-    expect(built.durability.sd).toBe(Math.round(FOUNDERS.DURABILITY_SD * factor));
-    expect(built.temper.sd).toBe(Math.round(FOUNDERS.TEMPER_SD * factor));
-    expect(built['surface.turf'].sd).toBe(Math.round((90 - 20) / Math.sqrt(12) * factor));
+    const g = Math.sqrt(2 * 0.2 - 0.2 * 0.2); // = 0.6
+    const f = BALANCE.CLAMP_TRUNCATION_FACTOR;
+    expect(built.durability.sd).toBe(Math.round((FOUNDERS.DURABILITY_SD * g) / f));
+    expect(built.temper.sd).toBe(Math.round((FOUNDERS.TEMPER_SD * g) / f));
+    expect(built['surface.turf'].sd).toBe(Math.round(((90 - 20) / Math.sqrt(12)) * g / f));
     // 能力5種だけは例外（V-1 から較正するため上書きしない）
     expect(built.sp.sd).toBeUndefined();
   });
 
-  it('distance_center: sd 312 / clamp 520 / 回帰 0.20（共通） / 中心 2100', () => {
+  it('sd は創始定義の SD に追随する（I-5・center と同じ担保）', () => {
+    // FOUNDERS.*_SD を変えたら導出 sd も変わること。
+    // center 側（D-009）には同等のテストがあったが sd 側には無かった
+    const wider = buildTraitMutation({
+      ...FOUNDERS,
+      DURABILITY_SD: 200,
+      TEMPER_SD: 30,
+      SURFACE_RANGE: [0, 140],
+      DISTANCE_CENTER_RANGE: [0, 3600],
+    });
+    const g = Math.sqrt(2 * 0.2 - 0.2 * 0.2);
+    const f = BALANCE.CLAMP_TRUNCATION_FACTOR;
+    expect(wider.durability.sd).toBe(Math.round((200 * g) / f));
+    expect(wider.temper.sd).toBe(Math.round((30 * g) / f));
+    expect(wider['surface.turf'].sd).toBe(Math.round((140 / Math.sqrt(12)) * g / f));
+    expect(wider.distance_center.sd).toBe(Math.round((3600 / Math.sqrt(12)) * g / f));
+    // 創始SDを2倍にしたら sd もほぼ2倍（丸めで ±1 の差は許容）
+    const base = buildTraitMutation(FOUNDERS).durability.sd ?? 0;
+    expect(Math.abs((wider.durability.sd ?? 0) - base * 2)).toBeLessThanOrEqual(1);
+  });
+
+  it('distance_center: sd 341 / clamp 568 / 回帰 0.20（共通） / 中心 2100', () => {
     const m = resolveMutation(DEFAULT_BALANCE, 'distance_center');
-    expect(m.sd).toBe(312);
-    expect(m.clamp).toBe(520);
+    expect(m.sd).toBe(341);
+    expect(m.clamp).toBe(568);
     expect(m.regressionRate).toBe(0.2);
     expect(m.center).toBe(2100);
   });
 
-  it('distance_range: sd 104 / clamp 173 / 回帰 0.20（共通） / 中心 700', () => {
+  it('distance_range: sd 114 / clamp 189 / 回帰 0.20（共通） / 中心 700', () => {
     const m = resolveMutation(DEFAULT_BALANCE, 'distance_range');
-    expect(m.sd).toBe(104);
-    expect(m.clamp).toBe(173);
+    expect(m.sd).toBe(114);
+    expect(m.clamp).toBe(189);
     expect(m.regressionRate).toBe(0.2);
     expect(m.center).toBe(700);
   });
@@ -218,16 +252,17 @@ describe('形質別の変異・回帰パラメータ（正典 §6.4 の表・D-0
     // 平衡SD = sd / sqrt(2r - r²) を創始水準に保つため sd は r に従属する。
     // r を変えたら sd も自動で追随すること（定数が別々に固まって壊れるのを防ぐ）
     const alleleSd = (1000 - 400) / Math.sqrt(12); // distance_range の創始アレルSD
+    const f = BALANCE.CLAMP_TRUNCATION_FACTOR;
     for (const r of [0.05, 0.1, 0.2]) {
       const built = buildTraitMutation(FOUNDERS, r);
-      expect(built.distance_range.sd).toBe(Math.round(alleleSd * Math.sqrt(2 * r - r * r)));
+      expect(built.distance_range.sd).toBe(Math.round((alleleSd * Math.sqrt(2 * r - r * r)) / f));
     }
-    expect(buildTraitMutation(FOUNDERS, 0.2).distance_center.sd).toBe(312);
+    expect(buildTraitMutation(FOUNDERS, 0.2).distance_center.sd).toBe(341);
   });
 
   it('距離系の大突然変異SDは通常変異との比（180/90 = 2倍）を保つ', () => {
-    expect(resolveMutation(DEFAULT_BALANCE, 'distance_center').bigSd).toBe(624);
-    expect(resolveMutation(DEFAULT_BALANCE, 'distance_range').bigSd).toBe(208);
+    expect(resolveMutation(DEFAULT_BALANCE, 'distance_center').bigSd).toBe(682);
+    expect(resolveMutation(DEFAULT_BALANCE, 'distance_range').bigSd).toBe(228);
   });
 
   it('MUTATION_SD=0 でも NaN を返さない（ゼロ除算の防御）', () => {
@@ -319,6 +354,87 @@ describe('変異＋回帰の式（正典 §6.4・D-012）', () => {
 
   it('品種中心ちょうどならノイズだけが効く', () => {
     expect(mutateAllele(450, 30, mutation, false)).toBe(480);
+  });
+});
+
+/**
+ * 【I-3】clamp の式を**本番経路**でも固定する。
+ *
+ * 前便で `mutateAllele()` を純関数化して式を固定したが、固定できていたのは
+ * **純関数の内部だけ**だった。レビュー側の監査で「純関数はそのままに、呼び出し側
+ * （`inheritGenotype`）へ旧「合計 clamp」形をインラインで書き戻す」と82件すべて PASS
+ * することが確認された。単体を固定することと経路を固定することは別物である。
+ *
+ * ここでは `breed()` を通した**観測可能な境界**で式を判別する。
+ * 両親のアレルを 900（品種中心450・回帰0.2 → 引き戻し −90）に固定し、
+ * 変異ノイズは N(0,90) を ±150 で clamp する条件にすると:
+ *
+ *   正しい式  child = 900 + clamp(X, ±150) − 90        → 値域 [660, 960]
+ *   誤った式  child = 900 + clamp(X − 90, ±150)        → 値域 [750, 1050]
+ *
+ * **上限960超**と**下限750未満**のどちらも、片方の式でしか起こり得ない。
+ */
+describe('clamp の式が本番経路（breed 経由）でも固定されていること（I-3）', () => {
+  const CENTER = 450;
+  const PARENT_ALLELE = 900;
+  const PULL = (PARENT_ALLELE - CENTER) * 0.2; // = 90
+  const CLAMP = 150;
+
+  function breedMany(count: number): number[] {
+    // 隔世遺伝・大物覚醒・大突然変異を止め、通常変異と回帰だけが効く条件にする
+    const balance = {
+      ...DEFAULT_BALANCE,
+      genetics: {
+        ...DEFAULT_BALANCE.genetics,
+        ATAVISM_RATE: 0,
+        BIG_ATAVISM_RATE: 0,
+        BIG_MUTATION_RATE: 0,
+      },
+    };
+    const herd = new Herd();
+    const sire = herd.add('S', 'male', null, null, { birthYear: 0 });
+    const dam = herd.add('D', 'female', null, null, { birthYear: 0 });
+    for (const h of [sire, dam]) {
+      h.genotype.sp = { a1: PARENT_ALLELE, a2: PARENT_ALLELE };
+    }
+    const out: number[] = [];
+    for (let seed = 0; seed < count; seed++) {
+      const foal = breed({
+        id: `F${seed}`,
+        sire,
+        dam,
+        seed,
+        generation: 1,
+        birthYear: 10,
+        lookup: herd.lookup,
+        balance,
+        nicks: NO_NICKS,
+      });
+      out.push(foal.genotype.sp.a1, foal.genotype.sp.a2);
+    }
+    return out;
+  }
+
+  const alleles = breedMany(400);
+
+  it('観測値が正しい式の値域 [660, 960] に収まる', () => {
+    const lo = PARENT_ALLELE - CLAMP - PULL; // 660
+    const hi = PARENT_ALLELE + CLAMP - PULL; // 960
+    expect(Math.min(...alleles)).toBeGreaterThanOrEqual(lo);
+    // ★誤った式なら最大 1050 まで出る。ここで確実に落ちる
+    expect(Math.max(...alleles)).toBeLessThanOrEqual(hi);
+  });
+
+  it('誤った式では到達できない下限（750未満）が実際に観測される', () => {
+    // 合計に clamp をかける式では child は 750 を下回れない
+    expect(Math.min(...alleles)).toBeLessThan(750);
+  });
+
+  it('引き戻しの分だけ分布全体が下にずれている（中心が親より低い）', () => {
+    const avg = alleles.reduce((a, b) => a + b, 0) / alleles.length;
+    // 正: 900 − 90 = 810 付近 / 誤: clamp が引き戻しを削るので 810 より高く出る
+    expect(avg).toBeGreaterThan(795);
+    expect(avg).toBeLessThan(825);
   });
 });
 

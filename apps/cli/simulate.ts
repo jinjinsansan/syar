@@ -10,7 +10,8 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { DEFAULT_BALANCE, FOUNDERS, NICKS_GEN, type BalanceConfig } from '@star/sim-engine';
+import { NICKS_GEN } from '@star/sim-engine';
+import { resolveRuntimeConfig } from './src/config.js';
 import { formatReport } from './src/format.js';
 import { DEFAULT_OPTIONS, runSimulation, type SimulationOptions } from './src/simulator.js';
 
@@ -187,27 +188,15 @@ function parseArgs(argv: readonly string[]): CliArgs {
   return { options, json, quiet, geneticsOverrides, balanceOverrides, founderOverrides };
 }
 
-function applyOverrides<T extends object>(
-  base: T,
-  overrides: Record<string, number>,
-  label: string,
-): T {
-  const out = { ...base } as Record<string, unknown>;
-  for (const [key, value] of Object.entries(overrides)) {
-    if (!(key in out)) throw new Error(`${label} に存在しない定数です: ${key}`);
-    out[key] = value;
-  }
-  return out as T;
-}
-
 function main(): void {
   const args = parseArgs(process.argv.slice(2));
 
-  const balance: BalanceConfig = {
-    ...applyOverrides(DEFAULT_BALANCE, args.balanceOverrides, 'balance'),
-    genetics: applyOverrides(DEFAULT_BALANCE.genetics, args.geneticsOverrides, 'genetics'),
-  };
-  const founders = applyOverrides(FOUNDERS, args.founderOverrides, 'founders');
+  // 上書きの適用と形質別パラメータの再導出は config.ts に集約（I-4）
+  const { balance, founders } = resolveRuntimeConfig(
+    args.balanceOverrides,
+    args.geneticsOverrides,
+    args.founderOverrides,
+  );
 
   const result = runSimulation(args.options, balance, founders, NICKS_GEN);
 

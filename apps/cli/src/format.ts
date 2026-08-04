@@ -214,10 +214,24 @@ export function formatReport(result: SimulationResult): string {
     `V-2d 全形質の水準維持: 集団平均が創始水準 ±${pct(v2d.targetAbsMax, 0)} 以内` +
       `（能力5種は方向性選抜で上がるのが正常なため判定対象外・参考表示）`,
   );
+  const founderPheno = founderCohort.phenotypeMeans;
+  const finalPheno = last?.phenotypeMeans;
   for (const t of v2d.traits) {
+    const key = t.key as keyof typeof founderPheno;
+    const pheno =
+      founderPheno[key] === undefined || finalPheno === undefined
+        ? ''
+        : `  [表現型 ${founderPheno[key].toFixed(1)}→${finalPheno[key].toFixed(1)}]`;
+    const unit = t.basis === 'sd' ? '創始SD' : t.basis === 'none' ? '判定不能' : '%';
+    const value =
+      t.basis === 'none'
+        ? '—'
+        : t.basis === 'sd'
+          ? `${t.deviation >= 0 ? '+' : ''}${t.deviation.toFixed(3)}`
+          : `${t.deviation >= 0 ? '+' : ''}${(t.deviation * 100).toFixed(2)}`;
     lines.push(
       `    ${pad(t.key, 16)}: 創始 ${pad(t.founderMean.toFixed(1), 8)} → 最終 ${pad(t.finalMean.toFixed(1), 8)}` +
-        `  乖離 ${t.deviation >= 0 ? '+' : ''}${(t.deviation * 100).toFixed(2)}%  ${verdict(t.pass)}`,
+        `  乖離 ${value}${unit}  ${verdict(t.pass)}${pheno}`,
     );
   }
   for (const t of v2d.abilityReference) {

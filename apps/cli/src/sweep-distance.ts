@@ -17,7 +17,13 @@
  *   当時は集団200頭・V-2d 未実装だったため、判定条件が異なる。
  */
 
-import { DEFAULT_BALANCE, FOUNDERS, NICKS_GEN, type BalanceConfig } from '@star/sim-engine';
+import {
+  DEFAULT_BALANCE,
+  FOUNDERS,
+  NICKS_GEN,
+  buildTraitMutation,
+  type BalanceConfig,
+} from '@star/sim-engine';
 import { runSimulation } from './simulator.js';
 import { mean, round } from './stats.js';
 
@@ -55,8 +61,6 @@ const POPULATION = parseNumber('--population', 800);
 const HORIZON = parseNumber('--horizon', 300);
 const SEEDS = parseList("--seeds", [42, 7, 2026, 31337]);
 const RATES = parseList('--rates', [0.05, 0.1, 0.2]);
-/** clamp / sd の比。能力5種と同じ 150/90 = 1.67 に揃える */
-const CLAMP_RATIO = 150 / 90;
 
 function pad(s: string | number, w: number): string {
   const str = String(s);
@@ -80,21 +84,10 @@ for (const r of RATES) {
   const rangeSd = sdFor(FOUNDER_ALLELE_SD.range, r);
   const balance: BalanceConfig = {
     ...DEFAULT_BALANCE,
-    traitMutation: {
-      ...DEFAULT_BALANCE.traitMutation,
-      distance_center: {
-        sd: centerSd,
-        clamp: Math.round(centerSd * CLAMP_RATIO),
-        regressionRate: r,
-        center: 2100,
-      },
-      distance_range: {
-        sd: rangeSd,
-        clamp: Math.round(rangeSd * CLAMP_RATIO),
-        regressionRate: r,
-        center: 700,
-      },
-    },
+    REGRESSION_RATE: r,
+    // ★距離2形質だけ手で組むと、D-012 以降は丈夫さ・気性・適性が置き去りになる（I-4）。
+    //   全形質を同じ導出で組み直す
+    traitMutation: buildTraitMutation(FOUNDERS, r),
   };
 
   const centerDev: number[] = [];

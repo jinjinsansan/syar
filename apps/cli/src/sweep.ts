@@ -11,7 +11,13 @@
  * 本ファイルは P0 報告書の数値を再現できるように残している。
  */
 
-import { DEFAULT_BALANCE, FOUNDERS, NICKS_GEN, type BalanceConfig } from '@star/sim-engine';
+import {
+  DEFAULT_BALANCE,
+  FOUNDERS,
+  NICKS_GEN,
+  buildTraitMutation,
+  type BalanceConfig,
+} from '@star/sim-engine';
 import { runSimulation } from './simulator.js';
 import { mean, round } from './stats.js';
 
@@ -48,10 +54,17 @@ console.log(
 console.log('-'.repeat(97));
 
 for (const cfg of CONFIGS) {
+  const regressionRate = cfg.regression ?? 0;
   const balance: BalanceConfig = {
     ...DEFAULT_BALANCE,
     genetics: { ...DEFAULT_BALANCE.genetics, MUTATION_SD: cfg.mutationSd },
-    REGRESSION_RATE: cfg.regression ?? 0,
+    REGRESSION_RATE: regressionRate,
+    // 回帰率/変異SDを振ったら形質別 sd も導出し直す（I-4。据え置くと平衡がずれる）
+    traitMutation: buildTraitMutation(
+      FOUNDERS,
+      regressionRate,
+      DEFAULT_BALANCE.MUTATION_CLAMP / cfg.mutationSd,
+    ),
   };
   const v2s: number[] = [];
   const v1s: number[] = [];

@@ -178,6 +178,22 @@ export interface CohortStat {
    */
   traitSds: Record<NumericTraitKey, number>;
   /**
+   * 非能力6形質の**表現型**平均（I-2c）。
+   *
+   * V-2d/V-2e の判定は genotype 発現値で行うが、§7.5 の故障率の分母は表現型
+   * （インブリードの減点を含む `horse.durability`）である。P0 では平均F が小さく
+   * 両者の差は無視できるが、P1 で近交が進むと genotype 側だけ見ていては乖離を検出できない。
+   * 判定には使わず、監視のために併記する。
+   */
+  phenotypeMeans: {
+    durability: number;
+    temper: number;
+    'surface.turf': number;
+    'surface.dirt': number;
+    distance_center: number;
+    distance_range: number;
+  };
+  /**
    * 中間親（父母の能力合計の平均）と産駒の能力合計のピアソン相関。
    * 「血のつながりの強さ」の実測値。正典 §1.1「血をつなぐことが唯一の進行軸」／
    * §1.4-3「蓄積感」が成立しているかの健全性指標であり、
@@ -255,8 +271,13 @@ export interface Verification {
       key: NumericTraitKey;
       founderMean: number;
       finalMean: number;
-      /** finalMean / founderMean - 1 */
+      /** basis=ratio なら finalMean/founderMean−1、basis=sd なら (finalMean−founderMean)/創始SD */
       deviation: number;
+      /**
+       * 判定の物差し（I-2b）。創始平均が0の形質は比率で測れないため創始SD基準に切り替える。
+       * none = 創始平均もSDも0で判定不能 → PASS させない（静かに素通りさせない）
+       */
+      basis: 'ratio' | 'sd' | 'none';
       pass: boolean;
     }[];
     /** 参考: 能力5種（方向性選抜で上がるのが正常なので判定対象外） */
@@ -447,6 +468,14 @@ function summarizeCohort(
     },
     traitMeans: traitStats.means,
     traitSds: traitStats.sds,
+    phenotypeMeans: {
+      durability: round(mean(horses.map((h) => h.durability)), 2),
+      temper: round(mean(horses.map((h) => h.temper)), 2),
+      'surface.turf': round(mean(horses.map((h) => h.surfaceAptitude.turf)), 2),
+      'surface.dirt': round(mean(horses.map((h) => h.surfaceAptitude.dirt)), 2),
+      distance_center: round(mean(horses.map((h) => h.distanceCenter)), 2),
+      distance_range: round(mean(horses.map((h) => h.distanceRange)), 2),
+    },
     parentOffspringCorrelation:
       extra.midParent === undefined ? 0 : round(correlation(extra.midParent, totals), 4),
   };
@@ -894,17 +923,30 @@ export function runSimulation(
 
   // --- V-2d 全形質の水準維持: 集団平均が創始水準 ±10% 以内 ---
   const founderTraitMeans = founderCohort.traitMeans;
+  const founderTraitSds = founderCohort.traitSds;
   const finalTraitMeans = finalCohort?.traitMeans;
   const v2dTraits = V2D_TRAITS.map((key) => {
     const founderMean = founderTraitMeans[key];
     const finalMean = finalTraitMeans?.[key] ?? 0;
-    const deviation = founderMean === 0 ? 0 : finalMean / founderMean - 1;
+    // ★創始平均が0の形質は比率で判定できない（I-2b）。
+    //   ゼロ割を「乖離0 = 無条件 PASS」で握り潰すと、将来 0 中心の形質が入ったときに
+    //   静かに素通りする。創始SDを物差しにした絶対差へ切り替え、basis で明示する。
+    const usesRatio = Math.abs(founderMean) > 1e-9;
+    const founderSd = founderTraitSds[key];
+    const deviation = usesRatio
+      ? finalMean / founderMean - 1
+      : founderSd > 1e-9
+        ? (finalMean - founderMean) / founderSd
+        : Number.NaN;
     return {
       key,
       founderMean,
       finalMean,
-      deviation: round(deviation, 4),
-      pass: Math.abs(deviation) <= V2D_TARGET_ABS_MAX,
+      deviation: Number.isNaN(deviation) ? Number.NaN : round(deviation, 4),
+      /** ratio = 創始平均比 / sd = 創始SDを単位とした差 / undefined = 判定不能 */
+      basis: usesRatio ? ('ratio' as const) : founderSd > 1e-9 ? ('sd' as const) : ('none' as const),
+      // 判定不能（創始平均も創始SDも0）なら PASS させない
+      pass: Number.isNaN(deviation) ? false : Math.abs(deviation) <= V2D_TARGET_ABS_MAX,
     };
   });
   const abilityReference = ABILITY_KEYS.map((key) => {
@@ -923,7 +965,6 @@ export function runSimulation(
   );
 
   // --- V-2e 非能力形質の分化: 集団SDが創始の 0.8〜1.4倍（D-012 で全非能力形質へ一般化） ---
-  const founderTraitSds = founderCohort.traitSds;
   const finalTraitSds = finalCohort?.traitSds;
   const v2eTraits = V2D_TRAITS.map((key) => {
     const founderSd = founderTraitSds[key];
