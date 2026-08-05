@@ -22,10 +22,14 @@ import {
   FOUNDERS,
   NICKS_GEN,
   buildTraitMutation,
+  clampTruncationFactor,
   type BalanceConfig,
 } from '@star/sim-engine';
 import { runSimulation } from './simulator.js';
 import { mean, round } from './stats.js';
+
+/** 表示・導出の双方で使う clamp比（片方だけ変えると N-4 の食い違いが再発する） */
+const DEFAULT_CLAMP_RATIO = DEFAULT_BALANCE.MUTATION_CLAMP / DEFAULT_BALANCE.genetics.MUTATION_SD;
 
 /** 創始アレルSD（一様分布 [a,b] の SD = (b-a)/sqrt(12)） */
 const FOUNDER_ALLELE_SD = {
@@ -33,9 +37,17 @@ const FOUNDER_ALLELE_SD = {
   range: (FOUNDERS.DISTANCE_RANGE_RANGE[1] - FOUNDERS.DISTANCE_RANGE_RANGE[0]) / Math.sqrt(12),
 };
 
-/** 平衡SDを創始水準に保つ sd を回帰率から逆算する */
+/**
+ * 平衡SDを創始水準に保つ sd を回帰率から逆算する（表示用）。
+ *
+ * ⚠️ **`buildTraitMutation()` と同じ式にすること**（N-4）。
+ *    以前ここは切断係数で割っておらず、**表に 312 と表示しながらループが実際に使うのは 341**
+ *    という「記述と実装の食い違い」になっていた（M-1 と同じクラス）。
+ */
 function sdFor(alleleSd: number, r: number): number {
-  return Math.round(alleleSd * Math.sqrt(2 * r - r * r));
+  return Math.round(
+    (alleleSd * Math.sqrt(2 * r - r * r)) / clampTruncationFactor(DEFAULT_CLAMP_RATIO),
+  );
 }
 
 function parseNumber(flag: string, fallback: number): number {

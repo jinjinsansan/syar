@@ -5,16 +5,35 @@
  *    P0-fix の誤結論（「回帰0.20 では距離SDが0.4倍に収縮する」）を生んだのと同じ経路。
  */
 
-import { DEFAULT_BALANCE, FOUNDERS, NICKS_GEN, clampTruncationFactor } from '@star/sim-engine';
+import {
+  DEFAULT_BALANCE,
+  FOUNDERS,
+  NICKS_GEN,
+  buildTraitMutation,
+  clampTruncationFactor,
+} from '@star/sim-engine';
 import { describe, expect, it } from 'vitest';
 import { resolveRuntimeConfig } from '../src/config.js';
 import { runSimulation } from '../src/simulator.js';
 
 describe('CLI の上書きと形質別パラメータの再導出（I-4）', () => {
-  it('上書きなしなら既定と同じ値になる', () => {
+  it('上書きなしでも導出を実行している（既定値との同語反復にしない・N-5）', () => {
+    // ⚠️ `toEqual(DEFAULT_BALANCE.traitMutation)` だけだと、resolveRuntimeConfig が
+    //    再導出を丸ごと省いて DEFAULT_BALANCE をそのまま返しても緑になる（I-4 そのもの）。
+    //    **独立に組み直した期待値**と突き合わせて、導出が実行されたことを担保する。
     const { balance, founders } = resolveRuntimeConfig();
     expect(founders).toEqual(FOUNDERS);
-    expect(balance.traitMutation).toEqual(DEFAULT_BALANCE.traitMutation);
+
+    const expected = buildTraitMutation(
+      FOUNDERS,
+      DEFAULT_BALANCE.REGRESSION_RATE,
+      DEFAULT_BALANCE.MUTATION_CLAMP / DEFAULT_BALANCE.genetics.MUTATION_SD,
+    );
+    expect(balance.traitMutation).toEqual(expected);
+    // 参照が使い回されていない（＝作り直している）ことも確認する
+    expect(balance.traitMutation).not.toBe(DEFAULT_BALANCE.traitMutation);
+
+    // 正典 §6.4 の表とのリテラル一致（値そのものの固定）
     expect(balance.traitMutation['durability']?.sd).toBe(66);
     expect(balance.traitMutation['distance_center']?.sd).toBe(341);
   });

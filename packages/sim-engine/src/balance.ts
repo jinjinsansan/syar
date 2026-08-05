@@ -384,7 +384,9 @@ function uniformSd(range: readonly [number, number]): number {
  *
  * FOUNDERS から導出しているのは、創始定義と回帰中心が将来ずれないようにするため
  * （FOUNDERS.DURABILITY_MEAN を変えたら回帰中心も自動で追随する）。
- * 実際の値は正典 §13.1 の表とリテラル一致することをテストで固定している。
+ * 実際の値が正典 §13.1 の表とリテラル一致することは、`regression.test.ts` の
+ * **「丈夫さ: sd 66 / clamp 109 …」「気性: sd 10 / clamp 16 …」「芝/ダート適性: sd 13 …」
+ * 「distance_center: sd 341 …」「distance_range: sd 114 …」** で固定している（N-3）。
  *
  * ★上書きするのは **sd（と比例する clamp）と品種中心だけ**。回帰率・clamp比は全形質共通（0.20 / 1.67）。
  *

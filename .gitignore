@@ -11,6 +11,9 @@ dist/
 out/
 *.out.json
 
+# --- 棚卸し計測の中間出力（N-2 / R-10。npm run inventory で再生成できる）---
+tools/inventory/.probe.jsonl
+
 # --- OS / エディタ ---
 .DS_Store
 Thumbs.db
