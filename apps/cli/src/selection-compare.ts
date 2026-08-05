@@ -38,6 +38,7 @@ const SEEDS = parseList('--seeds', [42, 7]);
 const MODES = [
   { label: 'proxy（P0 の近似）', selection: 'proxy' as const, metric: 'prize' as const },
   { label: 'race / prize', selection: 'race' as const, metric: 'prize' as const },
+  { label: 'race / prize/starts', selection: 'race' as const, metric: 'prizePerStart' as const },
   { label: 'race / winRate', selection: 'race' as const, metric: 'winRate' as const },
   { label: 'race / composite', selection: 'race' as const, metric: 'composite' as const },
 ];

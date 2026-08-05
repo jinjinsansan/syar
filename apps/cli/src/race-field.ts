@@ -159,6 +159,44 @@ export const DEFAULT_CLASS_BAND = 0.06;
  */
 export const OFF_SURFACE_ENTRY_RATE = 0.15;
 
+/**
+ * 距離が向かないレースに出る割合と、「向いている」と見なす距離適性の下限（O-2）。
+ *
+ * ★V-6（最低人気の勝率 0.5〜2%）が成立しないのは、**出走表の下側の裾が長すぎる**ため。
+ *   現実の競馬は1番人気32%・大穴1〜2%で比 20〜30倍だが、実装は 34% 対 0.27% で **比126倍**。
+ *   距離が全く合わない馬が混ざると、その馬は勝ち目がゼロに近くなり裾を伸ばす。
+ *   正典 §10.4「自馬の出走レースは自分で時刻を選んでエントリー」＝オーナーは
+ *   **自馬に向いたレースを選ぶ**ので、距離でも絞るのが実態に近い。
+ */
+export const DISTANCE_SUIT_MIN = 55;
+export const OFF_DISTANCE_ENTRY_RATE = 0.12;
+
+/**
+ * 1レース内の能力レンジの下限（O-2。レビュー側の助言「1レース内の能力レンジに上限を設ける」）。
+ *
+ * ★V-4 と V-6 は**スケールを変えるだけでは両立しない**。K や開放率の幅を動かすと
+ *   1番人気の勝率と最低人気の勝率は必ず逆方向に動き、比（実測で約126倍）が変わらないため。
+ *   現実の競馬の比は 20〜30倍で、違いは**分布の形**にある — 実際の番組では
+ *   「勝ち目のない馬」は出走してこない（オーナーが出さない・条件で弾かれる）。
+ *   そこでレース内で最強馬のこの割合を下回る馬は出走させない＝**下側の裾を切る**。
+ */
+export const FIELD_STRENGTH_FLOOR = 0.78;
+
+/**
+ * 出走可否の判定に使う強さの近似（レース判定そのものではない）。
+ *
+ * ★`resolveRace` を呼んで正確なスコアを出すこともできるが、
+ *   出走表を作る段階で本番の判定を回すのは循環的で重い。
+ *   支配的な3要素（現在値・距離適性・馬場適性）だけの近似で足りる。
+ */
+export function entryStrength(entrant: RaceEntrant, distance: number, surface: Surface): number {
+  const total = ABILITY_KEYS.reduce((acc, k) => acc + entrant.stats[k], 0) / ABILITY_KEYS.length;
+  const d = distance - entrant.distanceCenter;
+  const distanceFit = Math.exp(-(d * d) / (2 * entrant.distanceRange * entrant.distanceRange));
+  const surfaceFit = 0.7 + (entrant.surfaceAptitude[surface] / 100) * 0.35;
+  return total * (0.75 + distanceFit * 0.3) * surfaceFit;
+}
+
 export function generateRace(
   pool: readonly HorseRecord[],
   raceIndex: number,
@@ -200,24 +238,45 @@ export function generateRace(
     //   ★ただし全馬を厳密に絞ると出走頭数が埋まらないので、不向きな馬も一定割合で出す。
     const suited = horse.surfaceAptitude[surface] >= horse.surfaceAptitude[surface === 'turf' ? 'dirt' : 'turf'];
     if (!suited && attempts < bandSize * 4 && !rng.bool(OFF_SURFACE_ENTRY_RATE)) continue;
+    // ★距離でも同じ理屈で絞る（O-2）。距離適性は §5.2 の正規分布カーブ（0〜100）
+    const distanceFit =
+      100 *
+      Math.exp(
+        -((distance - horse.distanceCenter) ** 2) / (2 * horse.distanceRange * horse.distanceRange),
+      );
+    if (distanceFit < DISTANCE_SUIT_MIN && attempts < bandSize * 6 && !rng.bool(OFF_DISTANCE_ENTRY_RATE))
+      continue;
     used.add(idx);
     picked.push(horse);
   }
 
-  const entrants = picked.map((horse, i) =>
-    toEntrant(
-      horse,
-      rng,
-      {
-        gate: i + 1,
-        // 調子・年齢・斤量にレースごとのばらつきを持たせる（P3 の育成が入るまでの仮定）
-        condition: rng.int(2, 4),
-        age: rng.int(3, 5),
-        weightKg: 55 + rng.range(-2, 2),
-      },
-      unlockRange,
-    ),
-  );
+  // ★出走馬を作る。頭数より多めに作ってから「レース内の能力レンジ」で絞る（O-2）。
+  //   絞る前に多めに作るのは、絞った結果 頭数が足りなくなるのを避けるため。
+  const oversample = Math.min(picked.length, fieldSize + Math.ceil(fieldSize * 0.6));
+  const candidates = picked
+    .slice(0, oversample)
+    .map((horse) =>
+      toEntrant(
+        horse,
+        rng,
+        {
+          // 調子・年齢・斤量にレースごとのばらつきを持たせる（P3 の育成が入るまでの仮定）
+          condition: rng.int(2, 4),
+          age: rng.int(3, 5),
+          weightKg: 55 + rng.range(-2, 2),
+        },
+        unlockRange,
+      ),
+    );
+
+  const withStrength = candidates.map((e) => ({ e, s: entryStrength(e, distance, surface) }));
+  withStrength.sort((a, b) => b.s - a.s);
+  const best = withStrength[0]?.s ?? 1;
+  // レース内で「最強の FIELD_STRENGTH_FLOOR 倍」を下回る馬は出走させない（＝下側の裾を切る）
+  const kept = withStrength.filter((x) => x.s >= best * FIELD_STRENGTH_FLOOR);
+  const chosen = (kept.length >= FIELD_SIZE.MIN ? kept : withStrength).slice(0, fieldSize);
+  // 枠順は強さ順ではなく抽選（強い馬が常に内枠になると gateCoef と交絡する）
+  const entrants = rng.shuffled(chosen.map((x) => x.e)).map((e, i) => ({ ...e, gate: i + 1 }));
 
   const classLevel =
     pool.length <= bandSize ? 0.5 : bandStart / (pool.length - bandSize);

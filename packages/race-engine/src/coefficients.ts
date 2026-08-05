@@ -17,7 +17,13 @@ import type {
   TrackCondition,
 } from './types.js';
 
+/**
+ * ★NaN は `<` `>` の両方が false になるため、素朴な三項演算子の clamp を**素通りする**（O-7）。
+ *   係数が NaN になると score が NaN になり、着順比較がすべて false になって
+ *   「入力順のまま」という静かな破綻を生む（R-3）。中央値に倒して止める。
+ */
 function clamp(value: number, min: number, max: number): number {
+  if (Number.isNaN(value)) return (min + max) / 2;
   return value < min ? min : value > max ? max : value;
 }
 
@@ -142,14 +148,24 @@ export function conditionCoef(condition: number, balance: RaceBalance): number {
   return balance.CONDITION_COEF_MIN + t * (balance.CONDITION_COEF_MAX - balance.CONDITION_COEF_MIN);
 }
 
-/** §8.3 fatigueCoef = `1 - fatigue / 500` */
+/**
+ * §8.3 fatigueCoef = `1 - fatigue / 500`
+ *
+ * ★下限0でクランプする（O-7）。疲労が 500 を超えると係数が負になり、
+ *   スコアの符号が反転して**最も疲れた馬が最強**になる。
+ *   `randomMult` 側には `Math.max(0,…)` の防御があるのに、ここだけ無防備だった（非対称）。
+ */
 export function fatigueCoef(fatigue: number, balance: RaceBalance): number {
-  return 1 - fatigue / balance.FATIGUE_DIV;
+  return clamp(1 - fatigue / balance.FATIGUE_DIV, 0, 1);
 }
 
 /** §8.3 weightCoef: 基準55kg・±1kg ごとに ∓0.8% */
+/**
+ * ★同じく下限でクランプする（O-7）。基準から +125kg で係数が0、それ以上で負になる。
+ *   現実的な斤量では起きないが、**符号が反転しうる式を無防備に置かない**。
+ */
 export function weightCoef(weightKg: number, baseWeightKg: number, balance: RaceBalance): number {
-  return 1 - (weightKg - baseWeightKg) * balance.WEIGHT_PER_KG;
+  return clamp(1 - (weightKg - baseWeightKg) * balance.WEIGHT_PER_KG, 0, 2);
 }
 
 /**

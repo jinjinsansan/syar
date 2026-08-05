@@ -56,10 +56,10 @@ const SELECTION: 'proxy' | 'race' = process.argv.includes('--selection')
       ? 'race'
       : 'proxy') as 'proxy' | 'race')
   : 'proxy';
-const SELECTION_METRIC: 'prize' | 'winRate' | 'composite' = (() => {
+const SELECTION_METRIC: 'prize' | 'prizePerStart' | 'winRate' | 'composite' = (() => {
   const i = process.argv.indexOf('--selection-metric');
   const v = i < 0 ? '' : process.argv[i + 1];
-  return v === 'winRate' || v === 'composite' ? v : 'prize';
+  return v === 'winRate' || v === 'composite' || v === 'prize' ? v : 'prizePerStart';
 })();
 
 function pad(s: string | number, w: number): string {

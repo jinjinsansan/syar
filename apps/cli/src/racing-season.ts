@@ -102,12 +102,19 @@ export function runSeason(
  */
 export function selectionScore(
   career: CareerRecord | undefined,
-  metric: 'prize' | 'winRate' | 'composite',
+  metric: 'prize' | 'prizePerStart' | 'winRate' | 'composite',
 ): number {
   if (career === undefined || career.starts === 0) return 0;
   switch (metric) {
     case 'prize':
       return career.prize;
+    // ★出走数で正規化した指標（O-5）。
+    //   `prize`（累計）は「長く走ったこと」も測ってしまう — 監査の実測で
+    //   r(累計賞金, 在籍年数) = 0.353 / r(累計賞金, 能力合計) = 0.440 に対し
+    //   r(1走あたり賞金, 能力合計) = 0.503 と、正規化した方が能力をよく測る。
+    //   **選抜指標は「強さ」を測るべきで「長く走ったこと」を測るべきではない。**
+    case 'prizePerStart':
+      return career.prize / career.starts;
     case 'winRate':
       return career.wins / career.starts;
     case 'composite':

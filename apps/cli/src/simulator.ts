@@ -131,7 +131,7 @@ export interface SimulationOptions {
    * - `'winRate'`: 勝率
    * - `'composite'`: 賞金と複勝率の複合
    */
-  selectionMetric: 'prize' | 'winRate' | 'composite';
+  selectionMetric: 'prize' | 'prizePerStart' | 'winRate' | 'composite';
 }
 
 export const DEFAULT_OPTIONS: SimulationOptions = {
@@ -153,7 +153,9 @@ export const DEFAULT_OPTIONS: SimulationOptions = {
   retainFinalPopulation: false,
   selection: 'proxy',
   racesPerYear: 4,
-  selectionMetric: 'prize',
+  // ★O-5 で再選定: prize（累計）は在籍年数と r=0.365 で相関し「長く走ったこと」を測っていた。
+  //   prizePerStart は在籍年数と無相関(r=-0.007)で、能力との相関も最も高い(0.639)
+  selectionMetric: 'prizePerStart',
 };
 
 // ---------------------------------------------------------------------------

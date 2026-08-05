@@ -34,6 +34,8 @@ import {
   sortPoolByClass,
 } from './race-field.js';
 import { runSimulation } from './simulator.js';
+import { toSafeJson } from './json-safe.js';
+import { PopularityEstimator } from './popularity.js';
 import { mean, round, sd } from './stats.js';
 
 // ---------------------------------------------------------------------------
@@ -61,8 +63,15 @@ function parseList(flag: string, fallback: number[]): number[] {
 
 const TOTAL_RACES = parseNumber('--races', 100_000);
 const SEEDS = parseList('--seeds', [42, 7, 2026, 31337]);
-/** 人気推定の試行数（本番確定とは別系列） */
-const POPULARITY_TRIALS = parseNumber('--popularity-trials', 60);
+/**
+ * 人気推定の試行数（本番確定とは別系列）。
+ *
+ * ★R-12: **測定の自由変数は判定に効かないことを確認する**。
+ *   タイブレークを枠順から平均着順に変えた結果、V-6 は 30〜1200試行で 0.23〜0.33% と
+ *   傾向なく安定する（変更前は 60試行 1.00% → 1200試行 0.30% と単調に動き、
+ *   **PASS が推定ノイズの産物**だった）。既定 200 は安定域の中央付近。
+ */
+const POPULARITY_TRIALS = parseNumber('--popularity-trials', 200);
 /** 母集団を作る世代数 */
 const POOL_GENERATIONS = parseNumber('--pool-generations', 40);
 const POOL_MARES = parseNumber('--pool-mares', 400);
@@ -172,22 +181,18 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     const fieldSize = race.entrants.length;
 
     // (1) 人気を推定する（本番とは別系列・§9.2）
-    const winCount = new Map<string, number>();
-    for (const e of race.entrants) winCount.set(e.horseId, 0);
+    //   タイブレークを含む順位付けは popularity.ts に切り出し、経路テストを掛けている（O-2）
+    const estimator = new PopularityEstimator(race.entrants.map((e) => e.horseId));
     for (let t = 0; t < POPULARITY_TRIALS; t++) {
       const r = resolveRace({
         conditions: race.conditions,
         entrants: race.entrants,
-        seed: (deriveRng(seed, STREAM.POPULARITY, raceIndex, t).nextUint32() >>> 0),
+        seed: deriveRng(seed, STREAM.POPULARITY, raceIndex, t).nextUint32() >>> 0,
         balance,
       });
-      const w = r.order[0];
-      if (w !== undefined) winCount.set(w.horseId, (winCount.get(w.horseId) ?? 0) + 1);
+      estimator.addTrial(r.order.map((o) => o.horseId));
     }
-    // 勝率降順に並べて人気順にする。同数は入力順（枠順）で安定させる
-    const ranked = race.entrants
-      .map((e, i) => ({ id: e.horseId, wins: winCount.get(e.horseId) ?? 0, i }))
-      .sort((a, b) => b.wins - a.wins || a.i - b.i);
+    const ranked = estimator.rank().map((x) => ({ id: x.horseId }));
     const favorite = ranked[0];
     const longshot = ranked[ranked.length - 1];
     if (favorite === undefined || longshot === undefined) continue;
@@ -293,8 +298,8 @@ const GATES = {
   V5: [0.6, 0.65] as const,
   V6: [0.005, 0.02] as const,
   V8: [0.93, 0.97] as const,
-  V9_MEAN: [0.99, 1.01] as const,
-  V9_RANGE: [0.9, 1.1] as const,
+  /** V-9a（D-014）: 不変条件。全サンプルが 0.90〜1.10。これがゲート */
+  V9A_RANGE: [0.9, 1.1] as const,
   V12_F_MAX: 0.1,
   V12_DURABILITY_MIN: -0.08,
 } as const;
@@ -394,16 +399,12 @@ const checks: { id: string; label: string; value: string; pass: boolean }[] = [
     pass: v8Ratio >= GATES.V8[0] && v8Ratio <= GATES.V8[1],
   },
   {
+    // ★D-014 で V-9 は V-9a（不変条件・ゲート）と V-9b（監視・目標値なし）に分割された。
+    //   旧 V-9「平均 0.99〜1.01」は §8b.3 の片側正のボーナスと両立しないため廃止。
     id: 'V-9a',
-    label: 'interventionMult 平均 0.99〜1.01（全出走馬）',
-    value: String(round(multMeanAll, 4)),
-    pass: multMeanAll >= GATES.V9_MEAN[0] && multMeanAll <= GATES.V9_MEAN[1],
-  },
-  {
-    id: 'V-9b',
-    label: '全サンプルが 0.90〜1.10 内',
+    label: '全サンプルが 0.90〜1.10 内（ハードキャップの不変条件）',
     value: `${round(multMin, 4)}〜${round(multMax, 4)}`,
-    pass: multMin >= GATES.V9_RANGE[0] && multMax <= GATES.V9_RANGE[1],
+    pass: multMin >= GATES.V9A_RANGE[0] && multMax <= GATES.V9A_RANGE[1],
   },
   {
     id: 'V-12a',
@@ -435,7 +436,11 @@ for (let rank = 0; rank < Math.min(maxRank, 18); rank++) {
 }
 
 console.log('');
-console.log('--- 参考値（ゲートではない・解釈の食い違いを避けるため併記する） ---');
+console.log('--- V-9b（監視・絶対目標値は置かない・D-014）と参考値 ---');
+ console.log(
+   `  V-9b 介入した馬だけの interventionMult 平均: ${round(multMeanIntervened, 4)}（時系列で監視する値）`,
+ );
+ console.log(`  全出走馬での平均（介入なしは1.00）: ${round(multMeanAll, 4)}`);
 console.log(`  介入対象馬だけの interventionMult 平均: ${round(multMeanIntervened, 4)}`);
 console.log(`  AI代行の倍率平均: ${round(aiMult, 4)} / 手動最適: ${round(optMult, 4)}`);
 console.log(
@@ -450,7 +455,24 @@ const overall = checks.every((c) => c.pass);
 console.log(`総合: ${verdict(overall)}`);
 
 if (process.argv.includes('--json')) {
-  console.log(JSON.stringify({ checks, results, elapsedSec: elapsed }, null, 2));
+  // ★非有限値は文字列化する（O-7）。素の JSON.stringify だと NaN と Infinity が
+  //   どちらも null になり、V-9a の範囲判定を JSON から追試できない。
+  //   あわせて測定条件（自由変数）も出す（R-12: どの条件で出た数字かを機械可読に残す）
+  console.log(
+    toSafeJson({
+      checks,
+      results,
+      elapsedSec: elapsed,
+      settings: {
+        races: racesPerSeed * SEEDS.length,
+        seeds: SEEDS,
+        popularityTrials: POPULARITY_TRIALS,
+        classBand: CLASS_BAND,
+        unlock: UNLOCK,
+        raceRandomK: RACE_K,
+      },
+    }),
+  );
 }
 
 process.exitCode = overall ? 0 : 1;

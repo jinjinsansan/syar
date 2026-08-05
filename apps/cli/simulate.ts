@@ -12,6 +12,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { NICKS_GEN } from '@star/sim-engine';
 import { resolveRuntimeConfig } from './src/config.js';
+import { toSafeJson, type SerializeNumbers } from './src/json-safe.js';
 import { formatReport } from './src/format.js';
 import {
   DEFAULT_OPTIONS,
@@ -200,12 +201,9 @@ function parseArgs(argv: readonly string[]): CliArgs {
  * JSON からは判別できず、本番経路を直接叩く手間が余分に発生した。
  * **直ったかを判定したい場面で見分けがつかない**のは実害なので、文字列化して残す（M-5）。
  */
-function jsonSafeNumber(_key: string, value: unknown): unknown {
-  if (typeof value === 'number' && !Number.isFinite(value)) {
-    return Number.isNaN(value) ? 'NaN' : value > 0 ? 'Infinity' : '-Infinity';
-  }
-  return value;
-}
+// ★実装は `src/json-safe.ts` に集約した（O-7）。
+//   以前はここにだけあり、`verify-race.ts` の --json は素の JSON.stringify を使っていた。
+//   K-b で宣言した型もどこからも使われておらず、宣言と実装が食い違っていた（M-1 と同じクラス）。
 
 /**
  * 【K-b】シリアライズ後の数値の型。
@@ -216,23 +214,10 @@ function jsonSafeNumber(_key: string, value: unknown): unknown {
  * 残っていた**。JSON を読む側（レビュー側の再実行・将来のツール）が
  * 「数値のはずのフィールドに文字列が来る」ことを型から知れるようにする。
  */
-export type SerializedNumber = number | 'Infinity' | '-Infinity' | 'NaN';
+export type { SerializedNumber, SerializeNumbers } from './src/json-safe.js';
 
 /** `balanceDigest` をシリアライズしたときの型（数値フィールドが `SerializedNumber` になる） */
-export type SerializedBalanceDigest = {
-  [K in keyof SimulationResult['balanceDigest']]: SerializeNumbers<
-    SimulationResult['balanceDigest'][K]
-  >;
-};
-
-/** 再帰的に `number` を `SerializedNumber` へ置き換える */
-export type SerializeNumbers<T> = T extends number
-  ? SerializedNumber
-  : T extends readonly (infer U)[]
-    ? readonly SerializeNumbers<U>[]
-    : T extends object
-      ? { [K in keyof T]: SerializeNumbers<T[K]> }
-      : T;
+export type SerializedBalanceDigest = SerializeNumbers<SimulationResult['balanceDigest']>;
 
 /** 出力 JSON 全体の型。`--json` の読み手はこれを使う */
 export type SerializedSimulationResult = SerializeNumbers<SimulationResult>;
@@ -256,7 +241,7 @@ function main(): void {
   if (args.json !== null) {
     const path = resolve(process.cwd(), args.json);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, `${JSON.stringify(result, jsonSafeNumber, 2)}\n`, 'utf8');
+    writeFileSync(path, `${toSafeJson(result)}\n`, 'utf8');
     if (!args.quiet) console.log(`\nJSON を書き出しました: ${path}`);
   }
 

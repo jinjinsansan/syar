@@ -103,6 +103,30 @@ const MUTATIONS = [
     to: '    for (const s of starts) if (s.clientMs < earliest) earliest = s.clientMs;',
     expect: 'fail',
   },
+  {
+    id: 'O2-1',
+    label: '人気のタイブレークを枠順に戻す（V-6 が測定ノイズで決まる状態）',
+    file: 'apps/cli/src/popularity.ts',
+    from: '    (a, b) => b.wins - a.wins || a.meanRank - b.meanRank || a.index - b.index,',
+    to: '    (a, b) => b.wins - a.wins || a.index - b.index,',
+    expect: 'fail',
+  },
+  {
+    id: 'O7-1',
+    label: '疲労係数のクランプを外す（疲労500超でスコアの符号が反転する）',
+    file: 'packages/race-engine/src/coefficients.ts',
+    from: '  return clamp(1 - fatigue / balance.FATIGUE_DIV, 0, 1);',
+    to: '  return 1 - fatigue / balance.FATIGUE_DIV;',
+    expect: 'fail',
+  },
+  {
+    id: 'O7-2',
+    label: 'clamp が NaN を素通しする状態に戻す',
+    file: 'packages/race-engine/src/coefficients.ts',
+    from: '  if (Number.isNaN(value)) return (min + max) / 2;',
+    to: '  if (false) return (min + max) / 2;',
+    expect: 'fail',
+  },
 ];
 
 const args = process.argv.slice(2);
