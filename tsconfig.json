@@ -23,7 +23,8 @@
     "noEmit": true,
 
     "paths": {
-      "@star/sim-engine": ["./packages/sim-engine/src/index.ts"]
+      "@star/sim-engine": ["./packages/sim-engine/src/index.ts"],
+      "@star/race-engine": ["./packages/race-engine/src/index.ts"]
     }
   },
   "include": ["packages/**/*.ts", "apps/**/*.ts"],

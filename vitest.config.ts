@@ -7,6 +7,9 @@ export default defineConfig({
       '@star/sim-engine': fileURLToPath(
         new URL('./packages/sim-engine/src/index.ts', import.meta.url),
       ),
+      '@star/race-engine': fileURLToPath(
+        new URL('./packages/race-engine/src/index.ts', import.meta.url),
+      ),
     },
   },
   test: {

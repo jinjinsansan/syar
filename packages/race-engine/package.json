@@ -1,0 +1,15 @@
+{
+  "name": "@star/race-engine",
+  "private": true,
+  "version": "0.0.0",
+  "description": "STAR race resolution engine. Pure TypeScript, zero runtime dependencies.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@star/sim-engine": "*"
+  },
+  "peerDependencies": {}
+}
