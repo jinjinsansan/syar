@@ -5,9 +5,10 @@
  *    P0-fix の誤結論（「回帰0.20 では距離SDが0.4倍に収縮する」）を生んだのと同じ経路。
  */
 
-import { DEFAULT_BALANCE, FOUNDERS, clampTruncationFactor } from '@star/sim-engine';
+import { DEFAULT_BALANCE, FOUNDERS, NICKS_GEN, clampTruncationFactor } from '@star/sim-engine';
 import { describe, expect, it } from 'vitest';
 import { resolveRuntimeConfig } from '../src/config.js';
+import { runSimulation } from '../src/simulator.js';
 
 describe('CLI の上書きと形質別パラメータの再導出（I-4）', () => {
   it('上書きなしなら既定と同じ値になる', () => {
@@ -75,6 +76,43 @@ describe('CLI の上書きと形質別パラメータの再導出（I-4）', () 
     expect(clampTruncationFactor(1.5)).toBeCloseTo(0.8823, 3);
     // 比が大きいほど切断の影響が小さくなる（単調）
     expect(clampTruncationFactor(3)).toBeGreaterThan(clampTruncationFactor(1.5));
+  });
+
+  /**
+   * 【L-1】`MUTATION_SD = 0` で導出 sd が NaN にならないこと。
+   *
+   * ⚠️ 同名のテストが `regression.test.ts` にもあるが、あちらは balance を直接組んでおり
+   *    **本番経路（resolveRuntimeConfig → buildTraitMutation）を通らない**ため、
+   *    J-1 が開けた穴（clamp比 150/0 = ∞ → 係数が NaN）を捕まえられなかった。
+   *    I-3・I-4 と同じ構造の3度目なので、ここで経路側に置く。
+   */
+  it('MUTATION_SD=0 でも導出 sd が NaN にならない（L-1・本番経路）', () => {
+    const { balance } = resolveRuntimeConfig({}, { MUTATION_SD: 0 });
+    for (const [key, spec] of Object.entries(balance.traitMutation)) {
+      expect(Number.isNaN(spec?.sd ?? 0), `${key}.sd が NaN`).toBe(false);
+      expect(Number.isNaN(spec?.clamp ?? 0), `${key}.clamp が NaN`).toBe(false);
+      expect(Number.isNaN(spec?.center ?? 0), `${key}.center が NaN`).toBe(false);
+    }
+    // clamp比が ∞（= clamp をかけない）なら切断による目減りは無いので係数は 1
+    expect(clampTruncationFactor(Number.POSITIVE_INFINITY)).toBe(1);
+    // 係数1なので sd は √(2r−r²) 倍そのもの（100 × 0.6 = 60）
+    expect(balance.traitMutation['durability']?.sd).toBe(60);
+    // clamp は無限大（＝実質無効）。NaN ではない
+    expect(balance.traitMutation['durability']?.clamp).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it('NaN が genotype に流れ込まないこと（L-1・breed まで通す）', () => {
+    const { balance, founders } = resolveRuntimeConfig({}, { MUTATION_SD: 0 });
+    const result = runSimulation(
+      { generations: 6, population: 30, stallionPool: 12, v1Pairs: 1, v1Repeats: 5, seed: 42 },
+      balance,
+      founders,
+      NICKS_GEN,
+    );
+    const last = result.cohorts[result.cohorts.length - 1];
+    for (const [key, value] of Object.entries(last?.traitMeans ?? {})) {
+      expect(Number.isFinite(value), `${key} の集団平均が有限でない`).toBe(true);
+    }
   });
 
   it('回帰率0の上書きは例外にする（無言で変異が止まるのを防ぐ・J-3）', () => {

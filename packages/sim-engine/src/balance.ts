@@ -42,18 +42,16 @@ export const BALANCE = {
   REGRESSION_CENTER_RATIO: 0.45, // 回帰先＝値域の45%（0〜1000形質なら450）
   DOMINANT_WEIGHT: 0.5, // 素質発現＝2アレルの相加平均。★0.5超は系統的な上げ要因になる
   /**
-   * clamp による切断で失われる分散の補正係数（正典 §6.4・D-013）。
+   * clamp による切断で失われる分散の補正係数（正典 §6.4・D-013）— **既定 k での参考値**。
    *
    *   X ~ N(0, σ²), Y = clamp(X, ±kσ) のとき
    *   E[Y²]/σ² = (2Φ(k) − 1) − 2k·φ(k) + 2k²(1 − Φ(k))
-   *   k = MUTATION_CLAMP / MUTATION_SD = 150/90 = 1.6667 → E[Y²]/σ² = 0.8383
-   *   ∴ 実効SD = √0.8383 × sd = 0.9156 × sd
+   *   k = MUTATION_CLAMP / MUTATION_SD = 150/90 = 1.6667 → 実効SD = 0.9156 × sd
    *
-   * つまり clamp をかけた時点で分散が 8.4% 目減りするので、平衡SDを創始水準に
-   * 合わせるには sd をこの分だけ割り増す必要がある。
-   *
-   * ⚠️ **この値は clamp/sd 比（= MUTATION_CLAMP_RATIO）に依存する。**
-   *    比を変えたら上式で再計算すること（比を変えて係数を据え置くと平衡がずれる）。
+   * ⚠️ **実装はこの値を使わない。** J-1 以降、係数は `clampTruncationFactor(k)` が
+   *    clamp比から解析的に計算する（比が変われば係数も追随する）。
+   *    ここに残しているのは正典 §6.4 の記載値との対応を示すためだけで、
+   *    **一致することはテストで固定している**（食い違ったら解析式が正）。
    */
   CLAMP_TRUNCATION_FACTOR: 0.9156,
   INBREED_BOOST_MAX: 0.3,
@@ -344,6 +342,11 @@ export function clampTruncationFactor(clampRatio: number): number {
   if (!(clampRatio > 0)) {
     throw new Error(`clampTruncationFactor: clamp比は正の数である必要があります (${clampRatio})`);
   }
+  // ★k = ∞ は「clamp をかけない」ことを意味するので切断による目減りは無い（係数 1）。
+  //   ガード `> 0` は Infinity を通すため、ここで明示的に処理しないと
+  //   2·k·φ(k) が ∞×0 = NaN になり、**NaN の sd が genotype に流れ込む**。
+  //   実際 `--set-genetics MUTATION_SD=0` で clamp比 150/0 = ∞ となり踏んだ（L-1）。
+  if (!Number.isFinite(clampRatio)) return 1;
   const k = clampRatio;
   const variance =
     2 * normalCdf(k) - 1 - 2 * k * normalPdf(k) + 2 * k * k * (1 - normalCdf(k));

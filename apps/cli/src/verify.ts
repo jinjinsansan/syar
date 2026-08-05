@@ -111,7 +111,12 @@ for (const horizon of HORIZONS) {
       `${pad(seed, 7)} | ${pad(`${round(v.v1.primaryMeanCv * 100, 2)}%`, 8)} ${pad(mark(v.v1.pass), 5)} | ` +
         `${pad(v.v2a.slopePctPerGeneration.toFixed(4), 12)} ${pad(mark(v.v2a.pass), 5)} | ` +
         `${pad(`${round(v.v2b.ceilingRatio * 100, 2)}%`, 9)} ${pad(mark(v.v2b.pass), 5)} | ` +
-        `${pad(`${v.v2d.worstKey ?? '-'} ${(v.v2d.worstDeviation * 100).toFixed(2)}%`, 18)} ${pad(mark(v.v2d.pass), 5)} | ` +
+        `${pad(
+          v.v2d.worstDeviation === null
+            ? `判定不能:${v.v2d.undecidableKeys.length}件`
+            : `${v.v2d.worstKey ?? '-'} ${(v.v2d.worstDeviation * 100).toFixed(2)}%`,
+          18,
+        )} ${pad(mark(v.v2d.pass), 5)} | ` +
         `${pad(`${v.v2e.worstKey ?? '-'} ${v.v2e.worstRatio.toFixed(2)}x`, 22)} ${pad(mark(v.v2e.pass), 5)} | ` +
         `${pad(mark(v.v3.pass), 5)} | ${pad(durability.toFixed(1), 8)} | ${pad(corr.toFixed(3), 8)}`,
     );

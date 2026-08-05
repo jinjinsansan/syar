@@ -7,6 +7,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_BALANCE } from '../src/balance.js';
+import { breed } from '../src/breeding.js';
 import { calcInbreedCoefficient } from '../src/inbreeding.js';
 import { Herd } from './helpers.js';
 
@@ -161,6 +163,42 @@ describe('近交係数 F（Wright）', () => {
     expect(result.F).toBeCloseTo(0.25, 12);
     // A のみが有効な共通祖先。P / Q は経路が A を共有するので寄与しない
     expect(result.contributions.map((x) => x.ancestorId)).toEqual(['A']);
+  });
+
+  /**
+   * 【L-1 の棚卸しで追加】本 describe の他のケースはすべて `calcInbreedCoefficient()` を
+   * 直接呼ぶ**単体テスト**であり、`breed()` がその結果を実際に使っているかは固定していない。
+   * R-1（経路を固定する）に従い、配合本体を通した担保を1本置く。
+   */
+  it('breed() が算出した F を実際に使っている（経路の固定・R-1）', () => {
+    // 3×4 クロス（父の2代前・母の3代前が同一祖先 X）→ F = (1/2)^6 = 0.015625
+    const herd = new Herd();
+    const x = herd.add('X', 'male');
+    const p1 = herd.descendLine('SIRE', x, 1, 'male');
+    const p1Mate = herd.add('S_MATE', 'female');
+    const sire = herd.add('S', 'male', p1, p1Mate);
+    const q2 = herd.descendLine('DAM', x, 2, 'male');
+    const q2Mate = herd.add('D_MATE', 'female');
+    const dam = herd.add('D', 'female', q2, q2Mate);
+
+    const foal = breed({
+      id: 'FOAL',
+      sire,
+      dam,
+      seed: 1,
+      generation: 1,
+      birthYear: 10,
+      lookup: herd.lookup,
+      balance: DEFAULT_BALANCE,
+      nicks: new Map(),
+    });
+
+    // 単体テストと同じ値が、配合を通しても得られること
+    expect(foal.inbreedCoeff).toBeCloseTo(1 / 64, 12);
+    // F が下流の補正にも渡っていること（§6.5: injuryRateMult = 1 + F × 2.0）
+    expect(foal.injuryRateMult).toBeCloseTo(1 + (1 / 64) * 2.0, 12);
+    // 血の濃縮の参照先（最大寄与の共通祖先）も記録されていること
+    expect(foal.breedingRecord?.topCommonAncestorId).toBe('X');
   });
 
   it('5代を超える共通祖先は探索しない（正典 §6.5 の打ち切り）', () => {

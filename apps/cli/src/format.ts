@@ -242,7 +242,8 @@ export function formatReport(result: SimulationResult): string {
   }
   lines.push(
     `    → ${verdict(v2d.pass)}` +
-      `${v2d.worstKey === null ? '' : `  最大乖離 ${v2d.worstKey} ${v2d.worstDeviation >= 0 ? '+' : ''}${(v2d.worstDeviation * 100).toFixed(2)}%`}`,
+      `${v2d.worstKey === null || v2d.worstDeviation === null ? '' : `  最大乖離 ${v2d.worstKey} ${v2d.worstDeviation >= 0 ? '+' : ''}${(v2d.worstDeviation * 100).toFixed(2)}%`}` +
+      `${v2d.undecidableKeys.length === 0 ? '' : `  ※判定不能: ${v2d.undecidableKeys.join(', ')}`}`,
   );
   lines.push('');
 

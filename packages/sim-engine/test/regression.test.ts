@@ -12,6 +12,7 @@ import {
   FOUNDERS,
   MUTATION_CLAMP_RATIO,
   buildTraitMutation,
+  clampTruncationFactor,
 } from '../src/balance.js';
 import { breed } from '../src/breeding.js';
 import { mutateAllele, resolveMutation } from '../src/genetics.js';
@@ -203,7 +204,7 @@ describe('形質別の変異・回帰パラメータ（正典 §6.4 の表・D-0
     // 値域比スケールのままだと芝適性は平衡SDが 0.71倍に収縮、丈夫さは 1.41倍に拡大していた
     const built = buildTraitMutation(FOUNDERS, 0.2);
     const g = Math.sqrt(2 * 0.2 - 0.2 * 0.2); // = 0.6
-    const f = BALANCE.CLAMP_TRUNCATION_FACTOR;
+    const f = clampTruncationFactor(MUTATION_CLAMP_RATIO);
     expect(built.durability.sd).toBe(Math.round((FOUNDERS.DURABILITY_SD * g) / f));
     expect(built.temper.sd).toBe(Math.round((FOUNDERS.TEMPER_SD * g) / f));
     expect(built['surface.turf'].sd).toBe(Math.round(((90 - 20) / Math.sqrt(12)) * g / f));
@@ -222,7 +223,7 @@ describe('形質別の変異・回帰パラメータ（正典 §6.4 の表・D-0
       DISTANCE_CENTER_RANGE: [0, 3600],
     });
     const g = Math.sqrt(2 * 0.2 - 0.2 * 0.2);
-    const f = BALANCE.CLAMP_TRUNCATION_FACTOR;
+    const f = clampTruncationFactor(MUTATION_CLAMP_RATIO);
     expect(wider.durability.sd).toBe(Math.round((200 * g) / f));
     expect(wider.temper.sd).toBe(Math.round((30 * g) / f));
     expect(wider['surface.turf'].sd).toBe(Math.round((140 / Math.sqrt(12)) * g / f));
@@ -252,7 +253,7 @@ describe('形質別の変異・回帰パラメータ（正典 §6.4 の表・D-0
     // 平衡SD = sd / sqrt(2r - r²) を創始水準に保つため sd は r に従属する。
     // r を変えたら sd も自動で追随すること（定数が別々に固まって壊れるのを防ぐ）
     const alleleSd = (1000 - 400) / Math.sqrt(12); // distance_range の創始アレルSD
-    const f = BALANCE.CLAMP_TRUNCATION_FACTOR;
+    const f = clampTruncationFactor(MUTATION_CLAMP_RATIO);
     for (const r of [0.05, 0.1, 0.2]) {
       const built = buildTraitMutation(FOUNDERS, r);
       expect(built.distance_range.sd).toBe(Math.round((alleleSd * Math.sqrt(2 * r - r * r)) / f));

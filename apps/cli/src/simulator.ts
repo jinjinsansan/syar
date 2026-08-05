@@ -290,7 +290,10 @@ export interface Verification {
       deviation: number;
     }[];
     worstKey: NumericTraitKey | null;
-    worstDeviation: number;
+    /** 判定可能な形質の中での最大乖離。1件も判定できなければ null（JSON の型と実値を一致させる） */
+    worstDeviation: number | null;
+    /** 判定不能（basis='none'）だった形質。worst からは除外するが隠さない */
+    undecidableKeys: NumericTraitKey[];
     targetAbsMax: number;
     pass: boolean;
   };
@@ -965,10 +968,24 @@ export function runSimulation(
       deviation: round(founderMean === 0 ? 0 : finalMean / founderMean - 1, 4),
     };
   });
-  const worst = v2dTraits.reduce<(typeof v2dTraits)[number] | null>(
-    (acc, t) => (acc === null || Math.abs(t.deviation) > Math.abs(acc.deviation) ? t : acc),
-    null,
-  );
+  /**
+   * 最大乖離の形質を選ぶ（L-3）。
+   *
+   * ⚠️ NaN（判定不能な形質）を含めて素朴に比較すると、`Math.abs(x) > NaN` が常に false に
+   *    なるため **先頭の NaN が居座り、同時に存在する実数の乖離が隠れる**。
+   *    合否は every() で別計算なのでゲート自体は正しいが、**最も診断が必要な場面で
+   *    verify 表に NaN が出て真の最悪形質が見えなくなる**。NaN は候補から外す。
+   */
+  const worst = v2dTraits
+    .filter((t) => Number.isFinite(t.deviation))
+    .reduce<(typeof v2dTraits)[number] | null>(
+      (acc, t) => (acc === null || Math.abs(t.deviation) > Math.abs(acc.deviation) ? t : acc),
+      null,
+    );
+  /** 判定不能だった形質（NaN）。worst には出さないが、隠さず別枠で報告する */
+  const undecidableKeys = v2dTraits
+    .filter((t) => !Number.isFinite(t.deviation))
+    .map((t) => t.key);
 
   // --- V-2e 非能力形質の分化: 集団SDが創始の 0.8〜1.4倍（D-012 で全非能力形質へ一般化） ---
   const finalTraitSds = finalCohort?.traitSds;
@@ -1045,7 +1062,8 @@ export function runSimulation(
       traits: v2dTraits,
       abilityReference,
       worstKey: worst?.key ?? null,
-      worstDeviation: worst?.deviation ?? 0,
+      worstDeviation: worst?.deviation ?? null,
+      undecidableKeys,
       targetAbsMax: V2D_TARGET_ABS_MAX,
       pass: v2dTraits.every((t) => t.pass),
     },
