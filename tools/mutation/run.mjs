@@ -39,30 +39,8 @@ const MUTATIONS = [
     to: 'c.prize += PRIZE_BY_POSITION[row.finishPosition - 1] ?? 0;',
     expect: 'fail',
   },
-  {
-    id: 'O4-2',
-    label: '素質開放率の幅を広げる（0.55–0.85 → 0.30–0.95）',
-    file: 'apps/cli/src/race-field.ts',
-    from: "export const PLACEHOLDER_UNLOCK = { MIN: 0.55, MAX: 0.85 } as const;",
-    to: "export const PLACEHOLDER_UNLOCK = { MIN: 0.3, MAX: 0.95 } as const;",
-    expect: 'fail',
-  },
-  {
-    id: 'O4-3',
-    label: 'クラス分けを撤廃する（クラス幅 6% → 100%）',
-    file: 'apps/cli/src/race-field.ts',
-    from: 'export const DEFAULT_CLASS_BAND = 0.06;',
-    to: 'export const DEFAULT_CLASS_BAND = 1.0;',
-    expect: 'fail',
-  },
-  {
-    id: 'O4-4',
-    label: '較正した K を正典の旧値へ戻す（0.26 → 0.12）',
-    file: 'packages/race-engine/src/balance.ts',
-    from: 'export const CALIBRATED_RACE_RANDOM_K = 0.26;',
-    to: 'export const CALIBRATED_RACE_RANDOM_K = 0.12;',
-    expect: 'fail',
-  },
+  // ★O4-2（開放率）/ O4-3（クラス幅）/ O4-4（K）は `calibration.ts` の登録簿へ移した。
+  //   手書きと登録簿の二重管理にすると片方だけ更新される（L-2 で潰したクラス）。
   {
     id: 'O4-5',
     label: '母集団を能力順に並べない（クラス分けが無意味になる）',
@@ -129,13 +107,45 @@ const MUTATIONS = [
   },
 ];
 
+/**
+ * ★較正定数の変異は**登録簿から自動生成する**（Q-3）。
+ *
+ *   手で書いた変異集合は、定数を新設したときに必ず漏れる（実際 P1-fix2 の1便で3つ漏れた）。
+ *   登録簿から生成すれば、**新しい較正定数を追加した瞬間に変異項目も増える**ので、
+ *   防御するテストが無ければ `npm run mutation` がその場で落ちる。
+ *   登録漏れそのものは `apps/cli/test/calibration-registry.test.ts` が塞ぐ。
+ */
+function calibrationMutations() {
+  const raw = execFileSync('npx', ['tsx', 'tools/mutation/dump-calibration.ts'], {
+    encoding: 'utf8',
+    shell: true,
+  });
+  const start = raw.indexOf('[');
+  if (start < 0) throw new Error('登録簿の JSON を取得できなかった');
+  const list = JSON.parse(raw.slice(start));
+  if (!Array.isArray(list) || list.length === 0) {
+    throw new Error('登録簿が空。変異試験が何も検査しない状態になる');
+  }
+  return list.map((c) => ({
+    id: `CAL-${c.key}`,
+    label: `較正定数 ${c.key} を摂動（${c.affects}）`,
+    file: c.file,
+    from: c.declaration,
+    to: c.perturbed,
+    expect: 'fail',
+  }));
+}
+
 const args = process.argv.slice(2);
 if (args.includes('--list')) {
-  for (const m of MUTATIONS) console.log(`${m.id.padEnd(6)} ${m.file.padEnd(42)} ${m.label}`);
+  for (const m of [...MUTATIONS, ...calibrationMutations()]) {
+    console.log(`${m.id.padEnd(30)} ${m.file.padEnd(40)} ${m.label}`);
+  }
   process.exit(0);
 }
+const ALL = [...MUTATIONS, ...calibrationMutations()];
 const only = args.includes('--id') ? args[args.indexOf('--id') + 1] : null;
-const targets = only === null ? MUTATIONS : MUTATIONS.filter((m) => m.id === only);
+const targets = only === null ? ALL : ALL.filter((m) => m.id === only);
 if (targets.length === 0) throw new Error(`変異が見つからない: ${only}`);
 
 function runTests() {

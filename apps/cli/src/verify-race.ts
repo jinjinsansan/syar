@@ -40,7 +40,7 @@ import {
 } from './race-field.js';
 import { runSimulation } from './simulator.js';
 import { toSafeJson } from './json-safe.js';
-import { PopularityEstimator } from './popularity.js';
+import { DEFAULT_POPULARITY_TRIALS, PopularityEstimator } from './popularity.js';
 import { mean, round, sd } from './stats.js';
 
 // ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ const SEEDS = parseList('--seeds', [42, 7, 2026, 31337]);
  *   傾向なく安定する（変更前は 60試行 1.00% → 1200試行 0.30% と単調に動き、
  *   **PASS が推定ノイズの産物**だった）。既定 200 は安定域の中央付近。
  */
-const POPULARITY_TRIALS = parseNumber('--popularity-trials', 200);
+const POPULARITY_TRIALS = parseNumber('--popularity-trials', DEFAULT_POPULARITY_TRIALS);
 /** 母集団を作る世代数 */
 const POOL_GENERATIONS = parseNumber('--pool-generations', 40);
 const POOL_MARES = parseNumber('--pool-mares', 400);

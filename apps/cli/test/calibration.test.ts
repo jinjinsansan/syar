@@ -24,11 +24,15 @@ import { describe, expect, it } from 'vitest';
 import { resolveRuntimeConfig } from '../src/config.js';
 import {
   DEFAULT_CLASS_BAND,
+  FIELD_STRENGTH_FLOOR,
   OFF_SURFACE_ENTRY_RATE,
   PLACEHOLDER_UNLOCK,
+  entryStrength,
+  floorForFieldSize,
   generateRace,
   sortPoolByClass,
 } from '../src/race-field.js';
+import { DEFAULT_POPULARITY_TRIALS, PopularityEstimator } from '../src/popularity.js';
 import { emptyCareer, runSeason, type CareerRecord } from '../src/racing-season.js';
 import { runSimulation } from '../src/simulator.js';
 import { coefficientOfVariation, mean } from '../src/stats.js';
@@ -189,5 +193,84 @@ describe('O-4 ★経路: クラス係数が runSeason で実際に賞金へ掛�
     const careers = new Map<string, CareerRecord>();
     runSeason(POOL.slice(0, 7), careers, deriveRng(6, 7), 4);
     expect(careers.size).toBe(0);
+  });
+});
+
+describe('Q-3 追加防御: 登録簿が「無防備」と暴いた3定数', () => {
+  it('★FLOOR_REDRAW_PASSES / FLOOR_FIELD_SIZE_SLOPE: 多頭数レースほど能力レンジが締まる', () => {
+    const rng = deriveRng(11, 11);
+    const ratioBySize = new Map<number, number[]>();
+    for (let i = 0; i < 400; i++) {
+      const race = generateRace(POOL, i, rng);
+      const strengths = race.entrants.map((e) =>
+        entryStrength(e, race.conditions.distance, race.conditions.surface),
+      );
+      const ratio = Math.min(...strengths) / Math.max(...strengths);
+      const list = ratioBySize.get(race.entrants.length) ?? [];
+      list.push(ratio);
+      ratioBySize.set(race.entrants.length, list);
+    }
+    const at = (n: number): number => mean(ratioBySize.get(n) ?? [0]);
+    const small = at(8);
+    const large = at(18);
+    expect(small).toBeGreaterThan(0);
+    expect(large).toBeGreaterThan(0);
+    // 差し替え（FLOOR_REDRAW_PASSES）が効いていれば、最弱/最強の比は床の水準まで押し上がる
+    expect(small, `8頭立ての最弱/最強比 ${small}`).toBeGreaterThan(FIELD_STRENGTH_FLOOR * 0.9);
+    // 頭数が増えるほど床が上がる（FLOOR_FIELD_SIZE_SLOPE）ので、18頭のほうが比が1に近い
+    expect(large, `18頭立ての最弱/最強比 ${large}`).toBeGreaterThan(
+      floorForFieldSize(18) * 0.9,
+    );
+    expect(large, `18頭 ${large} は 8頭 ${small} より締まっているはず`).toBeGreaterThan(small);
+  });
+
+  it('★DEFAULT_POPULARITY_TRIALS: 既定の試行数で人気順が安定している（R-12）', () => {
+    // 既定試行数と その4倍 で最低人気が一致すること。試行数が少なすぎると一致しなくなる
+    const rng = deriveRng(12, 11);
+    let agree = 0;
+    const races = 40;
+    for (let i = 0; i < races; i++) {
+      const race = generateRace(POOL, i, rng);
+      const rank = (trials: number): string => {
+        const est = new PopularityEstimator(race.entrants.map((e) => e.horseId));
+        for (let t = 0; t < trials; t++) {
+          const r = resolveRace({
+            conditions: race.conditions,
+            entrants: race.entrants,
+            seed: deriveRng(99, 12, i, t).nextUint32() >>> 0,
+            balance: B,
+          });
+          est.addTrial(r.order.map((o) => o.horseId));
+        }
+        const ranked = est.rank();
+        return ranked[ranked.length - 1]?.horseId ?? '';
+      };
+      if (rank(DEFAULT_POPULARITY_TRIALS) === rank(DEFAULT_POPULARITY_TRIALS * 4)) agree += 1;
+    }
+    // 既定が安定域にあれば大半のレースで最低人気が一致する。試行数3では一致しなくなる
+    expect(agree / races, `最低人気の一致率 ${agree}/${races}`).toBeGreaterThan(0.6);
+  });
+});
+
+describe('Q-3 追加防御: 距離エントリの絞り込み', () => {
+  it('★DISTANCE_SUIT_MIN / OFF_DISTANCE_ENTRY_RATE: 出走馬の大半が距離に向いている', () => {
+    const rng = deriveRng(13, 11);
+    let suited = 0;
+    let total = 0;
+    for (let i = 0; i < 200; i++) {
+      const race = generateRace(POOL, i, rng);
+      for (const e of race.entrants) {
+        const d = race.conditions.distance - e.distanceCenter;
+        const fit = 100 * Math.exp(-(d * d) / (2 * e.distanceRange * e.distanceRange));
+        total += 1;
+        // ★しきい値に DISTANCE_SUIT_MIN 自身を使うと、0 に摂動したとき全馬が
+      //   「向いている」ことになり同語反復で緑になる。リテラルで固定する
+      if (fit >= 55) suited += 1;
+      }
+    }
+    expect(total).toBeGreaterThan(1000);
+    const rate = suited / total;
+    // 絞り込みを外す（DISTANCE_SUIT_MIN=0 / 例外率=1.0）と、この比率が大きく下がる
+    expect(rate, `距離が向いている出走馬の割合 ${rate}`).toBeGreaterThan(0.8);
   });
 });
