@@ -165,7 +165,7 @@ export const SCAN_EXCLUDED_FILES: readonly { file: string; why: string }[] = [
  */
 export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
   {
-    pattern: 'apps/cli/src/(sweep|sweep-distance|selection-compare|race-diagnostics|metric-correlation)\.ts',
+    pattern: 'apps/cli/src/(sweep|sweep-distance|selection-compare|race-diagnostics|metric-correlation|decompose)\.ts',
     why: '開発用の診断・掃引ツール。判定（V-x）を作らない。ここの定数は実行時に --flag で上書きする前提の既定値',
   },
   {
