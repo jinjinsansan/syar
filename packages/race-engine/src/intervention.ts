@@ -94,6 +94,13 @@ export interface InterventionBalance {
   AI_SPURT_SPREAD_METER: number;
   AI_DRIVE_MIN_RATIO: number;
   AI_DRIVE_MAX_RATIO: number;
+
+  /**
+   * 直線の連打を集計する区間の長さ（秒）。介入ログ→連打レートの換算に使う（§8.8・O-1）。
+   * ★正典 §8b は「直線」としか書いておらず秒数を定めていない。
+   *   直線400m を平均速度で割った概算（I-DRIVE-WINDOW）。
+   */
+  DRIVE_WINDOW_SEC: number;
 }
 
 export const DEFAULT_INTERVENTION_BALANCE: InterventionBalance = {
@@ -134,6 +141,8 @@ export const DEFAULT_INTERVENTION_BALANCE: InterventionBalance = {
   AI_SPURT_SPREAD_METER: 190,
   AI_DRIVE_MIN_RATIO: 0.55,
   AI_DRIVE_MAX_RATIO: 0.72,
+
+  DRIVE_WINDOW_SEC: 24,
 };
 
 // ---------------------------------------------------------------------------

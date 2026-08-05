@@ -139,4 +139,9 @@ export interface RaceResult {
   order: RaceResultEntry[];
   /** 1着の走破タイムの基準（§8.7 baseTime） */
   baseTimeSec: number;
+  /**
+   * ハードキャップ外の `interventionMult` が渡された記録（O-3）。
+   * 通常は空。空でなければバグかマクロの兆候なので、呼び出し側は監視に流すこと（§8b.7/§8b.8）。
+   */
+  capViolations: { horseId: string; received: number; applied: number }[];
 }

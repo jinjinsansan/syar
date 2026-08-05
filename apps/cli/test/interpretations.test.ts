@@ -17,12 +17,28 @@ import { fileURLToPath } from 'node:url';
 import { INTERPRETATIONS } from '@star/race-engine';
 import { describe, expect, it } from 'vitest';
 
-const SRC_DIR = fileURLToPath(new URL('../../../packages/race-engine/src', import.meta.url));
+/**
+ * ★走査範囲（O-6）。
+ *
+ * P1 提出時は `packages/race-engine/src` だけを見ており、`apps/cli` 側のプレースホルダが
+ * 対象外だった。その結果、報告書 §7 の「全件」は**この範囲での全件**にすぎず、
+ * 未登録の解釈が4件あった。**「全件」と書くときは、その全件がどの範囲の全件かを併記する**（R-9 の一般形）。
+ */
+const SCAN_DIRS = [
+  fileURLToPath(new URL('../../../packages/race-engine/src', import.meta.url)),
+  fileURLToPath(new URL('../../../packages/sim-engine/src', import.meta.url)),
+  fileURLToPath(new URL('../src', import.meta.url)),
+];
 
 function readAllSources(): { file: string; text: string }[] {
-  return readdirSync(SRC_DIR)
-    .filter((f) => f.endsWith('.ts'))
-    .map((f) => ({ file: f, text: readFileSync(`${SRC_DIR}/${f}`, 'utf8') }));
+  const out: { file: string; text: string }[] = [];
+  for (const dir of SCAN_DIRS) {
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith('.ts')) continue;
+      out.push({ file: `${dir}/${f}`, text: readFileSync(`${dir}/${f}`, 'utf8') });
+    }
+  }
+  return out;
 }
 
 /** ソース中に現れる解釈ID。登録簿定義そのものの行（`id: 'I-XXX'`）は除く */

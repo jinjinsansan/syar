@@ -195,6 +195,62 @@ export const INTERPRETATIONS: readonly Interpretation[] = [
       '「上手い手動は上回り、下手な手動は下回る」を満たすには AI を確率的にする必要がある。',
   },
   {
+    id: 'I-REPLAY-POSITION',
+    canon: '§8b.4 / §8.8',
+    given: 'クライアントは入力イベント（種別＋時刻）のみ送り、サーバーが記録する',
+    filled: '道中のポジション指示は**中団固定**として再現する',
+    rationale:
+      '`InterventionInput` は種別と時刻しか持たず、内/外・前/後の別を持たない。' +
+      'ログだけからポジションを一意に復元できないため、再現時は中立値に倒す。' +
+      '§8b.4 のログ形式にポジション指示の内容を含める必要がある（照会中）。',
+  },
+  {
+    id: 'I-DRIVE-WINDOW',
+    canon: '§8b.3 / §8.8',
+    given: '直線は連打 or リズムタップ。連打は秒間15回で頭打ち',
+    filled: '連打レートを求める集計区間を 24 秒（直線400m ÷ 平均速度）とする',
+    rationale:
+      '正典は「直線」としか書かず秒数を定めていない。ログの件数から秒間レートへ換算するには' +
+      '区間長が要る。距離やコースで変わりうるが、P1 では定数で足りる。',
+  },
+  {
+    id: 'I-ENTROPY-SORT',
+    canon: '§8.6',
+    given: 'client_entropy = 全出走馬IDのハッシュ結合',
+    filled: '**IDをソートしてから**結合する（順序非依存の集合ハッシュ）',
+    rationale:
+      '「結合」の順序が定められていない。枠順は締切後の抽選で決まるため順序依存にすると、' +
+      '同じ出走馬・同じ server_seed でも entropy が変わり検証者が再計算できない。',
+  },
+  {
+    id: 'I-SEED-FOLD',
+    canon: '§8.6',
+    given: 'final_seed = HMAC-SHA256(...)（256bit）',
+    filled: '256bit を 32bit ごとに XOR で畳んで `Rng` のシードにする',
+    rationale:
+      'PRNG（xoshiro128**）は 32bit シードを取るが、正典は畳み方を定めていない。' +
+      '先頭32bitだけを使うとハッシュの一部しか結果に効かず、' +
+      '「final_seed 全体が結果を決めている」という Provably Fair の主張が弱くなる。',
+  },
+  {
+    id: 'I-SCORE-FLOOR',
+    canon: '§8.7',
+    given: 'finalScore = score × (1 + gaussian(0,K)) × interventionMult',
+    filled: '`Math.max(0, …)` で下限0にする',
+    rationale:
+      '乱数が −1 を下回ると符号が反転し、着順の意味が壊れる（最弱が1着になる）。' +
+      'K=0.26 では約3.8σ で起こりうるため塞ぐ。正典に記述は無い。',
+  },
+  {
+    id: 'I-MARGIN-BASIS',
+    canon: '§8.7',
+    given: '着差ラベル: `<0.03秒=ハナ, …`',
+    filled: 'ラベルは**前の馬との差**で出す（1着との差ではない）',
+    rationale:
+      '正典は timeGap を「1着との差」と定義する一方、着差ラベルの基準を書いていない。' +
+      '競馬の着差表記は直前の馬との差なのでそちらを採った。表示のみで判定に影響しない。',
+  },
+  {
     id: 'I-STRATEGY-APT-MAP',
     canon: '§8.4',
     given: '脚質適性 `strategy_aptitude[選択脚質]/100` が 0.85〜1.05 で効く',
@@ -256,6 +312,13 @@ export const SKILLS: readonly SkillSpec[] = [
 export interface RaceBalance {
   /** 正典 §13.1 RACE_RANDOM_K。上げるとレースが荒れる */
   RACE_RANDOM_K: number;
+  /**
+   * 介入倍率のハードキャップ幅（正典 §13.1 INTERVENTION_CAP / 憲法 §1.5-1）。
+   * ★`InterventionBalance` にも同名の定数があるが、**スコア確定点である resolveRace が
+   *   介入モジュールに依存せずに自力でクランプできる**ようにこちらにも持つ（O-3）。
+   *   両者が食い違わないことは `race.test.ts` が固定する。
+   */
+  INTERVENTION_CAP: number;
 
   /** 発動率 = SKILL_FIRE_BASE + IQ / SKILL_FIRE_IQ_DIV（正典 §8.5） */
   SKILL_FIRE_BASE: number;
@@ -321,33 +384,23 @@ export interface RaceBalance {
 }
 
 /**
- * ★★ K-5 のモンテカルロで求めた較正値。**正典 §13.1 の値ではない。** ★★
+ * `RACE_RANDOM_K`。**2026-08-05 の D-016 で正典 §13.1 が 0.12 → 0.26 に改訂された**ため、
+ * これは正典の写しである（P1 提出時は「較正値・正典外」だった）。
  *
- * 正典 §13.1 は `RACE_RANDOM_K = 0.12`、§8.7 は「0.12 は『1番人気の勝率が30%前後』に
- * 落ち着く値」と述べている。しかし §8.7 は同時に
- * 「**実装後に必ずモンテカルロ10万レースで人気別勝率を較正する**」とも定めている。
+ * 経緯: K=0.12 では 1番人気の勝率が実測 51.6% で V-4（30〜34%）を大きく外れた。
+ * §8.7 の「実装後に必ずモンテカルロ10万レースで人気別勝率を較正する」に従って 0.26 を求め、
+ * 照会（QUESTIONS_P1 Q3）の結果 D-016 で正典化された。§8.7 の「0.12 は30%前後」は誤りとして訂正済み。
  *
- * 実測（`npm run verify:race`）では、K=0.12 のとき 1番人気の勝率は **51.6%** で
- * V-4（30〜34%）を大きく外れる。原因は出走馬間の実力差が K に対して大きいことで、
- * 要因分解（`apps/cli/src/race-diagnostics.ts`）では
- *   レース内スコアCV 17.2%（K=12% より大きい）／最大の寄与は素質開放率のプレースホルダ
- * だった。**開放率の幅をほぼ0まで潰しても 38% までしか下がらない**ため、
- * 残りは K を動かすほかない。
- *
- * したがって:
- *   - `DEFAULT_RACE_BALANCE.RACE_RANDOM_K` は**正典の写しとして 0.12 のまま**にする
- *     （正典を推測で上書きしない。P0 の D-008 と同じ進め方）
- *   - 較正値はこの定数として分離し、`verify:race` の既定に使う
- *   - 正典 §13.1 を 0.26 に改訂するかはオーナー／レビュー側の判断（QUESTIONS_P1）
- *
- * ⚠️ **この値は素質開放率プレースホルダ（0.55〜0.85）に依存する**（R-7）。
- *    P3 で本物の育成ループが入ったら**必ず再較正すること**。
+ * ⚠️ **較正条件（正典 §13.1 に明記）**: 素質開放率プレースホルダ(0.55〜0.85)・クラス分け番組・18頭立て。
+ *    P3 で本物の育成ループが入ったら**必ず再較正すること**（R-7）。
+ *    この前提が壊れていないことは `apps/cli/test/calibration.test.ts` が経路で固定する（O-4）。
  */
 export const CALIBRATED_RACE_RANDOM_K = 0.26;
 
 export const DEFAULT_RACE_BALANCE: RaceBalance = {
-  /** 正典 §13.1 の写し。較正値は `CALIBRATED_RACE_RANDOM_K` を見ること */
-  RACE_RANDOM_K: 0.12,
+  // ★二重管理を作らない（G-0/I-2a/L-2 で三度潰したクラス）。定義は1か所だけ
+  RACE_RANDOM_K: CALIBRATED_RACE_RANDOM_K,
+  INTERVENTION_CAP: 0.1,
 
   SKILL_FIRE_BASE: 0.4,
   SKILL_FIRE_IQ_DIV: 2000,

@@ -34,6 +34,27 @@ export const RNG_STREAM = {
   FINAL: 2,
 } as const;
 
+/**
+ * `interventionMult` をハードキャップ内に収める（憲法 §1.5-1 / 正典 §8b.3・§13.1）。
+ *
+ * ★非有限値（NaN / Infinity）は**1 に倒す**。NaN を素通しすると `finalScore` が NaN になり、
+ *   ソート比較がすべて false になって「着順が入力順のまま」という静かな破綻を生む（R-3）。
+ */
+export function clampInterventionMult(value: number, balance: RaceBalance): number {
+  if (!Number.isFinite(value)) return 1;
+  const cap = balance.INTERVENTION_CAP;
+  const min = 1 - cap;
+  const max = 1 + cap;
+  return value < min ? min : value > max ? max : value;
+}
+
+/** キャップを超える `interventionMult` が渡された記録（§8b.7 マクロ検知・§8b.8 監視の入力） */
+export interface CapViolation {
+  horseId: string;
+  received: number;
+  applied: number;
+}
+
 export interface ResolveRaceParams {
   conditions: RaceConditions;
   entrants: readonly RaceEntrant[];
@@ -92,6 +113,7 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
 
   const { pace, nigeCount } = paceOf(entrants, balance);
   const fieldSize = entrants.length;
+  const capViolations: CapViolation[] = [];
 
   const scored = entrants.map((entrant, index) => {
     const skillCtx: SkillContext = {
@@ -159,8 +181,20 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
     // §8.7: finalScore = score * (1 + gaussian(0, K)) * interventionMult
     const finalRng: Rng = deriveRng(seed, RNG_STREAM.FINAL, index);
     const randomMult = 1 + finalRng.gaussian(0, balance.RACE_RANDOM_K);
-    const interventionMult = params.interventionMults?.get(entrant.horseId) ?? 1;
-    // ★負のスコアは着順の意味を壊す（乱数が -1 を下回ると符号が反転する）。
+    // ★憲法 §1.5-1 のハードキャップ ±10% は、**サーバー権威のスコア確定点**（§8b.4）である
+    //   ここで効かなければ意味がない。純関数 `resolveIntervention` の中だけで守っていたため、
+    //   `interventionMults` に 100 を渡すとそのまま勝てた（O-3）。
+    //   クランプは黙って行わず `capViolations` に記録する（不正の兆候かもしれないため）。
+    const rawInterventionMult = params.interventionMults?.get(entrant.horseId) ?? 1;
+    const interventionMult = clampInterventionMult(rawInterventionMult, balance);
+    if (interventionMult !== rawInterventionMult) {
+      capViolations.push({
+        horseId: entrant.horseId,
+        received: rawInterventionMult,
+        applied: interventionMult,
+      });
+    }
+    // ★負のスコアは着順の意味を壊す（乱数が -1 を下回ると符号が反転する・I-SCORE-FLOOR）。
     //   K=0.12 なら 8.3σ 相当で実質起きないが、K を上げて較正する運用があるため塞いでおく。
     const finalScore = Math.max(0, breakdown.score * randomMult * interventionMult);
 
@@ -207,9 +241,10 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
       finalScore: row.finalScore,
       timeGapSec,
       timeSec: baseTimeSec + timeGapSec,
+      // 着差ラベルは**前の馬との差**で出す（I-MARGIN-BASIS）
       marginLabel: i === 0 ? '' : marginLabel(timeGapSec - prevGap),
     };
   });
 
-  return { raceId: conditions.raceId, conditions, pace, nigeCount, order, baseTimeSec };
+  return { raceId: conditions.raceId, conditions, pace, nigeCount, order, baseTimeSec, capViolations };
 }

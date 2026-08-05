@@ -499,7 +499,7 @@ describe('§8.7 着順・着差・タイム', () => {
     expect(averageSpeedMps(3000, 'turf', 'good', B)).toBeLessThan(turfGood);
   });
 
-  it('乱数倍率は K=0.12 の正規分布に従う（統計量で固定）', () => {
+  it('乱数倍率は K（正典 §13.1・D-016 で 0.26）の正規分布に従う（統計量で固定）', () => {
     const samples: number[] = [];
     for (let seed = 0; seed < 400; seed++) {
       const r = resolveRace({
@@ -514,9 +514,14 @@ describe('§8.7 着順・着差・タイム', () => {
     const sd = Math.sqrt(
       samples.reduce((a, b) => a + (b - mean) * (b - mean), 0) / (samples.length - 1),
     );
-    expect(mean).toBeCloseTo(1, 2);
-    expect(sd).toBeGreaterThan(0.11);
-    expect(sd).toBeLessThan(0.13);
+    // K が大きいほど標本平均のばらつきも大きい。K に応じた許容幅で見る
+    expect(Math.abs(mean - 1)).toBeLessThan(B.RACE_RANDOM_K * 0.05);
+    // ★リテラルで固定すると K を動かしたとき同期が要る（L-2 で潰したクラス）。
+    //   balance の値そのものと突き合わせる。ここが K の**経路側の固定**でもある（O-4）
+    expect(sd).toBeGreaterThan(B.RACE_RANDOM_K * 0.92);
+    expect(sd).toBeLessThan(B.RACE_RANDOM_K * 1.08);
+    // 正典 §13.1（D-016）の値そのもの
+    expect(B.RACE_RANDOM_K).toBe(0.26);
   });
 
   it('介入倍率が finalScore に掛かる（§8.7 の式の第3項）', () => {

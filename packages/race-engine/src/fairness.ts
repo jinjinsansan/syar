@@ -46,7 +46,7 @@ export function commitServerSeed(serverSeed: string, hash: HashProvider): string
 /**
  * 手順2: client_entropy = 全出走馬IDのハッシュ結合（正典 §8.6）
  *
- * ★出走馬IDを**ソートしてから**結合する。
+ * ★出走馬IDを**ソートしてから**結合する（I-ENTROPY-SORT）。
  *   出走表の並び順（枠順）は締切後の抽選で決まるため、並び順に依存させると
  *   「同じ出走馬・同じ server_seed なのに entropy が変わる」ことが起き、
  *   検証者が再計算できなくなる。順序に依存しない集合ハッシュにする。
@@ -79,7 +79,7 @@ export function deriveFinalSeed(
 /**
  * final_seed（16進64桁）を `Rng` が使う 32bit 整数へ畳み込む。
  *
- * ★全 256bit を XOR で畳む。先頭8桁だけを使うと、ハッシュの一部しか結果に効かなくなり
+ * ★全 256bit を XOR で畳む（I-SEED-FOLD）。先頭8桁だけを使うと、ハッシュの一部しか結果に効かなくなり
  *   「final_seed 全体が結果を決めている」という Provably Fair の主張が弱くなる。
  */
 export function finalSeedToRngSeed(finalSeed: string): number {
