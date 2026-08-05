@@ -65,7 +65,7 @@ describe('O-1 介入ログ → プランの変換（§8.8）', () => {
     driveWindowSec: IB.DRIVE_WINDOW_SEC,
   };
 
-  it('スタート誤差はサーバー受信時刻から取る（クライアント申告時刻は使わない）', () => {
+  it('★スタート誤差はサーバー受信時刻から取る（クライアント申告時刻は使わない）', () => {
     const plan = planFromInputs(
       [{ horseId: 'A', phase: 'start', serverMs: 200, clientMs: 0 }],
       ctx,

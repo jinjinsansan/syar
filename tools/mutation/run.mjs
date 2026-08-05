@@ -27,6 +27,15 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const md5 = (s) => createHash('md5').update(s).digest('hex');
 
 /**
+ * 振る舞いを固定するテストの目印（R-14）。
+ *
+ * ★値照合テスト（`toBe(0.26)` の類）は摂動すれば必ず落ちるので、
+ *   「落ちた＝守られている」は成立しない。**振る舞いのテストが落ちたこと**を要求する。
+ *   規約: 振る舞いを固定するテストは名前の先頭に ★ を付ける。
+ */
+const BEHAVIOURAL_MARK = "★";
+
+/**
  * 変異の定義。
  * `expect: 'fail'` = この改変を入れたらテストが落ちなければならない（＝守られている）
  */
@@ -238,15 +247,29 @@ for (const mut of targets) {
   }
 
   const detected = !result.passed;
-  const ok = mut.expect === 'fail' ? detected : !detected;
-  results.push({ ...mut, detected, ok, failed: failedTestNames(result.output) });
+  const failed = failedTestNames(result.output);
+  // ★R-14 の機械強制:
+  //   「何かが落ちた」だけでは不十分。**振る舞いのテストが落ちること**を要求する。
+  //   値照合テスト（`toBe(0.26)` の類）は摂動すれば必ず落ちるので、それだけでは
+  //   「守られている」と言えない — K と OFF_SURFACE_ENTRY_RATE が実際にその状態だった。
+  //   規約: 振る舞いを固定するテストは名前に ★ を付ける。
+  const behavioural = failed.filter((n) => n.includes(BEHAVIOURAL_MARK));
+  const ok =
+    mut.expect === 'fail' ? detected && behavioural.length > 0 : !detected;
+  results.push({ ...mut, detected, ok, failed, behavioural });
 
+  const verdictText = !detected
+    ? '全緑（守られていない）'
+    : behavioural.length > 0
+      ? '落ちた（振る舞いのテストが検出）'
+      : `落ちたが**値照合のみ**（${BEHAVIOURAL_MARK} 付きのテストが1件も落ちていない）`;
   console.log(`[${mut.id}] ${mut.label}`);
-  console.log(`   → テスト: ${detected ? '落ちた（守られている）' : '★全緑（守られていない）'}  判定: ${ok ? 'OK' : 'NG'}`);
-  if (detected && result.output !== '') {
-    const names = failedTestNames(result.output);
-    for (const n of names.slice(0, 4)) console.log(`      × ${n}`);
-    if (names.length > 4) console.log(`      … ほか ${names.length - 4} 件`);
+  console.log(`   → テスト: ${verdictText}  判定: ${ok ? 'OK' : 'NG'}`);
+  if (detected && failed.length > 0) {
+    for (const n of failed.slice(0, 4)) {
+      console.log(`      ${n.includes(BEHAVIOURAL_MARK) ? '×★' : '× '} ${n}`);
+    }
+    if (failed.length > 4) console.log(`      … ほか ${failed.length - 4} 件`);
   }
   console.log('');
 }
@@ -254,7 +277,14 @@ for (const mut of targets) {
 const ng = results.filter((r) => !r.ok);
 console.log('---');
 console.log(`実施 ${results.length} 件 / 守られている ${results.length - ng.length} 件 / 守られていない ${ng.length} 件`);
-for (const r of ng) console.log(`  ★未防御: [${r.id}] ${r.label}`);
+for (const r of ng) {
+  const why =
+    r.detected && r.behavioural.length === 0
+      ? `値照合テストしか落ちていない（${BEHAVIOURAL_MARK} 付きの振る舞いテストが要る）`
+      : 'テストが全緑';
+  console.log(`  未防御: [${r.id}] ${r.label}`);
+  console.log(`          理由: ${why}`);
+}
 if (toolFailure) {
   console.error('!!! ツール自身の事後条件が破れた。結果は信用できない');
   process.exit(2);
