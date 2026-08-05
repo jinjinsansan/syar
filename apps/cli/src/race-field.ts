@@ -204,7 +204,7 @@ export const FLOOR_REDRAW_PASSES = 12;
  *   少頭数では締めすぎ（V-4 が落ちる）／多頭数では緩すぎ（裾が死ぬ）になる。
  *   頭数が増えるほど床を上げて、1頭あたりの勝ち目を確保する。
  */
-export function floorForFieldSize(fieldSize: number, base = FIELD_STRENGTH_FLOOR): number {
+export function floorForFieldSize(fieldSize: number, base: number = FIELD_STRENGTH_FLOOR): number {
   const t = (fieldSize - FIELD_SIZE.MIN) / (FIELD_SIZE.MAX - FIELD_SIZE.MIN);
   return base + Math.max(0, Math.min(1, t)) * FLOOR_FIELD_SIZE_SLOPE;
 }
@@ -280,6 +280,8 @@ export function generateRace(
   /** クラス幅。1.0 なら母集団全体から無作為（＝クラス分けなし） */
   classBand: number = DEFAULT_CLASS_BAND,
   unlockRange: { MIN: number; MAX: number } = PLACEHOLDER_UNLOCK,
+  /** 能力レンジの床（掃引用に実行時上書き可能にする・Q-1/掃引） */
+  floorBase: number = FIELD_STRENGTH_FLOOR,
 ): GeneratedRace {
   if (pool.length < FIELD_SIZE.MIN) {
     throw new Error(`generateRace: 母集団が少なすぎる (${pool.length}頭)`);
@@ -379,7 +381,7 @@ export function generateRace(
         weakestIndex = i;
       }
     }
-    if (weakestIndex < 0 || weakest >= best * floorForFieldSize(fieldSize)) break;
+    if (weakestIndex < 0 || weakest >= best * floorForFieldSize(fieldSize, floorBase)) break;
     const replacement = spare.pop();
     if (replacement === undefined) break;
     chosen[weakestIndex] = replacement;

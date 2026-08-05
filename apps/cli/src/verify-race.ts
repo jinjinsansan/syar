@@ -83,6 +83,8 @@ const POOL_MARES = parseNumber('--pool-mares', 400);
 /** クラス幅（母集団に対する割合）。1.0 でクラス分けなし */
 const CLASS_BAND = parseNumber('--class-band', DEFAULT_CLASS_BAND);
 /** 素質開放率のプレースホルダ範囲（P3 の育成モデルで置き換わる・R-7） */
+/** 能力レンジの床（掃引用）。既定は較正値 */
+const FLOOR = parseNumber('--field-floor', FIELD_STRENGTH_FLOOR);
 const UNLOCK = {
   MIN: parseNumber('--unlock-min', PLACEHOLDER_UNLOCK.MIN),
   MAX: parseNumber('--unlock-max', PLACEHOLDER_UNLOCK.MAX),
@@ -188,7 +190,7 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
   const fieldRng = deriveRng(seed, STREAM.FIELD);
 
   for (let raceIndex = 0; raceIndex < racesForSeed; raceIndex++) {
-    const race = generateRace(pool, raceIndex, fieldRng, CLASS_BAND, UNLOCK);
+    const race = generateRace(pool, raceIndex, fieldRng, CLASS_BAND, UNLOCK, FLOOR);
     const fieldSize = race.entrants.length;
 
     // (1) 人気を推定する（本番とは別系列・§9.2）
@@ -512,7 +514,7 @@ if (process.argv.includes('--json')) {
         classBand: CLASS_BAND,
         unlock: UNLOCK,
         raceRandomK: RACE_K,
-        fieldStrengthFloor: FIELD_STRENGTH_FLOOR,
+        fieldStrengthFloor: FLOOR,
         distanceSuitMin: DISTANCE_SUIT_MIN,
         offDistanceEntryRate: OFF_DISTANCE_ENTRY_RATE,
         offSurfaceEntryRate: OFF_SURFACE_ENTRY_RATE,
