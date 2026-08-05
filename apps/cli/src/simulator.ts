@@ -27,6 +27,11 @@ import {
   type NicksTable,
   type NumericTraitKey,
 } from '@star/sim-engine';
+import {
+  runSeason,
+  selectionScore,
+  type CareerRecord,
+} from './racing-season.js';
 import { correlation, linearSlope, max, mean, min, quantileSorted, round, sd } from './stats.js';
 
 // --- 正典 §13.2 の合格基準（D-008 で再定義） ---
@@ -98,6 +103,35 @@ export interface SimulationOptions {
    * 0 なら実行しない（判定は「別実行で確認」となる）。正典 §13.2 の既定は 300ゲーム内年。
    */
   longHorizonGenerations: number;
+  /**
+   * 最終年の産駒を結果に残す（K-5 のレース母集団・V-12 用）。
+   * ★既定 false。true にしない限り戻り値も JSON 出力も P0 と完全に同一のままになる
+   *   （追加が既存の検証結果に影響していないことを、既定値の側で担保する）。
+   */
+  retainFinalPopulation: boolean;
+
+  /**
+   * 種牡馬選抜の方式（K-4）。
+   *
+   * - `'proxy'`: P0 の近似。真の potential に観測ノイズを載せた「観測能力」で選ぶ（`selectionH2`）。
+   *   **レース非搭載時のフォールバックとして明示的に隔離している**（指示書 K-4）。
+   * - `'race'`: 実際にレースを走らせ、その成績で選ぶ。P1 の本来の姿。
+   *
+   * ★既定は `'proxy'`。P0 の受け入れ結果（`npm run verify`）を P0-fix5 と**同一の数値**に
+   *   保つため。`--selection race` で切り替え、P0 ゲートが実レース選抜下でも成立するかを
+   *   別途測る（指示書 §4「P0 ゲートの維持」）。既定を変えると「K-4 の影響」と
+   *   「それ以外の変更の影響」が混ざって切り分けられなくなる。
+   */
+  selection: 'proxy' | 'race';
+  /** 1年あたり各馬が走るレース数（`selection: 'race'` のとき） */
+  racesPerYear: number;
+  /**
+   * 選抜指標（`selection: 'race'` のとき）。K-4 で開発側が選ぶ。
+   * - `'prize'`: 累計獲得賞金
+   * - `'winRate'`: 勝率
+   * - `'composite'`: 賞金と複勝率の複合
+   */
+  selectionMetric: 'prize' | 'winRate' | 'composite';
 }
 
 export const DEFAULT_OPTIONS: SimulationOptions = {
@@ -116,6 +150,10 @@ export const DEFAULT_OPTIONS: SimulationOptions = {
   v1Repeats: 100,
   prune: true,
   longHorizonGenerations: 0,
+  retainFinalPopulation: false,
+  selection: 'proxy',
+  racesPerYear: 4,
+  selectionMetric: 'prize',
 };
 
 // ---------------------------------------------------------------------------
@@ -358,6 +396,11 @@ export interface SimulationResult {
   verification: Verification;
   /** V-2c 用の長期シミュレーション結果（--long-horizon 指定時のみ） */
   longHorizon: SimulationResult | null;
+  /**
+   * 最終年の産駒（`retainFinalPopulation` 指定時のみ。既定は null）。
+   * K-5 のレース母集団と V-12（平均F・表現型乖離）の実測に使う。
+   */
+  finalPopulation: readonly HorseRecord[] | null;
   totals: {
     matings: number;
     foals: number;
@@ -377,6 +420,8 @@ const RNG_DOMAIN = {
   MATING: 4,
   V1: 5,
   PERF: 6,
+  /** K-4: 実レース選抜のシーズン（他の用途と系列を混ぜない） */
+  RACE: 7,
 } as const;
 
 function abilityTotal(horse: HorseRecord): number {
@@ -598,6 +643,8 @@ export function runSimulation(
    * 生涯を通じて固定する（引退時の成績で種牡馬入りが決まるのと同じ構造）。
    */
   const perfNoise = new Map<HorseId, number>();
+  /** K-4: 実レース選抜の通算成績（`selection: 'race'` のときだけ使う） */
+  const careers = new Map<HorseId, CareerRecord>();
 
   const register = (horse: HorseRecord): HorseRecord => {
     all.set(horse.id, horse);
@@ -629,6 +676,8 @@ export function runSimulation(
   let founderIndex = 0;
   const mares: HorseRecord[] = [];
   const stallions: HorseRecord[] = [];
+  /** 最終年の産駒（`retainFinalPopulation` 時のみ蓄える） */
+  let finalFoals: HorseRecord[] = [];
 
   // 年0 から供用可能な現役繁殖世代。年齢を散らして退厩が一度に来ないようにする
   for (let i = 0; i < opts.population; i++) {
@@ -726,18 +775,21 @@ export function runSimulation(
     for (const m of mares) m.bredThisYear = false;
     for (const s of stallions) s.coveringsThisYear = 0;
 
-    // 4. 種付け候補 = 観測能力の上位 stallionTopRatio（指示書 §3.4）
-    //    観測能力は真の能力に個体固有ノイズを載せたもの（selectionH2 参照）
-    const poolSd = sd(stallions.map(abilityTotal));
-    const observedAbility = (h: HorseRecord): number =>
-      abilityTotal(h) + (perfNoise.get(h.id) ?? 0) * noiseK * poolSd;
+    // 4. 種付け候補 = 上位 stallionTopRatio
+    //    'proxy': 観測能力（真の能力＋個体固有ノイズ・selectionH2 参照。P0 の近似）
+    //    'race' : 実際に走らせた成績（K-4。P1 の本来の姿）
+    let rankKey: (h: HorseRecord) => number;
+    if (opts.selection === 'race') {
+      // ★このシーズンのレースを走らせてから選ぶ。走っていない馬はスコア0で自動的に落ちる
+      runSeason(stallions, careers, deriveRng(opts.seed, RNG_DOMAIN.RACE, year), opts.racesPerYear);
+      rankKey = (h) => selectionScore(careers.get(h.id), opts.selectionMetric);
+    } else {
+      const poolSd = sd(stallions.map(abilityTotal));
+      rankKey = (h) => abilityTotal(h) + (perfNoise.get(h.id) ?? 0) * noiseK * poolSd;
+    }
     const ranked = stallions
       .slice()
-      .sort((a, b) =>
-        observedAbility(b) !== observedAbility(a)
-          ? observedAbility(b) - observedAbility(a)
-          : a.id.localeCompare(b.id),
-      );
+      .sort((a, b) => (rankKey(b) !== rankKey(a) ? rankKey(b) - rankKey(a) : a.id.localeCompare(b.id)));
     const candidateCount = Math.max(1, Math.ceil(ranked.length * opts.stallionTopRatio));
     const candidates = ranked.slice(0, candidateCount);
 
@@ -827,6 +879,11 @@ export function runSimulation(
         midParent,
       }),
     );
+
+    // 6b. 最終年の産駒を残す（K-5 のレース母集団・V-12 用。既定 false なので通常は無効）
+    if (opts.retainFinalPopulation && year === opts.generations) {
+      finalFoals = foals.slice();
+    }
 
     // 7. V-1 チェックポイント
     if (v1Years.has(year)) {
@@ -1120,6 +1177,7 @@ export function runSimulation(
     cohorts,
     verification,
     longHorizon,
+    finalPopulation: opts.retainFinalPopulation ? finalFoals : null,
     totals: {
       matings: totalMatings,
       foals: totalMatings,

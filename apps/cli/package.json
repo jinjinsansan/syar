@@ -5,6 +5,7 @@
   "description": "STAR P0 CLI: 100-generation genetics simulator",
   "type": "module",
   "dependencies": {
+    "@star/race-engine": "*",
     "@star/sim-engine": "*"
   }
 }

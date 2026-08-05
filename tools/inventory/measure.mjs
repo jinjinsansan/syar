@@ -26,6 +26,12 @@ const ENTRIES = [
   ['packages/sim-engine/src/phenotype.ts', 'expressPhenotype', '): Phenotype {'],
   ['apps/cli/src/config.ts', 'resolveRuntimeConfig', '): RuntimeConfig {'],
   ['apps/cli/src/simulator.ts', 'runSimulation', '): SimulationResult {'],
+  // --- P1（race-engine）の本番エントリ ---
+  ['packages/race-engine/src/race.ts', 'resolveRace', 'export function resolveRace(params: ResolveRaceParams): RaceResult {'],
+  ['packages/race-engine/src/skills.ts', 'resolveSkills', '): SkillOutcome {'],
+  ['packages/race-engine/src/intervention.ts', 'resolveIntervention', '): InterventionOutcome {'],
+  ['packages/race-engine/src/fairness.ts', 'commitServerSeed', 'export function commitServerSeed(serverSeed: string, hash: HashProvider): string {'],
+  ['packages/race-engine/src/fairness.ts', 'auditFailures', 'export function auditFailures(record: RaceAuditRecord, hash: HashProvider): string[] {'],
 ];
 
 const OUT = 'tools/inventory/.probe.jsonl';
@@ -36,18 +42,29 @@ const probeLine = (name) =>
 const originals = new Map();
 
 function inject() {
+  // ★原本は**ファイルごとに1度だけ**読む。
+  //   当初これをエントリごとに読んでいたため、同一ファイルに2点挿すと
+  //   2回目の読み込みが「1点挿した後の内容」を原本として記録してしまい、
+  //   **復元でプローブが本番コードに残った**（fairness.ts で実際に発生）。
+  //   復元検査（md5 と TEMP-PROBE 走査）は検出できたが、修復はできなかった。
+  for (const [file] of ENTRIES) {
+    if (!originals.has(file)) originals.set(file, readFileSync(file, 'utf8'));
+  }
+  // ファイル単位に集約してから一括で書く
+  const pending = new Map();
   for (const [file, name, anchor] of ENTRIES) {
-    const text = readFileSync(file, 'utf8');
-    originals.set(file, text);
+    const text = pending.get(file) ?? originals.get(file);
+    if (text === undefined) throw new Error(`${file}: 原本が読めていない`);
     const count = text.split(anchor).length - 1;
     if (count !== 1) {
       throw new Error(`${file}: アンカー「${anchor}」が ${count} 件（1件でないと挿入位置が定まらない）`);
     }
     const next = text.replace(anchor, `${anchor}\n${probeLine(name)}`);
     if (next === text) throw new Error(`${file}: プローブ挿入が空振りした`);
-    writeFileSync(file, next);
+    pending.set(file, next);
   }
-  console.log(`プローブ挿入: ${ENTRIES.length}件`);
+  for (const [file, text] of pending) writeFileSync(file, text);
+  console.log(`プローブ挿入: ${ENTRIES.length}件（${pending.size}ファイル）`);
 }
 
 function restore() {

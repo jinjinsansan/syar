@@ -13,7 +13,12 @@ import { dirname, resolve } from 'node:path';
 import { NICKS_GEN } from '@star/sim-engine';
 import { resolveRuntimeConfig } from './src/config.js';
 import { formatReport } from './src/format.js';
-import { DEFAULT_OPTIONS, runSimulation, type SimulationOptions } from './src/simulator.js';
+import {
+  DEFAULT_OPTIONS,
+  runSimulation,
+  type SimulationOptions,
+  type SimulationResult,
+} from './src/simulator.js';
 
 interface CliArgs {
   options: Partial<SimulationOptions>;
@@ -201,6 +206,36 @@ function jsonSafeNumber(_key: string, value: unknown): unknown {
   }
   return value;
 }
+
+/**
+ * 【K-b】シリアライズ後の数値の型。
+ *
+ * 内部型は `number` のままで正しい（`Infinity` も `number`）。ずれているのは **JSON 表現の型宣言**で、
+ * `jsonSafeNumber` を通した後の値は `number | "Infinity" | "-Infinity" | "NaN"` になる。
+ * M-5 で `traits[].deviation` の同種のずれを直したが、**同じクラスが一段外側（出力全体）に
+ * 残っていた**。JSON を読む側（レビュー側の再実行・将来のツール）が
+ * 「数値のはずのフィールドに文字列が来る」ことを型から知れるようにする。
+ */
+export type SerializedNumber = number | 'Infinity' | '-Infinity' | 'NaN';
+
+/** `balanceDigest` をシリアライズしたときの型（数値フィールドが `SerializedNumber` になる） */
+export type SerializedBalanceDigest = {
+  [K in keyof SimulationResult['balanceDigest']]: SerializeNumbers<
+    SimulationResult['balanceDigest'][K]
+  >;
+};
+
+/** 再帰的に `number` を `SerializedNumber` へ置き換える */
+export type SerializeNumbers<T> = T extends number
+  ? SerializedNumber
+  : T extends readonly (infer U)[]
+    ? readonly SerializeNumbers<U>[]
+    : T extends object
+      ? { [K in keyof T]: SerializeNumbers<T[K]> }
+      : T;
+
+/** 出力 JSON 全体の型。`--json` の読み手はこれを使う */
+export type SerializedSimulationResult = SerializeNumbers<SimulationResult>;
 
 function main(): void {
   const args = parseArgs(process.argv.slice(2));

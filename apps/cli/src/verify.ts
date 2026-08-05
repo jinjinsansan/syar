@@ -46,6 +46,21 @@ const SEEDS = parseList('--seeds', [42, 7, 2026, 31337]);
 const HORIZONS = parseList('--horizons', [100, LONG_HORIZON]);
 const POPULATION = parseNumber('--population', DEFAULT_POPULATION);
 const STALLION_POOL = Math.max(1, Math.round(POPULATION * STALLION_RATIO));
+/**
+ * 種牡馬選抜の方式（K-4）。既定は P0 と同じ `proxy`。
+ * `--selection race` で実レース成績にもとづく選抜に切り替える。
+ * 指示書 §4「P0 ゲートの維持: V-1 / V-2a〜e / V-3 が**実レース選抜下でも**成立する」の測定用。
+ */
+const SELECTION: 'proxy' | 'race' = process.argv.includes('--selection')
+  ? ((process.argv[process.argv.indexOf('--selection') + 1] === 'race'
+      ? 'race'
+      : 'proxy') as 'proxy' | 'race')
+  : 'proxy';
+const SELECTION_METRIC: 'prize' | 'winRate' | 'composite' = (() => {
+  const i = process.argv.indexOf('--selection-metric');
+  const v = i < 0 ? '' : process.argv[i + 1];
+  return v === 'winRate' || v === 'composite' ? v : 'prize';
+})();
 
 function pad(s: string | number, w: number): string {
   const str = String(s);
@@ -61,6 +76,13 @@ const startedAt = process.hrtime.bigint();
 console.log(
   `繁殖牝馬=${POPULATION}頭 / 種牡馬プール=${STALLION_POOL}頭 / シード=${SEEDS.join(',')} / horizon=${HORIZONS.join(',')}`,
 );
+// ★R-8: 既定から外れた設定は冒頭で自己申告する
+if (SELECTION !== 'proxy') {
+  console.log(
+    `[注意] 種牡馬選抜 = 実レース成績（指標: ${SELECTION_METRIC}）。P0 の既定（proxy）とは別条件です。` +
+      'P0-fix5 のベースライン数値と直接比較しないでください（K-4）。',
+  );
+}
 if (POPULATION < DEFAULT_POPULATION) {
   console.log(
     `[注意] 既定（${DEFAULT_POPULATION}頭・正典 §10.5）より小さい集団です。遺伝的浮動が大きく出るため、` +
@@ -90,7 +112,14 @@ for (const horizon of HORIZONS) {
 
   for (const seed of SEEDS) {
     const r = runSimulation(
-      { seed, generations: horizon, population: POPULATION, stallionPool: STALLION_POOL },
+      {
+        seed,
+        generations: horizon,
+        population: POPULATION,
+        stallionPool: STALLION_POOL,
+        selection: SELECTION,
+        selectionMetric: SELECTION_METRIC,
+      },
       DEFAULT_BALANCE,
       FOUNDERS,
       NICKS_GEN,
