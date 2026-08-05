@@ -16,12 +16,14 @@
  *   一致していないと変異試験が空振りし、「防御されている」と誤読される（R-9 / R-11）。
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   CALIBRATION,
-  CALIBRATION_SCAN_FILES,
+  CALIBRATION_SCAN_DIRS,
+  EXEMPT_PATTERNS,
+  SCAN_EXCLUDED_FILES,
   EXEMPT,
   declarationPattern,
 } from '../src/calibration.js';
@@ -32,14 +34,45 @@ function read(relPath: string): string {
   return readFileSync(`${ROOT}${relPath}`, 'utf8');
 }
 
+/**
+ * 走査対象のファイル一覧を**ディレクトリから列挙**する（S-4）。
+ * 手書きのファイルリストだと新規ファイルが黙って漏れる。除外は明示のみ。
+ */
+function scanFiles(): string[] {
+  const excluded = new Set(SCAN_EXCLUDED_FILES.map((e) => e.file));
+  const out: string[] = [];
+  for (const dir of CALIBRATION_SCAN_DIRS) {
+    for (const name of readdirSync(`${ROOT}${dir}`)) {
+      if (!name.endsWith('.ts')) continue;
+      const rel = `${dir}/${name}`;
+      if (excluded.has(rel)) continue;
+      out.push(rel);
+    }
+  }
+  return out;
+}
+
 /** 数値・数値オブジェクトの `export const`（較正定数になりうるもの）を抜き出す */
 function numericExports(text: string): string[] {
   const keys: string[] = [];
-  for (const line of text.split('\n')) {
-    const m = line.match(/^export const ([A-Z][A-Z0-9_]*)\s*[:=]/);
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    // ★`export const` だけでなくモジュールスコープの `const` も見る。
+    //   `POOL_GENERATIONS`（判定を決める自由変数）は非 export だったため漏れていた。
+    const m = line.match(/^(?:export )?const ([A-Z][A-Z0-9_]*)\s*[:=]/);
     if (m === null || m[1] === undefined) continue;
-    // 数値リテラル、または `{ ... 数値 ... }` の形だけを対象にする
-    if (/=\s*-?[0-9]/.test(line) || /=\s*\{[^}]*[0-9]/.test(line)) keys.push(m[1]);
+    // ★宣言が複数行に渡る場合（オブジェクト定数）も中身を見る。
+    //   `DEFAULT_RACE_BALANCE` は `= {` の行に数値が無いため漏れていた。
+    let block = line;
+    if (line.includes('{') || line.includes('(')) {
+      for (let j = i + 1; j < Math.min(lines.length, i + 120); j++) {
+        const next = lines[j] ?? '';
+        block += `\n${next}`;
+        if (/^\}/.test(next) || /^\);/.test(next)) break;
+      }
+    }
+    if (/-?[0-9]/.test(block.replace(/^[^=]*=/, ''))) keys.push(m[1]);
   }
   return keys;
 }
@@ -50,7 +83,9 @@ describe('Q-3 較正定数の登録簿（メタテスト）', () => {
 
   it('走査対象の数値 export const はすべて登録済みか、理由付きで免除されている', () => {
     const unregistered: string[] = [];
-    for (const file of CALIBRATION_SCAN_FILES) {
+    const patterns = EXEMPT_PATTERNS.map((p) => new RegExp(p.pattern));
+    for (const file of scanFiles()) {
+      if (patterns.some((re) => re.test(file))) continue;
       for (const key of numericExports(read(file))) {
         if (registered.has(key) || exempt.has(key)) continue;
         unregistered.push(`${file}: ${key}`);
@@ -66,6 +101,12 @@ describe('Q-3 較正定数の登録簿（メタテスト）', () => {
   it('免除には必ず理由が書かれている（理由なしの免除を作らない）', () => {
     for (const e of EXEMPT) {
       expect(e.why.length, `${e.key} の免除理由が短すぎる`).toBeGreaterThan(20);
+    }
+    for (const p of EXEMPT_PATTERNS) {
+      expect(p.why.length, `${p.pattern} の免除理由が短すぎる`).toBeGreaterThan(20);
+    }
+    for (const f of SCAN_EXCLUDED_FILES) {
+      expect(f.why.length, `${f.file} の除外理由が短すぎる`).toBeGreaterThan(20);
     }
   });
 
@@ -105,7 +146,7 @@ describe('Q-3 較正定数の登録簿（メタテスト）', () => {
 
   it('走査が空振りしていない（0件で緑になるのを防ぐ・R-9）', () => {
     let total = 0;
-    for (const file of CALIBRATION_SCAN_FILES) total += numericExports(read(file)).length;
+    for (const file of scanFiles()) total += numericExports(read(file)).length;
     expect(total).toBeGreaterThan(8);
     expect(CALIBRATION.length).toBeGreaterThan(8);
   });

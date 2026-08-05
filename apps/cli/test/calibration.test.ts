@@ -274,3 +274,25 @@ describe('Q-3 追加防御: 距離エントリの絞り込み', () => {
     expect(rate, `距離が向いている出走馬の割合 ${rate}`).toBeGreaterThan(0.8);
   });
 });
+
+describe('S-3 OFF_SURFACE_ENTRY_RATE の振る舞いを固定する', () => {
+  it('★出走馬の大半が、そのレースの馬場に向いている', () => {
+    // 例外率を 1.0 にする（＝馬場を無視した混合番組）と、この割合は約50%まで落ちる。
+    // しきい値はリテラルで置く（摂動対象の定数を使うと同語反復になる）
+    const rng = deriveRng(14, 11);
+    let suited = 0;
+    let total = 0;
+    for (let i = 0; i < 200; i++) {
+      const race = generateRace(POOL, i, rng);
+      const s = race.conditions.surface;
+      const other = s === 'turf' ? 'dirt' : 'turf';
+      for (const e of race.entrants) {
+        total += 1;
+        if (e.surfaceAptitude[s] >= e.surfaceAptitude[other]) suited += 1;
+      }
+    }
+    expect(total).toBeGreaterThan(1000);
+    const rate = suited / total;
+    expect(rate, `馬場が向いている出走馬の割合 ${rate}`).toBeGreaterThan(0.70);
+  });
+});

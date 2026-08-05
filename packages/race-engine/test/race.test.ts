@@ -645,3 +645,43 @@ describe('解釈の登録簿（報告書 §7 の出所）', () => {
     }
   });
 });
+
+describe('S-1 K の振る舞いを固定する（しきい値に K 自身を使わない）', () => {
+  /**
+   * ★これが無いと K は「値の照合」でしか守られていなかった:
+   *     expect(sd).toBeGreaterThan(B.RACE_RANDOM_K * 0.92)  ← しきい値が摂動対象自身
+   *     expect(B.RACE_RANDOM_K).toBe(0.26)                  ← 唯一の実質的な検出源
+   *   K を 0.12 にすると sd も 0.12 になるので統計量のテストは**追随して通る**。
+   *   「統計量で固定している」という見た目を取りながら、振る舞いを見ていなかった。
+   *   `DISTANCE_SUIT_MIN` で自分が見つけた同語反復と完全に同型（4度目）。
+   *
+   * ★ここでは**リテラルのしきい値**で「K がレースの荒れ具合をどれだけ決めているか」を固定する。
+   *   能力を 3% 刻みで並べた8頭立てで、最強馬が勝つ割合:
+   *     K=0.12 → 37.70% / K=0.20 → 28.18% / K=0.26 → 24.90% / K=0.34 → 22.63%（実測）
+   *   K を動かせば必ずこの帯から外れる。
+   */
+  it('★能力差が既知の出走表で、最強馬の勝率が K に対応した水準になる', () => {
+    const field = Array.from({ length: 8 }, (_, i) =>
+      neutralEntrant(`H${i}`, {
+        gate: i + 1,
+        stats: {
+          sp: 500 - i * 15,
+          st: 500 - i * 15,
+          pw: 500 - i * 15,
+          gt: 500 - i * 15,
+          iq: 500 - i * 15,
+        },
+      }),
+    );
+    let wins = 0;
+    const races = 2000;
+    for (let seed = 0; seed < races; seed++) {
+      const r = resolveRace({ conditions: conditions(), entrants: field, seed, balance: B });
+      if (r.order[0]?.horseId === 'H0') wins += 1;
+    }
+    const rate = wins / races;
+    // ★リテラルで固定する（B.RACE_RANDOM_K を使わない）。K=0.20 でも K=0.34 でも外れる幅
+    expect(rate, `最強馬の勝率 ${rate}（K=0.26 の実測は 24.9%）`).toBeGreaterThan(0.232);
+    expect(rate, `最強馬の勝率 ${rate}（K=0.26 の実測は 24.9%）`).toBeLessThan(0.266);
+  });
+});

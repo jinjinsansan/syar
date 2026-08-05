@@ -150,7 +150,11 @@ if (targets.length === 0) throw new Error(`変異が見つからない: ${only}`
 
 function runTests() {
   try {
-    execFileSync('npx', ['vitest', 'run', '--reporter', 'dot'], {
+    // ★`--reporter dot` はテスト名を出さないため、落ちたテスト名が**常に空**だった（Q-6c）。
+    //   その結果「どのテストが守っているか」を誰も確認できず、
+    //   自己検出（値照合テストだけが落ちている状態）を見逃した。
+    //   **ハーネスの verdict が監査できないなら、ハーネスを信頼する根拠がない。**
+    execFileSync('npx', ['vitest', 'run', '--reporter', 'basic'], {
       stdio: 'pipe',
       shell: true,
       encoding: 'utf8',
@@ -165,8 +169,9 @@ function runTests() {
 function failedTestNames(output) {
   const names = new Set();
   for (const line of output.split('\n')) {
-    const m = line.match(/×\s+(.+?)(?:\s+\d+ms)?\s*$/);
-    if (m !== null && m[1] !== undefined) names.add(m[1].replace(/\[[0-9;]*m/g, '').trim());
+    const clean = line.replace(new RegExp(String.fromCharCode(27) + String.raw`[[0-9;]*m`, 'g'), '');
+    const m = clean.match(/(?:×|FAIL)\s+(.+?)(?:\s+\d+ms)?\s*$/);
+    if (m !== null && m[1] !== undefined) names.add(m[1].trim());
   }
   return [...names];
 }
