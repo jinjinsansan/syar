@@ -22,8 +22,9 @@ describe('CLI の上書きと形質別パラメータの再導出（I-4）', () 
   it('REGRESSION_RATE を上書きすると sd が追随する', () => {
     const { balance } = resolveRuntimeConfig({ REGRESSION_RATE: 0.05 });
     expect(balance.REGRESSION_RATE).toBe(0.05);
-    // sd = 創始アレルSD × √(2r−r²) ÷ 0.9156。r=0.05 なら √0.0975 = 0.3122
-    const f = 0.9156;
+    // sd = 創始アレルSD × √(2r−r²) ÷ 切断係数。r=0.05 なら √0.0975 = 0.3122
+    // ★係数はリテラルで持たず解析式から取る（M-2。リテラルだと比を変えたとき同期が要る）
+    const f = clampTruncationFactor(DEFAULT_BALANCE.MUTATION_CLAMP / DEFAULT_BALANCE.genetics.MUTATION_SD);
     const g = Math.sqrt(2 * 0.05 - 0.05 * 0.05);
     expect(balance.traitMutation['durability']?.sd).toBe(Math.round((100 * g) / f));
     expect(balance.traitMutation['distance_center']?.sd).toBe(
@@ -37,7 +38,10 @@ describe('CLI の上書きと形質別パラメータの再導出（I-4）', () 
   it('FOUNDERS の SD を上書きすると sd が追随する', () => {
     const { balance, founders } = resolveRuntimeConfig({}, {}, { DURABILITY_SD: 200 });
     expect(founders.DURABILITY_SD).toBe(200);
-    expect(balance.traitMutation['durability']?.sd).toBe(Math.round((200 * 0.6) / 0.9156));
+    const factor = clampTruncationFactor(
+      DEFAULT_BALANCE.MUTATION_CLAMP / DEFAULT_BALANCE.genetics.MUTATION_SD,
+    );
+    expect(balance.traitMutation['durability']?.sd).toBe(Math.round((200 * 0.6) / factor));
     expect(balance.traitMutation['durability']?.sd).not.toBe(66);
     // 他形質は変わらない
     expect(balance.traitMutation['distance_center']?.sd).toBe(341);

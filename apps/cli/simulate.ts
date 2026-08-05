@@ -188,6 +188,20 @@ function parseArgs(argv: readonly string[]): CliArgs {
   return { options, json, quiet, geneticsOverrides, balanceOverrides, founderOverrides };
 }
 
+/**
+ * JSON では非有限値（Infinity / -Infinity / NaN）がすべて `null` になり、**区別がつかない**。
+ *
+ * L-1 の確認時、`clamp: null` が「NaN のまま（未修正）」なのか「Infinity（修正済み）」なのか
+ * JSON からは判別できず、本番経路を直接叩く手間が余分に発生した。
+ * **直ったかを判定したい場面で見分けがつかない**のは実害なので、文字列化して残す（M-5）。
+ */
+function jsonSafeNumber(_key: string, value: unknown): unknown {
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    return Number.isNaN(value) ? 'NaN' : value > 0 ? 'Infinity' : '-Infinity';
+  }
+  return value;
+}
+
 function main(): void {
   const args = parseArgs(process.argv.slice(2));
 
@@ -207,7 +221,7 @@ function main(): void {
   if (args.json !== null) {
     const path = resolve(process.cwd(), args.json);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
+    writeFileSync(path, `${JSON.stringify(result, jsonSafeNumber, 2)}\n`, 'utf8');
     if (!args.quiet) console.log(`\nJSON を書き出しました: ${path}`);
   }
 

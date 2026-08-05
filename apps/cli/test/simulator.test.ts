@@ -170,7 +170,7 @@ describe('シミュレータの決定論（指示書 §3.5-1）', () => {
     for (const t of result.verification.v2d.traits) {
       expect(t.founderMean).toBe(result.founderCohort.traitMeans[t.key]);
       expect(t.finalMean).toBe(last?.traitMeans[t.key]);
-      expect(t.pass).toBe(Math.abs(t.deviation) <= 0.1);
+      expect(t.pass).toBe(t.deviation !== null && Math.abs(t.deviation) <= 0.1);
     }
   });
 

@@ -271,8 +271,11 @@ export interface Verification {
       key: NumericTraitKey;
       founderMean: number;
       finalMean: number;
-      /** basis=ratio なら finalMean/founderMean−1、basis=sd なら (finalMean−founderMean)/創始SD */
-      deviation: number;
+      /**
+       * basis=ratio なら finalMean/founderMean−1、basis=sd なら (finalMean−founderMean)/創始SD。
+       * basis=none（判定不能）のときは **null**（M-5: 型 `number` に NaN を入れていた不一致を是正）。
+       */
+      deviation: number | null;
       /**
        * 判定の物差し（I-2b）。
        * ratio = 創始平均比（|平均| > 創始SD のとき。既定の6形質はすべてこちら）
@@ -951,7 +954,8 @@ export function runSimulation(
       key,
       founderMean,
       finalMean,
-      deviation: Number.isNaN(deviation) ? Number.NaN : round(deviation, 4),
+      // 判定不能は NaN ではなく null にする（JSON の型と実値を一致させる・M-5）
+      deviation: Number.isFinite(deviation) ? round(deviation, 4) : null,
       /** ratio = 創始平均比 / sd = 創始SDを単位とした差 / undefined = 判定不能 */
       basis: usesRatio ? ('ratio' as const) : founderSd > 1e-9 ? ('sd' as const) : ('none' as const),
       // 判定不能（創始平均も創始SDも0）なら PASS させない
@@ -976,16 +980,15 @@ export function runSimulation(
    *    合否は every() で別計算なのでゲート自体は正しいが、**最も診断が必要な場面で
    *    verify 表に NaN が出て真の最悪形質が見えなくなる**。NaN は候補から外す。
    */
-  const worst = v2dTraits
-    .filter((t) => Number.isFinite(t.deviation))
-    .reduce<(typeof v2dTraits)[number] | null>(
-      (acc, t) => (acc === null || Math.abs(t.deviation) > Math.abs(acc.deviation) ? t : acc),
-      null,
-    );
-  /** 判定不能だった形質（NaN）。worst には出さないが、隠さず別枠で報告する */
-  const undecidableKeys = v2dTraits
-    .filter((t) => !Number.isFinite(t.deviation))
-    .map((t) => t.key);
+  const decidable = v2dTraits.filter(
+    (t): t is (typeof v2dTraits)[number] & { deviation: number } => t.deviation !== null,
+  );
+  const worst = decidable.reduce<(typeof decidable)[number] | null>(
+    (acc, t) => (acc === null || Math.abs(t.deviation) > Math.abs(acc.deviation) ? t : acc),
+    null,
+  );
+  /** 判定不能だった形質。worst には出さないが、隠さず別枠で報告する */
+  const undecidableKeys = v2dTraits.filter((t) => t.deviation === null).map((t) => t.key);
 
   // --- V-2e 非能力形質の分化: 集団SDが創始の 0.8〜1.4倍（D-012 で全非能力形質へ一般化） ---
   const finalTraitSds = finalCohort?.traitSds;

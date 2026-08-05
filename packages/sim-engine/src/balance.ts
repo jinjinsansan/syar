@@ -50,8 +50,13 @@ export const BALANCE = {
    *
    * ⚠️ **実装はこの値を使わない。** J-1 以降、係数は `clampTruncationFactor(k)` が
    *    clamp比から解析的に計算する（比が変われば係数も追随する）。
-   *    ここに残しているのは正典 §6.4 の記載値との対応を示すためだけで、
-   *    **一致することはテストで固定している**（食い違ったら解析式が正）。
+   *    ここに残しているのは正典 §6.4 の記載値との対応を示すためだけ。
+   *    一致は `regression.test.ts` の
+   *    **「切断係数の出所は解析式であり、正典の記載値と一致する（L-2/M-1）」** で固定している
+   *    （食い違ったら解析式が正。定数側を直す）。
+   *
+   * ⚠️ この種の「テストで固定している」という記述は、**テスト名まで書いて検証可能にすること**。
+   *    以前ここに存在しないテストを書いてしまい、次の読み手を誤らせた（M-1）。
    */
   CLAMP_TRUNCATION_FACTOR: 0.9156,
   INBREED_BOOST_MAX: 0.3,
@@ -294,7 +299,10 @@ export const FOUNDERS: FoundersConfig = {
 /**
  * clamp幅 ÷ sd の比（正典 §6.4: ±150 と N(0,90)）。
  * リテラルで二重管理せず §13.1 の定数から導出する（I-2a）。
- * この比を変えたら `CLAMP_TRUNCATION_FACTOR` の再計算も必要。
+ *
+ * この比を変えても**手作業の再計算は不要**。切断係数は `clampTruncationFactor(k)` が
+ * この比から解析的に求めるので自動で追随する（J-1）。
+ * `BALANCE.CLAMP_TRUNCATION_FACTOR` は正典 §6.4 との対応を示す参考値にすぎない。
  */
 export const MUTATION_CLAMP_RATIO = BALANCE.MUTATION_CLAMP / BALANCE.MUTATION_SD;
 
@@ -336,7 +344,8 @@ function normalCdf(z: number): number {
  *   追随せず、導出 sd が静かに誤る（k=3.33 なら係数 0.999 で丈夫さ sd は 66 ではなく 60）。
  *   これは I-4（CLI が導出をバイパスする）と同じクラスの事故なので、関数にしてある。
  *
- * 既定 k = 150/90 では 0.915604 を返し、正典 §6.4 の 0.9156 と一致する（テストで固定）。
+ * 既定 k = 150/90 では 0.915604 を返す。これが正典 §6.4 の記載値 0.9156 と一致することは
+ * `regression.test.ts` の「切断係数の出所は解析式であり、正典の記載値と一致する」で固定している。
  */
 export function clampTruncationFactor(clampRatio: number): number {
   if (!(clampRatio > 0)) {

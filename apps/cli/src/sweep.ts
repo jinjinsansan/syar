@@ -53,6 +53,9 @@ function pad(s: string | number, w: number): string {
  * 回帰率0の歴史的構成を再現するためだけに使う。
  */
 function legacyCentersOnly(): BalanceConfig['traitMutation'] {
+  // 既定引数で呼んでよい理由（M-4 の確認）: ここで取り出すのは `center` だけで、
+  // center は創始分布の期待値なので**回帰率にも clamp比にも依存しない**。
+  // sd/clamp を使う場合は必ず両方を明示的に渡すこと。
   const base = buildTraitMutation(FOUNDERS);
   const out: Record<string, { center: number }> = {};
   for (const [key, spec] of Object.entries(base)) {

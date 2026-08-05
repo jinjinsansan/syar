@@ -87,7 +87,13 @@ for (const r of RATES) {
     REGRESSION_RATE: r,
     // ★距離2形質だけ手で組むと、D-012 以降は丈夫さ・気性・適性が置き去りになる（I-4）。
     //   全形質を同じ導出で組み直す
-    traitMutation: buildTraitMutation(FOUNDERS, r),
+    // ★clampRatio を省略すると既定比が使われ、MUTATION_SD を振ったときに追随しない（M-4）。
+    //   このファイルは現状 MUTATION_SD を上書きしないので無害だが、I-4 の再発形なので明示する
+    traitMutation: buildTraitMutation(
+      FOUNDERS,
+      r,
+      DEFAULT_BALANCE.MUTATION_CLAMP / DEFAULT_BALANCE.genetics.MUTATION_SD,
+    ),
   };
 
   const centerDev: number[] = [];

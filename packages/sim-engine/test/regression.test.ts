@@ -194,10 +194,17 @@ describe('形質別の変異・回帰パラメータ（正典 §6.4 の表・D-0
     }
   });
 
-  it('clamp 切断補正の係数がリテラル固定されている（D-013）', () => {
-    // clamp/sd 比 1.6667 での実効SD係数。比を変えたら再計算が必要
-    expect(BALANCE.CLAMP_TRUNCATION_FACTOR).toBe(0.9156);
+  it('切断係数の出所は解析式であり、正典の記載値と一致する（L-2/M-1）', () => {
+    // ★実装が使うのは clampTruncationFactor(k)。BALANCE の定数は正典 §6.4 との
+    //   対応を示す参考値にすぎない。**両者が一致すること**をここで固定する
+    //   （食い違ったら解析式が正。定数側を直す）。
+    //   以前は `toBe(0.9156)` とリテラル同士を比べる同語反復で、
+    //   解析式との突き合わせを一切していなかった（M-1 で是正）。
     expect(MUTATION_CLAMP_RATIO).toBeCloseTo(150 / 90, 10);
+    expect(clampTruncationFactor(MUTATION_CLAMP_RATIO)).toBeCloseTo(
+      BALANCE.CLAMP_TRUNCATION_FACTOR,
+      4,
+    );
   });
 
   it('非能力形質の sd はすべて創始アレルSDから導出される（D-012/D-013）', () => {
@@ -436,6 +443,83 @@ describe('clamp の式が本番経路（breed 経由）でも固定されてい�
     // 正: 900 − 90 = 810 付近 / 誤: clamp が引き戻しを削るので 810 より高く出る
     expect(avg).toBeGreaterThan(795);
     expect(avg).toBeLessThan(825);
+  });
+});
+
+/**
+ * 【M-3c】`resolveMutation()` が **breed 経由**で使われていることを固定する。
+ *
+ * L-1 の棚卸しで「`resolveMutation` の定数アサーションは `config.test.ts` が経路で
+ * 押さえている」と書いたのは**誤り**だった。`config.test.ts` が見ているのは
+ * `buildTraitMutation` の出力（= traitMutation テーブル）だけで、
+ * **`resolveMutation` には一度も到達しない**。両者は別物である:
+ *   - 上書きのある形質 → traitMutation の sd/clamp をそのまま採用
+ *   - 上書きのない形質（能力5種） → `genetics.MUTATION_SD × 値域比` で算出（resolveMutation 内）
+ *   - `bigSd` は resolveMutation でしか計算されない
+ *
+ * ここでは I-3 と同じ「観測可能な境界」で、resolveMutation の**両分岐**を判別する。
+ */
+describe('resolveMutation が breed 経由で使われていること（M-3c）', () => {
+  /** 両親のアレルを固定して多数繁殖させ、子のアレルの実測範囲を返す */
+  function alleleRange(
+    trait: 'sp' | 'durability',
+    parentAllele: number,
+    count = 400,
+  ): { min: number; max: number } {
+    const balance = {
+      ...DEFAULT_BALANCE,
+      genetics: {
+        ...DEFAULT_BALANCE.genetics,
+        ATAVISM_RATE: 0,
+        BIG_ATAVISM_RATE: 0,
+        BIG_MUTATION_RATE: 0,
+      },
+    };
+    const herd = new Herd();
+    const sire = herd.add('S', 'male', null, null, { birthYear: 0 });
+    const dam = herd.add('D', 'female', null, null, { birthYear: 0 });
+    for (const h of [sire, dam]) {
+      h.genotype[trait] = { a1: parentAllele, a2: parentAllele };
+    }
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (let seed = 0; seed < count; seed++) {
+      const foal = breed({
+        id: `F${seed}`,
+        sire,
+        dam,
+        seed,
+        generation: 1,
+        birthYear: 10,
+        lookup: herd.lookup,
+        balance,
+        nicks: NO_NICKS,
+      });
+      for (const v of [foal.genotype[trait].a1, foal.genotype[trait].a2]) {
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+    }
+    return { min, max };
+  }
+
+  it('上書きの無い形質（能力）は値域比スケールで解決される: clamp 150', () => {
+    // sp は traitMutation に sd/clamp を持たない → resolveMutation が
+    // genetics.MUTATION_SD(90) × 値域比(1) と MUTATION_CLAMP(150) を返す経路。
+    // 親900・中心450・r0.2 → 引き戻し90 → 値域 [900-150-90, 900+150-90] = [660, 960]
+    const { min, max } = alleleRange('sp', 900);
+    expect(max).toBeLessThanOrEqual(960);
+    expect(min).toBeLessThan(750); // clamp が 150 より小さいと到達できない
+  });
+
+  it('上書きのある形質（丈夫さ）は traitMutation の clamp 109 が使われる', () => {
+    // durability は traitMutation に clamp 109 を持つ → resolveMutation が上書きを返す経路。
+    // 親900・中心650・r0.2 → 引き戻し50 → 値域 [900-109-50, 900+109-50] = [741, 959]
+    // ★上書きを無視して値域比フォールバック（clamp 150）に落ちると最大 1000 まで出る
+    const { min, max } = alleleRange('durability', 900);
+    expect(max).toBeLessThanOrEqual(959);
+    expect(max).toBeGreaterThan(930); // clamp が極端に小さくないこと
+    expect(min).toBeGreaterThanOrEqual(741);
   });
 });
 

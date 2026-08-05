@@ -223,12 +223,13 @@ export function formatReport(result: SimulationResult): string {
         ? ''
         : `  [表現型 ${founderPheno[key].toFixed(1)}→${finalPheno[key].toFixed(1)}]`;
     const unit = t.basis === 'sd' ? '創始SD' : t.basis === 'none' ? '判定不能' : '%';
+    const dev = t.deviation;
     const value =
-      t.basis === 'none'
+      dev === null
         ? '—'
         : t.basis === 'sd'
-          ? `${t.deviation >= 0 ? '+' : ''}${t.deviation.toFixed(3)}`
-          : `${t.deviation >= 0 ? '+' : ''}${(t.deviation * 100).toFixed(2)}`;
+          ? `${dev >= 0 ? '+' : ''}${dev.toFixed(3)}`
+          : `${dev >= 0 ? '+' : ''}${(dev * 100).toFixed(2)}`;
     lines.push(
       `    ${pad(t.key, 16)}: 創始 ${pad(t.founderMean.toFixed(1), 8)} → 最終 ${pad(t.finalMean.toFixed(1), 8)}` +
         `  乖離 ${value}${unit}  ${verdict(t.pass)}${pheno}`,
