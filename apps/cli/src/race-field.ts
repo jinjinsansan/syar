@@ -180,7 +180,83 @@ export const OFF_DISTANCE_ENTRY_RATE = 0.12;
  *   「勝ち目のない馬」は出走してこない（オーナーが出さない・条件で弾かれる）。
  *   そこでレース内で最強馬のこの割合を下回る馬は出走させない＝**下側の裾を切る**。
  */
-export const FIELD_STRENGTH_FLOOR = 0.78;
+export const FIELD_STRENGTH_FLOOR = 0.5;
+
+/**
+ * 候補を何倍引いてから絞るか（Q-4）。
+ *
+ * ★これが実質1倍だったために、床フィルタが**頭数を削って**いた。
+ *   多めに引いておけば、能力レンジを締めても正典 §10.4 の頭数を維持できる。
+ */
+export const OVERSAMPLE_RATIO = 3;
+
+/**
+ * 床を割る馬を差し替える最大回数（Q-4）。
+ * 上限を置くのは、候補が尽きたときに無限ループしないため。
+ */
+export const FLOOR_REDRAW_PASSES = 12;
+
+/**
+ * 頭数に応じた床（P-4）。
+ *
+ * ★裾（最低人気の勝率）は**多頭数レースほど死ぬ**。18頭立てでは最下位人気が
+ *   10万レース中一度も勝たなかった。同じ床を全頭数に当てると、
+ *   少頭数では締めすぎ（V-4 が落ちる）／多頭数では緩すぎ（裾が死ぬ）になる。
+ *   頭数が増えるほど床を上げて、1頭あたりの勝ち目を確保する。
+ */
+export function floorForFieldSize(fieldSize: number, base = FIELD_STRENGTH_FLOOR): number {
+  const t = (fieldSize - FIELD_SIZE.MIN) / (FIELD_SIZE.MAX - FIELD_SIZE.MIN);
+  return base + Math.max(0, Math.min(1, t)) * FLOOR_FIELD_SIZE_SLOPE;
+}
+
+/** 8頭→18頭で床がどれだけ上がるか（P-4 の較正対象） */
+export const FLOOR_FIELD_SIZE_SLOPE = 0.2;
+
+/**
+ * 強さ降順に並んだ配列から、`size` 個の連続した窓のうち**最大/最小の比が最も1に近い**開始位置を返す。
+ *
+ * ★「レース内の能力レンジを締める」を、頭数を削らずに実現する方法（Q-4）。
+ *   床を下回る馬を落とす方式は頭数が減るため、正典 §10.4 の分布が壊れる。
+ */
+export function tightestWindow(sortedDesc: readonly number[], size: number): number {
+  if (size >= sortedDesc.length) return 0;
+  let bestStart = 0;
+  let bestRatio = Number.POSITIVE_INFINITY;
+  for (let i = 0; i + size <= sortedDesc.length; i++) {
+    const hi = sortedDesc[i] ?? 0;
+    const lo = sortedDesc[i + size - 1] ?? 0;
+    const ratio = lo > 0 ? hi / lo : Number.POSITIVE_INFINITY;
+    if (ratio < bestRatio) {
+      bestRatio = ratio;
+      bestStart = i;
+    }
+  }
+  return bestStart;
+}
+
+/**
+ * 床（`FIELD_STRENGTH_FLOOR`）を満たす窓の中から**抽選**で1つ選ぶ（Q-4 / P-4）。
+ *
+ * ★常に「最も狭い窓」を採ると締めすぎる（実測 V-4 22.7% で下限を大きく割った）。
+ *   床は「これ以上は開かない」という上限であって、最小化する目的関数ではない。
+ *   満たす窓が無ければ最も狭い窓に落とす（＝できる範囲で締める）。
+ */
+export function pickWindow(
+  sortedDesc: readonly number[],
+  size: number,
+  floor: number,
+  rng: Rng,
+): number {
+  if (size >= sortedDesc.length) return 0;
+  const valid: number[] = [];
+  for (let i = 0; i + size <= sortedDesc.length; i++) {
+    const hi = sortedDesc[i] ?? 0;
+    const lo = sortedDesc[i + size - 1] ?? 0;
+    if (hi > 0 && lo >= hi * floor) valid.push(i);
+  }
+  if (valid.length === 0) return tightestWindow(sortedDesc, size);
+  return valid[rng.int(0, valid.length - 1)] ?? 0;
+}
 
 /**
  * 出走可否の判定に使う強さの近似（レース判定そのものではない）。
@@ -218,12 +294,27 @@ export function generateRace(
 
   // クラス帯（能力順の連続した窓）から重複なしで fieldSize 頭を引く。
   // ★`pool` は能力昇順に並んでいる前提（`sortPoolByClass`）。並んでいなければクラス分けは効かない
-  const bandSize = Math.max(fieldSize, Math.round(pool.length * classBand));
+  // ★候補は必ず fieldSize × OVERSAMPLE_RATIO 頭ぶん確保する（Q-4 / P-4）。
+  //   クラス幅だけで決めると、18頭立てのとき候補が頭数と同数近くになり
+  //   「能力レンジの最も狭い窓を選ぶ」自由度が消える＝**大頭数ほど裾が締まらない**。
+  //   クラス幅は**下限**として扱う。
+  const bandSize = Math.min(
+    pool.length,
+    Math.max(fieldSize * OVERSAMPLE_RATIO, Math.round(pool.length * classBand)),
+  );
   const bandStart = rng.int(0, Math.max(0, pool.length - bandSize));
+  // ★★ Q-4: **必ず fieldSize 頭を出走させる**（正典 §10.4「1レース 8〜18頭」）
+  //
+  //   以前は「多めに作ってから絞る」と書きながら、ここで fieldSize 頭ちょうどしか引いていなかった。
+  //   その結果 oversample = fieldSize となり、能力レンジの床フィルタが**頭数を直接削って**いた。
+  //   実測で 8頭 21.4% / 18頭 3.4%・平均 10.97頭（仕様どおりなら各9.1%・平均13.00）。
+  //   **頭数が減れば1頭あたりの勝率は機械的に上がる**ので、V-4/V-6 の較正が
+  //   この意図せぬ副作用の上に乗っていた。**候補を多めに引き、絞ったあとも頭数は維持する。**
+  const candidateCount = Math.min(bandSize, fieldSize * OVERSAMPLE_RATIO);
   const picked: HorseRecord[] = [];
   const used = new Set<number>();
   let attempts = 0;
-  while (picked.length < fieldSize) {
+  while (picked.length < candidateCount) {
     const idx = bandStart + rng.int(0, bandSize - 1);
     attempts += 1;
     if (used.has(idx)) continue;
@@ -250,31 +341,49 @@ export function generateRace(
     picked.push(horse);
   }
 
-  // ★出走馬を作る。頭数より多めに作ってから「レース内の能力レンジ」で絞る（O-2）。
-  //   絞る前に多めに作るのは、絞った結果 頭数が足りなくなるのを避けるため。
-  const oversample = Math.min(picked.length, fieldSize + Math.ceil(fieldSize * 0.6));
-  const candidates = picked
-    .slice(0, oversample)
-    .map((horse) =>
-      toEntrant(
-        horse,
-        rng,
-        {
-          // 調子・年齢・斤量にレースごとのばらつきを持たせる（P3 の育成が入るまでの仮定）
-          condition: rng.int(2, 4),
-          age: rng.int(3, 5),
-          weightKg: 55 + rng.range(-2, 2),
-        },
-        unlockRange,
-      ),
-    );
+  const candidates = picked.map((horse) =>
+    toEntrant(
+      horse,
+      rng,
+      {
+        // 調子・年齢・斤量にレースごとのばらつきを持たせる（P3 の育成が入るまでの仮定）
+        condition: rng.int(2, 4),
+        age: rng.int(3, 5),
+        weightKg: 55 + rng.range(-2, 2),
+      },
+      unlockRange,
+    ),
+  );
 
+  // ★**頭数は必ず fieldSize に保ったまま、床を割る馬だけを引き直す**（Q-4）。
+  //
+  //   以前の「床を下回る馬を落とす」方式は**頭数を直接削って**いた（実測 平均10.97頭）。
+  //   代わりに「能力差の最も小さい連続窓」を採る方式も試したが、**締めすぎて V-4 が 24.5%**
+  //   まで落ちた — 床は「これ以上は開かない」上限であって、最小化する目的関数ではない。
+  //   最も素直なのは「弱すぎる馬を別の候補と差し替える」で、これは
+  //   「勝ち目のない馬は出走してこない」という現実の番組の姿そのもの。
   const withStrength = candidates.map((e) => ({ e, s: entryStrength(e, distance, surface) }));
-  withStrength.sort((a, b) => b.s - a.s);
-  const best = withStrength[0]?.s ?? 1;
-  // レース内で「最強の FIELD_STRENGTH_FLOOR 倍」を下回る馬は出走させない（＝下側の裾を切る）
-  const kept = withStrength.filter((x) => x.s >= best * FIELD_STRENGTH_FLOOR);
-  const chosen = (kept.length >= FIELD_SIZE.MIN ? kept : withStrength).slice(0, fieldSize);
+  const chosen = withStrength.slice(0, Math.min(fieldSize, withStrength.length));
+  // ★差し替え先は**強い順**に使う。ランダムな候補から取ると弱い馬を弱い馬に替えるだけで、
+  //   床がほとんど効かない（実測で床 0.78 と 0.86 の差が 0.3pp しか出なかった）
+  const spare = withStrength.slice(chosen.length).sort((a, b) => a.s - b.s);
+  for (let pass = 0; pass < FLOOR_REDRAW_PASSES && spare.length > 0; pass++) {
+    let best = 0;
+    for (const x of chosen) if (x.s > best) best = x.s;
+    let weakestIndex = -1;
+    let weakest = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < chosen.length; i++) {
+      const s = chosen[i]?.s ?? 0;
+      if (s < weakest) {
+        weakest = s;
+        weakestIndex = i;
+      }
+    }
+    if (weakestIndex < 0 || weakest >= best * floorForFieldSize(fieldSize)) break;
+    const replacement = spare.pop();
+    if (replacement === undefined) break;
+    chosen[weakestIndex] = replacement;
+  }
   // 枠順は強さ順ではなく抽選（強い馬が常に内枠になると gateCoef と交絡する）
   const entrants = rng.shuffled(chosen.map((x) => x.e)).map((e, i) => ({ ...e, gate: i + 1 }));
 

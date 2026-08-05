@@ -29,6 +29,11 @@ import { NICKS_GEN, deriveRng } from '@star/sim-engine';
 import { resolveRuntimeConfig } from './config.js';
 import {
   DEFAULT_CLASS_BAND,
+  DISTANCE_SUIT_MIN,
+  FIELD_STRENGTH_FLOOR,
+  OFF_DISTANCE_ENTRY_RATE,
+  OFF_SURFACE_ENTRY_RATE,
+  OVERSAMPLE_RATIO,
   PLACEHOLDER_UNLOCK,
   generateRace,
   sortPoolByClass,
@@ -127,6 +132,10 @@ interface SeedResult {
   meanF: number;
   durabilityGap: number;
   poolSize: number;
+  /** 出走頭数 → その頭数のレース数（正典 §10.4 の分布を確認する・Q-4） */
+  fieldSizeCounts: Record<number, number>;
+  /** 出走頭数 → 最低人気の勝利数（P-4: 裾が頭数によらず生きているか） */
+  longshotWinsByFieldSize: Record<number, number>;
 }
 
 function runSeed(seed: number, racesForSeed: number): SeedResult {
@@ -165,6 +174,8 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
   let longshotWins = 0;
   const winsByRank: number[] = [];
   const racesByRank: number[] = [];
+  const fieldSizeCounts: Record<number, number> = {};
+  const longshotWinsByFieldSize: Record<number, number> = {};
 
   const allMults: number[] = [];
   const intervenedMults: number[] = [];
@@ -246,7 +257,11 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     if (winner.horseId === favorite.id) favoriteWins += 1;
     const top3 = result.order.slice(0, 3).map((o) => o.horseId);
     if (top3.includes(favorite.id)) favoriteTop3 += 1;
-    if (winner.horseId === longshot.id) longshotWins += 1;
+    fieldSizeCounts[fieldSize] = (fieldSizeCounts[fieldSize] ?? 0) + 1;
+    if (winner.horseId === longshot.id) {
+      longshotWins += 1;
+      longshotWinsByFieldSize[fieldSize] = (longshotWinsByFieldSize[fieldSize] ?? 0) + 1;
+    }
 
     for (let rank = 0; rank < ranked.length; rank++) {
       racesByRank[rank] = (racesByRank[rank] ?? 0) + 1;
@@ -286,6 +301,8 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     meanF,
     durabilityGap,
     poolSize: pool.length,
+    fieldSizeCounts,
+    longshotWinsByFieldSize,
   };
 }
 
@@ -436,6 +453,26 @@ for (let rank = 0; rank < Math.min(maxRank, 18); rank++) {
 }
 
 console.log('');
+console.log('--- P-4: 出走頭数別の最低人気勝率（V-6 をプール値だけで見ない）---');
+console.log('※ 正典 §10.4 は 8〜18頭。頭数分布が一様かもここで確認する');
+{
+  const sizes = new Set<number>();
+  for (const r of results) for (const k of Object.keys(r.fieldSizeCounts)) sizes.add(Number(k));
+  const sorted = [...sizes].sort((a, b) => a - b);
+  let totalRaces = 0;
+  for (const n of sorted) totalRaces += results.reduce((s, r) => s + (r.fieldSizeCounts[n] ?? 0), 0);
+  console.log(`  ${pad('頭数', 5)} ${pad('レース数', 9)} ${pad('構成比', 8)} ${pad('最低人気勝率', 13)}`);
+  for (const n of sorted) {
+    const races = results.reduce((s, r) => s + (r.fieldSizeCounts[n] ?? 0), 0);
+    const wins = results.reduce((s, r) => s + (r.longshotWinsByFieldSize[n] ?? 0), 0);
+    const rate = races === 0 ? 0 : wins / races;
+    const flag = rate < GATES.V6[0] ? '  ← 裾が死んでいる' : '';
+    console.log(
+      `  ${pad(n, 5)} ${pad(races, 9)} ${pad(pct(races / Math.max(1, totalRaces)), 8)} ${pad(pct(rate), 13)}${flag}`,
+    );
+  }
+}
+console.log('');
 console.log('--- V-9b（監視・絶対目標値は置かない・D-014）と参考値 ---');
  console.log(
    `  V-9b 介入した馬だけの interventionMult 平均: ${round(multMeanIntervened, 4)}（時系列で監視する値）`,
@@ -463,13 +500,23 @@ if (process.argv.includes('--json')) {
       checks,
       results,
       elapsedSec: elapsed,
+      // ★R-12 / Q-2: **判定に効く自由変数はすべて機械可読に残す**。
+      //   pool-generations は実測で V-4 を約0.75pp 動かす（20世代 34.16% / 40世代 33.41%）。
+      //   どの条件で出た数字かが JSON だけで再現できる状態にする。
       settings: {
         races: racesPerSeed * SEEDS.length,
         seeds: SEEDS,
         popularityTrials: POPULARITY_TRIALS,
+        poolGenerations: POOL_GENERATIONS,
+        poolMares: POOL_MARES,
         classBand: CLASS_BAND,
         unlock: UNLOCK,
         raceRandomK: RACE_K,
+        fieldStrengthFloor: FIELD_STRENGTH_FLOOR,
+        distanceSuitMin: DISTANCE_SUIT_MIN,
+        offDistanceEntryRate: OFF_DISTANCE_ENTRY_RATE,
+        offSurfaceEntryRate: OFF_SURFACE_ENTRY_RATE,
+        oversampleRatio: OVERSAMPLE_RATIO,
       },
     }),
   );
