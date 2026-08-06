@@ -188,3 +188,33 @@ describe('§9.1 払戻・返還', () => {
     }
   });
 });
+
+describe('★§9.4 配当上限が実際に効いている（R-14 の振る舞い側）', () => {
+  // ★閾値に ODDS_CAP 自身を使わない（使うと定数を動かしたときテストも一緒に動き、
+  //   「守られている」が空振りになる。D-018 で潰した自己検出）。正典の数字をリテラルで置く。
+  it('★万に一つの目でも券種ごとの上限を超えて払わない', () => {
+    const oneInAMillion = 1e-6;
+    expect(oddsFromProbability('win', oneInAMillion)).toBeLessThanOrEqual(500);
+    expect(oddsFromProbability('place', oneInAMillion)).toBeLessThanOrEqual(100);
+    expect(oddsFromProbability('quinella_place', oneInAMillion)).toBeLessThanOrEqual(300);
+    expect(oddsFromProbability('quinella', oneInAMillion)).toBeLessThanOrEqual(2000);
+    expect(oddsFromProbability('exacta', oneInAMillion)).toBeLessThanOrEqual(4000);
+    expect(oddsFromProbability('trio', oneInAMillion)).toBeLessThanOrEqual(10_000);
+    expect(oddsFromProbability('trifecta', oneInAMillion)).toBeLessThanOrEqual(100_000);
+  });
+
+  it('★上限に達した1本の払戻が PP 発行を跳ねさせない', () => {
+    // 上限を外すと、10,000 EP の三連単1本で 10^13 PP が発行されうる。
+    // 経済が壊れる経路なので、払戻額そのもので押さえる。
+    const odds = oddsFromProbability('trifecta', 1e-12);
+    const payout = settle(bet({ kind: 'trifecta', horses: [1, 2, 3] }, odds, 10_000), straight())
+      .payout;
+    expect(payout).toBeLessThanOrEqual(10_000 * 100_000);
+  });
+
+  it('★上限に達しない確率では上限を返さない（cap が常時発動していない）', () => {
+    // 常に cap を返す実装でも上の2件は通ってしまう。効いていない状態も検出する。
+    expect(oddsFromProbability('win', 0.1)).toBeCloseTo(8.2, 10);
+    expect(oddsFromProbability('trifecta', 0.001)).toBeCloseTo(770, 10);
+  });
+});

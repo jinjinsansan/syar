@@ -1,6 +1,8 @@
 -- STAR 0002 — RLS と 発売 RPC（正典 §14.4・§15.3・§8.6・§9.5）
 --
 -- ⚠️ 未適用。レビュー用（QUESTIONS_P2 Q-2 で「実行前に読んでほしい」と出した SQL です）。
+--    ★実際に適用前レビューで **3件の欠陥（S-1/S-2/S-3）** が見つかりました。
+--      うち S-1 は A-4 が機能しないもので、動かしていたら本番構成で初めて分かる類でした。
 --
 -- 【A-4 について、正典の書き方をそのままでは実装できない点】
 --   指示書は「RLS で `status != 'scheduled'` の行のみ露出」と書いていますが、
@@ -8,7 +10,7 @@
 --   `seed_reveal` という**列**で、Postgres の RLS は行単位なので列を隠せません。
 --   → 実体テーブルへの select を剥奪し、**列をマスクしたビュー**を公開経路にします。
 --     RLS も併せて張りますが、A-4 の実効はビュー側です。
---     この読み替えでよいか照会します（QUESTIONS_P2 に追記）。
+--   ✅ この読み替えはレビュー側が承認済み（Q-3・指示書の記述のほうが誤りだった）。
 
 begin;
 
@@ -23,10 +25,20 @@ alter table pp_ledger enable row level security;
 
 -- 実体テーブルは触らせない。読み取りはビュー経由に一本化する
 revoke all on races from anon, authenticated;
-revoke all on ep_ledger, pp_ledger from anon, authenticated;
+-- ★S-2（レビュー側が適用前に発見）: ここを revoke all にしていたため、
+--   下の「自分の行だけ見える」ポリシーが打ち消され、
+--   プレイヤーが自分のポイント履歴を**永久に見られない**状態だった。
+--   revoke が勝つので、ポリシーを足しても意味がない。**書き込みだけ剥奪する。**
+revoke insert, update, delete on ep_ledger, pp_ledger from anon, authenticated;
 
-create or replace view races_public
-with (security_invoker = true) as
+-- ★S-1（レビュー側が適用前に発見）: ここに security_invoker = true を付けていた。
+--   invoker 指定は**基底テーブルを呼び出し元の権限で検査する**ので、直下で
+--   races の select を剥奪している以上 permission denied になり、
+--   A-4 どころかレース一覧が誰にも見えない状態だった。
+--   ビューは definer（既定）で持ち、列のマスクだけを担わせる。
+--   ⚠️ P2 指示書 §3 が予告していた「ローカルでは動くが本番構成では動かない」そのもの。
+--      authenticated として1回引くテストがあれば、その場で分かった。
+create or replace view races_public as
 select
   r.id,
   r.name,
@@ -70,11 +82,20 @@ create policy bets_own on bets for select using (user_id = auth.uid());
 --   ただし definer は**呼び出し元の権限を無視する**ので、
 --   `user_id` を引数で受け取ってはいけません（他人の EP で買えてしまう）。
 --   **必ず auth.uid() を使う。**
+-- ★S-3（レビュー側が適用前に発見）: 冪等キーが無く、再送で馬券が2枚・EP が二重に引かれた。
+--   A-2「再起動しても二重生成・二重払戻が起きない」は購入側にも要る。
+--   クライアントが発行する p_client_token で一意にし、**再送は既存の馬券IDを返す**
+--   （エラーにしない。エラーにすると、成功したのに失敗と見えた再送で客が二度払う）。
+alter table bets add column if not exists client_token uuid;
+create unique index if not exists bets_user_token_uniq
+  on bets (user_id, client_token) where client_token is not null;
+
 create or replace function place_bet(
   p_race_id uuid,
   p_bet_type text,
   p_selection jsonb,
-  p_amount int
+  p_amount int,
+  p_client_token uuid
 ) returns bigint
 language plpgsql
 security definer
@@ -95,6 +116,15 @@ declare
 begin
   if v_user is null then
     raise exception '未認証';
+  end if;
+  if p_client_token is null then
+    raise exception '冪等キー（client_token）が必要';
+  end if;
+
+  -- ★再送なら既存の馬券を返して終わる（EP を二度引かない）
+  select id into v_bet_id from bets where user_id = v_user and client_token = p_client_token;
+  if found then
+    return v_bet_id;
   end if;
 
   -- ★行ロック。同じユーザーの同時購入で残高チェックをすり抜けさせない
@@ -168,8 +198,8 @@ begin
   -- --- ここから先は同一トランザクション。途中で例外が出れば全部戻る ---
   update users set entry_points = entry_points - p_amount where id = v_user;
 
-  insert into bets (user_id, race_id, bet_type, selection, amount, odds_at_purchase)
-  values (v_user, p_race_id, p_bet_type, p_selection, p_amount, v_odds)
+  insert into bets (user_id, race_id, bet_type, selection, amount, odds_at_purchase, client_token)
+  values (v_user, p_race_id, p_bet_type, p_selection, p_amount, v_odds, p_client_token)
   returning id into v_bet_id;
 
   insert into ep_ledger (user_id, delta, balance_after, reason, ref_id)
@@ -179,7 +209,7 @@ begin
 end;
 $$;
 
-revoke all on function place_bet(uuid, text, jsonb, int) from public;
-grant execute on function place_bet(uuid, text, jsonb, int) to authenticated;
+revoke all on function place_bet(uuid, text, jsonb, int, uuid) from public;
+grant execute on function place_bet(uuid, text, jsonb, int, uuid) to authenticated;
 
 commit;
