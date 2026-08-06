@@ -212,6 +212,7 @@ export const CALIBRATION_SCAN_DIRS: readonly string[] = [
   // ★S-4: パッケージを増やしたら走査対象に加える。加え忘れると
   //   「変異試験すべて防御」が**走査していない範囲について何も言っていない**状態になる。
   'packages/betting/src',
+  'packages/scheduler/src',
 ];
 
 /** 走査から外すファイル（理由必須）。新規ファイルは既定で走査される */
@@ -289,6 +290,18 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   {
     key: 'DEFAULT_PRESEED_OPTIONS',
     why: 'プリシードのプール構成（正典 §10.5 の 現役2,500/種牡馬200/繁殖牝馬800）の写し。実際に何頭になったかは npm run preseed の出力で照合する',
+  },
+  {
+    key: 'CYCLE_MS',
+    why: '正典 §10.2 / D-007 の10分サイクルそのもの。較正で動かす値ではなくゲームの構造で、値の一致は scheduler のテストが照合する',
+  },
+  {
+    key: 'PHASE_OFFSET_MS',
+    why: '正典 §10.2 のタイムテーブルの写し（確定0:00/公開0:30/発売3:00/締切9:30/発走10:00）。順序が単調増加であること自体を ★テストが押さえている',
+  },
+  {
+    key: 'LOOKAHEAD_RACES',
+    why: '正典 §10.2「生成は2レース先まで先行実行」の写し。障害時バッファの深さで、判定（V-x）を作らない',
   },
   {
     key: 'MIN_STAKE',

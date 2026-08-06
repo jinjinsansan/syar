@@ -1,0 +1,13 @@
+{
+  "name": "@star/scheduler",
+  "private": true,
+  "version": "0.0.0",
+  "description": "STAR race scheduling cycle. Pure TypeScript, zero runtime dependencies, no clock access.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {},
+  "peerDependencies": {}
+}
