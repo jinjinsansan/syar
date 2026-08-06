@@ -25,6 +25,8 @@ import {
 const neutralHorse: InterventionHorse = { iq: 500, gt: 500, st: 500, condition: 3, fatigue: 0 };
 /** 2000m を約2分で走る想定の平均速度 */
 const SPEED_MPS = 16.6;
+/** 2000m を想定（D-017 で距離が要るようになった） */
+const RACE_M = 2000;
 
 describe('§8b.2 スタミナゲージ', () => {
   it('初期値は正典の式そのもの: clamp(50 + ST/20 + (condition-3)*4 - max(0,fatigue-50)/2, 20, 100)', () => {
@@ -113,7 +115,7 @@ describe('§8b.3 interventionMult のハードキャップ（±10%）', () => {
   it('最良入力でも 1.10 を超えない', () => {
     const best = optimalPlan(IB);
     const strong: InterventionHorse = { iq: 1000, gt: 1000, st: 1000, condition: 5, fatigue: 0 };
-    const out = resolveIntervention(strong, best, SPEED_MPS, IB);
+    const out = resolveIntervention(strong, best, SPEED_MPS, RACE_M, IB);
     expect(out.interventionMult).toBeLessThanOrEqual(1.1);
     expect(out.interventionMult).toBeCloseTo(1.1, 10);
   });
@@ -126,7 +128,7 @@ describe('§8b.3 interventionMult のハードキャップ（±10%）', () => {
       position: 'front',
     };
     const weak: InterventionHorse = { iq: 0, gt: 0, st: 0, condition: 1, fatigue: 100 };
-    const out = resolveIntervention(weak, worst, SPEED_MPS, IB);
+    const out = resolveIntervention(weak, worst, SPEED_MPS, RACE_M, IB);
     expect(out.ranEmpty).toBe(true);
     // クランプ前は 0.90 を割っている（＝ペナルティがクランプ前に効いている・正典の明記事項）
     expect(out.rawMult).toBeLessThan(0.9);
@@ -151,6 +153,7 @@ describe('§8b.3 interventionMult のハードキャップ（±10%）', () => {
                 horse,
                 { startErrorMs, spurtAtMeter, driveTapsPerSec, position },
                 SPEED_MPS,
+                RACE_M,
                 IB,
               );
               expect(out.interventionMult).toBeGreaterThanOrEqual(0.9);
@@ -176,7 +179,7 @@ describe('§8b.3 interventionMult のハードキャップ（±10%）', () => {
       driveTapsPerSec: 15,
       position: 'front',
     };
-    const out = resolveIntervention(weak, early, SPEED_MPS, IB);
+    const out = resolveIntervention(weak, early, SPEED_MPS, RACE_M, IB);
     expect(out.ranEmpty).toBe(true);
     // クランプ後に -0.15 していたら 0.75 になる。クランプ前なら 0.90 で止まる
     expect(out.interventionMult).toBe(0.9);
@@ -190,7 +193,7 @@ describe('§8b.5 AI 代行', () => {
     const mults: number[] = [];
     for (let i = 0; i < 2000; i++) {
       const plan = aiProxyPlan(neutralHorse, rng, IB);
-      const out = resolveIntervention(neutralHorse, plan, SPEED_MPS, IB);
+      const out = resolveIntervention(neutralHorse, plan, SPEED_MPS, RACE_M, IB);
       expect(out.interventionMult).toBeGreaterThanOrEqual(0.9);
       expect(out.interventionMult).toBeLessThanOrEqual(1.1);
       mults.push(out.interventionMult);

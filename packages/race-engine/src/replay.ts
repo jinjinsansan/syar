@@ -176,7 +176,7 @@ export function interventionMultsFromLog(params: ReplayParams): Map<string, numb
       fatigue: entrant.fatigue,
     };
     const plan = planFromInputs(inputs, ctx);
-    out.set(entrant.horseId, resolveIntervention(horse, plan, speed, ib).interventionMult);
+    out.set(entrant.horseId, resolveIntervention(horse, plan, speed, params.conditions.distance, ib).interventionMult);
   }
   return out;
 }

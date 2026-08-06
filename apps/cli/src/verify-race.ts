@@ -251,8 +251,8 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
         condition: own.condition,
         fatigue: own.fatigue,
       };
-      const ai = resolveIntervention(horse, aiProxyPlan(horse, ownRng, ib), speed, ib);
-      const opt = resolveIntervention(horse, optimalPlan(ib), speed, ib);
+      const ai = resolveIntervention(horse, aiProxyPlan(horse, ownRng, ib), speed, race.conditions.distance, ib);
+      const opt = resolveIntervention(horse, optimalPlan(ib), speed, race.conditions.distance, ib);
       aiMult = ai.interventionMult;
       optMult = opt.interventionMult;
       aiMults.push(aiMult);

@@ -79,6 +79,12 @@ export interface InterventionBalance {
    * 【暫定解釈】ゲージは「勝負所（残り800m）以降の余力」を表すものとし、
    *   この窓の内側だけで消費する。QUESTIONS_P1 で照会中。
    */
+  /**
+   * ★D-017: レース全体での基準消費量。**毎秒ではなく総量**で持つ。
+   *   毎秒 = 基準消費量 / レース秒数 なので、距離が変わっても余力の残り方が同じになる。
+   *   較正条件（R-7）: 中団・仕掛けなしの典型馬（初期値75）がゴール時に2割残す = 60。
+   */
+  STAMINA_BASE_DRAIN: number;
   STAMINA_WINDOW_METER: number;
   /**
    * ★「バテ」と判定する残距離（I-STAMINA-EMPTY）。
@@ -134,6 +140,7 @@ export const DEFAULT_INTERVENTION_BALANCE: InterventionBalance = {
 
   IQ_WINDOW_FULL: 1000,
 
+  STAMINA_BASE_DRAIN: 60,
   STAMINA_WINDOW_METER: 800,
   STAMINA_EMPTY_METER: 400,
 
@@ -291,6 +298,8 @@ export function resolveIntervention(
   plan: InterventionPlan,
   /** 平均速度 m/s（§8.7 の averageSpeed。残距離を秒に換算するのに使う） */
   averageSpeedMps: number,
+  /** レース距離 m。★D-017 で消費がレース時間に対する割合になったので必要 */
+  distanceMeter: number,
   balance: InterventionBalance,
 ): InterventionOutcome {
   const startBonus = startBonusOf(plan.startErrorMs, horse.iq, balance);
@@ -300,17 +309,19 @@ export function resolveIntervention(
   const stamina0 = initialStamina(horse.st, horse.condition, horse.fatigue, balance);
   const earlySpurt = plan.spurtAtMeter > balance.EARLY_SPURT_METER;
 
-  // ゲージが減るのは勝負所（残り800m）以降（I-STAMINA-WINDOW）。
-  // 窓の内側を「仕掛け前」と「仕掛け後」に割り、それぞれの消費率で積分する。
-  const windowStart = balance.STAMINA_WINDOW_METER;
-  const spurtStart = Math.min(plan.spurtAtMeter, windowStart);
-  const cruiseMeter = Math.max(0, windowStart - spurtStart);
-  const spurtMeter = Math.max(0, spurtStart);
+  // ★D-017: 毎秒消費 = (基準消費量 / レース秒数) × ポジション係数 × ペース係数。
+  //   **レース全体での総消費が距離によらず一定**になるので、2000m でも 3200m でも
+  //   同じ「余力の残り方」になる（旧実装は絶対値 1.0/秒で、2000m だと必ずゲージ0になった）。
+  const raceSec = distanceMeter / averageSpeedMps;
+  const unit = balance.STAMINA_BASE_DRAIN / raceSec; // 1秒あたりの基準消費
+  const spurtStart = Math.min(Math.max(0, plan.spurtAtMeter), distanceMeter);
+  const cruiseMeter = Math.max(0, distanceMeter - spurtStart);
 
-  const cruiseRate = drainPerSecond(plan.position, false, false, balance);
-  const spurtRate = drainPerSecond(plan.position, true, earlySpurt, balance);
+  const cruiseRate = unit * balance.STAMINA_POSITION_MULT[plan.position];
+  const spurtRate =
+    cruiseRate * balance.STAMINA_SPURT_DRAIN * (earlySpurt ? balance.EARLY_SPURT_DRAIN_MULT : 1);
   const cruiseUsed = (cruiseMeter / averageSpeedMps) * cruiseRate;
-  const spurtUsed = (spurtMeter / averageSpeedMps) * spurtRate;
+  const spurtUsed = (spurtStart / averageSpeedMps) * spurtRate;
   const staminaLeft = stamina0 - cruiseUsed - spurtUsed;
 
   // 「バテ」= 直線（残り400m）に入る前にゲージが尽きること（I-STAMINA-EMPTY）
@@ -318,7 +329,7 @@ export function resolveIntervention(
   if (staminaLeft <= 0) {
     if (cruiseUsed >= stamina0) {
       const sec = stamina0 / cruiseRate;
-      emptyAtMeter = windowStart - sec * averageSpeedMps;
+      emptyAtMeter = distanceMeter - sec * averageSpeedMps;
     } else {
       const sec = (stamina0 - cruiseUsed) / spurtRate;
       emptyAtMeter = spurtStart - sec * averageSpeedMps;
