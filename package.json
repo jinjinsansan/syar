@@ -15,6 +15,7 @@
     "verify:race": "tsx apps/cli/src/verify-race.ts",
     "preseed": "tsx apps/cli/src/preseed-run.ts",
     "preseed:verify": "tsx apps/cli/src/preseed-verify.ts",
+    "blocklist:build": "tsx apps/cli/src/blocklist-build.ts",
     "test": "vitest run",
     "inventory": "node tools/inventory/measure.mjs",
     "mutation": "node tools/mutation/run.mjs",

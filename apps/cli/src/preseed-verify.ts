@@ -10,9 +10,10 @@
  * 実行: npm run preseed:verify -- --seed 42 [--preseed-generations 100] [--generations 100]
  */
 
-import { ALLOW_ALL_NAMES, NPC_STABLES } from '@star/sim-engine';
+import { NPC_STABLES } from '@star/sim-engine';
 import { DEFAULT_BALANCE, FOUNDERS, NICKS_GEN } from '@star/sim-engine';
 import { DEFAULT_OPTIONS, runSimulation, type SeedPopulation } from './simulator.js';
+import { loadNameBlocklist } from './name-blocklist.js';
 import { DEFAULT_PRESEED_OPTIONS, preseedNicks, runPreseed } from './preseed.js';
 
 const argv = process.argv.slice(2);
@@ -30,12 +31,18 @@ const longHorizon = argOf('long-horizon', 300);
 console.log(`# 合格基準1: プリシード後の集団に対する P0 ゲート`);
 console.log(`  seed=${seed} プリシード=${preseedGenerations}世代 → P0=${generations}ゲーム内年`);
 
+const ng = loadNameBlocklist(undefined, false);
+if (ng.size === 0) {
+  console.log(`  ⚠️ 実在馬名 NG リスト未設定（憲法 §0.1 の突合なし）。本番前に npm run blocklist:build が要ります`);
+}
+const { blocklist } = ng;
+
 const pre = runPreseed({
   ...DEFAULT_PRESEED_OPTIONS,
   seed,
   generations: preseedGenerations,
   nicks: preseedNicks(seed, NPC_STABLES),
-  blocklist: ALLOW_ALL_NAMES,
+  blocklist,
 });
 
 const seedPopulation: SeedPopulation = {

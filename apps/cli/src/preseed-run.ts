@@ -4,8 +4,9 @@
  * 出力は**再現可能な成果物**（§10.5）。同じシードから同じ血統プールが出ることは
  * `apps/cli/test/preseed.test.ts` が測る。
  */
-import { ALLOW_ALL_NAMES, NPC_STABLES } from '@star/sim-engine';
+import { NPC_STABLES } from '@star/sim-engine';
 import { auditPedigrees } from './pedigree-audit.js';
+import { loadNameBlocklist } from './name-blocklist.js';
 import { DEFAULT_PRESEED_OPTIONS, preseedNicks, runPreseed } from './preseed.js';
 
 const argv = process.argv.slice(2);
@@ -17,12 +18,18 @@ const argOf = (name: string, fallback: number): number => {
 const seed = argOf('seed', 42);
 const generations = argOf('generations', DEFAULT_PRESEED_OPTIONS.generations);
 const t0 = process.hrtime.bigint();
+const ng = loadNameBlocklist(undefined, false);
+if (ng.size === 0) {
+  console.log(`⚠️ 実在馬名 NG リスト未設定（憲法 §0.1 の突合なし）。本番前に npm run blocklist:build が要ります`);
+}
+const { blocklist } = ng;
+
 const r = runPreseed({
   ...DEFAULT_PRESEED_OPTIONS,
   seed,
   generations,
   nicks: preseedNicks(seed, NPC_STABLES),
-  blocklist: ALLOW_ALL_NAMES,
+  blocklist,
 });
 const ms = Number(process.hrtime.bigint() - t0) / 1e6;
 for (const y of r.years) {

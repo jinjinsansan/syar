@@ -31,3 +31,6 @@ SPEC.md
 AI_PROMPT.md
 # 別プロジェクトの参考資料（正典ではない）
 GORILLA_STABLE_SPEC_v1.2_infra.md
+
+# 憲法 §0.1: 実在競走馬名の平文リスト。ハッシュ（*.hash）のみコミットする
+data/ng-names.txt
