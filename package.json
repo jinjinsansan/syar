@@ -13,6 +13,7 @@
     "verify": "tsx apps/cli/src/verify.ts",
     "verify:distance": "tsx apps/cli/src/sweep-distance.ts",
     "verify:race": "tsx apps/cli/src/verify-race.ts",
+    "preseed": "tsx apps/cli/src/preseed-run.ts",
     "test": "vitest run",
     "inventory": "node tools/inventory/measure.mjs",
     "mutation": "node tools/mutation/run.mjs",

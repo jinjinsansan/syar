@@ -47,6 +47,24 @@ export interface CalibrationConstant {
  */
 export const CALIBRATION: readonly CalibrationConstant[] = [
   {
+    key: 'STABLE_EMPHASIS_WEIGHT',
+    file: 'apps/cli/src/preseed.ts',
+    perturbed: 'export const STABLE_EMPHASIS_WEIGHT = 1.0;',
+    affects: 'N-4（厩舎方針が選抜に効く強さ。1.0 にすると 40厩舎が同じ馬を選び系統が潰れる）',
+  },
+  {
+    key: 'NPC_FOLLOW_COEFFICIENT',
+    file: 'apps/cli/src/preseed.ts',
+    perturbed: 'export const NPC_FOLLOW_COEFFICIENT = 1.0;',
+    affects: 'N-3（正典 §10.5 の 0.92。1.0 にすると NPC がプレイヤー上位と同水準になり成長実感が消える）',
+  },
+  {
+    key: 'NPC_FOLLOW_TOP_RATIO',
+    file: 'apps/cli/src/preseed.ts',
+    perturbed: 'export const NPC_FOLLOW_TOP_RATIO = 1.0;',
+    affects: 'N-3（正典 §10.5 の上位30%。1.0 にすると全体平均への追従になり NPC が弱くなる）',
+  },
+  {
     key: 'NAME_TAIL_RATE',
     file: 'packages/sim-engine/src/naming.ts',
     perturbed: 'export const NAME_TAIL_RATE = 0;',
@@ -205,6 +223,26 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
+  {
+    key: 'PRESEED_RETIRE_AGE',
+    why: '引退年齢。正典 §10.4 の現役年齢の写しで、現役プール頭数（§10.5 の2,500）を決める運用条件。実測値は npm run preseed が毎回出力する',
+  },
+  {
+    key: 'PRESEED_DEBUT_AGE',
+    why: 'デビュー年齢。正典 §10.4 の写し。較正で動かす値ではなくルールそのもの',
+  },
+  {
+    key: 'PEDIGREE_GENERATIONS',
+    why: '正典 §10.5 の「5代血統表」の 5 そのもの。判定を通すために動かす値ではなく、測る対象の定義',
+  },
+  {
+    key: 'FULL_PEDIGREE_ANCESTORS',
+    why: '5代の枠数 62（2+4+8+16+32）。PEDIGREE_GENERATIONS からの導出で、導出関係を ★テストが押さえている',
+  },
+  {
+    key: 'DEFAULT_PRESEED_OPTIONS',
+    why: 'プリシードのプール構成（正典 §10.5 の 現役2,500/種牡馬200/繁殖牝馬800）の写し。実際に何頭になったかは npm run preseed の出力で照合する',
+  },
   {
     key: 'NAME_MAX_ATTEMPTS',
     why: '馬名生成の引き直し上限。安全弁であって較正値ではない（増やしても名前の性質は変わらず、失敗が遅くなるだけ）。ここに達したら例外を投げる＝黙って重複を通さない',
