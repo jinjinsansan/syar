@@ -21,6 +21,7 @@ import {
   NICKS_GEN,
   generateNicksTable,
   DEFAULT_NAME_SHAPE,
+  DISTANCE_BIAS_CENTER,
   NPC_STABLES,
   applyMatingCounters,
   breed,
@@ -37,6 +38,7 @@ import {
 } from '@star/sim-engine';
 
 import { ABILITY_KEYS } from '@star/sim-engine';
+import { lineConcentration } from './pedigree-audit.js';
 
 /** 乱数サブストリームの用途 ID（識別子であって較正値ではない） */
 const STREAM = {
@@ -52,6 +54,18 @@ const STREAM = {
  * 1.0 にすると 40厩舎が同じ馬を選び、父系が一系統に潰れる（N-4 の分散基準に落ちる）。
  */
 export const STABLE_EMPHASIS_WEIGHT = 1.35;
+
+/**
+ * 厩舎方針への適合が配合相手の評価に効く強さ（正典 D-025）。
+ * 0 にすると D-025 以前の無差別選択に戻る。
+ */
+export const POLICY_FIT_WEIGHT = 0.25;
+
+/** 狙う距離帯からこれだけ離れると適合度が 0 になる（m） */
+export const DISTANCE_FIT_SPAN = 1200;
+
+/** 自厩舎（自牧場）の種牡馬を配合相手に選ぶときの上乗せ。1.0 = 上乗せなし */
+export const HOME_SIRE_BONUS = 1.0;
 
 /*
  * ★削除: PRESEED_OBSERVE_NOISE（選抜時の観測ノイズ・0.55）
@@ -141,7 +155,50 @@ function abilityTotal(h: HorseRecord): number {
   return total;
 }
 
-/** 厩舎方針を反映した選抜スコア。重視能力を STABLE_EMPHASIS_WEIGHT 倍して評価する */
+/**
+ * 厩舎方針への適合度（正典 D-025）。−1〜+1。
+ *
+ * 【なぜ要るか】
+ *   D-025 以前は「母の厩舎の評価軸で最も高い種牡馬を、全厩舎から選ぶ」だった。
+ *   評価軸が能力合計だけなので 40厩舎がほぼ同じ馬を選び、良い系統が全厩舎に広がって
+ *   父系ラインが 50世代で 40 → 9〜15 まで減った（REPORT_P15 §3）。
+ *   **厩舎ごとに評価軸が違うことが、系統の多様性を保つ機構**（D-025）。
+ */
+export function policyFit(h: HorseRecord, stable: Stable): number {
+  const terms: number[] = [];
+
+  // 距離: 狙う距離帯からのずれ。DISTANCE_FIT_SPAN 離れると適合度 0
+  const target = DISTANCE_BIAS_CENTER[stable.distance];
+  terms.push(clampUnit(1 - (2 * Math.abs(h.distanceCenter - target)) / DISTANCE_FIT_SPAN));
+
+  // 馬場: 芝/ダート特化の厩舎だけが見る（'both' は中立）
+  if (stable.surface !== 'both') {
+    terms.push(clampUnit((h.surfaceAptitude[stable.surface] - 50) / 30));
+  }
+
+  // 道悪: 道悪巧者志向の厩舎だけが見る。中央値 55（§6.4 の heavy_aptitude 導出）
+  if (stable.heavy) {
+    terms.push(clampUnit((h.heavyAptitude - 55) / 25));
+  }
+
+  return terms.reduce((a, b) => a + b, 0) / terms.length;
+}
+
+function clampUnit(x: number): number {
+  if (!Number.isFinite(x)) return 0;
+  return Math.min(1, Math.max(-1, x));
+}
+
+/**
+ * 配合相手の評価（D-025）。能力 × 厩舎方針への適合。
+ * ★ POLICY_FIT_WEIGHT を 0 にすると D-025 以前の無差別選択に戻り、系統が集約する。
+ */
+export function mateScore(h: HorseRecord, stable: Stable, home = false): number {
+  const base = stableScore(h, stable) * (1 + POLICY_FIT_WEIGHT * policyFit(h, stable));
+  return home ? base * HOME_SIRE_BONUS : base;
+}
+
+
 export function stableScore(h: HorseRecord, stable: Stable): number {
   let total = 0;
   for (const k of ABILITY_KEYS) {
@@ -179,6 +236,8 @@ export interface PreseedYearStat {
   readonly npcTarget: number;
   /** 種牡馬プールに存在する父系ラインの数 */
   readonly sireLines: number;
+  /** ★合格基準3（改訂）: 有効系統数 1/Σshare²。本数と違い偏りで下がる */
+  readonly effectiveSireLines: number;
 }
 
 export interface PreseedResult {
@@ -264,7 +323,7 @@ export function runPreseed(opts: PreseedOptions): PreseedResult {
       for (const sid of stallionIds) {
         const sire = all.get(sid)!.record;
         if (!canMate(sire, mare.record, balance, year).ok) continue;
-        const score = stableScore(sire, stable);
+        const score = mateScore(sire, stable, stableOf.get(sid)?.id === stable.id);
         if (score > bestScore) {
           bestScore = score;
           best = sid;
@@ -322,6 +381,9 @@ export function runPreseed(opts: PreseedOptions): PreseedResult {
       meanAbility: abilities.length ? abilities.reduce((a, b) => a + b, 0) / abilities.length : 0,
       npcTarget: npcTargetFrom(abilities),
       sireLines: new Set(stallionIds.map((id) => all.get(id)!.record.sireLine)).size,
+      effectiveSireLines: lineConcentration(
+        stallionIds.map((id) => all.get(id)!.record.sireLine),
+      ).effective,
     });
   }
 

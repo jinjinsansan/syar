@@ -47,6 +47,18 @@ export interface CalibrationConstant {
  */
 export const CALIBRATION: readonly CalibrationConstant[] = [
   {
+    key: 'POLICY_FIT_WEIGHT',
+    file: 'apps/cli/src/preseed.ts',
+    perturbed: 'export const POLICY_FIT_WEIGHT = 0;',
+    affects: 'N-4 / D-025（厩舎方針が配合相手の評価に効く強さ。0 にすると D-025 以前の無差別選択に戻る）',
+  },
+  {
+    key: 'DISTANCE_FIT_SPAN',
+    file: 'apps/cli/src/preseed.ts',
+    perturbed: 'export const DISTANCE_FIT_SPAN = 100000;',
+    affects: 'D-025（距離方針の効く幅。極端に広げると全馬が適合扱いになり距離の個性が消える）',
+  },
+  {
     key: 'STABLE_EMPHASIS_WEIGHT',
     file: 'apps/cli/src/preseed.ts',
     perturbed: 'export const STABLE_EMPHASIS_WEIGHT = 1.0;',
@@ -223,6 +235,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
+  {
+    key: 'HOME_SIRE_BONUS',
+    why: '★R-15 で未接続（1.0 ＝ 無効）。自厩舎の種牡馬を優先する機構だが、合格基準3 を通す 1.30 では平均F が 0.107 → 0.500・虚弱率 3.5% → 23.8% になる。採否はレビュー側の判断待ちで、判断が出るまで有効化しない',
+  },
   {
     key: 'PRESEED_RETIRE_AGE',
     why: '引退年齢。正典 §10.4 の現役年齢の写しで、現役プール頭数（§10.5 の2,500）を決める運用条件。実測値は npm run preseed が毎回出力する',

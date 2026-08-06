@@ -6,7 +6,7 @@
  *   `npm run preseed` の実測を報告書に載せる**（R-12: 測定条件で判定を動かさない）。
  */
 
-import { ALLOW_ALL_NAMES, NPC_STABLES } from '@star/sim-engine';
+import { ALLOW_ALL_NAMES, DISTANCE_BIAS_CENTER, NPC_STABLES } from '@star/sim-engine';
 import { describe, expect, it } from 'vitest';
 import {
   FULL_PEDIGREE_ANCESTORS,
@@ -17,7 +17,9 @@ import {
 import {
   DEFAULT_PRESEED_OPTIONS,
   NPC_FOLLOW_TOP_RATIO,
+  mateScore,
   npcTargetFrom,
+  policyFit,
   preseedNicks,
   runPreseed,
   stableScore,
@@ -173,5 +175,59 @@ describe('§10.5 N-4 血統表と系統の分散', () => {
     expect(skewed.count).toBe(4); // 本数は同じ
     expect(skewed.effective).toBeLessThan(even.effective); // 有効数は下がる
     expect(skewed.topShare).toBeGreaterThan(even.topShare);
+  });
+});
+
+describe('D-025 厩舎方針に沿った配合相手の選択', () => {
+  const base = (over: Partial<Record<string, unknown>> = {}) =>
+    ({
+      potential: { sp: 500, st: 500, pw: 500, gt: 500, iq: 500 },
+      surfaceAptitude: { turf: 50, dirt: 50 },
+      distanceCenter: 2000,
+      heavyAptitude: 55,
+      ...over,
+    }) as never;
+
+  const sprintTurf = NPC_STABLES.find((s) => s.distance === 'sprint' && s.surface === 'turf')!;
+  const stayerDirt = NPC_STABLES.find((s) => s.distance === 'stayer' && s.surface === 'dirt')!;
+
+  it('★厩舎ごとに評価が逆転する（同じ馬でも厩舎が違えば順位が変わる）', () => {
+    // これが D-025 の目的そのもの。逆転しないなら 40厩舎が同じ馬を選び系統が集約する
+    const sprinter = base({ distanceCenter: 1300, surfaceAptitude: { turf: 80, dirt: 30 } });
+    const stayer = base({ distanceCenter: 2900, surfaceAptitude: { turf: 30, dirt: 80 } });
+    expect(policyFit(sprinter, sprintTurf)).toBeGreaterThan(policyFit(stayer, sprintTurf));
+    expect(policyFit(stayer, stayerDirt)).toBeGreaterThan(policyFit(sprinter, stayerDirt));
+  });
+
+  it('★方針適合が配合評価に実際に効く（POLICY_FIT_WEIGHT）', () => {
+    const fits = base({ distanceCenter: 1300, surfaceAptitude: { turf: 85, dirt: 20 } });
+    const misses = base({ distanceCenter: 2900, surfaceAptitude: { turf: 20, dirt: 85 } });
+    // 能力は同じなので、差がつくのは方針適合のぶんだけ。5%以上の差を要求する
+    const ratio = mateScore(fits, sprintTurf) / mateScore(misses, sprintTurf);
+    expect(ratio).toBeGreaterThan(1.05);
+    // 重みが 0 なら能力合計と一致してしまう（＝ D-025 以前の無差別選択）
+    expect(mateScore(fits, sprintTurf)).not.toBeCloseTo(stableScore(fits, sprintTurf), 3);
+  });
+
+  it('★距離の適合は離れるほど下がり、DISTANCE_FIT_SPAN 離れると負になる', () => {
+    const target = DISTANCE_BIAS_CENTER[sprintTurf.distance];
+    const at = policyFit(base({ distanceCenter: target, surfaceAptitude: { turf: 50, dirt: 50 } }), sprintTurf);
+    const near = policyFit(base({ distanceCenter: target + 500, surfaceAptitude: { turf: 50, dirt: 50 } }), sprintTurf);
+    // 閾値に DISTANCE_FIT_SPAN 自身を使わない（自己検出の回避・D-018 の教訓）。リテラル 1400 で押さえる
+    const far = policyFit(base({ distanceCenter: target + 1400, surfaceAptitude: { turf: 50, dirt: 50 } }), sprintTurf);
+    expect(at).toBeGreaterThan(near);
+    expect(near).toBeGreaterThan(far);
+    expect(far).toBeLessThan(0);
+  });
+
+  it('★道悪巧者志向の厩舎だけが heavy_aptitude を見る', () => {
+    const heavy = NPC_STABLES.find((s) => s.heavy && s.surface === 'both')!;
+    const dry = NPC_STABLES.find((s) => !s.heavy && s.surface === 'both')!;
+    const mudder = base({ distanceCenter: DISTANCE_BIAS_CENTER[heavy.distance], heavyAptitude: 85 });
+    const nonMudder = base({ distanceCenter: DISTANCE_BIAS_CENTER[heavy.distance], heavyAptitude: 25 });
+    expect(policyFit(mudder, heavy)).toBeGreaterThan(policyFit(nonMudder, heavy));
+    if (dry.distance === heavy.distance) {
+      expect(policyFit(mudder, dry)).toBeCloseTo(policyFit(nonMudder, dry), 6);
+    }
   });
 });
