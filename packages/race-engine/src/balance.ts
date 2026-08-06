@@ -67,12 +67,22 @@ export const INTERPRETATIONS: readonly Interpretation[] = [
       '（馬場状態は馬場種別より影響が小さいという競馬の通念）。V-4〜V-6 の較正対象。',
   },
   {
+    id: 'I-HEAVY-SEVERITY',
+    canon: '§5.2 / §8.3',
+    given: '稍重・重・不良でのみ heavy_aptitude が効く（4段）',
+    filled: '馬場の悪さごとに効き具合を段階化: 稍重0.4 / 重0.7 / 不良1.0 を係数の振れ幅に掛ける',
+    rationale:
+      '正典は4段を列挙するが、段ごとにどれだけ強く効くかは定めていない。' +
+      '一律にすると「不良を足した意味」が消える（稍重も不良も同じ係数になる）。' +
+      '道悪巧者が輝くのは最悪の馬場、という §1.1 の狙いを段階化で表現した。',
+  },
+  {
     id: 'I-COND-APT-SOURCE',
     canon: '§5.2 / §5.4',
     given: '`condition_aptitude` は馬のパラメータとして定義されている',
     filled:
-      'genotype スキーマ(§5.4)に無いため**遺伝しない**。race-engine の入力として受け取り、' +
-      'K-5 のモンテカルロでは中立値(50)を置く',
+      '★D-015 で解決済み。単一の heavy_aptitude として genotype に追加され、遺伝するようになった。' +
+      'P1 時点では中立値(50)の固定だった（この項目は経緯の記録として残す）',
     rationale:
       '正典の §5.2 と §5.4 が食い違っている。推測で genotype を拡張すると P0 の全ゲートに影響する' +
       'ため、QUESTIONS_P1 で照会し、それまでは入力として外に出した。',
@@ -344,9 +354,15 @@ export interface RaceBalance {
   /** 馬場適性の写像（I-SURF-MAP） */
   SURFACE_COEF_MIN: number;
   SURFACE_COEF_MAX: number;
-  /** 馬場状態適性の写像（I-COND-APT-MAP。良馬場は常に 1.0） */
+  /** 道悪適性の写像（I-COND-APT-MAP。良馬場は常に 1.0） */
   TRACK_COND_COEF_MIN: number;
   TRACK_COND_COEF_MAX: number;
+  /**
+   * 馬場の悪さごとの効き具合（I-HEAVY-SEVERITY）。
+   * ★悪い馬場ほど道悪適性の差が大きく出る。これが無いと4段にした意味がない
+   *   （稍重も不良も同じ係数なら、極端な馬場を足した効果が消える）。
+   */
+  TRACK_COND_SEVERITY: Readonly<Record<TrackCondition, number>>;
   /** 調子の写像（I-CONDITION-MAP） */
   CONDITION_COEF_MIN: number;
   CONDITION_COEF_MAX: number;
@@ -433,6 +449,7 @@ export const DEFAULT_RACE_BALANCE: RaceBalance = {
   SURFACE_COEF_MAX: 1.05,
   TRACK_COND_COEF_MIN: 0.88,
   TRACK_COND_COEF_MAX: 1.05,
+  TRACK_COND_SEVERITY: { good: 0, yielding: 0.4, soft: 0.7, bad: 1.0 },
   CONDITION_COEF_MIN: 0.88,
   CONDITION_COEF_MAX: 1.1,
   CONDITION_MIN: 1,

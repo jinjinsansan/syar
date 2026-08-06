@@ -71,11 +71,10 @@ export interface RaceEntrant {
   distanceRange: number;
   strategyAptitude: Record<Strategy, number>;
   /**
-   * 馬場状態適性（正典 §5.2）。
-   * ⚠️ **genotype スキーマ（§5.4）に `condition_aptitude` が無い**ため遺伝で決まらない（I-COND-APT-SOURCE）。
-   *    P1 では入力として受け取り、既定は中立値を置く（QUESTIONS_P1 で照会中）。
+   * 道悪適性 0〜100（正典 §5.2・D-015）。**genotype から遺伝する**。
+   * 良馬場は全馬 1.0 なので、効くのは稍重・重・不良のみ。
    */
-  conditionAptitude: Record<TrackCondition, number>;
+  heavyAptitude: number;
   /** この馬が選択した脚質（プレイヤーの意思決定。§8.4） */
   strategy: Strategy;
   /** 調子 1〜5（正典 §8b.2 が `(condition - 3) * 4` と書くので中央値3） */

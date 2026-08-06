@@ -8,7 +8,7 @@
  */
 
 import type { AbilityKey, Strategy } from '@star/sim-engine';
-import type { RaceEntrant, Surface, TrackCondition } from '../src/types.js';
+import type { RaceEntrant, Surface, } from '../src/types.js';
 
 /** 全能力500・全適性ちょうど中央の中立馬。テストは必要な項目だけ上書きする */
 export function neutralEntrant(id: string, overrides: Partial<RaceEntrant> = {}): RaceEntrant {
@@ -20,7 +20,7 @@ export function neutralEntrant(id: string, overrides: Partial<RaceEntrant> = {})
     sashi: 50,
     oikomi: 50,
   };
-  const conditionAptitude: Record<TrackCondition, number> = { good: 50, yielding: 50, soft: 50, bad: 50 };
+  const heavyAptitude = 55;
   return {
     horseId: id,
     stats,
@@ -28,7 +28,7 @@ export function neutralEntrant(id: string, overrides: Partial<RaceEntrant> = {})
     distanceCenter: 2000,
     distanceRange: 600,
     strategyAptitude,
-    conditionAptitude,
+    heavyAptitude,
     strategy: 'senko',
     condition: 3,
     fatigue: 0,

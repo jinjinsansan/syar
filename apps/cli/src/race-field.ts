@@ -93,12 +93,8 @@ export function toEntrant(
     distanceCenter: horse.distanceCenter,
     distanceRange: horse.distanceRange,
     strategyAptitude: { ...horse.strategyAptitude },
-    conditionAptitude: {
-      good: NEUTRAL_CONDITION_APTITUDE,
-      yielding: NEUTRAL_CONDITION_APTITUDE,
-      soft: NEUTRAL_CONDITION_APTITUDE,
-      bad: NEUTRAL_CONDITION_APTITUDE,
-    },
+    // ★D-015: 道悪適性は genotype から遺伝する（P1 までは中立値の固定だった）
+    heavyAptitude: horse.heavyAptitude,
     strategy: overrides.strategy ?? bestStrategy,
     condition: overrides.condition ?? 3,
     fatigue: overrides.fatigue ?? 0,

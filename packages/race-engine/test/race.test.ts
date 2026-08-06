@@ -151,22 +151,32 @@ describe('§8.3 乗算補正10種', () => {
     expect(surfaceCoef({ turf: 50, dirt: 100 }, 'turf', B)).toBeCloseTo(0.875, 10);
   });
 
-  it('trackConditionCoef: 良馬場は適性によらず常に 1.0（正典 §8.3 の明記事項）', () => {
+  it('★trackConditionCoef: 良馬場は道悪適性によらず常に 1.0（正典 §8.3・D-015）', () => {
     for (const apt of [0, 50, 100]) {
-      expect(
-        trackConditionCoef({ good: apt, yielding: apt, soft: apt, bad: apt }, 'good', B),
-        `適性${apt}`,
-      ).toBe(1.0);
+      expect(trackConditionCoef(apt, 'good', B), `適性${apt}`).toBe(1.0);
     }
     // 良以外は適性で変わる（＝「常に1.0」が全馬場に広がっていないこと）
-    expect(trackConditionCoef({ good: 50, yielding: 0, soft: 0, bad: 0 }, 'yielding', B)).toBeCloseTo(
-      0.88,
-      10,
+    expect(trackConditionCoef(0, 'bad', B)).toBeCloseTo(0.88, 10);
+    expect(trackConditionCoef(100, 'bad', B)).toBeCloseTo(1.05, 10);
+  });
+
+  it('★悪い馬場ほど道悪適性の差が大きく出る（4段にした意味を固定する）', () => {
+    // 同じ適性0の馬でも、不良 < 重 < 稍重 の順に不利が大きい
+    const y = trackConditionCoef(0, 'yielding', B);
+    const s = trackConditionCoef(0, 'soft', B);
+    const b = trackConditionCoef(0, 'bad', B);
+    expect(b).toBeLessThan(s);
+    expect(s).toBeLessThan(y);
+    expect(y).toBeLessThan(1);
+    // 道悪巧者（適性100）は逆に、悪い馬場ほど有利が大きい
+    expect(trackConditionCoef(100, 'bad', B)).toBeGreaterThan(trackConditionCoef(100, 'soft', B));
+    expect(trackConditionCoef(100, 'soft', B)).toBeGreaterThan(
+      trackConditionCoef(100, 'yielding', B),
     );
-    expect(trackConditionCoef({ good: 50, yielding: 100, soft: 0, bad: 0 }, 'yielding', B)).toBeCloseTo(
-      1.05,
-      10,
-    );
+    // 適性50（中立）は馬場によらず概ね中央
+    for (const c of ['yielding', 'soft', 'bad'] as const) {
+      expect(Math.abs(trackConditionCoef(50, c, B) - 1)).toBeLessThan(0.04);
+    }
   });
 
   it('conditionCoef は調子1〜5で 0.88〜1.10（R-2）', () => {
@@ -375,7 +385,7 @@ describe('§8.5 発動型スキル', () => {
           neutralEntrant('A', {
             skillGenes: ['G_MUD'],
             stats: { sp: 500, st: 500, pw: 500, gt: 500, iq: 1000 },
-            conditionAptitude: { good: 50, yielding: 50, soft: 0, bad: 0 },
+            heavyAptitude: 0,
           }),
         ],
         'A',

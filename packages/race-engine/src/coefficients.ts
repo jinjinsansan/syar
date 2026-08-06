@@ -99,16 +99,21 @@ export function surfaceCoef(
  * 正典「良馬場は常に1.0」— 適性値によらず 1.0 を返す。
  */
 export function trackConditionCoef(
-  conditionAptitude: Record<TrackCondition, number>,
+  heavyAptitude: number,
   trackCondition: TrackCondition,
   balance: RaceBalance,
 ): number {
+  // 正典「良馬場は常に1.0」— 道悪適性によらず 1.0（「良馬場が得意」は無意味・D-015）
   if (trackCondition === 'good') return 1.0;
-  return mapAptitude(
-    conditionAptitude[trackCondition],
+  // ★悪い馬場ほど適性差が大きく出る（I-HEAVY-SEVERITY）。
+  //   稍重も不良も同じ係数なら、正典どおり4段にした意味が消える。
+  const severity = balance.TRACK_COND_SEVERITY[trackCondition];
+  const full = mapAptitude(
+    heavyAptitude,
     balance.TRACK_COND_COEF_MIN,
     balance.TRACK_COND_COEF_MAX,
   );
+  return 1 + severity * (full - 1);
 }
 
 /** §8.4 展開の決定。逃げ宣言頭数から決まる */
@@ -236,11 +241,7 @@ export function deterministicCoefs(
       balance,
     ),
     surfaceCoef: surfaceCoef(entrant.surfaceAptitude, params.surface, balance),
-    trackConditionCoef: trackConditionCoef(
-      entrant.conditionAptitude,
-      params.trackCondition,
-      balance,
-    ),
+    trackConditionCoef: trackConditionCoef(entrant.heavyAptitude, params.trackCondition, balance),
     strategyCoef: strategyCoef(entrant.strategy, entrant.strategyAptitude, params.pace, balance),
     conditionCoef: conditionCoef(entrant.condition, balance),
     fatigueCoef: fatigueCoef(entrant.fatigue, balance),
