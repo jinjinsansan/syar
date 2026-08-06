@@ -409,13 +409,13 @@ export interface RaceBalance {
  *    P3 で本物の育成ループが入ったら**必ず再較正すること**（R-7）。
  *    この前提が壊れていないことは `apps/cli/test/calibration.test.ts` が経路で固定する（O-4）。
  */
-export const CALIBRATED_RACE_RANDOM_K = 0.26;
+export const CALIBRATED_RACE_RANDOM_K = 0.22;
 
 /** 案D: 大偏差を引く確率（較正対象） */
-export const TAIL_MIX_P_DEFAULT = 0.04;
+export const TAIL_MIX_P_DEFAULT = 0.03;
 
 /** 案D: 大偏差のときの幅の倍率（較正対象） */
-export const TAIL_MIX_M_DEFAULT = 3;
+export const TAIL_MIX_M_DEFAULT = 5;
 
 export const DEFAULT_RACE_BALANCE: RaceBalance = {
   // ★二重管理を作らない（G-0/I-2a/L-2 で三度潰したクラス）。定義は1か所だけ

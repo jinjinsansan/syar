@@ -499,7 +499,7 @@ describe('§8.7 着順・着差・タイム', () => {
     expect(averageSpeedMps(3000, 'turf', 'good', B)).toBeLessThan(turfGood);
   });
 
-  it('乱数倍率は K（正典 §13.1・D-016 で 0.26）の正規分布に従う（統計量で固定）', () => {
+  it('乱数倍率は K の混合分布に従う（統計量で固定・案D 反映）', () => {
     const samples: number[] = [];
     for (let seed = 0; seed < 400; seed++) {
       const r = resolveRace({
@@ -524,7 +524,7 @@ describe('§8.7 着順・着差・タイム', () => {
     expect(sd).toBeGreaterThan(theoretical * 0.9);
     expect(sd).toBeLessThan(theoretical * 1.1);
     // 正典 §13.1（D-016）の値そのもの
-    expect(B.RACE_RANDOM_K).toBe(0.26);
+    expect(B.RACE_RANDOM_K).toBe(0.22);
   });
 
   it('介入倍率が finalScore に掛かる（§8.7 の式の第3項）', () => {
@@ -660,7 +660,7 @@ describe('S-1 K の振る舞いを固定する（しきい値に K 自身を使�
    *
    * ★ここでは**リテラルのしきい値**で「K がレースの荒れ具合をどれだけ決めているか」を固定する。
    *   能力を 3% 刻みで並べた8頭立てで、最強馬が勝つ割合:
-   *     K=0.12 → 37.70% / K=0.20 → 28.18% / K=0.26 → 24.90% / K=0.34 → 22.63%（実測）
+   *     K=0.12 → 35.60% / K=0.18 → 29.45% / K=0.22 → 26.57% / K=0.30 → 23.57%（実測・混合分布下）
    *   K を動かせば必ずこの帯から外れる。
    */
   it('★能力差が既知の出走表で、最強馬の勝率が K に対応した水準になる', () => {
@@ -684,8 +684,8 @@ describe('S-1 K の振る舞いを固定する（しきい値に K 自身を使�
     }
     const rate = wins / races;
     // ★リテラルで固定する（B.RACE_RANDOM_K を使わない）。K=0.20 でも K=0.34 でも外れる幅
-    expect(rate, `最強馬の勝率 ${rate}（K=0.26 の実測は 24.9%）`).toBeGreaterThan(0.232);
-    expect(rate, `最強馬の勝率 ${rate}（K=0.26 の実測は 24.9%）`).toBeLessThan(0.266);
+    expect(rate, `最強馬の勝率 ${rate}（K=0.22 の実測は 26.57%）`).toBeGreaterThan(0.250);
+    expect(rate, `最強馬の勝率 ${rate}（K=0.22 の実測は 26.57%）`).toBeLessThan(0.281);
   });
 });
 

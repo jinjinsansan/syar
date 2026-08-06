@@ -49,7 +49,7 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
   {
     key: 'CALIBRATED_RACE_RANDOM_K',
     file: 'packages/race-engine/src/balance.ts',
-    perturbed: 'export const CALIBRATED_RACE_RANDOM_K = 0.12;',
+    perturbed: 'export const CALIBRATED_RACE_RANDOM_K = 0.26;',
     affects: 'V-4 / V-5 / V-6（乱数の荒れ具合。正典 §13.1・D-016）',
   },
   {

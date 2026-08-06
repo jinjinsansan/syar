@@ -22,7 +22,10 @@
  *   **V-4 は試行回数で約1pp 動く**（60→200 で +1.19pp）ため、これは判定に効く自由変数である。
  *    に登録し、変異試験で防御を要求する。
  */
-export const DEFAULT_POPULARITY_TRIALS = 200;
+// ★案D（裾の厚い混合分布）を入れると大偏差が混ざるぶん人気順の推定が不安定になり、
+//   200試行では最低人気の一致率が 0.70 → 0.55 に落ちた。試行数を上げて戻す。
+//   これは**測定の精度**であってゲーム側の定数ではない（R-12: 判定に効かない範囲にする）。
+export const DEFAULT_POPULARITY_TRIALS = 500;
 
 export interface PopularitySample {
   horseId: string;
