@@ -462,7 +462,7 @@ export const DEFAULT_RACE_BALANCE: RaceBalance = {
 
   BASE_SPEED_MPS: 16.6,
   SPEED_SURFACE_MULT: { turf: 1.0, dirt: 0.975 },
-  SPEED_CONDITION_MULT: { good: 1.0, yielding: 0.99, soft: 0.975 },
+  SPEED_CONDITION_MULT: { good: 1.0, yielding: 0.99, soft: 0.975, bad: 0.96 },
   SPEED_DISTANCE_DECAY_PER_1000M: 0.022,
   TIME_GAP_FACTOR: 0.55,
 };

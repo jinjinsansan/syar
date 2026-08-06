@@ -33,6 +33,22 @@ export const PLACEHOLDER_UNLOCK = { MIN: 0.55, MAX: 0.85 } as const;
 /** 馬場状態適性の既定値（I-COND-APT-SOURCE: genotype に無いため遺伝しない） */
 export const NEUTRAL_CONDITION_APTITUDE = 50;
 
+/**
+ * 馬場状態の出現分布（累積確率・良/稍重/重/不良）。**較正定数**（R-7）。
+ *
+ * ★正典 §5.2 は「この分布は §10 執筆時に確定が要る」と記録しており、値は未定。
+ *   ここは P1 の較正条件として置く。
+ *
+ * ★★これは測定条件ではなく**ゲームの挙動を決める較正定数**である。
+ *   `heavy_aptitude` が発現するのは非良のレースだけなので、**非良の割合と、その内訳
+ *   （どれだけ極端な馬場があるか）が、この形質にかかる選抜圧の強さを決める**。
+ *   良が9割なら選抜圧はほぼゼロ（V-2d 的な振る舞い）、非良が3割あれば選抜圧がかかる
+ *   （V-2f 的な振る舞い）。**どちらに分類するかは実測してから決める。**
+ */
+// ★1行で書く: 登録簿の変異試験は**宣言を1行で置換する**ため、複数行の定数だと
+//   残りの行が浮いて構文エラーになり、テストが収集されず「値照合のみ」と誤判定される（実際に踏んだ）。
+export const TRACK_CONDITION_CDF = { good: 0.75, yielding: 0.9, soft: 0.97 } as const; // 残り3%が不良
+
 export interface EntrantOverrides {
   strategy?: Strategy;
   condition?: number;
@@ -81,6 +97,7 @@ export function toEntrant(
       good: NEUTRAL_CONDITION_APTITUDE,
       yielding: NEUTRAL_CONDITION_APTITUDE,
       soft: NEUTRAL_CONDITION_APTITUDE,
+      bad: NEUTRAL_CONDITION_APTITUDE,
     },
     strategy: overrides.strategy ?? bestStrategy,
     condition: overrides.condition ?? 3,
@@ -292,7 +309,13 @@ export function generateRace(
   // 良馬場が大半（稍重・重は少数）
   const conditionRoll = rng.float();
   const trackCondition: TrackCondition =
-    conditionRoll < 0.75 ? 'good' : conditionRoll < 0.93 ? 'yielding' : 'soft';
+    conditionRoll < TRACK_CONDITION_CDF.good
+      ? 'good'
+      : conditionRoll < TRACK_CONDITION_CDF.yielding
+        ? 'yielding'
+        : conditionRoll < TRACK_CONDITION_CDF.soft
+          ? 'soft'
+          : 'bad';
 
   // クラス帯（能力順の連続した窓）から重複なしで fieldSize 頭を引く。
   // ★`pool` は能力昇順に並んでいる前提（`sortPoolByClass`）。並んでいなければクラス分けは効かない

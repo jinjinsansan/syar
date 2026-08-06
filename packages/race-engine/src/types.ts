@@ -16,9 +16,16 @@ import type { AbilityKey, HorseId, SkillGene, Strategy } from '@star/sim-engine'
 export type Surface = 'turf' | 'dirt';
 
 /** 馬場状態（正典 §5.2 condition_aptitude に対応） */
-export type TrackCondition = 'good' | 'yielding' | 'soft';
+/**
+ * 馬場状態（正典 §5.2）。**良/稍重/重/不良の4段**。
+ *
+ * ★P0 では3段（soft が「重〜不良」を兼ねる）だったが、D-015 で `heavy_aptitude` が
+ *   単一値になった以上、潰す理由がない。**この形質が最も強く効くのは最悪の馬場**なので、
+ *   不良を落とすと発現幅が構造的に狭まり、D-015 の目的（道悪巧者を配合で狙える）が薄まる。
+ */
+export type TrackCondition = 'good' | 'yielding' | 'soft' | 'bad';
 
-export const TRACK_CONDITIONS: readonly TrackCondition[] = ['good', 'yielding', 'soft'];
+export const TRACK_CONDITIONS: readonly TrackCondition[] = ['good', 'yielding', 'soft', 'bad'];
 
 /**
  * コース形態。枠順補正（§8.3 gateCoef）の向きを決める。

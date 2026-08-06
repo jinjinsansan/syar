@@ -83,6 +83,13 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: 'V-2f（混合番組が万能型を有利にし、芝/ダート適性を押し上げる）',
   },
   {
+    key: 'TRACK_CONDITION_CDF',
+    file: 'apps/cli/src/race-field.ts',
+    perturbed: 'export const TRACK_CONDITION_CDF = { good: 1.0, yielding: 1.0, soft: 1.0 } as const;',
+    affects:
+      'V-2d/V-2f（馬場状態の出現分布。良100%にすると heavy_aptitude が一度も発現せず選抜圧がゼロになる）',
+  },
+  {
     key: 'DISTANCE_SUIT_MIN',
     file: 'apps/cli/src/race-field.ts',
     perturbed: 'export const DISTANCE_SUIT_MIN = 0;',

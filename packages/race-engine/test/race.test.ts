@@ -154,16 +154,16 @@ describe('§8.3 乗算補正10種', () => {
   it('trackConditionCoef: 良馬場は適性によらず常に 1.0（正典 §8.3 の明記事項）', () => {
     for (const apt of [0, 50, 100]) {
       expect(
-        trackConditionCoef({ good: apt, yielding: apt, soft: apt }, 'good', B),
+        trackConditionCoef({ good: apt, yielding: apt, soft: apt, bad: apt }, 'good', B),
         `適性${apt}`,
       ).toBe(1.0);
     }
     // 良以外は適性で変わる（＝「常に1.0」が全馬場に広がっていないこと）
-    expect(trackConditionCoef({ good: 50, yielding: 0, soft: 0 }, 'yielding', B)).toBeCloseTo(
+    expect(trackConditionCoef({ good: 50, yielding: 0, soft: 0, bad: 0 }, 'yielding', B)).toBeCloseTo(
       0.88,
       10,
     );
-    expect(trackConditionCoef({ good: 50, yielding: 100, soft: 0 }, 'yielding', B)).toBeCloseTo(
+    expect(trackConditionCoef({ good: 50, yielding: 100, soft: 0, bad: 0 }, 'yielding', B)).toBeCloseTo(
       1.05,
       10,
     );
@@ -375,7 +375,7 @@ describe('§8.5 発動型スキル', () => {
           neutralEntrant('A', {
             skillGenes: ['G_MUD'],
             stats: { sp: 500, st: 500, pw: 500, gt: 500, iq: 1000 },
-            conditionAptitude: { good: 50, yielding: 50, soft: 0 },
+            conditionAptitude: { good: 50, yielding: 50, soft: 0, bad: 0 },
           }),
         ],
         'A',

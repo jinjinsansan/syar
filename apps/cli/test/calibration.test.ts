@@ -301,3 +301,35 @@ describe('S-3 OFF_SURFACE_ENTRY_RATE の振る舞いを固定する', () => {
     expect(rate, `馬場が向いている出走馬の割合 ${rate}`).toBeGreaterThan(0.70);
   });
 });
+
+describe('P-1 馬場状態の出現分布（較正定数）', () => {
+  it('★実際の出走表に、正典 §5.2 の4段（良/稍重/重/不良）がすべて現れ、割合が分布どおり', () => {
+    // ★heavy_aptitude が発現するのは非良のレースだけなので、**非良の割合とその内訳が
+    //   この形質にかかる選抜圧の強さを決める**。分布を変えれば選抜圧が変わる＝較正定数。
+    //   しきい値は TRACK_CONDITION_CDF 自身ではなくリテラルで置く（同語反復を避ける・R-14）。
+    const rng = deriveRng(21, 11);
+    const counts: Record<string, number> = { good: 0, yielding: 0, soft: 0, bad: 0 };
+    const N = 3000;
+    for (let i = 0; i < N; i++) {
+      const race = generateRace(POOL, i, rng);
+      counts[race.conditions.trackCondition] = (counts[race.conditions.trackCondition] ?? 0) + 1;
+    }
+    // 4段すべてが出現する（不良を落とすと heavy_aptitude の発現幅が構造的に狭まる）
+    for (const k of ['good', 'yielding', 'soft', 'bad']) {
+      expect(counts[k] ?? 0, `${k} が一度も出ていない`).toBeGreaterThan(0);
+    }
+    // 良 75% / 稍重 15% / 重 7% / 不良 3%（±2pt）
+    expect((counts.good ?? 0) / N).toBeGreaterThan(0.73);
+    expect((counts.good ?? 0) / N).toBeLessThan(0.77);
+    expect((counts.yielding ?? 0) / N).toBeGreaterThan(0.13);
+    expect((counts.yielding ?? 0) / N).toBeLessThan(0.17);
+    expect((counts.soft ?? 0) / N).toBeGreaterThan(0.05);
+    expect((counts.soft ?? 0) / N).toBeLessThan(0.09);
+    expect((counts.bad ?? 0) / N).toBeGreaterThan(0.01);
+    expect((counts.bad ?? 0) / N).toBeLessThan(0.05);
+    // 非良の合計は 25%（heavy_aptitude に選抜圧がかかる機会の総量）
+    const nonGood = 1 - (counts.good ?? 0) / N;
+    expect(nonGood, `非良の割合 ${nonGood}`).toBeGreaterThan(0.23);
+    expect(nonGood, `非良の割合 ${nonGood}`).toBeLessThan(0.27);
+  });
+});

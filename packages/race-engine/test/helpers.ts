@@ -20,7 +20,7 @@ export function neutralEntrant(id: string, overrides: Partial<RaceEntrant> = {})
     sashi: 50,
     oikomi: 50,
   };
-  const conditionAptitude: Record<TrackCondition, number> = { good: 50, yielding: 50, soft: 50 };
+  const conditionAptitude: Record<TrackCondition, number> = { good: 50, yielding: 50, soft: 50, bad: 50 };
   return {
     horseId: id,
     stats,
