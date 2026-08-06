@@ -97,6 +97,17 @@ export function deviationBasis(founderMean: number, founderSd: number): 'ratio' 
 // オプション
 // ---------------------------------------------------------------------------
 
+/** プリシード集団を P0 シミュレータへ渡すための入力（P1.5・合格基準1） */
+export interface SeedPopulation {
+  /** 祖先参照のため**全馬**を渡す（近交係数とニックスの計算に要る） */
+  readonly all: readonly HorseRecord[];
+  readonly mareIds: readonly string[];
+  readonly stallionIds: readonly string[];
+  readonly activeIds: readonly string[];
+  /** プリシードの最終年。生年をこの年ぶんだけ手前へ寄せて相対年齢を保つ */
+  readonly finalYear: number;
+}
+
 export interface SimulationOptions {
   /** 回す世代数（= 年数。1世代 = 1年 = 繁殖牝馬プール全頭が1産） */
   generations: number;
@@ -156,6 +167,13 @@ export interface SimulationOptions {
    *   「それ以外の変更の影響」が混ざって切り分けられなくなる。
    */
   selection: 'proxy' | 'race';
+  /**
+   * ★合格基準1（P1.5）: 創始世代を作らず、**プリシード後の集団**を出発点にする。
+   *   ゲートの計算式は P0 のまま一行も変えない ＝ 再実装による測り方の差を作らない。
+   *   V-2d/V-2e/V-2f の基準（founder 側）は「サービス開始時点の集団」になり、
+   *   「開始状態から健全さが保てるか」を測ることになる。
+   */
+  seedPopulation?: SeedPopulation;
   /** 1年あたり各馬が走るレース数（`selection: 'race'` のとき） */
   racesPerYear: number;
   /**
@@ -725,13 +743,15 @@ export function runSimulation(
   let finalFoals: HorseRecord[] = [];
 
   // 年0 から供用可能な現役繁殖世代。年齢を散らして退厩が一度に来ないようにする
-  for (let i = 0; i < opts.population; i++) {
-    const birthYear = -(opts.maturityYears + (i % 8));
-    mares.push(makeFounder('female', birthYear, founderIndex++));
-  }
-  for (let i = 0; i < opts.stallionPool; i++) {
-    const birthYear = -(opts.maturityYears + (i % opts.stallionServiceYears));
-    stallions.push(makeFounder('male', birthYear, founderIndex++));
+  if (opts.seedPopulation === undefined) {
+    for (let i = 0; i < opts.population; i++) {
+      const birthYear = -(opts.maturityYears + (i % 8));
+      mares.push(makeFounder('female', birthYear, founderIndex++));
+    }
+    for (let i = 0; i < opts.stallionPool; i++) {
+      const birthYear = -(opts.maturityYears + (i % opts.stallionServiceYears));
+      stallions.push(makeFounder('male', birthYear, founderIndex++));
+    }
   }
 
   // 若駒の在庫（年1〜maturity に成熟する創始馬）。これが無いと序盤にプールが枯れる
@@ -741,14 +761,43 @@ export function runSimulation(
     if (list === undefined) pending.set(year, [horse]);
     else list.push(horse);
   };
-  const filliesPerYear = Math.ceil(opts.population / 8);
-  const coltsPerYear = Math.ceil(opts.stallionPool / opts.stallionServiceYears);
-  for (let y = 1; y <= opts.maturityYears; y++) {
-    for (let i = 0; i < filliesPerYear; i++) {
-      pushPending(y, makeFounder('female', y - opts.maturityYears, founderIndex++));
+  if (opts.seedPopulation === undefined) {
+    const filliesPerYear = Math.ceil(opts.population / 8);
+    const coltsPerYear = Math.ceil(opts.stallionPool / opts.stallionServiceYears);
+    for (let y = 1; y <= opts.maturityYears; y++) {
+      for (let i = 0; i < filliesPerYear; i++) {
+        pushPending(y, makeFounder('female', y - opts.maturityYears, founderIndex++));
+      }
+      for (let i = 0; i < coltsPerYear; i++) {
+        pushPending(y, makeFounder('male', y - opts.maturityYears, founderIndex++));
+      }
     }
-    for (let i = 0; i < coltsPerYear; i++) {
-      pushPending(y, makeFounder('male', y - opts.maturityYears, founderIndex++));
+  } else {
+    // --- プリシード集団を出発点にする（合格基準1） ---
+    const sp = opts.seedPopulation;
+    // 生年を最終年ぶん手前へ寄せる。**相対年齢が変わらない**ので繁殖可能年齢の判定は保たれる
+    // ⚠️ **元のレコードを書き換えない**。V-2c は同じ opts で runSimulation を再帰呼び出しするので、
+    //    ここで h.birthYear を破壊的に減らすと2回目の実行で**二重にずれる**（長期判定が別集団になる）。
+    for (const src of sp.all) {
+      const h = { ...src, birthYear: src.birthYear - sp.finalYear };
+      all.set(h.id, h);
+      perfNoise.set(h.id, deriveRng(opts.seed, RNG_DOMAIN.PERF, all.size).gaussian(0, 1));
+    }
+    for (const id of sp.mareIds) {
+      const h = all.get(id);
+      if (h) mares.push(h);
+    }
+    for (const id of sp.stallionIds) {
+      const h = all.get(id);
+      if (h) stallions.push(h);
+    }
+    // ★基準となる「創始世代」＝ サービス開始時点の繁殖集団
+    founderHorses.push(...mares, ...stallions);
+    // 現役（デビュー〜引退）は成熟年に達する年の若駒在庫として積む
+    for (const id of sp.activeIds) {
+      const h = all.get(id);
+      if (h === undefined) continue;
+      pushPending(Math.max(1, opts.maturityYears + h.birthYear), h);
     }
   }
 
