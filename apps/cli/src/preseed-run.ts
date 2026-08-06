@@ -16,6 +16,7 @@ const argOf = (name: string, fallback: number): number => {
   return Number.isFinite(v) ? v : fallback;
 };
 const seed = argOf('seed', 42);
+const linesPerStable = argOf('lines-per-stable', DEFAULT_PRESEED_OPTIONS.linesPerStable);
 const generations = argOf('generations', DEFAULT_PRESEED_OPTIONS.generations);
 const t0 = process.hrtime.bigint();
 const ng = loadNameBlocklist(undefined, false);
@@ -28,7 +29,8 @@ const r = runPreseed({
   ...DEFAULT_PRESEED_OPTIONS,
   seed,
   generations,
-  nicks: preseedNicks(seed, NPC_STABLES),
+  linesPerStable,
+  nicks: preseedNicks(seed, NPC_STABLES, linesPerStable),
   blocklist,
 });
 const ms = Number(process.hrtime.bigint() - t0) / 1e6;
@@ -36,7 +38,7 @@ for (const y of r.years) {
   if (y.year % 10 !== 0 && y.year !== 1) continue;
   console.log(
     `y${String(y.year).padStart(3)} foals=${y.foals} active=${y.active} ` +
-      `mean=${y.meanAbility.toFixed(0)} 系統=${y.sireLines} 有効=${y.effectiveSireLines.toFixed(2)}`,
+      `mean=${y.meanAbility.toFixed(0)} 系統=${y.sireLines} 有効=${y.effectiveSireLines.toFixed(2)} 種付種牡馬=${y.siresUsed}`,
   );
 }
 

@@ -24,6 +24,7 @@ const argOf = (name: string, fallback: number): number => {
 };
 
 const seed = argOf('seed', 42);
+const linesPerStable = argOf('lines-per-stable', DEFAULT_PRESEED_OPTIONS.linesPerStable);
 const preseedGenerations = argOf('preseed-generations', 100);
 const generations = argOf('generations', DEFAULT_OPTIONS.generations);
 const longHorizon = argOf('long-horizon', 300);
@@ -41,7 +42,8 @@ const pre = runPreseed({
   ...DEFAULT_PRESEED_OPTIONS,
   seed,
   generations: preseedGenerations,
-  nicks: preseedNicks(seed, NPC_STABLES),
+  linesPerStable,
+  nicks: preseedNicks(seed, NPC_STABLES, linesPerStable),
   blocklist,
 });
 

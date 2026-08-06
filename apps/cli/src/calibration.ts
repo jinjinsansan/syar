@@ -236,6 +236,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
   {
+    key: 'SIRE_CHOICE_TOP_K',
+    why: '★R-15 で未接続（1 ＝ 厩舎ごとの最良1頭・従来動作）。上位K頭に分散させる機構だが、実測で有効系統数が y50 8.83 → 2.28 と悪化したため有効化しない',
+  },
+  {
     key: 'HOME_SIRE_BONUS',
     why: '★R-15 で未接続（1.0 ＝ 無効）。自厩舎の種牡馬を優先する機構だが、合格基準3 を通す 1.30 では平均F が 0.107 → 0.500・虚弱率 3.5% → 23.8% になる。採否はレビュー側の判断待ちで、判断が出るまで有効化しない',
   },

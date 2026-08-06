@@ -64,6 +64,27 @@ export const POLICY_FIT_WEIGHT = 0.25;
 /** 狙う距離帯からこれだけ離れると適合度が 0 になる（m） */
 export const DISTANCE_FIT_SPAN = 1200;
 
+/**
+ * ★1厩舎が1年に使う種牡馬の数（父方の有効個体数を決める）。
+ *
+ * 【なぜ要るか — 実測で見つけた律速】
+ *   「厩舎の評価軸で最良の1頭を選ぶ」だと、20頭の繁殖牝馬が全員同じ種牡馬に行く。
+ *   年間種付上限が 20（§6.7）なのでちょうど1頭で足り、**毎年きっかり40頭**しか
+ *   種付けしない（プール200頭のうち160頭は一度も使われない）。
+ *   父系ラインの浮動を決めるのは**プールの頭数ではなく実際に使われた頭数**なので、
+ *   創始系統を 40 → 200 に増やしても 100世代での有効系統数は 1.27〜2.29 のままだった。
+ *   ⚠️ 正典 §6.7 の上限20は**上限**であって「集中させろ」ではない。
+ *      1頭に絞っていたのは正典ではなくこちらの実装の都合。
+ *
+ * 【★ただし分散させると悪化した（実測・seed42・L=5）】
+ *   K=1 → y50 有効系統 8.83 / y100 1.27
+ *   K=5 → y50 有効系統 2.28 / y100 1.00（種付種牡馬は 40 → 61 に増えたのに悪化）
+ *   厩舎ごとの最良（argmax）は厩舎の評価軸の違いが最も出る点なので、
+ *   そこから順位を下げると**厩舎間で候補が重なり**、かえって系統が集約する。
+ *   ＝ 集中を駆動しているのは浮動ではなく**方向性選択**。R-15 に従い K=1（無効）で入れる。
+ */
+export const SIRE_CHOICE_TOP_K = 1;
+
 /** 自厩舎（自牧場）の種牡馬を配合相手に選ぶときの上乗せ。1.0 = 上乗せなし */
 export const HOME_SIRE_BONUS = 1.0;
 
@@ -99,6 +120,14 @@ export interface PreseedOptions {
   readonly founders: FoundersConfig;
   readonly nicks: NicksTable;
   readonly stables: readonly Stable[];
+  /**
+   * ★1厩舎あたりの創始父系ライン数（レビュー側 2026-08-06）。
+   *   系統数の減少は**父系ラインの遺伝的浮動**で、突然変異でアレルが増えるのと違い
+   *   **系統は増えない**。有限の種牡馬枠で世代を重ねれば確率的に失われる一方なので、
+   *   配合を制限して守るのではなく**創始系統を増やして**浮動に耐えさせる。
+   *   配合を制限しないので近交は増えない（むしろアウトブリードの選択肢が増える）。
+   */
+  readonly linesPerStable: number;
   /** 実在競走馬名 NG 判定（憲法 §0.1）。**本番では必ず実物を注入する** */
   readonly blocklist: NameBlocklist;
 }
@@ -108,9 +137,18 @@ export interface PreseedOptions {
  * ここは検証用の合成データを厩舎の父系ラインから作る。
  * N-4「ニックスが意味を持つ程度に系統が分散している」はこの表に対して測る。
  */
-export function preseedNicks(seed: number, stables: readonly Stable[]): NicksTable {
+export function preseedNicks(
+  seed: number,
+  stables: readonly Stable[],
+  linesPerStable = 1,
+): NicksTable {
+  // 系統を増やしたらニックス表も同じ系統集合で作る（表に無い系統は組が成立しない）
+  const lines =
+    linesPerStable <= 1
+      ? stables.map((s) => `L-${s.id}`)
+      : stables.flatMap((s) => Array.from({ length: linesPerStable }, (_, i) => `L-${s.id}-${i}`));
   return generateNicksTable(
-    stables.map((s) => `L-${s.id}`),
+    lines,
     deriveRng(seed, STREAM.NICKS),
     NICKS_GEN.HIT_RATIO,
     NICKS_GEN.MULT_MIN,
@@ -130,6 +168,7 @@ export const DEFAULT_PRESEED_OPTIONS: Omit<PreseedOptions, 'seed' | 'blocklist' 
   balance: DEFAULT_BALANCE,
   founders: FOUNDERS,
   stables: NPC_STABLES,
+  linesPerStable: 1,
 };
 
 export interface PreseedHorse {
@@ -238,6 +277,12 @@ export interface PreseedYearStat {
   readonly sireLines: number;
   /** ★合格基準3（改訂）: 有効系統数 1/Σshare²。本数と違い偏りで下がる */
   readonly effectiveSireLines: number;
+  /**
+   * ★その年に実際に種付けした種牡馬の数。
+   *   父系ラインの浮動の速さを決めるのは**プールの頭数ではなくここ**（父方の有効個体数）。
+   *   プールが200頭でも、実際に使われるのが40頭なら Ne は 40 で計算される。
+   */
+  readonly siresUsed: number;
 }
 
 export interface PreseedResult {
@@ -262,14 +307,17 @@ export function runPreseed(opts: PreseedOptions): PreseedResult {
   const nameRng = deriveRng(opts.seed, STREAM.NAMING, 0);
   let serial = 0;
 
-  const addFounder = (sex: 'male' | 'female', stable: Stable): string => {
+  const addFounder = (sex: 'male' | 'female', stable: Stable, lineIndex: number): string => {
     serial += 1;
     const id = `NPC-F${String(serial).padStart(5, '0')}`;
     const record = createFounder({
       id,
       sex,
       // 父系ラインを厩舎ごとに分ける ＝ N-4「父系ラインが分散している」の出発点
-      sireLine: `L-${stable.id}`,
+      sireLine:
+        opts.linesPerStable <= 1
+          ? `L-${stable.id}`
+          : `L-${stable.id}-${lineIndex % opts.linesPerStable}`,
       birthYear: founderYear,
       rng: founderRng,
       balance,
@@ -289,10 +337,14 @@ export function runPreseed(opts: PreseedOptions): PreseedResult {
   const stallionIds: string[] = [];
   const mareIds: string[] = [];
   for (let i = 0; i < opts.stallions; i += 1) {
-    stallionIds.push(addFounder('male', stables[i % stables.length] as Stable));
+    stallionIds.push(
+      addFounder('male', stables[i % stables.length] as Stable, Math.floor(i / stables.length)),
+    );
   }
   for (let i = 0; i < opts.mares; i += 1) {
-    mareIds.push(addFounder('female', stables[i % stables.length] as Stable));
+    mareIds.push(
+      addFounder('female', stables[i % stables.length] as Stable, Math.floor(i / stables.length)),
+    );
   }
 
   let activeIds: string[] = [];
@@ -315,21 +367,30 @@ export function runPreseed(opts: PreseedOptions): PreseedResult {
     // 3. 配合。牝馬ごとに、**自厩舎の方針で最も高く評価される**種牡馬を選ぶ
     const matingRng = deriveRng(opts.seed, STREAM.MATING, year);
     const foalIds: string[] = [];
+    const usedSires = new Set<string>();
+    /**
+     * ★**厩舎ごとの**カウンタ。最初は全厩舎で共有していたが、それだと厩舎をまたいで
+     *   同じ強い種牡馬に集中し、有効系統数が 8.83 → 1.95 と**悪化した**（y50・seed42）。
+     *   候補は厩舎の評価軸で並べているので、ずらすのも厩舎の中でなければ意味がない。
+     */
+    const mareTurn = new Map<string, number>();
     for (const mareId of mareIds) {
       const mare = all.get(mareId)!;
       const stable = stableOf.get(mareId) ?? (stables[0] as Stable);
-      let best: string | null = null;
-      let bestScore = -Infinity;
+      // 厩舎の評価軸で上位 SIRE_CHOICE_TOP_K 頭を候補にし、牝馬ごとに順番に割り振る。
+      // 1頭に絞ると父方の有効個体数が厩舎数まで落ちる（実測: 毎年40頭）。
+      const ranked: { id: string; score: number }[] = [];
       for (const sid of stallionIds) {
         const sire = all.get(sid)!.record;
         if (!canMate(sire, mare.record, balance, year).ok) continue;
-        const score = mateScore(sire, stable, stableOf.get(sid)?.id === stable.id);
-        if (score > bestScore) {
-          bestScore = score;
-          best = sid;
-        }
+        ranked.push({ id: sid, score: mateScore(sire, stable, stableOf.get(sid)?.id === stable.id) });
       }
-      if (best === null) continue; // 相手がいない年は産まない（黙って規則を曲げない）
+      if (ranked.length === 0) continue; // 相手がいない年は産まない（黙って規則を曲げない）
+      ranked.sort((a, b) => (b.score !== a.score ? b.score - a.score : a.id.localeCompare(b.id)));
+      const turn = mareTurn.get(stable.id) ?? 0;
+      mareTurn.set(stable.id, turn + 1);
+      const pick = ranked[(turn % SIRE_CHOICE_TOP_K) % ranked.length]!;
+      const best: string = pick.id;
 
       const sire = all.get(best)!.record;
       serial += 1;
@@ -345,6 +406,7 @@ export function runPreseed(opts: PreseedOptions): PreseedResult {
         balance,
         nicks,
       });
+      usedSires.add(best);
       applyMatingCounters(sire, mare.record);
       const { name } = generateHorseName(
         nameRng,
@@ -381,6 +443,7 @@ export function runPreseed(opts: PreseedOptions): PreseedResult {
       meanAbility: abilities.length ? abilities.reduce((a, b) => a + b, 0) / abilities.length : 0,
       npcTarget: npcTargetFrom(abilities),
       sireLines: new Set(stallionIds.map((id) => all.get(id)!.record.sireLine)).size,
+      siresUsed: usedSires.size,
       effectiveSireLines: lineConcentration(
         stallionIds.map((id) => all.get(id)!.record.sireLine),
       ).effective,
