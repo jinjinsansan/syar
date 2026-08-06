@@ -518,8 +518,11 @@ describe('§8.7 着順・着差・タイム', () => {
     expect(Math.abs(mean - 1)).toBeLessThan(B.RACE_RANDOM_K * 0.05);
     // ★リテラルで固定すると K を動かしたとき同期が要る（L-2 で潰したクラス）。
     //   balance の値そのものと突き合わせる。ここが K の**経路側の固定**でもある（O-4）
-    expect(sd).toBeGreaterThan(B.RACE_RANDOM_K * 0.92);
-    expect(sd).toBeLessThan(B.RACE_RANDOM_K * 1.08);
+    // ★混合分布（案D）の理論SD = K × sqrt((1-p) + p·m²)。裾を厚くすると SD は広がる
+    const theoretical =
+      B.RACE_RANDOM_K * Math.sqrt(1 - B.TAIL_MIX_P + B.TAIL_MIX_P * B.TAIL_MIX_M ** 2);
+    expect(sd).toBeGreaterThan(theoretical * 0.9);
+    expect(sd).toBeLessThan(theoretical * 1.1);
     // 正典 §13.1（D-016）の値そのもの
     expect(B.RACE_RANDOM_K).toBe(0.26);
   });
@@ -683,5 +686,51 @@ describe('S-1 K の振る舞いを固定する（しきい値に K 自身を使�
     // ★リテラルで固定する（B.RACE_RANDOM_K を使わない）。K=0.20 でも K=0.34 でも外れる幅
     expect(rate, `最強馬の勝率 ${rate}（K=0.26 の実測は 24.9%）`).toBeGreaterThan(0.232);
     expect(rate, `最強馬の勝率 ${rate}（K=0.26 の実測は 24.9%）`).toBeLessThan(0.266);
+  });
+});
+
+describe('案D 裾の厚い混合分布（正典 §8.7 の乱数）', () => {
+  it('★大偏差の発生率が p に一致し、幅が m 倍になる（分布の形を固定する）', () => {
+    // ★しきい値に TAIL_MIX_P/M 自身を使わない（R-14）。リテラルで固定する。
+    //   p=0.03 / m=5 なら、|randomMult-1| > 3σ(=0.66) の割合が単一正規分布より桁で多い。
+    const samples: number[] = [];
+    for (let seed = 0; seed < 600; seed++) {
+      const r = resolveRace({
+        conditions: conditions(),
+        entrants: neutralField(12),
+        seed,
+        balance: B,
+      });
+      for (const row of r.order) samples.push(row.randomMult - 1);
+    }
+    const sd0 = B.RACE_RANDOM_K;
+    const beyond3 = samples.filter((x) => Math.abs(x) > 3 * sd0).length / samples.length;
+    // 単一正規分布なら 3σ 超は 0.27%。混合分布では p に応じて桁で増える
+    expect(beyond3, `3σ超の割合 ${beyond3}`).toBeGreaterThan(0.008);
+    // 裾が厚くても中心は動かない（平均は1のまま）
+    const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+    expect(Math.abs(mean), `平均のずれ ${mean}`).toBeLessThan(0.02);
+  });
+
+  it('★混合分布でも乱数の消費数は一定（決定論と Provably Fair を壊さない）', () => {
+    // 同じ seed なら完全に同じレースになること。分岐で消費数が変われば再現が壊れる
+    const field = neutralField(14);
+    const a = resolveRace({ conditions: conditions(), entrants: field, seed: 777, balance: B });
+    const b = resolveRace({ conditions: conditions(), entrants: field, seed: 777, balance: B });
+    expect(JSON.stringify(b)).toBe(JSON.stringify(a));
+    // 裾を無効化（p=0）しても同じ seed で再現する
+    const flat = { ...B, TAIL_MIX_P: 0 };
+    const c = resolveRace({ conditions: conditions(), entrants: field, seed: 777, balance: flat });
+    const d = resolveRace({ conditions: conditions(), entrants: field, seed: 777, balance: flat });
+    expect(JSON.stringify(d)).toBe(JSON.stringify(c));
+    // p=0 と p>0 では結果が違う（裾が実際に効いている）。
+    // 1レースでは大偏差が1頭も出ないことがあるので、複数シードで少なくとも1件違うことを見る
+    let differed = 0;
+    for (let seed = 0; seed < 30; seed++) {
+      const withTail = resolveRace({ conditions: conditions(), entrants: field, seed, balance: B });
+      const noTail = resolveRace({ conditions: conditions(), entrants: field, seed, balance: flat });
+      if (JSON.stringify(withTail) !== JSON.stringify(noTail)) differed += 1;
+    }
+    expect(differed, `30シード中 ${differed} 件で差が出た`).toBeGreaterThan(0);
   });
 });

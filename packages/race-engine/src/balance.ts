@@ -319,6 +319,20 @@ export interface RaceBalance {
    *   両者が食い違わないことは `race.test.ts` が固定する。
    */
   INTERVENTION_CAP: number;
+  /**
+   * 案D: 乱数を**裾の厚い混合分布**にする。
+   *   ε ~ 確率(1-p) で N(0, K) / 確率 p で N(0, m·K)
+   *
+   * ★正規分布は裾が指数的に減衰するため、最下位人気が勝つのに必要な大偏差が
+   *   構造的に潰される（＝V-6 が死ぬ数学的な正体）。K を動かしても直らない:
+   *   K は V-4 と V-6 を必ず逆方向に動かすだけで、**比を変えられない**。
+   *   裾を厚くすると大偏差の確率が桁で上がる一方、1番人気は既に約69%負けているので
+   *   稀な大偏差が加わっても勝率の低下は限定的 — K が持っていない非対称性がある。
+   * ★現実の競馬に大穴があるのは「その日だけ格上の走りをする馬がいる」からで、
+   *   単一の正規分布では表現できない。
+   */
+  TAIL_MIX_P: number;
+  TAIL_MIX_M: number;
 
   /** 発動率 = SKILL_FIRE_BASE + IQ / SKILL_FIRE_IQ_DIV（正典 §8.5） */
   SKILL_FIRE_BASE: number;
@@ -397,10 +411,18 @@ export interface RaceBalance {
  */
 export const CALIBRATED_RACE_RANDOM_K = 0.26;
 
+/** 案D: 大偏差を引く確率（較正対象） */
+export const TAIL_MIX_P_DEFAULT = 0.04;
+
+/** 案D: 大偏差のときの幅の倍率（較正対象） */
+export const TAIL_MIX_M_DEFAULT = 3;
+
 export const DEFAULT_RACE_BALANCE: RaceBalance = {
   // ★二重管理を作らない（G-0/I-2a/L-2 で三度潰したクラス）。定義は1か所だけ
   RACE_RANDOM_K: CALIBRATED_RACE_RANDOM_K,
   INTERVENTION_CAP: 0.1,
+  TAIL_MIX_P: TAIL_MIX_P_DEFAULT,
+  TAIL_MIX_M: TAIL_MIX_M_DEFAULT,
 
   SKILL_FIRE_BASE: 0.4,
   SKILL_FIRE_IQ_DIV: 2000,

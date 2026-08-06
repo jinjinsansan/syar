@@ -180,7 +180,11 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
 
     // §8.7: finalScore = score * (1 + gaussian(0, K)) * interventionMult
     const finalRng: Rng = deriveRng(seed, RNG_STREAM.FINAL, index);
-    const randomMult = 1 + finalRng.gaussian(0, balance.RACE_RANDOM_K);
+    // ★案D: 混合分布。**bool を必ず1回消費する**ので、馬あたりの乱数消費数は
+    //   分岐に関わらず一定（決定論と Provably Fair を壊さない）。
+    const heavyTail = finalRng.bool(balance.TAIL_MIX_P);
+    const spread = balance.RACE_RANDOM_K * (heavyTail ? balance.TAIL_MIX_M : 1);
+    const randomMult = 1 + finalRng.gaussian(0, spread);
     // ★憲法 §1.5-1 のハードキャップ ±10% は、**サーバー権威のスコア確定点**（§8b.4）である
     //   ここで効かなければ意味がない。純関数 `resolveIntervention` の中だけで守っていたため、
     //   `interventionMults` に 100 を渡すとそのまま勝てた（O-3）。

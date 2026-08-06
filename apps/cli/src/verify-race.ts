@@ -85,6 +85,9 @@ const CLASS_BAND = parseNumber('--class-band', DEFAULT_CLASS_BAND);
 /** 素質開放率のプレースホルダ範囲（P3 の育成モデルで置き換わる・R-7） */
 /** 能力レンジの床（掃引用）。既定は較正値 */
 const FLOOR = parseNumber('--field-floor', FIELD_STRENGTH_FLOOR);
+/** 案D: 裾の厚さ（掃引用） */
+const TAIL_P = parseNumber('--tail-p', DEFAULT_RACE_BALANCE.TAIL_MIX_P);
+const TAIL_M = parseNumber('--tail-m', DEFAULT_RACE_BALANCE.TAIL_MIX_M);
 const UNLOCK = {
   MIN: parseNumber('--unlock-min', PLACEHOLDER_UNLOCK.MIN),
   MAX: parseNumber('--unlock-max', PLACEHOLDER_UNLOCK.MAX),
@@ -108,7 +111,12 @@ const STREAM = {
  *   既定から外れた値で回した場合は冒頭で自己申告する（R-8）。
  */
 const RACE_K = parseNumber("--k", CALIBRATED_RACE_RANDOM_K);
-const balance: RaceBalance = { ...DEFAULT_RACE_BALANCE, RACE_RANDOM_K: RACE_K };
+const balance: RaceBalance = {
+  ...DEFAULT_RACE_BALANCE,
+  RACE_RANDOM_K: RACE_K,
+  TAIL_MIX_P: TAIL_P,
+  TAIL_MIX_M: TAIL_M,
+};
 const ib = DEFAULT_INTERVENTION_BALANCE;
 
 // ---------------------------------------------------------------------------
@@ -519,6 +527,8 @@ if (process.argv.includes('--json')) {
         offDistanceEntryRate: OFF_DISTANCE_ENTRY_RATE,
         offSurfaceEntryRate: OFF_SURFACE_ENTRY_RATE,
         oversampleRatio: OVERSAMPLE_RATIO,
+        tailMixP: TAIL_P,
+        tailMixM: TAIL_M,
       },
     }),
   );

@@ -53,6 +53,18 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: 'V-4 / V-5 / V-6（乱数の荒れ具合。正典 §13.1・D-016）',
   },
   {
+    key: 'TAIL_MIX_P_DEFAULT',
+    file: 'packages/race-engine/src/balance.ts',
+    perturbed: 'export const TAIL_MIX_P_DEFAULT = 0;',
+    affects: 'V-6（案D: 大偏差を引く確率。0 にすると単一正規分布に戻り裾が死ぬ）',
+  },
+  {
+    key: 'TAIL_MIX_M_DEFAULT',
+    file: 'packages/race-engine/src/balance.ts',
+    perturbed: 'export const TAIL_MIX_M_DEFAULT = 1;',
+    affects: 'V-6（案D: 大偏差の幅の倍率。1 にすると単一正規分布に戻る）',
+  },
+  {
     key: 'PLACEHOLDER_UNLOCK',
     file: 'apps/cli/src/race-field.ts',
     perturbed: 'export const PLACEHOLDER_UNLOCK = { MIN: 0.3, MAX: 0.95 } as const;',
