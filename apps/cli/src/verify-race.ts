@@ -14,6 +14,7 @@
  *   参考値として「介入対象馬だけの分布」も併記する（どちらで測ったかを隠さない）。
  */
 
+import { VERIFY_RACE_STREAM } from '@star/sim-engine';
 import {
   CALIBRATED_RACE_RANDOM_K,
   DEFAULT_INTERVENTION_BALANCE,
@@ -97,16 +98,9 @@ const UNLOCK = {
 };
 
 /** 乱数系列の用途（K-2 の系列独立性。ここでも混ぜない） */
-const STREAM = {
-  /** 出走表の生成 */
-  FIELD: 11,
-  /** 人気推定（= オッズ算出相当・§9.2 で本番と別系列と定められている） */
-  POPULARITY: 12,
-  /** 本番確定 */
-  DECIDE: 13,
-  /** 介入 */
-  INTERVENTION: 14,
-} as const;
+// ★用途IDは集約表から取る。11〜14 の帯を取っていたのはここだけで、
+//   規約は一度確立されていたのに新設ファイルが 1〜4 に戻していた
+const STREAM = VERIFY_RACE_STREAM;
 
 /**
  * ★K は正典 §13.1 の値（0.12）。§8.7 が「実装後に必ずモンテカルロ10万レースで

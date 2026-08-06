@@ -16,6 +16,7 @@
  */
 
 import {
+  PRESEED_STREAM,
   DEFAULT_BALANCE,
   FOUNDERS,
   NICKS_GEN,
@@ -41,13 +42,8 @@ import {
 import { ABILITY_KEYS } from '@star/sim-engine';
 import { lineConcentration } from './pedigree-audit.js';
 
-/** 乱数サブストリームの用途 ID（識別子であって較正値ではない） */
-const STREAM = {
-  FOUNDER: 1,
-  MATING: 2,
-  NAMING: 3,
-  NICKS: 5,
-} as const;
+// ★用途IDは集約表から取る（番号の重複を型で禁じる）
+const STREAM = PRESEED_STREAM;
 
 /**
  * 厩舎方針が選抜に効く強さ（正典 §10.5「厩舎方針は調教AIの選択に反映される」）。

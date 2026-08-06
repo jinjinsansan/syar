@@ -248,6 +248,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
     why: 'P0 受け入れハーネスの実行条件。既定値は正典 §10.5（800頭）等の写しで、--flag で明示上書きする。判定条件は出力の冒頭に自己申告する（R-8）',
   },
   {
+    pattern: 'apps/cli/src/diag-streams\.ts',
+    why: '切り分け用の診断ツール（乱数系列の分布比較）。判定（V-x）を作らず、本番経路からも参照されない。実行条件は出力の冒頭に自己申告する（R-8）',
+  },
+  {
     pattern: 'apps/cli/src/verify-payout\.ts',
     why: 'A-3/V-10 の測定ハーネスの実行条件（レース数・MC試行数）。--races / --odds-trials で明示上書きし、実行条件を出力の冒頭に自己申告する（R-8）。MC試行数の既定 10,000 は正典 §9.2 の写し',
   },
@@ -290,6 +294,34 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   {
     key: 'DEFAULT_PRESEED_OPTIONS',
     why: 'プリシードのプール構成（正典 §10.5 の 現役2,500/種牡馬200/繁殖牝馬800）の写し。実際に何頭になったかは npm run preseed の出力で照合する',
+  },
+  {
+    key: 'GENETICS_STREAM',
+    why: '乱数ストリームの用途ID（遺伝・配合）。較正値ではなく識別子で、値の大小に意味はない。重複していないことは streams.test.ts が検査する',
+  },
+  {
+    key: 'RACE_STREAM',
+    why: '乱数ストリームの用途ID（レース解決）。同上',
+  },
+  {
+    key: 'VERIFY_RACE_STREAM',
+    why: '乱数ストリームの用途ID（verify-race）。同上。★§9.2 の「オッズ算出と本番確定は別系列」は ID が別であることで担保され、テストが照合する',
+  },
+  {
+    key: 'VERIFY_PAYOUT_STREAM',
+    why: '乱数ストリームの用途ID（verify-payout / A-3）。同上',
+  },
+  {
+    key: 'PRESEED_STREAM',
+    why: '乱数ストリームの用途ID（NPCプリシード）。同上',
+  },
+  {
+    key: 'DIAGNOSTIC_STREAM',
+    why: '乱数ストリームの用途ID（切り分け用の診断ツール専用・本番経路では使わない）。同上',
+  },
+  {
+    key: 'ALL_STREAM_TABLES',
+    why: '用途ID表の一覧。重複検査の走査範囲そのもので、較正値ではない。表を足してここに入れ忘れると ★テストが落ちる（R-19）',
   },
   {
     key: 'CYCLE_MS',

@@ -31,7 +31,8 @@
  * 実行: npm run verify:payout -- --races 2000 --seeds 42
  */
 
-import { NICKS_GEN, deriveRng } from '@star/sim-engine';
+import {
+  VERIFY_PAYOUT_STREAM, NICKS_GEN, deriveRng } from '@star/sim-engine';
 import {
   DEFAULT_RACE_BALANCE,
   resolveRace,
@@ -51,15 +52,9 @@ import { resolveRuntimeConfig } from './config.js';
 import { runSimulation } from './simulator.js';
 import { POOL_GENERATIONS, POOL_MARES } from './measurement.js';
 
-/** 乱数サブストリームの用途 ID（識別子であって較正値ではない） */
-const STREAM = {
-  POOL: 1,
-  FIELD: 2,
-  /** ★オッズ算出用（§9.2: 本番確定用とは別系列） */
-  ODDS: 3,
-  /** ★本番確定用（§8.6 の final_seed 相当） */
-  FINAL: 4,
-} as const;
+// ★用途IDは集約表から取る。ここで独自採番したために race.ts の 1/2 と重なっていた
+//   （レビュー側 2026-08-07 の指摘。相関は実測で否定されたが、重なる構造は実在した）
+const STREAM = VERIFY_PAYOUT_STREAM;
 
 const argv = process.argv.slice(2);
 const argOf = (name: string, fallback: number): number => {

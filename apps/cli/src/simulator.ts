@@ -6,6 +6,7 @@
  */
 
 import {
+  GENETICS_STREAM,
   ABILITY_KEYS,
   NUMERIC_TRAITS,
   applyMatingCounters,
@@ -475,16 +476,8 @@ export interface SimulationResult {
 // 内部ヘルパ
 // ---------------------------------------------------------------------------
 
-const RNG_DOMAIN = {
-  NICKS: 1,
-  FOUNDER: 2,
-  RECRUIT: 3,
-  MATING: 4,
-  V1: 5,
-  PERF: 6,
-  /** K-4: 実レース選抜のシーズン（他の用途と系列を混ぜない） */
-  RACE: 7,
-} as const;
+// ★用途IDは集約表から取る
+const RNG_DOMAIN = GENETICS_STREAM;
 
 function abilityTotal(horse: HorseRecord): number {
   let total = 0;

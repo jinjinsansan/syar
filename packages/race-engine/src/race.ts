@@ -11,7 +11,8 @@
  *     「何が効いたのか」を切り分けられなくなる（K-2 の系列独立性の要求と同根）。
  */
 
-import { deriveRng, type Rng } from '@star/sim-engine';
+import {
+  RACE_STREAM, deriveRng, type Rng } from '@star/sim-engine';
 import { MARGIN_LABELS, type RaceBalance } from './balance.js';
 import { baseScore, decidePace, deterministicCoefs } from './coefficients.js';
 import { resolveSkills, type SkillContext } from './skills.js';
@@ -27,12 +28,8 @@ import type {
 } from './types.js';
 
 /** 乱数サブストリームの用途ID。混ざらないよう1か所で管理する（K-2 の系列独立性） */
-export const RNG_STREAM = {
-  /** スキル発動判定（馬ごと） */
-  SKILL: 1,
-  /** 着順を決める最終乱数（馬ごと） */
-  FINAL: 2,
-} as const;
+// ★用途IDは @star/sim-engine の集約表に一本化した（番号の重複を型で禁じるため）
+export const RNG_STREAM = RACE_STREAM;
 
 /**
  * `interventionMult` をハードキャップ内に収める（憲法 §1.5-1 / 正典 §8b.3・§13.1）。
