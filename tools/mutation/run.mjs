@@ -217,6 +217,21 @@ console.log('');
 const results = [];
 let toolFailure = false;
 
+/** 実行中に摂動しているファイル。異常終了時に復元する */
+let pendingRestore = null;
+const restoreOnAbort = (signal) => {
+  if (pendingRestore !== null) {
+    writeFileSync(pendingRestore.file, pendingRestore.content);
+    console.error(`
+!!! ${signal} を受けたので ${pendingRestore.file} を復元しました`);
+    pendingRestore = null;
+  }
+  process.exit(1);
+};
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK']) {
+  process.on(sig, () => restoreOnAbort(sig));
+}
+
 for (const mut of targets) {
   const original = readFileSync(mut.file, 'utf8');
   const originalHash = md5(original);
@@ -240,6 +255,12 @@ for (const mut of targets) {
   }
 
   let result;
+  // ★強制終了（Ctrl-C / タイムアウトの SIGTERM）でも復元する。
+  //   finally は SIGTERM では走らないため、これが無いと**摂動したままのファイルが
+  //   作業ツリーに残る**。実際に10分タイムアウトで POLICY_FIT_WEIGHT = 0 が残り、
+  //   次の実行が「改変なしの状態でテストが落ちている」と誤判定した。
+  //   R-11 の系: 検証ツールは異常終了したときの後始末まで含めて検証ツールである。
+  pendingRestore = { file: mut.file, content: original };
   try {
     writeFileSync(mut.file, mutated);
     // --- 事後条件(3): 書き込んだ内容がディスク上で原本と異なる ---
@@ -250,6 +271,7 @@ for (const mut of targets) {
     result = runTests();
   } finally {
     writeFileSync(mut.file, original);
+    pendingRestore = null;
     // --- 事後条件(4): 復元後に md5 が原本と一致 ---
     if (md5(readFileSync(mut.file, 'utf8')) !== originalHash) {
       console.error(`!!! [${mut.id}] ${mut.file} の復元に失敗した`);

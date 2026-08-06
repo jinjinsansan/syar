@@ -4,7 +4,7 @@
  * 出力は**再現可能な成果物**（§10.5）。同じシードから同じ血統プールが出ることは
  * `apps/cli/test/preseed.test.ts` が測る。
  */
-import { NPC_STABLES } from '@star/sim-engine';
+import { DEFAULT_BALANCE, NPC_STABLES, calcInbreedCoefficient, nicksKey } from '@star/sim-engine';
 import { auditPedigrees } from './pedigree-audit.js';
 import { loadNameBlocklist } from './name-blocklist.js';
 import { DEFAULT_PRESEED_OPTIONS, preseedNicks, runPreseed } from './preseed.js';
@@ -70,6 +70,43 @@ console.log(
   `V-12a  近交（平均F ≤ 0.10）  平均F=${meanF.toFixed(4)} 最大F=${Math.max(...Fs).toFixed(3)} ` +
     `虚弱=${((frail / Fs.length) * 100).toFixed(1)}%  ${meanF <= 0.1 ? 'PASS' : 'FAIL'}`,
 );
+/**
+ * ★合格基準3 の確認測定（レビュー側 §2）: **指標ではなく機能を測る**。
+ *   有効系統数 5.03 は「レビュー側が発明した閾値に対する余裕ゼロの通過」なので、
+ *   指標の値だけで閉じない。実際にニックスが成立するか／配合の選択肢が残るかを見る。
+ */
+{
+  const stallions = r.world.stallionIds.map((id) => lookup(id)!);
+  const mares = r.world.mareIds.map((id) => lookup(id)!);
+  // (1) 実際に成立している sire_line × bms_line の組
+  const combos = new Set<string>();
+  for (const st of stallions) {
+    for (const m of mares) {
+      if (m.sireLine !== undefined) combos.add(`${st.sireLine}|${m.sireLine}`);
+    }
+  }
+  // ★キー形式は推測せず nicksKey() を使う（最初 '::' と '-' を推測してヒット0を出した）
+  const nicksHit = [...combos].filter((k) => {
+    const i = k.indexOf('|');
+    return r.options.nicks.has(nicksKey(k.slice(0, i), k.slice(i + 1)));
+  }).length;
+  // (2) 任意の配合で高F になる割合（アウトブリードの選択肢が残っているか）
+  //     牝馬200頭 × 種牡馬全頭を総当たりし、F > 0.0625（いとこ相当）の割合を出す
+  const sample = mares.filter((_, i) => i % Math.max(1, Math.floor(mares.length / 200)) === 0);
+  let pairs = 0;
+  let highF = 0;
+  for (const m of sample) {
+    for (const st of stallions) {
+      pairs += 1;
+      if (calcInbreedCoefficient(st, m, lookup, DEFAULT_BALANCE.PEDIGREE_DEPTH).F > 0.0625) highF += 1;
+    }
+  }
+  console.log(
+    `合格基準3 確認: sire×bms の組 ${combos.size} 通り成立（ニックス表ヒット ${nicksHit}）  ` +
+      `高F(>1/16)になる配合 ${((highF / pairs) * 100).toFixed(1)}%（${pairs} 通り総当たり）`,
+  );
+}
+
 const a = auditPedigrees(r.world.activeIds, r.world.stallionIds, lookup);
 console.log(`seed=${seed} all=${r.world.all.size} ${(ms / 1000).toFixed(1)}s`);
 console.log(`5代完全=${(a.fullRate * 100).toFixed(1)}% 平均埋=${a.meanFilled.toFixed(1)}/62 血統内系統=${a.meanLines.toFixed(1)} クロス保有=${(a.crossRate * 100).toFixed(1)}%`);

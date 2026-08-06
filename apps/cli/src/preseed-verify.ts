@@ -7,7 +7,7 @@
  *   V-2d / V-2e / V-2f の比較基準（founder 側）は「サービス開始時点の集団」になり、
  *   「開始状態から健全さが保てるか」を測ることになる。
  *
- * 実行: npm run preseed:verify -- --seed 42 [--preseed-generations 100] [--generations 100]
+ * 実行: npm run preseed:verify -- --seed 42 [--preseed-generations 50] [--generations 100]
  */
 
 import { NPC_STABLES } from '@star/sim-engine';
@@ -25,7 +25,11 @@ const argOf = (name: string, fallback: number): number => {
 
 const seed = argOf('seed', 42);
 const linesPerStable = argOf('lines-per-stable', DEFAULT_PRESEED_OPTIONS.linesPerStable);
-const preseedGenerations = argOf('preseed-generations', 100);
+// ★R-12: 既定は**出荷構成**（正典 §10.5 のプリシードは50世代）でなければならない。
+//   ここを 100 にハードコードしていたため、合格基準1 の V-2e 0.771 を
+//   「仕様の倍の深さ」で測って FAIL として報告していた。
+//   厳しい構成で測って落とすのも、緩い構成で測って通すのと同じ誤り。
+const preseedGenerations = argOf('preseed-generations', DEFAULT_PRESEED_OPTIONS.generations);
 const generations = argOf('generations', DEFAULT_OPTIONS.generations);
 const longHorizon = argOf('long-horizon', 300);
 

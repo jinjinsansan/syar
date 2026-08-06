@@ -236,6 +236,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
   {
+    key: 'SELECTED',
+    why: 'F-4 の V-2e 分解で「レース選抜がかかる形質」を列挙した集合。数値の較正値ではなく形質キーの一覧で、V-2f が選抜対象として明示している集合と同じ。判定は変えず、内訳の見出しを分けるだけに使う',
+  },
+  {
     key: 'INBREED_PENALTY_WEIGHT',
     why: '★F-1 の近交回避項。R-15 で未接続（0 ＝ 無効）。3.0 にすると平均F 0.0519 → 0.0095 と劇的に効くが、y50 有効系統数が 6.02 → 2.09 に悪化し実行時間が25倍になる。採否はレビュー側の判断待ち',
   },
