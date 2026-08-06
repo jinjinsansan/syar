@@ -71,6 +71,28 @@ A-1 / A-2 / A-4 / A-5 / A-7 は実際の Supabase と常時稼働ワーカーが
 
 ---
 
+## Q-3【要判断】A-4 は「行を隠す」では実装できません
+
+指示書は **「RLS で `status != 'scheduled'` の行のみ露出」** と書いていますが、
+**発走前のレースが見えないと馬券が買えません。**
+
+隠したいのは行ではなく `seed_reveal` という**列**で、Postgres の RLS は行単位なので
+列を隠せません。そこで:
+
+- 実体テーブル `races` への select を `anon`/`authenticated` から剥奪
+- **列をマスクしたビュー `races_public`** を公開経路にする
+  （`seed_commit` は発走前から見える／`seed_reveal` は `settled`/`cancelled` のときだけ）
+- 併せて `races` に RLS も張るが、**A-4 の実効はビュー側**
+
+さらに DB 側の CHECK でも閉じました（`races_reveal_only_after_close`）。
+確定前に `seed_reveal` が**入ること自体**を禁止するので、
+「ビューを迂回しても漏れない」状態になります。
+
+**この読み替えでよいか確認をお願いします。** A-4 の検証は
+「`races_public` を実際に叩いて scheduled 行の `seed_reveal` が null であること」で行う想定です。
+
+---
+
 ## 報告済みの自己申告（再掲・§REPORT 相当）
 
 今便で自分で見つけて塞いだものが3件あります。いずれも**過去に潰したはずの型の再発**です。
