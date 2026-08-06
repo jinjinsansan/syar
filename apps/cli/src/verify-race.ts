@@ -479,6 +479,36 @@ for (let rank = 0; rank < Math.min(maxRank, 18); rank++) {
 }
 
 console.log('');
+console.log('--- 余裕（合格域の端までの距離）と標準誤差 ---');
+console.log('※ SE の算出法: **1レースを独立標本とするベルヌーイ**。');
+console.log('   V-6 は1レースで勝つのは1頭なので下位3枠は排他 → レース単位で p3=3×rate を用い、');
+console.log('   得られた SE を 3 で割って1枠あたりに戻す。枠を独立とみなす素朴計算とほぼ同じ値になる。');
+console.log('   ★手計算だと基準がぶれる（実際に私は根拠不明の 19.6 SE を報告した）ので、ここで出す。');
+{
+  const totalRaces = racesPerSeed * SEEDS.length;
+  const rows: { id: string; value: number; lo: number; hi: number; se: number }[] = [
+    { id: 'V-4', value: favWin, lo: GATES.V4[0], hi: GATES.V4[1], se: Math.sqrt((favWin * (1 - favWin)) / totalRaces) },
+    { id: 'V-5', value: favTop3, lo: GATES.V5[0], hi: GATES.V5[1], se: Math.sqrt((favTop3 * (1 - favTop3)) / totalRaces) },
+    {
+      id: 'V-6',
+      value: longshot,
+      lo: GATES.V6[0],
+      hi: GATES.V6[1],
+      se: Math.sqrt((longshot * LONGSHOT_RANKS * (1 - longshot * LONGSHOT_RANKS)) / totalRaces) / LONGSHOT_RANKS,
+    },
+  ];
+  console.log(`  ${pad('#', 5)} ${pad('実測', 9)} ${pad('SE', 9)} ${pad('下限まで', 20)} ${pad('上限まで', 20)}`);
+  for (const r of rows) {
+    const loM = r.value - r.lo;
+    const hiM = r.hi - r.value;
+    console.log(
+      `  ${pad(r.id, 5)} ${pad(pct(r.value), 9)} ${pad(round(r.se * 100, 4) + 'pp', 9)} ` +
+        `${pad(`${round(loM * 100, 2)}pp（${round(loM / r.se, 1)} SE）`, 20)} ` +
+        `${pad(`${round(hiM * 100, 2)}pp（${round(hiM / r.se, 1)} SE）`, 20)}`,
+    );
+  }
+}
+console.log('');
 console.log('--- 案B: 出走頭数別の下位3ランク平均勝率（V-6 をプール値だけで見ない）---');
 console.log('※ 正典 §10.4 は 8〜18頭。頭数分布が一様かもここで確認する');
 {
