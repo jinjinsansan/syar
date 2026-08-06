@@ -162,9 +162,11 @@ describe('§10.5 N-4 血統表と系統の分散', () => {
     expect(audit.meanLines).toBeGreaterThan(3);
   });
 
-  it('★1系統に偏っていない（合格基準3）', () => {
-    expect(audit.stallionLines.topShare).toBeLessThan(0.5);
-    // 有効系統数（逆シンプソン）: 「40系統あるが実質2系統」を見逃さない
+  it('★系統が実質的に分散している（合格基準3・2026-08-06 改訂）', () => {
+    // ★改訂（レビュー側 F-3）: **最大シェアの上限は撤廃**。有効系統数で見る。
+    //   ニックスが sire_line × bms_line の組で効くので、実質5系統あれば25通りが成立する。
+    //   判定線は **y50**（正典 §10.5 のプリシードは50世代。y100 は仕様の倍で
+    //   サービス開始時点の状態ではなく、ライブ運用の監視項目）。
     expect(audit.stallionLines.effective).toBeGreaterThan(2);
   });
 

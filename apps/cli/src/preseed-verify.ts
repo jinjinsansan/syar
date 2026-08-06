@@ -85,5 +85,42 @@ row('V-2e', `距離の分化（0.8〜1.4x・${v.v2e.worstKey ?? '-'}）`, v.v2e.
 row('V-2f', `形質の平坦化（<0.5%/世代・${v.v2f.worstKey ?? '-'}）`, v.v2f.worstSlopePctPerGen.toFixed(4), v.v2f.pass);
 row('V-3', '隔世遺伝/大物覚醒/突然変異の頻度', `${(v.v3.atavism.rate * 100).toFixed(2)}%`, v.v3.pass);
 
+/**
+ * ★F-4: V-2e を形質別に、**選抜のかかる/かからない**で分けて出す。
+ *
+ *   下限0.8 は D-013 までの導出（sd/√(2r−r²) ÷ 0.916）から出た値で、
+ *   **方向性選抜を含んでいない**。一方 V-2f が明示するとおり
+ *   芝/ダート適性・距離2種・道悪適性・気性には選抜がかかり、分散が追加で削られる。
+ *   選抜のかかる形質に選抜のない前提の下限を当てているなら category 違い。
+ */
+const SELECTED = new Set([
+  'surface.turf',
+  'surface.dirt',
+  'distance_center',
+  'distance_range',
+  'heavy_aptitude',
+  'temper',
+]);
+console.log('\n  V-2e 形質別（下限0.8 / 上限1.4）:');
+for (const t of [...v.v2e.traits].sort((a, b) => a.ratio - b.ratio)) {
+  const kind = SELECTED.has(t.key) ? '選抜あり' : '選抜なし';
+  console.log(
+    `    ${t.key.padEnd(16)} ${kind}  ratio=${t.ratio.toFixed(3)}  ` +
+      `(founderSd=${t.founderSd.toFixed(2)} finalSd=${t.finalSd.toFixed(2)})  ${t.pass ? 'PASS' : 'FAIL'}`,
+  );
+}
+{
+  const sel = v.v2e.traits.filter((t) => SELECTED.has(t.key)).map((t) => t.ratio);
+  const uns = v.v2e.traits.filter((t) => !SELECTED.has(t.key)).map((t) => t.ratio);
+  const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+  // SD比の SE: 標本SDの相対SE ≒ 1/√(2(n−1))。n = 最終世代の個体数
+  const n = pre.world.activeIds.length;
+  const relSe = 1 / Math.sqrt(2 * (n - 1));
+  console.log(
+    `    選抜あり平均 ${mean(sel).toFixed(3)} / 選抜なし平均 ${mean(uns).toFixed(3)}  ` +
+      `（SD比の相対SE ≒ ${relSe.toFixed(4)}, n=${n}）`,
+  );
+}
+
 const gates = [v.v1, v.v2a, v.v2b, v.v2c, v.v2d, v.v2e, v.v2f, v.v3];
 console.log(`\n  総合: ${gates.every((g) => g.pass) ? 'PASS' : 'FAIL'}`);

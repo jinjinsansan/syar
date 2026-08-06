@@ -63,7 +63,13 @@ const lookup = (id: string) => r.world.all.get(id)?.record;
 // ★系統を保つ機構は近交と表裏。閉じるほど系統は残るが F が上がる（§6.5）ので必ず併記する
 const Fs = r.world.activeIds.map((id) => lookup(id)!.inbreedCoeff);
 const frail = r.world.activeIds.filter((id) => lookup(id)!.frail).length;
-console.log(`近交: 平均F=${(Fs.reduce((a, b) => a + b, 0) / Fs.length).toFixed(4)} 最大F=${Math.max(...Fs).toFixed(3)} 虚弱=${((frail / Fs.length) * 100).toFixed(1)}%`);
+// ★F-2: V-12a（平均F ≤ 0.10）をプリシード集団で測る。
+//   F-1 以前は近交回避が実装に一切無く、しかも**誰も測っていなかった**。
+const meanF = Fs.reduce((a, b) => a + b, 0) / Fs.length;
+console.log(
+  `V-12a  近交（平均F ≤ 0.10）  平均F=${meanF.toFixed(4)} 最大F=${Math.max(...Fs).toFixed(3)} ` +
+    `虚弱=${((frail / Fs.length) * 100).toFixed(1)}%  ${meanF <= 0.1 ? 'PASS' : 'FAIL'}`,
+);
 const a = auditPedigrees(r.world.activeIds, r.world.stallionIds, lookup);
 console.log(`seed=${seed} all=${r.world.all.size} ${(ms / 1000).toFixed(1)}s`);
 console.log(`5代完全=${(a.fullRate * 100).toFixed(1)}% 平均埋=${a.meanFilled.toFixed(1)}/62 血統内系統=${a.meanLines.toFixed(1)} クロス保有=${(a.crossRate * 100).toFixed(1)}%`);

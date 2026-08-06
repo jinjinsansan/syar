@@ -25,6 +25,7 @@ import {
   NPC_STABLES,
   applyMatingCounters,
   breed,
+  calcInbreedCoefficient,
   canMate,
   createFounder,
   deriveRng,
@@ -84,6 +85,38 @@ export const DISTANCE_FIT_SPAN = 1200;
  *   ＝ 集中を駆動しているのは浮動ではなく**方向性選択**。R-15 に従い K=1（無効）で入れる。
  */
 export const SIRE_CHOICE_TOP_K = 1;
+
+/**
+ * ★F-1: NPC 配合 AI の近交回避の強さ（正典 D-026）。
+ *
+ * 【なぜ mateScore に入れて canMate に入れないか】
+ *   `canMate` は**エンジンの規則**で、ここに近交禁止を入れると遺伝エンジンの仕様が変わり
+ *   P0 ゲートに波及する。`mateScore` は **AI の選好**であって、
+ *   現実の生産者も近交を「禁止」ではなく「割り引いて」評価する。
+ *   この層分けにより**遺伝エンジンには一切触れない**。
+ *
+ * 【R-17】
+ *   維持したい属性があるなら、**決定経路がその属性を参照していなければならない**。
+ *   D-025（形質による方針選択）は形質しか見ておらず、父系ラインは形質と独立に伝わるので、
+ *   評価軸をいくら分散させても系統は保存されなかった。
+ *   0 にするとこの項が消え、F-1 以前に戻る（対照が取れる）。
+ *
+ * 【★出荷値を 0（無効）にしている理由 — 実測した副作用】
+ *   50世代・3シードで 0 と 3.0 を比べた結果:
+ *
+ *     penalty=0    平均F 0.0519/0.0884/0.0508（V-12a PASS）  y50 有効系統 6.02/5.25/5.03
+ *     penalty=3.0  平均F 0.0095（最大F 0.477→0.046・虚弱 1.7%→0.0%）  y50 有効系統 2.09
+ *
+ *   近交には**劇的に効く**が、**合格基準3 が悪化する**（有効系統 6.02 → 2.09）。
+ *   機構: 牝馬は自厩舎の血を避けるので全厩舎が「自分と血の遠い、最も強い系統」へ集まる。
+ *   近交回避そのものが**系統を1本へ収束させる方向に働く**。
+ *   さらに 1配合ごとに全種牡馬との F を計算するため 50世代の実行が 4秒 → 3分超（25倍）。
+ *
+ *   V-12a は penalty=0 でも PASS（0.051〜0.088 ≤ 0.10）なので、
+ *   「近交を直すために系統を壊す」交換を勝手に成立させない。R-15 に従い無効で入れ、
+ *   採否と強さの判断を仰ぐ。有効化するときは実行時間の対策も要る。
+ */
+export const INBREED_PENALTY_WEIGHT = 0;
 
 /** 自厩舎（自牧場）の種牡馬を配合相手に選ぶときの上乗せ。1.0 = 上乗せなし */
 export const HOME_SIRE_BONUS = 1.0;
@@ -237,6 +270,24 @@ export function mateScore(h: HorseRecord, stable: Stable, home = false): number 
   return home ? base * HOME_SIRE_BONUS : base;
 }
 
+/**
+ * ★F-1: 近交を割り引いた配合相手の評価（正典 D-026）。
+ *
+ * @param inbreedCoeff この組み合わせで生まれる仔の近交係数 F（§6.5）
+ *
+ * F=0 なら `mateScore` そのまま。F が大きいほど線形に割り引く。
+ * 係数3.0 は「F=0.25（全兄弟相当）で評価が 1/4 になる」水準。
+ */
+export function mateScoreWithInbreeding(
+  h: HorseRecord,
+  stable: Stable,
+  inbreedCoeff: number,
+  home = false,
+): number {
+  const f = Number.isFinite(inbreedCoeff) ? Math.max(0, inbreedCoeff) : 0;
+  return mateScore(h, stable, home) / (1 + INBREED_PENALTY_WEIGHT * f);
+}
+
 
 export function stableScore(h: HorseRecord, stable: Stable): number {
   let total = 0;
@@ -383,7 +434,12 @@ export function runPreseed(opts: PreseedOptions): PreseedResult {
       for (const sid of stallionIds) {
         const sire = all.get(sid)!.record;
         if (!canMate(sire, mare.record, balance, year).ok) continue;
-        ranked.push({ id: sid, score: mateScore(sire, stable, stableOf.get(sid)?.id === stable.id) });
+        // ★F-1: 近交係数を**決定経路で**参照する（R-17: 監査で見ているだけでは保存されない）
+        const f = calcInbreedCoefficient(sire, mare.record, lookup, balance.PEDIGREE_DEPTH).F;
+        ranked.push({
+          id: sid,
+          score: mateScoreWithInbreeding(sire, stable, f, stableOf.get(sid)?.id === stable.id),
+        });
       }
       if (ranked.length === 0) continue; // 相手がいない年は産まない（黙って規則を曲げない）
       ranked.sort((a, b) => (b.score !== a.score ? b.score - a.score : a.id.localeCompare(b.id)));
