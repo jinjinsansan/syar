@@ -85,6 +85,8 @@ const CLASS_BAND = parseNumber('--class-band', DEFAULT_CLASS_BAND);
 /** 素質開放率のプレースホルダ範囲（P3 の育成モデルで置き換わる・R-7） */
 /** 能力レンジの床（掃引用）。既定は較正値 */
 const FLOOR = parseNumber('--field-floor', FIELD_STRENGTH_FLOOR);
+/** V-6 が対象にする下位ランク数（2026-08-06 改訂: 最下位1頭 → 下位3ランクの平均） */
+const LONGSHOT_RANKS = parseNumber('--longshot-ranks', 3);
 /** 案D: 裾の厚さ（掃引用） */
 const TAIL_P = parseNumber('--tail-p', DEFAULT_RACE_BALANCE.TAIL_MIX_P);
 const TAIL_M = parseNumber('--tail-m', DEFAULT_RACE_BALANCE.TAIL_MIX_M);
@@ -146,6 +148,8 @@ interface SeedResult {
   fieldSizeCounts: Record<number, number>;
   /** 出走頭数 → 最低人気の勝利数（P-4: 裾が頭数によらず生きているか） */
   longshotWinsByFieldSize: Record<number, number>;
+  /** 頭数別の「下位3ランク」の延べ枠数（分母） */
+  longshotSlotsByFieldSize: Record<number, number>;
 }
 
 function runSeed(seed: number, racesForSeed: number): SeedResult {
@@ -185,6 +189,8 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
   const winsByRank: number[] = [];
   const racesByRank: number[] = [];
   const fieldSizeCounts: Record<number, number> = {};
+  const longshotSlotsByFieldSize: Record<number, number> = {};
+  let longshotSlots = 0;
   const longshotWinsByFieldSize: Record<number, number> = {};
 
   const allMults: number[] = [];
@@ -215,8 +221,13 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     }
     const ranked = estimator.rank().map((x) => ({ id: x.horseId }));
     const favorite = ranked[0];
-    const longshot = ranked[ranked.length - 1];
-    if (favorite === undefined || longshot === undefined) continue;
+    // ★V-6 は「最下位1頭」ではなく**下位3ランクの平均**で測る（2026-08-06 改訂）。
+    //   案D で裾を厚くした結果、最下位の**同定**が本質的に不安定になった
+    //   （下位の順位が稀な大偏差で決まるため）。V-6 の趣旨は「大穴が出るか」であって
+    //   「最下位の1頭が勝つか」ではないので、下位3ランクの平均なら
+    //   同定の揺れに強く、趣旨も変わらない。
+    const bottom = ranked.slice(Math.max(0, ranked.length - LONGSHOT_RANKS));
+    if (favorite === undefined || bottom.length === 0) continue;
 
     // (2) 介入: 1レースにつき1頭を「自馬」とみなす（§8b.1: 介入できるのは自馬のみ）
     const ownRng = deriveRng(seed, STREAM.INTERVENTION, raceIndex);
@@ -268,7 +279,10 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     const top3 = result.order.slice(0, 3).map((o) => o.horseId);
     if (top3.includes(favorite.id)) favoriteTop3 += 1;
     fieldSizeCounts[fieldSize] = (fieldSizeCounts[fieldSize] ?? 0) + 1;
-    if (winner.horseId === longshot.id) {
+    longshotSlots += bottom.length;
+    longshotSlotsByFieldSize[fieldSize] =
+      (longshotSlotsByFieldSize[fieldSize] ?? 0) + bottom.length;
+    if (bottom.some((b) => b.id === winner.horseId)) {
       longshotWins += 1;
       longshotWinsByFieldSize[fieldSize] = (longshotWinsByFieldSize[fieldSize] ?? 0) + 1;
     }
@@ -298,7 +312,7 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     races: racesForSeed,
     favoriteWinRate: favoriteWins / denom,
     favoriteTop3Rate: favoriteTop3 / denom,
-    longshotWinRate: longshotWins / denom,
+    longshotWinRate: longshotWins / Math.max(1, longshotSlots),
     winRateByRank: racesByRank.map((n, i) => (winsByRank[i] ?? 0) / Math.max(1, n)),
     interventionMeanAll: mean(allMults),
     interventionMeanIntervened: mean(intervenedMults),
@@ -313,6 +327,7 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     poolSize: pool.length,
     fieldSizeCounts,
     longshotWinsByFieldSize,
+    longshotSlotsByFieldSize,
   };
 }
 
@@ -415,7 +430,7 @@ const checks: { id: string; label: string; value: string; pass: boolean }[] = [
   },
   {
     id: 'V-6',
-    label: '最低人気の勝率 0.5〜2%',
+    label: '下位3ランクの平均勝率 0.5〜2%（旧「最低人気」）',
     value: pct(longshot),
     pass: longshot >= GATES.V6[0] && longshot <= GATES.V6[1],
   },
@@ -463,7 +478,7 @@ for (let rank = 0; rank < Math.min(maxRank, 18); rank++) {
 }
 
 console.log('');
-console.log('--- P-4: 出走頭数別の最低人気勝率（V-6 をプール値だけで見ない）---');
+console.log('--- 案B: 出走頭数別の下位3ランク平均勝率（V-6 をプール値だけで見ない）---');
 console.log('※ 正典 §10.4 は 8〜18頭。頭数分布が一様かもここで確認する');
 {
   const sizes = new Set<number>();
@@ -471,11 +486,12 @@ console.log('※ 正典 §10.4 は 8〜18頭。頭数分布が一様かもここ
   const sorted = [...sizes].sort((a, b) => a - b);
   let totalRaces = 0;
   for (const n of sorted) totalRaces += results.reduce((s, r) => s + (r.fieldSizeCounts[n] ?? 0), 0);
-  console.log(`  ${pad('頭数', 5)} ${pad('レース数', 9)} ${pad('構成比', 8)} ${pad('最低人気勝率', 13)}`);
+  console.log(`  ${pad('頭数', 5)} ${pad('レース数', 9)} ${pad('構成比', 8)} ${pad('下位3平均勝率', 14)}`);
   for (const n of sorted) {
     const races = results.reduce((s, r) => s + (r.fieldSizeCounts[n] ?? 0), 0);
     const wins = results.reduce((s, r) => s + (r.longshotWinsByFieldSize[n] ?? 0), 0);
-    const rate = races === 0 ? 0 : wins / races;
+    const slots = results.reduce((s, r) => s + (r.longshotSlotsByFieldSize[n] ?? 0), 0);
+    const rate = slots === 0 ? 0 : wins / slots;
     const flag = rate < GATES.V6[0] ? '  ← 裾が死んでいる' : '';
     console.log(
       `  ${pad(n, 5)} ${pad(races, 9)} ${pad(pct(races / Math.max(1, totalRaces)), 8)} ${pad(pct(rate), 13)}${flag}`,
@@ -529,6 +545,7 @@ if (process.argv.includes('--json')) {
         oversampleRatio: OVERSAMPLE_RATIO,
         tailMixP: TAIL_P,
         tailMixM: TAIL_M,
+        longshotRanks: LONGSHOT_RANKS,
       },
     }),
   );

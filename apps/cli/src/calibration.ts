@@ -289,6 +289,14 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
     why: 'DEFAULT_POPULARITY_TRIALS（登録済み・防御済み）を読むだけの CLI 既定値',
   },
   {
+    key: 'FLOOR',
+    why: 'FIELD_STRENGTH_FLOOR（登録済み・防御済み）を読むだけの CLI 既定値。掃引用に --field-floor で上書きする',
+  },
+  {
+    key: 'LONGSHOT_RANKS',
+    why: '★V-6 の**定義**（下位3ランクの平均）であって較正値ではない。正典 §13.2 の改訂事項として扱い、settings に記録する。判定を通すために動かす種類の値ではない',
+  },
+  {
     key: 'POOL_GENERATIONS',
     why: '★判定を決める自由変数（監査の実測で 20世代 FAIL / 40世代 PASS）。単体テストでは防御できない（10万レースの実行が要る）ため、いまは settings への記録と本報告での明示に留めている。**未防御であることを承知の上での免除**で、K と床の同時掃引で条件ごと確定させたうえで正典に固定する必要がある',
   },
