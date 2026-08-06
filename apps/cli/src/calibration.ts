@@ -47,6 +47,12 @@ export interface CalibrationConstant {
  */
 export const CALIBRATION: readonly CalibrationConstant[] = [
   {
+    key: 'NAME_TAIL_RATE',
+    file: 'packages/sim-engine/src/naming.ts',
+    perturbed: 'export const NAME_TAIL_RATE = 0;',
+    affects: 'N-1（馬名の語尾音が付く割合。0 にすると語尾が消えて名前空間が狭まり、重複が増える）',
+  },
+  {
     key: 'CALIBRATED_RACE_RANDOM_K',
     file: 'packages/race-engine/src/balance.ts',
     perturbed: 'export const CALIBRATED_RACE_RANDOM_K = 0.26;',
@@ -199,6 +205,34 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
+  {
+    key: 'NAME_MAX_ATTEMPTS',
+    why: '馬名生成の引き直し上限。安全弁であって較正値ではない（増やしても名前の性質は変わらず、失敗が遅くなるだけ）。ここに達したら例外を投げる＝黙って重複を通さない',
+  },
+  {
+    key: 'DISTANCE_BIAS_CENTER',
+    why: 'NPC 厩舎の距離方針 → 狙う距離適性中心（m）。正典 §8.2 の距離帯の写しで、判定（V-x）を作らない。分散したかは N-4 で実測する',
+  },
+  {
+    key: 'NPC_STABLES',
+    why: 'NPC 厩舎表そのもの。数値の較正値ではなく方針の組み合わせ。分散の有無は N-4 で実測して報告する（R-16）',
+  },
+  {
+    key: 'NAME_SYLLABLES',
+    why: '馬名の音節表。数値ではなく語彙。名前空間の広さは ★テストで下限を押さえる',
+  },
+  {
+    key: 'NAME_TAILS',
+    why: '馬名の語尾音表。数値ではなく語彙で、付く割合のほうは NAME_TAIL_RATE として登録簿に載せている',
+  },
+  {
+    key: 'DEFAULT_NAME_SHAPE',
+    why: '馬名の既定形（冠名なし・2〜4音節）。厩舎ごとに上書きされる既定値で、判定を作らない',
+  },
+  {
+    key: 'ALLOW_ALL_NAMES',
+    why: '何も禁止しない NG 判定。**テストとプリシードの部分実行専用**。本番経路で使われていないことは ★テストで押さえる',
+  },
   {
     key: 'NEUTRAL_CONDITION_APTITUDE',
     why: '馬場状態適性の中立値。P-1 で heavy_aptitude を genotype に入れたら消える暫定値で、判定の較正には使っていない',

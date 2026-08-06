@@ -15,3 +15,5 @@ export * from './inbreeding.js';
 export * from './nicks.js';
 export * from './breeding.js';
 export * from './founders.js';
+export * from './naming.js';
+export * from './stable.js';
