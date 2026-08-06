@@ -41,6 +41,17 @@ const BEHAVIOURAL_MARK = "★";
  */
 const MUTATIONS = [
   {
+    // ★V-13 / R-16: 旧スタミナ実装（絶対値 1.0/秒）へ戻す。全馬のゲージが必ず空になり、
+    //   仕掛けの巧拙が結果に出なくなる。**V-8（比）も V-9a（範囲）もこれを検出できなかった**
+    //   ので、差を見る ★V-13 が唯一の検出器であることを、この変異で毎回確かめる。
+    id: 'V13-1',
+    label: 'D-017 を撤回し毎秒消費を距離非依存の絶対値に戻す（全馬バテる）',
+    file: 'packages/race-engine/src/intervention.ts',
+    from: 'const unit = balance.STAMINA_BASE_DRAIN / raceSec;',
+    to: 'const unit = 1.0;',
+    expect: 'fail',
+  },
+  {
     id: 'O4-1',
     label: 'クラス係数を適用経路から外す（runSeason が掛けない）',
     file: 'apps/cli/src/racing-season.ts',

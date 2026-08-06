@@ -140,6 +140,8 @@ interface SeedResult {
   interventionMax: number;
   aiMultMean: number;
   optimalMultMean: number;
+  /** V-13: 早すぎる仕掛けの倍率平均（最適との差が「巧拙が出るか」の指標） */
+  earlyMultMean: number;
   aiWinRate: number;
   optimalWinRate: number;
   meanF: number;
@@ -198,6 +200,7 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
   const intervenedMults: number[] = [];
   const aiMults: number[] = [];
   const optimalMults: number[] = [];
+  const earlyMults: number[] = [];
   let aiWins = 0;
   let optimalWins = 0;
   let interventionRaces = 0;
@@ -253,6 +256,17 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
       };
       const ai = resolveIntervention(horse, aiProxyPlan(horse, ownRng, ib), speed, race.conditions.distance, ib);
       const opt = resolveIntervention(horse, optimalPlan(ib), speed, race.conditions.distance, ib);
+      // ★V-13: **仕掛けの巧拙が結果に出るか**を測る。
+      //   旧スタミナ実装では全馬のゲージが必ず空になり、どう仕掛けても同じだった。
+      //   最適な仕掛けと早すぎる仕掛けで倍率に差が出ることを確認する。
+      const early = resolveIntervention(
+        horse,
+        { ...optimalPlan(ib), spurtAtMeter: ib.EARLY_SPURT_METER * GATES.V13_EARLY_FACTOR },
+        speed,
+        race.conditions.distance,
+        ib,
+      );
+      earlyMults.push(early.interventionMult);
       aiMult = ai.interventionMult;
       optMult = opt.interventionMult;
       aiMults.push(aiMult);
@@ -321,6 +335,7 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     interventionMax: maxOf(allMults, 1),
     aiMultMean: mean(aiMults),
     optimalMultMean: mean(optimalMults),
+    earlyMultMean: mean(earlyMults),
     aiWinRate: aiWins / Math.max(1, interventionRaces),
     optimalWinRate: optimalWins / Math.max(1, interventionRaces),
     meanF,
@@ -345,6 +360,21 @@ const GATES = {
   V9A_RANGE: [0.9, 1.1] as const,
   V12_F_MAX: 0.1,
   V12_DURABILITY_MIN: -0.08,
+  /**
+   * V-13（2026-08-06 新設）: 仕掛けの巧拙が結果に出ること。
+   * ★R-16 の適用: 比率や範囲は**全体に一様にかかる歪み**を検出できない。
+   *   旧スタミナ実装では全馬のゲージが必ず空で、どう仕掛けても同じだったが、
+   *   V-8（倍率の比）も V-9a（範囲）もそれを検出できなかった。
+   *   「最適な仕掛け」と「早すぎる仕掛け」の**差**を見れば、壊れた状態では差が消える。
+   */
+  V13_MIN_GAP: 0.03,
+  /**
+   * V-13 の測定条件: 「早すぎる仕掛け」を EARLY_SPURT_METER の何倍地点とするか。
+   * ⚠️ R-12: この値は判定を動かせる自由変数なので GATES 内に置き、
+   *    GATES の免除理由（オーナー承認なしに変えない）の対象に含める。
+   *    正典 §13.2 への追記を照会中（QUESTIONS_P15）。
+   */
+  V13_EARLY_FACTOR: 1.6,
 } as const;
 
 /**
@@ -409,6 +439,8 @@ const multMin = Math.min(...results.map((r) => r.interventionMin));
 const multMax = Math.max(...results.map((r) => r.interventionMax));
 const aiMult = mean(results.map((r) => r.aiMultMean));
 const optMult = mean(results.map((r) => r.optimalMultMean));
+const earlyMult = mean(results.map((r) => r.earlyMultMean));
+const v13Gap = optMult - earlyMult;
 const v8Ratio = optMult === 0 ? 0 : aiMult / optMult;
 const aiWin = mean(results.map((r) => r.aiWinRate));
 const optWin = mean(results.map((r) => r.optimalWinRate));
@@ -448,6 +480,12 @@ const checks: { id: string; label: string; value: string; pass: boolean }[] = [
     label: '全サンプルが 0.90〜1.10 内（ハードキャップの不変条件）',
     value: `${round(multMin, 4)}〜${round(multMax, 4)}`,
     pass: multMin >= GATES.V9A_RANGE[0] && multMax <= GATES.V9A_RANGE[1],
+  },
+  {
+    id: 'V-13',
+    label: '仕掛けの巧拙が結果に出る（最適 − 早仕掛けの倍率差）',
+    value: String(round(v13Gap, 4)),
+    pass: v13Gap >= GATES.V13_MIN_GAP,
   },
   {
     id: 'V-12a',

@@ -229,3 +229,51 @@ describe('§8b.5 AI 代行', () => {
     expect(spurtBonusOf(p.spurtAtMeter, IB)).toBeCloseTo(IB.SPURT_BONUS_MAX, 10);
   });
 });
+
+/**
+ * V-13（正典 §13.2・2026-08-06）: 仕掛けの巧拙が結果に出ること。
+ *
+ * ★R-16 の直接の産物。旧スタミナ実装では**全馬のゲージが必ず空になり**、
+ * どう仕掛けても倍率が同じだった。V-8（比）も V-9a（範囲）も、
+ * 全馬に一律に掛かるその歪みを検出できなかった。
+ * 「上手い仕掛け」と「下手な仕掛け」の**差**だけが、その状態で消える。
+ */
+describe('★V-13 仕掛けの巧拙', () => {
+  const B = IB;
+  /** 全能力500・万全の中立馬（正典の基準馬） */
+  const neutralIntervener = (): InterventionHorse => ({ iq: 500, gt: 500, st: 500, condition: 3, fatigue: 0 });
+
+  /** 距離・平均速度は §8.4 の実効域から取る。2000m を 120秒＝16.67m/s */
+  const DIST = 2000;
+  const SPEED = 16.67;
+
+  it('★早すぎるスパートは最適な仕掛けより倍率が低い（差は 0.03 以上）', () => {
+    const horse = neutralIntervener();
+    const best = resolveIntervention(horse, optimalPlan(B), SPEED, DIST, B);
+    const early = resolveIntervention(
+      horse,
+      { ...optimalPlan(B), spurtAtMeter: B.EARLY_SPURT_METER * 1.6 },
+      SPEED,
+      DIST,
+      B,
+    );
+    // 較正定数を閾値に使わない（D-018 の教訓・自己検出の回避）。リテラルで押さえる。
+    expect(best.interventionMult - early.interventionMult).toBeGreaterThan(0.03);
+  });
+
+  it('★どの距離でも巧拙の差が消えない（時間比例スタミナ・D-017）', () => {
+    // 距離不変性が壊れると、短距離か長距離のどちらかで差がゼロに潰れる。
+    for (const d of [1200, 1600, 2400, 3200]) {
+      const horse = neutralIntervener();
+      const best = resolveIntervention(horse, optimalPlan(B), SPEED, d, B);
+      const early = resolveIntervention(
+        horse,
+        { ...optimalPlan(B), spurtAtMeter: B.EARLY_SPURT_METER * 1.6 },
+        SPEED,
+        d,
+        B,
+      );
+      expect(best.interventionMult - early.interventionMult).toBeGreaterThan(0.03);
+    }
+  });
+});
