@@ -56,9 +56,42 @@ const V2E_TARGET: readonly [number, number] = [0.8, 1.4];
  * 「選抜圧がかからないのに水準がずれる」形質（丈夫さ・気性・適性・距離）。
  * NUMERIC_TRAITS からの差分で定義しているので、**新しい形質を追加すれば自動で監視対象に入る**。
  */
-const V2D_TRAITS: readonly NumericTraitKey[] = NUMERIC_TRAITS.filter(
+const NON_ABILITY_TRAITS: readonly NumericTraitKey[] = NUMERIC_TRAITS.filter(
   (key): key is NumericTraitKey => !(ABILITY_KEYS as readonly string[]).includes(key),
 );
+
+/**
+ * ★D-019 による分割（P-3）。
+ *
+ * - **V-2d（水準維持 ±10%）**: 選抜圧が**かからない**形質。§8.3 の乗算補正に現れず、
+ *   故障率にのみ効く「丈夫さ」だけ。
+ * - **V-2f（平坦化 0.5%/世代未満）**: レース選抜が**かかる**形質。§8.3 の乗算補正が使うもの。
+ *   走って強い形質を選べば集団で上がるのは**設計どおり**なので、上がること自体ではなく
+ *   **上がり続けること**を禁じる（D-008 と同じ構図）。
+ *
+ * ★heavy_aptitude は実測で分類した（分類を先に決めない）。150世代・実レース選抜で
+ *   proxy −0.22% → race +0.55% と**符号が反転**しており選抜圧がかかっている。
+ *   振れ幅が他の適性の約1/10なのは発現機会が非良25%に限られるため。
+ *   **TRACK_CONDITION_CDF / TRACK_COND_SEVERITY を変えたら再測定が要る。**
+ */
+const V2D_TRAITS: readonly NumericTraitKey[] = ['durability'];
+
+const V2F_TRAITS: readonly NumericTraitKey[] = NON_ABILITY_TRAITS.filter(
+  (key) => !V2D_TRAITS.includes(key),
+);
+
+/**
+ * V-2d の乖離をどの物差しで測るか（J-2）。
+ *
+ * ★D-019 で V-2d の対象が丈夫さ1つに絞られた結果、**形質経由ではこの分岐を試せなくなった**
+ *   （丈夫さは値域が0以上にクランプされるので創始平均を0にできない）。
+ *   機構そのものを関数として切り出し、直接テストする。
+ *   ——「対象が減ったせいで機構のテストが書けない」を、機構を隠したまま放置しない。
+ */
+export function deviationBasis(founderMean: number, founderSd: number): 'ratio' | 'sd' | 'none' {
+  if (Math.abs(founderMean) > founderSd) return 'ratio';
+  return founderSd > 1e-9 ? 'sd' : 'none';
+}
 
 // ---------------------------------------------------------------------------
 // オプション
@@ -347,6 +380,14 @@ export interface Verification {
    * 分化は「拡散」でも「収縮」でも失われる。**平均（V-2d）だけ見ても捕まらない** —
    * 実測で芝適性は平均が ±10% 内に収まったまま SD が 0.71倍へ収縮していた。
    */
+  /** V-2f 平坦化（D-019）: レース選抜がかかる形質の傾き（%/世代） */
+  v2f: {
+    traits: { key: NumericTraitKey; slopePctPerGen: number; pass: boolean }[];
+    worstKey: NumericTraitKey | null;
+    worstSlopePctPerGen: number;
+    target: number;
+    pass: boolean;
+  };
   v2e: {
     traits: {
       key: NumericTraitKey;
@@ -984,6 +1025,27 @@ export function runSimulation(
   // 「平坦化」の判定なので絶対値で見る（急落も平坦ではないため。REPORT に解釈として明記）
   const v2aPass = slopeWindow.length >= 2 && Math.abs(slopePct) < V2A_TARGET_ABS_MAX;
 
+  // --- V-2f 平坦化（D-019・P-3）: レース選抜がかかる形質は「上がり続けない」ことを見る ---
+  const v2fTraits = V2F_TRAITS.map((key) => {
+    const level = mean(slopeWindow.map((c) => c.traitMeans[key]));
+    const slope = linearSlope(
+      slopeWindow.map((c) => c.generation),
+      slopeWindow.map((c) => c.traitMeans[key]),
+    );
+    const slopePctPerGen = level === 0 ? 0 : (slope / level) * 100;
+    return {
+      key,
+      slopePctPerGen: round(slopePctPerGen, 4),
+      pass: slopeWindow.length >= 2 && Math.abs(slopePctPerGen) < V2A_TARGET_ABS_MAX,
+    };
+  });
+  const worstSlope = v2fTraits.reduce<(typeof v2fTraits)[number] | null>(
+    (acc, t) =>
+      acc === null || Math.abs(t.slopePctPerGen) > Math.abs(acc.slopePctPerGen) ? t : acc,
+    null,
+  );
+  const v2fPass = v2fTraits.every((t) => t.pass);
+
   // --- V-2b 天井余裕: 集団平均能力 ÷ アレル上限 が 80% 以下 ---
   const alleleMax = balance.traitBounds['sp'].max;
   const meanAbilityPerKey = finalMean / ABILITY_KEYS.length;
@@ -1005,7 +1067,8 @@ export function runSimulation(
     //   `!== 0` だけを見ると、平均1・SD19 のような分布でも比率判定になってしまい、
     //   ほぼ0の値で割った不安定な乖離が出る（J-2 のテストを書いていて判明）。
     const founderSd = founderTraitSds[key];
-    const usesRatio = Math.abs(founderMean) > founderSd;
+    const basis = deviationBasis(founderMean, founderSd);
+    const usesRatio = basis === 'ratio';
     const deviation = usesRatio
       ? finalMean / founderMean - 1
       : founderSd > 1e-9
@@ -1018,7 +1081,7 @@ export function runSimulation(
       // 判定不能は NaN ではなく null にする（JSON の型と実値を一致させる・M-5）
       deviation: Number.isFinite(deviation) ? round(deviation, 4) : null,
       /** ratio = 創始平均比 / sd = 創始SDを単位とした差 / undefined = 判定不能 */
-      basis: usesRatio ? ('ratio' as const) : founderSd > 1e-9 ? ('sd' as const) : ('none' as const),
+      basis,
       // 判定不能（創始平均も創始SDも0）なら PASS させない
       pass: Number.isNaN(deviation) ? false : Math.abs(deviation) <= V2D_TARGET_ABS_MAX,
     };
@@ -1053,7 +1116,7 @@ export function runSimulation(
 
   // --- V-2e 非能力形質の分化: 集団SDが創始の 0.8〜1.4倍（D-012 で全非能力形質へ一般化） ---
   const finalTraitSds = finalCohort?.traitSds;
-  const v2eTraits = V2D_TRAITS.map((key) => {
+  const v2eTraits = NON_ABILITY_TRAITS.map((key) => {
     const founderSd = founderTraitSds[key];
     const finalSd = finalTraitSds?.[key] ?? 0;
     const ratio = founderSd === 0 ? 0 : finalSd / founderSd;
@@ -1131,6 +1194,13 @@ export function runSimulation(
       targetAbsMax: V2D_TARGET_ABS_MAX,
       pass: v2dTraits.every((t) => t.pass),
     },
+    v2f: {
+      traits: v2fTraits,
+      worstKey: worstSlope?.key ?? null,
+      worstSlopePctPerGen: worstSlope?.slopePctPerGen ?? 0,
+      target: V2A_TARGET_ABS_MAX,
+      pass: v2fPass,
+    },
     v2e: {
       traits: v2eTraits,
       worstKey: worstSd?.key ?? null,
@@ -1159,6 +1229,7 @@ export function runSimulation(
       v2aPass &&
       v2bPass &&
       v2dTraits.every((t) => t.pass) &&
+      v2fPass &&
       v2ePass &&
       v3Pass &&
       (!v2c.evaluated || v2c.pass),

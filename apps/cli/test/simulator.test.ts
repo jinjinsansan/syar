@@ -5,7 +5,7 @@
 
 import { DEFAULT_BALANCE, FOUNDERS, NICKS_GEN } from '@star/sim-engine';
 import { describe, expect, it } from 'vitest';
-import { runSimulation } from '../src/simulator.js';
+import { deviationBasis, runSimulation } from '../src/simulator.js';
 
 const SMALL = { generations: 12, population: 40, stallionPool: 16, v1Pairs: 2, v1Repeats: 20 };
 
@@ -106,6 +106,19 @@ describe('シミュレータの決定論（指示書 §3.5-1）', () => {
     expect(keys).toEqual(
       [
         'durability',
+      ].sort(),
+    );
+    // ★D-019（P-3）: V-2d は選抜圧が**かからない**形質のみ（丈夫さ＝§8.3 に現れず故障率にのみ効く）。
+    //   §8.3 の乗算補正が使う形質はレース選抜で上がるのが設計どおりなので V-2f（平坦化）で見る。
+    //   **形質を増やしたら、どちらかに必ず入る**ことをここで固定する（監視から漏れない）。
+    expect(
+      [
+        ...result.verification.v2d.traits.map((t) => t.key),
+        ...result.verification.v2f.traits.map((t) => t.key),
+      ].sort(),
+    ).toEqual(
+      [
+        'durability',
         'temper',
         'surface.turf',
         'surface.dirt',
@@ -138,28 +151,39 @@ describe('シミュレータの決定論（指示書 §3.5-1）', () => {
       }
     });
 
-    it('創始平均が0でSDがある形質は sd（創始SD単位の差）へ切り替わる', () => {
-      // 芝/ダート適性の創始分布を [-50, 50] にすると平均0・SD>0 になる
-      const founders = { ...FOUNDERS, SURFACE_RANGE: [-50, 50] as const };
-      const result = runSimulation({ ...SMALL, seed: 42 }, DEFAULT_BALANCE, founders, NICKS_GEN);
-      const turf = result.verification.v2d.traits.find((t) => t.key === 'surface.turf');
-      expect(turf).toBeDefined();
-      expect(Math.abs(turf?.founderMean ?? 99)).toBeLessThan(2); // ほぼ0
-      expect(turf?.basis).toBe('sd');
-      // 創始SDを単位とした差なので有限値であること（比率だとゼロ割で壊れる）
-      expect(Number.isFinite(turf?.deviation ?? Number.NaN)).toBe(true);
+    // ★D-019 で V-2d の対象が丈夫さ1つに絞られた結果、**形質経由ではこの分岐を試せなくなった**
+    //   （丈夫さは値域が0以上にクランプされるので創始平均を0にできない）。
+    //   対象が減ったせいで機構のテストが書けない、を放置せず、機構を関数に切り出して直接試す。
+    it('★物差しの切替: 平均がSDより大きければ比、小さければSD単位、両方0なら判定不能', () => {
+      // 比（通常の形質はこちら）
+      expect(deviationBasis(650, 100)).toBe('ratio');
+      expect(deviationBasis(-650, 100)).toBe('ratio');
+      // SD単位（創始平均が0付近だと比がゼロ割で壊れるため切り替える）
+      expect(deviationBasis(0, 100)).toBe('sd');
+      expect(deviationBasis(50, 100)).toBe('sd');
+      // 境界の両側（R-2）: |mean| > sd のときだけ比
+      expect(deviationBasis(100.0001, 100)).toBe('ratio');
+      expect(deviationBasis(100, 100)).toBe('sd');
+      // 判定不能（平均もSDも0）
+      expect(deviationBasis(0, 0)).toBe('none');
+      expect(deviationBasis(0, 1e-12)).toBe('none');
     });
 
-    it('創始平均もSDも0の形質は判定不能として必ず FAIL する', () => {
-      // 芝/ダート適性の創始分布を [0, 0] にすると平均もSDも0（変異幅も0になり凍結する）
-      const founders = { ...FOUNDERS, SURFACE_RANGE: [0, 0] as const };
+    it('★判定不能な形質は「乖離0だから PASS」で静かに素通りしない（R-3）', () => {
+      // 丈夫さの創始分布を平均0・SD0 にすると変異幅も0で凍結する
+      const founders = {
+        ...FOUNDERS,
+        DURABILITY_MEAN: 0,
+        DURABILITY_SD: 0,
+        DURABILITY_MIN: 0,
+        DURABILITY_MAX: 0,
+      };
       const result = runSimulation({ ...SMALL, seed: 42 }, DEFAULT_BALANCE, founders, NICKS_GEN);
-      const turf = result.verification.v2d.traits.find((t) => t.key === 'surface.turf');
-      expect(turf).toBeDefined();
-      expect(turf?.founderMean).toBe(0);
-      expect(turf?.basis).toBe('none');
-      // ★「乖離0だから PASS」で静かに素通りさせない
-      expect(turf?.pass).toBe(false);
+      const dur = result.verification.v2d.traits.find((t) => t.key === 'durability');
+      expect(dur).toBeDefined();
+      expect(dur?.founderMean).toBe(0);
+      expect(dur?.basis).toBe('none');
+      expect(dur?.pass).toBe(false);
       expect(result.verification.v2d.pass).toBe(false);
       expect(result.verification.pass).toBe(false);
     });

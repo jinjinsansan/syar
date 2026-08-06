@@ -102,6 +102,7 @@ for (const horizon of HORIZONS) {
   console.log(
     `${pad('seed', 7)} | ${pad('V-1', 8)} ${pad('判定', 5)} | ${pad('V-2a %/世代', 12)} ${pad('判定', 5)} | ` +
       `${pad('V-2b 天井', 9)} ${pad('判定', 5)} | ${pad('V-2d 最大乖離', 18)} ${pad('判定', 5)} | ` +
+      `${pad('V-2f 最悪傾き', 20)} ${pad('判定', 5)} | ` +
       `${pad('V-2e 最悪SD比', 22)} ${pad('判定', 5)} | ${pad('V-3', 5)} | ${pad('丈夫さ', 8)} | ${pad('親子相関', 8)}`,
   );
   console.log('-'.repeat(152));
@@ -146,6 +147,7 @@ for (const horizon of HORIZONS) {
             : `${v.v2d.worstKey ?? '-'} ${(v.v2d.worstDeviation * 100).toFixed(2)}%`,
           18,
         )} ${pad(mark(v.v2d.pass), 5)} | ` +
+        `${pad(`${v.v2f.worstKey ?? '-'} ${v.v2f.worstSlopePctPerGen.toFixed(3)}`, 20)} ${pad(mark(v.v2f.pass), 5)} | ` +
         `${pad(`${v.v2e.worstKey ?? '-'} ${v.v2e.worstRatio.toFixed(2)}x`, 22)} ${pad(mark(v.v2e.pass), 5)} | ` +
         `${pad(mark(v.v3.pass), 5)} | ${pad(durability.toFixed(1), 8)} | ${pad(corr.toFixed(3), 8)}`,
     );

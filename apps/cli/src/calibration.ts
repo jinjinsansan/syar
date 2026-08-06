@@ -324,6 +324,14 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
     why: 'PRNG の 2^32。アルゴリズム上の固定値で較正対象ではない',
   },
   {
+    key: 'NON_ABILITY_TRAITS',
+    why: '能力5種を除いた形質の一覧。NUMERIC_TRAITS からの差分で自動導出しており独立した較正値ではない',
+  },
+  {
+    key: 'V2F_TRAITS',
+    why: '正典 §13.2・D-019 の V-2f 対象形質の定義。V2D_TRAITS からの差分で自動導出しており較正値ではない',
+  },
+  {
     key: 'V1_TARGET',
     why: '正典 §13.2 の合格域・対象形質の定義そのもの。変更にはオーナー承認が要る（勝手に緩めない）',
   },
