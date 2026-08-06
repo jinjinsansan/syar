@@ -177,6 +177,10 @@ export const SCAN_EXCLUDED_FILES: readonly { file: string; why: string }[] = [
  */
 export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
   {
+    pattern: 'apps/cli/src/measurement\.ts',
+    why: '★測定条件（どう測るか）。較正定数とは扱いが違い、正典 §13.2/§13.3 に固定して measurement.test.ts が値照合で守る。R-14 は較正定数についての規則で、文書化された測定条件の照合を禁じない',
+  },
+  {
     pattern: 'apps/cli/src/(sweep|sweep-distance|selection-compare|race-diagnostics|metric-correlation|decompose)\.ts',
     why: '開発用の診断・掃引ツール。判定（V-x）を作らない。ここの定数は実行時に --flag で上書きする前提の既定値',
   },
@@ -286,7 +290,7 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   },
   {
     key: 'POPULARITY_TRIALS',
-    why: 'DEFAULT_POPULARITY_TRIALS（登録済み・防御済み）を読むだけの CLI 既定値',
+    why: '測定条件（measurement.ts）を読むだけの CLI 既定値。実体は measurement.test.ts が正典 §13.2 との一致を照合している',
   },
   {
     key: 'FLOOR',
@@ -294,15 +298,15 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   },
   {
     key: 'LONGSHOT_RANKS',
-    why: '★V-6 の**定義**（下位3ランクの平均）であって較正値ではない。正典 §13.2 の改訂事項として扱い、settings に記録する。判定を通すために動かす種類の値ではない',
+    why: '測定条件（measurement.ts）を読むだけの CLI 既定値。実体は apps/cli/test/measurement.test.ts が正典 §13.2 との一致を照合している',
   },
   {
     key: 'POOL_GENERATIONS',
-    why: '★判定を決める自由変数（監査の実測で 20世代 FAIL / 40世代 PASS）。単体テストでは防御できない（10万レースの実行が要る）ため、いまは settings への記録と本報告での明示に留めている。**未防御であることを承知の上での免除**で、K と床の同時掃引で条件ごと確定させたうえで正典に固定する必要がある',
+    why: '測定条件（measurement.ts）を読むだけの CLI 既定値。実体は measurement.test.ts が正典 §13.2 との一致を照合している。★Q-4 で頭数分布を是正した結果 ΔV-4 = 0.00 になり、自由変数ではなくなった（decompose.ts の実測）',
   },
   {
     key: 'POOL_MARES',
-    why: '母集団規模。POOL_GENERATIONS と同じ理由で単体テストでは未防御。settings に記録している',
+    why: '測定条件（measurement.ts）を読むだけの CLI 既定値。実体は measurement.test.ts が正典 §13.2 との一致を照合している',
   },
   {
     key: 'HEX64',

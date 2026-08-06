@@ -40,7 +40,8 @@ import {
 } from './race-field.js';
 import { runSimulation } from './simulator.js';
 import { toSafeJson } from './json-safe.js';
-import { DEFAULT_POPULARITY_TRIALS, PopularityEstimator } from './popularity.js';
+import * as MC from './measurement.js';
+import { PopularityEstimator } from './popularity.js';
 import { mean, round, sd } from './stats.js';
 
 // ---------------------------------------------------------------------------
@@ -66,8 +67,8 @@ function parseList(flag: string, fallback: number[]): number[] {
   return out.length > 0 ? out : fallback;
 }
 
-const TOTAL_RACES = parseNumber('--races', 100_000);
-const SEEDS = parseList('--seeds', [42, 7, 2026, 31337]);
+const TOTAL_RACES = parseNumber('--races', MC.VERIFY_RACES);
+const SEEDS = parseList('--seeds', [...MC.VERIFY_SEEDS]);
 /**
  * 人気推定の試行数（本番確定とは別系列）。
  *
@@ -76,17 +77,17 @@ const SEEDS = parseList('--seeds', [42, 7, 2026, 31337]);
  *   傾向なく安定する（変更前は 60試行 1.00% → 1200試行 0.30% と単調に動き、
  *   **PASS が推定ノイズの産物**だった）。既定 200 は安定域の中央付近。
  */
-const POPULARITY_TRIALS = parseNumber('--popularity-trials', DEFAULT_POPULARITY_TRIALS);
+const POPULARITY_TRIALS = parseNumber('--popularity-trials', MC.POPULARITY_TRIALS);
 /** 母集団を作る世代数 */
-const POOL_GENERATIONS = parseNumber('--pool-generations', 40);
-const POOL_MARES = parseNumber('--pool-mares', 400);
+const POOL_GENERATIONS = parseNumber('--pool-generations', MC.POOL_GENERATIONS);
+const POOL_MARES = parseNumber('--pool-mares', MC.POOL_MARES);
 /** クラス幅（母集団に対する割合）。1.0 でクラス分けなし */
 const CLASS_BAND = parseNumber('--class-band', DEFAULT_CLASS_BAND);
 /** 素質開放率のプレースホルダ範囲（P3 の育成モデルで置き換わる・R-7） */
 /** 能力レンジの床（掃引用）。既定は較正値 */
 const FLOOR = parseNumber('--field-floor', FIELD_STRENGTH_FLOOR);
 /** V-6 が対象にする下位ランク数（2026-08-06 改訂: 最下位1頭 → 下位3ランクの平均） */
-const LONGSHOT_RANKS = parseNumber('--longshot-ranks', 3);
+const LONGSHOT_RANKS = parseNumber('--longshot-ranks', MC.LONGSHOT_RANKS);
 /** 案D: 裾の厚さ（掃引用） */
 const TAIL_P = parseNumber('--tail-p', DEFAULT_RACE_BALANCE.TAIL_MIX_P);
 const TAIL_M = parseNumber('--tail-m', DEFAULT_RACE_BALANCE.TAIL_MIX_M);
