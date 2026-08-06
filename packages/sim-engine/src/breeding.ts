@@ -177,6 +177,7 @@ export function breed(params: BreedParams): HorseRecord {
     growth: phenotype.growth,
     temper: phenotype.temper,
     durability: phenotype.durability,
+    heavyAptitude: phenotype.heavyAptitude,
     injuryRateMult: phenotype.injuryRateMult,
     frail: phenotype.frail,
     skillGenes: genotype.skill_genes.slice(),

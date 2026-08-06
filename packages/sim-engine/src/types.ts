@@ -61,6 +61,8 @@ export interface Genotype {
   growth: CategoricalAllelePair<GrowthType>;
   temper: AllelePair;
   durability: AllelePair;
+  /** 道悪適性 0〜100（正典 §5.2/§5.4・D-015）。良馬場は全馬1.0なので単一値で足りる */
+  heavy_aptitude: AllelePair;
   skill_genes: SkillGene[];
 }
 
@@ -80,6 +82,7 @@ export const NUMERIC_TRAITS = [
   'distance_range',
   'temper',
   'durability',
+  'heavy_aptitude',
 ] as const;
 
 export type NumericTraitKey = (typeof NUMERIC_TRAITS)[number];
@@ -109,6 +112,8 @@ export function getAllelePair(g: Genotype, key: NumericTraitKey): AllelePair {
       return g.temper;
     case 'durability':
       return g.durability;
+    case 'heavy_aptitude':
+      return g.heavy_aptitude;
   }
 }
 
@@ -148,6 +153,9 @@ export function setAllelePair(g: Genotype, key: NumericTraitKey, pair: AllelePai
     case 'durability':
       g.durability = pair;
       return;
+    case 'heavy_aptitude':
+      g.heavy_aptitude = pair;
+      return;
   }
 }
 
@@ -165,6 +173,7 @@ export function cloneGenotype(g: Genotype): Genotype {
     growth: { ...g.growth },
     temper: { ...g.temper },
     durability: { ...g.durability },
+    heavy_aptitude: { ...g.heavy_aptitude },
     skill_genes: g.skill_genes.slice(),
   };
 }
@@ -240,6 +249,8 @@ export interface HorseRecord {
   growth: GrowthType;
   temper: number;
   durability: number;
+  /** 道悪適性 0〜100（正典 §5.2・D-015） */
+  heavyAptitude: number;
   /** 故障率倍率（正典 §6.5: インブリード由来。§7.5 で使用予定） */
   injuryRateMult: number;
   /** 近交弱勢の虚弱フラグ（正典 §6.5） */

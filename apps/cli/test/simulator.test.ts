@@ -111,6 +111,7 @@ describe('シミュレータの決定論（指示書 §3.5-1）', () => {
         'surface.dirt',
         'distance_center',
         'distance_range',
+        'heavy_aptitude',
       ].sort(),
     );
     // 能力5種は判定対象外だが参考値として必ず併記する
@@ -202,6 +203,7 @@ describe('シミュレータの決定論（指示書 §3.5-1）', () => {
         'surface.dirt',
         'distance_center',
         'distance_range',
+        'heavy_aptitude',
       ].sort(),
     );
     expect(v2e.target).toEqual([0.8, 1.4]);

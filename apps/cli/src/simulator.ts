@@ -230,6 +230,7 @@ export interface CohortStat {
     temper: number;
     'surface.turf': number;
     'surface.dirt': number;
+    heavy_aptitude: number;
     distance_center: number;
     distance_range: number;
   };
@@ -528,6 +529,7 @@ function summarizeCohort(
       temper: round(mean(horses.map((h) => h.temper)), 2),
       'surface.turf': round(mean(horses.map((h) => h.surfaceAptitude.turf)), 2),
       'surface.dirt': round(mean(horses.map((h) => h.surfaceAptitude.dirt)), 2),
+      heavy_aptitude: round(mean(horses.map((h) => h.heavyAptitude)), 2),
       distance_center: round(mean(horses.map((h) => h.distanceCenter)), 2),
       distance_range: round(mean(horses.map((h) => h.distanceRange)), 2),
     },

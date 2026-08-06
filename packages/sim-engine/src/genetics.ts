@@ -180,6 +180,7 @@ export function inheritGenotype(params: {
     },
     temper: { a1: 0, a2: 0 },
     durability: { a1: 0, a2: 0 },
+    heavy_aptitude: { a1: 0, a2: 0 },
     skill_genes: [],
   };
 

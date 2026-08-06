@@ -26,6 +26,8 @@ export interface Phenotype {
   stats: Record<AbilityKey, number>;
   unlockRate: number;
   surfaceAptitude: { turf: number; dirt: number };
+  /** 道悪適性 0〜100（正典 §5.2・D-015） */
+  heavyAptitude: number;
   distanceCenter: number;
   distanceRange: number;
   strategyAptitude: Record<Strategy, number>;
@@ -116,6 +118,7 @@ export function expressPhenotype(
       turf: Math.round(expressNumeric(genotype.surface.turf, balance.DOMINANT_WEIGHT)),
       dirt: Math.round(expressNumeric(genotype.surface.dirt, balance.DOMINANT_WEIGHT)),
     },
+    heavyAptitude: Math.round(expressNumeric(genotype.heavy_aptitude, balance.DOMINANT_WEIGHT)),
     distanceCenter: Math.round(expressNumeric(genotype.distance_center, balance.DOMINANT_WEIGHT)),
     distanceRange: Math.round(expressNumeric(genotype.distance_range, balance.DOMINANT_WEIGHT)),
     strategyAptitude: expressStrategyAptitude(

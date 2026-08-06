@@ -18,6 +18,7 @@ export function makeGenotype(value: number): Genotype {
     growth: { a1: 'normal', a2: 'normal' },
     temper: pair(50),
     durability: pair(600),
+    heavy_aptitude: pair(55),
     skill_genes: [],
   };
 }
@@ -59,6 +60,7 @@ export class Herd {
       growth: 'normal',
       temper: 50,
       durability: 600,
+      heavyAptitude: 55,
       injuryRateMult: 1,
       frail: false,
       skillGenes: [],

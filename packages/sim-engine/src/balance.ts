@@ -113,6 +113,7 @@ export const TRAIT_BOUNDS: Readonly<Record<NumericTraitKey, TraitBound>> = {
   iq: { min: 0, max: 1000 },
   'surface.turf': { min: 0, max: 100 },
   'surface.dirt': { min: 0, max: 100 },
+  heavy_aptitude: { min: 0, max: 100 },
   distance_center: { min: 1000, max: 3600 },
   distance_range: { min: 200, max: 1200 },
   temper: { min: 0, max: 100 },
@@ -262,6 +263,8 @@ export interface FoundersConfig {
   DISTANCE_RANGE_RANGE: readonly [number, number];
   /** 正典・指示書ともに未定義。P0 で定義（芝/ダート適性アレルの一様範囲） */
   SURFACE_RANGE: readonly [number, number];
+  /** 道悪適性の創始分布（正典 §5.2・D-015）。芝/ダート適性と同じ 0〜100 スケール */
+  HEAVY_RANGE: readonly [number, number];
   SKILL_GENE_COUNT: readonly [number, number];
   /** 血統ライン数（指示書 §3.3: LINE_A〜LINE_T の20系統） */
   LINE_COUNT: number;
@@ -286,6 +289,7 @@ export const FOUNDERS: FoundersConfig = {
   DISTANCE_CENTER_RANGE: [1200, 3000],
   DISTANCE_RANGE_RANGE: [400, 1000],
   SURFACE_RANGE: [20, 90],
+  HEAVY_RANGE: [20, 90],
   SKILL_GENE_COUNT: [0, 2],
   LINE_COUNT: 20,
   STRATEGY_POOL: ['nige', 'senko', 'sashi', 'oikomi'],
@@ -459,6 +463,9 @@ export function buildTraitMutation(
     temper: { ...derive(f.TEMPER_SD), center: f.TEMPER_MEAN },
     'surface.turf': { ...derive(uniformSd(f.SURFACE_RANGE)), center: uniformMean(f.SURFACE_RANGE) },
     'surface.dirt': { ...derive(uniformSd(f.SURFACE_RANGE)), center: uniformMean(f.SURFACE_RANGE) },
+    // ★導出は他の非能力形質と同じ式（創始アレルSD × √(2r−r²) ÷ 切断係数・D-013）。
+    //   正典 §6.4 の表: sd 13 / clamp 22 / 回帰0.20 / 中心55
+    heavy_aptitude: { ...derive(uniformSd(f.HEAVY_RANGE)), center: uniformMean(f.HEAVY_RANGE) },
     distance_center: {
       ...derive(uniformSd(f.DISTANCE_CENTER_RANGE)),
       center: uniformMean(f.DISTANCE_CENTER_RANGE),
