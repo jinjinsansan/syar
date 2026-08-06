@@ -77,6 +77,18 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: 'N-3（正典 §10.5 の上位30%。1.0 にすると全体平均への追従になり NPC が弱くなる）',
   },
   {
+    key: 'MARGIN',
+    file: 'packages/betting/src/balance.ts',
+    perturbed: 'export const MARGIN: Readonly<Record<TicketKind, number>> = { win: 0, place: 0, quinella_place: 0, quinella: 0, exacta: 0, trio: 0, trifecta: 0 };',
+    affects: 'V-10 / §11（控除率。PP 発行量の最大の調整弁。0 にすると胴元の取り分が消える）',
+  },
+  {
+    key: 'ODDS_CAP',
+    file: 'packages/betting/src/balance.ts',
+    perturbed: 'export const ODDS_CAP: Readonly<Record<TicketKind, number>> = { win: 1e9, place: 1e9, quinella_place: 1e9, quinella: 1e9, exacta: 1e9, trio: 1e9, trifecta: 1e9 };',
+    affects: '§9.4（配当上限。実質無限にすると1本の高配当で PP 発行が跳ねる）',
+  },
+  {
     key: 'NAME_TAIL_RATE',
     file: 'packages/sim-engine/src/naming.ts',
     perturbed: 'export const NAME_TAIL_RATE = 0;',
@@ -197,6 +209,9 @@ export const CALIBRATION_SCAN_DIRS: readonly string[] = [
   'apps/cli/src',
   'packages/sim-engine/src',
   'packages/race-engine/src',
+  // ★S-4: パッケージを増やしたら走査対象に加える。加え忘れると
+  //   「変異試験すべて防御」が**走査していない範囲について何も言っていない**状態になる。
+  'packages/betting/src',
 ];
 
 /** 走査から外すファイル（理由必須）。新規ファイルは既定で走査される */
@@ -230,6 +245,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
   {
     pattern: 'apps/cli/src/verify\.ts',
     why: 'P0 受け入れハーネスの実行条件。既定値は正典 §10.5（800頭）等の写しで、--flag で明示上書きする。判定条件は出力の冒頭に自己申告する（R-8）',
+  },
+  {
+    pattern: 'apps/cli/src/verify-payout\.ts',
+    why: 'A-3/V-10 の測定ハーネスの実行条件（レース数・MC試行数）。--races / --odds-trials で明示上書きし、実行条件を出力の冒頭に自己申告する（R-8）。MC試行数の既定 10,000 は正典 §9.2 の写し',
   },
 ];
 
@@ -270,6 +289,26 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   {
     key: 'DEFAULT_PRESEED_OPTIONS',
     why: 'プリシードのプール構成（正典 §10.5 の 現役2,500/種牡馬200/繁殖牝馬800）の写し。実際に何頭になったかは npm run preseed の出力で照合する',
+  },
+  {
+    key: 'MIN_STAKE',
+    why: '正典 §9.1 の最小購入単位 100 EP の写し。判定（V-x）を作らず、値の一致は betting のテストが照合する',
+  },
+  {
+    key: 'BET_LIMITS',
+    why: '正典 §9.4 のベット上限の写し。射幸性抑制とエクスプロイト時の被害上限で、較正で動かす値ではない。値の一致はテストが照合する',
+  },
+  {
+    key: 'OWN_HORSE_RACE_LIMIT',
+    why: '正典 §9.5 の自馬出走レース上限 5,000 EP の写し。八百長利得の遮断装置そのもので、較正値ではない',
+  },
+  {
+    key: 'PLACE_THREE_MIN_FIELD',
+    why: '正典 §9.1「出走7頭以下は複勝・ワイドを2着まで」の境界。実競馬の慣行の写しで、較正で動かす値ではない。両側の挙動を ★テストが押さえている（R-2）',
+  },
+  {
+    key: 'TICKET_ARITY',
+    why: '券種ごとに必要な馬番の数（単勝1・馬連2・三連単3）。定義であって較正値ではない',
   },
   {
     key: 'NAME_MAX_ATTEMPTS',
