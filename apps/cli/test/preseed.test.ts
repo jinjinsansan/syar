@@ -18,6 +18,7 @@ import {
   DEFAULT_PRESEED_OPTIONS,
   NPC_FOLLOW_TOP_RATIO,
   mateScore,
+  mateScoreWithInbreeding,
   npcTargetFrom,
   policyFit,
   preseedNicks,
@@ -231,5 +232,34 @@ describe('D-025 厩舎方針に沿った配合相手の選択', () => {
     if (dry.distance === heavy.distance) {
       expect(policyFit(mudder, dry)).toBeCloseTo(policyFit(nonMudder, dry), 6);
     }
+  });
+});
+
+describe('★D-026 近交回避が配合の決定経路で効いている', () => {
+  // ★R-17: 維持したい属性は、決定経路がそれを参照していなければ保存されない。
+  //   ここは「監査で見ている」ではなく「選ぶときに見ている」ことを測る。
+  const stable = NPC_STABLES[0]!;
+
+  it('★F が高い相手ほど評価が下がる（単調性）', () => {
+    const h = smallRun(42).world.all.get(smallRun(42).world.stallionIds[0]!)!.record;
+    const base = mateScore(h, stable);
+    const scores = [0, 0.05, 0.125, 0.25].map((f) => mateScoreWithInbreeding(h, stable, f));
+    expect(scores[0]).toBeCloseTo(base, 6);
+    for (let i = 1; i < scores.length; i += 1) {
+      expect(scores[i]!, `F=${[0, 0.05, 0.125, 0.25][i]}`).toBeLessThan(scores[i - 1]!);
+    }
+  });
+
+  it('★全兄弟相当（F=0.25）で評価が 5%以上下がる（効きが実質ゼロでない）', () => {
+    // 較正定数を閾値に使わない（D-018 の教訓）。リテラルで押さえる。
+    const h = smallRun(42).world.all.get(smallRun(42).world.stallionIds[0]!)!.record;
+    const ratio = mateScoreWithInbreeding(h, stable, 0.25) / mateScore(h, stable);
+    expect(ratio).toBeLessThan(0.95);
+  });
+
+  it('非有限な F でも壊れない（NaN が評価に伝播しない）', () => {
+    const h = smallRun(42).world.all.get(smallRun(42).world.stallionIds[0]!)!.record;
+    expect(mateScoreWithInbreeding(h, stable, Number.NaN)).toBeCloseTo(mateScore(h, stable), 6);
+    expect(mateScoreWithInbreeding(h, stable, -1)).toBeCloseTo(mateScore(h, stable), 6);
   });
 });
