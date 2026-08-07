@@ -5,3 +5,4 @@
  *   （ゲーム内時刻の真実は Postgres の now() のみ・§14）。
  */
 export * from './cycle.js';
+export * from './programme.js';
