@@ -111,10 +111,14 @@ interface KindStat {
   /** MC で一度も出なかった目が的中した回数（オッズが cap になり大きく払う） */
   unseenHits: number;
   bets: number;
+  /** ★配当上限（§9.4）で切り詰められた**売り目**の数 */
+  cappedBets: number;
+  /** ★cap が無ければ払っていた額との差の総額 */
+  cappedLoss: number;
 }
 
 function emptyStat(): KindStat {
-  return { stake: 0, payout: 0, unseenHits: 0, bets: 0 };
+  return { stake: 0, payout: 0, unseenHits: 0, bets: 0, cappedBets: 0, cappedLoss: 0 };
 }
 
 function orderOf(result: RaceResult): number[] {
@@ -184,6 +188,11 @@ function runSeed(seed: number): Map<TicketKind, KindStat> {
       // 買える目 = MC で1回以上出た目（p=0 の目は運営が売らない想定）
       st.stake += m.size;
       st.bets += m.size;
+      // ★cap に当たっている売り目を数える。払戻率の下振れが「推定誤差」なのか
+      //   「§9.4 の切り詰め」なのかは、これを測らないと区別できません。
+      for (const c of m.values()) {
+        if ((1 / (c / ODDS_TRIALS)) * (1 - MARGIN[kind]) > ODDS_CAP[kind]) st.cappedBets += 1;
+      }
       for (const key of winningKeys(kind, finalOrder, fieldSize)) {
         const c = m.get(key);
         if (c === undefined) {
@@ -191,7 +200,11 @@ function runSeed(seed: number): Map<TicketKind, KindStat> {
           st.unseenHits += 1;
           continue;
         }
-        st.payout += oddsFromProbability(kind, c / ODDS_TRIALS);
+        const prob = c / ODDS_TRIALS;
+        const raw = (1 / prob) * (1 - MARGIN[kind]);
+        const paid = oddsFromProbability(kind, prob);
+        st.payout += paid;
+        if (raw > paid) st.cappedLoss += raw - paid;
       }
     }
   }
@@ -211,6 +224,8 @@ for (const seed of SEEDS) {
     a.payout += b.payout;
     a.unseenHits += b.unseenHits;
     a.bets += b.bets;
+    a.cappedBets += b.cappedBets;
+    a.cappedLoss += b.cappedLoss;
   }
 }
 
@@ -226,7 +241,9 @@ for (const k of TICKET_KINDS) {
     `  ${k.padEnd(16)} 払戻率 ${(rate * 100).toFixed(2)}%  目標 ${(target * 100).toFixed(0)}%  ` +
       `乖離 ${(dev * 100 >= 0 ? '+' : '') + (dev * 100).toFixed(2)}pt  ` +
       `売目 ${(st.bets / (RACES * SEEDS.length)).toFixed(0)}/R  ` +
-      `未発売的中 ${st.unseenHits}  cap ${ODDS_CAP[k]}  ${pass ? 'PASS' : 'FAIL'}`,
+      `未発売的中 ${st.unseenHits}  cap該当 ${((st.cappedBets / Math.max(1, st.bets)) * 100).toFixed(1)}%  ` +
+      `cap無しなら ${(((st.payout + st.cappedLoss) / Math.max(1, st.stake)) * 100).toFixed(2)}%  ` +
+      `${pass ? 'PASS' : 'FAIL'}`,
   );
 }
 console.log(`\n  V-10 総合: ${allPass ? 'PASS' : 'FAIL'}`);
