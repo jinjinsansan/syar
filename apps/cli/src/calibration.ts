@@ -254,7 +254,7 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
     why: 'P0 受け入れハーネスの実行条件。既定値は正典 §10.5（800頭）等の写しで、--flag で明示上書きする。判定条件は出力の冒頭に自己申告する（R-8）',
   },
   {
-    pattern: 'apps/cli/src/diag-streams\.ts',
+    pattern: 'apps/cli/src/diag-(streams|win)\.ts',
     why: '切り分け用の診断ツール（乱数系列の分布比較）。判定（V-x）を作らず、本番経路からも参照されない。実行条件は出力の冒頭に自己申告する（R-8）',
   },
   {
