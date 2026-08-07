@@ -50,6 +50,14 @@ let sumPhatOfWinner = 0;
 let sumPhatSq = 0;
 let sumInvPhatOfWinner = 0;
 let fields = 0;
+/** ★売られた頭数（MC で1回以上勝った馬）。恒等式の分母はこちらでなければならない */
+let sold = 0;
+/** MC で1回も勝たなかった馬が実際に勝った回数 */
+let unsoldWins = 0;
+const contribSum = new Array(7).fill(0);
+const contribN = new Array(7).fill(0);
+const binOf = (v: number): number =>
+  BINS.findIndex((_, j) => j < BINS.length - 1 && v >= BINS[j]! && v < BINS[j + 1]!);
 
 for (let i = 0; i < RACES; i += 1) {
   const race = generateRace(pool, i, deriveRng(SEED, S.FIELD, i));
@@ -71,6 +79,10 @@ for (let i = 0; i < RACES; i += 1) {
   sumPhatOfWinner += pw;
   if (pw > 0) sumInvPhatOfWinner += 1 / pw;
   fields += entrants.length;
+  sold += phat.size;
+  if (pw === 0) unsoldWins += 1;
+  if (pw > 0) { const b = binOf(pw); if (b >= 0) contribSum[b] += 1 / pw; }
+  for (let k = 1; k <= entrants.length; k += 1) { const b = binOf(phat.get(k) ?? -1); if (b >= 0) contribN[b] += 1; }
 
   // 較正曲線: 各馬について「予測勝率」と「実際に勝ったか」を層に積む
   for (let k = 1; k <= entrants.length; k += 1) {
@@ -90,7 +102,32 @@ console.log(`    E[p̂(勝者)] = ${(sumPhatOfWinner / RACES).toFixed(4)}`);
 console.log(`    Σp̂²/R      = ${(sumPhatSq / RACES).toFixed(4)}`);
 console.log(`\n  ★払戻率 = 0.82 × E[1/p̂(勝者)] / 平均頭数`);
 console.log(`    E[1/p̂(勝者)] = ${(sumInvPhatOfWinner / RACES).toFixed(3)}  （一致するなら平均頭数と等しい）`);
-console.log(`    払戻率        = ${((0.82 * (sumInvPhatOfWinner / RACES)) / (fields / RACES) * 100).toFixed(2)}%`);
+console.log(`    払戻率(頭数で割る) = ${((0.82 * (sumInvPhatOfWinner / RACES)) / (fields / RACES) * 100).toFixed(2)}%`);
+console.log(`
+  ★分母は**売られた頭数**でなければならない（未発売の馬は買えないので賭け金に入らない）`);
+console.log(`    平均売り目数 ${(sold / RACES).toFixed(3)}  未発売馬の勝利 ${unsoldWins}回（${((unsoldWins / RACES) * 100).toFixed(2)}%）`);
+console.log(`    払戻率(売り目で割る) = ${((0.82 * (sumInvPhatOfWinner / RACES)) / (sold / RACES) * 100).toFixed(2)}%`);
+
+// ★機構を推測せず、不足がどこから来ているかを直接分解する。
+//   恒等式 Σ pi/p̂i = 売り目数 は、各馬が 1 ずつ寄与することを意味する。
+//   p̂ の帯ごとに寄与の合計と頭数を並べれば、1 を下回っている帯が不足の出どころ。
+//   ⚠️ 較正曲線（平均の比較）では見えない。恒等式は 1/p̂ で重み付いた和なので、
+//      帯の平均が一致していても比で重み付けた和は一致しない（R-16 と同じ形）。
+console.log(`
+  ★寄与の分解: 各帯は「頭数ぶんの寄与」を出すはず`);
+console.log(`    ${"帯".padEnd(14)} ${"寄与合計".padStart(10)} ${"期待(頭数)".padStart(11)} ${"差".padStart(9)}`);
+{
+  let deficit = 0;
+  for (let b = 0; b < BINS.length - 1; b += 1) {
+    if (contribN[b] === 0) continue;
+    const exp = contribN[b] / RACES;
+    const got = contribSum[b] / RACES;
+    deficit += got - exp;
+    const label = `${(BINS[b]! * 100).toFixed(0)}〜${(BINS[b + 1]! * 100).toFixed(0)}%`;
+    console.log(`    ${label.padEnd(14)} ${got.toFixed(3).padStart(10)} ${exp.toFixed(3).padStart(11)} ${(got - exp).toFixed(3).padStart(9)}`);
+  }
+  console.log(`    合計の差 ${deficit.toFixed(3)}`);
+}
 console.log(`\n  ★較正曲線（予測 vs 実現）`);
 console.log(`    ${'帯'.padEnd(14)} ${'予測'.padStart(8)} ${'実現'.padStart(8)} ${'頭数'.padStart(7)}`);
 for (let b = 0; b < BINS.length - 1; b += 1) {
