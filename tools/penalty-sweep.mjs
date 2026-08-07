@@ -25,7 +25,7 @@ const restore = (signal) => {
   process.exit(1);
 };
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK']) process.on(sig, () => restore(sig));
-const LEVELS = ['0', '0.1', '0.3', '1.0', '3.0'];
+const LEVELS = (process.argv[2] ?? '0,0.1,0.3,1.0,3.0').split(',');
 const SEEDS = Array.from({ length: 12 }, (_, i) => 1000 + i * 7);
 
 const stat = (xs) => {
