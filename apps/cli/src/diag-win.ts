@@ -29,6 +29,20 @@ const SEED = num('seed', 42);
 const RACES = num('races', 400);
 const MC = num('odds-trials', 4000);
 
+/**
+ * ★R-21 の適用: 測定条件が成立していなければ**結果を報告せず失敗させる**。
+ *   races が 1/p_min を大きく下回ると、M を上げるほど「売り目」だけが増えて
+ *   分子（勝者の 1/p̂）が増えず、払戻率が機械的に下がる。
+ *   実際これで「平坦域の実力は 75%」という**存在しない結論**を報告しました。
+ */
+if (RACES < MC / 4) {
+  throw new Error(
+    `測定条件が成立していません: races=${RACES} は M=${MC} に対して少なすぎます。` +
+      '確率 1/M 級の馬が一度も勝てず、払戻率が機械的に下がります（R-21）。' +
+      `races >= ${Math.ceil(MC / 4)} で実行してください。`,
+  );
+}
+
 const { balance, founders } = resolveRuntimeConfig();
 const sim = runSimulation(
   { seed: SEED, generations: POOL_GENERATIONS, population: POOL_MARES,
