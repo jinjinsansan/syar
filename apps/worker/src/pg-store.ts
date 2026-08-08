@@ -13,9 +13,34 @@
  */
 
 import type pg from 'pg';
+import type { RaceEntrant } from '@star/race-engine';
+import { settlePayouts } from './payout.js';
+import { settleRace as settleRaceFair } from './settle.js';
 import type { CycleStore, RaceSpec } from './cycle-runner.js';
 
-export function createPgStore(client: pg.Client | pg.PoolClient): CycleStore {
+/**
+ * ★出走馬の能力は DB から読むべきですが、現時点では中立値で確定しています。
+ *   §8.7 の着順計算は能力を使うので、**このままだと全馬が同じ実力で走ります**。
+ *   ⚠️ 未完成であることを明示します（本物らしい値を入れない）。
+ *   次便で horses から能力を読んで渡します。
+ */
+const NEUTRAL_ENTRANT = {
+  stats: { sp: 500, st: 500, pw: 500, gt: 500, iq: 500 },
+  surfaceAptitude: { turf: 50, dirt: 50 },
+  distanceCenter: 2000,
+  distanceRange: 600,
+  strategyAptitude: { nige: 50, senko: 50, sashi: 50, oikomi: 50 },
+  heavyAptitude: 55,
+  condition: 3,
+  fatigue: 0,
+  age: 4,
+  skillGenes: [],
+} as const;
+
+export function createPgStore(
+  client: pg.Client | pg.PoolClient,
+  hash: { sha256(m: string): string; hmacSha256(k: string, m: string): string },
+): CycleStore {
   return {
     async serverNowMs(): Promise<number> {
       // ★ゲーム内時刻の真実は Postgres の now() のみ（§14）
@@ -122,14 +147,92 @@ export function createPgStore(client: pg.Client | pg.PoolClient): CycleStore {
       return r.rows.map((x: { cycle_index: number }) => x.cycle_index);
     },
 
+    /**
+     * レースを確定する（§8.6・§8.7・§9）。
+     *
+     * ★**同一トランザクション**で 着順・seed_reveal・払戻 をすべて行います。
+     *   途中で落ちると「着順は出たが払戻されていない」「reveal だけ公開された」
+     *   といった状態が残り、どちらも手で直せません（結果の事後差し替えは §8.6 で禁止）。
+     *
+     * ★二重確定・二重払戻の防止は **status を条件に含める**ことで行います。
+     *   既に settled なら最初の update が0行になり、そこで抜けます。
+     *   A-5 の place_bet と同じ構造です。
+     */
     async settleRace(cycleIndex: number): Promise<void> {
-      // ★status を条件に含める。既に settled なら 0行更新で、**二重払戻にならない**
-      //   確定時に server_seed を seed_reveal として公開する（§8.6）
-      await client.query(
-        `update races set status = 'settled', seed_reveal = server_seed
-          where cycle_index = $1 and status = 'scheduled'`,
-        [cycleIndex],
-      );
+      await client.query('begin');
+      try {
+        // ★ここで排他を取る。同時に2プロセスが確定に入っても、片方は0行で抜ける
+        const race = await client.query<{
+          id: string; server_seed: string; distance: number;
+          surface: string; track_condition: string; course_id: string;
+        }>(
+          `update races set status = 'settled', seed_reveal = server_seed
+            where cycle_index = $1 and status = 'scheduled'
+            returning id, server_seed, distance, surface, track_condition, course_id`,
+          [cycleIndex],
+        );
+        if (race.rowCount === 0) {
+          // 既に確定済み。**何もしない**（二重払戻にならない）
+          await client.query('rollback');
+          return;
+        }
+        const r = race.rows[0]!;
+
+        // --- 出走表を読んで着順を計算 ---
+        const es = await client.query<{ horse_id: string; gate: number; weight: string; strategy: string }>(
+          `select horse_id, gate, weight, strategy from race_entries where race_id = $1 order by gate`,
+          [r.id],
+        );
+        if (es.rowCount === 0) {
+          // ★出走表が無いレースは確定できない。黙って settled にしない
+          throw new Error(`settleRace: cycle=${cycleIndex} に出走表がありません`);
+        }
+
+        // ★着順は §8.6 の final_seed から決める（settle.ts）。
+        //   ここで独自の乱数を使うと、seed_reveal を公開しても検証できません。
+        const entrants: RaceEntrant[] = es.rows.map((e) => ({
+          ...NEUTRAL_ENTRANT,
+          horseId: String(e.gate),
+          gate: e.gate,
+          weightKg: Number(e.weight),
+          strategy: e.strategy as RaceEntrant['strategy'],
+        }));
+        const res = settleRaceFair(
+          {
+            conditions: {
+              raceId: r.id,
+              distance: r.distance,
+              surface: r.surface as RaceEntrant['surfaceAptitude'] extends never ? never : 'turf' | 'dirt',
+              trackCondition: r.track_condition as 'good' | 'yielding' | 'soft' | 'bad',
+              courseShape: 'oval',
+              baseWeightKg: 55,
+            },
+            entrants,
+            serverSeed: r.server_seed,
+          },
+          hash,
+        );
+        const finished = res.order.map((o) => ({
+          gate: Number(o.horseId),
+          finishPosition: o.finishPosition,
+          timeSec: o.timeSec,
+        }));
+        for (const f of finished) {
+          await client.query(
+            `update race_entries set finish_pos = $1, finish_time = $2
+              where race_id = $3 and gate = $4`,
+            [f.finishPosition, f.timeSec, r.id, f.gate],
+          );
+        }
+
+        // --- 馬券の精算（§9）。EP で買い PP で払い戻す ---
+        await settlePayouts(client, r.id, finished);
+
+        await client.query('commit');
+      } catch (e) {
+        await client.query('rollback');
+        throw e;
+      }
     },
   };
 }

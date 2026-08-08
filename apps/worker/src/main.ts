@@ -65,7 +65,7 @@ async function main(): Promise<void> {
   const pool = await loadRaceablePool(client);
   console.log(`[worker] 出走可能な馬 ${pool.length} 頭`);
 
-  const store = createPgStore(client);
+  const store = createPgStore(client, hash);
   let stopping = false;
   let failures = 0;
 
