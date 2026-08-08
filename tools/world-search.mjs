@@ -16,7 +16,9 @@ const MIN_EXPECTED_CANDIDATES = Math.max(1, Math.floor(N * 0.15));
 
 const rows = [];
 for (let i = 0; i < N; i += 1) {
-  const seed = 20260807 + i;
+  // ★40シード分布と**同じシード系列**にする（1000 + i×7）。
+  //   別系列だと分布と突き合わせられず、「中央値以上」の判定ができない。
+  const seed = 1000 + i * 7;
   const out = execSync(`npm run preseed --silent -- --seed ${seed} --generations 50`, {
     encoding: 'utf8', maxBuffer: 1 << 24,
   });
