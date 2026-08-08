@@ -24,7 +24,9 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.112.2",
     "@types/node": "^22.10.2",
+    "pg": "^8.22.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

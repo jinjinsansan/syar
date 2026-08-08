@@ -34,3 +34,10 @@ GORILLA_STABLE_SPEC_v1.2_infra.md
 
 # 憲法 §0.1: 実在競走馬名の平文リスト。ハッシュ（*.hash）のみコミットする
 data/ng-names.txt
+
+# 環境変数の実値。雛形は .env.example（実値は絶対にコミットしない）
+.env
+.env.local
+
+# 環境変数の実値（.env と同じ扱い・絶対にコミットしない）
+secrets.local.env
