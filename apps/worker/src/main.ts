@@ -55,14 +55,16 @@ async function main(): Promise<void> {
     try {
       const out = await runCycle(store, cfg.epochMs);
       failures = 0;
-      if (out.lockBusy) {
-        console.log(`[worker] cycle=${out.cycleIndex} 他プロセスが処理中`);
-      } else if (out.created.length > 0 || out.settled.length > 0) {
-        console.log(
-          `[worker] cycle=${out.cycleIndex} phase=${out.phase} ` +
-            `生成=[${out.created.join(',')}] 確定=[${out.settled.join(',')}]`,
-        );
-      }
+      // ★毎周かならず記録する。
+      //   当初は「生成か確定があったときだけ」出力していたが、それだと
+      //   **プロセスが生きているだけの空回りと、実際に処理している状態を区別できない**。
+      //   A-1 は「レースが実際に生成・確定・払戻されたことまで確認」する基準なので、
+      //   周ごとの記録が無いと**測定そのものが成立しません**（指示書 §3 の警告どおり）。
+      console.log(
+        `[worker] cycle=${out.cycleIndex} phase=${out.phase} ` +
+          `生成=[${out.created.join(',')}] 既存=${out.skipped.length} ` +
+          `確定=[${out.settled.join(',')}]${out.lockBusy ? ' lock=busy' : ''}`,
+      );
     } catch (e) {
       failures += 1;
       // ★1周の失敗で終了しない。次の周で回復しうる
