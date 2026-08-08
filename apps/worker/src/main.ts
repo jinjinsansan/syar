@@ -14,10 +14,12 @@
  *   ゲームの判断はすべて Postgres の `now()`（`serverNowMs`）で行います。
  */
 
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import pg from 'pg';
 import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
+import { seedCommitFor, serverSeedFor } from './seeding.js';
 
 /** 1周の間隔。★サイクル長より短くする（1サイクルを取りこぼさないため） */
 export const TICK_MS = 60_000;
@@ -37,6 +39,25 @@ async function main(): Promise<void> {
   assertEnvironmentMatches(cfg.env, await readDbEnvironment(client));
   console.log(`[worker] 起動 env=${cfg.env} tick=${TICK_MS}ms`);
 
+  // ★§8.6 の秘密。環境変数に無ければ**その場で作る**が、警告を出す。
+  //   本番では STAR_SEED_SECRET を固定すること —
+  //   毎回作ると、再起動をまたいだ commit/reveal の対応が取れなくなる。
+  //   （生成時に server_seed を DB へ保存しているので直ちには壊れないが、
+  //     保存前に落ちたレースは reveal を出せない）
+  const secret = process.env.STAR_SEED_SECRET;
+  if (secret === undefined || secret === '') {
+    console.warn('[worker] ⚠️ STAR_SEED_SECRET が未設定です。起動ごとに秘密が変わります');
+  }
+  const effectiveSecret = secret !== undefined && secret !== '' ? secret : randomBytes(32).toString('hex');
+  const hash = {
+    sha256: (m: string) => createHash('sha256').update(m, 'utf8').digest('hex'),
+    hmacSha256: (k: string, m: string) => createHmac('sha256', k).update(m, 'utf8').digest('hex'),
+  };
+  const seeds = {
+    serverSeed: (i: number) => serverSeedFor(effectiveSecret, i, hash),
+    seedCommit: (i: number) => seedCommitFor(effectiveSecret, i, hash),
+  };
+
   const store = createPgStore(client);
   let stopping = false;
   let failures = 0;
@@ -53,7 +74,7 @@ async function main(): Promise<void> {
   while (!stopping) {
     const started = Date.now();
     try {
-      const out = await runCycle(store, cfg.epochMs);
+      const out = await runCycle(store, cfg.epochMs, seeds);
       failures = 0;
       // ★毎周かならず記録する。
       //   当初は「生成か確定があったときだけ」出力していたが、それだと

@@ -49,9 +49,9 @@ export function createPgStore(client: pg.Client | pg.PoolClient): CycleStore {
       //   確認だけに頼ると「確認 → 割り込み → 挿入」で二重になります。
       await client.query(
         `insert into races (cycle_index, name, class_rank, grade, surface, distance,
-                            track_condition, course_id, scheduled_at, seed_commit, purse, status)
+                            track_condition, course_id, scheduled_at, seed_commit, server_seed, purse, status)
          values ($1, $2, $3, $4, 'turf', 2000, 'good', 'C1',
-                 to_timestamp($5 / 1000.0), $6, 0, 'scheduled')
+                 to_timestamp($5 / 1000.0), $6, $7, 0, 'scheduled')
          on conflict (cycle_index) do nothing`,
         [
           spec.cycleIndex,
@@ -60,6 +60,8 @@ export function createPgStore(client: pg.Client | pg.PoolClient): CycleStore {
           spec.grade,
           spec.scheduledAtMs,
           spec.seedCommit,
+          // ★保存する。公開経路（races_public）には含めない
+          spec.serverSeed,
         ],
       );
     },
@@ -76,8 +78,10 @@ export function createPgStore(client: pg.Client | pg.PoolClient): CycleStore {
 
     async settleRace(cycleIndex: number): Promise<void> {
       // ★status を条件に含める。既に settled なら 0行更新で、**二重払戻にならない**
+      //   確定時に server_seed を seed_reveal として公開する（§8.6）
       await client.query(
-        `update races set status = 'settled' where cycle_index = $1 and status = 'scheduled'`,
+        `update races set status = 'settled', seed_reveal = server_seed
+          where cycle_index = $1 and status = 'scheduled'`,
         [cycleIndex],
       );
     },

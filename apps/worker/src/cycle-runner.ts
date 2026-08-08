@@ -52,15 +52,18 @@ export interface RaceSpec {
   readonly scheduledAtMs: number;
   /** §8.6 のコミット。発走前に公開する */
   readonly seedCommit: string;
+  /**
+   * §8.6 の server_seed。**生成時に DB へ保存する**。
+   * ★プロセスの秘密から毎回導出する形だと、再起動で秘密が変わり
+   *   コミット済みのレースの reveal を出せなくなります（Provably Fair が成立しない）。
+   */
+  readonly serverSeed: string;
 }
 
-/**
- * §8.6 のコミット値。★実装は次便（ハッシュの注入が要る）。
- *   今は「サイクル番号から決まる」ことだけを満たす仮値で、
- *   **未実装であることが分かる形**にしておく（本物らしい値を入れない）。
- */
-function commitFor(cycleIndex: number): string {
-  return `UNIMPLEMENTED-COMMIT-${cycleIndex}`;
+/** §8.6 の seed を作る。ハッシュとプロセス秘密は呼び出し側から注入する */
+export interface SeedSource {
+  serverSeed(cycleIndex: number): string;
+  seedCommit(cycleIndex: number): string;
 }
 
 /** advisory lock のキー。★用途ごとに固定値。他の用途と衝突させない */
@@ -87,7 +90,11 @@ export interface CycleOutcome {
  *    ロックが取れないのは正常系なので `lockBusy` で返します
  *    （例外にすると再起動ループになり、A-1 の24時間稼働が壊れます）。
  */
-export async function runCycle(store: CycleStore, epochMs: number): Promise<CycleOutcome> {
+export async function runCycle(
+  store: CycleStore,
+  epochMs: number,
+  seeds: SeedSource,
+): Promise<CycleOutcome> {
   const nowMs = await store.serverNowMs();
   const cycleIndex = cycleIndexAt(nowMs, epochMs);
   const phase = phaseAt(nowMs, epochMs);
@@ -116,7 +123,8 @@ export async function runCycle(store: CycleStore, epochMs: number): Promise<Cycl
         grade: gradeOf(idx),
         // ★発走時刻もサイクル番号から決める。再起動しても同じ時刻になる
         scheduledAtMs: cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.start,
-        seedCommit: commitFor(idx),
+        seedCommit: seeds.seedCommit(idx),
+        serverSeed: seeds.serverSeed(idx),
       });
       created.push(idx);
     }
