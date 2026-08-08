@@ -1,0 +1,48 @@
+# STAR ゲームループワーカー（正典 §14）
+#
+# 配置: /etc/systemd/system/star-worker.service
+# 有効化: sudo systemctl daemon-reload && sudo systemctl enable --now star-worker
+#
+# ★Render Background Worker の代わりに VPS を使う場合、Render が代行していた
+#   「プロセスの自動再起動」を systemd が担います。正典 §14.2 は
+#   「常時稼働ワーカー（Render Background Worker 等）」で実装先を固定していません。
+
+[Unit]
+Description=STAR game loop worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=star
+WorkingDirectory=/opt/star
+# ★秘密は systemd の EnvironmentFile で渡す。リポジトリにも履歴にも残さない
+#   権限は 600 / 所有者 star にすること
+EnvironmentFile=/etc/star/worker.env
+ExecStart=/usr/bin/node --experimental-strip-types apps/worker/src/main.ts
+
+# ★A-1「24時間止まらない」の担保。落ちても必ず戻す
+Restart=always
+RestartSec=10
+# ★ただし短時間に落ち続けるなら止める（壊れたまま回り続けるほうが悪い）
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+# ★SIGTERM で周の切れ目まで待つ。A-2 があるので途中で殺されても壊れないが、
+#   無駄な再計算を避ける
+KillSignal=SIGTERM
+TimeoutStopSec=90
+
+# 最低限の隔離
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/star
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=star-worker
+
+[Install]
+WantedBy=multi-user.target
