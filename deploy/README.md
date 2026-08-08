@@ -4,6 +4,12 @@
 > 要求は **常時稼働・任意の実行時間・状態が前進すること**の3点で、VPS はこれを満たします。
 > 名指しで禁止されているのは **Vercel Cron と pg_cron** だけです（実行保証が弱い・§14.2）。
 
+## 0. ★先にやること — 管理画面の二段階認証
+
+このサーバーには **`service_role` キー**（RLS を素通りする鍵）を置きます。
+VPS 管理画面が乗っ取られると DB を直接操作されるので、
+**インフラを立てる前に二段階認証を設定**してください。
+
 ## 1. VPS の準備
 
 - Ubuntu 22.04 LTS 以降 / 2vCPU / 4GB 目安
@@ -12,9 +18,20 @@
 
 ```bash
 sudo adduser --system --group --home /opt/star star
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt-get install -y nodejs git
+sudo apt-get update && sudo apt-get install -y git
+
+# ★Ubuntu 24.04 以降は OS 標準の Node が十分新しい。まず確認する
+apt-cache policy nodejs | head -3
+sudo apt-get install -y nodejs npm
+node -v      # v22 以上であること
+
+# v22 未満だった場合のみ NodeSource を足す（22.04 など）
+#   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+#   sudo apt-get install -y nodejs
 ```
+
+⚠️ **NodeSource は新しい Ubuntu に未対応のことがあります**（26.04 など）。
+OS 標準で足りるなら足さないでください。
 
 ## 2. コードの配置
 
