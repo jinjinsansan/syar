@@ -34,9 +34,14 @@ export async function settlePayouts(
   client: pg.Client | pg.PoolClient,
   raceId: string,
   finished: readonly FinishedEntry[],
-): Promise<{ won: number; lost: number; paid: number }> {
+  /** 取消・除外馬の馬番（§9.1）。空なら返還は発生しない */
+  scratched: readonly number[] = [],
+): Promise<{ won: number; lost: number; refunded: number; refundedEp: number; paid: number }> {
   const order = [...finished].sort((a, b) => a.finishPosition - b.finishPosition).map((f) => f.gate);
-  const outcome: RaceOutcome = { order, fieldSize: finished.length };
+  // ★取消・除外馬を outcome に渡す。渡さないと settle() が返還を判定できない
+  const outcome: RaceOutcome = scratched.length > 0
+    ? { order, fieldSize: finished.length, scratched }
+    : { order, fieldSize: finished.length };
 
   const bets = await client.query<{
     id: string; user_id: string; bet_type: string; selection: number[];
@@ -51,6 +56,8 @@ export async function settlePayouts(
   let won = 0;
   let lost = 0;
   let paid = 0;
+  let refunded = 0;
+  let refundedEp = 0;
   for (const b of bets.rows) {
     const kind = BET_TYPE_MAP[b.bet_type];
     if (kind === undefined) {
@@ -66,7 +73,23 @@ export async function settlePayouts(
       outcome,
     );
 
-    if (s.hit) {
+    // ★取消・除外を含む馬券は EP で全額返還（§9.1）。
+    //   当初この分岐が無く、settle() が返す3状態のうち refunded を**無視していました**。
+    //   無視すると取消馬を含む馬券が「外れ」になり、客の EP が返りません。
+    if (s.refunded) {
+      refunded += 1;
+      refundedEp += Number(s.refund);
+      await client.query(`update bets set status = 'refunded' where id = $1`, [b.id]);
+      // ★返還は EP。PP で返すと EP→PP の変換経路ができる（憲法 §0.2）
+      await client.query(`update users set entry_points = entry_points + $1 where id = $2`, [
+        s.refund, b.user_id,
+      ]);
+      await client.query(
+        `insert into ep_ledger (user_id, delta, balance_after, reason, ref_id)
+         select $1, $2, entry_points, 'refund', $3 from users where id = $1`,
+        [b.user_id, s.refund, raceId],
+      );
+    } else if (s.hit) {
       won += 1;
       paid += s.payout;
       await client.query(`update bets set status = 'won', payout = $1 where id = $2`, [s.payout, b.id]);
@@ -85,5 +108,5 @@ export async function settlePayouts(
       await client.query(`update bets set status = 'lost' where id = $1`, [b.id]);
     }
   }
-  return { won, lost, paid: Number(pp(paid)) };
+  return { won, lost, refunded, refundedEp, paid: Number(pp(paid)) };
 }
