@@ -1,0 +1,11 @@
+{
+  "name": "@star/web",
+  "private": true,
+  "version": "0.0.0",
+  "description": "STAR frontend (Vercel). ★読み取り系だけ。ビジネスロジックを置かない（正典 §14.3・§15.2）",
+  "type": "module",
+  "dependencies": {
+    "@star/betting": "*",
+    "@star/scheduler": "*"
+  }
+}
