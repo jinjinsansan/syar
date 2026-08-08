@@ -11,6 +11,10 @@
 Description=STAR game loop worker
 After=network-online.target
 Wants=network-online.target
+# ★StartLimit* は [Unit] に置く。[Service] に書くと systemd に無視され、
+#   「短時間に落ち続けたら止める」が効かない（VPS で実際に警告が出た）
+StartLimitIntervalSec=300
+StartLimitBurst=10
 
 [Service]
 Type=simple
@@ -26,9 +30,7 @@ ExecStart=/opt/star/node_modules/.bin/tsx apps/worker/src/main.ts
 # ★A-1「24時間止まらない」の担保。落ちても必ず戻す
 Restart=always
 RestartSec=10
-# ★ただし短時間に落ち続けるなら止める（壊れたまま回り続けるほうが悪い）
-StartLimitIntervalSec=300
-StartLimitBurst=10
+# ★短時間に落ち続けるなら止める設定は [Unit] にある（上を参照）
 
 # ★SIGTERM で周の切れ目まで待つ。A-2 があるので途中で殺されても壊れないが、
 #   無駄な再計算を避ける
