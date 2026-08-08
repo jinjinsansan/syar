@@ -26,7 +26,7 @@ import {
   racesToPrepare,
   type Phase,
 } from '@star/scheduler';
-import { classOf, gradeOf } from '@star/scheduler';
+import { classOf, conditionsOf, gradeOf, type RaceConditions } from '@star/scheduler';
 
 /** DB 操作の注入口。テストで差し替えられるようにし、SQL をここに書かない */
 export interface CycleStore {
@@ -58,6 +58,8 @@ export interface RaceSpec {
    *   コミット済みのレースの reveal を出せなくなります（Provably Fair が成立しない）。
    */
   readonly serverSeed: string;
+  /** ★§10.3/§10.4 の条件。サイクル番号だけから決まる（乱数で決めると commit 後に変わる） */
+  readonly conditions: RaceConditions;
 }
 
 /** §8.6 の seed を作る。ハッシュとプロセス秘密は呼び出し側から注入する */
@@ -123,6 +125,7 @@ export async function runCycle(
         grade: gradeOf(idx),
         // ★発走時刻もサイクル番号から決める。再起動しても同じ時刻になる
         scheduledAtMs: cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.start,
+        conditions: conditionsOf(idx, classOf(idx), gradeOf(idx)),
         seedCommit: seeds.seedCommit(idx),
         serverSeed: seeds.serverSeed(idx),
       });

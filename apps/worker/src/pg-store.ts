@@ -50,7 +50,7 @@ export function createPgStore(client: pg.Client | pg.PoolClient): CycleStore {
       await client.query(
         `insert into races (cycle_index, name, class_rank, grade, surface, distance,
                             track_condition, course_id, scheduled_at, seed_commit, server_seed, purse, status)
-         values ($1, $2, $3, $4, 'turf', 2000, 'good', 'C1',
+         values ($1, $2, $3, $4, $8, $9, 'good', $10,
                  to_timestamp($5 / 1000.0), $6, $7, 0, 'scheduled')
          on conflict (cycle_index) do nothing`,
         [
@@ -62,6 +62,9 @@ export function createPgStore(client: pg.Client | pg.PoolClient): CycleStore {
           spec.seedCommit,
           // ★保存する。公開経路（races_public）には含めない
           spec.serverSeed,
+          spec.conditions.surface,
+          spec.conditions.distance,
+          spec.conditions.courseId,
         ],
       );
     },
