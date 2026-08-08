@@ -26,7 +26,10 @@ import {
   racesToPrepare,
   type Phase,
 } from '@star/scheduler';
-import { classOf, conditionsOf, gradeOf, type RaceConditions } from '@star/scheduler';
+import {
+  classOf, conditionsOf, gradeOf, prizeTierOf, purseOf,
+  type RaceConditions,
+} from '@star/scheduler';
 
 /** DB 操作の注入口。テストで差し替えられるようにし、SQL をここに書かない */
 export interface CycleStore {
@@ -58,6 +61,8 @@ export interface RaceSpec {
    *   コミット済みのレースの reveal を出せなくなります（Provably Fair が成立しない）。
    */
   readonly serverSeed: string;
+  /** 賞金総額（§11.1）。★PP の主な発行源（§9.3） */
+  readonly purse: number;
   /** ★§10.3/§10.4 の条件。サイクル番号だけから決まる（乱数で決めると commit 後に変わる） */
   readonly conditions: RaceConditions;
   /** 出走表（§10.4 の同格帯から組む。D-018） */
@@ -149,6 +154,7 @@ export async function runCycle(
         scheduledAtMs: cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.start,
         conditions: conditionsOf(idx, classOf(idx), gradeOf(idx)),
         ...build(idx),
+        purse: purseOf(prizeTierOf(classOf(idx), gradeOf(idx))),
         seedCommit: seeds.seedCommit(idx),
         serverSeed: seeds.serverSeed(idx),
       });

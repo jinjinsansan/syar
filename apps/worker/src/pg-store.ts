@@ -15,6 +15,7 @@
 import type pg from 'pg';
 import type { RaceEntrant } from '@star/race-engine';
 import { rowToHorse } from './horse-repo.js';
+import { awardPrizes } from './prize-award.js';
 import { settlePayouts } from './payout.js';
 import { settleRace as settleRaceFair } from './settle.js';
 import type { CycleStore, RaceSpec } from './cycle-runner.js';
@@ -70,7 +71,7 @@ export function createPgStore(
         `insert into races (cycle_index, name, class_rank, grade, surface, distance,
                             track_condition, course_id, scheduled_at, seed_commit, server_seed, purse, status)
          values ($1, $2, $3, $4, $8, $9, 'good', $10,
-                 to_timestamp($5 / 1000.0), $6, $7, 0, 'scheduled')
+                 to_timestamp($5 / 1000.0), $6, $7, $11, 'scheduled')
          on conflict (cycle_index) do nothing`,
         [
           spec.cycleIndex,
@@ -84,6 +85,7 @@ export function createPgStore(
           spec.conditions.surface,
           spec.conditions.distance,
           spec.conditions.courseId,
+          spec.purse,
         ],
       );
         // ★挿入されなかった＝他プロセスが先に作った。何もせず抜ける（重複させない）
@@ -147,10 +149,12 @@ export function createPgStore(
         const race = await client.query<{
           id: string; server_seed: string; distance: number;
           surface: string; track_condition: string; course_id: string;
+          class_rank: number; grade: string | null;
         }>(
           `update races set status = 'settled', seed_reveal = server_seed
             where cycle_index = $1 and status = 'scheduled'
-            returning id, server_seed, distance, surface, track_condition, course_id`,
+            returning id, server_seed, distance, surface, track_condition, course_id,
+                      class_rank, grade`,
           [cycleIndex],
         );
         if (race.rowCount === 0) {
@@ -225,6 +229,9 @@ export function createPgStore(
             [f.finishPosition, f.timeSec, r.id, f.gate],
           );
         }
+
+        // --- 賞金（§11.1）。★PP の主な発行源（§9.3）---
+        await awardPrizes(client, r.id, r.class_rank, r.grade, finished);
 
         // --- 馬券の精算（§9）。EP で買い PP で払い戻す ---
         await settlePayouts(client, r.id, finished);

@@ -47,6 +47,13 @@ export interface CalibrationConstant {
  */
 export const CALIBRATION: readonly CalibrationConstant[] = [
   {
+    key: 'PRIZE_TABLE',
+    file: 'packages/scheduler/src/prize.ts',
+    perturbed: "export const PRIZE_TABLE: Readonly<Record<PrizeTier, readonly number[]>> = { G1: [1,1,1,1,1], G2: [1,1,1,1,1], G3: [1,1,1,1,1], open: [1,1,1,1,1], win3: [1,1,1,1,1], win2: [1,1,1,1,1], win1: [1,1,1,1,1], maiden: [1,1,1,1,1] };",
+    affects:
+      '§9.3 / §11.1（賞金は PP の主な発行源。平坦にするとクラスが上がっても賞金が跳ねず、育成が飾りになる・D-020）',
+  },
+  {
     key: 'INBREED_PENALTY_WEIGHT',
     file: 'apps/cli/src/preseed.ts',
     perturbed: 'export const INBREED_PENALTY_WEIGHT = 0;',

@@ -7,3 +7,4 @@
 export * from './cycle.js';
 export * from './programme.js';
 export * from './conditions.js';
+export * from './prize.js';
