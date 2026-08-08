@@ -14,28 +14,10 @@
 
 import type pg from 'pg';
 import type { RaceEntrant } from '@star/race-engine';
+import { rowToHorse } from './horse-repo.js';
 import { settlePayouts } from './payout.js';
 import { settleRace as settleRaceFair } from './settle.js';
 import type { CycleStore, RaceSpec } from './cycle-runner.js';
-
-/**
- * ★出走馬の能力は DB から読むべきですが、現時点では中立値で確定しています。
- *   §8.7 の着順計算は能力を使うので、**このままだと全馬が同じ実力で走ります**。
- *   ⚠️ 未完成であることを明示します（本物らしい値を入れない）。
- *   次便で horses から能力を読んで渡します。
- */
-const NEUTRAL_ENTRANT = {
-  stats: { sp: 500, st: 500, pw: 500, gt: 500, iq: 500 },
-  surfaceAptitude: { turf: 50, dirt: 50 },
-  distanceCenter: 2000,
-  distanceRange: 600,
-  strategyAptitude: { nige: 50, senko: 50, sashi: 50, oikomi: 50 },
-  heavyAptitude: 55,
-  condition: 3,
-  fatigue: 0,
-  age: 4,
-  skillGenes: [],
-} as const;
 
 export function createPgStore(
   client: pg.Client | pg.PoolClient,
@@ -179,8 +161,13 @@ export function createPgStore(
         const r = race.rows[0]!;
 
         // --- 出走表を読んで着順を計算 ---
-        const es = await client.query<{ horse_id: string; gate: number; weight: string; strategy: string }>(
-          `select horse_id, gate, weight, strategy from race_entries where race_id = $1 order by gate`,
+        // ★horses と結合して**実際の能力**を読む。
+        //   中立値で走らせると全馬が同じ実力になり、V-4（1番人気の勝率）などの
+        //   較正がすべて意味を失います。
+        const es = await client.query<Record<string, unknown>>(
+          `select e.gate, e.weight, e.strategy, h.*
+             from race_entries e join horses h on h.id = e.horse_id
+            where e.race_id = $1 order by e.gate`,
           [r.id],
         );
         if (es.rowCount === 0) {
@@ -190,13 +177,27 @@ export function createPgStore(
 
         // ★着順は §8.6 の final_seed から決める（settle.ts）。
         //   ここで独自の乱数を使うと、seed_reveal を公開しても検証できません。
-        const entrants: RaceEntrant[] = es.rows.map((e) => ({
-          ...NEUTRAL_ENTRANT,
-          horseId: String(e.gate),
-          gate: e.gate,
-          weightKg: Number(e.weight),
-          strategy: e.strategy as RaceEntrant['strategy'],
-        }));
+        const entrants: RaceEntrant[] = es.rows.map((row) => {
+          const h = rowToHorse(row);
+          return {
+            // ★着順の同定は馬番で行う（DB の UUID ではなく枠番）
+            horseId: String(row['gate']),
+            stats: h.stats,
+            surfaceAptitude: h.surfaceAptitude,
+            distanceCenter: h.distanceCenter,
+            distanceRange: h.distanceRange,
+            strategyAptitude: h.strategyAptitude,
+            heavyAptitude: h.heavyAptitude,
+            strategy: String(row['strategy']) as RaceEntrant['strategy'],
+            // ★調子・疲労は未実装（§7）。実装したら DB から読む
+            condition: 3,
+            fatigue: 0,
+            weightKg: Number(row['weight']),
+            gate: Number(row['gate']),
+            age: 4,
+            skillGenes: h.skillGenes,
+          };
+        });
         const res = settleRaceFair(
           {
             conditions: {
