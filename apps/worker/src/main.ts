@@ -19,6 +19,7 @@ import pg from 'pg';
 import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
 import { buildRace } from './build-race.js';
+import { aggregateDay } from './daily-flow.js';
 import { loadRaceablePool } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
@@ -68,6 +69,8 @@ async function main(): Promise<void> {
   const store = createPgStore(client, hash);
   let stopping = false;
   let failures = 0;
+  /** ★日次集計は1日1回でよい。毎周やると DB を無駄に叩く */
+  let lastAggregated = '';
 
   // ★SIGTERM で綺麗に止める。処理の途中で殺されないよう、周の切れ目で抜ける
   //   （A-2 があるので途中で殺されても壊れませんが、無駄な再計算を避けます）
@@ -103,6 +106,20 @@ async function main(): Promise<void> {
         break;
       }
     }
+    // --- 日次集計（§4.6・§11.2）---
+    //   ★サーバー時刻の日付で判定する。ワーカーの時計は使わない
+    try {
+      const today = (await client.query<{ d: string }>('select current_date::text as d')).rows[0]!.d;
+      if (today !== lastAggregated) {
+        await aggregateDay(client, today);
+        lastAggregated = today;
+        console.log(`[worker] 日次集計を更新 date=${today}`);
+      }
+    } catch (e) {
+      // ★集計の失敗でループを止めない（A-1 が壊れる）。ただし黙らせない
+      console.error('[worker] 日次集計に失敗:', (e as Error).message);
+    }
+
     const elapsed = Date.now() - started;
     await new Promise((r) => setTimeout(r, Math.max(1000, TICK_MS - elapsed)));
   }
