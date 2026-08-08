@@ -1,0 +1,14 @@
+{
+  "name": "@star/worker",
+  "private": true,
+  "version": "0.0.0",
+  "description": "STAR game loop worker. 24/7, idempotent, advisory-locked.",
+  "type": "module",
+  "main": "./src/main.ts",
+  "dependencies": {
+    "@star/betting": "*",
+    "@star/race-engine": "*",
+    "@star/scheduler": "*",
+    "@star/sim-engine": "*"
+  }
+}
