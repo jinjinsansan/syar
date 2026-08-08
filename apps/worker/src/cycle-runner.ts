@@ -17,7 +17,15 @@
  *   ワーカーの時計は使いません。`Date.now()` をこのファイルで呼びません。
  */
 
-import { cycleIndexAt, isOnSale, phaseAt, racesToPrepare, type Phase } from '@star/scheduler';
+import {
+  PHASE_OFFSET_MS,
+  cycleIndexAt,
+  cycleStartMs,
+  isOnSale,
+  phaseAt,
+  racesToPrepare,
+  type Phase,
+} from '@star/scheduler';
 import { classOf, gradeOf } from '@star/scheduler';
 
 /** DB 操作の注入口。テストで差し替えられるようにし、SQL をここに書かない */
@@ -40,6 +48,19 @@ export interface RaceSpec {
   readonly cycleIndex: number;
   readonly raceClass: ReturnType<typeof classOf>;
   readonly grade: ReturnType<typeof gradeOf>;
+  /** 発走時刻（サイクル番号から決まる。★ワーカーの時計を使わない） */
+  readonly scheduledAtMs: number;
+  /** §8.6 のコミット。発走前に公開する */
+  readonly seedCommit: string;
+}
+
+/**
+ * §8.6 のコミット値。★実装は次便（ハッシュの注入が要る）。
+ *   今は「サイクル番号から決まる」ことだけを満たす仮値で、
+ *   **未実装であることが分かる形**にしておく（本物らしい値を入れない）。
+ */
+function commitFor(cycleIndex: number): string {
+  return `UNIMPLEMENTED-COMMIT-${cycleIndex}`;
 }
 
 /** advisory lock のキー。★用途ごとに固定値。他の用途と衝突させない */
@@ -89,7 +110,14 @@ export async function runCycle(store: CycleStore, epochMs: number): Promise<Cycl
         skipped.push(idx);
         continue;
       }
-      await store.createRace({ cycleIndex: idx, raceClass: classOf(idx), grade: gradeOf(idx) });
+      await store.createRace({
+        cycleIndex: idx,
+        raceClass: classOf(idx),
+        grade: gradeOf(idx),
+        // ★発走時刻もサイクル番号から決める。再起動しても同じ時刻になる
+        scheduledAtMs: cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.start,
+        seedCommit: commitFor(idx),
+      });
       created.push(idx);
     }
 
