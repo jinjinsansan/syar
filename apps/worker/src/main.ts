@@ -18,6 +18,8 @@ import { createHash, createHmac, randomBytes } from 'node:crypto';
 import pg from 'pg';
 import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
+import { buildRace } from './build-race.js';
+import { loadRaceablePool } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 
@@ -58,6 +60,11 @@ async function main(): Promise<void> {
     seedCommit: (i: number) => seedCommitFor(effectiveSecret, i, hash),
   };
 
+  // ★出走可能な馬を1回だけ読む。毎周読むと DB を無駄に叩く
+  //   （プリシード集団は日次バッチでしか変わらない）
+  const pool = await loadRaceablePool(client);
+  console.log(`[worker] 出走可能な馬 ${pool.length} 頭`);
+
   const store = createPgStore(client);
   let stopping = false;
   let failures = 0;
@@ -74,7 +81,7 @@ async function main(): Promise<void> {
   while (!stopping) {
     const started = Date.now();
     try {
-      const out = await runCycle(store, cfg.epochMs, seeds);
+      const out = await runCycle(store, cfg.epochMs, seeds, (i) => buildRace(pool, i, cfg.epochMs));
       failures = 0;
       // ★毎周かならず記録する。
       //   当初は「生成か確定があったときだけ」出力していたが、それだと

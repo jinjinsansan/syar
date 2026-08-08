@@ -60,6 +60,27 @@ export interface RaceSpec {
   readonly serverSeed: string;
   /** ★§10.3/§10.4 の条件。サイクル番号だけから決まる（乱数で決めると commit 後に変わる） */
   readonly conditions: RaceConditions;
+  /** 出走表（§10.4 の同格帯から組む。D-018） */
+  readonly entrants: readonly RaceEntrantSpec[];
+  /** オッズ（§9.2 のモンテカルロ実測） */
+  readonly odds: readonly OddsSpec[];
+}
+
+export interface RaceEntrantSpec {
+  readonly horseId: string;
+  readonly gate: number;
+  readonly weightKg: number;
+  readonly strategy: string;
+  /** モンテカルロ勝率順位（§9.2）。算出前は undefined */
+  readonly popularity?: number | undefined;
+}
+
+export interface OddsSpec {
+  readonly betType: string;
+  readonly selection: readonly number[];
+  readonly probability: number;
+  readonly odds: number;
+  readonly capped: boolean;
 }
 
 /** §8.6 の seed を作る。ハッシュとプロセス秘密は呼び出し側から注入する */
@@ -96,6 +117,7 @@ export async function runCycle(
   store: CycleStore,
   epochMs: number,
   seeds: SeedSource,
+  build: (cycleIndex: number) => { entrants: readonly RaceEntrantSpec[]; odds: readonly OddsSpec[] },
 ): Promise<CycleOutcome> {
   const nowMs = await store.serverNowMs();
   const cycleIndex = cycleIndexAt(nowMs, epochMs);
@@ -126,6 +148,7 @@ export async function runCycle(
         // ★発走時刻もサイクル番号から決める。再起動しても同じ時刻になる
         scheduledAtMs: cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.start,
         conditions: conditionsOf(idx, classOf(idx), gradeOf(idx)),
+        ...build(idx),
         seedCommit: seeds.seedCommit(idx),
         serverSeed: seeds.serverSeed(idx),
       });

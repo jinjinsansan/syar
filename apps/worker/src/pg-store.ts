@@ -43,11 +43,23 @@ export function createPgStore(client: pg.Client | pg.PoolClient): CycleStore {
       return Number(r.rows[0]!.n) > 0;
     },
 
+    /**
+     * レースを作る。★**レース行・出走表・オッズを同一トランザクションに収める**。
+     *
+     *   advisory lock は「二重に作らない」を守りますが、**半端な生成**は防げません:
+     *     レース行を作る →（ここで SIGKILL）→ オッズが無いレースが残る
+     *   オッズが無いと place_bet が「発売していない買い目」で全部拒否するので、
+     *   **誰も買えないレースが番組に並びます**。
+     *   A-2 で確認したのは「重複しないこと」だけで、この状態は見ていませんでした。
+     *   → トランザクションで、途中で落ちれば全部消えるようにします（A-5 と同じ構造）。
+     */
     async createRace(spec: RaceSpec): Promise<void> {
+      await client.query('begin');
+      try {
       // ★on conflict do nothing: 存在確認と挿入の間に割り込まれても二重にならない。
       //   確認（raceExists）は無駄な生成計算を避けるためで、**一意性の担保はこちら**。
       //   確認だけに頼ると「確認 → 割り込み → 挿入」で二重になります。
-      await client.query(
+      const ins = await client.query(
         `insert into races (cycle_index, name, class_rank, grade, surface, distance,
                             track_condition, course_id, scheduled_at, seed_commit, server_seed, purse, status)
          values ($1, $2, $3, $4, $8, $9, 'good', $10,
@@ -67,6 +79,37 @@ export function createPgStore(client: pg.Client | pg.PoolClient): CycleStore {
           spec.conditions.courseId,
         ],
       );
+        // ★挿入されなかった＝他プロセスが先に作った。何もせず抜ける（重複させない）
+        if (ins.rowCount === 0) {
+          await client.query('rollback');
+          return;
+        }
+        const raceId = (await client.query<{ id: string }>(
+          'select id from races where cycle_index = $1', [spec.cycleIndex],
+        )).rows[0]!.id;
+
+        // --- 出走表（§10.4 の同格帯から。D-018: 無作為だと V-4 が壊れる）---
+        for (const e of spec.entrants) {
+          await client.query(
+            `insert into race_entries (race_id, horse_id, gate, weight, strategy, popularity)
+             values ($1,$2,$3,$4,$5,$6)`,
+            [raceId, e.horseId, e.gate, e.weightKg, e.strategy, e.popularity ?? null],
+          );
+        }
+
+        // --- オッズ（§9.2）---
+        for (const o of spec.odds) {
+          await client.query(
+            `insert into race_odds (race_id, bet_type, selection, probability, odds, capped)
+             values ($1,$2,$3::jsonb,$4,$5,$6)`,
+            [raceId, o.betType, JSON.stringify(o.selection), o.probability, o.odds, o.capped],
+          );
+        }
+        await client.query('commit');
+      } catch (e) {
+        await client.query('rollback');
+        throw e;
+      }
     },
 
     async pendingSettlements(nowMs: number): Promise<number[]> {

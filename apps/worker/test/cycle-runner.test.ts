@@ -12,6 +12,9 @@ import { assertEnvironmentMatches, loadConfig } from '../src/env.js';
 const EPOCH = 1_700_000_000_000;
 
 /** テスト用の seed 源。★決定論（同じサイクルからは同じ値） */
+/** テスト用の出走表・オッズ（中身は問わない。runCycle は素通しするだけ） */
+const BUILD = () => ({ entrants: [], odds: [] });
+
 const SEEDS = {
   serverSeed: (i: number) => `seed-${i}`,
   seedCommit: (i: number) => `commit-${i}`,
@@ -53,7 +56,7 @@ describe('★A-2 冪等性（壊して確かめる）', () => {
   it('★同じ時刻で何度回しても、レースは一度しか作られない', async () => {
     const now = EPOCH + 4 * 60_000;
     const store = makeStore(now);
-    for (let i = 0; i < 10; i += 1) await runCycle(store, EPOCH, SEEDS);
+    for (let i = 0; i < 10; i += 1) await runCycle(store, EPOCH, SEEDS, BUILD);
     // 10周しても作成は最初の1回ぶんだけ（先行2レース）
     expect(store.createLog).toEqual([1, 2]);
     expect(new Set(store.createLog).size).toBe(store.createLog.length);
@@ -61,18 +64,18 @@ describe('★A-2 冪等性（壊して確かめる）', () => {
 
   it('★「再起動」しても作り直さない（ストアは残り、プロセスだけ落ちた想定）', async () => {
     const store = makeStore(EPOCH + 4 * 60_000);
-    await runCycle(store, EPOCH, SEEDS);
+    await runCycle(store, EPOCH, SEEDS, BUILD);
     const before = [...store.createLog];
     // プロセスが落ちて上がり直しても、runCycle をもう一度呼ぶだけ
-    await runCycle(store, EPOCH, SEEDS);
-    await runCycle(store, EPOCH, SEEDS);
+    await runCycle(store, EPOCH, SEEDS, BUILD);
+    await runCycle(store, EPOCH, SEEDS, BUILD);
     expect(store.createLog).toEqual(before);
   });
 
   it('★ロックが取れないときは何もせず戻る（例外にしない）', async () => {
     const store = makeStore(EPOCH + 4 * 60_000);
     store.tryLock = async () => false;
-    const out = await runCycle(store, EPOCH, SEEDS);
+    const out = await runCycle(store, EPOCH, SEEDS, BUILD);
     expect(out.lockBusy).toBe(true);
     expect(out.created).toEqual([]);
     // ★例外にすると再起動ループになり A-1（24時間稼働）が壊れる
@@ -87,23 +90,23 @@ describe('★A-2 冪等性（壊して確かめる）', () => {
     store.createRace = async () => {
       throw new Error('生成失敗');
     };
-    await expect(runCycle(store, EPOCH, SEEDS)).rejects.toThrow('生成失敗');
+    await expect(runCycle(store, EPOCH, SEEDS, BUILD)).rejects.toThrow('生成失敗');
     expect(unlocked).toBe(true);
   });
 
   it('★時刻が進めば新しいレースだけを作る（既存は作り直さない）', async () => {
     const store = makeStore(EPOCH + 4 * 60_000);
-    await runCycle(store, EPOCH, SEEDS);
+    await runCycle(store, EPOCH, SEEDS, BUILD);
     expect(store.createLog).toEqual([1, 2]);
     store.serverNowMs = async () => EPOCH + CYCLE_MS + 4 * 60_000;
-    await runCycle(store, EPOCH, SEEDS);
+    await runCycle(store, EPOCH, SEEDS, BUILD);
     // 次のサイクルでは 3 だけが増える（2 は既存）
     expect(store.createLog).toEqual([1, 2, 3]);
   });
 
   it('★ワーカーの時計を使わない（serverNowMs だけを見る）', async () => {
     const store = makeStore(EPOCH + 4 * 60_000);
-    const out = await runCycle(store, EPOCH, SEEDS);
+    const out = await runCycle(store, EPOCH, SEEDS, BUILD);
     expect(out.nowMs).toBe(EPOCH + 4 * 60_000);
     expect(out.cycleIndex).toBe(0);
   });
