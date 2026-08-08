@@ -6,6 +6,14 @@
   "type": "module",
   "dependencies": {
     "@star/betting": "*",
-    "@star/scheduler": "*"
+    "@star/scheduler": "*",
+    "@supabase/supabase-js": "^2.112.2",
+    "next": "^15.5.23",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4"
   }
 }

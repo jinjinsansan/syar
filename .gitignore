@@ -41,3 +41,5 @@ data/ng-names.txt
 
 # 環境変数の実値（.env と同じ扱い・絶対にコミットしない）
 secrets.local.env
+
+apps/web/.env.local
