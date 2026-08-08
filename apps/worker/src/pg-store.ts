@@ -91,3 +91,16 @@ function classRankOf(c: string): number {
   if (i < 0) throw new Error(`未知のクラス: ${c}`);
   return i + 1;
 }
+
+/**
+ * ★A-7: DB 側の環境宣言を読む（§14.6）。
+ *   行が無ければ null を返し、呼び出し側が**起動を失敗させる**。
+ *   ここで既定値を返さないこと — 「不明なら安全側」は
+ *   「不明なら止める」であって「不明なら production でないとみなす」ではありません。
+ */
+export async function readDbEnvironment(client: pg.Client | pg.PoolClient): Promise<string | null> {
+  const r = await client.query<{ environment: string }>(
+    `select environment from app_environment limit 1`,
+  );
+  return r.rows[0]?.environment ?? null;
+}
