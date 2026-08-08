@@ -47,3 +47,5 @@ apps/web/.env.local
 # Next.js のビルド成果物（生成物なのでコミットしない）
 apps/web/.next/
 apps/web/out/
+
+.vercel
