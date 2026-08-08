@@ -19,7 +19,9 @@ WorkingDirectory=/opt/star
 # ★秘密は systemd の EnvironmentFile で渡す。リポジトリにも履歴にも残さない
 #   権限は 600 / 所有者 star にすること
 EnvironmentFile=/etc/star/worker.env
-ExecStart=/usr/bin/node --experimental-strip-types apps/worker/src/main.ts
+# ★node --experimental-strip-types は一部の TS 構文を扱えず ERR_NO_TYPESCRIPT で落ちる。
+#   リポジトリで既に使っている tsx を使う（npm ci で入る）。
+ExecStart=/opt/star/node_modules/.bin/tsx apps/worker/src/main.ts
 
 # ★A-1「24時間止まらない」の担保。落ちても必ず戻す
 Restart=always
