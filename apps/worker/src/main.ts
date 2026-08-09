@@ -18,6 +18,7 @@ import { createHash, createHmac, randomBytes } from 'node:crypto';
 import pg from 'pg';
 // ★最初に読み込む。DB へ最初のクエリを出す前に型変換を有効にする必要があります
 import { assertPgTypesConfigured } from './pg-types.js';
+import { APPLICATION_NAME, formatResources, sampleResources } from './resources.js';
 import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
 import { buildRace } from './build-race.js';
@@ -38,6 +39,10 @@ async function main(): Promise<void> {
   const client = new pg.Client({
     connectionString: cfg.databaseUrl,
     ssl: { rejectUnauthorized: false },
+    // ★自分の接続に名前を付ける。pg_stat_activity には他の接続（Web・検証
+    //   スクリプト・手で繋いだセッション）も見えるので、名前で絞らないと
+    //   他人の増減を自分のリークと読み違えます
+    application_name: APPLICATION_NAME,
   });
   await client.connect();
 
@@ -112,10 +117,13 @@ async function main(): Promise<void> {
       //   **プロセスが生きているだけの空回りと、実際に処理している状態を区別できない**。
       //   A-1 は「レースが実際に生成・確定・払戻されたことまで確認」する基準なので、
       //   周ごとの記録が無いと**測定そのものが成立しません**（指示書 §3 の警告どおり）。
+      // ★資源は毎周記録する。リークは「あとで見よう」では測れません
+      //   （1回目の A-1 で、最長無停止区間の両端を記録しておらず取得できませんでした）
+      const res = await sampleResources(client);
       console.log(
         `[worker] cycle=${out.cycleIndex} phase=${out.phase} ` +
           `生成=[${out.created.join(',')}] 既存=${out.skipped.length} ` +
-          `確定=[${out.settled.join(',')}]` +
+          `確定=[${out.settled.join(',')}] ${formatResources(res)}` +
           // ★0件のときは出さない。毎周 中止=[] と出ると、実際に起きた周が埋もれます
           `${out.cancelled.length > 0 ? ` ★中止=[${out.cancelled.join(',')}]` : ''}` +
           `${out.lockBusy ? ' lock=busy' : ''}`,
