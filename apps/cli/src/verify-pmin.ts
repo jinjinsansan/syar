@@ -12,7 +12,14 @@
  *   そのレースの実現払戻率が高精度で出ます。
  *   測っている量（オッズ推定の誤差）は変わらず、**分散だけが下がります。**
  *
- *   これで 8レース × K=100,000 でも、8,000レース×1回より精密になります。
+ * 【★ただしレース数は1にできません（D-036）】
+ *   残差 Σ(1−pᵢ)/(M·pᵢ) は**出走表の確率構造に依存します**。
+ *   堅い1番人気がいるレースと横一線のレースでは違います。
+ *   1つの出走表を10万回引いても、**出走表間のばらつきは1標本のまま**です
+ *   （A-3 をシード4本で判定して失敗したのと同じ形・R-20）。
+ *
+ *   → K は**レース内**の分散を、RACES は**レース間**の分散を潰します。両方要ります。
+ *   → ★N が足りているかは推測せず、**レース間のばらつきから SE を出して報告**します。
  *
  * 【★本番のコードを通す】
  *   オッズは `apps/worker/src/odds.ts` の `buildOddsRows` で作ります。
@@ -37,8 +44,8 @@ const num = (n: string, d: number): number => {
   return Number.isFinite(v) ? v : d;
 };
 const SEED = num('seed', 42);
-const RACES = num('races', 8);
-const FINALS = num('finals', 100_000);
+const RACES = num('races', 100);
+const FINALS = num('finals', 20_000);
 const MC = num('odds-trials', ODDS_MC_TRIALS);
 
 const { balance, founders } = resolveRuntimeConfig();
@@ -56,6 +63,8 @@ interface Stat { stake: number; payout: number; unsold: number; capped: number }
 const total = new Map<TicketKind, Stat>(
   TICKET_KINDS.map((k) => [k, { stake: 0, payout: 0, unsold: 0, capped: 0 }]),
 );
+/** ★レースごとの払戻率。レース間のばらつき（＝N が足りているか）を測るために要る */
+const perRace = new Map<TicketKind, number[]>(TICKET_KINDS.map((k) => [k, []]));
 
 console.log(`# D-035 を本番コード経路で確認  seed=${SEED} races=${RACES} M=${MC.toLocaleString()} 確定${FINALS.toLocaleString()}回/レース`);
 console.log(`  ★1レースにつきオッズを1回作り、独立系列から確定を多数引く（分散低減）`);
@@ -85,6 +94,8 @@ for (let i = 0; i < RACES; i += 1) {
   }
 
   // --- 確定を K 回引く（§8.6 とは別系列でよい。ここは測定） ---
+  const beforeStake = new Map(TICKET_KINDS.map((k) => [k, total.get(k)!.stake]));
+  const beforePayout = new Map(TICKET_KINDS.map((k) => [k, total.get(k)!.payout]));
   const finalRng = deriveRng(SEED, S.FINAL, i);
   for (let t = 0; t < FINALS; t += 1) {
     const order = orderOf(resolveRace({ conditions: race.conditions, entrants, seed: finalRng.nextUint32(), balance: DEFAULT_RACE_BALANCE }));
@@ -100,7 +111,16 @@ for (let i = 0; i < RACES; i += 1) {
       }
     }
   }
-  console.log(`  レース ${i + 1}/${RACES}（${entrants.length}頭）完了`);
+  for (const kind of TICKET_KINDS) {
+    const st = total.get(kind)!;
+    const stake = st.stake - beforeStake.get(kind)!;
+    const payout = st.payout - beforePayout.get(kind)!;
+    if (stake === 0) throw new Error(`${kind}: レース ${i} の売り目が0です（R-21）`);
+    perRace.get(kind)!.push(payout / stake);
+  }
+  if ((i + 1) % 10 === 0 || i + 1 === RACES) {
+    console.log(`  レース ${i + 1}/${RACES} 完了`);
+  }
 }
 
 console.log('');
@@ -113,10 +133,17 @@ for (const kind of TICKET_KINDS) {
   const dev = (rate - (1 - MARGIN[kind])) * 100;
   const pass = Math.abs(dev) <= 1;
   if (!pass) allPass = false;
+  // ★レース間のばらつきから SE を出す。N が足りているかを**測って**言う
+  const xs = perRace.get(kind)!;
+  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const sd = Math.sqrt(xs.reduce((a, b) => a + (b - mean) ** 2, 0) / (xs.length - 1)) * 100;
+  const se = sd / Math.sqrt(xs.length);
   console.log(
-    `  ${kind.padEnd(16)} 払戻率 ${(rate * 100).toFixed(2)}%  目標 ${((1 - MARGIN[kind]) * 100).toFixed(0)}%  ` +
-      `乖離 ${(dev >= 0 ? '+' : '') + dev.toFixed(2)}pt  売目 ${(st.stake / (RACES * FINALS)).toFixed(1)}/R  ` +
-      `未発売的中 ${((st.unsold / (RACES * FINALS)) * 100).toFixed(2)}%  ${pass ? 'PASS' : 'FAIL'}`,
+    `  ${kind.padEnd(16)} 払戻率 ${(rate * 100).toFixed(2)}%  ` +
+      `乖離 ${((dev >= 0 ? '+' : '') + dev.toFixed(2) + 'pt').padStart(7)}  ` +
+      `レース間SD ${sd.toFixed(2).padStart(5)}pt  SE ${se.toFixed(3)}pt  ` +
+      `売目 ${(st.stake / (RACES * FINALS)).toFixed(0).padStart(4)}/R  ` +
+      `未発売 ${((st.unsold / (RACES * FINALS)) * 100).toFixed(2)}%  ${pass ? 'PASS' : 'FAIL'}`,
   );
 }
 // ★D-035 の下では cap に当たる目が存在しないはず。立っていたら発売下限が効いていない

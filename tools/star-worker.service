@@ -1,0 +1,63 @@
+# STAR ゲームループワーカー（正典 §14 / D-037）
+#
+# 配置: /etc/systemd/system/star-worker.service
+# 有効化: sudo systemctl daemon-reload && sudo systemctl enable --now star-worker
+#
+# ★配備はリリースディレクトリ＋シンボリックリンク切替（tools/deploy.sh）。
+#   /opt/star-releases/<sha>/   ← 木を丸ごと作る
+#   /opt/star-current -> ...    ← ここを張り替えて restart
+#
+#   ★`WorkingDirectory` と `ExecStart` が **/opt/star ではなく /opt/star-current** を
+#     指していることが要点です。稼働中プロセスの木を書き換えないための構造で、
+#     ここが /opt/star に戻ると、木を置き換える配備に逆戻りします。
+#     （Node は必要になるまで require しないので、稼働中の木を置き換えると
+#       後から読んだモジュールで新旧が混ざります）
+
+[Unit]
+Description=STAR game loop worker
+After=network-online.target
+Wants=network-online.target
+# ★StartLimit* は [Unit] に置く。[Service] に書くと systemd に無視され、
+#   「短時間に落ち続けたら止める」が効かない（VPS で実際に警告が出た）
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=star
+WorkingDirectory=/opt/star-current
+# ★秘密は systemd の EnvironmentFile で渡す。リポジトリにも履歴にも残さない
+#   権限は 600 / 所有者 star にすること
+EnvironmentFile=/etc/star/worker.env
+# ★node --experimental-strip-types は一部の TS 構文を扱えず ERR_NO_TYPESCRIPT で落ちる。
+#   リポジトリで既に使っている tsx を使う（npm ci で入る）。
+ExecStart=/opt/star-current/node_modules/.bin/tsx apps/worker/src/main.ts
+
+# ★A-1「24時間止まらない」の担保。落ちても必ず戻す。
+#   ⚠️ ただし **Restart=always は壊れた配備を救いません**。同じ壊れたものを
+#      起動し直すだけで、StartLimitBurst に当たれば systemd が諦めます
+#      （2026-08-09 に7分停止）。配備側で守るのが tools/deploy.sh です。
+Restart=always
+RestartSec=10
+
+# ★SIGTERM で周の切れ目まで待つ。A-2 があるので途中で殺されても壊れないが、
+#   無駄な再計算を避ける。
+#   ⚠️ D-035 で M=3,896,104 になり、**1周が最大275秒**（1レース138秒×2）です。
+#      TimeoutStopSec が周の長さを下回ると、毎回 SIGKILL で落とすことになります。
+TimeoutStopSec=330
+
+# 最低限の隔離
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# ★リリース木は /opt/star-releases に作られ、/opt/star-current はそこへの symlink。
+#   両方を書き込み可能にしておく（symlink の解決先が読めないと起動できない）
+ReadWritePaths=/opt/star-releases
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=star-worker
+
+[Install]
+WantedBy=multi-user.target
