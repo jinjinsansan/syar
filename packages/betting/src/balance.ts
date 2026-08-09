@@ -8,7 +8,7 @@
  *      勝手に動かすと経済が変わります。変更にはオーナー承認が要ります。
  */
 
-import type { TicketKind } from './types.js';
+import { TICKET_KINDS, type TicketKind } from './types.js';
 
 /** 最小購入単位（正典 §9.1: 全券種 100 EP） */
 export const MIN_STAKE = 100;
@@ -90,6 +90,61 @@ export function debiasedProbability(pHat: number, trials: number): number {
     throw new Error(`debiasedProbability: 試行数 M が不正です (${trials})`);
   }
   return pHat + (1 - pHat) / trials;
+}
+
+/**
+ * ★D-035: 発売する最小確率。**これ未満の目は売らない。**
+ *
+ *     p_min = (1 − margin) / ODDS_CAP
+ *
+ * 【なぜ「上限で頭打ち」ではなく「売らない」なのか】
+ *   上限は**払戻を減らす方向にしか働きません**。上限に当たる目を売ると、
+ *   客は当たっても**黙って切り詰められた配当**を受け取ります。
+ *   実測（二項分布の厳密計算）で、券種によっては還元率が設定 margin より
+ *   **7〜13pt 低く**なっていました。**払えない配当を売らないほうが客に有利です。**
+ *
+ * 【★これが3つの効果を同時に閉じます】
+ *   ③ 上限の切り詰めが消える … 売る目がすべて上限の内側にある
+ *   ② c ≧ 1 の打ち切りが消える … 売る下限が p_min に固定されるので、
+ *      M·p_min = λ* を十分大きく取れば c の条件付けが無視できる
+ *   ① 凸性は `debiasedProbability` で既に消えている
+ *   残るのは margin ちょうどです。
+ *
+ *   ★②と③が正面衝突していたのは、どちらも「稀な目」に効くからでした。
+ *     稀な目の扱いを**1箇所で**決めれば両方閉じます。
+ */
+export function minSellableProbability(kind: TicketKind): number {
+  return (1 - MARGIN[kind]) / ODDS_CAP[kind];
+}
+
+/**
+ * ★打ち切りを無視できるとみなす M·p_min（正典 D-035 の設計余裕）。
+ *
+ * ⚠️ **1行で書くこと**（MARGIN 参照）。
+ * ⚠️ これは較正定数です。大きくすると必要な試行数がそのまま比例して増え、
+ *    レース生成の所要時間に直結します（本番機で λ*=30 → 1レース 137秒）。
+ */
+// prettier-ignore
+export const LAMBDA_STAR = 30;
+
+/**
+ * ★券種ごとに必要なモンテカルロ試行数（正典 D-035）。
+ *
+ *     M ≧ λ* × ODDS_CAP / (1 − margin) = λ* / p_min
+ *
+ * MC は1回の試行で全券種の的中目を同時に数えるので、**M は券種で共有**します。
+ * したがって実際に使うのは全券種の最大値（`requiredOddsTrials()`）です。
+ */
+export function requiredOddsTrialsFor(kind: TicketKind): number {
+  return Math.ceil(LAMBDA_STAR / minSellableProbability(kind));
+}
+
+/**
+ * 全券種を満たす試行数。★律速は三連単（上限 100,000倍）です。
+ * ⚠️ 正典 §9.2 の 10,000 では足りません（三連単で −20.90pt）。§9.2 の改訂が要ります。
+ */
+export function requiredOddsTrials(): number {
+  return Math.max(...TICKET_KINDS.map(requiredOddsTrialsFor));
 }
 
 /**

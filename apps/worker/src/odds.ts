@@ -18,10 +18,27 @@
  *     しかも当たったときは cap 上限を払うので運営の損失も読めません。
  */
 
-import { MARGIN, debiasedProbability, oddsFromProbability, type TicketKind } from '@star/betting';
+import {
+  MARGIN,
+  debiasedProbability,
+  minSellableProbability,
+  oddsFromProbability,
+  requiredOddsTrials,
+  type TicketKind,
+} from '@star/betting';
 
-/** 正典 §9.2: レース生成時のモンテカルロ試行数 */
-export const ODDS_MC_TRIALS = 10_000;
+/**
+ * レース生成時のモンテカルロ試行数（正典 D-035 の設計式から決まる）。
+ *
+ * ★ここに数値リテラルを置きません。**上限を動かせば必要な試行数も動く**ので、
+ *   `M ≧ λ* × ODDS_CAP / (1−margin)` を式のまま参照します。
+ *   独立した数値にすると、上限だけ変えたときに静かに不足します。
+ *
+ * ⚠️ 正典 §9.2 の 10,000 では足りません（三連単で −20.90pt）。§9.2 の改訂が要ります。
+ * ⚠️ 本番機（VPS・16頭立て）で 1レースあたり約 138秒、1周2レースで約 275秒です。
+ *    10分サイクルの 46% を使います。★モンテカルロは DB トランザクションの外で走ります。
+ */
+export const ODDS_MC_TRIALS = requiredOddsTrials();
 
 export interface OddsRow {
   readonly betType: TicketKind;
@@ -79,9 +96,14 @@ export function buildOddsRows(
   if (trials <= 0) throw new Error('buildOddsRows: 試行数が 0 以下です');
   const rows: OddsRow[] = [];
   for (const [betType, m] of counts) {
+    const pMin = minSellableProbability(betType);
     for (const [key, c] of m) {
       // ★1回も出なかった目はそもそもここに現れない（= 売らない）
       const probability = c / trials;
+      // ★D-035: 上限に当たる目は売らない。
+      //   売ると、客は当たっても切り詰められた配当しか受け取れません。
+      //   ここで弾くことで、以降のオッズは**必ず上限の内側**に収まります。
+      if (probability < pMin) continue;
       const odds = oddsFromProbability(betType, probability, trials);
       // ★cap 判定の raw も補正後で取る。補正前と比べると、D-013 の割り戻しで
       //   下がったぶんまで「cap に当たった」と数えてしまう
@@ -91,7 +113,8 @@ export function buildOddsRows(
         selection: keyToSelection(key),
         probability,
         odds,
-        // ★上限に当たったことを記録する。§9.4 が「到達時は表示に明示」と定めている
+        // ★D-035 の下で `capped` は決して立ちません（上限に当たる目を売らないため）。
+        //   欄は残します — 立ったら「売らない規則が効いていない」ことの証拠になります。
         capped: raw > odds,
       });
     }

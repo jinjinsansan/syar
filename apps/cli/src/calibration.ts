@@ -96,6 +96,12 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: 'V-10 / §11（控除率。PP 発行量の最大の調整弁。0 にすると胴元の取り分が消える）',
   },
   {
+    key: 'LAMBDA_STAR',
+    file: 'packages/betting/src/balance.ts',
+    perturbed: 'export const LAMBDA_STAR = 1;',
+    affects: 'V-10 / D-035（M·p_min の設計余裕。1 にすると c≧1 の打ち切りが無視できなくなり、稀な目のオッズが低く付いて払戻率が不足する。必要な試行数にそのまま比例し、レース生成の所要時間にも直結する）',
+  },
+  {
     key: 'ODDS_CAP',
     file: 'packages/betting/src/balance.ts',
     perturbed: 'export const ODDS_CAP: Readonly<Record<TicketKind, number>> = { win: 1e9, place: 1e9, quinella_place: 1e9, quinella: 1e9, exacta: 1e9, trio: 1e9, trifecta: 1e9 };',
@@ -267,6 +273,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
   {
     pattern: 'apps/cli/src/diag-bias\.ts',
     why: "★恒等式 払戻率 = (1−margin)×[1 + (1/n)Σ(1−p)/(M·p)] の**予測値**を計算する道具。上の diag-* と違い、この出力は判定に効く（予測と実測が一致するかで是正方針が決まる）ので、同じ枠に入れずここに分ける。それでも較正定数ではない理由: (a) MC は自由変数ではなく**実測と同じ M でなければ意味を持たない**量で、ずらすことは較正ではなく誤りである (b) RACES は全出走馬にわたる平均の標準誤差だけを決め、期待値を動かさない (c) SEED は実測と同じ10シードを掃引する。予測を実測に近づけるために動かせる値が1つも無い（R-12）",
+  },
+  {
+    pattern: 'apps/cli/src/verify-pmin\.ts',
+    why: "★D-035 を本番のコード経路（apps/worker/src/odds.ts の buildOddsRows）で確かめるハーネス。実行条件は較正定数ではない: MC は D-035 の設計式から決まる値を既定に取り（自由に選べない）、RACES と FINALS は**推定の分散だけ**を下げて期待値を動かさない。★M=3,896,104 では §13.2 の10万レース測定が 3.9×10^11 回の解決（本番機で約44日）になるため、同一レースから確定を多数引く分散低減を使う。合否は出力の乖離で決まり、ここの値をいじって通せるものではない（R-12）",
   },
   {
     pattern: 'apps/cli/src/bench-mc\.ts',

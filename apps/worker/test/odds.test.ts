@@ -1,7 +1,15 @@
 /**
  * §9.2 オッズ算出。★経済に直結するので「間違ったオッズを付けない」ことを測る。
  */
-import { MARGIN, ODDS_CAP, TICKET_KINDS, debiasedProbability, type TicketKind } from '@star/betting';
+import {
+  MARGIN,
+  ODDS_CAP,
+  TICKET_KINDS,
+  debiasedProbability,
+  minSellableProbability,
+  requiredOddsTrials,
+  type TicketKind,
+} from '@star/betting';
 import { describe, expect, it } from 'vitest';
 import { ODDS_MC_TRIALS, buildOddsRows, keyToSelection, winningKeys } from '../src/odds.js';
 
@@ -9,8 +17,36 @@ const counts = (kind: TicketKind, entries: [string, number][]) =>
   new Map<TicketKind, ReadonlyMap<string, number>>([[kind, new Map(entries)]]);
 
 describe('§9.2 オッズ算出', () => {
-  it('正典のモンテカルロ試行数は 10,000', () => {
-    expect(ODDS_MC_TRIALS).toBe(10_000);
+  it('★試行数は D-035 の設計式から決まる（数値リテラルを置かない）', () => {
+    // M ≧ λ* × ODDS_CAP / (1 − margin)。律速は三連単（上限 100,000倍）
+    expect(ODDS_MC_TRIALS).toBe(requiredOddsTrials());
+    expect(ODDS_MC_TRIALS).toBe(3_896_104);
+    // ★正典 §9.2 の 10,000 では足りない（三連単で −20.90pt）
+    expect(ODDS_MC_TRIALS).toBeGreaterThan(10_000);
+  });
+
+  it('★D-035: p_min 未満の目は行が作られない（売らない）', () => {
+    const M = ODDS_MC_TRIALS;
+    // win の p_min = 0.82/500 = 1.64e-3。M·p_min = 6,389 回が境界
+    const boundary = Math.ceil(M * minSellableProbability('win'));
+    const rows = buildOddsRows(
+      counts('win', [['1', boundary], ['2', boundary - 1], ['3', M / 2]]),
+      M,
+    );
+    // ★境界の両側を見る（R-2）。ちょうどは売る、1つ下は売らない
+    expect(rows.map((r) => r.selection[0]!).sort((a, b) => a - b)).toEqual([1, 3]);
+  });
+
+  it('★D-035 の下では配当上限に当たる目が存在しない（capped が立たない）', () => {
+    const M = ODDS_MC_TRIALS;
+    for (const kind of TICKET_KINDS) {
+      const boundary = Math.ceil(M * minSellableProbability(kind));
+      // 売られる最小の目でも上限を超えない
+      const [row] = buildOddsRows(counts(kind, [['7', boundary]]), M);
+      expect(row, `${kind} の境界の目が売られていない`).toBeDefined();
+      expect(row!.odds).toBeLessThanOrEqual(ODDS_CAP[kind]);
+      expect(row!.capped, `${kind} で上限に当たった`).toBe(false);
+    }
   });
 
   it('★オッズ = (1/p_eff) × (1 − margin)（D-013 の割り戻し込み）', () => {
@@ -22,16 +58,15 @@ describe('§9.2 オッズ算出', () => {
     expect(row!.capped).toBe(false);
   });
 
-  it('★推定できる最小確率は 1/M なので、到達しうる最大オッズは (1−margin)×M', () => {
-    // ★§9.4 の cap との関係が M で決まることを固定する。
-    //   MC で1回だけ出た目（c=1）が最も高いオッズになる。
+  it('★売る下限は推定の天井 1/M ではなく p_min（D-035 が先に効く）', () => {
+    // ★D-035 の前は「推定できる最小確率 1/M」が実質の下限で、
+    //   券種によっては §9.4 の上限に**届かないまま**稀な目を売っていた。
+    //   いまは p_min が必ず先に効く（p_min ≫ 1/M）。
     const M = ODDS_MC_TRIALS;
     for (const kind of TICKET_KINDS) {
-      const [row] = buildOddsRows(counts(kind, [['9', 1]]), M);
-      const ceiling = (1 - MARGIN[kind]) * M;
-      expect(row!.odds).toBeLessThanOrEqual(ceiling + 1e-6);
-      // cap が天井より上にある券種では、cap は M=10,000 では**到達不能**になる
-      if (ODDS_CAP[kind] > ceiling) expect(row!.capped).toBe(false);
+      expect(minSellableProbability(kind), `${kind}`).toBeGreaterThan(1 / M);
+      // c=1（MC で1回だけ出た目）は、どの券種でも売られない
+      expect(buildOddsRows(counts(kind, [['9', 1]]), M), `${kind}`).toEqual([]);
     }
   });
 
@@ -42,10 +77,12 @@ describe('§9.2 オッズ算出', () => {
     // ★売ると「絶対に当たらないはずの目」に賭けさせ、当たれば cap を払うことになる
   });
 
-  it('★上限に当たったら capped を立てる（§9.4 は表示への明示を求めている）', () => {
-    const [row] = buildOddsRows(counts('win', [['9', 1]]), 10_000);
-    expect(row!.odds).toBe(ODDS_CAP.win);
-    expect(row!.capped).toBe(true);
+  it('★上限に当たる目は行が作られない（D-035 で「頭打ちにして売る」をやめた）', () => {
+    // 以前はここで capped=true・odds=cap の行を作っていた。
+    // ★それは「当たっても切り詰められた配当しか払わない馬券」を売る実装だった。
+    //   D-035 では**売らない**ので、行そのものが存在しない。
+    const rows = buildOddsRows(counts('win', [['9', 1]]), 10_000);
+    expect(rows).toEqual([]);
   });
 
   it('試行数が0以下なら例外（ゼロ除算で Infinity のオッズを作らない）', () => {
