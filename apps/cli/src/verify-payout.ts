@@ -43,6 +43,7 @@ import {
   MARGIN,
   ODDS_CAP,
   TICKET_KINDS,
+  debiasedProbability,
   oddsFromProbability,
   placeDepth,
   type TicketKind,
@@ -191,7 +192,8 @@ function runSeed(seed: number): Map<TicketKind, KindStat> {
       // ★cap に当たっている売り目を数える。払戻率の下振れが「推定誤差」なのか
       //   「§9.4 の切り詰め」なのかは、これを測らないと区別できません。
       for (const c of m.values()) {
-        if ((1 / (c / ODDS_TRIALS)) * (1 - MARGIN[kind]) > ODDS_CAP[kind]) st.cappedBets += 1;
+        const pe = debiasedProbability(c / ODDS_TRIALS, ODDS_TRIALS);
+        if ((1 / pe) * (1 - MARGIN[kind]) > ODDS_CAP[kind]) st.cappedBets += 1;
       }
       for (const key of winningKeys(kind, finalOrder, fieldSize)) {
         const c = m.get(key);
@@ -201,8 +203,10 @@ function runSeed(seed: number): Map<TicketKind, KindStat> {
           continue;
         }
         const prob = c / ODDS_TRIALS;
-        const raw = (1 / prob) * (1 - MARGIN[kind]);
-        const paid = oddsFromProbability(kind, prob);
+        // ★raw も補正後で取る。補正前の raw と比べると、cap による損失に
+        //   「バイアス補正で下がったぶん」が混ざり、cap の効果を過大に読む
+        const raw = (1 / debiasedProbability(prob, ODDS_TRIALS)) * (1 - MARGIN[kind]);
+        const paid = oddsFromProbability(kind, prob, ODDS_TRIALS);
         st.payout += paid;
         if (raw > paid) st.cappedLoss += raw - paid;
       }

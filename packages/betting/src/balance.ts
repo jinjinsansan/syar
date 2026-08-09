@@ -58,9 +58,49 @@ export function placeDepth(fieldSize: number): number {
   return fieldSize >= PLACE_THREE_MIN_FIELD ? 3 : 2;
 }
 
-/** オッズ = (1/p) × (1 − margin)、上限で頭打ち（正典 §9.2・§9.4） */
-export function oddsFromProbability(kind: TicketKind, p: number): number {
+/**
+ * ★モンテカルロ推定量のバイアスを打ち消した確率（正典 D-013）
+ *
+ * 【なぜ必要か】
+ *   `p̂ = c/M`（c 〜 Binomial(M, p)）は **p の不偏推定量**ですが、
+ *   オッズが使うのは `1/p̂` で、**1/x が凸なので `1/p̂` は不偏ではありません**。
+ *
+ *     E[1/p̂] ≈ (1/p) · ( 1 + (1−p)/(M·p) )
+ *
+ *   角括弧の中は**必ず 1 より大きい**ので、オッズは系統的に高く付きます。
+ *   A-3 で10シードすべてが払戻率 82% を上回り、**下振れが1つも無かった**のは
+ *   偶然ではなく、この恒等式の帰結です（実測 +1.36pt / 予測 +1.10pt）。
+ *
+ * 【★これは測定を通すための調整ではありません】
+ *   運営が意図する控除率は §9.3 の `MARGIN` です。補正前のオッズは
+ *   **推定量のバイアスのぶんだけ、意図より客に有利**に付いていました。
+ *   補正は**オッズを設計意図に一致させる**もので、本番として正しい実装です。
+ *
+ * 【式】
+ *   割り戻し `odds = (1/p̂)(1−margin) / (1 + (1−p̂)/(M·p̂))` は、
+ *   分母を p̂ に畳むと **p_eff = p̂ + (1−p̂)/M** と等価になります。
+ *   こちらの形なら補正が**確率の側に1か所だけ**閉じ、券種ごとに散りません。
+ *   （等価であることは `settle.test.ts` が両式を突き合わせて守ります）
+ *
+ * ★M を上げるのでもゲート幅を広げるのでもなく**導出式で打ち消す**のが D-013 の方針です。
+ *   稀な目ほど補正が大きく、裾に寄与が集中していた実測とも整合します。
+ */
+export function debiasedProbability(pHat: number, trials: number): number {
+  if (!Number.isFinite(trials) || trials <= 0) {
+    throw new Error(`debiasedProbability: 試行数 M が不正です (${trials})`);
+  }
+  return pHat + (1 - pHat) / trials;
+}
+
+/**
+ * オッズ = (1/p_eff) × (1 − margin)、上限で頭打ち（正典 §9.2・§9.4・D-013）
+ *
+ * ★`trials` は必須です。既定値を持たせません —
+ *   補正量は M に依存するので、**呼ぶ側が「どの M で推定したか」を必ず宣言する**必要があります。
+ *   既定値があると、別の M で推定した確率に誤った補正が当たっても型でも実行時でも気づけません。
+ */
+export function oddsFromProbability(kind: TicketKind, p: number, trials: number): number {
   if (!Number.isFinite(p) || p <= 0) return ODDS_CAP[kind];
-  const raw = (1 / p) * (1 - MARGIN[kind]);
+  const raw = (1 / debiasedProbability(p, trials)) * (1 - MARGIN[kind]);
   return Math.min(ODDS_CAP[kind], raw);
 }

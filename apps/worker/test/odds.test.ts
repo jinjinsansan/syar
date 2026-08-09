@@ -1,7 +1,7 @@
 /**
  * §9.2 オッズ算出。★経済に直結するので「間違ったオッズを付けない」ことを測る。
  */
-import { MARGIN, ODDS_CAP, TICKET_KINDS, type TicketKind } from '@star/betting';
+import { MARGIN, ODDS_CAP, TICKET_KINDS, debiasedProbability, type TicketKind } from '@star/betting';
 import { describe, expect, it } from 'vitest';
 import { ODDS_MC_TRIALS, buildOddsRows, keyToSelection, winningKeys } from '../src/odds.js';
 
@@ -13,11 +13,26 @@ describe('§9.2 オッズ算出', () => {
     expect(ODDS_MC_TRIALS).toBe(10_000);
   });
 
-  it('★オッズ = (1/p) × (1 − margin)', () => {
+  it('★オッズ = (1/p_eff) × (1 − margin)（D-013 の割り戻し込み）', () => {
     const [row] = buildOddsRows(counts('win', [['3', 2000]]), 10_000);
     expect(row!.probability).toBeCloseTo(0.2, 10);
-    expect(row!.odds).toBeCloseTo(5 * (1 - MARGIN.win), 10);
+    // ★保存するのは素の p̂。補正はオッズにだけ効く（表示する確率まで動かさない）
+    expect(row!.odds).toBeCloseTo((1 - MARGIN.win) / debiasedProbability(0.2, 10_000), 10);
+    expect(row!.odds).toBeLessThan(5 * (1 - MARGIN.win));
     expect(row!.capped).toBe(false);
+  });
+
+  it('★推定できる最小確率は 1/M なので、到達しうる最大オッズは (1−margin)×M', () => {
+    // ★§9.4 の cap との関係が M で決まることを固定する。
+    //   MC で1回だけ出た目（c=1）が最も高いオッズになる。
+    const M = ODDS_MC_TRIALS;
+    for (const kind of TICKET_KINDS) {
+      const [row] = buildOddsRows(counts(kind, [['9', 1]]), M);
+      const ceiling = (1 - MARGIN[kind]) * M;
+      expect(row!.odds).toBeLessThanOrEqual(ceiling + 1e-6);
+      // cap が天井より上にある券種では、cap は M=10,000 では**到達不能**になる
+      if (ODDS_CAP[kind] > ceiling) expect(row!.capped).toBe(false);
+    }
   });
 
   it('★MC で出なかった目は売らない（cap を付けて売らない）', () => {

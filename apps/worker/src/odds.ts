@@ -18,7 +18,7 @@
  *     しかも当たったときは cap 上限を払うので運営の損失も読めません。
  */
 
-import { MARGIN, oddsFromProbability, type TicketKind } from '@star/betting';
+import { MARGIN, debiasedProbability, oddsFromProbability, type TicketKind } from '@star/betting';
 
 /** 正典 §9.2: レース生成時のモンテカルロ試行数 */
 export const ODDS_MC_TRIALS = 10_000;
@@ -82,8 +82,10 @@ export function buildOddsRows(
     for (const [key, c] of m) {
       // ★1回も出なかった目はそもそもここに現れない（= 売らない）
       const probability = c / trials;
-      const odds = oddsFromProbability(betType, probability);
-      const raw = (1 / probability) * (1 - marginOf(betType));
+      const odds = oddsFromProbability(betType, probability, trials);
+      // ★cap 判定の raw も補正後で取る。補正前と比べると、D-013 の割り戻しで
+      //   下がったぶんまで「cap に当たった」と数えてしまう
+      const raw = (1 / debiasedProbability(probability, trials)) * (1 - marginOf(betType));
       rows.push({
         betType,
         selection: keyToSelection(key),
