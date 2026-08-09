@@ -46,6 +46,13 @@ const STAKE = 100; // §9.1 の最小単位
 /** 初期 EP。1日144レース × 100 EP = 14,400 EP なので、これで約69日ぶん */
 const SEED_EP = 1_000_000;
 const CLEAN = process.argv.includes('--clean');
+/**
+ * ★検証用: 単勝の全目を1度だけ買って終わる。
+ *   常用モード（1番人気だけ）だと**外れたときに払戻の枝を一度も通りません**。
+ *   「1点買って外れると、払戻が壊れていても PASS に見える」形を避けるため、
+ *   道具を渡す前にこちらで**必ず当たりを作って**確かめます。
+ */
+const ALL = process.argv.includes('--all');
 
 const c = new pg.Client({
   connectionString: env.DATABASE_URL,
@@ -128,21 +135,27 @@ async function tick() {
   }
 
   // 単勝の1番人気（オッズ最小）を買う。★当たる目に賭けないと払戻経路が通らない
-  const fav = (
+  const rows = (
     await c.query(
       `select selection, odds from race_odds
-        where race_id=$1 and bet_type='win' order by odds limit 1`,
+        where race_id=$1 and bet_type='win' order by odds`,
       [race.id],
     )
-  ).rows[0];
-  if (!fav) return;
+  ).rows;
+  if (rows.length === 0) return;
+  const targets = ALL ? rows : [rows[0]];
+  const fav = rows[0];
 
   const before = Number((await c.query('select entry_points from users where id=$1', [UID])).rows[0].entry_points);
   try {
     // ★set_config の第3引数 true はトランザクション内でのみ有効
     await c.query('begin');
     await c.query(`select set_config('request.jwt.claims', json_build_object('sub',$1::text)::text, true)`, [UID]);
-    await c.query(`select place_bet($1,'win',$2::jsonb,$3,$4)`, [race.id, JSON.stringify(fav.selection), STAKE, idem]);
+    for (let i = 0; i < targets.length; i += 1) {
+      await c.query(`select place_bet($1,'win',$2::jsonb,$3,$4)`, [
+        race.id, JSON.stringify(targets[i].selection), STAKE, `${idem.slice(0, 34)}${String(i).padStart(2, '0')}`,
+      ]);
+    }
     await c.query('commit');
   } catch (e) {
     await c.query('rollback');
@@ -154,11 +167,21 @@ async function tick() {
   // ★「買えた」を信じない。EP が減って馬券が増えたことを確かめる（R-21）
   const after = Number((await c.query('select entry_points from users where id=$1', [UID])).rows[0].entry_points);
   const n = Number((await c.query('select count(*) from bets where user_id=$1 and race_id=$2', [UID, race.id])).rows[0].count);
-  if (after !== before - STAKE || n !== 1) {
-    throw new Error(`購入後の状態が合いません: EP ${before}→${after}（期待 ${before - STAKE}） / 馬券 ${n}枚`);
+  const want = STAKE * targets.length;
+  if (after !== before - want || n !== targets.length) {
+    throw new Error(`購入後の状態が合いません: EP ${before}→${after}（期待 ${before - want}） / 馬券 ${n}枚（期待 ${targets.length}）`);
   }
-  placed += 1;
-  log(`cycle=${race.cycle_index} 購入 単勝${fav.selection} ${STAKE}EP（オッズ${fav.odds}） 累計${placed}件`);
+  placed += targets.length;
+  log(
+    ALL
+      ? `cycle=${race.cycle_index} ★全${targets.length}点購入 ${want}EP（必ず1点当たる）`
+      : `cycle=${race.cycle_index} 購入 単勝${fav.selection} ${STAKE}EP（オッズ${fav.odds}） 累計${placed}件`,
+  );
+  if (ALL) {
+    log('★--all は1レースで終わります。確定後に払戻を確認してください');
+    await c.end();
+    process.exit(0);
+  }
 }
 
 log('開始。Ctrl-C で停止（--clean で後片付け）');
