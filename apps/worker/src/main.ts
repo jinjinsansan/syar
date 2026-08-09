@@ -23,6 +23,7 @@ import { aggregateDay } from './daily-flow.js';
 import { loadRaceablePool } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
+import { CANCEL_AFTER_START_MS } from '@star/scheduler';
 
 /** 1周の間隔。★サイクル長より短くする（1サイクルを取りこぼさないため） */
 export const TICK_MS = 60_000;
@@ -84,7 +85,21 @@ async function main(): Promise<void> {
   while (!stopping) {
     const started = Date.now();
     try {
-      const out = await runCycle(store, cfg.epochMs, seeds, (i) => buildRace(pool, i, cfg.epochMs));
+      const out = await runCycle(
+        store,
+        cfg.epochMs,
+        seeds,
+        (i) => buildRace(pool, i, cfg.epochMs),
+        // ★開催中止は黙って通さない（正典 D-037）。
+        //   静かに返還されると原因が調査されないまま繰り返します。
+        //   ⚠️ ここは「客の金が戻った」記録です。**必ず目に付く形で残すこと。**
+        (a) =>
+          console.error(
+            `[worker] ★★開催中止 cycle=${a.cycleIndex} ` +
+              `返還 ${a.refundedBets}枚 / ${a.refundedEp} EP ` +
+              `— 確定が ${CANCEL_AFTER_START_MS / 60000}分以内に完了しませんでした。原因を調査してください`,
+          ),
+      );
       failures = 0;
       // ★毎周かならず記録する。
       //   当初は「生成か確定があったときだけ」出力していたが、それだと
@@ -94,7 +109,10 @@ async function main(): Promise<void> {
       console.log(
         `[worker] cycle=${out.cycleIndex} phase=${out.phase} ` +
           `生成=[${out.created.join(',')}] 既存=${out.skipped.length} ` +
-          `確定=[${out.settled.join(',')}]${out.lockBusy ? ' lock=busy' : ''}`,
+          `確定=[${out.settled.join(',')}]` +
+          // ★0件のときは出さない。毎周 中止=[] と出ると、実際に起きた周が埋もれます
+          `${out.cancelled.length > 0 ? ` ★中止=[${out.cancelled.join(',')}]` : ''}` +
+          `${out.lockBusy ? ' lock=busy' : ''}`,
       );
     } catch (e) {
       failures += 1;

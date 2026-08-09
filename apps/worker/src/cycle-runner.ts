@@ -45,6 +45,13 @@ export interface CycleStore {
   /** 確定していない、発走時刻を過ぎたレースの番号 */
   pendingSettlements(nowMs: number): Promise<number[]>;
   settleRace(cycleIndex: number): Promise<void>;
+  /**
+   * ★確定できないまま `CANCEL_AFTER_START_MS` を過ぎたレースの番号（D-037）。
+   *   `pendingSettlements` と違い、**もう確定を待たない**ものを返します。
+   */
+  overdueRaces(nowMs: number): Promise<number[]>;
+  /** ★開催中止にして全ベットを EP で返還する（D-037・§9.1）。冪等 */
+  cancelRace(cycleIndex: number): Promise<{ refundedBets: number; refundedEp: number }>;
 }
 
 export interface RaceSpec {
@@ -107,6 +114,8 @@ export interface CycleOutcome {
   /** 既にあったので作らなかったレース */
   readonly skipped: readonly number[];
   readonly settled: readonly number[];
+  /** ★確定できず開催中止にしたレース（D-037）。★0 でない周は必ず調査対象 */
+  readonly cancelled: readonly number[];
   /** ロックが取れずに何もしなかった */
   readonly lockBusy: boolean;
 }
@@ -123,6 +132,12 @@ export async function runCycle(
   epochMs: number,
   seeds: SeedSource,
   build: (cycleIndex: number) => { entrants: readonly RaceEntrantSpec[]; odds: readonly OddsSpec[] },
+  /**
+   * ★開催中止が起きたときの通報（正典 D-037）。
+   *   **既定を「何もしない」にしません。** 黙って返還されると原因が調査されないので、
+   *   呼ぶ側が通報先を明示する必要があります（省略できない引数にしてあります）。
+   */
+  onAlert: (a: { cycleIndex: number; refundedBets: number; refundedEp: number }) => void,
 ): Promise<CycleOutcome> {
   const nowMs = await store.serverNowMs();
   const cycleIndex = cycleIndexAt(nowMs, epochMs);
@@ -131,14 +146,50 @@ export async function runCycle(
 
   const locked = await store.tryLock(LOCK_KEY.CYCLE);
   if (!locked) {
-    return { nowMs, cycleIndex, phase, onSale, created: [], skipped: [], settled: [], lockBusy: true };
+    return {
+      nowMs, cycleIndex, phase, onSale,
+      created: [], skipped: [], settled: [], cancelled: [], lockBusy: true,
+    };
   }
 
   const created: number[] = [];
   const skipped: number[] = [];
   const settled: number[] = [];
+  const cancelled: number[] = [];
   try {
-    // --- 1. 先行生成（§10.2: 2レース先まで） ---
+    // --- 1. 確定と払戻（★生成より先に。正典 D-038） ---
+    //
+    // ★余裕の小さい仕事を先に処理する。
+    //   確定の期限は**サイクル境界ちょうど**で、生成の引き金も同じ境界です。
+    //   生成を先にすると、生成にかかった時間だけ確定が遅れます
+    //   （D-035 で M=3,896,104 になり、生成は1本あたり約138秒）。
+    //   生成は2周先まで作るので **1200秒の余裕**がありますが、
+    //   確定は**客が結果を待っている**処理で余裕がありません。
+    //
+    // ★入れ替えても A-2 は壊れません（両方とも冪等で、互いの出力に依存しない）。
+    //   本番コードは `horses` を一度も更新しないので、
+    //   生成が確定の結果を読むことはありません（確認済み）。
+    //   ⚠️ §7 の成長や §10.3 のクラス昇級を入れて確定が馬の状態を書くようになったら、
+    //      この順序は**速度ではなく正しさ**の問題になります。そのときに読み直すこと。
+    for (const idx of await store.pendingSettlements(nowMs)) {
+      await store.settleRace(idx);
+      settled.push(idx);
+    }
+
+    // --- 2. 期限切れの開催中止と返還（正典 D-037・§9.1） ---
+    //
+    // ★S型（レースは生成され、馬券が売れ、そのあと確定できない）の受け皿です。
+    //   これが無いと `bets` が pending のまま**永久に残り**、客の EP も PP も動きません。
+    //   ★呼び出し元はここです。以前は `cancelRace` を検証スクリプトしか
+    //     呼んでおらず、**機能もテストもあるのに本番の経路だけが繋がっていません**でした。
+    for (const idx of await store.overdueRaces(nowMs)) {
+      const r = await store.cancelRace(idx);
+      cancelled.push(idx);
+      // ★黙って返還しない。静かに返すと原因が調査されないまま繰り返します（D-037）
+      onAlert({ cycleIndex: idx, refundedBets: r.refundedBets, refundedEp: r.refundedEp });
+    }
+
+    // --- 3. 先行生成（§10.2: 2レース先まで） ---
     for (const idx of racesToPrepare(nowMs, epochMs)) {
       // ★ロックを取れていても存在確認する。ロックは同時実行を防ぐだけで、
       //   「前回の自分が既に作った」ことは防げない
@@ -160,16 +211,10 @@ export async function runCycle(
       });
       created.push(idx);
     }
-
-    // --- 2. 確定と払戻 ---
-    for (const idx of await store.pendingSettlements(nowMs)) {
-      await store.settleRace(idx);
-      settled.push(idx);
-    }
   } finally {
     // ★必ず解放する。落ちたままだと次の周が永久にロック待ちになる
     await store.unlock(LOCK_KEY.CYCLE);
   }
 
-  return { nowMs, cycleIndex, phase, onSale, created, skipped, settled, lockBusy: false };
+  return { nowMs, cycleIndex, phase, onSale, created, skipped, settled, cancelled, lockBusy: false };
 }

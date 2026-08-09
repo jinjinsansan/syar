@@ -96,6 +96,12 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: 'V-10 / §11（控除率。PP 発行量の最大の調整弁。0 にすると胴元の取り分が消える）',
   },
   {
+    key: 'CANCEL_AFTER_START_MS',
+    file: 'packages/scheduler/src/cycle.ts',
+    perturbed: 'export const CANCEL_AFTER_START_MS = 0;',
+    affects: '★D-037（確定できないレースを開催中止にして EP を返すまでの時間）。0 にすると発走直後の全レースが中止・全額返還になり、確定が一度も走らない。客の金が戻る条件そのものなので、変異が必ずテストに出ること',
+  },
+  {
     key: 'LAMBDA_STAR',
     file: 'packages/betting/src/balance.ts',
     perturbed: 'export const LAMBDA_STAR = 1;',

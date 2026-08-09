@@ -12,6 +12,7 @@ import {
 } from '@star/betting';
 import { describe, expect, it } from 'vitest';
 import { ODDS_MC_TRIALS, buildOddsRows, keyToSelection, winningKeys } from '../src/odds.js';
+import { toCycleIndexes } from '../src/pg-store.js';
 
 const counts = (kind: TicketKind, entries: [string, number][]) =>
   new Map<TicketKind, ReadonlyMap<string, number>>([[kind, new Map(entries)]]);
@@ -123,5 +124,18 @@ describe('§9.1 的中目の導出', () => {
   it('★順不同の券種はキーが昇順に正規化される（同じ組が2行にならない）', () => {
     expect(winningKeys('quinella', [3, 5], 3)).toEqual(['3-5']);
     expect(winningKeys('quinella', [5, 3], 3)).toEqual(['3-5']);
+  });
+});
+
+describe('★pg が bigint を文字列で返す件（cycle_index）', () => {
+  it('★文字列で返っても数値になる', () => {
+    // ★`pg` は bigint を文字列で返す。`number[]` と型付けしたまま素通しすると、
+    //   型は通るのに中身は文字列で、数値比較した瞬間に静かに外れる。
+    //   実 DB を叩く verify-overdue.mjs でこれに当たった（偽ストアでは絶対に出ない）。
+    expect(toCycleIndexes([{ cycle_index: '900002' }, { cycle_index: 7 }])).toEqual([900002, 7]);
+  });
+
+  it('★数値にできないものは黙って通さない', () => {
+    expect(() => toCycleIndexes([{ cycle_index: 'abc' }])).toThrow();
   });
 });

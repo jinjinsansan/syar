@@ -15,6 +15,7 @@ import {
   cycleStartMs,
   isOnSale,
   offsetInCycle,
+  overdueBefore,
   phaseAt,
   racesToPrepare,
 } from '../src/index.js';
@@ -119,5 +120,27 @@ describe('§10.2 先行生成', () => {
     const a = racesToPrepare(at(3, 1), EPOCH);
     const b = racesToPrepare(at(9, 29), EPOCH);
     expect(b).toEqual(a);
+  });
+});
+
+describe('★D-037 確定できないレースを開催中止にする境界', () => {
+  // ★閾値に CANCEL_AFTER_START_MS 自身を使わない。使うと定数を動かしたとき
+  //   テストも一緒に動き、「守られている」が空振りになる（D-018 で潰した自己検出）。
+  //   正典の 60分 をリテラルで置く。
+  const MIN = 60_000;
+  const NOW = 1_800_000_000_000;
+
+  it('★59分前の発走は中止しない / 61分前は中止する（境界の両側・R-2）', () => {
+    expect(NOW - 59 * MIN > overdueBefore(NOW)).toBe(true); // まだ確定を待つ
+    expect(NOW - 61 * MIN <= overdueBefore(NOW)).toBe(true); // もう待たない
+  });
+
+  it('★配備・再起動・ヘルスチェック待ちを吸収できる長さがある', () => {
+    // ヘルスチェックの待ちは 600秒。配備が2回続けて失敗しても中止に至らないこと
+    expect(NOW - overdueBefore(NOW)).toBeGreaterThan(3 * 600_000);
+  });
+
+  it('★かといって客を長く拘束しない（2時間より短い）', () => {
+    expect(NOW - overdueBefore(NOW)).toBeLessThan(120 * MIN);
   });
 });

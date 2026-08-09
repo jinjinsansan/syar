@@ -19,6 +19,22 @@ import { awardPrizes } from './prize-award.js';
 import { settlePayouts } from './payout.js';
 import { settleRace as settleRaceFair } from './settle.js';
 import type { CycleStore, RaceSpec } from './cycle-runner.js';
+import { overdueBefore } from '@star/scheduler';
+import { cancelRace as cancelRaceImpl } from './cancel.js';
+
+/**
+ * ★`cycle_index` は bigint なので、`pg` は**文字列で返します**。
+ *   `number[]` と型付けしたまま素通しすると、型は通るのに中身は文字列で、
+ *   数値として比較した瞬間に静かに外れます（`horse-repo` で潰したのと同じ形）。
+ *   ここで必ず数値に直し、直せなければ**黙って進まない**。
+ */
+export function toCycleIndexes(rows: readonly { cycle_index: number | string }[]): number[] {
+  return rows.map((r) => {
+    const n = Number(r.cycle_index);
+    if (!Number.isFinite(n)) throw new Error(`cycle_index を数値にできません: ${String(r.cycle_index)}`);
+    return n;
+  });
+}
 
 export function createPgStore(
   client: pg.Client | pg.PoolClient,
@@ -128,7 +144,36 @@ export function createPgStore(
           order by cycle_index`,
         [nowMs],
       );
-      return r.rows.map((x: { cycle_index: number }) => x.cycle_index);
+      return toCycleIndexes(r.rows);
+    },
+
+    /**
+     * ★確定できないまま期限を過ぎたレース（正典 D-037 の S型）。
+     *
+     *   `pendingSettlements` は「確定すべきもの」、こちらは**「もう確定を待たないもの」**です。
+     *   境界は `scheduled_at + CANCEL_AFTER_START_MS`（60分＝6サイクル）。
+     *   ★配備・再起動・ヘルスチェック待ち600秒を吸収してなお十分で、
+     *     かつ客を1時間以上 pending で拘束しません。
+     */
+    async overdueRaces(nowMs: number): Promise<number[]> {
+      const r = await client.query<{ cycle_index: number }>(
+        `select cycle_index from races
+          where status = 'scheduled'
+            -- ★引き算を SQL でやらない。$1 - $2 を素で書くと Postgres が
+            --   "operator is not unique: unknown - unknown" で落ちる（実際に落ちた）。
+            --   偽ストアの単体テストでは絶対に出ず、実 DB を叩いて初めて出た。
+            --   境界は overdueBefore()（純関数・単体テストで防御）に置く
+            and scheduled_at <= to_timestamp($1::bigint / 1000.0)
+          order by cycle_index`,
+        [overdueBefore(nowMs)],
+      );
+      return toCycleIndexes(r.rows);
+    },
+
+    /** ★開催中止＋EP 全額返還（D-037・§9.1）。1トランザクション・冪等 */
+    async cancelRace(cycleIndex: number): Promise<{ refundedBets: number; refundedEp: number }> {
+      const r = await cancelRaceImpl(client, cycleIndex);
+      return { refundedBets: r.refundedBets, refundedEp: r.refundedEp };
     },
 
     /**
