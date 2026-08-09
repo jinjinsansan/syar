@@ -21,7 +21,7 @@ describe('§9.2 オッズ算出', () => {
   it('★試行数は D-035 の設計式から決まる（数値リテラルを置かない）', () => {
     // M ≧ λ* × ODDS_CAP / (1 − margin)。律速は三連単（上限 100,000倍）
     expect(ODDS_MC_TRIALS).toBe(requiredOddsTrials());
-    expect(ODDS_MC_TRIALS).toBe(3_896_104);
+    expect(ODDS_MC_TRIALS).toBe(7_792_208); // λ*=60 × 100,000 / 0.77
     // ★正典 §9.2 の 10,000 では足りない（三連単で −20.90pt）
     expect(ODDS_MC_TRIALS).toBeGreaterThan(10_000);
   });
