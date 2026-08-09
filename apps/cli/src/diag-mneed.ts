@@ -66,6 +66,25 @@ const NO_CAP = argv.includes('--no-cap');
  *      2つの誤りが打ち消し合っているだけで、頭数や M が変われば崩れます。
  */
 const NO_DEBIAS = argv.includes('--no-debias');
+/**
+ * ★D-035: 上限に当たる目はそもそも売らない。
+ *
+ *     p_min = (1 − margin) / ODDS_CAP
+ *
+ *   これ未満の目を発売しないと、3つの効果が**同時に**閉じます:
+ *     ③ 切り詰めが消える … 売る目がすべて上限の内側にあるので、cap に当たらない
+ *     ② 打ち切りが消える … 売る下限が p_min に固定されるので、M·p_min = λ* を
+ *                          十分大きく取れば c の条件付けが無視できる
+ *     ① 凸性は解析補正で既に消えている
+ *   残るのは margin ちょうどです。
+ *
+ *   ★②と③が正面衝突していたのは、どちらも「稀な目」に効くからでした。
+ *     稀な目の扱いを1箇所で決めれば両方閉じます。
+ */
+const PMIN = argv.includes('--pmin');
+/** 打ち切りを無視できるとみなす M·p_min（設計余裕）。M ≧ λ* × ODDS_CAP / (1−margin) */
+const LAMBDA_STAR = num('lambda', 30);
+const pMinOf = (kind: TicketKind): number => (1 - MARGIN[kind]) / ODDS_CAP[kind];
 
 /** Lanczos 近似の log Γ（二項係数を対数で扱うため） */
 const G = [
@@ -93,27 +112,35 @@ function exactContribution(
   kind: TicketKind,
 ): { sold: number; payout: number } {
   const log1mp = Math.log1p(-p);
-  const sold = -Math.expm1(M * log1mp); // 1 − (1−p)^M（桁落ちを避ける）
+  const logp = Math.log(p);
+  // ★売る下限。D-035 なら p̂ ≧ p_min、そうでなければ従来どおり c ≧ 1
+  const threshold = PMIN ? Math.ceil(M * pMinOf(kind)) : 1;
   // ★c の全域を回すと M=10^7 で回らない。平均の周りに十分広い窓を取る
   const mean = M * p;
   const sd = Math.sqrt(M * p * (1 - p));
-  const lo = Math.max(1, Math.floor(mean - 14 * sd - 20));
-  const hi = Math.min(M, Math.ceil(mean + 14 * sd + 20));
-  const logp = Math.log(p);
+  const lo = Math.max(0, Math.floor(mean - 14 * sd) - 20);
+  const hi = Math.min(M, Math.ceil(mean + 14 * sd) + 20);
   let payout = 0;
-  let mass = 0;
+  let sold = 0;
+  let mass = lo === 0 ? 0 : 0;
   for (let c = lo; c <= hi; c += 1) {
     const pmf = Math.exp(logChoose(M, c) + c * logp + (M - c) * log1mp);
     mass += pmf;
+    if (c < threshold) continue; // 売らない目は賭け金にも払戻にも入らない
+    sold += pmf;
     const pUsed = NO_DEBIAS ? c / M : debiasedProbability(c / M, M);
     const uncapped = (1 - MARGIN[kind]) / pUsed;
     const odds = NO_CAP ? uncapped : Math.min(ODDS_CAP[kind], uncapped);
     payout += pmf * p * odds;
   }
-  // ★R-21: 窓が確率質量を取りこぼしていたら、結果を報告せず失敗させる
-  const p0 = Math.exp(M * log1mp);
-  if (Math.abs(mass + p0 - 1) > 1e-6) {
-    throw new Error(`窓が狭すぎます: p=${p} M=${M} 捕捉率=${(mass + p0).toFixed(9)}`);
+  // ★R-21: 窓が確率質量を取りこぼしていたら、結果を報告せず失敗させる。
+  //   窓が 0 から始まらない場合は下側の裾を別途足す（M·p が大きいと lo > 0 になる）
+  const lower = lo === 0 ? 0 : 1 - mass; // 近似ではなく残差として扱い、閾値で弾く
+  if (Math.abs(mass + (lo === 0 ? 0 : lower) - 1) > 1e-6) {
+    throw new Error(`窓が狭すぎます: p=${p} M=${M} 捕捉率=${mass.toFixed(9)}`);
+  }
+  if (lo > 0 && Math.abs(1 - mass) > 1e-6) {
+    throw new Error(`窓が下側を取りこぼしています: p=${p} M=${M} 捕捉率=${mass.toFixed(9)}`);
   }
   return { sold, payout };
 }
@@ -169,12 +196,33 @@ for (let i = 0; i < RACES; i += 1) {
 //   目標 M では p ≳ 1/M の目が売られるが、参照 MC は p ≳ 1/REF の目しか観測できない。
 //   M > REF だと「本来 cap に切り詰められて売られる稀な目」がまるごと抜け、
 //   cap の損失を**過小に**見積もる。前回それに気づかず M=1M/10M を出した。
-for (const M of TARGETS) {
-  if (M > REF) {
-    throw new Error(
-      `目標 M=${M} が参照 MC ${REF} を超えています。参照は p ≳ 1/${REF} の目しか観測できず、` +
-        `M=${M} で売られる稀な目を落とします。--ref-trials を ${M} 以上にしてください（R-21）`,
-    );
+// ★参照 MC が解像できない領域を判定してはならない（R-21）。
+//   ★何を解像すべきかは「売る下限」で決まる:
+//     D-035 なし … 目標 M では p ≳ 1/M の目が売られて cap に切り詰められるので、参照は M 以上要る
+//     D-035 あり … 売られるのは p ≳ p_min の目だけ。p_min は M に依らないので、
+//                  参照は p_min を数えられればよい（M と同じ大きさは要らない）
+//   前回この区別をせず、参照 10万で「M=100万なら三連単 −0.00pt」と出しました。
+const REF_COUNTS_AT_PMIN = 20;
+if (PMIN) {
+  for (const kind of TICKET_KINDS) {
+    const need = REF_COUNTS_AT_PMIN / pMinOf(kind);
+    if (REF < need) {
+      throw new Error(
+        `${kind}: 参照 MC ${REF.toLocaleString()} では p_min=${pMinOf(kind).toExponential(2)} の目を` +
+          `平均 ${(REF * pMinOf(kind)).toFixed(1)} 回しか観測できません。` +
+          `--ref-trials を ${Math.ceil(need).toLocaleString()} 以上にしてください（R-21）`,
+      );
+    }
+  }
+} else {
+  for (const M of TARGETS) {
+    if (M > REF) {
+      throw new Error(
+        `目標 M=${M.toLocaleString()} が参照 MC ${REF.toLocaleString()} を超えています。` +
+          `参照は p ≳ 1/${REF} の目しか観測できず、M=${M} で売られる稀な目を落とします。` +
+          `--ref-trials を ${M} 以上にしてください（R-21）`,
+      );
+    }
   }
 }
 
@@ -182,9 +230,19 @@ console.log(`# 券種ごとに必要な M を計算で出す  seed=${SEED} races
 console.log(`  ★測定ではありません。真の確率が分かれば二項分布から厳密に決まります`);
 if (NO_CAP) console.log(`  ⚠️ --no-cap: §9.4 の配当上限を外しています（切り分け用。本番の設定ではありません）`);
 if (NO_DEBIAS) console.log(`  ⚠️ --no-debias: D-013 の補正を外しています（補正前＝現行本番の挙動）`);
+if (PMIN) {
+  console.log(`  ★--pmin: D-035（p_min 未満の目は発売しない）を適用。λ* = ${LAMBDA_STAR}`);
+  console.log(`  ${'券種'.padEnd(16)} ${'p_min'.padStart(10)} ${'必要な M'.padStart(12)}`);
+  for (const kind of TICKET_KINDS) {
+    const pm = pMinOf(kind);
+    console.log(`  ${kind.padEnd(16)} ${pm.toExponential(2).padStart(10)} ${Math.ceil(LAMBDA_STAR / pm).toLocaleString().padStart(12)}`);
+  }
+}
 console.log('');
 console.log(`  ${'券種'.padEnd(16)} ${'目数/R'.padStart(7)} ${TARGETS.map((m) => `M=${m >= 1e6 ? m / 1e6 + 'M' : m / 1000 + 'k'}`.padStart(10)).join('')}`);
 
+/** ★売られる目の数も出す。D-035 は「買えなくなる目」を作るので、製品影響を数字にする */
+const soldPerRace = new Map<TicketKind, number>();
 for (const kind of TICKET_KINDS) {
   const ps = refProbs.get(kind)!;
   if (ps.length === 0) throw new Error(`${kind}: 参照確率が空です（R-21）`);
@@ -197,12 +255,26 @@ for (const kind of TICKET_KINDS) {
       sold += c.sold;
       payout += c.payout;
     }
+    if (M === TARGETS[TARGETS.length - 1]) soldPerRace.set(kind, sold / RACES);
     const rate = payout / sold;
     const dev = (rate - (1 - MARGIN[kind])) * 100;
     const ok = Math.abs(dev) <= 1;
     cells.push(`${(dev >= 0 ? '+' : '') + dev.toFixed(2)}${ok ? '*' : ' '}`.padStart(10));
   }
   console.log(`  ${kind.padEnd(16)} ${(ps.length / RACES).toFixed(0).padStart(7)} ${cells.join('')}`);
+}
+
+// ★製品影響: 参照で観測できた目のうち、実際に売られるのは何割か（最大 M で評価）
+console.log(`
+  ★売られる目（M=${TARGETS[TARGETS.length - 1]!.toLocaleString()}）`);
+console.log(`  ${'券種'.padEnd(16)} ${'参照で観測'.padStart(11)} ${'売られる'.padStart(10)} ${'売られない'.padStart(11)}`);
+for (const kind of TICKET_KINDS) {
+  const seen = refProbs.get(kind)!.length / RACES;
+  const sold = soldPerRace.get(kind)!;
+  console.log(
+    `  ${kind.padEnd(16)} ${seen.toFixed(1).padStart(11)} ${sold.toFixed(1).padStart(10)} ` +
+      `${(((seen - sold) / seen) * 100).toFixed(1).padStart(10)}%`,
+  );
 }
 console.log(`\n  * = |乖離| ≦ 1pt（V-10 合格）。単位は pt`);
 console.log(`  ★正典 §9.2 の現行値は M = 10,000 です`);
