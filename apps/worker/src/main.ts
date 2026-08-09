@@ -16,6 +16,8 @@
 
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import pg from 'pg';
+// ★最初に読み込む。DB へ最初のクエリを出す前に型変換を有効にする必要があります
+import { assertPgTypesConfigured } from './pg-types.js';
 import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
 import { buildRace } from './build-race.js';
@@ -38,6 +40,10 @@ async function main(): Promise<void> {
     ssl: { rejectUnauthorized: false },
   });
   await client.connect();
+
+  // ★bigint の型変換が効いていることを最初に確かめる（`pg-types.ts`）。
+  //   効いていないと台帳の金額が文字列で流れ、演算が静かに壊れます
+  assertPgTypesConfigured();
 
   // ★起動時の検査。ここだけは失敗させる（続けると本番の台帳を壊す）
   assertEnvironmentMatches(cfg.env, await readDbEnvironment(client));

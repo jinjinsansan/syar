@@ -13,6 +13,9 @@
  */
 
 import type pg from 'pg';
+// ★副作用の import。読み込んだ時点で int8 の型変換が有効になります。
+//   `pg-store` は SQL を出す唯一の層なので、ここを通れば必ず設定済みです。
+import { assertPgTypesConfigured } from './pg-types.js';
 import type { RaceEntrant } from '@star/race-engine';
 import { rowToHorse } from './horse-repo.js';
 import { awardPrizes } from './prize-award.js';
@@ -40,6 +43,10 @@ export function createPgStore(
   client: pg.Client | pg.PoolClient,
   hash: { sha256(m: string): string; hmacSha256(k: string, m: string): string },
 ): CycleStore {
+  // ★import しただけで効くが、**効いていることを確かめる**。
+  //   副作用の import は書き忘れると静かに無効になります
+  //   （`cancelRace` が呼ばれていなかったのと同じ穴をここで作らない）
+  assertPgTypesConfigured();
   return {
     async serverNowMs(): Promise<number> {
       // ★ゲーム内時刻の真実は Postgres の now() のみ（§14）
