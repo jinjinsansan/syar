@@ -39,9 +39,10 @@ async function main(): Promise<void> {
   const client = new pg.Client({
     connectionString: cfg.databaseUrl,
     ssl: { rejectUnauthorized: false },
-    // ★自分の接続に名前を付ける。pg_stat_activity には他の接続（Web・検証
-    //   スクリプト・手で繋いだセッション）も見えるので、名前で絞らないと
-    //   他人の増減を自分のリークと読み違えます
+    // ★名前は付けるが、**数えるのには使えません**。
+    //   Supabase のプーラ（Supavisor）が application_name を上書きするため、
+    //   Postgres 側からはこの名前が見えません（実測で確認）。
+    //   リーク検出はプロセス側の FD／ソケット数で行います（resources.ts）。
     application_name: APPLICATION_NAME,
   });
   await client.connect();
@@ -119,7 +120,7 @@ async function main(): Promise<void> {
       //   周ごとの記録が無いと**測定そのものが成立しません**（指示書 §3 の警告どおり）。
       // ★資源は毎周記録する。リークは「あとで見よう」では測れません
       //   （1回目の A-1 で、最長無停止区間の両端を記録しておらず取得できませんでした）
-      const res = await sampleResources(client);
+      const res = sampleResources();
       console.log(
         `[worker] cycle=${out.cycleIndex} phase=${out.phase} ` +
           `生成=[${out.created.join(',')}] 既存=${out.skipped.length} ` +

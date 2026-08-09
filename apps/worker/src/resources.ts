@@ -4,22 +4,34 @@
  * 【なぜ要るか】
  *   1回目の A-1 で、そちらは「**最長無停止区間と、その両端のメモリ／接続数**」を
  *   求めました。私は**記録していなかったので、後から取得できませんでした**。
- *   随時測った値（95 → 100 → 62 → 69 → 67MB）に増加傾向は見えませんでしたが、
- *   **求められた形の測定ではありません**でした。
- *
  *   ★リークは「あとで見よう」では測れません。**起きている最中にしか記録できない**ので、
  *     周ごとに残します。1周60秒なので、24時間で1,440行です。
  *
- * 【★接続数は「自分の接続」だけを数える】
- *   `pg_stat_activity` は**同じ DB への他の接続も見えます**（Web からの読み取り、
- *   検証スクリプト、私が手で繋いだセッション）。全部数えると、
- *   **他人の増減を自分のリークと読み違えます**（R-16 と同じ形）。
- *   → 接続に `application_name` を付け、**それで絞って数えます**。
+ * 【★DB の接続数は、この構成では測れません（実測して分かりました）】
+ *   最初 `pg_stat_activity` を `application_name='star-worker'` で絞って数えました。
+ *   **`conn=0` が出続けました。** 接続が0本のはずはないので調べたところ:
+ *
+ *     select current_setting('application_name')  →  "Supavisor"
+ *
+ *   ★**Supabase のプーラが application_name を上書き**しており、こちらで付けた名前は
+ *     Postgres に届いていませんでした。しかも `pg_stat_activity` に見えるのは
+ *     **プーラ側の接続**で、ワーカーの接続と1対1になりません。
+ *
+ *   ★これは「測れなかった」ではなく**「正しく実行されて別物を測っていた」**状態です。
+ *     取得失敗（-1）は検出できる作りにしていましたが、**成功して誤答する形**は
+ *     防げていませんでした。**「対照が通る」は「正しい理由で通った」ではありません。**
+ *
+ *   → 数えるのをやめ、**プロセス側で実際に漏れるもの**を数えます:
+ *       開いているファイル記述子（Linux の /proc/self/fd）と、そのうちのソケット数。
+ *     接続が漏れればソケットが増えるので、**同じ現象をこちら側から見ています**。
  */
 
-import type pg from 'pg';
+import { readdirSync, readlinkSync } from 'node:fs';
 
-/** ★ワーカーの接続に付ける名前。これで自分の接続だけを数える */
+/**
+ * 接続に付ける名前。★プーラに上書きされるので**数えるのには使えません**。
+ * それでもプーラを外した構成に移ったときのために残します（害はありません）。
+ */
 export const APPLICATION_NAME = 'star-worker';
 
 export interface ResourceSample {
@@ -27,42 +39,57 @@ export interface ResourceSample {
   readonly rssMb: number;
   /** V8 ヒープ使用量（MB）。rss と分けると、リークが JS 側かネイティブ側かが分かる */
   readonly heapMb: number;
-  /** ★自分の名前が付いた DB 接続の本数 */
-  readonly dbConnections: number;
-  /** イベントループに残っているハンドルの種類数（増え続けたら解放漏れ） */
+  /** 開いているファイル記述子の数。★取れなければ -1（0 と区別する） */
+  readonly fds: number;
+  /** うちソケットの数。★DB 接続が漏れればここが増える。取れなければ -1 */
+  readonly sockets: number;
+  /** イベントループに残っているハンドルの数（増え続けたら解放漏れ） */
   readonly handles: number;
+}
+
+/**
+ * 開いている記述子とソケットを数える（Linux）。
+ * ★Linux 以外や読めない環境では **-1** を返します。**0 と混同させません。**
+ */
+function countFds(): { fds: number; sockets: number } {
+  try {
+    const dir = '/proc/self/fd';
+    const names = readdirSync(dir);
+    let sockets = 0;
+    for (const n of names) {
+      try {
+        if (readlinkSync(`${dir}/${n}`).startsWith('socket:')) sockets += 1;
+      } catch {
+        // 読んでいる間に閉じた記述子。数えないだけでよい
+      }
+    }
+    return { fds: names.length, sockets };
+  } catch {
+    return { fds: -1, sockets: -1 };
+  }
 }
 
 /**
  * いまの資源使用量を測る。
  *
- * ★接続数の取得に失敗しても**例外にしません**。
- *   これは観測であって処理ではないので、観測の失敗で周を落とすと本末転倒です
- *   （A-1 の「止まらない」を、A-1 のための計測が壊すことになります）。
- *   取れなければ -1 を返し、**「測れなかった」と「0本だった」を区別できるようにします。**
+ * ★測定は**処理ではありません**。ここで例外を投げると、
+ *   A-1 のための計測が A-1（止まらないこと）を壊します。
+ *   測れないものは -1 にして、**「測れなかった」と「0だった」を区別**します。
  */
-export async function sampleResources(client: pg.Client | pg.PoolClient): Promise<ResourceSample> {
+export function sampleResources(): ResourceSample {
   const mem = process.memoryUsage();
-  let dbConnections = -1;
-  try {
-    const r = await client.query<{ n: number }>(
-      `select count(*)::int as n from pg_stat_activity where application_name = $1`,
-      [APPLICATION_NAME],
-    );
-    dbConnections = r.rows[0]?.n ?? -1;
-  } catch {
-    // ★握りつぶすが、値で分かるようにする（-1）
-  }
+  const { fds, sockets } = countFds();
   return {
     rssMb: Math.round(mem.rss / 1024 / 1024),
     heapMb: Math.round(mem.heapUsed / 1024 / 1024),
-    dbConnections,
+    fds,
+    sockets,
     handles: process.getActiveResourcesInfo().length,
   };
 }
 
 /** ログ1行ぶんの文字列。★毎周出るので短くする */
 export function formatResources(s: ResourceSample): string {
-  const conn = s.dbConnections < 0 ? '?' : String(s.dbConnections);
-  return `mem=${s.rssMb}MB heap=${s.heapMb}MB conn=${conn} handles=${s.handles}`;
+  const v = (n: number): string => (n < 0 ? '?' : String(n));
+  return `mem=${s.rssMb}MB heap=${s.heapMb}MB fd=${v(s.fds)} sock=${v(s.sockets)} handles=${s.handles}`;
 }
