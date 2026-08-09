@@ -19,11 +19,12 @@
  *   ワーカーには一切入れていません。認証が入って実ユーザーが現れたら**捨てます**。
  *   本番コードに「テスト用の分岐」を入れると、消し忘れが本番に残ります。
  *
- * 【⚠️ 未解決 — §11.2 の監視を汚します】
- *   この馬券は `point_flow_daily` に**そのまま集計されます**。実ユーザーがいない間、
- *   **監視は合成ベッターだけを見ている**ことになり、`margin_actual` の3%アラートも
- *   合成側の性質で決まります。除外すべきか、承知の上で汚すかは**レビュー側の判断**です。
- *   照会に載せてあります。
+ * 【§11.2 の扱い — 除外ではなく別掲（0009）】
+ *   この利用者は **`account_type='internal'`** で作られます。
+ *   `point_flow_daily` は**内部口座を除いた値と内部口座の値を両方**出すので、
+ *   実経済の指標は汚れず、**流量も隠れません**。
+ *   ★黙って落とす形にしなかったのは、そうすると**口座に印を付けるだけで
+ *     流量を隠せてしまう**からです。
  *
  * 実行: npx tsx tools/synthetic-bettor.mjs          （常駐）
  *       npx tsx tools/synthetic-bettor.mjs --clean  （後片付け）
@@ -86,10 +87,12 @@ await c.query(
    on conflict (id) do nothing`,
   [UID],
 );
+// ★内部口座として作る（0009）。§11.2 の実経済の指標からは分けて別掲されます。
+//   ここを 'player' のままにすると、監視が合成ベッターだけを見ることになります。
 await c.query(
-  `insert into users (id,display_name,stable_name,entry_points,prize_points)
-   values ($1,'合成ベッター','検証用',$2,0)
-   on conflict (id) do nothing`,
+  `insert into users (id,display_name,stable_name,entry_points,prize_points,account_type)
+   values ($1,'合成ベッター','検証用',$2,0,'internal')
+   on conflict (id) do update set account_type = 'internal'`,
   [UID, SEED_EP],
 );
 
