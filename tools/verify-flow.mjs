@@ -16,6 +16,7 @@ import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { aggregateDay } from '../apps/worker/src/daily-flow.ts';
 
+import { assertNotProduction } from './lib/guard.mjs';
 const env = Object.fromEntries(
   readFileSync('secrets.local.env', 'utf8')
     .split(/\r?\n/)
@@ -25,6 +26,9 @@ const env = Object.fromEntries(
 );
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await c.connect();
+
+// ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
+await assertNotProduction(c, 'verify-flow.mjs');
 
 const PLAYER = '00000000-0000-4000-8000-00000000f10f';
 const INTERNAL = '00000000-0000-4000-8000-00000000f1f1';

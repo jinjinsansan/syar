@@ -16,6 +16,7 @@ import pg from 'pg';
 import { ALLOW_ALL_NAMES, NPC_STABLES } from '../packages/sim-engine/src/index.ts';
 import { DEFAULT_PRESEED_OPTIONS, preseedNicks, runPreseed } from '../apps/cli/src/preseed.ts';
 
+import { assertNotProduction } from './lib/guard.mjs';
 const SEED = Number(process.argv[2] ?? 20260833);
 const GENERATIONS = Number(process.argv[3] ?? 50);
 
@@ -50,6 +51,9 @@ const rows = [...need].map((id) => pre.world.all.get(id)).filter(Boolean)
 
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 await c.connect();
+// ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
+await assertNotProduction(c, 'seed-world.mjs');
+
 await c.query('delete from horses');
 console.log('  既存の馬を削除しました');
 

@@ -1,8 +1,12 @@
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
+import { assertNotProduction } from './lib/guard.mjs';
 const env = Object.fromEntries(readFileSync('secrets.local.env','utf8').split(/\r?\n/).map(l=>l.match(/^([A-Za-z_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 await c.connect();
+// ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
+await assertNotProduction(c, 'verify-db.mjs');
+
 const q = async (label, sql) => { const r = await c.query(sql); console.log(label, JSON.stringify(r.rows)); };
 
 await q('テーブル数:', `select count(*)::int as n from information_schema.tables where table_schema='public'`);

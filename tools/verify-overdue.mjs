@@ -17,6 +17,7 @@ import { createHash, createHmac } from 'node:crypto';
 import pg from 'pg';
 import { createPgStore } from '../apps/worker/src/pg-store.ts';
 
+import { assertNotProduction } from './lib/guard.mjs';
 const env = Object.fromEntries(
   readFileSync('secrets.local.env', 'utf8')
     .split(/\r?\n/)
@@ -26,6 +27,9 @@ const env = Object.fromEntries(
 );
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await c.connect();
+
+// ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
+await assertNotProduction(c, 'verify-overdue.mjs');
 
 /** ★本番のサイクル番号と絶対に重ならない領域を使う */
 const INSIDE = 900_001; // 59分前 → 中止しない

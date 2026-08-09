@@ -8,9 +8,13 @@ import pg from 'pg';
 import { purseOf } from '../packages/scheduler/src/index.ts';
 import { tierFromDb } from '../apps/worker/src/prize-award.ts';
 
+import { assertNotProduction } from './lib/guard.mjs';
 const env = Object.fromEntries(readFileSync('secrets.local.env','utf8').split(/\r?\n/).map(l=>l.match(/^([A-Za-z_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 await c.connect();
+// ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
+await assertNotProduction(c, 'fix-purse.mjs');
+
 const rows = (await c.query(`select id, cycle_index, class_rank, grade from races where purse = 0`)).rows;
 console.log(`purse=0 のレース: ${rows.length}件`);
 for (const r of rows) {

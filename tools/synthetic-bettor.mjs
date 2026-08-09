@@ -33,6 +33,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import pg from 'pg';
 
+import { assertNotProduction } from './lib/guard.mjs';
 const env = Object.fromEntries(
   readFileSync('secrets.local.env', 'utf8')
     .split(/\r?\n/)
@@ -61,6 +62,9 @@ const c = new pg.Client({
   application_name: 'star-synthetic-bettor',
 });
 await c.connect();
+
+// ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
+await assertNotProduction(c, 'synthetic-bettor.mjs');
 
 const log = (m) => console.log(`[bettor] ${new Date().toISOString().slice(11, 19)} ${m}`);
 

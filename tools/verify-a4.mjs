@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import pg from 'pg';
 
+import { assertNotProduction } from './lib/guard.mjs';
 const env = Object.fromEntries(
   readFileSync('secrets.local.env', 'utf8').split(/\r?\n/)
     .map((l) => l.match(/^([A-Za-z_]+)=(.*)$/)).filter(Boolean)
@@ -18,6 +19,9 @@ const env = Object.fromEntries(
 // --- 準備: service_role で scheduled と settled を1件ずつ作る ---
 const admin = new pg.Client({ connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await admin.connect();
+// ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
+await assertNotProduction(admin, 'verify-a4.mjs');
+
 await admin.query(`delete from races where name in ('A4-SCHEDULED','A4-SETTLED')`);
 const mk = async (name, status, reveal) =>
   admin.query(

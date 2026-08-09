@@ -7,9 +7,13 @@ import { createHash, createHmac, randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { createPgStore } from '../apps/worker/src/pg-store.ts';
 
+import { assertNotProduction } from './lib/guard.mjs';
 const env = Object.fromEntries(readFileSync('secrets.local.env','utf8').split(/\r?\n/).map(l=>l.match(/^([A-Za-z_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 await c.connect();
+// ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
+await assertNotProduction(c, 'verify-economy.mjs');
+
 const hash = {
   sha256:(m)=>createHash('sha256').update(m,'utf8').digest('hex'),
   hmacSha256:(k,m)=>createHmac('sha256',k).update(m,'utf8').digest('hex'),

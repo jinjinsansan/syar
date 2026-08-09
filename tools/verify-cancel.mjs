@@ -7,9 +7,13 @@ import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { cancelRace } from '../apps/worker/src/cancel.ts';
 
+import { assertNotProduction } from './lib/guard.mjs';
 const env = Object.fromEntries(readFileSync('secrets.local.env','utf8').split(/\r?\n/).map(l=>l.match(/^([A-Za-z_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 await c.connect();
+// ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
+await assertNotProduction(c, 'verify-cancel.mjs');
+
 const uid = '00000000-0000-4000-8000-0000000ca4ce';
 const clean = async () => {
   await c.query('delete from ep_ledger where user_id=$1',[uid]);

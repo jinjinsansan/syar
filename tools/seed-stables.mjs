@@ -7,9 +7,13 @@ import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { NPC_STABLES } from '../packages/sim-engine/src/index.ts';
 
+import { assertNotProduction } from './lib/guard.mjs';
 const env = Object.fromEntries(readFileSync('secrets.local.env','utf8').split(/\r?\n/).map(l=>l.match(/^([A-Za-z_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 await c.connect();
+
+// ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
+await assertNotProduction(c, 'seed-stables.mjs');
 
 let n = 0;
 for (const s of NPC_STABLES) {
