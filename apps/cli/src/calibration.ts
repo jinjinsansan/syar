@@ -316,6 +316,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
     why: '★測定条件（どう測るか）。較正定数とは扱いが違い、正典 §13.2/§13.3 に固定して measurement.test.ts が値照合で守る。R-14 は較正定数についての規則で、文書化された測定条件の照合を禁じない',
   },
   {
+    pattern: 'apps/cli/src/diag-loop\.ts',
+    why: '★週ループの載せ替え差分を測る診断ツール。判定を出さない（V-x を作らない）。SEED / HORSES は標本の取り方で、通すために動かせる値ではない',
+  },
+  {
     pattern: 'apps/cli/src/(sweep|sweep-distance|selection-compare|race-diagnostics|metric-correlation|decompose)\.ts',
     why: '開発用の診断・掃引ツール。判定（V-x）を作らない。ここの定数は実行時に --flag で上書きする前提の既定値',
   },
@@ -364,6 +368,8 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
   { key: 'AWAKENING_PROB', why: '正典 §7.6「素質が開花した！（1%）」の写し' },
+  { key: 'TRAIN_STREAM', why: '★乱数の用途ID（61〜64）。値そのものに意味は無く、他の乱数と衝突しないための番号。★ただし変えると較正済みの数字が再現しなくなるので、動かしてはいけない定数ではある（判定を通すために動かせる値ではない）' },
+  { key: 'MAX_LIFE_WEEKS', why: '正典 §7.1 の 260週 + 1。★無限ループ防止の番人であり、判定条件ではない（ここに当たったら実装が壊れている）' },
   { key: 'AWAKENING_MULT', why: '正典 §7.6「potential のうち1形質 +5%」の写し' },
   { key: 'PUSH_THROUGH_TEMPER', why: '正典 §7.6「強行は…気性+10」の写し' },
   { key: 'EVENTS', why: '正典 §7.6 のイベント表（テキストと効果）。★選択肢の効果を data-driven にしたもので、個々の数値は AWAKENING_* / PUSH_THROUGH_* / COMMON_EVENT_PROB として別に登録済み' },

@@ -17,9 +17,12 @@ import { ALLOW_ALL_NAMES, NPC_STABLES } from '../packages/sim-engine/src/index.t
 import { DEFAULT_PRESEED_OPTIONS, preseedNicks, runPreseed } from '../apps/cli/src/preseed.ts';
 
 import { assertNotProduction } from './lib/guard.mjs';
-import { loadEnv } from './lib/env.mjs';
-const SEED = Number(process.argv[2] ?? 20260833);
-const GENERATIONS = Number(process.argv[3] ?? 50);
+import { loadEnv, positionals } from './lib/env.mjs';
+
+/** ★フラグ（--env など）を除いた位置引数 */
+const POS = positionals();
+const SEED = Number(POS[0] ?? 20260833);
+const GENERATIONS = Number(POS[1] ?? 50);
 
 const env = loadEnv();
 

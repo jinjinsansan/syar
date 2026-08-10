@@ -40,3 +40,21 @@ export function loadEnv(argv = process.argv) {
   console.log(`[env] 接続先: ${file}`);
   return env;
 }
+
+/**
+ * ★フラグを除いた位置引数を返す。
+ *
+ * 【なぜ要るか】
+ *   `--env staging` を足した瞬間、`process.argv[2]` を直接読んでいたツールが壊れます。
+ *   `seed-world.mjs` は `Number(process.argv[2] ?? 既定)` で種を読んでおり、
+ *   `--env` が入ると **NaN** になります。★落ちずに NaN のまま進むのが厄介です。
+ */
+export function positionals(argv = process.argv) {
+  const rest = argv.slice(2);
+  const out = [];
+  for (let i = 0; i < rest.length; i += 1) {
+    if (rest[i].startsWith('--')) { i += 1; continue; } // フラグとその値を飛ばす
+    out.push(rest[i]);
+  }
+  return out;
+}

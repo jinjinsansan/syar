@@ -52,6 +52,8 @@ export const STATE_CHANGING = [
   'seed-world.mjs',
   'synthetic-bettor.mjs',
   'verify-a2.mjs',
+  // ★B-1: 馬の育成状態を書き換え、horse_week_log を作る
+  'verify-b1.mjs',
   'verify-a4.mjs',
   'verify-a5.mjs',
   'verify-a6.mjs',

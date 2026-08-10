@@ -9,8 +9,11 @@ import { ALLOW_ALL_NAMES, NPC_STABLES } from '../packages/sim-engine/src/index.t
 import { DEFAULT_PRESEED_OPTIONS, preseedNicks, runPreseed } from '../apps/cli/src/preseed.ts';
 import { lineConcentration } from '../apps/cli/src/pedigree-audit.ts';
 
-import { loadEnv } from './lib/env.mjs';
-const SEED = Number(process.argv[2] ?? 1231);
+import { loadEnv, positionals } from './lib/env.mjs';
+
+/** ★フラグ（--env など）を除いた位置引数 */
+const POS = positionals();
+const SEED = Number(POS[0] ?? 1231);
 const pre = runPreseed({
   ...DEFAULT_PRESEED_OPTIONS, seed: SEED, generations: 50,
   nicks: preseedNicks(SEED, NPC_STABLES), blocklist: ALLOW_ALL_NAMES,

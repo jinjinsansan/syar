@@ -101,6 +101,8 @@ export interface WeekLog {
   /** 進める**前**の週齢（この記録が指す週） */
   readonly week: number;
   readonly stage: LifeStage;
+  /** ★プレイヤーが選んだメニュー（差し替え前）。これが無いと「何に EP を払ったか」が記録から読めない */
+  readonly menuChosen: MenuId;
   /** 実際に行ったメニュー（休養強制・イベントによる差し替えを反映した後） */
   readonly menu: MenuId;
   /** ★消費した EP。記帳は呼ぶ側（G-6） */
@@ -196,6 +198,7 @@ export function advanceWeek(input: AdvanceWeekInput): AdvanceWeekResult {
   let current = { ...state.current } as Record<AbilityKey, number>;
   let { durability, temper, fatigue, condition, restUntilWeek, careerEnded } = state;
 
+  const menuChosen: MenuId = input.menu;
   let menu: MenuId = input.menu;
   let epSpent = 0;
   let injuryProb = 0;
@@ -272,6 +275,8 @@ export function advanceWeek(input: AdvanceWeekInput): AdvanceWeekResult {
           if (out.forceRest) {
             // ★メニューを休養に「差し替えた」ことにする。EP は既に払っているので戻しません
             //   （正典に返金の規定が無いため。照会 Q-P3-12〜16）
+            //   ★このとき `menu` は rest だが `epSpent` は元のメニューぶんです。
+            //     `menuChosen` を残しているので、記録から両者を突き合わせられます。
             menu = 'rest';
           }
           eventLog = {
@@ -320,6 +325,7 @@ export function advanceWeek(input: AdvanceWeekInput): AdvanceWeekResult {
     log: {
       week,
       stage,
+      menuChosen,
       menu,
       epSpent,
       resting,
