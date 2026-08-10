@@ -28,19 +28,31 @@ export const HEADROOM_EXPONENT = 0.7;
 export const GAIN_JITTER = { min: 0.85, max: 1.15 } as const;
 
 /**
- * ★気性難とみなす閾値（較正定数・**正典に規定なし**）。
- *   temper は 0..100 で高いほど気性難、創始水準は 50（D-009）。
- *   ここを動かすと「不安定な馬」の割合が変わり、成長のばらつきが変わります。
- * ⚠️ **1行で書くこと**（変異試験は行単位で宣言を置換するため）
+ * 正典 §7.3（D-044 で改訂）: 気性の係数は**2分類ではなく連続補間**。
+ *
+ * ```
+ * temper   0 → rand(0.9, 1.1)   （温順）
+ * temper 100 → rand(0.5, 1.3)   （気性難）
+ * temper  50 → rand(0.7, 1.2)   （補間）
+ * ```
+ *
+ * 【★なぜ閾値をやめたか】
+ *   `temper` の創始水準は**ちょうど 50**（D-009）で変異SDは10です。
+ *   閾値を50に置くと**集団の半分が境界のすぐ両側に密集**し、
+ *   **±1 の遺伝的な揺れで成長のばらつきが `rand(0.9,1.1)` と `rand(0.5,1.3)` の間を飛びます。**
+ *   気性が**全形質で最も不連続な形質**になってしまいます。
+ *
+ *   ★**正典が与えた2つの値はどちらも両端として保存され、境界だけが消えます。**
  */
-// prettier-ignore
-export const TEMPER_DIFFICULT_AT = 50;
-
-/** 正典 §7.3: 気性難は不安定 `rand(0.5,1.3)` / 温順は `rand(0.9,1.1)`。★正典の写し */
 export const TEMPER_COEF_RANGE = {
-  difficult: { min: 0.5, max: 1.3 },
+  /** temper=0（最も温順）。★正典の `rand(0.9,1.1)` */
   gentle: { min: 0.9, max: 1.1 },
+  /** temper=100（最も気性難）。★正典の `rand(0.5,1.3)` */
+  difficult: { min: 0.5, max: 1.3 },
 } as const;
+
+/** `temper` の値域（正典 §5.2: 0..100・高いほど気性難）。★正典の写し */
+export const TEMPER_RANGE = { min: 0, max: 100 } as const;
 
 /** 正典 §7.3: conditionCoef は 0.7〜1.3。★幅は正典の写し（対応は下で決める） */
 export const CONDITION_COEF_RANGE = { min: 0.7, max: 1.3 } as const;
@@ -76,10 +88,18 @@ export function growthCoef(type: GrowthType, ageWeeks: number): number {
   return last[1];
 }
 
-/** 気性による係数（§7.3）。★不安定さそのものが効果なので、必ず乱数を消費する */
+/**
+ * 気性による係数（§7.3・D-044）。★不安定さそのものが効果なので、必ず乱数を消費する。
+ *
+ * ★**幅の両端を線形補間**します。閾値で切り替えると、境界の±1で
+ *   ばらつきが飛びます（集団の半分が境界に密集しているため）。
+ */
 export function temperCoef(temper: number, rng: Rng): number {
-  const r = temper >= TEMPER_DIFFICULT_AT ? TEMPER_COEF_RANGE.difficult : TEMPER_COEF_RANGE.gentle;
-  return rng.range(r.min, r.max);
+  const { min: lo, max: hi } = TEMPER_RANGE;
+  const t = Math.max(0, Math.min(1, (temper - lo) / (hi - lo)));
+  const g = TEMPER_COEF_RANGE.gentle;
+  const d = TEMPER_COEF_RANGE.difficult;
+  return rng.range(g.min + (d.min - g.min) * t, g.max + (d.max - g.max) * t);
 }
 
 /**
@@ -121,6 +141,17 @@ export interface GrowthInput {
  */
 export function grow(input: GrowthInput, rng: Rng): Record<AbilityKey, number> {
   const { menu, ageWeeks, growth, temper, condition, current, potential } = input;
+  // ★不変条件が既に破れていたら、**黙って直さず落とす**（D-045）。
+  //   ここで静かに切り下げると、故障の恒久ダメージが「成長の副作用」として現れ、
+  //   原因が効果の場所に書かれていない状態になります。
+  for (const key of ABILITY_KEYS) {
+    if (current[key] > potential[key]) {
+      throw new Error(
+        `grow: current が potential を超えています (${key}: ${current[key]} > ${potential[key]})。` +
+          `故障の恒久ダメージは applyInjury で current を切り下げてから週を進めてください（D-045）`,
+      );
+    }
+  }
   const gc = growthCoef(growth, ageWeeks);
   const cc = conditionCoef(condition);
   // ★気性の係数は**週に1回**引く。形質ごとに引くと、同じ週で馬の気性が形質ごとに変わる
@@ -132,7 +163,10 @@ export function grow(input: GrowthInput, rng: Rng): Record<AbilityKey, number> {
     const jitter = rng.range(GAIN_JITTER.min, GAIN_JITTER.max);
     const gain = BASE_GAIN * menuCoef(menu, key) * gc * tc * cc * headroom(cur, pot) * jitter;
     const next = cur + Math.max(0, gain);
-    // ★不変条件（正典 §7.3・B-4）: current は potential を超えない
+    // ★不変条件（正典 §7.3・B-4）: current は potential を超えない。
+    //   ★ここは**成長で超えない**ことだけを担保します。
+    //     故障で potential が下がったときの切り下げは **applyInjury の責務**です（D-045）。
+    //     成長関数に任せると、休養中・引退後など**成長を通らない週で不変条件が破れます**。
     out[key] = next >= pot ? pot : next;
   }
   return out;

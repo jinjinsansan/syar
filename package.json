@@ -25,7 +25,8 @@
     "mutation": "node tools/mutation/run.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "build:worker": "esbuild apps/worker/src/main.ts --bundle --platform=node --format=cjs --target=node22 --outfile=dist/worker.cjs --external:pg-native"
+    "build:worker": "esbuild apps/worker/src/main.ts --bundle --platform=node --format=cjs --target=node22 --outfile=dist/worker.cjs --external:pg-native",
+    "verify:v14": "tsx apps/cli/src/verify-v14.ts"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.112.2",

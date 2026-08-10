@@ -96,6 +96,12 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: 'V-10 / §11（控除率。PP 発行量の最大の調整弁。0 にすると胴元の取り分が消える）',
   },
   {
+    key: 'DOMINANCE_MARGIN',
+    file: 'apps/cli/src/verify-v14.ts',
+    perturbed: 'export const DOMINANCE_MARGIN = 100;',
+    affects: '★V-14 の3つ目「追い切り偏重が支配戦略でない」の判定幅。正典 D-044 は「大きく上回らない」としか書いておらず、+2pt は**私が決めた値**。100 にすると、追い切りが何 pt 上回っても PASS になり、ゲートが意味を失う（照会中）',
+  },
+  {
     key: 'MAIN_EFFECT_COEF',
     file: 'packages/training/src/menus.ts',
     perturbed: 'export const MAIN_EFFECT_COEF = 0.08;',
@@ -106,12 +112,6 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     file: 'packages/training/src/menus.ts',
     perturbed: 'export const SIDE_EFFECT_COEF = 0;',
     affects: '★§7.3 成長式（正典に規定なし）。0 にすると「坂路だけ続けた馬は ST/GT/IQ が初期値のまま」になり、1形質だけ極端に伸びた馬が量産される',
-  },
-  {
-    key: 'TEMPER_DIFFICULT_AT',
-    file: 'packages/training/src/growth.ts',
-    perturbed: 'export const TEMPER_DIFFICULT_AT = 200;',
-    affects: '★§7.3 気性難の閾値（正典に規定なし・temper は 0..100 で創始水準50）。200 にすると全馬が「温順」になり、気性難の不安定さ rand(0.5,1.3) が一度も使われなくなる',
   },
   {
     key: 'CANCEL_AFTER_START_MS',
@@ -306,6 +306,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
     why: "★D-035 を本番のコード経路（apps/worker/src/odds.ts の buildOddsRows）で確かめるハーネス。実行条件は較正定数ではない: MC は D-035 の設計式から決まる値を既定に取り（自由に選べない）、RACES と FINALS は**推定の分散だけ**を下げて期待値を動かさない。★M=3,896,104 では §13.2 の10万レース測定が 3.9×10^11 回の解決（本番機で約44日）になるため、同一レースから確定を多数引く分散低減を使う。合否は出力の乖離で決まり、ここの値をいじって通せるものではない（R-12）",
   },
   {
+    pattern: 'apps/cli/src/verify-v14\.ts',
+    why: "★V-14（D-044）の測定ハーネス。SEED/HORSES は標本の取り方で、TRAIN_STREAM は乱数の用途ID（既存4表と重ならない61〜の帯）。いずれも判定を通すために動かせる値ではない。★ただし DOMINANCE_MARGIN（『大きく上回らない』を +2pt と定義した値）だけは判定そのものを決めるので、較正定数として別に登録している",
+  },
+  {
     pattern: 'apps/cli/src/diag-growth-scale\.ts',
     why: '★成長式を実装する前に桁が合うかを確かめる診断ツール（P3 指示書 §5-1「掃引する前に解析で決まるものを先に決める」）。正典 §7.3 の値の写しを持つだけで、判定（V-x / B-x）を作らない',
   },
@@ -325,6 +329,15 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
+  { key: 'TEMPER_RANGE', why: '正典 §5.2 の temper 値域 0..100 の写し。D-044 の連続補間で両端として使う' },
+  { key: 'INJURY_BASE_PROB', why: '正典 §7.5 の基礎確率 0.0018 の写し' },
+  { key: 'FATIGUE_DIVISOR', why: '正典 §7.5 の (1 + fatigue / 40) の 40 の写し' },
+  { key: 'DURABILITY_REFERENCE', why: '正典 §7.5 の (1000 / durability) の 1000 の写し' },
+  { key: 'AGE_FACTOR', why: '正典 §7.5「4歳以降1.0 → 5歳末1.6 へ線形」の写し。★4歳未満の値は正典に規定が無く 1.0 に置いた（照会 Q-P3-9）' },
+  { key: 'SEVERITY_TABLE', why: '正典 §7.5 の重篤度表（60/30/9/1%・休養週）の写し' },
+  { key: 'MODERATE_SP_LOSS', why: '正典 §7.5「中度: potential SP -3%」の写し' },
+  { key: 'SEVERE_ALL_LOSS', why: '正典 §7.5「重度: potential 全体 -8%」の写し' },
+  { key: 'SEVERE_DURABILITY_LOSS', why: '正典 §7.5「重度: durability -100」の写し' },
   { key: 'FATIGUE_RANGE', why: '疲労の値域 0..100。★正典 §7.4 に上限の規定が無いため暫定で置いた値で、照会中（Q-P3-8）。判定を通すために動かす値ではない' },
   { key: 'FATIGUE_CAPS_CONDITION_AT', why: '正典 §7.4「疲労70以上は調子2止まり」の 70 の写し。★総当たりで、この規定は一度も効かないと判明（式が先に効く）。照会中（Q-P3-6）' },
   { key: 'CAPPED_CONDITION_MAX', why: '正典 §7.4「調子は最大2止まり」の 2 の写し' },
@@ -336,7 +349,7 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   { key: 'HEADROOM_EXPONENT', why: '正典 §7.3 の headroom 指数 0.7 の写し' },
   { key: 'HEADROOM_EXP', why: 'diag-growth-scale.ts（実装前に桁を確かめる診断ツール）が持つ正典 §7.3 の写し。判定を作らない' },
   { key: 'GAIN_JITTER', why: '正典 §7.3 の rand(0.85, 1.15) の写し' },
-  { key: 'TEMPER_COEF_RANGE', why: '正典 §7.3 の rand(0.5,1.3) / rand(0.9,1.1) の写し。★閾値のほうは TEMPER_DIFFICULT_AT として較正定数に登録済み' },
+  { key: 'TEMPER_COEF_RANGE', why: '正典 §7.3 の rand(0.9,1.1)（temper=0）と rand(0.5,1.3)（temper=100）の写し。★D-044 で2分類をやめ連続補間にしたため閾値の定数は無くなった（両端は正典の値のまま保存）' },
   { key: 'CONDITION_COEF_RANGE', why: '正典 §7.3 の「0.7〜1.3」の写し。★0..5 への対応づけは正典に無く、線形と決めた旨を照会中' },
   { key: 'GROWTH_CURVE', why: '正典 §7.3 の成長型カーブ表（104/156/208/260週）の写し' },
   { key: 'MENUS', why: '正典 §7.2 の調教メニュー表（疲労・EP・主効果の対象・気性への影響）と §7.5 の menuIntensity の写し。★係数だけが MAIN_EFFECT_COEF / SIDE_EFFECT_COEF として較正定数に登録済み' },

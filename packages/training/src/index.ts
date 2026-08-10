@@ -7,3 +7,4 @@
 export * from './menus.js';
 export * from './growth.js';
 export * from './condition.js';
+export * from './injury.js';

@@ -7,8 +7,8 @@
 import { describe, expect, it } from 'vitest';
 import { ABILITY_KEYS, deriveRng, type AbilityKey } from '@star/sim-engine';
 import {
-  BASE_GAIN, GROWTH_CURVE, MENUS, MENU_IDS, TEMPER_DIFFICULT_AT,
-  conditionCoef, epCost, fatigueDelta, grow, growthCoef, headroom, menuCoef,
+  BASE_GAIN, GROWTH_CURVE, MENUS, MENU_IDS, TEMPER_COEF_RANGE,
+  conditionCoef, epCost, fatigueDelta, grow, growthCoef, headroom, menuCoef, temperCoef,
 } from '../src/index.js';
 
 const rec = (v: number): Record<AbilityKey, number> =>
@@ -66,15 +66,25 @@ describe('★B-4 current は potential を超えない', () => {
     }
   });
 
-  it('★★故障で potential が current を下回ったとき、current が切り下がる（未確定の仕様）', () => {
+  it('★★故障で potential が current を下回った状態で成長を呼ぶと落ちる（D-045）', () => {
+    // ★切り下げは applyInjury の責務。成長関数の副作用にすると、
+    //   休養中・引退後など**成長を通らない週で不変条件が破れたまま**になる。
+    //   → 黙って直さず、原因を指して落とす。
+    const rng = deriveRng(12, 61, 12);
+    expect(() =>
+      grow({ ...base, current: rec(500), potential: rec(460) }, rng),
+    ).toThrow(/applyInjury/);
+  });
+
+  it('（旧）故障で potential が current を下回ったとき、current が切り下がる', () => {
     // §7.5: 重度故障は potential 全体 -8%。★このとき current > potential になりうる。
     //   正典は「current ≤ potential 絶対」と「恒久ダメージは potential を削る」の
     //   両方を書いているが、**その結果 current をどうするかは書いていない**。
     //   ★いまの実装は不変条件を守るために切り下げる。**照会中の挙動**なので、
     //     変わったらこのテストが落ちて気づけるようにしておく。
+    // ★D-045 で applyInjury に移したので、ここでは成長側が拒否することだけを見る
     const rng = deriveRng(10, 61, 10);
-    const out = grow({ ...base, menu: 'light', current: rec(500), potential: rec(460) }, rng);
-    for (const k of ABILITY_KEYS) expect(out[k]).toBe(460);
+    expect(() => grow({ ...base, menu: 'light', current: rec(500), potential: rec(460) }, rng)).toThrow();
   });
 
   it('★potential が 0 でも壊れない（0 除算・NaN を出さない）', () => {
@@ -185,17 +195,40 @@ describe('§7.3 調子と気性', () => {
     expect(spread(100)).toBeGreaterThan(spread(0));
   });
 
-  it('★気性難が実在する（全馬が「温順」になっていない）', () => {
-    // ★閾値を値域の外（200 など）に動かすと全馬が温順になり、
-    //   正典の rand(0.5,1.3) が一度も使われなくなる。それを直接検出する。
-    expect(TEMPER_DIFFICULT_AT).toBeGreaterThan(0);
-    expect(TEMPER_DIFFICULT_AT).toBeLessThanOrEqual(100);
-    // 値域の上端の馬は必ず「気性難」側に入る
-    expect(spread(100)).toBeGreaterThan(spread(100) * 0); // 形だけでなく実測で
-    const gentle = spread(0);
-    const difficult = spread(100);
-    // 正典の幅: 気性難 0.8 幅 / 温順 0.2 幅 → ばらつきは 2倍以上開く
-    expect(difficult / gentle).toBeGreaterThan(2);
+  it('★正典の2値が両端として保存されている（D-044）', () => {
+    // temper=0 → rand(0.9,1.1) / temper=100 → rand(0.5,1.3)
+    const bounds = (temper: number): { lo: number; hi: number } => {
+      let lo = Infinity, hi = -Infinity;
+      for (let i = 0; i < 2000; i += 1) {
+        const v = temperCoef(temper, deriveRng(20, 61, i));
+        lo = Math.min(lo, v); hi = Math.max(hi, v);
+      }
+      return { lo, hi };
+    };
+    const g = bounds(0);
+    expect(g.lo).toBeGreaterThanOrEqual(TEMPER_COEF_RANGE.gentle.min);
+    expect(g.hi).toBeLessThanOrEqual(TEMPER_COEF_RANGE.gentle.max);
+    const d = bounds(100);
+    expect(d.lo).toBeGreaterThanOrEqual(TEMPER_COEF_RANGE.difficult.min);
+    expect(d.hi).toBeLessThanOrEqual(TEMPER_COEF_RANGE.difficult.max);
+    // 中間は補間（temper=50 → rand(0.7,1.2)）
+    const m = bounds(50);
+    expect(m.lo).toBeGreaterThanOrEqual(0.7);
+    expect(m.hi).toBeLessThanOrEqual(1.2);
+  });
+
+  it('★★境界で飛ばない（D-044 の理由そのもの）', () => {
+    // 創始水準50の±1で、ばらつきが 0.2幅 ↔ 0.8幅 と飛んではいけない
+    const s49 = spread(49), s50 = spread(50), s51 = spread(51);
+    // 隣り合う temper のばらつきの差は、値域全体の差の 5% 未満
+    const whole = spread(100) - spread(0);
+    expect(Math.abs(s50 - s49)).toBeLessThan(whole * 0.05);
+    expect(Math.abs(s51 - s50)).toBeLessThan(whole * 0.05);
+  });
+
+  it('★気性が悪いほどばらつきが大きい（単調）', () => {
+    expect(spread(100)).toBeGreaterThan(spread(50));
+    expect(spread(50)).toBeGreaterThan(spread(0));
   });
 });
 
