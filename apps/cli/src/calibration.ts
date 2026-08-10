@@ -330,6 +330,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
     why: "★D-035 を本番のコード経路（apps/worker/src/odds.ts の buildOddsRows）で確かめるハーネス。実行条件は較正定数ではない: MC は D-035 の設計式から決まる値を既定に取り（自由に選べない）、RACES と FINALS は**推定の分散だけ**を下げて期待値を動かさない。★M=3,896,104 では §13.2 の10万レース測定が 3.9×10^11 回の解決（本番機で約44日）になるため、同一レースから確定を多数引く分散低減を使う。合否は出力の乖離で決まり、ここの値をいじって通せるものではない（R-12）",
   },
   {
+    pattern: 'apps/cli/src/verify-v7\.ts',
+    why: "★V-7 の測定条件を決めるための実測ツール（P3 指示書 §4）。SEED/HORSES は標本の取り方、TRAIN_STREAM は乱数の用途ID（既存4表と重ならない61〜の帯）。★このツールは判定を出さず、定義の候補ごとの数字を並べるだけなので、通すために動かせる値がない",
+  },
+  {
     pattern: 'apps/cli/src/verify-v14\.ts',
     why: "★V-14（D-044）の測定ハーネス。SEED/HORSES は標本の取り方で、TRAIN_STREAM は乱数の用途ID（既存4表と重ならない61〜の帯）。いずれも判定を通すために動かせる値ではない。★ただし DOMINANCE_MARGIN（『大きく上回らない』を +2pt と定義した値）だけは判定そのものを決めるので、較正定数として別に登録している",
   },
