@@ -21,7 +21,7 @@ import {
   ABILITY_KEYS, NICKS_GEN, deriveRng, type AbilityKey, type HorseRecord,
 } from '@star/sim-engine';
 import {
-  DEFAULT_MENU, applyFatigue, applyInjury, epCost, fatigueDelta,
+  DEFAULT_MENU, applyInjury, epCost, fatigueDelta, weeklyFatigue,
   MENU_IDS, grow, injuryProbability, menuCoef, nextCondition, rollSeverity, type MenuId,
 } from '@star/training';
 import { LIFECYCLE_WEEKS } from '@star/scheduler';
@@ -142,7 +142,8 @@ function runCareer(horse: HorseRecord, policy: Policy, horseIndex: number): Care
     for (const k of ABILITY_KEYS) current[k] = next[k];
 
     // --- 疲労と調子（§7.4） ---
-    fatigue = applyFatigue(fatigue, fatigueDelta(menu));
+    // ★自然回復こみ（D-046）。applyFatigue を直に呼ぶと放置馬が慢性疲労に戻る
+    fatigue = weeklyFatigue(fatigue, fatigueDelta(menu));
     condition = nextCondition(fatigue, deriveRng(SEED, TRAIN_STREAM.CONDITION, horseIndex * 1000 + week));
     epSpent += epCost(menu);
   }
@@ -205,6 +206,12 @@ const hardOnly = u('hard_only');
 console.log('');
 const g1 = neglect >= 55 && neglect <= 75;
 const g2 = balanced >= 90;
+// ★③の定義（D-047 で確定）: 「同一 EP 予算下の開放率」。
+//   EP は希少資源で、プレイヤーが直面する問いは
+//   「同じ EP を注いだときどちらが強くなるか」だから。
+const epBalanced = mean(results.balanced.map((r) => r.epSpent));
+const epHard = mean(results.hard_only.map((r) => r.epSpent));
+const perEp = (p: Policy): number => u(p) / mean(results[p].map((r) => r.epSpent));
 /**
  * ★「大きく上回らない」の判定幅（較正定数）。
  *   正典 D-044 は「大きく上回らない」としか書いておらず、**+2pt は私が決めた値**です。
@@ -216,6 +223,12 @@ const g3 = hardOnly <= balanced + DOMINANCE_MARGIN;
 console.log(`  ★放置が 55〜75%          : ${neglect.toFixed(1)}%  ${g1 ? 'PASS' : 'FAIL'}`);
 console.log(`  ★適切な育成が 90%以上    : ${balanced.toFixed(1)}%  ${g2 ? 'PASS' : 'FAIL'}`);
 console.log(`  ★追い切り偏重が支配的でない: ${hardOnly.toFixed(1)}% vs ${balanced.toFixed(1)}%（+${DOMINANCE_MARGIN}pt まで）  ${g3 ? 'PASS' : 'FAIL'}`);
+console.log(
+  `     ★同一EP予算下（D-047）: EP あたり開放率 追い切り ${(perEp('hard_only') * 10000).toFixed(2)} vs ` +
+    `バランス ${(perEp('balanced') * 10000).toFixed(2)}（1万EPあたり%）` +
+    `  → 比 ${(perEp('hard_only') / perEp('balanced')).toFixed(2)}倍` +
+    `   EP実額 ${Math.round(epHard).toLocaleString()} vs ${Math.round(epBalanced).toLocaleString()}`,
+);
 console.log(`\n★V-14: ${g1 && g2 && g3 ? 'PASS' : 'FAIL'}`);
 
 // ---------------------------------------------------------------------------

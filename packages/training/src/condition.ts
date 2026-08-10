@@ -42,6 +42,40 @@ export const FATIGUE_PER_CONDITION_STEP = 25;
 /** 正典 §7.4 の基準値 3。★正典の写し */
 export const CONDITION_BASE = 3;
 
+/**
+ * ★週ごとの疲労の自然回復（D-046 で新設・較正定数）。
+ *
+ * 【なぜ要るか — 実測で出た設計の誤り】
+ *   自然回復が無いと、**何もしない馬が、最も激しい調教をした馬より疲れます**:
+ *
+ *   ```
+ *   放置（軽め調整のみ） 平均疲労 77.9
+ *   追い切り偏重         平均疲労 69.2   ← ★こちらのほうが低い
+ *   ```
+ *
+ *   追い切り偏重は休養（0 EP・−35）を挟めますが、**放置は挟めません**
+ *   （§7.1「指示を出さない週は軽め調整扱い」なので、+4 がたまり続けます）。
+ *   しかも**疲労は §8b の介入ゲージ初期値に効く**ので、
+ *   放置馬は**レース中の操作まで不利**になります。**二重の罰**でした。
+ *
+ * 【効果】
+ *   軽め +4 は実質 **−1**、追い切り +32 は実質 **+27** になり、
+ *   「**疲労は強度に対してたまる**」という当たり前の関係が初めて成立します。
+ *
+ * ⚠️ **1行で書くこと**（変異試験は行単位で宣言を置換するため）
+ */
+// prettier-ignore
+export const FATIGUE_NATURAL_RECOVERY = 5;
+
+/**
+ * ★1週ぶんの疲労の変化（メニューの疲労 − 自然回復）。
+ *   **週進行では必ずこちらを使います。** `applyFatigue` を直に呼ぶと
+ *   自然回復が抜け落ち、放置馬が慢性疲労に戻ります。
+ */
+export function weeklyFatigue(current: number, menuFatigue: number): number {
+  return applyFatigue(current, menuFatigue - FATIGUE_NATURAL_RECOVERY);
+}
+
 /** 疲労を加減して値域に収める */
 export function applyFatigue(current: number, delta: number): number {
   const v = current + delta;

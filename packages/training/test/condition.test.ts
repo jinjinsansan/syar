@@ -10,7 +10,7 @@ import { deriveRng } from '@star/sim-engine';
 import { DEFAULT_INTERVENTION_BALANCE, initialStamina } from '@star/race-engine';
 import {
   CAPPED_CONDITION_MAX, FATIGUE_CAPS_CONDITION_AT, FATIGUE_RACE_PENALTY_AT,
-  applyFatigue, isRacePenalized, nextCondition,
+  applyFatigue, isRacePenalized, nextCondition, weeklyFatigue,
 } from '../src/index.js';
 
 describe('§7.4 疲労', () => {
@@ -102,5 +102,32 @@ describe('★B-6 §8b の介入ゲージ初期値に効いている', () => {
     const fixed = gauge(3, 0);
     expect(gauge(5, 0)).toBeGreaterThan(fixed);
     expect(gauge(0, 100)).toBeLessThan(fixed);
+  });
+});
+
+describe('★D-046 疲労の自然回復', () => {
+  it('★軽め調整は実質マイナス（放置馬が慢性疲労にならない）', () => {
+    // 軽め +4 − 自然回復5 = 実質 −1
+    expect(weeklyFatigue(50, 4)).toBe(49);
+  });
+
+  it('★追い切りは実質プラス（強度に対して疲労がたまる関係が成立する）', () => {
+    // 追い切り +32 − 5 = +27
+    expect(weeklyFatigue(50, 32)).toBe(77);
+  });
+
+  it('★強度の順に疲労がたまる（D-046 が成立させた当たり前の関係）', () => {
+    const light = weeklyFatigue(50, 4);
+    const hill = weeklyFatigue(50, 18);
+    const hard = weeklyFatigue(50, 32);
+    expect(light).toBeLessThan(50); // 軽めは回復する
+    expect(hill).toBeGreaterThan(light);
+    expect(hard).toBeGreaterThan(hill);
+  });
+
+  it('値域から飛び出さない', () => {
+    expect(weeklyFatigue(2, 4)).toBe(1);
+    expect(weeklyFatigue(0, 4)).toBe(0);
+    expect(weeklyFatigue(98, 32)).toBe(100);
   });
 });

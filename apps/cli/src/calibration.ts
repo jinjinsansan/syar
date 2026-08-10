@@ -102,6 +102,12 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: '★V-14 の3つ目「追い切り偏重が支配戦略でない」の判定幅。正典 D-044 は「大きく上回らない」としか書いておらず、+2pt は**私が決めた値**。100 にすると、追い切りが何 pt 上回っても PASS になり、ゲートが意味を失う（照会中）',
   },
   {
+    key: 'FATIGUE_NATURAL_RECOVERY',
+    file: 'packages/training/src/condition.ts',
+    perturbed: 'export const FATIGUE_NATURAL_RECOVERY = 0;',
+    affects: '★D-046 で新設した週ごとの疲労回復。0 にすると自然回復が消え、★何もしない馬（軽め+4がたまり続ける）が最も激しい調教をした馬より疲れる状態に戻る（実測: 放置77.9 vs 追い切り偏重69.2）。疲労は §8b の介入ゲージ初期値にも効くので、放置馬はレース中の操作まで不利になる二重の罰になる',
+  },
+  {
     key: 'MAIN_EFFECT_COEF',
     file: 'packages/training/src/menus.ts',
     perturbed: 'export const MAIN_EFFECT_COEF = 0.08;',
