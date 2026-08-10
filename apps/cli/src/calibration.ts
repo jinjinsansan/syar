@@ -96,6 +96,24 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: 'V-10 / §11（控除率。PP 発行量の最大の調整弁。0 にすると胴元の取り分が消える）',
   },
   {
+    key: 'MAIN_EFFECT_COEF',
+    file: 'packages/training/src/menus.ts',
+    perturbed: 'export const MAIN_EFFECT_COEF = 0.08;',
+    affects: '★§7.3 成長式（正典に数値が無い）。副効果と同値にすると「主効果」列の意味が消え、どのメニューを選んでも同じ伸びになる。★実装前の解析で、他の係数が1だと調教104週で素質上限に張り付き後半78週の伸びが0になると分かっているため、この値が式全体の桁を決める',
+  },
+  {
+    key: 'SIDE_EFFECT_COEF',
+    file: 'packages/training/src/menus.ts',
+    perturbed: 'export const SIDE_EFFECT_COEF = 0;',
+    affects: '★§7.3 成長式（正典に規定なし）。0 にすると「坂路だけ続けた馬は ST/GT/IQ が初期値のまま」になり、1形質だけ極端に伸びた馬が量産される',
+  },
+  {
+    key: 'TEMPER_DIFFICULT_AT',
+    file: 'packages/training/src/growth.ts',
+    perturbed: 'export const TEMPER_DIFFICULT_AT = 200;',
+    affects: '★§7.3 気性難の閾値（正典に規定なし・temper は 0..100 で創始水準50）。200 にすると全馬が「温順」になり、気性難の不安定さ rand(0.5,1.3) が一度も使われなくなる',
+  },
+  {
     key: 'CANCEL_AFTER_START_MS',
     file: 'packages/scheduler/src/cycle.ts',
     perturbed: 'export const CANCEL_AFTER_START_MS = 0;',
@@ -238,6 +256,9 @@ export const CALIBRATION_SCAN_DIRS: readonly string[] = [
   //   「変異試験すべて防御」が**走査していない範囲について何も言っていない**状態になる。
   'packages/betting/src',
   'packages/scheduler/src',
+  // ★P3 で追加。加え忘れると「変異試験すべて防御」が
+  //   **走査していない範囲について何も言っていない**状態になる（S-4）
+  'packages/training/src',
 ];
 
 /** 走査から外すファイル（理由必須）。新規ファイルは既定で走査される */
@@ -285,6 +306,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
     why: "★D-035 を本番のコード経路（apps/worker/src/odds.ts の buildOddsRows）で確かめるハーネス。実行条件は較正定数ではない: MC は D-035 の設計式から決まる値を既定に取り（自由に選べない）、RACES と FINALS は**推定の分散だけ**を下げて期待値を動かさない。★M=3,896,104 では §13.2 の10万レース測定が 3.9×10^11 回の解決（本番機で約44日）になるため、同一レースから確定を多数引く分散低減を使う。合否は出力の乖離で決まり、ここの値をいじって通せるものではない（R-12）",
   },
   {
+    pattern: 'apps/cli/src/diag-growth-scale\.ts',
+    why: '★成長式を実装する前に桁が合うかを確かめる診断ツール（P3 指示書 §5-1「掃引する前に解析で決まるものを先に決める」）。正典 §7.3 の値の写しを持つだけで、判定（V-x / B-x）を作らない',
+  },
+  {
     pattern: 'apps/cli/src/bench-mc\.ts',
     why: 'オッズ MC の実費用（μs/試行）を測るだけの計測器。合否をいっさい作らず、TRIALS は測定の精度を上げるだけで測っている量（1試行あたりの時間）を変えない',
   },
@@ -300,6 +325,21 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
+  { key: 'BASE_GAIN', why: '正典 §7.3 の「既定 12」の写し。成長式の基準量そのもので、判定を通すために動かす値ではない' },
+  { key: 'HEADROOM_EXPONENT', why: '正典 §7.3 の headroom 指数 0.7 の写し' },
+  { key: 'HEADROOM_EXP', why: 'diag-growth-scale.ts（実装前に桁を確かめる診断ツール）が持つ正典 §7.3 の写し。判定を作らない' },
+  { key: 'GAIN_JITTER', why: '正典 §7.3 の rand(0.85, 1.15) の写し' },
+  { key: 'TEMPER_COEF_RANGE', why: '正典 §7.3 の rand(0.5,1.3) / rand(0.9,1.1) の写し。★閾値のほうは TEMPER_DIFFICULT_AT として較正定数に登録済み' },
+  { key: 'CONDITION_COEF_RANGE', why: '正典 §7.3 の「0.7〜1.3」の写し。★0..5 への対応づけは正典に無く、線形と決めた旨を照会中' },
+  { key: 'GROWTH_CURVE', why: '正典 §7.3 の成長型カーブ表（104/156/208/260週）の写し' },
+  { key: 'MENUS', why: '正典 §7.2 の調教メニュー表（疲労・EP・主効果の対象・気性への影響）と §7.5 の menuIntensity の写し。★係数だけが MAIN_EFFECT_COEF / SIDE_EFFECT_COEF として較正定数に登録済み' },
+  { key: 'MENU_IDS', why: '§7.2 の8メニューの一覧。値ではなく集合の定義' },
+  { key: 'DEFAULT_MENU', why: '正典 §7.1「指示を出さない週は軽め調整扱い」の写し' },
+  { key: 'CYCLES_PER_WEEK', why: '正典 D-007（1週=4時間・1サイクル=10分）から決まる導出値 24。★別々に書くと片方だけ動いて静かにずれるので CYCLE_MS から導出しており、week.test.ts が正典の値と一致することを守る' },
+  { key: 'WEEKS_PER_DAY', why: '正典 §7.1「1日6週」の導出値。テストがリテラル 6 と一致することを守る' },
+  { key: 'WEEK_MS', why: '正典 D-007「1ゲーム内週 = リアル4時間」の導出値' },
+  { key: 'LIFECYCLE_WEEKS', why: '正典 §7.1 のタイムライン表（78/104/260週）の写し。ルールそのもので較正で動かす値ではない' },
+  { key: 'CAREER_RACE_LIMIT', why: '正典 §7.1「キャリア上限 24戦」の写し' },
   {
     key: 'SELECTED',
     why: 'F-4 の V-2e 分解で「レース選抜がかかる形質」を列挙した集合。数値の較正値ではなく形質キーの一覧で、V-2f が選抜対象として明示している集合と同じ。判定は変えず、内訳の見出しを分けるだけに使う',
