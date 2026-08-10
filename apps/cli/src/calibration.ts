@@ -102,6 +102,18 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: '★V-14 の3つ目「追い切り偏重が支配戦略でない」の判定幅。正典 D-044 は「大きく上回らない」としか書いておらず、+2pt は**私が決めた値**。100 にすると、追い切りが何 pt 上回っても PASS になり、ゲートが意味を失う（照会中）',
   },
   {
+    key: 'COMMON_EVENT_PROB',
+    file: 'packages/training/src/events.ts',
+    perturbed: 'export const COMMON_EVENT_PROB = 0.5;',
+    affects: '★§7.6 の「低確率」の既定値（正典に数値が無い。数値があるのは素質開花の1%だけ）。0.5 にすると毎週のようにイベントが起き、テキストの特別感が消える',
+  },
+  {
+    key: 'PUSH_THROUGH_IQ_MULT',
+    file: 'packages/training/src/events.ts',
+    perturbed: 'export const PUSH_THROUGH_IQ_MULT = 1.0;',
+    affects: '★§7.6「強行は IQ+ だが気性+10」の IQ+ の量（正典に数値が無い）。1.0 にすると強行の利得が消え、気性+10 だけを負う選択肢になり、選ぶ理由が無くなる',
+  },
+  {
     key: 'BASE_GAIN',
     file: 'packages/training/src/growth.ts',
     perturbed: 'export const BASE_GAIN = 12;',
@@ -341,6 +353,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
+  { key: 'AWAKENING_PROB', why: '正典 §7.6「素質が開花した！（1%）」の写し' },
+  { key: 'AWAKENING_MULT', why: '正典 §7.6「potential のうち1形質 +5%」の写し' },
+  { key: 'PUSH_THROUGH_TEMPER', why: '正典 §7.6「強行は…気性+10」の写し' },
+  { key: 'EVENTS', why: '正典 §7.6 のイベント表（テキストと効果）。★選択肢の効果を data-driven にしたもので、個々の数値は AWAKENING_* / PUSH_THROUGH_* / COMMON_EVENT_PROB として別に登録済み' },
   { key: 'TEMPER_RANGE', why: '正典 §5.2 の temper 値域 0..100 の写し。D-044 の連続補間で両端として使う' },
   { key: 'INJURY_BASE_PROB', why: '正典 §7.5 の基礎確率 0.0018 の写し' },
   { key: 'FATIGUE_DIVISOR', why: '正典 §7.5 の (1 + fatigue / 40) の 40 の写し' },
