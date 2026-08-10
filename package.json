@@ -24,12 +24,14 @@
     "inventory": "node tools/inventory/measure.mjs",
     "mutation": "node tools/mutation/run.mjs",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:worker": "esbuild apps/worker/src/main.ts --bundle --platform=node --format=cjs --target=node22 --outfile=dist/worker.cjs --external:pg-native"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.112.2",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.21.0",
+    "esbuild": "^0.28.1",
     "pg": "^8.22.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",

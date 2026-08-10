@@ -63,25 +63,31 @@ else
   mkdir -p "$DEST"
   git archive "$SHA" | tar -x -C "$DEST"
   log "木を展開しました $DEST"
-  # ★--omit=dev を絶対に付けない。tsx は devDependency だが**実行に必要**
+  # ★ここは**ビルドのため**に開発依存が要ります（実行時には要りません・D-043）。
+  #   以前は tsx と pg が devDependency のまま**実行時に**必要だったので、
+  #   `npm ci --omit=dev` が 2026-08-09 の7分停止を引き起こしました。
   (cd "$DEST" && npm ci --silent)
   log "依存を入れました"
+  # ★1ファイルにバンドルする。これ以降、**実行に node_modules は不要**
+  (cd "$DEST" && npm run build:worker --silent >/dev/null)
+  log "バンドルしました dist/worker.cjs"
 
   # --- 2. 新しい木を検証する（★まだリンクを張り替えない） ---
   preflight() {
-    # ExecStart が指すバイナリそのものを見る
-    if [ ! -x "$DEST/node_modules/.bin/tsx" ]; then
-      log "★tsx がありません"
+    # ExecStart が指すファイルそのものを見る
+    if [ ! -f "$DEST/dist/worker.cjs" ]; then
+      log "★dist/worker.cjs がありません"
       return 1
     fi
-    # 依存の網が解けることを確かめる（DB には触れない純ロジックのモジュールを読む）
-    # ★`-e` は CJS 評価なので **top-level await が使えません**。
-    #   `await import(...)` と書くと健全な木でも必ず落ち、しかも
-    #   「壊れた木なら落ちる」対照**も同じ理由で落ちる**ので効いて見えます。
-    #   ★「落ちた」は「検出できた」ではありません（R-21）。
-    if ! "$DEST/node_modules/.bin/tsx" -e \
-      "import('$DEST/apps/worker/src/cycle-runner.ts').catch((e) => { console.error(e.message); process.exit(1); })"; then
-      log "★モジュールを読み込めません"
+    # ★バンドルを**環境変数なしで実際に起動**する。模擬ではなく本物の起動なので、
+    #   依存が解けていなければ別の理由でここに出ます。
+    # ⚠️ これは「失敗すること」を期待する検査なので、**理由まで読みます**。
+    #    落ちただけで通すと、壊れたバンドルも「検出できた」ことになります（R-21）。
+    #    以前 `-e` の top-level await で、健全な木も壊れた木も同じ理由で落ちていました。
+    local out
+    out="$(cd "$DEST" && env -i /usr/bin/node dist/worker.cjs 2>&1 || true)"
+    if ! printf '%s' "$out" | grep -q 'STAR_ENV'; then
+      log "★バンドルを起動できません: $(printf '%s' "$out" | head -3)"
       return 1
     fi
   }

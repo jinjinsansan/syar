@@ -9,6 +9,7 @@
     "@star/betting": "*",
     "@star/race-engine": "*",
     "@star/scheduler": "*",
-    "@star/sim-engine": "*"
+    "@star/sim-engine": "*",
+    "pg": "^8.13.1"
   }
 }

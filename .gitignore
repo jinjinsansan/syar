@@ -49,3 +49,12 @@ apps/web/.next/
 apps/web/out/
 
 .vercel
+
+# ★認証情報の実値（絶対にコミットしない）。
+#   2026-08-10: オーナーが置いた「壊す用のsupabse情報.txt」が .gitignore に無く、
+#   こちらは毎回 `git add -A` でコミットしていた。**次のコミットで入るところだった。**
+#   → 受け渡し用のテキストは拡張子や名前に頼らず、**広めに**除外する。
+secrets.staging.env
+*supabse*
+*supabase情報*
+壊す用*

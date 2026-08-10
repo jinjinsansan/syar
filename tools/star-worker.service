@@ -29,9 +29,16 @@ WorkingDirectory=/opt/star-current
 # ★秘密は systemd の EnvironmentFile で渡す。リポジトリにも履歴にも残さない
 #   権限は 600 / 所有者 star にすること
 EnvironmentFile=/etc/star/worker.env
-# ★node --experimental-strip-types は一部の TS 構文を扱えず ERR_NO_TYPESCRIPT で落ちる。
-#   リポジトリで既に使っている tsx を使う（npm ci で入る）。
-ExecStart=/opt/star-current/node_modules/.bin/tsx apps/worker/src/main.ts
+# ★★実行時に開発依存を要求しない（正典 D-043）。
+#   以前は `node_modules/.bin/tsx apps/worker/src/main.ts` で起動していました。
+#   これが 2026-08-09 の7分停止の**根本原因**です:
+#     `npm ci --omit=dev` が tsx を消す → ExecStart のバイナリが無い → 203/EXEC
+#   ★しかも `pg` も devDependency だったので、tsx があっても DB に繋げませんでした。
+#     事故ではなく、その構成だったから必然でした。
+#
+#   いまは配備時に1ファイルへバンドルし、**素の node が単体で起動**します。
+#   `node_modules` が丸ごと消えても動きます（実測で確認）。
+ExecStart=/usr/bin/node /opt/star-current/dist/worker.cjs
 
 # ★A-1「24時間止まらない」の担保。落ちても必ず戻す。
 #   ⚠️ ただし **Restart=always は壊れた配備を救いません**。同じ壊れたものを
