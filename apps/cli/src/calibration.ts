@@ -325,6 +325,13 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
+  { key: 'FATIGUE_RANGE', why: '疲労の値域 0..100。★正典 §7.4 に上限の規定が無いため暫定で置いた値で、照会中（Q-P3-8）。判定を通すために動かす値ではない' },
+  { key: 'FATIGUE_CAPS_CONDITION_AT', why: '正典 §7.4「疲労70以上は調子2止まり」の 70 の写し。★総当たりで、この規定は一度も効かないと判明（式が先に効く）。照会中（Q-P3-6）' },
+  { key: 'CAPPED_CONDITION_MAX', why: '正典 §7.4「調子は最大2止まり」の 2 の写し' },
+  { key: 'FATIGUE_RACE_PENALTY_AT', why: '正典 §7.4「疲労90以上で出走時に大幅マイナス（§8.3）」の 90 の写し' },
+  { key: 'CONDITION_RANGE', why: '正典 §7.4「condition (0..5)」の値域の写し。段階値の定義そのもの' },
+  { key: 'FATIGUE_PER_CONDITION_STEP', why: '正典 §7.4 の floor(fatigue / 25) の 25 の写し' },
+  { key: 'CONDITION_BASE', why: '正典 §7.4 の base = 3 - ... の 3 の写し' },
   { key: 'BASE_GAIN', why: '正典 §7.3 の「既定 12」の写し。成長式の基準量そのもので、判定を通すために動かす値ではない' },
   { key: 'HEADROOM_EXPONENT', why: '正典 §7.3 の headroom 指数 0.7 の写し' },
   { key: 'HEADROOM_EXP', why: 'diag-growth-scale.ts（実装前に桁を確かめる診断ツール）が持つ正典 §7.3 の写し。判定を作らない' },
