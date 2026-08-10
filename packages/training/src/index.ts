@@ -9,3 +9,4 @@ export * from './growth.js';
 export * from './condition.js';
 export * from './injury.js';
 export * from './events.js';
+export * from './retirement.js';
