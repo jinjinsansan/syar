@@ -22,7 +22,7 @@ import {
 } from '@star/sim-engine';
 import {
   DEFAULT_MENU, applyFatigue, applyInjury, epCost, fatigueDelta,
-  grow, injuryProbability, nextCondition, rollSeverity, type MenuId,
+  MENU_IDS, grow, injuryProbability, menuCoef, nextCondition, rollSeverity, type MenuId,
 } from '@star/training';
 import { LIFECYCLE_WEEKS } from '@star/scheduler';
 import { resolveRuntimeConfig } from './config.js';
@@ -71,6 +71,16 @@ interface CareerResult {
   readonly epSpent: number;
   /** 現役週数（早期引退なら短い） */
   readonly weeks: number;
+  /** ★分解用: メニュー別の週数 */
+  readonly menuWeeks: Record<MenuId, number>;
+  /** ★分解用: 故障の休養に費やした週数 */
+  readonly injuryRestWeeks: number;
+  /** ★分解用: 調子の平均 */
+  readonly conditionMean: number;
+  /** ★分解用: 疲労の平均 */
+  readonly fatigueMean: number;
+  /** ★分解用: 恒久ダメージで失われた potential の割合 */
+  readonly potentialLost: number;
 }
 
 /** 1頭を78週から260週まで通す */
@@ -85,10 +95,21 @@ function runCareer(horse: HorseRecord, policy: Policy, horseIndex: number): Care
   let careerEnded = false;
   let epSpent = 0;
   let week = LIFECYCLE_WEEKS.trainableFrom;
+  const menuWeeks = Object.fromEntries(MENU_IDS.map((m) => [m, 0])) as Record<MenuId, number>;
+  const potential0 = { ...horse.potential } as Record<AbilityKey, number>;
+  let injuryRestWeeks = 0;
+  let condSum = 0;
+  let fatSum = 0;
+  let weeksCounted = 0;
 
   for (; week < LIFECYCLE_WEEKS.retireAt; week += 1) {
     const resting = week < restUntil;
     const menu: MenuId = resting ? 'rest' : chooseMenu(policy, week, fatigue);
+    menuWeeks[menu] += 1;
+    if (resting) injuryRestWeeks += 1;
+    condSum += condition;
+    fatSum += fatigue;
+    weeksCounted += 1;
 
     // --- 故障判定（§7.5）。★休養中は menuIntensity 0 なので起きない ---
     const p = injuryProbability({
@@ -128,10 +149,16 @@ function runCareer(horse: HorseRecord, policy: Policy, horseIndex: number): Care
 
   let sum = 0;
   for (const k of ABILITY_KEYS) sum += potential[k] > 0 ? current[k] / potential[k] : 0;
+  let lost = 0;
+  for (const k of ABILITY_KEYS) lost += potential0[k] > 0 ? 1 - potential[k] / potential0[k] : 0;
   return {
     unlock: sum / ABILITY_KEYS.length,
     injuries, careerEnded, epSpent,
     weeks: week - LIFECYCLE_WEEKS.trainableFrom,
+    menuWeeks, injuryRestWeeks,
+    conditionMean: weeksCounted > 0 ? condSum / weeksCounted : 0,
+    fatigueMean: weeksCounted > 0 ? fatSum / weeksCounted : 0,
+    potentialLost: lost / ABILITY_KEYS.length,
   };
 }
 
@@ -190,3 +217,35 @@ console.log(`  ★放置が 55〜75%          : ${neglect.toFixed(1)}%  ${g1 ? '
 console.log(`  ★適切な育成が 90%以上    : ${balanced.toFixed(1)}%  ${g2 ? 'PASS' : 'FAIL'}`);
 console.log(`  ★追い切り偏重が支配的でない: ${hardOnly.toFixed(1)}% vs ${balanced.toFixed(1)}%（+${DOMINANCE_MARGIN}pt まで）  ${g3 ? 'PASS' : 'FAIL'}`);
 console.log(`\n★V-14: ${g1 && g2 && g3 ? 'PASS' : 'FAIL'}`);
+
+// ---------------------------------------------------------------------------
+// ★分解: なぜ追い切り偏重が支配的なのか。**機構を推測せず、実際の内訳を出す**
+// ---------------------------------------------------------------------------
+console.log('');
+console.log('# ★分解 — 追い切りの利得を、故障と疲労がどれだけ削っているか');
+console.log('');
+console.log(`  ${'方針'.padEnd(14)} ${MENU_IDS.map((m) => m.slice(0, 4).padStart(8)).join('')}`);
+for (const policy of ['neglect', 'balanced', 'hard_only'] as const) {
+  const rs = results[policy];
+  const label = { neglect: '放置', balanced: 'バランス型', hard_only: '追い切り偏重' }[policy];
+  const cells = MENU_IDS.map((m) => mean(rs.map((r) => r.menuWeeks[m])).toFixed(0).padStart(8));
+  console.log(`  ${label.padEnd(14)} ${cells.join('')}`);
+}
+console.log('  （メニュー別の平均週数。全体で182週）');
+console.log('');
+console.log(`  ${'方針'.padEnd(14)} ${'実効係数'.padStart(9)} ${'故障休養'.padStart(9)} ${'平均疲労'.padStart(9)} ${'平均調子'.padStart(9)} ${'素質喪失'.padStart(9)}`);
+for (const policy of ['neglect', 'balanced', 'hard_only'] as const) {
+  const rs = results[policy];
+  const label = { neglect: '放置', balanced: 'バランス型', hard_only: '追い切り偏重' }[policy];
+  // ★実効係数 = メニュー係数を週数で加重平均（sp で代表）
+  const totalW = MENU_IDS.reduce((a, m) => a + mean(rs.map((r) => r.menuWeeks[m])), 0);
+  const eff = MENU_IDS.reduce((a, m) => a + menuCoef(m, 'sp') * mean(rs.map((r) => r.menuWeeks[m])), 0) / totalW;
+  console.log(
+    `  ${label.padEnd(14)} ${eff.toFixed(3).padStart(9)} ${mean(rs.map((r) => r.injuryRestWeeks)).toFixed(1).padStart(8)}週 ` +
+      `${mean(rs.map((r) => r.fatigueMean)).toFixed(1).padStart(9)} ${mean(rs.map((r) => r.conditionMean)).toFixed(2).padStart(9)} ` +
+      `${(mean(rs.map((r) => r.potentialLost)) * 100).toFixed(2).padStart(8)}%`,
+  );
+}
+console.log('');
+console.log('  ★読み方: 実効係数の比がそのまま到達率の差に効く。');
+console.log('    故障休養（週）と素質喪失（%）が、その利得をどれだけ打ち消せているかを見る。');
