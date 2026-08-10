@@ -1,11 +1,26 @@
 /**
  * ★V-14（D-044 で新設）— 育成の効きを**結果で**測る
  *
- * | 育成方針 | 引退時の素質開放率 |
+ * ★D-048 で改訂（旧: 放置 55〜75% かつ 適切な育成 90%以上）。
+ *
+ * | # | 基準 |
  * |---|---|
- * | 放置（軽め調整のみ） | 55〜75% |
- * | 適切な育成 | 90%以上 |
- * | 追い切り偏重 | ★故障込みの期待値がバランス型を**大きく上回らない** |
+ * | ① | **適切な育成が 88%以上**（水準の錨） |
+ * | ② | **適切な育成 − 放置 が 12pt 以上**（★これが「デイリー来訪の動機」の本体） |
+ * | ③ | **同一 EP 予算下**で追い切り偏重がバランス型を大きく上回らない（D-047） |
+ *
+ * 【★なぜ旧定義が満たせなかったか】
+ *   実質的な自由度は `BASE_GAIN` **1つ**でした。放置は `BASE_GAIN × 0.3` で一意に決まるので、
+ *   **放置を帯に入れた時点で `BASE_GAIN` が決まり**、バランス型は
+ *   **残り26%の週（`MAIN_EFFECT_COEF` が効く48週/182週）**でしか動かせません。
+ *   **1つの自由度に2つの絶対水準を要求していた**ため、構成上満たせませんでした。
+ *
+ * 【★差は BASE_GAIN によらず不変でした — そこが本質】
+ *   BASE 7.4: 89.3 − 73.7 = 15.6pt / BASE 7.8: 90.5 − 75.2 = 15.3pt
+ *   §7.1 が求めるのは「指示を出さない週は成長が鈍る＝デイリー来訪の動機」で、
+ *   **動機は差**です。放置馬が何%に着地するかは、プレイヤーの意思決定に影響しません。
+ *   ★ただし水準の錨を1つ残します（差だけだと 40%/55% でも通り、
+ *     「育て切った」実感が消えるため）。
  *
  * 【★なぜ係数ではなく結果をゲートにするのか】
  *   係数の値が正しいかは誰にも分かりませんが、**満たすべき結果は決められます**。
@@ -204,8 +219,10 @@ const balanced = u('balanced');
 const hardOnly = u('hard_only');
 
 console.log('');
-const g1 = neglect >= 55 && neglect <= 75;
-const g2 = balanced >= 90;
+// ★D-048: 水準の錨は1つだけ。動機の本体は「差」
+const g1 = balanced >= 88;
+const gap = balanced - neglect;
+const g2 = gap >= 12;
 // ★③の定義（D-047 で確定）: 「同一 EP 予算下の開放率」。
 //   EP は希少資源で、プレイヤーが直面する問いは
 //   「同じ EP を注いだときどちらが強くなるか」だから。
@@ -220,9 +237,15 @@ const perEp = (p: Policy): number => u(p) / mean(results[p].map((r) => r.epSpent
 // prettier-ignore
 export const DOMINANCE_MARGIN = 2;
 const g3 = hardOnly <= balanced + DOMINANCE_MARGIN;
-console.log(`  ★放置が 55〜75%          : ${neglect.toFixed(1)}%  ${g1 ? 'PASS' : 'FAIL'}`);
-console.log(`  ★適切な育成が 90%以上    : ${balanced.toFixed(1)}%  ${g2 ? 'PASS' : 'FAIL'}`);
-console.log(`  ★追い切り偏重が支配的でない: ${hardOnly.toFixed(1)}% vs ${balanced.toFixed(1)}%（+${DOMINANCE_MARGIN}pt まで）  ${g3 ? 'PASS' : 'FAIL'}`);
+const seOf = (p: Policy): number => {
+  const a = results[p].map((r) => r.unlock * 100);
+  return sd(a) / Math.sqrt(a.length);
+};
+const gapSe = Math.sqrt(seOf('balanced') ** 2 + seOf('neglect') ** 2);
+console.log(`  ★① 適切な育成が 88%以上 : ${balanced.toFixed(1)}%  （余裕 ${(balanced - 88).toFixed(1)}pt = ${((balanced - 88) / seOf('balanced')).toFixed(1)} SE）  ${g1 ? 'PASS' : 'FAIL'}`);
+console.log(`  ★② 差が 12pt 以上       : ${gap.toFixed(1)}pt（${balanced.toFixed(1)} − ${neglect.toFixed(1)}）  （余裕 ${(gap - 12).toFixed(1)}pt = ${((gap - 12) / gapSe).toFixed(1)} SE）  ${g2 ? 'PASS' : 'FAIL'}`);
+console.log(`     （放置 ${neglect.toFixed(1)}% は錨を持たない。★動機は差であって水準ではない・D-048）`);
+console.log(`  ★③ 追い切り偏重が支配的でない: ${hardOnly.toFixed(1)}% vs ${balanced.toFixed(1)}%（時間軸・+${DOMINANCE_MARGIN}pt まで）  ${g3 ? 'PASS' : 'FAIL'}`);
 console.log(
   `     ★同一EP予算下（D-047）: EP あたり開放率 追い切り ${(perEp('hard_only') * 10000).toFixed(2)} vs ` +
     `バランス ${(perEp('balanced') * 10000).toFixed(2)}（1万EPあたり%）` +

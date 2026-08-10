@@ -18,8 +18,22 @@ import type { AbilityKey, GrowthType, Rng } from '@star/sim-engine';
 import { ABILITY_KEYS } from '@star/sim-engine';
 import { MENUS, menuCoef, type MenuId } from './menus.js';
 
-/** 正典 §7.3 の既定値。★正典の写し */
-export const BASE_GAIN = 12;
+/**
+ * 成長式の基準量（正典 §7.3 は「**既定** 12」と書いており固定値ではない・D-048）。
+ *
+ * ★**これが実質的に唯一の自由度**です。3つの育成方針すべてに効きます:
+ *     放置       = BASE_GAIN × 0.3（軽め・正典の固定値）
+ *     追い切り偏重 = BASE_GAIN × 1.6（正典の固定値）
+ *     バランス型  = その中間 ＋ MAIN_EFFECT_COEF が効く48週/182週
+ *
+ * ★**7.8 を選んだ理由**: V-14 の2つのゲートの余裕が均衡する点だからです。
+ *     BASE 7.4 → ①余裕 4.7 SE / ②余裕 9.1 SE   ← ①が弱い
+ *     BASE 7.8 → ①余裕 8.8 SE / ②余裕 8.4 SE   ← ★最小余裕が最大
+ *
+ * ⚠️ **1行で書くこと**（変異試験は行単位で宣言を置換するため）
+ */
+// prettier-ignore
+export const BASE_GAIN = 7.8;
 
 /** 正典 §7.3 の headroom 指数。★正典の写し */
 export const HEADROOM_EXPONENT = 0.7;

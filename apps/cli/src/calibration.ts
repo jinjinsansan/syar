@@ -102,6 +102,12 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: '★V-14 の3つ目「追い切り偏重が支配戦略でない」の判定幅。正典 D-044 は「大きく上回らない」としか書いておらず、+2pt は**私が決めた値**。100 にすると、追い切りが何 pt 上回っても PASS になり、ゲートが意味を失う（照会中）',
   },
   {
+    key: 'BASE_GAIN',
+    file: 'packages/training/src/growth.ts',
+    perturbed: 'export const BASE_GAIN = 12;',
+    affects: '★V-14（D-048）。正典 §7.3 は「既定 12」で固定値ではない。★実質的に唯一の自由度で、3方針すべてに効く（放置=BASE×0.3 / 追い切り偏重=BASE×1.6）。12 に戻すと放置が 87% まで上がり、適切な育成との差（デイリー来訪の動機）が縮む',
+  },
+  {
     key: 'FATIGUE_NATURAL_RECOVERY',
     file: 'packages/training/src/condition.ts',
     perturbed: 'export const FATIGUE_NATURAL_RECOVERY = 0;',
@@ -351,7 +357,6 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   { key: 'CONDITION_RANGE', why: '正典 §7.4「condition (0..5)」の値域の写し。段階値の定義そのもの' },
   { key: 'FATIGUE_PER_CONDITION_STEP', why: '正典 §7.4 の floor(fatigue / 25) の 25 の写し' },
   { key: 'CONDITION_BASE', why: '正典 §7.4 の base = 3 - ... の 3 の写し' },
-  { key: 'BASE_GAIN', why: '正典 §7.3 の「既定 12」の写し。成長式の基準量そのもので、判定を通すために動かす値ではない' },
   { key: 'HEADROOM_EXPONENT', why: '正典 §7.3 の headroom 指数 0.7 の写し' },
   { key: 'HEADROOM_EXP', why: 'diag-growth-scale.ts（実装前に桁を確かめる診断ツール）が持つ正典 §7.3 の写し。判定を作らない' },
   { key: 'GAIN_JITTER', why: '正典 §7.3 の rand(0.85, 1.15) の写し' },

@@ -127,7 +127,11 @@ describe('§7.3 成長曲線', () => {
 
 describe('§7.2/§7.3 の写しが正典と一致する', () => {
   it('BASE_GAIN と headroom', () => {
-    expect(BASE_GAIN).toBe(12);
+    // ★D-048: 正典 §7.3 は「**既定** 12」で固定値ではない。V-14 の余裕が
+    //   均衡する 7.8 を選んだ（BASE 7.4 は①が 4.7 SE と弱い）。
+    //   ここは「較正された値である」ことの確認で、正典の写しの確認ではない。
+    expect(BASE_GAIN).toBe(7.8);
+    expect(BASE_GAIN).toBeGreaterThan(0);
     expect(headroom(0, 100)).toBeCloseTo(1, 10);
     expect(headroom(100, 100)).toBe(0);
     // ★指数 0.7（1.0 なら 0.5、0.7 なら約 0.616）
@@ -243,5 +247,28 @@ describe('★決定論（同じ入力・同じ乱数から同じ結果）', () =
     const a = grow(base, deriveRng(99, 61, 1));
     const b = grow(base, deriveRng(99, 61, 2));
     expect(a.sp).not.toBe(b.sp);
+  });
+});
+
+describe('★D-048 V-14 を通す較正値であること', () => {
+  it('★主効果は追い切りと同じ水準まで上げてある（バランス型が88%に届くため）', () => {
+    // ★MAIN_EFFECT_COEF が効くのはバランス型の182週中48週(26%)だけ。
+    //   0.45 だと 78.9% で、正典の上限1.6まで上げて 83.9%（BASE=6 のとき）。
+    //   ここを下げると V-14 ① が落ちるので、値そのものを固定する。
+    for (const k of ABILITY_KEYS) {
+      expect(menuCoef('hill', 'sp')).toBe(menuCoef('hard', k));
+    }
+    expect(menuCoef('hill', 'sp')).toBe(1.6);
+  });
+
+  it('★副効果は主効果より十分小さい（メニュー選択に意味がある）', () => {
+    expect(menuCoef('hill', 'st') / menuCoef('hill', 'sp')).toBeLessThan(0.2);
+  });
+
+  it('★追い切りは全能力に効くので、1週あたりでは依然として最強', () => {
+    // 坂路は2能力に1.6、追い切りは5能力すべてに1.6
+    const hill = ABILITY_KEYS.reduce((a, k) => a + menuCoef('hill', k), 0);
+    const hard = ABILITY_KEYS.reduce((a, k) => a + menuCoef('hard', k), 0);
+    expect(hard).toBeGreaterThan(hill);
   });
 });

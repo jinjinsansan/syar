@@ -43,7 +43,7 @@ export const MENU_IDS: readonly MenuId[] = [
  *    §7.1 の「デイリー来訪の動機」が成立する範囲に収める必要があります。
  */
 // prettier-ignore
-export const MAIN_EFFECT_COEF = 0.45;
+export const MAIN_EFFECT_COEF = 1.6;
 
 /**
  * ★副効果（主効果の付かない形質にも僅かに乗るぶん）。較正定数。
