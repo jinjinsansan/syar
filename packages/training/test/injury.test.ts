@@ -69,8 +69,11 @@ describe('§7.5 故障確率', () => {
     expect(ageFactor(AGE_FACTOR.toWeeks + 40)).toBe(1.6);
   });
 
-  it('正典の基礎確率と一致する', () => {
-    expect(INJURY_BASE_PROB).toBe(0.0018);
+  it('★V-7a で較正された基礎確率（D-049）', () => {
+    // ★正典 §7.5 は 0.0018 だが、1,800頭の実測で V-7a が 39.1%（上端まで 0.8 SE）。
+    //   0.0013 で 29.9%（両端 9.2/9.4 SE）＝帯の中央。V-7 がその較正ゲート。
+    expect(INJURY_BASE_PROB).toBe(0.0013);
+    expect(INJURY_BASE_PROB).toBeGreaterThan(0);
   });
 });
 

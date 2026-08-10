@@ -102,6 +102,12 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: '★V-14 の3つ目「追い切り偏重が支配戦略でない」の判定幅。正典 D-044 は「大きく上回らない」としか書いておらず、+2pt は**私が決めた値**。100 にすると、追い切りが何 pt 上回っても PASS になり、ゲートが意味を失う（照会中）',
   },
   {
+    key: 'INJURY_BASE_PROB',
+    file: 'packages/training/src/injury.ts',
+    perturbed: 'export const INJURY_BASE_PROB = 0.0018;',
+    affects: '★V-7a（D-049 の較正ゲート）。正典 §7.5 は 0.0018 と書くが、1,800頭の実測で V-7a が 39.1% となり上端40%まで 0.8 SE しか無い。0.0013 で 29.9%（両端 9.2/9.4 SE）。0.0018 に戻すと余裕がほぼゼロになる',
+  },
+  {
     key: 'COMMON_EVENT_PROB',
     file: 'packages/training/src/events.ts',
     perturbed: 'export const COMMON_EVENT_PROB = 0.5;',
@@ -362,7 +368,6 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   { key: 'PUSH_THROUGH_TEMPER', why: '正典 §7.6「強行は…気性+10」の写し' },
   { key: 'EVENTS', why: '正典 §7.6 のイベント表（テキストと効果）。★選択肢の効果を data-driven にしたもので、個々の数値は AWAKENING_* / PUSH_THROUGH_* / COMMON_EVENT_PROB として別に登録済み' },
   { key: 'TEMPER_RANGE', why: '正典 §5.2 の temper 値域 0..100 の写し。D-044 の連続補間で両端として使う' },
-  { key: 'INJURY_BASE_PROB', why: '正典 §7.5 の基礎確率 0.0018 の写し' },
   { key: 'FATIGUE_DIVISOR', why: '正典 §7.5 の (1 + fatigue / 40) の 40 の写し' },
   { key: 'DURABILITY_REFERENCE', why: '正典 §7.5 の (1000 / durability) の 1000 の写し' },
   { key: 'AGE_FACTOR', why: '正典 §7.5「4歳以降1.0 → 5歳末1.6 へ線形」の写し。★4歳未満の値は正典に規定が無く 1.0 に置いた（照会 Q-P3-9）' },

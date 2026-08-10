@@ -41,8 +41,22 @@ import type { AbilityKey, Rng } from '@star/sim-engine';
 import { ABILITY_KEYS } from '@star/sim-engine';
 import { MENUS, type MenuId } from './menus.js';
 
-/** 正典 §7.5 の基礎確率。★正典の写し */
-export const INJURY_BASE_PROB = 0.0018;
+/**
+ * 故障の基礎確率（正典 §7.5 は 0.0018 と書くが、★V-7 の較正ゲートで決める・D-049）。
+ *
+ * 【★較正の根拠】
+ *   V-7a（恒久ダメージを伴う故障を負うキャリアの割合・帯 20〜40%）で較正します。
+ *   1,800頭・バランス型・78→260週:
+ *
+ *     0.0018 → 39.1%（上端まで 0.8 SE）★正典の値だが余裕ほぼゼロ
+ *     0.0015 → 34.0%（上端まで 5.4 SE）
+ *     ★0.0013 → 29.9%（下端 9.2 SE / 上端 9.4 SE）★最小余裕が最大・帯の中央
+ *     0.0011 → 26.6%（下端まで 6.3 SE）
+ *
+ * ⚠️ **1行で書くこと**（変異試験は行単位で宣言を置換するため）
+ */
+// prettier-ignore
+export const INJURY_BASE_PROB = 0.0013;
 
 /** 正典 §7.5 の `1 + fatigue / 40` の 40。★正典の写し */
 export const FATIGUE_DIVISOR = 40;
