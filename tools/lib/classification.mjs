@@ -54,6 +54,8 @@ export const STATE_CHANGING = [
   'verify-a2.mjs',
   // ★B-1: 馬の育成状態を書き換え、horse_week_log を作る
   'verify-b1.mjs',
+  // ★G-6: 検証用の口座と台帳を作り、馬の所有者を書き換える
+  'verify-g6.mjs',
   'verify-a4.mjs',
   'verify-a5.mjs',
   'verify-a6.mjs',
