@@ -58,6 +58,12 @@ const ref = url ? (url.match(/https:\/\/([a-z0-9]+)\.supabase\.co/) ?? [])[1] ??
  *   組み立てたもので繋がらなければ**推測を続けず、ダッシュボードの値を要求**します。
  */
 let databaseUrl = explicitDb;
+// ★ダッシュボードの表示が枠ごとに分かれていると、貼られた文字列から
+//   スキーム（postgresql://）が欠けることがあります。実際に欠けていました。
+//   ★値を推測で作るのではなく、**欠けている接頭辞だけを補います**。
+if (databaseUrl !== null && !/^postgres(ql)?:\/\//i.test(databaseUrl)) {
+  databaseUrl = `postgresql://${databaseUrl}`;
+}
 let built = false;
 if (databaseUrl === null && ref !== null && password !== null) {
   const prod = readFileSync('secrets.local.env', 'utf8').match(/^DATABASE_URL=(.*)$/m);

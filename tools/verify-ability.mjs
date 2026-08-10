@@ -8,7 +8,8 @@ import { createHash, createHmac } from 'node:crypto';
 import pg from 'pg';
 import { createPgStore } from '../apps/worker/src/pg-store.ts';
 
-const env = Object.fromEntries(readFileSync('secrets.local.env','utf8').split(/\r?\n/).map(l=>l.match(/^([A-Za-z_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
+import { loadEnv } from './lib/env.mjs';
+const env = loadEnv();
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 await c.connect();
 const hash = { sha256:(m)=>createHash('sha256').update(m,'utf8').digest('hex'), hmacSha256:(k,m)=>createHmac('sha256',k).update(m,'utf8').digest('hex') };

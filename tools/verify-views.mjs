@@ -5,7 +5,8 @@
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 
-const env = Object.fromEntries(readFileSync('secrets.local.env','utf8').split(/\r?\n/).map(l=>l.match(/^([A-Za-z_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
+import { loadEnv } from './lib/env.mjs';
+const env = loadEnv();
 const anon = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
 
 const check = async (label, table, cols='*') => {

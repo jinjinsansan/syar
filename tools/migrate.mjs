@@ -6,8 +6,19 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import pg from 'pg';
 
+/**
+ * ★接続先を選べるようにする（2026-08-11）。
+ *   `--env staging` で `secrets.staging.env` を使います。**既定は本番のまま**です。
+ *   ⚠️ 既定を staging にしません。**「いつもの手順」で本番に当たらなくなる**ほうが危険です
+ *      （マイグレーションは本番に当てるのが目的の運用ツール・R-24 の PRODUCTION_OPS）。
+ */
+const envIdx = process.argv.indexOf('--env');
+const envName = envIdx >= 0 ? process.argv[envIdx + 1] : 'local';
+const envFile = envName === 'staging' ? 'secrets.staging.env' : 'secrets.local.env';
+console.log(`接続先: ${envFile}`);
+
 const env = Object.fromEntries(
-  readFileSync('secrets.local.env', 'utf8')
+  readFileSync(envFile, 'utf8')
     .split(/\r?\n/)
     .map((l) => l.match(/^([A-Za-z_]+)=(.*)$/))
     .filter(Boolean)
@@ -16,7 +27,7 @@ const env = Object.fromEntries(
 if (!env.DATABASE_URL) throw new Error('DATABASE_URL が未設定です');
 
 const files = readdirSync('db/migrations').filter((f) => f.endsWith('.sql')).sort();
-const only = process.argv[2];
+const only = process.argv[2] === '--env' ? process.argv[4] : process.argv[2];
 const target = only ? files.filter((f) => f.startsWith(only)) : files;
 if (target.length === 0) throw new Error(`適用対象がありません（指定: ${only ?? 'すべて'}）`);
 

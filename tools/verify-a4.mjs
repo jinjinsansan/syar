@@ -10,11 +10,8 @@ import { createClient } from '@supabase/supabase-js';
 import pg from 'pg';
 
 import { assertNotProduction } from './lib/guard.mjs';
-const env = Object.fromEntries(
-  readFileSync('secrets.local.env', 'utf8').split(/\r?\n/)
-    .map((l) => l.match(/^([A-Za-z_]+)=(.*)$/)).filter(Boolean)
-    .map((m) => [m[1], m[2].trim()]),
-);
+import { loadEnv } from './lib/env.mjs';
+const env = loadEnv();
 
 // --- 準備: service_role で scheduled と settled を1件ずつ作る ---
 const admin = new pg.Client({ connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: false } });

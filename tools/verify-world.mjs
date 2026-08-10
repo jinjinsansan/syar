@@ -9,6 +9,7 @@ import { ALLOW_ALL_NAMES, NPC_STABLES } from '../packages/sim-engine/src/index.t
 import { DEFAULT_PRESEED_OPTIONS, preseedNicks, runPreseed } from '../apps/cli/src/preseed.ts';
 import { lineConcentration } from '../apps/cli/src/pedigree-audit.ts';
 
+import { loadEnv } from './lib/env.mjs';
 const SEED = Number(process.argv[2] ?? 1231);
 const pre = runPreseed({
   ...DEFAULT_PRESEED_OPTIONS, seed: SEED, generations: 50,
@@ -28,7 +29,7 @@ console.log(`  ★有効系統数: ${conc.effective.toFixed(2)}   （選定時 8
 console.log(`  ★平均F:      ${meanF.toFixed(4)}  （選定時 0.0287）`);
 console.log(`  系統数 ${conc.count} / 最大シェア ${(conc.topShare*100).toFixed(1)}%`);
 
-const env = Object.fromEntries(readFileSync('secrets.local.env','utf8').split(/\r?\n/).map(l=>l.match(/^([A-Za-z_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
+const env = loadEnv();
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 await c.connect();
 const dbn = (await c.query('select count(*)::int n from horses')).rows[0].n;

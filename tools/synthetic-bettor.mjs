@@ -34,13 +34,8 @@ import { createHash } from 'node:crypto';
 import pg from 'pg';
 
 import { assertNotProduction } from './lib/guard.mjs';
-const env = Object.fromEntries(
-  readFileSync('secrets.local.env', 'utf8')
-    .split(/\r?\n/)
-    .map((l) => l.match(/^([A-Za-z_]+)=(.*)$/))
-    .filter(Boolean)
-    .map((m) => [m[1], m[2].trim()]),
-);
+import { loadEnv } from './lib/env.mjs';
+const env = loadEnv();
 
 /** ★固定 UUID。毎回同じ利用者になるので、あとから集計と除外の両方ができる */
 const UID = '00000000-0000-4000-8000-00000000a1a1';

@@ -17,10 +17,11 @@ import { ALLOW_ALL_NAMES, NPC_STABLES } from '../packages/sim-engine/src/index.t
 import { DEFAULT_PRESEED_OPTIONS, preseedNicks, runPreseed } from '../apps/cli/src/preseed.ts';
 
 import { assertNotProduction } from './lib/guard.mjs';
+import { loadEnv } from './lib/env.mjs';
 const SEED = Number(process.argv[2] ?? 20260833);
 const GENERATIONS = Number(process.argv[3] ?? 50);
 
-const env = Object.fromEntries(readFileSync('secrets.local.env','utf8').split(/\r?\n/).map(l=>l.match(/^([A-Za-z_]+)=(.*)$/)).filter(Boolean).map(m=>[m[1],m[2].trim()]));
+const env = loadEnv();
 
 console.log(`# プリシード世界の投入  seed=${SEED} generations=${GENERATIONS}`);
 const t0 = Date.now();
