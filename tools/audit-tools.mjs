@@ -36,6 +36,7 @@ import { loadEnv } from './lib/env.mjs';
 const SKIP = new Map([
   ['seed-world.mjs', '世界を作り直すツール。2回流せば当然2回作り直るので、一致を問う対象ではない（そもそも他の点検の前提を壊す）'],
   ['seed-stables.mjs', '同上（NPC 厩舎の初期投入）'],
+  ['seed-races.mjs', 'レースを作るのが仕事のツール。2回流せば2回ぶん増えるので、一致を問う対象ではない。★1回 4〜16分かかるので、点検に入れると他のツールの測定窓が長時間開き、その間の変化を拾ってしまう'],
   ['synthetic-bettor.mjs', '常駐して賭け続けるツール。終了しないので2回流す形にならない'],
   ['audit-tools.mjs', 'これ自身'],
   ['fix-purse.mjs', '一度きりの是正ツール（P2 の賞金額修正）。当てる対象がもう無い'],
@@ -72,7 +73,18 @@ const targets = [...STATE_CHANGING, ...READONLY]
   .filter((f) => !SKIP.has(f) && connects(f))
   .sort();
 
+/**
+ * ★この点検を回している間、**同じ DB に他のツールを流さないこと。**
+ *
+ * 【一度やりました（2026-08-11）】
+ *   点検を裏で回しながら、同じ staging に `verify-flow` / `verify-economy` /
+ *   `diag-v11` / `seed-races` を並走させました。結果、
+ *   `verify-ability` の出力が違う・`verify-flow` の行数が戻らない、と出ましたが、
+ *   **どちらも私の並走が原因**でした（単独で流し直すと一致します）。
+ *   ★測定中に別の作業を走らせて測定を汚す — レビュー側が P1 で踏んだのと同じ型です。
+ */
 console.log('# 検証ツールの自己汚染点検');
+console.log('  ⚠️ この点検の実行中は、同じ DB に他のツールを流さないでください');
 console.log(`  対象 ${targets.length} 本 / 除外 ${SKIP.size} 本`);
 console.log('  ★「2回流して出力が一致するか」と「行数が戻るか」の両方を見ます');
 console.log('');
