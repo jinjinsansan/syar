@@ -93,7 +93,7 @@ export function createPgStore(
       const ins = await client.query(
         `insert into races (cycle_index, name, class_rank, grade, surface, distance,
                             track_condition, course_id, scheduled_at, seed_commit, server_seed, purse, status)
-         values ($1, $2, $3, $4, $8, $9, 'good', $10,
+         values ($1, $2, $3, $4, $8, $9, $12, $10,
                  to_timestamp($5 / 1000.0), $6, $7, $11, 'scheduled')
          on conflict (cycle_index) do nothing`,
         [
@@ -109,6 +109,15 @@ export function createPgStore(
           spec.conditions.distance,
           spec.conditions.courseId,
           spec.purse,
+          /**
+           * ★馬場状態を保存する（Q-P3-32 の是正）。
+           *   ここは **'good' を直書き**していました。`generateRace` は §10.4 の分布から
+           *   稍重・重・不良も引いてオッズを計算しているのに、DB には常に良と書かれ、
+           *   確定処理は DB の値で走らせていました。
+           *   ★本番の 443件すべてが good で、**道悪が一度も発生せず
+           *     `heavy_aptitude` が一度も効いていません**（P-1 で genotype に足した形質）。
+           */
+          spec.conditions.trackCondition,
         ],
       );
         // ★挿入されなかった＝他プロセスが先に作った。何もせず抜ける（重複させない）

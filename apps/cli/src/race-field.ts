@@ -293,6 +293,14 @@ export interface GenerateRaceOptions {
    * ★レースごとに違う値を返してよい（現実には毎週引き直される）。
    */
   readonly trainingStateOf?: (horse: HorseRecord) => { condition: number; fatigue: number } | undefined;
+  /**
+   * ★番組表が決めたレース条件（§10.3・`conditionsOf` の出力）。
+   *   渡すと距離と馬場をそれに合わせます。**渡さなければ従来どおり自分で引きます**
+   *   （P1 の検証ハーネスは番組表を持たないため）。
+   *   ⚠️ 馬場状態（`trackCondition`）は §10.4 の分布からここで引きます。
+   *      番組表は馬場状態を決めません。
+   */
+  readonly programme?: { readonly surface: 'turf' | 'dirt'; readonly distance: number };
 }
 
 export function generateRace(
@@ -311,8 +319,25 @@ export function generateRace(
     throw new Error(`generateRace: 母集団が少なすぎる (${pool.length}頭)`);
   }
   const fieldSize = rng.int(FIELD_SIZE.MIN, Math.min(FIELD_SIZE.MAX, pool.length));
-  const distance = rng.pick(DISTANCES);
-  const surface = rng.pick(SURFACES);
+  /**
+   * ★番組表（§10.3）が距離と馬場を決めているなら、それに従います（Q-P3-32 の是正）。
+   *
+   * 【何が起きていたか】
+   *   `cycle-runner` は `conditionsOf(idx)` を DB に保存し、
+   *   `generateRace` は**自分で引いた**距離・馬場でオッズを計算していました。
+   *   本番で **1/7 しか一致せず**、芝/ダートも距離も違いました。
+   *   確定処理は DB の値で着順を出すので、
+   *   ★**プレイヤーが見るオッズは、実際に走るレースとは別の条件のもの**でした。
+   *
+   * 【★引いてから上書きします】
+   *   `rng.pick` を飛ばすと**乱数の並びがずれ**、頭数も馬場状態も出走馬も変わります。
+   *   P1 のゲート（V-4/V-5/V-6）は `programme` を渡さない経路で測っているので、
+   *   **引いてから捨てる**ことで、そちらの結果を1ビットも動かしません。
+   */
+  const drawnDistance = rng.pick(DISTANCES);
+  const drawnSurface = rng.pick(SURFACES);
+  const distance = opts.programme?.distance ?? drawnDistance;
+  const surface = opts.programme?.surface ?? drawnSurface;
   // 良馬場が大半（稍重・重は少数）
   const conditionRoll = rng.float();
   const trackCondition: TrackCondition =

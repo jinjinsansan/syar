@@ -9,11 +9,24 @@ import { CYCLE_MS } from '@star/scheduler';
 import { LOCK_KEY, runCycle, type CycleStore, type RaceSpec } from '../src/cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from '../src/env.js';
 
+/**
+ * ★空の出走表。Q-P3-32 で `build` の戻り値に `conditions` が加わったので、
+ *   ここでも返します。**A-2 は生成の冪等性を見るので中身は問いません。**
+ */
+const EMPTY_BUILD = {
+  entrants: [],
+  odds: [],
+  conditions: {
+    surface: 'turf' as const, distance: 1600, courseId: 'C1',
+    trackCondition: 'good' as const,
+  },
+};
+
 const EPOCH = 1_700_000_000_000;
 
 /** テスト用の seed 源。★決定論（同じサイクルからは同じ値） */
 /** テスト用の出走表・オッズ（中身は問わない。runCycle は素通しするだけ） */
-const BUILD = () => ({ entrants: [], odds: [] });
+const BUILD = () => (EMPTY_BUILD);
 
 const SEEDS = {
   serverSeed: (i: number) => `seed-${i}`,
@@ -200,7 +213,7 @@ describe('★D-038 確定を生成より先に処理する', () => {
     let settledWhenCreating = false;
     const build = () => {
       settledWhenCreating = store.settleLog.length > 0;
-      return { entrants: [], odds: [] };
+      return EMPTY_BUILD;
     };
     await runCycle(store, EPOCH, SEEDS, build, ALERT);
     expect(settledWhenCreating).toBe(true);

@@ -19,6 +19,17 @@ const STREAM = { FIELD: 61, ODDS: 62 } as const;
 export interface BuiltRace {
   readonly entrants: RaceEntrantSpec[];
   readonly odds: OddsSpec[];
+  /**
+   * ★**オッズを計算したときの条件そのもの**（Q-P3-32 の是正）。
+   *   これを DB に保存します。別経路で組み直すと、
+   *   「オッズは芝1600m・実際の走行はダート2400m」が再発します。
+   */
+  readonly conditions: {
+    readonly surface: 'turf' | 'dirt';
+    readonly distance: number;
+    readonly trackCondition: 'good' | 'yielding' | 'soft' | 'bad';
+    readonly courseId: string;
+  };
 }
 
 /**
@@ -36,12 +47,20 @@ export function buildRace(
    *     片方だけ実データにすると、オッズを計算した馬と実際に走る馬が変わります。
    */
   trainingStates?: ReadonlyMap<string, { condition: number; fatigue: number }>,
+  /**
+   * ★番組表が決めた条件（§10.3・`conditionsOf` の出力）。
+   *   渡すと距離と馬場をそれに合わせ、**使った条件を返り値に載せます**。
+   */
+  programme?: { readonly surface: 'turf' | 'dirt'; readonly distance: number; readonly courseId: string },
 ): BuiltRace {
   const sorted = sortPoolByClass(pool);
   const race = generateRace(
     sorted, cycleIndex, deriveRng(seed, STREAM.FIELD, cycleIndex),
     undefined, undefined, undefined,
-    trainingStates === undefined ? {} : { trainingStateOf: (h) => trainingStates.get(h.id) },
+    {
+      ...(trainingStates === undefined ? {} : { trainingStateOf: (h: HorseRecord) => trainingStates.get(h.id) }),
+      ...(programme === undefined ? {} : { programme: { surface: programme.surface, distance: programme.distance } }),
+    },
   );
 
   // 馬番を 1..n に振る（馬券は馬番で買う）
@@ -80,5 +99,15 @@ export function buildRace(
     popularity: ranked.indexOf(i + 1) >= 0 ? ranked.indexOf(i + 1) + 1 : undefined,
   }));
 
-  return { entrants, odds: buildOddsRows(counts, trials) as OddsSpec[] };
+  return {
+    entrants,
+    odds: buildOddsRows(counts, trials) as OddsSpec[],
+    // ★オッズを計算したときの条件をそのまま返す（Q-P3-32）
+    conditions: {
+      surface: race.conditions.surface,
+      distance: race.conditions.distance,
+      trackCondition: race.conditions.trackCondition,
+      courseId: programme?.courseId ?? 'C1',
+    },
+  };
 }

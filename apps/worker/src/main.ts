@@ -27,7 +27,7 @@ import { loadRaceablePool, loadTrainingStates } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { runSelfcheck } from './selfcheck.js';
-import { CANCEL_AFTER_START_MS } from '@star/scheduler';
+import { CANCEL_AFTER_START_MS, classOf, conditionsOf, gradeOf } from '@star/scheduler';
 
 /** 1周の間隔。★サイクル長より短くする（1サイクルを取りこぼさないため） */
 export const TICK_MS = 60_000;
@@ -110,7 +110,9 @@ async function main(): Promise<void> {
         store,
         cfg.epochMs,
         seeds,
-        (i) => buildRace(pool, i, cfg.epochMs, undefined, trainingStates),
+        (i) => buildRace(pool, i, cfg.epochMs, undefined, trainingStates,
+          // ★番組表（§10.3）が距離・馬場・コースを決める（Q-P3-32）
+          conditionsOf(i, classOf(i), gradeOf(i))),
         // ★開催中止は黙って通さない（正典 D-037）。
         //   静かに返還されると原因が調査されないまま繰り返します。
         //   ⚠️ ここは「客の金が戻った」記録です。**必ず目に付く形で残すこと。**

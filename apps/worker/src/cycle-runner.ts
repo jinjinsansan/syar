@@ -27,7 +27,7 @@ import {
   type Phase,
 } from '@star/scheduler';
 import {
-  classOf, conditionsOf, gradeOf, prizeTierOf, purseOf,
+  classOf, gradeOf, prizeTierOf, purseOf,
   type RaceConditions,
 } from '@star/scheduler';
 
@@ -71,7 +71,13 @@ export interface RaceSpec {
   /** 賞金総額（§11.1）。★PP の主な発行源（§9.3） */
   readonly purse: number;
   /** ★§10.3/§10.4 の条件。サイクル番号だけから決まる（乱数で決めると commit 後に変わる） */
-  readonly conditions: RaceConditions;
+  /**
+   * ★オッズを計算したときの条件（Q-P3-32）。**馬場状態も含みます。**
+   *   `RaceConditions`（番組表の出力）は馬場状態を持たないので、ここで足します。
+   */
+  readonly conditions: RaceConditions & {
+    readonly trackCondition: 'good' | 'yielding' | 'soft' | 'bad';
+  };
   /** 出走表（§10.4 の同格帯から組む。D-018） */
   readonly entrants: readonly RaceEntrantSpec[];
   /** オッズ（§9.2 のモンテカルロ実測） */
@@ -131,7 +137,14 @@ export async function runCycle(
   store: CycleStore,
   epochMs: number,
   seeds: SeedSource,
-  build: (cycleIndex: number) => { entrants: readonly RaceEntrantSpec[]; odds: readonly OddsSpec[] },
+  build: (cycleIndex: number) => {
+    readonly entrants: readonly RaceEntrantSpec[];
+    readonly odds: readonly OddsSpec[];
+    // ★オッズを計算したときの条件。これを保存する（Q-P3-32）
+    readonly conditions: RaceConditions & {
+      readonly trackCondition: 'good' | 'yielding' | 'soft' | 'bad';
+    };
+  },
   /**
    * ★開催中止が起きたときの通報（正典 D-037）。
    *   **既定を「何もしない」にしません。** 黙って返還されると原因が調査されないので、
@@ -197,14 +210,25 @@ export async function runCycle(
         skipped.push(idx);
         continue;
       }
+      /**
+       * ★**オッズを計算したときの条件をそのまま保存します**（Q-P3-32 の是正）。
+       *
+       * 【何が起きていたか】
+       *   ここは `conditionsOf(idx)` を保存し、`build(idx)` は
+       *   `generateRace` が**自分で引いた**条件でオッズを計算していました。
+       *   本番で 1/7 しか一致せず、**別のレースのオッズ**を売っていました。
+       *   → 条件の出所を `build` の返り値**ひとつ**にします。
+       */
+      const built = build(idx);
       await store.createRace({
         cycleIndex: idx,
         raceClass: classOf(idx),
         grade: gradeOf(idx),
         // ★発走時刻もサイクル番号から決める。再起動しても同じ時刻になる
         scheduledAtMs: cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.start,
-        conditions: conditionsOf(idx, classOf(idx), gradeOf(idx)),
-        ...build(idx),
+        conditions: built.conditions,
+        entrants: built.entrants,
+        odds: built.odds,
         purse: purseOf(prizeTierOf(classOf(idx), gradeOf(idx))),
         seedCommit: seeds.seedCommit(idx),
         serverSeed: seeds.serverSeed(idx),

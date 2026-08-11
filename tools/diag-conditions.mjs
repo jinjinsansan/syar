@@ -51,7 +51,9 @@ const idxs = [100, 101, 102, 200, 300, 400, 500];
 let same = 0;
 for (const idx of idxs) {
   const a = conditionsOf(idx, classOf(idx), gradeOf(idx));
-  const b = generateRace(pool, idx, deriveRng(EPOCH, 61, idx)).conditions;
+  // ★是正後は番組表を渡す（本番と同じ呼び方・Q-P3-32）
+  const b = generateRace(pool, idx, deriveRng(EPOCH, 61, idx), undefined, undefined, undefined,
+    { programme: { surface: a.surface, distance: a.distance } }).conditions;
   const ok = a.surface === b.surface && a.distance === b.distance;
   if (ok) same += 1;
   console.log(
@@ -65,8 +67,16 @@ console.log('');
 console.log('## ② 実際に保存されたレースの馬場状態');
 const tc = await c.query('select track_condition, count(*)::int n from races group by 1 order by 2 desc');
 console.log(`  DB: ${tc.rows.map((r) => `${r.track_condition}=${r.n}`).join(' / ') || '（レース無し）'}`);
-console.log("  ★`pg-store.ts` の createRace は 'good' を直書きしています。");
-console.log('    `generateRace` は稍重・重・不良も引くので、オッズはそれらの前提で計算されています。');
+// ★§10.4 の分布と突き合わせる（是正後は good 以外も出るはず）
+const drawn = {};
+for (let idx = 0; idx < 2000; idx += 1) {
+  const a = conditionsOf(idx, classOf(idx), gradeOf(idx));
+  const t = generateRace(pool, idx, deriveRng(EPOCH, 61, idx), undefined, undefined, undefined,
+    { programme: { surface: a.surface, distance: a.distance } }).conditions.trackCondition;
+  drawn[t] = (drawn[t] ?? 0) + 1;
+}
+console.log(`  生成側（2000サイクル）: ${Object.entries(drawn).map(([k, v]) => `${k}=${(v / 20).toFixed(1)}%`).join(' / ')}`);
+console.log('  ★是正前は pg-store が good を直書きしており、DB は 443件すべて good でした。');
 console.log('');
 
 console.log('## ③ なぜ気づきにくいか');
