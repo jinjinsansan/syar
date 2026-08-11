@@ -58,3 +58,4 @@ secrets.staging.env
 *supabse*
 *supabase情報*
 壊す用*
+tools/_*.mjs
