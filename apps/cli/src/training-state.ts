@@ -67,6 +67,9 @@ export interface TrainingStateSampler {
   readonly advance: () => void;
   /** 実測の要約。★黙って仮定値に落ちていないことの確認に使う */
   readonly stats: () => {
+    /** ★同じ時点にいる馬どうしの散らばり。0 に近いとレース内の分散源にならない */
+    readonly withinRaceSdFatigue: number;
+    readonly withinRaceSdCondition: number;
     readonly horses: number;
     readonly withSamples: number;
     readonly meanSamples: number;
@@ -85,10 +88,33 @@ export interface TrainingStateSampler {
 export function buildTrainingStateSampler(
   pool: readonly HorseRecord[],
   seed: number,
+  /**
+   * ★true にすると全馬の位相を揃えます（＝最初に外した版）。
+   *   **比較のためだけ**にあります。既定は false。
+   */
+  SYNCHRONIZED = false,
 ): TrainingStateSampler {
   const samples = new Map<string, ConditionFatigue[]>();
+  /**
+   * ★馬ごとの位相のずれ。
+   *
+   * 【なぜ要るか — これを入れずに一度測って外しました】
+   *   最初、標本の位置を**全馬で共有する1つのカーソル**で進めていました。
+   *   バランス型の方針はメニューが `week % 4` の周期で、疲労も同じ周期で上下します。
+   *   → **全馬が同じ位相に並び、レース内の調子・疲労の差がほぼ消えました。**
+   *
+   *   結果として V-4（1番人気の勝率）が 31.29% → 34.02% に**上がりました**。
+   *   ★分散源を足したのに1番人気が強くなるのは不自然で、そこで気づきました。
+   *     「疲労を入れたら V-4 が上がった」と報告するところでした。
+   *
+   *   現実には、馬は生まれた週も デビューの週も違うので位相はばらばらです。
+   *   → 馬ごとに決まったずれを与えます（乱数ではなく添字から決めるので再現します）。
+   */
+  const phase = new Map<string, number>();
 
   pool.forEach((horse, idx) => {
+    // ★素数を掛けて散らす。添字そのものだと隣接する馬が近い位相になる
+    phase.set(horse.id, (idx * 37) % 149);
     const traits: HorseTraits = {
       sex: horse.sex, growth: horse.growth,
       injuryRateMult: horse.injuryRateMult, birthTemper: horse.temper,
@@ -122,7 +148,9 @@ export function buildTrainingStateSampler(
     stateOf: (horse) => {
       const list = samples.get(horse.id);
       if (list === undefined || list.length === 0) return undefined;
-      return list[cursor % list.length];
+      // ★馬ごとの位相を足す。共有カーソルだけだと全馬が同じ調教サイクルに並ぶ
+      const off = SYNCHRONIZED ? 0 : (phase.get(horse.id) ?? 0);
+      return list[(cursor + off) % list.length];
     },
     advance: () => { cursor += 1; },
     stats: () => {
@@ -136,7 +164,13 @@ export function buildTrainingStateSampler(
         const m = mean(a);
         return Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / (a.length - 1));
       };
+      // ★同じ標本位置にいる馬どうしの散らばり（＝レース内の分散源）
+      const atCursor = lists
+        .filter((l) => l.length > 0)
+        .map((l, i) => l[((SYNCHRONIZED ? 0 : (i * 37) % 149)) % l.length]!);
       return {
+        withinRaceSdFatigue: sd(atCursor.map((x) => x.fatigue)),
+        withinRaceSdCondition: sd(atCursor.map((x) => x.condition)),
         horses: lists.length,
         withSamples,
         meanSamples: mean(lists.map((l) => l.length)),
