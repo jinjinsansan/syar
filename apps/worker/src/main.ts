@@ -27,6 +27,7 @@ import { aggregateDay } from './daily-flow.js';
 import { loadRaceablePool } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
+import { advanceTrainingWeeks } from './training-runner.js';
 import { runSelfcheck } from './selfcheck.js';
 import { CANCEL_AFTER_START_MS, classOf, conditionsOf, gradeOf } from '@star/scheduler';
 
@@ -174,6 +175,38 @@ async function main(): Promise<void> {
     } catch (e) {
       // ★集計の失敗でループを止めない（A-1 が壊れる）。ただし黙らせない
       console.error('[worker] 日次集計に失敗:', (e as Error).message);
+    }
+
+    /**
+     * ── ★週送り（正典 §7・P3 の本体）─────────────────────────
+     *
+     *   ★毎周呼びますが、**進むのは週が締まったときだけ**です
+     *   （`weeksToProcess` が空を返せば何もしません）。
+     *   サイクルは10分、週は24サイクル = 4時間なので、24周に1回だけ動きます。
+     *
+     *   ★レースの生成・確定より**後**に置いています。
+     *     前に置くと、7,000頭の週送りが終わるまで確定が待たされます。
+     *     確定は客が結果を待っている処理で、余裕がありません（D-038 と同じ考え方）。
+     *
+     *   ★失敗しても周を止めません（A-1）。ただし黙らせません。
+     */
+    try {
+      const nowMs = Number(
+        (await client.query<{ ms: string }>(
+          'select (extract(epoch from now()) * 1000)::bigint as ms',
+        )).rows[0]!.ms,
+      );
+      const t = await advanceTrainingWeeks(client, nowMs, cfg.epochMs,
+        (m) => console.error(`[worker] ★${m}`));
+      if (t.advanced > 0) {
+        console.log(
+          `[worker] 週送り 週=${t.weeks.join(',')} ` +
+          `延べ${t.advanced}頭 / 引退${t.retired}頭 / EP ${t.epSpent.toLocaleString()}`,
+        );
+      }
+    } catch (e) {
+      // ★週送りの失敗でループを止めない（A-1 が壊れる）。ただし黙らせない
+      console.error('[worker] 週送りに失敗:', (e as Error).message);
     }
 
     const elapsed = Date.now() - started;

@@ -68,6 +68,8 @@ export const STATE_CHANGING = [
   'seed-races.mjs',
   // ★staging のレースを確定させる（時間を進める代わり）
   'settle-races.mjs',
+  // ★週送りをワーカーの経路で実際に回す（全馬の状態を進める）
+  'verify-training-week.mjs',
   'seed-stables.mjs',
   'seed-world.mjs',
   'synthetic-bettor.mjs',
