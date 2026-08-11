@@ -106,13 +106,22 @@ for (let k = 0; k < RACES; k += 1) {
   const t0 = process.hrtime.bigint();
   const raceClass = classOf(idx);
   const grade = gradeOf(idx);
+  /**
+   * ★ワーカーと同じ呼び方にする（Q-P3-32）。
+   *   番組表を渡さないと `generateRace` が自分で距離・馬場を引くので、
+   *   **本番と違うレースが staging に積まれます**。
+   *   条件は `buildRace` の返り値ひとつから取ります（出所を1つに）。
+   */
+  const programme = conditionsOf(idx, raceClass, grade);
+  const built = buildRace(pool, idx, EPOCH, TRIALS, states, programme);
   await store.createRace({
     cycleIndex: idx,
     raceClass,
     grade,
     scheduledAtMs: cycleStartMs(idx, EPOCH) + PHASE_OFFSET_MS.start,
-    conditions: conditionsOf(idx, raceClass, grade),
-    ...buildRace(pool, idx, EPOCH, TRIALS, states),
+    conditions: built.conditions,
+    entrants: built.entrants,
+    odds: built.odds,
     purse: purseOf(prizeTierOf(raceClass, grade)),
     seedCommit: seedCommitFor(SEED_SECRET, idx, hash),
     serverSeed: serverSeedFor(SEED_SECRET, idx, hash),

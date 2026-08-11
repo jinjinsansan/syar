@@ -28,6 +28,10 @@ export const READONLY = [
   'diag-b6.mjs',
   // ★読むだけ。生成時と保存時のレース条件を突き合わせる
   'diag-conditions.mjs',
+  // ★読むだけ。保存済みレースが番組表と一致し、馬場が good 固定でないかを見る
+  'verify-conditions-db.mjs',
+  // ★読むだけ。本番が作ったオッズと本番が出した着順で払戻率を測る
+  'verify-v10-db.mjs',
   // ★読むだけ。PP の発行と吸収を数える。本番の実データでないと意味がない
   'diag-v11.mjs',
   // ★DB に一切接続しない。受け渡しテキストから secrets.staging.env を作るだけ。
