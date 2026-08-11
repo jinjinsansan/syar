@@ -19,8 +19,11 @@ await assertNotProduction(c, 'verify-cancel.mjs');
 // ★前提の確認は**状態を作る前**に行う（2026-08-11）。
 //   後ろに置くと、落ちたときに検証用の利用者が残ります。実際 staging に3件残っていました。
 requireRow(
-  (await c.query(`select id from races where status='scheduled' limit 1`)).rows[0],
-  '発売中のレース', 'ワーカーを回すか、レースを生成してから流してください',
+  // ★`status='scheduled'` だけでは足りません。**発走時刻を過ぎたレースには馬券を買えません**
+  //   （place_bet が「発売時間外」で落ちます）。実際にそれで落ち、利用者を作った後だったので
+  //   **行が残りました**。前提は「買えること」まで見ます。
+  (await c.query(`select id from races where status='scheduled' and scheduled_at > now() limit 1`)).rows[0],
+  'これから発走する発売中のレース', 'レースを生成してから流してください（発走済みには買えません）',
 );
 
 const uid = '00000000-0000-4000-8000-0000000ca4ce';
@@ -35,8 +38,8 @@ await c.query(`insert into users (id,display_name,stable_name,entry_points,accou
 
 // 発売中のレースに馬券を買う
 const race = requireRow(
-  (await c.query(`select id, cycle_index from races where status='scheduled' order by cycle_index desc limit 1`)).rows[0],
-  '発売中のレース', 'ワーカーを回すか、レースを生成してから流してください',
+  (await c.query(`select id, cycle_index from races where status='scheduled' and scheduled_at > now() order by cycle_index desc limit 1`)).rows[0],
+  'これから発走する発売中のレース', 'レースを生成してから流してください（発走済みには買えません）',
 );
 const odds = (await c.query(`select selection from race_odds where race_id=$1 and bet_type='win' limit 3`,[race.id])).rows;
 const ep = async () => Number((await c.query('select entry_points from users where id=$1',[uid])).rows[0].entry_points);

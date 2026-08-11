@@ -19,8 +19,11 @@ await assertNotProduction(c, 'verify-economy.mjs');
 // ★前提の確認は**状態を作る前**に行う（2026-08-11）。
 //   後ろに置くと、落ちたときに検証用の利用者が残ります。実際 staging に3件残っていました。
 requireRow(
-  (await c.query(`select id from races where status='scheduled' limit 1`)).rows[0],
-  '発売中のレース', 'ワーカーを回すか、レースを生成してから流してください',
+  // ★`status='scheduled'` だけでは足りません。**発走時刻を過ぎたレースには馬券を買えません**
+  //   （place_bet が「発売時間外」で落ちます）。実際にそれで落ち、利用者を作った後だったので
+  //   **行が残りました**。前提は「買えること」まで見ます。
+  (await c.query(`select id from races where status='scheduled' and scheduled_at > now() limit 1`)).rows[0],
+  'これから発走する発売中のレース', 'レースを生成してから流してください（発走済みには買えません）',
 );
 
 const hash = {
@@ -41,8 +44,8 @@ await c.query(`insert into users (id,display_name,stable_name,entry_points,accou
 
 // 発売中のレースを1つ選び、人気1位の単勝を買う
 const race = requireRow(
-  (await c.query(`select r.id, r.cycle_index from races r where r.status='scheduled' order by r.cycle_index limit 1`)).rows[0],
-  '発売中のレース', 'ワーカーを回すか、レースを生成してから流してください',
+  (await c.query(`select r.id, r.cycle_index from races r where r.status='scheduled' and r.scheduled_at > now() order by r.cycle_index limit 1`)).rows[0],
+  'これから発走する発売中のレース', 'レースを生成してから流してください（発走済みには買えません）',
 );
 // ★全馬の単勝を買う。**必ず1点は当たる**ので、払戻の経路を確実に通す。
 //   1点だけ買って外れると「払戻が壊れていても PASS に見える」。
