@@ -244,23 +244,41 @@ const live = await c.query(
 );
 const L = live.rows[0];
 console.log(`  利用者 ${L.users} 人 / 馬券 ${L.bets} 枚 / PP 台帳 ${L.pp_rows} 行 / 確定済みレース ${L.settled} / プレイヤー所有馬 ${L.player_horses} 頭`);
-// ★②の実測: 実集団（internal を除く）の発行量と消費量
-const real = (await c.query(
+/**
+ * ★②は**較正と監視で対象が逆**です（レビュー側裁定）:
+ *
+ *   | | 対象 | ②の期待 |
+ *   |---|---|---|
+ *   | **較正**（P3 のゲート） | **合成集団**（internal） | **②が成立すること** |
+ *   | **運用監視** | 実集団（internal を除く） | 開業前は②が不成立で正常 |
+ *
+ *   ★両方を出します。片方だけ出すと、
+ *     「合成が動いているから経済は生きている」（監視の誤読）か
+ *     「利用者がいないからゲートが通らない」（較正の誤読）のどちらかになります。
+ */
+const flowOf = async (kind) => (await c.query(
   `select
      coalesce(sum(l.delta) filter (where l.delta > 0), 0)::text as issued,
      coalesce(-sum(l.delta) filter (where l.delta < 0), 0)::text as consumed,
      count(*)::int as rows
    from pp_ledger l
    join users u on u.id = l.user_id
-   where coalesce(u.account_type, 'player') = 'player'`,
+   where coalesce(u.account_type, 'player') ${kind === 'synthetic' ? '=' : '<>'} 'internal'`,
 )).rows[0];
+const synth = await flowOf('synthetic');
+const real = await flowOf('real');
 const issuedReal = n(real.issued);
 const consumedReal = n(real.consumed);
-console.log(`  実集団（internal を除く）: 発行 ${jp(issuedReal)} PP / 消費 ${jp(consumedReal)} PP / ${real.rows} 行`);
-console.log('  ★合成ベッターの口座（internal）は②の判定から除きます。');
-console.log('    除かないと「合成が動いているから経済は生きている」と読めてしまいます。');
-const g2 = issuedReal > 0 && consumedReal > 0;
-console.log(`  ${g2 ? '✓' : '★'} ② 発行量と消費量がともに実質ゼロでない  ${g2 ? '成立' : '★成立しない'}`);
+const issuedSyn = n(synth.issued);
+const consumedSyn = n(synth.consumed);
+
+console.log(`  較正（合成集団・internal）: 発行 ${jp(issuedSyn)} PP / 消費 ${jp(consumedSyn)} PP / ${synth.rows} 行`);
+console.log(`  監視（実集団）            : 発行 ${jp(issuedReal)} PP / 消費 ${jp(consumedReal)} PP / ${real.rows} 行`);
+const gCal = issuedSyn > 0 && consumedSyn > 0;
+const gMon = issuedReal > 0 && consumedReal > 0;
+console.log(`  ${gCal ? '✓' : '★'} ②（較正）合成集団で発行も消費もある  ${gCal ? '成立' : '★成立しない'}`);
+console.log(`  ${gMon ? '✓' : '−'} ②（監視）実集団で発行も消費もある    ${gMon ? '成立' : '不成立（★開業前は正常）'}`);
+const g2 = gCal;
 console.log('');
 
 if (L.pp_rows === 0) {
@@ -276,7 +294,7 @@ if (L.pp_rows === 0) {
     console.log('    原因: **利用者が 0 人**です。馬券が買われないので payout も発行されません。');
   }
   console.log('');
-  console.log('  → ★V-11 の②が成立しません。①（純発行量ゼロ近傍）は自動的に通りますが、');
+  console.log('  → ★V-11 の②（較正）が成立しません。①（純発行量ゼロ近傍）は自動的に通りますが、');
   console.log('    それは「健全な経済」ではなく「経済が存在しない」ことの表れです。');
 } else if (!g2) {
   console.log('  ★PP は動いていますが、**実集団では**発行か消費のどちらかが 0 です。');

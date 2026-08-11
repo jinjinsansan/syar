@@ -72,6 +72,8 @@ export const STATE_CHANGING = [
   'verify-training-week.mjs',
   // ★staging の馬を実際に育てる（誕生週をずらして週送りを回す）
   'age-horses.mjs',
+  // ★合成集団で経済を一巡させる（V-11 の②）
+  'verify-v11-synthetic.mjs',
   'seed-stables.mjs',
   'seed-world.mjs',
   'synthetic-bettor.mjs',
