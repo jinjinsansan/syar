@@ -286,6 +286,15 @@ export function entryStrength(entrant: RaceEntrant, distance: number, surface: S
   return total * (0.75 + distanceFit * 0.3) * surfaceFit;
 }
 
+/** ★B-6（D-050）: 出走馬の実際の育成状態を渡すための口 */
+export interface GenerateRaceOptions {
+  /**
+   * その馬のいまの調子・疲労（§7.4）。`undefined` を返した馬は従来どおりの仮定値。
+   * ★レースごとに違う値を返してよい（現実には毎週引き直される）。
+   */
+  readonly trainingStateOf?: (horse: HorseRecord) => { condition: number; fatigue: number } | undefined;
+}
+
 export function generateRace(
   pool: readonly HorseRecord[],
   raceIndex: number,
@@ -295,6 +304,8 @@ export function generateRace(
   unlockRange: { MIN: number; MAX: number } = PLACEHOLDER_UNLOCK,
   /** 能力レンジの床（掃引用に実行時上書き可能にする・Q-1/掃引） */
   floorBase: number = FIELD_STRENGTH_FLOOR,
+  /** ★B-6: 出走馬の実際の育成状態（§7.4）。渡さなければ従来どおりの仮定値 */
+  opts: GenerateRaceOptions = {},
 ): GeneratedRace {
   if (pool.length < FIELD_SIZE.MIN) {
     throw new Error(`generateRace: 母集団が少なすぎる (${pool.length}頭)`);
@@ -362,19 +373,35 @@ export function generateRace(
     picked.push(horse);
   }
 
-  const candidates = picked.map((horse) =>
-    toEntrant(
+  const candidates = picked.map((horse) => {
+    /**
+     * ★B-6 の配線点（D-050）。
+     *
+     * 【配線前に何が一律だったか — 記録を訂正します】
+     *   `docs/B6_WIRING_PLAN.md` には「全馬が condition 3 / fatigue 0」と書きましたが、
+     *   **condition は以前からここで `rng.int(2, 4)` を渡しており、一律ではありませんでした。**
+     *   実際に全馬で同一だったのは **`fatigue`（`toEntrant` の `?? 0`）だけ**です。
+     *   ★`fatigue` は `fatigueCoef` と `initialStamina` の両方に入るので、
+     *     **疲労という分散源が丸ごと欠けていた**のは事実です。
+     *
+     * 【配線後】
+     *   `trainingStateOf` が値を返せば、**§7.4 の実際の調子・疲労**を使います。
+     *   返さなければ従来どおりの仮定値です（母集団に育成状態が無い経路のため）。
+     *   ★既定で実データに化けさせません。**呼ぶ側が渡したときだけ**切り替わります。
+     */
+    const trained = opts.trainingStateOf?.(horse);
+    return toEntrant(
       horse,
       rng,
       {
-        // 調子・年齢・斤量にレースごとのばらつきを持たせる（P3 の育成が入るまでの仮定）
-        condition: rng.int(2, 4),
+        condition: trained?.condition ?? rng.int(2, 4),
+        fatigue: trained?.fatigue ?? 0,
         age: rng.int(3, 5),
         weightKg: 55 + rng.range(-2, 2),
       },
       unlockRange,
-    ),
-  );
+    );
+  });
 
   // ★**頭数は必ず fieldSize に保ったまま、床を割る馬だけを引き直す**（Q-4）。
   //

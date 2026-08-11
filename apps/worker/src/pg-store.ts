@@ -245,9 +245,22 @@ export function createPgStore(
             strategyAptitude: h.strategyAptitude,
             heavyAptitude: h.heavyAptitude,
             strategy: String(row['strategy']) as RaceEntrant['strategy'],
-            // ★調子・疲労は未実装（§7）。実装したら DB から読む
-            condition: 3,
-            fatigue: 0,
+            /**
+             * ★B-6（D-050）: 調子・疲労を DB から読む（0010 で列を追加）。
+             *
+             * 【★ここが2か所目だったこと】
+             *   出走馬は**生成時（race-field.ts）と確定時（ここ）で別々に組まれます**。
+             *   `docs/B6_WIRING_PLAN.md` に「MC と本番確定は同じ entrants を使うので
+             *   乖離は構造上起きません」と書きましたが、**誤りでした**。
+             *   片方だけ実データにすると、**オッズを計算した馬と実際に走る馬が変わります**。
+             *
+             * ★週送りを通していない馬（`last_processed_week` が null）は
+             *   §7.4 の中央値に落とします。**0 にすると生まれた瞬間が絶不調**になります。
+             */
+            condition: row['condition'] === null || row['condition'] === undefined
+              ? 3 : Number(row['condition']),
+            fatigue: row['fatigue'] === null || row['fatigue'] === undefined
+              ? 0 : Number(row['fatigue']),
             weightKg: Number(row['weight']),
             gate: Number(row['gate']),
             age: 4,

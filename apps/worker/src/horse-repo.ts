@@ -82,3 +82,34 @@ export async function loadRaceablePool(
   }
   return r.rows.map(rowToHorse);
 }
+
+/**
+ * ★B-6（D-050）: 出走馬の調子・疲労を DB から読む（0010 の列）。
+ *
+ * 【なぜ `HorseRecord` に入れないか】
+ *   `HorseRecord` は `sim-engine` の**遺伝の記録**です。調子・疲労は育成の状態なので、
+ *   そこに混ぜると「遺伝エンジンが育成を知っている」形になります。
+ *   → **別の表**として返し、`generateRace` に渡します。
+ *
+ * ★週送りを通していない馬（`last_processed_week` が null）は**返しません**。
+ *   呼ぶ側が §7.4 の中央値に落とします。ここで 3/0 を作ると、
+ *   「実データがある馬」と「無い馬」が区別できなくなります。
+ */
+export async function loadTrainingStates(
+  client: pg.Client | pg.PoolClient,
+): Promise<Map<string, { condition: number; fatigue: number }>> {
+  const r = await client.query<{ id: string; condition: string | number; fatigue: string | number }>(
+    `select id, condition, fatigue from horses where last_processed_week is not null`,
+  );
+  const out = new Map<string, { condition: number; fatigue: number }>();
+  for (const row of r.rows) {
+    const condition = Number(row.condition);
+    const fatigue = Number(row.fatigue);
+    // ★numeric は文字列で返る。数値にならないものを黙って通さない
+    if (!Number.isFinite(condition) || !Number.isFinite(fatigue)) {
+      throw new Error(`loadTrainingStates: 馬 ${row.id} の調子・疲労が数値として読めません`);
+    }
+    out.set(row.id, { condition, fatigue });
+  }
+  return out;
+}

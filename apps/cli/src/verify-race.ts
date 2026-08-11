@@ -45,6 +45,7 @@ import * as MC from './measurement.js';
 import { PopularityEstimator } from './popularity.js';
 import { mean, round, sd } from './stats.js';
 
+import { buildTrainingStateSampler } from './training-state.js';
 // ---------------------------------------------------------------------------
 // 引数
 // ---------------------------------------------------------------------------
@@ -80,6 +81,12 @@ const SEEDS = parseList('--seeds', [...MC.VERIFY_SEEDS]);
  */
 const POPULARITY_TRIALS = parseNumber('--popularity-trials', MC.POPULARITY_TRIALS);
 /** 母集団を作る世代数 */
+/**
+ * ★B-6（D-050）: 出走馬の調子・疲労を実データにするか。
+ *   ★既定は false。付けたときだけ切り替わるので、
+ *     「いつの間にか別の世界で測っていた」が起きません。
+ */
+const B6_WIRED = process.argv.includes('--b6-wired');
 const POOL_GENERATIONS = parseNumber('--pool-generations', MC.POOL_GENERATIONS);
 const POOL_MARES = parseNumber('--pool-mares', MC.POOL_MARES);
 /** クラス幅（母集団に対する割合）。1.0 でクラス分けなし */
@@ -201,8 +208,17 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
 
   const fieldRng = deriveRng(seed, STREAM.FIELD);
 
+  /**
+   * ★B-6（D-050）: 出走馬の調子・疲労を**実際の週ループから**採る。
+   *   `--b6-wired` を付けたときだけ切り替わります。
+   *   ★既定で切り替えません。ゲートの値が動く変更を、旗なしで既定にしません。
+   */
+  const sampler = B6_WIRED ? buildTrainingStateSampler(pool, seed) : null;
+
   for (let raceIndex = 0; raceIndex < racesForSeed; raceIndex++) {
-    const race = generateRace(pool, raceIndex, fieldRng, CLASS_BAND, UNLOCK, FLOOR);
+    const race = generateRace(pool, raceIndex, fieldRng, CLASS_BAND, UNLOCK, FLOOR,
+      sampler === null ? {} : { trainingStateOf: sampler.stateOf });
+    sampler?.advance();
     const fieldSize = race.entrants.length;
 
     // (1) 人気を推定する（本番とは別系列・§9.2）

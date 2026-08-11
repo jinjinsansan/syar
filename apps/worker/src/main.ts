@@ -23,7 +23,7 @@ import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
 import { buildRace } from './build-race.js';
 import { aggregateDay } from './daily-flow.js';
-import { loadRaceablePool } from './horse-repo.js';
+import { loadRaceablePool, loadTrainingStates } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { CANCEL_AFTER_START_MS } from '@star/scheduler';
@@ -97,11 +97,19 @@ async function main(): Promise<void> {
   while (!stopping) {
     const started = Date.now();
     try {
+      /**
+       * ★B-6（D-050）: 調子・疲労は**毎周読み直します**。
+       *   母集団（`pool`）は日次バッチでしか変わらないので1回でよいのですが、
+       *   調子・疲労は**週ごとに変わります**。ここを1回だけにすると、
+       *   ワーカーが起動した週の値のまま何日も走り続けます。
+       *   ★「読んでいるのに古い」は、読んでいないより気づきにくい形です。
+       */
+      const trainingStates = await loadTrainingStates(client);
       const out = await runCycle(
         store,
         cfg.epochMs,
         seeds,
-        (i) => buildRace(pool, i, cfg.epochMs),
+        (i) => buildRace(pool, i, cfg.epochMs, undefined, trainingStates),
         // ★開催中止は黙って通さない（正典 D-037）。
         //   静かに返還されると原因が調査されないまま繰り返します。
         //   ⚠️ ここは「客の金が戻った」記録です。**必ず目に付く形で残すこと。**

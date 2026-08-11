@@ -30,9 +30,19 @@ export function buildRace(
   cycleIndex: number,
   seed: number,
   trials: number = ODDS_MC_TRIALS,
+  /**
+   * ★B-6（D-050）: 出走馬の調子・疲労（§7.4）。渡さなければ従来どおりの仮定値。
+   *   ★**確定処理（pg-store.ts の settleRace）と同じ値を渡すこと。**
+   *     片方だけ実データにすると、オッズを計算した馬と実際に走る馬が変わります。
+   */
+  trainingStates?: ReadonlyMap<string, { condition: number; fatigue: number }>,
 ): BuiltRace {
   const sorted = sortPoolByClass(pool);
-  const race = generateRace(sorted, cycleIndex, deriveRng(seed, STREAM.FIELD, cycleIndex));
+  const race = generateRace(
+    sorted, cycleIndex, deriveRng(seed, STREAM.FIELD, cycleIndex),
+    undefined, undefined, undefined,
+    trainingStates === undefined ? {} : { trainingStateOf: (h) => trainingStates.get(h.id) },
+  );
 
   // 馬番を 1..n に振る（馬券は馬番で買う）
   const numbered: RaceEntrant[] = race.entrants.map((e, i) => ({ ...e, horseId: `H${i + 1}` }));
