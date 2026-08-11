@@ -326,6 +326,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
     why: '★V-15 の測定ハーネス。SEED / HORSES は標本の取り方。V15_MEASUREMENT は**測定条件**（中盤=169週・方針=balanced・下限50%）で、正典 §13.2 の写しとして固定する — 較正定数ではなく、通すために動かせる値でもない。較正の対象は TEMPER_FLOOR_RATIO のほうで、そちらは CALIBRATION に登録済み',
   },
   {
+    pattern: 'apps/cli/src/diag-topgap\.ts',
+    why: '★V-4 が動いた理由を測り直す診断（Q-P3-36）。判定を出さない。SEED / RACES は標本の取り方で、通すために動かせる値ではない',
+  },
+  {
     pattern: 'apps/cli/src/diag-loop\.ts',
     why: '★週ループの載せ替え差分を測る診断ツール。判定を出さない（V-x を作らない）。SEED / HORSES は標本の取り方で、通すために動かせる値ではない',
   },

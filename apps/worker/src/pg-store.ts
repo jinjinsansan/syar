@@ -300,10 +300,15 @@ export function createPgStore(
              * ★週送りを通していない馬（`last_processed_week` が null）は
              *   §7.4 の中央値に落とします。**0 にすると生まれた瞬間が絶不調**になります。
              */
-            condition: row['condition'] === null || row['condition'] === undefined
-              ? 3 : Number(row['condition']),
-            fatigue: row['fatigue'] === null || row['fatigue'] === undefined
-              ? 0 : Number(row['fatigue']),
+            /**
+             * ★B-6 をいったん外したので、生成側と同じ仮定値に戻します（2026-08-12）。
+             *   ★生成側だけ実データにすると「オッズを計算した馬と走る馬が違う」が
+             *     再発します（Q-P3-32 と同じ型）。**両側を揃えて動かします。**
+             *   戻すときは、上の DB 読み出しに差し替えてください:
+             *     condition: row['condition'] ?? 3 / fatigue: row['fatigue'] ?? 0
+             */
+            condition: 3,
+            fatigue: 0,
             weightKg: Number(row['weight']),
             gate: Number(row['gate']),
             age: 4,

@@ -23,7 +23,8 @@ import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
 import { buildRace } from './build-race.js';
 import { aggregateDay } from './daily-flow.js';
-import { loadRaceablePool, loadTrainingStates } from './horse-repo.js';
+// ★loadTrainingStates は B-6 を戻すときに使う（いまは呼んでいない）
+import { loadRaceablePool } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { runSelfcheck } from './selfcheck.js';
@@ -99,19 +100,30 @@ async function main(): Promise<void> {
     const started = Date.now();
     try {
       /**
-       * ★B-6（D-050）: 調子・疲労は**毎周読み直します**。
-       *   母集団（`pool`）は日次バッチでしか変わらないので1回でよいのですが、
-       *   調子・疲労は**週ごとに変わります**。ここを1回だけにすると、
-       *   ワーカーが起動した週の値のまま何日も走り続けます。
-       *   ★「読んでいるのに古い」は、読んでいないより気づきにくい形です。
+       * ★B-6（調子・疲労の配線）は**いったん外しています**（2026-08-12）。
+       *
+       * 【なぜ外すか】
+       *   ハーネスで「B-6 だけ入れた状態」を測ったところ、**帯を出ていました**:
+       *     V-4 34.60%（帯 30〜34%） / V-5 65.83%（帯 60〜65%）
+       *   一方、**能力も実データにした状態（③）は帯の中**に戻ります:
+       *     V-4 32.73% / V-5 63.99%
+       *   → **2つの是正は V-4 を逆向きに動かし、揃えたときだけ帯に入ります。**
+       *     片方だけ入れると、途中で必ず落ちる状態を通ります。
+       *
+       * 【いつ戻すか】
+       *   ★週送りをワーカーに繋ぎ、`horses.stats` がハーネスの前提
+       *     （開放率 平均73.8% / SD11.0pt）に到達したことを測ってから、
+       *     **能力の実データ化と一緒に**入れます。
+       *
+       * ⚠️ `loadTrainingStates` と `buildRace` の受け口は残してあります。
+       *    消すと「繋ぎ直す」が作り直しになり、そのとき別物になります。
        */
-      const trainingStates = await loadTrainingStates(client);
       const out = await runCycle(
         store,
         cfg.epochMs,
         seeds,
-        (i) => buildRace(pool, i, cfg.epochMs, undefined, trainingStates,
-          // ★番組表（§10.3）が距離・馬場・コースを決める（Q-P3-32）
+        (i) => buildRace(pool, i, cfg.epochMs, undefined, undefined,
+          // ★番組表（§10.3）が距離・馬場・コースを決める（Q-P3-32・こちらは有効のまま）
           conditionsOf(i, classOf(i), gradeOf(i))),
         // ★開催中止は黙って通さない（正典 D-037）。
         //   静かに返還されると原因が調査されないまま繰り返します。
