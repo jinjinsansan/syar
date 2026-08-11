@@ -26,6 +26,8 @@ export const READONLY = [
   'a3-converge.mjs',
   // ★読むだけ。オッズ計算時と確定時の出走馬を突き合わせて数字を並べる
   'diag-b6.mjs',
+  // ★読むだけ。生成時と保存時のレース条件を突き合わせる
+  'diag-conditions.mjs',
   // ★読むだけ。PP の発行と吸収を数える。本番の実データでないと意味がない
   'diag-v11.mjs',
   // ★DB に一切接続しない。受け渡しテキストから secrets.staging.env を作るだけ。
@@ -55,6 +57,8 @@ export const STATE_CHANGING = [
   'audit-tools.mjs',
   'fix-purse.mjs',
   // ★staging に発売中のレースを作る（検証ツールの前提を揃える）
+  // ★同じレースを2通りの方法で投入して突き合わせる（後片付けあり）
+  'diag-insert.mjs',
   'seed-races.mjs',
   'seed-stables.mjs',
   'seed-world.mjs',

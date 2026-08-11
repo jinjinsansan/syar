@@ -120,23 +120,57 @@ export function createPgStore(
           'select id from races where cycle_index = $1', [spec.cycleIndex],
         )).rows[0]!.id;
 
-        // --- 出走表（§10.4 の同格帯から。D-018: 無作為だと V-4 が壊れる）---
-        for (const e of spec.entrants) {
-          await client.query(
-            `insert into race_entries (race_id, horse_id, gate, weight, strategy, popularity)
-             values ($1,$2,$3,$4,$5,$6)`,
-            [raceId, e.horseId, e.gate, e.weightKg, e.strategy, e.popularity ?? null],
-          );
-        }
+        /**
+         * --- 出走表（§10.4 の同格帯から。D-018: 無作為だと V-4 が壊れる）---
+         *
+         * ★1行ずつではなく**一括**で入れます（2026-08-11・A-1 の余裕のため）。
+         *   下のオッズと同じ理由です。
+         */
+        await client.query(
+          `insert into race_entries (race_id, horse_id, gate, weight, strategy, popularity)
+           select $1, t.horse_id, t.gate, t.weight, t.strategy, t.popularity
+             from unnest($2::uuid[], $3::int[], $4::numeric[], $5::text[], $6::int[])
+               as t(horse_id, gate, weight, strategy, popularity)`,
+          [
+            raceId,
+            spec.entrants.map((e) => e.horseId),
+            spec.entrants.map((e) => e.gate),
+            spec.entrants.map((e) => e.weightKg),
+            spec.entrants.map((e) => e.strategy),
+            spec.entrants.map((e) => e.popularity ?? null),
+          ],
+        );
 
-        // --- オッズ（§9.2）---
-        for (const o of spec.odds) {
-          await client.query(
-            `insert into race_odds (race_id, bet_type, selection, probability, odds, capped)
-             values ($1,$2,$3::jsonb,$4,$5,$6)`,
-            [raceId, o.betType, JSON.stringify(o.selection), o.probability, o.odds, o.capped],
-          );
-        }
+        /**
+         * --- オッズ（§9.2）---
+         *
+         * ★**1行ずつ入れていました。** 18頭立てだと 5,483 行あり、
+         *   1行 = 1往復なので、**生成時間の大半がネットワーク待ち**になっていました。
+         *   実測（staging・シドニー）: 27分のうち CPU は 6.4分（24%）だけ。
+         *   残りはこの往復です。
+         *
+         *   ★これは A-1（10分サイクルが無人で回り続ける）を脅かします。
+         *     生成はサイクルのロックを保持したまま行われるので、
+         *     長引くとその間の確定が止まります。
+         *
+         *   → `unnest` で**1往復**にします。行の中身も順序も変えません。
+         *     ⚠️ `numeric(9,8)` / `numeric(9,1)` に入るので、配列も `numeric[]` で渡します
+         *        （`float8[]` にすると丸めが変わりえます）。
+         */
+        await client.query(
+          `insert into race_odds (race_id, bet_type, selection, probability, odds, capped)
+           select $1, t.bet_type, t.selection::jsonb, t.probability, t.odds, t.capped
+             from unnest($2::text[], $3::text[], $4::numeric[], $5::numeric[], $6::boolean[])
+               as t(bet_type, selection, probability, odds, capped)`,
+          [
+            raceId,
+            spec.odds.map((o) => o.betType),
+            spec.odds.map((o) => JSON.stringify(o.selection)),
+            spec.odds.map((o) => o.probability),
+            spec.odds.map((o) => o.odds),
+            spec.odds.map((o) => o.capped),
+          ],
+        );
         await client.query('commit');
       } catch (e) {
         await client.query('rollback');
