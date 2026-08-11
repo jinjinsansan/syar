@@ -53,6 +53,7 @@ import {
   type PermanentLoss,
 } from './injury.js';
 import { applyEvent, rollEvent, type EventDef } from './events.js';
+import { applyTemperDelta } from './temper.js';
 import {
   decideRetirement,
   shouldRetire,
@@ -71,6 +72,8 @@ export const TRAIN_STREAM = { GROWTH: 61, CONDITION: 62, INJURY: 63, EVENT: 64 }
 export interface HorseTraits {
   readonly sex: Sex;
   readonly growth: GrowthType;
+  /** ★誕生時の気性。気性の下限を決める（D-049）。一生変わらない */
+  readonly birthTemper: number;
   /** インブリード由来の故障率倍率（§6.5） */
   readonly injuryRateMult: number;
 }
@@ -263,7 +266,7 @@ export function advanceWeek(input: AdvanceWeekInput): AdvanceWeekResult {
         const rolled = rollEvent(evRng, input.chooseEvent);
         if (rolled !== null) {
           const out = applyEvent(
-            { condition, temper, fatigue, current, potential },
+            { condition, temper, birthTemper: traits.birthTemper, fatigue, current, potential },
             rolled.effect,
             evRng,
           );
@@ -288,8 +291,9 @@ export function advanceWeek(input: AdvanceWeekInput): AdvanceWeekResult {
           };
         }
       }
-      // ★メニューによる気性の変化（§7.2 の temperDelta）
-      temper = Math.max(0, Math.min(100, temper + MENUS[menu].temperDelta));
+      // ★メニューによる気性の変化（§7.2 の temperDelta）。
+      //   ★下限つき・残り幅に比例（D-049）。素の加算に戻すと気性が 0 に潰れます
+      temper = applyTemperDelta(temper, MENUS[menu].temperDelta, traits.birthTemper);
     }
   }
 

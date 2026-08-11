@@ -10,4 +10,5 @@ export * from './condition.js';
 export * from './injury.js';
 export * from './events.js';
 export * from './retirement.js';
+export * from './temper.js';
 export * from './week.js';

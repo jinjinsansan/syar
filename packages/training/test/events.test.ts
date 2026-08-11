@@ -15,7 +15,7 @@ import {
 const rec = (v: number): Record<AbilityKey, number> =>
   Object.fromEntries(ABILITY_KEYS.map((k) => [k, v])) as Record<AbilityKey, number>;
 
-const target = { condition: 3, temper: 50, fatigue: 20, current: rec(400), potential: rec(500) };
+const target = { condition: 3, temper: 50, birthTemper: 50, fatigue: 20, current: rec(400), potential: rec(500) };
 
 describe('§7.6 イベント表（data-driven）', () => {
   it('★正典の3つが表にある（テキストは正典の文言）', () => {

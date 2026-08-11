@@ -127,6 +127,7 @@ function unifiedCareer(
 ): Outcome {
   const traits: HorseTraits = {
     sex: horse.sex, growth: horse.growth, injuryRateMult: horse.injuryRateMult,
+    birthTemper: horse.temper,
   };
   let state = initialState({
     potential: horse.potential, current: horse.stats,

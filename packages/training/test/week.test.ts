@@ -23,7 +23,7 @@ import {
 const rec = (v: number): Record<AbilityKey, number> =>
   Object.fromEntries(ABILITY_KEYS.map((k) => [k, v])) as Record<AbilityKey, number>;
 
-const traits: HorseTraits = { sex: 'male', growth: 'normal', injuryRateMult: 1 };
+const traits: HorseTraits = { sex: 'male', growth: 'normal', injuryRateMult: 1, birthTemper: 50 };
 
 const start = (over: Partial<TrainingState> = {}): TrainingState => ({
   ...initialState({ potential: rec(700), current: rec(300), durability: 650, temper: 50 }),

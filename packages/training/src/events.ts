@@ -29,6 +29,7 @@
 import type { AbilityKey, Rng } from '@star/sim-engine';
 import { ABILITY_KEYS } from '@star/sim-engine';
 
+import { applyTemperDelta } from './temper.js';
 /** イベントの効果。★すべて「差分」で持つ（絶対値にすると適用順で結果が変わる） */
 export interface EventEffect {
   /** 調子の増減（§7.4 の 0..5 に収める） */
@@ -166,6 +167,8 @@ export function rollEvent(
 export interface EventTarget {
   readonly condition: number;
   readonly temper: number;
+  /** ★誕生時の気性。下限の算出に要る（D-049）。現在値からは決められない */
+  readonly birthTemper: number;
   readonly fatigue: number;
   readonly current: Readonly<Record<AbilityKey, number>>;
   readonly potential: Readonly<Record<AbilityKey, number>>;
@@ -210,7 +213,9 @@ export function applyEvent(target: EventTarget, effect: EventEffect, rng: Rng): 
   }
 
   const condition = Math.max(0, Math.min(5, target.condition + (effect.condition ?? 0)));
-  const temper = Math.max(0, Math.min(100, target.temper + (effect.temper ?? 0)));
+  // ★気性の変化も下限を通す（D-049）。ここを素の加算のままにすると、
+  //   §7.6 の「強行 +10」だけが下限の外側で動き、週送りとイベントで規則が食い違います。
+  const temper = applyTemperDelta(target.temper, effect.temper ?? 0, target.birthTemper);
   const fatigue = Math.max(0, Math.min(100, target.fatigue + (effect.fatigue ?? 0)));
 
   return {

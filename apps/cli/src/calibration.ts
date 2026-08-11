@@ -102,6 +102,12 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: '★V-14 の3つ目「追い切り偏重が支配戦略でない」の判定幅。正典 D-044 は「大きく上回らない」としか書いておらず、+2pt は**私が決めた値**。100 にすると、追い切りが何 pt 上回っても PASS になり、ゲートが意味を失う（照会中）',
   },
   {
+    key: 'TEMPER_FLOOR_RATIO',
+    file: 'packages/training/src/temper.ts',
+    perturbed: 'export const TEMPER_FLOOR_RATIO = 0;',
+    affects: '★V-15（キャリア中盤の集団SD ≥ 誕生時SD の 50%・D-049）。0 にすると下限が消え、是正前と同じく全馬の気性が 0 に潰れる（1,800頭で 51.0→0.1・199/200 が平均40週で 0 到達）。★潰れても V-2e/V-2f/B-1/全テストは通るので、V-15 だけが検出する',
+  },
+  {
     key: 'INJURY_BASE_PROB',
     file: 'packages/training/src/injury.ts',
     perturbed: 'export const INJURY_BASE_PROB = 0.0018;',
@@ -316,6 +322,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
     why: '★測定条件（どう測るか）。較正定数とは扱いが違い、正典 §13.2/§13.3 に固定して measurement.test.ts が値照合で守る。R-14 は較正定数についての規則で、文書化された測定条件の照合を禁じない',
   },
   {
+    pattern: 'apps/cli/src/verify-v15\.ts',
+    why: '★V-15 の測定ハーネス。SEED / HORSES は標本の取り方。V15_MEASUREMENT は**測定条件**（中盤=169週・方針=balanced・下限50%）で、正典 §13.2 の写しとして固定する — 較正定数ではなく、通すために動かせる値でもない。較正の対象は TEMPER_FLOOR_RATIO のほうで、そちらは CALIBRATION に登録済み',
+  },
+  {
     pattern: 'apps/cli/src/diag-loop\.ts',
     why: '★週ループの載せ替え差分を測る診断ツール。判定を出さない（V-x を作らない）。SEED / HORSES は標本の取り方で、通すために動かせる値ではない',
   },
@@ -368,6 +378,7 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
   { key: 'AWAKENING_PROB', why: '正典 §7.6「素質が開花した！（1%）」の写し' },
+  { key: 'TEMPER_BOUNDS', why: '正典 §5.2 の temper 値域 0..100 の写し（TEMPER_RANGE と同じ値。下限つき変化の上側の端として使う）' },
   { key: 'TRAIN_STREAM', why: '★乱数の用途ID（61〜64）。値そのものに意味は無く、他の乱数と衝突しないための番号。★ただし変えると較正済みの数字が再現しなくなるので、動かしてはいけない定数ではある（判定を通すために動かせる値ではない）' },
   { key: 'MAX_LIFE_WEEKS', why: '正典 §7.1 の 260週 + 1。★無限ループ防止の番人であり、判定条件ではない（ここに当たったら実装が壊れている）' },
   { key: 'AWAKENING_MULT', why: '正典 §7.6「potential のうち1形質 +5%」の写し' },
