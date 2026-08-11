@@ -32,6 +32,8 @@ export const READONLY = [
   'verify-conditions-db.mjs',
   // ★読むだけ。本番が作ったオッズと本番が出した着順で払戻率を測る
   'verify-v10-db.mjs',
+  // ★読むだけ。道悪のレースで heavy_aptitude が着順に効いているかを見る
+  'verify-heavy.mjs',
   // ★読むだけ。PP の発行と吸収を数える。本番の実データでないと意味がない
   'diag-v11.mjs',
   // ★DB に一切接続しない。受け渡しテキストから secrets.staging.env を作るだけ。
@@ -64,6 +66,8 @@ export const STATE_CHANGING = [
   // ★同じレースを2通りの方法で投入して突き合わせる（後片付けあり）
   'diag-insert.mjs',
   'seed-races.mjs',
+  // ★staging のレースを確定させる（時間を進める代わり）
+  'settle-races.mjs',
   'seed-stables.mjs',
   'seed-world.mjs',
   'synthetic-bettor.mjs',

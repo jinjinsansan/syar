@@ -40,10 +40,27 @@ console.log('# 保存されたレースは番組表どおりか（Q-P3-32 の是
 console.log('');
 
 // ── ① 番組表との一致 ────────────────────────────────────
-const rows = (await c.query(
+/**
+ * ★`--after <ISO>` を渡すと、その時刻より後に作られたレースだけを判定します。
+ *
+ * 【なぜ要るか】
+ *   staging には**是正前に作ったレース**が残っています。それらは
+ *   「オッズは A の条件・DB は B の条件」のままなので、**永久に FAIL します**。
+ *   ★とはいえ黙って除くと「直った」と読めてしまうので、
+ *     **除いた本数と、除いた理由を必ず出します**。
+ */
+const afterIdx = process.argv.indexOf('--from-cycle');
+const FROM = afterIdx >= 0 ? Number(process.argv[afterIdx + 1]) : null;
+const all = (await c.query(
   `select cycle_index, surface, distance, track_condition, created_at
-     from races order by cycle_index desc limit 20`,
+     from races order by cycle_index desc limit 40`,
 )).rows;
+const rows = FROM === null ? all : all.filter((r) => Number(r.cycle_index) >= FROM);
+if (FROM !== null) {
+  console.log(`  ★判定対象: cycle ${FROM} 以降の ${rows.length} 本`);
+  console.log(`     除外: ${all.length - rows.length} 本（是正前に作られたもの。オッズと条件が食い違ったまま）`);
+  console.log('');
+}
 if (rows.length === 0) {
   console.error('★レースが1本もありません。seed-races で作ってから流してください');
   await c.end();
