@@ -26,6 +26,8 @@ export const READONLY = [
   'a3-converge.mjs',
   // ★読むだけ。オッズ計算時と確定時の出走馬を突き合わせて数字を並べる
   'diag-b6.mjs',
+  // ★読むだけ。PP の発行と吸収を数える。本番の実データでないと意味がない
+  'diag-v11.mjs',
   // ★DB に一切接続しない。受け渡しテキストから secrets.staging.env を作るだけ。
   //   ファイルは書くが DB の状態は変えないので、ガードの対象外。
   'import-staging-secrets.mjs',

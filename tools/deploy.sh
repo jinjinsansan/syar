@@ -90,6 +90,16 @@ else
       log "★バンドルを起動できません: $(printf '%s' "$out" | head -3)"
       return 1
     fi
+    # ★配る物そのものに自己検査を走らせる（D-043 の残件）。
+    #   上の検査は「起動できるか」しか見ていません。定数が畳み込まれて別の値に
+    #   なっていても、表が欠けていても、STAR_ENV のエラーは同じように出ます。
+    #   ⚠️ これは「成功すること」を期待する検査です。環境変数は要りません。
+    local sc
+    if ! sc="$(cd "$DEST" && env -i /usr/bin/node dist/worker.cjs --selfcheck 2>&1)"; then
+      log "★バンドルの自己検査が失敗: $(printf '%s' "$sc" | grep '★NG' | head -3)"
+      return 1
+    fi
+    log "自己検査 OK: $(printf '%s' "$sc" | grep -c '^  ' ) 行"
   }
 
   if ! preflight; then

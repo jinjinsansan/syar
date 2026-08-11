@@ -26,6 +26,7 @@ import { aggregateDay } from './daily-flow.js';
 import { loadRaceablePool, loadTrainingStates } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
+import { runSelfcheck } from './selfcheck.js';
 import { CANCEL_AFTER_START_MS } from '@star/scheduler';
 
 /** 1周の間隔。★サイクル長より短くする（1サイクルを取りこぼさないため） */
@@ -167,6 +168,21 @@ async function main(): Promise<void> {
 
   await client.end();
   console.log('[worker] 停止しました');
+}
+
+/**
+ * ★`--selfcheck` は**設定を読む前**に処理します（D-043）。
+ *   `loadConfig()` は STAR_ENV などを要求するので、後ろに置くと
+ *   「環境変数が無いと自己検査もできない」形になります。
+ *   ★配る物を**どこでも**走らせて確かめられることが要点です。
+ */
+if (process.argv.includes('--selfcheck')) {
+  // ★動的 import を使いません。**CJS バンドルはトップレベル await を許しません**
+  //   （esbuild が「Top-level await is currently not supported with the cjs output format」で落ちます）。
+  //   ★ここで落ちると、配る物が作れなくなります。静的に読み込みます。
+  const r = runSelfcheck();
+  for (const line of r.report) console.log(line);
+  process.exit(r.ok ? 0 : 1);
 }
 
 main().catch((e) => {
