@@ -33,11 +33,11 @@
  * 実行: npm run verify:v14 -- --horses 400 --seed 42
  */
 import {
-  ABILITY_KEYS, NICKS_GEN, deriveRng, type AbilityKey, type HorseRecord,
+  ABILITY_KEYS, NICKS_GEN, deriveRng, type AbilityKey, type HorseRecord, type Rng,
 } from '@star/sim-engine';
 import {
-  DEFAULT_MENU, applyInjury, epCost, fatigueDelta, weeklyFatigue,
-  MENU_IDS, grow, injuryProbability, menuCoef, nextCondition, rollSeverity, type MenuId,
+  DEFAULT_MENU, MENU_IDS, advanceWeek, initialState, menuCoef,
+  type HorseTraits, type MenuId, type TrainingState,
 } from '@star/training';
 import { LIFECYCLE_WEEKS } from '@star/scheduler';
 import { resolveRuntimeConfig } from './config.js';
@@ -54,7 +54,6 @@ const SEED = num('seed', 42);
 const HORSES = num('horses', 400);
 
 /** ★週進行の乱数の用途ID。既存4表（1〜52）と重ならない 61〜 の帯（指示書 §2） */
-const TRAIN_STREAM = { GROWTH: 61, CONDITION: 62, INJURY: 63 } as const;
 
 /** 育成方針 */
 type Policy = 'neglect' | 'balanced' | 'hard_only';
@@ -98,18 +97,34 @@ interface CareerResult {
   readonly potentialLost: number;
 }
 
-/** 1頭を78週から260週まで通す */
+/**
+ * 1頭を78週から260週まで通す。
+ *
+ * ★**`advanceWeek`（週送りの合成器）を通します**（2026-08-11 の載せ替え）。
+ *   以前はこの関数が**自前の週ループ**を持っており、
+ *   - §7.6 のイベントを一度も引かない
+ *   - §7.2 の気性変化（temperDelta）を適用しない
+ *   状態で測っていました。**較正した経路と、遊びの経路が別物**だったということです。
+ *   R-23 は「いつの証拠か」でしたが、これは「**どの経路の証拠か**」の失効です。
+ *
+ * ★平均の取り方を旧ループに合わせています（調子・疲労は**その週を進める前**の値）。
+ *   ここを後の値に変えると、載せ替え以外の理由で数字が動きます。
+ */
 function runCareer(horse: HorseRecord, policy: Policy, horseIndex: number): CareerResult {
-  const potential = { ...horse.potential } as Record<AbilityKey, number>;
-  const current = { ...horse.stats } as Record<AbilityKey, number>;
-  let durability = horse.durability;
-  let fatigue = 0;
-  let condition = 3;
-  let restUntil = -1;
+  const traits: HorseTraits = {
+    sex: horse.sex, growth: horse.growth,
+    injuryRateMult: horse.injuryRateMult, birthTemper: horse.temper,
+  };
+  let state: TrainingState = {
+    ...initialState({
+      potential: horse.potential, current: horse.stats,
+      durability: horse.durability, temper: horse.temper,
+    }),
+    ageWeeks: LIFECYCLE_WEEKS.trainableFrom,
+  };
+
   let injuries = 0;
-  let careerEnded = false;
   let epSpent = 0;
-  let week = LIFECYCLE_WEEKS.trainableFrom;
   const menuWeeks = Object.fromEntries(MENU_IDS.map((m) => [m, 0])) as Record<MenuId, number>;
   const potential0 = { ...horse.potential } as Record<AbilityKey, number>;
   let injuryRestWeeks = 0;
@@ -117,60 +132,38 @@ function runCareer(horse: HorseRecord, policy: Policy, horseIndex: number): Care
   let fatSum = 0;
   let weeksCounted = 0;
 
-  for (; week < LIFECYCLE_WEEKS.retireAt; week += 1) {
-    const resting = week < restUntil;
-    const menu: MenuId = resting ? 'rest' : chooseMenu(policy, week, fatigue);
-    menuWeeks[menu] += 1;
-    if (resting) injuryRestWeeks += 1;
-    condSum += condition;
-    fatSum += fatigue;
+  while (state.retirement === null) {
+    const week = state.ageWeeks;
+    // ★進める「前」の値を積む（旧ループと同じ）
+    condSum += state.condition;
+    fatSum += state.fatigue;
     weeksCounted += 1;
 
-    // --- 故障判定（§7.5）。★休養中は menuIntensity 0 なので起きない ---
-    const p = injuryProbability({
-      menu, fatigue, durability, injuryRateMult: horse.injuryRateMult, ageWeeks: week,
+    const r = advanceWeek({
+      state,
+      traits,
+      menu: chooseMenu(policy, week, state.fatigue),
+      // ★B-1 が通す経路と同じ条件で測る。false に戻すと
+      //   「較正した経路と遊びの経路が別物」に逆戻りします
+      enableEvents: true,
+      rngFor: (stream: number): Rng => deriveRng(SEED, stream, horseIndex * 1000 + week),
     });
-    const injRng = deriveRng(SEED, TRAIN_STREAM.INJURY, horseIndex * 1000 + week);
-    if (injRng.bool(p)) {
-      injuries += 1;
-      const r = applyInjury(
-        { potential, current, durability },
-        rollSeverity(injRng),
-        injRng,
-      );
-      for (const k of ABILITY_KEYS) {
-        potential[k] = r.potential[k];
-        current[k] = r.current[k];
-      }
-      durability = r.durability;
-      if (r.careerEnding) { careerEnded = true; week += 1; break; }
-      restUntil = week + (r.restWeeks ?? 0);
-      continue;
-    }
-
-    // --- 成長（§7.3） ---
-    const gRng = deriveRng(SEED, TRAIN_STREAM.GROWTH, horseIndex * 1000 + week);
-    const next = grow(
-      { menu, ageWeeks: week, growth: horse.growth, temper: horse.temper, condition, current, potential },
-      gRng,
-    );
-    for (const k of ABILITY_KEYS) current[k] = next[k];
-
-    // --- 疲労と調子（§7.4） ---
-    // ★自然回復こみ（D-046）。applyFatigue を直に呼ぶと放置馬が慢性疲労に戻る
-    fatigue = weeklyFatigue(fatigue, fatigueDelta(menu));
-    condition = nextCondition(fatigue, deriveRng(SEED, TRAIN_STREAM.CONDITION, horseIndex * 1000 + week));
-    epSpent += epCost(menu);
+    menuWeeks[r.log.menu] += 1;
+    if (r.log.resting) injuryRestWeeks += 1;
+    if (r.log.injury !== null) injuries += 1;
+    epSpent += r.log.epSpent;
+    state = r.state;
   }
 
+  const { potential, current } = state;
   let sum = 0;
   for (const k of ABILITY_KEYS) sum += potential[k] > 0 ? current[k] / potential[k] : 0;
   let lost = 0;
   for (const k of ABILITY_KEYS) lost += potential0[k] > 0 ? 1 - potential[k] / potential0[k] : 0;
   return {
     unlock: sum / ABILITY_KEYS.length,
-    injuries, careerEnded, epSpent,
-    weeks: week - LIFECYCLE_WEEKS.trainableFrom,
+    injuries, careerEnded: state.careerEnded, epSpent,
+    weeks: state.ageWeeks - LIFECYCLE_WEEKS.trainableFrom,
     menuWeeks, injuryRestWeeks,
     conditionMean: weeksCounted > 0 ? condSum / weeksCounted : 0,
     fatigueMean: weeksCounted > 0 ? fatSum / weeksCounted : 0,

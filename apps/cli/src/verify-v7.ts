@@ -18,11 +18,11 @@
  * 実行: npm run verify:v7 -- --horses 500 --seed 42
  */
 import {
-  ABILITY_KEYS, NICKS_GEN, deriveRng, type AbilityKey, type HorseRecord,
+  NICKS_GEN, deriveRng, type HorseRecord, type Rng,
 } from '@star/sim-engine';
 import {
-  DEFAULT_MENU, applyInjury, epCost, fatigueDelta, grow, injuryProbability,
-  nextCondition, rollSeverity, weeklyFatigue, type MenuId,
+  DEFAULT_MENU, advanceWeek, initialState,
+  type HorseTraits, type MenuId, type TrainingState,
 } from '@star/training';
 import { LIFECYCLE_WEEKS } from '@star/scheduler';
 import { resolveRuntimeConfig } from './config.js';
@@ -37,9 +37,6 @@ const num = (n: string, d: number): number => {
 };
 export const SEED = num('seed', 42);
 export const HORSES = num('horses', 500);
-
-/** ★週進行の乱数の用途ID（既存4表と重ならない61〜の帯） */
-const TRAIN_STREAM = { GROWTH: 61, CONDITION: 62, INJURY: 63 } as const;
 
 /**
  * ★測定のための育成方針。V-14 と同一の3方針にする（別物にすると比較できない）。
@@ -82,57 +79,68 @@ interface CareerInjuries {
  *   false なら**現在値**を使う（重度故障の durability −100 が将来の確率に効く）。
  *   ★どちらかで挙動が変わるので、両方測って報告します。
  */
-function runCareer(horse: HorseRecord, idx: number, policy: Policy, fixDurability = false): CareerInjuries {
-  const potential = { ...horse.potential } as Record<AbilityKey, number>;
-  const current = { ...horse.stats } as Record<AbilityKey, number>;
-  let durability = horse.durability;
+/**
+ * 1頭のキャリアを通す。
+ *
+ * ★**`advanceWeek`（週送りの合成器）を通します**（2026-08-11 の載せ替え）。
+ *   以前はここが自前の週ループで、§7.6 のイベントも §7.2 の気性変化も通っていませんでした。
+ *   **較正した経路と、B-1 が通す経路が別物**だったということです。
+ *   載せ替えの差分は `apps/cli/src/diag-loop.ts` で1条件ずつ測ってあります
+ *   （V-7a / V-7b は4条件すべてで不変・成長のみ +1.9%）。
+ *
+ * 【★`fixDurability` を落としました（照会 Q-P3-20）】
+ *   REVIEW_P3_V7_VERDICT は「キャリア開始時の丈夫さを**測定条件として固定**」としました。
+ *   一方 §7.5 の式 `1000/durability` は、重度故障の −100 が**その後の確率に効く**と読めます。
+ *   合成器は**ゲームの規則（現在値）**を実装しています。
+ *   ★測定のためだけの旗を合成器に足すと、その旗が本体に残ります。
+ *     実測の差は小さい（開始時 640.0 対 期間平均 634.4）ので、
+ *     **現在値で測り、差を報告する**ほうを採りました。裁定を仰ぎます。
+ */
+function runCareer(horse: HorseRecord, idx: number, policy: Policy): CareerInjuries {
+  const traits: HorseTraits = {
+    sex: horse.sex, growth: horse.growth,
+    injuryRateMult: horse.injuryRateMult, birthTemper: horse.temper,
+  };
+  let state: TrainingState = {
+    ...initialState({
+      potential: horse.potential, current: horse.stats,
+      durability: horse.durability, temper: horse.temper,
+    }),
+    ageWeeks: LIFECYCLE_WEEKS.trainableFrom,
+  };
+
   const durability0 = horse.durability;
   let durSum = 0;
   let weeks = 0;
-  let fatigue = 0;
-  let condition = 3;
-  let restUntil = -1;
   let fromTrainable = 0;
   let fromDebut = 0;
   const bySeverity: Record<string, number> = {};
-  let careerEnded = false;
 
-  for (let week = LIFECYCLE_WEEKS.trainableFrom; week < LIFECYCLE_WEEKS.retireAt; week += 1) {
-    durSum += durability;
+  while (state.retirement === null) {
+    const week = state.ageWeeks;
+    durSum += state.durability;
     weeks += 1;
-    const resting = week < restUntil;
-    const menu: MenuId = resting ? 'rest' : chooseMenu(policy, week, fatigue);
-    const p = injuryProbability({
-      menu, fatigue,
-      durability: fixDurability ? durability0 : durability,
-      injuryRateMult: horse.injuryRateMult, ageWeeks: week,
+    const r = advanceWeek({
+      state,
+      traits,
+      menu: chooseMenu(policy, week, state.fatigue),
+      // ★B-1 が通す経路と同じ条件で測る
+      enableEvents: true,
+      rngFor: (stream: number): Rng => deriveRng(SEED, stream, idx * 1000 + week),
     });
-    const injRng = deriveRng(SEED, TRAIN_STREAM.INJURY, idx * 1000 + week);
-    if (injRng.bool(p)) {
+    if (r.log.injury !== null) {
       fromTrainable += 1;
       if (week >= LIFECYCLE_WEEKS.raceableFrom) fromDebut += 1;
-      const sev = rollSeverity(injRng);
+      const sev = r.log.injury.severity;
       bySeverity[sev] = (bySeverity[sev] ?? 0) + 1;
-      const r = applyInjury({ potential, current, durability }, sev, injRng);
-      for (const k of ABILITY_KEYS) { potential[k] = r.potential[k]; current[k] = r.current[k]; }
-      durability = r.durability;
-      if (r.careerEnding) { careerEnded = true; break; }
-      restUntil = week + (r.restWeeks ?? 0);
-      continue;
     }
-    const next = grow(
-      { menu, ageWeeks: week, growth: horse.growth, temper: horse.temper, condition, current, potential },
-      deriveRng(SEED, TRAIN_STREAM.GROWTH, idx * 1000 + week),
-    );
-    for (const k of ABILITY_KEYS) current[k] = next[k];
-    fatigue = weeklyFatigue(fatigue, fatigueDelta(menu));
-    condition = nextCondition(fatigue, deriveRng(SEED, TRAIN_STREAM.CONDITION, idx * 1000 + week));
-    epCost(menu);
+    state = r.state;
   }
+
   const permanent =
     (bySeverity['moderate'] ?? 0) + (bySeverity['severe'] ?? 0) + (bySeverity['career_ending'] ?? 0) > 0;
   return {
-    fromTrainable, fromDebut, bySeverity, careerEnded, permanent,
+    fromTrainable, fromDebut, bySeverity, careerEnded: state.careerEnded, permanent,
     durability0, durabilityMean: weeks > 0 ? durSum / weeks : durability0,
   };
 }
@@ -225,15 +233,14 @@ for (const policy of ['neglect', 'balanced', 'hard_only'] as const) {
 console.log('    V-7a: 恒久ダメージを伴う故障（中度以上）を負うキャリアの割合 20〜40%');
 console.log('    V-7b: 致命的故障（強制引退）3%以下');
 console.log('');
-console.log('  【★丈夫さの扱いによる差（裁定の読みの確認）】');
+console.log('  【★丈夫さの扱い（照会 Q-P3-20）】');
 {
-  const fixedRs = pool.map((h, i) => runCareer(h, i, 'balanced', true));
-  const a1 = rs.map((r) => (r.permanent ? 1 : 0));
-  const a2 = fixedRs.map((r) => (r.permanent ? 1 : 0));
-  console.log(`    式に現在値を使う（重度の −100 が効く）    : V-7a ${pct(a1)}`);
-  console.log(`    ★式にキャリア開始時の値を固定して使う    : V-7a ${pct(a2)}`);
-  console.log(`    → 差 ${((mean(a2) - mean(a1)) * 100).toFixed(2)}pt`);
-  console.log('    ★固定すると、重度故障の durability −100 が将来の故障確率に効かなくなります');
+  // ★「キャリア開始時に固定する」版は**測定できなくなりました**（合成器に載せ替えたため）。
+  //   測定のためだけの旗を合成器に足すと、その旗が本体に残ります。
+  //   ★測れなくなったことを黙って落とさず、ここに書き残します（R-21）。
+  console.log(`    実測（現在値を使う・§7.5 の式どおり）: 開始時の平均 ${mean(rs.map((r) => r.durability0)).toFixed(1)} / 期間平均 ${mean(rs.map((r) => r.durabilityMean)).toFixed(1)}`);
+  console.log(`    → 差 ${(mean(rs.map((r) => r.durability0)) - mean(rs.map((r) => r.durabilityMean))).toFixed(1)}（重度故障の −100 が効いたぶん）`);
+  console.log('    ★「開始時に固定」版は合成器に載せ替えたため測定していません（Q-P3-20 の裁定待ち）');
 }
 console.log('');
 console.log('  【候補④】どの育成方針で測るか（★裁定でバランス型に確定）');
