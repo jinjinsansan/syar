@@ -28,7 +28,7 @@
 import pg from 'pg';
 import { deriveRng, ABILITY_KEYS } from '../packages/sim-engine/src/index.ts';
 import {
-  DEFAULT_MENU, MENUS, TRAIN_STREAM, advanceWeek, initialState,
+  DEFAULT_MENU, MENUS, TEMPER_FLOOR_RATIO, advanceWeek, initialState,
 } from '../packages/training/src/index.ts';
 import { LIFECYCLE_WEEKS } from '../packages/scheduler/src/index.ts';
 import { assertNotProduction } from './lib/guard.mjs';
@@ -117,7 +117,13 @@ if (picked.birth_snapshot === null) {
  */
 const injuryRateMult = 1;
 
-const traits = { sex: h.sex, growth: h.growth, injuryRateMult };
+/**
+ * ★`birthTemper` を必ず渡す（D-049）。
+ *   ここは .mjs で型検査の外なので、渡し忘れると `temperFloor(undefined)` が NaN になり、
+ *   **落ちずに気性が NaN のまま一生を通ります**。数値として読めることをここで確かめます。
+ */
+const birthTemper = num(h.temper, 'birth.temper');
+const traits = { sex: h.sex, growth: h.growth, injuryRateMult, birthTemper };
 const BIRTH_WEEK = 0;
 
 console.log(`# B-1: 1頭を誕生から引退まで通す  seed=${SEED} 方針=${POLICY}`);
@@ -333,6 +339,14 @@ check(f.retired_at_week !== null && f.retirement_role === expectRole,
 check(mismatches.length === 0, '⑧ DB を読み直した値がメモリと一致（往復で落ちていない）',
   mismatches.length ? mismatches.slice(0, 3).join(' / ') : `${rows.length} 週すべて一致`);
 
+// ⑩ ★気性が下限を割らない（D-049）。★是正前はここで 0 まで落ちていた
+const temperEnd = num(f.temper, 'temper');
+const floor = birthTemper * TEMPER_FLOOR_RATIO;
+check(temperEnd >= floor - 1e-6 && Number.isFinite(temperEnd),
+  '⑩ 気性が誕生時×比率の下限を割らない（D-049）',
+  `誕生 ${birthTemper.toFixed(1)} → 引退時 ${temperEnd.toFixed(2)} / 下限 ${floor.toFixed(2)}`,
+  1);
+
 // ⑨ ★EP を払った週とメニューが整合する（イベントで休養に差し替わった週を除く）
 const paid = rows.filter((r) => Number(r.ep_spent) > 0);
 const paidMismatch = paid.filter((r) => Number(r.ep_spent) !== (MENUS[r.menu_chosen]?.epCost ?? -1));
@@ -364,11 +378,11 @@ if (fails.length > 0) {
   console.log(`★B-1: FAIL — ${fails.length} 項目: ${fails.join(' / ')}`);
 } else if (vacuous.length > 0) {
   // ★ここを PASS にしません。「その一生では起きなかった」だけで、検査は通っていません
-  console.log(`★B-1: 条件付き — ${rows.length} 週を記録し、${9 - vacuous.length}/9 項目が成立。`);
+  console.log(`★B-1: 条件付き — ${rows.length} 週を記録し、${10 - vacuous.length}/10 項目が成立。`);
   console.log(`  ★ただし ${vacuous.length} 項目は**対象が 0 件で検査できていません**: ${vacuous.join(' / ')}`);
   console.log(`  → 故障が起きる条件で流し直してください（例: --menu hard_only、別の --seed）`);
 } else {
-  console.log(`★B-1: PASS — ${rows.length} 週すべて記録し、9項目すべてを実データで検査`);
+  console.log(`★B-1: PASS — ${rows.length} 週すべて記録し、10項目すべてを実データで検査`);
 }
 await c.end();
 process.exit(fails.length === 0 && vacuous.length === 0 ? 0 : 1);
