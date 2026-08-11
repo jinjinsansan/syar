@@ -7,7 +7,8 @@
  * |---|---|
  * | ① | **適切な育成が 88%以上**（水準の錨） |
  * | ② | **適切な育成 − 放置 が 12pt 以上**（★これが「デイリー来訪の動機」の本体） |
- * | ③ | **同一 EP 予算下**で追い切り偏重がバランス型を大きく上回らない（D-047） |
+ * | ③ | **同一 EP 予算下**で追い切り偏重がバランス型を大きく上回らない（D-047）
+ * |   | ★**水準の差ではありません。** EP あたり開放率の比で見ます |
  *
  * 【★なぜ旧定義が満たせなかったか】
  *   実質的な自由度は `BASE_GAIN` **1つ**でした。放置は `BASE_GAIN × 0.3` で一意に決まるので、
@@ -224,12 +225,25 @@ const epHard = mean(results.hard_only.map((r) => r.epSpent));
 const perEp = (p: Policy): number => u(p) / mean(results[p].map((r) => r.epSpent));
 /**
  * ★「大きく上回らない」の判定幅（較正定数）。
- *   正典 D-044 は「大きく上回らない」としか書いておらず、**+2pt は私が決めた値**です。
- *   照会に上げます。⚠️ **1行で書くこと**
+ *   正典 D-044 は「大きく上回らない」としか書いておらず、**この値は私が決めたもの**です。
+ *
+ * 【★2026-08-11 の是正】
+ *   ここは長らく **`hardOnly <= balanced + 2pt`（時間軸の差）**で判定していました。
+ *   ★**すぐ上のコメントで「③の定義は同一 EP 予算下の開放率」と書きながら、
+ *     判定はそうなっていませんでした。** 定義と実装が食い違ったまま
+ *   「V-14 ③ FAIL」を何便も報告し、「次の梃子は menuIntensity」と書いていました。
+ *
+ *   **EP を多く注いだほうが強くなるのは設計として正しい**（D-048 の「動機は差」）。
+ *   ③ が問うのは **「同じ EP でどちらが強いか」だけ**です。
+ *
+ *   → 判定を **EP あたり開放率の比**に直します。比 1.0 が「互角」で、
+ *     追い切り偏重がこれを大きく超えたら支配戦略です。
+ *   ⚠️ **1行で書くこと**
  */
 // prettier-ignore
-export const DOMINANCE_MARGIN = 2;
-const g3 = hardOnly <= balanced + DOMINANCE_MARGIN;
+export const DOMINANCE_MARGIN_RATIO = 1.02;
+const epRatio = perEp('hard_only') / perEp('balanced');
+const g3 = epRatio <= DOMINANCE_MARGIN_RATIO;
 const seOf = (p: Policy): number => {
   const a = results[p].map((r) => r.unlock * 100);
   return sd(a) / Math.sqrt(a.length);
@@ -238,12 +252,19 @@ const gapSe = Math.sqrt(seOf('balanced') ** 2 + seOf('neglect') ** 2);
 console.log(`  ★① 適切な育成が 88%以上 : ${balanced.toFixed(1)}%  （余裕 ${(balanced - 88).toFixed(1)}pt = ${((balanced - 88) / seOf('balanced')).toFixed(1)} SE）  ${g1 ? 'PASS' : 'FAIL'}`);
 console.log(`  ★② 差が 12pt 以上       : ${gap.toFixed(1)}pt（${balanced.toFixed(1)} − ${neglect.toFixed(1)}）  （余裕 ${(gap - 12).toFixed(1)}pt = ${((gap - 12) / gapSe).toFixed(1)} SE）  ${g2 ? 'PASS' : 'FAIL'}`);
 console.log(`     （放置 ${neglect.toFixed(1)}% は錨を持たない。★動機は差であって水準ではない・D-048）`);
-console.log(`  ★③ 追い切り偏重が支配的でない: ${hardOnly.toFixed(1)}% vs ${balanced.toFixed(1)}%（時間軸・+${DOMINANCE_MARGIN}pt まで）  ${g3 ? 'PASS' : 'FAIL'}`);
 console.log(
-  `     ★同一EP予算下（D-047）: EP あたり開放率 追い切り ${(perEp('hard_only') * 10000).toFixed(2)} vs ` +
+  `  ★③ 同一EP予算下で追い切り偏重が支配的でない: 比 ${epRatio.toFixed(2)}倍` +
+    `（上限 ${DOMINANCE_MARGIN_RATIO.toFixed(2)}倍）  ${g3 ? 'PASS' : 'FAIL'}`,
+);
+console.log(
+  `     EP あたり開放率: 追い切り ${(perEp('hard_only') * 10000).toFixed(2)} vs ` +
     `バランス ${(perEp('balanced') * 10000).toFixed(2)}（1万EPあたり%）` +
-    `  → 比 ${(perEp('hard_only') / perEp('balanced')).toFixed(2)}倍` +
     `   EP実額 ${Math.round(epHard).toLocaleString()} vs ${Math.round(epBalanced).toLocaleString()}`,
+);
+console.log(
+  `     【参考・判定に使わない】時間軸の水準差: ${hardOnly.toFixed(1)}% vs ${balanced.toFixed(1)}% ` +
+    `= ${(hardOnly - balanced).toFixed(1)}pt` +
+    `  ★EP を多く注いだほうが強くなるのは設計として正しい（D-048）。ここは③の失敗ではない`,
 );
 console.log(`\n★V-14: ${g1 && g2 && g3 ? 'PASS' : 'FAIL'}`);
 

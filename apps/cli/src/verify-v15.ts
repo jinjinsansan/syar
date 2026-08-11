@@ -1,8 +1,14 @@
 /**
  * ★V-15: 気性の集団分散がキャリア中に保たれるか（正典 §13.2・D-049）
  *
- * 正典（レビュー側新設・2026-08-11）:
- *   > **キャリア中盤の集団 SD が誕生時 SD の 50% 以上**
+ * 正典（レビュー側新設・2026-08-11 / 両側化 同日）:
+ *   > ① **キャリア中盤の集団 SD が誕生時 SD の 50% 以上**
+ *   > ② **キャリアを通じた平均低下が 15% 以上**
+ *
+ * 【★なぜ両側なのか】
+ *   ①だけだと、**最大余裕を与える状態が「比率 1.0 ＝ 気性の変化が一度も起きない世界」**でした。
+ *   V-12a（上限のみ → F≒0 ＝ 近交の機構が一度も働かない世界）と同じ型です。
+ *   → **機構を止めるとゲートが最もよく通る**形を、②で塞ぎます。
  *
  * 【★なぜこのゲートが要るのか】
  *   V-2e / V-2f は**誕生時の値**を見ます。だから
@@ -53,14 +59,22 @@ export const V15_MEASUREMENT = {
   midCareerWeek: (LIFECYCLE_WEEKS.trainableFrom + LIFECYCLE_WEEKS.retireAt) / 2,
   /** 推移を見る週（1点だけ見ると見逃す） */
   probeWeeks: [104, 130, 169, 208, 259] as const,
-  /** 合格の下限: 誕生時 SD に対する比 */
-  minRatio: 0.5,
-  /** ★基準の育成方針。V-7 / V-14 と同一（別物にすると比較できない） */
-  policy: 'balanced' as const,
+  /** ①合格の下限: 誕生時 SD に対する比 */
+  minSdRatio: 0.5,
+  /** ★②合格の下限: キャリアを通じた平均低下（機構が働いていることの担保） */
+  minDecline: 0.15,
+  /** 測る方針（★①は最悪、②は代表。§理由は下） */
+  policies: ['neglect', 'balanced', 'hard_only'] as const,
+  /** ②の代表方針。V-7 / V-14 の錨と揃える */
+  representative: 'balanced' as const,
 } as const;
 
-/** ★V-7 / V-14 / B-1 と**同一**のバランス型方針 */
-function chooseMenu(week: number, fatigue: number): MenuId {
+export type Policy = (typeof V15_MEASUREMENT.policies)[number];
+
+/** ★V-7 / V-14 / B-1 と**同一**の3方針（別物にすると比較できない） */
+function chooseMenu(policy: Policy, week: number, fatigue: number): MenuId {
+  if (policy === 'neglect') return DEFAULT_MENU;
+  if (policy === 'hard_only') return fatigue >= 85 ? 'rest' : 'hard';
   if (fatigue >= 70) return 'rest';
   const cycle = week % 4;
   if (cycle === 0) return 'hard';
@@ -69,8 +83,18 @@ function chooseMenu(week: number, fatigue: number): MenuId {
   return DEFAULT_MENU;
 }
 
-/** 1頭を回して、指定の週での気性を記録する。★引退したらそこで止める */
-function temperTrace(horse: HorseRecord, idx: number): Map<number, number> {
+interface TemperTrace {
+  /** 指定の週での気性（引退後は入らない） */
+  readonly at: Map<number, number>;
+  /** ★キャリアを通じた平均の気性（②の分子） */
+  readonly careerMean: number;
+  /** 引退時点の気性 */
+  readonly end: number;
+  readonly birth: number;
+}
+
+/** 1頭を回して気性の推移を記録する。★引退したらそこで止める */
+function temperTrace(horse: HorseRecord, idx: number, policy: Policy): TemperTrace {
   const traits: HorseTraits = {
     sex: horse.sex, growth: horse.growth,
     injuryRateMult: horse.injuryRateMult, birthTemper: horse.temper,
@@ -82,13 +106,18 @@ function temperTrace(horse: HorseRecord, idx: number): Map<number, number> {
     }),
     ageWeeks: LIFECYCLE_WEEKS.trainableFrom,
   };
-  const trace = new Map<number, number>();
+  const at = new Map<number, number>();
   const want = new Set<number>(V15_MEASUREMENT.probeWeeks);
+  let sum = 0;
+  let weeks = 0;
   while (state.retirement === null) {
     const week = state.ageWeeks;
-    if (want.has(week)) trace.set(week, state.temper);
+    if (want.has(week)) at.set(week, state.temper);
+    // ★キャリアを通じた平均（②）。進める前の値を積む
+    sum += state.temper;
+    weeks += 1;
     const r = advanceWeek({
-      state, traits, menu: chooseMenu(week, state.fatigue),
+      state, traits, menu: chooseMenu(policy, week, state.fatigue),
       // ★B-1 が通す経路と同じ条件で測る（イベント有り）。
       //   ここを false にすると「較正した経路と遊びの経路が別物」に逆戻りします
       enableEvents: true,
@@ -96,7 +125,12 @@ function temperTrace(horse: HorseRecord, idx: number): Map<number, number> {
     });
     state = r.state;
   }
-  return trace;
+  return {
+    at,
+    careerMean: weeks > 0 ? sum / weeks : horse.temper,
+    end: state.temper,
+    birth: horse.temper,
+  };
 }
 
 const { balance, founders } = resolveRuntimeConfig();
@@ -130,48 +164,99 @@ const sdv = (a: number[]): number => {
 
 const birth = pool.map((h) => h.temper);
 const sdBirth = sdv(birth);
-const traces = pool.map((h, i) => temperTrace(h, i));
 
-console.log(`# V-15: 気性の集団分散がキャリア中に保たれるか  seed=${SEED} horses=${pool.length}`);
-console.log(`  正典: 「キャリア中盤の集団 SD が誕生時 SD の 50% 以上」`);
-console.log(`  測定条件: 中盤 = ${V15_MEASUREMENT.midCareerWeek}週（78と260の中点） / 方針 = ${V15_MEASUREMENT.policy} / イベント有`);
+/** 方針ごとの実測 */
+const byPolicy = new Map<Policy, TemperTrace[]>(
+  V15_MEASUREMENT.policies.map((p) => [p, pool.map((h, i) => temperTrace(h, i, p))]),
+);
+
+console.log(`# V-15: 気性が育成中に死なないか（両側・D-049）  seed=${SEED} horses=${pool.length}`);
+console.log('  正典: ① キャリア中盤の集団 SD が誕生時 SD の 50% 以上');
+console.log('        ② キャリアを通じた平均低下が 15% 以上');
+console.log(`  ★①は**最悪の方針**で判定します（安全性は「ある遊び方をした人だけ壊れる」を許さない）`);
+console.log(`  ★②は**代表方針（${V15_MEASUREMENT.representative}）**で判定します（理由は下の【★】）`);
 console.log(`  ★較正対象: TEMPER_FLOOR_RATIO = ${TEMPER_FLOOR_RATIO}`);
 console.log('');
 console.log(`  誕生時: 平均 ${mean(birth).toFixed(2)}  SD ${sdBirth.toFixed(3)}  ` +
   `（下限の平均 ${mean(pool.map((h) => temperFloor(h.temper))).toFixed(2)}）`);
 console.log('');
-console.log(`  ${'週'.padStart(5)} ${'頭数'.padStart(6)} ${'平均'.padStart(8)} ${'SD'.padStart(8)} ${'SD比'.padStart(8)}`);
 
-let midRatio = NaN;
-let midAlive = 0;
-for (const w of V15_MEASUREMENT.probeWeeks) {
-  const vals = traces.map((t) => t.get(w)).filter((v): v is number => v !== undefined);
-  if (vals.length === 0) {
-    console.log(`  ${String(w).padStart(5)} ${'0'.padStart(6)}  ★この週に残っている馬がいません`);
-    continue;
-  }
-  const sd = sdv(vals);
-  const ratio = sd / sdBirth;
-  const mark = w === V15_MEASUREMENT.midCareerWeek ? ' ←中盤' : '';
-  console.log(
-    `  ${String(w).padStart(5)} ${String(vals.length).padStart(6)} ` +
-    `${mean(vals).toFixed(2).padStart(8)} ${sd.toFixed(3).padStart(8)} ` +
-    `${(ratio * 100).toFixed(1).padStart(7)}%${mark}`,
-  );
-  if (w === V15_MEASUREMENT.midCareerWeek) { midRatio = ratio; midAlive = vals.length; }
+interface PolicyResult {
+  readonly policy: Policy;
+  readonly sdRatio: number;
+  readonly alive: number;
+  readonly declineCareer: number;
+  readonly declineEnd: number;
+  readonly declineMid: number;
 }
 
-const dropped = pool.length - midAlive;
-console.log('');
-console.log(`  ★中盤(${V15_MEASUREMENT.midCareerWeek}週)より前に引退した馬: ${dropped} 頭（致命的故障・§7.5）`);
-console.log(`     → 中盤の集団は ${midAlive} 頭。★黙って除いていないことの確認`);
+const results: PolicyResult[] = [];
+console.log('  【方針ごとの実測】');
+console.log(
+  `  ${'方針'.padEnd(14)} ${'中盤SD比'.padStart(10)} ${'中盤頭数'.padStart(9)} ` +
+  `${'低下(キャリア平均)'.padStart(18)} ${'低下(中盤)'.padStart(11)} ${'低下(引退時)'.padStart(12)}`,
+);
+for (const policy of V15_MEASUREMENT.policies) {
+  const ts = byPolicy.get(policy)!;
+  const mid = ts.map((t) => t.at.get(V15_MEASUREMENT.midCareerWeek))
+    .filter((v): v is number => v !== undefined);
+  const sdRatio = sdv(mid) / sdBirth;
+  // ★低下率は**1頭ずつ**求めてから平均する（集団平均の比だと大きい馬に引っぱられる）
+  const declineCareer = mean(ts.map((t) => (t.birth > 0 ? 1 - t.careerMean / t.birth : 0)));
+  const declineEnd = mean(ts.map((t) => (t.birth > 0 ? 1 - t.end / t.birth : 0)));
+  const midByHorse = ts
+    .map((t) => { const v = t.at.get(V15_MEASUREMENT.midCareerWeek); return v === undefined || t.birth <= 0 ? null : 1 - v / t.birth; })
+    .filter((v): v is number => v !== null);
+  const declineMid = mean(midByHorse);
+  results.push({ policy, sdRatio, alive: mid.length, declineCareer, declineEnd, declineMid });
+  console.log(
+    `  ${policy.padEnd(14)} ${`${(sdRatio * 100).toFixed(1)}%`.padStart(10)} ${String(mid.length).padStart(9)} ` +
+    `${`${(declineCareer * 100).toFixed(1)}%`.padStart(18)} ${`${(declineMid * 100).toFixed(1)}%`.padStart(11)} ` +
+    `${`${(declineEnd * 100).toFixed(1)}%`.padStart(12)}`,
+  );
+}
+console.log(`  ★中盤より前に引退した馬は除外しています（致命的故障・§7.5）。頭数は上の列のとおり`);
 console.log('');
 
-const pass = midRatio >= V15_MEASUREMENT.minRatio;
+// ── ① 最悪の方針で判定 ──────────────────────────────────
+const worst1 = results.reduce((a, b) => (b.sdRatio < a.sdRatio ? b : a));
+const g1 = worst1.sdRatio >= V15_MEASUREMENT.minSdRatio;
 console.log(
-  pass
-    ? `★V-15: PASS — 中盤の SD は誕生時の ${(midRatio * 100).toFixed(1)}%（下限 ${V15_MEASUREMENT.minRatio * 100}%）`
-    : `★V-15: FAIL — 中盤の SD は誕生時の ${(midRatio * 100).toFixed(1)}%（下限 ${V15_MEASUREMENT.minRatio * 100}%に届かない）`,
+  `  ★① 中盤の集団SD ≥ 誕生時の ${V15_MEASUREMENT.minSdRatio * 100}%  ` +
+  `最悪の方針 ${worst1.policy}: ${(worst1.sdRatio * 100).toFixed(1)}%  ${g1 ? 'PASS' : 'FAIL'}`,
 );
-console.log(`  ★TEMPER_FLOOR_RATIO = ${TEMPER_FLOOR_RATIO} での実測です。比率を変えて流し直して較正してください`);
+
+// ── ② 代表方針で判定 + 最悪も出す ───────────────────────
+const rep = results.find((r) => r.policy === V15_MEASUREMENT.representative)!;
+const worst2 = results.reduce((a, b) => (b.declineCareer < a.declineCareer ? b : a));
+const g2 = rep.declineCareer >= V15_MEASUREMENT.minDecline;
+console.log(
+  `  ★② キャリアを通じた平均低下 ≥ ${V15_MEASUREMENT.minDecline * 100}%  ` +
+  `代表方針 ${rep.policy}: ${(rep.declineCareer * 100).toFixed(1)}%  ${g2 ? 'PASS' : 'FAIL'}`,
+);
+// ★最悪方針で読んだ場合の判定も出す。どちらの読みでも結論が変わらないなら、
+//   照会の答えを待たずに進めます（変わるなら止めます）
+const g2worst = worst2.declineCareer >= V15_MEASUREMENT.minDecline;
+console.log(
+  `     ★最悪の方針 ${worst2.policy} で読んだ場合: ${(worst2.declineCareer * 100).toFixed(1)}%  ${g2worst ? 'PASS' : 'FAIL'}` +
+  `  → 読みの違いで結論は${g2 === g2worst ? '**変わりません**' : '★変わります（裁定が要る）'}`,
+);
+console.log(
+  `  【要約】① 最悪 ${(worst1.sdRatio * 100).toFixed(1)}% / ② 代表 ${(rep.declineCareer * 100).toFixed(1)}% ` +
+  `最悪 ${(worst2.declineCareer * 100).toFixed(1)}%  ratio=${TEMPER_FLOOR_RATIO}`,
+);
+
+console.log('');
+console.log('  【★①と②は「最悪の方針」が逆向きです（照会 Q-P3-28）】');
+console.log(`    ① が最も厳しいのは**休養の多い方針**（${worst1.policy}）— 下限に速く収束するほど SD が縮む`);
+console.log(`    ② が最も厳しいのは**休養の少ない方針**（${worst2.policy}）— そもそも temperDelta を引かない`);
+console.log('    ★放置（軽め調整のみ）は §7.2 の temperDelta が 0 のメニューしか使わないので、');
+console.log('      気性は故障休養の週しか動きません。**機構が壊れているのではなく、プレイヤーが使っていない**状態です。');
+console.log('      → ②を最悪方針で測ると「使わなかった人がいるから機構が死んでいる」と判定してしまいます。');
+console.log(`      ここでは②を代表方針（${V15_MEASUREMENT.representative}）で判定しました。裁定を仰ぎます。`);
+
+console.log('');
+const pass = g1 && g2;
+console.log(pass ? '★V-15: PASS' : '★V-15: FAIL');
+console.log(`  ★TEMPER_FLOOR_RATIO = ${TEMPER_FLOOR_RATIO} での実測です`);
 process.exit(pass ? 0 : 1);

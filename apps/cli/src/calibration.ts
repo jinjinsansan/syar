@@ -96,10 +96,10 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: 'V-10 / §11（控除率。PP 発行量の最大の調整弁。0 にすると胴元の取り分が消える）',
   },
   {
-    key: 'DOMINANCE_MARGIN',
+    key: 'DOMINANCE_MARGIN_RATIO',
     file: 'apps/cli/src/verify-v14.ts',
-    perturbed: 'export const DOMINANCE_MARGIN = 100;',
-    affects: '★V-14 の3つ目「追い切り偏重が支配戦略でない」の判定幅。正典 D-044 は「大きく上回らない」としか書いておらず、+2pt は**私が決めた値**。100 にすると、追い切りが何 pt 上回っても PASS になり、ゲートが意味を失う（照会中）',
+    perturbed: 'export const DOMINANCE_MARGIN_RATIO = 100;',
+    affects: '★V-14 の3つ目「同一 EP 予算下で追い切り偏重が支配的でない」の判定幅（D-047）。正典 D-044 は「大きく上回らない」としか書いておらず、1.02倍は**私が決めた値**。100 にすると EP あたり効率が何倍でも PASS になり、ゲートが意味を失う（照会中）。★2026-08-11 まで、この定数は「時間軸の水準差 +2pt」を判定していた — すぐ上のコメントが「③の定義は同一EP予算下」と書いているのに、実装がそうなっていなかった',
   },
   {
     key: 'TEMPER_FLOOR_RATIO',
