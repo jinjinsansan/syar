@@ -26,7 +26,7 @@
  *     この頭数を `stats()` で出します（黙って仮定値に落ちるのを防ぐため）。
  */
 
-import { deriveRng, type HorseRecord, type Rng } from '@star/sim-engine';
+import { deriveRng, type AbilityKey, type HorseRecord, type Rng } from '@star/sim-engine';
 import {
   DEFAULT_MENU, advanceWeek, initialState,
   type HorseTraits, type MenuId, type TrainingState,
@@ -58,6 +58,12 @@ function chooseMenu(week: number, fatigue: number): MenuId {
 export interface ConditionFatigue {
   readonly condition: number;
   readonly fatigue: number;
+  /**
+   * ★その時点の**現在能力**（Q-P3-29 の是正で使う）。
+   *   `PLACEHOLDER_UNLOCK`（0.55〜0.85 の再抽選）を廃し、
+   *   **週ループが実際に育てた値**を使うためのものです。
+   */
+  readonly stats: Readonly<Record<AbilityKey, number>>;
 }
 
 export interface TrainingStateSampler {
@@ -67,6 +73,9 @@ export interface TrainingStateSampler {
   readonly advance: () => void;
   /** 実測の要約。★黙って仮定値に落ちていないことの確認に使う */
   readonly stats: () => {
+    /** ★開放率（現在能力 ÷ 素質）の平均と SD。PLACEHOLDER_UNLOCK と比べるため */
+    readonly meanUnlock: number;
+    readonly sdUnlock: number;
     /** ★同じ時点にいる馬どうしの散らばり。0 に近いとレース内の分散源にならない */
     readonly withinRaceSdFatigue: number;
     readonly withinRaceSdCondition: number;
@@ -131,7 +140,12 @@ export function buildTrainingStateSampler(
       const week = state.ageWeeks;
       // ★出走しうる週だけを標本にする（調教期間の値は出走に使われない）
       if (week >= B6_SAMPLING.fromWeek) {
-        list.push({ condition: state.condition, fatigue: state.fatigue });
+        list.push({
+          condition: state.condition,
+          fatigue: state.fatigue,
+          // ★参照ではなく写しを持つ（state は次の週で作り替わるが、念のため）
+          stats: { ...state.current },
+        });
       }
       const r = advanceWeek({
         state, traits, menu: chooseMenu(week, state.fatigue),
@@ -168,7 +182,23 @@ export function buildTrainingStateSampler(
       const atCursor = lists
         .filter((l) => l.length > 0)
         .map((l, i) => l[((SYNCHRONIZED ? 0 : (i * 37) % 149)) % l.length]!);
+      // ★開放率（現在能力 ÷ 素質）。PLACEHOLDER_UNLOCK と比べるために出す
+      const unlocks = [];
+      for (let i = 0; i < pool.length; i += 1) {
+        const l = samples.get(pool[i]!.id);
+        if (l === undefined || l.length === 0) continue;
+        const st = l[Math.floor(l.length / 2)]!;
+        const pot = pool[i]!.potential;
+        let acc = 0;
+        let n2 = 0;
+        for (const k of Object.keys(st.stats) as AbilityKey[]) {
+          if (pot[k] > 0) { acc += st.stats[k]! / pot[k]; n2 += 1; }
+        }
+        if (n2 > 0) unlocks.push(acc / n2);
+      }
       return {
+        meanUnlock: mean(unlocks),
+        sdUnlock: sd(unlocks),
         withinRaceSdFatigue: sd(atCursor.map((x) => x.fatigue)),
         withinRaceSdCondition: sd(atCursor.map((x) => x.condition)),
         horses: lists.length,

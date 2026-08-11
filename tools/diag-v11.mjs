@@ -219,7 +219,21 @@ console.log('');
 //   V-15①（下限のみ → 比率1.0 が最大余裕）と**同じ型**です。
 //   ★純発行量は「発行も交換も 0」のとき**必ず 0** になり、V-11 は自動的に通ります。
 // ───────────────────────────────────────────────────────────
-console.log('## ⑦ ★V-11 が「機構が止まっているから通る」状態になっていないか');
+/**
+ * ★V-11 は**両側**になりました（レビュー側裁定・2026-08-11）:
+ *   ① 純発行量/日が ゼロ近傍〜微減
+ *   ② **発行量と消費量がともに実質ゼロでない**
+ *
+ *   ①だけだと「経済が存在しない」が最も安易に満たす方法でした
+ *   （V-12a の F≒0 / V-15① の比率1.0 と同じ型で、通算3件目）。
+ *
+ * 【★測定条件（裁定）】
+ *   較正は**合成集団**（合成ベッターを回した実測）、監視は**実集団**（実プレイヤー）。
+ *   ★ここは監視側なので、実集団を見ます。合成ベッターの口座は
+ *     `account_type='internal'` で別掲されるので、②の判定からは**除きます**。
+ *     ★除かないと「合成ベッターが動いているから経済は生きている」と読めてしまいます。
+ */
+console.log('## ⑦ ★V-11 の② — 発行量と消費量がともに実質ゼロでないか');
 const live = await c.query(
   `select
      (select count(*) from users)::int as users,
@@ -230,6 +244,25 @@ const live = await c.query(
 );
 const L = live.rows[0];
 console.log(`  利用者 ${L.users} 人 / 馬券 ${L.bets} 枚 / PP 台帳 ${L.pp_rows} 行 / 確定済みレース ${L.settled} / プレイヤー所有馬 ${L.player_horses} 頭`);
+// ★②の実測: 実集団（internal を除く）の発行量と消費量
+const real = (await c.query(
+  `select
+     coalesce(sum(l.delta) filter (where l.delta > 0), 0)::text as issued,
+     coalesce(-sum(l.delta) filter (where l.delta < 0), 0)::text as consumed,
+     count(*)::int as rows
+   from pp_ledger l
+   join users u on u.id = l.user_id
+   where coalesce(u.account_type, 'player') = 'player'`,
+)).rows[0];
+const issuedReal = n(real.issued);
+const consumedReal = n(real.consumed);
+console.log(`  実集団（internal を除く）: 発行 ${jp(issuedReal)} PP / 消費 ${jp(consumedReal)} PP / ${real.rows} 行`);
+console.log('  ★合成ベッターの口座（internal）は②の判定から除きます。');
+console.log('    除かないと「合成が動いているから経済は生きている」と読めてしまいます。');
+const g2 = issuedReal > 0 && consumedReal > 0;
+console.log(`  ${g2 ? '✓' : '★'} ② 発行量と消費量がともに実質ゼロでない  ${g2 ? '成立' : '★成立しない'}`);
+console.log('');
+
 if (L.pp_rows === 0) {
   console.log('');
   console.log('  ★**経済が動いていません。** PP が1点も発行されていないので、');
@@ -243,10 +276,13 @@ if (L.pp_rows === 0) {
     console.log('    原因: **利用者が 0 人**です。馬券が買われないので payout も発行されません。');
   }
   console.log('');
-  console.log('  → **V-11 には「機構が動いていること」の条件が要ります。**');
-  console.log('    V-15 に②（低下 15%以上）を足したのと同じ形です。');
+  console.log('  → ★V-11 の②が成立しません。①（純発行量ゼロ近傍）は自動的に通りますが、');
+  console.log('    それは「健全な経済」ではなく「経済が存在しない」ことの表れです。');
+} else if (!g2) {
+  console.log('  ★PP は動いていますが、**実集団では**発行か消費のどちらかが 0 です。');
+  console.log('    → ②が成立しません（合成ベッターだけが動いている状態です）。');
 } else {
-  console.log('  ★PP が動いています。V-11 は実測で判定できます');
+  console.log('  ★PP が実集団で発行も消費もされています。V-11 は①②とも実測で判定できます');
 }
 console.log('');
 

@@ -87,6 +87,11 @@ const POPULARITY_TRIALS = parseNumber('--popularity-trials', MC.POPULARITY_TRIAL
  *     「いつの間にか別の世界で測っていた」が起きません。
  */
 const B6_WIRED = process.argv.includes('--b6-wired');
+/**
+ * ★Q-P3-29: `PLACEHOLDER_UNLOCK`（0.55〜0.85 の再抽選）を使わず、
+ *   **週ループが育てた現在能力**を使うか。★既定は false。
+ */
+const REAL_ABILITY = process.argv.includes('--real-ability');
 const POOL_GENERATIONS = parseNumber('--pool-generations', MC.POOL_GENERATIONS);
 const POOL_MARES = parseNumber('--pool-mares', MC.POOL_MARES);
 /** クラス幅（母集団に対する割合）。1.0 でクラス分けなし */
@@ -213,11 +218,15 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
    *   `--b6-wired` を付けたときだけ切り替わります。
    *   ★既定で切り替えません。ゲートの値が動く変更を、旗なしで既定にしません。
    */
-  const sampler = B6_WIRED ? buildTrainingStateSampler(pool, seed) : null;
+  const sampler = (B6_WIRED || REAL_ABILITY) ? buildTrainingStateSampler(pool, seed) : null;
 
   for (let raceIndex = 0; raceIndex < racesForSeed; raceIndex++) {
-    const race = generateRace(pool, raceIndex, fieldRng, CLASS_BAND, UNLOCK, FLOOR,
-      sampler === null ? {} : { trainingStateOf: sampler.stateOf });
+    const race = generateRace(pool, raceIndex, fieldRng, CLASS_BAND, UNLOCK, FLOOR, {
+      // ★2つの旗を独立に効かせる（1回の変更で3点測るため）
+      ...(B6_WIRED && sampler !== null ? { trainingStateOf: sampler.stateOf } : {}),
+      ...(REAL_ABILITY && sampler !== null
+        ? { abilityOf: (h) => sampler.stateOf(h)?.stats } : {}),
+    });
     sampler?.advance();
     const fieldSize = race.entrants.length;
 

@@ -50,6 +50,12 @@ export const NEUTRAL_CONDITION_APTITUDE = 50;
 export const TRACK_CONDITION_CDF = { good: 0.75, yielding: 0.9, soft: 0.97 } as const; // 残り3%が不良
 
 export interface EntrantOverrides {
+  /**
+   * ★現在能力そのもの（Q-P3-29 の是正）。渡すと `potential × 開放率` を使いません。
+   *   `PLACEHOLDER_UNLOCK`（0.55〜0.85）は**育成ループが無かった時代の仮定**で、
+   *   実データ（週ループが育てた値）は狭くて高い水準です。
+   */
+  stats?: Record<AbilityKey, number>;
   strategy?: Strategy;
   condition?: number;
   fatigue?: number;
@@ -70,9 +76,17 @@ export function toEntrant(
   overrides: EntrantOverrides = {},
   unlockRange: { MIN: number; MAX: number } = PLACEHOLDER_UNLOCK,
 ): RaceEntrant {
+  /**
+   * ★開放率は**引いてから捨てます**（Q-P3-29）。
+   *   `rng.range` を飛ばすと乱数の並びがずれ、脚質も枠順も出走馬も変わります。
+   *   実データを渡さない経路（P1 のゲート）を1ビットも動かさないため、
+   *   **必ず引いてから、渡されていれば上書き**します。
+   */
   const unlock = rng.range(unlockRange.MIN, unlockRange.MAX);
   const stats = {} as Record<AbilityKey, number>;
-  for (const key of ABILITY_KEYS) stats[key] = horse.potential[key] * unlock;
+  for (const key of ABILITY_KEYS) {
+    stats[key] = overrides.stats?.[key] ?? horse.potential[key] * unlock;
+  }
 
   // 脚質は素質（strategyAptitude）が最も高いものを既定にする。
   // 「適性のない脚質を選ぶと露骨に弱くなる」（§8.4）ので、放置馬が理不尽に弱くならないようにする。
@@ -301,6 +315,11 @@ export interface GenerateRaceOptions {
    *      番組表は馬場状態を決めません。
    */
   readonly programme?: { readonly surface: 'turf' | 'dirt'; readonly distance: number };
+  /**
+   * ★その馬の**現在能力**（Q-P3-29 の是正）。`undefined` を返した馬は
+   *   従来どおり `potential × PLACEHOLDER_UNLOCK` を使います。
+   */
+  readonly abilityOf?: (horse: HorseRecord) => Record<AbilityKey, number> | undefined;
 }
 
 export function generateRace(
@@ -415,10 +434,12 @@ export function generateRace(
      *   ★既定で実データに化けさせません。**呼ぶ側が渡したときだけ**切り替わります。
      */
     const trained = opts.trainingStateOf?.(horse);
+    const ability = opts.abilityOf?.(horse);
     return toEntrant(
       horse,
       rng,
       {
+        ...(ability === undefined ? {} : { stats: ability }),
         condition: trained?.condition ?? rng.int(2, 4),
         fatigue: trained?.fatigue ?? 0,
         age: rng.int(3, 5),
