@@ -8,12 +8,20 @@ import pg from 'pg';
 import { createPgStore } from '../apps/worker/src/pg-store.ts';
 
 import { assertNotProduction } from './lib/guard.mjs';
-import { loadEnv } from './lib/env.mjs';
+import { loadEnv, requireRow } from './lib/env.mjs';
 const env = loadEnv();
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 await c.connect();
 // ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
 await assertNotProduction(c, 'verify-economy.mjs');
+
+
+// ★前提の確認は**状態を作る前**に行う（2026-08-11）。
+//   後ろに置くと、落ちたときに検証用の利用者が残ります。実際 staging に3件残っていました。
+requireRow(
+  (await c.query(`select id from races where status='scheduled' limit 1`)).rows[0],
+  '発売中のレース', 'ワーカーを回すか、レースを生成してから流してください',
+);
 
 const hash = {
   sha256:(m)=>createHash('sha256').update(m,'utf8').digest('hex'),
@@ -29,10 +37,13 @@ const clean = async () => {
 };
 await clean();
 await c.query(`insert into auth.users (id,instance_id,aud,role,email,encrypted_password,created_at,updated_at) values ($1,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','eco@test.local','x',now(),now()) on conflict (id) do nothing`,[uid]);
-await c.query(`insert into users (id,display_name,stable_name,entry_points) values ($1,'経済テスト','テスト牧場',100000)`,[uid]);
+await c.query(`insert into users (id,display_name,stable_name,entry_points,account_type) values ($1,'経済テスト','テスト牧場',100000,'internal')`,[uid]);
 
 // 発売中のレースを1つ選び、人気1位の単勝を買う
-const race = (await c.query(`select r.id, r.cycle_index from races r where r.status='scheduled' order by r.cycle_index limit 1`)).rows[0];
+const race = requireRow(
+  (await c.query(`select r.id, r.cycle_index from races r where r.status='scheduled' order by r.cycle_index limit 1`)).rows[0],
+  '発売中のレース', 'ワーカーを回すか、レースを生成してから流してください',
+);
 // ★全馬の単勝を買う。**必ず1点は当たる**ので、払戻の経路を確実に通す。
 //   1点だけ買って外れると「払戻が壊れていても PASS に見える」。
 const all = (await c.query(`select selection, odds from race_odds where race_id=$1 and bet_type='win' order by odds`,[race.id])).rows;

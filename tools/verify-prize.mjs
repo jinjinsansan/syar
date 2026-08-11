@@ -8,12 +8,20 @@ import pg from 'pg';
 import { createPgStore } from '../apps/worker/src/pg-store.ts';
 
 import { assertNotProduction } from './lib/guard.mjs';
-import { loadEnv } from './lib/env.mjs';
+import { loadEnv, requireRow } from './lib/env.mjs';
 const env = loadEnv();
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 await c.connect();
 // ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
 await assertNotProduction(c, 'verify-prize.mjs');
+
+
+// ★前提の確認は**状態を作る前**に行う（2026-08-11）。
+//   後ろに置くと、落ちたときに検証用の利用者が残ります。実際 staging に3件残っていました。
+requireRow(
+  (await c.query(`select id from races where status='scheduled' limit 1`)).rows[0],
+  '発売中のレース', 'ワーカーを回すか、レースを生成してから流してください',
+);
 
 const hash = { sha256:(m)=>createHash('sha256').update(m,'utf8').digest('hex'), hmacSha256:(k,m)=>createHmac('sha256',k).update(m,'utf8').digest('hex') };
 
@@ -25,10 +33,13 @@ const clean = async () => {
 };
 await clean();
 await c.query(`insert into auth.users (id,instance_id,aud,role,email,encrypted_password,created_at,updated_at) values ($1,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','prize@test.local','x',now(),now()) on conflict (id) do nothing`,[uid]);
-await c.query(`insert into users (id,display_name,stable_name,entry_points,prize_points) values ($1,'賞金テスト','テスト牧場',0,0)`,[uid]);
+await c.query(`insert into users (id,display_name,stable_name,entry_points,prize_points,account_type) values ($1,'賞金テスト','テスト牧場',0,0,'internal')`,[uid]);
 
 // 発売中レースの出走馬を1頭「プレイヤーの馬」にする
-const race = (await c.query(`select id, cycle_index, class_rank, grade, purse from races where status='scheduled' order by cycle_index limit 1`)).rows[0];
+const race = requireRow(
+  (await c.query(`select id, cycle_index, class_rank, grade, purse from races where status='scheduled' order by cycle_index limit 1`)).rows[0],
+  '発売中のレース', 'ワーカーを回すか、レースを生成してから流してください',
+);
 const ent = (await c.query(`select horse_id, gate from race_entries where race_id=$1 order by gate limit 1`,[race.id])).rows[0];
 await c.query(`update horses set owner_id=$1, npc_stable_id=null where id=$2`,[uid, ent.horse_id]);
 console.log(`レース cycle=${race.cycle_index} class=${race.class_rank}${race.grade?'/'+race.grade:''} purse=${race.purse}`);

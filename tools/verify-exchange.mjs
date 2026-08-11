@@ -40,7 +40,11 @@ const call = async (token, prize=pid) => {
 console.log(`初期: PP=${await pp()} 在庫=${await stock()}`);
 const tok = randomUUID();
 const a = await call(tok);
-console.log(`① 交換: ${a.ok?'成功 id='+a.id:'失敗 '+a.msg}  PP=${await pp()} 在庫=${await stock()}`);
+// ★交換 id（bigserial）は出しません。流すたびに増えるので、
+//   **2回流して出力が一致するか**という点検が、中身と無関係な理由で毎回落ちます。
+//   ★隠しているのではなく、id はこのツールが検証している対象ではありません
+//   （見ているのは PP の減少・在庫の減少・二重交換の拒否）。id の有無だけ出します。
+console.log(`① 交換: ${a.ok ? `成功（id 発行あり: ${a.id !== undefined && a.id !== null}）` : `失敗 ${a.msg}`}  PP=${await pp()} 在庫=${await stock()}`);
 const b = await call(tok);
 console.log(`② 再送（同じ冪等キー）: ${b.ok?'同じID='+String(b.id===a.id):'失敗'}  PP=${await pp()} 在庫=${await stock()}`);
 const cRes = await call(randomUUID());

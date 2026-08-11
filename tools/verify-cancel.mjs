@@ -8,12 +8,20 @@ import pg from 'pg';
 import { cancelRace } from '../apps/worker/src/cancel.ts';
 
 import { assertNotProduction } from './lib/guard.mjs';
-import { loadEnv } from './lib/env.mjs';
+import { loadEnv, requireRow } from './lib/env.mjs';
 const env = loadEnv();
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 await c.connect();
 // ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
 await assertNotProduction(c, 'verify-cancel.mjs');
+
+
+// ★前提の確認は**状態を作る前**に行う（2026-08-11）。
+//   後ろに置くと、落ちたときに検証用の利用者が残ります。実際 staging に3件残っていました。
+requireRow(
+  (await c.query(`select id from races where status='scheduled' limit 1`)).rows[0],
+  '発売中のレース', 'ワーカーを回すか、レースを生成してから流してください',
+);
 
 const uid = '00000000-0000-4000-8000-0000000ca4ce';
 const clean = async () => {
@@ -23,10 +31,13 @@ const clean = async () => {
 };
 await clean();
 await c.query(`insert into auth.users (id,instance_id,aud,role,email,encrypted_password,created_at,updated_at) values ($1,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','cancel@test.local','x',now(),now()) on conflict (id) do nothing`,[uid]);
-await c.query(`insert into users (id,display_name,stable_name,entry_points) values ($1,'中止テスト','テスト牧場',100000)`,[uid]);
+await c.query(`insert into users (id,display_name,stable_name,entry_points,account_type) values ($1,'中止テスト','テスト牧場',100000,'internal')`,[uid]);
 
 // 発売中のレースに馬券を買う
-const race = (await c.query(`select id, cycle_index from races where status='scheduled' order by cycle_index desc limit 1`)).rows[0];
+const race = requireRow(
+  (await c.query(`select id, cycle_index from races where status='scheduled' order by cycle_index desc limit 1`)).rows[0],
+  '発売中のレース', 'ワーカーを回すか、レースを生成してから流してください',
+);
 const odds = (await c.query(`select selection from race_odds where race_id=$1 and bet_type='win' limit 3`,[race.id])).rows;
 const ep = async () => Number((await c.query('select entry_points from users where id=$1',[uid])).rows[0].entry_points);
 

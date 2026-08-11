@@ -58,3 +58,25 @@ export function positionals(argv = process.argv) {
   }
   return out;
 }
+
+/**
+ * ★前提が揃っているかを、**状態を作る前に**確かめる（2026-08-11）。
+ *
+ * 【なぜ要るか】
+ *   `verify-prize` / `verify-cancel` / `verify-economy` は
+ *   **利用者を作ってから**「発売中のレース」を探しており、
+ *   staging にレースが無いと `race.id` で TypeError になって落ちていました。
+ *   ★後片付けに到達しないので、**利用者の行が残ります**。
+ *   実際 staging に3件残っており、しかも `account_type='player'` だったので
+ *   §11.2 の実経済の指標に検証用の口座が混ざる状態でした。
+ *
+ *   → **状態を作る前に**前提を確かめ、揃っていなければ**何も作らずに**終わります。
+ */
+export function requireRow(row, what, hint) {
+  if (row === undefined || row === null) {
+    console.error(`★${what}が見つかりません。${hint}`);
+    console.error('  ★このツールは前提が揃うまで**何も作らずに**終了します（後片付け漏れを作らないため）');
+    process.exit(2);
+  }
+  return row;
+}

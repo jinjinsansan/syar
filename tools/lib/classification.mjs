@@ -47,6 +47,8 @@ export const READONLY = [
  *   メタテストが、ここに載っているのに呼んでいないファイルを落とします。
  */
 export const STATE_CHANGING = [
+  // ★中で状態を変えるツールを流すので、これ自体も状態を変える
+  'audit-tools.mjs',
   'fix-purse.mjs',
   'seed-stables.mjs',
   'seed-world.mjs',
