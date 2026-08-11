@@ -79,13 +79,59 @@ const rev = (await c.query(`select seed_reveal, seed_commit, status from races w
 console.log('');
 console.log(`★§8.6 検証: sha256(seed_reveal)==seed_commit → ${hash.sha256(rev.seed_reveal)===rev.seed_commit?'PASS':'FAIL'}  status=${rev.status}`);
 
+/**
+ * ★判定を**戻り値で返す**（2026-08-11）。これまでは PASS / FAIL を表示するだけで
+ *   どちらでも `exit 0` でした。自動化からは FAIL が成功に見えます。
+ *
+ * ★併せて、**経済の恒等式**を検査に足します。これまでは残高を表示するだけで、
+ *   「EP を焼いた額」と「PP が出た額」が突き合わされていませんでした。
+ */
+const fails = [];
+const check = (cond, label, detail) => {
+  console.log(`  ${cond ? '✓' : '★'} ${label}${detail ? `  ${detail}` : ''}`);
+  if (!cond) fails.push(label);
+};
+
+const staked = all.length * 100;
+const epNow = await bal('entry_points');
+const ppNow = await bal('prize_points');
+const won = bs.find((x) => x.status === 'won');
+const paidPp = Number(won?.paid ?? 0);
+const epLed = (await c.query(
+  `select reason, coalesce(sum(delta),0)::bigint t from ep_ledger where user_id=$1 group by 1`,[uid])).rows;
+const ppLed = (await c.query(
+  `select reason, coalesce(sum(delta),0)::bigint t, count(*)::int n from pp_ledger where user_id=$1 group by 1`,[uid])).rows;
+
+console.log('');
+console.log('【判定】');
+check(epNow === 100000 - staked, '① EP は購入額だけ減る（払戻で EP は戻らない）',
+  `${epNow.toLocaleString()} = 100,000 − ${staked.toLocaleString()}`);
+check(Number(epLed.find((r) => r.reason === 'bet')?.t ?? 0) === -staked,
+  '② EP 台帳の bet が購入額と一致', `${epLed.map(r=>r.reason+' '+r.t).join(', ')}`);
+check(won !== undefined && Number(won.n) === 1, '③ 全通り買ったので的中は必ず1枚',
+  `${bs.map(x=>x.status+' '+x.n+'枚').join(' / ')}`);
+check(ppNow === paidPp && paidPp > 0, '④ PP は払戻額と一致（★EP を焼いて PP が出る一方通行）',
+  `PP=${ppNow.toLocaleString()} / 払戻=${paidPp.toLocaleString()}`);
+const ppPayout = ppLed.find((r) => r.reason === 'payout');
+check(ppPayout !== undefined && Number(ppPayout.t) === paidPp && Number(ppPayout.n) === 1,
+  '⑤ PP 台帳に payout が1行だけ', `${ppLed.map(r=>r.reason+' '+r.t+'('+r.n+'行)').join(', ') || 'なし'}`);
+check(Number(epLed.find((r) => r.reason === 'payout')?.t ?? 0) === 0,
+  '⑥ EP 台帳に払戻の行が無い（PP→EP の還流が無い・憲法②）');
+check(hash.sha256(rev.seed_reveal) === rev.seed_commit && rev.status === 'settled',
+  '⑦ §8.6 sha256(seed_reveal) == seed_commit', `status=${rev.status}`);
+
 // ★二重確定してみる（PP が増えないこと）
 const before = await bal('prize_points');
 await store.settleRace(race.cycle_index);
 const after = await bal('prize_points');
-console.log(`★二重確定: PP ${before} → ${after}  ${before===after?'PASS（増えない）':'FAIL（増えた）'}`);
+const ppRows = (await c.query(`select count(*)::int n from pp_ledger where user_id=$1`,[uid])).rows[0].n;
+check(before === after && ppRows === Number(ppPayout?.n ?? 0),
+  '⑧ 二重確定で PP が増えない', `PP ${before.toLocaleString()} → ${after.toLocaleString()} / 台帳 ${ppRows} 行`);
 
-const led = await c.query(`select reason, delta from pp_ledger where user_id=$1`,[uid]);
-console.log(`★PP台帳: ${led.rows.map(r=>r.reason+' '+r.delta).join(', ')||'（なし）'}`);
 await clean();
 await c.end();
+console.log('');
+console.log(fails.length === 0
+  ? `★経済の一巡: PASS — 8項目すべて成立（${staked.toLocaleString()} EP を焼き ${paidPp.toLocaleString()} PP が出た）`
+  : `★経済の一巡: FAIL — ${fails.length} 項目: ${fails.join(' / ')}`);
+process.exit(fails.length === 0 ? 0 : 1);

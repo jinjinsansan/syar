@@ -46,6 +46,17 @@ const arg = (n, d) => {
 };
 const RACES = Number(arg('races', '4'));
 const TRIALS = Number(arg('trials', String(ODDS_MC_TRIALS)));
+/**
+ * ★何サイクル先から作るか。
+ *
+ * 【なぜ要るか】
+ *   既定の 2 で作ったら、**検証している間にレースが発走時刻を過ぎました**。
+ *   1本の生成に 236〜976秒（頭数で4倍以上ばらつく）かかるのに、
+ *   サイクルは10分間隔です。**生成のほうがサイクルより遅い**ので、
+ *   2つ先に作ると出来上がった時にはもう買えません。
+ *   → 先のサイクルに作れば、その分だけ発売期間が伸びます。
+ */
+const AHEAD = Number(arg('ahead', '2'));
 if (!Number.isFinite(RACES) || RACES < 1) throw new Error('--races は1以上の数です');
 
 const env = loadEnv();
@@ -81,13 +92,13 @@ const states = await loadTrainingStates(c);
 
 console.log(`# staging に発売中のレースを作る`);
 console.log(`  母集団 ${pool.length} 頭 / 育成状態のある馬 ${states.size} 頭`);
-console.log(`  いまのサイクル ${current} / 試行数 ${TRIALS.toLocaleString()}${TRIALS === ODDS_MC_TRIALS ? '（本番と同じ）' : '  ★本番と違います。売られる買い目の数が変わります'}`);
+console.log(`  いまのサイクル ${current} / ${AHEAD} 先から / 試行数 ${TRIALS.toLocaleString()}${TRIALS === ODDS_MC_TRIALS ? '（本番と同じ）' : '  ★本番と違います。売られる買い目の数が変わります'}`);
 console.log('');
 
 let made = 0;
 for (let k = 0; k < RACES; k += 1) {
-  // ★2つ先から順に作る（いま発走中のものを上書きしない）
-  const idx = current + 2 + k;
+  // ★AHEAD 先から順に作る（いま発走中のものを上書きしない）
+  const idx = current + AHEAD + k;
   if (await store.raceExists(idx)) {
     console.log(`  cycle ${idx} ... 既にあります`);
     continue;

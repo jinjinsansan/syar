@@ -70,6 +70,30 @@ console.log(`★PP: ${pp}（返還で PP が増えていないこと＝EP→PP �
 
 const raceStatus = (await c.query('select status from races where id=$1',[race.id])).rows[0].status;
 console.log(`★レース状態: ${raceStatus}`);
-const ok = r1.cancelled && !r2.cancelled && (await ep())===100000 && pp===0 && raceStatus==='cancelled';
-console.log(`\n★§10.2 開催中止: ${ok?'PASS':'FAIL'}`);
+/**
+ * ★判定を**戻り値で返す**（2026-08-11）。
+ *   これまで PASS / FAIL を**表示するだけ**で、どちらでも `exit 0` でした。
+ *   自動化からは FAIL が「成功した実行」に見えます。
+ *   ★合否を機械が返さない検証は、合格の証拠になりません。
+ */
+const fails = [];
+const check = (cond, label, detail) => {
+  console.log(`  ${cond ? '✓' : '★'} ${label}${detail ? `  ${detail}` : ''}`);
+  if (!cond) fails.push(label);
+};
+const epAfter = await ep();
+console.log('');
+console.log('【判定】');
+check(r1.cancelled, '① 開催中止が実行された', `返還 ${r1.refundedBets}枚 / ${r1.refundedEp} EP`);
+check(r1.refundedBets === odds.length, '② 買った枚数だけ返還された', `${r1.refundedBets} / ${odds.length} 枚`);
+check(epAfter === 100000, '③ EP が全額戻った', `${epAfter.toLocaleString()} / 100,000`);
+check(!r2.cancelled, '④ 二重中止で二度目は何もしない');
+check(pp === 0, '⑤ 返還で PP が増えていない（EP→PP の変換が無い・憲法②）', `PP=${pp}`);
+check(raceStatus === 'cancelled', '⑥ レースが cancelled になっている', raceStatus);
+
 await clean(); await c.end();
+console.log('');
+console.log(fails.length === 0
+  ? `★§10.2 開催中止: PASS — 6項目すべて成立（${odds.length}枚 / ${r1.refundedEp.toLocaleString()} EP 返還）`
+  : `★§10.2 開催中止: FAIL — ${fails.length} 項目: ${fails.join(' / ')}`);
+process.exit(fails.length === 0 ? 0 : 1);
