@@ -179,6 +179,40 @@ if (daily.rowCount === 0) {
 console.log('');
 
 // ───────────────────────────────────────────────────────────
+// ⑥b ★日次の記録が台帳から再現できるか
+//
+//   V-11 は `point_flow_daily` を見て判定します。ところがこの表は**集計結果**で、
+//   元の台帳が消えても値が残ります。実際 staging で、`pp_ledger` が空なのに
+//   「PP発行 30,000 / 純発行 25,000」と記録されていました
+//   （検証ツールが台帳だけ後片付けし、集計行を残したため）。
+//   ★**ダッシュボードの数字が台帳と食い違う**形なので、突き合わせます。
+// ───────────────────────────────────────────────────────────
+console.log('## ⑥b 日次の記録は台帳から再現できるか');
+const recon = await c.query(
+  `select d.date,
+          d.pp_issued::bigint as recorded,
+          coalesce((select sum(l.delta) from pp_ledger l
+                     where l.delta > 0
+                       and l.created_at >= d.date::date
+                       and l.created_at < (d.date::date + interval '1 day')), 0)::bigint as from_ledger
+     from point_flow_daily d order by d.date desc limit 7`,
+);
+let drift = 0;
+for (const r of recon.rows) {
+  const rec = n(r.recorded), led = n(r.from_ledger);
+  const same = rec === led;
+  if (!same) drift += 1;
+  console.log(`  ${String(r.date).slice(0, 10)}  記録 ${jp(rec).padStart(12)} PP / 台帳から ${jp(led).padStart(12)} PP  ${same ? '一致' : '★食い違い'}`);
+}
+if (drift > 0) {
+  console.log(`  ★${drift} 日ぶんが台帳と食い違います。**V-11 はこの表を見て判定する**ので、`);
+  console.log('    台帳から再現できない値が残っていると、実際には起きていない経済を見ることになります。');
+} else if (recon.rowCount > 0) {
+  console.log('  ★全日が台帳と一致します');
+}
+console.log('');
+
+// ───────────────────────────────────────────────────────────
 // ⑦ ★V-11 が「機構が止まっているから通る」状態になっていないか
 //
 //   これは V-12a（上限のみ → F≒0 が最大余裕）や

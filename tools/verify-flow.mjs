@@ -35,6 +35,20 @@ const clean = async () => {
   await c.query('delete from bets where user_id = any($1)', [IDS]);
   await c.query('delete from users where id = any($1)', [IDS]);
   await c.query('delete from auth.users where id = any($1)', [IDS]);
+  /**
+   * ★集計行も消す（2026-08-11 に発見）。
+   *   これまで台帳だけ片付けて `point_flow_daily` を残していました。
+   *   結果、staging に「PP発行 30,000 / 純発行 25,000」という行が残り、
+   *   **`pp_ledger` は空**という状態になっていました。
+   *   ★V-11 はこの表を見て判定します。台帳から再現できない値が残っていると、
+   *     **実際には起きていない経済**を見ることになります。
+   *   ★行数は変わらず**値だけ**変わるので、`audit-tools.mjs` の行数比較では拾えません
+   *     （`diag-v11.mjs` の⑥bが台帳との突合で拾います）。
+   */
+  // ★`today` はこの関数より後で定義されるので、ここで引き直す
+  //   （そのまま参照すると TDZ で ReferenceError になり、後片付けが丸ごと落ちます）
+  const d = (await c.query('select current_date::text d')).rows[0].d;
+  await c.query('delete from point_flow_daily where date = $1', [d]);
 };
 
 // ★異常終了しても片付ける（R-18）
