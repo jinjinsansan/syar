@@ -70,6 +70,8 @@ export const STATE_CHANGING = [
   'settle-races.mjs',
   // ★週送りをワーカーの経路で実際に回す（全馬の状態を進める）
   'verify-training-week.mjs',
+  // ★staging の馬を実際に育てる（誕生週をずらして週送りを回す）
+  'age-horses.mjs',
   'seed-stables.mjs',
   'seed-world.mjs',
   'synthetic-bettor.mjs',
