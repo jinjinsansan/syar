@@ -54,6 +54,8 @@ export const STATE_CHANGING = [
   // ★中で状態を変えるツールを流すので、これ自体も状態を変える
   'audit-tools.mjs',
   'fix-purse.mjs',
+  // ★staging に発売中のレースを作る（検証ツールの前提を揃える）
+  'seed-races.mjs',
   'seed-stables.mjs',
   'seed-world.mjs',
   'synthetic-bettor.mjs',
