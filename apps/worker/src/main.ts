@@ -147,10 +147,25 @@ async function main(): Promise<void> {
       // ★資源は毎周記録する。リークは「あとで見よう」では測れません
       //   （1回目の A-1 で、最長無停止区間の両端を記録しておらず取得できませんでした）
       const res = sampleResources();
+      /**
+       * ★周の所要時間を毎周出します（レビュー側指定・2026-08-12）。
+       *
+       *   A-1 は「10分サイクルが無人で回り続ける」ですが、
+       *   **最初の PASS は1周116秒の観測**でした。D-035 で M が 3,896,104 になり、
+       *   1レースの生成に時間がかかるようになったので、**余裕は動きます**。
+       *   ★ログに出していないと、余裕が減っていることに気づく契機がありません。
+       *
+       *   ★`Date.now()` を使うのは「経過時間の計測」だけです（憲法④）。
+       *     ゲームの判断はすべて Postgres の `now()` で行っています。
+       */
+      const cycleMs = Date.now() - started;
       console.log(
         `[worker] cycle=${out.cycleIndex} phase=${out.phase} ` +
           `生成=[${out.created.join(',')}] 既存=${out.skipped.length} ` +
-          `確定=[${out.settled.join(',')}] ${formatResources(res)}` +
+          `確定=[${out.settled.join(',')}] ` +
+          // ★1周600秒に対する割合も出す。秒数だけだと余裕が読み取れません
+          `周=${(cycleMs / 1000).toFixed(1)}s(${((cycleMs / 600000) * 100).toFixed(1)}%) ` +
+          `${formatResources(res)}` +
           // ★0件のときは出さない。毎周 中止=[] と出ると、実際に起きた周が埋もれます
           `${out.cancelled.length > 0 ? ` ★中止=[${out.cancelled.join(',')}]` : ''}` +
           `${out.lockBusy ? ' lock=busy' : ''}`,
