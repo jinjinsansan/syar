@@ -151,3 +151,11 @@ const cappedTotal = [...total.values()].reduce((a, b) => a + b.capped, 0);
 console.log(`\n  ★上限に当たった売り目: ${cappedTotal} 件（D-035 の下では 0 のはず）`);
 if (cappedTotal !== 0) throw new Error('発売下限が効いていません（上限に当たる目が売られています）');
 console.log(`  ★V-10 総合: ${allPass ? 'PASS' : 'FAIL'}`);
+
+/**
+ * ★**終了コードに判定を出す。**
+ *   `verify-payout.ts` と同じ欠陥がここにもありました（FAIL でも 0 を返す）。
+ *   ★A-3 の記録を作ったのは**このツール**なので、こちらのほうが影響が大きい:
+ *     自動判定に載せれば **A-3 は常に成功**になります。
+ */
+process.exit(allPass ? 0 : 1);
