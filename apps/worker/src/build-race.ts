@@ -58,6 +58,23 @@ export function buildRace(
     sorted, cycleIndex, deriveRng(seed, STREAM.FIELD, cycleIndex),
     undefined, undefined, undefined,
     {
+      /**
+       * ★能力は **`horses.stats`（週送りが育てた現在値）**を使います
+       *   （Q-P3-29 の廃止裁定・Q-P3-35 で投入）。
+       *
+       * 【何が変わったか】
+       *   これまで `toEntrant` が `potential × PLACEHOLDER_UNLOCK`（0.55〜0.85 の再抽選）で
+       *   能力を作っていました。**育成ループが無かった時代の仮定**です。
+       *   確定側（`pg-store.settleRace`）は `horses.stats` を使っていたので、
+       *   **オッズを計算した馬と実際に走る馬の能力が違いました**（実測 2.28倍）。
+       *
+       * 【前提】
+       *   ★`horses.stats` が**訓練後の値**であること。週送りが回っていないと誕生時の値
+       *     （potential × 0.28〜0.35）になり、想定より大幅に弱い馬でオッズが付きます。
+       *     → 週送りはワーカーに繋がっており、staging では開放率 71.3% を実測しています。
+       *   ★`unlock_daily` が毎日分布を記録します。ここがずれたら P1 のゲートを測り直します。
+       */
+      abilityOf: (h: HorseRecord) => h.stats,
       ...(trainingStates === undefined ? {} : { trainingStateOf: (h: HorseRecord) => trainingStates.get(h.id) }),
       ...(programme === undefined ? {} : { programme: { surface: programme.surface, distance: programme.distance } }),
     },

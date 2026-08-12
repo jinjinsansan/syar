@@ -23,8 +23,7 @@ import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
 import { buildRace } from './build-race.js';
 import { aggregateDay } from './daily-flow.js';
-// ★loadTrainingStates は B-6 を戻すときに使う（いまは呼んでいない）
-import { loadRaceablePool } from './horse-repo.js';
+import { loadRaceablePool, loadTrainingStates } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
@@ -102,30 +101,31 @@ async function main(): Promise<void> {
     const started = Date.now();
     try {
       /**
-       * ★B-6（調子・疲労の配線）は**いったん外しています**（2026-08-12）。
+       * ★B-6（調子・疲労）と Q-P3-29（能力の実データ化）を**揃えて入れています**
+       *   （2026-08-12・Q-P3-35 の裁定）。
        *
-       * 【なぜ外すか】
-       *   ハーネスで「B-6 だけ入れた状態」を測ったところ、**帯を出ていました**:
-       *     V-4 34.60%（帯 30〜34%） / V-5 65.83%（帯 60〜65%）
-       *   一方、**能力も実データにした状態（③）は帯の中**に戻ります:
-       *     V-4 32.73% / V-5 63.99%
+       * 【なぜ揃えるのか】
+       *   ハーネスで4通り測りました。**帯に入るのは①と③だけ**です:
+       *     ①どちらも無し           V-4 31.29% / V-5 62.40%  ✓
+       *     ①＋B-6 だけ             V-4 34.60% / V-5 65.83%  ✗ 帯外
+       *     ②能力だけ               V-4 29.20% / V-5 59.78%  ✗ 帯外
+       *     ★③両方                 V-4 32.73% / V-5 63.99%  ✓
        *   → **2つの是正は V-4 を逆向きに動かし、揃えたときだけ帯に入ります。**
-       *     片方だけ入れると、途中で必ず落ちる状態を通ります。
+       *     ★片方だけ入れると、途中で必ず落ちる状態を通ります。
        *
-       * 【いつ戻すか】
-       *   ★週送りをワーカーに繋ぎ、`horses.stats` がハーネスの前提
-       *     （開放率 平均73.8% / SD11.0pt）に到達したことを測ってから、
-       *     **能力の実データ化と一緒に**入れます。
+       * 【本番の実分布でも確認済み】
+       *   staging の 3,000頭をそのままハーネスに食わせて:
+       *     V-4 32.32% / V-5 63.26% / V-6 1.00% / V-8 93.59% / V-13 0.165  全 PASS
        *
-       * ⚠️ `loadTrainingStates` と `buildRace` の受け口は残してあります。
-       *    消すと「繋ぎ直す」が作り直しになり、そのとき別物になります。
+       * ⚠️ **どちらか片方だけを外さないこと。** 外すなら両方です。
        */
+      const trainingStates = await loadTrainingStates(client);
       const out = await runCycle(
         store,
         cfg.epochMs,
         seeds,
-        (i) => buildRace(pool, i, cfg.epochMs, undefined, undefined,
-          // ★番組表（§10.3）が距離・馬場・コースを決める（Q-P3-32・こちらは有効のまま）
+        (i) => buildRace(pool, i, cfg.epochMs, undefined, trainingStates,
+          // ★番組表（§10.3）が距離・馬場・コースを決める（Q-P3-32）
           conditionsOf(i, classOf(i), gradeOf(i))),
         // ★開催中止は黙って通さない（正典 D-037）。
         //   静かに返還されると原因が調査されないまま繰り返します。

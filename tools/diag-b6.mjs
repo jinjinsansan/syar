@@ -29,7 +29,7 @@
 import pg from 'pg';
 import { deriveRng } from '../packages/sim-engine/src/index.ts';
 import { generateRace, sortPoolByClass } from '../apps/cli/src/race-field.ts';
-import { loadRaceablePool } from '../apps/worker/src/horse-repo.ts';
+import { loadRaceablePool, loadTrainingStates } from '../apps/worker/src/horse-repo.ts';
 import { loadEnv } from './lib/env.mjs';
 
 const env = loadEnv();
@@ -37,6 +37,7 @@ const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl: { rejectUnaut
 await c.connect();
 
 const pool = sortPoolByClass(await loadRaceablePool(c));
+const states = await loadTrainingStates(c);
 console.log(`# B-6 診断: オッズを作った馬と、実際に走る馬が同じか`);
 console.log(`  母集団 ${pool.length} 頭（ワーカーと同じ取り方）`);
 console.log('');
@@ -52,7 +53,9 @@ const ratios = [];
 const absDiff = [];
 let entrants = 0;
 for (let i = 0; i < RACES; i += 1) {
-  const race = generateRace(pool, i, deriveRng(4242, 61, i));
+  // ★本番と同じ呼び方にする（Q-P3-35 で投入した abilityOf を通す）
+  const race = generateRace(pool, i, deriveRng(4242, 61, i), undefined, undefined, undefined,
+    { abilityOf: (h) => h.stats });
   for (const e of race.entrants) {
     const horse = pool.find((h) => h.id === e.horseId);
     if (horse === undefined) continue;
@@ -82,7 +85,8 @@ console.log('');
 console.log('【② 調子・疲労】');
 const conds = [];
 for (let i = 0; i < RACES; i += 1) {
-  const race = generateRace(pool, i, deriveRng(4243, 61, i));
+  const race = generateRace(pool, i, deriveRng(4243, 61, i), undefined, undefined, undefined,
+    { abilityOf: (h) => h.stats, trainingStateOf: (h) => states.get(h.id) });
   for (const e of race.entrants) conds.push({ c: e.condition, f: e.fatigue });
 }
 console.log(`  生成時: 調子 平均 ${mean(conds.map((x) => x.c)).toFixed(2)} SD ${sd(conds.map((x) => x.c)).toFixed(2)} / ` +
