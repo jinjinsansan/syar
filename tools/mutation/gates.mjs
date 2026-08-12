@@ -34,7 +34,8 @@
  */
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 
 const md5 = (s) => createHash('md5').update(s).digest('hex');
 const arg = (flag, fallback) => {
@@ -99,16 +100,82 @@ if (targets.length === 0) {
   process.exit(2);
 }
 
-/** ゲートを回して JSON を返す */
+// ────────────────────────────────────────────────────────────────
+// ★★変異は**使い捨ての作業ツリーの中だけ**で起こす（R-18 の拡張・2度目の是正）
+//
+// 【なぜ手順ではだめか】
+//   「実行中はコミットしない」は**手順**です。**2度**踏みました:
+//     1回目 … 実行中にコミットし、`NPC_FOLLOW_TOP_RATIO` の変異が `aec4467` に焼き付いた
+//     2回目 … 実行中にコミットし（今回は運良く無事）、さらに**ハーネスを中断したら
+//              `FIELD_STRENGTH_FLOOR = 0.0` が作業ツリーに残っていた**
+//   ★中断・異常終了では `finally` すら走りません。**手順で守る限り3度目が来ます。**
+//
+// 【構造で守る】
+//   `git worktree` で別のツリーを作り、**そこで改変してそこでゲートを回します**。
+//   本体のツリーは**一度も触られません**。中断しても残るのは捨てるツリーだけです。
+// ────────────────────────────────────────────────────────────────
+const KEEP = process.argv.includes('--keep-worktree');
+const WORKTREE = arg('--worktree', join(process.cwd(), '.mutation-worktree'));
+const sh = (cmd, args, opts = {}) =>
+  execFileSync(cmd, args, { encoding: 'utf8', shell: process.platform === 'win32', ...opts });
+
+// ★汚れたツリーから作ると「原本」が何か分からなくなります
+const dirty = sh('git', ['status', '--porcelain', '--untracked-files=no']).trim();
+if (dirty !== '') {
+  console.error('★作業ツリーに未コミットの変更があります。原本が確定しないので中止します:');
+  console.error(dirty.split('\n').map((l) => `    ${l}`).join('\n'));
+  console.error('  （コミットするか stash してから回してください）');
+  process.exit(2);
+}
+const HEAD_SHA = sh('git', ['rev-parse', 'HEAD']).trim();
+
+if (existsSync(WORKTREE)) {
+  try { sh('git', ['worktree', 'remove', '--force', WORKTREE]); } catch { rmSync(WORKTREE, { recursive: true, force: true }); }
+}
+sh('git', ['worktree', 'add', '--detach', WORKTREE, HEAD_SHA], { stdio: 'pipe' });
+console.log(`  ★変異は別ツリーの中だけで起こします: ${WORKTREE}（${HEAD_SHA.slice(0, 7)}）`);
+// ★node_modules はツリーに含まれないので、本体のものを指す（npm ci をやり直さない）
+//   Windows のジャンクションは管理者権限が要らない
+const nm = join(WORKTREE, 'node_modules');
+if (!existsSync(nm)) {
+  if (process.platform === 'win32') {
+    sh('cmd', ['/c', 'mklink', '/J', nm, join(process.cwd(), 'node_modules')], { stdio: 'pipe' });
+  } else {
+    sh('ln', ['-s', join(process.cwd(), 'node_modules'), nm]);
+  }
+}
+const cleanupWorktree = () => {
+  if (KEEP) { console.log(`  ★--keep-worktree が付いているので残します: ${WORKTREE}`); return; }
+  try { sh('git', ['worktree', 'remove', '--force', WORKTREE], { stdio: 'pipe' }); } catch { /* 残っても本体は無傷 */ }
+};
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { cleanupWorktree(); process.exit(130); });
+
+/**
+ * ゲートを回して JSON を返す。
+ *
+ * ★**ゲートが FAIL すると非ゼロ終了し、`execFileSync` は例外を投げます。**
+ *   つまり素直に書くと「**捕まえたときに必ず落ちる**」ツールになります（実際そうなりました）。
+ *   ここで拾うのが目的そのものなので、**終了コードではなく出力を読みます**。
+ */
 const runGate = (gate) => {
   if (gate !== 'race') throw new Error(`未対応のゲート: ${gate}`);
-  const out = execFileSync('npx', [
-    'tsx', 'apps/cli/src/verify-race.ts',
-    '--races', RACES, '--seeds', SEEDS, '--json',
-  ], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, shell: process.platform === 'win32' });
+  const opts = { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, shell: process.platform === 'win32' };
+  const argv = ['tsx', 'apps/cli/src/verify-race.ts', '--races', RACES, '--seeds', SEEDS, '--json'];
+  let out;
+  let exitCode = 0;
+  try {
+    // ★cwd を作業ツリーにする。**本体のソースは一度も読まれません**
+    out = execFileSync('npx', argv, { ...opts, cwd: WORKTREE });
+  } catch (e) {
+    // ★非ゼロ終了は**想定内**（ゲートが落ちた場合）。出力が取れていなければ本当の異常
+    out = typeof e.stdout === 'string' ? e.stdout : '';
+    exitCode = typeof e.status === 'number' ? e.status : -1;
+    if (out === '') throw new Error(`ゲートが出力なしで終了しました (status=${exitCode}): ${e.message}`);
+  }
   const start = out.lastIndexOf('\n{');
-  if (start < 0) throw new Error('JSON が見つかりません');
-  return JSON.parse(out.slice(start + 1));
+  if (start < 0) throw new Error(`JSON が見つかりません (status=${exitCode})`);
+  const parsed = JSON.parse(out.slice(start + 1));
+  return { ...parsed, exitCode };
 };
 
 console.log('# ★較正定数を壊したとき V-ゲートが落ちるか（Q-P3-42）');
@@ -124,6 +191,11 @@ const baseById = new Map(base.checks.map((c) => [c.id, c]));
 for (const c of base.checks) console.log(`  ${c.id}  ${c.value}  ${c.pass ? 'PASS' : '★FAIL'}`);
 // ★基準が緑でなければ、以後の「落ちた」は変異のせいだと言えません
 const baseBad = base.checks.filter((c) => !c.pass);
+// ★終了コードと判定が食い違ったら、どちらかが壊れています（R-21）
+if ((base.exitCode === 0) !== (baseBad.length === 0)) {
+  console.error(`★基準の終了コード(${base.exitCode})と判定(${baseBad.length}件FAIL)が食い違います。中止します`);
+  process.exit(2);
+}
 if (baseBad.length > 0) {
   console.error('');
   console.error(`★基準が緑ではありません（${baseBad.map((c) => c.id).join(', ')}）。`);
@@ -135,7 +207,9 @@ console.log('');
 
 const rows = [];
 for (const t of targets) {
-  const original = readFileSync(t.file, 'utf8');
+  // ★改変するのは**作業ツリー側のファイル**。本体は触りません
+  const path = join(WORKTREE, t.file);
+  const original = readFileSync(path, 'utf8');
   const originalMd5 = md5(original);
   console.log(`── ${t.key} → ${t.expect.join(' / ')} が落ちるはず`);
 
@@ -146,12 +220,12 @@ for (const t of targets) {
     process.exit(2);
   }
   const mutated = original.replace(t.from, t.to);
-  writeFileSync(t.file, mutated, 'utf8');
+  writeFileSync(path, mutated, 'utf8');
 
   let row;
   try {
     // 事後条件(2): ディスク上で変わった
-    if (md5(readFileSync(t.file, 'utf8')) === originalMd5) {
+    if (md5(readFileSync(path, 'utf8')) === originalMd5) {
       throw new Error('書き込んだのに内容が変わっていません');
     }
     const got = runGate(t.gate);
@@ -174,8 +248,8 @@ for (const t of targets) {
     console.log(`  → ${failed.length > 0 ? `✓ ゲートが捕まえた（${failed.join(', ')}）` : '★どのゲートも捕まえなかった'}`);
   } finally {
     // 事後条件(4): 復元して md5 一致
-    writeFileSync(t.file, original, 'utf8');
-    if (md5(readFileSync(t.file, 'utf8')) !== originalMd5) {
+    writeFileSync(path, original, 'utf8');
+    if (md5(readFileSync(path, 'utf8')) !== originalMd5) {
       console.error('  ★★復元に失敗しました。手で確認してください');
       process.exit(2);
     }
@@ -194,4 +268,16 @@ console.log('');
 console.log(bad.length === 0
   ? `★全 ${rows.length} 件: ゲートが実際に捕まえました（推論ではなく実測）`
   : `★${bad.length} 件が未証明: ${bad.map((r) => r.key).join(', ')}`);
+
+// ★本体のツリーが一度も触られていないことを、最後に機械で確かめる
+const after = sh('git', ['status', '--porcelain', '--untracked-files=no']).trim();
+if (after !== '') {
+  console.error('');
+  console.error('★★本体の作業ツリーが汚れています（worktree 分離が効いていません）:');
+  console.error(after.split('\n').map((l) => `    ${l}`).join('\n'));
+  cleanupWorktree();
+  process.exit(2);
+}
+console.log('  ✓ 本体の作業ツリーは無傷（git status が空）');
+cleanupWorktree();
 process.exit(bad.length === 0 ? 0 : 1);
