@@ -62,6 +62,31 @@ describe('★開放率が P1 のゲートを測ったときの分布からずれ
       .map((x) => x.key)).toEqual(['mean']);
   });
 
+  it('★平均の許容幅が「V-4 が帯を出る手前」であること（導出を固定する）', () => {
+    /**
+     * ★値だけ固定しても「**なぜ 3pt か**」は守られません。導出を書き下します。
+     *   3点測定の①→② が「開放率 → V-4」の感度:
+     *     開放率 70.0% → V-4 31.29% ／ 73.8% → 29.20%
+     */
+    const sensitivity = (31.29 - 29.20) / (73.8 - 70.0); // pt(V-4) / pt(開放率)
+    const V4_NOW = 32.32;
+    const V4_BAND = [30, 34] as const;
+    const upRoom = (V4_BAND[1] - V4_NOW) / sensitivity;   // 上限まで開放率で何 pt か
+    const downRoom = (V4_NOW - V4_BAND[0]) / sensitivity; // 下限まで
+    expect(upRoom).toBeCloseTo(3.1, 1);
+    expect(downRoom).toBeCloseTo(4.2, 1);
+    // ★厳しいほうを両側に採る（安全側）。許容幅がこれを超えたら、鳴るべきときに鳴らない
+    expect(UNLOCK_DRIFT_TOLERANCE.mean * 100).toBeLessThanOrEqual(Math.min(upRoom, downRoom));
+    // ★狭すぎても困る（毎日鳴れば読まれなくなる）。1pt は下回らない
+    expect(UNLOCK_DRIFT_TOLERANCE.mean * 100).toBeGreaterThanOrEqual(1);
+  });
+
+  it('★四分位の許容幅には導出根拠が無いことを明示する', () => {
+    // ★感度を測っていないので、ここは**暫定**です。値を固定して「暫定のまま動かない」ことだけ守る。
+    //   掃引で感度が出たら、上の平均と同じ形の導出テストに置き換えること（P4）。
+    expect(UNLOCK_DRIFT_TOLERANCE.quantile).toBeCloseTo(0.08, 3);
+  });
+
   it('★基準値が「ゲートを測ったときの分布」であること（勝手に動かさない）', () => {
     // ★実測に合わせて基準を動かすと警告が黙るだけなので、値そのものを固定する
     expect(UNLOCK_BASELINE.mean).toBeCloseTo(0.713, 3);
