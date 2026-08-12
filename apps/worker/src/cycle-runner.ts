@@ -191,8 +191,27 @@ export async function runCycle(
     //   ⚠️ §7 の成長や §10.3 のクラス昇級を入れて確定が馬の状態を書くようになったら、
     //      この順序は**速度ではなく正しさ**の問題になります。そのときに読み直すこと。
     for (const idx of await store.pendingSettlements(nowMs)) {
-      await store.settleRace(idx);
-      settled.push(idx);
+      try {
+        await store.settleRace(idx);
+        settled.push(idx);
+      } catch (e) {
+        /**
+         * ★凍結（0016）が無いレースは**確定せず開催中止**にします（D-056）。
+         *
+         *   旧経路（`horses` を読み直す）に落とすのが D-055 で閉じた欠陥そのものなので、
+         *   フォールバックを持ちません。**中止なら返還・冪等・アラートが既にあります。**
+         *   ★ここで握り潰すと「静かに劣化」に戻るので、**中止アラートに必ず載せます**。
+         *
+         *   ⚠️ 名前で判定します（`instanceof` は層をまたぐと束ね方次第で外れます）。
+         */
+        if (e instanceof Error && e.name === 'UnfrozenRaceError') {
+          const r = await store.cancelRace(idx);
+          cancelled.push(idx);
+          onAlert({ cycleIndex: idx, refundedBets: r.refundedBets, refundedEp: r.refundedEp });
+          continue;
+        }
+        throw e;
+      }
     }
 
     // --- 2. 期限切れの開催中止と返還（正典 D-037・§9.1） ---

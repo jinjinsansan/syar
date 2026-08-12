@@ -220,6 +220,53 @@ describe('★D-038 確定を生成より先に処理する', () => {
   });
 });
 
+describe('★D-056 凍結が無いレースは確定せず中止する', () => {
+  /**
+   * ★旧経路（`horses` を読み直す）に落とすのが D-055 で閉じた欠陥そのものなので、
+   *   フォールバックを持たず**中止に載せます**。ここで検査するのは:
+   *     ① 確定済みに数えない（結果を出してしまわない）
+   *     ② 中止に載る（返還される）
+   *     ③ ★アラートに出る（黙って劣化しない）
+   *     ④ ★対照: 凍結があれば普通に確定する（①〜③が空振りでない）
+   */
+  const unfrozen = (cycleIndex: number): Error => {
+    const e = new Error(`cycle=${cycleIndex} の出走馬に凍結がありません`);
+    e.name = 'UnfrozenRaceError';
+    return e;
+  };
+
+  it('★凍結が無ければ確定せず、中止して通報する', async () => {
+    ALERTS.length = 0;
+    const store = makeStore(EPOCH + 4 * 60_000);
+    store.pendingSettlements = async () => [21];
+    store.settleRace = async (i: number) => { throw unfrozen(i); };
+    const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    expect(out.settled).toEqual([]);          // ① 結果を出していない
+    expect(out.cancelled).toEqual([21]);      // ② 中止に載った
+    expect(store.cancelLog).toEqual([21]);
+    expect(ALERTS.map((a) => a.cycleIndex)).toEqual([21]); // ③ 黙っていない
+  });
+
+  it('★対照: 凍結があれば普通に確定する（上の検査が空振りでない）', async () => {
+    ALERTS.length = 0;
+    const store = makeStore(EPOCH + 4 * 60_000);
+    store.pendingSettlements = async () => [21];
+    const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    expect(out.settled).toEqual([21]);
+    expect(out.cancelled).toEqual([]);
+    expect(ALERTS).toEqual([]);
+  });
+
+  it('★凍結と無関係な失敗は握り潰さない（中止に化けさせない）', async () => {
+    const store = makeStore(EPOCH + 4 * 60_000);
+    store.pendingSettlements = async () => [22];
+    store.settleRace = async () => { throw new Error('DB が落ちた'); };
+    await expect(runCycle(store, EPOCH, SEEDS, BUILD, ALERT)).rejects.toThrow('DB が落ちた');
+    // ★中止に載せてしまうと、DB 障害が「開催中止」として静かに返還され続けます
+    expect(store.cancelLog).toEqual([]);
+  });
+});
+
 describe('★D-037 確定できないレースを期限で中止し EP を返す', () => {
   it('★期限切れのレースを中止し、通報する', async () => {
     ALERTS.length = 0;

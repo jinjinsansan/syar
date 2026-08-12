@@ -75,6 +75,8 @@ export const STATE_CHANGING = [
   // ★出走馬の凍結（0016）の検証。horses を一時的に壊してから確定するので状態を変える
   //   （壊した値は1頭ずつ元に戻し、戻せたことも検査する）
   'verify-entrant-freeze.mjs',
+  // ★D-056 の検証。凍結を消してレースを中止させるので状態を変える（元に戻す）
+  'verify-unfrozen-cancel.mjs',
   // ★開放率の日次記録（unlock_daily に書く）
   'verify-unlock-daily.mjs',
   // ★staging の馬を実際に育てる（誕生週をずらして週送りを回す）

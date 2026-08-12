@@ -17,7 +17,6 @@ import type pg from 'pg';
 //   `pg-store` は SQL を出す唯一の層なので、ここを通れば必ず設定済みです。
 import { assertPgTypesConfigured } from './pg-types.js';
 import type { RaceEntrant } from '@star/race-engine';
-import { rowToHorse } from './horse-repo.js';
 import { awardPrizes } from './prize-award.js';
 import { settlePayouts } from './payout.js';
 import { settleRace as settleRaceFair } from './settle.js';
@@ -31,6 +30,27 @@ import { cancelRace as cancelRaceImpl } from './cancel.js';
  *   数値として比較した瞬間に静かに外れます（`horse-repo` で潰したのと同じ形）。
  *   ここで必ず数値に直し、直せなければ**黙って進まない**。
  */
+/**
+ * ★凍結（0016）を持たない出走馬がいるレース（D-056）。
+ *
+ *   確定せず、**正典 D-037 の開催中止**に載せます。返還・冪等・アラートは実装済みです。
+ *   ⚠️ これを握り潰して `horses` から組み直す経路を足さないこと。
+ *      それは D-055 で閉じた欠陥そのもので、**「凍結が無いとき」だけ穴が既定で開きます。**
+ */
+export class UnfrozenRaceError extends Error {
+  constructor(
+    readonly cycleIndex: number,
+    readonly unfrozen: number,
+    readonly total: number,
+  ) {
+    super(
+      `cycle=${cycleIndex} の出走馬 ${unfrozen}/${total} 頭に凍結がありません。`
+        + '確定せず開催中止にします（D-056）',
+    );
+    this.name = 'UnfrozenRaceError';
+  }
+}
+
 export function toCycleIndexes(rows: readonly { cycle_index: number | string }[]): number[] {
   return rows.map((r) => {
     const n = Number(r.cycle_index);
@@ -261,13 +281,16 @@ export function createPgStore(
         }
         const r = race.rows[0]!;
 
-        // --- 出走表を読んで着順を計算 ---
-        // ★horses と結合して**実際の能力**を読む。
-        //   中立値で走らせると全馬が同じ実力になり、V-4（1番人気の勝率）などの
-        //   較正がすべて意味を失います。
+        /**
+         * --- 出走表を読んで着順を計算 ---
+         *
+         * ★**`horses` と結合しません**（D-056）。読むのは**凍結だけ**です。
+         *   結合を残すと「一部だけ最新値で上書き」が書けてしまい、
+         *   2回読む構造に戻れます。**読む対象を1つにして、戻れなくします。**
+         */
         const es = await client.query<Record<string, unknown>>(
-          `select e.gate, e.weight, e.strategy, e.entrant_snapshot, h.*
-             from race_entries e join horses h on h.id = e.horse_id
+          `select e.gate, e.weight, e.strategy, e.entrant_snapshot
+             from race_entries e
             where e.race_id = $1 order by e.gate`,
           [r.id],
         );
@@ -276,83 +299,40 @@ export function createPgStore(
           throw new Error(`settleRace: cycle=${cycleIndex} に出走表がありません`);
         }
 
+        /**
+         * ★**凍結が無いレースは確定せず、開催中止にします**（D-056・正典 D-037 の経路）。
+         *
+         * 【なぜ「昔の経路に落ちる」ではいけないか】
+         *   旧経路（`horses` を読み直す）こそが D-055 で閉じた欠陥そのものです。
+         *   フォールバックを残すと、**「凍結が無いとき」だけ閉じたはずの穴が既定で開きます。**
+         *   ★警告を出しても、開いていることに変わりはありません。
+         *
+         * 【移行の猶予は終わっています】
+         *   レースは生成2周先 → 10分程度で確定するので、
+         *   0016 適用から1時間もあれば全レースが凍結を持ちます。
+         *
+         * ★中止なら返還・冪等・アラートが実装済みで、**新しい仕組みは要りません**。
+         *   将来この書き込みが壊れても、静かに劣化せず**目に見える形で止まります**。
+         */
+        const unfrozen = es.rows.filter(
+          (row) => row['entrant_snapshot'] === null || row['entrant_snapshot'] === undefined,
+        ).length;
+        if (unfrozen > 0) {
+          // ★中止は**別トランザクション**（cancelRace が自分で begin する）。
+          //   ここでは確定を巻き戻してから抜け、呼び出し側の中止経路に載せます。
+          await client.query('rollback');
+          throw new UnfrozenRaceError(cycleIndex, unfrozen, es.rowCount ?? 0);
+        }
+
         // ★着順は §8.6 の final_seed から決める（settle.ts）。
         //   ここで独自の乱数を使うと、seed_reveal を公開しても検証できません。
-        /**
-         * ★0016 より前に作られたレースだけが凍結を持ちません。
-         *   **黙って昔の経路に落ちると、食い違いが見えないまま戻ります**ので数えて報告します。
-         */
-        let unfrozen = 0;
-        const entrants: RaceEntrant[] = es.rows.map((row) => {
-          /**
-           * ★**凍結された出走馬をそのまま使う**（0016）。
-           *   `horses` を読み直さないので、生成と確定の食い違いが**原理的に起きません**。
-           *   ⚠️ ここに「一部だけ DB の最新値で上書きする」を足さないこと。
-           *      それをやった瞬間、2回読む構造に戻ります。
-           */
-          const snap = row['entrant_snapshot'];
-          if (snap !== null && snap !== undefined) {
-            const s = snap as Record<string, unknown>;
-            return {
-              ...(s as unknown as RaceEntrant),
-              // ★着順の同定は馬番で行う（凍結側は元の UUID を持っている）
-              horseId: String(row['gate']),
-            };
-          }
-          unfrozen += 1;
-          const h = rowToHorse(row);
-          return {
-            // ★着順の同定は馬番で行う（DB の UUID ではなく枠番）
-            horseId: String(row['gate']),
-            stats: h.stats,
-            surfaceAptitude: h.surfaceAptitude,
-            distanceCenter: h.distanceCenter,
-            distanceRange: h.distanceRange,
-            strategyAptitude: h.strategyAptitude,
-            heavyAptitude: h.heavyAptitude,
-            strategy: String(row['strategy']) as RaceEntrant['strategy'],
-            /**
-             * ★B-6（D-050）: 調子・疲労を DB から読む（0010 で列を追加）。
-             *
-             * 【★ここが2か所目だったこと】
-             *   出走馬は**生成時（race-field.ts）と確定時（ここ）で別々に組まれます**。
-             *   `docs/B6_WIRING_PLAN.md` に「MC と本番確定は同じ entrants を使うので
-             *   乖離は構造上起きません」と書きましたが、**誤りでした**。
-             *   片方だけ実データにすると、**オッズを計算した馬と実際に走る馬が変わります**。
-             *
-             * ★週送りを通していない馬（`last_processed_week` が null）は
-             *   §7.4 の中央値に落とします。**0 にすると生まれた瞬間が絶不調**になります。
-             */
-            /**
-             * ★B-6: 調子・疲労を DB から読みます（Q-P3-35 の裁定で投入）。
-             *   ★生成側（`race-field.ts`）と**同じ値**を使うことが要点です。
-             *     片側だけ実データにすると「オッズを計算した馬と実際に走る馬が違う」が
-             *     再発します（Q-P3-32 と同じ型）。
-             *   ★週送りを通していない馬は §7.4 の中央値に落とします。
-             *     0 にすると生まれた瞬間が絶不調になります。
-             */
-            condition: row['condition'] === null || row['condition'] === undefined
-              ? 3 : Number(row['condition']),
-            fatigue: row['fatigue'] === null || row['fatigue'] === undefined
-              ? 0 : Number(row['fatigue']),
-            weightKg: Number(row['weight']),
-            gate: Number(row['gate']),
-            age: 4,
-            skillGenes: h.skillGenes,
-          };
-        });
-        /**
-         * ★凍結が無い馬がいたら**必ず目に付く形で残す**（黙って昔の経路に落ちない）。
-         *   0016 より前のレースなら想定内ですが、**新しく作ったレースで出たら生成側の不具合**です。
-         *   ⚠️ ここを静かにすると「食い違いが起きうる状態」に戻ったことに誰も気づきません。
-         */
-        if (unfrozen > 0) {
-          console.error(
-            `[worker] ★出走馬の凍結がありません cycle=${cycleIndex} ${unfrozen}/${es.rows.length}頭 — ` +
-              'horses を読み直して確定します（生成時と食い違う可能性があります）。' +
-              '0016 より前のレースなら想定内ですが、新しいレースなら生成側を調べてください',
-          );
-        }
+        const entrants: RaceEntrant[] = es.rows.map((row) => ({
+          // ★凍結された出走馬を**そのまま**使う（D-056）。
+          //   ⚠️ ここに DB の最新値を混ぜないこと。混ぜた瞬間に2回読む構造に戻ります。
+          ...(row['entrant_snapshot'] as unknown as RaceEntrant),
+          // ★着順の同定は馬番で行う（凍結側は元の馬の UUID を持っている）
+          horseId: String(row['gate']),
+        }));
         const res = settleRaceFair(
           {
             conditions: {
