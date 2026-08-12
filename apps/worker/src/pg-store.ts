@@ -136,10 +136,10 @@ export function createPgStore(
          *   下のオッズと同じ理由です。
          */
         await client.query(
-          `insert into race_entries (race_id, horse_id, gate, weight, strategy, popularity)
-           select $1, t.horse_id, t.gate, t.weight, t.strategy, t.popularity
-             from unnest($2::uuid[], $3::int[], $4::numeric[], $5::text[], $6::int[])
-               as t(horse_id, gate, weight, strategy, popularity)`,
+          `insert into race_entries (race_id, horse_id, gate, weight, strategy, popularity, entrant_snapshot)
+           select $1, t.horse_id, t.gate, t.weight, t.strategy, t.popularity, t.snapshot
+             from unnest($2::uuid[], $3::int[], $4::numeric[], $5::text[], $6::int[], $7::jsonb[])
+               as t(horse_id, gate, weight, strategy, popularity, snapshot)`,
           [
             raceId,
             spec.entrants.map((e) => e.horseId),
@@ -147,6 +147,8 @@ export function createPgStore(
             spec.entrants.map((e) => e.weightKg),
             spec.entrants.map((e) => e.strategy),
             spec.entrants.map((e) => e.popularity ?? null),
+            // ★オッズ計算に使った出走馬を凍結（0016）。確定はこれを使う
+            spec.entrants.map((e) => (e.snapshot === undefined ? null : JSON.stringify(e.snapshot))),
           ],
         );
 
@@ -264,7 +266,7 @@ export function createPgStore(
         //   中立値で走らせると全馬が同じ実力になり、V-4（1番人気の勝率）などの
         //   較正がすべて意味を失います。
         const es = await client.query<Record<string, unknown>>(
-          `select e.gate, e.weight, e.strategy, h.*
+          `select e.gate, e.weight, e.strategy, e.entrant_snapshot, h.*
              from race_entries e join horses h on h.id = e.horse_id
             where e.race_id = $1 order by e.gate`,
           [r.id],
@@ -276,7 +278,28 @@ export function createPgStore(
 
         // ★着順は §8.6 の final_seed から決める（settle.ts）。
         //   ここで独自の乱数を使うと、seed_reveal を公開しても検証できません。
+        /**
+         * ★0016 より前に作られたレースだけが凍結を持ちません。
+         *   **黙って昔の経路に落ちると、食い違いが見えないまま戻ります**ので数えて報告します。
+         */
+        let unfrozen = 0;
         const entrants: RaceEntrant[] = es.rows.map((row) => {
+          /**
+           * ★**凍結された出走馬をそのまま使う**（0016）。
+           *   `horses` を読み直さないので、生成と確定の食い違いが**原理的に起きません**。
+           *   ⚠️ ここに「一部だけ DB の最新値で上書きする」を足さないこと。
+           *      それをやった瞬間、2回読む構造に戻ります。
+           */
+          const snap = row['entrant_snapshot'];
+          if (snap !== null && snap !== undefined) {
+            const s = snap as Record<string, unknown>;
+            return {
+              ...(s as unknown as RaceEntrant),
+              // ★着順の同定は馬番で行う（凍結側は元の UUID を持っている）
+              horseId: String(row['gate']),
+            };
+          }
+          unfrozen += 1;
           const h = rowToHorse(row);
           return {
             // ★着順の同定は馬番で行う（DB の UUID ではなく枠番）
@@ -318,6 +341,18 @@ export function createPgStore(
             skillGenes: h.skillGenes,
           };
         });
+        /**
+         * ★凍結が無い馬がいたら**必ず目に付く形で残す**（黙って昔の経路に落ちない）。
+         *   0016 より前のレースなら想定内ですが、**新しく作ったレースで出たら生成側の不具合**です。
+         *   ⚠️ ここを静かにすると「食い違いが起きうる状態」に戻ったことに誰も気づきません。
+         */
+        if (unfrozen > 0) {
+          console.error(
+            `[worker] ★出走馬の凍結がありません cycle=${cycleIndex} ${unfrozen}/${es.rows.length}頭 — ` +
+              'horses を読み直して確定します（生成時と食い違う可能性があります）。' +
+              '0016 より前のレースなら想定内ですが、新しいレースなら生成側を調べてください',
+          );
+        }
         const res = settleRaceFair(
           {
             conditions: {

@@ -124,13 +124,13 @@ const WORKTREE = arg('--worktree', join(tmpdir(), 'star-mutation-worktree'));
 const sh = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { encoding: 'utf8', shell: process.platform === 'win32', ...opts });
 
-// ★汚れたツリーから作ると「原本」が何か分からなくなります
 const dirty = sh('git', ['status', '--porcelain', '--untracked-files=no']).trim();
 if (dirty !== '') {
-  console.error('★作業ツリーに未コミットの変更があります。原本が確定しないので中止します:');
-  console.error(dirty.split('\n').map((l) => `    ${l}`).join('\n'));
-  console.error('  （コミットするか stash してから回してください）');
-  process.exit(2);
+  // ★中止はしません。**変異は HEAD から作った別ツリーで起こす**ので、
+  //   本体が汚れていても結果は汚染されません（何を測ったかは HEAD が決めます）。
+  //   ただし「HEAD を測っている＝手元の編集は入っていない」ことは明示します。
+  console.log('  ★本体に未コミットの変更があります。**測るのは HEAD の状態**で、手元の編集は入りません:');
+  console.log(dirty.split('\n').map((l) => `      ${l}`).join('\n'));
 }
 const HEAD_SHA = sh('git', ['rev-parse', 'HEAD']).trim();
 
@@ -287,10 +287,26 @@ for (const t of targets) {
       const c = got.checks.find((x) => x.id === id);
       return `${id} ${b?.value ?? '?'} → ${c?.value ?? '?'} ${c?.pass ? 'PASS' : '★FAIL'}`;
     });
-    row = { key: t.key, reached, eff, detail, caught: failed.length > 0, failed };
+    /**
+     * ★**「効いているか」と「ゲートが捕まえるか」は別の問い**です。混ぜてはいけません。
+     *   実測: `TAIL_MIX_P_DEFAULT` を壊すと V-6 は 1.14% → 0.61% と**半分近く動く**のに、
+     *   帯（0.5〜2%）の中なので**ゲートは落ちません**。
+     *     ・効いている  … 統計量が動いた（＝定数は実行経路で仕事をしている）
+     *     ・捕まえる    … 帯を出た（＝そのゲートが防御になっている）
+     *   登録簿が主張しているのは**後者**です。前者だけで「防御済み」と書いてはいけません。
+     */
+    const moved = t.expect.map((id) => {
+      const b = Number(String(baseById.get(id)?.value ?? '').replace('%', ''));
+      const c = Number(String(got.checks.find((x) => x.id === id)?.value ?? '').replace('%', ''));
+      return Number.isFinite(b) && Number.isFinite(c) && b !== 0 ? Math.abs(c - b) / Math.abs(b) : 0;
+    });
+    const moveRatio = Math.max(0, ...moved);
+    const effective = moveRatio >= 0.10;
+    row = { key: t.key, reached, eff, detail, caught: failed.length > 0, failed, effective, moveRatio };
     console.log(`  経路に届いた: ${reached ? `✓（${t.settingsKey}=${eff}）` : `★届いていない（${t.settingsKey}=${eff}）`}`);
     for (const d of detail) console.log(`  ${d}`);
-    console.log(`  → ${failed.length > 0 ? `✓ ゲートが捕まえた（${failed.join(', ')}）` : '★どのゲートも捕まえなかった'}`);
+    console.log(`  → 効いている: ${effective ? `✓（統計量が ${(moveRatio * 100).toFixed(0)}% 動いた）` : `★ほとんど動かない（${(moveRatio * 100).toFixed(0)}%）`}`);
+    console.log(`  → ★ゲートが捕まえる: ${failed.length > 0 ? `✓（${failed.join(', ')}）` : '★捕まえない（帯の中に留まった）'}`);
   } finally {
     // 事後条件(4): 復元して md5 一致
     writeFileSync(path, original, 'utf8');
@@ -306,7 +322,15 @@ for (const t of targets) {
 console.log('【まとめ】');
 for (const r of rows) {
   const ok = r.reached && r.caught;
-  console.log(`  ${ok ? '✓' : '★'} ${r.key}  経路${r.reached ? '○' : '×'} / 捕捉${r.caught ? `○(${r.failed.join(',')})` : '×'}`);
+  console.log(`  ${ok ? '✓' : '★'} ${r.key}  経路${r.reached ? '○' : '×'} / `
+    + `効き${r.effective ? '○' : '×'}(${(r.moveRatio * 100).toFixed(0)}%) / `
+    + `捕捉${r.caught ? `○(${r.failed.join(',')})` : '×'}`);
+}
+const effectiveButUncaught = rows.filter((r) => r.reached && r.effective && !r.caught);
+if (effectiveButUncaught.length > 0) {
+  console.log('');
+  console.log('  ★★効いているのにゲートが捕まえない（＝登録簿の主張が成り立たない）:');
+  for (const r of effectiveButUncaught) console.log(`      ${r.key}（統計量は ${(r.moveRatio * 100).toFixed(0)}% 動くが帯の中）`);
 }
 const bad = rows.filter((r) => !(r.reached && r.caught));
 console.log('');
@@ -314,15 +338,17 @@ console.log(bad.length === 0
   ? `★全 ${rows.length} 件: ゲートが実際に捕まえました（推論ではなく実測）`
   : `★${bad.length} 件が未証明: ${bad.map((r) => r.key).join(', ')}`);
 
-// ★本体のツリーが一度も触られていないことを、最後に機械で確かめる
+// ★本体のツリーが**開始時から変わっていない**ことを、最後に機械で確かめる。
+//   ⚠️ 「空であること」を要求すると、**別の作業で編集しただけ**でも汚染と誤判定します。
+//      比べるのは開始時の状態です。
 const after = sh('git', ['status', '--porcelain', '--untracked-files=no']).trim();
-if (after !== '') {
+if (after !== dirty) {
   console.error('');
   console.error('★★本体の作業ツリーが汚れています（worktree 分離が効いていません）:');
   console.error(after.split('\n').map((l) => `    ${l}`).join('\n'));
   cleanupWorktree();
   process.exit(2);
 }
-console.log('  ✓ 本体の作業ツリーは無傷（git status が空）');
+console.log('  ✓ 本体の作業ツリーは開始時から変わっていない');
 cleanupWorktree();
 process.exit(bad.length === 0 ? 0 : 1);

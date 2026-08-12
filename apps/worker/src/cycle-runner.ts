@@ -91,6 +91,12 @@ export interface RaceEntrantSpec {
   readonly strategy: string;
   /** モンテカルロ勝率順位（§9.2）。算出前は undefined */
   readonly popularity?: number | undefined;
+  /**
+   * ★オッズ計算に使った出走馬そのもの（0016）。確定はこれを使い、`horses` を読み直しません。
+   *   ★型を `RaceEntrant` に固定していないのは、この層が race-engine に依存しないためです。
+   *     中身は `RaceEntrant` で、`settleRace` が復元します。
+   */
+  readonly snapshot?: Readonly<Record<string, unknown>> | undefined;
 }
 
 export interface OddsSpec {

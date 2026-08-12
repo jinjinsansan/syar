@@ -114,6 +114,22 @@ export function buildRace(
     weightKg: e.weightKg,
     strategy: e.strategy,
     popularity: ranked.indexOf(i + 1) >= 0 ? ranked.indexOf(i + 1) + 1 : undefined,
+    /**
+     * ★**モンテカルロに渡した出走馬そのもの**を凍結して返す（0016）。
+     *
+     * 【なぜ要るか】
+     *   確定側はこれまで `horses` を**もう一度読んで**いました。
+     *   2回読む以上、その間に馬の状態が動けば食い違います。
+     *   ★調子・疲労だけの問題ではありません。**能力（`stats`）も週送りで動きます。**
+     *     生成は2周先なので、間に週が進めば能力そのものがずれます。
+     *   → **オッズを計算した入力を保存し、確定はそれを使う**（読むのは1回だけ）。
+     *
+     * ★`numbered[i]` は `resolveRace` に実際に渡した値です。
+     *   ここで組み直すと「保存したものと計算に使ったものが違う」が起きるので、
+     *   **必ず MC に渡した配列から取ること。**
+     *   `horseId` だけは馬番に振り替えてあるので、元の UUID に戻します。
+     */
+    snapshot: { ...numbered[i]!, horseId: e.horseId },
   }));
 
   return {
