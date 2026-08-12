@@ -91,15 +91,24 @@ export async function loadRaceablePool(
  *   そこに混ぜると「遺伝エンジンが育成を知っている」形になります。
  *   → **別の表**として返し、`generateRace` に渡します。
  *
- * ★週送りを通していない馬（`last_processed_week` が null）は**返しません**。
- *   呼ぶ側が §7.4 の中央値に落とします。ここで 3/0 を作ると、
- *   「実データがある馬」と「無い馬」が区別できなくなります。
+ * 【★全馬を返します（2026-08-12 に直しました）】
+ *   最初は「週送りを通していない馬は**返さない**。呼ぶ側が §7.4 の中央値に落とす。
+ *   ここで 3/0 を作ると『実データがある馬』と『無い馬』が区別できなくなる」
+ *   という理由で絞っていました。**その判断が乖離を作っていました。**
+ *
+ *   返さないと、生成側は `rng.int(2, 4)` に落ちます。ところが確定側
+ *   （`pg-store.settleRace`）は **DB の列**を読み、そこには既定値 3 が入っています。
+ *   → **生成側と確定側で調子が違う**。Q-P3-32 と同じ型です。
+ *   ★実測: 本番で「育成状態が無い馬 224頭」となり、その全頭が乖離していました。
+ *
+ *   → **確定側が読む値をそのまま返します。** 区別が要るなら
+ *     `last_processed_week` を見れば分かるので、ここで絞る理由はありません。
  */
 export async function loadTrainingStates(
   client: pg.Client | pg.PoolClient,
 ): Promise<Map<string, { condition: number; fatigue: number }>> {
   const r = await client.query<{ id: string; condition: string | number; fatigue: string | number }>(
-    `select id, condition, fatigue from horses where last_processed_week is not null`,
+    `select id, condition, fatigue from horses`,
   );
   const out = new Map<string, { condition: number; fatigue: number }>();
   for (const row of r.rows) {
