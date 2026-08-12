@@ -29,6 +29,7 @@ import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
 import { recordUnlockDistribution } from './unlock-flow.js';
 import { runSelfcheck } from './selfcheck.js';
+import { runSchemacheck } from './schemacheck.js';
 import { CANCEL_AFTER_START_MS, classOf, conditionsOf, gradeOf } from '@star/scheduler';
 
 /** 1周の間隔。★サイクル長より短くする（1サイクルを取りこぼさないため） */
@@ -236,16 +237,41 @@ async function main(): Promise<void> {
  *   「環境変数が無いと自己検査もできない」形になります。
  *   ★配る物を**どこでも**走らせて確かめられることが要点です。
  */
-if (process.argv.includes('--selfcheck')) {
+/**
+ * ★`--schemacheck` は DB に繋ぎます（`--selfcheck` と違う点）。
+ *   配備前に「繋ぎ先がこのコードを動かせる形か」を確かめるためです。
+ *   2026-08-12、これが無いまま配備してワーカーが10回連続失敗しました。
+ */
+if (process.argv.includes('--schemacheck')) {
+  runSchemacheck()
+    .then((r) => {
+      for (const line of r.report) console.log(line);
+      process.exit(r.ok ? 0 : 1);
+    })
+    .catch((e: unknown) => {
+      console.error('[worker] schemacheck に失敗:', (e as Error).message);
+      process.exit(1);
+    });
+} else if (process.argv.includes('--selfcheck')) {
   // ★動的 import を使いません。**CJS バンドルはトップレベル await を許しません**
   //   （esbuild が「Top-level await is currently not supported with the cjs output format」で落ちます）。
   //   ★ここで落ちると、配る物が作れなくなります。静的に読み込みます。
   const r = runSelfcheck();
   for (const line of r.report) console.log(line);
   process.exit(r.ok ? 0 : 1);
+} else {
+  /**
+   * ★検査の旗が付いているときは **`main()` を呼びません**。
+   *
+   * 【なぜ else が要るか（2026-08-12 に踏みました）】
+   *   `--schemacheck` は非同期なので、`process.exit` が走る前に**下の `main()` も始まります**。
+   *   実際に `[worker] 起動 env=staging` が出ました。
+   *   ★**検査のつもりでワーカーを起動していた**ことになります。
+   *     本番に向けて流したら、周回が始まってレースを作りかねません。
+   *   `--selfcheck` は同期なので偶然表面化しませんでしたが、同じ穴でした。
+   */
+  main().catch((e) => {
+    console.error('[worker] 起動に失敗:', (e as Error).message);
+    process.exit(1);
+  });
 }
-
-main().catch((e) => {
-  console.error('[worker] 起動に失敗:', (e as Error).message);
-  process.exit(1);
-});

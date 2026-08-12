@@ -100,6 +100,21 @@ else
       return 1
     fi
     log "自己検査 OK: $(printf '%s' "$sc" | grep -c '^  ' ) 行"
+    # ★繋ぎ先の DB がこのコードを動かせる形かを見る（2026-08-12 の事故）。
+    #   ★上の2つの検査は**どちらも DB を見ていません**。
+    #     起動できるか／束ね方が壊れていないか、しか見ていないので、
+    #     マイグレーション未適用のまま配備でき、実際にそうなりました
+    #     （column "condition" does not exist で10回連続失敗して終了）。
+    #   ⚠️ ここは環境変数が要ります（DB に繋ぐので）。EnvironmentFile を読ませます。
+    local sch
+    if ! sch="$(cd "$DEST" && set -a && . /etc/star-worker.env 2>/dev/null; set +a; /usr/bin/node dist/worker.cjs --schemacheck 2>&1)"; then
+      log "★スキーマ照合が失敗:"
+      printf '%s
+' "$sch" | sed 's/^/    /'
+      log "★配備を中止します。`npx tsx tools/migrate.mjs` を先に流してください"
+      return 1
+    fi
+    log "スキーマ照合 OK"
   }
 
   if ! preflight; then
