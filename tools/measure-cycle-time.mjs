@@ -42,8 +42,18 @@ const SAMPLES = arg('--samples', 5);
 /** ★正典 §10.4 の上限。ここを変えるなら FIELD_SIZE も見ること */
 const WORST_FIELD = 18;
 
-const env = loadEnv();
-const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+/**
+ * ★VPS には `secrets.local.env` がありません（systemd が `/etc/star/worker.env` を渡します）。
+ *   すでに環境変数にあるならそれを使い、無ければ開発機と同じ `loadEnv` に落とします。
+ *
+ * ⚠️ 共通の `loadEnv` 側では**この分岐をしないこと**。あちらは状態を変えるツールも使っており、
+ *    「staging のつもりが環境変数で本番を拾う」が起きます。**本ツールは読み出しだけ**なので安全です。
+ */
+const dbUrl = process.env['DATABASE_URL'] ?? loadEnv().DATABASE_URL;
+// ★接続先は必ず出す。ただし**資格情報は絶対に出さない**（host と db 名だけ）
+const u = new URL(dbUrl);
+console.log(`[env] 接続先: ${u.hostname}${u.pathname}`);
+const c = new pg.Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
 await c.connect();
 
 console.log('# VPS 周時間の実測（★最悪 18頭立て）');
