@@ -14,6 +14,7 @@
  *   参考値として「介入対象馬だけの分布」も併記する（どちらで測ったかを隠さない）。
  */
 
+import { readFileSync } from 'node:fs';
 import { VERIFY_RACE_STREAM } from '@star/sim-engine';
 import {
   CALIBRATED_RACE_RANDOM_K,
@@ -26,7 +27,7 @@ import {
   resolveRace,
   type RaceBalance,
 } from '@star/race-engine';
-import { NICKS_GEN, deriveRng } from '@star/sim-engine';
+import { NICKS_GEN, deriveRng, type HorseRecord } from '@star/sim-engine';
 import { resolveRuntimeConfig } from './config.js';
 import {
   DEFAULT_CLASS_BAND,
@@ -92,6 +93,32 @@ const B6_WIRED = process.argv.includes('--b6-wired');
  *   **週ループが育てた現在能力**を使うか。★既定は false。
  */
 const REAL_ABILITY = process.argv.includes('--real-ability');
+/**
+ * ★`--pool <file>`: 本番から書き出した母集団を使う（Q-P3-39）。
+ *   `tools/export-pool.mjs` が作ったファイルを読みます。
+ */
+interface RealPoolHorse extends HorseRecord {
+  /** ★書き出し時の調子・疲労（B-6 用）。無ければ null */
+  readonly __training?: { condition: number; fatigue: number } | null;
+  readonly __ageWeeks?: number | null;
+}
+const REAL_POOL: RealPoolHorse[] | null = (() => {
+  const i = process.argv.indexOf('--pool');
+  if (i < 0) return null;
+  const file = process.argv[i + 1];
+  if (file === undefined) throw new Error('--pool にファイル名がありません');
+  const raw = JSON.parse(readFileSync(file, 'utf8')) as RealPoolHorse[];
+  if (!Array.isArray(raw) || raw.length === 0) throw new Error(`${file}: 母集団が空です`);
+  // ★`pedigreeCache` は Map に戻す。配列のままだと遺伝の関数が黙って空として扱う
+  for (const h of raw) {
+    // ★JSON では Map が空になるので、配列から戻す。
+    //   黙って空のままにすると、血統が消えた別の馬で測ることになります。
+    const entries = (h as unknown as { pedigreeCache: unknown }).pedigreeCache;
+    (h as unknown as { pedigreeCache: unknown }).pedigreeCache =
+      new Map((Array.isArray(entries) ? entries : []) as [string, readonly number[]][]);
+  }
+  return raw;
+})();
 const POOL_GENERATIONS = parseNumber('--pool-generations', MC.POOL_GENERATIONS);
 const POOL_MARES = parseNumber('--pool-mares', MC.POOL_MARES);
 /** クラス幅（母集団に対する割合）。1.0 でクラス分けなし */
@@ -162,23 +189,37 @@ interface SeedResult {
 }
 
 function runSeed(seed: number, racesForSeed: number): SeedResult {
+  /**
+   * --- 母集団 ---
+   *
+   * ★`--pool <file>` を渡すと、**本番（staging）から書き出した実物**を使います
+   *   （Q-P3-39 の裁定）。平均を合わせにいくのではなく、
+   *   **`potential` と `stats` の同時分布＝開放率の分布の形**をそのまま持ち込みます。
+   *
+   * ⚠️ 実物を使うと**シードを変えても母集団は同じ**です。
+   *    シード間のばらつきは「レースの引き方」だけになり、
+   *    **母集団のばらつきは測れません**。そのぶん SE は小さく出ます。
+   */
   // --- 母集団を作る（実際の遺伝エンジンの産物を使う） ---
   const { balance: geneticsBalance, founders } = resolveRuntimeConfig();
-  const sim = runSimulation(
-    {
-      seed,
-      generations: POOL_GENERATIONS,
-      population: POOL_MARES,
-      stallionPool: Math.round(POOL_MARES * 0.3),
-      v1Pairs: 1,
-      v1Repeats: 5,
-      retainFinalPopulation: true,
-    },
-    geneticsBalance,
-    founders,
-    NICKS_GEN,
-  );
-  const pool = sortPoolByClass(sim.finalPopulation ?? []);
+  const pool = REAL_POOL !== null
+    ? sortPoolByClass(REAL_POOL as unknown as HorseRecord[])
+    : sortPoolByClass(
+      runSimulation(
+        {
+          seed,
+          generations: POOL_GENERATIONS,
+          population: POOL_MARES,
+          stallionPool: Math.round(POOL_MARES * 0.3),
+          v1Pairs: 1,
+          v1Repeats: 5,
+          retainFinalPopulation: true,
+        },
+        geneticsBalance,
+        founders,
+        NICKS_GEN,
+      ).finalPopulation ?? [],
+    );
   if (pool.length === 0) throw new Error('母集団の取得に失敗（retainFinalPopulation）');
 
   // --- V-12: 平均F と 表現型 − genotype 乖離（丈夫さ） ---
@@ -218,14 +259,32 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
    *   `--b6-wired` を付けたときだけ切り替わります。
    *   ★既定で切り替えません。ゲートの値が動く変更を、旗なしで既定にしません。
    */
-  const sampler = (B6_WIRED || REAL_ABILITY) ? buildTrainingStateSampler(pool, seed) : null;
+  /**
+   * ★実物の母集団を使うときは、**その馬の値をそのまま**使います。
+   *   週ループを回し直す必要がありません（既に本番で回った結果が入っています）。
+   */
+  const sampler = REAL_POOL === null && (B6_WIRED || REAL_ABILITY)
+    ? buildTrainingStateSampler(pool, seed) : null;
+  const realOf = (h: HorseRecord): RealPoolHorse | undefined =>
+    REAL_POOL === null ? undefined : (h as RealPoolHorse);
 
   for (let raceIndex = 0; raceIndex < racesForSeed; raceIndex++) {
     const race = generateRace(pool, raceIndex, fieldRng, CLASS_BAND, UNLOCK, FLOOR, {
       // ★2つの旗を独立に効かせる（1回の変更で3点測るため）
-      ...(B6_WIRED && sampler !== null ? { trainingStateOf: sampler.stateOf } : {}),
-      ...(REAL_ABILITY && sampler !== null
-        ? { abilityOf: (h) => sampler.stateOf(h)?.stats } : {}),
+      ...(B6_WIRED
+        ? {
+          trainingStateOf: (h: HorseRecord) => (REAL_POOL === null
+            ? sampler?.stateOf(h)
+            : realOf(h)?.__training ?? undefined),
+        }
+        : {}),
+      ...(REAL_ABILITY
+        ? {
+          abilityOf: (h: HorseRecord) => (REAL_POOL === null
+            ? sampler?.stateOf(h)?.stats
+            : h.stats),
+        }
+        : {}),
     });
     sampler?.advance();
     const fieldSize = race.entrants.length;

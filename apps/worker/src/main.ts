@@ -28,6 +28,7 @@ import { loadRaceablePool } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
+import { recordUnlockDistribution } from './unlock-flow.js';
 import { runSelfcheck } from './selfcheck.js';
 import { CANCEL_AFTER_START_MS, classOf, conditionsOf, gradeOf } from '@star/scheduler';
 
@@ -170,7 +171,19 @@ async function main(): Promise<void> {
       if (today !== lastAggregated) {
         await aggregateDay(client, today);
         lastAggregated = today;
-        console.log(`[worker] 日次集計を更新 date=${today}`);
+        /**
+         * ★開放率の分布も毎日残す（レビュー側裁定 2026-08-12）。
+         *   P1 のゲートはこの分布の上に立っているので、
+         *   **測定時からずれたらゲートを測り直す**ための記録です。
+         */
+        const u = await recordUnlockDistribution(client, today);
+        console.log(
+          `[worker] 日次集計を更新 date=${today}` +
+          (u === null ? ' / 開放率: 対象0頭'
+            : ` / 開放率 平均${(u.mean * 100).toFixed(1)}% SD${(u.sd * 100).toFixed(1)}pt ` +
+              `(${(u.p10 * 100).toFixed(0)}/${(u.p50 * 100).toFixed(0)}/${(u.p90 * 100).toFixed(0)}) ` +
+              `週齢平均${u.ageMean.toFixed(0)} ${u.horses}頭`),
+        );
       }
     } catch (e) {
       // ★集計の失敗でループを止めない（A-1 が壊れる）。ただし黙らせない

@@ -28,6 +28,8 @@ export const READONLY = [
   'diag-b6.mjs',
   // ★読むだけ。生成時と保存時のレース条件を突き合わせる
   'diag-conditions.mjs',
+  // ★読むだけ。本番の馬をそのまま書き出してハーネスに食わせる
+  'export-pool.mjs',
   // ★読むだけ。保存済みレースが番組表と一致し、馬場が good 固定でないかを見る
   'verify-conditions-db.mjs',
   // ★読むだけ。本番が作ったオッズと本番が出した着順で払戻率を測る
@@ -70,6 +72,8 @@ export const STATE_CHANGING = [
   'settle-races.mjs',
   // ★週送りをワーカーの経路で実際に回す（全馬の状態を進める）
   'verify-training-week.mjs',
+  // ★開放率の日次記録（unlock_daily に書く）
+  'verify-unlock-daily.mjs',
   // ★staging の馬を実際に育てる（誕生週をずらして週送りを回す）
   'age-horses.mjs',
   // ★合成集団で経済を一巡させる（V-11 の②）
