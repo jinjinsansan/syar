@@ -106,12 +106,21 @@ else
     #     マイグレーション未適用のまま配備でき、実際にそうなりました
     #     （column "condition" does not exist で10回連続失敗して終了）。
     #   ⚠️ ここは環境変数が要ります（DB に繋ぐので）。EnvironmentFile を読ませます。
+    #   ⚠️ 環境ファイルの場所は systemd の EnvironmentFile と**同じもの**を使う。
+    #      別に書くと、片方だけ変わったときに検査が黙って落ちる。
+    local envfile="${STAR_ENV_FILE:-/etc/star/worker.env}"
+    if [ ! -f "$envfile" ]; then
+      log "★環境ファイルがありません: $envfile"
+      return 1
+    fi
     local sch
-    if ! sch="$(cd "$DEST" && set -a && . /etc/star-worker.env 2>/dev/null; set +a; /usr/bin/node dist/worker.cjs --schemacheck 2>&1)"; then
-      log "★スキーマ照合が失敗:"
+    if ! sch="$(cd "$DEST" && set -a && . "$envfile" && set +a && /usr/bin/node dist/worker.cjs --schemacheck 2>&1)"; then
+      log '★スキーマ照合が失敗:'
       printf '%s
 ' "$sch" | sed 's/^/    /'
-      log "★配備を中止します。`npx tsx tools/migrate.mjs` を先に流してください"
+      # ★シングルクォート。ダブルクォートでバッククォートを書くとコマンド置換になり、
+      #   **ログのつもりで migrate.mjs が実行された**（2026-08-12 に踏んだ）。
+      log '★配備を中止します。先に npx tsx tools/migrate.mjs を流してください'
       return 1
     fi
     log "スキーマ照合 OK"
