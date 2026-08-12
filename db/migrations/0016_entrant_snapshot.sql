@@ -29,6 +29,6 @@
 alter table race_entries
   add column if not exists entrant_snapshot jsonb;
 
+-- ★`comment on ... is` は式を取りません（`||` は構文エラー）。文字列リテラル1つで書きます
 comment on column race_entries.entrant_snapshot is
-  '★オッズ計算に使った RaceEntrant そのもの。確定はこれを使う（horses を読み直さない）。'
-  || 'null は 0016 より前に作られたレースのみ。新規レースで null なら生成側の不具合。';
+  '★オッズ計算に使った RaceEntrant そのもの。確定はこれを使う（horses を読み直さない）。null は 0016 より前に作られたレースのみ。新規レースで null なら生成側の不具合。';

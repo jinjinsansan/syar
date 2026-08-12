@@ -44,9 +44,16 @@ const arg = (flag, fallback) => {
   return i >= 0 ? process.argv[i + 1] : fallback;
 };
 
-/** ★縮小した本数。「効いているか」を見るだけなので帯の精度は要りません */
-const RACES = arg('--races', '4000');
-const SEEDS = arg('--seeds', '42,7');
+/**
+ * ★本数と seed。**指定しなければゲート自身の既定（60,000本 × 4シード）**を使います。
+ *
+ * ⚠️ ここに既定値を書いてはいけません。**書いたせいで「本番本数で測った」と誤認しました**
+ *    （既定 4000 のまま `--races` 無しで回し、前回と同じ基準値が出たので気づきました）。
+ *    ★「帯を出るか」の判定には**ゲートと同じ本数**が要ります。
+ *      縮小してよいのは「その定数が効いているか」を見るときだけです。
+ */
+const RACES = arg('--races', null);
+const SEEDS = arg('--seeds', null);
 
 /**
  * 対象。`settingsKey` は **ゲートの JSON が返す実効値の名前**で、
@@ -205,7 +212,10 @@ for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { cleanupWorktree
 const runGate = (gate) => {
   if (gate !== 'race') throw new Error(`未対応のゲート: ${gate}`);
   const opts = { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, shell: process.platform === 'win32' };
-  const argv = ['tsx', 'apps/cli/src/verify-race.ts', '--races', RACES, '--seeds', SEEDS, '--json'];
+  const argv = ['tsx', 'apps/cli/src/verify-race.ts', '--json'];
+  // ★指定されたときだけ渡す。渡さなければゲートの既定（本来の本数）で回ります
+  if (RACES !== null) argv.push('--races', RACES);
+  if (SEEDS !== null) argv.push('--seeds', SEEDS);
   let out;
   let exitCode = 0;
   try {
@@ -225,9 +235,13 @@ const runGate = (gate) => {
 
 console.log('# ★較正定数を壊したとき V-ゲートが落ちるか（Q-P3-42）');
 console.log('');
-console.log(`  ★縮小して回しています: races=${RACES} seeds=${SEEDS}`);
-console.log('    「帯を出るか」ではなく「その定数が効いているか」を見るためです。');
-console.log('    ⚠️ この本数は**帯の判定には足りません**。ゲート本体は本来の本数で回すこと。');
+if (RACES === null && SEEDS === null) {
+  console.log('  ★ゲート本来の本数で回します（60,000本 × 4シード）。帯の判定はこれでのみ有効です');
+} else {
+  console.log(`  ★縮小して回しています: races=${RACES ?? '既定'} seeds=${SEEDS ?? '既定'}`);
+  console.log('    ⚠️ **この本数で「ゲートが捕まえない」とは言えません。**帯の縁で判定が変わります。');
+  console.log('    縮小してよいのは「その定数が効いているか」を見るときだけです。');
+}
 console.log('');
 
 console.log('【基準】改変なしで回します');

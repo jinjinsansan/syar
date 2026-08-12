@@ -83,17 +83,45 @@ const applied = new Map(rows.map((r) => [r.filename, r.checksum]));
 
 // ★適用済みのファイルが書き換えられていないか。ここは黙って通さない
 let drift = 0;
+const driftFiles = [];
 for (const f of files) {
   const want = applied.get(f);
   if (want === undefined) continue;
   const got = sha(readFileSync(`db/migrations/${f}`, 'utf8'));
   if (got !== want) {
     console.error(`  ★${f}: 適用済みだが内容が変わっています（DB とリポジトリが食い違っている）`);
+    console.error(`      DB の記録: ${want.length === 64 ? `${want.slice(0, 16)}…` : `★"${want}"（sha256 ではありません＝手で入れた記録）`}`);
+    console.error(`      ファイル : ${got.slice(0, 16)}…`);
     drift += 1;
+    driftFiles.push(f);
   }
 }
 if (drift > 0) {
+  /**
+   * ★`--repair-checksum <file>` は**記録だけ**を直します。
+   *
+   * ⚠️ **使ってよいのは「スキーマが実際にそのマイグレーションどおりだと確かめた」ときだけ**です。
+   *    記録を合わせれば警告は消えますが、**消えるのは警告であって食い違いではありません。**
+   *    実例: staging の 0015 は `checksum='restored'` という手書きの記録が入っていました
+   *    （テーブル定義は 0015 と完全一致していたので、記録だけの問題でした）。
+   *
+   * ★ファイルを書き換えてしまった場合は**これを使わず、新しい番号で足してください。**
+   */
+  const repairIdx = process.argv.indexOf('--repair-checksum');
+  const repairTarget = repairIdx >= 0 ? process.argv[repairIdx + 1] : null;
+  if (repairTarget !== null && driftFiles.includes(repairTarget)) {
+    const got = sha(readFileSync(`db/migrations/${repairTarget}`, 'utf8'));
+    console.error('');
+    console.error(`★記録だけを直します: ${repairTarget}`);
+    console.error(`    ${applied.get(repairTarget)} → ${got}`);
+    console.error('  ⚠️ スキーマが実際にこのマイグレーションどおりであることは、呼び出した人の責任です');
+    await client.query('update schema_migrations set checksum = $2 where filename = $1', [repairTarget, got]);
+    console.error('  直しました。もう一度実行してください');
+    await client.end();
+    process.exit(1);
+  }
   console.error(`\n★${drift} 件が食い違っています。適用済みのファイルを書き換えず、新しい番号で足してください`);
+  console.error('  （★記録だけが壊れていると確認できた場合に限り: --repair-checksum <ファイル名>）');
   await client.end();
   process.exit(1);
 }
