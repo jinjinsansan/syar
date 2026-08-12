@@ -27,7 +27,7 @@ import { loadRaceablePool, loadTrainingStates } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
-import { recordUnlockDistribution } from './unlock-flow.js';
+import { recordUnlockDistribution, unlockDrift } from './unlock-flow.js';
 import { runSelfcheck } from './selfcheck.js';
 import { runSchemacheck } from './schemacheck.js';
 import { CANCEL_AFTER_START_MS, classOf, conditionsOf, gradeOf } from '@star/scheduler';
@@ -200,6 +200,27 @@ async function main(): Promise<void> {
               `(${(u.p10 * 100).toFixed(0)}/${(u.p50 * 100).toFixed(0)}/${(u.p90 * 100).toFixed(0)}) ` +
               `週齢平均${u.ageMean.toFixed(0)} ${u.horses}頭`),
         );
+        /**
+         * ★**ずれたら黙らせない**（レビュー側裁定 2026-08-13）。
+         *
+         *   これまでは記録するだけで、「測定時からずれたら測り直してください」は
+         *   ★**手順**でした。手順は読まれなければ働きません。
+         *   → ワーカー自身がゲートを測ったときの分布と突き合わせ、**目に付く形で出します**。
+         *
+         *   ⚠️ ここで `UNLOCK_BASELINE` を実測に合わせて更新しないこと。
+         *      更新すれば警告は消えますが、**消えるのは警告であってずれではありません。**
+         */
+        if (u !== null) {
+          const drift = unlockDrift(u);
+          if (drift.length > 0) {
+            console.error(
+              `[worker] ★★開放率が P1 のゲートを測ったときの分布からずれています — ` +
+                drift.map((d) => `${d.key} ${(d.baseline * 100).toFixed(1)}% → ${(d.now * 100).toFixed(1)}%`
+                  + `（${d.diff >= 0 ? '+' : ''}${(d.diff * 100).toFixed(1)}pt）`).join(' / ') +
+                '。V-4/V-5/V-6 はこの分布の上に立っているので、測り直してください（D-053）',
+            );
+          }
+        }
       }
     } catch (e) {
       // ★集計の失敗でループを止めない（A-1 が壊れる）。ただし黙らせない

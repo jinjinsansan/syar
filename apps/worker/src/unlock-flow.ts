@@ -87,3 +87,57 @@ export async function recordUnlockDistribution(
   );
   return snap;
 }
+
+/**
+ * ★P1 のゲート（V-4/V-5/V-6）を測ったときの開放率の分布（D-053 の「較正条件」）。
+ *
+ * ⚠️ **この値を、実測に合わせて動かさないこと。**
+ *    ここは「ゲートがどの世界で通ったか」の記録です。動かすと**警告が黙るだけ**で、
+ *    ゲートが古い世界の証拠のまま生き続けます（R-23 と同じ構図）。
+ *    分布が動いたなら、**測り直してからこの値を更新**します。
+ *
+ * 出典: `docs/MEASURE_P1GATES_REALPOOL_BOTH.txt` / `REPORT_P3_REALPOOL_20260812.md`
+ */
+export const UNLOCK_BASELINE = {
+  mean: 0.713,
+  sd: 0.126,
+  p10: 0.553,
+  p50: 0.738,
+  p90: 0.861,
+} as const;
+
+/**
+ * ★ずれの許容幅。
+ *   平均で 5pt、四分位で 8pt。**根拠は「これを超えると V-4 が帯を出る」ではありません**
+ *   （それを測るには開放率を振ってゲートを回す掃引が要ります）。
+ *   ★現時点では「明らかに別の世界になったら気づく」ための暫定値です。
+ *   → 掃引で「V-4 が帯を出る開放率」を出したら、この値をそれに置き換えること（照会 Q-P3-44）。
+ */
+export const UNLOCK_DRIFT_TOLERANCE = { mean: 0.05, quantile: 0.08 } as const;
+
+export interface UnlockDrift {
+  readonly key: string;
+  readonly baseline: number;
+  readonly now: number;
+  readonly diff: number;
+}
+
+/**
+ * 記録した分布が、ゲートを測ったときの分布からずれていないかを見る。
+ *
+ * ★**平均だけを見ません。** 平均が同じでも上下に割れていれば別の世界です
+ *   （Q-P3-39 の裁定そのもの）。四分位も同時に見ます。
+ */
+export function unlockDrift(snap: UnlockSnapshot): UnlockDrift[] {
+  const out: UnlockDrift[] = [];
+  const check = (key: keyof typeof UNLOCK_BASELINE, now: number, tol: number): void => {
+    const baseline = UNLOCK_BASELINE[key];
+    const diff = now - baseline;
+    if (Math.abs(diff) > tol) out.push({ key, baseline, now, diff });
+  };
+  check('mean', snap.mean, UNLOCK_DRIFT_TOLERANCE.mean);
+  check('p10', snap.p10, UNLOCK_DRIFT_TOLERANCE.quantile);
+  check('p50', snap.p50, UNLOCK_DRIFT_TOLERANCE.quantile);
+  check('p90', snap.p90, UNLOCK_DRIFT_TOLERANCE.quantile);
+  return out;
+}
