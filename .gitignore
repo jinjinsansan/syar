@@ -59,3 +59,6 @@ secrets.staging.env
 *supabase情報*
 壊す用*
 tools/_*.mjs
+
+# ★変異試験の使い捨て作業ツリー（tools/mutation/gates.mjs）
+.mutation-wt/
