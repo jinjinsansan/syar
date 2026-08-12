@@ -41,6 +41,62 @@ UNIT="${STAR_UNIT:-star-worker}"
 #   ★「時間内に出なかった」を「壊れている」と読む誤りで、
 #     `-e` の top-level await で検査自体が落ちていたのと同じ形です。理由を先に確かめること。
 HEALTH_TIMEOUT="${STAR_HEALTH_TIMEOUT:-900}"
+LOGFILE="${STAR_DEPLOY_LOG:-/var/log/star-deploy.log}"
+
+# ────────────────────────────────────────────────────────────────
+# ★★配備を、配備した人の接続から切り離す（2026-08-12 の事故の是正）
+#
+# 【何が起きたか】
+#   12:30:07 に配備 → 毎周 `column "condition" does not exist` で失敗。
+#   `healthy()` は 900秒待って**自動でロールバックする**設計でした。
+#   ★ところが 12:45:07（時間切れの時刻）に restart の記録がありません。
+#     **自動ロールバックは走っていません。** 実際に戻ったのは 12:52:34 で、手作業です。
+#
+# 【なぜ走らなかったか】
+#   このスクリプトは ssh セッションの**前景プロセス**でした。
+#   配備側の ssh 呼び出しが 900秒より短いタイムアウトで打ち切られ、
+#   **SIGHUP がこのスクリプトを殺し、健全性確認とロールバックごと消えました。**
+#
+#   ★つまり **防御機構が、配備した人の接続が生きていることに依存していました。**
+#     `--schemacheck` は「あの事故」を塞ぎますが、**この構造を直さなければ
+#     次の別の事故は同じように通ります**（個別の穴と、防御機構の不作動は別の問題）。
+#
+# 【直し方】
+#   自分自身を `setsid` で切り離して再実行し、記録はファイルに残します。
+#   呼び出し側には `tail --pid` で見せるので、対話的な使い勝手は変わりません。
+#   ★**ssh が切れても、健全性確認とロールバックは最後まで走ります。**
+# ────────────────────────────────────────────────────────────────
+STATUSFILE="$LOGFILE.status"
+
+if [ "${STAR_DEPLOY_DETACHED:-}" != "1" ]; then
+  touch "$LOGFILE"
+  rm -f "$STATUSFILE"
+  echo "[deploy] ── $(date -Is) 配備開始 target=$TARGET ──" >>"$LOGFILE"
+  # ★`setsid` は fork するので `$!` が**実プロセスを指しません**（`tail --pid` が即終了する）。
+  #   SIGHUP を無視させれば足りるので `nohup` を使います。
+  STAR_DEPLOY_DETACHED=1 nohup bash "$0" "$@" >>"$LOGFILE" 2>&1 &
+  child=$!
+  echo "[deploy] ★接続から切り離して実行します（pid=$child・記録 $LOGFILE）"
+  echo "[deploy] ★ここで接続が切れても、健全性確認とロールバックは完走します"
+  # ★対話的な使い勝手のために記録を流すだけです。
+  #   ⚠️ **「tail が終わった＝配備成功」ではありません。**下の結果判定を必ず見ること。
+  tail --pid="$child" -n +0 -f "$LOGFILE" 2>/dev/null || true
+
+  # ★結果は**ファイルから読みます**。
+  #   `wait` に頼ると、接続が切れた場合はもちろん、`disown` した場合にも拾えません。
+  #   実際、最初に `wait` で書いたら**子が失敗しているのに 0 を返しました**
+  #   （＝失敗した配備が成功として報告される）。
+  status="$(cat "$STATUSFILE" 2>/dev/null || true)"
+  if [ "$status" = "0" ]; then
+    exit 0
+  fi
+  echo "[deploy] ★配備は成功していません（status=${status:-不明}・記録 $LOGFILE）"
+  exit 1
+fi
+
+# ★切り離した側: どの経路で終わっても結果を残す（★これが呼び出し側の唯一の判定材料）
+trap 'rc=$?; echo "$rc" > "$STATUSFILE"; exit $rc' EXIT
+
 /usr/bin/env true
 
 log() { echo "[deploy] $*"; }
