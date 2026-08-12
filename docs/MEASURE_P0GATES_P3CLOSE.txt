@@ -1,0 +1,27 @@
+
+> star@0.0.0 verify
+> tsx apps/cli/src/verify.ts
+
+繁殖牝馬=800頭 / 種牡馬プール=240頭 / シード=42,7,2026,31337 / horizon=100,300
+
+=== 100 ゲーム内年（実時間 約2.4年相当）===
+   seed |      V-1    判定 |    V-2a %/世代    判定 |   V-2b 天井    判定 |          V-2d 最大乖離    判定 |            V-2f 最悪傾き    判定 |             V-2e 最悪SD比    判定 |   V-3 |      丈夫さ |     親子相関
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+     42 |    15.8%  PASS |       0.0528  PASS |    53.63%  PASS |   durability 0.15%  PASS |  surface.dirt -0.087  PASS |  distance_center 0.92x  PASS |  PASS |    650.5 |    0.361
+      7 |   15.37%  PASS |       0.0494  PASS |    53.53%  PASS |  durability -1.44%  PASS | distance_center 0.102  PASS |   heavy_aptitude 0.92x  PASS |  PASS |    639.9 |    0.357
+   2026 |   16.86%  PASS |       0.3142  PASS |    56.87%  PASS |   durability 0.72%  PASS | distance_range -0.193  PASS |       durability 1.08x  PASS |  PASS |    655.6 |    0.367
+  31337 |   15.87%  PASS |       0.1234  PASS |     54.4%  PASS |   durability 0.97%  PASS | heavy_aptitude 0.151  PASS |       durability 1.04x  PASS |  PASS |    655.5 |    0.316
+     平均 |   15.97%       |                    |                 |                          |                  0.99x       |       |    650.4 |
+
+=== 300 ゲーム内年（実時間 約7.1年相当）===
+   seed |      V-1    判定 |    V-2a %/世代    判定 |   V-2b 天井    判定 |          V-2d 最大乖離    判定 |            V-2f 最悪傾き    判定 |             V-2e 最悪SD比    判定 |   V-3 |      丈夫さ |     親子相関
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+     42 |   16.49%  PASS |      -0.0076  PASS |    60.68%  PASS |  durability -0.35%  PASS |   surface.dirt 0.155  PASS |       durability 1.05x  PASS |  PASS |    647.3 |    0.403
+      7 |   15.96%  PASS |       0.0392  PASS |       55%  PASS |   durability 0.11%  PASS | distance_range -0.215  PASS |  distance_center 0.94x  PASS |  PASS |    650.0 |    0.270
+   2026 |   15.18%  PASS |      -0.0692  PASS |     60.3%  PASS |   durability 0.42%  PASS |  surface.dirt -0.155  PASS |     surface.turf 0.92x  PASS |  PASS |    653.6 |    0.360
+  31337 |      16%  PASS |       0.0183  PASS |    63.38%  PASS |  durability -1.00%  PASS |        temper -0.127  PASS |     surface.turf 1.05x  PASS |  PASS |    642.7 |    0.357
+     平均 |   15.91%       |                    |                 |                          |                  0.99x       |       |    648.4 |
+V-2c（300年での V-1 が 12〜18%）: PASS  [最小 15.18% / 最大 16.49%]
+
+所要時間: 421.3 秒
+総合: PASS
