@@ -68,8 +68,20 @@ const hash = {
 };
 const store = createPgStore(c, hash);
 const seeds = { serverSeed: (i) => `a2-seed-${i}`, seedCommit: (i) => hash.sha256(`a2-seed-${i}`) };
-/** ★A-2 は生成の冪等性を見るので、出走表とオッズの中身は問わない */
-const build = () => ({ entrants: [], odds: [] });
+/**
+ * ★A-2 は生成の冪等性を見るので、出走表とオッズの**中身**は問わない。
+ *
+ * ⚠️ ただし `conditions` は**省略できません**（Q-P3-32 で `createRace` が条件を保存するようになった）。
+ *    ★ここが欠けたまま**気づかれずに残っていました**: A-2 の PASS は古い SHA のまま繰り越され、
+ *      ツールは `Cannot read properties of undefined (reading 'surface')` で
+ *      **起動直後に落ちる状態**でした。R-23 が想定した事態そのものの再発です。
+ *    → 中身を問わないものと、**省略すると壊れるもの**は違います。
+ */
+const build = () => ({
+  entrants: [],
+  odds: [],
+  conditions: { surface: 'turf', distance: 1600, trackCondition: 'good', courseId: 'C1' },
+});
 const alerts = [];
 const onAlert = (a) => alerts.push(a);
 
