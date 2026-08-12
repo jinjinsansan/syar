@@ -72,6 +72,9 @@ export const STATE_CHANGING = [
   'settle-races.mjs',
   // ★週送りをワーカーの経路で実際に回す（全馬の状態を進める）
   'verify-training-week.mjs',
+  // ★出走馬の凍結（0016）の検証。horses を一時的に壊してから確定するので状態を変える
+  //   （壊した値は1頭ずつ元に戻し、戻せたことも検査する）
+  'verify-entrant-freeze.mjs',
   // ★開放率の日次記録（unlock_daily に書く）
   'verify-unlock-daily.mjs',
   // ★staging の馬を実際に育てる（誕生週をずらして週送りを回す）
