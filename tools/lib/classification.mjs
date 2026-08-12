@@ -78,6 +78,8 @@ export const STATE_CHANGING = [
   'age-horses.mjs',
   // ★合成集団で経済を一巡させる（V-11 の②）
   'verify-v11-synthetic.mjs',
+  // ★実際に馬券を買って払戻の機械を検査する
+  'verify-v10-bets.mjs',
   'seed-stables.mjs',
   'seed-world.mjs',
   'synthetic-bettor.mjs',
