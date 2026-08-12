@@ -36,6 +36,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const md5 = (s) => createHash('md5').update(s).digest('hex');
 const arg = (flag, fallback) => {
@@ -115,7 +116,11 @@ if (targets.length === 0) {
 //   本体のツリーは**一度も触られません**。中断しても残るのは捨てるツリーだけです。
 // ────────────────────────────────────────────────────────────────
 const KEEP = process.argv.includes('--keep-worktree');
-const WORKTREE = arg('--worktree', join(process.cwd(), '.mutation-worktree'));
+/**
+ * ★作業ツリーは**リポジトリの外**に作ります。
+ *   中に作ると、掃除に失敗したとき本体の `git status` に混ざります。
+ */
+const WORKTREE = arg('--worktree', join(tmpdir(), 'star-mutation-worktree'));
 const sh = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { encoding: 'utf8', shell: process.platform === 'win32', ...opts });
 
@@ -130,22 +135,62 @@ if (dirty !== '') {
 const HEAD_SHA = sh('git', ['rev-parse', 'HEAD']).trim();
 
 if (existsSync(WORKTREE)) {
-  try { sh('git', ['worktree', 'remove', '--force', WORKTREE]); } catch { rmSync(WORKTREE, { recursive: true, force: true }); }
+  // ★ここでも**リンクを先に外す**。rmSync の recursive はジャンクションを辿ります
+  const oldNm = join(WORKTREE, 'node_modules');
+  if (existsSync(oldNm)) {
+    try {
+      if (process.platform === 'win32') sh('cmd', ['/c', 'rmdir', oldNm], { stdio: 'pipe' });
+      else sh('unlink', [oldNm]);
+    } catch { /* 下で確認する */ }
+  }
+  if (existsSync(oldNm)) {
+    console.error(`★前回の node_modules リンクを外せません。手で外してください: ${oldNm}`);
+    process.exit(2);
+  }
+  try { sh('git', ['worktree', 'remove', '--force', WORKTREE], { stdio: 'pipe' }); } catch { rmSync(WORKTREE, { recursive: true, force: true }); }
 }
+sh('git', ['worktree', 'prune'], { stdio: 'pipe' });
 sh('git', ['worktree', 'add', '--detach', WORKTREE, HEAD_SHA], { stdio: 'pipe' });
 console.log(`  ★変異は別ツリーの中だけで起こします: ${WORKTREE}（${HEAD_SHA.slice(0, 7)}）`);
 // ★node_modules はツリーに含まれないので、本体のものを指す（npm ci をやり直さない）
 //   Windows のジャンクションは管理者権限が要らない
+/**
+ * ★`node_modules` はツリーに含まれないので、本体のものを指します（`npm ci` をやり直さない）。
+ *
+ * ⚠️⚠️ **リンクを張ったまま `git worktree remove --force` を実行してはいけません。**
+ *   ★実際にやって**本体を壊しました**: Windows のジャンクションを再帰削除が辿り、
+ *     **本体の `node_modules` が空になり、追跡ファイル178件が消えました**
+ *     （コミット済みだったので `git checkout -- .` と `npm ci` で復旧）。
+ *   → 片付けでは**必ず先にリンクだけを外します**（下の `unlinkNodeModules`）。
+ */
 const nm = join(WORKTREE, 'node_modules');
+const realNodeModules = join(process.cwd(), 'node_modules');
 if (!existsSync(nm)) {
   if (process.platform === 'win32') {
-    sh('cmd', ['/c', 'mklink', '/J', nm, join(process.cwd(), 'node_modules')], { stdio: 'pipe' });
+    sh('cmd', ['/c', 'mklink', '/J', nm, realNodeModules], { stdio: 'pipe' });
   } else {
-    sh('ln', ['-s', join(process.cwd(), 'node_modules'), nm]);
+    sh('ln', ['-s', realNodeModules, nm]);
   }
 }
+
+/** ★リンクだけを外す（中身は消さない）。`rmdir` / `unlink` はリンクを辿りません */
+const unlinkNodeModules = () => {
+  if (!existsSync(nm)) return;
+  try {
+    if (process.platform === 'win32') sh('cmd', ['/c', 'rmdir', nm], { stdio: 'pipe' });
+    else sh('unlink', [nm]);
+  } catch { /* 外せなければ worktree を消さない（下で確認する） */ }
+};
+
 const cleanupWorktree = () => {
   if (KEEP) { console.log(`  ★--keep-worktree が付いているので残します: ${WORKTREE}`); return; }
+  unlinkNodeModules();
+  // ★事後条件: リンクが残っているのに再帰削除しない（本体を巻き添えにするため）
+  if (existsSync(nm)) {
+    console.error(`  ★node_modules のリンクを外せませんでした。**worktree を消しません**: ${WORKTREE}`);
+    console.error('    （このまま消すと本体の node_modules を巻き添えにします）');
+    return;
+  }
   try { sh('git', ['worktree', 'remove', '--force', WORKTREE], { stdio: 'pipe' }); } catch { /* 残っても本体は無傷 */ }
 };
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { cleanupWorktree(); process.exit(130); });
