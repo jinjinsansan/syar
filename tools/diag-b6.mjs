@@ -82,18 +82,38 @@ console.log('  ★1.00 でなければ、**オッズを計算した馬と実際�
 console.log('    （§9.2 のオッズはサーバー権威で、プレイヤーはこれを見て買います）');
 console.log('');
 
-console.log('【② 調子・疲労】');
-const conds = [];
+console.log('【② 調子・疲労】★馬ごとに突き合わせる');
+/**
+ * ★**同じ馬どうし**で比べます。
+ *
+ * 【なぜ直したか】
+ *   最初、「生成時の平均」と「DB 全馬の平均」を並べて出していました。
+ *   生成時は**出走した254頭**、DB は**全7,370頭**で、**母集団が違います**。
+ *   実測: 全馬 65.88 / 出走可能な母集団(3,000頭) 65.39 / 出走した254頭 66.38。
+ *   ★能力比は per-horse なので 1.0000 と出るのに、調子・疲労だけ差が出て見えました。
+ *   **量が違うものを並べていただけ**で、実装の差ではありません。
+ */
+const condDiff = [];
+const fatDiff = [];
+let noState = 0;
 for (let i = 0; i < RACES; i += 1) {
   const race = generateRace(pool, i, deriveRng(4243, 61, i), undefined, undefined, undefined,
     { abilityOf: (h) => h.stats, trainingStateOf: (h) => states.get(h.id) });
-  for (const e of race.entrants) conds.push({ c: e.condition, f: e.fatigue });
+  for (const e of race.entrants) {
+    const st = states.get(e.horseId);
+    if (st === undefined) { noState += 1; continue; }
+    condDiff.push(e.condition - st.condition);
+    fatDiff.push(e.fatigue - st.fatigue);
+  }
 }
-console.log(`  生成時: 調子 平均 ${mean(conds.map((x) => x.c)).toFixed(2)} SD ${sd(conds.map((x) => x.c)).toFixed(2)} / ` +
-  `疲労 平均 ${mean(conds.map((x) => x.f)).toFixed(2)} SD ${sd(conds.map((x) => x.f)).toFixed(2)}`);
-console.log('  確定時: 調子 3（固定） / 疲労 0（固定）  ← pg-store.ts:249-250');
+const within = (a) => a.filter((x) => Math.abs(x) < 1e-9).length;
+console.log(`  突き合わせ ${condDiff.length} 頭（育成状態が無い馬 ${noState} 頭は除外）`);
+console.log(`  調子: 生成時 − DB の差が 0 の馬 ${within(condDiff)}/${condDiff.length}  最大差 ${Math.max(0, ...condDiff.map(Math.abs)).toFixed(4)}`);
+console.log(`  疲労: 生成時 − DB の差が 0 の馬 ${within(fatDiff)}/${fatDiff.length}  最大差 ${Math.max(0, ...fatDiff.map(Math.abs)).toFixed(4)}`);
+console.log('  ★1頭でも差があれば、生成側が DB を見ていないということです。');
+console.log('  確定時: 同じ列を読んでいる（pg-store.settleRace が horses.condition / fatigue を読む）');
 console.log('');
-console.log('  ★DB には 0010 で condition / fatigue の列があります。どちらもそれを見ていません');
+console.log('  ★生成側も確定側も 0010 の列を見ています（Q-P3-35 で投入）');
 
 const dbState = await c.query(
   `select count(*)::int n,
