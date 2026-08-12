@@ -328,7 +328,7 @@ export function stableScore(h: HorseRecord, stable: Stable): number {
  * → 週次再較正が始まればプレイヤー側の値に置き換わり、この初期値は使われなくなる。
  */
 export const NPC_FOLLOW_COEFFICIENT = 0.92;
-export const NPC_FOLLOW_TOP_RATIO = 1.0;
+export const NPC_FOLLOW_TOP_RATIO = 0.3;
 
 export function npcTargetFrom(scores: readonly number[]): number {
   if (scores.length === 0) return 0;
