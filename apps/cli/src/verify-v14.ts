@@ -242,8 +242,23 @@ const perEp = (p: Policy): number => u(p) / mean(results[p].map((r) => r.epSpent
  */
 // prettier-ignore
 export const DOMINANCE_MARGIN_RATIO = 1.02;
+
+/**
+ * ★③の判定を**純関数に切り出します**（変異試験 CAL-DOMINANCE_MARGIN_RATIO）。
+ *
+ *   切り出す前は、この判定を確かめる方法が `toBe(1.02)` の値照合しかありませんでした。
+ *   ★値照合は摂動すれば必ず落ちるので、「守られている」とは言えません（R-14）。
+ *   関数にすれば「**支配的な戦略を実際に落とせるか**」を試験できます。
+ *
+ * @param epRatio 追い切り偏重の EP あたり開放率 ÷ バランス型のそれ
+ * @returns 支配的でなければ true（＝③が通る）
+ */
+export function isNotDominant(epRatio: number): boolean {
+  return epRatio <= DOMINANCE_MARGIN_RATIO;
+}
+
 const epRatio = perEp('hard_only') / perEp('balanced');
-const g3 = epRatio <= DOMINANCE_MARGIN_RATIO;
+const g3 = isNotDominant(epRatio);
 const seOf = (p: Policy): number => {
   const a = results[p].map((r) => r.unlock * 100);
   return sd(a) / Math.sqrt(a.length);

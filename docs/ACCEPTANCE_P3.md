@@ -19,7 +19,7 @@
 | **B-6** | 調子・疲労が §8b の介入ゲージ初期値に接続 | **PASS** | `9fce812` | 本番の実分布で V-13 = 0.165（有意差）・全ゲート PASS |
 | **B-7** | 引退馬が NPC と同一の遺伝エンジンで繁殖に乗る | **PASS** | `6423e38` | `retirement.test.ts`（★繁殖の実装がここに無いことを機械的に検査） |
 | **B-8** | P0/P1/P2 の全ゲートが通る（回帰） | **PASS** | §2 参照 | 各ゲートを現 HEAD で再実行 |
-| **B-9** | テスト全PASS・typecheck・`any` ゼロ・変異試験 | **PASS** | 本便 | 614件緑 / `tsc --noEmit` / 変異試験（§3） |
+| **B-9** | テスト全PASS・typecheck・`any` ゼロ・変異試験 | **★条件付き** | 本便 | 622件緑 / `tsc --noEmit` / ★**変異試験は 24 OK / 23 NG**（§3） |
 
 ---
 
@@ -36,24 +36,56 @@
 
 ---
 
-## 3. 変異試験（B-9）
+## 3. 変異試験（B-9）— ★満たしていません
 
-`npm run mutation`。★**「テストがある」ことと「テストが守っている」ことは別**なので、
-較正定数を1つずつ壊して**落ちること**を確かめます。
+`npm run mutation` を流しました。**24 OK / 23 NG** です。
+★**「テストがある」ことと「テストが守っている」ことは別**で、
+このハーネスは「**★付きの振る舞いテストが落ちること**」を要求します
+（値照合 `toBe(7.8)` は摂動すれば必ず落ちるので、防御の証拠になりません・R-14）。
 
-P3 で追加・変更した定数:
+### ★まず、これは私が確かめずに PASS と書いていました
 
-| 定数 | 壊したときに何が起きるか |
+最初この判定書に「B-9 PASS」と書きました。**変異試験の結果を見る前**です。
+「PASS と書いてあることが、何についての PASS なのか」——**自分で踏みました。**
+
+### P3 で足した定数は防御できています
+
+| 定数 | 判定 |
 |---|---|
-| `INJURY_BASE_PROB` | V-7a が 39.1% に上がり、帯の上端まで 0.8 SE しか残らない |
-| `TEMPER_FLOOR_RATIO` | **下限が消え、全馬の気性が 0 に潰れる**（V-15 だけが検出する） |
-| `BASE_GAIN` | 放置が 87% まで上がり、適切な育成との差が縮む |
-| `FATIGUE_NATURAL_RECOVERY` | 何もしない馬が最も激しい調教をした馬より疲れる |
-| `MAIN_EFFECT_COEF` / `SIDE_EFFECT_COEF` | 主効果の意味が消える / 1形質だけ極端に伸びる |
-| `COMMON_EVENT_PROB` ほか §7.6 | 毎週イベントが起き、テキストの特別感が消える |
-| `DOMINANCE_MARGIN_RATIO` | EP あたり効率が何倍でも PASS になる |
+| `TEMPER_FLOOR_RATIO` | ✓ OK（V-15 が検出） |
+| `INJURY_BASE_PROB` | ✓ OK |
+| `COMMON_EVENT_PROB` / `PUSH_THROUGH_IQ_MULT` | ✓ OK |
+| `FATIGUE_NATURAL_RECOVERY` | ✓ OK |
+| `MAIN_EFFECT_COEF` / `SIDE_EFFECT_COEF` | ✓ OK |
+| **`BASE_GAIN`** | ✗ → **★本便で ★試験を足して OK にしました** |
+| **`DOMINANCE_MARGIN_RATIO`** | ✗ → **★本便で ★試験を足して OK にしました** |
 
----
+- `BASE_GAIN`: `packages/training/test/base-gain.test.ts`
+  「**放置だけでは上限近くまで開放されない**」（実測 68.2%。既定値 12 に戻すと約87%）
+- `DOMINANCE_MARGIN_RATIO`: 判定を `isNotDominant()` に切り出し、
+  `apps/cli/test/dominance.test.ts` で「**支配的な戦略を実際に落とせるか**」を試験
+
+**どちらも変異試験を単体で流し、★付きテストが検出することを確認済み**です。
+
+### ★残り 21 件は P1 期からの積み残しです
+
+変異試験は **P1（`7bbf1c6`）以来、一度も流されていません**。
+その間に登録簿へ追加された定数（`race-field.ts` 系・`race-engine/balance.ts` 系・
+`LAMBDA_STAR` / `ODDS_CAP` / `CANCEL_AFTER_START_MS` / `PRIZE_TABLE` ほか）は、
+**値照合テストしか持っていません**。
+
+```
+未防御 21件:
+  PRIZE_TABLE / CANCEL_AFTER_START_MS / LAMBDA_STAR / ODDS_CAP / NAME_TAIL_RATE /
+  CALIBRATED_RACE_RANDOM_K / TAIL_MIX_P_DEFAULT / TAIL_MIX_M_DEFAULT /
+  PLACEHOLDER_UNLOCK / DEFAULT_CLASS_BAND / OFF_SURFACE_ENTRY_RATE /
+  TRACK_CONDITION_CDF / DISTANCE_SUIT_MIN / OFF_DISTANCE_ENTRY_RATE /
+  FIELD_STRENGTH_FLOOR / FLOOR_FIELD_SIZE_SLOPE / OVERSAMPLE_RATIO /
+  FLOOR_REDRAW_PASSES / CLASS_PRIZE_TOP_MULT / FIELD_SIZE / DEFAULT_POPULARITY_TRIALS
+```
+
+★**P3 の範囲外なので、こちらでは手を付けていません**（照会 Q-P3-40）。
+★ただし **B-9 は「変異試験すべて防御」なので、この状態では満たしていません。**
 
 ## 4. G-1〜G-8
 
@@ -89,7 +121,8 @@ P3 で追加・変更した定数:
 | 2 | **P1 は実物の母集団で測っているので、シードを変えても母集団は同じ**です。シード間 SD は 0.39%（合成母集団のときは 0.55%）で、**そのぶん SE は小さく出ます** |
 | 3 | **開放率は動き続ける入力**です。この判定は **平均 71.3% / SD 12.6pt / p10 55.3% p50 73.8% p90 86.1% / 週齢平均 182週** の上に立っています。`unlock_daily` が毎日記録するので、**ここがずれたら測り直してください** |
 | 4 | **②③（`PLACEHOLDER_UNLOCK` 廃止 ＋ B-6）は本番に入っていません。** 受け口は残してあり、裁定待ちです（Q-P3-35） |
-| 5 | **V-10 の本番経路版は、実現払戻率では原理的に測れません**（±1% に 287万〜6,700万レース）。`p × odds` で代替しており、測り方の裁定待ちです（Q-P3-34） |
+| 5 | **B-9 は満たしていません**（変異試験 23件 NG のうち 21件は P1 期からの積み残し・§3） |
+| 6 | **V-10 の本番経路版は、実現払戻率では原理的に測れません**（±1% に 287万〜6,700万レース）。`p × odds` で代替しており、測り方の裁定待ちです（Q-P3-34） |
 
 ---
 
@@ -103,3 +136,4 @@ P3 で追加・変更した定数:
 | **Q-P3-37** | VPS に Q-P3-32 の是正（オッズと条件の不一致・馬場 good 固定）を配備するか |
 | **Q-P3-34** | V-10 の本番経路版の測り方（`p × odds` を採るか） |
 | **Q-P3-33** | 馬場状態の割合は何本で判定するか |
+| **Q-P3-40（新規）** | ★変異試験の未防御 21件（P1 期からの積み残し）をどう扱うか。B-9 の判定に含めるか |
