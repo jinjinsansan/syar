@@ -1,0 +1,77 @@
+  ★変異は別ツリーの中だけで起こします: V:\dev\Cusor\star\.mutation-wt（6bdfb8f）
+# ★較正定数を壊したとき V-ゲートが落ちるか（Q-P3-42）
+
+  ★ゲート本来の本数で回します（60,000本 × 4シード）。帯の判定はこれでのみ有効です
+
+【基準】改変なしで回します
+  V-4  31.29%  PASS
+  V-5  62.4%  PASS
+  V-6  1.21%  PASS
+  V-8  94.57%  PASS
+  V-9a  0.9〜1.1  PASS
+  V-13  0.1999  PASS
+  V-12a  0.0156  PASS
+  V-12b  -0.84%  PASS
+
+── TAIL_MIX_P_DEFAULT → V-6 が落ちるはず
+  経路に届いた: ✓（tailMixP=0）
+  V-6 1.21% → 0.59% PASS
+  → 効いている: ✓（統計量が 51% 動いた）
+  → ★ゲートが捕まえる: ★捕まえない（帯の中に留まった）
+
+── TAIL_MIX_M_DEFAULT → V-6 が落ちるはず
+  経路に届いた: ✓（tailMixM=1）
+  V-6 1.21% → 0.59% PASS
+  → 効いている: ✓（統計量が 51% 動いた）
+  → ★ゲートが捕まえる: ★捕まえない（帯の中に留まった）
+
+── DEFAULT_CLASS_BAND → V-4 が落ちるはず
+  経路に届いた: ✓（classBand=1）
+  V-4 31.29% → 34.82% ★FAIL
+  → 効いている: ✓（統計量が 11% 動いた）
+  → ★ゲートが捕まえる: ✓（V-4）
+
+── DISTANCE_SUIT_MIN → V-6 が落ちるはず
+  経路に届いた: ✓（distanceSuitMin=0）
+  V-6 1.21% → 1.18% PASS
+  → 効いている: ★ほとんど動かない（2%）
+  → ★ゲートが捕まえる: ★捕まえない（帯の中に留まった）
+
+── OFF_DISTANCE_ENTRY_RATE → V-6 が落ちるはず
+  経路に届いた: ✓（offDistanceEntryRate=1）
+  V-6 1.21% → 1.16% PASS
+  → 効いている: ★ほとんど動かない（4%）
+  → ★ゲートが捕まえる: ★捕まえない（帯の中に留まった）
+
+── OFF_SURFACE_ENTRY_RATE → V-6 / V-4 が落ちるはず
+  経路に届いた: ✓（offSurfaceEntryRate=1）
+  V-6 1.21% → 1.18% PASS
+  V-4 31.29% → 31.29% PASS
+  → 効いている: ★ほとんど動かない（2%）
+  → ★ゲートが捕まえる: ★捕まえない（帯の中に留まった）
+
+── FIELD_STRENGTH_FLOOR → V-4 / V-6 が落ちるはず
+  経路に届いた: ✓（fieldStrengthFloor=0）
+  V-4 31.29% → 32.81% PASS
+  V-6 1.21% → 1.14% PASS
+  → 効いている: ★ほとんど動かない（6%）
+  → ★ゲートが捕まえる: ★捕まえない（帯の中に留まった）
+
+【まとめ】
+  ★ TAIL_MIX_P_DEFAULT  経路○ / 効き○(51%) / 捕捉×
+  ★ TAIL_MIX_M_DEFAULT  経路○ / 効き○(51%) / 捕捉×
+  ✓ DEFAULT_CLASS_BAND  経路○ / 効き○(11%) / 捕捉○(V-4)
+  ★ DISTANCE_SUIT_MIN  経路○ / 効き×(2%) / 捕捉×
+  ★ OFF_DISTANCE_ENTRY_RATE  経路○ / 効き×(4%) / 捕捉×
+  ★ OFF_SURFACE_ENTRY_RATE  経路○ / 効き×(2%) / 捕捉×
+  ★ FIELD_STRENGTH_FLOOR  経路○ / 効き×(6%) / 捕捉×
+
+  ★★効いているのにゲートが捕まえない（＝登録簿の主張が成り立たない）:
+      TAIL_MIX_P_DEFAULT（統計量は 51% 動くが帯の中）
+      TAIL_MIX_M_DEFAULT（統計量は 51% 動くが帯の中）
+
+★6 件が未証明: TAIL_MIX_P_DEFAULT, TAIL_MIX_M_DEFAULT, DISTANCE_SUIT_MIN, OFF_DISTANCE_ENTRY_RATE, OFF_SURFACE_ENTRY_RATE, FIELD_STRENGTH_FLOOR
+
+★★本体の作業ツリーが汚れています（worktree 分離が効いていません）:
+    M STAR_SPEC_v2.0.md
+     M docs/MUTATION_TRIAGE.md
