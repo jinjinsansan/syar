@@ -53,6 +53,8 @@ export const READONLY = [
   'verify-repo.mjs',
   'verify-views.mjs',
   'verify-world.mjs',
+  // ★読むだけ。判定書の SHA が HEAD かを見る（R-23）
+  'verify-acceptance-sha.mjs',
   'world-search.mjs',
 ];
 
