@@ -25,7 +25,8 @@
  */
 
 import { DEFAULT_INTERVENTION_BALANCE } from './intervention.js';
-import type { RaceResult, RaceResultEntry } from './types.js';
+import type { Strategy } from '@star/sim-engine';
+import type { Pace, RaceResult, RaceResultEntry } from './types.js';
 
 /**
  * §8b の局面（正典 §13）。
@@ -52,6 +53,75 @@ export function phaseOfMetersLeft(metersLeft: number): Phase {
 }
 
 /**
+ * ★**ペース配分**（正典 D-059 / Q-P4-11 の裁定「B を採る。露出であって発明ではない」）
+ *
+ * 【なぜ発明ではないか（レビュー側の確認）】
+ *   ① `strategyCoef` = 展開（ペース）× 脚質適性 が**結果に効いている**
+ *   ② ペースは**逃げ馬の頭数**から決まる
+ *   ③ `spurtAtMeter` は**距離上の位置**を持つ
+ *   → 「逃げ馬が前半先行する」「追込馬が後方から来る」は、
+ *     **エンジンが既に割り当てて結果に使っている属性の意味そのもの**です。
+ *
+ * 【★制約3件（裁定）】
+ *   1. **新しい乱数を引かない** — 既に計算済みの値からの決定的導出のみ
+ *   2. **最終着順と走破タイムを1ミリも動かさない** — これは**時間の再パラメータ化**であって、
+ *      結果の再計算ではない
+ *   3. **導出の前後で V-4/V-5/V-6/V-8/V-9a/V-13 が完全一致すること**
+ *      → ★`resolveRace` を一切呼ばず、触らないので**構造上そうなります**。
+ *        ただし**そう仮定せず、`watch.test.ts` で確かめます**。
+ */
+
+/**
+ * 脚質ごとの「進み方の形」。
+ *
+ * ★`x(τ)` は**正規化した時刻 τ∈[0,1] → 正規化した距離 x∈[0,1]**。
+ *   **必ず x(0)=0 / x(1)=1**（＝走破タイムが動かない・制約2）。
+ *
+ *   逃げ … 前半で先に出る（x が上に凸）
+ *   追込 … 前半は後ろ（x が下に凸）
+ *   先行・差し … その中間
+ *
+ * ⚠️ ここは**演出の強さではありません**。脚質という**機構の属性**の見え方です。
+ *    値を動かすと「逃げが逃げに見えない」ことになります。
+ */
+const STRATEGY_BIAS: Record<Strategy, number> = {
+  nige: 0.10,     // 逃げ: 前半速い
+  senko: 0.05,    // 先行
+  sashi: -0.05,   // 差し
+  oikomi: -0.10,  // 追込: 前半遅い
+};
+
+/**
+ * ペースが脚質の効き方を増減させる（§8.4 と同じ向き）。
+ *   ハイペースなら逃げは前半さらに速く出て、そのぶん終いが甘くなる。
+ */
+const PACE_GAIN: Record<Pace, number> = { high: 1.3, middle: 1.0, slow: 0.7 };
+
+/**
+ * ★進み方の形。**単調増加で、両端が固定**。
+ *
+ *   x(τ) = τ + b·sin(πτ)
+ *     b>0 … 前半で先に出る（逃げ）
+ *     b<0 … 前半は遅れる（追込）
+ *   x(0)=0 / x(1)=1 は sin(0)=sin(π)=0 から自動的に成り立ちます。
+ *
+ *   ★単調性: x'(τ) = 1 + bπ·cos(πτ) なので、**|b| < 1/π ≈ 0.318** なら常に正。
+ *     上の係数は最大 0.10×1.3 = 0.13 で、余裕があります。
+ */
+export function paceShape(strategy: Strategy, pace: Pace): (tau: number) => number {
+  const b = STRATEGY_BIAS[strategy] * PACE_GAIN[pace];
+  const LIMIT = 1 / Math.PI;
+  if (Math.abs(b) >= LIMIT) {
+    // ★係数を大きくすると位置が後戻りします（画面で馬が下がる）。黙って進まない
+    throw new Error(`ペース配分の係数が大きすぎます（${b}。上限 ${LIMIT.toFixed(3)}）`);
+  }
+  return (tau: number): number => {
+    const t = Math.max(0, Math.min(1, tau));
+    return Math.max(0, Math.min(1, t + b * Math.sin(Math.PI * t)));
+  };
+}
+
+/**
  * ★1頭が各境界を通過する時刻（秒）。**これがエンジンの真実**です。
  *
  *   ⚠️ **`atSec` を描画側で作らないこと。** ここから受け取ってください。
@@ -72,16 +142,14 @@ export interface BoundaryTimes {
 /**
  * 各馬の境界通過時刻を出す。
  *
- * ★**走破タイムからの按分**です。エンジンが区間ごとの速度を持たないので、
- *   それ以上のことは言えません。**発明しないための選択**です。
- *
- * ⚠️ このため **境界での順位は最終着順と一致します**（追い抜きは局面の間でしか起きない）。
- *    実際のレースは境界でも順位が入れ替わるので、そこは Q-P4-11 の裁定待ちです。
+ * ★**走破タイムは動きません**（制約2）。動くのは「途中でどこにいるか」だけです。
  */
 export function boundaryTimesOf(
   entry: RaceResultEntry,
   distanceMeter: number,
   gate: number,
+  strategy: Strategy,
+  pace: Pace,
 ): BoundaryTimes {
   if (!Number.isFinite(entry.timeSec) || entry.timeSec <= 0) {
     throw new Error(`走破タイムが不正です: ${entry.timeSec}`);
@@ -89,24 +157,40 @@ export function boundaryTimesOf(
   if (!Number.isFinite(distanceMeter) || distanceMeter <= 0) {
     throw new Error(`距離が不正です: ${distanceMeter}`);
   }
-  const at = (metersLeft: number): number => {
-    // ★距離が短くて境界が存在しない場合（例 400m 戦）は 0 に潰す
-    const covered = Math.max(0, distanceMeter - metersLeft);
-    return (covered / distanceMeter) * entry.timeSec;
+  const shape = paceShape(strategy, pace);
+  /**
+   * 距離 → 時刻。`x(τ)` の逆関数を二分探索で求めます。
+   * ★閉じた式が無いので数値解ですが、**単調増加なので必ず1点に収束**します。
+   */
+  const secAt = (metersLeft: number): number => {
+    const target = Math.max(0, Math.min(1, (distanceMeter - metersLeft) / distanceMeter));
+    if (target <= 0) return 0;
+    if (target >= 1) return entry.timeSec;
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 40; i += 1) {
+      const mid = (lo + hi) / 2;
+      if (shape(mid) < target) lo = mid; else hi = mid;
+    }
+    return ((lo + hi) / 2) * entry.timeSec;
   };
   return {
     gate,
     startSec: 0,
-    spurtSec: at(PHASE_METERS.SPURT),
-    straightSec: at(PHASE_METERS.STRAIGHT),
-    finishSec: entry.timeSec,
+    spurtSec: secAt(PHASE_METERS.SPURT),
+    straightSec: secAt(PHASE_METERS.STRAIGHT),
+    finishSec: entry.timeSec,   // ★1ミリも動かさない
   };
 }
 
 /**
  * レース全体の境界時刻。★**馬番で引けるようにする**（D-056 と同じ単位）。
  */
-export function replayOf(result: RaceResult): readonly BoundaryTimes[] {
+export function replayOf(
+  result: RaceResult,
+  /** 馬番 → 脚質。★出走表（凍結スナップショット）から取る */
+  strategyOf: (gate: number) => Strategy,
+  pace: Pace,
+): readonly BoundaryTimes[] {
   const out: BoundaryTimes[] = [];
   for (const e of result.order) {
     // ★`horseId` は確定処理で馬番に振り替えられている（D-056）
@@ -114,7 +198,7 @@ export function replayOf(result: RaceResult): readonly BoundaryTimes[] {
     if (!Number.isInteger(gate) || gate < 1) {
       throw new Error(`馬番として読めません: ${e.horseId}`);
     }
-    out.push(boundaryTimesOf(e, result.conditions.distance, gate));
+    out.push(boundaryTimesOf(e, result.conditions.distance, gate, strategyOf(gate), pace));
   }
   // ★馬番順に揃える。順位順のまま返すと、描画側の並びが着順に依存する
   return [...out].sort((a, b) => a.gate - b.gate);
