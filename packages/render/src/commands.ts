@@ -257,6 +257,56 @@ export type DrawCommand =
    *   ★**接地点に置く**ので、宙に浮く局面では小さく薄くなります
    *     — それが「跳んでいる」ことの表現になります。
    */
+  /**
+   * ★**決勝線**（ゴール）。走路の座標系なので、馬と同じ速さで近づいてきます。
+   *
+   *   ⚠️ これが無いと、**レースがどこで終わるのか画面から分かりません**。
+   *      いまは映像がただ止まっていました。
+   */
+  | {
+    readonly kind: 'finishLine';
+    readonly at: Point;
+    readonly height: number;
+    readonly scale: Zoom;
+  }
+  /**
+   * ★**着順**（確定後）。**画面の座標系**。
+   *   ⚠️ レース中は出しません（結果を先に見せない）。`entries` が空なら未確定です。
+   */
+  | {
+    readonly kind: 'result';
+    readonly at: Point;
+    readonly entries: readonly {
+      readonly place: number;
+      readonly gate: number;
+      readonly silk: PaletteRole;
+      /** 前の馬との着差ラベル（1着は空） */
+      readonly margin: string;
+    }[];
+  }
+  /**
+   * ★**実況**（裁定 Q-P4-14 ①）。
+   *
+   *   > 実況は「位置」ではなく「変化」を言う（「3番手」ではなく「上がってきた」）
+   *
+   *   ★だから `rank` を持ちません。**何が変わったか**だけを持ちます。
+   *   ⚠️ 文面はここで作りません（言語も表現もレンダラ側の領分）。
+   *      **起きたこと**を渡します。
+   */
+  | {
+    readonly kind: 'callout';
+    readonly at: Point;
+    /** 何が起きたか */
+    readonly event:
+      | { readonly kind: 'start' }
+      | { readonly kind: 'leadTaken'; readonly gate: number }
+      | { readonly kind: 'closing'; readonly gate: number; readonly mps: number }
+      | { readonly kind: 'fading'; readonly gate: number }
+      | { readonly kind: 'straight' }
+      | { readonly kind: 'finish'; readonly gate: number };
+    /** ★出てからの経過秒（レンダラが濃さを決める） */
+    readonly ageSec: number;
+  }
   | {
     readonly kind: 'shadow';
     readonly at: Point;

@@ -43,6 +43,8 @@ interface Built {
   readonly pace: 'slow' | 'middle' | 'high';
   readonly order: readonly number[];
   readonly raceSec: number;
+  /** ★着順（エンジンが決めたもの。画面では並べ替えません） */
+  readonly result: readonly { place: number; gate: number; margin: string }[];
 }
 
 /** ★レースを1本組む。**乱数はシードから**（憲法4: 直接呼ばない） */
@@ -92,6 +94,9 @@ function build(seed: number, ownGate: number, jostle: number, cruise: number): B
   return {
     model, warp, pace, order: settled, raceSec: model.raceSec,
     strategyOf: (g) => entrants[g - 1]!.strategy,
+    result: result.order.map((e, i) => ({
+      place: i + 1, gate: Number(e.horseId), margin: e.marginLabel,
+    })),
   };
 }
 
@@ -167,6 +172,11 @@ export default function WatchPage(): React.JSX.Element {
       poleEveryMeter: 200,
       // ★走路の縮尺。見て決める数字なので画面から変えられます
       pxPerMeter: pxm,
+      /**
+       * ★**着順はゴール後にだけ出します。**
+       *   ⚠️ レース中に出すと、見る前に結果が分かります。
+       */
+      ...(d >= built.warp.displaySec - 0.01 ? { result: built.result.slice(0, 5) } : {}),
     }, sec);
     drawFrame(ctx, frame, atlas, VIEW);
   }, [built, ownGate, pxm]);

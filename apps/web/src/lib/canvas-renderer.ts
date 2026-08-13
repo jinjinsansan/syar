@@ -282,6 +282,73 @@ export function drawFrame(
         ctx.fillText(label, x + 2 * c.scale, y - 5 * c.scale);
         break;
       }
+      case 'finishLine': {
+        // ★決勝線。白黒の市松（どこで終わるかが一目で分かる）
+        const w = 6 * c.scale;
+        for (let i = 0; i * 8 * c.scale < c.height; i += 1) {
+          ctx.fillStyle = i % 2 === 0 ? '#efe9dc' : '#22201c';
+          ctx.fillRect(c.at.x, c.at.y + i * 8 * c.scale, w, 8 * c.scale);
+        }
+        // ★ゴール板
+        ctx.fillStyle = '#efe9dc';
+        ctx.fillRect(c.at.x - 14 * c.scale, c.at.y - 26 * c.scale, 34 * c.scale, 18 * c.scale);
+        ctx.fillStyle = '#22201c';
+        ctx.font = `bold ${11 * c.scale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('GOAL', c.at.x + 3 * c.scale, c.at.y - 13 * c.scale);
+        break;
+      }
+      case 'callout': {
+        /**
+         * ★実況。**順位の数字は出しません**（裁定 Q-P4-14 ①）。
+         *   「3番手」ではなく「上がってきた」。
+         */
+        const e = c.event;
+        const text = e.kind === 'start' ? 'スタートしました'
+          : e.kind === 'leadTaken' ? `${e.gate}番が先頭に立ちました`
+          : e.kind === 'closing' ? `${e.gate}番が外から迫ります`
+          : e.kind === 'fading' ? `${e.gate}番、脚色が鈍りました`
+          : e.kind === 'straight' ? '直線に入りました'
+          : `${e.gate}番、ゴールイン`;
+        const w = Math.min(viewport.width * 0.62, 26 + text.length * 17);
+        drawPanel(ctx, c.at.x - 8, c.at.y - 24, w, 34);
+        ctx.font = 'bold 17px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#efe9dc';
+        ctx.fillText(text, c.at.x + 2, c.at.y);
+        break;
+      }
+      case 'result': {
+        // ★着順。⚠️ 並べ替えません（エンジンが決めたものを描くだけ）
+        const rowH = 26;
+        const w = 340;
+        drawPanel(ctx, c.at.x, c.at.y, w, 18 + c.entries.length * rowH);
+        ctx.font = 'bold 15px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#f2c14e';
+        ctx.fillText('着 順', c.at.x + 14, c.at.y + 4 + rowH * 0.6);
+        for (let i = 0; i < c.entries.length; i += 1) {
+          const e = c.entries[i]!;
+          const y = c.at.y + 18 + (i + 0.7) * rowH;
+          ctx.fillStyle = '#efe9dc';
+          ctx.font = 'bold 16px sans-serif';
+          ctx.fillText(`${e.place}`, c.at.x + 16, y);
+          // ★枠順の色
+          const g = Number(String(e.silk).replace('silk-', ''));
+          const col = atlas.postColors[g - 1] ?? [200, 200, 200];
+          ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+          ctx.fillRect(c.at.x + 46, y - 14, 22, 19);
+          ctx.fillStyle = (col[0] * 299 + col[1] * 587 + col[2] * 114) / 1000 < 140 ? '#f5f5f5' : '#111';
+          ctx.font = 'bold 13px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(`${e.gate}`, c.at.x + 57, y);
+          ctx.textAlign = 'left';
+          ctx.fillStyle = 'rgba(239,233,220,0.75)';
+          ctx.font = '14px sans-serif';
+          ctx.fillText(e.margin, c.at.x + 84, y);
+        }
+        break;
+      }
       case 'text': {
         ctx.font = '14px sans-serif';
         ctx.textAlign = 'left';

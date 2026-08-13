@@ -522,3 +522,55 @@ describe('★影', () => {
     }
   });
 });
+
+/**
+ * ★レースの終わり（決勝線・着順）と実況
+ */
+describe('★レースの終わりと実況', () => {
+  it('★決勝線が、ゴールに近づくと画面に出る', () => {
+    let seen = false;
+    for (let sec = 0; sec <= 99; sec += 1) {
+      const fl = sceneAt(input(1), sec).commands.find((c) => c.kind === 'finishLine');
+      if (fl !== undefined) { seen = true; break; }
+    }
+    // ★一度も出ないなら「どこで終わるか」が分かりません
+    expect(seen).toBe(true);
+  });
+
+  it('★★着順はレース中に出ない（結果を先に見せない）', () => {
+    // 渡さなければ出ない
+    expect(sceneAt(input(1), 50).commands.filter((c) => c.kind === 'result')).toHaveLength(0);
+    // 渡せば出る（空振りでない）
+    const withResult = sceneAt({
+      ...input(1),
+      result: [{ place: 1, gate: 5, margin: '' }, { place: 2, gate: 3, margin: 'クビ' }],
+    }, 99).commands.find((c) => c.kind === 'result') as { entries: readonly unknown[] };
+    expect(withResult.entries).toHaveLength(2);
+  });
+
+  it('★着順は渡された順のまま（画面が並べ替えない）', () => {
+    const given = [{ place: 1, gate: 9, margin: '' }, { place: 2, gate: 2, margin: '1/2馬身' }];
+    const r = sceneAt({ ...input(1), result: given }, 99).commands
+      .find((c) => c.kind === 'result') as { entries: readonly { gate: number }[] };
+    expect(r.entries.map((e) => e.gate)).toEqual([9, 2]);
+  });
+
+  it('★実況は「変化」を言う（順位の数字を持たない）', () => {
+    const kinds = new Set<string>();
+    for (let sec = 0; sec <= 99; sec += 1) {
+      const c = sceneAt(input(1), sec).commands.find((x) => x.kind === 'callout') as
+        { event: { kind: string } } | undefined;
+      if (c !== undefined) kinds.add(c.event.kind);
+    }
+    expect(kinds.size).toBeGreaterThan(0);
+    // ★「順位」という概念を持たないこと
+    for (const k of kinds) expect(['start', 'leadTaken', 'closing', 'fading', 'straight', 'finish']).toContain(k);
+  });
+
+  it('★対照: 実況を切れば出ない', () => {
+    for (let sec = 0; sec <= 99; sec += 10) {
+      expect(sceneAt({ ...input(1), callouts: false }, sec).commands
+        .filter((c) => c.kind === 'callout')).toHaveLength(0);
+    }
+  });
+});

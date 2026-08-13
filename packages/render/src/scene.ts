@@ -216,6 +216,15 @@ export interface SceneInput {
   readonly packBias?: number | undefined;
   /** ★手前のラチを出すか（馬より前に描かれます） */
   readonly foregroundRail?: boolean | undefined;
+  /**
+   * ★**着順**（確定後に出す）。レース中は渡しません。
+   *   ⚠️ ここで着順を計算しません。**エンジンが決めたものを受け取るだけ**です（D-059）。
+   */
+  readonly result?: readonly {
+    readonly place: number; readonly gate: number; readonly margin: string;
+  }[] | undefined;
+  /** ★実況を出すか（既定 true。起きたことはこの層が位置から判断します） */
+  readonly callouts?: boolean | undefined;
 }
 
 /**
@@ -368,6 +377,23 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
     tileWidth: 96,
     offset: Math.max(0, Math.round(cam * PX_PER_M)),
   });
+
+  /**
+   * ★**決勝線**。走路の座標系なので、馬と同じ速さで近づいてきます。
+   *   ⚠️ これが無いと「どこで終わるのか」が画面から分かりません。
+   */
+  {
+    const zz = camera.zoom;
+    const gx = Math.round(vp.width * 0.35 + (model.distanceMeter - cam) * PX_PER_M0 * zz);
+    if (gx > -60 && gx < vp.width + 60) {
+      commands.push({
+        kind: 'finishLine',
+        at: { x: gx, y: vp.trackTop },
+        height: Math.round(vp.laneHeight * 4.2) * zz,
+        scale: zz,
+      });
+    }
+  }
 
   /**
    * ★**ハロン棒**（残り距離の標識）。走路の座標系なので、馬と同じ速さで流れます。
@@ -609,6 +635,58 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
         });
       }
     }
+  }
+
+  /**
+   * ★**実況**（裁定 Q-P4-14 ①「実況は位置ではなく変化を言う」）。
+   *
+   *   ⚠️ **順位は言いません。** 起きた**変化**だけを渡します。
+   *      文面はレンダラが決めます（言語も表現もこの層の領分ではない）。
+   */
+  if (input.callouts !== false) {
+    const byPos = [...horses].sort((a, b) => b.meters - a.meters);
+    const leader = byPos[0];
+    const leaderLeft = leader === undefined ? model.distanceMeter : model.distanceMeter - leader.meters;
+    const at = { x: Math.round(vp.width * 0.05), y: Math.round(vp.height * 0.955) };
+    /** ★少し前と比べて「変化」を拾う */
+    const back = model.at(Math.max(0, sec - 1.2));
+    const backLead = [...back].sort((a, b) => b.meters - a.meters)[0];
+
+    if (sec < 3) {
+      commands.push({ kind: 'callout', at, event: { kind: 'start' }, ageSec: sec });
+    } else if (leader !== undefined && backLead !== undefined && leader.gate !== backLead.gate) {
+      // ★先頭が替わった
+      commands.push({ kind: 'callout', at, event: { kind: 'leadTaken', gate: leader.gate }, ageSec: 0 });
+    } else if (phaseOf(leaderLeft) === 'straight' && leaderLeft > model.distanceMeter * 0) {
+      // ★いちばん詰めている馬
+      let bestGate = -1, bestMps = 0;
+      for (const h of horses) {
+        const b0 = back.find((o) => o.gate === h.gate);
+        if (b0 === undefined || leader === undefined) continue;
+        const gapNow = leader.meters - h.meters;
+        const gapBefore = backLead === undefined ? gapNow : backLead.meters - b0.meters;
+        const mps = (gapBefore - gapNow) / 1.2;
+        if (mps > bestMps) { bestMps = mps; bestGate = h.gate; }
+      }
+      if (bestGate > 0 && bestMps > 0.3) {
+        commands.push({ kind: 'callout', at, event: { kind: 'closing', gate: bestGate, mps: bestMps }, ageSec: 0 });
+      } else {
+        commands.push({ kind: 'callout', at, event: { kind: 'straight' }, ageSec: 0 });
+      }
+    }
+  }
+
+  /**
+   * ★**着順**。⚠️ ここで並べ替えません。**エンジンが決めたものを描くだけ**です。
+   */
+  if (input.result !== undefined && input.result.length > 0) {
+    commands.push({
+      kind: 'result',
+      at: { x: Math.round(vp.width * 0.34), y: Math.round(vp.height * 0.12) },
+      entries: input.result.map((r) => ({
+        place: r.place, gate: r.gate, silk: input.silkOf(r.gate), margin: r.margin,
+      })),
+    });
   }
 
   return { atSec: sec, commands };
