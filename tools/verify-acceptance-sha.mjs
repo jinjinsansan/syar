@@ -34,6 +34,32 @@ const sh = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8' }).trim();
 const HEAD = sh('git', ['rev-parse', 'HEAD']);
 const HEAD_SHORT = HEAD.slice(0, 7);
 
+/**
+ * ★**「全 SHA が HEAD と一致」は原理的に達成できません。**
+ *
+ *   SHA を判定書に書き込むと**新しいコミットができる**ので、
+ *   書いた SHA は必ず1つ古くなります。実際、9件を更新した直後に
+ *   その9件が「古い」と出ました。**基準そのものが誤っていました。**
+ *
+ * ★R-23 が守りたいのは「**証拠が現在のコードに対応していること**」です。
+ *   だから判定はこうします:
+ *     ・その SHA から HEAD までの間に、**コードが1行も変わっていない** → 有効
+ *     ・コードが変わっている → **古い**（再実行するか、理由を書く）
+ *
+ *   ★「コード」から除くのは **文書だけ**です（`.md` と `docs/`）。
+ *     ⚠️ ツールやテストは**除きません**。測定に効きうるからです。
+ *     実例: `race-field.ts` が91行変わっていたのを、
+ *     「効く経路」を手で選んだせいで見落としかけました。
+ */
+const codeChangedSince = (sha) => {
+  const out = execFileSync(
+    'git',
+    ['diff', '--name-only', sha, 'HEAD', '--', '.', ':(exclude)*.md', ':(exclude)docs/*'],
+    { encoding: 'utf8' },
+  ).trim();
+  return out === '' ? [] : out.split(String.fromCharCode(10));
+};
+
 /** その SHA が HEAD の祖先か（＝古い証拠か）。不明な SHA は「不明」として区別する */
 const ageOf = (sha) => {
   try {
@@ -62,8 +88,22 @@ let old = 0;
 let unknown = 0;
 let head = 0;
 for (const file of TARGETS) {
-  const text = readFileSync(file, 'utf8');
-  // ★表の中のバッククォート付き 7〜40桁 16進を SHA 候補とみなす
+  /**
+   * ★**合格基準の行だけ**を見ます。
+   *
+   *   最初は文書全体の SHA を拾っていましたが、**経緯の記述**まで
+   *   「古い証拠」と判定していました（「配備前 `ca575f9` → 配備後 `67b2971`」など）。
+   *   ★あれは証拠ではなく**歴史**で、古いのが正しい状態です。
+   *   → 行頭が `| **X-n**` の行に限ります。
+   *
+   * ⚠️ 逆に、**合格基準を表以外の形で書いたら、この検査からこぼれます。**
+   *    判定の証拠は必ず表の行に置くこと。
+   */
+  const whole = readFileSync(file, 'utf8');
+  const text = whole
+    .split(String.fromCharCode(10))
+    .filter((l) => /^\|\s*\*\*[A-Z]+-[0-9]/.test(l))
+    .join(String.fromCharCode(10));
   const found = new Map();
   for (const m of text.matchAll(/`([0-9a-f]{7,40})`/g)) {
     const sha = m[1];
@@ -80,7 +120,19 @@ for (const file of TARGETS) {
   for (const [sha, count] of [...found.entries()].sort()) {
     const age = ageOf(sha);
     if (age === 'HEAD') { head += count; continue; }
-    if (age === 'old') { old += count; console.log(`  ★古い: ${sha}（${count}箇所）`); }
+    if (age === 'old') {
+      // ★文書しか変わっていなければ、証拠は現在のコードに対応している
+      const files = codeChangedSince(sha);
+      if (files.length === 0) {
+        head += count;
+        console.log(`  ✓ ${sha}（${count}箇所）— この SHA 以降、コードは変わっていません`);
+        continue;
+      }
+      old += count;
+      console.log(`  ★古い: ${sha}（${count}箇所）— 以降 ${files.length} ファイルが変更:`);
+      for (const f of files.slice(0, 4)) console.log(`        ${f}`);
+      if (files.length > 4) console.log(`        …ほか ${files.length - 4} 件`);
+    }
     else if (age === 'unrelated') { old += count; console.log(`  ★HEAD に含まれない: ${sha}（${count}箇所）`); }
     else { unknown += count; console.log(`  ★不明（この repo に無い）: ${sha}（${count}箇所）`); }
   }
@@ -91,7 +143,7 @@ console.log('【判定】');
 console.log(`  HEAD の SHA: ${head}箇所 / 古い: ${old}箇所 / 不明: ${unknown}箇所`);
 console.log('');
 if (old === 0 && unknown === 0) {
-  console.log('★R-23: PASS — すべて HEAD です');
+  console.log('★R-23: PASS — すべての証拠が現在のコードに対応しています');
   process.exit(0);
 }
 console.log('★R-23: 古い SHA が残っています。');

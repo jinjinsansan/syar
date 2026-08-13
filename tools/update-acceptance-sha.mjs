@@ -27,12 +27,17 @@ let text = readFileSync(file, 'utf8');
 let changed = 0;
 const notFound = [];
 for (const key of keys) {
-  // 「| **KEY** | 内容 | 判定 | `SHA` |」の SHA 欄だけを差し替える
-  const re = new RegExp(
-    '(\\|\\s*\\*\\*' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\*\\*[^\\n|]*\\|[^\\n|]*\\|[^\\n|]*\\|\\s*)`[0-9a-f]{7,40}`',
-  );
-  if (!re.test(text)) { notFound.push(key); continue; }
-  text = text.replace(re, (_m, head1) => head1 + '`' + head + '`');
+  /**
+   * ★**行を特定して、その行の最初の SHA を差し替えます。**
+   *   最初は「| KEY | 内容 | 判定 | SHA |」と**列数を決め打ち**していましたが、
+   *   P2 の判定書は列が1つ少なく、**8項目すべて更新できませんでした**（「更新 0 件」と出た）。
+   *   ★表の形はファイルごとに違うので、列数に依存させてはいけません。
+   */
+  const esc = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const rowRe = new RegExp('^\\|\\s*\\*\\*' + esc + '\\*\\*.*$', 'm');
+  const row = text.match(rowRe);
+  if (row === null || !/`[0-9a-f]{7,40}`/.test(row[0])) { notFound.push(key); continue; }
+  text = text.replace(row[0], row[0].replace(/`[0-9a-f]{7,40}`/, '`' + head + '`'));
   changed += 1;
 }
 writeFileSync(file, text, 'utf8');
