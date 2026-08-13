@@ -1,0 +1,13 @@
+{
+  "name": "@star/render",
+  "private": true,
+  "version": "0.0.0",
+  "description": "STAR race rendering abstraction. Pure TypeScript, zero runtime dependencies, no canvas/DOM access (canon 12.8).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {},
+  "peerDependencies": {}
+}
