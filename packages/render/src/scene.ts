@@ -161,6 +161,39 @@ export interface SceneInput {
   readonly strategyOf?: ((gate: number) => StrategyMark) | undefined;
   /** ★ペース。`paceOf()` が出したものをそのまま渡します */
   readonly pace?: PaceMark | undefined;
+  /**
+   * ★段の数（既定3）。`laneOf` が返す値の範囲と揃えます。
+   *   ⚠️ ここがずれると、**馬が走路の外（空やスタンド）に出ます**。実際に出ました。
+   */
+  readonly laneCount?: number | undefined;
+  /**
+   * ★**各馬の余力を描くか**（既定 false）。
+   *
+   *   ⚠️ いま `effort` に入っている値は**余力ではありません**。
+   *      `BoundaryTimes` から作れるのは進捗の言い換えだけで、**必ず逆を向きます**
+   *      （実測: 残り200m で順位相関 −0.518）。
+   *   ★オーナーの指摘「馬の上の黄色の線がある」。**意味の無いものを出しません。**
+   *     `emptyAtMeter` が渡るようになったら（Q-P4-21）、既定で出します。
+   */
+  readonly showEffort?: boolean | undefined;
+  /**
+   * ★**実走の 1m あたりの秒数**（＝1/速度）。脚の回転をここから決めます。
+   *   ⚠️ **表示の速さではありません。** 送りを速くしても脚は馬の速さで回ります。
+   *   省略時は 16m/s 相当。
+   */
+  readonly secondsPerMeter?: number | undefined;
+  /**
+   * ★**脚を回すための時計（表示の秒）。**
+   *   ⚠️ レースの時刻を渡すと、送りを速くしたとき脚も速くなります。
+   *   省略時はレースの時刻（＝等速のとき正しい）。
+   */
+  readonly animSec?: number | undefined;
+  /**
+   * ★**ハロン棒**（残り距離の標識）を出すか。
+   *   オーナーの指摘「競馬コースのポールもない」。
+   *   ⚠️ ここで「何mごとか」を発明しません。**間隔は呼び出し側が渡します**。
+   */
+  readonly poleEveryMeter?: number | undefined;
 }
 
 /**
@@ -203,14 +236,32 @@ function cameraMeters(horses: readonly HorseAt[], follow: number | undefined): n
  *   距離で回せば、**速い馬ほど脚が速く回ります**。
  *   アートバイブル §3「接地の瞬間が分かることを優先」。
  */
-function gallopFrame(meters: number, frames: number): number {
-  /** ★1歩の距離（メートル）。競走馬のストライドは概ね 7m 前後 */
+function gallopFrame(
+  gate: number, frames: number, animSec: number, metersPerSec: number,
+): number {
+  /**
+   * ★**脚は「表示の時間」で回します。距離ではありません。**
+   *
+   * 【★2回書き直しました】
+   *   1回目: 「進んだ距離 ÷ 1歩 7m」。
+   *     ⚠️ 時間配分（D-062）で道中を3倍速にすると、**脚も3倍速**になります。
+   *        オーナーの指摘「**走り方が小走りで全く馬の走りになっていない**」はこれです。
+   *   2回目: 距離のまま歩数だけ丸めようとして、**掛けて割るだけの恒等式**を書きました。
+   *     ★何も変わっていませんでした。**式を書いたら値が変わるか確かめること。**
+   *
+   * 【★決め方】
+   *   競走馬のストライドは概ね 7m、走行速度は 15〜17m/s → **毎秒 2.1〜2.4 歩**。
+   *   ★画面が何倍速で送られていても、**脚は毎秒 2 歩前後で回らないと馬に見えません。**
+   *   位相は馬番でずらします（全馬が同じ脚さばきだと**行進**に見えます）。
+   */
   const STRIDE_M = 7;
-  const phase = (meters / STRIDE_M) % 1;
+  const strideHz = Math.min(2.6, Math.max(2.0, metersPerSec / STRIDE_M));
+  const phase = ((animSec * strideHz) + gate * 0.37) % 1;
   const f = Math.floor(phase * frames);
-  // ★浮動小数の端で frames と等しくなりうる。範囲外のフレームを指さない
   return f >= frames ? frames - 1 : f < 0 ? 0 : f;
 }
+
+
 
 /**
  * 1フレーム分の描画コマンドを組む。★**純粋関数**（同じ入力 → 同じ配列）。
@@ -226,6 +277,7 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
   const cam = cameraMeters(horses, camera.followGate);
   const commands: DrawCommand[] = [];
   const PX_PER_M = input.pxPerMeter ?? SPRITE.width / 4;
+  const PX_PER_M0 = PX_PER_M;
 
   /**
    * ★背景は**カメラの位置に応じて流します**（パララックス）。
@@ -249,6 +301,33 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
     tileWidth: 96,
     offset: Math.max(0, Math.round(cam * PX_PER_M)),
   });
+
+  /**
+   * ★**ハロン棒**（残り距離の標識）。走路の座標系なので、馬と同じ速さで流れます。
+   *   ⚠️ 「200mごと」はこの層で決めません。**渡された間隔で置くだけ**です。
+   */
+  if (input.poleEveryMeter !== undefined && input.poleEveryMeter > 0) {
+    const zz = camera.zoom;
+    const step = input.poleEveryMeter;
+    /**
+     * ★**画面に映る範囲だけを置きます。**
+     *   ⚠️ 最初は範囲の式を間違えて**1本も出ませんでした**（検査が落ちて気づきました）。
+     *   ★実測: 55px/m・幅1280 なので、**画面に映るのは約23m**です。
+     *     200m ごとの標識は**12秒に1本**しか通りません。それが実際の間隔です。
+     */
+    const leftM = cam - (vp.width * 0.35) / (PX_PER_M0 * zz);
+    const rightM = cam + (vp.width * 0.65) / (PX_PER_M0 * zz);
+    const first = Math.ceil(Math.max(0, leftM) / step) * step;
+    for (let m = first; m <= Math.min(model.distanceMeter, rightM); m += step) {
+      commands.push({
+        kind: 'pole',
+        at: { x: Math.round(vp.width * 0.35 + (m - cam) * PX_PER_M0 * zz), y: vp.trackTop },
+        metersLeft: model.distanceMeter - m,
+        scale: zz,
+      });
+    }
+  }
+
 
   /**
    * ★**描く順序を馬番で固定します。**
@@ -290,10 +369,20 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
     const ownLane = input.ownGate === undefined
       ? 0
       : (input.laneOf === undefined ? input.ownGate - 1 : input.laneOf(input.ownGate));
-    const y = vp.trackTop + (lane - ownLane) * vp.laneHeight * z;
+    /**
+     * ★**段は必ず走路の中に収めます。**
+     *
+     *   ⚠️ 以前は `lane - ownLane` をそのまま使っていました。
+     *      自馬が最下段（例: 段2）のとき、段0と段1が **負のずれ**になり、
+     *      ★**馬が芝の上（スタンドや空）を走っていました。** 実際に空を走っていました。
+     *   → **巡回**させます。自馬が必ず先頭の段に来て、他は下に回ります。
+     */
+    const laneCount = Math.max(1, input.laneCount ?? 3);
+    const rel = (((lane - ownLane) % laneCount) + laneCount) % laneCount;
+    const y = vp.trackTop + rel * vp.laneHeight * z;
     const sprite: SpriteRef = {
       sheet: 'horse-gallop',
-      frame: gallopFrame(h.meters, input.gallopFrames),
+      frame: gallopFrame(h.gate, input.gallopFrames, input.animSec ?? sec, 1 / (input.secondsPerMeter ?? 1 / 16)),
     };
     commands.push({
       kind: 'sprite', sprite, at: { x, y }, silk: input.silkOf(h.gate), scale: z,
@@ -311,12 +400,14 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
      *
      *   ★馬に付くので**世界の座標系**です（ゲージ・合図とは扱いが違う）。
      */
-    commands.push({
-      kind: 'effort',
-      at: { x, y: y - Math.round(vp.laneHeight * 0.18) * z },
-      ratio: h.staminaRatio,
-      scale: z,
-    });
+    if (input.showEffort === true) {
+      commands.push({
+        kind: 'effort',
+        at: { x, y: y - Math.round(vp.laneHeight * 0.18) * z },
+        ratio: h.staminaRatio,
+        scale: z,
+      });
+    }
   }
 
   /**

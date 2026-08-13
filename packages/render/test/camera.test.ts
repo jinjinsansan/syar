@@ -296,8 +296,18 @@ describe('★寄っても自馬が画面から消えない（C-6 の前提）', 
  *   → 余力（`effort`）と変化（`gap`）を出しました。**消したら検査が落ちます。**
  */
 describe('★展開が画面に出ている（消したら落ちる）', () => {
-  it('★全馬の余力が出ている（自馬のゲージだけでは展開が読めない）', () => {
-    const efforts = sceneAt(input(1), 30).commands.filter((c) => c.kind === 'effort');
+  it('★★余力は既定で出さない（意味の無いものを画面に出さない）', () => {
+    /**
+     * ★オーナーの指摘「**馬の上の黄色の線がある**」。
+     *   いま `effort` に入っている値は**余力ではありません**
+     *   （`BoundaryTimes` から作れるのは進捗の言い換えで、実測 −0.518 と逆を向く）。
+     *   → `emptyAtMeter` が渡るまで（Q-P4-21）、**既定で出しません**。
+     */
+    expect(sceneAt(input(1), 30).commands.filter((c) => c.kind === 'effort')).toHaveLength(0);
+  });
+
+  it('★求められたときは全馬ぶん出る', () => {
+    const efforts = sceneAt({ ...input(1), showEffort: true }, 30).commands.filter((c) => c.kind === 'effort');
     expect(efforts.length).toBe(18);
     for (const e of efforts) {
       expect((e as { ratio: number }).ratio).toBeGreaterThanOrEqual(0);
@@ -307,7 +317,7 @@ describe('★展開が画面に出ている（消したら落ちる）', () => {
 
   it('★余力は馬と同じ倍率で描かれる（寄ったとき馬から離れない）', () => {
     for (const z of [1, 2] as Zoom[]) {
-      const e = sceneAt(input(z), 30).commands.find((c) => c.kind === 'effort') as { scale: number };
+      const e = sceneAt({ ...input(z), showEffort: true }, 30).commands.find((c) => c.kind === 'effort') as { scale: number };
       expect(e.scale).toBe(z);
     }
   });
@@ -338,5 +348,82 @@ describe('★展開が画面に出ている（消したら落ちる）', () => {
     // 線が広がれば、抜くべき頭数は減る
     expect(g(1)).toBeGreaterThan(g(3));
     expect(g(3)).toBeGreaterThanOrEqual(g(5));
+  });
+});
+
+/**
+ * ★オーナーが画面を見て挙げた不具合（2026-08-13）— **同じことを繰り返さないための検査**
+ */
+describe('★見て分かった不具合を固定する', () => {
+  it('★★馬が走路の外（空・スタンド）に出ない', () => {
+    /**
+     * ⚠️ **実際に空を走っていました。**
+     *   `lane - ownLane` をそのまま使ったので、自馬が最下段のとき
+     *   他の段が**負のずれ**になり、芝の上に飛び出していました。
+     */
+    for (const own of [1, 2, 3, 5, 12, 18]) {
+      for (const z of [1, 2] as Zoom[]) {
+        const inp: SceneInput = {
+          ...input(z), ownGate: own, laneOf: (g) => (g - 1) % 3, laneCount: 3,
+        };
+        const sprites = inp.model.at(30).length > 0
+          ? sceneAt(inp, 30).commands.filter((c) => c.kind === 'sprite') as { at: { y: number } }[]
+          : [];
+        expect(sprites.length).toBeGreaterThan(0);
+        for (const sp of sprites) {
+          // ★走路の上端より上には出ない
+          expect(sp.at.y).toBeGreaterThanOrEqual(inp.viewport.trackTop);
+        }
+      }
+    }
+  });
+
+  it('★★脚の回転は、送りの速さで変わらない（小走りにならない）', () => {
+    /**
+     * ⚠️ 距離でコマを決めていたので、道中3倍速で**脚も3倍速**になっていました。
+     *   ★画面が何倍速でも、脚は馬の速さで回らなければ馬に見えません。
+     */
+    const frameAt = (animSec: number) =>
+      (sceneAt({ ...input(1), animSec }, 30).commands
+        .find((c) => c.kind === 'sprite') as { sprite: { frame: number } }).sprite.frame;
+    // 1秒で 2.0〜2.6 歩 ＝ 6コマなら 12〜16 コマぶん進む
+    const seen = new Set<number>();
+    for (let t = 0; t < 1; t += 1 / 60) seen.add(frameAt(t));
+    expect(seen.size).toBe(6);           // ★1秒で全コマを何周かする
+    // ★同じ時刻なら同じコマ（決定論）
+    expect(frameAt(0.4)).toBe(frameAt(0.4));
+  });
+
+  it('★全馬が同じ脚さばきにならない（行進に見えない）', () => {
+    const frames = (sceneAt(input(1), 30).commands
+      .filter((c) => c.kind === 'sprite') as { sprite: { frame: number } }[])
+      .map((c) => c.sprite.frame);
+    expect(new Set(frames).size).toBeGreaterThan(1);
+  });
+
+  it('★ハロン棒が出る（どこを走っているか分かる）', () => {
+    /**
+     * ★実測: 55px/m・幅1280 なので**画面に映るのは約23m**。
+     *   200m ごとの標識は常には映りません。**レース全体で1本も出ないのは異常**なので、
+     *   時間を通して数えます。
+     */
+    let total = 0;
+    const seen = new Set<number>();
+    for (let sec = 0; sec <= 99; sec += 0.5) {
+      const poles = sceneAt({ ...input(1), poleEveryMeter: 200 }, sec).commands
+        .filter((c) => c.kind === 'pole') as { metersLeft: number }[];
+      total += poles.length;
+      for (const p of poles) {
+        expect(p.metersLeft % 200).toBe(0);       // ★残り距離は 200 の倍数
+        seen.add(p.metersLeft);
+      }
+    }
+    expect(total).toBeGreaterThan(0);
+    // ★1本だけ映って終わり、ではない
+    expect(seen.size).toBeGreaterThan(3);
+  });
+
+  it('★対照: 間隔を渡さなければ出ない（発明しない）', () => {
+    expect(sceneAt(input(1), 30).commands.filter((c) => c.kind === 'pole')).toHaveLength(0);
   });
 });

@@ -1,0 +1,271 @@
+/**
+ * ★Canvas レンダラ（正典 §12.8）
+ *
+ * > 描画ロジックを「位置データ → 描画コマンド」の純粋関数として切り出す。
+ * > **レンダラだけを** Web（Canvas 2D）と将来のモバイルで差し替えられるようにする。
+ *
+ * 【★この層がしないこと】
+ *   位置を決めません。局面を決めません。カメラを決めません。
+ *   ★**渡された `DrawCommand[]` を描くだけ**です。
+ *   ⚠️ ここに「残り800mなら…」のような判断を書いた瞬間、§12.8 は崩れます。
+ *      **判断は `packages/render` にあります。**
+ */
+
+import type { DrawCommand, Frame } from '@star/render';
+
+/** 焼き出したスプライト（`tools/bake-sprites.mjs`） */
+export interface SpriteAtlas {
+  /** 馬番 → 6コマ横並びの帯（1コマ 220×140） */
+  readonly stripOf: (gate: number) => HTMLImageElement | undefined;
+  readonly postColors: readonly (readonly [number, number, number])[];
+}
+
+const SPRITE_W = 220;
+const SPRITE_H = 140;
+
+/** アートバイブル §4 の役割色（★16進をここで発明しない — 役割から引く） */
+const PALETTE: Record<string, string> = {
+  sky: '#8fb8cf',
+  stand: '#6b6f74',
+  rail: '#c8c6bd',
+  turf: '#4b7a41',
+  dirt: '#8a6b4a',
+  paper: '#efe9dc',
+  ink: '#22201c',
+};
+
+const roleColor = (role: string): string => PALETTE[role] ?? '#888888';
+
+/** 繰り返し模様は1回だけ作って使い回す（毎フレーム作ると落ちます） */
+const tileCache = new Map<string, CanvasPattern | null>();
+
+function tileFor(
+  ctx: CanvasRenderingContext2D, role: string, tileWidth: number, height: number,
+): CanvasPattern | null {
+  const key = `${role}-${tileWidth}-${height}`;
+  const hit = tileCache.get(key);
+  if (hit !== undefined) return hit;
+
+  const c = document.createElement('canvas');
+  c.width = tileWidth;
+  c.height = Math.max(1, height);
+  const t = c.getContext('2d');
+  if (t === null) return null;
+  const base = roleColor(role);
+  t.fillStyle = base;
+  t.fillRect(0, 0, c.width, c.height);
+
+  /**
+   * ★**縦の要素は最小限**（アートバイブル §3「水平の帯で構成する」）。
+   *   奥行きは**速度差だけ**で作るので、ここで線遠近を描き込みません。
+   */
+  t.globalAlpha = 0.18;
+  if (role === 'sky') {
+    t.fillStyle = '#ffffff';
+    for (let y = Math.floor(c.height * 0.35); y < Math.floor(c.height * 0.46); y += 1) {
+      for (let x = 0; x < c.width; x += 1) if (((x * 7 + y * 13) % 97) < 40) t.fillRect(x, y, 1, 1);
+    }
+  } else if (role === 'stand') {
+    for (let y = 2; y < c.height - 2; y += 3) {
+      for (let x = 1; x < c.width; x += 4) {
+        t.fillStyle = ((x + y) % 7 < 3) ? '#ffffff' : '#000000';
+        t.fillRect(x, y, 1, 1);
+      }
+    }
+  } else if (role === 'rail') {
+    // ★縦の要素はここだけ（支柱）
+    t.fillStyle = '#000000';
+    t.globalAlpha = 0.35;
+    t.fillRect(0, 0, 3, c.height);
+  } else if (role === 'turf') {
+    // 芝の刈り目（横縞）
+    t.fillStyle = '#000000';
+    t.globalAlpha = 0.08;
+    for (let y = 0; y < c.height; y += 1) {
+      if (Math.floor(y / 26) % 2 === 1) t.fillRect(0, y, c.width, 1);
+    }
+  }
+  t.globalAlpha = 1;
+
+  const pat = ctx.createPattern(c, 'repeat');
+  tileCache.set(key, pat);
+  return pat;
+}
+
+/** ★重ね表示は「紙」（アートバイブル §3）。ゲージだけが唯一の「機械」の表現 */
+function drawPanel(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
+  ctx.fillStyle = 'rgba(28,26,22,0.72)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = 'rgba(239,233,220,0.35)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+}
+
+const PACE_LABEL: Record<string, string> = { slow: 'スロー', middle: 'ミドル', high: 'ハイ' };
+const STRATEGY_LABEL: Record<string, string> = {
+  nige: '逃', senko: '先', sashi: '差', oikomi: '追',
+};
+
+/**
+ * 1フレームを描く。
+ *
+ * ★**コマンドの順に描きます。** 並べ替えません
+ *   （順序は `packages/render` が馬番で固定しています＝C-5）。
+ */
+export function drawFrame(
+  ctx: CanvasRenderingContext2D,
+  frame: Frame,
+  atlas: SpriteAtlas,
+  viewport: { width: number; height: number },
+): void {
+  ctx.imageSmoothingEnabled = false;   // ★ピクセルアートを滲ませない（D-058）
+  ctx.clearRect(0, 0, viewport.width, viewport.height);
+
+  for (const c of frame.commands) {
+    switch (c.kind) {
+      case 'band': {
+        ctx.fillStyle = roleColor(c.role);
+        ctx.fillRect(0, c.y, viewport.width, c.height);
+        break;
+      }
+      case 'parallax': {
+        const pat = tileFor(ctx, c.role, c.tileWidth, c.height);
+        if (pat === null) break;
+        ctx.save();
+        // ★`offset` は「左へずれた画素数」。剰余はここで取る（コマンドは 0 以上を保証）
+        ctx.translate(-(c.offset % c.tileWidth), c.y);
+        ctx.fillStyle = pat;
+        ctx.fillRect(0, 0, viewport.width + c.tileWidth, c.height);
+        ctx.restore();
+        break;
+      }
+      case 'sprite': {
+        const gate = Number(String(c.silk ?? 'silk-1').replace('silk-', ''));
+        const img = atlas.stripOf(gate);
+        if (img === undefined) break;
+        const w = SPRITE_W * c.scale;
+        const h = SPRITE_H * c.scale;
+        ctx.drawImage(img, c.sprite.frame * SPRITE_W, 0, SPRITE_W, SPRITE_H, c.at.x, c.at.y, w, h);
+
+        // ★脚質（V-16 ①）。位置の意味は、脚質が見えて初めて読めます
+        if (c.strategy !== undefined) {
+          const label = STRATEGY_LABEL[c.strategy] ?? '';
+          ctx.font = `bold ${11 * c.scale}px sans-serif`;
+          ctx.textAlign = 'center';
+          const tx = c.at.x + w * 0.5;
+          const ty = c.at.y + h - 4 * c.scale;
+          ctx.fillStyle = 'rgba(20,18,16,0.7)';
+          ctx.fillRect(tx - 9 * c.scale, ty - 11 * c.scale, 18 * c.scale, 14 * c.scale);
+          ctx.fillStyle = '#efe9dc';
+          ctx.fillText(label, tx, ty);
+        }
+        break;
+      }
+      case 'effort': {
+        // ★各馬の余力。⚠️ いまここに入っている値は「余力」ではありません（Q-P4-21）
+        const w = 34 * c.scale;
+        const h = 4 * c.scale;
+        ctx.fillStyle = 'rgba(20,18,16,0.6)';
+        ctx.fillRect(c.at.x + (SPRITE_W * c.scale - w) / 2, c.at.y, w, h);
+        ctx.fillStyle = c.ratio < 0.3 ? '#d05a3a' : '#d8c96a';
+        ctx.fillRect(c.at.x + (SPRITE_W * c.scale - w) / 2, c.at.y, w * c.ratio, h);
+        break;
+      }
+      case 'gauge': {
+        drawPanel(ctx, c.at.x - 6, c.at.y - 18, c.width + 12, 26);
+        ctx.fillStyle = '#3a3630';
+        ctx.fillRect(c.at.x, c.at.y - 12, c.width, 12);
+        // ★ゲージだけが唯一の「機械」の表現（アートバイブル §3）
+        ctx.fillStyle = c.ratio < 0.25 ? '#d05a3a' : '#7fc06a';
+        ctx.fillRect(c.at.x, c.at.y - 12, c.width * c.ratio, 12);
+        break;
+      }
+      case 'cue': {
+        drawPanel(ctx, c.at.x - 6, c.at.y - 16, 150, 24);
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = c.active ? '#f2c14e' : 'rgba(239,233,220,0.35)';
+        const t = c.phase === 'straight' ? '直線' : c.phase === 'spurt' ? '勝負所' : '道中';
+        // ★出ていない間も描きます（「まだ来ていない」と「見落とした」を分ける）
+        ctx.fillText(c.active ? `▶ ${t}` : `　 ${t}`, c.at.x, c.at.y);
+        break;
+      }
+      case 'gap': {
+        drawPanel(ctx, c.at.x - 6, c.at.y - 16, 260, 24);
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#efe9dc';
+        /**
+         * ★**順位の数字は出しません**（裁定 Q-P4-14 ①）。
+         *   > 実況は「位置」ではなく「変化」を言う
+         */
+        const closing = c.closingMps >= 0.05 ? `▲${c.closingMps.toFixed(1)}m/s`
+          : c.closingMps <= -0.05 ? `▼${Math.abs(c.closingMps).toFixed(1)}m/s` : '±0';
+        const head = c.meters <= 0.01 ? '先頭' : `前まで ${c.meters.toFixed(1)}m`;
+        const need = c.toGo === 0 ? '圏内' : `あと ${c.toGo} 頭`;
+        ctx.fillText(`${head}　${closing}　${need}`, c.at.x, c.at.y);
+        break;
+      }
+      case 'pace': {
+        drawPanel(ctx, c.at.x - 6, c.at.y - 16, 150, 24);
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = c.pace === 'high' ? '#e0704a' : c.pace === 'slow' ? '#6aa7d8' : '#efe9dc';
+        ctx.fillText(`ペース ${PACE_LABEL[c.pace] ?? c.pace}`, c.at.x, c.at.y);
+        break;
+      }
+      case 'pole': {
+        /**
+         * ★ハロン棒（残り距離の標識）。**走路の座標系**なので馬と同じ速さで流れます。
+         *   これが横切ることで「どれだけ進んだか」が体感できます。
+         */
+        const h = 44 * c.scale;
+        const x = c.at.x;
+        const y = c.at.y - h;
+        ctx.fillStyle = '#e8e4d8';
+        ctx.fillRect(x, y, 3 * c.scale, h);
+        ctx.fillStyle = '#22201c';
+        for (let i = 0; i < 3; i += 1) ctx.fillRect(x, y + (i * 2 + 1) * 6 * c.scale, 3 * c.scale, 5 * c.scale);
+        // ★残り距離の板
+        const label = `${c.metersLeft}`;
+        ctx.font = `bold ${11 * c.scale}px sans-serif`;
+        ctx.textAlign = 'center';
+        const bw = 30 * c.scale;
+        ctx.fillStyle = '#efe9dc';
+        ctx.fillRect(x + 2 * c.scale - bw / 2, y - 16 * c.scale, bw, 14 * c.scale);
+        ctx.fillStyle = '#22201c';
+        ctx.fillText(label, x + 2 * c.scale, y - 5 * c.scale);
+        break;
+      }
+      case 'text': {
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = roleColor(c.role);
+        ctx.fillText(c.text, c.at.x, c.at.y);
+        break;
+      }
+      default: {
+        // ★新しいコマンドを足したのに描いていない、を静かに見逃さない
+        const never: never = c;
+        throw new Error(`描き方の無い描画コマンド: ${JSON.stringify(never)}`);
+      }
+    }
+  }
+}
+
+/** 焼き出した帯を読み込む */
+export async function loadAtlas(gates: number): Promise<SpriteAtlas> {
+  const imgs = new Map<number, HTMLImageElement>();
+  await Promise.all(Array.from({ length: gates }, (_, i) => i + 1).map((g) => new Promise<void>((res) => {
+    const im = new Image();
+    im.onload = () => { imgs.set(g, im); res(); };
+    im.onerror = () => res();   // ★1頭欠けても全体を止めない
+    im.src = `/sprites/horse-${g}.png`;
+  })));
+  const post = await fetch('/sprites/post-colors.json').then((r) => r.json()) as
+    (readonly [number, number, number])[];
+  return { stripOf: (g) => imgs.get(g), postColors: post };
+}
+
+/** DrawCommand の型を落とさないためのヘルパ（未使用の警告避けではありません） */
+export type { DrawCommand };

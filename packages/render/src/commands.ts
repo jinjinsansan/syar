@@ -233,6 +233,21 @@ export type DrawCommand =
     readonly kind: 'pace';
     readonly at: Point;
     readonly pace: PaceMark;
+  }
+  /**
+   * ★**ハロン棒**（残り距離の標識）。
+   *
+   *   オーナーの指摘「**競馬コースの1コーナー2コーナーなどのポールもない**」。
+   *   ★**走路の座標系**なので、馬と同じ速さで流れます。
+   *     これがあると「どこを走っているか」が分かり、**速さが体感できます**
+   *     （背景の縞だけでは、どれだけ進んだか読めません）。
+   */
+  | {
+    readonly kind: 'pole';
+    readonly at: Point;
+    /** ゴールまでの残り（m） */
+    readonly metersLeft: number;
+    readonly scale: Zoom;
   };
 
 /**

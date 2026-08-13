@@ -17,8 +17,11 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches } from '@star/race-engine';
-import { replayPositionModel, sceneAt, finalOrderOf, cameraFor } from '@star/render';
-import { digitPixels, outlinePixels, textWidth, GLYPH_H } from './lib/pixel-font.mjs';
+import {
+  replayPositionModel, sceneAt, finalOrderOf, cameraFor,
+  timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
+} from '@star/render';
+import { loadFrames, dressed, POST, isDark } from './lib/dress.mjs';
 
 const arg = (n, d) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -31,14 +34,7 @@ const SHEET = 'design/art/assets/horse-gallop-cloth2-sheet.png';
 const DIST = 1600;
 const FIELD = 12;   // ★18頭は画面に入らないので（実測: 720p/220px = 3段）
 
-/** ★枠順ごとの標準ゼッケン色（D-060 で採用） */
-const POST = [
-  [214, 40, 40], [245, 245, 245], [20, 70, 180], [250, 215, 40], [20, 140, 70], [25, 25, 25],
-  [240, 130, 25], [245, 150, 190], [45, 190, 180], [120, 45, 160], [150, 150, 155], [170, 220, 50],
-  [110, 70, 45], [128, 30, 55], [175, 165, 120], [135, 190, 230], [25, 40, 95], [30, 80, 50],
-];
 const STRATS = ['nige', 'senko', 'sashi', 'oikomi'];
-const isDark = (c) => (c[0] * 299 + c[1] * 587 + c[2] * 114) / 1000 < 140;
 
 /**
  * --- 出走馬 ---
@@ -92,6 +88,8 @@ if (!finalOrderMatches(result, boundaries)) {
 // --- ③ 位置モデル ---
 const model = replayPositionModel({
   distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
+  // ★D-061 改訂: 別ストリームの揺らぎ（着順は動かない）
+  jostle: arg('jostle', 0.6), jostleSeed: SEED * 2654435761,
 });
 const orderFromModel = finalOrderOf(model);
 const settled = result.order.map((e) => Number(e.horseId));
@@ -100,22 +98,8 @@ if (JSON.stringify(orderFromModel) !== JSON.stringify(settled)) {
 }
 console.log('  ✓ D-059 のゲート: 位置モデルの最終順 == 着順');
 
-// --- スプライトの用意 ---
-const meta = await sharp(SHEET).metadata();
-const cellW = Math.floor(meta.width / 6);
-const frames = [];
-for (let f = 0; f < 6; f += 1) {
-  const raw = await sharp(SHEET).extract({ left: f * cellW, top: 0, width: cellW, height: meta.height })
-    .ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  for (let i = 0; i < raw.data.length; i += raw.info.channels) {
-    if (raw.data[i] < 120 && raw.data[i + 1] > 180 && raw.data[i + 2] < 120) raw.data[i + 3] = 0;
-  }
-  const cut = await sharp(raw.data, { raw: { width: raw.info.width, height: raw.info.height, channels: raw.info.channels } }).png().toBuffer();
-  const tr = await sharp(cut).trim().png().toBuffer();
-  frames.push(await sharp(tr).resize(220, 140, {
-    fit: 'contain', position: 'bottom', kernel: 'nearest', background: { r: 0, g: 0, b: 0, alpha: 0 },
-  }).png().toBuffer());
-}
+// --- スプライトの用意（★塗りは tools/lib/dress.mjs に1か所化）---
+const frames = await loadFrames(SHEET);
 
 /**
  * ★層ごとの模様（1枚ぶん）。**縦の要素は最小限**（アートバイブル §3）。
@@ -152,88 +136,6 @@ async function tileOf(role, w, h, base) {
   return png;
 }
 
-/** 勝負服とゼッケンを塗る（`render-field.mjs` と同じ処理） */
-async function dressed(frameIdx, gate) {
-  const color = POST[gate - 1];
-  const { data, info } = await sharp(frames[frameIdx]).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  // 勝負服
-  for (let i = 0; i < data.length; i += info.channels) {
-    if (data[i + 3] < 128) continue;
-    const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
-    const s = mx === 0 ? 0 : d / mx;
-    let h = 0;
-    if (d !== 0) { if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
-    if (s >= 0.35 && h >= 200 && h <= 260) {
-      const v = mx / 255;
-      data[i] = Math.round(color[0] * v); data[i + 1] = Math.round(color[1] * v); data[i + 2] = Math.round(color[2] * v);
-    }
-  }
-  // ゼッケン（白い塊を探して塗る）
-  const isCloth = (i, y) => {
-    if (data[i + 3] < 128) return false;
-    const mx = Math.max(data[i], data[i + 1], data[i + 2]);
-    const mn = Math.min(data[i], data[i + 1], data[i + 2]);
-    return mx > 195 && (mx === 0 ? 0 : (mx - mn) / mx) < 0.12 && y > 50 && y < 110;
-  };
-  const W = info.width, H = info.height, seen = new Uint8Array(W * H);
-  let best = [];
-  for (let p0 = 0; p0 < W * H; p0 += 1) {
-    if (seen[p0]) continue;
-    if (!isCloth(p0 * info.channels, Math.floor(p0 / W))) { seen[p0] = 1; continue; }
-    const st = [p0], blob = []; seen[p0] = 1;
-    while (st.length > 0) {
-      const q = st.pop(); const qy = Math.floor(q / W), qx = q % W; blob.push([qx, qy]);
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const nx = qx + dx, ny = qy + dy;
-        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-        const n = ny * W + nx; if (seen[n]) continue; seen[n] = 1;
-        if (isCloth(n * info.channels, ny)) st.push(n);
-      }
-    }
-    if (blob.length > best.length) best = blob;
-  }
-  if (best.length >= 100) {
-    let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
-    for (const [x, y] of best) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-    const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
-    const on = new Set(best.map(([x, y]) => `${x},${y}`));
-    const isEdge = (x, y) => !on.has(`${x - 1},${y}`) || !on.has(`${x + 1},${y}`) || !on.has(`${x},${y - 1}`) || !on.has(`${x},${y + 1}`);
-    for (const [x, y] of best) {
-      const i = (y * W + x) * info.channels;
-      const t = (y - y0) / Math.max(1, ch - 1);
-      let k = [1.0, 0.9, 0.8][Math.min(2, Math.floor(t * 3))];
-      if (isEdge(x, y)) k *= 0.7;
-      const v = Math.max(data[i], data[i + 1], data[i + 2]) / 255;
-      data[i] = Math.round(color[0] * v * k); data[i + 1] = Math.round(color[1] * v * k); data[i + 2] = Math.round(color[2] * v * k);
-    }
-    const num = String(gate);
-    let sc = 0, ox = 0, oy = 0;
-    for (let c = 2; c >= 1; c -= 1) {
-      const px = x0 + Math.floor((cw - textWidth(num, c)) / 2);
-      const py = y0 + Math.floor((ch - GLYPH_H * c) / 2);
-      const pix = digitPixels(num, c);
-      let out = 0;
-      for (const [dx, dy] of pix) if (!on.has(`${px + dx},${py + dy}`)) out += 1;
-      if (out <= pix.length * 0.2) { sc = c; ox = px; oy = py; break; }
-    }
-    if (sc > 0) {
-      const fg = isDark(color) ? [250, 250, 250] : [15, 15, 15];
-      const ol = isDark(color) ? [10, 10, 10] : [245, 245, 245];
-      for (const [dx, dy] of outlinePixels(num, sc)) {
-        if (!on.has(`${ox + dx},${oy + dy}`)) continue;
-        const i = ((oy + dy) * W + ox + dx) * info.channels;
-        data[i] = ol[0]; data[i + 1] = ol[1]; data[i + 2] = ol[2];
-      }
-      for (const [dx, dy] of digitPixels(num, sc)) {
-        const i = ((oy + dy) * W + ox + dx) * info.channels;
-        data[i] = fg[0]; data[i + 1] = fg[1]; data[i + 2] = fg[2]; data[i + 3] = 255;
-      }
-    }
-  }
-  return sharp(data, { raw: { width: W, height: H, channels: info.channels } }).png().toBuffer();
-}
-
 // --- ④ フレームを描く（★描画コマンドは packages/render が作る）---
 const SW = 1280, SH = 720;
 const WORK = join(tmpdir(), 'star-race-frames');
@@ -253,9 +155,20 @@ const sceneInput = {
   // ★段番号 → 元の馬番。丸めた番号で勝負服を選ぶと、色が3種類しか出ません
   silkOf: (gate) => `silk-${gate}`,
   gallopFrames: 6,
+  // ★V-16 ①: 展開を画面に出す
+  strategyOf: (gate) => entrants[gate - 1].strategy,
+  pace,
 };
 
-const total = Math.ceil(model.raceSec * FPS);
+/**
+ * ★**時間配分**（D-062）。道中は速く送り、直線は引き伸ばす。
+ *   ⚠️ 着順にも境界にも触れません。**表示の時計を読み替えるだけ**です。
+ */
+const warp = timeWarpFor(knotsFor(boundaries, OWN), DEFAULT_PHASE_RATES);
+console.log(`  ✓ 時間配分: ${model.raceSec.toFixed(1)}秒 → 表示 ${warp.displaySec.toFixed(1)}秒`
+  + `（道中 ${DEFAULT_PHASE_RATES.cruise}倍速 / 直線 ${DEFAULT_PHASE_RATES.straight}倍）`);
+
+const total = Math.ceil(warp.displaySec * FPS);
 const STEP = Math.max(1, Math.round(total / 60));   // ★60枚程度に間引く（GIF の大きさ）
 const paths = [];
 for (let i = 0, n = 0; i <= total; i += STEP, n += 1) {
@@ -263,7 +176,8 @@ for (let i = 0, n = 0; i <= total; i += STEP, n += 1) {
    * ★**カメラは自馬の残り距離で決まります**（アートバイブル §9）。
    *   時刻ではありません — 遅い馬と速い馬で、同じ時刻でも局面が違います。
    */
-  const sec = i / FPS;
+  // ★表示の時計 → レースの時計（D-062）
+  const sec = warp.raceSecAt(i / FPS);
   const own = model.at(sec).find((h) => h.gate === OWN);
   const metersLeft = own === undefined ? DIST : DIST - own.meters;
   const frame = sceneAt({ ...sceneInput, camera: cameraFor(metersLeft, OWN) }, sec);
@@ -315,8 +229,8 @@ for (let i = 0, n = 0; i <= total; i += STEP, n += 1) {
       const w = 220 * sc, hh = 140 * sc;
       if (x < 0 || y < 0 || x + w > SW || y + hh > SH) continue;
       const img = sc === 1
-        ? await dressed(c.sprite.frame, gate)
-        : await sharp(await dressed(c.sprite.frame, gate)).resize(w, hh, { kernel: 'nearest' }).png().toBuffer();
+        ? await dressed(frames, c.sprite.frame, gate)
+        : await sharp(await dressed(frames, c.sprite.frame, gate)).resize(w, hh, { kernel: 'nearest' }).png().toBuffer();
       tiles.push({ input: img, left: x, top: y });
     }
   }

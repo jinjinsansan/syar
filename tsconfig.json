@@ -28,5 +28,11 @@
     }
   },
   "include": ["packages/**/*.ts", "apps/**/*.ts"],
-  "exclude": ["node_modules", "image-cockpit-for-codex-workflows"]
+  "exclude": [
+    "node_modules",
+    "image-cockpit-for-codex-workflows",
+    // ★apps/web は DOM を使うので別プロジェクトで検査します（apps/web/tsconfig.json）。
+    //   ⚠️ ここに "dom" を足すと、**sim-engine が DOM に触れても型検査が通ります**（§14 違反）。
+    "apps/web"
+  ]
 }

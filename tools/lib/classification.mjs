@@ -72,6 +72,11 @@ export const READONLY = [
   'deps-of.mjs',
   // ★P4 のアセット系。**DB に一切接続しません**（画像を読み書きするだけ）
   //   分類の基準は「DB の状態を変えるか」なので、ファイルを書いても readonly です
+  'bake-sprites.mjs',
+  // ★読むだけ。自分で画面を見るための静止画
+  'shot.mjs',
+  // ★読むだけ。シートの本当のコマ位置を数える
+  'measure-sheet-blobs.mjs',
   'codex-imagegen.mjs',
   'make-gif.mjs',
   'measure-silk-budget.mjs',
