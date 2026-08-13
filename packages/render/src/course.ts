@@ -45,6 +45,14 @@ export interface Course {
   readonly widthM: number;
   /** 直線（ゴール前）の長さ [m] */
   readonly homeStretchM: number;
+  /**
+   * ★**スタート地点の進行方向** [rad]。
+   *
+   *   ⚠️ これが無いと、コースが**斜めに寝ます**（実際に寝ました）。
+   *   ★**ゴール前の直線が水平・右向きになる**ように、逆算して決めます。
+   *     競馬場の俯瞰は、**決勝線のある直線を手前・水平**に置くのが作法です。
+   */
+  readonly startHeading: number;
 }
 
 export interface WorldPos {
@@ -105,7 +113,18 @@ export function ovalCourse(
     left -= take;
     i += 1;
   }
-  return { distance, segments: [...backward].reverse(), widthM, homeStretchM };
+  const segments = [...backward].reverse();
+
+  /**
+   * ★**ゴール前の直線が水平（heading = 0）になるように、スタートの向きを逆算します。**
+   *   最後の直線までに曲がる角度の合計だけ、最初に戻しておきます。
+   */
+  let turned = 0;
+  for (const seg of segments) {
+    if (seg.type !== 'corner' || seg.radius === undefined || seg.radius <= 0) continue;
+    turned += (seg.length / seg.radius) * (seg.turn === 'right' ? -1 : 1);
+  }
+  return { distance, segments, widthM, homeStretchM, startHeading: -turned };
 }
 
 /** ★`s`（スタートからの中心線距離）がどの区間にあるか */
@@ -162,7 +181,7 @@ export function posOf(course: Course, s: number, w: number): WorldPos {
   const wCentre = course.widthM / 2;
   const off = w - wCentre;
   let acc = 0;
-  let x = 0, y = 0, heading = 0;
+  let x = 0, y = 0, heading = course.startHeading;
 
   for (const seg of course.segments) {
     const segStart = acc;

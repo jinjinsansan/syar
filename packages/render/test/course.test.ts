@@ -96,3 +96,30 @@ describe('★コース幾何', () => {
     expect(() => ovalCourse(1600, { lapM: 500, homeStretchM: 400 })).toThrow();
   });
 });
+
+describe('★コースの向き（俯瞰の作法）', () => {
+  it('★★ゴール前の直線は水平・右向き', () => {
+    /**
+     * ⚠️ これが無いとコースが**斜めに寝ます**（実際に寝ました）。
+     *   競馬場の俯瞰は、**決勝線のある直線を手前・水平**に置くのが作法です。
+     */
+    for (const d of [1200, 1600, 2000, 2400]) {
+      const c = ovalCourse(d);
+      const a = posOf(c, d - 100, 10);
+      const b = posOf(c, d, 10);
+      // ★右向き
+      expect(b.x - a.x).toBeGreaterThan(90);
+      // ★水平（縦のずれがほぼ無い）
+      expect(Math.abs(b.y - a.y)).toBeLessThan(1);
+      expect(Math.abs(b.heading)).toBeLessThan(1e-6);
+    }
+  });
+
+  it('★右回りでも成り立つ', () => {
+    const c = ovalCourse(1600, { turn: 'right' });
+    const a = posOf(c, 1500, 10);
+    const b = posOf(c, 1600, 10);
+    expect(b.x - a.x).toBeGreaterThan(90);
+    expect(Math.abs(b.y - a.y)).toBeLessThan(1);
+  });
+});
