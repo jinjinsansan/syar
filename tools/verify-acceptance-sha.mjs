@@ -107,7 +107,7 @@ for (const file of TARGETS) {
     .join(String.fromCharCode(10));
   /**
    * ★**「なぜ古い SHA でも有効か」が明文で書かれている行**（R-23 が認める例外）。
-   *   目印は `★古いSHA根拠:` です。
+   *   目印は `古いSHA根拠` を含むことです（`**` などの書式は問いません）。
    *
    * ⚠️⚠️ **これは黙らせる仕組みではありません。**
    *    ・目印があっても**必ず一覧に出します**（件数も内容も）
@@ -117,7 +117,8 @@ for (const file of TARGETS) {
    */
   const justified = new Set();
   for (const line of text.split(String.fromCharCode(10))) {
-    if (!line.includes('★古いSHA根拠:')) continue;
+    // ★書式（`**` や `★`）に依存させない。実際 `★**古いSHA根拠:**` と書いて一致しなかった
+    if (!/古いSHA根拠/.test(line)) continue;
     for (const m of line.matchAll(/`([0-9a-f]{7,40})`/g)) justified.add(m[1]);
   }
 
