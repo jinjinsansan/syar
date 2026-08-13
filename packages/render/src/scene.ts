@@ -103,6 +103,18 @@ export interface SceneInput {
   readonly silkOf: (gate: number) => PaletteRole;
   /** ギャロップのフレーム数（★シート契約。1頭目で確定・A-3） */
   readonly gallopFrames: number;
+  /**
+   * ★馬番 → **走路の段**（0始まり）。
+   *
+   *   ⚠️ **`gate` を縦位置に流用しないこと。** `gate` は**馬の識別**です。
+   *      12頭立てで `gate-1` を段にすると **12段**になり、画面からはみ出ます
+   *      （実際にはみ出して落ちました）。
+   *   ★実測どおり **720p / 220px なら3段**しか入りません。
+   *      **何頭を何段に置くかは上位が決めます**（カメラの設計・アートバイブル §9）。
+   *
+   *   省略時は `gate - 1`（＝1頭1段。少頭数のときだけ成り立つ）。
+   */
+  readonly laneOf?: ((gate: number) => number) | undefined;
 }
 
 /** ★背景の帯。アートバイブル §3「水平の帯で構成する。縦の要素は最小限」 */
@@ -183,7 +195,8 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
   for (const h of sorted) {
     // ★倍率は**整数**なので、位置も整数倍になります（画素が割れません）
     const x = Math.round(vp.width * 0.35 + (h.meters - cam) * PX_PER_M * z);
-    const y = vp.trackTop + (h.gate - 1) * vp.laneHeight * z;
+    const lane = input.laneOf === undefined ? h.gate - 1 : input.laneOf(h.gate);
+    const y = vp.trackTop + lane * vp.laneHeight * z;
     const sprite: SpriteRef = {
       sheet: 'horse-gallop',
       frame: gallopFrame(h.meters, input.gallopFrames),

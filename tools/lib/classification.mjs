@@ -66,6 +66,7 @@ export const READONLY = [
   'measure-sprite-sheet.mjs',
   'pick-silk-palette.mjs',
   'render-field.mjs',
+  'render-race.mjs',
   'world-search.mjs',
 ];
 

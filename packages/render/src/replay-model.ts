@@ -135,14 +135,38 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
 
 /**
  * ★**ゲート**: この位置モデルから出る最終順が、確定済みの着順と一致すること（D-059）。
- *   ⚠️ 「近い」では通しません。1頭でも違えば false です。
+ *
+ * 【★1度間違えました】
+ *   最初は `model.at(raceSec)` の**位置**で並べていました。
+ *   → **レース終了時刻には全馬がゴール線上にいる**ので位置に差が無く、
+ *     同着扱いで**馬番順（1,2,3,…）**が返っていました。
+ *   ★**着順は「どこにいるか」ではなく「いつ着いたか」で決まります。**
+ *
+ * → 各馬が**ゴールに到達した時刻**を二分探索で求め、その順に並べます。
+ *   ⚠️ 「近い」では通しません。1頭でも違えば呼び出し側が落とします。
  */
 export function finalOrderOf(model: PositionModel): number[] {
-  const last = model.at(model.raceSec);
-  return [...last]
+  const gates = model.at(0).map((h) => h.gate);
+  const finishSecOf = (gate: number): number => {
+    // ★位置は単調増加なので、二分探索が必ず1点に収束します
+    let lo = 0, hi = model.raceSec;
+    const at = (sec: number): number => {
+      const h = model.at(sec).find((x) => x.gate === gate);
+      if (h === undefined) throw new Error(`馬番 ${gate} が位置モデルにありません`);
+      return h.meters;
+    };
+    if (at(hi) < model.distanceMeter - 1e-6) return Number.POSITIVE_INFINITY;
+    for (let i = 0; i < 60; i += 1) {
+      const mid = (lo + hi) / 2;
+      if (at(mid) < model.distanceMeter - 1e-9) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  };
+  return gates
+    .map((gate) => ({ gate, sec: finishSecOf(gate) }))
     .sort((a, b) => {
-      if (b.meters !== a.meters) return b.meters - a.meters;
+      if (a.sec !== b.sec) return a.sec - b.sec;
       return a.gate - b.gate;   // ★同着は馬番順（確定側と同じ規則）
     })
-    .map((h) => h.gate);
+    .map((r) => r.gate);
 }

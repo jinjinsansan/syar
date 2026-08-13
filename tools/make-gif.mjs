@@ -31,8 +31,32 @@ if (out === undefined || ins.length === 0) {
  *   ⚠️ 減色でピクセルアートの色が変わると、**見ているものが別物**になります。
  *      → 実際に使われた色数を出して、**落ちていないことを確かめられる**ようにします。
  */
+/**
+ * ★**減色は黙ってやりません。**
+ *   `--quantise` を付けたときだけ、**いちばん近い色に寄せます**。
+ *   そして**何画素を寄せたか・最大でどれだけ色が変わったか**を必ず出します。
+ *   ⚠️ 「見た目は同じ」ではなく、**数字で示します**。
+ */
+const QUANTISE = args.includes('--quantise');
+let overflow = 0;
+let maxShift = 0;
+
 const frames = [];
 const palette = new Map(); // 'r,g,b' -> index
+
+/** パレットの中でいちばん近い色（ユークリッド距離） */
+function nearest(r, g, b) {
+  let best = 0, bestD = Infinity;
+  let i = 0;
+  for (const key of palette.keys()) {
+    const [pr, pg, pb] = key.split(',').map(Number);
+    const d = (pr - r) ** 2 + (pg - g) ** 2 + (pb - b) ** 2;
+    if (d < bestD) { bestD = d; best = i; }
+    i += 1;
+  }
+  if (Math.sqrt(bestD) > maxShift) maxShift = Math.sqrt(bestD);
+  return best;
+}
 for (const f of ins) {
   const { data, info } = await sharp(f).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const idx = new Uint8Array(info.width * info.height);
@@ -41,8 +65,14 @@ for (const f of ins) {
     const key = `${data[o]},${data[o + 1]},${data[o + 2]}`;
     if (!palette.has(key)) {
       if (palette.size >= 256) {
-        console.error(`★色が 256 を超えました（${palette.size}）。減色していないので中止します`);
-        process.exit(1);
+        if (!QUANTISE) {
+          console.error(`★色が 256 を超えました。減色していないので中止します`);
+          console.error('  ★減色してよいなら --quantise を付けてください（何色をいくつ落としたか必ず出します）');
+          process.exit(1);
+        }
+        overflow += 1;
+        idx[p] = nearest(data[o], data[o + 1], data[o + 2]);
+        continue;
       }
       palette.set(key, palette.size);
     }
@@ -137,6 +167,9 @@ push(0x3b);
 
 writeFileSync(out, Buffer.from(bytes));
 console.log(`  ${out}: ${frames.length} フレーム / ${W}×${H} / 色 ${palette.size} / ${bytes.length.toLocaleString()} バイト`);
+if (overflow > 0) {
+  console.log(`  ★減色しました: ${overflow.toLocaleString()} 画素を近い色に寄せた / 最大のずれ ${maxShift.toFixed(1)}（RGB距離）`);
+}
 
 // ★事後条件: 書いたものが本当に多ページの GIF か（自分で確かめる）
 const check = await sharp(out).metadata();
