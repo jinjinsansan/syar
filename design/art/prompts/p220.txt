@@ -1,0 +1,30 @@
+Generate a pixel-art SPRITE SHEET of a galloping racehorse and save it as a PNG file
+in the CURRENT WORKING DIRECTORY named exactly: horse-gallop-220-sheet.png
+
+LAYOUT (strict):
+- 6 frames of one gallop cycle, in ONE HORIZONTAL ROW (1 row x 6 columns).
+- Each cell is exactly 220 x 140 pixels. Total image: 1320 x 140 pixels.
+- The horse must fill the cell: roughly 200px wide and 130px tall inside each cell.
+- Same scale and SAME GROUND LINE (hoof line) in every frame, so the frames align.
+- Transparent background. No text, no logo, no grid lines, no frame numbers.
+
+STYLE - detailed pixel art, NOT chunky retro, NOT blurry:
+- Clean hard-edged pixels. NO anti-aliasing, NO blur, NO soft gradients.
+- Rich shading with flat colour bands (2-3 tones per material), like late 16-bit
+  arcade sprites. Readable muscle definition on the horse's shoulder and hindquarters.
+- Muted, desaturated earth palette for the horse and tack.
+
+SUBJECT (identical horse in all 6 frames; only the pose changes):
+- Realistic thoroughbred racehorse, SIDE VIEW, facing RIGHT, full gallop.
+  Long legs, arched neck reaching forward, level back, athletic silhouette.
+- Horse coat: BAY (medium brown body, near-black mane, tail and lower legs).
+- A jockey crouched low, wearing PLAIN SOLID-COLOUR racing silks and helmet:
+  one flat block of saturated BLUE, NO pattern, NO stripes, NO logo.
+  This blue area will be recoloured later to identify different horses,
+  so keep it as a clear, contiguous, easily-selectable block of one blue.
+- White breeches, black boots.
+
+The 6 frames must read as one gallop cycle, and the moment of hoof contact
+with the ground must be obvious.
+
+After saving, print the absolute path of the saved file.

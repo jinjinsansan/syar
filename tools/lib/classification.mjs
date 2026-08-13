@@ -64,6 +64,8 @@ export const READONLY = [
   'make-gif.mjs',
   'measure-silk-budget.mjs',
   'measure-sprite-sheet.mjs',
+  'pick-silk-palette.mjs',
+  'render-field.mjs',
   'world-search.mjs',
 ];
 

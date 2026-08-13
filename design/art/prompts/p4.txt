@@ -1,0 +1,37 @@
+Generate a pixel-art SPRITE SHEET of a galloping racehorse and save it as a PNG
+in the CURRENT WORKING DIRECTORY named exactly: horse-gallop-cloth2-sheet.png
+
+LAYOUT (strict):
+- 6 frames of one gallop cycle, ONE HORIZONTAL ROW (1 row x 6 columns).
+- Each cell exactly 220 x 140 pixels. Total 1320 x 140 pixels.
+- Horse fills the cell (about 200px wide). Same scale and SAME GROUND LINE in every frame.
+- Transparent background. No text outside the saddle cloth, no logo, no grid.
+
+STYLE: detailed pixel art, hard-edged pixels, NO anti-aliasing, NO blur, NO gradients.
+Flat colour bands (2-3 tones per material). Late 16-bit arcade sprite quality.
+
+SUBJECT (identical horse in all 6 frames, only the pose changes):
+- Realistic thoroughbred racehorse, SIDE VIEW, facing RIGHT, full gallop.
+- Bay coat: medium brown body, near-black mane, tail and lower legs.
+- Jockey crouched low in PLAIN SOLID BLUE silks and helmet (flat, no pattern).
+  White breeches, black boots.
+
+*** MOST IMPORTANT - THE SADDLE CLOTH (number cloth) ***
+- A LARGE rectangular WHITE saddle cloth sits UNDER the saddle, on the horse's barrel.
+- It is VERY BIG - this is the single most important detail in the sprite.
+  It must cover roughly HALF the horse's body length and hang down about TWO THIRDS
+  of the depth of the barrel, reaching well below the saddle toward the horse's belly.
+  It extends BACKWARD from under the jockey's leg all the way to the horse's flank,
+  like a real racing number cloth. Think of the large white number cloths seen in
+  televised racing, where the number is readable from a distance.
+- The cloth is a CLEAN RECTANGLE with straight edges (it may follow the body curve
+  slightly, but do NOT round the corners heavily) - a number will be printed on it.
+- The jockey's leg and boot overlap the FRONT of the cloth.
+- The cloth is PLAIN WHITE and EMPTY - absolutely NO number, NO text, NO symbol on it.
+  It must be a clean flat white rectangle so a number can be drawn onto it later.
+- Give the cloth a thin darker edge so it reads as a separate piece of fabric,
+  and let it follow the curve of the horse's body.
+
+The 6 frames must read as one gallop cycle; the moment of hoof contact must be obvious.
+
+After saving, print the absolute path of the saved file.
