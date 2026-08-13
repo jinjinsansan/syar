@@ -103,6 +103,20 @@ function screenFeatures(commands, ownSilk) {
   const gap = commands.find((c) => c.kind === 'gap');
   const gauge = commands.find((c) => c.kind === 'gauge');
 
+  /**
+   * ★**脚質とペース**（V-16 ①）。
+   *   これが無いと位置の意味が読めません:
+   *   「前にいる逃げ馬」と「前にいる追込馬」はまったく違う情報です。
+   */
+  const STR = ['nige', 'senko', 'sashi', 'oikomi'];
+  const ownStrategy = own.strategy === undefined ? 1.5 : STR.indexOf(own.strategy);
+  const paceCmd = commands.find((c) => c.kind === 'pace');
+  const paceIdx = paceCmd === undefined ? 1 : ['slow', 'middle', 'high'].indexOf(paceCmd.pace);
+  // ★前にいる馬のうち、逃げ・先行がどれだけ占めるか（速いペースなら止まる）
+  const upFront = sprites.filter((c) => c.at.x > own.at.x && c.strategy !== undefined);
+  const frontRunnersAhead = upFront.length === 0 ? 0
+    : upFront.filter((c) => c.strategy === 'nige' || c.strategy === 'senko').length / upFront.length;
+
   return [
     1,                                              // 切片
     ahead / FIELD,
@@ -114,6 +128,13 @@ function screenFeatures(commands, ownSilk) {
     gap === undefined ? 0 : Math.max(-1, Math.min(1, gap.closingMps / 5)),
     gap === undefined ? 0 : gap.toGo / FIELD,
     gauge === undefined ? 1 : gauge.ratio,
+    ownStrategy / 3,
+    paceIdx / 2,
+    // ★噛み合い: 速いペース × 差し追込 が有利
+    (paceIdx - 1) * (ownStrategy - 1.5) / 3,
+    frontRunnersAhead,
+    // ★前が逃げ・先行だらけ かつ 速いペース = 前は止まる
+    frontRunnersAhead * (paceIdx - 1),
   ];
 }
 
@@ -132,6 +153,20 @@ function formFeatures(f) {
     f.paceIdx / 2,
     f.strategyFitsPace,           // ★展開との噛み合い（coefficients.ts:134 の観点）
     f.ownGate / FIELD,
+    /**
+     * ★**出走表ボットにも「隊列の顔ぶれ」を渡します。**
+     *
+     *   ⚠️ 渡さないまま画面ボットに脚質を足すと、**比較が不公平**になります。
+     *      実際、渡さずに測ったとき道中が −0.221 → **+0.176** に跳ねました。
+     *      ★それは「画面が良くなった」ではなく「**読み手に良い特徴を与えた**」
+     *        可能性があります（R-16・裁定の「画面に出走表を貼る」）。
+     *   → **逃げ馬の頭数も、相手の脚質構成も、ゲートが開く前に分かります。**
+     *     だから出走表ボットが持っていて当然です。
+     */
+    f.frontRunnerShare,
+    f.frontRunnerShare * (f.paceIdx - 1),
+    f.rivalStMean,
+    f.ownSp - f.rivalSpMean > 0 ? 1 : 0,
   ];
 }
 
@@ -219,6 +254,9 @@ function runRace(seed) {
     laneOf: (g) => (g - 1) % 3,
     ownGate, silkOf: (g) => `silk-${g}`, gallopFrames: 6,
     camera: cameraFor(AT_LEFT, ownGate),
+    // ★V-16 ①: 展開を画面に出す（エンジンが持っているものを渡すだけ）
+    strategyOf: (g) => entrants[g - 1].strategy,
+    pace,
   }, sec);
 
   // ── ★出走表（ゲートが開く前に分かること**だけ**）──
@@ -235,6 +273,9 @@ function runRace(seed) {
     // ★速いペースなら差し・追込が有利、遅いペースなら逃げ・先行が有利
     strategyFitsPace: (paceIdx - 1) * (sIdx - 1.5) / 3,
     ownGate,
+    // ★隊列の顔ぶれ（ゲートが開く前に分かる）
+    frontRunnerShare: rivals.filter((e) => e.strategy === 'nige' || e.strategy === 'senko').length / rivals.length,
+    rivalStMean: rivals.reduce((s2, e) => s2 + e.stats.st, 0) / rivals.length / 1000,
   };
 
   return {

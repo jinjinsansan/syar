@@ -17,7 +17,11 @@
  *   ★時刻を進めるのも、位置を決めるのも、ここではありません。
  */
 
-import { SPRITE, type DrawCommand, type Frame, type PaletteRole, type SpriteRef, type Zoom } from './commands.js';
+import {
+  SPRITE,
+  type DrawCommand, type Frame, type PaceMark, type PaletteRole,
+  type SpriteRef, type StrategyMark, type Zoom,
+} from './commands.js';
 
 /** 走行中の1頭の状態。★これが位置モデルの出力です */
 export interface HorseAt {
@@ -150,6 +154,13 @@ export interface SceneInput {
    *      画面はそれを**受け取って表示するだけ**です。
    */
   readonly payLine?: number | undefined;
+  /**
+   * ★馬番 → **脚質**（正典 V-16 ①）。
+   *   ⚠️ ここで発明しません。**エンジンが持っているものを受け取るだけ**です。
+   */
+  readonly strategyOf?: ((gate: number) => StrategyMark) | undefined;
+  /** ★ペース。`paceOf()` が出したものをそのまま渡します */
+  readonly pace?: PaceMark | undefined;
 }
 
 /**
@@ -284,7 +295,11 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
       sheet: 'horse-gallop',
       frame: gallopFrame(h.meters, input.gallopFrames),
     };
-    commands.push({ kind: 'sprite', sprite, at: { x, y }, silk: input.silkOf(h.gate), scale: z });
+    commands.push({
+      kind: 'sprite', sprite, at: { x, y }, silk: input.silkOf(h.gate), scale: z,
+      // ★脚質が見えないと、位置は嘘をつきます（V-16 ①）
+      ...(input.strategyOf === undefined ? {} : { strategy: input.strategyOf(h.gate) }),
+    });
 
     /**
      * ★**各馬の余力**（展開を読ませる）。
@@ -368,6 +383,18 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
         closingMps: (gapBefore - gapNow) / dt,
         toGo: Math.max(0, ahead.length - (payLine - 1)),
       });
+
+      /**
+       * ★**ペース**（V-16 ①）。脚質と対で初めて意味を持ちます。
+       *   速いペースなら前が止まり、遅いペースなら前が残ります。
+       */
+      if (input.pace !== undefined) {
+        commands.push({
+          kind: 'pace',
+          at: { x: Math.round(vp.width * 0.05), y: Math.round(vp.height * 0.66) },
+          pace: input.pace,
+        });
+      }
     }
   }
 

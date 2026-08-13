@@ -53,6 +53,16 @@ export type PaletteRole =
 /** ★倍率は整数のみ。型で縛ります（0.5 や 1.5 を渡せない） */
 export type Zoom = 1 | 2;
 
+/**
+ * ★脚質。`@star/race-engine` の `Strategy` と同じ並びです。
+ *   ⚠️ ここで **`@star/race-engine` を import しません**（§14: `render` は依存ゼロ）。
+ *      ずれたら困るので、**呼び出し側が渡す**形にしています。
+ */
+export type StrategyMark = 'nige' | 'senko' | 'sashi' | 'oikomi';
+
+/** ★ペース。`paceOf()` が出すもの（race.ts の逃げ馬頭数で決まる） */
+export type PaceMark = 'slow' | 'middle' | 'high';
+
 export type DrawCommand =
   /** 背景の帯（アートバイブル §3「水平の帯で構成する」） */
   | {
@@ -91,6 +101,23 @@ export type DrawCommand =
     readonly silk?: PaletteRole | undefined;
     /** 左右反転（進行方向）。★既定は false */
     readonly flip?: boolean | undefined;
+    /**
+     * ★**脚質**（正典 V-16 ①）。
+     *
+     * 【なぜスプライトに載せるか — 実測】
+     *   道中で画面から読める情報は**位置だけ**でした。そして
+     *   ★**位置は嘘をつきます**（逃げ馬が前にいるのは強いからではない）。
+     *   結果、道中の画面ボットは出走表ボットを **0.221 下回りました**
+     *   ＝**見るほうが分からなくなる**。
+     *
+     *   > エンジンは、その情報を既に全部持っています（裁定）
+     *   >   race.ts:97 逃げ馬の頭数 → ペース
+     *   >   coefficients.ts:134 strategyCoef = 展開との噛み合い × 脚質適性
+     *
+     *   ★**脚質が見えて初めて、位置の意味が読めます。**
+     *     「前にいる逃げ馬」と「前にいる追込馬」は、まったく違う情報です。
+     */
+    readonly strategy?: StrategyMark | undefined;
     /**
      * ★**描く倍率**（整数のみ）。
      *
@@ -181,6 +208,20 @@ export type DrawCommand =
     readonly closingMps: number;
     /** ★あと何頭抜けば「足りる」か。0 なら既に足りている */
     readonly toGo: number;
+  }
+  /**
+   * ★**ペース**（正典 V-16 ①）。
+   *
+   *   逃げ馬の頭数で決まり、**誰がバテるか**を決めます（race.ts:97）。
+   *   ★脚質と対にならないと意味がありません:
+   *     速いペース → 前が止まる / 遅いペース → 前が残る。
+   *
+   * 【★画面の座標系】カメラが隠せません。
+   */
+  | {
+    readonly kind: 'pace';
+    readonly at: Point;
+    readonly pace: PaceMark;
   };
 
 /**
@@ -200,7 +241,7 @@ export const SPRITE = { width: 220, height: 140 } as const;
  *   → これらは**走路の座標系ではなく画面の座標系**に置きます。
  *     ★カメラが動いても位置が変わらないので、**隠しようがありません**。
  */
-export const OVERLAY_KINDS = ['gauge', 'cue', 'gap'] as const;
+export const OVERLAY_KINDS = ['gauge', 'cue', 'gap', 'pace'] as const;
 export type OverlayKind = (typeof OVERLAY_KINDS)[number];
 
 /** 1フレーム分の描画命令 */

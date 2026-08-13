@@ -41,6 +41,9 @@ const input = (zoom: Zoom, follow?: number): SceneInput => ({
   ownGate: 5,
   silkOf: (g) => `silk-${g}`,
   gallopFrames: 6,
+  // ★V-16 ①: 展開（脚質・ペース）を画面に出す。**渡さないと画面から消えます**
+  strategyOf: (g) => (['nige', 'senko', 'sashi', 'oikomi'] as const)[(g - 1) % 4]!,
+  pace: 'middle',
 });
 
 /**
@@ -74,6 +77,21 @@ describe('★カメラがゲージと合図を隠さない（C-6 の前提）', 
         expect(kinds).toEqual([...OVERLAY_KINDS].sort());
       }
     }
+  });
+
+  it('★展開を渡さないと、画面から消える（黙って落ちないことを固定する）', () => {
+    /**
+     * ★`strategyOf` と `pace` は任意引数です。**渡さなければ描かれません。**
+     *   V-16 ① は「全局面で画面ボット ≥ 出走表ボット」を要求しており、
+     *   ★**これが無いと道中で 0.221 下回ります**（実測）。
+     *   → 「消えうる」という事実を、検査として固定しておきます。
+     */
+    const bare = sceneAt({
+      ...input(1), strategyOf: undefined, pace: undefined,
+    }, 30).commands;
+    expect(bare.find((c) => c.kind === 'pace')).toBeUndefined();
+    const sp = bare.find((c) => c.kind === 'sprite') as { strategy?: string };
+    expect(sp.strategy).toBeUndefined();
   });
 
   it('★対照: 馬の位置は倍率で変わる（上の検査が空振りでない）', () => {
