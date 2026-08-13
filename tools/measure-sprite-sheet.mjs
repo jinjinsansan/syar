@@ -26,7 +26,9 @@ if (src === undefined) {
   process.exit(2);
 }
 const FRAMES = arg('frames', 6);
-const CELL = arg('cell', 32);
+/** ★セルは正方形ではありません（D-058: 220×140） */
+const CELL_W = arg('cell-w', arg('cell', 220));
+const CELL_H = arg('cell-h', 140);
 
 const hsv = (r, g, b) => {
   const R = r / 255, G = g / 255, B = b / 255;
@@ -66,7 +68,7 @@ console.log('');
 const outDir = join(dirname(src), 'frames');
 mkdirSync(outDir, { recursive: true });
 
-console.log(`【2. ${CELL}×${CELL} に落とす】★正典 §12.1 の契約`);
+console.log(`【2. ${CELL_W}×${CELL_H} に落とす】★正典 §12.1・D-058 の契約`);
 let totalBytes = 0;
 let silkTotal = 0;
 let opaqueTotal = 0;
@@ -81,8 +83,17 @@ for (let f = 0; f < FRAMES; f += 1) {
     .png()
     .toBuffer();
   const trimmed = await sharp(cut).trim().png().toBuffer();
+  /**
+   * ★**接地線を揃える。**
+   *   `trim` は各フレームを個別に詰めるので、脚の伸びが違うと**接地線がずれます**
+   *   （実測で 13px ずれ、そのままだと再生時に馬が上下に跳ねます）。
+   *   → **下端を合わせて**配置します（`position: 'bottom'`）。
+   */
   const buf = await sharp(trimmed)
-    .resize(CELL, CELL, { fit: 'contain', kernel: 'nearest', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .resize(CELL_W, CELL_H, {
+      fit: 'contain', position: 'bottom', kernel: 'nearest',
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
     .png({ compressionLevel: 9, palette: true })
     .toBuffer();
   const out = join(outDir, `${basename(src, '.png')}-${f}.png`);
@@ -94,7 +105,7 @@ for (let f = 0; f < FRAMES; f += 1) {
   for (let i = 0; i < data.length; i += info.channels) {
     if (data[i + 3] < 128) continue;
     opaque += 1;
-    const y = Math.floor((i / info.channels) / CELL);
+    const y = Math.floor((i / info.channels) / CELL_W);
     if (y > bottom) bottom = y;
     if (isSilk(data[i], data[i + 1], data[i + 2])) silk += 1;
   }
@@ -106,7 +117,7 @@ for (let f = 0; f < FRAMES; f += 1) {
 
 console.log('');
 console.log('【3. 判定】');
-console.log(`  ★1頭あたり（${FRAMES}フレーム・${CELL}×${CELL}）: ${totalBytes.toLocaleString()} バイト`);
+console.log(`  ★1頭あたり（${FRAMES}フレーム・${CELL_W}×${CELL_H}）: ${totalBytes.toLocaleString()} バイト`);
 console.log(`  ★勝負服の平均: ${(silkTotal / FRAMES).toFixed(1)} px（不透明部の ${((silkTotal / opaqueTotal) * 100).toFixed(1)}%）`);
 
 /**
