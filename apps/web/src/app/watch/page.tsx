@@ -106,6 +106,8 @@ export default function WatchPage(): React.JSX.Element {
   const [ownGate, setOwnGate] = useState(3);
   const [jostle, setJostle] = useState(0.25);
   const [cruise, setCruise] = useState(DEFAULT_PHASE_RATES.cruise);
+  /** ★走路の縮尺。実測: 55→5頭 / 30→8頭 / 20→10頭 / 14→12頭（残り1500m・1倍） */
+  const [pxm, setPxm] = useState(24);
   const [playing, setPlaying] = useState(false);
   const [ready, setReady] = useState(false);
   const [built, setBuilt] = useState<Built | null>(null);
@@ -163,9 +165,11 @@ export default function WatchPage(): React.JSX.Element {
       animSec: d,
       // ★ハロン棒（間隔は画面が発明しない）
       poleEveryMeter: 200,
+      // ★走路の縮尺。見て決める数字なので画面から変えられます
+      pxPerMeter: pxm,
     }, sec);
     drawFrame(ctx, frame, atlas, VIEW);
-  }, [built, ownGate]);
+  }, [built, ownGate, pxm]);
 
   /**
    * ★**画像が届いたら描き直します。**
@@ -258,6 +262,14 @@ export default function WatchPage(): React.JSX.Element {
             onChange={(e) => setCruise(Number(e.target.value))}
           />
           {' '}{cruise.toFixed(1)}倍
+        </label>
+        <label title="走路の縮尺。小さいほど広く映る（馬は重なる）">
+          縮尺{' '}
+          <input
+            type="range" min={12} max={55} step={2} value={pxm}
+            onChange={(e) => setPxm(Number(e.target.value))}
+          />
+          {' '}{pxm}px/m（{Math.round(1280 / pxm)}m 幅）
         </label>
         <label title="D-061 改訂: 別ストリームの揺らぎ。着順は動かない">
           揺らぎ{' '}

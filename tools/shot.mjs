@@ -45,7 +45,7 @@ for (const [name, d] of [['a-start', 1], ['b-cruise', warp.displaySec * 0.35], [
     model, viewport: VIEW, camera: cameraFor(DIST - own.meters, OWN), ownGate: OWN,
     silkOf: (g) => `silk-${g}`, gallopFrames: 6, laneOf: (g) => (g - 1) % LANES,
     laneCount: LANES, foregroundRail: true, strategyOf: (g) => entrants[g - 1].strategy, pace,
-    animSec: d, poleEveryMeter: 200,
+    animSec: d, poleEveryMeter: 200, pxPerMeter: 24,
   }, sec);
 
   let img = sharp({ create: { width: VIEW.width, height: VIEW.height, channels: 4, background: { r: 17, g: 17, b: 17, alpha: 1 } } });
