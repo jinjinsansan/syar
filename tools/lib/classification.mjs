@@ -55,6 +55,9 @@ export const READONLY = [
   'verify-world.mjs',
   // ★読むだけ。判定書の SHA が HEAD かを見る（R-23）
   'verify-acceptance-sha.mjs',
+  // ★読むだけ（判定書の SHA を書き換えるが DB は変えない）
+  'update-acceptance-sha.mjs',
+  'deps-of.mjs',
   'world-search.mjs',
 ];
 
