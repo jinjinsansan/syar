@@ -25,9 +25,25 @@ const pool = JSON.parse(readFileSync('docs/pool-staging.json', 'utf8'));
 const arr = Array.isArray(pool) ? pool : (pool.horses ?? []);
 const stock = arr.filter((h) => h.stats && Number.isFinite(h.stats.sp)).sort((a, b) => b.stats.sp - a.stats.sp);
 
-let totalSwaps = 0, totalLeadChanges = 0;
-/** ★局面ごとに数える（道中に無いのか、全体に無いのかを分けるため） */
-const byPhase = { cruise: 0, spurt: 0, straight: 0 };
+/**
+ * ★**通過順位で測ります。**
+ *
+ *   ⚠️ 最初は「隣り合う2頭の入れ替わり回数」を数えていました。**測るものが違いました。**
+ *      馬群が密になるほど、わずかな動きで順位が入れ替わり、**回数は増えます**
+ *      （実測: 隊列を 120m→26m に締めたら、追い抜きは 84.8→76.8 とほぼ変わらず）。
+ *   ★実際のレースが「動かない」と言うときの単位は **通過順位** です:
+ *      `8-8-8-4` … 1角・2角・3角・4角の順位。**前3つが同じ＝道中は動かない**。
+ *   → **各コーナー相当の地点での順位**を取り、**その変化**を数えます。
+ */
+const CHECKPOINTS = [
+  { left: 1300, name: '1角' },
+  { left: 1000, name: '2角' },
+  { left: 700, name: '3角' },
+  { left: 400, name: '4角' },
+  { left: 0, name: 'ゴール' },
+];
+const moves = CHECKPOINTS.slice(1).map(() => []);
+const samples = [];
 
 for (let seed = 1; seed <= RACES; seed += 1) {
   const off = (seed * 13) % Math.max(1, stock.length - FIELD);
@@ -47,44 +63,49 @@ for (let seed = 1; seed <= RACES; seed += 1) {
   const model = replayPositionModel({
     distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400,
     boundaries: replayOf(result, (g) => entrants[g - 1].strategy, pace),
+    jostle: 0.25, jostleSeed: seed,
   });
 
-  let prev = null, prevLead = null;
-  for (let i = 0; i <= SAMPLES; i += 1) {
-    const sec = (i / SAMPLES) * model.raceSec;
-    const at = [...model.at(sec)].sort((a, b) => b.meters - a.meters);
-    const order = at.map((h) => h.gate);
-    const lead = order[0];
-    // ★局面は先頭の残り距離で見る
-    const left = DIST - at[0].meters;
-    const ph = left <= 400 ? 'straight' : left <= 800 ? 'spurt' : 'cruise';
-    if (prev !== null) {
-      // 隣り合う2頭の前後が入れ替わった回数
-      let swaps = 0;
-      for (let a = 0; a < order.length; a += 1) {
-        for (let b = a + 1; b < order.length; b += 1) {
-          const wasBefore = prev.indexOf(order[a]) < prev.indexOf(order[b]);
-          if (!wasBefore) swaps += 1;
-        }
-      }
-      totalSwaps += swaps;
-      byPhase[ph] += swaps;
-      if (lead !== prevLead) totalLeadChanges += 1;
+  const ranksAt = [];
+  for (const cp of CHECKPOINTS) {
+    let sec = model.raceSec;
+    for (let i = 0; i <= 800; i += 1) {
+      const t = (i / 800) * model.raceSec;
+      const lead = Math.max(...model.at(t).map((h) => h.meters));
+      if (DIST - lead <= cp.left) { sec = t; break; }
     }
-    prev = order;
-    prevLead = lead;
+    const order = [...model.at(sec)].sort((a2, b2) => b2.meters - a2.meters).map((h) => h.gate);
+    const r = new Map();
+    order.forEach((g, i) => r.set(g, i + 1));
+    ranksAt.push(r);
+  }
+  for (let i = 1; i < CHECKPOINTS.length; i += 1) {
+    let sum = 0;
+    for (const g of ranksAt[0].keys()) sum += Math.abs(ranksAt[i].get(g) - ranksAt[i - 1].get(g));
+    moves[i - 1].push(sum / FIELD);
+  }
+  if (seed <= 3) {
+    samples.push([...ranksAt[0].keys()].slice(0, 4).map((g) => ranksAt.map((r) => r.get(g)).join('-')));
   }
 }
 
-console.log('# ★映像に抜き差しはあるか（' + RACES + ' レース × ' + SAMPLES + ' 標本）');
+const avg = (a) => a.reduce((s2, v) => s2 + v, 0) / a.length;
+console.log('# ★通過順位の動き（' + RACES + ' レース・12頭）');
 console.log('');
-console.log(`  1レースあたりの追い抜き   : ${(totalSwaps / RACES).toFixed(1)} 回`);
-console.log(`  1レースあたりの先頭交代   : ${(totalLeadChanges / RACES).toFixed(2)} 回`);
-console.log('');
-console.log('  局面ごとの追い抜き（1レースあたり）');
-for (const [k, v] of Object.entries(byPhase)) {
-  console.log(`    ${k.padEnd(9)}: ${(v / RACES).toFixed(1)} 回`);
+console.log('  区間          | 1頭あたりの順位変動（平均）');
+for (let i = 1; i < CHECKPOINTS.length; i += 1) {
+  const label = `${CHECKPOINTS[i - 1].name}→${CHECKPOINTS[i].name}`;
+  console.log(`  ${label.padEnd(13)} | ${avg(moves[i - 1]).toFixed(2)} 着`);
 }
 console.log('');
-console.log('★読み方: 追い抜きがほとんど無ければ、映像は「並んで流れているだけ」です。');
-console.log('  そのとき、最初に見えた並びが最後の並びなので、**見ても新しいことが起きません。**');
+console.log('  実際の表記の例（この実装から出したもの・1角-2角-3角-4角-ゴール）');
+for (const s2 of samples) console.log(`    ${s2.join('  ')}`);
+console.log('');
+
+console.log('★実際のレース（中継の解説より）:');
+console.log('  「前からシンガリまで**10馬身くらいで一団**で進んでいきます」');
+console.log('  「**隊列特に変わらずに**（道中を）通過」');
+console.log('  「先頭から最後方までは10馬身。**ひとかたまりで第4コーナーから直線に向かいます**」');
+console.log('  通過順位 `8-8-8-4` — ★**前3つが同じ＝道中は動かない**。動くのは4角以降');
+console.log('');
+console.log('★つまり本来は: 道中の追い抜き ≒ 0 / 直線に集中 / 隊列は 10馬身（24m）');

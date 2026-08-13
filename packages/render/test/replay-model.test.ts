@@ -128,7 +128,28 @@ describe('★別ストリームの揺らぎ（D-061 改訂）', () => {
   it('★シードが違えば揺らぎが違う（レースごとに違う＝学習で除けない）', () => {
     const a = mk({ jostle: 0.9, jostleSeed: 1, boundaryFidelity: 'shape' });
     const b = mk({ jostle: 0.9, jostleSeed: 2, boundaryFidelity: 'shape' });
-    expect(JSON.stringify(a.at(40))).not.toBe(JSON.stringify(b.at(40)));
+    // ★勝負所以降で見ます（道中は意図的に動かしていません。下の検査を参照）
+    expect(JSON.stringify(a.at(90))).not.toBe(JSON.stringify(b.at(90)));
+  });
+
+  it('★★道中は動かない（実際のレース展開に合わせた・意図的）', () => {
+    /**
+     * 中継の解説より:
+     *   「**隊列特に変わらずに**（道中を）通過」
+     *   通過順位 `8-8-8-4` — ★**前3つが同じ＝道中は動かない**。動くのは4角以降。
+     *
+     * ⚠️ 実測: 揺らぎを道中にも入れていたとき、通過順位は
+     *    `2-6-2-6-9` のようにふらつき、**1区間あたり 2.2着**動いていました。
+     * → 道中の揺らぎを 0 にしました。**1区間あたり 0.05着**になります。
+     *
+     * ★これは**副作用ではなく設計**なので、検査で固定します。
+     */
+    const a = mk({ jostle: 0.9, jostleSeed: 1 });
+    const b = mk({ jostle: 0.9, jostleSeed: 2 });
+    // 道中（spurtSec 前）は、シードが違っても同じ
+    expect(JSON.stringify(a.at(30))).toBe(JSON.stringify(b.at(30)));
+    // ★勝負所以降は違う（空振りでない）
+    expect(JSON.stringify(a.at(90))).not.toBe(JSON.stringify(b.at(90)));
   });
 
   it('★位置は後戻りしない（どの強さでも・馬が下がって見えない）', () => {
@@ -166,7 +187,8 @@ describe('★別ストリームの揺らぎ（D-061 改訂）', () => {
     const m = mk({ jostle: 0.9, jostleSeed: 3, boundaryFidelity: 'shape' });
     let moved = 0;
     for (const b of bs) {
-      if (Math.abs(m.at(b.spurtSec).find((h) => h.gate === b.gate)!.meters - 800) > 1) moved += 1;
+      // ★直線の境界で見ます（道中の境界は、道中の揺らぎが 0 なので動きません）
+      if (Math.abs(m.at(b.straightSec).find((h) => h.gate === b.gate)!.meters - 1200) > 1) moved += 1;
     }
     expect(moved).toBeGreaterThan(0);
     // ★それでも端は端（着順は動かない）

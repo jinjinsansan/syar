@@ -27,6 +27,8 @@ const SPRITE_H = 140;
 const PALETTE: Record<string, string> = {
   sky: '#8fb8cf',
   stand: '#6b6f74',
+  hedge: '#2f4a2b',
+  fence: '#3b3f36',
   rail: '#c8c6bd',
   turf: '#4b7a41',
   dirt: '#8a6b4a',
@@ -85,6 +87,24 @@ function tileFor(
         t.fillRect(x, y, 1, 1);
       }
     }
+  } else if (role === 'hedge') {
+    // ★生垣の粒（縦の要素にしない・アートバイブル §3）
+    for (let y = 0; y < c.height; y += 2) {
+      for (let x = 0; x < c.width; x += 3) {
+        t.fillStyle = ((x * 5 + y * 3) % 11 < 5) ? '#ffffff' : '#000000';
+        t.globalAlpha = 0.12;
+        t.fillRect(x, y, 2, 2);
+      }
+    }
+    t.globalAlpha = 0.18;
+  } else if (role === 'fence') {
+    // ★柵の支柱
+    t.fillStyle = '#000000';
+    t.globalAlpha = 0.45;
+    t.fillRect(0, 0, 2, c.height);
+    t.globalAlpha = 0.2;
+    t.fillRect(0, Math.floor(c.height / 2), c.width, 1);
+    t.globalAlpha = 0.18;
   } else if (role === 'rail') {
     // ★縦の要素はここだけ（支柱）
     t.fillStyle = '#000000';

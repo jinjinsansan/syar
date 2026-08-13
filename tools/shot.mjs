@@ -35,7 +35,7 @@ const model = replayPositionModel({
 const warp = timeWarpFor(knotsFor(boundaries, OWN), DEFAULT_PHASE_RATES);
 const frames = await loadFrames('design/art/assets/horse-gallop-v2.png');
 
-const P = { sky: [143,184,207], stand: [107,111,116], rail: [200,198,189], turf: [75,122,65] };
+const P = { sky: [143,184,207], stand: [107,111,116], hedge: [47,74,43], fence: [59,63,54], rail: [200,198,189], turf: [75,122,65] };
 mkdirSync('design/art/assets/shots', { recursive: true });
 
 for (const [name, d] of [['a-start', 1], ['b-cruise', warp.displaySec * 0.35], ['c-spurt', warp.displaySec * 0.72], ['d-straight', warp.displaySec * 0.93]]) {
@@ -78,6 +78,14 @@ for (const [name, d] of [['a-start', 1], ['b-cruise', warp.displaySec * 0.35], [
     } else if (role === 'stand') {
       for (let y = 2; y < h - 2; y += 3)
         for (let x = 1; x < w; x += 4) put(x, y, mix(base, ((x + y) % 7 < 3) ? [255, 255, 255] : [0, 0, 0], 0.18));
+    } else if (role === 'hedge') {
+      for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 3) {
+        const c2 = mix(base, ((x * 5 + y * 3) % 11 < 5) ? [255, 255, 255] : [0, 0, 0], 0.12);
+        for (let dy = 0; dy < 2 && y + dy < h; dy += 1) for (let dx = 0; dx < 2 && x + dx < w; dx += 1) put(x + dx, y + dy, c2);
+      }
+    } else if (role === 'fence') {
+      for (let y = 0; y < h; y += 1) for (let x = 0; x < 2; x += 1) put(x, y, mix(base, [0, 0, 0], 0.45));
+      for (let x = 0; x < w; x += 1) put(x, Math.floor(h / 2), mix(base, [0, 0, 0], 0.2));
     } else if (role === 'rail') {
       for (let y = 0; y < h; y += 1) for (let x = 0; x < 3; x += 1) put(x, y, mix(base, [0, 0, 0], 0.35));
     } else if (role === 'turf') {

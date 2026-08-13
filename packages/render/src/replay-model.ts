@@ -122,8 +122,30 @@ interface Harmonics {
 }
 
 /** ★区間ごと・馬ごとに違う揺らぎを引く（レースが違えば違う） */
+/**
+ * ★**局面ごとの揺らぎの強さ**（実際のレース展開に合わせる）。
+ *
+ *   中継の解説より:
+ *     「**隊列特に変わらずに**（道中を）通過」
+ *     「ひとかたまりで**第4コーナーから直線に向かいます**」
+ *     通過順位 `8-8-8-4` — ★**前3つが同じ＝道中は動かない**。動くのは4角以降。
+ *
+ *   ⚠️ 実測: 道中の追い抜きが**1レース 84.8回**、先頭交代 10.63回。
+ *      ★**ファミコンのゲームのように前後を入れ替わり続けていました。**
+ *   → 道中はほぼ動かさず、勝負所から動かします。
+ */
+const PHASE_JOSTLE: readonly number[] = [0, 0.2, 1.0];
+
+/**
+ * ★**レース全体に1本かけるとき**（`'shape'`）は、局面の重みを使いません。
+ *   ⚠️ 区間番号 0 を渡していたため、**`'shape'` の揺らぎが丸ごと 0 になりました**
+ *      （道中の重みが 0 なので）。検査が捕まえました。
+ */
+const WHOLE_RACE_SEGMENT = -1;
+
 function harmonicsFor(seed: number, gate: number, segment: number, amount: number): Harmonics {
-  if (amount === 0) return { amps: [], phases: [] };
+  const scaled = amount * (segment === WHOLE_RACE_SEGMENT ? 1 : (PHASE_JOSTLE[segment] ?? 1));
+  if (scaled === 0) return { amps: [], phases: [] };
   /**
    * ★**基本波だけを使います（K=1）。**
    *
@@ -150,7 +172,7 @@ function harmonicsFor(seed: number, gate: number, segment: number, amount: numbe
    *   → 合計が `amount`（≤0.9）になるよう正規化します。**構造で単調性を保証します。**
    */
   const total = raw.reduce((s2, v) => s2 + Math.abs(v), 0);
-  const scale = total === 0 ? 0 : Math.max(-0.9, Math.min(0.9, amount)) / total;
+  const scale = total === 0 ? 0 : Math.max(-0.9, Math.min(0.9, scaled)) / total;
   return { amps: raw.map((v) => v * scale), phases };
 }
 
@@ -307,7 +329,7 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
     const span = b.finishSec - b.startSec;
     if (span <= 0) return distanceMeter;
     const tau = (sec - b.startSec) / span;
-    const warped = easeWithin(tau, harmonicsFor(jostleSeed, b.gate, 0, jostle));
+    const warped = easeWithin(tau, harmonicsFor(jostleSeed, b.gate, WHOLE_RACE_SEGMENT, jostle));
     const at = b.startSec + warped * span;
 
     // ★歪めた時刻を、脚質の形に通す

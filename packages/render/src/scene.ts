@@ -232,9 +232,15 @@ export interface SceneInput {
 const BANDS: readonly {
   role: PaletteRole; top: number; height: number; speed: number; tile: number;
 }[] = [
-  { role: 'sky', top: 0, height: 0.35, speed: 0.06, tile: 320 },
-  { role: 'stand', top: 0.35, height: 0.12, speed: 0.22, tile: 160 },
-  { role: 'rail', top: 0.47, height: 0.03, speed: 0.55, tile: 64 },
+  { role: 'sky', top: 0, height: 0.30, speed: 0.05, tile: 320 },
+  // ★観客席（いちばん奥なので最も遅い）
+  { role: 'stand', top: 0.30, height: 0.09, speed: 0.14, tile: 160 },
+  // ★生垣（スタンドと走路の間）。**これが無いと平らな板の上を走って見えます**
+  { role: 'hedge', top: 0.39, height: 0.07, speed: 0.30, tile: 112 },
+  // ★走路を囲う柵
+  { role: 'fence', top: 0.46, height: 0.025, speed: 0.44, tile: 80 },
+  // ★奥のラチ
+  { role: 'rail', top: 0.485, height: 0.02, speed: 0.58, tile: 64 },
 ];
 
 /**

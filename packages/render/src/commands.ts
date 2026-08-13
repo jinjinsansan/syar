@@ -47,6 +47,13 @@ export interface SpriteRef {
  */
 export type PaletteRole =
   | 'turf' | 'dirt' | 'sky' | 'rail' | 'stand' | 'paper' | 'ink'
+  /**
+   * ★**周囲の景色**（アートバイブル §3「水平の帯で構成する」）。
+   *   ⚠️ 空・スタンド・芝の3層だけだと、**平らな板の上を走っている**ように見えます。
+   *   `hedge` … 生垣・植え込み（スタンドと走路の間）
+   *   `fence` … 走路を囲う柵（生垣の手前）
+   */
+  | 'hedge' | 'fence'
   /** ★勝負服。個体識別の唯一の手段（アートバイブル §3） */
   | `silk-${number}`;
 
