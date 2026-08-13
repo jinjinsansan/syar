@@ -79,6 +79,8 @@ export const READONLY = [
   'diag-speed.mjs',
   // ★読むだけ。馬群の広がりが画面に収まるかを測る
   'diag-pack.mjs',
+  // ★読むだけ。走破タイムの差がどの要素から来るかを切り分ける
+  'diag-finish-spread.mjs',
   // ★読むだけ。シートの本当のコマ位置を数える
   'measure-sheet-blobs.mjs',
   'codex-imagegen.mjs',
