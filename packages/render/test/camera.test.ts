@@ -488,3 +488,37 @@ describe('★カメラが馬群を写す（1頭に固定しない）', () => {
     expect(rails).toHaveLength(1);
   });
 });
+
+/**
+ * ★影（馬が芝に貼った絵に見えないこと）
+ */
+describe('★影', () => {
+  it('★全馬に影が出て、馬より先に描かれる', () => {
+    const cmds = sceneAt(input(1), 30).commands;
+    const shadows = cmds.filter((c) => c.kind === 'shadow');
+    expect(shadows.length).toBe(18);
+    // ★各馬について、影がその馬より前にある
+    const firstShadow = cmds.findIndex((c) => c.kind === 'shadow');
+    const firstSprite = cmds.findIndex((c) => c.kind === 'sprite');
+    expect(firstShadow).toBeLessThan(firstSprite);
+  });
+
+  it('★宙に浮く局面では影が薄く小さい（跳んでいることの表現）', () => {
+    const seen = new Set<number>();
+    for (let t = 0; t < 1; t += 1 / 60) {
+      const sh = sceneAt({ ...input(1), animSec: t }, 30).commands
+        .find((c) => c.kind === 'shadow') as { strength: number };
+      seen.add(sh.strength);
+    }
+    // ★2種類（接地・宙）が出る
+    expect(seen.size).toBe(2);
+    expect(Math.min(...seen)).toBeLessThan(Math.max(...seen));
+  });
+
+  it('★影は馬と同じ倍率（寄っても足元から離れない）', () => {
+    for (const z of [1, 2] as Zoom[]) {
+      const sh = sceneAt(input(z), 30).commands.find((c) => c.kind === 'shadow') as { scale: number };
+      expect(sh.scale).toBe(z);
+    }
+  });
+});

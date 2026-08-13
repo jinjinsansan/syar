@@ -165,7 +165,19 @@ export async function loadFrames(sheetPath) {
 }
 
 /** 勝負服とゼッケンを塗る（`render-field.mjs` と同じ処理） */
-export async function dressed(frames, frameIdx, gate) {
+/**
+ * ★**番号の大きさは、全コマで1つに揃えます。**
+ *
+ * ⚠️ 以前はコマごとに独立に決めていました。ゼッケン布の大きさは
+ *    **コマごとに 77% もばらつく**（実測: 幅 33〜146px）ので、
+ *    ★**走るたびに番号が伸び縮みして見えます。**
+ *    オーナーが以前「数字の大きさが揃っていない」と指摘されたのと同じ形が、
+ *    今度は**コマ間**で起きていました。
+ * → **一番小さい布に収まる大きさ**を選び、全コマで使います。
+ */
+const scaleCache = new Map();
+
+export async function dressed(frames, frameIdx, gate, commonScale) {
   const color = POST[gate - 1];
   const { data, info } = await sharp(frames[frameIdx]).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   // 勝負服
@@ -221,12 +233,15 @@ export async function dressed(frames, frameIdx, gate) {
     }
     const num = String(gate);
     let sc = 0, ox = 0, oy = 0;
-    for (let c = 2; c >= 1; c -= 1) {
+    for (let c = commonScale ?? 2; c >= 1; c -= 1) {
       const px = x0 + Math.floor((cw - textWidth(num, c)) / 2);
       const py = y0 + Math.floor((ch - GLYPH_H * c) / 2);
       const pix = digitPixels(num, c);
       let out = 0;
       for (const [dx, dy] of pix) if (!on.has(`${px + dx},${py + dy}`)) out += 1;
+      // ★共通の大きさを渡されたら、収まらなくても**その大きさで置きます**
+      //   （収まりを優先するとコマごとに大きさが変わり、番号が伸び縮みします）
+      if (commonScale !== undefined) { sc = c; ox = px; oy = py; break; }
       if (out <= pix.length * 0.2) { sc = c; ox = px; oy = py; break; }
     }
     if (sc > 0) {
@@ -246,3 +261,55 @@ export async function dressed(frames, frameIdx, gate) {
   return sharp(data, { raw: { width: W, height: H, channels: info.channels } }).png().toBuffer();
 }
 
+
+/**
+ * ★**全コマ共通の番号の大きさ**を決める。
+ *   いちばん小さい布に収まる大きさを選びます（大きいほうに合わせると溢れます）。
+ */
+export async function commonDigitScale(frames, gate) {
+  const key = `${frames.length}-${gate}`;
+  const hit = scaleCache.get(key);
+  if (hit !== undefined) return hit;
+  let best = 2;
+  for (let i = 0; i < frames.length; i += 1) {
+    const { data, info } = await sharp(frames[i]).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const W = info.width, H = info.height, C = info.channels;
+    // ★布の連結成分（`dressed` と同じ条件）
+    const isCloth = (o, y) => {
+      if (data[o + 3] < 128) return false;
+      const mx = Math.max(data[o], data[o + 1], data[o + 2]);
+      const mn = Math.min(data[o], data[o + 1], data[o + 2]);
+      return mx > 195 && (mx === 0 ? 0 : (mx - mn) / mx) < 0.12 && y > 50 && y < 110;
+    };
+    const seen = new Uint8Array(W * H);
+    let blob = 0, bw = 0, bh = 0;
+    for (let p0 = 0; p0 < W * H; p0 += 1) {
+      if (seen[p0]) continue;
+      if (!isCloth(p0 * C, Math.floor(p0 / W))) { seen[p0] = 1; continue; }
+      const st = [p0]; seen[p0] = 1;
+      let n = 0, x0 = W, x1 = -1, y0 = H, y1 = -1;
+      while (st.length > 0) {
+        const q = st.pop(); const qy = Math.floor(q / W), qx = q % W;
+        n += 1;
+        if (qx < x0) x0 = qx; if (qx > x1) x1 = qx;
+        if (qy < y0) y0 = qy; if (qy > y1) y1 = qy;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = qx + dx, ny = qy + dy;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const nq = ny * W + nx; if (seen[nq]) continue; seen[nq] = 1;
+          if (isCloth(nq * C, ny)) st.push(nq);
+        }
+      }
+      if (n > blob) { blob = n; bw = x1 - x0 + 1; bh = y1 - y0 + 1; }
+    }
+    const num = String(gate);
+    // ★この布に収まる最大の大きさ
+    let fits = 1;
+    for (let c = 2; c >= 1; c -= 1) {
+      if (textWidth(num, c) <= bw - 2 && GLYPH_H * c <= bh - 2) { fits = c; break; }
+    }
+    if (fits < best) best = fits;
+  }
+  scaleCache.set(key, best);
+  return best;
+}

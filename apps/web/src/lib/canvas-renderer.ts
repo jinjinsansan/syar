@@ -61,10 +61,23 @@ function tileFor(
    */
   t.globalAlpha = 0.18;
   if (role === 'sky') {
+    /**
+     * ★**横に流れる薄い雲**。
+     *   ⚠️ 以前は `(x*7 + y*13) % 97` で置いていました。これは**斜めの縞**になり、
+     *      空に格子が走って見えました（実際に見えました）。
+     *   ★アートバイブル §3「水平の帯で構成する」。**縦・斜めの要素を入れません。**
+     */
     t.fillStyle = '#ffffff';
-    for (let y = Math.floor(c.height * 0.35); y < Math.floor(c.height * 0.46); y += 1) {
-      for (let x = 0; x < c.width; x += 1) if (((x * 7 + y * 13) % 97) < 40) t.fillRect(x, y, 1, 1);
+    const bands: readonly (readonly [number, number])[] = [[0.30, 0.34], [0.42, 0.45], [0.55, 0.57]];
+    for (const [a, b] of bands) {
+      const y0 = Math.floor(c.height * a), y1 = Math.floor(c.height * b);
+      for (let y = y0; y < y1; y += 1) {
+        const fade = 1 - Math.abs((y - (y0 + y1) / 2) / Math.max(1, (y1 - y0) / 2));
+        t.globalAlpha = 0.10 * fade;
+        t.fillRect(0, y, c.width, 1);
+      }
     }
+    t.globalAlpha = 0.18;
   } else if (role === 'stand') {
     for (let y = 2; y < c.height - 2; y += 3) {
       for (let x = 1; x < c.width; x += 4) {
@@ -159,6 +172,18 @@ export function drawFrame(
           ctx.fillStyle = '#efe9dc';
           ctx.fillText(label, tx, ty);
         }
+        break;
+      }
+      case 'shadow': {
+        // ★楕円の影。接地点に置き、宙に浮く局面では薄く小さくなります
+        ctx.save();
+        // ★薄く平たく。濃い楕円は「置き物」に見えます
+        ctx.globalAlpha = c.strength * 0.4;
+        ctx.fillStyle = '#243a1e';
+        ctx.beginPath();
+        ctx.ellipse(c.at.x, c.at.y, c.width / 2, Math.max(2, c.width / 10), 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
         break;
       }
       case 'effort': {

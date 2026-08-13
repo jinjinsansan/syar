@@ -242,6 +242,22 @@ export type DrawCommand =
    *     これがあると「どこを走っているか」が分かり、**速さが体感できます**
    *     （背景の縞だけでは、どれだけ進んだか読めません）。
    */
+  /**
+   * ★**影**（馬の足元）。
+   *
+   *   ⚠️ 影が無いと、馬が**芝の上に貼った絵**に見えます。
+   *      奥行きの手掛かりが「速度差」だけになるためです（アートバイブル §3）。
+   *   ★**接地点に置く**ので、宙に浮く局面では小さく薄くなります
+   *     — それが「跳んでいる」ことの表現になります。
+   */
+  | {
+    readonly kind: 'shadow';
+    readonly at: Point;
+    readonly width: number;
+    /** 0〜1。★宙に浮いているほど薄く小さい */
+    readonly strength: number;
+    readonly scale: Zoom;
+  }
   | {
     readonly kind: 'pole';
     readonly at: Point;

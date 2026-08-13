@@ -13,7 +13,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { loadFrames, dressed, POST } from './lib/dress.mjs';
+import { loadFrames, dressed, commonDigitScale, POST } from './lib/dress.mjs';
 
 const SHEET = 'design/art/assets/horse-gallop-v2.png';
 const OUT = join('apps', 'web', 'public', 'sprites');
@@ -26,7 +26,9 @@ const frames = await loadFrames(SHEET);
 for (let gate = 1; gate <= GATES; gate += 1) {
   // ★1頭ぶんを「6枚横並び」の1枚に（ブラウザは1回の読み込みで済む）
   const cells = [];
-  for (let f = 0; f < FRAMES; f += 1) cells.push(await dressed(frames, f, gate));
+  // ★番号の大きさは全コマ共通（コマごとに決めると走るたび伸び縮みします）
+  const sc = await commonDigitScale(frames, gate);
+  for (let f = 0; f < FRAMES; f += 1) cells.push(await dressed(frames, f, gate, sc));
   const strip = await sharp({
     create: { width: 220 * FRAMES, height: 140, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   })

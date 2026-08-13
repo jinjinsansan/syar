@@ -453,10 +453,34 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
      *   → **巡回**させます。自馬が必ず先頭の段に来て、他は下に回ります。
      */
     const y = vp.trackTop + screenLane(h.gate) * vp.laneHeight * z;
-    const sprite: SpriteRef = {
-      sheet: 'horse-gallop',
-      frame: gallopFrame(h.gate, input.gallopFrames, input.animSec ?? sec, 1 / (input.secondsPerMeter ?? 1 / 16)),
-    };
+    /**
+     * ★**影を先に描きます**（馬より下に来る）。
+     *   ⚠️ 影が無いと馬が芝に貼った絵に見えます。
+     *   ★接地の強さは**ギャロップのコマ**から決めます。宙に浮く局面では薄く小さくなり、
+     *     それが「跳んでいる」ことの表現になります。**別の乱数は使いません。**
+     */
+    const gf = gallopFrame(h.gate, input.gallopFrames, input.animSec ?? sec, 1 / (input.secondsPerMeter ?? 1 / 16));
+    /**
+     * ★**接地線と、宙に浮くコマは、シートの実測から来ます。**
+     *   `tools/measure-gallop.mjs`（140px のコマ内）:
+     *     地面線 y=133（＝0.95）／コマごとの浮き 26,0,5,22,6,15 px
+     *   → **0コマ目と3コマ目が伸展・収縮の宙**です。
+     *   ⚠️ ここを目分量で置いたら、影が**足元から離れて浮きました**（実際に浮きました）。
+     */
+    const GROUND_RATIO = 0.95;
+    const airborne = gf === 0 || gf === 3;
+    commands.push({
+      kind: 'shadow',
+      at: {
+        x: x + Math.round(SPRITE.width * 0.45) * z,
+        y: y + Math.round(SPRITE.height * GROUND_RATIO) * z,
+      },
+      width: Math.round(SPRITE.width * (airborne ? 0.30 : 0.40)) * z,
+      strength: airborne ? 0.22 : 0.42,
+      scale: z,
+    });
+
+    const sprite: SpriteRef = { sheet: 'horse-gallop', frame: gf };
     commands.push({
       kind: 'sprite', sprite, at: { x, y }, silk: input.silkOf(h.gate), scale: z,
       // ★脚質が見えないと、位置は嘘をつきます（V-16 ①）
