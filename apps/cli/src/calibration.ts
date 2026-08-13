@@ -318,6 +318,10 @@ export const SCAN_EXCLUDED_FILES: readonly { file: string; why: string }[] = [
  */
 export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
   {
+    pattern: 'packages/race-engine/src/watch\.ts',
+    why: '★観戦の再生（D-059）。PHASE_METERS は**値を持たず** DEFAULT_INTERVENTION_BALANCE から取る（二重定義を作らないため）。較正の対象は STAMINA_WINDOW_METER / STAMINA_EMPTY_METER のほうで、そちらは登録済み',
+  },
+  {
     pattern: 'apps/cli/src/measurement\.ts',
     why: '★測定条件（どう測るか）。較正定数とは扱いが違い、正典 §13.2/§13.3 に固定して measurement.test.ts が値照合で守る。R-14 は較正定数についての規則で、文書化された測定条件の照合を禁じない',
   },

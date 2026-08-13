@@ -14,3 +14,4 @@ export * from './race.js';
 export * from './fairness.js';
 export * from './intervention.js';
 export * from './replay.js';
+export * from './watch.js';
