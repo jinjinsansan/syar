@@ -83,6 +83,29 @@ export interface Camera {
 }
 
 /**
+ * ★**局面に応じたカメラ**（アートバイブル §9・2026-08-13 承認）
+ *
+ *   道中は引き（1×）、勝負所と直線で寄る（2×）、確定ですっと引く。
+ *
+ * 【★C-6 を殺さないための約束】
+ *   ⚠️ **切り替えは「跨いだ瞬間」に1回だけ**です。行ったり来たりさせません。
+ *      寄ったり引いたりを繰り返すと、**プレイヤーはゲージを追えなくなります**。
+ *   ⚠️ ゲージと合図は**画面の座標系**なので、倍率が変わっても動きません（構造で保証）。
+ *
+ * 【なぜ関数にするか】
+ *   ★「いつ寄るか」は**位置で決まります**（残り800m）。**時刻ではありません。**
+ *     遅い馬と速い馬で、同じ時刻でも局面が違います。
+ */
+export function cameraFor(
+  metersLeft: number,
+  followGate: number | undefined,
+): Camera {
+  const phase = phaseOf(metersLeft);
+  const zoom: Zoom = phase === 'spurt' || phase === 'straight' ? 2 : 1;
+  return followGate === undefined ? { zoom } : { zoom, followGate };
+}
+
+/**
  * ★§8b の局面。**位置（残り距離）で決まります**（正典 §13）。
  *   ⚠️ 時刻ではありません。**遅い馬と速い馬で、同じ時刻でも局面が違います**。
  */
@@ -235,12 +258,26 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
     // ★倍率は**整数**なので、位置も整数倍になります（画素が割れません）
     const x = Math.round(vp.width * 0.35 + (h.meters - cam) * PX_PER_M * z);
     const lane = input.laneOf === undefined ? h.gate - 1 : input.laneOf(h.gate);
-    const y = vp.trackTop + lane * vp.laneHeight * z;
+    /**
+     * ★**自馬の段を画面に入れる**（C-6 の前提）。
+     *
+     *   ⚠️ 寄る（2×）と段の間隔も2倍になり、**入る段が減ります**
+     *      （実測: 720p で 1× なら3段、2× なら1段）。
+     *      このとき自馬の段が画面外だと、**仕掛ける瞬間に自分の馬が消えます**。
+     *      ★実際にそうなりました（自馬3番が寄りの間ずっと見えなかった）。
+     *
+     *   → 自馬の段が**先頭の段に来るよう縦にずらします**。カメラの縦の追従です。
+     *     自馬を指定していないときはずらしません（観戦モード）。
+     */
+    const ownLane = input.ownGate === undefined
+      ? 0
+      : (input.laneOf === undefined ? input.ownGate - 1 : input.laneOf(input.ownGate));
+    const y = vp.trackTop + (lane - ownLane) * vp.laneHeight * z;
     const sprite: SpriteRef = {
       sheet: 'horse-gallop',
       frame: gallopFrame(h.meters, input.gallopFrames),
     };
-    commands.push({ kind: 'sprite', sprite, at: { x, y }, silk: input.silkOf(h.gate) });
+    commands.push({ kind: 'sprite', sprite, at: { x, y }, silk: input.silkOf(h.gate), scale: z });
   }
 
   /**

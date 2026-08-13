@@ -50,6 +50,9 @@ export type PaletteRole =
   /** ★勝負服。個体識別の唯一の手段（アートバイブル §3） */
   | `silk-${number}`;
 
+/** ★倍率は整数のみ。型で縛ります（0.5 や 1.5 を渡せない） */
+export type Zoom = 1 | 2;
+
 export type DrawCommand =
   /** 背景の帯（アートバイブル §3「水平の帯で構成する」） */
   | {
@@ -88,6 +91,16 @@ export type DrawCommand =
     readonly silk?: PaletteRole | undefined;
     /** 左右反転（進行方向）。★既定は false */
     readonly flip?: boolean | undefined;
+    /**
+     * ★**描く倍率**（整数のみ）。
+     *
+     *   ⚠️ これが無いと、**レンダラがカメラを知らないと馬を大きく描けません**。
+     *      実際、寄っても位置だけ変わって**馬の大きさが変わらない**状態になりました。
+     *   ★§12.8 は「レンダラを差し替えられること」を求めています。
+     *     レンダラがカメラを参照した瞬間、その約束が崩れます。
+     *     **必要な情報は、すべて描画コマンドに載せます。**
+     */
+    readonly scale: Zoom;
   }
   /**
    * 文字。★UI は「紙」（アートバイブル §3）なので、
@@ -130,9 +143,6 @@ export type DrawCommand =
  *   ⚠️ 非整数倍で拡大縮小すると**ピクセルアートが壊れます**（アートバイブルの禁止事項）。
  */
 export const SPRITE = { width: 220, height: 140 } as const;
-
-/** ★倍率は整数のみ。型で縛ります（0.5 や 1.5 を渡せない） */
-export type Zoom = 1 | 2;
 
 /**
  * ★**カメラが隠してはいけないもの**（アートバイブル §9 の制約）。

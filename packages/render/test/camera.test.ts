@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  sceneAt, phaseOf, lanesOnScreen, SPRITE,
+  sceneAt, phaseOf, cameraFor, lanesOnScreen, SPRITE,
   type PositionModel, type SceneInput, type HorseAt, type Zoom,
 } from '../src/index.js';
 
@@ -177,5 +177,76 @@ describe('★多層パララックス（アートバイブル §3「奥行きは
     expect(par(30).length).toBe(
       (sceneAt(input(2), 30).commands.filter((c) => c.kind === 'parallax')).length,
     );
+  });
+});
+
+describe('★勝負所で寄る（アートバイブル §9）— C-6 を殺さないこと', () => {
+  it('★道中は引き、勝負所と直線は寄る', () => {
+    expect(cameraFor(1200, 5).zoom).toBe(1);   // 道中
+    expect(cameraFor(800, 5).zoom).toBe(2);    // 勝負所（境界そのもの）
+    expect(cameraFor(500, 5).zoom).toBe(2);
+    expect(cameraFor(400, 5).zoom).toBe(2);    // 直線（境界そのもの）
+    expect(cameraFor(100, 5).zoom).toBe(2);
+  });
+
+  it('★境界の両側で切り替わる（R-2）', () => {
+    expect(cameraFor(801, 5).zoom).toBe(1);
+    expect(cameraFor(800, 5).zoom).toBe(2);
+  });
+
+  it('★一度寄ったら、ゴールまで引き戻さない（行ったり来たりさせない）', () => {
+    // ★寄ったり引いたりを繰り返すと、プレイヤーはゲージを追えません
+    let zooms = [];
+    for (let left = 1600; left >= 0; left -= 10) zooms.push(cameraFor(left, 5).zoom);
+    // 1 が続いたあと 2 になり、そのあと 1 に戻らないこと
+    const firstTwo = zooms.indexOf(2);
+    expect(firstTwo).toBeGreaterThan(0);
+    expect(zooms.slice(firstTwo).every((z) => z === 2)).toBe(true);
+  });
+
+  it('★寄っても、ゲージと合図の位置が1画素も動かない（C-6 の本題）', () => {
+    // 同じ時刻で倍率だけ変えて、重なりを比べる
+    for (const sec of [10, 40, 70, 95]) {
+      const wide = sceneAt({ ...input(1) }, sec).commands.filter((c) => c.kind === 'gauge' || c.kind === 'cue');
+      const near = sceneAt({ ...input(2) }, sec).commands.filter((c) => c.kind === 'gauge' || c.kind === 'cue');
+      expect(near.length).toBe(wide.length);
+      for (let i = 0; i < wide.length; i += 1) {
+        expect(near[i]!.at).toEqual(wide[i]!.at);
+      }
+    }
+  });
+
+  it('★追う対象を渡さなければ、倍率だけ返す（先頭追従のまま）', () => {
+    const c = cameraFor(500, undefined);
+    expect(c.zoom).toBe(2);
+    expect(c.followGate).toBeUndefined();
+  });
+});
+
+describe('★寄っても自馬が画面から消えない（C-6 の前提）', () => {
+  it('★自馬は必ず先頭の段に来る（倍率によらず）', () => {
+    for (const z of [1, 2] as Zoom[]) {
+      const inp: SceneInput = {
+        ...input(z),
+        ownGate: 5,
+        laneOf: (g) => (g - 1) % 3,
+      };
+      const cmds = sceneAt(inp, 30).commands.filter((c) => c.kind === 'sprite') as
+        { silk?: string; at: { y: number } }[];
+      const own = cmds.find((c) => c.silk === 'silk-5');
+      expect(own).toBeDefined();
+      // ★自馬の y は走路の上端そのもの（段のずれが 0）
+      expect(own!.at.y).toBe(380);
+    }
+  });
+
+  it('★対照: 自馬を指定しなければ、ずらさない（観戦モード）', () => {
+    const inp: SceneInput = { ...input(1), ownGate: undefined, laneOf: (g) => (g - 1) % 3 };
+    const cmds = sceneAt(inp, 30).commands.filter((c) => c.kind === 'sprite') as
+      { silk?: string; at: { y: number } }[];
+    const g1 = cmds.find((c) => c.silk === 'silk-1')!;
+    const g2 = cmds.find((c) => c.silk === 'silk-2')!;
+    expect(g1.at.y).toBe(380);          // 段0
+    expect(g2.at.y).toBeGreaterThan(380); // 段1
   });
 });

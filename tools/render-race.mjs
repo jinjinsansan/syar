@@ -17,7 +17,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches } from '@star/race-engine';
-import { replayPositionModel, sceneAt, finalOrderOf } from '@star/render';
+import { replayPositionModel, sceneAt, finalOrderOf, cameraFor } from '@star/render';
 import { digitPixels, outlinePixels, textWidth, GLYPH_H } from './lib/pixel-font.mjs';
 
 const arg = (n, d) => {
@@ -26,7 +26,7 @@ const arg = (n, d) => {
 };
 const SEED = arg('seed', 42);
 const FPS = arg('fps', 12);
-const ZOOM = arg('zoom', 1);
+const OWN = arg('own', 3);
 const SHEET = 'design/art/assets/horse-gallop-cloth2-sheet.png';
 const DIST = 1600;
 const FIELD = 12;   // ★18頭は画面に入らないので（実測: 720p/220px = 3段）
@@ -248,9 +248,8 @@ const sceneInput = {
   model,
   viewport: { width: SW, height: SH, trackTop: 340, laneHeight: 105 },
   laneOf: (gate) => (gate - 1) % LANES,
-  // ★自馬に寄る（§12.6・アートバイブル §9）。先頭追従だと自馬が画面外に出る
-  camera: { zoom: ZOOM, followGate: 3 },
-  ownGate: 3,
+  // ★カメラはフレームごとに決めます（下で差し替え）
+  ownGate: OWN,
   // ★段番号 → 元の馬番。丸めた番号で勝負服を選ぶと、色が3種類しか出ません
   silkOf: (gate) => `silk-${gate}`,
   gallopFrames: 6,
@@ -260,7 +259,14 @@ const total = Math.ceil(model.raceSec * FPS);
 const STEP = Math.max(1, Math.round(total / 60));   // ★60枚程度に間引く（GIF の大きさ）
 const paths = [];
 for (let i = 0, n = 0; i <= total; i += STEP, n += 1) {
-  const frame = sceneAt(sceneInput, i / FPS);
+  /**
+   * ★**カメラは自馬の残り距離で決まります**（アートバイブル §9）。
+   *   時刻ではありません — 遅い馬と速い馬で、同じ時刻でも局面が違います。
+   */
+  const sec = i / FPS;
+  const own = model.at(sec).find((h) => h.gate === OWN);
+  const metersLeft = own === undefined ? DIST : DIST - own.meters;
+  const frame = sceneAt({ ...sceneInput, camera: cameraFor(metersLeft, OWN) }, sec);
   const tiles = [];
   for (const c of frame.commands) {
     if (c.kind === 'parallax') {
@@ -304,8 +310,14 @@ for (let i = 0, n = 0; i <= total; i += STEP, n += 1) {
        */
       // ★合成できる位置か（sharp は元より大きい合成を許さない）
       if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-      if (x < 0 || y < 0 || x + 220 > SW || y + 140 > SH) continue;
-      tiles.push({ input: await dressed(c.sprite.frame, gate), left: x, top: y });
+      // ★描画コマンドが持つ倍率で描く（レンダラはカメラを知らない）
+      const sc = c.scale ?? 1;
+      const w = 220 * sc, hh = 140 * sc;
+      if (x < 0 || y < 0 || x + w > SW || y + hh > SH) continue;
+      const img = sc === 1
+        ? await dressed(c.sprite.frame, gate)
+        : await sharp(await dressed(c.sprite.frame, gate)).resize(w, hh, { kernel: 'nearest' }).png().toBuffer();
+      tiles.push({ input: img, left: x, top: y });
     }
   }
   const p = join(WORK, `f${String(n).padStart(3, '0')}.png`);
