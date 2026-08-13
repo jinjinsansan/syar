@@ -108,7 +108,14 @@ export default function WatchPage(): React.JSX.Element {
   const [clock, setClock] = useState(0);
 
   useEffect(() => {
-    void loadAtlas(18).then((a) => { atlasRef.current = a; setReady(true); });
+    /**
+     * ★読み込みに失敗したら**黙って真っ暗**にしません。
+     *   ⚠️ `loadAtlas` が投げると `ready` が false のままになり、
+     *      **発走も押せず、画面も真っ暗**になります。実際そうなりました。
+     */
+    loadAtlas(18)
+      .then((a) => { atlasRef.current = a; setReady(true); })
+      .catch((e: unknown) => setErr(`スプライトを読み込めません: ${e instanceof Error ? e.message : String(e)}`));
   }, []);
 
   useEffect(() => {
@@ -154,7 +161,15 @@ export default function WatchPage(): React.JSX.Element {
     drawFrame(ctx, frame, atlas, VIEW);
   }, [built, ownGate]);
 
-  useEffect(() => { render(pausedAtRef.current); }, [render]);
+  /**
+   * ★**画像が届いたら描き直します。**
+   *
+   *   ⚠️ 以前は `[render]` だけを見ていました。`render` は `[built, ownGate]` から作られるので、
+   *      **スプライトが届いても再描画のきっかけがありません**。
+   *      → 最初の1回は「画像がまだ無い」で何も描かずに戻り、**そのまま真っ暗**でした。
+   *      ★オーナーの「画面真っ暗です」はこれです。
+   */
+  useEffect(() => { render(pausedAtRef.current); }, [render, ready]);
 
   useEffect(() => {
     if (!playing || built === null) return;
