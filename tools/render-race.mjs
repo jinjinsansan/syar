@@ -13,7 +13,7 @@
  * 実行: node tools/render-race.mjs [--seed 42] [--fps 12] [--zoom 1]
  */
 import sharp from 'sharp';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches } from '@star/race-engine';
@@ -40,21 +40,37 @@ const POST = [
 const STRATS = ['nige', 'senko', 'sashi', 'oikomi'];
 const isDark = (c) => (c[0] * 299 + c[1] * 587 + c[2] * 114) / 1000 < 140;
 
-// --- 出走馬（★合成。本番は凍結スナップショットから来る）---
-const entrants = [];
-for (let g = 1; g <= FIELD; g += 1) {
-  const base = 60 + ((g * 7919) % 25);
-  entrants.push({
-    horseId: String(g),
-    stats: { sp: base + 5, st: base, pw: base + 3, gt: base + 2, iq: base + 1, du: base },
-    surfaceAptitude: { turf: 80, dirt: 55 },
-    distanceCenter: 1600, distanceRange: 400,
-    strategyAptitude: { nige: 80, senko: 80, sashi: 80, oikomi: 80 },
-    heavyAptitude: 60,
-    strategy: STRATS[g % 4],
-    condition: 3, fatigue: 20, weightKg: 55, gate: g, age: 4, skillGenes: [],
-  });
-}
+/**
+ * --- 出走馬 ---
+ *
+ * ★**本番の実分布から取ります**（`docs/pool-staging.json`）。
+ *
+ * ⚠️ 最初は能力を適当に散らした合成馬（SP 66〜86）を使い、
+ *    **1着と最下位の差が 35.7秒**になりました（実際の1600m は 3〜5秒）。
+ *    → **馬群が 359m に広がり、同じ画面に映らなくなりました。**
+ *    ★エンジンの不具合ではなく、**私が試験用の馬を作り間違えていた**だけです。
+ *    実際の出走表は**同クラスで揃います**（§10.4 のクラス分け）。
+ */
+const pool = JSON.parse(readFileSync('docs/pool-staging.json', 'utf8'));
+const poolArr = Array.isArray(pool) ? pool : (pool.horses ?? []);
+// ★同クラス相当＝能力上位から連続で取る（クラス分けの近似）
+const picked = [...poolArr]
+  .filter((h) => h.stats && Number.isFinite(h.stats.sp))
+  .sort((a, b) => b.stats.sp - a.stats.sp)
+  .slice(0, FIELD);
+const entrants = picked.map((h, i) => ({
+  horseId: String(i + 1),
+  stats: h.stats,
+  surfaceAptitude: h.surfaceAptitude,
+  distanceCenter: h.distanceCenter,
+  distanceRange: h.distanceRange,
+  strategyAptitude: h.strategyAptitude,
+  heavyAptitude: h.heavyAptitude,
+  strategy: STRATS[i % 4],
+  condition: 3, fatigue: 20, weightKg: 55, gate: i + 1, age: 4,
+  skillGenes: h.skillGenes ?? [],
+}));
+
 const conditions = {
   raceId: 'demo', distance: DIST, surface: 'turf', trackCondition: 'good',
   courseShape: 'oval', baseWeightKg: 55,
@@ -197,6 +213,8 @@ const sceneInput = {
   model,
   viewport: { width: SW, height: SH, trackTop: 340, laneHeight: 105 },
   laneOf: (gate) => (gate - 1) % LANES,
+  // ★自馬に寄る（§12.6・アートバイブル §9）。先頭追従だと自馬が画面外に出る
+  camera: { zoom: ZOOM, followGate: 3 },
   ownGate: 3,
   // ★段番号 → 元の馬番。丸めた番号で勝負服を選ぶと、色が3種類しか出ません
   silkOf: (gate) => `silk-${gate}`,

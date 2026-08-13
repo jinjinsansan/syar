@@ -115,6 +115,11 @@ export interface SceneInput {
    *   省略時は `gate - 1`（＝1頭1段。少頭数のときだけ成り立つ）。
    */
   readonly laneOf?: ((gate: number) => number) | undefined;
+  /**
+   * ★1m あたりの画素。省略時は**スプライトの実寸から決まります**（220px = 4m）。
+   *   ⚠️ 小さくすると馬群が重なります。**演出のつまみではありません。**
+   */
+  readonly pxPerMeter?: number | undefined;
 }
 
 /** ★背景の帯。アートバイブル §3「水平の帯で構成する。縦の要素は最小限」 */
@@ -189,8 +194,20 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
    */
   const sorted = [...horses].sort((a, b) => a.gate - b.gate);
 
-  /** ★1m あたりの画素。走路の見た目の速度を決める（演出であってゲートに触れない） */
-  const PX_PER_M = 0.6;
+  /**
+   * ★**1m あたりの画素。スプライトの実寸と整合していなければなりません。**
+   *
+   *   スプライトは 220px で、馬1頭ぶん（実寸およそ 2.4m ＋ 前後の間隔）を表します。
+   *   → **220px ÷ 4m ＝ 55px/m** が整合する縮尺です。
+   *
+   *   ⚠️ 最初 **0.6px/m** にしていました（★150倍のずれ）。
+   *      結果、60秒時点で 359m に広がった馬群が **215px** に収まり、
+   *      **全馬が1頭ぶんの幅に重なって団子**になりました。
+   *
+   *   ★**縮尺は演出ではなく、スプライトの寸法から決まります。**
+   *     ここを自由に決めると、馬の大きさと走路の速さが噛み合わなくなります。
+   */
+  const PX_PER_M = input.pxPerMeter ?? SPRITE.width / 4;
   const z = camera.zoom;
   for (const h of sorted) {
     // ★倍率は**整数**なので、位置も整数倍になります（画素が割れません）
