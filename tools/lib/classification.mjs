@@ -75,6 +75,8 @@ export const READONLY = [
   'bake-sprites.mjs',
   // ★読むだけ。自分で画面を見るための静止画
   'shot.mjs',
+  // ★読むだけ。画面上の速さの変化を測る
+  'diag-speed.mjs',
   // ★読むだけ。シートの本当のコマ位置を数える
   'measure-sheet-blobs.mjs',
   'codex-imagegen.mjs',

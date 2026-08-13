@@ -39,10 +39,32 @@ describe('★時間配分（D-062）', () => {
     const w = timeWarpFor(knots, DEFAULT_PHASE_RATES);
     const cruiseDisplay = w.displaySecAt(knots.spurtSec) - w.displaySecAt(knots.startSec);
     const straightDisplay = w.displaySecAt(knots.finishSec) - w.displaySecAt(knots.straightSec);
-    // 道中 60秒 → 20秒（3倍速）
-    expect(cruiseDisplay).toBeCloseTo(20, 6);
-    // 直線 11秒 → 15.7秒（伸ばす）
+    /**
+     * ★**ぴったり 60÷3 にはなりません。** 境目を滑らかに繋いでいるためです
+     *   （段で切り替えると、実測で **0.2秒に 31.3m/s** の速度変化が出ました）。
+     *   → 見るのは「**縮んだか**」で、正確な値ではありません。
+     */
+    expect(cruiseDisplay).toBeLessThan(knots.spurtSec - knots.startSec);
     expect(straightDisplay).toBeGreaterThan(knots.finishSec - knots.straightSec);
+  });
+
+  it('★★送り速さが跳ばない（境目で速度が段にならない）', () => {
+    /**
+     * ★オーナーの指摘「**途中でグングンスピードが上がるが不自然**」。
+     *   段で切り替えていたときの実測は **0.2秒あたり 31.3m/s** の変化でした。
+     *   ここでは「表示1秒あたりに進むレース秒数」の変化率を見ます。
+     */
+    const w = timeWarpFor(knots, DEFAULT_PHASE_RATES);
+    const dt = 0.05;
+    let prev = Number.NaN;
+    let maxJump = 0;
+    for (let d = 0; d + dt <= w.displaySec; d += dt) {
+      const rate = (w.raceSecAt(d + dt) - w.raceSecAt(d)) / dt;
+      if (Number.isFinite(prev)) maxJump = Math.max(maxJump, Math.abs(rate - prev));
+      prev = rate;
+    }
+    // ★段で切り替えると 2.0 近い跳びが出ます（3倍速 → 1倍）
+    expect(maxJump).toBeLessThan(0.05);
   });
 
   it('★時間は必ず前に進む（戻ると馬が下がって見える）', () => {

@@ -41,7 +41,7 @@ interface Built {
 }
 
 /** ★レースを1本組む。**乱数はシードから**（憲法4: 直接呼ばない） */
-function build(seed: number, ownGate: number, jostle: number, warped: boolean): Built {
+function build(seed: number, ownGate: number, jostle: number, cruise: number): Built {
   const start = (seed * 13) % Math.max(1, POOL.length - FIELD);
   const entrants = POOL.slice(start, start + FIELD).map((h, i) => ({
     horseId: String(i + 1),
@@ -80,8 +80,8 @@ function build(seed: number, ownGate: number, jostle: number, warped: boolean): 
     throw new Error('★位置モデルの最終順が着順と違います（D-059）');
   }
 
-  // ★時間配分（D-062）。切ると等速になります（比べられるように）
-  const rates = warped ? DEFAULT_PHASE_RATES : { cruise: 1, spurt: 1, straight: 1 };
+  // ★時間配分（D-062）。★道中の送りは**見て決める数字**なので画面から変えられます
+  const rates = { ...DEFAULT_PHASE_RATES, cruise };
   const warp = timeWarpFor(knotsFor(boundaries, ownGate), rates);
 
   return {
@@ -99,8 +99,8 @@ export default function WatchPage(): React.JSX.Element {
 
   const [seed, setSeed] = useState(42);
   const [ownGate, setOwnGate] = useState(3);
-  const [jostle, setJostle] = useState(0.6);
-  const [warped, setWarped] = useState(true);
+  const [jostle, setJostle] = useState(0.25);
+  const [cruise, setCruise] = useState(DEFAULT_PHASE_RATES.cruise);
   const [playing, setPlaying] = useState(false);
   const [ready, setReady] = useState(false);
   const [built, setBuilt] = useState<Built | null>(null);
@@ -120,14 +120,14 @@ export default function WatchPage(): React.JSX.Element {
 
   useEffect(() => {
     try {
-      setBuilt(build(seed, ownGate, jostle, warped));
+      setBuilt(build(seed, ownGate, jostle, cruise));
       setErr(null);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
     pausedAtRef.current = 0;
     setClock(0);
-  }, [seed, ownGate, jostle, warped]);
+  }, [seed, ownGate, jostle, cruise]);
 
   /** 表示の時刻 d（秒）を1枚描く */
   const render = useCallback((d: number) => {
@@ -245,9 +245,13 @@ export default function WatchPage(): React.JSX.Element {
             ))}
           </select>
         </label>
-        <label title="D-062: 道中を速く送り、直線を引き伸ばす">
-          <input type="checkbox" checked={warped} onChange={(e) => setWarped(e.target.checked)} />
-          {' '}時間配分（道中3倍速・直線0.7倍）
+        <label title="D-062: 道中を速く送る。1 で等速。★実測: 1.8倍で画面上の速さは実馬の2.5倍">
+          道中の送り{' '}
+          <input
+            type="range" min={1} max={3} step={0.2} value={cruise}
+            onChange={(e) => setCruise(Number(e.target.value))}
+          />
+          {' '}{cruise.toFixed(1)}倍
         </label>
         <label title="D-061 改訂: 別ストリームの揺らぎ。着順は動かない">
           揺らぎ{' '}
@@ -273,7 +277,7 @@ export default function WatchPage(): React.JSX.Element {
         <div style={{ ...row, fontSize: 13, opacity: 0.85 }}>
           <span>
             表示 {clock.toFixed(1)} / {built.warp.displaySec.toFixed(1)} 秒
-            {warped && <span style={{ opacity: 0.6 }}>（レースは {built.raceSec.toFixed(1)} 秒）</span>}
+            <span style={{ opacity: 0.6 }}>（レースは {built.raceSec.toFixed(1)} 秒）</span>
           </span>
           <span>ペース {built.pace}</span>
           <span style={{ opacity: 0.6 }}>着順 {built.order.join(' ')}</span>

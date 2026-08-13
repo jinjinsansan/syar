@@ -84,12 +84,34 @@ export function phaseOfMetersLeft(metersLeft: number): Phase {
  * ⚠️ ここは**演出の強さではありません**。脚質という**機構の属性**の見え方です。
  *    値を動かすと「逃げが逃げに見えない」ことになります。
  */
+/**
+ * ★脚質ごとの前後の振り分け。
+ *
+ * 【★強すぎました。実測で分かりました】
+ *   以前は nige 0.10 / senko 0.05 / sashi −0.05 / oikomi −0.10。
+ *   ハイペース（×1.3）で b = 0.13 になり、速度は x'(τ) = 1 + bπ·cos(πτ) なので
+ *   ★**前後で ±41%** 振れていました。実測した区間平均速度:
+ *
+ *     逃げ  17.2 → 13.0 → ★**8.9 m/s**（駆け足ではなく速歩の速さ）
+ *     追込  11.5 → 17.9 → ★**19.7 m/s**（72%の加速）
+ *
+ *   ★オーナーの指摘「**途中でグングンスピードが上がるが不自然**」
+ *     「**他の馬に追いつく時も不自然**」の根っこはここです。
+ *
+ * 【★決め方】
+ *   実際の1600m戦は、区間平均が概ね **15〜17m/s**（振れ幅 ±10%程度）に収まります。
+ *   速度の振れは `bπ·gain` なので、**±12% に収めるには b·gain ≤ 0.12/π ≈ 0.038**。
+ *   → 最大の `nige × high`（gain 1.3）で 0.038 になるよう決めます。
+ *
+ *   ⚠️ **着順は変わりません。** ここが決めるのは「**いつ境界を通るか**」だけで、
+ *      `finishSec`（＝走破タイム）には触れていません。
+ */
 const STRATEGY_BIAS: Record<Strategy, number> = {
-  nige: 0.10,     // 逃げ: 前半速い
-  senko: 0.05,    // 先行
-  sashi: -0.05,   // 差し
-  oikomi: -0.10,  // 追込: 前半遅い
+  nige: 0.029, senko: 0.015, sashi: -0.015, oikomi: -0.029,
 };
+
+/** ★速度の振れの上限（実測に基づく。超えたら起動時に止める） */
+export const MAX_SPEED_SWING = 0.12;
 
 /**
  * ペースが脚質の効き方を増減させる（§8.4 と同じ向き）。
@@ -110,10 +132,17 @@ const PACE_GAIN: Record<Pace, number> = { high: 1.3, middle: 1.0, slow: 0.7 };
  */
 export function paceShape(strategy: Strategy, pace: Pace): (tau: number) => number {
   const b = STRATEGY_BIAS[strategy] * PACE_GAIN[pace];
-  const LIMIT = 1 / Math.PI;
-  if (Math.abs(b) >= LIMIT) {
-    // ★係数を大きくすると位置が後戻りします（画面で馬が下がる）。黙って進まない
-    throw new Error(`ペース配分の係数が大きすぎます（${b}。上限 ${LIMIT.toFixed(3)}）`);
+  /**
+   * ★上限は「後戻りしないこと」ではなく「**馬の速さに見えること**」で決めます。
+   *   ⚠️ 1/π（≈0.318）まで許すと、単調ではあっても**速度が ±100% 振れます**。
+   *      実際に ±41% で「不自然」と判定されました。
+   */
+  const LIMIT = MAX_SPEED_SWING / Math.PI;
+  if (Math.abs(b) > LIMIT + 1e-9) {
+    throw new Error(
+      `ペース配分の係数が大きすぎます（${b}）。速度の振れが ±${(Math.abs(b) * Math.PI * 100).toFixed(0)}% になります`
+      + `（上限 ±${(MAX_SPEED_SWING * 100).toFixed(0)}%）`,
+    );
   }
   return (tau: number): number => {
     const t = Math.max(0, Math.min(1, tau));

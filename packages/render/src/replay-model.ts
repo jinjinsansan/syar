@@ -125,10 +125,19 @@ interface Harmonics {
 function harmonicsFor(seed: number, gate: number, segment: number, amount: number): Harmonics {
   if (amount === 0) return { amps: [], phases: [] };
   /**
-   * ★**3つの倍音**。1つだけだと「山が1つ」の同じ形になり、
-   *   ★**学習すれば取り除けます**（＝漏洩が残る）。
+   * ★**基本波だけを使います（K=1）。**
+   *
+   * 【★倍音を3つにしたら、馬の動きが壊れました】
+   *   速度は v(τ) = 1 + Σ aₖ·sin(2πk·τ + φₖ) です。
+   *   ⚠️ **高い倍音は「速い速度変化」そのもの**で、実測すると
+   *      画面上の速さが **3.6 〜 43.4 m/s（12倍の幅）** で暴れていました。
+   *      ★オーナーの指摘「**追いつく時も不自然**」「**走り方も不自然**」はこれです。
+   *
+   *   ★**漏洩を塞ぐのに要るのは「位置のずれ」で、「速度の振れ」ではありません。**
+   *     基本波なら 1レースに1周期しかないので、**ゆっくり前後する**だけです。
+   *     位置のずれは (a/2π)×距離 まで出るので、漏洩を壊すには十分です。
    */
-  const K = 3;
+  const K = 1;
   const raw: number[] = [];
   const phases: number[] = [];
   for (let k = 0; k < K; k += 1) {
@@ -165,6 +174,59 @@ function easeWithin(t: number, h: Harmonics): number {
   return Math.max(0, Math.min(1, x));
 }
 
+
+/**
+ * ★**折れ線ではなく、単調で滑らかな曲線で繋ぎます。**
+ *
+ * 【なぜ】
+ *   折れ線だと、**境界（残り800m / 400m）で速度が瞬間的に変わります**。
+ *   実測: 送りを等速・揺らぎ 0 にしても、画面上の速さが **5.0 〜 31.0 m/s** で跳んでいました。
+ *   ★実馬は 15〜17m/s で、レース中の変化は 2〜3m/s 程度です。
+ *   ★オーナーの指摘「**途中でグングンスピードが上がるが不自然**」の根っこはここです。
+ *
+ * 【★守ること】
+ *   **折れ点は必ず通ります**（PCHIP＝単調保存の3次補間）。
+ *   ⚠️ ふつうの3次スプラインは**折れ点の間で後戻りしえます**（馬が下がって見える）。
+ *      単調保存の傾き制限を入れて、**位置が必ず増える**ようにします。
+ */
+function alongPath(
+  pts: readonly (readonly [number, number])[], at: number, fallback: number,
+): number {
+  const n = pts.length;
+  if (at <= pts[0]![0]) return pts[0]![1];
+  if (at >= pts[n - 1]![0]) return fallback;
+
+  // 区間の平均傾き
+  const d: number[] = [];
+  for (let i = 0; i < n - 1; i += 1) {
+    const dt = pts[i + 1]![0] - pts[i]![0];
+    d.push(dt <= 0 ? 0 : (pts[i + 1]![1] - pts[i]![1]) / dt);
+  }
+  // 折れ点での傾き（★単調保存: 符号が変わる/端では 0、それ以外は調和平均）
+  const m: number[] = [];
+  for (let i = 0; i < n; i += 1) {
+    if (i === 0) m.push(d[0]!);
+    else if (i === n - 1) m.push(d[n - 2]!);
+    else {
+      const a = d[i - 1]!, b2 = d[i]!;
+      m.push(a * b2 <= 0 ? 0 : (2 * a * b2) / (a + b2));
+    }
+  }
+  for (let i = 0; i < n - 1; i += 1) {
+    const [t0, m0] = pts[i]!;
+    const [t1, m1] = pts[i + 1]!;
+    if (at < t0 || at > t1) continue;
+    const h = t1 - t0;
+    if (h <= 0) return m1;
+    const s2 = (at - t0) / h;
+    const h00 = 2 * s2 ** 3 - 3 * s2 ** 2 + 1;
+    const h10 = s2 ** 3 - 2 * s2 ** 2 + s2;
+    const h01 = -2 * s2 ** 3 + 3 * s2 ** 2;
+    const h11 = s2 ** 3 - s2 ** 2;
+    return h00 * m0 + h10 * h * m[i]! + h01 * m1 + h11 * h * m[i + 1]!;
+  }
+  return fallback;
+}
 
 /**
  * 境界時刻から位置モデルを作る。
@@ -221,12 +283,19 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
     if (fidelity === 'exact') {
       // ★D-059 の明文どおり: 境界時刻には必ず境界の位置にいる（揺らぎは区間の中だけ）
       for (let i = 0; i < pts.length - 1; i += 1) {
-        const [t0, m0] = pts[i]!;
+        const [t0] = pts[i]!;
         const [t1, m1] = pts[i + 1]!;
         if (sec < t0 || sec > t1) continue;
         if (t1 <= t0) return m1;
+        /**
+         * ★**揺らぎは「時間の歪み」として入れ、位置は滑らかな曲線から取ります。**
+         *   ⚠️ 以前は `m0 + (m1-m0)*ease(t)` と**折れ線の上**で混ぜていました。
+         *      折れ線なので、**境界で速度が瞬間的に変わります**（実測 5.0〜31.0 m/s）。
+         *   ★端で ease(0)=0, ease(1)=1 なので、**境界は動きません**（D-059）。
+         */
         const t = (sec - t0) / (t1 - t0);
-        return m0 + (m1 - m0) * easeWithin(t, harmonicsFor(jostleSeed, b.gate, i, jostle));
+        const tw = easeWithin(t, harmonicsFor(jostleSeed, b.gate, i, jostle));
+        return alongPath(pts, t0 + tw * (t1 - t0), distanceMeter);
       }
       return distanceMeter;
     }
@@ -241,15 +310,8 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
     const warped = easeWithin(tau, harmonicsFor(jostleSeed, b.gate, 0, jostle));
     const at = b.startSec + warped * span;
 
-    // ★歪めた時刻を、脚質の形（折れ線）に通す。**形は残り、いつ通るかが揺れる**
-    for (let i = 0; i < pts.length - 1; i += 1) {
-      const [t0, m0] = pts[i]!;
-      const [t1, m1] = pts[i + 1]!;
-      if (at < t0 || at > t1) continue;
-      if (t1 <= t0) return m1;
-      return m0 + (m1 - m0) * ((at - t0) / (t1 - t0));
-    }
-    return distanceMeter;
+    // ★歪めた時刻を、脚質の形に通す
+    return alongPath(pts, at, distanceMeter);
   };
 
   /**
