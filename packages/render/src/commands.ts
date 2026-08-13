@@ -59,6 +59,24 @@ export type DrawCommand =
     readonly height: number;
   }
   /**
+   * ★**多層パララックス**（アートバイブル §3「奥行きは速度差だけで作る」）。
+   *
+   *   同じ模様を横に繰り返し、層ごとに違う速さで流します。
+   *   `offset` は**その層が左へずれた画素数**（レンダラは `offset % tileWidth` で敷き詰める）。
+   *
+   *   ⚠️ **線遠近を描き込みません**（アートバイブル §3）。奥行きは**速度差だけ**で作ります。
+   */
+  | {
+    readonly kind: 'parallax';
+    readonly role: PaletteRole;
+    readonly y: number;
+    readonly height: number;
+    /** 繰り返す模様の1枚の幅 */
+    readonly tileWidth: number;
+    /** ★左へずれた画素数（0 以上。レンダラが剰余を取る） */
+    readonly offset: number;
+  }
+  /**
    * スプライト1枚。
    * ★`silk` は**色替えの指定**で、同じ `sprite` を共有したまま個体を分けます
    *   （アートバイブル §5 の「馬体は共通スプライトの色替えで足りるか」の受け口）。

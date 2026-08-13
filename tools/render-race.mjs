@@ -117,6 +117,41 @@ for (let f = 0; f < 6; f += 1) {
   }).png().toBuffer());
 }
 
+/**
+ * ★層ごとの模様（1枚ぶん）。**縦の要素は最小限**（アートバイブル §3）。
+ *   空 … ほぼ無地に薄い雲 / スタンド … 観客の粒 / ラチ … 支柱 / 芝 … 縞
+ */
+const tileCache = new Map();
+async function tileOf(role, w, h, base) {
+  const key = `${role}-${w}-${h}`;
+  if (tileCache.has(key)) return tileCache.get(key);
+  const buf = Buffer.alloc(w * h * 3);
+  const put = (x, y, c) => { const i = (y * w + x) * 3; buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; };
+  for (let y = 0; y < h; y += 1) for (let x = 0; x < w; x += 1) put(x, y, base);
+  const shade = (c, k) => c.map((v) => Math.max(0, Math.min(255, Math.round(v * k))));
+  if (role === 'sky') {
+    // 薄い雲（横に伸びた帯）
+    for (let y = Math.floor(h * 0.35); y < Math.floor(h * 0.45); y += 1)
+      for (let x = 0; x < w; x += 1) if (((x * 7 + y * 13) % 97) < 40) put(x, y, shade(base, 1.06));
+  } else if (role === 'stand') {
+    // 観客の粒（★色は使わない。スタンドは奥なので彩度を上げない）
+    for (let y = 2; y < h - 2; y += 3)
+      for (let x = 1; x < w; x += 4) put(x, y, shade(base, ((x + y) % 7 < 3) ? 1.35 : 0.75));
+  } else if (role === 'rail') {
+    // 支柱（★縦の要素はここだけ）
+    for (let y = 0; y < h; y += 1) for (let x = 0; x < 3; x += 1) put(x, y, shade(base, 0.55));
+  } else if (role === 'turf') {
+    // 芝の刈り目（横縞）
+    for (let y = 0; y < h; y += 1) {
+      const k = (Math.floor(y / 26) % 2 === 0) ? 1.0 : 0.93;
+      for (let x = 0; x < w; x += 1) put(x, y, shade(base, k * (((x + y) % 11 === 0) ? 1.05 : 1)));
+    }
+  }
+  const png = await sharp(buf, { raw: { width: w, height: h, channels: 3 } }).png().toBuffer();
+  tileCache.set(key, png);
+  return png;
+}
+
 /** 勝負服とゼッケンを塗る（`render-field.mjs` と同じ処理） */
 async function dressed(frameIdx, gate) {
   const color = POST[gate - 1];
@@ -228,7 +263,29 @@ for (let i = 0, n = 0; i <= total; i += STEP, n += 1) {
   const frame = sceneAt(sceneInput, i / FPS);
   const tiles = [];
   for (const c of frame.commands) {
-    if (c.kind === 'band') {
+    if (c.kind === 'parallax') {
+      /**
+       * ★層の模様を敷き詰める。**速度差だけで奥行きを作る**（アートバイブル §3）。
+       *   ⚠️ 線遠近を描き込みません。縦の要素は最小限です。
+       */
+      const top = Math.max(0, Math.min(SH - 1, c.y));
+      const h = Math.max(1, Math.min(c.height, SH - top));
+      const base = { sky: [120, 135, 150], stand: [70, 62, 58], rail: [190, 185, 175], turf: [58, 78, 48] }[c.role] ?? [40, 40, 40];
+      const tile = await tileOf(c.role, c.tileWidth, h, base);
+      const off = c.offset % c.tileWidth;
+      for (let x = -off; x < SW; x += c.tileWidth) {
+        const left = Math.round(x);
+        if (left + c.tileWidth <= 0) continue;
+        // ★左右にはみ出す分は切って敷く（sharp は画面外を許さない）
+        const cutL = left < 0 ? -left : 0;
+        const w = Math.min(c.tileWidth - cutL, SW - Math.max(0, left));
+        if (w <= 0) continue;
+        const piece = cutL > 0 || w < c.tileWidth
+          ? await sharp(tile).extract({ left: cutL, top: 0, width: w, height: h }).png().toBuffer()
+          : tile;
+        tiles.push({ input: piece, left: Math.max(0, left), top });
+      }
+    } else if (c.kind === 'band') {
       const col = { sky: [120, 135, 150], stand: [70, 62, 58], rail: [190, 185, 175], turf: [58, 78, 48] }[c.role] ?? [40, 40, 40];
       // ★帯も画面に収める。y+height が画面を超えると sharp が落ちる
       const top = Math.max(0, Math.min(SH - 1, c.y));

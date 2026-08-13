@@ -135,3 +135,47 @@ describe('★カメラの実装が、隠せない構造になっている（メ�
     }
   });
 });
+
+describe('★多層パララックス（アートバイブル §3「奥行きは速度差だけで作る」）', () => {
+  const par = (sec: number) =>
+    sceneAt(input(1), sec).commands.filter((c) => c.kind === 'parallax') as
+      { role: string; offset: number; tileWidth: number }[];
+
+  it('★層ごとに流れる速さが違う（全部同じなら平面になる）', () => {
+    const a = par(20);
+    const offs = a.map((c) => c.offset);
+    // ★重複なし＝全層が違う速さ
+    expect(new Set(offs).size).toBe(offs.length);
+  });
+
+  it('★手前ほど速い（空 < スタンド < ラチ < 芝）', () => {
+    const byRole = new Map(par(40).map((c) => [c.role, c.offset]));
+    const sky = byRole.get('sky')!;
+    const stand = byRole.get('stand')!;
+    const rail = byRole.get('rail')!;
+    const turf = byRole.get('turf')!;
+    expect(sky).toBeLessThan(stand);
+    expect(stand).toBeLessThan(rail);
+    expect(rail).toBeLessThan(turf);
+  });
+
+  it('★時間が進むと流れる（止まって見えない）', () => {
+    const a = par(10);
+    const b = par(30);
+    for (let i = 0; i < a.length; i += 1) {
+      expect(b[i]!.offset).toBeGreaterThan(a[i]!.offset);
+    }
+  });
+
+  it('★オフセットは 0 以上（負の剰余はレンダラごとに挙動が違う）', () => {
+    for (const sec of [0, 1, 50, 99]) {
+      for (const c of par(sec)) expect(c.offset).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('★倍率を変えても背景の層構成は変わらない（層が消えない）', () => {
+    expect(par(30).length).toBe(
+      (sceneAt(input(2), 30).commands.filter((c) => c.kind === 'parallax')).length,
+    );
+  });
+});

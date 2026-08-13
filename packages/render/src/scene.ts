@@ -122,11 +122,23 @@ export interface SceneInput {
   readonly pxPerMeter?: number | undefined;
 }
 
-/** ★背景の帯。アートバイブル §3「水平の帯で構成する。縦の要素は最小限」 */
-const BANDS: readonly { role: PaletteRole; top: number; height: number }[] = [
-  { role: 'sky', top: 0, height: 0.35 },
-  { role: 'stand', top: 0.35, height: 0.12 },
-  { role: 'rail', top: 0.47, height: 0.03 },
+/**
+ * ★背景の層（アートバイブル §3「水平の帯で構成する」「奥行きは速度差だけで作る」）。
+ *
+ *   `speed` は**手前（走路）を 1.0 としたときの流れる速さ**。
+ *   実測（馬の見た目の速度 647px/秒）に対して:
+ *     空 0.06 → 39px/秒（画面横断 33秒）… 動いていると分かる遅さ
+ *     スタンド 0.22 → 142px/秒
+ *     ラチ 0.55 → 356px/秒
+ *
+ *   ⚠️ **速さは奥行きの表現そのもの**です。全部同じにすると平面になります。
+ */
+const BANDS: readonly {
+  role: PaletteRole; top: number; height: number; speed: number; tile: number;
+}[] = [
+  { role: 'sky', top: 0, height: 0.35, speed: 0.06, tile: 320 },
+  { role: 'stand', top: 0.35, height: 0.12, speed: 0.22, tile: 160 },
+  { role: 'rail', top: 0.47, height: 0.03, speed: 0.55, tile: 64 },
 ];
 
 /**
@@ -172,18 +184,29 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
   const horses = model.at(sec);
   const cam = cameraMeters(horses, camera.followGate);
   const commands: DrawCommand[] = [];
+  const PX_PER_M = input.pxPerMeter ?? SPRITE.width / 4;
 
+  /**
+   * ★背景は**カメラの位置に応じて流します**（パララックス）。
+   *   `cam` は先頭（または自馬）が走った距離なので、**そのまま流れの量**になります。
+   */
   for (const b of BANDS) {
     commands.push({
-      kind: 'band', role: b.role,
+      kind: 'parallax', role: b.role,
       y: Math.round(b.top * vp.height),
       height: Math.round(b.height * vp.height),
+      tileWidth: b.tile,
+      // ★0 以上に保つ（負の剰余はレンダラごとに挙動が違う）
+      offset: Math.max(0, Math.round(cam * PX_PER_M * b.speed)),
     });
   }
+  // ★走路は手前なので速度 1.0。馬と同じだけ流れる
   commands.push({
-    kind: 'band', role: 'turf',
+    kind: 'parallax', role: 'turf',
     y: Math.round(0.5 * vp.height),
     height: vp.height - Math.round(0.5 * vp.height),
+    tileWidth: 96,
+    offset: Math.max(0, Math.round(cam * PX_PER_M)),
   });
 
   /**
@@ -207,7 +230,6 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
    *   ★**縮尺は演出ではなく、スプライトの寸法から決まります。**
    *     ここを自由に決めると、馬の大きさと走路の速さが噛み合わなくなります。
    */
-  const PX_PER_M = input.pxPerMeter ?? SPRITE.width / 4;
   const z = camera.zoom;
   for (const h of sorted) {
     // ★倍率は**整数**なので、位置も整数倍になります（画素が割れません）
