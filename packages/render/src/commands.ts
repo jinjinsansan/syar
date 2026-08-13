@@ -91,7 +91,43 @@ export type DrawCommand =
     readonly at: Point;
     readonly width: number;
     readonly ratio: number;
+  }
+  /**
+   * ★**仕掛けの合図**（§8b の局面が変わったこと）。
+   *   ★これも画面の座標系。**カメラが隠せません**。
+   *   反応時間制限ボットは**これを見て**押すので、C-6 の測定対象そのものです。
+   */
+  | {
+    readonly kind: 'cue';
+    readonly at: Point;
+    /** §8b の局面 */
+    readonly phase: 'start' | 'cruise' | 'spurt' | 'straight';
+    /** ★合図が「出ている」か。出ていない間は描かない、ではなく false を出す */
+    readonly active: boolean;
   };
+
+/**
+ * ★スプライトの実寸（正典 §12.1・D-058）。
+ *   **表示は整数倍のみ**（引き 1× / 寄り 2×）。
+ *   ⚠️ 非整数倍で拡大縮小すると**ピクセルアートが壊れます**（アートバイブルの禁止事項）。
+ */
+export const SPRITE = { width: 220, height: 140 } as const;
+
+/** ★倍率は整数のみ。型で縛ります（0.5 や 1.5 を渡せない） */
+export type Zoom = 1 | 2;
+
+/**
+ * ★**カメラが隠してはいけないもの**（アートバイブル §9 の制約）。
+ *
+ *   勝負所は**プレイヤーが仕掛ける瞬間そのもの**です。
+ *   カメラが寄る最中にゲージや合図が消えると、
+ *   **V-13 は通り続けたまま、プレイヤーには「仕掛けても何も変わらない」ゲーム**になります。
+ *
+ *   → これらは**走路の座標系ではなく画面の座標系**に置きます。
+ *     ★カメラが動いても位置が変わらないので、**隠しようがありません**。
+ */
+export const OVERLAY_KINDS = ['gauge', 'cue'] as const;
+export type OverlayKind = (typeof OVERLAY_KINDS)[number];
 
 /** 1フレーム分の描画命令 */
 export interface Frame {

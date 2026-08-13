@@ -58,6 +58,12 @@ export const READONLY = [
   // ★読むだけ（判定書の SHA を書き換えるが DB は変えない）
   'update-acceptance-sha.mjs',
   'deps-of.mjs',
+  // ★P4 のアセット系。**DB に一切接続しません**（画像を読み書きするだけ）
+  //   分類の基準は「DB の状態を変えるか」なので、ファイルを書いても readonly です
+  'codex-imagegen.mjs',
+  'make-gif.mjs',
+  'measure-silk-budget.mjs',
+  'measure-sprite-sheet.mjs',
   'world-search.mjs',
 ];
 

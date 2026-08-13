@@ -17,7 +17,7 @@
  *   ★時刻を進めるのも、位置を決めるのも、ここではありません。
  */
 
-import type { DrawCommand, Frame, PaletteRole, SpriteRef } from './commands.js';
+import { SPRITE, type DrawCommand, type Frame, type PaletteRole, type SpriteRef, type Zoom } from './commands.js';
 
 /** 走行中の1頭の状態。★これが位置モデルの出力です */
 export interface HorseAt {
@@ -54,9 +54,49 @@ export interface Viewport {
   readonly laneHeight: number;
 }
 
+/**
+ * ★倍率を決めたとき、画面に**何段**入るか（実測に基づく判断材料）。
+ *
+ *   スプライトは 220×140（D-058）。縦は重ねて詰めるので実効 0.62 倍で数えます。
+ *   ★オーナーの判断: 350px(2段) と 220px(3段) は可、140px(6段) は**不可**。
+ *   → **全頭を同時に映すことはできません**。カメラで見せる範囲を選びます（§9）。
+ */
+export function lanesOnScreen(viewportHeight: number, zoom: Zoom): number {
+  const laneH = SPRITE.height * zoom * 0.62;
+  return Math.max(1, Math.floor((viewportHeight * 0.48) / laneH));
+}
+
+/**
+ * ★カメラ（アートバイブル §9・2026-08-13 承認）
+ *
+ *   道中は引き（1×）、勝負所で寄る（2×）。
+ *   ⚠️ **倍率は整数のみ**。非整数倍はピクセルアートを壊します（D-058）。
+ *
+ * 【★カメラが隠してはいけないもの】
+ *   ゲージと合図は**画面の座標系**に置くので、ここでは扱いません。
+ *   ★構造として隠せないようにしてあり、`camera.test.ts` が機械で見ています。
+ */
+export interface Camera {
+  readonly zoom: Zoom;
+  /** ★寄る対象（馬番）。undefined なら先頭馬に合わせる */
+  readonly followGate?: number | undefined;
+}
+
+/**
+ * ★§8b の局面。**位置（残り距離）で決まります**（正典 §13）。
+ *   ⚠️ 時刻ではありません。**遅い馬と速い馬で、同じ時刻でも局面が違います**。
+ */
+export function phaseOf(metersLeft: number): 'start' | 'cruise' | 'spurt' | 'straight' {
+  if (metersLeft <= 400) return 'straight';
+  if (metersLeft <= 800) return 'spurt';   // ★勝負所（STAMINA_WINDOW_METER = 800）
+  return 'cruise';
+}
+
 export interface SceneInput {
   readonly model: PositionModel;
   readonly viewport: Viewport;
+  /** ★省略時は引き（1×・先頭追従） */
+  readonly camera?: Camera | undefined;
   /** 自馬の馬番。★§12.6「自馬にのみスタミナゲージを表示」 */
   readonly ownGate?: number | undefined;
   /** 馬番 → 勝負服。★個体識別の唯一の手段（アートバイブル §3） */
@@ -76,7 +116,11 @@ const BANDS: readonly { role: PaletteRole; top: number; height: number }[] = [
  * ★**カメラ**: 先頭馬を画面の一定位置に置き、走路をスクロールさせる。
  *   アートバイブル §3「奥行きは速度差だけで作る（線遠近を描き込まない）」。
  */
-function cameraMeters(horses: readonly HorseAt[]): number {
+function cameraMeters(horses: readonly HorseAt[], follow: number | undefined): number {
+  if (follow !== undefined) {
+    const target = horses.find((h) => h.gate === follow);
+    if (target !== undefined) return target.meters;
+  }
   let lead = 0;
   for (const h of horses) if (h.meters > lead) lead = h.meters;
   return lead;
@@ -103,8 +147,13 @@ function gallopFrame(meters: number, frames: number): number {
  */
 export function sceneAt(input: SceneInput, sec: number): Frame {
   const { model, viewport: vp } = input;
+  const camera: Camera = input.camera ?? { zoom: 1 };
+  if (camera.zoom !== 1 && camera.zoom !== 2) {
+    // ★型で縛っているが、境界（JSON 由来など）から来る場合に備えて実行時にも見る
+    throw new Error(`倍率は 1 か 2 だけです（受け取った値: ${String(camera.zoom)}）`);
+  }
   const horses = model.at(sec);
-  const cam = cameraMeters(horses);
+  const cam = cameraMeters(horses, camera.followGate);
   const commands: DrawCommand[] = [];
 
   for (const b of BANDS) {
@@ -130,9 +179,11 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
 
   /** ★1m あたりの画素。走路の見た目の速度を決める（演出であってゲートに触れない） */
   const PX_PER_M = 0.6;
+  const z = camera.zoom;
   for (const h of sorted) {
-    const x = Math.round(vp.width * 0.35 + (h.meters - cam) * PX_PER_M);
-    const y = vp.trackTop + (h.gate - 1) * vp.laneHeight;
+    // ★倍率は**整数**なので、位置も整数倍になります（画素が割れません）
+    const x = Math.round(vp.width * 0.35 + (h.meters - cam) * PX_PER_M * z);
+    const y = vp.trackTop + (h.gate - 1) * vp.laneHeight * z;
     const sprite: SpriteRef = {
       sheet: 'horse-gallop',
       frame: gallopFrame(h.meters, input.gallopFrames),
@@ -140,7 +191,13 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
     commands.push({ kind: 'sprite', sprite, at: { x, y }, silk: input.silkOf(h.gate) });
   }
 
-  // ★スタミナゲージは**自馬にのみ**（§12.6）
+  /**
+   * ★**ゲージと合図は画面の座標系**（アートバイブル §9 の制約）。
+   *
+   *   カメラの倍率も中心も**一切使いません**。だから**カメラが隠せません**。
+   *   ⚠️ ここに `cam` や `z` を持ち込んだ瞬間、寄りの最中にゲージが動きます。
+   *      その禁止は `camera.test.ts` が機械で見ています。
+   */
   if (input.ownGate !== undefined) {
     const own = sorted.find((h) => h.gate === input.ownGate);
     if (own !== undefined) {
@@ -149,6 +206,16 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
         at: { x: Math.round(vp.width * 0.05), y: Math.round(vp.height * 0.9) },
         width: Math.round(vp.width * 0.3),
         ratio: own.staminaRatio,
+      });
+      // ★合図は**出ていない間も false で出します**。
+      //   「描かない」にすると、ボットは「まだ来ていない」と「見落とした」を区別できません。
+      const left = model.distanceMeter - own.meters;
+      const phase = phaseOf(left);
+      commands.push({
+        kind: 'cue',
+        at: { x: Math.round(vp.width * 0.05), y: Math.round(vp.height * 0.82) },
+        phase,
+        active: phase === 'spurt' || phase === 'straight',
       });
     }
   }
