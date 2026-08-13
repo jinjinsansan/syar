@@ -51,6 +51,8 @@ const RACES = num('--races', 800);
 const JOSTLE = num('--jostle', 0.06);
 /** ★どこで止めて予想させるか（残りメートル）。時間の構造を測るために動かせます */
 const AT_LEFT = num('--at', 800);
+/** ★中間境界を位置として厳守するか（'exact' = D-059 の明文 / 'shape' = D-061 改訂の含意） */
+const FIDELITY = argv.includes('--shape') ? 'shape' : 'exact';
 /** ★能力の幅（1 = 同クラス最小 / 大きいほどばらばら） */
 const SPREAD = num('--spread', 1);
 const DIST = 1600;
@@ -236,6 +238,8 @@ function runRace(seed) {
   const boundaries = replayOf(result, (g) => entrants[g - 1].strategy, pace);
   const model = replayPositionModel({
     distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries, jostle: JOSTLE,
+    // ★別ストリーム（D-061 改訂）。resolveRace の乱数には触れません
+    jostleSeed: seed * 2654435761, boundaryFidelity: FIDELITY,
   });
 
   const ownGate = 1 + (seed % FIELD);

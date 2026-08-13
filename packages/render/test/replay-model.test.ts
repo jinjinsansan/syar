@@ -87,3 +87,95 @@ describe('★D-059 補間は境界を動かさない', () => {
     expect(a).toBe(c);
   });
 });
+
+/**
+ * ★**別ストリームの揺らぎ**（正典 D-061 改訂）
+ *
+ * > 正しくは「結果に影響する乱数を引かない」でした。
+ * > 別ストリームから引く揺らぎは、シードから再計算できるので Provably Fair は保たれ、
+ * > `resolveRace` に触れないので再較正も要りません。
+ */
+describe('★別ストリームの揺らぎ（D-061 改訂）', () => {
+  const bs: readonly Boundaries[] = [
+    { gate: 1, startSec: 0, spurtSec: 61, straightSec: 86, finishSec: 97.4 },
+    { gate: 2, startSec: 0, spurtSec: 59, straightSec: 84, finishSec: 96.1 },
+    { gate: 3, startSec: 0, spurtSec: 62, straightSec: 87, finishSec: 96.8 },
+    { gate: 4, startSec: 0, spurtSec: 58, straightSec: 85, finishSec: 98.2 },
+  ];
+  const mk = (o: Record<string, unknown>) => replayPositionModel({
+    distanceMeter: 1600, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries: bs, ...o,
+  });
+  const EXPECTED = [2, 3, 1, 4];   // finishSec の順
+
+  it('★★どのシード・どの強さでも、着順は1頭も動かない', () => {
+    for (const fid of ['exact', 'shape'] as const) {
+      for (const jostleSeed of [0, 1, 42, 99991, -7]) {
+        for (const jostle of [0, 0.06, 0.5, 0.9]) {
+          expect(finalOrderOf(mk({ jostle, jostleSeed, boundaryFidelity: fid }))).toEqual(EXPECTED);
+        }
+      }
+    }
+  });
+
+  it('★同じシードから同じ位置（乱数を直接呼んでいない・憲法4）', () => {
+    const a = mk({ jostle: 0.9, jostleSeed: 12345, boundaryFidelity: 'shape' });
+    const b = mk({ jostle: 0.9, jostleSeed: 12345, boundaryFidelity: 'shape' });
+    for (const sec of [5, 20, 50, 80, 95]) {
+      expect(JSON.stringify(a.at(sec))).toBe(JSON.stringify(b.at(sec)));
+    }
+  });
+
+  it('★シードが違えば揺らぎが違う（レースごとに違う＝学習で除けない）', () => {
+    const a = mk({ jostle: 0.9, jostleSeed: 1, boundaryFidelity: 'shape' });
+    const b = mk({ jostle: 0.9, jostleSeed: 2, boundaryFidelity: 'shape' });
+    expect(JSON.stringify(a.at(40))).not.toBe(JSON.stringify(b.at(40)));
+  });
+
+  it('★位置は後戻りしない（どの強さでも・馬が下がって見えない）', () => {
+    for (const fid of ['exact', 'shape'] as const) {
+      for (const jostle of [0.06, 0.5, 0.9]) {
+        const m = mk({ jostle, jostleSeed: 777, boundaryFidelity: fid });
+        for (const g of [1, 2, 3, 4]) {
+          let prev = -1;
+          for (let sec = 0; sec <= 99; sec += 0.25) {
+            const v = m.at(sec).find((h) => h.gate === g)!.meters;
+            expect(v).toBeGreaterThanOrEqual(prev - 1e-9);
+            prev = v;
+          }
+        }
+      }
+    }
+  });
+
+  it("★'exact' は中間境界を動かさない（D-059 の明文どおり）", () => {
+    const m = mk({ jostle: 0.9, jostleSeed: 3, boundaryFidelity: 'exact' });
+    for (const b of bs) {
+      expect(m.at(b.spurtSec).find((h) => h.gate === b.gate)!.meters).toBeCloseTo(800, 6);
+      expect(m.at(b.straightSec).find((h) => h.gate === b.gate)!.meters).toBeCloseTo(1200, 6);
+    }
+  });
+
+  it("★★'shape' は中間境界を動かす — **そこが漏洩の口だったから**", () => {
+    /**
+     * ★区間ごとに揺らぐと、**境界ではちょうど 0** になります。
+     *   そこでは `位置 + 脚質` から走破タイムが厳密に逆算でき、
+     *   実測で**揺らぎをいくら強くしても残り800m の AUC は 0.931 のまま**でした
+     *   （道中は 0.923 → 0.731 まで落ちるのに）。
+     *   → `'shape'` で 0.931 → **0.799**。
+     */
+    const m = mk({ jostle: 0.9, jostleSeed: 3, boundaryFidelity: 'shape' });
+    let moved = 0;
+    for (const b of bs) {
+      if (Math.abs(m.at(b.spurtSec).find((h) => h.gate === b.gate)!.meters - 800) > 1) moved += 1;
+    }
+    expect(moved).toBeGreaterThan(0);
+    // ★それでも端は端（着順は動かない）
+    expect(finalOrderOf(m)).toEqual(EXPECTED);
+  });
+
+  it('★揺らぎ 0 なら、シードを変えても何も変わらない（空振りでない対照）', () => {
+    const a = mk({ jostle: 0, jostleSeed: 1, boundaryFidelity: 'shape' });
+    const b = mk({ jostle: 0, jostleSeed: 999, boundaryFidelity: 'shape' });
+    expect(JSON.stringify(a.at(40))).toBe(JSON.stringify(b.at(40)));
+  });
+});
