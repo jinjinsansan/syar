@@ -135,6 +135,52 @@ export type DrawCommand =
     readonly phase: 'start' | 'cruise' | 'spurt' | 'straight';
     /** ★合図が「出ている」か。出ていない間は描かない、ではなく false を出す */
     readonly active: boolean;
+  }
+  /**
+   * ★**各馬の余力**（REVIEW_P4_QUALITY_VERDICT Q-P4-13）。
+   *
+   * 【なぜ要るか — 測って分かったこと】
+   *   画面に**位置しか無い**とき、勝負所の見た目の順位から3着以内を当てる能力は
+   *   ★**AUC 0.431**（＝**何も見ないより悪い**）でした。
+   *   逃げ馬が前にいるのは「強いから」ではなく「先に行ったから」で、
+   *   **位置だけを読むと必ず騙されます。**
+   *
+   *   > 「あと何頭抜けば足りるか」「**まだ余力があるか**」が読めること（裁定）
+   *
+   *   ★これは自馬のゲージ（§12.6）とは**別のもの**です。
+   *     ゲージは「自分が仕掛けられるか」、こちらは「**前の馬が持つか**」。
+   *
+   * 【★世界の座標系】
+   *   馬に付くので、カメラで動きます。**ゲージ・合図とは扱いが違います。**
+   */
+  | {
+    readonly kind: 'effort';
+    readonly at: Point;
+    /** 0〜1。0 に近いほどバテている */
+    readonly ratio: number;
+    /** ★馬と同じ倍率で描く（そうしないと寄ったとき馬から離れます） */
+    readonly scale: Zoom;
+  }
+  /**
+   * ★**変化**（裁定 Q-P4-14 ①）。
+   *
+   *   > 実況は「位置」ではなく「変化」を言う（「3番手」ではなく「上がってきた」）
+   *   > → 順位の数字ではなく、**前の馬との差がメートルで詰まるのを見せる**
+   *
+   *   ★だから `rank` を持ちません。持つのは**差**と**詰まる速さ**と
+   *     **あと何頭抜けば足りるか**の3つだけです。
+   *
+   * 【★画面の座標系】ゲージ・合図と同じく、**カメラが隠せません**。
+   */
+  | {
+    readonly kind: 'gap';
+    readonly at: Point;
+    /** 前の馬との差（m）。先頭なら 0 */
+    readonly meters: number;
+    /** ★毎秒どれだけ詰めているか（m/s）。**負なら離されている** */
+    readonly closingMps: number;
+    /** ★あと何頭抜けば「足りる」か。0 なら既に足りている */
+    readonly toGo: number;
   };
 
 /**
@@ -154,7 +200,7 @@ export const SPRITE = { width: 220, height: 140 } as const;
  *   → これらは**走路の座標系ではなく画面の座標系**に置きます。
  *     ★カメラが動いても位置が変わらないので、**隠しようがありません**。
  */
-export const OVERLAY_KINDS = ['gauge', 'cue'] as const;
+export const OVERLAY_KINDS = ['gauge', 'cue', 'gap'] as const;
 export type OverlayKind = (typeof OVERLAY_KINDS)[number];
 
 /** 1フレーム分の描画命令 */

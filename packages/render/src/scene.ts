@@ -143,6 +143,13 @@ export interface SceneInput {
    *   ⚠️ 小さくすると馬群が重なります。**演出のつまみではありません。**
    */
   readonly pxPerMeter?: number | undefined;
+  /**
+   * ★「足りる」着順の線（既定3）。`gap.toGo` の計算に使います。
+   *
+   *   ⚠️ ここで数字を発明しません。**賞金の刻みは正典が決めるもの**で、
+   *      画面はそれを**受け取って表示するだけ**です。
+   */
+  readonly payLine?: number | undefined;
 }
 
 /**
@@ -278,6 +285,23 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
       frame: gallopFrame(h.meters, input.gallopFrames),
     };
     commands.push({ kind: 'sprite', sprite, at: { x, y }, silk: input.silkOf(h.gate), scale: z });
+
+    /**
+     * ★**各馬の余力**（展開を読ませる）。
+     *
+     *   ⚠️ これが無いと、画面から読めるのは「位置」だけになります。
+     *      勝負所で位置だけを読んだときの的中能力は **AUC 0.431**
+     *      ＝**何も見ないより悪い**、と実測しました（`tools/verify-readable.mjs`）。
+     *      逃げ馬が前にいるのは強いからではないので、**位置は嘘をつきます。**
+     *
+     *   ★馬に付くので**世界の座標系**です（ゲージ・合図とは扱いが違う）。
+     */
+    commands.push({
+      kind: 'effort',
+      at: { x, y: y - Math.round(vp.laneHeight * 0.18) * z },
+      ratio: h.staminaRatio,
+      scale: z,
+    });
   }
 
   /**
@@ -305,6 +329,44 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
         at: { x: Math.round(vp.width * 0.05), y: Math.round(vp.height * 0.82) },
         phase,
         active: phase === 'spurt' || phase === 'straight',
+      });
+
+      /**
+       * ★**変化を出す**（裁定 Q-P4-14 ①「実況は『位置』ではなく『変化』を言う」）。
+       *
+       *   順位の数字は出しません。出すのは
+       *     ① 前の馬との**差**（m）
+       *     ② それが**毎秒どれだけ詰まっているか**（m/s）
+       *     ③ **あと何頭抜けば足りるか**
+       *   の3つだけです。
+       *
+       *   ★③ の「足りる」の線（既定3着）は**上位から渡します**。
+       *     ここで発明すると、賞金の刻みが変わったとき画面だけ古くなります。
+       */
+      const ahead = horses.filter((o) => o.meters > own.meters);
+      const nearest = ahead.reduce<number | undefined>(
+        (best, o) => (best === undefined || o.meters < best ? o.meters : best), undefined,
+      );
+      /** ★少し前の時刻と比べて、差が縮んでいるかを出す。**位置ではなく変化** */
+      const dt = 0.5;
+      const before = model.at(Math.max(0, sec - dt));
+      const ownBefore = before.find((o) => o.gate === own.gate);
+      const nearestBefore = ahead.length === 0 ? undefined
+        : before.filter((o) => ahead.some((a) => a.gate === o.gate))
+          .reduce<number | undefined>(
+            (best, o) => (best === undefined || o.meters < best ? o.meters : best), undefined,
+          );
+      const gapNow = nearest === undefined ? 0 : nearest - own.meters;
+      const gapBefore = (nearestBefore === undefined || ownBefore === undefined)
+        ? gapNow : nearestBefore - ownBefore.meters;
+      const payLine = input.payLine ?? 3;
+      commands.push({
+        kind: 'gap',
+        at: { x: Math.round(vp.width * 0.05), y: Math.round(vp.height * 0.74) },
+        meters: gapNow,
+        // ★詰めていれば正。**離されていれば負**（そこも読めなければ意味がない）
+        closingMps: (gapBefore - gapNow) / dt,
+        toGo: Math.max(0, ahead.length - (payLine - 1)),
       });
     }
   }

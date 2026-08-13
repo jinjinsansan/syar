@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  sceneAt, phaseOf, cameraFor, lanesOnScreen, SPRITE,
+  sceneAt, phaseOf, cameraFor, lanesOnScreen, SPRITE, OVERLAY_KINDS,
   type PositionModel, type SceneInput, type HorseAt, type Zoom,
 } from '../src/index.js';
 
@@ -43,8 +43,18 @@ const input = (zoom: Zoom, follow?: number): SceneInput => ({
   gallopFrames: 6,
 });
 
+/**
+ * ★**画面の座標系にあるものを列挙で書きません。**
+ *
+ *   ⚠️ 最初は `'gauge' || 'cue'` と直接書いていました。
+ *      そこへ `gap`（変化の表示）を足したとき、**検査は何も言わずに通りました**。
+ *      新しい重ね表示が**カメラ不変の検査を素通りできる**状態です。
+ *   → `OVERLAY_KINDS` を引くようにして、**足したら自動で検査対象になる**ようにします。
+ */
 const overlays = (z: Zoom, sec: number) =>
-  sceneAt(input(z), sec).commands.filter((c) => c.kind === 'gauge' || c.kind === 'cue');
+  sceneAt(input(z), sec).commands.filter(
+    (c) => (OVERLAY_KINDS as readonly string[]).includes(c.kind),
+  );
 
 describe('★カメラがゲージと合図を隠さない（C-6 の前提）', () => {
   it('★倍率を変えても、ゲージと合図の位置が1画素も動かない', () => {
@@ -60,7 +70,8 @@ describe('★カメラがゲージと合図を隠さない（C-6 の前提）', 
     for (const z of [1, 2] as Zoom[]) {
       for (const sec of [0, 20, 50, 80, 99]) {
         const kinds = overlays(z, sec).map((c) => c.kind).sort();
-        expect(kinds).toEqual(['cue', 'gauge']);
+        // ★列挙を書き写しません。**`OVERLAY_KINDS` に足したら、ここも自動で要求されます**
+        expect(kinds).toEqual([...OVERLAY_KINDS].sort());
       }
     }
   });
@@ -207,10 +218,12 @@ describe('★勝負所で寄る（アートバイブル §9）— C-6 を殺さ�
   it('★寄っても、ゲージと合図の位置が1画素も動かない（C-6 の本題）', () => {
     // 同じ時刻で倍率だけ変えて、重なりを比べる
     for (const sec of [10, 40, 70, 95]) {
-      const wide = sceneAt({ ...input(1) }, sec).commands.filter((c) => c.kind === 'gauge' || c.kind === 'cue');
-      const near = sceneAt({ ...input(2) }, sec).commands.filter((c) => c.kind === 'gauge' || c.kind === 'cue');
+      const wide = overlays(1, sec) as { at: unknown }[];
+      const near = overlays(2, sec) as { at: unknown }[];
       expect(near.length).toBe(wide.length);
+      // ★重ね表示は全部**画面の座標系**なので、必ず `at` を持ちます
       for (let i = 0; i < wide.length; i += 1) {
+        expect(near[i]!.at).toBeDefined();
         expect(near[i]!.at).toEqual(wide[i]!.at);
       }
     }
@@ -248,5 +261,64 @@ describe('★寄っても自馬が画面から消えない（C-6 の前提）', 
     const g2 = cmds.find((c) => c.silk === 'silk-2')!;
     expect(g1.at.y).toBe(380);          // 段0
     expect(g2.at.y).toBeGreaterThan(380); // 段1
+  });
+});
+
+/**
+ * ★**展開が画面に出ているか**（REVIEW_P4_QUALITY_VERDICT Q-P4-13）
+ *
+ * 【なぜこの検査が要るか】
+ *   > 面白さは③予想と④当たり外れから出て、③が成立するには②（いま何が起きているか）が要る。
+ *   > **いまの画面には②がありません。**
+ *
+ *   ★実測（`tools/verify-readable.mjs`・1200レース）:
+ *     画面に**位置しか無かったとき**、勝負所で3着以内を当てる能力は **AUC 0.431**
+ *     ＝**何も見ないより悪い**。逃げ馬が前にいるのは強いからではないためです。
+ *
+ *   → 余力（`effort`）と変化（`gap`）を出しました。**消したら検査が落ちます。**
+ */
+describe('★展開が画面に出ている（消したら落ちる）', () => {
+  it('★全馬の余力が出ている（自馬のゲージだけでは展開が読めない）', () => {
+    const efforts = sceneAt(input(1), 30).commands.filter((c) => c.kind === 'effort');
+    expect(efforts.length).toBe(18);
+    for (const e of efforts) {
+      expect((e as { ratio: number }).ratio).toBeGreaterThanOrEqual(0);
+      expect((e as { ratio: number }).ratio).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('★余力は馬と同じ倍率で描かれる（寄ったとき馬から離れない）', () => {
+    for (const z of [1, 2] as Zoom[]) {
+      const e = sceneAt(input(z), 30).commands.find((c) => c.kind === 'effort') as { scale: number };
+      expect(e.scale).toBe(z);
+    }
+  });
+
+  it('★変化が出ている — **順位の数字ではなく、差と詰まる速さ**', () => {
+    const gap = sceneAt(input(1), 40).commands.find((c) => c.kind === 'gap') as
+      { meters: number; closingMps: number; toGo: number } | undefined;
+    expect(gap).toBeDefined();
+    // ★「3番手」ではなく「何m前に、毎秒何m詰めている」
+    expect(typeof gap!.meters).toBe('number');
+    expect(typeof gap!.closingMps).toBe('number');
+    expect(Number.isFinite(gap!.closingMps)).toBe(true);
+    expect(gap!.toGo).toBeGreaterThanOrEqual(0);
+  });
+
+  it('★対照: 先頭にいるときは差 0・抜く必要 0（空振りでない）', () => {
+    // 馬番1が最も遅い模型なので、自馬を最速（18番）にすると先頭になる
+    const inp: SceneInput = { ...input(1), ownGate: 18, laneOf: (g) => (g - 1) % 3 };
+    const gap = sceneAt(inp, 50).commands.find((c) => c.kind === 'gap') as
+      { meters: number; toGo: number };
+    expect(gap.meters).toBe(0);
+    expect(gap.toGo).toBe(0);
+  });
+
+  it('★「足りる」着順の線は外から渡す（画面が発明しない）', () => {
+    const g = (payLine: number) => (sceneAt({ ...input(1), payLine }, 30)
+      .commands.find((c) => c.kind === 'gap') as { toGo: number }).toGo;
+    // 線が広がれば、抜くべき頭数は減る
+    expect(g(1)).toBeGreaterThan(g(3));
+    expect(g(3)).toBeGreaterThanOrEqual(g(5));
   });
 });
