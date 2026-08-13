@@ -27,8 +27,13 @@ import POOL from '../../lib/watch-pool.json';
 
 const DIST = 1600;
 const FIELD = 12;
-const LANES = 3;
-const VIEW = { width: 1280, height: 720, trackTop: 340, laneHeight: 105 };
+/**
+ * ★**段を増やして詰めます。**
+ *   実際のレースは馬が重なって見えます。3段・105px 間隔では**まばら**でした。
+ *   ⚠️ 段の数は「画面に何頭映るか」ではなく「**馬群に見えるか**」で決めます。
+ */
+const LANES = 6;
+const VIEW = { width: 1280, height: 720, trackTop: 330, laneHeight: 46 };
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 
 interface Built {
@@ -151,6 +156,7 @@ export default function WatchPage(): React.JSX.Element {
       gallopFrames: 6,
       laneOf: (g) => (g - 1) % LANES,
       laneCount: LANES,
+      foregroundRail: true,
       strategyOf: built.strategyOf,
       pace: built.pace,
       // ★脚は**表示の時計**で回す（送りを速くしても小走りにならない）

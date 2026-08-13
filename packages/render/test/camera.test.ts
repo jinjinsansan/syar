@@ -427,3 +427,64 @@ describe('★見て分かった不具合を固定する', () => {
     expect(sceneAt(input(1), 30).commands.filter((c) => c.kind === 'pole')).toHaveLength(0);
   });
 });
+
+/**
+ * ★カメラは馬群を写す（オーナー指摘 ①・1996年の作品との比較）
+ *
+ *   > ちゃんと競馬レースのカメラワークになっている。
+ *   > 開発サーバーは**1匹の主役をずっと中央に置いている**
+ */
+describe('★カメラが馬群を写す（1頭に固定しない）', () => {
+  it('★自馬は画面の同じ場所に貼り付かない', () => {
+    /**
+     * ⚠️ 以前は `x = 0.35W + (m - cam)·px` で `cam = 自馬の位置` だったので、
+     *    **自馬の x は常に 0.35W** でした。他馬だけが出入りして見えます。
+     */
+    const xs = new Set<number>();
+    for (let sec = 10; sec <= 90; sec += 10) {
+      const own = sceneAt(input(1), sec).commands
+        .find((c) => c.kind === 'sprite' && c.silk === 'silk-5') as { at: { x: number } } | undefined;
+      expect(own).toBeDefined();
+      xs.add(own!.at.x);
+    }
+    expect(xs.size).toBeGreaterThan(1);
+  });
+
+  it('★★それでも自馬は画面から出ない（C-6 の前提）', () => {
+    for (const own of [1, 5, 12, 18]) {
+      for (const z of [1, 2] as Zoom[]) {
+        for (let sec = 0; sec <= 99; sec += 3) {
+          const sp = sceneAt({ ...input(z), ownGate: own }, sec).commands
+            .find((c) => c.kind === 'sprite' && c.silk === `silk-${own}`) as { at: { x: number } };
+          expect(sp.at.x).toBeGreaterThan(-SPRITE.width * z);
+          expect(sp.at.x).toBeLessThan(1280);
+        }
+      }
+    }
+  });
+
+  it('★手前の馬が奥の馬を隠す（馬群に見える順序）', () => {
+    const cmds = sceneAt({ ...input(1), laneOf: (g) => (g - 1) % 6, laneCount: 6 }, 30)
+      .commands.filter((c) => c.kind === 'sprite') as { at: { y: number } }[];
+    // ★後に描かれるものほど手前＝y が大きい（単調非減少）
+    for (let i = 1; i < cmds.length; i += 1) {
+      expect(cmds[i]!.at.y).toBeGreaterThanOrEqual(cmds[i - 1]!.at.y);
+    }
+  });
+
+  it('★手前のラチは、馬より後に描かれる（馬の前に来る）', () => {
+    const cmds = sceneAt({ ...input(1), foregroundRail: true }, 30).commands;
+    const lastSprite = cmds.map((c) => c.kind).lastIndexOf('sprite');
+    const rails = cmds
+      .map((c, i) => ({ c, i }))
+      .filter((x) => x.c.kind === 'parallax' && x.c.role === 'rail');
+    expect(rails.length).toBe(2);                      // 奥と手前
+    expect(rails[1]!.i).toBeGreaterThan(lastSprite);   // ★手前は馬より後
+  });
+
+  it('★対照: 求めなければ手前のラチは出ない', () => {
+    const rails = sceneAt(input(1), 30).commands
+      .filter((c) => c.kind === 'parallax' && c.role === 'rail');
+    expect(rails).toHaveLength(1);
+  });
+});

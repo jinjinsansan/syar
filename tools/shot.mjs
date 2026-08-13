@@ -12,8 +12,8 @@ import {
 import { loadFrames, dressed } from './lib/dress.mjs';
 import POOL from '../apps/web/src/lib/watch-pool.json' with { type: 'json' };
 
-const SEED = 42, OWN = 3, DIST = 1600, FIELD = 12, LANES = 3;
-const VIEW = { width: 1280, height: 720, trackTop: 340, laneHeight: 105 };
+const SEED = 42, OWN = 3, DIST = 1600, FIELD = 12, LANES = 6;
+const VIEW = { width: 1280, height: 720, trackTop: 330, laneHeight: 46 };
 const STRATS = ['nige', 'senko', 'sashi', 'oikomi'];
 
 const start = (SEED * 13) % Math.max(1, POOL.length - FIELD);
@@ -44,7 +44,7 @@ for (const [name, d] of [['a-start', 1], ['b-cruise', warp.displaySec * 0.35], [
   const frame = sceneAt({
     model, viewport: VIEW, camera: cameraFor(DIST - own.meters, OWN), ownGate: OWN,
     silkOf: (g) => `silk-${g}`, gallopFrames: 6, laneOf: (g) => (g - 1) % LANES,
-    laneCount: LANES, strategyOf: (g) => entrants[g - 1].strategy, pace,
+    laneCount: LANES, foregroundRail: true, strategyOf: (g) => entrants[g - 1].strategy, pace,
     animSec: d, poleEveryMeter: 200,
   }, sec);
 

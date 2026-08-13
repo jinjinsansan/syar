@@ -194,6 +194,13 @@ export interface SceneInput {
    *   ⚠️ ここで「何mごとか」を発明しません。**間隔は呼び出し側が渡します**。
    */
   readonly poleEveryMeter?: number | undefined;
+  /**
+   * ★カメラを先頭寄りに構える度合い（0＝馬群の重心 / 1＝先頭）。既定 0.5。
+   *   中継は先頭を画面のやや前寄りに置きます。
+   */
+  readonly packBias?: number | undefined;
+  /** ★手前のラチを出すか（馬より前に描かれます） */
+  readonly foregroundRail?: boolean | undefined;
 }
 
 /**
@@ -219,15 +226,44 @@ const BANDS: readonly {
  * ★**カメラ**: 先頭馬を画面の一定位置に置き、走路をスクロールさせる。
  *   アートバイブル §3「奥行きは速度差だけで作る（線遠近を描き込まない）」。
  */
-function cameraMeters(horses: readonly HorseAt[], follow: number | undefined): number {
-  if (follow !== undefined) {
-    const target = horses.find((h) => h.gate === follow);
-    if (target !== undefined) return target.meters;
-  }
+function cameraMeters(
+  horses: readonly HorseAt[], follow: number | undefined, packBias: number,
+): number {
+  /**
+   * ★**カメラは「馬群」を写します。1頭を中央に置き続けません。**
+   *
+   * 【★オーナーの指摘（1996年の作品との比較）】
+   *   > ちゃんと競馬レースのカメラワークになっている。
+   *   > 開発サーバーは**1匹の主役をずっと中央に置いている**
+   *
+   *   中継のカメラは**先頭集団**を追い、先頭が画面のやや前寄りに来ます。
+   *   ★1頭に固定すると、他馬は**その馬との相対速度でしか動かず**、
+   *     画面の外へ出入りを繰り返します。
+   *
+   * 【★C-6 を殺さないこと】
+   *   自馬が画面から出ると仕掛けられません。
+   *   → 馬群の基準に寄せつつ、**自馬が画面に残るところまでで止めます**（下の呼び出し側で clamp）。
+   */
   let lead = 0;
   for (const h of horses) if (h.meters > lead) lead = h.meters;
-  return lead;
+
+  // ★先頭集団の重心（先頭から離れすぎた馬は「馬群」ではないので数えない）
+  const PACK_M = 40;
+  let sum = 0, n = 0;
+  for (const h of horses) {
+    if (lead - h.meters > PACK_M) continue;
+    sum += h.meters;
+    n += 1;
+  }
+  const packCentre = n > 0 ? sum / n : lead;
+
+  // ★先頭寄りに構える（中継は先頭を画面の前寄りに置く）
+  const base = packCentre + (lead - packCentre) * packBias;
+  if (follow === undefined) return base;
+  const target = horses.find((h) => h.gate === follow);
+  return target === undefined ? base : base;
 }
+
 
 /**
  * ★ギャロップのフレームを、**時刻ではなく走った距離**から決める。
@@ -274,10 +310,20 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
     throw new Error(`倍率は 1 か 2 だけです（受け取った値: ${String(camera.zoom)}）`);
   }
   const horses = model.at(sec);
-  const cam = cameraMeters(horses, camera.followGate);
-  const commands: DrawCommand[] = [];
   const PX_PER_M = input.pxPerMeter ?? SPRITE.width / 4;
   const PX_PER_M0 = PX_PER_M;
+
+  /**
+   * ★カメラの位置。馬群に構えつつ、**自馬が画面から出ないところで止めます**（C-6）。
+   */
+  const rawCam = cameraMeters(horses, camera.followGate, input.packBias ?? 0.5);
+  const halfM = vp.width / (2 * PX_PER_M * camera.zoom);
+  const ownHorse = input.ownGate === undefined
+    ? undefined : horses.find((h) => h.gate === input.ownGate);
+  const cam = ownHorse === undefined ? rawCam
+    : Math.max(ownHorse.meters - halfM * 0.55, Math.min(ownHorse.meters + halfM * 0.55, rawCam));
+  const commands: DrawCommand[] = [];
+
 
   /**
    * ★背景は**カメラの位置に応じて流します**（パララックス）。
@@ -335,7 +381,25 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
    *   C-5（同じ seed から同じ映像）が**理由なく**崩れます。
    *   重なりの前後関係が要るなら、レンダラではなくここで明示的に決めること。
    */
-  const sorted = [...horses].sort((a, b) => a.gate - b.gate);
+  /**
+   * ★**奥（上の段）から手前（下の段）へ描きます。**
+   *   ⚠️ 馬番順のままだと、手前の馬が奥の馬に隠れて**重なりが逆**になります。
+   *      実際の中継は**手前の馬が奥を隠します**。馬群に見せるにはこの順序が要ります。
+   *   ★同じ段の中は**馬番順**なので、順序は決まります（C-5 は崩れません）。
+   */
+  const laneOfGate = (g: number): number => (input.laneOf === undefined ? g - 1 : input.laneOf(g));
+  const laneCount = Math.max(1, input.laneCount ?? 3);
+  const ownLane = input.ownGate === undefined ? 0 : laneOfGate(input.ownGate);
+  /**
+   * ★並べるのは**画面上の段**です。生の段ではありません。
+   *   ⚠️ 生の段で並べたら、自馬基準の巡回で順序が入れ替わり、
+   *      **奥の馬が手前の馬を隠す**フレームが出ました（検査が落ちて気づきました）。
+   */
+  const screenLane = (g: number): number =>
+    (((laneOfGate(g) - ownLane) % laneCount) + laneCount) % laneCount;
+  const sorted = [...horses].sort(
+    (a, b) => (screenLane(a.gate) - screenLane(b.gate)) || (a.gate - b.gate),
+  );
 
   /**
    * ★**1m あたりの画素。スプライトの実寸と整合していなければなりません。**
@@ -354,7 +418,6 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
   for (const h of sorted) {
     // ★倍率は**整数**なので、位置も整数倍になります（画素が割れません）
     const x = Math.round(vp.width * 0.35 + (h.meters - cam) * PX_PER_M * z);
-    const lane = input.laneOf === undefined ? h.gate - 1 : input.laneOf(h.gate);
     /**
      * ★**自馬の段を画面に入れる**（C-6 の前提）。
      *
@@ -366,9 +429,6 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
      *   → 自馬の段が**先頭の段に来るよう縦にずらします**。カメラの縦の追従です。
      *     自馬を指定していないときはずらしません（観戦モード）。
      */
-    const ownLane = input.ownGate === undefined
-      ? 0
-      : (input.laneOf === undefined ? input.ownGate - 1 : input.laneOf(input.ownGate));
     /**
      * ★**段は必ず走路の中に収めます。**
      *
@@ -377,9 +437,7 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
      *      ★**馬が芝の上（スタンドや空）を走っていました。** 実際に空を走っていました。
      *   → **巡回**させます。自馬が必ず先頭の段に来て、他は下に回ります。
      */
-    const laneCount = Math.max(1, input.laneCount ?? 3);
-    const rel = (((lane - ownLane) % laneCount) + laneCount) % laneCount;
-    const y = vp.trackTop + rel * vp.laneHeight * z;
+    const y = vp.trackTop + screenLane(h.gate) * vp.laneHeight * z;
     const sprite: SpriteRef = {
       sheet: 'horse-gallop',
       frame: gallopFrame(h.gate, input.gallopFrames, input.animSec ?? sec, 1 / (input.secondsPerMeter ?? 1 / 16)),
@@ -408,6 +466,25 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
         scale: z,
       });
     }
+  }
+
+  /**
+   * ★**手前のラチ**（馬より後に描く＝馬の前に来る）。
+   *
+   *   ⚠️ 奥のラチだけだと、馬が**芝の上に貼った絵**に見えます。
+   *      手前に柵が1本入るだけで、**馬が「走路の中にいる」**ように見えます。
+   *   ★アートバイブル §3「奥行きは速度差だけで作る」に沿って、**手前ほど速く流します**。
+   */
+  if (input.foregroundRail === true) {
+    commands.push({
+      kind: 'parallax',
+      role: 'rail',
+      y: Math.round(vp.height * 0.86),
+      height: Math.round(vp.height * 0.06),
+      tileWidth: 48,
+      // ★手前なので走路より速い
+      offset: Math.max(0, Math.round(cam * PX_PER_M * 1.35)),
+    });
   }
 
   /**

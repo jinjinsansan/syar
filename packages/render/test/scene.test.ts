@@ -43,18 +43,29 @@ describe('★§12.8 描画抽象化', () => {
     expect(a).not.toBe(b);
   });
 
-  it('★描く順序が馬番で固定される（同着付近で順序が揺れない）', () => {
-    // 全馬が同じ位置でも、コマンドの並びは馬番順
-    const same: PositionModel = {
-      raceSec: 10, distanceMeter: 1600,
-      at: () => [3, 1, 2].map((g) => ({ gate: g, meters: 500, staminaRatio: 1 })),
+  it('★描く順序が「位置」で変わらない（同着付近で順序が揺れない）', () => {
+    /**
+     * ★**この検査の目的は「馬番順であること」ではありません。**
+     *   **位置で順序が変わらないこと**です（同着付近で描画コマンドが揺れると C-5 が崩れる）。
+     *
+     *   ⚠️ 順序は **段（奥→手前）→ 馬番** になりました。
+     *      実際の中継は**手前の馬が奥を隠す**ので、馬群に見せるにはこの順序が要ります。
+     *      段も馬番も**レース中に変わらない**ので、C-5 の目的は保たれます。
+     */
+    const silksAt = (meters: (g: number) => number): (string | undefined)[] => {
+      const m: PositionModel = {
+        raceSec: 10, distanceMeter: 1600,
+        at: () => [3, 1, 2].map((g) => ({ gate: g, meters: meters(g), staminaRatio: 1 })),
+      };
+      return sceneAt({ ...input(), model: m }, 5).commands
+        .filter((c) => c.kind === 'sprite').map((c) => (c as { silk?: string }).silk);
     };
-    const f = sceneAt({ ...input(), model: same }, 5);
-    const gates = f.commands.filter((c) => c.kind === 'sprite').map((_c, i) => i);
-    expect(gates.length).toBe(3);
-    // 勝負服の並びで馬番順を確認する
-    const silks = f.commands.filter((c) => c.kind === 'sprite').map((c) => (c as { silk?: string }).silk);
-    expect(silks).toEqual(['silk-1', 'silk-2', 'silk-3']);
+    const allSame = silksAt(() => 500);
+    expect(allSame.length).toBe(3);
+    // ★位置を入れ替えても、描く順序は1つも変わらない
+    expect(silksAt((g) => 500 + g * 30)).toEqual(allSame);
+    expect(silksAt((g) => 500 - g * 30)).toEqual(allSame);
+    expect(silksAt((g) => (g === 2 ? 900 : 100))).toEqual(allSame);
   });
 
   it('★スタミナゲージは自馬にのみ出る（§12.6）', () => {
