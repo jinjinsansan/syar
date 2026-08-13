@@ -85,6 +85,7 @@ console.log(`  HEAD = ${HEAD_SHORT}`);
 console.log('');
 
 let old = 0;
+let justifiedCount = 0;
 let unknown = 0;
 let head = 0;
 for (const file of TARGETS) {
@@ -104,6 +105,22 @@ for (const file of TARGETS) {
     .split(String.fromCharCode(10))
     .filter((l) => /^\|\s*\*\*[A-Z]+-[0-9]/.test(l))
     .join(String.fromCharCode(10));
+  /**
+   * ★**「なぜ古い SHA でも有効か」が明文で書かれている行**（R-23 が認める例外）。
+   *   目印は `★古いSHA根拠:` です。
+   *
+   * ⚠️⚠️ **これは黙らせる仕組みではありません。**
+   *    ・目印があっても**必ず一覧に出します**（件数も内容も）
+   *    ・「再実行した」とは扱いません。**人が読んで判断するために出します**
+   *    ★目印を付ければ検査が緑になる、という使い方をした瞬間に
+   *      R-23 は「SHA を書き換えて閉じる」と同じところへ戻ります。
+   */
+  const justified = new Set();
+  for (const line of text.split(String.fromCharCode(10))) {
+    if (!line.includes('★古いSHA根拠:')) continue;
+    for (const m of line.matchAll(/`([0-9a-f]{7,40})`/g)) justified.add(m[1]);
+  }
+
   const found = new Map();
   for (const m of text.matchAll(/`([0-9a-f]{7,40})`/g)) {
     const sha = m[1];
@@ -128,6 +145,13 @@ for (const file of TARGETS) {
         console.log(`  ✓ ${sha}（${count}箇所）— この SHA 以降、コードは変わっていません`);
         continue;
       }
+      if (justified.has(sha)) {
+        // ★根拠が書いてある。**それでも必ず出す**（黙らせない）
+        justifiedCount += count;
+        console.log(`  ⚠️ ${sha}（${count}箇所）— 以降 ${files.length} ファイル変更・**根拠が明文で書かれています**`);
+        console.log('       ★「根拠あり」は「再実行した」ではありません。人が読んで判断してください');
+        continue;
+      }
       old += count;
       console.log(`  ★古い: ${sha}（${count}箇所）— 以降 ${files.length} ファイルが変更:`);
       for (const f of files.slice(0, 4)) console.log(`        ${f}`);
@@ -140,10 +164,14 @@ for (const file of TARGETS) {
 }
 
 console.log('【判定】');
-console.log(`  HEAD の SHA: ${head}箇所 / 古い: ${old}箇所 / 不明: ${unknown}箇所`);
+console.log(`  HEAD の SHA: ${head}箇所 / 古い: ${old}箇所 / 不明: ${unknown}箇所`
+  + (justifiedCount > 0 ? ` / ⚠️根拠つきの古い SHA: ${justifiedCount}箇所` : ''));
 console.log('');
 if (old === 0 && unknown === 0) {
-  console.log('★R-23: PASS — すべての証拠が現在のコードに対応しています');
+  console.log(justifiedCount === 0
+    ? '★R-23: PASS — すべての証拠が現在のコードに対応しています'
+    : `★R-23: PASS — ただし ⚠️${justifiedCount}箇所は「根拠を明文で書いた」古い SHA です。`
+      + String.fromCharCode(10) + '  ★その根拠が妥当かは、この検査では判定していません。必ず読むこと');
   process.exit(0);
 }
 console.log('★R-23: 古い SHA が残っています。');
