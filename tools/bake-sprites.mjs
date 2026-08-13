@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { loadFrames, dressed, POST } from './lib/dress.mjs';
 
-const SHEET = 'design/art/assets/horse-gallop-cloth2-sheet.png';
+const SHEET = 'design/art/assets/horse-gallop-v2.png';
 const OUT = join('apps', 'web', 'public', 'sprites');
 const GATES = 18;
 const FRAMES = 6;

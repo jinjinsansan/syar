@@ -49,10 +49,32 @@ export async function loadFrames(sheetPath) {
   const { data, info } = await sharp(sheetPath).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height, C = info.channels;
 
+  /**
+   * ★**緑を抜く（クロマキー）。縁を残さないこと。**
+   *
+   * 【★間違えていました】
+   *   以前は `r<120 && g>180 && b<120` という「濃い緑だけ」の条件でした。
+   *   ⚠️ 生成画像の輪郭は**中間色でなだらかに**なっているので、
+   *      `rgb(150,190,140)` のような**薄い緑が残ります**。
+   *      実測 **3137画素**が残り、★**馬の輪郭に緑の線**が出ていました。
+   *
+   * 【★どう直すか】
+   *   ① **緑が他の2色より明確に強い**画素を抜く（濃さによらない）
+   *   ② 残った画素の**緑かぶりを落とす**（despill）。
+   *      緑が赤・青より強い画素は、緑を `max(r,b)` まで下げます。
+   *      ⚠️ ①だけだと、抜けなかった半端な画素が**緑がかったまま**残ります。
+   */
   const solid = new Uint8Array(W * H);
   for (let p = 0; p < W * H; p += 1) {
     const o = p * C;
-    solid[p] = (!(data[o] < 120 && data[o + 1] > 180 && data[o + 2] < 120) && data[o + 3] > 128) ? 1 : 0;
+    const r = data[o], g = data[o + 1], b = data[o + 2];
+    const isKey = g > r + 40 && g > b + 40;
+    solid[p] = (!isKey && data[o + 3] > 128) ? 1 : 0;
+    if (solid[p] === 1) {
+      // ★despill: 緑かぶりを落とす（輪郭の緑の線を消す）
+      const cap = Math.max(r, b);
+      if (g > cap) data[o + 1] = cap;
+    }
   }
 
   // ★連結成分で塊を拾う

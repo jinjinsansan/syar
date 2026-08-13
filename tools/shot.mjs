@@ -33,7 +33,7 @@ const model = replayPositionModel({
   jostle: 0.6, jostleSeed: SEED * 2654435761,
 });
 const warp = timeWarpFor(knotsFor(boundaries, OWN), DEFAULT_PHASE_RATES);
-const frames = await loadFrames('design/art/assets/horse-gallop-cloth2-sheet.png');
+const frames = await loadFrames('design/art/assets/horse-gallop-v2.png');
 
 const P = { sky: [143,184,207], stand: [107,111,116], rail: [200,198,189], turf: [75,122,65] };
 mkdirSync('design/art/assets/shots', { recursive: true });

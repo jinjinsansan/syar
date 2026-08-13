@@ -1,0 +1,50 @@
+Generate a pixel-art sprite sheet image of a racehorse and jockey galloping, viewed from the side, facing right.
+
+CANVAS
+- One image, 6 frames laid out in a single horizontal row, evenly spaced.
+- Each frame cell about 340 x 280 pixels. Total about 2040 x 280.
+- Background: pure saturated green (RGB 0,255,0) everywhere, including between frames. No gradients, no shadows on the background, no ground line.
+
+THE MOST IMPORTANT REQUIREMENT
+The six frames must be six DIFFERENT poses of ONE complete gallop stride cycle.
+The WHOLE body must change between frames, not only the legs.
+In each frame the following must differ from the previous frame:
+- the arch of the back (rounded when the legs gather, flat/hollow when the legs extend)
+- the length and angle of the neck (the neck stretches forward and low during extension, shortens and lifts during gathering)
+- the height and angle of the head
+- the vertical height of the whole body above the frame bottom (the horse rises and falls within the stride)
+- the angle of the tail (it streams and lifts with the stride)
+- the jockey's body (see below)
+
+A common failure to avoid: drawing one horse body once and only swapping the legs. That must not happen. Redraw the entire animal in each frame.
+
+THE GALLOP CYCLE (six frames, in order)
+1. Full extension: front legs reaching far forward, hind legs stretched far back, body long and low, back flat, neck extended forward and low. All four hooves off the ground.
+2. Landing on the trailing hind leg: that hoof touches the ground, the other three legs still in the air, body beginning to compress.
+3. Both hind legs and one foreleg supporting, body compressing, back rounding, neck shortening and rising.
+4. Full gathering: all four legs folded under the belly, body at its shortest and highest, back strongly rounded, hindquarters coiled. All four hooves off the ground.
+5. Leading foreleg reaching down and forward, striking the ground, neck beginning to extend again.
+6. Weight over the leading foreleg, hind legs swinging through underneath, body starting to stretch back out toward extension.
+
+THE JOCKEY (this is a key requirement)
+- Racing crouch, not sitting. The stirrups are very short, so the knees are sharply bent and high.
+- The jockey is standing in the irons: the seat is clearly ABOVE and off the saddle, never touching it.
+- The torso is folded low and forward, nearly parallel to the horse's neck. The chest is close to the withers.
+- The head is low and forward, looking ahead between the horse's ears; the helmet is at roughly the same height as the horse's shoulder, not above the horse's back.
+- The arms reach far forward along both sides of the neck, hands low near the crest, reins short.
+- The jockey's body MUST move between frames: the torso pushes forward and back with the horse's rhythm, the arms extend and draw back, the seat rises and lowers slightly. Do not paste an identical jockey into every frame.
+
+ANIMATION ANCHOR
+- Keep the horse's barrel (the rib cage and saddle area) at roughly the same position within each frame cell, so the sheet can be played back without the horse sliding sideways.
+- Everything else (legs, neck, head, tail, jockey) moves around that anchor.
+
+STYLE
+- Clean pixel art with a limited palette and hard edges. No anti-aliasing against the green background, no soft glow, no blur.
+- Readable at small size: strong silhouette, clear separation between legs, dark outline around the animal.
+- Bay horse: brown body, black mane, black tail, black lower legs, small white markings on the hooves.
+- Saddle cloth: plain solid white rectangle on the horse's side, with no number, no text, no logo, no pattern. It will be recoloured and numbered later, so it must be a clean flat white shape with clear edges.
+- Jockey silks and helmet: plain solid blue, no pattern, no lettering, no emblem.
+- Do not draw any text, numbers, letters, logos, emblems, watermarks, or signatures anywhere in the image.
+- Do not depict any real, identifiable person, stable, organisation, or branded design.
+
+Save the image as a PNG.
