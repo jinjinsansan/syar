@@ -102,6 +102,54 @@ console.log(`  対象 ${before.total} 頭 / 進捗 ${before.mn}〜${before.mx} /
 console.log(`  ★締まった最後の週 = ${currentWeek - 1}`);
 console.log('');
 
+/**
+ * ── ★先に追いつかせる ───────────────────────────────────
+ *
+ * 【なぜ要るか】
+ *   ①b/②a/③ は「**遅れが解消された状態**」の性質を見ています。
+ *   1回の週送りには上限（`MAX_WEEKS_PER_RUN`）があるので、
+ *   ★**遅れが上限を超えていると、この3項目は必ず「FAIL」になります。**
+ *     それは製品の欠陥ではなく、**測れていない**だけです（R-21）。
+ *
+ *   実際に踏みました: staging が週18・現在週30（**11週の遅れ**）のとき、
+ *   ①b「上限に当たらず最後まで進んだ」/ ②a「進捗が全馬で揃っている」/
+ *   ③「二度呼んでも二度進まない」が揃って FAIL し、**製品の不具合に見えました**。
+ *   ★③は特に紛らわしく、「2回目も進んだ」のは**残りの遅れを処理しただけ**で正しい動作です。
+ *
+ * ⚠️ ここを「上限に当たったら PASS にする」で黙らせないこと。
+ *    それでは①b が何も見なくなります。**追いつかせてから測る**のが正しい形です。
+ */
+/**
+ * ★追いつかせるのは「**1週手前まで**」です。
+ *   最後まで追いつかせると、判定用の実行に**仕事が残らず①が空振り**します
+ *   （実際に「延べ 0 頭」で①が落ちました）。
+ *   → 時計を1週戻した状態で追いつかせ、判定用の実行が**ちょうど1週ぶん**を処理するようにします。
+ */
+// ★WEEK_MS は既に上で定義済み（重複宣言で落ちた）
+const CATCHUP_MAX = 20;
+let catchup = 0;
+for (; catchup < CATCHUP_MAX; catchup += 1) {
+  const pre = await advanceTrainingWeeks(c, nowMs - WEEK_MS, EPOCH, () => {});
+  if (!pre.incomplete) break;
+}
+if (catchup >= CATCHUP_MAX) {
+  console.error(`★${CATCHUP_MAX} 回まわしても遅れが解消しません。`);
+  console.error('  ★この状態では①b/②a/③を測れません（「測れなかった」は「落ちた」ではありません）');
+  await c.end();
+  process.exit(2);
+}
+console.log(`  ★1週手前まで追いつかせました（${catchup} 回）。判定用の実行が1週ぶんを処理します`);
+// ★前提: 判定用の実行に仕事が残っていること。残っていなければ①は空振りする
+const pending = (await c.query(
+  `select count(*)::int n from horses
+    where retired_at_week is null and coalesce(last_processed_week, -1) < $1`, [currentWeek - 1],
+)).rows[0];
+if (pending.n === 0) {
+  console.error('★判定用の実行に処理対象がありません。①が空振りするので中止します');
+  await c.end();
+  process.exit(2);
+}
+
 // ── ① 1回目 ────────────────────────────────────────────
 const t0 = process.hrtime.bigint();
 const r1 = await advanceTrainingWeeks(c, nowMs, EPOCH, (m) => console.log(`  [警告] ${m}`));
