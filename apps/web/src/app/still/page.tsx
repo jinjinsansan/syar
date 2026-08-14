@@ -129,11 +129,14 @@ export default function StillPage(): React.JSX.Element {
     if (parts.turfStripes) {
       // ★刈り目（横帯）。手前ほど広い＝奥行きの手掛かり
       let y = trackTop;
-      let band = 10;
+      let band = 14;
       let dark = false;
       while (y < H) {
-        if (dark) { ctx.fillStyle = 'rgba(0,0,0,0.07)'; ctx.fillRect(0, y, W, band); }
-        y += band; band = Math.round(band * 1.22); dark = !dark;
+        ctx.fillStyle = dark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.05)';
+        ctx.fillRect(0, y, W, band);
+        y += band;
+        band = Math.round(band * 1.16);
+        dark = !dark;
       }
     }
 
@@ -180,18 +183,29 @@ export default function StillPage(): React.JSX.Element {
       const w = SPRITE_W * p.k;
       const h = SPRITE_H * p.k;
       if (parts.shadow) {
-        ctx.globalAlpha = 0.3;
+        /**
+         * ★影は**小さく薄く**。
+         * ⚠️ 半径 w×0.16（≒54px）にしていたら、**巨大な楕円が並んで泡のよう**になりました。
+         *    馬体の接地はもっと狭いので、**w×0.07・高さはその 1/4** にします。
+         */
+        ctx.globalAlpha = 0.22;
         ctx.fillStyle = '#22381c';
-        ctx.beginPath(); ctx.ellipse(p.x, p.y, w * 0.16, w * 0.042, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(p.x - w * 0.02, p.y - 2, w * 0.07, w * 0.018, 0, 0, Math.PI * 2);
+        ctx.fill();
         ctx.globalAlpha = 1;
       }
       if (parts.dust) {
-        // ★砂煙（アートバイブル §2）。後肢のあたりに薄く
-        ctx.globalAlpha = 0.16;
-        ctx.fillStyle = '#cfd8bb';
-        for (let i = 0; i < 4; i += 1) {
+        /**
+         * ★砂煙（アートバイブル §2）。
+         * ⚠️ 丸を並べたら**白い泡**になりました。
+         *    実際は**地面すれすれに横へ流れる薄い帯**なので、平たくします。
+         */
+        ctx.fillStyle = '#c9d2b4';
+        for (let i = 0; i < 3; i += 1) {
+          ctx.globalAlpha = 0.10 - i * 0.028;
           ctx.beginPath();
-          ctx.arc(p.x - w * (0.22 + i * 0.06), p.y - h * 0.02, w * (0.05 - i * 0.008), 0, Math.PI * 2);
+          ctx.ellipse(p.x - w * (0.16 + i * 0.07), p.y - 2, w * (0.055 - i * 0.012), w * 0.012, 0, 0, Math.PI * 2);
           ctx.fill();
         }
         ctx.globalAlpha = 1;
@@ -206,16 +220,23 @@ export default function StillPage(): React.JSX.Element {
      *   参照画像でも、手前を白い柵が横切っています。
      */
     if (parts.frontRail) {
-      const ry = Math.round(H * 0.855);
-      ctx.fillStyle = '#e9e6da';
-      ctx.fillRect(0, ry, W, 9);
-      ctx.fillStyle = 'rgba(0,0,0,0.18)';
-      ctx.fillRect(0, ry + 9, W, 3);
-      for (let x = -20; x < W; x += 132) {
-        ctx.fillStyle = '#e9e6da';
-        ctx.fillRect(x, ry, 11, 62);
-        ctx.fillStyle = 'rgba(0,0,0,0.22)';
-        ctx.fillRect(x + 8, ry, 3, 62);
+      /**
+       * ★手前の白柵。**横棒2本＋細い支柱**。
+       * ⚠️ 支柱を 11px 幅・132px おきにしたら、**白い箱が並んでいるだけ**に見えました。
+       *    実際のラチは**横棒が主役で、支柱は細い**です。
+       */
+      const ry = Math.round(H * 0.845);
+      for (let x = -30; x < W; x += 168) {
+        ctx.fillStyle = '#d9d6c9';
+        ctx.fillRect(x, ry, 5, 54);
+        ctx.fillStyle = 'rgba(0,0,0,0.20)';
+        ctx.fillRect(x + 4, ry, 2, 54);
+      }
+      for (const [dy, hh] of [[0, 8], [26, 6]] as const) {
+        ctx.fillStyle = '#efece0';
+        ctx.fillRect(0, ry + dy, W, hh);
+        ctx.fillStyle = 'rgba(0,0,0,0.16)';
+        ctx.fillRect(0, ry + dy + hh, W, 2);
       }
     }
 
