@@ -17,7 +17,7 @@ import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches 
 import type { Strategy } from '@star/sim-engine';
 import {
   replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
-  phaseOf,
+  phaseOf, ovalCourse, segmentAt,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 
@@ -26,7 +26,10 @@ const FIELD = 12;
 const W = 1280;
 const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '5';
+const ASSET_VERSION = '6';
+
+/** ★コース（1角/2角/向正面/3角/4角/直線）。いまどこを走っているかを出すため */
+const COURSE = ovalCourse(DIST);
 
 interface StarStill {
   buildAtlas: (sheet: HTMLImageElement, pal: unknown, layers: unknown) => Promise<unknown>;
@@ -182,6 +185,8 @@ export default function RacePage(): React.JSX.Element {
     const gapB = (ownB === undefined || aheadB === undefined) ? gapM : aheadB.meters - ownB.meters;
 
     const phase = phaseOf(metersLeft);
+    // ★いまコースのどこか（実際の区間名）
+    const segment = segmentAt(COURSE, Math.min(DIST, own === undefined ? lead : own.meters)).label;
     const finished = d >= built.warp.displaySec - 0.01;
 
     api.drawStill(ctx, {
@@ -198,14 +203,16 @@ export default function RacePage(): React.JSX.Element {
       own: ownGate,
       runningOrder: sorted.map((h) => h.gate),
       gauge: own === undefined ? 1 : own.staminaRatio,
-      cue: phase === 'straight' ? '直線' : phase === 'spurt' ? '勝負所' : '道中',
+      cue: segment,
       cueActive: phase === 'spurt' || phase === 'straight',
       gap: { m: gapM, mps: (gapB - gapM) / 0.6, toGo: Math.max(0, myRank - 2) },
       pace: built.pace,
       callout: finished
         ? `${built.result[0]!.gate}番　ゴールイン`
-        : phase === 'straight' ? `さあ直線　${sorted[0]!.gate}番が先頭`
-          : phase === 'spurt' ? '勝負所　各馬が動いた' : `残り ${metersLeft.toFixed(0)}m`,
+        : segment === '直線' ? `さあ直線　${sorted[0]!.gate}番が先頭`
+          : segment === '4角' ? '4角をまわった　各馬が動いた'
+            : segment === '3角' ? '3角　隊列が動き始めた'
+              : `${segment}　${sorted[0]!.gate}番が先頭　残り ${metersLeft.toFixed(0)}m`,
     });
   }, [built, ownGate]);
 

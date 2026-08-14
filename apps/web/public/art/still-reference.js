@@ -16,7 +16,12 @@
   /** ★接地線（コマ内 y）。6コマの最下端は 121〜139、胴体基準で揃えた上での平均接地は 136 */
   var GROUND_LINE = 136;
   /** ★ゼッケンの当て布を描く位置（コマ内・1×）。番号は必ずここに描く＝2桁が欠けない */
-  var CLOTH = { x: 100, y: 62, w: 30, h: 20 };
+  /**
+   * ★ゼッケンの位置と大きさ（コマ内・1×）。
+   * ⚠️ 30×20 は馬体（220px）の 14% で、**実際のゼッケンより小さく読めません**。
+   *    実物は馬体の 1/4 ほどあります。→ **48×32**（22%）に広げました。
+   */
+  var CLOTH = { x: 92, y: 58, w: 48, h: 32 };
 
   // ── 5×7 のドット数字（tools/lib/pixel-font.mjs と同じ字形） ──
   var GLYPHS = {
@@ -338,9 +343,9 @@
       ctx.fillStyle = rgba(pal['ink-0'], 0.55); ctx.fillRect(bx, by + bh - scale, bw, scale);
       ctx.fillStyle = 'rgb(' + col[0] + ',' + col[1] + ',' + col[2] + ')';
       ctx.fillRect(bx, by, bw, 3 * scale);
-      var ds = scale;
-      var tw = textWidth(String(gate), ds * 2);
-      drawDigits(ctx, gate, Math.round(bx + (bw - tw) / 2), Math.round(by + (bh - GH * ds * 2) / 2 + scale), ds * 2,
+      var ds = scale * 3;
+      var tw = textWidth(String(gate), ds);
+      drawDigits(ctx, gate, Math.round(bx + (bw - tw) / 2), Math.round(by + (bh - GH * ds) / 2 + scale), ds,
         pal['ink-0'], darkBg ? null : null);
     }
     if (parts.effort && opts.effort !== undefined) {
