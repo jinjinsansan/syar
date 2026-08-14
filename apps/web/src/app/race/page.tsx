@@ -39,7 +39,7 @@ const LANE_BY_STRATEGY: Record<Strategy, number> = { nige: 3, senko: 5, sashi: 8
 interface Built {
   readonly model: ReturnType<typeof replayPositionModel>;
   readonly warp: ReturnType<typeof timeWarpFor>;
-  readonly wOf: (gate: number) => number;
+  readonly wOf: (gate: number, s: number) => number;
   readonly pace: 'slow' | 'middle' | 'high';
   readonly result: readonly { place: number; gate: number; margin: string }[];
 }
@@ -72,8 +72,21 @@ function build(seed: number, ownGate: number, jostle: number): Built {
   return {
     model,
     warp: timeWarpFor(knotsFor(boundaries, ownGate), DEFAULT_PHASE_RATES),
-    // ★内ラチからの距離。脚質でだいたい決め、馬番で少しずらす（見せているだけ）
-    wOf: (g) => LANE_BY_STRATEGY[entrants[g - 1]!.strategy] + ((g * 7) % 5) * 0.9,
+    /**
+     * ★**横位置**（内ラチからの距離 m）。**見せているだけ**。
+     *
+     * ⚠️ 以前は脚質だけで決めていたので、**発走時に全馬が同じところに重なりました**
+     *    （スクリーンショットで団子になっていたのはこれです）。
+     * ★実際のゲートは**枠順どおり横一線**に並びます。
+     *   → 発走時は枠順で走路いっぱいに広げ、**最初の 300m で脚質の位置へ寄せます**。
+     */
+    wOf: (g, s2) => {
+      const gateW = 1.6 + ((g - 1) / (FIELD - 1)) * 16.8;
+      const laneW = LANE_BY_STRATEGY[entrants[g - 1]!.strategy] + ((g * 7) % 5) * 0.9;
+      const k = Math.max(0, Math.min(1, s2 / 300));
+      const e = k * k * (3 - 2 * k);
+      return gateW + (laneW - gateW) * e;
+    },
     pace,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
   };
@@ -120,7 +133,7 @@ export default function RacePage(): React.JSX.Element {
     ctx.imageSmoothingEnabled = false;
 
     const sec = built.warp.raceSecAt(d);
-    const horses = built.model.at(sec).map((h) => ({ gate: h.gate, s: h.meters, w: built.wOf(h.gate) }));
+    const horses = built.model.at(sec).map((h) => ({ gate: h.gate, s: h.meters, w: built.wOf(h.gate, h.meters) }));
     const lead = Math.max(...horses.map((h) => h.s));
     const metersLeft = DIST - lead;
 
@@ -156,6 +169,60 @@ export default function RacePage(): React.JSX.Element {
     }
     ctx.closePath();
     ctx.fill();
+
+    /**
+     * ★**芝の刈り目**（走路を横切る帯）。
+     *
+     * ⚠️ これが無いと芝が**べた塗り**になり、カメラが馬群を追う以上
+     *    **画面の中で動くものが何も無くなります** → 「スローで走っているみたい」。
+     * ★速度感は**地面の模様が流れること**で出ます。
+     */
+    for (let m = Math.floor((focusS - near) / 25) * 25; m <= focusS + near; m += 25) {
+      if (m < 0 || m > DIST) continue;
+      if (Math.floor(m / 25) % 2 !== 0) continue;
+      ctx.fillStyle = 'rgba(0,0,0,0.07)';
+      ctx.beginPath();
+      for (let w = 0; w <= course.widthM; w += 4) {
+        const p = courseToScreen(course, pose, VP, m, w);
+        if (w === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      }
+      for (let w = course.widthM; w >= 0; w -= 4) {
+        const p = courseToScreen(course, pose, VP, Math.min(DIST, m + 12), w);
+        ctx.lineTo(p.x, p.y);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    /**
+     * ★**外の景観**（走路の外側に、生垣とスタンドを帯で置く）。
+     *   ⚠️ 走路と空だけだと、**競馬場に見えません**。
+     *   走路の座標系に置くので、**馬と一緒に流れます**（奥行きは速度差で作る・§3）。
+     */
+    for (const [from, to, col] of [
+      [course.widthM + 2, course.widthM + 9, '#2f4a2b'],
+      [course.widthM + 9, course.widthM + 22, '#5b6068'],
+    ] as const) {
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      for (let s2 = focusS - near; s2 <= focusS + near; s2 += 8) {
+        const p = courseToScreen(course, pose, VP, clampS(s2), from);
+        if (s2 === focusS - near) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      }
+      for (let s2 = focusS + near; s2 >= focusS - near; s2 -= 8) {
+        const p = courseToScreen(course, pose, VP, clampS(s2), to);
+        ctx.lineTo(p.x, p.y);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+    // ★柵の支柱（縦の要素はここだけ）
+    for (let m = Math.floor((focusS - near) / 10) * 10; m <= focusS + near; m += 10) {
+      if (m < 0 || m > DIST) continue;
+      const a = courseToScreen(course, pose, VP, m, course.widthM + 1.5);
+      ctx.fillStyle = 'rgba(20,20,18,0.5)';
+      ctx.fillRect(a.x - 1, a.y - 14, 2, 14);
+    }
 
     // ★ラチ
     for (const [w, col, lw] of [[0, '#e6e3d6', 3], [course.widthM, '#cfd6c6', 2]] as const) {
@@ -211,7 +278,14 @@ export default function RacePage(): React.JSX.Element {
       const w = SPRITE_W * k;
       const hh = SPRITE_H * k;
       // ★脚は表示の時計で回す（毎秒 2.3 歩・馬番で位相をずらす）
-      const frame = Math.floor((((d * 2.3 + h.gate * 0.37) % 1) + 1) % 1 * 6);
+      /**
+       * ★脚の回転。**毎秒 2.3 歩**が実際の駆歩です。
+       * ⚠️ ただし**画面が寄っている（spriteScale=2）ときは、遅く見えます**
+       *    — 馬が大きく映るぶん、同じ歩数でもゆっくりに見えるためです。
+       *    ★実写の中継でも寄ると脚は速く見えるので、寄りでは少し上げます。
+       */
+      const strideHz = state.spriteScale === 2 ? 2.9 : 2.4;
+      const frame = Math.floor(((((d * strideHz + h.gate * 0.37) % 1) + 1) % 1) * 6);
       ctx.globalAlpha = 0.28;
       ctx.fillStyle = '#243a1e';
       ctx.beginPath();
