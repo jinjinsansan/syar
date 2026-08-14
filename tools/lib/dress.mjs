@@ -27,32 +27,6 @@ export const POST = [
  *    値が違う**状態が一瞬できました（P3 で繰り返した形そのものです）。
  *    ★オーナーが承認したのは **140** の見た目です。
  */
-/**
- * ★**サラブレッドの毛色**（JRA が定める8種類）。
- *
- * ⚠️ **実在の馬・馬主・団体とは無関係の、一般的な毛色の名称と色味**です（憲法 §0.1）。
- *
- * 【★いま遺伝子にありません】
- *   `genotype` に毛色の項目が無いので、**馬番から決めています**（見せかけ）。
- *   ★繁殖ゲームなら毛色は**遺伝する形質**です（芦毛は片親からで発現する等）。
- *   → 遺伝に入れるかは照会中（Q-P4-30）。
- *
- * 各項目: [胴の色, たてがみ・尾・四肢の色, 名前]
- */
-export const COATS = [
-  [[132, 84, 46], [38, 28, 22], '鹿毛'],
-  [[104, 62, 36], [30, 22, 18], '黒鹿毛'],
-  [[76, 48, 34], [26, 20, 16], '青鹿毛'],
-  [[52, 44, 42], [24, 22, 21], '青毛'],
-  [[168, 106, 52], [150, 96, 48], '栗毛'],
-  [[130, 74, 36], [96, 54, 28], '栃栗毛'],
-  [[178, 176, 172], [150, 148, 146], '芦毛'],
-  [[228, 226, 220], [206, 204, 198], '白毛'],
-];
-
-/** ★馬番から毛色を決める（★遺伝子が持つようになったら、そちらを使います） */
-export const coatOf = (gate) => COATS[(gate * 5 + 3) % COATS.length];
-
 export const isDark = (c) => (c[0] * 299 + c[1] * 587 + c[2] * 114) / 1000 < 140;
 
 /**
@@ -206,61 +180,6 @@ const scaleCache = new Map();
 export async function dressed(frames, frameIdx, gate, commonScale) {
   const color = POST[gate - 1];
   const { data, info } = await sharp(frames[frameIdx]).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  /**
-   * ★**毛色を塗り替える。**
-   *   もとの絵は鹿毛（茶）なので、**茶系の画素を目的の毛色に置き換えます**。
-   *   ⚠️ 勝負服（青系）・ゼッケン（白）・肌・蹄（白）には触れません。**色相で分けます。**
-   */
-  const coat = coatOf(gate);
-  /**
-   * ★**毛色を塗る前の画素を控えておきます。**
-   *   ⚠️ ゼッケンは「いちばん大きい白い塊」で探しています。
-   *      毛色を先に塗ると、**芦毛・白毛では胴体が白い塊になり、ゼッケンが体に化けます**
-   *      （実際に化けました）。
-   *   ★**探すのは元の絵から。塗るのは新しい絵に。**
-   */
-  const orig = Buffer.from(data);
-  for (let i = 0; i < data.length; i += info.channels) {
-    if (data[i + 3] < 128) continue;
-    const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), dd = mx - mn;
-    const sat = mx === 0 ? 0 : dd / mx;
-    let hh = 0;
-    if (dd !== 0) {
-      if (mx === r) hh = ((g - b) / dd) % 6;
-      else if (mx === g) hh = (b - r) / dd + 2;
-      else hh = (r - g) / dd + 4;
-      hh *= 60; if (hh < 0) hh += 360;
-    }
-    const v = mx / 255;
-    /**
-     * ★茶〜橙（胴）。
-     *
-     * ⚠️ **騎手の肌を巻き込んでいました。**
-     *    肌は色相 20〜30・彩度 0.39 で、この条件に**そのまま入ります**。
-     *    白毛の馬では**騎手の顔まで白く**なっていました。
-     * ★肌は**明るい**（v ≳ 0.8）のに対し、馬の胴は v ≈ 0.5〜0.7 です。
-     *   → **明るすぎる画素は除きます。**
-     */
-    if (sat >= 0.22 && hh >= 8 && hh <= 46 && v <= 0.78) {
-      const t = coat[0];
-      data[i] = Math.round(t[0] * (0.55 + v * 0.75));
-      data[i + 1] = Math.round(t[1] * (0.55 + v * 0.75));
-      data[i + 2] = Math.round(t[2] * (0.55 + v * 0.75));
-    } else if (sat < 0.25 && v >= 0.10 && v < 0.34) {
-      /**
-       * ★黒い部分（たてがみ・尾・四肢）。
-       * ⚠️ `v >= 0.10` で**いちばん暗い画素＝輪郭線を除きます**。
-       *    除かないと、芦毛・白毛で**輪郭が途切れて絵が崩れます**（実際に崩れました）。
-       */
-      const t = coat[1];
-      const k = 0.6 + v * 1.6;
-      data[i] = Math.min(255, Math.round(t[0] * k));
-      data[i + 1] = Math.min(255, Math.round(t[1] * k));
-      data[i + 2] = Math.min(255, Math.round(t[2] * k));
-    }
-  }
-
   // 勝負服
   for (let i = 0; i < data.length; i += info.channels) {
     if (data[i + 3] < 128) continue;
@@ -275,11 +194,10 @@ export async function dressed(frames, frameIdx, gate, commonScale) {
     }
   }
   // ゼッケン（白い塊を探して塗る）
-  // ★元の絵から探します（毛色を塗ったあとの絵ではありません）
   const isCloth = (i, y) => {
-    if (orig[i + 3] < 128) return false;
-    const mx = Math.max(orig[i], orig[i + 1], orig[i + 2]);
-    const mn = Math.min(orig[i], orig[i + 1], orig[i + 2]);
+    if (data[i + 3] < 128) return false;
+    const mx = Math.max(data[i], data[i + 1], data[i + 2]);
+    const mn = Math.min(data[i], data[i + 1], data[i + 2]);
     return mx > 195 && (mx === 0 ? 0 : (mx - mn) / mx) < 0.12 && y > 50 && y < 110;
   };
   const W = info.width, H = info.height, seen = new Uint8Array(W * H);
