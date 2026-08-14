@@ -26,7 +26,9 @@ const FIELD = 12;
 const W = 1280;
 const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '7';
+const ASSET_VERSION = '8';
+/** ★構図の基準幅（`layers.json` の viewport と同じ） */
+const VP_W = 1280;
 
 /** ★コース（1角/2角/向正面/3角/4角/直線）。いまどこを走っているかを出すため */
 const COURSE = ovalCourse(DIST);
@@ -175,7 +177,13 @@ export default function RacePage(): React.JSX.Element {
      *     中   4頭（1×）… x 430 / 615 / 800 / 985
      *     奥   5頭（1×）… x 150 / 330 / 505 / 685 / 860
      */
-    const SLOTS: readonly (readonly [number, number])[] = [
+    const closeUp = metersLeft <= 200;
+    const SLOTS: readonly (readonly [number, number])[] = closeUp ? [
+      // ★ゴール前: 手前（2×）を5枠に増やして叩き合いを大きく
+      [2, 1120], [2, 830], [2, 540], [2, 250], [2, -40],
+      [1, 985], [1, 800], [1, 615], [1, 430],
+      [0, 860], [0, 685], [0, 505],
+    ] : [
       // [row, x] を「先頭から順に」並べる
       [2, 1060], [2, 660], [2, 230],
       [1, 985], [1, 800], [1, 615], [1, 430],
@@ -189,11 +197,19 @@ export default function RacePage(): React.JSX.Element {
        *   ⚠️ 大きく動かすと構図が壊れるので、**±40px まで**に抑えます。
        */
       const behind = lead - h.s;
+      /**
+       * ★**馬群の伸縮**（調べた実際のレース展開）。
+       *   「前からシンガリまで**10馬身くらいで一団**で進んでいきます」
+       *   「ひとかたまりで**第4コーナーから直線に向かいます**」
+       *   ★道中は詰まり、直線で伸びる。**枠の位置を縮尺で寄せ書きします**（構図は壊さない）。
+       */
+      const tight = metersLeft > 800 ? 0.72 : metersLeft > 400 ? 0.86 : 1.0;
       const nudge = Math.max(-40, Math.min(40, (behind - rank * 2.2) * -6));
       return {
         gate: h.gate,
         row,
-        x: Math.round(baseX + nudge),
+        // ★画面中央へ寄せる度合いで一団に見せる（枠そのものは動かさない）
+        x: Math.round(VP_W / 2 + (baseX - VP_W / 2) * tight + nudge),
         frame: Math.floor((((d * 2.4 + h.gate * 0.37) % 1) + 1) % 1 * 6),
         effort: h.stamina,
         own: h.gate === ownGate,
@@ -244,6 +260,12 @@ export default function RacePage(): React.JSX.Element {
       gap: { m: gapM, mps: (gapB - gapM) / 0.6, toGo: Math.max(0, myRank - 2) },
       pace: built.pace,
       curve: curveAmount,
+      /**
+       * ★**ゴール前は寄る**（アートバイブル §9「勝負所で寄る」）。
+       *   残り200m から、手前の段（2×）に入る頭数を増やして叩き合いを大きく見せます。
+       *   ⚠️ 倍率は 1× と 2× のまま（D-058）。**枠の割り当てを変えるだけ**です。
+       */
+      closeUp: metersLeft <= 200,
       /**
        * ★**実況は「変化」を言う**（裁定 Q-P4-14 ①）。
        *   「3番手」ではなく「上がってきた」。**順位の数字は言いません。**
