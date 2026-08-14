@@ -13,7 +13,7 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { loadAtlas, type SpriteAtlas } from '../../lib/canvas-renderer';
+import { loadAtlas, drawRunningOrder, type SpriteAtlas } from '../../lib/canvas-renderer';
 
 const W = 1280;
 const H = 720;
@@ -32,16 +32,17 @@ interface Parts {
   dust: boolean;
   callout: boolean;
   finish: boolean;
+  order: boolean;
 }
 const ALL_ON: Parts = {
   sky: true, stand: true, hedge: true, fence: true, turfStripes: true,
-  frontRail: true, shadow: true, dust: true, callout: true, finish: true,
+  frontRail: true, shadow: true, dust: true, callout: true, finish: true, order: true,
 };
 
 const LABELS: Record<keyof Parts, string> = {
   sky: '空', stand: 'スタンド', hedge: '生垣', fence: '奥の柵',
   turfStripes: '芝の刈り目', frontRail: '★手前の白柵', shadow: '影',
-  dust: '砂煙', callout: '実況の帯', finish: 'ゴール板・決勝線',
+  dust: '砂煙', callout: '実況の帯', finish: 'ゴール板・決勝線', order: '★順位表示',
 };
 
 export default function StillPage(): React.JSX.Element {
@@ -238,6 +239,22 @@ export default function StillPage(): React.JSX.Element {
         ctx.fillStyle = 'rgba(0,0,0,0.16)';
         ctx.fillRect(0, ry + dy + hh, W, 2);
       }
+    }
+
+    /**
+     * ★**順位表示**（上部の丸に馬番）。
+     *   馬群が団子で走るので、**画面だけでは順位が読めません**。
+     */
+    if (parts.order) {
+      const ord = [12, 9, 7, 3, 11, 1, 5, 8, 10, 2, 4, 6];
+      const size = 30;
+      const gap = 10;
+      const wBar = ord.length * (size + gap) + 24;
+      ctx.fillStyle = 'rgba(22,20,17,0.55)';
+      ctx.fillRect(Math.round((W - wBar) / 2), 12, wBar, size + 20);
+      drawRunningOrder(ctx, ord, atlas.postColors, {
+        x: Math.round((W - wBar) / 2) + 12, y: 22, size, gap,
+      });
     }
 
     // ── 実況の帯 ──

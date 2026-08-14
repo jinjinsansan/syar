@@ -23,7 +23,7 @@ import {
   ovalCourse, posOf, courseToScreen, segmentAt, cutsFor, cutAt, blendCamera, focusOf,
   HORSE_LENGTH_M, type CameraPose, type CameraState,
 } from '@star/render';
-import { loadAtlas, type SpriteAtlas } from '../../lib/canvas-renderer';
+import { loadAtlas, drawRunningOrder, type SpriteAtlas } from '../../lib/canvas-renderer';
 import POOL from '../../lib/watch-pool.json';
 
 const DIST = 1600;
@@ -293,6 +293,22 @@ export default function RacePage(): React.JSX.Element {
       ctx.fill();
       ctx.globalAlpha = 1;
       ctx.drawImage(img, frame * SPRITE_W, 0, SPRITE_W, SPRITE_H, p.x - w / 2, p.y - hh * 0.92, w, hh);
+    }
+
+    /**
+     * ★**順位表示**。⚠️ ここで着順を決めているのではありません。
+     *   **いま前にいる順**（位置から）を描くだけです。確定着順はゴール後の表示です。
+     */
+    {
+      const ord = [...horses].sort((a, b) => b.s - a.s).map((h) => h.gate);
+      const size = 26;
+      const gap = 8;
+      const wBar = ord.length * (size + gap) + 20;
+      ctx.fillStyle = 'rgba(22,20,17,0.5)';
+      ctx.fillRect(Math.round((VP.width - wBar) / 2), 8, wBar, size + 18);
+      drawRunningOrder(ctx, ord, atlas.postColors, {
+        x: Math.round((VP.width - wBar) / 2) + 10, y: 17, size, gap,
+      });
     }
 
     // ★いま何を見ているか

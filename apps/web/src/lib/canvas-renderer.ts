@@ -381,3 +381,54 @@ export async function loadAtlas(gates: number): Promise<SpriteAtlas> {
 
 /** DrawCommand の型を落とさないためのヘルパ（未使用の警告避けではありません） */
 export type { DrawCommand };
+
+/**
+ * ★**順位表示**（画面上部の丸に馬番）
+ *
+ * 【なぜ要るか】
+ *   ⚠️ 馬群が団子で走るので、**画面だけでは順位が読めません**。
+ *   ★実際の中継にも、80〜90年代の競馬ゲームにも、**同じものがあります**。
+ *     これは「業界共通の作法」なので採ってよい（D-060）。
+ *
+ * 【★守ること】
+ *   ・**枠順の色＋馬番**（色だけに頼らない＝色覚多様性・アートバイブル §4）
+ *   ・**先頭が左**。順位が変わったら並びが入れ替わる
+ *   ・⚠️ ここで**並べ替えません**。渡された順に描きます（順位を決めるのは上位）
+ */
+export function drawRunningOrder(
+  ctx: CanvasRenderingContext2D,
+  order: readonly number[],
+  postColors: readonly (readonly [number, number, number])[],
+  opts: { readonly x: number; readonly y: number; readonly size?: number; readonly gap?: number },
+): void {
+  const r = (opts.size ?? 26) / 2;
+  const gap = opts.gap ?? 8;
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < order.length; i += 1) {
+    const gate = order[i]!;
+    const col = postColors[gate - 1] ?? [200, 200, 200];
+    const cx = opts.x + r + i * (r * 2 + gap);
+    const cy = opts.y + r;
+    // ★先頭だけ枠を強調（「いま誰が前か」が一目で分かる）
+    if (i === 0) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#f2c14e';
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(20,20,18,0.6)';
+    ctx.stroke();
+    // ★色だけに頼らない。番号を必ず載せる
+    ctx.fillStyle = (col[0] * 299 + col[1] * 587 + col[2] * 114) / 1000 < 140 ? '#f5f5f5' : '#141414';
+    ctx.font = `bold ${Math.round(r * 1.15)}px sans-serif`;
+    ctx.fillText(String(gate), cx, cy + 1);
+  }
+  ctx.restore();
+}
