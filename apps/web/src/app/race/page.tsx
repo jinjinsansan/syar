@@ -186,7 +186,14 @@ export default function RacePage(): React.JSX.Element {
 
     api.drawStill(ctx, {
       palette: art.pal, layers: art.layers, atlas: art.atlas,
-      parts: {}, scene: 'straight200', scroll: lead * 3.2,
+      /**
+       * ★**背景の流れ**。
+       * ⚠️ 3.2倍にしていたので、91秒で 5,120px しか流れず（毎秒 56px）、
+       *    **止まって見えていました**（オーナー判定「超スロー」）。
+       * ★実馬は 16m/s。手前のラチが 1.00 のとき、**毎秒 320px 前後**流れるべきです。
+       *   → 1m あたり 20px として 20倍にします。
+       */
+      parts: {}, scene: 'straight200', scroll: lead * 20,
       horses,
       own: ownGate,
       runningOrder: sorted.map((h) => h.gate),
