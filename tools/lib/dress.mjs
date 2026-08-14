@@ -229,9 +229,18 @@ export async function dressed(frames, frameIdx, gate, commonScale) {
     else h0 = (r0 - g0) / dd + 4;
     h0 *= 60; if (h0 < 0) h0 += 360;
     if (h0 < 8 || h0 > 48) continue;
-    const step = v > 0.62 ? 0 : v > 0.45 ? 1 : v > 0.28 ? 2 : 3;
-    const t = ramp[step];
-    data[i] = t[0]; data[i + 1] = t[1]; data[i + 2] = t[2];
+    /**
+     * ★**4階調に量子化しません。連続に補間します。**
+     *   ⚠️ 4段だと**筋肉の陰影が4色に潰れ**、馬が平板になります。
+     *      元の素材は約 7,000 色あり、その明暗が立体を作っています。
+     */
+    const tt = ((0.72 - Math.min(0.72, Math.max(0.16, v))) / (0.72 - 0.16)) * 3;
+    const ri = Math.min(2, Math.floor(tt));
+    const rf = tt - ri;
+    const cA = ramp[ri], cB = ramp[ri + 1];
+    data[i] = Math.round(cA[0] + (cB[0] - cA[0]) * rf);
+    data[i + 1] = Math.round(cA[1] + (cB[1] - cA[1]) * rf);
+    data[i + 2] = Math.round(cA[2] + (cB[2] - cA[2]) * rf);
   }
 
   // 勝負服
