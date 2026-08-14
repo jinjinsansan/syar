@@ -44,6 +44,14 @@ const SCENES: readonly (readonly [string, string])[] = [
   ['backstretch', '向正面'],
 ];
 
+/**
+ * ★**キャッシュ避け。**
+ *   ⚠️ 参照実装を直したのに「変わっていない」と報告されました。
+ *      ブラウザが**古い JS と JSON を使い続けます**（ハードリロードでも残ることがある）。
+ *   → 読み込む URL に版を付けます。**直したら必ず反映されます。**
+ */
+const ASSET_VERSION = '3';
+
 export default function StillPage(): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dataRef = useRef<{ pal: unknown; layers: unknown; atlas: unknown } | null>(null);
@@ -60,21 +68,21 @@ export default function StillPage(): React.JSX.Element {
       if (window.STARStill === undefined) {
         await new Promise<void>((res, rej) => {
           const s = document.createElement('script');
-          s.src = '/art/still-reference.js';
+          s.src = `/art/still-reference.js?v=${ASSET_VERSION}`;
           s.onload = () => res();
           s.onerror = () => rej(new Error('参照実装を読み込めません'));
           document.head.appendChild(s);
         });
       }
       const [pal, layers] = await Promise.all([
-        fetch('/art/palette.json').then((r) => r.json()),
-        fetch('/art/layers.json').then((r) => r.json()),
+        fetch(`/art/palette.json?v=${ASSET_VERSION}`).then((r) => r.json()),
+        fetch(`/art/layers.json?v=${ASSET_VERSION}`).then((r) => r.json()),
       ]);
       const sheet = await new Promise<HTMLImageElement>((res, rej) => {
         const im = new Image();
         im.onload = () => res(im);
         im.onerror = () => rej(new Error('スプライトを読み込めません'));
-        im.src = '/art/horse-gallop.png';
+        im.src = `/art/horse-gallop.png?v=${ASSET_VERSION}`;
       });
       const api = window.STARStill;
       if (api === undefined) throw new Error('STARStill がありません');

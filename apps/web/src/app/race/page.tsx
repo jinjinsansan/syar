@@ -124,7 +124,7 @@ export default function RacePage(): React.JSX.Element {
 
   useEffect(() => {
     // ★配色はハンドオフの palette.json から（読めなければ従来色で動く）
-    fetch('/art/palette.json').then((r) => r.json())
+    fetch('/art/palette.json?v=3').then((r) => r.json())
       .then((p: Palette) => { palRef.current = { ...FALLBACK, ...p }; })
       .catch(() => { /* ★読めなくても止めない。従来色で描く */ });
     loadAtlas(18)

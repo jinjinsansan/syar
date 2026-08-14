@@ -372,7 +372,8 @@ export async function loadAtlas(gates: number): Promise<SpriteAtlas> {
     const im = new Image();
     im.onload = () => { imgs.set(g, im); res(); };
     im.onerror = () => res();   // ★1頭欠けても全体を止めない
-    im.src = `/sprites/horse-${g}.png`;
+    // ★キャッシュ避け（焼き直しても古い絵が出続けるのを防ぐ）
+    im.src = `/sprites/horse-${g}.png?v=3`;
   })));
   const post = await fetch('/sprites/post-colors.json').then((r) => r.json()) as
     (readonly [number, number, number])[];
