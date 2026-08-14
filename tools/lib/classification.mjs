@@ -80,6 +80,8 @@ export const READONLY = [
   // ★読むだけ。画面上の速さの変化を測る
   'diag-speed.mjs',
   // ★読むだけ。馬群の広がりが画面に収まるかを測る
+  // ★読むだけ。距離ロスが着順に与える影響の大きさを見積もる（D-065 手順1）
+  'diag-lane-impact.mjs',
   'diag-pack.mjs',
   // ★読むだけ。走破タイムの差がどの要素から来るかを切り分ける
   'diag-finish-spread.mjs',
