@@ -152,11 +152,25 @@ export default function Race2Page(): React.JSX.Element {
       const into = Math.max(0, (prev.fromMetersLeft - metersLeft) / 16);
       state = blendCamera(prev.state, cut.state, into / cut.blendSec);
     }
+    /**
+     * ★**中継の画作りに寄せる**（オーナー判定）。
+     *
+     * ⚠️ カット表の `tilt` は 0.45〜0.55（寝かせ）でしたが、そのまま使うと
+     *    **走路が真上から見た広大な緑**になり、**馬が小さく**なりました。
+     * ★実際の中継は**ほぼ真横**（低い `tilt`）で、**馬が画面を占めます**。
+     *   → `tilt` を 0.22 以下に抑え、`zoom` を上げます。
+     */
+    state = {
+      ...state,
+      tilt: Math.min(0.20, state.tilt),
+      zoom: Math.max(30, state.zoom * 1.7),
+      xCompression: Math.min(0.85, state.xCompression),
+    };
     const focusS = focusOf(state.targetMode, horses, ownGate, HORSE_LENGTH_M);
     const c0 = posOf(COURSE, focusS, COURSE.widthM / 2);
     const pose: CameraPose = { state, centre: { x: c0.x, y: c0.y }, heading: c0.heading };
     const clampS = (s: number): number => Math.max(0, Math.min(DIST, s));
-    const near = 320;
+    const near = 160;
 
     // ── ① 遠景（横帯。★遠いので曲がりません） ──
     ctx.fillStyle = pal['sky-2']!;
@@ -251,8 +265,12 @@ export default function Race2Page(): React.JSX.Element {
     for (const { h, p } of placed) {
       const img = atlas.stripOf(h.gate);
       if (img === undefined) continue;
-      // ★画面の下寄りにいる馬（手前）だけ 2×。**連続値で縮小しません**
-      const scale = p.y > VP.height * 0.62 ? 2 : 1;
+      /**
+       * ★**先頭集団は 2×**。⚠️ 画面の y で決めていたら、寝かせが浅いと**全馬 1×**になり
+       *    馬が小さいままでした。**順位で決めます**（連続値では縮小しません・D-058）。
+       */
+      const rank = sorted.findIndex((x) => x.gate === h.gate);
+      const scale = rank < 5 ? 2 : 1;
       const w = SPRITE_W * scale;
       const hh = SPRITE_H * scale;
       if (p.x + w < 0 || p.x - w > VP.width) continue;
