@@ -172,24 +172,34 @@ export default function Race2Page(): React.JSX.Element {
     const clampS = (s: number): number => Math.max(0, Math.min(DIST, s));
     const near = 160;
 
-    // ── ① 遠景（横帯。★遠いので曲がりません） ──
+    /**
+     * ── ① 遠景 ──
+     * ★**走路の位置から決めます。**
+     *   ⚠️ 固定の高さ（216/300/354）で描いていたので、
+     *      **遠景と走路が繋がらず、下に巨大な空きの緑**ができていました。
+     */
+    const outerY = courseToScreen(COURSE, pose, VP, clampS(focusS), COURSE.widthM).y;
+    const innerY = courseToScreen(COURSE, pose, VP, clampS(focusS), 0).y;
+    const hedgeH = 46;
+    const standH = 86;
+    const hedgeY = Math.round(outerY - hedgeH);
+    const standY = Math.round(hedgeY - standH);
+
     ctx.fillStyle = pal['sky-2']!;
-    ctx.fillRect(0, 0, VP.width, 216);
+    ctx.fillRect(0, 0, VP.width, Math.max(0, standY));
     ctx.fillStyle = pal['stand-2']!;
-    ctx.fillRect(0, 216, VP.width, 84);
-    for (let y = 219; y < 298; y += 4) {
+    ctx.fillRect(0, standY, VP.width, standH);
+    for (let y = standY + 3; y < standY + standH - 2; y += 4) {
       for (let x = 2; x < VP.width; x += 5) {
         ctx.fillStyle = ((x * 3 + y * 7) % 11 < 5) ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)';
         ctx.fillRect(x, y, 2, 2);
       }
     }
     ctx.fillStyle = pal['hedge-1']!;
-    ctx.fillRect(0, 300, VP.width, 44);
-    ctx.fillStyle = pal['fence-1']!;
-    ctx.fillRect(0, 344, VP.width, 10);
-    // ★走路の外の芝
+    ctx.fillRect(0, hedgeY, VP.width, hedgeH);
+    // ★走路より手前は芝で埋める（内ラチの内側）
     ctx.fillStyle = pal['turf-5']!;
-    ctx.fillRect(0, 354, VP.width, VP.height - 354);
+    ctx.fillRect(0, Math.round(innerY), VP.width, VP.height - Math.round(innerY));
 
     // ── ② 走路の面（★コースの座標系。コーナーで曲がる） ──
     ctx.fillStyle = pal['turf-3']!;
@@ -289,7 +299,8 @@ export default function Race2Page(): React.JSX.Element {
      *   ⚠️ ここを馬より先に描くと、馬が芝に貼った絵に見えます。
      */
     {
-      const y = Math.round(VP.height * 0.86);
+      /** ★内ラチのすぐ手前に置く（★固定の高さだと走路から離れます） */
+      const y = Math.round(Math.min(VP.height - 70, innerY + 26));
       for (let x = -30; x < VP.width; x += 168) {
         ctx.fillStyle = pal['rail-1']!;
         ctx.fillRect(x, y, 5, 56);
