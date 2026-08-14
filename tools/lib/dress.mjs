@@ -10,7 +10,29 @@
  *   ★描画コマンドも位置モデルも知りません。**画像を作るだけ**です。
  */
 import sharp from 'sharp';
+import { readFileSync } from 'node:fs';
 import { digitPixels, outlinePixels, textWidth, GLYPH_H } from './pixel-font.mjs';
+
+/**
+ * ★**毛色**（デザイン・ハンドオフ由来）。
+ *
+ * 【★私のやり方は間違っていました】
+ *   ⚠️ 私は「元の色に毛色を**掛ける**」方式にして、**3回壊しました**
+ *      （ゼッケンが胴体に化ける／騎手の顔が白くなる／毛色が効かなくなる）。
+ *   ★ハンドオフの方式は**明るさで4階調に量子化して置き換える**もので、
+ *     **元の色の明暗を使わない**ので、肌やゼッケンを巻き込みません。
+ *
+ * 【★色はここに書きません】
+ *   `design/art/handoff/palette.json` から役割名で引きます（アートバイブル §6）。
+ */
+const PALETTE = JSON.parse(readFileSync('design/art/handoff/palette.json', 'utf8'));
+const COATS = ['kage', 'kurokage', 'kuri', 'ashi', 'ao'];
+const hex2rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+export const coatNameOf = (gate) => COATS[gate % COATS.length];
+const coatRampOf = (gate) => {
+  const c = coatNameOf(gate);
+  return [0, 1, 2, 3].map((i) => hex2rgb(PALETTE[`coat-${c}-${i}`]));
+};
 
 /** ★枠順ごとの標準ゼッケン色（D-060 で採用） */
 export const POST = [
@@ -188,6 +210,29 @@ export async function dressed(frames, frameIdx, gate, commonScale) {
   const { data, info } = await sharp(frames[frameIdx]).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   // ★塗り替える前の画素（ゼッケンを探すのに使う）
   const orig = Buffer.from(data);
+
+  /**
+   * ★**毛色**。明るさで4階調に量子化して置き換えます。
+   *   ⚠️ 「掛ける」方式にすると、肌（明るい茶）まで巻き込みます。**置き換えなら巻き込みません。**
+   */
+  const ramp = coatRampOf(gate);
+  for (let i = 0; i < data.length; i += info.channels) {
+    if (data[i + 3] < 128) continue;
+    const [r0, g0, b0] = [data[i], data[i + 1], data[i + 2]];
+    const mx = Math.max(r0, g0, b0), mn = Math.min(r0, g0, b0), dd = mx - mn;
+    const sat = mx === 0 ? 0 : dd / mx;
+    const v = mx / 255;
+    if (sat < 0.18 || dd === 0) continue;
+    let h0 = 0;
+    if (mx === r0) h0 = ((g0 - b0) / dd) % 6;
+    else if (mx === g0) h0 = (b0 - r0) / dd + 2;
+    else h0 = (r0 - g0) / dd + 4;
+    h0 *= 60; if (h0 < 0) h0 += 360;
+    if (h0 < 8 || h0 > 48) continue;
+    const step = v > 0.62 ? 0 : v > 0.45 ? 1 : v > 0.28 ? 2 : 3;
+    const t = ramp[step];
+    data[i] = t[0]; data[i + 1] = t[1]; data[i + 2] = t[2];
+  }
 
   // 勝負服
   for (let i = 0; i < data.length; i += info.channels) {
