@@ -80,6 +80,15 @@
    *   ② 馬体の茶（hue 10〜45）→ 毛色の4階調
    *   ③ 逆光で全体を落とす（bodyMul）
    */
+  /**
+   * ★**毛色と逆光は、切れるようにします。**
+   *   ⚠️ どちらも元の絵の階調を殺します。オーナー判定は
+   *      「元の素材の馬と騎手のクオリティにしてほしい」でした。
+   *   → **既定は「切」**。背景と UI はハンドオフのまま、馬は元の絵のままにできます。
+   */
+  var OPT = { coat: false, backlight: false };
+  function setOptions(o) { OPT = { coat: !!o.coat, backlight: !!o.backlight }; }
+
   function bakeStrip(sheet, pal, gate, tier) {
     var c = document.createElement('canvas');
     c.width = SPRITE_W * 6; c.height = SPRITE_H;
@@ -90,7 +99,7 @@
     var silk = hex2rgb(pal['silk-' + gate] || pal['silk-1']);
     var coat = coatOf(gate);
     var ramp = [pal['coat-' + coat + '-0'], pal['coat-' + coat + '-1'], pal['coat-' + coat + '-2'], pal['coat-' + coat + '-3']].map(hex2rgb);
-    var mul = tier === 'front' ? (pal.$backlight.bodyMulNear) : (pal.$backlight.bodyMul);
+    var mul = OPT.backlight ? (tier === 'front' ? pal.$backlight.bodyMulNear : pal.$backlight.bodyMul) : 1;
     for (var i = 0; i < d.length; i += 4) {
       if (d[i + 3] < 128) { d[i + 3] = 0; continue; }
       var r = d[i], gg = d[i + 1], b = d[i + 2];
@@ -98,7 +107,7 @@
       var s = mx === 0 ? 0 : (mx - mn) / mx, h = hueOf(r, gg, b), v = mx / 255;
       if (s >= 0.35 && h >= 200 && h <= 260) {
         d[i] = silk[0] * v; d[i + 1] = silk[1] * v; d[i + 2] = silk[2] * v;
-      } else if (s >= 0.18 && h >= 8 && h <= 48) {
+      } else if (OPT.coat && s >= 0.18 && h >= 8 && h <= 48) {
         /**
          * ★**4階調への量子化をやめ、連続に補間します。**
          *
@@ -658,6 +667,7 @@
     SPRITE_W: SPRITE_W, SPRITE_H: SPRITE_H, GROUND_LINE: GROUND_LINE, CLOTH: CLOTH,
     ALL_PARTS: ALL_PARTS, SCENES: SCENES, LAYER_PART: LAYER_PART,
     buildAtlas: buildAtlas, drawStill: drawStill, drawLayer: drawLayer,
+    setOptions: setOptions,
     coatOf: coatOf, textWidth: textWidth, drawDigits: drawDigits
   };
 })(typeof window !== 'undefined' ? window : globalThis);

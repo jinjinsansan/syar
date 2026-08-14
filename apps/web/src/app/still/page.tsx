@@ -21,6 +21,7 @@ const H = 720;
 /** ★参照実装が公開する形（`apps/web/public/art/still-reference.js`） */
 interface StarStill {
   buildAtlas: (sheet: HTMLImageElement, pal: unknown, layers: unknown) => Promise<unknown>;
+  setOptions: (o: { coat: boolean; backlight: boolean }) => void;
   drawStill: (ctx: CanvasRenderingContext2D, o: Record<string, unknown>) => void;
 }
 declare global {
@@ -50,7 +51,7 @@ const SCENES: readonly (readonly [string, string])[] = [
  *      ブラウザが**古い JS と JSON を使い続けます**（ハードリロードでも残ることがある）。
  *   → 読み込む URL に版を付けます。**直したら必ず反映されます。**
  */
-const ASSET_VERSION = '3';
+const ASSET_VERSION = '4';
 
 export default function StillPage(): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -60,6 +61,12 @@ export default function StillPage(): React.JSX.Element {
   const [off, setOff] = useState<ReadonlySet<string>>(new Set());
   const [scene, setScene] = useState('straight200');
   const [scroll, setScroll] = useState(0);
+  /**
+   * ★**毛色**と**逆光**は既定で切ります。
+   *   どちらも元の絵の階調を殺すので、**まず元の質で見ていただく**ためです。
+   */
+  const [coat, setCoat] = useState(false);
+  const [backlight, setBacklight] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +93,7 @@ export default function StillPage(): React.JSX.Element {
       });
       const api = window.STARStill;
       if (api === undefined) throw new Error('STARStill がありません');
+      api.setOptions({ coat, backlight });
       const atlas = await api.buildAtlas(sheet, pal, layers);
       if (cancelled) return;
       dataRef.current = { pal, layers, atlas };
@@ -93,7 +101,7 @@ export default function StillPage(): React.JSX.Element {
     };
     boot().catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)));
     return () => { cancelled = true; };
-  }, []);
+  }, [coat, backlight]);
 
   const draw = useCallback(() => {
     const cv = canvasRef.current;
@@ -154,6 +162,12 @@ export default function StillPage(): React.JSX.Element {
           <select value={scene} onChange={(e) => setScene(e.target.value)}>
             {SCENES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
+        </label>
+        <label title="馬体の色を毛色に置き換える。元の絵の階調が減ります">
+          <input type="checkbox" checked={coat} onChange={(e) => setCoat(e.target.checked)} />{' '}毛色
+        </label>
+        <label title="馬体を暗く落として縁を光らせる。元の絵の階調が減ります">
+          <input type="checkbox" checked={backlight} onChange={(e) => setBacklight(e.target.checked)} />{' '}逆光
         </label>
         <label>
           背景の流れ{' '}
