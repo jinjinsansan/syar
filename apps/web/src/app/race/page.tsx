@@ -17,7 +17,7 @@ import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches 
 import type { Strategy } from '@star/sim-engine';
 import {
   replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
-  phaseOf, ovalCourse, segmentAt,
+  phaseOf, ovalCourse, segmentAt, HORSE_LENGTH_M,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 
@@ -244,12 +244,46 @@ export default function RacePage(): React.JSX.Element {
       gap: { m: gapM, mps: (gapB - gapM) / 0.6, toGo: Math.max(0, myRank - 2) },
       pace: built.pace,
       curve: curveAmount,
-      callout: finished
-        ? `${built.result[0]!.gate}番　ゴールイン`
-        : segment === '直線' ? `さあ直線　${sorted[0]!.gate}番が先頭`
-          : segment === '4角' ? '4角をまわった　各馬が動いた'
-            : segment === '3角' ? '3角　隊列が動き始めた'
-              : `${segment}　${sorted[0]!.gate}番が先頭　残り ${metersLeft.toFixed(0)}m`,
+      /**
+       * ★**実況は「変化」を言う**（裁定 Q-P4-14 ①）。
+       *   「3番手」ではなく「上がってきた」。**順位の数字は言いません。**
+       *   ⚠️ 少し前と比べて、**実際に起きたこと**を拾います。
+       */
+      callout: (() => {
+        if (finished) return `${built.result[0]!.gate}番　ゴールイン`;
+        const prevSorted = [...back].sort((a, b) => b.meters - a.meters);
+        const leaderNow = sorted[0]!.gate;
+        const leaderBefore = prevSorted[0]?.gate;
+        // ★先頭が替わった
+        if (leaderBefore !== undefined && leaderBefore !== leaderNow) {
+          return `${leaderNow}番　先頭に立った`;
+        }
+        // ★いちばん詰めている馬
+        let bestGate = -1;
+        let bestGain = 0;
+        for (const h of sorted) {
+          const b = back.find((x) => x.gate === h.gate);
+          if (b === undefined) continue;
+          const gainNow = lead - h.s;
+          const gainBefore = (prevSorted[0]?.meters ?? lead) - b.meters;
+          const g = gainBefore - gainNow;
+          if (g > bestGain) { bestGain = g; bestGate = h.gate; }
+        }
+        if (bestGain > 0.8 && bestGate > 0) {
+          return segment === '直線' ? `${bestGate}番　外から伸びてきた` : `${bestGate}番　上がってきた`;
+        }
+        if (segment === '直線' && metersLeft < 200) {
+          const second = sorted[1];
+          if (second !== undefined && sorted[0]!.s - second.s < HORSE_LENGTH_M) {
+            return `${leaderNow}番と${second.gate}番　並んだ`;
+          }
+          return `残り ${metersLeft.toFixed(0)}m　${leaderNow}番先頭`;
+        }
+        if (segment === '直線') return `さあ直線　${leaderNow}番が先頭`;
+        if (segment === '4角') return '4角をまわった　各馬が動いた';
+        if (segment === '3角') return '3角　隊列が動き始めた';
+        return `${segment}　${leaderNow}番が先頭　残り ${metersLeft.toFixed(0)}m`;
+      })(),
     });
   }, [built, ownGate]);
 
