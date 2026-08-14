@@ -109,3 +109,58 @@ describe('★ペース配分は「時間の再パラメータ化」であって�
     }
   });
 });
+
+/**
+ * ★**係数を2つに分けた**（裁定 Q-P4-28）
+ *
+ *   > つまみが1つで目標が2つです。**係数を2つに分けてください。**
+ *   > 隊列の広がりは**位置の散らばり**、速度の振れは**時間の変動**。
+ *
+ *   位置 x(τ) = τ + a·sin(πτ) + (d/2π)·sin(2πτ)
+ *     `a`（脚質ごと）… 半周期。**τ=0.5 で最大** → 隊列の広がりを決める
+ *     `d`（全馬共通）… 1周期。★**τ=0.5 でちょうど 0** → 隊列に効かない
+ */
+describe('★脚質の偏りと、レースの律動を分けた', () => {
+  it('★★道中（τ=0.5）のずれは、脚質だけで決まる', () => {
+    /**
+     * ★ここが「分けた」ことの本体です。
+     *   律動の項は `sin(2π·0.5) = 0` なので、**道中のずれに1ミリも効きません**。
+     */
+    const mid = (s: Strategy): number => paceShape(s, 'middle')(0.5) - 0.5;
+    // 逃げは前、追込は後ろ
+    expect(mid('nige')).toBeGreaterThan(0);
+    expect(mid('oikomi')).toBeLessThan(0);
+    // ★対称（同じ大きさで逆向き）＝律動が混ざっていない証拠
+    expect(mid('nige')).toBeCloseTo(-mid('oikomi'), 9);
+    expect(mid('senko')).toBeCloseTo(-mid('sashi'), 9);
+  });
+
+  it('★★脚質が同じでも、速度は道中で振れる（律動が効いている）', () => {
+    const f = paceShape('senko', 'middle');
+    const v = (t: number): number => (f(t + 0.005) - f(t - 0.005)) / 0.01;
+    // 前半は速く、道中は落ち着き、終いはまた速い
+    expect(v(0.1)).toBeGreaterThan(v(0.5));
+    expect(v(0.9)).toBeGreaterThan(v(0.5));
+  });
+
+  it('★★位置は必ず前に進む（どの脚質・どのペースでも）', () => {
+    for (const s of ['nige', 'senko', 'sashi', 'oikomi'] as Strategy[]) {
+      for (const p of ['slow', 'middle', 'high'] as Pace[]) {
+        const f = paceShape(s, p);
+        let prev = -1;
+        for (let t = 0; t <= 1.0001; t += 0.002) {
+          const x = f(t);
+          expect(x).toBeGreaterThanOrEqual(prev - 1e-12);
+          prev = x;
+        }
+      }
+    }
+  });
+
+  it('★両端は固定（境界も着順も動かない）', () => {
+    for (const s of ['nige', 'senko', 'sashi', 'oikomi'] as Strategy[]) {
+      expect(paceShape(s, 'high')(0)).toBeCloseTo(0, 12);
+      expect(paceShape(s, 'high')(1)).toBeCloseTo(1, 12);
+    }
+  });
+});

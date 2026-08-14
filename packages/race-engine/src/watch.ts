@@ -143,25 +143,50 @@ const PACE_GAIN: Record<Pace, number> = { high: 1.3, middle: 1.0, slow: 0.7 };
  *   ★単調性: x'(τ) = 1 + bπ·cos(πτ) なので、**|b| < 1/π ≈ 0.318** なら常に正。
  *     上の係数は最大 0.10×1.3 = 0.13 で、余裕があります。
  */
+/**
+ * ★**レースの律動**（全馬に共通）。速度の振れだけを作り、**隊列の広がりには効きません**。
+ *
+ * 【なぜ係数を分けたか — 裁定 Q-P4-28】
+ *   > つまみが1つで目標が2つです。**係数を2つに分けてください。**
+ *   > 隊列の広がりは**位置の散らばり**、速度の振れは**時間の変動**。
+ *   > **同じ係数を共有している理由がありません。**
+ *
+ * 【★分け方】
+ *   位置 x(τ) = τ + a·sin(πτ) + (d/2π)·sin(2πτ)
+ *   速度 x'(τ) = 1 + aπ·cos(πτ) + d·cos(2πτ)
+ *
+ *     `a`（脚質ごと）… **半周期**。τ=0.5 で最大 a ずれる → ★**隊列の広がりを決める**
+ *     `d`（全馬共通）… **1周期**。★**τ=0.5 でずれが 0** → 隊列に効かない。速度だけ振れる
+ *
+ *   ★`d` の形（速い→落ち着く→また速い）は、実際のレースの流れそのものです
+ *     （前半は速く入り、道中は息を入れ、直線で伸びる）。
+ *
+ * ⚠️ **単調性**: 速度が正であるには `aπ + d < 1`。**構造で確かめます。**
+ */
+const RACE_RHYTHM = 0.085;
+
+/** ★速度の振れの上限（実測に基づく。超えたら起動時に止める） */
+export const MAX_SPEED_SWING_TOTAL = 0.14;
+
 export function paceShape(strategy: Strategy, pace: Pace): (tau: number) => number {
-  const b = STRATEGY_BIAS[strategy] * PACE_GAIN[pace];
-  /**
-   * ★上限は「後戻りしないこと」ではなく「**馬の速さに見えること**」で決めます。
-   *   ⚠️ 1/π（≈0.318）まで許すと、単調ではあっても**速度が ±100% 振れます**。
-   *      実際に ±41% で「不自然」と判定されました。
-   */
-  const LIMIT = MAX_SPEED_SWING / Math.PI;
-  if (Math.abs(b) > LIMIT + 1e-9) {
+  const a = STRATEGY_BIAS[strategy] * PACE_GAIN[pace];
+  const d = RACE_RHYTHM;
+  const swing = Math.abs(a) * Math.PI + Math.abs(d);
+  if (swing > MAX_SPEED_SWING_TOTAL + 1e-9) {
     throw new Error(
-      `ペース配分の係数が大きすぎます（${b}）。速度の振れが ±${(Math.abs(b) * Math.PI * 100).toFixed(0)}% になります`
-      + `（上限 ±${(MAX_SPEED_SWING * 100).toFixed(0)}%）`,
+      `ペース配分の係数が大きすぎます（速度の振れが ±${(swing * 100).toFixed(0)}%）`
+      + `。上限 ±${(MAX_SPEED_SWING_TOTAL * 100).toFixed(0)}%`,
     );
   }
+  // ★速度が正であること（位置が後戻りしないこと）を、ここで保証します
+  if (swing >= 1) throw new Error('速度が負になりえます');
   return (tau: number): number => {
     const t = Math.max(0, Math.min(1, tau));
-    return Math.max(0, Math.min(1, t + b * Math.sin(Math.PI * t)));
+    const x = t + a * Math.sin(Math.PI * t) + (d / (2 * Math.PI)) * Math.sin(2 * Math.PI * t);
+    return Math.max(0, Math.min(1, x));
   };
 }
+
 
 /**
  * ★1頭が各境界を通過する時刻（秒）。**これがエンジンの真実**です。
