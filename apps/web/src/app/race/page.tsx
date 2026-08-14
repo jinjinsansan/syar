@@ -33,6 +33,17 @@ const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 const SPRITE_W = 220;
 const SPRITE_H = 140;
 
+/**
+ * ★**色は役割名で引きます**（アートバイブル §6・デザイン・ハンドオフ）。
+ *   ⚠️ 16進をここに書きません。`/art/palette.json` から読みます。
+ */
+type Palette = Record<string, string>;
+const FALLBACK: Palette = {
+  'sky-2': '#8fb8cf', 'stand-2': '#5b6068', 'hedge-1': '#2f4a2b',
+  'fence-1': '#a2a99d', 'turf-3': '#4b7a41', 'turf-5': '#385428',
+  'rail-1': '#e6e3d6', 'paper-0': '#efe9dc', 'ink-0': '#22201c',
+};
+
 /** ★脚質ごとの「だいたいの横位置」（内ラチからの距離 m）。**見せているだけ** */
 const LANE_BY_STRATEGY: Record<Strategy, number> = { nige: 3, senko: 5, sashi: 8, oikomi: 12 };
 
@@ -106,11 +117,16 @@ export default function RacePage(): React.JSX.Element {
   const [built, setBuilt] = useState<Built | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [clock, setClock] = useState(0);
+  const palRef = useRef<Palette>(FALLBACK);
 
   const course = ovalCourse(DIST);
   const cuts = cutsFor(course);
 
   useEffect(() => {
+    // ★配色はハンドオフの palette.json から（読めなければ従来色で動く）
+    fetch('/art/palette.json').then((r) => r.json())
+      .then((p: Palette) => { palRef.current = { ...FALLBACK, ...p }; })
+      .catch(() => { /* ★読めなくても止めない。従来色で描く */ });
     loadAtlas(18)
       .then((a) => { atlasRef.current = a; setReady(true); })
       .catch((e: unknown) => setErr(`スプライトを読み込めません: ${String(e)}`));
@@ -147,17 +163,18 @@ export default function RacePage(): React.JSX.Element {
     const c0 = posOf(course, focusS, course.widthM / 2);
     const pose: CameraPose = { state, centre: { x: c0.x, y: c0.y }, heading: c0.heading };
 
+    const pal = palRef.current;
     // ★空と、走路の外の芝
-    ctx.fillStyle = '#8fb8cf';
+    ctx.fillStyle = pal['sky-2']!;
     ctx.fillRect(0, 0, VP.width, VP.height * 0.42);
-    ctx.fillStyle = '#3d6438';
+    ctx.fillStyle = pal['turf-5']!;
     ctx.fillRect(0, VP.height * 0.42, VP.width, VP.height * 0.58);
 
     const near = 300;
     const clampS = (s: number): number => Math.max(0, Math.min(DIST, s));
 
     // ★走路の面（内ラチ〜外ラチ）
-    ctx.fillStyle = '#4b7a41';
+    ctx.fillStyle = pal['turf-3']!;
     ctx.beginPath();
     for (let s = focusS - near; s <= focusS + near; s += 6) {
       const p = courseToScreen(course, pose, VP, clampS(s), 0);
@@ -200,8 +217,8 @@ export default function RacePage(): React.JSX.Element {
      *   走路の座標系に置くので、**馬と一緒に流れます**（奥行きは速度差で作る・§3）。
      */
     for (const [from, to, col] of [
-      [course.widthM + 2, course.widthM + 9, '#2f4a2b'],
-      [course.widthM + 9, course.widthM + 22, '#5b6068'],
+      [course.widthM + 2, course.widthM + 9, pal['hedge-1']!],
+      [course.widthM + 9, course.widthM + 22, pal['stand-2']!],
     ] as const) {
       ctx.fillStyle = col;
       ctx.beginPath();
@@ -225,7 +242,7 @@ export default function RacePage(): React.JSX.Element {
     }
 
     // ★ラチ
-    for (const [w, col, lw] of [[0, '#e6e3d6', 3], [course.widthM, '#cfd6c6', 2]] as const) {
+    for (const [w, col, lw] of [[0, pal['rail-1']!, 3], [course.widthM, pal['fence-1']!, 2]] as const) {
       ctx.strokeStyle = col;
       ctx.lineWidth = lw;
       ctx.beginPath();
@@ -243,9 +260,9 @@ export default function RacePage(): React.JSX.Element {
     for (let m = 0; m <= DIST; m += 200) {
       if (Math.abs(m - focusS) > near) continue;
       const a = courseToScreen(course, pose, VP, m, 0);
-      ctx.fillStyle = '#efe9dc';
+      ctx.fillStyle = pal['rail-1']!;
       ctx.fillRect(a.x - 1, a.y - 22, 3, 22);
-      ctx.fillStyle = '#22201c';
+      ctx.fillStyle = pal['ink-0']!;
       ctx.fillRect(a.x - 13, a.y - 37, 28, 15);
       ctx.fillStyle = '#f2c14e';
       ctx.fillText(`${DIST - m}`, a.x + 1, a.y - 25);
