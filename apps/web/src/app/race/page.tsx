@@ -26,7 +26,7 @@ const FIELD = 12;
 const W = 1280;
 const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '6';
+const ASSET_VERSION = '7';
 
 /** ★コース（1角/2角/向正面/3角/4角/直線）。いまどこを走っているかを出すため */
 const COURSE = ovalCourse(DIST);
@@ -184,9 +184,20 @@ export default function RacePage(): React.JSX.Element {
     const aheadB = ahead === undefined ? undefined : back.find((h) => h.gate === ahead.gate);
     const gapB = (ownB === undefined || aheadB === undefined) ? gapM : aheadB.meters - ownB.meters;
 
+    /**
+     * ★**コーナーの曲がり**を、走路の帯に出します。
+     *
+     *   ⚠️ デザイナーの描画は**真横専用**で、コーナーを描けません。
+     *      走路の帯を**ゆるく反らせる**ことで「いま曲がっている」ことを伝えます。
+     *   ★線遠近は描き込みません（アートバイブル §3）。**帯の反りだけ**です。
+     *   ⚠️ **絵の都合であって、機構ではありません。** 着順にも位置にも触れません。
+     */
+    const seg = segmentAt(COURSE, Math.min(DIST, own === undefined ? lead : own.meters));
+    const curveAmount = seg.type === 'corner' ? (seg.turn === 'right' ? -1 : 1) : 0;
+
     const phase = phaseOf(metersLeft);
     // ★いまコースのどこか（実際の区間名）
-    const segment = segmentAt(COURSE, Math.min(DIST, own === undefined ? lead : own.meters)).label;
+    const segment = seg.label;
     const finished = d >= built.warp.displaySec - 0.01;
 
     api.drawStill(ctx, {
@@ -207,6 +218,7 @@ export default function RacePage(): React.JSX.Element {
       cueActive: phase === 'spurt' || phase === 'straight',
       gap: { m: gapM, mps: (gapB - gapM) / 0.6, toGo: Math.max(0, myRank - 2) },
       pace: built.pace,
+      curve: curveAmount,
       callout: finished
         ? `${built.result[0]!.gate}番　ゴールイン`
         : segment === '直線' ? `さあ直線　${sorted[0]!.gate}番が先頭`

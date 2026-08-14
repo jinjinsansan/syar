@@ -625,6 +625,13 @@
     var byId = {};
     layers.layers.forEach(function (L) { byId[L.id] = L; });
 
+    /**
+     * ★**コーナーの反り**。`o.curve`（-1〜1）で走路の帯をゆるく反らせます。
+     *   ⚠️ **線遠近は描き込みません**（アートバイブル §3）。帯を**上下に反らせるだけ**です。
+     *   ★0 のときは何もしません（直線では完全に従来どおり）。
+     */
+    var curve = o.curve || 0;
+
     ['sky', 'stand', 'hedge', 'fenceFar', 'turfFar', 'turfMain'].forEach(function (id) {
       if (parts[LAYER_PART[id]]) drawLayer(ctx, byId[id], pal, scroll, V);
     });
@@ -674,6 +681,23 @@
             own: gate === plan.own
           });
         });
+      });
+    }
+
+    /**
+     * ★コーナーの反りを、走路の境目に描き足します（帯そのものは反らせない＝安全）。
+     */
+    if (curve !== 0) {
+      var cy0 = byId.turfMain.y, cy1 = byId.turfMain.y + byId.turfMain.height;
+      [[cy0, pal['fence-1'], 3], [cy1, pal['rail-1'], 4]].forEach(function (e) {
+        ctx.strokeStyle = e[1]; ctx.lineWidth = e[2];
+        ctx.beginPath();
+        for (var cx = 0; cx <= V.width; cx += 8) {
+          var t = cx / V.width;
+          var bow = Math.sin(t * Math.PI) * 26 * curve;
+          if (cx === 0) ctx.moveTo(cx, e[0] + bow); else ctx.lineTo(cx, e[0] + bow);
+        }
+        ctx.stroke();
       });
     }
 
