@@ -149,8 +149,9 @@ export default function RacePage(): React.JSX.Element {
 
     const sec = built.warp.raceSecAt(d);
     const at = built.model.at(sec);
-    const sorted = [...at].sort((a, b) => b.meters - a.meters);
-    const lead = sorted[0]!.meters;
+    const sorted = [...at].sort((a, b) => b.meters - a.meters)
+      .map((h) => ({ gate: h.gate, s: h.meters, stamina: h.staminaRatio }));
+    const lead = sorted[0]!.s;
     const own = at.find((h) => h.gate === ownGate);
     const metersLeft = DIST - (own === undefined ? lead : own.meters);
 
@@ -159,18 +160,42 @@ export default function RacePage(): React.JSX.Element {
      *   ⚠️ 段は 1×／1×／2× の3つだけ（D-058）。**非整数倍で縮小しません。**
      *   先頭ほど右、後方ほど左。**先頭集団の3頭を手前（2×）**に置きます。
      */
+    /**
+     * ★**構図はデザイナーのものをそのまま使います。**
+     *
+     * 【★なぜ計算で置かないか】
+     *   ⚠️ 順位から x を計算して置いていたら、**馬が団子になったり間延びしたり**しました。
+     *   ★`/still` が綺麗なのは、**12頭を手で配置した構図**だからです。
+     *     計算に自由を与えるほど、その構図から離れます。
+     *   → **枠（段と位置）は固定**し、**誰がどの枠に入るか**だけを順位で決めます。
+     *     さらに**実際の差**でわずかに前後させ、追い抜きが見えるようにします。
+     *
+     *   枠（`layers.json` の `horsePlan`）:
+     *     手前 3頭（2×）… x 230 / 660 / 1060
+     *     中   4頭（1×）… x 430 / 615 / 800 / 985
+     *     奥   5頭（1×）… x 150 / 330 / 505 / 685 / 860
+     */
+    const SLOTS: readonly (readonly [number, number])[] = [
+      // [row, x] を「先頭から順に」並べる
+      [2, 1060], [2, 660], [2, 230],
+      [1, 985], [1, 800], [1, 615], [1, 430],
+      [0, 860], [0, 685], [0, 505], [0, 330], [0, 150],
+    ];
     const horses = sorted.map((h, rank) => {
-      const row = rank < 3 ? 2 : rank < 7 ? 1 : 0;
-      // ★先頭からの差（m）を画面の x に。手前ほど大きく開く
-      const behind = lead - h.meters;
-      const pxPerM = row === 2 ? 26 : row === 1 ? 20 : 15;
-      const baseX = row === 2 ? 1010 : row === 1 ? 940 : 880;
+      const slot = SLOTS[Math.min(rank, SLOTS.length - 1)]!;
+      const [row, baseX] = slot;
+      /**
+       * ★**実際の差でわずかに前後させます**（追い抜きが見えるように）。
+       *   ⚠️ 大きく動かすと構図が壊れるので、**±40px まで**に抑えます。
+       */
+      const behind = lead - h.s;
+      const nudge = Math.max(-40, Math.min(40, (behind - rank * 2.2) * -6));
       return {
         gate: h.gate,
         row,
-        x: Math.round(baseX - behind * pxPerM - (rank % 3) * 18),
+        x: Math.round(baseX + nudge),
         frame: Math.floor((((d * 2.4 + h.gate * 0.37) % 1) + 1) % 1 * 6),
-        effort: h.staminaRatio,
+        effort: h.stamina,
         own: h.gate === ownGate,
       };
     });
@@ -178,7 +203,7 @@ export default function RacePage(): React.JSX.Element {
     // ★前の馬との差（順位ではなく変化を出す・裁定 Q-P4-14 ①）
     const myRank = sorted.findIndex((h) => h.gate === ownGate);
     const ahead = myRank > 0 ? sorted[myRank - 1]! : undefined;
-    const gapM = ahead === undefined || own === undefined ? 0 : ahead.meters - own.meters;
+    const gapM = ahead === undefined || own === undefined ? 0 : ahead.s - own.meters;
     const back = built.model.at(Math.max(0, sec - 0.6));
     const ownB = back.find((h) => h.gate === ownGate);
     const aheadB = ahead === undefined ? undefined : back.find((h) => h.gate === ahead.gate);
