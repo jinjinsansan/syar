@@ -34,7 +34,7 @@
 import sharp from 'sharp';
 import { loadFrames } from './lib/dress.mjs';
 
-const SHEET = process.argv[2] ?? 'design/art/assets/horse-gallop-v2.png';
+const SHEET = process.argv[2] ?? 'design/art/assets/horse-gallop-sheet.png';
 const frames = await loadFrames(SHEET);
 
 /** 1コマぶんの計測 */

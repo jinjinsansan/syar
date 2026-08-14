@@ -68,6 +68,12 @@ export async function loadFrames(sheetPath) {
   for (let p = 0; p < W * H; p += 1) {
     const o = p * C;
     const r = data[o], g = data[o + 1], b = data[o + 2];
+    /**
+     * ★**背景の抜き方は素材によって違います。**
+     *   元の素材（`horse-gallop-sheet.png`）は**背景が透明**なので、緑を抜く必要がありません。
+     *   ⚠️ 緑を抜く条件を無条件に当てると、**緑がかった画素まで消します**。
+     *   → **透明で抜けているなら、それを尊重します。**
+     */
     const isKey = g > r + 40 && g > b + 40;
     solid[p] = (!isKey && data[o + 3] > 128) ? 1 : 0;
     if (solid[p] === 1) {
@@ -180,6 +186,9 @@ const scaleCache = new Map();
 export async function dressed(frames, frameIdx, gate, commonScale) {
   const color = POST[gate - 1];
   const { data, info } = await sharp(frames[frameIdx]).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  // ★塗り替える前の画素（ゼッケンを探すのに使う）
+  const orig = Buffer.from(data);
+
   // 勝負服
   for (let i = 0; i < data.length; i += info.channels) {
     if (data[i + 3] < 128) continue;
@@ -193,12 +202,31 @@ export async function dressed(frames, frameIdx, gate, commonScale) {
       data[i] = Math.round(color[0] * v); data[i + 1] = Math.round(color[1] * v); data[i + 2] = Math.round(color[2] * v);
     }
   }
-  // ゼッケン（白い塊を探して塗る）
+  /**
+   * ★**ゼッケン**は、もともと絵にある**鞍下の当て布**を使います。
+   *
+   * 【★作り直さない】
+   *   ⚠️ ゼッケンが要ると分かったとき、私は**絵を作り直しました**。
+   *      その結果、**筋肉の陰影・毛艶・手綱・深く屈んだ騎手**を失いました
+   *      （オーナーの指摘で判明）。
+   *   ★**元の絵には鞍下の当て布が既にあります。** そこに番号を置けば足ります。
+   *
+   * 【★騎手の上着と分ける】
+   *   当て布も上着も同じ青なので、**位置で分けます**。
+   *   当て布は馬体の上（コマの下半分寄り）、上着はその上です。
+   */
   const isCloth = (i, y) => {
-    if (data[i + 3] < 128) return false;
-    const mx = Math.max(data[i], data[i + 1], data[i + 2]);
-    const mn = Math.min(data[i], data[i + 1], data[i + 2]);
-    return mx > 195 && (mx === 0 ? 0 : (mx - mn) / mx) < 0.12 && y > 50 && y < 110;
+    if (orig[i + 3] < 128) return false;
+    const r0 = orig[i], g0 = orig[i + 1], b0 = orig[i + 2];
+    const mx = Math.max(r0, g0, b0), mn = Math.min(r0, g0, b0), d0 = mx - mn;
+    if (mx === 0 || d0 / mx < 0.30) return false;
+    let h0 = 0;
+    if (mx === r0) h0 = ((g0 - b0) / d0) % 6;
+    else if (mx === g0) h0 = (b0 - r0) / d0 + 2;
+    else h0 = (r0 - g0) / d0 + 4;
+    h0 *= 60; if (h0 < 0) h0 += 360;
+    // ★青（勝負服・当て布）で、コマの下半分寄り＝鞍下
+    return h0 >= 200 && h0 <= 260 && y > 58 && y < 112;
   };
   const W = info.width, H = info.height, seen = new Uint8Array(W * H);
   let best = [];
