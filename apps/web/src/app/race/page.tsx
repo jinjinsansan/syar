@@ -1,16 +1,13 @@
 /**
- * ★レース観戦（PR4）— **エンジン + コース幾何 + カメラ + スプライト**
- *
- * 【これまでとの違い】
- *   `/watch`  … 1次元の横スクロール（★コーナーが無い）
- *   `/course` … コース幾何だけ（点）
- *   `/camera` … カメラだけ（丸）
- *   ★ここ    … **全部を繋いだもの**
+ * ★レース観戦 — **エンジン + コース幾何 + カメラ + デザイン・ハンドオフの絵**
  *
  * 【★守っていること】
  *   ・**着順はエンジンが決めたもの**（開始時に D-059 のゲートを通す）
  *   ・横位置 `w` は**見せているだけ**（★距離ロスは着順に効かせていません・D-065 は裁定待ち）
- *   ・カメラは**見え方だけ**を変える
+ *   ・絵は**参照実装**が描きます（16進を持たず `palette.json` から役割名で引く）
+ *
+ * 【★毛色と逆光は既定で切っています】
+ *   どちらも元の素材の階調を殺すためです（オーナー判定）。上のチェックで入れられます。
  */
 'use client';
 
@@ -20,42 +17,34 @@ import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches 
 import type { Strategy } from '@star/sim-engine';
 import {
   replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
-  ovalCourse, posOf, courseToScreen, segmentAt, cutsFor, cutAt, blendCamera, focusOf,
-  HORSE_LENGTH_M, type CameraPose, type CameraState,
+  phaseOf,
 } from '@star/render';
-import { loadAtlas, drawRunningOrder, type SpriteAtlas } from '../../lib/canvas-renderer';
 import POOL from '../../lib/watch-pool.json';
 
 const DIST = 1600;
 const FIELD = 12;
-const VP = { width: 1280, height: 640 };
+const W = 1280;
+const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const SPRITE_W = 220;
-const SPRITE_H = 140;
+const ASSET_VERSION = '5';
 
-/**
- * ★**色は役割名で引きます**（アートバイブル §6・デザイン・ハンドオフ）。
- *   ⚠️ 16進をここに書きません。`/art/palette.json` から読みます。
- */
-type Palette = Record<string, string>;
-const FALLBACK: Palette = {
-  'sky-2': '#8fb8cf', 'stand-2': '#5b6068', 'hedge-1': '#2f4a2b',
-  'fence-1': '#a2a99d', 'turf-3': '#4b7a41', 'turf-5': '#385428',
-  'rail-1': '#e6e3d6', 'paper-0': '#efe9dc', 'ink-0': '#22201c',
-};
-
-/** ★脚質ごとの「だいたいの横位置」（内ラチからの距離 m）。**見せているだけ** */
-const LANE_BY_STRATEGY: Record<Strategy, number> = { nige: 3, senko: 5, sashi: 8, oikomi: 12 };
+interface StarStill {
+  buildAtlas: (sheet: HTMLImageElement, pal: unknown, layers: unknown) => Promise<unknown>;
+  drawStill: (ctx: CanvasRenderingContext2D, o: Record<string, unknown>) => void;
+  setOptions: (o: { coat: boolean; backlight: boolean }) => void;
+}
+declare global {
+  interface Window { STARStill?: StarStill }
+}
 
 interface Built {
   readonly model: ReturnType<typeof replayPositionModel>;
   readonly warp: ReturnType<typeof timeWarpFor>;
-  readonly wOf: (gate: number, s: number) => number;
   readonly pace: 'slow' | 'middle' | 'high';
   readonly result: readonly { place: number; gate: number; margin: string }[];
 }
 
-function build(seed: number, ownGate: number, jostle: number): Built {
+function build(seed: number, ownGate: number): Built {
   const start = (seed * 13) % Math.max(1, POOL.length - FIELD);
   const entrants = POOL.slice(start, start + FIELD).map((h, i) => ({
     horseId: String(i + 1), stats: h.stats, surfaceAptitude: h.surfaceAptitude,
@@ -74,7 +63,7 @@ function build(seed: number, ownGate: number, jostle: number): Built {
   if (!finalOrderMatches(result, boundaries)) throw new Error('映像の着順が確定着順と違います（D-059）');
   const model = replayPositionModel({
     distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
-    jostle, jostleSeed: seed * 2654435761,
+    jostle: 0.25, jostleSeed: seed * 2654435761,
   });
   const settled = result.order.map((e) => Number(e.horseId));
   if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(settled)) {
@@ -83,21 +72,6 @@ function build(seed: number, ownGate: number, jostle: number): Built {
   return {
     model,
     warp: timeWarpFor(knotsFor(boundaries, ownGate), DEFAULT_PHASE_RATES),
-    /**
-     * ★**横位置**（内ラチからの距離 m）。**見せているだけ**。
-     *
-     * ⚠️ 以前は脚質だけで決めていたので、**発走時に全馬が同じところに重なりました**
-     *    （スクリーンショットで団子になっていたのはこれです）。
-     * ★実際のゲートは**枠順どおり横一線**に並びます。
-     *   → 発走時は枠順で走路いっぱいに広げ、**最初の 300m で脚質の位置へ寄せます**。
-     */
-    wOf: (g, s2) => {
-      const gateW = 1.6 + ((g - 1) / (FIELD - 1)) * 16.8;
-      const laneW = LANE_BY_STRATEGY[entrants[g - 1]!.strategy] + ((g * 7) % 5) * 0.9;
-      const k = Math.max(0, Math.min(1, s2 / 300));
-      const e = k * k * (3 - 2 * k);
-      return gateW + (laneW - gateW) * e;
-    },
     pace,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
   };
@@ -105,7 +79,7 @@ function build(seed: number, ownGate: number, jostle: number): Built {
 
 export default function RacePage(): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const atlasRef = useRef<SpriteAtlas | null>(null);
+  const artRef = useRef<{ pal: unknown; layers: unknown; atlas: unknown } | null>(null);
   const rafRef = useRef<number | null>(null);
   const t0Ref = useRef(0);
   const dRef = useRef(0);
@@ -117,23 +91,45 @@ export default function RacePage(): React.JSX.Element {
   const [built, setBuilt] = useState<Built | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [clock, setClock] = useState(0);
-  const palRef = useRef<Palette>(FALLBACK);
-
-  const course = ovalCourse(DIST);
-  const cuts = cutsFor(course);
+  const [coat, setCoat] = useState(false);
+  const [backlight, setBacklight] = useState(false);
 
   useEffect(() => {
-    // ★配色はハンドオフの palette.json から（読めなければ従来色で動く）
-    fetch('/art/palette.json?v=3').then((r) => r.json())
-      .then((p: Palette) => { palRef.current = { ...FALLBACK, ...p }; })
-      .catch(() => { /* ★読めなくても止めない。従来色で描く */ });
-    loadAtlas(18)
-      .then((a) => { atlasRef.current = a; setReady(true); })
-      .catch((e: unknown) => setErr(`スプライトを読み込めません: ${String(e)}`));
-  }, []);
+    let cancelled = false;
+    const boot = async (): Promise<void> => {
+      if (window.STARStill === undefined) {
+        await new Promise<void>((res, rej) => {
+          const s = document.createElement('script');
+          s.src = `/art/still-reference.js?v=${ASSET_VERSION}`;
+          s.onload = () => res();
+          s.onerror = () => rej(new Error('参照実装を読み込めません'));
+          document.head.appendChild(s);
+        });
+      }
+      const [pal, layers] = await Promise.all([
+        fetch(`/art/palette.json?v=${ASSET_VERSION}`).then((r) => r.json()),
+        fetch(`/art/layers.json?v=${ASSET_VERSION}`).then((r) => r.json()),
+      ]);
+      const sheet = await new Promise<HTMLImageElement>((res, rej) => {
+        const im = new Image();
+        im.onload = () => res(im);
+        im.onerror = () => rej(new Error('スプライトを読み込めません'));
+        im.src = `/art/horse-gallop.png?v=${ASSET_VERSION}`;
+      });
+      const api = window.STARStill;
+      if (api === undefined) throw new Error('STARStill がありません');
+      api.setOptions({ coat, backlight });
+      const atlas = await api.buildAtlas(sheet, pal, layers);
+      if (cancelled) return;
+      artRef.current = { pal, layers, atlas };
+      setReady(true);
+    };
+    boot().catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)));
+    return () => { cancelled = true; };
+  }, [coat, backlight]);
 
   useEffect(() => {
-    try { setBuilt(build(seed, ownGate, 0.25)); setErr(null); } catch (e) {
+    try { setBuilt(build(seed, ownGate)); setErr(null); } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
     dRef.current = 0;
@@ -142,230 +138,69 @@ export default function RacePage(): React.JSX.Element {
 
   const render = useCallback((d: number) => {
     const cv = canvasRef.current;
-    const atlas = atlasRef.current;
-    if (cv === null || atlas === null || built === null) return;
+    const art = artRef.current;
+    const api = window.STARStill;
+    if (cv === null || art === null || api === undefined || built === null) return;
     const ctx = cv.getContext('2d');
     if (ctx === null) return;
-    ctx.imageSmoothingEnabled = false;
 
     const sec = built.warp.raceSecAt(d);
-    const horses = built.model.at(sec).map((h) => ({ gate: h.gate, s: h.meters, w: built.wOf(h.gate, h.meters) }));
-    const lead = Math.max(...horses.map((h) => h.s));
-    const metersLeft = DIST - lead;
-
-    const { cut, prev } = cutAt(cuts, metersLeft);
-    let state: CameraState = cut.state;
-    if (prev !== undefined && cut.blendSec > 0) {
-      const into = Math.max(0, (prev.fromMetersLeft - metersLeft) / 16);
-      state = blendCamera(prev.state, cut.state, into / cut.blendSec);
-    }
-    const focusS = focusOf(state.targetMode, horses, ownGate, HORSE_LENGTH_M);
-    const c0 = posOf(course, focusS, course.widthM / 2);
-    const pose: CameraPose = { state, centre: { x: c0.x, y: c0.y }, heading: c0.heading };
-
-    const pal = palRef.current;
-    // ★空と、走路の外の芝
-    ctx.fillStyle = pal['sky-2']!;
-    ctx.fillRect(0, 0, VP.width, VP.height * 0.42);
-    ctx.fillStyle = pal['turf-5']!;
-    ctx.fillRect(0, VP.height * 0.42, VP.width, VP.height * 0.58);
-
-    const near = 300;
-    const clampS = (s: number): number => Math.max(0, Math.min(DIST, s));
-
-    // ★走路の面（内ラチ〜外ラチ）
-    ctx.fillStyle = pal['turf-3']!;
-    ctx.beginPath();
-    for (let s = focusS - near; s <= focusS + near; s += 6) {
-      const p = courseToScreen(course, pose, VP, clampS(s), 0);
-      if (s === focusS - near) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
-    }
-    for (let s = focusS + near; s >= focusS - near; s -= 6) {
-      const p = courseToScreen(course, pose, VP, clampS(s), course.widthM);
-      ctx.lineTo(p.x, p.y);
-    }
-    ctx.closePath();
-    ctx.fill();
+    const at = built.model.at(sec);
+    const sorted = [...at].sort((a, b) => b.meters - a.meters);
+    const lead = sorted[0]!.meters;
+    const own = at.find((h) => h.gate === ownGate);
+    const metersLeft = DIST - (own === undefined ? lead : own.meters);
 
     /**
-     * ★**芝の刈り目**（走路を横切る帯）。
-     *
-     * ⚠️ これが無いと芝が**べた塗り**になり、カメラが馬群を追う以上
-     *    **画面の中で動くものが何も無くなります** → 「スローで走っているみたい」。
-     * ★速度感は**地面の模様が流れること**で出ます。
+     * ★**順位から段と横位置を決めます。**
+     *   ⚠️ 段は 1×／1×／2× の3つだけ（D-058）。**非整数倍で縮小しません。**
+     *   先頭ほど右、後方ほど左。**先頭集団の3頭を手前（2×）**に置きます。
      */
-    for (let m = Math.floor((focusS - near) / 25) * 25; m <= focusS + near; m += 25) {
-      if (m < 0 || m > DIST) continue;
-      if (Math.floor(m / 25) % 2 !== 0) continue;
-      ctx.fillStyle = 'rgba(0,0,0,0.07)';
-      ctx.beginPath();
-      for (let w = 0; w <= course.widthM; w += 4) {
-        const p = courseToScreen(course, pose, VP, m, w);
-        if (w === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
-      }
-      for (let w = course.widthM; w >= 0; w -= 4) {
-        const p = courseToScreen(course, pose, VP, Math.min(DIST, m + 12), w);
-        ctx.lineTo(p.x, p.y);
-      }
-      ctx.closePath();
-      ctx.fill();
-    }
+    const horses = sorted.map((h, rank) => {
+      const row = rank < 3 ? 2 : rank < 7 ? 1 : 0;
+      // ★先頭からの差（m）を画面の x に。手前ほど大きく開く
+      const behind = lead - h.meters;
+      const pxPerM = row === 2 ? 26 : row === 1 ? 20 : 15;
+      const baseX = row === 2 ? 1010 : row === 1 ? 940 : 880;
+      return {
+        gate: h.gate,
+        row,
+        x: Math.round(baseX - behind * pxPerM - (rank % 3) * 18),
+        frame: Math.floor((((d * 2.4 + h.gate * 0.37) % 1) + 1) % 1 * 6),
+        effort: h.staminaRatio,
+        own: h.gate === ownGate,
+      };
+    });
 
-    /**
-     * ★**外の景観**（走路の外側に、生垣とスタンドを帯で置く）。
-     *   ⚠️ 走路と空だけだと、**競馬場に見えません**。
-     *   走路の座標系に置くので、**馬と一緒に流れます**（奥行きは速度差で作る・§3）。
-     */
-    for (const [from, to, col] of [
-      [course.widthM + 2, course.widthM + 9, pal['hedge-1']!],
-      [course.widthM + 9, course.widthM + 22, pal['stand-2']!],
-    ] as const) {
-      ctx.fillStyle = col;
-      ctx.beginPath();
-      for (let s2 = focusS - near; s2 <= focusS + near; s2 += 8) {
-        const p = courseToScreen(course, pose, VP, clampS(s2), from);
-        if (s2 === focusS - near) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
-      }
-      for (let s2 = focusS + near; s2 >= focusS - near; s2 -= 8) {
-        const p = courseToScreen(course, pose, VP, clampS(s2), to);
-        ctx.lineTo(p.x, p.y);
-      }
-      ctx.closePath();
-      ctx.fill();
-    }
-    // ★柵の支柱（縦の要素はここだけ）
-    for (let m = Math.floor((focusS - near) / 10) * 10; m <= focusS + near; m += 10) {
-      if (m < 0 || m > DIST) continue;
-      const a = courseToScreen(course, pose, VP, m, course.widthM + 1.5);
-      ctx.fillStyle = 'rgba(20,20,18,0.5)';
-      ctx.fillRect(a.x - 1, a.y - 14, 2, 14);
-    }
+    // ★前の馬との差（順位ではなく変化を出す・裁定 Q-P4-14 ①）
+    const myRank = sorted.findIndex((h) => h.gate === ownGate);
+    const ahead = myRank > 0 ? sorted[myRank - 1]! : undefined;
+    const gapM = ahead === undefined || own === undefined ? 0 : ahead.meters - own.meters;
+    const back = built.model.at(Math.max(0, sec - 0.6));
+    const ownB = back.find((h) => h.gate === ownGate);
+    const aheadB = ahead === undefined ? undefined : back.find((h) => h.gate === ahead.gate);
+    const gapB = (ownB === undefined || aheadB === undefined) ? gapM : aheadB.meters - ownB.meters;
 
-    // ★ラチ
-    for (const [w, col, lw] of [[0, pal['rail-1']!, 3], [course.widthM, pal['fence-1']!, 2]] as const) {
-      ctx.strokeStyle = col;
-      ctx.lineWidth = lw;
-      ctx.beginPath();
-      let started = false;
-      for (let s = focusS - near; s <= focusS + near; s += 4) {
-        const p = courseToScreen(course, pose, VP, clampS(s), w);
-        if (!started) { ctx.moveTo(p.x, p.y); started = true; } else ctx.lineTo(p.x, p.y);
-      }
-      ctx.stroke();
-    }
+    const phase = phaseOf(metersLeft);
+    const finished = d >= built.warp.displaySec - 0.01;
 
-    // ★ハロン棒
-    ctx.font = 'bold 13px sans-serif';
-    ctx.textAlign = 'center';
-    for (let m = 0; m <= DIST; m += 200) {
-      if (Math.abs(m - focusS) > near) continue;
-      const a = courseToScreen(course, pose, VP, m, 0);
-      ctx.fillStyle = pal['rail-1']!;
-      ctx.fillRect(a.x - 1, a.y - 22, 3, 22);
-      ctx.fillStyle = pal['ink-0']!;
-      ctx.fillRect(a.x - 13, a.y - 37, 28, 15);
-      ctx.fillStyle = '#f2c14e';
-      ctx.fillText(`${DIST - m}`, a.x + 1, a.y - 25);
-    }
-
-    // ★決勝線
-    if (Math.abs(DIST - focusS) <= near) {
-      const a = courseToScreen(course, pose, VP, DIST, 0);
-      const b = courseToScreen(course, pose, VP, DIST, course.widthM);
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
-    }
-
-    /**
-     * ★**奥（上）から手前（下）へ描き、手前ほど大きくします。**
-     *   奥行きの手掛かりはこれだけです（線遠近は描き込まない・アートバイブル §3）。
-     */
-    const drawn = horses
-      .map((h) => ({ h, p: courseToScreen(course, pose, VP, h.s, h.w) }))
-      .sort((a, b) => a.p.y - b.p.y);
-    for (const { h, p } of drawn) {
-      const img = atlas.stripOf(h.gate);
-      if (img === undefined) continue;
-      const depth = 1 + 0.35 * ((p.y - VP.height / 2) / (VP.height / 2));
-      const k = Math.max(0.45, depth) * (state.spriteScale === 2 ? 1.35 : 0.8);
-      const w = SPRITE_W * k;
-      const hh = SPRITE_H * k;
-      // ★脚は表示の時計で回す（毎秒 2.3 歩・馬番で位相をずらす）
-      /**
-       * ★脚の回転。**毎秒 2.3 歩**が実際の駆歩です。
-       * ⚠️ ただし**画面が寄っている（spriteScale=2）ときは、遅く見えます**
-       *    — 馬が大きく映るぶん、同じ歩数でもゆっくりに見えるためです。
-       *    ★実写の中継でも寄ると脚は速く見えるので、寄りでは少し上げます。
-       */
-      const strideHz = state.spriteScale === 2 ? 2.9 : 2.4;
-      const frame = Math.floor(((((d * strideHz + h.gate * 0.37) % 1) + 1) % 1) * 6);
-      ctx.globalAlpha = 0.28;
-      ctx.fillStyle = '#243a1e';
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y, w * 0.17, w * 0.045, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.drawImage(img, frame * SPRITE_W, 0, SPRITE_W, SPRITE_H, p.x - w / 2, p.y - hh * 0.92, w, hh);
-    }
-
-    /**
-     * ★**順位表示**。⚠️ ここで着順を決めているのではありません。
-     *   **いま前にいる順**（位置から）を描くだけです。確定着順はゴール後の表示です。
-     */
-    {
-      const ord = [...horses].sort((a, b) => b.s - a.s).map((h) => h.gate);
-      const size = 26;
-      const gap = 8;
-      const wBar = ord.length * (size + gap) + 20;
-      ctx.fillStyle = 'rgba(22,20,17,0.5)';
-      ctx.fillRect(Math.round((VP.width - wBar) / 2), 8, wBar, size + 18);
-      drawRunningOrder(ctx, ord, atlas.postColors, {
-        x: Math.round((VP.width - wBar) / 2) + 10, y: 17, size, gap,
-      });
-    }
-
-    // ★いま何を見ているか
-    ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(28,26,22,0.72)';
-    ctx.fillRect(10, 10, 440, 62);
-    ctx.fillStyle = '#f2c14e';
-    ctx.font = 'bold 18px sans-serif';
-    ctx.fillText(`${cut.label}（${segmentAt(course, focusS).label}）`, 22, 36);
-    ctx.fillStyle = '#efe9dc';
-    ctx.font = '14px sans-serif';
-    ctx.fillText(`残り ${metersLeft.toFixed(0)}m　ペース ${built.pace}　${state.targetMode}`, 22, 60);
-
-    // ★着順（ゴール後だけ。レース中に出すと結果を先に見せてしまう）
-    if (d >= built.warp.displaySec - 0.01) {
-      const bx = VP.width * 0.36;
-      ctx.fillStyle = 'rgba(28,26,22,0.85)';
-      ctx.fillRect(bx, 90, 330, 24 + 5 * 26);
-      ctx.fillStyle = '#f2c14e';
-      ctx.font = 'bold 15px sans-serif';
-      ctx.fillText('着 順', bx + 16, 112);
-      built.result.slice(0, 5).forEach((e, i) => {
-        const y = 138 + i * 26;
-        const col = atlas.postColors[e.gate - 1] ?? [200, 200, 200];
-        ctx.fillStyle = '#efe9dc';
-        ctx.font = 'bold 15px sans-serif';
-        ctx.fillText(`${e.place}`, bx + 18, y);
-        ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
-        ctx.fillRect(bx + 46, y - 14, 22, 19);
-        ctx.fillStyle = (col[0] * 299 + col[1] * 587 + col[2] * 114) / 1000 < 140 ? '#f5f5f5' : '#111';
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 13px sans-serif';
-        ctx.fillText(`${e.gate}`, bx + 57, y);
-        ctx.textAlign = 'left';
-        ctx.fillStyle = 'rgba(239,233,220,0.75)';
-        ctx.font = '14px sans-serif';
-        ctx.fillText(e.margin, bx + 84, y);
-      });
-    }
-  }, [built, ownGate, course, cuts]);
+    api.drawStill(ctx, {
+      palette: art.pal, layers: art.layers, atlas: art.atlas,
+      parts: {}, scene: 'straight200', scroll: lead * 3.2,
+      horses,
+      own: ownGate,
+      runningOrder: sorted.map((h) => h.gate),
+      gauge: own === undefined ? 1 : own.staminaRatio,
+      cue: phase === 'straight' ? '直線' : phase === 'spurt' ? '勝負所' : '道中',
+      cueActive: phase === 'spurt' || phase === 'straight',
+      gap: { m: gapM, mps: (gapB - gapM) / 0.6, toGo: Math.max(0, myRank - 2) },
+      pace: built.pace,
+      callout: finished
+        ? `${built.result[0]!.gate}番　ゴールイン`
+        : phase === 'straight' ? `さあ直線　${sorted[0]!.gate}番が先頭`
+          : phase === 'spurt' ? '勝負所　各馬が動いた' : `残り ${metersLeft.toFixed(0)}m`,
+    });
+  }, [built, ownGate]);
 
   useEffect(() => { render(dRef.current); }, [render, ready]);
 
@@ -391,11 +226,11 @@ export default function RacePage(): React.JSX.Element {
   }, [playing, built, render]);
 
   return (
-    <main style={{ background: '#221f1b', color: '#efe9dc', padding: 14, fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }}>
-      <h1 style={{ fontSize: 18, margin: '4px 0 10px' }}>
-        レース（PR4）
+    <main style={{ background: '#14120f', color: '#efe9dc', padding: 14, fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }}>
+      <h1 style={{ fontSize: 18, margin: '4px 0 8px' }}>
+        レース
         <span style={{ opacity: 0.6, fontSize: 13, marginLeft: 12 }}>
-          本番と同じエンジン → 境界時刻 → 位置モデル → ★コース幾何 → ★カメラ → Canvas
+          ★本番と同じエンジン → 境界時刻 → 位置モデル → 描画（palette.json / layers.json）
         </span>
       </h1>
       {err !== null && <p style={{ color: '#e06a4a', fontWeight: 'bold' }}>★{err}</p>}
@@ -419,15 +254,22 @@ export default function RacePage(): React.JSX.Element {
             {Array.from({ length: FIELD }, (_, i) => i + 1).map((g) => <option key={g} value={g}>{g} 番</option>)}
           </select>
         </label>
+        <label title="馬体の色を毛色に置き換える。元の絵の階調が減ります">
+          <input type="checkbox" checked={coat} onChange={(e) => setCoat(e.target.checked)} />{' '}毛色
+        </label>
+        <label title="馬体を暗く落として縁を光らせる。元の絵の階調が減ります">
+          <input type="checkbox" checked={backlight} onChange={(e) => setBacklight(e.target.checked)} />{' '}逆光
+        </label>
         {built !== null && <span style={{ fontSize: 13, opacity: 0.8 }}>{clock.toFixed(1)} / {built.warp.displaySec.toFixed(1)} 秒</span>}
       </div>
       <canvas
-        ref={canvasRef} width={VP.width} height={VP.height}
-        style={{ width: '100%', maxWidth: VP.width, border: '1px solid #4a453d', imageRendering: 'pixelated', background: '#111' }}
+        ref={canvasRef} width={W} height={H}
+        style={{ width: '100%', maxWidth: W, border: '1px solid #4a453d', imageRendering: 'pixelated', background: '#111' }}
       />
       <p style={{ fontSize: 12, opacity: 0.55, marginTop: 10, lineHeight: 1.8 }}>
         ★<b>着順はエンジンが決めたもの</b>です（開始時に D-059 のゲートを通しています）。<br />
-        ⚠️ <b>横位置は見せているだけ</b>で、<b>距離ロスは着順に効かせていません</b>（D-065 は Q-P4-29 の裁定待ち）。
+        ★<b>段は 1×／1×／2× の3つだけ</b>（D-058）。先頭の3頭が手前（2×）に来ます。<br />
+        ⚠️ 横位置は見せているだけで、<b>距離ロスは着順に効かせていません</b>（D-065 は裁定待ち）。
       </p>
     </main>
   );

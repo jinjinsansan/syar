@@ -637,17 +637,40 @@
       drawFinish(ctx, pal, scene.finishX, byId.turfMain.y, byId.turfMain.height + 30, 2);
     }
 
-    // ★馬群。奥の段から手前の段へ
+    /**
+     * ★**馬群**。奥の段から手前の段へ。
+     *
+     *   ⚠️ 既定は `layers.horsePlan`（静止画のための固定配置）ですが、
+     *      **動くレースでは外から配置を渡せる**ようにしています（`o.horses`）。
+     *      形: `[{ gate, row: 0|1|2, x, frame, effort, own }]`
+     *   ★**この層は順位を決めません。** 渡された配置を描くだけです。
+     */
     var plan = layers.horsePlan;
-    plan.rows.forEach(function (row, ri) {
-      row.gates.forEach(function (gate, i) {
-        drawHorse(ctx, pal, atlas, gate, (i * 2 + ri * 3) % 6, row.x[i], row.groundY, row.scale, parts, {
-          air: row.air,
-          effort: gate === plan.own ? scene.gauge : [0.7, 0.5, 0.35, 0.6, 0.8, 0.45, 0.55, 0.3, 0.65][(gate * 3) % 9],
-          own: gate === plan.own
+    var own = (o.own !== undefined) ? o.own : plan.own;
+    if (o.horses) {
+      var byRow = [[], [], []];
+      o.horses.forEach(function (hh) { (byRow[hh.row] || byRow[0]).push(hh); });
+      byRow.forEach(function (list, ri) {
+        var row = plan.rows[ri];
+        list.forEach(function (hh) {
+          drawHorse(ctx, pal, atlas, hh.gate, hh.frame % 6, hh.x, row.groundY, row.scale, parts, {
+            air: row.air,
+            effort: hh.effort === undefined ? 0.6 : hh.effort,
+            own: hh.gate === own
+          });
         });
       });
-    });
+    } else {
+      plan.rows.forEach(function (row, ri) {
+        row.gates.forEach(function (gate, i) {
+          drawHorse(ctx, pal, atlas, gate, (i * 2 + ri * 3) % 6, row.x[i], row.groundY, row.scale, parts, {
+            air: row.air,
+            effort: gate === plan.own ? scene.gauge : [0.7, 0.5, 0.35, 0.6, 0.8, 0.45, 0.55, 0.3, 0.65][(gate * 3) % 9],
+            own: gate === plan.own
+          });
+        });
+      });
+    }
 
     if (parts.railFront) drawLayer(ctx, byId.railFront, pal, scroll, V);
     if (parts.pole && scene.poleX !== null) drawPole(ctx, pal, scene.poleX, byId.railFront.y, scene.poleMeters, 2);
@@ -655,11 +678,12 @@
     if (parts.turfNear) drawLayer(ctx, byId.turfNear, pal, scroll, V);
 
     // ── UI（画面の座標系。カメラが隠せない） ──
-    if (parts.order) drawOrder(ctx, pal, plan.runningOrder, plan.own);
-    if (parts.pace) drawPace(ctx, pal, 1106, 22, scene.pace);
-    if (parts.gauge) drawGauge(ctx, pal, 24, 22, 300, scene.gauge, scene.cue, scene.cueActive);
-    if (parts.gap) drawGap(ctx, pal, 24, 96, 300, scene.gap.m, scene.gap.mps, scene.gap.toGo);
-    if (parts.callout) drawCallout(ctx, pal, scene.callout);
+    if (parts.order) drawOrder(ctx, pal, o.runningOrder || plan.runningOrder, own);
+    if (parts.pace) drawPace(ctx, pal, 1106, 22, o.pace || scene.pace);
+    if (parts.gauge) drawGauge(ctx, pal, 24, 22, 300, o.gauge !== undefined ? o.gauge : scene.gauge, o.cue || scene.cue, o.cueActive !== undefined ? o.cueActive : scene.cueActive);
+    var gp = o.gap || scene.gap;
+    if (parts.gap) drawGap(ctx, pal, 24, 96, 300, gp.m, gp.mps, gp.toGo);
+    if (parts.callout) drawCallout(ctx, pal, o.callout !== undefined ? o.callout : scene.callout);
     if (parts.result && scene.result) drawResult(ctx, pal, 866, 200, scene.result);
   }
 
