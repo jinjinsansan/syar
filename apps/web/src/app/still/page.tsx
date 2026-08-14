@@ -75,7 +75,7 @@ export default function StillPage(): React.JSX.Element {
     ctx.fillRect(0, 0, W, hy);
     if (parts.sky) {
       ctx.fillStyle = 'rgba(255,255,255,0.10)';
-      for (const [a, b] of [[0.35, 0.42], [0.55, 0.60]]) {
+      for (const [a, b] of [[0.35, 0.42], [0.55, 0.60]] as const) {
         ctx.fillRect(0, Math.round(hy * a), W, Math.round(hy * (b - a)));
       }
     }
