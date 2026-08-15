@@ -99,6 +99,9 @@ export const READONLY = [
   'shot-oblique.mjs',
   // ★画像を読み書きするだけ。DB に触れません
   'bake-oblique.mjs',
+  // ★動画をコマに切って幾何と時間を測るだけ。DB に触れません
+  'measure-race-video.mjs',
+  'measure-race-still.mjs',
   'measure-silk-budget.mjs',
   'measure-sprite-sheet.mjs',
   'pick-silk-palette.mjs',
