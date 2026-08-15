@@ -13,14 +13,13 @@
  *   ★実際、①②だけなら**漏洩したまま通りました**:
  *     位置の順位と脚質の2つだけで、スタート直後から AUC 0.928・**ずっと平坦**。
  *
- * 実行: npx tsx tools/verify-v16.mjs [--races 1200] [--shape] [--jostle 0.9]
+ * 実行: npx tsx tools/verify-v16.mjs [--races 1200] [--formation 0]
  */
 import { execFileSync } from 'node:child_process';
 
 const argv = process.argv.slice(2);
 const num = (f, d) => { const i = argv.indexOf(f); return i >= 0 ? Number(argv[i + 1]) : d; };
 const RACES = num('--races', 1200);
-const PASS = argv.filter((a) => a === '--shape' || a === '--jostle' || !Number.isNaN(Number(a)) === false);
 
 /** 測る点。★局面の代表点（残りメートル） */
 const POINTS = [
@@ -34,9 +33,8 @@ const POINTS = [
 ];
 
 const extra = [];
-if (argv.includes('--shape')) extra.push('--shape');
-const ji = argv.indexOf('--jostle');
-if (ji >= 0) extra.push('--jostle', argv[ji + 1]);
+const ji = argv.indexOf('--formation');
+if (ji >= 0) extra.push('--formation', argv[ji + 1]);
 
 console.log('# ★V-16 — 画面が情報を運んでいるか');
 console.log(`  ${RACES} レース / ${extra.join(' ') || '既定'}`);

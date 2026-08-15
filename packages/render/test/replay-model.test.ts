@@ -19,30 +19,46 @@ const boundaries = (): Boundaries[] => {
   return out;
 };
 
-const model = (jostle?: number) => replayPositionModel({
+const model = (formation?: number) => replayPositionModel({
   distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400,
-  boundaries: boundaries(), ...(jostle === undefined ? {} : { jostle }),
+  boundaries: boundaries(),
+  strategyOf: (g) => (['nige', 'senko', 'sashi', 'oikomi'] as const)[(g - 1) % 4]!,
+  formationSeed: 777,
+  ...(formation === undefined ? {} : { formation }),
 });
 
 describe('★D-059 補間は境界を動かさない', () => {
-  it('★境界時刻には、必ず境界の位置にいる', () => {
+  /**
+   * ★★**2026-08-15（Q-P4-38）で、この検査の対象が変わりました。**
+   *
+   * 【旧】**中間境界（残り800m / 400m）でも**位置がぴったり
+   * 【新】★**発走とゴールだけ**がぴったり
+   *
+   * 【なぜ】道中の位置を**脚質から生成**するようになったためです。
+   *   ⚠️ そして、これは**副作用ではなく目的**です:
+   *      中間境界がぴったりだと、★**その時刻に「位置＋脚質」から走破タイムが厳密に逆算でき**、
+   *      実測でも**そこだけ AUC が落ちませんでした**（道中 0.923 → 0.731 なのに境界は 0.963 のまま）。
+   *   ★**D-059 が守るのは着順です。** 中間境界の位置ではありません。
+   *
+   * ⚠️ ★**残っている問い**: 仕掛けの受付（C-6）と局面の合図は「残り距離」で決まります。
+   *    画面の位置が真の位置と最大 20m ずれるので、**どちらを基準にするか**を照会します。
+   */
+  it('★★発走とゴールは、生成器を通しても厳密に一致する（D-059）', () => {
     for (const b of boundaries()) {
-      for (const [sec, expected] of [
-        [b.startSec, 0], [b.spurtSec, DIST - 800], [b.straightSec, DIST - 400], [b.finishSec, DIST],
-      ] as const) {
-        const h = model().at(sec).find((x) => x.gate === b.gate)!;
-        expect(h.meters).toBeCloseTo(expected, 6);
+      for (const f of [0, 0.5, 1]) {
+        const m = model(f);
+        expect(m.at(b.startSec).find((x) => x.gate === b.gate)!.meters).toBeCloseTo(0, 6);
+        expect(m.at(b.finishSec).find((x) => x.gate === b.gate)!.meters).toBeCloseTo(DIST, 6);
       }
     }
   });
 
-  it('★演出の強さをいくら変えても、境界は動かない', () => {
-    for (const j of [0, 0.05, 0.2, 0.5]) {
-      for (const b of boundaries()) {
-        const h = model(j).at(b.spurtSec).find((x) => x.gate === b.gate)!;
-        expect(h.meters).toBeCloseTo(DIST - 800, 6);
-      }
-    }
+  it('★★中間境界は、生成器のぶんだけずれる（＝逆算できない）', () => {
+    const b = boundaries()[4]!;
+    const off = model(0).at(b.spurtSec).find((x) => x.gate === b.gate)!.meters;
+    const on = model(1).at(b.spurtSec).find((x) => x.gate === b.gate)!.meters;
+    expect(off).toBeCloseTo(DIST - 800, 6);      // 生成しなければ真実
+    expect(Math.abs(on - off)).toBeGreaterThan(1);
   });
 
   it('★最終順が確定着順と完全一致する（D-059 のゲート）', () => {
@@ -58,7 +74,7 @@ describe('★D-059 補間は境界を動かさない', () => {
     const b = boundaries()[4]!;
     const mid = (b.spurtSec + b.straightSec) / 2;
     const off = model(0).at(mid).find((x) => x.gate === b.gate)!.meters;
-    const on = model(0.2).at(mid).find((x) => x.gate === b.gate)!.meters;
+    const on = model(1).at(mid).find((x) => x.gate === b.gate)!.meters;
     expect(on).not.toBeCloseTo(off, 3);
   });
 
@@ -78,7 +94,13 @@ describe('★D-059 補間は境界を動かさない', () => {
     const b = boundaries()[0]!;
     const m = model();
     expect(m.at(b.spurtSec - 1).find((h) => h.gate === 1)!.staminaRatio).toBe(1);
-    expect(m.at(b.spurtSec + 1).find((h) => h.gate === 1)!.staminaRatio).toBeLessThan(1);
+    /**
+     * ⚠️ ★生成器のぶん位置がずれるので、**時刻ではなく残り距離**で見ます。
+     *    （「勝負所に入った」の判定は §13 で**残り距離**と定められています）
+     */
+    const late = m.at(b.spurtSec + 6).find((h) => h.gate === 1)!;
+    expect(late.meters).toBeGreaterThan(DIST - 800);
+    expect(late.staminaRatio).toBeLessThan(1);
   });
 
   it('★同じ入力から同じ位置（乱数を使っていない）', () => {
@@ -89,13 +111,16 @@ describe('★D-059 補間は境界を動かさない', () => {
 });
 
 /**
- * ★**別ストリームの揺らぎ**（正典 D-061 改訂）
+ * ★**隊列の生成**（D-061 改訂 → ★Q-P4-38 で `jostle` から置き換え）
  *
- * > 正しくは「結果に影響する乱数を引かない」でした。
- * > 別ストリームから引く揺らぎは、シードから再計算できるので Provably Fair は保たれ、
- * > `resolveRace` に触れないので再較正も要りません。
+ * > 正しくは「結果に影響する乱数を引かない」でした（D-061 改訂）。
+ * > **別ストリーム**から引くので Provably Fair は保たれ、`resolveRace` に触れないので
+ * > 再較正も要りません。★**その性質は生成器でもそのまま**です。
+ *
+ * ★2026-08-15（Q-P4-38）: `jostle`（揺らぎ）を撤去し、
+ *   **道中を脚質から生成して真の着順へ収束させる**形に置き換えました。
  */
-describe('★別ストリームの揺らぎ（D-061 改訂）', () => {
+describe('★隊列の生成（D-061 改訂 → Q-P4-38）', () => {
   const bs: readonly Boundaries[] = [
     { gate: 1, startSec: 0, spurtSec: 61, straightSec: 86, finishSec: 97.4 },
     { gate: 2, startSec: 0, spurtSec: 59, straightSec: 84, finishSec: 96.1 },
@@ -103,113 +128,91 @@ describe('★別ストリームの揺らぎ（D-061 改訂）', () => {
     { gate: 4, startSec: 0, spurtSec: 58, straightSec: 85, finishSec: 98.2 },
   ];
   const mk = (o: Record<string, unknown>) => replayPositionModel({
-    distanceMeter: 1600, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries: bs, ...o,
+    distanceMeter: 1600, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries: bs,
+    strategyOf: (g) => (['nige', 'senko', 'sashi', 'oikomi'] as const)[(g - 1) % 4]!,
+    ...o,
   });
   const EXPECTED = [2, 3, 1, 4];   // finishSec の順
 
   it('★★どのシード・どの強さでも、着順は1頭も動かない', () => {
-    for (const fid of ['exact', 'shape'] as const) {
-      for (const jostleSeed of [0, 1, 42, 99991, -7]) {
-        for (const jostle of [0, 0.06, 0.5, 0.9]) {
-          expect(finalOrderOf(mk({ jostle, jostleSeed, boundaryFidelity: fid }))).toEqual(EXPECTED);
-        }
+    for (const formationSeed of [0, 1, 42, 99991, -7]) {
+      for (const formation of [0, 0.3, 0.7, 1]) {
+        expect(finalOrderOf(mk({ formation, formationSeed }))).toEqual(EXPECTED);
       }
     }
   });
 
   it('★同じシードから同じ位置（乱数を直接呼んでいない・憲法4）', () => {
-    const a = mk({ jostle: 0.9, jostleSeed: 12345, boundaryFidelity: 'shape' });
-    const b = mk({ jostle: 0.9, jostleSeed: 12345, boundaryFidelity: 'shape' });
+    const a = mk({ formationSeed: 12345 });
+    const b = mk({ formationSeed: 12345 });
     for (const sec of [5, 20, 50, 80, 95]) {
       expect(JSON.stringify(a.at(sec))).toBe(JSON.stringify(b.at(sec)));
     }
   });
 
   it('★シードが違えば揺らぎが違う（レースごとに違う＝学習で除けない）', () => {
-    const a = mk({ jostle: 0.9, jostleSeed: 1, boundaryFidelity: 'shape' });
-    const b = mk({ jostle: 0.9, jostleSeed: 2, boundaryFidelity: 'shape' });
+    const a = mk({ formationSeed: 1 });
+    const b = mk({ formationSeed: 2 });
     // ★勝負所以降で見ます（道中は意図的に動かしていません。下の検査を参照）
     expect(JSON.stringify(a.at(90))).not.toBe(JSON.stringify(b.at(90)));
   });
 
-  it('★★道中はシードで変わる（漏洩を隠す・2026-08-15 の裁定）', () => {
+  it('★★道中の位置は「脚質」で決まり、「走破タイム」では決まらない（Q-P4-38）', () => {
     /**
-     * ★★**2026-08-15 に、この検査の意味が反転しました。**
+     * ★★**2026-08-15（Q-P4-38）で、この検査の意味が2度目の変更を受けました。**
      *
-     * 【旧】道中は動かない（`PHASE_JOSTLE = [0, 0.2, 1.0]`）
-     *   根拠: 中継の解説「隊列特に変わらずに通過」／通過順位 `8-8-8-4`
+     * 【① 旧】道中は動かない（`PHASE_JOSTLE = [0, 0.2, 1.0]`）
+     * 【② 8/15 午前】道中はシードで変わる（★乱数で漏洩を隠す）
+     * 【③ 8/15 午後・いま】★**道中は脚質で決まる**（隠す必要がない）
      *
-     * 【新】レビュー側の裁定:
-     *   > 振幅を**残り距離とともにゼロへ減衰**させてください。
-     *   > 序盤: 大きい → **漏洩が隠れる** ／ 終盤: ゼロ → 画面が真実になる
-     *   > D-063 で一定振幅を指示したのは**こちらの誤り**です。
+     * > 漏洩の正体は「道中の順位＝最終着順」なので、乱数で順位を動かす以外に隠す手がなかった。
+     * > ★**どの振幅でも両立しないのは当然で、同じつまみで反対向きのことをさせていた**（裁定）
      *
-     * 【⚠️ ★そして、2つは両立しませんでした（実測）】
-     *   ```
-     *   jostle   道中の順位変動(1角→2角 / 2角→3角)   V-16 ③（スタート直後）
-     *   0        ★0.03 / 0.43                       ★FAIL（+0.218・許容 0.188）
-     *   0.05     2.71 / 1.77                        PASS（+0.008）
-     *   0.25     3.35 / 3.55                        PASS（−0.061）
-     *   ```
-     *   ★**漏洩を隠すことと、道中の順位を動かさないことは、同じものの裏表です。**
-     *     道中の位置が**結果から作られている**限り（`replayOf(result, …)`）、
-     *     順位を隠す＝順位を動かす、になります。
-     *
-     * → ★**照会中**（`REPORT_P4_JOSTLE_20260815.md`）。
-     *   提案: **道中の順位を脚質から作り、結果から作らない**。
-     *   そうすれば「隠す」必要がなくなり、道中も安定します。
-     *
-     * ここでは**裁定どおりの挙動**を固定します。
+     * ★**②は乱数で隠していたので、道中が 2.7〜3.5着 ふらつきました。**
+     *   ③は隠していないので、★**道中は揃い、しかも漏れません。**
      */
-    const a = mk({ jostle: 0.9, jostleSeed: 1 });
-    const b = mk({ jostle: 0.9, jostleSeed: 2 });
-    // ★道中はシードで変わる（＝結果が読めない）
-    expect(JSON.stringify(a.at(30))).not.toBe(JSON.stringify(b.at(30)));
-    // ★★終盤はシードによらず同じ（＝画面が真実になる）
-    expect(JSON.stringify(a.at(99))).toBe(JSON.stringify(b.at(99)));
+    // ★走破タイムを入れ替えても、道中の並びは変わらない（＝結果が入っていない）
+    const swapped = bs.map((b, i) => ({ ...b, finishSec: bs[bs.length - 1 - i]!.finishSec }));
+    const a2 = mk({ formationSeed: 5 });
+    const b2 = replayPositionModel({
+      distanceMeter: 1600, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries: swapped,
+      strategyOf: (g) => (['nige', 'senko', 'sashi', 'oikomi'] as const)[(g - 1) % 4]!,
+      formationSeed: 5,
+    });
+    const order = (m: ReturnType<typeof mk>, sec: number) =>
+      [...m.at(sec)].sort((x, y) => y.meters - x.meters).map((h) => h.gate).join(',');
+    // ★道中は同じ（走破タイムが違うのに）
+    expect(order(b2, 20)).toBe(order(a2, 20));
+    // ★★終盤は違う（着順が違うので収束先が違う）
+    expect(order(b2, 96)).not.toBe(order(a2, 96));
   });
 
-  it('★位置は後戻りしない（どの強さでも・馬が下がって見えない）', () => {
-    for (const fid of ['exact', 'shape'] as const) {
-      for (const jostle of [0.06, 0.5, 0.9]) {
-        const m = mk({ jostle, jostleSeed: 777, boundaryFidelity: fid });
-        for (const g of [1, 2, 3, 4]) {
-          let prev = -1;
-          for (let sec = 0; sec <= 99; sec += 0.25) {
-            const v = m.at(sec).find((h) => h.gate === g)!.meters;
-            expect(v).toBeGreaterThanOrEqual(prev - 1e-9);
-            prev = v;
-          }
-        }
-      }
-    }
-  });
-
-  it("★'exact' は中間境界を動かさない（D-059 の明文どおり）", () => {
-    const m = mk({ jostle: 0.9, jostleSeed: 3, boundaryFidelity: 'exact' });
-    for (const b of bs) {
-      expect(m.at(b.spurtSec).find((h) => h.gate === b.gate)!.meters).toBeCloseTo(800, 6);
-      expect(m.at(b.straightSec).find((h) => h.gate === b.gate)!.meters).toBeCloseTo(1200, 6);
-    }
-  });
-
-  it("★★'shape' は中間境界を動かす — **そこが漏洩の口だったから**", () => {
+  it('★★中間境界は動く — **そこが漏洩の口だったから**', () => {
     /**
-     * ★区間ごとに揺らぐと、**境界ではちょうど 0** になります。
+     * ★区間ごとに揺らぐ形（旧 `'exact'`）では、**境界ではちょうど 0** になります。
      *   そこでは `位置 + 脚質` から走破タイムが厳密に逆算でき、
      *   実測で**揺らぎをいくら強くしても残り800m の AUC は 0.931 のまま**でした
      *   （道中は 0.923 → 0.731 まで落ちるのに）。
-     *   → `'shape'` で 0.931 → **0.799**。
+     *
+     * ★Q-P4-38 の生成器では、道中を**脚質から作る**ので、
+     *   中間境界も**そもそも真の位置ではありません**。★逆算する手がかりがありません。
      */
-    const m = mk({ jostle: 0.9, jostleSeed: 3, boundaryFidelity: 'shape' });
+    const m = mk({ formation: 1, formationSeed: 3 });
     let moved = 0;
     for (const b of bs) {
-      // ★直線の境界で見ます（道中の境界は、道中の揺らぎが 0 なので動きません）
+      if (Math.abs(m.at(b.spurtSec).find((h) => h.gate === b.gate)!.meters - 800) > 1) moved += 1;
       if (Math.abs(m.at(b.straightSec).find((h) => h.gate === b.gate)!.meters - 1200) > 1) moved += 1;
     }
     expect(moved).toBeGreaterThan(0);
-    // ★それでも端は端（着順は動かない）
+    // ★それでも着順は動かない
     expect(finalOrderOf(m)).toEqual(EXPECTED);
+  });
+
+  it('★生成しなければ（formation: 0）中間境界は真実のまま = 逆算できる', () => {
+    const m = mk({ formation: 0 });
+    for (const b of bs) {
+      expect(m.at(b.spurtSec).find((h) => h.gate === b.gate)!.meters).toBeCloseTo(800, 6);
+    }
   });
 
   it('★揺らぎ 0 なら、シードを変えても何も変わらない（空振りでない対照）', () => {

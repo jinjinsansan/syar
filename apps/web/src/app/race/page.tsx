@@ -75,8 +75,10 @@ function build(seed: number, ownGate: number): Built {
   if (!finalOrderMatches(result, boundaries)) throw new Error('映像の着順が確定着順と違います（D-059）');
   const model = replayPositionModel({
     distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
-    // ★揺らぎの既定は `@star/render` の DEFAULT_JOSTLE 1か所（判定側もそこから輸入する）
-    jostleSeed: seed * 2654435761,
+    // ★道中は脚質から生成する（Q-P4-38）。走破タイムからは作らない
+    strategyOf: (g) => entrants[g - 1]!.strategy,
+    pace,
+    formationSeed: seed * 2654435761,
   });
   const settled = result.order.map((e) => Number(e.horseId));
   if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(settled)) {

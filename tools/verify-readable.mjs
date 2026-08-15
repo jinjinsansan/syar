@@ -40,7 +40,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf } from '@star/race-engine';
-import { replayPositionModel, sceneAt, cameraFor, DEFAULT_JOSTLE } from '@star/render';
+import { replayPositionModel, sceneAt, cameraFor } from '@star/render';
 
 const argv = process.argv.slice(2);
 const num = (flag, dflt) => {
@@ -49,15 +49,13 @@ const num = (flag, dflt) => {
 };
 const RACES = num('--races', 800);
 /**
- * ★**製品の既定を輸入します**（レビュー側裁定 2026-08-15）。
- *   ⚠️ 以前は判定 0.06 / 画面 0.25 と**別々に持っていました**。
- *      ★V-16 は、画面に出ていないものを測っていました。
+ * ★**隊列の強さ**（Q-P4-38）。★`jostle`（揺らぎ）は撤去しました。
+ *   1 = 道中を脚質から生成する（既定）／0 = 真の位置そのまま（★漏れる。対照用）
  */
-const JOSTLE = num('--jostle', DEFAULT_JOSTLE);
+const FORMATION = num('--formation', 1);
 /** ★どこで止めて予想させるか（残りメートル）。時間の構造を測るために動かせます */
 const AT_LEFT = num('--at', 800);
 /** ★中間境界を位置として厳守するか（'exact' = D-059 の明文 / 'shape' = D-061 改訂の含意） */
-const FIDELITY = argv.includes('--shape') ? 'shape' : 'exact';
 /** ★能力の幅（1 = 同クラス最小 / 大きいほどばらばら） */
 const SPREAD = num('--spread', 1);
 const DIST = 1600;
@@ -242,9 +240,12 @@ function runRace(seed) {
   const { pace } = paceOf(entrants, DEFAULT_RACE_BALANCE);
   const boundaries = replayOf(result, (g) => entrants[g - 1].strategy, pace);
   const model = replayPositionModel({
-    distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries, jostle: JOSTLE,
+    distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
+    strategyOf: (g) => entrants[g - 1].strategy,
+    pace,
+    formation: FORMATION,
     // ★別ストリーム（D-061 改訂）。resolveRace の乱数には触れません
-    jostleSeed: seed * 2654435761, boundaryFidelity: FIDELITY,
+    formationSeed: seed * 2654435761,
   });
 
   const ownGate = 1 + (seed % FIELD);

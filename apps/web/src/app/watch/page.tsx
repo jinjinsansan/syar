@@ -80,7 +80,11 @@ function build(seed: number, ownGate: number, jostle: number, cruise: number): B
   }
   const model = replayPositionModel({
     distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
-    jostle, jostleSeed: seed * 2654435761,
+    // ★道中は脚質から生成する（Q-P4-38）。走破タイムからは作らない
+    strategyOf: (g) => entrants[g - 1]!.strategy,
+    pace,
+    formation: jostle,
+    formationSeed: seed * 2654435761,
   });
   const settled = result.order.map((e) => Number(e.horseId));
   if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(settled)) {
