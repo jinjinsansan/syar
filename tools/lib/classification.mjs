@@ -94,6 +94,7 @@ export const READONLY = [
   // ★scene.js をそのまま実行して PNG にするだけ。DB にも台帳にも触れません
   'shot-scene.mjs',
   'diag-screen-overtake.mjs',
+  'diag-cuts.mjs',
   'measure-silk-budget.mjs',
   'measure-sprite-sheet.mjs',
   'pick-silk-palette.mjs',

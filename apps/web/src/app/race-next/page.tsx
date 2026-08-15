@@ -25,7 +25,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches } from '@star/race-engine';
 import type { Strategy } from '@star/sim-engine';
 import {
-  replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
+  replayPositionModel, finalOrderOf, timeWarpFor, knotsFor,
   ovalCourse, segmentStarts, HORSE_LENGTH_M,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
@@ -36,7 +36,7 @@ const W = 1280;
 const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 /** ★上げないと古い JS が使われます（「変わっていません」の正体） */
-const V = '18';
+const V = '19';
 
 /** ★区間の境目（1角/2角/向正面/…）。**コースから読みます**（書き写すとずれる） */
 const COURSE = ovalCourse(DIST);
@@ -44,6 +44,31 @@ const SEGS: readonly { s: number; end: number; label: string }[] = (() => {
   const st = segmentStarts(COURSE);
   return st.map((x, i) => ({ s: x.s, end: st[i + 1]?.s ?? COURSE.distance, label: x.label }));
 })();
+
+/**
+ * ★★**送り速さ**（レース秒 ÷ 表示秒。大きいほど速送り）
+ *
+ * 【オーナー判定】「なぜか急にスピードが上がる時がある。そのスピードを最初から最後まで。
+ *   最低でもスピード感がある」「レースは30秒」
+ *
+ * 【何が起きていたか】
+ *   ・「急に上がる」の正体は**背景ではなく馬**でした。★残り800m が勝負所の境目で、
+ *     そこから**馬が離れ始める**ので、それまで動かなかった馬が急に動き出します
+ *   ・送り速さ自体は `道中1.8 → 勝負所1.0 → 直線0.7` で、★**進むほど遅く**なります
+ *   ・1600m の表示が **91秒**。長すぎます
+ *
+ * 【どう変えたか】★**比を保ったまま全体を上げます**（D-062 の向きは崩さない）
+ *     道中 3.6 / 勝負所 3.0 / 直線 2.4  → 表示 約31秒
+ *   ・★段差を 1.8:1:0.7（2.6倍）から 3.6:3:2.4（1.5倍）に**縮めた**ので、
+ *     「急に変わった」と感じにくくなります
+ *   ・★決着に向けて少し伸びるのは**残します**。D-062（時間を情報量に比例して配る）と
+ *     C-6（人間が読んで押す余地）が、そこに依っているためです
+ *
+ * ⚠️ ★**これは D-062 の数字を変える決定です。** 正典の改訂が要ります。
+ *    ⚠️ `packages/render` の既定（`DEFAULT_PHASE_RATES`）は**変えていません**。
+ *       あれはレビュー側が実測から置いた数字で、`/race` と V-16 が使っています。
+ */
+const RATES = { cruise: 3.6, spurt: 3.0, straight: 2.4 };
 
 /** ★発走の間（秒）。この間はレースの時計を進めません */
 const GATE_HOLD = 3.4;
@@ -99,6 +124,42 @@ function softGap(dm: number): number {
 }
 /** ★段の中でも数 px ずらして重なりを解く（段の接地線そのものは動かさない） */
 const SUB_DEPTH = 7;
+
+/**
+ * ★★**カット**（オーナー指示②「ずっと同じカメラワークで飽きる。見せ場が要る」）
+ *
+ * 【できること】★**画角**（馬間の広がり＝寄り/引き）と**注視点**（誰を画面の中心に置くか）。
+ *   ⚠️ **倍率は 1×/2× のみ**（D-058）なので、寄り＝スプライトを拡大ではなく
+ *      **馬間を広げて遠い馬を画面外へ出す**（＝望遠で寄るのと同じ効果）。
+ *
+ * 【★できないこと（素材が無い）】
+ *   ・**上空からの俯瞰**（②2角）… ★一度自作して失敗しました。走路が真上から見た広大な緑になり、
+ *     馬が小さく「地図」に見えた（`/race2`・削除済み）。**第3便でデザイナーに頼みます**
+ *   ・**奥から走ってくる正面の絵**（④4角）… ★斜め・奥行きの線は
+ *     アートバイブル §3（線遠近を描き込まない）に正面から抵触します。**同じく第3便**
+ *   → ★**推測で作らず、素材が来るまでは「画角と注視点」で作ります。**
+ *
+ * 【区間】★コースから読みます（1600m は 2角の途中から始まる）
+ *   残り1600〜1400 2角  … 発走。★引いて全馬。逃げ・先行が前へ、差し・追込が後ろへ流れる
+ *   残り1400〜1000 向正面 … 道中。★いちばん引く（上空の代わり）
+ *   残り1000〜 700 3角  … 仕掛け。★寄り始め・注視は**いちばん上がってきている馬**
+ *   残り 700〜 400 4角  … 勝負所。★さらに寄る・注視は先頭争い
+ *   残り 400〜   0 直線  … 決着。★最も寄る。ただし**入った瞬間だけ一度引く**（裁定）
+ */
+interface Cut { readonly zoom: number; readonly target: 'pack' | 'mover' | 'lead2'; readonly label: string }
+const CUT_OF: Record<string, Cut> = {
+  '2角': { zoom: 0.72, target: 'pack', label: '発走' },
+  '1角': { zoom: 0.72, target: 'pack', label: '発走' },
+  向正面: { zoom: 0.6, target: 'pack', label: '道中' },
+  '3角': { zoom: 1.25, target: 'mover', label: '仕掛け' },
+  '4角': { zoom: 1.7, target: 'lead2', label: '勝負所' },
+  直線: { zoom: 2.1, target: 'lead2', label: '決着' },
+};
+/** ★カットが切り替わってから画角が落ち着くまで（秒）。0 だと「バグ」に見える */
+const CUT_EASE = 0.55;
+/** ★「寄る前に一度引く」（裁定）。直線に入った最初の 0.7秒だけ引く */
+const PULL_BACK_SEC = 0.7;
+const PULL_BACK_ZOOM = 0.75;
 
 /**
  * ★**走る段は、レース中ずっと変わりません。**
@@ -175,7 +236,7 @@ function build(seed: number, ownGate: number): Built {
   }
   return {
     model,
-    warp: timeWarpFor(knotsFor(boundaries, ownGate), DEFAULT_PHASE_RATES),
+    warp: timeWarpFor(knotsFor(boundaries, ownGate), RATES),
     pace,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
   };
@@ -209,6 +270,10 @@ export default function RaceNextPage(): React.JSX.Element {
   const dRef = useRef(0);
   const lastSecRef = useRef('');
   const badgeAtRef = useRef(-9);
+  /** ★カットの画角と注視点。**なめらかに追う**ための保持値 */
+  const zoomRef = useRef(0);
+  const camRef = useRef<number | null>(null);
+  const lastDRef = useRef(0);
 
   const [seed, setSeed] = useState(42);
   const [ownGate, setOwnGate] = useState(3);
@@ -273,6 +338,9 @@ export default function RaceNextPage(): React.JSX.Element {
     setClock(0);
     lastSecRef.current = '';
     badgeAtRef.current = -9;
+    zoomRef.current = 0;
+    camRef.current = null;
+    lastDRef.current = 0;
   }, [seed, ownGate]);
 
   const render = useCallback((d: number) => {
@@ -302,15 +370,56 @@ export default function RaceNextPage(): React.JSX.Element {
     const gateT = Math.max(0, d - GATE_OPEN_AT) / 1.4;
     const gateX = gateT <= 0 ? 83 : 83 - 1500 * (gateT * gateT);
 
-    // ★区間が切り替わった瞬間だけ帯を出す（時刻を書き写さない）
-    if (lastSecRef.current !== section) { lastSecRef.current = section; badgeAtRef.current = d; }
+    /**
+     * ★カットが切り替わった瞬間（時刻を書き写さない・**コースが知っている**）。
+     *   ⚠️ 景観は 3角 も 4角 も同じ `corner` なので、**景観ではなく区間名**で見ます。
+     *      でないと 3角→4角 でカットが切り替わりません（＝ずっと同じカメラワーク）。
+     */
+    const cutKey = inGate ? 'gate' : seg.label;
+    if (lastSecRef.current !== cutKey) { lastSecRef.current = cutKey; badgeAtRef.current = d; }
+
+    /* ── ★カット（画角と注視点を区間で切り替える）─────────────── */
+    const cut = inGate
+      ? { zoom: 0.72, target: 'pack' as const, label: '発走' }
+      : (CUT_OF[seg.label] ?? CUT_OF['直線']!);
+    const sinceCut = d - badgeAtRef.current;
+    // ★「寄る前に一度引く」（裁定）。直線に入った最初だけ引いてから寄る
+    const wanted = (seg.label === '直線' && sinceCut < PULL_BACK_SEC && !inGate)
+      ? PULL_BACK_ZOOM : cut.zoom;
+    const dt = Math.max(0, Math.min(0.1, d - lastDRef.current));
+    lastDRef.current = d;
+    if (zoomRef.current <= 0 || dt === 0) zoomRef.current = wanted;
+    else zoomRef.current += (wanted - zoomRef.current) * Math.min(1, dt / CUT_EASE);
+    const zoom = zoomRef.current;
 
     /**
-     * ★**横位置＝実際の差**。カメラは馬群の重心を追い、そこからの差[m] を px にします。
-     *   ⚠️ 段（奥行き）は**レース中ずっと変わりません**。動くのは横だけ。
-     *      → ★**抜くところが、抜くように見えます。**
+     * ★**注視点**。カメラが誰を画面の中心に置くか。
+     *   ・pack  … 馬群の重心（発走・道中）
+     *   ・mover … ★**いちばん上がってきている馬**（3角＝仕掛けどころ）
+     *   ・lead2 … 先頭争いの2頭（4角・直線）
      */
-    const camM = at.reduce((s, h) => s + h.meters, 0) / at.length;
+    const packM = at.reduce((s, h) => s + h.meters, 0) / at.length;
+    let targetM = packM;
+    if (cut.target === 'lead2') {
+      targetM = packM * 0.35 + ((sorted[0]!.meters + (sorted[1]?.meters ?? sorted[0]!.meters)) / 2) * 0.65;
+    } else if (cut.target === 'mover') {
+      const back = built.model.at(Math.max(0, sec - 1.2));
+      const lead0 = Math.max(...back.map((h) => h.meters));
+      let best = packM;
+      let bestGain = 0;
+      for (const h of sorted) {
+        const b = back.find((x) => x.gate === h.gate);
+        if (b === undefined) continue;
+        const gain = (lead0 - b.meters) - (sorted[0]!.meters - h.meters);
+        if (gain > bestGain) { bestGain = gain; best = h.meters; }
+      }
+      targetM = packM * 0.55 + best * 0.45;
+    }
+    /** ★注視点は**なめらかに**移す（急に飛ぶと切れたように見える） */
+    if (camRef.current === null || dt === 0) camRef.current = targetM;
+    else camRef.current += (targetM - camRef.current) * Math.min(1, dt / 0.9);
+    const camM = camRef.current;
+
     const rows = ROW_DEF.map((r, ri) => {
       const mine = lanes.filter((l) => l.row === ri);
       const pos = mine.map((l) => at.find((h) => h.gate === l.gate));
@@ -319,7 +428,7 @@ export default function RaceNextPage(): React.JSX.Element {
         gates: mine.map((l) => l.gate),
         // ★重なった2頭が1頭に見えないよう、段の中でだけ数 px 奥へずらす
         groundY: mine.map((l) => r.groundY - l.sub * SUB_DEPTH),
-        x: pos.map((h) => Math.round(X_ANCHOR + softGap((h === undefined ? 0 : h.meters) - camM) * r.pxPerM)),
+        x: pos.map((h) => Math.round(X_ANCHOR + softGap((h === undefined ? 0 : h.meters) - camM) * r.pxPerM * zoom)),
       };
     });
 
@@ -349,8 +458,8 @@ export default function RaceNextPage(): React.JSX.Element {
     // ★ファンファーレ（枠入り → 発走）
     if (d < GATE_OPEN_AT) scene.drawFanfare(ctx, pal, W, d < 1.5 ? 0 : 1);
     // ★カットの帯（区間が切り替わってから 1.2秒）
-    if (!inGate && d - badgeAtRef.current < 1.2) {
-      scene.drawCutBadge(ctx, pal, seg.label, Math.round(metersLeft));
+    if (!inGate && sinceCut < 1.2) {
+      scene.drawCutBadge(ctx, pal, `${seg.label}　${cut.label}`, Math.round(metersLeft));
     }
 
     /* ── UI（★このファイルで描きます。`drawStill` と役割を重ねません）── */
@@ -398,7 +507,7 @@ export default function RaceNextPage(): React.JSX.Element {
       ctx.fillRect(32, 104, Math.round(276 * Math.max(0, Math.min(1, st))), 12);
       ctx.fillStyle = c('mark-gold');
       ctx.font = 'bold 15px sans-serif';
-      ctx.fillText(inGate ? '発走前' : `${seg.label}　残り ${metersLeft.toFixed(0)}m`, 32, 138);
+      ctx.fillText(inGate ? '発走前' : `${seg.label}　${cut.label}　残り ${metersLeft.toFixed(0)}m`, 32, 138);
       ctx.fillStyle = `${c('paper-0')}bb`;
       ctx.font = '13px sans-serif';
       ctx.fillText(`ペース ${built.pace}`, 228, 138);
@@ -499,6 +608,9 @@ export default function RaceNextPage(): React.JSX.Element {
     setPlaying(false);
     lastSecRef.current = '';
     badgeAtRef.current = -9;
+    zoomRef.current = 0;
+    camRef.current = null;
+    lastDRef.current = 0;
     render(0);
   };
 
