@@ -26,7 +26,7 @@ import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches 
 import type { Strategy } from '@star/sim-engine';
 import {
   replayPositionModel, finalOrderOf, timeWarpFor, knotsFor,
-  ovalCourse, segmentStarts, HORSE_LENGTH_M,
+  ovalCourse, segmentStarts, HORSE_LENGTH_M, frameRoleOf,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 
@@ -36,7 +36,7 @@ const W = 1280;
 const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 /** ★上げないと古い JS が使われます（「変わっていません」の正体） */
-const V = '22';
+const V = '23';
 
 /** ★区間の境目（1角/2角/向正面/…）。**コースから読みます**（書き写すとずれる） */
 const COURSE = ovalCourse(DIST);
@@ -304,6 +304,17 @@ function panEase(m: number, seg: { s: number; end: number }): number {
   const out = (seg.end - m) / PAN_EASE_M;
   const t = Math.max(0, Math.min(1, Math.min(inn, out)));
   return t * t * (3 - 2 * t);
+}
+
+/**
+ * ★**色は枠、数字は個体**（D-060・レビュー側指摘 2026-08-15）。
+ *
+ *   ⚠️ 以前は `silk-{馬番}` で**頭数ぶん別々の色**を引いていました。
+ *      18頭立てで「いちばん近い2色」が見分けられなくなります。
+ *   → ★枠番（1〜8）の色にし、**馬番を必ず併記**します。
+ */
+function frameColor(pal: Palette, gate: number): string {
+  return pal[frameRoleOf(gate, FIELD)] ?? pal['paper-0'] ?? '#000000';
 }
 
 function lumOf(hex: string): number {
@@ -673,7 +684,7 @@ export default function RaceNextPage(): React.JSX.Element {
       ctx.fillRect(bx, 12, barW, size + 26);
       sorted.forEach((h, i) => {
         const x = bx + 9 + i * (size + gap);
-        const col = pal[`silk-${h.gate}`] ?? c('paper-0');
+        const col = frameColor(pal, h.gate);
         if (i === 0) { ctx.fillStyle = c('mark-gold'); ctx.fillRect(x - 3, 19, size + 6, size + 6); }
         ctx.fillStyle = col;
         ctx.fillRect(x, 22, size, size);
@@ -767,7 +778,7 @@ export default function RaceNextPage(): React.JSX.Element {
       ctx.fillRect(0, by + bh - 2, W, 2);
       // ★枠順色の枡＋馬番
       {
-        const col = pal[`silk-${chip}`] ?? c('paper-0');
+        const col = frameColor(pal, chip);
         ctx.fillStyle = col;
         ctx.fillRect(26, by + 18, 48, 44);
         ctx.strokeStyle = `${c('paper-0')}66`;
@@ -804,7 +815,7 @@ export default function RaceNextPage(): React.JSX.Element {
       ctx.fillText('着 順', bx + 18, 178);
       rs.forEach((e, i) => {
         const y = 210 + i * 30;
-        const col = pal[`silk-${e.gate}`] ?? c('paper-0');
+        const col = frameColor(pal, e.gate);
         ctx.fillStyle = c('paper-0');
         ctx.font = 'bold 17px sans-serif';
         ctx.fillText(`${e.place}着`, bx + 18, y);

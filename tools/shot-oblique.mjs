@@ -17,7 +17,11 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { ovalCourse, obliqueProject, railPolyline, gateStalls } from '@star/render';
+import { ovalCourse, obliqueProject, railPolyline, gateStalls, frameRoleOf, bracketOf } from '@star/render';
+
+/** ★色は枠、数字は個体（D-060）。18頭でも 8色で足りる */
+const FIELD_SIZE = 12;
+const frameColor = (gate) => pal[frameRoleOf(gate, FIELD_SIZE)] ?? pal['paper-0'];
 
 const W = 1280, H = 720;
 const OUT = path.resolve('out/oblique');
@@ -92,7 +96,7 @@ function drawHorse(ctx, img, x, y, frame, gate, frames, mul) {
   // ★接地点はセルの左下（契約）。そこが (x, y) に来るように置く
   ctx.drawImage(img, frame * cw, 0, cw, img.height,
     Math.round(x - HW * 0.30), Math.round(y - hh + 3), HW, hh);
-  const col = pal[`silk-${gate}`] ?? pal['paper-0'];
+  const col = frameColor(gate);
   const bx = Math.round(x + HW * 0.02), by = Math.round(y - hh * 0.46);
   ctx.fillStyle = pal['paper-0']; ctx.fillRect(bx - 13, by, 27, 19);
   ctx.fillStyle = col; ctx.fillRect(bx - 13, by, 27, 4);
@@ -145,7 +149,7 @@ async function main() {
         ctx.fillStyle = pal['gate-1']; ctx.fillRect(st.x - 30, st.y - d, 150, 3);
         // ★馬（房の中）— 真横では 12頭が重なって 1頭しか見えなかった
         drawHorse(ctx, img, st.x + 84, st.y - 2, st.gate % frames, st.gate, frames, 0.62);
-        const col = pal[`silk-${st.gate}`] ?? pal['paper-0'];
+        const col = frameColor(st.gate);
         ctx.fillStyle = col; ctx.fillRect(st.x - 28, st.y - d + 4, 26, d - 9);
         ctx.fillStyle = pal['ink-0'];
         ctx.font = 'bold 12px sans-serif';
