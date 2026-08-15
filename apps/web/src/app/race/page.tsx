@@ -26,7 +26,9 @@ const FIELD = 12;
 const W = 1280;
 const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '11';
+/** ★発走の間（秒）。この間はレースの時計を進めません */
+const GATE_HOLD = 3.0;
+const ASSET_VERSION = '12';
 /** ★構図の基準幅（`layers.json` の viewport と同じ） */
 const VP_W = 1280;
 
@@ -43,7 +45,8 @@ const COURSE = ovalCourse(DIST);
 /** ★第2便の区間別レンダラ（`/art/scene.js`）。★`still.js` を土台にして読み込みます */
 interface StarScene {
   drawScene: (ctx: CanvasRenderingContext2D, o: Record<string, unknown>) => void;
-  drawCutBadge: (ctx: CanvasRenderingContext2D, ...a: unknown[]) => void;
+  drawCutBadge: (ctx: CanvasRenderingContext2D, pal: unknown, label: string, metersLeft: number) => void;
+  drawFanfare: (ctx: CanvasRenderingContext2D, pal: unknown, w: number, phase: number) => void;
 }
 
 interface StarStill {
@@ -107,6 +110,9 @@ export default function RacePage(): React.JSX.Element {
   const rafRef = useRef<number | null>(null);
   const t0Ref = useRef(0);
   const dRef = useRef(0);
+  /** ★区間が変わってからの経過（カットの帯を出す時間） */
+  const sinceSectionRef = useRef(0);
+  const lastSectionRef = useRef('');
 
   const [seed, setSeed] = useState(42);
   const [ownGate, setOwnGate] = useState(3);
@@ -179,7 +185,13 @@ export default function RacePage(): React.JSX.Element {
     const ctx = cv.getContext('2d');
     if (ctx === null) return;
 
-    const sec = built.warp.raceSecAt(d);
+    /**
+     * ★ゲート中はレースの時計を 0 に固定します（馬は進みません）。
+     *   ⚠️ **表示の時計だけを前にずらす**ので、レースの長さは変わりません。
+     */
+    const gateHold = GATE_HOLD;
+    const raceD = Math.max(0, d - gateHold);
+    const sec = built.warp.raceSecAt(raceD);
     const at = built.model.at(sec);
     const sorted = [...at].sort((a, b) => b.meters - a.meters)
       .map((h) => ({ gate: h.gate, s: h.meters, stamina: h.staminaRatio }));
@@ -273,14 +285,14 @@ export default function RacePage(): React.JSX.Element {
     const phase = phaseOf(metersLeft);
     // ★いまコースのどこか（実際の区間名）
     const segment = seg.label;
-    const finished = d >= built.warp.displaySec - 0.01;
+    const finished = raceD >= built.warp.displaySec - 0.01;
     /**
      * ★**決着で一拍置く**（アートバイブル §2「決着直前に音を抜く」の視覚版）。
      *   ゴール直後の 0.8秒は**着順を出さず**、ゴールした絵だけを見せます。
      *   ⚠️ レースの時計は伸ばしません（表示の後ろで走るだけ）。
      */
     const holdSec = 0.8;
-    const sinceFinish = d - built.warp.displaySec;
+    const sinceFinish = raceD - built.warp.displaySec;
     const showResult = finished && sinceFinish >= holdSec;
 
     /**
@@ -289,7 +301,19 @@ export default function RacePage(): React.JSX.Element {
      *   ⚠️ `still.js` は書き換えていません（`scene.js` がそれを土台にしています）。
      */
     const scene = window.STARScene;
-    const section = SECTION_OF[seg.label] ?? 'homestretch';
+    if (lastSectionRef.current !== seg.label) {
+      lastSectionRef.current = seg.label;
+      sinceSectionRef.current = 0;
+    } else {
+      sinceSectionRef.current = Math.min(9, sinceSectionRef.current + 1 / 60);
+    }
+    /**
+     * ★**発走**。ゲートが開くまでの間を作ります。
+     *   ⚠️ レースの時計は伸ばしません（表示の先頭に置くだけ）。
+     *   `gateSec` のあいだは `section: 'gate'` で描き、ファンファーレを重ねます。
+     */
+    const inGate = d < gateHold;
+    const section = inGate ? 'gate' : (SECTION_OF[seg.label] ?? 'homestretch');
     /**
      * ★**馬の配置**。枠（3段12箇所）は固定し、**誰がどの枠に入るか**だけを順位で決めます。
      *   ⚠️ 計算で置き直すと構図が壊れます（一度やって戻しました）。
@@ -318,7 +342,15 @@ export default function RacePage(): React.JSX.Element {
         sharedLayers: (art.layers as { layers: unknown[] }).layers,
         atlas: art.atlas, section, scroll: lead * 20,
         horsePlan: plan, cornerVariant: 'c',
+        // ★扉は 2.2秒で開き始める
+        gateOpen: d >= 2.2,
       });
+      // ★ファンファーレ（0〜1.6秒。旗が上がる → 振られる）
+      if (d < 1.6) scene.drawFanfare(ctx, art.pal, VP_W, d < 0.8 ? 0 : 1);
+      // ★カットの帯（区間が変わってから 1.2秒だけ）
+      if (!inGate && sinceSectionRef.current < 1.2) {
+        scene.drawCutBadge(ctx, art.pal, seg.label, Math.round(metersLeft));
+      }
     } else {
       api.drawStill(ctx, {
         palette: art.pal, layers: art.layers, atlas: art.atlas,
@@ -382,8 +414,8 @@ export default function RacePage(): React.JSX.Element {
     const loop = (): void => {
       const d = (performance.now() - t0Ref.current) / 1000;
       // ★ゴール後も 1.2秒だけ回す（決着の一拍と着順表示のため）
-      if (d >= built.warp.displaySec + 1.2) {
-        dRef.current = built.warp.displaySec + 1.2;
+      if (d >= built.warp.displaySec + GATE_HOLD + 1.2) {
+        dRef.current = built.warp.displaySec + GATE_HOLD + 1.2;
         setClock(built.warp.displaySec);
         render(dRef.current);
         setPlaying(false);
