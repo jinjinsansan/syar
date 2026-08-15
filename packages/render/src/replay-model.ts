@@ -17,7 +17,7 @@
 
 import type { HorseAt, PositionModel } from './scene.js';
 import {
-  slotOf, packSpreadM, convergeAt, laneOf, TRACK_WIDTH_M,
+  slotOf, packSpreadM, convergeAt, laneAt, TRACK_WIDTH_M,
   type FormStrategy, type FormPace,
 } from './formation.js';
 
@@ -210,11 +210,15 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
     return Math.max(0, Math.min(distanceMeter, truth + a * (form - truth)));
   };
 
-  /** ★横位置（内=0）。**位置と同じ生成器から**（Q-P4-29・裁定 2026-08-15） */
-  const laneAt = (b: Boundaries, meters: number): number => {
-    const slot = slots.get(b.gate) ?? 0.5;
-    return laneOf(slot, distanceMeter - meters, TRACK_WIDTH_M, b.gate, seed);
-  };
+  /**
+   * ★**横位置（内=0）。**
+   *
+   *   ⚠️ ★**脚質から作りません**（レビュー側が Q-P4-29 の裁定を撤回・2026-08-15）。
+   *      脚質から作ると `w` も**出走表から予測でき**、V-16 ① が成立しません。
+   *   → ★**シードから引き、レース中に段階的に開きます**（＝「外を回された」）。
+   */
+  const laneOfHorse = (b: Boundaries, meters: number): number =>
+    laneAt(b.gate, boundaries.length, TRACK_WIDTH_M, distanceMeter - meters, distanceMeter, seed);
 
   /**
    * ★余力（§12.6 のゲージ）。
@@ -262,7 +266,7 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
           meters,
           staminaRatio: staminaOf(b, sec),
           /** ★内ラチからの距離 [m]。**位置と同じ生成器から出します**（Q-P4-29） */
-          w: laneAt(b, meters),
+          w: laneOfHorse(b, meters),
         };
       });
     },

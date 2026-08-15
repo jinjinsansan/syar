@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  replayPositionModel, finalOrderOf, slotOf, packSpreadM, convergeAt, TRACK_WIDTH_M,
+  replayPositionModel, finalOrderOf, slotOf, packSpreadM, convergeAt, TRACK_WIDTH_M, laneAtStart, laneAt,
   type FormStrategy,
 } from '../src/index.js';
 
@@ -79,18 +79,84 @@ describe('★隊列の生成', () => {
     expect(JSON.stringify(mk().at(30))).toBe(JSON.stringify(mk().at(30)));
   });
 
-  it('★★横位置 w が出る。逃げは内、追込は外（直線で開く）', () => {
-    const m = mk();
-    const at = (sec: number) => new Map(m.at(sec).map((h) => [h.gate, h.w ?? -1]));
-    const mid = at(20);
-    // gate1 = 逃げ / gate4 = 追込
-    expect(mid.get(1)!).toBeLessThan(mid.get(4)!);
-    for (const w of mid.values()) {
-      expect(w).toBeGreaterThanOrEqual(1);
-      expect(w).toBeLessThanOrEqual(TRACK_WIDTH_M - 1);
+  /**
+   * ★★**2026-08-15 に、この検査の要求が反転しました。**
+   *
+   * 【旧】`w` は脚質から作る（逃げは内・追込は外）— Q-P4-29
+   * 【新】★**`w` を脚質から作ってはいけない**（レビュー側が撤回）
+   *   > それでは `w` も**出走表から予測でき**、V-16 ① が成立しません。
+   *   > → `w` は**シードから引かれ、距離ロスを通じて着順に効き、
+   *   >   レース中に段階的に判明する**ものにしてください。
+   */
+  it('★★w は脚質から予測できない（出走表に無い情報である）', () => {
+    /**
+     * ⚠️ ★最初は「同じ時刻の w が一致すること」で検査し、**落ちました**。
+     *    `w` は**その馬の残り距離**で決まるので、脚質が**位置を通して間接的に**効きます
+     *    （逃げ馬は同じ時刻でも先にいるので、`w` も先の値になる）。
+     *    ★**それは漏洩ではありません。** 漏洩になるのは
+     *    「**同じ地点での `w` が脚質で決まる**」場合です。
+     * → ★**同じ残り距離で比べます。**
+     */
+    const wAtLeft = (m: ReturnType<typeof mk>, gate: number, left: number): number => {
+      let lo = 0, hi = 120;
+      for (let i = 0; i < 60; i++) {
+        const mid = (lo + hi) / 2;
+        const h = m.at(mid).find((x) => x.gate === gate)!;
+        if (1600 - h.meters > left) lo = mid; else hi = mid;
+      }
+      return m.at(hi).find((x) => x.gate === gate)!.w ?? 0;
+    };
+    const a2 = mk();
+    const b2 = replayPositionModel({
+      distanceMeter: 1600, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
+      strategyOf: (g) => STRAT[(g + 1) % 4]!,   // ★脚質を総取り替え
+      pace: 'middle', formationSeed: 4242,
+    });
+    for (const gate of [1, 5, 9, 12]) {
+      for (const left of [1200, 800, 400]) {
+        expect(wAtLeft(b2, gate, left)).toBeCloseTo(wAtLeft(a2, gate, left), 3);
+      }
     }
-    // ★直線では後ろの馬が外へ出る
-    expect(at(92).get(4)!).toBeGreaterThan(mid.get(4)!);
+  });
+
+  it('★★w を作る関数は、そもそも脚質を受け取らない', () => {
+    // ★型と引数の形で保証する（実装が変わっても、脚質が入り込む余地がない）
+    expect(laneAt.length).toBe(6);   // gate, fieldSize, widthM, metersLeft, distance, seed
+  });
+
+  it('★★w はシードで変わる（レース中に決まる情報）', () => {
+    const a2 = mk({ formationSeed: 1 });
+    const b2 = mk({ formationSeed: 2 });
+    const wOf = (m: ReturnType<typeof mk>, sec: number) =>
+      m.at(sec).map((h) => (h.w ?? 0).toFixed(4)).join(',');
+    expect(wOf(b2, 60)).not.toBe(wOf(a2, 60));
+  });
+
+  it('★★w は段階的に開く（発走時は枠順どおり・進むほどばらける）', () => {
+    const m = mk();
+    const spread = (sec: number) => {
+      const ws = m.at(sec).map((h) => h.w ?? 0);
+      // ★枠順どおりの並びからのずれ
+      const sorted = [...m.at(sec)].sort((x, y) => x.gate - y.gate).map((h) => h.w ?? 0);
+      let dev = 0;
+      for (let i = 1; i < sorted.length; i++) dev += Math.abs(sorted[i]! - sorted[i - 1]!);
+      void ws;
+      return dev;
+    };
+    const early = spread(2);
+    const late = spread(90);
+    // ★発走直後は枠順どおり（隣との差がほぼ一定 = ずれが小さい）
+    expect(late).toBeGreaterThan(early * 1.5);
+  });
+
+  it('★w は走路の内側に収まる', () => {
+    const m = mk();
+    for (const sec of [0, 20, 50, 80, 99]) {
+      for (const h of m.at(sec)) {
+        expect(h.w ?? -1).toBeGreaterThan(0.5);
+        expect(h.w ?? 1e9).toBeLessThan(TRACK_WIDTH_M - 0.5);
+      }
+    }
   });
 
   it('★生成器そのもの: スロット・広がり・収束', () => {
@@ -100,5 +166,7 @@ describe('★隊列の生成', () => {
     expect(convergeAt(1600)).toBeCloseTo(1, 5);
     expect(convergeAt(200)).toBeCloseTo(0, 5);
     expect(convergeAt(0)).toBeCloseTo(0, 5);
+    // ★発走時の横位置は枠順どおり（内枠ほど内）
+    expect(laneAtStart(1, 12, 25)).toBeLessThan(laneAtStart(12, 12, 25));
   });
 });

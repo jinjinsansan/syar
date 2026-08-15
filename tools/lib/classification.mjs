@@ -95,6 +95,8 @@ export const READONLY = [
   'shot-scene.mjs',
   'diag-screen-overtake.mjs',
   'diag-cuts.mjs',
+  // ★読むだけ。w による距離ロスの大きさを見積もる（D-065 の手順①）
+  'diag-lane-loss.mjs',
   // ★読むだけ。斜め俯瞰の試作を静止画で確かめる
   'shot-oblique.mjs',
   // ★画像を読み書きするだけ。DB に触れません
