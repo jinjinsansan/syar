@@ -1,146 +1,268 @@
 {
-  "$comment": "★第2便の追記ぶん。handoff/palette.json（第1便）に**マージ**してください。役割名の付け方は第1便と同じ（役割 + '-N'、0 = 奥／明るい → N = 手前／暗い）。",
-  "$version": "2.0.0",
-  "$merge": "第1便の palette.json に、このファイルのキーを上書きせず追加します。既存キーの変更は1つもありません。",
-  "$comment-backside": "★向正面（スタンドの裏側）。正面と違う景色にするための役割。★正面は「観客と屋根」、裏は「無装飾のコンクリと設備」です。",
-  "backside-0": "#6e6a62",
-  "backside-1": "#5a5750",
-  "backside-2": "#47443e",
-  "backside-3": "#35322d",
-  "backside-4": "#24221e",
-  "$comment-tree": "★外周の樹林（向正面・3-4角の外側）。生垣（hedge）より暗く、彩度も低い。★輪郭を描かず、粒の密度だけで塊にします。",
-  "tree-0": "#48583c",
-  "tree-1": "#3a4a30",
-  "tree-2": "#2c3a25",
-  "tree-3": "#1f2a1b",
-  "tree-4": "#141d12",
-  "$comment-crowd": "★観客の粒（3-4角の外側・直線のスタンド）。★1粒 2×2px。逆光なので頭頂だけ明るい。",
-  "crowd-0": "#cfc4ac",
-  "crowd-1": "#9a9280",
-  "crowd-2": "#665f52",
-  "crowd-3": "#3b372f",
-  "$comment-gate": "★発走ゲート。業界共通の作法として採ります（固有の意匠は入れません）。金属の枠＋番号板＋開いた扉。",
-  "gate-0": "#c3c8cc",
-  "gate-1": "#9aa0a6",
-  "gate-2": "#6f757b",
-  "gate-3": "#4a4f55",
-  "gate-4": "#2b2f33",
-  "$comment-sign": "★標識（1角/2角/3角/4角・残り距離）。紙ではなく**屋外の板**なので paper と分けます。",
-  "sign-0": "#e8e3d2",
-  "sign-1": "#c6bfa9",
-  "sign-2": "#8f8874",
-  "sign-3": "#4c4840",
-  "$comment-section-sky": "★区間ごとの空。**同じ空を使い回すと区間が変わって見えません。** 逆光は直線だけ（スタンドが正面＝西日）。向正面は順光なので空が澄み、コーナーは中間です。",
-  "$sections": {
-    "backstretch": {
-      "label": "向正面",
-      "skyRamp": [
-        "sky-0",
-        "sky-1",
-        "sky-2",
-        "sky-3"
-      ],
-      "glare": 0,
-      "$note": "★順光。グレアなし。空の彩度がいちばん高く、遠くまで見通せる＝霞を弱める",
-      "airMul": 0.6,
-      "bodyMul": 1
-    },
-    "corner": {
-      "label": "3〜4角",
-      "skyRamp": [
-        "sky-1",
-        "sky-2",
-        "sky-3",
-        "sky-4"
-      ],
-      "glare": 0.35,
-      "$note": "★斜光。半分だけグレア。ここで空が明るくなり始める＝直線へ向かう予感",
-      "airMul": 0.8,
-      "bodyMul": 0.88
-    },
-    "homestretch": {
-      "label": "直線",
-      "skyRamp": [
-        "sky-0",
-        "sky-1",
-        "sky-2",
-        "sky-3"
-      ],
-      "glare": 1,
-      "$note": "★逆光（第1便のまま）。グレア全開・砂煙で霞む",
-      "airMul": 1,
-      "bodyMul": 0.74
-    },
-    "gate": {
-      "label": "発走",
-      "skyRamp": [
-        "sky-0",
-        "sky-1",
-        "sky-2",
-        "sky-3"
-      ],
-      "glare": 0.2,
-      "$note": "★発走はまだ静か。グレアを抑え、砂煙もゲートが開くまで出しません",
-      "airMul": 0.7,
-      "bodyMul": 0.95
-    }
-  },
-  "$comment-daylight": "★時間帯。**同じ役割名のまま、乗算と加算だけで切り替えます**（パレットを3つ持ちません）。sky/turf/stand それぞれに [R,G,B] の倍率と、全体に載せる色かぶりを持ちます。",
-  "$daylight": {
-    "day": {
-      "label": "昼",
-      "skyMul": [
-        1.02,
-        1.05,
-        1.08
-      ],
-      "groundMul": [
-        1.06,
-        1.08,
-        1
-      ],
-      "bodyMul": 1,
-      "cast": null,
-      "castA": 0,
-      "glareMul": 0.35,
-      "rim": "sky-5"
-    },
-    "dusk": {
-      "label": "薄暮",
-      "skyMul": [
-        1,
-        0.92,
-        0.84
-      ],
-      "groundMul": [
-        0.94,
-        0.88,
-        0.8
-      ],
-      "bodyMul": 0.88,
-      "cast": "mark-gold",
-      "castA": 0.14,
-      "glareMul": 1,
-      "rim": "sky-5"
-    },
-    "night": {
-      "label": "ナイター",
-      "skyMul": [
-        0.3,
-        0.34,
-        0.46
-      ],
-      "groundMul": [
-        0.72,
-        0.8,
-        0.72
-      ],
-      "bodyMul": 0.78,
-      "cast": "silk-17",
-      "castA": 0.22,
-      "glareMul": 0,
-      "rim": "paper-0",
-      "$note": "★ナイターは照明があるので**走路だけ明るい**（groundMul を空より高く保つ）。空を落として走路を残すのが要点です。照明塔は stand の層に立てます"
-    }
+ "$comment": "★第2便の追記ぶん。handoff/palette.json（第1便）に**マージ**してください。役割名の付け方は第1便と同じ（役割 + '-N'、0 = 奥／明るい → N = 手前／暗い）。",
+ "$version": "2.0.0",
+ "$scene": "芝・良・直線残り200m・逆光",
+ "sky": "#7d9db2",
+ "sky-0": "#6b8ba4",
+ "sky-1": "#7d9db2",
+ "sky-2": "#96b0bd",
+ "sky-3": "#b6c5c4",
+ "sky-4": "#d9d6bf",
+ "sky-5": "#eee7cb",
+ "stand": "#4d525a",
+ "stand-0": "#2a2e35",
+ "stand-1": "#3b404a",
+ "stand-2": "#4d525a",
+ "stand-3": "#5e646d",
+ "stand-4": "#9a9280",
+ "stand-5": "#c0b49a",
+ "hedge": "#33492f",
+ "hedge-0": "#4a6440",
+ "hedge-1": "#34492d",
+ "hedge-2": "#26381f",
+ "hedge-3": "#1b2916",
+ "hedge-4": "#121e10",
+ "fence": "#9aa198",
+ "fence-0": "#cdd2c6",
+ "fence-1": "#a2a99d",
+ "fence-2": "#767d73",
+ "fence-3": "#535a51",
+ "turf": "#4c7440",
+ "turf-0": "#7f9a6e",
+ "turf-1": "#6d8c5b",
+ "turf-2": "#6b9152",
+ "turf-3": "#5a7f45",
+ "turf-4": "#496b37",
+ "turf-5": "#385428",
+ "turf-6": "#2d4720",
+ "turf-7": "#213717",
+ "rail": "#ddd8c6",
+ "rail-0": "#f6f3e6",
+ "rail-1": "#ddd8c6",
+ "rail-2": "#b3ad9a",
+ "rail-3": "#7d7868",
+ "rail-4": "#443f36",
+ "dirt": "#8a6b4a",
+ "dirt-0": "#b09472",
+ "dirt-1": "#8a6b4a",
+ "dirt-2": "#6d5236",
+ "dirt-3": "#4f3a25",
+ "paper": "#efe9dc",
+ "paper-0": "#f6f2e7",
+ "paper-1": "#efe9dc",
+ "paper-2": "#ddd5c2",
+ "paper-3": "#c2b9a3",
+ "ink": "#22201c",
+ "ink-0": "#22201c",
+ "ink-1": "#3a372f",
+ "ink-2": "#5e5a4d",
+ "$comment-mark": "§4「意味の割り当て」の色。★色だけで運ばないこと。冠マーク・矢印・線種・文字の併記は省略不可（mark.shape に必須の形を書いています）。",
+ "mark-gold": "#e0ac3c",
+ "mark-red": "#c8503a",
+ "mark-teal": "#3aa89b",
+ "mark-purple": "#7a5aa8",
+ "mark-gray": "#8d8878",
+ "$comment-silk": "★枠順色（D-060 で採用済みの 18 色をそのまま採っています。枠順の色は業界共通の作法）。勝負服の「柄」は実在意匠を使えないため、この 18 色を地色として柄はオリジナルで設計します。",
+ "silk-1": "#d62828",
+ "silk-2": "#f5f5f5",
+ "silk-3": "#1446b4",
+ "silk-4": "#fad728",
+ "silk-5": "#148c46",
+ "silk-6": "#191919",
+ "silk-7": "#f08219",
+ "silk-8": "#f596be",
+ "silk-9": "#2dbeb4",
+ "silk-10": "#782da0",
+ "silk-11": "#96969b",
+ "silk-12": "#96dc32",
+ "silk-13": "#6e462d",
+ "silk-14": "#801e37",
+ "silk-15": "#afa578",
+ "silk-16": "#87bee6",
+ "silk-17": "#19285f",
+ "silk-18": "#1e5032",
+ "$comment-coat": "★毛色5種（§3）。共有スプライトのパレット差し替えで作るので、アセット量は増えません。0=ハイライト → 3=影。",
+ "coat-kage-0": "#8d5730",
+ "coat-kage-1": "#6f4222",
+ "coat-kage-2": "#502d13",
+ "coat-kage-3": "#301a0a",
+ "coat-kurokage-0": "#5d3419",
+ "coat-kurokage-1": "#452310",
+ "coat-kurokage-2": "#2e1709",
+ "coat-kurokage-3": "#1a0d05",
+ "coat-kuri-0": "#ab6a30",
+ "coat-kuri-1": "#8b5220",
+ "coat-kuri-2": "#673a13",
+ "coat-kuri-3": "#432309",
+ "coat-ashi-0": "#dcd7cb",
+ "coat-ashi-1": "#b8b2a5",
+ "coat-ashi-2": "#8e887c",
+ "coat-ashi-3": "#605b52",
+ "coat-ao-0": "#3a352f",
+ "coat-ao-1": "#282420",
+ "coat-ao-2": "#1a1715",
+ "coat-ao-3": "#0d0b0a",
+ "$comment-air": "★空気遠近（層ごとの霞）。奥の層に sky-3 をこの不透明度で重ねます。これが「手前と奥の差」（不足 #4）の実体です。",
+ "$air": {
+  "color": "sky-3",
+  "alpha": {
+   "stand": 0.16,
+   "hedge": 0.1,
+   "fence": 0.07,
+   "turfFar": 0.05,
+   "turfMain": 0,
+   "railFront": 0,
+   "turfNear": 0
   }
+ },
+ "$comment-backlight": "★逆光。馬体はこの倍率で落とし、輪郭に sky-5 の縁を +2px（1×）/+4px（2×）で右上に出します。",
+ "$backlight": {
+  "bodyMul": 0.74,
+  "bodyMulNear": 0.86,
+  "rim": "sky-5",
+  "rimAlpha": 1,
+  "dust": "sky-4"
+ },
+ "$merge": "第1便の palette.json に、このファイルのキーを上書きせず追加します。既存キーの変更は1つもありません。",
+ "$comment-backside": "★向正面（スタンドの裏側）。正面と違う景色にするための役割。★正面は「観客と屋根」、裏は「無装飾のコンクリと設備」です。",
+ "backside-0": "#6e6a62",
+ "backside-1": "#5a5750",
+ "backside-2": "#47443e",
+ "backside-3": "#35322d",
+ "backside-4": "#24221e",
+ "$comment-tree": "★外周の樹林（向正面・3-4角の外側）。生垣（hedge）より暗く、彩度も低い。★輪郭を描かず、粒の密度だけで塊にします。",
+ "tree-0": "#48583c",
+ "tree-1": "#3a4a30",
+ "tree-2": "#2c3a25",
+ "tree-3": "#1f2a1b",
+ "tree-4": "#141d12",
+ "$comment-crowd": "★観客の粒（3-4角の外側・直線のスタンド）。★1粒 2×2px。逆光なので頭頂だけ明るい。",
+ "crowd-0": "#cfc4ac",
+ "crowd-1": "#9a9280",
+ "crowd-2": "#665f52",
+ "crowd-3": "#3b372f",
+ "$comment-gate": "★発走ゲート。業界共通の作法として採ります（固有の意匠は入れません）。金属の枠＋番号板＋開いた扉。",
+ "gate-0": "#c3c8cc",
+ "gate-1": "#9aa0a6",
+ "gate-2": "#6f757b",
+ "gate-3": "#4a4f55",
+ "gate-4": "#2b2f33",
+ "$comment-sign": "★標識（1角/2角/3角/4角・残り距離）。紙ではなく**屋外の板**なので paper と分けます。",
+ "sign-0": "#e8e3d2",
+ "sign-1": "#c6bfa9",
+ "sign-2": "#8f8874",
+ "sign-3": "#4c4840",
+ "$comment-section-sky": "★区間ごとの空。**同じ空を使い回すと区間が変わって見えません。** 逆光は直線だけ（スタンドが正面＝西日）。向正面は順光なので空が澄み、コーナーは中間です。",
+ "$sections": {
+  "backstretch": {
+   "label": "向正面",
+   "skyRamp": [
+    "sky-0",
+    "sky-1",
+    "sky-2",
+    "sky-3"
+   ],
+   "glare": 0,
+   "$note": "★順光。グレアなし。空の彩度がいちばん高く、遠くまで見通せる＝霞を弱める",
+   "airMul": 0.6,
+   "bodyMul": 1
+  },
+  "corner": {
+   "label": "3〜4角",
+   "skyRamp": [
+    "sky-1",
+    "sky-2",
+    "sky-3",
+    "sky-4"
+   ],
+   "glare": 0.35,
+   "$note": "★斜光。半分だけグレア。ここで空が明るくなり始める＝直線へ向かう予感",
+   "airMul": 0.8,
+   "bodyMul": 0.88
+  },
+  "homestretch": {
+   "label": "直線",
+   "skyRamp": [
+    "sky-0",
+    "sky-1",
+    "sky-2",
+    "sky-3"
+   ],
+   "glare": 1,
+   "$note": "★逆光（第1便のまま）。グレア全開・砂煙で霞む",
+   "airMul": 1,
+   "bodyMul": 0.74
+  },
+  "gate": {
+   "label": "発走",
+   "skyRamp": [
+    "sky-0",
+    "sky-1",
+    "sky-2",
+    "sky-3"
+   ],
+   "glare": 0.2,
+   "$note": "★発走はまだ静か。グレアを抑え、砂煙もゲートが開くまで出しません",
+   "airMul": 0.7,
+   "bodyMul": 0.95
+  }
+ },
+ "$comment-daylight": "★時間帯。**同じ役割名のまま、乗算と加算だけで切り替えます**（パレットを3つ持ちません）。sky/turf/stand それぞれに [R,G,B] の倍率と、全体に載せる色かぶりを持ちます。",
+ "$daylight": {
+  "day": {
+   "label": "昼",
+   "skyMul": [
+    1.02,
+    1.05,
+    1.08
+   ],
+   "groundMul": [
+    1.06,
+    1.08,
+    1
+   ],
+   "bodyMul": 1,
+   "cast": null,
+   "castA": 0,
+   "glareMul": 0.35,
+   "rim": "sky-5"
+  },
+  "dusk": {
+   "label": "薄暮",
+   "skyMul": [
+    1,
+    0.92,
+    0.84
+   ],
+   "groundMul": [
+    0.94,
+    0.88,
+    0.8
+   ],
+   "bodyMul": 0.88,
+   "cast": "mark-gold",
+   "castA": 0.14,
+   "glareMul": 1,
+   "rim": "sky-5"
+  },
+  "night": {
+   "label": "ナイター",
+   "skyMul": [
+    0.3,
+    0.34,
+    0.46
+   ],
+   "groundMul": [
+    0.72,
+    0.8,
+    0.72
+   ],
+   "bodyMul": 0.78,
+   "cast": "silk-17",
+   "castA": 0.22,
+   "glareMul": 0,
+   "rim": "paper-0",
+   "$note": "★ナイターは照明があるので**走路だけ明るい**（groundMul を空より高く保つ）。空を落として走路を残すのが要点です。照明塔は stand の層に立てます"
+  }
+ }
 }

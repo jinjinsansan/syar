@@ -26,7 +26,7 @@ const FIELD = 12;
 const W = 1280;
 const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '10';
+const ASSET_VERSION = '11';
 /** ★構図の基準幅（`layers.json` の viewport と同じ） */
 const VP_W = 1280;
 
@@ -40,14 +40,26 @@ const POST_COLORS: readonly (readonly [number, number, number])[] = [
 /** ★コース（1角/2角/向正面/3角/4角/直線）。いまどこを走っているかを出すため */
 const COURSE = ovalCourse(DIST);
 
+/** ★第2便の区間別レンダラ（`/art/scene.js`）。★`still.js` を土台にして読み込みます */
+interface StarScene {
+  drawScene: (ctx: CanvasRenderingContext2D, o: Record<string, unknown>) => void;
+  drawCutBadge: (ctx: CanvasRenderingContext2D, ...a: unknown[]) => void;
+}
+
 interface StarStill {
   buildAtlas: (sheet: HTMLImageElement, pal: unknown, layers: unknown) => Promise<unknown>;
   drawStill: (ctx: CanvasRenderingContext2D, o: Record<string, unknown>) => void;
   setOptions: (o: { coat: boolean; backlight: boolean }) => void;
 }
 declare global {
-  interface Window { STARStill?: StarStill }
+  interface Window { STARStill?: StarStill; STARScene?: StarScene }
 }
+
+/** ★コースの区間 → 第2便の景観（`layers2.sections`） */
+const SECTION_OF: Record<string, string> = {
+  直線: 'homestretch', 向正面: 'backstretch',
+  '1角': 'corner', '2角': 'corner', '3角': 'corner', '4角': 'corner',
+};
 
 interface Built {
   readonly model: ReturnType<typeof replayPositionModel>;
@@ -91,7 +103,7 @@ function build(seed: number, ownGate: number): Built {
 
 export default function RacePage(): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const artRef = useRef<{ pal: unknown; layers: unknown; atlas: unknown } | null>(null);
+  const artRef = useRef<{ pal: unknown; layers: unknown; layers2: unknown; atlas: unknown } | null>(null);
   const rafRef = useRef<number | null>(null);
   const t0Ref = useRef(0);
   const dRef = useRef(0);
@@ -118,8 +130,19 @@ export default function RacePage(): React.JSX.Element {
           document.head.appendChild(s);
         });
       }
-      const [pal, layers] = await Promise.all([
+      // ★第2便の区間別レンダラ（still.js の後に読む）
+      if (window.STARScene === undefined) {
+        await new Promise<void>((res, rej) => {
+          const s2 = document.createElement('script');
+          s2.src = `/art/scene.js?v=${ASSET_VERSION}`;
+          s2.onload = () => res();
+          s2.onerror = () => rej(new Error('区間別レンダラを読み込めません'));
+          document.head.appendChild(s2);
+        });
+      }
+      const [pal, layers, layers2] = await Promise.all([
         fetch(`/art/palette.json?v=${ASSET_VERSION}`).then((r) => r.json()),
+        fetch(`/art/layers1.json?v=${ASSET_VERSION}`).then((r) => r.json()),
         fetch(`/art/layers.json?v=${ASSET_VERSION}`).then((r) => r.json()),
       ]);
       const sheet = await new Promise<HTMLImageElement>((res, rej) => {
@@ -133,7 +156,7 @@ export default function RacePage(): React.JSX.Element {
       api.setOptions({ coat, backlight });
       const atlas = await api.buildAtlas(sheet, pal, layers);
       if (cancelled) return;
-      artRef.current = { pal, layers, atlas };
+      artRef.current = { pal, layers, layers2, atlas };
       setReady(true);
     };
     boot().catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)));
@@ -260,72 +283,63 @@ export default function RacePage(): React.JSX.Element {
     const sinceFinish = d - built.warp.displaySec;
     const showResult = finished && sinceFinish >= holdSec;
 
-    api.drawStill(ctx, {
-      palette: art.pal, layers: art.layers, atlas: art.atlas,
-      /**
-       * ★**背景の流れ**。
-       * ⚠️ 3.2倍にしていたので、91秒で 5,120px しか流れず（毎秒 56px）、
-       *    **止まって見えていました**（オーナー判定「超スロー」）。
-       * ★実馬は 16m/s。手前のラチが 1.00 のとき、**毎秒 320px 前後**流れるべきです。
-       *   → 1m あたり 20px として 20倍にします。
-       */
-      parts: {}, scene: 'straight200', scroll: lead * 20,
-      horses,
+    /**
+     * ★**区間別レンダラで描きます**（第2便）。
+     *   背景・馬・手前のラチまでを `drawScene` が描き、**UI はこちらで足します**。
+     *   ⚠️ `still.js` は書き換えていません（`scene.js` がそれを土台にしています）。
+     */
+    const scene = window.STARScene;
+    const section = SECTION_OF[seg.label] ?? 'homestretch';
+    /**
+     * ★**馬の配置**。枠（3段12箇所）は固定し、**誰がどの枠に入るか**だけを順位で決めます。
+     *   ⚠️ 計算で置き直すと構図が壊れます（一度やって戻しました）。
+     */
+    const ROWS: readonly (readonly [number, readonly number[]])[] = closeUp
+      ? [[2, [1120, 830, 540, 250, -40]], [1, [985, 800, 615, 430]], [0, [860, 685, 505]]]
+      : [[2, [1060, 660, 230]], [1, [985, 800, 615, 430]], [0, [860, 685, 505, 330, 150]]];
+    const plan = {
       own: ownGate,
-      runningOrder: sorted.map((h) => h.gate),
-      gauge: own === undefined ? 1 : own.staminaRatio,
-      cue: segment,
-      cueActive: phase === 'spurt' || phase === 'straight',
-      gap: { m: gapM, mps: (gapB - gapM) / 0.6, toGo: Math.max(0, myRank - 2) },
-      pace: built.pace,
-      curve: curveAmount,
-      /**
-       * ★**ゴール前は寄る**（アートバイブル §9「勝負所で寄る」）。
-       *   残り200m から、手前の段（2×）に入る頭数を増やして叩き合いを大きく見せます。
-       *   ⚠️ 倍率は 1× と 2× のまま（D-058）。**枠の割り当てを変えるだけ**です。
-       */
-      closeUp: metersLeft <= 200,
-      /**
-       * ★**実況は「変化」を言う**（裁定 Q-P4-14 ①）。
-       *   「3番手」ではなく「上がってきた」。**順位の数字は言いません。**
-       *   ⚠️ 少し前と比べて、**実際に起きたこと**を拾います。
-       */
-      callout: (() => {
-        if (finished) return `${built.result[0]!.gate}番　ゴールイン`;
-        const prevSorted = [...back].sort((a, b) => b.meters - a.meters);
-        const leaderNow = sorted[0]!.gate;
-        const leaderBefore = prevSorted[0]?.gate;
-        // ★先頭が替わった
-        if (leaderBefore !== undefined && leaderBefore !== leaderNow) {
-          return `${leaderNow}番　先頭に立った`;
-        }
-        // ★いちばん詰めている馬
-        let bestGate = -1;
-        let bestGain = 0;
-        for (const h of sorted) {
-          const b = back.find((x) => x.gate === h.gate);
-          if (b === undefined) continue;
-          const gainNow = lead - h.s;
-          const gainBefore = (prevSorted[0]?.meters ?? lead) - b.meters;
-          const g = gainBefore - gainNow;
-          if (g > bestGain) { bestGain = g; bestGate = h.gate; }
-        }
-        if (bestGain > 0.8 && bestGate > 0) {
-          return segment === '直線' ? `${bestGate}番　外から伸びてきた` : `${bestGate}番　上がってきた`;
-        }
-        if (segment === '直線' && metersLeft < 200) {
-          const second = sorted[1];
-          if (second !== undefined && sorted[0]!.s - second.s < HORSE_LENGTH_M) {
-            return `${leaderNow}番と${second.gate}番　並んだ`;
-          }
-          return `残り ${metersLeft.toFixed(0)}m　${leaderNow}番先頭`;
-        }
-        if (segment === '直線') return `さあ直線　${leaderNow}番が先頭`;
-        if (segment === '4角') return '4角をまわった　各馬が動いた';
-        if (segment === '3角') return '3角　隊列が動き始めた';
-        return `${segment}　${leaderNow}番が先頭　残り ${metersLeft.toFixed(0)}m`;
-      })(),
-    });
+      rows: ROWS.map(([rowIdx, xs], ri) => {
+        const base = ri === 0 ? 0 : ri === 1 ? ROWS[0]![1].length : ROWS[0]![1].length + ROWS[1]![1].length;
+        return {
+          id: rowIdx === 2 ? 'front' : rowIdx === 1 ? 'mid' : 'back',
+          scale: rowIdx === 2 ? 2 : 1,
+          groundY: rowIdx === 2 ? 626 : rowIdx === 1 ? 520 : 436,
+          air: rowIdx === 2 ? 0 : rowIdx === 1 ? 0.04 : 0.1,
+          gates: xs.map((_, i) => sorted[base + i]?.gate ?? 1),
+          x: [...xs],
+        };
+      }),
+    };
+
+    if (scene !== undefined) {
+      scene.drawScene(ctx, {
+        palette: art.pal, layers2: art.layers2,
+        sharedLayers: (art.layers as { layers: unknown[] }).layers,
+        atlas: art.atlas, section, scroll: lead * 20,
+        horsePlan: plan, cornerVariant: 'c',
+      });
+    } else {
+      api.drawStill(ctx, {
+        palette: art.pal, layers: art.layers, atlas: art.atlas,
+        parts: {}, scene: 'straight200', scroll: lead * 20,
+        horses: plan.rows.flatMap((r, ri) => r.gates.map((g, i) => ({
+          gate: g, row: ri === 0 ? 2 : ri === 1 ? 1 : 0, x: r.x[i]!,
+          frame: Math.floor((((d * 2.4 + g * 0.37) % 1) + 1) % 1 * 6),
+        }))),
+        own: ownGate,
+      });
+    }
+
+    /** ★UI（画面の座標系。カメラが隠せません） */
+    api.drawStill(ctx, {
+      palette: art.pal, layers: art.layers, atlas: art.atlas, transparent: true,
+      parts: {
+        sky: false, stand: false, hedge: false, fenceFar: false, turfFar: false,
+        turfMain: false, railFront: false, turfNear: false, dust: false, finish: false,
+        pole: false,
+      },
+      scene: 'straight200', scroll: 0, horses: [], own: ownGate,    });
     /**
      * ★**着順**（決着の一拍のあとに出す）。
      *   ⚠️ 参照実装の上に**足して描くだけ**です（構図に触れません）。
