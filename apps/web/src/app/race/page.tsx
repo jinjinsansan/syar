@@ -28,7 +28,7 @@ const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 /** ★発走の間（秒）。この間はレースの時計を進めません */
 const GATE_HOLD = 3.0;
-const ASSET_VERSION = '12';
+const ASSET_VERSION = '13';
 /** ★構図の基準幅（`layers.json` の viewport と同じ） */
 const VP_W = 1280;
 

@@ -743,6 +743,12 @@
     ALL_PARTS: ALL_PARTS, SCENES: SCENES, LAYER_PART: LAYER_PART,
     buildAtlas: buildAtlas, drawStill: drawStill, drawLayer: drawLayer,
     setOptions: setOptions,
-    coatOf: coatOf, textWidth: textWidth, drawDigits: drawDigits
+    coatOf: coatOf, textWidth: textWidth, drawDigits: drawDigits,
+    /**
+     * ★**第2便の `scene.js` が使う補助関数**。
+     *   ⚠️ 公開していなかったため `S.rgba is not a function` で落ちました。
+     *      `scene.js` は「still.js を土台にする」設計なので、**土台側が出す必要があります**。
+     */
+    rgba: rgba, hex: hex2rgb, paperBox: paperBox, drawHorse: drawHorse
   };
 })(typeof window !== 'undefined' ? window : globalThis);
