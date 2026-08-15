@@ -85,6 +85,75 @@ export interface TimeWarp {
  *   **折れ点では必ず一致します**（表示←→レースの往復で誤差ゼロ）。
  *   だから「勝負所に入った瞬間」が、配分を変えてもずれません。
  */
+/**
+ * ★★**距離ごとの目標表示時間 [秒]**（`RACE_PRESENTATION_BASICS.md` §4）
+ *
+ * 【オーナー判定】「★**レースはおよそ45秒（短距離は短くてもいい）**」
+ *
+ * 【★なぜ距離で変えるか — 実測】
+ *   送り速さを距離によらず固定すると、こうなりました:
+ *   ```
+ *   1200m  走破 76.4s → 表示 35.0s   ★合っている
+ *   1600m      102.9s      44.7s     ★合っている
+ *   2400m      157.6s      65.0s     ⚠️ 長い
+ *   3000m      199.6s      80.5s     ⚠️ ★長すぎる
+ *   ```
+ *   ★**道中の実時間だけが距離とともに伸びる**ので、そこを吸収させます。
+ */
+export function targetDisplaySec(distanceMeter: number): number {
+  /**
+   * ⚠️ ★最初は距離帯（5段階）で段にしました。すると
+   *    ★**1400m と 1500m で、道中の送りが 4.17倍 → 2.2倍 に跳びます**
+   *    （目標が 35秒 → 45秒 に段で変わるため）。
+   *    ★**ほとんど同じレースが、まったく違う速さで流れます。**
+   * → **なだらかに繋ぎます。** 折れ点はオーナー指示の2つ:
+   *    ★**短距離 35秒 ／ マイル 45秒**。そこから長距離へ緩やかに伸ばします。
+   */
+  const d = Math.max(800, distanceMeter);
+  if (d <= 1200) return 35;
+  if (d <= 1600) return 35 + ((d - 1200) / 400) * 10;   // 1200→35 / 1600→45
+  if (d <= 3000) return 45 + ((d - 1600) / 1400) * 7;   // 1600→45 / 3000→52
+  return 52;
+}
+
+/**
+ * ★★**勝負所と直線の送り速さは、距離によらず一定**にします。
+ *
+ *   ★**ここが「レースの中身」で、C-6（仕掛け）が成立する場所**だからです。
+ *   ⚠️ ここを距離で縮めると、**長距離ほど押す余地が減ります**。
+ */
+export const FIXED_SPURT_RATE = 2.25;
+export const FIXED_STRAIGHT_RATE = 1.8;
+
+/**
+ * ★**目標の表示時間に収まるよう、道中の送りだけを逆算する。**
+ *
+ * ```
+ * 道中の送り = 道中の実時間 ÷ (目標表示時間 − 勝負所と直線の表示時間)
+ * ```
+ *
+ * ⚠️ ★**目標が「勝負所＋直線」より短いときは、そこで止めません**（映像が作れなくなるため）。
+ *    ★**道中の送りに上限**を置き、**溢れたぶんは表示時間が延びる**ようにします。
+ *    そのほうが「勝負所が消える」より害が小さいためです。
+ */
+export function ratesForTarget(knots: PhaseKnots, targetSec: number): PhaseRates {
+  const cruiseRace = Math.max(0, knots.spurtSec - knots.startSec);
+  const spurtRace = Math.max(0, knots.straightSec - knots.spurtSec);
+  const straightRace = Math.max(0, knots.finishSec - knots.straightSec);
+  const tail = spurtRace / FIXED_SPURT_RATE + straightRace / FIXED_STRAIGHT_RATE;
+  const room = targetSec - tail;
+  /** ★道中の送りの上限。これ以上速いと**何が起きたか読めません** */
+  const MAX_CRUISE = 8;
+  const MIN_CRUISE = 1;
+  if (cruiseRace <= 0) return { cruise: MIN_CRUISE, spurt: FIXED_SPURT_RATE, straight: FIXED_STRAIGHT_RATE };
+  const want = room > 0.5 ? cruiseRace / room : MAX_CRUISE;
+  return {
+    cruise: Math.max(MIN_CRUISE, Math.min(MAX_CRUISE, want)),
+    spurt: FIXED_SPURT_RATE,
+    straight: FIXED_STRAIGHT_RATE,
+  };
+}
+
 export function timeWarpFor(knots: PhaseKnots, rates: PhaseRates = DEFAULT_PHASE_RATES): TimeWarp {
   for (const [name, r] of [['cruise', rates.cruise], ['spurt', rates.spurt], ['straight', rates.straight]] as const) {
     if (!(r > 0) || !Number.isFinite(r)) {

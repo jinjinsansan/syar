@@ -25,7 +25,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches } from '@star/race-engine';
 import type { Strategy } from '@star/sim-engine';
 import {
-  replayPositionModel, finalOrderOf, timeWarpFor, knotsFor,
+  replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, ratesForTarget, targetDisplaySec,
   ovalCourse, segmentStarts, HORSE_LENGTH_M, frameRoleOf,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
@@ -36,7 +36,7 @@ const W = 1280;
 const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 /** ★上げないと古い JS が使われます（「変わっていません」の正体） */
-const V = '23';
+const V = '24';
 
 /** ★区間の境目（1角/2角/向正面/…）。**コースから読みます**（書き写すとずれる） */
 const COURSE = ovalCourse(DIST);
@@ -46,30 +46,18 @@ const SEGS: readonly { s: number; end: number; label: string }[] = (() => {
 })();
 
 /**
- * ★★**送り速さ**（レース秒 ÷ 表示秒。大きいほど速送り）
+ * ★★**送り速さは、距離から逆算します**（`RACE_PRESENTATION_BASICS.md` §4）
  *
- * 【オーナー判定】「なぜか急にスピードが上がる時がある。そのスピードを最初から最後まで。
- *   最低でもスピード感がある」「レースは30秒」
+ * 【オーナー判定】「レースはおよそ45秒（★**短距離は短くてもいい**）」
  *
- * 【何が起きていたか】
- *   ・「急に上がる」の正体は**背景ではなく馬**でした。★残り800m が勝負所の境目で、
- *     そこから**馬が離れ始める**ので、それまで動かなかった馬が急に動き出します
- *   ・送り速さ自体は `道中1.8 → 勝負所1.0 → 直線0.7` で、★**進むほど遅く**なります
- *   ・1600m の表示が **91秒**。長すぎます
+ * 【★なぜ固定をやめたか — 実測】
+ *   距離によらず `2.7 / 2.25 / 1.8` の固定だと:
+ *     1200m 35.0s ★合っている ／ 1600m 44.7s ★合っている
+ *     2400m 65.0s ⚠️ 長い     ／ 3000m 80.5s ⚠️ ★長すぎる
+ *   ★**道中の実時間だけが距離とともに伸びる**ので、そこを吸収させます。
  *
- * 【どう変えたか】★**比を保ったまま全体を上げます**（D-062 の向きは崩さない）
- *     道中 2.7 / 勝負所 2.25 / 直線 1.8  → 表示 **約45秒**
- *   ⚠️ 一度 3.6/3.0/2.4（33.5秒）にしたところ★**「30秒は短い。45秒にする」**（オーナー）
- *   ・★段差を 1.8:1:0.7（2.6倍）から 3.6:3:2.4（1.5倍）に**縮めた**ので、
- *     「急に変わった」と感じにくくなります
- *   ・★決着に向けて少し伸びるのは**残します**。D-062（時間を情報量に比例して配る）と
- *     C-6（人間が読んで押す余地）が、そこに依っているためです
- *
- * ⚠️ ★**これは D-062 の数字を変える決定です。** 正典の改訂が要ります。
- *    ⚠️ `packages/render` の既定（`DEFAULT_PHASE_RATES`）は**変えていません**。
- *       あれはレビュー側が実測から置いた数字で、`/race` と V-16 が使っています。
+ * ★**勝負所と直線の送りは距離によらず一定**（C-6 が成立する場所なので縮めない）。
  */
-const RATES = { cruise: 2.7, spurt: 2.25, straight: 1.8 };
 
 /** ★発走の間（秒）。この間はレースの時計を進めません */
 const GATE_HOLD = 3.4;
@@ -271,7 +259,10 @@ function build(seed: number, ownGate: number): Built {
   const winner = Number(result.order[0]!.horseId);
   return {
     model,
-    warp: timeWarpFor(knotsFor(boundaries, ownGate), RATES),
+    warp: (() => {
+      const knots = knotsFor(boundaries, ownGate);
+      return timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
+    })(),
     pace,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
     finishSec,
