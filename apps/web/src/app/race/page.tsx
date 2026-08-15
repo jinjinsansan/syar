@@ -30,6 +30,13 @@ const ASSET_VERSION = '8';
 /** ★構図の基準幅（`layers.json` の viewport と同じ） */
 const VP_W = 1280;
 
+/** ★枠順の色（D-060）。着順表示に使います */
+const POST_COLORS: readonly (readonly [number, number, number])[] = [
+  [214, 40, 40], [245, 245, 245], [20, 70, 180], [250, 215, 40], [20, 140, 70], [25, 25, 25],
+  [240, 130, 25], [245, 150, 190], [45, 190, 180], [120, 45, 160], [150, 150, 155], [170, 220, 50],
+  [110, 70, 45], [128, 30, 55], [175, 165, 120], [135, 190, 230], [25, 40, 95], [30, 80, 50],
+];
+
 /** ★コース（1角/2角/向正面/3角/4角/直線）。いまどこを走っているかを出すため */
 const COURSE = ovalCourse(DIST);
 
@@ -240,6 +247,14 @@ export default function RacePage(): React.JSX.Element {
     // ★いまコースのどこか（実際の区間名）
     const segment = seg.label;
     const finished = d >= built.warp.displaySec - 0.01;
+    /**
+     * ★**決着で一拍置く**（アートバイブル §2「決着直前に音を抜く」の視覚版）。
+     *   ゴール直後の 0.8秒は**着順を出さず**、ゴールした絵だけを見せます。
+     *   ⚠️ レースの時計は伸ばしません（表示の後ろで走るだけ）。
+     */
+    const holdSec = 0.8;
+    const sinceFinish = d - built.warp.displaySec;
+    const showResult = finished && sinceFinish >= holdSec;
 
     api.drawStill(ctx, {
       palette: art.pal, layers: art.layers, atlas: art.atlas,
@@ -307,6 +322,38 @@ export default function RacePage(): React.JSX.Element {
         return `${segment}　${leaderNow}番が先頭　残り ${metersLeft.toFixed(0)}m`;
       })(),
     });
+    /**
+     * ★**着順**（決着の一拍のあとに出す）。
+     *   ⚠️ 参照実装の上に**足して描くだけ**です（構図に触れません）。
+     *   ★並べ替えません。**エンジンが決めた順**をそのまま描きます。
+     */
+    if (showResult) {
+      const bx = Math.round(VP_W * 0.34);
+      const rows = built.result.slice(0, 5);
+      ctx.fillStyle = 'rgba(22,20,17,0.88)';
+      ctx.fillRect(bx, 120, 330, 26 + rows.length * 28);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#f2c14e';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText('着 順', bx + 16, 144);
+      rows.forEach((e, i2) => {
+        const y = 172 + i2 * 28;
+        const col = POST_COLORS[e.gate - 1] ?? [200, 200, 200];
+        ctx.fillStyle = '#f6f2e7';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillText(`${e.place}`, bx + 18, y);
+        ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+        ctx.fillRect(bx + 48, y - 15, 24, 20);
+        ctx.fillStyle = (col[0] * 299 + col[1] * 587 + col[2] * 114) / 1000 < 140 ? '#f5f5f5' : '#111';
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillText(`${e.gate}`, bx + 60, y);
+        ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(246,242,231,0.75)';
+        ctx.font = '15px sans-serif';
+        ctx.fillText(e.margin, bx + 88, y);
+      });
+    }
   }, [built, ownGate]);
 
   useEffect(() => { render(dRef.current); }, [render, ready]);
@@ -316,15 +363,16 @@ export default function RacePage(): React.JSX.Element {
     t0Ref.current = performance.now() - dRef.current * 1000;
     const loop = (): void => {
       const d = (performance.now() - t0Ref.current) / 1000;
-      if (d >= built.warp.displaySec) {
-        dRef.current = built.warp.displaySec;
-        setClock(dRef.current);
+      // ★ゴール後も 1.2秒だけ回す（決着の一拍と着順表示のため）
+      if (d >= built.warp.displaySec + 1.2) {
+        dRef.current = built.warp.displaySec + 1.2;
+        setClock(built.warp.displaySec);
         render(dRef.current);
         setPlaying(false);
         return;
       }
       dRef.current = d;
-      setClock(d);
+      setClock(Math.min(d, built.warp.displaySec));
       render(d);
       rafRef.current = requestAnimationFrame(loop);
     };
