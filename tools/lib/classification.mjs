@@ -91,6 +91,8 @@ export const READONLY = [
   'make-gif.mjs',
   // ★読むだけ。ギャロップが走りとして成立しているかを測る
   'measure-gallop.mjs',
+  // ★scene.js をそのまま実行して PNG にするだけ。DB にも台帳にも触れません
+  'shot-scene.mjs',
   'measure-silk-budget.mjs',
   'measure-sprite-sheet.mjs',
   'pick-silk-palette.mjs',

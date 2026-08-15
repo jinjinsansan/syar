@@ -748,7 +748,9 @@
      * ★**第2便の `scene.js` が使う補助関数**。
      *   ⚠️ 公開していなかったため `S.rgba is not a function` で落ちました。
      *      `scene.js` は「still.js を土台にする」設計なので、**土台側が出す必要があります**。
+     *   ⚠️ ★`hex` という別名だけ出していたため、`drawGate` が `S.hex2rgb is not a function`
+     *      で落ちる状態でした（`S.rgba` と**同じ抜け**）。**呼ばれている名前で出します。**
      */
-    rgba: rgba, hex: hex2rgb, paperBox: paperBox, drawHorse: drawHorse
+    rgba: rgba, hex: hex2rgb, hex2rgb: hex2rgb, paperBox: paperBox, drawHorse: drawHorse
   };
 })(typeof window !== 'undefined' ? window : globalThis);

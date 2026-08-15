@@ -457,14 +457,30 @@
       }
     }
 
+    /**
+     * ★**ゲート（馬より後ろ）**。⚠️ 順番がここでなければいけません。
+     *   デザイナーの指摘: 「扉が開いた瞬間、馬はもうゲートより前にいる」。
+     *   `drawGate` を呼び出し側で後から描くと、**馬がゲートに隠れます**。
+     */
+    if (o.gate) {
+      var G = o.gate;
+      drawGate(ctx, pal, G.x, G.groundY, G.stalls, G.open, G.firstGate, G.scale || 2);
+    }
+
     // ── 馬群 ──
     if (o.showHorses !== false) {
       var plan = o.horsePlan;
       var bodyMul = meta.bodyMul === undefined ? 0.74 : meta.bodyMul;
+      /**
+       * ★**コマ番号の決め方**（既定は静止画むけの固定値）。
+       *   ⚠️ 既定のままだと**脚が一切動きません**（枠ごとに固定のコマ）。
+       *      動かす側は `frameOf(gate, ri, i)` を渡してください。**既定は変えていません。**
+       */
+      var frameOf = o.frameOf || function (gate, ri, i) { return (i * 2 + ri * 3) % 6; };
       plan.rows.forEach(function (row, ri) {
         row.gates.forEach(function (gate, i) {
           var gy = row.groundY + bow(row.scale === 2 ? 'railFront' : 'turfMain') * 0;
-          S.drawHorse(ctx, pal, atlas, gate, (i * 2 + ri * 3) % 6, row.x[i], gy, row.scale, {
+          S.drawHorse(ctx, pal, atlas, gate, frameOf(gate, ri, i), row.x[i], gy, row.scale, {
             shadow: true, dust: name !== 'gate', bib: true, backlight: (meta.glare || 0) > 0.3,
             air: true, effort: false, ownMark: gate === plan.own
           }, { air: row.air * (meta.airMul === undefined ? 1 : meta.airMul), own: gate === plan.own });
