@@ -99,6 +99,8 @@ export const READONLY = [
   'diag-lane-loss.mjs',
   // ★読むだけ。斜め俯瞰の試作を静止画で確かめる
   'shot-oblique.mjs',
+  // ★読むだけ。3カットを本番のエンジンで描いて大きさを決める
+  'shot-cuts.mjs',
   // ★画像を読み書きするだけ。DB に触れません
   'bake-oblique.mjs',
   // ★動画をコマに切って幾何と時間を測るだけ。DB に触れません
