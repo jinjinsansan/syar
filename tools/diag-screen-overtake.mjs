@@ -11,9 +11,10 @@
  *   ★**変えたと言うだけでは足りないので、画面 x の入れ替わりを数えます。**
  *
  * 【何を数えるか】
- *   同じ段の2頭について、画面 x の大小が**入れ替わった回数**。
- *   ⚠️ 段はレース中ずっと変わらないので、段をまたぐ見かけの入れ替わりは数えません
- *      （それは奥行きの違いであって、抜いたことではない）。
+ *   2頭について、画面 x の大小が**入れ替わった回数**。
+ *   ⚠️ 段（奥行き）も順位で動くようになったので、段で絞らず全 66組を見ます。
+ *      段が違うと px/m が違うため、x の前後が位置の前後と一致しないことがあります
+ *      （＝視差。奥の馬のほうが横に動かない）。**それは正しい見え方です。**
  *
  * 実行: npx tsx tools/diag-screen-overtake.mjs
  */
@@ -28,27 +29,21 @@ const STRATS = ['nige', 'senko', 'sashi', 'oikomi'];
 
 /** ★`race-next/page.tsx` と同じ値であること */
 const ROW_DEF = [
-  { id: 'back', pxPerM: 22, slots: 5 },
-  { id: 'mid', pxPerM: 30, slots: 4 },
-  { id: 'front', pxPerM: 40, slots: 3 },
+  { id: 'back', pxPerM: 22, limitPx: 330 },
+  { id: 'mid', pxPerM: 30, limitPx: 440 },
+  { id: 'front', pxPerM: 40, limitPx: 560 },
 ];
+const LANE_MOVE_SEC = 1.2;
+function targetLane(rank, current, isOwn) {
+  const up2 = rank <= 2, down2 = rank >= 4, up1 = rank <= 6, down1 = rank >= 8;
+  let want = current >= 1.5 ? (down2 ? 1 : 2) : (up2 ? 2 : (current >= 0.5 ? (down1 ? 0 : 1) : (up1 ? 1 : 0)));
+  if (isOwn) want = Math.max(1, want);
+  return want;
+}
 const X_ANCHOR = 640;
 /** ★望遠の圧縮（`race-next/page.tsx` と同じ値であること）。単調なので前後関係は変わりません */
-const SOFT_LIMIT_M = 14;
-const softGap = (dm) => SOFT_LIMIT_M * Math.tanh(dm / SOFT_LIMIT_M);
-
-function lanesOf(ownGate) {
-  const rest = Array.from({ length: FIELD }, (_, i) => i + 1).filter((g) => g !== ownGate);
-  const out = [{ gate: ownGate, row: 2, sub: 0 }];
-  const counts = [0, 0, 1];
-  let ri = 0;
-  for (const g of rest) {
-    while (ri < 3 && counts[ri] >= ROW_DEF[ri].slots) ri++;
-    if (ri > 2) break;
-    out.push({ gate: g, row: ri, sub: counts[ri]++ });
-  }
-  return out;
-}
+/** ★上限は px 側（`race-next/page.tsx` と同じ式であること）。誰も枠外へ出さない */
+const softX = (dm, pxPerM, zoom, limitPx) => limitPx * Math.tanh((dm * pxPerM * zoom) / limitPx);
 
 function modelOf(seed) {
   const start = (seed * 13) % Math.max(1, POOL.length - FIELD);
@@ -75,11 +70,10 @@ function modelOf(seed) {
 const SEEDS = [42, 7, 101, 2026, 555];
 let total = 0;
 let totalPairs = 0;
-console.log('★同じ段の中で、画面 x の前後が入れ替わった回数（＝抜いた回数）\n');
+console.log('★画面 x の前後が入れ替わった回数（＝抜いた回数）\n');
 for (const seed of SEEDS) {
   const model = modelOf(seed);
-  const lanes = lanesOf(3);
-  const laneOf = Object.fromEntries(lanes.map((l) => [l.gate, l.row]));
+  const lane = new Map();
   // ★`raceSec` です。最初 `finishSec` と書いたら undefined → x が NaN になり、
   //   `sign(NaN) !== sign(NaN)` が常に真で **全組が毎コマ入れ替わった**ことになり、
   //   ★どのシードでも同じ 4560 回という数字で「PASS」と表示しました。
@@ -94,21 +88,31 @@ for (const seed of SEEDS) {
   const first = new Map();
   for (let t = 0; t <= T; t++) {
     const at = model.at(t * step);
+    const sortedNow = [...at].sort((a, b) => b.meters - a.meters);
     const camM = at.reduce((s, h) => s + h.meters, 0) / at.length;
     const x = new Map();
-    for (const h of at) {
-      const v = X_ANCHOR + softGap(h.meters - camM) * ROW_DEF[laneOf[h.gate]].pxPerM;
+    sortedNow.forEach((h, rank) => {
+      // ★段は順位で決まり、1.2秒かけて移る（`race-next/page.tsx` と同じ）
+      const cur = lane.get(h.gate) ?? (rank <= 2 ? 2 : rank <= 6 ? 1 : 0);
+      const want = targetLane(rank, cur, h.gate === 3);
+      const now = cur + (want - cur) * Math.min(1, step / LANE_MOVE_SEC);
+      lane.set(h.gate, now);
+      const lo = ROW_DEF[Math.max(0, Math.min(1, Math.floor(now)))];
+      const hi = ROW_DEF[Math.max(1, Math.min(2, Math.floor(now) + 1))];
+      const f = Math.max(0, Math.min(1, now - Math.floor(now)));
+      const mix = (a, b) => a + (b - a) * f;
+      const v = X_ANCHOR + softX(h.meters - camM, mix(lo.pxPerM, hi.pxPerM), 1, mix(lo.limitPx, hi.limitPx));
       if (!Number.isFinite(v)) throw new Error(`★${h.gate}番の画面 x が ${v} です`);
       x.set(h.gate, v);
       if (!first.has(h.gate)) first.set(h.gate, v);
       maxTravel = Math.max(maxTravel, Math.abs(v - first.get(h.gate)));
-    }
+    });
     if (prev !== null) {
       for (const a of gates) {
         for (const b of gates) {
-          if (a >= b || laneOf[a] !== laneOf[b]) continue;
+          if (a >= b) continue;
           if (Math.sign(x.get(a) - x.get(b)) !== Math.sign(prev.get(a) - prev.get(b))) {
-            swaps++; perLane[laneOf[a]]++;
+            swaps++; perLane[Math.round(lane.get(a) ?? 0)]++;
           }
         }
       }
@@ -129,20 +133,20 @@ for (const seed of SEEDS) {
     const place = new Map(finalOrderOf(model).map((g, i) => [g, i]));
     for (const a of gates) {
       for (const b of gates) {
-        if (a >= b || laneOf[a] !== laneOf[b]) continue;
+        if (a >= b) continue;
         // 道中で前 = early が大きい／着順が上 = place が小さい
         if (Math.sign(early.get(a) - early.get(b)) !== Math.sign(place.get(b) - place.get(a))) decided++;
       }
     }
   }
-  const pairs = [0, 1, 2].reduce((s, i) => s + (ROW_DEF[i].slots * (ROW_DEF[i].slots - 1)) / 2, 0);
+  const pairs = (FIELD * (FIELD - 1)) / 2;
   total += decided;
   totalPairs += pairs;
   console.log(`  seed ${String(seed).padStart(4)}  ★道中の前後が着順で逆転した組 ${String(decided).padStart(2)} / ${pairs}`
     + `　（途中の入れ替わり延べ ${String(swaps).padStart(3)} 回・奥 ${perLane[0]} / 中 ${perLane[1]} / 手前 ${perLane[2]}）`
     + `  1頭が画面上を動いた幅 ${maxTravel.toFixed(0)}px`);
 }
-console.log(`\n  合計 ${total} 回 / 同段の組 ${totalPairs} 通り × ${SEEDS.length} レース`);
+console.log(`\n  合計 ${total} 回 / 組 ${totalPairs} 通り × ${SEEDS.length} レース`);
 if (total === 0) {
   console.log('\n★FAIL — 1回も抜いていません。「定位置で走っているだけ」の状態です');
   process.exit(1);

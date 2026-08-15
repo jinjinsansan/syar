@@ -13,7 +13,7 @@
  *
  * 【★守っていること】
  *   ・着順はエンジンが決めたもの（開始時に D-059 のゲートを通す）
- *   ・構図（3段12枠）は固定。**誰がどの枠に入るか**だけを順位で決める
+ *   ・横位置は**実際の差**／段は順位で決めるが、**瞬間移動させない**（1.2秒かけて移す）
  *   ・倍率は 1× と 2× だけ（D-058）
  *   ・16進を書かない（`palette.json` から役割名で）
  *   ・コーナーの回頭は 0 → 0.48 → 0 に補間（突然逆流すると「バグ」に見える）
@@ -36,7 +36,7 @@ const W = 1280;
 const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 /** ★上げないと古い JS が使われます（「変わっていません」の正体） */
-const V = '19';
+const V = '21';
 
 /** ★区間の境目（1角/2角/向正面/…）。**コースから読みます**（書き写すとずれる） */
 const COURSE = ovalCourse(DIST);
@@ -58,7 +58,8 @@ const SEGS: readonly { s: number; end: number; label: string }[] = (() => {
  *   ・1600m の表示が **91秒**。長すぎます
  *
  * 【どう変えたか】★**比を保ったまま全体を上げます**（D-062 の向きは崩さない）
- *     道中 3.6 / 勝負所 3.0 / 直線 2.4  → 表示 約31秒
+ *     道中 2.7 / 勝負所 2.25 / 直線 1.8  → 表示 **約45秒**
+ *   ⚠️ 一度 3.6/3.0/2.4（33.5秒）にしたところ★**「30秒は短い。45秒にする」**（オーナー）
  *   ・★段差を 1.8:1:0.7（2.6倍）から 3.6:3:2.4（1.5倍）に**縮めた**ので、
  *     「急に変わった」と感じにくくなります
  *   ・★決着に向けて少し伸びるのは**残します**。D-062（時間を情報量に比例して配る）と
@@ -68,7 +69,7 @@ const SEGS: readonly { s: number; end: number; label: string }[] = (() => {
  *    ⚠️ `packages/render` の既定（`DEFAULT_PHASE_RATES`）は**変えていません**。
  *       あれはレビュー側が実測から置いた数字で、`/race` と V-16 が使っています。
  */
-const RATES = { cruise: 3.6, spurt: 3.0, straight: 2.4 };
+const RATES = { cruise: 2.7, spurt: 2.25, straight: 1.8 };
 
 /** ★発走の間（秒）。この間はレースの時計を進めません */
 const GATE_HOLD = 3.4;
@@ -103,24 +104,28 @@ const SECTION_OF: Record<string, string> = {
  *   奥 (1×) は turfMain の上   → 0.55            → **11px/m**
  *   ★同じ 24m でも奥ほど狭く見えます。これが奥行きです。
  */
-const ROW_DEF: readonly { id: string; scale: number; groundY: number; air: number; pxPerM: number; slots: number }[] = [
-  { id: 'back', scale: 1, groundY: 436, air: 0.1, pxPerM: 22, slots: 5 },
-  { id: 'mid', scale: 1, groundY: 520, air: 0.04, pxPerM: 30, slots: 4 },
-  { id: 'front', scale: 2, groundY: 626, air: 0, pxPerM: 40, slots: 3 },
+const ROW_DEF: readonly { id: string; scale: number; groundY: number; air: number; pxPerM: number; slots: number; limitPx: number }[] = [
+  { id: 'back', scale: 1, groundY: 436, air: 0.1, pxPerM: 22, slots: 5, limitPx: 330 },
+  { id: 'mid', scale: 1, groundY: 520, air: 0.04, pxPerM: 30, slots: 4, limitPx: 440 },
+  { id: 'front', scale: 2, groundY: 626, air: 0, pxPerM: 40, slots: 3, limitPx: 560 },
 ];
 /** ★画面のどこを「カメラが見ている地点」にするか */
 const X_ANCHOR = 640;
 /**
  * ★**望遠の圧縮**（`camera.ts` の `xCompression` と同じ考え）。
- *   ⚠️ 差をそのまま px にすると、実測で **1頭が 1900px 動き**、
- *      終盤に自馬が画面の外へ出ます（順位表示にしか残らない）。
- *   → ★**接戦（±数m）はそのまま・離れた馬ほど端に寄る**ようにします。
- *      `soft(d) = LIM·tanh(d/LIM)`。**単調なので前後関係は1つも変わりません**
- *      （＝抜き差しの回数は圧縮しても同じ）。
+ *
+ * 【★オーナー判定「画面の右端に消える馬が多い」】
+ *   ⚠️ 前の式は `LIM[m]·tanh(dm/LIM)` で、**上限が「メートル」側**にありました。
+ *      画角（zoom）を掛けると **px の上限は zoom 倍に伸びる**ので、
+ *      ★寄ったカット（2.1×）で **上限 1176px** になり、先頭が右の枠外へ出ていました。
+ *
+ * → ★**上限を px 側に置きます。**  `x = LIM_PX · tanh(dm · pxPerM · zoom / LIM_PX)`
+ *      ・差が小さいところ … 傾き = `pxPerM · zoom`（★寄ると接戦が拡大される＝画角は効く）
+ *      ・差が大きいところ … ★**画角によらず ±LIM_PX で頭打ち。誰も枠外へ出ません**
+ *   ★単調なので前後関係は1つも変わりません（＝抜き差しの回数は同じ）。
  */
-const SOFT_LIMIT_M = 14;
-function softGap(dm: number): number {
-  return SOFT_LIMIT_M * Math.tanh(dm / SOFT_LIMIT_M);
+function softX(dm: number, pxPerM: number, zoom: number, limitPx: number): number {
+  return limitPx * Math.tanh((dm * pxPerM * zoom) / limitPx);
 }
 /** ★段の中でも数 px ずらして重なりを解く（段の接地線そのものは動かさない） */
 const SUB_DEPTH = 7;
@@ -148,10 +153,13 @@ const SUB_DEPTH = 7;
  */
 interface Cut { readonly zoom: number; readonly target: 'pack' | 'mover' | 'lead2'; readonly label: string }
 const CUT_OF: Record<string, Cut> = {
-  '2角': { zoom: 0.72, target: 'pack', label: '発走' },
-  '1角': { zoom: 0.72, target: 'pack', label: '発走' },
-  向正面: { zoom: 0.6, target: 'pack', label: '道中' },
-  '3角': { zoom: 1.25, target: 'mover', label: '仕掛け' },
+  // ★発走は**寄る**。オーナー指示「逃げ・先行が前へ踊り出て、差し・追込が後方へ」＝
+  //   隊列ができていく過程が見えないと意味がないので、引くと逆効果でした
+  '2角': { zoom: 1.5, target: 'pack', label: '発走' },
+  '1角': { zoom: 1.5, target: 'pack', label: '発走' },
+  // ★道中がいちばん引く（＝上空の代わり。一団であることが伝わる）
+  向正面: { zoom: 0.95, target: 'pack', label: '道中' },
+  '3角': { zoom: 1.35, target: 'mover', label: '仕掛け' },
   '4角': { zoom: 1.7, target: 'lead2', label: '勝負所' },
   直線: { zoom: 2.1, target: 'lead2', label: '決着' },
 };
@@ -162,23 +170,32 @@ const PULL_BACK_SEC = 0.7;
 const PULL_BACK_ZOOM = 0.75;
 
 /**
- * ★**走る段は、レース中ずっと変わりません。**
- *   段を順位で入れ替えると**縦に瞬間移動**します。
- *   自馬は必ず手前（2×）。残りは馬番順に配ります（内枠ほど奥＝内めを回る）。
+ * ★★**段（奥行き）の決め方**
+ *
+ * 【★オーナー判定「遠近法なのか、ずっと小さい馬がいるのはなぜ？」】
+ *   段を**レース中ずっと固定**していました。奥の段の馬は 1×（半分の大きさ）なので、
+ *   ★**その馬は最初から最後まで小さいまま**です。**指摘のとおりです。**
+ *
+ * 【なぜ固定していたか】
+ *   段を順位で入れ替えると**縦に瞬間移動**するからです（横の瞬間移動を直したのと同じ問題）。
+ *
+ * 【どう直したか】★**順位で段を決める。ただし瞬間移動させず 1.2秒かけて移す。**
+ *   ・接地線は 436 / 520 / 626 の**間を連続に**移動する
+ *     （⚠️ 段そのものの接地線は動かしていません。**馬が段の間を移る**だけです）
+ *   ・★**倍率は 1× と 2× だけ**（D-058）。手前寄りに 55% 以上入ったところで切り替える
+ *   ・★**行ったり来たりしないよう「ため」を入れます**（上がるのは3着以内、下がるのは4着より後ろ）
+ *   ・★**自馬は奥の段に落としません**（プレイヤーが自分の馬を見失わないため）
  */
-function lanesOf(ownGate: number): readonly { gate: number; row: number; sub: number }[] {
-  const rest = Array.from({ length: FIELD }, (_, i) => i + 1).filter((g) => g !== ownGate);
-  const out: { gate: number; row: number; sub: number }[] = [];
-  const counts = [0, 0, 0];
-  out.push({ gate: ownGate, row: 2, sub: counts[2]!++ });
-  // 奥（内枠）から順に埋める
-  let ri = 0;
-  for (const g of rest) {
-    while (ri < 3 && counts[ri]! >= ROW_DEF[ri]!.slots) ri++;
-    if (ri > 2) break;
-    out.push({ gate: g, row: ri, sub: counts[ri]!++ });
-  }
-  return out;
+const LANE_MOVE_SEC = 1.2;
+/** 順位 → 目標の段（0=奥 1=中 2=手前）。★上げ下げで境目をずらす（ため） */
+function targetLane(rank: number, current: number, isOwn: boolean): number {
+  const up2 = rank <= 2;
+  const down2 = rank >= 4;
+  const up1 = rank <= 6;
+  const down1 = rank >= 8;
+  let want = current >= 1.5 ? (down2 ? 1 : 2) : (up2 ? 2 : (current >= 0.5 ? (down1 ? 0 : 1) : (up1 ? 1 : 0)));
+  if (isOwn) want = Math.max(1, want);
+  return want;
 }
 
 interface StillApi {
@@ -274,6 +291,8 @@ export default function RaceNextPage(): React.JSX.Element {
   const zoomRef = useRef(0);
   const camRef = useRef<number | null>(null);
   const lastDRef = useRef(0);
+  /** ★馬ごとの「いまいる段」（連続値）。瞬間移動させないための保持値 */
+  const laneRef = useRef<Map<number, number>>(new Map());
 
   const [seed, setSeed] = useState(42);
   const [ownGate, setOwnGate] = useState(3);
@@ -341,6 +360,7 @@ export default function RaceNextPage(): React.JSX.Element {
     zoomRef.current = 0;
     camRef.current = null;
     lastDRef.current = 0;
+    laneRef.current = new Map();
   }, [seed, ownGate]);
 
   const render = useCallback((d: number) => {
@@ -352,7 +372,6 @@ export default function RaceNextPage(): React.JSX.Element {
     if (ctx === null) return;
     const pal = art.pal;
     const c = (k: string): string => pal[k] ?? '#000000';
-    const lanes = lanesOf(ownGate);
 
     const inGate = d < GATE_HOLD;
     const gateOpen = d >= GATE_OPEN_AT;
@@ -388,7 +407,14 @@ export default function RaceNextPage(): React.JSX.Element {
       ? PULL_BACK_ZOOM : cut.zoom;
     const dt = Math.max(0, Math.min(0.1, d - lastDRef.current));
     lastDRef.current = d;
-    if (zoomRef.current <= 0 || dt === 0) zoomRef.current = wanted;
+    /**
+     * ★**カットは「切り替え」です。** 区間が変わった瞬間は**その場で**画角を変えます。
+     *   ⚠️ 前は 0.55秒かけて滑らかに変えていたので、★**切り替わったことが分かりませんでした**
+     *      （オーナー「カメラワーク切り替えは？」）。中継のカットは一瞬で変わります。
+     *   区間の中では、寄り/引きをゆっくり効かせます。
+     */
+    const isCutMoment = sinceCut < dt * 1.5 || zoomRef.current <= 0 || dt === 0;
+    if (isCutMoment) zoomRef.current = wanted;
     else zoomRef.current += (wanted - zoomRef.current) * Math.min(1, dt / CUT_EASE);
     const zoom = zoomRef.current;
 
@@ -415,22 +441,44 @@ export default function RaceNextPage(): React.JSX.Element {
       }
       targetM = packM * 0.55 + best * 0.45;
     }
-    /** ★注視点は**なめらかに**移す（急に飛ぶと切れたように見える） */
-    if (camRef.current === null || dt === 0) camRef.current = targetM;
+    /** ★注視点。**カットの瞬間は飛ばす**（＝切り替え）。区間の中ではなめらかに追う */
+    if (camRef.current === null || isCutMoment) camRef.current = targetM;
     else camRef.current += (targetM - camRef.current) * Math.min(1, dt / 0.9);
     const camM = camRef.current;
 
-    const rows = ROW_DEF.map((r, ri) => {
-      const mine = lanes.filter((l) => l.row === ri);
-      const pos = mine.map((l) => at.find((h) => h.gate === l.gate));
+    /**
+     * ★**1頭 = 1段**にして組みます。
+     *   ⚠️ `drawScene` は段ごとに倍率が1つなので、**段を共有すると同じ大きさに縛られます**。
+     *      1頭ずつ段にすれば、**その馬だけ 1×→2× に上げる**ことができます。
+     *   ★描く順は**奥から**（接地線の y が小さい順）。手前の馬が上に重なります。
+     */
+    const laneNow = laneRef.current;
+    const horses = sorted.map((h, rank) => {
+      const cur = laneNow.get(h.gate) ?? (rank <= 2 ? 2 : rank <= 6 ? 1 : 0);
+      const want = targetLane(rank, cur, h.gate === ownGate);
+      // ★1.2秒かけて段を移す（瞬間移動させない）
+      const step = dt === 0 ? 1 : Math.min(1, dt / LANE_MOVE_SEC);
+      const now = cur + (want - cur) * step;
+      laneNow.set(h.gate, now);
+
+      const lo = ROW_DEF[Math.max(0, Math.min(1, Math.floor(now)))]!;
+      const hi = ROW_DEF[Math.max(1, Math.min(2, Math.floor(now) + 1))]!;
+      const f = Math.max(0, Math.min(1, now - Math.floor(now)));
+      const mix = (a: number, b: number): number => a + (b - a) * f;
+      // ★重なった2頭が1頭に見えないよう、数 px だけ奥へずらす（馬番で固定）
+      const groundY = Math.round(mix(lo.groundY, hi.groundY) - (h.gate % 3) * SUB_DEPTH);
       return {
-        id: r.id, scale: r.scale, air: r.air,
-        gates: mine.map((l) => l.gate),
-        // ★重なった2頭が1頭に見えないよう、段の中でだけ数 px 奥へずらす
-        groundY: mine.map((l) => r.groundY - l.sub * SUB_DEPTH),
-        x: pos.map((h) => Math.round(X_ANCHOR + softGap((h === undefined ? 0 : h.meters) - camM) * r.pxPerM * zoom)),
+        id: `h${h.gate}`,
+        // ★倍率は 1× と 2× だけ（D-058）。手前寄りに 55% 入ったところで切り替える
+        scale: now >= 1.55 ? 2 : 1,
+        air: mix(lo.air, hi.air),
+        gates: [h.gate],
+        groundY: [groundY],
+        x: [Math.round(X_ANCHOR + softX(h.meters - camM, mix(lo.pxPerM, hi.pxPerM), zoom, mix(lo.limitPx, hi.limitPx)))],
+        _y: groundY,
       };
     });
+    const rows = [...horses].sort((a, b) => a._y - b._y);
 
     // ★回頭は 0 → 0.48 → 0 に補間（`$cornerMotion` を複製して pan だけ差し替え）
     const ease = section === 'corner' ? panEase(focus, seg) : 0;
@@ -611,6 +659,7 @@ export default function RaceNextPage(): React.JSX.Element {
     zoomRef.current = 0;
     camRef.current = null;
     lastDRef.current = 0;
+    laneRef.current = new Map();
     render(0);
   };
 
@@ -651,9 +700,10 @@ export default function RaceNextPage(): React.JSX.Element {
         style={{ width: '100%', maxWidth: W, border: '1px solid #4a453d', imageRendering: 'pixelated', background: '#111' }}
       />
       <p style={{ fontSize: 12, opacity: 0.55, marginTop: 10, lineHeight: 1.8 }}>
-        ★<b>発走</b>: 枠入り → ファンファーレ → ゲートが開く（★ゲートは馬より後ろに描かれます）。<br />
-        ★<b>区間で景色が変わります</b>（向正面は<b>観客が1人もいません</b>）。<b>コーナーでは層の流れる向きが上下で分かれ</b>、回頭が出ます。<br />
-        ★<b>着順はエンジンが決めたもの</b>（開始時に D-059 のゲートを通しています）。<b>倍率は 1× と 2× だけ</b>（D-058）。
+        ★<b>カットは区間で切り替わります</b>（発走 → 道中 → 仕掛け → 勝負所 → 決着）。<b>画角と、カメラが誰を追うか</b>が変わります。<br />
+        ★<b>順位が上がった馬は手前へ出てきます</b>（1.2秒かけて移動し、手前で 2× になります）。<b>ずっと小さいままの馬はいません</b>。<br />
+        ★<b>誰も画面の外へ出ません</b>（離れた馬は端で頭打ち）。<b>着順はエンジンが決めたもの</b>（D-059）。<b>倍率は 1× と 2× だけ</b>（D-058）。<br />
+        ⚠️ <b>上空からの俯瞰</b>と<b>奥から走ってくる画</b>は素材がありません（第3便でデザイナーに依頼済み）。
       </p>
     </main>
   );
