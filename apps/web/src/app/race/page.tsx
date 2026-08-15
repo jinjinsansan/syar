@@ -26,7 +26,7 @@ const FIELD = 12;
 const W = 1280;
 const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '8';
+const ASSET_VERSION = '9';
 /** ★構図の基準幅（`layers.json` の viewport と同じ） */
 const VP_W = 1280;
 
@@ -217,6 +217,10 @@ export default function RacePage(): React.JSX.Element {
         row,
         // ★画面中央へ寄せる度合いで一団に見せる（枠そのものは動かさない）
         x: Math.round(VP_W / 2 + (baseX - VP_W / 2) * tight + nudge),
+        /**
+         * ★脚の回転。**毎秒 2.4 歩**（実際の駆歩は 2.1〜2.4）。
+         *   位相を馬番でずらします（全馬が同じ脚さばきだと**行進**に見えます）。
+         */
         frame: Math.floor((((d * 2.4 + h.gate * 0.37) % 1) + 1) % 1 * 6),
         effort: h.stamina,
         own: h.gate === ownGate,
