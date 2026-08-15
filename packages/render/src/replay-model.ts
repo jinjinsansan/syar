@@ -134,7 +134,33 @@ interface Harmonics {
  *      ★**ファミコンのゲームのように前後を入れ替わり続けていました。**
  *   → 道中はほぼ動かさず、勝負所から動かします。
  */
-const PHASE_JOSTLE: readonly number[] = [0, 0.2, 1.0];
+const PHASE_JOSTLE: readonly number[] = [1, 1, 1];
+
+/**
+ * ★★**2026-08-15 に [0, 0.2, 1.0] から [1, 1, 1] に変えました。**
+ *
+ * 【なぜ】レビュー側の裁定:
+ *   > 振幅を**残り距離とともにゼロへ減衰**させてください。
+ *   > 序盤: 大きい → 漏洩が隠れる ／ 終盤: ゼロ → 画面が真実になる
+ *   > 序盤の位置は、本来 結果を決めません。**減衰する揺らぎは現実の模写です。**
+ *   > **D-063 で一定振幅を指示したのはこちらの誤りです。**
+ *
+ *   ★**旧 `[0, 0.2, 1.0]` は、裁定と正反対でした**（道中ゼロ・直線が最大）。
+ *     そしてそれが、V-16 の失敗をそのまま説明します:
+ *       ③ スタート直後で既に読めすぎ ← ★**序盤に揺らぎが無いので漏洩が隠れない**
+ *       ② 残り200m で有意差なし     ← ★**直線で揺らぎが最大なので画面が嘘をつく**
+ *
+ * 【★ただし衝突があります — 上の観察は消えていません】
+ *   通過順位 `8-8-8-4`（★前3つが同じ＝道中は動かない）は**実際の競馬の観察**で、
+ *   ⚠️ 実測でも、揺らぎを道中に入れると**追い抜きが 1レース 84.8回**まで増えました
+ *      （★「ファミコンのゲームのように前後を入れ替わり続ける」）。
+ *
+ *   → ★**振幅の大きさで両立させます。**
+ *     揺らぎは「区間の中の時間の歪み」なので、
+ *     **小さければ位置はぼやけるが順位は入れ替わりません**。
+ *     ★**どこまで大きくしてよいか**は、追い抜き回数と V-16 を**同時に測って**決めます
+ *     （`tools/diag-overtake.mjs` と `tools/verify-v16.mjs`）。
+ */
 
 /**
  * ★**レース全体に1本かけるとき**（`'shape'`）は、局面の重みを使いません。
@@ -183,6 +209,29 @@ function harmonicsFor(seed: number, gate: number, segment: number, amount: numbe
  *   x(t) = ∫v = t + Σ (aₖ/2πk)·(cos φₖ − cos(2πk·t + φₖ))
  *   ★x(0)=0・x(1)=1（cos が一周する）。**Σ|aₖ| < 1 なら v > 0 なので単調増加。**
  */
+/**
+ * ★**揺らぎの既定**。⚠️ **判定と製品で別々に持たないこと。**
+ *
+ * 【なぜ1か所か — 実測】
+ *   判定（`tools/verify-readable.mjs`）は **0.06**、画面（`/race`・`/race-next`）は **0.25** でした。
+ *   ★**V-16 は、画面に出ていないものを測っていました。**
+ *   画面と同じ 0.25 で測り直すと ②③④ が全部 FAIL になりました。
+ *   → レビュー側の裁定「**判定側が製品の値を輸入する形にしてください。
+ *     別々に持てば、また離れます**」。
+ */
+export const DEFAULT_JOSTLE = 0.25;
+
+/**
+ * ★**揺らぎが残る割合**（1 = そのまま／0 = 揺らぎなし）。
+ *   残り `JOSTLE_FADE_M` から**滑らかに 0 へ**落とします。
+ *   ⚠️ 端で急に切ると、そこで**速度が跳ねます**（境界で 5.0〜31.0 m/s になった件と同じ）。
+ */
+export const JOSTLE_FADE_M = 800;
+function fadeOf(metersLeft: number): number {
+  const t = Math.max(0, Math.min(1, metersLeft / JOSTLE_FADE_M));
+  return t * t * (3 - 2 * t);
+}
+
 function easeWithin(t: number, h: Harmonics): number {
   if (h.amps.length === 0) return t;
   let x = t;
@@ -260,7 +309,7 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
   const {
     distanceMeter, spurtMetersLeft, straightMetersLeft, boundaries,
   } = input;
-  const jostle = input.jostle ?? 0.06;
+  const jostle = input.jostle ?? DEFAULT_JOSTLE;
   const jostleSeed = input.jostleSeed ?? 0;
   const fidelity = input.boundaryFidelity ?? 'exact';
   if (boundaries.length === 0) throw new Error('境界時刻がありません');
@@ -316,7 +365,31 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
          *   ★端で ease(0)=0, ease(1)=1 なので、**境界は動きません**（D-059）。
          */
         const t = (sec - t0) / (t1 - t0);
-        const tw = easeWithin(t, harmonicsFor(jostleSeed, b.gate, i, jostle));
+        /**
+         * ★★**揺らぎは、残り距離とともにゼロへ減衰させます**（レビュー側裁定 2026-08-15）。
+         *
+         *   序盤: 大きい → ★**漏洩が隠れる**（序盤の位置は、本来 結果を決めません）
+         *   終盤: ゼロ  → ★**画面が真実になる**
+         *
+         *   ⚠️ 一定振幅（D-063 の当初指示）だと、V-16 の実測で
+         *      ★**残り200m の AUC が 0.773 まで落ちました**
+         *      ＝「最初から分かる」を隠す代わりに、**決着間際の画面が嘘をつく**。
+         *      レビュー側が「一定振幅を指示したのはこちらの誤り」として訂正済み。
+         *
+         *   ★**減衰は「歪みの量」に掛けます**（歪んだ時刻に掛けるのではありません）。
+         *     `easeWithin` は端で `t` に一致するので、**掛けても境界は動きません**（D-059）。
+         */
+        /**
+         * ⚠️ ★**減衰は「区間ごとの定数」にします。**
+         *    最初は**今いる位置**で減衰を計算しました。すると係数が時間とともに動くので
+         *    `d/dt[t + k(t)(e(t)−t)] = 1 + k'(e−t) + k(e'−1)` が**負になり得ます**
+         *    ＝ ★**馬が後ろに下がって見えます**（既存の検査が捕まえました）。
+         *    → 区間の中で `k` を定数にすれば、`e` が単調な限り**厳密に単調**です。
+         *    ★区間の境界では歪みが 0 なので、`k` が段で変わっても**位置は跳ねません**。
+         */
+        const k = fadeOf(distanceMeter - (pts[i + 1]?.[1] ?? distanceMeter));
+        const eased = easeWithin(t, harmonicsFor(jostleSeed, b.gate, i, jostle));
+        const tw = t + k * (eased - t);
         return alongPath(pts, t0 + tw * (t1 - t0), distanceMeter);
       }
       return distanceMeter;
@@ -328,6 +401,8 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
      */
     const span = b.finishSec - b.startSec;
     if (span <= 0) return distanceMeter;
+    // ⚠️ ★`'shape'`（レース全体に1本かける）には減衰を掛けません。
+    //    1本の歪みなので「残り距離ごとの減衰」を掛けると単調性が壊れます。既定は `'exact'`。
     const tau = (sec - b.startSec) / span;
     const warped = easeWithin(tau, harmonicsFor(jostleSeed, b.gate, WHOLE_RACE_SEGMENT, jostle));
     const at = b.startSec + warped * span;

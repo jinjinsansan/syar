@@ -17,7 +17,11 @@
  */
 import { readFileSync } from 'node:fs';
 import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf } from '@star/race-engine';
-import { replayPositionModel } from '@star/render';
+import { replayPositionModel, DEFAULT_JOSTLE } from '@star/render';
+
+/** ★製品の既定を輸入する（判定と製品で別々に持たない） */
+const ji = process.argv.indexOf('--jostle');
+const JOSTLE = ji >= 0 ? Number(process.argv[ji + 1]) : DEFAULT_JOSTLE;
 
 const FIELD = 12, DIST = 1600, RACES = 200, SAMPLES = 120;
 const STRATS = ['nige', 'senko', 'sashi', 'oikomi'];
@@ -63,7 +67,7 @@ for (let seed = 1; seed <= RACES; seed += 1) {
   const model = replayPositionModel({
     distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400,
     boundaries: replayOf(result, (g) => entrants[g - 1].strategy, pace),
-    jostle: 0.25, jostleSeed: seed,
+    jostle: JOSTLE, jostleSeed: seed,
   });
 
   const ranksAt = [];
