@@ -479,7 +479,13 @@
       var frameOf = o.frameOf || function (gate, ri, i) { return (i * 2 + ri * 3) % 6; };
       plan.rows.forEach(function (row, ri) {
         row.gates.forEach(function (gate, i) {
-          var gy = row.groundY + bow(row.scale === 2 ? 'railFront' : 'turfMain') * 0;
+          /**
+           * ★`groundY` は数値でも**枠ごとの配列**でもよい。
+           *   ⚠️ 同じ段の馬が完全に重なると1頭に見えるので、段の中で数 px ずらせるようにします。
+           *      **段の接地線（436/520/626）そのものは動かしません**（区間で変えると枠が全部壊れる）。
+           */
+          var gy = (row.groundY instanceof Array ? row.groundY[i] : row.groundY)
+            + bow(row.scale === 2 ? 'railFront' : 'turfMain') * 0;
           S.drawHorse(ctx, pal, atlas, gate, frameOf(gate, ri, i), row.x[i], gy, row.scale, {
             shadow: true, dust: name !== 'gate', bib: true, backlight: (meta.glare || 0) > 0.3,
             air: true, effort: false, ownMark: gate === plan.own

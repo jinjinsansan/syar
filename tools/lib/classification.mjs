@@ -93,6 +93,7 @@ export const READONLY = [
   'measure-gallop.mjs',
   // ★scene.js をそのまま実行して PNG にするだけ。DB にも台帳にも触れません
   'shot-scene.mjs',
+  'diag-screen-overtake.mjs',
   'measure-silk-budget.mjs',
   'measure-sprite-sheet.mjs',
   'pick-silk-palette.mjs',

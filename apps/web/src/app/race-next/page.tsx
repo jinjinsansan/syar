@@ -36,7 +36,7 @@ const W = 1280;
 const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 /** ★上げないと古い JS が使われます（「変わっていません」の正体） */
-const V = '17';
+const V = '18';
 
 /** ★区間の境目（1角/2角/向正面/…）。**コースから読みます**（書き写すとずれる） */
 const COURSE = ovalCourse(DIST);
@@ -58,19 +58,67 @@ const SECTION_OF: Record<string, string> = {
 };
 
 /**
- * ★枠（3段12箇所）。**デザイナーの構図をそのまま使います。**
- *   計算で置き直したら壊れたので、**誰がどの枠に入るかだけ**を順位で決めます。
+ * ★★**横位置は「枠」ではなく「実際の差」で決めます。**
+ *
+ * 【何が間違っていたか】
+ *   3段12枠に**順位順で馬を入れ替えて**いました。すると
+ *   ★**誰も誰も抜きません。** 順位が変わると馬が瞬間移動するだけで、
+ *   画面上は「定位置で走り、背景だけが流れる」ものになります。オーナー判定のとおりです。
+ *
+ * 【縮尺の根拠】`design/art/handoff2/RESEARCH.md` §3
+ *   ・1馬身 = **2.4m**（競馬ブック用語辞典・dbpedia）
+ *   ・第1便の zoom は **20px/m**。220px のスプライトは 1× で **4.6馬身ぶんの幅**
+ *   ・→ ★**絵は実寸の 4.6倍。** 直しません（実寸だと何も見えない）。**馬は重なります**
+ *   ・道中は **24m に一団**（10馬身）→ 手前の段で 480px、奥の段で 264px
+ *   ・★望遠レンズは馬間を圧縮する。それが `xCompression` の正体（RESEARCH §4）
+ *
+ * 【段ごとの px/m】★背景の層の速度から出します（勝手な値を置かない）
+ *   手前(2×) は railFront の上 → speedRatio 1.00 → **20px/m**
+ *   中 (1×)                    → 0.65            → **13px/m**
+ *   奥 (1×) は turfMain の上   → 0.55            → **11px/m**
+ *   ★同じ 24m でも奥ほど狭く見えます。これが奥行きです。
  */
-const SLOTS: readonly { row: number; x: number }[] = [
-  { row: 2, x: 1060 }, { row: 2, x: 660 }, { row: 2, x: 230 },
-  { row: 1, x: 985 }, { row: 1, x: 800 }, { row: 1, x: 615 }, { row: 1, x: 430 },
-  { row: 0, x: 860 }, { row: 0, x: 685 }, { row: 0, x: 505 }, { row: 0, x: 330 }, { row: 0, x: 150 },
+const ROW_DEF: readonly { id: string; scale: number; groundY: number; air: number; pxPerM: number; slots: number }[] = [
+  { id: 'back', scale: 1, groundY: 436, air: 0.1, pxPerM: 22, slots: 5 },
+  { id: 'mid', scale: 1, groundY: 520, air: 0.04, pxPerM: 30, slots: 4 },
+  { id: 'front', scale: 2, groundY: 626, air: 0, pxPerM: 40, slots: 3 },
 ];
-const ROW_DEF: readonly { id: string; scale: number; groundY: number; air: number }[] = [
-  { id: 'back', scale: 1, groundY: 436, air: 0.1 },
-  { id: 'mid', scale: 1, groundY: 520, air: 0.04 },
-  { id: 'front', scale: 2, groundY: 626, air: 0 },
-];
+/** ★画面のどこを「カメラが見ている地点」にするか */
+const X_ANCHOR = 640;
+/**
+ * ★**望遠の圧縮**（`camera.ts` の `xCompression` と同じ考え）。
+ *   ⚠️ 差をそのまま px にすると、実測で **1頭が 1900px 動き**、
+ *      終盤に自馬が画面の外へ出ます（順位表示にしか残らない）。
+ *   → ★**接戦（±数m）はそのまま・離れた馬ほど端に寄る**ようにします。
+ *      `soft(d) = LIM·tanh(d/LIM)`。**単調なので前後関係は1つも変わりません**
+ *      （＝抜き差しの回数は圧縮しても同じ）。
+ */
+const SOFT_LIMIT_M = 14;
+function softGap(dm: number): number {
+  return SOFT_LIMIT_M * Math.tanh(dm / SOFT_LIMIT_M);
+}
+/** ★段の中でも数 px ずらして重なりを解く（段の接地線そのものは動かさない） */
+const SUB_DEPTH = 7;
+
+/**
+ * ★**走る段は、レース中ずっと変わりません。**
+ *   段を順位で入れ替えると**縦に瞬間移動**します。
+ *   自馬は必ず手前（2×）。残りは馬番順に配ります（内枠ほど奥＝内めを回る）。
+ */
+function lanesOf(ownGate: number): readonly { gate: number; row: number; sub: number }[] {
+  const rest = Array.from({ length: FIELD }, (_, i) => i + 1).filter((g) => g !== ownGate);
+  const out: { gate: number; row: number; sub: number }[] = [];
+  const counts = [0, 0, 0];
+  out.push({ gate: ownGate, row: 2, sub: counts[2]!++ });
+  // 奥（内枠）から順に埋める
+  let ri = 0;
+  for (const g of rest) {
+    while (ri < 3 && counts[ri]! >= ROW_DEF[ri]!.slots) ri++;
+    if (ri > 2) break;
+    out.push({ gate: g, row: ri, sub: counts[ri]!++ });
+  }
+  return out;
+}
 
 interface StillApi {
   buildAtlas: (sheet: HTMLImageElement, pal: unknown, layers: unknown) => Promise<unknown>;
@@ -236,6 +284,7 @@ export default function RaceNextPage(): React.JSX.Element {
     if (ctx === null) return;
     const pal = art.pal;
     const c = (k: string): string => pal[k] ?? '#000000';
+    const lanes = lanesOf(ownGate);
 
     const inGate = d < GATE_HOLD;
     const gateOpen = d >= GATE_OPEN_AT;
@@ -256,13 +305,21 @@ export default function RaceNextPage(): React.JSX.Element {
     // ★区間が切り替わった瞬間だけ帯を出す（時刻を書き写さない）
     if (lastSecRef.current !== section) { lastSecRef.current = section; badgeAtRef.current = d; }
 
-    /** ★枠に順位を割り当てる（構図は固定・先頭が手前の 2×） */
+    /**
+     * ★**横位置＝実際の差**。カメラは馬群の重心を追い、そこからの差[m] を px にします。
+     *   ⚠️ 段（奥行き）は**レース中ずっと変わりません**。動くのは横だけ。
+     *      → ★**抜くところが、抜くように見えます。**
+     */
+    const camM = at.reduce((s, h) => s + h.meters, 0) / at.length;
     const rows = ROW_DEF.map((r, ri) => {
-      const slots = SLOTS.map((s, i) => ({ ...s, i })).filter((s) => s.row === ri);
+      const mine = lanes.filter((l) => l.row === ri);
+      const pos = mine.map((l) => at.find((h) => h.gate === l.gate));
       return {
-        id: r.id, scale: r.scale, groundY: r.groundY, air: r.air,
-        gates: slots.map((s) => sorted[s.i]?.gate ?? 1),
-        x: slots.map((s) => s.x),
+        id: r.id, scale: r.scale, air: r.air,
+        gates: mine.map((l) => l.gate),
+        // ★重なった2頭が1頭に見えないよう、段の中でだけ数 px 奥へずらす
+        groundY: mine.map((l) => r.groundY - l.sub * SUB_DEPTH),
+        x: pos.map((h) => Math.round(X_ANCHOR + softGap((h === undefined ? 0 : h.meters) - camM) * r.pxPerM)),
       };
     });
 
@@ -272,7 +329,8 @@ export default function RaceNextPage(): React.JSX.Element {
 
     scene.drawScene(ctx, {
       palette: pal, layers2: l2, sharedLayers: art.shared, atlas: art.atlas,
-      section, scroll: (inGate ? 0 : lead) * 20, cornerVariant: 'c',
+      // ★背景もカメラ地点で流します（馬と背景の基準がずれると足が滑って見える）
+      section, scroll: (inGate ? 0 : camM) * 20, cornerVariant: 'c',
       signText: seg.label,
       horsePlan: { own: ownGate, rows },
       /**

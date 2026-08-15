@@ -57,14 +57,52 @@ const pal = JSON.parse(readFileSync(path.join(ART, 'palette.json'), 'utf8'));
 const l1 = JSON.parse(readFileSync(path.join(ART, 'layers.json'), 'utf8'));
 const l2 = JSON.parse(readFileSync(path.join(ART, 'layers2.json'), 'utf8'));
 
-/** ★ページ側と**同じ構図**（3段12枠）。ここを変えたら意味がありません */
+/**
+ * ★ページ側と**同じ置き方**（`race-next/page.tsx` と揃えること）。
+ *   横位置は枠ではなく**実際の差 [m] × 段ごとの px/m**。
+ */
 const ROW_DEF = [
-  { id: 'back', scale: 1, groundY: 436, air: 0.1, x: [150, 330, 505, 685, 860] },
-  { id: 'mid', scale: 1, groundY: 520, air: 0.04, x: [430, 615, 800, 985] },
-  { id: 'front', scale: 2, groundY: 626, air: 0, x: [230, 660, 1060] },
+  { id: 'back', scale: 1, groundY: 436, air: 0.1, pxPerM: 22, slots: 5 },
+  { id: 'mid', scale: 1, groundY: 520, air: 0.04, pxPerM: 30, slots: 4 },
+  { id: 'front', scale: 2, groundY: 626, air: 0, pxPerM: 40, slots: 3 },
 ];
-/** 先頭から順に手前 → 中 → 奥（ページ側の SLOTS と同じ並び） */
-const ORDER = [3, 1, 7, 8, 12, 4, 9, 17, 2, 11, 6, 14];
+const X_ANCHOR = 640;
+/** ★望遠の圧縮（`race-next/page.tsx` と同じ値であること）。単調なので前後関係は変わりません */
+const SOFT_LIMIT_M = 14;
+const softGap = (dm) => SOFT_LIMIT_M * Math.tanh(dm / SOFT_LIMIT_M);
+const SUB_DEPTH = 7;
+const OWN = 3;
+
+/** ★道中の一団（RESEARCH §4: 24m に 12頭）。先頭 = 差 0 */
+const SPREAD = Number(arg('spread', '24'));
+const METERS = Object.fromEntries(
+  Array.from({ length: 12 }, (_, i) => [i + 1, -((i * 7919) % 12) / 11 * SPREAD]),
+);
+
+function planOf() {
+  const rest = Array.from({ length: 12 }, (_, i) => i + 1).filter((g) => g !== OWN);
+  const lanes = [{ gate: OWN, row: 2, sub: 0 }];
+  const counts = [0, 0, 1];
+  let ri = 0;
+  for (const g of rest) {
+    while (ri < 3 && counts[ri] >= ROW_DEF[ri].slots) ri++;
+    if (ri > 2) break;
+    lanes.push({ gate: g, row: ri, sub: counts[ri]++ });
+  }
+  const camM = Object.values(METERS).reduce((a, b) => a + b, 0) / 12;
+  return {
+    own: OWN,
+    rows: ROW_DEF.map((r, ri2) => {
+      const mine = lanes.filter((l) => l.row === ri2);
+      return {
+        id: r.id, scale: r.scale, air: r.air,
+        gates: mine.map((l) => l.gate),
+        groundY: mine.map((l) => r.groundY - l.sub * SUB_DEPTH),
+        x: mine.map((l) => Math.round(X_ANCHOR + softGap(METERS[l.gate] - camM) * r.pxPerM)),
+      };
+    }),
+  };
+}
 
 async function main() {
   mkdirSync(OUT, { recursive: true });
@@ -79,17 +117,11 @@ async function main() {
   const baked = Object.keys(atlas).map(Number).sort((a, b) => a - b);
   if (baked.length !== 18) throw new Error(`★焼けた馬番が ${baked.length} 個しかありません: ${baked}`);
 
-  // ★順位 → 枠（手前 3枠 → 中 4枠 → 奥 5枠 の順に埋める）
-  const slotOrder = [
-    { ri: 2, i: 2 }, { ri: 2, i: 1 }, { ri: 2, i: 0 },
-    { ri: 1, i: 3 }, { ri: 1, i: 2 }, { ri: 1, i: 1 }, { ri: 1, i: 0 },
-    { ri: 0, i: 4 }, { ri: 0, i: 3 }, { ri: 0, i: 2 }, { ri: 0, i: 1 }, { ri: 0, i: 0 },
-  ];
-  const plan = {
-    own: 7,
-    rows: ROW_DEF.map((r) => ({ id: r.id, scale: r.scale, groundY: r.groundY, air: r.air, x: r.x, gates: r.x.map(() => 1) })),
-  };
-  slotOrder.forEach((s, rank) => { plan.rows[s.ri].gates[s.i] = ORDER[rank]; });
+  const plan = planOf();
+  console.log(`★馬群の広がり ${SPREAD}m（＝${(SPREAD / 2.4).toFixed(1)}馬身）のときの横位置`);
+  for (const r of plan.rows) {
+    console.log(`  ${r.id.padEnd(5)} ${r.scale}×  馬番 ${r.gates.join(',')}  x=${r.x.join(',')}`);
+  }
 
   const panMul = Number(arg('pan', '1'));
   const cases = [
