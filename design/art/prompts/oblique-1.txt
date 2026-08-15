@@ -1,0 +1,52 @@
+Generate ONE pixel-art sprite of a racehorse with jockey and save it as a PNG file
+in the CURRENT WORKING DIRECTORY named exactly: horse-oblique-1.png
+
+CANVAS (strict):
+- Exactly 128 x 96 pixels. Transparent background.
+- The horse+jockey occupies about 110 px wide and 80 px tall inside the cell.
+- The hooves that touch the ground must sit 8 px above the bottom edge,
+  and the horse must be centred horizontally.
+- No text, no logo, no grid lines, no frame number, no ground shadow baked in.
+
+CAMERA (this is the important part - read carefully):
+- This is NOT a flat side view and NOT a top-down view.
+- The camera is ABOVE and OUTSIDE the racetrack, looking DOWN at about 30 degrees.
+- The horse gallops toward the RIGHT of the image and slightly AWAY from the camera,
+  so we see it from BEHIND-AND-TO-THE-SIDE (a three-quarter rear view).
+- We see: the horse's left flank and hindquarters, the top line of its back and rump,
+  the neck foreshortened going away to the upper right, and the jockey's BACK.
+- The ground plane is tilted: the horse's near hind hoof is LOWER on the image than
+  its far fore hoof. Legs on the far side are partly hidden by the body.
+
+SUBJECT:
+- Realistic thoroughbred racehorse in full gallop, extended phase
+  (fore legs reaching forward, hind legs pushed back, one hind hoof on the ground).
+- Coat: BAY - medium warm brown body, near-black mane, tail and lower legs.
+- Rich muscle shading on the hindquarters and shoulder. Coat sheen.
+  Thousands of shades allowed inside the body - DO NOT posterize or flatten to 4 tones.
+- Visible bridle and double reins. Black tail streaming backward and slightly down.
+- A jockey crouched low over the withers, seen from behind: we see the back of the
+  jacket, the back of the helmet, both arms forward, boots in the irons.
+
+SILKS (critical - these get recoloured later):
+- The jockey's jacket, sleeves and helmet must be ONE flat, saturated BLUE
+  (hue 200-260 degrees, saturation 0.35 or higher), as a clear contiguous block.
+- NO pattern, NO stripes, NO star, NO logo on the silks.
+- White breeches, black boots.
+
+SADDLE CLOTH:
+- A plain rectangular saddle cloth sits under the saddle on the horse's visible flank,
+  angled with the body. Leave it COMPLETELY BLANK - no number, no text, no logo.
+  It must be a clean readable quadrilateral, at least 26 px wide, because a number
+  will be drawn onto it by the renderer.
+
+STYLE:
+- Clean hard-edged pixels. NO anti-aliasing on the outer silhouette, NO blur.
+- Detailed, late-16-bit arcade quality. Not chunky retro, not blurry.
+- Muted desaturated earth palette for the horse and tack; the silks are the only
+  saturated colour.
+
+DO NOT depict any real racehorse, real owner, real stable, real racecourse,
+or any real silk design. Invent everything. No text, no logos, no watermarks.
+
+After saving, print the absolute path of the saved file.

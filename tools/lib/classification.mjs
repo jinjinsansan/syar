@@ -95,6 +95,8 @@ export const READONLY = [
   'shot-scene.mjs',
   'diag-screen-overtake.mjs',
   'diag-cuts.mjs',
+  // ★読むだけ。斜め俯瞰の試作を静止画で確かめる
+  'shot-oblique.mjs',
   'measure-silk-budget.mjs',
   'measure-sprite-sheet.mjs',
   'pick-silk-palette.mjs',
