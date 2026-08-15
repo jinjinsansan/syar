@@ -97,6 +97,8 @@ export const READONLY = [
   'diag-cuts.mjs',
   // ★読むだけ。斜め俯瞰の試作を静止画で確かめる
   'shot-oblique.mjs',
+  // ★画像を読み書きするだけ。DB に触れません
+  'bake-oblique.mjs',
   'measure-silk-budget.mjs',
   'measure-sprite-sheet.mjs',
   'pick-silk-palette.mjs',

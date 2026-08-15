@@ -1,0 +1,68 @@
+Generate a pixel-art SPRITE SHEET of a galloping racehorse and save it as a PNG file
+in the CURRENT WORKING DIRECTORY named exactly: horse-oblique-sheet2.png
+
+LAYOUT (strict):
+- 6 frames of ONE gallop cycle, in ONE HORIZONTAL ROW (1 row x 6 columns).
+- Every cell is exactly the same size and the cells are square-ish (4:3, wider than tall).
+- Total image is 6 cells wide, 1 cell tall. No borders, no numbers.
+- CRITICAL SPACING: leave at least 60 pixels of FULLY TRANSPARENT space between
+  one frame and the next. NOTHING may cross from one frame into its neighbour -
+  not the streaming tail, not a hoof, not the nose. Each frame must be completely
+  separated from the next by an empty transparent gap, so the sheet can be sliced
+  automatically. Make the horses smaller if that is what it takes.
+- Transparent background. No text, no logo, no grid lines, no ground shadow.
+- IDENTICAL horse, identical jockey, identical colours in all 6 frames.
+  Only the pose of the legs, neck and jockey changes.
+
+CAMERA (this is the important part - read carefully, it is the SAME in all 6 frames):
+- This is NOT a flat side view and NOT a top-down view.
+- The camera is ABOVE and OUTSIDE the racetrack, looking DOWN at about 30 degrees.
+- The horse gallops toward the RIGHT of the image and slightly AWAY from the camera,
+  so we see it from BEHIND-AND-TO-THE-SIDE (a three-quarter rear view).
+- We see: the horse's left flank and hindquarters, the top line of its back and rump,
+  the neck foreshortened going away to the upper right, and the jockey's BACK.
+- The ground plane is tilted: the near hind hoof is LOWER on the image than the far
+  fore hoof. Legs on the far side are partly hidden by the body.
+- CRITICAL: in every frame the horse's body must sit at the SAME place in its cell,
+  and the hoof that touches the ground must land on the SAME point in every cell
+  (about 30% of the cell width from the LEFT edge, on the bottom edge of the cell).
+
+THE 6 POSES (one full gallop cycle, in this order):
+1. Full extension - fore legs reaching forward, hind legs pushed back, no hoof down.
+2. Landing - one fore hoof strikes the ground, neck stretched forward and down.
+3. Most collected - all four legs gathered under the belly, back rounded, neck raised.
+4. Suspension - all four hooves clear of the ground, body compact, highest point.
+5. Hind drive - hind legs planted and pushing, body angled up, neck rising.
+6. Opening out - legs unfolding toward extension again, neck lowering.
+The moment of hoof contact must be obvious in frames 2 and 5.
+
+SUBJECT:
+- Realistic thoroughbred racehorse in full gallop.
+- Coat: BAY - medium warm brown body, near-black mane, tail and lower legs.
+- Rich muscle shading on the hindquarters and shoulder, coat sheen.
+  Thousands of shades allowed inside the body - DO NOT posterize or flatten to 4 tones.
+- Visible bridle and double reins. Black tail streaming backward and slightly down.
+- A jockey crouched low over the withers, seen from behind: the back of the jacket,
+  the back of the helmet, both arms forward, boots in the irons.
+
+SILKS (critical - these get recoloured later):
+- The jockey's jacket, sleeves and helmet must be ONE flat, saturated BLUE
+  (hue 200-260 degrees, saturation 0.35 or higher), as a clear contiguous block.
+- NO pattern, NO stripes, NO star, NO logo. White breeches, black boots.
+
+SADDLE CLOTH:
+- A plain rectangular saddle cloth under the saddle on the horse's visible flank,
+  angled with the body, in the SAME place in every frame.
+  Leave it COMPLETELY BLANK - no number, no text, no logo. At least 26 px wide
+  relative to a 128 px cell, because a number is drawn onto it by the renderer.
+
+STYLE:
+- Clean hard-edged pixels. NO anti-aliasing on the outer silhouette, NO blur.
+- Detailed, late-16-bit arcade quality. Not chunky retro, not blurry.
+- Muted desaturated earth palette for the horse and tack; the silks are the only
+  saturated colour.
+
+DO NOT depict any real racehorse, real owner, real stable, real racecourse,
+or any real silk design. Invent everything. No text, no logos, no watermarks.
+
+After saving, print the absolute path of the saved file.

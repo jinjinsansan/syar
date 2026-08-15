@@ -1,144 +1,187 @@
 /**
- * ★斜め俯瞰の**静止1枚**（試作①の確認用）
+ * ★斜め俯瞰 — **静止画で「表示できるようになったもの」を確かめる**（手順②）
  *
- * 【これは何か】
- *   ★**新しいレンダラではありません。** 裁定の手順①「1頭だけ斜め俯瞰で試作」に対し、
- *   ★**その1頭を置いたときに「内/外」が画面に出るか**だけを確かめる静止画です。
+ * 【裁定の手順】①1頭だけ試作 → ★**②内/外・コーナー・ゲートが表示できることと V-16 を確認**
  *
- * 【なぜ要るか】
- *   絵だけを見ても決まりません。`SPRITE_LOG_20260813.md §1` に
- *   ★**「判断材料は『部品』ではなく『使われる場面』で作る」**と書いてあります
- *   （32×32 のときも、レース画面を作って初めてオーナーが判断できました）。
+ * 【★この道具の立ち位置】
+ *   ★**新しいレンダラではありません。** `packages/render/src/oblique.ts`（純粋関数）を
+ *   そのまま呼んで、**真横では原理的に不可能だった3つ**が出るかだけを見ます。
  *
- * 【★投影】`design/art/OBLIQUE_CONTRACT_20260815.md`
- *   進行 → 画面 x（26 px/m）／内外 → 画面 y（7.6 px/m・上が内）
- *   ★大きさは全馬同じ（D-058）。奥行きは**接地線の y と重なり順**で作る
+ * 【★測るもの】
+ *   ・内/外 … 内を通る馬と外を回る馬が、画面の y で分かれるか
+ *   ・コーナー … ラチが画面の中で曲がるか（直線では曲がらないか）
+ *   ・ゲート … 12房が重ならずに散るか（真横では前後に重なって1頭しか見えなかった）
  *
- * 実行: node tools/shot-oblique.mjs
+ * 実行: npx tsx tools/shot-oblique.mjs
  */
 import { createCanvas, loadImage } from '@napi-rs/canvas';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
+import { ovalCourse, obliqueProject, railPolyline, gateStalls } from '@star/render';
 
 const W = 1280, H = 720;
 const OUT = path.resolve('out/oblique');
 const pal = JSON.parse(readFileSync('apps/web/public/art/palette.json', 'utf8'));
+const COURSE = ovalCourse(1600);
 
-/* ── ★投影（契約どおり）───────────────────────── */
-const PX_PER_M = 26;          // 進行方向
-const TRACK_W_M = 25;         // 走路の幅
-const TRACK_TOP = 360;        // 内ラチの画面 y
-const TRACK_PX = 190;         // 走路の幅の画面 y
-const PX_PER_M_W = TRACK_PX / TRACK_W_M;
-const HORSE_W = 160;          // ★スプライトの表示幅（比較で読めた最小に近い）
-const X_ANCHOR = 520;
+/** ★契約（design/art/OBLIQUE_CONTRACT_20260815.md） */
+const CAM = { pxPerM: 26, depth: 0.29, anchorX: 520, anchorY: 470 };
+const HORSE_W = 160;
 
-/** 内からの距離 w[m] → 画面 y（接地点） */
-const yOf = (w) => TRACK_TOP + w * PX_PER_M_W;
-/** 進行 m → 画面 x */
-const xOf = (m, camM) => X_ANCHOR + (m - camM) * PX_PER_M;
+/** 12頭。道中の一団（22m）に散らし、内/外もばらす */
+const FIELD = Array.from({ length: 12 }, (_, i) => ({
+  gate: i + 1,
+  ds: -((i * 7919) % 12) / 11 * 22,
+  w: 1.5 + ((i * 5 + 3) % 12) * 1.8,
+}));
 
-/** 12頭。★道中の一団（24m）に散らし、内/外もばらす */
-const FIELD = Array.from({ length: 12 }, (_, i) => {
-  const gate = i + 1;
-  return {
-    gate,
-    m: -((i * 7919) % 12) / 11 * 22,
-    // ★内枠ほど内を通り、差し馬は外に出す（ここは見せ方の仮置き）
-    w: 1.5 + ((gate * 5) % 12) * 1.7,
-  };
-});
-
-function band(ctx, y, h, role) { ctx.fillStyle = pal[role]; ctx.fillRect(0, y, W, h); }
-
-async function main() {
-  mkdirSync(OUT, { recursive: true });
-  const horse = await loadImage(path.resolve('out/oblique/w160.png'));
-  const hh = Math.round(horse.height * (HORSE_W / horse.width));
-
-  const cv = createCanvas(W, H);
-  const ctx = cv.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-
-  // 空・スタンド（★ここは水平の帯のまま）
-  for (let y = 0; y < 216; y++) {
-    const t = y / 215;
+function sky(ctx) {
+  for (let y = 0; y < 214; y++) {
+    const t = y / 213;
     ctx.fillStyle = pal[t < 0.34 ? 'sky-0' : t < 0.67 ? 'sky-1' : 'sky-2'];
     ctx.fillRect(0, y, W, 1);
   }
-  band(ctx, 216, 64, 'stand-1');
-  ctx.fillStyle = pal['stand-0']; ctx.fillRect(0, 216, W, 6);
-  for (let x = 0; x < W; x += 3) for (let y = 226; y < 274; y += 3) {
+  ctx.fillStyle = pal['stand-1']; ctx.fillRect(0, 214, W, 60);
+  ctx.fillStyle = pal['stand-0']; ctx.fillRect(0, 214, W, 6);
+  for (let x = 0; x < W; x += 3) for (let y = 224; y < 270; y += 3) {
     ctx.fillStyle = ((x * 3 + y * 5) % 11) < 5 ? pal['crowd-0'] : pal['crowd-2'];
     ctx.fillRect(x, y, 2, 2);
   }
-  band(ctx, 280, 40, 'hedge-1');
-  band(ctx, 320, 40, 'turf-0');
+  ctx.fillStyle = pal['hedge-1']; ctx.fillRect(0, 274, W, 34);
+  ctx.fillStyle = pal['turf-0']; ctx.fillRect(0, 308, W, H - 308);
+}
 
-  /* ── ★走路（内ラチ → 外ラチ）。★奥ほど暗く、手前ほど明るい ── */
-  for (let y = TRACK_TOP; y < TRACK_TOP + TRACK_PX + 90; y++) {
-    const t = (y - TRACK_TOP) / (TRACK_PX + 90);
-    ctx.fillStyle = pal[t < 0.25 ? 'turf-2' : t < 0.5 ? 'turf-3' : t < 0.78 ? 'turf-4' : 'turf-5'];
-    ctx.fillRect(0, y, W, 1);
-  }
-  // ★内ラチ（奥）／外ラチ（手前）。★どちらも水平の帯（直線区間なので曲げない）
-  ctx.fillStyle = pal['rail-1']; ctx.fillRect(0, TRACK_TOP - 10, W, 4);
-  ctx.fillStyle = pal['rail-0']; ctx.fillRect(0, TRACK_TOP - 14, W, 4);
-  for (let x = 0; x < W; x += 64) { ctx.fillStyle = pal['rail-1']; ctx.fillRect(x, TRACK_TOP - 12, 3, 12); }
-
-  /* ── ★馬（内＝上＝先に描く。手前が上に重なる）── */
-  const camM = FIELD.reduce((s, h) => s + h.m, 0) / FIELD.length;
-  const sorted = [...FIELD].sort((a, b) => a.w - b.w);
-  for (const h of sorted) {
-    const cx = xOf(h.m, camM);
-    const cy = yOf(h.w);
-    // ★影（接地点を示す。これが無いと『浮いている』ように見える）
-    ctx.fillStyle = 'rgba(20,30,18,0.32)';
+/** ★走路を「内ラチの線と外ラチの線の間」として塗る（帯ではない。コーナーで曲がる） */
+function track(ctx, cam) {
+  const inner = railPolyline(COURSE, cam, 0, { fromM: -70, toM: 190, stepM: 4 });
+  const outer = railPolyline(COURSE, cam, COURSE.widthM, { fromM: -70, toM: 190, stepM: 4 });
+  ctx.beginPath();
+  inner.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+  for (let i = outer.length - 1; i >= 0; i--) ctx.lineTo(outer[i].x, outer[i].y);
+  ctx.closePath();
+  ctx.fillStyle = pal['turf-3'];
+  ctx.fill();
+  // ★手入れの縞（内外方向に等間隔）。走路の面であることが伝わる
+  for (let k = 1; k < 6; k++) {
+    const line = railPolyline(COURSE, cam, (COURSE.widthM * k) / 6, { fromM: -70, toM: 190, stepM: 4 });
     ctx.beginPath();
-    ctx.ellipse(cx, cy - 2, HORSE_W * 0.22, HORSE_W * 0.05, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.drawImage(horse, Math.round(cx - HORSE_W / 2), Math.round(cy - hh + 6), HORSE_W, hh);
-    // ★馬番（当て布の上あたり）
-    const col = pal[`silk-${h.gate}`] ?? pal['paper-0'];
-    const bx = Math.round(cx - 6), byy = Math.round(cy - hh * 0.52);
-    ctx.fillStyle = pal['paper-0']; ctx.fillRect(bx - 12, byy, 28, 20);
-    ctx.fillStyle = col; ctx.fillRect(bx - 12, byy, 28, 4);
-    const rgb = parseInt(col.slice(1), 16);
-    const lum = (((rgb >> 16) & 255) * 299 + ((rgb >> 8) & 255) * 587 + (rgb & 255) * 114) / 1000;
-    ctx.fillStyle = lum < 140 ? pal['ink-0'] : pal['ink-0'];
-    ctx.font = 'bold 15px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(String(h.gate), bx + 2, byy + 17);
-    ctx.textAlign = 'left';
+    line.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.strokeStyle = k % 2 ? pal['turf-2'] : pal['turf-4'];
+    ctx.lineWidth = 10;
+    ctx.stroke();
   }
-
-  // 外ラチ（手前）
-  ctx.fillStyle = pal['rail-1']; ctx.fillRect(0, TRACK_TOP + TRACK_PX + 40, W, 6);
-  ctx.fillStyle = pal['rail-0']; ctx.fillRect(0, TRACK_TOP + TRACK_PX + 34, W, 5);
-  for (let x = 0; x < W; x += 80) { ctx.fillStyle = pal['rail-1']; ctx.fillRect(x, TRACK_TOP + TRACK_PX + 34, 5, 18); }
-
-  const file = path.join(OUT, 'scene-oblique.png');
-  writeFileSync(file, cv.toBuffer('image/png'));
-
-  /* ── ★測る ─────────────────────────────── */
-  const im = ctx.getImageData(0, 0, W, H).data;
-  const colours = new Set();
-  for (let i = 0; i < im.length; i += 4) colours.add((im[i] << 16) | (im[i + 1] << 8) | im[i + 2]);
-  const ys = FIELD.map((h) => Math.round(yOf(h.w)));
-  const xs = FIELD.map((h) => Math.round(xOf(h.m, camM)));
-  console.log(`★${file}`);
-  console.log(`  色数 ${colours.size.toLocaleString()}`);
-  console.log(`  ★内/外の画面 y  最小 ${Math.min(...ys)} 〜 最大 ${Math.max(...ys)}（差 ${Math.max(...ys) - Math.min(...ys)} px）`);
-  console.log(`  進行の画面 x     最小 ${Math.min(...xs)} 〜 最大 ${Math.max(...xs)}（差 ${Math.max(...xs) - Math.min(...xs)} px）`);
-  // ★何頭が「他の馬に隠れずに」見えるか（中心どうしが HORSE_W*0.45 以上離れているか）
-  let clear = 0;
-  for (const a of FIELD) {
-    const ax = xOf(a.m, camM), ay = yOf(a.w);
-    const hidden = FIELD.some((b) => b !== a && yOf(b.w) > ay
-      && Math.abs(xOf(b.m, camM) - ax) < HORSE_W * 0.45 && Math.abs(yOf(b.w) - ay) < 34);
-    if (!hidden) clear++;
+  for (const [w, thick, role] of [[0, 5, 'rail-0'], [COURSE.widthM, 7, 'rail-1']]) {
+    const line = railPolyline(COURSE, cam, w, { fromM: -70, toM: 190, stepM: 4 });
+    ctx.beginPath();
+    line.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.strokeStyle = pal[role];
+    ctx.lineWidth = thick;
+    ctx.stroke();
   }
-  console.log(`  ★他の馬に隠れずに見える頭数 ${clear} / 12`);
-  console.log('\n⚠️ ★これは静止1枚です。動き・カット・ゲートは手順②で確かめます。');
+}
+
+function drawHorse(ctx, img, x, y, frame, gate, frames, mul) {
+  // ⚠️ ★1コマの絵をシート扱いして 6分の1 幅で切り、6倍に拡大していました（真っ黒な塊になった）
+  const cw = img.width / frames;
+  const HW = HORSE_W * (mul ?? 1);
+  const hh = Math.round(img.height * (HW / cw));
+  ctx.fillStyle = 'rgba(20,30,18,0.30)';
+  ctx.beginPath();
+  ctx.ellipse(x, y - 2, HW * 0.20, HW * 0.045, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // ★接地点はセルの左下（契約）。そこが (x, y) に来るように置く
+  ctx.drawImage(img, frame * cw, 0, cw, img.height,
+    Math.round(x - HW * 0.30), Math.round(y - hh + 3), HW, hh);
+  const col = pal[`silk-${gate}`] ?? pal['paper-0'];
+  const bx = Math.round(x + HW * 0.02), by = Math.round(y - hh * 0.46);
+  ctx.fillStyle = pal['paper-0']; ctx.fillRect(bx - 13, by, 27, 19);
+  ctx.fillStyle = col; ctx.fillRect(bx - 13, by, 27, 4);
+  ctx.fillStyle = pal['ink-0'];
+  ctx.font = 'bold 14px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(String(gate), bx + 1, by + 16);
+  ctx.textAlign = 'left';
+}
+
+async function main() {
+  mkdirSync(OUT, { recursive: true });
+  const sheetPath = path.resolve('apps/web/public/art/horse-oblique.png');
+  const single = path.resolve('out/oblique/w160.png');
+  const useSheet = existsSync(sheetPath);
+  const img = await loadImage(useSheet ? sheetPath : single);
+  const frames = useSheet ? 6 : 1;
+  console.log(`★馬の絵: ${useSheet ? '6コマのシート' : '1コマ（試作①）'}`);
+
+  /**
+   * ★**カットごとにカメラを変えます。**
+   *   これが「真横ではできなかったこと」の4つめ（裁定表の「カメラの自由度」）。
+   *   ・直線 … 標準
+   *   ・4角  … ★引いて（pxPerM を下げて）**曲がりが見えるところまで先を映す**
+   *   ・ゲート … ★俯角を深く（depth を上げる）。房が内外方向に並ぶので、寝かせると潰れる
+   */
+  const cases = [
+    { name: 'a-straight', s: 1400, label: '直線', cam: {} },
+    { name: 'b-corner', s: 1050, label: '4角', cam: { pxPerM: 11, depth: 0.34, anchorX: 300, anchorY: 430 } },
+    { name: 'c-gate', s: 0, label: 'ゲート', gate: true, cam: { pxPerM: 34, depth: 0.62, anchorX: 300, anchorY: 400 } },
+  ];
+
+  for (const cs of cases) {
+    const cam = { ...CAM, ...cs.cam, s: cs.s, w: COURSE.widthM / 2 };
+    const cv = createCanvas(W, H);
+    const ctx = cv.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    sky(ctx);
+    track(ctx, cam);
+
+    if (cs.gate) {
+      // ★ゲート: 12房が**内外方向**に並ぶ。真横では原理的に描けなかったもの
+      const stalls = gateStalls(COURSE, cam, cs.s, 12);
+      const sw = Math.round((COURSE.widthM - 2) / 12 * cam.pxPerM * cam.depth);
+      for (const st of stalls) {
+        // ★房は「内外方向に並ぶ箱」。奥行き 1房ぶんの高さを投影から出す
+        const d = Math.max(10, sw);
+        ctx.fillStyle = pal['gate-2']; ctx.fillRect(st.x - 30, st.y - d, 150, d - 1);
+        ctx.fillStyle = pal['gate-4']; ctx.fillRect(st.x - 26, st.y - d + 3, 142, d - 7);
+        ctx.fillStyle = pal['gate-1']; ctx.fillRect(st.x - 30, st.y - d, 150, 3);
+        // ★馬（房の中）— 真横では 12頭が重なって 1頭しか見えなかった
+        drawHorse(ctx, img, st.x + 84, st.y - 2, st.gate % frames, st.gate, frames, 0.62);
+        const col = pal[`silk-${st.gate}`] ?? pal['paper-0'];
+        ctx.fillStyle = col; ctx.fillRect(st.x - 28, st.y - d + 4, 26, d - 9);
+        ctx.fillStyle = pal['ink-0'];
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(String(st.gate), st.x - 15, st.y - 4);
+        ctx.textAlign = 'left';
+      }
+      const ys = stalls.map((s) => s.y);
+      console.log(`  ★ゲート12房の画面 y ${Math.min(...ys).toFixed(0)} 〜 ${Math.max(...ys).toFixed(0)}`
+        + `（隣との間隔 ${(ys[1] - ys[0]).toFixed(1)}px）`);
+    } else {
+      const drawn = FIELD.map((h) => {
+        const p = obliqueProject(COURSE, cam, Math.max(0, cam.s + h.ds), h.w);
+        return { ...h, ...p };
+      }).sort((a, b) => a.y - b.y);   // ★内（奥）から描く
+      for (const h of drawn) drawHorse(ctx, img, h.x, h.y, (h.gate * 2) % frames, h.gate, frames);
+      const ys = drawn.map((h) => h.y);
+      // ⚠️ ★0 を falsy で落としていたので、直線で Math.max() が -Infinity になっていました
+      const off = drawn.map((h) => Math.abs(h.headingOffset));
+      console.log(`  ★${cs.label}: 内/外の画面 y ${Math.min(...ys).toFixed(0)} 〜 ${Math.max(...ys).toFixed(0)}`
+        + `（差 ${(Math.max(...ys) - Math.min(...ys)).toFixed(0)}px）`
+        + `  向きのずれ 最大 ${(Math.max(...off) * 180 / Math.PI).toFixed(1)}°`);
+    }
+
+    // ラチの曲がりを数える
+    const rail = railPolyline(COURSE, cam, 0, { fromM: -70, toM: 190, stepM: 4 });
+    const rys = rail.map((p) => p.y);
+    console.log(`     内ラチの上下の振れ ${(Math.max(...rys) - Math.min(...rys)).toFixed(0)}px`);
+
+    ctx.fillStyle = `${pal['ink-0']}dd`; ctx.fillRect(0, H - 54, W, 54);
+    ctx.fillStyle = pal['mark-gold']; ctx.fillRect(0, H - 54, W, 3);
+    ctx.fillStyle = pal['paper-0'];
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText(cs.label, 24, H - 18);
+    writeFileSync(path.join(OUT, `${cs.name}.png`), cv.toBuffer('image/png'));
+  }
+  console.log(`\n★${OUT}\n⚠️ 静止画です。動きと V-16 は別に測ります。`);
 }
 main().catch((e) => { console.error('★落ちました:', e); process.exit(1); });
