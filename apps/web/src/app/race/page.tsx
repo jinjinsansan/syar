@@ -28,7 +28,7 @@ const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 /** ★発走の間（秒）。この間はレースの時計を進めません */
 const GATE_HOLD = 3.0;
-const ASSET_VERSION = '13';
+const ASSET_VERSION = '14';
 /** ★構図の基準幅（`layers.json` の viewport と同じ） */
 const VP_W = 1280;
 
@@ -160,7 +160,25 @@ export default function RacePage(): React.JSX.Element {
       const api = window.STARStill;
       if (api === undefined) throw new Error('STARStill がありません');
       api.setOptions({ coat, backlight });
-      const atlas = await api.buildAtlas(sheet, pal, layers);
+      /**
+       * ★**全馬番（1〜18）を焼きます。**
+       *   ⚠️ `buildAtlas` は `layers.horsePlan.rows` に載っている馬番だけを焼きます。
+       *      第1便の計画は 14,6,11,2,17,9,4,12,8,7,1,3 なので、
+       *      **5番・10番などが焼かれず、画面に出ませんでした**（「馬すら写っていない」）。
+       */
+      const allGates = Array.from({ length: 18 }, (_, i) => i + 1);
+      const atlasLayers = {
+        ...(layers as Record<string, unknown>),
+        horsePlan: {
+          ...((layers as { horsePlan: Record<string, unknown> }).horsePlan),
+          rows: [
+            { id: 'back', scale: 1, groundY: 436, air: 0.1, gates: allGates, x: allGates.map(() => 0) },
+            { id: 'mid', scale: 1, groundY: 520, air: 0.04, gates: [], x: [] },
+            { id: 'front', scale: 2, groundY: 626, air: 0, gates: allGates, x: allGates.map(() => 0) },
+          ],
+        },
+      };
+      const atlas = await api.buildAtlas(sheet, pal, atlasLayers);
       if (cancelled) return;
       artRef.current = { pal, layers, layers2, atlas };
       setReady(true);

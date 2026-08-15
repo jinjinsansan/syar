@@ -51,7 +51,7 @@ const SCENES: readonly (readonly [string, string])[] = [
  *      ブラウザが**古い JS と JSON を使い続けます**（ハードリロードでも残ることがある）。
  *   → 読み込む URL に版を付けます。**直したら必ず反映されます。**
  */
-const ASSET_VERSION = '13';
+const ASSET_VERSION = '14';
 
 export default function StillPage(): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
