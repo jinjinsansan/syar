@@ -93,8 +93,42 @@ async function measure(buf) {
     if (g > r + 30 && g > b + 30) greenEdge += 1;
   }
 
+  /**
+   * ★**脚先の広がり**（下 28% の帯にある画素の左右の広がり）。
+   *
+   * ⚠️ **外接矩形の幅を使ってはいけません。尾が左端を固定してしまいます。**
+   *    駆歩の尾は常に後方へ流れているので、**四肢が畳まれても bbox は縮みません**。
+   *    ★こちらは長らく bbox で測り、「伸縮が浅い（5.5%）」と誤判定して
+   *      **絵の作り直しを依頼しかけました**（デザイナーの指摘で判明）。
+   *      部位別に測ると **53.5%** あります。
+   */
+  const legTop = y0 + Math.round((y1 - y0) * 0.72);
+  let lx0 = W, lx1 = -1;
+  for (let y = legTop; y <= y1; y += 1) for (let x = 0; x < W; x += 1) {
+    if (!on(x, y)) continue;
+    if (x < lx0) lx0 = x;
+    if (x > lx1) lx1 = x;
+  }
+
+  /**
+   * ★**胴〜鼻**（明るい画素だけ）。尾・たてがみ・馬具の黒を落とします。
+   *   背中のしなりはここに出ます。
+   */
+  const bandTop = y0 + Math.round((y1 - y0) * 0.20);
+  const bandBot = y0 + Math.round((y1 - y0) * 0.55);
+  let bx0 = W, bx1 = -1;
+  for (let y = bandTop; y <= bandBot; y += 1) for (let x = 0; x < W; x += 1) {
+    const o = (y * W + x) * C;
+    if (data[o + 3] <= 128) continue;
+    if (Math.max(data[o], data[o + 1], data[o + 2]) < 70) continue;   // ★尾を落とす
+    if (x < bx0) bx0 = x;
+    if (x > bx1) bx1 = x;
+  }
+
   return {
     W, H, x0, x1, y0, y1, n, upper, upperCut, greenEdge,
+    legSpan: lx1 - lx0 + 1,
+    torsoLen: bx1 - bx0 + 1,
     bodyLen: x1 - x0 + 1,
     bodyTop: y0,
     bottom: y1,
@@ -140,14 +174,31 @@ if (maxGap < AIR_MIN_PX) {
   console.log(`  ① 宙に浮く局面: あり（最大 ${maxGap}px 浮く）`);
 }
 
-// ② 体の伸び縮み
-const lens = ms.map((m) => m.bodyLen);
-const lenVar = (Math.max(...lens) - Math.min(...lens)) / Math.max(...lens);
-const LEN_MIN = 0.06;
-if (lenVar < LEN_MIN) {
-  fails.push(`② ★**体が伸び縮みしない**（体長の変化 ${(lenVar * 100).toFixed(1)}%、必要 ${LEN_MIN * 100}%以上）`);
+/**
+ * ② ★**四肢の伸び縮み** — **脚の広がり**で測ります。
+ *
+ * ⚠️ 以前は外接矩形の幅で測っていました。**それは尾の長さです。**
+ *    その数字（5.5%）を根拠に**絵の作り直しを依頼しかけました**。
+ * ★**基準は「いま良いとされているもの」より下に引きます**（現行 53.5% に対し 30%）。
+ *   上に引くと、良い絵まで落ちます。
+ */
+const legs = ms.map((m) => m.legSpan);
+const legVar = (Math.max(...legs) - Math.min(...legs)) / Math.max(...legs);
+const LEG_MIN = 0.30;
+if (legVar < LEG_MIN) {
+  fails.push(`② ★**四肢が伸び縮みしない**（脚の広がりの変化 ${(legVar * 100).toFixed(1)}%、必要 ${LEG_MIN * 100}%以上）`);
 } else {
-  console.log(`  ② 体の伸び縮み: ${(lenVar * 100).toFixed(1)}%`);
+  console.log(`  ② 四肢の伸び縮み: ${(legVar * 100).toFixed(1)}%`);
+}
+
+// ②-b ★背中のしなり（胴〜鼻。尾を除く）
+const torsos = ms.map((m) => m.torsoLen);
+const torsoVar = (Math.max(...torsos) - Math.min(...torsos)) / Math.max(...torsos);
+const TORSO_MIN = 0.07;
+if (torsoVar < TORSO_MIN) {
+  fails.push(`②-b ★**背中がしならない**（胴〜鼻の変化 ${(torsoVar * 100).toFixed(1)}%、必要 ${TORSO_MIN * 100}%以上）`);
+} else {
+  console.log(`  ②-b 背中のしなり: ${(torsoVar * 100).toFixed(1)}%`);
 }
 
 // ③ 接地の変化
