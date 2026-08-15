@@ -312,7 +312,8 @@
     ctx.textAlign = 'center';
     ctx.fillStyle = pal['ink-0'];
     ctx.font = 'bold 40px ui-monospace, "Hiragino Kaku Gothic ProN", sans-serif';
-    ctx.fillText(phase ? '発　走' : '枠　入　り', W / 2, y + 50);
+    // ★オーナー指示 F-03: 「枠入り」ではなく「ゲート入り」
+    ctx.fillText(phase ? '発　走' : 'ゲ ー ト 入 り', W / 2, y + 50);
     // ★赤い旗（スターターの合図）。★色だけに頼らないので文字と併記
     if (phase) {
       ctx.fillStyle = pal['mark-red'];
@@ -458,14 +459,17 @@
     }
 
     /**
-     * ★**ゲート（馬より後ろ）**。⚠️ 順番がここでなければいけません。
-     *   デザイナーの指摘: 「扉が開いた瞬間、馬はもうゲートより前にいる」。
-     *   `drawGate` を呼び出し側で後から描くと、**馬がゲートに隠れます**。
+     * ★**ゲート**。⚠️ 描く順がここでなければいけません。
+     *   ・開いた後 … **馬より後ろ**（デザイナー「扉が開いた瞬間、馬はもうゲートより前にいる」）
+     *   ・開く前  … ★**馬より手前**（`gateFront`）。そうしないと
+     *     **馬がゲートの前に立って見え、房の中にいるように見えません**
      */
-    if (o.gate) {
+    function paintGate() {
       var G = o.gate;
+      if (!G) return;
       drawGate(ctx, pal, G.x, G.groundY, G.stalls, G.open, G.firstGate, G.scale || 2);
     }
+    if (!o.gateFront) paintGate();
 
     // ── 馬群 ──
     if (o.showHorses !== false) {
@@ -493,6 +497,8 @@
         });
       });
     }
+
+    if (o.gateFront) paintGate();
 
     // ── 手前（全区間で共通） ──
     ['railFront', 'turfNear'].forEach(function (id) {

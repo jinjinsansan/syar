@@ -27,23 +27,26 @@ const DIST = 1600;
 const FIELD = 12;
 const STRATS = ['nige', 'senko', 'sashi', 'oikomi'];
 
-/** ★`race-next/page.tsx` と同じ値であること */
-const ROW_DEF = [
-  { id: 'back', pxPerM: 22, limitPx: 330 },
-  { id: 'mid', pxPerM: 30, limitPx: 440 },
-  { id: 'front', pxPerM: 40, limitPx: 560 },
-];
-const LANE_MOVE_SEC = 1.2;
+/** ★`race-next/page.tsx` と同じ式・同じ値であること */
+const W = 1280;
+const LANE_Y = [436, 520, 626];
+const LANE_AIR = [0.1, 0.04, 0];
+const PX_PER_M = 30;
+const LANE_MOVE_SEC = 1.6;
+const SCALE_AT = 1.6;
+/** ★左右で別々の上限。スプライトの半分の幅を引く（中心が枠内でも絵がはみ出すため） */
+function softX(dm, zoom, anchorX, halfW) {
+  const lim = dm >= 0
+    ? Math.max(60, W - anchorX - halfW - 8)
+    : Math.max(60, anchorX - halfW - 8);
+  return lim * Math.tanh((dm * PX_PER_M * zoom) / lim);
+}
 function targetLane(rank, current, isOwn) {
   const up2 = rank <= 2, down2 = rank >= 4, up1 = rank <= 6, down1 = rank >= 8;
   let want = current >= 1.5 ? (down2 ? 1 : 2) : (up2 ? 2 : (current >= 0.5 ? (down1 ? 0 : 1) : (up1 ? 1 : 0)));
   if (isOwn) want = Math.max(1, want);
   return want;
 }
-const X_ANCHOR = 640;
-/** ★望遠の圧縮（`race-next/page.tsx` と同じ値であること）。単調なので前後関係は変わりません */
-/** ★上限は px 側（`race-next/page.tsx` と同じ式であること）。誰も枠外へ出さない */
-const softX = (dm, pxPerM, zoom, limitPx) => limitPx * Math.tanh((dm * pxPerM * zoom) / limitPx);
 
 function modelOf(seed) {
   const start = (seed * 13) % Math.max(1, POOL.length - FIELD);
@@ -97,11 +100,8 @@ for (const seed of SEEDS) {
       const want = targetLane(rank, cur, h.gate === 3);
       const now = cur + (want - cur) * Math.min(1, step / LANE_MOVE_SEC);
       lane.set(h.gate, now);
-      const lo = ROW_DEF[Math.max(0, Math.min(1, Math.floor(now)))];
-      const hi = ROW_DEF[Math.max(1, Math.min(2, Math.floor(now) + 1))];
-      const f = Math.max(0, Math.min(1, now - Math.floor(now)));
-      const mix = (a, b) => a + (b - a) * f;
-      const v = X_ANCHOR + softX(h.meters - camM, mix(lo.pxPerM, hi.pxPerM), 1, mix(lo.limitPx, hi.limitPx));
+      const halfW = 110 * (now >= SCALE_AT ? 2 : 1);
+      const v = 640 + softX(h.meters - camM, 1, 640, halfW);
       if (!Number.isFinite(v)) throw new Error(`★${h.gate}番の画面 x が ${v} です`);
       x.set(h.gate, v);
       if (!first.has(h.gate)) first.set(h.gate, v);

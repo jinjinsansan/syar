@@ -57,51 +57,43 @@ const pal = JSON.parse(readFileSync(path.join(ART, 'palette.json'), 'utf8'));
 const l1 = JSON.parse(readFileSync(path.join(ART, 'layers.json'), 'utf8'));
 const l2 = JSON.parse(readFileSync(path.join(ART, 'layers2.json'), 'utf8'));
 
-/**
- * ★ページ側と**同じ置き方**（`race-next/page.tsx` と揃えること）。
- *   横位置は枠ではなく**実際の差 [m] × 段ごとの px/m**。
- */
-const ROW_DEF = [
-  { id: 'back', scale: 1, groundY: 436, air: 0.1, pxPerM: 22, slots: 5 },
-  { id: 'mid', scale: 1, groundY: 520, air: 0.04, pxPerM: 30, slots: 4 },
-  { id: 'front', scale: 2, groundY: 626, air: 0, pxPerM: 40, slots: 3 },
-];
-const X_ANCHOR = 640;
-/** ★望遠の圧縮（`race-next/page.tsx` と同じ値であること）。単調なので前後関係は変わりません */
-const SOFT_LIMIT_M = 14;
-const softGap = (dm) => SOFT_LIMIT_M * Math.tanh(dm / SOFT_LIMIT_M);
-const SUB_DEPTH = 7;
+/** ★ページ側（`race-next/page.tsx`）と**同じ式・同じ値**であること */
+const LANE_Y = [436, 520, 626];
+const LANE_AIR = [0.1, 0.04, 0];
+const PX_PER_M = 30;
+const GATE_SCALE = 2, STALL_W = 46 * GATE_SCALE, GATE_X0 = 60, GATE_GROUND = 626;
+const stallX = (gate) => GATE_X0 + (gate - 1) * STALL_W + STALL_W / 2 + 5;
+function softX(dm, zoom, anchorX, halfW) {
+  const lim = dm >= 0
+    ? Math.max(60, W - anchorX - halfW - 8)
+    : Math.max(60, anchorX - halfW - 8);
+  return lim * Math.tanh((dm * PX_PER_M * zoom) / lim);
+}
 const OWN = 3;
-
-/** ★道中の一団（RESEARCH §4: 24m に 12頭）。先頭 = 差 0 */
+/** 馬番 → 位置[m]（先頭が 0、後ろほどマイナス） */
 const SPREAD = Number(arg('spread', '24'));
 const METERS = Object.fromEntries(
   Array.from({ length: 12 }, (_, i) => [i + 1, -((i * 7919) % 12) / 11 * SPREAD]),
 );
+/** 順位 → 段（手前3・中4・奥5） */
+function laneOfRank(rank) { return rank <= 2 ? 2 : rank <= 6 ? 1 : 0; }
 
-function planOf() {
-  const rest = Array.from({ length: 12 }, (_, i) => i + 1).filter((g) => g !== OWN);
-  const lanes = [{ gate: OWN, row: 2, sub: 0 }];
-  const counts = [0, 0, 1];
-  let ri = 0;
-  for (const g of rest) {
-    while (ri < 3 && counts[ri] >= ROW_DEF[ri].slots) ri++;
-    if (ri > 2) break;
-    lanes.push({ gate: g, row: ri, sub: counts[ri]++ });
-  }
+/** 走行中の隊列（gp = 1）／ゲート内（gp = 0） */
+function planOf(zoom, anchorX, gp) {
+  const order = Object.entries(METERS).map(([g, m]) => ({ gate: Number(g), m }))
+    .sort((a, b) => b.m - a.m);
   const camM = Object.values(METERS).reduce((a, b) => a + b, 0) / 12;
-  return {
-    own: OWN,
-    rows: ROW_DEF.map((r, ri2) => {
-      const mine = lanes.filter((l) => l.row === ri2);
-      return {
-        id: r.id, scale: r.scale, air: r.air,
-        gates: mine.map((l) => l.gate),
-        groundY: mine.map((l) => r.groundY - l.sub * SUB_DEPTH),
-        x: mine.map((l) => Math.round(X_ANCHOR + softGap(METERS[l.gate] - camM) * r.pxPerM)),
-      };
-    }),
-  };
+  const rows = order.map((h, rank) => {
+    const lane = laneOfRank(rank);
+    const scale = gp < 0.5 ? 1 : (lane >= 2 ? 2 : 1);
+    const halfW = 110 * scale;
+    const runX = anchorX + softX(h.m - camM, zoom, anchorX, halfW);
+    const x = gp >= 1 ? runX : stallX(h.gate) + (runX - stallX(h.gate)) * gp;
+    const y = gp >= 1 ? LANE_Y[lane] : GATE_GROUND + (LANE_Y[lane] - GATE_GROUND) * gp;
+    return { id: `h${h.gate}`, scale, air: LANE_AIR[lane] * gp, gates: [h.gate], groundY: [Math.round(y)], x: [Math.round(x)], _y: y };
+  });
+  rows.sort((a, b) => a._y - b._y);
+  return { own: OWN, rows };
 }
 
 async function main() {
@@ -112,24 +104,21 @@ async function main() {
   // ★1〜18 を全部焼く（載っていない馬番は **黙って描かれません**）
   const all = Array.from({ length: 18 }, (_, i) => i + 1);
   const atlas = S.buildAtlas(sheet, pal, {
-    horsePlan: { rows: ROW_DEF.map((r) => ({ id: r.id, gates: all })) },
+    horsePlan: { rows: [{ id: 'back', gates: all }, { id: 'mid', gates: all }, { id: 'front', gates: all }] },
   });
   const baked = Object.keys(atlas).map(Number).sort((a, b) => a - b);
   if (baked.length !== 18) throw new Error(`★焼けた馬番が ${baked.length} 個しかありません: ${baked}`);
 
-  const plan = planOf();
-  console.log(`★馬群の広がり ${SPREAD}m（＝${(SPREAD / 2.4).toFixed(1)}馬身）のときの横位置`);
-  for (const r of plan.rows) {
-    console.log(`  ${r.id.padEnd(5)} ${r.scale}×  馬番 ${r.gates.join(',')}  x=${r.x.join(',')}`);
-  }
-
   const panMul = Number(arg('pan', '1'));
   const cases = [
-    { name: '1-gate-closed', section: 'gate', gate: { x: 83, groundY: 626, stalls: 12, open: false, firstGate: 1, scale: 2 }, showHorses: false, fanfare: 0 },
-    { name: '2-gate-open', section: 'gate', gate: { x: 83, groundY: 626, stalls: 12, open: true, firstGate: 1, scale: 2 }, showHorses: true },
-    { name: '3-backstretch', section: 'backstretch' },
-    { name: '4-corner', section: 'corner', sign: '3角' },
-    { name: '5-homestretch', section: 'homestretch' },
+    { name: '1-gate-closed', section: 'gate', zoom: 1.35, anchorX: 380, gp: 0,
+      gate: { x: GATE_X0, groundY: GATE_GROUND, stalls: 12, open: false, firstGate: 1, scale: GATE_SCALE },
+      gateFront: true, fanfare: 0 },
+    { name: '2-gate-open', section: 'gate', zoom: 1.35, anchorX: 380, gp: 0.25,
+      gate: { x: GATE_X0 - 1900 * 0.25 * 0.25, groundY: GATE_GROUND, stalls: 12, open: true, firstGate: 1, scale: GATE_SCALE } },
+    { name: '3-backstretch', section: 'backstretch', zoom: 0.95, anchorX: 640, gp: 1 },
+    { name: '4-corner', section: 'corner', zoom: 1.35, anchorX: 600, gp: 1, sign: '3角' },
+    { name: '5-homestretch', section: 'homestretch', zoom: 2.1, anchorX: 540, gp: 1, goal: true },
   ];
 
   const report = [];
@@ -137,6 +126,7 @@ async function main() {
     const cv = createCanvas(W, H);
     const ctx = cv.getContext('2d');
     const scroll = cs.section === 'gate' ? 0 : 900 * 20;
+    const plan = planOf(cs.zoom, cs.anchorX, cs.gp);
     const useL2 = cs.section === 'corner'
       ? { ...l2, $cornerMotion: { ...l2.$cornerMotion, pan: l2.$cornerMotion.pan * panMul } }
       : l2;
@@ -146,16 +136,24 @@ async function main() {
       signText: cs.sign || '4 角',
       horsePlan: plan,
       gate: cs.gate,
-      showHorses: cs.showHorses !== false,
+      gateFront: cs.gateFront,
+      showHorses: true,
       frameOf: (gate) => Math.floor(((((scroll / 340) * 2.4 + gate * 0.37) % 1) + 1) % 1 * 6),
     });
+    if (cs.goal) {
+      // ★決勝線（ページ側と同じ位置に出るか）
+      const gx = Math.round(cs.anchorX + softX(6, cs.zoom, cs.anchorX, 0));
+      ctx.fillStyle = pal['ink-0']; ctx.fillRect(gx - 3, 300, 6, GATE_GROUND - 300);
+      ctx.fillStyle = pal['paper-0']; ctx.fillRect(gx - 2, 302, 3, GATE_GROUND - 304);
+      ctx.fillStyle = pal['ink-0']; ctx.fillRect(gx - 62, 254, 124, 44);
+      ctx.fillStyle = pal['mark-gold']; ctx.fillRect(gx - 58, 258, 116, 36);
+      ctx.fillStyle = pal['paper-0'] + 'cc'; ctx.fillRect(gx - 4, 400, 9, GATE_GROUND - 400 + 26);
+    }
     if (cs.fanfare !== undefined) Scene.drawFanfare(ctx, pal, W, cs.fanfare);
     if (cs.section !== 'gate') Scene.drawCutBadge(ctx, pal, cs.sign || '直線', 400);
 
     const file = path.join(OUT, `${cs.name}.png`);
     writeFileSync(file, cv.toBuffer('image/png'));
-
-    // ★測る: 何色使われているか（のっぺり検出）・馬が実際に写っているか
     const d = ctx.getImageData(0, 0, W, H).data;
     const colours = new Set();
     for (let i = 0; i < d.length; i += 4) colours.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
@@ -184,7 +182,7 @@ async function main() {
     Scene.drawScene(ctx, {
       palette: pal, layers2: { ...l2, $cornerMotion: { ...l2.$cornerMotion, pan: l2.$cornerMotion.pan * panMul } },
       sharedLayers: l1.layers, atlas, section, scroll: 18000, cornerVariant: 'c',
-      horsePlan: plan, showHorses: false, sign: false,
+      horsePlan: planOf(1, 640, 1), showHorses: false, sign: false,
     });
     S.drawLayer = realDrawLayer;
     return seen;

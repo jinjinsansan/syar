@@ -26,31 +26,32 @@ const STRATS = ['nige', 'senko', 'sashi', 'oikomi'];
 const RATES = { cruise: 2.7, spurt: 2.25, straight: 1.8 };
 const HORSE_LENGTH_M = 2.4;
 
-const ROW_DEF = [
-  { id: 'back', pxPerM: 22, limitPx: 330, groundY: 436, air: 0.1 },
-  { id: 'mid', pxPerM: 30, limitPx: 440, groundY: 520, air: 0.04 },
-  { id: 'front', pxPerM: 40, limitPx: 560, groundY: 626, air: 0 },
-];
-const X_ANCHOR = 640;
-const LANE_MOVE_SEC = 1.2;
-const softX = (dm, pxPerM, zoom, limitPx) => limitPx * Math.tanh((dm * pxPerM * zoom) / limitPx);
-const CUT_OF = {
-  // ★発走は**寄る**。オーナー指示「逃げ・先行が前へ踊り出て、差し・追込が後方へ」＝
-  //   隊列ができていく過程が見えないと意味がないので、引くと逆効果でした
-  '2角': { zoom: 1.5, target: 'pack', label: '発走' },
-  '1角': { zoom: 1.5, target: 'pack', label: '発走' },
-  // ★道中がいちばん引く（＝上空の代わり。一団であることが伝わる）
-  向正面: { zoom: 0.95, target: 'pack', label: '道中' },
-  '3角': { zoom: 1.35, target: 'mover', label: '仕掛け' },
-  '4角': { zoom: 1.7, target: 'lead2', label: '勝負所' },
-  直線: { zoom: 2.1, target: 'lead2', label: '決着' },
-};
+const LANE_Y = [436, 520, 626];
+const LANE_AIR = [0.1, 0.04, 0];
+const PX_PER_M = 30;
+const LANE_MOVE_SEC = 1.6;
+const SCALE_AT = 1.6;
+/** ★左右で別々の上限。スプライトの半分の幅を引く（中心が枠内でも絵がはみ出すため） */
+function softX(dm, zoom, anchorX, halfW) {
+  const lim = dm >= 0
+    ? Math.max(60, W - anchorX - halfW - 8)
+    : Math.max(60, anchorX - halfW - 8);
+  return lim * Math.tanh((dm * PX_PER_M * zoom) / lim);
+}
 function targetLane(rank, current, isOwn) {
   const up2 = rank <= 2, down2 = rank >= 4, up1 = rank <= 6, down1 = rank >= 8;
   let want = current >= 1.5 ? (down2 ? 1 : 2) : (up2 ? 2 : (current >= 0.5 ? (down1 ? 0 : 1) : (up1 ? 1 : 0)));
   if (isOwn) want = Math.max(1, want);
   return want;
 }
+const CUT_OF = {
+  '2角': { zoom: 1.35, target: 'pack', anchorX: 380, label: '発走' },
+  '1角': { zoom: 1.35, target: 'pack', anchorX: 380, label: '発走' },
+  向正面: { zoom: 0.95, target: 'pack', anchorX: 640, label: '道中' },
+  '3角': { zoom: 1.35, target: 'mover', anchorX: 600, label: '仕掛け' },
+  '4角': { zoom: 1.7, target: 'lead2', anchorX: 580, label: '勝負所' },
+  直線: { zoom: 2.1, target: 'lead2', anchorX: 540, label: '決着' },
+};
 
 const COURSE = ovalCourse(DIST);
 const ST = segmentStarts(COURSE);
@@ -89,10 +90,13 @@ let samples = 0;
 const smallShare = new Map();
 let durSum = 0;
 
+let maxJump = 0, jumpSum = 0, jumpN = 0;
 for (const seed of [42, 7, 101, 2026, 555]) {
   const { model, warp } = raceOf(seed);
   durSum += warp.displaySec;
   const lane = new Map();
+  let prevX = null, prevSeg = null;
+  let camResid = 0;
   const N = 900;
   for (let i = 0; i <= N; i++) {
     const d = (warp.displaySec * i) / N;
@@ -103,8 +107,8 @@ for (const seed of [42, 7, 101, 2026, 555]) {
     const seg = segAt(own.meters);
     const cut = CUT_OF[seg.label];
     const packM = at.reduce((s, h) => s + h.meters, 0) / at.length;
-    let camM = packM;
-    if (cut.target === 'lead2') camM = packM * 0.35 + ((sorted[0].meters + sorted[1].meters) / 2) * 0.65;
+    let targetM = packM;
+    if (cut.target === 'lead2') targetM = packM * 0.35 + ((sorted[0].meters + sorted[1].meters) / 2) * 0.65;
     else if (cut.target === 'mover') {
       const back = model.at(Math.max(0, warp.raceSecAt(d) - 1.2));
       const lead0 = Math.max(...back.map((h) => h.meters));
@@ -115,29 +119,64 @@ for (const seed of [42, 7, 101, 2026, 555]) {
         const gain = (lead0 - b.meters) - (sorted[0].meters - h.meters);
         if (gain > bestGain) { bestGain = gain; best = h.meters; }
       }
-      camM = packM * 0.55 + best * 0.45;
+      targetM = packM * 0.55 + best * 0.45;
     }
+    /**
+     * ★カメラは重心に**厳密に一致**させ、「誰を見るか」の**差だけ**を滑らかにします。
+     *   ⚠️ 差を滑らかにしないと、注視の対象が別の馬に移った瞬間に
+     *      **画面全体がごそっと飛びます**（＝オーナーの「小間切れ現象」の 2つめの原因）。
+     */
+    const resid = targetM - packM;
+    camResid += (resid - camResid) * Math.min(1, dt / 0.9);
+    const camM = packM + camResid;
 
     let minX = Infinity, maxX = -Infinity;
+    const curX = new Map();
     sorted.forEach((h, rank) => {
       const cur = lane.get(h.gate) ?? (rank <= 2 ? 2 : rank <= 6 ? 1 : 0);
       const want = targetLane(rank, cur, h.gate === OWN);
       const now = cur + (want - cur) * Math.min(1, dt / LANE_MOVE_SEC);
       lane.set(h.gate, now);
-      const lo = ROW_DEF[Math.max(0, Math.min(1, Math.floor(now)))];
-      const hi = ROW_DEF[Math.max(1, Math.min(2, Math.floor(now) + 1))];
-      const f = Math.max(0, Math.min(1, now - Math.floor(now)));
-      const mix = (a, b) => a + (b - a) * f;
-      const x = X_ANCHOR + softX(h.meters - camM, mix(lo.pxPerM, hi.pxPerM), cut.zoom, mix(lo.limitPx, hi.limitPx));
+      // ⚠️ ★添字は丸めたほうに合わせる（`now - Math.floor(now)` だと now=2 で f=0 になる）
+      const i = Math.max(0, Math.min(1, Math.floor(now)));
+      const f = Math.max(0, Math.min(1, now - i));
+      const scale = now >= SCALE_AT ? 2 : 1;
+      const halfW = 110 * scale;
+      const x = cut.anchorX + softX(h.meters - camM, cut.zoom, cut.anchorX, halfW);
+      curX.set(h.gate, x);
       minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-      // ★スプライトは 1× で 220px 幅。中心が枠から 110px 以上外なら「消えた」
-      if (x < -110 || x > W + 110) offScreen++;
+      // ★絵の端まで含めて枠内か（中心ではなく**絵**で判定する）
+      if (x - halfW < -2 || x + halfW > W + 2) offScreen++;
       samples++;
+      void f;
       const s = smallShare.get(h.gate) ?? { small: 0, n: 0 };
-      if (now < 1.55) s.small++;
+      if (scale === 1) s.small++;
       s.n++;
       smallShare.set(h.gate, s);
     });
+
+    /**
+     * ★**「馬全部がごそっと動く」を測る**（F-09）。
+     *
+     * ⚠️ 最初は「馬群の左端と右端の中点」で測りましたが、
+     *    ★**直線で隊列がばらけると中点そのものが動く**ので、カメラのせいでない量まで拾いました
+     *    （13.8px と出た）。**測っていたものが違いました。**
+     * → ★全馬の画面 x の変化量の**中央値**（＝全馬に共通して掛かった動き＝カメラのぶん）を見ます。
+     *    1頭だけ伸びた・下がったは中央値に出ません。
+     */
+    if (prevX !== null && prevSeg === seg.label) {
+      const deltas = [];
+      for (const [g, xv] of curX) {
+        const pv = prevX.get(g);
+        if (pv !== undefined) deltas.push(xv - pv);
+      }
+      deltas.sort((a, b) => a - b);
+      const med = deltas.length ? deltas[deltas.length >> 1] : 0;
+      const jump = Math.abs(med) * (1 / 60) / dt;   // 1/60秒あたりに直す
+      maxJump = Math.max(maxJump, jump);
+      jumpSum += jump; jumpN++;
+    }
+    prevX = curX; prevSeg = seg.label;
 
     const rec = acc.get(seg.label) ?? { label: cut.label, zoom: cut.zoom, target: cut.target, n: 0, span: 0, sec: 0 };
     rec.n++; rec.span += maxX - minX; rec.sec += dt;
@@ -149,7 +188,7 @@ console.log(`★1600m の表示時間 ${(durSum / 5).toFixed(1)} 秒（5レー�
 console.log('★カットごとの見え方（5レースの平均・自馬3番）\n');
 console.log('  区間    見せ場    画角   注視点  ★1馬身が何px に見えるか  馬群の画面上の幅   尺');
 for (const [segLabel, r] of acc) {
-  const perLen = 40 * r.zoom * HORSE_LENGTH_M;   // 手前の段（40px/m）での見た目
+  const perLen = PX_PER_M * r.zoom * HORSE_LENGTH_M;
   console.log(`  ${segLabel.padEnd(5)} ${r.label.padEnd(5)} ${r.zoom.toFixed(2)}×  ${r.target.padEnd(6)}`
     + `        ${perLen.toFixed(0).padStart(3)} px          `
     + `${(r.span / r.n).toFixed(0).padStart(4)} px      ${(r.sec / 5).toFixed(1)} 秒`);
@@ -165,9 +204,14 @@ console.log('\n★「1×（小さいまま）で写っていた割合」馬番�
 console.log('  ' + shares.map(([g, v]) => `${g}番 ${(v * 100).toFixed(0)}%`).join('  '));
 const always = shares.filter(([, v]) => v > 0.97);
 
+console.log(`\n★全馬に共通して掛かる動き（＝カメラ）が 1コマ（1/60秒）で動く量`
+  + `　平均 ${(jumpSum / jumpN).toFixed(2)} px ／ 最大 ${maxJump.toFixed(2)} px`);
+
 let bad = false;
 if (spanZ < 1.5) { console.log('\n★FAIL — カットが実質的に変わっていません'); bad = true; }
 if (offScreen > 0) { console.log(`\n★FAIL — ${offScreen} 標本で馬が枠外へ出ています`); bad = true; }
+if (maxJump > 12) { console.log(`
+★FAIL — 1コマで ${maxJump.toFixed(1)}px 飛んでいます（ごそっと動く）`); bad = true; }
 if (always.length > 0) {
   console.log(`\n★FAIL — 最初から最後まで小さいままの馬がいます: ${always.map(([g]) => `${g}番`).join(',')}`);
   bad = true;

@@ -36,7 +36,7 @@ const W = 1280;
 const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 /** ★上げないと古い JS が使われます（「変わっていません」の正体） */
-const V = '21';
+const V = '22';
 
 /** ★区間の境目（1角/2角/向正面/…）。**コースから読みます**（書き写すとずれる） */
 const COURSE = ovalCourse(DIST);
@@ -104,98 +104,107 @@ const SECTION_OF: Record<string, string> = {
  *   奥 (1×) は turfMain の上   → 0.55            → **11px/m**
  *   ★同じ 24m でも奥ほど狭く見えます。これが奥行きです。
  */
-const ROW_DEF: readonly { id: string; scale: number; groundY: number; air: number; pxPerM: number; slots: number; limitPx: number }[] = [
-  { id: 'back', scale: 1, groundY: 436, air: 0.1, pxPerM: 22, slots: 5, limitPx: 330 },
-  { id: 'mid', scale: 1, groundY: 520, air: 0.04, pxPerM: 30, slots: 4, limitPx: 440 },
-  { id: 'front', scale: 2, groundY: 626, air: 0, pxPerM: 40, slots: 3, limitPx: 560 },
-];
-/** ★画面のどこを「カメラが見ている地点」にするか */
-const X_ANCHOR = 640;
 /**
- * ★**望遠の圧縮**（`camera.ts` の `xCompression` と同じ考え）。
+ * ★★**奥行き（段）と横位置**
  *
- * 【★オーナー判定「画面の右端に消える馬が多い」】
- *   ⚠️ 前の式は `LIM[m]·tanh(dm/LIM)` で、**上限が「メートル」側**にありました。
- *      画角（zoom）を掛けると **px の上限は zoom 倍に伸びる**ので、
- *      ★寄ったカット（2.1×）で **上限 1176px** になり、先頭が右の枠外へ出ていました。
+ * 【★F-10「奥の小さな馬が円を描くように動く」／F-11「追い抜き方が不自然」の原因】
+ *   ⚠️ 段ごとに `px/m` を変えていました（奥22 / 中30 / 手前40）。すると
+ *      ★**馬が段を移るだけで横にも滑る**ので、上下＋左右の動きが合成されて
+ *      **円を描いて**見えます。追い抜きも、進んでいないのに前後が入れ替わります。
+ *   → ★**px/m は全段で同じ**にします。コース上の内外（横幅 10m 程度）は
+ *      進行方向の位置にほとんど影響しないので、これが物理的にも正しい。
+ *      奥行きは**大きさ（1×/2×）と接地線の y** だけで作ります。
  *
- * → ★**上限を px 側に置きます。**  `x = LIM_PX · tanh(dm · pxPerM · zoom / LIM_PX)`
- *      ・差が小さいところ … 傾き = `pxPerM · zoom`（★寄ると接戦が拡大される＝画角は効く）
- *      ・差が大きいところ … ★**画角によらず ±LIM_PX で頭打ち。誰も枠外へ出ません**
- *   ★単調なので前後関係は1つも変わりません（＝抜き差しの回数は同じ）。
+ * 【★F-06「大小わけのわからない状態」の原因 — こちらは実装のバグ】
+ *   ⚠️ 段の補間で `f = now - Math.floor(now)` と書いていました。
+ *      `now = 2`（いちばん手前）のとき `floor(2) = 2` で **f = 0** になり、
+ *      ★**位置は中段（y=520・1×相当）のまま、倍率だけ 2× になる**という
+ *      ちぐはぐな状態を作っていました。**接地線がばらばらに見えていたのはこれです。**
+ *   → 添字を丸めたほうに合わせて `f = now - i` にします。
  */
-function softX(dm: number, pxPerM: number, zoom: number, limitPx: number): number {
-  return limitPx * Math.tanh((dm * pxPerM * zoom) / limitPx);
-}
-/** ★段の中でも数 px ずらして重なりを解く（段の接地線そのものは動かさない） */
-const SUB_DEPTH = 7;
+const LANE_Y = [436, 520, 626] as const;
+const LANE_AIR = [0.1, 0.04, 0] as const;
+/** ★**全段で同じ**（上のコメント）。1馬身 = 2.4m なので 1馬身 = 72px（画角 1× のとき） */
+const PX_PER_M = 30;
+/** ★段を移るのにかける秒数。短いと「瞬間移動」、長いと反応しない */
+const LANE_MOVE_SEC = 1.6;
+/** ★倍率が 1× → 2× に変わる位置（D-058: 倍率は 1× と 2× だけ） */
+const SCALE_AT = 1.6;
 
 /**
- * ★★**カット**（オーナー指示②「ずっと同じカメラワークで飽きる。見せ場が要る」）
- *
- * 【できること】★**画角**（馬間の広がり＝寄り/引き）と**注視点**（誰を画面の中心に置くか）。
- *   ⚠️ **倍率は 1×/2× のみ**（D-058）なので、寄り＝スプライトを拡大ではなく
- *      **馬間を広げて遠い馬を画面外へ出す**（＝望遠で寄るのと同じ効果）。
+ * ★**横位置**。`anchorX` からの左右で**別々に上限**を持ちます。
+ *   ⚠️ 上限を1つにすると、`anchorX` を左に寄せた発走のカットで
+ *      **右に走れる余地まで狭まります**。
+ *   ★上限にはスプライトの半分の幅を引いています。
+ *      **中心が枠内でも、絵の右半分がはみ出して「消えた」ように見えた**ためです（F-08）。
+ */
+function softX(dm: number, zoom: number, anchorX: number, halfW: number): number {
+  const lim = dm >= 0
+    ? Math.max(60, W - anchorX - halfW - 8)
+    : Math.max(60, anchorX - halfW - 8);
+  return lim * Math.tanh((dm * PX_PER_M * zoom) / lim);
+}
+
+/**
+ * ★★**カット**（区間ごとに画角・注視点・画面のどこを基準にするかを切り替える）
  *
  * 【★できないこと（素材が無い）】
- *   ・**上空からの俯瞰**（②2角）… ★一度自作して失敗しました。走路が真上から見た広大な緑になり、
- *     馬が小さく「地図」に見えた（`/race2`・削除済み）。**第3便でデザイナーに頼みます**
- *   ・**奥から走ってくる正面の絵**（④4角）… ★斜め・奥行きの線は
- *     アートバイブル §3（線遠近を描き込まない）に正面から抵触します。**同じく第3便**
- *   → ★**推測で作らず、素材が来るまでは「画角と注視点」で作ります。**
- *
- * 【区間】★コースから読みます（1600m は 2角の途中から始まる）
- *   残り1600〜1400 2角  … 発走。★引いて全馬。逃げ・先行が前へ、差し・追込が後ろへ流れる
- *   残り1400〜1000 向正面 … 道中。★いちばん引く（上空の代わり）
- *   残り1000〜 700 3角  … 仕掛け。★寄り始め・注視は**いちばん上がってきている馬**
- *   残り 700〜 400 4角  … 勝負所。★さらに寄る・注視は先頭争い
- *   残り 400〜   0 直線  … 決着。★最も寄る。ただし**入った瞬間だけ一度引く**（裁定）
+ *   ・**上空からの俯瞰** … 一度自作して失敗（`/race2`・馬が小さく「地図」に見えた）
+ *   ・**奥から走ってくる正面の絵** … アートバイブル §3（線遠近を描き込まない）に抵触
+ *   → **第3便でデザイナーに依頼**。推測で作りません。
  */
-interface Cut { readonly zoom: number; readonly target: 'pack' | 'mover' | 'lead2'; readonly label: string }
+interface Cut {
+  readonly zoom: number;
+  readonly target: 'pack' | 'mover' | 'lead2' | 'winner';
+  /** ★画面のどこを「カメラが見ている地点」にするか */
+  readonly anchorX: number;
+  readonly label: string;
+}
 const CUT_OF: Record<string, Cut> = {
-  // ★発走は**寄る**。オーナー指示「逃げ・先行が前へ踊り出て、差し・追込が後方へ」＝
-  //   隊列ができていく過程が見えないと意味がないので、引くと逆効果でした
-  '2角': { zoom: 1.5, target: 'pack', label: '発走' },
-  '1角': { zoom: 1.5, target: 'pack', label: '発走' },
-  // ★道中がいちばん引く（＝上空の代わり。一団であることが伝わる）
-  向正面: { zoom: 0.95, target: 'pack', label: '道中' },
-  '3角': { zoom: 1.35, target: 'mover', label: '仕掛け' },
-  '4角': { zoom: 1.7, target: 'lead2', label: '勝負所' },
-  直線: { zoom: 2.1, target: 'lead2', label: '決着' },
+  // ★発走は**左に寄せる**。オーナー指示「馬は→に走るのでゲートは左サイド」＝
+  //   右にたっぷり走る余地がないと、飛び出した感じが出ません
+  '2角': { zoom: 1.35, target: 'pack', anchorX: 380, label: '発走' },
+  '1角': { zoom: 1.35, target: 'pack', anchorX: 380, label: '発走' },
+  向正面: { zoom: 0.95, target: 'pack', anchorX: 640, label: '道中' },
+  '3角': { zoom: 1.35, target: 'mover', anchorX: 600, label: '仕掛け' },
+  '4角': { zoom: 1.7, target: 'lead2', anchorX: 580, label: '勝負所' },
+  直線: { zoom: 2.1, target: 'lead2', anchorX: 540, label: '決着' },
 };
-/** ★カットが切り替わってから画角が落ち着くまで（秒）。0 だと「バグ」に見える */
+/** ★ゲート入り（発走前） */
+const CUT_GATE: Cut = { zoom: 1.35, target: 'pack', anchorX: 380, label: 'ゲート入り' };
+/**
+ * ★★**ゴール後は1着の馬を追う**（オーナー指示 F-14「JRA は1着の馬をカメラワークが追う」）。
+ *   勝ち馬を画面の右寄りに置き、**後続が左へ流れていく**。
+ */
+const CUT_WINNER: Cut = { zoom: 1.9, target: 'winner', anchorX: 800, label: '★ゴール後' };
+/** ★カットが切り替わってから画角が落ち着くまで（区間の中だけ効く） */
 const CUT_EASE = 0.55;
 /** ★「寄る前に一度引く」（裁定）。直線に入った最初の 0.7秒だけ引く */
 const PULL_BACK_SEC = 0.7;
 const PULL_BACK_ZOOM = 0.75;
 
 /**
- * ★★**段（奥行き）の決め方**
- *
- * 【★オーナー判定「遠近法なのか、ずっと小さい馬がいるのはなぜ？」】
- *   段を**レース中ずっと固定**していました。奥の段の馬は 1×（半分の大きさ）なので、
- *   ★**その馬は最初から最後まで小さいまま**です。**指摘のとおりです。**
- *
- * 【なぜ固定していたか】
- *   段を順位で入れ替えると**縦に瞬間移動**するからです（横の瞬間移動を直したのと同じ問題）。
- *
- * 【どう直したか】★**順位で段を決める。ただし瞬間移動させず 1.2秒かけて移す。**
- *   ・接地線は 436 / 520 / 626 の**間を連続に**移動する
- *     （⚠️ 段そのものの接地線は動かしていません。**馬が段の間を移る**だけです）
- *   ・★**倍率は 1× と 2× だけ**（D-058）。手前寄りに 55% 以上入ったところで切り替える
- *   ・★**行ったり来たりしないよう「ため」を入れます**（上がるのは3着以内、下がるのは4着より後ろ）
- *   ・★**自馬は奥の段に落としません**（プレイヤーが自分の馬を見失わないため）
+ * ★**段（奥行き）は順位で決めるが、瞬間移動させない。**
+ *   ⚠️ 固定すると「ずっと小さいままの馬」ができます（オーナー判定）。
+ *   ★行ったり来たりしないよう「ため」を入れます。
+ *   ★自馬は奥の段に落としません（自分の馬を見失わないため）。
  */
-const LANE_MOVE_SEC = 1.2;
-/** 順位 → 目標の段（0=奥 1=中 2=手前）。★上げ下げで境目をずらす（ため） */
 function targetLane(rank: number, current: number, isOwn: boolean): number {
-  const up2 = rank <= 2;
-  const down2 = rank >= 4;
-  const up1 = rank <= 6;
-  const down1 = rank >= 8;
+  const up2 = rank <= 2, down2 = rank >= 4, up1 = rank <= 6, down1 = rank >= 8;
   let want = current >= 1.5 ? (down2 ? 1 : 2) : (up2 ? 2 : (current >= 0.5 ? (down1 ? 0 : 1) : (up1 ? 1 : 0)));
   if (isOwn) want = Math.max(1, want);
   return want;
+}
+
+/* ── ★発走ゲート ───────────────────────────────── */
+const GATE_SCALE = 2;
+/** 1房の幅（`scene.js` の `drawGate` と同じ 46 × 倍率） */
+const STALL_W = 46 * GATE_SCALE;
+const GATE_X0 = 60;
+const GATE_GROUND = 626;
+/** 房 g の中心の画面 x（★ここに馬を立たせます） */
+function stallX(gate: number): number {
+  return GATE_X0 + (gate - 1) * STALL_W + STALL_W / 2 + 5;
 }
 
 interface StillApi {
@@ -223,6 +232,10 @@ interface Built {
   readonly warp: ReturnType<typeof timeWarpFor>;
   readonly pace: string;
   readonly result: readonly { place: number; gate: number; margin: string }[];
+  /** ★各馬がゴール線に達したレース秒。**ゴール後も走らせ続ける**ために要ります */
+  readonly finishSec: ReadonlyMap<number, number>;
+  readonly winner: number;
+  readonly winnerSec: number;
 }
 
 function build(seed: number, ownGate: number): Built {
@@ -251,12 +264,30 @@ function build(seed: number, ownGate: number): Built {
   if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(settled)) {
     throw new Error('位置モデルの最終順が着順と違います（D-059）');
   }
+  const finishSec = new Map<number, number>(boundaries.map((b) => [b.gate, b.finishSec]));
+  const winner = Number(result.order[0]!.horseId);
   return {
     model,
     warp: timeWarpFor(knotsFor(boundaries, ownGate), RATES),
     pace,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
+    finishSec,
+    winner,
+    winnerSec: finishSec.get(winner) ?? 0,
   };
+}
+
+/**
+ * ★**ゴール後も走り続ける距離**（減速しながら）。
+ *
+ * 【★F-13「ゴールでなぜかまた馬が全部並ぶ」の原因】
+ *   ⚠️ 位置モデルはゴール線で頭打ちになります（`replay-model.ts`）。
+ *      ★全馬の位置が `distanceMeter` で同じ値になるので、**差が 0 になり、
+ *      画面上で全員が1点に集まって**いました。
+ *   → ゴールした馬は **そこから先も惰性で走らせます**。着差がそのまま残ります。
+ */
+function coastM(t: number): number {
+  return 96 * (1 - Math.exp(-t / 6));
 }
 
 /** ★区間を距離から引く（入口・出口も要るので `segmentAt` ではなく表を持つ） */
@@ -338,7 +369,7 @@ export default function RaceNextPage(): React.JSX.Element {
        */
       const all = Array.from({ length: 18 }, (_, i) => i + 1);
       const atlas = await api.buildAtlas(sheet, pal, {
-        horsePlan: { rows: ROW_DEF.map((r) => ({ id: r.id, gates: all })) },
+        horsePlan: { rows: [{ id: 'back', gates: all }, { id: 'mid', gates: all }, { id: 'front', gates: all }] },
       });
       if (cancelled) return;
       artRef.current = { pal, shared: l1.layers, l2, atlas };
@@ -378,55 +409,72 @@ export default function RaceNextPage(): React.JSX.Element {
     const raceD = Math.max(0, d - GATE_HOLD);
     const sec = built.warp.raceSecAt(raceD);
     const at = built.model.at(sec);
-    const sorted = [...at].sort((a, b) => b.meters - a.meters);
+
+    /**
+     * ★**ゴールしたあとも走らせます**（F-13）。
+     *   位置モデルはゴール線で頭打ちになるので、そのままだと**全馬の位置が同じ値**になり、
+     *   画面上で1点に集まります。ゴール後は惰性ぶんを足して、着差を残します。
+     */
+    const mOf = (gate: number, meters: number): number => {
+      const fin = built.finishSec.get(gate);
+      if (fin === undefined || sec <= fin) return meters;
+      return DIST + coastM(sec - fin);
+    };
+    const pos = at.map((h) => ({ gate: h.gate, meters: mOf(h.gate, h.meters), staminaRatio: h.staminaRatio }));
+    const sorted = [...pos].sort((a2, b2) => b2.meters - a2.meters);
     const lead = sorted[0]!.meters;
-    const own = at.find((h) => h.gate === ownGate);
-    const focus = own === undefined ? lead : own.meters;
+    const own = pos.find((h) => h.gate === ownGate);
+    const focus = Math.min(DIST, own === undefined ? lead : own.meters);
     const metersLeft = Math.max(0, DIST - focus);
     const seg = segAt(focus);
+    /** ★勝ち馬がゴール線を通過したら「ゴール後」のカットへ */
+    const afterGoal = !inGate && sec >= built.winnerSec;
     const section = inGate ? 'gate' : (SECTION_OF[seg.label] ?? 'homestretch');
-    /** ★ゲートは開いたあと **1.4秒かけて後ろへ流れて**画面から抜けます（急に消さない） */
-    const gateT = Math.max(0, d - GATE_OPEN_AT) / 1.4;
-    const gateX = gateT <= 0 ? 83 : 83 - 1500 * (gateT * gateT);
 
     /**
      * ★カットが切り替わった瞬間（時刻を書き写さない・**コースが知っている**）。
      *   ⚠️ 景観は 3角 も 4角 も同じ `corner` なので、**景観ではなく区間名**で見ます。
-     *      でないと 3角→4角 でカットが切り替わりません（＝ずっと同じカメラワーク）。
      */
-    const cutKey = inGate ? 'gate' : seg.label;
+    const cutKey = inGate ? 'gate' : afterGoal ? 'goal' : seg.label;
     if (lastSecRef.current !== cutKey) { lastSecRef.current = cutKey; badgeAtRef.current = d; }
 
-    /* ── ★カット（画角と注視点を区間で切り替える）─────────────── */
-    const cut = inGate
-      ? { zoom: 0.72, target: 'pack' as const, label: '発走' }
-      : (CUT_OF[seg.label] ?? CUT_OF['直線']!);
+    /* ── ★カット（画角・注視点・基準の x を区間で切り替える）───────── */
+    const cut = inGate ? CUT_GATE : afterGoal ? CUT_WINNER : (CUT_OF[seg.label] ?? CUT_OF['直線']!);
     const sinceCut = d - badgeAtRef.current;
     // ★「寄る前に一度引く」（裁定）。直線に入った最初だけ引いてから寄る
-    const wanted = (seg.label === '直線' && sinceCut < PULL_BACK_SEC && !inGate)
+    const wanted = (seg.label === '直線' && !afterGoal && sinceCut < PULL_BACK_SEC && !inGate)
       ? PULL_BACK_ZOOM : cut.zoom;
     const dt = Math.max(0, Math.min(0.1, d - lastDRef.current));
     lastDRef.current = d;
     /**
-     * ★**カットは「切り替え」です。** 区間が変わった瞬間は**その場で**画角を変えます。
-     *   ⚠️ 前は 0.55秒かけて滑らかに変えていたので、★**切り替わったことが分かりませんでした**
-     *      （オーナー「カメラワーク切り替えは？」）。中継のカットは一瞬で変わります。
-     *   区間の中では、寄り/引きをゆっくり効かせます。
+     * ★**カットは「切り替え」です。** 区間が変わった瞬間は**その場で**画角を変えます
+     *   （滑らかに変えると、切り替わったことが分かりません）。
      */
     const isCutMoment = sinceCut < dt * 1.5 || zoomRef.current <= 0 || dt === 0;
     if (isCutMoment) zoomRef.current = wanted;
     else zoomRef.current += (wanted - zoomRef.current) * Math.min(1, dt / CUT_EASE);
     const zoom = zoomRef.current;
+    const anchorX = cut.anchorX;
 
     /**
-     * ★**注視点**。カメラが誰を画面の中心に置くか。
-     *   ・pack  … 馬群の重心（発走・道中）
-     *   ・mover … ★**いちばん上がってきている馬**（3角＝仕掛けどころ）
-     *   ・lead2 … 先頭争いの2頭（4角・直線）
+     * ★★**注視点**
+     *
+     * 【★F-08「右端に消える」／F-09「ごそっと左に移動してまた前に進む」の原因】
+     *   ⚠️ カメラ位置そのもの（＝**増え続けるメートル**）に一次遅れをかけていました。
+     *      ★**ランプ入力に遅れをかけると、平滑化ではなく「一定のずれ」になります。**
+     *      表示は毎秒 40m 以上進むので、時定数 0.9秒 なら**常に 35m 以上あとをついていく**。
+     *      → 馬群が右へ寄り続け、追いつくたびに**ごそっと左へ戻る**。
+     *      ★オーナーが見た「小間切れ現象」と「右端に消える」は、**同じ1つのバグ**でした。
+     *
+     *   → ★**カメラの基準は馬群の重心（`packM`）に厳密に一致させ、
+     *        「誰を見るか」のぶんの**差だけ**を滑らかにします。**
+     *        差は有界（数十m）なので、遅れをかけても溜まりません。
      */
-    const packM = at.reduce((s, h) => s + h.meters, 0) / at.length;
+    const packM = pos.reduce((s2, h) => s2 + h.meters, 0) / pos.length;
     let targetM = packM;
-    if (cut.target === 'lead2') {
+    if (cut.target === 'winner') {
+      targetM = sorted[0]!.meters;
+    } else if (cut.target === 'lead2') {
       targetM = packM * 0.35 + ((sorted[0]!.meters + (sorted[1]?.meters ?? sorted[0]!.meters)) / 2) * 0.65;
     } else if (cut.target === 'mover') {
       const back = built.model.at(Math.max(0, sec - 1.2));
@@ -434,51 +482,71 @@ export default function RaceNextPage(): React.JSX.Element {
       let best = packM;
       let bestGain = 0;
       for (const h of sorted) {
-        const b = back.find((x) => x.gate === h.gate);
-        if (b === undefined) continue;
-        const gain = (lead0 - b.meters) - (sorted[0]!.meters - h.meters);
+        const b2 = back.find((x) => x.gate === h.gate);
+        if (b2 === undefined) continue;
+        const gain = (lead0 - b2.meters) - (sorted[0]!.meters - h.meters);
         if (gain > bestGain) { bestGain = gain; best = h.meters; }
       }
       targetM = packM * 0.55 + best * 0.45;
     }
-    /** ★注視点。**カットの瞬間は飛ばす**（＝切り替え）。区間の中ではなめらかに追う */
-    if (camRef.current === null || isCutMoment) camRef.current = targetM;
-    else camRef.current += (targetM - camRef.current) * Math.min(1, dt / 0.9);
-    const camM = camRef.current;
+    const resid = targetM - packM;
+    if (camRef.current === null || isCutMoment) camRef.current = resid;
+    else camRef.current += (resid - camRef.current) * Math.min(1, dt / 0.9);
+    const camM = packM + camRef.current;
 
     /**
-     * ★**1頭 = 1段**にして組みます。
-     *   ⚠️ `drawScene` は段ごとに倍率が1つなので、**段を共有すると同じ大きさに縛られます**。
-     *      1頭ずつ段にすれば、**その馬だけ 1×→2× に上げる**ことができます。
-     *   ★描く順は**奥から**（接地線の y が小さい順）。手前の馬が上に重なります。
+     * ★★**発走**（F-01/F-02/F-05/F-07）
+     *   `gp` … 0 = ゲートの中 ／ 1 = 通常の隊列。**1.4秒かけて移ります。**
+     *   ・`gp = 0` では **12頭が房の位置に立ち、接地線はゲートと同じ 626**
+     *     → ★ゲートが「下にある」ように見えません。大きさも全頭同じです
+     *   ・ゲートは**開いた瞬間から左へ流れ**、馬は右へ出ていきます
+     *     → ★「馬は → に走るのでゲートは左サイド」
+     */
+    const gp = Math.max(0, Math.min(1, (d - GATE_OPEN_AT) / 1.4));
+    const gateX = GATE_X0 - 1900 * gp * gp;
+    const showGate = gateX > -(FIELD * STALL_W + 40);
+
+    /**
+     * ★**1頭 = 1段**にして組みます（`drawScene` は段ごとに倍率が1つなので、
+     *   段を共有するとその馬だけ 2× にできません）。描く順は**奥から**。
      */
     const laneNow = laneRef.current;
     const horses = sorted.map((h, rank) => {
       const cur = laneNow.get(h.gate) ?? (rank <= 2 ? 2 : rank <= 6 ? 1 : 0);
       const want = targetLane(rank, cur, h.gate === ownGate);
-      // ★1.2秒かけて段を移す（瞬間移動させない）
       const step = dt === 0 ? 1 : Math.min(1, dt / LANE_MOVE_SEC);
-      const now = cur + (want - cur) * step;
+      const now = gp < 1 ? cur : cur + (want - cur) * step;
       laneNow.set(h.gate, now);
 
-      const lo = ROW_DEF[Math.max(0, Math.min(1, Math.floor(now)))]!;
-      const hi = ROW_DEF[Math.max(1, Math.min(2, Math.floor(now) + 1))]!;
-      const f = Math.max(0, Math.min(1, now - Math.floor(now)));
-      const mix = (a: number, b: number): number => a + (b - a) * f;
-      // ★重なった2頭が1頭に見えないよう、数 px だけ奥へずらす（馬番で固定）
-      const groundY = Math.round(mix(lo.groundY, hi.groundY) - (h.gate % 3) * SUB_DEPTH);
+      /**
+       * ⚠️ ★添字は**丸めたほう**に合わせること。
+       *    `f = now - Math.floor(now)` だと `now = 2` で f = 0 になり、
+       *    ★**位置は中段のまま倍率だけ 2×** というちぐはぐな状態になりました（F-06）。
+       */
+      const i = Math.max(0, Math.min(1, Math.floor(now)));
+      const f = Math.max(0, Math.min(1, now - i));
+      const laneY = LANE_Y[i]! + (LANE_Y[i + 1]! - LANE_Y[i]!) * f;
+      const laneAir = LANE_AIR[i]! + (LANE_AIR[i + 1]! - LANE_AIR[i]!) * f;
+      const scale = (gp < 0.5 ? 1 : now >= SCALE_AT ? 2 : 1);
+      const halfW = 110 * scale;
+
+      const runX = anchorX + softX(h.meters - camM, zoom, anchorX, halfW);
+      // ★発走: 房の位置から隊列へ（瞬間移動させない）
+      const x = gp >= 1 ? runX : stallX(h.gate) + (runX - stallX(h.gate)) * gp;
+      const y = gp >= 1 ? laneY : GATE_GROUND + (laneY - GATE_GROUND) * gp;
       return {
         id: `h${h.gate}`,
-        // ★倍率は 1× と 2× だけ（D-058）。手前寄りに 55% 入ったところで切り替える
-        scale: now >= 1.55 ? 2 : 1,
-        air: mix(lo.air, hi.air),
+        scale,
+        air: laneAir * gp,
         gates: [h.gate],
-        groundY: [groundY],
-        x: [Math.round(X_ANCHOR + softX(h.meters - camM, mix(lo.pxPerM, hi.pxPerM), zoom, mix(lo.limitPx, hi.limitPx)))],
-        _y: groundY,
+        groundY: [Math.round(y)],
+        x: [Math.round(x)],
+        _y: y,
       };
     });
-    const rows = [...horses].sort((a, b) => a._y - b._y);
+    const rows = [...horses].sort((a2, b2) => a2._y - b2._y);
+    /** ★ゴール後に「1着」の旗を出す位置（F-14「誰が1着かわかるカメラワーク」） */
+    const winnerRow = horses.find((r) => r.gates[0] === built.winner);
 
     // ★回頭は 0 → 0.48 → 0 に補間（`$cornerMotion` を複製して pan だけ差し替え）
     const ease = section === 'corner' ? panEase(focus, seg) : 0;
@@ -491,19 +559,99 @@ export default function RaceNextPage(): React.JSX.Element {
       signText: seg.label,
       horsePlan: { own: ownGate, rows },
       /**
-       * ★発走ゲート（**馬より後ろ**に描かれます）。
-       *   ⚠️ 開いた瞬間に消すと「バグ」に見えたので、**後ろへ流して画面から抜けさせます**。
+       * ★発走ゲート。★**開く前は馬より手前**（＝馬が房の中にいるように見える）、
+       *   ★**開いた後は馬より後ろ**（デザイナー指摘「扉が開いた瞬間、馬はもうゲートより前にいる」）。
        */
-      gate: gateX > -1300
-        ? { x: gateX, groundY: 626, stalls: FIELD, open: gateOpen, firstGate: 1, scale: 2 }
+      gate: showGate
+        ? { x: gateX, groundY: GATE_GROUND, stalls: FIELD, open: gateOpen, firstGate: 1, scale: GATE_SCALE }
         : undefined,
-      showHorses: !inGate || gateOpen,
+      gateFront: !gateOpen,
+      // ★F-02「ゲートと馬と騎手も見せるべき」→ 発走前から馬を出します
+      showHorses: true,
       /** ★脚の回転。**毎秒 2.4 歩**（実際の駆歩は 2.1〜2.4）。★既定は固定コマなので必ず渡す */
       frameOf: (gate: number): number =>
         Math.floor(((((inGate ? 0 : raceD) * 2.4 + gate * 0.37) % 1) + 1) % 1 * 6),
     });
 
-    // ★ファンファーレ（枠入り → 発走）
+    /**
+     * ★★**決勝線とハロン棒**（F-12「ゴール前が一番盛り上がるはずなのに全くわからない」）。
+     *   ⚠️ ゴール板もハロン棒も**画面に1つも出ていませんでした**。残り距離は数字だけ。
+     *   ★内ラチの上に立つので、**馬より手前**に描くのが正しい（`railFront` と同じ側）。
+     */
+    if (!inGate) {
+      const marks: readonly { m: number; label: string; big: boolean }[] = [
+        { m: DIST, label: 'ゴール', big: true },
+        { m: DIST - 100, label: '100', big: false },
+        { m: DIST - 200, label: '200', big: false },
+        { m: DIST - 400, label: '400', big: false },
+      ];
+      for (const mk of marks) {
+        const mx = anchorX + softX(mk.m - camM, zoom, anchorX, 0);
+        if (mx < -60 || mx > W + 60) continue;
+        const x0 = Math.round(mx);
+        const top = mk.big ? 300 : 400;
+        ctx.fillStyle = c('ink-0');
+        ctx.fillRect(x0 - 3, top, 6, GATE_GROUND - top);
+        ctx.fillStyle = c('paper-0');
+        ctx.fillRect(x0 - 2, top + 2, 3, GATE_GROUND - top - 4);
+        if (mk.big) {
+          // ★ゴール板
+          ctx.fillStyle = c('ink-0');
+          ctx.fillRect(x0 - 62, top - 46, 124, 44);
+          ctx.fillStyle = c('mark-gold');
+          ctx.fillRect(x0 - 58, top - 42, 116, 36);
+          ctx.fillStyle = c('ink-0');
+          ctx.font = 'bold 24px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('ゴール', x0, top - 14);
+          // ★決勝線（走路を横切る白い帯）
+          ctx.fillStyle = `${c('paper-0')}cc`;
+          ctx.fillRect(x0 - 4, 400, 9, GATE_GROUND - 400 + 26);
+        } else {
+          ctx.fillStyle = c('paper-0');
+          ctx.fillRect(x0 - 21, top - 30, 42, 28);
+          ctx.fillStyle = c('ink-0');
+          ctx.font = 'bold 19px ui-monospace, monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(mk.label, x0, top - 9);
+        }
+        ctx.textAlign = 'left';
+      }
+    }
+
+    /**
+     * ★★**1着の旗**（F-14「ゴール通過したら1着の馬をカメラワークが追う／誰が1着かわかる」）
+     *   カメラは `CUT_WINNER` で勝ち馬を追っています。そのうえで
+     *   **どの馬が1着か**を画面上でも指します。
+     *   ⚠️ ★**騎手が手を上げて喜ぶ絵（F-15）は素材がありません。** 第3便で頼みます。
+     */
+    if (afterGoal && winnerRow !== undefined && sec >= built.winnerSec + 0.5) {
+      const wx = winnerRow.x[0]!;
+      const wy = winnerRow.groundY[0]! - 150 * winnerRow.scale;
+      const t = Math.min(1, (sec - built.winnerSec - 0.5) / 0.4);
+      const yy = Math.round(wy - 30 * (1 - t));
+      ctx.globalAlpha = t;
+      ctx.fillStyle = `${c('ink-0')}cc`;
+      ctx.fillRect(wx - 74, yy - 4, 152, 48);
+      ctx.fillStyle = c('mark-gold');
+      ctx.fillRect(wx - 70, yy, 144, 40);
+      ctx.fillStyle = c('ink-0');
+      ctx.font = 'bold 26px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`1着 ${built.winner}番`, wx, yy + 30);
+      // ★下向きの三角で、どの馬か指す
+      ctx.beginPath();
+      ctx.moveTo(wx - 12, yy + 40);
+      ctx.lineTo(wx + 12, yy + 40);
+      ctx.lineTo(wx, yy + 56);
+      ctx.closePath();
+      ctx.fillStyle = c('mark-gold');
+      ctx.fill();
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
+    }
+
+    // ★ファンファーレ（ゲート入り → 発走）
     if (d < GATE_OPEN_AT) scene.drawFanfare(ctx, pal, W, d < 1.5 ? 0 : 1);
     // ★カットの帯（区間が切り替わってから 1.2秒）
     if (!inGate && sinceCut < 1.2) {
@@ -561,44 +709,91 @@ export default function RaceNextPage(): React.JSX.Element {
       ctx.fillText(`ペース ${built.pace}`, 228, 138);
     }
 
-    // ★実況（★順位の数字を読み上げない。**変化**を言う）
+    /**
+     * ★★**実況の帯**（F-04「実況中継の帯がダサい」）
+     *   ⚠️ 紙色のべた塗り1枚に文字を置いただけでした。
+     *   → 中継の下三分の一（lower third）の作りにします:
+     *      墨の帯 ＋ 上辺に金の罫 ＋ **枠順色の枡に馬番** ＋ 右に区間と残り。
+     *   ★色だけに頼らないため、枡の中に**馬番の数字**を必ず入れます。
+     */
     {
       const back = built.model.at(Math.max(0, sec - 0.6));
-      const prev = [...back].sort((a, b) => b.meters - a.meters);
+      const prev = [...back].sort((a2, b2) => b2.meters - a2.meters);
       const leaderNow = sorted[0]!.gate;
+      /** 帯の左に出す馬番（いま話題にしている馬） */
+      let chip = leaderNow;
       let line: string;
-      if (inGate) line = gateOpen ? 'ゲートが開いた' : d < 1.5 ? 'まもなく枠入り' : '各馬が態勢を整えた';
-      else if (raceD >= built.warp.displaySec - 0.01) line = `${built.result[0]!.gate}番　ゴールイン`;
-      else if (prev[0] !== undefined && prev[0].gate !== leaderNow) line = `${leaderNow}番　先頭に立った`;
-      else {
+      if (inGate) {
+        chip = ownGate;
+        line = gateOpen ? 'ゲートが開いた' : d < 1.5 ? 'まもなくゲート入り' : '各馬が態勢を整えた';
+      } else if (afterGoal) {
+        chip = built.winner;
+        const t = sec - built.winnerSec;
+        line = t < 1.2 ? `${built.winner}番　ゴールイン` : `${built.winner}番　先頭でゴールを駆け抜けた`;
+      } else if (prev[0] !== undefined && prev[0].gate !== leaderNow) {
+        line = `${leaderNow}番　先頭に立った`;
+      } else {
         let bg = -1;
         let bv = 0;
         for (const h of sorted) {
-          const b = back.find((x) => x.gate === h.gate);
-          if (b === undefined || prev[0] === undefined) continue;
-          const g = (prev[0].meters - b.meters) - (lead - h.meters);
+          const b2 = back.find((x) => x.gate === h.gate);
+          if (b2 === undefined || prev[0] === undefined) continue;
+          const g = (prev[0].meters - b2.meters) - (lead - h.meters);
           if (g > bv) { bv = g; bg = h.gate; }
         }
         const s2 = sorted[1];
-        if (bv > 0.8 && bg > 0) line = seg.label === '直線' ? `${bg}番　外から伸びてきた` : `${bg}番　上がってきた`;
-        else if (seg.label === '直線' && metersLeft < 200) {
-          line = (s2 !== undefined && sorted[0]!.meters - s2.meters < HORSE_LENGTH_M)
-            ? `${leaderNow}番と${s2.gate}番　並んだ`
-            : `残り ${metersLeft.toFixed(0)}m　${leaderNow}番先頭`;
+        if (bv > 0.8 && bg > 0) {
+          chip = bg;
+          line = seg.label === '直線' ? `${bg}番　外から伸びてきた` : `${bg}番　上がってきた`;
+        } else if (seg.label === '直線' && metersLeft < 200) {
+          if (s2 !== undefined && sorted[0]!.meters - s2.meters < HORSE_LENGTH_M) {
+            line = `${leaderNow}番と${s2.gate}番　並んだ　どっちだ`;
+          } else {
+            line = `残り ${metersLeft.toFixed(0)}m　${leaderNow}番先頭`;
+          }
         } else if (seg.label === '直線') line = `さあ直線　${leaderNow}番が先頭`;
-        else if (seg.label === '4角') line = '4角をまわった　各馬が動いた';
+        else if (seg.label === '4角') line = '4角をまわった　各馬がいっせいに動いた';
         else line = `${seg.label}　${leaderNow}番が先頭`;
       }
+
+      const by = H - 96;
+      const bh = 78;
+      ctx.fillStyle = `${c('ink-0')}ee`;
+      ctx.fillRect(0, by, W, bh);
+      ctx.fillStyle = c('mark-gold');
+      ctx.fillRect(0, by, W, 4);
+      ctx.fillStyle = `${c('ink-1')}88`;
+      ctx.fillRect(0, by + bh - 2, W, 2);
+      // ★枠順色の枡＋馬番
+      {
+        const col = pal[`silk-${chip}`] ?? c('paper-0');
+        ctx.fillStyle = col;
+        ctx.fillRect(26, by + 18, 48, 44);
+        ctx.strokeStyle = `${c('paper-0')}66`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(27, by + 19, 46, 42);
+        ctx.fillStyle = lumOf(col) < 140 ? c('paper-0') : c('ink-0');
+        ctx.font = 'bold 26px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(String(chip), 50, by + 49);
+        ctx.textAlign = 'left';
+      }
       ctx.fillStyle = c('paper-0');
-      ctx.fillRect(20, H - 70, 780, 52);
-      ctx.fillStyle = c('ink-0');
-      ctx.fillRect(20, H - 70, 6, 52);
-      ctx.font = 'bold 25px sans-serif';
-      ctx.fillText(line, 44, H - 34);
+      ctx.font = 'bold 29px sans-serif';
+      ctx.fillText(line, 92, by + 50);
+      // ★右端に区間と残り
+      ctx.textAlign = 'right';
+      ctx.fillStyle = c('mark-gold');
+      ctx.font = 'bold 17px sans-serif';
+      ctx.fillText(inGate ? 'ゲート入り' : `${seg.label}　${cut.label}`, W - 24, by + 32);
+      ctx.fillStyle = `${c('paper-0')}cc`;
+      ctx.font = 'bold 22px ui-monospace, monospace';
+      ctx.fillText(inGate ? `${DIST}m` : `残り ${metersLeft.toFixed(0)}m`, W - 24, by + 60);
+      ctx.textAlign = 'left';
     }
 
     // ★着順（★決着の一拍のあと）
-    if (raceD >= built.warp.displaySec + 0.8) {
+    if (afterGoal && sec >= built.winnerSec + 2.2) {
       const bx = Math.round(W * 0.36);
       const rs = built.result.slice(0, 5);
       ctx.fillStyle = `${c('ink-0')}e6`;
@@ -631,7 +826,8 @@ export default function RaceNextPage(): React.JSX.Element {
   useEffect(() => {
     if (!playing || built === null) return;
     t0Ref.current = performance.now() - dRef.current * 1000;
-    const total = built.warp.displaySec + GATE_HOLD + 1.4;
+    // ★ゴール後（1着を追うカット・着順）を見せるぶんを足す
+    const total = built.warp.displaySec + GATE_HOLD + 3.6;
     const loop = (): void => {
       const d = (performance.now() - t0Ref.current) / 1000;
       if (d >= total) {
@@ -700,10 +896,11 @@ export default function RaceNextPage(): React.JSX.Element {
         style={{ width: '100%', maxWidth: W, border: '1px solid #4a453d', imageRendering: 'pixelated', background: '#111' }}
       />
       <p style={{ fontSize: 12, opacity: 0.55, marginTop: 10, lineHeight: 1.8 }}>
-        ★<b>カットは区間で切り替わります</b>（発走 → 道中 → 仕掛け → 勝負所 → 決着）。<b>画角と、カメラが誰を追うか</b>が変わります。<br />
-        ★<b>順位が上がった馬は手前へ出てきます</b>（1.2秒かけて移動し、手前で 2× になります）。<b>ずっと小さいままの馬はいません</b>。<br />
-        ★<b>誰も画面の外へ出ません</b>（離れた馬は端で頭打ち）。<b>着順はエンジンが決めたもの</b>（D-059）。<b>倍率は 1× と 2× だけ</b>（D-058）。<br />
-        ⚠️ <b>上空からの俯瞰</b>と<b>奥から走ってくる画</b>は素材がありません（第3便でデザイナーに依頼済み）。
+        ★<b>ゲート入り → 発走 → 道中 → 仕掛け → 勝負所 → 決着 → ゴール後</b>でカットが切り替わります（画角と、カメラが誰を追うか）。<br />
+        ★<b>ゲートから出て走ります</b>。ゲートは左へ流れて抜けます。<b>ゴール板とハロン棒</b>（残り400/200/100m）が立っています。<br />
+        ★<b>ゴール後は1着の馬をカメラが追います</b>。着差は残ります（ゴール線で全馬が1点に集まりません）。<br />
+        ★<b>誰も画面の外へ出ません</b>（絵の端まで含めて判定）。<b>着順はエンジンが決めたもの</b>（D-059）。<b>倍率は 1× と 2× だけ</b>（D-058）。<br />
+        ⚠️ <b>上空からの俯瞰</b>／<b>奥から走ってくる画</b>／<b>ゴール後に騎手が喜ぶ絵</b>は<b>素材がありません</b>（第3便でデザイナーに依頼予定・未発注）。
       </p>
     </main>
   );
