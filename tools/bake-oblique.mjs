@@ -14,8 +14,61 @@
  * 実行: node tools/bake-oblique.mjs [--cell 160x120]
  */
 import sharp from 'sharp';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+
+const PALETTE = JSON.parse(readFileSync('apps/web/public/art/palette.json', 'utf8'));
+/** ★枠色は8色だけ（色は枠、数字は個体・D-060） */
+const FRAME_COLORS = Array.from({ length: 8 }, (_, i) => PALETTE[`frame-${i + 1}`]);
+
+const hex2rgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+
+/** その画素が「青い勝負服」か（生成時の契約: 色相 200〜260・彩度 0.35 以上） */
+function isSilk(r, g, b) {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  if (mx < 40) return false;                 // ★黒（帽の影・ブーツ）は触らない
+  const sat = (mx - mn) / mx;
+  if (sat < 0.30) return false;              // ★白いズボン・馬体は触らない
+  if (b !== mx) return false;                // 青が最大でなければ勝負服ではない
+  let h = 0;
+  const d = mx - mn;
+  h = 60 * (4 + (r - g) / d);                // 青が最大のときの色相
+  if (h < 0) h += 360;
+  return h >= 190 && h <= 265;
+}
+
+/**
+ * ★**勝負服だけを枠色に置き換える。**
+ *
+ * ⚠️ ★**階調を落としません。** 以前、毛色を4階調に量子化して
+ *    **約7,000色あった陰影が4色に潰れました**。
+ * → ★**明るさの比を掛ける**方式（`出力 = 枠色 × 明るさ/基準`）。
+ *   陰影がそのまま残り、白い勝負服も黒い勝負服も作れます。
+ */
+async function recolour(buf, w, h, targetHex) {
+  const { data } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const out = Buffer.from(data);
+  const [tr, tg, tb] = hex2rgb(targetHex);
+  // ★基準の明るさ = 勝負服の画素の平均
+  let sum = 0, n = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] > 24 && isSilk(data[i], data[i + 1], data[i + 2])) {
+      sum += Math.max(data[i], data[i + 1], data[i + 2]); n++;
+    }
+  }
+  if (n === 0) return buf;
+  const ref = sum / n;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] <= 24) continue;
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    if (!isSilk(r, g, b)) continue;
+    const k = Math.max(r, g, b) / ref;
+    out[i] = Math.max(0, Math.min(255, Math.round(tr * k)));
+    out[i + 1] = Math.max(0, Math.min(255, Math.round(tg * k)));
+    out[i + 2] = Math.max(0, Math.min(255, Math.round(tb * k)));
+  }
+  return sharp(out, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
+}
 
 
 const OUT_DIR = path.resolve('apps/web/public/art');
@@ -181,12 +234,25 @@ async function main() {
     const top = Math.round(ay - m.cy * scale);
     cells.push({ input: buf, left: m.i * CELL_W + left, top });
   }
+  /**
+   * ★**8行に焼きます**（枠色1〜8）。
+   *   ★色は枠、数字は個体（D-060）。**18頭でも8行で足ります。**
+   */
+  const rowBuf = await sharp({ create: { width: CELL_W * 6, height: CELL_H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite(cells).png().toBuffer();
+  const rows = [];
+  for (let f = 0; f < 8; f++) {
+    const tinted = await recolour(rowBuf, CELL_W * 6, CELL_H, FRAME_COLORS[f]);
+    rows.push({ input: tinted, left: 0, top: f * CELL_H });
+  }
   const outFile = path.join(OUT_DIR, 'horse-oblique.png');
-  await sharp({ create: { width: CELL_W * 6, height: CELL_H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
-    .composite(cells).png().toFile(outFile);
+  await sharp({ create: { width: CELL_W * 6, height: CELL_H * 8, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite(rows).png().toFile(outFile);
+  console.log(`
+★枠色 8行に焼きました: ${FRAME_COLORS.join(' ')}`);
 
   /* ── ★焼いたあとに測り直す（揃っているか） ── */
-  const baked = await sharp(outFile).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const baked = await sharp(rowBuf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const cs = [];
   for (let i = 0; i < 6; i++) {
     const box = { x0: i * CELL_W, y0: 0, x1: (i + 1) * CELL_W - 1, y1: CELL_H - 1 };

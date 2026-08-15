@@ -81,45 +81,81 @@ function sky(ctx, horizonY) {
   ctx.fillStyle = pal['turf-0']; ctx.fillRect(0, horizonY + 88, W, H - horizonY - 88);
 }
 
-function track(ctx, cam) {
-  const poly = (w) => railPolyline(COURSE, cam, w, { fromM: -90, toM: 260, stepM: 5 });
-  const inner = poly(0);
-  const outer = poly(COURSE.widthM);
+/**
+ * ★走路まわりを、**内外方向の帯**として描く。
+ *
+ * ⚠️ ★以前は「芝コースだけ」を描き、その外は一面の緑でした。
+ *    参考では**外の芝・ダート・内馬場・埒**で埋まっており、
+ *    ★**一面の緑だと「空いている」ように見えます**（引きのカットで上下が余った原因）。
+ *
+ * ★`w` は走路の内外 [m] ですが、**0 未満や幅より大きい値も投影できます**
+ *   （`posOf` は `w − 中心` を法線方向に足すだけなので、走路の外側も出せる）。
+ */
+/**
+ * ★内馬場のいちばん奥。⚠️ ここを深くしすぎると**スタンドを覆い隠します**
+ *   （実際に隠れました）。★**地平線はこの帯の端から決めます。**
+ */
+const INFIELD_W = -26;
+
+function bandBetween(ctx, cam, w0, w1, role) {
+  const poly = (w) => railPolyline(COURSE, cam, w, { fromM: -120, toM: 320, stepM: 5 });
+  const a2 = poly(w0);
+  const b2 = poly(w1);
   ctx.beginPath();
-  inner.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-  for (let i = outer.length - 1; i >= 0; i--) ctx.lineTo(outer[i].x, outer[i].y);
+  a2.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+  for (let i = b2.length - 1; i >= 0; i--) ctx.lineTo(b2[i].x, b2[i].y);
   ctx.closePath();
-  ctx.fillStyle = pal['turf-3'];
+  ctx.fillStyle = pal[role];
   ctx.fill();
-  for (let k = 1; k < 7; k++) {
-    const line = poly((COURSE.widthM * k) / 7);
-    ctx.beginPath();
-    line.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-    ctx.strokeStyle = k % 2 ? pal['turf-2'] : pal['turf-4'];
-    ctx.lineWidth = Math.max(4, cam.pxPerM * cam.depth * (COURSE.widthM / 7));
-    ctx.stroke();
-  }
-  const rails = [[0, 5, 'rail-0'], [COURSE.widthM, 7, 'rail-1']];
-  for (const [w, thick, role] of rails) {
-    const line = poly(w);
-    ctx.beginPath();
-    line.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-    ctx.strokeStyle = pal[role];
-    ctx.lineWidth = thick;
-    ctx.stroke();
-  }
 }
 
-/** ★接地点はセルの左下（契約 (52,116) / セル 160x120） */
+function lineAt(ctx, cam, w, thick, role) {
+  const line = railPolyline(COURSE, cam, w, { fromM: -120, toM: 320, stepM: 5 });
+  ctx.beginPath();
+  line.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+  ctx.strokeStyle = pal[role];
+  ctx.lineWidth = thick;
+  ctx.stroke();
+}
+
+function track(ctx, cam) {
+  const WIDTH = COURSE.widthM;
+  /* ── 奥（内ラチより内側）── ★これが無いと一面の緑になる ── */
+  bandBetween(ctx, cam, INFIELD_W, -12, 'turf-1');     // 内馬場
+  lineAt(ctx, cam, -12, 3, 'rail-1');            // 内埒
+  bandBetween(ctx, cam, -12, -1, 'dirt-2');      // ★ダートコース（内側）
+  lineAt(ctx, cam, -1, 2, 'dirt-3');
+
+  /* ── 芝コース ── */
+  bandBetween(ctx, cam, 0, WIDTH, 'turf-3');
+  for (let k = 1; k < 7; k++) {
+    if (k % 2 === 0) continue;
+    bandBetween(ctx, cam, (WIDTH * k) / 7, (WIDTH * (k + 1)) / 7, 'turf-2');
+  }
+
+  /* ── 手前（外ラチより外側）── */
+  bandBetween(ctx, cam, WIDTH, WIDTH + 30, 'turf-4');
+
+  lineAt(ctx, cam, 0, 4, 'rail-0');              // 内ラチ
+  lineAt(ctx, cam, WIDTH, 6, 'rail-1');          // 外ラチ
+}
+
+/**
+ * ★接地点はセルの左下（契約 (52,116) / セル 160x120）。
+ * ★シートは **6コマ × 8行（枠色）**。★色は枠、数字は個体（D-060）。
+ */
+const CELL_H = 120;
 function drawHorse(ctx, img, x, y, frame, gate, widthPx) {
   const cw = img.width / 6;
   const sc = widthPx / cw;
-  const hh = Math.round(img.height * sc);
+  const hh = Math.round(CELL_H * sc);
+  /** ★枠色の行を選ぶ（1〜8 → 0〜7） */
+  const row = Math.max(0, Math.min(7, Number(frameRoleOf(gate, FIELD).slice(6)) - 1));
   ctx.fillStyle = 'rgba(20,30,18,0.30)';
   ctx.beginPath();
   ctx.ellipse(x, y - 2, widthPx * 0.20, widthPx * 0.05, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.drawImage(img, frame * cw, 0, cw, img.height,
+  ctx.drawImage(img, frame * cw, row * CELL_H, cw, CELL_H,
     Math.round(x - 52 * sc), Math.round(y - 116 * sc), widthPx, hh);
   const col = pal[frameRoleOf(gate, FIELD)] ?? pal['paper-0'];
   const bw = Math.max(16, Math.round(widthPx * 0.17));
@@ -145,11 +181,11 @@ function drawHorse(ctx, img, x, y, frame, gate, widthPx) {
 const CUTS = [
   // 25m × 15 × 0.45 = 169px = 23%   ★参考どおり
   // ⚠️ ★anchorY は「走路の中心（w=12.5m）が来る画面 y」。低くしないと馬が上半分に寄る
-  { name: 'wide', label: '引き（道中）', d: 0.30, cam: { pxPerM: 15, depth: 0.45, anchorX: 470, anchorY: 545 }, horiz: 300 },
+  { name: 'wide', label: '引き（道中）', d: 0.30, cam: { pxPerM: 15, depth: 0.45, anchorX: 470, anchorY: 545 } },
   // 25m × 30 × 0.42 = 315px = 44%   ★参考どおり
-  { name: 'close', label: '寄り（見せ場）', d: 0.62, cam: { pxPerM: 30, depth: 0.42, anchorX: 380, anchorY: 590 }, horiz: 230 },
+  { name: 'close', label: '寄り（見せ場）', d: 0.62, cam: { pxPerM: 30, depth: 0.42, anchorX: 380, anchorY: 590 } },
   // ★ゴールはほぼ真横（帯を薄く）
-  { name: 'goal', label: 'ゴール', d: 0.985, cam: { pxPerM: 22, depth: 0.16, anchorX: 560, anchorY: 560 }, horiz: 380 },
+  { name: 'goal', label: 'ゴール', d: 0.985, cam: { pxPerM: 22, depth: 0.16, anchorX: 560, anchorY: 560 } },
 ];
 /** 引きで試す幅（★並べて決める） */
 const WIDE_SIZES = [48, 64, 96, 128];
@@ -171,7 +207,12 @@ async function main() {
     const cv = createCanvas(W, H);
     const ctx = cv.getContext('2d');
     ctx.imageSmoothingEnabled = false;
-    sky(ctx, cut.horiz);
+    /**
+     * ★**地平線は、内馬場のいちばん奥が来る画面 y** から決めます。
+     *   ⚠️ 手で決めていたら、★**帯がスタンドを覆い隠しました**。
+     */
+    const farY = obliqueProject(COURSE, cam, cam.s, INFIELD_W).y;
+    sky(ctx, Math.max(60, Math.round(farY - 88)));
     track(ctx, cam);
     const drawn = at.map((h) => {
       const p = obliqueProject(COURSE, cam, Math.max(0, Math.min(DIST, h.meters)), h.w ?? TRACK_WIDTH_M / 2);
