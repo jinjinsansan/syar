@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { broadcastCamera, broadcastEnvironmentAt, drawPerspectiveWorld, ovalCourse, segmentStarts, trackSurfacePaletteRole } from '../src/index.js';
+import { broadcastCamera, broadcastEnvironmentAt, drawPerspectiveWorld, ovalCourse, segmentStarts, trackKickupIntensity, trackSurfacePaletteRole } from '../src/index.js';
 
 describe('drawPerspectiveWorld', () => {
   it('芝・ダートと4段階の馬場状態を別のパレット役割へ割り当てる', () => {
@@ -7,6 +7,13 @@ describe('drawPerspectiveWorld', () => {
     expect(trackSurfacePaletteRole('turf', 'bad')).toBe('turf-6');
     expect(trackSurfacePaletteRole('dirt', 'good')).toBe('dirt-0');
     expect(trackSurfacePaletteRole('dirt', 'bad')).toBe('dirt-3');
+  });
+
+  it('乾いた芝では飛沫を出さず、悪化したダートほど蹴り上げを強くする', () => {
+    expect(trackKickupIntensity('turf', 'good')).toBe(0);
+    expect(trackKickupIntensity('turf', 'bad')).toBeGreaterThan(0);
+    expect(trackKickupIntensity('dirt', 'good')).toBeGreaterThan(0);
+    expect(trackKickupIntensity('dirt', 'bad')).toBeGreaterThan(trackKickupIntensity('dirt', 'soft'));
   });
   it('注視地点を中継用の背景区間へ分類する', () => {
     const course = ovalCourse(1600);

@@ -35,6 +35,23 @@ export interface RaceShot {
   readonly camera: ShotCameraPreset;
 }
 
+export interface ShotFocusGroups<T> {
+  readonly all: readonly T[];
+  readonly pack: readonly T[];
+  readonly contenders: readonly T[];
+  readonly leader: readonly T[];
+  readonly winner: readonly T[];
+}
+
+/** Webと監査で同じ注視対象を選ぶ。gateは発馬地点ではなく発馬した全馬群を意味する。 */
+export function focusForRaceShot<T>(shot: RaceShot, groups: ShotFocusGroups<T>): readonly T[] {
+  if (shot.family === 'finish' || shot.target === 'gate') return groups.all;
+  if (shot.target === 'leader') return groups.leader;
+  if (shot.target === 'winner') return groups.winner;
+  if (shot.target === 'contenders') return groups.contenders;
+  return groups.pack;
+}
+
 export interface ShotSequenceInput {
   readonly distanceMeter: number;
   readonly leaderMeters: number;
@@ -50,7 +67,7 @@ const SHOTS: Readonly<Record<ShotFamily, RaceShot>> = {
     camera: { backM: 54, upM: 19, sideM: 11, fovDeg: 38 },
   },
   formation: {
-    family: 'formation', view: 'diag-rear', target: 'pack', transition: 'blend', transitionSec: 0.8,
+    family: 'formation', view: 'diag-rear', target: 'pack', transition: 'cut', transitionSec: 0,
     camera: { backM: 43, upM: 15, sideM: 8, fovDeg: 34 },
   },
   'side-pack': {
@@ -78,13 +95,13 @@ const SHOTS: Readonly<Record<ShotFamily, RaceShot>> = {
     camera: { backM: 50, upM: 17, sideM: 10, fovDeg: 40 },
   },
   winner: {
-    family: 'winner', view: 'diag-rear', target: 'winner', transition: 'blend', transitionSec: 0.7,
+    family: 'winner', view: 'diag-rear', target: 'winner', transition: 'cut', transitionSec: 0,
     camera: { backM: 22, upM: 9, sideM: 7, fovDeg: 25 },
   },
 };
 
 const LONG_DISTANCE_CAMERAS: Partial<Record<ShotFamily, ShotCameraPreset>> = {
-  'corner-chase': { backM: 72, upM: 30, sideM: 10, fovDeg: 52 },
+  'corner-chase': { backM: 80, upM: 34, sideM: 10, fovDeg: 58 },
   'straight-wide': { backM: 96, upM: 34, sideM: 14, fovDeg: 52 },
   finish: { backM: 70, upM: 30, sideM: 8, fovDeg: 52 },
 };

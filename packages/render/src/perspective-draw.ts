@@ -217,6 +217,14 @@ export function trackSurfacePaletteRole(surface: RenderSurface, condition: Rende
   return `turf-${3 + level}`;
 }
 
+/** 蹄が蹴り上げる土・芝片の強度。0なら描画しない。 */
+export function trackKickupIntensity(surface: RenderSurface, condition: RenderTrackCondition): number {
+  if (surface === 'dirt') {
+    return condition === 'good' ? 0.22 : condition === 'yielding' ? 0.38 : condition === 'soft' ? 0.62 : 0.86;
+  }
+  return condition === 'good' ? 0 : condition === 'yielding' ? 0.12 : condition === 'soft' ? 0.3 : 0.5;
+}
+
 /** 注視地点から背景の役割を決める。カメラ座標や時刻には依存しない。 */
 export function broadcastEnvironmentAt(course: Course, focusS: number): BroadcastEnvironment {
   const label = segmentAt(course, focusS).label;
@@ -477,6 +485,11 @@ export function drawPerspectiveHorses<TImage>(
     readonly frameOf: (gate: number) => number;
     readonly frameRoleOf: (gate: number, fieldSize: number) => string;
     readonly distanceMeter: number;
+    readonly trackEffect?: {
+      readonly surface: RenderSurface;
+      readonly condition: RenderTrackCondition;
+      readonly color: string;
+    } | undefined;
   },
 ): void {
   const basis = cameraBasis(cam);
@@ -513,6 +526,25 @@ export function drawPerspectiveHorses<TImage>(
         Math.atan2(tip.y - d.p.y, tip.x - d.p.x), 0, Math.PI * 2,
       );
       ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    const kickup = opts.trackEffect === undefined ? 0
+      : trackKickupIntensity(opts.trackEffect.surface, opts.trackEffect.condition);
+    if (kickup > 0) {
+      const phase = ((opts.frameOf(d.h.gate) + d.h.gate * 3) % Math.max(1, opts.spec.frames)) / Math.max(1, opts.spec.frames);
+      const particles = 2 + Math.round(kickup * 5);
+      ctx.fillStyle = opts.trackEffect!.color;
+      for (let i = 0; i < particles; i += 1) {
+        const u = (i + 0.35 + phase) / particles;
+        const lateral = (((d.h.gate * 17 + i * 11) % 9) - 4) * 0.08 * kickup;
+        const q = P(d.s - (0.45 + u * 2.8) * (0.55 + kickup), d.h.w + lateral);
+        if (q.depth <= 2) continue;
+        const radius = Math.max(1, hpx * (0.018 + 0.035 * kickup) * (1 - u * 0.45));
+        ctx.globalAlpha = kickup * (0.34 - u * 0.19);
+        ctx.beginPath();
+        ctx.ellipse(q.x, q.y - radius * (0.2 + u * 0.8), radius * 1.5, radius * 0.62, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.globalAlpha = 1;
     }
     const role = opts.frameRoleOf(d.h.gate, opts.fieldSize);

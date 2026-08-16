@@ -23,6 +23,36 @@ export interface CallPart {
   readonly role?: string | undefined;
 }
 
+/** レース映像の局面ごとに、互いに競合する HUD を整理する。 */
+export interface RaceHudVisibility {
+  readonly gauge: boolean;
+  readonly standings: boolean;
+  readonly calls: boolean;
+  readonly result: boolean;
+}
+
+export function raceHudVisibilityAt(
+  displaySec: number, raceDisplaySec: number, allFinished: boolean,
+): RaceHudVisibility {
+  if (allFinished) {
+    const afterFinish = Math.max(0, displaySec - raceDisplaySec);
+    return { gauge: false, standings: false, calls: false, result: afterFinish >= 0.35 };
+  }
+  // 発馬直後は映像そのものを見せ、情報は一拍遅れて載せる。
+  const settled = displaySec >= 0.8;
+  return { gauge: settled, standings: settled, calls: settled, result: false };
+}
+
+/** 微小な順位変動による実況の連打を止める。局面転換だけは即時に通す。 */
+export function shouldEmitRaceCall(
+  previousKey: string, nextKey: string, previousSec: number, displaySec: number,
+): boolean {
+  if (previousKey === nextKey) return false;
+  const previousPhase = previousKey.split('/')[0] ?? '';
+  const nextPhase = nextKey.split('/')[0] ?? '';
+  return previousKey === '' || previousPhase !== nextPhase || displaySec - previousSec >= 1.5;
+}
+
 /**
  * ★**自馬のスタミナゲージ**（§12.6「自馬にのみ表示」）。
  *
@@ -80,6 +110,48 @@ export interface StandingRow {
   /** ★ゴール後に出す走破タイム（秒）。無ければ差を出します */
   readonly timeSec?: number | undefined;
   readonly isOwn: boolean;
+}
+
+export interface ResultRow {
+  readonly place: number;
+  readonly gate: number;
+  readonly margin: string;
+}
+
+/** ゴール後専用。ライブ順位とは同時表示しない。 */
+export function drawResultPanel(
+  ctx: Ctx2D<never>, pal: Palette, vp: Viewport2D, font: FontOf,
+  rows: readonly ResultRow[], fieldSize: number,
+  frameRoleOf: (gate: number, fieldSize: number) => string,
+): void {
+  const shown = rows.slice(0, 5);
+  const w = 330;
+  // 勝者は画面中央〜左に残す構図なので、結果は右のセーフエリアへ置く。
+  const x = vp.width - w - 48;
+  const y = 120;
+  ctx.fillStyle = 'rgba(22,20,17,0.88)';
+  ctx.fillRect(x, y, w, 34 + shown.length * 28);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = pal['frame-5'] ?? '#f2c14e';
+  ctx.font = font(16, true);
+  ctx.fillText('着 順', x + 16, y + 24);
+  shown.forEach((row, i) => {
+    const yy = y + 52 + i * 28;
+    ctx.fillStyle = pal['paper-0'] ?? '#fff';
+    ctx.font = font(16, true);
+    ctx.fillText(String(row.place), x + 18, yy);
+    const role = frameRoleOf(row.gate, fieldSize);
+    ctx.fillStyle = pal[role] ?? pal['paper-0'] ?? '#fff';
+    ctx.fillRect(x + 48, yy - 15, 24, 20);
+    ctx.fillStyle = inkOn(pal, role);
+    ctx.textAlign = 'center';
+    ctx.font = font(14, true);
+    ctx.fillText(String(row.gate), x + 60, yy);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(246,242,231,0.75)';
+    ctx.font = font(15);
+    ctx.fillText(row.margin, x + 92, yy);
+  });
 }
 
 /**
@@ -143,8 +215,12 @@ export function drawCallBand(
   shown.forEach((ln, i) => {
     const yy = bottom - (shown.length - 1 - i) * 22;
     const alpha = 0.35 + 0.25 * i;
+    const textWidth = ln.reduce((sum, part) => {
+      ctx.font = font(14, part.role !== undefined);
+      return sum + ctx.measureText(part.text).width;
+    }, 0);
     ctx.fillStyle = `rgba(16,20,16,${alpha.toFixed(2)})`;
-    ctx.fillRect(x - 8, yy - 15, 520, 20);
+    ctx.fillRect(x - 8, yy - 15, Math.min(520, Math.ceil(textWidth) + 16), 20);
     let cx = x;
     for (const part of ln) {
       ctx.fillStyle = part.role === undefined

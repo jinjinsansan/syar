@@ -20,7 +20,7 @@
 'use client';
 
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DEFAULT_RACE_BALANCE, DEFAULT_INTERVENTION_BALANCE,
   resolveRace, paceOf, replayOf, finalOrderMatches,
@@ -39,8 +39,10 @@ import {
   broadcastCamera, drawPerspectiveWorld, drawPerspectiveHorses,
   raceShotAt,
   shotCameraForDistance,
+  focusForRaceShot,
   // ★UI も package が唯一の出どころ（動画の道具と同じ関数）
-  drawGauge, drawStandings, drawCallBand, type CallPart,
+  drawGauge, drawStandings, drawCallBand, drawResultPanel,
+  raceHudVisibilityAt, shouldEmitRaceCall, type CallPart,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 
@@ -51,17 +53,6 @@ const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 const ASSET_VERSION = '20';
 /** ★構図の基準幅（`layers.json` の viewport と同じ） */
-const VP_W = 1280;
-
-/** ★枠順の色（D-060）。着順表示に使います */
-const POST_COLORS: readonly (readonly [number, number, number])[] = [
-  [214, 40, 40], [245, 245, 245], [20, 70, 180], [250, 215, 40], [20, 140, 70], [25, 25, 25],
-  [240, 130, 25], [245, 150, 190], [45, 190, 180], [120, 45, 160], [150, 150, 155], [170, 220, 50],
-  [110, 70, 45], [128, 30, 55], [175, 165, 120], [135, 190, 230], [25, 40, 95], [30, 80, 50],
-];
-
-/** ★コース（1角/2角/向正面/3角/4角/直線）。いまどこを走っているかを出すため */
-const COURSE = ovalCourse(DIST);
 
 /**
  * ⚠️ ★**カットごとの `horseW`（120px / 300px）は撤去しました。**
@@ -153,6 +144,7 @@ export default function RacePage(): React.JSX.Element {
   /** ★実況の行（変化したときだけ積む） */
   const callRef = useRef<readonly (readonly CallPart[])[]>([]);
   const callKeyRef = useRef<string>('');
+  const callLastSecRef = useRef<number>(-Infinity);
   const artRef = useRef<{
     pal: unknown; layers: unknown; atlas: unknown;
     rear: HTMLImageElement;
@@ -176,6 +168,8 @@ export default function RacePage(): React.JSX.Element {
   const [backlight, setBacklight] = useState(false);
   const [surface, setSurface] = useState<Surface>('turf');
   const [trackCondition, setTrackCondition] = useState<TrackCondition>('good');
+  const [turn, setTurn] = useState<'left' | 'right'>('left');
+  const course = useMemo(() => ovalCourse(DIST, { turn }), [turn]);
 
   useEffect(() => {
     let cancelled = false;
@@ -245,6 +239,9 @@ export default function RacePage(): React.JSX.Element {
       setErr(e instanceof Error ? e.message : String(e));
     }
     dRef.current = 0;
+    callRef.current = [];
+    callKeyRef.current = '';
+    callLastSecRef.current = -Infinity;
     setClock(0);
   }, [seed, ownGate, surface, trackCondition]);
 
@@ -295,15 +292,14 @@ export default function RacePage(): React.JSX.Element {
     const winnerGate = built.result[0]!.gate;
     const contenders = visualAt.filter((h) => visualLead - h.meters <= HORSE_LENGTH_M * 2);
     const pack = visualAt.filter((h) => visualLead - h.meters <= 40);
-    const focusHorses = shot.family === 'finish' ? visualAt
-      : shot.target === 'leader' || shot.target === 'winner'
-      ? visualAt.filter((h) => shot.target === 'winner' ? h.gate === winnerGate : h.meters === visualLead)
-      : shot.target === 'contenders' ? contenders
-        : shot.target === 'gate' ? visualAt.filter((h) => h.meters === Math.min(...visualAt.map((x) => x.meters)))
-          : pack;
+    const focusHorses = focusForRaceShot(shot, {
+      all: visualAt, pack, contenders,
+      leader: visualAt.filter((h) => h.meters === visualLead),
+      winner: visualAt.filter((h) => h.gate === winnerGate),
+    });
     const packS = focusHorses.reduce((sum, h) => sum + h.meters, 0) / Math.max(1, focusHorses.length);
-    const packW = focusHorses.reduce((sum, h) => sum + (h.w ?? COURSE.widthM / 2), 0) / Math.max(1, focusHorses.length);
-    const cam = broadcastCamera(COURSE, {
+    const packW = focusHorses.reduce((sum, h) => sum + (h.w ?? course.widthM / 2), 0) / Math.max(1, focusHorses.length);
+    const cam = broadcastCamera(course, {
       atS: Math.max(20, shot.family === 'finish' || shot.family === 'winner' ? packS : Math.min(DIST - 5, packS)),
       atW: packW,
       width: W, height: H,
@@ -318,14 +314,20 @@ export default function RacePage(): React.JSX.Element {
     const horseSpec = useRear ? SHEET_REAR : useDiagRear ? SHEET_DIAG_REAR_V1 : useDiagFront ? SHEET_DIAG_FRONT_V1 : useHighDiag ? SHEET_HIGH_DIAG_V1 : SHEET_V2;
     const horsesToDraw = shot.family === 'winner' ? visualAt.filter((h) => h.gate === winnerGate) : visualAt;
     ctx.imageSmoothingEnabled = true;   // ★遠近で滑らかに縮む。整数倍はもうやりません
-    drawPerspectiveWorld(ctx, COURSE, cam, art.pal as Record<string, string>, DIST, packS, { surface, condition: trackCondition });
-    drawPerspectiveHorses(ctx, COURSE, cam,
-      horsesToDraw.map((h) => ({ gate: h.gate, s: h.meters, w: h.w ?? COURSE.widthM / 2 })), {
+    drawPerspectiveWorld(ctx, course, cam, art.pal as Record<string, string>, DIST, packS, { surface, condition: trackCondition });
+    drawPerspectiveHorses(ctx, course, cam,
+      horsesToDraw.map((h) => ({ gate: h.gate, s: h.meters, w: h.w ?? course.widthM / 2 })), {
         sheet: horseSheet, sheetWidth: horseSheet.width, spec: horseSpec,
         fieldSize: FIELD,
         // ★脚は**表示の時間**で回す（距離で回すと道中の早送りで小走りになる）
         frameOf: (g) => Math.floor(d * 16 + g * 0.37 * horseSpec.frames) % horseSpec.frames,
         frameRoleOf, distanceMeter: DIST,
+        trackEffect: {
+          surface, condition: trackCondition,
+          color: (art.pal as Record<string, string>)[surface === 'dirt'
+            ? (trackCondition === 'good' || trackCondition === 'yielding' ? 'dirt-0' : 'dirt-1')
+            : 'turf-5'] ?? '#6d5236',
+        },
       });
 
     /**
@@ -337,10 +339,13 @@ export default function RacePage(): React.JSX.Element {
       const vp = { width: W, height: H };
       const FONT = (px: number, bold?: boolean): string =>
         `${bold === true ? 'bold ' : ''}${px}px sans-serif`;
+      const hud = raceHudVisibilityAt(d, built.warp.displaySec, allFinishedNow);
       // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）
       const g = staminaAt(built.gauge, Math.max(0, metersLeft));
-      drawGauge(ctx, art.pal as Record<string, string>, vp, FONT,
-        `${ownGate}番（自分の馬）`, g.left, built.gauge.initial, g.drainPerMeter);
+      if (hud.gauge) {
+        drawGauge(ctx, art.pal as Record<string, string>, vp, FONT,
+          `${ownGate}番（自分の馬）`, g.left, built.gauge.initial, g.drainPerMeter);
+      }
 
       /**
        * ★ゴールした馬は**確定着順**で並べます。
@@ -355,12 +360,14 @@ export default function RacePage(): React.JSX.Element {
         return q.meters - p.meters;
       });
       const allIn = rank[0] !== undefined && finished(rank[0]);
-      drawStandings(ctx, art.pal as Record<string, string>, vp, FONT, rank.map((h) => ({
-        gate: h.gate,
-        lengths: ((rank[0]?.meters ?? h.meters) - h.meters) / HORSE_LENGTH_M,
-        timeSec: allIn ? built.finishSec.get(h.gate) : undefined,
-        isOwn: h.gate === ownGate,
-      })), FIELD, frameRoleOf);
+      if (hud.standings) {
+        drawStandings(ctx, art.pal as Record<string, string>, vp, FONT, rank.map((h) => ({
+          gate: h.gate,
+          lengths: ((rank[0]?.meters ?? h.meters) - h.meters) / HORSE_LENGTH_M,
+          timeSec: allIn ? built.finishSec.get(h.gate) : undefined,
+          isOwn: h.gate === ownGate,
+        })), FIELD, frameRoleOf);
+      }
 
       /**
        * ★**実況は「変化」を言う**（Q-P4-14 ①）。
@@ -392,53 +399,19 @@ export default function RacePage(): React.JSX.Element {
       }
       if (phaseName !== '道中') say.push({ text: `　★${phaseName}` });
       const key = `${phaseName}/${lengths < 0.3 ? '並' : closing > 0.15 ? '詰' : closing < -0.15 ? '離' : '同'}/${ownIdx + 1}`;
-      if (key !== callKeyRef.current) {
+      if (hud.calls && shouldEmitRaceCall(callKeyRef.current, key, callLastSecRef.current, d)) {
         callKeyRef.current = key;
+        callLastSecRef.current = d;
         callRef.current = [...callRef.current, say].slice(-3);
       }
-      drawCallBand(ctx, art.pal as Record<string, string>, vp, FONT, callRef.current);
-    }
+      if (hud.calls) drawCallBand(ctx, art.pal as Record<string, string>, vp, FONT, callRef.current);
 
-    /**
-     * ★**着順を出す時点**。
-     *   ⚠️ ★元は旧構図の変数を使っていました。撤去したので、ここで定義し直します。
-     *   ★**全馬がゴールしてから**出します（1着だけで出すと、後ろの叩き合いが隠れます）。
-     */
-    const showResult = at.every((h) => h.meters >= DIST - 1e-6);
-
-    /**
-     * ★**着順**（決着の一拍のあとに出す）。
-     *   ⚠️ 参照実装の上に**足して描くだけ**です（構図に触れません）。
-     *   ★並べ替えません。**エンジンが決めた順**をそのまま描きます。
-     */
-    if (showResult) {
-      const bx = Math.round(VP_W * 0.34);
-      const rows = built.result.slice(0, 5);
-      ctx.fillStyle = 'rgba(22,20,17,0.88)';
-      ctx.fillRect(bx, 120, 330, 26 + rows.length * 28);
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#f2c14e';
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillText('着 順', bx + 16, 144);
-      rows.forEach((e, i2) => {
-        const y = 172 + i2 * 28;
-        const col = POST_COLORS[e.gate - 1] ?? [200, 200, 200];
-        ctx.fillStyle = '#f6f2e7';
-        ctx.font = 'bold 16px sans-serif';
-        ctx.fillText(`${e.place}`, bx + 18, y);
-        ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
-        ctx.fillRect(bx + 48, y - 15, 24, 20);
-        ctx.fillStyle = (col[0] * 299 + col[1] * 587 + col[2] * 114) / 1000 < 140 ? '#f5f5f5' : '#111';
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 14px sans-serif';
-        ctx.fillText(`${e.gate}`, bx + 60, y);
-        ctx.textAlign = 'left';
-        ctx.fillStyle = 'rgba(246,242,231,0.75)';
-        ctx.font = '15px sans-serif';
-        ctx.fillText(e.margin, bx + 88, y);
-      });
+      if (hud.result) {
+        drawResultPanel(ctx, art.pal as Record<string, string>, vp, FONT,
+          built.result, FIELD, frameRoleOf);
+      }
     }
-  }, [built, ownGate, surface, trackCondition]);
+  }, [built, course, ownGate, surface, trackCondition]);
 
   useEffect(() => { render(dRef.current); }, [render, ready]);
 
@@ -481,7 +454,13 @@ export default function RacePage(): React.JSX.Element {
           {playing ? '停止' : '発走'}
         </button>
         <button
-          type="button" onClick={() => { dRef.current = 0; setClock(0); setPlaying(false); render(0); }}
+          type="button" onClick={() => {
+            dRef.current = 0;
+            callRef.current = [];
+            callKeyRef.current = '';
+            callLastSecRef.current = -Infinity;
+            setClock(0); setPlaying(false); render(0);
+          }}
           style={{ padding: '8px 14px', cursor: 'pointer', background: '#3a3630', color: '#efe9dc', border: 0 }}
         >
           最初から
@@ -504,6 +483,12 @@ export default function RacePage(): React.JSX.Element {
           <select value={trackCondition} onChange={(e) => setTrackCondition(e.target.value as TrackCondition)}>
             <option value="good">良</option><option value="yielding">稍重</option>
             <option value="soft">重</option><option value="bad">不良</option>
+          </select>
+        </label>
+        <label>
+          回り{' '}
+          <select value={turn} onChange={(e) => setTurn(e.target.value as 'left' | 'right')}>
+            <option value="left">左回り</option><option value="right">右回り</option>
           </select>
         </label>
         <label title="馬体の色を毛色に置き換える。元の絵の階調が減ります">

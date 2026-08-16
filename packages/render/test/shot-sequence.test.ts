@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { raceShotAt, shotCameraForDistance, type ShotSequenceInput } from '../src/index.js';
+import { focusForRaceShot, raceShotAt, shotCameraForDistance, type ShotSequenceInput } from '../src/index.js';
 
 const base = (overrides: Partial<ShotSequenceInput> = {}): ShotSequenceInput => ({
   distanceMeter: 1600,
@@ -17,6 +17,14 @@ describe('raceShotAt', () => {
     expect(raceShotAt(base({ leaderMeters: 120 })).family).toBe('start-wide');
     expect(raceShotAt(base({ leaderMeters: 121 })).family).toBe('formation');
     expect(raceShotAt(base({ leaderMeters: 300 })).family).toBe('formation');
+  });
+
+  it('発馬カメラは最後尾1頭ではなく全馬群を注視する', () => {
+    const all = [{ gate: 1 }, { gate: 2 }, { gate: 18 }];
+    const shot = raceShotAt(base({ leaderMeters: 20 }));
+    expect(focusForRaceShot(shot, {
+      all, pack: [all[0]], contenders: [all[1]], leader: [all[0]], winner: [all[1]],
+    })).toBe(all);
   });
 
   it('道中は6秒ごとに異なるショット族を使う', () => {
@@ -47,7 +55,7 @@ describe('raceShotAt', () => {
     const shot = raceShotAt(base({ phase: 'spurt' }));
     expect(shotCameraForDistance(shot, 1200)).toEqual(shot.camera);
     expect(shotCameraForDistance(shot, 1600)).toEqual(shot.camera);
-    expect(shotCameraForDistance(shot, 2300).fovDeg).toBe(42);
-    expect(shotCameraForDistance(shot, 3000)).toEqual({ backM: 72, upM: 30, sideM: 10, fovDeg: 52 });
+    expect(shotCameraForDistance(shot, 2300).fovDeg).toBe(45);
+    expect(shotCameraForDistance(shot, 3000)).toEqual({ backM: 80, upM: 34, sideM: 10, fovDeg: 58 });
   });
 });
