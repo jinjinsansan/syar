@@ -22,15 +22,20 @@
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches,
+  DEFAULT_RACE_BALANCE, DEFAULT_INTERVENTION_BALANCE,
+  resolveRace, paceOf, replayOf, finalOrderMatches,
   laneAt, laneAtStart, TRACK_WIDTH_M,
+  aiProxyPlan, staminaTrackOf, staminaGaugeOf, staminaAt, boundaryTimesOf,
 } from '@star/race-engine';
+import { deriveRng } from '@star/sim-engine';
 import type { Strategy } from '@star/sim-engine';
 import {
   replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
   phaseOf, ovalCourse, segmentAt, HORSE_LENGTH_M,
   // ★描き方は package が唯一の出どころ（この画面には持たない）
-  drawObliqueWorld, frameRoleOf, type Ctx2D,
+  drawObliqueWorld, frameRoleOf,
+  // ★UI も package が唯一の出どころ（動画の道具と同じ関数）
+  drawGauge, drawStandings, drawCallBand, type CallPart,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 
@@ -78,6 +83,11 @@ interface Built {
   readonly warp: ReturnType<typeof timeWarpFor>;
   readonly pace: 'slow' | 'middle' | 'high';
   readonly result: readonly { place: number; gate: number; margin: string }[];
+  /** ★自馬のゲージ（D-072）。**エンジンが出した状態**を読むだけ */
+  readonly gauge: ReturnType<typeof staminaGaugeOf>;
+  /** ★確定着順と走破タイム（ゴール後の順位表示に使う） */
+  readonly finishPos: ReadonlyMap<number, number>;
+  readonly finishSec: ReadonlyMap<number, number>;
 }
 
 function build(seed: number, ownGate: number): Built {
@@ -110,16 +120,39 @@ function build(seed: number, ownGate: number): Built {
   if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(settled)) {
     throw new Error('位置モデルの最終順が着順と違います（D-059）');
   }
+  /**
+   * ★**自馬のゲージ**（§12.6「自馬にのみ表示」・D-072）。
+   *   ⚠️ ★**ここで式を作りません。** エンジンの `staminaGaugeOf` が出した状態を読むだけです。
+   *      一度この層で近似を作って**符号が逆**になりました。
+   *   ★乱数は注入します（憲法4）。`Math.random` は呼びません。
+   */
+  const own = entrants[ownGate - 1]!;
+  const ownHorse = {
+    iq: own.stats.iq, gt: own.stats.gt, st: own.stats.st,
+    condition: own.condition, fatigue: own.fatigue,
+  };
+  const ownEntry = result.order.find((e) => Number(e.horseId) === ownGate)!;
+  const gauge = staminaGaugeOf(
+    staminaTrackOf(ownHorse, aiProxyPlan(ownHorse, deriveRng(seed, ownGate), DEFAULT_INTERVENTION_BALANCE), DIST, DEFAULT_INTERVENTION_BALANCE),
+    boundaryTimesOf(ownEntry, DIST, ownGate, own.strategy, pace),
+    DIST, own.strategy, pace,
+  );
+  const finishPos = new Map(result.order.map((e) => [Number(e.horseId), e.finishPosition]));
+  const finishSec = new Map(result.order.map((e) => [Number(e.horseId), e.timeSec]));
   return {
     model,
     warp: timeWarpFor(knotsFor(boundaries, ownGate), DEFAULT_PHASE_RATES),
     pace,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
+    gauge, finishPos, finishSec,
   };
 }
 
 export default function RacePage(): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  /** ★実況の行（変化したときだけ積む） */
+  const callRef = useRef<readonly (readonly CallPart[])[]>([]);
+  const callKeyRef = useRef<string>('');
   const artRef = useRef<{
     pal: unknown; layers: unknown; atlas: unknown; oblique: HTMLImageElement;
   } | null>(null);
@@ -223,14 +256,14 @@ export default function RacePage(): React.JSX.Element {
       w: wCentre,
     };
     ctx.imageSmoothingEnabled = false;
-    drawObliqueWorld(ctx as unknown as Ctx2D, {
+    drawObliqueWorld(ctx, {
       course: COURSE, cam, pal: art.pal as Record<string, string>,
       viewport: { width: W, height: H }, distanceMeter: DIST,
       horses: at.map((h) => ({
         gate: h.gate, meters: h.meters, w: h.w ?? COURSE.widthM / 2,
       })),
       fieldSize: FIELD, horseWidthPx: cut.horseW,
-      sheet: art.oblique as never, sheetWidth: art.oblique.width,
+      sheet: art.oblique, sheetWidth: art.oblique.width,
       // ★脚は**表示の時間**で回す（距離で回すと道中の早送りで小走りになる）
       frameOf: (g) => Math.floor(d * 12 + g * 0.37 * 6) % 6,
       modeOf: (h) => (h.meters >= DIST ? 'celebrate' : (DIST - h.meters) <= 400 ? 'drive' : 'cruise'),
@@ -238,6 +271,77 @@ export default function RacePage(): React.JSX.Element {
       gateWOf: (g) => laneAtStart(g, FIELD, TRACK_WIDTH_M),
       frameRoleOf, font: (px, bold) => `${bold === true ? 'bold ' : ''}${px}px sans-serif`,
     });
+
+    /**
+     * ★**UI は画面の座標系**（アートバイブル §9）。
+     *   ⚠️ ★`cam` を一切使いません。使った瞬間、寄りの最中にゲージが動きます。
+     *   ⚠️ ★**描き方はこの画面に持ちません** — 動画の道具と**同じ関数**を呼びます。
+     */
+    {
+      const vp = { width: W, height: H };
+      const FONT = (px: number, bold?: boolean): string =>
+        `${bold === true ? 'bold ' : ''}${px}px sans-serif`;
+      // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）
+      const g = staminaAt(built.gauge, Math.max(0, metersLeft));
+      drawGauge(ctx, art.pal as Record<string, string>, vp, FONT,
+        `${ownGate}番（自分の馬）`, g.left, built.gauge.initial, g.drainPerMeter);
+
+      /**
+       * ★ゴールした馬は**確定着順**で並べます。
+       *   ⚠️ 画面上の距離で並べると、ゴール後は全馬が張り付いて★**着順が読めません**。
+       */
+      const finished = (h: { meters: number }): boolean => h.meters >= DIST - 1e-6;
+      const rank = [...at].sort((p, q) => {
+        if (finished(p) && finished(q)) {
+          return (built.finishPos.get(p.gate) ?? 99) - (built.finishPos.get(q.gate) ?? 99);
+        }
+        if (finished(p) !== finished(q)) return finished(p) ? -1 : 1;
+        return q.meters - p.meters;
+      });
+      const allIn = rank[0] !== undefined && finished(rank[0]);
+      drawStandings(ctx, art.pal as Record<string, string>, vp, FONT, rank.map((h) => ({
+        gate: h.gate,
+        lengths: ((rank[0]?.meters ?? h.meters) - h.meters) / HORSE_LENGTH_M,
+        timeSec: allIn ? built.finishSec.get(h.gate) : undefined,
+        isOwn: h.gate === ownGate,
+      })), FIELD, frameRoleOf);
+
+      /**
+       * ★**実況は「変化」を言う**（Q-P4-14 ①）。
+       *   ⚠️ ★同じことを繰り返させません。**状態が変わったときだけ**足します
+       *      （一度、機械的に足して**3行とも同じ文**になりました）。
+       */
+      const ownIdx = rank.findIndex((h) => h.gate === ownGate);
+      const ownM = rank[ownIdx]?.meters ?? 0;
+      const aheadM = ownIdx > 0 ? rank[ownIdx - 1]!.meters : undefined;
+      const before = built.model.at(Math.max(0, sec - 0.5));
+      const ownBefore = before.find((h) => h.gate === ownGate)?.meters ?? ownM;
+      const aheadGate = ownIdx > 0 ? rank[ownIdx - 1]!.gate : undefined;
+      const aheadBefore = aheadGate === undefined
+        ? undefined : before.find((h) => h.gate === aheadGate)?.meters;
+      const gapNow = aheadM === undefined ? 0 : aheadM - ownM;
+      const gapBefore = (aheadM === undefined || aheadBefore === undefined)
+        ? 0 : aheadBefore - ownBefore;
+      const closing = gapBefore - gapNow;
+      const lengths = gapNow / HORSE_LENGTH_M;
+      const phaseName = metersLeft <= 400 ? '直線' : metersLeft <= 800 ? '勝負所' : '道中';
+      const say: CallPart[] = [{ text: `${ownGate}番`, role: frameRoleOf(ownGate, FIELD) }];
+      if (aheadM === undefined) say.push({ text: ' が先頭。' });
+      else if (lengths < 0.3) say.push({ text: ' は前と並んでいます' });
+      else {
+        say.push({ text: ` は前と ${lengths.toFixed(1)} 馬身` });
+        say.push({
+          text: closing > 0.15 ? '、詰めています' : closing < -0.15 ? '、離されています' : 'の差',
+        });
+      }
+      if (phaseName !== '道中') say.push({ text: `　★${phaseName}` });
+      const key = `${phaseName}/${lengths < 0.3 ? '並' : closing > 0.15 ? '詰' : closing < -0.15 ? '離' : '同'}/${ownIdx + 1}`;
+      if (key !== callKeyRef.current) {
+        callKeyRef.current = key;
+        callRef.current = [...callRef.current, say].slice(-3);
+      }
+      drawCallBand(ctx, art.pal as Record<string, string>, vp, FONT, callRef.current);
+    }
 
     /**
      * ★**着順を出す時点**。

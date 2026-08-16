@@ -34,7 +34,7 @@ import {
   replayPositionModel, finalOrderOf, ovalCourse, obliqueProject, railPolyline,
   timeWarpFor, knotsFor, ratesForTarget, targetDisplaySec, frameRoleOf,
   // ★描き方は package が唯一の出どころ（この道具には持たない）
-  drawObliqueWorld, inkOn as inkOnRole,
+  drawObliqueWorld, drawGauge, drawStandings, drawCallBand,
 } from '@star/render';
 
 /**
@@ -139,134 +139,10 @@ const FINISH_SEC = new Map(result.order.map((e) => [Number(e.horseId), e.timeSec
  *      （`jostle` 0.06/0.25 ／ 走路の幅 20m/25m ／ ゲートの房 13.8m/18m と同じ形）。
  */
 
-/** ★枠色の上の文字色も package から（2か所で持たない） */
-const inkOn = (role) => inkOnRole(pal, role);
-
-/* ── ★UI（画面の座標系）─────────────────────────
- *
- * ⚠️ ★**カメラの倍率も中心も使いません。** アートバイブル §9 の制約です。
- *    ここに `cam` を持ち込んだ瞬間、寄りの最中にゲージが動きます。
- * ------------------------------------------------------------------ */
-
 /**
- * ★**自馬のスタミナゲージ**（§12.6「自馬にのみ表示」）。
- *   ★出すのは D-070 の「状態」＝**残量と減り方**。`emptyAtMeter` ではありません。
+ * ⚠️ ★**UI の描き方もこの道具にはありません。**
+ *    `@star/render` の `oblique-ui` が唯一の出どころです（Web の画面と同じ関数）。
  */
-function gauge(ctx, metersLeft) {
-  const g = staminaAt(ownGauge, metersLeft);
-  const ratio = Math.max(0, Math.min(1, g.left / Math.max(1e-6, ownGauge.initial)));
-  const x = 40, y = H - 70, w = 300, h = 18;
-  ctx.fillStyle = 'rgba(16,20,16,0.72)';
-  ctx.fillRect(x - 8, y - 26, w + 16, h + 42);
-  ctx.fillStyle = pal['paper-0'];
-  ctx.font = FONT(14, true);
-  ctx.fillText(`${ownName}（自分の馬）`, x, y - 10);
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  ctx.fillRect(x, y, w, h);
-  /**
-   * ★**色は「残量」ではなく「状態」で変える。**
-   *   ⚠️ 数字だけだと、押す瞬間に読み取れません（C-6）。
-   */
-  // 緑 → 黄 → 赤（★色の意味は「余力があるか」）
-  ctx.fillStyle = ratio > 0.5 ? pal['frame-6'] : ratio > 0.2 ? pal['frame-5'] : pal['frame-3'];
-  ctx.fillRect(x, y, Math.round(w * ratio), h);
-  ctx.strokeStyle = pal['paper-0']; ctx.lineWidth = 1;
-  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-  /**
-   * ★**減り方**（D-070 の②）。1m あたりの消費を「この先どれだけ保つか」ではなく
-   *   ⚠️ **いまどれだけ速く減っているか**として、目盛りの動きで見せます。
-   *   ★「いつ尽きるか」は出しません（出すと予言になります）。
-   */
-  const drainPer100m = g.drainPerMeter * 100;
-  const bars = Math.max(1, Math.min(5, Math.round(drainPer100m / 1.2)));
-  for (let i = 0; i < 5; i += 1) {
-    ctx.fillStyle = i < bars ? pal['paper-0'] : 'rgba(255,255,255,0.22)';
-    ctx.fillRect(x + w + 8 + i * 7, y + h - 4 - i * 3, 5, 4 + i * 3);
-  }
-  ctx.fillStyle = pal['paper-0'];
-  ctx.font = FONT(11);
-  ctx.fillText('減り方', x + w + 8, y - 4);
-}
-
-/**
- * ★順位表示（上位5頭）。★色は枠、数字は個体（D-060）
- *
- * ⚠️ ★**ゴールした馬は「確定着順」で並べます。**
- *    一度、画面上の距離だけで並べたら、★**ゴール後は全馬が 1600m に張り付き、
- *    順位表示が「0.0 馬身」だらけで着順が読めませんでした。**
- *    ★一番知りたいところで、画面が何も言っていませんでした。
- */
-function standings(ctx, at) {
-  const sorted = [...at].sort((a, b) => {
-    const fa = FINISH_POS.get(a.gate), fb = FINISH_POS.get(b.gate);
-    const da = a.meters >= DIST - 1e-6, db = b.meters >= DIST - 1e-6;
-    // ★ゴールした馬が先。その中は確定着順
-    if (da && db) return (fa ?? 99) - (fb ?? 99);
-    if (da !== db) return da ? -1 : 1;
-    return b.meters - a.meters;
-  }).slice(0, 5);
-  const settled = sorted[0] !== undefined && sorted[0].meters >= DIST - 1e-6;
-  const x = W - 190, y = 24;
-  ctx.fillStyle = 'rgba(16,20,16,0.72)';
-  ctx.fillRect(x - 10, y - 18, 190, 5 * 22 + 16);
-  sorted.forEach((h, i) => {
-    const yy = y + i * 22;
-    ctx.fillStyle = pal['paper-0'];
-    ctx.font = FONT(13, true);
-    ctx.fillText(`${i + 1}`, x, yy);
-    const role = frameRoleOf(h.gate, FIELD);
-    ctx.fillStyle = pal[role] ?? pal['paper-0'];
-    ctx.fillRect(x + 18, yy - 11, 22, 14);
-    ctx.fillStyle = inkOn(role);
-    ctx.font = FONT(11, true);
-    ctx.textAlign = 'center';
-    ctx.fillText(String(h.gate), x + 29, yy);
-    ctx.textAlign = 'left';
-    // ★自馬だけ印を付ける（自分がどこにいるか分からないと C-6 が成り立たない）
-    if (h.gate === OWN) {
-      ctx.fillStyle = pal['paper-0'];
-      ctx.font = FONT(12, true);
-      ctx.fillText('★', x + 46, yy);
-    }
-    /**
-     * ★先頭との差（馬身）。★順位の数字ではなく**差**（Q-P4-14 ①）。
-     *   ⚠️ ★ゴール後は差が 0 になるので、**走破タイム**に切り替えます。
-     */
-    ctx.fillStyle = pal['paper-0'];
-    ctx.font = FONT(11);
-    if (settled) {
-      const t = FINISH_SEC.get(h.gate);
-      ctx.fillText(t === undefined ? '' : `${t.toFixed(1)} 秒`, x + 66, yy);
-    } else {
-      const gap = (sorted[0].meters - h.meters) / 2.4;
-      ctx.fillText(i === 0 ? '' : `${gap.toFixed(1)} 馬身`, x + 66, yy);
-    }
-  });
-}
-
-/**
- * ★**実況の帯**（裁定 Q-P4-14 ①「実況は『位置』ではなく『変化』を言う」）。
- *
- *   ⚠️ ★**下から積みます。** 新しい行が下に出て、古い行が上に流れます。
- *   ★馬名（＝馬番）だけ色を変えます。全部色を付けると、どれが主語か分かりません。
- */
-function callBand(ctx, lines) {
-  const x = 40, bottom = H - 118;
-  ctx.font = FONT(14);
-  lines.slice(-3).forEach((ln, i, arr) => {
-    const yy = bottom - (arr.length - 1 - i) * 22;
-    const alpha = 0.35 + 0.25 * i;
-    ctx.fillStyle = `rgba(16,20,16,${alpha.toFixed(2)})`;
-    ctx.fillRect(x - 8, yy - 15, 520, 20);
-    let cx = x;
-    for (const part of ln) {
-      ctx.fillStyle = part.role === undefined ? pal['paper-0'] : (pal[part.role] ?? pal['paper-0']);
-      ctx.font = FONT(14, part.role !== undefined);
-      ctx.fillText(part.text, cx, yy);
-      cx += ctx.measureText(part.text).width;
-    }
-  });
-}
 
 /**
  * ★**カットの切り替え**（アートバイブル「カットの3系統」）。
@@ -398,9 +274,30 @@ async function main() {
     }
 
     // ★UI は最後に（馬の上に載る）。★カメラを一切使いません
-    gauge(ctx, Math.max(0, metersLeftOwn));
-    standings(ctx, at);
-    callBand(ctx, lines);
+    {
+      const vp = { width: W, height: H };
+      // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）
+      const g = staminaAt(ownGauge, Math.max(0, metersLeftOwn));
+      drawGauge(ctx, pal, vp, FONT, `${ownName}（自分の馬）`, g.left, ownGauge.initial, g.drainPerMeter);
+      /**
+       * ★ゴールした馬は**確定着順**で並べる（D-059 の結果そのもの）。
+       *   ⚠️ 画面上の距離で並べると、ゴール後は全馬が張り付いて着順が読めません。
+       */
+      const settled = ordered[0] !== undefined && ordered[0].meters >= DIST - 1e-6;
+      const rank = [...at].sort((a, b) => {
+        const da = a.meters >= DIST - 1e-6, db = b.meters >= DIST - 1e-6;
+        if (da && db) return (FINISH_POS.get(a.gate) ?? 99) - (FINISH_POS.get(b.gate) ?? 99);
+        if (da !== db) return da ? -1 : 1;
+        return b.meters - a.meters;
+      });
+      drawStandings(ctx, pal, vp, FONT, rank.map((h) => ({
+        gate: h.gate,
+        lengths: ((rank[0]?.meters ?? h.meters) - h.meters) / 2.4,
+        timeSec: settled ? FINISH_SEC.get(h.gate) : undefined,
+        isOwn: h.gate === OWN,
+      })), FIELD, frameRoleOf);
+      drawCallBand(ctx, pal, vp, FONT, lines);
+    }
     writeFileSync(path.join(WORK, `f${String(i).padStart(4, '0')}.png`), cv.toBuffer('image/png'));
   }
 

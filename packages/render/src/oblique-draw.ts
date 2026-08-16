@@ -26,12 +26,18 @@ import type { Course } from './course.js';
  * ★描画に必要な最小の形。
  *   ⚠️ **足さないでください。** 足すほど、使える環境が減ります。
  */
-export interface Ctx2D {
-  fillStyle: string;
-  strokeStyle: string;
+export interface Ctx2D<TImage = unknown> {
+  /**
+   * ⚠️ ★`string` にすると**ブラウザの `CanvasRenderingContext2D` が入りません**
+   *    （あちらは `string | CanvasGradient | CanvasPattern`）。
+   *    ★型を狭めた結果、呼ぶ側が `as unknown as Ctx2D` で**型検査を殺す**ことになります。
+   *    実際に一度そう書きました。→ 書き込み専用なので `unknown` で受けます。
+   */
+  fillStyle: unknown;
+  strokeStyle: unknown;
   lineWidth: number;
   font: string;
-  textAlign: string;
+  textAlign: CanvasTextAlignLike;
   globalAlpha: number;
   fillRect(x: number, y: number, w: number, h: number): void;
   beginPath(): void;
@@ -45,11 +51,21 @@ export interface Ctx2D {
     rot: number, a0: number, a1: number,
   ): void;
   fillText(text: string, x: number, y: number): void;
+  /**
+   * ★文字幅。**両方の環境にあります**（ブラウザは `TextMetrics`、
+   *   `@napi-rs/canvas` も `width` を持つ）。
+   * ⚠️ ★これを持たずに `文字数 × 13` で概算したら、
+   *    **和文と欧文が混じった行で必ずずれます**。近似しません。
+   */
+  measureText(text: string): { readonly width: number };
   drawImage(
-    img: never, sx: number, sy: number, sw: number, sh: number,
+    img: TImage, sx: number, sy: number, sw: number, sh: number,
     dx: number, dy: number, dw: number, dh: number,
   ): void;
 }
+
+/** ★ブラウザの `CanvasTextAlign` と同じ並び（`lib.dom` に依存しないため自前に持つ） */
+export type CanvasTextAlignLike = 'center' | 'end' | 'left' | 'right' | 'start';
 
 /** 画面の寸法 */
 export interface Viewport2D {
@@ -93,7 +109,7 @@ export function inkOn(pal: Palette, role: string): string {
 const POLY = { fromM: -180, toM: 420, stepM: 5 } as const;
 
 function bandBetween(
-  ctx: Ctx2D, course: Course, cam: ObliqueCamera, w0: number, w1: number, color: string,
+  ctx: Ctx2D<never>, course: Course, cam: ObliqueCamera, w0: number, w1: number, color: string,
 ): void {
   const a = railPolyline(course, cam, w0, POLY);
   const b = railPolyline(course, cam, w1, POLY);
@@ -106,7 +122,7 @@ function bandBetween(
 }
 
 function lineAt(
-  ctx: Ctx2D, course: Course, cam: ObliqueCamera, w: number, thick: number, color: string,
+  ctx: Ctx2D<never>, course: Course, cam: ObliqueCamera, w: number, thick: number, color: string,
 ): void {
   const line = railPolyline(course, cam, w, POLY);
   ctx.beginPath();
@@ -121,7 +137,7 @@ function lineAt(
  *   ⚠️ 手で決めていたら、★**帯がスタンドを覆い隠しました**。
  */
 export function drawSky(
-  ctx: Ctx2D, pal: Palette, vp: Viewport2D, horizonY: number,
+  ctx: Ctx2D<never>, pal: Palette, vp: Viewport2D, horizonY: number,
 ): void {
   const W = vp.width;
   for (let y = 0; y < horizonY; y += 1) {
@@ -146,7 +162,7 @@ export function drawSky(
  * ★走路（内馬場・ダート・芝・刈り目・ラチ）。
  */
 export function drawTrack(
-  ctx: Ctx2D, course: Course, cam: ObliqueCamera, pal: Palette, vp: Viewport2D,
+  ctx: Ctx2D<never>, course: Course, cam: ObliqueCamera, pal: Palette, vp: Viewport2D,
 ): void {
   const WIDTH = course.widthM;
   const IN_W = infieldW(cam, vp);
@@ -194,7 +210,7 @@ export function drawTrack(
  *      （オーナーの指摘「ゴール前が一番盛り上がるはずなのに全くわからない」）。
  */
 export function drawMarks(
-  ctx: Ctx2D, course: Course, cam: ObliqueCamera, pal: Palette, vp: Viewport2D,
+  ctx: Ctx2D<never>, course: Course, cam: ObliqueCamera, pal: Palette, vp: Viewport2D,
   distanceMeter: number, font: FontOf, poleEveryMeter = 200,
 ): void {
   for (let m = poleEveryMeter; m < distanceMeter; m += poleEveryMeter) {
@@ -231,7 +247,7 @@ export function drawMarks(
  *   ⚠️ ★高さは**縦方向**なので `depth` を掛けません（掛けると房が潰れます）。
  */
 export function drawGate(
-  ctx: Ctx2D, course: Course, cam: ObliqueCamera, pal: Palette, vp: Viewport2D,
+  ctx: Ctx2D<never>, course: Course, cam: ObliqueCamera, pal: Palette, vp: Viewport2D,
   fieldSize: number, wOf: (gate: number) => number,
   frameRoleOf: (gate: number, fieldSize: number) => string, font: FontOf,
 ): void {
@@ -297,8 +313,8 @@ export const OBLIQUE_ANCHOR = { x: 52, y: 116 } as const;
  * ⚠️ ★**騎手の姿勢は作りません。** シートに別コマがありません。
  *    上体の揺れと鞭だけにしてあります（**無い絵を「あることにしない」**）。
  */
-export function drawObliqueHorse(
-  ctx: Ctx2D, img: never, imgWidth: number, pal: Palette,
+export function drawObliqueHorse<TImage>(
+  ctx: Ctx2D<TImage>, img: TImage, imgWidth: number, pal: Palette,
   x: number, y: number, frame: number, gate: number, fieldSize: number, widthPx: number,
   frameRoleOf: (gate: number, fieldSize: number) => string, font: FontOf,
   mode: RideMode = 'cruise', phaseT = 0,
@@ -371,8 +387,8 @@ export interface ObliqueHorse {
  *   ⚠️ ★**UI はここに入れません**（画面の座標系のもの・アートバイブル §9）。
  *      アプリ側で、`cam` を一切使わずに描いてください。
  */
-export function drawObliqueWorld(
-  ctx: Ctx2D,
+export function drawObliqueWorld<TImage>(
+  ctx: Ctx2D<TImage>,
   opts: {
     readonly course: Course;
     readonly cam: ObliqueCamera;
@@ -382,7 +398,7 @@ export function drawObliqueWorld(
     readonly horses: readonly ObliqueHorse[];
     readonly fieldSize: number;
     readonly horseWidthPx: number;
-    readonly sheet: never;
+    readonly sheet: TImage;
     readonly sheetWidth: number;
     readonly frameOf: (gate: number) => number;
     readonly modeOf?: (h: ObliqueHorse) => RideMode;
