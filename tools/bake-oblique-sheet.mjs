@@ -119,7 +119,13 @@ await sharp({
     width: cw * FRAMES, height: ch * 8, channels: 4,
     background: { r: 0, g: 0, b: 0, alpha: 0 },
   },
-}).composite(rows.map((input, i) => ({ input, left: 0, top: i * ch }))).png().toFile(outFile);
+}).composite(rows.map((input, i) => ({ input, left: 0, top: i * ch })))
+  /**
+   * ⚠️ ★無圧縮で焼いたら **9.8MB** になり、Web で読み込むには重すぎました。
+   *    ★色数を絞ります（馬体の階調は残しつつ、Web に載る大きさへ）。
+   */
+  .png({ palette: true, colours: num('--colours', 160), compressionLevel: 9 })
+  .toFile(outFile);
 
 console.log(`\n★${outFile}`);
 console.log('⚠️ ★色が出ているかは**絵を見て**確かめます。数字だけで済ませません。');

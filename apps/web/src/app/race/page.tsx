@@ -33,9 +33,9 @@ import {
   replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
   phaseOf, ovalCourse, segmentAt, HORSE_LENGTH_M,
   // ★描き方は package が唯一の出どころ（この画面には持たない）
-  frameRoleOf, SHEET_V2,
-  // ★透視投影（据えたカメラ）。動画の道具と同じ関数
-  trackCamera, drawPerspectiveWorld, drawPerspectiveHorses,
+  frameRoleOf, SHEET_REAR,
+  // ★透視投影（追走カメラ）。動画の道具と同じ関数
+  chaseCamera, drawPerspectiveWorld, drawPerspectiveHorses,
   // ★UI も package が唯一の出どころ（動画の道具と同じ関数）
   drawGauge, drawStandings, drawCallBand, type CallPart,
 } from '@star/render';
@@ -152,7 +152,7 @@ export default function RacePage(): React.JSX.Element {
   const callKeyRef = useRef<string>('');
   const artRef = useRef<{
     pal: unknown; layers: unknown; atlas: unknown;
-    oblique: HTMLImageElement;
+    rear: HTMLImageElement;
   } | null>(null);
   const rafRef = useRef<number | null>(null);
   const t0Ref = useRef(0);
@@ -207,13 +207,18 @@ export default function RacePage(): React.JSX.Element {
        *    透視投影では大きさが連続的に変わるので、**段階に分けられません**。
        *    → 高解像度の1枚を**滑らかに縮小**します（D-058 の廃止が前提）。
        */
-      const oblique = await loadImg(`/art/horse-oblique-v2.png?v=${ASSET_VERSION}`);
+      /**
+       * ★**後ろ姿のシート**（追走カメラの主役）。
+       * ⚠️ 真横のシートを後ろから見るカメラで使うと、
+       *    ★**馬だけ横を向いた別物**になります。
+       */
+      const rear = await loadImg(`/art/horse-rear.png?v=${ASSET_VERSION}`);
       const api = window.STARStill;
       if (api === undefined) throw new Error('STARStill がありません');
       api.setOptions({ coat, backlight });
       const atlas = await api.buildAtlas(sheet, pal, layers);
       if (cancelled) return;
-      artRef.current = { pal, layers, atlas, oblique };
+      artRef.current = { pal, layers, atlas, rear };
       setReady(true);
     };
     boot().catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)));
@@ -255,8 +260,14 @@ export default function RacePage(): React.JSX.Element {
      * ⚠️ ★**描き方はこの画面に持ちません。** `@star/render` が唯一の出どころで、
      *    動画の道具と**同じ関数**を呼びます。
      */
+    /**
+     * ★**馬群の後ろから、走路に沿って見ます**（参考の主役の画）。
+     *
+     * ⚠️ ★最初は走路の**横**に据えました。**丸ごと外していました。**
+     *    参考は3枚とも馬群の後ろから見ており、★**空もスタンドも写っていません**。
+     */
     const packS = at.reduce((sum, h) => sum + h.meters, 0) / at.length;
-    const cam = trackCamera(COURSE, {
+    const cam = chaseCamera(COURSE, {
       atS: Math.max(20, Math.min(DIST - 5, packS)),
       width: W, height: H,
     });
@@ -264,7 +275,7 @@ export default function RacePage(): React.JSX.Element {
     drawPerspectiveWorld(ctx, COURSE, cam, art.pal as Record<string, string>, DIST);
     drawPerspectiveHorses(ctx, COURSE, cam,
       at.map((h) => ({ gate: h.gate, s: h.meters, w: h.w ?? COURSE.widthM / 2 })), {
-        sheet: art.oblique, sheetWidth: art.oblique.width, spec: SHEET_V2,
+        sheet: art.rear, sheetWidth: art.rear.width, spec: SHEET_REAR,
         fieldSize: FIELD,
         // ★脚は**表示の時間**で回す（距離で回すと道中の早送りで小走りになる）
         frameOf: (g) => Math.floor(d * 16 + g * 0.37 * 8) % 8,
