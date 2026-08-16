@@ -33,7 +33,9 @@ import {
   replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
   phaseOf, ovalCourse, segmentAt, HORSE_LENGTH_M,
   // ★描き方は package が唯一の出どころ（この画面には持たない）
-  drawObliqueWorld, frameRoleOf, SHEET_V2, SHEET_FAR,
+  frameRoleOf, SHEET_V2,
+  // ★透視投影（据えたカメラ）。動画の道具と同じ関数
+  trackCamera, drawPerspectiveWorld, drawPerspectiveHorses,
   // ★UI も package が唯一の出どころ（動画の道具と同じ関数）
   drawGauge, drawStandings, drawCallBand, type CallPart,
 } from '@star/render';
@@ -59,15 +61,10 @@ const POST_COLORS: readonly (readonly [number, number, number])[] = [
 const COURSE = ovalCourse(DIST);
 
 /**
- * ★**カットの3系統**（アートバイブル）。★数字は 2D の参考の実測から（2026-08-16）:
- *   引き 馬の幅 = 画面幅の 9〜11% ／ 寄り 24% ／ 走路の帯 33%
- *   ⚠️ ★**動画の道具と同じ値**です。離したら見え方が変わります。
+ * ⚠️ ★**カットごとの `horseW`（120px / 300px）は撤去しました。**
+ *    透視投影では、馬の大きさは**深さから連続的に決まります**。
+ *    固定の px を持つと、遠近と食い違って**手前と奥で同じ大きさ**になります。
  */
-const CUTS = {
-  wide: { horseW: 120, far: true, cam: { pxPerM: 22, depth: 0.54, anchorX: 470, anchorY: 500 } },
-  close: { horseW: 300, cam: { pxPerM: 46, depth: 0.36, anchorX: 380, anchorY: 560 } },
-  goal: { horseW: 190, cam: { pxPerM: 34, depth: 0.22, anchorX: 560, anchorY: 540 } },
-} as const;
 
 interface StarStill {
   buildAtlas: (sheet: HTMLImageElement, pal: unknown, layers: unknown) => Promise<unknown>;
@@ -155,7 +152,7 @@ export default function RacePage(): React.JSX.Element {
   const callKeyRef = useRef<string>('');
   const artRef = useRef<{
     pal: unknown; layers: unknown; atlas: unknown;
-    oblique: HTMLImageElement; obliqueFar: HTMLImageElement;
+    oblique: HTMLImageElement;
   } | null>(null);
   const rafRef = useRef<number | null>(null);
   const t0Ref = useRef(0);
@@ -205,16 +202,18 @@ export default function RacePage(): React.JSX.Element {
           im.onerror = () => rej(new Error(`スプライトを読み込めません: ${src}`));
           im.src = src;
         });
-      const [oblique, obliqueFar] = await Promise.all([
-        loadImg(`/art/horse-oblique-v2.png?v=${ASSET_VERSION}`),
-        loadImg(`/art/horse-oblique-far.png?v=${ASSET_VERSION}`),
-      ]);
+      /**
+       * ⚠️ ★引き用（120px）の読み込みは**やめました**。
+       *    透視投影では大きさが連続的に変わるので、**段階に分けられません**。
+       *    → 高解像度の1枚を**滑らかに縮小**します（D-058 の廃止が前提）。
+       */
+      const oblique = await loadImg(`/art/horse-oblique-v2.png?v=${ASSET_VERSION}`);
       const api = window.STARStill;
       if (api === undefined) throw new Error('STARStill がありません');
       api.setOptions({ coat, backlight });
       const atlas = await api.buildAtlas(sheet, pal, layers);
       if (cancelled) return;
-      artRef.current = { pal, layers, atlas, oblique, obliqueFar };
+      artRef.current = { pal, layers, atlas, oblique };
       setReady(true);
     };
     boot().catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)));
@@ -246,43 +245,31 @@ export default function RacePage(): React.JSX.Element {
     const metersLeft = DIST - (own === undefined ? lead : own.meters);
 
     /**
-     * ★**斜め俯瞰で描きます**（D-066・β／2026-08-16 の裁定「動画と同じ見え方に揃える」）。
+     * ★**透視投影で描きます**（据えたカメラ）。
      *
-     * ⚠️ ★**描き方はこの画面に持ちません。** `@star/render` の `drawObliqueWorld` が
-     *    唯一の出どころです。動画の道具と**同じ関数**を呼びます。
-     *    ★別々に描いたら必ず離れます（走路の幅 20m/25m と同じ形）。
+     * ⚠️ ★これまでの斜め俯瞰は**平行投影**でした。`w` に係数を掛けて縦にずらすだけなので、
+     *    **奥も手前も同じ太さの帯**になり、板を並べた絵にしか見えませんでした。
+     *    参考（2D の中継画）は**透視投影**で、ラチが収束し、
+     *    反対側の走路とスタンドまで見えています。
      *
-     * ⚠️ ★**旧・手配置スロットの構図は撤去しました。**
-     *    平面の段は**コーナーが無く、内外の差も出ません**でした
-     *    （オーナーの指摘「馬それぞれの場所が定位置」「競馬ではない」）。
+     * ⚠️ ★**描き方はこの画面に持ちません。** `@star/render` が唯一の出どころで、
+     *    動画の道具と**同じ関数**を呼びます。
      */
-    const cut = metersLeft <= 220 ? CUTS.goal : metersLeft <= 800 ? CUTS.close : CUTS.wide;
-    const centre = at.reduce((sum, h) => sum + h.meters, 0) / at.length;
-    // ★内外もカメラが追う（走路の真ん中を見ると馬群が上端に貼りつく）
-    const wCentre = at.reduce((sum, h) => sum + (h.w ?? COURSE.widthM / 2), 0) / at.length;
-    const cam = {
-      ...cut.cam,
-      s: Math.max(1, Math.min(DIST - 1, centre)),
-      w: wCentre,
-    };
-    ctx.imageSmoothingEnabled = false;
-    drawObliqueWorld(ctx, {
-      course: COURSE, cam, pal: art.pal as Record<string, string>,
-      viewport: { width: W, height: H }, distanceMeter: DIST,
-      horses: at.map((h) => ({
-        gate: h.gate, meters: h.meters, w: h.w ?? COURSE.widthM / 2,
-      })),
-      fieldSize: FIELD, horseWidthPx: cut.horseW,
-      sheet: 'far' in cut ? art.obliqueFar : art.oblique,
-      sheetWidth: ('far' in cut ? art.obliqueFar : art.oblique).width,
-      sheet_: 'far' in cut ? SHEET_FAR : SHEET_V2,
-      // ★脚は**表示の時間**で回す（距離で回すと道中の早送りで小走りになる）
-      frameOf: (g) => Math.floor(d * 16 + g * 0.37 * 8) % 8,
-      modeOf: (h) => (h.meters >= DIST ? 'celebrate' : (DIST - h.meters) <= 400 ? 'drive' : 'cruise'),
-      ridePhase: d * 2,
-      gateWOf: (g) => laneAtStart(g, FIELD, TRACK_WIDTH_M),
-      frameRoleOf, font: (px, bold) => `${bold === true ? 'bold ' : ''}${px}px sans-serif`,
+    const packS = at.reduce((sum, h) => sum + h.meters, 0) / at.length;
+    const cam = trackCamera(COURSE, {
+      atS: Math.max(20, Math.min(DIST - 5, packS)),
+      width: W, height: H,
     });
+    ctx.imageSmoothingEnabled = true;   // ★遠近で滑らかに縮む。整数倍はもうやりません
+    drawPerspectiveWorld(ctx, COURSE, cam, art.pal as Record<string, string>, DIST);
+    drawPerspectiveHorses(ctx, COURSE, cam,
+      at.map((h) => ({ gate: h.gate, s: h.meters, w: h.w ?? COURSE.widthM / 2 })), {
+        sheet: art.oblique, sheetWidth: art.oblique.width, spec: SHEET_V2,
+        fieldSize: FIELD,
+        // ★脚は**表示の時間**で回す（距離で回すと道中の早送りで小走りになる）
+        frameOf: (g) => Math.floor(d * 16 + g * 0.37 * 8) % 8,
+        frameRoleOf, distanceMeter: DIST,
+      });
 
     /**
      * ★**UI は画面の座標系**（アートバイブル §9）。
