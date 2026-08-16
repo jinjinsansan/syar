@@ -101,6 +101,10 @@ export const READONLY = [
   'diag-lane-loss.mjs',
   // ★読むだけ。ゲージの向きを測る（D-072・前回は符号が逆だった）
   'diag-gauge.mjs',
+  // ★生アートから カットごとの元スプライトを焼く（契約 §5）。DB にも台帳にも触れません
+  'bake-sprite-sizes.mjs',
+  // ★斜め俯瞰でレースを動画にする。★絵を動かして自分の目で見るため。DB に触れません
+  'render-oblique-video.mjs',
   // ★読むだけ。斜め俯瞰の試作を静止画で確かめる
   'shot-oblique.mjs',
   // ★読むだけ。3カットを本番のエンジンで描いて大きさを決める

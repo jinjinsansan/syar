@@ -123,8 +123,15 @@ export function railPolyline(
   const step = opts?.stepM ?? 4;
   const out: { x: number; y: number }[] = [];
   for (let d = from; d <= to + 1e-9; d += step) {
-    const s = Math.max(0, Math.min(course.distance, cam.s + d));
-    const q = obliqueProject(course, cam, s, w);
+    /**
+     * ⚠️ ★**ここで [0, 距離] に丸めていました。**
+     *    → ★**決勝線の先で走路が途切れ**、その先が地の色のまま残りました
+     *      （動画のゴールのカットで、右3分の1が芝ではありませんでした）。
+     *    ★丸めると、範囲外の点が**すべて同じ場所に積み上がります**。
+     * → `posOf` が走路の前後を**接線方向に延長**するようになったので、丸めません。
+     *   ★走路は画面の外まで続いていないと、走路に見えません。
+     */
+    const q = obliqueProject(course, cam, cam.s + d, w);
     out.push({ x: q.x, y: q.y });
   }
   return out;
@@ -141,13 +148,23 @@ export function gateStalls(
   cam: ObliqueCamera,
   startS: number,
   stalls: number,
+  /**
+   * ★**房の内外位置は、エンジンから受け取ります**（`laneAtStart`）。
+   *
+   * ⚠️ ★ここで自前に並べていました。**エンジンは 13.8m に、ここは 18m に**
+   *    並べており、★**描いたゲートと馬の位置が合いません**でした
+   *    （＝馬が房の外に立つ）。**2か所で持てば必ず離れます。**
+   *
+   *   省略時は従来どおり等間隔（★検査と既存の静止画のため）。
+   */
+  wOf?: (gate: number) => number,
 ): readonly { readonly gate: number; readonly x: number; readonly y: number; readonly w: number }[] {
   const out: { gate: number; x: number; y: number; w: number }[] = [];
   // ★内ラチから 1m 空けて等間隔に並べる（実際の枠順も内から）
   const margin = 1;
   const span = Math.max(1, course.widthM - margin * 2);
   for (let i = 0; i < stalls; i++) {
-    const w = margin + (span * (i + 0.5)) / stalls;
+    const w = wOf === undefined ? margin + (span * (i + 0.5)) / stalls : wOf(i + 1);
     const q = obliqueProject(course, cam, startS, w);
     out.push({ gate: i + 1, x: q.x, y: q.y, w });
   }

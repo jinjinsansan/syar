@@ -17,7 +17,7 @@
 
 import type { HorseAt, PositionModel } from './scene.js';
 import {
-  slotOf, packSpreadM, convergeAt,
+  slotOf, packSpreadM, convergeAt, formStartRamp,
   type FormStrategy, type FormPace,
 } from './formation.js';
 
@@ -206,7 +206,13 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
     const truth = truthOf(b, sec);
     if (strength <= 0 || sec <= b.startSec || sec >= b.finishSec) return truth;
     const centre = centreOf(sec);
-    const a = convergeAt(distanceMeter - centre) * Math.max(0, Math.min(1, strength));
+    /**
+     * ★発走の立ち上がりを掛けます。
+     *   ⚠️ ★これが無いと**ゲートが開いた瞬間に隊列へ飛びます**（実測 0.25秒で 18.3m）。
+     */
+    const a = convergeAt(distanceMeter - centre)
+      * formStartRamp(centre)
+      * Math.max(0, Math.min(1, strength));
     if (a <= 0) return truth;
     const spread = packSpreadM(distanceMeter - centre, pace);
     const slot = slots.get(b.gate) ?? 0.5;

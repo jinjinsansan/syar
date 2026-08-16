@@ -213,6 +213,21 @@ export function posOf(course: Course, s: number, w: number): WorldPos {
   let acc = 0;
   let x = 0, y = 0, heading = course.startHeading;
 
+  /**
+   * ★**走路の前後に、接線方向の延長を持ちます。**
+   *
+   * ⚠️ ★以前は範囲の外で**1点に潰れていました**（`off` が効かず、
+   *    どの `w` も同じ座標）。→ ★**決勝線の先で走路が消えました。**
+   *    実際の動画で、ゴールの右側が芝ではなく地の色になっていました。
+   *
+   * ★実際の競馬場にも、発走の手前（引き込み線）とゴールの先（走路の続き）があります。
+   *   **画面の外まで走路が続いていること**が、走路に見えるための条件です。
+   */
+  if (s < 0) {
+    const nx = Math.sin(heading), ny = -Math.cos(heading);
+    return { x: Math.cos(heading) * s + nx * off, y: Math.sin(heading) * s + ny * off, heading };
+  }
+
   for (const seg of course.segments) {
     const segStart = acc;
     const segEnd = acc + seg.length;
@@ -257,7 +272,14 @@ export function posOf(course: Course, s: number, w: number): WorldPos {
     }
     acc = segEnd;
   }
-  return { x, y, heading };
+  // ★走路の終わりから先は、最後の向きにまっすぐ延ばす（★1点に潰さない）
+  const over = s - acc;
+  const nx = Math.sin(heading), ny = -Math.cos(heading);
+  return {
+    x: x + Math.cos(heading) * over + nx * off,
+    y: y + Math.sin(heading) * over + ny * off,
+    heading,
+  };
 }
 
 /** ★区間の境目（俯瞰デバッグ表示と標識に使う） */

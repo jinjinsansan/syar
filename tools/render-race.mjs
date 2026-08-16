@@ -16,9 +16,9 @@ import sharp from 'sharp';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches } from '@star/race-engine';
+import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt } from '@star/race-engine';
 import {
-  replayPositionModel, sceneAt, finalOrderOf, cameraFor,
+  replayPositionModel, sceneAt, finalOrderOf, cameraFor, ovalCourse,
   timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
 } from '@star/render';
 import { loadFrames, dressed, POST, isDark } from './lib/dress.mjs';
@@ -88,8 +88,19 @@ if (!finalOrderMatches(result, boundaries)) {
 // --- ③ 位置モデル ---
 const model = replayPositionModel({
   distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
-  // ★D-061 改訂: 別ストリームの揺らぎ（着順は動かない）
-  jostle: arg('jostle', 0.6), jostleSeed: SEED * 2654435761,
+  /**
+   * ⚠️ ★**この道具は撤去済みの `jostle` を渡したままでした。**
+   *    Q-P4-38 の裁定で `jostle` は撤去され、隊列は `formation` になっています。
+   *    → ★**黙って無視されていました**（JS なので落ちません）。
+   *      隊列も脚質も入らないまま動画が出ていたことになります。
+   */
+  strategyOf: (gate) => entrants[gate - 1].strategy,
+  pace,
+  formation: arg('formation', 1),
+  // ★別ストリーム（D-061 改訂）。resolveRace の乱数には触れません
+  formationSeed: SEED * 2654435761,
+  // ★横位置はエンジンから受け取る（D-071）
+  laneOf: (gate, metersLeft) => laneAt(gate, FIELD, metersLeft, DIST, SEED),
 });
 const orderFromModel = finalOrderOf(model);
 const settled = result.order.map((e) => Number(e.horseId));
@@ -146,6 +157,23 @@ mkdirSync(WORK, { recursive: true });
  *   12頭で12段になり画面外に出ます。実測どおり 720p/220px は3段です。
  */
 const LANES = 3;
+/**
+ * ★斜め俯瞰で描くか（D-066・β）。
+ *   ⚠️ 既定は平面のままにします。**対照が取れなくなる**ので既定を勝手に動かしません。
+ */
+const OBLIQUE = process.argv.includes('--oblique');
+/**
+ * ★**このカットのスプライト実寸**（シート契約 §5）。
+ *
+ * ⚠️ ★**位置の縮尺（px/m）と、馬の大きさは別々に決まります。**
+ *    斜め俯瞰で位置を 15px/m に縮めたのに 220px のまま描いて、
+ *    ★**1280幅で馬が 17%**（参考の引きは 2.7%）という絵になりました。
+ * → 引きのカットは **far（馬 64px）** で描きます。
+ *   ★生アートから焼くのと同じ縮尺です（`tools/bake-sprite-sizes.mjs` と揃えてあります）。
+ */
+const SPRITE_W = OBLIQUE ? 72 : 220;
+const SPRITE_H = OBLIQUE ? 46 : 140;
+const COURSE = ovalCourse(DIST);
 const sceneInput = {
   model,
   viewport: { width: SW, height: SH, trackTop: 340, laneHeight: 105 },
@@ -158,6 +186,21 @@ const sceneInput = {
   // ★V-16 ①: 展開を画面に出す
   strategyOf: (gate) => entrants[gate - 1].strategy,
   pace,
+  ...(OBLIQUE ? {
+    /**
+     * ★実測（参考映像）に合わせた画角。走路の帯が画面の 23%（引き）。
+     *   ⚠️ 既定の 55px/m のままだと帯が 44% になり、**寄りの画角**になります。
+     */
+    pxPerMeter: 15,
+    spriteSize: { width: SPRITE_W, height: SPRITE_H },
+    oblique: {
+      course: COURSE,
+      // ★横位置はエンジンが引いたものを読むだけ（D-071）
+      widthOf: (gate, metersLeft) => laneAt(gate, FIELD, metersLeft, DIST, SEED),
+      depth: 0.55,
+      anchorY: 540,
+    },
+  } : {}),
 };
 
 /**
@@ -226,11 +269,12 @@ for (let i = 0, n = 0; i <= total; i += STEP, n += 1) {
       if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
       // ★描画コマンドが持つ倍率で描く（レンダラはカメラを知らない）
       const sc = c.scale ?? 1;
-      const w = 220 * sc, hh = 140 * sc;
+      const w = SPRITE_W * sc, hh = SPRITE_H * sc;
       if (x < 0 || y < 0 || x + w > SW || y + hh > SH) continue;
-      const img = sc === 1
-        ? await dressed(frames, c.sprite.frame, gate)
-        : await sharp(await dressed(frames, c.sprite.frame, gate)).resize(w, hh, { kernel: 'nearest' }).png().toBuffer();
+      const base = await dressed(frames, c.sprite.frame, gate);
+      const img = (sc === 1 && SPRITE_W === 220 && SPRITE_H === 140)
+        ? base
+        : await sharp(base).resize(w, hh, { kernel: 'nearest' }).png().toBuffer();
       tiles.push({ input: img, left: x, top: y });
     }
   }

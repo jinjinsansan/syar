@@ -184,6 +184,20 @@ export interface SceneInput {
    */
   readonly ownGaugeOf?: ((metersLeft: number) => number) | undefined;
   /**
+   * ★**このカットで使うスプライトの実寸**（シート契約 §5）。
+   *
+   * 【★なぜ要るか — 絵を見て分かりました】
+   *   斜め俯瞰で位置を 15px/m に縮めたのに、★**スプライトは 220px のまま**でした。
+   *   → 1280 幅で馬が 17%。**引き（参考 2.7%）どころか、寄り（14.2%）より大きい**。
+   *   ★**位置の縮尺と馬の大きさは、別々に決まってしまいます。**
+   *
+   *   → カットごとに元スプライトを分ける（far 64px / mid 96px / near 180px）ので、
+   *     ★**接地点と影も、そのカットの実寸から決めます。**
+   *
+   *   省略時は 220×140（従来のシート）。
+   */
+  readonly spriteSize?: { readonly width: number; readonly height: number } | undefined;
+  /**
    * ★**斜め俯瞰**（D-066・β）。渡すと、平面の段ではなく**コースに沿って**置きます。
    *
    * 【★なぜ「段」をやめるか】
@@ -385,7 +399,9 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
     throw new Error(`倍率は 1 か 2 だけです（受け取った値: ${String(camera.zoom)}）`);
   }
   const horses = model.at(sec);
-  const PX_PER_M = input.pxPerMeter ?? SPRITE.width / 4;
+  const SP = input.spriteSize ?? SPRITE;
+  // ★1m あたりの画素は、**そのカットのスプライト実寸**から（220px = 4m ＝ 55px/m と同じ理屈）
+  const PX_PER_M = input.pxPerMeter ?? SP.width / 4;
   const PX_PER_M0 = PX_PER_M;
 
   /**
@@ -399,6 +415,37 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
     : Math.max(ownHorse.meters - halfM * 0.55, Math.min(ownHorse.meters + halfM * 0.55, rawCam));
   const commands: DrawCommand[] = [];
 
+
+  /**
+   * ★**斜め俯瞰のカメラ。** 馬群と一緒にコースを回るので、コーナーが画面に出ます。
+   */
+  const ob = input.oblique;
+  const obCam: ObliqueCamera | undefined = ob === undefined ? undefined : {
+    s: Math.max(1, Math.min(model.distanceMeter - 1, cam)),
+    w: ob.course.widthM / 2,
+    pxPerM: PX_PER_M * camera.zoom,
+    depth: ob.depth ?? 0.29,
+    anchorX: ob.anchorX ?? Math.round(vp.width * 0.35),
+    anchorY: ob.anchorY ?? Math.round(vp.trackTop + vp.laneHeight * 1.5),
+  };
+  /** ★1頭を画面に置く（斜め俯瞰）。スプライトは左上を指すので接地点から戻す */
+  const placeOblique = (
+    course: Course, camObj: ObliqueCamera,
+    widthOf: (g: number, m: number) => number, gate: number, meters: number,
+  ): { readonly x: number; readonly y: number } => {
+    // ⚠️ ★`w` はエンジンから受け取るだけ（D-071）
+    const w = widthOf(gate, model.distanceMeter - meters);
+    const p = obliqueProject(
+      course, camObj, Math.max(0, Math.min(model.distanceMeter, meters)), w,
+    );
+    return {
+      x: Math.round(p.x - SP.width * 0.45 * camera.zoom),
+      y: Math.round(p.y - SP.height * 0.95 * camera.zoom),
+    };
+  };
+  const place = (gate: number, meters: number): { readonly x: number; readonly y: number } | undefined =>
+    (ob === undefined || obCam === undefined
+      ? undefined : placeOblique(ob.course, obCam, ob.widthOf, gate, meters));
 
   /**
    * ★背景は**カメラの位置に応じて流します**（パララックス）。
@@ -429,11 +476,23 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
    */
   {
     const zz = camera.zoom;
-    const gx = Math.round(vp.width * 0.35 + (model.distanceMeter - cam) * PX_PER_M0 * zz);
+    /**
+     * ★斜め俯瞰では、決勝線も**コースに沿って**置きます。
+     *   ⚠️ 平面の式のままだと、馬だけが投影され**ゴールだけ別の場所**に出ます。
+     */
+    const gp = ob === undefined || obCam === undefined ? undefined
+      : obliqueProject(ob.course, obCam, model.distanceMeter, ob.course.widthM / 2);
+    const gx = gp === undefined
+      ? Math.round(vp.width * 0.35 + (model.distanceMeter - cam) * PX_PER_M0 * zz)
+      : Math.round(gp.x);
     if (gx > -60 && gx < vp.width + 60) {
       commands.push({
         kind: 'finishLine',
-        at: { x: gx, y: vp.trackTop },
+        at: {
+          x: gx,
+          y: gp === undefined ? vp.trackTop
+            : Math.round(gp.y - ob!.course.widthM * obCam!.pxPerM * obCam!.depth * 0.5),
+        },
         height: Math.round(vp.laneHeight * 4.2) * zz,
         scale: zz,
       });
@@ -457,9 +516,13 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
     const rightM = cam + (vp.width * 0.65) / (PX_PER_M0 * zz);
     const first = Math.ceil(Math.max(0, leftM) / step) * step;
     for (let m = first; m <= Math.min(model.distanceMeter, rightM); m += step) {
+      const pp = ob === undefined || obCam === undefined ? undefined
+        : obliqueProject(ob.course, obCam, m, 0);
       commands.push({
         kind: 'pole',
-        at: { x: Math.round(vp.width * 0.35 + (m - cam) * PX_PER_M0 * zz), y: vp.trackTop },
+        at: pp === undefined
+          ? { x: Math.round(vp.width * 0.35 + (m - cam) * PX_PER_M0 * zz), y: vp.trackTop }
+          : { x: Math.round(pp.x), y: Math.round(pp.y) },
         metersLeft: model.distanceMeter - m,
         scale: zz,
       });
@@ -479,37 +542,6 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
    *      実際の中継は**手前の馬が奥を隠します**。馬群に見せるにはこの順序が要ります。
    *   ★同じ段の中は**馬番順**なので、順序は決まります（C-5 は崩れません）。
    */
-  /**
-   * ★**斜め俯瞰のカメラ。** 馬群と一緒にコースを回るので、コーナーが画面に出ます。
-   */
-  const ob = input.oblique;
-  const obCam: ObliqueCamera | undefined = ob === undefined ? undefined : {
-    s: Math.max(1, Math.min(model.distanceMeter - 1, cam)),
-    w: ob.course.widthM / 2,
-    pxPerM: PX_PER_M * camera.zoom,
-    depth: ob.depth ?? 0.29,
-    anchorX: ob.anchorX ?? Math.round(vp.width * 0.35),
-    anchorY: ob.anchorY ?? Math.round(vp.trackTop + vp.laneHeight * 1.5),
-  };
-  /** ★1頭を画面に置く（斜め俯瞰）。スプライトは左上を指すので接地点から戻す */
-  const placeOblique = (
-    course: Course, camObj: ObliqueCamera,
-    widthOf: (g: number, m: number) => number, gate: number, meters: number,
-  ): { readonly x: number; readonly y: number } => {
-    // ⚠️ ★`w` はエンジンから受け取るだけ（D-071）
-    const w = widthOf(gate, model.distanceMeter - meters);
-    const p = obliqueProject(
-      course, camObj, Math.max(0, Math.min(model.distanceMeter, meters)), w,
-    );
-    return {
-      x: Math.round(p.x - SPRITE.width * 0.45 * camera.zoom),
-      y: Math.round(p.y - SPRITE.height * 0.95 * camera.zoom),
-    };
-  };
-  const place = (gate: number, meters: number): { readonly x: number; readonly y: number } | undefined =>
-    (ob === undefined || obCam === undefined
-      ? undefined : placeOblique(ob.course, obCam, ob.widthOf, gate, meters));
-
   const laneOfGate = (g: number): number => (input.laneOf === undefined ? g - 1 : input.laneOf(g));
   const laneCount = Math.max(1, input.laneCount ?? 3);
   const ownLane = input.ownGate === undefined ? 0 : laneOfGate(input.ownGate);
@@ -587,10 +619,10 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
     commands.push({
       kind: 'shadow',
       at: {
-        x: x + Math.round(SPRITE.width * 0.45) * z,
-        y: y + Math.round(SPRITE.height * GROUND_RATIO) * z,
+        x: x + Math.round(SP.width * 0.45) * z,
+        y: y + Math.round(SP.height * GROUND_RATIO) * z,
       },
-      width: Math.round(SPRITE.width * (airborne ? 0.30 : 0.40)) * z,
+      width: Math.round(SP.width * (airborne ? 0.30 : 0.40)) * z,
       strength: airborne ? 0.22 : 0.42,
       scale: z,
     });
