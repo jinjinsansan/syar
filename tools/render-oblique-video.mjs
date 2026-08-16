@@ -254,21 +254,63 @@ function gate(ctx, cam) {
     (g) => laneAtStart(g, FIELD, TRACK_WIDTH_M));
   const first = stalls[0], last = stalls[stalls.length - 1];
   if (first === undefined || last === undefined) return;
-  if (Math.max(first.x, last.x) < -80 || Math.min(first.x, last.x) > W + 80) return;
-  const h = Math.max(10, Math.round((cam.pxPerM ?? 15) * 2.4));   // ★房の高さ = 馬の背丈ぶん
+  if (Math.max(first.x, last.x) < -140 || Math.min(first.x, last.x) > W + 140) return;
+
+  /**
+   * ★**房は「箱」です。** 色帯ではありません。
+   *   ⚠️ 最初は色の帯を縦に積んだだけで、★**ゲートに見えませんでした。**
+   *
+   * ★寸法は実物から: 房の長さ **4.0m**・高さ **2.6m**・仕切りの厚み 0.1m。
+   *   ⚠️ ここも**投影で置きます**。画面座標で組み立てると、コーナーで走路から浮きます。
+   */
+  const LEN_M = 4.0, TOP_M = 2.6;
+  const px = cam.pxPerM;
+  const top = TOP_M * px;                    // ★高さは「縦方向」なので depth を掛けない
+  const at = (sM, wM) => obliqueProject(COURSE, cam, sM, wM);
+
   for (const st of stalls) {
-    const x = Math.round(st.x), y = Math.round(st.y);
-    // 房の枠（後ろ扉は開いている＝横棒は上だけ）
+    const back = at(-LEN_M, st.w);           // 房の後ろ（馬が入る側）
+    const front = at(0, st.w);               // 房の前（開く側）
+    // 仕切り（面）— ★奥の房から手前の房の順に描かれる（stalls は内→外）
     ctx.fillStyle = pal['rail-1'];
-    ctx.fillRect(x - 2, y - h, 3, h);
-    ctx.fillRect(x + Math.round(h * 0.5), y - h, 3, h);
+    ctx.beginPath();
+    ctx.moveTo(back.x, back.y);
+    ctx.lineTo(front.x, front.y);
+    ctx.lineTo(front.x, front.y - top);
+    ctx.lineTo(back.x, back.y - top);
+    ctx.closePath();
+    ctx.globalAlpha = 0.55;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    // 前後の柱
     ctx.fillStyle = pal['rail-0'];
-    ctx.fillRect(x - 2, y - h - 3, Math.round(h * 0.5) + 5, 3);
-    // ★房の番号（枠色）
-    ctx.fillStyle = pal[frameRoleOf(st.gate, FIELD)] ?? pal['paper-0'];
-    ctx.fillRect(x - 2, y - h - 9, Math.round(h * 0.5) + 5, 6);
+    ctx.fillRect(Math.round(back.x) - 1, Math.round(back.y - top), 2, Math.round(top));
+    ctx.fillRect(Math.round(front.x) - 1, Math.round(front.y - top), 2, Math.round(top));
+    // 上の桁
+    ctx.beginPath();
+    ctx.moveTo(back.x, back.y - top);
+    ctx.lineTo(front.x, front.y - top);
+    ctx.strokeStyle = pal['rail-0'];
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    /**
+     * ★房の番号（枠色＋馬番）。⚠️ 黒枠に黒文字だと読めないので、明るさで文字色を選ぶ。
+     */
+    const bw = Math.max(12, Math.round(px * 1.1));
+    const bh = Math.max(9, Math.round(bw * 0.62));
+    const bx = Math.round((back.x + front.x) / 2 - bw / 2);
+    const by = Math.round((back.y + front.y) / 2 - top - bh - 2);
+    const role = frameRoleOf(st.gate, FIELD);
+    ctx.fillStyle = pal[role] ?? pal['paper-0'];
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = inkOn(role);
+    ctx.font = FONT(Math.max(8, Math.round(bh * 0.8)), true);
+    ctx.textAlign = 'center';
+    ctx.fillText(String(st.gate), bx + bw / 2, by + bh - 2);
+    ctx.textAlign = 'left';
   }
 }
+
 
 
 /**
