@@ -33,9 +33,11 @@ import {
   replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
   phaseOf, ovalCourse, segmentAt, HORSE_LENGTH_M,
   // ★描き方は package が唯一の出どころ（この画面には持たない）
-  frameRoleOf, SHEET_REAR,
+  frameRoleOf, SHEET_REAR, SHEET_V2, SHEET_DIAG_FRONT_V1, SHEET_HIGH_DIAG_V1, SHEET_DIAG_REAR_V1,
   // ★透視投影（追走カメラ）。動画の道具と同じ関数
-  chaseCamera, drawPerspectiveWorld, drawPerspectiveHorses,
+  broadcastCamera, drawPerspectiveWorld, drawPerspectiveHorses,
+  raceShotAt,
+  shotCameraForDistance,
   // ★UI も package が唯一の出どころ（動画の道具と同じ関数）
   drawGauge, drawStandings, drawCallBand, type CallPart,
 } from '@star/render';
@@ -46,7 +48,7 @@ const FIELD = 12;
 const W = 1280;
 const H = 720;
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '16';
+const ASSET_VERSION = '20';
 /** ★構図の基準幅（`layers.json` の viewport と同じ） */
 const VP_W = 1280;
 
@@ -153,6 +155,10 @@ export default function RacePage(): React.JSX.Element {
   const artRef = useRef<{
     pal: unknown; layers: unknown; atlas: unknown;
     rear: HTMLImageElement;
+    side: HTMLImageElement;
+    diagFront: HTMLImageElement;
+    highDiag: HTMLImageElement;
+    diagRear: HTMLImageElement;
   } | null>(null);
   const rafRef = useRef<number | null>(null);
   const t0Ref = useRef(0);
@@ -212,13 +218,19 @@ export default function RacePage(): React.JSX.Element {
        * ⚠️ 真横のシートを後ろから見るカメラで使うと、
        *    ★**馬だけ横を向いた別物**になります。
        */
-      const rear = await loadImg(`/art/horse-rear.png?v=${ASSET_VERSION}`);
+      const [rear, side, diagFront, highDiag, diagRear] = await Promise.all([
+        loadImg(`/art/horse-rear.png?v=${ASSET_VERSION}`),
+        loadImg(`/art/horse-side-v3.png?v=${ASSET_VERSION}`),
+        loadImg(`/art/horse-diag-front-v1.png?v=${ASSET_VERSION}`),
+        loadImg(`/art/horse-high-diag-v1.png?v=${ASSET_VERSION}`),
+        loadImg(`/art/horse-diag-rear-v1.png?v=${ASSET_VERSION}`),
+      ]);
       const api = window.STARStill;
       if (api === undefined) throw new Error('STARStill がありません');
       api.setOptions({ coat, backlight });
       const atlas = await api.buildAtlas(sheet, pal, layers);
       if (cancelled) return;
-      artRef.current = { pal, layers, atlas, rear };
+      artRef.current = { pal, layers, atlas, rear, side, diagFront, highDiag, diagRear };
       setReady(true);
     };
     boot().catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)));
@@ -266,19 +278,44 @@ export default function RacePage(): React.JSX.Element {
      * ⚠️ ★最初は走路の**横**に据えました。**丸ごと外していました。**
      *    参考は3枚とも馬群の後ろから見ており、★**空もスタンドも写っていません**。
      */
-    const packS = at.reduce((sum, h) => sum + h.meters, 0) / at.length;
-    const cam = chaseCamera(COURSE, {
+    const allFinishedNow = at.every((h) => h.meters >= DIST - 1e-6);
+    const shot = raceShotAt({
+      distanceMeter: DIST,
+      leaderMeters: lead,
+      displaySec: d,
+      displayDurationSec: built.warp.displaySec,
+      phase: phaseOf(DIST - lead),
+      allFinished: allFinishedNow,
+    });
+    const contenders = at.filter((h) => lead - h.meters <= HORSE_LENGTH_M * 2);
+    const pack = at.filter((h) => lead - h.meters <= 40);
+    const focusHorses = shot.family === 'finish' ? at
+      : shot.target === 'leader' || shot.target === 'winner'
+      ? at.filter((h) => h.meters === lead)
+      : shot.target === 'contenders' ? contenders
+        : shot.target === 'gate' ? at.filter((h) => h.meters === Math.min(...at.map((x) => x.meters)))
+          : pack;
+    const packS = focusHorses.reduce((sum, h) => sum + h.meters, 0) / Math.max(1, focusHorses.length);
+    const cam = broadcastCamera(COURSE, {
       atS: Math.max(20, Math.min(DIST - 5, packS)),
       width: W, height: H,
+      view: shot.view,
+      preset: shotCameraForDistance(shot, DIST),
     });
+    const useRear = shot.view === 'rear';
+    const useDiagRear = shot.view === 'diag-rear';
+    const useDiagFront = shot.view === 'diag-front';
+    const useHighDiag = shot.view === 'high-diag';
+    const horseSheet = useRear ? art.rear : useDiagRear ? art.diagRear : useDiagFront ? art.diagFront : useHighDiag ? art.highDiag : art.side;
+    const horseSpec = useRear ? SHEET_REAR : useDiagRear ? SHEET_DIAG_REAR_V1 : useDiagFront ? SHEET_DIAG_FRONT_V1 : useHighDiag ? SHEET_HIGH_DIAG_V1 : SHEET_V2;
     ctx.imageSmoothingEnabled = true;   // ★遠近で滑らかに縮む。整数倍はもうやりません
-    drawPerspectiveWorld(ctx, COURSE, cam, art.pal as Record<string, string>, DIST);
+    drawPerspectiveWorld(ctx, COURSE, cam, art.pal as Record<string, string>, DIST, packS);
     drawPerspectiveHorses(ctx, COURSE, cam,
       at.map((h) => ({ gate: h.gate, s: h.meters, w: h.w ?? COURSE.widthM / 2 })), {
-        sheet: art.rear, sheetWidth: art.rear.width, spec: SHEET_REAR,
+        sheet: horseSheet, sheetWidth: horseSheet.width, spec: horseSpec,
         fieldSize: FIELD,
         // ★脚は**表示の時間**で回す（距離で回すと道中の早送りで小走りになる）
-        frameOf: (g) => Math.floor(d * 16 + g * 0.37 * 8) % 8,
+        frameOf: (g) => Math.floor(d * 16 + g * 0.37 * horseSpec.frames) % horseSpec.frames,
         frameRoleOf, distanceMeter: DIST,
       });
 

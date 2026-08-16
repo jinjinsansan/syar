@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "asset": "horse-diag-front-v1.png",
+  "role": "runtime-directional-animation-sheet",
+  "view": "diag-front",
+  "motion": "gallop",
+  "frames": 4,
+  "frameOrder": ["gather", "push", "flight", "landing"],
+  "rows": 8,
+  "cell": { "width": 300, "height": 274 },
+  "anchor": { "xRatio": 0.5805739514, "yRatio": 1.0 },
+  "productionStatus": "runtime-v1",
+  "runtimeReady": true,
+  "alignment": {
+    "method": "blue-silk-centroid-and-width",
+    "sourceCell": { "width": 453, "height": 413 },
+    "sourceSilkAnchor": { "x": 263, "y": 54 }
+  },
+  "generation": {
+    "mode": "built-in imagegen identity-preserving edits",
+    "promptSet": [
+      "Preserve the approved horse, jockey, tack, palette, high three-quarter-front camera and solid green background; change only the legs to a compact gather phase.",
+      "Preserve all identity and camera invariants; change only the four legs to a powerful push-off phase.",
+      "Preserve all identity and camera invariants; change only the four legs to a maximum-extension flight phase.",
+      "Preserve all identity and camera invariants; change only the four legs to a landing/support phase."
+    ],
+    "backgroundRemoval": "remove_chroma_key.py auto-key border soft-matte despill",
+    "assemblyTool": "tools/assemble-directional-frames.mjs",
+    "paletteTool": "tools/bake-oblique-sheet.mjs"
+  }
+}

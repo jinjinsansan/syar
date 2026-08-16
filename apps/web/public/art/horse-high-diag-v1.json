@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "asset": "horse-high-diag-v1.png",
+  "role": "runtime-directional-animation-sheet",
+  "view": "high-diag",
+  "motion": "gallop",
+  "frames": 4,
+  "frameOrder": ["gather", "push", "flight", "landing"],
+  "rows": 8,
+  "cell": { "width": 300, "height": 202 },
+  "anchor": { "xRatio": 0.5692695214, "yRatio": 1.0 },
+  "productionStatus": "runtime-v1",
+  "runtimeReady": true,
+  "alignment": {
+    "method": "blue-silk-centroid-and-width",
+    "sourceCell": { "width": 397, "height": 267 },
+    "sourceSilkAnchor": { "x": 226, "y": 56 }
+  },
+  "generation": {
+    "mode": "built-in imagegen identity-preserving edits",
+    "promptSet": [
+      "Create the approved horse and jockey from an elevated high-oblique side camera, running screen-right, in maximum-extension flight.",
+      "Preserve identity and camera; change only the legs to compact gather.",
+      "Preserve identity and camera; change only the legs to powerful push-off.",
+      "Preserve identity and camera; change only the legs to landing/support."
+    ],
+    "backgroundRemoval": "remove_chroma_key.py auto-key border soft-matte despill",
+    "assemblyTool": "tools/assemble-directional-frames.mjs",
+    "paletteTool": "tools/bake-oblique-sheet.mjs"
+  }
+}

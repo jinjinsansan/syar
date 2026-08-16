@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "asset": "horse-diag-front-master.png",
+  "role": "directional-animation-master",
+  "view": "diag-front",
+  "motion": "gallop",
+  "frames": 1,
+  "rows": 1,
+  "productionStatus": "approved-master-not-runtime-sheet",
+  "runtimeReady": false,
+  "anchor": {
+    "xRatio": 0.5,
+    "yRatio": 0.91,
+    "note": "各アニメーションコマで最下部の接地蹄を同じ基準線へ揃える"
+  },
+  "requiredRuntimeSheet": {
+    "frames": 8,
+    "frameOrder": [
+      "gather",
+      "push",
+      "extension",
+      "flight",
+      "landing",
+      "support",
+      "recovery",
+      "gather-return"
+    ],
+    "frameColorRows": 8,
+    "directions": ["diag-front"],
+    "requirements": [
+      "全コマで馬体・騎手・鞍・手綱の同一性を維持する",
+      "接地基準線を固定する",
+      "頭部と胴体の画面内重心がコマ間で跳ねない",
+      "枠色以外の画素を行間で変更しない",
+      "実行時に単一マスターを8回複製して代用しない"
+    ]
+  },
+  "generation": {
+    "mode": "built-in imagegen with two local style references",
+    "backgroundRemoval": "remove_chroma_key.py auto-key border soft-matte despill",
+    "sourceKeyedAsset": "design/race-assets/horse-diag-front-master-key.png"
+  }
+}

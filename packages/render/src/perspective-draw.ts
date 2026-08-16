@@ -12,13 +12,14 @@
  *   ・**UI**: `oblique-ui` と同じ扱い（画面の座標系のもの）。
  */
 
-import { posOf, type Course } from './course.js';
+import { posOf, segmentAt, type Course } from './course.js';
 import {
   cameraBasis, project, horizonY,
   type PerspectiveCamera,
 } from './perspective.js';
 import type { Ctx2D, Palette } from './oblique-draw.js';
 import type { SheetSpec } from './oblique-draw.js';
+import type { ShotCameraPreset, ShotView } from './shot-sequence.js';
 
 /** 1頭ぶん（★位置は `PositionModel` が持つ。ここは受け取るだけ） */
 export interface PerspHorse {
@@ -146,7 +147,72 @@ export function chaseCamera(
   };
 }
 
+/**
+ * ショット定義を実際のカメラ方位へ変換する。
+ * `atS`は注視対象のコース位置であり、馬の位置や着順は変更しない。
+ */
+export function broadcastCamera(
+  course: Course,
+  opts: {
+    readonly atS: number;
+    readonly width: number;
+    readonly height: number;
+    readonly view: ShotView;
+    readonly preset: ShotCameraPreset;
+  },
+): PerspectiveCamera {
+  const c = posOf(course, opts.atS, course.widthM / 2);
+  const a = posOf(course, opts.atS + 20, course.widthM / 2);
+  const dl = Math.hypot(a.x - c.x, a.y - c.y) || 1;
+  const fx = (a.x - c.x) / dl;
+  const fy = (a.y - c.y) / dl;
+  const nx = -fy;
+  const ny = fx;
+  const inner = posOf(course, opts.atS, 0);
+  const outer = posOf(course, opts.atS, course.widthM);
+  const outside = ((outer.x - inner.x) * nx + (outer.y - inner.y) * ny) >= 0 ? 1 : -1;
+  const p = opts.preset;
+
+  let along = -p.backM;
+  let across = p.sideM * outside;
+  if (opts.view === 'side') {
+    along = -p.sideM * 0.25;
+    across = p.backM * outside;
+  } else if (opts.view === 'diag-front') {
+    along = p.backM;
+    across = p.sideM * outside;
+  } else if (opts.view === 'high-diag') {
+    along = -p.backM * 0.45;
+    across = Math.max(p.sideM, p.backM * 0.55) * outside;
+  } else if (opts.view === 'rear') {
+    across = 0;
+  }
+
+  return {
+    eye: {
+      x: c.x + fx * along + nx * across,
+      y: c.y + fy * along + ny * across,
+      z: p.upM,
+    },
+    target: { x: c.x, y: c.y, z: 0.8 },
+    fovY: (p.fovDeg * Math.PI) / 180,
+    width: opts.width,
+    height: opts.height,
+  };
+}
+
 interface Ctx extends Ctx2D<never> {}
+
+export type BroadcastEnvironment = 'gate' | 'backstretch' | 'corner' | 'homestretch';
+
+/** 注視地点から背景の役割を決める。カメラ座標や時刻には依存しない。 */
+export function broadcastEnvironmentAt(course: Course, focusS: number): BroadcastEnvironment {
+  const label = segmentAt(course, focusS).label;
+  if (label === '向正面') return 'backstretch';
+  if (label.includes('角')) return 'corner';
+  if (label === '直線') return 'homestretch';
+  return 'gate';
+}
 
 /**
  * ★**世界を描く**（空・スタンド・反対側の走路・内馬場・ダート・芝・刈り目・ラチ）。
@@ -161,6 +227,7 @@ export function drawPerspectiveWorld(
   cam: PerspectiveCamera,
   pal: Palette,
   distanceMeter: number,
+  focusS: number = distanceMeter,
 ): void {
   const basis = cameraBasis(cam);
   const W = cam.width;
@@ -169,6 +236,11 @@ export function drawPerspectiveWorld(
     const p = posOf(course, s, w);
     return project(cam, basis, { x: p.x, y: p.y, z });
   };
+  const environment = broadcastEnvironmentAt(course, focusS);
+
+  // 投影帯の外側も競馬場の地表である。透明（Canvas/CSS次第では黒）を残さない。
+  ctx.fillStyle = pal['turf-4'] ?? '#355a35';
+  ctx.fillRect(0, 0, cam.width, cam.height);
 
   // 空
   const top = Math.max(0, Math.round(hz));
@@ -203,17 +275,20 @@ export function drawPerspectiveWorld(
       ctx.closePath(); ctx.fill();
     }
   };
-  /** ★ラチ。柱も立てる — **速度感は柱の間隔から出ます** */
+  /** ★ラチ。上下2本の横木と柱で、一本線のデバッグ表示に見せない。 */
   const rail = (w: number, color: string, postEveryM: number, postH: number): void => {
-    ctx.strokeStyle = color; ctx.lineWidth = 2;
-    ctx.beginPath();
-    let started = false;
-    for (let s = NEAR; s <= FAR; s += 6) {
-      const p = P(s, w, postH * 0.55);
-      if (p.depth <= 1) { started = false; continue; }
-      if (!started) { ctx.moveTo(p.x, p.y); started = true; } else ctx.lineTo(p.x, p.y);
+    ctx.strokeStyle = color;
+    for (const height of [postH * 0.48, postH * 0.88]) {
+      ctx.lineWidth = height > postH * 0.6 ? 2.4 : 1.25;
+      ctx.beginPath();
+      let started = false;
+      for (let s = NEAR; s <= FAR; s += 6) {
+        const p = P(s, w, height);
+        if (p.depth <= 1) { started = false; continue; }
+        if (!started) { ctx.moveTo(p.x, p.y); started = true; } else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
     if (postEveryM <= 0) return;
     ctx.lineWidth = 1;
     for (let s = Math.floor(NEAR / postEveryM) * postEveryM; s <= FAR; s += postEveryM) {
@@ -224,10 +299,10 @@ export function drawPerspectiveWorld(
   };
 
   const WD = course.widthM;
-  band(-260, -120, pal['turf-1'] ?? '#2f5a38', 20);      // ★反対側の走路とその外
-  rail(-120, pal['rail-1'] ?? '#c9cfc2', 0, 1.2);
-  band(-120, -14, pal['hedge-1'] ?? '#27472e', 16);      // 内馬場
-  band(-14, -1.5, pal['dirt-2'] ?? '#6b4c34', 10);       // ダート
+  band(-260, -120, pal['turf-1'] ?? '#2f5a38', 20);      // 反対側の走路とその外
+  rail(-120, pal['rail-2'] ?? '#b3ad9a', 14, 1.15);
+  band(-120, -5, pal['hedge-2'] ?? '#26381f', 16);        // 暗い樹林・内馬場
+  band(-5, -1.5, pal['dirt-3'] ?? '#4f3a25', 8);          // 内ラチ沿いの細い管理路
   rail(-1.5, pal['dirt-3'] ?? '#8a6', 0, 1.0);
   band(0, WD, pal['turf-3'] ?? '#3f6b43', 6);            // 芝
   /**
@@ -235,7 +310,7 @@ export function drawPerspectiveWorld(
    * ⚠️ 内外にも刻むと市松になります。斜めに見えるのは**投影の結果**です。
    */
   const STRIPE = 22;
-  ctx.globalAlpha = 0.5;
+  ctx.globalAlpha = 0.18;
   ctx.fillStyle = pal['turf-2'] ?? '#4a7a4e';
   for (let s = Math.floor(NEAR / (STRIPE * 2)) * STRIPE * 2; s < FAR; s += STRIPE * 2) {
     for (let t = s; t < s + STRIPE; t += 6) {
@@ -248,7 +323,110 @@ export function drawPerspectiveWorld(
     }
   }
   ctx.globalAlpha = 1;
+
+  // 進行方向に沿う芝の筋。規則的な大面積の市松模様を崩し、速度感を補う。
+  ctx.strokeStyle = pal['turf-1'] ?? '#6d8c5b';
+  ctx.globalAlpha = 0.13;
+  ctx.lineWidth = 1;
+  for (let lane = 1.5; lane < WD; lane += 2.6) {
+    ctx.beginPath();
+    let started = false;
+    for (let s = NEAR; s <= FAR; s += 8) {
+      const p = P(s, lane, 0.01);
+      if (p.depth <= 1) { started = false; continue; }
+      if (!started) { ctx.moveTo(p.x, p.y); started = true; } else ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
   band(WD, WD + 160, pal['turf-4'] ?? '#356', 10);       // ★外側（隅の抜けを塞ぐ）
+
+  // 区間ごとの遠景建築。直線は観客席、向正面は低い設備棟、コーナーは樹林を主役にする。
+  if (environment === 'homestretch' || environment === 'backstretch') {
+    const buildingW = environment === 'homestretch' ? -42 : -36;
+    const buildingH = environment === 'homestretch' ? 6.0 : 3.2;
+    const moduleM = environment === 'homestretch' ? 28 : 42;
+    const fromS = Math.max(-100, focusS - 190);
+    const toS = Math.min(distanceMeter + 100, focusS + 190);
+    for (let s = fromS; s < toS; s += moduleM) {
+      const endS = Math.min(toS, s + moduleM + 0.5);
+      const a = P(s, buildingW, 0), b = P(endS, buildingW, 0);
+      const c = P(endS, buildingW, buildingH), d = P(s, buildingW, buildingH);
+      if ([a, b, c, d].some((p) => p.depth <= 3)) continue;
+      if (Math.max(a.x, b.x, c.x, d.x) < -40 || Math.min(a.x, b.x, c.x, d.x) > W + 40) continue;
+      ctx.fillStyle = pal[environment === 'homestretch' ? 'stand-0' : 'backside-3'] ?? '#2a2e35';
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.fill();
+      const crowdTop = environment === 'homestretch' ? 0.28 : 0.12;
+      ctx.fillStyle = pal[environment === 'homestretch' ? 'crowd-2' : 'backside-1'] ?? '#665f52';
+      ctx.globalAlpha = environment === 'homestretch' ? 0.48 : 0.24;
+      ctx.beginPath();
+      ctx.moveTo(d.x, d.y + (a.y - d.y) * crowdTop);
+      ctx.lineTo(c.x, c.y + (b.y - c.y) * crowdTop);
+      ctx.lineTo(c.x, c.y + (b.y - c.y) * 0.62);
+      ctx.lineTo(d.x, d.y + (a.y - d.y) * 0.62);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+      if (environment === 'homestretch') {
+        ctx.strokeStyle = pal['stand-0'] ?? '#2a2e35'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(c.x, c.y); ctx.stroke();
+      }
+    }
+  }
+
+  /**
+   * コースに固定された遠景。画面座標へ直接貼らず、馬と同じ透視投影を使う。
+   * 木々は内馬場の奥、標識は内ラチ際、照明塔はさらに奥へ置く。
+   */
+  const scenery: Array<{ depth: number; draw: () => void }> = [];
+  const treeStep = environment === 'corner' ? 13 : environment === 'gate' ? 18 : 26;
+  for (let s = -200; s <= distanceMeter + 200; s += treeStep) {
+    const base = P(s, -22, 0);
+    const crown = P(s, -22, 3.5 + ((Math.abs(s) / treeStep) % 3) * 0.45);
+    if (base.depth <= 2 || crown.depth <= 2 || base.x < -100 || base.x > W + 100) continue;
+    const crownH = Math.max(2, base.y - crown.y);
+    if (crownH > 42) continue; // 近景の巨大な円形樹冠は中継背景に使わない
+    const crownW = crownH * (0.82 + ((Math.abs(s) / treeStep) % 4) * 0.07);
+    scenery.push({ depth: base.depth, draw: () => {
+      ctx.fillStyle = pal[((Math.abs(s) / treeStep) % 3) < 1 ? 'tree-2' : 'tree-3'] ?? '#26351f';
+      for (const [ox, oy, rx, ry] of [
+        [-0.26, 0.46, 0.34, 0.31], [0, 0.32, 0.42, 0.38], [0.28, 0.48, 0.32, 0.29],
+      ] as const) {
+        ctx.beginPath();
+        ctx.ellipse(crown.x + crownW * ox, crown.y + crownH * oy,
+          crownW * rx, crownH * ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } });
+  }
+  scenery.sort((a, b) => b.depth - a.depth).forEach((x) => x.draw());
+
+  // 距離標識。固有ロゴや文字は使わず、白い屋外板＋赤い天端だけで識別する。
+  for (let s = 200; s < distanceMeter; s += 200) {
+    const foot = P(s, -0.75, 0), top = P(s, -0.75, 3.2);
+    if (foot.depth <= 2 || top.depth <= 2 || foot.x < -30 || foot.x > W + 30) continue;
+    const h = Math.max(2, foot.y - top.y), w = Math.max(2, h * 0.38);
+    if (h > 54) continue;
+    ctx.fillStyle = pal['sign-0'] ?? '#e8e3d2';
+    ctx.fillRect(top.x - w / 2, top.y, w, h * 0.58);
+    ctx.fillStyle = pal['mark-red'] ?? '#c8503a';
+    ctx.fillRect(top.x - w / 2, top.y, w, Math.max(1, h * 0.1));
+    ctx.strokeStyle = pal['sign-3'] ?? '#4c4840';
+    ctx.lineWidth = Math.max(1, w * 0.08);
+    ctx.beginPath(); ctx.moveTo(foot.x, foot.y); ctx.lineTo(top.x, top.y + h * 0.58); ctx.stroke();
+  }
+
+  // 照明塔。遠景に細い垂直基準を作り、コースのスケールを読めるようにする。
+  for (let s = 0; s <= distanceMeter; s += 400) {
+    const foot = P(s, -15, 0), top = P(s, -15, 14);
+    if (foot.depth <= 4 || top.depth <= 4 || foot.x < -40 || foot.x > W + 40) continue;
+    const lampW = Math.max(3, (foot.y - top.y) * 0.22);
+    ctx.strokeStyle = pal['stand-3'] ?? '#5e646d';
+    ctx.lineWidth = Math.max(1, lampW * 0.12);
+    ctx.beginPath(); ctx.moveTo(foot.x, foot.y); ctx.lineTo(top.x, top.y); ctx.stroke();
+    ctx.fillStyle = pal['paper-1'] ?? '#efe9dc';
+    ctx.fillRect(top.x - lampW / 2, top.y - lampW * 0.16, lampW, Math.max(2, lampW * 0.32));
+  }
+
   rail(0, pal['rail-0'] ?? '#e8eade', 8, 1.3);
   rail(WD, pal['rail-1'] ?? '#c9cfc2', 8, 1.4);
 

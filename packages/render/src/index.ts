@@ -11,3 +11,4 @@ export * from './oblique-draw.js';
 export * from './oblique-ui.js';
 export * from './perspective.js';
 export * from './perspective-draw.js';
+export * from './shot-sequence.js';

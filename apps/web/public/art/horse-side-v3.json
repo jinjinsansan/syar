@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "asset": "horse-side-v3.png",
+  "role": "runtime-directional-animation-sheet",
+  "view": "side",
+  "motion": "gallop",
+  "frames": 8,
+  "rows": 8,
+  "cell": { "width": 300, "height": 209 },
+  "productionStatus": "runtime-cleaned",
+  "runtimeReady": true,
+  "source": "horse-oblique-v2.png",
+  "cleanup": {
+    "tool": "tools/clean-sprite-sheet-components.mjs",
+    "method": "per-cell strong-alpha connected component and main-bounds cleanup",
+    "alphaThreshold": 96,
+    "removedAlphaPixels": 9752,
+    "note": "Removes fragments leaked from neighbouring animation cells without regenerating the approved horse art."
+  }
+}

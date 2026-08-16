@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "source": "ダービースタリオン/ダービースタリオン2025の２D参考用.mp4",
+  "recording": {
+    "width": 296,
+    "height": 640,
+    "durationSec": 53.075,
+    "estimatedGameViewport": { "x": 0, "y": 145, "width": 296, "height": 190 }
+  },
+  "shots": [
+    { "fromSec": 1.3, "toSec": 3.0, "family": "start-wide", "view": "diag-rear", "target": "gate" },
+    { "fromSec": 3.0, "toSec": 9.0, "family": "side-pack", "view": "side", "target": "pack" },
+    { "fromSec": 9.0, "toSec": 15.0, "family": "close-pack", "view": "diag-front", "target": "contenders" },
+    { "fromSec": 15.0, "toSec": 24.0, "family": "side-pack", "view": "side", "target": "pack" },
+    { "fromSec": 24.0, "toSec": 27.5, "family": "transition", "view": "side", "target": "pack" },
+    { "fromSec": 27.5, "toSec": 31.0, "family": "corner-wide", "view": "high-diag", "target": "pack" },
+    { "fromSec": 31.0, "toSec": 42.4, "family": "corner-chase", "view": "diag-rear", "target": "contenders" },
+    { "fromSec": 42.4, "toSec": 49.0, "family": "straight-wide", "view": "side", "target": "contenders" },
+    { "fromSec": 49.0, "toSec": 52.1, "family": "finish", "view": "diag-front", "target": "leader" }
+  ]
+}

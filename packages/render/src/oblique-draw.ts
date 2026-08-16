@@ -339,6 +339,18 @@ export const SHEET_V2: SheetSpec = {
 export const SHEET_REAR: SheetSpec = {
   frames: 8, cellH: 506, anchorXRatio: 0.50, anchorYRatio: 1.0,
 };
+/** 斜め前の中継カメラ用（4コマ・セル 300×274）。勝負服の重心で機械整列済み。 */
+export const SHEET_DIAG_FRONT_V1: SheetSpec = {
+  frames: 4, cellH: 274, anchorXRatio: 263 / 453, anchorYRatio: 1.0,
+};
+/** 高い斜め俯瞰カメラ用（4コマ・セル 300×202）。勝負服の重心で機械整列済み。 */
+export const SHEET_HIGH_DIAG_V1: SheetSpec = {
+  frames: 4, cellH: 202, anchorXRatio: 226 / 397, anchorYRatio: 1.0,
+};
+/** 斜め後方カメラ用（4コマ・セル 300×249）。勝負服の重心で機械整列済み。 */
+export const SHEET_DIAG_REAR_V1: SheetSpec = {
+  frames: 4, cellH: 249, anchorXRatio: 284 / 425, anchorYRatio: 1.0,
+};
 export const SHEET_FAR: SheetSpec = {
   frames: 8, cellH: 76, anchorXRatio: 0.50, anchorYRatio: 1.0,
 };

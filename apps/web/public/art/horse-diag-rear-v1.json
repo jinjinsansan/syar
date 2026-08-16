@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "asset": "horse-diag-rear-v1.png",
+  "role": "runtime-directional-animation-sheet",
+  "view": "diag-rear",
+  "motion": "gallop",
+  "frames": 4,
+  "frameOrder": ["gather", "push", "flight", "landing"],
+  "rows": 8,
+  "cell": { "width": 300, "height": 249 },
+  "anchor": { "xRatio": 0.6682352941, "yRatio": 1.0 },
+  "productionStatus": "runtime-v1",
+  "runtimeReady": true,
+  "alignment": {
+    "method": "blue-silk-centroid-and-width",
+    "sourceCell": { "width": 425, "height": 353 },
+    "sourceSilkAnchor": { "x": 284, "y": 76 }
+  },
+  "generation": {
+    "mode": "built-in imagegen identity-preserving edits",
+    "promptSet": [
+      "Create the approved horse and jockey from a three-quarter rear camera, running away toward screen-right, in maximum-extension flight.",
+      "Preserve identity and camera; change only the legs to compact gather.",
+      "Preserve identity and camera; change only the legs to powerful push-off.",
+      "Preserve identity and camera; change only the legs to landing/support."
+    ],
+    "backgroundRemoval": "remove_chroma_key.py auto-key border soft-matte despill",
+    "assemblyTool": "tools/assemble-directional-frames.mjs",
+    "paletteTool": "tools/bake-oblique-sheet.mjs"
+  }
+}
