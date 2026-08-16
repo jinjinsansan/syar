@@ -115,6 +115,8 @@ export const READONLY = [
   'align-gallop-sheet.mjs',
   // ★画像を読んで枠色8行に焼くだけ。DB に触れません
   'bake-oblique-sheet.mjs',
+  // ★透視投影の静止画を描くだけ。DB に触れません
+  'shot-perspective.mjs',
   // ★読むだけ。斜め俯瞰の試作を静止画で確かめる
   'shot-oblique.mjs',
   // ★読むだけ。3カットを本番のエンジンで描いて大きさを決める
