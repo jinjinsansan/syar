@@ -181,6 +181,125 @@ export function initialStamina(
 
 export type RunPosition = 'front' | 'middle' | 'back';
 
+// ---------------------------------------------------------------------------
+// ★ゲージの状態（D-072）
+// ---------------------------------------------------------------------------
+
+/**
+ * ★**ゲージが読むもの**（D-070 / D-072）。
+ *
+ * 裁定:
+ *   > エンジンが `intervention.ts` の内部状態を境界で露出。**自馬のみでよい**。
+ *   > 出すのは D-070 の「状態」＝**残量と減り方**。`emptyAtMeter` ではない。
+ *
+ * 【★なぜ「近似」が要らないか】
+ *   消費は**残り距離について区分線形**です（道中の率 → 仕掛けてからの率、の2段だけ）。
+ *   ⚠️ 節目を線で結べば、元の式と**完全に一致**します。**丸めも当てはめもありません。**
+ *
+ * 【★なぜ「1m あたり」で出すか】
+ *   §8b.2 の消費は `基準量 ÷ レース秒数 × 秒数` なので、**秒が約分されて消えます**。
+ *
+ *   ```
+ *   1m あたりの消費 = STAMINA_BASE_DRAIN × ポジション係数 ÷ レース距離
+ *                     ★平均速度が入っていない（約分で消えた）
+ *   ```
+ *
+ *   → ★**残り距離だけで残量が決まります。** 描画層は残り距離を知っているので、
+ *     時刻に直す必要がありません（時刻に直すと `BoundaryTimes` と二重に持つことになる）。
+ *
+ * ⚠️ ★**これは「予言」ではありません。** 位置（`BoundaryTimes`）と同じで、
+ *    再生に必要な全区間を持ちますが、**画面に出してよいのは現在時刻までです**。
+ */
+export interface StaminaSegment {
+  /** この区間の始まり（残り距離 m。★大きいほうが先） */
+  readonly fromMetersLeft: number;
+  /** この区間の終わり（残り距離 m） */
+  readonly toMetersLeft: number;
+  /** ★減り方。1m 進むごとに減る量 */
+  readonly drainPerMeter: number;
+}
+
+export interface StaminaTrack {
+  /** 発走時の残量（§8b.2 の初期ゲージ） */
+  readonly initial: number;
+  /** ★発走→ゴールの順。区間の中では減り方が一定 */
+  readonly segments: readonly StaminaSegment[];
+}
+
+/**
+ * ★ゲージの状態を組み立てる（自馬のみ）。
+ *
+ * ⚠️ ★**`resolveIntervention` はこの関数の結果から答えを出します。**
+ *    別々に計算すると必ず離れるからです（走路の幅が 20m と 25m で離れていたのと同じ形）。
+ */
+export function staminaTrackOf(
+  horse: InterventionHorse,
+  plan: InterventionPlan,
+  distanceMeter: number,
+  balance: InterventionBalance,
+): StaminaTrack {
+  if (!Number.isFinite(distanceMeter) || distanceMeter <= 0) {
+    throw new Error(`レース距離が不正です: ${distanceMeter}`);
+  }
+  const initial = initialStamina(horse.st, horse.condition, horse.fatigue, balance);
+  const earlySpurt = plan.spurtAtMeter > balance.EARLY_SPURT_METER;
+  // ★1m あたりの消費。秒が約分されて消えている（§8b.2・D-017）
+  const cruisePerMeter =
+    (balance.STAMINA_BASE_DRAIN * balance.STAMINA_POSITION_MULT[plan.position]) / distanceMeter;
+  const spurtPerMeter =
+    cruisePerMeter * balance.STAMINA_SPURT_DRAIN * (earlySpurt ? balance.EARLY_SPURT_DRAIN_MULT : 1);
+  const spurtStart = Math.min(Math.max(0, plan.spurtAtMeter), distanceMeter);
+  const segments: StaminaSegment[] = [];
+  if (distanceMeter > spurtStart) {
+    segments.push({
+      fromMetersLeft: distanceMeter,
+      toMetersLeft: spurtStart,
+      drainPerMeter: cruisePerMeter,
+    });
+  }
+  if (spurtStart > 0) {
+    segments.push({ fromMetersLeft: spurtStart, toMetersLeft: 0, drainPerMeter: spurtPerMeter });
+  }
+  return { initial, segments };
+}
+
+/**
+ * ★残り距離 `metersLeft` の時点での残量。
+ *
+ * ⚠️ 返す値は**負になりえます**（＝途中で尽きた）。
+ *    ゲージに出すときは 0 で止めてください。負のままだと棒が裏返ります。
+ */
+export function staminaAtMeter(track: StaminaTrack, metersLeft: number): number {
+  let left = track.initial;
+  for (const seg of track.segments) {
+    // ★この区間で「実際に進んだ距離」だけを引く
+    const from = Math.max(seg.toMetersLeft, Math.min(seg.fromMetersLeft, seg.fromMetersLeft));
+    const to = Math.max(seg.toMetersLeft, Math.min(seg.fromMetersLeft, metersLeft));
+    left -= Math.max(0, from - to) * seg.drainPerMeter;
+  }
+  return left;
+}
+
+/**
+ * ★ゲージが 0 になる地点（残り距離 m）。無ければ `null`。
+ *
+ * ⚠️ ★**これは描画層に渡しません**（D-070）。「バテ」の判定に使う内部の値です。
+ *    渡してしまうと、ゲージが状態ではなく**予言**になります。
+ */
+function emptyAtMeterOf(track: StaminaTrack): number | null {
+  let left = track.initial;
+  if (left <= 0) return track.segments[0]?.fromMetersLeft ?? null;
+  for (const seg of track.segments) {
+    const span = Math.max(0, seg.fromMetersLeft - seg.toMetersLeft);
+    const used = span * seg.drainPerMeter;
+    if (used >= left && seg.drainPerMeter > 0) {
+      return seg.fromMetersLeft - left / seg.drainPerMeter;
+    }
+    left -= used;
+  }
+  return null;
+}
+
 /** 走行中のスタミナ消費（正典 §8b.2） */
 export function drainPerSecond(
   position: RunPosition,
@@ -296,8 +415,17 @@ export function driveBonusOf(
 export function resolveIntervention(
   horse: InterventionHorse,
   plan: InterventionPlan,
-  /** 平均速度 m/s（§8.7 の averageSpeed。残距離を秒に換算するのに使う） */
-  averageSpeedMps: number,
+  /**
+   * 平均速度 m/s（§8.7 の averageSpeed）。
+   *
+   * ⚠️ ★**D-072 以降、結果に影響しません。** 消費を「1m あたり」に直したところ、
+   *    `秒 = m ÷ 平均速度` と `1秒あたりの消費 ∝ 1 ÷ レース秒数` で
+   *    **平均速度が約分で消えました**（値は1ミリも変わりません・検査で固定）。
+   *
+   * ★引数は残してあります。**消すかどうかは裁定をもらいます**（公開している形なので）。
+   *   ⚠️ このままだと「渡した速度が効いている」と読めてしまうのが唯一の難点です。
+   */
+  _averageSpeedMps: number,
   /** レース距離 m。★D-017 で消費がレース時間に対する割合になったので必要 */
   distanceMeter: number,
   balance: InterventionBalance,
@@ -306,35 +434,23 @@ export function resolveIntervention(
   const spurtBonus = spurtBonusOf(plan.spurtAtMeter, balance);
   const driveBonus = driveBonusOf(plan.driveTapsPerSec, horse.gt, balance);
 
-  const stamina0 = initialStamina(horse.st, horse.condition, horse.fatigue, balance);
-  const earlySpurt = plan.spurtAtMeter > balance.EARLY_SPURT_METER;
-
-  // ★D-017: 毎秒消費 = (基準消費量 / レース秒数) × ポジション係数 × ペース係数。
-  //   **レース全体での総消費が距離によらず一定**になるので、2000m でも 3200m でも
-  //   同じ「余力の残り方」になる（旧実装は絶対値 1.0/秒で、2000m だと必ずゲージ0になった）。
-  const raceSec = distanceMeter / averageSpeedMps;
-  const unit = balance.STAMINA_BASE_DRAIN / raceSec; // 1秒あたりの基準消費
-  const spurtStart = Math.min(Math.max(0, plan.spurtAtMeter), distanceMeter);
-  const cruiseMeter = Math.max(0, distanceMeter - spurtStart);
-
-  const cruiseRate = unit * balance.STAMINA_POSITION_MULT[plan.position];
-  const spurtRate =
-    cruiseRate * balance.STAMINA_SPURT_DRAIN * (earlySpurt ? balance.EARLY_SPURT_DRAIN_MULT : 1);
-  const cruiseUsed = (cruiseMeter / averageSpeedMps) * cruiseRate;
-  const spurtUsed = (spurtStart / averageSpeedMps) * spurtRate;
-  const staminaLeft = stamina0 - cruiseUsed - spurtUsed;
+  /**
+   * ★D-072: 消費は**ゲージの状態から読みます**。ここで別に計算しません。
+   *
+   *   ⚠️ 旧実装は毎秒の消費（`基準量 / レース秒数 × ポジション係数`）を
+   *      ここだけで持っていました。★**画面に出す段になったとき、必ず2本目ができます。**
+   *      → 1本にして、`staminaTrackOf` を**唯一の出どころ**にしました。
+   *
+   *   ★数値は1ミリも変わりません。`秒 = m ÷ 平均速度` を代入すると
+   *     平均速度が約分で消え、「1m あたりの消費」に一致します（検査で固定）。
+   *
+   * ★D-017: レース全体での総消費が**距離によらず一定**になる形は変えていません。
+   */
+  const gauge = staminaTrackOf(horse, plan, distanceMeter, balance);
+  const staminaLeft = staminaAtMeter(gauge, 0);
 
   // 「バテ」= 直線（残り400m）に入る前にゲージが尽きること（I-STAMINA-EMPTY）
-  let emptyAtMeter: number | null = null;
-  if (staminaLeft <= 0) {
-    if (cruiseUsed >= stamina0) {
-      const sec = stamina0 / cruiseRate;
-      emptyAtMeter = distanceMeter - sec * averageSpeedMps;
-    } else {
-      const sec = (stamina0 - cruiseUsed) / spurtRate;
-      emptyAtMeter = spurtStart - sec * averageSpeedMps;
-    }
-  }
+  const emptyAtMeter = emptyAtMeterOf(gauge);
   const ranEmpty = emptyAtMeter !== null && emptyAtMeter > balance.STAMINA_EMPTY_METER;
 
   const rawMult =

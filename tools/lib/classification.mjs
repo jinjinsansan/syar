@@ -99,6 +99,8 @@ export const READONLY = [
   'diag-cuts.mjs',
   // ★読むだけ。w による距離ロスの大きさを見積もる（D-065 の手順①）
   'diag-lane-loss.mjs',
+  // ★読むだけ。ゲージの向きを測る（D-072・前回は符号が逆だった）
+  'diag-gauge.mjs',
   // ★読むだけ。斜め俯瞰の試作を静止画で確かめる
   'shot-oblique.mjs',
   // ★読むだけ。3カットを本番のエンジンで描いて大きさを決める

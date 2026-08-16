@@ -24,7 +24,12 @@
  *     「各馬が各境界を通過する時刻」までで、**その導出に使えるのは走破タイムだけ**です。
  */
 
-import { DEFAULT_INTERVENTION_BALANCE } from './intervention.js';
+import {
+  DEFAULT_INTERVENTION_BALANCE,
+  staminaAtMeter,
+  type InterventionBalance,
+  type StaminaTrack,
+} from './intervention.js';
 import type { Strategy } from '@star/sim-engine';
 import type { Pace, RaceResult, RaceResultEntry } from './types.js';
 
@@ -207,6 +212,33 @@ export interface BoundaryTimes {
 }
 
 /**
+ * ★**残り距離 → 時刻**。`x(τ)` の逆関数を二分探索で求めます。
+ *   閉じた式が無いので数値解ですが、**単調増加なので必ず1点に収束**します。
+ *
+ * ⚠️ ★**切り出した理由**: 境界時刻（位置）とゲージ（D-072）の**両方**がこの変換を要ります。
+ *    2か所で書けば必ず離れ、★**ゲージだけ別の時間軸で動く**ことになります。
+ */
+export function secAtMetersLeftOf(
+  finishSec: number,
+  distanceMeter: number,
+  strategy: Strategy,
+  pace: Pace,
+): (metersLeft: number) => number {
+  const shape = paceShape(strategy, pace);
+  return (metersLeft: number): number => {
+    const target = Math.max(0, Math.min(1, (distanceMeter - metersLeft) / distanceMeter));
+    if (target <= 0) return 0;
+    if (target >= 1) return finishSec;
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 40; i += 1) {
+      const mid = (lo + hi) / 2;
+      if (shape(mid) < target) lo = mid; else hi = mid;
+    }
+    return ((lo + hi) / 2) * finishSec;
+  };
+}
+
+/**
  * 各馬の境界通過時刻を出す。
  *
  * ★**走破タイムは動きません**（制約2）。動くのは「途中でどこにいるか」だけです。
@@ -224,22 +256,7 @@ export function boundaryTimesOf(
   if (!Number.isFinite(distanceMeter) || distanceMeter <= 0) {
     throw new Error(`距離が不正です: ${distanceMeter}`);
   }
-  const shape = paceShape(strategy, pace);
-  /**
-   * 距離 → 時刻。`x(τ)` の逆関数を二分探索で求めます。
-   * ★閉じた式が無いので数値解ですが、**単調増加なので必ず1点に収束**します。
-   */
-  const secAt = (metersLeft: number): number => {
-    const target = Math.max(0, Math.min(1, (distanceMeter - metersLeft) / distanceMeter));
-    if (target <= 0) return 0;
-    if (target >= 1) return entry.timeSec;
-    let lo = 0, hi = 1;
-    for (let i = 0; i < 40; i += 1) {
-      const mid = (lo + hi) / 2;
-      if (shape(mid) < target) lo = mid; else hi = mid;
-    }
-    return ((lo + hi) / 2) * entry.timeSec;
-  };
+  const secAt = secAtMetersLeftOf(entry.timeSec, distanceMeter, strategy, pace);
   return {
     gate,
     startSec: 0,
@@ -291,3 +308,124 @@ export function finalOrderMatches(
   for (let i = 0; i < settled.length; i += 1) if (byTime[i] !== settled[i]) return false;
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// ★ゲージ（D-072）— 境界で内部状態を露出する
+// ---------------------------------------------------------------------------
+
+/**
+ * ★ゲージの節目。**残量と減り方**だけ（D-070）。
+ *
+ * ⚠️ ★`emptyAtMeter`（＝いつ尽きるか）は**入れていません**。
+ *    入れるとゲージが「状態」ではなく「予言」になります。
+ */
+export interface StaminaKnot {
+  /** 残り距離 m */
+  readonly metersLeft: number;
+  /** その時点の時刻（秒）。★`BoundaryTimes` と**同じ変換**で出している */
+  readonly sec: number;
+  /**
+   * ★残量。⚠️ **0 未満になりえます**（＝使い切った先）。
+   *
+   *   ★**ここで 0 で止めません。** 止めてから線を引くと、
+   *     ★**0 を跨ぐ区間だけ元の式と合わなくなります**（実測で 0.017 ずれました）。
+   *   → 止めるのは読み出しの一箇所（`staminaAt`）だけにしてあります。
+   */
+  readonly left: number;
+  /** ★減り方。ここから次の節目まで、1m 進むごとに減る量 */
+  readonly drainPerMeter: number;
+}
+
+/**
+ * ★**自馬のゲージ**（§12.6 は「自馬にのみ表示」なので、これ1頭ぶんで足ります）。
+ *
+ * 【★描画層の仕事】
+ *   節目の**間は線で結ぶだけ**です（D-059 と同じ分担）。
+ *   ⚠️ ★**それで元の式と完全に一致します。** 区間の中では減り方が一定だからです。
+ *   ★**式を描画層に書かないでください。** 一度それをやって**符号が逆**になりました
+ *     （残り200m で順位相関 −0.653 ＝ 勝つ馬ほどバテて見えていた）。
+ */
+export interface StaminaGauge {
+  readonly gate: number;
+  /** 発走時の残量 */
+  readonly initial: number;
+  /** ★発走 → ゴールの順 */
+  readonly knots: readonly StaminaKnot[];
+}
+
+/**
+ * ゲージの状態を、**境界の時刻に載せて**出す（D-072）。
+ *
+ * ★節目に採るのは:
+ *   - 4つの境界（発走 / 勝負所 800m / 直線 400m / ゴール）… ★仕掛けの判断がここで起きる
+ *   - ★**減り方が変わる点**（＝仕掛けた地点）… ⚠️ これが無いと、800m と 400m の間で
+ *     率が切り替わったことが**線で結んでも再現できません**
+ */
+export function staminaGaugeOf(
+  track: StaminaTrack,
+  times: BoundaryTimes,
+  distanceMeter: number,
+  strategy: Strategy,
+  pace: Pace,
+): StaminaGauge {
+  const secAt = secAtMetersLeftOf(times.finishSec, distanceMeter, strategy, pace);
+  const marks = new Set<number>([distanceMeter, PHASE_METERS.SPURT, PHASE_METERS.STRAIGHT, 0]);
+  // ★率が変わる点を必ず入れる
+  for (const seg of track.segments) {
+    marks.add(seg.fromMetersLeft);
+    marks.add(seg.toMetersLeft);
+  }
+  const metersLeftDesc = [...marks]
+    .filter((m) => m >= 0 && m <= distanceMeter)
+    .sort((a, b) => b - a);
+  const knots: StaminaKnot[] = metersLeftDesc.map((metersLeft) => ({
+    metersLeft,
+    sec: secAt(metersLeft),
+    left: staminaAtMeter(track, metersLeft),
+    drainPerMeter: drainAt(track, metersLeft),
+  }));
+  return { gate: times.gate, initial: track.initial, knots };
+}
+
+/** その地点で効いている減り方（区間の中では一定） */
+function drainAt(track: StaminaTrack, metersLeft: number): number {
+  for (const seg of track.segments) {
+    // ★節目そのものは「これから進む側」の率を返す（次の節目までの傾き）
+    if (metersLeft <= seg.fromMetersLeft && metersLeft > seg.toMetersLeft) return seg.drainPerMeter;
+  }
+  return track.segments[track.segments.length - 1]?.drainPerMeter ?? 0;
+}
+
+/**
+ * ★ゲージが「息を入れられる状態か」を、**残量と減り方だけ**から言う。
+ *
+ * ⚠️ ★これは**判断の材料**であって、判断ではありません。
+ *    「いつ仕掛けるべきか」を出すと、C-6（人間が読んで押せるか）を測れなくなります
+ *    — 画面が答えを出していたら、押せて当たり前だからです。
+ */
+export function staminaAt(
+  gauge: StaminaGauge,
+  metersLeft: number,
+): { readonly left: number; readonly drainPerMeter: number } {
+  // ★棒が裏返らないよう、0 で止めるのは**ここだけ**（節目は生の値を持っている）
+  const done = (left: number, drainPerMeter: number) => ({ left: Math.max(0, left), drainPerMeter });
+  const ks = gauge.knots;
+  const first = ks[0];
+  const last = ks[ks.length - 1];
+  if (first === undefined || last === undefined) return done(0, 0);
+  if (metersLeft >= first.metersLeft) return done(first.left, first.drainPerMeter);
+  for (let i = 0; i + 1 < ks.length; i += 1) {
+    const a = ks[i]!;
+    const b = ks[i + 1]!;
+    if (metersLeft <= a.metersLeft && metersLeft >= b.metersLeft) {
+      const span = a.metersLeft - b.metersLeft;
+      // ★線で結ぶだけ。区間の中では率が一定なので、これで厳密
+      const t = span > 0 ? (a.metersLeft - metersLeft) / span : 1;
+      return done(a.left + (b.left - a.left) * t, a.drainPerMeter);
+    }
+  }
+  return done(last.left, last.drainPerMeter);
+}
+
+/** 較正の型が要るので再輸出（ゲージの定数は §8b.2 側にある） */
+export type { InterventionBalance };
