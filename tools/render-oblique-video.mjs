@@ -34,7 +34,7 @@ import {
   replayPositionModel, finalOrderOf, ovalCourse, obliqueProject, railPolyline,
   timeWarpFor, knotsFor, ratesForTarget, targetDisplaySec, frameRoleOf,
   // ★描き方は package が唯一の出どころ（この道具には持たない）
-  drawObliqueWorld, drawGauge, drawStandings, drawCallBand, SHEET_V2,
+  drawObliqueWorld, drawGauge, drawStandings, drawCallBand, SHEET_V2, SHEET_FAR,
 } from '@star/render';
 
 /**
@@ -161,7 +161,7 @@ const FINISH_SEC = new Map(result.order.map((e) => [Number(e.horseId), e.timeSec
  *   走路の帯 33% ＝ 20m × pxPerM × depth ÷ 720 → **pxPerM × depth = 11.9**
  */
 const CUTS = {
-  wide: { label: '引き', horseW: 120, cam: { pxPerM: 22, depth: 0.54, anchorX: 470, anchorY: 500 } },
+  wide: { label: '引き', far: true, horseW: 120, cam: { pxPerM: 22, depth: 0.54, anchorX: 470, anchorY: 500 } },
   close: { label: '寄り', horseW: 300, cam: { pxPerM: 46, depth: 0.36, anchorX: 380, anchorY: 560 } },
   goal: { label: 'ゴール', horseW: 190, cam: { pxPerM: 34, depth: 0.22, anchorX: 560, anchorY: 540 } },
 };
@@ -179,7 +179,13 @@ async function main() {
  *   ⚠️ ★コマ数が 6 → 8 に変わっています。**シートの形も一緒に渡します**
  *      （渡さないと、黙って別のコマを切り出して描きます）。
  */
-const img = await loadImage(path.resolve('apps/web/public/art/horse-oblique-v2.png'));
+const imgNear = await loadImage(path.resolve('apps/web/public/art/horse-oblique-v2.png'));
+/**
+ * ★引き用は**別に描き起こした**シート（120px）。
+ * ⚠️ 寄りの 300px を 0.4倍に縮めて描いていました。半端な比なので輪郭が濁ります
+ *    — 契約 §5 で自分が禁じていた形を、自分でやっていました。
+ */
+const imgFar = await loadImage(path.resolve('apps/web/public/art/horse-oblique-far.png'));
 
   const total = Math.ceil(warp.displaySec * FPS);
   console.log(`★${DIST}m・${FIELD}頭・シード ${SEED}`);
@@ -217,14 +223,15 @@ const img = await loadImage(path.resolve('apps/web/public/art/horse-oblique-v2.p
       course: COURSE, cam, pal, viewport: { width: W, height: H }, distanceMeter: DIST,
       horses: at.map((h) => ({ gate: h.gate, meters: h.meters, w: h.w ?? COURSE.widthM / 2 })),
       fieldSize: FIELD, horseWidthPx: cut.horseW,
-      sheet: img, sheetWidth: img.width,
+      sheet: cut.far === true ? imgFar : imgNear,
+      sheetWidth: (cut.far === true ? imgFar : imgNear).width,
       /**
        * ★脚は**表示の時間**で回します（D-062 の教訓）。
        *   ⚠️ 距離で回すと、道中を速く送ったときに**脚も速く回り**、小走りに見えます。
        *   ★競走馬は毎秒およそ2歩。6コマ1完歩なので **毎秒12コマ**。
        */
       frameOf: (g) => Math.floor(dispSec * 16 + g * 0.37 * 8) % 8,
-      sheet_: SHEET_V2,
+      sheet_: cut.far === true ? SHEET_FAR : SHEET_V2,
       modeOf: (h) => (h.meters >= DIST ? 'celebrate' : (DIST - h.meters) <= 400 ? 'drive' : 'cruise'),
       ridePhase: dispSec * 2,
       gateWOf: (g) => laneAtStart(g, FIELD, TRACK_WIDTH_M),

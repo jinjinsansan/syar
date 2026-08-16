@@ -150,10 +150,22 @@ if (silks.length !== f.length) {
  */
 const sortedB = [...bottoms].sort((p, q) => p - q);
 const med = sortedB[Math.floor(sortedB.length / 2)];
-const floats = f.filter((m) => med - m.bottom >= 15).map((m) => m.k);
+/**
+ * ⚠️ ★**「15px 以上」と絶対値で書いていました。間違いです。**
+ *    シートの大きさが変わると意味が変わります。実際、
+ *    near（高さ 182px）では 40px 浮いて通り、
+ *    ★far（高さ 110px）では 14px 浮いているのに**落ちました**。
+ *    ★浮いている割合は far のほうが大きいのに、です。
+ * → **馬の高さに対する割合**で見ます。
+ */
+const medH = [...f.map((m) => m.height)].sort((p2, q2) => p2 - q2)[Math.floor(f.length / 2)];
+const FLOAT_RATIO = 0.08;
+const floatPx = medH * FLOAT_RATIO;
+const floats = f.filter((m) => med - m.bottom >= floatPx).map((m) => m.k);
 const bob = Math.max(...f.filter((m) => !floats.includes(m.k)).map((m) => m.bottom))
           - Math.min(...f.filter((m) => !floats.includes(m.k)).map((m) => m.bottom));
-console.log(`  ② 宙に浮くコマ            ${floats.length === 0 ? '★無し' : `コマ ${floats.join(',')}`}`);
+console.log(`  ② 宙に浮くコマ            ${floats.length === 0 ? '★無し' : `コマ ${floats.join(',')}`}`
+  + `（判定: 馬の高さ ${medH}px の ${(FLOAT_RATIO * 100).toFixed(0)}% ＝ ${floatPx.toFixed(0)}px 以上）`);
 console.log(`  ③ 接地コマの上下動        ${bob}px（★これは自然な動きです）`);
 if (floats.length === 0) {
   fails.push('② ★宙に浮くコマがありません → **行進に見えます**（駆歩は1完歩に1回浮きます）');

@@ -1,0 +1,29 @@
+Read the existing sprite sheet at design/art/assets/horse-gallop-near.png
+(2288 x 199 pixels, 8 frames of a galloping racehorse with jockey, each cell 286 x 199).
+
+Produce a NEW sheet with exactly the same dimensions (2288 x 199, 8 frames of 286 x 199)
+and save it in the CURRENT WORKING DIRECTORY named exactly: horse-gallop-drive.png
+
+CRITICAL — the HORSE must be IDENTICAL to the source, pixel for pixel where possible:
+same pose in every frame, same position inside every cell, same coat, same mane and
+tail, same bridle, same legs. Do NOT redraw the horse. Do NOT move it.
+The game switches between the two sheets in the middle of a race, so any change to
+the horse will look like the horse was swapped.
+
+ONLY the JOCKEY changes. This is the "driving" pose used in the final straight,
+when the rider is asking the horse for everything:
+ - The back is LOWER: the top of the helmet drops about 6 pixels closer to the mane.
+ - The hands PUSH FORWARD along the neck, about 8 pixels further forward than in
+   the source, reins still held in both hands.
+ - The rider now carries a WHIP in the right hand (the hand nearest the viewer).
+   In frames 0 and 4 the whip is RAISED behind the shoulder.
+   In frames 2 and 6 the whip is coming DOWN against the horse's flank.
+   In the other frames the whip is in between.
+ - Keep the same blue silks (hue 200-260, saturation 0.35 or higher), the same
+   white breeches, the same black boots, the same helmet shape.
+ - The saddle and saddle cloth do NOT move. Leave the saddle cloth COMPLETELY BLANK.
+
+Keep the transparent background. No text, no logos, no watermarks, no ground,
+no shadow. Same hard-edged pixel-art style as the source.
+
+Do NOT depict any real racehorse, owner, stable, racecourse or real silk design.

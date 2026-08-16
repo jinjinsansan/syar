@@ -1,0 +1,47 @@
+Generate a pixel-art SPRITE SHEET of a galloping racehorse with jockey and save it
+as a PNG file in the CURRENT WORKING DIRECTORY named exactly: horse-gallop-far.png
+
+THE BACKGROUND MUST BE FULLY TRANSPARENT (RGBA PNG with a real alpha channel).
+Do NOT fill the background with black, white or any colour. If the tool cannot
+write alpha, stop and say so rather than delivering an opaque background.
+
+LAYOUT (strict):
+- 8 frames of ONE complete gallop cycle, in ONE HORIZONTAL ROW (1 row x 8 columns).
+- Each cell is exactly 160 x 110 pixels. Total image: 1280 x 110 pixels.
+- Side view, the horse faces RIGHT in every frame.
+- The horse is SMALL: its outer bounding box (tail tip to nose) is about
+  120 pixels wide. This sprite is used when the camera is far away and about
+  10 horses are on screen at once.
+- No text, no logo, no grid lines, no frame numbers, no ground, no shadow.
+
+ALIGNMENT (matters more than detail at this size):
+- All 8 frames share the same ground line and the same body position inside the
+  cell, so the horse does not bounce or slide when the frames are played in order.
+
+THE 8 FRAMES, in order:
+  0  full extension - fore and hind legs stretched furthest apart
+  1  landing, legs beginning to gather
+  2  collected - legs folding under the body
+  3  MOST COLLECTED - all four legs gathered beneath the belly, one HIND hoof
+     still down, neck raised, back rounded, body shortest
+  4  push-off from the hind legs
+  5  collected again, opening up
+  6  SUSPENSION - all four hooves clear of the ground, body floating
+  7  returning toward full extension
+
+STYLE - readable at small size:
+- Clean hard-edged pixels. NO anti-aliasing on the outline, no blur.
+- At 120 pixels wide the silhouette carries everything: make the LEG POSITIONS
+  unmistakable in every frame. Reduce interior detail rather than the silhouette.
+- Bay horse: warm brown coat, black mane and tail streaming backward, black lower
+  legs. Simple bridle. Keep the shading simple - a light side and a shadow side.
+
+THE JOCKEY:
+- Crouched forward over the withers in every frame, small but clearly a rider:
+  helmet, rounded back, one visible arm reaching down the neck.
+- Silks (jacket, cap, sleeves) must be BLUE: hue 200-260 degrees, saturation 0.35
+  or higher. White breeches.
+- A plain saddle cloth under the saddle, COMPLETELY BLANK - no number, no logo.
+
+Do NOT depict any real racehorse, owner, stable, racecourse, or any real silk
+design. Invent the silks. No text, no logos, no watermarks anywhere.

@@ -319,9 +319,20 @@ export interface SheetSpec {
 export const SHEET_V1: SheetSpec = {
   frames: 6, cellH: 120, anchorXRatio: 52 / 160, anchorYRatio: 116 / 120,
 };
-/** ★第3便のシート（8コマ・セル 300×209）。接地点は整列で下端付近に揃っています */
+/** ★第3便の寄り用（8コマ・セル 300×209）。接地点は整列で下端付近に揃っています */
 export const SHEET_V2: SheetSpec = {
   frames: 8, cellH: 209, anchorXRatio: 0.50, anchorYRatio: 1.0,
+};
+/**
+ * ★第3便の引き用（8コマ・セル 120×76）。
+ *
+ * ⚠️ ★引きも寄りのシート（300px）を **0.4倍**に縮めて描いていました。
+ *    半端な比なので**画素の格子が合わず、輪郭が濁ります**
+ *    — 契約 §5 で自分が禁じていた形を、自分でやっていました。
+ * → ★引き用は**別に描き起こした**シートを使います。
+ */
+export const SHEET_FAR: SheetSpec = {
+  frames: 8, cellH: 76, anchorXRatio: 0.50, anchorYRatio: 1.0,
 };
 
 /**
