@@ -1,0 +1,56 @@
+Generate a pixel-art SPRITE SHEET of a galloping racehorse with jockey seen FROM
+BEHIND, and save it in the CURRENT WORKING DIRECTORY named exactly:
+horse-gallop-rear.png
+
+THE BACKGROUND MUST BE FULLY TRANSPARENT (RGBA PNG with a real alpha channel).
+Do NOT fill the background with black, white or any colour.
+
+VIEW - this is the important part:
+The camera is BEHIND the horse and slightly ABOVE it, as if a television camera
+is following the field down the track. We are looking at the horse's HINDQUARTERS
+and at the JOCKEY'S BACK. The horse is running directly AWAY from the viewer.
+We see: the rump, the tail hanging and swinging between us and the horse, both
+hind legs, the saddle cloth from behind, the jockey's back, shoulders, and the
+helmet from behind, and the soles of the boots in the stirrups.
+We do NOT see the horse's head except as a small sliver past the shoulders.
+This is a three-quarter REAR view, turned about 15 degrees so it does not look
+perfectly symmetrical - the horse angles very slightly to the right.
+
+LAYOUT (strict):
+- 8 frames of ONE complete gallop cycle, in ONE HORIZONTAL ROW (1 row x 8 columns).
+- Each cell is exactly 220 x 260 pixels. Total image: 1760 x 260 pixels.
+- The horse's outer bounding box is about 170 pixels wide and 240 pixels tall.
+- No text, no logo, no grid lines, no frame numbers, no ground, no shadow.
+
+ALIGNMENT (matters more than detail):
+- ALL 8 frames share the same GROUND LINE at y = 252 and the same body-center
+  x = 110, measured from each cell's top-left corner.
+- In frames 0-5 and 7 the supporting hoof rests on that line; in frame 6 all four
+  hooves are 8 or more pixels above it.
+- Seen from behind, the visible motion is: the rump rises and falls, the hind legs
+  swing out and under, the tail swings side to side, and the jockey's back rocks.
+  Do NOT let the whole body slide left and right between frames.
+
+THE 8 FRAMES, in order:
+  0  full extension - hind legs stretched far back, rump low
+  1  landing - hind legs swinging forward under the body
+  2  collected - hind legs gathering under the belly
+  3  MOST COLLECTED - hind legs fully gathered under the barrel, rump at its
+     highest, one hind hoof still on the ground
+  4  push-off - both hind legs driving back, rump low again
+  5  collected again, opening up
+  6  SUSPENSION - all four hooves clear of the ground
+  7  returning toward full extension
+
+STYLE:
+- Clean hard-edged pixels on the silhouette, NO anti-aliasing on the outline.
+- Inside the body, rich shading: the rump is a rounded muscular form, so it needs
+  a lit top and a shadowed underside to read as three-dimensional from behind.
+- Bay horse: warm brown coat, black tail, black lower legs.
+- The jockey's silks (jacket, cap) must be BLUE: hue 200-260 degrees, saturation
+  0.35 or higher. White breeches, black boots.
+- The saddle cloth is visible from behind on both flanks; leave it COMPLETELY
+  BLANK - no number, no logo.
+
+Do NOT depict any real racehorse, owner, stable, racecourse, or any real silk
+design. Invent the silks. No text, no logos, no watermarks anywhere.

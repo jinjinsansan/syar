@@ -331,6 +331,14 @@ export const SHEET_V2: SheetSpec = {
  *    — 契約 §5 で自分が禁じていた形を、自分でやっていました。
  * → ★引き用は**別に描き起こした**シートを使います。
  */
+/**
+ * ★**後ろ姿**（8コマ・セル 200×506）。追走カメラの主役の絵です。
+ *
+ * ⚠️ ★参考は3枚とも**馬群の後ろ**から見ていました。真横の絵では別物になります。
+ */
+export const SHEET_REAR: SheetSpec = {
+  frames: 8, cellH: 506, anchorXRatio: 0.50, anchorYRatio: 1.0,
+};
 export const SHEET_FAR: SheetSpec = {
   frames: 8, cellH: 76, anchorXRatio: 0.50, anchorYRatio: 1.0,
 };

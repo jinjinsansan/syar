@@ -244,12 +244,20 @@ function finishLine(ctx) {
 }
 
 /* ── 馬 ─────────────────────────────────── */
-const SHEET = { frames: 8, cellH: 209 };
+const SHEET = argv.includes('--side-cam')
+  ? { frames: 8, cellH: 209 } : { frames: 8, cellH: 506 };
 const HORSE_H_M = 2.5;   // ★馬＋騎手のおよその高さ
 
 async function main() {
   mkdirSync(OUT, { recursive: true });
-  const img = await loadImage(path.resolve('apps/web/public/art/horse-oblique-v2.png'));
+  /**
+ * ★**後ろ姿のシート**（追走カメラの主役）。
+ * ⚠️ 真横のシートを後ろから見るカメラで使うと、★**馬だけ横を向いた別物**になります。
+ */
+const img = await loadImage(path.resolve(
+  argv.includes('--side-cam')
+    ? 'apps/web/public/art/horse-oblique-v2.png'
+    : 'apps/web/public/art/horse-rear.png'));
   const cw = img.width / SHEET.frames;
 
   const sec = warp.raceSecAt(warp.displaySec * AT);
