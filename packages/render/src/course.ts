@@ -25,6 +25,12 @@
 /** ★1馬身。隊列の基準に使います */
 export const HORSE_LENGTH_M = 2.4;
 
+/**
+ * ★発走から最初のコーナーまでの直線 [m]。
+ *   ⚠️ ★`@star/race-engine` の `RUN_UP_M` と**同じ値**であること。
+ */
+export const RUN_UP_M = 250;
+
 export interface CourseSegment {
   readonly type: 'straight' | 'corner';
   /** 中心線上の長さ [m] */
@@ -113,7 +119,31 @@ export function ovalCourse(
     left -= take;
     i += 1;
   }
-  const segments = [...backward].reverse();
+  /**
+   * ★**発走から最初のコーナーまでの直線**（引き込み線）。
+   *   ⚠️ ★**コーナーの途中から発走させると、外枠が発走直後に大きく外を回ります。**
+   *      実測で 枠とロスの相関が 直線発走 0.117 に対し**コーナー発走 0.539**。
+   *   ★実際の競馬場が「コーナーの途中から発走させない」理由がこれです。
+   *   ⚠️ ★`@star/race-engine` の `ovalSegments` と**同じ規則**であること
+   *      （`lane-geometry.test.ts` が突き合わせます）。
+   */
+  const reversed = [...backward].reverse();
+  const segments: CourseSegment[] = (() => {
+    const out: CourseSegment[] = [];
+    let straight = 0;
+    for (let i = 0; i < reversed.length; i++) {
+      const seg = reversed[i]!;
+      if (seg.type !== 'corner') { straight += seg.length; out.push(seg); continue; }
+      const need = RUN_UP_M - straight;
+      if (need <= 1e-9) { out.push(...reversed.slice(i)); break; }
+      const take = Math.min(seg.length, need);
+      out.push({ type: 'straight', length: take, label: '発走' });
+      straight += take;
+      const rest = seg.length - take;
+      if (rest > 1e-9) { out.push({ ...seg, length: rest }); out.push(...reversed.slice(i + 1)); break; }
+    }
+    return out.length > 0 ? out : reversed;
+  })();
 
   /**
    * ★**ゴール前の直線が水平（heading = 0）になるように、スタートの向きを逆算します。**

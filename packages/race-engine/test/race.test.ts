@@ -239,7 +239,7 @@ describe('§8.3 乗算補正10種', () => {
     expect(ageCoef(10, B)).toBeCloseTo(0.96, 10);
   });
 
-  it('★経路: 10係数がすべて resolveRace の内訳に現れ、既定の中立馬では既知の値になる', () => {
+  it('★経路: 11係数がすべて resolveRace の内訳に現れ、既定の中立馬では既知の値になる', () => {
     const row = breakdownOf(neutralField(2), 'H001');
     const bd = row.breakdown;
     // 中立馬（適性50・調子3・疲労0・斤量55・4歳・良馬場）
@@ -251,6 +251,14 @@ describe('§8.3 乗算補正10種', () => {
     expect(bd.weightCoef).toBe(1);
     expect(bd.ageCoef).toBeCloseTo(1.0, 10);
     expect(bd.skillCoef).toBe(1); // スキル無し
+    /**
+     * ★**11個目: 距離ロス**（D-065 / D-071・2026-08-16 に追加）。
+     *   `1 − 余計に走った距離 ÷ レース距離`。内を通れば 1 より大きい。
+     *   ⚠️ ★中立馬でも 1 ではありません（`w` はシードから引くので）。
+     *      ★**範囲だけ固定します**（大きさは V-18 が縛る）。
+     */
+    expect(bd.laneCoef).toBeGreaterThan(0.9);
+    expect(bd.laneCoef).toBeLessThan(1.1);
     // score は base × 全係数の積であること（式の接続を固定する）
     const product =
       bd.base *
@@ -263,7 +271,8 @@ describe('§8.3 乗算補正10種', () => {
       bd.weightCoef *
       bd.gateCoef *
       bd.ageCoef *
-      bd.skillCoef;
+      bd.skillCoef *
+      bd.laneCoef;
     expect(bd.score).toBeCloseTo(product, 10);
   });
 

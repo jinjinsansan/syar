@@ -101,88 +101,12 @@ export const CONVERGE_START_M = 1000;
 export const CONVERGE_END_M = 200;
 
 /**
- * ★★**横位置 `w` [m]**（0 = 内ラチ）
+ * ★★**横位置 `w` は、この層では作りません**（D-071・2026-08-16）
  *
- * 【★2026-08-15 に作り直しました。レビュー側が Q-P4-29 の裁定を撤回】
+ *   > `w` は着順に効く（D-065）以上、★**レースの結果の一部**であり、描画層が引くのは責務が逆。
+ *   > ★**2か所で引けば必ず離れる。**
+ *   > ★**Provably Fair の観点でも、結果に効くものはシードから結果を作る鎖の中に無ければならない。**
  *
- *   > 旧裁定: 「`w` も脚質から作ってください」
- *   > ★**撤回**: 「それでは `w` も**出走表から予測でき**、V-16 ① が成立しません」
- *   > → ★**`w` はシードから引かれ、距離ロスを通じて着順に効き、
- *   >   レース中に段階的に判明するもの**にしてください。現実の「**外を回された**」に相当します。
- *
- * 【★なぜ脚質から作ってはいけないか】
- *   道中の位置を脚質から作ると（D-068）、★**道中の画面は出走表の部分集合**になります
- *   （位置 → 脚質、脚質は出走表にある）。★**部分集合が上回ることはありません。**
- *   → 画面が出走表を上回るには、★**レース中に決まる情報**が要ります。それが `w` です。
- *
- * 【★漏洩にならない理由】（裁定より）
- *   > `w` は **K = 0.22 の雑音を含む多数の要素の1つ**です。
- *
- * 【★段階的に判明する】
- *   ・発走の時点では、**枠順から決まる位置**にいます（出走表で分かる ＝ 新しい情報ではない）
- *   ・レースが進むにつれ、★**シードから引いた「ばらけ」が開いていきます**
- *     ＝ **外を回されるか、内が空くか**が、走ってみないと分からない
+ * → ★**`@star/race-engine` の `laneAt` が引きます。** この層は `laneOf` で**受け取るだけ**です。
+ *   ⚠️ ここに `w` の生成器を戻してはいけません。
  */
-
-/** ★枠順から決まる発走時の横位置。**出走表で分かる部分** */
-/** ★落ち着き先（ラチ沿い）。どの馬もここを取りにいく */
-export const RAIL_W = 2.2;
-/** ★枠順の位置から落ち着くまでの距離 [m] */
-export const SETTLE_M = 250;
-
-export function laneAtStart(gate: number, fieldSize: number, widthM: number): number {
-  const t = fieldSize <= 1 ? 0.5 : (gate - 0.5) / fieldSize;
-  return 1 + t * (widthM - 2);
-}
-
-/**
- * ★**レース中の横位置。** シードから引き、進むほど開きます。
- *
- * ⚠️ ★**脚質を受け取りません。** 受け取ると出走表から予測できてしまいます。
- */
-export function laneAt(
-  gate: number, fieldSize: number, widthM: number, metersLeft: number, distanceMeter: number,
-  seed: number,
-): number {
-  const start = laneAtStart(gate, fieldSize, widthM);
-  /** 走った距離 [m] と割合 */
-  const ranM = Math.max(0, distanceMeter - metersLeft);
-  const run = Math.max(0, Math.min(1, ranM / Math.max(1, distanceMeter)));
-
-  /**
-   * ★★**発走後、みんな内へ寄ります。**
-   *
-   *   ⚠️ 最初は「枠順の位置にそのまま居続ける」形にしました。実測:
-   *      ★**枠による偏りが 85.2m = 35.5馬身**。★**枠順で決まるゲーム**になります。
-   *      （内枠が 32m 得をし、外枠が 53m 損をする）
-   *   → ★**ラチ沿いが最短なので、どの馬もそこを取りにいきます。**
-   *     枠順が効くのは**発走からの数百メートルだけ**。
-   *     ★**その先で外を回されるかどうかは、シードが決めます**（＝走ってみないと分からない）。
-   */
-  const settle = Math.max(0, Math.min(1, ranM / SETTLE_M));
-  const settled = settle * settle * (3 - 2 * settle);
-  /**
-   * ⚠️ ★残す割合を 0.18 にしたら、**枠による偏りが 12.7馬身**残りました。
-   *    外枠は「落ち着き先」が 6.1m で、**レース中ずっと 4m 外**を回ることになります。
-   *    コーナー2つ（合計 π ラジアン）で 4m × π ≒ 12.6m。★**これが偏りの正体**でした。
-   * → ★**ほぼ全馬がラチ沿いに落ち着く**（枠の差は発走からの数百メートルだけ）。
-   */
-  const home = RAIL_W + (start - RAIL_W) * 0.05;
-  const base = start + (home - start) * settled;
-
-  /**
-   * ★**外を回されるか、内が空くか**。シードから引き、進むほど開きます。
-   *   ・`drift` … そのレースでどちらへ寄るか
-   *   ・`wave`  … コーナーごとの出入り
-   */
-  const drift = (stream(seed ^ 0x1b873593, gate) - 0.5) * 2;
-  const phase = stream(seed ^ 0x2f5c1d3b, gate) * Math.PI * 2;
-  const wave = Math.sin(phase + run * Math.PI * 3) * 0.3;
-  /** ★段階的に判明する */
-  const reveal = run * run * (3 - 2 * run);
-  const swing = Math.max(0, drift * 0.85 + wave) * reveal * (widthM * 0.62);
-
-  return Math.max(0.8, Math.min(widthM - 0.8, base + swing));
-}
-
-

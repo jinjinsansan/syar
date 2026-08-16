@@ -22,7 +22,7 @@ const PACES: Pace[] = ['high', 'middle', 'slow'];
 
 const entry = (gate: number, timeSec: number): RaceResultEntry => ({
   horseId: String(gate), finishPosition: gate, timeSec, timeGapSec: 0,
-  finalScore: 0, randomMult: 1, interventionMult: 1, marginLabel: '',
+  finalScore: 0, randomMult: 1, interventionMult: 1, marginLabel: '', laneExtraM: 0,
   breakdown: {} as RaceResultEntry['breakdown'],
 });
 

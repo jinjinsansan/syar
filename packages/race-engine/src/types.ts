@@ -111,6 +111,12 @@ export interface ScoreBreakdown {
   gateCoef: number;
   ageCoef: number;
   skillCoef: number;
+  /**
+   * ★**距離ロス**（D-065 / D-071）。内を通れば 1 より大きく、外を回れば小さい。
+   *   `1 − 余計に走った距離 ÷ レース距離`。★**`w` はエンジンがシードから引く**
+   *   （結果に効くものは、シードから結果を作る鎖の中に無ければならない）。
+   */
+  laneCoef: number;
   /** 全補正適用後・乱数適用前 */
   score: number;
   /** 発動したスキル */
@@ -127,6 +133,11 @@ export interface RaceResultEntry {
   /** 介入倍率（§8b）。介入なしは 1 */
   interventionMult: number;
   finalScore: number;
+  /**
+   * ★**余計に走った距離 [m]**（内を通れば負）。
+   *   ⚠️ ★描画層はこれを**読むだけ**で、自分では引きません（D-071）。
+   */
+  laneExtraM: number;
   /** 1着との着差（秒） */
   timeGapSec: number;
   /** 走破タイム（秒） */

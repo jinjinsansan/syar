@@ -13,7 +13,7 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches } from '@star/race-engine';
+import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches , laneAt } from '@star/race-engine';
 import type { Strategy } from '@star/sim-engine';
 import {
   replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
@@ -77,6 +77,8 @@ function build(seed: number, ownGate: number): Built {
     distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
     // ★道中は脚質から生成する（Q-P4-38）。走破タイムからは作らない
     strategyOf: (g) => entrants[g - 1]!.strategy,
+    // ★横位置はエンジンが引いたものを読むだけ（D-071）
+    laneOf: (gate, metersLeft) => laneAt(gate, entrants.length, metersLeft, DIST, seed),
     pace,
     formationSeed: seed * 2654435761,
   });

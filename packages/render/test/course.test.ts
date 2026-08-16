@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   ovalCourse, posOf, segmentAt, laneExtraMeters, segmentStarts, HORSE_LENGTH_M,
+  RUN_UP_M,
 } from '../src/index.js';
 
 describe('★コース幾何', () => {
@@ -32,11 +33,57 @@ describe('★コース幾何', () => {
     }
   });
 
-  it('★1周すると元の位置に戻る（コースが閉じている）', () => {
+  /**
+   * ★★**2026-08-16 に、この検査の意味が変わりました。**
+   *
+   * 【旧】1周すると元の位置に戻る（コースが閉じている）
+   * 【新】★**引き込み線があるレースは閉じません。それが引き込み線の意味です。**
+   *
+   * 【なぜ入れたか】D-071 / V-18
+   *   ⚠️ ★**コーナーの途中から発走させると、外枠が発走直後に大きく外を回ります。** 実測で
+   *      枠とロスの相関が 直線発走 0.117 に対し**コーナー発走 0.539**。
+   *   ★**実際の競馬場が「コーナーの途中から発走させない」理由がこれ**で、
+   *     短い距離は**引き込み線（チュート）**から発走します。
+   *   → 引き込み線は**楕円の外**にあるので、★**経路は閉じません**（現実もそうです）。
+   *
+   * ★守るべきは「閉じること」ではなく、★**コーナーの幾何が正しいこと**です。
+   */
+  it('★★曲がる角度の合計が、引き込み線のぶんだけ減っている', () => {
+    const c = ovalCourse(2000);
+    let turned = 0;
+    for (const seg of c.segments) {
+      if (seg.type === 'corner' && seg.radius !== undefined) turned += seg.length / seg.radius;
+    }
+    const runUp = c.segments.find((x) => x.label === '発走');
+    const radius = c.segments.find((x) => x.type === 'corner')?.radius ?? 1;
+    // ★1周ぶんは 2π。引き込み線に置き換えた弧のぶんだけ減る
+    const expected = 2 * Math.PI - (runUp?.length ?? 0) / radius;
+    expect(turned).toBeCloseTo(expected, 6);
+    expect(RUN_UP_M).toBeGreaterThan(0);
+  });
+
+  it('★丸ごと1つ残っているコーナーは 90度', () => {
+    const c = ovalCourse(2400);
+    const radius = c.segments.find((x) => x.type === 'corner')?.radius ?? 1;
+    const full = c.segments.filter((x) => x.type === 'corner')
+      .find((x) => Math.abs(x.length / radius - Math.PI / 2) < 1e-6);
+    expect(full).toBeDefined();
+  });
+
+  it('★★引き込み線ぶんを戻せば、経路は閉じる（幾何は壊れていない）', () => {
     const c = ovalCourse(2000);
     const a = posOf(c, 0, 10);
     const b = posOf(c, 2000, 10);
-    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeLessThan(1);
+    const gap = Math.hypot(a.x - b.x, a.y - b.y);
+    // ★引き込み線（発走の直線）に置き換えたぶんだけ開く。その量が説明できること
+    const runUp = c.segments.find((x) => x.label === '発走');
+    if (runUp === undefined) {
+      expect(gap).toBeLessThan(1);
+    } else {
+      // 置き換えた弧長ぶん、円弧が足りない → 開きは弦の長さ程度に収まる
+      expect(gap).toBeGreaterThan(1);
+      expect(gap).toBeLessThan(runUp.length * 1.2);
+    }
   });
 
   it('★★外を回ると余計に走る — 90度で内2m・外12mなら約15.7m', () => {

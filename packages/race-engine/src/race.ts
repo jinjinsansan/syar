@@ -16,6 +16,7 @@ import {
 import { MARGIN_LABELS, type RaceBalance } from './balance.js';
 import { baseScore, decidePace, deterministicCoefs } from './coefficients.js';
 import { resolveSkills, type SkillContext } from './skills.js';
+import { laneExtraM } from './lane.js';
 import type {
   Pace,
   RaceConditions,
@@ -126,6 +127,15 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
     const skillRng: Rng = deriveRng(seed, RNG_STREAM.SKILL, index);
     const skills = resolveSkills(entrant.skillGenes, skillCtx, skillRng, balance);
 
+    /**
+     * ★**横位置 `w` と距離ロス**（D-071）。
+     *   ⚠️ ★`deriveRng` のストリームを使いません。`w` は**レース共通のシードから**
+     *      決定的に引きます（馬ごとの乱数消費数を変えないため。Provably Fair）。
+     */
+    const laneExtra = conditions.courseShape === 'oval'
+      ? laneExtraM(entrant.gate, fieldSize, conditions.distance, seed)
+      : 0;
+
     const coefs = deterministicCoefs(
       entrant,
       {
@@ -159,6 +169,13 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
       gateCoef: gate,
       ageCoef: coefs.ageCoef,
       skillCoef: skills.skillCoef,
+      /**
+       * ★**距離ロス**（D-065 / D-071）。`w` は**シードから引き**、脚質からは作らない（D-069）。
+       *   ⚠️ ★**倍率を発明していません。** `1 − 余計に走った距離 ÷ レース距離` そのままです。
+       *      1600m で 25m 余計に走れば 1.56% 遅い、という物理どおりの量。
+       *   ★大きさは V-18 が縛ります（枠順と着順の相関 ≤ 0.10 かつ 内外差 4〜12馬身）。
+       */
+      laneCoef: 1 - laneExtra / conditions.distance,
       score: 0,
       firedSkills: skills.firedSkills,
     };
@@ -173,7 +190,8 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
       breakdown.weightCoef *
       breakdown.gateCoef *
       breakdown.ageCoef *
-      breakdown.skillCoef;
+      breakdown.skillCoef *
+      breakdown.laneCoef;
 
     // §8.7: finalScore = score * (1 + gaussian(0, K)) * interventionMult
     const finalRng: Rng = deriveRng(seed, RNG_STREAM.FINAL, index);
@@ -199,7 +217,7 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
     //   K=0.12 なら 8.3σ 相当で実質起きないが、K を上げて較正する運用があるため塞いでおく。
     const finalScore = Math.max(0, breakdown.score * randomMult * interventionMult);
 
-    return { entrant, breakdown, randomMult, interventionMult, finalScore };
+    return { entrant, breakdown, randomMult, interventionMult, finalScore, laneExtra };
   });
 
   // 着順 = finalScore 降順。同値は入力順（＝枠順）で安定させる
@@ -240,6 +258,7 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
       randomMult: row.randomMult,
       interventionMult: row.interventionMult,
       finalScore: row.finalScore,
+      laneExtraM: row.laneExtra,
       timeGapSec,
       timeSec: baseTimeSec + timeGapSec,
       // 着差ラベルは**前の馬との差**で出す（I-MARGIN-BASIS）

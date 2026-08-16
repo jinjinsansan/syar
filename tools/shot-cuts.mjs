@@ -17,10 +17,10 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches } from '@star/race-engine';
+import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt } from '@star/race-engine';
 import {
   replayPositionModel, finalOrderOf, ovalCourse, obliqueProject, railPolyline,
-  timeWarpFor, knotsFor, ratesForTarget, targetDisplaySec, frameRoleOf, TRACK_WIDTH_M,
+  timeWarpFor, knotsFor, ratesForTarget, targetDisplaySec, frameRoleOf,
 } from '@star/render';
 
 const W = 1280, H = 720;
@@ -55,6 +55,8 @@ if (!finalOrderMatches(result, boundaries)) throw new Error('★D-059: 映像の
 const model = replayPositionModel({
   distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
   strategyOf: (g) => entrants[g - 1].strategy, pace, formationSeed: SEED * 2654435761,
+  // ★横位置はエンジンが引いたものを読むだけ（D-071）
+  laneOf: (gate, metersLeft) => laneAt(gate, FIELD, metersLeft, DIST, SEED),
 });
 if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((e) => Number(e.horseId)))) {
   throw new Error('★D-059: 位置モデルの最終順が着順と違います');
@@ -179,13 +181,13 @@ function drawHorse(ctx, img, x, y, frame, gate, widthPx) {
  *   参考の実測に合わせます: ★**引き 23% ／ 寄り 43%**。
  */
 const CUTS = [
-  // 25m × 15 × 0.45 = 169px = 23%   ★参考どおり
+  // 20m × 15 × 0.55 = 165px = 23%   ★参考どおり
   // ⚠️ ★anchorY は「走路の中心（w=12.5m）が来る画面 y」。低くしないと馬が上半分に寄る
-  { name: 'wide', label: '引き（道中）', d: 0.30, cam: { pxPerM: 15, depth: 0.45, anchorX: 470, anchorY: 545 } },
-  // 25m × 30 × 0.42 = 315px = 44%   ★参考どおり
-  { name: 'close', label: '寄り（見せ場）', d: 0.62, cam: { pxPerM: 30, depth: 0.42, anchorX: 380, anchorY: 590 } },
+  { name: 'wide', label: '引き（道中）', d: 0.30, cam: { pxPerM: 15, depth: 0.55, anchorX: 470, anchorY: 545 } },
+  // 20m × 30 × 0.52 = 312px = 43%   ★参考どおり
+  { name: 'close', label: '寄り（見せ場）', d: 0.62, cam: { pxPerM: 30, depth: 0.52, anchorX: 380, anchorY: 590 } },
   // ★ゴールはほぼ真横（帯を薄く）
-  { name: 'goal', label: 'ゴール', d: 0.985, cam: { pxPerM: 22, depth: 0.16, anchorX: 560, anchorY: 560 } },
+  { name: 'goal', label: 'ゴール', d: 0.985, cam: { pxPerM: 22, depth: 0.20, anchorX: 560, anchorY: 560 } },
 ];
 /** 引きで試す幅（★並べて決める） */
 const WIDE_SIZES = [48, 64, 96, 128];
@@ -203,7 +205,7 @@ async function main() {
      * → ★**馬群の中心**に合わせます。
      */
     const centre = at.reduce((s2, h) => s2 + h.meters, 0) / at.length;
-    const cam = { ...cut.cam, s: Math.max(1, Math.min(DIST - 1, centre)), w: TRACK_WIDTH_M / 2 };
+    const cam = { ...cut.cam, s: Math.max(1, Math.min(DIST - 1, centre)), w: COURSE.widthM / 2 };
     const cv = createCanvas(W, H);
     const ctx = cv.getContext('2d');
     ctx.imageSmoothingEnabled = false;
@@ -215,7 +217,7 @@ async function main() {
     sky(ctx, Math.max(60, Math.round(farY - 88)));
     track(ctx, cam);
     const drawn = at.map((h) => {
-      const p = obliqueProject(COURSE, cam, Math.max(0, Math.min(DIST, h.meters)), h.w ?? TRACK_WIDTH_M / 2);
+      const p = obliqueProject(COURSE, cam, Math.max(0, Math.min(DIST, h.meters)), h.w ?? COURSE.widthM / 2);
       return { ...h, ...p };
     }).sort((a, b) => a.y - b.y);
     for (const h of drawn) {
@@ -234,7 +236,7 @@ async function main() {
       const ys = drawn.map((h) => h.y);
       const file = path.join(OUT, `${cut.name}${sizes.length > 1 ? `-${hw}` : ''}.png`);
       writeFileSync(file, cv.toBuffer('image/png'));
-      const band = TRACK_WIDTH_M * cut.cam.pxPerM * cut.cam.depth;
+      const band = COURSE.widthM * cut.cam.pxPerM * cut.cam.depth;
       const xs = drawn.map((h) => h.x);
       console.log(`  ${cut.label.padEnd(12)} ${(cut.d * 100).toFixed(0).padStart(3)}%  ${String(hw).padStart(4)}px`
         + `   ${(hw / W * 100).toFixed(1).padStart(5)}%     ${String(inFrame).padStart(2)}/${FIELD}`

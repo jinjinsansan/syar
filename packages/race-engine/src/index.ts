@@ -15,3 +15,4 @@ export * from './fairness.js';
 export * from './intervention.js';
 export * from './replay.js';
 export * from './watch.js';
+export * from './lane.js';

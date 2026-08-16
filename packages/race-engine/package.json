@@ -11,5 +11,8 @@
   "dependencies": {
     "@star/sim-engine": "*"
   },
-  "peerDependencies": {}
+  "peerDependencies": {},
+  "devDependencies": {
+    "@star/render": "*"
+  }
 }

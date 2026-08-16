@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  replayPositionModel, finalOrderOf, slotOf, packSpreadM, convergeAt, TRACK_WIDTH_M, laneAtStart, laneAt,
+  replayPositionModel, finalOrderOf, slotOf, packSpreadM, convergeAt,
   type FormStrategy,
 } from '../src/index.js';
 
@@ -88,75 +88,38 @@ describe('★隊列の生成', () => {
    *   > → `w` は**シードから引かれ、距離ロスを通じて着順に効き、
    *   >   レース中に段階的に判明する**ものにしてください。
    */
-  it('★★w は脚質から予測できない（出走表に無い情報である）', () => {
-    /**
-     * ⚠️ ★最初は「同じ時刻の w が一致すること」で検査し、**落ちました**。
-     *    `w` は**その馬の残り距離**で決まるので、脚質が**位置を通して間接的に**効きます
-     *    （逃げ馬は同じ時刻でも先にいるので、`w` も先の値になる）。
-     *    ★**それは漏洩ではありません。** 漏洩になるのは
-     *    「**同じ地点での `w` が脚質で決まる**」場合です。
-     * → ★**同じ残り距離で比べます。**
-     */
-    const wAtLeft = (m: ReturnType<typeof mk>, gate: number, left: number): number => {
-      let lo = 0, hi = 120;
-      for (let i = 0; i < 60; i++) {
-        const mid = (lo + hi) / 2;
-        const h = m.at(mid).find((x) => x.gate === gate)!;
-        if (1600 - h.meters > left) lo = mid; else hi = mid;
-      }
-      return m.at(hi).find((x) => x.gate === gate)!.w ?? 0;
-    };
-    const a2 = mk();
-    const b2 = replayPositionModel({
+  /**
+   * ★★**2026-08-16 に、この検査の対象が移りました。**
+   *
+   * 【旧】`w` を描画層が引き、脚質から予測できないことを見る
+   * 【新】★**`w` は描画層では引かない**（D-071）。
+   *   > `w` は着順に効く以上、**レースの結果の一部**であり、描画層が引くのは責務が逆。
+   *   > ★**2か所で引けば必ず離れる。**
+   *   → ★`w` の性質（脚質から予測できない・シードで変わる・段階的に開く）は
+   *     **エンジン側の検査**（`race-engine/test/lane.test.ts`）と **V-18** が見ます。
+   *     ここは「**受け取ったものをそのまま出しているか**」だけを見ます。
+   */
+  it('★★w はエンジンから受け取る（この層では作らない）', () => {
+    const seen: number[] = [];
+    const m = replayPositionModel({
       distanceMeter: 1600, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
-      strategyOf: (g) => STRAT[(g + 1) % 4]!,   // ★脚質を総取り替え
-      pace: 'middle', formationSeed: 4242,
+      strategyOf: (g) => STRAT[(g - 1) % 4]!, pace: 'middle', formationSeed: 4242,
+      laneOf: (gate, metersLeft) => { seen.push(gate); return 3 + (gate % 5) + metersLeft / 10000; },
     });
-    for (const gate of [1, 5, 9, 12]) {
-      for (const left of [1200, 800, 400]) {
-        expect(wAtLeft(b2, gate, left)).toBeCloseTo(wAtLeft(a2, gate, left), 3);
-      }
+    const at = m.at(30);
+    expect(seen.length).toBeGreaterThan(0);
+    for (const h of at) {
+      const expected = 3 + (h.gate % 5) + (1600 - h.meters) / 10000;
+      expect(h.w ?? -1).toBeCloseTo(expected, 9);
     }
   });
 
-  it('★★w を作る関数は、そもそも脚質を受け取らない', () => {
-    // ★型と引数の形で保証する（実装が変わっても、脚質が入り込む余地がない）
-    expect(laneAt.length).toBe(6);   // gate, fieldSize, widthM, metersLeft, distance, seed
-  });
-
-  it('★★w はシードで変わる（レース中に決まる情報）', () => {
-    const a2 = mk({ formationSeed: 1 });
-    const b2 = mk({ formationSeed: 2 });
-    const wOf = (m: ReturnType<typeof mk>, sec: number) =>
-      m.at(sec).map((h) => (h.w ?? 0).toFixed(4)).join(',');
-    expect(wOf(b2, 60)).not.toBe(wOf(a2, 60));
-  });
-
-  it('★★w は段階的に開く（発走時は枠順どおり・進むほどばらける）', () => {
-    const m = mk();
-    const spread = (sec: number) => {
-      const ws = m.at(sec).map((h) => h.w ?? 0);
-      // ★枠順どおりの並びからのずれ
-      const sorted = [...m.at(sec)].sort((x, y) => x.gate - y.gate).map((h) => h.w ?? 0);
-      let dev = 0;
-      for (let i = 1; i < sorted.length; i++) dev += Math.abs(sorted[i]! - sorted[i - 1]!);
-      void ws;
-      return dev;
-    };
-    const early = spread(2);
-    const late = spread(90);
-    // ★発走直後は枠順どおり（隣との差がほぼ一定 = ずれが小さい）
-    expect(late).toBeGreaterThan(early * 1.5);
-  });
-
-  it('★w は走路の内側に収まる', () => {
-    const m = mk();
-    for (const sec of [0, 20, 50, 80, 99]) {
-      for (const h of m.at(sec)) {
-        expect(h.w ?? -1).toBeGreaterThan(0.5);
-        expect(h.w ?? 1e9).toBeLessThan(TRACK_WIDTH_M - 0.5);
-      }
-    }
+  it('★渡さなければ w は 0（＝内/外が画面に出ない）', () => {
+    const m = replayPositionModel({
+      distanceMeter: 1600, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
+      strategyOf: (g) => STRAT[(g - 1) % 4]!, pace: 'middle', formationSeed: 1,
+    });
+    for (const h of m.at(30)) expect(h.w).toBe(0);
   });
 
   it('★生成器そのもの: スロット・広がり・収束', () => {
@@ -166,7 +129,5 @@ describe('★隊列の生成', () => {
     expect(convergeAt(1600)).toBeCloseTo(1, 5);
     expect(convergeAt(200)).toBeCloseTo(0, 5);
     expect(convergeAt(0)).toBeCloseTo(0, 5);
-    // ★発走時の横位置は枠順どおり（内枠ほど内）
-    expect(laneAtStart(1, 12, 25)).toBeLessThan(laneAtStart(12, 12, 25));
   });
 });

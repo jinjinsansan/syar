@@ -47,6 +47,41 @@ export interface CalibrationConstant {
  */
 export const CALIBRATION: readonly CalibrationConstant[] = [
   {
+    key: 'RAIL_W',
+    file: 'packages/race-engine/src/lane.ts',
+    perturbed: 'export const RAIL_W = 10;',
+    affects:
+      '★V-18 / D-065 / D-071（横位置の落ち着き先。ラチから遠ざけると全馬が外を回り、距離ロスの差が消える。実測: 枠の位置に居続ける形では枠による偏りが 35.5馬身＝枠順で決まるゲームになった）',
+  },
+  {
+    key: 'SETTLE_M',
+    file: 'packages/race-engine/src/lane.ts',
+    perturbed: 'export const SETTLE_M = 2000;',
+    affects:
+      '★V-18 / D-071（枠順の位置から内へ寄るまでの距離。長くすると外枠がレース中ずっと外を回り、枠順と着順の相関が上がる）',
+  },
+  {
+    key: 'TRACK_WIDTH_M',
+    file: 'packages/race-engine/src/lane.ts',
+    perturbed: 'export const TRACK_WIDTH_M = 4;',
+    affects:
+      '★V-18 / D-065（走路の幅。狭くすると内外差が消え、D-065 が何もしていない状態になる）。⚠️ ★`@star/render` の `ovalCourse` の既定と**必ず同じ値**であること（lane-geometry.test.ts が突き合わせる）',
+  },
+  {
+    key: 'RUN_UP_M',
+    file: 'packages/race-engine/src/lane.ts',
+    perturbed: 'export const RUN_UP_M = 0;',
+    affects:
+      '★V-18 ①（発走から最初のコーナーまでの直線）。0 にするとコーナーの途中から発走することになり、外枠が発走直後に大きく外を回る。実測: 枠とロスの相関が 直線発走 0.117 に対し★コーナー発走 0.539。⚠️ ★`@star/render` の `RUN_UP_M` と**必ず同じ値**であること',
+  },
+  {
+    key: 'STALL_W_M',
+    file: 'packages/race-engine/src/lane.ts',
+    perturbed: 'export const STALL_W_M = 3;',
+    affects:
+      '★V-18 ①（1房の幅）。広げるとゲートが走路の幅いっぱいに広がり、外枠が発走直後から大きく外を回る',
+  },
+  {
     key: 'PRIZE_TABLE',
     file: 'packages/scheduler/src/prize.ts',
     perturbed: "export const PRIZE_TABLE: Readonly<Record<PrizeTier, readonly number[]>> = { G1: [1,1,1,1,1], G2: [1,1,1,1,1], G3: [1,1,1,1,1], open: [1,1,1,1,1], win3: [1,1,1,1,1], win2: [1,1,1,1,1], win1: [1,1,1,1,1], maiden: [1,1,1,1,1] };",
@@ -385,6 +420,9 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
+  { key: 'TURN_REF_M', why: '★外へ膨らむ量を距離で割り戻すときの**基準点**（1600m での旋回角を 1 とする）。★較正値ではなく単位の取り方で、動かしても V-18 ② の内外差が全距離で一律に伸縮するだけ。⚠️ 割り戻し自体をやめると長距離で 13.2馬身まで積み上がり V-18 ② を超える（実測）' },
+  { key: 'HORSE_LENGTH_M', why: '★1馬身 = 2.4m。**実寸の定義**（競馬ブック用語辞典・dbpedia「着差 (競馬)」）であって較正値ではない。動かすと「馬身」という単位の意味が変わる' },
+  { key: 'DEFAULT_OVAL', why: '★`@star/render` の `ovalCourse` の既定（1周2000m・直線400m・幅20m）の**写し**。層の向きの都合でエンジン側にも持つが、★較正するものではなく**同期させるもの**。lane-geometry.test.ts が両者の距離ロスを突き合わせて、離れたら落とす' },
   { key: 'AWAKENING_PROB', why: '正典 §7.6「素質が開花した！（1%）」の写し' },
   { key: 'B6_SAMPLING', why: '★B-6（D-050）の測定条件。出走馬の調子・疲労をどの方針・どの週から採るか（バランス型 / デビュー104週以降 / イベント有）。V-7・V-14・V-15 の錨と揃えてあり、較正定数ではなく測定条件。★通すために動かせる値ではない（動かすと V-4/V-5/V-6 が動くので、動かすなら再測定と報告が要る）' },
   { key: 'B6_WIRED', why: '★配線を有効にするかの旗（--b6-wired）。値ではなく実行条件。既定 false で、付けたときだけ実データに切り替わる' },

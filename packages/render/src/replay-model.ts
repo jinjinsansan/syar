@@ -17,7 +17,7 @@
 
 import type { HorseAt, PositionModel } from './scene.js';
 import {
-  slotOf, packSpreadM, convergeAt, laneAt, TRACK_WIDTH_M,
+  slotOf, packSpreadM, convergeAt,
   type FormStrategy, type FormPace,
 } from './formation.js';
 
@@ -48,6 +48,11 @@ export interface ReplayInput {
    *   ⚠️ 0 にすると**道中から着順が読めます**（漏洩する）。検査用です。
    */
   readonly formation?: number | undefined;
+  /**
+   * ★**横位置 `w` を返す関数**（D-071）。★**エンジンが引いたものを渡してください。**
+   *   ⚠️ 渡さないと `w` は 0 になります（＝内/外が画面に出ません）。
+   */
+  readonly laneOf?: ((gate: number, metersLeft: number) => number) | undefined;
   /**
    * ★**隊列のシード**（憲法4「乱数は必ず注入する」）。
    *   ⚠️ `Math.random()` は**呼びません**。同じシード → 同じ映像です。
@@ -211,14 +216,11 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
   };
 
   /**
-   * ★**横位置（内=0）。**
-   *
-   *   ⚠️ ★**脚質から作りません**（レビュー側が Q-P4-29 の裁定を撤回・2026-08-15）。
-   *      脚質から作ると `w` も**出走表から予測でき**、V-16 ① が成立しません。
-   *   → ★**シードから引き、レース中に段階的に開きます**（＝「外を回された」）。
+   * ★**横位置（内=0）は、エンジンから受け取ります**（D-071）。
+   *   ⚠️ ★**この層では引きません。** 引くと2か所になり、必ず離れます。
    */
   const laneOfHorse = (b: Boundaries, meters: number): number =>
-    laneAt(b.gate, boundaries.length, TRACK_WIDTH_M, distanceMeter - meters, distanceMeter, seed);
+    input.laneOf?.(b.gate, distanceMeter - meters) ?? 0;
 
   /**
    * ★余力（§12.6 のゲージ）。
