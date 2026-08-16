@@ -72,3 +72,6 @@ tools/_*.mjs
 #      新しい参考素材は `reference-media/` に入れてください。
 /reference-media/
 out/ref2d/
+
+# ★Codex が作業用に置いていくスクリプト（成果物ではありません）
+/generate_*.py
