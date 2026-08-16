@@ -1,0 +1,57 @@
+Generate a pixel-art SPRITE SHEET of a galloping racehorse with jockey and save it
+as a PNG file in the CURRENT WORKING DIRECTORY named exactly: horse-gallop-near.png
+
+LAYOUT (strict):
+- 8 frames of ONE complete gallop cycle, in ONE HORIZONTAL ROW (1 row x 8 columns).
+- Each cell is exactly 360 x 260 pixels. Total image: 2880 x 260 pixels.
+- Side view, the horse faces RIGHT in every frame.
+- Transparent background. No text, no logo, no grid lines, no frame numbers,
+  no background, no ground, no shadow baked into the sprite.
+
+ALIGNMENT (this matters more than the drawing):
+- ALL 8 frames share the SAME GROUND LINE at y = 252, measured from the top of
+  each cell. The supporting hoof rests exactly on that line.
+- ALL 8 frames share the SAME BODY-CENTER at x = 180, measured from the left
+  edge of each cell (the middle of the horse's barrel).
+- If the horse drifts up, down or sideways between frames, it will visibly bounce
+  when animated. Alignment beats detail.
+- The horse's OUTER bounding box - tip of the streaming tail to tip of the nose -
+  is about 300 pixels wide. That is the outer box, NOT the body length.
+  Leave room for the tail and mane. DO NOT crop the tail.
+
+THE 8 FRAMES, in order (one full gallop cycle):
+  0  full extension - fore and hind legs stretched furthest apart; a hind hoof down
+  1  landing - legs beginning to gather; a forehoof down
+  2  collected - legs folding under the body; a forehoof down
+  3  MOST COLLECTED - all four legs gathered beneath the belly, hind legs swung
+     forward under the barrel, forelegs folded tight at the knee. Neck RAISED,
+     back rounded, nose-to-hip is the SHORTEST of all frames.
+     ONE HIND HOOF is on the ground. Do NOT put a forehoof down in this frame -
+     the collected phase is hind-leg driven.
+  4  push-off - driving off the hind legs
+  5  collected again, beginning to open up
+  6  SUSPENSION - ALL FOUR HOOVES CLEAR OF THE GROUND, at least 8 pixels above
+     the ground line, body floating, neck stretched forward
+  7  returning toward full extension
+
+Frames 3 and 6 are the important ones. A gallop has exactly one airborne moment
+per stride; without frame 6 the animation does not read as running.
+
+STYLE - detailed pixel art, NOT chunky retro, NOT blurry:
+- Clean hard-edged pixels on the silhouette. NO anti-aliasing on the outline,
+  NO blur, no semi-transparent fringe.
+- Inside the body, use rich shading: muscle definition, coat sheen, highlights.
+  Do NOT posterize the interior - thousands of shades are fine there.
+- Bay horse: warm brown coat, black mane and tail streaming backward, black
+  lower legs, white socks. Visible bridle and double reins.
+
+THE JOCKEY:
+- Deeply crouched in the irons in every frame, weight forward over the withers,
+  hands low on the neck holding both reins, heels down.
+- Silks (jacket, cap, sleeves) must be BLUE: hue 200-260 degrees, saturation
+  0.35 or higher. White breeches, black boots.
+- A plain saddle cloth sits under the saddle. Leave it COMPLETELY BLANK -
+  no number, no logo, no pattern. Numbers are added later by the game.
+
+DO NOT depict any real racehorse, owner, stable, racecourse, or any real silk
+design. Invent the silks. No text, no logos, no watermarks anywhere in the image.

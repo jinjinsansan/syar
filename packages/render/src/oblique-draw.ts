@@ -302,10 +302,27 @@ export function drawGate(
 /** 騎手の乗り方。★**姿勢は作りません**（別コマがシートに無いため・第3便で依頼） */
 export type RideMode = 'cruise' | 'drive' | 'celebrate';
 
-/** シートの1コマの高さ（★シート契約） */
-export const OBLIQUE_CELL_H = 120;
-/** 接地点のセル内座標（★シート契約） */
-export const OBLIQUE_ANCHOR = { x: 52, y: 116 } as const;
+/**
+ * ★シートの形。**コマ数と接地点はシートごとに違う**ので、引数で受け取ります。
+ *
+ * ⚠️ ★以前は「6コマ・セル高 120・接地点 (52,116)」を**この層に直接書いて**いました。
+ *    8コマのシートに差し替えた瞬間、★**別のコマを切り出して描きます**（黙って壊れます）。
+ */
+export interface SheetSpec {
+  readonly frames: number;
+  readonly cellH: number;
+  /** 接地点のセル内座標（★1コマの幅に対する比・高さに対する比） */
+  readonly anchorXRatio: number;
+  readonly anchorYRatio: number;
+}
+/** 第2便までのシート（6コマ・セル 160×120・接地点 (52,116)） */
+export const SHEET_V1: SheetSpec = {
+  frames: 6, cellH: 120, anchorXRatio: 52 / 160, anchorYRatio: 116 / 120,
+};
+/** ★第3便のシート（8コマ・セル 300×209）。接地点は整列で下端付近に揃っています */
+export const SHEET_V2: SheetSpec = {
+  frames: 8, cellH: 209, anchorXRatio: 0.50, anchorYRatio: 1.0,
+};
 
 /**
  * ★1頭を描く。
@@ -317,11 +334,11 @@ export function drawObliqueHorse<TImage>(
   ctx: Ctx2D<TImage>, img: TImage, imgWidth: number, pal: Palette,
   x: number, y: number, frame: number, gate: number, fieldSize: number, widthPx: number,
   frameRoleOf: (gate: number, fieldSize: number) => string, font: FontOf,
-  mode: RideMode = 'cruise', phaseT = 0,
+  mode: RideMode = 'cruise', phaseT = 0, sheet: SheetSpec = SHEET_V1,
 ): void {
-  const cw = imgWidth / 6;
+  const cw = imgWidth / sheet.frames;
   const sc = widthPx / cw;
-  const hh = Math.round(OBLIQUE_CELL_H * sc);
+  const hh = Math.round(sheet.cellH * sc);
   const role = frameRoleOf(gate, fieldSize);
   const row = Math.max(0, Math.min(7, Number(role.slice(6)) - 1));
 
@@ -333,8 +350,9 @@ export function drawObliqueHorse<TImage>(
   // ★追っているときは上体が大きく上下する（走りそのものは変えない）
   const bob = mode === 'cruise' ? 0 : Math.sin(phaseT * Math.PI * 2) * (widthPx * 0.025);
   ctx.drawImage(
-    img, frame * cw, row * OBLIQUE_CELL_H, cw, OBLIQUE_CELL_H,
-    Math.round(x - OBLIQUE_ANCHOR.x * sc), Math.round(y - OBLIQUE_ANCHOR.y * sc - bob),
+    img, frame * cw, row * sheet.cellH, cw, sheet.cellH,
+    Math.round(x - cw * sheet.anchorXRatio * sc),
+    Math.round(y - sheet.cellH * sheet.anchorYRatio * sc - bob),
     widthPx, hh,
   );
 
@@ -406,6 +424,8 @@ export function drawObliqueWorld<TImage>(
     readonly gateWOf?: (gate: number) => number;
     readonly frameRoleOf: (gate: number, fieldSize: number) => string;
     readonly font: FontOf;
+    /** ★シートの形（コマ数・セル高・接地点）。省略時は第2便までのシート */
+    readonly sheet_?: SheetSpec | undefined;
   },
 ): void {
   const { course, cam, pal, viewport: vp, distanceMeter } = opts;
@@ -434,7 +454,7 @@ export function drawObliqueWorld<TImage>(
       ctx, opts.sheet, opts.sheetWidth, pal, d.x, d.y,
       opts.frameOf(d.h.gate), d.h.gate, opts.fieldSize, opts.horseWidthPx,
       opts.frameRoleOf, opts.font,
-      opts.modeOf?.(d.h) ?? 'cruise', opts.ridePhase ?? 0,
+      opts.modeOf?.(d.h) ?? 'cruise', opts.ridePhase ?? 0, opts.sheet_ ?? SHEET_V1,
     );
   }
 }

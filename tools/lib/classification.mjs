@@ -109,6 +109,12 @@ export const READONLY = [
   'measure-ref2d.mjs',
   // ★コース幾何を読んで数えるだけ（Q-P4-46 手順①）。DB に触れません
   'count-headings.mjs',
+  // ★画像を読んで測るだけ（駆歩シートの受け入れ判定）。DB に触れません
+  'verify-gallop-sheet.mjs',
+  // ★画像を読んで整列し直すだけ。DB に触れません
+  'align-gallop-sheet.mjs',
+  // ★画像を読んで枠色8行に焼くだけ。DB に触れません
+  'bake-oblique-sheet.mjs',
   // ★読むだけ。斜め俯瞰の試作を静止画で確かめる
   'shot-oblique.mjs',
   // ★読むだけ。3カットを本番のエンジンで描いて大きさを決める

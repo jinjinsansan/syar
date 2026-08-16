@@ -34,7 +34,7 @@ import {
   replayPositionModel, finalOrderOf, ovalCourse, obliqueProject, railPolyline,
   timeWarpFor, knotsFor, ratesForTarget, targetDisplaySec, frameRoleOf,
   // ★描き方は package が唯一の出どころ（この道具には持たない）
-  drawObliqueWorld, drawGauge, drawStandings, drawCallBand,
+  drawObliqueWorld, drawGauge, drawStandings, drawCallBand, SHEET_V2,
 } from '@star/render';
 
 /**
@@ -174,7 +174,12 @@ function cutFor(metersLeft) {
 async function main() {
   rmSync(WORK, { recursive: true, force: true });
   mkdirSync(WORK, { recursive: true });
-  const img = await loadImage(path.resolve('apps/web/public/art/horse-oblique.png'));
+  /**
+ * ★第3便のシート（8コマ × 枠色8行）。
+ *   ⚠️ ★コマ数が 6 → 8 に変わっています。**シートの形も一緒に渡します**
+ *      （渡さないと、黙って別のコマを切り出して描きます）。
+ */
+const img = await loadImage(path.resolve('apps/web/public/art/horse-oblique-v2.png'));
 
   const total = Math.ceil(warp.displaySec * FPS);
   console.log(`★${DIST}m・${FIELD}頭・シード ${SEED}`);
@@ -218,7 +223,8 @@ async function main() {
        *   ⚠️ 距離で回すと、道中を速く送ったときに**脚も速く回り**、小走りに見えます。
        *   ★競走馬は毎秒およそ2歩。6コマ1完歩なので **毎秒12コマ**。
        */
-      frameOf: (g) => Math.floor(dispSec * 12 + g * 0.37 * 6) % 6,
+      frameOf: (g) => Math.floor(dispSec * 16 + g * 0.37 * 8) % 8,
+      sheet_: SHEET_V2,
       modeOf: (h) => (h.meters >= DIST ? 'celebrate' : (DIST - h.meters) <= 400 ? 'drive' : 'cruise'),
       ridePhase: dispSec * 2,
       gateWOf: (g) => laneAtStart(g, FIELD, TRACK_WIDTH_M),
