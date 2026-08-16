@@ -12,7 +12,7 @@
  *   ② 走路の帯（内ラチ〜外ラチ）が画面の高さの何割か
  *   ③ 馬の幅が画面の幅の何割か（★これは切り出しを見て人が測る）
  *
- * 実行: npx tsx tools/measure-ref2d.mjs [--at 45]
+ * 実行: npx tsx tools/measure-ref2d.mjs --src <参考映像> [--at 45]
  */
 import sharp from 'sharp';
 import ffmpeg from 'ffmpeg-static';
@@ -20,7 +20,19 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 
-const SRC = 'ダービースタリオン/ダービースタリオン2025の２D参考用.mp4';
+/**
+ * ★参考映像のパスは**引数で受け取ります**。
+ *
+ * ⚠️ ★ここに**他社製品の名前を直接書いていました**（憲法違反）。
+ *    「★他社製品の固有名称（製品名・機能名）を**コード内の変数名・コメント・出力にも書かない**」。
+ *    ファイル名だからと書いてしまい、★**出力にもそのまま出ていました。**
+ * → ★**参考素材は追跡しません**（`.gitignore`）。パスは実行時に渡します。
+ */
+const SRC = (() => {
+  const i = process.argv.indexOf('--src');
+  if (i >= 0 && process.argv[i + 1] !== undefined) return process.argv[i + 1];
+  throw new Error('★参考映像のパスを --src で渡してください（このコードには書きません）');
+})();
 const OUT = path.resolve('out/ref2d');
 const argv = process.argv.slice(2);
 const num = (f, d) => { const i = argv.indexOf(f); return i >= 0 ? Number(argv[i + 1]) : d; };
@@ -49,7 +61,8 @@ function greenRatio(data, info, y) {
 }
 
 console.log('# ★2D の参考映像を測る');
-console.log(`  ${SRC}\n`);
+// ⚠️ ★パスは出しません（他社製品の名前が**出力**に混じるため。憲法）
+console.log('  （参考素材のパスは出力しません）\n');
 
 /**
  * ★**画の範囲は動画を通して一定**です（Shorts の枠は動きません）。
