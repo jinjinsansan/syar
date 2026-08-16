@@ -384,21 +384,24 @@ export function drawObliqueHorse<TImage>(
   }
 
   /**
-   * ★ゼッケン（枠色＋馬番。D-060「色は枠、数字は個体」）。
-   * ⚠️ ★寄り（300px）で 51px になり**馬より目立ちました** → 上限 30px。
+   * ★ゼッケンの馬番（D-060「色は枠、数字は個体」）。
+   *
+   * ⚠️ ★第3便のシートは**鞍布そのものが枠色**になりました。
+   *    その上に**白い板を重ねて**いたので、★**貼り付けた札**に見えていました。
+   * → 板は**枠色**にして鞍布と地続きにし、数字だけを読ませます。
+   *   ⚠️ ★寄り（300px）で 51px になり馬より目立ったので、上限は残します。
    */
-  const bw = Math.max(14, Math.min(30, Math.round(widthPx * 0.17)));
-  const bh = Math.max(10, Math.round(bw * 0.72));
+  const bw = Math.max(13, Math.min(28, Math.round(widthPx * 0.15)));
+  const bh = Math.max(9, Math.round(bw * 0.72));
   const bx = Math.round(x + widthPx * 0.02);
   const by = Math.round(y - hh * 0.5);
-  ctx.fillStyle = pal['paper-0'] ?? '#fff';
-  ctx.fillRect(bx - bw / 2, by, bw, bh);
   ctx.fillStyle = pal[role] ?? pal['paper-0'] ?? '#fff';
-  ctx.fillRect(bx - bw / 2, by, bw, Math.max(3, bh * 0.22));
-  ctx.fillStyle = pal['ink-0'] ?? '#000';
-  ctx.font = font(Math.max(8, Math.round(bh * 0.72)), true);
+  ctx.fillRect(bx - bw / 2, by, bw, bh);
+  // ★枠色の上で読める色を選ぶ（黒枠に黒文字だと消えます）
+  ctx.fillStyle = inkOn(pal, role);
+  ctx.font = font(Math.max(8, Math.round(bh * 0.78)), true);
   ctx.textAlign = 'center';
-  ctx.fillText(String(gate), bx, by + bh - Math.max(2, bh * 0.18));
+  ctx.fillText(String(gate), bx, by + bh - Math.max(2, bh * 0.16));
   ctx.textAlign = 'left';
 }
 

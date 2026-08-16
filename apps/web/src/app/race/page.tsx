@@ -33,7 +33,7 @@ import {
   replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
   phaseOf, ovalCourse, segmentAt, HORSE_LENGTH_M,
   // ★描き方は package が唯一の出どころ（この画面には持たない）
-  drawObliqueWorld, frameRoleOf,
+  drawObliqueWorld, frameRoleOf, SHEET_V2, SHEET_FAR,
   // ★UI も package が唯一の出どころ（動画の道具と同じ関数）
   drawGauge, drawStandings, drawCallBand, type CallPart,
 } from '@star/render';
@@ -64,7 +64,7 @@ const COURSE = ovalCourse(DIST);
  *   ⚠️ ★**動画の道具と同じ値**です。離したら見え方が変わります。
  */
 const CUTS = {
-  wide: { horseW: 120, cam: { pxPerM: 22, depth: 0.54, anchorX: 470, anchorY: 500 } },
+  wide: { horseW: 120, far: true, cam: { pxPerM: 22, depth: 0.54, anchorX: 470, anchorY: 500 } },
   close: { horseW: 300, cam: { pxPerM: 46, depth: 0.36, anchorX: 380, anchorY: 560 } },
   goal: { horseW: 190, cam: { pxPerM: 34, depth: 0.22, anchorX: 560, anchorY: 540 } },
 } as const;
@@ -154,7 +154,8 @@ export default function RacePage(): React.JSX.Element {
   const callRef = useRef<readonly (readonly CallPart[])[]>([]);
   const callKeyRef = useRef<string>('');
   const artRef = useRef<{
-    pal: unknown; layers: unknown; atlas: unknown; oblique: HTMLImageElement;
+    pal: unknown; layers: unknown; atlas: unknown;
+    oblique: HTMLImageElement; obliqueFar: HTMLImageElement;
   } | null>(null);
   const rafRef = useRef<number | null>(null);
   const t0Ref = useRef(0);
@@ -192,19 +193,28 @@ export default function RacePage(): React.JSX.Element {
         im.onerror = () => rej(new Error('スプライトを読み込めません'));
         im.src = `/art/horse-gallop.png?v=${ASSET_VERSION}`;
       });
-      // ★斜め俯瞰のシート（6コマ × 8行＝枠色）
-      const oblique = await new Promise<HTMLImageElement>((res, rej) => {
-        const im = new Image();
-        im.onload = () => res(im);
-        im.onerror = () => rej(new Error('斜め俯瞰のスプライトを読み込めません'));
-        im.src = `/art/horse-oblique.png?v=${ASSET_VERSION}`;
-      });
+      /**
+       * ★第3便のシート（8コマ × 枠色8行）を**カットごとに2枚**。
+       *   ⚠️ 引きに寄りのシートを縮めて使うと **0.4倍**になり、輪郭が濁ります
+       *      （契約 §5 で禁じている形）。★引き用は別に描き起こしたものです。
+       */
+      const loadImg = (src: string): Promise<HTMLImageElement> =>
+        new Promise((res, rej) => {
+          const im = new Image();
+          im.onload = () => res(im);
+          im.onerror = () => rej(new Error(`スプライトを読み込めません: ${src}`));
+          im.src = src;
+        });
+      const [oblique, obliqueFar] = await Promise.all([
+        loadImg(`/art/horse-oblique-v2.png?v=${ASSET_VERSION}`),
+        loadImg(`/art/horse-oblique-far.png?v=${ASSET_VERSION}`),
+      ]);
       const api = window.STARStill;
       if (api === undefined) throw new Error('STARStill がありません');
       api.setOptions({ coat, backlight });
       const atlas = await api.buildAtlas(sheet, pal, layers);
       if (cancelled) return;
-      artRef.current = { pal, layers, atlas, oblique };
+      artRef.current = { pal, layers, atlas, oblique, obliqueFar };
       setReady(true);
     };
     boot().catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)));
@@ -263,9 +273,11 @@ export default function RacePage(): React.JSX.Element {
         gate: h.gate, meters: h.meters, w: h.w ?? COURSE.widthM / 2,
       })),
       fieldSize: FIELD, horseWidthPx: cut.horseW,
-      sheet: art.oblique, sheetWidth: art.oblique.width,
+      sheet: 'far' in cut ? art.obliqueFar : art.oblique,
+      sheetWidth: ('far' in cut ? art.obliqueFar : art.oblique).width,
+      sheet_: 'far' in cut ? SHEET_FAR : SHEET_V2,
       // ★脚は**表示の時間**で回す（距離で回すと道中の早送りで小走りになる）
-      frameOf: (g) => Math.floor(d * 12 + g * 0.37 * 6) % 6,
+      frameOf: (g) => Math.floor(d * 16 + g * 0.37 * 8) % 8,
       modeOf: (h) => (h.meters >= DIST ? 'celebrate' : (DIST - h.meters) <= 400 ? 'drive' : 'cruise'),
       ridePhase: d * 2,
       gateWOf: (g) => laneAtStart(g, FIELD, TRACK_WIDTH_M),
