@@ -1,10 +1,18 @@
 /**
- * ★レース観戦 — **エンジン + コース幾何 + カメラ + デザイン・ハンドオフの絵**
+ * ★レース観戦 — **斜め俯瞰**（D-066・β）
  *
  * 【★守っていること】
  *   ・**着順はエンジンが決めたもの**（開始時に D-059 のゲートを通す）
- *   ・横位置 `w` は**見せているだけ**（★距離ロスは着順に効かせていません・D-065 は裁定待ち）
- *   ・絵は**参照実装**が描きます（16進を持たず `palette.json` から役割名で引く）
+ *   ・★横位置 `w` は**エンジンが引いたもの**（D-071）。**距離ロスは着順に効いています**
+ *     （D-065 は 2026-08-16 にエンジンへ入りました＝`race.ts` の `laneCoef`）
+ *   ・★**描き方はこの画面に持ちません** — `@star/render` の `drawObliqueWorld` が唯一の出どころで、
+ *     **動画の道具と同じ関数**を呼びます（2か所で描いたら必ず離れます）
+ *   ・色は 16進を持たず `palette.json` から役割名で引く
+ *
+ * 【⚠️ ★まだ入っていないもの】
+ *   ・実況帯／ゲージ／順位表示（★動画の道具にはあります。この画面には**まだ移していません**）
+ *   ・★ゲージを入れるときは**エンジンの `staminaAt()` を読むこと**（D-072）。
+ *     **この画面で式を作らないでください** — 一度作って**符号が逆**になりました。
  *
  * 【★毛色と逆光は既定で切っています】
  *   どちらも元の素材の階調を殺すためです（オーナー判定）。上のチェックで入れられます。
@@ -13,11 +21,16 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches , laneAt } from '@star/race-engine';
+import {
+  DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches,
+  laneAt, laneAtStart, TRACK_WIDTH_M,
+} from '@star/race-engine';
 import type { Strategy } from '@star/sim-engine';
 import {
   replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
   phaseOf, ovalCourse, segmentAt, HORSE_LENGTH_M,
+  // ★描き方は package が唯一の出どころ（この画面には持たない）
+  drawObliqueWorld, frameRoleOf, type Ctx2D,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 
@@ -39,6 +52,17 @@ const POST_COLORS: readonly (readonly [number, number, number])[] = [
 
 /** ★コース（1角/2角/向正面/3角/4角/直線）。いまどこを走っているかを出すため */
 const COURSE = ovalCourse(DIST);
+
+/**
+ * ★**カットの3系統**（アートバイブル）。★数字は 2D の参考の実測から（2026-08-16）:
+ *   引き 馬の幅 = 画面幅の 9〜11% ／ 寄り 24% ／ 走路の帯 33%
+ *   ⚠️ ★**動画の道具と同じ値**です。離したら見え方が変わります。
+ */
+const CUTS = {
+  wide: { horseW: 120, cam: { pxPerM: 22, depth: 0.54, anchorX: 470, anchorY: 500 } },
+  close: { horseW: 300, cam: { pxPerM: 46, depth: 0.36, anchorX: 380, anchorY: 560 } },
+  goal: { horseW: 190, cam: { pxPerM: 34, depth: 0.22, anchorX: 560, anchorY: 540 } },
+} as const;
 
 interface StarStill {
   buildAtlas: (sheet: HTMLImageElement, pal: unknown, layers: unknown) => Promise<unknown>;
@@ -96,7 +120,9 @@ function build(seed: number, ownGate: number): Built {
 
 export default function RacePage(): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const artRef = useRef<{ pal: unknown; layers: unknown; atlas: unknown } | null>(null);
+  const artRef = useRef<{
+    pal: unknown; layers: unknown; atlas: unknown; oblique: HTMLImageElement;
+  } | null>(null);
   const rafRef = useRef<number | null>(null);
   const t0Ref = useRef(0);
   const dRef = useRef(0);
@@ -133,12 +159,19 @@ export default function RacePage(): React.JSX.Element {
         im.onerror = () => rej(new Error('スプライトを読み込めません'));
         im.src = `/art/horse-gallop.png?v=${ASSET_VERSION}`;
       });
+      // ★斜め俯瞰のシート（6コマ × 8行＝枠色）
+      const oblique = await new Promise<HTMLImageElement>((res, rej) => {
+        const im = new Image();
+        im.onload = () => res(im);
+        im.onerror = () => rej(new Error('斜め俯瞰のスプライトを読み込めません'));
+        im.src = `/art/horse-oblique.png?v=${ASSET_VERSION}`;
+      });
       const api = window.STARStill;
       if (api === undefined) throw new Error('STARStill がありません');
       api.setOptions({ coat, backlight });
       const atlas = await api.buildAtlas(sheet, pal, layers);
       if (cancelled) return;
-      artRef.current = { pal, layers, atlas };
+      artRef.current = { pal, layers, atlas, oblique };
       setReady(true);
     };
     boot().catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)));
@@ -170,167 +203,49 @@ export default function RacePage(): React.JSX.Element {
     const metersLeft = DIST - (own === undefined ? lead : own.meters);
 
     /**
-     * ★**順位から段と横位置を決めます。**
-     *   ⚠️ 段は 1×／1×／2× の3つだけ（D-058）。**非整数倍で縮小しません。**
-     *   先頭ほど右、後方ほど左。**先頭集団の3頭を手前（2×）**に置きます。
-     */
-    /**
-     * ★**構図はデザイナーのものをそのまま使います。**
+     * ★**斜め俯瞰で描きます**（D-066・β／2026-08-16 の裁定「動画と同じ見え方に揃える」）。
      *
-     * 【★なぜ計算で置かないか】
-     *   ⚠️ 順位から x を計算して置いていたら、**馬が団子になったり間延びしたり**しました。
-     *   ★`/still` が綺麗なのは、**12頭を手で配置した構図**だからです。
-     *     計算に自由を与えるほど、その構図から離れます。
-     *   → **枠（段と位置）は固定**し、**誰がどの枠に入るか**だけを順位で決めます。
-     *     さらに**実際の差**でわずかに前後させ、追い抜きが見えるようにします。
+     * ⚠️ ★**描き方はこの画面に持ちません。** `@star/render` の `drawObliqueWorld` が
+     *    唯一の出どころです。動画の道具と**同じ関数**を呼びます。
+     *    ★別々に描いたら必ず離れます（走路の幅 20m/25m と同じ形）。
      *
-     *   枠（`layers.json` の `horsePlan`）:
-     *     手前 3頭（2×）… x 230 / 660 / 1060
-     *     中   4頭（1×）… x 430 / 615 / 800 / 985
-     *     奥   5頭（1×）… x 150 / 330 / 505 / 685 / 860
+     * ⚠️ ★**旧・手配置スロットの構図は撤去しました。**
+     *    平面の段は**コーナーが無く、内外の差も出ません**でした
+     *    （オーナーの指摘「馬それぞれの場所が定位置」「競馬ではない」）。
      */
-    const closeUp = metersLeft <= 200;
-    const SLOTS: readonly (readonly [number, number])[] = closeUp ? [
-      // ★ゴール前: 手前（2×）を5枠に増やして叩き合いを大きく
-      [2, 1120], [2, 830], [2, 540], [2, 250], [2, -40],
-      [1, 985], [1, 800], [1, 615], [1, 430],
-      [0, 860], [0, 685], [0, 505],
-    ] : [
-      // [row, x] を「先頭から順に」並べる
-      [2, 1060], [2, 660], [2, 230],
-      [1, 985], [1, 800], [1, 615], [1, 430],
-      [0, 860], [0, 685], [0, 505], [0, 330], [0, 150],
-    ];
-    const horses = sorted.map((h, rank) => {
-      const slot = SLOTS[Math.min(rank, SLOTS.length - 1)]!;
-      const [row, baseX] = slot;
-      /**
-       * ★**実際の差でわずかに前後させます**（追い抜きが見えるように）。
-       *   ⚠️ 大きく動かすと構図が壊れるので、**±40px まで**に抑えます。
-       */
-      const behind = lead - h.s;
-      /**
-       * ★**馬群の伸縮**（調べた実際のレース展開）。
-       *   「前からシンガリまで**10馬身くらいで一団**で進んでいきます」
-       *   「ひとかたまりで**第4コーナーから直線に向かいます**」
-       *   ★道中は詰まり、直線で伸びる。**枠の位置を縮尺で寄せ書きします**（構図は壊さない）。
-       */
-      const tight = metersLeft > 800 ? 0.72 : metersLeft > 400 ? 0.86 : 1.0;
-      const nudge = Math.max(-40, Math.min(40, (behind - rank * 2.2) * -6));
-      return {
-        gate: h.gate,
-        row,
-        // ★画面中央へ寄せる度合いで一団に見せる（枠そのものは動かさない）
-        x: Math.round(VP_W / 2 + (baseX - VP_W / 2) * tight + nudge),
-        /**
-         * ★脚の回転。**毎秒 2.4 歩**（実際の駆歩は 2.1〜2.4）。
-         *   位相を馬番でずらします（全馬が同じ脚さばきだと**行進**に見えます）。
-         */
-        frame: Math.floor((((d * 2.4 + h.gate * 0.37) % 1) + 1) % 1 * 6),
-        effort: h.stamina,
-        own: h.gate === ownGate,
-      };
+    const cut = metersLeft <= 220 ? CUTS.goal : metersLeft <= 800 ? CUTS.close : CUTS.wide;
+    const centre = at.reduce((sum, h) => sum + h.meters, 0) / at.length;
+    // ★内外もカメラが追う（走路の真ん中を見ると馬群が上端に貼りつく）
+    const wCentre = at.reduce((sum, h) => sum + (h.w ?? COURSE.widthM / 2), 0) / at.length;
+    const cam = {
+      ...cut.cam,
+      s: Math.max(1, Math.min(DIST - 1, centre)),
+      w: wCentre,
+    };
+    ctx.imageSmoothingEnabled = false;
+    drawObliqueWorld(ctx as unknown as Ctx2D, {
+      course: COURSE, cam, pal: art.pal as Record<string, string>,
+      viewport: { width: W, height: H }, distanceMeter: DIST,
+      horses: at.map((h) => ({
+        gate: h.gate, meters: h.meters, w: h.w ?? COURSE.widthM / 2,
+      })),
+      fieldSize: FIELD, horseWidthPx: cut.horseW,
+      sheet: art.oblique as never, sheetWidth: art.oblique.width,
+      // ★脚は**表示の時間**で回す（距離で回すと道中の早送りで小走りになる）
+      frameOf: (g) => Math.floor(d * 12 + g * 0.37 * 6) % 6,
+      modeOf: (h) => (h.meters >= DIST ? 'celebrate' : (DIST - h.meters) <= 400 ? 'drive' : 'cruise'),
+      ridePhase: d * 2,
+      gateWOf: (g) => laneAtStart(g, FIELD, TRACK_WIDTH_M),
+      frameRoleOf, font: (px, bold) => `${bold === true ? 'bold ' : ''}${px}px sans-serif`,
     });
 
-    // ★前の馬との差（順位ではなく変化を出す・裁定 Q-P4-14 ①）
-    const myRank = sorted.findIndex((h) => h.gate === ownGate);
-    const ahead = myRank > 0 ? sorted[myRank - 1]! : undefined;
-    const gapM = ahead === undefined || own === undefined ? 0 : ahead.s - own.meters;
-    const back = built.model.at(Math.max(0, sec - 0.6));
-    const ownB = back.find((h) => h.gate === ownGate);
-    const aheadB = ahead === undefined ? undefined : back.find((h) => h.gate === ahead.gate);
-    const gapB = (ownB === undefined || aheadB === undefined) ? gapM : aheadB.meters - ownB.meters;
-
     /**
-     * ★**コーナーの曲がり**を、走路の帯に出します。
-     *
-     *   ⚠️ デザイナーの描画は**真横専用**で、コーナーを描けません。
-     *      走路の帯を**ゆるく反らせる**ことで「いま曲がっている」ことを伝えます。
-     *   ★線遠近は描き込みません（アートバイブル §3）。**帯の反りだけ**です。
-     *   ⚠️ **絵の都合であって、機構ではありません。** 着順にも位置にも触れません。
+     * ★**着順を出す時点**。
+     *   ⚠️ ★元は旧構図の変数を使っていました。撤去したので、ここで定義し直します。
+     *   ★**全馬がゴールしてから**出します（1着だけで出すと、後ろの叩き合いが隠れます）。
      */
-    const seg = segmentAt(COURSE, Math.min(DIST, own === undefined ? lead : own.meters));
-    const curveAmount = seg.type === 'corner' ? (seg.turn === 'right' ? -1 : 1) : 0;
+    const showResult = at.every((h) => h.meters >= DIST - 1e-6);
 
-    const phase = phaseOf(metersLeft);
-    // ★いまコースのどこか（実際の区間名）
-    const segment = seg.label;
-    const finished = d >= built.warp.displaySec - 0.01;
-    /**
-     * ★**決着で一拍置く**（アートバイブル §2「決着直前に音を抜く」の視覚版）。
-     *   ゴール直後の 0.8秒は**着順を出さず**、ゴールした絵だけを見せます。
-     *   ⚠️ レースの時計は伸ばしません（表示の後ろで走るだけ）。
-     */
-    const holdSec = 0.8;
-    const sinceFinish = d - built.warp.displaySec;
-    const showResult = finished && sinceFinish >= holdSec;
-
-    api.drawStill(ctx, {
-      palette: art.pal, layers: art.layers, atlas: art.atlas,
-      /**
-       * ★**背景の流れ**。
-       * ⚠️ 3.2倍にしていたので、91秒で 5,120px しか流れず（毎秒 56px）、
-       *    **止まって見えていました**（オーナー判定「超スロー」）。
-       * ★実馬は 16m/s。手前のラチが 1.00 のとき、**毎秒 320px 前後**流れるべきです。
-       *   → 1m あたり 20px として 20倍にします。
-       */
-      parts: {}, scene: 'straight200', scroll: lead * 20,
-      horses,
-      own: ownGate,
-      runningOrder: sorted.map((h) => h.gate),
-      gauge: own === undefined ? 1 : own.staminaRatio,
-      cue: segment,
-      cueActive: phase === 'spurt' || phase === 'straight',
-      gap: { m: gapM, mps: (gapB - gapM) / 0.6, toGo: Math.max(0, myRank - 2) },
-      pace: built.pace,
-      curve: curveAmount,
-      /**
-       * ★**ゴール前は寄る**（アートバイブル §9「勝負所で寄る」）。
-       *   残り200m から、手前の段（2×）に入る頭数を増やして叩き合いを大きく見せます。
-       *   ⚠️ 倍率は 1× と 2× のまま（D-058）。**枠の割り当てを変えるだけ**です。
-       */
-      closeUp: metersLeft <= 200,
-      /**
-       * ★**実況は「変化」を言う**（裁定 Q-P4-14 ①）。
-       *   「3番手」ではなく「上がってきた」。**順位の数字は言いません。**
-       *   ⚠️ 少し前と比べて、**実際に起きたこと**を拾います。
-       */
-      callout: (() => {
-        if (finished) return `${built.result[0]!.gate}番　ゴールイン`;
-        const prevSorted = [...back].sort((a, b) => b.meters - a.meters);
-        const leaderNow = sorted[0]!.gate;
-        const leaderBefore = prevSorted[0]?.gate;
-        // ★先頭が替わった
-        if (leaderBefore !== undefined && leaderBefore !== leaderNow) {
-          return `${leaderNow}番　先頭に立った`;
-        }
-        // ★いちばん詰めている馬
-        let bestGate = -1;
-        let bestGain = 0;
-        for (const h of sorted) {
-          const b = back.find((x) => x.gate === h.gate);
-          if (b === undefined) continue;
-          const gainNow = lead - h.s;
-          const gainBefore = (prevSorted[0]?.meters ?? lead) - b.meters;
-          const g = gainBefore - gainNow;
-          if (g > bestGain) { bestGain = g; bestGate = h.gate; }
-        }
-        if (bestGain > 0.8 && bestGate > 0) {
-          return segment === '直線' ? `${bestGate}番　外から伸びてきた` : `${bestGate}番　上がってきた`;
-        }
-        if (segment === '直線' && metersLeft < 200) {
-          const second = sorted[1];
-          if (second !== undefined && sorted[0]!.s - second.s < HORSE_LENGTH_M) {
-            return `${leaderNow}番と${second.gate}番　並んだ`;
-          }
-          return `残り ${metersLeft.toFixed(0)}m　${leaderNow}番先頭`;
-        }
-        if (segment === '直線') return `さあ直線　${leaderNow}番が先頭`;
-        if (segment === '4角') return '4角をまわった　各馬が動いた';
-        if (segment === '3角') return '3角　隊列が動き始めた';
-        return `${segment}　${leaderNow}番が先頭　残り ${metersLeft.toFixed(0)}m`;
-      })(),
-    });
     /**
      * ★**着順**（決着の一拍のあとに出す）。
      *   ⚠️ 参照実装の上に**足して描くだけ**です（構図に触れません）。

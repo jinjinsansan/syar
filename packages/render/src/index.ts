@@ -7,3 +7,4 @@ export * from './camera.js';
 export * from './oblique.js';
 export * from './bracket.js';
 export * from './formation.js';
+export * from './oblique-draw.js';
