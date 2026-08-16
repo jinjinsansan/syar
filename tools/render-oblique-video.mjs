@@ -17,18 +17,40 @@
  *
  * 実行: npx tsx tools/render-oblique-video.mjs [--distance 1600] [--seed 42] [--fps 24]
  */
-import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
+import { existsSync } from 'node:fs';
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import ffmpeg from 'ffmpeg-static';
 import {
-  DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt, laneAtStart, TRACK_WIDTH_M,
+  DEFAULT_RACE_BALANCE, DEFAULT_INTERVENTION_BALANCE as IB,
+  resolveRace, paceOf, replayOf, finalOrderMatches, laneAt, laneAtStart, TRACK_WIDTH_M,
+  aiProxyPlan, staminaTrackOf, staminaGaugeOf, staminaAt, boundaryTimesOf,
 } from '@star/race-engine';
+// ★乱数は注入する（憲法4）。`Math.random` は呼ばない
+import { deriveRng } from '@star/sim-engine';
 import {
   replayPositionModel, finalOrderOf, ovalCourse, obliqueProject, railPolyline,
   timeWarpFor, knotsFor, ratesForTarget, targetDisplaySec, frameRoleOf, gateStalls,
 } from '@star/render';
+
+/**
+ * ★**日本語のフォントを登録します。**
+ *
+ * ⚠️ ★登録しないと、実況帯も順位表示も**すべて豆腐（□）**になります。
+ *    実際になりました。★**絵を見なければ「文字を描いた」で終わっていました。**
+ */
+const JP_FONTS = [
+  'C:/Windows/Fonts/NotoSansJP-VF.ttf',
+  'C:/Windows/Fonts/meiryo.ttc',
+  'C:/Windows/Fonts/YuGothR.ttc',
+  'C:/Windows/Fonts/msgothic.ttc',
+];
+const jp = JP_FONTS.find((f) => existsSync(f));
+if (jp === undefined) throw new Error('★日本語フォントが見つかりません（文字が豆腐になります）');
+GlobalFonts.registerFromPath(jp, 'STARJP');
+const FONT = (px, bold = false) => `${bold ? 'bold ' : ''}${px}px STARJP, sans-serif`;
 
 const W = 1280, H = 720;
 const OUT = path.resolve('out/video');
@@ -72,6 +94,40 @@ if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((e) 
 }
 const knots = knotsFor(boundaries, 1);
 const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
+
+/**
+ * ★**自馬**（§12.6 は「自馬にのみ表示」）。
+ */
+const OWN = 1 + (SEED % FIELD);
+const ownEntrant = entrants[OWN - 1];
+const ownEntry = result.order.find((e) => Number(e.horseId) === OWN);
+/**
+ * ★**ゲージはエンジンの内部状態を読むだけ**（D-072）。
+ *   ⚠️ ★この層で式を作りません。一度作って**符号が逆**になりました
+ *      （残り200m で 余力と着順の順位相関 −0.653 ＝ 勝つ馬ほどバテて見えていた）。
+ */
+const ownGauge = staminaGaugeOf(
+  staminaTrackOf(
+    {
+      iq: ownEntrant.stats.iq, gt: ownEntrant.stats.gt, st: ownEntrant.stats.st,
+      condition: ownEntrant.condition, fatigue: ownEntrant.fatigue,
+    },
+    aiProxyPlan(
+      {
+        iq: ownEntrant.stats.iq, gt: ownEntrant.stats.gt, st: ownEntrant.stats.st,
+        condition: ownEntrant.condition, fatigue: ownEntrant.fatigue,
+      },
+      deriveRng(SEED, OWN), IB,
+    ),
+    DIST, IB,
+  ),
+  boundaryTimesOf(ownEntry, DIST, OWN, ownEntrant.strategy, pace),
+  DIST, ownEntrant.strategy, pace,
+);
+const ownName = `${OWN}番`;
+/** ★確定着順と走破タイム（★エンジンの結果そのもの。画面で作りません） */
+const FINISH_POS = new Map(result.order.map((e) => [Number(e.horseId), e.finishPosition]));
+const FINISH_SEC = new Map(result.order.map((e) => [Number(e.horseId), e.timeSec]));
 
 /* ── 背景・走路（★`shot-cuts.mjs` と同じ描き方）─────────── */
 const INFIELD_W = -26;
@@ -122,9 +178,35 @@ function track(ctx, cam) {
   bandBetween(ctx, cam, -12, -1, 'dirt-2');
   lineAt(ctx, cam, -1, 2, 'dirt-3');
   bandBetween(ctx, cam, 0, WIDTH, 'turf-3');
-  for (let k = 1; k < 7; k++) {
-    if (k % 2 === 0) continue;
-    bandBetween(ctx, cam, (WIDTH * k) / 7, (WIDTH * (k + 1)) / 7, 'turf-2');
+  /**
+   * ★**芝の刈り目**。⚠️ 内外に平行な帯だと、**進んでも景色が動きません**
+   *    （＝走っている感じが出ない）。★実際の芝目は**走路を斜めに横切ります**。
+   *   → 進行方向にも刻んで、**市松に近い斜めの縞**にします。
+   */
+  /**
+   * ★1本ぶんの長さは**画面での見え方**から決めます。
+   *   ⚠️ 25m 固定にしたら、ゴールのカット（22px/m）で **1マス 550px** になり、
+   *      画面に1〜2マスしか入らず**縞に見えませんでした**。
+   *   → 画面上で 70px 前後になる長さにします。
+   */
+  const STRIPE_M = Math.max(6, Math.round(70 / cam.pxPerM));
+  /**
+   * ⚠️ ★内外にも刻んだら**市松模様**になりました。芝目は市松ではありません。
+   * → ★**進行方向だけ**で刻みます（走路を端から端まで横切る帯）。
+   *   斜めに見えるのは**投影の結果**であって、斜めに描くのではありません。
+   */
+  const first = Math.floor((cam.s - 220) / (STRIPE_M * 2)) * (STRIPE_M * 2);
+  for (let m = first; m < cam.s + 480; m += STRIPE_M * 2) {
+    const a = obliqueProject(COURSE, cam, m, 0);
+    const b = obliqueProject(COURSE, cam, m + STRIPE_M, 0);
+    const c = obliqueProject(COURSE, cam, m + STRIPE_M, WIDTH);
+    const d = obliqueProject(COURSE, cam, m, WIDTH);
+    if (Math.max(a.x, b.x, c.x, d.x) < -60 || Math.min(a.x, b.x, c.x, d.x) > W + 60) continue;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y);
+    ctx.closePath();
+    ctx.fillStyle = pal['turf-2'];
+    ctx.fill();
   }
   bandBetween(ctx, cam, WIDTH, WIDTH + 30, 'turf-4');
   lineAt(ctx, cam, 0, 4, 'rail-0');
@@ -152,7 +234,7 @@ function marks(ctx, cam) {
     ctx.fillStyle = pal['paper-0'];
     ctx.fillRect(Math.round(p.x) - 2, Math.round(p.y) - 18, 4, 18);
     ctx.fillStyle = pal['ink-0'];
-    ctx.font = 'bold 12px sans-serif';
+    ctx.font = FONT(12, true);
     ctx.textAlign = 'center';
     ctx.fillText(String(DIST - m), Math.round(p.x), Math.round(p.y) - 22);
     ctx.textAlign = 'left';
@@ -188,9 +270,160 @@ function gate(ctx, cam) {
   }
 }
 
+
+/**
+ * ★**枠色の上に置く文字の色**。
+ *
+ * ⚠️ ★黒枠（`#191919`）の上に黒い文字を描いて、**馬番が読めませんでした。**
+ *    D-060 は「★色は枠、**数字は個体**」なので、
+ *    ★**数字が読めないと個体が識別できません**（V-16 の前提が壊れます）。
+ */
+function inkOn(role) {
+  const hex = pal[role] ?? '#ffffff';
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  // ★人の目の感度で明るさを見る
+  return (0.299 * r + 0.587 * g + 0.114 * b) < 140 ? pal['paper-0'] : pal['ink-0'];
+}
+
+/* ── ★UI（画面の座標系）─────────────────────────
+ *
+ * ⚠️ ★**カメラの倍率も中心も使いません。** アートバイブル §9 の制約です。
+ *    ここに `cam` を持ち込んだ瞬間、寄りの最中にゲージが動きます。
+ * ------------------------------------------------------------------ */
+
+/**
+ * ★**自馬のスタミナゲージ**（§12.6「自馬にのみ表示」）。
+ *   ★出すのは D-070 の「状態」＝**残量と減り方**。`emptyAtMeter` ではありません。
+ */
+function gauge(ctx, metersLeft) {
+  const g = staminaAt(ownGauge, metersLeft);
+  const ratio = Math.max(0, Math.min(1, g.left / Math.max(1e-6, ownGauge.initial)));
+  const x = 40, y = H - 70, w = 300, h = 18;
+  ctx.fillStyle = 'rgba(16,20,16,0.72)';
+  ctx.fillRect(x - 8, y - 26, w + 16, h + 42);
+  ctx.fillStyle = pal['paper-0'];
+  ctx.font = FONT(14, true);
+  ctx.fillText(`${ownName}（自分の馬）`, x, y - 10);
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(x, y, w, h);
+  /**
+   * ★**色は「残量」ではなく「状態」で変える。**
+   *   ⚠️ 数字だけだと、押す瞬間に読み取れません（C-6）。
+   */
+  // 緑 → 黄 → 赤（★色の意味は「余力があるか」）
+  ctx.fillStyle = ratio > 0.5 ? pal['frame-6'] : ratio > 0.2 ? pal['frame-5'] : pal['frame-3'];
+  ctx.fillRect(x, y, Math.round(w * ratio), h);
+  ctx.strokeStyle = pal['paper-0']; ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  /**
+   * ★**減り方**（D-070 の②）。1m あたりの消費を「この先どれだけ保つか」ではなく
+   *   ⚠️ **いまどれだけ速く減っているか**として、目盛りの動きで見せます。
+   *   ★「いつ尽きるか」は出しません（出すと予言になります）。
+   */
+  const drainPer100m = g.drainPerMeter * 100;
+  const bars = Math.max(1, Math.min(5, Math.round(drainPer100m / 1.2)));
+  for (let i = 0; i < 5; i += 1) {
+    ctx.fillStyle = i < bars ? pal['paper-0'] : 'rgba(255,255,255,0.22)';
+    ctx.fillRect(x + w + 8 + i * 7, y + h - 4 - i * 3, 5, 4 + i * 3);
+  }
+  ctx.fillStyle = pal['paper-0'];
+  ctx.font = FONT(11);
+  ctx.fillText('減り方', x + w + 8, y - 4);
+}
+
+/**
+ * ★順位表示（上位5頭）。★色は枠、数字は個体（D-060）
+ *
+ * ⚠️ ★**ゴールした馬は「確定着順」で並べます。**
+ *    一度、画面上の距離だけで並べたら、★**ゴール後は全馬が 1600m に張り付き、
+ *    順位表示が「0.0 馬身」だらけで着順が読めませんでした。**
+ *    ★一番知りたいところで、画面が何も言っていませんでした。
+ */
+function standings(ctx, at) {
+  const sorted = [...at].sort((a, b) => {
+    const fa = FINISH_POS.get(a.gate), fb = FINISH_POS.get(b.gate);
+    const da = a.meters >= DIST - 1e-6, db = b.meters >= DIST - 1e-6;
+    // ★ゴールした馬が先。その中は確定着順
+    if (da && db) return (fa ?? 99) - (fb ?? 99);
+    if (da !== db) return da ? -1 : 1;
+    return b.meters - a.meters;
+  }).slice(0, 5);
+  const settled = sorted[0] !== undefined && sorted[0].meters >= DIST - 1e-6;
+  const x = W - 190, y = 24;
+  ctx.fillStyle = 'rgba(16,20,16,0.72)';
+  ctx.fillRect(x - 10, y - 18, 190, 5 * 22 + 16);
+  sorted.forEach((h, i) => {
+    const yy = y + i * 22;
+    ctx.fillStyle = pal['paper-0'];
+    ctx.font = FONT(13, true);
+    ctx.fillText(`${i + 1}`, x, yy);
+    const role = frameRoleOf(h.gate, FIELD);
+    ctx.fillStyle = pal[role] ?? pal['paper-0'];
+    ctx.fillRect(x + 18, yy - 11, 22, 14);
+    ctx.fillStyle = inkOn(role);
+    ctx.font = FONT(11, true);
+    ctx.textAlign = 'center';
+    ctx.fillText(String(h.gate), x + 29, yy);
+    ctx.textAlign = 'left';
+    // ★自馬だけ印を付ける（自分がどこにいるか分からないと C-6 が成り立たない）
+    if (h.gate === OWN) {
+      ctx.fillStyle = pal['paper-0'];
+      ctx.font = FONT(12, true);
+      ctx.fillText('★', x + 46, yy);
+    }
+    /**
+     * ★先頭との差（馬身）。★順位の数字ではなく**差**（Q-P4-14 ①）。
+     *   ⚠️ ★ゴール後は差が 0 になるので、**走破タイム**に切り替えます。
+     */
+    ctx.fillStyle = pal['paper-0'];
+    ctx.font = FONT(11);
+    if (settled) {
+      const t = FINISH_SEC.get(h.gate);
+      ctx.fillText(t === undefined ? '' : `${t.toFixed(1)} 秒`, x + 66, yy);
+    } else {
+      const gap = (sorted[0].meters - h.meters) / 2.4;
+      ctx.fillText(i === 0 ? '' : `${gap.toFixed(1)} 馬身`, x + 66, yy);
+    }
+  });
+}
+
+/**
+ * ★**実況の帯**（裁定 Q-P4-14 ①「実況は『位置』ではなく『変化』を言う」）。
+ *
+ *   ⚠️ ★**下から積みます。** 新しい行が下に出て、古い行が上に流れます。
+ *   ★馬名（＝馬番）だけ色を変えます。全部色を付けると、どれが主語か分かりません。
+ */
+function callBand(ctx, lines) {
+  const x = 40, bottom = H - 118;
+  ctx.font = FONT(14);
+  lines.slice(-3).forEach((ln, i, arr) => {
+    const yy = bottom - (arr.length - 1 - i) * 22;
+    const alpha = 0.35 + 0.25 * i;
+    ctx.fillStyle = `rgba(16,20,16,${alpha.toFixed(2)})`;
+    ctx.fillRect(x - 8, yy - 15, 520, 20);
+    let cx = x;
+    for (const part of ln) {
+      ctx.fillStyle = part.role === undefined ? pal['paper-0'] : (pal[part.role] ?? pal['paper-0']);
+      ctx.font = FONT(14, part.role !== undefined);
+      ctx.fillText(part.text, cx, yy);
+      cx += ctx.measureText(part.text).width;
+    }
+  });
+}
+
 /* ── 馬 ─────────────────────────────────── */
 const CELL_H = 120;
-function drawHorse(ctx, img, x, y, frame, gate, widthPx) {
+/**
+ * ★**騎手の動き**（オーナーの指摘「騎手も手をあげたり馬を叩いたりして喜ぶのが競馬レース」）。
+ *
+ * ⚠️ ★スプライトに騎手の別コマがありません（シート契約は8コマの脚だけ）。
+ *    → ★**姿勢を作らず、上下の揺れと鞭だけ**にします。
+ *      **無い絵を描いたことにしません。** 別コマは第3便（デザイナー）で頼みます。
+ *
+ *   drive   … 直線で追う（★上体の上下を大きく・鞭を振る）
+ *   celebrate … ゴール後（★手綱から手を離して上げる代わりに、鞭を高く上げる）
+ */
+function drawHorse(ctx, img, x, y, frame, gate, widthPx, mode = 'cruise', phaseT = 0) {
   const cw = img.width / 6;
   const sc = widthPx / cw;
   const hh = Math.round(CELL_H * sc);
@@ -199,8 +432,29 @@ function drawHorse(ctx, img, x, y, frame, gate, widthPx) {
   ctx.beginPath();
   ctx.ellipse(x, y - 2, widthPx * 0.20, widthPx * 0.05, 0, 0, Math.PI * 2);
   ctx.fill();
+  /**
+   * ★追っているときは**上体が大きく上下**します。
+   *   ⚠️ 走りそのものを変えません（脚は同じコマ）。**乗り方だけ**です。
+   */
+  const bob = mode === 'cruise' ? 0 : Math.sin(phaseT * Math.PI * 2) * (widthPx * 0.025);
   ctx.drawImage(img, frame * cw, row * CELL_H, cw, CELL_H,
-    Math.round(x - 52 * sc), Math.round(y - 116 * sc), widthPx, hh);
+    Math.round(x - 52 * sc), Math.round(y - 116 * sc - bob), widthPx, hh);
+  /**
+   * ⚠️ ★鞭は**寄りのカットだけ**にします。
+   *    96px で描いたら、★**馬の上に棒が1本浮いている**だけに見えました。
+   */
+  if (mode !== 'cruise' && widthPx >= 140) {
+    // ★鞭。追うときは後ろで振り、ゴール後は高く上げる
+    const up = mode === 'celebrate' ? 1 : Math.max(0, Math.sin(phaseT * Math.PI * 2));
+    const wx = Math.round(x - widthPx * 0.10);
+    const wy = Math.round(y - hh * 0.78 - bob);
+    ctx.strokeStyle = pal['ink-0'];
+    ctx.lineWidth = Math.max(1, Math.round(widthPx / 60));
+    ctx.beginPath();
+    ctx.moveTo(wx, wy);
+    ctx.lineTo(wx - widthPx * 0.10, wy - widthPx * (0.06 + 0.16 * up));
+    ctx.stroke();
+  }
   const col = pal[frameRoleOf(gate, FIELD)] ?? pal['paper-0'];
   const bw = Math.max(14, Math.round(widthPx * 0.17));
   const bh = Math.max(10, Math.round(bw * 0.72));
@@ -211,7 +465,7 @@ function drawHorse(ctx, img, x, y, frame, gate, widthPx) {
   ctx.fillStyle = col;
   ctx.fillRect(bx - bw / 2, by, bw, Math.max(3, bh * 0.22));
   ctx.fillStyle = pal['ink-0'];
-  ctx.font = `bold ${Math.max(8, Math.round(bh * 0.72))}px sans-serif`;
+  ctx.font = FONT(Math.max(8, Math.round(bh * 0.72)), true);
   ctx.textAlign = 'center';
   ctx.fillText(String(gate), bx, by + bh - Math.max(2, bh * 0.18));
   ctx.textAlign = 'left';
@@ -245,6 +499,8 @@ async function main() {
 
   let prevCut = '';
   const cuts = [];
+  const lines = [];
+  const lastSay = { key: '' };
   for (let i = 0; i <= total; i += 1) {
     const dispSec = i / FPS;
     const sec = warp.raceSecAt(dispSec);
@@ -280,6 +536,55 @@ async function main() {
       const p = obliqueProject(COURSE, cam, Math.max(0, Math.min(DIST, h.meters)), h.w ?? COURSE.widthM / 2);
       return { ...h, ...p };
     }).sort((a, b) => a.y - b.y);   // ★奥（上）から描く＝手前の馬が奥を隠す
+    /**
+     * ★**実況は「変化」を言う**（裁定 Q-P4-14 ①）。
+     *   ⚠️ ★順位の数字は言いません。言うのは
+     *      ① 前との差 ② それが詰まっているか ③ 局面 の3つだけです。
+     */
+    const ordered = [...at].sort((a, b) => b.meters - a.meters);
+    const ownIdx = ordered.findIndex((h) => h.gate === OWN);
+    const ownM = ordered[ownIdx]?.meters ?? 0;
+    const aheadM = ownIdx > 0 ? ordered[ownIdx - 1].meters : undefined;
+    const before = model.at(Math.max(0, sec - 0.5));
+    const ownBefore = before.find((h) => h.gate === OWN)?.meters ?? ownM;
+    const aheadGate = ownIdx > 0 ? ordered[ownIdx - 1].gate : undefined;
+    const aheadBefore = aheadGate === undefined ? undefined
+      : before.find((h) => h.gate === aheadGate)?.meters;
+    const gapNow = aheadM === undefined ? 0 : aheadM - ownM;
+    const gapBefore = (aheadM === undefined || aheadBefore === undefined) ? 0 : aheadBefore - ownBefore;
+    const closing = gapBefore - gapNow;   // ＋なら詰めている
+    const metersLeftOwn = DIST - ownM;
+    const say = [];
+    if (aheadM === undefined) {
+      say.push({ text: `${OWN}番`, role: frameRoleOf(OWN, FIELD) }, { text: ' が先頭。' });
+    } else {
+      say.push({ text: `${OWN}番`, role: frameRoleOf(OWN, FIELD) });
+      const lengths = gapNow / 2.4;
+      if (lengths < 0.3) {
+        // ⚠️ ★「0.0 馬身、離されています」と言っていました。**並んでいるのに。**
+        say.push({ text: ' は前と並んでいます' });
+      } else {
+        say.push({ text: ` は前と ${lengths.toFixed(1)} 馬身` });
+        say.push({ text: closing > 0.15 ? '、詰めています' : closing < -0.15 ? '、離されています' : 'の差' });
+      }
+    }
+    const phase = metersLeftOwn <= 400 ? '直線' : metersLeftOwn <= 800 ? '勝負所' : '道中';
+    if (phase !== '道中') say.push({ text: `　★${phase}` });
+    /**
+     * ⚠️ ★**同じことを繰り返し言わせません。**
+     *    一度、0.5秒ごとに機械的に行を足したら、
+     *    ★**3行とも「7番 は前と 0.6 馬身、離されています」**になりました。
+     *    実況は**変化を言うもの**なので（Q-P4-14 ①）、
+     *    ★**状態が変わったときだけ**足します。
+     */
+    const closeState = gapNow / 2.4 < 0.3 ? '並' : closing > 0.15 ? '詰' : closing < -0.15 ? '離' : '同';
+    const rank = ownIdx + 1;
+    const key = `${phase}/${closeState}/${rank}`;
+    if (key !== lastSay.key && i > 0) {
+      lines.push(say);
+      lastSay.key = key;
+    }
+
     for (const h of drawn) {
       /**
        * ★脚は**表示の時間**で回します（D-062 の教訓）。
@@ -287,8 +592,14 @@ async function main() {
        *   ★競走馬は毎秒およそ2歩。6コマ1完歩なので **毎秒12コマ**。
        */
       const frame = Math.floor(dispSec * 12 + h.gate * 0.37 * 6) % 6;
-      drawHorse(ctx, img, h.x, h.y, frame, h.gate, cut.horseW);
+      const left = DIST - h.meters;
+      const mode = h.meters >= DIST ? 'celebrate' : left <= 400 ? 'drive' : 'cruise';
+      drawHorse(ctx, img, h.x, h.y, frame, h.gate, cut.horseW, mode, dispSec * 2 + h.gate * 0.37);
     }
+    // ★UI は最後に（馬の上に載る）。★カメラを一切使いません
+    gauge(ctx, Math.max(0, metersLeftOwn));
+    standings(ctx, at);
+    callBand(ctx, lines);
     writeFileSync(path.join(WORK, `f${String(i).padStart(4, '0')}.png`), cv.toBuffer('image/png'));
   }
 
@@ -299,6 +610,6 @@ async function main() {
     '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', mp4,
   ], { stdio: 'pipe' });
   console.log(`\n★${mp4}`);
-  console.log('⚠️ ★UI（実況帯・ゲージ・順位表示）はまだ入れていません。動きと構図だけを見ます。');
+  console.log('⚠️ ★騎手の別コマ（手を上げる姿勢）はシートに無いので、鞭と上体の揺れだけです（第3便で依頼）。');
 }
 main().catch((e) => { console.error('★落ちました:', e); process.exit(1); });
