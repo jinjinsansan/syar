@@ -21,7 +21,7 @@ import {
 import {
   replayPositionModel, finalOrderOf, ovalCourse, posOf, frameRoleOf,
   timeWarpFor, knotsFor, ratesForTarget, targetDisplaySec,
-  cameraBasis, project, horizonY,
+  cameraBasis, project, horizonY, chaseCamera,
 } from '@star/render';
 
 const W = 1280, H = 720;
@@ -107,7 +107,11 @@ const outSign = ((outer.x - inner.x) * nx + (outer.y - inner.y) * ny) >= 0 ? 1 :
 const CAM_OUT_M = num('--cam-out', 24);      // 走路の外へ何 m
 const CAM_UP_M = num('--cam-up', 9);         // 高さ
 const CAM_BACK_M = num('--cam-back', 18);    // 後ろへ（斜めに見るため）
-const cam = {
+/**
+ * ★**追走カメラ**（馬群の後ろから、走路に沿って）。
+ *   `--side-cam` を付けると、これまでの「横から」に戻ります（対照用）。
+ */
+const cam = argv.includes('--side-cam') ? {
   eye: {
     x: centre.x + nx * outSign * CAM_OUT_M - fx * CAM_BACK_M,
     y: centre.y + ny * outSign * CAM_OUT_M - fy * CAM_BACK_M,
@@ -122,7 +126,11 @@ const cam = {
   target: { x: centre.x, y: centre.y, z: num('--look-up', 5.2) },
   fovY: (num('--fov', 34) * Math.PI) / 180,
   width: W, height: H,
-};
+} : chaseCamera(COURSE, {
+  atS: LOOK_AT_S, width: W, height: H,
+  backM: num('--back', 38), upM: num('--up', 13), sideM: num('--side', 6),
+  fovDeg: num('--fov', 34),
+});
 const basis = cameraBasis(cam);
 const hz = horizonY(cam, basis);
 

@@ -81,6 +81,71 @@ export function trackCamera(
   };
 }
 
+/**
+ * ★**馬群の後ろから、走路に沿って見るカメラ**（参考の主役の画）。
+ *
+ * ⚠️ ★最初は「中継カメラはスタンドから横を見る」と思い込み、
+ *    走路の**横**に据えました。★**丸ごと外していました。**
+ *    参考は3枚とも**馬群の後ろ**から見ており、
+ *    ★**空もスタンドも写っていません**（走路で画面が埋まる）。
+ *
+ * 【★地平線を画面の外に出す条件】
+ *   俯角 = atan(高さ ÷ 前方距離) が **画角の半分**を超えること。
+ *   画角 34° なら 17° 超 → **高さ ÷ 前方距離 > 0.306**。
+ *   ⚠️ ここを満たさないと、★**空が入って参考と別物になります**。
+ */
+export function chaseCamera(
+  course: Course,
+  opts: {
+    /** 追う馬群のコース上の位置（m） */
+    readonly atS: number;
+    readonly width: number;
+    readonly height: number;
+    /** 後ろへ何 m */
+    readonly backM?: number | undefined;
+    /** 高さ m */
+    readonly upM?: number | undefined;
+    /** 走路の外へ何 m（★0 だと左右対称になって不自然） */
+    readonly sideM?: number | undefined;
+    readonly fovDeg?: number | undefined;
+    /** 見る点の高さ m */
+    readonly lookAtZ?: number | undefined;
+  },
+): PerspectiveCamera {
+  const c = posOf(course, opts.atS, course.widthM / 2);
+  const b = posOf(course, opts.atS - 20, course.widthM / 2);
+  const dl = Math.hypot(c.x - b.x, c.y - b.y) || 1;
+  const fx = (c.x - b.x) / dl, fy = (c.y - b.y) / dl;   // 進行方向
+  const nx = -fy, ny = fx;
+  const inner = posOf(course, opts.atS, 0);
+  const outer = posOf(course, opts.atS, course.widthM);
+  const sign = ((outer.x - inner.x) * nx + (outer.y - inner.y) * ny) >= 0 ? 1 : -1;
+  const back = opts.backM ?? 38, up = opts.upM ?? 13, side = opts.sideM ?? 6;
+  const fov = opts.fovDeg ?? 34;
+  /**
+   * ⚠️ ★俯角が画角の半分以下だと**空が入ります**。ここで気づけるように、
+   *    満たしていなければ**投げます**（黙って別物の絵を出すより安全です）。
+   */
+  const tilt = (Math.atan(up / back) * 180) / Math.PI;
+  if (tilt <= fov / 2) {
+    throw new Error(
+      `★俯角 ${tilt.toFixed(1)}° が画角の半分（${(fov / 2).toFixed(1)}°）以下です。`
+      + '空が画面に入り、参考と別物になります。高さを上げるか、後ろを詰めてください',
+    );
+  }
+  return {
+    eye: {
+      x: c.x - fx * back + nx * sign * side,
+      y: c.y - fy * back + ny * sign * side,
+      z: up,
+    },
+    target: { x: c.x, y: c.y, z: opts.lookAtZ ?? 0.8 },
+    fovY: (fov * Math.PI) / 180,
+    width: opts.width,
+    height: opts.height,
+  };
+}
+
 interface Ctx extends Ctx2D<never> {}
 
 /**
