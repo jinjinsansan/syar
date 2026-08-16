@@ -130,7 +130,16 @@ const FINISH_POS = new Map(result.order.map((e) => [Number(e.horseId), e.finishP
 const FINISH_SEC = new Map(result.order.map((e) => [Number(e.horseId), e.timeSec]));
 
 /* ── 背景・走路（★`shot-cuts.mjs` と同じ描き方）─────────── */
-const INFIELD_W = -26;
+/**
+ * ★内馬場のいちばん奥。
+ *
+ * ⚠️ ★−26m 固定にしたら、寄りのカット（16.6px/m）で**内馬場だけで 431px**になり、
+ *    **画面の上半分が空虚**になりました。参考では内馬場は細い帯です。
+ * → ★**画面に対する割合**で決めます（走路の外に、走路のおよそ 1.2 倍ぶん）。
+ */
+function infieldW(cam) {
+  return -Math.max(8, Math.min(26, (H * 0.30) / (cam.pxPerM * cam.depth)));
+}
 
 function sky(ctx, horizonY) {
   for (let y = 0; y < horizonY; y++) {
@@ -173,9 +182,11 @@ function lineAt(ctx, cam, w, thick, role) {
 
 function track(ctx, cam) {
   const WIDTH = COURSE.widthM;
-  bandBetween(ctx, cam, INFIELD_W, -12, 'turf-1');
-  lineAt(ctx, cam, -12, 3, 'rail-1');
-  bandBetween(ctx, cam, -12, -1, 'dirt-2');
+  const IN_W = infieldW(cam);
+  const DIRT = Math.max(IN_W + 2, -12);
+  bandBetween(ctx, cam, IN_W, DIRT, 'turf-1');
+  lineAt(ctx, cam, DIRT, 3, 'rail-1');
+  bandBetween(ctx, cam, DIRT, -1, 'dirt-2');
   lineAt(ctx, cam, -1, 2, 'dirt-3');
   bandBetween(ctx, cam, 0, WIDTH, 'turf-3');
   /**
@@ -498,7 +509,12 @@ function drawHorse(ctx, img, x, y, frame, gate, widthPx, mode = 'cruise', phaseT
     ctx.stroke();
   }
   const col = pal[frameRoleOf(gate, FIELD)] ?? pal['paper-0'];
-  const bw = Math.max(14, Math.round(widthPx * 0.17));
+  /**
+   * ⚠️ ★**寄り（300px）でゼッケンが 51px になり、馬より目立ちました。**
+   *    参考では寄りのとき番号はほぼ見えず、**勝負服の色**で見分けています。
+   * → ★上限を付けます。番号は「読めればよい」もので、主役ではありません。
+   */
+  const bw = Math.max(14, Math.min(30, Math.round(widthPx * 0.17)));
   const bh = Math.max(10, Math.round(bw * 0.72));
   const bx = Math.round(x + widthPx * 0.02);
   const by = Math.round(y - hh * 0.5);
@@ -519,10 +535,20 @@ function drawHorse(ctx, img, x, y, frame, gate, widthPx, mode = 'cruise', phaseT
  *   ★切り替えの条件は「先頭の残り距離」— **時刻ではありません**
  *     （時間配分 D-062 で表示の時計は伸び縮みするので、時刻で切ると局面とずれます）。
  */
+/**
+ * ⚠️ ★**2D の参考を測って、全部の値を入れ替えました**（2026-08-16）。
+ *
+ *   ★実測（画の範囲 296×186 を機械で決めてから）:
+ *     引き  馬 9〜11% ／ 走路の帯 33%
+ *     寄り  馬 24%
+ *   ★こちらは 5.0% と 14.1% で、**両方とも小さすぎました**。
+ *
+ *   走路の帯 33% ＝ 20m × pxPerM × depth ÷ 720 → **pxPerM × depth = 11.9**
+ */
 const CUTS = {
-  wide: { label: '引き', horseW: 64, cam: { pxPerM: 15, depth: 0.55, anchorX: 470, anchorY: 545 } },
-  close: { label: '寄り', horseW: 180, cam: { pxPerM: 30, depth: 0.52, anchorX: 380, anchorY: 590 } },
-  goal: { label: 'ゴール', horseW: 96, cam: { pxPerM: 22, depth: 0.20, anchorX: 560, anchorY: 560 } },
+  wide: { label: '引き', horseW: 120, cam: { pxPerM: 22, depth: 0.54, anchorX: 470, anchorY: 500 } },
+  close: { label: '寄り', horseW: 300, cam: { pxPerM: 46, depth: 0.36, anchorX: 380, anchorY: 560 } },
+  goal: { label: 'ゴール', horseW: 190, cam: { pxPerM: 34, depth: 0.22, anchorX: 560, anchorY: 540 } },
 };
 function cutFor(metersLeft) {
   if (metersLeft <= 220) return CUTS.goal;
@@ -567,7 +593,7 @@ async function main() {
     const cv = createCanvas(W, H);
     const ctx = cv.getContext('2d');
     ctx.imageSmoothingEnabled = false;
-    const farY = obliqueProject(COURSE, cam, cam.s, INFIELD_W).y;
+    const farY = obliqueProject(COURSE, cam, cam.s, infieldW(cam)).y;
     sky(ctx, Math.max(60, Math.round(farY - 88)));
     track(ctx, cam);
     marks(ctx, cam);

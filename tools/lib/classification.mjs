@@ -105,6 +105,8 @@ export const READONLY = [
   'bake-sprite-sizes.mjs',
   // ★斜め俯瞰でレースを動画にする。★絵を動かして自分の目で見るため。DB に触れません
   'render-oblique-video.mjs',
+  // ★参考映像を読んで測るだけ。DB に触れません
+  'measure-ref2d.mjs',
   // ★読むだけ。斜め俯瞰の試作を静止画で確かめる
   'shot-oblique.mjs',
   // ★読むだけ。3カットを本番のエンジンで描いて大きさを決める
