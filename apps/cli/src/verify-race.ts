@@ -21,7 +21,7 @@ import {
   DEFAULT_INTERVENTION_BALANCE,
   DEFAULT_RACE_BALANCE,
   aiProxyPlan,
-  averageSpeedMps,
+
   optimalPlan,
   resolveIntervention,
   resolveRace,
@@ -315,12 +315,8 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     const ownRng = deriveRng(seed, STREAM.INTERVENTION, raceIndex);
     const ownIndex = ownRng.int(0, fieldSize - 1);
     const own = race.entrants[ownIndex];
-    const speed = averageSpeedMps(
-      race.conditions.distance,
-      race.conditions.surface,
-      race.conditions.trackCondition,
-      balance,
-    );
+    // ⚠️ ★平均速度は `resolveIntervention` から消えました（Q-P4-45）。
+    //    「1m あたりの消費」に直したとき、★**約分で消えた**ためです。
     const mults = new Map<string, number>();
     let aiMult = 1;
     let optMult = 1;
@@ -332,15 +328,14 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
         condition: own.condition,
         fatigue: own.fatigue,
       };
-      const ai = resolveIntervention(horse, aiProxyPlan(horse, ownRng, ib), speed, race.conditions.distance, ib);
-      const opt = resolveIntervention(horse, optimalPlan(ib), speed, race.conditions.distance, ib);
+      const ai = resolveIntervention(horse, aiProxyPlan(horse, ownRng, ib), race.conditions.distance, ib);
+      const opt = resolveIntervention(horse, optimalPlan(ib), race.conditions.distance, ib);
       // ★V-13: **仕掛けの巧拙が結果に出るか**を測る。
       //   旧スタミナ実装では全馬のゲージが必ず空になり、どう仕掛けても同じだった。
       //   最適な仕掛けと早すぎる仕掛けで倍率に差が出ることを確認する。
       const early = resolveIntervention(
         horse,
         { ...optimalPlan(ib), spurtAtMeter: ib.EARLY_SPURT_METER * GATES.V13_EARLY_FACTOR },
-        speed,
         race.conditions.distance,
         ib,
       );

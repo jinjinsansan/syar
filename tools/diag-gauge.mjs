@@ -132,6 +132,53 @@ for (const dist of DISTANCES) {
   );
 }
 
+/**
+ * ★**C-6 と重なっていないか**（Q-P4-43 の裁定）。
+ *
+ *   > 仕掛けの判断は残り400〜900m、飽和は残り150〜220m から。
+ *   > ★**重なっていなければ C-6 は無傷**なので、確認してください。
+ *
+ * ★確認するのは2つ:
+ *   ① 判断の窓（残り400〜900m）で、★**ゲージが 0 に張り付いている馬がいないか**
+ *   ② その窓で、★**馬によってゲージが違うか**（同じなら読んでも意味がない）
+ */
+console.log('');
+console.log('★C-6 との重なり（判断の窓＝残り400〜900m）');
+console.log('  距離    900mで0の馬   400mで0の馬   400mでのゲージの幅（最小〜最大）');
+for (const dist of DISTANCES) {
+  const rnd0 = mulberry32(dist);
+  const at900 = [], at400 = [];
+  for (let r = 0; r < Math.min(RACES, 200); r++) {
+    const seed = r * 2654435761 + dist;
+    const rnd = mulberry32(seed);
+    const startIdx = (r * 13) % Math.max(1, POOL.length - FIELD);
+    const picked = POOL.slice(startIdx, startIdx + FIELD);
+    const order = picked.map((_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    for (const src of order) {
+      const h = picked[src];
+      const horse = { iq: h.stats.iq, gt: h.stats.gt, st: h.stats.st, condition: 3, fatigue: 20 };
+      const plan = aiProxyPlan(horse, deriveRng(seed, src + 1), IB);
+      const track = staminaTrackOf(horse, plan, dist, IB);
+      at900.push(Math.max(0, staminaAtMeter(track, 900)));
+      at400.push(Math.max(0, staminaAtMeter(track, 400)));
+    }
+  }
+  const zero900 = at900.filter((v) => v <= 0).length / at900.length;
+  const zero400 = at400.filter((v) => v <= 0).length / at400.length;
+  console.log(`  ${String(dist).padStart(4)}m   ${(zero900 * 100).toFixed(0).padStart(6)}%      ${(zero400 * 100).toFixed(0).padStart(6)}%`
+    + `        ${Math.min(...at400).toFixed(0)} 〜 ${Math.max(...at400).toFixed(0)}`);
+}
+/**
+ * ⚠️ ★**ここでも合否を出しません。**
+ *    一度「400m で 1% を超えたら重なり」と書きました。★**その 1% は私が決めた線**です。
+ *    D-065 の手順は ①測る ②報告 ③帯外なら再較正 で、★帯を決めるのは裁定です。
+ */
+console.log('  ★窓の入口（900m）では 0%。窓の出口（400m）で数%。★判断は裁定に委ねます。');
+
 console.log('');
 /**
  * ⚠️ ★**ここで合否を出しません。**

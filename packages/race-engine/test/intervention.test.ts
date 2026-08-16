@@ -23,8 +23,7 @@ import {
 } from '../src/index.js';
 
 const neutralHorse: InterventionHorse = { iq: 500, gt: 500, st: 500, condition: 3, fatigue: 0 };
-/** 2000m を約2分で走る想定の平均速度 */
-const SPEED_MPS = 16.6;
+// ⚠️ ★平均速度は `resolveIntervention` から消えました（Q-P4-45・約分で消えたため）。
 /** 2000m を想定（D-017 で距離が要るようになった） */
 const RACE_M = 2000;
 
@@ -115,7 +114,7 @@ describe('§8b.3 interventionMult のハードキャップ（±10%）', () => {
   it('最良入力でも 1.10 を超えない', () => {
     const best = optimalPlan(IB);
     const strong: InterventionHorse = { iq: 1000, gt: 1000, st: 1000, condition: 5, fatigue: 0 };
-    const out = resolveIntervention(strong, best, SPEED_MPS, RACE_M, IB);
+    const out = resolveIntervention(strong, best, RACE_M, IB);
     expect(out.interventionMult).toBeLessThanOrEqual(1.1);
     expect(out.interventionMult).toBeCloseTo(1.1, 10);
   });
@@ -128,7 +127,7 @@ describe('§8b.3 interventionMult のハードキャップ（±10%）', () => {
       position: 'front',
     };
     const weak: InterventionHorse = { iq: 0, gt: 0, st: 0, condition: 1, fatigue: 100 };
-    const out = resolveIntervention(weak, worst, SPEED_MPS, RACE_M, IB);
+    const out = resolveIntervention(weak, worst, RACE_M, IB);
     expect(out.ranEmpty).toBe(true);
     // クランプ前は 0.90 を割っている（＝ペナルティがクランプ前に効いている・正典の明記事項）
     expect(out.rawMult).toBeLessThan(0.9);
@@ -152,7 +151,6 @@ describe('§8b.3 interventionMult のハードキャップ（±10%）', () => {
               const out = resolveIntervention(
                 horse,
                 { startErrorMs, spurtAtMeter, driveTapsPerSec, position },
-                SPEED_MPS,
                 RACE_M,
                 IB,
               );
@@ -179,7 +177,7 @@ describe('§8b.3 interventionMult のハードキャップ（±10%）', () => {
       driveTapsPerSec: 15,
       position: 'front',
     };
-    const out = resolveIntervention(weak, early, SPEED_MPS, RACE_M, IB);
+    const out = resolveIntervention(weak, early, RACE_M, IB);
     expect(out.ranEmpty).toBe(true);
     // クランプ後に -0.15 していたら 0.75 になる。クランプ前なら 0.90 で止まる
     expect(out.interventionMult).toBe(0.9);
@@ -193,7 +191,7 @@ describe('§8b.5 AI 代行', () => {
     const mults: number[] = [];
     for (let i = 0; i < 2000; i++) {
       const plan = aiProxyPlan(neutralHorse, rng, IB);
-      const out = resolveIntervention(neutralHorse, plan, SPEED_MPS, RACE_M, IB);
+      const out = resolveIntervention(neutralHorse, plan, RACE_M, IB);
       expect(out.interventionMult).toBeGreaterThanOrEqual(0.9);
       expect(out.interventionMult).toBeLessThanOrEqual(1.1);
       mults.push(out.interventionMult);
@@ -243,17 +241,15 @@ describe('★V-13 仕掛けの巧拙', () => {
   /** 全能力500・万全の中立馬（正典の基準馬） */
   const neutralIntervener = (): InterventionHorse => ({ iq: 500, gt: 500, st: 500, condition: 3, fatigue: 0 });
 
-  /** 距離・平均速度は §8.4 の実効域から取る。2000m を 120秒＝16.67m/s */
+  /** 距離は §8.4 の実効域から取る。★平均速度は不要になりました（Q-P4-45） */
   const DIST = 2000;
-  const SPEED = 16.67;
 
   it('★早すぎるスパートは最適な仕掛けより倍率が低い（差は 0.03 以上）', () => {
     const horse = neutralIntervener();
-    const best = resolveIntervention(horse, optimalPlan(B), SPEED, DIST, B);
+    const best = resolveIntervention(horse, optimalPlan(B), DIST, B);
     const early = resolveIntervention(
       horse,
       { ...optimalPlan(B), spurtAtMeter: B.EARLY_SPURT_METER * 1.6 },
-      SPEED,
       DIST,
       B,
     );
@@ -265,11 +261,10 @@ describe('★V-13 仕掛けの巧拙', () => {
     // 距離不変性が壊れると、短距離か長距離のどちらかで差がゼロに潰れる。
     for (const d of [1200, 1600, 2400, 3200]) {
       const horse = neutralIntervener();
-      const best = resolveIntervention(horse, optimalPlan(B), SPEED, d, B);
+      const best = resolveIntervention(horse, optimalPlan(B), d, B);
       const early = resolveIntervention(
         horse,
         { ...optimalPlan(B), spurtAtMeter: B.EARLY_SPURT_METER * 1.6 },
-        SPEED,
         d,
         B,
       );

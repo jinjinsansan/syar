@@ -72,14 +72,19 @@ describe('★ゲージは内部状態の露出であって、作り直しでは�
     }
   });
 
-  it('★★平均速度を変えても結果が動かない（約分で消えているので）', () => {
-    for (const dist of [1200, 2400]) {
-      const a = resolveIntervention(HORSE, PLAN, 14, dist, IB);
-      const b = resolveIntervention(HORSE, PLAN, 18, dist, IB);
-      expect(a.staminaLeft).toBe(b.staminaLeft);
-      expect(a.ranEmpty).toBe(b.ranEmpty);
-      expect(a.interventionMult).toBe(b.interventionMult);
-    }
+  /**
+   * ⚠️ ★**「平均速度を変えても結果が動かない」検査は消しました。**
+   *    Q-P4-45 の裁定で**引数そのものを消した**ので、
+   *    ★**渡しようがなく、検査として成り立ちません。**
+   *
+   *   ★同じことは上の「旧式と1ミリも違わない」で押さえてあります —
+   *     旧式は**速度を使う形のまま**残してあり、
+   *     3通りの速度すべてで新しい値と一致することを確かめています。
+   */
+  it('★★速度を使う旧式と、速度を使わない今の式が一致する（1080通り）', () => {
+    // ★上の検査が本体。ここは「消した検査の代わりがあること」を明示するための目印
+    expect(staminaAtMeter(staminaTrackOf(HORSE, PLAN, 1600, IB), 0))
+      .toBeCloseTo(oldStaminaLeft(HORSE, PLAN, 16.5, 1600), 9);
   });
 
   it('★D-017 は生きている（総消費が距離によらない）', () => {
@@ -189,7 +194,7 @@ describe('★★ゲージの向きが正しい（ここが逆だと仕掛けを�
       for (const st of [100, 500, 900]) {
         const horse = { ...HORSE, st, fatigue: 80 };
         const plan = { ...PLAN, spurtAtMeter: spurtAt, position: 'front' as const };
-        const out = resolveIntervention(horse, plan, 16.5, DIST, IB);
+        const out = resolveIntervention(horse, plan, DIST, IB);
         // ★直線に入る前に 0 になっていること ⇔ ranEmpty
         const emptyBeforeStraight = rawAt(horse, plan, PHASE_METERS.STRAIGHT) <= 0;
         expect(out.ranEmpty).toBe(emptyBeforeStraight);

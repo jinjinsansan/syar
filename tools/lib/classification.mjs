@@ -107,6 +107,8 @@ export const READONLY = [
   'render-oblique-video.mjs',
   // ★参考映像を読んで測るだけ。DB に触れません
   'measure-ref2d.mjs',
+  // ★コース幾何を読んで数えるだけ（Q-P4-46 手順①）。DB に触れません
+  'count-headings.mjs',
   // ★読むだけ。斜め俯瞰の試作を静止画で確かめる
   'shot-oblique.mjs',
   // ★読むだけ。3カットを本番のエンジンで描いて大きさを決める
