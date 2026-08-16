@@ -1,127 +1,91 @@
-# 生成ジョブ — `horse-gallop-near`（馬の幅 300px・駆歩8コマ）
+# 依頼 — 駆歩8コマのスプライトシート
 
-★**一言**: `near` の駆歩8コマを、**馬の幅 300px** で作ってください。
+**作ってほしいもの: PNG 1枚（`horse-gallop-near.png` / 2880 × 260px）だけです。**
 
-## 参照
+競馬ゲームのレース映像に使う、**横向きに走る馬（騎手つき）の駆歩8コマ**です。
+これを横に並べて1枚のシートにしてください。左から右へ、1完歩ぶん。
 
-- 画風の基準: `design/art/assets/horse-gallop-sheet.png`
-  ★**この絵の画風・毛艶・筋肉の陰影・手綱の描き込み量を、そのまま維持**してください
-- コマの意味: 下の表（第2便で 6→8 コマに増やしています）
+---
 
-## ⚠️ なぜ縮小ではなく作り直すのか
-
-既存の生アートは 1コマ 362px です。そこから 300px へ縮めると **0.83倍**になり、
-★**画素の格子が合わず輪郭が濁ります**（実際に濁りました）。
-→ ★**300px で描き起こしてください。** こちらでは整数倍でしか拡大しません。
-
-## コマの並び（8コマ・左から）
-
-| コマ | 局面 | 脚先の広がり | 備考 |
-|---|---|---|---|
-| 0 | 伸展（脚が最も開く） | 最大 | |
-| 1 | 着地〜引き寄せ | | |
-| 2 | 収縮 | | |
-| **3** | **最収縮** | ★**最小** | 四肢が腹の下に集まる。首を引き上げる。★接地は**後肢1本** |
-| 4 | 蹴り出し | | |
-| 5 | 収縮 | | |
-| **6** | **宙に浮く** | 中 | ★**四肢すべてが地を離れる** |
-| 7 | 伸展へ戻る | 大 | |
-
-★**コマ3 と コマ6 が要点**です。駆歩は1完歩に「宙に浮く局面」が1回あり、
-ここが無いと**走りに見えません**。
-
-⚠️ ★**コマ3 の接地は「後肢1本」です。**
-   最収縮は空中局面とほぼ重なるので、前肢を接地させると不自然になります。
-   収縮期は**後肢主導**なので、残すなら後肢です。
-   （第2便の契約では「前肢1本」と書いていました。★こちらの誤りです。契約も直します）
-
-## セルと寸法の決め方
-
-★**セルはきつく縛りません。** こちらは**生アートから焼き直す**ので、
-余裕を持って描いていただき、**セルはこちらで測って決めます**。
+## 数字（★ここが命です）
 
 ```
-セル        360 x 260（★余白を多めに取ってあります）
-接地線      y = 252（セル上端から。全コマ共通）
-重心 x      x = 180（セル中央。全コマ共通）
-★馬の幅     300 ± 12px ＝ **外接矩形**（尾の先端 〜 鼻先。透明でない範囲の左端〜右端）
+シート全体   2880 × 260 px
+1コマ        360 × 260 px（8コマ・隙間なし・左から右へ）
+
+★接地線     全8コマで y = 252（各コマの上端から）
+★重心 x     全8コマで x = 180（各コマの左端から。馬の胴の中心）
+馬の大きさ   外接矩形（尾の先端〜鼻先）が 300 ± 12 px
+背景        完全に透明
 ```
 
-⚠️ ★**「馬の幅」は外接矩形です。胴の長さではありません。**
-   尾とたてがみは後方に流れるので、胴で 300px にすると**尾がセルからはみ出します**。
-   ★前回、そこで**尾が隣のセルに写り込み、走路に尾が1本浮いて見えました**。
+⚠️ **接地線と重心 x が揃っていないと、動かしたときに馬が跳ねたり横に揺れたりします。**
+これが一番大事です。絵の巧拙より優先してください。
 
-★**尾を切らないでください。** 収まらなければ、はみ出したまま出していただければ、
-こちらでセルを取り直します。**切られると復元できません。**
+⚠️ **「300px」は外接矩形です。胴の長さではありません。**
+尾とたてがみは後ろに流れるので、胴を 300px にすると尾がはみ出します。
+★**尾は切らないでください。** はみ出すなら、はみ出したまま返してください
+（こちらでセルを取り直します。切られると戻せません）。
 
-## プロンプト
+---
 
-```
-A horizontal sprite sheet of ONE galloping racehorse with jockey, 8 frames of a
-single complete gallop cycle, side view, facing right.
+## 8コマの中身
 
-Each frame is 360 x 260 pixels; the sheet is 2880 x 260 pixels
-(8 frames laid left to right, no gaps).
-The horse's full bounding box - from the tip of the streaming tail to the tip of
-the nose - is about 300 pixels wide. That is the OUTER bounding box, not the
-body length; leave the tail and mane room and DO NOT crop them.
+| コマ | 局面 | 接地 |
+|---|---|---|
+| 0 | 伸展。前肢と後肢が最も開く | 後肢 |
+| 1 | 着地。脚を畳みはじめる | 前肢 |
+| 2 | 収縮。脚が腹の下へ | 前肢 |
+| **3** | ★**最収縮**。四肢が腹の下に集まる。首を引き上げ、背が丸まり、鼻〜尻が最短 | ★**後肢1本だけ** |
+| 4 | 後肢で蹴り出す | 後肢 |
+| 5 | 収縮から開きはじめる | 後肢 |
+| **6** | ★**宙に浮く**。四肢すべてが地を離れる。首を前へ伸ばす | ★**なし** |
+| 7 | 伸展へ戻る | なし〜前肢 |
 
-CRITICAL - all 8 frames share the same GROUND LINE at y = 252 and the same
-body-center x = 180, measured from each cell's top-left corner.
-In frames 0-5 and 7 the supporting hoof rests on that line; in frame 6 all four
-hooves are 8 or more pixels above it.
-A horse that drifts up, down or sideways between frames will visibly bounce.
+★**コマ3 と コマ6 が要点です。**
+駆歩は1完歩に「宙に浮く瞬間」が1回あります。**これが無いと走りに見えません。**
+そして最収縮は空中局面とほぼ重なるので、**コマ3 で接地させるなら後肢**です
+（収縮期は後肢が主導するので、前肢を着けると不自然になります）。
 
-The 8 frames, in order:
- 0  full extension - fore and hind legs stretched furthest apart
- 1  landing, legs beginning to gather
- 2  collected - legs folding under the body
- 3  MOST COLLECTED - all four legs gathered beneath the belly, hind legs swung
-    forward under the barrel, forelegs folded tight at the knee, ONE HIND HOOF
-    still on the ground (the collected phase is hind-leg driven, so do NOT put a
-    forehoof down); neck RAISED, back rounded, nose-to-hip shortest
- 4  push-off from the hind legs
- 5  collected again, opening up
- 6  SUSPENSION - all four hooves clear of the ground, body floating, neck
-    stretched forward
- 7  returning toward full extension
+⚠️ コマ6 は接地しないので、**接地「点」ではなく接地「線」**で揃えます。
+コマ6 は四肢すべてがその線より **8px 以上上**にあること。
 
-Style: pixel art, hard-edged pixels with NO anti-aliasing on the silhouette,
-transparent background, rich muscle shading and coat sheen inside the body
-(thousands of shades allowed - DO NOT posterize the interior), visible bridle
-and double reins, black mane and tail streaming backward.
+---
 
-The jockey stays deeply crouched in the irons throughout, weight forward over
-the withers, hands low on the neck holding both reins.
-The jockey's silks (jacket, cap, sleeves) MUST be BLUE:
-hue 200-260 degrees, saturation 0.35 or higher. Breeches white, boots black.
-A plain saddle cloth sits under the saddle; leave it BLANK - no number, no logo.
+## 絵柄
 
-Do NOT depict any real racehorse, owner, stable, racecourse, or any real silk
-design. Invent the silks. No text, no logos, no watermarks, no background,
-no ground shadow baked into the sprite.
-```
+- **ドット絵**。★**輪郭にアンチエイリアスをかけない**（半透明の縁を残さない）
+- 胴の中は階調を使って構いません（筋肉の陰影・毛艶。★**内側は減色しないでください**）
+- 黒いたてがみと尾が後ろへ流れる。頭絡と手綱を描く
+- 騎手は**終始しゃがんだ前傾**。体重は肩の上、手は首の低い位置で手綱を持つ
+- 勝負服（上着・帽子・袖）は**青**（色相 200〜260°・彩度 0.35 以上）。
+  ズボンは白、ブーツは黒
+- ★**ゼッケンは無地**（数字もロゴも描かないでください。数字はこちらで描きます）
 
-## ★受け入れ条件（こちらで機械的に測ります）
+---
 
-```
-シート寸法            2880 x 260（1コマ 360 x 260・8コマ）
-★馬の幅（外接矩形）   300 ± 12 px（尾の先端 〜 鼻先）
-★接地線              全8コマで y = 252（許容 ±1px）
-                     ★コマ6 は接地しないので、**接地線**で揃えます（接地点ではありません）
-★重心 x              全8コマで x = 180（許容 ±2px）
-                     ★ここがずれると、走らせたときに馬が横に揺れます
-コマ3 の脚先の広がり   ★全コマ中で最小 ／ 接地は**後肢1本**
-コマ6 の浮き          ★接地線から 8px 以上（四肢すべてが地を離れる）
-背景                 完全に透明（半透明の縁を残さない）
-勝負服               hue 200-260 / 彩度 0.35 以上・重心が全コマで一致
-ゼッケン             無地（数字・ロゴなし。★数字はこちらで描きます）
-★尾                 切らない（はみ出したままで結構です）
-```
+## ⚠️ 入れてはいけないもの
 
-## 次にお願いするもの（今回は含みません）
+- **実在の競走馬・馬主・厩舎・競馬場・実在の勝負服の柄** — 勝負服は creative に作ってください
+- **文字・ロゴ・透かし**
+- **背景・地面・影**（★影はこちらで描きます。スプライトに焼き込まないでください）
 
-1. 騎手の別コマ 2姿勢（`drive` / `celebrate`）— **near サイズのみ**
-2. `far`（馬の幅 **120px**）を **4向き**（0° / 45° / 90° / −45°）
-   ★真後ろ（180°）は要りません
-3. 発走ゲート / 決勝線・ハロン棒・ラチ・芝目
+---
+
+## 返し方
+
+★**PNG 1枚だけ**返してください。説明文は要りません。
+
+はみ出しや、数字を満たせなかった箇所があれば、**そこだけ**一言添えてください
+（こちらで測って合わせます）。
+
+---
+
+## ⚠️ 作り方について（お任せします）
+
+**コードで描いても、画像として描いても構いません。**
+ただし ★**接地線 y=252 と 重心 x=180 が全8コマで揃っていること**が最優先なので、
+**座標を計算して置ける方法**のほうが、こちらとしては確実です。
+
+こちらは戻ってきた PNG を機械で測ります（接地線・重心x・外接矩形・コマ3の脚の広がり・コマ6の浮き）。
+数字が外れていたら、**どこがどれだけ外れたか**をお返しします。
