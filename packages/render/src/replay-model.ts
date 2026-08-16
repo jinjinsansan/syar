@@ -282,6 +282,26 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
 }
 
 /**
+ * ゴール到達後の表示用ランアウト。確定時刻や着順は変えず、描画座標だけを
+ * 決勝線の先へ進める。先着馬ほど長く進むため、全馬が一点へ潰れない。
+ */
+export function withFinishRunOut(
+  horses: readonly HorseAt[],
+  finishSecOf: (gate: number) => number | undefined,
+  raceSec: number,
+  distanceMeter: number,
+  postDisplaySec = 0,
+  speedMps = 14,
+): readonly HorseAt[] {
+  return horses.map((horse) => {
+    const finishSec = finishSecOf(horse.gate);
+    if (finishSec === undefined || raceSec < finishSec) return horse;
+    const elapsed = Math.max(0, raceSec - finishSec) + Math.max(0, postDisplaySec);
+    return { ...horse, meters: distanceMeter + elapsed * speedMps };
+  });
+}
+
+/**
  * ★**ゲート**: この位置モデルから出る最終順が、確定済みの着順と一致すること（D-059）。
  *
  * 【★1度間違えました】

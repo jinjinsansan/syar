@@ -155,14 +155,17 @@ export function broadcastCamera(
   course: Course,
   opts: {
     readonly atS: number;
+    /** 注視対象の内ラチからの距離。省略時は走路中央。 */
+    readonly atW?: number;
     readonly width: number;
     readonly height: number;
     readonly view: ShotView;
     readonly preset: ShotCameraPreset;
   },
 ): PerspectiveCamera {
-  const c = posOf(course, opts.atS, course.widthM / 2);
-  const a = posOf(course, opts.atS + 20, course.widthM / 2);
+  const atW = opts.atW ?? course.widthM / 2;
+  const c = posOf(course, opts.atS, atW);
+  const a = posOf(course, opts.atS + 20, atW);
   const dl = Math.hypot(a.x - c.x, a.y - c.y) || 1;
   const fx = (a.x - c.x) / dl;
   const fy = (a.y - c.y) / dl;
@@ -204,6 +207,15 @@ export function broadcastCamera(
 interface Ctx extends Ctx2D<never> {}
 
 export type BroadcastEnvironment = 'gate' | 'backstretch' | 'corner' | 'homestretch';
+export type RenderSurface = 'turf' | 'dirt';
+export type RenderTrackCondition = 'good' | 'yielding' | 'soft' | 'bad';
+
+/** 馬場条件をパレットの役割へ変換する。色そのものは描画層へ直書きしない。 */
+export function trackSurfacePaletteRole(surface: RenderSurface, condition: RenderTrackCondition): string {
+  const level = condition === 'good' ? 0 : condition === 'yielding' ? 1 : condition === 'soft' ? 2 : 3;
+  if (surface === 'dirt') return `dirt-${level}`;
+  return `turf-${3 + level}`;
+}
 
 /** 注視地点から背景の役割を決める。カメラ座標や時刻には依存しない。 */
 export function broadcastEnvironmentAt(course: Course, focusS: number): BroadcastEnvironment {
@@ -228,6 +240,7 @@ export function drawPerspectiveWorld(
   pal: Palette,
   distanceMeter: number,
   focusS: number = distanceMeter,
+  track: { readonly surface: RenderSurface; readonly condition: RenderTrackCondition } = { surface: 'turf', condition: 'good' },
 ): void {
   const basis = cameraBasis(cam);
   const W = cam.width;
@@ -237,6 +250,8 @@ export function drawPerspectiveWorld(
     return project(cam, basis, { x: p.x, y: p.y, z });
   };
   const environment = broadcastEnvironmentAt(course, focusS);
+  const trackRole = trackSurfacePaletteRole(track.surface, track.condition);
+  const trackColor = pal[trackRole] ?? (track.surface === 'dirt' ? '#8a6b4a' : '#5a7f45');
 
   // 投影帯の外側も競馬場の地表である。透明（Canvas/CSS次第では黒）を残さない。
   ctx.fillStyle = pal['turf-4'] ?? '#355a35';
@@ -304,14 +319,14 @@ export function drawPerspectiveWorld(
   band(-120, -5, pal['hedge-2'] ?? '#26381f', 16);        // 暗い樹林・内馬場
   band(-5, -1.5, pal['dirt-3'] ?? '#4f3a25', 8);          // 内ラチ沿いの細い管理路
   rail(-1.5, pal['dirt-3'] ?? '#8a6', 0, 1.0);
-  band(0, WD, pal['turf-3'] ?? '#3f6b43', 6);            // 芝
+  band(0, WD, trackColor, 6);
   /**
    * ★芝の刈り目 — **走路を端から端まで横切る帯**。
    * ⚠️ 内外にも刻むと市松になります。斜めに見えるのは**投影の結果**です。
    */
   const STRIPE = 22;
-  ctx.globalAlpha = 0.18;
-  ctx.fillStyle = pal['turf-2'] ?? '#4a7a4e';
+  ctx.globalAlpha = track.surface === 'turf' ? 0.18 : 0.1;
+  ctx.fillStyle = pal[track.surface === 'turf' ? 'turf-2' : 'dirt-0'] ?? '#4a7a4e';
   for (let s = Math.floor(NEAR / (STRIPE * 2)) * STRIPE * 2; s < FAR; s += STRIPE * 2) {
     for (let t = s; t < s + STRIPE; t += 6) {
       const t2 = Math.min(t + 6, s + STRIPE);
@@ -324,11 +339,11 @@ export function drawPerspectiveWorld(
   }
   ctx.globalAlpha = 1;
 
-  // 進行方向に沿う芝の筋。規則的な大面積の市松模様を崩し、速度感を補う。
-  ctx.strokeStyle = pal['turf-1'] ?? '#6d8c5b';
-  ctx.globalAlpha = 0.13;
+  // 進行方向に沿う芝の刈り筋／ダートのハロー跡。
+  ctx.strokeStyle = pal[track.surface === 'turf' ? 'turf-1' : 'dirt-2'] ?? '#6d8c5b';
+  ctx.globalAlpha = track.surface === 'turf' ? 0.13 : 0.24;
   ctx.lineWidth = 1;
-  for (let lane = 1.5; lane < WD; lane += 2.6) {
+  for (let lane = 1.5; lane < WD; lane += track.surface === 'turf' ? 2.6 : 1.35) {
     ctx.beginPath();
     let started = false;
     for (let s = NEAR; s <= FAR; s += 8) {
@@ -473,8 +488,8 @@ export function drawPerspectiveHorses<TImage>(
   const drawn = horses
     .map((h) => ({
       h,
-      s: Math.max(0, Math.min(opts.distanceMeter, h.s)),
-      p: P(Math.max(0, Math.min(opts.distanceMeter, h.s)), h.w),
+      s: Math.max(0, h.s),
+      p: P(Math.max(0, h.s), h.w),
     }))
     .filter((d) => d.p.depth > 2)
     .sort((x, y) => y.p.depth - x.p.depth);

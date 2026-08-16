@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { broadcastCamera, ovalCourse, posOf, type ShotView } from '../src/index.js';
+import { broadcastCamera, cameraBasis, ovalCourse, posOf, project, type ShotView } from '../src/index.js';
 
 const course = ovalCourse(1600);
 const preset = { backM: 40, upM: 16, sideM: 10, fovDeg: 30 };
@@ -38,5 +38,13 @@ describe('broadcastCamera', () => {
       preset: { ...preset, upM: 28 },
     });
     expect(high.eye.z).toBeGreaterThan(cam('diag-rear').eye.z);
+  });
+
+  it('横位置を指定した注視対象が画面中央へ来る', () => {
+    const camera = broadcastCamera(course, { atS: 700, atW: 2, width: 1280, height: 720, view: 'diag-rear', preset });
+    const world = posOf(course, 700, 2);
+    const point = project(camera, cameraBasis(camera), { x: world.x, y: world.y, z: 0.8 });
+    expect(point.x).toBeCloseTo(640, 8);
+    expect(point.y).toBeCloseTo(360, 8);
   });
 });

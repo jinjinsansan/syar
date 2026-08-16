@@ -22,6 +22,7 @@
     "blocklist:build": "tsx apps/cli/src/blocklist-build.ts",
     "test": "vitest run",
     "inventory": "node tools/inventory/measure.mjs",
+    "audit:race:scenarios": "tsx tools/audit-race-scenarios.mjs",
     "mutation": "node tools/mutation/run.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit && tsc --noEmit -p apps/web",

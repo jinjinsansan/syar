@@ -29,8 +29,9 @@ import {
 } from '@star/race-engine';
 import { deriveRng } from '@star/sim-engine';
 import type { Strategy } from '@star/sim-engine';
+import type { Surface, TrackCondition } from '@star/race-engine';
 import {
-  replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
+  replayPositionModel, finalOrderOf, withFinishRunOut, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
   phaseOf, ovalCourse, segmentAt, HORSE_LENGTH_M,
   // ★描き方は package が唯一の出どころ（この画面には持たない）
   frameRoleOf, SHEET_REAR, SHEET_V2, SHEET_DIAG_FRONT_V1, SHEET_HIGH_DIAG_V1, SHEET_DIAG_REAR_V1,
@@ -89,7 +90,7 @@ interface Built {
   readonly finishSec: ReadonlyMap<number, number>;
 }
 
-function build(seed: number, ownGate: number): Built {
+function build(seed: number, ownGate: number, surface: Surface, trackCondition: TrackCondition): Built {
   const start = (seed * 13) % Math.max(1, POOL.length - FIELD);
   const entrants = POOL.slice(start, start + FIELD).map((h, i) => ({
     horseId: String(i + 1), stats: h.stats, surfaceAptitude: h.surfaceAptitude,
@@ -99,8 +100,8 @@ function build(seed: number, ownGate: number): Built {
     weightKg: 55, gate: i + 1, age: 4, skillGenes: h.skillGenes,
   }));
   const conditions = {
-    raceId: `r${seed}`, distance: DIST, surface: 'turf' as const,
-    trackCondition: 'good' as const, courseShape: 'oval' as const, baseWeightKg: 55,
+    raceId: `r${seed}-${surface}-${trackCondition}`, distance: DIST, surface,
+    trackCondition, courseShape: 'oval' as const, baseWeightKg: 55,
   };
   const result = resolveRace({ conditions, entrants, seed, balance: DEFAULT_RACE_BALANCE });
   const { pace } = paceOf(entrants, DEFAULT_RACE_BALANCE);
@@ -173,6 +174,8 @@ export default function RacePage(): React.JSX.Element {
   const [clock, setClock] = useState(0);
   const [coat, setCoat] = useState(false);
   const [backlight, setBacklight] = useState(false);
+  const [surface, setSurface] = useState<Surface>('turf');
+  const [trackCondition, setTrackCondition] = useState<TrackCondition>('good');
 
   useEffect(() => {
     let cancelled = false;
@@ -238,12 +241,12 @@ export default function RacePage(): React.JSX.Element {
   }, [coat, backlight]);
 
   useEffect(() => {
-    try { setBuilt(build(seed, ownGate)); setErr(null); } catch (e) {
+    try { setBuilt(build(seed, ownGate, surface, trackCondition)); setErr(null); } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
     dRef.current = 0;
     setClock(0);
-  }, [seed, ownGate]);
+  }, [seed, ownGate, surface, trackCondition]);
 
   const render = useCallback((d: number) => {
     const cv = canvasRef.current;
@@ -287,17 +290,22 @@ export default function RacePage(): React.JSX.Element {
       phase: phaseOf(DIST - lead),
       allFinished: allFinishedNow,
     });
-    const contenders = at.filter((h) => lead - h.meters <= HORSE_LENGTH_M * 2);
-    const pack = at.filter((h) => lead - h.meters <= 40);
-    const focusHorses = shot.family === 'finish' ? at
+    const visualAt = withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST, Math.max(0, d - built.warp.displaySec));
+    const visualLead = Math.max(...visualAt.map((h) => h.meters));
+    const winnerGate = built.result[0]!.gate;
+    const contenders = visualAt.filter((h) => visualLead - h.meters <= HORSE_LENGTH_M * 2);
+    const pack = visualAt.filter((h) => visualLead - h.meters <= 40);
+    const focusHorses = shot.family === 'finish' ? visualAt
       : shot.target === 'leader' || shot.target === 'winner'
-      ? at.filter((h) => h.meters === lead)
+      ? visualAt.filter((h) => shot.target === 'winner' ? h.gate === winnerGate : h.meters === visualLead)
       : shot.target === 'contenders' ? contenders
-        : shot.target === 'gate' ? at.filter((h) => h.meters === Math.min(...at.map((x) => x.meters)))
+        : shot.target === 'gate' ? visualAt.filter((h) => h.meters === Math.min(...visualAt.map((x) => x.meters)))
           : pack;
     const packS = focusHorses.reduce((sum, h) => sum + h.meters, 0) / Math.max(1, focusHorses.length);
+    const packW = focusHorses.reduce((sum, h) => sum + (h.w ?? COURSE.widthM / 2), 0) / Math.max(1, focusHorses.length);
     const cam = broadcastCamera(COURSE, {
-      atS: Math.max(20, Math.min(DIST - 5, packS)),
+      atS: Math.max(20, shot.family === 'finish' || shot.family === 'winner' ? packS : Math.min(DIST - 5, packS)),
+      atW: packW,
       width: W, height: H,
       view: shot.view,
       preset: shotCameraForDistance(shot, DIST),
@@ -308,10 +316,11 @@ export default function RacePage(): React.JSX.Element {
     const useHighDiag = shot.view === 'high-diag';
     const horseSheet = useRear ? art.rear : useDiagRear ? art.diagRear : useDiagFront ? art.diagFront : useHighDiag ? art.highDiag : art.side;
     const horseSpec = useRear ? SHEET_REAR : useDiagRear ? SHEET_DIAG_REAR_V1 : useDiagFront ? SHEET_DIAG_FRONT_V1 : useHighDiag ? SHEET_HIGH_DIAG_V1 : SHEET_V2;
+    const horsesToDraw = shot.family === 'winner' ? visualAt.filter((h) => h.gate === winnerGate) : visualAt;
     ctx.imageSmoothingEnabled = true;   // ★遠近で滑らかに縮む。整数倍はもうやりません
-    drawPerspectiveWorld(ctx, COURSE, cam, art.pal as Record<string, string>, DIST, packS);
+    drawPerspectiveWorld(ctx, COURSE, cam, art.pal as Record<string, string>, DIST, packS, { surface, condition: trackCondition });
     drawPerspectiveHorses(ctx, COURSE, cam,
-      at.map((h) => ({ gate: h.gate, s: h.meters, w: h.w ?? COURSE.widthM / 2 })), {
+      horsesToDraw.map((h) => ({ gate: h.gate, s: h.meters, w: h.w ?? COURSE.widthM / 2 })), {
         sheet: horseSheet, sheetWidth: horseSheet.width, spec: horseSpec,
         fieldSize: FIELD,
         // ★脚は**表示の時間**で回す（距離で回すと道中の早送りで小走りになる）
@@ -429,7 +438,7 @@ export default function RacePage(): React.JSX.Element {
         ctx.fillText(e.margin, bx + 88, y);
       });
     }
-  }, [built, ownGate]);
+  }, [built, ownGate, surface, trackCondition]);
 
   useEffect(() => { render(dRef.current); }, [render, ready]);
 
@@ -482,6 +491,19 @@ export default function RacePage(): React.JSX.Element {
           自馬{' '}
           <select value={ownGate} onChange={(e) => setOwnGate(Number(e.target.value))}>
             {Array.from({ length: FIELD }, (_, i) => i + 1).map((g) => <option key={g} value={g}>{g} 番</option>)}
+          </select>
+        </label>
+        <label>
+          走路{' '}
+          <select value={surface} onChange={(e) => setSurface(e.target.value as Surface)}>
+            <option value="turf">芝</option><option value="dirt">ダート</option>
+          </select>
+        </label>
+        <label>
+          馬場{' '}
+          <select value={trackCondition} onChange={(e) => setTrackCondition(e.target.value as TrackCondition)}>
+            <option value="good">良</option><option value="yielding">稍重</option>
+            <option value="soft">重</option><option value="bad">不良</option>
           </select>
         </label>
         <label title="馬体の色を毛色に置き換える。元の絵の階調が減ります">

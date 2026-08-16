@@ -5,7 +5,7 @@
  * > 描画層が少しでもずれたら必ず落ちます。
  */
 import { describe, it, expect } from 'vitest';
-import { replayPositionModel, finalOrderOf, type Boundaries } from '../src/index.js';
+import { replayPositionModel, finalOrderOf, withFinishRunOut, type Boundaries } from '../src/index.js';
 
 const DIST = 1600;
 /** 走破タイムが違う18頭。★境界時刻は走破タイムからの按分（D-059） */
@@ -25,6 +25,20 @@ const model = (formation?: number) => replayPositionModel({
   strategyOf: (g) => (['nige', 'senko', 'sashi', 'oikomi'] as const)[(g - 1) % 4]!,
   formationSeed: 777,
   ...(formation === undefined ? {} : { formation }),
+});
+
+describe('ゴール後ランアウト', () => {
+  it('確定時刻を変えず、先着馬ほど決勝線の先へ流す', () => {
+    const at = [
+      { gate: 1, meters: DIST, staminaRatio: 0, w: 2 },
+      { gate: 2, meters: DIST, staminaRatio: 0, w: 3 },
+    ];
+    const finish = new Map([[1, 95], [2, 96]]);
+    const visual = withFinishRunOut(at, (gate) => finish.get(gate), 96, DIST, 0.5, 10);
+    expect(visual[0]!.meters).toBe(1615);
+    expect(visual[1]!.meters).toBe(1605);
+    expect(at.map((h) => h.meters)).toEqual([DIST, DIST]);
+  });
 });
 
 describe('★D-059 補間は境界を動かさない', () => {

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { broadcastCamera, broadcastEnvironmentAt, drawPerspectiveWorld, ovalCourse, segmentStarts } from '../src/index.js';
+import { broadcastCamera, broadcastEnvironmentAt, drawPerspectiveWorld, ovalCourse, segmentStarts, trackSurfacePaletteRole } from '../src/index.js';
 
 describe('drawPerspectiveWorld', () => {
+  it('芝・ダートと4段階の馬場状態を別のパレット役割へ割り当てる', () => {
+    expect(trackSurfacePaletteRole('turf', 'good')).toBe('turf-3');
+    expect(trackSurfacePaletteRole('turf', 'bad')).toBe('turf-6');
+    expect(trackSurfacePaletteRole('dirt', 'good')).toBe('dirt-0');
+    expect(trackSurfacePaletteRole('dirt', 'bad')).toBe('dirt-3');
+  });
   it('注視地点を中継用の背景区間へ分類する', () => {
     const course = ovalCourse(1600);
     for (const part of segmentStarts(course)) {
