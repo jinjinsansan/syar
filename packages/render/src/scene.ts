@@ -22,6 +22,8 @@ import {
   type DrawCommand, type Frame, type PaceMark, type PaletteRole,
   type SpriteRef, type StrategyMark, type Zoom,
 } from './commands.js';
+import { obliqueProject, type ObliqueCamera } from './oblique.js';
+import type { Course } from './course.js';
 
 /** 走行中の1頭の状態。★これが位置モデルの出力です */
 export interface HorseAt {
@@ -168,6 +170,43 @@ export interface SceneInput {
    *   ⚠️ ただし**どれが良いかは見て決まります**。だから画面から変えられるようにしてあります。
    */
   readonly pxPerMeter?: number | undefined;
+  /**
+   * ★**自馬のゲージ**（残り距離 → 残量 0〜1）。D-072。
+   *
+   *   ⚠️ ★**式をここで作らないでください。** エンジンの `staminaAt()` を渡します。
+   *      一度この層で近似を作って**符号が逆**になりました
+   *      （残り200m で 余力と着順の順位相関 −0.653 ＝ 勝つ馬ほどバテて見えていた）。
+   *
+   *   ★**自馬のぶんだけ**です（§12.6「自馬にのみ表示」）。
+   *     ⚠️ 全馬ぶんを渡すと、**他馬の余力が読めてしまい §12.6 に反します**。
+   *
+   *   省略時は `model` が持つ値（★馬ごとの情報を持たない仮の値）にそのまま倒します。
+   */
+  readonly ownGaugeOf?: ((metersLeft: number) => number) | undefined;
+  /**
+   * ★**斜め俯瞰**（D-066・β）。渡すと、平面の段ではなく**コースに沿って**置きます。
+   *
+   * 【★なぜ「段」をやめるか】
+   *   平面の段は**コーナーが無く**、**内外の差も出ません**。
+   *   オーナーの指摘「馬それぞれの場所が定位置」「競馬ではない」の根っこがここです。
+   *   ★カメラを馬群と一緒に回すので、**コーナーは投影から自然に出ます**（発明しません）。
+   *
+   * ⚠️ ★**省略したときの挙動は1画素も変わりません。** 平面の経路はそのまま残します
+   *    （既存の検査・V-16/V-17 の対照を壊さないため）。
+   */
+  readonly oblique?: {
+    readonly course: Course;
+    /**
+     * ★馬番 → **内ラチからの距離 m**（エンジンが引いた `w`。D-071）。
+     * ⚠️ ★**この層で引かないこと。** 引くと2か所になり、必ず離れます。
+     */
+    readonly widthOf: (gate: number, metersLeft: number) => number;
+    /** 内外の圧縮率（★小さいほど「横から」に近い）。既定はアートバイブルの 0.29 */
+    readonly depth?: number | undefined;
+    /** カメラを画面のどこに置くか（既定は 35% / 走路の中ほど） */
+    readonly anchorX?: number | undefined;
+    readonly anchorY?: number | undefined;
+  } | undefined;
   /**
    * ★「足りる」着順の線（既定3）。`gap.toGo` の計算に使います。
    *
@@ -440,6 +479,37 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
    *      実際の中継は**手前の馬が奥を隠します**。馬群に見せるにはこの順序が要ります。
    *   ★同じ段の中は**馬番順**なので、順序は決まります（C-5 は崩れません）。
    */
+  /**
+   * ★**斜め俯瞰のカメラ。** 馬群と一緒にコースを回るので、コーナーが画面に出ます。
+   */
+  const ob = input.oblique;
+  const obCam: ObliqueCamera | undefined = ob === undefined ? undefined : {
+    s: Math.max(1, Math.min(model.distanceMeter - 1, cam)),
+    w: ob.course.widthM / 2,
+    pxPerM: PX_PER_M * camera.zoom,
+    depth: ob.depth ?? 0.29,
+    anchorX: ob.anchorX ?? Math.round(vp.width * 0.35),
+    anchorY: ob.anchorY ?? Math.round(vp.trackTop + vp.laneHeight * 1.5),
+  };
+  /** ★1頭を画面に置く（斜め俯瞰）。スプライトは左上を指すので接地点から戻す */
+  const placeOblique = (
+    course: Course, camObj: ObliqueCamera,
+    widthOf: (g: number, m: number) => number, gate: number, meters: number,
+  ): { readonly x: number; readonly y: number } => {
+    // ⚠️ ★`w` はエンジンから受け取るだけ（D-071）
+    const w = widthOf(gate, model.distanceMeter - meters);
+    const p = obliqueProject(
+      course, camObj, Math.max(0, Math.min(model.distanceMeter, meters)), w,
+    );
+    return {
+      x: Math.round(p.x - SPRITE.width * 0.45 * camera.zoom),
+      y: Math.round(p.y - SPRITE.height * 0.95 * camera.zoom),
+    };
+  };
+  const place = (gate: number, meters: number): { readonly x: number; readonly y: number } | undefined =>
+    (ob === undefined || obCam === undefined
+      ? undefined : placeOblique(ob.course, obCam, ob.widthOf, gate, meters));
+
   const laneOfGate = (g: number): number => (input.laneOf === undefined ? g - 1 : input.laneOf(g));
   const laneCount = Math.max(1, input.laneCount ?? 3);
   const ownLane = input.ownGate === undefined ? 0 : laneOfGate(input.ownGate);
@@ -450,9 +520,15 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
    */
   const screenLane = (g: number): number =>
     (((laneOfGate(g) - ownLane) % laneCount) + laneCount) % laneCount;
-  const sorted = [...horses].sort(
-    (a, b) => (screenLane(a.gate) - screenLane(b.gate)) || (a.gate - b.gate),
-  );
+  /**
+   * ★斜め俯瞰では、**画面の上にいる馬ほど奥**です（内ラチ側が上）。
+   *   → 上から順に描けば、**手前の馬が奥を隠します**（実際の中継と同じ重なり）。
+   *   ★同じ高さなら馬番順なので、順序は決まります（C-5 は崩れません）。
+   */
+  const sorted = ob === undefined
+    ? [...horses].sort((a, b) => (screenLane(a.gate) - screenLane(b.gate)) || (a.gate - b.gate))
+    : [...horses].sort((a, b) =>
+      ((place(a.gate, a.meters)?.y ?? 0) - (place(b.gate, b.meters)?.y ?? 0)) || (a.gate - b.gate));
 
   /**
    * ★**1m あたりの画素。スプライトの実寸と整合していなければなりません。**
@@ -470,7 +546,8 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
   const z = camera.zoom;
   for (const h of sorted) {
     // ★倍率は**整数**なので、位置も整数倍になります（画素が割れません）
-    const x = Math.round(vp.width * 0.35 + (h.meters - cam) * PX_PER_M * z);
+    const placed = place(h.gate, h.meters);
+    const x = placed?.x ?? Math.round(vp.width * 0.35 + (h.meters - cam) * PX_PER_M * z);
     /**
      * ★**自馬の段を画面に入れる**（C-6 の前提）。
      *
@@ -490,7 +567,7 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
      *      ★**馬が芝の上（スタンドや空）を走っていました。** 実際に空を走っていました。
      *   → **巡回**させます。自馬が必ず先頭の段に来て、他は下に回ります。
      */
-    const y = vp.trackTop + screenLane(h.gate) * vp.laneHeight * z;
+    const y = placed?.y ?? (vp.trackTop + screenLane(h.gate) * vp.laneHeight * z);
     /**
      * ★**影を先に描きます**（馬より下に来る）。
      *   ⚠️ 影が無いと馬が芝に貼った絵に見えます。
@@ -578,7 +655,10 @@ export function sceneAt(input: SceneInput, sec: number): Frame {
         kind: 'gauge',
         at: { x: Math.round(vp.width * 0.05), y: Math.round(vp.height * 0.9) },
         width: Math.round(vp.width * 0.3),
-        ratio: own.staminaRatio,
+        // ★エンジンが出した残量。無ければ従来の仮の値（★どちらも「発明」はしていない）
+        ratio: input.ownGaugeOf === undefined
+          ? own.staminaRatio
+          : Math.max(0, Math.min(1, input.ownGaugeOf(model.distanceMeter - own.meters))),
       });
       // ★合図は**出ていない間も false で出します**。
       //   「描かない」にすると、ボットは「まだ来ていない」と「見落とした」を区別できません。

@@ -39,8 +39,8 @@
  * 実行: npx tsx tools/verify-readable.mjs [--races 800]
  */
 import { readFileSync } from 'node:fs';
-import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf } from '@star/race-engine';
-import { replayPositionModel, sceneAt, cameraFor } from '@star/render';
+import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, laneAt } from '@star/race-engine';
+import { replayPositionModel, sceneAt, cameraFor, ovalCourse } from '@star/render';
 
 const argv = process.argv.slice(2);
 const num = (flag, dflt) => {
@@ -53,6 +53,11 @@ const RACES = num('--races', 800);
  *   1 = 道中を脚質から生成する（既定）／0 = 真の位置そのまま（★漏れる。対照用）
  */
 const FORMATION = num('--formation', 1);
+/**
+ * ★斜め俯瞰で測るか（D-062 の再測定）。
+ *   ⚠️ 既定は**平面のまま**にします。★対照が取れなくなるので、既定を勝手に動かしません。
+ */
+const OBLIQUE = argv.includes('--oblique');
 /** ★どこで止めて予想させるか（残りメートル）。時間の構造を測るために動かせます */
 const AT_LEFT = num('--at', 800);
 /** ★中間境界を位置として厳守するか（'exact' = D-059 の明文 / 'shape' = D-061 改訂の含意） */
@@ -105,6 +110,24 @@ function screenFeatures(commands, ownSilk) {
     }
   }
 
+  /**
+   * ★**内を通っているか、外を回されているか**（D-071 の `w` が画面に出たので読めます）。
+   *
+   * 【★なぜ足すか】
+   *   斜め俯瞰では**内ラチ側が画面の上**です。人間には「外を回されている」ことが
+   *   ★**見えています**。ボットが `at.x` しか読まないままだと、
+   *   **人間が読めるものをボットが読めない**状態を測ることになります。
+   *
+   * ⚠️ ★**通るまで特徴を足しません。** 足すのはこの1つだけで、結果は出たまま報告します。
+   *    （平面のままなら全馬が同じ段に並ぶので、この特徴は 0 付近で効きません）
+   */
+  const ys = sprites.map((c) => c.at.y);
+  const ySpan = Math.max(1, Math.max(...ys) - Math.min(...ys));
+  const ownOutside = (own.at.y - Math.min(...ys)) / ySpan;
+  // ★前にいる馬たちが内を通れているか（＝自分より前が得をしているか）
+  const upY = sprites.filter((c) => c.at.x > own.at.x).map((c) => (c.at.y - Math.min(...ys)) / ySpan);
+  const aheadOutside = upY.length === 0 ? 0.5 : upY.reduce((a, b) => a + b, 0) / upY.length;
+
   const gap = commands.find((c) => c.kind === 'gap');
   const gauge = commands.find((c) => c.kind === 'gauge');
 
@@ -126,6 +149,8 @@ function screenFeatures(commands, ownSilk) {
     1,                                              // 切片
     ahead / FIELD,
     spread / 100,
+    ownOutside,        // ★自分が外を回されているか（D-071）
+    aheadOutside,      // ★前の馬が内を通れているか
     ownEffort,
     aheadEffortMean,
     aheadEffortMin,
@@ -246,6 +271,7 @@ function runRace(seed) {
     formation: FORMATION,
     // ★別ストリーム（D-061 改訂）。resolveRace の乱数には触れません
     formationSeed: seed * 2654435761,
+    ...(OBLIQUE ? { laneOf: (gate, metersLeft) => laneAt(gate, FIELD, metersLeft, DIST, seed) } : {}),
   });
 
   const ownGate = 1 + (seed % FIELD);
@@ -267,6 +293,11 @@ function runRace(seed) {
     // ★V-16 ①: 展開を画面に出す（エンジンが持っているものを渡すだけ）
     strategyOf: (g) => entrants[g - 1].strategy,
     pace,
+    // ★横位置はエンジンが引いたものを読むだけ（D-071）
+    ...(OBLIQUE ? { oblique: {
+      course: ovalCourse(DIST),
+      widthOf: (gate, metersLeft) => laneAt(gate, FIELD, metersLeft, DIST, seed),
+    } } : {}),
   }, sec);
 
   // ── ★出走表（ゲートが開く前に分かること**だけ**）──
