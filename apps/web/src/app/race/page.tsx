@@ -83,7 +83,7 @@ function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, st
   ctx.restore();
 }
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '48';
+const ASSET_VERSION = '49';
 const HORSE_GROUND_LIFTS = [55, 90, 25, 0, 0, 0, 0, 55] as const;
 /**
  * ★コーナー専用カット（3角後方・4角俯瞰）の長さ（m）。**0 = 使わない**。
