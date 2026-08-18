@@ -214,9 +214,10 @@ export function broadcastV2LeadFrameFocusMeters(
  */
 export function broadcastV2AnchorWeight(course: Course, shotId: BroadcastV2ShotId, focusS: number): number {
   if (shotId === 'finish-line' || shotId === 'winner-follow') return 1;
-  // ★発走: 発馬機（世界固定）が見える 60m は真の速度に一致させ、60→120m でなだらかに見た目の速度へ
+  // ★発走: 発馬機（世界固定）が画面にある間（注視点 25m まで）だけ真の速度に一致させ、25→50m でなだらかに
+  //   見た目の速度へ（オーナー指摘「ゲート後の走りがせわしない」→ ゴール前直線と同じ実速の周期にする）
   if (shotId === 'start-follow') {
-    const u = Math.max(0, Math.min(1, (focusS - 60) / 60));
+    const u = Math.max(0, Math.min(1, (focusS - 25) / 25));
     const startWeight = 1 - u * u * (3 - 2 * u);
     if (startWeight > 0) return startWeight;
   }
