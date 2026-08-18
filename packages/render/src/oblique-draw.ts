@@ -69,6 +69,8 @@ export interface Ctx2D<TImage = unknown> {
   save?(): void;
   restore?(): void;
   transform?(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  /** ★任意。毛色バリエーション（馬体の色相・明度・彩度）に使う CSS filter。無い環境では無視 */
+  filter?: string;
 }
 
 /** ★ブラウザの `CanvasTextAlign` と同じ並び（`lib.dom` に依存しないため自前に持つ） */

@@ -514,6 +514,11 @@ export function drawPerspectiveHorses<TImage>(
      */
     readonly frameSetOf?: ((horse: PerspHorse, view: HorseViewInfo) =>
       { readonly frames: readonly HqHorseFrame<TImage>[] | undefined; readonly flip: boolean }) | undefined;
+    /**
+     * ★毛色バリエーション: 馬ごとの CSS filter（例 'hue-rotate(12deg) brightness(1.08)'）。基準コマの描画にだけ掛け、
+     *   勝負服オーバーレイと影には掛けない。無彩色（勝負服の灰、鞍布の白、脚元の黒）はほぼ変わらない。
+     */
+    readonly coatFilterOf?: ((gate: number) => string | undefined) | undefined;
     /** 真横カメラ用の高解像度・個別フレーム。指定時はシートより優先する。 */
     readonly frameImages?: readonly {
       readonly image: TImage;
@@ -733,10 +738,14 @@ export function drawPerspectiveHorses<TImage>(
       const top = hi.bodyAnchorSourcePx !== undefined
         ? d.p.y - (hi.bodyLiftSourcePx ?? 0) * scale - (hi.bodyAnchorSourcePx.y - source.y) * scale
         : d.p.y - hiH;
+      const coat = opts.coatFilterOf?.(d.h.gate);
+      const canFilter = coat !== undefined && 'filter' in ctx;
+      if (canFilter) ctx.filter = coat;
       ctx.drawImage(
         hi.image, source.x, source.y, source.width, source.height,
         left, top, hiW, hiH,
       );
+      if (canFilter) ctx.filter = 'none';
       if (hi.overlay !== undefined) {
         const overlayX = left + (hi.overlay.offsetXSourcePx - source.x) * scale;
         const overlayY = top + (hi.overlay.offsetYSourcePx - source.y) * scale;

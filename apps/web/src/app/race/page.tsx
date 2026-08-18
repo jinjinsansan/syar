@@ -130,6 +130,21 @@ const SILKS_COLORS = ['#ececec', '#20242a', '#d52d35', '#2359c4', '#efd329', '#1
  *   以前は実在名のプレースホルダーが直書きされていたので架空名に置換した。
  */
 const RACE_META = { venue: 'スターパーク競馬場', raceName: '桜星賞', raceNo: '11R' } as const;
+/**
+ * ★毛色バリエーション（案 A・docs/race-horse-art-options-20260819.md）。素材は鹿毛 1 頭のまま、描画時に馬体だけ
+ *   色相・明度・彩度を変える。無彩色（勝負服の灰・鞍布の白・脚元の黒）はほぼ変わらない。
+ *   ゲート番号から決定論で割り当て（鹿毛が最多、栗毛・黒鹿毛・青鹿毛・芦毛を混ぜる）。
+ */
+const COAT_FILTERS = {
+  bay: undefined,                                                   // 鹿毛（素材そのまま）
+  chestnut: 'hue-rotate(10deg) saturate(1.15) brightness(1.1)',      // 栗毛
+  'dark-bay': 'brightness(0.78) saturate(0.95)',                    // 黒鹿毛
+  'blue-black': 'brightness(0.62) saturate(0.6)',                   // 青鹿毛
+  grey: 'saturate(0.12) brightness(1.32) contrast(0.95)',           // 芦毛
+} as const;
+const COAT_BY_GATE = ['bay', 'chestnut', 'dark-bay', 'bay', 'grey', 'bay', 'chestnut', 'blue-black', 'bay', 'dark-bay', 'chestnut', 'bay'] as const;
+const coatFilterOf = (gate: number): string | undefined =>
+  COAT_FILTERS[COAT_BY_GATE[(gate - 1) % COAT_BY_GATE.length] ?? 'bay'];
 const HORSE_NAMES = ['スターライト', 'サクラブリーズ', 'ハンシンドリーム', 'ミライノツバサ', 'グリーンアロー', 'オウカノキセキ', 'ナニワスピリット', 'ローズクイーン', 'ムラサキノホシ', 'アオバハヤテ', 'ブラウンエース', 'ピンクレディ'] as const;
 const JOCKEY_NAMES = ['田中 守', '佐藤 翼', '山本 誠', '中村 駿', '高橋 蓮', '松本 拓海', '藤田 昇', '小林 亮', '伊藤 健', '吉田 直樹', '岡田 悠', '森川 浩'] as const;
 /** ★固定2D中継の基準幅 */
@@ -1149,6 +1164,7 @@ export default function RacePage(): React.JSX.Element {
         libraries,
         fieldSize: FIELD,
         directionalSets: art.directionalReady,
+        coatFilterOf,
         // ★ゲート待機中（raceD=0）は脚を体の下に畳んだ支持局面 pose04（index 3）で静止させる
         frameOf: (gate) => raceD <= 0 ? 3
           : Math.floor((((metersByGate.get(gate) ?? 0) + visualDelta) / STRIDE_M) * 8 + gate * 2.96) % 8,

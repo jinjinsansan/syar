@@ -188,6 +188,8 @@ export function drawBroadcastV2Scene<TImage>(
     readonly phaseOf?: ((gate: number) => number) | undefined;
     /** ★承認水準の方向別素材が揃っている集合。揃っていない方向は真横素材で代用 */
     readonly directionalSets?: { readonly rear?: boolean; readonly front?: boolean } | undefined;
+    /** ★毛色バリエーション（馬ごとの CSS filter） */
+    readonly coatFilterOf?: ((gate: number) => string | undefined) | undefined;
     readonly frameRoleOf: (gate: number, fieldSize: number) => string;
     readonly surface: RenderSurface;
     readonly condition: RenderTrackCondition;
@@ -297,6 +299,7 @@ export function drawBroadcastV2Scene<TImage>(
     fieldSize: opts.fieldSize,
     frameOf: opts.frameOf,
     phaseOf: opts.phaseOf,
+    coatFilterOf: opts.coatFilterOf,
     frameRoleOf: opts.frameRoleOf,
     distanceMeter: course.distance,
     trackEffect: { surface: opts.surface, condition: opts.condition, color: opts.kickupColor },
