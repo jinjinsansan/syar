@@ -259,3 +259,77 @@ export function drawWinnerLowerThird(
     ctx.fillText(`${timeSec.toFixed(1)}秒`, vp.width - 48, y + 88); ctx.textAlign = 'left';
   }
 }
+
+/**
+ * ★レース後の**着順ボード**（アーケード参考映像 124〜134 秒: 全頭の着順・馬名・騎手・タイム・着差を大きな板で）。
+ *   `progress` 0→1 で行が上から順に現れる。背景の勝馬走り抜けは薄く透ける。
+ */
+export interface ResultsBoardRow {
+  readonly place: number;
+  readonly gate: number;
+  readonly horseName: string;
+  readonly jockeyName: string;
+  readonly timeSec?: number | undefined;
+  readonly margin: string;
+}
+
+export function drawResultsBoard(
+  ctx: Ctx2D<never>, pal: Palette, vp: Viewport2D, font: FontOf,
+  rows: readonly ResultsBoardRow[], fieldSize: number,
+  frameRoleOf: (gate: number, fieldSize: number) => string,
+  meta: { readonly raceName: string; readonly venue: string; readonly raceNo: string; readonly distanceLabel: string },
+  progress: number,
+): void {
+  const t = Math.max(0, Math.min(1, progress));
+  const bw = Math.min(vp.width - 96, 820);
+  const rowH = 36;
+  const headH = 88;
+  const bh = headH + rows.length * rowH + 22;
+  const x = (vp.width - bw) / 2;
+  const y = Math.max(24, (vp.height - bh) / 2 - 20);
+  // 板（全体はすぐ出る）
+  ctx.globalAlpha = Math.min(1, t * 4);
+  ctx.fillStyle = 'rgba(6,10,8,0.86)'; ctx.fillRect(x, y, bw, bh);
+  ctx.fillStyle = pal['frame-5'] ?? '#e9c94d'; ctx.fillRect(x, y, bw, 4);
+  ctx.strokeStyle = 'rgba(236,232,211,0.4)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x + 0.5, y + 4.5); ctx.lineTo(x + bw - 0.5, y + 4.5); ctx.lineTo(x + bw - 0.5, y + bh - 0.5); ctx.lineTo(x + 0.5, y + bh - 0.5); ctx.closePath(); ctx.stroke();
+  // 見出し
+  ctx.textAlign = 'left';
+  ctx.fillStyle = pal['frame-5'] ?? '#e9c94d'; ctx.font = font(15, true);
+  ctx.fillText(`${meta.venue}　${meta.raceNo}　${meta.distanceLabel}`, x + 24, y + 30);
+  ctx.fillStyle = pal['paper-0'] ?? '#fff'; ctx.font = font(26, true);
+  ctx.fillText(`${meta.raceName}　確定`, x + 24, y + 62);
+  ctx.fillStyle = 'rgba(236,232,211,0.55)'; ctx.font = font(12);
+  ctx.textAlign = 'right';
+  ctx.fillText('着　枠　馬名　　　　　　　　騎手　　　　タイム　　着差', x + bw - 24, y + 62);
+  ctx.textAlign = 'left';
+  ctx.strokeStyle = 'rgba(236,232,211,0.25)';
+  ctx.beginPath(); ctx.moveTo(x + 24, y + headH - 12); ctx.lineTo(x + bw - 24, y + headH - 12); ctx.stroke();
+  // 行（順に出る）
+  rows.forEach((row, i) => {
+    const appear = Math.max(0, Math.min(1, (t * (rows.length + 3) - i) / 2));
+    if (appear <= 0) return;
+    ctx.globalAlpha = appear;
+    const yy = y + headH + i * rowH + 24;
+    if (i % 2 === 0) { ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fillRect(x + 12, yy - 24, bw - 24, rowH); }
+    ctx.fillStyle = i === 0 ? (pal['frame-5'] ?? '#e9c94d') : (pal['paper-0'] ?? '#fff');
+    ctx.font = font(i === 0 ? 20 : 17, true);
+    ctx.textAlign = 'right'; ctx.fillText(String(row.place), x + 52, yy); ctx.textAlign = 'left';
+    const role = frameRoleOf(row.gate, fieldSize);
+    ctx.fillStyle = pal[role] ?? '#fff'; ctx.fillRect(x + 66, yy - 17, 26, 22);
+    ctx.fillStyle = inkOn(pal, role); ctx.textAlign = 'center'; ctx.font = font(14, true);
+    ctx.fillText(String(row.gate), x + 79, yy - 1); ctx.textAlign = 'left';
+    ctx.fillStyle = pal['paper-0'] ?? '#fff'; ctx.font = font(18, i === 0);
+    ctx.fillText(row.horseName, x + 108, yy);
+    ctx.fillStyle = 'rgba(246,242,231,0.85)'; ctx.font = font(15);
+    ctx.fillText(row.jockeyName, x + 330, yy);
+    ctx.textAlign = 'right';
+    ctx.font = font(16, true);
+    ctx.fillText(row.timeSec === undefined ? '—' : `${row.timeSec.toFixed(1)}秒`, x + bw - 130, yy);
+    ctx.font = font(15);
+    ctx.fillStyle = 'rgba(246,242,231,0.75)';
+    ctx.fillText(i === 0 ? '' : row.margin, x + bw - 24, yy);
+    ctx.textAlign = 'left';
+  });
+  ctx.globalAlpha = 1;
+}

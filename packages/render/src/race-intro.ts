@@ -1,10 +1,19 @@
 import type { Ctx2D, FontOf, Palette, SheetSpec, Viewport2D } from './oblique-draw.js';
 
-export const RACE_INTRO_RACE_START_SEC = 4.8;
+/**
+ * ★導入の時間割（アーケード参考映像: 空撮フライオーバー → レース名タイトル → 発馬機正面 → 発走）
+ *   0.0〜3.0  空撮フライオーバー（コースの上を飛ぶ）
+ *   3.0〜5.6  タイトルカード
+ *   5.6〜7.8  ゲート待機（正面の発馬機・扉閉）
+ *   7.8〜     発走（開扉）
+ */
+export const RACE_INTRO_FLYOVER_SEC = 3.0;
+export const RACE_INTRO_TITLE_END_SEC = 5.6;
+export const RACE_INTRO_RACE_START_SEC = 7.8;
 // 参考映像は開扉後およそ2秒で次の追走カメラへ渡る。長い横滑りを禁止する。
-export const RACE_INTRO_END_SEC = 7.0;
+export const RACE_INTRO_END_SEC = 10.0;
 
-export type RaceIntroStage = 'title' | 'gate-hold' | 'gate-release' | 'race';
+export type RaceIntroStage = 'flyover' | 'title' | 'gate-hold' | 'gate-release' | 'race';
 
 export interface RaceIntroState {
   readonly stage: RaceIntroStage;
@@ -15,7 +24,8 @@ export interface RaceIntroState {
 export function raceIntroAt(displaySec: number): RaceIntroState {
   const d = Math.max(0, displaySec);
   const raceDisplaySec = Math.max(0, d - RACE_INTRO_RACE_START_SEC);
-  if (d < 2.6) return { stage: 'title', raceDisplaySec: 0, releaseProgress: 0 };
+  if (d < RACE_INTRO_FLYOVER_SEC) return { stage: 'flyover', raceDisplaySec: 0, releaseProgress: 0 };
+  if (d < RACE_INTRO_TITLE_END_SEC) return { stage: 'title', raceDisplaySec: 0, releaseProgress: 0 };
   if (d < RACE_INTRO_RACE_START_SEC) return { stage: 'gate-hold', raceDisplaySec: 0, releaseProgress: 0 };
   if (d < RACE_INTRO_END_SEC) return {
     stage: 'gate-release', raceDisplaySec,
@@ -75,7 +85,9 @@ export function drawRaceTitleCard<TImage>(
   meta: RaceIntroMeta, displaySec: number,
   background?: { readonly image: TImage; readonly width: number; readonly height: number },
 ): void {
-  const fade = Math.min(1, displaySec / 0.35, (2.6 - displaySec) / 0.35);
+  // ★タイトルはフライオーバー後（RACE_INTRO_FLYOVER_SEC〜RACE_INTRO_TITLE_END_SEC）に出る。前後 0.35 秒でフェード
+  const local = displaySec - RACE_INTRO_FLYOVER_SEC;
+  const fade = Math.min(1, local / 0.35, (RACE_INTRO_TITLE_END_SEC - RACE_INTRO_FLYOVER_SEC - local) / 0.35);
   if (background !== undefined) {
     const sourceRatio = background.width / background.height;
     const targetRatio = vp.width / vp.height;

@@ -39,7 +39,7 @@ import {
   focusForRaceShot,
   drawFixed2DSideScene, fixed2DBackgroundRoleOf, fixed2DPackLayout,
   // ★UI も package が唯一の出どころ（動画の道具と同じ関数）
-  drawGauge, drawStandings, drawCallBand, drawResultPanel,
+  drawGauge, drawStandings, drawCallBand, drawResultPanel, drawResultsBoard,
   drawCourseSectionTag, drawWinnerLowerThird, raceCourseSectionAt,
   raceHudVisibilityAt, shouldEmitRaceCall, type CallPart,
   raceIntroAt, RACE_INTRO_RACE_START_SEC, RACE_INTRO_END_SEC,
@@ -48,7 +48,7 @@ import {
   broadcastV2FinishStyleOf, broadcastV2StartEase, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
-  drawCourseMinimap,
+  drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 
@@ -93,7 +93,10 @@ const HORSE_GROUND_LIFTS = [55, 90, 25, 0, 0, 0, 0, 55] as const;
 const CORNER_CUT_M_WEB = 400;
 /** ★ゴール後の勝馬追従: 走り抜けを 0.6 倍のスローで見せ、6.5 秒（アーケード参考映像 114〜123s は約 9 秒） */
 const RUNOUT_SLOW = 0.6;
-const POST_RACE_SEC = 6.5;
+const WINNER_FOLLOW_SEC = 6.5;
+/** ★その後の着順ボード（参考映像 124〜134s）: 6 秒 */
+const RESULTS_BOARD_SEC = 6;
+const POST_RACE_SEC = WINNER_FOLLOW_SEC + RESULTS_BOARD_SEC;
 /**
  * ★4 角を「奥からこちらへ向かってくる」固定カメラにするか（build 時のショット列挙にも使うので定数）。
  *   正面寄りの一体素材 diag-front-v3 が承認されたら true にする。
@@ -122,6 +125,11 @@ function flightLiftFor(index: number, count: number): number {
   return 0;
 }
 const SILKS_COLORS = ['#ececec', '#20242a', '#d52d35', '#2359c4', '#efd329', '#199655', '#ef7d20', '#e75c9a', '#713aa8', '#22a9b5', '#9b5b2e', '#d74d79'] as const;
+/**
+ * ★表示用のレース情報（憲法 §0.1: 実在の競馬場名・レース名は使わない）。
+ *   以前は実在名のプレースホルダーが直書きされていたので架空名に置換した。
+ */
+const RACE_META = { venue: 'スターパーク競馬場', raceName: '桜星賞', raceNo: '11R' } as const;
 const HORSE_NAMES = ['スターライト', 'サクラブリーズ', 'ハンシンドリーム', 'ミライノツバサ', 'グリーンアロー', 'オウカノキセキ', 'ナニワスピリット', 'ローズクイーン', 'ムラサキノホシ', 'アオバハヤテ', 'ブラウンエース', 'ピンクレディ'] as const;
 const JOCKEY_NAMES = ['田中 守', '佐藤 翼', '山本 誠', '中村 駿', '高橋 蓮', '松本 拓海', '藤田 昇', '小林 亮', '伊藤 健', '吉田 直樹', '岡田 悠', '森川 浩'] as const;
 /** ★固定2D中継の基準幅 */
@@ -694,7 +702,7 @@ export default function RacePage(): React.JSX.Element {
         })),
       };
       const loaded = await Promise.all([
-        loadImg(`/art/race-title-hanshin-spring-v1.png?v=${ASSET_VERSION}`),
+        loadImg(`/art/race-title-spring-v1.png?v=${ASSET_VERSION}`),
         loadImg(`/art/race-narrator-v1.png?v=${ASSET_VERSION}`),
         loadImg(`/art/starting-gate-side-v1.png?v=${ASSET_VERSION}`),
         loadImg(`/art/race-backstretch-side-v1.png?v=${ASSET_VERSION}`),
@@ -941,9 +949,31 @@ export default function RacePage(): React.JSX.Element {
     const conditionLabel: Record<TrackCondition, string> = {
       good: '良', yielding: '稍重', soft: '重', bad: '不良',
     };
-    if (intro.stage === 'title') {
+    if (intro.stage === 'flyover' && renderer === 'v2') {
+      /**
+       * ★空撮フライオーバー（アーケード参考映像 31 秒）: コースの上を斜めに飛ぶカメラで透視ワールドだけを描く（馬なし）。
+       *   時刻 d の関数（決定論）。終わりでタイトルへ暗転で渡す。
+       */
+      const course = ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn });
+      const t = Math.max(0, Math.min(1, d / RACE_INTRO_FLYOVER_SEC));
+      const ease = t * t * (3 - 2 * t);
+      const eyeS = -140 + ease * 620;                // 発走の手前上空から向正面の上空へ
+      const eye = posOf(course, eyeS, -60 + ease * 20);
+      const target = posOf(course, eyeS + 260, TRACK_WIDTH_M / 2);
+      drawTexturedWorld(ctx, course, {
+        eye: { x: eye.x, y: eye.y, z: 62 - ease * 14 },
+        target: { x: target.x, y: target.y, z: 0 },
+        fovY: (34 * Math.PI) / 180, width: W, height: H,
+      }, art.texturedWorld);
+      // 冒頭のフェードインと終わりのフェードアウト
+      const fade = t < 0.15 ? 1 - t / 0.15 : t > 0.85 ? (t - 0.85) / 0.15 : 0;
+      if (fade > 0) { ctx.globalAlpha = fade; ctx.fillStyle = '#05080a'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+      drawRendererBadge(ctx, renderer, 'flyover');
+      return;
+    }
+    if (intro.stage === 'title' || intro.stage === 'flyover') {
       drawRaceTitleCard(ctx, art.pal as Record<string, string>, vp, FONT, {
-        venue: '阪神競馬場', raceName: '桜花賞', raceNo: '11R',
+        venue: RACE_META.venue, raceName: RACE_META.raceName, raceNo: RACE_META.raceNo,
         distanceMeter: DIST, surfaceLabel: surface === 'turf' ? '芝' : 'ダート',
         weatherLabel: '晴', conditionLabel: conditionLabel[trackCondition],
         turnLabel: turn === 'left' ? '左回り' : '右回り',
@@ -1345,15 +1375,29 @@ export default function RacePage(): React.JSX.Element {
       if (hud.calls) drawCallBand(ctx, art.pal as Record<string, string>, vp, FONT, callRef.current,
         { image: art.raceNarrator, width: art.raceNarrator.width, height: art.raceNarrator.height });
 
-      if (winnerFinishedNow && winnerAfterSec < 3.4) {
-        drawWinnerLowerThird(ctx, art.pal as Record<string, string>, vp, FONT,
-          winnerGate, HORSE_NAMES[winnerGate - 1] ?? `スター${winnerGate}`,
-          JOCKEY_NAMES[winnerGate - 1] ?? 'STAR騎手', built.finishSec.get(winnerGate));
-      }
-
-      if (hud.result) {
-        drawResultPanel(ctx, art.pal as Record<string, string>, vp, FONT,
-          built.result, FIELD, frameRoleOf);
+      const afterRaceSec = Math.max(0, raceD - built.warp.displaySec);
+      const resultsT = (afterRaceSec - WINNER_FOLLOW_SEC) / RESULTS_BOARD_SEC;
+      if (resultsT >= 0) {
+        // ★着順ボード（全頭）。勝馬追従の後、レースの締め
+        drawResultsBoard(ctx, art.pal as Record<string, string>, vp, FONT,
+          built.result.map((row) => ({
+            place: row.place, gate: row.gate,
+            horseName: HORSE_NAMES[row.gate - 1] ?? `スター${row.gate}`,
+            jockeyName: JOCKEY_NAMES[row.gate - 1] ?? 'STAR騎手',
+            timeSec: built.finishSec.get(row.gate), margin: row.margin,
+          })), FIELD, frameRoleOf,
+          { raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo, distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${DIST}m` },
+          Math.min(1, resultsT * 1.6));
+      } else {
+        if (winnerFinishedNow && winnerAfterSec < 3.4) {
+          drawWinnerLowerThird(ctx, art.pal as Record<string, string>, vp, FONT,
+            winnerGate, HORSE_NAMES[winnerGate - 1] ?? `スター${winnerGate}`,
+            JOCKEY_NAMES[winnerGate - 1] ?? 'STAR騎手', built.finishSec.get(winnerGate));
+        }
+        if (hud.result) {
+          drawResultPanel(ctx, art.pal as Record<string, string>, vp, FONT,
+            built.result, FIELD, frameRoleOf);
+        }
       }
     }
   }, [built, ownGate, surface, trackCondition, turn, renderer]);

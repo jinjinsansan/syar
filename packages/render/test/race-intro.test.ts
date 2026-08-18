@@ -5,8 +5,10 @@ import {
 
 describe('raceIntroAt', () => {
   it('タイトルからゲート待機へ進み、発馬までレース時計を止める', () => {
-    expect(raceIntroAt(0)).toMatchObject({ stage: 'title', raceDisplaySec: 0 });
-    expect(raceIntroAt(2.6)).toMatchObject({ stage: 'gate-hold', raceDisplaySec: 0 });
+    expect(raceIntroAt(0)).toMatchObject({ stage: 'flyover', raceDisplaySec: 0 });
+    expect(raceIntroAt(5.6)).toMatchObject({ stage: 'gate-hold', raceDisplaySec: 0 });
+    expect(raceIntroAt(1.0).stage).toBe('flyover');
+    expect(raceIntroAt(4.0).stage).toBe('title');
     expect(raceIntroAt(RACE_INTRO_RACE_START_SEC - 0.01).raceDisplaySec).toBe(0);
   });
 
@@ -14,8 +16,8 @@ describe('raceIntroAt', () => {
     expect(raceIntroAt(RACE_INTRO_RACE_START_SEC)).toEqual({
       stage: 'gate-release', raceDisplaySec: 0, releaseProgress: 0,
     });
-    expect(raceIntroAt(5.4).stage).toBe('gate-release');
-    expect(raceIntroAt(5.4).raceDisplaySec).toBeCloseTo(0.6);
+    expect(raceIntroAt(RACE_INTRO_RACE_START_SEC + 0.6).stage).toBe('gate-release');
+    expect(raceIntroAt(RACE_INTRO_RACE_START_SEC + 0.6).raceDisplaySec).toBeCloseTo(0.6);
   });
 
   it('発馬映像後もレース時間を巻き戻さず通常中継へ渡す', () => {
