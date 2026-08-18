@@ -1,0 +1,17 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with reference images.
+
+GOAL
+Repaint frame {POSE} of an 8-frame gallop cycle of a racehorse WITH jockey, SIDE view facing RIGHT, at higher effective resolution (the horse fills the frame) and with a consistent, natural gallop across the set. This set replaces the approved side-view frames for large on-screen display, so it must look like the SAME horse and jockey.
+
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- POSE / PHASE reference (this exact frame of the cycle; copy the leg phase, neck, head, tail and the jockey's posture): apps/web/public/art/horse-jockey-side-v6-pose{POSE}.png
+- IDENTITY / STYLE reference (the same horse and jockey, approved rendering): apps/web/public/art/horse-jockey-side-v6-pose01.png
+- CONSISTENCY reference (previous frame of THIS new set, if it exists — keep the same size, position, proportions and painting style): {PREV_REF}
+
+REQUIREMENTS
+- Same bay horse (black mane and tail, white socks), white saddle cloth, same jockey (grey/white silks to be recoloured later, grey helmet, crouched racing position). Painterly, highly detailed, sharp; same soft overcast lighting.
+- Side view, facing RIGHT, ground line horizontal. The horse's barrel (rib cage / saddle area) must sit at the SAME position and size in every frame of the set (anchor for animation); legs, neck, head, tail and jockey move around it.
+- Correct gallop anatomy for this phase: four legs, clearly separated hooves, no extra limbs; the leg phase must match the pose reference (frame {POSE} of 8).
+- Framing: the horse fills about 92% of the frame width (nose near the right edge, tail near the left edge), hooves near the bottom, jockey's helmet near the top. Output 1536 x 1024 (landscape).
+- Background: uniform flat chroma GREEN (RGB 0,255,0), no ground, no cast shadow, no text, no border. The subject must not contain that green.
+- Produce exactly ONE image and save it as a PNG.

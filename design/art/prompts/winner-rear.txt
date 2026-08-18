@@ -1,0 +1,17 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with reference images.
+
+GOAL
+Create frame {POSE} of an 8-frame gallop cycle of the RACE WINNER just after the finish line, seen from a three-quarter REAR view: the horse is easing down at a canter/gallop, and the jockey is STANDING TALL in the stirrups with the right arm raised (whip up), head turned slightly, celebrating.
+
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- HORSE POSE / CAMERA ANGLE reference (same frame number of the rear-view gallop set; copy the leg phase and the camera angle exactly): apps/web/public/art/horse-jockey-diag-rear-v4-pose{POSE}.png
+- JOCKEY CELEBRATION reference (posture only: standing in the irons, upright torso, right arm raised with whip): apps/web/public/art/horse-jockey-winner-v2-pose01.png
+- CONSISTENCY reference (previous frame of THIS new set, if it exists — keep the same size, position, camera angle and style): {PREV_REF}
+
+REQUIREMENTS
+- Same bay horse, same tack, same painterly high-detail style and lighting as the references. Same three-quarter rear camera as the rear-view reference (do not drift to side view).
+- The jockey stands in the stirrups, torso upright, right arm raised with the whip, left hand on the reins; silks grey/white (recoloured later), grey helmet.
+- Leg phase must match the rear-view reference of the same frame number.
+- Framing: horse and raised arm fill about 85% of the frame height, hooves near the bottom. Output 1024 x 1536 (portrait).
+- Background: uniform flat chroma GREEN (RGB 0,255,0), no ground, no shadow, no text, no border. The subject must not contain that green.
+- Four legs, correct anatomy, one jockey. Produce exactly ONE image and save it as a PNG.

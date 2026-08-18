@@ -146,6 +146,8 @@ export const READONLY = [
   'split-parallax-layers.mjs',
   // ★読むだけ。Broadcast V2 の動き（背景の流速・馬の大きさ・見た目速度）を全編で数値化する
   'audit-race-motion.mjs',
+  // ★画像ファイルを WebP に変換して隣に置くだけ。DBには接続しない
+  'build-art-webp.mjs',
 ];
 
 /**

@@ -91,6 +91,9 @@ const HORSE_GROUND_LIFTS = [55, 90, 25, 0, 0, 0, 0, 55] as const;
  *   ユーザー指摘③④「カーブで急におかしい」の主因。承認水準の素材ができるまでコーナーも望遠横追従で通す。
  */
 const CORNER_CUT_M_WEB = 400;
+/** ★ゴール後の勝馬追従: 走り抜けを 0.6 倍のスローで見せ、6.5 秒（アーケード参考映像 114〜123s は約 9 秒） */
+const RUNOUT_SLOW = 0.6;
+const POST_RACE_SEC = 6.5;
 /**
  * ★4 角を「奥からこちらへ向かってくる」固定カメラにするか（build 時のショット列挙にも使うので定数）。
  *   正面寄りの一体素材 diag-front-v3 が承認されたら true にする。
@@ -475,7 +478,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
   const winnerGate = settled[0]!;
   const course = ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn: 'left' });
   const STEP = 0.05;
-  const totalSec = RACE_INTRO_RACE_START_SEC + warp.displaySec + 5.2;
+  const totalSec = RACE_INTRO_RACE_START_SEC + warp.displaySec + POST_RACE_SEC;
   // ★ゴール前の展開: 先頭が残り 80m に達した瞬間の位置関係
   let finishStyle: BroadcastV2FinishStyle = 'solo';
   for (let sec = 0; sec <= warp.raceSecAt(warp.displaySec) + 1e-9; sec += 0.05) {
@@ -491,7 +494,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     const clampedD = Math.min(raceD, warp.displaySec);
     const sec = warp.raceSecAt(clampedD);
     const at = model.at(sec);
-    const visual = withFinishRunOut(at, (g) => finishSec.get(g), sec, DIST, Math.max(0, raceD - warp.displaySec));
+    const visual = withFinishRunOut(at, (g) => finishSec.get(g), sec, DIST, Math.max(0, raceD - warp.displaySec) * RUNOUT_SLOW);
     const winnerDone = (at.find((h) => h.gate === winnerGate)?.meters ?? 0) >= DIST - 1e-6;
     const ease = broadcastV2StartEase(raceD);
     const scene = resolveBroadcastV2Scene(course, visual.map((h) => ({
@@ -547,6 +550,8 @@ export default function RacePage(): React.JSX.Element {
     winnerHighQuality: readonly (readonly HighQualityHorseFrame[])[];
     /** ★勝馬の 8 コマ（未承認のうちは undefined → 走行 8 コマで代用） */
     winnerCycleHighQuality?: readonly (readonly HighQualityHorseFrame[])[];
+    /** ★勝馬の後方寄り 8 コマ（あれば勝馬追従を後方〜横の寄りにする） */
+    winnerRearHighQuality?: readonly (readonly HighQualityHorseFrame[])[];
     /** ★向正面ショット用のループ多層パララックス（`tools/split-parallax-layers.mjs` の出力） */
     parallaxBackstretch: ParallaxPlate<HTMLImageElement>;
     /** ★コーナー・斜めショット用のテクスチャ付き透視ワールド素材（芝タイル・遠景パノラマ） */
@@ -587,13 +592,22 @@ export default function RacePage(): React.JSX.Element {
        *   ⚠️ 引きに寄りのシートを縮めて使うと **0.4倍**になり、輪郭が濁ります
        *      （契約 §5 で禁じている形）。★引き用は別に描き起こしたものです。
        */
-      const loadImg = (src: string): Promise<HTMLImageElement> =>
+      const loadRaw = (src: string): Promise<HTMLImageElement> =>
         new Promise((res, rej) => {
           const im = new Image();
           im.onload = () => res(im);
           im.onerror = () => rej(new Error(`スプライトを読み込めません: ${src}`));
           im.src = src;
         });
+      /**
+       * ★`.png` の代わりに `.webp`（`tools/build-art-webp.mjs` が生成・約 1/7 の大きさ）を先に読み、
+       *   無ければ `.png` に落ちる。初回ロード約 145MB → 約 18MB。
+       */
+      const loadImg = (src: string): Promise<HTMLImageElement> => {
+        const m = /^(.*)\.png(\?.*)?$/.exec(src);
+        if (m === null) return loadRaw(src);
+        return loadRaw(`${m[1]}.webp${m[2] ?? ''}`).catch(() => loadRaw(src));
+      };
       /**
        * ⚠️ ★引き用（120px）の読み込みは**やめました**。
        *    透視投影では大きさが連続的に変わるので、**段階に分けられません**。
@@ -828,16 +842,6 @@ export default function RacePage(): React.JSX.Element {
       const composedWinner = winnerCycleReady ? composeCycle(
         [jockeyImages[2]!, jockeyImages[3]!] as [HTMLImageElement, HTMLImageElement],
         [winnerCycleImages[0] as HTMLImageElement, winnerCycleImages[4] as HTMLImageElement], [1, 5], SILKS_LAYOUT_WINNER) : undefined;
-      const sidePoses: readonly FrameImage[] = composedRace ?? loaded.slice(8, 16);
-      /**
-       * ★16 コマ（中間コマ入り）は「ウサギ跳ね」と評価されたため既定は 8 コマ。
-       *   中間コマは脚位置の計測で「両隣の真の中間」と確認できたものだけ後で戻す。
-       */
-      const USE_MID_FRAMES = false;
-      const sideCycle: readonly FrameImage[] = midsReady && USE_MID_FRAMES
-        ? sidePoses.flatMap((pose, index) => [pose, midImages[index]!])
-        : sidePoses;
-      const sideHighQuality = buildFrames(sideCycle);
       /**
        * ★方向別の一体素材（勝馬 8 コマと同じ方式で Codex 生成・騎手込み・1024×1536）。
        *   diag-rear-v4 / diag-front-v3 が 8 枚揃ったときだけ採用。揃わない方向は真横素材で代用（低解像度 v2 は使わない）。
@@ -848,11 +852,24 @@ export default function RacePage(): React.JSX.Element {
         return images.every((image): image is HTMLImageElement => image !== null) ? images : undefined;
       };
       const rearV4 = await loadSet('horse-jockey-diag-rear-v4');
+      const winnerRear = await loadSet('horse-jockey-winner-rear-v1');
+      const sideV7 = await loadSet('horse-jockey-side-v7');
       const [gateClosed, gateOpen] = await Promise.all([
         loadImg(`/art/starting-gate-front-v1.png?v=${ASSET_VERSION}`).catch(() => null),
         loadImg(`/art/starting-gate-front-open-v1.png?v=${ASSET_VERSION}`).catch(() => null),
       ]);
       const frontV3 = await loadSet('horse-jockey-diag-front-v3');
+      // ★真横は v7（一貫性を持たせて作り直した 8 コマ）が揃えばそれを、無ければ承認済み v6
+      const sidePoses: readonly FrameImage[] = composedRace ?? sideV7 ?? loaded.slice(8, 16);
+      /**
+       * ★16 コマ（中間コマ入り）は「ウサギ跳ね」と評価されたため既定は 8 コマ。
+       *   中間コマは脚位置の計測で「両隣の真の中間」と確認できたものだけ後で戻す。
+       */
+      const USE_MID_FRAMES = false;
+      const sideCycle: readonly FrameImage[] = midsReady && USE_MID_FRAMES
+        ? sidePoses.flatMap((pose, index) => [pose, midImages[index]!])
+        : sidePoses;
+      const sideHighQuality = buildFrames(sideCycle);
       const diagFrontHighQuality = frontV3 !== undefined
         ? buildFrames(frontV3, undefined, SILKS_LAYOUT_FRONT)
         : buildFrames(loaded.slice(16, 24));
@@ -874,6 +891,7 @@ export default function RacePage(): React.JSX.Element {
          */
         texturedWorld,
         directionalReady: { rear: rearV4 !== undefined, front: frontV3 !== undefined },
+        ...(winnerRear !== undefined ? { winnerRearHighQuality: buildFrames(winnerRear, undefined, SILKS_LAYOUT_REAR) } : {}),
         ...(gateClosed !== null && gateOpen !== null ? { gateFront: {
           closed: gateClosed, open: gateOpen,
           closedSource: opaqueBounds(gateClosed), openSource: opaqueBounds(gateOpen),
@@ -986,7 +1004,7 @@ export default function RacePage(): React.JSX.Element {
       phase: phaseOf(DIST - lead),
       allFinished: allFinishedNow,
     });
-    const visualAt = withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST, Math.max(0, raceD - built.warp.displaySec));
+    const visualAt = withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST, Math.max(0, raceD - built.warp.displaySec) * RUNOUT_SLOW);
     const visualLead = Math.max(...visualAt.map((h) => h.meters));
     const winnerGate = built.result[0]!.gate;
     const winnerFinishedNow = (at.find((horse) => horse.gate === winnerGate)?.meters ?? 0) >= DIST - 1e-6;
@@ -1022,6 +1040,7 @@ export default function RacePage(): React.JSX.Element {
         finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
         raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
         fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
+        winnerRear: art.winnerRearHighQuality !== undefined,
       });
       v2ShotId = scene.shot.id;
       v2SectionLabel = broadcastV2SectionLabel(course, visualLead, scene.shot.id);
@@ -1049,7 +1068,10 @@ export default function RacePage(): React.JSX.Element {
          * ★勝馬追従: 1 枚絵 `winner-v1` は脚が動かず「絵だけになって背景が動く」（ユーザー指摘⑥）。
          *   勝馬の 8 コマ（騎手が立ってガッツポーズ）が承認されるまでは走行 8 コマで脚を動かす。
          */
-        'winner-v1': library(art.winnerCycleHighQuality ?? art.sideHighQuality),
+        'winner-v1': library(
+          scene.shot.id === 'winner-follow-rear' && art.winnerRearHighQuality !== undefined
+            ? art.winnerRearHighQuality
+            : art.winnerCycleHighQuality ?? art.sideHighQuality),
       };
       const plate = scene.shot.id === 'finish-line' || scene.shot.id === 'winner-follow' ? art.raceFinish
         : scene.shot.id === 'homestretch-side' ? art.raceCornerExit
@@ -1162,7 +1184,7 @@ export default function RacePage(): React.JSX.Element {
           })), { width: W, height: H }, winnerFinishedNow, {
             finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
             raceDisplaySec: d - RACE_INTRO_RACE_START_SEC, forceShotId: change.from,
-            fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
+            fourthCornerFront: FOURTH_CORNER_FRONT_WEB, winnerRear: art.winnerRearHighQuality !== undefined,
           });
           offCtx.clearRect(0, 0, W, H);
           drawScene(offCtx, prevScene);
@@ -1348,7 +1370,7 @@ export default function RacePage(): React.JSX.Element {
     const loop = (): void => {
       const d = (performance.now() - t0Ref.current) / 1000;
       // ゴール後はランアウト→勝者紹介→正式着順まで5.2秒確保する。
-      const totalDisplaySec = RACE_INTRO_RACE_START_SEC + built.warp.displaySec + 5.2;
+      const totalDisplaySec = RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC;
       if (d >= totalDisplaySec) {
         dRef.current = totalDisplaySec;
         setClock(built.warp.displaySec);

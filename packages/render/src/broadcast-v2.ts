@@ -7,7 +7,7 @@ export type BroadcastV2ShotId =
   | 'homestretch-side' | 'finish-line' | 'winner-follow'
   // ★中継台本 v3（アーケード参考映像に合わせた追加ショット）
   | 'side-low' | 'side-close' | 'aerial' | 'side-drive' | 'fourth-corner-wide' | 'front-close'
-  | 'start-front';
+  | 'start-front' | 'winner-follow-rear';
 
 export type BroadcastV2HorseAssetRole = 'side-v6' | 'diag-front-v2' | 'diag-rear-v2' | 'high-diag-v2' | 'winner-v1';
 
@@ -113,6 +113,11 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
     id: 'front-close', view: 'diag-front', target: 'contenders', horseAsset: 'diag-front-v2', transitionSec: 0.35,
     camera: { backM: 18, upM: 2.6, sideM: 5, fovDeg: 20 },
   },
+  'winner-follow-rear': {
+    // ★勝馬（アーケード参考映像 114〜123s）: 後方〜横の寄り、騎手が立ってガッツポーズ
+    id: 'winner-follow-rear', view: 'diag-rear', target: 'winner', horseAsset: 'winner-v1', transitionSec: 0.4,
+    camera: { backM: 20, upM: 3.6, sideM: 5, fovDeg: 22 },
+  },
   'winner-follow': {
     id: 'winner-follow', view: 'side', target: 'winner', horseAsset: 'winner-v1', transitionSec: 0.4,
     // 勝馬は一回り寄る（画面高の約 35%）
@@ -188,9 +193,9 @@ export const FLASH_INTO: ReadonlySet<BroadcastV2ShotId> = new Set<BroadcastV2Sho
 
 export function broadcastV2ShotAt(
   course: Course, leaderMeters: number, allFinished = false, cornerCutM = CORNER_CUT_M,
-  options: { readonly fourthCornerFront?: boolean | undefined; readonly script?: 'v2' | 'v3' | undefined } = {},
+  options: { readonly fourthCornerFront?: boolean | undefined; readonly script?: 'v2' | 'v3' | undefined; readonly winnerRear?: boolean | undefined } = {},
 ): BroadcastV2Shot {
-  if (allFinished) return SHOTS['winner-follow'];
+  if (allFinished) return options.winnerRear === true ? SHOTS['winner-follow-rear'] : SHOTS['winner-follow'];
   if ((options.script ?? 'v3') === 'v3') {
     const frac = Math.max(0, leaderMeters) / Math.max(1, course.distance);
     for (const row of SCRIPT_V3) {
@@ -226,7 +231,7 @@ export function broadcastV2ShotById(id: BroadcastV2ShotId): BroadcastV2Shot {
 
 /** ★HUD の区間名。ショット選択と**同じ区間定義**から出す（別定義だと「第1コーナー」表示中に向正面ショット、が起きた） */
 export function broadcastV2SectionLabel(course: Course, leaderMeters: number, shotId: BroadcastV2ShotId): string {
-  if (shotId === 'winner-follow') return 'レース確定';
+  if (shotId === 'winner-follow' || shotId === 'winner-follow-rear') return 'レース確定';
   if (shotId === 'finish-line') return 'ゴール前';
   const label = segmentAtWithStart(course, Math.max(0, leaderMeters)).label;
   if (label.includes('1角')) return '第1コーナー';
@@ -286,7 +291,7 @@ export function broadcastV2LeadFrameFocusMeters(
  *   ゴール前 80m の手前 80m（残り 160→80m）で滑らかに 0→1 にし、流速の段差を作らない。
  */
 export function broadcastV2AnchorWeight(course: Course, shotId: BroadcastV2ShotId, focusS: number): number {
-  if (shotId === 'finish-line' || shotId === 'winner-follow') return 1;
+  if (shotId === 'finish-line' || shotId === 'winner-follow' || shotId === 'winner-follow-rear') return 1;
   // ★発走: 発馬機（世界固定）が画面にある間（注視点 25m まで）だけ真の速度に一致させ、25→50m でなだらかに
   //   見た目の速度へ（オーナー指摘「ゲート後の走りがせわしない」→ ゴール前直線と同じ実速の周期にする）
   if (shotId === 'start-follow' || shotId === 'start-front') {

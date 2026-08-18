@@ -105,12 +105,14 @@ export function resolveBroadcastV2Scene(
     readonly fourthCornerFront?: boolean;
     /** 台本: 'v3'（既定・アーケード参考映像）／'v2'（区間ベースの旧台本） */
     readonly script?: 'v2' | 'v3';
+    /** ★勝馬追従を後方寄りにする（勝馬の後方寄り素材があるとき） */
+    readonly winnerRear?: boolean;
   } = {},
 ): BroadcastV2Scene {
   const leaderS = horses.reduce((max, horse) => Math.max(max, horse.s), 0);
   const shot = options.forceShotId !== undefined
     ? broadcastV2ShotById(options.forceShotId)
-    : broadcastV2ShotAt(course, leaderS, allFinished, options.cornerCutM, { fourthCornerFront: options.fourthCornerFront, script: options.script });
+    : broadcastV2ShotAt(course, leaderS, allFinished, options.cornerCutM, { fourthCornerFront: options.fourthCornerFront, script: options.script, winnerRear: options.winnerRear });
   // ★直線→ゴール前は展開に応じた連続ズーム（`broadcastV2FinishCamera`）
   const finish = (shot.id === 'homestretch-side' || shot.id === 'finish-line')
     ? broadcastV2FinishCamera(options.finishStyle ?? 'solo', broadcastV2AnchorWeight(course, shot.id, leaderS))
@@ -277,7 +279,7 @@ export function drawBroadcastV2Scene<TImage>(
    *   0〜60°: 斜め後ろ / 60〜120°: 真横 / 120〜180°: 斜め前（純後方・正面の素材ができたら細分化）。
    *   勝馬追従は勝馬専用集合を使う。
    */
-  const directional = scene.shot.id !== 'winner-follow';
+  const directional = scene.shot.id !== 'winner-follow' && scene.shot.id !== 'winner-follow-rear';
   drawPerspectiveHorses(ctx, course, scene.camera, scene.visibleHorses, {
     ...library,
     frameSetOf: directional ? (horse, view) => {
