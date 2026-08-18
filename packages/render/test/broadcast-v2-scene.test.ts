@@ -40,7 +40,7 @@ describe('Broadcast V2 scene', () => {
     const horses: BroadcastV2Horse[] = [
       { gate: 1, s, w: 3 }, { gate: 2, s: s - 2, w: 5 }, { gate: 3, s: s - 4, w: 7 },
     ];
-    const scene = resolveBroadcastV2Scene(fullLapCourse, horses, { width: 960, height: 540 });
+    const scene = resolveBroadcastV2Scene(fullLapCourse, horses, { width: 960, height: 540 }, false, { script: 'v2' });
     expect(scene.shot.id).toBe('first-corner-front');
     expect(scene.shot.horseAsset).toBe('diag-front-v2');
     expect(scene.visibleHorses).toEqual(horses);

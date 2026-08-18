@@ -45,7 +45,7 @@ import {
   raceIntroAt, RACE_INTRO_RACE_START_SEC, RACE_INTRO_END_SEC,
   drawRaceTitleCard, drawStartingGate, drawStartCallBand,
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
-  broadcastV2FinishStyleOf, broadcastV2StartEase, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
+  broadcastV2FinishStyleOf, broadcastV2StartEase, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets,
   drawCourseMinimap,
@@ -1118,7 +1118,16 @@ export default function RacePage(): React.JSX.Element {
         texturedWorld: sceneToDraw.shot.view === 'side' ? undefined : art.texturedWorld,
       });
       drawScene(ctx, scene);
-      if (change !== undefined) {
+      if (change !== undefined && FLASH_INTO.has(change.to)) {
+        // ★閃光トランジション（アーケード参考映像 74 秒）: 白 → 0.3 秒で消える
+        const t = (d - change.displaySec) / 0.3;
+        if (t < 1) {
+          ctx.globalAlpha = Math.max(0, 1 - t) * 0.95;
+          ctx.fillStyle = '#fff8ea';
+          ctx.fillRect(0, 0, W, H);
+          ctx.globalAlpha = 1;
+        }
+      } else if (change !== undefined) {
         const off = dissolveCanvasRef.current ?? (dissolveCanvasRef.current = document.createElement('canvas'));
         if (off.width !== W || off.height !== H) { off.width = W; off.height = H; }
         const offCtx = off.getContext('2d');

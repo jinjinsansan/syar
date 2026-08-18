@@ -6,7 +6,7 @@ describe('Broadcast V2', () => {
 
   it('実コース区間から方向別ショットを選ぶ', () => {
     for (const boundary of segmentStarts(course)) {
-      const shot = broadcastV2ShotAt(course, Math.min(1599, boundary.s + 1));
+      const shot = broadcastV2ShotAt(course, Math.min(1599, boundary.s + 1), false, undefined, { script: 'v2' });
       if (boundary.label.includes('1角')) expect(shot.id).toBe('first-corner-front');
       if (boundary.label.includes('2角')) expect(shot.id).toBe('second-corner-high');
       if (boundary.label === '向正面') expect(shot.id).toBe('backstretch-side');
@@ -17,8 +17,17 @@ describe('Broadcast V2', () => {
   });
 
   it('ゴール前と決着後を専用ショットへ切り替える', () => {
-    expect(broadcastV2ShotAt(course, 1550).id).toBe('finish-line');
+    expect(broadcastV2ShotAt(course, 1550, false, undefined, { script: 'v2' }).id).toBe('finish-line');
     expect(broadcastV2ShotAt(course, 1600, true).id).toBe('winner-follow');
+  });
+
+  it('★台本 v3: 距離比で発走→低いサイド→寄り→空撮→3角→勝負所→4角→正面固定→直線→先頭争い→ゴール→勝馬', () => {
+    const seq = [30, 150, 300, 500, 700, 850, 950, 1050, 1200, 1400, 1550].map((s) => broadcastV2ShotAt(course, s).id);
+    expect(seq).toEqual(['start-follow', 'side-low', 'side-close', 'aerial', 'third-corner-rear', 'side-drive',
+      'fourth-corner-wide', 'fourth-corner-front', 'homestretch-side', 'front-close', 'finish-line']);
+    expect(broadcastV2ShotAt(course, 1600, true).id).toBe('winner-follow');
+    // 正面寄り素材が無いときは 4 角を俯瞰ワイドで代用
+    expect(broadcastV2ShotAt(course, 1050, false, undefined, { fourthCornerFront: false }).id).toBe('fourth-corner-wide');
   });
 
   it('注視点は両端の外れ値を除いた平均になる', () => {

@@ -4,7 +4,9 @@ import type { ShotCameraPreset, ShotTarget, ShotView } from './shot-sequence.js'
 export type BroadcastV2ShotId =
   | 'start-follow' | 'first-corner-front' | 'second-corner-high'
   | 'backstretch-side' | 'third-corner-rear' | 'fourth-corner-high' | 'fourth-corner-front'
-  | 'homestretch-side' | 'finish-line' | 'winner-follow';
+  | 'homestretch-side' | 'finish-line' | 'winner-follow'
+  // ★中継台本 v3（アーケード参考映像に合わせた追加ショット）
+  | 'side-low' | 'side-close' | 'aerial' | 'side-drive' | 'fourth-corner-wide' | 'front-close';
 
 export type BroadcastV2HorseAssetRole = 'side-v6' | 'diag-front-v2' | 'diag-rear-v2' | 'high-diag-v2' | 'winner-v1';
 
@@ -31,6 +33,9 @@ export interface BroadcastV2Shot {
  *   （寄りのカメラで同じ大きさにすると前列/後列が 3 倍違い、参考の「3〜12%」から外れる）
  */
 const SIDE_TELE: ShotCameraPreset = { backM: 44, upM: 6, sideM: 9, fovDeg: 12 };
+/** ★台本 v3 の横追従: 低く・望遠を強め（馬 ≈35%・アーケード参考映像の 40% に寄せる） */
+const SIDE_LOW: ShotCameraPreset = { backM: 44, upM: 3.5, sideM: 9, fovDeg: 9 };
+const SIDE_CLOSE: ShotCameraPreset = { backM: 44, upM: 3.2, sideM: 9, fovDeg: 7.5 };
 
 const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
   'start-follow': {
@@ -78,6 +83,30 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
     camera: SIDE_TELE,
     leadFraction: 0.78,
   },
+  'side-low': {
+    id: 'side-low', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35, camera: SIDE_LOW,
+  },
+  'side-close': {
+    id: 'side-close', view: 'side', target: 'contenders', horseAsset: 'side-v6', transitionSec: 0.35, camera: SIDE_CLOSE,
+  },
+  'aerial': {
+    // ★高い空撮（向正面〜3角）: 馬群全体とコース形状
+    id: 'aerial', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.4,
+    camera: { backM: 90, upM: 42, sideM: 30, fovDeg: 30 },
+  },
+  'side-drive': {
+    id: 'side-drive', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35, camera: SIDE_LOW,
+  },
+  'fourth-corner-wide': {
+    // ★4 角をラチのカーブごと広く（後方・高め）
+    id: 'fourth-corner-wide', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.4,
+    camera: { backM: 40, upM: 14, sideM: 13, fovDeg: 34 },
+  },
+  'front-close': {
+    // ★先頭争いを斜め前・寄りで（先頭の少し前・外側・低い、追従）
+    id: 'front-close', view: 'diag-front', target: 'contenders', horseAsset: 'diag-front-v2', transitionSec: 0.35,
+    camera: { backM: 18, upM: 2.6, sideM: 5, fovDeg: 20 },
+  },
   'winner-follow': {
     id: 'winner-follow', view: 'side', target: 'winner', horseAsset: 'winner-v1', transitionSec: 0.4,
     // 勝馬は一回り寄る（画面高の約 35%）
@@ -124,11 +153,49 @@ export function broadcastV2SegmentSpan(course: Course, meters: number): { readon
   return { start, end, label };
 }
 
+/**
+ * ★中継台本 v3（アーケード参考映像 `docs/race-broadcast-script-reference-20260818.md` §3）。
+ *   レース距離に対する先頭の位置の比で区間を割り当てる（1600m での目安を括弧に）。
+ *   閃光トランジションは 3角斜め後方 → 勝負所サイドの切替（`broadcastV2FlashAt`）。
+ */
+export const SCRIPT_V3: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
+  { until: 0.0375, id: 'start-follow' },        // 〜60m   発走（発馬機の正面素材ができるまで現行）
+  { until: 0.1625, id: 'side-low' },            // 〜260m  低いサイド追従
+  { until: 0.2625, id: 'side-close' },          // 〜420m  寄りサイド
+  { until: 0.375, id: 'aerial' },               // 〜600m  空撮
+  { until: 0.4875, id: 'third-corner-rear' },   // 〜780m  3角 斜め後方
+  { until: 0.5625, id: 'side-drive' },          // 〜900m  勝負所サイド（閃光で入る）
+  { until: 0.625, id: 'fourth-corner-wide' },   // 〜1000m 4角 俯瞰ワイド
+  { until: 0.70, id: 'fourth-corner-front' },   // 〜1120m 直線入口 正面固定
+  { until: 0.8125, id: 'homestretch-side' },    // 〜1300m 直線サイド
+  { until: 0.925, id: 'front-close' },          // 〜1480m 先頭争い 斜め前寄り
+  { until: 1.0, id: 'finish-line' },            // 〜1600m ゴール板 横（決勝線・審判塔）
+];
+
+/** ★台本 v3 でショットが変わる先頭位置（m）。閃光を出す境目もここから引く */
+export function broadcastV2ScriptBoundariesM(course: Course): readonly { readonly meters: number; readonly id: BroadcastV2ShotId }[] {
+  return SCRIPT_V3.map((row) => ({ meters: row.until * course.distance, id: row.id }));
+}
+
+/** 閃光トランジションで入るショット */
+export const FLASH_INTO: ReadonlySet<BroadcastV2ShotId> = new Set<BroadcastV2ShotId>(['side-drive']);
+
 export function broadcastV2ShotAt(
   course: Course, leaderMeters: number, allFinished = false, cornerCutM = CORNER_CUT_M,
-  options: { readonly fourthCornerFront?: boolean | undefined } = {},
+  options: { readonly fourthCornerFront?: boolean | undefined; readonly script?: 'v2' | 'v3' | undefined } = {},
 ): BroadcastV2Shot {
   if (allFinished) return SHOTS['winner-follow'];
+  if ((options.script ?? 'v3') === 'v3') {
+    const frac = Math.max(0, leaderMeters) / Math.max(1, course.distance);
+    for (const row of SCRIPT_V3) {
+      if (frac < row.until) {
+        // 4 角の正面固定は正面寄り素材が無いときは俯瞰ワイドで代用
+        if (row.id === 'fourth-corner-front' && options.fourthCornerFront === false) return SHOTS['fourth-corner-wide'];
+        return SHOTS[row.id];
+      }
+    }
+    return SHOTS['finish-line'];
+  }
   const left = course.distance - leaderMeters;
   if (left <= 80) return SHOTS['finish-line'];
   const seg = segmentAtWithStart(course, Math.max(0, leaderMeters));

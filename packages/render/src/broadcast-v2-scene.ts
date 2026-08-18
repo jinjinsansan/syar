@@ -103,12 +103,14 @@ export function resolveBroadcastV2Scene(
     readonly forceShotId?: BroadcastV2ShotId;
     /** ★4 角を「奥からこちらへ」の固定カメラにする（正面寄りの素材が揃っているとき） */
     readonly fourthCornerFront?: boolean;
+    /** 台本: 'v3'（既定・アーケード参考映像）／'v2'（区間ベースの旧台本） */
+    readonly script?: 'v2' | 'v3';
   } = {},
 ): BroadcastV2Scene {
   const leaderS = horses.reduce((max, horse) => Math.max(max, horse.s), 0);
   const shot = options.forceShotId !== undefined
     ? broadcastV2ShotById(options.forceShotId)
-    : broadcastV2ShotAt(course, leaderS, allFinished, options.cornerCutM, { fourthCornerFront: options.fourthCornerFront });
+    : broadcastV2ShotAt(course, leaderS, allFinished, options.cornerCutM, { fourthCornerFront: options.fourthCornerFront, script: options.script });
   // ★直線→ゴール前は展開に応じた連続ズーム（`broadcastV2FinishCamera`）
   const finish = (shot.id === 'homestretch-side' || shot.id === 'finish-line')
     ? broadcastV2FinishCamera(options.finishStyle ?? 'solo', broadcastV2AnchorWeight(course, shot.id, leaderS))

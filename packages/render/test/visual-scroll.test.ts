@@ -60,10 +60,11 @@ describe('Broadcast V2 framing', () => {
     const course = ovalCourse(1600, { turn: 'left' });
     const third = segmentStarts(course).find((b) => b.label.includes('3角'))!;
     const fourth = segmentStarts(course).find((b) => b.label.includes('4角'))!;
-    expect(broadcastV2ShotAt(course, third.s + 5).id).toBe('third-corner-rear');
-    expect(broadcastV2ShotAt(course, third.s + CORNER_CUT_M + 5).id).toBe('backstretch-side');
-    expect(broadcastV2ShotAt(course, fourth.s + 5).id).toBe('fourth-corner-high');
-    expect(broadcastV2ShotAt(course, fourth.s + CORNER_CUT_M + 5).id).toBe('homestretch-side');
+    const v2 = { script: 'v2' as const };
+    expect(broadcastV2ShotAt(course, third.s + 5, false, undefined, v2).id).toBe('third-corner-rear');
+    expect(broadcastV2ShotAt(course, third.s + CORNER_CUT_M + 5, false, undefined, v2).id).toBe('backstretch-side');
+    expect(broadcastV2ShotAt(course, fourth.s + 5, false, undefined, v2).id).toBe('fourth-corner-high');
+    expect(broadcastV2ShotAt(course, fourth.s + CORNER_CUT_M + 5, false, undefined, v2).id).toBe('homestretch-side');
   });
 
   it('区間名はショット選択と同じ区間定義から出る', () => {
