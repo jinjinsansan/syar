@@ -53,6 +53,47 @@ export interface ParallaxObject<TImage> {
   readonly scale?: number;
 }
 
+/**
+ * ★世界に置く**看板（ビルボード）**: 走路上の (s, w)〜(s, w+widthM) に幅を実寸で合わせて立てる。
+ *   発馬機の正面プレートなど。両端の地面点を投影し、その間に画像を貼る（ほぼ正面のカメラ向け）。
+ */
+export interface WorldBillboard<TImage> {
+  readonly image: TImage;
+  readonly width: number;
+  readonly height: number;
+  readonly worldS: number;
+  readonly worldW: number;
+  readonly widthM: number;
+  /** 画像内の描画範囲（透明余白を除いた矩形）。省略時は画像全体。矩形の下端が地面、幅が widthM */
+  readonly source?: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  readonly zOrder?: 'behind' | 'front';
+  readonly alpha?: number;
+}
+
+export function drawWorldBillboards<TImage>(
+  ctx: Ctx2D<TImage>,
+  billboards: readonly WorldBillboard<TImage>[],
+  projectGround: (s: number, w: number) => { readonly x: number; readonly y: number; readonly depth: number },
+  zOrder: 'behind' | 'front',
+  viewportWidth: number,
+): void {
+  for (const b of billboards) {
+    if ((b.zOrder ?? 'behind') !== zOrder) continue;
+    const a = projectGround(b.worldS, b.worldW);
+    const c = projectGround(b.worldS, b.worldW + b.widthM);
+    if (a.depth <= 1.5 || c.depth <= 1.5) continue;
+    const left = Math.min(a.x, c.x), right = Math.max(a.x, c.x);
+    const w = right - left;
+    if (w < 2 || right < 0 || left > viewportWidth) continue;
+    const src = b.source ?? { x: 0, y: 0, width: b.width, height: b.height };
+    const h = w * (src.height / src.width);
+    const bottom = (a.y + c.y) / 2;
+    if (b.alpha !== undefined) ctx.globalAlpha = b.alpha;
+    ctx.drawImage(b.image, src.x, src.y, src.width, src.height, left, bottom - h, w, h);
+    ctx.globalAlpha = 1;
+  }
+}
+
 export interface ParallaxPlate<TImage> {
   readonly plateWidth: number;
   readonly plateHeight: number;

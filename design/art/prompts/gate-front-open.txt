@@ -1,0 +1,12 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with a reference image.
+
+GOAL
+Take the reference image (a starting gate seen from the front, 12 stalls, front doors CLOSED, on chroma green) and produce the SAME gate at the SAME position, size and camera angle, but with ALL front doors OPEN (swung fully outward to both sides of each stall, so every stall opening is empty and you can see straight through each stall to the green background).
+
+REFERENCE (read it and pass it as the reference image): out/gen/starting-gate-front-v1-chroma.png
+
+REQUIREMENTS
+- Keep everything identical to the reference except the doors: same frame, same 12 stalls, same number plates 1..12, same wheels and chassis, same painterly style and lighting, same framing (1536 x 1024).
+- Every stall's doors are open; the stall interiors show only the chroma GREEN (RGB 0,255,0) background (no horses, no people).
+- Background: uniform flat chroma GREEN everywhere around the gate. No ground, no shadow, no text other than the number plates.
+- Produce exactly ONE image and save it as a PNG.

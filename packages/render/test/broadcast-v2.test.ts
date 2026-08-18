@@ -23,7 +23,7 @@ describe('Broadcast V2', () => {
 
   it('★台本 v3: 距離比で発走→低いサイド→寄り→空撮→3角→勝負所→4角→正面固定→直線→先頭争い→ゴール→勝馬', () => {
     const seq = [30, 150, 300, 500, 700, 850, 950, 1050, 1200, 1400, 1550].map((s) => broadcastV2ShotAt(course, s).id);
-    expect(seq).toEqual(['start-follow', 'side-low', 'side-close', 'aerial', 'third-corner-rear', 'side-drive',
+    expect(seq).toEqual(['start-front', 'side-low', 'side-close', 'aerial', 'third-corner-rear', 'side-drive',
       'fourth-corner-wide', 'fourth-corner-front', 'homestretch-side', 'front-close', 'finish-line']);
     expect(broadcastV2ShotAt(course, 1600, true).id).toBe('winner-follow');
     // 正面寄り素材が無いときは 4 角を俯瞰ワイドで代用

@@ -1,0 +1,15 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with a reference image.
+
+GOAL
+Paint a racecourse STARTING GATE seen from the FRONT (the side the horses run out of), for a 12-horse field, with the front doors CLOSED, as a cut-out element on chroma green so it can be composited onto the racecourse later.
+
+STYLE REFERENCE (read it and pass it as reference image): apps/web/public/art/starting-gate-side-v1.png
+Match its painterly high-detail style, materials (light grey-green steel frame, padded stall dividers, rubber-lined doors), and lighting (soft overcast daylight). That reference shows the same kind of gate from the side; here we need the FRONT face.
+
+REQUIREMENTS
+- Front view, camera at about the height of a horse's chest, slightly to the left of centre, so the 12 stalls recede very slightly to the right (mild perspective, almost frontal).
+- EXACTLY TWELVE (12) stalls side by side — count them: 12 doors, 12 number plates reading 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 from left to right with NO number skipped. Each stall has its front doors closed. A horizontal top rail with a subtle white/green trim. Padded dividers between stalls, the towing chassis and wheels visible below.
+- No horses, no people, no text other than the stall numbers, no logos.
+- Background: uniform flat chroma GREEN (RGB 0,255,0) everywhere behind and around the gate. No ground, no cast shadow, no sky.
+- Framing: the gate fills almost the whole width; leave a little margin left and right. Output 1536 x 1024 (landscape).
+- Produce exactly ONE image and save it as a PNG.

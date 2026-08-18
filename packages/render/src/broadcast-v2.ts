@@ -6,7 +6,8 @@ export type BroadcastV2ShotId =
   | 'backstretch-side' | 'third-corner-rear' | 'fourth-corner-high' | 'fourth-corner-front'
   | 'homestretch-side' | 'finish-line' | 'winner-follow'
   // ★中継台本 v3（アーケード参考映像に合わせた追加ショット）
-  | 'side-low' | 'side-close' | 'aerial' | 'side-drive' | 'fourth-corner-wide' | 'front-close';
+  | 'side-low' | 'side-close' | 'aerial' | 'side-drive' | 'fourth-corner-wide' | 'front-close'
+  | 'start-front';
 
 export type BroadcastV2HorseAssetRole = 'side-v6' | 'diag-front-v2' | 'diag-rear-v2' | 'high-diag-v2' | 'winner-v1';
 
@@ -82,6 +83,11 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
     // ★実際のカメラは展開で決まる（`broadcastV2FinishCamera`）: 接戦は引いて全員、単独は寄る。ここは既定値
     camera: SIDE_TELE,
     leadFraction: 0.78,
+  },
+  'start-front': {
+    // ★発走（アーケード参考映像 39〜49s）: 正面の発馬機 → 斜め前から馬群がこちらへ飛び出す。待機中は注視点をゲート付近に固定
+    id: 'start-front', view: 'diag-front', target: 'pack', horseAsset: 'diag-front-v2', transitionSec: 0.35,
+    camera: { backM: 24, upM: 2.4, sideM: 5, fovDeg: 34 },
   },
   'side-low': {
     id: 'side-low', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35, camera: SIDE_LOW,
@@ -159,7 +165,7 @@ export function broadcastV2SegmentSpan(course: Course, meters: number): { readon
  *   閃光トランジションは 3角斜め後方 → 勝負所サイドの切替（`broadcastV2FlashAt`）。
  */
 export const SCRIPT_V3: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
-  { until: 0.0375, id: 'start-follow' },        // 〜60m   発走（発馬機の正面素材ができるまで現行）
+  { until: 0.0375, id: 'start-front' },         // 〜60m   発走（正面の発馬機 → 斜め前で飛び出す）
   { until: 0.1625, id: 'side-low' },            // 〜260m  低いサイド追従
   { until: 0.2625, id: 'side-close' },          // 〜420m  寄りサイド
   { until: 0.375, id: 'aerial' },               // 〜600m  空撮
@@ -283,7 +289,7 @@ export function broadcastV2AnchorWeight(course: Course, shotId: BroadcastV2ShotI
   if (shotId === 'finish-line' || shotId === 'winner-follow') return 1;
   // ★発走: 発馬機（世界固定）が画面にある間（注視点 25m まで）だけ真の速度に一致させ、25→50m でなだらかに
   //   見た目の速度へ（オーナー指摘「ゲート後の走りがせわしない」→ ゴール前直線と同じ実速の周期にする）
-  if (shotId === 'start-follow') {
+  if (shotId === 'start-follow' || shotId === 'start-front') {
     const u = Math.max(0, Math.min(1, (focusS - 25) / 25));
     const startWeight = 1 - u * u * (3 - 2 * u);
     if (startWeight > 0) return startWeight;

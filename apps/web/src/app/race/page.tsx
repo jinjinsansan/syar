@@ -47,7 +47,7 @@ import {
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
   broadcastV2FinishStyleOf, broadcastV2StartEase, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
-  type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets,
+  type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
@@ -83,7 +83,7 @@ function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, st
   ctx.restore();
 }
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '47';
+const ASSET_VERSION = '48';
 const HORSE_GROUND_LIFTS = [55, 90, 25, 0, 0, 0, 0, 55] as const;
 /**
  * ★コーナー専用カット（3角後方・4角俯瞰）の長さ（m）。**0 = 使わない**。
@@ -553,6 +553,11 @@ export default function RacePage(): React.JSX.Element {
     texturedWorld: TexturedWorldAssets<HTMLImageElement>;
     /** ★承認水準（一体・高解像度）の方向別素材が揃っているか */
     directionalReady: { rear: boolean; front: boolean };
+    /** ★正面の発馬機（扉閉／扉開・透過）と不透明範囲。無ければ undefined */
+    gateFront?: {
+      closed: HTMLImageElement; open: HTMLImageElement;
+      closedSource: HighQualityHorseFrame['source']; openSource: HighQualityHorseFrame['source'];
+    };
   } | null>(null);
   const rafRef = useRef<number | null>(null);
   /** ★ディゾルブ用のオフスクリーン（前ショットを描く） */
@@ -659,8 +664,8 @@ export default function RacePage(): React.JSX.Element {
           plateY1: layer.plateY1,
           depthOffsetM: layer.depthOffsetM,
         })),
-        // ★決勝線・審判塔は世界に固定（worldS='finish' → 距離）
-        objects: parallaxManifest.objects.map((object, index) => ({
+        // ★決勝線・審判塔は世界に固定（worldS='finish' → 距離）。発馬機の側面切り出しは正面ビルボードに置き換えたので除外
+        objects: parallaxManifest.objects.filter((object) => !object.name.startsWith('start-')).map((object, index) => ({
           image: objectImages[index]!,
           width: objectImages[index]!.naturalWidth,
           height: objectImages[index]!.naturalHeight,
@@ -843,6 +848,10 @@ export default function RacePage(): React.JSX.Element {
         return images.every((image): image is HTMLImageElement => image !== null) ? images : undefined;
       };
       const rearV4 = await loadSet('horse-jockey-diag-rear-v4');
+      const [gateClosed, gateOpen] = await Promise.all([
+        loadImg(`/art/starting-gate-front-v1.png?v=${ASSET_VERSION}`).catch(() => null),
+        loadImg(`/art/starting-gate-front-open-v1.png?v=${ASSET_VERSION}`).catch(() => null),
+      ]);
       const frontV3 = await loadSet('horse-jockey-diag-front-v3');
       const diagFrontHighQuality = frontV3 !== undefined
         ? buildFrames(frontV3, undefined, SILKS_LAYOUT_FRONT)
@@ -865,6 +874,10 @@ export default function RacePage(): React.JSX.Element {
          */
         texturedWorld,
         directionalReady: { rear: rearV4 !== undefined, front: frontV3 !== undefined },
+        ...(gateClosed !== null && gateOpen !== null ? { gateFront: {
+          closed: gateClosed, open: gateOpen,
+          closedSource: opaqueBounds(gateClosed), openSource: opaqueBounds(gateOpen),
+        } } : {}),
         ...(composedWinner !== undefined ? {
           // ★合成勝馬: 馬体は側面走り 8 コマそのもの（伸縮なし）、騎手はガッツポーズ 2 姿勢
           winnerCycleHighQuality: buildFrames(composedWinner, undefined, SILKS_LAYOUT_WINNER),
@@ -1116,6 +1129,18 @@ export default function RacePage(): React.JSX.Element {
           : undefined,
         // ★横視点以外（コーナー後方・俯瞰・斜め前）はテクスチャ付き透視ワールド（背景が実際に動く）
         texturedWorld: sceneToDraw.shot.view === 'side' ? undefined : art.texturedWorld,
+        /**
+         * ★正面の発馬機ビルボード（走路 s=1.6・w 0.5〜15.3）。待機中は扉閉を馬の手前に（馬は見えない）、
+         *   開扉後は扉開を馬の後ろに。発走 60m を過ぎたら描かない。
+         */
+        worldBillboards: art.gateFront !== undefined && visualLead < 90 ? [{
+          image: raceD <= 0 ? art.gateFront.closed : art.gateFront.open,
+          width: (raceD <= 0 ? art.gateFront.closed : art.gateFront.open).naturalWidth,
+          height: (raceD <= 0 ? art.gateFront.closed : art.gateFront.open).naturalHeight,
+          source: raceD <= 0 ? art.gateFront.closedSource : art.gateFront.openSource,
+          worldS: 1.6, worldW: 0.5, widthM: 14.8,
+          zOrder: raceD <= 0 ? 'front' : 'behind',
+        } satisfies WorldBillboard<HTMLImageElement>] : undefined,
       });
       drawScene(ctx, scene);
       if (change !== undefined && FLASH_INTO.has(change.to)) {

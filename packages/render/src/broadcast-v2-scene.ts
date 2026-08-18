@@ -1,7 +1,7 @@
 import { posOf, type Course } from './course.js';
 import type { Ctx2D, Palette, SheetSpec } from './oblique-draw.js';
 import { cameraBasis, project } from './perspective.js';
-import { drawParallaxObjects, drawParallaxPlate, type ParallaxDrawOptions, type ParallaxPlate } from './parallax-plate.js';
+import { drawParallaxObjects, drawParallaxPlate, drawWorldBillboards, type ParallaxDrawOptions, type ParallaxPlate, type WorldBillboard } from './parallax-plate.js';
 import { drawTexturedWorld, type TexturedWorldAssets } from './world-textured.js';
 import {
   broadcastCamera,
@@ -158,7 +158,7 @@ export function resolveBroadcastV2Scene(
     const projected = project(probeCam, cameraBasis(probeCam), { x: probe.x, y: probe.y, z: 0 });
     const halfFrameM = projected.pxPerM > 0 ? (viewport.width / 2) / projected.pxPerM : Number.POSITIVE_INFINITY;
     focusS = broadcastV2LeadFrameFocusMeters(focusMeters, halfFrameM, leadFraction);
-    if (shot.id === 'start-follow' && options.raceDisplaySec !== undefined) {
+    if ((shot.id === 'start-follow' || shot.id === 'start-front') && options.raceDisplaySec !== undefined) {
       focusS = broadcastV2StartFocus(focusS, options.raceDisplaySec);
     }
   }
@@ -214,8 +214,16 @@ export function drawBroadcastV2Scene<TImage>(
      *   `parallaxPlate` / `backgroundPlate` より優先。
      */
     readonly texturedWorld?: TexturedWorldAssets<TImage> | undefined;
+    /** ★世界に置く看板（発馬機の正面など）。どちらの描画方式でも同じ透視カメラで置く */
+    readonly worldBillboards?: readonly WorldBillboard<TImage>[] | undefined;
   },
 ): void {
+  const basisForObjects = cameraBasis(scene.camera);
+  const projectGround = (s: number, w: number): { readonly x: number; readonly y: number; readonly depth: number } => {
+    const p = posOf(course, s, w);
+    const q = project(scene.camera, basisForObjects, { x: p.x, y: p.y, z: 0 });
+    return { x: q.x, y: q.y, depth: q.depth };
+  };
   let parallaxOpts: ParallaxDrawOptions | undefined;
   if (opts.texturedWorld !== undefined) {
     drawTexturedWorld(ctx, course, scene.camera, opts.texturedWorld);
@@ -261,6 +269,7 @@ export function drawBroadcastV2Scene<TImage>(
       course.distance, scene.focusS, { surface: opts.surface, condition: opts.condition },
     );
   }
+  if (opts.worldBillboards !== undefined) drawWorldBillboards(ctx, opts.worldBillboards, projectGround, 'behind', scene.camera.width);
   const library = opts.libraries[scene.shot.horseAsset];
   /**
    * ★方向別素材の選択: 馬ごとの「進行方向とカメラの相対角」で集合を選ぶ（俯瞰でも後方でも、その馬が
@@ -294,4 +303,5 @@ export function drawBroadcastV2Scene<TImage>(
   if (opts.parallaxPlate !== undefined && parallaxOpts !== undefined) {
     drawParallaxObjects(ctx, opts.parallaxPlate.plate, parallaxOpts, 'front');
   }
+  if (opts.worldBillboards !== undefined) drawWorldBillboards(ctx, opts.worldBillboards, projectGround, 'front', scene.camera.width);
 }
