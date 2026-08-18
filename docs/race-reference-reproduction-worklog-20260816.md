@@ -358,3 +358,9 @@
 - 憲法 §0.1 対応: 表示用の競馬場名・レース名を実在名のプレースホルダーから架空名（`RACE_META`）へ置換、タイトル素材のファイル名も実在地名を含まない名前へ変更。
 - 馬の作り直し議論を `docs/race-horse-art-options-20260819.md` に記録（A 毛色バリエーション／B 写実寄り描き直し／C 複数モデル／D 3D 化）。A・B 採用（オーナー OK）。
 - **A 実装**: 描画時に馬体へ CSS filter（色相・明度・彩度）を掛ける `coatFilterOf`（鹿毛／栗毛／黒鹿毛／青鹿毛／芦毛、ゲート番号から決定論）。勝負服オーバーレイと影には掛けない。素材は不変。
+
+## 2026-08-19 HUD のデザインシステム（Claude Design）を開始
+
+- Claude Design に新規デザインシステム「STAR レース中継 HUD」を作成し、`design/hud-ds/` のプレビュー（Tokens／区間タグ／順位パネル／実況帯／勝馬テロップ／着順ボード／ミニマップ／タイトル）を同期。
+  `node design/hud-ds/build.mjs` で HTML を再生成 → DesignSync で `tokens/**`, `components/**` を上書きする運用。
+- 目的: HUD の見た目を Claude Design 上で合意してから、Canvas 実装（`packages/render/src/oblique-ui.ts` 等）へ反映する。馬の走り（B 案）は Codex 再開待ち（8/20 14:13）。
