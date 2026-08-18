@@ -1,0 +1,254 @@
+import { posOf, type Course } from './course.js';
+import type { Ctx2D } from './oblique-draw.js';
+import { cameraBasis, horizonY, project, type PerspectiveCamera } from './perspective.js';
+
+/**
+ * ★**テクスチャ付き透視ワールド**（コーナー・斜め・後方などカメラが横向きでないショット用）。
+ *
+ * 1 枚絵のコーナー背景は前後方向へ流せない（ユーザー指摘「背景が止まる」）。ここでは
+ *   - 地面: 承認済みプレートの芝タイル（2 方向ループ）を**走査線ごとに透視で貼る**（いわゆる mode-7）。
+ *     カメラが進めば芝が正しい遠近で流れ、旋回すれば地面が回る。
+ *   - ラチ・支柱: コース形状（曲率）から透視投影で描く（プレートと同じ白ラチ・緑支柱）。
+ *   - 遠景: プレート上部（樹木・スタンド・生垣）の帯を地平線に貼り、カメラの向き（heading）でゆっくり流す。
+ * 馬は従来どおり `drawPerspectiveHorses` が同じカメラで描くので、地面と馬の速さは一致する。
+ *
+ * ⚠️ 乱数・時刻は使わない。カメラと世界座標だけの関数（憲法4）。
+ */
+export interface WorldStripTexture<TImage> {
+  readonly image: TImage;
+  readonly width: number;
+  readonly height: number;
+  /** テクスチャの横方向 px/m（実寸に対する密度） */
+  readonly pxPerM: number;
+}
+
+export interface TexturedWorldAssets<TImage> {
+  readonly turf: { readonly image: TImage; readonly width: number; readonly height: number; readonly pxPerM: number };
+  /** 遠景の帯（横ループ）。`horizonY` は帯の中で地面が始まる行 */
+  readonly panorama: { readonly image: TImage; readonly width: number; readonly height: number; readonly horizonY: number };
+  /**
+   * ★コース沿いの立体帯（世界座標に置き、カメラと一緒に正しく流れる）。
+   *   hedge: 外ラチ・内ラチの外の生垣（低い）、trees: その外側の樹林帯（高い）、stand: 直線の観客席
+   */
+  readonly scenery?: {
+    readonly hedge?: WorldStripTexture<TImage>;
+    readonly trees?: WorldStripTexture<TImage>;
+    readonly stand?: WorldStripTexture<TImage>;
+  } | undefined;
+}
+
+export interface TexturedWorldOptions {
+  /** 内ラチの外側（内馬場）と外ラチの外側を暗くする量（0〜1） */
+  readonly outsideDarken?: number;
+}
+
+const wrap = (a: number, n: number): number => ((a % n) + n) % n;
+
+export function drawTexturedWorld<TImage>(
+  ctx: Ctx2D<TImage>,
+  course: Course,
+  cam: PerspectiveCamera,
+  assets: TexturedWorldAssets<TImage>,
+  opts: TexturedWorldOptions = {},
+): void {
+  const basis = cameraBasis(cam);
+  const W = cam.width, H = cam.height;
+  const hz = horizonY(cam, basis);
+  const focal = basis.focal;
+  // 水平な前方・右方向（roll 無し前提。right は水平）
+  const fwdFlatLen = Math.hypot(basis.fwd.x, basis.fwd.y) || 1;
+  const fwdFlat = { x: basis.fwd.x / fwdFlatLen, y: basis.fwd.y / fwdFlatLen };
+  const right = basis.right;
+  const heading = Math.atan2(fwdFlat.y, fwdFlat.x);
+
+  // ── 遠景: 地平線に帯を貼る。空はその上を帯の最上段の色で塗る ─────────────
+  const pano = assets.panorama;
+  const fovRad = cam.fovY * (W / H); // 横画角（近似）
+  const panoScale = 0.36 * H / pano.horizonY;              // 帯の地面線までを画面高の 36% に
+  const panoW = pano.width * panoScale;
+  const panoTop = hz - pano.horizonY * panoScale;
+  const panoH = pano.height * panoScale;
+  // カメラの向き 1 ラジアンあたり、帯を横画角に対する比で流す（旋回で遠景がパンする）
+  const panoShift = wrap(-(heading / fovRad) * W, panoW);
+  ctx.fillStyle = '#9aa3ad';
+  ctx.fillRect(0, 0, W, Math.max(0, Math.ceil(panoTop) + 1));
+  for (let x = -panoShift - panoW; x < W; x += panoW) {
+    ctx.drawImage(pano.image, 0, 0, pano.width, pano.height, x, panoTop, panoW + 1, panoH + 1);
+  }
+
+  // ── 地面: 走査線ごとに芝タイルを貼る ────────────────────────────────
+  const turf = assets.turf;
+  const tileM = turf.width / turf.pxPerM;      // タイル 1 枚の実寸（m）
+  const tileHM = turf.height / turf.pxPerM;
+  const eye = cam.eye;
+  const yStart = Math.max(0, Math.floor(hz) + 1);
+  for (let y = yStart; y < H; y += 1) {
+    // 画面中央列の視線が地面に当たる距離
+    const b = (H / 2 - (y + 0.5)) / focal;
+    const dirZ = basis.fwd.z + basis.up.z * b;
+    if (dirZ >= -1e-6) continue;                 // 地平線より上
+    const t = -eye.z / dirZ;                     // 視線パラメータ（= カメラ前方距離）
+    const px = eye.x + (basis.fwd.x + basis.up.x * b) * t;
+    const py = eye.y + (basis.fwd.y + basis.up.y * b) * t;
+    const mPerPx = t / focal;                    // この行で画面 1px が地面何 m か（right 方向）
+    // テクスチャ座標（タイル単位）: u は right 方向、v は前方
+    const uC = (px * right.x + py * right.y) / tileM;
+    const v = (px * fwdFlat.x + py * fwdFlat.y) / tileHM;
+    const kTile = mPerPx / tileM;                // 画面 1px あたりのタイル数
+    const srcPerPx = kTile * turf.width;         // 画面 1px あたりの元画像 px
+    const sy = wrap(v * turf.height, turf.height);
+    // 左端のテクスチャ x
+    let u0px = wrap((uC - (W / 2) * kTile) * turf.width, turf.width);
+    let x = 0;
+    // ★遠い行ほど 1px に多くの元画素が入る。sw を刻んで複数回描く（タイル境界で分割）
+    while (x < W) {
+      const remainSrc = turf.width - u0px;
+      const spanPx = Math.max(1, Math.min(W - x, remainSrc / srcPerPx));
+      const sw = spanPx * srcPerPx;
+      ctx.drawImage(turf.image, u0px, sy, sw, 1, x, y, spanPx + 0.5, 1);
+      x += spanPx;
+      u0px = 0;
+    }
+  }
+
+  // ── 遠くの地面ほど霞む（空気遠近）: 地平線から 140px を上向きに薄く ─────────
+  {
+    const hazeH = Math.min(H, 140);
+    for (let i = 0; i < hazeH; i += 2) {
+      const yy = Math.floor(hz) + i;
+      if (yy < 0 || yy >= H) continue;
+      ctx.globalAlpha = 0.34 * (1 - i / hazeH) * (1 - i / hazeH);
+      ctx.fillStyle = '#b7c1c6';
+      ctx.fillRect(0, yy, W, 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ── 内馬場・外側を少し暗くして走路を読ませる（台形で塗る） ─────────────
+  const darken = opts.outsideDarken ?? 0.28;
+  const P = (s: number, w: number, z = 0): ReturnType<typeof project> => {
+    const p = posOf(course, s, w);
+    return project(cam, basis, { x: p.x, y: p.y, z });
+  };
+  const NEAR = -400, FAR = course.distance + 400;
+  const band = (w0: number, w1: number, alpha: number, step = 10): void => {
+    ctx.fillStyle = '#12220f';
+    ctx.globalAlpha = alpha;
+    for (let s = NEAR; s < FAR; s += step) {
+      const s2 = Math.min(s + step, FAR);
+      const a = P(s, w0), b2 = P(s2, w0), c = P(s2, w1), d = P(s, w1);
+      // ★遠い側（w1 が大きく外へ出る側）はカメラの後ろに回りやすい。1 点でも後ろなら飛ばすが、
+      //   近い側の 2 点が前にあれば w1 を近づけて描く（隅を抜かさない）
+      if (a.depth <= 1 || b2.depth <= 1) continue;
+      let cc = c, dd = d;
+      if (cc.depth <= 1 || dd.depth <= 1) {
+        const wMid = w0 + (w1 - w0) * 0.25;
+        cc = P(s2, wMid); dd = P(s, wMid);
+        if (cc.depth <= 1 || dd.depth <= 1) continue;
+      }
+      if (Math.max(a.x, b2.x, cc.x, dd.x) < -20 || Math.min(a.x, b2.x, cc.x, dd.x) > W + 20) continue;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y); ctx.lineTo(cc.x, cc.y); ctx.lineTo(dd.x, dd.y);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  };
+  const WD = course.widthM;
+  // ★内外を暗くする代わりに、走路だけを少し明るく（台形が裏返らない範囲）。全体を先に薄く落とす
+  ctx.globalAlpha = darken * 0.5;
+  ctx.fillStyle = '#12220f';
+  ctx.fillRect(0, Math.max(0, Math.floor(hz)), W, H);
+  ctx.globalAlpha = 1;
+  const trackBand = (alpha: number): void => {
+    ctx.fillStyle = '#9ccb55';
+    ctx.globalAlpha = alpha;
+    for (let s = NEAR; s < FAR; s += 8) {
+      const s2 = Math.min(s + 8, FAR);
+      const a = P(s, 0), b2 = P(s2, 0), c = P(s2, WD), d = P(s, WD);
+      if (a.depth <= 1 || b2.depth <= 1 || c.depth <= 1 || d.depth <= 1) continue;
+      if (Math.max(a.x, b2.x, c.x, d.x) < -20 || Math.min(a.x, b2.x, c.x, d.x) > W + 20) continue;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  };
+  void band;
+  trackBand(darken * 0.55);
+
+  // ── コース沿いの立体帯（生垣・樹林・スタンド）: 縦の看板状の帯を s 方向に細かく刻んで貼る ───────
+  const strip = (tex: WorldStripTexture<TImage>, w: number, heightM: number, sFrom: number, sTo: number, stepM: number, alpha = 1, minDepth = 14): void => {
+    ctx.globalAlpha = alpha;
+    const slices: { readonly depth: number; readonly draw: () => void }[] = [];
+    let s0 = sFrom;
+    while (s0 < sTo) {
+      // ★近いほど細かく刻む（階段状に見えない）。極端に近い帯（カメラ脇）は描かない
+      const probe = P(s0, w, 0);
+      const step = probe.depth > 1.5 ? Math.max(0.35, Math.min(stepM, probe.depth / 60)) : stepM;
+      const s1 = Math.min(sTo, s0 + step);
+      const b0 = P(s0, w, 0), b1 = P(s1, w, 0), t0 = P(s0, w, heightM), t1 = P(s1, w, heightM);
+      s0 = s1;
+      if (b0.depth <= minDepth || b1.depth <= minDepth) continue;
+      const xl = Math.min(b0.x, b1.x), xr = Math.max(b0.x, b1.x);
+      if (xr < -4 || xl > W + 4) continue;
+      const top = (t0.y + t1.y) / 2, bottom = (b0.y + b1.y) / 2;
+      const dh = bottom - top;
+      if (dh < 0.5 || dh > H * 0.9) continue;   // 極端に近い（画面いっぱいの）帯は描かない
+      const sSlice = s1 - step;
+      const sx = wrap(sSlice * tex.pxPerM, tex.width);
+      const sw = Math.max(1, Math.min(tex.width - sx, step * tex.pxPerM));
+      slices.push({ depth: (b0.depth + b1.depth) / 2, draw: () => {
+        ctx.drawImage(tex.image, sx, 0, sw, tex.height, xl, top, Math.max(1, xr - xl) + 0.7, dh);
+      } });
+    }
+    // 遠い順に描く（近い帯が手前に重なる）
+    slices.sort((a, b) => b.depth - a.depth);
+    for (const slice of slices) slice.draw();
+    ctx.globalAlpha = 1;
+  };
+  const scenery = assets.scenery;
+  if (scenery !== undefined) {
+    const sFrom = NEAR, sTo = FAR;
+    // 樹林帯（遠い・高い）: 内外とも
+    // ★樹林帯は遠景（100m 以遠）だけ。近くで斜めから見ると板状に割れる。望遠（fov<12°）では遠景パノラマに任せる
+    const tele = cam.fovY < (12 * Math.PI) / 180;
+    if (scenery.trees !== undefined && !tele) {
+      strip(scenery.trees, WD + 34, 9, sFrom, sTo, 6, 0.96, 100);
+      strip(scenery.trees, -38, 8, sFrom, sTo, 6, 0.96, 100);
+    }
+    // 直線の観客席（外側・ゴール前 450m）
+    if (scenery.stand !== undefined) {
+      strip(scenery.stand, WD + 16, 9, Math.max(sFrom, course.distance - 480), course.distance + 40, 4, 1, 40);
+    }
+    // 生垣（低い）: 外ラチの外側と内ラチの内側
+    if (scenery.hedge !== undefined) {
+      strip(scenery.hedge, WD + 3.5, 1.3, sFrom, sTo, 2.5);
+      strip(scenery.hedge, -4, 1.1, sFrom, sTo, 2.5);
+    }
+  }
+
+  // ── ラチ: 白い横木 2 本と緑の支柱（プレートの意匠に合わせる） ─────────────
+  const rail = (w: number, postEveryM: number, postH: number, near: boolean): void => {
+    for (const [height, width, color] of [[postH * 0.55, 1.6, '#c9cbc4'], [postH, 3.2, '#e6e6e0']] as const) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      let started = false;
+      for (let s = NEAR; s <= FAR; s += 5) {
+        const p = P(s, w, height);
+        if (p.depth <= 1 || p.x < -200 || p.x > W + 200) { started = false; continue; }
+        if (!started) { ctx.moveTo(p.x, p.y); started = true; } else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = near ? '#3f6b4c' : '#4a7455';
+    for (let s = Math.floor(NEAR / postEveryM) * postEveryM; s <= FAR; s += postEveryM) {
+      const a = P(s, w, 0), b2 = P(s, w, postH);
+      if (a.depth <= 1 || a.x < -40 || a.x > W + 40) continue;
+      ctx.lineWidth = Math.max(1, a.pxPerM * 0.09);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y); ctx.stroke();
+    }
+  };
+  rail(0, 6, 1.1, false);          // 内ラチ
+  rail(WD, 6, 1.1, true);          // 外ラチ
+}

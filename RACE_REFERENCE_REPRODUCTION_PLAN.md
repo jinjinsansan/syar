@@ -247,3 +247,6 @@ PositionModel + Course + display time
 5. 固定シード42・1600mの比較レンダー。
 
 方向別素材の本制作は、この基盤で必要な方向と表示寸法が確定してから開始する。
+# 承認済みビジュアル品質基準
+
+2026-08-17以降、発馬背景`apps/web/public/art/starting-gate-side-v1.png`の画風・密度・質感をレース映像全体の基準とする。馬、騎手、コース、設備の刷新では`docs/race-visual-quality-standard.md`を必ず参照し、1カットずつユーザー目視承認を得る。

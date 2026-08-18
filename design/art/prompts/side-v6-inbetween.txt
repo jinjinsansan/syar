@@ -1,0 +1,15 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with reference images.
+
+GOAL
+Create ONE in-between frame of a racehorse gallop cycle: the pose exactly HALFWAY between two existing consecutive frames, so the 8-frame cycle becomes a smoother 16-frame cycle.
+
+REFERENCE FILES (read them and pass BOTH as reference images to the image generation tool)
+- Frame A (the pose just before): apps/web/public/art/horse-jockey-side-v6-pose{A}.png
+- Frame B (the pose just after):  apps/web/public/art/horse-jockey-side-v6-pose{B}.png
+
+REQUIREMENTS
+- Same horse (bay coat, black mane and tail, white saddle cloth), same jockey (grey/white silks, crouched racing position, same helmet), same painterly high-detail style, same lighting and shadowing, same side view facing RIGHT, same scale and framing as frames A and B.
+- The pose must be the physically correct MIDPOINT of the gallop between A and B: every leg joint angle, the neck/head position, the back arch, the tail, and the jockey's body must be halfway between A and B. Do not copy A or B; do not invent a new phase. Four legs, correct anatomy, no extra limbs, hooves and legs clearly separated.
+- Keep the horse's barrel (rib cage / saddle area) at the same position and size within the frame as in A and B, so the frames play back without the body sliding.
+- Background: uniform flat chroma GREEN (RGB 0,255,0), no ground, no cast shadow, no text, no border. The subject must not contain that green.
+- Output 1536 x 1024 (landscape). Produce exactly ONE image and save it as a PNG.

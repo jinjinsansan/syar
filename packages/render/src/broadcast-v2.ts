@@ -1,0 +1,317 @@
+import { segmentStarts, type Course } from './course.js';
+import type { ShotCameraPreset, ShotTarget, ShotView } from './shot-sequence.js';
+
+export type BroadcastV2ShotId =
+  | 'start-follow' | 'first-corner-front' | 'second-corner-high'
+  | 'backstretch-side' | 'third-corner-rear' | 'fourth-corner-high' | 'fourth-corner-front'
+  | 'homestretch-side' | 'finish-line' | 'winner-follow';
+
+export type BroadcastV2HorseAssetRole = 'side-v6' | 'diag-front-v2' | 'diag-rear-v2' | 'high-diag-v2' | 'winner-v1';
+
+export interface BroadcastV2Shot {
+  readonly id: BroadcastV2ShotId;
+  readonly view: ShotView;
+  readonly target: ShotTarget;
+  readonly horseAsset: BroadcastV2HorseAssetRole;
+  readonly transitionSec: number;
+  readonly camera: ShotCameraPreset;
+  /** 馬群が画面に収まらないとき、先頭を画面幅のどこに置くか（0〜1・進行方向側が 1）。既定 0.78 */
+  readonly leadFraction?: number;
+  /**
+   * ★固定カメラ（JRA 中継の 4 角: 直線入口の外側から、奥からこちらへ向かってくる馬群を見る）。
+   *   現在の区間の終点から `sFromSegmentEnd` 先・内ラチから `w` の位置・高さ `upM` にカメラを置き、注視点だけ追う。
+   */
+  readonly fixedCamera?: { readonly sFromSegmentEnd: number; readonly w: number; readonly upM: number };
+}
+
+/**
+ * ★横追従は**望遠**で撮る（参考映像 6〜25 秒: 馬＋騎手の高さが画面高の 30〜34%）。
+ *   旧 backM 29 / fov 30° では馬が画面高の 16%（116px）で、背景の画質に対して馬だけ粗く小さく見えた。
+ *   望遠（fov 12°・44m）にすると px/m ≈ 77 → 馬 ≈ 190px（26%）で、前列と後列の大きさの差は 1.3 倍以内に収まる。
+ *   （寄りのカメラで同じ大きさにすると前列/後列が 3 倍違い、参考の「3〜12%」から外れる）
+ */
+const SIDE_TELE: ShotCameraPreset = { backM: 44, upM: 6, sideM: 9, fovDeg: 12 };
+
+const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
+  'start-follow': {
+    id: 'start-follow', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
+    // ★実際のカメラは `broadcastV2StartCamera`（発馬機の絵に合わせた構図 → 望遠横追従へ連続移行）
+    camera: SIDE_TELE,
+  },
+  'first-corner-front': {
+    id: 'first-corner-front', view: 'diag-front', target: 'pack', horseAsset: 'diag-front-v2', transitionSec: 0.4,
+    camera: { backM: 25, upM: 8.5, sideM: 10, fovDeg: 30 },
+  },
+  'second-corner-high': {
+    id: 'second-corner-high', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.4,
+    camera: { backM: 31, upM: 15, sideM: 12, fovDeg: 34 },
+  },
+  'backstretch-side': {
+    id: 'backstretch-side', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
+    camera: SIDE_TELE,
+  },
+  'third-corner-rear': {
+    id: 'third-corner-rear', view: 'diag-rear', target: 'pack', horseAsset: 'diag-rear-v2', transitionSec: 0.4,
+    // ★透視ワールド用: 地平線（遠景の帯）が画面上部 ≈15% に入る高さ・画角
+    // 地平線が画面の約 25% に来る（遠景のスタンド・樹木が見える）
+    camera: { backM: 44, upM: 5.5, sideM: 10, fovDeg: 23 },
+  },
+  'fourth-corner-high': {
+    id: 'fourth-corner-high', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.4,
+    // 地平線が画面の約 20% に来る
+    camera: { backM: 40, upM: 6.5, sideM: 13, fovDeg: 34 },
+  },
+  'fourth-corner-front': {
+    id: 'fourth-corner-front', view: 'diag-front', target: 'pack', horseAsset: 'diag-front-v2', transitionSec: 0.4,
+    // ★JRA 中継の 4 角: 直線入口の外側・高さ 9m の固定カメラ。馬群が奥から手前へ向かってくる
+    // fovDeg は上限（距離に応じて自動ズーム: `broadcastV2FixedFov`）
+    camera: { backM: 60, upM: 7, sideM: 12, fovDeg: 24 },
+    fixedCamera: { sFromSegmentEnd: 30, w: 27, upM: 7 },
+  },
+  'homestretch-side': {
+    id: 'homestretch-side', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
+    camera: SIDE_TELE,
+  },
+  'finish-line': {
+    id: 'finish-line', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.3,
+    // ★実際のカメラは展開で決まる（`broadcastV2FinishCamera`）: 接戦は引いて全員、単独は寄る。ここは既定値
+    camera: SIDE_TELE,
+    leadFraction: 0.78,
+  },
+  'winner-follow': {
+    id: 'winner-follow', view: 'side', target: 'winner', horseAsset: 'winner-v1', transitionSec: 0.4,
+    // 勝馬は一回り寄る（画面高の約 35%）
+    camera: { backM: 34, upM: 5, sideM: 7, fovDeg: 12 },
+  },
+};
+
+/**
+ * ★コーナー専用カット（斜め前・俯瞰・斜め後方）はコーナー**冒頭のこの距離だけ**入れる。
+ *   コーナー用の背景は 1 枚絵で、馬の速さで流せない（横構図のようにループ層へ分解できない）。
+ *   3 秒程度のカットならパン＋ズームで持つが、14〜20 秒の静止背景は「その場走り」になる（ユーザー指摘）。
+ *   残りは横追従（パララックス）に戻し、区間名は HUD が示す。
+ */
+export const CORNER_CUT_M = 70;
+
+function segmentAtWithStart(course: Course, meters: number): { readonly label: string; readonly start: number } {
+  let found = { label: '', start: 0 };
+  for (const boundary of segmentStarts(course)) {
+    if (boundary.s <= meters) found = { label: boundary.label, start: boundary.s };
+  }
+  return found;
+}
+
+/** コーナー専用カットの進行率（0→1）。カット外は 0 */
+export function broadcastV2CutProgress(course: Course, leaderMeters: number, cornerCutM = CORNER_CUT_M): number {
+  if (cornerCutM <= 0) return 0;
+  const seg = segmentAtWithStart(course, Math.max(0, leaderMeters));
+  if (!seg.label.includes('角')) return 0;
+  return Math.max(0, Math.min(1, (leaderMeters - seg.start) / cornerCutM));
+}
+
+/**
+ * @param cornerCutM コーナー専用カットの長さ（m）。0 でカット無し（コーナーも横追従のまま）。
+ *   ★方向別 8 コマ（後方・俯瞰）が承認水準に達するまで、Web は 0 で運用する（ユーザー指摘③④）。
+ */
+/** 現在の区間の始点と終点（m） */
+export function broadcastV2SegmentSpan(course: Course, meters: number): { readonly start: number; readonly end: number; readonly label: string } {
+  let start = 0, end = course.distance, label = '';
+  const starts = segmentStarts(course);
+  for (let i = 0; i < starts.length; i += 1) {
+    const b = starts[i]!;
+    if (b.s <= meters) { start = b.s; label = b.label; end = starts[i + 1]?.s ?? course.distance; }
+  }
+  return { start, end, label };
+}
+
+export function broadcastV2ShotAt(
+  course: Course, leaderMeters: number, allFinished = false, cornerCutM = CORNER_CUT_M,
+  options: { readonly fourthCornerFront?: boolean | undefined } = {},
+): BroadcastV2Shot {
+  if (allFinished) return SHOTS['winner-follow'];
+  const left = course.distance - leaderMeters;
+  if (left <= 80) return SHOTS['finish-line'];
+  const seg = segmentAtWithStart(course, Math.max(0, leaderMeters));
+  const label = seg.label;
+  const inCut = cornerCutM > 0 && leaderMeters - seg.start < cornerCutM;
+  if (label.includes('1角')) return inCut ? SHOTS['first-corner-front'] : SHOTS['backstretch-side'];
+  if (label.includes('2角')) return inCut ? SHOTS['second-corner-high'] : SHOTS['backstretch-side'];
+  if (label === '向正面') return SHOTS['backstretch-side'];
+  if (label.includes('3角')) return inCut ? SHOTS['third-corner-rear'] : SHOTS['backstretch-side'];
+  if (label.includes('4角')) {
+    if (!inCut) return SHOTS['homestretch-side'];
+    return options.fourthCornerFront === true ? SHOTS['fourth-corner-front'] : SHOTS['fourth-corner-high'];
+  }
+  if (label === '直線') return SHOTS['homestretch-side'];
+  return SHOTS['start-follow'];
+}
+
+/** id からショット定義を引く（ディゾルブで直前ショットを描くとき用） */
+export function broadcastV2ShotById(id: BroadcastV2ShotId): BroadcastV2Shot {
+  return SHOTS[id];
+}
+
+/** ★HUD の区間名。ショット選択と**同じ区間定義**から出す（別定義だと「第1コーナー」表示中に向正面ショット、が起きた） */
+export function broadcastV2SectionLabel(course: Course, leaderMeters: number, shotId: BroadcastV2ShotId): string {
+  if (shotId === 'winner-follow') return 'レース確定';
+  if (shotId === 'finish-line') return 'ゴール前';
+  const label = segmentAtWithStart(course, Math.max(0, leaderMeters)).label;
+  if (label.includes('1角')) return '第1コーナー';
+  if (label.includes('2角')) return '第2コーナー';
+  if (label === '向正面') return '向正面';
+  if (label.includes('3角')) return '第3コーナー';
+  if (label.includes('4角')) return '第4コーナー';
+  if (label === '直線') return '最後の直線';
+  return 'スタート後';
+}
+
+/** 外れた後方馬や単独先頭でカメラが振られない、中央80%の平均注視距離。 */
+export function broadcastV2FocusMeters(meters: readonly number[]): number {
+  if (meters.length === 0) return 0;
+  const sorted = [...meters].sort((a, b) => a - b);
+  const trim = sorted.length >= 10 ? 1 : 0;
+  const kept = sorted.slice(trim, sorted.length - trim);
+  return kept.reduce((sum, value) => sum + value, 0) / kept.length;
+}
+
+/** 全馬群を映すショットでは先頭と最後尾を等距離に置き、単独先頭を切らない。 */
+export function broadcastV2RangeCenterMeters(meters: readonly number[]): number {
+  if (meters.length === 0) return 0;
+  let min = meters[0]!;
+  let max = meters[0]!;
+  for (const value of meters.slice(1)) { min = Math.min(min, value); max = Math.max(max, value); }
+  return (min + max) / 2;
+}
+
+/**
+ * ★馬群が画面幅より広いとき、先頭を画面内（進行方向側の約 78%）に置く注視距離。
+ *   参考映像の横追従は先頭集団を画面いっぱいに映し、後方は画面外に出る（全頭を収めるために引かない）。
+ *   馬群が画面に収まるときは従来どおり先頭と最後尾の中点。
+ * @param halfFrameM 画面の半幅（m）＝ (画面幅/2) / 注視点の px/m
+ */
+export function broadcastV2LeadFrameFocusMeters(
+  meters: readonly number[], halfFrameM: number, leadFraction = 0.78,
+): number {
+  if (meters.length === 0) return 0;
+  const centre = broadcastV2RangeCenterMeters(meters);
+  let min = meters[0]!, max = meters[0]!;
+  for (const value of meters) { min = Math.min(min, value); max = Math.max(max, value); }
+  void min;
+  if (!Number.isFinite(halfFrameM)) return centre;
+  // 先頭を画面幅の leadFraction の位置に: 注視点 = 先頭 − 半幅 × (2·leadFraction − 1)
+  const lead = max - halfFrameM * (2 * leadFraction - 1);
+  /**
+   * ★しきい値で切り替えると、馬群が広がった瞬間にカメラが跳ぶ（実測 0.25 秒で 3.5m）。
+   *   max(中点, 先頭基準) は連続: 馬群が狭いうちは中点、広がるほど先頭基準に自然に移る。
+   */
+  return Math.max(centre, lead);
+}
+
+/**
+ * ★世界に固定した物体（決勝線・審判塔）を映すショットでは、背景の流れを馬の真の位置に一致させる重み。
+ *   1 = 完全に一致（ゴール前・勝馬追従）、0 = 見た目の速度（時間圧縮を打ち消した実速度）で流してよい。
+ *   ゴール前 80m の手前 80m（残り 160→80m）で滑らかに 0→1 にし、流速の段差を作らない。
+ */
+export function broadcastV2AnchorWeight(course: Course, shotId: BroadcastV2ShotId, focusS: number): number {
+  if (shotId === 'finish-line' || shotId === 'winner-follow') return 1;
+  // ★発走: 発馬機（世界固定）が見える 60m は真の速度に一致させ、60→120m でなだらかに見た目の速度へ
+  if (shotId === 'start-follow') {
+    const u = Math.max(0, Math.min(1, (focusS - 60) / 60));
+    const startWeight = 1 - u * u * (3 - 2 * u);
+    if (startWeight > 0) return startWeight;
+  }
+  const left = course.distance - focusS;
+  const t = Math.max(0, Math.min(1, (160 - left) / 80));
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * ★発走のカメラ（ゲート待機〜発走直後）。承認済み発馬機プレートの遠近（右端が手前で大きく、左へ奥に受ける）に
+ *   合わせて探索した構図: 発馬機の**後方**から前を向く（alongM +30）・低い（3m）・遠い望遠（70m・7°）。
+ *   発走後 1.0〜3.5 秒で望遠横追従 `SIDE_TELE` へ連続的に移る（カット無し）。
+ */
+export const START_CAMERA: ShotCameraPreset = { backM: 70, upM: 3, sideM: 9, fovDeg: 7, alongM: 30 };
+export function broadcastV2StartCamera(raceDisplaySec: number): ShotCameraPreset {
+  const t = Math.max(0, Math.min(1, (raceDisplaySec - 1.0) / 2.5));
+  const k = t * t * (3 - 2 * t);
+  const mix = (a: number, b: number): number => a + (b - a) * k;
+  return {
+    backM: mix(START_CAMERA.backM, SIDE_TELE.backM),
+    upM: mix(START_CAMERA.upM, SIDE_TELE.upM),
+    sideM: SIDE_TELE.sideM,
+    fovDeg: mix(START_CAMERA.fovDeg, SIDE_TELE.fovDeg),
+    alongM: mix(START_CAMERA.alongM ?? 0, SIDE_TELE.sideM * 0.25),
+  };
+}
+
+/**
+ * ★発走の注視点: 待機中はゲート付近（`holdS`）に固定し、発走後 `blendSec` で馬群追従へ滑らかに移す（カット無し）。
+ *   `holdS`=4m は START_CAMERA で 12 枠が画面 x≈118〜585 に並ぶ距離（発馬機プレートの枠位置と一致）。
+ */
+export function broadcastV2StartFocus(
+  packFocusS: number, raceDisplaySec: number, blendSec = 1.5, holdS = 4,
+): number {
+  if (raceDisplaySec <= 0) return holdS;
+  const t = Math.max(0, Math.min(1, raceDisplaySec / blendSec));
+  const k = t * t * (3 - 2 * t);
+  return holdS + (Math.max(holdS, packFocusS) - holdS) * k;
+}
+
+/**
+ * ★発走イージング（描画のみ）。位置モデルは開扉直後から全速なので、開扉から `rampSec` の間、
+ *   各馬の表示位置を「発馬地点からの距離 × k(t)」に圧縮する（k: 0.22 → 1、なめらか）。
+ *   全馬に同じ係数を掛けるので順位・着差の見え方は変わらない。脚の周期・背景の流れも同じ位置から
+ *   決まるので「止まった状態から走り出して加速」になる（ユーザー指摘「ロケットスタート」）。
+ */
+export function broadcastV2StartEase(raceDisplaySec: number, rampSec = 3.0): number {
+  if (raceDisplaySec <= 0) return 0.12;
+  const t = Math.min(1, raceDisplaySec / rampSec);
+  // ★立ち上がりは緩く（最初の 1 秒はゲートから数馬身）、その後なめらかに全速へ
+  const k = t * t * (3 - 2 * t);
+  return 0.12 + 0.88 * k;
+}
+
+/**
+ * ★固定カメラの自動ズーム（TV の望遠）: 注視点までの距離が遠いほど狭い画角。
+ *   馬体（2.5m）が画面高の約 22% になる画角を基準に、6°〜上限 fovDeg の範囲。
+ */
+export function broadcastV2FixedFov(distanceM: number, maxFovDeg: number): number {
+  const wantHalfHeightM = 2.5 / 0.22 / 2;               // 画面半分の高さに入れたい実寸（m）
+  const fov = 2 * Math.atan(wantHalfHeightM / Math.max(5, distanceM)) * (180 / Math.PI);
+  return Math.max(6, Math.min(maxFovDeg, fov));
+}
+
+/** ゴール前のカメラの型: 接戦（引いて並ぶ馬を全員入れる）／単独（寄る） */
+export type BroadcastV2FinishStyle = 'contest' | 'solo';
+
+/**
+ * ★ゴール前の展開判定（決定論・順位には触れない）。
+ *   先頭が残り 80m に達した時点で、2 着以内が 1 馬身以内、または 3 着以内が 2 馬身以内なら接戦。
+ * @param metersSorted 先頭から順に並べた位置（m）
+ */
+export function broadcastV2FinishStyleOf(metersSorted: readonly number[], horseLengthM = 2.4): BroadcastV2FinishStyle {
+  const lead = metersSorted[0];
+  const second = metersSorted[1];
+  const third = metersSorted[2];
+  if (lead === undefined || second === undefined) return 'solo';
+  if (lead - second <= horseLengthM) return 'contest';
+  if (third !== undefined && lead - third <= horseLengthM * 2) return 'contest';
+  return 'solo';
+}
+
+/**
+ * ★直線→ゴール前のカメラを**連続**に変える（カット無し）。重み w=`broadcastV2AnchorWeight`（残り 160→80m で 0→1）。
+ *   接戦: fov 12°→22° に引き、先頭を画面 45% に置いて後続と決勝線を同時に入れる（参考映像のゴール ≈10%）
+ *   単独: 望遠のまま（27%）、先頭をやや中央寄り 60% にして決勝線を早めに入れる
+ */
+export function broadcastV2FinishCamera(
+  style: BroadcastV2FinishStyle, weight: number,
+): { readonly camera: ShotCameraPreset; readonly leadFraction: number } {
+  const w = Math.max(0, Math.min(1, weight));
+  const targetFov = style === 'contest' ? 22 : 12;
+  const targetLead = style === 'contest' ? 0.45 : 0.6;
+  return {
+    camera: { ...SIDE_TELE, fovDeg: SIDE_TELE.fovDeg + (targetFov - SIDE_TELE.fovDeg) * w },
+    leadFraction: 0.78 + (targetLead - 0.78) * w,
+  };
+}

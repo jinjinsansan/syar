@@ -1,0 +1,18 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with reference images.
+
+GOAL
+Create ONE frame of an 8-frame gallop cycle for the RACE WINNER: the same horse and the same painterly high-detail style as the approved side-view frames, but the jockey is celebrating right after the finish line (standing tall in the stirrups, right arm raised straight up with the whip, head up), while the horse is still galloping at full stride.
+
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- HORSE POSE / LEG PHASE reference (copy this exact horse pose, leg positions, neck, tail, and body proportions):
+  apps/web/public/art/horse-jockey-side-v6-pose{POSE}.png
+- JOCKEY POSE / STYLE reference (copy this jockey posture: standing in the irons, upright torso, right arm raised with whip, silks and helmet, same lighting):
+  apps/web/public/art/horse-jockey-winner-v1.png
+
+REQUIREMENTS
+- Side view, horse facing RIGHT, exactly like the references. Same bay horse, same coat, same tack (white saddle cloth), same jockey silks colours as in horse-jockey-winner-v1.png (plain grey/white so it can be recoloured), same painterly rendering, same light direction and shadowing.
+- The HORSE must be a faithful copy of the pose in horse-jockey-side-v6-pose{POSE}.png (this frame is one phase of the gallop cycle: legs, neck, head, tail must match that reference frame, not a new pose).
+- The JOCKEY must be a faithful copy of the celebrating posture in horse-jockey-winner-v1.png (standing in the stirrups, torso upright, right arm raised, whip in hand), adapted naturally to this horse pose. Four legs, correct anatomy, no extra limbs.
+- Background: uniform flat chroma GREEN (RGB 0,255,0), no ground, no shadow on the ground, no text, no border. The subject must not contain that green.
+- Framing and scale: same as the reference frames (the horse fills the width similarly, feet near the bottom, jockey's raised arm fully inside the frame). Output 1536 x 1024 (landscape).
+- Produce exactly ONE image and save it as a PNG.

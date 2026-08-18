@@ -1,0 +1,17 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with reference images.
+
+GOAL
+Create ONE high-resolution frame of a RIDERLESS racehorse galloping, seen from {VIEW_DESC}, as frame {POSE} of an 8-frame gallop cycle.
+
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- HORSE IDENTITY / STYLE reference (same horse, same tack, same painterly high-detail style, same lighting): apps/web/public/art/horse-only-side-v6-pose{POSE}.png  (this is the SAME gallop phase seen from the side — copy the leg phase from it)
+- VIEW / CAMERA ANGLE reference (low-resolution older sprite; use ONLY for the camera angle and the general silhouette of this view, not for detail): apps/web/public/art/horse-jockey-diag-rear-v2-pose{POSE}.png
+
+REQUIREMENTS
+- Riderless: NO jockey. Keep the tack: white saddle cloth, small racing saddle, girth, bridle, reins lying on the neck.
+- Same bay horse (black mane and tail, white socks) as the identity reference, at the same rendering quality (large, crisp, painterly, detailed musculature).
+- Camera: {VIEW_DESC}. The horse is running AWAY from the viewer along the track and slightly to the right; the viewer sees mostly the hindquarters, the tail, the back and saddle, and the head beyond.
+- The leg phase must match the side-view identity reference for the same frame number (frame {POSE} of 8): if the reference has all four legs gathered under the body, do the same; if extended, do the same.
+- Framing: the horse fills most of the frame height (about 80%), feet near the bottom, centred. Output 1024 x 1536 (portrait) so the horse is large.
+- Background: uniform flat chroma GREEN (RGB 0,255,0), no ground, no cast shadow, no text, no border. The subject must not contain that green.
+- Produce exactly ONE image and save it as a PNG.

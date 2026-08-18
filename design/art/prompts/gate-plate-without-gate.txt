@@ -1,0 +1,15 @@
+You are working in the repository at the current directory. Use your image generation / image editing skill (imagegen).
+
+TASK
+Edit the existing image file `apps/web/public/art/starting-gate-side-v1.png` (a hand-painted side view of a racecourse: turf, white rails, hedge, grandstand, trees, overcast sky, and a starting gate machine on the left with a red-and-white striped pole).
+
+Produce a NEW image that is IDENTICAL to the input in every pixel you can keep — same camera, same framing, same turf texture, same rails, same hedge, same grandstand, same trees, same sky, same lighting, same painterly style — EXCEPT:
+- REMOVE the starting gate machine completely (all of it: the cage, stall frames, doors, wheels, tow bar, shadows it casts on the turf).
+- REMOVE the red-and-white striped pole and its base completely.
+- Fill the areas where they were with continuous turf, the white running rails and the inner rail continuing seamlessly, exactly as they appear elsewhere in the same image. Do not invent new objects. Do not add horses, people, text, or any other element.
+
+STRICT REQUIREMENTS
+- Use the input file as the reference/edit source. This is an inpainting-style removal, not a re-imagining. Everything outside the removed objects must stay as close to the original as possible (composition, colors, positions of every rail and post, the stand, the trees).
+- Output size must match the input aspect ratio (16:9). Prefer the exact same pixel size as the input (1672 x 941); if the tool cannot do that, use the closest 16:9 size available and keep the whole frame (no cropping).
+- No text, no watermark, no borders.
+- Save the result as a PNG file. Produce exactly ONE image.

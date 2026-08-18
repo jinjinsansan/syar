@@ -20,7 +20,7 @@
 'use client';
 
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_RACE_BALANCE, DEFAULT_INTERVENTION_BALANCE,
   resolveRace, paceOf, replayOf, finalOrderMatches,
@@ -32,17 +32,23 @@ import type { Strategy } from '@star/sim-engine';
 import type { Surface, TrackCondition } from '@star/race-engine';
 import {
   replayPositionModel, finalOrderOf, withFinishRunOut, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
-  phaseOf, ovalCourse, segmentAt, HORSE_LENGTH_M,
+  phaseOf, HORSE_LENGTH_M,
   // ★描き方は package が唯一の出どころ（この画面には持たない）
-  frameRoleOf, SHEET_REAR, SHEET_V2, SHEET_DIAG_FRONT_V1, SHEET_HIGH_DIAG_V1, SHEET_DIAG_REAR_V1,
-  // ★透視投影（追走カメラ）。動画の道具と同じ関数
-  broadcastCamera, drawPerspectiveWorld, drawPerspectiveHorses,
+  frameRoleOf, SHEET_V2,
   raceShotAt,
-  shotCameraForDistance,
   focusForRaceShot,
+  drawFixed2DSideScene, fixed2DBackgroundRoleOf, fixed2DPackLayout,
   // ★UI も package が唯一の出どころ（動画の道具と同じ関数）
   drawGauge, drawStandings, drawCallBand, drawResultPanel,
+  drawCourseSectionTag, drawWinnerLowerThird, raceCourseSectionAt,
   raceHudVisibilityAt, shouldEmitRaceCall, type CallPart,
+  raceIntroAt, RACE_INTRO_RACE_START_SEC, RACE_INTRO_END_SEC,
+  drawRaceTitleCard, drawStartingGate, drawStartCallBand,
+  ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
+  broadcastV2FinishStyleOf, broadcastV2StartEase, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
+  buildVisualScroll, type VisualScroll, type VisualScrollSample,
+  type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets,
+  drawCourseMinimap,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 
@@ -50,24 +56,78 @@ const DIST = 1600;
 const FIELD = 12;
 const W = 1280;
 const H = 720;
+/**
+ * ★描画分岐（引継ぎ書 2026-08-17 §1）
+ *   既定は Broadcast V2。旧固定2Dは `?renderer=legacy` でのみ表示する（比較用）。
+ *   ⚠️ 通常 URL を旧版のままにしてはいけない（ユーザーが見る画面が変わらない）。
+ */
+type RendererKind = 'v2' | 'legacy';
+function rendererFromSearch(search: string): RendererKind {
+  return new URLSearchParams(search).get('renderer') === 'legacy' ? 'legacy' : 'v2';
+}
+/**
+ * ★一時バッジ（引継ぎ書 §1-4）— どの分岐が実ブラウザで描いたかを Canvas 上に証明する。
+ *   ユーザー合格後に撤去する（§11-8）。
+ */
+function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, stage: string): void {
+  const label = kind === 'v2' ? 'BROADCAST V2 ACTIVE' : 'LEGACY RENDERER';
+  ctx.save();
+  ctx.font = 'bold 15px monospace';
+  const text = `${label}  [${stage}]`;
+  const w = ctx.measureText(text).width + 24;
+  ctx.fillStyle = kind === 'v2' ? 'rgba(200,30,120,0.92)' : 'rgba(80,80,80,0.92)';
+  ctx.fillRect(24, 76, w, 28);
+  ctx.fillStyle = '#fff';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 36, 90);
+  ctx.restore();
+}
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '20';
-/** ★構図の基準幅（`layers.json` の viewport と同じ） */
+const ASSET_VERSION = '47';
+const HORSE_GROUND_LIFTS = [55, 90, 25, 0, 0, 0, 0, 55] as const;
+/**
+ * ★コーナー専用カット（3角後方・4角俯瞰）の長さ（m）。**0 = 使わない**。
+ *   方向別 8 コマ（`diag-rear-v2` / `high-diag-v2`）は 271×724 の低解像度で真横 v6 と釣り合わず、
+ *   ユーザー指摘③④「カーブで急におかしい」の主因。承認水準の素材ができるまでコーナーも望遠横追従で通す。
+ */
+const CORNER_CUT_M_WEB = 400;
+/**
+ * ★4 角を「奥からこちらへ向かってくる」固定カメラにするか（build 時のショット列挙にも使うので定数）。
+ *   正面寄りの一体素材 diag-front-v3 が承認されたら true にする。
+ */
+const FOURTH_CORNER_FRONT_WEB = true;
+/**
+ * ★2026-08-18: テクスチャ付き透視ワールド（`world-textured.ts`）で背景が動くようになったので、
+ *   コーナー専用ショット（3角後方・4角俯瞰）を**コーナー全区間**で復活（オーナー指示「元のカメラワークを復活、ただし背景は動く」）。
+ *   方向別 8 コマは高解像度版へ順次差し替え。
+ */
+/**
+ * ★空中局面の浮き（元画像 px・そのコマの「最下点の蹄が地面」を 0 とする）。
+ *   支持局面（04〜07）は蹄が地面に接し（0）、離地〜空中（08・01・02）だけ体高の 3〜5% 浮く。03 は着地直前で僅か。
+ *   ⚠️ 旧方式（全コマ平均の高さ＋bob）は支持局面で蹄が地面より上に来て「浮いて見える」原因だった。
+ */
+const HORSE_FLIGHT_LIFT_SOURCE_PX = [15, 20, 6, 0, 0, 0, 0, 22] as const;
+/** 8 コマ表を任意のコマ数へ（16 コマなら中間は両隣の平均、1 コマなら 0） */
+function flightLiftFor(index: number, count: number): number {
+  if (count === 8) return HORSE_FLIGHT_LIFT_SOURCE_PX[index] ?? 0;
+  if (count === 16) {
+    const a = HORSE_FLIGHT_LIFT_SOURCE_PX[Math.floor(index / 2) % 8] ?? 0;
+    if (index % 2 === 0) return a;
+    const b = HORSE_FLIGHT_LIFT_SOURCE_PX[(Math.floor(index / 2) + 1) % 8] ?? 0;
+    return (a + b) / 2;
+  }
+  return 0;
+}
+const SILKS_COLORS = ['#ececec', '#20242a', '#d52d35', '#2359c4', '#efd329', '#199655', '#ef7d20', '#e75c9a', '#713aa8', '#22a9b5', '#9b5b2e', '#d74d79'] as const;
+const HORSE_NAMES = ['スターライト', 'サクラブリーズ', 'ハンシンドリーム', 'ミライノツバサ', 'グリーンアロー', 'オウカノキセキ', 'ナニワスピリット', 'ローズクイーン', 'ムラサキノホシ', 'アオバハヤテ', 'ブラウンエース', 'ピンクレディ'] as const;
+const JOCKEY_NAMES = ['田中 守', '佐藤 翼', '山本 誠', '中村 駿', '高橋 蓮', '松本 拓海', '藤田 昇', '小林 亮', '伊藤 健', '吉田 直樹', '岡田 悠', '森川 浩'] as const;
+/** ★固定2D中継の基準幅 */
 
 /**
  * ⚠️ ★**カットごとの `horseW`（120px / 300px）は撤去しました。**
  *    透視投影では、馬の大きさは**深さから連続的に決まります**。
  *    固定の px を持つと、遠近と食い違って**手前と奥で同じ大きさ**になります。
  */
-
-interface StarStill {
-  buildAtlas: (sheet: HTMLImageElement, pal: unknown, layers: unknown) => Promise<unknown>;
-  drawStill: (ctx: CanvasRenderingContext2D, o: Record<string, unknown>) => void;
-  setOptions: (o: { coat: boolean; backlight: boolean }) => void;
-}
-declare global {
-  interface Window { STARStill?: StarStill }
-}
 
 interface Built {
   readonly model: ReturnType<typeof replayPositionModel>;
@@ -79,6 +139,282 @@ interface Built {
   /** ★確定着順と走破タイム（ゴール後の順位表示に使う） */
   readonly finishPos: ReadonlyMap<number, number>;
   readonly finishSec: ReadonlyMap<number, number>;
+  /**
+   * ★見た目の速度の補正 Δ(d)（`visual-scroll.ts`）。背景の流れと脚の周期に使う。
+   *   位置・時刻・着順には触れない（時間圧縮 D-062 はそのまま）。
+   */
+  readonly visualScroll: VisualScroll;
+  /** ★ゴール前のカメラの型（接戦=引く／単独=寄る）。先頭が残り 80m に達した時点の着差から決定論的に決める */
+  readonly finishStyle: BroadcastV2FinishStyle;
+  /** ★ショット切替の時刻（表示秒）と前後の id。切替直後は前ショットとディゾルブする（ユーザー指摘⑥） */
+  readonly shotChanges: readonly { readonly displaySec: number; readonly from: BroadcastV2ShotId; readonly to: BroadcastV2ShotId }[];
+}
+
+interface HighQualityHorseFrame {
+  readonly image: CanvasImageSource;
+  readonly source: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  readonly referenceHeight: number;
+  readonly groundLiftSourcePx: number;
+  /** ★胴体の基準点と接地までの高さ（元画像 px）。配置を外接矩形に依存させない（perspective-draw 参照） */
+  readonly bodyAnchorSourcePx?: { readonly x: number; readonly y: number };
+  readonly bodyLiftSourcePx?: number;
+  /** ★接地影用シルエット（source と同じ大きさ・黒＋α・軽くぼかし） */
+  readonly shadow?: { readonly image: CanvasImageSource; readonly width: number; readonly height: number } | undefined;
+  readonly overlay?: {
+    readonly image: CanvasImageSource;
+    readonly width: number;
+    readonly height: number;
+    readonly offsetXSourcePx: number;
+    readonly offsetYSourcePx: number;
+  } | undefined;
+}
+
+/** 勝負服・ゼッケンの位置（外接矩形に対する比率）。コマ集合ごとに騎手の姿勢が違うので切り替える */
+interface SilksLayout {
+  readonly cropX: number; readonly cropW: number; readonly cropH: number;
+  readonly helmet: readonly [number, number, number];            // nx0, nx1, ny1
+  readonly jacket: readonly [number, number, number, number];    // nx0, nx1, ny0, ny1
+  readonly saddlecloth: readonly [number, number, number, number];
+  readonly number: readonly [number, number];
+}
+/** 騎手が低く伏せる走行コマ（side-v6 など） */
+const SILKS_LAYOUT_CROUCH: SilksLayout = {
+  cropX: 0.24, cropW: 0.44, cropH: 0.60,
+  helmet: [0.30, 0.72, 0.23], jacket: [0.31, 0.59, 0.08, 0.39], saddlecloth: [0.27, 0.59, 0.34, 0.58], number: [0.47, 0.49],
+};
+/** 騎手なしの馬（horse-only）: 鞍布の検出窓だけ広く取る（白い騎手のズボンが無いので誤検出しない） */
+const SILKS_LAYOUT_HORSE_ONLY: SilksLayout = {
+  cropX: 0.2, cropW: 0.6, cropH: 0.9,
+  helmet: [0, 0, -1], jacket: [0, 0, 1, 0], saddlecloth: [0.25, 0.70, 0.10, 0.75], number: [0.47, 0.5],
+};
+/** 斜め後ろ（diag-rear-v3 合成）: 騎手は上中央、鞍布は騎手の脚の両脇に見える。ゼッケンは描かない（後ろ向き） */
+const SILKS_LAYOUT_REAR: SilksLayout = {
+  cropX: 0.1, cropW: 0.8, cropH: 0.6,
+  helmet: [0.25, 0.75, 0.10], jacket: [0.15, 0.85, 0.06, 0.24], saddlecloth: [0.1, 0.9, 0.34, 0.5], number: [-1, -1],
+};
+/** 斜め前（diag-front-v3 一体）: 騎手は上中央、鞍布は騎手の脚の下に少し見える。ゼッケンは胸前に */
+const SILKS_LAYOUT_FRONT: SilksLayout = {
+  cropX: 0.1, cropW: 0.8, cropH: 0.6,
+  helmet: [0.25, 0.75, 0.10], jacket: [0.15, 0.85, 0.06, 0.26], saddlecloth: [0.05, 0.95, 0.30, 0.48], number: [-1, -1],
+};
+/** 騎手が鐙に立って腕を挙げる勝馬コマ（winner-v2）: 矩形が縦に長く、馬体は下 6 割 */
+const SILKS_LAYOUT_WINNER: SilksLayout = {
+  cropX: 0.30, cropW: 0.52, cropH: 0.72,
+  helmet: [0.52, 0.76, 0.17], jacket: [0.48, 0.72, 0.12, 0.40], saddlecloth: [0.36, 0.60, 0.48, 0.66], number: [0.47, 0.57],
+};
+
+function silksOverlays(
+  image: FrameImage, source: HighQualityHorseFrame['source'], colors: readonly string[],
+  layout: SilksLayout = SILKS_LAYOUT_CROUCH,
+): readonly NonNullable<HighQualityHorseFrame['overlay']>[] {
+  const x0 = Math.round(source.x + source.width * layout.cropX);
+  const y0 = Math.round(source.y);
+  const width = Math.round(source.width * layout.cropW);
+  const height = Math.round(source.height * layout.cropH);
+  const scratch = document.createElement('canvas'); scratch.width = imgW(image); scratch.height = imgH(image);
+  const scratchCtx = scratch.getContext('2d', { willReadFrequently: true });
+  if (scratchCtx === null) return [];
+  scratchCtx.drawImage(image, 0, 0);
+  const input = scratchCtx.getImageData(x0, y0, width, height).data;
+  return colors.map((hex, colorIndex) => {
+    const red = Number.parseInt(hex.slice(1, 3), 16);
+    const green = Number.parseInt(hex.slice(3, 5), 16);
+    const blue = Number.parseInt(hex.slice(5, 7), 16);
+    const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext('2d'); if (ctx === null) return { image: canvas, width, height, offsetXSourcePx: x0, offsetYSourcePx: y0 };
+    const output = ctx.createImageData(width, height);
+    for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      const r = input[index] ?? 0; const g = input[index + 1] ?? 0; const b = input[index + 2] ?? 0; const a = input[index + 3] ?? 0;
+      const nx = (x + x0 - source.x) / source.width;
+      const ny = (y + y0 - source.y) / source.height;
+      const helmet = nx >= layout.helmet[0] && nx <= layout.helmet[1] && ny <= layout.helmet[2];
+      const jacket = nx >= layout.jacket[0] && nx <= layout.jacket[1] && ny >= layout.jacket[2] && ny <= layout.jacket[3];
+      const saddlecloth = nx >= layout.saddlecloth[0] && nx <= layout.saddlecloth[1]
+        && ny >= layout.saddlecloth[2] && ny <= layout.saddlecloth[3];
+      if (!helmet && !jacket && !saddlecloth) continue;
+      const spread = Math.max(r, g, b) - Math.min(r, g, b);
+      if (a < 16 || spread > (helmet ? 62 : 34) || Math.max(r, g, b) < (helmet ? 42 : 72)) continue;
+      const luminance = (r + g + b) / (3 * 255);
+      const shade = 0.30 + luminance * 0.78;
+      output.data[index] = Math.min(255, red * shade);
+      output.data[index + 1] = Math.min(255, green * shade);
+      output.data[index + 2] = Math.min(255, blue * shade);
+      output.data[index + 3] = Math.round(a * 0.94);
+    }
+    ctx.putImageData(output, 0, 0);
+    if (layout.number[0] < 0) { ctx.putImageData(output, 0, 0); return { image: canvas, width, height, offsetXSourcePx: x0, offsetYSourcePx: y0 }; }
+    const numberX = source.x + source.width * layout.number[0] - x0;
+    const numberY = source.y + source.height * layout.number[1] - y0;
+    ctx.font = `bold ${Math.max(42, Math.round(source.height * 0.068))}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = Math.max(4, source.height * 0.006);
+    ctx.strokeStyle = 'rgba(0,0,0,0.78)'; ctx.strokeText(String(colorIndex + 1), numberX, numberY);
+    ctx.fillStyle = '#fff'; ctx.fillText(String(colorIndex + 1), numberX, numberY);
+    return { image: canvas, width, height, offsetXSourcePx: x0, offsetYSourcePx: y0 };
+  });
+}
+
+/**
+ * ★鞍布（白い長方形・剛体）の中心と幅（元画像 px）。配置の基準点と縮尺の補正に使う。
+ *   胴体重心（上 55% の α 重心）は騎手の姿勢で動くが、鞍布は馬体に固定されているので最も安定。
+ *   検出: レイアウトの鞍布窓の中で、明るく彩度の低い画素の外接矩形。見つからなければ重心にフォールバック。
+ */
+type FrameImage = HTMLImageElement | HTMLCanvasElement;
+const imgW = (image: FrameImage): number => (image instanceof HTMLCanvasElement ? image.width : image.naturalWidth);
+const imgH = (image: FrameImage): number => (image instanceof HTMLCanvasElement ? image.height : image.naturalHeight);
+
+function saddleReference(
+  image: FrameImage, bounds: HighQualityHorseFrame['source'], layout: SilksLayout,
+): { x: number; y: number; width: number } | undefined {
+  const scratch = document.createElement('canvas');
+  scratch.width = imgW(image); scratch.height = imgH(image);
+  const ctx = scratch.getContext('2d', { willReadFrequently: true });
+  if (ctx === null) return undefined;
+  ctx.drawImage(image, 0, 0);
+  const data = ctx.getImageData(0, 0, scratch.width, scratch.height).data;
+  const [nx0, nx1, ny0, ny1] = layout.saddlecloth;
+  const X0 = Math.floor(bounds.x + bounds.width * nx0), X1 = Math.ceil(bounds.x + bounds.width * nx1);
+  const Y0 = Math.floor(bounds.y + bounds.height * ny0), Y1 = Math.ceil(bounds.y + bounds.height * ny1);
+  let l = Infinity, t = Infinity, r = -1, b = -1, n = 0;
+  for (let y = Y0; y < Y1; y += 1) for (let x = X0; x < X1; x += 1) {
+    const k = (y * scratch.width + x) * 4;
+    if (data[k + 3]! < 200) continue;
+    const R = data[k]!, G = data[k + 1]!, B = data[k + 2]!;
+    const mx = Math.max(R, G, B), mn = Math.min(R, G, B);
+    if (mx > 170 && mx - mn < 28) { n += 1; if (x < l) l = x; if (x > r) r = x; if (y < t) t = y; if (y > b) b = y; }
+  }
+  if (n < 400 || r < l) return undefined;
+  return { x: (l + r) / 2, y: (t + b) / 2, width: r - l + 1 };
+}
+
+/**
+ * ★馬（騎手なし）と騎手（単体）を合成して 1 コマにする。
+ *   騎手素材は「参照コマ（例: pose01）の騎手をそのままの位置・大きさで描いたもの」なので、
+ *   参照コマの鞍布中心 → 対象コマの鞍布中心 の差だけ平行移動して重ねれば、鞍の上に乗る。
+ *   馬体は 8 コマとも承認済みの走り、騎手は 2 姿勢だけ → 騎手のガクつき（ユーザー指摘④）が構造的に消える。
+ */
+/**
+ * ★騎手のランドマーク: ヘルメット上端（矩形の最上行）と、ブーツ下端・中心（指定領域内の黒画素の最下部）。
+ *   参照コマ（一体）では「鞍布中心より下・鞍布の x 範囲」の黒画素がブーツ（鞍・鬣・脚を避ける）。
+ *   騎手単体では矩形の下半分の黒画素がブーツ。ブーツは剛体なので位置合わせの基準に使える。
+ */
+function jockeyLandmarks(
+  image: FrameImage, region: { x0: number; x1: number; y0: number; y1: number }, top: number,
+): { top: number; bootBottom: number; bootX: number } | undefined {
+  const w = imgW(image), h = imgH(image);
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  if (ctx === null) return undefined;
+  ctx.drawImage(image, 0, 0);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  let bottom = -1;
+  const rows: number[][] = [];
+  for (let y = Math.max(0, Math.floor(region.y0)); y < Math.min(h, region.y1); y += 1) {
+    for (let x = Math.max(0, Math.floor(region.x0)); x < Math.min(w, region.x1); x += 1) {
+      const i = (y * w + x) * 4;
+      if (d[i + 3]! < 200) continue;
+      const lum = (d[i]! + d[i + 1]! + d[i + 2]!) / 3;
+      if (lum > 52) continue;
+      if (y > bottom) bottom = y;
+      (rows[y] ??= []).push(x);
+    }
+  }
+  if (bottom < 0) return undefined;
+  // 最下 24 行の黒画素の x 平均 = ブーツの中心
+  let sx = 0, n = 0;
+  for (let y = bottom; y > bottom - 24 && y >= 0; y -= 1) for (const x of rows[y] ?? []) { sx += x; n += 1; }
+  if (n === 0) return undefined;
+  return { top, bootBottom: bottom, bootX: sx / n };
+}
+
+function composeHorseAndJockey(
+  horse: HTMLImageElement, jockey: HTMLImageElement,
+  gen: { top: number; bootBottom: number; bootX: number },
+  ref: { top: number; bootBottom: number; bootX: number },
+  horseSaddle: { x: number; y: number }, jockeyRefSaddle: { x: number; y: number },
+): HTMLCanvasElement {
+  const cv = document.createElement('canvas');
+  cv.width = horse.naturalWidth; cv.height = horse.naturalHeight;
+  const ctx = cv.getContext('2d');
+  if (ctx === null) return cv;
+  ctx.drawImage(horse, 0, 0);
+  // ヘルメット上端→ブーツ下端の高さで縮尺、ブーツ下端中心を参照位置へ、さらに鞍布の差だけ平行移動
+  const scale = (ref.bootBottom - ref.top) / Math.max(1, gen.bootBottom - gen.top);
+  const dx = ref.bootX - gen.bootX * scale + (horseSaddle.x - jockeyRefSaddle.x);
+  const dy = ref.bootBottom - gen.bootBottom * scale + (horseSaddle.y - jockeyRefSaddle.y);
+  ctx.drawImage(jockey, dx, dy, jockey.naturalWidth * scale, jockey.naturalHeight * scale);
+  return cv;
+}
+
+/**
+ * ★胴体の重心（元画像 px）。外接矩形の上 55% にある不透明画素の α 重み付き重心（脚をほぼ除外）。
+ *   鞍布が見つからないときのフォールバック。
+ */
+function bodyCentroid(image: FrameImage, bounds: HighQualityHorseFrame['source']): { x: number; y: number } {
+  const scratch = document.createElement('canvas');
+  scratch.width = imgW(image);
+  scratch.height = imgH(image);
+  const ctx = scratch.getContext('2d', { willReadFrequently: true });
+  if (ctx === null) return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height * 0.4 };
+  ctx.drawImage(image, 0, 0);
+  const data = ctx.getImageData(0, 0, scratch.width, scratch.height).data;
+  const cut = bounds.y + bounds.height * 0.55;
+  let sx = 0, sy = 0, sw = 0;
+  for (let y = bounds.y; y < cut; y += 1) {
+    for (let x = bounds.x; x < bounds.x + bounds.width; x += 1) {
+      const a = data[(y * scratch.width + x) * 4 + 3]!;
+      if (a < 12) continue;
+      sx += x * a; sy += y * a; sw += a;
+    }
+  }
+  if (sw === 0) return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height * 0.4 };
+  return { x: sx / sw, y: sy / sw };
+}
+
+/**
+ * ★接地影用のシルエットを焼く: 元コマの不透明部分を黒（α はそのまま）にし、少しぼかす。
+ *   描画側（perspective-draw）はこれを地面へ潰して落とすだけ。毎フレームの色変換をしない。
+ */
+function bakeShadowSilhouette(image: FrameImage, bounds: HighQualityHorseFrame['source']): HighQualityHorseFrame['shadow'] {
+  const cv = document.createElement('canvas');
+  cv.width = bounds.width; cv.height = bounds.height;
+  const ctx = cv.getContext('2d');
+  if (ctx === null) return undefined;
+  ctx.filter = 'blur(3px)';
+  ctx.drawImage(image, bounds.x, bounds.y, bounds.width, bounds.height, 0, 0, bounds.width, bounds.height);
+  ctx.filter = 'none';
+  ctx.globalCompositeOperation = 'source-in';
+  ctx.fillStyle = '#07110a';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.globalCompositeOperation = 'source-over';
+  return { image: cv, width: cv.width, height: cv.height };
+}
+
+function opaqueBounds(image: FrameImage): HighQualityHorseFrame['source'] {
+  const scratch = document.createElement('canvas');
+  scratch.width = imgW(image);
+  scratch.height = imgH(image);
+  const ctx = scratch.getContext('2d', { willReadFrequently: true });
+  if (ctx === null) return { x: 0, y: 0, width: imgW(image), height: imgH(image) };
+  ctx.drawImage(image, 0, 0);
+  const data = ctx.getImageData(0, 0, scratch.width, scratch.height).data;
+  let left = scratch.width, top = scratch.height, right = -1, bottom = -1;
+  for (let y = 0; y < scratch.height; y += 1) {
+    for (let x = 0; x < scratch.width; x += 1) {
+      if (data[(y * scratch.width + x) * 4 + 3]! < 12) continue;
+      left = Math.min(left, x); top = Math.min(top, y);
+      right = Math.max(right, x); bottom = Math.max(bottom, y);
+    }
+  }
+  if (right < left || bottom < top) return { x: 0, y: 0, width: scratch.width, height: scratch.height };
+  const pad = 2;
+  const x = Math.max(0, left - pad); const y = Math.max(0, top - pad);
+  return {
+    x, y,
+    width: Math.min(scratch.width, right + pad + 1) - x,
+    height: Math.min(scratch.height, bottom + pad + 1) - y,
+  };
 }
 
 function build(seed: number, ownGate: number, surface: Surface, trackCondition: TrackCondition): Built {
@@ -130,12 +466,61 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
   );
   const finishPos = new Map(result.order.map((e) => [Number(e.horseId), e.finishPosition]));
   const finishSec = new Map(result.order.map((e) => [Number(e.horseId), e.timeSec]));
+  const warp = timeWarpFor(knotsFor(boundaries, ownGate), DEFAULT_PHASE_RATES);
+  /**
+   * ★見た目の速度テーブル。描画と同じ手順（時計 → 位置モデル → 走り抜け → V2 注視点）で
+   *   0.05 秒ごとに注視点を求め、時間圧縮の倍率 rate と固定物体の重みから Δ を積分する。
+   *   ★左右回りで注視点は変わらないので、ここは左回りの course で求める。
+   */
+  const winnerGate = settled[0]!;
+  const course = ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn: 'left' });
+  const STEP = 0.05;
+  const totalSec = RACE_INTRO_RACE_START_SEC + warp.displaySec + 5.2;
+  // ★ゴール前の展開: 先頭が残り 80m に達した瞬間の位置関係
+  let finishStyle: BroadcastV2FinishStyle = 'solo';
+  for (let sec = 0; sec <= warp.raceSecAt(warp.displaySec) + 1e-9; sec += 0.05) {
+    const at = model.at(sec);
+    const sortedM = at.map((h) => h.meters).sort((a, b) => b - a);
+    if ((sortedM[0] ?? 0) >= DIST - 80) { finishStyle = broadcastV2FinishStyleOf(sortedM, HORSE_LENGTH_M); break; }
+  }
+  const samples: VisualScrollSample[] = [];
+  const shotChanges: { displaySec: number; from: BroadcastV2ShotId; to: BroadcastV2ShotId }[] = [];
+  let lastShot: BroadcastV2ShotId | undefined;
+  for (let d = 0; d <= totalSec + 1e-9; d += STEP) {
+    const raceD = Math.max(0, d - RACE_INTRO_RACE_START_SEC);
+    const clampedD = Math.min(raceD, warp.displaySec);
+    const sec = warp.raceSecAt(clampedD);
+    const at = model.at(sec);
+    const visual = withFinishRunOut(at, (g) => finishSec.get(g), sec, DIST, Math.max(0, raceD - warp.displaySec));
+    const winnerDone = (at.find((h) => h.gate === winnerGate)?.meters ?? 0) >= DIST - 1e-6;
+    const ease = broadcastV2StartEase(raceD);
+    const scene = resolveBroadcastV2Scene(course, visual.map((h) => ({
+      gate: h.gate, s: h.meters * ease, w: h.w ?? TRACK_WIDTH_M / 2, finished: h.meters >= DIST - 1e-6,
+    })), { width: W, height: H }, winnerDone, {
+      finishStyle, cornerCutM: CORNER_CUT_M_WEB, raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
+      fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
+    });
+    const h = 0.05;
+    const lo = Math.max(0, clampedD - h);
+    const hi = Math.min(warp.displaySec, clampedD + h);
+    const rate = raceD >= warp.displaySec || hi <= lo ? 1
+      : (warp.raceSecAt(hi) - warp.raceSecAt(lo)) / (hi - lo);
+    samples.push({
+      displaySec: d, focusS: scene.focusS, rate: rate > 0 ? rate : 1,
+      anchorWeight: broadcastV2AnchorWeight(course, scene.shot.id, scene.focusS),
+    });
+    if (lastShot !== undefined && lastShot !== scene.shot.id) shotChanges.push({ displaySec: d, from: lastShot, to: scene.shot.id });
+    lastShot = scene.shot.id;
+  }
   return {
     model,
-    warp: timeWarpFor(knotsFor(boundaries, ownGate), DEFAULT_PHASE_RATES),
+    warp,
     pace,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
     gauge, finishPos, finishSec,
+    visualScroll: buildVisualScroll(samples),
+    finishStyle,
+    shotChanges,
   };
 }
 
@@ -146,14 +531,32 @@ export default function RacePage(): React.JSX.Element {
   const callKeyRef = useRef<string>('');
   const callLastSecRef = useRef<number>(-Infinity);
   const artRef = useRef<{
-    pal: unknown; layers: unknown; atlas: unknown;
-    rear: HTMLImageElement;
-    side: HTMLImageElement;
-    diagFront: HTMLImageElement;
-    highDiag: HTMLImageElement;
-    diagRear: HTMLImageElement;
+    pal: unknown;
+    raceTitle: HTMLImageElement;
+    raceNarrator: HTMLImageElement;
+    startingGate: HTMLImageElement;
+    raceBackstretch: HTMLImageElement;
+    raceCornerExit: HTMLImageElement;
+    raceFinish: HTMLImageElement;
+    raceCornerRear: HTMLImageElement;
+    raceCornerHigh: HTMLImageElement;
+    sideHighQuality: readonly (readonly HighQualityHorseFrame[])[];
+    diagFrontHighQuality: readonly (readonly HighQualityHorseFrame[])[];
+    diagRearHighQuality: readonly (readonly HighQualityHorseFrame[])[];
+    highDiagHighQuality: readonly (readonly HighQualityHorseFrame[])[];
+    winnerHighQuality: readonly (readonly HighQualityHorseFrame[])[];
+    /** ★勝馬の 8 コマ（未承認のうちは undefined → 走行 8 コマで代用） */
+    winnerCycleHighQuality?: readonly (readonly HighQualityHorseFrame[])[];
+    /** ★向正面ショット用のループ多層パララックス（`tools/split-parallax-layers.mjs` の出力） */
+    parallaxBackstretch: ParallaxPlate<HTMLImageElement>;
+    /** ★コーナー・斜めショット用のテクスチャ付き透視ワールド素材（芝タイル・遠景パノラマ） */
+    texturedWorld: TexturedWorldAssets<HTMLImageElement>;
+    /** ★承認水準（一体・高解像度）の方向別素材が揃っているか */
+    directionalReady: { rear: boolean; front: boolean };
   } | null>(null);
   const rafRef = useRef<number | null>(null);
+  /** ★ディゾルブ用のオフスクリーン（前ショットを描く） */
+  const dissolveCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const t0Ref = useRef(0);
   const dRef = useRef(0);
 
@@ -164,35 +567,16 @@ export default function RacePage(): React.JSX.Element {
   const [built, setBuilt] = useState<Built | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [clock, setClock] = useState(0);
-  const [coat, setCoat] = useState(false);
-  const [backlight, setBacklight] = useState(false);
   const [surface, setSurface] = useState<Surface>('turf');
   const [trackCondition, setTrackCondition] = useState<TrackCondition>('good');
   const [turn, setTurn] = useState<'left' | 'right'>('left');
-  const course = useMemo(() => ovalCourse(DIST, { turn }), [turn]);
-
+  /** ★既定は V2。`?renderer=legacy` のときだけ旧固定2D（引継ぎ書 §1-5） */
+  const [renderer, setRenderer] = useState<RendererKind>('v2');
+  useEffect(() => { setRenderer(rendererFromSearch(window.location.search)); }, []);
   useEffect(() => {
     let cancelled = false;
     const boot = async (): Promise<void> => {
-      if (window.STARStill === undefined) {
-        await new Promise<void>((res, rej) => {
-          const s = document.createElement('script');
-          s.src = `/art/still-reference.js?v=${ASSET_VERSION}`;
-          s.onload = () => res();
-          s.onerror = () => rej(new Error('参照実装を読み込めません'));
-          document.head.appendChild(s);
-        });
-      }
-      const [pal, layers] = await Promise.all([
-        fetch(`/art/palette.json?v=${ASSET_VERSION}`).then((r) => r.json()),
-        fetch(`/art/layers.json?v=${ASSET_VERSION}`).then((r) => r.json()),
-      ]);
-      const sheet = await new Promise<HTMLImageElement>((res, rej) => {
-        const im = new Image();
-        im.onload = () => res(im);
-        im.onerror = () => rej(new Error('スプライトを読み込めません'));
-        im.src = `/art/horse-gallop.png?v=${ASSET_VERSION}`;
-      });
+      const pal = await fetch(`/art/palette.json?v=${ASSET_VERSION}`).then((r) => r.json());
       /**
        * ★第3便のシート（8コマ × 枠色8行）を**カットごとに2枚**。
        *   ⚠️ 引きに寄りのシートを縮めて使うと **0.4倍**になり、輪郭が濁ります
@@ -215,24 +599,291 @@ export default function RacePage(): React.JSX.Element {
        * ⚠️ 真横のシートを後ろから見るカメラで使うと、
        *    ★**馬だけ横を向いた別物**になります。
        */
-      const [rear, side, diagFront, highDiag, diagRear] = await Promise.all([
-        loadImg(`/art/horse-rear.png?v=${ASSET_VERSION}`),
-        loadImg(`/art/horse-side-v3.png?v=${ASSET_VERSION}`),
-        loadImg(`/art/horse-diag-front-v1.png?v=${ASSET_VERSION}`),
-        loadImg(`/art/horse-high-diag-v1.png?v=${ASSET_VERSION}`),
-        loadImg(`/art/horse-diag-rear-v1.png?v=${ASSET_VERSION}`),
+      /**
+       * ★向正面のパララックス層。1枚絵を送るだけでは 400m で 137px しか動かず「その場走り」に見えた
+       *   （実測 12px/秒・必要量の約 1/100）。層ごとにループさせ、馬群の進行距離で流す。
+       */
+      const parallaxManifest = await fetch(`/art/parallax/backstretch-side-v1/manifest.json?v=${ASSET_VERSION}`)
+        .then((r) => r.json()) as {
+          plateWidth: number; plateHeight: number;
+          layers: { name: string; file: string; plateY0: number; plateY1: number; tileWidth: number; depthOffsetM: number }[];
+          objects: {
+            name: string; file: string; plateY0: number; anchorXRatio: number; worldS: number | 'finish'; depthOffsetM: number;
+            zOrder?: 'behind' | 'front'; worldW?: number; anchorYRatio?: number; scale?: number;
+          }[];
+          world: {
+            turf: { file: string; tileWidth: number; tileHeight: number; pxPerM: number };
+            panorama: { file: string; tileWidth: number; height: number; horizonY: number };
+            trees?: { file: string; tileWidth: number; height: number };
+          };
+        };
+      const parallaxImages = await Promise.all(parallaxManifest.layers.map((layer) =>
+        loadImg(`/art/parallax/backstretch-side-v1/${layer.file}?v=${ASSET_VERSION}`)));
+      const objectImages = await Promise.all(parallaxManifest.objects.map((object) =>
+        loadImg(`/art/parallax/backstretch-side-v1/${object.file}?v=${ASSET_VERSION}`)));
+      const [worldTurfImg, worldPanoImg, worldTreesImg] = await Promise.all([
+        loadImg(`/art/parallax/backstretch-side-v1/${parallaxManifest.world.turf.file}?v=${ASSET_VERSION}`),
+        loadImg(`/art/parallax/backstretch-side-v1/${parallaxManifest.world.panorama.file}?v=${ASSET_VERSION}`),
+        parallaxManifest.world.trees !== undefined
+          ? loadImg(`/art/parallax/backstretch-side-v1/${parallaxManifest.world.trees.file}?v=${ASSET_VERSION}`).catch(() => null)
+          : Promise.resolve(null),
       ]);
-      const api = window.STARStill;
-      if (api === undefined) throw new Error('STARStill がありません');
-      api.setOptions({ coat, backlight });
-      const atlas = await api.buildAtlas(sheet, pal, layers);
+      // ★コース沿いの立体帯: 横追従用の層タイル（生垣・樹林・スタンド）をそのままテクスチャに使う
+      const layerTexture = (name: string, pxPerM: number) => {
+        const index = parallaxManifest.layers.findIndex((layer) => layer.name === name);
+        const image = index >= 0 ? parallaxImages[index] : undefined;
+        return image === undefined ? undefined : { image, width: image.naturalWidth, height: image.naturalHeight, pxPerM };
+      };
+      const hedgeTex = layerTexture('hedge', 60);
+      const treesTex = worldTreesImg !== null
+        ? { image: worldTreesImg, width: worldTreesImg.naturalWidth, height: worldTreesImg.naturalHeight, pxPerM: 20 }
+        : layerTexture('trees', 20);
+      const standTex = layerTexture('stand', 12);
+      const texturedWorld: TexturedWorldAssets<HTMLImageElement> = {
+        turf: { image: worldTurfImg, width: worldTurfImg.naturalWidth, height: worldTurfImg.naturalHeight, pxPerM: parallaxManifest.world.turf.pxPerM },
+        panorama: { image: worldPanoImg, width: worldPanoImg.naturalWidth, height: worldPanoImg.naturalHeight, horizonY: parallaxManifest.world.panorama.horizonY },
+        scenery: {
+          ...(hedgeTex !== undefined ? { hedge: hedgeTex } : {}),
+          ...(treesTex !== undefined ? { trees: treesTex } : {}),
+          ...(standTex !== undefined ? { stand: standTex } : {}),
+        },
+      };
+      const parallaxBackstretch: ParallaxPlate<HTMLImageElement> = {
+        plateWidth: parallaxManifest.plateWidth,
+        plateHeight: parallaxManifest.plateHeight,
+        layers: parallaxManifest.layers.map((layer, index) => ({
+          image: parallaxImages[index]!,
+          width: parallaxImages[index]!.naturalWidth,
+          height: parallaxImages[index]!.naturalHeight,
+          plateY0: layer.plateY0,
+          plateY1: layer.plateY1,
+          depthOffsetM: layer.depthOffsetM,
+        })),
+        // ★決勝線・審判塔は世界に固定（worldS='finish' → 距離）
+        objects: parallaxManifest.objects.map((object, index) => ({
+          image: objectImages[index]!,
+          width: objectImages[index]!.naturalWidth,
+          height: objectImages[index]!.naturalHeight,
+          plateY0: object.plateY0,
+          anchorXRatio: object.anchorXRatio,
+          worldS: object.worldS === 'finish' ? DIST : object.worldS,
+          depthOffsetM: object.depthOffsetM,
+          ...(object.zOrder !== undefined ? { zOrder: object.zOrder } : {}),
+          ...(object.worldW !== undefined ? { worldW: object.worldW } : {}),
+          ...(object.anchorYRatio !== undefined ? { anchorYRatio: object.anchorYRatio } : {}),
+          ...(object.scale !== undefined ? { scale: object.scale } : {}),
+        })),
+      };
+      const loaded = await Promise.all([
+        loadImg(`/art/race-title-hanshin-spring-v1.png?v=${ASSET_VERSION}`),
+        loadImg(`/art/race-narrator-v1.png?v=${ASSET_VERSION}`),
+        loadImg(`/art/starting-gate-side-v1.png?v=${ASSET_VERSION}`),
+        loadImg(`/art/race-backstretch-side-v1.png?v=${ASSET_VERSION}`),
+        loadImg(`/art/race-corner-exit-side-v1.png?v=${ASSET_VERSION}`),
+        loadImg(`/art/race-finish-side-v2.png?v=${ASSET_VERSION}`),
+        loadImg(`/art/race-corner-rear-v2.png?v=${ASSET_VERSION}`),
+        loadImg(`/art/race-corner-high-v2.png?v=${ASSET_VERSION}`),
+        ...Array.from({ length: 8 }, (_, i) =>
+          loadImg(`/art/horse-jockey-side-v6-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`)),
+        ...Array.from({ length: 8 }, (_, i) =>
+          loadImg(`/art/horse-jockey-diag-front-v2-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`)),
+        ...Array.from({ length: 8 }, (_, i) =>
+          loadImg(`/art/horse-jockey-diag-rear-v2-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`)),
+        ...Array.from({ length: 8 }, (_, i) =>
+          loadImg(`/art/horse-jockey-high-diag-v2-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`)),
+        loadImg(`/art/horse-jockey-winner-v1.png?v=${ASSET_VERSION}`),
+      ]);
       if (cancelled) return;
-      artRef.current = { pal, layers, atlas, rear, side, diagFront, highDiag, diagRear };
+      const [raceTitle, raceNarrator, startingGate, raceBackstretch, raceCornerExit, raceFinish,
+        raceCornerRear, raceCornerHigh] = loaded;
+      const buildFrames = (
+        images: readonly FrameImage[],
+        referenceHeightOverride?: number,
+        silksLayout: SilksLayout = SILKS_LAYOUT_CROUCH,
+        anchorsOverride?: readonly { x: number; y: number; width: number }[],
+      ): readonly (readonly HighQualityHorseFrame[])[] => {
+        const measured = images.map((image) => ({ image, source: opaqueBounds(image) }));
+        const referenceHeight = referenceHeightOverride ?? Math.max(...measured.map((frame) => frame.source.height));
+        const overlays = images.map((image, index) => silksOverlays(image, measured[index]!.source, SILKS_COLORS, silksLayout));
+        /**
+         * ★配置と縮尺の基準は鞍布（剛体）。
+         *   - 基準点 = 鞍布中心（無ければ胴体重心）
+         *   - 縮尺 = 鞍布幅の中央値との比で各コマを補正（±8% で頭打ち。騎手の脚で一部隠れるぶんの誤検出を抑える）
+         *   - 接地高さ = そのコマの最下点（蹄）を地面に置き、空中局面だけ `HORSE_FLIGHT_LIFT_SOURCE_PX` 浮かせる
+         */
+        const refs = anchorsOverride ?? measured.map((frame) => saddleReference(frame.image, frame.source, silksLayout));
+        const anchors = measured.map((frame, index) => refs[index] ?? bodyCentroid(frame.image, frame.source));
+        const widths = refs.flatMap((ref) => (ref === undefined ? [] : [ref.width]));
+        const medianWidth = widths.length === 0 ? 0 : [...widths].sort((a, b) => a - b)[Math.floor(widths.length / 2)]!;
+        const scaleFix = (index: number): number => {
+          const ref = refs[index];
+          if (ref === undefined || medianWidth <= 0) return 1;
+          return Math.max(0.92, Math.min(1.08, ref.width / medianWidth));
+        };
+        const shadows = measured.map((frame) => bakeShadowSilhouette(frame.image, frame.source));
+        return SILKS_COLORS.map((_, gateIndex) => measured.map((frame, frameIndex) => ({
+          ...frame,
+          referenceHeight: referenceHeight * scaleFix(frameIndex),
+          groundLiftSourcePx: HORSE_GROUND_LIFTS[frameIndex] ?? 0,
+          shadow: shadows[frameIndex],
+          bodyAnchorSourcePx: anchors[frameIndex]!,
+          bodyLiftSourcePx: (frame.source.y + frame.source.height - anchors[frameIndex]!.y)
+            + flightLiftFor(frameIndex, images.length),
+          overlay: overlays[frameIndex]?.[gateIndex],
+        })));
+      };
+      /**
+       * ★勝馬の 8 コマ（騎手が立ってガッツポーズ・Codex 生成）。8 枚すべて揃ったときだけ使う。
+       *   揃わない間は走行 8 コマで代用（`winnerCycleHighQuality` を undefined のまま）。
+       */
+      /**
+       * ★走行 16 コマ: side-v6 の 8 姿勢の間に Codex 生成の中間姿勢 mid01..08 を挟む（01, mid01, 02, mid02, …）。
+       *   8 枚揃わなければ 8 コマのまま。
+       */
+      const midImages = await Promise.all(Array.from({ length: 8 }, (_, i) =>
+        loadImg(`/art/horse-jockey-side-v6-mid${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)));
+      const midsReady = midImages.every((image): image is HTMLImageElement => image !== null);
+      const winnerCycleImages = await Promise.all(Array.from({ length: 8 }, (_, i) =>
+        loadImg(`/art/horse-jockey-winner-v2-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)));
+      const winnerCycleReady = winnerCycleImages.every((image): image is HTMLImageElement => image !== null);
+      /**
+       * ★馬・騎手分離素材（Codex 生成）: 騎手なしの馬 8 コマ ＋ 騎手 2 姿勢（前傾 a/b・ガッツポーズ a/b）。
+       *   全部揃ったときだけ合成コマを使い、揃わなければ従来の一体コマ。
+       */
+      const horseOnlyImages = await Promise.all(Array.from({ length: 8 }, (_, i) =>
+        loadImg(`/art/horse-only-side-v6-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)));
+      const jockeyImages = await Promise.all(['jockey-crouch-a', 'jockey-crouch-b', 'jockey-celebrate-a', 'jockey-celebrate-b']
+        .map((name) => loadImg(`/art/${name}.png?v=${ASSET_VERSION}`).catch(() => null)));
+      /**
+       * ★2026-08-18 オーナー判定: 馬・騎手の分離合成は「馬の形・大きさがアンバランス」「勝馬の騎手が破綻」で不採用。
+       *   合格していた一体素材（side-v6 8 コマ・winner-v2 8 コマ）へ戻す。素材は残すが使わない。
+       */
+      const USE_SEPARATED_COMPOSITE = false;
+      const separatedReady = USE_SEPARATED_COMPOSITE
+        && horseOnlyImages.every((image): image is HTMLImageElement => image !== null)
+        && jockeyImages.every((image): image is HTMLImageElement => image !== null);
+      const composeCycle = (
+        jockeys: readonly [HTMLImageElement, HTMLImageElement],
+        refFrames: readonly [HTMLImageElement, HTMLImageElement],   // 騎手 a/b の元になった一体コマ
+        refPoses: readonly [number, number],                          // その馬姿勢（1〜8）
+        refLayout: SilksLayout,                                        // 参照コマの鞍布検出レイアウト
+      ): FrameImage[] | undefined => {
+        if (!separatedReady) return undefined;
+        const horses = horseOnlyImages as HTMLImageElement[];
+        const saddles = horses.map((image) => saddleReference(image, opaqueBounds(image), SILKS_LAYOUT_HORSE_ONLY));
+        if (saddles.some((saddle) => saddle === undefined)) return undefined;
+        // 参照コマ: 鞍布（一体コマ用レイアウトで検出）の中心より下・x 範囲内の黒画素＝ブーツ
+        const refMarks = [0, 1].map((k) => {
+          const refImage = refFrames[k]!;
+          const b = opaqueBounds(refImage);
+          const cloth = saddleReference(refImage, b, refLayout);
+          if (cloth === undefined) return undefined;
+          return jockeyLandmarks(refImage, { x0: cloth.x - cloth.width * 0.55, x1: cloth.x + cloth.width * 0.55, y0: cloth.y, y1: cloth.y + cloth.width * 0.7 }, b.y);
+        });
+        const genMarks = jockeys.map((jockey) => {
+          const b = opaqueBounds(jockey);
+          return jockeyLandmarks(jockey, { x0: b.x, x1: b.x + b.width, y0: b.y + b.height * 0.5, y1: b.y + b.height }, b.y);
+        });
+        if (refMarks.some((m) => m === undefined) || genMarks.some((m) => m === undefined)) return undefined;
+        return horses.map((horse, index) => {
+          const k = index >= 4 ? 1 : 0;
+          return composeHorseAndJockey(horse, jockeys[k]!, genMarks[k]!, refMarks[k]!, saddles[index]!, saddles[refPoses[k]! - 1]!);
+        });
+      };
+      /**
+       * ★斜め後ろ（v3・高解像度）: 騎手なし 8 コマ ＋ 後方視点の前傾騎手 1 枚。騎手は pose04 の座標で描かれているので、
+       *   各コマの鞍布中心の差だけ移動して合成。揃わなければ従来の低解像度 diag-rear-v2。
+       */
+      const rearHorseImages = await Promise.all(Array.from({ length: 8 }, (_, i) =>
+        loadImg(`/art/horse-only-diag-rear-v3-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)));
+      const rearJockey = await loadImg(`/art/jockey-crouch-rear.png?v=${ASSET_VERSION}`).catch(() => null);
+      let composedRear: { frames: FrameImage[]; anchors: { x: number; y: number; width: number }[] } | undefined;
+      if (USE_SEPARATED_COMPOSITE && rearJockey !== null && rearHorseImages.every((image): image is HTMLImageElement => image !== null)) {
+        const saddles = rearHorseImages.map((image) => saddleReference(image, opaqueBounds(image), SILKS_LAYOUT_HORSE_ONLY));
+        const ref = saddles[3];
+        if (ref !== undefined && saddles.every((saddle) => saddle !== undefined)) {
+          composedRear = {
+            frames: rearHorseImages.map((horse, index) => {
+              const cv = document.createElement('canvas'); cv.width = horse.naturalWidth; cv.height = horse.naturalHeight;
+              const ctx = cv.getContext('2d');
+              if (ctx !== null) {
+                ctx.drawImage(horse, 0, 0);
+                ctx.drawImage(rearJockey, Math.round(saddles[index]!.x - ref.x), Math.round(saddles[index]!.y - ref.y));
+              }
+              return cv;
+            }),
+            anchors: saddles.map((saddle) => saddle!),
+          };
+        }
+      }
+      const sideRefs = loaded.slice(8, 16);
+      const composedRace = composeCycle(
+        [jockeyImages[0]!, jockeyImages[1]!] as [HTMLImageElement, HTMLImageElement],
+        [sideRefs[0]!, sideRefs[4]!], [1, 5], SILKS_LAYOUT_CROUCH);
+      const composedWinner = winnerCycleReady ? composeCycle(
+        [jockeyImages[2]!, jockeyImages[3]!] as [HTMLImageElement, HTMLImageElement],
+        [winnerCycleImages[0] as HTMLImageElement, winnerCycleImages[4] as HTMLImageElement], [1, 5], SILKS_LAYOUT_WINNER) : undefined;
+      const sidePoses: readonly FrameImage[] = composedRace ?? loaded.slice(8, 16);
+      /**
+       * ★16 コマ（中間コマ入り）は「ウサギ跳ね」と評価されたため既定は 8 コマ。
+       *   中間コマは脚位置の計測で「両隣の真の中間」と確認できたものだけ後で戻す。
+       */
+      const USE_MID_FRAMES = false;
+      const sideCycle: readonly FrameImage[] = midsReady && USE_MID_FRAMES
+        ? sidePoses.flatMap((pose, index) => [pose, midImages[index]!])
+        : sidePoses;
+      const sideHighQuality = buildFrames(sideCycle);
+      /**
+       * ★方向別の一体素材（勝馬 8 コマと同じ方式で Codex 生成・騎手込み・1024×1536）。
+       *   diag-rear-v4 / diag-front-v3 が 8 枚揃ったときだけ採用。揃わない方向は真横素材で代用（低解像度 v2 は使わない）。
+       */
+      const loadSet = async (prefix: string): Promise<HTMLImageElement[] | undefined> => {
+        const images = await Promise.all(Array.from({ length: 8 }, (_, i) =>
+          loadImg(`/art/${prefix}-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)));
+        return images.every((image): image is HTMLImageElement => image !== null) ? images : undefined;
+      };
+      const rearV4 = await loadSet('horse-jockey-diag-rear-v4');
+      const frontV3 = await loadSet('horse-jockey-diag-front-v3');
+      const diagFrontHighQuality = frontV3 !== undefined
+        ? buildFrames(frontV3, undefined, SILKS_LAYOUT_FRONT)
+        : buildFrames(loaded.slice(16, 24));
+      const diagRearHighQuality = rearV4 !== undefined
+        ? buildFrames(rearV4, undefined, SILKS_LAYOUT_REAR)
+        : composedRear !== undefined
+          ? buildFrames(composedRear.frames, undefined, SILKS_LAYOUT_REAR, composedRear.anchors)
+          : buildFrames(loaded.slice(24, 32));
+      const highDiagHighQuality = buildFrames(loaded.slice(32, 40));
+      const winnerHighQuality = buildFrames(loaded.slice(40, 41));
+      artRef.current = {
+        pal, raceTitle: raceTitle!, raceNarrator: raceNarrator!, startingGate: startingGate!,
+        raceBackstretch: raceBackstretch!, raceCornerExit: raceCornerExit!, raceFinish: raceFinish!,
+        raceCornerRear: raceCornerRear!, raceCornerHigh: raceCornerHigh!,
+        sideHighQuality, diagFrontHighQuality, diagRearHighQuality, highDiagHighQuality, winnerHighQuality,
+        /**
+         * ★勝馬コマは騎手が腕を挙げるぶん外接矩形が縦に長い。矩形高さを基準にすると馬体が 2〜3 割縮むので、
+         *   馬体の大きさ（矩形幅の中央値の比）で side-v6 の基準高さに合わせる。
+         */
+        texturedWorld,
+        directionalReady: { rear: rearV4 !== undefined, front: frontV3 !== undefined },
+        ...(composedWinner !== undefined ? {
+          // ★合成勝馬: 馬体は側面走り 8 コマそのもの（伸縮なし）、騎手はガッツポーズ 2 姿勢
+          winnerCycleHighQuality: buildFrames(composedWinner, undefined, SILKS_LAYOUT_WINNER),
+        } : winnerCycleReady ? {
+          winnerCycleHighQuality: buildFrames(winnerCycleImages, (() => {
+            const median = (values: number[]): number => { const v = [...values].sort((x, y) => x - y); return v[Math.floor(v.length / 2)] ?? 1; };
+            const sideRef = sideHighQuality[0]![0]!.referenceHeight;
+            const sideWidth = median(sideHighQuality[0]!.map((frame) => frame.source.width));
+            const winnerWidth = median(winnerCycleImages.map((image) => opaqueBounds(image).width));
+            return sideRef * (winnerWidth / sideWidth);
+          })(), SILKS_LAYOUT_WINNER),
+        } : {}),
+        parallaxBackstretch,
+      };
       setReady(true);
     };
     boot().catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)));
     return () => { cancelled = true; };
-  }, [coat, backlight]);
+  }, []);
 
   useEffect(() => {
     try { setBuilt(build(seed, ownGate, surface, trackCondition)); setErr(null); } catch (e) {
@@ -243,17 +894,51 @@ export default function RacePage(): React.JSX.Element {
     callKeyRef.current = '';
     callLastSecRef.current = -Infinity;
     setClock(0);
-  }, [seed, ownGate, surface, trackCondition]);
+  }, [seed, ownGate, surface, trackCondition, turn]);
 
   const render = useCallback((d: number) => {
     const cv = canvasRef.current;
     const art = artRef.current;
-    const api = window.STARStill;
-    if (cv === null || art === null || api === undefined || built === null) return;
+    if (cv === null || art === null || built === null) return;
     const ctx = cv.getContext('2d');
     if (ctx === null) return;
 
-    const sec = built.warp.raceSecAt(d);
+    const intro = raceIntroAt(d);
+    const vp = { width: W, height: H };
+    const FONT = (px: number, bold?: boolean): string =>
+      `${bold === true ? 'bold ' : ''}${px}px sans-serif`;
+    const conditionLabel: Record<TrackCondition, string> = {
+      good: '良', yielding: '稍重', soft: '重', bad: '不良',
+    };
+    if (intro.stage === 'title') {
+      drawRaceTitleCard(ctx, art.pal as Record<string, string>, vp, FONT, {
+        venue: '阪神競馬場', raceName: '桜花賞', raceNo: '11R',
+        distanceMeter: DIST, surfaceLabel: surface === 'turf' ? '芝' : 'ダート',
+        weatherLabel: '晴', conditionLabel: conditionLabel[trackCondition],
+        turnLabel: turn === 'left' ? '左回り' : '右回り',
+      }, d, { image: art.raceTitle, width: art.raceTitle.width, height: art.raceTitle.height });
+      drawRendererBadge(ctx, renderer, 'title');
+      return;
+    }
+    /**
+     * ★V2 はゲート待機〜発走〜追走を**同じ透視カメラの一続き**で描く（ユーザー指摘①: カット無し）。
+     *   発馬機は世界固定の物体（`start-gate`）として馬の手前に描き、発走後は左へ流れ去る。
+     *   旧固定2D（legacy）だけが従来のプレート＋振り付けの発走を使う。
+     */
+    const v2StartHold = renderer === 'v2' && (intro.stage === 'gate-hold' || intro.stage === 'gate-release');
+    if (renderer !== 'v2' && (intro.stage === 'gate-hold' || intro.stage === 'gate-release')) {
+      drawStartingGate(ctx, art.pal as Record<string, string>, vp, FONT,
+        undefined, 0, SHEET_V2, FIELD, intro.releaseProgress, frameRoleOf,
+        { image: art.startingGate, width: art.startingGate.width, height: art.startingGate.height },
+        art.sideHighQuality[0], art.sideHighQuality,
+        { image: art.raceNarrator, width: art.raceNarrator.width, height: art.raceNarrator.height });
+      drawRendererBadge(ctx, renderer, intro.stage);
+      return;
+    }
+
+    const raceD = intro.raceDisplaySec;
+
+    const sec = built.warp.raceSecAt(raceD);
     const at = built.model.at(sec);
     const sorted = [...at].sort((a, b) => b.meters - a.meters)
       .map((h) => ({ gate: h.gate, s: h.meters, stamina: h.staminaRatio }));
@@ -279,17 +964,21 @@ export default function RacePage(): React.JSX.Element {
      *    参考は3枚とも馬群の後ろから見ており、★**空もスタンドも写っていません**。
      */
     const allFinishedNow = at.every((h) => h.meters >= DIST - 1e-6);
+    const courseSection = raceCourseSectionAt(lead, DIST, allFinishedNow);
     const shot = raceShotAt({
       distanceMeter: DIST,
       leaderMeters: lead,
-      displaySec: d,
+      displaySec: raceD,
       displayDurationSec: built.warp.displaySec,
       phase: phaseOf(DIST - lead),
       allFinished: allFinishedNow,
     });
-    const visualAt = withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST, Math.max(0, d - built.warp.displaySec));
+    const visualAt = withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST, Math.max(0, raceD - built.warp.displaySec));
     const visualLead = Math.max(...visualAt.map((h) => h.meters));
     const winnerGate = built.result[0]!.gate;
+    const winnerFinishedNow = (at.find((horse) => horse.gate === winnerGate)?.meters ?? 0) >= DIST - 1e-6;
+    const winnerFinishSec = built.finishSec.get(winnerGate);
+    const winnerAfterSec = winnerFinishSec === undefined ? 0 : Math.max(0, sec - winnerFinishSec);
     const contenders = visualAt.filter((h) => visualLead - h.meters <= HORSE_LENGTH_M * 2);
     const pack = visualAt.filter((h) => visualLead - h.meters <= 40);
     const focusHorses = focusForRaceShot(shot, {
@@ -298,37 +987,233 @@ export default function RacePage(): React.JSX.Element {
       winner: visualAt.filter((h) => h.gate === winnerGate),
     });
     const packS = focusHorses.reduce((sum, h) => sum + h.meters, 0) / Math.max(1, focusHorses.length);
-    const packW = focusHorses.reduce((sum, h) => sum + (h.w ?? course.widthM / 2), 0) / Math.max(1, focusHorses.length);
-    const cam = broadcastCamera(course, {
-      atS: Math.max(20, shot.family === 'finish' || shot.family === 'winner' ? packS : Math.min(DIST - 5, packS)),
-      atW: packW,
-      width: W, height: H,
-      view: shot.view,
-      preset: shotCameraForDistance(shot, DIST),
-    });
-    const useRear = shot.view === 'rear';
-    const useDiagRear = shot.view === 'diag-rear';
-    const useDiagFront = shot.view === 'diag-front';
-    const useHighDiag = shot.view === 'high-diag';
-    const horseSheet = useRear ? art.rear : useDiagRear ? art.diagRear : useDiagFront ? art.diagFront : useHighDiag ? art.highDiag : art.side;
-    const horseSpec = useRear ? SHEET_REAR : useDiagRear ? SHEET_DIAG_REAR_V1 : useDiagFront ? SHEET_DIAG_FRONT_V1 : useHighDiag ? SHEET_HIGH_DIAG_V1 : SHEET_V2;
-    const horsesToDraw = shot.family === 'winner' ? visualAt.filter((h) => h.gate === winnerGate) : visualAt;
-    ctx.imageSmoothingEnabled = true;   // ★遠近で滑らかに縮む。整数倍はもうやりません
-    drawPerspectiveWorld(ctx, course, cam, art.pal as Record<string, string>, DIST, packS, { surface, condition: trackCondition });
-    drawPerspectiveHorses(ctx, course, cam,
-      horsesToDraw.map((h) => ({ gate: h.gate, s: h.meters, w: h.w ?? course.widthM / 2 })), {
-        sheet: horseSheet, sheetWidth: horseSheet.width, spec: horseSpec,
-        fieldSize: FIELD,
-        // ★脚は**表示の時間**で回す（距離で回すと道中の早送りで小走りになる）
-        frameOf: (g) => Math.floor(d * 16 + g * 0.37 * horseSpec.frames) % horseSpec.frames,
-        frameRoleOf, distanceMeter: DIST,
-        trackEffect: {
-          surface, condition: trackCondition,
-          color: (art.pal as Record<string, string>)[surface === 'dirt'
-            ? (trackCondition === 'good' || trackCondition === 'yielding' ? 'dirt-0' : 'dirt-1')
-            : 'turf-5'] ?? '#6d5236',
-        },
+    const cornerSection = courseSection === 'first-corner' || courseSection === 'second-corner'
+      || courseSection === 'third-corner' || courseSection === 'fourth-corner';
+    // ★既定は V2（引継ぎ書 §1-5）。旧固定2Dは `?renderer=legacy` のときだけ
+    let v2ShotId: string | undefined;
+    /** ★V2 の区間名はショット選択と同じ区間定義から（`broadcastV2SectionLabel`）。旧 `raceCourseSectionAt` とは別定義 */
+    let v2SectionLabel: string | undefined;
+    /** ★ミニマップ用: 注視点と描画に使った馬の位置（描画と同じ値） */
+    let v2Minimap: { focusS: number; horses: { gate: number; s: number; w: number; own: boolean }[] } | undefined;
+    if (renderer === 'v2') {
+      const course = ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn });
+      /** ★発走イージング（描画のみ・全馬同じ係数）。順位・着差・HUD には触れない */
+      const startEase = broadcastV2StartEase(raceD);
+      const easedAt = visualAt.map((horse) => ({ ...horse, meters: horse.meters * startEase }));
+      const scene = resolveBroadcastV2Scene(course, easedAt.map((horse) => ({
+        gate: horse.gate,
+        s: horse.meters,
+        w: horse.w ?? TRACK_WIDTH_M / 2,
+        finished: horse.meters >= DIST - 1e-6,
+      })), { width: W, height: H }, winnerFinishedNow, {
+        finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
+        raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
+        fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
       });
+      v2ShotId = scene.shot.id;
+      v2SectionLabel = broadcastV2SectionLabel(course, visualLead, scene.shot.id);
+      v2Minimap = {
+        focusS: scene.focusS,
+        horses: easedAt.map((horse) => ({ gate: horse.gate, s: horse.meters, w: horse.w ?? TRACK_WIDTH_M / 2, own: horse.gate === ownGate })),
+      };
+      const library = (frames: readonly (readonly HighQualityHorseFrame[])[]) => ({
+        sheet: frames[0]![0]!.image,
+        sheetWidth: frames[0]![0]!.source.width,
+        spec: {
+          frames: 1,
+          cellH: frames[0]![0]!.referenceHeight,
+          anchorXRatio: 0.5,
+          anchorYRatio: 1,
+        },
+        frameImagesByGate: frames,
+      });
+      const libraries: BroadcastV2FrameLibraries<CanvasImageSource> = {
+        'side-v6': library(art.sideHighQuality),
+        'diag-front-v2': library(art.diagFrontHighQuality),
+        'diag-rear-v2': library(art.diagRearHighQuality),
+        'high-diag-v2': library(art.highDiagHighQuality),
+        /**
+         * ★勝馬追従: 1 枚絵 `winner-v1` は脚が動かず「絵だけになって背景が動く」（ユーザー指摘⑥）。
+         *   勝馬の 8 コマ（騎手が立ってガッツポーズ）が承認されるまでは走行 8 コマで脚を動かす。
+         */
+        'winner-v1': library(art.winnerCycleHighQuality ?? art.sideHighQuality),
+      };
+      const plate = scene.shot.id === 'finish-line' || scene.shot.id === 'winner-follow' ? art.raceFinish
+        : scene.shot.id === 'homestretch-side' ? art.raceCornerExit
+          : scene.shot.id === 'third-corner-rear' ? art.raceCornerRear
+            : scene.shot.id === 'first-corner-front' || scene.shot.id === 'second-corner-high'
+              || scene.shot.id === 'fourth-corner-high' ? art.raceCornerHigh
+              : art.raceBackstretch;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      /**
+       * ★脚の周期は「時間」ではなく「進んだ距離」から。
+       *   旧: `raceD * 12`（全馬 1.5 完歩/秒で一定・速度と無関係）。
+       *   → 1完歩 ≈ 7m（競走速度 16m/s で約 2.3 完歩/秒）。速い馬ほど脚が速く回り、失速も脚に出る。
+       *   位相の個体差 `gate * 2.96` は据え置き。
+       */
+      /**
+       * ★見た目の周期。実馬は 1 完歩 ≈7m（2.3 完歩/秒）だが、画面では跳ねて見える（ユーザー指摘「ウサギ」）。
+       *   合格に近いと評価されたゴール後の走り（≈1.6〜1.8 完歩/秒）に合わせ 9m とする。
+       */
+      const STRIDE_M = 7;
+      /**
+       * ★見た目の進行距離 = 真の位置 + Δ（`visual-scroll.ts`）。時間圧縮を打ち消し、
+       *   背景の流れと脚の周期を常に実馬の速さにする。ゴール前は Δ=0（決勝線と馬が一致）。
+       */
+      const visualDelta = built.visualScroll.deltaAt(d);
+      const metersByGate = new Map(easedAt.map((horse) => [horse.gate, horse.meters]));
+      /**
+       * ★発走直後 0.7 秒だけ、減衰する小さなカメラ揺れ（世界だけ・HUD は揺らさない）。
+       *   時刻 d の関数なので決定論（憲法4）。実況カメラが開扉の衝撃で震える感じを出す。
+       */
+      const shakeT = raceD > 0 && raceD < 0.7 ? raceD / 0.7 : -1;
+      if (shakeT >= 0) {
+        const amp = 5 * (1 - shakeT) * (1 - shakeT);
+        ctx.save();
+        ctx.translate(Math.sin(raceD * 61) * amp, Math.cos(raceD * 47) * amp * 0.6);
+      }
+      /**
+       * ★カット切替のディゾルブ（0.45 秒）: 直前のショットを同じ時刻でオフスクリーンに描き、
+       *   新ショットの上に薄れながら重ねる。切替時刻は build 時に決定論で求めてある（`shotChanges`）。
+       */
+      const DISSOLVE_SEC = 0.45;
+      const change = built.shotChanges.find((c) => c.displaySec <= d && d - c.displaySec < DISSOLVE_SEC && c.to === scene.shot.id);
+      const drawScene = (target: CanvasRenderingContext2D, sceneToDraw: typeof scene): void => drawBroadcastV2Scene(target, course, sceneToDraw, {
+        palette: art.pal as Record<string, string>,
+        libraries,
+        fieldSize: FIELD,
+        directionalSets: art.directionalReady,
+        // ★ゲート待機中（raceD=0）は脚を体の下に畳んだ支持局面 pose04（index 3）で静止させる
+        frameOf: (gate) => raceD <= 0 ? 3
+          : Math.floor((((metersByGate.get(gate) ?? 0) + visualDelta) / STRIDE_M) * 8 + gate * 2.96) % 8,
+        // ★位相（0〜1）: 8 コマ・16 コマどちらの素材でも同じ周期で回る。待機中は pose04 の位相
+        phaseOf: (gate) => raceD <= 0 ? 3.5 / 8
+          : ((((metersByGate.get(gate) ?? 0) + visualDelta) / STRIDE_M) + gate * 0.37) % 1,
+        frameRoleOf,
+        surface,
+        condition: trackCondition,
+        kickupColor: surface === 'dirt' ? '#796047' : '#738b43',
+        /**
+         * ★コーナー専用カット（3 秒程度）の 1 枚絵は、カットの進行に合わせてパン＋軽いズーム。
+         *   旧 `(focusS % 400)/400` は 400m で 137px しか動かず静止に見えた。
+         */
+        backgroundPlate: plate === undefined ? undefined : {
+          image: plate,
+          width: plate.naturalWidth,
+          height: plate.naturalHeight,
+          progress: scene.cutProgress,
+          zoom: 1.14 + 0.08 * scene.cutProgress,
+        },
+        /**
+         * ★横追従の全ショット（発走追従・向正面・直線・ゴール前・勝馬追従）をループ多層パララックスにする。
+         *   コーナー（3角後方・4角俯瞰）は別構図なので従来プレートのまま（次段で対処）。
+         *   縦の枠取り: 望遠カメラで蹄が y≈375〜470 に来るので、芝の帯（プレート 503–762）が
+         *   その範囲を含むよう anchor を 1.0（窓を下端まで）にする。
+         */
+        parallaxPlate: sceneToDraw.shot.view === 'side'
+          ? { plate: art.parallaxBackstretch, zoom: 1.14, verticalAnchor: 1.0, scrollM: sceneToDraw.focusS + visualDelta }
+          : undefined,
+        // ★横視点以外（コーナー後方・俯瞰・斜め前）はテクスチャ付き透視ワールド（背景が実際に動く）
+        texturedWorld: sceneToDraw.shot.view === 'side' ? undefined : art.texturedWorld,
+      });
+      drawScene(ctx, scene);
+      if (change !== undefined) {
+        const off = dissolveCanvasRef.current ?? (dissolveCanvasRef.current = document.createElement('canvas'));
+        if (off.width !== W || off.height !== H) { off.width = W; off.height = H; }
+        const offCtx = off.getContext('2d');
+        if (offCtx !== null) {
+          const prevScene = resolveBroadcastV2Scene(course, easedAt.map((horse) => ({
+            gate: horse.gate, s: horse.meters, w: horse.w ?? TRACK_WIDTH_M / 2, finished: horse.meters >= DIST - 1e-6,
+          })), { width: W, height: H }, winnerFinishedNow, {
+            finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
+            raceDisplaySec: d - RACE_INTRO_RACE_START_SEC, forceShotId: change.from,
+            fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
+          });
+          offCtx.clearRect(0, 0, W, H);
+          drawScene(offCtx, prevScene);
+          const t = (d - change.displaySec) / DISSOLVE_SEC;
+          ctx.globalAlpha = Math.max(0, 1 - t * t);
+          ctx.drawImage(off, 0, 0);
+          ctx.globalAlpha = 1;
+        }
+      }
+      if (shakeT >= 0) ctx.restore();
+    } else {
+    const background = courseSection === 'finish' || courseSection === 'winner' ? art.raceFinish
+      : cornerSection ? art.raceCornerExit : art.raceBackstretch;
+    const horsesToDraw = shot.family === 'winner'
+      ? visualAt.filter((h) => h.gate === winnerGate)
+      : visualAt;
+    const isClose = shot.family === 'winner';
+    // 発走カメラ終了時の密集3列から通常追走配置へ、約7秒かけて連続移行する。
+    const formationRaw = Math.max(0, Math.min(1, (raceD - (RACE_INTRO_END_SEC - RACE_INTRO_RACE_START_SEC)) / 7));
+    const formation = formationRaw * formationRaw * (3 - 2 * formationRaw);
+    const mix = (from: number, to: number): number => from + (to - from) * formation;
+    const normalGround = isClose ? [470, 515, 560] as const
+      : cornerSection ? [390, 440, 494] as const
+        : courseSection === 'straight' || courseSection === 'finish'
+          ? [450, 505, 562] as const : [455, 505, 555] as const;
+    const normalHeight = isClose ? [235, 270, 305] as const
+      : cornerSection ? [128, 150, 174] as const
+        : courseSection === 'straight' || courseSection === 'finish'
+          ? [190, 220, 252] as const : [175, 205, 235] as const;
+    const normalOffset = isClose ? [-55, 0, 55] as const
+      : cornerSection ? [-125, 0, 125] as const : [-70, 0, 70] as const;
+    const cameraCenter = isClose ? 650 : cornerSection ? 820
+      : courseSection === 'straight' || courseSection === 'finish' ? 850 : 940;
+    const pxPerMeter = isClose ? 18 : cornerSection ? 7.5
+      : courseSection === 'straight' || courseSection === 'finish' ? 15 : 12;
+    const minimumGap = isClose ? 190 : cornerSection ? 105
+      : courseSection === 'straight' || courseSection === 'finish' ? 155 : 150;
+    const layouts = fixed2DPackLayout(horsesToDraw.map((horse) => ({
+      gate: horse.gate, meters: horse.meters, laneM: horse.w ?? TRACK_WIDTH_M / 2,
+    })), {
+      cameraMeters: packS,
+      centerX: mix(820, cameraCenter),
+      pxPerMeter: mix(9, pxPerMeter), trackWidthM: TRACK_WIDTH_M,
+      groundY: [mix(452, normalGround[0]), mix(482, normalGround[1]), mix(512, normalGround[2])],
+      displayReferenceHeight: [mix(146, normalHeight[0]), mix(160, normalHeight[1]), mix(174, normalHeight[2])],
+      bandXOffsetPx: [mix(-24, normalOffset[0]), 0, mix(24, normalOffset[2])],
+      minVisibleGapPx: mix(72, minimumGap),
+    });
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    drawFixed2DSideScene(ctx, { width: W, height: H }, {
+      image: background, width: background.naturalWidth, height: background.naturalHeight,
+    }, layouts.map((horse) => ({
+      frame: art.sideHighQuality[horse.gate - 1]![Math.floor(raceD * 12 + horse.gate * 2.96) % 8]!,
+      x: horse.x, groundY: horse.groundY, displayReferenceHeight: horse.displayReferenceHeight,
+    })), {
+      travelPx: raceD * (courseSection === 'straight' || courseSection === 'finish' ? 178 : cornerSection ? 108 : 138),
+      mode: courseSection === 'straight' ? 'straight'
+        : courseSection === 'finish' || courseSection === 'winner' ? 'finish'
+          : cornerSection ? 'corner' : 'side',
+    });
+    }
+
+    if (v2StartHold) {
+      // ★ゲート待機〜発走直後: 順位 HUD の代わりに発走の中継帯（「ゲートイン完了」→「スタートしました！」）
+      drawStartCallBand(ctx, art.pal as Record<string, string>, vp, FONT, FIELD, intro.stage === 'gate-release',
+        { image: art.raceNarrator, width: art.raceNarrator.width, height: art.raceNarrator.height });
+      drawRendererBadge(ctx, renderer, `${intro.stage}/${v2ShotId ?? 'v2'}`);
+      return;
+    }
+    const sectionLabel: Record<typeof courseSection, string> = {
+      start: 'スタート後', 'first-corner': '第1コーナー', 'second-corner': '第2コーナー',
+      backstretch: '向正面', 'third-corner': '第3コーナー', 'fourth-corner': '第4コーナー',
+      straight: '最後の直線', finish: 'ゴール前', winner: 'レース確定',
+    };
+    drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, v2SectionLabel ?? sectionLabel[courseSection]);
+    /**
+     * ★コース図ミニマップ（左上・区間タグの下）。カットが変わっても「今どこか」が繋がる（ユーザー指摘⑥）。
+     *   描画に使った位置をそのまま点にする（順位計算はしない）。
+     */
+    if (v2Minimap !== undefined) {
+      drawCourseMinimap(ctx, ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn }), art.pal as Record<string, string>, FONT,
+        v2Minimap.horses, v2Minimap.focusS, { x: 24, y: 112, width: 190, height: 112 },
+        (gate) => SILKS_COLORS[(gate - 1) % SILKS_COLORS.length] ?? '#fff');
+    }
+    drawRendererBadge(ctx, renderer, renderer === 'v2' ? v2ShotId ?? 'v2' : `legacy/${courseSection}`);
 
     /**
      * ★**UI は画面の座標系**（アートバイブル §9）。
@@ -336,10 +1221,7 @@ export default function RacePage(): React.JSX.Element {
      *   ⚠️ ★**描き方はこの画面に持ちません** — 動画の道具と**同じ関数**を呼びます。
      */
     {
-      const vp = { width: W, height: H };
-      const FONT = (px: number, bold?: boolean): string =>
-        `${bold === true ? 'bold ' : ''}${px}px sans-serif`;
-      const hud = raceHudVisibilityAt(d, built.warp.displaySec, allFinishedNow);
+      const hud = raceHudVisibilityAt(raceD, built.warp.displaySec, allFinishedNow);
       // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）
       const g = staminaAt(built.gauge, Math.max(0, metersLeft));
       if (hud.gauge) {
@@ -387,7 +1269,7 @@ export default function RacePage(): React.JSX.Element {
         ? 0 : aheadBefore - ownBefore;
       const closing = gapBefore - gapNow;
       const lengths = gapNow / HORSE_LENGTH_M;
-      const phaseName = metersLeft <= 400 ? '直線' : metersLeft <= 800 ? '勝負所' : '道中';
+      const phaseName = v2SectionLabel ?? sectionLabel[courseSection];
       const say: CallPart[] = [{ text: `${ownGate}番`, role: frameRoleOf(ownGate, FIELD) }];
       if (aheadM === undefined) say.push({ text: ' が先頭。' });
       else if (lengths < 0.3) say.push({ text: ' は前と並んでいます' });
@@ -397,39 +1279,51 @@ export default function RacePage(): React.JSX.Element {
           text: closing > 0.15 ? '、詰めています' : closing < -0.15 ? '、離されています' : 'の差',
         });
       }
-      if (phaseName !== '道中') say.push({ text: `　★${phaseName}` });
+      say.push({ text: `　★${phaseName}` });
       const key = `${phaseName}/${lengths < 0.3 ? '並' : closing > 0.15 ? '詰' : closing < -0.15 ? '離' : '同'}/${ownIdx + 1}`;
-      if (hud.calls && shouldEmitRaceCall(callKeyRef.current, key, callLastSecRef.current, d)) {
+      if (hud.calls && shouldEmitRaceCall(callKeyRef.current, key, callLastSecRef.current, raceD)) {
         callKeyRef.current = key;
-        callLastSecRef.current = d;
+        callLastSecRef.current = raceD;
         callRef.current = [...callRef.current, say].slice(-3);
       }
-      if (hud.calls) drawCallBand(ctx, art.pal as Record<string, string>, vp, FONT, callRef.current);
+      if (hud.calls) drawCallBand(ctx, art.pal as Record<string, string>, vp, FONT, callRef.current,
+        { image: art.raceNarrator, width: art.raceNarrator.width, height: art.raceNarrator.height });
+
+      if (winnerFinishedNow && winnerAfterSec < 3.4) {
+        drawWinnerLowerThird(ctx, art.pal as Record<string, string>, vp, FONT,
+          winnerGate, HORSE_NAMES[winnerGate - 1] ?? `スター${winnerGate}`,
+          JOCKEY_NAMES[winnerGate - 1] ?? 'STAR騎手', built.finishSec.get(winnerGate));
+      }
 
       if (hud.result) {
         drawResultPanel(ctx, art.pal as Record<string, string>, vp, FONT,
           built.result, FIELD, frameRoleOf);
       }
     }
-  }, [built, course, ownGate, surface, trackCondition]);
+  }, [built, ownGate, surface, trackCondition, turn, renderer]);
 
-  useEffect(() => { render(dRef.current); }, [render, ready]);
+  useEffect(() => {
+    const auditSec = Number(new URLSearchParams(window.location.search).get('auditSec'));
+    if (Number.isFinite(auditSec) && auditSec >= 0) dRef.current = auditSec;
+    render(dRef.current);
+  }, [render, ready]);
 
   useEffect(() => {
     if (!playing || built === null) return;
     t0Ref.current = performance.now() - dRef.current * 1000;
     const loop = (): void => {
       const d = (performance.now() - t0Ref.current) / 1000;
-      // ★ゴール後も 1.2秒だけ回す（決着の一拍と着順表示のため）
-      if (d >= built.warp.displaySec + 1.2) {
-        dRef.current = built.warp.displaySec + 1.2;
+      // ゴール後はランアウト→勝者紹介→正式着順まで5.2秒確保する。
+      const totalDisplaySec = RACE_INTRO_RACE_START_SEC + built.warp.displaySec + 5.2;
+      if (d >= totalDisplaySec) {
+        dRef.current = totalDisplaySec;
         setClock(built.warp.displaySec);
         render(dRef.current);
         setPlaying(false);
         return;
       }
       dRef.current = d;
-      setClock(Math.min(d, built.warp.displaySec));
+      setClock(Math.min(raceIntroAt(d).raceDisplaySec, built.warp.displaySec));
       render(d);
       rafRef.current = requestAnimationFrame(loop);
     };
@@ -442,7 +1336,13 @@ export default function RacePage(): React.JSX.Element {
       <h1 style={{ fontSize: 18, margin: '4px 0 8px' }}>
         レース
         <span style={{ opacity: 0.6, fontSize: 13, marginLeft: 12 }}>
-          ★本番と同じエンジン → 境界時刻 → 位置モデル → 描画（palette.json / layers.json）
+          ★本番と同じエンジン → 境界時刻 → 位置モデル → {renderer === 'v2' ? 'Broadcast V2（透視カメラ中継）' : '旧固定2D描画（legacy）'}
+        </span>
+        <span style={{
+          marginLeft: 12, padding: '2px 8px', fontSize: 12, fontWeight: 'bold', borderRadius: 3,
+          background: renderer === 'v2' ? '#c81e78' : '#505050', color: '#fff',
+        }}>
+          {renderer === 'v2' ? 'BROADCAST V2 ACTIVE' : 'LEGACY RENDERER'}
         </span>
       </h1>
       {err !== null && <p style={{ color: '#e06a4a', fontWeight: 'bold' }}>★{err}</p>}
@@ -451,7 +1351,7 @@ export default function RacePage(): React.JSX.Element {
           type="button" onClick={() => setPlaying((p) => !p)} disabled={!ready || built === null}
           style={{ padding: '8px 22px', fontSize: 15, fontWeight: 'bold', cursor: 'pointer', background: playing ? '#8a4030' : '#3a6a40', color: '#fff', border: 0 }}
         >
-          {playing ? '停止' : '発走'}
+          {playing ? '停止' : '演出開始'}
         </button>
         <button
           type="button" onClick={() => {
@@ -491,22 +1391,18 @@ export default function RacePage(): React.JSX.Element {
             <option value="left">左回り</option><option value="right">右回り</option>
           </select>
         </label>
-        <label title="馬体の色を毛色に置き換える。元の絵の階調が減ります">
-          <input type="checkbox" checked={coat} onChange={(e) => setCoat(e.target.checked)} />{' '}毛色
-        </label>
-        <label title="馬体を暗く落として縁を光らせる。元の絵の階調が減ります">
-          <input type="checkbox" checked={backlight} onChange={(e) => setBacklight(e.target.checked)} />{' '}逆光
-        </label>
         {built !== null && <span style={{ fontSize: 13, opacity: 0.8 }}>{clock.toFixed(1)} / {built.warp.displaySec.toFixed(1)} 秒</span>}
       </div>
       <canvas
         ref={canvasRef} width={W} height={H}
-        style={{ width: '100%', maxWidth: W, border: '1px solid #4a453d', imageRendering: 'pixelated', background: '#111' }}
+        style={{ width: '100%', maxWidth: W, border: '1px solid #4a453d', imageRendering: 'auto', background: '#111' }}
       />
       <p style={{ fontSize: 12, opacity: 0.55, marginTop: 10, lineHeight: 1.8 }}>
         ★<b>着順はエンジンが決めたもの</b>です（開始時に D-059 のゲートを通しています）。<br />
-        ★<b>段は 1×／1×／2× の3つだけ</b>（D-058）。先頭の3頭が手前（2×）に来ます。<br />
-        ⚠️ 横位置は見せているだけで、<b>距離ロスは着順に効かせていません</b>（D-065 は裁定待ち）。
+        {renderer === 'v2'
+          ? <>★Broadcast V2: コース座標 (s, w) を透視カメラで投影し、区間ごとに中継カメラを切り替えています（旧版は <code>?renderer=legacy</code>）。<br /></>
+          : <>★旧固定2Dカメラの前景・中景・後景3帯で、距離差とレーンを表示しています（比較用 legacy）。<br /></>}
+        ★横位置と距離ロスはレースエンジンが決めた値を読み、描画側では着順を変更しません。
       </p>
     </main>
   );

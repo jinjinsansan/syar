@@ -1,0 +1,14 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with a reference image.
+
+GOAL
+Create the SAME racehorse frame as the reference, but WITHOUT the jockey (riderless), so that a separately drawn jockey can be composited on the saddle later.
+
+REFERENCE FILE (read it and pass it as the reference image to the image generation tool)
+- apps/web/public/art/horse-jockey-side-v6-pose{POSE}.png
+
+REQUIREMENTS
+- The HORSE must be an exact copy of the reference: same bay coat, same black mane and tail, same pose (every leg, the neck, head, tail), same size and position in the frame, same painterly high-detail style, same lighting and shadowing, side view facing RIGHT.
+- REMOVE the jockey completely (no rider, no boots, no legs, no arms, no helmet, no whip). Where the jockey was, paint the horse's back, withers, saddle and mane naturally continued.
+- KEEP the tack: white saddle cloth, small racing saddle, girth, bridle, and the reins lying loosely along the neck (no hands).
+- Background: uniform flat chroma GREEN (RGB 0,255,0), no ground, no cast shadow, no text, no border. The subject must not contain that green.
+- Output 1536 x 1024 (landscape). Produce exactly ONE image and save it as a PNG.

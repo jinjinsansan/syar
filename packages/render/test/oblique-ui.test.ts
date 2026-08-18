@@ -14,9 +14,10 @@ describe('raceHudVisibilityAt', () => {
     });
   });
 
-  it('決着後はライブUIを消し、一拍後だけ結果を出す', () => {
+  it('決着後はライブUIを消し、勝者紹介後に正式結果を出す', () => {
     expect(raceHudVisibilityAt(20.2, 20, true).result).toBe(false);
-    expect(raceHudVisibilityAt(20.35, 20, true)).toEqual({
+    expect(raceHudVisibilityAt(22.39, 20, true).result).toBe(false);
+    expect(raceHudVisibilityAt(22.41, 20, true)).toEqual({
       gauge: false, standings: false, calls: false, result: true,
     });
   });

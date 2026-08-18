@@ -1,0 +1,16 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with reference images.
+
+GOAL
+Draw ONLY a racing jockey (no horse) in the crouched racing position, seen from the SAME three-quarter REAR camera angle as the riderless horse in the reference, positioned and scaled EXACTLY as if he were sitting in that horse's saddle. The output will be composited over that horse image at the same pixel coordinates.
+
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- Riderless horse (defines camera angle, frame coordinates, and where the saddle is): apps/web/public/art/horse-only-diag-rear-v3-pose04.png
+- Jockey posture reference from the same angle (older low-resolution sprite; use only for the posture and how much of the jockey is visible from behind): apps/web/public/art/horse-jockey-diag-rear-v2-pose04.png
+- Jockey identity / silks / style reference: apps/web/public/art/jockey-crouch-a.png
+
+REQUIREMENTS
+- Draw ONLY the jockey: helmet, silks (grey/white, to be recoloured later), breeches, boots in the stirrups, hands forward on the reins. Seen from behind and slightly above/left, matching the horse's camera angle. Same painterly high-detail style and lighting.
+- Position and scale: exactly on the saddle of the reference riderless horse — his seat over the saddle, boots hanging at the horse's sides, torso leaning forward over the withers. Do NOT draw the horse; leave everything except the jockey as background.
+- Where the jockey would be hidden by the horse (e.g. the far boot behind the body), leave it out.
+- Background: uniform flat chroma GREEN (RGB 0,255,0), no ground, no shadow, no text, no border. The subject must not contain that green.
+- Output 1024 x 1536 (portrait, same as the horse reference). Produce exactly ONE image and save it as a PNG.

@@ -1,0 +1,15 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with a reference image.
+
+GOAL
+Extract / repaint ONLY THE JOCKEY from the reference frame, in exactly the same position, size and pose, so it can be composited back onto a riderless horse frame later.
+
+REFERENCE FILE (read it and pass it as the reference image to the image generation tool)
+- {REF}
+
+REQUIREMENTS
+- Draw ONLY the jockey: helmet, goggles, silks (jacket), breeches, boots, hands, whip, and the short length of reins held in the hands. Same grey/white silks colours as the reference (they will be recoloured later).
+- The jockey must be at EXACTLY the same position and scale within the 1536 x 1024 frame as in the reference (as if the horse had been erased): same posture, same lean, same arm and leg angles.
+- Do NOT draw the horse, saddle, saddle cloth, mane, neck, or any part of the horse. Where the jockey's body was hidden behind the horse in the reference (e.g. the far leg), leave it out — draw only what was visible.
+- Same painterly high-detail style, same lighting and shadowing as the reference.
+- Background: uniform flat chroma GREEN (RGB 0,255,0), no ground, no shadow, no text, no border. The subject must not contain that green.
+- Output 1536 x 1024 (landscape). Produce exactly ONE image and save it as a PNG.

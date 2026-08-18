@@ -1,0 +1,17 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with reference images.
+
+GOAL
+Create ONE high-resolution frame of a racehorse WITH its jockey galloping, seen from {VIEW_DESC}, as frame {POSE} of an 8-frame gallop cycle. This must look like the same horse, jockey and painting style as the approved side-view frames, just from a different camera angle.
+
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- IDENTITY / STYLE / GALLOP PHASE reference (side view of the SAME frame number): apps/web/public/art/horse-jockey-side-v6-pose{POSE}.png
+  Copy: the bay horse (black mane and tail, white socks), the white saddle cloth, the jockey (grey/white silks, grey helmet, crouched racing position), the painterly high-detail rendering, the lighting, and the LEG PHASE of this frame.
+- CAMERA ANGLE reference (older low-resolution sprite; use ONLY for the camera angle and general silhouette, not for detail): {ANGLE_REF}
+- ANGLE CONSISTENCY reference (if this file exists, keep exactly the same camera angle as it): {PREV_REF}
+
+REQUIREMENTS
+- Camera: {VIEW_DESC}. Keep the camera angle IDENTICAL across all frames of this set (do not drift toward side view or rear view).
+- The leg phase must match the side-view reference for the same frame number (frame {POSE} of 8).
+- Framing: the horse fills about 80% of the frame height, hooves near the bottom, centred. Output 1024 x 1536 (portrait).
+- Background: uniform flat chroma GREEN (RGB 0,255,0), no ground, no cast shadow, no text, no border. The subject must not contain that green.
+- Four legs, correct anatomy, one jockey. Produce exactly ONE image and save it as a PNG.

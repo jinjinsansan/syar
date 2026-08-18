@@ -132,6 +132,20 @@ export const READONLY = [
   'render-field.mjs',
   'render-race.mjs',
   'world-search.mjs',
+  // ★画像・監査成果物だけを読み書きし、DB状態には触れない
+  'assemble-directional-frames.mjs',
+  'audit-race-broadcast.mjs',
+  'audit-race-scenarios.mjs',
+  'clean-sprite-sheet-components.mjs',
+  // ★Broadcast V2のPNG・測定JSONだけを出力する。DBには接続しない
+  'audit-broadcast-v2.mjs',
+  // ★画像ファイルのクロマ除去・分割だけを行い、DB状態には触れない
+  'remove-chroma-key.mjs',
+  'split-horizontal-frames.mjs',
+  // ★合格済み背景プレートをループ多層パララックス素材（PNG＋manifest）へ分解するだけ。DBには接続しない
+  'split-parallax-layers.mjs',
+  // ★読むだけ。Broadcast V2 の動き（背景の流速・馬の大きさ・見た目速度）を全編で数値化する
+  'audit-race-motion.mjs',
 ];
 
 /**

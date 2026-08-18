@@ -36,7 +36,7 @@ export function raceHudVisibilityAt(
 ): RaceHudVisibility {
   if (allFinished) {
     const afterFinish = Math.max(0, displaySec - raceDisplaySec);
-    return { gauge: false, standings: false, calls: false, result: afterFinish >= 0.35 };
+    return { gauge: false, standings: false, calls: false, result: afterFinish >= 2.4 };
   }
   // 発馬直後は映像そのものを見せ、情報は一拍遅れて載せる。
   const settled = displaySec >= 0.8;
@@ -206,21 +206,22 @@ export function drawStandings(
  *      「状態が変わったときだけ足す」ようにします。一度、0.5秒ごとに機械的に足して
  *      ★**3行とも同じ文**になりました。
  */
-export function drawCallBand(
-  ctx: Ctx2D<never>, pal: Palette, vp: Viewport2D, font: FontOf,
+export function drawCallBand<TImage>(
+  ctx: Ctx2D<TImage>, pal: Palette, vp: Viewport2D, font: FontOf,
   lines: readonly (readonly CallPart[])[],
+  narrator?: { readonly image: TImage; readonly width: number; readonly height: number },
 ): void {
-  const x = 40, bottom = vp.height - 118;
+  const bandY = vp.height - 112;
+  ctx.fillStyle = 'rgba(3,7,5,0.82)'; ctx.fillRect(0, bandY, vp.width, 112);
+  ctx.fillStyle = pal['frame-5'] ?? '#e9c94d'; ctx.fillRect(0, bandY, vp.width, 3);
+  if (narrator !== undefined) {
+    ctx.drawImage(narrator.image, 0, 0, narrator.width, narrator.height,
+      14, vp.height - 122, 122, 122);
+  }
+  const x = narrator === undefined ? 40 : 154, bottom = vp.height - 24;
   const shown = lines.slice(-3);
   shown.forEach((ln, i) => {
     const yy = bottom - (shown.length - 1 - i) * 22;
-    const alpha = 0.35 + 0.25 * i;
-    const textWidth = ln.reduce((sum, part) => {
-      ctx.font = font(14, part.role !== undefined);
-      return sum + ctx.measureText(part.text).width;
-    }, 0);
-    ctx.fillStyle = `rgba(16,20,16,${alpha.toFixed(2)})`;
-    ctx.fillRect(x - 8, yy - 15, Math.min(520, Math.ceil(textWidth) + 16), 20);
     let cx = x;
     for (const part of ln) {
       ctx.fillStyle = part.role === undefined
@@ -230,4 +231,31 @@ export function drawCallBand(
       cx += ctx.measureText(part.text).width;
     }
   });
+}
+
+export function drawCourseSectionTag(
+  ctx: Ctx2D<never>, pal: Palette, font: FontOf, label: string,
+): void {
+  ctx.fillStyle = 'rgba(4,8,6,0.76)'; ctx.fillRect(24, 22, 250, 46);
+  ctx.fillStyle = pal['frame-5'] ?? '#e9c94d'; ctx.fillRect(24, 22, 6, 46);
+  ctx.fillStyle = pal['paper-0'] ?? '#fff'; ctx.font = font(20, true);
+  ctx.fillText(label, 48, 53);
+}
+
+export function drawWinnerLowerThird(
+  ctx: Ctx2D<never>, pal: Palette, vp: Viewport2D, font: FontOf,
+  gate: number, horseName: string, jockeyName: string, timeSec?: number,
+): void {
+  const y = vp.height - 150;
+  ctx.fillStyle = 'rgba(3,7,5,0.90)'; ctx.fillRect(0, y, vp.width, 150);
+  ctx.fillStyle = pal['frame-5'] ?? '#e9c94d'; ctx.fillRect(0, y, vp.width, 4);
+  ctx.fillStyle = pal['frame-5'] ?? '#e9c94d'; ctx.font = font(22, true);
+  ctx.fillText(`1着　${gate}番`, 48, y + 42);
+  ctx.fillStyle = pal['paper-0'] ?? '#fff'; ctx.font = font(34, true);
+  ctx.fillText(horseName, 48, y + 88);
+  ctx.font = font(20); ctx.fillText(`騎手　${jockeyName}`, 48, y + 124);
+  if (timeSec !== undefined) {
+    ctx.textAlign = 'right'; ctx.font = font(22, true);
+    ctx.fillText(`${timeSec.toFixed(1)}秒`, vp.width - 48, y + 88); ctx.textAlign = 'left';
+  }
 }

@@ -60,6 +60,25 @@ export function slotOf(strategy: FormStrategy, gate: number, seed: number): numb
   return Math.max(0.02, Math.min(0.98, SLOT[strategy] + jitter));
 }
 
+/**
+ * ★全馬のスロットを**順位に応じて等間隔**に並べ直す（2026-08-18・オーナー指摘「前後 2 つの塊」）。
+ *   脚質 4 種の離散スロット（0.06/0.30/0.66/0.90）だと、先行 0.30 と差し 0.66 の間に空白ができ、
+ *   馬群が前後 2 塊に見えた。順序（脚質→ジッタ）はそのまま、間隔だけを均す。
+ *   ★入力は脚質とゲート番号だけ（走破タイムは入らない＝漏れない）。
+ * @returns gate → 等間隔スロット（0.04〜0.96）
+ */
+export function evenSlots(entries: readonly { readonly gate: number; readonly slot: number }[]): ReadonlyMap<number, number> {
+  const sorted = [...entries].sort((a, b) => a.slot - b.slot || a.gate - b.gate);
+  const out = new Map<number, number>();
+  const n = sorted.length;
+  sorted.forEach((entry, index) => {
+    const even = n <= 1 ? 0.5 : 0.04 + (0.92 * index) / (n - 1);
+    // ★半分だけ均す（脚質の塊感を少し残す: 逃げは前に固まる）
+    out.set(entry.gate, 0.5 * even + 0.5 * entry.slot);
+  });
+  return out;
+}
+
 /** ペースで隊列の伸び方が変わる（速いと縦長・遅いと詰まる） */
 const PACE_MUL: Record<FormPace, number> = { slow: 0.78, middle: 1, high: 1.25 };
 
@@ -68,9 +87,15 @@ const PACE_MUL: Record<FormPace, number> = { slow: 0.78, middle: 1, high: 1.25 }
  *   道中は 24m（＝10馬身。中継の解説「10馬身くらいで一団」）、
  *   勝負所から徐々に伸びます。
  */
-export function packSpreadM(metersLeft: number, pace: FormPace = 'middle'): number {
+export function packSpreadM(metersLeft: number, pace: FormPace = 'middle', metersRun?: number): number {
   const t = Math.max(0, Math.min(1, (800 - metersLeft) / 800));
-  const spread = 24 + t * t * 26;   // 24m → 50m
+  let spread = 24 + t * t * 26;   // 24m → 50m
+  // ★序盤（発走〜600m）は 12m から 24m へ徐々に伸ばす（実際の発走直後は 4〜6 馬身）
+  if (metersRun !== undefined) {
+    const u = Math.max(0, Math.min(1, metersRun / 600));
+    const early = 12 + (24 - 12) * (u * u * (3 - 2 * u));
+    spread = Math.min(spread, Math.max(early, 24 + t * t * 26 - (24 - early)));
+  }
   return spread * PACE_MUL[pace];
 }
 

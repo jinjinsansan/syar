@@ -45,7 +45,8 @@ describe('★時間配分（D-062）', () => {
      *   → 見るのは「**縮んだか**」で、正確な値ではありません。
      */
     expect(cruiseDisplay).toBeLessThan(knots.spurtSec - knots.startSec);
-    expect(straightDisplay).toBeGreaterThan(knots.finishSec - knots.straightSec);
+    // ★2026-08-18: 直線は 0.7 → 1.0（実時間）。「伸びる」ではなく「縮まない（実時間以上）」を見る
+    expect(straightDisplay).toBeGreaterThanOrEqual((knots.finishSec - knots.straightSec) * 0.999);
   });
 
   it('★★送り速さが跳ばない（境目で速度が段にならない）', () => {

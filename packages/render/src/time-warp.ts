@@ -48,7 +48,12 @@ export interface PhaseRates {
  *      直線   +0.181 → **伸ばす**
  *    ★数字そのものは V-16 で判定するので、**ここは出発点にすぎません。**
  */
-export const DEFAULT_PHASE_RATES: PhaseRates = { cruise: 1.8, spurt: 1, straight: 0.7 };
+export const DEFAULT_PHASE_RATES: PhaseRates = { cruise: 1.8, spurt: 1, straight: 1 };
+/**
+ * ★直線を 0.7 → 1.0（実時間）に（2026-08-18・オーナー指示「ゴール前でスローにする必要はない」）。
+ *   D-062 は「勝負所以降を実時間かそれ以上に伸ばす」なので 1.0 は範囲内。0.7 では決勝線付近で
+ *   背景の流れと脚の周期が 0.7 倍のスローモーションになっていた（見た目速度は真の位置に一致させる区間のため）。
+ */
 
 /**
  * ★**道中を 3倍速から 1.8倍速に落としました。**

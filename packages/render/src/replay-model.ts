@@ -17,7 +17,7 @@
 
 import type { HorseAt, PositionModel } from './scene.js';
 import {
-  slotOf, packSpreadM, convergeAt, formStartRamp,
+  slotOf, evenSlots, packSpreadM, convergeAt, formStartRamp,
   type FormStrategy, type FormPace,
 } from './formation.js';
 
@@ -156,9 +156,7 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
   const raceSec = Math.max(...boundaries.map((b) => b.finishSec));
 
   /** ★脚質から決まる隊列スロット。**レース中ずっと変わりません**（通過順位が揃う） */
-  const slots = new Map<number, number>(
-    boundaries.map((b) => [b.gate, slotOf(strategyOf(b.gate), b.gate, seed)]),
-  );
+  const slots = evenSlots(boundaries.map((b) => ({ gate: b.gate, slot: slotOf(strategyOf(b.gate), b.gate, seed) })));
 
   /**
    * ★**真の位置**（結果から作られたもの）。折れ点＝境界＝真実。
@@ -214,7 +212,7 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
       * formStartRamp(centre)
       * Math.max(0, Math.min(1, strength));
     if (a <= 0) return truth;
-    const spread = packSpreadM(distanceMeter - centre, pace);
+    const spread = packSpreadM(distanceMeter - centre, pace, centre);
     const slot = slots.get(b.gate) ?? 0.5;
     // ★スロット 0 = 先頭寄り → 中心より前
     const form = centre + spread * (0.5 - slot);

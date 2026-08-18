@@ -24,6 +24,11 @@ export interface ShotCameraPreset {
   readonly upM: number;
   readonly sideM: number;
   readonly fovDeg: number;
+  /**
+   * ★横視点で、注視点より**後ろ**に置く距離（m）。大きいほどカメラが斜め前を向き、奥の馬ほど画面の進行方向側へ受ける。
+   *   省略時は sideM×0.25（従来）。発走ショットは発馬機の描かれ方（奥の枠ほど右）に合わせて 10m。
+   */
+  readonly alongM?: number;
 }
 
 export interface RaceShot {
@@ -63,40 +68,40 @@ export interface ShotSequenceInput {
 
 const SHOTS: Readonly<Record<ShotFamily, RaceShot>> = {
   'start-wide': {
-    family: 'start-wide', view: 'diag-rear', target: 'gate', transition: 'cut', transitionSec: 0,
-    camera: { backM: 54, upM: 19, sideM: 11, fovDeg: 38 },
+    family: 'start-wide', view: 'side', target: 'gate', transition: 'cut', transitionSec: 0,
+    camera: { backM: 40, upM: 11, sideM: 14, fovDeg: 32 },
   },
   formation: {
-    family: 'formation', view: 'diag-rear', target: 'pack', transition: 'cut', transitionSec: 0,
-    camera: { backM: 43, upM: 15, sideM: 8, fovDeg: 34 },
+    family: 'formation', view: 'side', target: 'pack', transition: 'cut', transitionSec: 0,
+    camera: { backM: 36, upM: 10, sideM: 12, fovDeg: 31 },
   },
   'side-pack': {
     family: 'side-pack', view: 'side', target: 'pack', transition: 'cut', transitionSec: 0,
-    camera: { backM: 48, upM: 17, sideM: 14, fovDeg: 30 },
+    camera: { backM: 34, upM: 10, sideM: 12, fovDeg: 29 },
   },
   'close-pack': {
-    family: 'close-pack', view: 'diag-front', target: 'contenders', transition: 'cut', transitionSec: 0,
-    camera: { backM: 27, upM: 11, sideM: 9, fovDeg: 28 },
+    family: 'close-pack', view: 'side', target: 'contenders', transition: 'cut', transitionSec: 0,
+    camera: { backM: 27, upM: 8, sideM: 9, fovDeg: 28 },
   },
   'corner-wide': {
-    family: 'corner-wide', view: 'high-diag', target: 'pack', transition: 'cut', transitionSec: 0,
-    camera: { backM: 66, upM: 28, sideM: 18, fovDeg: 36 },
+    family: 'corner-wide', view: 'side', target: 'pack', transition: 'cut', transitionSec: 0,
+    camera: { backM: 44, upM: 13, sideM: 15, fovDeg: 34 },
   },
   'corner-chase': {
-    family: 'corner-chase', view: 'diag-rear', target: 'pack', transition: 'cut', transitionSec: 0,
-    camera: { backM: 42, upM: 15, sideM: 9, fovDeg: 32 },
+    family: 'corner-chase', view: 'side', target: 'pack', transition: 'cut', transitionSec: 0,
+    camera: { backM: 34, upM: 10, sideM: 11, fovDeg: 32 },
   },
   'straight-wide': {
     family: 'straight-wide', view: 'side', target: 'pack', transition: 'cut', transitionSec: 0,
-    camera: { backM: 58, upM: 18, sideM: 18, fovDeg: 34 },
+    camera: { backM: 38, upM: 11, sideM: 14, fovDeg: 32 },
   },
   finish: {
-    family: 'finish', view: 'diag-front', target: 'leader', transition: 'cut', transitionSec: 0,
-    camera: { backM: 50, upM: 17, sideM: 10, fovDeg: 40 },
+    family: 'finish', view: 'side', target: 'leader', transition: 'cut', transitionSec: 0,
+    camera: { backM: 31, upM: 9, sideM: 10, fovDeg: 32 },
   },
   winner: {
-    family: 'winner', view: 'diag-rear', target: 'winner', transition: 'cut', transitionSec: 0,
-    camera: { backM: 22, upM: 9, sideM: 7, fovDeg: 25 },
+    family: 'winner', view: 'side', target: 'winner', transition: 'cut', transitionSec: 0,
+    camera: { backM: 23, upM: 7, sideM: 7, fovDeg: 25 },
   },
 };
 

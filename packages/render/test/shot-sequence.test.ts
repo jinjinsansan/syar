@@ -13,7 +13,7 @@ const base = (overrides: Partial<ShotSequenceInput> = {}): ShotSequenceInput => 
 
 describe('raceShotAt', () => {
   it('発走から隊列形成へ進む', () => {
-    expect(raceShotAt(base({ leaderMeters: 0 })).family).toBe('start-wide');
+    expect(raceShotAt(base({ leaderMeters: 0 }))).toMatchObject({ family: 'start-wide', view: 'side' });
     expect(raceShotAt(base({ leaderMeters: 120 })).family).toBe('start-wide');
     expect(raceShotAt(base({ leaderMeters: 121 })).family).toBe('formation');
     expect(raceShotAt(base({ leaderMeters: 300 })).family).toBe('formation');

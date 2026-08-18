@@ -62,6 +62,13 @@ export interface Ctx2D<TImage = unknown> {
     img: TImage, sx: number, sy: number, sw: number, sh: number,
     dx: number, dy: number, dw: number, dh: number,
   ): void;
+  /**
+   * ★任意（両環境にある）。接地影のように**画像を変形して描く**ときだけ使う。
+   *   無い環境では変形を伴う描画を省く（落ちない）。
+   */
+  save?(): void;
+  restore?(): void;
+  transform?(a: number, b: number, c: number, d: number, e: number, f: number): void;
 }
 
 /** ★ブラウザの `CanvasTextAlign` と同じ並び（`lib.dom` に依存しないため自前に持つ） */

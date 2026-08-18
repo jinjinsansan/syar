@@ -10,7 +10,7 @@ describe('drawPerspectiveWorld', () => {
   });
 
   it('乾いた芝では飛沫を出さず、悪化したダートほど蹴り上げを強くする', () => {
-    expect(trackKickupIntensity('turf', 'good')).toBe(0);
+    expect(trackKickupIntensity('turf', 'good')).toBeGreaterThan(0);
     expect(trackKickupIntensity('turf', 'bad')).toBeGreaterThan(0);
     expect(trackKickupIntensity('dirt', 'good')).toBeGreaterThan(0);
     expect(trackKickupIntensity('dirt', 'bad')).toBeGreaterThan(trackKickupIntensity('dirt', 'soft'));

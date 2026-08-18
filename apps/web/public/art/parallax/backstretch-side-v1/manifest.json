@@ -1,0 +1,164 @@
+{
+  "source": "race-backstretch-side-v1.png",
+  "plateWidth": 1672,
+  "plateHeight": 941,
+  "layers": [
+    {
+      "name": "trees",
+      "file": "trees.png",
+      "plateY0": 0,
+      "plateY1": 188,
+      "tileWidth": 1350,
+      "depthOffsetM": 160
+    },
+    {
+      "name": "stand",
+      "file": "stand.png",
+      "plateY0": 188,
+      "plateY1": 342,
+      "tileWidth": 1450,
+      "depthOffsetM": 70
+    },
+    {
+      "name": "hedge",
+      "file": "hedge.png",
+      "plateY0": 342,
+      "plateY1": 398,
+      "tileWidth": 1500,
+      "depthOffsetM": 30
+    },
+    {
+      "name": "back-rails",
+      "file": "back-rails.png",
+      "plateY0": 398,
+      "plateY1": 458,
+      "tileWidth": 1530,
+      "depthOffsetM": 18
+    },
+    {
+      "name": "inner-rail",
+      "file": "inner-rail.png",
+      "plateY0": 458,
+      "plateY1": 503,
+      "tileWidth": 1110,
+      "depthOffsetM": 10
+    },
+    {
+      "name": "turf-far",
+      "file": "turf-far.png",
+      "plateY0": 503,
+      "plateY1": 578,
+      "tileWidth": 1500,
+      "depthOffsetM": 3
+    },
+    {
+      "name": "turf-mid",
+      "file": "turf-mid.png",
+      "plateY0": 578,
+      "plateY1": 672,
+      "tileWidth": 1500,
+      "depthOffsetM": -3
+    },
+    {
+      "name": "turf-near",
+      "file": "turf-near.png",
+      "plateY0": 672,
+      "plateY1": 762,
+      "tileWidth": 1500,
+      "depthOffsetM": -8
+    },
+    {
+      "name": "front-rail",
+      "file": "front-rail.png",
+      "plateY0": 762,
+      "plateY1": 941,
+      "tileWidth": 835,
+      "depthOffsetM": -13
+    }
+  ],
+  "objects": [
+    {
+      "name": "finish-tower",
+      "file": "finish-tower.png",
+      "plateY0": 250,
+      "anchorXRatio": 0.49193548387096775,
+      "worldS": "finish",
+      "depthOffsetM": 10
+    },
+    {
+      "name": "finish-line-far",
+      "file": "finish-line-far.png",
+      "plateY0": 518,
+      "anchorXRatio": 0.48214285714285715,
+      "worldS": "finish",
+      "depthOffsetM": 3
+    },
+    {
+      "name": "finish-line-mid",
+      "file": "finish-line-mid.png",
+      "plateY0": 578,
+      "anchorXRatio": 0.48214285714285715,
+      "worldS": "finish",
+      "depthOffsetM": -3
+    },
+    {
+      "name": "finish-line-near",
+      "file": "finish-line-near.png",
+      "plateY0": 672,
+      "anchorXRatio": 0.48214285714285715,
+      "worldS": "finish",
+      "depthOffsetM": -8
+    },
+    {
+      "name": "finish-line-hedge",
+      "file": "finish-line-hedge.png",
+      "plateY0": 800,
+      "anchorXRatio": 0.48214285714285715,
+      "worldS": "finish",
+      "depthOffsetM": -13
+    },
+    {
+      "name": "start-gate",
+      "file": "start-gate.png",
+      "plateY0": 226,
+      "anchorXRatio": 0.920863309352518,
+      "worldS": 0,
+      "depthOffsetM": -9,
+      "zOrder": "front",
+      "worldW": 14.2,
+      "anchorYRatio": 0.9790575916230366,
+      "scale": 0.82
+    },
+    {
+      "name": "start-pole",
+      "file": "start-pole.png",
+      "plateY0": 222,
+      "anchorXRatio": 0.5,
+      "worldS": -3,
+      "depthOffsetM": 12,
+      "zOrder": "behind",
+      "worldW": -1.5,
+      "anchorYRatio": 0.9738562091503268,
+      "scale": 0.82
+    }
+  ],
+  "world": {
+    "turf": {
+      "file": "world-turf.png",
+      "tileWidth": 1500,
+      "tileHeight": 208,
+      "pxPerM": 90
+    },
+    "panorama": {
+      "file": "world-panorama.png",
+      "tileWidth": 1450,
+      "height": 398,
+      "horizonY": 398
+    },
+    "trees": {
+      "file": "world-trees.png",
+      "tileWidth": 1350,
+      "height": 130
+    }
+  }
+}

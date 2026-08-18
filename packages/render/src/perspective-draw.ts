@@ -179,7 +179,7 @@ export function broadcastCamera(
   let along = -p.backM;
   let across = p.sideM * outside;
   if (opts.view === 'side') {
-    along = -p.sideM * 0.25;
+    along = -(p.alongM ?? p.sideM * 0.25);
     across = p.backM * outside;
   } else if (opts.view === 'diag-front') {
     along = p.backM;
@@ -222,7 +222,8 @@ export function trackKickupIntensity(surface: RenderSurface, condition: RenderTr
   if (surface === 'dirt') {
     return condition === 'good' ? 0.22 : condition === 'yielding' ? 0.38 : condition === 'soft' ? 0.62 : 0.86;
   }
-  return condition === 'good' ? 0 : condition === 'yielding' ? 0.12 : condition === 'soft' ? 0.3 : 0.5;
+  // 良芝でも蹄が芝片と乾いた表土をわずかに蹴る。0だと接地感と速度感が消える。
+  return condition === 'good' ? 0.07 : condition === 'yielding' ? 0.12 : condition === 'soft' ? 0.3 : 0.5;
 }
 
 /** 注視地点から背景の役割を決める。カメラ座標や時刻には依存しない。 */
@@ -472,6 +473,32 @@ export const HORSE_HEIGHT_M = 2.5;
  *   ★大きさは「馬の高さ × その深さの px/m」。整数倍にしません
  *     — 遠近では大きさが**連続的に変わる**ので、整数倍では表現できません。
  */
+/** 高解像度の個別コマ（`frameImagesByGate` の要素） */
+export interface HqHorseFrame<TImage> {
+  readonly image: TImage;
+  readonly source: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  readonly referenceHeight: number;
+  readonly bodyAnchorSourcePx?: { readonly x: number; readonly y: number } | undefined;
+  readonly bodyLiftSourcePx?: number | undefined;
+  readonly shadow?: { readonly image: TImage; readonly width: number; readonly height: number } | undefined;
+  readonly overlay?: {
+    readonly image: TImage;
+    readonly width: number;
+    readonly height: number;
+    readonly offsetXSourcePx: number;
+    readonly offsetYSourcePx: number;
+  } | undefined;
+}
+
+/**
+ * ★馬の向きとカメラの相対角（度）。0 = カメラから遠ざかる（後方視点）、180 = カメラへ向かってくる（正面）、
+ *   90 = 真横。`forwardDx` は進行方向が画面でどちらへ向くか（＋=右）。
+ */
+export interface HorseViewInfo {
+  readonly viewDeg: number;
+  readonly forwardDx: number;
+}
+
 export function drawPerspectiveHorses<TImage>(
   ctx: Ctx2D<TImage>,
   course: Course,
@@ -481,8 +508,58 @@ export function drawPerspectiveHorses<TImage>(
     readonly sheet: TImage;
     readonly sheetWidth: number;
     readonly spec: SheetSpec;
+    /**
+     * ★馬ごとに「進行方向とカメラの相対角」で素材集合と左右反転を選ぶ（方向別素材）。
+     *   指定があると `frameImagesByGate` より優先。返した frames が undefined なら従来の選択に戻る。
+     */
+    readonly frameSetOf?: ((horse: PerspHorse, view: HorseViewInfo) =>
+      { readonly frames: readonly HqHorseFrame<TImage>[] | undefined; readonly flip: boolean }) | undefined;
+    /** 真横カメラ用の高解像度・個別フレーム。指定時はシートより優先する。 */
+    readonly frameImages?: readonly {
+      readonly image: TImage;
+      readonly source: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+      readonly referenceHeight: number;
+      /**
+       * ★胴体の基準点（元画像 px）。指定時は外接矩形ではなく**この点**を接地点の真上に置く。
+       *   外接矩形基準だと脚の伸縮で矩形が変わり、コマごとに胴体が上下左右へ跳ぶ（実測: v6 で
+       *   矩形下端〜胴体 509〜563px・中心ずれ ±20px → 画面 194px で 12px/9px の跳び。空中局面ほど沈む逆位相）。
+       */
+      readonly bodyAnchorSourcePx?: { readonly x: number; readonly y: number } | undefined;
+      /** 胴体基準点から接地点までの高さ（元画像 px）。コマ間で一定＋小さな上下動を含める */
+      readonly bodyLiftSourcePx?: number | undefined;
+      /** ★接地影用シルエット（`source` と同じ大きさ・黒＋α）。あれば楕円影の代わりに地面へ潰して落とす */
+      readonly shadow?: { readonly image: TImage; readonly width: number; readonly height: number } | undefined;
+      readonly overlay?: {
+        readonly image: TImage;
+        readonly width: number;
+        readonly height: number;
+        readonly offsetXSourcePx: number;
+        readonly offsetYSourcePx: number;
+      } | undefined;
+    }[] | undefined;
+    /** 馬番ごとの勝負服・ゼッケンを焼いた個別フレーム。 */
+    readonly frameImagesByGate?: readonly (readonly {
+      readonly image: TImage;
+      readonly source: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+      readonly referenceHeight: number;
+      readonly bodyAnchorSourcePx?: { readonly x: number; readonly y: number } | undefined;
+      readonly bodyLiftSourcePx?: number | undefined;
+      readonly shadow?: { readonly image: TImage; readonly width: number; readonly height: number } | undefined;
+      readonly overlay?: {
+        readonly image: TImage;
+        readonly width: number;
+        readonly height: number;
+        readonly offsetXSourcePx: number;
+        readonly offsetYSourcePx: number;
+      } | undefined;
+    }[])[] | undefined;
     readonly fieldSize: number;
     readonly frameOf: (gate: number) => number;
+    /**
+     * ★走行周期の位相（0〜1）。指定があるとコマ数に依存せず `floor(phase × コマ数)` でコマを選ぶ
+     *   （8 コマと 16 コマの素材を同じ位相で回せる）。無ければ従来どおり `frameOf` の値をコマ数で割った余り。
+     */
+    readonly phaseOf?: ((gate: number) => number) | undefined;
     readonly frameRoleOf: (gate: number, fieldSize: number) => string;
     readonly distanceMeter: number;
     readonly trackEffect?: {
@@ -510,48 +587,170 @@ export function drawPerspectiveHorses<TImage>(
   for (const d of drawn) {
     const hpx = HORSE_HEIGHT_M * d.p.pxPerM;
     const wpx = hpx * (cw / opts.spec.cellH);
-    /**
-     * ★**長く伸びる影**。⚠️ 参考の接地感はほぼこれが作っています。
-     *    足元の小さな楕円だと、馬が芝に貼った絵に見えます。
-     */
-    const tip = P(d.s + 0.25 * HORSE_HEIGHT_M * 2.2, d.h.w - 0.75 * HORSE_HEIGHT_M * 2.2);
-    if (tip.depth > 2) {
+    // ★位相 → コマ: 8 コマ相当の局面番号（芝片・接地影の判定用）と、実コマ数に応じたインデックス
+    const phase = opts.phaseOf !== undefined ? ((opts.phaseOf(d.h.gate) % 1) + 1) % 1 : undefined;
+    const frameIndex = phase !== undefined ? Math.floor(phase * 8) % 8 : opts.frameOf(d.h.gate);
+    const pickFrame = <T,>(frames: readonly T[] | undefined): T | undefined => {
+      if (frames === undefined || frames.length === 0) return undefined;
+      const n = frames.length;
+      const index = phase !== undefined ? Math.floor(phase * n) % n : ((frameIndex % n) + n) % n;
+      return frames[index];
+    };
+    // ★方向別素材: 馬の進行方向 f とカメラ→馬の水平ベクトル v の角度、進行方向の画面上の向き
+    let flip = false;
+    let chosen: readonly HqHorseFrame<TImage>[] | undefined;
+    if (opts.frameSetOf !== undefined) {
+      const p0 = posOf(course, d.s, d.h.w);
+      const p1 = posOf(course, d.s + 1, d.h.w);
+      const fx = p1.x - p0.x, fy = p1.y - p0.y;
+      const vx = p0.x - cam.eye.x, vy = p0.y - cam.eye.y;
+      const fl = Math.hypot(fx, fy) || 1, vl = Math.hypot(vx, vy) || 1;
+      const cosT = Math.max(-1, Math.min(1, (fx * vx + fy * vy) / (fl * vl)));
+      const viewDeg = (Math.acos(cosT) * 180) / Math.PI;
+      const q1 = project(cam, basis, { x: p1.x, y: p1.y, z: 0 });
+      const set = opts.frameSetOf(d.h, { viewDeg, forwardDx: q1.x - d.p.x });
+      chosen = set.frames;
+      flip = set.flip;
+    }
+    const gateSet = chosen ?? opts.frameImagesByGate?.[d.h.gate - 1];
+    const hiForShadow = pickFrame(gateSet) ?? pickFrame(opts.frameImages);
+    const canTransform = ctx.save !== undefined && ctx.restore !== undefined && ctx.transform !== undefined;
+    if (hiForShadow?.shadow !== undefined && hiForShadow.bodyAnchorSourcePx !== undefined && canTransform) {
+      /**
+       * ★**接地影**: そのコマのシルエットを地面へ潰し（縦 0.26）、光源の反対（進行方向前・カメラ側）へ
+       *   ずらして落とす。脚の形が影に出るので「芝に貼った絵」に見えない。楕円影は使わない。
+       *   ⚠️ 上下動（bodyLift の bob）は影に入れない — 影は地面にあるので馬が跳ねても位置は変わらない。
+       */
+      const src = hiForShadow.source;
+      const scale = hpx / hiForShadow.referenceHeight;
+      const anchorX = (hiForShadow.bodyAnchorSourcePx.x - src.x) * scale;
+      const ahead = P(d.s + 1, d.h.w);
+      const dirX = ahead.x >= d.p.x ? 1 : -1;
+      const skew = 0.28 * dirX;   // 前方（画面上の進行方向）へ少し倒す（倒しすぎると蹄と影が離れて浮いて見える）
+      const flat = 0.22;          // 地面への圧縮
+      ctx.save!();
       ctx.globalAlpha = 0.34;
-      ctx.fillStyle = '#0d1408';
-      ctx.beginPath();
-      ctx.ellipse(
-        (d.p.x + tip.x) / 2, (d.p.y + tip.y) / 2,
-        Math.hypot(tip.x - d.p.x, tip.y - d.p.y) / 2 + wpx * 0.18,
-        Math.max(2, hpx * 0.055),
-        Math.atan2(tip.y - d.p.y, tip.x - d.p.x), 0, Math.PI * 2,
+      // ローカル座標: 蹄の行が y=0、上へ行くほど y<0。x' = X ± x − skew·y, y' = Y − flat·y（反転時は x を鏡像）
+      ctx.transform!(flip ? -1 : 1, 0, -skew, -flat, d.p.x, d.p.y);
+      ctx.drawImage(
+        hiForShadow.shadow.image, 0, 0, hiForShadow.shadow.width, hiForShadow.shadow.height,
+        -anchorX, -src.height * scale, src.width * scale, src.height * scale,
       );
+      ctx.restore!();
+      // ★接地影: 蹄の真下の濃い楕円。支持局面（コマ 04〜07）は濃く、空中では薄く小さく
+      const cyc = ((frameIndex % 8) + 8) % 8;
+      const grounded = cyc >= 3 && cyc <= 6;
+      ctx.globalAlpha = grounded ? 0.30 : 0.14;
+      ctx.fillStyle = '#07110a';
+      ctx.beginPath();
+      ctx.ellipse(d.p.x + dirX * hpx * 0.05, d.p.y - 1, hpx * (grounded ? 0.30 : 0.22), hpx * 0.035, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
+    } else {
+      /**
+       * ★**長く伸びる影**（シルエットが無い環境・シート描画のとき）。
+       *    足元の小さな楕円だと、馬が芝に貼った絵に見えます。
+       */
+      const tip = P(d.s + 0.25 * HORSE_HEIGHT_M * 2.2, d.h.w - 0.75 * HORSE_HEIGHT_M * 2.2);
+      if (tip.depth > 2) {
+        ctx.globalAlpha = 0.34;
+        ctx.fillStyle = '#0d1408';
+        ctx.beginPath();
+        ctx.ellipse(
+          (d.p.x + tip.x) / 2, (d.p.y + tip.y) / 2,
+          Math.hypot(tip.x - d.p.x, tip.y - d.p.y) / 2 + wpx * 0.18,
+          Math.max(2, hpx * 0.055),
+          Math.atan2(tip.y - d.p.y, tip.x - d.p.x), 0, Math.PI * 2,
+        );
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
     }
     const kickup = opts.trackEffect === undefined ? 0
       : trackKickupIntensity(opts.trackEffect.surface, opts.trackEffect.condition);
     if (kickup > 0) {
-      const phase = ((opts.frameOf(d.h.gate) + d.h.gate * 3) % Math.max(1, opts.spec.frames)) / Math.max(1, opts.spec.frames);
-      const particles = 2 + Math.round(kickup * 5);
-      ctx.fillStyle = opts.trackEffect!.color;
-      for (let i = 0; i < particles; i += 1) {
-        const u = (i + 0.35 + phase) / particles;
-        const lateral = (((d.h.gate * 17 + i * 11) % 9) - 4) * 0.08 * kickup;
-        const q = P(d.s - (0.45 + u * 2.8) * (0.55 + kickup), d.h.w + lateral);
-        if (q.depth <= 2) continue;
-        const radius = Math.max(1, hpx * (0.018 + 0.035 * kickup) * (1 - u * 0.45));
-        ctx.globalAlpha = kickup * (0.34 - u * 0.19);
-        ctx.beginPath();
-        ctx.ellipse(q.x, q.y - radius * (0.2 + u * 0.8), radius * 1.5, radius * 0.62, 0, 0, Math.PI * 2);
-        ctx.fill();
+      /**
+       * ★**芝片・土煙**は後肢が接地して蹴る局面でだけ出る（8 コマ: 06/07 が後肢接地・蹴り出し、08 で離地）。
+       *   蹄の少し後ろから、後方上へ放物線を描いて飛び、落ちながら薄れる。
+       *   位相はコマ番号（距離連動）から決めるので決定論。旧実装は `spec.frames`（HQ では 1）で位相が常に 0 だった。
+       */
+      const cycle = 8;
+      const f = ((frameIndex % cycle) + cycle) % cycle;
+      // 蹴り出しからの経過（コマ）: 06→0, 07→1, 08→2, 01→3, 02→4 … 5 コマで消える
+      const sinceKick = (f - 5 + cycle) % cycle;
+      if (sinceKick <= 4) {
+        const life = sinceKick / 4;             // 0=発生 … 1=消滅
+        const chunks = 2 + Math.round(kickup * 6);
+        for (let i = 0; i < chunks; i += 1) {
+          const seed = ((d.h.gate * 31 + i * 17) % 13) / 13;   // 個体・粒ごとの散らし（乱数ではなく決定的）
+          const back = 0.35 + life * (1.6 + seed * 1.2);          // 後方へ（m）
+          const lateral = (seed - 0.5) * 0.9;                    // 横へ（m）
+          const rise = Math.sin(life * Math.PI) * (0.35 + seed * 0.45); // 放物線（m）
+          const q = P(d.s - back, d.h.w + lateral);
+          if (q.depth <= 2) continue;
+          const size = Math.max(1.5, q.pxPerM * (0.05 + seed * 0.05) * (1 - life * 0.4));
+          const yy = q.y - rise * q.pxPerM;
+          ctx.globalAlpha = (0.55 - life * 0.45) * Math.min(1, kickup * 3);
+          ctx.fillStyle = opts.trackEffect!.color;
+          ctx.beginPath();
+          // 不揃いな四角（芝片・土塊）
+          ctx.moveTo(q.x - size, yy - size * 0.4);
+          ctx.lineTo(q.x + size * 0.6, yy - size * 0.9);
+          ctx.lineTo(q.x + size * 1.1, yy + size * 0.5);
+          ctx.lineTo(q.x - size * 0.5, yy + size * 0.8);
+          ctx.closePath();
+          ctx.fill();
+        }
+        // 薄い土煙（発生直後だけ）
+        if (life < 0.5) {
+          const q = P(d.s - 0.4, d.h.w);
+          if (q.depth > 2) {
+            ctx.globalAlpha = (0.16 - life * 0.3) * Math.min(1, kickup * 3);
+            ctx.fillStyle = opts.trackEffect!.color;
+            ctx.beginPath();
+            ctx.ellipse(q.x, q.y - q.pxPerM * 0.15, q.pxPerM * (0.35 + life * 0.5), q.pxPerM * (0.14 + life * 0.2), 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.globalAlpha = 1;
       }
-      ctx.globalAlpha = 1;
     }
     const role = opts.frameRoleOf(d.h.gate, opts.fieldSize);
     const row = Math.max(0, Math.min(7, Number(role.slice(6)) - 1));
-    ctx.drawImage(
-      opts.sheet, opts.frameOf(d.h.gate) * cw, row * opts.spec.cellH, cw, opts.spec.cellH,
-      d.p.x - wpx * 0.5, d.p.y - hpx, wpx, hpx,
-    );
+    const frame = frameIndex;
+    const hi = pickFrame(gateSet) ?? pickFrame(opts.frameImages);
+    if (hi !== undefined) {
+      const source = hi.source;
+      const scale = hpx / hi.referenceHeight;
+      const hiW = source.width * scale; const hiH = source.height * scale;
+      // ★左右反転: 接地点 x を軸に鏡像（基準点は接地点の真上なので位置は変わらない）
+      const mirrored = flip && ctx.save !== undefined && ctx.restore !== undefined && ctx.transform !== undefined;
+      if (mirrored) { ctx.save!(); ctx.transform!(-1, 0, 0, 1, 2 * d.p.x, 0); }
+      // ★胴体基準点があればそれを接地点の真上 `bodyLift` に置く。無ければ従来（矩形の中心・下端）
+      const left = hi.bodyAnchorSourcePx !== undefined
+        ? d.p.x - (hi.bodyAnchorSourcePx.x - source.x) * scale
+        : d.p.x - hiW * 0.5;
+      const top = hi.bodyAnchorSourcePx !== undefined
+        ? d.p.y - (hi.bodyLiftSourcePx ?? 0) * scale - (hi.bodyAnchorSourcePx.y - source.y) * scale
+        : d.p.y - hiH;
+      ctx.drawImage(
+        hi.image, source.x, source.y, source.width, source.height,
+        left, top, hiW, hiH,
+      );
+      if (hi.overlay !== undefined) {
+        const overlayX = left + (hi.overlay.offsetXSourcePx - source.x) * scale;
+        const overlayY = top + (hi.overlay.offsetYSourcePx - source.y) * scale;
+        ctx.drawImage(
+          hi.overlay.image, 0, 0, hi.overlay.width, hi.overlay.height,
+          overlayX, overlayY, hi.overlay.width * scale, hi.overlay.height * scale,
+        );
+      }
+      if (mirrored) ctx.restore!();
+    } else {
+      ctx.drawImage(
+        opts.sheet, frame * cw, row * opts.spec.cellH, cw, opts.spec.cellH,
+        d.p.x - wpx * 0.5, d.p.y - hpx, wpx, hpx,
+      );
+    }
   }
 }
