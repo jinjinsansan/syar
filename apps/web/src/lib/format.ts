@@ -45,3 +45,25 @@ export function formatRaceTitle(classRank: number, grade: string | null): string
   if (grade !== null && grade !== '') return grade;
   return CLASS_LABEL[classRank - 1] ?? '?';
 }
+
+/** 発走時刻の表示（HH:MM・日本時間で固定。サーバーの TZ に依存させない） */
+export function formatClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' });
+}
+
+/** 走破タイム（秒 → m:ss.s） */
+export function formatRaceTime(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec - m * 60;
+  return `${m}:${s < 10 ? '0' : ''}${s.toFixed(1)}`;
+}
+
+/** 券種名（正典 §9.1 の 6 券種） */
+export const BET_TYPE_LABEL: Readonly<Record<string, string>> = {
+  win: '単勝', place: '複勝', quinella: '馬連', exacta: '馬単', trio: '三連複', trifecta: '三連単',
+};
+
+/** レース状態の表示（サーバーの status が正） */
+export const STATUS_LABEL: Readonly<Record<string, string>> = {
+  scheduled: '発売中', closed: '発走', settled: '確定', cancelled: '中止',
+};

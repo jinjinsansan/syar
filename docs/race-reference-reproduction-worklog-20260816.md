@@ -398,3 +398,15 @@
 
 - オーナー判定: **Claude Design 側の HUD デザイン（派手版）は合格**。Canvas 実装も開発サーバーで確認し「ＯＫ」。
 - Codex 復帰（8/20 14:13）後の続きは `CLAUDE_CODE_HANDOFF_RACE_20260819.md` に集約（勝馬後方寄り 06–08、正面／真後ろセット、案 B side-v8 の 1 コマ目、ナレーター立ち絵、HUD の未実装分と検証手順・push の注意）。
+
+## 2026-08-19 Web（DOM）3 画面をデザインシステムに合わせて実装（Codex 復帰待ちの間）
+
+- `apps/web/src/app/globals.css`（トークンは design/hud-ds/styles.css と 1:1）、`components/ui.tsx`（枠色バッジ・状態バッジ・脚質チップ・格バッジ・パネル）、
+  `components/clock.tsx`（表示用の時計。壁時計はこの 1 か所だけ・純関数 `formatCountdown` は注入で試験可）。
+- `layout.tsx`: グローバルヘッダー h56（ロゴ金・ナビ。未実装画面はリンクにしない。EP/PP はログイン導入まで出さない）、main 1180。
+- `page.tsx`（番組表）: 次の発走ヒーロー（時刻 64px 金プレート・格バッジ・条件・賞金・出馬表／オッズ）＋発走までのカウントダウン帯、一覧（直近 24・確定済みは 6 件残して沈める）。
+- `races/[id]/page.tsx`（レース詳細）: 出走表（枠色バッジ・脚質チップ・単勝 3 番人気以内は金・確定後は着順/タイム）、公正性の検証 3 ステップ
+  （`verifyReveal`＝race-engine の検証関数で SHA-256 照合。一致／不一致／未確定を必ず出す・「自分で確かめる」コマンド）。
+- `races/[id]/odds/page.tsx`（オッズ・新規）: 券種タブ、単勝・複勝の人気順＋支持の目安バー（1 番人気=100% の相対。支持率%はデータに無いので出さない）、馬連上位 10 組、他券種は上位 30。購入導線は置かない。
+- ローカル確認のため `apps/web/.env.local`（gitignore 済み）に NEXT_PUBLIC_SUPABASE_URL / ANON_KEY を置いた（`secrets.local.env` から公開キーだけをシェルで転記・値は表示していない）。本番 DB の read-only。
+- 検証: typecheck ✓、ヘッドレス Edge で 番組表／発売中の詳細／オッズ／確定済み詳細（seed 照合「一致しました」を実データで確認）。
