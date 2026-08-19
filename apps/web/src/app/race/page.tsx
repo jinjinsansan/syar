@@ -39,7 +39,7 @@ import {
   focusForRaceShot,
   drawFixed2DSideScene, fixed2DBackgroundRoleOf, fixed2DPackLayout,
   // ★UI も package が唯一の出どころ（動画の道具と同じ関数）
-  drawGauge, drawStandings, drawCallBand, drawResultPanel, drawResultsBoard,
+  drawStandings, drawCallBand, drawResultPanel, drawResultsBoard, drawRaceHeadlineChip,
   drawCourseSectionTag, drawWinnerLowerThird, raceCourseSectionAt,
   raceHudVisibilityAt, shouldEmitRaceCall, type CallPart,
   raceIntroAt, RACE_INTRO_RACE_START_SEC, RACE_INTRO_END_SEC,
@@ -48,7 +48,7 @@ import {
   broadcastV2FinishStyleOf, broadcastV2StartEase, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
-  drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC,
+  drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 
@@ -130,6 +130,10 @@ const SILKS_COLORS = ['#ececec', '#20242a', '#d52d35', '#2359c4', '#efd329', '#1
  *   以前は実在名のプレースホルダーが直書きされていたので架空名に置換した。
  */
 const RACE_META = { venue: 'スターパーク競馬場', raceName: '桜星賞', raceNo: '11R' } as const;
+/** 実況アナ（架空・design/hud-ds/components/narrator-cast の A） */
+const NARRATOR_NAME = '星野 亮太';
+/** HUD が載るのは発走 0.8 秒後（motion-spec §6） */
+const HUD_SETTLE_SEC = 0.8;
 /**
  * ★毛色バリエーション（案 A・docs/race-horse-art-options-20260819.md）。素材は鹿毛 1 頭のまま、描画時に馬体だけ
  *   色相・明度・彩度を変える。無彩色（勝負服の灰・鞍布の白・脚元の黒）はほぼ変わらない。
@@ -554,6 +558,10 @@ export default function RacePage(): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   /** ★実況の行（変化したときだけ積む） */
   const callRef = useRef<readonly (readonly CallPart[])[]>([]);
+  /** 各行の発話開始秒（文字送り 20 文字/秒・callRef と同じ添字） */
+  const callStartRef = useRef<readonly number[]>([]);
+  /** 区間タグの文言と、それに変わった秒（スライドイン用） */
+  const sectionTagRef = useRef<{ label: string; sinceSec: number }>({ label: '', sinceSec: -Infinity });
   const callKeyRef = useRef<string>('');
   const callLastSecRef = useRef<number>(-Infinity);
   const artRef = useRef<{
@@ -945,8 +953,10 @@ export default function RacePage(): React.JSX.Element {
     }
     dRef.current = 0;
     callRef.current = [];
+    callStartRef.current = [];
     callKeyRef.current = '';
     callLastSecRef.current = -Infinity;
+    sectionTagRef.current = { label: '', sinceSec: -Infinity };
     setClock(0);
   }, [seed, ownGate, surface, trackCondition, turn]);
 
@@ -960,7 +970,7 @@ export default function RacePage(): React.JSX.Element {
     const intro = raceIntroAt(d);
     const vp = { width: W, height: H };
     const FONT = (px: number, bold?: boolean): string =>
-      `${bold === true ? 'bold ' : ''}${px}px sans-serif`;
+      `${bold === true ? 'bold ' : ''}${px}px system-ui, sans-serif`;
     const conditionLabel: Record<TrackCondition, string> = {
       good: '良', yielding: '稍重', soft: '重', bad: '不良',
     };
@@ -991,7 +1001,12 @@ export default function RacePage(): React.JSX.Element {
         venue: RACE_META.venue, raceName: RACE_META.raceName, raceNo: RACE_META.raceNo,
         distanceMeter: DIST, surfaceLabel: surface === 'turf' ? '芝' : 'ダート',
         weatherLabel: '晴', conditionLabel: conditionLabel[trackCondition],
-        turnLabel: turn === 'left' ? '左回り' : '右回り',
+        turnLabel: turn === 'left' ? '左' : '右',
+        fieldSize: FIELD,
+        own: {
+          gate: ownGate, role: frameRoleOf(ownGate, FIELD),
+          name: HORSE_NAMES[ownGate - 1] ?? `スター${ownGate}`, jockey: JOCKEY_NAMES[ownGate - 1] ?? 'STAR騎手',
+        },
       }, d, { image: art.raceTitle, width: art.raceTitle.width, height: art.raceTitle.height });
       drawRendererBadge(ctx, renderer, 'title');
       return;
@@ -1296,7 +1311,13 @@ export default function RacePage(): React.JSX.Element {
     if (v2StartHold) {
       // ★ゲート待機〜発走直後: 順位 HUD の代わりに発走の中継帯（「ゲートイン完了」→「スタートしました！」）
       drawStartCallBand(ctx, art.pal as Record<string, string>, vp, FONT, FIELD, intro.stage === 'gate-release',
-        { image: art.raceNarrator, width: art.raceNarrator.width, height: art.raceNarrator.height });
+        { image: art.raceNarrator, width: art.raceNarrator.width, height: art.raceNarrator.height }, {
+          timeSec: d,
+          lineStartSec: intro.stage === 'gate-release' ? RACE_INTRO_RACE_START_SEC : RACE_INTRO_TITLE_END_SEC + 0.3,
+          secondsToStart: RACE_INTRO_RACE_START_SEC - d,
+          narratorName: NARRATOR_NAME,
+          sinceSec: d - RACE_INTRO_TITLE_END_SEC,
+        });
       drawRendererBadge(ctx, renderer, `${intro.stage}/${v2ShotId ?? 'v2'}`);
       return;
     }
@@ -1305,15 +1326,31 @@ export default function RacePage(): React.JSX.Element {
       backstretch: '向正面', 'third-corner': '第3コーナー', 'fourth-corner': '第4コーナー',
       straight: '最後の直線', finish: 'ゴール前', winner: 'レース確定',
     };
-    drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, v2SectionLabel ?? sectionLabel[courseSection]);
+    {
+      const label = v2SectionLabel ?? sectionLabel[courseSection];
+      // 初回は即表示（静止画の監査でも見える）。以後は文言が変わった瞬間からスライドイン
+      if (sectionTagRef.current.label !== label) sectionTagRef.current = { label, sinceSec: sectionTagRef.current.label === '' ? d - 1 : d };
+      const hudSince = raceD - HUD_SETTLE_SEC;
+      // ★ゴール後はライブ HUD（見出し・区間タグ・コース図）を落とす（motion-spec §6: ゴール〜2.4s は勝馬テロップのみ）
+      if (!winnerFinishedNow) drawRaceHeadlineChip(ctx, FONT, {
+        raceNo: RACE_META.raceNo, raceName: RACE_META.raceName,
+        distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${DIST}m`,
+      }, { timeSec: d, sinceSec: hudSince });
+      if (!winnerFinishedNow) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
+        { timeSec: d, sinceSec: Math.min(hudSince, d - sectionTagRef.current.sinceSec) });
+    }
     /**
      * ★コース図ミニマップ（左上・区間タグの下）。カットが変わっても「今どこか」が繋がる（ユーザー指摘⑥）。
      *   描画に使った位置をそのまま点にする（順位計算はしない）。
      */
-    if (v2Minimap !== undefined) {
+    if (v2Minimap !== undefined && !winnerFinishedNow) {
       drawCourseMinimap(ctx, ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn }), art.pal as Record<string, string>, FONT,
-        v2Minimap.horses, v2Minimap.focusS, { x: 24, y: 112, width: 190, height: 112 },
-        (gate) => SILKS_COLORS[(gate - 1) % SILKS_COLORS.length] ?? '#fff');
+        v2Minimap.horses, v2Minimap.focusS, { x: 40, y: 321, width: 264, height: 209 },
+        (gate) => SILKS_COLORS[(gate - 1) % SILKS_COLORS.length] ?? '#fff', {
+          distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${DIST}m`,
+          metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
+          timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
+        });
     }
     drawRendererBadge(ctx, renderer, renderer === 'v2' ? v2ShotId ?? 'v2' : `legacy/${courseSection}`);
 
@@ -1323,13 +1360,11 @@ export default function RacePage(): React.JSX.Element {
      *   ⚠️ ★**描き方はこの画面に持ちません** — 動画の道具と**同じ関数**を呼びます。
      */
     {
-      const hud = raceHudVisibilityAt(raceD, built.warp.displaySec, allFinishedNow);
+      // ★ゴールした瞬間からライブ HUD（順位・実況帯）を落とし、勝馬テロップだけにする（motion-spec §6）
+      const hudRaw = raceHudVisibilityAt(raceD, built.warp.displaySec, allFinishedNow);
+      const hud = winnerFinishedNow ? { ...hudRaw, gauge: false, standings: false, calls: false } : hudRaw;
       // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）
       const g = staminaAt(built.gauge, Math.max(0, metersLeft));
-      if (hud.gauge) {
-        drawGauge(ctx, art.pal as Record<string, string>, vp, FONT,
-          `${ownGate}番（自分の馬）`, g.left, built.gauge.initial, g.drainPerMeter);
-      }
 
       /**
        * ★ゴールした馬は**確定着順**で並べます。
@@ -1347,10 +1382,14 @@ export default function RacePage(): React.JSX.Element {
       if (hud.standings) {
         drawStandings(ctx, art.pal as Record<string, string>, vp, FONT, rank.map((h) => ({
           gate: h.gate,
+          name: HORSE_NAMES[h.gate - 1] ?? `スター${h.gate}`,
           lengths: ((rank[0]?.meters ?? h.meters) - h.meters) / HORSE_LENGTH_M,
           timeSec: allIn ? built.finishSec.get(h.gate) : undefined,
           isOwn: h.gate === ownGate,
-        })), FIELD, frameRoleOf);
+        })), FIELD, frameRoleOf, {
+          rightLabel: v2SectionLabel ?? sectionLabel[courseSection],
+          timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
+        });
       }
 
       /**
@@ -1372,8 +1411,11 @@ export default function RacePage(): React.JSX.Element {
       const closing = gapBefore - gapNow;
       const lengths = gapNow / HORSE_LENGTH_M;
       const phaseName = v2SectionLabel ?? sectionLabel[courseSection];
-      const say: CallPart[] = [{ text: `${ownGate}番`, role: frameRoleOf(ownGate, FIELD) }];
-      if (aheadM === undefined) say.push({ text: ' が先頭。' });
+      // 局面が変わった発言は区間名から入る（「3コーナー、…」）。同じ局面では主語から
+      const prevPhase = callKeyRef.current.split('/')[0] ?? '';
+      const say: CallPart[] = prevPhase === phaseName ? [] : [{ text: `${phaseName}、` }];
+      say.push({ text: `${ownGate}番`, role: frameRoleOf(ownGate, FIELD) });
+      if (aheadM === undefined) say.push({ text: ' が先頭です。' });
       else if (lengths < 0.3) say.push({ text: ' は前と並んでいます' });
       else {
         say.push({ text: ` は前と ${lengths.toFixed(1)} 馬身` });
@@ -1381,15 +1423,22 @@ export default function RacePage(): React.JSX.Element {
           text: closing > 0.15 ? '、詰めています' : closing < -0.15 ? '、離されています' : 'の差',
         });
       }
-      say.push({ text: `　★${phaseName}` });
       const key = `${phaseName}/${lengths < 0.3 ? '並' : closing > 0.15 ? '詰' : closing < -0.15 ? '離' : '同'}/${ownIdx + 1}`;
       if (hud.calls && shouldEmitRaceCall(callKeyRef.current, key, callLastSecRef.current, raceD)) {
         callKeyRef.current = key;
         callLastSecRef.current = raceD;
         callRef.current = [...callRef.current, say].slice(-3);
+        callStartRef.current = [...callStartRef.current, d].slice(-3);
       }
-      if (hud.calls) drawCallBand(ctx, art.pal as Record<string, string>, vp, FONT, callRef.current,
-        { image: art.raceNarrator, width: art.raceNarrator.width, height: art.raceNarrator.height });
+      if (hud.calls) {
+        drawCallBand(ctx, art.pal as Record<string, string>, vp, FONT, callRef.current,
+          { image: art.raceNarrator, width: art.raceNarrator.width, height: art.raceNarrator.height }, {
+            timeSec: d, lineStartSec: callStartRef.current, narratorName: NARRATOR_NAME,
+            gauge: hud.gauge ? { left: g.left, initial: built.gauge.initial } : undefined,
+            metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
+            sinceSec: raceD - HUD_SETTLE_SEC,
+          });
+      }
 
       const afterRaceSec = Math.max(0, raceD - built.warp.displaySec);
       const resultsT = (afterRaceSec - WINNER_FOLLOW_SEC) / RESULTS_BOARD_SEC;
@@ -1400,15 +1449,22 @@ export default function RacePage(): React.JSX.Element {
             place: row.place, gate: row.gate,
             horseName: HORSE_NAMES[row.gate - 1] ?? `スター${row.gate}`,
             jockeyName: JOCKEY_NAMES[row.gate - 1] ?? 'STAR騎手',
-            timeSec: built.finishSec.get(row.gate), margin: row.margin,
+            timeSec: built.finishSec.get(row.gate), margin: row.margin, isOwn: row.gate === ownGate,
           })), FIELD, frameRoleOf,
-          { raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo, distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${DIST}m` },
-          Math.min(1, resultsT * 1.6));
+          {
+            raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo,
+            distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${DIST}m ${turn === 'left' ? '左' : '右'}`,
+            conditionLabel: `晴 / ${conditionLabel[trackCondition]}`,
+            winTimeSec: built.finishSec.get(winnerGate),
+            secondsToNext: Math.max(0, RESULTS_BOARD_SEC - (afterRaceSec - WINNER_FOLLOW_SEC)),
+          },
+          Math.min(1, resultsT * 1.6), d);
       } else {
         if (winnerFinishedNow && winnerAfterSec < 3.4) {
           drawWinnerLowerThird(ctx, art.pal as Record<string, string>, vp, FONT,
             winnerGate, HORSE_NAMES[winnerGate - 1] ?? `スター${winnerGate}`,
-            JOCKEY_NAMES[winnerGate - 1] ?? 'STAR騎手', built.finishSec.get(winnerGate));
+            JOCKEY_NAMES[winnerGate - 1] ?? 'STAR騎手', built.finishSec.get(winnerGate),
+            { role: frameRoleOf(winnerGate, FIELD), animSec: d, sinceSec: winnerAfterSec });
         }
         if (hud.result) {
           drawResultPanel(ctx, art.pal as Record<string, string>, vp, FONT,
@@ -1473,8 +1529,10 @@ export default function RacePage(): React.JSX.Element {
           type="button" onClick={() => {
             dRef.current = 0;
             callRef.current = [];
+            callStartRef.current = [];
             callKeyRef.current = '';
             callLastSecRef.current = -Infinity;
+            sectionTagRef.current = { label: '', sinceSec: -Infinity };
             setClock(0); setPlaying(false); render(0);
           }}
           style={{ padding: '8px 14px', cursor: 'pointer', background: '#3a3630', color: '#efe9dc', border: 0 }}

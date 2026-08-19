@@ -71,6 +71,8 @@ export interface Ctx2D<TImage = unknown> {
   transform?(a: number, b: number, c: number, d: number, e: number, f: number): void;
   /** ★任意。毛色バリエーション（馬体の色相・明度・彩度）に使う CSS filter。無い環境では無視 */
   filter?: string;
+  /** ★任意。HUD の金プレート（グラデーション 1 本だけ許可・MOTION_HANDOFF §0）。無い環境では単色の金 */
+  createLinearGradient?(x0: number, y0: number, x1: number, y1: number): { addColorStop(offset: number, color: string): void };
 }
 
 /** ★ブラウザの `CanvasTextAlign` と同じ並び（`lib.dom` に依存しないため自前に持つ） */

@@ -9,6 +9,7 @@ export * from './bracket.js';
 export * from './formation.js';
 export * from './oblique-draw.js';
 export * from './oblique-ui.js';
+export * from './hud-kit.js';
 export * from './race-intro.js';
 export * from './perspective.js';
 export * from './perspective-draw.js';

@@ -1,4 +1,8 @@
 import type { Ctx2D, FontOf, Palette, SheetSpec, Viewport2D } from './oblique-draw.js';
+import {
+  HUD, goldPlate, drawGoldEdge, fillSlant, strokeSlant, drawFrameBadge, drawLabel, drawSpacedText,
+  riseAt, wipeAt, drawOnAir, typedCount, drawNarratorFrame, drawGoldChip,
+} from './hud-kit.js';
 
 /**
  * ★導入の時間割（アーケード参考映像: 空撮フライオーバー → レース名タイトル → 発馬機正面 → 発走）
@@ -43,6 +47,15 @@ export interface RaceIntroMeta {
   readonly weatherLabel: string;
   readonly conditionLabel: string;
   readonly turnLabel: string;
+  /** 発走時刻の表記（例 "15:40"）。無ければ出さない */
+  readonly startTimeLabel?: string | undefined;
+  /** 頭数（右上の「12 HORSES」）。無ければ出さない */
+  readonly fieldSize?: number | undefined;
+  /** 自馬（右下の「あなたの馬」パネル）。無ければ出さない */
+  readonly own?: {
+    readonly gate: number; readonly role: string; readonly name: string; readonly jockey: string;
+    readonly oddsLabel?: string | undefined;
+  } | undefined;
 }
 
 export interface StartHorseVisual {
@@ -85,67 +98,188 @@ export function drawRaceTitleCard<TImage>(
   meta: RaceIntroMeta, displaySec: number,
   background?: { readonly image: TImage; readonly width: number; readonly height: number },
 ): void {
-  // ★タイトルはフライオーバー後（RACE_INTRO_FLYOVER_SEC〜RACE_INTRO_TITLE_END_SEC）に出る。前後 0.35 秒でフェード
+  /**
+   * ★本線（design/hud-ds/components/title-card）: 出るのは displaySec 3.0–5.6（空撮のあと）。前後 0.35 秒でフェード。
+   *   背景は映像のまま、左 44% に暗幕 → 78% へ 0。板 left-40 top150 w820（斜度 -9°・上下辺のみ金ヘアライン）。
+   *   レース名 96px 金プレート（0.7s 左からワイプ）／金の下線 5×520／距離 64px＋「m 芝・左」26px／条件 20px／格 12px 金
+   */
   const local = displaySec - RACE_INTRO_FLYOVER_SEC;
   const fade = Math.min(1, local / 0.35, (RACE_INTRO_TITLE_END_SEC - RACE_INTRO_FLYOVER_SEC - local) / 0.35);
+  const W = vp.width, H = vp.height;
   if (background !== undefined) {
     const sourceRatio = background.width / background.height;
-    const targetRatio = vp.width / vp.height;
+    const targetRatio = W / H;
     const sw = sourceRatio > targetRatio ? background.height * targetRatio : background.width;
     const sh = sourceRatio > targetRatio ? background.height : background.width / targetRatio;
     const sx = (background.width - sw) * 0.5;
     const sy = (background.height - sh) * 0.5;
-    ctx.drawImage(background.image, sx, sy, sw, sh, 0, 0, vp.width, vp.height);
-    ctx.fillStyle = 'rgba(3,8,6,0.18)'; ctx.fillRect(0, 0, vp.width, vp.height);
-    ctx.fillStyle = 'rgba(3,8,6,0.30)'; ctx.fillRect(0, 0, vp.width * 0.68, vp.height);
-    ctx.fillStyle = 'rgba(3,8,6,0.20)'; ctx.fillRect(0, 0, vp.width * 0.46, vp.height);
-    ctx.fillStyle = 'rgba(2,5,4,0.22)'; ctx.fillRect(0, 0, vp.width, 72);
-    ctx.fillRect(0, vp.height - 54, vp.width, 54);
+    ctx.drawImage(background.image, sx, sy, sw, sh, 0, 0, W, H);
   } else {
-    ctx.fillStyle = '#0b1210'; ctx.fillRect(0, 0, vp.width, vp.height);
+    ctx.fillStyle = '#0b1210'; ctx.fillRect(0, 0, W, H);
   }
-  ctx.globalAlpha = Math.max(0, fade);
-  ctx.fillStyle = 'rgba(5,9,7,0.76)'; ctx.fillRect(76, 104, 720, 452);
-  ctx.strokeStyle = 'rgba(235,225,187,0.46)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(76.5, 104.5); ctx.lineTo(795.5, 104.5);
-  ctx.lineTo(795.5, 555.5); ctx.lineTo(76.5, 555.5); ctx.closePath(); ctx.stroke();
-  ctx.fillStyle = pal['frame-5'] ?? '#e9c94d'; ctx.fillRect(76, 104, 9, 452);
-  ctx.fillStyle = pal['paper-0'] ?? '#fff'; ctx.font = font(30, true);
-  ctx.fillText(`${meta.venue}　${meta.raceNo}`, 126, 174);
-  ctx.font = font(68, true); ctx.fillText(meta.raceName, 126, 282);
-  ctx.fillStyle = pal['frame-5'] ?? '#e9c94d'; ctx.fillRect(126, 320, 590, 3);
-  ctx.fillStyle = pal['paper-0'] ?? '#fff'; ctx.font = font(30, true);
-  ctx.fillText(`${meta.surfaceLabel} ${meta.distanceMeter}m　${meta.turnLabel}`, 126, 388);
-  ctx.font = font(26);
-  ctx.fillText(`天候 ${meta.weatherLabel}　　馬場 ${meta.conditionLabel}`, 126, 448);
-  ctx.fillStyle = 'rgba(255,255,255,0.68)'; ctx.font = font(17, true);
-  ctx.fillText('GRADE I  •  TURF CHAMPIONSHIP', 128, 512);
-  ctx.globalAlpha = 1;
+  // 暗幕: x0–44% は rgba(3,6,4,.86)、78% へ向けて 0（グラデーションが無い環境では段で近似）
+  if (typeof ctx.createLinearGradient === 'function') {
+    const g = ctx.createLinearGradient(0, 0, W, 0);
+    g.addColorStop(0, 'rgba(3,6,4,.86)'); g.addColorStop(0.44, 'rgba(3,6,4,.86)'); g.addColorStop(0.78, 'rgba(3,6,4,0)'); g.addColorStop(1, 'rgba(3,6,4,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  } else {
+    ctx.fillStyle = 'rgba(3,6,4,.86)'; ctx.fillRect(0, 0, W * 0.44, H);
+    for (let i = 0; i < 8; i += 1) {
+      ctx.fillStyle = `rgba(3,6,4,${(0.86 * (1 - (i + 0.5) / 8)).toFixed(3)})`;
+      ctx.fillRect(W * (0.44 + (0.34 * i) / 8), 0, W * 0.34 / 8 + 1, H);
+    }
+  }
+  const baseAlpha = ctx.globalAlpha;
+  const rise = riseAt(local, 0, 0.55);
+  ctx.globalAlpha = baseAlpha * Math.max(0, fade) * rise.alpha;
+  const t = displaySec;
+  // 板 left-40 top150 w820（斜度 -9°）。高さは中身なり（≒ 388）
+  const px = -40, py = 150 + rise.dy, pw = 820, ph = 388;
+  fillSlant(ctx, px, py, pw, ph, HUD.glass);
+  ctx.fillStyle = HUD.goldHair;
+  const k = HUD.skew * ph * 0.5;
+  ctx.fillRect(px + k, py, pw, 1); ctx.fillRect(px - k, py + ph - 1, pw, 1);
+  const ix = 90;                       // 板の内側 x90+
+  let y = py + 34;
+  drawLabel(ctx, font, `${meta.venue}　${meta.raceNo}`, ix, y + 12, HUD.paper70);
+  y += 12 + 10;
+  // レース名 96px 金プレート（ワイプ 0.7s）
+  ctx.font = font(96, true);
+  const nw = ctx.measureText(meta.raceName).width;
+  const wipe = wipeAt(local, 0, 0.7);
+  const shown = Math.max(0, Math.min(meta.raceName.length, Math.round(meta.raceName.length * wipe)));
+  ctx.fillStyle = goldPlate(ctx, ix, nw, t);
+  ctx.fillText(meta.raceName.slice(0, shown), ix, y + 96 * 0.86);
+  y += 96 + 18;
+  // 金の下線 高5 幅520（0.2s 遅れて 0.6s でワイプ）
+  ctx.fillStyle = goldPlate(ctx, ix, 520, t);
+  ctx.fillRect(ix, y, Math.round(520 * wipeAt(local, 0.2, 0.6)), 5);
+  y += 5 + 26;
+  // 距離 64px ＋「m　芝・左」26px を下端揃え
+  ctx.font = font(64, true); ctx.fillStyle = HUD.paper;
+  const dText = String(meta.distanceMeter);
+  ctx.fillText(dText, ix, y + 58);
+  const dw = ctx.measureText(dText).width;
+  ctx.font = font(26, true);
+  ctx.fillText(`m　${meta.surfaceLabel}・${meta.turnLabel}`, ix + dw + 30, y + 58 - 8);
+  y += 64 + 22;
+  // 条件 20px 3 項目・間隔 28px
+  ctx.font = font(20, true); ctx.fillStyle = 'rgba(246,242,231,.9)';
+  let cx = ix;
+  const items = [`天候　${meta.weatherLabel}`, `馬場　${meta.conditionLabel}`];
+  if (meta.startTimeLabel !== undefined) items.push(`発走　${meta.startTimeLabel}`);
+  for (const item of items) { ctx.fillText(item, cx, y + 18); cx += ctx.measureText(item).width + 28; }
+  y += 20 + 34;
+  // 格 12px 字間 .34em 金
+  ctx.font = font(12, true); ctx.fillStyle = HUD.gold;
+  drawSpacedText(ctx, 'GRADE I ・ TURF CHAMPIONSHIP', ix, y + 12, 12 * 0.34);
+  // 頭数バッジ 右上 x1244 基準
+  if (meta.fieldSize !== undefined) {
+    ctx.font = font(12, true);
+    const label = `${meta.fieldSize} HORSES`;
+    const lw = label.length * 12 * 0.18 + ctx.measureText(label).width;
+    const bw = lw + 32, bh = 26;
+    fillSlant(ctx, W - 36 - bw, 36, bw, bh, HUD.glass);
+    strokeSlant(ctx, W - 36 - bw, 36, bw, bh, HUD.goldHair);
+    drawLabel(ctx, font, label, W - 36 - bw + 16, 36 + 17, HUD.gold);
+  }
+  // 自馬パネル 右下 右端 x1244・下端 y676（w296）／0.5s 遅れてライズ
+  if (meta.own !== undefined) {
+    const own = meta.own;
+    const orise = riseAt(local, 0.5);
+    ctx.globalAlpha = baseAlpha * Math.max(0, fade) * orise.alpha;
+    const ow = 296, oh = 122;
+    const ox = W - 36 - ow, oyy = H - 44 - oh + orise.dy;
+    ctx.fillStyle = HUD.glass; ctx.fillRect(ox, oyy, ow, oh);
+    ctx.strokeStyle = HUD.goldHair; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ox + 0.5, oyy + 0.5); ctx.lineTo(ox + ow - 0.5, oyy + 0.5); ctx.lineTo(ox + ow - 0.5, oyy + oh - 0.5); ctx.lineTo(ox + 0.5, oyy + oh - 0.5); ctx.closePath(); ctx.stroke();
+    drawGoldEdge(ctx, ox, oyy, ow, t);
+    drawLabel(ctx, font, 'あなたの馬', ox + 14, oyy + 4 + 10 + 12, HUD.gold);
+    drawLabel(ctx, font, 'MY HORSE', ox + ow - 14, oyy + 4 + 10 + 12, 'rgba(246,242,231,.42)', 'right');
+    drawFrameBadge(ctx, pal, font, own.role, String(own.gate), ox + 14, oyy + 38, 40, 32, 22);
+    ctx.font = font(26, true); ctx.fillStyle = HUD.paper;
+    ctx.fillText(own.name, ox + 14 + 40 + 12, oyy + 38 + 25);
+    ctx.font = font(15, true); ctx.fillStyle = 'rgba(246,242,231,.85)';
+    ctx.fillText(`騎手　${own.jockey}`, ox + 14, oyy + oh - 14);
+    if (own.oddsLabel !== undefined) {
+      drawLabel(ctx, font, '単勝', ox + ow - 14, oyy + 38 + 30, HUD.paper70, 'right');
+      ctx.textAlign = 'right'; ctx.font = font(34, true);
+      const tw = ctx.measureText(own.oddsLabel).width;
+      ctx.fillStyle = goldPlate(ctx, ox + ow - 14 - tw, tw, t);
+      ctx.fillText(own.oddsLabel, ox + ow - 14, oyy + oh - 12);
+      ctx.textAlign = 'left';
+    }
+  }
+  ctx.globalAlpha = baseAlpha;
 }
 
-/** ★ゲート待機〜発走の中継帯（画面下端に密着）。V2 の統合発走でも同じ帯を使う */
+/**
+ * ★ゲート待機〜発走の中継帯（本線 = design/hud-ds/components/start-band）。V2 の統合発走でも同じ帯を使う。
+ *   帯 y616 h104（斜度 -9°・上縁 金4px）／ナレーター x36 y548 150×172（レース中と同一座標）／
+ *   「まもなく発走」金チップ＋ON AIR＋音声レベル／実況 28px を 20 文字/秒で左から／右にカウントダウン 64px 金プレート。
+ *   開扉では文言だけ差し替え、帯は動かさない。開扉の瞬間の白フラッシュは呼ぶ側。
+ */
 export function drawStartCallBand<TImage>(
   ctx: Ctx2D<TImage>, pal: Palette, vp: Viewport2D, font: FontOf,
   fieldSize: number, released: boolean,
   narrator?: { readonly image: TImage; readonly width: number; readonly height: number },
+  opts: {
+    readonly timeSec?: number | undefined;
+    /** この文言を出し始めた秒（文字送り用）。省略で全文 */
+    readonly lineStartSec?: number | undefined;
+    /** 発走までの秒。0 以下・省略で出さない（開扉後は消す） */
+    readonly secondsToStart?: number | undefined;
+    readonly narratorName?: string | undefined;
+    readonly sinceSec?: number | undefined;
+  } = {},
 ): void {
-  // 参考映像のように画面下端へ密着した中継帯。独立カードには見せない。
-  const bandY = vp.height - 104, bandH = 104;
-  ctx.fillStyle = 'rgba(3,7,5,0.88)'; ctx.fillRect(0, bandY, vp.width, bandH);
-  ctx.fillStyle = 'rgba(30,45,34,0.62)'; ctx.fillRect(0, bandY + 5, vp.width, bandH - 5);
-  ctx.fillStyle = pal['frame-5'] ?? '#e9c94d'; ctx.fillRect(0, bandY, vp.width, 4);
-  ctx.strokeStyle = 'rgba(236,232,211,0.52)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, bandY + 4.5); ctx.lineTo(vp.width, bandY + 4.5); ctx.stroke();
-  if (narrator !== undefined) {
-    const portraitSize = 136;
-    ctx.drawImage(narrator.image, 0, 0, narrator.width, narrator.height,
-      18, vp.height - portraitSize, portraitSize, portraitSize);
+  void pal;
+  const t = opts.timeSec ?? 0;
+  const W = vp.width, H = vp.height;
+  const rise = riseAt(opts.sinceSec ?? 1, 0, 0.5);
+  const baseAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = baseAlpha * rise.alpha;
+  const oy = rise.dy;
+  fillSlant(ctx, -40, H - 104 + oy, W + 91, 104, HUD.glass);
+  drawGoldEdge(ctx, 0, H - 104 + oy, W, t);
+  drawNarratorFrame(ctx, font, 36, H - 172 + oy, narrator, '実況', opts.narratorName ?? '実況アナ');
+  const text = released ? 'スタートしました！' : `${fieldSize}頭、ゲートイン完了しました`;
+  const shown = opts.lineStartSec === undefined ? text.length : typedCount(text.length, t - opts.lineStartSec);
+  // まもなく発走チップ x206 y632 h26 ＋ ON AIR
+  const chipW = drawGoldChip(ctx, font, released ? '発走' : 'まもなく発走', 206, H - 88 + oy, 26, 16, 14, 16 * 0.06);
+  drawOnAir(ctx, font, 206 + chipW + 14, H - 88 + 2 + oy, t, shown < text.length);
+  // 実況 x206 y668 28px/40（先頭の頭数は 36px 金）
+  ctx.textAlign = 'left';
+  let cx = 206;
+  const numLen = released ? 0 : String(fieldSize).length;
+  const head = text.slice(0, Math.min(numLen, shown));
+  if (head.length > 0) {
+    ctx.font = font(36, true); ctx.fillStyle = HUD.gold;
+    ctx.fillText(head, cx, H - 52 + 30 + oy);
+    cx += ctx.measureText(head).width;
   }
-  const textX = narrator === undefined ? 34 : 172;
-  ctx.fillStyle = pal['frame-5'] ?? '#e9c94d'; ctx.font = font(15, true);
-  ctx.fillText('実況', textX, bandY + 31);
-  ctx.fillStyle = pal['paper-0'] ?? '#fff'; ctx.font = font(27, true);
-  ctx.fillText(released ? 'スタートしました！' : `${fieldSize}頭、ゲートイン完了`, textX, bandY + 70);
+  const rest = text.slice(numLen, shown);
+  if (rest.length > 0) {
+    ctx.font = font(28, true); ctx.fillStyle = HUD.paper;
+    ctx.fillText(rest, cx, H - 52 + 30 + oy);
+  }
+  // カウントダウン 右端 x1244 基準 w150／ラベル 12px／数字 64px 金プレート（1.0s の 2 ステップ点滅・残り 5 秒以下は 0.5s）
+  if (opts.secondsToStart !== undefined && opts.secondsToStart > 0 && !released) {
+    const secs = Math.ceil(opts.secondsToStart);
+    const right = W - 36;
+    drawLabel(ctx, font, '発走まで', right, H - 94 + 12 + oy, HUD.paper70, 'right');
+    const m = Math.floor(secs / 60), s = secs % 60;
+    const label = `${m}:${s < 10 ? '0' : ''}${s}`;
+    const period = secs <= 5 ? 0.5 : 1.0;
+    const blink = Math.floor(t / period) % 2 === 0 ? 1 : 0.62;
+    ctx.globalAlpha = baseAlpha * rise.alpha * blink;
+    ctx.textAlign = 'right'; ctx.font = font(64, true);
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = goldPlate(ctx, right - tw, tw, t);
+    ctx.fillText(label, right, H - 94 + 16 + 54 + oy);
+    ctx.textAlign = 'left';
+  }
+  ctx.globalAlpha = baseAlpha;
 }
 
 export function drawStartingGate<TImage>(

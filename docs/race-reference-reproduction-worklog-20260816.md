@@ -373,3 +373,23 @@
 - 旧 `components/results-board` は削除（デザイナー側で `payout-board` に統合）。`build.mjs`（叩き台生成）は役目を終えたので削除 — 以後 `design/hud-ds` の正本は Claude Design 側。
 - 本線: **派手版**（金グラデ 1 本・斜度 -9°・コンデンス数字）。実装座標の正本は `components/screen-live/index.html`、規約は `MOTION_HANDOFF.md`。
 - 実装への反映は未着手（次工程）。順番の案: ①トークン／共通描画（金プレート・斜め帯・枠色バッジ）→ ②レース中 HUD（screen-live）→ ③タイトル・発走帯 → ④勝馬テロップ・確定払戻 → ⑤Web 3 画面（DOM）。
+
+## 2026-08-19 HUD をデザインシステム（派手版）に合わせて Canvas 実装
+
+- 共通部品 `packages/render/src/hud-kit.ts`（トークン `HUD`、金プレート `goldPlate`＝createLinearGradient 1 本・4.5s 光沢、
+  斜度 -9° の `fillSlant`、切り欠き板 `drawGlassNotchPanel`、枠色バッジ `drawFrameBadge`、字間ラベル、登場 `riseAt`／ワイプ `wipeAt`、
+  ON AIR＋音声レベル `drawOnAir`、文字送り `typedCount`（20 文字/秒）、ナレーター枠 `drawNarratorFrame`、金チップ、`formatRaceTime`）。
+  `Ctx2D` に任意の `createLinearGradient` を追加（無い環境では単色の金）。
+- `oblique-ui.ts`: 順位パネル（x930 y34 314×224・馬名つき・1 位金プレート・自馬 ★／金バー）、実況帯（帯 y574 h146 斜め・ナレーター 150×172・
+  ON AIR・直前 19px 60%／現在 28px 文字送り・余力バー 5 本（状態色）・残り距離 76px 金プレート）、区間タグ（x44 y120・番号＋語）、
+  レース見出しチップ（`drawRaceHeadlineChip`）、勝馬テロップ（h180・1着 64px・馬名 56px ワイプ・TIME 78px）、確定ボード（板 1200×544・
+  1着行 h56・6着以下バッジ＋右に明細・「確定」タブ・自動で次へカウントダウン。払戻は投票データが来てから）。
+- `minimap.ts`: `opts` を渡すと本線の板（x40 y321 264×209・COURSE／距離・GOAL・残距離バー・「残 400m」）。
+- `race-intro.ts`: タイトル（左 44% 暗幕・板 -40/150/820・レース名 96px 金プレート ワイプ・頭数バッジ・自馬パネル）、
+  発走帯（y616 h104・「まもなく発走」金チップ・ON AIR・文字送り・発走までカウントダウン）。
+- `race/page.tsx`: フォントを system-ui に、HUD 登場 0.8s、区間タグは文言が変わるとスライドイン、実況の各行に発話開始秒を持たせて文字送り、
+  局面が変わった発言は区間名から入る、ゴールした瞬間からライブ HUD（見出し・区間・コース図・順位・実況帯）を落として勝馬テロップのみ、
+  旧 `drawGauge` の単独表示は廃止（実況帯の余力に統合）。
+- 検証: typecheck・render テスト 204 件・全体 872 件通過。ヘッドレス Edge で 静止（4.6/6.9/12/30/45/86.5/95 秒）と再生（9〜94 秒）を目視。
+- 未実装（デザインにあるが今回は見送り）: 払戻ブロック・あなたの結果、出馬表・パドック・リプレイ操作（新規画面）、Web 3 画面（DOM）、
+  ナレーター 4 名の切替（絵が無い）、コンデンス数字書体（system-ui bold で代替）。
