@@ -469,3 +469,4 @@
 - `/race`: `?badge=0` で一時バッジ（BROADCAST V2 ACTIVE）を消せる（LP 用キャプチャのため。描画分岐は不変）。`globals.css`: `.lp-bleed`（全幅ブロック）。
 - 画像: `public/lp/*.jpg`（HUD 2 枚 1280 幅・画面キャプチャ 7 枚 760 幅、計約 0.6MB）。
 - 検証: typecheck ✓／vitest ✓／ヘッドレス Edge で `/`・`/races`・`/signup`・`/login`・`/stable`・`/race` に例外なし。途中で開発サーバーが「Compiling /」で固まったため再起動（コード起因ではない）。
+- 2026-08-19 オーナー判定: **R-3（LP）合格**「まずはこの LP でいく」。REQUESTS.md に記入し Claude Design へ書き戻し。
