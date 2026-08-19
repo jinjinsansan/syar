@@ -83,7 +83,8 @@ const PEDIGREE: readonly (readonly string[])[] = [
   ],
 ];
 
-const HORSES: readonly StableHorse[] = [
+/** デモの所有馬（画面側の見本にも使う） */
+export const DEMO_HORSES: readonly StableHorse[] = [
   { id: 'h1', name: 'サクラブリーズ', sexAge: '牝4', classRank: 6, classLabel: '重賞 GIII', stars: 4.5, condition: 5, fatigue: 24, nextRace: '桜星賞（8/22）', week: { kind: 'done', menu: '追い切り' }, prizePP: 4520 },
   { id: 'h2', name: 'ホクトリュウセイ', sexAge: '牡5', classRank: 5, classLabel: 'オープン', stars: 4, condition: 4, fatigue: 41, nextRace: '若草賞（8/24）', week: { kind: 'done', menu: '坂路' }, prizePP: 3100 },
   { id: 'h3', name: 'トキメキステップ', sexAge: '牝3', classRank: 3, classLabel: '2勝クラス', stars: 3.5, condition: 3, fatigue: 58, nextRace: null, week: { kind: 'todo' }, prizePP: 900 },
@@ -136,8 +137,8 @@ function detailOf(h: StableHorse): HorseDetail {
 }
 
 export const demoStableRepo: StableRepo = {
-  stable: async () => ({ demo: true, weekNo: 32, weekRange: '8/18 〜 8/24', horses: HORSES, entries: 3, plannedEP: 1150 }),
-  horse: async (id) => { const h = HORSES.find((x) => x.id === id); return h === undefined ? null : detailOf(h); },
+  stable: async () => ({ demo: true, weekNo: 32, weekRange: '8/18 〜 8/24', horses: DEMO_HORSES, entries: 3, plannedEP: 1150 }),
+  horse: async (id) => { const h = DEMO_HORSES.find((x) => x.id === id); return h === undefined ? null : detailOf(h); },
 };
 
 /** 一覧の並び: 未指示 → 指示済み → 休養中。同順位内は格の高い順、次に獲得賞金の多い順（カードの規則） */

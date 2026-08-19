@@ -62,6 +62,7 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
             <span style={{ fontSize: 13, color: 'var(--paper-70)' }}>発走まで <Countdown untilIso={String(r['scheduled_at'])} after="まもなく発走" /></span>
           )}
           <a className="chip-glass" href={`/races/${id}/odds`} style={{ height: 30, fontSize: 14 }}><span className="unskew">オッズ</span></a>
+          {r['status'] === 'scheduled' && <a className="chip-gold" href={`/races/${id}/bet`} style={{ height: 30, fontSize: 14 }}><span className="unskew">投票</span></a>}
         </div>
       </div>
 
