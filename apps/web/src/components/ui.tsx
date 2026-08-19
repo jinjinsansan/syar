@@ -23,16 +23,88 @@ export function StatusBadge({ status }: { readonly status: string }): React.Reac
   return <span className="a-badge open">発売中</span>;
 }
 
-/** 脚質チップ（逃げ #ff4d3d・先行 #f08219・差し #3fd0e0・追込 #7f9cf5） */
-const STYLE_COLOR: Readonly<Record<string, string>> = {
-  nige: '#ff4d3d', senko: '#f08219', sashi: '#3fd0e0', oikomi: '#7f9cf5',
+/** 脚質チップ（アーケード: 濃色文字＋淡色地＋同色 2px 縁・h26・角丸 6px・12px 900 — MOTION_HANDOFF §6.5） */
+const STYLE_COLOR: Readonly<Record<string, readonly [string, string]>> = {
+  nige: ['#a81a13', '#ffe9e7'], senko: ['#a35a04', '#fff1de'], sashi: ['#0c5f9f', '#e0eefa'], oikomi: ['#4a4fa8', '#e8e9fb'],
 };
 const STYLE_LABEL: Readonly<Record<string, string>> = {
   nige: '逃げ', senko: '先行', sashi: '差し', oikomi: '追込',
 };
 export function StyleChip({ strategy }: { readonly strategy: string }): React.ReactElement {
-  const c = STYLE_COLOR[strategy] ?? 'rgba(246,242,231,.6)';
-  return <span className="style-chip" style={{ color: c, borderColor: `${c}66` }}>{STYLE_LABEL[strategy] ?? strategy}</span>;
+  const [c, bg] = STYLE_COLOR[strategy] ?? ['#4a6178', '#eef2f6'];
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', height: 26, padding: '0 11px', borderRadius: 6, background: bg, border: `2px solid ${c}`, color: c, fontSize: 12, fontWeight: 900 }}>
+      {STYLE_LABEL[strategy] ?? strategy}
+    </span>
+  );
+}
+
+/** 券種・馬・表のタブ（h42・上だけ角丸・選択中は青（または赤）グロス＋下辺を白にして板と繋ぐ／未選択は沈んだ白） */
+export function TabButton({ label, selected, onClick, href, tone = 'blue' }: {
+  readonly label: string; readonly selected: boolean; readonly onClick?: () => void; readonly href?: string; readonly tone?: 'blue' | 'red';
+}): React.ReactElement {
+  const style: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', height: 42, padding: '0 20px', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none',
+    borderRadius: '10px 10px 0 0', border: '2px solid var(--a-edge)', borderBottom: selected ? '2px solid #fff' : '2px solid var(--a-edge)',
+    backgroundImage: selected ? (tone === 'red' ? 'var(--a-gloss-red)' : 'var(--a-gloss-blue)') : 'linear-gradient(#fff,#e3ecf3)',
+    color: selected ? '#fff' : 'var(--a-ink-2)', fontSize: 16, fontWeight: 900,
+    boxShadow: selected ? 'var(--a-inset)' : 'inset 0 -3px 4px rgba(16,36,58,.12)', position: 'relative', zIndex: selected ? 2 : 1,
+  };
+  if (href !== undefined) return <a href={href} style={style}>{label}</a>;
+  return <button type="button" onClick={onClick} style={style}>{label}</button>;
+}
+
+/** 現在値バー（明るい地: 地 #e3ecf3・縁 2px 濃青・塗り 青グロス・数値 青・右に「上限 nnn」12px） */
+export function StatBar({ label, value, cap, delta, height = 16, valueSize = 24, rowHeight = 34, labelWidth = 72 }: {
+  readonly label: string; readonly value: number; readonly cap: number; readonly delta?: number | undefined;
+  readonly height?: number; readonly valueSize?: number; readonly rowHeight?: number; readonly labelWidth?: number;
+}): React.ReactElement {
+  const pct = cap > 0 ? Math.max(0, Math.min(100, (value / cap) * 100)) : 0;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: rowHeight }}>
+      <span style={{ width: labelWidth, flex: `0 0 ${labelWidth}px`, fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)' }}>{label}</span>
+      <span style={{ position: 'relative', flex: 1, height, borderRadius: height / 2, background: '#e3ecf3', border: '2px solid var(--a-edge)', overflow: 'hidden' }}>
+        <span style={{ display: 'block', width: `${pct}%`, height: '100%', backgroundImage: 'var(--a-gloss-blue)' }} />
+      </span>
+      <span className="a-num" style={{ width: 58, flex: '0 0 58px', textAlign: 'right', fontSize: valueSize, color: 'var(--a-num-time)' }}>{value}</span>
+      <span style={{ width: 78, flex: '0 0 78px', textAlign: 'right', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>上限 {cap}</span>
+      {delta !== undefined && (
+        <span className="a-num" style={{ width: 44, flex: '0 0 44px', textAlign: 'right', fontSize: 15, color: delta > 0 ? 'var(--a-green-d)' : delta < 0 ? 'var(--a-red-d)' : 'var(--a-ink-3)' }}>
+          {delta > 0 ? `+${delta}` : delta === 0 ? '±0' : String(delta)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** 白地カプセル（見出し右の「週 32」「現在 15:37」「未指示 2」など） */
+export function Capsule({ label, value, unit, color = 'var(--a-num-time)', size = 26 }: {
+  readonly label: string; readonly value: string; readonly unit?: string; readonly color?: string; readonly size?: number;
+}): React.ReactElement {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, height: 40, padding: '0 16px', borderRadius: 10, background: '#fff', border: '2px solid var(--a-edge)', boxShadow: 'var(--a-shadow-sm)' }}>
+      <span className="a-lbl">{label}</span>
+      <span className="a-num" style={{ fontSize: size, color }}>{value}</span>
+      {unit !== undefined && <span className="a-lbl">{unit}</span>}
+    </span>
+  );
+}
+
+/** 状態ピル（h26・角丸 6px・2px 縁）— green=緑グロス白／yellow=黄グロス／gold=金グロス／grey=白→灰／red=赤グロス白／blue=青グロス白 */
+export function Pill({ tone, children }: { readonly tone: 'green' | 'yellow' | 'gold' | 'grey' | 'red' | 'blue'; readonly children: React.ReactNode }): React.ReactElement {
+  const T: Readonly<Record<string, React.CSSProperties>> = {
+    green: { backgroundImage: 'var(--a-gloss-green)', borderColor: 'var(--a-green-d)', color: '#fff' },
+    yellow: { backgroundImage: 'var(--a-gloss-yellow)', borderColor: '#a9741a', color: '#4a3105' },
+    gold: { backgroundImage: 'var(--a-gloss-gold)', borderColor: '#8a5a06', color: '#4a3105' },
+    grey: { backgroundImage: 'linear-gradient(#fff,#e6edf4)', borderColor: 'var(--a-edge-soft)', color: 'var(--a-ink-3)' },
+    red: { backgroundImage: 'var(--a-gloss-red)', borderColor: 'var(--a-red-d)', color: '#fff' },
+    blue: { backgroundImage: 'var(--a-gloss-blue)', borderColor: 'var(--a-edge)', color: '#fff' },
+  };
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', height: 26, padding: '0 12px', borderRadius: 6, border: '2px solid', fontSize: 12, fontWeight: 900, letterSpacing: '.06em', whiteSpace: 'nowrap', ...T[tone] }}>
+      {children}
+    </span>
+  );
 }
 
 /** 金グロスの格バッジ（grade があれば grade、無ければ格ラベル） */

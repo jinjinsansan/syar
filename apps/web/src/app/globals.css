@@ -77,13 +77,13 @@ main { max-width: 1180px; margin: 0 auto; padding: 0; }
 [data-theme="arcade"] {
   --a-bg: linear-gradient(#eaf6ff 0%, #cfe6f7 100%);
   --a-ivory: #fbf7ec; --a-panel: #ffffff; --a-panel-2: #f4f9fd;
-  --a-ink: #10243a; --a-ink-2: #4a6178; --a-ink-3: #5b7488;
+  --a-ink: #10243a; --a-ink-2: #4a6178; --a-ink-3: #52697c;
   --a-line: #cfe0ee; --a-edge: #123f6b; --a-edge-soft: #9fb8cc;
   --a-blue: #1a6fd4; --a-blue-d: #0f56ab; --a-red: #d62f26; --a-red-d: #a81a13;
   --a-green: #2f9e4f; --a-green-d: #1e7a3a; --a-yellow: #f6c21c; --a-gold-ink: #a9741a;
   --a-gloss-blue: linear-gradient(#3c92e6 0%, #1a6fd4 48%, #0f56ab 100%);
   --a-gloss-red: linear-gradient(#f06a5f 0%, #d62f26 48%, #a81a13 100%);
-  --a-gloss-green: linear-gradient(#5cc47a 0%, #2f9e4f 48%, #1e7a3a 100%);
+  --a-gloss-green: linear-gradient(#3faa5f 0%, #1e7a3a 48%, #15612d 100%);
   --a-gloss-gold: linear-gradient(#fff0a8 0%, #ffd84a 44%, #f2b012 62%, #d98f0a 100%);
   --a-gloss-yellow: linear-gradient(#ffe270 0%, #f6c21c 52%, #d99f06 100%);
   --a-gloss-ivory: linear-gradient(#ffffff 0%, #eef4fa 100%);
