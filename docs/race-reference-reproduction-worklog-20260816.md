@@ -451,3 +451,11 @@
 - 検証: typecheck ✓（root + apps/web）、vitest 872 ✓、ヘッドレス Edge で `/`・`/stable`・`/races/x/bet`・`/training`・`/records` を確認。
 - 次: オーナーが開発サーバーで可否判定 → `REQUESTS.md` の R-1 の下に可否を書いて Claude Design に書き戻す → 合格なら残り 7 枚をデザイナーが差し替え → 同期して Web 残り 7 画面を書き換え、暫定の再割り当て CSS を削除。
 - 2026-08-19 オーナー判定: **R-1 合格**（「凄くゲーム感がある」）。`REQUESTS.md` の R-1 に判定を記入し、R-2（残り 7 枚の展開: training → race-entry → horse-detail → race-detail → odds-board → records → prize-exchange、実装側からの注意点つき）を追記して Claude Design プロジェクトに書き戻した。
+
+## 2026-08-19 R-2: Web 残り 7 画面をアーケード筐体テーマに差し替え（全 10 画面が統一）
+
+- Claude Design から R-2（training／race-entry／horse-detail／race-detail／odds-board／records／prize-exchange）と styles.css（緑グロスを #3faa5f→#1e7a3a→#15612d に濃化＝白文字 5.4:1、--a-ink-3 #52697c）・MOTION_HANDOFF §6.5（確定配色）§7（プレイヤー画面の憲法）を同期。
+- 共通部品（`components/ui.tsx`）: `StyleChip` を明るい地用の濃色＋淡色地に、`TabButton`（h42 タブ）、`StatBar`（現在値バー）、`Capsule`（白カプセル）、`Pill`（状態ピル）を追加。`EdgePanel` と暫定の暗色トークン再割り当て CSS・`.legacy-dark` を削除。`fatigueColor` の中間色を #8a5a06 に（18px 未満の数値に #a9741a を使わない規則）。
+- 差し替え: `/training`・`/entry`・`/stable/[horseId]`・`/races/[id]`・`/races/[id]/odds`・`/records`・`/prizes`。データ取得・状態・公正性検証（verifyReveal）・デモデータ・書き込み無効はそのまま（見た目だけ）。
+- カードどおりにできなかった点（データに無い）: レース詳細の騎手列・「場・R」・自馬行の強調（ログイン/所有情報なし）、オッズの支持率%・最終更新・複勝の範囲・自馬タグ。馬詳細の現在値バーは StatBar（value/cap）で塗る。
+- 検証: typecheck ✓、vitest ✓、ヘッドレス Edge で 9 URL を撮影して確認。

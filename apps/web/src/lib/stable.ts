@@ -160,5 +160,5 @@ export function conditionView(c: Condition): { readonly mark: string; readonly l
 
 /** 疲労の色: ≤30 緑・≤60 黄・>60 赤 */
 export function fatigueColor(f: number): string {
-  return f <= 30 ? '#1e7a3a' : f <= 60 ? '#a9741a' : '#a81a13';
+  return f <= 30 ? '#1e7a3a' : f <= 60 ? '#8a5a06' : '#a81a13';
 }

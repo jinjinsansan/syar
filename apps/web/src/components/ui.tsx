@@ -121,18 +121,6 @@ export function MyHorseTag(): React.ReactElement {
   return <span className="a-chip gold" style={{ marginLeft: 10, height: 22, fontSize: 11, padding: '0 8px', letterSpacing: '.1em' }}>わたしの馬</span>;
 }
 
-/** 上縁 金 4px つきのパネル */
-export function EdgePanel({ children, kind = 'panel', style }: {
-  readonly children: React.ReactNode; readonly kind?: 'panel' | 'board'; readonly style?: React.CSSProperties;
-}): React.ReactElement {
-  return (
-    <div className={kind} style={style}>
-      <div className="edge" />
-      {children}
-    </div>
-  );
-}
-
 /** ページ見出し行 */
 export function PageTitle({ title, sub, right }: {
   readonly title: string; readonly sub?: string | undefined; readonly right?: React.ReactNode;

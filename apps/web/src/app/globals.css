@@ -129,32 +129,5 @@ main { max-width: 1180px; margin: 0 auto; padding: 0; }
 [data-theme="arcade"] .a-row:nth-child(even) { background: var(--a-panel-2); }
 [data-theme="arcade"] .a-row:hover { color: var(--a-ink); background: #fff8e1; box-shadow: inset 5px 0 0 var(--a-blue); }
 [data-theme="arcade"] .a-row.done { background: #e7edf3; }
-/* アーケード未対応のページ（暗色トークンのまま）を、明るい地の上で読めるようにする仮の箱 */
-[data-theme="arcade"] .legacy-dark { background: #0c100d; color: var(--paper); border-radius: 12px; padding: 4px 28px 24px; margin-top: 18px; border: 3px solid var(--a-edge); }
-/* アーケード適用中は、暗色トークンで書かれた画面（未差し替え 7 枚）も明るい地で読めるよう色だけ再割り当てする（暫定・差し替え後に削除） */
-[data-theme="arcade"] {
-  --gold: #a9741a; --gold-dim: rgba(169,116,26,.5);
-  --paper: #10243a; --paper-70: #4a6178; --paper-45: #5b7488;
-  --glass: #ffffff; --panel: #ffffff; --board: #ffffff;
-  --hair: #123f6b; --gold-hair: #8a5a06; --rule: #cfe0ee; --row: #f4f9fd;
-  --ok: #1e7a3a; --warn: #a9741a; --bad: #a81a13; --replay: #0f56ab;
-  --sk: 0deg; --sk-i: 0deg;
-}
-[data-theme="arcade"] .panel, [data-theme="arcade"] .board { border-width: 2px; border-radius: 10px; box-shadow: var(--a-shadow); overflow: hidden; }
-[data-theme="arcade"] .edge { background-image: var(--a-gloss-blue); animation: none; height: 6px; }
-[data-theme="arcade"] .plate { background-image: none; color: var(--a-num-time); animation: none; }
-[data-theme="arcade"] .chip-gold { background-image: var(--a-gloss-gold); background-color: transparent; border: 2px solid #8a5a06; border-radius: 10px; color: #4a3105; box-shadow: var(--a-shadow-sm), var(--a-inset); }
-[data-theme="arcade"] .chip-gold:hover { color: #4a3105; background: none; background-image: var(--a-gloss-gold); filter: brightness(1.04); }
-[data-theme="arcade"] .chip-glass, [data-theme="arcade"] .chip-off { background-image: var(--a-gloss-ivory); background-color: transparent; border: 2px solid var(--a-edge); border-radius: 10px; color: var(--a-ink); box-shadow: var(--a-shadow-sm), var(--a-inset); }
-[data-theme="arcade"] .chip-glass:hover { color: var(--a-ink); border-color: var(--a-edge); filter: brightness(1.04); }
-[data-theme="arcade"] .badge { height: 26px; border-radius: 6px; border: 2px solid; font-weight: 900; letter-spacing: .06em; }
-[data-theme="arcade"] .badge.open { background-image: var(--a-gloss-green); border-color: var(--a-green-d); color: #fff; }
-[data-theme="arcade"] .badge.soon { background-image: var(--a-gloss-yellow); border-color: #a9741a; color: #4a3105; }
-[data-theme="arcade"] .badge.live { background-image: var(--a-gloss-red); border-color: var(--a-red-d); color: #fff; }
-[data-theme="arcade"] .badge.done, [data-theme="arcade"] .badge.off { background-image: linear-gradient(#ffffff, #e6edf4); border-color: var(--a-edge-soft); color: var(--a-ink-3); }
-[data-theme="arcade"] .row-link { border-top-color: var(--a-line); }
-[data-theme="arcade"] .row-link:hover { background: #fff8e1; box-shadow: inset 5px 0 0 var(--a-blue); }
-[data-theme="arcade"] .row-link.done { opacity: 1; background: #e7edf3; }
-[data-theme="arcade"] .lbl { letter-spacing: .12em; font-weight: 900; }
 html:has(> body[data-theme="arcade"]) { background: #cfe6f7; }
 body[data-theme="arcade"] { min-height: 100vh; }
