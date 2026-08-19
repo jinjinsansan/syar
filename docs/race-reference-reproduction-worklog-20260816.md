@@ -410,3 +410,9 @@
 - `races/[id]/odds/page.tsx`（オッズ・新規）: 券種タブ、単勝・複勝の人気順＋支持の目安バー（1 番人気=100% の相対。支持率%はデータに無いので出さない）、馬連上位 10 組、他券種は上位 30。購入導線は置かない。
 - ローカル確認のため `apps/web/.env.local`（gitignore 済み）に NEXT_PUBLIC_SUPABASE_URL / ANON_KEY を置いた（`secrets.local.env` から公開キーだけをシェルで転記・値は表示していない）。本番 DB の read-only。
 - 検証: typecheck ✓、ヘッドレス Edge で 番組表／発売中の詳細／オッズ／確定済み詳細（seed 照合「一致しました」を実データで確認）。
+
+## 2026-08-19 出馬表オーバーレイ（Canvas）を実装
+
+- `packages/render/src/entry-board.ts` `drawEntryBoard`（design/hud-ds/components/entry-board どおり: 暗幕・タブ・板 1200×544・右端が 1 番の縦組み 12 列・枠色ブロック／馬番／馬名 22px／騎手 14px／斤量、自馬列の金枠＋「あなたの馬」タグ、枠の切れ目 2px、下帯にチップ・案内・ボタン列（表示のみ）・発走までカウントダウン）。オッズ・人気は渡されたときだけ行を出す（デモには無い）。
+- `/race`: チェックボックス「出馬表」または `?entryBoard=1` で、ゲート待機（5.6–7.8s）中に重ねる。開扉で自動的に閉じる。`Built.weightsKg` を追加。
+- 次の Claude Design 依頼（ログイン後のゲーム画面 7 種）を `docs/claude-design-game-screens-brief-20260819.md` に記録し、オーナーが貼り付け済み（返答待ち）。

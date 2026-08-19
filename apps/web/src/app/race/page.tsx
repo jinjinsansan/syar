@@ -39,7 +39,7 @@ import {
   focusForRaceShot,
   drawFixed2DSideScene, fixed2DBackgroundRoleOf, fixed2DPackLayout,
   // ★UI も package が唯一の出どころ（動画の道具と同じ関数）
-  drawStandings, drawCallBand, drawResultPanel, drawResultsBoard, drawRaceHeadlineChip,
+  drawStandings, drawCallBand, drawResultPanel, drawResultsBoard, drawRaceHeadlineChip, drawEntryBoard,
   drawCourseSectionTag, drawWinnerLowerThird, raceCourseSectionAt,
   raceHudVisibilityAt, shouldEmitRaceCall, type CallPart,
   raceIntroAt, RACE_INTRO_RACE_START_SEC, RACE_INTRO_END_SEC,
@@ -178,6 +178,8 @@ interface Built {
   readonly finishStyle: BroadcastV2FinishStyle;
   /** ★ショット切替の時刻（表示秒）と前後の id。切替直後は前ショットとディゾルブする（ユーザー指摘⑥） */
   readonly shotChanges: readonly { readonly displaySec: number; readonly from: BroadcastV2ShotId; readonly to: BroadcastV2ShotId }[];
+  /** 斤量（出馬表の表示用） */
+  readonly weightsKg: readonly number[];
 }
 
 interface HighQualityHorseFrame {
@@ -551,6 +553,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     visualScroll: buildVisualScroll(samples),
     finishStyle,
     shotChanges,
+    weightsKg: entrants.map((e) => e.weightKg),
   };
 }
 
@@ -613,7 +616,12 @@ export default function RacePage(): React.JSX.Element {
   const [turn, setTurn] = useState<'left' | 'right'>('left');
   /** ★既定は V2。`?renderer=legacy` のときだけ旧固定2D（引継ぎ書 §1-5） */
   const [renderer, setRenderer] = useState<RendererKind>('v2');
-  useEffect(() => { setRenderer(rendererFromSearch(window.location.search)); }, []);
+  /** ★発走前オーバーレイ「出馬表」（design/hud-ds/components/entry-board）。ゲート待機中に重ねる。`?entryBoard=1` でも開く */
+  const [showEntryBoard, setShowEntryBoard] = useState(false);
+  useEffect(() => {
+    setRenderer(rendererFromSearch(window.location.search));
+    setShowEntryBoard(new URLSearchParams(window.location.search).get('entryBoard') === '1');
+  }, []);
   useEffect(() => {
     let cancelled = false;
     const boot = async (): Promise<void> => {
@@ -1308,6 +1316,22 @@ export default function RacePage(): React.JSX.Element {
     });
     }
 
+    if (v2StartHold && showEntryBoard && intro.stage === 'gate-hold') {
+      // ★出馬表オーバーレイ（カウントダウン中だけ）。開扉で自動的に閉じる
+      drawEntryBoard(ctx, art.pal as Record<string, string>, vp, FONT,
+        Array.from({ length: FIELD }, (_, i) => ({
+          gate: i + 1, name: HORSE_NAMES[i] ?? `スター${i + 1}`, jockey: JOCKEY_NAMES[i] ?? 'STAR騎手',
+          weightKg: built.weightsKg[i], isOwn: i + 1 === ownGate,
+        })), {
+          raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo,
+          distanceMeter: DIST, surfaceLabel: surface === 'turf' ? '芝' : 'ダート', turnLabel: turn === 'left' ? '左' : '右',
+          weatherLabel: '晴', conditionLabel: conditionLabel[trackCondition],
+        }, frameRoleOf, {
+          timeSec: d, sinceSec: d - RACE_INTRO_TITLE_END_SEC, secondsToStart: RACE_INTRO_RACE_START_SEC - d,
+        });
+      drawRendererBadge(ctx, renderer, `${intro.stage}/entry-board`);
+      return;
+    }
     if (v2StartHold) {
       // ★ゲート待機〜発走直後: 順位 HUD の代わりに発走の中継帯（「ゲートイン完了」→「スタートしました！」）
       drawStartCallBand(ctx, art.pal as Record<string, string>, vp, FONT, FIELD, intro.stage === 'gate-release',
@@ -1472,7 +1496,7 @@ export default function RacePage(): React.JSX.Element {
         }
       }
     }
-  }, [built, ownGate, surface, trackCondition, turn, renderer]);
+  }, [built, ownGate, surface, trackCondition, turn, renderer, showEntryBoard]);
 
   useEffect(() => {
     const auditSec = Number(new URLSearchParams(window.location.search).get('auditSec'));
@@ -1558,6 +1582,9 @@ export default function RacePage(): React.JSX.Element {
             <option value="good">良</option><option value="yielding">稍重</option>
             <option value="soft">重</option><option value="bad">不良</option>
           </select>
+        </label>
+        <label title="発走前のカウントダウン中に出馬表を重ねる">
+          <input type="checkbox" checked={showEntryBoard} onChange={(e) => setShowEntryBoard(e.target.checked)} /> 出馬表
         </label>
         <label>
           回り{' '}
