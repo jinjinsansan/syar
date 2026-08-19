@@ -416,3 +416,13 @@
 - `packages/render/src/entry-board.ts` `drawEntryBoard`（design/hud-ds/components/entry-board どおり: 暗幕・タブ・板 1200×544・右端が 1 番の縦組み 12 列・枠色ブロック／馬番／馬名 22px／騎手 14px／斤量、自馬列の金枠＋「あなたの馬」タグ、枠の切れ目 2px、下帯にチップ・案内・ボタン列（表示のみ）・発走までカウントダウン）。オッズ・人気は渡されたときだけ行を出す（デモには無い）。
 - `/race`: チェックボックス「出馬表」または `?entryBoard=1` で、ゲート待機（5.6–7.8s）中に重ねる。開扉で自動的に閉じる。`Built.weightsKg` を追加。
 - 次の Claude Design 依頼（ログイン後のゲーム画面 7 種）を `docs/claude-design-game-screens-brief-20260819.md` に記録し、オーナーが貼り付け済み（返答待ち）。
+
+## 2026-08-19 牧場ホーム／馬詳細（Web）をデモデータで実装
+
+- Claude Design の `stable-home`・`horse-detail` を同期（`design/hud-ds/components/`）。
+- `apps/web/src/lib/stable.ts`: 表示モデル（`StableHorse`／`HorseDetail`）と `StableRepo`。**今はデモデータ**（カードのサンプルと同じ）。
+  ログインと「自分の馬だけ読める」ビューが入ったら `supabaseStableRepo` に差し替える（画面は触らない）。
+- `/stable`（わたしの馬）: 今週の予定（未指示数・出走登録・消費予定 EP・ボタン 2 つ・警告バー）、所有馬一覧（格チップ・素質★・調子・疲労バー・次走・今週バッジ、未指示行は左に黄 3px、並びは 未指示→指示済み→休養中）。
+- `/stable/[horseId]`（馬詳細）: 格を最初に（金チップ h46）、馬名 40px、素質★、獲得賞金 46px 金プレート、戦績（勝率は小さく）、状態バー、現在値 5 本（素質上限の目盛・前週比）、適性、戦績表（固定列 flex:0 0）、血統表 5 代（クロス 2 色・1 代目には付けない・父はヒーローと同じ値を参照）、調教履歴。
+- `components/ui.tsx` に `Stars`／`ClassChip`／`FatigueBar` を追加。ヘッダーの「わたしの馬」をリンクに。
+- ★未着手（DB・認証が要る）: Supabase Auth のログイン、`horses` を所有者だけが読めるビュー（`potential`・`genotype` を出さない）、週の指示（調教メニュー）の書き込み RPC、出走登録。これらはレビュー側の指示書（DB マイグレーション）が要るため `QUESTIONS` として挙げる。

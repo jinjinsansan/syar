@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <a href="/" style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.22em', color: 'var(--gold)' }}>STAR</a>
           <nav style={{ display: 'flex', gap: 26, marginLeft: 36, fontSize: 14 }}>
             <a href="/" style={{ color: 'var(--paper)' }}>番組表</a>
-            <span style={{ color: 'var(--paper-45)' }} title="準備中">わたしの馬</span>
+            <a href="/stable" style={{ color: 'var(--paper-70)' }}>わたしの馬</a>
             <span style={{ color: 'var(--paper-45)' }} title="準備中">育成</span>
             <span style={{ color: 'var(--paper-45)' }} title="準備中">記録</span>
           </nav>

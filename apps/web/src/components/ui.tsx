@@ -78,3 +78,42 @@ export function PageTitle({ title, sub, right }: {
 export function ReadError({ message }: { readonly message: string }): React.ReactElement {
   return <p style={{ color: 'var(--bad)', padding: '24px 40px' }}>読み取りに失敗しました: {message}</p>;
 }
+
+/** 素質 ★（0.5 刻み）。満 = 金／半 = 金を左 50% だけ重ねる／空 = 28%。数値は出さない */
+export function Stars({ value, size = 15 }: { readonly value: number; readonly size?: number }): React.ReactElement {
+  const items: React.ReactNode[] = [];
+  for (let i = 1; i <= 5; i += 1) {
+    if (value >= i) items.push(<span key={i} style={{ color: 'var(--gold)' }}>★</span>);
+    else if (value >= i - 0.5) items.push(
+      <span key={i} style={{ position: 'relative', display: 'inline-block' }}>
+        <span style={{ color: 'rgba(246,242,231,.28)' }}>★</span>
+        <span style={{ position: 'absolute', left: 0, top: 0, width: '50%', overflow: 'hidden', color: 'var(--gold)' }}>★</span>
+      </span>,
+    );
+    else items.push(<span key={i} style={{ color: 'rgba(246,242,231,.28)' }}>★</span>);
+  }
+  return <span style={{ display: 'inline-flex', fontSize: size, letterSpacing: '.04em', lineHeight: 1 }}>{items}</span>;
+}
+
+/** 格チップ（h24）。重賞・オープン（classRank ≥ 5）は金ベタ、それ以下は薄地＋1px 罫 */
+export function ClassChip({ label, classRank, h = 24, font = 12 }: { readonly label: string; readonly classRank: number; readonly h?: number; readonly font?: number }): React.ReactElement {
+  const top = classRank >= 5;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', height: h, padding: '0 11px', fontSize: font, fontWeight: 900, letterSpacing: '.06em',
+      background: top ? 'var(--gold)' : 'rgba(246,242,231,.1)', color: top ? 'var(--ink)' : 'var(--paper)', border: top ? undefined : '1px solid var(--rule)',
+    }}>{label}</span>
+  );
+}
+
+/** 疲労バー（w×8・地 rgba(0,0,0,.5)＋1px 45% 枠）＋数値 */
+export function FatigueBar({ value, width = 64, color }: { readonly value: number; readonly width?: number; readonly color: string }): React.ReactElement {
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ position: 'relative', width, height: 8, background: 'rgba(0,0,0,.5)', border: '1px solid var(--paper-45)' }}>
+        <span style={{ display: 'block', width: `${Math.max(0, Math.min(100, value))}%`, height: '100%', background: color }} />
+      </span>
+      <span className="num" style={{ fontSize: 14, color, width: 26, textAlign: 'right' }}>{value}</span>
+    </span>
+  );
+}
