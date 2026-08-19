@@ -13,7 +13,8 @@ export default function SignupPage(): React.ReactElement {
         <div className="a-band" style={{ height: 40, padding: '0 18px', fontSize: 16, fontWeight: 900, letterSpacing: '.1em' }}>いまは登録なしで見られます</div>
         <div style={{ padding: '18px 20px', backgroundImage: 'linear-gradient(#ffffff,#eef6fd)', fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)', lineHeight: 1.9 }}>
           アカウント作成（メール）はログイン機能の導入後に使えるようになります。<br />
-          それまでは番組表・中継・オッズ・記録を登録なしで見られます。参加ポイントを販売することはありません。
+          それまでは番組表・中継・オッズ・記録を登録なしで見られます。参加ポイントを販売することはありません。<br />
+          登録後の流れ: 1 牧場名を決める → 2 最初の馬を迎える → 3 調教を指示する → 4 出走登録する → 5 中継を観る
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
             <a className="a-btn a-btn-gold" href="/race" style={{ height: 44, padding: '0 22px', fontSize: 15 }}>中継を観る（デモ）</a>
             <a className="a-btn" href="/races" style={{ height: 44, padding: '0 22px', fontSize: 15 }}>番組表を見る</a>

@@ -26,7 +26,7 @@ const POINTS: ReadonlyArray<{ n: string; title: string; img: string; alt: string
 type Step = { readonly title: string; readonly desc: string; readonly button: string; readonly href: string; readonly event: string };
 const STEPS: readonly Step[] = [
   { title: 'アカウントをつくる', desc: 'メールだけで登録できます', button: 'はじめる', href: '/signup', event: 'step1_signup' },
-  { title: '最初の馬を迎える', desc: 'セリで 1 頭選びます', button: 'セリを見る', href: '/stable', event: 'step2_stable' },
+  { title: '最初の馬を迎える', desc: '迎え方は準備中です（正典の配合／入手規定に合わせます）', button: '牧場を見る', href: '/stable', event: 'step2_stable' },
   { title: '調教を指示する', desc: '8 つのメニューから 1 つ', button: '調教へ', href: '/training', event: 'step3_training' },
   { title: '出走登録する', desc: '格の合うレースを選ぶ', button: '番組表へ', href: '/races', event: 'step4_program' },
   { title: '中継を観る', desc: '実況つきの中継が始まります', button: '中継を観る', href: '/race', event: 'step5_watch' },
