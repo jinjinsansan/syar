@@ -3,11 +3,12 @@ branch: main
 path: packages/render/src
 
 ## Last sync
-date: 2026-08-19T09:40:00Z
+date: 2026-08-20T02:30:00Z
 commit: 65c017d6ffbc (tree)
 
 ### Updated in this project
-- R-3: TOP（LP）を追加（components/landing・1280×3770・ヒーロー／4 つのたのしみ／はじめの 5 ステップ／公正性／登録前に見られる画面／締めヒーロー／フッター）
+- R-4: 初回セットアップ 2 ステップ（components/setup・勝負服16色パレット／初期馬の付与演出）を追加、牧場ホームに会員ホーム 4 カードを追加
+- R-3: 未ログインの TOP（LP）を追加（components/landing／アーケードテーマ・1280×3770・実装表つき）
 - R-2 完了: Web 全 10 枚をアーケード筐体テーマに統一（調教・出走登録・馬詳細・レース詳細・オッズ・記録・景品交換）。共通配色は MOTION_HANDOFF §6.5 に集約
 - R-1: Web 画面の基調を「明るいアーケード筐体風」に変更。styles.css に [data-theme="arcade"] を追加し、番組表・牧場ホーム・投票の 3 枚を差し替え（HUD の暗色は据え置き）
 - プレイヤー画面 7 枚を追加（牧場ホーム・馬詳細・調教・出走登録・投票・記録・景品交換）＋憲法を MOTION_HANDOFF に明文化
