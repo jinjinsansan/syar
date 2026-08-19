@@ -1,4 +1,4 @@
-import { demoStableRepo, sortStable, conditionView, fatigueColor, type StableHorse } from '../../lib/stable';
+import { demoStableRepo, sortStable, conditionView, fatigueColor, type StableHome, type StableHorse } from '../../lib/stable';
 import { ClassChip, FatigueBar, PageTitle, Stars } from '../../components/ui';
 
 export const revalidate = 0;
@@ -15,6 +15,124 @@ function WeekBadge({ horse }: { readonly horse: StableHorse }): React.ReactEleme
   if (w.kind === 'done') return <span className="a-badge open">指示済み</span>;
   if (w.kind === 'todo') return <span className="a-badge soon">未指示</span>;
   return <span className="a-badge done">休養中</span>;
+}
+
+/** 4 カード共通の外枠（白地・2px 縁・青グロス帯 h38。馬と調教が主役のまま、カードは補助 — R-4） */
+function HomeCard({ title, badge, children }: { readonly title: string; readonly badge?: React.ReactNode; readonly children: React.ReactNode }): React.ReactElement {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', borderRadius: 10, overflow: 'hidden', background: '#fff', border: '2px solid var(--a-edge)', boxShadow: 'var(--a-shadow-sm)' }}>
+      <div className="a-band" style={{ height: 38, padding: '0 14px', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 15, fontWeight: 900, letterSpacing: '.08em' }}>{title}</span>
+        {badge}
+      </div>
+      <div style={{ padding: '12px 14px 14px', flex: 1, display: 'flex', flexDirection: 'column' }}>{children}</div>
+    </div>
+  );
+}
+
+/** カード内の小さな数値マス（ラベル 10px＋数値） */
+function MiniStat({ label, value, unit, color, size = 26 }: { readonly label: string; readonly value: number; readonly unit: string; readonly color: string; readonly size?: number }): React.ReactElement {
+  return (
+    <span style={{ flex: 1, textAlign: 'center', padding: '8px 6px', borderRadius: 8, background: '#fff', border: '2px solid var(--a-edge)' }}>
+      <span style={{ display: 'block', fontSize: 10, fontWeight: 900, color: 'var(--a-ink-2)' }}>{label}</span>
+      <span className="a-num" style={{ fontSize: size, color }}>{value}</span> <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--a-ink-2)' }}>{unit}</span>
+    </span>
+  );
+}
+
+/**
+ * ★会員ホームの 4 カード（R-4・裁定 Q-WEB-03）— 「今週の予定」板の上。着地は /stable のまま（着地＝何のゲームかの宣言）。
+ *   EP と PP は別カプセル（合算しない・憲法 §0.2）。デイリー額は D-075 の較正定数＝サーバー値をそのまま表示。
+ */
+function HomeCards({ home, ownedCount, todoCount }: { readonly home: StableHome; readonly ownedCount: number; readonly todoCount: number }): React.ReactElement {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginTop: 14 }}>
+      {/* ① アカウント */}
+      <HomeCard
+        title="アカウント"
+        badge={home.notices > 0 ? (
+          <span style={{ display: 'flex', alignItems: 'center', height: 22, padding: '0 9px', borderRadius: 6, backgroundImage: 'var(--a-gloss-red)', border: '2px solid var(--a-red-d)', fontSize: 11, fontWeight: 900 }}>お知らせ {home.notices}</span>
+        ) : undefined}
+      >
+        <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--a-ink)' }}>{home.stableName}</div>
+        <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)', marginTop: 3 }}>{home.displayName}</div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, padding: '7px 10px', borderRadius: 8, background: '#fff', border: '2px solid var(--a-edge)' }}>
+            <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: '.06em', color: 'var(--a-ink-2)' }}>参加ポイント</span>
+            <span><span className="a-num" style={{ fontSize: 22, color: 'var(--a-blue-d)' }}>{home.epBalance.toLocaleString('ja-JP')}</span> <span style={{ fontSize: 10, fontWeight: 900, color: 'var(--a-ink-2)' }}>EP</span></span>
+          </span>
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, padding: '7px 10px', borderRadius: 8, backgroundImage: 'var(--a-gloss-gold)', border: '2px solid #8a5a06' }}>
+            <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: '.06em', color: '#4a3105' }}>賞金ポイント</span>
+            <span><span className="a-num" style={{ fontSize: 22, color: '#4a3105' }}>{home.ppBalance.toLocaleString('ja-JP')}</span> <span style={{ fontSize: 10, fontWeight: 900, color: '#4a3105' }}>PP</span></span>
+          </span>
+        </div>
+        {home.dailyClaimed ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 12, padding: '9px 11px', borderRadius: 8, background: '#eefaf1', border: '2px solid var(--a-green-d)' }}>
+            <span style={{ width: 22, height: 22, borderRadius: 5, backgroundImage: 'var(--a-gloss-green)', border: '2px solid var(--a-green-d)', color: '#fff', fontSize: 12, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</span>
+            <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-green-d)' }}>今日の {home.dailyEP} EP 受取済み</span>
+          </div>
+        ) : (
+          <span className="a-btn a-btn-gold" style={{ width: '100%', height: 38, marginTop: 12, fontSize: 13, whiteSpace: 'nowrap' }}>今日の {home.dailyEP} EP を受け取る</span>
+        )}
+      </HomeCard>
+
+      {/* ② わたしの牧場（現役 0 頭なら再付与ボタンに切り替え — D-074） */}
+      <HomeCard title="わたしの牧場">
+        {ownedCount === 0 ? (
+          <>
+            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)', lineHeight: 1.7 }}>現役の馬がいません。新しい 1 頭を無償で迎えられます</div>
+            <a className="a-btn a-btn-gold" href="/setup" style={{ width: '100%', height: 40, marginTop: 'auto', fontSize: 13, whiteSpace: 'nowrap' }}>新しい 1 頭を迎える</a>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <MiniStat label="所有" value={ownedCount} unit="頭" color="var(--a-ink)" />
+              <MiniStat label="今週の未指示" value={todoCount} unit="頭" color={todoCount > 0 ? 'var(--a-num-rank)' : 'var(--a-ink)'} />
+            </div>
+            <div style={{ marginTop: 12, padding: '9px 11px', borderRadius: 8, background: 'var(--a-ivory)', border: '2px solid var(--a-line)' }}>
+              <span style={{ display: 'block', fontSize: 10, fontWeight: 900, letterSpacing: '.06em', color: 'var(--a-ink-2)' }}>次走</span>
+              {home.nextRun !== null ? (
+                <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink)' }}>{home.nextRun.race}　{home.nextRun.horse}</span>
+              ) : (
+                <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink-3)' }}>出走予定はありません</span>
+              )}
+            </div>
+            <a className="a-btn" href="#horses" style={{ width: '100%', height: 40, marginTop: 12, fontSize: 13, whiteSpace: 'nowrap' }}>わたしの馬を見る</a>
+          </>
+        )}
+      </HomeCard>
+
+      {/* ③ 開催状況（数字は青／締切は赤。0 件でも欄を消さない） */}
+      <HomeCard title="開催状況">
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
+          <span>
+            <span style={{ display: 'block', fontSize: 10, fontWeight: 900, letterSpacing: '.06em', color: 'var(--a-ink-2)' }}>次の発走</span>
+            <span className="a-num" style={{ fontSize: 34, color: 'var(--a-num-time)' }}>{home.nextStartAt ?? '—'}</span>
+          </span>
+          <span style={{ marginLeft: 'auto', textAlign: 'right' }}>
+            <span style={{ display: 'block', fontSize: 10, fontWeight: 900, letterSpacing: '.06em', color: 'var(--a-ink-2)' }}>締切まで</span>
+            <span className="a-num" style={{ fontSize: 26, color: 'var(--a-num-rank)' }}>{home.closesIn ?? '—'}</span>
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <MiniStat label="自馬の出走予定" value={home.myEntries} unit="件" color={home.myEntries > 0 ? 'var(--a-num-time)' : 'var(--a-ink-3)'} size={24} />
+          <MiniStat label="投票中の馬券" value={home.pendingBets} unit="件" color={home.pendingBets > 0 ? 'var(--a-num-time)' : 'var(--a-ink-3)'} size={24} />
+        </div>
+        <a className={`a-btn a-btn-blue${home.liveOpen ? '' : ' off'}`} href="/race" style={{ width: '100%', height: 40, marginTop: 12, fontSize: 13, whiteSpace: 'nowrap' }} title={home.liveOpen ? '' : '発走 3 分前から観られます'}>中継を観る</a>
+      </HomeCard>
+
+      {/* ④ ショートカット（先頭「調教」だけ金＝毎日の起点） */}
+      <HomeCard title="ショートカット">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <a className="a-btn a-btn-gold" href="/training" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>調教</a>
+          <a className="a-btn" href="/entry" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>出走登録</a>
+          <a className="a-btn" href="/races" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>番組表</a>
+          <a className="a-btn" href="/records" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>記録</a>
+          <a className="a-btn" href="/prizes" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>景品交換</a>
+        </div>
+      </HomeCard>
+    </div>
+  );
 }
 
 function StatCard({ label, value, unit, color }: { readonly label: string; readonly value: string; readonly unit: string; readonly color: string }): React.ReactElement {
@@ -50,6 +168,9 @@ export default async function StablePage() {
         <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>※ デモデータ（ログインと「自分の馬」の読み取りビューが入るまで、デザインどおりの見本を表示しています）</p>
       )}
 
+      {/* 会員ホームの 4 カード（R-4）— 馬と調教が主役のまま、カードは補助 */}
+      <HomeCards home={view.home} ownedCount={view.horses.length} todoCount={todo.length} />
+
       {/* 今週の予定 */}
       <div className="a-panel strong rise" style={{ marginTop: 14 }}>
         <div className="a-band" style={{ height: 40, padding: '0 18px', justifyContent: 'space-between' }}>
@@ -79,7 +200,7 @@ export default async function StablePage() {
       </div>
 
       {/* 所有馬一覧 */}
-      <div className="a-panel strong" style={{ marginTop: 18 }}>
+      <div id="horses" className="a-panel strong" style={{ marginTop: 18 }}>
         <div className="a-band" style={{ height: 38, padding: '0 18px', gap: 14 }}>
           <span className="a-lbl" style={{ width: COL.name, flex: `0 0 ${COL.name}px`, color: '#fff' }}>馬名</span>
           <span className="a-lbl" style={{ width: COL.cls, flex: `0 0 ${COL.cls}px`, color: '#fff' }}>格</span>
@@ -110,8 +231,9 @@ export default async function StablePage() {
             </a>
           );
         })}
+        {/* ★空状態の文言はカードの「セリで…」から改めている: セリは作らない（裁定 Q-WEB-01）。再付与は D-074 */}
         {horses.length === 0 && (
-          <p style={{ color: 'var(--a-ink-2)', fontWeight: 900, padding: '16px 20px', fontSize: 14 }}>まだ所有している馬がいません。セリで 1 頭迎えると牧場が始まります</p>
+          <p style={{ color: 'var(--a-ink-2)', fontWeight: 900, padding: '16px 20px', fontSize: 14 }}>まだ所有している馬がいません。新しい 1 頭を無償で迎えると牧場が始まります</p>
         )}
       </div>
     </div>

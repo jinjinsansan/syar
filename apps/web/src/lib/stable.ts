@@ -27,6 +27,32 @@ export interface StableHorse {
   readonly prizePP: number;
 }
 
+/**
+ * 会員ホーム 4 カード（R-4）の表示値 — すべてサーバー計算値をそのまま写す。
+ *   ⚠️ EP と PP は別の値のまま持つ（合算しない・憲法 §0.2）。
+ *   ⚠️ デイリー額・初期 EP は較正定数（D-075）— サーバーが出す値を表示するだけで、ここに定数を持たない。
+ */
+export interface StableHome {
+  readonly displayName: string;
+  readonly stableName: string;
+  readonly epBalance: number;
+  readonly ppBalance: number;
+  /** お知らせ件数（0 ならピルを出さない） */
+  readonly notices: number;
+  /** デイリーログイン EP（D-075 の較正定数・サーバー値） */
+  readonly dailyEP: number;
+  readonly dailyClaimed: boolean;
+  /** 次の発走（'15:40'）と締切までの残り（'2:24'）。開催が無ければ null */
+  readonly nextStartAt: string | null;
+  readonly closesIn: string | null;
+  /** 発走 3 分前から中継ボタンが押せる */
+  readonly liveOpen: boolean;
+  readonly myEntries: number;
+  readonly pendingBets: number;
+  /** 次走（最も近い 1 件）。無ければ null */
+  readonly nextRun: { readonly race: string; readonly horse: string } | null;
+}
+
 export interface StableView {
   readonly demo: boolean;
   readonly weekNo: number;
@@ -35,6 +61,7 @@ export interface StableView {
   /** 今週の出走登録頭数・消費予定 EP（サーバー計算値） */
   readonly entries: number;
   readonly plannedEP: number;
+  readonly home: StableHome;
 }
 
 export interface StatRow { readonly key: string; readonly label: string; readonly value: number; readonly capRatio: number; readonly delta: number }
@@ -137,7 +164,17 @@ function detailOf(h: StableHorse): HorseDetail {
 }
 
 export const demoStableRepo: StableRepo = {
-  stable: async () => ({ demo: true, weekNo: 32, weekRange: '8/18 〜 8/24', horses: DEMO_HORSES, entries: 3, plannedEP: 1150 }),
+  stable: async () => ({
+    demo: true, weekNo: 32, weekRange: '8/18 〜 8/24', horses: DEMO_HORSES, entries: 3, plannedEP: 1150,
+    home: {
+      displayName: 'たかせ みのる', stableName: 'サクラ牧場',
+      epBalance: 4200, ppBalance: 18600,
+      notices: 2, dailyEP: 200, dailyClaimed: true,
+      nextStartAt: '15:40', closesIn: '2:24', liveOpen: true,
+      myEntries: 3, pendingBets: 1,
+      nextRun: { race: '桜星賞（8/22）', horse: 'サクラブリーズ' },
+    },
+  }),
   horse: async (id) => { const h = DEMO_HORSES.find((x) => x.id === id); return h === undefined ? null : detailOf(h); },
 };
 

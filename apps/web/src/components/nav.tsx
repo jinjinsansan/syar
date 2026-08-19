@@ -17,7 +17,7 @@ const LP_LINKS: ReadonlyArray<{ href: string; label: string }> = [
 
 const pill = (on: boolean): React.CSSProperties => ({
   display: 'flex', alignItems: 'center', height: 34, padding: '0 16px', borderRadius: 8,
-  fontSize: 14, fontWeight: 900,
+  fontSize: 14, fontWeight: 900, whiteSpace: 'nowrap',
   background: on ? '#fff' : 'transparent',
   color: on ? 'var(--a-blue-d)' : 'rgba(255,255,255,.95)',
   boxShadow: on ? '0 2px 0 rgba(0,0,0,.25)' : 'none',

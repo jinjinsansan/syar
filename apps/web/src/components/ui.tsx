@@ -30,10 +30,10 @@ const STYLE_COLOR: Readonly<Record<string, readonly [string, string]>> = {
 const STYLE_LABEL: Readonly<Record<string, string>> = {
   nige: '逃げ', senko: '先行', sashi: '差し', oikomi: '追込',
 };
-export function StyleChip({ strategy }: { readonly strategy: string }): React.ReactElement {
+export function StyleChip({ strategy, h = 26, font = 12 }: { readonly strategy: string; readonly h?: number; readonly font?: number }): React.ReactElement {
   const [c, bg] = STYLE_COLOR[strategy] ?? ['#4a6178', '#eef2f6'];
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', height: 26, padding: '0 11px', borderRadius: 6, background: bg, border: `2px solid ${c}`, color: c, fontSize: 12, fontWeight: 900 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', height: h, padding: `0 ${h > 26 ? 14 : 11}px`, borderRadius: h > 26 ? 8 : 6, background: bg, border: `2px solid ${c}`, color: c, fontSize: font, fontWeight: 900 }}>
       {STYLE_LABEL[strategy] ?? strategy}
     </span>
   );
