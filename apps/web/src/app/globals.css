@@ -131,3 +131,6 @@ main { max-width: 1180px; margin: 0 auto; padding: 0; }
 [data-theme="arcade"] .a-row.done { background: #e7edf3; }
 html:has(> body[data-theme="arcade"]) { background: #cfe6f7; }
 body[data-theme="arcade"] { min-height: 100vh; }
+/* LP（/）: main の 1180 幅を突き抜けて全幅にするブロック（ヒーロー・白帯・フッター） */
+html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
+.lp-bleed { position: relative; left: 50%; right: 50%; width: 100vw; margin-left: -50vw; margin-right: -50vw; }

@@ -460,3 +460,12 @@
 - カードどおりにできなかった点（データに無い）: レース詳細の騎手列・「場・R」・自馬行の強調（ログイン/所有情報なし）、オッズの支持率%・最終更新・複勝の範囲・自馬タグ。馬詳細の現在値バーは StatBar（value/cap）で塗る。
 - 検証: typecheck ✓、vitest ✓、ヘッドレス Edge で 9 URL を撮影して確認。
 - 2026-08-19 TOP/LP: 参照作品 3 サイトの構造調査（`docs/lp-reference-research-20260819.md`）→ オーナー「案のまま」→ R-3（未ログイン LP 1 枚: ヒーロー／Point 01〜04／はじめの 5 ステップ／公正性／便利ツール／締め／フッター、憲法の文言制限つき）を `REQUESTS.md` に積み Claude Design に書き戻した。
+
+## 2026-08-19 TOP（未ログインの LP）を実装（R-3）
+
+- Claude Design の `components/landing`（R-3）を同期。`/` を LP に、番組表（ログイン後のハブ）を `/races` に移動（ナビの「番組表」は `/races`。Auth 導入後は `/` でログイン済みなら `/races` へ送る）。
+- `apps/web/src/app/page.tsx`: ヒーロー（中継 HUD の実キャプチャ `public/lp/hero.jpg` に青→水色の覆い・ロゴ 96px・コピー 2 行・主 CTA「無料ではじめる」／副 CTA「中継を観る（デモ）」）→ 白帯（EP/PP の役割を 1 回だけ）→ 4 つのたのしみ（実画面のキャプチャ入り）→ はじめの 5 ステップ（進捗 0/5）→ 公正性（seed の 3 箱・「仕組みを見る」は最新の確定レースへ）→ 登録前に見られる画面（番組表／オッズ＝次の発売中レース／記録）→ 締めヒーロー → フッター（「本サービスは参加ポイントを販売しません」）。CTA に `data-event`。
+- `components/nav.tsx`: `/` では LP 用ナビ＋「ログイン」「無料ではじめる」、他はアプリのナビ。`/signup`・`/login` は「準備中」ページ（Auth の指示書待ち。EP を買う導線なし）。
+- `/race`: `?badge=0` で一時バッジ（BROADCAST V2 ACTIVE）を消せる（LP 用キャプチャのため。描画分岐は不変）。`globals.css`: `.lp-bleed`（全幅ブロック）。
+- 画像: `public/lp/*.jpg`（HUD 2 枚 1280 幅・画面キャプチャ 7 枚 760 幅、計約 0.6MB）。
+- 検証: typecheck ✓／vitest ✓／ヘッドレス Edge で `/`・`/races`・`/signup`・`/login`・`/stable`・`/race` に例外なし。途中で開発サーバーが「Compiling /」で固まったため再起動（コード起因ではない）。

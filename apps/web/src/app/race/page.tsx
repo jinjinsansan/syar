@@ -69,7 +69,9 @@ function rendererFromSearch(search: string): RendererKind {
  * ★一時バッジ（引継ぎ書 §1-4）— どの分岐が実ブラウザで描いたかを Canvas 上に証明する。
  *   ユーザー合格後に撤去する（§11-8）。
  */
+let rendererBadgeHidden = false; // `?badge=0` で非表示（LP 用のキャプチャなど。描画分岐には影響しない）
 function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, stage: string): void {
+  if (rendererBadgeHidden) return;
   const label = kind === 'v2' ? 'BROADCAST V2 ACTIVE' : 'LEGACY RENDERER';
   ctx.save();
   ctx.font = 'bold 15px monospace';
@@ -1499,7 +1501,9 @@ export default function RacePage(): React.JSX.Element {
   }, [built, ownGate, surface, trackCondition, turn, renderer, showEntryBoard]);
 
   useEffect(() => {
-    const auditSec = Number(new URLSearchParams(window.location.search).get('auditSec'));
+    const params = new URLSearchParams(window.location.search);
+    rendererBadgeHidden = params.get('badge') === '0';
+    const auditSec = Number(params.get('auditSec'));
     if (Number.isFinite(auditSec) && auditSec >= 0) dRef.current = auditSec;
     render(dRef.current);
   }, [render, ready]);
