@@ -60,7 +60,7 @@ export function formatRaceTime(sec: number): string {
 
 /** 券種名（正典 §9.1 の 6 券種） */
 export const BET_TYPE_LABEL: Readonly<Record<string, string>> = {
-  win: '単勝', place: '複勝', quinella: '馬連', exacta: '馬単', trio: '三連複', trifecta: '三連単',
+  win: '単勝', place: '複勝', quinella_place: 'ワイド', quinella: '馬連', exacta: '馬単', trio: '三連複', trifecta: '三連単',
 };
 
 /** レース状態の表示（サーバーの status が正） */

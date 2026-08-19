@@ -11,8 +11,8 @@ type Row = Record<string, string | number | null>;
 const COL = { time: 70, grade: 186, purse: 130, status: 106 } as const;
 
 /**
- * ★番組表（ログイン後のハブ・/races）— 正本 design/hud-ds/components/program-board［アーケード］
- *   未ログインの `/` は LP（components/landing）。Auth 導入後はログイン済みなら `/` → ここへ
+ * ★番組表（/races）— 正本 design/hud-ds/components/program-board［アーケード］
+ *   未ログインの `/` は LP（components/landing）。ログイン後の着地は `/stable`（牧場ホーム・Q-WEB-03）。ここは出走登録／投票の導線から入る
  *   次の発走を主役（赤グロス帯＋青の大きな時刻＋金の賞金箱）に、直近の一覧を下に置く。
  *   確定済みは残すが地色だけで沈める（不透明度は掛けない＝コントラストの二重掛けを避ける）。
  *   ⚠️ 表示だけ。締切・状態はサーバーの `status`。オッズや結果をここで計算しない（正典 §14.3）

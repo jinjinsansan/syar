@@ -10,6 +10,7 @@ type Row = Record<string, string | number | boolean | null | number[]>;
 
 const TABS: readonly { readonly key: string; readonly label: string; readonly types: readonly string[] }[] = [
   { key: 'win', label: '単勝・複勝', types: ['win', 'place'] },
+  { key: 'quinella_place', label: 'ワイド', types: ['quinella_place'] },
   { key: 'quinella', label: '馬連', types: ['quinella'] },
   { key: 'exacta', label: '馬単', types: ['exacta'] },
   { key: 'trio', label: '三連複', types: ['trio'] },

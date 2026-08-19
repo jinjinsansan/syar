@@ -95,10 +95,11 @@ export const DEMO_BET_RACE = {
   epBalance: 4200,
   capPerBet: 5000,
 };
-/** 券種: 必要な選択数と区切り */
+/** 券種（正典 §9.1 の 7 券種。枠連は無い）: 必要な選択数と区切り */
 export const BET_TYPES: readonly { readonly key: string; readonly label: string; readonly picks: number; readonly ordered: boolean }[] = [
   { key: 'win', label: '単勝', picks: 1, ordered: false },
   { key: 'place', label: '複勝', picks: 1, ordered: false },
+  { key: 'quinella_place', label: 'ワイド', picks: 2, ordered: false },
   { key: 'quinella', label: '馬連', picks: 2, ordered: false },
   { key: 'exacta', label: '馬単', picks: 2, ordered: true },
   { key: 'trio', label: '三連複', picks: 3, ordered: false },
