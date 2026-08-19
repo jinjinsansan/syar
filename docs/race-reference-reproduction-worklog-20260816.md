@@ -459,3 +459,4 @@
 - 差し替え: `/training`・`/entry`・`/stable/[horseId]`・`/races/[id]`・`/races/[id]/odds`・`/records`・`/prizes`。データ取得・状態・公正性検証（verifyReveal）・デモデータ・書き込み無効はそのまま（見た目だけ）。
 - カードどおりにできなかった点（データに無い）: レース詳細の騎手列・「場・R」・自馬行の強調（ログイン/所有情報なし）、オッズの支持率%・最終更新・複勝の範囲・自馬タグ。馬詳細の現在値バーは StatBar（value/cap）で塗る。
 - 検証: typecheck ✓、vitest ✓、ヘッドレス Edge で 9 URL を撮影して確認。
+- 2026-08-19 TOP/LP: 参照作品 3 サイトの構造調査（`docs/lp-reference-research-20260819.md`）→ オーナー「案のまま」→ R-3（未ログイン LP 1 枚: ヒーロー／Point 01〜04／はじめの 5 ステップ／公正性／便利ツール／締め／フッター、憲法の文言制限つき）を `REQUESTS.md` に積み Claude Design に書き戻した。
