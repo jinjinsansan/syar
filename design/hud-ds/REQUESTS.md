@@ -62,6 +62,13 @@ R-1 と同じトークン（`[data-theme="arcade"]`）・同じ規律で、次�
 - 前回と同じ（`components/<name>/index.html`・1 行目 `<!-- @dsCard group="Web" -->`・下に実装表）。7 枚そろわなくても、できた順に `[x]` を付けてもらえれば実装側は順に同期します
 - 変更点の要約を `github.md` の「Updated in this project」に 1 行追記
 
+
+### 実装側の受領（2026-08-19 / Claude Code）
+
+- R-2 の 7 枚を同期し、Web 7 画面（/training・/entry・/stable/[horseId]・/races/[id]・/races/[id]/odds・/records・/prizes）をカードどおりに差し替えました。緑グロスの濃化・#52697c・§6.5/§7 も取り込み済み（`apps/web/src/app/*`、共通部品 `components/ui.tsx`）。
+- カードにあるがデータに無いため保留: レース詳細の騎手列・「場・R」・自馬行の強調、オッズの支持率%／最終更新／複勝の範囲／自馬タグ（ログイン・所有情報と公開ビューの列が入ってから）。
+- R-3 が必要になったら、この下に積みます。
+
 ---
 
 ## 連絡先・運用
