@@ -438,3 +438,15 @@
 - `/prizes`（景品交換）: PP 残高は右上 1 か所、分類タブ、カード 3 列（期間限定／残りわずか／不足 45%）、確認パネル、交換履歴。
 - ヘッダーの「育成」→ /training、「記録」→ /records をリンクに。レース詳細（発売中）に「投票」ボタン。
 - ★書き込み（指示・登録・投票・交換）は RPC（spend_training_ep / place_bet / exchange_prize）と Auth が画面に繋がるまで押せない表示。
+
+## 2026-08-19 アーケード筐体テーマ（明るい・派手・大きな数字・光沢）を Web に適用（R-1）
+
+- オーナー方針: ログイン後の Web 画面は暗色ではなく「メダルゲーム筐体」系（明るい地・グロス・大きな数字）。Claude Design と `design/hud-ds/REQUESTS.md` で往復し、
+  R-1（アーケードトークン `[data-theme="arcade"]`＋差し替え 3 枚: 番組表／牧場ホーム／投票）が完了 → `design/hud-ds/` に同期（styles.css・program-board・stable-home・bet-sheet）。
+- `apps/web/src/app/globals.css`: `[data-theme="arcade"]` トークン（--a-*）と部品（.a-panel/.a-band/.a-btn/.a-chip/.a-badge/.a-row/.frame 38×28 白縁）を追加。
+  **未差し替え 7 画面**（レース詳細・オッズ・馬詳細・調教・出走登録・記録・景品）は暗色トークン（--paper/--gold/--panel…）を明るい地向けに再割り当てして読めるようにした暫定（残り 7 枚の合格後に差し替えて削除）。
+- `layout.tsx`: body に `data-theme="arcade"`。ヘッダーは青グロス帯 h56＋濃青の下辺、ロゴ黄金、ナビは錠剤（現在地＝白地・青字。`components/nav.tsx` が usePathname で判定）。EP/PP カプセルはログイン導入まで出さない。
+- `page.tsx`（番組表）／`stable/page.tsx`（牧場ホーム）／`races/[id]/bet/page.tsx`（投票）をカードの実装表どおりに書き換え（赤グロスの「次の発走」帯、64px 青時刻、金の賞金箱、数値カード 40px、黄色い未指示行、券種タブのグロス、32px 真円マーク、金の選択帯、352px 右列）。
+  共通部品: `PageTitle` を青グロス帯に、`StatusBadge`→`.a-badge`、`GradeBadge`/`ClassChip`/`MyHorseTag`→金グロスチップ、`Stars`（#f2b012＋影）、`FatigueBar`（72×14 グロス）、`ClockNow`（白カプセル）、`Countdown` 既定色 赤。調子・疲労の色も明るい地用に（`lib/stable.ts`）。
+- 検証: typecheck ✓（root + apps/web）、vitest 872 ✓、ヘッドレス Edge で `/`・`/stable`・`/races/x/bet`・`/training`・`/records` を確認。
+- 次: オーナーが開発サーバーで可否判定 → `REQUESTS.md` の R-1 の下に可否を書いて Claude Design に書き戻す → 合格なら残り 7 枚をデザイナーが差し替え → 同期して Web 残り 7 画面を書き換え、暫定の再割り当て CSS を削除。

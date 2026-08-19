@@ -39,16 +39,20 @@ function useNow(tickMs: number): number | null {
 export function ClockNow(): React.ReactElement {
   const now = useNow(10_000);
   const text = now === null ? '--:--' : new Date(now).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' });
-  return <span className="num" style={{ fontSize: 16, color: 'var(--paper-70)' }}>現在 {text}</span>;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 40, padding: '0 16px', borderRadius: 10, background: '#fff', border: '2px solid var(--a-edge)', boxShadow: 'var(--a-shadow-sm)' }}>
+      <span className="a-lbl">現在</span><span className="a-num" style={{ fontSize: 26, color: 'var(--a-num-time)' }}>{text}</span>
+    </span>
+  );
 }
 
 /** 締切までのカウントダウン（`untilIso` まで）。過ぎたら `after` を出す */
-export function Countdown({ untilIso, after, size = 20, color = 'var(--bad)' }: {
+export function Countdown({ untilIso, after, size = 20, color = 'var(--a-num-rank)' }: {
   readonly untilIso: string; readonly after: string; readonly size?: number; readonly color?: string;
 }): React.ReactElement {
   const now = useNow(1000);
   const until = Date.parse(untilIso);
-  if (now === null) return <span className="num" style={{ fontSize: size, color }}>--:--</span>;
-  if (until - now <= 0) return <span style={{ fontSize: 13, color: 'var(--paper-70)' }}>{after}</span>;
-  return <span className="num" style={{ fontSize: size, color }}>{formatCountdown(until, now)}</span>;
+  if (now === null) return <span className="a-num" style={{ fontSize: size, color }}>--:--</span>;
+  if (until - now <= 0) return <span style={{ fontSize: 13, fontWeight: 900, color }}>{after}</span>;
+  return <span className="a-num" style={{ fontSize: size, color }}>{formatCountdown(until, now)}</span>;
 }

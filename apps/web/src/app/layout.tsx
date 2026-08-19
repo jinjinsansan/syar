@@ -1,25 +1,22 @@
 import './globals.css';
+import { ArcadeNav } from '../components/nav';
 
 export const metadata = { title: 'STAR', description: 'オンライン競馬育成' };
 
 /**
- * ★グローバルヘッダー（design/hud-ds/components/program-board の実装表）
- *   h56・padding 0 40／ロゴ 18px 字間 .22em 金／ナビ 14px（現在地は紙色、他は 70%）
- *   右に EP と PP を**別々に**表示（合算しない・憲法 §0.2）— ログイン導入まで表示しない
+ * ★グローバルヘッダー（アーケード筐体テーマ: design/hud-ds/components/program-board［アーケード］の実装表）
+ *   青グロス帯 h56・下辺 3px 濃青／ロゴ 20px 字間 .22em 黄金＋影／ナビは錠剤（現在地 白地・青字）
+ *   右に EP と PP を**別々の**カプセル（白＝EP／金＝PP）で表示（合算しない・憲法 §0.2）— ログイン導入まで表示しない
+ *   HUD（/race のキャンバス）は暗色系のまま。body の data-theme="arcade" は DOM 画面用
  */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
-      <body>
-        <header style={{ display: 'flex', alignItems: 'center', height: 56, padding: '0 40px', borderBottom: '1px solid var(--rule)' }}>
-          <a href="/" style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.22em', color: 'var(--gold)' }}>STAR</a>
-          <nav style={{ display: 'flex', gap: 26, marginLeft: 36, fontSize: 14 }}>
-            <a href="/" style={{ color: 'var(--paper)' }}>番組表</a>
-            <a href="/stable" style={{ color: 'var(--paper-70)' }}>わたしの馬</a>
-            <a href="/training" style={{ color: 'var(--paper-70)' }}>育成</a>
-            <a href="/records" style={{ color: 'var(--paper-70)' }}>記録</a>
-          </nav>
-          <a href="/race" style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--paper-70)' }}>中継（デモ）</a>
+      <body data-theme="arcade">
+        <header className="a-band" style={{ height: 56, padding: '0 26px', borderBottom: '3px solid var(--a-edge)' }}>
+          <a href="/" style={{ fontSize: 20, fontWeight: 900, letterSpacing: '.22em', color: '#ffe37a', textShadow: '0 2px 0 rgba(0,0,0,.35)' }}>STAR</a>
+          <ArcadeNav />
+          <a href="/race" style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 900, color: 'rgba(255,255,255,.86)' }}>中継（デモ）</a>
         </header>
         <main>{children}</main>
       </body>

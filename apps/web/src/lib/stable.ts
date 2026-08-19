@@ -150,15 +150,15 @@ export function sortStable(horses: readonly StableHorse[]): StableHorse[] {
 /** 調子の表示（記号・語・色）。エンジンの 1〜5 をそのまま写す */
 export function conditionView(c: Condition): { readonly mark: string; readonly label: string; readonly color: string } {
   return [
-    { mark: '▲', label: '不安', color: '#ff4d3d' },
-    { mark: '△', label: 'やや不安', color: '#fad728' },
-    { mark: '○', label: '普通', color: 'var(--paper-70)' },
-    { mark: '○', label: '好調', color: '#5fd48b' },
-    { mark: '◎', label: '絶好調', color: '#5fd48b' },
+    { mark: '▲', label: '不安', color: '#a81a13' },
+    { mark: '△', label: 'やや不安', color: '#a9741a' },
+    { mark: '○', label: '普通', color: '#4a6178' },
+    { mark: '○', label: '好調', color: '#2f9e4f' },
+    { mark: '◎', label: '絶好調', color: '#1e7a3a' },
   ][c - 1]!;
 }
 
 /** 疲労の色: ≤30 緑・≤60 黄・>60 赤 */
 export function fatigueColor(f: number): string {
-  return f <= 30 ? 'var(--ok)' : f <= 60 ? 'var(--warn)' : 'var(--bad)';
+  return f <= 30 ? '#1e7a3a' : f <= 60 ? '#a9741a' : '#a81a13';
 }
