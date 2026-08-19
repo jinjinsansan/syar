@@ -450,3 +450,4 @@
   共通部品: `PageTitle` を青グロス帯に、`StatusBadge`→`.a-badge`、`GradeBadge`/`ClassChip`/`MyHorseTag`→金グロスチップ、`Stars`（#f2b012＋影）、`FatigueBar`（72×14 グロス）、`ClockNow`（白カプセル）、`Countdown` 既定色 赤。調子・疲労の色も明るい地用に（`lib/stable.ts`）。
 - 検証: typecheck ✓（root + apps/web）、vitest 872 ✓、ヘッドレス Edge で `/`・`/stable`・`/races/x/bet`・`/training`・`/records` を確認。
 - 次: オーナーが開発サーバーで可否判定 → `REQUESTS.md` の R-1 の下に可否を書いて Claude Design に書き戻す → 合格なら残り 7 枚をデザイナーが差し替え → 同期して Web 残り 7 画面を書き換え、暫定の再割り当て CSS を削除。
+- 2026-08-19 オーナー判定: **R-1 合格**（「凄くゲーム感がある」）。`REQUESTS.md` の R-1 に判定を記入し、R-2（残り 7 枚の展開: training → race-entry → horse-detail → race-detail → odds-board → records → prize-exchange、実装側からの注意点つき）を追記して Claude Design プロジェクトに書き戻した。
