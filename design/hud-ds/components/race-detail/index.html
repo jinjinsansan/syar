@@ -1,190 +1,205 @@
-<!-- @dsCard group="Web" name="レース詳細＋公正性の検証" subtitle="出走表・単勝オッズ・seed の照合を図で見せる" viewport="1280x1660" -->
+<!-- @dsCard group="Web" name="レース詳細＋公正性の検証［アーケード］" subtitle="明るい筐体風／出走表・単勝オッズ・seed の照合" viewport="1280x2170" -->
 <title>レース詳細</title>
 <link rel="stylesheet" href="../../styles.css">
-<div style="width:1280px;background:#0c100d;padding:0 0 40px">
-<div style="display:flex;align-items:center;height:56px;padding:0 40px;border-bottom:1px solid var(--rule)">
-<span style="font:900 18px var(--jp);letter-spacing:.22em;color:var(--gold)">STAR</span>
-<div style="display:flex;gap:26px;margin-left:36px;font:700 14px var(--jp)"><a href="#" style="color:var(--paper-70)">番組表</a><a href="#" style="color:var(--paper)">レース詳細</a></div>
-<div style="margin-left:auto;display:flex;align-items:center;gap:20px;font:700 13px var(--jp)"><span style="color:var(--paper-70)">参加ポイント <span class="num" style="font-size:17px;color:var(--paper)">4,200</span> EP</span><span style="color:var(--paper-70)">賞金ポイント <span class="num" style="font-size:17px;color:var(--gold)">18,600</span> PP</span></div>
+<div data-theme="arcade" style="width:1280px;padding:0 0 40px">
+<div class="a-band" style="height:56px;padding:0 26px;border-bottom:3px solid var(--a-edge)">
+<span style="font:900 20px var(--a-jp);letter-spacing:.22em;color:#ffe37a;text-shadow:0 2px 0 rgba(0,0,0,.35)">STAR</span>
+<div style="display:flex;gap:6px;margin-left:24px"><span style="display:flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;font:900 14px var(--a-jp);background:#fff;color:var(--a-blue-d);box-shadow:0 2px 0 rgba(0,0,0,.25)">番組表</span><span style="display:flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;font:900 14px var(--a-jp);color:rgba(255,255,255,.95)">わたしの馬</span><span style="display:flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;font:900 14px var(--a-jp);color:rgba(255,255,255,.95)">育成</span><span style="display:flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;font:900 14px var(--a-jp);color:rgba(255,255,255,.95)">記録</span></div>
+<div style="margin-left:auto;display:flex;gap:10px">
+<span style="display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:8px;background:#fff;border:2px solid var(--a-edge)"><span style="font:900 11px var(--a-jp);letter-spacing:.08em;color:var(--a-ink-2)">参加ポイント</span><span class="a-num" style="font-size:22px;color:var(--a-blue-d)">4,200</span><span style="font:900 11px var(--a-jp);color:var(--a-ink-2)">EP</span></span>
+<span style="display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:8px;background-image:var(--a-gloss-gold);border:2px solid #8a5a06"><span style="font:900 11px var(--a-jp);letter-spacing:.08em;color:#4a3105">賞金ポイント</span><span class="a-num" style="font-size:22px;color:#4a3105">18,600</span><span style="font:900 11px var(--a-jp);color:#4a3105">PP</span></span>
+</div></div>
+<div style="width:1180px;margin:0 auto;padding-top:22px">
+<div class="a-panel" style="border-width:3px">
+<div class="a-band" style="height:44px;padding:0 20px;justify-content:space-between">
+<span style="display:flex;align-items:center;gap:14px"><span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:6px;background-image:var(--a-gloss-gold);border:2px solid #8a5a06;color:#4a3105;font:900 13px var(--a-jp);letter-spacing:.06em">重賞 GI</span><span style="font:900 24px var(--a-jp);letter-spacing:.04em">桜星賞</span><span style="font:900 13px var(--a-jp)">スターパーク競馬場　11R</span></span>
+<span style="display:flex;align-items:center;gap:12px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 12px;border-radius:6px;background-image:var(--a-gloss-green);border:2px solid var(--a-green-d);font:900 12px var(--a-jp)">発売中</span></span>
 </div>
-<div style="padding:26px 40px 0">
-<!-- レース見出し -->
-<div style="display:flex;align-items:flex-end;gap:18px">
-<span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;background:var(--gold);color:#12140f;font:900 13px var(--jp);letter-spacing:.08em">重賞 GI</span>
-<h1 style="font:900 36px var(--jp);margin:0">桜星賞</h1>
-<span style="font:700 15px var(--jp);color:var(--paper-70)">スターパーク競馬場　11R　芝 1600m 左　晴 / 良</span>
-<div style="margin-left:auto;display:flex;align-items:center;gap:24px">
-<span style="font:700 14px var(--jp);color:var(--paper-70)">賞金 <span class="num" style="font-size:22px;color:var(--gold)">6,200</span> PP</span>
-<span style="display:inline-flex;align-items:center;height:26px;padding:0 12px;background:rgba(95,212,139,.12);color:#5fd48b;font:700 12px var(--jp);letter-spacing:.08em">発売中</span>
-<span style="font:700 13px var(--jp);color:var(--paper-70)">締切まで <span class="num" style="font-size:20px;color:#ff4d3d">2:24</span></span>
+<div style="display:flex;align-items:center;gap:22px;padding:16px 20px;background-image:linear-gradient(#ffffff,#eef6fd)">
+<div style="text-align:center"><div class="a-lbl">発走</div><div class="a-num" style="font-size:46px;color:var(--a-num-time);text-shadow:0 2px 0 #fff,0 3px 0 var(--a-edge-soft)">15:40</div></div>
+<div style="width:2px;height:60px;background:var(--a-line)"></div>
+<div style="display:flex;gap:10px"><span class="a-chip" style="height:30px;padding:0 14px;font-size:14px;color:var(--a-ink)">12 頭</span><span class="a-chip" style="height:30px;padding:0 14px;font-size:14px;color:var(--a-ink)">芝 1600m 左</span><span class="a-chip" style="height:30px;padding:0 14px;font-size:14px;color:var(--a-ink)">晴 / 良</span></div>
+<div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+<div style="text-align:center;padding:8px 16px;border-radius:10px;background-image:var(--a-gloss-gold);border:2px solid #8a5a06;box-shadow:var(--a-shadow-sm)"><div style="font:900 11px var(--a-jp);letter-spacing:.1em;color:#4a3105">1着賞金</div><div><span class="a-num" style="font-size:32px;color:#4a3105">6,200</span> <span style="font:900 12px var(--a-jp);color:#4a3105">PP</span></div></div>
+<div style="text-align:center;padding:8px 16px;border-radius:10px;background-image:var(--a-gloss-red);border:2px solid var(--a-red-d);box-shadow:var(--a-shadow-sm)"><div style="font:900 11px var(--a-jp);letter-spacing:.1em;color:#fff">締切まで</div><div class="a-num" style="font-size:32px;color:#fff">2:24</div></div>
+<span class="a-btn a-btn-gold" style="height:52px;padding:0 24px;font-size:17px;white-space:nowrap">投票する</span>
 </div>
+</div></div>
+
+<div class="a-panel" style="margin-top:16px;border-width:3px">
+<div class="a-band" style="height:38px;padding:0 18px;gap:14px">
+<span class="a-lbl" style="width:44px;flex:0 0 44px;text-align:center;color:#fff">枠</span><span class="a-lbl" style="flex:1;min-width:150px;color:#fff">馬名</span><span class="a-lbl" style="width:104px;flex:0 0 104px;color:#fff">騎手</span><span class="a-lbl" style="width:104px;flex:0 0 104px;color:#fff">厩舎</span><span class="a-lbl" style="width:76px;flex:0 0 76px;color:#fff">脚質</span><span class="a-lbl" style="width:92px;flex:0 0 92px;text-align:right;color:#fff">単勝</span><span class="a-lbl" style="width:86px;flex:0 0 86px;text-align:right;color:#fff">人気</span>
 </div>
-<!-- 出走表 -->
-<div style="margin-top:20px;background:var(--panel);border:1px solid var(--hair)">
-<div class="edge"></div>
-<div style="display:flex;align-items:center;height:36px;padding:0 20px;gap:16px"><span class="lbl" style="width:32px">枠</span><span class="lbl" style="flex:1">馬名</span><span class="lbl" style="width:112px">騎手</span><span class="lbl" style="width:112px">厩舎</span><span class="lbl" style="width:74px">脚質</span><span class="lbl" style="width:82px;text-align:right">単勝</span><span class="lbl" style="width:74px;text-align:right">人気</span></div>
-<div style="display:flex;align-items:center;height:46px;padding:0 20px;gap:16px;background:transparent;border-top:1px solid var(--rule)">
-<span class="frame f1" style="width:32px;height:24px;font-size:16px"><i>1</i></span>
-<span style="flex:1;font:700 17px var(--jp)">アオバハヤテ</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">吉田直樹</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">鹿島厩舎</span>
-<span style="width:74px"><span style="display:inline-flex;align-items:center;height:22px;padding:0 10px;font:700 12px var(--jp);color:#f08219;border:1px solid #f0821966">先行</span></span>
-<span class="num" style="width:82px;text-align:right;font-size:18px;color:var(--paper)">8.4</span>
-<span style="width:74px;text-align:right;font:700 13px var(--jp);color:var(--paper-45)">4番人気</span>
+<div style="display:flex;align-items:center;height:52px;padding:0 18px;gap:14px;border-top:1px solid var(--a-line);background:#fff">
+<span style="width:44px;flex:0 0 44px;display:flex;justify-content:center"><span class="frame f1"><i>1</i></span></span>
+<span style="flex:1;min-width:150px;display:flex;align-items:center;gap:10px"><span style="font:900 18px var(--a-jp)">アオバハヤテ</span></span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">吉田直樹</span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">鹿島厩舎</span>
+<span style="width:76px;flex:0 0 76px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;background:#fff1de;border:2px solid #a35a04;color:#a35a04;font:900 12px var(--a-jp)">先行</span></span>
+<span class="a-num" style="width:92px;flex:0 0 92px;text-align:right;font-size:24px;color:var(--a-num-time)">8.4</span>
+<span style="width:86px;flex:0 0 86px;text-align:right;font:900 13px var(--a-jp);color:var(--a-ink-3)">4番人気</span>
+</div><div style="display:flex;align-items:center;height:52px;padding:0 18px;gap:14px;border-top:1px solid var(--a-line);background:var(--a-panel-2)">
+<span style="width:44px;flex:0 0 44px;display:flex;justify-content:center"><span class="frame f2"><i>2</i></span></span>
+<span style="flex:1;min-width:150px;display:flex;align-items:center;gap:10px"><span style="font:900 18px var(--a-jp)">コトブキノホシ</span></span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">中村駿</span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">花丘厩舎</span>
+<span style="width:76px;flex:0 0 76px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;background:#e8e9fb;border:2px solid #4a4fa8;color:#4a4fa8;font:900 12px var(--a-jp)">追込</span></span>
+<span class="a-num" style="width:92px;flex:0 0 92px;text-align:right;font-size:24px;color:var(--a-num-time)">24.6</span>
+<span style="width:86px;flex:0 0 86px;text-align:right;font:900 13px var(--a-jp);color:var(--a-ink-3)">8番人気</span>
+</div><div style="display:flex;align-items:center;height:52px;padding:0 18px;gap:14px;border-top:1px solid var(--a-line);background:#fff">
+<span style="width:44px;flex:0 0 44px;display:flex;justify-content:center"><span class="frame f3"><i>3</i></span></span>
+<span style="flex:1;min-width:150px;display:flex;align-items:center;gap:10px"><span style="font:900 18px var(--a-jp)">ライトニングボウ</span></span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">高橋玲</span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">高瀬厩舎</span>
+<span style="width:76px;flex:0 0 76px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;background:#ffe9e7;border:2px solid #a81a13;color:#a81a13;font:900 12px var(--a-jp)">逃げ</span></span>
+<span class="a-num" style="width:92px;flex:0 0 92px;text-align:right;font-size:30px;color:var(--a-num-rank)">4.1</span>
+<span style="width:86px;flex:0 0 86px;text-align:right;font:900 13px var(--a-jp);color:var(--a-num-rank)">2番人気</span>
+</div><div style="display:flex;align-items:center;height:52px;padding:0 18px;gap:14px;border-top:1px solid var(--a-line);background:var(--a-panel-2)">
+<span style="width:44px;flex:0 0 44px;display:flex;justify-content:center"><span class="frame f4"><i>4</i></span></span>
+<span style="flex:1;min-width:150px;display:flex;align-items:center;gap:10px"><span style="font:900 18px var(--a-jp)">ミライノツバサ</span></span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">林圭一</span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">三条厩舎</span>
+<span style="width:76px;flex:0 0 76px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;background:#e0eefa;border:2px solid #0c5f9f;color:#0c5f9f;font:900 12px var(--a-jp)">差し</span></span>
+<span class="a-num" style="width:92px;flex:0 0 92px;text-align:right;font-size:30px;color:var(--a-num-rank)">6.8</span>
+<span style="width:86px;flex:0 0 86px;text-align:right;font:900 13px var(--a-jp);color:var(--a-num-rank)">3番人気</span>
+</div><div style="display:flex;align-items:center;height:52px;padding:0 18px;gap:14px;border-top:1px solid var(--a-line);background:#fff">
+<span style="width:44px;flex:0 0 44px;display:flex;justify-content:center"><span class="frame f5"><i>5</i></span></span>
+<span style="flex:1;min-width:150px;display:flex;align-items:center;gap:10px"><span style="font:900 18px var(--a-jp)">セイランオー</span></span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">岡竜也</span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">鹿島厩舎</span>
+<span style="width:76px;flex:0 0 76px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;background:#fff1de;border:2px solid #a35a04;color:#a35a04;font:900 12px var(--a-jp)">先行</span></span>
+<span class="a-num" style="width:92px;flex:0 0 92px;text-align:right;font-size:24px;color:var(--a-num-time)">38.2</span>
+<span style="width:86px;flex:0 0 86px;text-align:right;font:900 13px var(--a-jp);color:var(--a-ink-3)">10番人気</span>
+</div><div style="display:flex;align-items:center;height:52px;padding:0 18px;gap:14px;border-top:1px solid var(--a-line);background:var(--a-panel-2)">
+<span style="width:44px;flex:0 0 44px;display:flex;justify-content:center"><span class="frame f5"><i>6</i></span></span>
+<span style="flex:1;min-width:150px;display:flex;align-items:center;gap:10px"><span style="font:900 18px var(--a-jp)">ハナカゼマル</span></span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">三木隆</span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">花丘厩舎</span>
+<span style="width:76px;flex:0 0 76px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;background:#ffe9e7;border:2px solid #a81a13;color:#a81a13;font:900 12px var(--a-jp)">逃げ</span></span>
+<span class="a-num" style="width:92px;flex:0 0 92px;text-align:right;font-size:24px;color:var(--a-num-time)">52.7</span>
+<span style="width:86px;flex:0 0 86px;text-align:right;font:900 13px var(--a-jp);color:var(--a-ink-3)">11番人気</span>
+</div><div style="display:flex;align-items:center;height:52px;padding:0 18px;gap:14px;border-top:1px solid var(--a-line);background:linear-gradient(#fffdf2,#fff3cf);box-shadow:inset 5px 0 0 #f2b012">
+<span style="width:44px;flex:0 0 44px;display:flex;justify-content:center"><span class="frame f6"><i>7</i></span></span>
+<span style="flex:1;min-width:150px;display:flex;align-items:center;gap:10px"><span style="font:900 18px var(--a-jp)">サクラブリーズ</span><span style="display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:5px;background-image:var(--a-gloss-gold);border:2px solid #8a5a06;font:900 10px var(--a-jp);color:#4a3105">わたしの馬</span></span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">佐藤翼</span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">高瀬厩舎</span>
+<span style="width:76px;flex:0 0 76px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;background:#e0eefa;border:2px solid #0c5f9f;color:#0c5f9f;font:900 12px var(--a-jp)">差し</span></span>
+<span class="a-num" style="width:92px;flex:0 0 92px;text-align:right;font-size:30px;color:var(--a-num-rank)">3.4</span>
+<span style="width:86px;flex:0 0 86px;text-align:right;font:900 13px var(--a-jp);color:var(--a-num-rank)">1番人気</span>
+</div><div style="display:flex;align-items:center;height:52px;padding:0 18px;gap:14px;border-top:1px solid var(--a-line);background:var(--a-panel-2)">
+<span style="width:44px;flex:0 0 44px;display:flex;justify-content:center"><span class="frame f6"><i>8</i></span></span>
+<span style="flex:1;min-width:150px;display:flex;align-items:center;gap:10px"><span style="font:900 18px var(--a-jp)">ゲンブノツルギ</span></span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">村上蓮</span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">三条厩舎</span>
+<span style="width:76px;flex:0 0 76px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;background:#fff1de;border:2px solid #a35a04;color:#a35a04;font:900 12px var(--a-jp)">先行</span></span>
+<span class="a-num" style="width:92px;flex:0 0 92px;text-align:right;font-size:24px;color:var(--a-num-time)">12.9</span>
+<span style="width:86px;flex:0 0 86px;text-align:right;font:900 13px var(--a-jp);color:var(--a-ink-3)">5番人気</span>
+</div><div style="display:flex;align-items:center;height:52px;padding:0 18px;gap:14px;border-top:1px solid var(--a-line);background:#fff">
+<span style="width:44px;flex:0 0 44px;display:flex;justify-content:center"><span class="frame f7"><i>9</i></span></span>
+<span style="flex:1;min-width:150px;display:flex;align-items:center;gap:10px"><span style="font:900 18px var(--a-jp)">トキメキステップ</span></span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">石井大和</span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">高瀬厩舎</span>
+<span style="width:76px;flex:0 0 76px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;background:#e8e9fb;border:2px solid #4a4fa8;color:#4a4fa8;font:900 12px var(--a-jp)">追込</span></span>
+<span class="a-num" style="width:92px;flex:0 0 92px;text-align:right;font-size:24px;color:var(--a-num-time)">19.3</span>
+<span style="width:86px;flex:0 0 86px;text-align:right;font:900 13px var(--a-jp);color:var(--a-ink-3)">7番人気</span>
+</div><div style="display:flex;align-items:center;height:52px;padding:0 18px;gap:14px;border-top:1px solid var(--a-line);background:var(--a-panel-2)">
+<span style="width:44px;flex:0 0 44px;display:flex;justify-content:center"><span class="frame f7"><i>10</i></span></span>
+<span style="flex:1;min-width:150px;display:flex;align-items:center;gap:10px"><span style="font:900 18px var(--a-jp)">ホクトリュウセイ</span></span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">東海林亮</span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">鹿島厩舎</span>
+<span style="width:76px;flex:0 0 76px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;background:#e0eefa;border:2px solid #0c5f9f;color:#0c5f9f;font:900 12px var(--a-jp)">差し</span></span>
+<span class="a-num" style="width:92px;flex:0 0 92px;text-align:right;font-size:24px;color:var(--a-num-time)">16.5</span>
+<span style="width:86px;flex:0 0 86px;text-align:right;font:900 13px var(--a-jp);color:var(--a-ink-3)">6番人気</span>
+</div><div style="display:flex;align-items:center;height:52px;padding:0 18px;gap:14px;border-top:1px solid var(--a-line);background:#fff">
+<span style="width:44px;flex:0 0 44px;display:flex;justify-content:center"><span class="frame f8"><i>11</i></span></span>
+<span style="flex:1;min-width:150px;display:flex;align-items:center;gap:10px"><span style="font:900 18px var(--a-jp)">シラユキノヒメ</span></span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">南条颯</span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">花丘厩舎</span>
+<span style="width:76px;flex:0 0 76px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;background:#e8e9fb;border:2px solid #4a4fa8;color:#4a4fa8;font:900 12px var(--a-jp)">追込</span></span>
+<span class="a-num" style="width:92px;flex:0 0 92px;text-align:right;font-size:24px;color:var(--a-num-time)">88.1</span>
+<span style="width:86px;flex:0 0 86px;text-align:right;font:900 13px var(--a-jp);color:var(--a-ink-3)">12番人気</span>
+</div><div style="display:flex;align-items:center;height:52px;padding:0 18px;gap:14px;border-top:1px solid var(--a-line);background:var(--a-panel-2)">
+<span style="width:44px;flex:0 0 44px;display:flex;justify-content:center"><span class="frame f8"><i>12</i></span></span>
+<span style="flex:1;min-width:150px;display:flex;align-items:center;gap:10px"><span style="font:900 18px var(--a-jp)">カガヤキボシ</span></span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">白石陽</span>
+<span style="width:104px;flex:0 0 104px;font:900 14px var(--a-jp);color:var(--a-ink-2)">三条厩舎</span>
+<span style="width:76px;flex:0 0 76px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;background:#fff1de;border:2px solid #a35a04;color:#a35a04;font:900 12px var(--a-jp)">先行</span></span>
+<span class="a-num" style="width:92px;flex:0 0 92px;text-align:right;font-size:24px;color:var(--a-num-time)">31.0</span>
+<span style="width:86px;flex:0 0 86px;text-align:right;font:900 13px var(--a-jp);color:var(--a-ink-3)">9番人気</span>
 </div>
-<div style="display:flex;align-items:center;height:46px;padding:0 20px;gap:16px;background:rgba(255,255,255,.025);border-top:1px solid var(--rule)">
-<span class="frame f2" style="width:32px;height:24px;font-size:16px"><i>2</i></span>
-<span style="flex:1;font:700 17px var(--jp)">コトブキノホシ</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">中村駿</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">花丘厩舎</span>
-<span style="width:74px"><span style="display:inline-flex;align-items:center;height:22px;padding:0 10px;font:700 12px var(--jp);color:#7f9cf5;border:1px solid #7f9cf566">追込</span></span>
-<span class="num" style="width:82px;text-align:right;font-size:18px;color:var(--paper)">24.6</span>
-<span style="width:74px;text-align:right;font:700 13px var(--jp);color:var(--paper-45)">8番人気</span>
+<div style="display:flex;align-items:center;gap:20px;height:42px;padding:0 18px;border-top:2px solid var(--a-line);background:var(--a-ivory);font:900 12px var(--a-jp);color:var(--a-ink-2)"><span>オッズは投票の締切で確定します</span><span>上限に達した場合は「99.9（上限）」と表示</span></div>
 </div>
-<div style="display:flex;align-items:center;height:46px;padding:0 20px;gap:16px;background:transparent;border-top:1px solid var(--rule)">
-<span class="frame f3" style="width:32px;height:24px;font-size:16px"><i>3</i></span>
-<span style="flex:1;font:700 17px var(--jp)">ライトニングボウ</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">高橋玲</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">高瀬厩舎</span>
-<span style="width:74px"><span style="display:inline-flex;align-items:center;height:22px;padding:0 10px;font:700 12px var(--jp);color:#ff4d3d;border:1px solid #ff4d3d66">逃げ</span></span>
-<span class="num" style="width:82px;text-align:right;font-size:21px;color:var(--gold)">4.1</span>
-<span style="width:74px;text-align:right;font:700 13px var(--jp);color:var(--paper-45)">2番人気</span>
-</div>
-<div style="display:flex;align-items:center;height:46px;padding:0 20px;gap:16px;background:rgba(255,255,255,.025);border-top:1px solid var(--rule)">
-<span class="frame f4" style="width:32px;height:24px;font-size:16px"><i>4</i></span>
-<span style="flex:1;font:700 17px var(--jp)">ミライノツバサ</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">林圭一</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">三条厩舎</span>
-<span style="width:74px"><span style="display:inline-flex;align-items:center;height:22px;padding:0 10px;font:700 12px var(--jp);color:#3fd0e0;border:1px solid #3fd0e066">差し</span></span>
-<span class="num" style="width:82px;text-align:right;font-size:21px;color:var(--gold)">6.8</span>
-<span style="width:74px;text-align:right;font:700 13px var(--jp);color:var(--paper-45)">3番人気</span>
-</div>
-<div style="display:flex;align-items:center;height:46px;padding:0 20px;gap:16px;background:transparent;border-top:1px solid var(--rule)">
-<span class="frame f5" style="width:32px;height:24px;font-size:16px"><i>5</i></span>
-<span style="flex:1;font:700 17px var(--jp)">セイランオー</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">岡竜也</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">鹿島厩舎</span>
-<span style="width:74px"><span style="display:inline-flex;align-items:center;height:22px;padding:0 10px;font:700 12px var(--jp);color:#f08219;border:1px solid #f0821966">先行</span></span>
-<span class="num" style="width:82px;text-align:right;font-size:18px;color:var(--paper)">38.2</span>
-<span style="width:74px;text-align:right;font:700 13px var(--jp);color:var(--paper-45)">10番人気</span>
-</div>
-<div style="display:flex;align-items:center;height:46px;padding:0 20px;gap:16px;background:rgba(255,255,255,.025);border-top:1px solid var(--rule)">
-<span class="frame f5" style="width:32px;height:24px;font-size:16px"><i>6</i></span>
-<span style="flex:1;font:700 17px var(--jp)">ハナカゼマル</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">三木隆</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">南雲厩舎</span>
-<span style="width:74px"><span style="display:inline-flex;align-items:center;height:22px;padding:0 10px;font:700 12px var(--jp);color:#7f9cf5;border:1px solid #7f9cf566">追込</span></span>
-<span class="num" style="width:82px;text-align:right;font-size:18px;color:var(--paper)">52.7</span>
-<span style="width:74px;text-align:right;font:700 13px var(--jp);color:var(--paper-45)">11番人気</span>
-</div>
-<div style="display:flex;align-items:center;height:46px;padding:0 20px;gap:16px;background:rgba(240,204,74,.12);box-shadow:inset 3px 0 0 var(--gold);border-top:1px solid var(--rule)">
-<span class="frame f6" style="width:32px;height:24px;font-size:16px"><i>7</i></span>
-<span style="flex:1;font:900 17px var(--jp)">サクラブリーズ<span style="margin-left:10px;font:900 11px var(--jp);background:var(--gold);color:#12140f;padding:2px 8px;letter-spacing:.1em">わたしの馬</span></span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">佐藤翼</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">高瀬厩舎</span>
-<span style="width:74px"><span style="display:inline-flex;align-items:center;height:22px;padding:0 10px;font:700 12px var(--jp);color:#3fd0e0;border:1px solid #3fd0e066">差し</span></span>
-<span class="num" style="width:82px;text-align:right;font-size:21px;color:var(--gold)">3.4</span>
-<span style="width:74px;text-align:right;font:700 13px var(--jp);color:var(--paper-45)">1番人気</span>
-</div>
-<div style="display:flex;align-items:center;height:46px;padding:0 20px;gap:16px;background:rgba(255,255,255,.025);border-top:1px solid var(--rule)">
-<span class="frame f6" style="width:32px;height:24px;font-size:16px"><i>8</i></span>
-<span style="flex:1;font:700 17px var(--jp)">ゲンブノツルギ</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">村上蓮</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">花丘厩舎</span>
-<span style="width:74px"><span style="display:inline-flex;align-items:center;height:22px;padding:0 10px;font:700 12px var(--jp);color:#f08219;border:1px solid #f0821966">先行</span></span>
-<span class="num" style="width:82px;text-align:right;font-size:18px;color:var(--paper)">12.9</span>
-<span style="width:74px;text-align:right;font:700 13px var(--jp);color:var(--paper-45)">5番人気</span>
-</div>
-<div style="display:flex;align-items:center;height:46px;padding:0 20px;gap:16px;background:transparent;border-top:1px solid var(--rule)">
-<span class="frame f7" style="width:32px;height:24px;font-size:16px"><i>9</i></span>
-<span style="flex:1;font:700 17px var(--jp)">トキメキステップ</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">石井大和</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">三条厩舎</span>
-<span style="width:74px"><span style="display:inline-flex;align-items:center;height:22px;padding:0 10px;font:700 12px var(--jp);color:#3fd0e0;border:1px solid #3fd0e066">差し</span></span>
-<span class="num" style="width:82px;text-align:right;font-size:18px;color:var(--paper)">19.3</span>
-<span style="width:74px;text-align:right;font:700 13px var(--jp);color:var(--paper-45)">7番人気</span>
-</div>
-<div style="display:flex;align-items:center;height:46px;padding:0 20px;gap:16px;background:rgba(255,255,255,.025);border-top:1px solid var(--rule)">
-<span class="frame f7" style="width:32px;height:24px;font-size:16px"><i>10</i></span>
-<span style="flex:1;font:700 17px var(--jp)">ホクトリュウセイ</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">東海林亮</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">南雲厩舎</span>
-<span style="width:74px"><span style="display:inline-flex;align-items:center;height:22px;padding:0 10px;font:700 12px var(--jp);color:#ff4d3d;border:1px solid #ff4d3d66">逃げ</span></span>
-<span class="num" style="width:82px;text-align:right;font-size:18px;color:var(--paper)">16.5</span>
-<span style="width:74px;text-align:right;font:700 13px var(--jp);color:var(--paper-45)">6番人気</span>
-</div>
-<div style="display:flex;align-items:center;height:46px;padding:0 20px;gap:16px;background:transparent;border-top:1px solid var(--rule)">
-<span class="frame f8" style="width:32px;height:24px;font-size:16px"><i>11</i></span>
-<span style="flex:1;font:700 17px var(--jp)">シラユキノヒメ</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">南条颯</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">高瀬厩舎</span>
-<span style="width:74px"><span style="display:inline-flex;align-items:center;height:22px;padding:0 10px;font:700 12px var(--jp);color:#7f9cf5;border:1px solid #7f9cf566">追込</span></span>
-<span class="num" style="width:82px;text-align:right;font-size:18px;color:var(--paper)">88.1</span>
-<span style="width:74px;text-align:right;font:700 13px var(--jp);color:var(--paper-45)">12番人気</span>
-</div>
-<div style="display:flex;align-items:center;height:46px;padding:0 20px;gap:16px;background:rgba(255,255,255,.025);border-top:1px solid var(--rule)">
-<span class="frame f8" style="width:32px;height:24px;font-size:16px"><i>12</i></span>
-<span style="flex:1;font:700 17px var(--jp)">カガヤキボシ</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">白石陽</span>
-<span style="width:112px;font:700 14px var(--jp);color:var(--paper-70)">鹿島厩舎</span>
-<span style="width:74px"><span style="display:inline-flex;align-items:center;height:22px;padding:0 10px;font:700 12px var(--jp);color:#3fd0e0;border:1px solid #3fd0e066">差し</span></span>
-<span class="num" style="width:82px;text-align:right;font-size:18px;color:var(--paper)">31.0</span>
-<span style="width:74px;text-align:right;font:700 13px var(--jp);color:var(--paper-45)">9番人気</span>
-</div>
-<div style="display:flex;align-items:center;gap:14px;height:40px;padding:0 20px;border-top:1px solid var(--rule);font:400 12px ui-monospace,monospace;color:var(--paper-45)">
-<span>オッズは投票の締切で確定します</span><span>上限に達した場合は「99.9（上限）」と表示</span>
-</div>
-</div>
+
 <!-- 公正性 -->
-<div style="margin-top:26px;background:var(--board);border:1px solid var(--gold-hair)">
-<div class="edge"></div>
-<div style="display:flex;align-items:center;gap:14px;padding:16px 22px 0">
-<span style="font:900 20px var(--jp)">公正性の検証</span>
-<span style="font:700 13px var(--jp);color:var(--paper-70)">運営が結果を見てから乱数を選んでいないことを、誰でも確かめられます</span>
-<span style="margin-left:auto;display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 14px;background:var(--gold);color:#12140f;font:900 13px var(--jp)">一致を確認</span>
+<div class="a-panel" style="margin-top:16px;border-width:3px">
+<div class="a-band" style="height:44px;padding:0 20px;gap:16px">
+<span style="font:900 18px var(--a-jp);letter-spacing:.08em">公正性の検証</span>
+<span style="font:900 13px var(--a-jp)">運営が結果を見てから乱数を選んでいないことを、誰でも確かめられます</span>
 </div>
-<div style="display:flex;align-items:stretch;gap:0;padding:16px 22px 20px">
-<div style="flex:1;background:rgba(255,255,255,.03);border:1px solid var(--rule);padding:14px 16px">
-<div style="display:flex;align-items:center;gap:8px"><span class="num plate" style="font-size:22px">1</span><span style="font:900 15px var(--jp)">発走前に公開</span></div>
-<div class="lbl" style="margin-top:10px">seed_commit</div>
-<div style="font:400 12px ui-monospace,monospace;color:var(--paper);word-break:break-all;line-height:1.7;margin-top:4px">9f2c4b7e1a83d605c47e9b2f1d80a6c35e7b94f2a1c608d3b5f7e29a4c16d80b</div>
+<div style="padding:16px 20px 18px;background-image:linear-gradient(#ffffff,#eef6fd)">
+<div style="display:flex;align-items:stretch">
+<div style="flex:1;border-radius:10px;background:#fff;border:2px solid var(--a-edge);box-shadow:var(--a-shadow-sm);overflow:hidden">
+<div class="a-band" style="height:34px;padding:0 12px;gap:10px"><span class="a-num" style="font-size:20px">1</span><span style="font:900 14px var(--a-jp)">発走前に公開</span></div>
+<div style="padding:12px 14px 14px">
+<div class="a-lbl">seed_commit</div>
+<div style="font:400 12px ui-monospace,Menlo,monospace;color:var(--a-ink);word-break:break-all;line-height:1.7;margin-top:5px">9f2c4b7e1a83d605c47e9b2f1d80a6c35e7b94f2a1c608d3b5f7e29a4c16d80b</div>
+
+</div></div>
+<div style="width:48px;display:flex;align-items:center;justify-content:center"><span style="font:900 26px var(--a-jp);color:var(--a-blue-d)">→</span></div>
+<div style="flex:1;border-radius:10px;background:#fff;border:2px solid var(--a-edge);box-shadow:var(--a-shadow-sm);overflow:hidden">
+<div class="a-band" style="height:34px;padding:0 12px;gap:10px"><span class="a-num" style="font-size:20px">2</span><span style="font:900 14px var(--a-jp)">確定後に公開</span></div>
+<div style="padding:12px 14px 14px">
+<div class="a-lbl">seed_reveal</div>
+<div style="font:400 12px ui-monospace,Menlo,monospace;color:var(--a-ink);word-break:break-all;line-height:1.7;margin-top:5px">star-2026-08-19-11r-8c41f0a9e5</div>
+<div style="font:900 12px var(--a-jp);color:var(--a-ink-3);margin-top:8px">未確定のうちは「確定後に公開されます」と出す</div>
+</div></div>
+<div style="width:48px;display:flex;align-items:center;justify-content:center"><span style="font:900 26px var(--a-jp);color:var(--a-blue-d)">→</span></div>
+<div style="flex:1;border-radius:10px;background:#eefaf1;border:3px solid var(--a-green-d);box-shadow:var(--a-shadow-sm);overflow:hidden">
+<div class="a-band" style="height:34px;padding:0 12px;gap:10px;background-image:var(--a-gloss-green)"><span class="a-num" style="font-size:20px">3</span><span style="font:900 14px var(--a-jp)">照合</span></div>
+<div style="padding:12px 14px 14px">
+<div style="font:400 12px ui-monospace,Menlo,monospace;color:var(--a-ink);line-height:1.8">SHA-256(seed_reveal)<br>＝ seed_commit</div>
+<div style="display:flex;align-items:center;gap:9px;margin-top:12px"><span style="width:26px;height:26px;border-radius:6px;background-image:var(--a-gloss-green);border:2px solid var(--a-green-d);color:#fff;font:900 15px var(--a-jp);display:flex;align-items:center;justify-content:center">✓</span><span style="font:900 17px var(--a-jp);color:var(--a-green-d)">一致しました</span></div>
+</div></div>
 </div>
-<div style="width:56px;display:flex;align-items:center;justify-content:center"><span style="font:700 22px var(--jp);color:var(--gold)">→</span></div>
-<div style="flex:1;background:rgba(255,255,255,.03);border:1px solid var(--rule);padding:14px 16px">
-<div style="display:flex;align-items:center;gap:8px"><span class="num plate" style="font-size:22px">2</span><span style="font:900 15px var(--jp)">確定後に公開</span></div>
-<div class="lbl" style="margin-top:10px">seed_reveal</div>
-<div style="font:400 12px ui-monospace,monospace;color:var(--paper);word-break:break-all;line-height:1.7;margin-top:4px">star-2026-08-19-11r-8c41f0a9e5</div>
-<div style="font:400 12px ui-monospace,monospace;color:var(--paper-45);margin-top:8px">未確定のうちは「確定後に公開されます」と出す</div>
+<div style="margin-top:14px;border-radius:10px;background:#f2f7fb;border:2px solid var(--a-edge-soft);padding:12px 14px">
+<div class="a-lbl" style="margin-bottom:6px">自分で確かめる</div>
+<div style="font:400 13px ui-monospace,Menlo,monospace;color:var(--a-ink);line-height:1.9">$ echo -n "star-2026-08-19-11r-8c41f0a9e5" | shasum -a 256<br><span style="color:var(--a-ink-2)">9f2c4b7e1a83d605c47e9b2f1d80a6c35e7b94f2a1c608d3b5f7e29a4c16d80b  -</span></div>
 </div>
-<div style="width:56px;display:flex;align-items:center;justify-content:center"><span style="font:700 22px var(--jp);color:var(--gold)">→</span></div>
-<div style="flex:1;background:rgba(240,204,74,.1);border:1px solid var(--gold-hair);padding:14px 16px">
-<div style="display:flex;align-items:center;gap:8px"><span class="num plate" style="font-size:22px">3</span><span style="font:900 15px var(--jp)">照合</span></div>
-<div style="font:700 14px var(--jp);margin-top:10px;line-height:1.7">SHA-256(seed_reveal)<br>＝ seed_commit</div>
-<div style="display:flex;align-items:center;gap:8px;margin-top:10px"><span style="width:20px;height:20px;background:var(--gold);color:#12140f;font:900 13px var(--jp);display:flex;align-items:center;justify-content:center">✓</span><span style="font:900 15px var(--jp);color:var(--gold)">一致しました</span></div>
+<div style="display:flex;gap:12px;margin-top:14px">
+<div style="flex:1;border-radius:10px;background:#fff;border:2px solid var(--a-edge-soft);overflow:hidden">
+<div style="display:flex;align-items:center;height:32px;padding:0 12px;background-image:linear-gradient(#fff,#e9eff5);border-bottom:2px solid var(--a-line)"><span class="a-lbl">未確定のとき</span></div>
+<div style="display:flex;align-items:center;gap:9px;padding:12px 14px"><span style="width:26px;height:26px;border-radius:6px;background-image:linear-gradient(#fff,#e6edf4);border:2px solid var(--a-edge-soft);color:var(--a-ink-3);font:900 15px var(--a-jp);display:flex;align-items:center;justify-content:center">—</span><span style="font:900 15px var(--a-jp);color:var(--a-ink-2)">確定後に検証できます</span></div>
 </div>
-</div>
-<div style="margin:0 22px 20px;background:#0b0f0c;border:1px solid var(--rule);padding:12px 16px">
-<div class="lbl" style="margin-bottom:6px">自分で確かめる</div>
-<div style="font:400 13px ui-monospace,monospace;color:var(--paper);line-height:1.9">$ echo -n "star-2026-08-19-11r-8c41f0a9e5" | shasum -a 256<br><span style="color:var(--paper-45)">9f2c4b7e1a83d605c47e9b2f1d80a6c35e7b94f2a1c608d3b5f7e29a4c16d80b  -</span></div>
+<div style="flex:1;border-radius:10px;background:#ffeceb;border:3px solid var(--a-red-d);overflow:hidden">
+<div class="a-band a-band-red" style="height:32px;padding:0 12px"><span style="font:900 12px var(--a-jp);letter-spacing:.1em">不一致のとき</span></div>
+<div style="display:flex;align-items:center;gap:9px;padding:12px 14px"><span style="width:26px;height:26px;border-radius:6px;background-image:var(--a-gloss-red);border:2px solid var(--a-red-d);color:#fff;font:900 15px var(--a-jp);display:flex;align-items:center;justify-content:center">×</span><span style="font:900 15px var(--a-jp);color:var(--a-red-d)">一致しません（要調査）</span></div>
 </div>
 </div>
-</div>
-</div>
-<div style="width:1280px;padding:24px 40px 34px;background:#0c100d;font:400 13px ui-monospace,Menlo,monospace;color:var(--paper-70);line-height:1.85;border-top:1px solid var(--rule)">
-<div style="font:700 22px var(--jp);color:var(--gold);margin-bottom:2px">実装（Next.js の DOM。Canvas ではない）</div>
-<div style="font:700 14px var(--jp);color:var(--paper);margin-bottom:14px">対象 apps/web/src/app/races/[id]/page.tsx。データは races_public / race_entries_public / race_odds_public。</div>
+</div></div>
+</div></div>
+<div style="width:1280px;padding:24px 50px 34px;background:#0c100d;font:400 13px ui-monospace,Menlo,monospace;color:var(--paper-70);line-height:1.85;border-top:1px solid var(--rule)">
+<div style="font:700 22px var(--jp);color:var(--gold);margin-bottom:2px">実装（Next.js の DOM。アーケード筐体テーマ）</div>
+<div style="font:700 14px var(--jp);color:var(--paper);margin-bottom:14px">対象 apps/web/src/app/races/[id]/page.tsx。最上位に <b>data-theme="arcade"</b>。main 幅 1180。ナビの現在地は<b>「番組表」</b>。データは races_public / race_entries_public / race_odds_public。</div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 40px">
-<div>見出し　　　　格バッジ h28 金ベタ（grade があれば grade、無ければ CLASS_LABEL）／レース名 36px 900／条件 15px 70%／右に 賞金 22px 金＋PP・状態バッジ・締切 20px 赤</div>
-<div>出走表　　　　上縁 金4px／見出し h36／行 h46・偶数行 rgba(255,255,255,.025)／列 枠32・馬名 flex・騎手112・厩舎112・脚質74・単勝82 右・人気74 右</div>
-<div>枠色バッジ　　32×24・斜度 -9°・数字 16px（明色枠は #111 文字）</div>
-<div>脚質　　　　　h22 の枠線チップ／逃げ #ff4d3d・先行 #f08219・差し #3fd0e0・追込 #7f9cf5（枠線は 40% 濃度）</div>
-<div>オッズ　　　　3番人気以内は 21px 金、他は 18px 紙／capped は「99.9（上限）」（formatOdds に従う）</div>
-<div>わたしの馬　　行の地 rgba(240,204,74,.12)＋左 3px 金＋馬名の右に金タグ h18（11px #12140f）</div>
-<div>確定後　　　　列の右端に「着順」を追加し、1着行は左 3px 金＋馬名 900。オッズ列は確定オッズに切り替え</div>
-<div>公正性　　　　板 上縁 金4px／見出し 20px＋説明 13px／右に「一致を確認」バッジ 金ベタ h28（未確定は「確定後に検証できます」暗地＋70%）</div>
-<div>3ステップ　　 等幅3カラム＋間 56px の「→」金 22px／各カード 地 rgba(255,255,255,.03)＋1px 罫／段番号 22px 金プレート／ハッシュは 12px 等幅・word-break: break-all・行間 1.7</div>
-<div>照合カード　　地 rgba(240,204,74,.1)＋金ヘアライン／✓ 20×20 金ベタ＋「一致しました」15px 金／不一致なら地 rgba(255,77,61,.12)・× 白・文言「一致しません（要調査）」で必ず出す（隠さない）</div>
-<div>検証コマンド　地 #0b0f0c＋1px 罫／13px 等幅／出力行は 45% で薄く／コピーボタンは右上に置いてよい</div>
-<div>文言　　　　　PP に「換金」「円」を想起させる語を使わない。EP と PP を合算しない（憲法 §0.2 / format.ts）</div>
+<div>見出し板　　　縁 3px／青グロス帯 h44（格バッジ 金グロス h28＋レース名 24px＋<b style="color:var(--paper)">「場・R」だけ 13px</b>、右に状態ピル）／<b style="color:var(--paper)">距離・馬場・頭数は下のチップに集約し、帯と重複させない</b>／中身の地 linear-gradient(#fff,#eef6fd)</div>
+<div>発走時刻　　　46px 青＋text-shadow 0 2px 0 #fff, 0 3px 0 #9fb8cc／条件チップ（頭数・距離・馬場）h30 を発走時刻の右に／右に 1着賞金（金グロス箱・32px #4a3105）と締切（<b style="color:var(--paper)">赤グロス箱・32px 白</b>）／主ボタン .a-btn-gold h52</div>
+<div>出走表見出し　h38 青グロス／列 枠44 中央・馬名 flex(min 150)・騎手104・厩舎104・脚質76・単勝92 右・人気86 右（固定列は flex:0 0 &lt;幅&gt;）</div>
+<div>行　　　　　　h52・奇数 #fff／偶数 #f4f9fd／罫 1px #cfe0ee／馬名 18px 900</div>
+<div>枠色バッジ　　枠色 1〜8 据え置き・38×28・角丸 6px・白 2px 縁＋外側 2px #123f6b・数字 19px（明色枠は #12140f）</div>
+<div>脚質　　　　　h26・角丸 6px・<b style="color:var(--paper)">明るい地用に濃色＋淡色地</b>／逃げ #a81a13(地 #ffe9e7)・先行 #a35a04(#fff1de)・差し <b style="color:var(--paper)">#0c5f9f</b>(#e0eefa)・追込 #4a4fa8(#e8e9fb)・縁 2px 同色</div>
+<div>オッズ　　　　<b style="color:var(--paper)">金は使わない</b>（金は勝ち・賞金・主ボタンだけ）／1〜3 番人気は 30px 赤 #d62f26、それ以外は 24px 青 #0f56ab／人気の文字も 1〜3 位だけ赤／capped は「99.9（上限）」（formatOdds に従う）</div>
+<div>わたしの馬　　行の地 linear-gradient(#fffdf2,#fff3cf)＋inset 5px 0 0 #f2b012／馬名の右に金グロスタグ h20（10px #4a3105）</div>
+<div>確定後　　　　列の右端に「着順」を追加し、1着行は左 5px 金＋馬名 900。オッズ列は確定オッズに切り替え</div>
+<div>脚注　　　　　h42・地 #fbf7ec＋上辺 2px #cfe0ee／12px 900 #4a6178</div>
+<div>公正性　　　　板 縁 3px／青グロス帯 h44（見出し 18px＋説明 13px）／中身の地 linear-gradient(#fff,#eef6fd)</div>
+<div>3ステップ　　 等幅3カラム＋間 48px の「→」青 26px／各箱は<b style="color:var(--paper)">白地・角丸 10px・2px #123f6b</b>＋上に青グロス帯 h34（段番号 20px＋見出し 14px）／ハッシュは 12px 等幅・word-break: break-all・行間 1.7（<b style="color:var(--paper)">折り返し可</b>）</div>
+<div>照合（一致）　地 #eefaf1・<b style="color:var(--paper)">縁 3px #1e7a3a</b>・帯は緑グロス／✓ 26×26 緑グロス＋「一致しました」17px #1e7a3a</div>
+<div>照合（不一致）地 #ffeceb・縁 3px #a81a13・帯は赤グロス／× 26×26 赤グロス＋「一致しません（要調査）」17px。<b style="color:var(--paper)">必ず出す（隠さない）</b></div>
+<div>照合（未確定）地 #fff・縁 2px #9fb8cc・帯は白→#e9eff5／「—」＋「確定後に検証できます」15px #4a6178</div>
+<div>検証コマンド　地 #f2f7fb＋2px #9fb8cc・角丸 10px／13px 等幅／出力行は #4a6178（<b style="color:var(--paper)">暗い地のコードブロックは使わない</b>＝明るい基調を崩さない）／コピーボタンは右上に置いてよい</div>
+<div>数字の色分け　発走時刻 = 青／賞金 = 金／締切・人気上位のオッズ = 赤。全 Web 画面で統一</div>
+<div>薄い文字色　　補助テキストは --a-ink-3 = <b style="color:var(--paper)">#52697c</b>。18px 未満の数値に #a9741a を使わない</div>
+<div>文言　　　　　PP に「換金」「円」を想起させる語を使わない。EP と PP を合算しない（憲法 §0.2 / format.ts）。馬券は「投票」</div>
+<div>空状態　　　　出走馬未確定「出馬表は発走 10 分前に確定します」／オッズ未生成「オッズ算出中です」</div>
 </div>
 </div>

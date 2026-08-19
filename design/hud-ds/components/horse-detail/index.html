@@ -1,291 +1,271 @@
-<!-- @dsCard group="Web" name="馬詳細" subtitle="格を主役に／現在値5本・適性・戦績・血統5代・調教履歴" viewport="1280x2620" -->
+<!-- @dsCard group="Web" name="馬詳細［アーケード］" subtitle="明るい筐体風／格を主役に・現在値5本・血統5代（クロス色分け）" viewport="1280x3120" -->
 <title>馬詳細</title>
 <link rel="stylesheet" href="../../styles.css">
-<div style="width:1280px;background:#0c100d;padding:0 0 40px">
-<div style="display:flex;align-items:center;height:56px;padding:0 40px;border-bottom:1px solid var(--rule)">
-<span style="font:900 18px var(--jp);letter-spacing:.22em;color:var(--gold)">STAR</span>
-<div style="display:flex;gap:26px;margin-left:36px;font:700 14px var(--jp)"><a href="#" style="color:var(--paper-70)">番組表</a><a href="#" style="color:var(--paper)">わたしの馬</a><a href="#" style="color:var(--paper-70)">育成</a><a href="#" style="color:var(--paper-70)">記録</a></div>
-<div style="margin-left:auto;display:flex;align-items:center;gap:20px;font:700 13px var(--jp)"><span style="color:var(--paper-70)">参加ポイント <span class="num" style="font-size:17px;color:var(--paper)">4,200</span> EP</span><span style="color:var(--paper-70)">賞金ポイント <span class="num" style="font-size:17px;color:var(--gold)">18,600</span> PP</span></div>
-</div>
-<div style="width:1180px;margin:0 auto;padding-top:22px">
-<div style="display:flex;align-items:center;gap:10px;font:700 13px var(--jp);color:var(--paper-45)"><a href="#" style="color:var(--paper-70)">わたしの馬</a><span>/</span><span style="color:var(--paper)">サクラブリーズ</span></div>
+<div data-theme="arcade" style="width:1280px;padding:0 0 40px">
+<div class="a-band" style="height:56px;padding:0 26px;border-bottom:3px solid var(--a-edge)">
+<span style="font:900 20px var(--a-jp);letter-spacing:.22em;color:#ffe37a;text-shadow:0 2px 0 rgba(0,0,0,.35)">STAR</span>
+<div style="display:flex;gap:6px;margin-left:24px"><span style="display:flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;font:900 14px var(--a-jp);color:rgba(255,255,255,.95)">番組表</span><span style="display:flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;font:900 14px var(--a-jp);background:#fff;color:var(--a-blue-d);box-shadow:0 2px 0 rgba(0,0,0,.25)">わたしの馬</span><span style="display:flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;font:900 14px var(--a-jp);color:rgba(255,255,255,.95)">育成</span><span style="display:flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;font:900 14px var(--a-jp);color:rgba(255,255,255,.95)">記録</span></div>
+<div style="margin-left:auto;display:flex;gap:10px">
+<span style="display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:8px;background:#fff;border:2px solid var(--a-edge)"><span style="font:900 11px var(--a-jp);letter-spacing:.08em;color:var(--a-ink-2)">参加ポイント</span><span class="a-num" style="font-size:22px;color:var(--a-blue-d)">4,200</span><span style="font:900 11px var(--a-jp);color:var(--a-ink-2)">EP</span></span>
+<span style="display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:8px;background-image:var(--a-gloss-gold);border:2px solid #8a5a06"><span style="font:900 11px var(--a-jp);letter-spacing:.08em;color:#4a3105">賞金ポイント</span><span class="a-num" style="font-size:22px;color:#4a3105">18,600</span><span style="font:900 11px var(--a-jp);color:#4a3105">PP</span></span>
+</div></div>
+<div style="width:1180px;margin:0 auto;padding-top:18px">
+<div style="display:flex;align-items:center;gap:10px;font:900 13px var(--a-jp);color:var(--a-ink-3)"><a href="#" style="color:var(--a-blue-d)">わたしの馬</a><span>/</span><span style="color:var(--a-ink)">サクラブリーズ</span></div>
 
 <!-- ヒーロー -->
-<div class="rise" style="margin-top:12px;background:var(--board);border:1px solid var(--gold-hair)">
-<div class="edge"></div>
-<div style="display:flex;align-items:flex-start;gap:30px;padding:22px 26px 20px">
+<div class="a-panel" style="margin-top:10px;border-width:3px">
+<div class="a-band" style="height:40px;padding:0 20px;justify-content:space-between"><span style="font:900 16px var(--a-jp);letter-spacing:.14em">現在の格</span><span style="font:900 13px var(--a-jp)">次の格は 重賞 GII　—　重賞 2 勝で昇格</span></div>
+<div style="display:flex;align-items:flex-start;gap:26px;padding:20px 22px;background-image:linear-gradient(#ffffff,#eef6fd)">
 <div>
-<div class="lbl" style="color:var(--gold)">現在の格</div>
-<div style="display:flex;align-items:center;gap:14px;margin-top:8px">
-<span style="display:inline-flex;align-items:center;height:46px;padding:0 20px;background:var(--gold);color:#12140f;font:900 28px var(--jp);letter-spacing:.02em">重賞 GIII</span>
-<span style="font:700 13px var(--jp);color:var(--paper-70);line-height:1.6">次の格は <span style="color:var(--paper)">重賞 GII</span><br>重賞 2 勝で昇格</span>
+<div style="display:flex;align-items:center;gap:14px">
+<span style="display:inline-flex;align-items:center;height:56px;padding:0 22px;border-radius:10px;background-image:var(--a-gloss-gold);border:3px solid #8a5a06;box-shadow:var(--a-shadow-sm);font:900 34px var(--a-jp);color:#4a3105">重賞 GIII</span>
 </div>
-<div style="font:900 40px var(--jp);margin-top:16px">サクラブリーズ</div>
-<div style="display:flex;gap:18px;margin-top:8px;font:700 14px var(--jp);color:var(--paper-70)"><span>牝4</span><span>鹿毛</span><span>高瀬厩舎</span><span>父 グレートボルト</span></div>
-<div style="display:flex;align-items:center;gap:12px;margin-top:14px"><span class="lbl">素質</span><span style="display:inline-flex;font-size:22px;letter-spacing:.04em;line-height:1"><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="position:relative;display:inline-block"><span style="color:rgba(246,242,231,.28)">★</span><span style="position:absolute;left:0;top:0;width:50%;overflow:hidden;color:var(--gold)">★</span></span></span><span style="font:700 13px var(--jp);color:var(--paper-45)">★4.5（生涯変わりません）</span></div>
+<div style="font:900 44px var(--a-jp);margin-top:14px">サクラブリーズ</div>
+<div style="display:flex;gap:10px;margin-top:10px"><span class="a-chip" style="height:28px;padding:0 12px;font-size:13px;color:var(--a-ink)">牝4</span><span class="a-chip" style="height:28px;padding:0 12px;font-size:13px;color:var(--a-ink)">鹿毛</span><span class="a-chip" style="height:28px;padding:0 12px;font-size:13px;color:var(--a-ink)">高瀬厩舎</span><span class="a-chip" style="height:28px;padding:0 12px;font-size:13px;color:var(--a-ink)">父 グレートボルト</span></div>
+<div style="display:flex;align-items:center;gap:12px;margin-top:14px"><span class="a-lbl">素質</span><span style="display:inline-flex;font-size:26px;letter-spacing:.04em;line-height:1"><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="position:relative;display:inline-block"><span style="color:#a9bccd">★</span><span style="position:absolute;left:0;top:0;width:50%;overflow:hidden;color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span></span></span><span style="font:900 13px var(--a-jp);color:var(--a-ink-3)">★4.5（生涯変わりません）</span></div>
 </div>
-<div style="width:1px;align-self:stretch;background:var(--rule)"></div>
-<div style="display:flex;flex-direction:column;gap:16px">
-<div><div class="lbl">獲得賞金</div><div style="margin-top:4px"><span class="num plate" style="font-size:46px;line-height:1">4,520</span> <span style="font:700 15px var(--jp);color:var(--paper-70)">PP</span></div></div>
-<div style="display:flex;gap:26px">
-<div><div class="lbl">戦績</div><div style="font:700 15px var(--jp);margin-top:5px"><span class="num" style="font-size:24px">12</span> 戦 <span class="num" style="font-size:24px;color:var(--gold)">4</span> 勝</div></div>
-<div><div class="lbl">2・3着</div><div style="font:700 15px var(--jp);margin-top:5px"><span class="num" style="font-size:20px;color:var(--paper-70)">3</span> ・ <span class="num" style="font-size:20px;color:var(--paper-70)">2</span></div></div>
-<div style="align-self:flex-end"><span style="font:700 12px var(--jp);color:var(--paper-45)">勝率 33%</span></div>
+<div style="width:2px;align-self:stretch;background:var(--a-line)"></div>
+<div style="display:flex;flex-direction:column;gap:14px">
+<div style="padding:10px 18px;border-radius:10px;background:#fff;border:3px solid #8a5a06;box-shadow:var(--a-shadow-sm);text-align:center">
+<div class="a-lbl" style="color:#8a5a06">獲得賞金</div>
+<div style="margin-top:2px"><span class="a-num" style="font-size:50px;color:var(--a-num-money);text-shadow:0 2px 0 #fff,0 3px 0 #e0c07a">4,520</span> <span style="font:900 15px var(--a-jp);color:#4a3105">PP</span></div>
+</div>
+<div style="display:flex;gap:14px;align-items:flex-end">
+<div style="flex:1;padding:8px 14px;border-radius:10px;background:#fff;border:2px solid var(--a-edge)"><div class="a-lbl">戦績</div><div style="font:900 14px var(--a-jp);margin-top:2px"><span class="a-num" style="font-size:28px">12</span> 戦 <span class="a-num" style="font-size:28px;color:var(--a-num-rank)">4</span> 勝</div></div>
+<div style="padding:8px 14px;border-radius:10px;background:#fff;border:2px solid var(--a-edge)"><div class="a-lbl">2・3着</div><div style="font:900 14px var(--a-jp);margin-top:2px"><span class="a-num" style="font-size:24px;color:var(--a-ink-2)">3</span> ・ <span class="a-num" style="font-size:24px;color:var(--a-ink-2)">2</span></div></div>
+<span style="font:900 12px var(--a-jp);color:var(--a-ink-3);padding-bottom:6px">勝率 33%</span>
 </div>
 </div>
 <div style="margin-left:auto;display:flex;flex-direction:column;gap:10px">
-<div style="display:flex;align-items:center;height:40px;background:var(--gold);transform:skewX(-9deg);padding:0 24px"><span class="unskew" style="font:900 16px var(--jp);color:#12140f">調教を指示する</span></div>
-<div style="display:flex;align-items:center;height:36px;background:rgba(7,10,8,.86);border:1px solid var(--gold-hair);transform:skewX(-9deg);padding:0 24px"><span class="unskew" style="font:700 15px var(--jp)">出走登録</span></div>
+<span class="a-btn a-btn-gold" style="height:48px;padding:0 24px;font-size:17px;white-space:nowrap">調教を指示する</span>
+<span class="a-btn" style="height:42px;padding:0 24px;font-size:15px;white-space:nowrap">出走登録</span>
 </div>
 </div>
-<div style="display:flex;align-items:center;gap:26px;height:44px;padding:0 26px;background:rgba(255,255,255,.03);border-top:1px solid var(--rule);font:700 14px var(--jp)">
-<span style="color:var(--paper-70)">調子 <span style="color:#5fd48b">◎ 絶好調</span></span>
-<span style="display:flex;align-items:center;gap:10px;color:var(--paper-70)">疲労 <span style="position:relative;width:120px;height:8px;background:rgba(0,0,0,.5);border:1px solid var(--paper-45)"><span style="display:block;width:24%;height:100%;background:var(--ok)"></span></span><span class="num" style="font-size:15px;color:var(--ok)">24</span></span>
-<span style="color:var(--paper-70)">今週の指示 <span style="color:var(--paper)">追い切り</span></span>
-<span style="margin-left:auto;color:var(--paper-70)">次走 <span style="color:var(--paper)">桜星賞（8/22）</span>　出走料 <span class="num" style="font-size:16px">400</span> EP</span>
-</div>
-</div>
+<div style="display:flex;align-items:center;gap:26px;height:52px;padding:0 22px;background:var(--a-ivory);border-top:2px solid var(--a-line);font:900 14px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">
+<span>調子 <span style="color:var(--a-green-d)">◎ 絶好調</span></span>
+<span style="display:flex;align-items:center;gap:10px">疲労 <span style="position:relative;width:130px;height:14px;border-radius:7px;background:#e3ecf3;border:2px solid var(--a-edge);overflow:hidden"><span style="display:block;width:24%;height:100%;background-image:var(--a-gloss-green)"></span></span><span class="a-num" style="font-size:18px;color:var(--a-green-d)">24</span></span>
+<span>今週の指示 <span style="color:var(--a-ink)">追い切り</span></span>
+<span style="margin-left:auto">次走 <span style="color:var(--a-ink)">桜星賞（8/22）</span>　出走料 <span class="a-num" style="font-size:19px;color:var(--a-num-money)">400</span> EP</span>
+</div></div>
 
 <!-- 現在値・適性・戦績 -->
-<div style="display:flex;gap:16px;margin-top:16px">
-<div style="flex:1;background:var(--panel);border:1px solid var(--hair);padding:14px 18px 16px">
-<div style="display:flex;align-items:baseline"><span class="lbl">現在値</span><span style="margin-left:auto;font:700 12px var(--jp);color:var(--paper-45)">縦の目盛 = 素質による上限</span></div>
-<div style="margin-top:6px"><div style="display:flex;align-items:center;gap:14px;height:36px">
-<span style="width:74px;font:700 14px var(--jp);color:var(--paper-70)">スピード</span>
-<span style="position:relative;flex:1;height:14px;background:rgba(0,0,0,.5);border:1px solid var(--rule)">
-<span style="display:block;width:84.2%;height:100%;background:var(--gold)"></span>
-<span style="position:absolute;left:90%;top:-4px;width:2px;height:20px;background:var(--paper-45)"></span>
-</span>
-<span class="num" style="width:52px;text-align:right;font-size:20px">842</span>
-<span class="num" style="width:44px;text-align:right;font-size:14px;color:#5fd48b">+12</span>
-</div><div style="display:flex;align-items:center;gap:14px;height:36px">
-<span style="width:74px;font:700 14px var(--jp);color:var(--paper-70)">スタミナ</span>
-<span style="position:relative;flex:1;height:14px;background:rgba(0,0,0,.5);border:1px solid var(--rule)">
-<span style="display:block;width:70.6%;height:100%;background:var(--gold)"></span>
-<span style="position:absolute;left:82%;top:-4px;width:2px;height:20px;background:var(--paper-45)"></span>
-</span>
-<span class="num" style="width:52px;text-align:right;font-size:20px">706</span>
-<span class="num" style="width:44px;text-align:right;font-size:14px;color:#5fd48b">+4</span>
-</div><div style="display:flex;align-items:center;gap:14px;height:36px">
-<span style="width:74px;font:700 14px var(--jp);color:var(--paper-70)">パワー</span>
-<span style="position:relative;flex:1;height:14px;background:rgba(0,0,0,.5);border:1px solid var(--rule)">
-<span style="display:block;width:76.8%;height:100%;background:var(--gold)"></span>
-<span style="position:absolute;left:88%;top:-4px;width:2px;height:20px;background:var(--paper-45)"></span>
-</span>
-<span class="num" style="width:52px;text-align:right;font-size:20px">768</span>
-<span class="num" style="width:44px;text-align:right;font-size:14px;color:#5fd48b">+8</span>
-</div><div style="display:flex;align-items:center;gap:14px;height:36px">
-<span style="width:74px;font:700 14px var(--jp);color:var(--paper-70)">根性</span>
-<span style="position:relative;flex:1;height:14px;background:rgba(0,0,0,.5);border:1px solid var(--rule)">
-<span style="display:block;width:65.5%;height:100%;background:var(--gold)"></span>
-<span style="position:absolute;left:76%;top:-4px;width:2px;height:20px;background:var(--paper-45)"></span>
-</span>
-<span class="num" style="width:52px;text-align:right;font-size:20px">655</span>
-<span class="num" style="width:44px;text-align:right;font-size:14px;color:var(--paper-45)">±0</span>
-</div><div style="display:flex;align-items:center;gap:14px;height:36px">
-<span style="width:74px;font:700 14px var(--jp);color:var(--paper-70)">賢さ</span>
-<span style="position:relative;flex:1;height:14px;background:rgba(0,0,0,.5);border:1px solid var(--rule)">
-<span style="display:block;width:72.1%;height:100%;background:var(--gold)"></span>
-<span style="position:absolute;left:84%;top:-4px;width:2px;height:20px;background:var(--paper-45)"></span>
-</span>
-<span class="num" style="width:52px;text-align:right;font-size:20px">721</span>
-<span class="num" style="width:44px;text-align:right;font-size:14px;color:#5fd48b">+6</span>
+<div style="display:flex;gap:16px;margin-top:16px;align-items:flex-start">
+<div class="a-panel" style="flex:1;border-width:3px">
+<div class="a-band" style="height:38px;padding:0 16px;justify-content:space-between"><span style="font:900 15px var(--a-jp);letter-spacing:.1em">現在値</span><span style="font:900 12px var(--a-jp)">上限は素質★から決まります</span></div>
+<div style="padding:10px 16px 14px;background-image:linear-gradient(#ffffff,#eef6fd)"><div style="display:flex;align-items:center;gap:12px;height:38px">
+<span style="width:76px;flex:0 0 76px;font:900 14px var(--a-jp);color:var(--a-ink-2)">スピード</span>
+<span style="position:relative;flex:1;height:18px;border-radius:9px;background:#e3ecf3;border:2px solid var(--a-edge);overflow:hidden"><span style="display:block;width:84.2%;height:100%;background-image:var(--a-gloss-blue)"></span></span>
+<span class="a-num" style="width:58px;flex:0 0 58px;text-align:right;font-size:26px;color:var(--a-num-time)">842</span>
+<span style="width:78px;flex:0 0 78px;text-align:right;font:900 12px var(--a-jp);color:var(--a-ink-3)">上限 900</span>
+<span class="a-num" style="width:44px;flex:0 0 44px;text-align:right;font-size:15px;color:var(--a-green-d)">+12</span></div><div style="display:flex;align-items:center;gap:12px;height:38px">
+<span style="width:76px;flex:0 0 76px;font:900 14px var(--a-jp);color:var(--a-ink-2)">スタミナ</span>
+<span style="position:relative;flex:1;height:18px;border-radius:9px;background:#e3ecf3;border:2px solid var(--a-edge);overflow:hidden"><span style="display:block;width:70.6%;height:100%;background-image:var(--a-gloss-blue)"></span></span>
+<span class="a-num" style="width:58px;flex:0 0 58px;text-align:right;font-size:26px;color:var(--a-num-time)">706</span>
+<span style="width:78px;flex:0 0 78px;text-align:right;font:900 12px var(--a-jp);color:var(--a-ink-3)">上限 820</span>
+<span class="a-num" style="width:44px;flex:0 0 44px;text-align:right;font-size:15px;color:var(--a-green-d)">+4</span></div><div style="display:flex;align-items:center;gap:12px;height:38px">
+<span style="width:76px;flex:0 0 76px;font:900 14px var(--a-jp);color:var(--a-ink-2)">パワー</span>
+<span style="position:relative;flex:1;height:18px;border-radius:9px;background:#e3ecf3;border:2px solid var(--a-edge);overflow:hidden"><span style="display:block;width:76.8%;height:100%;background-image:var(--a-gloss-blue)"></span></span>
+<span class="a-num" style="width:58px;flex:0 0 58px;text-align:right;font-size:26px;color:var(--a-num-time)">768</span>
+<span style="width:78px;flex:0 0 78px;text-align:right;font:900 12px var(--a-jp);color:var(--a-ink-3)">上限 880</span>
+<span class="a-num" style="width:44px;flex:0 0 44px;text-align:right;font-size:15px;color:var(--a-green-d)">+8</span></div><div style="display:flex;align-items:center;gap:12px;height:38px">
+<span style="width:76px;flex:0 0 76px;font:900 14px var(--a-jp);color:var(--a-ink-2)">根性</span>
+<span style="position:relative;flex:1;height:18px;border-radius:9px;background:#e3ecf3;border:2px solid var(--a-edge);overflow:hidden"><span style="display:block;width:65.5%;height:100%;background-image:var(--a-gloss-blue)"></span></span>
+<span class="a-num" style="width:58px;flex:0 0 58px;text-align:right;font-size:26px;color:var(--a-num-time)">655</span>
+<span style="width:78px;flex:0 0 78px;text-align:right;font:900 12px var(--a-jp);color:var(--a-ink-3)">上限 760</span>
+<span class="a-num" style="width:44px;flex:0 0 44px;text-align:right;font-size:15px;color:var(--a-ink-3)">±0</span></div><div style="display:flex;align-items:center;gap:12px;height:38px">
+<span style="width:76px;flex:0 0 76px;font:900 14px var(--a-jp);color:var(--a-ink-2)">賢さ</span>
+<span style="position:relative;flex:1;height:18px;border-radius:9px;background:#e3ecf3;border:2px solid var(--a-edge);overflow:hidden"><span style="display:block;width:72.1%;height:100%;background-image:var(--a-gloss-blue)"></span></span>
+<span class="a-num" style="width:58px;flex:0 0 58px;text-align:right;font-size:26px;color:var(--a-num-time)">721</span>
+<span style="width:78px;flex:0 0 78px;text-align:right;font:900 12px var(--a-jp);color:var(--a-ink-3)">上限 840</span>
+<span class="a-num" style="width:44px;flex:0 0 44px;text-align:right;font-size:15px;color:var(--a-green-d)">+6</span></div>
+<div style="display:flex;align-items:center;gap:10px;margin-top:8px;padding-top:10px;border-top:2px solid var(--a-line)"><span class="a-lbl">合計</span><span class="a-num" style="font-size:30px;color:var(--a-num-time)">3,692</span><span style="font:900 12px var(--a-jp);color:var(--a-ink-3)">/ 上限 4,200</span></div>
 </div></div>
-<div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:10px;border-top:1px solid var(--rule)"><span class="lbl">合計</span><span class="num" style="font-size:22px">3,692</span><span style="font:700 12px var(--jp);color:var(--paper-45)">/ 上限 4,200</span></div>
-</div>
-<div style="width:250px;background:var(--panel);border:1px solid var(--hair);padding:14px 0 0">
-<div class="lbl" style="padding:0 12px">適性</div>
-<div style="margin-top:8px"><div style="display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 12px;border-top:1px solid var(--rule)"><span style="font:700 14px var(--jp);color:var(--paper-70)">芝</span><span style="font:900 17px var(--jp);color:#5fd48b">◎</span></div><div style="display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 12px;border-top:1px solid var(--rule)"><span style="font:700 14px var(--jp);color:var(--paper-70)">ダート</span><span style="font:900 17px var(--jp);color:var(--paper-45)">△</span></div><div style="display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 12px;border-top:1px solid var(--rule)"><span style="font:700 14px var(--jp);color:var(--paper-70)">1400〜1800m</span><span style="font:900 17px var(--jp);color:#5fd48b">◎</span></div><div style="display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 12px;border-top:1px solid var(--rule)"><span style="font:700 14px var(--jp);color:var(--paper-70)">2000m 以上</span><span style="font:900 17px var(--jp);color:var(--paper-70)">○</span></div><div style="display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 12px;border-top:1px solid var(--rule)"><span style="font:700 14px var(--jp);color:var(--paper-70)">良</span><span style="font:900 17px var(--jp);color:#5fd48b">◎</span></div><div style="display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 12px;border-top:1px solid var(--rule)"><span style="font:700 14px var(--jp);color:var(--paper-70)">重</span><span style="font:900 17px var(--jp);color:var(--paper-45)">△</span></div></div>
-<div style="display:flex;align-items:center;justify-content:space-between;height:44px;padding:0 12px;border-top:1px solid var(--rule)"><span class="lbl">脚質</span><span style="display:inline-flex;align-items:center;height:24px;padding:0 12px;font:700 13px var(--jp);color:#3fd0e0;border:1px solid rgba(63,208,224,.4)">差し</span></div>
-</div>
-<div style="flex:1.15;background:var(--panel);border:1px solid var(--hair)">
-<div style="display:flex;align-items:center;height:34px;padding:0 14px;gap:10px"><span class="lbl" style="width:40px;flex:0 0 40px">週</span><span class="lbl" style="width:100px;flex:0 0 100px">レース</span><span class="lbl" style="width:78px;flex:0 0 78px">格</span><span class="lbl" style="flex:1;min-width:96px">条件</span><span class="lbl" style="width:30px;flex:0 0 30px;text-align:center">着</span><span class="lbl" style="width:56px;flex:0 0 56px;text-align:right">時計</span><span class="lbl" style="width:70px;flex:0 0 70px;text-align:right">賞金</span></div>
-<div style="display:flex;align-items:center;height:42px;padding:0 14px;gap:10px;border-top:1px solid var(--rule);background:transparent">
-<span class="num" style="width:40px;flex:0 0 40px;font-size:14px;color:var(--paper-45)">32週</span>
-<span style="width:100px;flex:0 0 100px;font:700 14px var(--jp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">若草賞</span>
-<span style="width:78px;flex:0 0 78px;font:700 12px var(--jp);color:var(--paper-70);white-space:nowrap">重賞 GIII</span>
-<span style="flex:1;min-width:96px;font:700 13px var(--jp);color:var(--paper-70);white-space:nowrap">芝1600 良</span>
-<span class="num" style="width:30px;flex:0 0 30px;text-align:center;font-size:21px;color:var(--gold)">1</span>
-<span class="num" style="width:56px;flex:0 0 56px;text-align:right;font-size:14px;color:var(--paper-70)">1:34.8</span>
-<span style="width:70px;flex:0 0 70px;text-align:right;font:700 12px var(--jp);color:var(--paper)"><span class="num" style="font-size:15px">2,400</span> PP</span>
-</div><div style="display:flex;align-items:center;height:42px;padding:0 14px;gap:10px;border-top:1px solid var(--rule);background:rgba(255,255,255,.025)">
-<span class="num" style="width:40px;flex:0 0 40px;font-size:14px;color:var(--paper-45)">28週</span>
-<span style="width:100px;flex:0 0 100px;font:700 14px var(--jp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">陽春特別</span>
-<span style="width:78px;flex:0 0 78px;font:700 12px var(--jp);color:var(--paper-70);white-space:nowrap">オープン</span>
-<span style="flex:1;min-width:96px;font:700 13px var(--jp);color:var(--paper-70);white-space:nowrap">芝1800 良</span>
-<span class="num" style="width:30px;flex:0 0 30px;text-align:center;font-size:18px;color:var(--paper)">3</span>
-<span class="num" style="width:56px;flex:0 0 56px;text-align:right;font-size:14px;color:var(--paper-70)">1:47.2</span>
-<span style="width:70px;flex:0 0 70px;text-align:right;font:700 12px var(--jp);color:var(--paper)"><span class="num" style="font-size:15px">420</span> PP</span>
-</div><div style="display:flex;align-items:center;height:42px;padding:0 14px;gap:10px;border-top:1px solid var(--rule);background:transparent">
-<span class="num" style="width:40px;flex:0 0 40px;font-size:14px;color:var(--paper-45)">24週</span>
-<span style="width:100px;flex:0 0 100px;font:700 14px var(--jp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">初雪賞</span>
-<span style="width:78px;flex:0 0 78px;font:700 12px var(--jp);color:var(--paper-70);white-space:nowrap">3勝クラス</span>
-<span style="flex:1;min-width:96px;font:700 13px var(--jp);color:var(--paper-70);white-space:nowrap">芝1600 稍</span>
-<span class="num" style="width:30px;flex:0 0 30px;text-align:center;font-size:18px;color:var(--paper)">2</span>
-<span class="num" style="width:56px;flex:0 0 56px;text-align:right;font-size:14px;color:var(--paper-70)">1:35.5</span>
-<span style="width:70px;flex:0 0 70px;text-align:right;font:700 12px var(--jp);color:var(--paper)"><span class="num" style="font-size:15px">600</span> PP</span>
-</div><div style="display:flex;align-items:center;height:42px;padding:0 14px;gap:10px;border-top:1px solid var(--rule);background:rgba(255,255,255,.025)">
-<span class="num" style="width:40px;flex:0 0 40px;font-size:14px;color:var(--paper-45)">19週</span>
-<span style="width:100px;flex:0 0 100px;font:700 14px var(--jp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">霜月賞</span>
-<span style="width:78px;flex:0 0 78px;font:700 12px var(--jp);color:var(--paper-70);white-space:nowrap">3勝クラス</span>
-<span style="flex:1;min-width:96px;font:700 13px var(--jp);color:var(--paper-70);white-space:nowrap">芝1400 良</span>
-<span class="num" style="width:30px;flex:0 0 30px;text-align:center;font-size:21px;color:var(--gold)">1</span>
-<span class="num" style="width:56px;flex:0 0 56px;text-align:right;font-size:14px;color:var(--paper-70)">1:21.9</span>
-<span style="width:70px;flex:0 0 70px;text-align:right;font:700 12px var(--jp);color:var(--paper)"><span class="num" style="font-size:15px">1,100</span> PP</span>
-</div><div style="display:flex;align-items:center;height:42px;padding:0 14px;gap:10px;border-top:1px solid var(--rule);background:transparent">
-<span class="num" style="width:40px;flex:0 0 40px;font-size:14px;color:var(--paper-45)">15週</span>
-<span style="width:100px;flex:0 0 100px;font:700 14px var(--jp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">紅葉特別</span>
-<span style="width:78px;flex:0 0 78px;font:700 12px var(--jp);color:var(--paper-70);white-space:nowrap">2勝クラス</span>
-<span style="flex:1;min-width:96px;font:700 13px var(--jp);color:var(--paper-70);white-space:nowrap">芝1600 良</span>
-<span class="num" style="width:30px;flex:0 0 30px;text-align:center;font-size:18px;color:var(--paper)">5</span>
-<span class="num" style="width:56px;flex:0 0 56px;text-align:right;font-size:14px;color:var(--paper-70)">1:36.4</span>
-<span style="width:70px;flex:0 0 70px;text-align:right;font:700 12px var(--jp);color:var(--paper-45)"><span class="num" style="font-size:15px">0</span> PP</span>
-</div>
-<div style="display:flex;align-items:center;height:38px;padding:0 14px;border-top:1px solid var(--rule)"><a href="#" style="font:700 13px var(--jp);color:var(--gold)">戦績をすべて見る（12 戦）</a></div>
+<div class="a-panel" style="width:252px;flex:0 0 252px">
+<div style="display:flex;align-items:center;height:34px;padding:0 12px;background-image:linear-gradient(#fff,#e3ecf3);border-bottom:2px solid var(--a-line)"><span class="a-lbl">適性</span></div>
+<div style="display:flex;align-items:center;justify-content:space-between;height:34px;padding:0 12px;border-top:1px solid var(--a-line)"><span style="font:900 14px var(--a-jp);color:var(--a-ink-2)">芝</span><span style="font:900 19px var(--a-jp);color:var(--a-green-d)">◎</span></div><div style="display:flex;align-items:center;justify-content:space-between;height:34px;padding:0 12px;border-top:1px solid var(--a-line)"><span style="font:900 14px var(--a-jp);color:var(--a-ink-2)">ダート</span><span style="font:900 19px var(--a-jp);color:var(--a-ink-3)">△</span></div><div style="display:flex;align-items:center;justify-content:space-between;height:34px;padding:0 12px;border-top:1px solid var(--a-line)"><span style="font:900 14px var(--a-jp);color:var(--a-ink-2)">1400〜1800m</span><span style="font:900 19px var(--a-jp);color:var(--a-green-d)">◎</span></div><div style="display:flex;align-items:center;justify-content:space-between;height:34px;padding:0 12px;border-top:1px solid var(--a-line)"><span style="font:900 14px var(--a-jp);color:var(--a-ink-2)">2000m 以上</span><span style="font:900 19px var(--a-jp);color:var(--a-ink-2)">○</span></div><div style="display:flex;align-items:center;justify-content:space-between;height:34px;padding:0 12px;border-top:1px solid var(--a-line)"><span style="font:900 14px var(--a-jp);color:var(--a-ink-2)">良</span><span style="font:900 19px var(--a-jp);color:var(--a-green-d)">◎</span></div><div style="display:flex;align-items:center;justify-content:space-between;height:34px;padding:0 12px;border-top:1px solid var(--a-line)"><span style="font:900 14px var(--a-jp);color:var(--a-ink-2)">重</span><span style="font:900 19px var(--a-jp);color:var(--a-ink-3)">△</span></div>
+<div style="display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 12px;border-top:2px solid var(--a-line);background:var(--a-ivory)"><span class="a-lbl">脚質</span><span style="display:inline-flex;align-items:center;height:30px;padding:0 14px;border-radius:8px;background-image:var(--a-gloss-blue);border:2px solid var(--a-edge);color:#fff;font:900 14px var(--a-jp)">差し</span></div>
 </div>
 </div>
-
+<div class="a-panel" style="margin-top:16px;border-width:3px">
+<div class="a-band" style="height:38px;padding:0 14px;gap:10px">
+<span class="a-lbl" style="width:42px;flex:0 0 42px;color:#fff">週</span><span class="a-lbl" style="width:200px;flex:0 0 200px;color:#fff">レース</span><span class="a-lbl" style="width:120px;flex:0 0 120px;color:#fff">格</span><span class="a-lbl" style="flex:1;min-width:160px;color:#fff">条件</span><span class="a-lbl" style="width:34px;flex:0 0 34px;text-align:center;color:#fff">着</span><span class="a-lbl" style="width:80px;flex:0 0 80px;text-align:right;color:#fff">時計</span><span class="a-lbl" style="width:110px;flex:0 0 110px;text-align:right;color:#fff">賞金</span>
+</div>
+<div style="display:flex;align-items:center;height:46px;padding:0 14px;gap:10px;border-top:1px solid var(--a-line);background:#fff">
+<span class="a-num" style="width:42px;flex:0 0 42px;font-size:14px;color:var(--a-ink-3)">32週</span>
+<span style="width:200px;flex:0 0 200px;font:900 15px var(--a-jp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">若草賞</span>
+<span style="width:88px;flex:0 0 88px"><span class="a-chip" style="height:24px;padding:0 10px;font-size:12px;background-image:var(--a-gloss-gold);border-color:#8a5a06;color:#4a3105">重賞 GIII</span></span>
+<span style="flex:1;min-width:160px;font:900 14px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">芝1600 良</span>
+<span class="a-num" style="width:34px;flex:0 0 34px;text-align:center;font-size:26px;color:var(--a-num-rank)">1</span>
+<span class="a-num" style="width:80px;flex:0 0 80px;text-align:right;font-size:18px;color:var(--a-ink-2)">1:34.8</span>
+<span style="width:110px;flex:0 0 110px;text-align:right;font:900 12px var(--a-jp);color:var(--a-ink-2)"><span class="a-num" style="font-size:17px;color:var(--a-num-money)">2,400</span> PP</span></div><div style="display:flex;align-items:center;height:46px;padding:0 14px;gap:10px;border-top:1px solid var(--a-line);background:var(--a-panel-2)">
+<span class="a-num" style="width:42px;flex:0 0 42px;font-size:14px;color:var(--a-ink-3)">28週</span>
+<span style="width:200px;flex:0 0 200px;font:900 15px var(--a-jp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">陽春特別</span>
+<span style="width:88px;flex:0 0 88px"><span class="a-chip" style="height:24px;padding:0 10px;font-size:12px;background-image:var(--a-gloss-gold);border-color:#8a5a06;color:#4a3105">オープン</span></span>
+<span style="flex:1;min-width:160px;font:900 14px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">芝1800 良</span>
+<span class="a-num" style="width:34px;flex:0 0 34px;text-align:center;font-size:20px;color:var(--a-ink)">3</span>
+<span class="a-num" style="width:80px;flex:0 0 80px;text-align:right;font-size:18px;color:var(--a-ink-2)">1:47.2</span>
+<span style="width:110px;flex:0 0 110px;text-align:right;font:900 12px var(--a-jp);color:var(--a-ink-2)"><span class="a-num" style="font-size:17px;color:var(--a-num-money)">420</span> PP</span></div><div style="display:flex;align-items:center;height:46px;padding:0 14px;gap:10px;border-top:1px solid var(--a-line);background:#fff">
+<span class="a-num" style="width:42px;flex:0 0 42px;font-size:14px;color:var(--a-ink-3)">24週</span>
+<span style="width:200px;flex:0 0 200px;font:900 15px var(--a-jp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">初雪賞</span>
+<span style="width:88px;flex:0 0 88px"><span class="a-chip" style="height:24px;padding:0 10px;font-size:12px;color:var(--a-ink)">3勝クラス</span></span>
+<span style="flex:1;min-width:160px;font:900 14px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">芝1600 稍</span>
+<span class="a-num" style="width:34px;flex:0 0 34px;text-align:center;font-size:20px;color:var(--a-ink)">2</span>
+<span class="a-num" style="width:80px;flex:0 0 80px;text-align:right;font-size:18px;color:var(--a-ink-2)">1:35.5</span>
+<span style="width:110px;flex:0 0 110px;text-align:right;font:900 12px var(--a-jp);color:var(--a-ink-2)"><span class="a-num" style="font-size:17px;color:var(--a-num-money)">600</span> PP</span></div><div style="display:flex;align-items:center;height:46px;padding:0 14px;gap:10px;border-top:1px solid var(--a-line);background:var(--a-panel-2)">
+<span class="a-num" style="width:42px;flex:0 0 42px;font-size:14px;color:var(--a-ink-3)">19週</span>
+<span style="width:200px;flex:0 0 200px;font:900 15px var(--a-jp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">霜月賞</span>
+<span style="width:88px;flex:0 0 88px"><span class="a-chip" style="height:24px;padding:0 10px;font-size:12px;color:var(--a-ink)">3勝クラス</span></span>
+<span style="flex:1;min-width:160px;font:900 14px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">芝1400 良</span>
+<span class="a-num" style="width:34px;flex:0 0 34px;text-align:center;font-size:26px;color:var(--a-num-rank)">1</span>
+<span class="a-num" style="width:80px;flex:0 0 80px;text-align:right;font-size:18px;color:var(--a-ink-2)">1:21.9</span>
+<span style="width:110px;flex:0 0 110px;text-align:right;font:900 12px var(--a-jp);color:var(--a-ink-2)"><span class="a-num" style="font-size:17px;color:var(--a-num-money)">1,100</span> PP</span></div><div style="display:flex;align-items:center;height:46px;padding:0 14px;gap:10px;border-top:1px solid var(--a-line);background:#fff">
+<span class="a-num" style="width:42px;flex:0 0 42px;font-size:14px;color:var(--a-ink-3)">15週</span>
+<span style="width:200px;flex:0 0 200px;font:900 15px var(--a-jp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">紅葉特別</span>
+<span style="width:88px;flex:0 0 88px"><span class="a-chip" style="height:24px;padding:0 10px;font-size:12px;color:var(--a-ink)">2勝クラス</span></span>
+<span style="flex:1;min-width:160px;font:900 14px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">芝1600 良</span>
+<span class="a-num" style="width:34px;flex:0 0 34px;text-align:center;font-size:20px;color:var(--a-ink)">5</span>
+<span class="a-num" style="width:80px;flex:0 0 80px;text-align:right;font-size:18px;color:var(--a-ink-2)">1:36.4</span>
+<span style="width:110px;flex:0 0 110px;text-align:right;font:900 12px var(--a-jp);color:var(--a-ink-2)"><span class="a-num" style="font-size:17px;color:var(--a-ink-3)">0</span> PP</span></div>
+<div style="display:flex;align-items:center;height:42px;padding:0 14px;border-top:2px solid var(--a-line);background:var(--a-ivory)"><a href="#" style="font:900 13px var(--a-jp)">戦績をすべて見る（12 戦）</a></div>
+</div>
 <!-- 血統表 -->
-<div style="margin-top:16px;background:var(--panel);border:1px solid var(--hair)">
-<div style="display:flex;align-items:center;height:44px;padding:0 18px;gap:20px;border-bottom:1px solid var(--rule)">
-<span class="lbl">血統表　5代</span>
-<span style="display:flex;align-items:center;gap:8px;font:700 13px var(--jp)"><span style="width:12px;height:12px;background:#7ad0ff33;box-shadow:inset 3px 0 0 #7ad0ff"></span><span style="color:#7ad0ff">サンダーボルト</span><span style="color:var(--paper-70)">4×5</span></span>
-<span style="display:flex;align-items:center;gap:8px;font:700 13px var(--jp)"><span style="width:12px;height:12px;background:#f3a5c833;box-shadow:inset 3px 0 0 #f3a5c8"></span><span style="color:#f3a5c8">ミスティローズ</span><span style="color:var(--paper-70)">5×5</span></span>
-<span style="margin-left:auto;font:700 12px var(--jp);color:var(--paper-45)">インブリード係数 <span class="num" style="font-size:15px;color:var(--paper-70)">4.69%</span></span>
+<div class="a-panel" style="margin-top:16px;border-width:3px">
+<div class="a-band" style="height:44px;padding:0 18px;gap:18px">
+<span style="font:900 16px var(--a-jp);letter-spacing:.12em">血統表　5代</span>
+<span style="display:flex;align-items:center;gap:8px;height:26px;padding:0 10px;border-radius:6px;background:#e0eefa;border:2px solid #0f6fb8"><span style="font:900 12px var(--a-jp);color:#0f6fb8">サンダーボルト 4×5</span></span>
+<span style="display:flex;align-items:center;gap:8px;height:26px;padding:0 10px;border-radius:6px;background:#fbe4ee;border:2px solid #b3306e"><span style="font:900 12px var(--a-jp);color:#b3306e">ミスティローズ 5×5</span></span>
+<span style="margin-left:auto;font:900 12px var(--a-jp)">インブリード係数 <span class="a-num" style="font-size:17px">4.69</span>%</span>
 </div>
-<div style="display:flex;height:704px;border-top:1px solid var(--rule)"><div style="flex:1.3;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:900 15px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">グレートボルト</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:900 15px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">グレートブレイド</span></div></div><div style="flex:1.14;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:900 14px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ゴールデンブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:900 14px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">シルバーブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:900 14px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">クリムゾンブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:900 14px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">エターナルブレイド</span></div></div><div style="flex:1;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 13px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ブライトブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 13px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ハイランドブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 13px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ウィンドブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 13px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">スカーレットブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 13px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">オーシャンブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 13px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">フォレストブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 13px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ロイヤルブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 13px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ムーンライトブレイド</span></div></div><div style="flex:1;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">サンライズブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">アイアンブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:#7ad0ff1f;box-shadow:inset 3px 0 0 #7ad0ff">
-<span style="font:700 12px var(--jp);color:#7ad0ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">サンダーボルト</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">グレートクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ゴールデンクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">シルバークラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">クリムゾンクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">エターナルクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ブライトクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ハイランドクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ウィンドクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">スカーレットクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">オーシャンクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">フォレストクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ロイヤルクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 12px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ムーンライトクラウン</span></div></div><div style="flex:1;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">サンライズクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">アイアンクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ノーザンスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">グレートスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ゴールデンスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:#f3a5c81f;box-shadow:inset 3px 0 0 #f3a5c8">
-<span style="font:700 11px var(--jp);color:#f3a5c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ミスティローズ</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">クリムゾンスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">エターナルスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ブライトスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ハイランドスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ウィンドスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">スカーレットスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">オーシャンスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">フォレストスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ロイヤルスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ムーンライトスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">サンライズスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">アイアンスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ノーザンアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">グレートアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ゴールデンアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:#7ad0ff1f;box-shadow:inset 3px 0 0 #7ad0ff">
-<span style="font:700 11px var(--jp);color:#7ad0ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">サンダーボルト</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">クリムゾンアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">エターナルアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ブライトアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ハイランドアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:#f3a5c81f;box-shadow:inset 3px 0 0 #f3a5c8">
-<span style="font:700 11px var(--jp);color:#f3a5c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ミスティローズ</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">スカーレットアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">オーシャンアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">フォレストアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:transparent">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ロイヤルアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--rule);border-bottom:1px solid var(--rule);background:rgba(255,255,255,.02)">
-<span style="font:700 11px var(--jp);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ムーンライトアロー</span></div></div></div>
+<div style="display:flex;height:704px;border-top:2px solid var(--a-edge)"><div style="flex:1.3;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:900 15px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">グレートボルト</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:900 15px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">グレートブレイド</span></div></div><div style="flex:1.14;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:900 14px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ゴールデンブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:900 14px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">シルバーブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:900 14px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">クリムゾンブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:900 14px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">エターナルブレイド</span></div></div><div style="flex:1;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 13px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ブライトブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 13px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ハイランドブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 13px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ウィンドブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 13px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">スカーレットブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 13px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">オーシャンブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 13px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">フォレストブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 13px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ロイヤルブレイド</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 13px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ムーンライトブレイド</span></div></div><div style="flex:1;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">サンライズクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">アイアンクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#e0eefa;box-shadow:inset 4px 0 0 #0f6fb8">
+<span style="font:700 12px var(--a-jp);color:#0f6fb8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">サンダーボルト</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">グレートクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ゴールデンクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">シルバークラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">クリムゾンクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">エターナルクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ブライトクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ハイランドクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ウィンドクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">スカーレットクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">オーシャンクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">フォレストクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ロイヤルクラウン</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ムーンライトクラウン</span></div></div><div style="flex:1;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">サンライズスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">アイアンスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ノーザンスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">グレートスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ゴールデンスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fbe4ee;box-shadow:inset 4px 0 0 #b3306e">
+<span style="font:700 12px var(--a-jp);color:#b3306e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ミスティローズ</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">クリムゾンスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">エターナルスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ブライトスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ハイランドスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ウィンドスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">スカーレットスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">オーシャンスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">フォレストスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ロイヤルスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ムーンライトスター</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">サンライズアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">アイアンアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ノーザンアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">グレートアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ゴールデンアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#e0eefa;box-shadow:inset 4px 0 0 #0f6fb8">
+<span style="font:700 12px var(--a-jp);color:#0f6fb8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">サンダーボルト</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">クリムゾンアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">エターナルアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ブライトアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ハイランドアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fbe4ee;box-shadow:inset 4px 0 0 #b3306e">
+<span style="font:700 12px var(--a-jp);color:#b3306e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ミスティローズ</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">スカーレットアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">オーシャンアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">フォレストアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#fff">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ロイヤルアロー</span></div><div style="flex:1;display:flex;align-items:center;padding:0 8px;border-left:1px solid var(--a-line);border-bottom:1px solid var(--a-line);background:#f7fbfe">
+<span style="font:700 12px var(--a-jp);color:var(--a-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ムーンライトアロー</span></div></div></div>
 </div>
 
 <!-- 調教履歴 -->
-<div style="margin-top:16px;background:var(--panel);border:1px solid var(--hair)">
-<div style="display:flex;align-items:center;height:34px;padding:0 14px;gap:14px"><span class="lbl" style="width:52px">週</span><span class="lbl" style="width:126px">メニュー</span><span class="lbl" style="width:150px">主効果</span><span class="lbl" style="width:120px">疲労</span><span class="lbl" style="flex:1">記録</span></div>
-<div style="display:flex;align-items:center;height:38px;padding:0 14px;gap:14px;border-top:1px solid var(--rule);background:transparent">
-<span class="num" style="width:52px;font-size:14px;color:var(--paper-45)">32週</span>
-<span style="width:126px;font:700 14px var(--jp)">追い切り</span>
-<span style="width:150px;font:700 13px var(--jp);color:#5fd48b">スピード +12</span>
-<span style="width:120px;font:700 13px var(--jp);color:#fad728">疲労 +18</span>
-<span style="flex:1;min-width:96px;font:700 13px var(--jp);color:var(--paper-70);white-space:nowrap">好調を維持</span>
-</div><div style="display:flex;align-items:center;height:38px;padding:0 14px;gap:14px;border-top:1px solid var(--rule);background:rgba(255,255,255,.025)">
-<span class="num" style="width:52px;font-size:14px;color:var(--paper-45)">31週</span>
-<span style="width:126px;font:700 14px var(--jp)">坂路</span>
-<span style="width:150px;font:700 13px var(--jp);color:#5fd48b">パワー +9</span>
-<span style="width:120px;font:700 13px var(--jp);color:#fad728">疲労 +14</span>
-<span style="flex:1;min-width:96px;font:700 13px var(--jp);color:var(--paper-70);white-space:nowrap">—</span>
-</div><div style="display:flex;align-items:center;height:38px;padding:0 14px;gap:14px;border-top:1px solid var(--rule);background:transparent">
-<span class="num" style="width:52px;font-size:14px;color:var(--paper-45)">30週</span>
-<span style="width:126px;font:700 14px var(--jp)">プール</span>
-<span style="width:150px;font:700 13px var(--jp);color:#5fd48b">スタミナ +7</span>
-<span style="width:120px;font:700 13px var(--jp);color:#5fd48b">疲労 −6</span>
-<span style="flex:1;min-width:96px;font:700 13px var(--jp);color:var(--paper-70);white-space:nowrap">疲労を抜いた</span>
-</div><div style="display:flex;align-items:center;height:38px;padding:0 14px;gap:14px;border-top:1px solid var(--rule);background:rgba(255,255,255,.025)">
-<span class="num" style="width:52px;font-size:14px;color:var(--paper-45)">29週</span>
-<span style="width:126px;font:700 14px var(--jp)">併せ馬</span>
-<span style="width:150px;font:700 13px var(--jp);color:#5fd48b">根性 +11</span>
-<span style="width:120px;font:700 13px var(--jp);color:#fad728">疲労 +16</span>
-<span style="flex:1;min-width:96px;font:700 13px var(--jp);color:var(--paper-70);white-space:nowrap">気合が乗ってきた</span>
-</div><div style="display:flex;align-items:center;height:38px;padding:0 14px;gap:14px;border-top:1px solid var(--rule);background:transparent">
-<span class="num" style="width:52px;font-size:14px;color:var(--paper-45)">28週</span>
-<span style="width:126px;font:700 14px var(--jp)">軽め調整</span>
-<span style="width:150px;font:700 13px var(--jp);color:#5fd48b">賢さ +4</span>
-<span style="width:120px;font:700 13px var(--jp);color:#5fd48b">疲労 −10</span>
-<span style="flex:1;min-width:96px;font:700 13px var(--jp);color:var(--paper-70);white-space:nowrap">出走後の調整</span>
-</div><div style="display:flex;align-items:center;height:38px;padding:0 14px;gap:14px;border-top:1px solid var(--rule);background:rgba(255,255,255,.025)">
-<span class="num" style="width:52px;font-size:14px;color:var(--paper-45)">27週</span>
-<span style="width:126px;font:700 14px var(--jp)">ウッドチップ</span>
-<span style="width:150px;font:700 13px var(--jp);color:#5fd48b">スタミナ +8</span>
-<span style="width:120px;font:700 13px var(--jp);color:#fad728">疲労 +9</span>
-<span style="flex:1;min-width:96px;font:700 13px var(--jp);color:var(--paper-70);white-space:nowrap">—</span>
+<div class="a-panel" style="margin-top:16px;border-width:3px">
+<div class="a-band" style="height:38px;padding:0 14px;gap:14px">
+<span class="a-lbl" style="width:52px;flex:0 0 52px;color:#fff">週</span><span class="a-lbl" style="width:130px;flex:0 0 130px;color:#fff">メニュー</span><span class="a-lbl" style="width:150px;flex:0 0 150px;color:#fff">主効果</span><span class="a-lbl" style="width:120px;flex:0 0 120px;color:#fff">疲労</span><span class="a-lbl" style="flex:1;min-width:120px;color:#fff">記録</span>
 </div>
+<div style="display:flex;align-items:center;height:42px;padding:0 14px;gap:14px;border-top:1px solid var(--a-line);background:#fff">
+<span class="a-num" style="width:52px;flex:0 0 52px;font-size:14px;color:var(--a-ink-3)">32週</span>
+<span style="width:130px;flex:0 0 130px;font:900 14px var(--a-jp)">追い切り</span>
+<span style="width:150px;flex:0 0 150px;font:900 13px var(--a-jp);color:var(--a-green-d)">スピード +12</span>
+<span style="width:120px;flex:0 0 120px;font:900 13px var(--a-jp);color:#8a5a06">疲労 +18</span>
+<span style="flex:1;min-width:120px;font:900 13px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">好調を維持</span></div><div style="display:flex;align-items:center;height:42px;padding:0 14px;gap:14px;border-top:1px solid var(--a-line);background:var(--a-panel-2)">
+<span class="a-num" style="width:52px;flex:0 0 52px;font-size:14px;color:var(--a-ink-3)">31週</span>
+<span style="width:130px;flex:0 0 130px;font:900 14px var(--a-jp)">坂路</span>
+<span style="width:150px;flex:0 0 150px;font:900 13px var(--a-jp);color:var(--a-green-d)">パワー +9</span>
+<span style="width:120px;flex:0 0 120px;font:900 13px var(--a-jp);color:#8a5a06">疲労 +14</span>
+<span style="flex:1;min-width:120px;font:900 13px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">—</span></div><div style="display:flex;align-items:center;height:42px;padding:0 14px;gap:14px;border-top:1px solid var(--a-line);background:#fff">
+<span class="a-num" style="width:52px;flex:0 0 52px;font-size:14px;color:var(--a-ink-3)">30週</span>
+<span style="width:130px;flex:0 0 130px;font:900 14px var(--a-jp)">プール</span>
+<span style="width:150px;flex:0 0 150px;font:900 13px var(--a-jp);color:var(--a-green-d)">スタミナ +7</span>
+<span style="width:120px;flex:0 0 120px;font:900 13px var(--a-jp);color:var(--a-green-d)">疲労 −6</span>
+<span style="flex:1;min-width:120px;font:900 13px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">疲労を抜いた</span></div><div style="display:flex;align-items:center;height:42px;padding:0 14px;gap:14px;border-top:1px solid var(--a-line);background:var(--a-panel-2)">
+<span class="a-num" style="width:52px;flex:0 0 52px;font-size:14px;color:var(--a-ink-3)">29週</span>
+<span style="width:130px;flex:0 0 130px;font:900 14px var(--a-jp)">併せ馬</span>
+<span style="width:150px;flex:0 0 150px;font:900 13px var(--a-jp);color:var(--a-green-d)">根性 +11</span>
+<span style="width:120px;flex:0 0 120px;font:900 13px var(--a-jp);color:#8a5a06">疲労 +16</span>
+<span style="flex:1;min-width:120px;font:900 13px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">気合が乗ってきた</span></div><div style="display:flex;align-items:center;height:42px;padding:0 14px;gap:14px;border-top:1px solid var(--a-line);background:#fff">
+<span class="a-num" style="width:52px;flex:0 0 52px;font-size:14px;color:var(--a-ink-3)">28週</span>
+<span style="width:130px;flex:0 0 130px;font:900 14px var(--a-jp)">軽め調整</span>
+<span style="width:150px;flex:0 0 150px;font:900 13px var(--a-jp);color:var(--a-green-d)">賢さ +4</span>
+<span style="width:120px;flex:0 0 120px;font:900 13px var(--a-jp);color:var(--a-green-d)">疲労 −10</span>
+<span style="flex:1;min-width:120px;font:900 13px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">出走後の調整</span></div><div style="display:flex;align-items:center;height:42px;padding:0 14px;gap:14px;border-top:1px solid var(--a-line);background:var(--a-panel-2)">
+<span class="a-num" style="width:52px;flex:0 0 52px;font-size:14px;color:var(--a-ink-3)">27週</span>
+<span style="width:130px;flex:0 0 130px;font:900 14px var(--a-jp)">ウッドチップ</span>
+<span style="width:150px;flex:0 0 150px;font:900 13px var(--a-jp);color:var(--a-green-d)">スタミナ +8</span>
+<span style="width:120px;flex:0 0 120px;font:900 13px var(--a-jp);color:#8a5a06">疲労 +9</span>
+<span style="flex:1;min-width:120px;font:900 13px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">—</span></div>
 </div>
-</div>
-</div>
+</div></div>
 <div style="width:1280px;padding:24px 50px 34px;background:#0c100d;font:400 13px ui-monospace,Menlo,monospace;color:var(--paper-70);line-height:1.85;border-top:1px solid var(--rule)">
-<div style="font:700 22px var(--jp);color:var(--gold);margin-bottom:2px">実装（Next.js の DOM。Canvas ではない）</div>
-<div style="font:700 14px var(--jp);color:var(--paper);margin-bottom:14px">対象 apps/web/src/app/stable/[horseId]/page.tsx（新規）。main 幅 1180・margin 0 auto。</div>
+<div style="font:700 22px var(--jp);color:var(--gold);margin-bottom:2px">実装（Next.js の DOM。アーケード筐体テーマ）</div>
+<div style="font:700 14px var(--jp);color:var(--paper);margin-bottom:14px">対象 apps/web/src/app/stable/[horseId]/page.tsx。最上位に <b>data-theme="arcade"</b>。main 幅 1180。ナビの現在地は<b>「わたしの馬」</b>。</div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 40px">
-<div>パンくず　　　13px／「わたしの馬 / &lt;馬名&gt;」現在地のみ紙色</div>
-<div>ヒーロー板　　全幅・上縁 金4px・地 rgba(5,8,6,.9)／padding 22 26</div>
-<div>格　　　　　　<b style="color:var(--paper)">板の最初の要素</b>。ラベル 12px 金＋<b style="color:var(--paper)">金ベタ h46・文字 28px 900 #12140f</b>。右に「次の格」と昇格条件 13px（馬名より先に格を読ませる）</div>
-<div>馬名　　　　　40px 900／その下に 性齢・毛色・厩舎・父 を 14px 70% で 18px 間隔</div>
-<div>素質　　　　　★ 22px＋「★4.5（生涯変わりません）」13px 45%。数値化しない</div>
-<div>獲得賞金　　　46px 金プレート＋「PP」15px。<b style="color:var(--paper)">育成の主指標なので格の次に大きく</b></div>
-<div>戦績　　　　　「12 戦 4 勝」24px（勝は金）／2・3着 20px 70%／<b style="color:var(--paper)">勝率は 12px 45% で末尾に小さく</b>（主指標にしない）</div>
-<div>ボタン　　　　斜度 -9°／「調教を指示する」h40 金ベタ／「出走登録」h36 暗地＋金ヘアライン。今週指示済みなら主ボタンは「指示を変更する」に文言だけ差し替え</div>
-<div>状態バー　　　h44・地 rgba(255,255,255,.03)／調子（記号＋語）・疲労バー 120×8＋数値・今週の指示・右に次走と出走料 EP</div>
-<div>現在値　　　　行 h36／項目名 74（14px 70%）／バー flex h14（地 rgba(0,0,0,.5)＋1px 罫、塗り 金）／<b style="color:var(--paper)">素質上限を 2×20px の目盛で示す</b>／数値 20px 幅52 右／前週比 14px 幅44（増は #5fd48b、変化なしは「±0」45%）</div>
-<div>合計　　　　　現在値の下に 22px＋「/ 上限 4,200」12px 45%（素質★から算出した上限）</div>
-<div>適性　　　　　幅250 の別枠／行 h32・項目 14px 70%＋記号 17px 900（◎#5fd48b ○70% △45%）／芝ダート・距離2区分・馬場2区分／最下段に脚質チップ h24（#3fd0e0＋40% 罫）</div>
-<div>戦績表　　　　flex1.15／行 h42・偶数行 rgba(255,255,255,.025)／列 週40・レース100・格78・条件 flex(min 96)・着30 中央（1着は金 21px）・時計56 右・賞金70 右／gap 10・<b style="color:var(--paper)">固定列はすべて flex:0 0 &lt;幅&gt;</b>（shrink させない。レース名は溢れたら省略記号）／最下段に「すべて見る」リンク h38</div>
-<div>血統表　　　　見出し h44（凡例＋インブリード係数）／表 <b style="color:var(--paper)">高さ 704・5列</b>／列幅比 1.3 : 1.14 : 1 : 1 : 1／セル数 2 / 4 / 8 / 16 / 32・各列で等分（32 段目は 22px）</div>
-<div>血統の文字　　1〜2代 900、3〜5代 700／サイズ 15 / 14 / 13 / 12 / <b style="color:var(--paper)">11px</b>（5 代目のみ 14px 未満を許容。溢れは省略記号）／セル境界は 1px rule のみ</div>
-<div>クロス　　　　同一祖先が 2 か所以上に出たら色を割り当てる。地は色＋透明度 12%、左 3px の実線、文字も同色／<b style="color:var(--paper)">色は 2 色まで</b>（#7ad0ff → #f3a5c8）。3 組以上ある場合は世代の近い 2 組だけ着色し、残りは凡例に名前だけ出す</div>
-<div>クロス表記　　「&lt;名前&gt; 4×5」＝父側4代目・母側5代目。凡例は見出し行に置き、表の中には書かない</div>
-<div>クロスの置き方 <b style="color:var(--paper)">1代目（父・母）には絶対に付けない</b>。上半分＝父系／下半分＝母系なので、同一祖先は<b style="color:var(--paper)">必ず上半分と下半分に1つずつ</b>置く（隣接セルに同名は不可＝父かつ母になる）。祖先名の自動生成をする場合はクロス指定名を生成プールから除外し、名前衝突で意図しないセルが着色されないようにする</div>
+<div>パンくず　　　13px 900／現在地のみ #10243a、リンクは #0f56ab</div>
+<div>ヒーロー板　　縁 3px／青グロス帯 h40（左「現在の格」16px 字間 .14em、右に昇格条件 13px）／中身の地 linear-gradient(#fff,#eef6fd)</div>
+<div>格　　　　　　<b style="color:var(--paper)">板の最初の要素</b>。金グロス・角丸 10px・<b style="color:var(--paper)">縁 3px #8a5a06・h56・文字 34px 900 #4a3105</b>・影 0 2px 0（馬名より先に格を読ませる）</div>
+<div>馬名　　　　　44px 900／その下に 性齢・毛色・厩舎・父 を .a-chip h28（13px）で 4 つ</div>
+<div>素質　　　　　★ 26px（塗り #f2b012＋影 0 1px 0 #8a5a06／空 #a9bccd）＋「★4.5（生涯変わりません）」13px。数値化しない</div>
+<div>獲得賞金　　　白地・<b style="color:var(--paper)">縁 3px #8a5a06</b> の箱に 50px 金＋影 0 2px 0 #fff, 0 3px 0 #e0c07a／「PP」15px。<b style="color:var(--paper)">育成の主指標なので格の次に大きく</b></div>
+<div>戦績　　　　　白地 2px 縁の箱に「12 戦 4 勝」28px（勝は<b style="color:var(--paper)">赤 #d62f26</b>＝順位系の色）／2・3着 24px #4a6178／<b style="color:var(--paper)">勝率は 12px #52697c で末尾に小さく</b></div>
+<div>ボタン　　　　主 .a-btn-gold h48・17px／副 .a-btn h42・15px。今週指示済みなら主は「指示を変更する」に文言だけ差し替え</div>
+<div>状態バー　　　h52・地 #fbf7ec＋上辺 2px #cfe0ee／調子・疲労バー 130×14＋数値 18px（状態色 ≤30 #1e7a3a／≤60 #8a5a06／&gt;60 #a81a13）・今週の指示・右に次走と出走料 EP（金 19px）</div>
+<div>現在値　　　　行 h38／項目 76／<b style="color:var(--paper)">バー 地 #e3ecf3・縁 2px #123f6b・角丸 9px・塗り 青グロス</b>／数値 26px 青／「上限 nnn」12px #52697c／前週比 15px（増 #1e7a3a・±0 は #52697c）</div>
+<div>合計　　　　　30px 青＋「/ 上限 4,200」12px（素質★から算出）</div>
+<div>適性　　　　　幅252／行 h34・項目 14px＋記号 19px（◎ #1e7a3a／○ #4a6178／△ #52697c）／最下段 h48 は地 #fbf7ec＋脚質チップ（青グロス h30・2px 縁・角丸 8px・白文字）</div>
+<div>戦績表　　　　縁 3px／青グロス見出し h38／行 h46・偶数 #f4f9fd／<b style="color:var(--paper)">全幅の独立パネル</b>（右カラムに入れると列が入り切らない）／列 週42・レース200・格120・条件 flex(min 160)・着34 中央（<b style="color:var(--paper)">1着は赤 26px</b>）・時計80 右（18px）・賞金110 右（金 17px、0 は #52697c）／固定列は flex:0 0 &lt;幅&gt;</div>
+<div>血統表　　　　縁 3px／青グロス見出し h44（凡例 2 つ＋インブリード係数）／表 <b style="color:var(--paper)">高さ 704・5列</b>・列幅比 1.3 : 1.14 : 1 : 1 : 1・セル 2/4/8/16/32（32 段は 22px）／セル地は 奇数 #fff・偶数 #f7fbfe、罫 1px #cfe0ee</div>
+<div>血統の文字　　1〜2代 900、3〜5代 700／サイズ 15 / 14 / 13 / 12 / <b style="color:var(--paper)">12px</b>（明るい地では 11px にしない）。溢れは省略記号</div>
+<div>クロス　　　　同一祖先が 2 か所以上に出たら色を割り当てる。<b style="color:var(--paper)">明るい地用に濃色 2 色</b>＝#0f6fb8（地 #e0eefa）／#b3306e（地 #fbe4ee）。左 4px の実線＋文字も同色。3 組以上は世代の近い 2 組だけ着色し、残りは凡例に名前だけ</div>
+<div>クロスの置き方 <b style="color:var(--paper)">1代目には絶対に付けない</b>。上半分＝父系／下半分＝母系なので、同一祖先は必ず上半分と下半分に 1 つずつ（隣接セルに同名は不可＝父かつ母になる）。祖先名を自動生成する場合はクロス指定名を生成プールから除外する</div>
 <div>整合性　　　　ヒーローの「父 &lt;名&gt;」は血統表 1 代目の上段と<b style="color:var(--paper)">同じ値を参照する</b>（別々に持たない）</div>
-<div>調教履歴　　　行 h38／列 週52・メニュー126・主効果150（#5fd48b）・疲労120（増 #fad728 / 減 #5fd48b）・記録 flex／直近 6 週を出し、それ以前は「もっと見る」で追加</div>
+<div>凡例　　　　　見出し行に h26 のピル（地は薄色・縁 2px・文字は濃色）。表の中に「4×5」は書かない</div>
+<div>調教履歴　　　青グロス見出し h38／行 h42／列 週52・メニュー130・主効果150（#1e7a3a）・疲労120（増 <b style="color:var(--paper)">#8a5a06</b>／減 #1e7a3a）・記録 flex／直近 6 週、以前は「もっと見る」</div>
+<div>数字の色分け　現在値・時計・合計 = 青／賞金・出走料 = 金／着順・勝ち鞍 = 赤。全 Web 画面で統一</div>
+<div>薄い文字色　　補助テキストは --a-ink-3 = <b style="color:var(--paper)">#52697c</b>（白地 5.7:1／沈めた地でも 4.85:1）。<b style="color:var(--paper)">18px 未満の数値に中間の黄土色 #a9741a を使わない</b>（#8a5a06 を使う）</div>
 <div>空状態　　　　戦績なし「まだ出走していません。出走登録から初戦を選べます」／調教履歴なし「今週が最初の週です」／血統不明「血統情報が登録されていません」</div>
-<div>禁止　　　　　EP と PP を同じ枠に並べない。金額表記に「円」を使わない。勝率を格や賞金より大きく出さない</div>
+<div>禁止　　　　　EP と PP を同じ枠に並べない。「円」を使わない。勝率を格や賞金より大きく出さない</div>
 </div>
 </div>
