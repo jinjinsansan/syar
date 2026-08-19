@@ -1,0 +1,46 @@
+<!-- @dsCard group="HUD" name="中継バッジと画面遷移エフェクト" subtitle="四隅の使い方・カメラ切替・LIVE / REPLAY" viewport="1280x1315" -->
+<title>中継バッジと画面遷移エフェクト</title>
+<link rel="stylesheet" href="../../styles.css">
+<div class="stage" style="width:1280px;height:720px">
+<div class="turf"></div><div class="ph"></div><div class="ph-l" style="top:44%">レース映像</div>
+<div style="position:absolute;left:0;top:0;width:1280px;height:104px;background:linear-gradient(rgba(2,5,3,.5),rgba(2,5,3,0))"></div>
+<div style="position:absolute;left:40px;top:34px;display:flex;align-items:center;gap:10px">
+<div style="display:flex;align-items:center;gap:8px;background:#c8271f;transform:skewX(-9deg);padding:4px 14px"><span class="unskew" style="display:flex;align-items:center;gap:7px;font:900 13px var(--jp);letter-spacing:.18em"><span style="width:7px;height:7px;background:#fff;border-radius:50%;animation:onair 1.1s ease-in-out infinite"></span>LIVE</span></div>
+<div style="display:flex;align-items:center;background:var(--glass);border:1px solid var(--gold-hair);transform:skewX(-9deg);padding:4px 14px"><span class="unskew" style="font:700 14px var(--jp)"><span style="color:var(--gold)">CAM 1</span>　追走</span></div>
+</div>
+<div style="position:absolute;right:40px;top:34px;display:flex;align-items:center;gap:10px">
+<div style="display:flex;align-items:center;background:var(--glass);border:1px solid var(--gold-hair);transform:skewX(-9deg);padding:4px 14px"><span class="unskew" style="font:700 14px var(--jp)">11R　桜星賞</span></div>
+<div style="display:flex;align-items:center;background:var(--glass);border:1px solid var(--gold-hair);transform:skewX(-9deg);padding:4px 14px"><span class="unskew num" style="font-size:15px">15:40</span></div>
+</div>
+<div style="position:absolute;left:40px;top:96px;width:520px;padding:14px 16px;background:rgba(7,10,8,.7);border-left:3px solid var(--gold)">
+<div class="lbl" style="color:var(--gold)">四隅の使い分け</div>
+<div style="font:700 14px var(--jp);line-height:1.9;margin-top:6px">左上＝中継種別＋カメラ名（常時）<br>右上＝R・レース名・時刻（常時）／その下に順位パネル<br>左下・右下＝<span style="color:var(--paper-45)">使わない</span>（実況帯とボタン列が占有）</div>
+</div>
+</div>
+<div style="width:1280px;padding:26px 32px 0;background:#0c100d">
+<div style="font:700 20px var(--jp);color:var(--gold);margin-bottom:12px">画面遷移エフェクト（見本）</div>
+<div style="display:flex;gap:16px">
+<div style="flex:1">
+<div style="position:relative;height:150px;background:linear-gradient(#7d94a8,#54744a);overflow:hidden"><div class="ph"></div><div style="position:absolute;inset:0;background:rgba(255,255,255,.18)"></div><div style="position:absolute;left:10px;bottom:8px;font:400 11px ui-monospace,monospace;color:rgba(255,255,255,.75)">白 rgba(255,255,255,.18)</div></div>
+<div style="font:900 15px var(--jp);margin-top:8px">カット替え</div><div style="font:400 12px ui-monospace,monospace;color:var(--paper-70)">3 フレーム / 50ms</div></div><div style="flex:1">
+<div style="position:relative;height:150px;background:linear-gradient(#7d94a8,#54744a);overflow:hidden"><div class="ph"></div><div style="position:absolute;inset:0;background:rgba(4,10,7,.55)"></div><div style="position:absolute;left:10px;bottom:8px;font:400 11px ui-monospace,monospace;color:rgba(255,255,255,.75)">暗緑 rgba(4,10,7,.55)</div></div>
+<div style="font:900 15px var(--jp);margin-top:8px">局面替え</div><div style="font:400 12px ui-monospace,monospace;color:var(--paper-70)">6 フレーム / 100ms</div></div><div style="flex:1">
+<div style="position:relative;height:150px;background:linear-gradient(#7d94a8,#54744a);overflow:hidden"><div class="ph"></div><div style="position:absolute;inset:0;background:transparent"></div><div style="position:absolute;left:10px;bottom:8px;font:400 11px ui-monospace,monospace;color:rgba(255,255,255,.75)">効果なし</div></div>
+<div style="font:900 15px var(--jp);margin-top:8px">ゴール直後</div><div style="font:400 12px ui-monospace,monospace;color:var(--paper-70)">—</div></div>
+</div>
+</div>
+<div style="width:1280px;padding:24px 32px 32px;background:#0c100d;font:400 13px ui-monospace,Menlo,monospace;color:var(--paper-70);line-height:1.85">
+<div style="font:700 22px var(--jp);color:var(--gold);margin-bottom:2px">実装座標と規則（1280×720 Canvas）</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 40px;margin-top:8px">
+<div>上部の暗幕　　y0 h104・上から rgba(2,5,3,.5) → 0 のみ（バッジを読ませるため。強くしない）</div>
+<div>中継種別　　　x40 y34 h26・斜度 -9°／LIVE = #c8271f＋白丸 1.1s 点滅／REPLAY = #2f6fd0（点滅なし）／PADDOCK = 金ベタ #12140f</div>
+<div>カメラ名　　　種別バッジの右 10px／暗地＋金ヘアライン／「CAM n」を金、名称を紙色 14px</div>
+<div>R・レース名　　右上 x1240 基準／その右に発走時刻（等幅 15px）。順位パネル（y34）と同じ行には置かず、<b style="color:var(--paper)">レース中は左上のみ</b>に減らす</div>
+<div>四隅の原則　　左下・右下は使わない（実況帯 y574–720 とボタン列が占有）</div>
+<div>カット替え　　白 rgba(255,255,255,.18) を全画面に 3 フレーム。<b style="color:var(--paper)">コマ送りの frame は戻さない</b>（脚が飛ぶ）</div>
+<div>局面替え　　　暗緑 rgba(4,10,7,.55) を 6 フレーム被せて入れ替え（コーナー→直線など）</div>
+<div>ゴール直後　　効果なし。勝馬テロップを 0.5s ワイプで載せるだけ</div>
+<div>禁止　　　　　ズームブラー・回転ワイプ・スライドは使わない（Canvas で重く、中継らしさも落ちる）</div>
+<div>バッジの寿命　レース中は出しっぱなし。出馬表・パドック・確定の各オーバーレイを開いている間も左上だけ残す</div>
+</div>
+</div>

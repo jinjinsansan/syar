@@ -1,0 +1,103 @@
+<!-- @dsCard group="Screens" name="【本線】フル画面／レース中" subtitle="派手版が正本。1280×720 の実測座標つき" viewport="1280x1190" -->
+<title>【本線】フル画面／レース中</title>
+<link rel="stylesheet" href="../../styles.css">
+<div class="stage" style="width:1280px;height:720px">
+<div class="turf"></div><div class="ph"></div><div class="ph-l" style="top:34%">レース映像（追走カメラ）</div>
+<div style="position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 20%,rgba(0,0,0,0),rgba(2,5,3,.62))"></div>
+<!-- レース見出しチップ x36 y34 247×56 -->
+<div style="position:absolute;left:40px;top:34px;height:56px;display:flex;align-items:stretch;background:var(--glass);border:1px solid var(--gold-hair);transform:skewX(-9deg);animation:slidein .45s cubic-bezier(.2,.85,.2,1) both">
+<div class="bar" style="width:8px"></div>
+<div style="display:flex;align-items:center;gap:16px;padding:0 24px 0 18px">
+<span class="unskew num plate" style="font-size:26px">11R</span>
+<span class="unskew" style="font:700 22px var(--jp)">桜星賞</span>
+<span class="unskew" style="font-size:14px;opacity:.8">芝1600m</span>
+</div></div>
+<!-- 区間タグ x41 y120 144×48 -->
+<div style="position:absolute;left:44px;top:120px;height:48px;display:flex;align-items:stretch;background:rgba(7,10,8,.8);border:1px solid var(--gold-hair);transform:skewX(-9deg);animation:slidein .45s .12s cubic-bezier(.2,.85,.2,1) both">
+<div style="width:6px;background:var(--gold)"></div>
+<div style="display:flex;align-items:center;gap:10px;padding:0 20px 0 16px"><span class="unskew num" style="font-size:26px;color:var(--gold)">3</span><span class="unskew" style="font:700 18px var(--jp)">コーナー</span></div>
+</div>
+<!-- ミニマップ x40 y321 264×219 -->
+<div class="glass notch rise" style="position:absolute;left:40px;top:321px;width:264px;padding-bottom:12px;animation-delay:.1s">
+<div class="edge"></div>
+<div style="display:flex;justify-content:space-between;padding:9px 14px 4px"><span class="lbl">COURSE</span><span class="lbl" style="letter-spacing:.1em">芝 1600m</span></div>
+<svg width="264" height="132" style="display:block">
+<path id="lane" d="M46 42 H182 A30 30 0 0 1 182 100 H46" fill="none" stroke="#4d6b40" stroke-width="16"></path>
+<path d="M46 42 H182 A30 30 0 0 1 182 100 H46" fill="none" stroke="rgba(247,244,234,.35)" stroke-width="1"></path>
+<line x1="46" y1="32" x2="46" y2="52" stroke="#fff" stroke-width="2"></line>
+<line x1="46" y1="90" x2="46" y2="110" stroke="#f0cc4a" stroke-width="3"></line>
+<text x="52" y="122" fill="#f0cc4a" font-family="system-ui" font-size="11" font-weight="700">GOAL</text>
+<circle r="3" fill="#d62828"><animateMotion dur="9s" repeatCount="indefinite"><mpath href="#lane"></mpath></animateMotion></circle>
+<circle r="3" fill="#1446b4"><animateMotion dur="9.4s" begin="-.25s" repeatCount="indefinite"><mpath href="#lane"></mpath></animateMotion></circle>
+<circle r="3" fill="#f08219"><animateMotion dur="9.8s" begin="-.5s" repeatCount="indefinite"><mpath href="#lane"></mpath></animateMotion></circle>
+<circle r="5.6" fill="none" stroke="#f0cc4a" stroke-width="2"><animateMotion dur="9.2s" begin="-.12s" repeatCount="indefinite"><mpath href="#lane"></mpath></animateMotion></circle>
+</svg>
+<div style="margin:2px 14px 0;height:6px;background:rgba(255,255,255,.12)"><div class="bar" style="width:74%;height:6px"></div></div>
+<div style="display:flex;justify-content:space-between;padding:6px 14px 0"><span class="lbl" style="opacity:.6">START</span><span class="num" style="font-size:16px;color:var(--gold)">残 400m</span></div>
+</div>
+<!-- 順位パネル x930 y34 314×224 -->
+<div class="glass notch rise" style="position:absolute;left:930px;top:34px;width:314px;padding-bottom:10px">
+<div class="edge"></div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 14px 8px"><span class="lbl">ORDER</span><span class="lbl" style="letter-spacing:.1em">LAP 3</span></div>
+<div style="display:flex;flex-direction:column;gap:3px;padding:0 10px">
+<div class="rise" style="display:flex;align-items:center;gap:10px;height:34px;padding:0 8px;background:rgba(240,204,74,.16)"><div style="width:4px;height:24px;background:var(--gold)"></div><span class="num plate" style="width:26px;font-size:28px">1</span><span class="frame f3"><i>3</i></span><span style="flex:1;font:700 15px var(--jp)">ライトニングボウ</span><span class="num" style="font-size:18px;color:var(--gold)">★</span></div>
+<div class="rise" style="animation-delay:.08s;display:flex;align-items:center;gap:10px;height:32px;padding:0 8px"><span class="num" style="width:26px;font-size:22px;opacity:.9">2</span><span class="frame f2"><i>11</i></span><span style="flex:1;font:700 15px var(--jp)">ミライノツバサ</span><span class="num" style="font-size:19px">0.7</span></div>
+<div class="rise" style="animation-delay:.16s;display:flex;align-items:center;gap:10px;height:32px;padding:0 8px;box-shadow:inset 3px 0 0 var(--gold)"><span class="num" style="width:26px;font-size:22px;opacity:.9">3</span><span class="frame f7"><i>7</i></span><span style="flex:1;font:700 15px var(--jp)">サクラブリーズ</span><span class="num" style="font-size:19px">1.2</span></div>
+<div class="rise" style="animation-delay:.24s;display:flex;align-items:center;gap:10px;height:32px;padding:0 8px"><span class="num" style="width:26px;font-size:22px;opacity:.9">4</span><span class="frame f8"><i>8</i></span><span style="flex:1;font:700 15px var(--jp)">コトブキノホシ</span><span class="num" style="font-size:19px">3.1</span></div>
+<div class="rise" style="animation-delay:.32s;display:flex;align-items:center;gap:10px;height:32px;padding:0 8px"><span class="num" style="width:26px;font-size:22px;opacity:.9">5</span><span class="frame f4"><i>12</i></span><span style="flex:1;font:700 15px var(--jp)">アオバハヤテ</span><span class="num" style="font-size:19px">3.9</span></div>
+</div></div>
+<!-- 実況帯 x-40 y574 1371×146（斜度 -9°・全幅より広く取って端を切らさない） -->
+<div style="position:absolute;left:-40px;top:574px;width:1371px;height:146px;background:var(--glass);transform:skewX(-9deg);overflow:hidden;animation:riseSk .5s cubic-bezier(.2,.85,.2,1) both">
+<div class="edge"></div>
+<div style="position:absolute;left:0;top:30px;width:100%;height:1px;background:rgba(255,255,255,.09);animation:streak 1.5s linear infinite"></div>
+<div style="position:absolute;left:0;top:104px;width:100%;height:1px;background:rgba(255,255,255,.07);animation:streak 2.1s linear .4s infinite"></div>
+</div>
+<!-- ナレーター立ち絵 x36 y548 150×172 -->
+<div style="position:absolute;left:36px;top:548px;width:150px;height:172px;background:#1b241d;border:1px solid var(--gold-hair);border-bottom:0;overflow:hidden">
+<div class="ph"></div>
+<div style="position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);text-align:center;font:400 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;color:rgba(255,255,255,.62)">実況アナ<br>立ち絵（口パク2枚）</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:30px;background:rgba(4,7,5,.92);border-top:1px solid var(--gold-hair);display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-size:10px;font-weight:700;letter-spacing:.2em;color:var(--gold)">実況</span><span style="font:700 15px var(--jp)">星野 亮太</span></div>
+</div>
+<!-- ON AIR x206 y594 h22 -->
+<div style="position:absolute;left:206px;top:594px;display:flex;align-items:center;gap:14px">
+<div class="onair"><div style="width:7px;height:7px;background:#fff;border-radius:50%;animation:onair 1.1s ease-in-out infinite"></div><span style="font-size:11px;font-weight:700;letter-spacing:.2em">ON AIR</span></div>
+<div class="lv"><i></i><i style="animation-delay:.08s"></i><i style="animation-delay:.16s"></i><i style="animation-delay:.24s"></i><i style="animation-delay:.32s"></i><i style="animation-delay:.4s"></i></div>
+<span style="font-size:11px;font-weight:700;letter-spacing:.18em;color:var(--paper-70)">実況中</span>
+</div>
+<!-- 直前の発言 x206 y627 h27 / 現在の発言 x206 y658 h40 -->
+<div style="position:absolute;left:206px;top:627px;font:700 19px/27px var(--jp);white-space:nowrap;animation:push .5s linear both">3コーナー、隊列は縦長になりました</div>
+<div class="say" style="position:absolute;left:206px;top:658px;font:900 28px/40px var(--jp);white-space:nowrap;text-shadow:0 2px 8px rgba(0,0,0,.6)"><span class="num" style="font-size:36px;color:#ff4d3d">3</span>番 が先頭、内から <span class="num" style="font-size:34px;color:var(--gold)">7</span>番 が詰めてきた</div>
+<!-- 余力ゲージ x950 y630 -->
+<div style="position:absolute;left:950px;top:630px;text-align:right"><div class="lbl">余力</div>
+<div style="display:flex;gap:5px;height:36px;align-items:flex-end;margin-top:8px">
+<div style="width:12px;height:36px;background:var(--gold);transform-origin:bottom;animation:gauge 1s ease-in-out infinite"></div>
+<div style="width:12px;height:30px;background:var(--gold);transform-origin:bottom;animation:gauge 1s ease-in-out .12s infinite"></div>
+<div style="width:12px;height:24px;background:var(--gold);transform-origin:bottom;animation:gauge 1s ease-in-out .24s infinite"></div>
+<div style="width:12px;height:18px;background:rgba(240,204,74,.28)"></div>
+<div style="width:12px;height:12px;background:rgba(240,204,74,.2)"></div>
+</div></div>
+<!-- 残り距離 x1116 y598 w108 -->
+<div style="position:absolute;left:1116px;top:598px;width:108px;text-align:right">
+<div class="lbl">残り</div>
+<div class="num plate" style="font-size:76px;transform:skewX(-9deg)">400</div>
+<div class="lbl" style="letter-spacing:.3em">METERS</div>
+</div>
+</div>
+<div style="width:1280px;padding:24px 32px 32px;background:#0c100d;font:400 13px ui-monospace,Menlo,monospace;color:var(--paper-70);line-height:1.85">
+<div style="font:700 22px var(--jp);color:var(--gold);margin-bottom:2px">本線＝この派手版。実装はこの数値に合わせる</div>
+<div style="font:700 14px var(--jp);color:var(--paper);margin-bottom:14px">1280×720・左上原点／中央 x310–920・y170–560 は空ける／斜度 -9°（Canvas は4点 path、文字は傾けない）</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 40px">
+<div>レース見出し　宣言 left40 top34 h56（斜度 -9°）→ 実測バウンディング x36 y34 241×56／金バー 8px／11R 26px 金プレート／レース名 22px／距離 14px</div>
+<div>区間タグ　　　宣言 left44 top120 h48 → 実測 x40 y120 122×48（幅は語長依存。基準 x44 は下底左）／金バー 6px／番号 26px gold／語 18px</div>
+<div>ミニマップ　　x40 y321 264×209（上縁4＋見出し29＋図132＋残距離バー6＋下余白12＋フッタ）／上縁 金4px／見出し 12px／走路 stroke16 #4d6b40＋外周線1px／GOAL 金3px・START 白2px／馬点 r3・自馬 r5.6 金線2／残距離バー 高6・74%</div>
+<div>順位パネル　　x930 y34 314×224／上縁 金4px／見出し h34／1位行 h34（地 rgba(240,204,74,.16)＋金4px）／2〜5位 h32・行間3／順位 22–28px（1位は金プレート）／馬番 32×26／馬名 15px／差 19px</div>
+<div>実況帯　　　　宣言 left-40 top574 1371×146（斜度 -9°）→ 実測バウンディング x-52 w1394。画面幅より左右計 114px 広く取り端を切らさない／上縁 金4px／地 rgba(7,10,8,.86)／スピードライン 1px を y30・y104 に 1.5s／2.1s</div>
+<div>ナレーター　　x36 y548 150×172（帯上端 y574 より 26px 上へ）／ネームプレート y690 h30（「実況」10px gold ＋ 氏名 15px）／口パク2枚 6fps</div>
+<div>ON AIR　　　　x206 y594 h22／地 #c8271f／白丸 r3.5 1.1s 点滅／音声レベル x306 6本 幅3 間隔3 高16／「実況中」x353 11px</div>
+<div>実況テキスト　直前 x206 y627 19px/27 不透明60%／現在 x206 y658 28px/40 を 20文字/秒で左から出す／馬番は 34–36px（赤=先頭・金=自馬）</div>
+<div>余力ゲージ　　x950 y630（ラベル 12px）／バー5本 幅12 間隔5 高36/30/24/18/12 y654–690／点灯3本は 1.0s 脈動</div>
+<div>残り距離　　　x1116 y598 w108 右揃え（ブロック y598–706）／ラベル 12px y598／数字 76px 金プレート 斜度 -9°（y614–682）／METERS 12px y690</div>
+<div>金プレート　　createLinearGradient(100°相当) #fff6b0 → #f3cf34 30% → #a9791a 48% → #f7dc6b 62% → #fff6b0。offset を 4.5s 周期で 190%→-90% に動かす（光沢が走る）</div>
+<div>数字　　　　　コンデンス書体 700 が本線。導入できない場合は system-ui bold + tabular にフォールバックし、右揃えの箱幅を +15% 取る</div>
+</div>
+</div>

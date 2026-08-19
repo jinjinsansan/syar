@@ -1,12 +1,61 @@
-<!-- @dsCard group="Tokens" -->
+<!-- @dsCard group="Tokens" name="トークン" subtitle="色・文字階層・パネル規範（Canvas 実装値つき）" viewport="1040x1400" -->
 <title>Tokens</title>
-<style>:root{--gold:#fad728;--paper:#f6f2e7;--paper-2:#efe9dc;--ink:#22201c;--panel:rgba(4,8,6,.76);--band:rgba(3,7,5,.82);--board:rgba(6,10,8,.86);--line:rgba(236,232,211,.4);--turf:#6b9152;--pink:#c81e78;--f1:#f5f5f5;--f2:#191919;--f3:#d62828;--f4:#1446b4;--f5:#fad728;--f6:#148c46;--f7:#f08219;--f8:#f596be;--font:system-ui,-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif}
-*{box-sizing:border-box}body{margin:0;font-family:var(--font);color:var(--paper)}
-.stage{position:relative;background:linear-gradient(#5f8f45,#4c7a3a);overflow:hidden}
-.frame{display:inline-block;width:24px;height:20px;line-height:20px;text-align:center;font-weight:700;font-size:13px;border-radius:2px}
-.frame.f1{background:var(--f1);color:#111}.frame.f2{background:var(--f2)}.frame.f3{background:var(--f3)}.frame.f4{background:var(--f4)}.frame.f5{background:var(--f5);color:#111}.frame.f6{background:var(--f6)}.frame.f7{background:var(--f7)}.frame.f8{background:var(--f8);color:#111}.sw{display:inline-block;width:64px;height:40px;margin:4px;border:1px solid var(--line)}.row{display:flex;flex-wrap:wrap;align-items:center;padding:8px}.k{font-size:11px;color:#333;width:72px}</style>
-<div style="background:#14120f;padding:12px;width:720px">
-<h3 style="margin:0 0 8px;color:var(--gold)">STAR レース中継 HUD — Tokens</h3>
-<div class="row" style="background:#fff;color:#111"><span class="k">gold</span><span class="sw" style="background:#fad728"></span><span class="k">paper</span><span class="sw" style="background:#f6f2e7"></span><span class="k">panel</span><span class="sw" style="background:rgba(4,8,6,.76)"></span><span class="k">turf</span><span class="sw" style="background:#6b9152"></span><span class="k">v2 badge</span><span class="sw" style="background:#c81e78"></span></div>
-<div class="row" style="background:#fff;color:#111"><span class="k">枠色 1〜8</span><span class="frame f1">1</span><span class="frame f2">2</span><span class="frame f3">3</span><span class="frame f4">4</span><span class="frame f5">5</span><span class="frame f6">6</span><span class="frame f7">7</span><span class="frame f8">8</span></div>
-<p style="font-size:12px;color:var(--paper-2)">画面は 1280×720 の Canvas。文字はシステム UI フォント（bold）。パネルは半透明の暗色に金の細線／左縁のアクセント。</p></div>
+<link rel="stylesheet" href="../styles.css">
+<div style="width:1040px;padding:28px 32px 36px;background:#0c100d">
+<div class="lbl">STAR レース中継 HUD / 1280×720 Canvas</div>
+<div style="font:700 40px var(--jp);color:var(--gold);margin:6px 0 4px">トークン</div>
+<div style="font:400 13px ui-monospace,Menlo,monospace;color:var(--paper-70);margin-bottom:26px">本線は派手版。塗り・1px 線・角丸2px を基本に、<b style="color:#f0cc4a">金だけグラデーション1本（createLinearGradient）を許可</b>。ぼかし・影は使わない。斜度 -9°。</div>
+
+<div class="lbl" style="margin-bottom:10px">金・紙・パネル</div>
+<div style="display:flex;gap:0;margin-bottom:6px">
+<div style="flex:1;height:76px;background:#f0cc4a;color:#12140f;padding:8px;display:flex;flex-direction:column;justify-content:flex-end;font:400 12px ui-monospace,monospace">gold<br>#f0cc4a</div>
+<div style="flex:1;height:76px;background:#f6f2e7;color:#12140f;padding:8px;display:flex;flex-direction:column;justify-content:flex-end;font:400 12px ui-monospace,monospace">paper<br>#f6f2e7</div>
+<div style="flex:1;height:76px;background:rgba(6,10,8,.82);border:1px solid var(--hair);padding:8px;display:flex;flex-direction:column;justify-content:flex-end;font:400 12px ui-monospace,monospace">panel<br>rgba(6,10,8,.82)</div>
+<div style="flex:1;height:76px;background:rgba(3,7,5,.86);border:1px solid var(--hair);padding:8px;display:flex;flex-direction:column;justify-content:flex-end;font:400 12px ui-monospace,monospace">band<br>rgba(3,7,5,.86)</div>
+<div style="flex:1;height:76px;background:rgba(6,10,8,.9);border:1px solid var(--hair);padding:8px;display:flex;flex-direction:column;justify-content:flex-end;font:400 12px ui-monospace,monospace">board<br>rgba(6,10,8,.9)</div>
+<div style="flex:1;height:76px;background:#5f8f45;padding:8px;display:flex;flex-direction:column;justify-content:flex-end;font:400 12px ui-monospace,monospace">turf<br>#5f8f45</div>
+</div>
+<div style="font:400 12px ui-monospace,monospace;color:var(--paper-70);margin-bottom:24px">線 hair rgba(246,242,231,.22) 1px／罫 rule rgba(246,242,231,.14) 1px／行地 row rgba(255,255,255,.05)／上縁の金 4px</div>
+
+<div class="lbl" style="margin-bottom:10px">金プレート（本線・光沢が走る）</div>
+<div class="bar" style="height:30px;margin-bottom:6px"></div>
+<div style="font:400 12px ui-monospace,monospace;color:var(--paper-70);margin-bottom:24px">#fff6b0 0% → #f3cf34 30% → #a9791a 48% → #f7dc6b 62% → #fff6b0 100%（100°）／文字にも同じグラデを掛ける（見出し数字・1位の順位・残り距離）</div>
+<div class="lbl" style="margin-bottom:10px">枠色 1〜8（白・黒・赤・青・黄・緑・橙・桃／変更禁止）</div>
+<div style="display:flex;gap:12px;align-items:center;margin-bottom:8px"><span class="frame f1"><i>1</i></span><span class="frame f2"><i>2</i></span><span class="frame f3"><i>3</i></span><span class="frame f4"><i>4</i></span><span class="frame f5"><i>5</i></span><span class="frame f6"><i>6</i></span><span class="frame f7"><i>7</i></span><span class="frame f8"><i>8</i></span><span style="font:400 12px ui-monospace,monospace;color:var(--paper-70);margin-left:10px">28×22px／斜度 -8°／数字 15px／地が明色なら文字 #111</span></div>
+<div style="font:400 12px ui-monospace,monospace;color:var(--paper-70);margin-bottom:24px">#f5f5f5 / #191919 / #d62828 / #1446b4 / #fad728 / #148c46 / #f08219 / #f596be</div>
+
+<div style="display:flex;gap:32px;margin-bottom:26px">
+<div style="flex:1">
+<div class="lbl" style="margin-bottom:10px">文字サイズ階層</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font:400 11px ui-monospace,monospace;color:var(--paper-70);width:104px">68 title</span><span style="font:700 68px var(--jp);line-height:1">桜星賞</span></div>
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font:400 11px ui-monospace,monospace;color:var(--paper-70);width:104px">48 hero 数字</span><span class="num" style="font-size:48px;color:var(--gold)">400</span></div>
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font:400 11px ui-monospace,monospace;color:var(--paper-70);width:104px">34 馬名</span><span style="font:700 34px var(--jp)">アオバハヤテ</span></div>
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font:400 11px ui-monospace,monospace;color:var(--paper-70);width:104px">26 見出し</span><span style="font:700 26px var(--jp)">着順　確定</span></div>
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font:400 11px ui-monospace,monospace;color:var(--paper-70);width:104px">22 小見出し</span><span style="font:700 22px var(--jp)">1着　10番</span></div>
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font:400 11px ui-monospace,monospace;color:var(--paper-70);width:104px">20 区間タグ</span><span style="font:700 20px var(--jp)">第3コーナー</span></div>
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font:400 11px ui-monospace,monospace;color:var(--paper-70);width:104px">18 行</span><span style="font:700 18px var(--jp)">ミライノツバサ</span></div>
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font:400 11px ui-monospace,monospace;color:var(--paper-70);width:104px">16 実況</span><span style="font:700 16px var(--jp)">3番が先頭、内から詰める</span></div>
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font:400 11px ui-monospace,monospace;color:var(--paper-70);width:104px">14 最小</span><span style="font:700 14px var(--jp)">実況　／　騎手 吉田 直樹</span></div>
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font:400 11px ui-monospace,monospace;color:var(--paper-70);width:104px">12 ラベル</span><span class="lbl">ORDER ・ 余力 ・ 残り</span></div>
+</div>
+<div style="font:400 12px ui-monospace,monospace;color:var(--paper-70);margin-top:10px">14px 未満は使わない。数字は font-variant-numeric: tabular-nums。太字は bold のみ（中間ウェイトなし）。</div>
+</div>
+<div style="width:360px">
+<div class="lbl" style="margin-bottom:10px">パネルの規範</div>
+<div class="panel" style="padding:16px;margin-bottom:8px"><div class="edge" style="margin:-16px -16px 12px"></div><div style="font:700 16px var(--jp)">panel + 上縁の金 4px</div><div style="font:400 12px ui-monospace,monospace;color:var(--paper-70);margin-top:6px">余白 16px（大 24px）／角丸 2px<br>影なし。縁は 1px hairline のみ</div></div>
+<div class="panel notch" style="padding:16px;margin-bottom:16px"><div style="font:700 16px var(--jp)">右下 12px 切り欠き（notch）</div><div style="font:400 12px ui-monospace,monospace;color:var(--paper-70);margin-top:6px">Canvas: 5 点 path で fill</div></div>
+<div class="lbl" style="margin-bottom:10px">余力ゲージの状態色</div>
+<div style="display:flex;gap:6px;margin-bottom:6px"><div style="flex:1;height:14px;background:#148c46"></div><div style="flex:1;height:14px;background:#fad728"></div><div style="flex:1;height:14px;background:#d62828"></div></div>
+<div style="font:400 12px ui-monospace,monospace;color:var(--paper-70);margin-bottom:16px">&gt;50% 緑 ／ &gt;20% 黄 ／ 以下 赤。枠 1px 紙色、地 rgba(0,0,0,.55)</div>
+<div class="lbl" style="margin-bottom:10px">カメラ切替</div>
+<div style="display:flex;gap:6px"><div style="flex:1;height:38px;background:#5f8f45;position:relative"><div style="position:absolute;inset:0;background:rgba(255,255,255,.18)"></div><span style="position:absolute;left:6px;bottom:4px;font:400 11px ui-monospace,monospace">flash 白18% 3f</span></div><div style="flex:1;height:38px;background:#5f8f45;position:relative"><div style="position:absolute;inset:0;background:rgba(4,10,7,.55)"></div><span style="position:absolute;left:6px;bottom:4px;font:400 11px ui-monospace,monospace">dissolve 6f</span></div></div>
+</div>
+</div>
+
+<div class="lbl" style="margin-bottom:10px">動き（Canvas で再現できる範囲だけ）</div>
+<div style="display:flex;gap:24px;font:700 14px var(--jp);line-height:1.9">
+<ul style="margin:0;padding-left:20px"><li>登場＝globalAlpha 0→1 ＋ y +10px、0.45s</li><li>帯・テロップ＝左から幅を伸ばす 0.5s</li><li>順位行＝0.08s ずつ遅延</li></ul>
+<ul style="margin:0;padding-left:20px"><li>余力の減り方バー＝1.0s の脈動（±26%）</li><li>金の光沢は 4.5s 周期で offset 190%→-90%</li><li>斜度は -9° 固定。文字は水平（傾けない）</li></ul>
+</div>
+</div>

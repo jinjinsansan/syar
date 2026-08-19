@@ -1,0 +1,97 @@
+/* 数字のコンデンス書体（本線）。日本語はシステム UI のまま */
+@import url("https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700&display=swap");
+/* STAR レース中継 HUD — 共通トークン
+   前提: 1280×720 Canvas / 外部フォント・画像・JS なし / Canvas API で再実装できる表現のみ
+   （fillRect・strokeRect・arc・fillText。グラデーションとぼかしは使わない） */
+:root{
+/* 金（アクセント）: 帯の上縁・見出し・強調数字。実装は単色 fillStyle */
+--gold:#f0cc4a;--gold-dim:rgba(240,204,74,.5);
+/* 金プレート（本線）: Canvas は createLinearGradient 1本。offset を時間で動かして光沢を走らせる */
+--plate:linear-gradient(100deg,#fff6b0 0%,#f3cf34 30%,#a9791a 48%,#f7dc6b 62%,#fff6b0 100%); /* @kind color */
+/* 文字（紙色） */
+--paper:#f6f2e7;--paper-70:rgba(246,242,231,.7);--paper-45:rgba(246,242,231,.45);
+--ink:#12140f;
+/* パネル地（半透明の暗色）。芝でも空でも読める不透明度 */
+--glass:rgba(7,10,8,.86);--panel:rgba(6,10,8,.82);--panel-lite:rgba(6,10,8,.62);--band:rgba(3,7,5,.86);--board:rgba(6,10,8,.9);
+--hair:rgba(246,242,231,.22);--gold-hair:rgba(243,207,52,.4);--rule:rgba(246,242,231,.14);--row:rgba(255,255,255,.05);
+/* 芝・空（モック背景用。実装では映像） */
+--turf:#5f8f45;--turf-dark:#3f5a3a;--sky:#7d94a8;
+/* 枠色 1〜8（白・黒・赤・青・黄・緑・橙・桃）＝競馬の慣習。変更禁止 */
+--f1:#f5f5f5;--f2:#191919;--f3:#d62828;--f4:#1446b4;--f5:#fad728;--f6:#148c46;--f7:#f08219;--f8:#f596be;
+/* 状態色（余力ゲージ）: >50% 緑 / >20% 黄 / それ以下 赤 */
+--ok:#148c46;--warn:#fad728;--bad:#d62828;
+/* カメラ切替: フラッシュ＝白 18%、ディゾルブ＝暗緑 */
+--flash:rgba(255,255,255,.18);--dissolve:rgba(4,10,7,.55);
+/* 書体: システム UI のみ。日本語は system-ui が Hiragino / Noto Sans JP を拾う */
+--jp:system-ui,sans-serif; /* @kind font */
+--num:"Saira Condensed",system-ui,sans-serif; /* @kind font */
+/* 斜度: 帯・タグ・馬番の平行四辺形。Canvas では 4 点 path で描く */
+--sk:-9deg; /* @kind other */
+--sk-i:9deg; /* @kind other */
+/* 文字サイズ階層（px） */
+--t-cap:12px; /* @kind font */
+--t-min:14px; /* @kind font */
+--t-body:16px; /* @kind font */
+--t-row:18px; /* @kind font */
+--t-tag:20px; /* @kind font */
+--t-lead:22px; /* @kind font */
+--t-name:26px; /* @kind font */
+--t-big:34px; /* @kind font */
+--t-hero:48px; /* @kind font */
+--t-title:68px; /* @kind font */
+/* 余白・線・角丸 */
+--pad:16px;--pad-lg:24px;--radius:2px;--line:1px;--edge:4px
+}
+/* プレビュー幅が 1280 未満のときだけ全体を縮小して収める。
+   Design System のカードは 1280 幅で描かれるので等倍（仕様の座標は変わらない） */
+@media (max-width:1279px){body{zoom:.95}}
+@media (max-width:1180px){body{zoom:.88}}
+@media (max-width:1080px){body{zoom:.80}}
+@media (max-width:980px){body{zoom:.72}}
+@media (max-width:880px){body{zoom:.64}}
+@media (max-width:780px){body{zoom:.56}}
+@media (max-width:680px){body{zoom:.48}}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--jp);font-weight:700;color:var(--paper);background:#0c100d;-webkit-font-smoothing:antialiased}
+a{color:var(--gold);text-decoration:none}a:hover{color:#fff0b8}
+/* 背景（モック用の芝＋空。実装ではレース映像） */
+.stage{position:relative;overflow:hidden;background:linear-gradient(var(--sky) 0%,var(--turf) 38%,var(--turf-dark) 100%)}
+.turf{position:absolute;inset:0;background:linear-gradient(var(--sky) 0%,var(--turf) 38%,var(--turf-dark) 100%)}
+.ph{position:absolute;inset:0;background:repeating-linear-gradient(135deg,rgba(255,255,255,.06) 0 8px,rgba(255,255,255,0) 8px 16px)}
+.ph-l{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:400 12px ui-monospace,Menlo,monospace;letter-spacing:.14em;color:rgba(255,255,255,.62)}
+/* パネル: 半透明塗り＋1px ヘアライン＋上縁 4px の金 */
+.glass{background:var(--glass);border:1px solid var(--gold-hair)}
+.panel{background:var(--panel);border:1px solid var(--hair)}
+.board{background:var(--board);border:1px solid var(--gold-hair)}
+.bar{background-image:var(--plate);background-size:240% 100%;animation:sheen 4.5s linear infinite}
+.plate{background-image:var(--plate);background-size:240% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sheen 4.5s linear infinite}
+.edge{height:var(--edge);background-image:var(--plate);background-size:240% 100%;animation:sheen 4.5s linear infinite}
+.notch{clip-path:polygon(0 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%)}
+.slant{transform:skewX(var(--sk))}.unskew{display:block;transform:skewX(var(--sk-i))}
+/* 数字: 等幅数字。太字で読ませる */
+.num{font-family:var(--num);font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.lbl{font-size:12px;font-weight:700;letter-spacing:.18em;color:var(--paper-70)}
+/* 枠色付き馬番（26×22 / 斜め 8°） */
+.frame{display:inline-flex;align-items:center;justify-content:center;width:28px;height:22px;font-family:var(--num);font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;transform:skewX(var(--sk))}
+.frame i{font-style:normal;transform:skewX(var(--sk-i))}
+.frame.f1{background:var(--f1);color:#111}.frame.f2{background:var(--f2)}.frame.f3{background:var(--f3)}.frame.f4{background:var(--f4)}.frame.f5{background:var(--f5);color:#111}.frame.f6{background:var(--f6)}.frame.f7{background:var(--f7)}.frame.f8{background:var(--f8);color:#111}
+/* 動き: Canvas で globalAlpha と座標だけで再現できる範囲に限る */
+@keyframes sheen{0%{background-position:190% 0}100%{background-position:-90% 0}}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes riseSk{from{opacity:0;transform:translateY(10px) skewX(-9deg)}to{opacity:1;transform:skewX(-9deg)}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes gauge{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.74)}}
+@keyframes wipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes slidein{from{opacity:0;transform:translateX(-24px) skewX(-9deg)}to{opacity:1;transform:skewX(-9deg)}}
+@keyframes streak{0%{transform:translateX(160px);opacity:0}30%{opacity:.7}100%{transform:translateX(-420px);opacity:0}}
+/* 実況のリアルタイム演出: 発話は文字を左から出す（Canvas は substring を描く） */
+@keyframes say{0%{clip-path:inset(0 100% 0 0)}62%{clip-path:inset(0 0 0 0)}100%{clip-path:inset(0 0 0 0)}}
+@keyframes onair{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes lv{0%,100%{transform:scaleY(.3)}20%{transform:scaleY(1)}45%{transform:scaleY(.55)}70%{transform:scaleY(.9)}}
+@keyframes push{0%{opacity:0;transform:translateY(12px)}18%{opacity:.6;transform:none}100%{opacity:.6;transform:none}}
+.rise{animation:rise .45s cubic-bezier(.2,.85,.2,1) both}
+.say{animation:say .9s linear both}
+.onair{display:flex;align-items:center;gap:7px;background:#c8271f;padding:3px 10px}
+.lv{display:flex;align-items:center;gap:3px;height:16px}
+.lv i{display:block;width:3px;height:16px;background:var(--gold);transform-origin:center;animation:lv .62s ease-in-out infinite}
+.reveal{animation:wipe .5s cubic-bezier(.2,.85,.2,1) both}

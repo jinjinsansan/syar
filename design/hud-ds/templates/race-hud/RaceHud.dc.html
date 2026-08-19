@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="レース中フル画面HUD" description="1280×720 のレース中継HUD一式（実況帯・順位・ミニマップ・区間タグ）" -->
+<helmet>
+<script src="./ds-base.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Saira+Condensed:wght@600;700&display=swap">
+<style>
+body{margin:0;background:#0c100d}
+@keyframes sheen{0%{background-position:190% 0}100%{background-position:-90% 0}}
+@keyframes wipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes riseSk{from{opacity:0;transform:translateY(12px) skewX(-9deg)}to{opacity:1;transform:skewX(-9deg)}}
+@keyframes slidein{from{opacity:0;transform:translateX(-28px) skewX(-9deg)}to{opacity:1;transform:skewX(-9deg)}}
+@keyframes streak{0%{transform:translateX(160px);opacity:0}30%{opacity:.7}100%{transform:translateX(-420px);opacity:0}}
+@keyframes gauge{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.72)}}
+@keyframes say{0%{clip-path:inset(0 100% 0 0)}62%{clip-path:inset(0 0 0 0)}100%{clip-path:inset(0 0 0 0)}}
+@keyframes onair{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes lv{0%,100%{transform:scaleY(.3)}20%{transform:scaleY(1)}45%{transform:scaleY(.55)}70%{transform:scaleY(.9)}}
+@keyframes push{0%{opacity:0;transform:translateY(14px)}18%{opacity:.55;transform:none}100%{opacity:.55;transform:none}}
+</style>
+</helmet>
+<div style="position:relative;width:1280px;height:720px;overflow:hidden;font-family:'Noto Sans JP',system-ui,sans-serif;font-weight:700;color:#f7f4ea">
+<div style="position:absolute;inset:0;background:linear-gradient(#7d94a8 0%,#54744a 34%,#3f5a3a 100%)"></div>
+<div style="position:absolute;inset:0;background:repeating-linear-gradient(135deg,rgba(255,255,255,.07) 0 8px,rgba(255,255,255,0) 8px 16px)"></div>
+<div style="position:absolute;left:50%;top:34%;transform:translate(-50%,-50%);font:400 12px ui-monospace,Menlo,monospace;letter-spacing:.16em;color:rgba(255,255,255,.6)">レース映像（走行カット）</div>
+<sc-if value="{{ night }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 20%,rgba(0,0,0,0),rgba(2,5,3,.62))"></div></sc-if>
+<div style="position:absolute;left:40px;top:34px;display:flex;align-items:stretch;height:56px;background:rgba(7,10,8,.86);border:1px solid rgba(243,207,52,.4);transform:skewX(-9deg);box-shadow:0 12px 28px rgba(0,0,0,.5);animation:slidein .45s cubic-bezier(.2,.85,.2,1) both">
+<div style="width:8px;background-image:linear-gradient(100deg,#fff6b0 0%,#f3cf34 30%,#a9791a 48%,#f7dc6b 62%,#fff6b0 100%);background-size:240% 100%;animation:sheen 4.5s linear infinite"></div>
+<div style="display:flex;align-items:center;gap:16px;padding:0 24px 0 18px">
+<span style="display:block;transform:skewX(9deg);font-family:'Saira Condensed',sans-serif;font-size:26px;font-variant-numeric:tabular-nums;background-image:linear-gradient(100deg,#fff6b0 0%,#f3cf34 30%,#a9791a 48%,#f7dc6b 62%,#fff6b0 100%);background-size:240% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sheen 4.5s linear infinite">11R</span>
+<span style="display:block;transform:skewX(9deg);font-weight:900;font-size:22px">桜星賞</span>
+<span style="display:block;transform:skewX(9deg);font-size:14px;opacity:.8">芝1600m</span>
+</div></div>
+<div style="position:absolute;left:44px;top:120px;display:flex;align-items:stretch;height:48px;background:rgba(7,10,8,.8);border:1px solid rgba(243,207,52,.4);transform:skewX(-9deg);animation:slidein .45s .12s cubic-bezier(.2,.85,.2,1) both">
+<div style="width:6px;background:#f3cf34"></div>
+<div style="display:flex;align-items:center;gap:10px;padding:0 20px 0 16px">
+<span style="display:block;transform:skewX(9deg);font-family:'Saira Condensed',sans-serif;font-size:26px;color:#f3cf34">3</span>
+<span style="display:block;transform:skewX(9deg);font-weight:900;font-size:18px">コーナー</span>
+</div></div>
+<sc-if value="{{ showStandings }}" hint-placeholder-val="{{ true }}">
+<div style="position:absolute;right:36px;top:34px;width:314px;background:rgba(7,10,8,.86);border:1px solid rgba(243,207,52,.4);box-shadow:0 20px 44px rgba(0,0,0,.5);clip-path:polygon(0 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%);padding-bottom:10px;animation:rise .5s cubic-bezier(.2,.85,.2,1) both">
+<div style="height:4px;background-image:linear-gradient(100deg,#fff6b0 0%,#f3cf34 30%,#a9791a 48%,#f7dc6b 62%,#fff6b0 100%);background-size:240% 100%;animation:sheen 4.5s linear infinite"></div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 14px 8px"><span style="font-size:11px;font-weight:900;letter-spacing:.22em;color:#cfcabb">ORDER</span><span style="font-size:11px;font-weight:900;letter-spacing:.1em;color:#cfcabb">LAP 3</span></div>
+<div style="display:flex;flex-direction:column;gap:3px;padding:0 10px">
+<div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 8px;background:linear-gradient(90deg,rgba(243,207,52,.18),rgba(243,207,52,0));animation:rise .5s cubic-bezier(.2,.85,.2,1) both">
+<div style="width:4px;height:24px;background:#f3cf34"></div>
+<span style="width:26px;font-family:'Saira Condensed',sans-serif;font-size:28px;font-variant-numeric:tabular-nums;background-image:linear-gradient(100deg,#fff6b0 0%,#f3cf34 30%,#a9791a 48%,#f7dc6b 62%,#fff6b0 100%);background-size:240% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sheen 4.5s linear infinite">1</span>
+<span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:26px;background:#d62828;font-family:'Saira Condensed',sans-serif;font-size:17px;transform:skewX(-9deg);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -4px 8px rgba(0,0,0,.28)"><span style="transform:skewX(9deg)">3</span></span>
+<span style="flex:1;font-weight:900;font-size:15px">ライトニングボウ</span><span style="font-family:'Saira Condensed',sans-serif;font-size:18px;color:#f3cf34">★</span></div>
+<div style="display:flex;align-items:center;gap:10px;height:32px;padding:0 8px;animation:rise .5s .08s cubic-bezier(.2,.85,.2,1) both"><span style="width:26px;font-family:'Saira Condensed',sans-serif;font-size:22px;opacity:.9">2</span><span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:26px;background:#191919;font-family:'Saira Condensed',sans-serif;font-size:17px;transform:skewX(-9deg);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -4px 8px rgba(0,0,0,.28)"><span style="transform:skewX(9deg)">11</span></span><span style="flex:1;font-size:15px">ミライノツバサ</span><span style="font-family:'Saira Condensed',sans-serif;font-size:19px;font-variant-numeric:tabular-nums">0.7</span></div>
+<div style="display:flex;align-items:center;gap:10px;height:32px;padding:0 8px;animation:rise .5s .16s cubic-bezier(.2,.85,.2,1) both"><span style="width:26px;font-family:'Saira Condensed',sans-serif;font-size:22px;opacity:.9">3</span><span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:26px;background:#f08219;font-family:'Saira Condensed',sans-serif;font-size:17px;transform:skewX(-9deg);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -4px 8px rgba(0,0,0,.28)"><span style="transform:skewX(9deg)">7</span></span><span style="flex:1;font-size:15px">サクラブリーズ</span><span style="font-family:'Saira Condensed',sans-serif;font-size:19px;font-variant-numeric:tabular-nums">1.2</span></div>
+<div style="display:flex;align-items:center;gap:10px;height:32px;padding:0 8px;animation:rise .5s .24s cubic-bezier(.2,.85,.2,1) both"><span style="width:26px;font-family:'Saira Condensed',sans-serif;font-size:22px;opacity:.9">4</span><span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:26px;background:#f596be;color:#111;font-family:'Saira Condensed',sans-serif;font-size:17px;transform:skewX(-9deg);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -4px 8px rgba(0,0,0,.28)"><span style="transform:skewX(9deg)">8</span></span><span style="flex:1;font-size:15px">コトブキノホシ</span><span style="font-family:'Saira Condensed',sans-serif;font-size:19px;font-variant-numeric:tabular-nums">3.1</span></div>
+<div style="display:flex;align-items:center;gap:10px;height:32px;padding:0 8px;animation:rise .5s .32s cubic-bezier(.2,.85,.2,1) both"><span style="width:26px;font-family:'Saira Condensed',sans-serif;font-size:22px;opacity:.9">5</span><span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:26px;background:#1446b4;font-family:'Saira Condensed',sans-serif;font-size:17px;transform:skewX(-9deg);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -4px 8px rgba(0,0,0,.28)"><span style="transform:skewX(9deg)">12</span></span><span style="flex:1;font-size:15px">アオバハヤテ</span><span style="font-family:'Saira Condensed',sans-serif;font-size:19px;font-variant-numeric:tabular-nums">3.9</span></div>
+</div></div>
+</sc-if>
+<sc-if value="{{ showMinimap }}" hint-placeholder-val="{{ true }}">
+<div style="position:absolute;left:40px;bottom:180px;width:264px;background:rgba(7,10,8,.86);border:1px solid rgba(243,207,52,.4);box-shadow:0 20px 44px rgba(0,0,0,.5);clip-path:polygon(0 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%);padding-bottom:12px;animation:rise .5s .1s cubic-bezier(.2,.85,.2,1) both">
+<div style="height:4px;background-image:linear-gradient(100deg,#fff6b0 0%,#f3cf34 30%,#a9791a 48%,#f7dc6b 62%,#fff6b0 100%);background-size:240% 100%;animation:sheen 4.5s linear infinite"></div>
+<div style="display:flex;justify-content:space-between;padding:9px 14px 4px"><span style="font-size:11px;font-weight:900;letter-spacing:.22em;color:#cfcabb">COURSE</span><span style="font-size:11px;font-weight:900;letter-spacing:.1em;color:#cfcabb">芝 1600m</span></div>
+<svg width="264" height="132" style="display:block">
+<path id="lane-hud" d="M46 42 H182 A30 30 0 0 1 182 100 H46" fill="none" stroke="#4d6b40" stroke-width="16"></path>
+<path d="M46 42 H182 A30 30 0 0 1 182 100 H46" fill="none" stroke="rgba(247,244,234,.35)" stroke-width="1"></path>
+<line x1="46" y1="32" x2="46" y2="52" stroke="#fff" stroke-width="2"></line>
+<line x1="46" y1="90" x2="46" y2="110" stroke="#f3cf34" stroke-width="3"></line>
+<text x="52" y="122" fill="#f3cf34" font-family="Saira Condensed" font-size="11" font-weight="700">GOAL</text>
+<circle r="3" fill="#d62828"><animateMotion dur="9s" repeatCount="indefinite"><mpath href="#lane-hud"></mpath></animateMotion></circle>
+<circle r="3" fill="#1446b4"><animateMotion dur="9.4s" begin="-.25s" repeatCount="indefinite"><mpath href="#lane-hud"></mpath></animateMotion></circle>
+<circle r="3" fill="#f08219"><animateMotion dur="9.8s" begin="-.5s" repeatCount="indefinite"><mpath href="#lane-hud"></mpath></animateMotion></circle>
+<circle r="5.6" fill="none" stroke="#f3cf34" stroke-width="2"><animateMotion dur="9.2s" begin="-.12s" repeatCount="indefinite"><mpath href="#lane-hud"></mpath></animateMotion></circle>
+</svg>
+<div style="margin:2px 14px 0;height:6px;background:rgba(255,255,255,.12)"><div style="width:74%;height:6px;background-image:linear-gradient(100deg,#fff6b0 0%,#f3cf34 30%,#a9791a 48%,#f7dc6b 62%,#fff6b0 100%);background-size:240% 100%;animation:sheen 4.5s linear infinite"></div></div>
+<div style="display:flex;justify-content:space-between;padding:6px 14px 0"><span style="font-size:11px;font-weight:900;letter-spacing:.22em;color:#cfcabb;opacity:.6">START</span><span style="font-family:'Saira Condensed',sans-serif;font-size:16px;color:#f3cf34">残 400m</span></div>
+</div>
+</sc-if>
+<div style="position:absolute;left:-30px;bottom:0;width:1350px;height:146px;background:rgba(7,10,8,.86);transform:skewX(-9deg);box-shadow:0 -16px 44px rgba(0,0,0,.55);overflow:hidden;animation:riseSk .5s cubic-bezier(.2,.85,.2,1) both">
+<div style="height:4px;background-image:linear-gradient(100deg,#fff6b0 0%,#f3cf34 30%,#a9791a 48%,#f7dc6b 62%,#fff6b0 100%);background-size:240% 100%;animation:sheen 4.5s linear infinite"></div>
+<div style="position:absolute;left:0;top:30px;width:100%;height:1px;background:rgba(255,255,255,.09);animation:streak 1.5s linear infinite"></div>
+<div style="position:absolute;left:0;top:104px;width:100%;height:1px;background:rgba(255,255,255,.07);animation:streak 2.1s linear .4s infinite"></div>
+</div>
+<div style="position:absolute;left:36px;bottom:0;width:150px;height:172px;background:#1b241d;border:1px solid rgba(243,207,52,.45);border-bottom:0;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(135deg,rgba(255,255,255,.07) 0 8px,rgba(255,255,255,0) 8px 16px)"></div><div style="position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);text-align:center;font:400 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;color:rgba(255,255,255,.62)">実況アナ<br>立ち絵（口パク2枚）</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:30px;background:rgba(4,7,5,.92);border-top:1px solid rgba(243,207,52,.45);display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-size:10px;font-weight:900;letter-spacing:.2em;color:#f3cf34">実況</span><span style="font-weight:900;font-size:15px">星野 亮太</span></div></div>
+<div style="position:absolute;left:206px;bottom:104px;display:flex;align-items:center;gap:14px">
+<div style="display:flex;align-items:center;gap:7px;background:#c8271f;padding:3px 10px"><div style="width:7px;height:7px;background:#fff;border-radius:50%;animation:onair 1.1s ease-in-out infinite"></div><span style="font-size:11px;font-weight:900;letter-spacing:.2em">ON AIR</span></div>
+<div style="display:flex;align-items:center;gap:3px;height:16px">
+<div style="width:3px;height:16px;background:#f3cf34;transform-origin:center;animation:lv .62s ease-in-out infinite"></div>
+<div style="width:3px;height:16px;background:#f3cf34;transform-origin:center;animation:lv .62s ease-in-out .08s infinite"></div>
+<div style="width:3px;height:16px;background:#f3cf34;transform-origin:center;animation:lv .62s ease-in-out .16s infinite"></div>
+<div style="width:3px;height:16px;background:#f3cf34;transform-origin:center;animation:lv .62s ease-in-out .24s infinite"></div>
+<div style="width:3px;height:16px;background:#f3cf34;transform-origin:center;animation:lv .62s ease-in-out .32s infinite"></div>
+<div style="width:3px;height:16px;background:#f3cf34;transform-origin:center;animation:lv .62s ease-in-out .4s infinite"></div>
+</div>
+<span style="font-size:11px;font-weight:900;letter-spacing:.18em;color:#cfcabb">実況中</span>
+</div>
+<div style="position:absolute;left:206px;bottom:66px;font-size:19px;font-weight:700;white-space:nowrap;color:#cfcabb;animation:push 3.4s linear infinite">3コーナー、隊列は縦長になりました</div>
+<div style="position:absolute;left:206px;bottom:22px;font-weight:900;font-size:28px;line-height:40px;white-space:nowrap;text-shadow:0 2px 8px rgba(0,0,0,.6);animation:say 3.4s linear infinite"><span style="font-family:'Saira Condensed',sans-serif;font-size:36px;color:#ff4d3d">3</span>番 が先頭、内から <span style="font-family:'Saira Condensed',sans-serif;font-size:34px;color:#f3cf34">7</span>番 が詰めてきた</div>
+<sc-if value="{{ showGauge }}" hint-placeholder-val="{{ true }}">
+<div style="position:absolute;right:250px;bottom:30px;text-align:right"><div style="font-size:11px;font-weight:900;letter-spacing:.22em;color:#cfcabb">余力</div>
+<div style="display:flex;gap:5px;height:36px;align-items:flex-end;margin-top:8px">
+<div style="width:12px;height:36px;background:#f3cf34;transform-origin:bottom;animation:gauge 1s ease-in-out infinite"></div>
+<div style="width:12px;height:30px;background:#f3cf34;transform-origin:bottom;animation:gauge 1s ease-in-out .12s infinite"></div>
+<div style="width:12px;height:24px;background:#f3cf34;transform-origin:bottom;animation:gauge 1s ease-in-out .24s infinite"></div>
+<div style="width:12px;height:18px;background:rgba(243,207,52,.28)"></div>
+<div style="width:12px;height:12px;background:rgba(243,207,52,.2)"></div>
+</div></div>
+</sc-if>
+<div style="position:absolute;right:56px;bottom:22px;text-align:right">
+<div style="font-size:11px;font-weight:900;letter-spacing:.22em;color:#cfcabb">残り</div>
+<div style="font-family:'Saira Condensed',sans-serif;font-size:76px;line-height:.9;font-variant-numeric:tabular-nums;transform:skewX(-9deg);background-image:linear-gradient(100deg,#fff6b0 0%,#f3cf34 30%,#a9791a 48%,#f7dc6b 62%,#fff6b0 100%);background-size:240% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sheen 4.5s linear infinite">400</div>
+<div style="font-size:11px;font-weight:900;letter-spacing:.3em;color:#cfcabb">METERS</div>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:720},&quot;showStandings&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;表示&quot;},&quot;showMinimap&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;表示&quot;},&quot;showGauge&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;表示&quot;},&quot;lighting&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ナイター&quot;,&quot;デイ&quot;],&quot;default&quot;:&quot;ナイター&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;表示&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    return {
+      showStandings: p.showStandings ?? true,
+      showMinimap: p.showMinimap ?? true,
+      showGauge: p.showGauge ?? true,
+      night: (p.lighting ?? 'ナイター') === 'ナイター'
+    };
+  }
+}
+
+</script>
+</body>
+</html>

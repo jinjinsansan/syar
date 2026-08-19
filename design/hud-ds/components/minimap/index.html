@@ -1,8 +1,21 @@
-<!-- @dsCard group="HUD" -->
+<!-- @dsCard group="HUD" viewport="320x300" name="コース図ミニマップ" subtitle="自馬マーカー走行／残距離ゲージ" -->
 <title>コース図ミニマップ</title>
-<style>:root{--gold:#fad728;--paper:#f6f2e7;--paper-2:#efe9dc;--ink:#22201c;--panel:rgba(4,8,6,.76);--band:rgba(3,7,5,.82);--board:rgba(6,10,8,.86);--line:rgba(236,232,211,.4);--turf:#6b9152;--pink:#c81e78;--f1:#f5f5f5;--f2:#191919;--f3:#d62828;--f4:#1446b4;--f5:#fad728;--f6:#148c46;--f7:#f08219;--f8:#f596be;--font:system-ui,-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif}
-*{box-sizing:border-box}body{margin:0;font-family:var(--font);color:var(--paper)}
-.stage{position:relative;background:linear-gradient(#5f8f45,#4c7a3a);overflow:hidden}
-.frame{display:inline-block;width:24px;height:20px;line-height:20px;text-align:center;font-weight:700;font-size:13px;border-radius:2px}
-.frame.f1{background:var(--f1);color:#111}.frame.f2{background:var(--f2)}.frame.f3{background:var(--f3)}.frame.f4{background:var(--f4)}.frame.f5{background:var(--f5);color:#111}.frame.f6{background:var(--f6)}.frame.f7{background:var(--f7)}.frame.f8{background:var(--f8);color:#111}</style>
-<div class="stage" style="width:240px;height:240px"><div style="position:absolute;left:24px;top:112px;width:190px;height:112px;background:rgba(5,10,8,.62);border:1px solid rgba(236,232,211,.35)"><div style="position:absolute;left:6px;top:2px;font:700 10px var(--font);opacity:.85">コース</div><svg width="190" height="112" style="position:absolute;left:0;top:0"><path d="M30 30 H150 A26 26 0 0 1 150 82 H30" fill="none" stroke="#5f8f45" stroke-width="12"/><path d="M30 30 H150 A26 26 0 0 1 150 82 H30" fill="none" stroke="rgba(240,240,236,.8)" stroke-width="1"/><line x1="30" y1="22" x2="30" y2="38" stroke="#fff" stroke-width="2"/><line x1="30" y1="74" x2="30" y2="90" stroke="#fad728" stroke-width="2"/><circle cx="96" cy="30" r="2.6" fill="#d62828"/><circle cx="102" cy="30" r="2.6" fill="#1446b4"/><circle cx="108" cy="30" r="2.6" fill="#f08219"/><circle cx="90" cy="30" r="4.2" fill="none" stroke="#fff" stroke-width="1.5"/><polygon points="98,20 93,30 103,30" fill="rgba(200,30,120,.95)"/></svg></div></div>
+<link rel="stylesheet" href="../../styles.css">
+<div class="stage" style="width:320px;height:300px"><div class="turf"></div>
+<div class="glass notch" style="position:absolute;left:28px;bottom:28px;width:264px;padding:0 0 12px">
+<div class="bar edge"></div>
+<div style="display:flex;justify-content:space-between;padding:9px 14px 4px"><span class="lbl">COURSE</span><span class="lbl" style="letter-spacing:.1em">芝 1600m</span></div>
+<svg width="264" height="132" style="display:block">
+<path id="lane" d="M46 42 H182 A30 30 0 0 1 182 100 H46" fill="none" stroke="#4d6b40" stroke-width="16"/>
+<path d="M46 42 H182 A30 30 0 0 1 182 100 H46" fill="none" stroke="rgba(247,244,234,.35)" stroke-width="1"/>
+<line x1="46" y1="32" x2="46" y2="52" stroke="#fff" stroke-width="2"/>
+<line x1="46" y1="90" x2="46" y2="110" stroke="#f3cf34" stroke-width="3"/>
+<text x="52" y="122" fill="#f3cf34" font-family="system-ui" font-size="11" font-weight="700">GOAL</text>
+<circle r="3" fill="#d62828"><animateMotion dur="9s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1"><mpath href="#lane"/></animateMotion></circle>
+<circle r="3" fill="#1446b4"><animateMotion dur="9.4s" begin="-.25s" repeatCount="indefinite"><mpath href="#lane"/></animateMotion></circle>
+<circle r="3" fill="#f08219"><animateMotion dur="9.8s" begin="-.5s" repeatCount="indefinite"><mpath href="#lane"/></animateMotion></circle>
+<circle r="5.6" fill="none" stroke="#f3cf34" stroke-width="2"><animateMotion dur="9.2s" begin="-.12s" repeatCount="indefinite"><mpath href="#lane"/></animateMotion></circle>
+</svg>
+<div style="margin:2px 14px 0;height:6px;background:rgba(255,255,255,.12)"><div class="bar" style="width:74%;height:6px"></div></div>
+<div style="display:flex;justify-content:space-between;padding:6px 14px 0"><span class="lbl" style="opacity:.6">START</span><span class="num" style="font-size:16px;color:var(--gold)">残 400m</span></div>
+</div></div>

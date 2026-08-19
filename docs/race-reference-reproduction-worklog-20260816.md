@@ -364,3 +364,12 @@
 - Claude Design に新規デザインシステム「STAR レース中継 HUD」を作成し、`design/hud-ds/` のプレビュー（Tokens／区間タグ／順位パネル／実況帯／勝馬テロップ／着順ボード／ミニマップ／タイトル）を同期。
   `node design/hud-ds/build.mjs` で HTML を再生成 → DesignSync で `tokens/**`, `components/**` を上書きする運用。
 - 目的: HUD の見た目を Claude Design 上で合意してから、Canvas 実装（`packages/render/src/oblique-ui.ts` 等）へ反映する。馬の走り（B 案）は Codex 再開待ち（8/20 14:13）。
+
+## 2026-08-19 Claude Design 側の成果物を取り込み（design/hud-ds をミラー）
+
+- デザイナー側（Claude Design「STAR レース中継 HUD」）が全面的に置き換えたカード群をローカルへ同期。
+  取り込み: `styles.css`（トークン正本）／`tokens/`／`components/*`（21 枚: screen-live・title-card・start-band・entry-board・payout-board・paddock・replay-bar・broadcast-badges・narrator-cast・motion-spec・sheet-spec・motion-mock・standings・call-band・section-tag・winner-lower-third・minimap・program-board・race-detail・odds-board）／`templates/race-hud/`（RaceHud.dc.html・ds-base.js・support.js）／`README.md`・`MOTION_HANDOFF.md`・`github.md`・`thumbnail.html`。
+  取り込まない: `uploads/*.png`（オーナーのスクリーンショット）、`_ds_bundle.js`・`_ds_manifest.json`・`_adherence.oxlintrc.json`・`.thumbnail`（アプリ生成物）。
+- 旧 `components/results-board` は削除（デザイナー側で `payout-board` に統合）。`build.mjs`（叩き台生成）は役目を終えたので削除 — 以後 `design/hud-ds` の正本は Claude Design 側。
+- 本線: **派手版**（金グラデ 1 本・斜度 -9°・コンデンス数字）。実装座標の正本は `components/screen-live/index.html`、規約は `MOTION_HANDOFF.md`。
+- 実装への反映は未着手（次工程）。順番の案: ①トークン／共通描画（金プレート・斜め帯・枠色バッジ）→ ②レース中 HUD（screen-live）→ ③タイトル・発走帯 → ④勝馬テロップ・確定払戻 → ⑤Web 3 画面（DOM）。

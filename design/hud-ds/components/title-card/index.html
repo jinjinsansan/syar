@@ -1,8 +1,40 @@
-<!-- @dsCard group="Screens" -->
-<title>レース名タイトル</title>
-<style>:root{--gold:#fad728;--paper:#f6f2e7;--paper-2:#efe9dc;--ink:#22201c;--panel:rgba(4,8,6,.76);--band:rgba(3,7,5,.82);--board:rgba(6,10,8,.86);--line:rgba(236,232,211,.4);--turf:#6b9152;--pink:#c81e78;--f1:#f5f5f5;--f2:#191919;--f3:#d62828;--f4:#1446b4;--f5:#fad728;--f6:#148c46;--f7:#f08219;--f8:#f596be;--font:system-ui,-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif}
-*{box-sizing:border-box}body{margin:0;font-family:var(--font);color:var(--paper)}
-.stage{position:relative;background:linear-gradient(#5f8f45,#4c7a3a);overflow:hidden}
-.frame{display:inline-block;width:24px;height:20px;line-height:20px;text-align:center;font-weight:700;font-size:13px;border-radius:2px}
-.frame.f1{background:var(--f1);color:#111}.frame.f2{background:var(--f2)}.frame.f3{background:var(--f3)}.frame.f4{background:var(--f4)}.frame.f5{background:var(--f5);color:#111}.frame.f6{background:var(--f6)}.frame.f7{background:var(--f7)}.frame.f8{background:var(--f8);color:#111}</style>
-<div class="stage" style="width:1280px;height:720px"><div style="position:absolute;inset:0;background:linear-gradient(#7d94a8,#3f5a3a)"></div><div style="position:absolute;left:64px;top:110px;width:720px;height:420px;background:rgba(6,10,8,.72);border:1px solid var(--line);border-left:6px solid var(--gold);padding:36px 40px"><div style="font:700 22px var(--font);color:var(--paper-2)">スターパーク競馬場　11R</div><div style="font:700 64px var(--font);margin-top:12px">桜星賞</div><div style="height:3px;background:var(--gold);width:560px;margin:14px 0 22px"></div><div style="font:700 26px var(--font)">芝 1600m　左回り</div><div style="font-size:20px;margin-top:14px;opacity:.9">天候 晴　　馬場 良</div><div style="font-size:14px;margin-top:40px;letter-spacing:.1em;opacity:.7">GRADE I ・ TURF CHAMPIONSHIP</div></div></div>
+<!-- @dsCard group="Screens" name="【本線】レース名タイトル（発走前）" subtitle="3.0–5.6秒に出る全画面タイトル／実測座標つき" viewport="1280x1120" -->
+<title>レース名タイトル（発走前）</title>
+<link rel="stylesheet" href="../../styles.css">
+<div class="stage" style="width:1280px;height:720px">
+<div style="position:absolute;inset:0;background:linear-gradient(#7d94a8,#3f5a3a)"></div><div class="ph"></div><div class="ph-l" style="top:20%">レース映像（空撮フライオーバーの止め）</div>
+<div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(3,6,4,.86) 0 44%,rgba(3,6,4,0) 78%)"></div>
+<div style="position:absolute;left:-40px;top:150px;width:820px;background:var(--glass);border-top:1px solid var(--gold-hair);border-bottom:1px solid var(--gold-hair);transform:skewX(-9deg);padding:34px 60px 38px 90px;animation:rise .55s cubic-bezier(.2,.85,.2,1) both">
+<div class="unskew" style="width:100%">
+<div class="lbl" style="letter-spacing:.3em">スターパーク競馬場　11R</div>
+<div class="reveal plate" style="font:900 96px var(--jp);letter-spacing:-.02em;margin:10px 0 0;animation:wipe .7s cubic-bezier(.2,.85,.2,1) both,sheen 5s linear infinite">桜星賞</div>
+<div class="bar" style="height:5px;width:520px;margin:18px 0 26px;animation:wipe .6s .2s both,sheen 4.5s linear infinite"></div>
+<div style="display:flex;align-items:flex-end;gap:30px"><span class="num" style="font-size:64px">1600</span><span style="font:900 26px var(--jp);padding-bottom:8px">m　芝・左</span></div>
+<div style="display:flex;gap:28px;margin-top:22px;font:700 20px var(--jp);opacity:.9"><span>天候　晴</span><span>馬場　良</span><span>発走　15:40</span></div>
+<div class="lbl" style="margin-top:34px;letter-spacing:.34em;color:var(--gold)">GRADE I ・ TURF CHAMPIONSHIP</div>
+</div></div>
+<div style="position:absolute;right:36px;top:36px;display:flex;align-items:center;gap:8px;background:var(--glass);border:1px solid var(--gold-hair);transform:skewX(-9deg);padding:6px 16px"><span class="unskew lbl" style="color:var(--gold)">12 HORSES</span></div>
+<div class="rise" style="position:absolute;right:36px;bottom:44px;width:296px;background:var(--glass);border:1px solid var(--gold-hair);animation-delay:.5s">
+<div class="edge"></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px 6px"><span class="lbl" style="color:var(--gold)">あなたの馬</span><span class="lbl" style="margin-left:auto;opacity:.6">MY HORSE</span></div>
+<div style="display:flex;align-items:center;gap:12px;padding:0 14px 6px"><span class="frame f7" style="width:40px;height:32px;font-size:22px"><i>7</i></span><span style="font:900 26px var(--jp)">サクラブリーズ</span></div>
+<div style="display:flex;align-items:flex-end;gap:18px;padding:0 14px 12px"><span style="font:700 15px var(--jp);opacity:.85">騎手　佐藤 翼</span><span style="margin-left:auto;text-align:right"><span class="lbl" style="display:block">単勝</span><span class="num plate" style="font-size:34px">3.4</span></span></div>
+</div>
+</div>
+<div style="width:1280px;padding:24px 32px 32px;background:#0c100d;font:400 13px ui-monospace,Menlo,monospace;color:var(--paper-70);line-height:1.85">
+<div style="font:700 22px var(--jp);color:var(--gold);margin-bottom:2px">実装座標（1280×720・左上原点）</div>
+<div style="font:700 14px var(--jp);color:var(--paper);margin-bottom:14px">出るのは displaySec 3.0–5.6（空撮のあと）。前後 0.35 秒でフェード。背景は映像のまま、左 44% に暗幕を敷く。</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 40px">
+<div>暗幕　　　　　x0–563（画面幅の 44%）に rgba(3,6,4,.86) → x998（78%）へ 0 まで。上下の帯は敷かない</div>
+<div>板　　　　　　宣言 left-40 top150 w820（斜度 -9°）／地 rgba(7,10,8,.86)／上下辺のみ金ヘアライン 1px／左端は画面外へ出して切り落とす</div>
+<div>競馬場・R　　 12px letter-spacing .3em、板の内側 x90+ から</div>
+<div>レース名　　　96px 金プレート・字間 -0.02em／0.7s で左からワイプ／光沢 5s 周期</div>
+<div>金の下線　　　高5 幅520／0.2s 遅れて 0.6s でワイプ</div>
+<div>距離　　　　　数字 64px（コンデンス）＋「m　芝・左」26px を下端揃え</div>
+<div>条件　　　　　20px 3項目・間隔 28px（天候／馬場／発走時刻）</div>
+<div>格　　　　　　12px letter-spacing .34em 金／板の最下部</div>
+<div>頭数バッジ　　右上 x1244 基準・斜度 -9°・地 rgba(7,10,8,.86)＋金ヘアライン</div>
+<div>自馬パネル　　右下 右端 x1244・下端 y676（w296）／上縁 金4px／見出し「あなたの馬」12px 金／馬番 40×32（枠色）／馬名 26px／騎手 15px／単勝 34px 金プレート 右揃え／0.5s 遅れてライズ（レース名の次に出す）</div>
+<div>参考　　　　　既存 drawRaceTitleCard は板 (76,104,720×452)・レース名 68px。本線ではレース名を 96px に上げ、板を画面外まで伸ばす</div>
+</div>
+</div>
