@@ -1,120 +1,131 @@
-<!-- @dsCard group="Web" name="牧場ホーム（わたしの馬）" subtitle="所有馬一覧＋今週の予定／未指示バッジ" viewport="1280x1490" -->
+<!-- @dsCard group="Web" name="牧場ホーム（わたしの馬）［アーケード］" subtitle="明るい筐体風／今週の予定＋未指示バッジ" viewport="1280x1660" -->
 <title>牧場ホーム</title>
 <link rel="stylesheet" href="../../styles.css">
-<div style="width:1280px;background:#0c100d;padding:0 0 40px">
-<div style="display:flex;align-items:center;height:56px;padding:0 40px;border-bottom:1px solid var(--rule)">
-<span style="font:900 18px var(--jp);letter-spacing:.22em;color:var(--gold)">STAR</span>
-<div style="display:flex;gap:26px;margin-left:36px;font:700 14px var(--jp)"><a href="#" style="color:var(--paper-70)">番組表</a><a href="#" style="color:var(--paper)">わたしの馬</a><a href="#" style="color:var(--paper-70)">育成</a><a href="#" style="color:var(--paper-70)">記録</a></div>
-<div style="margin-left:auto;display:flex;align-items:center;gap:20px;font:700 13px var(--jp)"><span style="color:var(--paper-70)">参加ポイント <span class="num" style="font-size:17px;color:var(--paper)">4,200</span> EP</span><span style="color:var(--paper-70)">賞金ポイント <span class="num" style="font-size:17px;color:var(--gold)">18,600</span> PP</span></div>
+<div data-theme="arcade" style="width:1280px;padding:0 0 40px">
+<div class="a-band" style="height:56px;padding:0 26px;border-bottom:3px solid var(--a-edge)">
+<span style="font:900 20px var(--a-jp);letter-spacing:.22em;color:#ffe37a;text-shadow:0 2px 0 rgba(0,0,0,.35)">STAR</span>
+<div style="display:flex;gap:6px;margin-left:24px"><span style="display:flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;font:900 14px var(--a-jp);color:rgba(255,255,255,.82)">番組表</span><span style="display:flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;font:900 14px var(--a-jp);background:#fff;color:var(--a-blue-d);box-shadow:0 2px 0 rgba(0,0,0,.25)">わたしの馬</span><span style="display:flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;font:900 14px var(--a-jp);color:rgba(255,255,255,.82)">育成</span><span style="display:flex;align-items:center;height:34px;padding:0 16px;border-radius:8px;font:900 14px var(--a-jp);color:rgba(255,255,255,.82)">記録</span></div>
+<div style="margin-left:auto;display:flex;gap:10px">
+<span style="display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:8px;background:#fff;border:2px solid var(--a-edge)"><span style="font:900 11px var(--a-jp);letter-spacing:.08em;color:var(--a-ink-2)">参加ポイント</span><span class="a-num" style="font-size:22px;color:var(--a-blue-d)">4,200</span><span style="font:900 11px var(--a-jp);color:var(--a-ink-2)">EP</span></span>
+<span style="display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:8px;background-image:var(--a-gloss-gold);border:2px solid #8a5a06"><span style="font:900 11px var(--a-jp);letter-spacing:.08em;color:#4a3105">賞金ポイント</span><span class="a-num" style="font-size:22px;color:#4a3105">18,600</span><span style="font:900 11px var(--a-jp);color:#4a3105">PP</span></span>
+</div></div>
+<div style="width:1180px;margin:0 auto;padding-top:22px">
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
+<span class="a-band" style="height:46px;padding:0 22px;border-radius:10px;border:2px solid var(--a-edge);font:900 26px var(--a-jp);letter-spacing:.06em;text-shadow:0 2px 0 rgba(0,0,0,.3)">わたしの馬</span>
+<span style="font:900 14px var(--a-jp);color:var(--a-ink-2)">所有 6 頭</span>
+<span style="margin-left:auto;display:flex;align-items:center;gap:10px;height:40px;padding:0 16px;border-radius:10px;background:#fff;border:2px solid var(--a-edge);box-shadow:var(--a-shadow-sm)"><span class="a-lbl">第</span><span class="a-num" style="font-size:26px;color:var(--a-num-time)">32</span><span class="a-lbl">週</span></span>
 </div>
-<div style="width:1180px;margin:0 auto;padding-top:28px">
-<div style="display:flex;align-items:baseline;gap:16px"><h1 style="font:900 34px var(--jp);margin:0">わたしの馬</h1><span style="font:700 14px var(--jp);color:var(--paper-70)">所有 6 頭</span><span style="margin-left:auto;font:700 14px var(--jp);color:var(--paper-70)">第 <span class="num" style="font-size:19px;color:var(--paper)">32</span> 週　—　次の週送りで調教が反映されます</span></div>
 
 <!-- 今週の予定 -->
-<div class="rise" style="margin-top:18px;background:var(--board);border:1px solid var(--gold-hair)">
-<div class="edge"></div>
-<div style="display:flex;align-items:center;gap:30px;padding:20px 26px">
-<div><div class="lbl" style="color:var(--gold)">今週の予定</div><div style="font:900 26px var(--jp);margin-top:6px">第 32 週</div><div style="font:700 13px var(--jp);color:var(--paper-70);margin-top:4px">8/18 〜 8/24</div></div>
-<div style="width:1px;height:78px;background:var(--rule)"></div>
-<div style="display:flex;gap:34px">
-<div><div class="lbl">調教の指示</div><div style="display:flex;align-items:baseline;gap:6px;margin-top:6px"><span class="num" style="font-size:30px;color:#fad728">2</span><span style="font:700 14px var(--jp);color:var(--paper-70)">/ 6 頭 未指示</span></div></div>
-<div><div class="lbl">出走登録</div><div style="display:flex;align-items:baseline;gap:6px;margin-top:6px"><span class="num" style="font-size:30px">3</span><span style="font:700 14px var(--jp);color:var(--paper-70)">頭</span></div></div>
-<div><div class="lbl">今週の消費予定</div><div style="display:flex;align-items:baseline;gap:6px;margin-top:6px"><span class="num" style="font-size:30px">1,150</span><span style="font:700 14px var(--jp);color:var(--paper-70)">EP</span></div></div>
+<div class="a-panel" style="border-width:3px">
+<div class="a-band" style="height:40px;padding:0 18px;justify-content:space-between">
+<span style="font:900 16px var(--a-jp);letter-spacing:.14em">今週の予定</span>
+<span style="font:900 13px var(--a-jp)">8/18 〜 8/24　次の週送りで調教が反映されます</span>
 </div>
+<div style="display:flex;align-items:center;gap:18px;padding:18px 22px;background-image:linear-gradient(#ffffff,#eef6fd)">
+<div style="text-align:center;min-width:150px;padding:10px 16px;border-radius:10px;background:#fff;border:2px solid var(--a-edge);box-shadow:var(--a-shadow-sm)"><div class="a-lbl">調教の指示</div><div style="margin-top:4px"><span class="a-num" style="font-size:40px;color:#d62f26">2</span> <span style="font:900 13px var(--a-jp);color:var(--a-ink-2)">/ 6 頭 未指示</span></div></div><div style="text-align:center;min-width:150px;padding:10px 16px;border-radius:10px;background:#fff;border:2px solid var(--a-edge);box-shadow:var(--a-shadow-sm)"><div class="a-lbl">出走登録</div><div style="margin-top:4px"><span class="a-num" style="font-size:40px;color:var(--a-num-time)">3</span> <span style="font:900 13px var(--a-jp);color:var(--a-ink-2)">頭</span></div></div><div style="text-align:center;min-width:150px;padding:10px 16px;border-radius:10px;background:#fff;border:2px solid var(--a-edge);box-shadow:var(--a-shadow-sm)"><div class="a-lbl">今週の消費予定</div><div style="margin-top:4px"><span class="a-num" style="font-size:40px;color:var(--a-num-money)">1,150</span> <span style="font:900 13px var(--a-jp);color:var(--a-ink-2)">EP</span></div></div>
 <div style="display:flex;flex-direction:column;gap:10px;margin-left:auto">
-<div style="display:flex;align-items:center;height:40px;background:var(--gold);transform:skewX(-9deg);padding:0 24px"><span class="unskew" style="font:900 16px var(--jp);color:#12140f">調教を指示する</span></div>
-<div style="display:flex;align-items:center;height:36px;background:rgba(7,10,8,.5);border:1px solid var(--rule);transform:skewX(-9deg);padding:0 24px;opacity:.4"><span class="unskew" style="font:700 15px var(--jp)">週を進める</span></div>
+<span class="a-btn a-btn-gold" style="height:48px;padding:0 26px;font-size:18px">調教を指示する</span>
+<span class="a-btn" style="height:40px;padding:0 26px;font-size:15px;opacity:.45">週を進める</span>
 </div>
 </div>
-<div style="display:flex;align-items:center;gap:10px;height:38px;padding:0 26px;background:rgba(250,215,40,.1);border-top:1px solid var(--rule)"><span style="font:700 12px var(--jp);letter-spacing:.08em;color:#fad728">未指示あり</span><span style="font:700 13px var(--jp);color:var(--paper-70)">トキメキステップ・ゲンブノツルギ の調教が未指示です。全頭に指示すると「週を進める」が押せます</span></div>
+<div style="display:flex;align-items:center;gap:12px;height:44px;padding:0 22px;background-image:linear-gradient(#fffbe8,#fff2c8);border-top:2px solid #e6c979">
+<span style="display:inline-flex;align-items:center;height:26px;padding:0 12px;border-radius:6px;background-image:linear-gradient(#ffe270,#f6c21c 52%,#d99f06);border:2px solid #a9741a;color:#4a3105;font:900 12px var(--a-jp)">未指示あり</span>
+<span style="font:900 14px var(--a-jp);color:var(--a-ink)">トキメキステップ・ゲンブノツルギ の調教が未指示です。全頭に指示すると「週を進める」が押せます</span>
+</div>
 </div>
 
-<!-- 所有馬一覧 -->
-<div style="margin-top:26px;background:var(--panel);border:1px solid var(--hair)">
-<div style="display:flex;align-items:center;height:34px;padding:0 20px;gap:16px"><span class="lbl" style="width:216px">馬名</span><span class="lbl" style="width:132px">格</span><span class="lbl" style="width:104px">素質</span><span class="lbl" style="width:104px">調子</span><span class="lbl" style="width:112px">疲労</span><span class="lbl" style="flex:1">次走</span><span class="lbl" style="width:88px;text-align:right">今週</span></div>
-<a href="#" style="display:flex;align-items:center;height:64px;padding:0 20px;gap:16px;text-decoration:none;color:var(--paper);border-top:1px solid var(--rule);background:transparent">
-<span style="width:216px;display:flex;flex-direction:column;gap:3px"><span style="font:900 17px var(--jp)">サクラブリーズ</span><span style="font:700 12px var(--jp);color:var(--paper-45)">牝4　今週 追い切り</span></span>
-<span style="width:132px"><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;font:900 12px var(--jp);letter-spacing:.06em;background:var(--gold);color:#12140f">重賞 GIII</span></span>
-<span style="width:104px"><span style="display:inline-flex;font-size:15px;letter-spacing:.04em;line-height:1"><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="position:relative;display:inline-block"><span style="color:rgba(246,242,231,.28)">★</span><span style="position:absolute;left:0;top:0;width:50%;overflow:hidden;color:var(--gold)">★</span></span></span></span>
-<span style="width:104px"><span style="display:inline-flex;align-items:center;gap:6px;font:700 13px var(--jp);color:#5fd48b"><span style="font-size:15px">◎</span>絶好調</span></span>
-<span style="width:112px"><span style="display:flex;align-items:center;gap:8px"><span style="position:relative;width:64px;height:8px;background:rgba(0,0,0,.5);border:1px solid var(--paper-45)"><span style="display:block;width:24%;height:100%;background:var(--ok)"></span></span><span class="num" style="font-size:14px;color:var(--ok);width:26px;text-align:right">24</span></span></span>
-<span style="flex:1;font:700 14px var(--jp);color:var(--paper-70)">桜星賞（8/22）</span>
-<span style="width:88px;display:flex;justify-content:flex-end"><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;background:rgba(95,212,139,.12);color:#5fd48b;font:700 12px var(--jp);letter-spacing:.06em">指示済み</span></span>
-</a><a href="#" style="display:flex;align-items:center;height:64px;padding:0 20px;gap:16px;text-decoration:none;color:var(--paper);border-top:1px solid var(--rule);background:rgba(255,255,255,.025)">
-<span style="width:216px;display:flex;flex-direction:column;gap:3px"><span style="font:900 17px var(--jp)">ホクトリュウセイ</span><span style="font:700 12px var(--jp);color:var(--paper-45)">牡5　今週 坂路</span></span>
-<span style="width:132px"><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;font:900 12px var(--jp);letter-spacing:.06em;background:var(--gold);color:#12140f">オープン</span></span>
-<span style="width:104px"><span style="display:inline-flex;font-size:15px;letter-spacing:.04em;line-height:1"><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="color:rgba(246,242,231,.28)">★</span></span></span>
-<span style="width:104px"><span style="display:inline-flex;align-items:center;gap:6px;font:700 13px var(--jp);color:#5fd48b"><span style="font-size:15px">○</span>好調</span></span>
-<span style="width:112px"><span style="display:flex;align-items:center;gap:8px"><span style="position:relative;width:64px;height:8px;background:rgba(0,0,0,.5);border:1px solid var(--paper-45)"><span style="display:block;width:41%;height:100%;background:var(--warn)"></span></span><span class="num" style="font-size:14px;color:var(--warn);width:26px;text-align:right">41</span></span></span>
-<span style="flex:1;font:700 14px var(--jp);color:var(--paper-70)">若草賞（8/24）</span>
-<span style="width:88px;display:flex;justify-content:flex-end"><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;background:rgba(95,212,139,.12);color:#5fd48b;font:700 12px var(--jp);letter-spacing:.06em">指示済み</span></span>
-</a><a href="#" style="display:flex;align-items:center;height:64px;padding:0 20px;gap:16px;text-decoration:none;color:var(--paper);border-top:1px solid var(--rule);background:transparent;box-shadow:inset 3px 0 0 #fad728">
-<span style="width:216px;display:flex;flex-direction:column;gap:3px"><span style="font:900 17px var(--jp)">トキメキステップ</span><span style="font:700 12px var(--jp);color:var(--paper-45)">牝3　今週の指示なし</span></span>
-<span style="width:132px"><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;font:900 12px var(--jp);letter-spacing:.06em;background:rgba(246,242,231,.1);color:var(--paper);border:1px solid var(--rule)">2勝クラス</span></span>
-<span style="width:104px"><span style="display:inline-flex;font-size:15px;letter-spacing:.04em;line-height:1"><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="position:relative;display:inline-block"><span style="color:rgba(246,242,231,.28)">★</span><span style="position:absolute;left:0;top:0;width:50%;overflow:hidden;color:var(--gold)">★</span></span><span style="color:rgba(246,242,231,.28)">★</span></span></span>
-<span style="width:104px"><span style="display:inline-flex;align-items:center;gap:6px;font:700 13px var(--jp);color:var(--paper-70)"><span style="font-size:15px">○</span>普通</span></span>
-<span style="width:112px"><span style="display:flex;align-items:center;gap:8px"><span style="position:relative;width:64px;height:8px;background:rgba(0,0,0,.5);border:1px solid var(--paper-45)"><span style="display:block;width:58%;height:100%;background:var(--warn)"></span></span><span class="num" style="font-size:14px;color:var(--warn);width:26px;text-align:right">58</span></span></span>
-<span style="flex:1;font:700 14px var(--jp);color:var(--paper-45)">未定</span>
-<span style="width:88px;display:flex;justify-content:flex-end"><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;background:rgba(250,215,40,.16);color:#fad728;font:700 12px var(--jp);letter-spacing:.06em">未指示</span></span>
-</a><a href="#" style="display:flex;align-items:center;height:64px;padding:0 20px;gap:16px;text-decoration:none;color:var(--paper);border-top:1px solid var(--rule);background:rgba(255,255,255,.025);box-shadow:inset 3px 0 0 #fad728">
-<span style="width:216px;display:flex;flex-direction:column;gap:3px"><span style="font:900 17px var(--jp)">ゲンブノツルギ</span><span style="font:700 12px var(--jp);color:var(--paper-45)">牡4　今週の指示なし</span></span>
-<span style="width:132px"><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;font:900 12px var(--jp);letter-spacing:.06em;background:rgba(246,242,231,.1);color:var(--paper);border:1px solid var(--rule)">1勝クラス</span></span>
-<span style="width:104px"><span style="display:inline-flex;font-size:15px;letter-spacing:.04em;line-height:1"><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="color:rgba(246,242,231,.28)">★</span><span style="color:rgba(246,242,231,.28)">★</span></span></span>
-<span style="width:104px"><span style="display:inline-flex;align-items:center;gap:6px;font:700 13px var(--jp);color:#fad728"><span style="font-size:15px">△</span>やや不安</span></span>
-<span style="width:112px"><span style="display:flex;align-items:center;gap:8px"><span style="position:relative;width:64px;height:8px;background:rgba(0,0,0,.5);border:1px solid var(--paper-45)"><span style="display:block;width:72%;height:100%;background:var(--bad)"></span></span><span class="num" style="font-size:14px;color:var(--bad);width:26px;text-align:right">72</span></span></span>
-<span style="flex:1;font:700 14px var(--jp);color:var(--paper-45)">未定</span>
-<span style="width:88px;display:flex;justify-content:flex-end"><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;background:rgba(250,215,40,.16);color:#fad728;font:700 12px var(--jp);letter-spacing:.06em">未指示</span></span>
-</a><a href="#" style="display:flex;align-items:center;height:64px;padding:0 20px;gap:16px;text-decoration:none;color:var(--paper);border-top:1px solid var(--rule);background:transparent">
-<span style="width:216px;display:flex;flex-direction:column;gap:3px"><span style="font:900 17px var(--jp)">シラユキノヒメ</span><span style="font:700 12px var(--jp);color:var(--paper-45)">牝3　今週 ウッドチップ</span></span>
-<span style="width:132px"><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;font:900 12px var(--jp);letter-spacing:.06em;background:rgba(246,242,231,.1);color:var(--paper);border:1px solid var(--rule)">未勝利</span></span>
-<span style="width:104px"><span style="display:inline-flex;font-size:15px;letter-spacing:.04em;line-height:1"><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="position:relative;display:inline-block"><span style="color:rgba(246,242,231,.28)">★</span><span style="position:absolute;left:0;top:0;width:50%;overflow:hidden;color:var(--gold)">★</span></span><span style="color:rgba(246,242,231,.28)">★</span><span style="color:rgba(246,242,231,.28)">★</span></span></span>
-<span style="width:104px"><span style="display:inline-flex;align-items:center;gap:6px;font:700 13px var(--jp);color:var(--paper-70)"><span style="font-size:15px">○</span>普通</span></span>
-<span style="width:112px"><span style="display:flex;align-items:center;gap:8px"><span style="position:relative;width:64px;height:8px;background:rgba(0,0,0,.5);border:1px solid var(--paper-45)"><span style="display:block;width:12%;height:100%;background:var(--ok)"></span></span><span class="num" style="font-size:14px;color:var(--ok);width:26px;text-align:right">12</span></span></span>
-<span style="flex:1;font:700 14px var(--jp);color:var(--paper-70)">新緑賞（8/23）</span>
-<span style="width:88px;display:flex;justify-content:flex-end"><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;background:rgba(95,212,139,.12);color:#5fd48b;font:700 12px var(--jp);letter-spacing:.06em">指示済み</span></span>
-</a><a href="#" style="display:flex;align-items:center;height:64px;padding:0 20px;gap:16px;text-decoration:none;color:var(--paper);border-top:1px solid var(--rule);background:rgba(255,255,255,.025)">
-<span style="width:216px;display:flex;flex-direction:column;gap:3px"><span style="font:900 17px var(--jp)">カガヤキボシ</span><span style="font:700 12px var(--jp);color:var(--paper-45)">牡2　今週 休養</span></span>
-<span style="width:132px"><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;font:900 12px var(--jp);letter-spacing:.06em;background:rgba(246,242,231,.1);color:var(--paper);border:1px solid var(--rule)">新馬</span></span>
-<span style="width:104px"><span style="display:inline-flex;font-size:15px;letter-spacing:.04em;line-height:1"><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span><span style="color:var(--gold)">★</span></span></span>
-<span style="width:104px"><span style="display:inline-flex;align-items:center;gap:6px;font:700 13px var(--jp);color:#5fd48b"><span style="font-size:15px">○</span>好調</span></span>
-<span style="width:112px"><span style="display:flex;align-items:center;gap:8px"><span style="position:relative;width:64px;height:8px;background:rgba(0,0,0,.5);border:1px solid var(--paper-45)"><span style="display:block;width:8%;height:100%;background:var(--ok)"></span></span><span class="num" style="font-size:14px;color:var(--ok);width:26px;text-align:right">8</span></span></span>
-<span style="flex:1;font:700 14px var(--jp);color:var(--paper-45)">デビュー戦 未定</span>
-<span style="width:88px;display:flex;justify-content:flex-end"><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;background:transparent;color:var(--paper-45);font:700 12px var(--jp);letter-spacing:.06em;border:1px solid var(--rule)">休養中</span></span>
+<!-- 一覧 -->
+<div class="a-panel" style="margin-top:18px;border-width:3px">
+<div class="a-band" style="height:38px;padding:0 18px;gap:16px">
+<span class="a-lbl" style="width:230px;flex:0 0 230px;color:#fff">馬名</span><span class="a-lbl" style="width:132px;flex:0 0 132px;color:#fff">格</span><span class="a-lbl" style="width:112px;flex:0 0 112px;color:#fff">素質</span><span class="a-lbl" style="width:118px;flex:0 0 118px;color:#fff">調子</span><span class="a-lbl" style="width:132px;flex:0 0 132px;color:#fff">疲労</span><span class="a-lbl" style="flex:1;min-width:150px;color:#fff">次走</span><span class="a-lbl" style="width:104px;flex:0 0 104px;text-align:right;color:#fff">今週</span>
+</div>
+<a href="#" style="display:flex;align-items:center;height:70px;padding:0 18px;gap:16px;text-decoration:none;color:var(--a-ink);border-top:1px solid var(--a-line);background:#fff;opacity:1">
+<span style="width:230px;flex:0 0 230px;display:flex;flex-direction:column;gap:4px"><span style="font:900 19px var(--a-jp)">サクラブリーズ</span><span style="font:900 12px var(--a-jp);color:var(--a-ink-3)">牝4　今週 追い切り</span></span>
+<span style="width:132px;flex:0 0 132px"><span class="a-chip" style="height:24px;padding:0 10px;font-size:12px;background-image:var(--a-gloss-gold);border-color:#8a5a06;color:#4a3105">重賞 GIII</span></span>
+<span style="width:112px;flex:0 0 112px"><span style="display:inline-flex;font-size:17px;letter-spacing:.04em;line-height:1"><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="position:relative;display:inline-block"><span style="color:#c9d7e2">★</span><span style="position:absolute;left:0;top:0;width:50%;overflow:hidden;color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span></span></span></span>
+<span style="width:118px;flex:0 0 118px"><span style="display:inline-flex;align-items:center;gap:6px;font:900 14px var(--a-jp);color:#1e7a3a"><span style="font-size:17px">◎</span>絶好調</span></span>
+<span style="width:132px;flex:0 0 132px"><span style="display:flex;align-items:center;gap:8px"><span style="position:relative;width:72px;height:14px;border-radius:7px;background:#e3ecf3;border:2px solid var(--a-edge);overflow:hidden"><span style="display:block;width:24%;height:100%;background-image:var(--a-gloss-green)"></span></span><span class="a-num" style="font-size:18px;color:var(--a-green-d)">24</span></span></span>
+<span style="flex:1;min-width:150px;font:900 14px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">桜星賞（8/22）</span>
+<span style="width:104px;flex:0 0 104px;display:flex;justify-content:flex-end"><span style="display:inline-flex;align-items:center;height:26px;padding:0 12px;border-radius:6px;background-image:var(--a-gloss-green);border:2px solid var(--a-green-d);color:#fff;font:900 12px var(--a-jp);letter-spacing:.06em">指示済み</span></span>
+</a><a href="#" style="display:flex;align-items:center;height:70px;padding:0 18px;gap:16px;text-decoration:none;color:var(--a-ink);border-top:1px solid var(--a-line);background:var(--a-panel-2);opacity:1">
+<span style="width:230px;flex:0 0 230px;display:flex;flex-direction:column;gap:4px"><span style="font:900 19px var(--a-jp)">ホクトリュウセイ</span><span style="font:900 12px var(--a-jp);color:var(--a-ink-3)">牡5　今週 坂路</span></span>
+<span style="width:132px;flex:0 0 132px"><span class="a-chip" style="height:24px;padding:0 10px;font-size:12px;background-image:var(--a-gloss-gold);border-color:#8a5a06;color:#4a3105">オープン</span></span>
+<span style="width:112px;flex:0 0 112px"><span style="display:inline-flex;font-size:17px;letter-spacing:.04em;line-height:1"><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#c9d7e2">★</span></span></span>
+<span style="width:118px;flex:0 0 118px"><span style="display:inline-flex;align-items:center;gap:6px;font:900 14px var(--a-jp);color:#2f9e4f"><span style="font-size:17px">○</span>好調</span></span>
+<span style="width:132px;flex:0 0 132px"><span style="display:flex;align-items:center;gap:8px"><span style="position:relative;width:72px;height:14px;border-radius:7px;background:#e3ecf3;border:2px solid var(--a-edge);overflow:hidden"><span style="display:block;width:41%;height:100%;background-image:linear-gradient(#ffe270,#f6c21c 52%,#d99f06)"></span></span><span class="a-num" style="font-size:18px;color:#a9741a">41</span></span></span>
+<span style="flex:1;min-width:150px;font:900 14px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">若草賞（8/24）</span>
+<span style="width:104px;flex:0 0 104px;display:flex;justify-content:flex-end"><span style="display:inline-flex;align-items:center;height:26px;padding:0 12px;border-radius:6px;background-image:var(--a-gloss-green);border:2px solid var(--a-green-d);color:#fff;font:900 12px var(--a-jp);letter-spacing:.06em">指示済み</span></span>
+</a><a href="#" style="display:flex;align-items:center;height:70px;padding:0 18px;gap:16px;text-decoration:none;color:var(--a-ink);border-top:1px solid var(--a-line);background:linear-gradient(#fffbe8,#fff5cf);box-shadow:inset 5px 0 0 #f6c21c;opacity:1">
+<span style="width:230px;flex:0 0 230px;display:flex;flex-direction:column;gap:4px"><span style="font:900 19px var(--a-jp)">トキメキステップ</span><span style="font:900 12px var(--a-jp);color:var(--a-ink-3)">牝3　今週の指示なし</span></span>
+<span style="width:132px;flex:0 0 132px"><span class="a-chip" style="height:24px;padding:0 10px;font-size:12px;color:var(--a-ink)">2勝クラス</span></span>
+<span style="width:112px;flex:0 0 112px"><span style="display:inline-flex;font-size:17px;letter-spacing:.04em;line-height:1"><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="position:relative;display:inline-block"><span style="color:#c9d7e2">★</span><span style="position:absolute;left:0;top:0;width:50%;overflow:hidden;color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span></span><span style="color:#c9d7e2">★</span></span></span>
+<span style="width:118px;flex:0 0 118px"><span style="display:inline-flex;align-items:center;gap:6px;font:900 14px var(--a-jp);color:var(--a-ink-2)"><span style="font-size:17px">○</span>普通</span></span>
+<span style="width:132px;flex:0 0 132px"><span style="display:flex;align-items:center;gap:8px"><span style="position:relative;width:72px;height:14px;border-radius:7px;background:#e3ecf3;border:2px solid var(--a-edge);overflow:hidden"><span style="display:block;width:58%;height:100%;background-image:linear-gradient(#ffe270,#f6c21c 52%,#d99f06)"></span></span><span class="a-num" style="font-size:18px;color:#a9741a">58</span></span></span>
+<span style="flex:1;min-width:150px;font:900 14px var(--a-jp);color:var(--a-ink-3);white-space:nowrap">未定</span>
+<span style="width:104px;flex:0 0 104px;display:flex;justify-content:flex-end"><span style="display:inline-flex;align-items:center;height:26px;padding:0 12px;border-radius:6px;background-image:linear-gradient(#ffe270,#f6c21c 52%,#d99f06);border:2px solid #a9741a;color:#4a3105;font:900 12px var(--a-jp);letter-spacing:.06em">未指示</span></span>
+</a><a href="#" style="display:flex;align-items:center;height:70px;padding:0 18px;gap:16px;text-decoration:none;color:var(--a-ink);border-top:1px solid var(--a-line);background:linear-gradient(#fffbe8,#fff5cf);box-shadow:inset 5px 0 0 #f6c21c;opacity:1">
+<span style="width:230px;flex:0 0 230px;display:flex;flex-direction:column;gap:4px"><span style="font:900 19px var(--a-jp)">ゲンブノツルギ</span><span style="font:900 12px var(--a-jp);color:var(--a-ink-3)">牡4　今週の指示なし</span></span>
+<span style="width:132px;flex:0 0 132px"><span class="a-chip" style="height:24px;padding:0 10px;font-size:12px;color:var(--a-ink)">1勝クラス</span></span>
+<span style="width:112px;flex:0 0 112px"><span style="display:inline-flex;font-size:17px;letter-spacing:.04em;line-height:1"><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#c9d7e2">★</span><span style="color:#c9d7e2">★</span></span></span>
+<span style="width:118px;flex:0 0 118px"><span style="display:inline-flex;align-items:center;gap:6px;font:900 14px var(--a-jp);color:#a9741a"><span style="font-size:17px">△</span>やや不安</span></span>
+<span style="width:132px;flex:0 0 132px"><span style="display:flex;align-items:center;gap:8px"><span style="position:relative;width:72px;height:14px;border-radius:7px;background:#e3ecf3;border:2px solid var(--a-edge);overflow:hidden"><span style="display:block;width:72%;height:100%;background-image:var(--a-gloss-red)"></span></span><span class="a-num" style="font-size:18px;color:var(--a-red-d)">72</span></span></span>
+<span style="flex:1;min-width:150px;font:900 14px var(--a-jp);color:var(--a-ink-3);white-space:nowrap">未定</span>
+<span style="width:104px;flex:0 0 104px;display:flex;justify-content:flex-end"><span style="display:inline-flex;align-items:center;height:26px;padding:0 12px;border-radius:6px;background-image:linear-gradient(#ffe270,#f6c21c 52%,#d99f06);border:2px solid #a9741a;color:#4a3105;font:900 12px var(--a-jp);letter-spacing:.06em">未指示</span></span>
+</a><a href="#" style="display:flex;align-items:center;height:70px;padding:0 18px;gap:16px;text-decoration:none;color:var(--a-ink);border-top:1px solid var(--a-line);background:#fff;opacity:1">
+<span style="width:230px;flex:0 0 230px;display:flex;flex-direction:column;gap:4px"><span style="font:900 19px var(--a-jp)">シラユキノヒメ</span><span style="font:900 12px var(--a-jp);color:var(--a-ink-3)">牝3　今週 ウッドチップ</span></span>
+<span style="width:132px;flex:0 0 132px"><span class="a-chip" style="height:24px;padding:0 10px;font-size:12px;color:var(--a-ink)">未勝利</span></span>
+<span style="width:112px;flex:0 0 112px"><span style="display:inline-flex;font-size:17px;letter-spacing:.04em;line-height:1"><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="position:relative;display:inline-block"><span style="color:#c9d7e2">★</span><span style="position:absolute;left:0;top:0;width:50%;overflow:hidden;color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span></span><span style="color:#c9d7e2">★</span><span style="color:#c9d7e2">★</span></span></span>
+<span style="width:118px;flex:0 0 118px"><span style="display:inline-flex;align-items:center;gap:6px;font:900 14px var(--a-jp);color:var(--a-ink-2)"><span style="font-size:17px">○</span>普通</span></span>
+<span style="width:132px;flex:0 0 132px"><span style="display:flex;align-items:center;gap:8px"><span style="position:relative;width:72px;height:14px;border-radius:7px;background:#e3ecf3;border:2px solid var(--a-edge);overflow:hidden"><span style="display:block;width:12%;height:100%;background-image:var(--a-gloss-green)"></span></span><span class="a-num" style="font-size:18px;color:var(--a-green-d)">12</span></span></span>
+<span style="flex:1;min-width:150px;font:900 14px var(--a-jp);color:var(--a-ink-2);white-space:nowrap">新緑賞（8/23）</span>
+<span style="width:104px;flex:0 0 104px;display:flex;justify-content:flex-end"><span style="display:inline-flex;align-items:center;height:26px;padding:0 12px;border-radius:6px;background-image:var(--a-gloss-green);border:2px solid var(--a-green-d);color:#fff;font:900 12px var(--a-jp);letter-spacing:.06em">指示済み</span></span>
+</a><a href="#" style="display:flex;align-items:center;height:70px;padding:0 18px;gap:16px;text-decoration:none;color:var(--a-ink);border-top:1px solid var(--a-line);background:var(--a-panel-2);opacity:0.6">
+<span style="width:230px;flex:0 0 230px;display:flex;flex-direction:column;gap:4px"><span style="font:900 19px var(--a-jp)">カガヤキボシ</span><span style="font:900 12px var(--a-jp);color:var(--a-ink-3)">牡2　今週 休養</span></span>
+<span style="width:132px;flex:0 0 132px"><span class="a-chip" style="height:24px;padding:0 10px;font-size:12px;color:var(--a-ink)">新馬</span></span>
+<span style="width:112px;flex:0 0 112px"><span style="display:inline-flex;font-size:17px;letter-spacing:.04em;line-height:1"><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span><span style="color:#f2b012;text-shadow:0 1px 0 #8a5a06">★</span></span></span>
+<span style="width:118px;flex:0 0 118px"><span style="display:inline-flex;align-items:center;gap:6px;font:900 14px var(--a-jp);color:#2f9e4f"><span style="font-size:17px">○</span>好調</span></span>
+<span style="width:132px;flex:0 0 132px"><span style="display:flex;align-items:center;gap:8px"><span style="position:relative;width:72px;height:14px;border-radius:7px;background:#e3ecf3;border:2px solid var(--a-edge);overflow:hidden"><span style="display:block;width:8%;height:100%;background-image:var(--a-gloss-green)"></span></span><span class="a-num" style="font-size:18px;color:var(--a-green-d)">8</span></span></span>
+<span style="flex:1;min-width:150px;font:900 14px var(--a-jp);color:var(--a-ink-3);white-space:nowrap">デビュー戦 未定</span>
+<span style="width:104px;flex:0 0 104px;display:flex;justify-content:flex-end"><span style="display:inline-flex;align-items:center;height:26px;padding:0 12px;border-radius:6px;background-image:linear-gradient(#fff,#e6edf4);border:2px solid var(--a-edge-soft);color:var(--a-ink-3);font:900 12px var(--a-jp);letter-spacing:.06em">休養中</span></span>
 </a>
 </div>
 
-<div style="display:flex;gap:16px;margin-top:20px">
-<div style="flex:1;background:var(--panel);border:1px solid var(--hair);padding:16px 18px">
-<div class="lbl">状態バッジ</div>
-<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:10px"><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;background:rgba(95,212,139,.12);color:#5fd48b;font:700 12px var(--jp);letter-spacing:.06em">指示済み</span><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;background:rgba(250,215,40,.16);color:#fad728;font:700 12px var(--jp);letter-spacing:.06em">未指示</span><span style="display:inline-flex;align-items:center;height:24px;padding:0 11px;background:transparent;color:var(--paper-45);font:700 12px var(--jp);letter-spacing:.06em;border:1px solid var(--rule)">休養中</span><span style="font:700 12px var(--jp);color:var(--paper-45)">未指示の行は左に 3px の黄色い縁がつく</span></div>
+<div style="display:flex;gap:16px;margin-top:16px">
+<div class="a-panel" style="flex:1;padding:14px 16px;box-shadow:var(--a-shadow-sm)">
+<span class="a-lbl">状態バッジ</span>
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:10px"><span style="display:inline-flex;align-items:center;height:26px;padding:0 12px;border-radius:6px;background-image:var(--a-gloss-green);border:2px solid var(--a-green-d);color:#fff;font:900 12px var(--a-jp);letter-spacing:.06em">指示済み</span><span style="display:inline-flex;align-items:center;height:26px;padding:0 12px;border-radius:6px;background-image:linear-gradient(#ffe270,#f6c21c 52%,#d99f06);border:2px solid #a9741a;color:#4a3105;font:900 12px var(--a-jp);letter-spacing:.06em">未指示</span><span style="display:inline-flex;align-items:center;height:26px;padding:0 12px;border-radius:6px;background-image:linear-gradient(#fff,#e6edf4);border:2px solid var(--a-edge-soft);color:var(--a-ink-3);font:900 12px var(--a-jp);letter-spacing:.06em">休養中</span><span style="font:900 12px var(--a-jp);color:var(--a-ink-3)">未指示の行は地が黄色くなり、左に 5px の黄帯がつく</span></div>
 </div>
-<div style="flex:1;background:var(--panel);border:1px solid var(--hair);padding:16px 18px">
-<div class="lbl">空状態</div>
-<div style="font:700 14px var(--jp);color:var(--paper-70);margin-top:8px">まだ所有している馬がいません。セリで 1 頭迎えると牧場が始まります</div>
+<div class="a-panel" style="width:400px;flex:0 0 400px;padding:14px 16px;box-shadow:var(--a-shadow-sm)">
+<span class="a-lbl">空状態</span>
+<div style="font:900 14px var(--a-jp);color:var(--a-ink-2);margin-top:8px">まだ所有している馬がいません。セリで 1 頭迎えると牧場が始まります</div>
 </div>
 </div>
 </div>
 </div>
 <div style="width:1280px;padding:24px 50px 34px;background:#0c100d;font:400 13px ui-monospace,Menlo,monospace;color:var(--paper-70);line-height:1.85;border-top:1px solid var(--rule)">
-<div style="font:700 22px var(--jp);color:var(--gold);margin-bottom:2px">実装（Next.js の DOM。Canvas ではない）</div>
-<div style="font:700 14px var(--jp);color:var(--paper);margin-bottom:14px">対象 apps/web/src/app/stable/page.tsx（新規）。main 幅 1180・margin 0 auto。ヘッダー h56 は layout.tsx の既存を使う。</div>
+<div style="font:700 22px var(--jp);color:var(--gold);margin-bottom:2px">実装（Next.js の DOM。アーケード筐体テーマ）</div>
+<div style="font:700 14px var(--jp);color:var(--paper);margin-bottom:14px">対象 apps/web/src/app/stable/page.tsx。最上位の要素に <b>data-theme="arcade"</b>。main 幅 1180・margin 0 auto。</div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 40px">
-<div>見出し　　　　「わたしの馬」34px 900／所有頭数 14px 70%／右に週番号（数字 19px）と一言 14px</div>
-<div>今週の予定　　板 全幅・上縁 金4px・地 rgba(5,8,6,.9)／週 26px 900・期間 13px 70%／縦罫 1px h78 で区切る</div>
-<div>予定の3項目　　ラベル 12px＋数値 30px（未指示が 1 頭以上なら #fad728、0 なら紙色）／単位は 14px 70%。<b style="color:var(--paper)">EP と PP を同じ行に並べない</b>（憲法 §0.2）</div>
-<div>ボタン　　　　斜度 -9°／主「調教を指示する」h40 金ベタ #12140f／副「週を進める」h36。<b style="color:var(--paper)">未指示が残っている間は不透明度 40% で押せない</b></div>
-<div>警告バー　　　h38・地 rgba(250,215,40,.1)／「未指示あり」12px #fad728＋対象馬名を列挙／全頭指示済みなら地 rgba(95,212,139,.1)・文言「全頭の指示が完了しました」に差し替え</div>
-<div>一覧　　　　　見出し h34（12px ラベル）／行 h64・偶数行 rgba(255,255,255,.025)／列 馬名216・格132・素質104・調子104・疲労112・次走 flex・今週88 右</div>
-<div>馬名セル　　　馬名 17px 900 ＋ 下に「性齢　今週 &lt;メニュー&gt;」12px 45%（未指示は「今週の指示なし」）</div>
-<div>格　　　　　　h24 チップ。重賞・オープンは金ベタ #12140f、それ以下は rgba(246,242,231,.1)＋1px 罫。<b style="color:var(--paper)">格を最重要指標として扱う</b>（勝率は一覧に出さない）</div>
-<div>素質　　　　　★5 個 15px。満 = 金／半 = 金を左 50% だけ重ねる／空 = rgba(246,242,231,.28)。数値は出さない</div>
-<div>調子　　　　　記号＋語 13px。絶好調◎#5fd48b／好調○#5fd48b／普通○70%／やや不安△#fad728／不安▲#ff4d3d</div>
-<div>疲労　　　　　バー 64×8（地 rgba(0,0,0,.5)＋1px 45% 枠）＋数値 14px 幅26 右揃え／≤30 緑・≤60 黄・&gt;60 赤（トークンの --ok / --warn / --bad）</div>
-<div>次走　　　　　レース名（日付）14px 70%。未定は 45%</div>
-<div>今週バッジ　　指示済み #5fd48b 12%地／未指示 #fad728 16%地／休養中 45% ＋1px 罫。<b style="color:var(--paper)">未指示の行だけ inset 3px #fad728</b></div>
-<div>行の操作　　　行全体が /stable/[horseId] へのリンク。hover で 地 rgba(240,204,74,.06)＋左 3px 金（未指示の黄色い縁は金に置き換わる）</div>
+<div>地・パネル　　--a-bg のグラデ地／.a-panel = #fff・縁 2px #123f6b（主要板 3px）・角丸 10px・影 0 3px 0 #9fb8cc, 0 6px 14px rgba(16,36,58,.16)</div>
+<div>見出し　　　　青グロス帯 h46・角丸 10px・26px 900 白／右に週番号カプセル（白地・2px 縁・数字 26px 青）</div>
+<div>今週の予定　　板 縁 3px／上に青グロス帯 h40（左 16px 字間 .14em、右に期間 13px）／中身の地 linear-gradient(#fff,#eef6fd)</div>
+<div>数値カード　　3 つ・白地・2px #123f6b・角丸 10px・影 0 2px 0 #9fb8cc／ラベル 12px 900／<b style="color:var(--paper)">数値 40px</b>／未指示は赤 #d62f26・登録頭数は青 #0f56ab・EP は金 #a9741a</div>
+<div>ボタン　　　　主 .a-btn-gold h48・18px（金グロス＋2px #8a5a06）／副 .a-btn h40・15px。<b style="color:var(--paper)">未指示が残る間は副ボタンを不透明度 45% で押せない</b></div>
+<div>警告バー　　　h44・地 linear-gradient(#fffbe8,#fff2c8)＋上辺 2px #e6c979／黄バッジ＋対象馬名 14px。全頭指示済みなら地を linear-gradient(#eefaf1,#dcf3e3)・上辺 2px #9fd3ae・文言「全頭の指示が完了しました」に差し替え</div>
+<div>一覧見出し　　h38 青グロス・ラベル 12px 900 白／列 馬名230・格132・素質112・調子118・疲労132・次走 flex(min 150)・今週104 右（固定列は flex:0 0 &lt;幅&gt;）</div>
+<div>行　　　　　　h70・奇数 #fff／偶数 #f4f9fd／罫 1px #cfe0ee／<b style="color:var(--paper)">未指示行は地 linear-gradient(#fffbe8,#fff5cf)＋inset 5px 0 0 #f6c21c</b>／休養中は<b style="color:var(--paper)">地 #e7edf3 だけで沈める（不透明度は掛けない）</b>＝文字色との二重掛けでコントラストを落とさないため</div>
+<div>馬名セル　　　馬名 19px 900＋下に「性齢　今週 &lt;メニュー&gt;」12px #5b7488（未指示は「今週の指示なし」）</div>
+<div>格　　　　　　.a-chip h24／重賞・オープンは金グロス＋2px #8a5a06・文字 #4a3105、それ以下は白グロス＋2px #123f6b。<b style="color:var(--paper)">格を最重要指標として扱う</b>（勝率は一覧に出さない）</div>
+<div>素質　　　　　★ 17px／満・半は #f2b012＋text-shadow 0 1px 0 #8a5a06（筐体の押し出し）／空は #c9d7e2。半星は左 50% だけ重ねる</div>
+<div>調子　　　　　記号＋語 14px 900／絶好調 #1e7a3a・好調 #2f9e4f・普通 #4a6178・やや不安 #a9741a・不安 #a81a13</div>
+<div>疲労　　　　　バー 72×14・角丸 7px・地 #e3ecf3・<b style="color:var(--paper)">縁 2px #123f6b</b>・塗りはグロス（≤30 緑／≤60 黄／&gt;60 赤）＋数値 18px 同色</div>
 <div>並び　　　　　未指示 → 指示済み → 休養中。同順位内は格の高い順、次に獲得賞金の多い順</div>
-<div>文言　　　　　EP は「参加ポイント」・PP は「賞金ポイント」。「購入」「チャージ」「換金」「円」は使わない</div>
+<div>行の操作　　　行全体が /stable/[horseId] へのリンク。hover で地 #fff8e1＋inset 5px 0 0 #1a6fd4（未指示の黄帯は青に置き換わる）</div>
+<div>状態バッジ　　h26・角丸 6px・2px 縁／指示済み 緑グロス白／未指示 黄グロス #4a3105／休養中 白→#e6edf4・文字 #5b7488</div>
+<div>数字の色分け　時刻・週 = 青／金額 = 金／警告・未指示数 = 赤。全 Web 画面で統一</div>
+<div>薄い文字色　　補助テキストは --a-ink-3 = <b style="color:var(--paper)">#5b7488</b>（白地で約 4.5:1）。これより薄い灰色を本文サイズに使わない。<b style="color:var(--paper)">行を沈めるときは地色だけを変え、不透明度と併用しない</b>（二重掛けでコントラストが基準を割る）</div>
+<div>文言　　　　　EP は「参加ポイント」・PP は「賞金ポイント」。「購入」「チャージ」「換金」「円」を使わない</div>
 <div>空状態　　　　「まだ所有している馬がいません。セリで 1 頭迎えると牧場が始まります」</div>
 </div>
 </div>
