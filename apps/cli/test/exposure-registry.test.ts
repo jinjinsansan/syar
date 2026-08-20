@@ -17,7 +17,7 @@
 
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error -- .mjs の素の JS を読む（型定義は置いていない）
-import { EXPECTED_EXPOSURE, unregistered, stale, PUBLIC_VIEW, OWNER_SCOPED, CLOSED } from '../../../tools/lib/exposure-registry.mjs';
+import { EXPECTED_EXPOSURE, unregistered, stale, judgeGrants, judgeReads, WRITE_PRIVILEGES, PUBLIC_VIEW, OWNER_SCOPED, CLOSED } from '../../../tools/lib/exposure-registry.mjs';
 
 const registered = Object.keys(EXPECTED_EXPOSURE) as string[];
 
@@ -69,5 +69,66 @@ describe('V-20 登録簿の中身（★正典の要求と直結する項目）',
     const views = Object.entries(EXPECTED_EXPOSURE).filter(([, k]) => k === PUBLIC_VIEW).map(([n]) => n);
     expect(views.sort()).toEqual(['prize_catalog_public', 'race_entries_public', 'race_odds_public', 'races_public']);
     for (const v of views) expect(v.endsWith('_public')).toBe(true);
+  });
+});
+
+describe('V-20 ① 書き込み権限の検出（★実際に開いていた形をそのまま並べる）', () => {
+  it('★TRUNCATE を書き込みとして数える（RLS はこれを止めない）', () => {
+    // 2026-08-20 に本番・staging で実際にこの付与があった
+    const grants = [
+      { table_name: 'ep_ledger', grantee: 'anon', privilege_type: 'TRUNCATE' },
+      { table_name: 'pp_ledger', grantee: 'anon', privilege_type: 'TRUNCATE' },
+    ];
+    expect(judgeGrants(grants)).toEqual([
+      'ep_ledger.TRUNCATE(anon)',
+      'pp_ledger.TRUNCATE(anon)',
+    ]);
+  });
+
+  it('★users への UPDATE を検出する（他人の EP/PP を書き換えられた形）', () => {
+    const grants = [{ table_name: 'users', grantee: 'anon', privilege_type: 'UPDATE' }];
+    expect(judgeGrants(grants)).toEqual(['users.UPDATE(anon)']);
+  });
+
+  it.each(WRITE_PRIVILEGES as string[])('★%s を見逃さない', (priv) => {
+    expect(judgeGrants([{ table_name: 't', grantee: 'anon', privilege_type: priv }])).toHaveLength(1);
+  });
+
+  it('SELECT / REFERENCES / TRIGGER は書き込みとして数えない', () => {
+    const grants = ['SELECT', 'REFERENCES', 'TRIGGER'].map((p) => ({ table_name: 't', grantee: 'anon', privilege_type: p }));
+    expect(judgeGrants(grants)).toEqual([]);
+  });
+
+  it('付与が空なら合格', () => {
+    expect(judgeGrants([])).toEqual([]);
+  });
+});
+
+describe('V-20 ② 読み取りの判定', () => {
+  it('★公開ビュー以外が1行でも返したら漏洩として数える', () => {
+    const r = judgeReads([
+      { name: 'users', rows: 1 },
+      { name: 'races_public', rows: 1 },
+    ]);
+    expect(r.leaked).toEqual(['users(1行)']);
+    expect(r.viewsUnreadable).toEqual([]);
+  });
+
+  it('★無防備でも0行なら ② では捕まらない（だから ① が要る）', () => {
+    // users が 0 行なのは「守られているから」ではなく「利用者がいないから」だった。
+    // ★読み取り側だけでは安全と見えてしまうことを、この試験で明示しておく。
+    const r = judgeReads([{ name: 'users', rows: 0 }]);
+    expect(r.leaked).toEqual([]);
+    // 同じ状態を ① は捕まえる
+    expect(judgeGrants([{ table_name: 'users', grantee: 'anon', privilege_type: 'UPDATE' }])).toHaveLength(1);
+  });
+
+  it('★公開ビューが読めなくなったら不合格（塞ぎすぎも検出する）', () => {
+    const r = judgeReads([{ name: 'races_public', rows: -1 }]);
+    expect(r.viewsUnreadable).toEqual(['races_public']);
+  });
+
+  it('拒否された非公開テーブル（-1）は漏洩ではない', () => {
+    expect(judgeReads([{ name: 'horses', rows: -1 }]).leaked).toEqual([]);
   });
 });

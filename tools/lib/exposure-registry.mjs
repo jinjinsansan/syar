@@ -77,3 +77,50 @@ export function stale(objectNames) {
   const present = new Set(objectNames);
   return Object.keys(EXPECTED_EXPOSURE).filter((n) => !present.has(n));
 }
+
+/**
+ * ★書き込みとみなす権限（V-20 ①）
+ *
+ * ⚠️ **`TRUNCATE` を必ず含めること。** `0002` は `insert, update, delete` だけを剥奪し、
+ *    **`TRUNCATE` を残していました**。そして **`TRUNCATE` は RLS の対象外**なので、
+ *    「自分の行だけ」のポリシーがあっても**台帳を全消しできる**状態でした（2026-08-20 実測）。
+ *    ★「読み取りが守られている」ことは「破壊が守られている」ことを意味しません。
+ */
+export const WRITE_PRIVILEGES = ['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'];
+
+/**
+ * V-20 ① — 書き込み権限の付与を探す。
+ *
+ * @param {ReadonlyArray<{table_name: string, grantee: string, privilege_type: string}>} grants
+ * @returns 違反の一覧（空なら合格）
+ */
+export function judgeGrants(grants) {
+  const write = new Set(WRITE_PRIVILEGES);
+  return grants
+    .filter((g) => write.has(String(g.privilege_type).toUpperCase()))
+    .map((g) => `${g.table_name}.${g.privilege_type}(${g.grantee})`);
+}
+
+/**
+ * V-20 ② — 「anon から何行返ったか」を登録簿と突き合わせる。
+ *
+ * ★行数が0でも合格とは限りません（無防備でたまたま空なだけかもしれない）が、
+ *   ここは**振る舞い側の確認**です。権限側は `judgeGrants` が見ます。**両方要ります。**
+ *
+ * @param {ReadonlyArray<{name: string, rows: number}>} reads `rows` は -1 なら拒否された
+ * @returns {{leaked: string[], viewsUnreadable: string[]}}
+ */
+export function judgeReads(reads) {
+  const leaked = [];
+  const viewsUnreadable = [];
+  for (const r of reads) {
+    const expected = EXPECTED_EXPOSURE[r.name];
+    if (expected === PUBLIC_VIEW) {
+      // ★公開ビューが読めないのも不合格にする — 守りは閉じる方向に倒れても気づきにくい
+      if (r.rows < 0) viewsUnreadable.push(r.name);
+    } else if (r.rows > 0) {
+      leaked.push(`${r.name}(${r.rows}行)`);
+    }
+  }
+  return { leaked, viewsUnreadable };
+}
