@@ -23,6 +23,8 @@
 
 /** 読むだけ。本番に向けてよい */
 export const READONLY = [
+  // ★anon で何が読めるかの全数確認（§8.6 server_seed・§12.4 potential）。select のみ
+  'verify-anon-exposure.mjs',
   'a3-converge.mjs',
   // ★読むだけ。ゲージ（余力）が正しい向きを向いているかを見る
   'diag-gauge.mjs',
