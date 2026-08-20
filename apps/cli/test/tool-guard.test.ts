@@ -58,7 +58,27 @@ describe('★R-24 ツールの分類（メタテスト）', () => {
 
   it('★読取専用に分類したものは書き込み文を持たない', () => {
     // ★分類簿が実態とずれていないかを、こちら側からも当てる（R-13 の形）
-    const write = /insert into|update [a-z_]+ set|delete from|truncate|alter table/i;
+    //
+    // 【2026-08-20: `truncate` を「語」から「文の形」に変えた】
+    //   `verify-anon-exposure.mjs` は **「anon に truncate 権限が付いていないか」を検査する**
+    //   ツールなので、語としての `truncate` を必然的に含みます（V-20 ①）。
+    //   ★語で弾くと、**書き込みを検査するツールが書き込むツールに見えます。**
+    //   → `truncate <識別子>` の形だけを書き込み文とみなす。
+    //   （他の3つは元から文の形なので変更していません）
+    const write = /insert into|update [a-z_]+ set|delete from|truncate\s+(table\s+)?["a-z_]|alter table/i;
+
+    // ★検出器が鈍っていないことを、ここで確かめる（R-14: 検出器は自分自身を検査しない）
+    for (const sample of [
+      'insert into t values (1)',
+      'delete from t where x',
+      'update horses set stats = 1',
+      'truncate t',
+      'truncate table t',
+      'alter table t add column c int',
+    ]) {
+      expect(write.test(sample), `★検出器がこれを見逃します: ${sample}`).toBe(true);
+    }
+
     const lying = READONLY.filter((f) => write.test(readFileSync(`${ROOT}tools/${f}`, 'utf8')));
     expect(lying, `読取専用と分類されているのに書き込み文があります:\n  ${lying.join('\n  ')}`).toEqual([]);
   });
