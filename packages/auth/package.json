@@ -1,0 +1,13 @@
+{
+  "name": "@star/auth",
+  "private": true,
+  "version": "0.0.0",
+  "description": "STAR auth: LINE ID token verification and login flow. Pure TypeScript, zero runtime dependencies (WebCrypto only).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {},
+  "peerDependencies": {}
+}

@@ -125,6 +125,97 @@ const MUTATIONS = [
     to: '  if (false) return (min + max) / 2;',
     expect: 'fail',
   },
+
+  // ==========================================================================
+  // V-19（認証が壊れたときに落ちること）— 裁定 REVIEW_AUTH_LINE_VERDICT_20260820 §3
+  //
+  // ★#11「本番経路で固定する（純関数だけで固定しない）」がここに当たる。
+  //   I-3 / I-4 / L-1 で3度踏んだ罠 —「単体テストが全緑でも、呼び出し側が検証を飛ばせば防御はゼロ」。
+  //   → V19-9 が**まさにその形の変異**（検証結果を握り潰してセッションを出す）である。
+  //
+  // ★認証の瑕疵は「壊れていても正常にログインできてしまう」ので、通常の動作確認では出ない。
+  //   PP は景品に換わるので、ここの見逃しはゲーム内の不具合ではない。
+  // ==========================================================================
+  {
+    id: 'V19-1',
+    label: '署名検証の結果を無視する（誰の署名でも通る）',
+    file: 'packages/auth/src/line-id-token.ts',
+    from: '  if (!signatureValid) return fail(\'bad_signature\');',
+    to: '  if (false) return fail(\'bad_signature\');',
+    expect: 'fail',
+  },
+  {
+    id: 'V19-2',
+    label: 'alg をヘッダの申告どおりに受け入れる（alg: none / ES256 すり替えが通る）',
+    file: 'packages/auth/src/line-id-token.ts',
+    from: "  if (header['alg'] !== EXPECTED_ALG) return fail('alg_mismatch');",
+    to: "  if (typeof header['alg'] !== 'string') return fail('alg_mismatch');",
+    expect: 'fail',
+  },
+  {
+    id: 'V19-3',
+    label: 'iss を検証しない（★照会でゲート項目から落としていた箇所）',
+    file: 'packages/auth/src/line-id-token.ts',
+    from: "  if (payload['iss'] !== LINE_ISSUER) return fail('iss_mismatch');",
+    to: "  if (false) return fail('iss_mismatch');",
+    expect: 'fail',
+  },
+  {
+    id: 'V19-4',
+    label: 'aud を検証しない（別チャネル宛のトークンが通る）',
+    file: 'packages/auth/src/line-id-token.ts',
+    from: "  if (payload['aud'] !== params.channelId) return fail('aud_mismatch');",
+    to: "  if (false) return fail('aud_mismatch');",
+    expect: 'fail',
+  },
+  {
+    id: 'V19-5',
+    label: '有効期限を見ない（期限切れトークンが通る）',
+    file: 'packages/auth/src/line-id-token.ts',
+    from: "  if (params.nowSec > exp + skew) return fail('expired');",
+    to: "  if (false) return fail('expired');",
+    expect: 'fail',
+  },
+  {
+    id: 'V19-6',
+    label: 'nonce が無ければ素通りにする（★リプレイ。照会では完全に欠落していた項目）',
+    file: 'packages/auth/src/line-id-token.ts',
+    from: "  if (typeof nonce !== 'string' || nonce.length === 0) return fail('nonce_missing');",
+    to: "  if (typeof nonce !== 'string') return { ok: true, identity: { sub: String(payload['sub'] ?? '') } };",
+    expect: 'fail',
+  },
+  {
+    id: 'V19-7',
+    label: 'nonce の一致を見ない（別セッションのトークンが通る）',
+    file: 'packages/auth/src/line-id-token.ts',
+    from: "  if (nonce !== params.expectedNonce) return fail('nonce_mismatch');",
+    to: "  if (false) return fail('nonce_mismatch');",
+    expect: 'fail',
+  },
+  {
+    id: 'V19-8',
+    label: 'state を確認するだけで消費しない（callback の再送で二重にセッションが出る）',
+    file: 'packages/auth/src/login-flow.ts',
+    from: '  const stateEntry = await deps.consumeState(input.state);',
+    to: '  const stateEntry = (await deps.consumeState(input.state)) ?? { nonce: \'\' };',
+    expect: 'fail',
+  },
+  {
+    id: 'V19-9',
+    label: '★検証結果を握り潰してセッションを発行する（#11 の罠そのもの — 純関数の試験は全緑のまま）',
+    file: 'packages/auth/src/login-flow.ts',
+    from: "  if (!verified.ok) return fail('token_rejected');",
+    to: "  if (!verified.ok) { const s = await deps.issueSession({ sub: 'U-forged' }); return { ok: true, session: s }; }",
+    expect: 'fail',
+  },
+  {
+    id: 'V19-10',
+    label: '検証を呼ばずに素通しする（呼び忘れ）',
+    file: 'packages/auth/src/login-flow.ts',
+    from: '  const verified = await deps.verifyIdToken(exchanged.idToken, stateEntry.nonce);',
+    to: "  const verified = { ok: true, identity: { sub: 'U-unverified' } } as const;",
+    expect: 'fail',
+  },
 ];
 
 /**
