@@ -17,36 +17,62 @@
  *     適用済みのファイルが**後から書き換えられた**場合、それは
  *     「DB とリポジトリが食い違っている」ので、黙って通さず落とします。
  *
- * 実行:
- *   npx tsx tools/migrate.mjs                    # 本番（既定）・未適用のみ
+ * 実行（★`--env` は必須。既定は廃止しました）:
  *   npx tsx tools/migrate.mjs --env staging      # staging・未適用のみ
  *   npx tsx tools/migrate.mjs --env staging 0010 # 指定ファイルだけ
  *   npx tsx tools/migrate.mjs --env staging --baseline 0009
  *       ★既に手で当たっている DB に「0009 までは適用済み」と**記録だけ**する（実行しない）
+ *   npx tsx tools/migrate.mjs --env production --yes-production
+ *       ★本番はもう一段の明示が要ります
  */
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import pg from 'pg';
+import { parseArgs } from './lib/args.mjs';
 
 /**
- * ★接続先を選べるようにする（2026-08-11）。
- *   `--env staging` で `secrets.staging.env` を使います。**既定は本番のまま**です。
- *   ⚠️ 既定を staging にしません。**「いつもの手順」で本番に当たらなくなる**ほうが危険です
- *      （マイグレーションは本番に当てるのが目的の運用ツール・R-24 の PRODUCTION_OPS）。
+ * ★接続先は**必ず明示する**（2026-08-20 の裁定で既定を廃止）。
+ *
+ * 【なぜ既定をやめたか】
+ *   旧実装は `--env` 省略時に `secrets.local.env` を使い、
+ *   コメントは「**既定は本番のまま**」と書いていました。つまり
+ *   **最も手を抜いた操作（引数なしの `npx tsx tools/migrate.mjs`）が、
+ *   最も危険な向き先（本番の全マイグレーション適用）に落ちる**形でした。
+ *
+ *   ★これを支えていたのは `app_environment` との突合1枚だけです。
+ *     そして `verify-a7.mjs` がその値を 'development' に固定する実装だった前歴があり
+ *     （R-24 の背景）、**その1枚が書き換わる経路は実在しました。**
+ *
+ *   → **`--env` を必須にする。さらに本番には `--yes-production` を要求する。**
+ *     ★網（DB との突合）は最後の砦であって、手順の代わりではない。
  */
 const argv = process.argv.slice(2);
-const flag = (name) => {
-  const i = argv.indexOf(`--${name}`);
-  return i >= 0 ? argv[i + 1] : null;
-};
-const envName = flag('env') ?? 'local';
-if (envName !== 'local' && envName !== 'staging') {
-  throw new Error(`--env は local か staging です（受け取った値: ${envName}）`);
+// ★値を取るフラグを解析器に教える（真偽値フラグが位置引数を食う事故の再発防止・tools/lib/args.mjs）
+const { flags, switches, positionals } = parseArgs(argv, ['--env', '--baseline']);
+const flag = (name) => flags[`--${name}`] ?? null;
+const ENV_FILES = { production: 'secrets.production.env', staging: 'secrets.staging.env' };
+const envName = flag('env');
+if (envName === null) {
+  throw new Error(
+    '--env を明示してください（production か staging）。★既定は廃止しました — ' +
+      '省略で本番へ向く形は、最も手を抜いた操作が最も危険な向き先に落ちる構造です',
+  );
 }
-const envFile = envName === 'staging' ? 'secrets.staging.env' : 'secrets.local.env';
+if (envName === 'local') {
+  throw new Error('--env local は廃止しました。★"local" は環境名ではなく、実際の接続先は本番でした。--env production を明示してください');
+}
+const envFile = ENV_FILES[envName];
+if (envFile === undefined) throw new Error(`--env は production か staging です（受け取った値: ${envName}）`);
+// ★本番だけは、もう一段の明示を要求する（打ち間違いでは到達できない形にする）
+if (envName === 'production' && !switches.has('--yes-production')) {
+  throw new Error(
+    '本番に適用するには --yes-production も付けてください。' +
+      '★「--env を書いた」だけでは、staging のつもりで production と打った場合を止められません',
+  );
+}
 const baseline = flag('baseline');
 /** フラグでない最初の引数 = 特定ファイルの前方一致指定 */
-const only = argv.filter((a, i) => !a.startsWith('--') && !argv[i - 1]?.startsWith('--'))[0] ?? null;
+const only = positionals[0] ?? null;
 
 console.log(`接続先: ${envFile}`);
 

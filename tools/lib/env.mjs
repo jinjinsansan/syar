@@ -6,23 +6,47 @@
  *   1本ずつ直すと**必ず漏れます**し、漏れたものは
  *   「staging を指しているつもりで本番を叩く」形で現れます。
  *
- * 【★既定は本番のまま】
+ * 【★既定は本番のまま（読み取り専用ツールに限る）】
  *   `--env staging` を**明示したときだけ** staging を使います。
  *   ⚠️ 既定を staging にすると、**読み取り専用ツールが本番を見なくなり**、
  *      「本番の状態を確かめたつもりが staging だった」という
  *      **逆向きの取り違え**が起きます。
  *   ★状態を変えるツールは、そもそも `assertNotProduction` が本番を拒否します（R-24）。
+ *   ★**状態を変える操作（マイグレーション）は、この既定に乗せてはいけません** —
+ *     `tools/migrate.mjs` は `--env` を必須にしています（2026-08-20 の裁定）。
+ *
+ * 【★環境名を "local" から "production" に改めた経緯（2026-08-20）】
+ *   旧 `secrets.local.env` の中身は `STAR_ENV=development` でしたが、
+ *   **実際の接続先は本番でした**（DB の `app_environment` が `production`・
+ *   実測時点で未来のレースが生成され続けていた）。**development の環境は存在しません。**
+ *   ファイル名の "local" は「自分のローカルマシンにある秘密ファイル」の意味で
+ *   環境名ではなかったのですが、**`--env local` という綴りがそれを環境名に見せていました。**
+ *   → ファイルを `secrets.production.env` に改名し、`--env` の値も `production` に改めました。
+ *      **接続先の名前と、環境の名前を一致させる。**
  */
 import { readFileSync } from 'node:fs';
 
-/** `--env staging` が指定されていれば staging の env ファイル名を返す */
+/** 環境名 → 秘密ファイル名。★ここが唯一の対応表 */
+const ENV_FILES = {
+  production: 'secrets.production.env',
+  staging: 'secrets.staging.env',
+};
+
+/** `--env staging` が指定されていれば staging の env ファイル名を返す（既定は本番・上の注記） */
 export function envFileName(argv = process.argv) {
   const i = argv.indexOf('--env');
-  const name = i >= 0 ? argv[i + 1] : 'local';
-  if (name !== 'local' && name !== 'staging') {
-    throw new Error(`--env は local か staging です（受け取った値: ${name}）`);
+  const name = i >= 0 ? argv[i + 1] : 'production';
+  if (name === 'local') {
+    throw new Error(
+      '--env local は廃止しました。★"local" は環境名ではなく、実際の接続先は本番でした（2026-08-20）。' +
+        '本番を見るなら --env production、staging なら --env staging を明示してください',
+    );
   }
-  return name === 'staging' ? 'secrets.staging.env' : 'secrets.local.env';
+  const file = ENV_FILES[name];
+  if (file === undefined) {
+    throw new Error(`--env は production か staging です（受け取った値: ${name}）`);
+  }
+  return file;
 }
 
 /** env ファイルを読んで key=value の表にする。★値は返すが表示はしない */

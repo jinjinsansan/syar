@@ -16,7 +16,7 @@
     "verify:race": "tsx apps/cli/src/verify-race.ts",
     "preseed": "tsx apps/cli/src/preseed-run.ts",
     "preseed:verify": "tsx apps/cli/src/preseed-verify.ts",
-    "worker": "tsx --env-file=secrets.local.env apps/worker/src/main.ts",
+    "worker": "tsx --env-file=secrets.staging.env apps/worker/src/main.ts",
     "build:web": "npm -w @star/web exec next build",
     "verify:payout": "tsx apps/cli/src/verify-payout.ts",
     "blocklist:build": "tsx apps/cli/src/blocklist-build.ts",

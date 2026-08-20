@@ -40,6 +40,13 @@ data/ng-names.txt
 .env.local
 
 # 環境変数の実値（.env と同じ扱い・絶対にコミットしない）
+#
+# ★個別の名前を列挙する形をやめ、パターンで広く落とす（2026-08-20）。
+#   `secrets.local.env` を `secrets.production.env` に改名する作業で、
+#   **改名した瞬間に本番の資格情報が追跡対象になる**ところだった
+#   （.gitignore が名前を1つずつ書いていたため）。
+#   ★名前を変える作業と、名前で守る仕組みは、相性が最悪である。
+secrets*.env
 secrets.local.env
 
 apps/web/.env.local

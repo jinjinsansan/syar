@@ -66,7 +66,7 @@ if (databaseUrl !== null && !/^postgres(ql)?:\/\//i.test(databaseUrl)) {
 }
 let built = false;
 if (databaseUrl === null && ref !== null && password !== null) {
-  const prod = readFileSync('secrets.local.env', 'utf8').match(/^DATABASE_URL=(.*)$/m);
+  const prod = readFileSync('secrets.production.env', 'utf8').match(/^DATABASE_URL=(.*)$/m);
   if (prod) {
     const host = prod[1].match(/@([^/]+)\//);
     if (host) {
@@ -83,7 +83,7 @@ const out = {
   SUPABASE_SERVICE_ROLE_KEY: service,
   SUPABASE_PROJECT_REF: ref,
   DATABASE_URL: databaseUrl,
-  STAR_EPOCH_ISO: (readFileSync('secrets.local.env', 'utf8').match(/^STAR_EPOCH_ISO=(.*)$/m) ?? [])[1] ?? null,
+  STAR_EPOCH_ISO: (readFileSync('secrets.production.env', 'utf8').match(/^STAR_EPOCH_ISO=(.*)$/m) ?? [])[1] ?? null,
 };
 
 console.log('# 読み取り結果（★値は表示しません。長さだけ）');
