@@ -76,6 +76,8 @@ export const READONLY = [
   // ★読むだけ（判定書の SHA を書き換えるが DB は変えない）
   'update-acceptance-sha.mjs',
   'deps-of.mjs',
+  // ★走行 8 コマの生成を回す（Codex）。画像とプロンプトを書くだけで DB に触れません
+  'gen-pose-set.mjs',
   // ★P4 のアセット系。**DB に一切接続しません**（画像を読み書きするだけ）
   //   分類の基準は「DB の状態を変えるか」なので、ファイルを書いても readonly です
   'bake-sprites.mjs',
@@ -111,6 +113,8 @@ export const READONLY = [
   'measure-ref2d.mjs',
   // ★コース幾何を読んで数えるだけ（Q-P4-46 手順①）。DB に触れません
   'count-headings.mjs',
+  // ★走行 8 コマ（個別ファイル）の受け入れ判定。画像を読んで測るだけ
+  'verify-pose-set.mjs',
   // ★画像を読んで測るだけ（駆歩シートの受け入れ判定）。DB に触れません
   'verify-gallop-sheet.mjs',
   // ★画像を読んで整列し直すだけ。DB に触れません
