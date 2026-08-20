@@ -69,6 +69,38 @@ const client = new pg.Client({
 await client.connect();
 console.log('接続しました');
 
+// ============================================================================
+// ★接続先の環境を DB に確認する（§14.6 / A-7 の照合を、適用の前に行う）
+//
+//   【なぜ要るか（2026-08-20・Q-AUTH-07 の裁定）】
+//     `--env` は「どの秘密ファイルを読むか」を選ぶだけで、
+//     **その接続文字列が本当にその環境を指しているかは確かめていませんでした。**
+//     接続文字列の取り違えは必ず起きる前提（`0001_init.sql` の app_environment の注記）なのに、
+//     マイグレーションという**最も状態を変える操作**が、その前提の外にありました。
+//
+//   ★「向き先を確認する」を人間の注意力に任せない。ワーカー（env.ts の
+//     assertEnvironmentMatches）が起動時にやっているのと同じ照合を、ここでも行う。
+// ============================================================================
+{
+  const declared = env.STAR_ENV;
+  if (!declared) throw new Error(`${envFile} に STAR_ENV がありません。接続先を確認できないため中止します（§14.6）`);
+  const r = await client.query('select environment from app_environment');
+  if (r.rows.length === 0) {
+    throw new Error('DB に app_environment がありません。接続先の環境が確認できないため中止します（§14.6）');
+  }
+  if (r.rows.length > 1) {
+    throw new Error(`app_environment が ${r.rows.length} 行あります。どちらが本当か決まらないため中止します`);
+  }
+  const onDb = r.rows[0].environment;
+  if (onDb !== declared) {
+    throw new Error(
+      `環境が一致しません: ${envFile} は "${declared}" のつもりですが、` +
+        `接続先の DB は "${onDb}" です。**適用しません**（§14.6・A-7）。`,
+    );
+  }
+  console.log(`環境を確認: ${onDb}（${envFile} の申告と一致）`);
+}
+
 // ★追跡表そのものは、どのマイグレーションよりも先に要る（ここで作る）
 await client.query(`
   create table if not exists schema_migrations (

@@ -173,6 +173,8 @@ export const STATE_CHANGING = [
   'verify-unfrozen-cancel.mjs',
   // ★開放率の日次記録（unlock_daily に書く）
   'verify-unlock-daily.mjs',
+  // ★V-19 の DB 側（#5/#6/#10/#15）。auth ユーザーと identity 行を作って一意制約と RLS を叩く（後片付けあり）
+  'verify-v19-db.mjs',
   // ★staging の馬を実際に育てる（誕生週をずらして週送りを回す）
   'age-horses.mjs',
   // ★合成集団で経済を一巡させる（V-11 の②）

@@ -22,3 +22,9 @@ export {
   type LoginFlowDeps,
   type LoginResult,
 } from './login-flow.js';
+
+export {
+  resolveUserId,
+  type IdentityStoreDeps,
+  type ResolveResult,
+} from './resolve-identity.js';

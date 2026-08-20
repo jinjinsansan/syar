@@ -216,6 +216,30 @@ const MUTATIONS = [
     to: "  const verified = { ok: true, identity: { sub: 'U-unverified' } } as const;",
     expect: 'fail',
   },
+  {
+    id: 'V19-11',
+    label: '★競合しても自分が作った auth ユーザーを返す（孤児で2口座になる = 穴 A）',
+    file: 'packages/auth/src/resolve-identity.ts',
+    from: "  if (linked === 'linked') return { ok: true, userId: candidate, created: true };",
+    to: "  if (linked === 'linked' || true) return { ok: true, userId: candidate, created: true };",
+    expect: 'fail',
+  },
+  {
+    id: 'V19-12',
+    label: '競合時に孤児の auth ユーザーを消さない',
+    file: 'packages/auth/src/resolve-identity.ts',
+    from: '    await deps.deleteAuthUser(candidate);',
+    to: '    void candidate;',
+    expect: 'fail',
+  },
+  {
+    id: 'V19-13',
+    label: '既に紐付いていても auth ユーザーを作る（毎回孤児を出す形）',
+    file: 'packages/auth/src/resolve-identity.ts',
+    from: '  if (existing !== null) return { ok: true, userId: existing, created: false };',
+    to: '  if (false) return { ok: true, userId: existing, created: false };',
+    expect: 'fail',
+  },
 ];
 
 /**

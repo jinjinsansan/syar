@@ -29,10 +29,24 @@ create table if not exists user_identities (
   provider text not null,
   -- ★プロバイダ側の sub。**メールを入れてはいけない**
   subject text not null,
-  user_id uuid not null references users (id) on delete cascade,
+
+  -- ★★参照先は `users` ではなく `auth.users`（D-078 改訂・Q-AUTH-06）
+  --
+  --   `users`（ゲーム口座）が作られるのは**セットアップ RPC の中**だが、
+  --   `sub` → 口座の対応が要るのは**その前のログイン時点**で、順序が逆になる。
+  --   `users` を参照すると identity 行を書けない期間ができ、
+  --   その間に離脱→再ログインした利用者に**別の auth ユーザーが作られる**。
+  --   結果、同じ LINE アカウントから **2口座・初期 EP 4,000・馬2頭**（D-074 / D-075）。
+  --
+  --   ★このとき下の primary key は「存在するのに働かない」— 行が書けて初めて効くため（R-16）。
+  --     一意性を「口座を持っている人」に限ると、**口座を持つ前の期間が丸ごと穴になる。**
+  user_id uuid not null references auth.users (id) on delete cascade,
   created_at timestamptz not null default now(),
 
   -- ★V-19 #10: 「同一 sub なら1ユーザー」の担保。アプリ側の確認だけにしない
+  --
+  --   ⚠️ ただしこれは「行が書けている」ことが前提の担保である。
+  --      上の参照先の注記を必ず読むこと（書けない期間があると、この制約は素通りする）。
   primary key (provider, subject),
 
   constraint provider_not_empty check (length(provider) > 0),
@@ -43,6 +57,21 @@ create table if not exists user_identities (
 -- （持てると、片方を消して「別人」として初回付与を受け直せる）
 create unique index if not exists user_identities_user_provider_uniq
   on user_identities (user_id, provider);
+
+-- ============================================================================
+-- ★on delete の非対称は「意図」である（揃えないこと）
+--
+--   user_identities → auth.users : cascade
+--   users          → auth.users : NO ACTION（`0001_init.sql:31` にカスケード指定が無い）
+--
+--   **揃っていないのは書き忘れではない。**
+--   ・identity は「どの LINE アカウントか」の対応表にすぎないので、auth ユーザーが消えれば一緒に消えてよい
+--   ・**口座（users）は EP/PP 台帳と PP 残高を持つ。PP は景品価値を持つので、勝手に消えてはならない**
+--     （結果として「auth ユーザーの削除は users 行に阻まれる」形になる。それが望ましい）
+--
+--   ★次にここを読む人へ: 「揃っていないから揃えよう」で cascade を足さないこと。
+--     足した瞬間、auth ユーザーの削除がポイント台帳ごと利用者の資産を消す。
+-- ============================================================================
 
 -- ============================================================================
 -- RLS: ★クライアントからは一切触らせない
