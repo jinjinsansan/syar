@@ -73,6 +73,19 @@ if (envName === 'production' && !switches.has('--yes-production')) {
 const baseline = flag('baseline');
 /** フラグでない最初の引数 = 特定ファイルの前方一致指定 */
 const only = positionals[0] ?? null;
+/**
+ * ★前提を飛ばして当てることを許すか（既定は許さない）
+ *
+ * 【なぜ足したか（2026-08-20 の実害）】
+ *   `--env staging 0020` と指定したところ、**`0019` が未適用のまま `0020` だけが当たりました。**
+ *   `0020` は `0019` が作る `assert_setup_complete()` を呼ぶ関数を定義するので、
+ *   **3つの書き込み RPC が「存在しない関数を呼ぶ」状態**になりました
+ *   （plpgsql は本体を実行時に解決するので、`create or replace` は成功してしまいます）。
+ *
+ *   ★位置引数は「対象を狭める」つもりの機能ですが、**順序という前提まで一緒に外していました。**
+ *     そして壊れ方は「静かに壊れて、実行時まで分からない」— **R-27 が言う「広い側に落ちる」**です。
+ */
+const allowGaps = switches.has('--allow-gaps');
 
 console.log(`接続先: ${envFile}`);
 
@@ -205,6 +218,21 @@ if (baseline !== null) {
 const candidates = only ? files.filter((f) => f.startsWith(only)) : files;
 if (candidates.length === 0) throw new Error(`適用対象がありません（指定: ${only ?? 'すべて'}）`);
 const target = candidates.filter((f) => !applied.has(f));
+
+// ★前提の抜けを検出する（上の allowGaps の注記）
+// 当てようとしているものより **前の番号**に未適用が残っていたら止める。
+// マイグレーションは順序を前提に書かれており、飛ばすと「静かに壊れて実行時まで分からない」形になる。
+if (target.length > 0 && !allowGaps) {
+  const first = target[0];
+  const gaps = files.filter((f) => f < first && !applied.has(f));
+  if (gaps.length > 0) {
+    throw new Error(
+      `前提のマイグレーションが未適用です:\n  ${gaps.join('\n  ')}\n` +
+        `★${first} より前のものが残っています。順序どおりに当ててください` +
+        `（意図して飛ばす場合のみ --allow-gaps）`,
+    );
+  }
+}
 
 if (target.length === 0) {
   console.log(`★未適用のものはありません（${candidates.length} 件はすべて適用済み）`);
