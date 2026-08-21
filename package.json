@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "verify:overdue": "tsx tools/verify-overdue.mjs",
+    "verify:billboards": "node tools/verify-world-billboards.mjs",
     "simulate": "tsx apps/cli/simulate.ts",
     "verify": "tsx apps/cli/src/verify.ts",
     "verify:distance": "tsx apps/cli/src/sweep-distance.ts",

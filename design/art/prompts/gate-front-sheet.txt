@@ -1,0 +1,74 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen).
+
+GOAL
+Create ONE image containing TWO views of the SAME 12-stall starting gate, seen head-on from the front:
+  TOP HALF    = doors CLOSED (horses are waiting inside)
+  BOTTOM HALF = doors OPEN   (the instant after the start)
+Both must be the SAME gate, the SAME size, the SAME camera, the SAME lighting.
+
+★WHY BOTH IN ONE IMAGE
+The program cross-fades between these two pictures at the moment the race starts. If they are generated
+separately the structure shifts and the gate appears to jump. Putting both in one image forces them to match.
+
+★★ THE MOST IMPORTANT REQUIREMENT — PROPORTIONS
+The picture this replaces was too TALL for its width, and the game found this out the hard way:
+the program scales the gate by its WIDTH (14.8 m of track), and the old art's aspect ratio then made the
+gate **5.60 m tall — 1.75x the height of a real starting gate.** The consequence in the running game was
+that a horse's head (2.5 m) landed halfway down the picture, right behind the solid door panels, so the
+owner saw **only the horses' legs sticking out below the gate and no bodies and no jockeys at all.**
+
+So, for EACH of the two views:
+- The gate structure must measure **14.0 m wide by 3.4 m tall** — an aspect ratio of about **4.1 : 1**.
+  It is a long, low, wide structure. It is NOT a tall boxy one.
+- Draw it WIDE and SHORT. If your gate looks tall, it is WRONG.
+
+WHAT MUST BE VISIBLE THROUGH THE GATE (this is why the proportions matter)
+The horses and jockeys are drawn by the program BEHIND this picture. For them to be seen:
+- The solid door panels must only reach about **1.4 m** above the ground — roughly chest height on a horse.
+- ★EVERYTHING ABOVE THE DOOR PANELS MUST BE SEE-THROUGH: open air and thin structural members only.
+  The horses' necks, heads and the jockeys' helmets and shoulders appear in that band and must not be
+  hidden. Do NOT fill the upper area with solid panels, sheeting, shadow, or a dark back wall.
+  Do NOT draw the far side of the gate as a solid mass.
+- Thin bars, tubes and truss members in that upper band are fine and wanted — they read as a real gate —
+  but the gaps between them must be genuinely EMPTY (fully transparent background), not dark fill.
+
+THE GATE ITSELF
+- 12 stalls side by side, each about 1.0 m wide, separated by slim vertical partitions.
+- Each stall has a hinged front door: a solid panel in its lower half, light tubular framing above.
+- A horizontal top beam runs the full width, carrying 12 small white number plates reading 1 to 12,
+  left to right, in plain dark numerals. No other text, no logos, no sponsor boards, no branding.
+- Painted steel: green framing with bare aluminium doors and fittings. Simple wheels and levelling jacks
+  at each end, at ground level.
+- ★No real-world racecourse names, no emblems, no flags, no advertising of any kind.
+
+THE TWO VIEWS
+- TOP (closed): all 12 doors shut and flush across the front.
+- BOTTOM (open): all 12 doors swung fully forward toward the viewer and to the sides, so the stalls are
+  wide open and clear. Nothing blocks the stall openings. Same gate, same place, same size on the canvas.
+
+CAMERA — identical for both
+- Straight-on from the front, at about the height of a horse's back (1.6 m), roughly 25 m away.
+- Very slight perspective: the far ends may converge a little, but the beam stays essentially level.
+- The two views must sit at the SAME horizontal position and be the SAME width on the canvas.
+
+LAYOUT
+- Output 1536 x 1024.
+- The closed view centred in the upper half, the open view centred in the lower half.
+- Leave at least 40 px of pure background between them, and a clear margin at every edge.
+- No borders, no labels, no captions, no grid lines.
+
+RENDERING
+- Photographic, like a frame from a live TV race broadcast: real brushed and painted metal, visible welds
+  and bolts, crisp specular highlights, subtle scuffs.
+- Bright, even daylight. Everything sharp — no motion blur, no depth-of-field blur.
+
+BACKGROUND
+- Uniform flat chroma GREEN (RGB 0,255,0) across the WHOLE image — including the gaps between the bars,
+  the stall openings, and the space between the two views.
+- ★The green must be visible THROUGH the gate wherever a real gate would be see-through. That green
+  becomes transparency, and that is how the horses behind it are seen.
+- No ground, no cast shadow, no track, no rail, no crowd, no sky, no text.
+- The gate itself must not contain that green anywhere — use a DEEPER, DARKER green for the paintwork,
+  clearly distinguishable from the chroma background.
+
+Produce exactly ONE image and save it as a PNG.

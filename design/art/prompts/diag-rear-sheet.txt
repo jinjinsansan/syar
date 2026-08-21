@@ -1,0 +1,105 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with reference images.
+
+GOAL
+Create ONE image that contains a COMPLETE 8-FRAME GALLOP CYCLE of a racehorse WITH jockey,
+seen from a THREE-QUARTER REAR camera, laid out as a sprite sheet.
+
+★WHY A SHEET AND NOT 8 SEPARATE IMAGES
+The set this replaces (diag-rear-v4) was generated one frame at a time. Measured against the
+approved sets it is the WORST of all five sprite sets we have:
+
+    winner-v2      4.6%   (made as a sheet)   approved
+    diag-front-v3  6.0%
+    side-v7        9.6%   approved
+    high-diag-v4   9.9%   (made as a sheet)
+    diag-rear-v4  11.6%   ← this set. Made one frame at a time.
+
+That number is how much the horse's contact point wanders between frames. The owner's verdict on
+the rear shots in the running game is "the horse from behind is not actually running" — and the
+measurement agrees with him. Frames drawn one at a time drift in camera angle and in body size,
+so the cycle flickers instead of running.
+
+Putting all 8 frames in ONE image forces the camera, the horse and the jockey to be identical
+across the cycle. **That consistency is the whole point of this image.**
+
+REFERENCE FILE (read it and pass it as a reference image to the image generation tool)
+- IDENTITY / STYLE reference — the approved side-view frame. Copy the horse (bay, black mane and tail,
+  black lower legs, white socks behind), the white saddle cloth, the tack, the jockey (grey/white silks,
+  grey helmet, deep racing crouch), the photographic rendering, the coat sheen and the lighting:
+  apps/web/public/art/horse-jockey-side-v7-pose01.png
+
+LAYOUT (strict — the sheet is sliced by a program, so this must be exact)
+- 8 frames of ONE gallop cycle, arranged 4 COLUMNS x 2 ROWS.
+- Reading order: top row left-to-right = frames 1,2,3,4; bottom row left-to-right = frames 5,6,7,8.
+- Every cell is EXACTLY the same size. No borders, no numbers, no labels, no grid lines.
+- ★CRITICAL SPACING: leave at least 40 px of pure background between one frame and the next.
+  NOTHING may cross from one cell into its neighbour — not the streaming tail, not a hoof.
+  Make the horses smaller if that is what it takes. The slicer needs clean gaps.
+- Output 1536 x 1024.
+
+CAMERA — ★IDENTICAL IN ALL 8 CELLS. This is the most important requirement.
+- The camera is BEHIND the horse and slightly ABOVE it, as if a television camera were following the
+  field from a truck: roughly 6 m above the track and about 25 m behind, looking down at about 12 degrees.
+- Turned about 15 degrees off dead-centre so it does not read as a flat rear elevation — we see a sliver
+  of the horse's right flank.
+- We see: the hindquarters and the rump, both hind legs, the tail streaming toward the camera, the saddle
+  cloth from behind on both flanks, and the jockey from behind — back, shoulders, the helmet from behind,
+  and the soles of both boots in the stirrups.
+- The horse runs AWAY from the camera in every cell.
+- ★Do NOT let the angle rotate between cells. Do NOT drift toward a side view, and do NOT drift toward a
+  high overhead view. If cell 8 is seen from a different angle than cell 1, the sheet is WRONG.
+
+★ANCHOR — the horse must not jump between cells
+- In every cell the horse's BARREL (the saddle area) sits at the SAME position within its cell and at the
+  SAME size. Only the legs, the tail and the jockey's body move around it.
+- The hoof that is on the ground lands on the SAME point in every cell.
+
+★WHAT THE MOTION LOOKS LIKE FROM BEHIND — this is what is currently missing
+From this angle you cannot see the fore legs reaching. What the viewer must read instead is:
+- the RUMP rising and falling through the cycle;
+- the two hind legs alternating clearly — at full drive they are extended back and well apart, at the
+  gathered phase they are folded up under the belly and close together;
+- the TAIL swinging with the stride, not frozen in the same shape;
+- the jockey's body pumping — lower at the drive, rising slightly at the gather.
+If the eight cells differ only a little, the set has failed. **The difference between cells must be
+obvious at a glance.**
+
+THE 8 POSES — one complete gallop cycle, in this order
+1. Full extension: hind legs stretched back and far apart, body at its longest, airborne. Rump at its lowest.
+2. Landing: weight coming onto the leading fore leg (unseen ahead); hind legs beginning to swing forward.
+3. Hind legs swinging through beneath the barrel; rump rising.
+4. Hind legs planting under the body, close together.
+5. Gathered: all four legs bunched under the body, back rounded, the shortest silhouette, airborne.
+   Rump at its highest.
+6. Hind legs driving off hard, beginning to extend back.
+7. Hind legs extending back and separating; body opening up.
+8. Almost full extension again, leading into frame 1 so the cycle loops seamlessly.
+
+★ JOCKEY PROPORTION
+- A real jockey is SMALL relative to the horse (about 1.6 m, very light).
+- Deep racing crouch: knees bent, heels down in short stirrups, seat OFF the saddle, torso folded low over
+  the neck. From behind he reads as helmet, shoulders, back and the soles of the boots.
+- He must NOT look tall, oversized, or floating above the saddle. The boots wrap the barrel.
+- Silks and helmet plain grey/white (recoloured in code later). No numbers, no logos, no text.
+
+★ SKIN — a defect we have already shipped once
+- The jockey's hands and the back of his neck are the only skin visible from behind. Keep them a natural
+  skin tone, clearly SEPARATE in colour from the silks. Do not blend the silk colour into the skin, and do
+  not leave the skin grey. The silks are recoloured by the program later, and anything that shares their
+  colour will be recoloured with them.
+
+RENDERING
+- Photographic, like a frame from a live TV race broadcast. Real coat texture with sheen and visible
+  muscle; individual hairs in mane and tail; crisp specular highlights on the leather tack.
+- Bright daylight from the upper left. Everything sharp — no motion blur.
+
+★ THE PICTURE MUST STILL READ WHEN SMALL
+- In the game each frame is drawn only 150-300 px tall. Keep the silhouette clean and the hind-leg
+  separation strong enough that the gallop still reads at that size.
+
+BACKGROUND
+- Uniform flat chroma GREEN (RGB 0,255,0) across the WHOLE image, including the gaps between cells.
+- No ground, no cast shadow, no rail, no crowd, no text, no border.
+- The subject must not contain that green anywhere.
+
+Produce exactly ONE image and save it as a PNG.
