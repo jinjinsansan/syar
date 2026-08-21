@@ -37,6 +37,8 @@ export const READONLY = [
   'sweep-lane-reveal.mjs',    // 横の広がりの帯を掃引する（読むだけ）
   'verify-cut-timing.mjs',    // 台本の各カットが実際に何秒あるかを測る（読むだけ）
   'verify-stride-rate.mjs',   // 画面上で 1 秒に何完歩しているかを測る（読むだけ）
+  'verify-v17-time.mjs',      // V-17（走破タイムの分布）を測る（読むだけ）
+  '_v17probe.mjs',            // 1 レースずつ走破タイムを照合する（読むだけ）
   '_stride.mjs',              // 送り速さと完歩数の対応を並べる（読むだけ）
   'verify-no-real-faces.mjs', // 人物立ち絵に写真が混ざっていないか（読むだけ）
   '_timefloor.mjs',   // 30 秒が実現できるかの下限計算
