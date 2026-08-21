@@ -37,9 +37,30 @@ export interface TexturedWorldAssets<TImage> {
   } | undefined;
 }
 
+/**
+ * ★`drawTexturedWorld` の返り値。**手前側のラチだけは呼び出し側が馬の後に描きます。**
+ *   （馬より先に描くと、脚がラチを突き抜けて見えるため）
+ */
+export interface TexturedWorldResult {
+  /** 手前側のラチの横位置（0 = 内ラチ / コース幅 = 外ラチ） */
+  readonly nearRailW: number;
+  /** ★馬を描いたあとに呼ぶこと */
+  readonly drawNearRail: () => void;
+}
+
 export interface TexturedWorldOptions {
   /** 内ラチの外側（内馬場）と外ラチの外側を暗くする量（0〜1） */
   readonly outsideDarken?: number;
+  /**
+   * ★注視点（馬群の位置・m）。**どちらのラチが手前か**の参考値に使います。
+   *   省略すると 0m で判定するので、**必ず渡すこと**。
+   */
+  readonly focusS?: number;
+  /**
+   * ★馬群の横位置（m）。**ラチを馬の前後どちらに描くか**を s ごとに決めるのに使います。
+   *   省略すると走路の中央で判定します。
+   */
+  readonly focusW?: number;
 }
 
 const wrap = (a: number, n: number): number => ((a % n) + n) % n;
@@ -50,7 +71,7 @@ export function drawTexturedWorld<TImage>(
   cam: PerspectiveCamera,
   assets: TexturedWorldAssets<TImage>,
   opts: TexturedWorldOptions = {},
-): void {
+): TexturedWorldResult {
   const basis = cameraBasis(cam);
   const W = cam.width, H = cam.height;
   const hz = horizonY(cam, basis);
@@ -228,7 +249,24 @@ export function drawTexturedWorld<TImage>(
   }
 
   // ── ラチ: 白い横木 2 本と緑の支柱（プレートの意匠に合わせる） ─────────────
-  const rail = (w: number, postEveryM: number, postH: number, near: boolean): void => {
+  /**
+   * ★ラチを**区間ごとに、馬より手前か奥かで振り分けて**描きます。
+   *
+   * ⚠️ ★「このカットではどちらのラチが手前」と**1 つに決められません。**
+   *    4 角正面は固定カメラで、馬が近づくにつれ**本当に前後が入れ替わります**
+   *    （検査が 800〜1056m の途中での入れ替わりを捕捉）。
+   *    カット単位で切り替えると、その瞬間に**ラチが馬の前後を跳びます。**
+   * → ★s ごとに「そこのラチは、そこの馬より手前か」を見て、
+   *   **手前の点だけを馬のあとに描き直します。** 切り替わりは点ごとなので跳びません。
+   *
+   * `wantNear` … true なら「馬より手前の区間だけ」を描く（馬のあとに呼ぶ）
+   */
+  const focusW = opts.focusW ?? WD / 2;
+  const isNearHorses = (s: number, w: number): boolean => {
+    const r = P(s, w, 0), h = P(s, focusW, 0);
+    return r.depth > 1 && h.depth > 1 && r.depth < h.depth;
+  };
+  const rail = (w: number, postEveryM: number, postH: number, near: boolean, wantNear: boolean): void => {
     for (const [height, width, color] of [[postH * 0.55, 1.6, '#c9cbc4'], [postH, 3.2, '#e6e6e0']] as const) {
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
@@ -236,7 +274,9 @@ export function drawTexturedWorld<TImage>(
       let started = false;
       for (let s = NEAR; s <= FAR; s += 5) {
         const p = P(s, w, height);
-        if (p.depth <= 1 || p.x < -200 || p.x > W + 200) { started = false; continue; }
+        if (p.depth <= 1 || p.x < -200 || p.x > W + 200 || isNearHorses(s, w) !== wantNear) {
+          started = false; continue;
+        }
         if (!started) { ctx.moveTo(p.x, p.y); started = true; } else ctx.lineTo(p.x, p.y);
       }
       ctx.stroke();
@@ -244,11 +284,43 @@ export function drawTexturedWorld<TImage>(
     ctx.strokeStyle = near ? '#3f6b4c' : '#4a7455';
     for (let s = Math.floor(NEAR / postEveryM) * postEveryM; s <= FAR; s += postEveryM) {
       const a = P(s, w, 0), b2 = P(s, w, postH);
-      if (a.depth <= 1 || a.x < -40 || a.x > W + 40) continue;
+      if (a.depth <= 1 || a.x < -40 || a.x > W + 40 || isNearHorses(s, w) !== wantNear) continue;
       ctx.lineWidth = Math.max(1, a.pxPerM * 0.09);
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y); ctx.stroke();
     }
   };
-  rail(0, 6, 1.1, false);          // 内ラチ
-  rail(WD, 6, 1.1, true);          // 外ラチ
+  /**
+   * ★**カメラに近いほうのラチは、ここでは描きません。**
+   *
+   * ⚠️ ラチは世界の一部なので馬より先に描かれます。ところが 4 角正面のように
+   *    **内ラチがカメラの手前に来るカット**では、手前にあるはずのラチの上に馬が塗られ、
+   *    ★**脚がラチを突き抜けて「馬がラチの向こうに立っている」ように見えます。**
+   *    オーナー評「コースの内側に馬の足が入ったりしている」はこれです。
+   *
+   *    実測（4 角正面・注視点 800m）: 内ラチの深さ 137.5m / 外ラチ 142.2m。
+   *    ★7 カット中このカットだけ内ラチが手前でした。
+   *    投影でも、全馬の接地点（画面Y 411〜428）が
+   *    **内ラチの地面 430.1 と横木 357.4 のあいだ**に落ちています。
+   *
+   * → 手前側は `nearRail` として**呼び出し側が馬の後に描きます**（`drawNearRail`）。
+   */
+  /**
+   * ★どちらが手前かは、**注視点の位置での深さ**（視線方向の距離）で決めます。
+   *
+   * ⚠️ ★手前かどうかは**視線方向の深さ**で決まります。カメラからの直線距離では決まりません
+   *    （幾何距離で判定したら、どのカットでも外ラチが手前という答えになり、実際の見え方と
+   *      合いませんでした）。
+   * ⚠️ ★「画面に映る範囲の深さの平均」でも判定しましたが、**カットの途中で入れ替わり**、
+   *    ラチが馬の前後を跳びました（4 角正面 800〜1056m で検査が捕捉）。
+   *    注視点が動くと視界に入る範囲が変わり、平均も変わるためです。
+   * → **注視点 1 点での深さ**にします。馬がいるのもそこなので、比べるべき場所はここです。
+   */
+  // ★馬より奥の区間だけを、ここ（馬の前）で描く
+  rail(0, 6, 1.1, false, false);        // 内ラチ
+  rail(WD, 6, 1.1, true, false);        // 外ラチ
+  return {
+    /** ★参考値: 注視点の位置でどちらが手前か（検査用。描き分けは区間ごとに行う） */
+    nearRailW: P(opts.focusS ?? 0, 0, 0).depth < P(opts.focusS ?? 0, WD, 0).depth ? 0 : WD,
+    drawNearRail: () => { rail(0, 6, 1.1, false, true); rail(WD, 6, 1.1, true, true); },
+  };
 }

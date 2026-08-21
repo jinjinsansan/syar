@@ -229,8 +229,22 @@ export function drawBroadcastV2Scene<TImage>(
     return { x: q.x, y: q.y, depth: q.depth };
   };
   let parallaxOpts: ParallaxDrawOptions | undefined;
+  /**
+   * ★**カメラに近いほうのラチは、馬を描いたあとに描きます。**
+   *
+   * ⚠️ ラチは世界の一部なので馬より先に描かれていました。ところが 4 角正面のように
+   *    **内ラチがカメラの手前に来るカット**では、手前にあるはずのラチの上に馬が塗られ、
+   *    ★脚がラチを突き抜けて**「馬がラチの向こうに立っている」**ように見えます。
+   *    オーナー評「コースの内側に馬の足が入ったりしている」はこれです（2026-08-21）。
+   *
+   * ⚠️ ★当初は「素材の半幅 0.99m に対し横位置の下限が 0.8m だからはみ出す」と見立て、
+   *    エンジンへの照会を書きかけました。**測ったら横位置の最小は 1.575m で、
+   *    下限 0.8m には一度も達していませんでした**（291,600 標本）。**素材の幅は無関係。**
+   *    ★照会を出す前に測って正解でした。
+   */
+  let nearRail: (() => void) | undefined;
   if (opts.texturedWorld !== undefined) {
-    drawTexturedWorld(ctx, course, scene.camera, opts.texturedWorld);
+    nearRail = drawTexturedWorld(ctx, course, scene.camera, opts.texturedWorld, { focusS: scene.focusS, focusW: scene.focusW }).drawNearRail;
   } else if (opts.parallaxPlate !== undefined) {
     // 注視点（馬群）の px/m・深さ・画面上の進行方向を、馬と同じ透視カメラから取る
     const basis = cameraBasis(scene.camera);
@@ -327,6 +341,8 @@ export function drawBroadcastV2Scene<TImage>(
     distanceMeter: course.distance,
     trackEffect: { surface: opts.surface, condition: opts.condition, color: opts.kickupColor },
   });
+  // ★手前側のラチ（馬の脚が突き抜けないように、馬のあとで描く）
+  nearRail?.();
   // ★馬の手前に立つ物体（発馬機の前枠など）
   if (opts.parallaxPlate !== undefined && parallaxOpts !== undefined) {
     drawParallaxObjects(ctx, opts.parallaxPlate.plate, parallaxOpts, 'front');

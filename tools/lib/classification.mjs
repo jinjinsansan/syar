@@ -39,6 +39,10 @@ export const READONLY = [
   'verify-stride-rate.mjs',   // 画面上で 1 秒に何完歩しているかを測る（読むだけ）
   'verify-v17-time.mjs',      // V-17（走破タイムの分布）を測る（読むだけ）
   '_v17probe.mjs',            // 1 レースずつ走破タイムを照合する（読むだけ）
+  '_railprobe.mjs',           // 内ラチへのはみ出し頻度（読むだけ）
+  '_railgeo.mjs',             // 馬の接地点とラチの画面上の並び（読むだけ）
+  '_railside.mjs',            // カットごとにどちらのラチが手前か（読むだけ）
+  '_nearrail.mjs',            // 手前のラチがコース上のどこで入れ替わるか（読むだけ）
   '_stride.mjs',              // 送り速さと完歩数の対応を並べる（読むだけ）
   'verify-no-real-faces.mjs', // 人物立ち絵に写真が混ざっていないか（読むだけ）
   '_timefloor.mjs',   // 30 秒が実現できるかの下限計算
