@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os';
 import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt } from '@star/race-engine';
 import {
   replayPositionModel, sceneAt, finalOrderOf, cameraFor, ovalCourse,
-  timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
+  timeWarpFor, knotsFor, ratesForTarget, targetDisplaySec,
 } from '@star/render';
 import { loadFrames, dressed, POST, isDark } from './lib/dress.mjs';
 
@@ -207,9 +207,9 @@ const sceneInput = {
  * ★**時間配分**（D-062）。道中は速く送り、直線は引き伸ばす。
  *   ⚠️ 着順にも境界にも触れません。**表示の時計を読み替えるだけ**です。
  */
-const warp = timeWarpFor(knotsFor(boundaries, OWN), DEFAULT_PHASE_RATES);
+const warp = timeWarpFor(knotsFor(boundaries, OWN), ratesForTarget(knotsFor(boundaries, OWN), targetDisplaySec(DIST)));
 console.log(`  ✓ 時間配分: ${model.raceSec.toFixed(1)}秒 → 表示 ${warp.displaySec.toFixed(1)}秒`
-  + `（道中 ${DEFAULT_PHASE_RATES.cruise}倍速 / 直線 ${DEFAULT_PHASE_RATES.straight}倍）`);
+  + `（道中 ${warp.rates?.cruise?.toFixed?.(1) ?? '—'}倍速 / 目標 ${targetDisplaySec(DIST)}秒）`);
 
 const total = Math.ceil(warp.displaySec * FPS);
 const STEP = Math.max(1, Math.round(total / 60));   // ★60枚程度に間引く（GIF の大きさ）

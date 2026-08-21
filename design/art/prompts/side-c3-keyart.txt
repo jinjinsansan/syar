@@ -1,0 +1,52 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with reference images.
+
+GOAL
+Create frame {POSE} of an 8-frame gallop cycle of a racehorse WITH jockey, SIDE view facing RIGHT.
+This is a STYLE CANDIDATE for a horse-racing game. The existing set is used ONLY for the leg phase
+and the framing anchor — NOT for the rendering style.
+
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- POSE / PHASE reference (copy ONLY the leg phase, neck, head, tail and the jockey's posture):
+  apps/web/public/art/horse-jockey-side-v6-pose{POSE}.png
+- CONSISTENCY reference (previous frame of THIS candidate, if it exists): {PREV_REF}
+
+  ★★ Use the consistency reference ONLY for identity, tack, style, lighting, size and placement.
+  DO NOT copy its leg positions. This is frame {POSE} of a RUNNING CYCLE — the legs, neck, tail and
+  the jockey's body MUST be visibly different from the previous frame.
+
+STYLE — CANDIDATE 3: BOLD GAME KEY ART
+- Dramatic, high-contrast game illustration built to read instantly at small size.
+- Strong directional key light from the upper left and a bright rim light along the top edge of the
+  horse and the jockey; deep, saturated shadows underneath.
+- Musculature slightly exaggerated and clearly sculpted; the silhouette is the priority.
+- Rich, saturated bay coat. Colour separation between horse, tack and silks is deliberately strong.
+- Confident rendering with visible form, but clean edges — not sketchy, not photographic.
+
+★ JOCKEY PROPORTION — the most common failure
+- A real jockey is SMALL relative to the horse (about 1.6 m, very light).
+- Deep racing crouch: knees bent, heels down in short stirrups, seat OFF the saddle, torso folded low
+  and almost parallel to the horse's neck, head low and forward, hands at the withers.
+- The jockey's head must NOT rise far above the horse's poll.
+- ★The jockey sits INTO the horse: boots wrap the barrel, knees grip the saddle flap.
+  He must NOT look tall, oversized, or floating above the saddle.
+- Silks and helmet plain grey/white (recoloured in code later). No numbers, no logos, no text.
+
+HORSE
+- Bay thoroughbred in racing condition: black mane and tail, black lower legs, white socks behind,
+  white saddle cloth, racing bridle and small exercise saddle.
+- Correct gallop anatomy for this phase: four legs, clearly separated hooves, no extra limbs.
+
+FRAMING (identical across the set — this is the animation anchor)
+- Side view, facing RIGHT, ground line horizontal.
+- The horse's barrel (rib cage / saddle area) sits at the SAME position and SAME size in every frame.
+- The horse fills about 92% of the frame width, hooves near the bottom. Output 1536 x 1024.
+
+★ THE PICTURE MUST STILL READ WHEN SMALL
+- In the game the horse is often drawn only 150-250 px wide. Keep the silhouette clean and the
+  contrast strong enough that the horse still reads as a galloping horse at that size.
+
+BACKGROUND
+- Uniform flat chroma GREEN (RGB 0,255,0). No ground, no cast shadow, no rail, no crowd, no text,
+  no border. The subject must not contain that green anywhere.
+
+Produce exactly ONE image and save it as a PNG.

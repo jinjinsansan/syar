@@ -9,7 +9,7 @@ import {
 import {
   cameraBasis, drawBroadcastV2Scene, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
   posOf, project, replayPositionModel, resolveBroadcastV2Scene, segmentStarts,
-  timeWarpFor, withFinishRunOut, DEFAULT_PHASE_RATES,
+  timeWarpFor, withFinishRunOut, ratesForTarget, targetDisplaySec,
 } from '@star/render';
 
 const W = 1280, H = 720, FIELD = 12, DIST = 1600;
@@ -44,11 +44,23 @@ async function library(prefix) {
   };
 }
 
+/**
+ * ★**この道具は、Web 画面と同じ素材を読まなければ意味がありません。**
+ *
+ * ⚠️ 2026-08-21 まで、ここは `side-v6 / diag-front-v2 / diag-rear-v2 / high-diag-v2`
+ *    ——**どれも差し替え前の古い素材**——を読んでいました。
+ *    Web 画面は `side-v7 / diag-front-v3 / diag-rear-v5 / high-diag-v4` を読みます。
+ *    ★つまり私は、**オーナーが見ている画とは別の画**を見て「問題ない」と判断しかけました。
+ *    俯瞰素材に**背景の緑が 57.9% 残っていた**不具合も、この道具では見えませんでした。
+ *
+ * ★鍵の名前（`*-v2`）は描画側の識別子で、**ファイル名とは無関係**です。
+ *   名前が古いままなのは描画側の都合なので、**読むファイルだけを最新に合わせます。**
+ */
 const libraries = {
-  'side-v6': await library('horse-jockey-side-v6-pose'),
-  'diag-front-v2': await library('horse-jockey-diag-front-v2-pose'),
-  'diag-rear-v2': await library('horse-jockey-diag-rear-v2-pose'),
-  'high-diag-v2': await library('horse-jockey-high-diag-v2-pose'),
+  'side-v6': await library('horse-jockey-side-v7-pose'),
+  'diag-front-v2': await library('horse-jockey-diag-front-v3-pose'),
+  'diag-rear-v2': await library('horse-jockey-diag-rear-v5-pose'),
+  'high-diag-v2': await library('horse-jockey-high-diag-v4-pose'),
   'winner-v1': await (async () => {
     const file = path.join(ART, 'horse-jockey-winner-v1.png');
     const image = await loadImage(file), source = await alphaBounds(file);
@@ -153,7 +165,7 @@ const model = replayPositionModel({
 if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((entry) => Number(entry.horseId)))) {
   throw new Error('timeline: position model mismatch');
 }
-const warp = timeWarpFor(knotsFor(boundaries, 3), DEFAULT_PHASE_RATES);
+const warp = timeWarpFor(knotsFor(boundaries, 3), ratesForTarget(knotsFor(boundaries, 3), targetDisplaySec(DIST)));
 const finishSec = new Map(result.order.map((entry) => [Number(entry.horseId), entry.timeSec]));
 const winnerGate = Number(result.order[0].horseId);
 const samples = [];

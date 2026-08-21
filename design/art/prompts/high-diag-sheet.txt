@@ -1,0 +1,70 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with reference images.
+
+GOAL
+Create ONE image that contains a COMPLETE 8-FRAME GALLOP CYCLE of a racehorse WITH jockey,
+seen from a HIGH THREE-QUARTER REAR camera, laid out as a sprite sheet.
+
+★WHY A SHEET AND NOT 8 SEPARATE IMAGES
+We already tried generating the 8 frames one at a time. Each frame looked good on its own, but the
+camera angle and the body drifted from frame to frame, so the set did not read as ONE horse running —
+it flickered. Putting all 8 frames in ONE image forces the camera, the horse and the jockey to be
+identical across the cycle. **That consistency is the whole point of this image.**
+
+REFERENCE FILE (read it and pass it as a reference image to the image generation tool)
+- IDENTITY / STYLE reference — the approved side-view frame. Copy the horse (bay, black mane and tail,
+  black lower legs, white socks behind), the white saddle cloth, the tack, the jockey (grey/white silks,
+  grey helmet, deep racing crouch), the photographic rendering, the coat sheen and the lighting:
+  apps/web/public/art/horse-jockey-side-v7-pose01.png
+
+LAYOUT (strict — the sheet is sliced by a program, so this must be exact)
+- 8 frames of ONE gallop cycle, arranged 4 COLUMNS x 2 ROWS.
+- Reading order: top row left-to-right = frames 1,2,3,4; bottom row left-to-right = frames 5,6,7,8.
+- Every cell is EXACTLY the same size. No borders, no numbers, no labels, no grid lines.
+- ★CRITICAL SPACING: leave at least 40 px of pure background between one frame and the next.
+  NOTHING may cross from one cell into its neighbour — not the streaming tail, not a hoof, not the nose.
+  Make the horses smaller if that is what it takes. The slicer needs clean gaps.
+- Output 1536 x 1024.
+
+CAMERA — ★IDENTICAL IN ALL 8 CELLS. This is the most important requirement.
+- Elevated three-quarter REAR view: the camera is about 14 m above the track and about 40 m behind,
+  looking DOWN at roughly 25 degrees, offset to the horse's right.
+- We see: the horse's back and croup from above, the right flank, the saddle and saddle cloth from a high
+  angle, the tail streaming behind and below, and the jockey from above-behind (helmet crown, shoulders,
+  back, outside of the right boot).
+- The horse runs toward the upper right and slightly AWAY from the camera in every cell.
+- ★Do NOT let the angle rotate between cells. Do NOT drift toward a pure side view or a pure rear view.
+  If cell 8 is seen from a different angle than cell 1, the sheet is WRONG.
+
+★ANCHOR — the horse must not jump between cells
+- In every cell the horse's BARREL (the saddle area) sits at the SAME position within its cell and at the
+  SAME size. Only the legs, the neck, the head, the tail and the jockey's body move around it.
+- The hoof that is on the ground lands on the SAME point in every cell.
+
+THE 8 POSES — one complete gallop cycle, in this order
+1. Full extension: fore legs reaching forward, hind legs stretched back, body at its longest, airborne.
+2. Landing on the leading fore leg; hind legs beginning to swing forward under the body.
+3. Weight over the fore legs; hind legs swinging through beneath the barrel.
+4. Hind legs planting; fore legs folding up under the chest.
+5. Gathered: all four legs bunched under the body, back rounded, the shortest silhouette, airborne.
+6. Hind legs driving off; fore legs beginning to unfold forward.
+7. Fore legs reaching out; hind legs extending back; body opening up.
+8. Almost full extension again, leading into frame 1 so the cycle loops seamlessly.
+
+★ JOCKEY PROPORTION
+- A real jockey is SMALL relative to the horse (about 1.6 m, very light).
+- Deep racing crouch: knees bent, heels down in short stirrups, seat OFF the saddle, torso folded low over
+  the neck. From this high angle he reads mostly as helmet, shoulders and back.
+- He must NOT look tall, oversized, or floating above the saddle. The boots wrap the barrel.
+- Silks and helmet plain grey/white (recoloured in code later). No numbers, no logos, no text.
+
+RENDERING
+- Photographic, like a frame from a live TV race broadcast. Real coat texture with sheen and visible
+  muscle; individual hairs in mane and tail; crisp specular highlights on the leather tack.
+- Bright daylight from the upper left. Everything sharp — no motion blur.
+
+BACKGROUND
+- Uniform flat chroma GREEN (RGB 0,255,0) across the WHOLE image, including the gaps between cells.
+- No ground, no cast shadow, no rail, no crowd, no text, no border.
+- The subject must not contain that green anywhere.
+
+Produce exactly ONE image and save it as a PNG.

@@ -19,7 +19,7 @@ import {
 } from '@star/race-engine';
 import {
   cameraBasis, finalOrderOf, knotsFor, ovalCourse, posOf, project, replayPositionModel,
-  resolveBroadcastV2Scene, timeWarpFor, withFinishRunOut, DEFAULT_PHASE_RATES,
+  resolveBroadcastV2Scene, timeWarpFor, withFinishRunOut, ratesForTarget, targetDisplaySec,
   RACE_INTRO_RACE_START_SEC, parallaxLayerShiftPx, HORSE_HEIGHT_M,
   broadcastV2AnchorWeight, buildVisualScroll, broadcastV2FinishStyleOf, HORSE_LENGTH_M,
 } from '@star/render';
@@ -54,7 +54,7 @@ const model = replayPositionModel({
   formationSeed: seed * 2654435761,
 });
 if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((e) => Number(e.horseId)))) throw new Error('model mismatch');
-const warp = timeWarpFor(knotsFor(boundaries, 3), DEFAULT_PHASE_RATES);
+const warp = timeWarpFor(knotsFor(boundaries, 3), ratesForTarget(knotsFor(boundaries, 3), targetDisplaySec(DIST)));
 const finishSec = new Map(result.order.map((entry) => [Number(entry.horseId), entry.timeSec]));
 const winnerGate = Number(result.order[0].horseId);
 const course = ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn: 'left' });
