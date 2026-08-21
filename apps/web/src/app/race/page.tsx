@@ -75,7 +75,13 @@ function rendererFromSearch(search: string): RendererKind {
 let rendererBadgeHidden = false; // `?badge=0` で非表示（LP 用のキャプチャなど。描画分岐には影響しない）
 function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, stage: string): void {
   if (rendererBadgeHidden) return;
-  const label = kind === 'v2' ? 'BROADCAST V2 ACTIVE' : 'LEGACY RENDERER';
+  /**
+   * ★**サーバーを起動した時刻**を併記します（2026-08-21）。
+   *   直した内容が画面に出ているかの取り違えが続いたため、
+   *   ★**スクリーンショットから「どの版を見ているか」が分かる**ようにします。
+   */
+  const stamp = process.env.NEXT_PUBLIC_BUILD_STAMP ?? '--:--:--';
+  const label = kind === 'v2' ? `BROADCAST V2 ${stamp}` : `LEGACY ${stamp}`;
   ctx.save();
   ctx.font = 'bold 15px monospace';
   const text = `${label}  [${stage}]`;
