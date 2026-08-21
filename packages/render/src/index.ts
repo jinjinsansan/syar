@@ -22,4 +22,4 @@ export * from './parallax-plate.js';
 export * from './visual-scroll.js';
 export * from './world-textured.js';
 export * from './minimap.js';
-export { isSkinTone, isSkinRepaint } from './silks-skin.js';
+export { isSkinTone } from './silks-skin.js';

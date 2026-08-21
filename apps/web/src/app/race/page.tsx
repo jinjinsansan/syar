@@ -50,7 +50,6 @@ import {
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   isSkinTone,
-  isSkinRepaint,
   ratesForTarget,
   targetDisplaySec,
 } from '@star/render';
@@ -165,9 +164,27 @@ const COAT_FILTERS = {
   chestnut: 'hue-rotate(10deg) saturate(1.15) brightness(1.1)',      // 栗毛
   'dark-bay': 'brightness(0.78) saturate(0.95)',                    // 黒鹿毛
   'blue-black': 'brightness(0.62) saturate(0.6)',                   // 青鹿毛
-  grey: 'saturate(0.12) brightness(1.32) contrast(0.95)',           // 芦毛
+  /**
+   * ⚠️ ★**芦毛は外しました**（2026-08-21・オーナー評「黄色の服の騎手の肌の色がグレー」）。
+   *
+   *   毛色は**素材全体に CSS フィルタ**を掛けて作ります。`saturate(0.12)` は
+   *   馬体だけでなく**騎手ごと脱色**するので、勝負服（別描画で色が残る）との対比で
+   *   ★**肌だけがグレー**に見えます。
+   *
+   *   ⚠️ ★「肌の画素だけ元の色で塗り直す」案を実装して**失敗しました**。
+   *      可視化して分かったこと（`tools/_skinmask.mjs`）:
+   *        ・勝負服の窓（兜＋上着）に**騎手の顔は入っていない** → 顔は塗り直されない
+   *        ・窓の中には**馬の尻**が入っており、そのハイライトを肌と誤判定して塗ってしまう
+   *      → **窓の位置が違ううえ、馬体を壊す。** 撤去しました。
+   *
+   *   ★他の毛色（栗毛・黒鹿毛・青鹿毛）は**色相と明度**を動かすだけなので、
+   *     肌は肌のまま残ります。**彩度を潰すのは芦毛だけ**でした。
+   *
+   *   ★芦毛を戻すには、**騎手を別レイヤーに分けた素材**が要ります（素材側の作業）。
+   */
+  grey: 'saturate(0.12) brightness(1.32) contrast(0.95)',           // 芦毛（★未使用）
 } as const;
-const COAT_BY_GATE = ['bay', 'chestnut', 'dark-bay', 'bay', 'grey', 'bay', 'chestnut', 'blue-black', 'bay', 'dark-bay', 'chestnut', 'bay'] as const;
+const COAT_BY_GATE = ['bay', 'chestnut', 'dark-bay', 'bay', 'dark-bay', 'bay', 'chestnut', 'blue-black', 'bay', 'dark-bay', 'chestnut', 'bay'] as const;
 const coatFilterOf = (gate: number): string | undefined =>
   COAT_FILTERS[COAT_BY_GATE[(gate - 1) % COAT_BY_GATE.length] ?? 'bay'];
 const HORSE_NAMES = ['スターライト', 'サクラブリーズ', 'ハンシンドリーム', 'ミライノツバサ', 'グリーンアロー', 'オウカノキセキ', 'ナニワスピリット', 'ローズクイーン', 'ムラサキノホシ', 'アオバハヤテ', 'ブラウンエース', 'ピンクレディ'] as const;
@@ -285,25 +302,6 @@ function silksOverlays(
       const jacket = nx >= layout.jacket[0] && nx <= layout.jacket[1] && ny >= layout.jacket[2] && ny <= layout.jacket[3];
       const saddlecloth = nx >= layout.saddlecloth[0] && nx <= layout.saddlecloth[1]
         && ny >= layout.saddlecloth[2] && ny <= layout.saddlecloth[3];
-      /**
-       * ★**騎手の肌は、元の色のままオーバーレイに載せます**（2026-08-21）。
-       *
-       *   毛色バリエーションは**素材全体に CSS フィルタ**を掛けるので、
-       *   芦毛（`saturate(0.12)`）では**騎手ごと脱色**されます。勝負服はこのオーバーレイなので
-       *   色が残り、★**肌だけグレー**になっていました
-       *   （オーナー評「黄色の服の騎手の肌の色がグレー」）。
-       *   → オーバーレイは**フィルタを外して描かれる**ので、ここに肌を載せれば塗り直せます。
-       *
-       *   ⚠️ 窓は**騎手の兜と上着まで**に限ります。鞍布の窓まで広げると馬体を巻き込み、
-       *      **毛色バリエーションが壊れます**（`isSkinRepaint` の注記）。
-       */
-      if ((helmet || jacket) && isSkinRepaint(r, g, b) && a >= 16) {
-        output.data[index] = r;
-        output.data[index + 1] = g;
-        output.data[index + 2] = b;
-        output.data[index + 3] = a;
-        continue;
-      }
       if (!helmet && !jacket && !saddlecloth) continue;
       const spread = Math.max(r, g, b) - Math.min(r, g, b);
       if (a < 16 || spread > (helmet ? 62 : 34) || Math.max(r, g, b) < (helmet ? 42 : 72)) continue;
