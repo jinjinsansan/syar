@@ -50,6 +50,10 @@ import {
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   isSkinTone,
+  applyCoat,
+  isHorseCoat,
+  COAT_TRANSFORMS,
+  type CoatName,
   ratesForTarget,
   targetDisplaySec,
 } from '@star/render';
@@ -161,38 +165,49 @@ const NARRATOR_NAME = '星野 亮太';
 /** HUD が載るのは発走 0.8 秒後（motion-spec §6） */
 const HUD_SETTLE_SEC = 0.8;
 /**
- * ★毛色バリエーション（案 A・docs/race-horse-art-options-20260819.md）。素材は鹿毛 1 頭のまま、描画時に馬体だけ
- *   色相・明度・彩度を変える。無彩色（勝負服の灰・鞍布の白・脚元の黒）はほぼ変わらない。
+ * ★毛色バリエーション（案 A・docs/race-horse-art-options-20260819.md）。
+ *   素材は鹿毛 1 頭のまま、**馬体の画素だけ**を色相・明度・彩度で変えて作る。
  *   ゲート番号から決定論で割り当て（鹿毛が最多、栗毛・黒鹿毛・青鹿毛・芦毛を混ぜる）。
+ *
+ * ⚠️ ★**`ctx.filter`（CSS フィルタ）では作りません**（2026-08-21）。
+ *    あれは**素材全体**に掛かるので、芦毛の `saturate(0.12)` は**騎手ごと脱色**します。
+ *    勝負服は別描画で色が残るため、★**肌だけグレー**になりました
+ *    （オーナー評「黄色の服の騎手の肌の色がグレー」）。
+ *
+ * ⚠️ ★開発側は最初「芦毛を割り当てから外す」で片付けようとしました。**問題のすり替え**です。
+ *    オーナー指摘: 「消えたはいいですが今後葦毛の馬はどうするのですか？
+ *    これはスターホースゲームですよ？ 消すのが目的になっていませんか？
+ *    **騎手の肌を治すだけなのに**」
+ *    → **毛色は減らさず、掛ける範囲を馬体に限る**（`@star/render` の `isHorseCoat`）。
  */
-const COAT_FILTERS = {
-  bay: undefined,                                                   // 鹿毛（素材そのまま）
-  chestnut: 'hue-rotate(10deg) saturate(1.15) brightness(1.1)',      // 栗毛
-  'dark-bay': 'brightness(0.78) saturate(0.95)',                    // 黒鹿毛
-  'blue-black': 'brightness(0.62) saturate(0.6)',                   // 青鹿毛
-  /**
-   * ⚠️ ★**芦毛は外しました**（2026-08-21・オーナー評「黄色の服の騎手の肌の色がグレー」）。
-   *
-   *   毛色は**素材全体に CSS フィルタ**を掛けて作ります。`saturate(0.12)` は
-   *   馬体だけでなく**騎手ごと脱色**するので、勝負服（別描画で色が残る）との対比で
-   *   ★**肌だけがグレー**に見えます。
-   *
-   *   ⚠️ ★「肌の画素だけ元の色で塗り直す」案を実装して**失敗しました**。
-   *      可視化して分かったこと（`tools/_skinmask.mjs`）:
-   *        ・勝負服の窓（兜＋上着）に**騎手の顔は入っていない** → 顔は塗り直されない
-   *        ・窓の中には**馬の尻**が入っており、そのハイライトを肌と誤判定して塗ってしまう
-   *      → **窓の位置が違ううえ、馬体を壊す。** 撤去しました。
-   *
-   *   ★他の毛色（栗毛・黒鹿毛・青鹿毛）は**色相と明度**を動かすだけなので、
-   *     肌は肌のまま残ります。**彩度を潰すのは芦毛だけ**でした。
-   *
-   *   ★芦毛を戻すには、**騎手を別レイヤーに分けた素材**が要ります（素材側の作業）。
-   */
-  grey: 'saturate(0.12) brightness(1.32) contrast(0.95)',           // 芦毛（★未使用）
-} as const;
-const COAT_BY_GATE = ['bay', 'chestnut', 'dark-bay', 'bay', 'dark-bay', 'bay', 'chestnut', 'blue-black', 'bay', 'dark-bay', 'chestnut', 'bay'] as const;
-const coatFilterOf = (gate: number): string | undefined =>
-  COAT_FILTERS[COAT_BY_GATE[(gate - 1) % COAT_BY_GATE.length] ?? 'bay'];
+const COAT_BY_GATE: readonly CoatName[] = ['bay', 'chestnut', 'dark-bay', 'bay', 'grey', 'bay', 'chestnut', 'blue-black', 'bay', 'dark-bay', 'chestnut', 'bay'];
+const coatOf = (gate: number): CoatName => COAT_BY_GATE[(gate - 1) % COAT_BY_GATE.length] ?? 'bay';
+/**
+ * ★毛色を**焼き込んだ**画像を作る。馬体の画素だけを変換し、騎手・馬具・白斑は触らない。
+ *   ⚠️ 読み込み時に 1 回だけ作ること（毎コマ画素を触ると重い）。
+ */
+function bakeCoat(image: FrameImage, coat: CoatName): FrameImage {
+  const t = COAT_TRANSFORMS[coat];
+  if (t === undefined) return image;                       // 鹿毛は素材そのまま
+  const w = imgW(image), h = imgH(image);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (ctx === null) return image;
+  ctx.drawImage(image, 0, 0);
+  const data = ctx.getImageData(0, 0, w, h);
+  const d = data.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3]! < 8) continue;
+    const r = d[i]!, g = d[i + 1]!, b = d[i + 2]!;
+    if (!isHorseCoat(r, g, b)) continue;
+    const [R, G, B] = applyCoat(r, g, b, t);
+    d[i] = R; d[i + 1] = G; d[i + 2] = B;
+  }
+  ctx.putImageData(data, 0, 0);
+  return canvas;
+}
+
 const HORSE_NAMES = ['スターライト', 'サクラブリーズ', 'ハンシンドリーム', 'ミライノツバサ', 'グリーンアロー', 'オウカノキセキ', 'ナニワスピリット', 'ローズクイーン', 'ムラサキノホシ', 'アオバハヤテ', 'ブラウンエース', 'ピンクレディ'] as const;
 const JOCKEY_NAMES = ['田中 守', '佐藤 翼', '山本 誠', '中村 駿', '高橋 蓮', '松本 拓海', '藤田 昇', '小林 亮', '伊藤 健', '吉田 直樹', '岡田 悠', '森川 浩'] as const;
 /** ★固定2D中継の基準幅 */
@@ -936,8 +951,24 @@ export default function RacePage(): React.JSX.Element {
           return Math.max(0.92, Math.min(1.08, ref.width / medianWidth));
         };
         const shadows = measured.map((frame) => bakeShadowSilhouette(frame.image, frame.source));
-        return SILKS_COLORS.map((_, gateIndex) => measured.map((frame, frameIndex) => ({
+        /**
+         * ★毛色は**枠ごとに 1 回だけ焼き込みます**（2026-08-21）。
+         *   ⚠️ 毎コマ `ctx.filter` を掛ける形だと**素材全体**に掛かり、騎手の肌まで脱色されます。
+         *   ⚠️ 同じ毛色は使い回します（12 枠に対し毛色は 5 種類）。焼き直すと読み込みが重くなります。
+         */
+        const bakedByCoat = new Map<CoatName, readonly FrameImage[]>();
+        const bakedFor = (coat: CoatName): readonly FrameImage[] => {
+          const hit = bakedByCoat.get(coat);
+          if (hit !== undefined) return hit;
+          const made = measured.map((frame) => bakeCoat(frame.image, coat));
+          bakedByCoat.set(coat, made);
+          return made;
+        };
+        return SILKS_COLORS.map((_, gateIndex) => {
+          const baked = bakedFor(coatOf(gateIndex + 1));
+          return measured.map((frame, frameIndex) => ({
           ...frame,
+          image: baked[frameIndex] ?? frame.image,
           referenceHeight: referenceHeight * scaleFix(frameIndex),
           // ★基準画布（1536px）での値を、この素材の画布の高さで比例させる（上の注記）
           groundLiftSourcePx: (HORSE_GROUND_LIFTS[frameIndex] ?? 0) * (imgH(frame.image) / LIFT_REFERENCE_HEIGHT_PX),
@@ -946,7 +977,8 @@ export default function RacePage(): React.JSX.Element {
           bodyLiftSourcePx: (frame.source.y + frame.source.height - anchors[frameIndex]!.y)
             + flightLiftFor(frameIndex, images.length) * (imgH(frame.image) / LIFT_REFERENCE_HEIGHT_PX),
           overlay: overlays[frameIndex]?.[gateIndex],
-        })));
+          }));
+        });
       };
       /**
        * ★勝馬の 8 コマ（騎手が立ってガッツポーズ・Codex 生成）。8 枚すべて揃ったときだけ使う。
@@ -1399,7 +1431,6 @@ export default function RacePage(): React.JSX.Element {
         libraries,
         fieldSize: FIELD,
         directionalSets: art.directionalReady,
-        coatFilterOf,
         // ★ゲート待機中（raceD=0）は脚を体の下に畳んだ支持局面 pose04（index 3）で静止させる
         frameOf: (gate) => raceD <= 0 ? 3
           : Math.floor((((metersByGate.get(gate) ?? 0) + visualDelta) / STRIDE_M) * 8 + gate * 2.96) % 8,
