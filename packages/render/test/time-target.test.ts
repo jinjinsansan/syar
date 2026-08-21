@@ -99,8 +99,14 @@ describe('★距離ごとの時間配分', () => {
       // ★50m 進むごとの変化が 2秒未満（段になっていない）
       expect(t[i]! - t[i - 1]!).toBeLessThan(2);
     }
-    expect(targetDisplaySec(1200)).toBeCloseTo(35, 6);
-    expect(targetDisplaySec(1600)).toBeCloseTo(45, 6);
+    /**
+     * ★**2026-08-21 にオーナー指示で短縮**（「レースは 30 秒にします」）。
+     *   以前の折れ点（短距離 35 秒 ／ マイル 45 秒）**もオーナー指示**でした。**上書きです。**
+     *   ⚠️ 併せて `FIXED_SPURT_RATE` / `FIXED_STRAIGHT_RATE` を 2.25/1.8 → 2.8/2.1 に上げています
+     *      （等倍区間だけで 25.6 秒あり、上げないと 30 秒に届かなかった）。
+     */
+    expect(targetDisplaySec(1200)).toBeCloseTo(26, 6);
+    expect(targetDisplaySec(1600)).toBeCloseTo(30, 6);
   });
 
   it('★★道中の送りにも段差がない（1400m と 1500m で跳ばない）', () => {

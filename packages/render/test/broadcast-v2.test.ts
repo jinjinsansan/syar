@@ -21,9 +21,43 @@ describe('Broadcast V2', () => {
     expect(broadcastV2ShotAt(course, 1600, true).id).toBe('winner-follow');
   });
 
-  it('★台本 v3: 距離比で発走→低いサイド→寄り→空撮→3角→勝負所→4角→正面固定→直線→先頭争い→ゴール→勝馬', () => {
-    const seq = [30, 150, 300, 500, 700, 850, 950, 1050, 1200, 1400, 1550].map((s) => broadcastV2ShotAt(course, s).id);
-    expect(seq).toEqual(['start-front', 'side-low', 'side-close', 'aerial', 'third-corner-rear', 'side-drive',
+  /**
+   * ★序盤の 2 カットを真横から斜めに替えました（2026-08-21）。
+   *
+   *   エンジンの `laneAt` は発走後どの馬もラチを取りにいく設計で、**残り 1350m の時点で
+   *   12 頭の横の広がりは 0.85m しかありません**（8 頭が同じ横位置）。
+   *   真横から撮ると同じ大きさの切り抜きが重なり、★オーナー評「**競艇のボートみたいな姿**」。
+   *   ゴール前が合格なのは、そこでは**横に 11.9m 散っている**からです（同じ素材・同じ真横）。
+   *
+   *   ★このテストは**カットの並び**を留めるためのものです。並びを変えるときは、
+   *     上のような理由を添えてここも直すこと。数字合わせで通さないこと。
+   */
+  /**
+   * ★台本 v4（既定）— オーナー判定（2026-08-21・12 カット全数）で
+   *   **後方・俯瞰が 5 戦 5 敗**だったため、**前からと真横だけ**で構成する。
+   *   詳細は `JUDGE_RACE_CUTS_20260821.md`。
+   *   ⚠️ ★このテストは**「後方・俯瞰が混ざっていないこと」**を留めるのが本体です。
+   *      並びを変えるときは判定表を更新してからにすること。
+   */
+  it('★★台本 v4（既定）: 前からと真横だけ。後方・俯瞰を含まない', () => {
+    // ★境界は 240 / 528 / 800 / 1056 / 1280 / 1472m（`SCRIPT_V4` の until × 1600）
+    const seq = [30, 400, 700, 900, 1100, 1300, 1500]
+      .map((s) => broadcastV2ShotAt(course, s).id);
+    expect(seq).toEqual([
+      'start-front', 'first-corner-front', 'side-drive', 'fourth-corner-front',
+      'homestretch-side', 'front-close', 'finish-line',
+    ]);
+    // ★不合格だった 5 カットが、距離のどこにも現れないこと
+    const banned = new Set(['second-corner-high', 'aerial', 'third-corner-rear', 'fourth-corner-wide']);
+    for (let m = 0; m <= 1600; m += 10) {
+      expect(banned.has(broadcastV2ShotAt(course, m).id)).toBe(false);
+    }
+  });
+
+  it('★台本 v3（旧）: 明示指定したときだけ使う', () => {
+    const seq = [30, 150, 300, 500, 700, 850, 950, 1050, 1200, 1400, 1550]
+      .map((s) => broadcastV2ShotAt(course, s, false, undefined, { script: 'v3' }).id);
+    expect(seq).toEqual(['start-front', 'first-corner-front', 'second-corner-high', 'aerial', 'third-corner-rear', 'side-drive',
       'fourth-corner-wide', 'fourth-corner-front', 'homestretch-side', 'front-close', 'finish-line']);
     expect(broadcastV2ShotAt(course, 1600, true).id).toBe('winner-follow');
     // 正面寄り素材が無いときは 4 角を俯瞰ワイドで代用
