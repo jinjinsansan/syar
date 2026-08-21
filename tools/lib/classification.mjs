@@ -47,6 +47,7 @@ export const READONLY = [
   '_orderjump.mjs',           // 表示上の順位が 1 コマでどれだけ入れ替わるか（読むだけ）
   '_skinmask.mjs',            // 肌の判定がどの画素を拾うかを色分けして見る（読むだけ）
   '_silksbleed.mjs',          // 勝負服の色替えがどこを塗るかを色分けして見る（読むだけ）
+  '_paintedhist.mjs',         // 塗られる画素の色分布（肌が混ざっていないか・読むだけ）
   '_stride.mjs',              // 送り速さと完歩数の対応を並べる（読むだけ）
   'verify-no-real-faces.mjs', // 人物立ち絵に写真が混ざっていないか（読むだけ）
   '_timefloor.mjs',   // 30 秒が実現できるかの下限計算
