@@ -175,6 +175,11 @@ export interface StandingsOptions {
   readonly timeSec?: number | undefined;
   /** 表示開始からの秒（登場アニメ 0.45s・行は 0.08s ずつ遅延）。省略で静止 */
   readonly sinceSec?: number | undefined;
+  /**
+   * ★その馬の**行の位置（小数可）**。省略すると並び順のまま瞬時に描く。
+   *   ⚠️ ★順位そのものではありません。**行が動く見た目**だけを滑らかにするための値です。
+   */
+  readonly animIndexOf?: ((gate: number) => number | undefined) | undefined;
 }
 
 export function drawStandings(
@@ -194,8 +199,28 @@ export function drawStandings(
   drawGlassNotchPanel(ctx, px, py + oy, pw, ph, t);
   drawLabel(ctx, font, 'ORDER', px + 14, py + oy + 4 + 22);
   if (opts.rightLabel !== undefined) drawLabel(ctx, font, opts.rightLabel, px + pw - 14, py + oy + 4 + 22, HUD.paper70, 'right');
-  let ry = py + oy + 4 + 34;
+  const rowTop = py + oy + 4 + 34;
+  /**
+   * ★行の縦位置。1 位の行だけ高さ 34、以下は 35 間隔。
+   *   `idx` は**小数**を受けます（並び替えの途中を補間するため）。idx=1 で連続。
+   */
+  const yOfIndex = (idx: number): number =>
+    rowTop + (idx <= 1 ? idx * 34 : 34 + (idx - 1) * 35);
+  let ry = rowTop;
   shown.forEach((r, i) => {
+    /**
+     * ★**行は瞬時に並び替えず、滑らかに動かします**（2026-08-21）。
+     *
+     *   順位表はエンジンの真の位置で毎コマ並び替えていました。直線では 1 秒あたり
+     *   1〜2 回入れ替わるので、★**行が瞬間的に跳び**、上位 5 頭の枠に出入りするたびに
+     *   表全体がガクッと動きます（オーナー評「このカメラワーク時に順番が急に変わる」）。
+     *
+     *   ⚠️ ★**順位そのものは変えません。** 変えると画面と結果が食い違います。
+     *      変えるのは**行が移動する見た目の速さ**だけ。
+     *      補間値は呼び出し側が**表示時刻から決定論的に**作って渡します（憲法 4）。
+     */
+    const animIdx = opts.animIndexOf?.(r.gate);
+    if (animIdx !== undefined) ry = yOfIndex(animIdx);
     const rowRise = riseAt(opts.sinceSec ?? 1, i * 0.08);
     ctx.globalAlpha = baseAlpha * rise.alpha * rowRise.alpha;
     const rh = i === 0 ? 34 : 32;

@@ -50,6 +50,7 @@ import {
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   isSkinTone,
+  isSkinRepaint,
   ratesForTarget,
   targetDisplaySec,
 } from '@star/render';
@@ -284,6 +285,25 @@ function silksOverlays(
       const jacket = nx >= layout.jacket[0] && nx <= layout.jacket[1] && ny >= layout.jacket[2] && ny <= layout.jacket[3];
       const saddlecloth = nx >= layout.saddlecloth[0] && nx <= layout.saddlecloth[1]
         && ny >= layout.saddlecloth[2] && ny <= layout.saddlecloth[3];
+      /**
+       * ★**騎手の肌は、元の色のままオーバーレイに載せます**（2026-08-21）。
+       *
+       *   毛色バリエーションは**素材全体に CSS フィルタ**を掛けるので、
+       *   芦毛（`saturate(0.12)`）では**騎手ごと脱色**されます。勝負服はこのオーバーレイなので
+       *   色が残り、★**肌だけグレー**になっていました
+       *   （オーナー評「黄色の服の騎手の肌の色がグレー」）。
+       *   → オーバーレイは**フィルタを外して描かれる**ので、ここに肌を載せれば塗り直せます。
+       *
+       *   ⚠️ 窓は**騎手の兜と上着まで**に限ります。鞍布の窓まで広げると馬体を巻き込み、
+       *      **毛色バリエーションが壊れます**（`isSkinRepaint` の注記）。
+       */
+      if ((helmet || jacket) && isSkinRepaint(r, g, b) && a >= 16) {
+        output.data[index] = r;
+        output.data[index + 1] = g;
+        output.data[index + 2] = b;
+        output.data[index + 3] = a;
+        continue;
+      }
       if (!helmet && !jacket && !saddlecloth) continue;
       const spread = Math.max(r, g, b) - Math.min(r, g, b);
       if (a < 16 || spread > (helmet ? 62 : 34) || Math.max(r, g, b) < (helmet ? 42 : 72)) continue;
@@ -729,6 +749,11 @@ export default function RacePage(): React.JSX.Element {
   const rafRef = useRef<number | null>(null);
   /** ★ディゾルブ用のオフスクリーン（前ショットを描く） */
   const dissolveCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  /**
+   * ★順位表の行の位置（小数）。**順位そのものではありません。**
+   *   毎コマ瞬時に並び替わると行が跳ぶので、表示時刻で補間して滑らかに動かします。
+   */
+  const standingsAnimRef = useRef<{ at: number; pos: Map<number, number> }>({ at: 0, pos: new Map() });
   const t0Ref = useRef(0);
   const dRef = useRef(0);
 
@@ -1594,6 +1619,25 @@ export default function RacePage(): React.JSX.Element {
         return q.meters - p.meters;
       });
       const allIn = rank[0] !== undefined && finished(rank[0]);
+      /**
+       * ★順位表の**行が動く速さ**だけを滑らかにします（2026-08-21）。
+       *
+       *   ⚠️ ★**順位は変えません。** `rank` はエンジンの真の位置で並べたままです。
+       *      ここで作るのは「行を今どこに描くか」だけ。
+       *   ⚠️ ★`Date.now()` は使いません（憲法 4）。**表示時刻 `d` の差分**で進めます。
+       *      撮影用シークで時刻が飛んだときは**補間せず即座に合わせます**。
+       */
+      {
+        const anim = standingsAnimRef.current;
+        const dt = d - anim.at;
+        anim.at = d;
+        const TAU = 0.12;                                  // 行が追いつく時定数（秒）
+        const k = dt > 0 && dt < 0.5 ? 1 - Math.exp(-dt / TAU) : 1;
+        rank.forEach((h, index) => {
+          const cur = anim.pos.get(h.gate);
+          anim.pos.set(h.gate, cur === undefined ? index : cur + (index - cur) * k);
+        });
+      }
       if (hud.standings) {
         drawStandings(ctx, art.pal as Record<string, string>, vp, FONT, rank.map((h) => ({
           gate: h.gate,
@@ -1602,6 +1646,7 @@ export default function RacePage(): React.JSX.Element {
           timeSec: allIn ? built.finishSec.get(h.gate) : undefined,
           isOwn: h.gate === ownGate,
         })), FIELD, frameRoleOf, {
+          animIndexOf: (gate: number) => standingsAnimRef.current.pos.get(gate),
           rightLabel: v2SectionLabel ?? sectionLabel[courseSection],
           timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
         });
