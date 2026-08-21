@@ -52,6 +52,7 @@ export const READONLY = [
   'verify-camera-continuity.mjs', // カメラがカットの中で跳んでいないか（読むだけ）
   '_cornermotion.mjs',        // カットごとの画面上の動きの滑らかさ（読むだけ）
   '_camjump.mjs',             // 固定カメラの注視点と画角の連続性（読むだけ）
+  '_cuts.mjs',                // 切替が 重ねる／切る／閃光 のどれになるか（読むだけ）
   '_stride.mjs',              // 送り速さと完歩数の対応を並べる（読むだけ）
   'verify-no-real-faces.mjs', // 人物立ち絵に写真が混ざっていないか（読むだけ）
   '_timefloor.mjs',   // 30 秒が実現できるかの下限計算

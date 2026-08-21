@@ -45,7 +45,7 @@ import {
   raceIntroAt, RACE_INTRO_RACE_START_SEC, RACE_INTRO_END_SEC,
   drawRaceTitleCard, drawStartingGate, drawStartCallBand,
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
-  broadcastV2FinishStyleOf, broadcastV2StartEase, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
+  broadcastV2FinishStyleOf, broadcastV2StartEase, broadcastV2ShotById, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
@@ -1437,11 +1437,25 @@ export default function RacePage(): React.JSX.Element {
         ctx.translate(Math.sin(raceD * 61) * amp, Math.cos(raceD * 47) * amp * 0.6);
       }
       /**
-       * ★カット切替のディゾルブ（0.45 秒）: 直前のショットを同じ時刻でオフスクリーンに描き、
-       *   新ショットの上に薄れながら重ねる。切替時刻は build 時に決定論で求めてある（`shotChanges`）。
+       * ★カット切替（`shotChanges` は build 時に決定論で求めてある）。
+       *
+       * ⚠️ ★以前は**どの切替でも 0.45 秒のディゾルブ**を掛けていました。
+       *    まったく違う画角どうしを重ねるので、**12 頭が二重写し**になり、
+       *    ★オーナー評「**カメラワークの切り替え時がごちゃごちゃする**」。
+       *
+       * ★実際の中継は、**画角が変わるところは切り替え（ハードカット）**です。
+       *   ディゾルブは「同じ向きのまま寄る／引く」ときにだけ使います。
+       *   → **視点の系統（真横／斜め前／斜め上）が変わる切替は重ねない。**
+       *
+       * ★台本 v4 は 前→前→横→前→横→前→横 なので、**ほとんどがハードカット**になります。
+       *   （閃光で入るカットは従来どおり閃光。`FLASH_INTO`）
        */
-      const DISSOLVE_SEC = 0.45;
-      const change = built.shotChanges.find((c) => c.displaySec <= d && d - c.displaySec < DISSOLVE_SEC && c.to === scene.shot.id);
+      const DISSOLVE_SEC = 0.28;
+      const sameFamily = (a: BroadcastV2ShotId, b: BroadcastV2ShotId): boolean =>
+        broadcastV2ShotById(a).view === broadcastV2ShotById(b).view;
+      const change = built.shotChanges.find((c) => c.displaySec <= d && d - c.displaySec < DISSOLVE_SEC
+        && c.to === scene.shot.id
+        && (FLASH_INTO.has(c.to) || sameFamily(c.from, c.to)));
       const drawScene = (target: CanvasRenderingContext2D, sceneToDraw: typeof scene): void => drawBroadcastV2Scene(target, course, sceneToDraw, {
         palette: art.pal as Record<string, string>,
         libraries,
@@ -1520,7 +1534,9 @@ export default function RacePage(): React.JSX.Element {
           })), { width: W, height: H }, winnerFinishedNow, {
             finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
             raceDisplaySec: d - RACE_INTRO_RACE_START_SEC, forceShotId: change.from,
-            fourthCornerFront: FOURTH_CORNER_FRONT_WEB, winnerRear: art.winnerRearHighQuality !== undefined,
+            fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
+            // ★本体と同じ設定にすること（食い違うと、重ねる直前のコマだけ別の素材になる）
+            winnerRear: false,
           });
           offCtx.clearRect(0, 0, W, H);
           drawScene(offCtx, prevScene);
