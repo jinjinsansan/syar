@@ -251,8 +251,33 @@ export const SCRIPT_V3: readonly { readonly until: number; readonly id: Broadcas
 ];
 
 /** ★台本 v3 でショットが変わる先頭位置（m）。閃光を出す境目もここから引く */
-export function broadcastV2ScriptBoundariesM(course: Course): readonly { readonly meters: number; readonly id: BroadcastV2ShotId }[] {
-  return SCRIPT_V3.map((row) => ({ meters: row.until * course.distance, id: row.id }));
+export function broadcastV2ScriptBoundariesM(
+  course: Course, script: 'v3' | 'v4' = 'v4',
+): readonly { readonly meters: number; readonly id: BroadcastV2ShotId }[] {
+  const rows = script === 'v4' ? SCRIPT_V4 : SCRIPT_V3;
+  return rows.map((row) => ({ meters: row.until * course.distance, id: row.id }));
+}
+
+/**
+ * ★そのカットが**終わる距離**（m）。固定カメラの据え位置に使います。
+ *
+ * 【なぜ要るか（2026-08-22 の実害）】
+ *   固定カメラは `broadcastV2SegmentSpan(course, leaderS).end` を基準に据えていました。
+ *   これは**先頭の現在位置が属するコース区間**なので、
+ *   ★**カットの途中で馬が区間の境界を跨ぐと、カメラが次の区間の終点へ瞬間移動**します。
+ *
+ *   実測（4 角正面・注視点 890m→900m）:
+ *     画角 **12.82° → 2.80°（−78%）**、馬の画面上の位置が **1 コマで 517px** 跳び、
+ *     大きさが **33% 変わる**。★オーナー評「カーブから曲がってくる時が雑、滑らかに走っていない」。
+ *
+ * → ★**台本のカットの終わり**を基準にします。カットの中では動かないので跳びません。
+ */
+export function broadcastV2ShotEndM(
+  course: Course, shotId: BroadcastV2ShotId, script: 'v3' | 'v4' = 'v4',
+): number | undefined {
+  const rows = script === 'v4' ? SCRIPT_V4 : SCRIPT_V3;
+  const row = rows.find((r) => r.id === shotId);
+  return row === undefined ? undefined : row.until * course.distance;
 }
 
 /**

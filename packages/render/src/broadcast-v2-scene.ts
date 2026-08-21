@@ -15,6 +15,7 @@ import type { PerspectiveCamera } from './perspective.js';
 import {
   broadcastV2FixedFov,
   broadcastV2SegmentSpan,
+  broadcastV2ShotEndM,
   broadcastV2ShotById,
   type BroadcastV2ShotId,
   broadcastV2AnchorWeight,
@@ -133,8 +134,24 @@ export function resolveBroadcastV2Scene(
   const cameraAt = (atS: number): PerspectiveCamera => {
     if (shot.fixedCamera !== undefined) {
       // ★固定カメラ: 位置は区間終点基準で固定、注視点（馬群）だけを追う
-      const span = broadcastV2SegmentSpan(course, leaderS);
-      const eyePos = posOf(course, span.end + shot.fixedCamera.sFromSegmentEnd, shot.fixedCamera.w);
+      /**
+       * ★据え位置は**台本のカットの終わり**を基準にします（2026-08-22）。
+       *
+       * ⚠️ ★以前は `broadcastV2SegmentSpan(course, leaderS).end`＝**先頭の現在位置が属する
+       *    コース区間の終点**でした。カットの途中で馬が区間の境界を跨ぐと、
+       *    ★**カメラが次の区間の終点へ瞬間移動**します。
+       *
+       *    実測（4 角正面・注視点 890m→900m）:
+       *      画角 **12.82° → 2.80°（−78%）**、馬の画面上の位置が **1 コマで 517px** 跳び、
+       *      大きさが **33% 変わる**。
+       *      ★オーナー評「カーブから曲がってくる時が雑、滑らかに走っていない」。
+       *
+       *    カットの終わりならカットの中で動かないので、跳びません。
+       *    ⚠️ 台本に無いショット（強制指定など）は従来どおり区間の終点を使います。
+       */
+      const shotEnd = broadcastV2ShotEndM(course, shot.id, options.script === 'v3' ? 'v3' : 'v4');
+      const anchorEnd = shotEnd ?? broadcastV2SegmentSpan(course, leaderS).end;
+      const eyePos = posOf(course, anchorEnd + shot.fixedCamera.sFromSegmentEnd, shot.fixedCamera.w);
       const target = posOf(course, atS, focusW);
       const dist = Math.hypot(target.x - eyePos.x, target.y - eyePos.y);
       return {

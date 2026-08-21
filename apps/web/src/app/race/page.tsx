@@ -1068,9 +1068,25 @@ export default function RacePage(): React.JSX.Element {
       const composedRace = composeCycle(
         [jockeyImages[0]!, jockeyImages[1]!] as [HTMLImageElement, HTMLImageElement],
         [sideRefs[0]!, sideRefs[4]!], [1, 5], SILKS_LAYOUT_CROUCH);
+      /**
+       * ★勝馬のガッツポーズは**1 姿勢・1 基準に固定**します（2026-08-22）。
+       *
+       * ⚠️ ★以前は 2 姿勢を 4 コマごとに切り替えていました（`index >= 4 ? 1 : 0`）。
+       *    実測すると中身の大きさが
+       *      celebrate-a 355×791（面積 90,361） ／ celebrate-b 278×657（面積 49,306）
+       *    と違い、★**4 コマ目で騎手が縦 17%・面積 45% 縮みます。**
+       *    オーナー評「喜び方が不自然　かくかくしている」はこれです。
+       *
+       * ⚠️ ★縮尺の正規化（`composeHorseAndJockey`）は「兜の上端→ブーツ下端」で合わせますが、
+       *    **腕を上げた姿勢では上端が鞭の先**になるため、この基準が成り立ちません。
+       *    2 姿勢で鞭の上がり方が違えば、そのまま大きさの差になります。
+       *
+       * ★ガッツポーズは**腕を上げたまま**が自然なので、姿勢を替える必要がありません。
+       *   1 枚に固定し、基準コマも 1 つに揃えて、大きさが跳ばないようにします。
+       */
       const composedWinner = winnerCycleReady ? composeCycle(
-        [jockeyImages[2]!, jockeyImages[3]!] as [HTMLImageElement, HTMLImageElement],
-        [winnerCycleImages[0] as HTMLImageElement, winnerCycleImages[4] as HTMLImageElement], [1, 5], SILKS_LAYOUT_WINNER) : undefined;
+        [jockeyImages[2]!, jockeyImages[2]!] as [HTMLImageElement, HTMLImageElement],
+        [winnerCycleImages[0] as HTMLImageElement, winnerCycleImages[0] as HTMLImageElement], [1, 1], SILKS_LAYOUT_WINNER) : undefined;
       /**
        * ★方向別の一体素材（勝馬 8 コマと同じ方式で Codex 生成・騎手込み・1024×1536）。
        *   diag-rear-v4 / diag-front-v3 が 8 枚揃ったときだけ採用。揃わない方向は真横素材で代用（低解像度 v2 は使わない）。
