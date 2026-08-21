@@ -9,7 +9,7 @@
  *    撮影用シークで時刻を戻しても同じ絵になること。
  */
 import { describe, it, expect } from 'vitest';
-import { narratorPortrait, narratorCastAt, NARRATOR_NAMES, NARRATOR_ROLES } from '@star/render';
+import { narratorPortrait, narratorCastForRace, NARRATOR_NAMES, NARRATOR_ROLES } from '@star/render';
 
 const img = (tag: string) => ({ tag, width: 300, height: 344 });
 const SET = {
@@ -54,14 +54,26 @@ describe('★実況の立ち絵', () => {
   });
 });
 
-describe('★話者の割り当て（仕様 narrator-cast の「出る局面」）', () => {
-  it('★★局面ごとに担当が替わる', () => {
-    expect(narratorCastAt('title')).toBe('c');        // 発走前の紹介＝進行
-    expect(narratorCastAt('gate-hold')).toBe('d');    // ゲート入り＝現地
-    expect(narratorCastAt('gate-release')).toBe('a'); // 発走＝実況
-    expect(narratorCastAt('race')).toBe('a');         // レース中ずっと＝実況
-    expect(narratorCastAt('straight')).toBe('b');     // 最後の直線＝解説
-    expect(narratorCastAt('result')).toBe('c');       // 着順確定の締め＝進行
+describe('★話者の割り当て（1 レースに 1 人）', () => {
+  it('★★同じシードなら必ず同じ人（決定論・憲法 4）', () => {
+    for (const seed of [42, 7, 2026, 31337]) {
+      expect(narratorCastForRace(seed)).toBe(narratorCastForRace(seed));
+    }
+  });
+
+  it('★★4 名すべてが出番を持つ（作った人が使われないことがない）', () => {
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 400; seed += 1) seen.add(narratorCastForRace(seed));
+    expect(seen).toEqual(new Set(['a', 'b', 'c', 'd']));
+  });
+
+  it('★連番のレースで同じ人が続きすぎない', () => {
+    let run = 1, worst = 1;
+    for (let seed = 2; seed <= 200; seed += 1) {
+      run = narratorCastForRace(seed) === narratorCastForRace(seed - 1) ? run + 1 : 1;
+      worst = Math.max(worst, run);
+    }
+    expect(worst, `同じ人が ${worst} レース続きます`).toBeLessThanOrEqual(4);
   });
 
   it('★名前と役割が 4 名そろっている', () => {

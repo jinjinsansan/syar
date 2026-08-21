@@ -29,18 +29,21 @@ export const NARRATOR_ROLES: Readonly<Record<NarratorCast, string>> = {
   a: '実況', b: '解説', c: '進行', d: '現地',
 };
 
-/** ★局面から話者を選ぶ。仕様の「出る局面」をそのまま写したもの */
-export function narratorCastAt(stage:
-  | 'flyover' | 'title' | 'gate-hold' | 'gate-release' | 'race' | 'straight' | 'result',
-): NarratorCast {
-  switch (stage) {
-    case 'flyover':
-    case 'title': return 'c';        // 発走前の紹介
-    case 'gate-hold': return 'd';    // ゲート入り
-    case 'straight': return 'b';     // 最後の直線（解説の一言）
-    case 'result': return 'c';       // 着順確定の締め
-    default: return 'a';             // レース中ずっと
-  }
+/**
+ * ★**1 レースに 1 人**（オーナー指示 2026-08-22「ナレーターは 1 レースで 1 人でいいです」）。
+ *
+ * ⚠️ ★一度は局面ごとに替える形にしました（ゲート入り＝現地／直線＝解説）。
+ *    仕様カードの「出る局面」をそのまま実装したものですが、**1 レースの中で話者が替わると
+ *    落ち着きません。** 4 名は**レースごとに交代**させ、レース中は替えません。
+ *
+ * ★誰になるかは**レースのシードから決定論**で決めます（乱数は使わない・憲法 4）。
+ *   同じレースを見直せば必ず同じ人が出ます。
+ */
+export function narratorCastForRace(seed: number): NarratorCast {
+  const casts: readonly NarratorCast[] = ['a', 'b', 'c', 'd'];
+  // ★シードを軽く撹拌してから割り当てる（連番のレースで同じ人が続かないように）
+  const mixed = Math.abs(Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b)) >>> 0;
+  return casts[mixed % casts.length] ?? 'a';
 }
 
 export interface NarratorSet<TImage> {

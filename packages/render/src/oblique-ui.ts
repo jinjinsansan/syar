@@ -281,6 +281,8 @@ export interface CallBandOptions {
   /** 各行の発話開始秒（`lines` と同じ添字）。文字送り 20 文字/秒 */
   readonly lineStartSec?: readonly number[] | undefined;
   readonly narratorName?: string | undefined;
+  /** ★話者の役職（実況／解説／進行／現地）。省略すると「実況」 */
+  readonly narratorRole?: string | undefined;
   /** 余力ゲージ（エンジンの `staminaAt()` の値をそのまま。式は作らない・D-072） */
   readonly gauge?: { readonly left: number; readonly initial: number } | undefined;
   /** 残り距離（m）。省略で出さない */
@@ -314,7 +316,9 @@ export function drawCallBand<TImage>(
   }
   ctx.globalAlpha = baseAlpha * rise.alpha;
   // ナレーター立ち絵 x36 y548 150×172（帯上端より 26px 上）
-  drawNarratorFrame(ctx, font, 36, H - 172 + oy, narrator, '実況', opts.narratorName ?? '実況アナ');
+  // ★役職は担当に合わせる（解説の人が「実況」と出ないように）
+  drawNarratorFrame(ctx, font, 36, H - 172 + oy, narrator,
+    opts.narratorRole ?? '実況', opts.narratorName ?? '実況アナ');
   // 文字送り
   const shown = lines.slice(-2);
   const starts = opts.lineStartSec?.slice(-2);

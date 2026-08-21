@@ -230,6 +230,8 @@ export function drawStartCallBand<TImage>(
     /** 発走までの秒。0 以下・省略で出さない（開扉後は消す） */
     readonly secondsToStart?: number | undefined;
     readonly narratorName?: string | undefined;
+    /** ★話者の役職（実況／解説／進行／現地）。省略すると「実況」 */
+    readonly narratorRole?: string | undefined;
     readonly sinceSec?: number | undefined;
   } = {},
 ): void {
@@ -242,7 +244,9 @@ export function drawStartCallBand<TImage>(
   const oy = rise.dy;
   fillSlant(ctx, -40, H - 104 + oy, W + 91, 104, HUD.glass);
   drawGoldEdge(ctx, 0, H - 104 + oy, W, t);
-  drawNarratorFrame(ctx, font, 36, H - 172 + oy, narrator, '実況', opts.narratorName ?? '実況アナ');
+  // ★役職は担当に合わせる（解説の人が「実況」と出ないように）
+  drawNarratorFrame(ctx, font, 36, H - 172 + oy, narrator,
+    opts.narratorRole ?? '実況', opts.narratorName ?? '実況アナ');
   const text = released ? 'スタートしました！' : `${fieldSize}頭、ゲートイン完了しました`;
   const shown = opts.lineStartSec === undefined ? text.length : typedCount(text.length, t - opts.lineStartSec);
   // まもなく発走チップ x206 y632 h26 ＋ ON AIR

@@ -54,7 +54,7 @@ import {
   raceCallAt,
   withPhasePrefix,
   narratorPortrait,
-  narratorCastAt,
+  narratorCastForRace,
   NARRATOR_NAMES,
   NARRATOR_ROLES,
   type NarratorCast,
@@ -793,6 +793,16 @@ export default function RacePage(): React.JSX.Element {
   const dRef = useRef(0);
 
   const [seed, setSeed] = useState(42);
+
+  /**
+
+   * ★このレースの実況（1 レースに 1 人・オーナー指示 2026-08-22）。
+
+   *   誰になるかは**シードから決定論**で決まるので、同じレースなら必ず同じ人が出ます。
+
+   */
+
+  const cast = narratorCastForRace(seed);
   const [ownGate, setOwnGate] = useState(3);
   const [playing, setPlaying] = useState(false);
   const [ready, setReady] = useState(false);
@@ -1662,23 +1672,19 @@ export default function RacePage(): React.JSX.Element {
     }
     if (v2StartHold) {
       // ★ゲート待機〜発走直後: 順位 HUD の代わりに発走の中継帯（「ゲートイン完了」→「スタートしました！」）
-      /**
-       * ★話者は局面で替えます（仕様 `narrator-cast` の「出る局面」）。
-       *   ゲート入り＝現地レポーター、発走後＝実況。
-       */
-      const startCast = narratorCastAt(intro.stage === 'gate-release' ? 'gate-release' : 'gate-hold');
       const startLineAt = intro.stage === 'gate-release' ? RACE_INTRO_RACE_START_SEC : RACE_INTRO_TITLE_END_SEC + 0.3;
       const startText = intro.stage === 'gate-release' ? 'スタートしました！' : `${FIELD}頭、ゲートイン完了しました`;
       drawStartCallBand(ctx, art.pal as Record<string, string>, vp, FONT, FIELD, intro.stage === 'gate-release',
         // ★口は「文字がまだ増えている間」だけ動かす（喋っている間）
-        narratorPortrait(art.raceNarrator, art.narratorSets?.[startCast], {
+        narratorPortrait(art.raceNarrator, art.narratorSets?.[cast], {
           metersLeft: DIST, displaySec: d,
           speaking: typedCount(startText.length, d - startLineAt) < startText.length,
         }), {
           timeSec: d,
           lineStartSec: startLineAt,
           secondsToStart: RACE_INTRO_RACE_START_SEC - d,
-          narratorName: NARRATOR_NAMES[startCast],
+          narratorName: NARRATOR_NAMES[cast],
+          narratorRole: NARRATOR_ROLES[cast],
           sinceSec: d - RACE_INTRO_TITLE_END_SEC,
         });
       drawRendererBadge(ctx, renderer, `${intro.stage}/${v2ShotId ?? 'v2'}`);
@@ -1810,15 +1816,10 @@ export default function RacePage(): React.JSX.Element {
         callRef.current = [...callRef.current, say as CallPart[]].slice(-3);
         callStartRef.current = [...callStartRef.current, d].slice(-3);
       }
-      /**
-       * ★話者は局面で替えます。**最後の直線は解説（元騎手）の一言**が入る（仕様 `narrator-cast`）。
-       *   ⚠️ 目まぐるしく替わらないよう、直線に入ってからだけ。
-       */
-      const raceCast = narratorCastAt(courseSection === 'straight' || courseSection === 'finish' ? 'straight' : 'race');
       if (hud.calls) {
         drawCallBand(ctx, art.pal as Record<string, string>, vp, FONT, callRef.current,
           // ★口は最後の一言がまだ出そろっていない間だけ動かす
-          narratorPortrait(art.raceNarrator, art.narratorSets?.[raceCast], {
+          narratorPortrait(art.raceNarrator, art.narratorSets?.[cast], {
             metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
             displaySec: d,
             speaking: (() => {
@@ -1827,7 +1828,8 @@ export default function RacePage(): React.JSX.Element {
               return last !== undefined && at0 !== undefined && typedCount(last.length, d - at0) < last.length;
             })(),
           }), {
-            timeSec: d, lineStartSec: callStartRef.current, narratorName: NARRATOR_NAMES[raceCast],
+            timeSec: d, lineStartSec: callStartRef.current,
+            narratorName: NARRATOR_NAMES[cast], narratorRole: NARRATOR_ROLES[cast],
             gauge: hud.gauge ? { left: g.left, initial: built.gauge.initial } : undefined,
             metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
             sinceSec: raceD - HUD_SETTLE_SEC,
