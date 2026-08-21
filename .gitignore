@@ -90,3 +90,9 @@ dev-web-error.log
 # --- 受け取った素材・スクリーンショット（作業用。成果物ではない） ---
 signal-*.jpeg
 参考映像.txt
+
+# --- 素材の中間生成物（2026-08-21 追加） ---
+#   `-chroma` は緑背景を抜く前の生データ。抜いたものだけを成果物として置く
+apps/web/public/art/*-chroma.png
+#   絵柄の比較用に並べただけの画像
+apps/web/public/art/lab/
