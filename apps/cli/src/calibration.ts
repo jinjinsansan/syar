@@ -54,6 +54,24 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
       '★V-18 / D-065 / D-071（横位置の落ち着き先。ラチから遠ざけると全馬が外を回り、距離ロスの差が消える。実測: 枠の位置に居続ける形では枠による偏りが 35.5馬身＝枠順で決まるゲームになった）',
   },
   {
+    key: 'LANE_REVEAL_FULL_RUN',
+    file: 'packages/race-engine/src/lane.ts',
+    perturbed: 'export const LANE_REVEAL_FULL_RUN = 1.0;',
+    affects:
+      '★V-4 / V-17 / V-18（シード由来の横の広がりが出そろう進行率。'
+      + '早めると中盤で隊列が横に散り、距離ロスの**ばらつき**が増える。'
+      + '実測: 1.0→0.18 で 中盤の広がり 2.13m→8.19m ／ 枠×ロス相関 0.013→0.011（悪化なし）／ ロスの SD +74%）。'
+      + '⚠️ ★枠に紐づく `base` / `SETTLE_M` とは別物。こちらは枠に対して単調でない一様乱数から作るので、'
+      + '早めても枠順ゲーム化しない（レビュー側裁定 2026-08-21）',
+  },
+  {
+    key: 'REVEAL_START_RUN',
+    file: 'packages/race-engine/src/lane.ts',
+    perturbed: 'export const REVEAL_START_RUN = 0.5;',
+    affects:
+      '★V-18（シード由来の広がりが出はじめる進行率。発走直後は枠の広がりが残っているので、そこに重ねない）',
+  },
+  {
     key: 'SETTLE_M',
     file: 'packages/race-engine/src/lane.ts',
     perturbed: 'export const SETTLE_M = 2000;',

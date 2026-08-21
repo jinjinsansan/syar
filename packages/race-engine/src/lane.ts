@@ -168,9 +168,39 @@ export function laneAtStart(gate: number, fieldSize: number, widthM = TRACK_WIDT
  *
  * ⚠️ ★**脚質を受け取りません**（D-069）。受け取ると出走表から予測できてしまいます。
  */
+/**
+ * ★シード由来の広がりが**出はじめる**進行率。発走直後は枠の広がりが残っているので、
+ *   そこに重ねない。0.03 ＝ 1600m で 48m 地点。
+ */
+export const REVEAL_START_RUN = 0.03;
+/**
+ * ★シード由来の広がりが**出そろう**進行率。**この値が本番の唯一の値**です。
+ *
+ *   1.0 ＝ 2026-08-21 以前の挙動（ゴール直前でようやく出そろう）。実測すると
+ *   **中盤（発走 180m〜900m）の 12 頭の横の広がりが 1.1〜3.4m** しかなく、
+ *   走路 20m のうち数 m に固まって見えていました（★オーナー評「ぴょんぴょん跳ねているだけ」）。
+ *   合格した 2 区間は発走直後 11.3m（枠の広がりの名残）と直線 9.2m（swing）です。
+ *
+ *   ★値は `npx tsx tools/sweep-lane-reveal.mjs` の掃引で決めること。
+ *     **先に値を決めて後から正当化しない**（レビュー側裁定 2026-08-21）。
+ */
+/**
+ * ⚠️ ★**2026-08-21 現在、この値はまだ検証が通っていません（暫定）。**
+ *   掃引（下見）では 枠×ロス相関 0.013→0.011（悪化なし）／中盤の広がり 2.13m→8.19m。
+ *   ただし**距離ロスのばらつきが +74%** 増えるので、V-4（1番人気の勝率）と V-17（タイム差）が動きます。
+ *   **`npm run verify:race` と `npm run verify` の結果が出るまで確定ではありません。**
+ *   帯を出たら 0.35 / 0.50 / 0.70 に落とすか、1.0（変更前）へ戻します。
+ */
+export const LANE_REVEAL_FULL_RUN = 0.18;
+
 export function laneAt(
   gate: number, fieldSize: number, metersLeft: number, distanceMeter: number,
   seed: number, widthM = TRACK_WIDTH_M,
+  /**
+   * ★**掃引の道具からだけ渡します。** 本番は既定値（`LANE_REVEAL_FULL_RUN`）のみ。
+   *   ここを呼び出し側ごとに変えると**同じレースが別の結果になります**（憲法 4・決定論）。
+   */
+  revealFullRun: number = LANE_REVEAL_FULL_RUN,
 ): number {
   const start = laneAtStart(gate, fieldSize, widthM);
   const ranM = Math.max(0, distanceMeter - metersLeft);
@@ -198,7 +228,17 @@ export function laneAt(
   const drift = (stream(seed, gate, 0x1b873593) - 0.5) * 2;
   const phase = stream(seed, gate, 0x2f5c1d3b) * Math.PI * 2;
   const wave = Math.sin(phase + run * Math.PI * 3) * 0.3;
-  const reveal = run * run * (3 - 2 * run);
+  /**
+   * ★**シード由来の広がりが、どこで出そろうか**（`revealFullRun` で調整）。
+   *
+   *   ⚠️ ★**`base` / `SETTLE_M` は触りません。** 触ると「枠の広がり」を中盤まで
+   *      引き延ばすことになり、上のコメントが記録しているとおり
+   *      **枠順で決まるゲーム**（偏り 35.5 馬身／枠を 5% 残しただけで相関 0.127）に戻ります。
+   *      動かしてよいのは**枠に対して単調でない一様乱数から作った `swing`** の出方だけです
+   *      （レビュー側裁定 2026-08-21）。
+   */
+  const revealRun = Math.max(0, Math.min(1, (run - REVEAL_START_RUN) / Math.max(1e-6, revealFullRun - REVEAL_START_RUN)));
+  const reveal = revealRun * revealRun * (3 - 2 * revealRun);
   const swing = Math.max(0, drift * 0.85 + wave) * reveal * (widthM * 0.62)
     * swingScale(distanceMeter, { ...DEFAULT_OVAL, widthM });
 
@@ -214,6 +254,8 @@ export function laneAt(
 export function laneExtraM(
   gate: number, fieldSize: number, distance: number, seed: number, spec: OvalSpec = DEFAULT_OVAL,
   stepM = 10,
+  /** ★掃引の道具からだけ渡します（`laneAt` と同じ理由）。本番は既定値のみ */
+  revealFullRun: number = LANE_REVEAL_FULL_RUN,
 ): number {
   const segs = ovalSegments(distance, spec);
   const centre = spec.widthM / 2;
@@ -224,7 +266,7 @@ export function laneExtraM(
       for (let o = 0; o < seg.length; o += stepM) {
         const len = Math.min(stepM, seg.length - o);
         const s = acc + o + len / 2;
-        const w = laneAt(gate, fieldSize, distance - s, distance, seed, spec.widthM);
+        const w = laneAt(gate, fieldSize, distance - s, distance, seed, spec.widthM, revealFullRun);
         extra += (w - centre) * (len / seg.radius);
       }
     }
