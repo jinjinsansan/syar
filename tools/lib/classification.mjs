@@ -23,6 +23,28 @@
 
 /** 読むだけ。本番に向けてよい */
 export const READONLY = [
+  // ★世界に置く看板（発馬機など）の実寸を確かめる。読むだけ
+  //   2026-08-21: 発馬機が実物の 1.65 倍の高さで置かれ、**馬の頭が扉に隠れて脚しか見えない**状態を見逃していた
+  'verify-world-billboards.mjs',
+  // ★ゲート待機・開扉の瞬間を本番と同じ描画で静止画にする。読むだけ
+  'shot-gate.mjs',
+  // ★**実レース**の任意の秒数を本番と同じ描画で静止画にする。読むだけ
+  //   `audit-broadcast-v2.mjs` は馬の位置が合成データなので、実際の団子具合が映らない
+  'shot-race-at.mjs',
+  // ★以下は計測用の使い捨て（`_` 始まり）。すべて読むだけ
+  'verify-horse-motion.mjs',  // 馬を世界に固定しコマだけ送り、素材由来のぶれを切り分ける
+  '_m4.mjs',          // 固定カメラの距離と画角（4角正面が小さすぎた件）
+  'sweep-lane-reveal.mjs',    // 横の広がりの帯を掃引する（読むだけ）
+  'verify-cut-timing.mjs',    // 台本の各カットが実際に何秒あるかを測る（読むだけ）
+  'verify-no-real-faces.mjs', // 人物立ち絵に写真が混ざっていないか（読むだけ）
+  '_timefloor.mjs',   // 30 秒が実現できるかの下限計算
+  '_timeopts.mjs',    // 30 秒にする案 A/B/C の比較
+  '_camjitter.mjs',   // カメラが時間に対して滑らかかを測る
+  '_filmstrip.mjs',   // 連続コマを先頭馬の周りだけ拡大して並べる
+  '_motion.mjs',      // 録画から馬の上下位置のカクつきを測る
+  '_shotsize.mjs',    // カットごとの馬の大きさ
+  '_amounttest.mjs', '_edgeguard.mjs', '_presharpen.mjs', '_scaletest.mjs', '_sharpentest.mjs',
+  '_strip.mjs', '_webpcost.mjs',
   // ★anon で何が読めるかの全数確認（§8.6 server_seed・§12.4 potential）。select のみ
   'verify-anon-exposure.mjs',
   'a3-converge.mjs',
@@ -113,6 +135,10 @@ export const READONLY = [
   'measure-ref2d.mjs',
   // ★コース幾何を読んで数えるだけ（Q-P4-46 手順①）。DB に触れません
   'count-headings.mjs',
+  // ★8 コマのシートを切り出し、同時に胴体基準で揃える。画像を読み書きするだけ
+  'slice-pose-sheet.mjs',
+  // ★走行 8 コマを胴体基準で揃え直す。画像を読み書きするだけ
+  'align-pose-set.mjs',
   // ★走行 8 コマ（個別ファイル）の受け入れ判定。画像を読んで測るだけ
   'verify-pose-set.mjs',
   // ★画像を読んで測るだけ（駆歩シートの受け入れ判定）。DB に触れません
