@@ -1,0 +1,59 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen).
+
+GOAL
+Create ONE image containing SIX portraits of the SAME fictional character — a race commentator —
+laid out as a 3 x 2 sheet, for a lip-sync talking-head in a horse racing game.
+
+★★ THE SINGLE MOST IMPORTANT REQUIREMENT
+The HEAD must be IDENTICAL in all six cells: same face, same size, same position within its cell,
+same angle, same hair, same collar. **Only the eyebrows/eyes (expression) and the mouth change.**
+A program will later take the head from one cell and paste ONLY the mouth from another, so if the
+head drifts between cells the character will visibly jitter when talking. If cell 6's head is a
+different size or position than cell 1's, the sheet is WRONG.
+
+★★ STYLE — HAND-DRAWN 2D, NOT PHOTOGRAPHIC
+- Clean hand-drawn 2D illustration: flat-ish cel shading, clear line work, simple gradients.
+- ★It must NOT look like a photograph and must NOT resemble any real, living person.
+  This is a legal requirement for this project, not a stylistic preference.
+- Light comes from ABOVE (matches the approved starting-gate background art).
+
+THE CHARACTER (fictional — invent them)
+- Role: キャスター（進行）
+- Appearance: 30代女性・落ち着いた色のジャケット・手元に進行表。姿勢はまっすぐ
+- ★This is a DIFFERENT person from the main commentator (a 30s man in a suit with binoculars).
+  Make them clearly distinguishable at a glance: different age, hair, and clothing.
+- Ordinary, believable, likeable — not a caricature, not a celebrity, not resembling any real person.
+
+FRAMING (identical in every cell)
+- Chest-up, facing the camera front or very slightly turned. His eyes look INTO the camera.
+- ★The head is centred horizontally, and the centre of the face sits at about 40% of the cell height
+  from the top.
+- ★★Leave the BOTTOM 18% of every cell EMPTY of face and chin — a name plate is drawn over that
+  band in the game. Shoulders and chest may enter it; the chin must not.
+
+LAYOUT (strict — the sheet is sliced by a program)
+- 3 COLUMNS x 2 ROWS. Every cell EXACTLY the same size. No borders, no labels, no numbers, no text.
+- Columns are the three EXPRESSIONS, left to right:
+    calm=neutral professional
+    smile=a warm closed-eye-free gentle smile, cheeks slightly raised
+    serious=level brows, composed, no smile
+- Rows are the MOUTH, top to bottom:
+    TOP    = mouth CLOSED (lips together, relaxed)
+    BOTTOM = mouth OPEN (speaking — jaw dropped, teeth/tongue visible, a natural "aa" shape)
+- ★So the top-left and bottom-left cells must be THE SAME PICTURE except for the mouth.
+  Same for the middle pair and the right pair.
+- ★CRITICAL SPACING: leave at least 40 px of pure background between cells. Nothing may cross
+  from one cell into its neighbour.
+- Output 1536 x 1024.
+
+COLOURS TO AVOID
+- ★Do NOT use gold #f0cc4a anywhere on the clothing — that colour means something in the game's HUD.
+- ★Do NOT dress him in strong pink, orange, teal, purple, red, blue, green or yellow — those are the
+  jockeys' silks colours. Keep the suit dark and neutral; the shirt white or very pale.
+
+BACKGROUND
+- Uniform flat chroma GREEN (RGB 0,255,0) across the WHOLE image, including the gaps between cells.
+- No room, no desk, no monitors, no logos, no text.
+- The character must not contain that green anywhere (no green tie, no green suit).
+
+Produce exactly ONE image and save it as a PNG.

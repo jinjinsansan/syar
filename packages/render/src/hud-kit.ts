@@ -234,10 +234,22 @@ export function drawNarratorFrame<TImage>(
   const w = 150, h = 172;
   ctx.fillStyle = '#1b241d'; ctx.fillRect(x, y, w, h);
   if (portrait !== undefined) {
-    // 顔の中心を (75, 68) に。正方形の立ち絵を枠幅に合わせて描く
+    /**
+     * ★立ち絵は**枠幅に合わせて、枠の左上から**描きます。
+     *
+     * ⚠️ ★以前は `Math.min(0, (h - 30) - dh)` だけ上へずらしていました。
+     *    仕様どおりの 300×344 を渡すと `dh` がちょうど枠の高さ 172 になるため、
+     *    ★**30px 上にはみ出し、頭の上が切れて顔が下がります**
+     *    （オーナー評「ナレーターの顔が枠からはみ出ています」）。
+     *    ずらしは「枠より低い立ち絵を下端に合わせる」ための保険なので、
+     *    **枠より高いときは 0**にします。
+     *
+     * ★仕様（`narrator-cast`）: 顔の中心を枠の (75, 68)。下 30px は名札が重なる。
+     *   素材側で (150, 136) に置いてあるので、ここでずらすと合わなくなります。
+     */
     const s = w / portrait.width;
     const dh = portrait.height * s;
-    ctx.drawImage(portrait.image, 0, 0, portrait.width, portrait.height, x, y + Math.min(0, (h - 30) - dh) , w, dh);
+    ctx.drawImage(portrait.image, 0, 0, portrait.width, portrait.height, x, y + Math.min(0, h - dh), w, dh);
   }
   ctx.strokeStyle = HUD.goldHair; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x + 0.5, y + h); ctx.lineTo(x + 0.5, y + 0.5); ctx.lineTo(x + w - 0.5, y + 0.5); ctx.lineTo(x + w - 0.5, y + h); ctx.stroke();

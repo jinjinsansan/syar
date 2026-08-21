@@ -51,6 +51,8 @@ import {
   drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   isSkinTone,
   typedCount,
+  raceCallAt,
+  withPhasePrefix,
   narratorPortrait,
   applyCoat,
   isHorseCoat,
@@ -735,6 +737,8 @@ export default function RacePage(): React.JSX.Element {
   /** 区間タグの文言と、それに変わった秒（スライドイン用） */
   const sectionTagRef = useRef<{ label: string; sinceSec: number }>({ label: '', sinceSec: -Infinity });
   const callKeyRef = useRef<string>('');
+  /** ★何本目の発言か。自馬に触れる間隔に使う（乱数の代わり・憲法 4） */
+  const callIndexRef = useRef(0);
   const callLastSecRef = useRef<number>(-Infinity);
   const artRef = useRef<{
     pal: unknown;
@@ -1755,37 +1759,34 @@ export default function RacePage(): React.JSX.Element {
        *   ⚠️ ★同じことを繰り返させません。**状態が変わったときだけ**足します
        *      （一度、機械的に足して**3行とも同じ文**になりました）。
        */
-      const ownIdx = rank.findIndex((h) => h.gate === ownGate);
-      const ownM = rank[ownIdx]?.meters ?? 0;
-      const aheadM = ownIdx > 0 ? rank[ownIdx - 1]!.meters : undefined;
-      const before = built.model.at(Math.max(0, sec - 0.5));
-      const ownBefore = before.find((h) => h.gate === ownGate)?.meters ?? ownM;
-      const aheadGate = ownIdx > 0 ? rank[ownIdx - 1]!.gate : undefined;
-      const aheadBefore = aheadGate === undefined
-        ? undefined : before.find((h) => h.gate === aheadGate)?.meters;
-      const gapNow = aheadM === undefined ? 0 : aheadM - ownM;
-      const gapBefore = (aheadM === undefined || aheadBefore === undefined)
-        ? 0 : aheadBefore - ownBefore;
-      const closing = gapBefore - gapNow;
-      const lengths = gapNow / HORSE_LENGTH_M;
+      /**
+       * ★実況は**馬名で呼びます**（2026-08-22）。
+       *
+       * ⚠️ ★以前は「`${ownGate}番` は前と ◯ 馬身」と、**常に自馬の枠番**を語っていました。
+       *    オーナー評「ナレーターの内容が 3 番の馬をずっと語っていますが、
+       *    本来の競馬レースのナレーターは**馬の名前を実況中継する**はずです」。
+       *
+       * ★文の組み立ては `@star/render` の `raceCallAt`（純粋な関数）に置いています。
+       *   ここは**状態を渡して受け取るだけ**です。
+       */
       const phaseName = v2SectionLabel ?? sectionLabel[courseSection];
-      // 局面が変わった発言は区間名から入る（「3コーナー、…」）。同じ局面では主語から
-      const prevPhase = callKeyRef.current.split('/')[0] ?? '';
-      const say: CallPart[] = prevPhase === phaseName ? [] : [{ text: `${phaseName}、` }];
-      say.push({ text: `${ownGate}番`, role: frameRoleOf(ownGate, FIELD) });
-      if (aheadM === undefined) say.push({ text: ' が先頭です。' });
-      else if (lengths < 0.3) say.push({ text: ' は前と並んでいます' });
-      else {
-        say.push({ text: ` は前と ${lengths.toFixed(1)} 馬身` });
-        say.push({
-          text: closing > 0.15 ? '、詰めています' : closing < -0.15 ? '、離されています' : 'の差',
-        });
-      }
-      const key = `${phaseName}/${lengths < 0.3 ? '並' : closing > 0.15 ? '詰' : closing < -0.15 ? '離' : '同'}/${ownIdx + 1}`;
-      if (hud.calls && shouldEmitRaceCall(callKeyRef.current, key, callLastSecRef.current, raceD)) {
-        callKeyRef.current = key;
+      const line = raceCallAt({
+        horses: at.map((h) => ({
+          gate: h.gate, name: HORSE_NAMES[h.gate - 1] ?? `スター${h.gate}`, meters: h.meters,
+        })),
+        distanceMeter: DIST,
+        phaseLabel: phaseName,
+        ownGate,
+        lineIndex: callIndexRef.current,
+        frameRoleOf: (gate: number) => frameRoleOf(gate, FIELD),
+      });
+      if (line !== undefined
+        && hud.calls && shouldEmitRaceCall(callKeyRef.current, line.key, callLastSecRef.current, raceD)) {
+        const say = withPhasePrefix(line, callKeyRef.current, phaseName).parts;
+        callKeyRef.current = line.key;
         callLastSecRef.current = raceD;
-        callRef.current = [...callRef.current, say].slice(-3);
+        callIndexRef.current += 1;
+        callRef.current = [...callRef.current, say as CallPart[]].slice(-3);
         callStartRef.current = [...callStartRef.current, d].slice(-3);
       }
       if (hud.calls) {

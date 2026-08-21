@@ -155,8 +155,21 @@ function frame(canvas, box) {
    */
   const faceCx = box.x + box.width / 2;
   const faceCy = box.y + box.height * 0.28;
-  // ★あごが名札の帯に入らないよう、顔の高さから縮尺を決める
-  const scale = (OUT_H - NAMEPLATE_H - FACE_CY) / (box.height * 0.30);
+  /**
+   * ★縮尺は**頭の大きさ**で決めます。
+   *
+   * ⚠️ ★以前は「あごが名札に入らない」条件だけで決めていました。その結果
+   *    被写体（肩まで含む外接矩形）の幅 478px が **493px** に拡大され、
+   *    幅 300 の枠に対して**大きすぎて肩が切れ、顔が枠いっぱい**になりました
+   *    （オーナー評「顔が枠からはみ出ています」）。
+   *
+   * ★頭（髪の上端〜あご）は被写体の高さのおよそ 55%。
+   *   枠 344 に対して**頭の高さを 190px**（＝表示 95px）にすると、
+   *   胸から上が収まり、あごが名札（下 60px）に掛かりません。
+   */
+  const HEAD_RATIO = 0.55;      // 被写体の高さに占める頭の割合
+  const HEAD_TARGET = 190;      // 枠内での頭の高さ（2 倍・px）
+  const scale = HEAD_TARGET / (box.height * HEAD_RATIO);
   const c = createCanvas(OUT_W, OUT_H);
   const x = c.getContext('2d');
   x.imageSmoothingEnabled = true;

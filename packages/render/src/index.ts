@@ -26,3 +26,4 @@ export { isSkinTone } from './silks-skin.js';
 export { applyCoat, isHorseCoat, COAT_TRANSFORMS, type CoatTransform, type CoatName } from './coat.js';
 export { typedCount } from './hud-kit.js';
 export { narratorPortrait, narratorExpressionAt, narratorMouthOpenAt, type NarratorSet, type NarratorExpression } from './narrator.js';
+export { raceCallAt, withPhasePrefix, type RaceCallPart, type RaceCallHorse, type RaceCallContext, type RaceCallLine } from './race-call.js';
