@@ -36,6 +36,8 @@ export const READONLY = [
   '_m4.mjs',          // 固定カメラの距離と画角（4角正面が小さすぎた件）
   'sweep-lane-reveal.mjs',    // 横の広がりの帯を掃引する（読むだけ）
   'verify-cut-timing.mjs',    // 台本の各カットが実際に何秒あるかを測る（読むだけ）
+  'verify-stride-rate.mjs',   // 画面上で 1 秒に何完歩しているかを測る（読むだけ）
+  '_stride.mjs',              // 送り速さと完歩数の対応を並べる（読むだけ）
   'verify-no-real-faces.mjs', // 人物立ち絵に写真が混ざっていないか（読むだけ）
   '_timefloor.mjs',   // 30 秒が実現できるかの下限計算
   '_timeopts.mjs',    // 30 秒にする案 A/B/C の比較
