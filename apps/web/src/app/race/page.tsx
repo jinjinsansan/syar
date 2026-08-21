@@ -49,6 +49,9 @@ import {
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
+  isSkinTone,
+  ratesForTarget,
+  targetDisplaySec,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 
@@ -85,7 +88,21 @@ function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, st
   ctx.restore();
 }
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '50';
+const ASSET_VERSION = '52';
+/**
+ * ★コマごとの持ち上げ量。**単位は「基準画布（高さ 1536px）での px」**。
+ *
+ * 【なぜ基準を明示するか（2026-08-20 の実害）】
+ *   この表は旧素材（高さ 1536 前後）に手で合わせた値でしたが、**画布の大きさに関係なく
+ *   そのまま px として適用**していました。
+ *   シート方式で作った俯瞰 v4 は画布が **518×424** しかなく、そこに 90px が掛かると
+ *   **画面高の 21% を 2 コマ目だけ跳ね上げる**ことになります。
+ *   → 素材をどれだけ綺麗に揃えても、描画側が跳ねさせるので必ずガクガクする。
+ *      オーナー確認「止まれば合格、動かすとガクガクして走れていない」の主因。
+ *
+ *   ★**素材ごとに画布の大きさが違う以上、px の直値は素材に依存する。割合で持たせる。**
+ */
+const LIFT_REFERENCE_HEIGHT_PX = 1536;
 const HORSE_GROUND_LIFTS = [55, 90, 25, 0, 0, 0, 0, 55] as const;
 /**
  * ★コーナー専用カット（3角後方・4角俯瞰）の長さ（m）。**0 = 使わない**。
@@ -114,6 +131,7 @@ const FOURTH_CORNER_FRONT_WEB = true;
  *   支持局面（04〜07）は蹄が地面に接し（0）、離地〜空中（08・01・02）だけ体高の 3〜5% 浮く。03 は着地直前で僅か。
  *   ⚠️ 旧方式（全コマ平均の高さ＋bob）は支持局面で蹄が地面より上に来て「浮いて見える」原因だった。
  */
+/** ★同じく基準画布（1536px）での px。使うときは実際の画布で比例させる */
 const HORSE_FLIGHT_LIFT_SOURCE_PX = [15, 20, 6, 0, 0, 0, 0, 22] as const;
 /** 8 コマ表を任意のコマ数へ（16 コマなら中間は両隣の平均、1 コマなら 0） */
 function flightLiftFor(index: number, count: number): number {
@@ -269,6 +287,18 @@ function silksOverlays(
       if (!helmet && !jacket && !saddlecloth) continue;
       const spread = Math.max(r, g, b) - Math.min(r, g, b);
       if (a < 16 || spread > (helmet ? 62 : 34) || Math.max(r, g, b) < (helmet ? 42 : 72)) continue;
+      /**
+       * ★**肌は塗りません**（2026-08-21・オーナー評「騎手の肌の色が白いのがいる」）。
+       *
+       * ⚠️ 上の条件は「彩度が低く、暗すぎない」画素を勝負服とみなします。
+       *    明るい肌（例 231/180/148・彩度差 83）は彩度で弾かれますが、
+       *    ★**陰になった肌**（例 150/130/120・彩度差 30）は**条件を通ってしまいます。**
+       *    首すじ・手の甲・頬がここに入り、淡い勝負服だと**白く塗り潰されます。**
+       *
+       *   素材の勝負服は**無彩色の灰／白**で作らせているので（生成プロンプトで指定）、
+       *   窓の中に R>G>B の肌色相があれば、それは**肌です。**
+       */
+      if (isSkinTone(r, g, b)) continue;
       const luminance = (r + g + b) / (3 * 255);
       const shade = 0.30 + luminance * 0.78;
       output.data[index] = Math.min(255, red * shade);
@@ -295,6 +325,88 @@ function silksOverlays(
  *   検出: レイアウトの鞍布窓の中で、明るく彩度の低い画素の外接矩形。見つからなければ重心にフォールバック。
  */
 type FrameImage = HTMLImageElement | HTMLCanvasElement;
+
+/**
+ * ★縮小に備えて輪郭を立てる（2026-08-20・「写真では合格なのにレースで劣化する」の対策）
+ *
+ * 【何が起きていたか】
+ *   素材は**馬の幅およそ 1400px** で作られ、画面では**およそ 400px** で描かれます。
+ *   3.5 倍の縮小で、**筋肉の陰影・毛艶・たてがみの毛筋**が落ちます。
+ *   ★それは「写真的に見える」ことの中身そのものなので、当て込むと平板になります。
+ *
+ *   ⚠️ 疑った2つは**どちらもシロ**でした（実測）:
+ *     ・WebP 圧縮（q88）… 芝の上に合成して平均差 **1.02 / 255**。見た目に影響しない
+ *     ・描画の縮小品質  … `imageSmoothingQuality = 'high'` は既に設定済み
+ *
+ * 【なぜ「縮小してから」ではなく「元解像度で」かけるのか】
+ *   理想は**縮小後に**かけることですが、描画のたびに画素を触ることになり現実的ではありません。
+ *   → **縮小率に見合う半径**（`sigma × 縮小率`）で**元解像度に一度だけ**かけ、
+ *     縮小後に理想へ近づける形にします（実測で差は平均 3.67 / 255）。
+ *
+ * 【★境界を保護する理由 — これが無いと全馬が光ります】
+ *   そのままかけると**輪郭に白い縁**が出ます（透明との境界にコントラストが立つため）。
+ *   → **半透明の画素と、その隣接に半透明を持つ画素には触らない。**
+ *     これで縁が消え、内側の質感だけが戻ります。
+ */
+const SHARPEN_SIGMA_DEFAULT = 2.8;   // ★表示 400px 側で sigma 0.8 相当（1400/400 ≒ 3.5 倍）
+/**
+ * ★強さ。**既定は 0（無効）**。
+ *
+ * 【なぜ無効にしたか】
+ *   縮小で細部が落ちること自体は実測で確認できたが（原画と縮小後を並べれば明らか）、
+ *   **実際のレース画面では、0.6 でも 1.4 でもオーナーが差を認められなかった**
+ *   （2026-08-20・2回とも「どちらもほとんど変わらない」）。
+ *   ★**切り出して並べれば見える差が、動いている画面では見えない。**
+ *     見えない改善を既定に入れない。
+ *
+ * 【残してある理由】
+ *   絵柄を写実寄りに作り直すと、落ちる細部が増えるため効きが変わりうる。
+ *   `?sharpen=1.4` のように**その場で強さを変えて**再評価できる形で残す。
+ *
+ * ⚠️ 実装のとき、検証で使った強さ（強い係数）ではなく 0.6 を入れていた —
+ *    **検証したものと違うものを実装していた。** 次に触るときは同じ強さを通すこと。
+ */
+const SHARPEN_AMOUNT_DEFAULT = 0;
+
+function sharpenForDownscale(src: FrameImage, sigma: number, amount: number): FrameImage {
+  if (sigma <= 0 || amount <= 0) return src;
+  const w = imgW(src), h = imgH(src);
+  if (w === 0 || h === 0) return src;
+
+  const base = document.createElement('canvas');
+  base.width = w; base.height = h;
+  const bctx = base.getContext('2d', { willReadFrequently: true });
+  if (bctx === null) return src;
+  bctx.drawImage(src, 0, 0);
+
+  const blurred = document.createElement('canvas');
+  blurred.width = w; blurred.height = h;
+  const lctx = blurred.getContext('2d', { willReadFrequently: true });
+  if (lctx === null) return src;
+  lctx.filter = `blur(${sigma}px)`;
+  lctx.drawImage(src, 0, 0);
+
+  const o = bctx.getImageData(0, 0, w, h);
+  const b = lctx.getImageData(0, 0, w, h);
+  const od = o.data, bd = b.data;
+  const alphaAt = (x: number, y: number): number => od[(y * w + x) * 4 + 3] ?? 0;
+
+  for (let y = 1; y < h - 1; y += 1) {
+    for (let x = 1; x < w - 1; x += 1) {
+      const i = (y * w + x) * 4;
+      // ★境界を保護（上の注記）。ここを外すと輪郭に白い縁が出る
+      if (od[i + 3] !== 255) continue;
+      if (alphaAt(x - 1, y) !== 255 || alphaAt(x + 1, y) !== 255
+        || alphaAt(x, y - 1) !== 255 || alphaAt(x, y + 1) !== 255) continue;
+      for (let c = 0; c < 3; c += 1) {
+        const v = (od[i + c] ?? 0) + amount * ((od[i + c] ?? 0) - (bd[i + c] ?? 0));
+        od[i + c] = v < 0 ? 0 : v > 255 ? 255 : v;
+      }
+    }
+  }
+  bctx.putImageData(o, 0, 0);
+  return base;
+}
 const imgW = (image: FrameImage): number => (image instanceof HTMLCanvasElement ? image.width : image.naturalWidth);
 const imgH = (image: FrameImage): number => (image instanceof HTMLCanvasElement ? image.height : image.naturalHeight);
 
@@ -500,7 +612,21 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
   );
   const finishPos = new Map(result.order.map((e) => [Number(e.horseId), e.finishPosition]));
   const finishSec = new Map(result.order.map((e) => [Number(e.horseId), e.timeSec]));
-  const warp = timeWarpFor(knotsFor(boundaries, ownGate), DEFAULT_PHASE_RATES);
+  /**
+   * ★**目標の表示時間から送り速さを逆算します**（`ratesForTarget`）。
+   *
+   * ⚠️ ★2026-08-21 まで、ここは `DEFAULT_PHASE_RATES`（道中 1.8 倍・勝負所と直線は等倍）の
+   *    **固定値**でした。`targetDisplaySec` を**一度も通していません**。
+   *    そのため 1600m は **80.3 秒**のままで、目標を 45 秒にしようが 30 秒にしようが
+   *    ★**画面はまったく変わりませんでした。**
+   *
+   *    ★私の計測道具（`shot-race-at.mjs` / `verify-cut-timing.mjs`）は `ratesForTarget` を
+   *      通していたので **29.9 秒**と出ており、**道具と画面が別の経路を測っていました。**
+   *      オーナー指摘「不合格シーンは除外されていますが尺は 100 秒ありますよ？」で発覚。
+   *      ★**道具が画面と同じ経路を通っているかを、毎回確かめること。**
+   */
+  const knots = knotsFor(boundaries, ownGate);
+  const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
   /**
    * ★見た目の速度テーブル。描画と同じ手順（時計 → 位置モデル → 走り抜け → V2 注視点）で
    *   0.05 秒ごとに注視点を求め、時間圧縮の倍率 rate と固定物体の重みから Δ を積分する。
@@ -784,11 +910,12 @@ export default function RacePage(): React.JSX.Element {
         return SILKS_COLORS.map((_, gateIndex) => measured.map((frame, frameIndex) => ({
           ...frame,
           referenceHeight: referenceHeight * scaleFix(frameIndex),
-          groundLiftSourcePx: HORSE_GROUND_LIFTS[frameIndex] ?? 0,
+          // ★基準画布（1536px）での値を、この素材の画布の高さで比例させる（上の注記）
+          groundLiftSourcePx: (HORSE_GROUND_LIFTS[frameIndex] ?? 0) * (imgH(frame.image) / LIFT_REFERENCE_HEIGHT_PX),
           shadow: shadows[frameIndex],
           bodyAnchorSourcePx: anchors[frameIndex]!,
           bodyLiftSourcePx: (frame.source.y + frame.source.height - anchors[frameIndex]!.y)
-            + flightLiftFor(frameIndex, images.length),
+            + flightLiftFor(frameIndex, images.length) * (imgH(frame.image) / LIFT_REFERENCE_HEIGHT_PX),
           overlay: overlays[frameIndex]?.[gateIndex],
         })));
       };
@@ -887,19 +1014,61 @@ export default function RacePage(): React.JSX.Element {
        * ★方向別の一体素材（勝馬 8 コマと同じ方式で Codex 生成・騎手込み・1024×1536）。
        *   diag-rear-v4 / diag-front-v3 が 8 枚揃ったときだけ採用。揃わない方向は真横素材で代用（低解像度 v2 は使わない）。
        */
-      const loadSet = async (prefix: string): Promise<HTMLImageElement[] | undefined> => {
+      /**
+       * ★縮小に備えた輪郭立ては、読み込み時に一度だけかける（`sharpenForDownscale` の注記）。
+       *   `?sharpen=0` で無効、`?sharpen=<数値>` で半径を変えられる（効き具合を見比べるため）。
+       */
+      const sharpenParam = new URLSearchParams(window.location.search).get('sharpen');
+      // ★`?sharpen=0` で無効、`?sharpen=<数値>` で**強さ**を変える（半径は固定）。
+      //   強さのほうを触れるようにしたのは、実測でここが効き目を決めていたため。
+      const sharpenAmount = sharpenParam === null ? SHARPEN_AMOUNT_DEFAULT
+        : Number.isFinite(Number(sharpenParam)) ? Math.max(0, Number(sharpenParam)) : SHARPEN_AMOUNT_DEFAULT;
+      const sharpenSigma = sharpenAmount > 0 ? SHARPEN_SIGMA_DEFAULT : 0;
+
+      const loadSet = async (prefix: string): Promise<FrameImage[] | undefined> => {
         const images = await Promise.all(Array.from({ length: 8 }, (_, i) =>
           loadImg(`/art/${prefix}-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)));
-        return images.every((image): image is HTMLImageElement => image !== null) ? images : undefined;
+        if (!images.every((image): image is HTMLImageElement => image !== null)) return undefined;
+        return images.map((image) => sharpenForDownscale(image, sharpenSigma, sharpenAmount));
       };
-      const rearV4 = await loadSet('horse-jockey-diag-rear-v4');
+      /**
+       * ★背後は v5（8 コマを 1 枚のシートで生成 → 切り出して胴体基準で整列）。
+       *
+       *   v4 は 1 コマずつ生成したもので、**5 つの素材のうちいちばん悪い**数値でした
+       *   （接地点のばらつき 11.6%。合格済みは winner-v2 4.6% / side-v7 9.6%）。
+       *   ★オーナー評「**背後からの馬はまともに走っていない**」— 計測も同じことを言っています。
+       *   シートで作り直して **11.6% → 8.0%**。
+       */
+      const rearV4 = await loadSet('horse-jockey-diag-rear-v5')
+        ?? await loadSet('horse-jockey-diag-rear-v4');
       const winnerRear = await loadSet('horse-jockey-winner-rear-v1');
-      const sideV7 = await loadSet('horse-jockey-side-v7');
+      // ★絵柄の候補を本番の画面に差し込んで見るための差し替え（P4・案 B の比較用）
+      //
+      //   白地や緑地に大きく置いた絵が良く見えても、**実際は縮小され、芝と柵と観客席の上に重なり、
+      //   勝負服を色替えされ、斜め俯瞰の遠近の中に置かれます**。当て込むと別物になるので、
+      //   ここで差し替えて**本番の条件で**見比べられるようにします。
+      //
+      //   使い方: /race?horse=side-c1-cg
+      //   ⚠️ 候補は 1 コマしか無いので 8 枚とも同じ絵です。**走りは判断できません**（絵柄だけ）。
+      const horseOverride = new URLSearchParams(window.location.search).get('horse');
+      const sideSetName = horseOverride !== null && /^[a-z0-9-]+$/.test(horseOverride)
+        ? `horse-jockey-${horseOverride}`
+        : 'horse-jockey-side-v7';
+      const sideV7 = await loadSet(sideSetName) ?? await loadSet('horse-jockey-side-v7');
       const [gateClosed, gateOpen] = await Promise.all([
         loadImg(`/art/starting-gate-front-v1.png?v=${ASSET_VERSION}`).catch(() => null),
         loadImg(`/art/starting-gate-front-open-v1.png?v=${ASSET_VERSION}`).catch(() => null),
       ]);
       const frontV3 = await loadSet('horse-jockey-diag-front-v3');
+      // ★俯瞰は v2（271×724 の低解像度・一度も作り直していない）のままで、
+      //   オーナー評「ここで一気にクオリティが下がる」の当のカットだった（2026-08-20）。
+      //   真横 v7 を参照に作り直した v3 が揃えばそれを使う。
+      // ★v3（1 コマずつ生成）は 1 枚ずつは合格だったが、**動かすとガクガクして走って見えなかった**
+      //   （オーナー確認・2026-08-20）。カメラ角度と体型がコマごとに流れていたため。
+      //   → v4 は **8 コマを 1 枚のシートで一度に生成**し、切り出して胴体基準で揃えたもの。
+      //      接地点のばらつき 22.0% → 9.9%（合格済みは 4.6〜9.6%）。
+      const highDiagV3 = await loadSet('horse-jockey-high-diag-v4')
+        ?? await loadSet('horse-jockey-high-diag-v3');
       // ★真横は v7（一貫性を持たせて作り直した 8 コマ）が揃えばそれを、無ければ承認済み v6
       const sidePoses: readonly FrameImage[] = composedRace ?? sideV7 ?? loaded.slice(8, 16);
       /**
@@ -919,7 +1088,9 @@ export default function RacePage(): React.JSX.Element {
         : composedRear !== undefined
           ? buildFrames(composedRear.frames, undefined, SILKS_LAYOUT_REAR, composedRear.anchors)
           : buildFrames(loaded.slice(24, 32));
-      const highDiagHighQuality = buildFrames(loaded.slice(32, 40));
+      const highDiagHighQuality = highDiagV3 !== undefined
+        ? buildFrames(highDiagV3, undefined, SILKS_LAYOUT_REAR)
+        : buildFrames(loaded.slice(32, 40));
       const winnerHighQuality = buildFrames(loaded.slice(40, 41));
       artRef.current = {
         pal, raceTitle: raceTitle!, raceNarrator: raceNarrator!, startingGate: startingGate!,
@@ -1110,7 +1281,17 @@ export default function RacePage(): React.JSX.Element {
         finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
         raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
         fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
-        winnerRear: art.winnerRearHighQuality !== undefined,
+        /**
+         * ★勝馬追従は**後方をやめ、真横にします**（2026-08-21・オーナー判定）。
+         *
+         *   後方視点の勝馬追従は 8/20 と 8/21 の**2 回とも不合格**でした
+         *   （「馬が跳ねているし、騎手もガクガクしている」）。
+         *   ★後方・俯瞰は 12 カット全数判定で **5 戦 5 敗**。後ろから見ると脚の伸び縮みが見えず、
+         *     尻の上下だけが残るためで、素材を作り直しても直りません。
+         *   ⚠️ 後方の素材（`winnerRearHighQuality`）は**読み込んだまま残します** —
+         *      裁定が変わったときに戻せるように。使うかどうかはここだけで決めます。
+         */
+        winnerRear: false,
       });
       v2ShotId = scene.shot.id;
       v2SectionLabel = broadcastV2SectionLabel(course, visualLead, scene.shot.id);
@@ -1223,8 +1404,16 @@ export default function RacePage(): React.JSX.Element {
         // ★横視点以外（コーナー後方・俯瞰・斜め前）はテクスチャ付き透視ワールド（背景が実際に動く）
         texturedWorld: sceneToDraw.shot.view === 'side' ? undefined : art.texturedWorld,
         /**
-         * ★正面の発馬機ビルボード（走路 s=1.6・w 0.5〜15.3）。待機中は扉閉を馬の手前に（馬は見えない）、
-         *   開扉後は扉開を馬の後ろに。発走 60m を過ぎたら描かない。
+         * ★正面の発馬機ビルボード（走路 s=1.6・w 0.5〜15.3）。
+         *   待機中は扉閉を**馬の手前**に、開扉後は扉開を**馬の後ろ**に。発走 60m を過ぎたら描かない。
+         *
+         * ★2026-08-21 に素材を作り直しました。
+         *   旧素材は中身が 1523×576 で、`widthM: 14.8` で置くと **高さ 5.60m** ——
+         *   実物（およそ 3.4m）の **1.65 倍**でした。そのため**馬の頭（2.5m）が扉の板の真ん中**に来て、
+         *   板の下からはみ出した脚だけが見える状態でした
+         *   （★オーナー評「**ゲートに馬や騎手がなく足しかない**」）。
+         *   新素材は **3.15m**、かつ**扉の上が抜けている**ので、頭と騎手が房越しに見えます。
+         *   ⚠️ 縦横比は絵を差し替えるたびに黙って変わります。**`tools/verify-world-billboards.mjs` で留めています。**
          */
         worldBillboards: art.gateFront !== undefined && visualLead < 90 ? [{
           image: raceD <= 0 ? art.gateFront.closed : art.gateFront.open,
@@ -1508,6 +1697,26 @@ export default function RacePage(): React.JSX.Element {
     render(dRef.current);
   }, [render, ready]);
 
+  /**
+   * ★撮影用のシーク（開発用）。
+   *   `render(表示秒)` が時刻から画面を作るので、時刻を置き換えて描き直すだけでよい。
+   *   ⚠️ シークしたら**再生は止める** — 動いたままだとすぐ現在時刻に戻ってしまう。
+   */
+  const totalDisplaySec = built === null ? 0
+    : RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC;
+  const seekTo = useCallback((sec: number): void => {
+    if (built === null) return;
+    const t = Math.max(0, Math.min(sec, RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC));
+    setPlaying(false);
+    dRef.current = t;
+    setClock(Math.min(raceIntroAt(t).raceDisplaySec, built.warp.displaySec));
+    render(t);
+    setSeekPos(t);
+  }, [built, render]);
+  const seekBy = useCallback((delta: number): void => { seekTo(dRef.current + delta); }, [seekTo]);
+  // ★スライダーの位置は `dRef`（ref）では追えないので、表示用の state を並走させる
+  const [seekPos, setSeekPos] = useState(0);
+
   useEffect(() => {
     if (!playing || built === null) return;
     t0Ref.current = performance.now() - dRef.current * 1000;
@@ -1523,6 +1732,7 @@ export default function RacePage(): React.JSX.Element {
         return;
       }
       dRef.current = d;
+      setSeekPos(d);   // ★再生中もスライダーが追随する
       setClock(Math.min(raceIntroAt(d).raceDisplaySec, built.warp.displaySec));
       render(d);
       rafRef.current = requestAnimationFrame(loop);
@@ -1561,7 +1771,7 @@ export default function RacePage(): React.JSX.Element {
             callKeyRef.current = '';
             callLastSecRef.current = -Infinity;
             sectionTagRef.current = { label: '', sinceSec: -Infinity };
-            setClock(0); setPlaying(false); render(0);
+            setClock(0); setSeekPos(0); setPlaying(false); render(0);
           }}
           style={{ padding: '8px 14px', cursor: 'pointer', background: '#3a3630', color: '#efe9dc', border: 0 }}
         >
@@ -1598,6 +1808,40 @@ export default function RacePage(): React.JSX.Element {
         </label>
         {built !== null && <span style={{ fontSize: 13, opacity: 0.8 }}>{clock.toFixed(1)} / {built.warp.displaySec.toFixed(1)} 秒</span>}
       </div>
+
+      {/*
+        ★開発用のシーク（早送り・巻き戻し）— 2026-08-20
+          場面を細かく見て撮るために付けた。**本番の画面には出さないこと。**
+          演出は `render(表示秒)` が時刻から画面を作る形なので、時刻を動かすだけで任意の瞬間を出せる。
+          ⚠️ 実況の文字送りなど**時刻とともに積み上がるもの**は、巻き戻すと途中から積み直しになる。
+             見た目の確認には支障ないが、実況の行が飛ぶことがある（撮影用途のため許容）。
+      */}
+      {built !== null && (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '0 0 8px', padding: '8px 10px', background: '#241f1a', border: '1px solid #4a453d' }}>
+          <span style={{ fontSize: 12, opacity: 0.7, whiteSpace: 'nowrap' }}>撮影用シーク</span>
+          {[-1, -0.1].map((d) => (
+            <button key={d} type="button" onClick={() => seekBy(d)}
+              style={{ padding: '4px 10px', cursor: 'pointer', background: '#3a3630', color: '#efe9dc', border: 0, fontSize: 12 }}>
+              {d}s
+            </button>
+          ))}
+          <input
+            type="range" min={0} max={totalDisplaySec} step={0.05} value={Math.min(seekPos, totalDisplaySec)}
+            onChange={(e) => seekTo(Number(e.target.value))}
+            style={{ flex: 1, minWidth: 240, accentColor: '#c8a24a' }}
+          />
+          {[0.1, 1].map((d) => (
+            <button key={d} type="button" onClick={() => seekBy(d)}
+              style={{ padding: '4px 10px', cursor: 'pointer', background: '#3a3630', color: '#efe9dc', border: 0, fontSize: 12 }}>
+              +{d}s
+            </button>
+          ))}
+          <span className="a-num" style={{ fontSize: 13, minWidth: 92, textAlign: 'right', color: '#e8dcc0' }}>
+            {seekPos.toFixed(2)} / {totalDisplaySec.toFixed(1)}s
+          </span>
+        </div>
+      )}
+
       <canvas
         ref={canvasRef} width={W} height={H}
         style={{ width: '100%', maxWidth: W, border: '1px solid #4a453d', imageRendering: 'auto', background: '#111' }}

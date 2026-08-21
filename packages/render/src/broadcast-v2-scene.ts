@@ -282,19 +282,42 @@ export function drawBroadcastV2Scene<TImage>(
    *   勝馬追従は勝馬専用集合を使う。
    */
   const directional = scene.shot.id !== 'winner-follow' && scene.shot.id !== 'winner-follow-rear';
+  /**
+   * ★**向きと素材は、カットにつき 1 つだけ決めます**（2026-08-21）。
+   *
+   * ⚠️ ★以前は**馬ごと**に `viewDeg` / `forwardDx` を計算して素材と左右反転を選んでいました。
+   *    コーナーでは馬ごとに走路の向きが違うので、**同じカットの中で
+   *    ある馬は後方素材・ある馬は真横素材、ある馬だけ左右反転**という状態になります。
+   *    ★オーナー評「**1匹別の方向に馬が走っている**」（2 カットで指摘）はこれです。
+   *
+   *   実際の中継では、1 つのカットの中で馬が別々の向きに走ることはありません。
+   *   **注視点（馬群の中心）の向きを 1 回だけ求めて、全馬に同じものを使います。**
+   */
+  const shotView = ((): { viewDeg: number; forwardDx: number } => {
+    const p0 = posOf(course, scene.focusS, scene.focusW);
+    const p1 = posOf(course, scene.focusS + 1, scene.focusW);
+    const fx = p1.x - p0.x, fy = p1.y - p0.y;
+    const vx = p0.x - scene.camera.eye.x, vy = p0.y - scene.camera.eye.y;
+    const fl = Math.hypot(fx, fy) || 1, vl = Math.hypot(vx, vy) || 1;
+    const cosT = Math.max(-1, Math.min(1, (fx * vx + fy * vy) / (fl * vl)));
+    const basis = cameraBasis(scene.camera);
+    const q0 = project(scene.camera, basis, { x: p0.x, y: p0.y, z: 0 });
+    const q1 = project(scene.camera, basis, { x: p1.x, y: p1.y, z: 0 });
+    return { viewDeg: (Math.acos(cosT) * 180) / Math.PI, forwardDx: q1.x - q0.x };
+  })();
   drawPerspectiveHorses(ctx, course, scene.camera, scene.visibleHorses, {
     ...library,
-    frameSetOf: directional ? (horse, view) => {
+    frameSetOf: directional ? (horse) => {
       /**
        * ★2026-08-18: 方向別の一体素材（後方・斜め後ろ・正面・斜め前）が承認水準で揃うまで、
        *   全ショットで承認済みの真横素材だけを使う（低解像度の方向別素材との混在は「破綻」と評価された）。
-       *   左右は進行方向の画面上の向きで反転する。
+       * ★2026-08-21: **馬ごとの `view` は使いません**（上の `shotView` を参照）。
        */
-      const useRear = opts.directionalSets?.rear === true && view.viewDeg < 60;
-      const useFront = opts.directionalSets?.front === true && view.viewDeg > 120;
+      const useRear = opts.directionalSets?.rear === true && shotView.viewDeg < 60;
+      const useFront = opts.directionalSets?.front === true && shotView.viewDeg > 120;
       const key: BroadcastV2HorseAssetRole = useRear ? 'diag-rear-v2' : useFront ? 'diag-front-v2' : 'side-v6';
       const set = opts.libraries[key];
-      return { frames: set.frameImagesByGate?.[horse.gate - 1], flip: view.forwardDx < 0 };
+      return { frames: set.frameImagesByGate?.[horse.gate - 1], flip: shotView.forwardDx < 0 };
     } : undefined,
     fieldSize: opts.fieldSize,
     frameOf: opts.frameOf,
