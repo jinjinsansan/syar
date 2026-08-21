@@ -54,6 +54,11 @@ import {
   raceCallAt,
   withPhasePrefix,
   narratorPortrait,
+  narratorCastAt,
+  NARRATOR_NAMES,
+  NARRATOR_ROLES,
+  type NarratorCast,
+  type NarratorSet,
   applyCoat,
   isHorseCoat,
   COAT_TRANSFORMS,
@@ -102,7 +107,7 @@ function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, st
   ctx.restore();
 }
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '53';
+const ASSET_VERSION = '54';
 /**
  * ★コマごとの持ち上げ量。**単位は「基準画布（高さ 1536px）での px」**。
  *
@@ -744,8 +749,11 @@ export default function RacePage(): React.JSX.Element {
     pal: unknown;
     raceTitle: HTMLImageElement;
     raceNarrator: HTMLImageElement;
-    /** ★口パク用の立ち絵（表情 3 × 口 2）。揃わなければ undefined で 1 枚に落とす */
-    narratorSet?: Record<'normal' | 'hot' | 'shout', { closed: HTMLImageElement; open: HTMLImageElement }>;
+    /**
+     * ★口パク用の立ち絵（4 名 × 表情 3 × 口 2 ＝ 24 枚）。
+     *   揃わなければ undefined で従来の 1 枚に落とす（読み込み失敗で演出を止めない）。
+     */
+    narratorSets?: Record<NarratorCast, NarratorSet<HTMLImageElement>>;
     startingGate: HTMLImageElement;
     raceBackstretch: HTMLImageElement;
     raceCornerExit: HTMLImageElement;
@@ -941,17 +949,25 @@ export default function RacePage(): React.JSX.Element {
        *     素材は `tools/slice-narrator.mjs` が、閉じた絵を土台に口の矩形だけを貼って作っています。
        *   揃わなければ従来の 1 枚に落とす（読み込み失敗で演出が止まらないように）。
        */
-      const narratorSet = await (async () => {
-        const names = ['normal', 'hot', 'shout'] as const;
-        const pairs = await Promise.all(names.map(async (expr) => {
-          const [closed, open] = await Promise.all([
-            loadImg(`/art/narrator-a-${expr}-closed.png?v=${ASSET_VERSION}`).catch(() => null),
-            loadImg(`/art/narrator-a-${expr}-open.png?v=${ASSET_VERSION}`).catch(() => null),
-          ]);
-          return closed === null || open === null ? null : [expr, { closed, open }] as const;
-        }));
-        return pairs.every((p): p is NonNullable<typeof p> => p !== null)
-          ? Object.fromEntries(pairs) as Record<typeof names[number], { closed: HTMLImageElement; open: HTMLImageElement }>
+      const narratorSets = await (async () => {
+        const exprs = ['normal', 'hot', 'shout'] as const;
+        const casts = ['a', 'b', 'c', 'd'] as const;
+        const loadCast = async (cast: typeof casts[number]) => {
+          const pairs = await Promise.all(exprs.map(async (expr) => {
+            const [closed, open] = await Promise.all([
+              loadImg(`/art/narrator-${cast}-${expr}-closed.png?v=${ASSET_VERSION}`).catch(() => null),
+              loadImg(`/art/narrator-${cast}-${expr}-open.png?v=${ASSET_VERSION}`).catch(() => null),
+            ]);
+            return closed === null || open === null ? undefined : { closed, open };
+          }));
+          const [normal, hot, shout] = pairs;
+          return normal === undefined || hot === undefined || shout === undefined
+            ? undefined : { normal, hot, shout };
+        };
+        const loaded = await Promise.all(casts.map(async (c) => [c, await loadCast(c)] as const));
+        const ok = loaded.filter((e): e is readonly [typeof casts[number], NarratorSet<HTMLImageElement>] => e[1] !== undefined);
+        return ok.length === casts.length
+          ? Object.fromEntries(ok) as Record<typeof casts[number], NarratorSet<HTMLImageElement>>
           : undefined;
       })();
       const buildFrames = (
@@ -1199,7 +1215,7 @@ export default function RacePage(): React.JSX.Element {
       const winnerHighQuality = buildFrames(loaded.slice(40, 41));
       artRef.current = {
         pal, raceTitle: raceTitle!, raceNarrator: raceNarrator!, startingGate: startingGate!,
-        ...(narratorSet !== undefined ? { narratorSet } : {}),
+        ...(narratorSets !== undefined ? { narratorSets } : {}),
         raceBackstretch: raceBackstretch!, raceCornerExit: raceCornerExit!, raceFinish: raceFinish!,
         raceCornerRear: raceCornerRear!, raceCornerHigh: raceCornerHigh!,
         sideHighQuality, diagFrontHighQuality, diagRearHighQuality, highDiagHighQuality, winnerHighQuality,
@@ -1646,18 +1662,23 @@ export default function RacePage(): React.JSX.Element {
     }
     if (v2StartHold) {
       // ★ゲート待機〜発走直後: 順位 HUD の代わりに発走の中継帯（「ゲートイン完了」→「スタートしました！」）
+      /**
+       * ★話者は局面で替えます（仕様 `narrator-cast` の「出る局面」）。
+       *   ゲート入り＝現地レポーター、発走後＝実況。
+       */
+      const startCast = narratorCastAt(intro.stage === 'gate-release' ? 'gate-release' : 'gate-hold');
       const startLineAt = intro.stage === 'gate-release' ? RACE_INTRO_RACE_START_SEC : RACE_INTRO_TITLE_END_SEC + 0.3;
       const startText = intro.stage === 'gate-release' ? 'スタートしました！' : `${FIELD}頭、ゲートイン完了しました`;
       drawStartCallBand(ctx, art.pal as Record<string, string>, vp, FONT, FIELD, intro.stage === 'gate-release',
         // ★口は「文字がまだ増えている間」だけ動かす（喋っている間）
-        narratorPortrait(art.raceNarrator, art.narratorSet, {
+        narratorPortrait(art.raceNarrator, art.narratorSets?.[startCast], {
           metersLeft: DIST, displaySec: d,
           speaking: typedCount(startText.length, d - startLineAt) < startText.length,
         }), {
           timeSec: d,
           lineStartSec: startLineAt,
           secondsToStart: RACE_INTRO_RACE_START_SEC - d,
-          narratorName: NARRATOR_NAME,
+          narratorName: NARRATOR_NAMES[startCast],
           sinceSec: d - RACE_INTRO_TITLE_END_SEC,
         });
       drawRendererBadge(ctx, renderer, `${intro.stage}/${v2ShotId ?? 'v2'}`);
@@ -1789,10 +1810,15 @@ export default function RacePage(): React.JSX.Element {
         callRef.current = [...callRef.current, say as CallPart[]].slice(-3);
         callStartRef.current = [...callStartRef.current, d].slice(-3);
       }
+      /**
+       * ★話者は局面で替えます。**最後の直線は解説（元騎手）の一言**が入る（仕様 `narrator-cast`）。
+       *   ⚠️ 目まぐるしく替わらないよう、直線に入ってからだけ。
+       */
+      const raceCast = narratorCastAt(courseSection === 'straight' || courseSection === 'finish' ? 'straight' : 'race');
       if (hud.calls) {
         drawCallBand(ctx, art.pal as Record<string, string>, vp, FONT, callRef.current,
           // ★口は最後の一言がまだ出そろっていない間だけ動かす
-          narratorPortrait(art.raceNarrator, art.narratorSet, {
+          narratorPortrait(art.raceNarrator, art.narratorSets?.[raceCast], {
             metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
             displaySec: d,
             speaking: (() => {
@@ -1801,7 +1827,7 @@ export default function RacePage(): React.JSX.Element {
               return last !== undefined && at0 !== undefined && typedCount(last.length, d - at0) < last.length;
             })(),
           }), {
-            timeSec: d, lineStartSec: callStartRef.current, narratorName: NARRATOR_NAME,
+            timeSec: d, lineStartSec: callStartRef.current, narratorName: NARRATOR_NAMES[raceCast],
             gauge: hud.gauge ? { left: g.left, initial: built.gauge.initial } : undefined,
             metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
             sinceSec: raceD - HUD_SETTLE_SEC,

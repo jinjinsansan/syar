@@ -33,14 +33,22 @@ import { createCanvas, loadImage } from '@napi-rs/canvas';
  * ★人物として画面に出る素材の登録簿。
  *   人物立ち絵を増やすときは、**ここに足してから**素材を入れること。
  */
-const PORTRAIT_ASSETS = [
-  { file: 'apps/web/public/art/narrator-a-normal-closed.png', label: '実況 A 通常・口閉' },
-  { file: 'apps/web/public/art/narrator-a-normal-open.png', label: '実況 A 通常・口開' },
-  { file: 'apps/web/public/art/narrator-a-hot-closed.png', label: '実況 A 熱・口閉' },
-  { file: 'apps/web/public/art/narrator-a-hot-open.png', label: '実況 A 熱・口開' },
-  { file: 'apps/web/public/art/narrator-a-shout-closed.png', label: '実況 A 絶叫・口閉' },
-  { file: 'apps/web/public/art/narrator-a-shout-open.png', label: '実況 A 絶叫・口開' },
-];
+const PORTRAIT_ASSETS = (() => {
+  const casts = [
+    ['a', '実況 星野 亮太'], ['b', '解説 大鷹 源三'],
+    ['c', '進行 遠山 かなえ'], ['d', '現地 南 ひかる'],
+  ];
+  const exprs = [['normal', '通常'], ['hot', '熱'], ['shout', '絶叫']];
+  const out = [];
+  for (const [id, who] of casts) {
+    for (const [e, ja] of exprs) {
+      for (const [m, mj] of [['closed', '口閉'], ['open', '口開']]) {
+        out.push({ file: `apps/web/public/art/narrator-${id}-${e}-${m}.png`, label: `${who} ${ja}・${mj}` });
+      }
+    }
+  }
+  return out;
+})();
 
 /** 肌色らしさ（ごく緩い判定。どの画素を調べるかを決めるだけ） */
 function skinLike(r, g, b) {

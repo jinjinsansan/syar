@@ -12,6 +12,37 @@
 
 export type NarratorExpression = 'normal' | 'hot' | 'shout';
 
+/**
+ * ★誰が喋る局面か（仕様 `narrator-cast` の「出る局面」）。
+ *
+ *   A 実況 星野 亮太   … レース中ずっと
+ *   B 解説 大鷹 源三   … 最後の直線・ゴール後の一言
+ *   C 進行 遠山 かなえ … 発走前の紹介・着順確定の締め
+ *   D 現地 南 ひかる   … パドック・ゲート入り
+ */
+export type NarratorCast = 'a' | 'b' | 'c' | 'd';
+
+export const NARRATOR_NAMES: Readonly<Record<NarratorCast, string>> = {
+  a: '星野 亮太', b: '大鷹 源三', c: '遠山 かなえ', d: '南 ひかる',
+};
+export const NARRATOR_ROLES: Readonly<Record<NarratorCast, string>> = {
+  a: '実況', b: '解説', c: '進行', d: '現地',
+};
+
+/** ★局面から話者を選ぶ。仕様の「出る局面」をそのまま写したもの */
+export function narratorCastAt(stage:
+  | 'flyover' | 'title' | 'gate-hold' | 'gate-release' | 'race' | 'straight' | 'result',
+): NarratorCast {
+  switch (stage) {
+    case 'flyover':
+    case 'title': return 'c';        // 発走前の紹介
+    case 'gate-hold': return 'd';    // ゲート入り
+    case 'straight': return 'b';     // 最後の直線（解説の一言）
+    case 'result': return 'c';       // 着順確定の締め
+    default: return 'a';             // レース中ずっと
+  }
+}
+
 export interface NarratorSet<TImage> {
   readonly normal: { readonly closed: TImage; readonly open: TImage };
   readonly hot: { readonly closed: TImage; readonly open: TImage };

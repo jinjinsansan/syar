@@ -75,7 +75,20 @@ for (let col = 0; col < COLS; col += 1) {
   const bc = bounds(closed), bo = bounds(open);
   const dx = bo.x - bc.x, dy = bo.y - bc.y;
   console.log(`  ${EXPR[col].padEnd(8)}(${bc.x},${bc.y}) ${bc.width}x${bc.height}   (${bo.x},${bo.y}) ${bo.width}x${bo.height}   Δ(${dx},${dy})`);
-  out.push({ expr: EXPR[col], closed, open, bc, bo, dx, dy });
+  /**
+   * ★**口を貼る前に、開いた絵を閉じた絵へ揃えます。**
+   *
+   * ⚠️ 生成物は列によって頭の位置が違います（実測: 実況 D は**縦に 34px**ずれていた）。
+   *    揃えずに口の矩形を貼ると、★**開いた絵の「鼻やあご」を口の位置に貼る**ことになります。
+   *    外接矩形の差だけ平行移動してから使います。
+   */
+  let aligned = open;
+  if (dx !== 0 || dy !== 0) {
+    const a = createCanvas(cellW, cellH);
+    a.getContext('2d').drawImage(open, -dx, -dy);
+    aligned = a;
+  }
+  out.push({ expr: EXPR[col], closed, open: aligned, bc, bo, dx, dy });
 }
 
 /**

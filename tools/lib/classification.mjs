@@ -54,6 +54,7 @@ export const READONLY = [
   '_camjump.mjs',             // 固定カメラの注視点と画角の連続性（読むだけ）
   '_cuts.mjs',                // 切替が 重ねる／切る／閃光 のどれになるか（読むだけ）
   'slice-narrator.mjs',       // ナレーターのシートを 6 枚に切り、口だけ差し替える（読むだけ）
+  '_pickgreen.mjs',           // 生成物 2 枚からクロマ緑のほうを選ぶ（読むだけ）
   '_stride.mjs',              // 送り速さと完歩数の対応を並べる（読むだけ）
   'verify-no-real-faces.mjs', // 人物立ち絵に写真が混ざっていないか（読むだけ）
   '_timefloor.mjs',   // 30 秒が実現できるかの下限計算

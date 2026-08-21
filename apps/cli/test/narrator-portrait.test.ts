@@ -9,7 +9,7 @@
  *    撮影用シークで時刻を戻しても同じ絵になること。
  */
 import { describe, it, expect } from 'vitest';
-import { narratorPortrait } from '@star/render';
+import { narratorPortrait, narratorCastAt, NARRATOR_NAMES, NARRATOR_ROLES } from '@star/render';
 
 const img = (tag: string) => ({ tag, width: 300, height: 344 });
 const SET = {
@@ -51,5 +51,25 @@ describe('★実況の立ち絵', () => {
 
   it('★素材が揃っていなければ従来の 1 枚に落ちる（読み込み失敗で演出を止めない）', () => {
     expect(tagOf(narratorPortrait(FALLBACK, undefined, { metersLeft: 100, displaySec: 0.1, speaking: true }))).toBe('fallback');
+  });
+});
+
+describe('★話者の割り当て（仕様 narrator-cast の「出る局面」）', () => {
+  it('★★局面ごとに担当が替わる', () => {
+    expect(narratorCastAt('title')).toBe('c');        // 発走前の紹介＝進行
+    expect(narratorCastAt('gate-hold')).toBe('d');    // ゲート入り＝現地
+    expect(narratorCastAt('gate-release')).toBe('a'); // 発走＝実況
+    expect(narratorCastAt('race')).toBe('a');         // レース中ずっと＝実況
+    expect(narratorCastAt('straight')).toBe('b');     // 最後の直線＝解説
+    expect(narratorCastAt('result')).toBe('c');       // 着順確定の締め＝進行
+  });
+
+  it('★名前と役割が 4 名そろっている', () => {
+    for (const c of ['a', 'b', 'c', 'd'] as const) {
+      expect(NARRATOR_NAMES[c].length).toBeGreaterThan(0);
+      expect(NARRATOR_ROLES[c].length).toBeGreaterThan(0);
+    }
+    expect(NARRATOR_NAMES.a).toBe('星野 亮太');
+    expect(NARRATOR_ROLES.b).toBe('解説');
   });
 });
