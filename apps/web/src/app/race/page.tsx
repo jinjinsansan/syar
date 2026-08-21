@@ -50,6 +50,8 @@ import {
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   isSkinTone,
+  typedCount,
+  narratorPortrait,
   applyCoat,
   isHorseCoat,
   COAT_TRANSFORMS,
@@ -98,7 +100,7 @@ function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, st
   ctx.restore();
 }
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '52';
+const ASSET_VERSION = '53';
 /**
  * ★コマごとの持ち上げ量。**単位は「基準画布（高さ 1536px）での px」**。
  *
@@ -738,6 +740,8 @@ export default function RacePage(): React.JSX.Element {
     pal: unknown;
     raceTitle: HTMLImageElement;
     raceNarrator: HTMLImageElement;
+    /** ★口パク用の立ち絵（表情 3 × 口 2）。揃わなければ undefined で 1 枚に落とす */
+    narratorSet?: Record<'normal' | 'hot' | 'shout', { closed: HTMLImageElement; open: HTMLImageElement }>;
     startingGate: HTMLImageElement;
     raceBackstretch: HTMLImageElement;
     raceCornerExit: HTMLImageElement;
@@ -926,6 +930,26 @@ export default function RacePage(): React.JSX.Element {
       if (cancelled) return;
       const [raceTitle, raceNarrator, startingGate, raceBackstretch, raceCornerExit, raceFinish,
         raceCornerRear, raceCornerHigh] = loaded;
+      /**
+       * ★実況の立ち絵（口パク用）。仕様 `design/hud-ds/components/narrator-cast`:
+       *   表情 3（通常／熱／絶叫）× 口 2（閉／開）= 6 枚。
+       *   ★**口パクは同一頭部で口だけ差し替え**（頭が動かないこと）。
+       *     素材は `tools/slice-narrator.mjs` が、閉じた絵を土台に口の矩形だけを貼って作っています。
+       *   揃わなければ従来の 1 枚に落とす（読み込み失敗で演出が止まらないように）。
+       */
+      const narratorSet = await (async () => {
+        const names = ['normal', 'hot', 'shout'] as const;
+        const pairs = await Promise.all(names.map(async (expr) => {
+          const [closed, open] = await Promise.all([
+            loadImg(`/art/narrator-a-${expr}-closed.png?v=${ASSET_VERSION}`).catch(() => null),
+            loadImg(`/art/narrator-a-${expr}-open.png?v=${ASSET_VERSION}`).catch(() => null),
+          ]);
+          return closed === null || open === null ? null : [expr, { closed, open }] as const;
+        }));
+        return pairs.every((p): p is NonNullable<typeof p> => p !== null)
+          ? Object.fromEntries(pairs) as Record<typeof names[number], { closed: HTMLImageElement; open: HTMLImageElement }>
+          : undefined;
+      })();
       const buildFrames = (
         images: readonly FrameImage[],
         referenceHeightOverride?: number,
@@ -1171,6 +1195,7 @@ export default function RacePage(): React.JSX.Element {
       const winnerHighQuality = buildFrames(loaded.slice(40, 41));
       artRef.current = {
         pal, raceTitle: raceTitle!, raceNarrator: raceNarrator!, startingGate: startingGate!,
+        ...(narratorSet !== undefined ? { narratorSet } : {}),
         raceBackstretch: raceBackstretch!, raceCornerExit: raceCornerExit!, raceFinish: raceFinish!,
         raceCornerRear: raceCornerRear!, raceCornerHigh: raceCornerHigh!,
         sideHighQuality, diagFrontHighQuality, diagRearHighQuality, highDiagHighQuality, winnerHighQuality,
@@ -1617,10 +1642,16 @@ export default function RacePage(): React.JSX.Element {
     }
     if (v2StartHold) {
       // ★ゲート待機〜発走直後: 順位 HUD の代わりに発走の中継帯（「ゲートイン完了」→「スタートしました！」）
+      const startLineAt = intro.stage === 'gate-release' ? RACE_INTRO_RACE_START_SEC : RACE_INTRO_TITLE_END_SEC + 0.3;
+      const startText = intro.stage === 'gate-release' ? 'スタートしました！' : `${FIELD}頭、ゲートイン完了しました`;
       drawStartCallBand(ctx, art.pal as Record<string, string>, vp, FONT, FIELD, intro.stage === 'gate-release',
-        { image: art.raceNarrator, width: art.raceNarrator.width, height: art.raceNarrator.height }, {
+        // ★口は「文字がまだ増えている間」だけ動かす（喋っている間）
+        narratorPortrait(art.raceNarrator, art.narratorSet, {
+          metersLeft: DIST, displaySec: d,
+          speaking: typedCount(startText.length, d - startLineAt) < startText.length,
+        }), {
           timeSec: d,
-          lineStartSec: intro.stage === 'gate-release' ? RACE_INTRO_RACE_START_SEC : RACE_INTRO_TITLE_END_SEC + 0.3,
+          lineStartSec: startLineAt,
           secondsToStart: RACE_INTRO_RACE_START_SEC - d,
           narratorName: NARRATOR_NAME,
           sinceSec: d - RACE_INTRO_TITLE_END_SEC,
@@ -1759,7 +1790,16 @@ export default function RacePage(): React.JSX.Element {
       }
       if (hud.calls) {
         drawCallBand(ctx, art.pal as Record<string, string>, vp, FONT, callRef.current,
-          { image: art.raceNarrator, width: art.raceNarrator.width, height: art.raceNarrator.height }, {
+          // ★口は最後の一言がまだ出そろっていない間だけ動かす
+          narratorPortrait(art.raceNarrator, art.narratorSet, {
+            metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
+            displaySec: d,
+            speaking: (() => {
+              const last = callRef.current[callRef.current.length - 1];
+              const at0 = callStartRef.current[callStartRef.current.length - 1];
+              return last !== undefined && at0 !== undefined && typedCount(last.length, d - at0) < last.length;
+            })(),
+          }), {
             timeSec: d, lineStartSec: callStartRef.current, narratorName: NARRATOR_NAME,
             gauge: hud.gauge ? { left: g.left, initial: built.gauge.initial } : undefined,
             metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
