@@ -63,6 +63,13 @@ export interface Ctx2D<TImage = unknown> {
     dx: number, dy: number, dw: number, dh: number,
   ): void;
   /**
+   * ★任意（両環境にある）。**文字の縁取り**に使う。芝の上に置く馬名プレートは、
+   *   縁取りが無いと明るい芝で読めなくなる。無い環境では縁取りを省く（落ちない）。
+   */
+  strokeText?(text: string, x: number, y: number): void;
+  /** ★任意（両環境にある）。枠線だけの矩形。無い環境では省く */
+  strokeRect?(x: number, y: number, w: number, h: number): void;
+  /**
    * ★任意（両環境にある）。接地影のように**画像を変形して描く**ときだけ使う。
    *   無い環境では変形を伴う描画を省く（落ちない）。
    */

@@ -19,7 +19,7 @@
  *   npx tsx tools/shot-race-at.mjs --from 9 --to 30 --step 3
  * 出力: out/race-at/NN-<秒>s-<ショット>.png と contact-sheet.png
  */
-import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { GlobalFonts, createCanvas, loadImage } from '@napi-rs/canvas';
 import sharp from 'sharp';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -27,7 +27,8 @@ import {
   DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt,
 } from '@star/race-engine';
 import {
-  BROADCAST_STRIDE_M, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
+  BROADCAST_STRIDE_M, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES, HORSE_HEIGHT_M,
+  drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
   cameraBasis, drawBroadcastV2Scene, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
   posOf, project, ratesForTarget, replayPositionModel, resolveBroadcastV2Scene,
   targetDisplaySec, timeWarpFor, withFinishRunOut,
@@ -61,6 +62,17 @@ function measureShot(course, camera, horses, width, height) {
 const W = 1280, H = 720, FIELD = 12, DIST = 1600, SEED = 42;
 const ART = path.resolve('apps/web/public/art');
 const OUT = path.resolve('out/race-at');
+/**
+ * ★**和文フォントを登録する。**
+ *
+ * ⚠️ `@napi-rs/canvas` は既定で和文の字形を持たないので、馬名が**全部豆腐（□）**になります。
+ *    ★それでも「HUD は出ている」ようには見えるので、**読めるかどうかを判定できません。**
+ *    画面（ブラウザ）は和文を出すので、登録しないとこの道具は別の画を出します（R-30）。
+ */
+for (const file of ['C:/Windows/Fonts/YuGothB.ttc', 'C:/Windows/Fonts/meiryob.ttc', 'C:/Windows/Fonts/msgothic.ttc']) {
+  try { if (GlobalFonts.registerFromPath(file, 'JPUI')) break; } catch { /* 次の候補へ */ }
+}
+
 const palette = JSON.parse(readFileSync(path.join(ART, 'palette.json'), 'utf8'));
 const POOL = JSON.parse(readFileSync('apps/web/src/lib/watch-pool.json', 'utf8'));
 const course = ovalCourse(DIST, { widthM: 20, turn: 'left' });
@@ -257,6 +269,36 @@ for (const [index, displaySec] of displaySecs.entries()) {
       source: gateOpen.source, worldS: 1.6, worldW: 0.5, widthM: 14.8, zOrder: 'behind',
     }] : undefined,
   });
+  /**
+   * ★**参考映像の HUD 3 点**（設計 1-4 / 1-5 / 1-6）も描く。
+   *
+   * ⚠️ ★これらは `apps/web/src/app/race/page.tsx` でも同じ関数を呼びます。
+   *    **呼び方（座標・渡す行）をここと画面で違えないこと。** 違えたらこの道具は
+   *    「オーナーと別の画」を出します（R-30。この案件で 3 回起きています）。
+   *    自馬は画面と同じ 4 番、名前は同じ配列から引いています。
+   */
+  const OWN_GATE = 4;
+  const NAMES = ['スターライト', 'サクラブリーズ', 'ハンシンドリーム', 'ミライノツバサ', 'グリーンアロー', 'オウカノキセキ',
+    'ナニワスピリット', 'ローズクイーン', 'ムラサキノホシ', 'アオバハヤテ', 'ブラウンエース', 'ピンクレディ'];
+  const FONT = (px, bold) => `${bold ? 'bold ' : ''}${px}px JPUI, system-ui, sans-serif`;
+  const ranked = [...horses].sort((a, b) => b.s - a.s);
+  drawFormationBar(ctx, palette, FONT, horses.map((h) => ({ gate: h.gate, s: h.s })), FIELD, frameRoleOf,
+    { x: 40, y: 4, width: W - 80, ownGate: OWN_GATE, timeSec: displaySec, sinceSec: 9 });
+  const plateRows = referenceNamePlateRows(ranked, OWN_GATE, (gate) => NAMES[gate - 1]);
+  drawHorseNamePlates(ctx, palette, FONT, plateRows, FIELD, frameRoleOf,
+    { viewport: { width: W, height: H }, bottomY: H - 158, timeSec: displaySec, sinceSec: 9 });
+  {
+    const own = horses.find((h) => h.gate === OWN_GATE);
+    if (own !== undefined) {
+      const basis2 = cameraBasis(scene.camera);
+      const g = posOf(course, Math.max(0, own.s), own.w);
+      const headPoint = project(scene.camera, basis2, { x: g.x, y: g.y, z: HORSE_HEIGHT_M });
+      if (headPoint.depth > 2) {
+        drawOwnHorseMarker(ctx, FONT, { x: headPoint.x, y: headPoint.y }, OWN_GATE,
+          { topLimitY: 40, viewport: { width: W, height: H }, timeSec: displaySec, sinceSec: 9 });
+      }
+    }
+  }
   const m = measureShot(course, scene.camera, horses, W, H);
   ctx.fillStyle = 'rgba(5,10,8,0.84)'; ctx.fillRect(18, 18, 700, 58);
   ctx.fillStyle = '#fff'; ctx.font = 'bold 20px sans-serif';

@@ -47,6 +47,9 @@ import {
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
   broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   BROADCAST_STRIDE_M, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
+  // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
+  drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
+  cameraBasis, project, HORSE_HEIGHT_M,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
@@ -1414,6 +1417,12 @@ export default function RacePage(): React.JSX.Element {
     let v2SectionLabel: string | undefined;
     /** ★ミニマップ用: 注視点と描画に使った馬の位置（描画と同じ値） */
     let v2Minimap: { focusS: number; horses: { gate: number; s: number; w: number; own: boolean }[] } | undefined;
+    /**
+     * ★自馬マーカー（設計 1-6）用: 自馬の**頭**の画面位置。
+     *   ⚠️ ここで求めるのは、**馬を描いたのと同じカメラ**で投影した点でなければなりません。
+     *      別に計算すると、寄ったカットでピンが馬から離れます。
+     */
+    let v2OwnHead: { x: number; y: number } | undefined;
     if (renderer === 'v2') {
       const course = ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn });
       /** ★発走イージング（描画のみ・全馬同じ係数）。順位・着差・HUD には触れない */
@@ -1445,6 +1454,16 @@ export default function RacePage(): React.JSX.Element {
         focusS: scene.focusS,
         horses: easedAt.map((horse) => ({ gate: horse.gate, s: horse.meters, w: horse.w ?? TRACK_WIDTH_M / 2, own: horse.gate === ownGate })),
       };
+      {
+        // ★自馬の頭（設計 1-6）。馬と**同じ `scene.camera`** で投影する
+        const ownVisual = easedAt.find((horse) => horse.gate === ownGate);
+        if (ownVisual !== undefined) {
+          const basis = cameraBasis(scene.camera);
+          const ground = posOf(course, Math.max(0, ownVisual.meters), ownVisual.w ?? TRACK_WIDTH_M / 2);
+          const headPoint = project(scene.camera, basis, { x: ground.x, y: ground.y, z: HORSE_HEIGHT_M });
+          if (headPoint.depth > 2) v2OwnHead = { x: headPoint.x, y: headPoint.y };
+        }
+      }
       const library = (frames: readonly (readonly HighQualityHorseFrame[])[]) => ({
         sheet: frames[0]![0]!.image,
         sheetWidth: frames[0]![0]!.source.width,
@@ -1812,6 +1831,33 @@ export default function RacePage(): React.JSX.Element {
           const cur = anim.pos.get(h.gate);
           anim.pos.set(h.gate, cur === undefined ? index : cur + (index - cur) * k);
         });
+      }
+      /**
+       * ★**参考映像にあって我々に無かった HUD 3 点**（設計 1-4 / 1-5 / 1-6）
+       *
+       *   出す・出さないは順位表と同じ条件（`hud.standings`）に揃えます。
+       *   ⚠️ 別々の条件にすると、ゴール後に**これだけが残る**という形で必ずずれます。
+       */
+      if (hud.standings) {
+        // A: 隊列バー（最上部）。順位ではなく**先頭からの距離**で並べる
+        drawFormationBar(ctx, art.pal as Record<string, string>, FONT,
+          visualAt.map((h) => ({ gate: h.gate, s: h.meters })), FIELD, frameRoleOf,
+          { x: 40, y: 4, width: W - 80, ownGate, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC });
+
+        // B: 馬名プレート（下部・固定枠）。自馬 ＋ 先頭 ＋ 2 番手
+        const plateRows = referenceNamePlateRows(rank, ownGate, (gate) => HORSE_NAMES[gate - 1] ?? `スター${gate}`);
+        /**
+         * ★下端ではなく**実況帯の上**に置きます。参考の筐体には実況帯が無く、
+         *   我々の実況字幕（`drawCallBand`・画面下 146px）は独自要素として残すと決めています。
+         */
+        drawHorseNamePlates(ctx, art.pal as Record<string, string>, FONT, plateRows, FIELD, frameRoleOf,
+          { viewport: { width: W, height: H }, bottomY: H - 158, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC });
+
+        // C: 自馬マーカー（雫型のピン・頭上を追従）
+        if (v2OwnHead !== undefined) {
+          drawOwnHorseMarker(ctx, FONT, v2OwnHead, ownGate,
+            { topLimitY: 40, viewport: { width: W, height: H }, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC });
+        }
       }
       if (hud.standings) {
         drawStandings(ctx, art.pal as Record<string, string>, vp, FONT, rank.map((h) => ({
