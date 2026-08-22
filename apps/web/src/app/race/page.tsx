@@ -1613,6 +1613,8 @@ export default function RacePage(): React.JSX.Element {
          *   進んだ距離だけ、進行方向の後ろへ尾を引く。寄りのカットほど px が伸びる（px/m に比例）。
          */
         motionBlur: { exposureSec: MOTION_BLUR_EXPOSURE_SEC, samples: MOTION_BLUR_SAMPLES, speedMpsOf },
+        // ★ハロン棒の数字（設計 1-7）。書体はこの画面のものを使う
+        poleFont: FONT,
         /**
          * ★正面の発馬機ビルボード（走路 s=1.6・w 0.5〜15.3）。
          *   待機中は扉閉を**馬の手前**に、開扉後は扉開を**馬の後ろ**に。発走 60m を過ぎたら描かない。

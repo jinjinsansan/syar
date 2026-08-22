@@ -467,6 +467,45 @@ export function drawPerspectiveWorld(
 export const HORSE_HEIGHT_M = 2.5;
 
 /**
+ * ★**太陽**（設計 1-8・参考映像 1.2 #13）
+ *
+ * 【参考で見えていること】
+ *   参考は**夕方の低い斜光**です（`out/judge/ref-high.png` 85s / 87s に照明塔と長い影、
+ *   67s / 69s の芝には強い逆光の白飛び）。影は**長く、斜めに**伸びています。
+ *   我々は**短い真下の影**でした（設計 1.2 の表 #13）。
+ *
+ * 【★なぜ画面の傾きではなく世界の方向で持つか】
+ *   旧実装は影を**画面座標の傾き**（`skew = 0.28 × 進行方向`）で描いていました。
+ *   進行方向を基準にしているので、★**馬がコーナーを回ると影も一緒に回ります。**
+ *   太陽は 1 つなので、これは物理的にありえません。
+ *   引きのカットで内回りと外回りの馬が**別々の方向に影を落とす**ことになります。
+ *
+ *   → 太陽は**世界の方位と高度**で持ちます。影の長さは `高さ / tan(高度)`、
+ *     向きは世界の方位。コースのどこにいても同じ向きに落ちます。
+ */
+
+/** 太陽の方位（世界座標のラジアン）。**光が来る方向**ではなく、影が伸びる方向 */
+export const SUN_AZIMUTH_RAD = -0.62;
+
+/**
+ * 太陽の高度（ラジアン）。低いほど影が長い。
+ *   18° で影は身長の **3.08 倍**（馬 2.5m → 7.7m）。参考の夕方の斜光に相当します。
+ * ⚠️ 0 に近づけると影が無限に伸びます。下限を持たせること。
+ */
+export const SUN_ELEVATION_RAD = (18 * Math.PI) / 180;
+
+/**
+ * 落ちる影の濃さ。★長さと**対**で決めること — 長くしたぶん薄くしないと、
+ * 芝に太い黒帯が並んでいるように見えます。
+ */
+export const SUN_SHADOW_ALPHA = 0.28;
+
+/** 高さ 1m あたりの影の長さ（m） */
+export function sunShadowLengthPerM(elevationRad = SUN_ELEVATION_RAD): number {
+  return 1 / Math.tan(Math.max(0.05, elevationRad));
+}
+
+/**
  * ★被写体ブラーの標本の間隔（px）。**枚数ではなく間隔**を決めるのが要点です。
  *
  * 【★この値は 2 回測って決めました（2026-08-22）】
@@ -709,11 +748,39 @@ export function drawPerspectiveHorses<TImage>(
       const anchorX = (hiForShadow.bodyAnchorSourcePx.x - src.x) * scale;
       const ahead = P(d.s + 1, d.h.w);
       const dirX = ahead.x >= d.p.x ? 1 : -1;
-      const skew = 0.28 * dirX;   // 前方（画面上の進行方向）へ少し倒す（倒しすぎると蹄と影が離れて浮いて見える）
-      const flat = 0.22;          // 地面への圧縮
+      /**
+       * ★**影は世界の太陽から決めます**（設計 1-8）。
+       *
+       *   高さ `HORSE_HEIGHT_M` の点の影は、地面を `HORSE_HEIGHT_M / tan(高度)` だけ
+       *   太陽の方位へ進んだところに落ちます。その点を**同じカメラで投影**し、
+       *   スプライトの上端がそこへ来るように変形をつくります。
+       *
+       *   ⚠️ ★旧実装は画面座標の傾き（進行方向 × 0.28）でした。**馬がコーナーを回ると
+       *      影も一緒に回り**、同じ画の中で馬ごとに影の向きが違うことになります。
+       *      太陽は 1 つです。
+       *
+       *   変形 (a,b,c,d,e,f) は (x,y) → (a·x + c·y + e, b·x + d·y + f)。
+       *   ローカルは蹄が y=0・上が負なので、上端 y=−hpx が影の先端へ行けばよい:
+       *     c = (足元.x − 先端.x) / hpx,  d = (足元.y − 先端.y) / hpx
+       */
+      const ground = posOf(course, d.s, d.h.w);
+      const reach = HORSE_HEIGHT_M * sunShadowLengthPerM();
+      const tipPoint = project(cam, basis, {
+        x: ground.x + Math.cos(SUN_AZIMUTH_RAD) * reach,
+        y: ground.y + Math.sin(SUN_AZIMUTH_RAD) * reach,
+        z: 0,
+      });
+      /** ★先端がカメラの後ろへ回ったときは、影を落とさない（画面の反対側へ飛ぶ） */
+      const shadowOk = tipPoint.depth > 1 && hpx > 1;
+      const skew = shadowOk ? (tipPoint.x - d.p.x) / hpx : 0.28 * dirX;
+      const flat = shadowOk ? (tipPoint.y - d.p.y) / hpx : 0.22;
       ctx.save!();
-      ctx.globalAlpha = 0.34;
-      // ローカル座標: 蹄の行が y=0、上へ行くほど y<0。x' = X ± x − skew·y, y' = Y − flat·y（反転時は x を鏡像）
+      /**
+       * ★影が**3 倍長くなった**ぶん、濃さを下げます（0.34 → `SUN_SHADOW_ALPHA`）。
+       *   同じ濃さのまま伸ばすと、芝に太い黒帯が並んでいるように見えます。
+       */
+      ctx.globalAlpha = SUN_SHADOW_ALPHA;
+      // ローカル座標: 蹄の行が y=0、上へ行くほど y<0
       ctx.transform!(flip ? -1 : 1, 0, -skew, -flat, d.p.x, d.p.y);
       ctx.drawImage(
         hiForShadow.shadow.image, 0, 0, hiForShadow.shadow.width, hiForShadow.shadow.height,
@@ -733,8 +800,15 @@ export function drawPerspectiveHorses<TImage>(
       /**
        * ★**長く伸びる影**（シルエットが無い環境・シート描画のとき）。
        *    足元の小さな楕円だと、馬が芝に貼った絵に見えます。
+       *    ★向きと長さは上と**同じ太陽**から引きます（2 か所で別の光を持たない）。
        */
-      const tip = P(d.s + 0.25 * HORSE_HEIGHT_M * 2.2, d.h.w - 0.75 * HORSE_HEIGHT_M * 2.2);
+      const shadowGround = posOf(course, d.s, d.h.w);
+      const shadowReach = HORSE_HEIGHT_M * sunShadowLengthPerM();
+      const tip = project(cam, basis, {
+        x: shadowGround.x + Math.cos(SUN_AZIMUTH_RAD) * shadowReach,
+        y: shadowGround.y + Math.sin(SUN_AZIMUTH_RAD) * shadowReach,
+        z: 0,
+      });
       if (tip.depth > 2) {
         ctx.globalAlpha = 0.34;
         ctx.fillStyle = '#0d1408';

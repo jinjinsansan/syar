@@ -256,6 +256,8 @@ for (const [index, displaySec] of displaySecs.entries()) {
     phaseOf: (g) => (((horses.find((h) => h.gate === g)?.s ?? 0) / BROADCAST_STRIDE_M) + g * 0.37) % 1,
     // ★被写体ブラー: 画面と同じ定数・同じ速度の作り方
     motionBlur: { exposureSec: MOTION_BLUR_EXPOSURE_SEC, samples: MOTION_BLUR_SAMPLES, speedMpsOf },
+    // ★ハロン棒の数字（設計 1-7）。画面と同じく書体を渡す
+    poleFont: (px, bold) => `${bold ? 'bold ' : ''}${px}px JPUI, system-ui, sans-serif`,
     frameRoleOf, surface: 'turf', condition: 'good', kickupColor: '#738b43',
     // ★Web 画面と同じ分岐（page.tsx: shot.view === 'side' ? undefined : texturedWorld）
     texturedWorld: scene.shot.view === 'side' ? undefined : texturedWorld,

@@ -1,6 +1,7 @@
 import { posOf, type Course } from './course.js';
-import type { Ctx2D, Palette, SheetSpec } from './oblique-draw.js';
+import type { Ctx2D, FontOf, Palette, SheetSpec } from './oblique-draw.js';
 import { cameraBasis, project } from './perspective.js';
+import { drawDistancePoles } from './distance-poles.js';
 import { drawMowStripes } from './mow-stripes.js';
 import { drawParallaxObjects, drawParallaxPlate, drawWorldBillboards, type ParallaxDrawOptions, type ParallaxPlate, type WorldBillboard } from './parallax-plate.js';
 import { drawTexturedWorld, type TexturedWorldAssets } from './world-textured.js';
@@ -275,6 +276,13 @@ export function drawBroadcastV2Scene<TImage>(
     /** ★芝の縞刈り（設計 1-3）。既定で描く。`false` で止める（素材の比較用） */
     readonly mowStripes?: boolean | undefined;
     /**
+     * ★ハロン棒・距離標（設計 1-7）の数字を描く書体。
+     *   省略すると**棒だけ**になります（数字なしでも「世界に固定された物が流れる」効果は出る）。
+     */
+    readonly poleFont?: FontOf | undefined;
+    /** ★ハロン棒を止める（素材の比較用） */
+    readonly distancePoles?: boolean | undefined;
+    /**
      * ★被写体ブラー（参考映像 1.4）。`drawPerspectiveHorses` へそのまま渡す。
      *   速度は呼び出し側が**表示時刻の関数**として渡す（決定論・憲法 4）。
      */
@@ -361,6 +369,10 @@ export function drawBroadcastV2Scene<TImage>(
     drawMowStripes(ctx, course, projectGround,
       { width: scene.camera.width, height: scene.camera.height }, { focusS: scene.focusS });
   }
+  if (opts.distancePoles !== false) {
+    // ★奥の棒は馬より先に。手前の棒は馬のあと（下の `front`）
+    drawDistancePoles(ctx, course, scene.camera, { focusS: scene.focusS, pass: 'behind', font: opts.poleFont });
+  }
   if (opts.worldBillboards !== undefined) drawWorldBillboards(ctx, opts.worldBillboards, projectGround, 'behind', scene.camera.width);
   const library = opts.libraries[scene.shot.horseAsset];
   /**
@@ -418,6 +430,10 @@ export function drawBroadcastV2Scene<TImage>(
   });
   // ★手前側のラチ（馬の脚が突き抜けないように、馬のあとで描く）
   nearRail?.();
+  if (opts.distancePoles !== false) {
+    // ★手前の棒（馬より camera 側）は馬のあと。先に描くと馬が棒に乗って見える
+    drawDistancePoles(ctx, course, scene.camera, { focusS: scene.focusS, pass: 'front', font: opts.poleFont });
+  }
   // ★馬の手前に立つ物体（発馬機の前枠など）
   if (opts.parallaxPlate !== undefined && parallaxOpts !== undefined) {
     drawParallaxObjects(ctx, opts.parallaxPlate.plate, parallaxOpts, 'front');
