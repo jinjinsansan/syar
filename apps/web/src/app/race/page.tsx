@@ -151,7 +151,37 @@ const HORSE_GROUND_LIFTS = [55, 90, 25, 0, 0, 0, 0, 55] as const;
 const CORNER_CUT_M_WEB = 400;
 /** ★ゴール後の勝馬追従: 走り抜けを 0.6 倍のスローで見せ、6.5 秒（アーケード参考映像 114〜123s は約 9 秒） */
 const RUNOUT_SLOW = 0.6;
-const WINNER_FOLLOW_SEC = 6.5;
+/**
+ * ★勝馬を映す長さ（秒）。6.5 → 4.2（2026-08-22・オーナー評「騎手が喜ぶ時間が長い」）。
+ */
+const WINNER_FOLLOW_SEC = 4.2;
+
+/**
+ * ★**勝馬がゴールしてから、勝利の見せ方に切り替えるまでの間**（レース秒）
+ *
+ *   ⚠️ ★これが無いと、**体の中心が決勝線を通った瞬間**に切り替わります。
+ *      鼻先はまだ線の上なので、オーナー評「**ゴールする前に騎手が喜んでいる**」になります。
+ *      実測（39.2s → 39.5s）で、切替時点では決勝線がまだ馬の後肢の位置でした。
+ *   実際の競馬でも、抜けてから一拍おいて手綱を緩めます。
+ */
+const WINNER_CELEBRATE_DELAY_SEC = 0.8;
+
+/**
+ * ★**勝馬の見せ方**（2026-08-22・オーナー判定）
+ *
+ *   オーナー評「**騎手の喜び方は身体をかくかくするのが治らないので、
+ *   もっと別の喜び方にかえるべき**」。
+ *
+ *   ガッツポーズ素材は 2 姿勢 → 1 姿勢に固定してもガクつきが残りました。
+ *   ★原因は姿勢の切替ではなく、**騎手が硬直したまま馬体だけが上下する**ことにあります。
+ *     腕を上げた姿勢は上下動を吸収しないので、馬の上下がそのまま騎手に出ます。
+ *     ⚠️ これは**素材を差し替えないと直りません**（合成側では吸収できない）。
+ *
+ *   → 当面は **`'run'`（走行のまま）** にし、勝利は**カメラの寄りと勝利テロップ**で見せます。
+ *     走行の絵はオーナーが 8/21 に合格を出したものなので、ガクつきません。
+ *   ⚠️ 素材（腕を上げない鐙立ち等）が来たら `'celebrate'` に戻せます。機構は残してあります。
+ */
+const WINNER_POSE: 'run' | 'celebrate' = 'run';
 /** ★その後の着順ボード（参考映像 124〜134s）: 6 秒 */
 const RESULTS_BOARD_SEC = 6;
 const POST_RACE_SEC = WINNER_FOLLOW_SEC + RESULTS_BOARD_SEC;
@@ -183,7 +213,27 @@ function flightLiftFor(index: number, count: number): number {
   }
   return 0;
 }
-const SILKS_COLORS = ['#ececec', '#20242a', '#d52d35', '#2359c4', '#efd329', '#199655', '#ef7d20', '#e75c9a', '#713aa8', '#22a9b5', '#9b5b2e', '#d74d79'] as const;
+/**
+ * ★**勝負服の色は「枠」から引きます**（2026-08-22・オーナー指摘で是正）
+ *
+ * 【何が起きていたか】
+ *   ここには**馬番ごとに 12 色**を並べていました。ところが HUD（順位表・隊列バー・名札）は
+ *   `frameRoleOf` → `palette.json` の **8 枠色**を使います。
+ *   ★12 頭立ての枠は `1,2,3,4 / 5,6 / 7,8 / 9,10 / 11,12` なので、
+ *     ★**5 番以降が全部ずれます**（6 番は画面では緑、HUD では黄）。
+ *   オーナー評「**上の順位で動く数字の図柄と実際の馬が合っていない**」はこれです。
+ *
+ * 【どちらに寄せたか】
+ *   正典が決めています（D-060 ／ `packages/render/src/bracket.ts`）:
+ *     ★**色は枠、数字は個体。** 実際の競馬も 8 枠の色を複数頭で共有し、馬番で区別します。
+ *   → **馬の側を枠色に合わせます。** HUD は正しかったので触りません。
+ *   ⚠️ 同じ枠の 2 頭は同じ色になりますが、**鞍布の馬番**で区別できます（それが枠色の作法）。
+ *
+ * ⚠️ ★16 進をここに持ちません。`palette.json` から役割名で引きます（アートバイブル §6）。
+ *    ここに 12 色を直書きしていたことが、そもそも食い違いの原因でした。
+ */
+const silksColorsFor = (pal: Record<string, string>, fieldSize: number): readonly string[] =>
+  Array.from({ length: fieldSize }, (_, index) => pal[frameRoleOf(index + 1, fieldSize)] ?? '#ffffff');
 /**
  * ★表示用のレース情報（憲法 §0.1: 実在の競馬場名・レース名は使わない）。
  *   以前は実在名のプレースホルダーが直書きされていたので架空名に置換した。
@@ -1035,6 +1085,8 @@ export default function RacePage(): React.JSX.Element {
           ? Object.fromEntries(ok) as Record<typeof casts[number], NarratorSet<HTMLImageElement>>
           : undefined;
       })();
+      /** ★枠色（`palette.json` が唯一の出どころ）。HUD と同じ引き方をする */
+      const silksByGate = silksColorsFor(pal as Record<string, string>, FIELD);
       const buildFrames = (
         images: readonly FrameImage[],
         referenceHeightOverride?: number,
@@ -1043,7 +1095,7 @@ export default function RacePage(): React.JSX.Element {
       ): readonly (readonly HighQualityHorseFrame[])[] => {
         const measured = images.map((image) => ({ image, source: opaqueBounds(image) }));
         const referenceHeight = referenceHeightOverride ?? Math.max(...measured.map((frame) => frame.source.height));
-        const overlays = images.map((image, index) => silksOverlays(image, measured[index]!.source, SILKS_COLORS, silksLayout));
+        const overlays = images.map((image, index) => silksOverlays(image, measured[index]!.source, silksByGate, silksLayout));
         /**
          * ★配置と縮尺の基準は鞍布（剛体）。
          *   - 基準点 = 鞍布中心（無ければ胴体重心）
@@ -1073,7 +1125,7 @@ export default function RacePage(): React.JSX.Element {
           bakedByCoat.set(coat, made);
           return made;
         };
-        return SILKS_COLORS.map((_, gateIndex) => {
+        return silksByGate.map((_, gateIndex) => {
           const baked = bakedFor(coatOf(gateIndex + 1));
           return measured.map((frame, frameIndex) => ({
           ...frame,
@@ -1534,10 +1586,17 @@ export default function RacePage(): React.JSX.Element {
          * ★勝馬追従: 1 枚絵 `winner-v1` は脚が動かず「絵だけになって背景が動く」（ユーザー指摘⑥）。
          *   勝馬の 8 コマ（騎手が立ってガッツポーズ）が承認されるまでは走行 8 コマで脚を動かす。
          */
-        'winner-v1': library(
-          scene.shot.id === 'winner-follow-rear' && art.winnerRearHighQuality !== undefined
-            ? art.winnerRearHighQuality
-            : art.winnerCycleHighQuality ?? art.sideHighQuality),
+        /**
+         * ★勝馬の絵。**ゴールしてすぐには切り替えません**（`WINNER_CELEBRATE_DELAY_SEC`）。
+         *   `WINNER_POSE` が `'run'` の間はずっと走行の絵のままです（上の注記）。
+         */
+        'winner-v1': library((() => {
+          if (scene.shot.id === 'winner-follow-rear' && art.winnerRearHighQuality !== undefined) {
+            return art.winnerRearHighQuality;
+          }
+          const celebrating = WINNER_POSE === 'celebrate' && winnerAfterSec >= WINNER_CELEBRATE_DELAY_SEC;
+          return (celebrating ? art.winnerCycleHighQuality : undefined) ?? art.sideHighQuality;
+        })()),
       };
       const plate = scene.shot.id === 'finish-line' || scene.shot.id === 'winner-follow' ? art.raceFinish
         : scene.shot.id === 'homestretch-side' ? art.raceCornerExit
@@ -1835,7 +1894,8 @@ export default function RacePage(): React.JSX.Element {
     if (v2Minimap !== undefined && !winnerFinishedNow) {
       drawCourseMinimap(ctx, ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn }), art.pal as Record<string, string>, FONT,
         v2Minimap.horses, v2Minimap.focusS, { x: 40, y: 321, width: 264, height: 209 },
-        (gate) => SILKS_COLORS[(gate - 1) % SILKS_COLORS.length] ?? '#fff', {
+        // ★コース図も HUD・馬体と同じ枠色から引く（3 か所で持たない）
+        (gate) => (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff', {
           distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${DIST}m`,
           metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
           timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,

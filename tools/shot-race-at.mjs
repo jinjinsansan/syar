@@ -153,6 +153,8 @@ if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((e) 
 const knots = knotsFor(boundaries, 1);
 const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
 const finishSec = new Map(boundaries.map((b) => [b.gate, b.finishSec]));
+/** ★勝馬（画面と同じく「勝馬がゴールしたら」勝馬カットへ切り替える） */
+const WINNER_GATE = Number(result.order[0].horseId);
 
 /* ── 素材（★Web 画面と同じものを読むこと） ─────────────── */
 async function alphaBounds(file) {
@@ -300,7 +302,12 @@ for (const [index, displaySec] of displaySecs.entries()) {
   const raceD = Math.max(0, displaySec - INTRO_SEC);
   const sec = warp.raceSecAt(raceD);
   const at = model.at(sec);
-  const allFinished = at.every((h) => h.meters >= DIST - 1e-6);
+  /**
+   * ★勝馬カットへ切り替える条件は**画面と同じ**にすること。
+   *   ⚠️ ここは「全馬がゴール」で判定していましたが、画面（`page.tsx`）は
+   *      「**勝馬が**ゴール」です。**切り替わる時刻が違う画**を出していました（R-30）。
+   */
+  const allFinished = (at.find((h) => h.gate === WINNER_GATE)?.meters ?? 0) >= DIST - 1e-6;
   const visual = withFinishRunOut(at, (g) => finishSec.get(g), sec, DIST, 0);
   const horses = visual.map((h) => ({ gate: h.gate, s: h.meters, w: h.w, staminaRatio: h.staminaRatio ?? 1 }));
   const lead = Math.max(...horses.map((h) => h.s));

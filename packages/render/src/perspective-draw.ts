@@ -151,6 +151,57 @@ export function chaseCamera(
  * ショット定義を実際のカメラ方位へ変換する。
  * `atS`は注視対象のコース位置であり、馬の位置や着順は変更しない。
  */
+/**
+ * ★カメラを**どちらへ向けるか**を、なめらかに決める（設計 §3 の案 B・2026-08-22）
+ *
+ * 【何が起きていたか】
+ *   ⚠️ ★コース模型は**直線と円弧をそのまま繋いで**います。曲率は継ぎ目で
+ *      ★**0 → 0.300°/m へ一瞬で切り替わります**（`tools/_curvature.mjs` で実測。600m と 1200m）。
+ *      16m/s なら **0 → 4.8°/秒**の跳びで、★オーナー評
+ *      「**コーナーから直線に入る時の曲り方が違和感、かくっと曲がっている**」。
+ *
+ *   以前は「20m 先との弦」1 本で向きを決めていました。弦の向きは**連続**ですが
+ *   **変化の速さが継ぎ目で跳ぶ**ので、カメラの回り方がカクつきます。
+ *
+ * 【ここで直せること・直せないこと】
+ *   ⚠️ ★**幾何そのものは直していません。** 走路の形を変えると `laneExtraM` が変わり、
+ *      ★**着順が変わります**（憲法 3）。それは未裁定です（`QUESTIONS_P4_WAVE2` Q-3）。
+ *   → 変えてよいのは**カメラの向け方**だけ。ここを C1 連続にします。
+ *
+ * 【なぜ窓を掛けると滑らかになるか】
+ *   向き h(s) は連続だが微分が跳ぶ（C0）。**微分が両端で 0 になる窓**（ハン窓）で
+ *   畳み込むと、結果は C1 になります。標本が窓に出入りするとき重みが 0 から始まるので、
+ *   ★**継ぎ目を跨いでも回り方が跳びません。**
+ *   ⚠️ 単純な平均（矩形窓）では駄目です。端で重みが 1 のまま切れるので跳びが残ります。
+ */
+export const CAMERA_HEADING_SMOOTH_M = 36;
+
+function smoothForward(course: Course, atS: number, atW: number): { readonly x: number; readonly y: number } {
+  const N = 9;
+  const step = 4;
+  let sx = 0, sy = 0;
+  for (let i = 0; i < N; i += 1) {
+    const u = i / (N - 1);
+    const offset = -CAMERA_HEADING_SMOOTH_M + 2 * CAMERA_HEADING_SMOOTH_M * u;
+    const weight = 0.5 - 0.5 * Math.cos(2 * Math.PI * u);   // ハン窓（両端で値も傾きも 0）
+    if (weight <= 0) continue;
+    const p0 = posOf(course, atS + offset, atW);
+    const p1 = posOf(course, atS + offset + step, atW);
+    const dx = p1.x - p0.x, dy = p1.y - p0.y;
+    const len = Math.hypot(dx, dy) || 1;
+    sx += (dx / len) * weight;
+    sy += (dy / len) * weight;
+  }
+  const len = Math.hypot(sx, sy);
+  if (!(len > 1e-9)) {
+    // ★窓が潰れたときの保険（従来どおり 20m の弦）
+    const a = posOf(course, atS, atW), b = posOf(course, atS + 20, atW);
+    const d = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    return { x: (b.x - a.x) / d, y: (b.y - a.y) / d };
+  }
+  return { x: sx / len, y: sy / len };
+}
+
 export function broadcastCamera(
   course: Course,
   opts: {
@@ -165,10 +216,9 @@ export function broadcastCamera(
 ): PerspectiveCamera {
   const atW = opts.atW ?? course.widthM / 2;
   const c = posOf(course, opts.atS, atW);
-  const a = posOf(course, opts.atS + 20, atW);
-  const dl = Math.hypot(a.x - c.x, a.y - c.y) || 1;
-  const fx = (a.x - c.x) / dl;
-  const fy = (a.y - c.y) / dl;
+  const forward = smoothForward(course, opts.atS, atW);
+  const fx = forward.x;
+  const fy = forward.y;
   const nx = -fy;
   const ny = fx;
   const inner = posOf(course, opts.atS, 0);

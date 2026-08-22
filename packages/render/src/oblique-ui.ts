@@ -307,8 +307,17 @@ export function drawCallBand<TImage>(
   const bandY = H - 146 + oy;
   fillSlant(ctx, -40, bandY, W + 91, 146, HUD.glass);
   drawGoldEdge(ctx, 0, bandY, W, t);
-  // スピードライン（1px・横流し 1.5s / 2.1s）— 任意
-  for (const [ly, dur, delay, a] of [[30, 1.5, 0, 0.09], [104, 2.1, 0.4, 0.07]] as const) {
+  /**
+   * スピードライン（1px・横流し 1.5s / 2.1s）
+   *
+   * ⚠️ ★以前は帯の上から **30px と 104px** に引いていました。帯は 574〜720 なので
+   *    実座標で **604 と 678** になり、★**604 は「ON AIR」の行（594〜616）、
+   *    678 は現在の発言（660〜690）を横切って**いました。
+   *    オーナー評「**実況中継の文字の裏に線がある**」はこれです。
+   *   → 文字の無い帯（上端の直下 と 下端）へ逃がします。
+   *      空いているのは 578〜590 と 700〜718 の 2 本だけです。
+   */
+  for (const [ly, dur, delay, a] of [[8, 1.5, 0, 0.09], [138, 2.1, 0.4, 0.07]] as const) {
     const ph = (((t - delay) / dur) % 1 + 1) % 1;
     const alpha = ph < 0.3 ? (ph / 0.3) * 0.7 : ((1 - ph) / 0.7) * 0.7;
     ctx.globalAlpha = baseAlpha * rise.alpha * Math.min(1, a * Math.max(0, alpha) * 4);
