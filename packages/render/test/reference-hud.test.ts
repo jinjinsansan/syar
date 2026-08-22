@@ -149,7 +149,34 @@ describe('参考映像の HUD 3 点', () => {
       expect(rows.every((r) => r.isOwn !== true)).toBe(true);
     });
 
-    it('名前は縁取りしてから塗る（明るい芝の上でも読める）', () => {
+    /**
+   * ★**置き場所は呼び出し側が決める。**
+   *
+   *   ⚠️ ★画面いっぱいに 3 等分したら、左端の枠が**実況の立ち絵の裏**に潜りました
+   *      （オーナー評「下のナレーターのあたりが崩れている」）。
+   *      この描画関数が画面の都合（コース図・立ち絵・実況帯の位置）を知る道理は無いので、
+   *      **空いている範囲を受け取れること**を留めます。
+   */
+    it('★横の範囲を指定でき、その中に収まる', () => {
+      const { ctx, ops } = recorder();
+      const rows = referenceNamePlateRows(ranked, 4, (g) => `馬${g}`);
+      drawHorseNamePlates(ctx as never, PAL, FONT, rows, 12, frameRoleOf,
+        { viewport: VIEWPORT, sinceSec: 9, x0: 330, x1: 1256 });
+      const xs = ops.filter((o) => o.op === 'fillRect').map((o) => o.args[0] as number);
+      expect(xs.length).toBeGreaterThan(0);
+      for (const x of xs) {
+        expect(x).toBeGreaterThanOrEqual(330);
+        expect(x).toBeLessThan(1256);
+      }
+      // ★対照: 範囲を渡さなければ画面左端から始まる（＝立ち絵に潜っていた状態）
+      const wide = recorder();
+      drawHorseNamePlates(wide.ctx as never, PAL, FONT, rows, 12, frameRoleOf,
+        { viewport: VIEWPORT, sinceSec: 9 });
+      const wideXs = wide.ops.filter((o) => o.op === 'fillRect').map((o) => o.args[0] as number);
+      expect(Math.min(...wideXs)).toBeLessThan(330);
+    });
+
+  it('名前は縁取りしてから塗る（明るい芝の上でも読める）', () => {
       const { ctx, ops } = recorder();
       drawHorseNamePlates(ctx as never, PAL, FONT, referenceNamePlateRows(ranked, 4, (g) => `馬${g}`),
         12, frameRoleOf, { viewport: VIEWPORT, sinceSec: 9 });

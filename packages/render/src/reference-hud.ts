@@ -137,6 +137,16 @@ export function drawHorseNamePlates(
   opts: ReferenceHudTiming & {
     readonly viewport: { readonly width: number; readonly height: number };
     readonly bottomY?: number | undefined;
+    /**
+     * ★枠を並べる**横の範囲**（省略すると画面いっぱい）。
+     *
+     * ⚠️ ★画面いっぱいにしたら、左端の枠が**実況のナレーター立ち絵の裏**に潜り、
+     *    ★オーナー評「**下のナレーターのあたりが崩れている**」になりました。
+     *    この画面にはコース図（左・y321〜530）と立ち絵（左下）が既にあります。
+     *    **空いている範囲を呼び出し側が渡す**こと。ここで画面の都合を決め打ちしません。
+     */
+    readonly x0?: number | undefined;
+    readonly x1?: number | undefined;
   },
 ): void {
   if (rows.length === 0) return;
@@ -144,11 +154,13 @@ export function drawHorseNamePlates(
   const baseAlpha = ctx.globalAlpha;
   const bottom = opts.bottomY ?? opts.viewport.height - 26;
   /** ★左・中・右の固定枠。順位が変わっても枠は動かない（参考の「席」に相当） */
-  const slotW = opts.viewport.width / 3;
+  const left = opts.x0 ?? 0;
+  const right = opts.x1 ?? opts.viewport.width;
+  const slotW = (right - left) / 3;
   shown.forEach((row, i) => {
     const rise = riseAt(opts.sinceSec ?? 1, i * 0.07);
     ctx.globalAlpha = baseAlpha * rise.alpha;
-    const x = slotW * i + 34;
+    const x = left + slotW * i;
     const y = bottom + rise.dy;
     const role = frameRoleOf(row.gate, fieldSize);
     // 枠色の四角＋馬番

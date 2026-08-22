@@ -27,7 +27,7 @@ import {
   DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt,
 } from '@star/race-engine';
 import {
-  BROADCAST_STRIDE_M, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES, HORSE_HEIGHT_M,
+  BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES, HORSE_HEIGHT_M,
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
   paintCrowd, seatMaskFromPixels, seatBandFromPixels,
   cameraBasis, drawBroadcastV2Scene, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
@@ -115,7 +115,7 @@ const forcedShot = argv.includes('--shot') ? argv[argv.indexOf('--shot') + 1] : 
  */
 const forcedFov = argv.includes('--fov') ? Number(argv[argv.indexOf('--fov') + 1]) : undefined;
 /** ★`--noblur` で被写体ブラーだけを止める（効いているのかを切り分けるため） */
-const noBlur = argv.includes('--noblur');
+const noBlur = argv.includes('--noblur') || (!MOTION_BLUR_ENABLED && !argv.includes('--exposure'));
 /**
  * ★`--exposure <分母>` で露光を変える（例 `--exposure 200` で 1/200 秒）。
  *   ブラーの量は**演出の好み**なので、同じコマを何段階かで並べて選べるようにする。
@@ -384,8 +384,11 @@ for (const [index, displaySec] of displaySecs.entries()) {
   drawFormationBar(ctx, palette, FONT, horses.map((h) => ({ gate: h.gate, s: h.s })), FIELD, frameRoleOf,
     { x: 40, y: 4, width: W - 80, ownGate: OWN_GATE, timeSec: displaySec, sinceSec: 9 });
   const plateRows = referenceNamePlateRows(ranked, OWN_GATE, (gate) => NAMES[gate - 1]);
-  drawHorseNamePlates(ctx, palette, FONT, plateRows, FIELD, frameRoleOf,
-    { viewport: { width: W, height: H }, bottomY: H - 158, timeSec: displaySec, sinceSec: 9 });
+  // ★置き場所は画面（`page.tsx`）と同じ値にすること。違えるとここだけ別の配置になる（R-30）
+  drawHorseNamePlates(ctx, palette, FONT, plateRows, FIELD, frameRoleOf, {
+    viewport: { width: W, height: H }, x0: 330, x1: W - 24, bottomY: H - 176,
+    timeSec: displaySec, sinceSec: 9,
+  });
   {
     const own = horses.find((h) => h.gate === OWN_GATE);
     if (own !== undefined) {

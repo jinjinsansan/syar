@@ -46,7 +46,7 @@ import {
   drawRaceTitleCard, drawStartingGate, drawStartCallBand,
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
   broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
-  BROADCAST_STRIDE_M, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
+  BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
   paintCrowd, seatMaskFromPixels, seatBandFromPixels,
@@ -1460,6 +1460,13 @@ export default function RacePage(): React.JSX.Element {
      *      別に計算すると、寄ったカットでピンが馬から離れます。
      */
     let v2OwnHead: { x: number; y: number } | undefined;
+    /**
+     * ★このカットで馬が画面高の何割を占めるか。
+     *   順位表を**寄りのカットでだけ薄くする**のに使います（オーナー指摘「馬が大きくなったので
+     *   順位表が邪魔」）。★カット名で分岐しません — 画角を変えたら意味が変わるので、
+     *   **実際の大きさ**から決めます。
+     */
+    let v2HorseRatio = 0;
     if (renderer === 'v2') {
       const course = ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn });
       /** ★発走イージング（描画のみ・全馬同じ係数）。順位・着差・HUD には触れない */
@@ -1491,6 +1498,12 @@ export default function RacePage(): React.JSX.Element {
         focusS: scene.focusS,
         horses: easedAt.map((horse) => ({ gate: horse.gate, s: horse.meters, w: horse.w ?? TRACK_WIDTH_M / 2, own: horse.gate === ownGate })),
       };
+      {
+        const basis = cameraBasis(scene.camera);
+        const focusGround = posOf(course, Math.max(0, scene.focusS), scene.focusW);
+        const focusPoint = project(scene.camera, basis, { x: focusGround.x, y: focusGround.y, z: 0 });
+        if (focusPoint.depth > 2) v2HorseRatio = (HORSE_HEIGHT_M * focusPoint.pxPerM) / H;
+      }
       {
         // ★自馬の頭（設計 1-6）。馬と**同じ `scene.camera`** で投影する
         const ownVisual = easedAt.find((horse) => horse.gate === ownGate);
@@ -1649,7 +1662,10 @@ export default function RacePage(): React.JSX.Element {
          * ★被写体ブラー（参考映像 1.4・設計 1-2）。露光 `MOTION_BLUR_EXPOSURE_SEC` の間に
          *   進んだ距離だけ、進行方向の後ろへ尾を引く。寄りのカットほど px が伸びる（px/m に比例）。
          */
-        motionBlur: { exposureSec: MOTION_BLUR_EXPOSURE_SEC, samples: MOTION_BLUR_SAMPLES, speedMpsOf },
+        // ★既定は切ってあります（理由は `MOTION_BLUR_ENABLED` の注記）
+        motionBlur: MOTION_BLUR_ENABLED
+          ? { exposureSec: MOTION_BLUR_EXPOSURE_SEC, samples: MOTION_BLUR_SAMPLES, speedMpsOf }
+          : undefined,
         // ★ハロン棒の数字（設計 1-7）。書体はこの画面のものを使う
         poleFont: FONT,
         /**
@@ -1886,11 +1902,21 @@ export default function RacePage(): React.JSX.Element {
         // B: 馬名プレート（下部・固定枠）。自馬 ＋ 先頭 ＋ 2 番手
         const plateRows = referenceNamePlateRows(rank, ownGate, (gate) => HORSE_NAMES[gate - 1] ?? `スター${gate}`);
         /**
-         * ★下端ではなく**実況帯の上**に置きます。参考の筐体には実況帯が無く、
-         *   我々の実況字幕（`drawCallBand`・画面下 146px）は独自要素として残すと決めています。
+         * ★置き場所は**空いているところ**を明示的に渡します。
+         *
+         *   この画面の下半分は既に埋まっています:
+         *     コース図      x 40〜304 / y 321〜530
+         *     実況帯        y 574〜720（`drawCallBand`）
+         *     ナレーター立ち絵  左下（実況帯の上にせり出す）
+         *   ⚠️ ★最初は画面いっぱいに 3 等分したので、左端の枠が**立ち絵の裏**に潜りました
+         *      （オーナー評「下のナレーターのあたりが崩れている」）。
+         *   → **コース図の右**から画面右端までを 3 等分し、実況帯の**上**に置きます。
          */
-        drawHorseNamePlates(ctx, art.pal as Record<string, string>, FONT, plateRows, FIELD, frameRoleOf,
-          { viewport: { width: W, height: H }, bottomY: H - 158, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC });
+        drawHorseNamePlates(ctx, art.pal as Record<string, string>, FONT, plateRows, FIELD, frameRoleOf, {
+          viewport: { width: W, height: H },
+          x0: 330, x1: W - 24, bottomY: H - 176,
+          timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
+        });
 
         // C: 自馬マーカー（雫型のピン・頭上を追従）
         if (v2OwnHead !== undefined) {
@@ -1899,6 +1925,21 @@ export default function RacePage(): React.JSX.Element {
         }
       }
       if (hud.standings) {
+        /**
+         * ★**寄ったカットでは順位表を薄くします**（オーナー指摘 2026-08-22）。
+         *
+         *   馬を参考と同じ大きさ（〜55%）にした結果、右上の順位表が**馬に被る**ようになりました。
+         *   ⚠️ ★消してしまうと「今何番手か」が分からなくなるので、**薄くして残します**。
+         *   ⚠️ ★段で切り替えると、カットの変わり目で**パッと明滅**します。なめらかに繋ぎます。
+         *
+         *   実測の画面比: 発走 24% ／ 4角正面 24% ／ ゴール 26% ／ 先頭争い 34%
+         *                 ／ 勝負所 41% ／ 直線の寄り 53%
+         *   → 28% までは通常、45% で最も薄く。
+         */
+        const closeUp = Math.max(0, Math.min(1, (v2HorseRatio - 0.28) / (0.45 - 0.28)));
+        const ease = closeUp * closeUp * (3 - 2 * closeUp);
+        const prevAlpha = ctx.globalAlpha;
+        ctx.globalAlpha = prevAlpha * (1 - 0.6 * ease);
         drawStandings(ctx, art.pal as Record<string, string>, vp, FONT, rank.map((h) => ({
           gate: h.gate,
           name: HORSE_NAMES[h.gate - 1] ?? `スター${h.gate}`,
@@ -1910,6 +1951,7 @@ export default function RacePage(): React.JSX.Element {
           rightLabel: v2SectionLabel ?? sectionLabel[courseSection],
           timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
         });
+        ctx.globalAlpha = prevAlpha;
       }
 
       /**
