@@ -82,7 +82,18 @@ const course = ovalCourse(DIST, { widthM: 20, turn: 'left' });
 const argv = process.argv.slice(2);
 const flag = (name, dflt) => { const i = argv.indexOf(name); return i >= 0 ? Number(argv[i + 1]) : dflt; };
 const INTRO_SEC = 7.8;  // race-intro.ts の RACE_INTRO_RACE_START_SEC
-let displaySecs = argv.filter((a) => /^[0-9.]+$/.test(a)).map(Number);
+/**
+ * ⚠️ ★`--shot` / `--fov` の**値**を秒数と取り違えないこと。
+ *    取り違えると、指定していない時刻の絵が黙って 1 枚増えます（実際に増えました）。
+ */
+const optionValueIndexes = new Set();
+for (const name of ['--shot', '--fov', '--from', '--to', '--step']) {
+  const i = argv.indexOf(name);
+  if (i >= 0) optionValueIndexes.add(i + 1);
+}
+let displaySecs = argv
+  .filter((a, i) => /^[0-9.]+$/.test(a) && !optionValueIndexes.has(i))
+  .map(Number);
 if (argv.includes('--from')) {
   const from = flag('--from', 9), to = flag('--to', 30), step = flag('--step', 3);
   displaySecs = [];
@@ -95,6 +106,14 @@ if (displaySecs.length === 0) displaySecs = [9, 12, 15, 18, 21, 24];
  *   落としてあるので、世界を埋めたあとに再判定するにはこれが要ります（設計 3-1）。
  */
 const forcedShot = argv.includes('--shot') ? argv[argv.indexOf('--shot') + 1] : undefined;
+/**
+ * ★`--fov <度>` で**画角だけ**を差し替える（カメラの位置は動かさない）。
+ *
+ *   「引きの画にするか、寄りのままか」は演出の裁定事項で、勝手に決めないと
+ *   `broadcast-v2.ts` に明記してあります。★裁定するには**同じ場面を両方の画角で**
+ *   並べる必要があるので、その材料を作るための口です。
+ */
+const forcedFov = argv.includes('--fov') ? Number(argv[argv.indexOf('--fov') + 1]) : undefined;
 
 /* ── ★本番と同じ経路（shot-cuts.mjs と同一） ─────────────── */
 const STRATS = ['nige', 'senko', 'sashi', 'oikomi'];
@@ -266,7 +285,8 @@ const gateOpen = { image: await loadImage(gateOpenFile), source: await alphaBoun
 
 mkdirSync(OUT, { recursive: true });
 const files = [];
-console.log('  表示秒   先頭m   ショット      横広がり   馬の高さ  画面比  画面内');
+console.log('  表示秒   先頭m   ショット      横広がり   馬の高さ  画面比  画面内   芝の緑');
+console.log('  ★芝の緑: 参考 平均 約20% / 実装前の我々 約60%（報告①と同じ判定式）');
 console.log('  ★合格の finish-line は 181px / 25.2%');
 for (const [index, displaySec] of displaySecs.entries()) {
   const raceD = Math.max(0, displaySec - INTRO_SEC);
@@ -279,11 +299,14 @@ for (const [index, displaySec] of displaySecs.entries()) {
   const spread = Math.max(...horses.map((h) => h.w)) - Math.min(...horses.map((h) => h.w));
   // ⚠️ 第4引数は `allFinished`（真偽値）。ここに object を渡すと**常に真**になり、
   //    全時刻が `winner-follow` になります（2026-08-21 に踏んだ）。
-  const scene = resolveBroadcastV2Scene(
+  let scene = resolveBroadcastV2Scene(
     course, horses, { width: W, height: H }, allFinished,
     forcedShot === undefined ? { raceDisplaySec: raceD } : { raceDisplaySec: raceD, forceShotId: forcedShot },
   );
 
+  if (forcedFov !== undefined && Number.isFinite(forcedFov)) {
+    scene = { ...scene, camera: { ...scene.camera, fovY: (forcedFov * Math.PI) / 180 } };
+  }
   const plate = scene.shot.id === 'finish-line' || scene.shot.id === 'winner-follow' ? plates.finish
     : scene.shot.id === 'homestretch-side' ? plates.homestretch
       : scene.shot.id === 'third-corner-rear' ? plates.cornerRear
@@ -367,6 +390,24 @@ for (const [index, displaySec] of displaySecs.entries()) {
       }
     }
   }
+  /**
+   * ★**画面に占める芝の緑の割合**（報告①の指標）
+   *
+   *   `REPORT_P4_REFERENCE4_20260822.md` の実測: 参考 平均 **約 20%** ／ 我々 **約 60%**（3 倍）。
+   *   ★判定式は報告と**同じ**にすること: `g > r*1.05 && g > b*1.05 && g > 40`、上下 10% を除く。
+   *   ⚠️ ここで式を変えると、報告の数字と比べられなくなります（R-30）。
+   */
+  const greenPct = (() => {
+    const y0 = Math.floor(H * 0.1), y1 = Math.floor(H * 0.9);
+    const px = ctx.getImageData(0, y0, W, y1 - y0).data;
+    let green = 0, total = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      if (g > r * 1.05 && g > b * 1.05 && g > 40) green += 1;
+      total += 1;
+    }
+    return total === 0 ? 0 : (100 * green) / total;
+  })();
   const m = measureShot(course, scene.camera, horses, W, H);
   ctx.fillStyle = 'rgba(5,10,8,0.84)'; ctx.fillRect(18, 18, 700, 58);
   ctx.fillStyle = '#fff'; ctx.font = 'bold 20px sans-serif';
@@ -374,7 +415,7 @@ for (const [index, displaySec] of displaySecs.entries()) {
   const file = path.join(OUT, `${String(index + 1).padStart(2, '0')}-${displaySec}s-${scene.shot.id}.png`);
   writeFileSync(file, canvas.toBuffer('image/png'));
   files.push(file);
-  console.log(`${String(displaySec).padStart(7)}${lead.toFixed(0).padStart(8)}   ${scene.shot.id.padEnd(20)}${spread.toFixed(2).padStart(6)}${(m.medianPx.toFixed(0) + 'px').padStart(9)}${((m.ratio * 100).toFixed(1) + '%').padStart(8)}${(m.inside + '/' + m.total).padStart(8)}`);
+  console.log(`${String(displaySec).padStart(7)}${lead.toFixed(0).padStart(8)}   ${scene.shot.id.padEnd(20)}${spread.toFixed(2).padStart(6)}${(m.medianPx.toFixed(0) + 'px').padStart(9)}${((m.ratio * 100).toFixed(1) + '%').padStart(8)}${(m.inside + '/' + m.total).padStart(8)}${(greenPct.toFixed(1) + '%').padStart(9)}`);
 }
 
 /** 一覧（2 列） */

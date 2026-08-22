@@ -2,6 +2,7 @@ import { posOf, type Course } from './course.js';
 import type { Ctx2D, FontOf, Palette, SheetSpec } from './oblique-draw.js';
 import { cameraBasis, project } from './perspective.js';
 import { drawDistancePoles } from './distance-poles.js';
+import { drawFinishPost } from './finish-post.js';
 import { drawMowStripes } from './mow-stripes.js';
 import { drawParallaxObjects, drawParallaxPlate, drawWorldBillboards, type ParallaxDrawOptions, type ParallaxPlate, type WorldBillboard } from './parallax-plate.js';
 import { drawTexturedWorld, type TexturedWorldAssets } from './world-textured.js';
@@ -283,6 +284,11 @@ export function drawBroadcastV2Scene<TImage>(
     /** ★ハロン棒を止める（素材の比較用） */
     readonly distancePoles?: boolean | undefined;
     /**
+     * ★ゴール板・決勝線（設計 2-3）。既定では**透視ワールドのカットだけ**に描く
+     *   （横視点はプレートに既に絵がある）。`false` で完全に止める。
+     */
+    readonly finishPost?: boolean | undefined;
+    /**
      * ★被写体ブラー（参考映像 1.4）。`drawPerspectiveHorses` へそのまま渡す。
      *   速度は呼び出し側が**表示時刻の関数**として渡す（決定論・憲法 4）。
      */
@@ -372,6 +378,15 @@ export function drawBroadcastV2Scene<TImage>(
   if (opts.distancePoles !== false) {
     // ★奥の棒は馬より先に。手前の棒は馬のあと（下の `front`）
     drawDistancePoles(ctx, course, scene.camera, { focusS: scene.focusS, pass: 'behind', font: opts.poleFont });
+  }
+  /**
+   * ★**ゴール板と決勝線**（設計 2-3）。
+   *
+   *   ⚠️ 横視点（パララックス）には**既に絵があります**（`finish-tower` / `finish-line-*`）。
+   *      そこで描くと**二重**になるので、透視ワールドを使うカットだけに出します。
+   */
+  if (opts.finishPost !== false && opts.texturedWorld !== undefined) {
+    drawFinishPost(ctx, course, scene.camera, { focusS: scene.focusS, font: opts.poleFont });
   }
   if (opts.worldBillboards !== undefined) drawWorldBillboards(ctx, opts.worldBillboards, projectGround, 'behind', scene.camera.width);
   const library = opts.libraries[scene.shot.horseAsset];
