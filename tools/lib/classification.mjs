@@ -52,6 +52,7 @@ export const READONLY = [
   'verify-camera-continuity.mjs', // カメラがカットの中で跳んでいないか（読むだけ）
   'verify-horse-smoothness.mjs',  // 馬 1 頭ごとの画面上の動きが滑らかか（読むだけ）
   '_g12probe.mjs',                // 1 頭を追って跳びの原因を見る（読むだけ）
+  '_startease.mjs',               // 発走の立ち上がりが見た目の速さと着差に何をするか（読むだけ）
   '_cornermotion.mjs',        // カットごとの画面上の動きの滑らかさ（読むだけ）
   '_camjump.mjs',             // 固定カメラの注視点と画角の連続性（読むだけ）
   '_cuts.mjs',                // 切替が 重ねる／切る／閃光 のどれになるか（読むだけ）

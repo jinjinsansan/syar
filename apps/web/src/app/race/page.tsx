@@ -45,7 +45,7 @@ import {
   raceIntroAt, RACE_INTRO_RACE_START_SEC, RACE_INTRO_END_SEC,
   drawRaceTitleCard, drawStartingGate, drawStartCallBand,
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
-  broadcastV2FinishStyleOf, broadcastV2StartEase, broadcastV2ShotById, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
+  broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
@@ -86,6 +86,19 @@ function rendererFromSearch(search: string): RendererKind {
  *   ユーザー合格後に撤去する（§11-8）。
  */
 let rendererBadgeHidden = false; // `?badge=0` で非表示（LP 用のキャプチャなど。描画分岐には影響しない）
+/**
+ * ★発走の見せ方。**位置に係数を掛けず、全馬から同じ距離を引きます**（2026-08-22）。
+ *
+ * ⚠️ ★以前は `meters × ease(t)` でした。実測で 2 つの実害:
+ *    ① 見た目の速さが **25.0 m/s まで行き過ぎてから 18.0 m/s へ戻る**（馬は減速しない）
+ *    ② **着差が縮む** — 実際 5 馬身が発走 0.2 秒で **0.66 馬身**に見える
+ *   引き算なら、速さは単調に上がり、**着差はそのまま**です。
+ */
+const startShownMeters = (meters: number, raceDisplaySec: number): number =>
+  Math.max(0, meters - broadcastV2StartLagM(raceDisplaySec, RACE_SPEED_MPS));
+/** ★立ち上がりの基準にする走速（m/s）。1600m をおよそ 100 秒で走る前提 */
+const RACE_SPEED_MPS = 15.6;
+
 function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, stage: string): void {
   if (rendererBadgeHidden) return;
   /**
@@ -701,9 +714,8 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     const at = model.at(sec);
     const visual = withFinishRunOut(at, (g) => finishSec.get(g), sec, DIST, Math.max(0, raceD - warp.displaySec) * RUNOUT_SLOW);
     const winnerDone = (at.find((h) => h.gate === winnerGate)?.meters ?? 0) >= DIST - 1e-6;
-    const ease = broadcastV2StartEase(raceD);
     const scene = resolveBroadcastV2Scene(course, visual.map((h) => ({
-      gate: h.gate, s: h.meters * ease, w: h.w ?? TRACK_WIDTH_M / 2, finished: h.meters >= DIST - 1e-6,
+      gate: h.gate, s: startShownMeters(h.meters, raceD), w: h.w ?? TRACK_WIDTH_M / 2, finished: h.meters >= DIST - 1e-6,
     })), { width: W, height: H }, winnerDone, {
       finishStyle, cornerCutM: CORNER_CUT_M_WEB, raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
       fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
@@ -1402,8 +1414,7 @@ export default function RacePage(): React.JSX.Element {
     if (renderer === 'v2') {
       const course = ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn });
       /** ★発走イージング（描画のみ・全馬同じ係数）。順位・着差・HUD には触れない */
-      const startEase = broadcastV2StartEase(raceD);
-      const easedAt = visualAt.map((horse) => ({ ...horse, meters: horse.meters * startEase }));
+      const easedAt = visualAt.map((horse) => ({ ...horse, meters: startShownMeters(horse.meters, raceD) }));
       const scene = resolveBroadcastV2Scene(course, easedAt.map((horse) => ({
         gate: horse.gate,
         s: horse.meters,

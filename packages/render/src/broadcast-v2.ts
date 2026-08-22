@@ -471,15 +471,48 @@ export function broadcastV2StartFocus(
 }
 
 /**
- * ★発走イージング（描画のみ）。位置モデルは開扉直後から全速なので、開扉から `rampSec` の間、
- *   各馬の表示位置を「発馬地点からの距離 × k(t)」に圧縮する（k: 0.22 → 1、なめらか）。
- *   全馬に同じ係数を掛けるので順位・着差の見え方は変わらない。脚の周期・背景の流れも同じ位置から
- *   決まるので「止まった状態から走り出して加速」になる（ユーザー指摘「ロケットスタート」）。
+ * ★発走イージング（描画のみ）。位置モデルは開扉直後から全速なので、
+ *   開扉から `rampSec` の間だけ**表示位置を実際より手前に置き**、加速して見せる。
+ *   （ユーザー指摘「ロケットスタート」への対処）
+ *
+ * ⚠️ ★以前は「**距離 × k(t)**」で圧縮していました。2 つの実害がありました（実測）:
+ *
+ *   ① **見た目の速さが行き過ぎて戻る。** 0 → **25.0 m/s** まで上がり、そこから 18.0 m/s へ落ちる。
+ *      実際の馬は加速したあと減速しません。★オーナー評「ゲートの出だし…馬が飛ぶ印象」。
+ *      原因は `d/dt(距離 × k) = v·k + 距離·k'` の第 2 項で、**距離が伸びるほど効いてしまう**ため。
+ *
+ *   ② **着差が縮む。** 全馬に同じ係数を掛けるので差も同じだけ縮み、
+ *      実際 5 馬身の差が発走 0.2 秒では **0.66 馬身**にしか見えない。
+ *      （旧コメントは「順位・着差の見え方は変わらない」としていたが、**誤り**）
+ *
+ * → ★**速さを立ち上げる**形にします。表示位置 = 真の距離 − 遅れ（m）。
+ *   遅れは「実速で走ったぶん」と「立ち上がりで走ったぶん」の差を積分したもので、
+ *   `rampSec` を過ぎたら**一定**になります。
+ *   ・見た目の速さは 0 から実速へ**単調に**上がり、行き過ぎません
+ *   ・全馬に**同じ距離**を引くので、**着差はそのまま**（掛け算ではなく引き算）
+ */
+export function broadcastV2StartLagM(raceDisplaySec: number, speedMps: number, rampSec = 3.0): number {
+  if (raceDisplaySec <= 0) return 0;
+  const t = Math.min(rampSec, raceDisplaySec);
+  /**
+   * 立ち上がりの速さは `v · smoothstep(t/ramp)`。
+   * 実速で走った距離 `v·t` との差が遅れ。smoothstep の積分は
+   *   ∫₀ᵘ (3x²−2x³) dx = u³ − u⁴/2   （u = t/ramp）
+   */
+  const u = t / rampSec;
+  const ranEased = speedMps * rampSec * (u * u * u - (u * u * u * u) / 2);
+  const lag = speedMps * t - ranEased;
+  // ★ramp を過ぎたら遅れは一定（それ以上ずれない）
+  return lag;
+}
+
+/**
+ * ★互換のため残す。**新しい経路では使いません**（上の注記のとおり掛け算では着差が縮む）。
+ * @deprecated `broadcastV2StartLagM` を使うこと
  */
 export function broadcastV2StartEase(raceDisplaySec: number, rampSec = 3.0): number {
   if (raceDisplaySec <= 0) return 0.12;
   const t = Math.min(1, raceDisplaySec / rampSec);
-  // ★立ち上がりは緩く（最初の 1 秒はゲートから数馬身）、その後なめらかに全速へ
   const k = t * t * (3 - 2 * t);
   return 0.12 + 0.88 * k;
 }
