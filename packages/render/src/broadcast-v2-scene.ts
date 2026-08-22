@@ -128,9 +128,38 @@ export function resolveBroadcastV2Scene(
     ? leaders
     : shot.target === 'contenders' ? contenders : horses;
   const focusMeters = focus.map((horse) => horse.s);
-  const focusW = focus.length === 0
-    ? course.widthM / 2
-    : focus.reduce((sum, horse) => sum + horse.w, 0) / focus.length;
+  /**
+   * ★注視点の**横位置**は、先頭からの差で**なだらかに重みを付けた平均**にします。
+   *
+   * ⚠️ ★以前は「上位 5 頭の単純平均」でした。順位が入れ替わると**集合ごと入れ替わる**ので、
+   *    平均が 1 コマで跳びます。実測（`front-close` 23.13 秒）:
+   *      注視点の横位置 **3.36m → 5.87m（1 コマで 2.51m）**
+   *      → カメラが横に 2.5m 動き、★**画面が 237px 飛ぶ**
+   *    ★オーナー評「順位を抜く時、様々な場面で滑らかさがなく、**馬が飛ぶ**印象があります」。
+   *
+   * ★重みを「入る／入らない」ではなく**連続**にすれば、順位が入れ替わっても
+   *   重みが少しずつ移るだけなので跳びません。
+   *
+   * ⚠️ ★これは**カメラの向け先**の話で、馬の位置ではありません。
+   *    着順にも位置にも触れていません（憲法 3）。
+   */
+  const focusW = ((): number => {
+    if (focus.length === 0) return course.widthM / 2;
+    if (shot.target === 'leader' || shot.target === 'winner') {
+      return focus.reduce((sum, horse) => sum + horse.w, 0) / focus.length;
+    }
+    const top = leaders[0]?.s ?? 0;
+    /** 先頭から `FALLOFF_M` 離れるまでに重みが 1→0 へなだらかに落ちる */
+    const FALLOFF_M = shot.target === 'contenders' ? 24 : 60;
+    let sum = 0, weight = 0;
+    for (const horse of horses) {
+      const u = Math.max(0, Math.min(1, (top - horse.s) / FALLOFF_M));
+      const w = 1 - u * u * (3 - 2 * u);          // smoothstep（端で滑らかに 0）
+      sum += horse.w * w;
+      weight += w;
+    }
+    return weight > 1e-6 ? sum / weight : course.widthM / 2;
+  })();
   const cameraAt = (atS: number): PerspectiveCamera => {
     if (shot.fixedCamera !== undefined) {
       // ★固定カメラ: 位置は区間終点基準で固定、注視点（馬群）だけを追う

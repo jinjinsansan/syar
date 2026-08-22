@@ -1,0 +1,103 @@
+/**
+ * ★**馬 1 頭ずつ**の画面上の動きが滑らかかを測る
+ *
+ * 【なぜ要るか（2026-08-22）】
+ *   ★オーナー評「カーブの曲がり、ゲートの出だし、順位を抜く時、様々な場面で
+ *     滑らかさがなく、**馬が飛ぶ**印象があります」。
+ *
+ * ⚠️ ★**先頭を追ってはいけません。** 先頭は途中で交代するので、
+ *    交代した瞬間に「別の馬の位置」へ跳び、偽の跳びが出ます（実際に 397px の偽陽性を出した）。
+ * ⚠️ ★**画面の端にいる馬も外します。** 投影が暴れて指標が雑音まみれになります。
+ * → **枠番で固定した 1 頭**を、**画面の内側にいる間だけ**追います。
+ *
+ * 【見るもの】
+ *   1 コマの移動量そのものではなく、**移動量の変化（跳び）**を見ます。
+ *   等速で動いていれば移動量は一定なので、変化は 0 に近くなります。
+ *
+ * 実行: npx tsx tools/verify-horse-smoothness.mjs
+ */
+import { readFileSync } from 'node:fs';
+import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt } from '@star/race-engine';
+import {
+  cameraBasis, knotsFor, ovalCourse, posOf, project, ratesForTarget,
+  replayPositionModel, resolveBroadcastV2Scene, targetDisplaySec, timeWarpFor, withFinishRunOut,
+} from '@star/render';
+
+const W = 1280, H = 720, FIELD = 12, DIST = 1600, SEED = 42, FPS = 30;
+const POOL = JSON.parse(readFileSync('apps/web/src/lib/watch-pool.json', 'utf8'));
+const course = ovalCourse(DIST, { widthM: 20, turn: 'left' });
+const S = ['nige', 'senko', 'sashi', 'oikomi'];
+const st = (SEED * 13) % (POOL.length - FIELD);
+const entrants = POOL.slice(st, st + FIELD).map((h, i) => ({
+  horseId: String(i + 1), stats: h.stats, surfaceAptitude: h.surfaceAptitude,
+  distanceCenter: h.distanceCenter, distanceRange: h.distanceRange,
+  strategyAptitude: h.strategyAptitude, heavyAptitude: h.heavyAptitude,
+  strategy: S[(i + SEED) % 4], condition: 3, fatigue: 20, weightKg: 55, gate: i + 1, age: 4,
+  skillGenes: h.skillGenes,
+}));
+const result = resolveRace({
+  conditions: { raceId: 'c', distance: DIST, surface: 'turf', trackCondition: 'good', courseShape: 'oval', baseWeightKg: 55 },
+  entrants, seed: SEED, balance: DEFAULT_RACE_BALANCE,
+});
+const { pace } = paceOf(entrants, DEFAULT_RACE_BALANCE);
+const boundaries = replayOf(result, (g) => entrants[g - 1].strategy, pace);
+if (!finalOrderMatches(result, boundaries)) throw new Error('着順不一致');
+const model = replayPositionModel({
+  distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
+  strategyOf: (g) => entrants[g - 1].strategy, pace, formationSeed: SEED * 2654435761,
+  laneOf: (g, ml) => laneAt(g, FIELD, ml, DIST, SEED),
+});
+const kn = knotsFor(boundaries, 3);
+const warp = timeWarpFor(kn, ratesForTarget(kn, targetDisplaySec(DIST)));
+const finishSec = new Map(boundaries.map((b) => [b.gate, b.finishSec]));
+
+/** 枠番ごとに、カット内での「移動量の変化」を集める */
+const agg = new Map();
+const prev = new Map();
+for (let t = 0; t <= warp.displaySec; t += 1 / FPS) {
+  const sec = warp.raceSecAt(t);
+  const at = model.at(sec);
+  const vis = withFinishRunOut(at, (g) => finishSec.get(g), sec, DIST, 0);
+  const horses = vis.map((h) => ({ gate: h.gate, s: h.meters, w: h.w, staminaRatio: 1 }));
+  const scene = resolveBroadcastV2Scene(course, horses, { width: W, height: H }, false, { raceDisplaySec: t });
+  const basis = cameraBasis(scene.camera);
+  for (const h of horses) {
+    const p = posOf(course, h.s, h.w);
+    const foot = project(scene.camera, basis, { x: p.x, y: p.y, z: 0 });
+    const head = project(scene.camera, basis, { x: p.x, y: p.y, z: 2.5 });
+    const key = `${scene.shot.id}#${h.gate}`;
+    if (foot === undefined || head === undefined || foot.depth <= 2) { prev.delete(key); continue; }
+    const size = Math.abs(foot.y - head.y);
+    // ★画面の内側にいる間だけ（端は投影が暴れる）
+    const inside = foot.x > 80 && foot.x < W - 80 && size > 20;
+    if (!inside) { prev.delete(key); continue; }
+    const p0 = prev.get(key);
+    if (p0 !== undefined) {
+      const dx = foot.x - p0.x, dy = foot.y - p0.y, ds = size / p0.size - 1;
+      if (p0.dx !== undefined) {
+        const r = agg.get(scene.shot.id) ?? { jx: 0, jy: 0, js: 0, n: 0, gate: 0, at: 0 };
+        const jx = Math.abs(dx - p0.dx), jy = Math.abs(dy - p0.dy), js = Math.abs(ds - p0.ds) * 100;
+        if (jx > r.jx) { r.jx = jx; r.gate = h.gate; r.at = t; }
+        r.jy = Math.max(r.jy, jy);
+        r.js = Math.max(r.js, js);
+        r.n += 1;
+        agg.set(scene.shot.id, r);
+      }
+      prev.set(key, { x: foot.x, y: foot.y, size, dx, dy, ds });
+    } else prev.set(key, { x: foot.x, y: foot.y, size });
+  }
+}
+
+console.log(`\n=== 馬 1 頭ごとの「動きの跳び」（${FPS}fps・カット内・画面の内側だけ）===\n`);
+console.log('  カット                 横の跳び  縦の跳び  大きさの跳び   最悪の枠/秒');
+let bad = 0;
+for (const [id, r] of agg) {
+  const ng = r.jx > 12 || r.jy > 12 || r.js > 6;
+  if (ng) bad += 1;
+  console.log(`  ${ng ? '🔴' : '  '}${id.padEnd(22)}${r.jx.toFixed(1).padStart(8)}${r.jy.toFixed(1).padStart(10)}${(r.js.toFixed(1) + '%').padStart(13)}`
+    + `   ${r.gate}番 / ${r.at.toFixed(1)}s`);
+}
+console.log('\n  ★「跳び」は 1 コマ間の移動量の変化。等速なら 0 に近い。');
+console.log('    横 12px / 縦 12px / 大きさ 6% を超えると、目に「飛んだ」と見える');
+if (bad > 0) { console.log(`  🔴 ${bad} カットで跳びがあります`); process.exit(1); }
+console.log('  ★どのカットも馬は滑らかです');
