@@ -7,7 +7,9 @@ export type BroadcastV2ShotId =
   | 'homestretch-side' | 'finish-line' | 'winner-follow'
   // ★中継台本 v3（アーケード参考映像に合わせた追加ショット）
   | 'side-low' | 'side-close' | 'aerial' | 'side-drive' | 'fourth-corner-wide' | 'front-close'
-  | 'start-front' | 'winner-follow-rear';
+  | 'start-front' | 'winner-follow-rear'
+  // ★直線の正面固定（差してくる馬を奥行きで見せる）
+  | 'homestretch-front';
 
 export type BroadcastV2HorseAssetRole = 'side-v6' | 'diag-front-v2' | 'diag-rear-v2' | 'high-diag-v2' | 'winner-v1';
 
@@ -153,6 +155,44 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
     // fovDeg は上限（距離に応じて自動ズーム: `broadcastV2FixedFov`）
     camera: { backM: 42, upM: 7, sideM: 12, fovDeg: 13.6 },
     fixedCamera: { sFromSegmentEnd: 30, w: 27, upM: 7 },
+  },
+  /**
+   * ★**直線の正面固定カメラ**（2026-08-22・オーナー指摘「差してくるのが見えない」）
+   *
+   * 【なぜ要るか — 実測で分かったこと】
+   *   参考（`out/judge/ref-race2.png` 98s を拡大）は、直線を**横 1 カットで見せ続け**、
+   *   ★**8 頭以上が 2〜3 馬身（5〜7m）の中に密集**しています。だから 1 つの画に全部入り、
+   *   その中で馬が前へ出ていくのが見えます。
+   *
+   *   ⚠️ ★**我々の隊列はそこまで詰まりません。** 実測（24 レース・中央値）:
+   *        ゴール前で上位 8 頭が **27.7m（11.5 馬身）** ← 参考の **4〜5 倍**
+   *      横から撮るかぎり、**寄れば差し馬が画面外／入れれば豆粒**の二択にしかなりません。
+   *
+   * 【★正面から撮ると解ける】
+   *   正面（奥から手前へ来る画）なら、**走路方向の広がりが「奥行き」になります。**
+   *   20m 後ろの馬は**小さく奥に**写るだけで、画面からは出ません。
+   *   ★差してくる馬が、奥から手前へ、他馬の間を縫って上がってくるのがそのまま見えます。
+   *   参考も 90〜92s は正面寄りの画です。
+   *
+   *   カメラは決勝線の少し先・外側に据え、注視点（馬群）だけを追います。
+   */
+  'homestretch-front': {
+    /**
+     * ★**追従**の正面カメラです（固定ではありません）。
+     *
+     * ⚠️ ★最初は決勝線に据えた**固定**カメラにしました。**逆効果でした。**
+     *    カメラまで 400m あるので画角が 1.4° まで狭まり、
+     *    ★**奥行きが完全に潰れて、11 頭が横一列の切り抜きに見えます**（実測 21 秒）。
+     *    「差してくる」は**奥行きの手掛かり**で成立するので、潰したら消えます。
+     *    ⚠️ 奥行きの潰れは**距離**で決まります。遠くから望遠で狙う限り直りません。
+     *
+     * → 馬群の**少し前**を走る追従カメラにします（34m）。
+     *   20m 後ろの馬は 54m 先になるので **6 割の大きさ**で写り、
+     *   前に出てくるほど**大きくなりながら上がって**きます。それが差し脚の見え方です。
+     */
+    id: 'homestretch-front', view: 'diag-front', target: 'pack', horseAsset: 'diag-front-v2', transitionSec: 0.4,
+    camera: { backM: 32, upM: 5.5, sideM: 9, fovDeg: 18.5 },
+    leadFraction: 0.60,
   },
   'homestretch-side': {
     id: 'homestretch-side', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
@@ -449,8 +489,12 @@ export const SCRIPT_V4: readonly { readonly until: number; readonly id: Broadcas
   { until: 0.330, id: 'first-corner-front' },   // 〜528m   1角（前から）
   { until: 0.500, id: 'side-drive' },           // 〜800m   道中〜勝負所（真横）
   { until: 0.660, id: 'fourth-corner-front' },  // 〜1056m  直線入口（前から・固定）
-  { until: 0.800, id: 'homestretch-side' },     // 〜1280m  直線（真横）
-  { until: 0.920, id: 'front-close' },          // 〜1472m  先頭争い（前から）
+  /**
+   * ★直線の**主役は正面固定**にしました（2026-08-22・オーナー指摘）。
+   *   我々の隊列は上位 8 頭で 27.7m 伸びるので、横からでは差し馬が画面に入りません。
+   *   正面なら走路方向の広がりが奥行きになり、**奥から上がってくる**のが見えます。
+   */
+  { until: 0.940, id: 'homestretch-front' },    // 〜1504m  ★直線ぜんぶ（正面固定・差しが見える）
   { until: 1.0, id: 'finish-line' },            // 〜1600m  ゴール（真横）
 ];
 
@@ -720,7 +764,18 @@ export function broadcastV2FixedFov(distanceM: number, maxFovDeg: number): numbe
    *
    * ★境目の手前から少しずつ寄せれば、**微分が連続**になり角が消えます。
    */
-  return softClamp(fov, 2.8, maxFovDeg);
+  /**
+   * ★下限を **2.8° → 1.4°** に下げました（2026-08-22）。
+   *
+   *   直線の正面固定（`homestretch-front`）はカメラまで **400m** に達します。
+   *   2.8° のままだと式より下限が勝ち、★**馬が画面の 12.5%** にしかなりません
+   *   （実測・先頭 1127m）。これは 2026-08-21 に 6°→2.8° へ下げたときと**同じ形の頭打ち**です。
+   *
+   *   ⚠️ ★望遠にしても**奥行きは潰れません**（潰れは距離で決まる・上の注記）。
+   *      画角を下げて戻るのは**大きさだけ**です。
+   *   1.4° は 400m で狙いの 22% に届く値です（2·atan(5.68/400)=1.63°）。
+   */
+  return softClamp(fov, 1.4, maxFovDeg);
 }
 
 /**

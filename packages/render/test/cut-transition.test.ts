@@ -44,7 +44,12 @@ describe('★カットの切替', () => {
     // 台本 v4 で実際に「画角が変わる切替」がいくつあるかを固定する
     const crossFamily = transitions().filter((t) =>
       broadcastV2ShotById(t.from as never).view !== broadcastV2ShotById(t.to as never).view);
-    expect(crossFamily.length, '画角が変わる切替の数が変わりました。台本を見直したなら更新すること').toBe(5);
+    /**
+     * ★**3 本**（2026-08-22）。直線を正面固定に替え、`homestretch-side` と `front-close` を
+     *   台本から外したので、5 → 3 に減りました（切替が減るほど画は落ち着きます）。
+     *   ⚠️ 数そのものより「台本を触ったら必ずここを見る」ことが目的です。
+     */
+    expect(crossFamily.length, '画角が変わる切替の数が変わりました。台本を見直したなら更新すること').toBe(3);
   });
 
   it('★同じ画角のまま変わる切替もある（そこは重ねてよい）', () => {

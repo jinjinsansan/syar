@@ -43,12 +43,21 @@ describe('Broadcast V2', () => {
    *      並びを変えるときは判定表を更新してからにすること。
    */
   it('★★台本 v4（既定）: 前からと真横だけ。後方・俯瞰を含まない', () => {
-    // ★境界は 240 / 528 / 800 / 1056 / 1280 / 1472m（`SCRIPT_V4` の until × 1600）
-    const seq = [30, 400, 700, 900, 1100, 1300, 1500]
+    /**
+     * ★境界は 240 / 528 / 800 / 1056 / 1504m（`SCRIPT_V4` の until × 1600）
+     *
+     * 【★直線を正面固定に替えました（2026-08-22・オーナー指摘）】
+     *   オーナー評「**差してくるのが見えない。最後は 2 頭が走ってそのままゴール**」。
+     *   実測すると、我々の隊列は**ゴール前で上位 8 頭が 27.7m（11.5 馬身）**伸びます。
+     *   参考（`ref-race2.png` 98s）は**同じ 8 頭が 2〜3 馬身**に収まっていました（4〜5 倍の差）。
+     *   ★横から撮るかぎり「寄れば差し馬が画面外／入れれば豆粒」にしかなりません。
+     *   → 直線は**正面追従**にして、走路方向の広がりを**奥行き**に変換します。
+     */
+    const seq = [30, 400, 700, 900, 1200, 1550]
       .map((s) => broadcastV2ShotAt(course, s).id);
     expect(seq).toEqual([
       'start-front', 'first-corner-front', 'side-drive', 'fourth-corner-front',
-      'homestretch-side', 'front-close', 'finish-line',
+      'homestretch-front', 'finish-line',
     ]);
     // ★不合格だった 5 カットが、距離のどこにも現れないこと
     const banned = new Set(['second-corner-high', 'aerial', 'third-corner-rear', 'fourth-corner-wide']);
@@ -97,14 +106,20 @@ describe('Broadcast V2', () => {
      *   → **1 頭だけ**にすれば広がりは 0 なので、必ずいちばん寄った値になります。
      */
     const horses = [{ gate: 1, s: 1200, w: 6 }];
-    const sceneOf = (leaderS: number) => resolveBroadcastV2Scene(
+    const sceneOf = (leaderS: number, forceShotId?: string) => resolveBroadcastV2Scene(
       course,
       horses.map((h) => ({ ...h, s: h.s - (1200 - leaderS) })),
-      { width: 1280, height: 720 }, false, { finishStyle: 'solo' },
+      { width: 1280, height: 720 }, false,
+      forceShotId === undefined ? { finishStyle: 'solo' } : { finishStyle: 'solo', forceShotId: forceShotId as never },
     );
 
     // 直線（1200m）は `homestretch-side`。その preset の画角がそのまま出ること
-    const straight = sceneOf(1200);
+    /**
+     * ⚠️ ★**ショットは明示指定します。** 台本の並びは演出の都合で変わるので、
+     *    「1200m なら◯◯」に頼ると、台本を触るたびにこの検査が落ちます。
+     *    ここが見たいのは**定義から画面までの経路**であって、台本ではありません。
+     */
+    const straight = sceneOf(1200, 'homestretch-side');
     expect(straight.shot.id).toBe('homestretch-side');
     const preset = broadcastV2ShotById('homestretch-side').camera;
     expect((straight.camera.fovY * 180) / Math.PI).toBeCloseTo(preset.fovDeg, 4);
@@ -115,7 +130,7 @@ describe('Broadcast V2', () => {
      */
     const finishPreset = broadcastV2ShotById('finish-line').camera;
     expect(finishPreset.fovDeg).not.toBeCloseTo(preset.fovDeg, 2);
-    const atFinish = sceneOf(1560);
+    const atFinish = sceneOf(1560, 'finish-line');
     expect(atFinish.shot.id).toBe('finish-line');
     expect((atFinish.camera.fovY * 180) / Math.PI).not.toBeCloseTo((straight.camera.fovY * 180) / Math.PI, 2);
   });
