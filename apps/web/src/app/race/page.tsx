@@ -49,6 +49,7 @@ import {
   BROADCAST_STRIDE_M, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
+  paintCrowd, seatMaskFromPixels, seatBandFromPixels,
   cameraBasis, project, HORSE_HEIGHT_M,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
@@ -788,9 +789,9 @@ export default function RacePage(): React.JSX.Element {
     /** ★勝馬の後方寄り 8 コマ（あれば勝馬追従を後方〜横の寄りにする） */
     winnerRearHighQuality?: readonly (readonly HighQualityHorseFrame[])[];
     /** ★向正面ショット用のループ多層パララックス（`tools/split-parallax-layers.mjs` の出力） */
-    parallaxBackstretch: ParallaxPlate<HTMLImageElement>;
+    parallaxBackstretch: ParallaxPlate<FrameImage>;
     /** ★コーナー・斜めショット用のテクスチャ付き透視ワールド素材（芝タイル・遠景パノラマ） */
-    texturedWorld: TexturedWorldAssets<HTMLImageElement>;
+    texturedWorld: TexturedWorldAssets<FrameImage>;
     /** ★承認水準（一体・高解像度）の方向別素材が揃っているか */
     directionalReady: { rear: boolean; front: boolean };
     /** ★正面の発馬機（扉閉／扉開・透過）と不透明範囲。無ければ undefined */
@@ -891,8 +892,38 @@ export default function RacePage(): React.JSX.Element {
             trees?: { file: string; tileWidth: number; height: number };
           };
         };
-      const parallaxImages = await Promise.all(parallaxManifest.layers.map((layer) =>
+      /**
+       * ★**空席のスタンドに観客を焼き込む**（設計 2-1・デザイナー依頼 D-1 の代替）
+       *
+       *   参考の引きのカット（67s / 69s）は馬が画面の 10% しかないのに成立します。
+       *   成立させているのは**背景の情報量**で、その大半が**数千人の観客の粒**です。
+       *   我々の `stand.png` / `world-panorama.png` は**一人もいない空席**でした。
+       *
+       * ⚠️ ★**起動時に 1 度だけ**焼きます。毎コマ数千個の点を描くと重すぎます。
+       * ⚠️ ★監査道具（`tools/shot-race-at.mjs`）と**同じ関数・同じ既定値**で焼くこと。
+       *    片方だけ満員にすると、道具がオーナーと別の画を出します（R-30）。
+       */
+      const bakeCrowd = (image: HTMLImageElement): FrameImage => {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+        const cx = canvas.getContext('2d');
+        if (cx === null) return image;
+        cx.drawImage(image, 0, 0);
+        try {
+          const data = cx.getImageData(0, 0, canvas.width, canvas.height).data;
+          // ★屋根の位置は素材から見つける（数字を手で書くと、素材差し替えで黙って屋根に人が乗る）
+          const band = seatBandFromPixels(data, canvas.width, canvas.height);
+          paintCrowd(cx, canvas.width, canvas.height,
+            seatMaskFromPixels(data, canvas.width, canvas.height, band));
+        } catch {
+          return image;   // 画素を読めない環境（CORS 等）では元のまま
+        }
+        return canvas;
+      };
+      const parallaxRaw = await Promise.all(parallaxManifest.layers.map((layer) =>
         loadImg(`/art/parallax/backstretch-side-v1/${layer.file}?v=${ASSET_VERSION}`)));
+      const parallaxImages: FrameImage[] = parallaxRaw.map((image, index) =>
+        parallaxManifest.layers[index]?.name === 'stand' ? bakeCrowd(image) : image);
       const objectImages = await Promise.all(parallaxManifest.objects.map((object) =>
         loadImg(`/art/parallax/backstretch-side-v1/${object.file}?v=${ASSET_VERSION}`)));
       const [worldTurfImg, worldPanoImg, worldTreesImg] = await Promise.all([
@@ -903,32 +934,38 @@ export default function RacePage(): React.JSX.Element {
           : Promise.resolve(null),
       ]);
       // ★コース沿いの立体帯: 横追従用の層タイル（生垣・樹林・スタンド）をそのままテクスチャに使う
+      const imgW = (image: FrameImage): number => (image instanceof HTMLCanvasElement ? image.width : image.naturalWidth);
+      const imgH = (image: FrameImage): number => (image instanceof HTMLCanvasElement ? image.height : image.naturalHeight);
       const layerTexture = (name: string, pxPerM: number) => {
         const index = parallaxManifest.layers.findIndex((layer) => layer.name === name);
         const image = index >= 0 ? parallaxImages[index] : undefined;
-        return image === undefined ? undefined : { image, width: image.naturalWidth, height: image.naturalHeight, pxPerM };
+        return image === undefined ? undefined : { image, width: imgW(image), height: imgH(image), pxPerM };
       };
       const hedgeTex = layerTexture('hedge', 60);
       const treesTex = worldTreesImg !== null
         ? { image: worldTreesImg, width: worldTreesImg.naturalWidth, height: worldTreesImg.naturalHeight, pxPerM: 20 }
         : layerTexture('trees', 20);
       const standTex = layerTexture('stand', 12);
-      const texturedWorld: TexturedWorldAssets<HTMLImageElement> = {
+      const texturedWorld: TexturedWorldAssets<FrameImage> = {
         turf: { image: worldTurfImg, width: worldTurfImg.naturalWidth, height: worldTurfImg.naturalHeight, pxPerM: parallaxManifest.world.turf.pxPerM },
-        panorama: { image: worldPanoImg, width: worldPanoImg.naturalWidth, height: worldPanoImg.naturalHeight, horizonY: parallaxManifest.world.panorama.horizonY },
+        // ★遠景の帯も空席だった。同じ焼き込みを通す
+        panorama: (() => {
+          const baked = bakeCrowd(worldPanoImg);
+          return { image: baked, width: imgW(baked), height: imgH(baked), horizonY: parallaxManifest.world.panorama.horizonY };
+        })(),
         scenery: {
           ...(hedgeTex !== undefined ? { hedge: hedgeTex } : {}),
           ...(treesTex !== undefined ? { trees: treesTex } : {}),
           ...(standTex !== undefined ? { stand: standTex } : {}),
         },
       };
-      const parallaxBackstretch: ParallaxPlate<HTMLImageElement> = {
+      const parallaxBackstretch: ParallaxPlate<FrameImage> = {
         plateWidth: parallaxManifest.plateWidth,
         plateHeight: parallaxManifest.plateHeight,
         layers: parallaxManifest.layers.map((layer, index) => ({
           image: parallaxImages[index]!,
-          width: parallaxImages[index]!.naturalWidth,
-          height: parallaxImages[index]!.naturalHeight,
+          width: imgW(parallaxImages[index]!),
+          height: imgH(parallaxImages[index]!),
           plateY0: layer.plateY0,
           plateY1: layer.plateY1,
           depthOffsetM: layer.depthOffsetM,

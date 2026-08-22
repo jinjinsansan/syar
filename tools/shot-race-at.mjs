@@ -29,6 +29,7 @@ import {
 import {
   BROADCAST_STRIDE_M, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES, HORSE_HEIGHT_M,
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
+  paintCrowd, seatMaskFromPixels, seatBandFromPixels,
   cameraBasis, drawBroadcastV2Scene, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
   posOf, project, ratesForTarget, replayPositionModel, resolveBroadcastV2Scene,
   targetDisplaySec, timeWarpFor, withFinishRunOut,
@@ -177,15 +178,69 @@ const plates = {
  */
 const PX = path.join(ART, 'parallax', 'backstretch-side-v1');
 const manifest = JSON.parse(readFileSync(path.join(PX, 'manifest.json'), 'utf8'));
-const layerImages = await Promise.all(manifest.layers.map((l) => loadImage(path.join(PX, l.file))));
+/**
+ * ★**空席のスタンドに観客を焼き込む**（設計 2-1）。
+ *
+ * ⚠️ ★画面（`page.tsx`）と**同じ関数・同じ設定**で焼くこと。
+ *    片方だけ満員にすると、この道具はオーナーと別の画を出します（R-30）。
+ */
+function withCrowd(image) {
+  const c = createCanvas(image.width, image.height);
+  const cx = c.getContext('2d');
+  cx.drawImage(image, 0, 0);
+  const data = cx.getImageData(0, 0, image.width, image.height).data;
+  // ★屋根の位置は素材から見つける（数字を手で書くと、素材差し替えで黙って屋根に人が乗る）
+  const band = seatBandFromPixels(data, image.width, image.height);
+  const mask = seatMaskFromPixels(data, image.width, image.height, band);
+  paintCrowd(cx, image.width, image.height, mask);
+  return c;
+}
+
+const layerImages = await Promise.all(manifest.layers.map(async (l) => {
+  const img = await loadImage(path.join(PX, l.file));
+  return l.name === 'stand' ? withCrowd(img) : img;
+}));
 const layerTexture = (name, pxPerM) => {
   const i = manifest.layers.findIndex((l) => l.name === name);
   if (i < 0) return undefined;
   const image = layerImages[i];
   return { image, width: image.width, height: image.height, pxPerM };
 };
+/**
+ * ★**横視点の背景をパララックスに揃える**（2026-08-22）
+ *
+ * ⚠️ ★ここは 1 枚絵（`plates.homestretch` など）を貼っていました。
+ *    画面（`page.tsx`）は**層に切ったパララックス**を使うので、
+ *    ★**道具と画面で背景がまったく別物**でした。
+ *    実害: スタンドに観客を焼き込んだのに、この道具の横視点では**空席のまま**に見え、
+ *    「焼き込みが効いていない」と誤診しかけました（R-30。この案件で 4 回目）。
+ */
+const objectImages = await Promise.all(manifest.objects.map((o) => loadImage(path.join(PX, o.file))));
+const parallaxBackstretch = {
+  plateWidth: manifest.plateWidth,
+  plateHeight: manifest.plateHeight,
+  layers: manifest.layers.map((l, i) => ({
+    image: layerImages[i], width: layerImages[i].width, height: layerImages[i].height,
+    plateY0: l.plateY0, plateY1: l.plateY1, depthOffsetM: l.depthOffsetM,
+  })),
+  // ★画面と同じ条件: 発馬機の側面切り出し（start-*）は使わない
+  objects: manifest.objects
+    .map((o, i) => ({ o, image: objectImages[i] }))
+    .filter(({ o }) => !o.name.startsWith('start-'))
+    .map(({ o, image }) => ({
+      image, width: image.width, height: image.height,
+      plateY0: o.plateY0, anchorXRatio: o.anchorXRatio,
+      worldS: o.worldS === 'finish' ? DIST : o.worldS,
+      depthOffsetM: o.depthOffsetM,
+      ...(o.zOrder !== undefined ? { zOrder: o.zOrder } : {}),
+      ...(o.worldW !== undefined ? { worldW: o.worldW } : {}),
+      ...(o.anchorYRatio !== undefined ? { anchorYRatio: o.anchorYRatio } : {}),
+      ...(o.scale !== undefined ? { scale: o.scale } : {}),
+    })),
+};
+
 const worldTurf = await loadImage(path.join(PX, manifest.world.turf.file));
-const worldPano = await loadImage(path.join(PX, manifest.world.panorama.file));
+const worldPano = withCrowd(await loadImage(path.join(PX, manifest.world.panorama.file)));
 const worldTrees = manifest.world.trees === undefined
   ? null : await loadImage(path.join(PX, manifest.world.trees.file));
 const texturedWorld = {
@@ -228,6 +283,7 @@ for (const [index, displaySec] of displaySecs.entries()) {
         : scene.shot.id === 'first-corner-front' || scene.shot.id === 'second-corner-high'
           || scene.shot.id === 'fourth-corner-high' ? plates.cornerHigh
           : plates.backstretch;
+  void plate;
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = true;
@@ -261,10 +317,13 @@ for (const [index, displaySec] of displaySecs.entries()) {
     frameRoleOf, surface: 'turf', condition: 'good', kickupColor: '#738b43',
     // ★Web 画面と同じ分岐（page.tsx: shot.view === 'side' ? undefined : texturedWorld）
     texturedWorld: scene.shot.view === 'side' ? undefined : texturedWorld,
-    backgroundPlate: scene.shot.view !== 'side' || plate === undefined ? undefined : {
-      image: plate, width: plate.width, height: plate.height,
-      progress: (scene.focusS % 400) / 400, zoom: 1.14,
-    },
+    /**
+     * ★横視点は**画面と同じパララックス**（1 枚絵ではない）。
+     *   縦の枠取り・ズーム・流す距離も `page.tsx` と同じ値にすること。
+     */
+    parallaxPlate: scene.shot.view === 'side'
+      ? { plate: parallaxBackstretch, zoom: 1.14, verticalAnchor: 1.0, scrollM: scene.focusS }
+      : undefined,
     // ★発走 90m までは開いた発馬機が後ろに残る（本番と同じ条件）
     worldBillboards: lead < 90 ? [{
       image: gateOpen.image, width: gateOpen.image.width, height: gateOpen.image.height,
