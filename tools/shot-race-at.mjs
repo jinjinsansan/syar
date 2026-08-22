@@ -87,7 +87,7 @@ const INTRO_SEC = 7.8;  // race-intro.ts の RACE_INTRO_RACE_START_SEC
  *    取り違えると、指定していない時刻の絵が黙って 1 枚増えます（実際に増えました）。
  */
 const optionValueIndexes = new Set();
-for (const name of ['--shot', '--fov', '--from', '--to', '--step']) {
+for (const name of ['--shot', '--fov', '--exposure', '--from', '--to', '--step']) {
   const i = argv.indexOf(name);
   if (i >= 0) optionValueIndexes.add(i + 1);
 }
@@ -114,6 +114,14 @@ const forcedShot = argv.includes('--shot') ? argv[argv.indexOf('--shot') + 1] : 
  *   並べる必要があるので、その材料を作るための口です。
  */
 const forcedFov = argv.includes('--fov') ? Number(argv[argv.indexOf('--fov') + 1]) : undefined;
+/** ★`--noblur` で被写体ブラーだけを止める（効いているのかを切り分けるため） */
+const noBlur = argv.includes('--noblur');
+/**
+ * ★`--exposure <分母>` で露光を変える（例 `--exposure 200` で 1/200 秒）。
+ *   ブラーの量は**演出の好み**なので、同じコマを何段階かで並べて選べるようにする。
+ */
+const exposureDen = argv.includes('--exposure') ? Number(argv[argv.indexOf('--exposure') + 1]) : undefined;
+const exposureSec = exposureDen !== undefined && exposureDen > 0 ? 1 / exposureDen : MOTION_BLUR_EXPOSURE_SEC;
 
 /* ── ★本番と同じ経路（shot-cuts.mjs と同一） ─────────────── */
 const STRATS = ['nige', 'senko', 'sashi', 'oikomi'];
@@ -341,7 +349,7 @@ for (const [index, displaySec] of displaySecs.entries()) {
     frameOf: (g) => Math.floor((horses.find((h) => h.gate === g)?.s ?? 0) / BROADCAST_STRIDE_M * 8 + g * 2.96) % 8,
     phaseOf: (g) => (((horses.find((h) => h.gate === g)?.s ?? 0) / BROADCAST_STRIDE_M) + g * 0.37) % 1,
     // ★被写体ブラー: 画面と同じ定数・同じ速度の作り方
-    motionBlur: { exposureSec: MOTION_BLUR_EXPOSURE_SEC, samples: MOTION_BLUR_SAMPLES, speedMpsOf },
+    motionBlur: noBlur ? undefined : { exposureSec, samples: MOTION_BLUR_SAMPLES, speedMpsOf },
     // ★ハロン棒の数字（設計 1-7）。画面と同じく書体を渡す
     poleFont: (px, bold) => `${bold ? 'bold ' : ''}${px}px JPUI, system-ui, sans-serif`,
     frameRoleOf, surface: 'turf', condition: 'good', kickupColor: '#738b43',
@@ -408,6 +416,12 @@ for (const [index, displaySec] of displaySecs.entries()) {
     }
     return total === 0 ? 0 : (100 * green) / total;
   })();
+  {
+    const g = posOf(course, horses[0].s, horses[0].w);
+    const q = project(scene.camera, cameraBasis(scene.camera), { x: g.x, y: g.y, z: 0 });
+    const v = speedMpsOf(horses[0].gate);
+    console.log(`   [blur] 速度 ${v.toFixed(1)}m/s  px/m ${q.pxPerM.toFixed(1)}  露光 1/${(1/exposureSec).toFixed(0)}s  尾 ${(v * exposureSec * q.pxPerM).toFixed(1)}px`);
+  }
   const m = measureShot(course, scene.camera, horses, W, H);
   ctx.fillStyle = 'rgba(5,10,8,0.84)'; ctx.fillRect(18, 18, 700, 58);
   ctx.fillStyle = '#fff'; ctx.font = 'bold 20px sans-serif';

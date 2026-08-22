@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { ovalCourse } from '../src/course.js';
 import { resolveBroadcastV2Scene } from '../src/broadcast-v2-scene.js';
 import { drawPerspectiveHorses, MOTION_BLUR_CORE_COVER, MOTION_BLUR_STEP_PX } from '../src/perspective-draw.js';
-import { MOTION_BLUR_SAMPLES } from '../src/broadcast-v2.js';
+import { MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES } from '../src/broadcast-v2.js';
 
 const course = ovalCourse(1600, { widthM: 20, turn: 'left' });
 
@@ -46,13 +46,17 @@ const scene = resolveBroadcastV2Scene(course, horses, { width: 1280, height: 720
   { forceShotId: 'homestretch-side' });
 
 /** 1 頭だけを描き、本体の描画呼び出しを取り出す */
-// ★既定は**本番と同じ上限**を使う。ここに数字を書くと、画面と別の条件で測ることになる（R-30）
-function drawOnce(speedMps: number, samples = MOTION_BLUR_SAMPLES) {
+/**
+ * ★既定は**本番と同じ値**を使う。ここに数字を書くと、画面と別の条件で測ることになる（R-30）。
+ * ⚠️ ★実際に踏みました: 露光を 1/60 と直書きしていたので、本番が 1/200 に変わったあとも
+ *    検査だけ 1/60 のまま測り続け、**上限を下げた瞬間に落ちました**（落ちたのは幸い）。
+ */
+function drawOnce(speedMps: number, samples = MOTION_BLUR_SAMPLES, exposureSec = MOTION_BLUR_EXPOSURE_SEC) {
   const { ctx, draws } = recorder();
   drawPerspectiveHorses(ctx as never, course, scene.camera, horses, {
     sheet: 'sheet' as never, sheetWidth: 800, spec: { frames: 8, cellH: 100 } as never,
     fieldSize: 12, frameOf: () => 0, frameRoleOf: () => 'frame-1', distanceMeter: 1600,
-    motionBlur: { exposureSec: 1 / 60, samples, speedMpsOf: () => speedMps },
+    motionBlur: { exposureSec, samples, speedMpsOf: () => speedMps },
   });
   return draws;
 }
@@ -150,7 +154,7 @@ describe('被写体ブラー', () => {
     drawPerspectiveHorses(ctx as never, course, wide.camera, horses, {
       sheet: 'sheet' as never, sheetWidth: 800, spec: { frames: 8, cellH: 100 } as never,
       fieldSize: 12, frameOf: () => 0, frameRoleOf: () => 'frame-1', distanceMeter: 1600,
-      motionBlur: { exposureSec: 1 / 60, samples: MOTION_BLUR_SAMPLES, speedMpsOf: () => 16 },
+      motionBlur: { exposureSec: MOTION_BLUR_EXPOSURE_SEC, samples: MOTION_BLUR_SAMPLES, speedMpsOf: () => 16 },
     });
     // finish-line（26%）は homestretch-side（53%）より px/m が小さい → 尾も枚数も少ない
     expect(draws.length).toBeLessThan(drawOnce(16).length);
