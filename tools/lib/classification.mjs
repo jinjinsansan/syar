@@ -31,6 +31,12 @@ export const READONLY = [
   // ★**実レース**の任意の秒数を本番と同じ描画で静止画にする。読むだけ
   //   `audit-broadcast-v2.mjs` は馬の位置が合成データなので、実際の団子具合が映らない
   'shot-race-at.mjs',
+  /**
+   * ★2D 馬群描画の限界テスト（`DEV_INSTRUCTIONS_P4_2D_LIMIT_TEST_20260822.md`）。
+   *   レース結果は読むだけ。DB にも外部にも接続しない。出力は `out/2d-pack-limit/` のみ。
+   */
+  'render-2d-pack-limit.mjs',
+  'render-2d-pack-compare.mjs',   // 上の出力と参考映像を並べるだけ。読むだけ
   // ★以下は計測用の使い捨て（`_` 始まり）。すべて読むだけ
   'verify-horse-motion.mjs',  // 馬を世界に固定しコマだけ送り、素材由来のぶれを切り分ける
   '_m4.mjs',          // 固定カメラの距離と画角（4角正面が小さすぎた件）
