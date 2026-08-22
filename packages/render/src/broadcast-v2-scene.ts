@@ -1,6 +1,7 @@
 import { posOf, type Course } from './course.js';
 import type { Ctx2D, Palette, SheetSpec } from './oblique-draw.js';
 import { cameraBasis, project } from './perspective.js';
+import { drawMowStripes } from './mow-stripes.js';
 import { drawParallaxObjects, drawParallaxPlate, drawWorldBillboards, type ParallaxDrawOptions, type ParallaxPlate, type WorldBillboard } from './parallax-plate.js';
 import { drawTexturedWorld, type TexturedWorldAssets } from './world-textured.js';
 import {
@@ -271,6 +272,8 @@ export function drawBroadcastV2Scene<TImage>(
     readonly texturedWorld?: TexturedWorldAssets<TImage> | undefined;
     /** ★世界に置く看板（発馬機の正面など）。どちらの描画方式でも同じ透視カメラで置く */
     readonly worldBillboards?: readonly WorldBillboard<TImage>[] | undefined;
+    /** ★芝の縞刈り（設計 1-3）。既定で描く。`false` で止める（素材の比較用） */
+    readonly mowStripes?: boolean | undefined;
     /**
      * ★被写体ブラー（参考映像 1.4）。`drawPerspectiveHorses` へそのまま渡す。
      *   速度は呼び出し側が**表示時刻の関数**として渡す（決定論・憲法 4）。
@@ -346,6 +349,17 @@ export function drawBroadcastV2Scene<TImage>(
       ctx as Ctx2D<never>, course, scene.camera, opts.palette,
       course.distance, scene.focusS, { surface: opts.surface, condition: opts.condition },
     );
+  }
+  /**
+   * ★**芝の縞刈り**（設計 1-3）。地面を描いたあと・馬を描く前に重ねる。
+   *
+   *   ⚠️ 背景の描き方は 3 通り（透視ワールド／パララックス／1 枚絵）ありますが、
+   *      縞は**どれか 1 つに足すのではなく、ここで 1 回**描きます。
+   *      走路の投影として描くので、地面の描き方に依らず馬と同じカメラに載ります（R-30）。
+   */
+  if (opts.mowStripes !== false) {
+    drawMowStripes(ctx, course, projectGround,
+      { width: scene.camera.width, height: scene.camera.height }, { focusS: scene.focusS });
   }
   if (opts.worldBillboards !== undefined) drawWorldBillboards(ctx, opts.worldBillboards, projectGround, 'behind', scene.camera.width);
   const library = opts.libraries[scene.shot.horseAsset];
