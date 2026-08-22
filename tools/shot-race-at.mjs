@@ -27,6 +27,7 @@ import {
   DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt,
 } from '@star/race-engine';
 import {
+  BROADCAST_STRIDE_M, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   cameraBasis, drawBroadcastV2Scene, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
   posOf, project, ratesForTarget, replayPositionModel, resolveBroadcastV2Scene,
   targetDisplaySec, timeWarpFor, withFinishRunOut,
@@ -219,10 +220,30 @@ for (const [index, displaySec] of displaySecs.entries()) {
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
+  /**
+   * ★被写体ブラーの速度（m/s）。**レース時計**で微分します（画面 `page.tsx` と同じ 1 つの量）。
+   *   ⚠️ **表示時計で微分してはいけません。** 時間圧縮ぶん過大になり（道中 125m/s）、
+   *      ここで作る絵だけ尾が長くなります（R-30: オーナーと別の画を測る）。
+   */
+  const PROBE = 0.08;
+  const nowByGate = new Map(at.map((h) => [h.gate, h.meters]));
+  const aheadByGate = new Map(model.at(sec + PROBE).map((h) => [h.gate, h.meters]));
+  const speedMpsOf = (g) => {
+    if (raceD <= 0) return 0;
+    const now = nowByGate.get(g); const next = aheadByGate.get(g);
+    if (now === undefined || next === undefined) return 0;
+    return Math.max(0, (next - now) / PROBE);
+  };
   drawBroadcastV2Scene(ctx, course, scene, {
     palette, libraries, fieldSize: FIELD,
-    // ★走行位相は進んだ距離から（本番と同じく距離でコマを送る）
-    frameOf: (g) => Math.floor((horses.find((h) => h.gate === g)?.s ?? 0) / 2.4 + g * 0.37) % 8,
+    /**
+     * ★走行位相は進んだ距離から。★完歩長は**パッケージの定数**を読みます
+     *   （以前ここだけ 2.4m と書いてあり、画面の 7m と 2.9 倍ずれていました）。
+     */
+    frameOf: (g) => Math.floor((horses.find((h) => h.gate === g)?.s ?? 0) / BROADCAST_STRIDE_M * 8 + g * 2.96) % 8,
+    phaseOf: (g) => (((horses.find((h) => h.gate === g)?.s ?? 0) / BROADCAST_STRIDE_M) + g * 0.37) % 1,
+    // ★被写体ブラー: 画面と同じ定数・同じ速度の作り方
+    motionBlur: { exposureSec: MOTION_BLUR_EXPOSURE_SEC, samples: MOTION_BLUR_SAMPLES, speedMpsOf },
     frameRoleOf, surface: 'turf', condition: 'good', kickupColor: '#738b43',
     // ★Web 画面と同じ分岐（page.tsx: shot.view === 'side' ? undefined : texturedWorld）
     texturedWorld: scene.shot.view === 'side' ? undefined : texturedWorld,

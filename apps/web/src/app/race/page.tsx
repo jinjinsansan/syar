@@ -46,6 +46,7 @@ import {
   drawRaceTitleCard, drawStartingGate, drawStartCallBand,
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
   broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
+  BROADCAST_STRIDE_M, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
@@ -98,6 +99,8 @@ const startShownMeters = (meters: number, raceDisplaySec: number): number =>
   Math.max(0, meters - broadcastV2StartLagM(raceDisplaySec, RACE_SPEED_MPS));
 /** ★立ち上がりの基準にする走速（m/s）。1600m をおよそ 100 秒で走る前提 */
 const RACE_SPEED_MPS = 15.6;
+/** ★被写体ブラーの速度を求める微分幅（**レース秒**。表示秒ではない — 上の注記を読むこと） */
+const BLUR_PROBE_RACE_SEC = 0.08;
 
 function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, stage: string): void {
   if (rendererBadgeHidden) return;
@@ -1485,13 +1488,40 @@ export default function RacePage(): React.JSX.Element {
        * ★見た目の周期。実馬は 1 完歩 ≈7m（2.3 完歩/秒）だが、画面では跳ねて見える（ユーザー指摘「ウサギ」）。
        *   合格に近いと評価されたゴール後の走り（≈1.6〜1.8 完歩/秒）に合わせ 9m とする。
        */
-      const STRIDE_M = 7;
+      const STRIDE_M = BROADCAST_STRIDE_M;
       /**
        * ★見た目の進行距離 = 真の位置 + Δ（`visual-scroll.ts`）。時間圧縮を打ち消し、
        *   背景の流れと脚の周期を常に実馬の速さにする。ゴール前は Δ=0（決勝線と馬が一致）。
        */
       const visualDelta = built.visualScroll.deltaAt(d);
       const metersByGate = new Map(easedAt.map((horse) => [horse.gate, horse.meters]));
+      /**
+       * ★被写体ブラー用の速度（m/s・設計 1-2）は **レース時計での実走速**を使います。
+       *
+       * 【★ここで 1 度間違えました（2026-08-22）】
+       *   最初は**表示時計**で位置を微分しました。表示時計は時間圧縮がかかっているので
+       *   （D-062: 道中は早送り）、★**道中で 125m/s、直線で 41m/s** という値が出て、
+       *   尾が馬 1 頭ぶんより長くなり**馬が判別できなくなりました**。
+       *   ⚠️ 型も検査も通ります。**絵を見るまで分かりませんでした。**
+       *
+       * ★`visual-scroll.ts` の定義そのものが「**見た目の速度＝真の走速**」なので、
+       *   圧縮を Δ で打ち消して微分するのは遠回りで、しかも Δ を持たない道具
+       *   （`tools/shot-race-at.mjs`）とは**同じ値になりません**（R-30）。
+       *   → **レース時計で微分する。** 画面でも道具でも同じ 1 つの量になります。
+       *
+       * ⚠️ `Date.now()` は使いません。レース時刻 `sec` を少し進めて差を取るだけです（憲法 4）。
+       */
+      const nowMetersByGate = new Map(at.map((horse) => [horse.gate, horse.meters]));
+      const aheadMetersByGate = new Map(
+        built.model.at(sec + BLUR_PROBE_RACE_SEC).map((horse) => [horse.gate, horse.meters]),
+      );
+      const speedMpsOf = (gate: number): number => {
+        if (raceD <= 0) return 0;      // ゲート待機中は動いていない
+        const now = nowMetersByGate.get(gate);
+        const next = aheadMetersByGate.get(gate);
+        if (now === undefined || next === undefined) return 0;
+        return Math.max(0, (next - now) / BLUR_PROBE_RACE_SEC);
+      };
       /**
        * ★発走直後 0.7 秒だけ、減衰する小さなカメラ揺れ（世界だけ・HUD は揺らさない）。
        *   時刻 d の関数なので決定論（憲法4）。実況カメラが開扉の衝撃で震える感じを出す。
@@ -1559,6 +1589,11 @@ export default function RacePage(): React.JSX.Element {
           : undefined,
         // ★横視点以外（コーナー後方・俯瞰・斜め前）はテクスチャ付き透視ワールド（背景が実際に動く）
         texturedWorld: sceneToDraw.shot.view === 'side' ? undefined : art.texturedWorld,
+        /**
+         * ★被写体ブラー（参考映像 1.4・設計 1-2）。露光 `MOTION_BLUR_EXPOSURE_SEC` の間に
+         *   進んだ距離だけ、進行方向の後ろへ尾を引く。寄りのカットほど px が伸びる（px/m に比例）。
+         */
+        motionBlur: { exposureSec: MOTION_BLUR_EXPOSURE_SEC, samples: MOTION_BLUR_SAMPLES, speedMpsOf },
         /**
          * ★正面の発馬機ビルボード（走路 s=1.6・w 0.5〜15.3）。
          *   待機中は扉閉を**馬の手前**に、開扉後は扉開を**馬の後ろ**に。発走 60m を過ぎたら描かない。

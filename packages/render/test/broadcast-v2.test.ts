@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { broadcastV2FocusMeters, broadcastV2RangeCenterMeters, broadcastV2ShotAt, ovalCourse, segmentStarts } from '../src/index.js';
+import {
+  broadcastV2FinishCamera, broadcastV2FocusMeters, broadcastV2RangeCenterMeters, broadcastV2ShotAt,
+  broadcastV2ShotById, ovalCourse, resolveBroadcastV2Scene, segmentStarts,
+} from '../src/index.js';
 
 describe('Broadcast V2', () => {
   const course = ovalCourse(1600, { turn: 'left' });
@@ -62,6 +65,63 @@ describe('Broadcast V2', () => {
     expect(broadcastV2ShotAt(course, 1600, true).id).toBe('winner-follow');
     // 正面寄り素材が無いときは 4 角を俯瞰ワイドで代用
     expect(broadcastV2ShotAt(course, 1050, false, undefined, { fourthCornerFront: false }).id).toBe('fourth-corner-wide');
+  });
+
+  /**
+   * ★**ショット定義の `camera:` が、実際に画面に効いていること**（2026-08-22）
+   *
+   * 【この検査が生まれた実害】
+   *   `resolveBroadcastV2Scene` は `homestretch-side` と `finish-line` を
+   *   `broadcastV2FinishCamera` に通します。その関数は **`SIDE_TELE` を直接**書いていたので、
+   *   ★**この 2 つのショットの `camera:` は誰にも読まれていませんでした。**
+   *
+   *   直線の寄りを作るため preset を 12° → 7.6° に変えたのに**画面は 25.1% のまま**で、
+   *   ★**定義を変えたのに何も起きない**という形で 1 度見落としました。
+   *   ⚠️ 型は通り、テストも通り、コメントにも「変えた」と書いてあります。
+   *      **効いていないことだけが、どこにも現れませんでした。**
+   *
+   * 【だから何を見るか】
+   *   「値が正しいか」ではなく **「定義から画面までの経路が繋がっているか」** を見ます（R-1）。
+   *   ★対照（下段）を必ず置くこと: 経路が切れていれば**両方が同じ値**になり、
+   *     この検査は「差がある」で落ちます。
+   */
+  it('★ショット定義の画角が、解決後のカメラに実際に効いている（経路）', () => {
+    const horses = Array.from({ length: 12 }, (_, i) => ({
+      gate: i + 1, s: 1200 - i * 3, w: 2.5 + (i % 4) * 2.2,
+    }));
+    const sceneOf = (leaderS: number) => resolveBroadcastV2Scene(
+      course,
+      horses.map((h) => ({ ...h, s: h.s - (1200 - leaderS) })),
+      { width: 1280, height: 720 }, false, { finishStyle: 'solo' },
+    );
+
+    // 直線（1200m）は `homestretch-side`。その preset の画角がそのまま出ること
+    const straight = sceneOf(1200);
+    expect(straight.shot.id).toBe('homestretch-side');
+    const preset = broadcastV2ShotById('homestretch-side').camera;
+    expect((straight.camera.fovY * 180) / Math.PI).toBeCloseTo(preset.fovDeg, 4);
+
+    /**
+     * ★対照: `finish-line` は**別の preset**なので、解決後の画角も**違う値**になること。
+     *   ⚠️ ここが同値なら経路が切れて既定値へ落ちている（＝実害の再発）。
+     */
+    const finishPreset = broadcastV2ShotById('finish-line').camera;
+    expect(finishPreset.fovDeg).not.toBeCloseTo(preset.fovDeg, 2);
+    const atFinish = sceneOf(1560);
+    expect(atFinish.shot.id).toBe('finish-line');
+    expect((atFinish.camera.fovY * 180) / Math.PI).not.toBeCloseTo((straight.camera.fovY * 180) / Math.PI, 2);
+  });
+
+  /**
+   * ★`broadcastV2FinishCamera` は**基準を受け取り、差分だけを決める**。
+   *   重み 0（まだ引き始めていない）なら、渡した基準がそのまま返ること。
+   */
+  it('★ゴール前カメラは重み0で基準の画角を素通しする', () => {
+    const base = { backM: 44, upM: 3.5, sideM: 9, fovDeg: 5.7 } as const;
+    expect(broadcastV2FinishCamera('solo', 0, base).camera.fovDeg).toBeCloseTo(5.7, 6);
+    expect(broadcastV2FinishCamera('contest', 0, base, 0.66).leadFraction).toBeCloseTo(0.66, 6);
+    // 重み 1 では接戦だけが引く（22°）
+    expect(broadcastV2FinishCamera('contest', 1, base).camera.fovDeg).toBeCloseTo(22, 6);
   });
 
   it('注視点は両端の外れ値を除いた平均になる', () => {

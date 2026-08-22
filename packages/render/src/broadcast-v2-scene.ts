@@ -115,8 +115,13 @@ export function resolveBroadcastV2Scene(
     ? broadcastV2ShotById(options.forceShotId)
     : broadcastV2ShotAt(course, leaderS, allFinished, options.cornerCutM, { fourthCornerFront: options.fourthCornerFront, script: options.script, winnerRear: options.winnerRear });
   // ★直線→ゴール前は展開に応じた連続ズーム（`broadcastV2FinishCamera`）
+  /**
+   * ★基準の画角は**ショット定義から**渡します（`shot.camera`）。
+   *   渡さないと `broadcastV2FinishCamera` が `SIDE_TELE` 固定で作り直すので、
+   *   この 2 ショットだけ `camera:` を変えても画面が変わりません（2026-08-22 の実害）。
+   */
   const finish = (shot.id === 'homestretch-side' || shot.id === 'finish-line')
-    ? broadcastV2FinishCamera(options.finishStyle ?? 'solo', broadcastV2AnchorWeight(course, shot.id, leaderS))
+    ? broadcastV2FinishCamera(options.finishStyle ?? 'solo', broadcastV2AnchorWeight(course, shot.id, leaderS), shot.camera, shot.leadFraction)
     : undefined;
   const startPreset = shot.id === 'start-follow' && options.raceDisplaySec !== undefined
     ? broadcastV2StartCamera(options.raceDisplaySec) : undefined;
@@ -266,6 +271,15 @@ export function drawBroadcastV2Scene<TImage>(
     readonly texturedWorld?: TexturedWorldAssets<TImage> | undefined;
     /** ★世界に置く看板（発馬機の正面など）。どちらの描画方式でも同じ透視カメラで置く */
     readonly worldBillboards?: readonly WorldBillboard<TImage>[] | undefined;
+    /**
+     * ★被写体ブラー（参考映像 1.4）。`drawPerspectiveHorses` へそのまま渡す。
+     *   速度は呼び出し側が**表示時刻の関数**として渡す（決定論・憲法 4）。
+     */
+    readonly motionBlur?: {
+      readonly exposureSec: number;
+      readonly samples: number;
+      readonly speedMpsOf: (gate: number) => number;
+    } | undefined;
   },
 ): void {
   const basisForObjects = cameraBasis(scene.camera);
@@ -386,6 +400,7 @@ export function drawBroadcastV2Scene<TImage>(
     frameRoleOf: opts.frameRoleOf,
     distanceMeter: course.distance,
     trackEffect: { surface: opts.surface, condition: opts.condition, color: opts.kickupColor },
+    motionBlur: opts.motionBlur,
   });
   // ★手前側のラチ（馬の脚が突き抜けないように、馬のあとで描く）
   nearRail?.();

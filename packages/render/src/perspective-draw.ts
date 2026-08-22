@@ -467,6 +467,31 @@ export function drawPerspectiveWorld(
 export const HORSE_HEIGHT_M = 2.5;
 
 /**
+ * ★被写体ブラーの標本の間隔（px）。**枚数ではなく間隔**を決めるのが要点です。
+ *
+ * 【★この値は 2 回測って決めました（2026-08-22）】
+ *   枚数固定（6 枚＝8px 間隔）→ 蹄とヘルメットが**階段**に見えた。
+ *   間隔 **2.5px** → まだ駄目。勝負服の白と脚の黒のような**高コントラストの縁**に
+ *   ★**細かい斜めの格子**が出ます（`out/race-at/_zoom-blur.png` で確認）。
+ *   間隔 **1.0px** → 消えました（`_zoom-step1.png`）。
+ *
+ *   ⚠️ ★「2.5px なら見えないはず」は**私の当て推量で、外れました**。
+ *      拡大して見るまで分かりませんでした。値を動かすときは同じ倍率で見比べること。
+ *
+ * 【費用】1 頭あたりの重ね枚数 ＝ 尾の長さ ÷ この値。寄るほど尾が伸びて枚数が増えますが、
+ *   寄るほど**画面に入る頭数が減る**ので積はおおむね一定です（実測: 最大でも 1 コマ 240 枚程度）。
+ *   ★画面外の間引き（下の `filter`）が無いとこれが 12 頭ぶんに膨らみます。**対で入れること。**
+ */
+export const MOTION_BLUR_STEP_PX = 1.0;
+
+/**
+ * ★掃いた帯の**芯**（全標本が覆う所）の不透明度。
+ *   1.0 にはできません（同じ α を n 枚重ねて 1 に到達するには α=1 が要り、それでは端も硬くなる）。
+ *   0.97 なら地の色は 3% しか透けず、目には不透明に見えます。
+ */
+export const MOTION_BLUR_CORE_COVER = 0.97;
+
+/**
  * ★**馬を置く**（奥から手前へ）。
  *
  *   ⚠️ 深さの順に描かないと、**奥の馬が手前の馬を隠します**。
@@ -572,6 +597,44 @@ export function drawPerspectiveHorses<TImage>(
       readonly condition: RenderTrackCondition;
       readonly color: string;
     } | undefined;
+    /**
+     * ★**被写体ブラー**（参考映像 1.4／設計 1-2）
+     *
+     * 【参考で実際に起きていること（`out/judge/ref-size.png` 104s を実見）】
+     *   ★**馬体が丸ごと流れ、埒とゴール板の柱は止まっています。**
+     *   カメラぶれ（画面全体が流れる）でも、被写界深度でもありません。
+     *   ＝ カメラが馬を追い切っておらず、**馬だけが画面上を動いている**露光です。
+     *
+     * 【我々の事情 — ★ここは意図的に物理と違えています】
+     *   我々のカメラは注視点（馬群）を追うので、**馬は画面上でほぼ止まっています**。
+     *   物理どおりに「カメラ相対の速度」で尾を引かせると **ブラーはほぼ 0** になり、
+     *   参考の見え方になりません。
+     *   → ★**地面に対する実走速度**（`speedMpsOf`）から尾の長さを決めます。
+     *     参考（アーケードの実機）も同種の演出的ブラーです。**物理の再現ではなく、絵の再現**です。
+     *
+     * 【やり方】
+     *   露光の間に馬が進む距離だけ、進行方向の**後ろ**へ `samples` 枚を重ねます。
+     *   古い順に `alpha = 1/(samples - j)` で描くと、重なりが**均等な平均**になり
+     *   （各標本の寄与が 1/samples）、最終的な不透明度は 1 のままです。
+     *   ⚠️ 一律 `1/samples` で描くと合成後の不透明度が 1-(1-1/n)^n ≒ 0.63 にしかならず、
+     *      **馬が透けます**。
+     *
+     * ⚠️ 時刻を持ち込みません。速度は呼び出し側が**表示時刻の関数**として渡すので決定論です（憲法 4）。
+     */
+    readonly motionBlur?: {
+      /** シャッター時間（秒）。1/60 前後。0 でブラー無し */
+      readonly exposureSec: number;
+      /**
+       * ★標本数の**上限**。実際の枚数は尾の長さから決めます。
+       *
+       * ⚠️ ★枚数を固定にすると、寄ったカットで**残像が粒に見えます**（実測: 尾 41px を 6 枚 ＝
+       *    8px 間隔で、蹄とヘルメットが**階段**になりました）。ブラーではなくコマ落ちに見えます。
+       *    → **間隔を px で決めます**（`MOTION_BLUR_STEP_PX`）。引いたカットでは自動的に枚数が減ります。
+       */
+      readonly samples: number;
+      /** 馬ごとの実走速度（m/s） */
+      readonly speedMpsOf: (gate: number) => number;
+    } | undefined;
   },
 ): void {
   const basis = cameraBasis(cam);
@@ -580,6 +643,16 @@ export function drawPerspectiveHorses<TImage>(
     const p = posOf(course, s, w);
     return project(cam, basis, { x: p.x, y: p.y, z: 0 });
   };
+  /**
+   * ★**画面から完全に外れた馬は描きません。**
+   *
+   *   これまでは奥行きだけで間引いていたので、寄りのカットでは**画面外の 10 頭ぶんも**
+   *   毎コマ `drawImage` していました。被写体ブラーで 1 頭あたりの枚数が増えるため、
+   *   ここを詰めないと費用がそのまま倍数で乗ります。
+   *
+   * ⚠️ ★余白を広めに取ること（馬体の半幅＋ブラーの尾）。切り詰めすぎると
+   *    **画面端で馬が消える**という、間引きの典型的な失敗になります。
+   */
   const drawn = horses
     .map((h) => ({
       h,
@@ -587,6 +660,11 @@ export function drawPerspectiveHorses<TImage>(
       p: P(Math.max(0, h.s), h.w),
     }))
     .filter((d) => d.p.depth > 2)
+    .filter((d) => {
+      const margin = HORSE_HEIGHT_M * d.p.pxPerM * 1.6;
+      return d.p.x > -margin && d.p.x < cam.width + margin
+        && d.p.y > -margin && d.p.y < cam.height + margin * 2;
+    })
     .sort((x, y) => y.p.depth - x.p.depth);
 
   for (const d of drawn) {
@@ -724,42 +802,97 @@ export function drawPerspectiveHorses<TImage>(
     const row = Math.max(0, Math.min(7, Number(role.slice(6)) - 1));
     const frame = frameIndex;
     const hi = pickFrame(gateSet) ?? pickFrame(opts.frameImages);
-    if (hi !== undefined) {
-      const source = hi.source;
-      const scale = hpx / hi.referenceHeight;
-      const hiW = source.width * scale; const hiH = source.height * scale;
-      // ★左右反転: 接地点 x を軸に鏡像（基準点は接地点の真上なので位置は変わらない）
-      const mirrored = flip && ctx.save !== undefined && ctx.restore !== undefined && ctx.transform !== undefined;
-      if (mirrored) { ctx.save!(); ctx.transform!(-1, 0, 0, 1, 2 * d.p.x, 0); }
-      // ★胴体基準点があればそれを接地点の真上 `bodyLift` に置く。無ければ従来（矩形の中心・下端）
-      const left = hi.bodyAnchorSourcePx !== undefined
-        ? d.p.x - (hi.bodyAnchorSourcePx.x - source.x) * scale
-        : d.p.x - hiW * 0.5;
-      const top = hi.bodyAnchorSourcePx !== undefined
-        ? d.p.y - (hi.bodyLiftSourcePx ?? 0) * scale - (hi.bodyAnchorSourcePx.y - source.y) * scale
-        : d.p.y - hiH;
-      const coat = opts.coatFilterOf?.(d.h.gate);
-      const canFilter = coat !== undefined && 'filter' in ctx;
-      if (canFilter) ctx.filter = coat;
-      ctx.drawImage(
-        hi.image, source.x, source.y, source.width, source.height,
-        left, top, hiW, hiH,
-      );
-      if (canFilter) ctx.filter = 'none';
-      if (hi.overlay !== undefined) {
-        const overlayX = left + (hi.overlay.offsetXSourcePx - source.x) * scale;
-        const overlayY = top + (hi.overlay.offsetYSourcePx - source.y) * scale;
+
+    /** ★1 枚ぶんの描画（`dx`,`dy` は画面上のずらし）。ブラーはこれを重ねて作る */
+    const paintHorse = (dx: number, dy: number): void => {
+      if (hi !== undefined) {
+        const source = hi.source;
+        const scale = hpx / hi.referenceHeight;
+        const hiW = source.width * scale; const hiH = source.height * scale;
+        // ★左右反転: 接地点 x を軸に鏡像（基準点は接地点の真上なので位置は変わらない）
+        const mirrored = flip && ctx.save !== undefined && ctx.restore !== undefined && ctx.transform !== undefined;
+        if (mirrored) { ctx.save!(); ctx.transform!(-1, 0, 0, 1, 2 * (d.p.x + dx), 0); }
+        // ★胴体基準点があればそれを接地点の真上 `bodyLift` に置く。無ければ従来（矩形の中心・下端）
+        const left = dx + (hi.bodyAnchorSourcePx !== undefined
+          ? d.p.x - (hi.bodyAnchorSourcePx.x - source.x) * scale
+          : d.p.x - hiW * 0.5);
+        const top = dy + (hi.bodyAnchorSourcePx !== undefined
+          ? d.p.y - (hi.bodyLiftSourcePx ?? 0) * scale - (hi.bodyAnchorSourcePx.y - source.y) * scale
+          : d.p.y - hiH);
+        const coat = opts.coatFilterOf?.(d.h.gate);
+        const canFilter = coat !== undefined && 'filter' in ctx;
+        if (canFilter) ctx.filter = coat;
         ctx.drawImage(
-          hi.overlay.image, 0, 0, hi.overlay.width, hi.overlay.height,
-          overlayX, overlayY, hi.overlay.width * scale, hi.overlay.height * scale,
+          hi.image, source.x, source.y, source.width, source.height,
+          left, top, hiW, hiH,
+        );
+        if (canFilter) ctx.filter = 'none';
+        if (hi.overlay !== undefined) {
+          const overlayX = left + (hi.overlay.offsetXSourcePx - source.x) * scale;
+          const overlayY = top + (hi.overlay.offsetYSourcePx - source.y) * scale;
+          ctx.drawImage(
+            hi.overlay.image, 0, 0, hi.overlay.width, hi.overlay.height,
+            overlayX, overlayY, hi.overlay.width * scale, hi.overlay.height * scale,
+          );
+        }
+        if (mirrored) ctx.restore!();
+      } else {
+        ctx.drawImage(
+          opts.sheet, frame * cw, row * opts.spec.cellH, cw, opts.spec.cellH,
+          d.p.x + dx - wpx * 0.5, d.p.y + dy - hpx, wpx, hpx,
         );
       }
-      if (mirrored) ctx.restore!();
+    };
+
+    /**
+     * ★被写体ブラー: 露光の間に進む距離を、現在位置を**中心**に前後へ割り振って重ねる。
+     *
+     * 【重みの決め方 — ★ここで 1 度間違えました（2026-08-22）】
+     *   最初は「古い順に `alpha = 1/(n-j)`」＝**逐次平均**にしていました。これは
+     *   ★**最後の 1 枚が α=1** になるので、**現在位置だけ完全に不透明**で、
+     *   その後ろに薄い残像が並ぶ絵になります。参考（馬体が丸ごと流れる）とは別物で、
+     *   **前縁だけが硬い**という不自然さが残りました。
+     *
+     * ★不透明な物体の露光は、本来こうです:
+     *     ある画素の濃さ ＝ **露光中にその画素を物体が覆っていた割合**
+     *   ＝ 掃いた帯の**芯（全標本が覆う所）は不透明**、**両端は薄く**なる。
+     *
+     *   → 全標本を**同じ α** で重ねます。n 枚重ねたとき芯が `COVER` に達するよう
+     *     `α = 1 - (1 - COVER)^(1/n)`。1 枚しか覆わない端は α のまま薄く残ります。
+     *   ⚠️ 一律 `1/n` だと芯が 1-(1-1/n)^n ≒ 0.63 にしかならず**馬が透けます**。
+     */
+    const blur = opts.motionBlur;
+    const tail = ((): { readonly dx: number; readonly dy: number; readonly n: number } | undefined => {
+      if (blur === undefined || !(blur.exposureSec > 0) || blur.samples < 2) return undefined;
+      const speed = blur.speedMpsOf(d.h.gate);
+      if (!(speed > 0)) return undefined;
+      const ahead = P(d.s + 1, d.h.w);
+      const ux = ahead.x - d.p.x, uy = ahead.y - d.p.y;
+      const len = Math.hypot(ux, uy);
+      if (!(len > 1e-6)) return undefined;
+      const travelPx = speed * blur.exposureSec * d.p.pxPerM;
+      // 1px 未満の尾は描いても見えないので、重ね描きの費用だけが残る
+      if (!(travelPx > 1)) return undefined;
+      /**
+       * ★枚数は**尾の長さ ÷ 目標間隔**。間隔が広いと残像が粒として見えます（階段）。
+       *   上限は呼び出し側の `samples`（費用の頭打ち）。
+       */
+      const n = Math.max(2, Math.min(Math.round(blur.samples), Math.ceil(travelPx / MOTION_BLUR_STEP_PX) + 1));
+      return { dx: (-ux / len) * travelPx, dy: (-uy / len) * travelPx, n };
+    })();
+
+    if (tail === undefined) {
+      paintHorse(0, 0);
     } else {
-      ctx.drawImage(
-        opts.sheet, frame * cw, row * opts.spec.cellH, cw, opts.spec.cellH,
-        d.p.x - wpx * 0.5, d.p.y - hpx, wpx, hpx,
-      );
+      const prevAlpha = ctx.globalAlpha;
+      const alpha = 1 - Math.pow(1 - MOTION_BLUR_CORE_COVER, 1 / tail.n);
+      ctx.globalAlpha = prevAlpha * alpha;
+      for (let j = 0; j < tail.n; j += 1) {
+        // ★現在位置を中心に −0.5 〜 +0.5。前後どちらの端も同じように薄くなる
+        const u = j / (tail.n - 1) - 0.5;
+        paintHorse(tail.dx * u, tail.dy * u);
+      }
+      ctx.globalAlpha = prevAlpha;
     }
   }
 }

@@ -40,8 +40,37 @@ const SIDE_TELE: ShotCameraPreset = { backM: 44, upM: 6, sideM: 9, fovDeg: 12 };
  *   fov 9° のとき馬が画面の **35.3%** になり、**胴体が画面端で切れて 6/12 頭しか写りません**でした。
  *   合格の `finish-line`（25.2%）に合わせて 12.2° に。★`SIDE_TELE` は合格済みなので触らないこと。
  */
-const SIDE_LOW: ShotCameraPreset = { backM: 44, upM: 3.5, sideM: 9, fovDeg: 12.2 };
+/**
+ * ★寄りの真横（2026-08-22 に 12.2° → 7.6°）
+ *
+ * 【なぜ変えたか — 参考映像との実測差】
+ *   参考（アーケード実機）の真横の寄りは**馬体が画面高の 43〜55%**です（62s / 104s）。
+ *   我々は全カットが **21.6〜27.4%** に固まっていました。
+ *   ★問題は「一律に小さい」ことではなく、**大きさの幅が無い**ことでした。
+ *     参考は 10%（内馬場からの引き 67s/85s）〜55%（直線の寄り 104s）を行き来します。
+ *   → 寄りのカットだけを寄せ、引きのカットは第 2 波（世界に物を入れてから）に回します。
+ *
+ * ⚠️ 画角を狭めると**画面に入る走路の幅**も狭まります。7.6° / 距離 44.9m で
+ *    横 11.2m ≒ 馬 4.7 頭分。参考 104s の見え方と同程度です。
+ */
+const SIDE_LOW: ShotCameraPreset = { backM: 44, upM: 3.5, sideM: 9, fovDeg: 7.6 };
 const SIDE_CLOSE: ShotCameraPreset = { backM: 44, upM: 3.2, sideM: 9, fovDeg: 7.5 };
+
+/**
+ * ★直線の寄り（参考映像 90〜110s の役割・馬体が画面高の **55%**）
+ *
+ *   参考は 1 本のレースの中で **10%（内馬場からの引き 67s/85s）〜 55%（直線の寄り 104s）**を
+ *   行き来します。我々は全カットが 21.6〜27.4% に固まっていました。
+ *   ★足りないのは「大きさ」ではなく「**大きさの幅**」です。
+ *
+ *   実測（`tools/shot-race-at.mjs`）で 7.6° → 41.3% だったので、
+ *   55% には 7.6 × 41.3/55 ≒ **5.7°**。距離 45.0m での視野は縦 4.48m / 横 7.97m
+ *   ＝ 走路方向に馬 3.3 頭分。参考 104s（3 頭が読める）と同程度です。
+ *
+ * ⚠️ ★`leadFraction` を既定の 0.78 のままにすると、先頭の前に 1.75m しか残らず
+ *    **半身（1.2m）ぎりぎり**です。0.66 にして前を 2.7m 空けています。
+ */
+const SIDE_HOMESTRETCH: ShotCameraPreset = { backM: 44, upM: 3.5, sideM: 9, fovDeg: 5.7 };
 
 /**
  * ★カットごとの「馬の大きさ」を揃えました（2026-08-21）
@@ -102,7 +131,9 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
   },
   'homestretch-side': {
     id: 'homestretch-side', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
-    camera: SIDE_TELE,
+    // ★直線の寄り（参考 104s と同じ役割）。SIDE_TELE 12° では 25.1% しかなかった
+    camera: SIDE_HOMESTRETCH,
+    leadFraction: 0.66,
   },
   'finish-line': {
     id: 'finish-line', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.3,
@@ -160,7 +191,8 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
   'front-close': {
     // ★先頭争いを斜め前・寄りで（先頭の少し前・外側・低い、追従）
     id: 'front-close', view: 'diag-front', target: 'contenders', horseAsset: 'diag-front-v2', transitionSec: 0.35,
-    camera: { backM: 18, upM: 2.6, sideM: 5, fovDeg: 20 },
+    // ★参考 94s に相当。20° では 27.4%。中間の大きさを担う
+    camera: { backM: 18, upM: 2.6, sideM: 5, fovDeg: 16 },
   },
   'winner-follow-rear': {
     // ★勝馬（アーケード参考映像 114〜123s）: 後方〜横の寄り、騎手が立ってガッツポーズ
@@ -173,6 +205,38 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
     camera: { backM: 34, upM: 5, sideM: 7, fovDeg: 12 },
   },
 };
+
+/**
+ * ★**中継の見た目を決める定数は、ここ 1 か所に置きます。**
+ *
+ * ⚠️ ★これらは画面（`apps/web`）と監査道具（`tools/`）の**両方**が読みます。
+ *    2 か所に書くと必ず離れ、**オーナーと別の画を測る**ことになります
+ *    （R-30。この案件で 3 回起きています）。
+ */
+
+/**
+ * ★1 完歩の距離（m）。脚のコマ送りの周期。
+ *   実馬は 1 完歩 ≈7m（16m/s で 2.3 完歩/秒）。
+ */
+export const BROADCAST_STRIDE_M = 7;
+
+/**
+ * ★被写体ブラーの露光時間（秒・設計 1-2）
+ *
+ *   参考（アーケード実機・`out/judge/ref-size.png` 104s）は**馬体が丸ごと流れ**、
+ *   埒とゴール板の柱は止まっています。実走 16m/s ならこの露光で **0.27m** 進むので、
+ *   直線の寄り（154px/m）で **41px** の尾になります。
+ *   ★カットごとに手で決めません。**px/m に比例**するので、寄れば伸び、引けば縮みます。
+ */
+export const MOTION_BLUR_EXPOSURE_SEC = 1 / 60;
+
+/**
+ * ★被写体ブラーの標本数の**上限**（費用の頭打ち）。
+ *   実際の枚数は尾の長さ ÷ `MOTION_BLUR_STEP_PX` で決まるので、引いたカットでは自動的に減ります。
+ *   いちばん寄る `homestretch-side`（53%）で尾 44px ＝ 45 枚なので、48 で頭が当たりません。
+ *   ★上限に当たると間隔が目標より広がり、格子が出ます。**当てないための値**です。
+ */
+export const MOTION_BLUR_SAMPLES = 48;
 
 /**
  * ★コーナー専用カット（斜め前・俯瞰・斜め後方）はコーナー**冒頭のこの距離だけ**入れる。
@@ -613,17 +677,30 @@ export function broadcastV2FinishStyleOf(metersSorted: readonly number[], horseL
 
 /**
  * ★直線→ゴール前のカメラを**連続**に変える（カット無し）。重み w=`broadcastV2AnchorWeight`（残り 160→80m で 0→1）。
- *   接戦: fov 12°→22° に引き、先頭を画面 45% に置いて後続と決勝線を同時に入れる（参考映像のゴール ≈10%）
- *   単独: 望遠のまま（27%）、先頭をやや中央寄り 60% にして決勝線を早めに入れる
+ *   接戦: 引いて先頭を画面 45% に置き、後続と決勝線を同時に入れる（参考映像のゴール ≈10%）
+ *   単独: 寄ったまま、先頭をやや中央寄り 60% にして決勝線を早めに入れる
+ *
+ * 【★`base` を引数にした理由（2026-08-22 の実害）】
+ *   ここは以前 **`SIDE_TELE` を直接**書いていました。`resolveBroadcastV2Scene` は
+ *   `homestretch-side` と `finish-line` の**両方**でこの関数を通すので、
+ *   ★**その 2 つのショットの `camera:` は読まれません。**
+ *
+ *   実害: 直線の寄りを作るため `homestretch-side` の preset を
+ *   `SIDE_TELE`(12°) → `SIDE_LOW`(7.6°) に変えたのに、**画面は 25.1% のまま**でした。
+ *   ★**定義を変えたのに何も起きない**（R-15 の裏返し: 「入っているが使われない」）。
+ *   測定器（`tools/shot-race-at.mjs`）が実プリセットを読んでいたので気づけました。
+ *
+ * → **基準の画角はショット定義から受け取る。** ここが決めてよいのは
+ *   「ゴール前でどれだけ引くか」という**差分**だけです。
  */
 export function broadcastV2FinishCamera(
-  style: BroadcastV2FinishStyle, weight: number,
+  style: BroadcastV2FinishStyle, weight: number, base: ShotCameraPreset = SIDE_TELE, baseLead = 0.78,
 ): { readonly camera: ShotCameraPreset; readonly leadFraction: number } {
   const w = Math.max(0, Math.min(1, weight));
   const targetFov = style === 'contest' ? 22 : 12;
   const targetLead = style === 'contest' ? 0.45 : 0.6;
   return {
-    camera: { ...SIDE_TELE, fovDeg: SIDE_TELE.fovDeg + (targetFov - SIDE_TELE.fovDeg) * w },
-    leadFraction: 0.78 + (targetLead - 0.78) * w,
+    camera: { ...base, fovDeg: base.fovDeg + (targetFov - base.fovDeg) * w },
+    leadFraction: baseLead + (targetLead - baseLead) * w,
   };
 }
