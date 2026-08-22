@@ -22,6 +22,7 @@ export * from './parallax-plate.js';
 export * from './mow-stripes.js';
 export * from './distance-poles.js';
 export * from './crowd.js';
+export * from './infield.js';
 export * from './reference-hud.js';
 export * from './visual-scroll.js';
 export * from './world-textured.js';

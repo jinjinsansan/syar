@@ -89,6 +89,12 @@ if (argv.includes('--from')) {
   for (let t = from; t <= to + 1e-9; t += step) displaySecs.push(Number(t.toFixed(2)));
 }
 if (displaySecs.length === 0) displaySecs = [9, 12, 15, 18, 21, 24];
+/**
+ * ★`--shot <id>` で**台本に無いカットも撮れる**ようにする。
+ *   引き・俯瞰（`aerial` / `fourth-corner-wide` / `second-corner-high`）は台本 v4 から
+ *   落としてあるので、世界を埋めたあとに再判定するにはこれが要ります（設計 3-1）。
+ */
+const forcedShot = argv.includes('--shot') ? argv[argv.indexOf('--shot') + 1] : undefined;
 
 /* ── ★本番と同じ経路（shot-cuts.mjs と同一） ─────────────── */
 const STRATS = ['nige', 'senko', 'sashi', 'oikomi'];
@@ -274,7 +280,8 @@ for (const [index, displaySec] of displaySecs.entries()) {
   // ⚠️ 第4引数は `allFinished`（真偽値）。ここに object を渡すと**常に真**になり、
   //    全時刻が `winner-follow` になります（2026-08-21 に踏んだ）。
   const scene = resolveBroadcastV2Scene(
-    course, horses, { width: W, height: H }, allFinished, { raceDisplaySec: raceD },
+    course, horses, { width: W, height: H }, allFinished,
+    forcedShot === undefined ? { raceDisplaySec: raceD } : { raceDisplaySec: raceD, forceShotId: forcedShot },
   );
 
   const plate = scene.shot.id === 'finish-line' || scene.shot.id === 'winner-follow' ? plates.finish

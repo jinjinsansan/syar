@@ -1,4 +1,5 @@
 import { posOf, type Course } from './course.js';
+import { drawInfield } from './infield.js';
 import type { Ctx2D } from './oblique-draw.js';
 import { cameraBasis, horizonY, project, type PerspectiveCamera } from './perspective.js';
 
@@ -61,6 +62,8 @@ export interface TexturedWorldOptions {
    *   省略すると走路の中央で判定します。
    */
   readonly focusW?: number;
+  /** ★内馬場とダートコース（設計 2-2）。既定で描く。`false` で止める（比較用） */
+  readonly infield?: boolean;
 }
 
 const wrap = (a: number, n: number): number => ((a % n) + n) % n;
@@ -130,6 +133,21 @@ export function drawTexturedWorld<TImage>(
       x += spanPx;
       u0px = 0;
     }
+  }
+
+  /**
+   * ── ★**内馬場とダートコース**（設計 2-2）─────────────────────────
+   *
+   *   芝を敷いたあと、走路の**内側**にもう 1 周（ダート）と内馬場を重ねる。
+   *   ⚠️ 走路の幾何（`laneExtraM`・着順）には触れていません。**描く帯だけ**です。
+   */
+  if (opts.infield !== false) {
+    const groundOf = (s: number, w: number): { x: number; y: number; depth: number } => {
+      const p = posOf(course, s, w);
+      const q = project(cam, basis, { x: p.x, y: p.y, z: 0 });
+      return { x: q.x, y: q.y, depth: q.depth };
+    };
+    drawInfield(ctx, course, groundOf, { width: W, height: H }, { focusS: opts.focusS ?? 0 });
   }
 
   // ── 遠くの地面ほど霞む（空気遠近）: 地平線から 140px を上向きに薄く ─────────
