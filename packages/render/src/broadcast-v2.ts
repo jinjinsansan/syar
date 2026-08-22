@@ -21,7 +21,7 @@ export interface BroadcastV2Shot {
   /** 馬群が画面に収まらないとき、先頭を画面幅のどこに置くか（0〜1・進行方向側が 1）。既定 0.78 */
   readonly leadFraction?: number;
   /**
-   * ★固定カメラ（JRA 中継の 4 角: 直線入口の外側から、奥からこちらへ向かってくる馬群を見る）。
+   * ★固定カメラ（実際の競馬中継の 4 角: 直線入口の外側から、奥からこちらへ向かってくる馬群を見る）。
    *   現在の区間の終点から `sFromSegmentEnd` 先・内ラチから `w` の位置・高さ `upM` にカメラを置き、注視点だけ追う。
    */
   readonly fixedCamera?: { readonly sFromSegmentEnd: number; readonly w: number; readonly upM: number };
@@ -149,7 +149,7 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
   },
   'fourth-corner-front': {
     id: 'fourth-corner-front', view: 'diag-front', target: 'pack', horseAsset: 'diag-front-v2', transitionSec: 0.4,
-    // ★JRA 中継の 4 角: 直線入口の外側・高さ 9m の固定カメラ。馬群が奥から手前へ向かってくる
+    // ★実際の競馬中継の 4 角: 直線入口の外側・高さ 9m の固定カメラ。馬群が奥から手前へ向かってくる
     // fovDeg は上限（距離に応じて自動ズーム: `broadcastV2FixedFov`）
     camera: { backM: 42, upM: 7, sideM: 12, fovDeg: 13.6 },
     fixedCamera: { sFromSegmentEnd: 30, w: 27, upM: 7 },

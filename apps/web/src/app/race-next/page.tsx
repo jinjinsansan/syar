@@ -161,7 +161,7 @@ const CUT_OF: Record<string, Cut> = {
 /** ★ゲート入り（発走前） */
 const CUT_GATE: Cut = { zoom: 1.35, target: 'pack', anchorX: 380, label: 'ゲート入り' };
 /**
- * ★★**ゴール後は1着の馬を追う**（オーナー指示 F-14「JRA は1着の馬をカメラワークが追う」）。
+ * ★★**ゴール後は1着の馬を追う**（オーナー指示 F-14「実際の中継は1着の馬をカメラワークが追う」）。
  *   勝ち馬を画面の右寄りに置き、**後続が左へ流れていく**。
  */
 const CUT_WINNER: Cut = { zoom: 1.9, target: 'winner', anchorX: 800, label: '★ゴール後' };

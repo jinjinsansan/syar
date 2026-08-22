@@ -156,6 +156,11 @@ export function targetDisplaySec(distanceMeter: number): number {
    *   ⚠️ ★目標をこれより短く置くと、**上限で頭打ちになり黙って伸びます**（目標が守られません）。
    *      以前 1600m 30 秒 / 3000m 35 秒と置いたとき、3000m は 39 秒より短くできませんでした。
    *
+   *   ⚠️ ★**上の実測値は古くなりました**（2026-08-22）。直線ぜんぶを実時間にしたので、
+   *      等倍区間が 160m → 400m に伸びています。**1600m の実測は 37.1 秒**で、
+   *      目標 30 秒には届きません。★「30 秒」はこの構成では**達成できない目標**です。
+   *      （R-7: 較正した条件を明記する。条件が変わったので、値も意味も変わりました）
+   *
    *   ★オーナー指示の **1600m = 30 秒**を満たし、他の距離は下限の上を通す折れ線にします。
    */
   /**
@@ -163,9 +168,28 @@ export function targetDisplaySec(distanceMeter: number): number {
    *    道中の送り倍率だけが距離とともに上がって、**1200m の前後で 0.69 倍の段**ができます
    *    （＝似た距離のレースが違う速さで流れる。この関数がそもそも直した不具合）。
    */
+  /**
+   * ★**+7 秒しました**（2026-08-22・直線ぜんぶを実時間にしたため）
+   *
+   *   ⚠️ ★**目標は、達成できる値でなければ意味がありません。**
+   *      直線を実時間にした結果、等倍区間だけで **29.6 秒**（距離によらず一定）になり、
+   *      旧目標（1600m=30 秒）は**どの距離でも 9 秒以上足りません**。
+   *      そのまま置くと `ratesForTarget` は毎回 8 倍の上限に張り付き、
+   *      ★**この関数は何も制御しなくなります**（黙って効かない knob になる）。
+   *
+   *   実測した到達可能な最短（等倍 29.6 秒＋発走 3.9 秒＋道中÷8）:
+   *     1200m 36.1 ／ 1600m 39.3 ／ 2000m 42.5 ／ 2400m 45.7 ／ 3000m 50.6
+   *   ★折れ線の**形は変えず**、その上を通るように持ち上げています。
+   */
+  /**
+   * ★実測の到達可能な最短は、距離にほぼ**線形**でした（等倍区間が距離によらず 29.6 秒で、
+   *   道中だけが距離に比例して伸びるため）:
+   *     1000m 33.7 ／ 1600m 38.5 ／ 2400m 44.9 ／ 3600m 54.6（傾き 0.00805 秒/m）
+   *   ★その **0.8 秒上**を通す 1 本の直線にします。少しだけ上に置くのが要点で、
+   *     ちょうど最短に置くと道中が上限に張り付き、この関数が**何も制御しなくなります**。
+   */
   const d = Math.max(800, distanceMeter);
-  if (d <= 1600) return 26 + ((d - 1200) / 400) * 4;    // 800→22 / 1200→26 / ★1600→30
-  return 30 + (d - 1600) * 0.0075;                      // 2400→36 / 3000→40.5 / 3600→45
+  return 34.5 + (d - 1000) * 0.008;   // 1200→36.1 / ★1600→39.3 / 2400→45.7 / 3600→55.3
 }
 
 /**
@@ -203,10 +227,21 @@ export function targetDisplaySec(distanceMeter: number): number {
  *      ★オーナーが「走り方・サイズとも合格」と評価したゴール前は、
  *        **この区間が実時間だったとき**の画です。
  *
- *   160m にすると 1600m のレース本編は 30.0 → **33.2 秒**（実測）。
- *   ★オーナー了承「30 秒はあくまで基本で、距離やレースによって多少前後するのは問題ない」。
+ * 【★160m → 400m（直線ぜんぶ）に拡げました（2026-08-22・オーナー指示）】
+ *   オーナー指示「**実際の競馬中継を再現すべき**」。実際の中継は**最後の直線に圧縮をかけません。**
+ *
+ *   ⚠️ 160m のとき、**勝負どころが決着後より短い**配分になっていました（実測・シード 42）:
+ *        差し切り（1338〜1410m・72m） **2.00 秒**
+ *        決着後　（1479〜1600m・121m） **6.40 秒**  ← 3.2 倍
+ *      ★いちばん盛り上がる場面が最も速く送られ、決まった後がいちばん長い、という逆の配分です。
+ *
+ *   400m（＝直線の長さ）にすると **差し切り 4.21 秒**（2.1 倍に）／決着後 6.91 秒（比 1.64 倍）。
+ *
+ *   ⚠️ ★**代償は総尺です。** 1600m のレース本編は 34.4 → **37.1 秒**（実測）。
+ *      「レースは 30 秒」は**この構成では届きません**（下の下限の注記を参照）。
+ *      ★オーナーは「実際の中継の再現」を優先すると判断しています。戻すならこの値を縮めます。
  */
-export const GOAL_REAL_TIME_M = 160;
+export const GOAL_REAL_TIME_M = 400;
 /**
  * ★**発走直後を実時間で見せる距離**（m）。
  *   発馬機も世界に固定されているので、ゴール前と同じ理屈で時間圧縮の打ち消しが効きません
@@ -218,7 +253,14 @@ export const GOAL_RATE = 1;
 /** 直線の長さ（m）。`replayPositionModel` の `straightMetersLeft` と揃えること */
 const STRAIGHT_M = 400;
 
-export const FIXED_SPURT_RATE = 2.8;
+/**
+ * ★勝負所（残り 800〜400m）の送り速さ。**2.8 → 5.2**（2026-08-22）。
+ *   直線ぜんぶを実時間にしたぶんの総尺（+7.4 秒）を、ここで取り戻しています
+ *   （41.8 → 37.1 秒）。
+ *   ⚠️ ★上げすぎると道中（8 倍）との差が無くなり、**勝負所が勝負所に見えません。**
+ *      5.2 なら 道中 8 倍 → 勝負所 5.1 倍 → 直線 1 倍 と段階が残ります（実測値）。
+ */
+export const FIXED_SPURT_RATE = 5.2;
 export const FIXED_STRAIGHT_RATE = 2.1;
 
 /**
@@ -243,7 +285,11 @@ export function ratesForTarget(knots: PhaseKnots, targetSec: number): PhaseRates
    *   分けずに数えると、逆算した道中の倍率が**実際より遅く**なり、目標より長くなります。
    */
   const goal = knots.goalSec;
-  const hasGoal = goal !== undefined && goal > knots.straightSec && goal < knots.finishSec;
+  /**
+   * ⚠️ ★`>=` であること。`>` にすると「直線ぜんぶを実時間」（`goalSec === straightSec`）が
+   *    **実時間区間なし**に化けます（上の注記と同じ縮退）。
+   */
+  const hasGoal = goal !== undefined && goal >= knots.straightSec && goal < knots.finishSec;
   const straightRace = Math.max(0, (hasGoal ? goal : knots.finishSec) - knots.straightSec);
   const goalRace = hasGoal ? Math.max(0, knots.finishSec - goal) : 0;
   const tail = startRace / GOAL_RATE + spurtRace / FIXED_SPURT_RATE
@@ -311,10 +357,22 @@ export function timeWarpFor(knots: PhaseKnots, rates: PhaseRates = DEFAULT_PHASE
         return (rates.start ?? 1) + (rates.cruise - (rates.start ?? 1)) * w;
       }
     }
+    /**
+     * ★**直線ぜんぶを実時間にできるようにする**（2026-08-22）
+     *
+     * ⚠️ ★`GOAL_REAL_TIME_M` を直線の長さ以上にすると `goalSec === straightSec` になり、
+     *    下の `goalSec > straightSec` が偽になって★**実時間区間が丸ごと消えていました。**
+     *    実測: 160m → 34.4 秒 ／ 320m → 39.5 秒 ／ **400m → 29.7 秒**（縮む）。
+     *    ★値を大きくしたのに機能が止まる、という縮退です（R-27: 縮退は狭い側へ落とす）。
+     * → 直線の頭から実時間にする、と読み替えます。
+     */
+    const wholeStraightIsReal = goalSec !== undefined && goalSec <= straightSec;
+    const straightRate = wholeStraightIsReal ? (rates.goal ?? 1) : rates.straight;
     if (t <= spurtSec - TRANSITION_SEC / 2) return rates.cruise;
     if (t <= spurtSec + TRANSITION_SEC / 2) return blend(rates.cruise, rates.spurt, spurtSec);
     if (t <= straightSec - TRANSITION_SEC / 2) return rates.spurt;
-    if (t <= straightSec + TRANSITION_SEC / 2) return blend(rates.spurt, rates.straight, straightSec);
+    if (t <= straightSec + TRANSITION_SEC / 2) return blend(rates.spurt, straightRate, straightSec);
+    if (wholeStraightIsReal) return straightRate;
     /**
      * ★ゴール前は実時間へ。**繋ぎ目は他と同じ `smoothstep`** にします
      *   （段で切り替えると「グングン速くなる」が再発します）。

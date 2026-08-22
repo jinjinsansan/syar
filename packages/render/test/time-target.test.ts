@@ -11,18 +11,29 @@
 import { describe, it, expect } from 'vitest';
 import {
   timeWarpFor, ratesForTarget, targetDisplaySec,
-  FIXED_SPURT_RATE, FIXED_STRAIGHT_RATE, type PhaseKnots,
+  FIXED_SPURT_RATE, FIXED_STRAIGHT_RATE, GOAL_REAL_TIME_M, START_REAL_TIME_M, type PhaseKnots,
 } from '../src/index.js';
 
-/** 距離 → だいたいの走破タイム（実測に近い値）で knots を作る */
+/**
+ * 距離 → だいたいの走破タイム（実測に近い値）で knots を作る。
+ *
+ * ⚠️ ★`goalSec` / `startRealSec` も入れること。**本番（`knotsFor`）は必ず入れます。**
+ *    入れずに測ると**実時間区間が無い別の構成**を測ることになり、
+ *    ★本番の配分を一切見ていない検査になります（2026-08-22 に実際そうなっていました）。
+ */
 function knotsOf(distanceMeter: number): PhaseKnots {
   const finish = distanceMeter / 15.6;             // 実測 1600m ≒ 103s に合わせる
   const perM = finish / distanceMeter;
+  const straightSec = (distanceMeter - 400) * perM;
+  const straightRace = finish - straightSec;
   return {
     startSec: 0,
     spurtSec: (distanceMeter - 800) * perM,
-    straightSec: (distanceMeter - 400) * perM,
+    straightSec,
     finishSec: finish,
+    // ★`knotsFor` と同じ式（400m の直線に対して残り GOAL_REAL_TIME_M から実時間）
+    goalSec: straightSec + straightRace * (1 - GOAL_REAL_TIME_M / 400),
+    startRealSec: START_REAL_TIME_M * perM,
   };
 }
 const displayOf = (d: number): number => {
@@ -54,9 +65,15 @@ describe('★距離ごとの時間配分', () => {
     });
     const min = Math.min(...tails), max = Math.max(...tails);
     expect(max - min).toBeLessThan(1.0);
-    // ★約23秒（§4 の設計値）
-    expect(min).toBeGreaterThan(20);
-    expect(max).toBeLessThan(26);
+    /**
+     * ★**約 29.6 秒**（2026-08-22）。
+     *   以前は約 23 秒でした。オーナー指示「実際の競馬中継を再現すべき」により
+     *   **直線ぜんぶを実時間**にした（`GOAL_REAL_TIME_M` 160 → 400）ぶん伸びています。
+     *   ⚠️ ★**距離によらず一定であること**が本題で、値そのものは構成で決まります。
+     *      構成を変えたらここも測り直すこと（R-7）。
+     */
+    expect(min).toBeGreaterThan(27);
+    expect(max).toBeLessThan(32);
   });
 
   it('★★固定の配分だと長距離が長すぎた（対照）', () => {
@@ -100,13 +117,20 @@ describe('★距離ごとの時間配分', () => {
       expect(t[i]! - t[i - 1]!).toBeLessThan(2);
     }
     /**
-     * ★**2026-08-21 にオーナー指示で短縮**（「レースは 30 秒にします」）。
-     *   以前の折れ点（短距離 35 秒 ／ マイル 45 秒）**もオーナー指示**でした。**上書きです。**
-     *   ⚠️ 併せて `FIXED_SPURT_RATE` / `FIXED_STRAIGHT_RATE` を 2.25/1.8 → 2.8/2.1 に上げています
-     *      （等倍区間だけで 25.6 秒あり、上げないと 30 秒に届かなかった）。
+     * ★**2026-08-22 にオーナー指示で伸長**（「実際の競馬中継を再現すべき」）。
+     *
+     *   ⚠️ 指示の履歴（**どれも上書きです**）:
+     *     2026-08-20 以前 … 短距離 35 秒 ／ マイル 45 秒
+     *     2026-08-21      … 「レースは 30 秒にします」
+     *     ★2026-08-22     … 「実際の競馬中継を再現すべき」→ **直線ぜんぶを実時間**
+     *
+     *   直線を実時間にすると等倍区間だけで **29.6 秒**（距離によらず一定）になり、
+     *   30 秒はどの距離でも**達成できません**。★目標は達成できる値でなければ、
+     *   `ratesForTarget` が毎回上限に張り付いて**何も制御しなくなります**。
+     *   → 実測した到達可能な最短の 0.8 秒上を通る直線に置き換えています。
      */
-    expect(targetDisplaySec(1200)).toBeCloseTo(26, 6);
-    expect(targetDisplaySec(1600)).toBeCloseTo(30, 6);
+    expect(targetDisplaySec(1200)).toBeCloseTo(36.1, 6);
+    expect(targetDisplaySec(1600)).toBeCloseTo(39.3, 6);
   });
 
   it('★★道中の送りにも段差がない（1400m と 1500m で跳ばない）', () => {
