@@ -22,6 +22,7 @@ import {
   broadcastV2ShotById,
   type BroadcastV2ShotId,
   broadcastV2AnchorWeight,
+  broadcastV2ContenderFov,
   broadcastV2CutProgress,
   broadcastV2FinishCamera,
   broadcastV2FocusMeters,
@@ -128,7 +129,28 @@ export function resolveBroadcastV2Scene(
     : undefined;
   const startPreset = shot.id === 'start-follow' && options.raceDisplaySec !== undefined
     ? broadcastV2StartCamera(options.raceDisplaySec) : undefined;
-  const cameraPreset = startPreset ?? finish?.camera ?? shot.camera;
+  const basePreset = startPreset ?? finish?.camera ?? shot.camera;
+  /**
+   * ★**争っている馬を画面に収める**（設計外・オーナー指摘 2026-08-22）。
+   *
+   *   固まっていれば寄り、ばらけていれば引く。**画角だけ**を動かします（着順・位置は不変）。
+   *   ⚠️ カメラの**位置**は動かしません。位置を動かすと画の性格まで変わります。
+   */
+  const contenderFov = ((): number | undefined => {
+    const spec = shot.frameContenders;
+    if (spec === undefined || horses.length === 0) return undefined;
+    const lead = horses.reduce((max, h) => Math.max(max, h.s), horses[0]!.s);
+    let tail = lead;
+    for (const h of horses) {
+      if (lead - h.s <= spec.withinM) tail = Math.min(tail, h.s);
+    }
+    // カメラから注視点までの距離（プリセットの3成分から。位置は動かさないので固定値）
+    const distM = Math.hypot(basePreset.backM, basePreset.upM, basePreset.sideM);
+    return broadcastV2ContenderFov(
+      lead - tail, distM, viewport.width / viewport.height, basePreset.fovDeg, spec.maxFovDeg,
+    );
+  })();
+  const cameraPreset = contenderFov === undefined ? basePreset : { ...basePreset, fovDeg: contenderFov };
   const leadFraction = finish?.leadFraction ?? shot.leadFraction;
   const leaders = leading(horses, 1);
   const contenders = leading(horses, Math.min(5, horses.length));

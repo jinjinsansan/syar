@@ -25,6 +25,31 @@ export interface BroadcastV2Shot {
    *   現在の区間の終点から `sFromSegmentEnd` 先・内ラチから `w` の位置・高さ `upM` にカメラを置き、注視点だけ追う。
    */
   readonly fixedCamera?: { readonly sFromSegmentEnd: number; readonly w: number; readonly upM: number };
+  /**
+   * ★**争っている馬を画面に収める**（2026-08-22・オーナー指摘）
+   *
+   * 【何が起きていたか】
+   *   参考に合わせて直線の寄りを 53% にした結果、★**画面に 1〜2 頭しか入らなくなりました。**
+   *   ところがエンジンは**差し・追い込みを出しています**（60 レースの実測: 残り 400m で
+   *   4 番手以下だった馬が勝つのが **35%**、先頭のまま押し切るのは 43%）。
+   *   デモのシード 42 も、勝ち馬 10 番は**追い込み**で、残り 400m は **3 番手・8.1m 差**。
+   *   ★**その差し切りが、全部画面の外で起きていました。**
+   *   オーナー評「最後の直線で最後 2 頭が走って、ただ前の馬が勝つだけ」。
+   *
+   * 【どうするか】
+   *   画角を**馬群の広がりに合わせて動かします。** 固まっていれば寄り（＝参考と同じ 53%）、
+   *   ばらけていれば引いて、争っている馬を全部入れる。
+   *   ★実際の中継のカメラマンがやっていることで、参考の 104s が寄りで成立しているのも
+   *     **その瞬間に馬群が固まっているから**です。
+   *
+   * ⚠️ 着順にも位置にも触れません。**画角だけ**です（憲法 3）。
+   */
+  readonly frameContenders?: {
+    /** 先頭からこの距離までを「争っている馬」とみなす（m） */
+    readonly withinM: number;
+    /** いちばん寄れる画角（＝`camera.fovDeg`）と、いちばん引ける画角 */
+    readonly maxFovDeg: number;
+  };
 }
 
 /**
@@ -134,6 +159,8 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
     // ★直線の寄り（参考 104s と同じ役割）。SIDE_TELE 12° では 25.1% しかなかった
     camera: SIDE_HOMESTRETCH,
     leadFraction: 0.66,
+    // ★勝負どころ。差してくる馬を画面に入れる（固まれば 5.7° まで寄る）
+    frameContenders: { withinM: 12, maxFovDeg: 13 },
   },
   'finish-line': {
     id: 'finish-line', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.3,
@@ -182,6 +209,8 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
   },
   'side-drive': {
     id: 'side-drive', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35, camera: SIDE_LOW,
+    // ★道中〜勝負所。隊列が伸びたら引いて、詰まったら寄る
+    frameContenders: { withinM: 11, maxFovDeg: 13 },
   },
   'fourth-corner-wide': {
     // ★4 角をラチのカーブごと広く（後方・高め）
@@ -424,6 +453,30 @@ export const SCRIPT_V4: readonly { readonly until: number; readonly id: Broadcas
   { until: 0.920, id: 'front-close' },          // 〜1472m  先頭争い（前から）
   { until: 1.0, id: 'finish-line' },            // 〜1600m  ゴール（真横）
 ];
+
+/**
+ * ★**争っている馬が画面に収まる画角**（度）を返す。
+ *
+ * @param spanM      先頭から最後尾の「争っている馬」までの距離（m）
+ * @param distM      カメラから注視点までの距離（m）
+ * @param aspect     画面の横／縦
+ * @param minFovDeg  いちばん寄れる画角（ショットの既定値）
+ * @param maxFovDeg  いちばん引ける画角
+ */
+export function broadcastV2ContenderFov(
+  spanM: number, distM: number, aspect: number, minFovDeg: number, maxFovDeg: number,
+): number {
+  if (!(distM > 1) || !(aspect > 0)) return minFovDeg;
+  /**
+   * ★余白。★1.0 にすると**先頭と最後尾が画面の縁**に来て、抜いた瞬間が切れます。
+   *   馬 1 頭ぶん（2.4m）以上の余白が要るので、比で 1.45 としています。
+   */
+  const needM = Math.max(0, spanM) * 1.45 + 4;
+  // 横の視野が needM になる縦画角
+  const fovY = 2 * Math.atan(needM / (2 * distM * aspect));
+  const deg = (fovY * 180) / Math.PI;
+  return Math.max(minFovDeg, Math.min(maxFovDeg, deg));
+}
 
 /** 閃光トランジションで入るショット */
 export const FLASH_INTO: ReadonlySet<BroadcastV2ShotId> = new Set<BroadcastV2ShotId>(['side-drive']);
