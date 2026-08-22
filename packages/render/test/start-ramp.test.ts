@@ -19,7 +19,7 @@ const shown = (t: number) => Math.max(0, V * t - broadcastV2StartLagM(t, V));
 describe('★発走の立ち上がり', () => {
   it('★★見た目の速さが単調に上がる（行き過ぎて戻らない）', () => {
     let prev = 0, worstDrop = 0;
-    for (let t = 0.1; t <= 3.0; t += 0.05) {
+    for (let t = 0.1; t <= 2.0; t += 0.05) {
       const v = (shown(t) - shown(t - 0.05)) / 0.05;
       worstDrop = Math.max(worstDrop, prev - v);
       prev = v;
@@ -42,8 +42,8 @@ describe('★発走の立ち上がり', () => {
   });
 
   it('★★立ち上がりが終わったら遅れは一定（それ以上ずれない）', () => {
-    const a = broadcastV2StartLagM(3.0, V);
-    for (const t of [3.5, 5, 20, 60]) {
+    const a = broadcastV2StartLagM(1.6, V);
+    for (const t of [2, 3, 20, 60]) {
       expect(broadcastV2StartLagM(t, V)).toBeCloseTo(a, 6);
     }
   });
@@ -55,5 +55,27 @@ describe('★発走の立ち上がり', () => {
       expect(m, `表示位置が ${t.toFixed(2)} 秒で後戻りしています`).toBeGreaterThanOrEqual(prev - 1e-9);
       prev = m;
     }
+  });
+});
+
+describe('★発走の勢い（出だしで加速が最大）', () => {
+  it('★★0.5 秒で実速の半分は出る（ゆっくりに見えない）', () => {
+    /**
+     * ⚠️ ★最初は `smoothstep` にしていました。**微分が 0 から始まる**ので
+     *    0.5 秒たっても実速の **7%** しか出ず、
+     *    ★オーナー評「ゲートの発送がゆっくりになってしまいました　インパクトが悪いです」。
+     */
+    const v = (shown(0.5) - shown(0.45)) / 0.05;
+    expect(v / V, `0.5 秒で実速の ${(v / V * 100).toFixed(0)}% しか出ていません`).toBeGreaterThan(0.45);
+  });
+
+  it('★★加速は出だしがいちばん強い（実際の馬と同じ）', () => {
+    const acc = (t: number): number => ((shown(t + 0.05) - shown(t)) - (shown(t) - shown(t - 0.05))) / 0.0025;
+    expect(acc(0.1), '出だしより後のほうが加速が強くなっています').toBeGreaterThan(acc(1.0));
+  });
+
+  it('★1.6 秒あたりで実速に達する（もたつかない）', () => {
+    const v = (shown(1.6) - shown(1.55)) / 0.05;
+    expect(v / V).toBeGreaterThan(0.97);
   });
 });

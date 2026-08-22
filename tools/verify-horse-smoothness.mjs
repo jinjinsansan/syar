@@ -75,11 +75,12 @@ for (let t = 0; t <= warp.displaySec; t += 1 / FPS) {
     if (p0 !== undefined) {
       const dx = foot.x - p0.x, dy = foot.y - p0.y, ds = size / p0.size - 1;
       if (p0.dx !== undefined) {
-        const r = agg.get(scene.shot.id) ?? { jx: 0, jy: 0, js: 0, n: 0, gate: 0, at: 0 };
+        const r = agg.get(scene.shot.id) ?? { jx: 0, jy: 0, js: 0, n: 0, gate: 0, at: 0, all: [] };
         const jx = Math.abs(dx - p0.dx), jy = Math.abs(dy - p0.dy), js = Math.abs(ds - p0.ds) * 100;
         if (jx > r.jx) { r.jx = jx; r.gate = h.gate; r.at = t; }
         r.jy = Math.max(r.jy, jy);
         r.js = Math.max(r.js, js);
+        r.all.push(jx);
         r.n += 1;
         agg.set(scene.shot.id, r);
       }
@@ -89,15 +90,31 @@ for (let t = 0; t <= warp.displaySec; t += 1 / FPS) {
 }
 
 console.log(`\n=== 馬 1 頭ごとの「動きの跳び」（${FPS}fps・カット内・画面の内側だけ）===\n`);
-console.log('  カット                 横の跳び  縦の跳び  大きさの跳び   最悪の枠/秒');
+console.log('  カット                 横の跳び  ふだん  尖り  縦の跳び  大きさ   最悪の枠/秒');
 let bad = 0;
 for (const [id, r] of agg) {
-  const ng = r.jx > 12 || r.jy > 12 || r.js > 6;
+  const sorted = [...r.all].sort((x, y) => x - y);
+  const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
+  /**
+   * ★**尖り** = いちばん大きい跳び ÷ ふだんの跳び（95% 点）。
+   *
+   *   ⚠️ ★大きさだけで良し悪しは決められません。**固定カメラに馬が近づくと、
+   *      画面上の移動量は本当に増えます**（遠近法）。それは滑らかな加速であって不具合ではない。
+   *   ★不具合は「**ふだんと比べて突出した 1 コマ**」＝尖りとして出ます。
+   */
+  const spike = p95 > 0.05 ? r.jx / p95 : 1;
+  /**
+   * ★**大きさと尖りの両方**で判定します。
+   *   ⚠️ 尖りだけだと、**1.3px が 16 倍**のような「目に見えない尖り」まで拾って役に立ちません。
+   *   ⚠️ 大きさだけだと、**遠近法による滑らかな加速**を不具合と誤判定します。
+   */
+  const ng = (r.jx > 6 && spike > 4) || r.jy > 12 || r.js > 6;
   if (ng) bad += 1;
-  console.log(`  ${ng ? '🔴' : '  '}${id.padEnd(22)}${r.jx.toFixed(1).padStart(8)}${r.jy.toFixed(1).padStart(10)}${(r.js.toFixed(1) + '%').padStart(13)}`
+  console.log(`  ${ng ? '🔴' : '  '}${id.padEnd(22)}${r.jx.toFixed(1).padStart(8)}${p95.toFixed(1).padStart(12)}${(spike.toFixed(1) + '倍').padStart(8)}${r.jy.toFixed(1).padStart(8)}${(r.js.toFixed(1) + '%').padStart(9)}`
     + `   ${r.gate}番 / ${r.at.toFixed(1)}s`);
 }
 console.log('\n  ★「跳び」は 1 コマ間の移動量の変化。等速なら 0 に近い。');
-console.log('    横 12px / 縦 12px / 大きさ 6% を超えると、目に「飛んだ」と見える');
+console.log('    ★**尖り 4 倍**を超えると「ふだんと違う 1 コマ」＝目に「飛んだ」と見える。');
+console.log('    大きさだけでは判定しない（固定カメラに近づくと移動量は本当に増えるため）');
 if (bad > 0) { console.log(`  🔴 ${bad} カットで跳びがあります`); process.exit(1); }
 console.log('  ★どのカットも馬は滑らかです');

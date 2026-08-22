@@ -414,9 +414,15 @@ export function broadcastV2LeadFrameFocusMeters(
   const lead = max - halfFrameM * (2 * leadFraction - 1);
   /**
    * ★しきい値で切り替えると、馬群が広がった瞬間にカメラが跳ぶ（実測 0.25 秒で 3.5m）。
-   *   max(中点, 先頭基準) は連続: 馬群が狭いうちは中点、広がるほど先頭基準に自然に移る。
+   *   中点と先頭基準の大きいほうを採る: 馬群が狭いうちは中点、広がるほど先頭基準に自然に移る。
+   *
+   * ⚠️ ★`Math.max` では**値は連続でも、切り替わる瞬間に増え方（微分）が跳びます。**
+   *    実測（`side-drive` 7.17 秒・12 番）: 馬の画面上の移動が
+   *    **11.6px → 0.0px** と 1 コマで止まる。★オーナー評「滑らかさがなく、馬が飛ぶ印象」。
+   *    → **なめらかな max** にして、境目の手前から少しずつ移します。
    */
-  return Math.max(centre, lead);
+  const band = Math.max(1, halfFrameM * 0.06);
+  return softMax(centre, lead, band);
 }
 
 /**
@@ -491,19 +497,24 @@ export function broadcastV2StartFocus(
  *   ・見た目の速さは 0 から実速へ**単調に**上がり、行き過ぎません
  *   ・全馬に**同じ距離**を引くので、**着差はそのまま**（掛け算ではなく引き算）
  */
-export function broadcastV2StartLagM(raceDisplaySec: number, speedMps: number, rampSec = 3.0): number {
+export function broadcastV2StartLagM(raceDisplaySec: number, speedMps: number, rampSec = 1.6): number {
   if (raceDisplaySec <= 0) return 0;
   const t = Math.min(rampSec, raceDisplaySec);
   /**
-   * 立ち上がりの速さは `v · smoothstep(t/ramp)`。
-   * 実速で走った距離 `v·t` との差が遅れ。smoothstep の積分は
-   *   ∫₀ᵘ (3x²−2x³) dx = u³ − u⁴/2   （u = t/ramp）
+   * ★立ち上がりの速さは `v · (2u − u²)`（u = t/ramp）。**出だしで加速が最大**の形。
+   *
+   * ⚠️ ★最初は `smoothstep`（3u²−2u³）にしていました。**微分が 0 から始まる**ので、
+   *    0.5 秒たっても実速の **7%** しか出ず、
+   *    ★オーナー評「**ゲートの発送がゆっくりになってしまいました　インパクトが悪いです**」。
+   *    実際の馬は**ゲートを出た瞬間がいちばん強く蹴ります。**
+   *    新しい形は 0.5 秒で **53%**、1.5 秒で 100%。
+   *
+   * 実速で走った距離 `v·t` との差が遅れ。`2u−u²` の積分は `u² − u³/3`。
    */
   const u = t / rampSec;
-  const ranEased = speedMps * rampSec * (u * u * u - (u * u * u * u) / 2);
-  const lag = speedMps * t - ranEased;
+  const ranEased = speedMps * rampSec * (u * u - (u * u * u) / 3);
+  return speedMps * t - ranEased;
   // ★ramp を過ぎたら遅れは一定（それ以上ずれない）
-  return lag;
 }
 
 /**
@@ -540,7 +551,46 @@ export function broadcastV2FixedFov(distanceM: number, maxFovDeg: number): numbe
    *   2.8° は 225m で狙いの 22% にちょうど届く値です（2·atan(5.68/225)=2.89°)。
    *   近づけば式のほうが大きくなるので、下限は自然に効かなくなります。
    */
-  return Math.max(2.8, Math.min(maxFovDeg, fov));
+  /**
+   * ★上限・下限は**なめらかに**当てます（2026-08-22）。
+   *
+   * ⚠️ ★`Math.min` / `Math.max` で角を作ると、**当たった瞬間に伸びが止まり**、
+   *    画面上の移動量の増え方が急に変わります。実測（4 角正面 14.53 秒・6 番）:
+   *      画角が 13.286° → **上限 13.600° に到達**した次のコマで、
+   *      馬の横移動が **11.2px → 23.1px** と倍に。★1 コマで 11.9px の跳び。
+   *    ★オーナー評「カーブの曲がり…滑らかさがなく、馬が飛ぶ印象」。
+   *
+   * ★境目の手前から少しずつ寄せれば、**微分が連続**になり角が消えます。
+   */
+  return softClamp(fov, 2.8, maxFovDeg);
+}
+
+/**
+ * ★境目に**なめらかに**近づく clamp。
+ *   境目の手前 `band`（既定は幅の 15%）から smoothstep で寄せるので、
+ *   値そのものも、**増え方（微分）も**途切れません。
+ */
+/**
+ * ★**なめらかな max**。`band` の幅で 2 つの値を混ぜるので、
+ *   どちらが大きいかが入れ替わっても**増え方（微分）が途切れません**。
+ *   ⚠️ `Math.max` は値こそ連続ですが、切り替わりで微分が跳びます（＝画面では「飛ぶ」）。
+ */
+export function softMax(a: number, b: number, band: number): number {
+  if (!(band > 0)) return Math.max(a, b);
+  const u = Math.max(0, Math.min(1, (a - b) / band / 2 + 0.5));
+  const w = u * u * (3 - 2 * u);
+  return b + (a - b) * w;
+}
+
+export function softClamp(x: number, lo: number, hi: number, bandRatio = 0.15): number {
+  if (!(hi > lo)) return Math.max(lo, Math.min(hi, x));
+  const band = (hi - lo) * bandRatio;
+  const smooth = (u: number): number => { const t = Math.max(0, Math.min(1, u)); return t * t * (3 - 2 * t); };
+  if (x >= hi) return hi;
+  if (x <= lo) return lo;
+  if (x > hi - band) return x + (hi - x) * smooth((x - (hi - band)) / band);
+  if (x < lo + band) return x + (lo - x) * smooth(((lo + band) - x) / band);
+  return x;
 }
 
 /** ゴール前のカメラの型: 接戦（引いて並ぶ馬を全員入れる）／単独（寄る） */

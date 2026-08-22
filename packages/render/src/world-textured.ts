@@ -218,8 +218,37 @@ export function drawTexturedWorld<TImage>(
       const sSlice = s1 - step;
       const sx = wrap(sSlice * tex.pxPerM, tex.width);
       const sw = Math.max(1, Math.min(tex.width - sx, step * tex.pxPerM));
+      /**
+       * ★短冊は**傾けて**描きます（2026-08-22）。
+       *
+       * ⚠️ ★以前は `drawImage` で**軸に平行な長方形**として置いていました。
+       *    帯が画面を斜めに横切る場面（コーナー・斜め前）では、
+       *    短冊ごとに上下の位置が違うので★**階段状のブロックの列**に見えます。
+       *    オーナー評「**芝や背景が雑なところがあります**」。
+       *
+       * ★左右の端で上端の高さが違うので、その差だけ**縦にせん断**すれば、
+       *   隣の短冊と辺がぴったり繋がります（左右の辺は垂直なので、せん断だけで一致します）。
+       */
+      const dxPx = Math.max(1, xr - xl) + 0.7;
+      const leftIsFirst = b0.x <= b1.x;
+      const topL = leftIsFirst ? t0.y : t1.y;
+      const topR = leftIsFirst ? t1.y : t0.y;
+      const botL = leftIsFirst ? b0.y : b1.y;
+      const botR = leftIsFirst ? b1.y : b0.y;
+      const canSkew = ctx.save !== undefined && ctx.restore !== undefined && ctx.transform !== undefined;
       slices.push({ depth: (b0.depth + b1.depth) / 2, draw: () => {
-        ctx.drawImage(tex.image, sx, 0, sw, tex.height, xl, top, Math.max(1, xr - xl) + 0.7, dh);
+        if (!canSkew) {
+          ctx.drawImage(tex.image, sx, 0, sw, tex.height, xl, top, dxPx, dh);
+          return;
+        }
+        const kx = dxPx / sw;
+        const ky = ((botL - topL) + (botR - topR)) / 2 / tex.height;
+        const skew = (topR - topL) / sw;             // 元画像 1px あたりの縦のずれ
+        // ★`transform` は現在の変換に**積む**ので、`save`/`restore` で挟む
+        ctx.save!();
+        ctx.transform!(kx, skew, 0, ky, xl - sx * kx, topL - sx * skew);
+        ctx.drawImage(tex.image, sx, 0, sw, tex.height, sx, 0, sw, tex.height);
+        ctx.restore!();
       } });
     }
     // 遠い順に描く（近い帯が手前に重なる）
