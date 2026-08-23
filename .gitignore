@@ -96,3 +96,9 @@ signal-*.jpeg
 apps/web/public/art/*-chroma.png
 #   絵柄の比較用に並べただけの画像
 apps/web/public/art/lab/
+
+# ★3D 検証で使ったモデル（オーナーが購入・または別プロジェクトから複製した資産）
+#   ⚠️ モデル単体を配布・外部公開しないため、リポジトリには入れない。
+#      実装は research/3d-hybrid-20260823 にある。複製手順は同ブランチの
+#      out/hybrid-pack-spike/README.txt を参照。
+/assets-spike/
