@@ -61,8 +61,8 @@ describe('既定台本 v5', () => {
     ]);
   });
 
-  /* ⑤ 台本差は 2 ショットだけ */
-  it('⑤ 旧 v4 との違いはショット 2 個だけ（境界も長さも同じ）', () => {
+  /* ⑤ 台本差は 1 ショットだけ */
+  it('⑤ 旧 v4 との違いはショット 1 個だけ（境界も長さも同じ）', () => {
     expect(SCRIPT_V5.length).toBe(SCRIPT_V4.length);
     const diffs: { index: number; from: string; to: string }[] = [];
     for (let i = 0; i < SCRIPT_V4.length; i += 1) {
@@ -73,17 +73,24 @@ describe('既定台本 v5', () => {
       if (a.id !== b.id) diffs.push({ index: i, from: a.id, to: b.id });
     }
     expect(diffs).toEqual([
-      { index: 3, from: 'fourth-corner-front', to: 'fourth-corner-high' },
       { index: 4, from: 'homestretch-front', to: 'homestretch-side' },
     ]);
   });
 
-  /* ⑥ fourth-corner-high が既定で選ばれる */
-  it('⑥ 第4コーナーで fourth-corner-high が選ばれる', () => {
+  /* ⑥ 第4コーナーは v4 と同じ「前から」 */
+  it('⑥ 第4コーナーは v4 と同じ fourth-corner-front（俯瞰は 2026-08-25 に撤回）', () => {
+    /**
+     * ★当初の v5 はここを `fourth-corner-high`（上・後ろから）にしていました。
+     *   オーナー評「ぴょんぴょんする」→ 2026-08-21 の 12 カット全数判定（後ろ・上からは
+     *   5 戦 5 敗・例外なし）に照らして撤回しました。
+     */
     for (const r of [0.55, 0.60, 0.65]) {
-      expect(shotAt(r, scriptOf('')), `進行 ${r}`).toBe('fourth-corner-high');
+      expect(shotAt(r, scriptOf('')), `進行 ${r}`).toBe('fourth-corner-front');
       expect(shotAt(r, scriptOf('?cinematography=v4')), `進行 ${r} の旧 v4`).toBe('fourth-corner-front');
     }
+    // ★俯瞰はどちらの台本にも残っていない
+    expect(SCRIPT_V5.some((cut) => cut.id === 'fourth-corner-high')).toBe(false);
+    expect(SCRIPT_V4.some((cut) => cut.id === 'fourth-corner-high')).toBe(false);
   });
 
   /* ⑦ homestretch-side が既定で選ばれる */
@@ -118,8 +125,15 @@ describe('既定台本 v5', () => {
       JSON.stringify([...scene.visibleHorses].map((h) => [h.gate, h.s, h.w]).sort());
     expect(idOf(b), '台本で馬の位置が変わった').toBe(idOf(a));
     // ★変わってよいのはショットだけ
+    // ★第4コーナーは両方とも同じショット（俯瞰を撤回したので差が無い）
     expect(a.shot.id).toBe('fourth-corner-front');
-    expect(b.shot.id).toBe('fourth-corner-high');
+    expect(b.shot.id).toBe('fourth-corner-front');
+    /* ★台本の違いが出るのは直線だけ: 先頭 1300m（進行 81%） */
+    const straight: BroadcastV2Horse[] = horses.map((h) => ({ ...h, s: h.s + 340 }));
+    const c = resolveBroadcastV2Scene(course, straight, viewport, false, { script: 'v4' });
+    const d = resolveBroadcastV2Scene(course, straight, viewport, false, { script: 'v5' });
+    expect(c.shot.id).toBe('homestretch-front');
+    expect(d.shot.id).toBe('homestretch-side');
   });
 
   /* ⑨ 順位表の減光と、変えていない値 */

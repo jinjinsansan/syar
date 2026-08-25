@@ -290,52 +290,6 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
 export const BROADCAST_STRIDE_M = 7;
 
 /**
- * ★**このショットだけ、見た目の完歩を長くする**（2026-08-25・オーナー判断）
- *
- * 【何が起きていたか】
- *   オーナー評「**第4コーナーの俯瞰で馬がぴょんぴょんする。絵は良いが走って見えない**」。
- *   脚は 2.07 完歩/秒で回るのに、体が足元の地面に対してほとんど進みません。
- *
- *   ★測る量は「画面上を何 px 進むか」**ではありません。** この台本のカメラは全部
- *   馬群を追う（`target: 'pack'`）ので、馬は画面の中でほとんど動きません。それは
- *   「カメラが追えているか」を測っているだけで、走って見えるかは測っていません。
- *   ★正しくは **1 完歩で足元の地面に対して馬体何個ぶん動くか**（実馬 = 7m ÷ 2.4m = 2.92 馬身）。
- *
- *   `REPORT_P4_2D_OVERHEAD_STRIDE_20260825.md` の実測（seed 42・v5・先頭馬・中央値）:
- *
- *   | ショット | 馬身/完歩 | 実馬比 |
- *   |---|---:|---:|
- *   | `side-drive` | 2.73 | 94% |
- *   | **`fourth-corner-high`** | **1.82** | **62%** ← 指摘された俯瞰 |
- *   | `homestretch-side` | 2.88 | 99%（旧指標では最悪だったが指摘なし） |
- *
- * 【なぜ完歩を伸ばすほうを採ったか】
- *   カメラを動かす案（`backM 14 / upM 18 / sideM 22`）は 86% 止まりで、しかも仰角が
- *   12.9° → 38.2° と**別の画**になり、背景の 1 枚絵（`raceCornerHigh`）との整合が未確認でした。
- *   完歩 9m なら 62% → **77%**（`first-corner-front` と同水準）で、触る範囲はこの俯瞰だけです。
- *
- * 【★「カットをまたぐと脚の速さが変わる」懸念について】
- *   この俯瞰の**前後は両方ともハードカット**です（`side-drive` → high-diag → `homestretch-side`。
- *   `page.tsx` のディゾルブ条件は `FLASH_INTO.has(to) || sameFamily(from, to)` で、
- *   view が side → high-diag → side と変わるためどちらも重なりません）。
- *   画角も向きも素材も一斉に変わる瞬間なので、脚の速さの変化はその切替に紛れます。
- *
- * ⚠️ ★**着順・馬の位置・カメラ定義・台本には触れていません**（憲法 3）。変えたのは
- *    脚のコマ送りの周期だけです。★時刻も乱数も使いません（憲法 4）。
- * ⚠️ ★画面（`apps/web`）と道具（`tools/`）は**この関数を読むこと。**
- *    `BROADCAST_STRIDE_M` を直に読むと、この俯瞰だけオーナーと別の脚を見ることになります（R-30）。
- */
-export const BROADCAST_STRIDE_M_BY_SHOT: ReadonlyMap<BroadcastV2ShotId, number> =
-  new Map<BroadcastV2ShotId, number>([
-    ['fourth-corner-high', 9],
-  ]);
-
-/** ★そのショットの見た目の完歩（m）。指定が無いショットは実馬どおり `BROADCAST_STRIDE_M`。 */
-export function broadcastStrideMFor(shotId: BroadcastV2ShotId): number {
-  return BROADCAST_STRIDE_M_BY_SHOT.get(shotId) ?? BROADCAST_STRIDE_M;
-}
-
-/**
  * ★被写体ブラーの露光時間（秒・設計 1-2）
  *
  * 【★1/60 → 1/200 に下げました（2026-08-22・オーナー指摘）】
@@ -584,16 +538,36 @@ export const SCRIPT_V4: readonly { readonly until: number; readonly id: Broadcas
 /**
  * ★**台本 v5 — 通常 `/race` の既定**
  *
- *   参考映像との差として測定で確定した 2 点だけを、旧 v4 から変える。
- *     ① 第4コーナーを**正面 → 俯瞰**へ  `fourth-corner-front` → `fourth-corner-high`
- *     ② 直線の 18.6 秒を**正面 → 横追従**へ  `homestretch-front` → `homestretch-side`
+ *   参考映像との差として測定で確定した点のうち、★**直線の向きだけ**を旧 v4 から変える。
+ *     ① 直線の 18.6 秒を**正面 → 横追従**へ  `homestretch-front` → `homestretch-side`
  *
  *   ⚠️ ★**それ以外は v4 と同じ**です。`until`（カット境界）も動かしていません。
- *      発走・1 角・道中・ゴールは v4 のまま。
+ *      発走・1 角・道中・**第4コーナー**・ゴールは v4 のまま。
  *   ⚠️ ★**分割していません。** 参考映像にも約 19 秒の長い横追従があるので、
  *      **長さは同じまま向きだけ**を変えています。
  *   ⚠️ ★target とカメラ定義は**各ショットが元から持っているもの**をそのまま使います。
  *      接戦判定・自馬追従・先頭馬追従は足していません。
+ *
+ * 【★第4コーナーを俯瞰にした試みは、オーナー判定で撤回しました（2026-08-25）】
+ *
+ *   v5 は当初、第4コーナーも `fourth-corner-front` → `fourth-corner-high`（上・後ろから）に
+ *   変えていました。★**オーナー評「馬がぴょんぴょんする。絵は良いが走って見えない」。**
+ *
+ *   ⚠️ ★**これは 2026-08-21 に一度決着していた論点でした**（`JUDGE_RACE_CUTS_20260821.md`・
+ *      12 カット全数判定）。**前から**見る 4 カットは全部合格、**後ろ・上から**見る 5 カットは
+ *      ★**5 戦 5 敗・例外なし**。`SCRIPT_V4` はその判定に従って後方・俯瞰を落とした台本です。
+ *      ★**v5 はその 4 角を俯瞰へ戻していました。** 同じ判定に照らさずに参考映像へ寄せたためです。
+ *
+ *   ★対処として「その俯瞰だけ見た目の完歩を 9m にする」（走路方向の圧縮 62% → 77%）を
+ *     一度入れましたが、オーナー評は「**多少いいが、いずれにしても思い切りぴょんぴょん**」。
+ *     ★**完歩の梃子は走路方向の圧縮にしか効かず、胴の上下には効きません。**
+ *     素材の実測（`tools/audit-hop-vs-reach.mjs`）: 矩形の下端を地面に置いたときの胴の上下は
+ *     `high-diag-v4` が **9.8%** で全素材の最大（`side-v6` 6.5% / `diag-front-v3` 6.0% /
+ *     `diag-rear-v2` 4.8%）。**上下が最大の素材に、走路方向の動きが最小の画角**が重なっていました。
+ *
+ *   → ★**第4コーナーは v4 と同じ `fourth-corner-front`（前から）に戻します。**
+ *     完歩 9m は行き場が無くなるので revert しました（記録は
+ *     `REPORT_P4_2D_OVERHEAD_STRIDE_FIX_20260825.md` と `..._20260825.md` に残しています）。
  *
  *   ⚠️ ★**ショット定義の変更は、カメラ平滑化状態の引き継ぎにより後続カットの初期構図にも
  *      影響します。** 台本上は変えていない `finish-line` でも、旧 v4 と絵が約 22.6% 変わります
@@ -601,13 +575,14 @@ export const SCRIPT_V4: readonly { readonly until: number; readonly id: Broadcas
  *   ⚠️ ★進行 88〜93% で馬体が右上の順位表の下を通ります（既知の許容事項・今回は直しません）。
  *
  *   ★旧 v4 は消していません。比較・即時切り戻しは `/race?cinematography=v4`。
+ *   ★v5 と v4 の違いは、いまは**直線の向きだけ**です。
  */
 export const SCRIPT_V5: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
   { until: 0.150, id: 'start-front' },          // 〜240m   v4 と同じ
   { until: 0.330, id: 'first-corner-front' },   // 〜528m   v4 と同じ
   { until: 0.500, id: 'side-drive' },           // 〜800m   v4 と同じ
-  { until: 0.660, id: 'fourth-corner-high' },   // 〜1056m  ★俯瞰へ（v4 は fourth-corner-front）
-  { until: 0.940, id: 'homestretch-side' },     // 〜1504m  ★横追従へ（v4 は homestretch-front）
+  { until: 0.660, id: 'fourth-corner-front' },  // 〜1056m  v4 と同じ（★俯瞰は 2026-08-25 に撤回）
+  { until: 0.940, id: 'homestretch-side' },     // 〜1504m  ★横追従へ（v4 は homestretch-front）★v5 唯一の違い
   { until: 1.0, id: 'finish-line' },            // 〜1600m  v4 と同じ
 ];
 
