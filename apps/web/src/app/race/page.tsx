@@ -346,6 +346,22 @@ interface HighQualityHorseFrame {
  */
 const scriptFromSearch = broadcastV2ScriptFromSearch;
 
+/**
+ * ★**着差の見せ方（γ）を URL で切り替える**（比較用・P4 のデモ画面限定）
+ *
+ *   `/race?contest=1.3` / `?contest=1.6`。指定なし・不正値は**現行（既定 1.0）**へ落とします
+ *   （`cinematography` と同じ作法・R-27: 既定は狭い側へ落とす）。
+ *
+ * ⚠️ ★**本番のサーバー確定経路には入りません**（憲法3）。ここはデモが自分で組むレースだけです。
+ * ⚠️ ★既定値をここに数字で書きません。出どころは `DEFAULT_RACE_BALANCE` の 1 か所です（R-30）。
+ * ⚠️ ★着順には効きません。写像は r について単調なので、γ を変えても着順は同じです。
+ */
+function contestGammaFromSearch(search: string): number {
+  const raw = new URLSearchParams(search).get('contest');
+  const g = raw === null ? Number.NaN : Number(raw);
+  return Number.isFinite(g) && g >= 1 && g <= 3 ? g : DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA;
+}
+
 /** 勝負服・ゼッケンの位置（外接矩形に対する比率）。コマ集合ごとに騎手の姿勢が違うので切り替える */
 interface SilksLayout {
   readonly cropX: number; readonly cropW: number; readonly cropH: number;
@@ -688,7 +704,7 @@ function opaqueBounds(image: FrameImage): HighQualityHorseFrame['source'] {
   };
 }
 
-function build(seed: number, ownGate: number, surface: Surface, trackCondition: TrackCondition): Built {
+function build(seed: number, ownGate: number, surface: Surface, trackCondition: TrackCondition, contestGamma: number): Built {
   const start = (seed * 13) % Math.max(1, POOL.length - FIELD);
   const entrants = POOL.slice(start, start + FIELD).map((h, i) => ({
     horseId: String(i + 1), stats: h.stats, surfaceAptitude: h.surfaceAptitude,
@@ -701,8 +717,12 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     raceId: `r${seed}-${surface}-${trackCondition}`, distance: DIST, surface,
     trackCondition, courseShape: 'oval' as const, baseWeightKg: 55,
   };
-  const result = resolveRace({ conditions, entrants, seed, balance: DEFAULT_RACE_BALANCE });
-  const { pace } = paceOf(entrants, DEFAULT_RACE_BALANCE);
+  /** ★比較用に着差の見せ方だけ差し替える（既定は `DEFAULT_RACE_BALANCE` のまま） */
+  const balance = contestGamma === DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA
+    ? DEFAULT_RACE_BALANCE
+    : { ...DEFAULT_RACE_BALANCE, TIME_GAP_SHAPE_GAMMA: contestGamma };
+  const result = resolveRace({ conditions, entrants, seed, balance });
+  const { pace } = paceOf(entrants, balance);
   const boundaries = replayOf(result, (g) => entrants[g - 1]!.strategy, pace);
   if (!finalOrderMatches(result, boundaries)) throw new Error('映像の着順が確定着順と違います（D-059）');
   const model = replayPositionModel({
@@ -1376,7 +1396,7 @@ export default function RacePage(): React.JSX.Element {
   }, []);
 
   useEffect(() => {
-    try { setBuilt(build(seed, ownGate, surface, trackCondition)); setErr(null); } catch (e) {
+    try { setBuilt(build(seed, ownGate, surface, trackCondition, contestGammaFromSearch(typeof window === 'undefined' ? '' : window.location.search))); setErr(null); } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
     dRef.current = 0;

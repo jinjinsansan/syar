@@ -236,21 +236,46 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
   );
   const baseTimeSec = conditions.distance / speed;
 
+  /**
+   * ★**スコア差 → 着差の写像**（正典 §8.7 / `TIME_GAP_SHAPE_GAMMA`）
+   *
+   *   現行（γ=1.0）は線形です。γ を上げると**レースごとの総差（1着-最下位）を保ったまま**、
+   *   上位を締めて下位を伸ばします。総差が定義から不変なので V-17② は動かず、
+   *   r について単調なので**着順は不変**です（着順は `finalScore` で既に確定しています）。
+   *
+   * ⚠️ ★**γ = 1.0 のときは現行の式をそのまま通します**（下の短絡）。
+   *    代数的に同値でも `Math.pow` を通せば浮動小数の最下位ビットが動きうるためです。
+   *    ★既定経路が 1 ビットも変わらないことを、実装で保証します（P0-fix5 と同じ規律）。
+   */
+  /** スコア差の比 `r_i = (S1 - Si)/S1`（現行と同じ量） */
+  const ratioOf = (score: number): number =>
+    winner.finalScore > 0 ? (winner.finalScore - score) / winner.finalScore : 0;
+  /** ★現行の式そのもの。γ=1.0 はこれを通る */
+  const linearGapOf = (score: number): number =>
+    winner.finalScore > 0
+      ? ((winner.finalScore - score) / winner.finalScore) *
+        baseTimeSec *
+        balance.TIME_GAP_FACTOR
+      : 0;
+  const lastRow = ranked[ranked.length - 1];
+  const ratioLast = lastRow === undefined ? 0 : ratioOf(lastRow.finalScore);
+  const gamma = balance.TIME_GAP_SHAPE_GAMMA;
+  const gapOf = (score: number): number => {
+    if (gamma === 1) return linearGapOf(score);          // ★短絡（既定経路は現行のまま）
+    if (!(ratioLast > 0)) return 0;                      // 全馬同スコア: 現行と同じく全員 0 秒
+    const total = ratioLast * baseTimeSec * balance.TIME_GAP_FACTOR;  // ★総差は現行と同一
+    return total * Math.pow(ratioOf(score) / ratioLast, gamma);
+  };
+  /**
+   * ★**着差ラベルは、確定した `timeGap` の隣接差から取ります**（I-4）。
+   *   ⚠️ 以前は前の馬のスコアから**式を再計算**していました。写像を変えると
+   *      画面に出る差とラベルが食い違います。**同じ写像から出すこと。**
+   */
+  const timeGaps = ranked.map((row) => gapOf(row.finalScore));
+
   const order: RaceResultEntry[] = ranked.map((row, i) => {
-    // §8.7: timeGap_i = (finalScore_1 - finalScore_i) / finalScore_1 * baseTime * 0.55
-    const timeGapSec =
-      winner.finalScore > 0
-        ? ((winner.finalScore - row.finalScore) / winner.finalScore) *
-          baseTimeSec *
-          balance.TIME_GAP_FACTOR
-        : 0;
-    const prev = i === 0 ? null : ranked[i - 1];
-    const prevGap =
-      prev === undefined || prev === null
-        ? 0
-        : ((winner.finalScore - prev.finalScore) / (winner.finalScore || 1)) *
-          baseTimeSec *
-          balance.TIME_GAP_FACTOR;
+    const timeGapSec = timeGaps[i] ?? 0;
+    const prevGap = i === 0 ? 0 : (timeGaps[i - 1] ?? 0);
     return {
       horseId: row.entrant.horseId,
       finishPosition: i + 1,
