@@ -24,6 +24,7 @@ import {
   broadcastV2AnchorWeight,
   broadcastV2ContenderFov,
   broadcastV2CutProgress,
+  broadcastV2CutStartMeters,
   broadcastV2FinishCamera,
   broadcastV2FocusMeters,
   broadcastV2LeadFrameFocusMeters,
@@ -48,6 +49,15 @@ export interface BroadcastV2Scene {
   readonly visibleHorses: readonly BroadcastV2Horse[];
   /** コーナー専用カットの進行率（0→1）。1 枚絵のパン・ズームに使う。カット外は 0 */
   readonly cutProgress: number;
+  /**
+   * ★**馬の絵を左右反転して描くか**（そのカットの中では変わりません）
+   *
+   *   板の絵なので、向きは素材の選び分けと左右反転でしか変わりません。反転を毎コマ
+   *   決めると、コーナーの途中で符号が変わって**馬だけが 1 コマで裏返ります**
+   *   （オーナー評「かくかく曲がっている」）。→ **カットが始まった地点で 1 回だけ**決めます。
+   *   ⚠️ ★描く側はこれを使うこと。自分で向きから決め直すと、また途中で裏返ります。
+   */
+  readonly faceFlip: boolean;
 }
 
 export interface BroadcastV2FrameLibrary<TImage> {
@@ -266,6 +276,21 @@ export function resolveBroadcastV2Scene(
       focusS = broadcastV2StartFocus(focusS, options.raceDisplaySec);
     }
   }
+  /**
+   * ★**左右反転は、このカットが始まった地点で 1 回だけ決めます**（上の `faceFlip` の注記）。
+   *   ⚠️ ゴール後（`allFinished`）は台本の表の外なので、これまでどおり現在地で決めます。
+   *   ⚠️ ディゾルブで直前のショットを描くとき（`forceShotId`）は、**そのショットのカット**の
+   *      始点で決めます。今のカットの始点で決めると、重ねている 0.28 秒だけ裏返ります。
+   */
+  const anchorS = allFinished ? focusS : broadcastV2CutStartMeters(course, leaderS, {
+    script: options.script, shotId: options.forceShotId,
+  });
+  const anchorCam = cameraAt(anchorS);
+  const anchorBasis = cameraBasis(anchorCam);
+  const a0 = posOf(course, anchorS, focusW);
+  const a1 = posOf(course, anchorS + 1, focusW);
+  const aq0 = project(anchorCam, anchorBasis, { x: a0.x, y: a0.y, z: 0 });
+  const aq1 = project(anchorCam, anchorBasis, { x: a1.x, y: a1.y, z: 0 });
   return {
     shot,
     focusS,
@@ -273,6 +298,7 @@ export function resolveBroadcastV2Scene(
     camera: cameraAt(focusS),
     visibleHorses: allFinished ? leaders : horses,
     cutProgress: broadcastV2CutProgress(course, leaderS, options.cornerCutM),
+    faceFlip: (aq1.x - aq0.x) < 0,
   };
 }
 
@@ -456,17 +482,14 @@ export function drawBroadcastV2Scene<TImage>(
    *   実際の中継では、1 つのカットの中で馬が別々の向きに走ることはありません。
    *   **注視点（馬群の中心）の向きを 1 回だけ求めて、全馬に同じものを使います。**
    */
-  const shotView = ((): { viewDeg: number; forwardDx: number } => {
+  const shotView = ((): { viewDeg: number } => {
     const p0 = posOf(course, scene.focusS, scene.focusW);
     const p1 = posOf(course, scene.focusS + 1, scene.focusW);
     const fx = p1.x - p0.x, fy = p1.y - p0.y;
     const vx = p0.x - scene.camera.eye.x, vy = p0.y - scene.camera.eye.y;
     const fl = Math.hypot(fx, fy) || 1, vl = Math.hypot(vx, vy) || 1;
     const cosT = Math.max(-1, Math.min(1, (fx * vx + fy * vy) / (fl * vl)));
-    const basis = cameraBasis(scene.camera);
-    const q0 = project(scene.camera, basis, { x: p0.x, y: p0.y, z: 0 });
-    const q1 = project(scene.camera, basis, { x: p1.x, y: p1.y, z: 0 });
-    return { viewDeg: (Math.acos(cosT) * 180) / Math.PI, forwardDx: q1.x - q0.x };
+    return { viewDeg: (Math.acos(cosT) * 180) / Math.PI };
   })();
   drawPerspectiveHorses(ctx, course, scene.camera, scene.visibleHorses, {
     ...library,
@@ -480,7 +503,8 @@ export function drawBroadcastV2Scene<TImage>(
       const useFront = opts.directionalSets?.front === true && shotView.viewDeg > 120;
       const key: BroadcastV2HorseAssetRole = useRear ? 'diag-rear-v2' : useFront ? 'diag-front-v2' : 'side-v6';
       const set = opts.libraries[key];
-      return { frames: set.frameImagesByGate?.[horse.gate - 1], flip: shotView.forwardDx < 0 };
+      /** ★左右反転は**カットが始まった地点で 1 回だけ**決めたもの（`scene.faceFlip`）。ここで決め直さない */
+      return { frames: set.frameImagesByGate?.[horse.gate - 1], flip: scene.faceFlip };
     } : undefined,
     fieldSize: opts.fieldSize,
     frameOf: opts.frameOf,

@@ -611,6 +611,48 @@ export function broadcastV2ContenderFov(
 }
 
 /** 閃光トランジションで入るショット */
+
+/**
+ * ★**いま映しているカットが始まった地点**（先頭の位置・m）
+ *
+ * 【何のためか】
+ *   馬の絵は板（ビルボード）なので、向きは**素材の選び分けと左右反転**でしか変わりません。
+ *   反転は「馬の進む向きが画面のどちら側を向くか」で決まるため、コーナーを回っている間に
+ *   ★**カットの途中で符号が変わり、馬だけが 1 コマで裏返ります。**
+ *   実測（seed 42・`fourth-corner-front`・表示 19.20s）: 向きが 141°→180° と変わる途中で反転。
+ *   ★オーナー評「**滑らかに曲がっていない。かくかく曲がっている**」。
+ *
+ *   ⚠️ ★これは**この案件で 3 度目の同じ形**です。①順位が入れ替わると注視点の横位置が 237px 飛ぶ
+ *      ②先頭差が境目をまたぐと画角が 1 コマで 13°→6° に跳ぶ ③今回の反転。
+ *      いずれも「**カットの途中で真偽が切り替わる**」ことが原因でした。
+ *   ★この案件の基準は「**カットの途中で跳ぶのは不具合／カットの境目なら許容**」です。
+ *
+ * 【どうするか】
+ *   反転の判定を**そのカットが始まった地点**で 1 回だけ行い、カット中は変えません。
+ *   ここはその「始まった地点」を返します。★台本の表がカット境界を持っているので、
+ *   **境界の値をここで作り直さず、表から引きます**（2 か所に持つと必ず離れる・R-30）。
+ *
+ * @param shotId 指定すると、そのショットのカットの始点を返す（ディゾルブで直前ショットを描くとき用）
+ */
+export function broadcastV2CutStartMeters(
+  course: Course, leaderMeters: number,
+  options: { readonly script?: BroadcastV2Script | undefined; readonly shotId?: BroadcastV2ShotId | undefined } = {},
+): number {
+  const script = options.script ?? 'v4';
+  // ★区間ベースの旧台本（v2）は表を持たないので、いまの地点をそのまま返す（＝これまでどおり）
+  if (script === 'v2') return leaderMeters;
+  const rows = scriptRowsOf(script);
+  const distance = Math.max(1, course.distance);
+  const frac = Math.max(0, leaderMeters) / distance;
+  let prevUntil = 0;
+  for (const row of rows) {
+    const isTarget = options.shotId === undefined ? frac < row.until : row.id === options.shotId;
+    if (isTarget && prevUntil <= frac) return prevUntil * distance;
+    if (frac >= row.until) prevUntil = row.until;
+    else if (options.shotId !== undefined && row.id === options.shotId) return prevUntil * distance;
+  }
+  return prevUntil * distance;
+}
 export const FLASH_INTO: ReadonlySet<BroadcastV2ShotId> = new Set<BroadcastV2ShotId>(['side-drive']);
 
 export function broadcastV2ShotAt(
