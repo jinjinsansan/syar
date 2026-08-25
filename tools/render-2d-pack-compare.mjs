@@ -19,7 +19,16 @@ import path from 'node:path';
 
 const OUT = path.resolve('out/2d-pack-limit');
 const TMP = path.join(OUT, '_tmp');
-const SRC = 'ダービースタリオン/参考映像スターホース版.mp4';
+/**
+ * ★**参考映像の場所は環境変数から受け取ります。**
+ * ⚠️ ★ここに実ファイル名を書くと、他社製品名がコードへ残ります（正典 §0 憲法1）。
+ *    → `REF_VIDEO` に参考映像のパスを入れて実行してください。
+ *      例: `REF_VIDEO="<参考映像のパス>" npx tsx tools/render-2d-pack-compare.mjs`
+ */
+const SRC = process.env.REF_VIDEO;
+if (SRC === undefined || SRC === '') {
+  throw new Error('★参考映像のパスを環境変数 REF_VIDEO で渡してください');
+}
 mkdirSync(TMP, { recursive: true });
 for (const f of ['C:/Windows/Fonts/YuGothB.ttc', 'C:/Windows/Fonts/meiryob.ttc']) {
   try { if (GlobalFonts.registerFromPath(f, 'JPUI')) break; } catch { /* 次へ */ }
