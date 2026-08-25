@@ -27,7 +27,7 @@ import {
   DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt,
 } from '@star/race-engine';
 import {
-  BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES, HORSE_HEIGHT_M,
+  broadcastStrideMFor, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES, HORSE_HEIGHT_M,
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
   paintCrowd, seatMaskFromPixels, seatBandFromPixels,
   cameraBasis, drawBroadcastV2Scene, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
@@ -350,11 +350,11 @@ for (const [index, displaySec] of displaySecs.entries()) {
   drawBroadcastV2Scene(ctx, course, scene, {
     palette, libraries, fieldSize: FIELD,
     /**
-     * ★走行位相は進んだ距離から。★完歩長は**パッケージの定数**を読みます
+     * ★走行位相は進んだ距離から。★完歩長は**パッケージの関数**を読みます（ショットごとに違います）
      *   （以前ここだけ 2.4m と書いてあり、画面の 7m と 2.9 倍ずれていました）。
      */
-    frameOf: (g) => Math.floor((horses.find((h) => h.gate === g)?.s ?? 0) / BROADCAST_STRIDE_M * 8 + g * 2.96) % 8,
-    phaseOf: (g) => (((horses.find((h) => h.gate === g)?.s ?? 0) / BROADCAST_STRIDE_M) + g * 0.37) % 1,
+    frameOf: (g) => Math.floor((horses.find((h) => h.gate === g)?.s ?? 0) / broadcastStrideMFor(scene.shot.id) * 8 + g * 2.96) % 8,
+    phaseOf: (g) => (((horses.find((h) => h.gate === g)?.s ?? 0) / broadcastStrideMFor(scene.shot.id)) + g * 0.37) % 1,
     // ★被写体ブラー: 画面と同じ定数・同じ速度の作り方
     motionBlur: noBlur ? undefined : { exposureSec, samples: MOTION_BLUR_SAMPLES, speedMpsOf },
     // ★ハロン棒の数字（設計 1-7）。画面と同じく書体を渡す

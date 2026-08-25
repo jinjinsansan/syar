@@ -290,6 +290,52 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
 export const BROADCAST_STRIDE_M = 7;
 
 /**
+ * ★**このショットだけ、見た目の完歩を長くする**（2026-08-25・オーナー判断）
+ *
+ * 【何が起きていたか】
+ *   オーナー評「**第4コーナーの俯瞰で馬がぴょんぴょんする。絵は良いが走って見えない**」。
+ *   脚は 2.07 完歩/秒で回るのに、体が足元の地面に対してほとんど進みません。
+ *
+ *   ★測る量は「画面上を何 px 進むか」**ではありません。** この台本のカメラは全部
+ *   馬群を追う（`target: 'pack'`）ので、馬は画面の中でほとんど動きません。それは
+ *   「カメラが追えているか」を測っているだけで、走って見えるかは測っていません。
+ *   ★正しくは **1 完歩で足元の地面に対して馬体何個ぶん動くか**（実馬 = 7m ÷ 2.4m = 2.92 馬身）。
+ *
+ *   `REPORT_P4_2D_OVERHEAD_STRIDE_20260825.md` の実測（seed 42・v5・先頭馬・中央値）:
+ *
+ *   | ショット | 馬身/完歩 | 実馬比 |
+ *   |---|---:|---:|
+ *   | `side-drive` | 2.73 | 94% |
+ *   | **`fourth-corner-high`** | **1.82** | **62%** ← 指摘された俯瞰 |
+ *   | `homestretch-side` | 2.88 | 99%（旧指標では最悪だったが指摘なし） |
+ *
+ * 【なぜ完歩を伸ばすほうを採ったか】
+ *   カメラを動かす案（`backM 14 / upM 18 / sideM 22`）は 86% 止まりで、しかも仰角が
+ *   12.9° → 38.2° と**別の画**になり、背景の 1 枚絵（`raceCornerHigh`）との整合が未確認でした。
+ *   完歩 9m なら 62% → **77%**（`first-corner-front` と同水準）で、触る範囲はこの俯瞰だけです。
+ *
+ * 【★「カットをまたぐと脚の速さが変わる」懸念について】
+ *   この俯瞰の**前後は両方ともハードカット**です（`side-drive` → high-diag → `homestretch-side`。
+ *   `page.tsx` のディゾルブ条件は `FLASH_INTO.has(to) || sameFamily(from, to)` で、
+ *   view が side → high-diag → side と変わるためどちらも重なりません）。
+ *   画角も向きも素材も一斉に変わる瞬間なので、脚の速さの変化はその切替に紛れます。
+ *
+ * ⚠️ ★**着順・馬の位置・カメラ定義・台本には触れていません**（憲法 3）。変えたのは
+ *    脚のコマ送りの周期だけです。★時刻も乱数も使いません（憲法 4）。
+ * ⚠️ ★画面（`apps/web`）と道具（`tools/`）は**この関数を読むこと。**
+ *    `BROADCAST_STRIDE_M` を直に読むと、この俯瞰だけオーナーと別の脚を見ることになります（R-30）。
+ */
+export const BROADCAST_STRIDE_M_BY_SHOT: ReadonlyMap<BroadcastV2ShotId, number> =
+  new Map<BroadcastV2ShotId, number>([
+    ['fourth-corner-high', 9],
+  ]);
+
+/** ★そのショットの見た目の完歩（m）。指定が無いショットは実馬どおり `BROADCAST_STRIDE_M`。 */
+export function broadcastStrideMFor(shotId: BroadcastV2ShotId): number {
+  return BROADCAST_STRIDE_M_BY_SHOT.get(shotId) ?? BROADCAST_STRIDE_M;
+}
+
+/**
  * ★被写体ブラーの露光時間（秒・設計 1-2）
  *
  * 【★1/60 → 1/200 に下げました（2026-08-22・オーナー指摘）】

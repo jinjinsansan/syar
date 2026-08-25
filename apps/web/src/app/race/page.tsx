@@ -46,7 +46,7 @@ import {
   drawRaceTitleCard, drawStartingGate, drawStartCallBand,
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
   broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
-  BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
+  broadcastStrideMFor, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
   paintCrowd, seatMaskFromPixels, seatBandFromPixels,
@@ -1622,10 +1622,15 @@ export default function RacePage(): React.JSX.Element {
        *   位相の個体差 `gate * 2.96` は据え置き。
        */
       /**
-       * ★見た目の周期。実馬は 1 完歩 ≈7m（2.3 完歩/秒）だが、画面では跳ねて見える（ユーザー指摘「ウサギ」）。
-       *   合格に近いと評価されたゴール後の走り（≈1.6〜1.8 完歩/秒）に合わせ 9m とする。
+       * ★見た目の完歩は**ショットごと**に `@star/render` から引きます（`broadcastStrideMFor`）。
+       *   既定は実馬どおり 7m。★`fourth-corner-high`（第4コーナーの俯瞰）だけ 9m です
+       *   —— オーナー指摘「ぴょんぴょんする」への対処で、理由と実測は
+       *   `broadcast-v2.ts` の `BROADCAST_STRIDE_M_BY_SHOT` に書いてあります。
+       *
+       * ⚠️ ★ここに数字を書かないこと。画面と道具が別の脚を回します（R-30）。
+       * ⚠️ ★引くのは**いま描くショット**（`sceneToDraw`）から。`scene`（＝今のショット）からでは
+       *    ありません —— ディゾルブの 0.28 秒は、1 コマの中で前のショットも描くためです。
        */
-      const STRIDE_M = BROADCAST_STRIDE_M;
       /**
        * ★見た目の進行距離 = 真の位置 + Δ（`visual-scroll.ts`）。時間圧縮を打ち消し、
        *   背景の流れと脚の周期を常に実馬の速さにする。ゴール前は Δ=0（決勝線と馬が一致）。
@@ -1696,10 +1701,10 @@ export default function RacePage(): React.JSX.Element {
         directionalSets: art.directionalReady,
         // ★ゲート待機中（raceD=0）は脚を体の下に畳んだ支持局面 pose04（index 3）で静止させる
         frameOf: (gate) => raceD <= 0 ? 3
-          : Math.floor((((metersByGate.get(gate) ?? 0) + visualDelta) / STRIDE_M) * 8 + gate * 2.96) % 8,
+          : Math.floor((((metersByGate.get(gate) ?? 0) + visualDelta) / broadcastStrideMFor(sceneToDraw.shot.id)) * 8 + gate * 2.96) % 8,
         // ★位相（0〜1）: 8 コマ・16 コマどちらの素材でも同じ周期で回る。待機中は pose04 の位相
         phaseOf: (gate) => raceD <= 0 ? 3.5 / 8
-          : ((((metersByGate.get(gate) ?? 0) + visualDelta) / STRIDE_M) + gate * 0.37) % 1,
+          : ((((metersByGate.get(gate) ?? 0) + visualDelta) / broadcastStrideMFor(sceneToDraw.shot.id)) + gate * 0.37) % 1,
         frameRoleOf,
         surface,
         condition: trackCondition,
