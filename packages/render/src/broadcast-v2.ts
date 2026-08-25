@@ -392,6 +392,45 @@ export function broadcastV2SegmentSpan(course: Course, meters: number): { readon
  *   レース距離に対する先頭の位置の比で区間を割り当てる（1600m での目安を括弧に）。
  *   閃光トランジションは 3角斜め後方 → 勝負所サイドの切替（`broadcastV2FlashAt`）。
  */
+/**
+ * ★台本の種類。通常 `/race` の既定は `starhorse-v1`。
+ *   `v2` は区間ベースの旧台本（表を持たない分岐）。
+ *
+ * ⚠️ ★**この下の関数群の既定引数は `v4` のままにしてあります。**
+ *    `script` を渡していない既存の測定ツール・テストが数多くあり、
+ *    そこまで巻き込むと今回の指示の範囲を超えるためです。
+ *    画面の既定は `broadcastV2ScriptFromSearch` が決めます。
+ */
+export type BroadcastV2Script = 'v2' | 'v3' | 'v4' | 'starhorse-v1';
+
+/** ★通常 `/race` の既定台本 */
+export const DEFAULT_RACE_SCRIPT: BroadcastV2Script = 'starhorse-v1';
+/** ★旧台本へ戻すときの値（`/race?cinematography=v4`） */
+export const LEGACY_RACE_SCRIPT: BroadcastV2Script = 'v4';
+
+/**
+ * ★**URL から台本を決める。**
+ *
+ *   - 指定なし        … `starhorse-v1`（既定）
+ *   - `starhorse-v1`  … `starhorse-v1`
+ *   - `v4`            … 旧 v4（比較・即時切り戻し用）
+ *   - 不正値          … `starhorse-v1`（既定へ戻す）
+ *
+ * ⚠️ ★**URL だけで決まります。** localStorage・時刻・乱数では切り替えません（憲法4）。
+ */
+export function broadcastV2ScriptFromSearch(search: string): BroadcastV2Script {
+  const v = new URLSearchParams(search).get('cinematography');
+  if (v === LEGACY_RACE_SCRIPT) return LEGACY_RACE_SCRIPT;
+  return DEFAULT_RACE_SCRIPT;
+}
+
+/** ★台本 → ショット表。`v2` は表を持たないので v4 で代用（呼び出し側が使わない） */
+function scriptRowsOf(script: BroadcastV2Script): readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] {
+  if (script === 'starhorse-v1') return SCRIPT_STARHORSE_V1;
+  if (script === 'v3') return SCRIPT_V3;
+  return SCRIPT_V4;
+}
+
 export const SCRIPT_V3: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
   { until: 0.0375, id: 'start-front' },         // 〜60m   発走（正面の発馬機 → 斜め前で飛び出す）
   /**
@@ -426,10 +465,9 @@ export const SCRIPT_V3: readonly { readonly until: number; readonly id: Broadcas
 
 /** ★台本 v3 でショットが変わる先頭位置（m）。閃光を出す境目もここから引く */
 export function broadcastV2ScriptBoundariesM(
-  course: Course, script: 'v3' | 'v4' = 'v4',
+  course: Course, script: BroadcastV2Script = 'v4',
 ): readonly { readonly meters: number; readonly id: BroadcastV2ShotId }[] {
-  const rows = script === 'v4' ? SCRIPT_V4 : SCRIPT_V3;
-  return rows.map((row) => ({ meters: row.until * course.distance, id: row.id }));
+  return scriptRowsOf(script).map((row) => ({ meters: row.until * course.distance, id: row.id }));
 }
 
 /**
@@ -447,10 +485,9 @@ export function broadcastV2ScriptBoundariesM(
  * → ★**台本のカットの終わり**を基準にします。カットの中では動かないので跳びません。
  */
 export function broadcastV2ShotEndM(
-  course: Course, shotId: BroadcastV2ShotId, script: 'v3' | 'v4' = 'v4',
+  course: Course, shotId: BroadcastV2ShotId, script: BroadcastV2Script = 'v4',
 ): number | undefined {
-  const rows = script === 'v4' ? SCRIPT_V4 : SCRIPT_V3;
-  const row = rows.find((r) => r.id === shotId);
+  const row = scriptRowsOf(script).find((r) => r.id === shotId);
   return row === undefined ? undefined : row.until * course.distance;
 }
 
@@ -499,6 +536,36 @@ export const SCRIPT_V4: readonly { readonly until: number; readonly id: Broadcas
 ];
 
 /**
+ * ★**台本 starhorse-v1 — 通常 `/race` の既定**
+ *
+ *   参考映像（スターホース版）との差として測定で確定した 2 点だけを、旧 v4 から変える。
+ *     ① 第4コーナーを**正面 → 俯瞰**へ  `fourth-corner-front` → `fourth-corner-high`
+ *     ② 直線の 18.6 秒を**正面 → 横追従**へ  `homestretch-front` → `homestretch-side`
+ *
+ *   ⚠️ ★**それ以外は v4 と同じ**です。`until`（カット境界）も動かしていません。
+ *      発走・1 角・道中・ゴールは v4 のまま。
+ *   ⚠️ ★**分割していません。** 参考映像にも約 19 秒の長い横追従があるので、
+ *      **長さは同じまま向きだけ**を変えています。
+ *   ⚠️ ★target とカメラ定義は**各ショットが元から持っているもの**をそのまま使います。
+ *      接戦判定・自馬追従・先頭馬追従は足していません。
+ *
+ *   ⚠️ ★**ショット定義の変更は、カメラ平滑化状態の引き継ぎにより後続カットの初期構図にも
+ *      影響します。** 台本上は変えていない `finish-line` でも、旧 v4 と絵が約 22.6% 変わります
+ *      （seed 42 実測）。これは比較動画で確認・承認した挙動です。
+ *   ⚠️ ★進行 88〜93% で馬体が右上の順位表の下を通ります（既知の許容事項・今回は直しません）。
+ *
+ *   ★旧 v4 は消していません。比較・即時切り戻しは `/race?cinematography=v4`。
+ */
+export const SCRIPT_STARHORSE_V1: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
+  { until: 0.150, id: 'start-front' },          // 〜240m   v4 と同じ
+  { until: 0.330, id: 'first-corner-front' },   // 〜528m   v4 と同じ
+  { until: 0.500, id: 'side-drive' },           // 〜800m   v4 と同じ
+  { until: 0.660, id: 'fourth-corner-high' },   // 〜1056m  ★俯瞰へ（v4 は fourth-corner-front）
+  { until: 0.940, id: 'homestretch-side' },     // 〜1504m  ★横追従へ（v4 は homestretch-front）
+  { until: 1.0, id: 'finish-line' },            // 〜1600m  v4 と同じ
+];
+
+/**
  * ★**争っている馬が画面に収まる画角**（度）を返す。
  *
  * @param spanM      先頭から最後尾の「争っている馬」までの距離（m）
@@ -527,12 +594,12 @@ export const FLASH_INTO: ReadonlySet<BroadcastV2ShotId> = new Set<BroadcastV2Sho
 
 export function broadcastV2ShotAt(
   course: Course, leaderMeters: number, allFinished = false, cornerCutM = CORNER_CUT_M,
-  options: { readonly fourthCornerFront?: boolean | undefined; readonly script?: 'v2' | 'v3' | 'v4' | undefined; readonly winnerRear?: boolean | undefined } = {},
+  options: { readonly fourthCornerFront?: boolean | undefined; readonly script?: BroadcastV2Script | undefined; readonly winnerRear?: boolean | undefined } = {},
 ): BroadcastV2Shot {
   if (allFinished) return options.winnerRear === true ? SHOTS['winner-follow-rear'] : SHOTS['winner-follow'];
   const script = options.script ?? 'v4';
-  if (script === 'v3' || script === 'v4') {
-    const rows = script === 'v4' ? SCRIPT_V4 : SCRIPT_V3;
+  if (script !== 'v2') {
+    const rows = scriptRowsOf(script);
     const frac = Math.max(0, leaderMeters) / Math.max(1, course.distance);
     for (const row of rows) {
       if (frac < row.until) {

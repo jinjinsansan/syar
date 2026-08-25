@@ -45,7 +45,7 @@ import {
   raceIntroAt, RACE_INTRO_RACE_START_SEC, RACE_INTRO_END_SEC,
   drawRaceTitleCard, drawStartingGate, drawStartCallBand,
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
-  broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
+  broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
@@ -338,6 +338,13 @@ interface HighQualityHorseFrame {
     readonly offsetYSourcePx: number;
   } | undefined;
 }
+
+/**
+ * ★**既定の台本は `starhorse-v1`。** 旧 v4 との差は 2 ショットだけです。
+ *   台本表と URL の読み方は `@star/render` 側に 1 つだけ置いてあります（二重管理しない）。
+ *   `/race?cinematography=v4` で旧映像へ即座に戻せます。
+ */
+const scriptFromSearch = broadcastV2ScriptFromSearch;
 
 /** 勝負服・ゼッケンの位置（外接矩形に対する比率）。コマ集合ごとに騎手の姿勢が違うので切り替える */
 interface SilksLayout {
@@ -776,6 +783,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     })), { width: W, height: H }, winnerDone, {
       finishStyle, cornerCutM: CORNER_CUT_M_WEB, raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
       fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
+      script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
     });
     const h = 0.05;
     const lo = Math.max(0, clampedD - h);
@@ -1532,6 +1540,7 @@ export default function RacePage(): React.JSX.Element {
         finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
         raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
         fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
+        script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
         /**
          * ★勝馬追従は**後方をやめ、真横にします**（2026-08-21・オーナー判定）。
          *
@@ -1769,6 +1778,7 @@ export default function RacePage(): React.JSX.Element {
             finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
             raceDisplaySec: d - RACE_INTRO_RACE_START_SEC, forceShotId: change.from,
             fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
+            script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
             // ★本体と同じ設定にすること（食い違うと、重ねる直前のコマだけ別の素材になる）
             winnerRear: false,
           });
@@ -1986,7 +1996,7 @@ export default function RacePage(): React.JSX.Element {
       }
       if (hud.standings) {
         /**
-         * ★**寄ったカットでは順位表を薄くします**（オーナー指摘 2026-08-22）。
+         * ★**寄りでは順位表を最大 25% 減光する。starhorse-v1 の横追従でも可読性を保つ**
          *
          *   馬を参考と同じ大きさ（〜55%）にした結果、右上の順位表が**馬に被る**ようになりました。
          *   ⚠️ ★消してしまうと「今何番手か」が分からなくなるので、**薄くして残します**。
@@ -1995,11 +2005,18 @@ export default function RacePage(): React.JSX.Element {
          *   実測の画面比: 発走 24% ／ 4角正面 24% ／ ゴール 26% ／ 先頭争い 34%
          *                 ／ 勝負所 41% ／ 直線の寄り 53%
          *   → 28% までは通常、45% で最も薄く。
+         *
+         *   ⚠️ ★**減光は 0.6 でした（最も薄いとき 40%）。** 旧 v4 の直線は `homestretch-front` で
+         *      画面比 24% 前後だったのでほとんど発動しませんでしたが、既定を `starhorse-v1` に
+         *      した結果、直線の横追従が 45% の閾値を超え、**いちばん馬が大きい瞬間に順位表が
+         *      いちばん薄くなり、1〜5 着の馬名と着差が読めなくなりました**（進行 86〜88%）。
+         *      → 0.25（最も薄いとき **75%**）へ弱めます。閾値・位置・大きさ・色・`HUD.glass` は
+         *        変えません。控えめにする意図は残したまま、読める濃さで止めます。
          */
         const closeUp = Math.max(0, Math.min(1, (v2HorseRatio - 0.28) / (0.45 - 0.28)));
         const ease = closeUp * closeUp * (3 - 2 * closeUp);
         const prevAlpha = ctx.globalAlpha;
-        ctx.globalAlpha = prevAlpha * (1 - 0.6 * ease);
+        ctx.globalAlpha = prevAlpha * (1 - 0.25 * ease);
         drawStandings(ctx, art.pal as Record<string, string>, vp, FONT, rank.map((h) => ({
           gate: h.gate,
           name: HORSE_NAMES[h.gate - 1] ?? `スター${h.gate}`,

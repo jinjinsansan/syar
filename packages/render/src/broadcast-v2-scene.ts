@@ -32,6 +32,7 @@ import {
   broadcastV2StartFocus,
   type BroadcastV2FinishStyle,
   type BroadcastV2HorseAssetRole,
+  type BroadcastV2Script,
   type BroadcastV2Shot,
 } from './broadcast-v2.js';
 
@@ -108,8 +109,8 @@ export function resolveBroadcastV2Scene(
     readonly forceShotId?: BroadcastV2ShotId;
     /** ★4 角を「奥からこちらへ」の固定カメラにする（正面寄りの素材が揃っているとき） */
     readonly fourthCornerFront?: boolean;
-    /** 台本: 'v3'（既定・アーケード参考映像）／'v2'（区間ベースの旧台本） */
-    readonly script?: 'v2' | 'v3';
+    /** 台本。既定は 'starhorse-v1'。'v4' は URL による旧台本への切り戻し用（`?cinematography=v4`） */
+    readonly script?: BroadcastV2Script;
     /** ★勝馬追従を後方寄りにする（勝馬の後方寄り素材があるとき） */
     readonly winnerRear?: boolean;
   } = {},
@@ -208,7 +209,7 @@ export function resolveBroadcastV2Scene(
        *    カットの終わりならカットの中で動かないので、跳びません。
        *    ⚠️ 台本に無いショット（強制指定など）は従来どおり区間の終点を使います。
        */
-      const shotEnd = broadcastV2ShotEndM(course, shot.id, options.script === 'v3' ? 'v3' : 'v4');
+      const shotEnd = broadcastV2ShotEndM(course, shot.id, options.script ?? 'v4');
       const anchorEnd = shotEnd ?? broadcastV2SegmentSpan(course, leaderS).end;
       const eyePos = posOf(course, anchorEnd + shot.fixedCamera.sFromSegmentEnd, shot.fixedCamera.w);
       const target = posOf(course, atS, focusW);
