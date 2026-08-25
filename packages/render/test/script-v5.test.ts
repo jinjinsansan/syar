@@ -1,5 +1,5 @@
 /**
- * ★**編集台本 starhorse-v1 が通常 `/race` の既定であることの検査**
+ * ★**編集台本 v5 が通常 `/race` の既定であることの検査**
  *
  * ⚠️ ★**製品コードだけで再現できる検査に限ります。**
  *    比較動画・コンタクトシート（`out/`）や未追跡の測定ツールには依存しません。
@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  SCRIPT_V4, SCRIPT_STARHORSE_V1, broadcastV2ShotAt, broadcastV2ScriptFromSearch,
+  SCRIPT_V4, SCRIPT_V5, broadcastV2ShotAt, broadcastV2ScriptFromSearch,
   DEFAULT_RACE_SCRIPT, LEGACY_RACE_SCRIPT, ovalCourse, type BroadcastV2Script,
 } from '../src/index.js';
 import { resolveBroadcastV2Scene, type BroadcastV2Horse } from '../src/broadcast-v2-scene.js';
@@ -27,25 +27,25 @@ const shotAt = (ratio: number, script: BroadcastV2Script): string =>
 /** ★URL から決まる台本（画面と同じ関数を通す・R-30） */
 const scriptOf = (search: string): BroadcastV2Script => broadcastV2ScriptFromSearch(search);
 
-describe('既定台本 starhorse-v1', () => {
-  /* ① 既定が starhorse-v1 */
-  it('① パラメータなしの /race は starhorse-v1', () => {
-    expect(scriptOf('')).toBe('starhorse-v1');
-    expect(scriptOf('?')).toBe('starhorse-v1');
-    expect(scriptOf('?seed=42')).toBe('starhorse-v1');
-    expect(DEFAULT_RACE_SCRIPT).toBe('starhorse-v1');
+describe('既定台本 v5', () => {
+  /* ① 既定が v5 */
+  it('① パラメータなしの /race は v5', () => {
+    expect(scriptOf('')).toBe('v5');
+    expect(scriptOf('?')).toBe('v5');
+    expect(scriptOf('?seed=42')).toBe('v5');
+    expect(DEFAULT_RACE_SCRIPT).toBe('v5');
   });
 
   /* ② 明示指定も同じ */
-  it('② cinematography=starhorse-v1 も既定と同じ', () => {
-    expect(scriptOf('?cinematography=starhorse-v1')).toBe(scriptOf(''));
+  it('② cinematography=v5 も既定と同じ', () => {
+    expect(scriptOf('?cinematography=v5')).toBe(scriptOf(''));
   });
 
   /* ③ 不正値は既定へ戻る */
-  it('③ 不正なフラグ値は starhorse-v1 へ戻る', () => {
+  it('③ 不正なフラグ値は v5 へ戻る', () => {
     for (const q of ['?cinematography=invalid', '?cinematography=', '?cinematography=V4',
-      '?cinematography=v5', '?cinematography=starhorse-v2', '?cinematography=starhorse-V1']) {
-      expect(scriptOf(q), q).toBe('starhorse-v1');
+      '?cinematography=V5', '?cinematography=v6', '?cinematography=v4-old']) {
+      expect(scriptOf(q), q).toBe('v5');
     }
   });
 
@@ -63,11 +63,11 @@ describe('既定台本 starhorse-v1', () => {
 
   /* ⑤ 台本差は 2 ショットだけ */
   it('⑤ 旧 v4 との違いはショット 2 個だけ（境界も長さも同じ）', () => {
-    expect(SCRIPT_STARHORSE_V1.length).toBe(SCRIPT_V4.length);
+    expect(SCRIPT_V5.length).toBe(SCRIPT_V4.length);
     const diffs: { index: number; from: string; to: string }[] = [];
     for (let i = 0; i < SCRIPT_V4.length; i += 1) {
       const a = SCRIPT_V4[i]!;
-      const b = SCRIPT_STARHORSE_V1[i]!;
+      const b = SCRIPT_V5[i]!;
       // ★カット境界（until）は動かしていない
       expect(b.until, `#${i} の境界`).toBe(a.until);
       if (a.id !== b.id) diffs.push({ index: i, from: a.id, to: b.id });
@@ -110,7 +110,7 @@ describe('既定台本 starhorse-v1', () => {
     const frozen = JSON.stringify(horses);
     const viewport = { width: 1280, height: 720 };
     const a = resolveBroadcastV2Scene(course, horses, viewport, false, { script: 'v4' });
-    const b = resolveBroadcastV2Scene(course, horses, viewport, false, { script: 'starhorse-v1' });
+    const b = resolveBroadcastV2Scene(course, horses, viewport, false, { script: 'v5' });
     // ★入力を書き換えていない（憲法3: 描画側は結果に触らない）
     expect(JSON.stringify(horses), '馬の入力が書き換えられた').toBe(frozen);
     // ★どちらの台本でも、映っている馬の (gate, s, w) は同じ
@@ -128,7 +128,7 @@ describe('既定台本 starhorse-v1', () => {
     /**
      * ★**減光は 0.6（最も薄いとき 40%）でした。**
      *   旧 v4 の直線は `homestretch-front` で画面比 24% 前後だったのでほぼ発動しませんが、
-     *   既定を `starhorse-v1` にすると横追従が 45% の閾値を超え、いちばん馬が大きい瞬間に
+     *   既定を `v5` にすると横追従が 45% の閾値を超え、いちばん馬が大きい瞬間に
      *   順位表がいちばん薄くなり、1〜5 着の馬名と着差が読めなくなりました（進行 86〜88%）。
      *   → 0.25（最も薄いとき **75%**）。
      */

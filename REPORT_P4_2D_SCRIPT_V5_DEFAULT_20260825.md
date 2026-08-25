@@ -1,6 +1,6 @@
-# REPORT — starhorse-v1 を通常 /race の既定へ昇格（2026-08-25）
+# REPORT — v5 を通常 /race の既定へ昇格（2026-08-25）
 
-指示書: 実装指示「starhorse-v1を通常 /race の既定候補へ昇格」
+指示書: 実装指示「v5を通常 /race の既定候補へ昇格」
 ★採否は書いていません。commit・push はしていません。
 
 ---
@@ -9,22 +9,22 @@
 
 | ファイル | 変更 |
 |---|---|
-| `packages/render/src/broadcast-v2.ts` | `DEFAULT_RACE_SCRIPT = 'starhorse-v1'` / `LEGACY_RACE_SCRIPT = 'v4'` / `broadcastV2ScriptFromSearch()` を追加。§5 のコメントを記載。カメラ定義（`SHOTS`）は無変更 |
+| `packages/render/src/broadcast-v2.ts` | `DEFAULT_RACE_SCRIPT = 'v5'` / `LEGACY_RACE_SCRIPT = 'v4'` / `broadcastV2ScriptFromSearch()` を追加。§5 のコメントを記載。カメラ定義（`SHOTS`）は無変更 |
 | `packages/render/src/broadcast-v2-scene.ts` | `script` オプションを `BroadcastV2Script` 型へ広げ、固定カメラの終点 `broadcastV2ShotEndM` へ台本をそのまま渡すよう変更。★新しい台本型と固定カメラ終点を正しく伝播させるために必要な変更で、残骸ではありません |
 | `apps/web/src/app/race/page.tsx` | URL の読み方を `@star/render` の関数へ委譲（1 行）。import に 1 語追加。既存の `script:` 3 か所はそのまま |
-| `packages/render/test/starhorse-script-v1.test.ts` | §8 の 10 項目へ書き換え（＋ポート・比較動画の検査で計 12 件） |
-| `tools/capture-starhorse-script-v1.mjs` | 旧 v4 側の URL を `&cinematography=v4` に（既定が反転したため） |
-| `tools/render-starhorse-script-v1-sheets.mjs` | 台本表の写しを削除し `broadcastV2ShotAt` を通すよう変更（§6 二重管理しない） |
+| `packages/render/test/script-v5.test.ts` | §8 の 10 項目へ書き換え（＋ポート・比較動画の検査で計 12 件） |
+| `tools/capture-script-v5.mjs` | 旧 v4 側の URL を `&cinematography=v4` に（既定が反転したため） |
+| `tools/render-script-v5-sheets.mjs` | 台本表の写しを削除し `broadcastV2ShotAt` を通すよう変更（§6 二重管理しない） |
 
 `apps/web/package.json` のポート 3210 は保持。3D・S3・v9 の研究コードは入れていません。
 
 ### 既定の挙動
 
 ```
-指定なし                        → starhorse-v1
-?cinematography=starhorse-v1    → starhorse-v1
+指定なし                        → v5
+?cinematography=v5    → v5
 ?cinematography=v4              → 旧 v4
-不正値                          → starhorse-v1
+不正値                          → v5
 ```
 
 URL だけで決まります（localStorage・時刻・乱数は使っていません／憲法4）。
@@ -42,11 +42,11 @@ URL だけで決まります（localStorage・時刻・乱数は使っていま�
 | URL | HTTP | 着順 | 発走 | 序盤 | 第4コーナー | 直線 | ゴール前 |
 |---|---|---|---|---|---|---|---|
 | `/race` | 200 | 一致 | 基準 | 基準 | 基準 | 基準 | 基準 |
-| `?cinematography=starhorse-v1` | 200 | 一致 | 同 | 同 | 同 | 同 | 同 |
+| `?cinematography=v5` | 200 | 一致 | 同 | 同 | 同 | 同 | 同 |
 | `?cinematography=invalid` | 200 | 一致 | 同 | 同 | 同 | 同 | 同 |
 | `?cinematography=v4` | 200 | 一致 | 同 | 同 | **違** | **違** | **違** |
 
-- `/race` と `starhorse-v1` と `invalid` は 5 点すべて**絵が完全に同じ**
+- `/race` と `v5` と `invalid` は 5 点すべて**絵が完全に同じ**
 - `v4` だけ旧映像。発走・序盤は同じ絵
 - 着順は 4 URL すべて一致
 
@@ -57,13 +57,13 @@ URL だけで決まります（localStorage・時刻・乱数は使っていま�
 
 ## 3. テスト結果
 
-`packages/render/test/starhorse-script-v1.test.ts` — **12 件パス**
+`packages/render/test/script-v5.test.ts` — **12 件パス**
 
 | | 内容 | 結果 |
 |---|---|---|
-| ① | 既定が starhorse-v1 | パス |
-| ② | 明示的な starhorse-v1 も同じ | パス |
-| ③ | 不正値が starhorse-v1 へ戻る（6 通り） | パス |
+| ① | 既定が v5 | パス |
+| ② | 明示的な v5 も同じ | パス |
+| ③ | 不正値が v5 へ戻る（6 通り） | パス |
 | ④ | v4 で旧台本を選べる | パス |
 | ⑤ | 台本差は 2 ショットだけ（境界も同値） | パス |
 | ⑥ | `fourth-corner-high` が選ばれる | パス |
@@ -89,7 +89,7 @@ URL だけで決まります（localStorage・時刻・乱数は使っていま�
 
 ## 5. 途中で見つけたこと
 
-**`out/2d-starhorse-script-v1/seed-474-starhorse-v1.mp4` が消えていました。**
+**`out/2d-script-v5/seed-474-v5.mp4` が消えていました。**
 01:18 時点では存在していた（送付用コピーをそこから作っています）ものが、テストで欠落を検出しました。
 削除の原因は特定できていません。連番 1160 枚は無傷だったので、**撮り直さず同じコマから同じ設定で
 再エンコード**して復元しました（1160 コマ / 30fps / 1280×720、対の一致は再確認済み）。

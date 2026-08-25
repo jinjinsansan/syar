@@ -393,7 +393,7 @@ export function broadcastV2SegmentSpan(course: Course, meters: number): { readon
  *   閃光トランジションは 3角斜め後方 → 勝負所サイドの切替（`broadcastV2FlashAt`）。
  */
 /**
- * ★台本の種類。通常 `/race` の既定は `starhorse-v1`。
+ * ★台本の種類。通常 `/race` の既定は `v5`。
  *   `v2` は区間ベースの旧台本（表を持たない分岐）。
  *
  * ⚠️ ★**この下の関数群の既定引数は `v4` のままにしてあります。**
@@ -401,20 +401,20 @@ export function broadcastV2SegmentSpan(course: Course, meters: number): { readon
  *    そこまで巻き込むと今回の指示の範囲を超えるためです。
  *    画面の既定は `broadcastV2ScriptFromSearch` が決めます。
  */
-export type BroadcastV2Script = 'v2' | 'v3' | 'v4' | 'starhorse-v1';
+export type BroadcastV2Script = 'v2' | 'v3' | 'v4' | 'v5';
 
 /** ★通常 `/race` の既定台本 */
-export const DEFAULT_RACE_SCRIPT: BroadcastV2Script = 'starhorse-v1';
+export const DEFAULT_RACE_SCRIPT: BroadcastV2Script = 'v5';
 /** ★旧台本へ戻すときの値（`/race?cinematography=v4`） */
 export const LEGACY_RACE_SCRIPT: BroadcastV2Script = 'v4';
 
 /**
  * ★**URL から台本を決める。**
  *
- *   - 指定なし        … `starhorse-v1`（既定）
- *   - `starhorse-v1`  … `starhorse-v1`
- *   - `v4`            … 旧 v4（比較・即時切り戻し用）
- *   - 不正値          … `starhorse-v1`（既定へ戻す）
+ *   - 指定なし  … `v5`（既定）
+ *   - `v5`      … `v5`
+ *   - `v4`      … 旧 v4（比較・即時切り戻し用）
+ *   - 不正値    … `v5`（既定へ戻す）
  *
  * ⚠️ ★**URL だけで決まります。** localStorage・時刻・乱数では切り替えません（憲法4）。
  */
@@ -426,7 +426,7 @@ export function broadcastV2ScriptFromSearch(search: string): BroadcastV2Script {
 
 /** ★台本 → ショット表。`v2` は表を持たないので v4 で代用（呼び出し側が使わない） */
 function scriptRowsOf(script: BroadcastV2Script): readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] {
-  if (script === 'starhorse-v1') return SCRIPT_STARHORSE_V1;
+  if (script === 'v5') return SCRIPT_V5;
   if (script === 'v3') return SCRIPT_V3;
   return SCRIPT_V4;
 }
@@ -536,9 +536,9 @@ export const SCRIPT_V4: readonly { readonly until: number; readonly id: Broadcas
 ];
 
 /**
- * ★**台本 starhorse-v1 — 通常 `/race` の既定**
+ * ★**台本 v5 — 通常 `/race` の既定**
  *
- *   参考映像（スターホース版）との差として測定で確定した 2 点だけを、旧 v4 から変える。
+ *   参考映像との差として測定で確定した 2 点だけを、旧 v4 から変える。
  *     ① 第4コーナーを**正面 → 俯瞰**へ  `fourth-corner-front` → `fourth-corner-high`
  *     ② 直線の 18.6 秒を**正面 → 横追従**へ  `homestretch-front` → `homestretch-side`
  *
@@ -556,7 +556,7 @@ export const SCRIPT_V4: readonly { readonly until: number; readonly id: Broadcas
  *
  *   ★旧 v4 は消していません。比較・即時切り戻しは `/race?cinematography=v4`。
  */
-export const SCRIPT_STARHORSE_V1: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
+export const SCRIPT_V5: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
   { until: 0.150, id: 'start-front' },          // 〜240m   v4 と同じ
   { until: 0.330, id: 'first-corner-front' },   // 〜528m   v4 と同じ
   { until: 0.500, id: 'side-drive' },           // 〜800m   v4 と同じ

@@ -109,7 +109,7 @@ export function resolveBroadcastV2Scene(
     readonly forceShotId?: BroadcastV2ShotId;
     /** ★4 角を「奥からこちらへ」の固定カメラにする（正面寄りの素材が揃っているとき） */
     readonly fourthCornerFront?: boolean;
-    /** 台本。既定は 'starhorse-v1'。'v4' は URL による旧台本への切り戻し用（`?cinematography=v4`） */
+    /** 台本。既定は 'v5'。'v4' は URL による旧台本への切り戻し用（`?cinematography=v4`） */
     readonly script?: BroadcastV2Script;
     /** ★勝馬追従を後方寄りにする（勝馬の後方寄り素材があるとき） */
     readonly winnerRear?: boolean;

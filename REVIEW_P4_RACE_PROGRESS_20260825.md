@@ -1,13 +1,13 @@
-# REVIEW — P4 スターホース版への接近：レビュー経緯と確定事項
+# REVIEW — P4 参考映像への接近：レビュー経緯と確定事項
 
 日付: 2026-08-25  
 ブランチ: `p4/race-30sec-cuts`  
-現在 HEAD: `7d62d25` — `中継の台本を starhorse-v1 にする（4角を俯瞰へ・直線を横追従へ）`
+現在 HEAD: `7d62d25` — `中継の台本を v5 にする（4角を俯瞰へ・直線を横追従へ）`
 
 ## 1. 目的
 
 通常 `/race` のレース演出を、参考映像
-`ダービースタリオン/参考映像スターホース版.mp4`
+参考映像（アーケード実機の撮影・リポジトリ外）
 へ近づける。
 
 レビュー側は、推測による修正を止め、参考映像と通常 `/race` を同じ条件で比較し、開発側（Claude Code）へ検証・実装指示を出した。
@@ -70,7 +70,7 @@
 - 既存の `homestretch-side` と `fourth-corner-high` が実画面で成立した。
 - 新素材ではなく台本とresolverが主な改善対象。
 
-## 5. starhorse-v1 の比較結果
+## 5. v5 の比較結果
 
 旧v4から次の2ショットだけを置換した。
 
@@ -94,15 +94,15 @@ homestretch-front   -> homestretch-side
 
 ## 6. 通常 `/race` への昇格
 
-コミット `7d62d25` で通常 `/race` の既定を `starhorse-v1` に変更した。
+コミット `7d62d25` で通常 `/race` の既定を `v5` に変更した。
 
 URL仕様:
 
 ```text
-/race                                  -> starhorse-v1
-/race?cinematography=starhorse-v1      -> starhorse-v1
+/race                                  -> v5
+/race?cinematography=v5      -> v5
 /race?cinematography=v4                -> 旧v4
-不正な cinematography 値               -> starhorse-v1
+不正な cinematography 値               -> v5
 ```
 
 レースエンジン、順位、着差、馬素材、カメラ定義値は変更していない。
@@ -161,7 +161,7 @@ ctx.globalAlpha = prevAlpha * (1 - 0.25 * ease);
 
 ## 10. レビュー側の最終判断
 
-`starhorse-v1` は旧v4より、参考映像の編集文法とレースとしての興奮度の両方で明確に改善している。
+`v5` は旧v4より、参考映像の編集文法とレースとしての興奮度の両方で明確に改善している。
 
 ここまでの主成果は、通常 `/race` の既定映像を実際に変更したこと。追加の素材研究へ戻らず、次は実プレイでの確認と、残る局所的な演出改善だけを扱う。
 
