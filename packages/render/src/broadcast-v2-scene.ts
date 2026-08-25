@@ -141,9 +141,34 @@ export function resolveBroadcastV2Scene(
     const spec = shot.frameContenders;
     if (spec === undefined || horses.length === 0) return undefined;
     const lead = horses.reduce((max, h) => Math.max(max, h.s), horses[0]!.s);
+    /**
+     * ★**「12m 以内か否か」で数えると、馬が境目をまたいだ 1 コマで画角が跳びます。**
+     *
+     * ⚠️ ★実測（seed 42・`homestretch-side` 19.83→19.86 秒）:
+     *      画角 **13.00° → 5.96°**、注視点 **+0.55m/コマ → +2.2m/コマ**
+     *      → 画面上で馬が **1113px 後ろへ跳ぶ**。オーナー評「まるで巻き戻しを見ているよう」。
+     *
+     *    これは注視点の横位置で一度直したのと**同じ間違い**です（下の重みの説明を参照）。
+     *    → 端の馬の効きを**連続**にします。`withinM` までは丸ごと数え、そこから
+     *      3m かけて 0 へ落とすので、境目をまたいでも寄与が少しずつ変わるだけです。
+     *
+     * ★数えるのは「先頭からの差」だけで、着順にも位置にも触れていません（憲法 3）。
+     */
+    /**
+     * ★**落とし方が急だと、そこがまた新しい境目になります。**
+     *   3m で 0 にすると、先頭差 14m あたりで画角が 0.5m の移動につき 3.22° 変わりました
+     *   （`contender-frame-continuity.test.ts` が検出）。→ `withinM` と同じ幅をかけて落とします。
+     */
+    const band = spec.withinM;
+    const weightOf = (gap: number): number => {
+      const u = Math.max(0, Math.min(1, (gap - spec.withinM) / band));
+      return 1 - u * u * (3 - 2 * u);
+    };
     let tail = lead;
     for (const h of horses) {
-      if (lead - h.s <= spec.withinM) tail = Math.min(tail, h.s);
+      const gap = lead - h.s;
+      if (gap <= 0) continue;
+      tail = Math.min(tail, lead - gap * weightOf(gap));
     }
     // カメラから注視点までの距離（プリセットの3成分から。位置は動かさないので固定値）
     const distM = Math.hypot(basePreset.backM, basePreset.upM, basePreset.sideM);
