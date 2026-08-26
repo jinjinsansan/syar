@@ -9,7 +9,9 @@ export type BroadcastV2ShotId =
   | 'side-low' | 'side-close' | 'aerial' | 'side-drive' | 'fourth-corner-wide' | 'front-close'
   | 'start-front' | 'winner-follow-rear'
   // ★直線の正面固定（差してくる馬を奥行きで見せる）
-  | 'homestretch-front';
+  | 'homestretch-front'
+  // ★競り合っている場所を大きく抜く（台本 v6・`contest-focus.ts`）
+  | 'straight-contest';
 
 export type BroadcastV2HorseAssetRole = 'side-v6' | 'diag-front-v2' | 'diag-rear-v2' | 'high-diag-v2' | 'winner-v1';
 
@@ -51,7 +53,69 @@ export interface BroadcastV2Shot {
     readonly withinM: number;
     /** いちばん寄れる画角（＝`camera.fovDeg`）と、いちばん引ける画角 */
     readonly maxFovDeg: number;
+    /**
+     * ★**その馬たちの「絵」が画面幅のどれだけを占めるか**（指示書 §4-4「中央 60〜75%」）
+     *
+     *   ⚠️ ★既定（未指定）は**従来の余白の取り方**（`spanM × 1.45 + 4m`）です。
+     *      ★その式は**馬 1 頭ぶんの絵の幅を勘定に入れていません**。実測（4 seed）では
+     *      主役 5 頭の絵が画面幅の **74.6〜84.6%** を占め、★最大では **102.8%**
+     *      ＝**端の馬が画面外へ切れて**いました。
+     *   ★この値を指定すると、★**絵の外縁まで含めて**その割合になるよう画角を決めます。
+     */
+    readonly fillFraction?: number;
   };
+  /**
+   * ★**このカットへは必ずハードカットで入る**（ディゾルブを禁止する）
+   *
+   *   ⚠️ ディゾルブは `view` の系統が同じとき（`page.tsx` の `sameFamily`）に掛かります。
+   *      ★勝馬の寄りは直前の `finish-line` と**同じ真横**なので、放っておくと重なります。
+   *      指示書 §5-5 は**ハードカット**を要求しています。
+   */
+  readonly hardCutIn?: boolean;
+  /**
+   * ★**注視点を「競り合っている場所」にする**（`contest-focus.ts`）。
+   *
+   *   ⚠️ 既定（未指定）は従来どおり**先頭を画面に置く**追従です。
+   *   ★これを立てたカットでは、★**先頭が画面外になることを許します。**
+   *      後方の 2 頭が競っているなら、そちらを映すのが中継の作法だからです。
+   *   ⚠️ ★馬の位置は動きません。動くのはカメラの向け先だけです（憲法3）。
+   */
+  readonly focusContest?: boolean;
+  /**
+   * ★**このカットで描く馬の頭数の上限**（注視点に近い順）。
+   *
+   * 【★なぜ要るか — オーナー指摘 2026-08-26】
+   *   ⚠️ ★寄りのカット（馬体 46%・画面に入る走路 9.3m）に、密集したレースだと
+   *      ★**10 頭が入ります**（seed 99・残り218m）。重なって**勝負服が破綻**します。
+   *   ★オーナー要求は「この大きさなら 4〜5 頭」。
+   *
+   * ⚠️ ★間引くのは**注視点から遠い順**です。遠い馬は画面の端に居るので、
+   *    ★出入りは端で起き、画面の真ん中で馬が消えることはありません。
+   * ⚠️ ★描画だけの間引きです。着順・位置・HUD の順位表には触れません（憲法3）。
+   */
+  readonly maxVisible?: number;
+  /**
+   * ★**コーナーで「向き」を素材の選び分けから作る**（2026-08-26・オーナー指摘③）
+   *
+   *   ⚠️ ★**このカットだけの振る舞いです。** 承認済みのカット
+   *      （`start-front` 168° / `first-corner-front` 158° / 直線 87°）は**巻き込みません**。
+   *   詳しくは `broadcastV2TurnFacing` の注記。
+   */
+  readonly turnFacing?: boolean;
+  /**
+   * ★**画に収める相手を「主役群」だけに絞る**（指示書 §4-4・2026-08-26）
+   *
+   *   ⚠️ ★`frameContenders` は既定では「先頭から `withinM` 以内の**全馬**」を収めます。
+   *      主役 5 頭の間に着外の馬が挟まっていると、★その馬まで入れるためにカメラが引き、
+   *      ★**主役 5 頭が画面幅の 2〜4 割**まで縮んでいました（実測・§4-4 は 60〜75% を要求）。
+   *
+   *   ⚠️ ★**このカットだけの振る舞いです。** `side-drive`（道中）には掛けません。
+   *      道中は「隊列が伸びたら引く」が正しく、そこに確定着順を持ち込む理由がありません
+   *      （★一度に複数の要因を変えない）。
+   *
+   *   実際の馬番は描画側が `resolveBroadcastV2Scene` の `leadGates` で渡します。
+   */
+  readonly frameLeadGroup?: boolean;
 }
 
 /**
@@ -154,7 +218,41 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
     // ★実際の競馬中継の 4 角: 直線入口の外側・高さ 9m の固定カメラ。馬群が奥から手前へ向かってくる
     // fovDeg は上限（距離に応じて自動ズーム: `broadcastV2FixedFov`）
     camera: { backM: 42, upM: 7, sideM: 12, fovDeg: 13.6 },
-    fixedCamera: { sFromSegmentEnd: 30, w: 27, upM: 7 },
+    /**
+     * ★**カメラを 30m 先 → 90m 先へ**（2026-08-26・指示書 §3-3「カット内で左右が反転しない」）
+     *
+     * 【★カットを詰めるだけでは反転は消えませんでした】
+     *   据え位置は `shotEnd + sFromSegmentEnd`（`broadcast-v2-scene.ts:239`）＝
+     *   ★**カットの終わりに追従**します。だからカットを詰めると**カメラごと動き**、
+     *   同じ掃引を圧縮するだけでした（実測: 3.27s→1.17s に縮めても反転は 1 回のまま）。
+     *   ★30m 先だと**カットの終わりで馬がカメラの真横に来る**ので、そこで必ず裏返ります。
+     *
+     * 【★どれだけ先に置くか】`npx tsx tools/audit-corner-camera-sweep.mjs`（seed 42）
+     *
+     *     カメラ   168°からのずれ   反転   馬高比(始→終)
+     *      30m(旧)     17.7°       ★1 回    21% → 26%
+     *      60m         12.0°       ★1 回    21% → 21%
+     *     ★90m(新)   ★11.1°        なし     21% → 21%
+     *     120m         14.4°        なし     21% → 21%
+     *
+     * 【★横位置 27m → 22m】★これが反転を消した決め手です（製品経路で実測）
+     *
+     *   ★反転は「馬の進行方向が**カメラの方を向く**瞬間」に起きます。カメラが外へ離れるほど
+     *     その向きは**直線方向から大きくずれ**、コーナーを回る途中で必ず通過してしまいます。
+     *     ラチのすぐ外（走路幅 20m に対して 22m）まで寄せると、その向きは直線方向とほぼ同じになり、
+     *     ★**カットが終わるまで通過しません。**
+     *
+     *     横位置   カット内の向き    168°ずれ   ★反転
+     *      27m(旧)  163.1°〜179.9°    11.9°    ★1 回
+     *      24m      162.2°〜179.8°    11.8°     なし
+     *     ★22m(新)  161.6°〜178.7°  ★10.7°     なし
+     *      21m      161.3°〜178.1°    10.1°     なし
+     *
+     *   ⚠️ 22m は**外ラチの 2m 外**です。それより内側はカメラを置ける場所ではありません。
+     *   ⚠️ 馬の大きさは 21% のまま（`broadcastV2FixedFov` が距離に応じて寄るため）。
+     *      ★30m のときの「21%→26%」＝迫ってくる分は減りますが、**裏返りと引き換え**です。
+     */
+    fixedCamera: { sFromSegmentEnd: 90, w: 22, upM: 7 },
   },
   /**
    * ★**直線の正面固定カメラ**（2026-08-22・オーナー指摘「差してくるのが見えない」）
@@ -199,14 +297,93 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
     // ★直線の寄り（参考 104s と同じ役割）。SIDE_TELE 12° では 25.1% しかなかった
     camera: SIDE_HOMESTRETCH,
     leadFraction: 0.66,
-    // ★勝負どころ。差してくる馬を画面に入れる（固まれば 5.7° まで寄る）
-    frameContenders: { withinM: 12, maxFovDeg: 13 },
+    /**
+     * ★勝負どころ。差してくる馬を画面に入れる（固まれば 5.7° まで寄る）
+     *
+     * 【★上限を 13° → 22° にしました（2026-08-26・オーナー決定）】
+     *
+     *   オーナー評 ①「直線で 4〜5 頭のせめぎ合いをゴールまで見せたい」
+     *              ②「最後の直線で馬が巨大化する」
+     *   ★**この 2 つは同じ 1 つの数字の裏表でした。**
+     *
+     *   ⚠️ ★実測（seed 42・30fps）で、この画角は**直線の 18.6 秒ずっと 13.00° に張り付いて**
+     *      いました。＝ `broadcastV2ContenderFov` は「もっと引きたい」と言い続けているのに、
+     *      **上限で止められていた**ということです。引けないから 2 頭しか入らず、
+     *      引けないから残った 2 頭が大きい。
+     *
+     * 【★上限だけでは足りず、`withinM` も 12 → 16 にしました】
+     *
+     *   実測（4 seed・γ=1.3＝デモ画面と同条件・`tools/audit-horse-size.mjs`）:
+     *
+     *     withinM / 上限   馬高比p50   面積p50   画角p50   頭数(中央)   ★最少頭数
+     *      12 / 13°(旧)      26.5%      6.7%     13.0°       5 頭        ★2 頭
+     *      12 / 22°          21.7%      4.5%     16.1°       6 頭        ★2 頭  ← ★上限だけでは足りない
+     *     ★16 / 22°(新)     17.2%    ★2.8%     20.5°       8 頭          3 頭
+     *      20 / 22°          16.2%      2.5%     22.0°       8 頭        ★5 頭
+     *     （参考映像）        14.1%    ★2.8%       —        3〜8 頭
+     *
+     *   ★**上限を上げただけでは最少頭数が 2 のまま**でした。直線の終盤は隊列が
+     *     `withinM = 12m` の帯からはみ出すので、★**カメラが「争っている」と見なす相手が
+     *     2 頭しか残らない**のが理由です。効いていたのは上限ではなく**帯の幅**でした。
+     *
+     *   ★**16 を採ったのは、面積が参考映像と一致する（2.8%）から**です。
+     *   ⚠️ **20 にすれば最少 5 頭**になりますが、画角が p50 22.0° ＝ **また上限に張り付き**、
+     *      20m（≒8 馬身）後ろの馬まで「争っている」として画に入れることになります。
+     *      ★**在る競り合いを見せるのが上限で、無い競り合いを作ってはいけません。**
+     *      → 最少 5 頭が要るなら 20 に上げられます（オーナー判断）。
+     *
+     * ⚠️ ★**「馬高比」だけでは②を見落とします。** 真横素材 `side-v6` の中身は 幅÷高さ = **1.71**、
+     *    斜め前 `diag-front-v3` は **0.77** で、★**同じ高さでも真横は 2.22 倍横に広い**。
+     *    v4（正面）→ v5（真横）で高さは +18% でも、**面積は 3.1 倍**になっていました。
+     *    → 判断は**面積**で見ること（`tools/audit-horse-size.mjs` と本表）。
+     *
+     * ⚠️ ★カメラの**位置**は動かしていません（`SIDE_HOMESTRETCH` のまま）。画角だけです。
+     *    着順・馬の位置・素材・台本・カット境界には触れていません（憲法3）。
+     * ⚠️ ★下限（`SIDE_HOMESTRETCH.fovDeg` = 5.7°）は**動かしていません**。
+     *    隊列が伸びたときに引ける幅が広がっただけで、固まったときの寄りは従来どおりです。
+     */
+    /**
+     * ★`fillFraction` は指示書 §4-4「中央 60〜75%」のまん中を採ります。
+     *   ⚠️ ★これが無いと主役 5 頭の絵が画面幅の 74.6〜84.6%（最大 102.8%＝端が切れる）でした。
+     */
+    frameContenders: { withinM: 16, maxFovDeg: 22, fillFraction: 0.68 },
+    /** ★収める相手は主役 5 頭だけ（§4-4）。着外の馬に引っ張られて引かない */
+    frameLeadGroup: true,
   },
   'finish-line': {
     id: 'finish-line', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.3,
     // ★実際のカメラは展開で決まる（`broadcastV2FinishCamera`）: 接戦は引いて全員、単独は寄る。ここは既定値
     camera: SIDE_TELE,
     leadFraction: 0.78,
+    /**
+     * ★**決着のカットでも主役 5 頭を画に入れる**（2026-08-26・指示書 §4-4／§9）
+     *
+     * 【★何が起きていたか — ★実画面で見つけました】
+     *   ⚠️ ★`homestretch-side` の構図を直しただけでは、★**最後の 96m が直っていませんでした。**
+     *      台本 v5 の最後の 6% は `finish-line` で、★このカットには
+     *      `frameContenders` が**付いていませんでした**。
+     *   ★実測（`npx tsx tools/audit-climax-camera.mjs --shot finish-line`・4 seed）:
+     *
+     *       画面内の頭数（中央値）  主役 5 頭の絵が画面幅に占める割合
+     *         **1〜2 頭**            40.4% / 95.3% / 95.8% / 82.9%（★最大 103.1% ＝ 端が切れる）
+     *
+     *   ★つまりオーナー評「**最後の直線で最後 2 頭が走って、ただ前の馬が勝つだけ**」は、
+     *     ★**決着の 5 秒間にそのまま残っていました。**
+     *
+     * 【★なぜ引く必要があるか】
+     *   ⚠️ ★残り 60m で表示オフセットは **0**（指示書 §1・結果不変の根拠）。
+     *      ★だから決着のカットでは主役 5 頭は**本来どおり 17〜21m に伸びています。**
+     *      ★演出では詰められないので、ここは**画角で入れるほかありません。**
+     *   ★引くのは「攻防を作るため」ではなく「★**もう起きている決着を切らないため**」です
+     *     （指示書 §4-1 が禁じているのは、引くことで攻防を作ったことにする代用です）。
+     *
+     * 【★どれだけ引くか】21m ＋ 馬 1 頭ぶんの絵（4.1m）を 68% に収めるには **24.7°** 要ります。
+     *   ★上限 26° にすると、馬は画面高の **12.2%**（参考映像は 14.1%）。
+     *   ⚠️ ★下限（`SIDE_TELE.fovDeg`）と**カメラの位置**は動かしていません。
+     *   ⚠️ ★寄りの見せ場は直後の `winner-follow`（画面高 39.8%）が受け持ちます。
+     */
+    frameContenders: { withinM: 24, maxFovDeg: 26, fillFraction: 0.68 },
+    frameLeadGroup: true,
   },
   'start-front': {
     // ★発走（アーケード参考映像 39〜49s）: 正面の発馬機 → 斜め前から馬群がこちらへ飛び出す。待機中は注視点をゲート付近に固定
@@ -215,6 +392,30 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
   },
   'side-low': {
     id: 'side-low', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35, camera: SIDE_LOW,
+  },
+  /**
+   * ★**競り合いを大きく抜く**（台本 v6 の ①③・2026-08-26 オーナー要求）
+   *
+   * 【★何が問題だったか】
+   *   `side-low` と同じカメラ（7.6°・馬体 46%）ですが、★**見る場所が違います。**
+   *   ⚠️ ★実測（`tools/audit-straight-spread.mjs`）で、上位 5 頭は直線を通して **19〜21m**
+   *      に伸びており、46% の画面に入る走路は **9.2m**。★5 頭は入りません。
+   *   ★しかし（`tools/audit-real-overtakes.mjs`）★**追い抜きは実在します**
+   *     （seed 42 で 3 回・14 で 9 回・332 で 4 回・474 で 4 回。★演出なしで）。
+   *   ★先頭に固定していたので、★**その競り合いが毎回画面の外**にありました。
+   *
+   * 【★どうするか】
+   *   ★注視点を競り合っている場所へ寄せます（`contestFocusMeters`）。
+   *   ★**馬は 1mm も動かしません。** だから見かけの速度は本来のままです。
+   *
+   * ⚠️ ★このカットでは**先頭が画面外になることがあります。** それは不具合ではなく、
+   *    ★「後方の差し合いを抜いている」という中継の意図です。
+   */
+  'straight-contest': {
+    id: 'straight-contest', view: 'side', target: 'pack', horseAsset: 'side-v6',
+    transitionSec: 0.35, camera: SIDE_LOW, focusContest: true,
+    /** ★この大きさで映すのは 4〜5 頭まで（`maxVisible` の注記・オーナー指摘） */
+    maxVisible: 5,
   },
   'side-close': {
     id: 'side-close', view: 'side', target: 'contenders', horseAsset: 'side-v6', transitionSec: 0.35, camera: SIDE_CLOSE,
@@ -270,8 +471,18 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
   },
   'winner-follow': {
     id: 'winner-follow', view: 'side', target: 'winner', horseAsset: 'winner-v1', transitionSec: 0.4,
-    // 勝馬は一回り寄る（画面高の約 35%）
-    camera: { backM: 34, upM: 5, sideM: 7, fovDeg: 12 },
+    /**
+     * ★**勝馬の寄り**（指示書 §5-3「馬体が画面高の 35〜45%」）
+     *
+     *   ⚠️ ★実測（`npx tsx tools/audit-winner-closeup.mjs`）で **33.1%** しかなく、
+     *      要求の下限 35% を**下回っていました**。コメントは「約 35%」と書いてありましたが、
+     *      ★**測ると違いました**（定義が在るだけで満たしているとは限らない・指示書 §5 の注記）。
+     *   ★画角 12° → **10°** に寄せて **39.7%**（35〜45% の中央）にします。
+     *   ⚠️ カメラの位置（34/5/7）は動かしていません。画角だけです。
+     */
+    camera: { backM: 34, upM: 5, sideM: 7, fovDeg: 10 },
+    /** ★直前の `finish-line` と同じ真横なので、放っておくと重なる。§5-5 はハードカット */
+    hardCutIn: true,
   },
 };
 
@@ -401,12 +612,17 @@ export function broadcastV2SegmentSpan(course: Course, meters: number): { readon
  *    そこまで巻き込むと今回の指示の範囲を超えるためです。
  *    画面の既定は `broadcastV2ScriptFromSearch` が決めます。
  */
-export type BroadcastV2Script = 'v2' | 'v3' | 'v4' | 'v5';
+export type BroadcastV2Script = 'v2' | 'v3' | 'v4' | 'v5' | 'v6';
 
 /** ★通常 `/race` の既定台本 */
 export const DEFAULT_RACE_SCRIPT: BroadcastV2Script = 'v5';
 /** ★旧台本へ戻すときの値（`/race?cinematography=v4`） */
 export const LEGACY_RACE_SCRIPT: BroadcastV2Script = 'v4';
+/**
+ * ★**最後の直線をカットで割る台本**（`/race?cinematography=v6`）。
+ *   ⚠️ ★まだ既定ではありません。オーナーの目視判定が済むまで opt-in のままにします。
+ */
+export const CUT_RACE_SCRIPT: BroadcastV2Script = 'v6';
 
 /**
  * ★**URL から台本を決める。**
@@ -421,11 +637,17 @@ export const LEGACY_RACE_SCRIPT: BroadcastV2Script = 'v4';
 export function broadcastV2ScriptFromSearch(search: string): BroadcastV2Script {
   const v = new URLSearchParams(search).get('cinematography');
   if (v === LEGACY_RACE_SCRIPT) return LEGACY_RACE_SCRIPT;
+  /**
+   * ★**`?cinematography=v6` で「直線を 4 カットに割る」台本**（`SCRIPT_V6` の注記）。
+   *   ⚠️ ★既定は **v5 のまま**です。v6 は明示したときだけ選ばれます。
+   */
+  if (v === CUT_RACE_SCRIPT) return CUT_RACE_SCRIPT;
   return DEFAULT_RACE_SCRIPT;
 }
 
 /** ★台本 → ショット表。`v2` は表を持たないので v4 で代用（呼び出し側が使わない） */
 function scriptRowsOf(script: BroadcastV2Script): readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] {
+  if (script === 'v6') return SCRIPT_V6;
   if (script === 'v5') return SCRIPT_V5;
   if (script === 'v3') return SCRIPT_V3;
   return SCRIPT_V4;
@@ -580,11 +802,117 @@ export const SCRIPT_V4: readonly { readonly until: number; readonly id: Broadcas
 export const SCRIPT_V5: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
   { until: 0.150, id: 'start-front' },          // 〜240m   v4 と同じ
   { until: 0.330, id: 'first-corner-front' },   // 〜528m   v4 と同じ
-  { until: 0.500, id: 'side-drive' },           // 〜800m   v4 と同じ
-  { until: 0.660, id: 'fourth-corner-front' },  // 〜1056m  v4 と同じ（★俯瞰は 2026-08-25 に撤回）
+  /**
+   * ★**第4コーナーのカット窓を狭めました**（2026-08-26・指示書 §3-2）
+   *
+   * 【★何が不合格だったか】
+   *   斜め前素材は **α=12°（＝ viewDeg 168°）**で描かれています。ところがこのカットは
+   *   ★**viewDeg 141.6° 〜 179.9°**（168° から最大 **26.4°** ずれる）を 3.27 秒かけて通っていました。
+   *   入口の 141.6° では正しい見かけ幅の **1.8 分の 1** しかなく、★**ずっと正面を向いた絵**でした。
+   *   → オーナー評「**斜め向いたまま曲がっている**」。
+   *
+   *   ⚠️ ★横に縮める案も、素材を入れ替える案も**不合格**です（指示書 §3-1）。
+   *      横縮小は回転ではなく、入替は 1 コマで絵の中身が跳びます。
+   *
+   * 【★編集で不自然な角度を見せない】
+   *   ⚠️ ★**カットを詰めるだけでは反転は消えません。** 固定カメラは `shotEnd` 基準なので
+   *      カットごと動きます。★反転を消したのは**カメラの据え直し**（上の `fixedCamera`）で、
+   *      ここで詰めているのは**角度の窓**です。両方要ります。
+   *
+   *   実測（`npx tsx tools/audit-corner-cut-window.mjs`・seed 42・カメラ 90m/22m）:
+   *
+   *     side-drive の until   4 角の長さ   カット内の向き     168°ずれ   反転
+   *      0.500（旧）           3.27s      141.6°〜179.9°     26.4°    ★1 回
+   *      0.520                 1.73s      151.2°〜178.7°     16.8°     なし
+   *     ★0.540（新）          1.33s      156.8°〜178.7°   ★11.2°     なし
+   *      0.555                 1.00s      159.2°〜178.7°     10.7°     なし
+   *
+   *   ★**0.540 を採りました。** これ以上詰めてもずれはほとんど縮まず、カットが短くなるだけです。
+   *   ★168° からのずれは **±11.2°**（旧 26.4° の半分以下）。素材が描かれている角度の近くだけを見せます。
+   *
+   * ⚠️ ★出口は**ハードカット**です。`fourth-corner-front` は view が `diag-front`、
+   *    `homestretch-side` は `side` で**系統が違う**ため、ディゾルブは掛かりません
+   *    （`page.tsx` の `sameFamily` 判定）。指示書 §3-2-4「方向素材間のディゾルブは使わない」を満たします。
+   *
+   * ⚠️ ★短くなった分は前後の**真横カット**（`side-drive` / `homestretch-side`）が受けます。
+   *    どちらも承認済みのカットで、向きは 87〜89° と一定です。
+   */
+  { until: 0.540, id: 'side-drive' },           // 〜864m   ★0.500 から延長（4 角を後ろへずらした分）
+  { until: 0.604, id: 'fourth-corner-front' },  // 〜966m   ★1.33 秒・反転 0 回・168°ずれ ±11.2°
   { until: 0.940, id: 'homestretch-side' },     // 〜1504m  ★横追従へ（v4 は homestretch-front）★v5 唯一の違い
   { until: 1.0, id: 'finish-line' },            // 〜1600m  v4 と同じ
 ];
+
+/**
+ * ★**台本 v6 — 最後の直線を 4 カットに割る**（2026-08-26・オーナー決定「JRA の中継のように」）
+ *
+ * 【★なぜ割るのか — 1 カットでは原理的に両立しないから】
+ *   オーナー要求は「差し・追い込み・逃げ・先行がドラマチックに読める」＋「馬が大きい」。
+ *   ⚠️ ★この 2 つは**1 つのカットでは同時に成立しません。**
+ *
+ *   ★実測（`REPORT_P4_2D_EXISTING_SHOT_GATE_20260824.md`・4 seed・ショットを強制して撮影）:
+ *
+ *     馬体が画面高の 40% ＝ 馬 2.4m が 288px ＝ ★**画面に入る走路は前後 10〜11m だけ**
+ *
+ *     地点        40% 級のショット      上位 4 頭が画面内
+ *      直線入口    side-low 39〜41%      ★**4/4 seed で ○**
+ *      直線中盤    side-low 38〜42%       1/4 seed
+ *      ゴール前    side-low 38〜41%      ★**0/4 seed**（40% 級は例外なく 2 頭）
+ *
+ *   ★つまり**馬群は入口では密集していて、ゴールに向かって伸びます。**
+ *     ゴール前で 4 頭を 40% で映すには、実際に 4 頭が 10m 以内に居なければなりません。
+ *     ⚠️ 実測（`tools/audit-finish-contest.mjs`・40 本）では
+ *        **4 頭以上が 2 馬身以内 = 0%** / **5 馬身以内 = 25%** です。★起きません。
+ *
+ * 【★だから「1 カットで全部」をやめます】
+ *   ⚠️ ★v5 は直線 538m を `homestretch-side` **1 カット**で通していました。
+ *      1 カットで「大きい」と「4〜5 頭」を両立させようとすると、
+ *      ★**表示位置を演出でねじ曲げる**しかなくなります（それが 2026-08-26 の
+ *      `climax-choreography` で、見かけの速度が **+13.3% / −14.8%** ずれました）。
+ *   ★**割れば、馬を動かさずに両方見せられます。** 各カットは自分の得意な仕事だけをします。
+ *
+ * 【★4 つのカットの役】
+ *
+ *   | # | 区間 | ショット | 実測の大きさ | 何を見せるか |
+ *   |---|---|---|---|---|
+ *   | ① | 〜1120m | `side-low`         | **39〜41%** ・上位 4 頭 ★4/4 | ★**せめぎ合い**。密集しているうちに大きく |
+ *   | ② | 〜1264m | `homestretch-front`| 18〜21% ・上位 4 頭 4/4     | ★**差し・追い込み**。奥から来る馬が大きくなりながら上がる |
+ *   | ③ | 〜1488m | `side-low`         | **38〜41%** ・先頭外 0/4    | ★**逃げ粘りと決着争い**。画角固定なので大きさが揺れない |
+ *   | ④ | 〜1600m | `finish-line`      | 24〜26%                     | 決勝線・審判塔 |
+ *
+ *   ★② を正面にするのは大きさのためではありません。**奥行きのためです。**
+ *     `homestretch-front` は馬群の少し前を走る追従カメラなので、
+ *     20m 後ろの馬は 6 割の大きさで写り、★**前に出るほど大きくなりながら上がって**きます。
+ *     ★それが「差してくる」の見え方です（`homestretch-front` の注記）。真横では出せません。
+ *
+ * ⚠️ ★**4 角までは v5 と 1 行も変えていません。** v6 の違いは直線の 4 行だけです。
+ * ⚠️ ★③ に `homestretch-side` を使わないのは、2026-08-26 に付いた枠取り
+ *    （`withinM: 16, maxFovDeg: 22, fillFraction`）が**引くための仕掛け**だからです。
+ *    v6 は割ることで引く必要が無くなりました。
+ * ⚠️ ★③ に `side-drive` も使いません。あちらは `frameContenders` で**伸びると引く**ので、
+ *    ★実測で **24.6%** まで下がります（① の 42% から落ちる）。`side-low` は画角が固定なので、
+ *    ★馬群が伸びても**大きさが変わりません**。決着のカットで大きさが揺れないことを優先します。
+ * ⚠️ ★v6 では表示位置の演出（`climax-choreography`）を**使いません**。
+ *    馬はエンジンが決めた位置のまま走ります（接続は `page.tsx`）。
+ */
+export const SCRIPT_V6: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
+  { until: 0.150, id: 'start-front' },          // 〜240m   ★v5 と同一
+  { until: 0.330, id: 'first-corner-front' },   // 〜528m   ★v5 と同一
+  { until: 0.540, id: 'side-drive' },           // 〜864m   ★v5 と同一
+  { until: 0.604, id: 'fourth-corner-front' },  // 〜966m   ★v5 と同一（4 角・反転 0 回）
+  // ★★ここから下だけが v6 の中身（直線 538m を 4 つに割る）
+  { until: 0.700, id: 'straight-contest' },     // 〜1120m  ①せめぎ合い（46%・競り合いを抜く）
+  { until: 0.790, id: 'homestretch-front' },    // 〜1264m  ②差し・追い込み（正面の奥行き）
+  { until: 0.930, id: 'straight-contest' },     // 〜1488m  ③差し・追い込み（46%・競り合いを抜く）
+  { until: 1.0, id: 'finish-line' },            // 〜1600m  ④ゴール板
+];
+
+/**
+ * ★**真横から見た馬 1 頭の「絵」の横幅（m 換算）**。
+ *   体高 `2.4m` × 真横素材 `side-v6` の縦横比 `1.71`（`broadcast-v2.ts` の面積の注記と同じ値）。
+ *   ⚠️ ★見た目の幅であって、馬の胴体の長さ（`TURN_BODY_LENGTH_M`）ではありません。
+ */
+export const BODY_DRAW_WIDTH_M = 2.4 * 1.71;
 
 /**
  * ★**争っている馬が画面に収まる画角**（度）を返す。
@@ -594,20 +922,183 @@ export const SCRIPT_V5: readonly { readonly until: number; readonly id: Broadcas
  * @param aspect     画面の横／縦
  * @param minFovDeg  いちばん寄れる画角（ショットの既定値）
  * @param maxFovDeg  いちばん引ける画角
+ * @param fillFraction ★指定すると「**絵の外縁まで含めて**画面幅のこの割合」に収める（§4-4）
  */
 export function broadcastV2ContenderFov(
   spanM: number, distM: number, aspect: number, minFovDeg: number, maxFovDeg: number,
+  fillFraction?: number,
 ): number {
   if (!(distM > 1) || !(aspect > 0)) return minFovDeg;
   /**
    * ★余白。★1.0 にすると**先頭と最後尾が画面の縁**に来て、抜いた瞬間が切れます。
    *   馬 1 頭ぶん（2.4m）以上の余白が要るので、比で 1.45 としています。
+   *
+   * ⚠️ ★この式は「馬の**中心**どうしの距離」しか見ていません。★絵には幅があります
+   *    （体高 2.4m × 見た目の縦横比 1.71 ＝ 約 `BODY_DRAW_WIDTH_M`）。
+   *    ★`fillFraction` を渡したときは、その幅を足したうえで割合を合わせます。
    */
-  const needM = Math.max(0, spanM) * 1.45 + 4;
+  const needM = fillFraction !== undefined && fillFraction > 0
+    ? (Math.max(0, spanM) + BODY_DRAW_WIDTH_M) / Math.min(1, fillFraction)
+    : Math.max(0, spanM) * 1.45 + 4;
   // 横の視野が needM になる縦画角
   const fovY = 2 * Math.atan(needM / (2 * distM * aspect));
   const deg = (fovY * 180) / Math.PI;
   return Math.max(minFovDeg, Math.min(maxFovDeg, deg));
+}
+
+/**
+ * ★**こちらへ向き直った分だけ、馬を横に縮める**（遠近の短縮）
+ *
+ * 【何を直すか】
+ *   馬の絵は板（ビルボード）なので、向きは**素材の選び分け**でしか変わりません。
+ *   はしごは 3 段（斜め後 / 真横 / 斜め前）で、★**真正面の素材はありません**。
+ *
+ *   4 角の固定カメラは直線入口に据わっているので、馬群が近づく途中で
+ *   ★**向きの角度が 179.4°（＝カメラへ真っすぐ）になる瞬間**があります
+ *   （実測・seed 42・表示 19.20s・カメラまで 92m）。
+ *   そこでも斜め前の絵を出すので、★オーナー評「**斜め向いたまま曲がる**」になります。
+ *
+ * 【なぜカメラでは直さないか】
+ *   ★固定カメラをやめると、**奥から手前へ向かってくる迫力が丸ごと消えます**。
+ *   カメラまで 270m → 45m と近づくこと自体がこのカットの価値なので、
+ *   ★**カメラは一切動かさず、絵の側で向きを作ります**。
+ *
+ * 【どうやるか】
+ *   長さ `TURN_BODY_LENGTH_M`・幅 `TURN_BODY_WIDTH_M` の胴体を、体軸から α の角度で
+ *   見たときの**見かけの横幅**は  w(α) = L·|sin α| + W·|cos α|  です（α = 180° − viewDeg）。
+ *   斜め前の素材は α ≈ `TURN_ASSET_ALPHA_DEG` で描かれていると見なし、その比を横倍率にします。
+ *
+ *   ⚠️ ★**縮める側にしか使いません**（上限 1.0）。引き伸ばすと、素材に無い幅を
+ *      発明することになり、馬が太って見えます。下限 `TURN_SQUEEZE_MIN` も置きます。
+ *   ★右左反転が起きるのは `forwardDx` の符号が変わる瞬間、つまり**真正面の瞬間**です。
+ *     この短縮を入れると、反転は★**絵がいちばん細いところ**で起きるので目立ちません。
+ *
+ * ⚠️ 着順・馬の位置・カメラ定義値・台本・素材には触れません（憲法 3）。
+ * ⚠️ 時刻も乱数も使いません（憲法 4）。viewDeg だけから決まります。
+ */
+export const TURN_BODY_LENGTH_M = 2.4;
+export const TURN_BODY_WIDTH_M = 0.6;
+/**
+ * ★斜め前素材が描かれていると見なす角度。
+ *
+ *   ★**すでに承認されている使い方のうち、もっとも正面寄りの値**を取ります。
+ *     `start-front` 12° / `homestretch-front` 16° / `front-close` 15.5° / `first-corner-front` 22°
+ *   こうすれば、★**いま良いとされているカットはすべて倍率 1.0（無変更）**になり、
+ *   それより正面寄りのときだけ縮みます。
+ *   ⚠️ 16° にすると `start-front`（168°）が 0.88 倍になり、
+ *      ★**指摘の無いカットまで変えてしまいます**（一度に複数の要因を変えない）。
+ */
+export const TURN_ASSET_ALPHA_DEG = 12;
+/** ★これ以上は縮めない（細すぎて棒に見えないように） */
+export const TURN_SQUEEZE_MIN = 0.55;
+
+/** 見かけの横幅  w(α) = L·|sin α| + W·|cos α| */
+function turnApparentWidth(alphaDeg: number): number {
+  const a = (alphaDeg * Math.PI) / 180;
+  return TURN_BODY_LENGTH_M * Math.abs(Math.sin(a)) + TURN_BODY_WIDTH_M * Math.abs(Math.cos(a));
+}
+
+/**
+ * ★向きの角度から、馬の絵の**横倍率**を出す（1.0 = そのまま）
+ *
+ *   viewDeg 168° 以下 … 1.00（今までと同じ。発走・1 角・直線は変わりません）
+ *   viewDeg 172°    … 0.86
+ *   viewDeg 179.4°  … 0.58        ← 真正面・反転が起きる点
+ */
+export function broadcastV2TurnSqueezeX(viewDeg: number): number {
+  if (!Number.isFinite(viewDeg)) return 1;
+  const alpha = 180 - viewDeg;
+  const ratio = turnApparentWidth(alpha) / turnApparentWidth(TURN_ASSET_ALPHA_DEG);
+  return Math.max(TURN_SQUEEZE_MIN, Math.min(1, ratio));
+}
+
+/**
+ * ★**コーナーで馬が「向きを変えながら」曲がって見えるようにする**（オーナー指摘③）
+ *
+ * 【何が起きていたか】
+ *   オーナー評「**第4コーナーの馬の曲がり方が斜め向いたまま曲がっている**」。
+ *
+ *   実測（seed 42・`tools/audit-corner-turn.mjs`）: `fourth-corner-front` は 3.30 秒の間に
+ *   向きが **141.6° → 179.9°** と動きますが、★**素材の入替は 0 回**でした。
+ *   横の短縮（`broadcastV2TurnSqueezeX`）も **99 コマ中 67 コマ（67.7%）で倍率 1.000**、
+ *   つまり★**カットの 3 分の 2 で絵が 1 ミリも変わっていません。**
+ *
+ * 【★なぜ短縮では直らないのか — 向きが逆】
+ *   胴体（長さ `TURN_BODY_LENGTH_M`・幅 `TURN_BODY_WIDTH_M`）を頭から α の角度で見たときの
+ *   見かけの横幅は w(α) = L·|sin α| + W·|cos α|（α = 180° − viewDeg）。
+ *
+ *     viewDeg   α    幾何の幅    真横素材に対する比   斜め前素材に対する比
+ *      141°    39°    1.977m         ★0.824              ★1.820
+ *      158°    22°    1.455m           0.606                1.340
+ *      168°    12°    1.086m           0.452              ★1.000
+ *      180°     0°    0.600m           0.250                0.553
+ *
+ *   ★**viewDeg 141° の正しい見かけは「真横の 82%」です。** ところが我々はそこで
+ *     **斜め前の素材**（幅÷高さ = 0.77）を出していました。正しい幅の **1.8 分の 1** です。
+ *   ★つまり「向きが変わらない」のではなく、★**ずっと正面を向いた絵を出していた**。
+ *     短縮は**縮める**方向なので、ここでは**逆向き**で、効かせても悪化します。
+ *
+ * 【★どう直すか — 素材を切り替える。幅は連続になる】
+ *   ★**2 つの素材のアスペクト比が、すでに幾何と一致しています**（実測）:
+ *
+ *     幾何どうしの比  w(90°)/w(12°) = **2.210**
+ *     素材どうしの比  真横 1.71 / 斜め前 0.77 = **2.221**   ← ★差 0.5%
+ *
+ *   ★だから**それぞれを自分の基準角で正規化して切り替えれば、見かけの幅は跳びません。**
+ *     入替点は**斜め前素材の基準角そのもの**（viewDeg 168°）に置きます。そこでは
+ *     真横素材の倍率 0.452 × アスペクト 1.71 = **0.774**、斜め前素材は 1.000 × 0.77 = **0.770**。
+ *
+ *     viewDeg 120°〜168° … ★**真横素材**を w(α)/w(90°) で縮める（0.99 → 0.45）
+ *     viewDeg 168°〜180° … ★**斜め前素材**を w(α)/w(12°) で縮める（1.00 → 0.55・従来どおり）
+ *
+ *   ★これでカットの間じゅう**絵が連続的に細くなり続ける**ので、曲がって見えます。
+ *
+ * ⚠️ ★**残る不連続は「絵の中身」だけ**です（横顔 ↔ 正面顔）。板である以上、ここは消せません。
+ *    入替点を 168°（＝いちばん細いところ）に置いたのは、**中身の差がいちばん小さい**からです。
+ *    ★左右反転が起きるのも真正面（179.4°）なので、同じく細いところに隠れます。
+ *
+ * ⚠️ ★**このカットだけの振る舞いです**（`turnFacing`）。承認済みの
+ *    `start-front`（168°）・`first-corner-front`（158°）・直線（87°）には**一切かかりません**。
+ *    ⚠️ 全ショットに掛けると `first-corner-front` が真横素材に変わってしまいます（158° < 168°）。
+ *
+ * ⚠️ 着順・馬の位置・カメラ定義値・台本・素材そのものには触れません（憲法3）。
+ * ⚠️ 時刻も乱数も使いません。`viewDeg` だけから決まります（憲法4）。
+ */
+/** ★真横素材が描かれていると見なす角度（＝真横） */
+export const TURN_SIDE_ALPHA_DEG = 90;
+/**
+ * ★**素材を入れ替える角度**（頭からの角度 α）。★viewDeg = 180 − これ。
+ *
+ * 【★なぜ 12°（＝ viewDeg 168°）ではなく 4°（＝ 176°）なのか】
+ *   幅はどの角度で入れ替えても連続です（アスペクト比が幾何と一致しているため）。
+ *   ★**跳ぶのは「絵の中身」**（横顔 ↔ 正面顔）で、こちらは板である以上消せません。
+ *
+ *   ⚠️ ★12°（168°）で試したところ、実画面で**1 コマで横向き → 正面向きに入れ替わる**のが
+ *      はっきり見えました（`out/2d-overhead-stride/turn-after` の 18.50s と 18.53s）。
+ *      ★この案件の基準は「**カットの途中で跳ぶのは不具合**」です。
+ *
+ *   → ★**絵がいちばん細いところまで引っ張ります。** α=4° では
+ *     真横素材 0.319 × 1.71 = **0.546** ／ 斜め前素材 0.705 × 0.77 = **0.543**。
+ *     どちらも**体高の半分ほどの細い絵**なので、中身の差がいちばん出ません。
+ *   ★左右反転が起きるのも真正面（179.4°）なので、同じ細いところに重なります。
+ */
+export const TURN_FACING_SWAP_ALPHA_DEG = 4;
+/** ★真横素材をどこまで縮めてよいか。★入替点（0.319）を下回らせない */
+export const TURN_SIDE_SQUEEZE_MIN = 0.30;
+
+export function broadcastV2TurnFacing(viewDeg: number): {
+  /** ★true なら斜め前素材、false なら真横素材 */
+  readonly useFront: boolean;
+  /** ★その素材に掛ける横倍率 */
+  readonly squeezeX: number;
+} {
+  if (!Number.isFinite(viewDeg)) return { useFront: false, squeezeX: 1 };
+  const alpha = 180 - viewDeg;
+  if (alpha <= TURN_FACING_SWAP_ALPHA_DEG) {
+    return { useFront: true, squeezeX: broadcastV2TurnSqueezeX(viewDeg) };
+  }
+  const ratio = turnApparentWidth(alpha) / turnApparentWidth(TURN_SIDE_ALPHA_DEG);
+  return { useFront: false, squeezeX: Math.max(TURN_SIDE_SQUEEZE_MIN, Math.min(1, ratio)) };
 }
 
 /** 閃光トランジションで入るショット */

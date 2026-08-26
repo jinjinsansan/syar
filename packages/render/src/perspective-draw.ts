@@ -627,7 +627,15 @@ export function drawPerspectiveHorses<TImage>(
      *   指定があると `frameImagesByGate` より優先。返した frames が undefined なら従来の選択に戻る。
      */
     readonly frameSetOf?: ((horse: PerspHorse, view: HorseViewInfo) =>
-      { readonly frames: readonly HqHorseFrame<TImage>[] | undefined; readonly flip: boolean }) | undefined;
+      {
+        readonly frames: readonly HqHorseFrame<TImage>[] | undefined;
+        readonly flip: boolean;
+        /**
+         * ★**馬の絵の横倍率**（遠近の短縮・省略時は 1）。
+         *   こちらへ向き直ったときに縮める。値の出どころは `broadcastV2TurnSqueezeX` 1 か所。
+         */
+        readonly squeezeX?: number;
+      }) | undefined;
     /**
      * ★毛色バリエーション: 馬ごとの CSS filter（例 'hue-rotate(12deg) brightness(1.08)'）。基準コマの描画にだけ掛け、
      *   勝負服オーバーレイと影には掛けない。無彩色（勝負服の灰、鞍布の白、脚元の黒）はほぼ変わらない。
@@ -770,6 +778,8 @@ export function drawPerspectiveHorses<TImage>(
     };
     // ★方向別素材: 馬の進行方向 f とカメラ→馬の水平ベクトル v の角度、進行方向の画面上の向き
     let flip = false;
+    /** ★遠近の短縮（横倍率）。1 = これまでどおり */
+    let squeezeX = 1;
     let chosen: readonly HqHorseFrame<TImage>[] | undefined;
     if (opts.frameSetOf !== undefined) {
       const p0 = posOf(course, d.s, d.h.w);
@@ -783,6 +793,7 @@ export function drawPerspectiveHorses<TImage>(
       const set = opts.frameSetOf(d.h, { viewDeg, forwardDx: q1.x - d.p.x });
       chosen = set.frames;
       flip = set.flip;
+      squeezeX = set.squeezeX ?? 1;
     }
     const gateSet = chosen ?? opts.frameImagesByGate?.[d.h.gate - 1];
     const hiForShadow = pickFrame(gateSet) ?? pickFrame(opts.frameImages);
@@ -831,7 +842,7 @@ export function drawPerspectiveHorses<TImage>(
        */
       ctx.globalAlpha = SUN_SHADOW_ALPHA;
       // ローカル座標: 蹄の行が y=0、上へ行くほど y<0
-      ctx.transform!(flip ? -1 : 1, 0, -skew, -flat, d.p.x, d.p.y);
+      ctx.transform!((flip ? -1 : 1) * squeezeX, 0, -skew, -flat, d.p.x, d.p.y);
       ctx.drawImage(
         hiForShadow.shadow.image, 0, 0, hiForShadow.shadow.width, hiForShadow.shadow.height,
         -anchorX, -src.height * scale, src.width * scale, src.height * scale,
@@ -933,9 +944,16 @@ export function drawPerspectiveHorses<TImage>(
         const source = hi.source;
         const scale = hpx / hi.referenceHeight;
         const hiW = source.width * scale; const hiH = source.height * scale;
-        // ★左右反転: 接地点 x を軸に鏡像（基準点は接地点の真上なので位置は変わらない）
-        const mirrored = flip && ctx.save !== undefined && ctx.restore !== undefined && ctx.transform !== undefined;
-        if (mirrored) { ctx.save!(); ctx.transform!(-1, 0, 0, 1, 2 * (d.p.x + dx), 0); }
+        /**
+         * ★**左右反転と遠近の短縮を 1 つの変形で掛けます。**
+         *   どちらも「接地点 x を軸にした横方向の拡大縮小」なので、掛け算で済みます。
+         *     x → sx·x + px·(1 − sx)   （px = 接地点。sx = −1 なら従来の鏡像と同じ）
+         *   ★基準点は接地点の真上なので、縮めても**足元は動きません**。
+         */
+        const px = d.p.x + dx;
+        const sx = (flip ? -1 : 1) * squeezeX;
+        const mirrored = sx !== 1 && ctx.save !== undefined && ctx.restore !== undefined && ctx.transform !== undefined;
+        if (mirrored) { ctx.save!(); ctx.transform!(sx, 0, 0, 1, px * (1 - sx), 0); }
         // ★胴体基準点があればそれを接地点の真上 `bodyLift` に置く。無ければ従来（矩形の中心・下端）
         const left = dx + (hi.bodyAnchorSourcePx !== undefined
           ? d.p.x - (hi.bodyAnchorSourcePx.x - source.x) * scale

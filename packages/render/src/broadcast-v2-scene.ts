@@ -1,3 +1,4 @@
+import { contestFocusMeters } from './contest-focus.js';
 import { posOf, type Course } from './course.js';
 import type { Ctx2D, FontOf, Palette, SheetSpec } from './oblique-draw.js';
 import { cameraBasis, project } from './perspective.js';
@@ -113,6 +114,53 @@ export function resolveBroadcastV2Scene(
     readonly script?: BroadcastV2Script;
     /** ★勝馬追従を後方寄りにする（勝馬の後方寄り素材があるとき） */
     readonly winnerRear?: boolean;
+    /**
+     * ★**主役群の馬番**（＝確定着順の上位 5 頭）。指示書 §4-4。
+     *
+     * 【★何のためにあるか】
+     *   ⚠️ ★これが無いと、`frameContenders` は「先頭から `withinM` 以内の**全馬**」を
+     *      画に収めようとします。★主役 5 頭の間に着外の馬が挟まっていると、
+     *      ★**その馬まで入れるためにカメラが引き**、主役 5 頭は画面のごく一部に縮みます。
+     *
+     *   実測（`tools/audit-climax-camera.mjs`・4 seed・残り 260〜60m）:
+     *     主役 5 頭が画面幅に占める割合の中央値 = **21.6 / 31.9 / 32.8 / 38.6%**
+     *     → 指示書 §4-4 の要求（**60〜75%**）に**まったく届いていませんでした**。
+     *
+     * 【★なぜ「画面内の頭数」では駄目か】
+     *   ★頭数は足りていました（画面内 5〜7 頭）。★**足りないのは「その 5 頭の大きさ」**です。
+     *      指示書 §4-1「4〜5 頭が同時に入ったことをせめぎ合いと数えない」はここにも効きます。
+     *
+     * ⚠️ ★この集合は**レース中ずっと変わりません**（確定着順から決めるため）。
+     *    ★だから「順位が入れ替わると集合ごと入れ替わって画角が跳ぶ」問題は起きません
+     *    （`focusW` の注記にある 2026-08-22 の実害と同じ罠を踏みません）。
+     * ⚠️ ★渡さなければ**従来どおり**です。着順・馬の位置には触れません（憲法3）。
+     */
+    readonly leadGates?: readonly number[];
+    /**
+     * ★**§4-4 のカメラ側の直しを丸ごと切る**（★新旧比較の映像を撮るためだけ・指示書 §8-B）
+     *
+     *   `leadGates`（主役群だけを収める）と `fillFraction`（絵の外縁で 68%）の**両方**を無視し、
+     *   ★2026-08-26 より前とまったく同じ画角の決め方に戻します。
+     *
+     * ⚠️ ★`ClimaxOptions.disabled` と対になる比較用の切替です（`/race?climax=off`）。
+     *    ★これが無いと、比較映像の「修正前」の側にカメラの直しだけが残り、
+     *    ★**何と何を比べているのか言えなくなります。**
+     */
+    readonly climaxCameraDisabled?: boolean;
+    /**
+     * ★**この ID のカットでは `frameContenders` を丸ごと使わない**（台本 v6 用）。
+     *
+     * 【なぜ要るか】
+     *   ⚠️ `finish-line` に付いている `frameContenders`（`withinM: 24, maxFovDeg: 26`）は
+     *      ★**直線を 1 カットで通す v5 のために「引く」仕掛け**です。
+     *      馬群が伸びるほど画角が広がり、実測で馬は画面高の **11.8%** まで小さくなります。
+     *   ★v6 は直線をカットで割るので**引く必要がありません**。同じ場面で **25.6%** になります。
+     *
+     * ⚠️ ★`climaxCameraDisabled` では足りません。あれは `leadGates` と `fillFraction` だけを
+     *    無効にし、`maxFovDeg` は残るからです。★ここは上限ごと外します。
+     * ⚠️ ★渡さなければ**従来どおり**です（v5 の挙動は 1 ビットも変わりません）。
+     */
+    readonly noContenderFrameShots?: readonly BroadcastV2ShotId[];
   } = {},
 ): BroadcastV2Scene {
   const leaderS = horses.reduce((max, horse) => Math.max(max, horse.s), 0);
@@ -140,6 +188,8 @@ export function resolveBroadcastV2Scene(
   const contenderFov = ((): number | undefined => {
     const spec = shot.frameContenders;
     if (spec === undefined || horses.length === 0) return undefined;
+    /** ★台本がこのカットの枠取りを要らないと言っている（`noContenderFrameShots` の注記） */
+    if (options.noContenderFrameShots?.includes(shot.id) === true) return undefined;
     const lead = horses.reduce((max, h) => Math.max(max, h.s), horses[0]!.s);
     /**
      * ★**「12m 以内か否か」で数えると、馬が境目をまたいだ 1 コマで画角が跳びます。**
@@ -164,16 +214,33 @@ export function resolveBroadcastV2Scene(
       const u = Math.max(0, Math.min(1, (gap - spec.withinM) / band));
       return 1 - u * u * (3 - 2 * u);
     };
-    let tail = lead;
-    for (const h of horses) {
-      const gap = lead - h.s;
+    /**
+     * ★**画に収める相手を「主役群」だけに絞る**（指示書 §4-4）。
+     *   ⚠️ ★絞らないと、主役の間に挟まった着外の馬まで入れようとしてカメラが引き、
+     *      ★主役 5 頭が画面幅の 2〜4 割まで縮みます（`leadGates` の注記の実測）。
+     *   ★渡されていなければ従来どおり全馬です。
+     */
+    const framed = shot.frameLeadGroup !== true || options.climaxCameraDisabled === true
+      || options.leadGates === undefined || options.leadGates.length === 0
+      ? horses
+      : horses.filter((h) => options.leadGates?.includes(h.gate) === true);
+    /**
+     * ★**先頭は「収める相手」の中で測ります。**
+     *   ⚠️ 全馬の先頭を基準にすると、主役群がまだ後ろにいる間、
+     *      ★居ない馬までの差を span に数えてしまいます。
+     */
+    const framedLead = framed.length === 0 ? lead : framed.reduce((m, h) => Math.max(m, h.s), framed[0]!.s);
+    let tail = framedLead;
+    for (const h of framed) {
+      const gap = framedLead - h.s;
       if (gap <= 0) continue;
-      tail = Math.min(tail, lead - gap * weightOf(gap));
+      tail = Math.min(tail, framedLead - gap * weightOf(gap));
     }
     // カメラから注視点までの距離（プリセットの3成分から。位置は動かさないので固定値）
     const distM = Math.hypot(basePreset.backM, basePreset.upM, basePreset.sideM);
     return broadcastV2ContenderFov(
-      lead - tail, distM, viewport.width / viewport.height, basePreset.fovDeg, spec.maxFovDeg,
+      framedLead - tail, distM, viewport.width / viewport.height, basePreset.fovDeg, spec.maxFovDeg,
+      options.climaxCameraDisabled === true ? undefined : spec.fillFraction,
     );
   })();
   const cameraPreset = contenderFov === undefined ? basePreset : { ...basePreset, fovDeg: contenderFov };
@@ -251,7 +318,21 @@ export function resolveBroadcastV2Scene(
     });
   };
   let focusS = broadcastV2FocusMeters(focusMeters);
-  if (shot.target === 'pack') {
+  /**
+   * ★**競り合っている場所を見る**（`contest-focus.ts`・台本 v6 の ①③）
+   *
+   *   ⚠️ ★下の「先頭を画面に置く」処理を**通しません。** 通すと先頭が必ず画面に
+   *      入るよう引き戻されるので、★後方の競り合いを抜けません。
+   *   ★見るのは主役群（`leadGates`）だけです。着外の馬の小競り合いは追いません。
+   *   ⚠️ ★馬の位置には触れていません。動くのはカメラの向け先だけです（憲法3）。
+   */
+  if (shot.focusContest === true) {
+    const gates = options.leadGates;
+    const targets = gates === undefined || gates.length === 0
+      ? focusMeters
+      : horses.filter((h) => gates.includes(h.gate)).map((h) => h.s);
+    focusS = contestFocusMeters(targets.length === 0 ? focusMeters : targets);
+  } else if (shot.target === 'pack') {
     /**
      * ★馬群ショットの注視: 画面の半幅（m）を**そのカメラの px/m** から求め、
      *   収まらなければ先頭を画面内に置く（参考映像の横追従）。手置きの m 数は使わない。
@@ -271,9 +352,29 @@ export function resolveBroadcastV2Scene(
     focusS,
     focusW,
     camera: cameraAt(focusS),
-    visibleHorses: allFinished ? leaders : horses,
+    visibleHorses: allFinished ? leaders : visibleFor(horses, focusS, shot.maxVisible),
     cutProgress: broadcastV2CutProgress(course, leaderS, options.cornerCutM),
   };
+}
+
+/**
+ * ★**寄りのカットで描く頭数を絞る**（`maxVisible` の注記・オーナー指摘 2026-08-26）
+ *
+ *   ⚠️ ★実害: 馬体 46%（画面に入る走路 9.3m）のカットに、密集したレースだと
+ *      ★**10 頭**が入って重なり、勝負服が破綻して見えました（seed 99・残り218m）。
+ *
+ *   ★残すのは**注視点にいちばん近い順**。遠い馬は画面の端に居るので、
+ *     ★出入りは端で起きます（画面の真ん中で馬が消えません）。
+ *   ⚠️ ★描画だけです。着順・位置・順位表には触れていません（憲法3）。
+ */
+function visibleFor(
+  horses: readonly BroadcastV2Horse[], focusS: number, maxVisible: number | undefined,
+): readonly BroadcastV2Horse[] {
+  if (maxVisible === undefined || horses.length <= maxVisible) return horses;
+  const near = [...horses].sort((a, b) => Math.abs(a.s - focusS) - Math.abs(b.s - focusS))
+    .slice(0, maxVisible);
+  /** ★描く順は元の並びのまま（重なりの前後関係を変えない） */
+  return horses.filter((h) => near.includes(h));
 }
 
 /** Webと動画書き出しが共有するBroadcast V2の唯一の世界描画入口。 */
@@ -480,7 +581,18 @@ export function drawBroadcastV2Scene<TImage>(
       const useFront = opts.directionalSets?.front === true && shotView.viewDeg > 120;
       const key: BroadcastV2HorseAssetRole = useRear ? 'diag-rear-v2' : useFront ? 'diag-front-v2' : 'side-v6';
       const set = opts.libraries[key];
-      return { frames: set.frameImagesByGate?.[horse.gate - 1], flip: shotView.forwardDx < 0 };
+      /**
+       * ★**横に縮めて向きを作るのは取り下げました**（2026-08-26・指示書 §3-1 で不合格）。
+       *
+       *   ⚠️ ★**横縮小は回転ではありません。** 素材を切り替える案（`broadcastV2TurnFacing`）も
+       *      **1 コマで絵の中身が跳ぶ**ので不合格でした。
+       *   ★代わりに**編集で不自然な角度を見せません**（`SCRIPT_V5` の 4 角のカット窓）。
+       *     関数と検査は記録として残していますが、★**描画からは呼びません。**
+       */
+      return {
+        frames: set.frameImagesByGate?.[horse.gate - 1],
+        flip: shotView.forwardDx < 0,
+      };
     } : undefined,
     fieldSize: opts.fieldSize,
     frameOf: opts.frameOf,

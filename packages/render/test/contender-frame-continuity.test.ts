@@ -17,7 +17,7 @@ const DIST = 1600;
 const course = ovalCourse(DIST, { widthM: 20, turn: 'left' });
 const VIEWPORT = { width: 1280, height: 720 };
 
-/** ★`frameContenders` を持つショット（`withinM` は 12m と 11m） */
+/** ★`frameContenders` を持つショット（`withinM` は 16m と 11m） */
 const SHOTS = ['homestretch-side', 'side-drive'] as const;
 
 /** ★先頭 1300m、2 番手が `gap` m 後ろ、残りはさらに後ろ */

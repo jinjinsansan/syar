@@ -43,8 +43,13 @@ describe('既定台本 v5', () => {
 
   /* ③ 不正値は既定へ戻る */
   it('③ 不正なフラグ値は v5 へ戻る', () => {
+    /**
+     * ⚠️ ★`v6` は 2026-08-26 に**実在する台本**になったのでここから外しました
+     *    （`SCRIPT_V6`・直線を 4 カットに割る）。★既定が v5 のままであることは
+     *    上の ① と `script-v6.test.ts` が別に固定しています。
+     */
     for (const q of ['?cinematography=invalid', '?cinematography=', '?cinematography=V4',
-      '?cinematography=V5', '?cinematography=v6', '?cinematography=v4-old']) {
+      '?cinematography=V5', '?cinematography=V6', '?cinematography=v4-old']) {
       expect(scriptOf(q), q).toBe('v5');
     }
   });
@@ -62,19 +67,31 @@ describe('既定台本 v5', () => {
   });
 
   /* ⑤ 台本差は 1 ショットだけ */
-  it('⑤ 旧 v4 との違いはショット 1 個だけ（境界も長さも同じ）', () => {
+  it('⑤ 旧 v4 との違いは「直線の向き」と「第4コーナーの窓」だけ', () => {
+    /**
+     * ★**2026-08-26 に第4コーナーのカット境界を動かしました**（指示書 §3-2）。
+     *
+     *   ⚠️ ★以前この検査は「境界は 1 つも動いていない」を固定していました。
+     *      オーナー評「**斜め向いたまま曲がっている**」の原因が、まさに
+     *      ★**カットが素材の描かれた角度から 26.4° も離れた区間まで通っていたこと**だったので、
+     *      窓を狭めました（`side-drive` 0.500→0.540 / `fourth-corner-front` 0.660→0.604）。
+     *   ★**動かしてよいのはこの 2 つだけ**です。ほかの境界は v4 のままであることを固定します。
+     */
     expect(SCRIPT_V5.length).toBe(SCRIPT_V4.length);
+    const MOVED = new Set([2, 3]);   // side-drive と fourth-corner-front
     const diffs: { index: number; from: string; to: string }[] = [];
     for (let i = 0; i < SCRIPT_V4.length; i += 1) {
       const a = SCRIPT_V4[i]!;
       const b = SCRIPT_V5[i]!;
-      // ★カット境界（until）は動かしていない
-      expect(b.until, `#${i} の境界`).toBe(a.until);
+      if (!MOVED.has(i)) expect(b.until, `#${i} の境界は動かさない`).toBe(a.until);
       if (a.id !== b.id) diffs.push({ index: i, from: a.id, to: b.id });
     }
     expect(diffs).toEqual([
       { index: 4, from: 'homestretch-front', to: 'homestretch-side' },
     ]);
+    /** ★動かした 2 つは、狭める向きにしか動かしていないこと */
+    expect(SCRIPT_V5[2]!.until, 'side-drive は後ろへ延ばす').toBeGreaterThan(SCRIPT_V4[2]!.until);
+    expect(SCRIPT_V5[3]!.until, '4 角は手前で切る').toBeLessThan(SCRIPT_V4[3]!.until);
   });
 
   /* ⑥ 第4コーナーは v4 と同じ「前から」 */
@@ -84,7 +101,7 @@ describe('既定台本 v5', () => {
      *   オーナー評「ぴょんぴょんする」→ 2026-08-21 の 12 カット全数判定（後ろ・上からは
      *   5 戦 5 敗・例外なし）に照らして撤回しました。
      */
-    for (const r of [0.55, 0.60, 0.65]) {
+    for (const r of [0.56, 0.58, 0.60]) {
       expect(shotAt(r, scriptOf('')), `進行 ${r}`).toBe('fourth-corner-front');
       expect(shotAt(r, scriptOf('?cinematography=v4')), `進行 ${r} の旧 v4`).toBe('fourth-corner-front');
     }

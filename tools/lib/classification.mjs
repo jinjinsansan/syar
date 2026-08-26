@@ -23,6 +23,82 @@
 
 /** 読むだけ。本番に向けてよい */
 export const READONLY = [
+  /**
+   * ★編集台本 v5 の比較動画（`/race?cinematography=v5`）。
+   *   フラグの有無で撮り比べるだけ。レース状態・順位・素材・HUD は変えない。
+   *   出力は `out/2d-script-v5/` のみ。
+   */
+  'capture-script-v5.mjs',
+  'render-script-v5-sheets.mjs',
+  /**
+   * ★編集文法の監査（参考映像と通常 /race のカット割り比較）。読むだけ。
+   *   ⚠️ ★改善動画は作らない。出力は `out/2d-edit-grammar/` のみ。
+   */
+  'audit-edit-grammar-reference.mjs',
+  'audit-existing-shot-gate.mjs',
+  'render-existing-shot-gate-sheets.mjs',
+  'capture-existing-shot-actual.mjs',
+  'render-existing-shot-actual-sheets.mjs',
+  'audit-edit-grammar-race.mjs',
+  'capture-edit-grammar-race.mjs',
+  'render-edit-grammar-comparison.mjs',
+  /**
+   * ★俯瞰で「ぴょんぴょん」する件（#1）の判断材料。読むだけ。
+   *   仮の完歩・代替カメラは道具の中だけで組む。製品のカメラ定義・台本・素材には触れない。
+   *   出力は標準出力のみ（ファイルを書かない）。
+   */
+  'audit-overhead-stride.mjs',
+  'audit-overhead-stride2.mjs',
+  /**
+   * ★#1「ぴょんぴょんする」の実画面での確認（2026-08-25）。読むだけ。
+   *   `capture-overhead-stride.mjs` … 通常 `/race` を本物のブラウザで開き、指定ショットの
+   *     前後を 30fps で取り込む。★オフライン描画では勝負服 overlay と毛色の焼き込みを
+   *     通らないので、オーナーと同じ絵を見るには実画面から撮るしかない（R-30）。
+   *   `render-overhead-stride-compare.mjs` / `render-corner-direction-compare.mjs`
+   *     … 撮ったコマを並べて動画と GIF にするだけ。
+   *   `audit-hop-vs-reach.mjs` … 素材 8 コマの画素から「胴の上下」と「脚の伸び縮み」を測る。
+   *   出力は `out/2d-overhead-stride/` と標準出力のみ。
+   */
+  'capture-overhead-stride.mjs',
+  'render-overhead-stride-compare.mjs',
+  'render-corner-direction-compare.mjs',
+  'audit-hop-vs-reach.mjs',
+  /**
+   * ★「攻防を見せたい」という要望の判断材料（2026-08-25）。読むだけ。
+   *   `audit-shot-coverage.mjs` … 各カットで何頭が画面に入り、何頭が実際に争っているか
+   *   `audit-finish-contest.mjs` … エンジンがゴール前に何頭の競り合いを出しているか（40 レース）
+   *   ★カメラは「あるもの」しか映せない。まず在るかどうかを数えるための道具。
+   *   出力は標準出力のみ。
+   */
+  'audit-shot-coverage.mjs',
+  'audit-finish-contest.mjs',
+  /**
+   * ★曲がり方が「かくかく」する件の測定（2026-08-25）。読むだけ。
+   *   1 カットの中で素材の入替・左右反転が何回起きるかを数える。
+   *   ⚠️ ★反転を「カット中は固定」にする案は、カット後半で向きが逆になるため取り下げた
+   *      （オーナー評「全員斜めになりながら曲がっている」）。いまは毎コマの判定に戻っている。
+   */
+  'audit-corner-turn.mjs',
+  /**
+   * ★「斜め向いたまま曲がる」件の測定（2026-08-25）。読むだけ・標準出力のみ。
+   *   固定カメラの据え位置を総当たりして**掃引が消せないこと**を示し、
+   *   追従カメラにしたときの向きの角度と馬の大きさを出す。製品コードには触れない。
+   */
+  'audit-corner-camera.mjs',
+  /**
+   * ★着差の見せ方（γ）の検証と比較映像（指示書 `DEV_INSTRUCTIONS_P4_FINISH_CONTEST_20260825.md`）。読むだけ。
+   *   `verify-time-gap-shape.mjs` … 既定が 1 ビットも動かないこと・着順が変わらないこと・
+   *     解析値と位置モデルの一致比を測る。★写像の差し替えは**道具の中だけ**（本番既定に触れない・I-5）
+   *   `render-contest-compare.mjs` … 撮ったコマを γ ごとに並べて動画にするだけ
+   *   出力は `out/2d-finish-contest/` と標準出力のみ。
+   */
+  'verify-time-gap-shape.mjs',
+  'render-contest-compare.mjs',
+  /** ★γ を上げたときの密集の副作用（重なり・HUD の裏）を数える。読むだけ・標準出力のみ */
+  'audit-contest-overlap.mjs',
+  // ★編集文法の監査で使う共通部品（読取専用）
+  //   cdp.mjs = Chrome DevTools Protocol の最小クライアント
+  //   race-audit-build.mjs = 実画面と同じ手順でレースを 1 本組む
   // ★世界に置く看板（発馬機など）の実寸を確かめる。読むだけ
   //   2026-08-21: 発馬機が実物の 1.65 倍の高さで置かれ、**馬の頭が扉に隠れて脚しか見えない**状態を見逃していた
   'verify-world-billboards.mjs',
@@ -36,6 +112,67 @@ export const READONLY = [
    *   レース結果は読むだけ。DB にも外部にも接続しない。出力は `out/2d-pack-limit/` のみ。
    */
   'render-2d-pack-limit.mjs',
+  /**
+   * ★参考映像をコマに切って「せめぎ合い」と馬の見かけの大きさを測る。
+   *   動画ファイルは引数で受け取るだけ。DB にも外部にも接続しない。
+   *   ⚠️ ★画面の幾何と時間だけを数字にする（絵を写さない・憲法1）。出力は `out/contest-video/` のみ。
+   */
+  'measure-contest-video.mjs',
+  /**
+   * ★台本 v4 / v5 と γ 別に「馬が画面のどれだけを占めるか」を測る。
+   *   `resolveBroadcastV2Scene` を読むだけ。レース結果・カメラ・台本を変えない。
+   */
+  'audit-horse-size.mjs',
+  /**
+   * ★直線の画角を広げた前後を並べた比較動画。撮ったコマを読んで並べるだけ。
+   *   レース状態・順位・素材・HUD は変えない。出力は `out/2d-overhead-stride/` のみ。
+   */
+  'render-stretch-fov-compare.mjs',
+  /**
+   * ★第4コーナーの「向き」を直した前後を並べた比較動画。撮ったコマを読んで並べるだけ。
+   *   レース状態・順位・素材・HUD は変えない。出力は `out/2d-overhead-stride/` のみ。
+   */
+  'render-turn-facing-compare.mjs',
+  /**
+   * ★レース終盤の再構築（指示書 `DEV_INSTRUCTIONS_P4_RACE_CLIMAX_REBUILD_20260826.md`）。すべて読むだけ。
+   *   `audit-corner-cut-window.mjs`    … 4 角のカット境界と向きの角度の対応
+   *   `audit-corner-camera-sweep.mjs`  … 固定カメラの据え位置の掃引（★式の写し・候補を絞る用）
+   *   `audit-climax-contest.mjs`       … §4-3 の攻防の定量条件（演出 ON/OFF を並べて測る）
+   *   `audit-winner-closeup.mjs`       … §5 の勝馬クローズアップ（切替・長さ・馬高比・切れ）
+   *   出力は標準出力のみ。レース状態・順位・素材・HUD は変えない。
+   */
+  'audit-corner-cut-window.mjs',
+  'audit-corner-camera-sweep.mjs',
+  'audit-climax-contest.mjs',
+  'audit-winner-closeup.mjs',
+  /**
+   * ★同じ指示書の続き（2026-08-26）。すべて読むだけ・出力は標準出力のみ。
+   *   `audit-climax-invariance.mjs` … §7-1 演出 ON/OFF で着順・タイム・着差・払戻・カット境界が一致するか
+   *   `audit-climax-camera.mjs`     … §4-4 主役 5 頭が画面幅のどれだけを占めるか／注視点・画角の連続性
+   *   `audit-climax-release.mjs`    … 演出の掛け・戻しで馬の「見かけの速さ」が本来から何 % ずれるか
+   */
+  'audit-climax-invariance.mjs',
+  'audit-climax-camera.mjs',
+  'audit-climax-release.mjs',
+  /**
+   * ★台本 v6（直線をカットで割る）の測定（2026-08-26）。すべて読取専用・標準出力のみ。
+   *
+   *   `audit-straight-spread.mjs`  … 上位 5 頭が実際に何 m に伸びているか／その大きさで画面に入るか
+   *   `audit-real-overtakes.mjs`   … ★演出なしで直線に追い抜きが実在するか（在らなければ映せない）
+   *   `audit-contest-focus.mjs`    … 競り合いが画面に映っている秒数／注視点が馬から離れる量
+   */
+  'audit-straight-spread.mjs',
+  'audit-real-overtakes.mjs',
+  'audit-contest-focus.mjs',
+  /**
+   * ★**せめぎ合いになる seed を総当たりで探す**（2026-08-26）。読取専用・標準出力のみ。
+   *   ⚠️ ★エンジンにも表示にも手を入れません。**見るレースを選ぶ**ための道具です。
+   */
+  'find-contest-seeds.mjs',
+  /** ★攻防演出の ON/OFF を並べた比較動画。撮ったコマを読んで並べるだけ */
+  'render-climax-compare.mjs',
+  /** ★撮ったコマを 1 本の動画にするだけ（§8-A / §8-C）。出力は `out/2d-overhead-stride/` のみ */
+  'render-climax-clip.mjs',
   'render-2d-pack-compare.mjs',   // 上の出力と参考映像を並べるだけ。読むだけ
   // ★以下は計測用の使い捨て（`_` 始まり）。すべて読むだけ
   'verify-horse-motion.mjs',  // 馬を世界に固定しコマだけ送り、素材由来のぶれを切り分ける

@@ -45,6 +45,7 @@ import {
   raceIntroAt, RACE_INTRO_RACE_START_SEC, RACE_INTRO_END_SEC,
   drawRaceTitleCard, drawStartingGate, drawStartCallBand,
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
+  climaxDisplayPositions, CLIMAX_LEAD_COUNT, CUT_RACE_SCRIPT,
   broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
@@ -154,7 +155,7 @@ const RUNOUT_SLOW = 0.6;
 /**
  * ★勝馬を映す長さ（秒）。6.5 → 4.2（2026-08-22・オーナー評「騎手が喜ぶ時間が長い」）。
  */
-const WINNER_FOLLOW_SEC = 4.2;
+const WINNER_FOLLOW_SEC = 2.4;
 
 /**
  * ★**勝馬がゴールしてから、勝利の見せ方に切り替えるまでの間**（レース秒）
@@ -345,21 +346,64 @@ interface HighQualityHorseFrame {
  *   `/race?cinematography=v4` で旧映像へ即座に戻せます。
  */
 const scriptFromSearch = broadcastV2ScriptFromSearch;
+/**
+ * ★**台本 v6 で `frameContenders` を使わないカット**（`broadcast-v2-scene.ts` の注記）。
+ *   ⚠️ ★`side-drive` の枠取りは**残します**。あれは「詰まれば寄る」ための仕掛けで、
+ *      実測 34〜41% を出しているのはその働きです。外すのは**引くための** `finish-line` だけ。
+ */
+const CUT_SCRIPT_NO_FRAME_SHOTS = ['finish-line'] as const;
+/**
+ * ★**勝馬が通過してから、決勝線のカメラを何秒保持するか**（レース時間・秒）
+ *   ★実測（seed 99）で 1〜5 着は **2.7 馬身 ≒ 6.5m ≒ 0.42 秒**に収まります。
+ *   ★1.0 秒あれば、上位の入線をすべて見せてから寄りへ移れます。
+ */
+const GOAL_HOLD_SEC = 1.0;
 
 /**
- * ★**着差の見せ方（γ）を URL で切り替える**（比較用・P4 のデモ画面限定）
+ * ★**このデモ画面の着差の見せ方（γ）**（2026-08-25・オーナー決定）
  *
- *   `/race?contest=1.3` / `?contest=1.6`。指定なし・不正値は**現行（既定 1.0）**へ落とします
- *   （`cinematography` と同じ作法・R-27: 既定は狭い側へ落とす）。
+ * 【なぜ 1.3 か】
+ *   オーナー要望「直線で 4〜5 頭のせめぎ合いをゴールまで見せたい」に対し、
+ *   ★**カメラでは満たせません**（描画側は着順・馬の位置を読むだけ・憲法3）。
+ *   実測（40 レース）では **ゴール時点で 4 頭以上が 2 馬身以内 = 0%**、
+ *   1 着-2 着の差の中央値は **3.1 馬身**。★**在るものしか映せない**ので、
+ *   スコア→タイム写像の**形**（総差を保存したまま内訳だけ変える γ）を入れました。
+ *
+ *   実測（200〜1000 レース・γ 別）:
+ *     γ 1.0（現行）  1着-2着 2.61 馬身 / 4 頭が 5 馬身内 32% / 画面内 2.0 頭 / 重なり 無し
+ *     ★γ 1.3        1着-2着 1.47 馬身 / 4 頭が 5 馬身内 55% / 画面内 3.0 頭 / 重なり 無し
+ *     γ 1.6         1着-2着 0.82 馬身 / 4 頭が 5 馬身内 70% / 画面内 6.0 頭 / ★重なり 有り
+ *   ★1.6 は頭数が増える代わりに**先頭 2 頭が重なって馬番が隠れ**、追走 4 頭が
+ *     左下の COURSE 表示の裏に入ります。→ **1.3 を採用**（重なりを作らずに頭数が増える側）。
+ *
+ * 【★なぜエンジンの既定（`DEFAULT_RACE_BALANCE`）を変えないのか】
+ *   ⚠️ 走破タイムは `race_entries.finish_time` に**保存**されます（再計算ではありません）。
+ *      既定を動かすと**過去の記録と新しい記録で写像が混在**し、
+ *      ★**Provably Fair の再現検証**（正典 §8.6）で第三者が `server_seed` から再計算したとき
+ *      **着順は一致するのに走破タイムが一致しません**。
+ *   ★新旧混在の扱いは未決（正典 §8.6 に関わる・レビュー側の判断待ち）なので、
+ *     **この便ではデモ画面の既定だけ**を 1.3 にします。サーバー確定経路（`settle.ts`）は
+ *     `DEFAULT_RACE_BALANCE`（γ=1.0）のままです。
+ *
+ * ⚠️ ★着順には効きません。写像は r について単調なので、γ を変えても着順は同じです
+ *    （1000 レース × γ 1.3 / 1.6 で**着順列の不一致 0 レース**を実測済み）。
+ * ⚠️ ★総差（1 着-最下位）は γ によらず同一です（定義から不変・V-17② に触れていません）。
+ */
+const DEMO_CONTEST_GAMMA = 1.3;
+
+/**
+ * ★**着差の見せ方（γ）を URL で切り替える**（P4 のデモ画面限定）
+ *
+ *   `/race?contest=1.0` で**エンジン既定（＝従来の見え方）**、`?contest=1.6` で更に詰まります。
+ *   指定なし・不正値は `DEMO_CONTEST_GAMMA` へ落とします
+ *   （`cinematography` と同じ作法・R-27: 既定は 1 か所から出す）。
  *
  * ⚠️ ★**本番のサーバー確定経路には入りません**（憲法3）。ここはデモが自分で組むレースだけです。
- * ⚠️ ★既定値をここに数字で書きません。出どころは `DEFAULT_RACE_BALANCE` の 1 か所です（R-30）。
- * ⚠️ ★着順には効きません。写像は r について単調なので、γ を変えても着順は同じです。
  */
 function contestGammaFromSearch(search: string): number {
   const raw = new URLSearchParams(search).get('contest');
   const g = raw === null ? Number.NaN : Number(raw);
-  return Number.isFinite(g) && g >= 1 && g <= 3 ? g : DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA;
+  return Number.isFinite(g) && g >= 1 && g <= 3 ? g : DEMO_CONTEST_GAMMA;
 }
 
 /** 勝負服・ゼッケンの位置（外接矩形に対する比率）。コマ集合ごとに騎手の姿勢が違うので切り替える */
@@ -890,6 +934,23 @@ export default function RacePage(): React.JSX.Element {
   const dRef = useRef(0);
 
   const [seed, setSeed] = useState(42);
+  /**
+   * ★**`/race?seed=99` で seed を URL から選べるようにします**（2026-08-26・オーナー要求）
+   *
+   * 【なぜ要るか】
+   *   ⚠️ ★デモ画面はずっと seed 42 で見られていました。実測（`tools/find-contest-seeds.mjs`）で
+   *      ★seed 42 は**上位 5 頭が 19〜21m に伸びる「せめぎ合いの無い」展開**でした。
+   *      ★どんなカメラを使っても、在らない競り合いは映せません。
+   *   ★エンジンは seed で決定論なので、**せめぎ合いになる seed が実在します**
+   *     （例: seed 99 = 上位 5 頭が 4.1 馬身・10 番手から差し切り・1-2 着差 0.15 馬身）。
+   *   ★これはエンジンにも表示にも手を入れず、**見るレースを選ぶだけ**です。
+   *
+   * ⚠️ ★`useState` の初期値にしないのは、サーバー側描画と食い違うためです（hydration）。
+   */
+  useEffect(() => {
+    const v = Number(new URLSearchParams(window.location.search).get('seed'));
+    if (Number.isFinite(v) && v > 0) setSeed(Math.floor(v));
+  }, []);
 
   /**
 
@@ -1515,9 +1576,75 @@ export default function RacePage(): React.JSX.Element {
     const visualAt = withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST, Math.max(0, raceD - built.warp.displaySec) * RUNOUT_SLOW);
     const visualLead = Math.max(...visualAt.map((h) => h.meters));
     const winnerGate = built.result[0]!.gate;
+    /**
+     * ★**確定着順（馬番 → 着）**。最後の直線の攻防（表示専用）の役どころに使います。
+     *   ⚠️ ★その瞬間の見た目の順位ではありません。見た目から決めると演出が自分に反応して発振します。
+     */
+    const finishPlaceByGate = new Map(built.result.map((row) => [row.gate, row.place]));
+    const search = typeof window === 'undefined' ? '' : window.location.search;
+    /**
+     * ★**台本 v6（最後の直線をカットで割る）を選んでいるか**（`/race?cinematography=v6`）
+     *
+     *   ⚠️ ★v6 では**表示位置の演出を使いません。** 馬はエンジンが決めた位置のまま走ります。
+     *   ★理由は `SCRIPT_V6` の注記のとおりで、演出は「1 カットで大きさと頭数を両立させる」ための
+     *     代償でした（見かけの速度が **+13.3% / −14.8%** ずれる）。カットで割れば要りません。
+     */
+    const cutScript = scriptFromSearch(search) === CUT_RACE_SCRIPT;
+    /** ★`/race?climax=off` で表示演出を切る（新旧比較用・指示書 §8-B）。★v6 は常に切る */
+    const climaxDisabled = cutScript || search.includes('climax=off');
+    /**
+     * ★**主役群の馬番**（確定着順の上位 `CLIMAX_LEAD_COUNT` 頭）。
+     *   ★演出の役どころにも、直線のカメラの「収める相手」にも、同じこの集合を使います。
+     *   ⚠️ ★レース中ずっと変わらない集合です（確定着順から決めるため）。
+     *      だから「順位が入れ替わって集合ごと入れ替わり、画角が跳ぶ」ことが起きません。
+     */
+    const climaxLeadGates = built.result
+      .filter((row) => row.place >= 1 && row.place <= CLIMAX_LEAD_COUNT)
+      .map((row) => row.gate);
+    /** ★発走イージング（描画のみ・全馬同じ係数）。★全馬に同じ量なので前後関係は変わりません */
+    const easedAt0 = visualAt.map((horse) => ({ ...horse, meters: startShownMeters(horse.meters, raceD) }));
+    /**
+     * ★**最後の直線の攻防（表示専用）**（指示書 §4・`climax-choreography.ts`）
+     *
+     *   ⚠️ ★**着順・確定タイム・着差ラベル・払戻・DB の値には触れません。**
+     *      ここが変えるのは「その瞬間、画面のどこに描くか」だけです。
+     *   ★残り 60m でオフセットは完全に 0 に戻るので、**ゴールは確定着順・確定着差**です。
+     *   ★役どころは `built.result` の**確定着順**から決めます（見た目の順位からではありません）。
+     *
+     *   ⚠️ ★**ここで作った位置は、順位表 HUD・馬名プレート・実況にも渡します。**
+     *      ★以前は HUD だけがエンジンの真の位置で並んでいたため、実測（4 seed・
+     *      `tools/audit-climax-contest.mjs` ⑥）で
+     *      ★**「絵では 4 番が先頭なのに順位表では 10 番が先頭」が 1.2〜3.8 秒**、
+     *      上位 5 頭の並びの食い違いが **7.5〜10.9 秒**ありました。
+     *      ★絵と数字が食い違うのは、どちらか一方が間違っているより悪い状態です。
+     *
+     *   比較用: `/race?climax=off` で素通し。
+     */
+    const easedAt = ((): typeof easedAt0 => {
+      const posed = climaxDisplayPositions(
+        easedAt0.map((h) => ({
+          gate: h.gate, s: h.meters, finishPosition: finishPlaceByGate.get(h.gate) ?? 99,
+        })),
+        { seed, distanceM: DIST, disabled: climaxDisabled },
+      );
+      return easedAt0.map((h, i) => ({ ...h, meters: posed[i]!.s }));
+    })();
     const winnerFinishedNow = (at.find((horse) => horse.gate === winnerGate)?.meters ?? 0) >= DIST - 1e-6;
     const winnerFinishSec = built.finishSec.get(winnerGate);
     const winnerAfterSec = winnerFinishSec === undefined ? 0 : Math.max(0, sec - winnerFinishSec);
+    /**
+     * ★**ゴールの通過を見せてから勝馬の寄りへ移る**（2026-08-26・オーナー指摘）
+     *
+     * 【★何が起きていたか】
+     *   ⚠️ ★`winner-follow` は**勝馬が決勝線を通過した瞬間**に切り替わっていました。
+     *      ★そのため「他の馬がゴール板を通過する画」が**1 コマも存在しません**でした。
+     *      ★オーナー評「ゴール通過カメラを見せずに、いきなり馬 1 頭が 1 着になっている」。
+     *   ★実際の中継は、決勝線のカメラを保持して**続く馬が入線するのを見せてから**寄ります。
+     *
+     * ⚠️ ★台本 v6 のときだけ保持します。**v5 の挙動は 1 ビットも変えません。**
+     */
+    const goalHeld = cutScript && winnerFinishedNow && winnerAfterSec < GOAL_HOLD_SEC;
+    const winnerShotNow = winnerFinishedNow && !goalHeld;
     const contenders = visualAt.filter((h) => visualLead - h.meters <= HORSE_LENGTH_M * 2);
     const pack = visualAt.filter((h) => visualLead - h.meters <= 40);
     const focusHorses = focusForRaceShot(shot, {
@@ -1549,14 +1676,12 @@ export default function RacePage(): React.JSX.Element {
     let v2HorseRatio = 0;
     if (renderer === 'v2') {
       const course = ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn });
-      /** ★発走イージング（描画のみ・全馬同じ係数）。順位・着差・HUD には触れない */
-      const easedAt = visualAt.map((horse) => ({ ...horse, meters: startShownMeters(horse.meters, raceD) }));
       const scene = resolveBroadcastV2Scene(course, easedAt.map((horse) => ({
         gate: horse.gate,
         s: horse.meters,
         w: horse.w ?? TRACK_WIDTH_M / 2,
         finished: horse.meters >= DIST - 1e-6,
-      })), { width: W, height: H }, winnerFinishedNow, {
+      })), { width: W, height: H }, winnerShotNow, {
         finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
         raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
         fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
@@ -1572,6 +1697,23 @@ export default function RacePage(): React.JSX.Element {
          *      裁定が変わったときに戻せるように。使うかどうかはここだけで決めます。
          */
         winnerRear: false,
+        /**
+         * ★**主役群の馬番**（確定着順の上位 5 頭・指示書 §4-4）
+         *
+         *   ⚠️ ★これが無いと、直線のカメラは「先頭から 16m 以内の**全馬**」を収めようとして
+         *      ★主役 5 頭の間に挟まった着外の馬まで入れるために引き、
+         *      ★**主役 5 頭が画面幅の 2〜4 割**まで縮みます（§4-4 の要求は 60〜75%）。
+         *   ⚠️ ★渡すのは馬番だけです。着順にも馬の位置にも触れません（憲法3）。
+         */
+        leadGates: climaxLeadGates,
+        /** ★`/race?climax=off` は**カメラ側の直しも**切ります（§8-B の「修正前」の側） */
+        climaxCameraDisabled: climaxDisabled,
+        /**
+         * ★**v6 のゴール板は「引く」枠取りを使いません**（`noContenderFrameShots` の注記）。
+         *   ⚠️ ★`finish-line` の `frameContenders` は v5 が直線を 1 カットで通すための仕掛けです。
+         *      v6 は割っているので、付いたままだと**同じ場面で馬が 25.6% → 11.8% に縮みます**。
+         */
+        ...(cutScript ? { noContenderFrameShots: CUT_SCRIPT_NO_FRAME_SHOTS } : {}),
       });
       v2ShotId = scene.shot.id;
       v2SectionLabel = broadcastV2SectionLabel(course, visualLead, scene.shot.id);
@@ -1708,7 +1850,9 @@ export default function RacePage(): React.JSX.Element {
         broadcastV2ShotById(a).view === broadcastV2ShotById(b).view;
       const change = built.shotChanges.find((c) => c.displaySec <= d && d - c.displaySec < DISSOLVE_SEC
         && c.to === scene.shot.id
-        && (FLASH_INTO.has(c.to) || sameFamily(c.from, c.to)));
+        && (FLASH_INTO.has(c.to) || sameFamily(c.from, c.to))
+        /** ★このカットへは必ず切り替え（指示書 §5-5・`hardCutIn`） */
+        && broadcastV2ShotById(c.to).hardCutIn !== true);
       const drawScene = (target: CanvasRenderingContext2D, sceneToDraw: typeof scene): void => drawBroadcastV2Scene(target, course, sceneToDraw, {
         palette: art.pal as Record<string, string>,
         libraries,
@@ -1794,7 +1938,7 @@ export default function RacePage(): React.JSX.Element {
         if (offCtx !== null) {
           const prevScene = resolveBroadcastV2Scene(course, easedAt.map((horse) => ({
             gate: horse.gate, s: horse.meters, w: horse.w ?? TRACK_WIDTH_M / 2, finished: horse.meters >= DIST - 1e-6,
-          })), { width: W, height: H }, winnerFinishedNow, {
+          })), { width: W, height: H }, winnerShotNow, {
             finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
             raceDisplaySec: d - RACE_INTRO_RACE_START_SEC, forceShotId: change.from,
             fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
@@ -1949,8 +2093,23 @@ export default function RacePage(): React.JSX.Element {
        * ★ゴールした馬は**確定着順**で並べます。
        *   ⚠️ 画面上の距離で並べると、ゴール後は全馬が張り付いて★**着順が読めません**。
        */
-      const finished = (h: { meters: number }): boolean => h.meters >= DIST - 1e-6;
-      const rank = [...at].sort((p, q) => {
+      /**
+       * ⚠️ ★**ゴールしたかどうかは「エンジンの真の位置」で見ます。**
+       *    ★表示位置は発走イージングのぶん全馬が一律に後ろへずれている（`startShownMeters`）ので、
+       *    表示位置で見ると**誰もゴールしていないこと**になります。
+       */
+      const trueMetersOf = new Map(at.map((h) => [h.gate, h.meters]));
+      const finished = (h: { gate: number }): boolean => (trueMetersOf.get(h.gate) ?? 0) >= DIST - 1e-6;
+      /**
+       * ★**並べるのは「画面に描いた位置」です**（`easedAt`）。
+       *
+       *   ⚠️ ★以前はここが `at`＝**エンジンの真の位置**でした。最後の直線の攻防（表示専用）は
+       *      **画面の前後関係**を変えるので、★**絵と順位表が食い違って**いました
+       *      （実測・4 seed: 先頭の食い違い 1.2〜3.8 秒 / 上位 5 頭の並び 7.5〜10.9 秒）。
+       *   ★ゴールした馬は**確定着順**で並べるので、★**決着した瞬間から表は正しい**ままです。
+       *   ★残り 60m で表示オフセットは 0 なので、★ゴール前の着差表示も本来の値に戻っています。
+       */
+      const rank = [...easedAt].sort((p, q) => {
         if (finished(p) && finished(q)) {
           return (built.finishPos.get(p.gate) ?? 99) - (built.finishPos.get(q.gate) ?? 99);
         }
@@ -1986,7 +2145,8 @@ export default function RacePage(): React.JSX.Element {
       if (hud.standings) {
         // A: 隊列バー（最上部）。順位ではなく**先頭からの距離**で並べる
         drawFormationBar(ctx, art.pal as Record<string, string>, FONT,
-          visualAt.map((h) => ({ gate: h.gate, s: h.meters })), FIELD, frameRoleOf,
+          /** ★★隊列バーも**画面に描いた位置**で並べます（順位表・実況と同じ・食い違いを作らない） */
+          easedAt.map((h) => ({ gate: h.gate, s: h.meters })), FIELD, frameRoleOf,
           { x: 40, y: 4, width: W - 80, ownGate, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC });
 
         // B: 馬名プレート（下部・固定枠）。自馬 ＋ 先頭 ＋ 2 番手
@@ -2068,7 +2228,12 @@ export default function RacePage(): React.JSX.Element {
        */
       const phaseName = v2SectionLabel ?? sectionLabel[courseSection];
       const line = raceCallAt({
-        horses: at.map((h) => ({
+        /**
+         * ★★実況も**画面に描いた位置**から組みます。
+         *   ⚠️ ★ここが `at`（真の位置）のままだと、★**絵では 4 番が抜いているのに
+         *      「先頭は 10 番」と実況する**ことになります（順位表と同じ食い違い）。
+         */
+        horses: easedAt.map((h) => ({
           gate: h.gate, name: HORSE_NAMES[h.gate - 1] ?? `スター${h.gate}`, meters: h.meters,
         })),
         distanceMeter: DIST,
