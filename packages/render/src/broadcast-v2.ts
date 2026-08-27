@@ -800,7 +800,39 @@ export const SCRIPT_V4: readonly { readonly until: number; readonly id: Broadcas
  *   ★v5 と v4 の違いは、いまは**直線の向きだけ**です。
  */
 export const SCRIPT_V5: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
-  { until: 0.150, id: 'start-front' },          // 〜240m   v4 と同じ
+  /**
+   * ★**発走の正面カットを 240m → 100m に詰め、収束の途中で真横へ切ります**
+   *   （2026-08-28・オーナー判断・案 A / 指摘②）
+   *
+   * 【★何が問題だったか】
+   *   オーナー評「ゲート発送後、一定の馬が内側へ・一定の馬が外側へ行くが、
+   *   **インベーダーみたいな動き**。本来ならば走りながら隊列を作るべき」。
+   *
+   *   ⚠️ ★**エンジンの動きは滑らかでした**（`tools/_laneprobe.mjs`・12 頭 /1600m/ 5 seed）:
+   *      全頭が同じ向きへ動く区間 **0%** ／ 内向きの移動 **59%** ／ 進路角 **中央 0.23°・最大 4.6°**。
+   *      ★`laneAt` にも `RACE_RANDOM_K` にも触れていません。
+   *
+   *   ★**原因はカメラを向けている先でした。**
+   *
+   *        start-front（正面から）  0 〜 240m ・ 12.13 秒
+   *        SETTLE_M（横の収束）      0 〜 250m          ← ★ほぼ完全に一致
+   *
+   *   ★12 頭が「12.7m の広がり → ラチ沿い」へ寄る**全過程**を、
+   *     ★**横移動がいちばん誇張される正面から 12 秒**かけて見せていました。
+   *   ★`SETTLE_M = 250` は D-071 が要求した値（枠順で決まるゲームにしないため）で、
+   *     ★**収束そのものは正しい。** 問題はそれを正面で全部見せていることでした。
+   *
+   * 【★なぜ真横か】★正面では横移動が画面 x にそのまま出ますが、
+   *   ★**真横では奥行きに化けるので滑って見えません。**
+   *   ⚠️ ★`SCRIPT_V3` の「序盤を真横から撮らない」（12 頭の広がりが 0.85m しかなく
+   *      オーナー評「競艇のボートみたいな姿」）は、★**`LANE_REVEAL_FULL_RUN` を
+   *      1.0 → 0.18 にする前の実測**です。★いまは 200m 地点で **7.6〜9.3m** あります。
+   *      ★裁定 `REVIEW_P4_CUT_SEAM_VERDICT_20260827.md` §7 が**この注記の失効**を認めています。
+   *
+   * ⚠️ ★`side-drive` ではなく `side-low` を使います。`side-drive` は密集時に 13° まで
+   *    寄る設定（`frameContenders`）で、★発走直後の団子では数頭しか映りません。
+   */
+  { until: 0.0625, id: 'start-front' },        // 〜100m   ★240m から詰めた（案 A・飛び出しだけ）
   { until: 0.330, id: 'first-corner-front' },   // 〜528m   v4 と同じ
   /**
    * ★**第4コーナーのカット窓を狭めました**（2026-08-26・指示書 §3-2）
@@ -929,7 +961,7 @@ export const SCRIPT_V5: readonly { readonly until: number; readonly id: Broadcas
  *    馬はエンジンが決めた位置のまま走ります（接続は `page.tsx`）。
  */
 export const SCRIPT_V6: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
-  { until: 0.150, id: 'start-front' },          // 〜240m   ★v5 と同一
+  { until: 0.0625, id: 'start-front' },        // 〜100m   ★v5 と同一（案 A・飛び出しだけ）
   { until: 0.330, id: 'first-corner-front' },   // 〜528m   ★v5 と同一
   { until: 0.604, id: 'side-drive' },           // 〜966m   ★v5 と同一（4 角ぶんを受ける・案 B）
   // ★★ここから下だけが v6 の中身（直線 538m を 4 つに割る）

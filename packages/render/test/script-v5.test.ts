@@ -86,8 +86,18 @@ describe('既定台本 v5', () => {
       .toBe(SCRIPT_V4.length - 1);
     expect(SCRIPT_V5.some((cut) => cut.id === 'fourth-corner-front'),
       '★4 角の正面カットは v5 の台本から外したまま（戻すと境目の反転が復活する）').toBe(false);
-    /** ★発走・1 角の境界は v4 のまま */
-    for (const i of [0, 1]) expect(SCRIPT_V5[i]!.until, `#${i} の境界は動かさない`).toBe(SCRIPT_V4[i]!.until);
+    /**
+     * ★**発走の正面カットを 240m → 100m に詰めました**（2026-08-28・案 A・オーナー指摘②）。
+     *   ★正面から見ると 12 頭が横一列に並んで見え、その列ごと横へ動くため
+     *   ★オーナー評「**インベーダーみたいな動き**」になっていました。
+     *   ★飛び出しだけを正面で見せ、以降は斜め前（`first-corner-front`）が受けます。
+     *   ⚠️ ★**真横（`side-low`）は不採用**です。実画面で馬が画面高の 43% まで寄って
+     *      大きく重なり、12 頭中 6 頭しか映りませんでした（旧注記「競艇のボートみたいな姿」の再来）。
+     */
+    expect(SCRIPT_V5[0]!.until, '★発走の正面は 100m で切る').toBe(0.0625);
+    expect(SCRIPT_V5[0]!.until, '★v4 より短いこと').toBeLessThan(SCRIPT_V4[0]!.until);
+    /** ★1 角の出口は v4 のまま（詰めたのは入口だけ） */
+    expect(SCRIPT_V5[1]!.until, '#1 の境界は動かさない').toBe(SCRIPT_V4[1]!.until);
     /** ★直線とゴールの境界も v4 のまま（末尾から数える） */
     expect(SCRIPT_V5.at(-1)!.until).toBe(SCRIPT_V4.at(-1)!.until);
     /**
