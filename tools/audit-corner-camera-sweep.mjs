@@ -30,13 +30,21 @@ const course = built.course;
 const DIST = built.DIST;
 
 /** ★ショット定義の現行値（`broadcast-v2.ts` の `fourth-corner-front`） */
-const CAM_W = 27, CAM_UP = 7, FOV_MAX = 13.6;
+const CAM_UP = 7, FOV_MAX = 13.6;
+/**
+ * ★**カメラの横位置も掃引します**（2026-08-28・裁定 Q-1 の案 A）。
+ *
+ *   ★案 A は「4 角を**反対側から**撮り、走行方向を直線・side-drive と同じ → に揃える」。
+ *   ★現行は `w=22`（外ラチの 2m 外）。反対側は**内馬場**（`w < 0`）です。
+ *   ⚠️ ★走路は 0〜20m。0 未満は内馬場、20 超は外側。**走路の上にはカメラを置けません。**
+ */
+const CAM_W_DEFAULT = 22;
 /** 馬の内ラチからの距離（代表値）。上位馬はおおむねこの辺り */
 const HORSE_W = 6;
 
 /** ★`broadcast-v2-scene.ts:239-243` と同じ式（写し） */
-function viewAt(cutEndM, sFrom, horseS) {
-  const eyePos = posOf(course, cutEndM + sFrom, CAM_W);
+function viewAt(cutEndM, sFrom, horseS, camW = CAM_W_DEFAULT) {
+  const eyePos = posOf(course, cutEndM + sFrom, camW);
   const target = posOf(course, horseS, HORSE_W);
   const dist = Math.hypot(target.x - eyePos.x, target.y - eyePos.y);
   const cam = {
@@ -58,6 +66,7 @@ function viewAt(cutEndM, sFrom, horseS) {
   const top = project(cam, basis, { x: p0.x, y: p0.y, z: 2.4 });
   return {
     viewDeg: (Math.acos(cosT) * 180) / Math.PI,
+    /** ★+ なら馬は画面を右へ、− なら左へ進む。★案 A はここを → に揃えるのが目的 */
     forwardDx: q1.x - q0.x,
     heightRatio: Math.max(0, q0.y - top.y) / H,
     distM: dist,
@@ -68,36 +77,44 @@ console.log(`★seed ${SEED} / 第4コーナー固定カメラの掃引`);
 console.log(`★斜め前素材は α=12°（viewDeg 168°）で描かれています。ここからのずれが小さいほど絵が合います。`);
 console.log(`★現行: カット 0.555〜0.612 / カメラ ${30}m 先\n`);
 
-const CUT_ENDS = [0.600, 0.612, 0.630, 0.660];
-const S_FROMS = [30, 60, 90, 120, 160, 200, 260];
+const CUT_ENDS = [0.604];
+const S_FROMS = [60, 90, 120, 160];
+/** ★内馬場側（負）と外側（正）の両方。走路 0〜20m の上は飛ばす */
+const CAM_WS = [-8, -6, -4, -2, 21, 22, 24, 27];
 
-console.log('  カット終  カメラ   カット内の向き        168°ずれ  ★反転  馬高比(始→終)  カメラ距離(始→終)');
+console.log('  カット終  カメラ先  横位置   カット内の向き        168°ずれ  ★反転  画面の向き   馬高比(始→終)');
 for (const uEnd of CUT_ENDS) {
-  for (const sFrom of S_FROMS) {
-    const cutEndM = uEnd * DIST;
-    /** ★入口は「出口から 90m 手前」で揃える（カットの長さを条件間で同じにする） */
-    const startM = cutEndM - 90;
-    const rows = [];
-    for (let s = startM; s <= cutEndM; s += 1) rows.push({ s, ...viewAt(cutEndM, sFrom, s) });
-    let flips = 0;
-    for (let i = 1; i < rows.length; i += 1) {
-      if ((rows[i].forwardDx < 0) !== (rows[i - 1].forwardDx < 0)) flips += 1;
+  for (const camW of CAM_WS) {
+    for (const sFrom of S_FROMS) {
+      const cutEndM = uEnd * DIST;
+      /** ★入口は「出口から 90m 手前」で揃える（カットの長さを条件間で同じにする） */
+      const startM = cutEndM - 90;
+      const rows = [];
+      for (let s = startM; s <= cutEndM; s += 1) rows.push({ s, ...viewAt(cutEndM, sFrom, s, camW) });
+      let flips = 0;
+      for (let i = 1; i < rows.length; i += 1) {
+        if ((rows[i].forwardDx < 0) !== (rows[i - 1].forwardDx < 0)) flips += 1;
+      }
+      const degs = rows.map((r) => r.viewDeg);
+      const dev = Math.max(...degs.map((d) => Math.abs(d - 168)));
+      const a = rows[0], b = rows[rows.length - 1];
+      /** ★カット全体の代表の向き（中央のコマで見る） */
+      const mid = rows[Math.floor(rows.length / 2)];
+      console.log(
+        `  ${uEnd.toFixed(3)}   ${String(sFrom).padStart(4)}m`
+        + `   ${String(camW).padStart(4)}m`
+        + `   ${Math.min(...degs).toFixed(0).padStart(3)}°〜${Math.max(...degs).toFixed(0).padStart(3)}°`
+        + `   ${dev.toFixed(1).padStart(9)}°`
+        + `   ${flips === 0 ? ' なし' : `★${flips} 回`}`
+        + `   ${(mid.forwardDx > 0 ? '→' : '←')}${Math.abs(mid.forwardDx).toFixed(1).padStart(5)}px/m`
+        + `   ${(a.heightRatio * 100).toFixed(0).padStart(3)}%→${(b.heightRatio * 100).toFixed(0).padStart(3)}%`,
+      );
     }
-    const degs = rows.map((r) => r.viewDeg);
-    const dev = Math.max(...degs.map((d) => Math.abs(d - 168)));
-    const a = rows[0], b = rows[rows.length - 1];
-    console.log(
-      `  ${uEnd.toFixed(3)}   ${String(sFrom).padStart(4)}m`
-      + `   ${Math.min(...degs).toFixed(0).padStart(3)}°〜${Math.max(...degs).toFixed(0).padStart(3)}°`
-      + `   ${dev.toFixed(1).padStart(9)}°`
-      + `   ${flips === 0 ? ' なし' : `★${flips} 回`}`
-      + `   ${(a.heightRatio * 100).toFixed(0).padStart(3)}%→${(b.heightRatio * 100).toFixed(0).padStart(3)}%`
-      + `   ${a.distM.toFixed(0).padStart(4)}m→${b.distM.toFixed(0).padStart(3)}m`,
-    );
   }
   console.log('');
 }
 console.log('★読み方');
-console.log('   ★反転が「なし」で、168°ずれがいちばん小さい行が候補です。');
+console.log('   ★案 A の条件: ★反転「なし」かつ ★画面の向きが →（side-drive・直線と同じ）。');
+console.log('   ★そのうえで 168°ずれがいちばん小さい行が候補です。');
 console.log('   ⚠️ 馬高比が小さすぎると「奥から迫ってくる迫力」が消えます（オーナー判定で一度差し戻された）。');
 console.log('   ⚠️ ★この道具は式の写しです。採用値は製品へ入れてから `audit-corner-turn.mjs` で確認すること。');

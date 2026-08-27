@@ -103,8 +103,9 @@ function screenDirection(course, camera, basis, s, w) {
   const a = project(camera, basis, { ...posOf(course, s, w), z: 0 });
   const b = project(camera, basis, { ...posOf(course, s + 2, w), z: 0 });
   if (!(a.depth > 0) || !(b.depth > 0)) return 0;
-  const dx = b.x - a.x;
-  return Math.abs(dx) < 1e-6 ? 0 : Math.sign(dx);
+  // ★1m 進むごとの画面 px（符号つき）。★符号だけでなく大きさも要る:
+  //   ★「向きが逆」でも大きさが 0 に近ければ、人は逆向きと読みません（正面から迫る画）。
+  return (b.x - a.x) / 2;
 }
 
 const median = (a) => {
@@ -137,7 +138,7 @@ function seamsOf(seed) {
       focusS: scene.focusS,
       focusW: scene.focusW,
       horses: scene.visibleHorses.map((h) => ({ gate: h.gate, s: h.s, w: h.w })),
-      dir: screenDirection(built.course, scene.camera, basis, scene.focusS, scene.focusW),
+      dirPxPerM: screenDirection(built.course, scene.camera, basis, scene.focusS, scene.focusW),
     };
     cutSec.set(cur.id, (cutSec.get(cur.id) ?? 0) + step);
 
@@ -165,9 +166,10 @@ function seamsOf(seed) {
         from: prev.id,
         to: cur.id,
         /** ★①符号の反転。閾値なし・事実 */
-        dirFlip: prev.dir !== 0 && cur.dir !== 0 && prev.dir !== cur.dir,
-        dirBefore: prev.dir,
-        dirAfter: cur.dir,
+        dirFlip: Math.sign(prev.dirPxPerM) !== 0 && Math.sign(cur.dirPxPerM) !== 0
+          && Math.sign(prev.dirPxPerM) !== Math.sign(cur.dirPxPerM),
+        dirBefore: prev.dirPxPerM,
+        dirAfter: cur.dirPxPerM,
         /** ★②共通の被写体。0 頭は閾値なしで問題 */
         sharedCount: shared.length,
         visibleBefore: prev.horses.length,
@@ -197,13 +199,15 @@ for (const seed of SEEDS) {
   allSeams.push(...seams.map((s) => ({ ...s, seed })));
 
   console.log(`\n=== seed ${seed} — カットの境目 ${seams.length} 箇所（全 ${totalSec.toFixed(1)} 秒）===\n`);
-  console.log('   表示秒  切り替わり                              向き  共通  跳び中央  跳び最大   画角比  大きさ比');
+  console.log('   表示秒  切り替わり                              向き(px/m)  共通  跳び中央  跳び最大   画角比  大きさ比');
   for (const s of seams) {
     const flag = s.dirFlip ? '🔴' : (s.sharedCount === 0 ? '🔴' : '  ');
-    const dir = s.dirFlip ? `${s.dirBefore > 0 ? '→' : '←'}${s.dirAfter > 0 ? '→' : '←'}` : '  ';
+    const dir = s.dirFlip
+      ? `${s.dirBefore > 0 ? '→' : '←'}${Math.abs(s.dirBefore).toFixed(0)}/${s.dirAfter > 0 ? '→' : '←'}${Math.abs(s.dirAfter).toFixed(0)}`
+      : '  ';
     console.log(
       `  ${flag}${s.t.toFixed(2).padStart(6)}  ${`${s.from} → ${s.to}`.padEnd(38)}`
-      + `${dir.padStart(4)}${String(s.sharedCount).padStart(6)}`
+      + `${dir.padStart(12)}${String(s.sharedCount).padStart(6)}`
       + `${fmt(s.jumpMedianPx).padStart(10)}${fmt(s.jumpMaxPx).padStart(10)}`
       + `${(fmt(s.fovRatio, 2) + '×').padStart(9)}${(fmt(s.sizeRatioMedian, 2) + '×').padStart(10)}`,
     );
