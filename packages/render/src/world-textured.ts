@@ -151,12 +151,25 @@ export function drawTexturedWorld<TImage>(
   }
 
   // ── 遠くの地面ほど霞む（空気遠近）: 地平線から 140px を上向きに薄く ─────────
+  /**
+   * ★**霞の濃さは画面 y の関数**（地平線でいちばん濃い）。
+   *
+   * ⚠️ ★以前はこの式が**この帯の中だけ**にありました。ところが霞は**ラチより先に塗られる**ので、
+   *    ★**遠いラチだけが霞の上に鮮明に乗っていました**（下の `rail()` の注記・オーナー指摘① 2026-08-27）。
+   * → ★**同じ量を 2 か所に持たないため関数にして、ラチからも引きます**（D-052）。
+   */
+  const HAZE_H = Math.min(H, 140);
+  const HAZE_MAX = 0.34;
+  const hazeAt = (y: number): number => {
+    const i = y - hz;
+    if (i < 0 || i >= HAZE_H) return 0;
+    return HAZE_MAX * (1 - i / HAZE_H) * (1 - i / HAZE_H);
+  };
   {
-    const hazeH = Math.min(H, 140);
-    for (let i = 0; i < hazeH; i += 2) {
+    for (let i = 0; i < HAZE_H; i += 2) {
       const yy = Math.floor(hz) + i;
       if (yy < 0 || yy >= H) continue;
-      ctx.globalAlpha = 0.34 * (1 - i / hazeH) * (1 - i / hazeH);
+      ctx.globalAlpha = hazeAt(yy);
       ctx.fillStyle = '#b7c1c6';
       ctx.fillRect(0, yy, W, 2);
     }
@@ -313,20 +326,58 @@ export function drawTexturedWorld<TImage>(
     const r = P(s, w, 0), h = P(s, focusW, 0);
     return r.depth > 1 && h.depth > 1 && r.depth < h.depth;
   };
+  /**
+   * ★**横木の太さは、支柱と同じ規則（実寸 × px/m）で決めます。**
+   *
+   * ⚠️ ★以前は `1.6px` / `3.2px` の**固定**でした。★支柱は下で `a.pxPerM * 0.09` と
+   *    **深さで縮んでいる**のに、★**横木だけがその規則から漏れていました。**
+   *    実測（オーナー指摘①・発走 6.5s・seed 42）:
+   *      左端の馬はカメラから **27.2m**、てっぺんは画面 y=257。
+   *      ★そこへ **149.1m 先の外ラチ（y=270）** と **420.8m 先の内ラチ（y=261）** が
+   *      ★**手前と同じ 3.2px の白線**で重なり、★白い勝負服と溶けて
+   *      「馬が柵に乗っている」ように見えていました。
+   *   ★実寸 0.09m の横木は 420m 先なら **0.3px** です。3.2px は 10 倍以上の太さでした。
+   *
+   * ★**1px 未満は「細く描く」ことができない**ので、代わりに**薄くします**（線描画の定石）。
+   *   ★これに空気遠近（`hazeAt`）を掛けます。★どちらも既にこの関数の中にある規則で、
+   *   ★**新しい定数を作っていません。**
+   */
+  const BAR_THICK_M = 0.09;   // ★支柱と同じ実寸
   const rail = (w: number, postEveryM: number, postH: number, near: boolean, wantNear: boolean): void => {
-    for (const [height, width, color] of [[postH * 0.55, 1.6, '#c9cbc4'], [postH, 3.2, '#e6e6e0']] as const) {
+    for (const [height, color] of [[postH * 0.55, '#c9cbc4'], [postH, '#e6e6e0']] as const) {
       ctx.strokeStyle = color;
-      ctx.lineWidth = width;
-      ctx.beginPath();
+      /**
+       * ★太さと薄さは**点ごとに変わる**ので、1 本のパスでは描けません。
+       *   ⚠️ ★かといって 5m ごとに `stroke()` すると 1 コマで数千回になります。
+       *   → ★**太さ 0.5px / 薄さ 0.1 の刻みで丸めて、値が変わったときだけ区切ります。**
+       *     連続する区間はまとめて 1 本のパスになるので、実際の `stroke()` は十数回です。
+       */
       let started = false;
+      let bucket = '';
+      let prev: { readonly x: number; readonly y: number } | null = null;
+      const flush = (): void => { if (started) ctx.stroke(); started = false; };
       for (let s = NEAR; s <= FAR; s += 5) {
         const p = P(s, w, height);
         if (p.depth <= 1 || p.x < -200 || p.x > W + 200 || isNearHorses(s, w) !== wantNear) {
-          started = false; continue;
+          flush(); prev = null; continue;
         }
-        if (!started) { ctx.moveTo(p.x, p.y); started = true; } else ctx.lineTo(p.x, p.y);
+        const barPx = p.pxPerM * BAR_THICK_M;
+        const lw = Math.round(Math.max(1, Math.min(6, barPx)) * 2) / 2;
+        const al = Math.round(Math.min(1, barPx) * (1 - hazeAt(p.y)) * 10) / 10;
+        const key = `${lw}/${al}`;
+        if (key !== bucket || !started) {
+          flush();
+          ctx.lineWidth = lw;
+          ctx.globalAlpha = al;
+          ctx.beginPath();
+          // ★区切っても線が途切れないよう、直前の点から引き継ぐ
+          if (prev !== null) { ctx.moveTo(prev.x, prev.y); ctx.lineTo(p.x, p.y); } else ctx.moveTo(p.x, p.y);
+          started = true; bucket = key;
+        } else ctx.lineTo(p.x, p.y);
+        prev = p;
       }
-      ctx.stroke();
+      flush();
+      ctx.globalAlpha = 1;
     }
     ctx.strokeStyle = near ? '#3f6b4c' : '#4a7455';
     for (let s = Math.floor(NEAR / postEveryM) * postEveryM; s <= FAR; s += postEveryM) {
