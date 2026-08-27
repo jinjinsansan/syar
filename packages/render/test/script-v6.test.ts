@@ -191,7 +191,14 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
     const { readFileSync } = await import('node:fs');
     const page = readFileSync('apps/web/src/app/race/page.tsx', 'utf8');
     expect(page).toContain('const cutScript = scriptFromSearch(search) === CUT_RACE_SCRIPT;');
-    expect(page).toContain('const climaxDisabled = cutScript || search.includes(\'climax=off\');');
+    /**
+     * ★**`cutScript ||` が残っていること**が、この検査の本体です（2026-08-27）。
+     *   ⚠️ ★既定を「演出を使わない」へ変えたとき（オーナー判断・R-27）、一度この項を
+     *      `!search.includes('climax=on')` だけにしました。★すると `?cinematography=v6&climax=on` で
+     *      ★**v6 に演出が入り**、上のコメントが守ろうとしている不変条件が壊れます。
+     *      ★この検査がそれを捕まえました。**文字列ではなく `cutScript ||` の有無を見ます。**
+     */
+    expect(page).toContain('const climaxDisabled = cutScript || ');
     expect(page).toContain('noContenderFrameShots: CUT_SCRIPT_NO_FRAME_SHOTS');
   });
 });

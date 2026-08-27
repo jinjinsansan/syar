@@ -1590,8 +1590,21 @@ export default function RacePage(): React.JSX.Element {
      *     代償でした（見かけの速度が **+13.3% / −14.8%** ずれる）。カットで割れば要りません。
      */
     const cutScript = scriptFromSearch(search) === CUT_RACE_SCRIPT;
-    /** ★`/race?climax=off` で表示演出を切る（新旧比較用・指示書 §8-B）。★v6 は常に切る */
-    const climaxDisabled = cutScript || search.includes('climax=off');
+    /**
+     * ★**表示位置の演出（`climax-choreography`）は既定で使いません**（2026-08-27・オーナー判断）。
+     *
+     * ⚠️ ★以前の既定は「台本 v5 なら**入れる**」でした。ところがこの演出は
+     *    ★**馬そのものを動かすため見かけの速度が +13.3% / −14.8% ずれ、オーナー不合格**です。
+     *    ★**不合格の状態が既定に残っていた**ことになります（正典 R-27:
+     *    既定と縮退は常に狭い側・安全な側へ落とす）。
+     *
+     * ★**比較したいときだけ `/race?climax=on` で入れます。** 省略時・不正値は「使わない」側へ落ちます。
+     * ⚠️ ★`?climax=off` も従来どおり「使わない」です（既存の URL と道具を壊さないため）。
+     * ⚠️ ★**v6 は `?climax=on` でも入りません**（`SCRIPT_V6` の注記）。
+     *    ★`cutScript ||` を残しているのはそのためです。★外すと `?cinematography=v6&climax=on` で
+     *    ★入ってしまい、`packages/render/test/script-v6.test.ts` が守っている不変条件が壊れます。
+     */
+    const climaxDisabled = cutScript || !search.includes('climax=on');
     /**
      * ★**主役群の馬番**（確定着順の上位 `CLIMAX_LEAD_COUNT` 頭）。
      *   ★演出の役どころにも、直線のカメラの「収める相手」にも、同じこの集合を使います。

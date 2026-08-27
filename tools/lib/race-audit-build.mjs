@@ -127,7 +127,10 @@ export function auditSceneAt(built, clock, displaySec, viewport = { width: 1280,
   }));
   /**
    * ★**最後の直線の攻防（表示専用）**。`page.tsx` と**同じ関数・同じ引数**を通します（R-30）。
-   *   ⚠️ ★`climax: false` を渡すと素通しになります（演出 ON/OFF の比較用・指示書 §7-1）。
+   *   ⚠️ ★**既定は「使わない」**です（2026-08-27）。`climax: true` を渡したときだけ入ります。
+   *      ★画面の既定（`page.tsx` の `climaxDisabled`）と**同じ側**に揃えてあります（R-30）。
+   *      ★以前は逆（渡さなければ入る）で、画面が v5 既定で演出を入れていた頃と対でした。
+   *      演出が既定から外れたので、測定器もこちら側へ移します。
    *   ⚠️ ★着順は `built.result.order` の**確定着順**から取ります。見た目の順位ではありません。
    */
   const finishPositionOf = new Map(built.result.order.map((row, i) => {
@@ -136,7 +139,7 @@ export function auditSceneAt(built, clock, displaySec, viewport = { width: 1280,
   }));
   const posed = climaxDisplayPositions(
     base.map((h) => ({ gate: h.gate, s: h.s, finishPosition: finishPositionOf.get(h.gate) ?? 99 })),
-    { seed: built.seed, distanceM: built.DIST, disabled: opts.climax === false },
+    { seed: built.seed, distanceM: built.DIST, disabled: opts.climax !== true },
   );
   const offsetByGate = new Map(posed.map((p) => [p.gate, p.offsetM]));
   const drawn = base.map((h, i) => ({ ...h, s: posed[i].s }));
@@ -153,8 +156,8 @@ export function auditSceneAt(built, clock, displaySec, viewport = { width: 1280,
     finishStyle: clock.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
     raceDisplaySec: raceD, fourthCornerFront: FOURTH_CORNER_FRONT_WEB, winnerRear: false,
     leadGates,
-    /** ★`climax: false` は**カメラ側の直しも**切ります（`page.tsx` と同じ・§8-B） */
-    climaxCameraDisabled: opts.climax === false,
+    /** ★`climax` を渡さない／`true` 以外は**カメラ側の直しも**切ります（`page.tsx` と同じ・§8-B） */
+    climaxCameraDisabled: opts.climax !== true,
     /**
      * ★**台本 v6 は `finish-line` の「引く」枠取りを外します**（`page.tsx` と同じ・R-30）。
      *   ⚠️ ★ここを渡さないと、測定器だけが v5 の枠取りで測ることになります。
