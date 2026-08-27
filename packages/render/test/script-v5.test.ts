@@ -77,32 +77,48 @@ describe('既定台本 v5', () => {
      *      窓を狭めました（`side-drive` 0.500→0.540 / `fourth-corner-front` 0.660→0.604）。
      *   ★**動かしてよいのはこの 2 つだけ**です。ほかの境界は v4 のままであることを固定します。
      */
-    expect(SCRIPT_V5.length).toBe(SCRIPT_V4.length);
-    const MOVED = new Set([2, 3]);   // side-drive と fourth-corner-front
-    const diffs: { index: number; from: string; to: string }[] = [];
-    for (let i = 0; i < SCRIPT_V4.length; i += 1) {
-      const a = SCRIPT_V4[i]!;
-      const b = SCRIPT_V5[i]!;
-      if (!MOVED.has(i)) expect(b.until, `#${i} の境界は動かさない`).toBe(a.until);
-      if (a.id !== b.id) diffs.push({ index: i, from: a.id, to: b.id });
-    }
-    expect(diffs).toEqual([
-      { index: 4, from: 'homestretch-front', to: 'homestretch-side' },
-    ]);
-    /** ★動かした 2 つは、狭める向きにしか動かしていないこと */
-    expect(SCRIPT_V5[2]!.until, 'side-drive は後ろへ延ばす').toBeGreaterThan(SCRIPT_V4[2]!.until);
-    expect(SCRIPT_V5[3]!.until, '4 角は手前で切る').toBeLessThan(SCRIPT_V4[3]!.until);
+    /**
+     * ★**2026-08-28・案 B で `fourth-corner-front` を外しました**（オーナー判断）。
+     *   ★したがって v5 は v4 より**カットが 1 つ少ない**です。以前ここは同数を固定していました。
+     *   ★理由は `broadcast-v2.ts` の `SCRIPT_V5` の注記（境目で走行方向が反転していた）。
+     */
+    expect(SCRIPT_V5.length, '★案 B で 4 角の正面カットを外したので v4 より 1 つ少ない')
+      .toBe(SCRIPT_V4.length - 1);
+    expect(SCRIPT_V5.some((cut) => cut.id === 'fourth-corner-front'),
+      '★4 角の正面カットは v5 の台本から外したまま（戻すと境目の反転が復活する）').toBe(false);
+    /** ★発走・1 角の境界は v4 のまま */
+    for (const i of [0, 1]) expect(SCRIPT_V5[i]!.until, `#${i} の境界は動かさない`).toBe(SCRIPT_V4[i]!.until);
+    /** ★直線とゴールの境界も v4 のまま（末尾から数える） */
+    expect(SCRIPT_V5.at(-1)!.until).toBe(SCRIPT_V4.at(-1)!.until);
+    /**
+     * ★`side-drive` が 4 角ぶんを受けるので、v4 より**後ろまで延びます。**
+     *   ⚠️ ★以前ここは「4 角は手前で切る」も見ていましたが、★**その 4 角自体が無くなりました。**
+     */
+    expect(SCRIPT_V5[2]!.until, 'side-drive は 4 角ぶんまで受ける').toBeGreaterThan(SCRIPT_V4[2]!.until);
+    /**
+     * ★**案 B は「直線の始まり」を動かしていません。**
+     *   ⚠️ ★v5 の直線は **0.604** から始まります（2026-08-26 に 4 角の窓を 0.660→0.604 へ
+     *      狭めたときの値）。★v4 の 0.660 とは**元から違います**。
+     *   ★案 B でやったのは「0.540〜0.604 を誰が受けるか」を 4 角の正面 → `side-drive` に
+     *      替えただけで、★**直線の入りは 0.604 のまま**です。ここが動くと直線の尺が変わります。
+     */
+    expect(SCRIPT_V5[2]!.until, '★直線の始まりは 0.604 のまま（案 B で動かしていない）').toBe(0.604);
   });
 
-  /* ⑥ 第4コーナーは v4 と同じ「前から」 */
-  it('⑥ 第4コーナーは v4 と同じ fourth-corner-front（俯瞰は 2026-08-25 に撤回）', () => {
+  /* ⑥ 第4コーナーは真横の side-drive が受ける（案 B） */
+  it('⑥ 第4コーナーは side-drive が受ける（正面カットは 2026-08-28 に外した）', () => {
     /**
-     * ★当初の v5 はここを `fourth-corner-high`（上・後ろから）にしていました。
-     *   オーナー評「ぴょんぴょんする」→ 2026-08-21 の 12 カット全数判定（後ろ・上からは
-     *   5 戦 5 敗・例外なし）に照らして撤回しました。
+     * ★経緯は 3 段あります。★**どれも「戻すと壊れる」ので固定します。**
+     *   ①当初の v5 は `fourth-corner-high`（上・後ろから）→ オーナー評「ぴょんぴょんする」で撤回
+     *     （後ろ・上からは 2026-08-21 の 12 カット全数判定で 5 戦 5 敗・例外なし）
+     *   ②`fourth-corner-front`（前から）へ戻した（`e009b34`）
+     *   ③★**その正面カットも 2026-08-28 に外した**（案 B・オーナー判断）。境目で
+     *     ★**画面上の走行方向が反転**しており（→83px/m → ←26px/m）、
+     *     ★オーナー評「**同じレースなのか分からない**」の原因だったため。
+     *     ★カメラでは直せないことを掃引 32 通りで実測済み（`audit-corner-camera-sweep.mjs`）。
      */
     for (const r of [0.56, 0.58, 0.60]) {
-      expect(shotAt(r, scriptOf('')), `進行 ${r}`).toBe('fourth-corner-front');
+      expect(shotAt(r, scriptOf('')), `進行 ${r}`).toBe('side-drive');
       expect(shotAt(r, scriptOf('?cinematography=v4')), `進行 ${r} の旧 v4`).toBe('fourth-corner-front');
     }
     // ★俯瞰はどちらの台本にも残っていない
@@ -142,9 +158,9 @@ describe('既定台本 v5', () => {
       JSON.stringify([...scene.visibleHorses].map((h) => [h.gate, h.s, h.w]).sort());
     expect(idOf(b), '台本で馬の位置が変わった').toBe(idOf(a));
     // ★変わってよいのはショットだけ
-    // ★第4コーナーは両方とも同じショット（俯瞰を撤回したので差が無い）
-    expect(a.shot.id).toBe('fourth-corner-front');
-    expect(b.shot.id).toBe('fourth-corner-front');
+    // ★第4コーナーは台本で違う: v4 は正面固定、v5 は真横追従（案 B で外したため）
+    expect(a.shot.id, '旧 v4 は 4 角を正面から').toBe('fourth-corner-front');
+    expect(b.shot.id, '★v5 は 4 角を真横追従で受ける（案 B）').toBe('side-drive');
     /* ★台本の違いが出るのは直線だけ: 先頭 1300m（進行 81%） */
     const straight: BroadcastV2Horse[] = horses.map((h) => ({ ...h, s: h.s + 340 }));
     const c = resolveBroadcastV2Scene(course, straight, viewport, false, { script: 'v4' });

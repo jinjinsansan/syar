@@ -837,8 +837,41 @@ export const SCRIPT_V5: readonly { readonly until: number; readonly id: Broadcas
    * ⚠️ ★短くなった分は前後の**真横カット**（`side-drive` / `homestretch-side`）が受けます。
    *    どちらも承認済みのカットで、向きは 87〜89° と一定です。
    */
-  { until: 0.540, id: 'side-drive' },           // 〜864m   ★0.500 から延長（4 角を後ろへずらした分）
-  { until: 0.604, id: 'fourth-corner-front' },  // 〜966m   ★1.33 秒・反転 0 回・168°ずれ ±11.2°
+  /**
+   * ★**第4コーナーの正面カットを外しました**（2026-08-28・オーナー判断・案 B）
+   *
+   * 【★何が問題だったか】`tools/audit-cut-seam.mjs`（新設・製品経路）
+   *   カットの**境目**は、これまで一度も測られていませんでした
+   *   （`verify-camera-continuity.mjs` は `prev.id === cur.id` で境目のコマを捨てます）。測ると:
+   *
+   *       side-drive → fourth-corner-front   ★→83px/m → ←26px/m
+   *       fourth-corner-front → 直線          　←5px/m → →119px/m
+   *
+   *   ★**画面上の走行方向が反転**していました（映像編集の「イマジナリーラインを越える」）。
+   *   ★seed 42 / 253 / 90 / 2 の**4 本すべて**で、★**台本 v5 / v6 の両方**で起きます。
+   *   → ★オーナー評「**同じレースなのか分からない（別のレースかもしれないレベル）**」。
+   *
+   * 【★カメラでは直せませんでした】`tools/audit-corner-camera-sweep.mjs`
+   *   ★反対側から撮る案（内馬場 w = −8〜−2m）を含む **32 通りすべてで向きは ←** のまま。
+   *   ★しかも内馬場側は**悪化**します（← 14.8px/m → 24.9px/m）。
+   *   ★向きを決めているのは「カメラがどちら側か」ではなく、
+   *     **カメラを直線の先に置いてコーナーを回る馬を正面から受けている配置そのもの**です。
+   *
+   * 【★カメラを寄せる案も採れませんでした】
+   *   60m まで寄せれば ← 8.0px/m まで落ちますが、★**カット内の反転が 1 回戻ります。**
+   *   それを消す機構（`aa52b70` の「反転をカット開始時に 1 回だけ決める」）は、
+   *   ★**2026-08-25 にオーナーが却下済み**です（`tools/audit-corner-turn.mjs` の注記）:
+   *     > カット後半で本来と逆を向くため「全員斜めになりながら曲がっている・前回より酷い」
+   *     > ★**跳びより「向きが逆のまま」のほうが悪い**
+   *
+   * 【★だから外します】★**この判定に正面から従う唯一の案**です。
+   *   ★`side-drive` が直線入口（0.604）まで受けます。前後とも真横系（87〜89°）なので、
+   *   ★**境目の反転が 2 箇所とも消えます。**
+   *   ⚠️ ★引き換えに**4 角の絵を失います**（`e009b34` で「前からに戻す」と決めた画角）。
+   *      ★それでも外すのは、上の優先順位（向きが逆 ＞ 跳び）がオーナー判定として明示されているためです。
+   *   ★`SHOTS['fourth-corner-front']` の定義と掃引の記録は**残しています**（台本から呼ばないだけ）。
+   */
+  { until: 0.604, id: 'side-drive' },           // 〜966m   ★4 角ぶんを受ける（0.540 → 0.604）
   { until: 0.940, id: 'homestretch-side' },     // 〜1504m  ★横追従へ（v4 は homestretch-front）★v5 唯一の違い
   { until: 1.0, id: 'finish-line' },            // 〜1600m  v4 と同じ
 ];
@@ -898,8 +931,7 @@ export const SCRIPT_V5: readonly { readonly until: number; readonly id: Broadcas
 export const SCRIPT_V6: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
   { until: 0.150, id: 'start-front' },          // 〜240m   ★v5 と同一
   { until: 0.330, id: 'first-corner-front' },   // 〜528m   ★v5 と同一
-  { until: 0.540, id: 'side-drive' },           // 〜864m   ★v5 と同一
-  { until: 0.604, id: 'fourth-corner-front' },  // 〜966m   ★v5 と同一（4 角・反転 0 回）
+  { until: 0.604, id: 'side-drive' },           // 〜966m   ★v5 と同一（4 角ぶんを受ける・案 B）
   // ★★ここから下だけが v6 の中身（直線 538m を 4 つに割る）
   { until: 0.700, id: 'straight-contest' },     // 〜1120m  ①せめぎ合い（46%・競り合いを抜く）
   { until: 0.790, id: 'homestretch-front' },    // 〜1264m  ②差し・追い込み（正面の奥行き）
