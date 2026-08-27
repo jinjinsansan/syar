@@ -229,6 +229,30 @@ for (const s of flips) console.log(`        seed ${s.seed} ${s.t.toFixed(2)}s  $
 console.log(`   🔴 共通の馬が 0 頭の境目 …… ${orphans.length} 箇所`);
 for (const s of orphans) console.log(`        seed ${s.seed} ${s.t.toFixed(2)}s  ${s.from} → ${s.to}`);
 
+/**
+ * ★**カット境界ごとの集計**（裁定 `REVIEW_P4_CUT_SEAM_VERDICT_20260827.md` §6 の宿題4）。
+ *   ★「どの境界で出ているか」を添えること、という指示に対応します。
+ */
+const byPair = new Map();
+for (const s of allSeams) {
+  const key = `${s.from} → ${s.to}`;
+  if (!byPair.has(key)) byPair.set(key, []);
+  byPair.get(key).push(s);
+}
+console.log('');
+console.log('★カット境界ごとの跳び（共通馬の中央値・px）');
+console.log('   境界                                          本数   最小   25%   中央    75%   最大   反転');
+const q = (a, p) => { const t = [...a].sort((x, y) => x - y); return t[Math.min(t.length - 1, Math.floor(p * t.length))]; };
+for (const [key, rows] of [...byPair.entries()].sort((a, b) => median(b[1].map((r) => r.jumpMedianPx)) - median(a[1].map((r) => r.jumpMedianPx)))) {
+  const v = rows.map((r) => r.jumpMedianPx).filter(Number.isFinite);
+  if (v.length === 0) continue;
+  const flips = rows.filter((r) => r.dirFlip).length;
+  console.log(`   ${key.padEnd(44)}${String(rows.length).padStart(5)}`
+    + `${fmt(Math.min(...v)).padStart(7)}${fmt(q(v, 0.25)).padStart(6)}${fmt(median(v)).padStart(7)}`
+    + `${fmt(q(v, 0.75)).padStart(7)}${fmt(Math.max(...v)).padStart(7)}`
+    + `${(flips === 0 ? ' なし' : `★${flips}`).padStart(7)}`);
+}
+
 const px = allSeams.map((s) => s.jumpMedianPx).filter(Number.isFinite);
 if (px.length > 0) {
   const sorted = [...px].sort((a, b) => a - b);

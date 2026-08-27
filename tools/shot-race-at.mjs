@@ -84,13 +84,22 @@ const course = ovalCourse(DIST, { widthM: 20, turn: 'left' });
 /** ★発走からの表示秒（`raceDisplaySec`）。ゲート待機の 7.8 秒はここに含めない */
 const argv = process.argv.slice(2);
 const flag = (name, dflt) => { const i = argv.indexOf(name); return i >= 0 ? Number(argv[i + 1]) : dflt; };
+/**
+ * ★**どの台本で描くか**（2026-08-28 追加）。
+ *
+ * ⚠️ ★以前この道具は `script` を**一度も渡していません**でした。`broadcast-v2.ts` の
+ *    既定引数は **v4** のままなので、★**画面（既定 v5）と違う台本の絵を描いていました**（R-30）。
+ *    ★4 角の前後を撮ると、画面には無い `fourth-corner-front` が出ます。
+ * ★既定は**画面の既定**（v5）にします。エンジン側の既定ではありません。
+ */
+const SCRIPT = (() => { const i = argv.indexOf('--script'); return i >= 0 ? argv[i + 1] : 'v5'; })();
 const INTRO_SEC = 7.8;  // race-intro.ts の RACE_INTRO_RACE_START_SEC
 /**
  * ⚠️ ★`--shot` / `--fov` の**値**を秒数と取り違えないこと。
  *    取り違えると、指定していない時刻の絵が黙って 1 枚増えます（実際に増えました）。
  */
 const optionValueIndexes = new Set();
-for (const name of ['--shot', '--fov', '--exposure', '--from', '--to', '--step']) {
+for (const name of ['--shot', '--fov', '--exposure', '--from', '--to', '--step', '--script']) {
   const i = argv.indexOf(name);
   if (i >= 0) optionValueIndexes.add(i + 1);
 }
@@ -319,7 +328,9 @@ for (const [index, displaySec] of displaySecs.entries()) {
   //    全時刻が `winner-follow` になります（2026-08-21 に踏んだ）。
   let scene = resolveBroadcastV2Scene(
     course, horses, { width: W, height: H }, allFinished,
-    forcedShot === undefined ? { raceDisplaySec: raceD } : { raceDisplaySec: raceD, forceShotId: forcedShot },
+    forcedShot === undefined
+      ? { raceDisplaySec: raceD, script: SCRIPT }
+      : { raceDisplaySec: raceD, script: SCRIPT, forceShotId: forcedShot },
   );
 
   if (forcedFov !== undefined && Number.isFinite(forcedFov)) {
