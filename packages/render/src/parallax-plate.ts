@@ -1,4 +1,4 @@
-import type { Ctx2D } from './oblique-draw.js';
+import type { Ctx2D, FontOf } from './oblique-draw.js';
 
 /**
  * ★**ループする多層パララックス背景**（Broadcast V2 の側面ショット用）。
@@ -68,6 +68,32 @@ export interface WorldBillboard<TImage> {
   readonly source?: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
   readonly zOrder?: 'behind' | 'front';
   readonly alpha?: number;
+  /**
+   * ★**絵に焼き込まれた番号を、コードで描き直す。**
+   *
+   * ⚠️ ★看板は `w` 軸が画面上で右→左に走るカットでは**左右反転して貼ります**（下の注記）。
+   *    ★そのとき**絵の中の数字も裏返ります。** 数字は反転してはいけないので、
+   *    ★**板を塗り直して、正しい向きの数字を描きます。**
+   * ★比率は素材から実測した値を渡します（目分量で置かない）。
+   */
+  readonly stallLabels?: GateStallLabels;
+}
+
+/**
+ * ★発馬機の番号板の位置（`source` 矩形に対する比）と、描き直しの見た目。
+ *   ★値は素材から機械で測ります（`tools/_gateplates.mjs`）。
+ */
+export interface GateStallLabels {
+  /** ★板の中心の横位置（`source` 幅に対する比）。**左から順に 1, 2, …** */
+  readonly centersXRatio: readonly number[];
+  /** ★板の中心の縦位置（`source` 高さに対する比・上から） */
+  readonly centerYRatio: number;
+  /** ★板の大きさ（`source` に対する比） */
+  readonly widthRatio: number;
+  readonly heightRatio: number;
+  readonly font: FontOf;
+  readonly plateColor: string;
+  readonly textColor: string;
 }
 
 export function drawWorldBillboards<TImage>(
@@ -89,10 +115,91 @@ export function drawWorldBillboards<TImage>(
     const h = w * (src.height / src.width);
     const bottom = (a.y + c.y) / 2;
     if (b.alpha !== undefined) ctx.globalAlpha = b.alpha;
-    ctx.drawImage(b.image, src.x, src.y, src.width, src.height, left, bottom - h, w, h);
+    /**
+     * ★**走路の `w` 軸が画面上で右→左に走るカットでは、絵を左右反転して貼ります。**
+     *
+     * ⚠️ ★以前は常に「画面 x の小さいほう」を絵の左端としていました。ところが `a` は
+     *    `worldW`、`c` は `worldW + widthM` の投影なので、★**カメラによっては `a.x > c.x`**
+     *    になります。そのとき絵は**世界と逆向きに貼られます。**
+     *
+     *    実害（オーナー指摘① 2026-08-27・発走 6.5s・seed 42）: `start-front` は内ラチが
+     *    画面右に来るため、馬は画面左から **12→1** の順に並びます。ところが発馬機の絵は
+     *    **1→12** と描かれているので、★**看板の番号と、そこに立っている馬が全部食い違って**
+     *    いました。オーナーが「左側の1枠の馬」と呼ばれた馬は、実際には**馬番12** です。
+     *
+     * ★**幾何が正で、看板は飾りです。** 馬の位置は `laneAt`（＝レースの結果の一部・D-065）
+     *   から来るので動かせません。★合わせるのは看板の側です。
+     * ⚠️ ★素材の絵を描き直す解は採れません。**`w` 軸が左→右のカットで今度は逆になる**ためです。
+     */
+    const mirrored = a.x > c.x;
+    const canMirror = ctx.save !== undefined && ctx.restore !== undefined && ctx.transform !== undefined;
+    if (mirrored && canMirror) {
+      ctx.save!();
+      // ★x = left と x = left + w を入れ替える鏡（left+w への平行移動 → x 反転）
+      ctx.transform!(-1, 0, 0, 1, 2 * left + w, 0);
+      ctx.drawImage(b.image, src.x, src.y, src.width, src.height, left, bottom - h, w, h);
+      ctx.restore!();
+    } else {
+      // ★`transform` を持たない環境では従来どおり（落とさない・番号以外は左右対称）
+      ctx.drawImage(b.image, src.x, src.y, src.width, src.height, left, bottom - h, w, h);
+    }
+    /**
+     * ★**番号は絵ごと反転してしまうので、板を塗り直して正しい向きで描きます。**
+     *   ⚠️ ★反転していないときも描きます。★描く/描かないを分けると、
+     *      **見え方が 2 通りになり、片方だけ壊れても気づけません**（R-16）。
+     */
+    if (b.stallLabels !== undefined) {
+      const L = b.stallLabels;
+      const plateW = w * L.widthRatio, plateH = h * L.heightRatio;
+      const cy = (bottom - h) + h * L.centerYRatio;
+      const px = Math.max(7, plateH * 0.72);
+      for (const [i, r] of L.centersXRatio.entries()) {
+        // ★反転しているときは、絵の中の比率も左右が入れ替わる
+        const cx = left + w * (mirrored ? 1 - r : r);
+        if (cx < -plateW || cx > viewportWidth + plateW) continue;
+        ctx.fillStyle = L.plateColor;
+        ctx.fillRect(cx - plateW / 2, cy - plateH / 2, plateW, plateH);
+        ctx.fillStyle = L.textColor;
+        ctx.font = L.font(px, true);
+        ctx.textAlign = 'center';
+        // ★`textBaseline` は Ctx2D に無いので、ベースラインを自分で置く
+        ctx.fillText(String(i + 1), cx, cy + px * 0.36);
+      }
+    }
     ctx.globalAlpha = 1;
   }
 }
+
+/**
+ * ★**発馬機（正面）の番号板**。`tools/_gateplates.mjs` で素材から実測した値。
+ *
+ *   素材 `apps/web/public/art/starting-gate-front-v1.png`（1536×512）の
+ *   不透明部分は x=24 y=130 幅 1491 高さ 318。その矩形に対して:
+ *     板の中心の縦位置 9.12% / 板の高さ 9.12% / 板の幅 2.62%
+ *
+ * ⚠️ ★**素材を差し替えたら測り直すこと。** 縦横比と同じく、この値も黙って変わります
+ *    （`tools/verify-world-billboards.mjs` の注記と同じ理由）。
+ */
+export const GATE_FRONT_STALL_PLATES = {
+  /**
+   * ⚠️ ★**10 番だけは両隣からの補間**（0.7109 と 0.8538 の中点）です。
+   *    2 桁の数字が白い板を細かく割るため検出が途中で切れ、中心が 3px ずれました。
+   *    ★全体の等間隔から推定すると 0.7768 になりますが、★**この絵の板の間隔は
+   *    完全な等間隔ではない**ので、**両隣から取るほうが合います**（実画面で確認済み）。
+   */
+  centersXRatio: [
+    0.1207, 0.1972, 0.2706, 0.3447, 0.4188, 0.4926,
+    0.5657, 0.6385, 0.7109, 0.7824, 0.8538, 0.9229,
+  ],
+  centerYRatio: 0.0912,
+  /**
+   * ★実測は 幅 2.62% / 高さ 9.12% ですが、★**少し大きく塗ります。**
+   *   ⚠️ ★ぴったりにすると、測定の 1〜2px の誤差で**裏返った数字の縁が覗きます**
+   *      （実際に 10 番で覗きました）。板は無地の白なので、少し大きい分には見えません。
+   */
+  widthRatio: 0.0300,
+  heightRatio: 0.0960,
+} as const;
 
 export interface ParallaxPlate<TImage> {
   readonly plateWidth: number;

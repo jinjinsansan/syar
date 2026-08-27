@@ -45,7 +45,7 @@ import {
   raceIntroAt, RACE_INTRO_RACE_START_SEC, RACE_INTRO_END_SEC,
   drawRaceTitleCard, drawStartingGate, drawStartCallBand,
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
-  climaxDisplayPositions, CLIMAX_LEAD_COUNT, CUT_RACE_SCRIPT,
+  climaxDisplayPositions, CLIMAX_LEAD_COUNT, CUT_RACE_SCRIPT, GATE_FRONT_STALL_PLATES,
   broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
@@ -1919,6 +1919,11 @@ export default function RacePage(): React.JSX.Element {
           source: raceD <= 0 ? art.gateFront.closedSource : art.gateFront.openSource,
           worldS: 1.6, worldW: 0.5, widthM: 14.8,
           zOrder: raceD <= 0 ? 'front' : 'behind',
+          /**
+           * ★**番号は絵ごと反転してしまうので、コードで描き直します**（2026-08-27・オーナー指摘①）。
+           *   ★比率は素材から実測した値（`GATE_FRONT_STALL_PLATES`）を 1 か所から引きます（D-052）。
+           */
+          stallLabels: { ...GATE_FRONT_STALL_PLATES, font: FONT, plateColor: '#f2f2ee', textColor: '#14181a' },
         } satisfies WorldBillboard<HTMLImageElement>] : undefined,
       });
       drawScene(ctx, scene);

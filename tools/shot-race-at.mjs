@@ -32,8 +32,11 @@ import {
   paintCrowd, seatMaskFromPixels, seatBandFromPixels,
   cameraBasis, drawBroadcastV2Scene, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
   posOf, project, ratesForTarget, replayPositionModel, resolveBroadcastV2Scene,
-  targetDisplaySec, timeWarpFor, withFinishRunOut,
+  targetDisplaySec, timeWarpFor, withFinishRunOut, GATE_FRONT_STALL_PLATES,
 } from '@star/render';
+
+/** ★書体。★画面（`page.tsx`）と同じ形にすること。ここだけ違えるとこの道具が別の絵を測る（R-30） */
+const FONT = (px, bold) => `${bold ? 'bold ' : ''}${px}px JPUI, system-ui, sans-serif`;
 
 /**
  * ★このカットで馬がどれだけの大きさで描かれ、何頭が画面に収まるか
@@ -373,6 +376,8 @@ for (const [index, displaySec] of displaySecs.entries()) {
     worldBillboards: lead < 90 ? [{
       image: gateOpen.image, width: gateOpen.image.width, height: gateOpen.image.height,
       source: gateOpen.source, worldS: 1.6, worldW: 0.5, widthM: 14.8, zOrder: 'behind',
+      /** ★番号の描き直しも画面と同じにする（R-30: 測定器が画面と違う画を見ない） */
+      stallLabels: { ...GATE_FRONT_STALL_PLATES, font: FONT, plateColor: '#f2f2ee', textColor: '#14181a' },
     }] : undefined,
   });
   /**
@@ -386,7 +391,6 @@ for (const [index, displaySec] of displaySecs.entries()) {
   const OWN_GATE = 4;
   const NAMES = ['スターライト', 'サクラブリーズ', 'ハンシンドリーム', 'ミライノツバサ', 'グリーンアロー', 'オウカノキセキ',
     'ナニワスピリット', 'ローズクイーン', 'ムラサキノホシ', 'アオバハヤテ', 'ブラウンエース', 'ピンクレディ'];
-  const FONT = (px, bold) => `${bold ? 'bold ' : ''}${px}px JPUI, system-ui, sans-serif`;
   const ranked = [...horses].sort((a, b) => b.s - a.s);
   drawFormationBar(ctx, palette, FONT, horses.map((h) => ({ gate: h.gate, s: h.s })), FIELD, frameRoleOf,
     { x: 40, y: 4, width: W - 80, ownGate: OWN_GATE, timeSec: displaySec, sinceSec: 9 });
