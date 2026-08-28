@@ -272,7 +272,23 @@ const HUD_SETTLE_SEC = 0.8;
  *    **騎手の肌を治すだけなのに**」
  *    → **毛色は減らさず、掛ける範囲を馬体に限る**（`@star/render` の `isHorseCoat`）。
  */
-const COAT_BY_GATE: readonly CoatName[] = ['bay', 'chestnut', 'dark-bay', 'bay', 'grey', 'bay', 'chestnut', 'blue-black', 'bay', 'dark-bay', 'chestnut', 'bay'];
+/**
+ * ★**毛色の並び**（2026-08-28・オーナー要望「JRA の登録馬の毛色通りに」）。
+ *
+ *   ★実在の登録頭数のおおよその割合: 鹿毛 ~48% / 黒鹿毛 ~22% / 栗毛 ~15% /
+ *     芦毛 ~7% / 青鹿毛 ~6% / 栃栗毛 ~1.5% / 青毛 ~1% / 白毛 <0.1%。
+ *   ★18 頭ぶん並べ、その割合に近づけています（鹿毛7 / 黒鹿毛4 / 栗毛3 / 芦毛1 /
+ *     青鹿毛1 / 栃栗毛1 / 青毛1）。★白毛は入れません（`COAT_TRANSFORMS` の注記）。
+ *
+ * ⚠️ ★**隣どうしが同じ毛色にならないよう散らしています。** 実在の割合どおりに
+ *    並べるだけだと鹿毛が固まり、★「同じ馬が並んでいる」に見えます。
+ * ⚠️ ★12 頭立てでは先頭 12 個が使われます（鹿毛5 / 黒鹿毛3 / 栗毛2 / 芦毛1 / 青鹿毛1）。
+ */
+const COAT_BY_GATE: readonly CoatName[] = [
+  'bay', 'chestnut', 'dark-bay', 'bay', 'grey', 'dark-bay',
+  'chestnut', 'seal-brown', 'bay', 'dark-bay', 'bay', 'bay',
+  'liver-chestnut', 'bay', 'blue-black', 'chestnut', 'dark-bay', 'bay',
+];
 const coatOf = (gate: number): CoatName => COAT_BY_GATE[(gate - 1) % COAT_BY_GATE.length] ?? 'bay';
 /**
  * ★毛色を**焼き込んだ**画像を作る。馬体の画素だけを変換し、騎手・馬具・白斑は触らない。
@@ -503,7 +519,22 @@ function silksOverlays(
       if (isSkinTone(r, g, b)) continue;
       const luminance = (r + g + b) / (3 * 255);
       const shade = 0.30 + luminance * 0.78;
-      const useCap = helmet || saddlecloth;
+      /**
+       * ★**重なった帯は「上着」が勝ちます**（2026-08-28・オーナー指摘）。
+       *
+       * ⚠️ ★兜と上着の窓は**重なっています**（`SILKS_LAYOUT_CROUCH` は
+       *    兜 ny≤0.23 / 上着 ny 0.08〜0.39 で **0.08〜0.23 が重複**）。
+       *    ★最初これを `helmet || saddlecloth` と書いたため、★**重なった帯が全部
+       *    帽子の色（＝枠色）**で塗られました。★横から見た伏せた騎手は、
+       *    ★**服のいちばん広い部分がまさにその帯**です。
+       *    → 実画面で ★**7番と8番が同じ緑・11番と12番が同じピンク**になっていました。
+       *    ⚠️ ★ゲート（`diag-front-v2`）は重なりが 0.06〜0.10 と狭いので正しく出ており、
+       *       ★オーナー評「ゲートでは違うのにレース中は同じ」はこの差でした。
+       *
+       * ★窓は「兜は上着より上」「鞍布は上着より下」という**上下の並び**で意味を持ちます。
+       *   ★重なりでは**内側（上着・鞍布）を優先**します。
+       */
+      const useCap = saddlecloth || (helmet && !jacket);
       output.data[index] = Math.min(255, (useCap ? capR : bodyR) * shade);
       output.data[index + 1] = Math.min(255, (useCap ? capG : bodyG) * shade);
       output.data[index + 2] = Math.min(255, (useCap ? capB : bodyB) * shade);

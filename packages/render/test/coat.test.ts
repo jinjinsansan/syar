@@ -67,16 +67,31 @@ describe('★毛色を馬体だけに掛ける', () => {
   });
 
   it('★他の毛色は色味を保つ（芦毛だけが特別に彩度を落とす）', () => {
-    for (const name of ['chestnut', 'dark-bay', 'blue-black'] as const) {
-      const t = COAT_TRANSFORMS[name];
-      const [R, G, B] = applyCoat(144, 79, 39, t);
-      const spread = Math.max(R, G, B) - Math.min(R, G, B);
-      expect(spread, `${name} が無彩色になっています`).toBeGreaterThan(30);
+    /**
+     * ⚠️ ★**「絶対値の色幅」で見てはいけません**（2026-08-28 に是正）。
+     *    ★以前ここは `spread > 30` でした。★暗さと無彩色を混同しています。
+     *    ★青毛（真っ黒）は**暗いので絶対値では必ず落ちます** — 実際、青毛を
+     *    ★黒鹿毛と区別がつくまで暗くした（0.62 → 0.36）ところ 14.4 で落ちました。
+     *
+     * ★危険なのは「暗くする」ことではなく ★**「彩度を落とす」**ことです
+     *   （芦毛を素材全体に掛けると騎手の肌まで灰色になる、という当の危険）。
+     * → ★**彩度（色幅 ÷ 最大値）**で見ます。芦毛だけが下回ることも併せて固定します。
+     */
+    /** ⚠️ ★鹿毛（`bay`）だけ変換が `undefined`（素材そのまま）なので、型で除いておく */
+    const satOf = (name: Exclude<keyof typeof COAT_TRANSFORMS, 'bay'>): number => {
+      const [R, G, B] = applyCoat(144, 79, 39, COAT_TRANSFORMS[name]);
+      const max = Math.max(R, G, B);
+      return max <= 0 ? 0 : (max - Math.min(R, G, B)) / max;
+    };
+    for (const name of ['chestnut', 'liver-chestnut', 'dark-bay', 'seal-brown', 'blue-black'] as const) {
+      expect(satOf(name), `${name} が無彩色になっています`).toBeGreaterThan(0.20);
     }
+    /** ★芦毛だけが彩度を落とす、という**対照**。これが無いと上の基準は「全部通る」で満たせます（R-16） */
+    expect(satOf('grey'), '★芦毛は彩度を落とす側であること').toBeLessThan(0.20);
   });
 
   it('★変換は 0〜255 に収まる', () => {
-    for (const name of ['chestnut', 'dark-bay', 'blue-black', 'grey'] as const) {
+    for (const name of ['chestnut', 'liver-chestnut', 'dark-bay', 'seal-brown', 'blue-black', 'grey'] as const) {
       for (const [r, g, b] of [...COAT_PIXELS, [255, 250, 240] as const, [2, 1, 0] as const]) {
         const out = applyCoat(r, g, b, COAT_TRANSFORMS[name]);
         for (const v of out) {
