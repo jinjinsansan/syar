@@ -18,11 +18,18 @@ import {
   DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt, TRACK_WIDTH_M,
 } from '@star/race-engine';
 import {
+  broadcastV2StartLagM,
   cameraBasis, finalOrderOf, knotsFor, ovalCourse, posOf, project, replayPositionModel,
   resolveBroadcastV2Scene, timeWarpFor, withFinishRunOut, ratesForTarget, targetDisplaySec,
   RACE_INTRO_RACE_START_SEC, parallaxLayerShiftPx, HORSE_HEIGHT_M,
   broadcastV2AnchorWeight, buildVisualScroll, broadcastV2FinishStyleOf, HORSE_LENGTH_M,
 } from '@star/render';
+
+
+/** ★立ち上がりの基準にする走速（m/s）。★`page.tsx` と同じ値 */
+const RACE_SPEED_MPS = 15.6;
+const startShownMeters = (meters, raceDisplaySec) =>
+  Math.max(0, meters - broadcastV2StartLagM(raceDisplaySec, RACE_SPEED_MPS));
 
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : def; };
@@ -76,7 +83,12 @@ function sample(displaySec) {
   const raw = model.at(raceSec);
   const visual = withFinishRunOut(raw, (gate) => finishSec.get(gate), raceSec, DIST, Math.max(0, raceD - warp.displaySec));
   const winnerFinished = (raw.find((h) => h.gate === winnerGate)?.meters ?? 0) >= DIST - 1e-6;
-  const horses = visual.map((h) => ({ gate: h.gate, s: h.meters, w: h.w ?? TRACK_WIDTH_M / 2, finished: h.meters >= DIST - 1e-6 }));
+  /**
+   * ★**発走の遅れを引く**（`page.tsx` の `startShownMeters` と同じ）。
+   * ⚠️ ★この道具は 2026-08-28 まで引いていませんでした。★画面も監査も引いています。
+   *    ★引かないと、★**馬を 8.32m 先で測り**、発走直後はその分の動きも見落とします（R-30）。
+   */
+  const horses = visual.map((h) => ({ gate: h.gate, s: startShownMeters(h.meters, raceD), w: h.w ?? TRACK_WIDTH_M / 2, finished: h.meters >= DIST - 1e-6 }));
   const scene = resolveBroadcastV2Scene(course, horses, { width: W, height: H }, winnerFinished, {
     finishStyle, cornerCutM: 400, raceDisplaySec: displaySec - RACE_INTRO_RACE_START_SEC,
   });

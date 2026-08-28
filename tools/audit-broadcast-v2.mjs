@@ -7,10 +7,17 @@ import {
   DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt,
 } from '@star/race-engine';
 import {
+  broadcastV2StartLagM,
   cameraBasis, drawBroadcastV2Scene, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
   posOf, project, replayPositionModel, resolveBroadcastV2Scene, segmentStarts,
   timeWarpFor, withFinishRunOut, ratesForTarget, targetDisplaySec,
 } from '@star/render';
+
+
+/** ★立ち上がりの基準にする走速（m/s）。★`page.tsx` と同じ値 */
+const RACE_SPEED_MPS = 15.6;
+const startShownMeters = (meters, raceDisplaySec) =>
+  Math.max(0, meters - broadcastV2StartLagM(raceDisplaySec, RACE_SPEED_MPS));
 
 const W = 1280, H = 720, FIELD = 12, DIST = 1600;
 const ART = path.resolve('apps/web/public/art');
@@ -181,7 +188,12 @@ for (let displaySec = 0; displaySec <= totalDisplaySec + 1e-9; displaySec += ste
   const visual = withFinishRunOut(raw, (gate) => finishSec.get(gate), raceSec, DIST,
     Math.max(0, displaySec - warp.displaySec));
   const winnerFinished = (raw.find((horse) => horse.gate === winnerGate)?.meters ?? 0) >= DIST - 1e-6;
-  const horses = visual.map((horse) => ({ gate: horse.gate, s: horse.meters, w: horse.w ?? course.widthM / 2 }));
+  /**
+   * ★**発走の遅れを引く**（`page.tsx` の `startShownMeters` と同じ）。
+   * ⚠️ ★この道具は 2026-08-28 まで引いていませんでした。★画面も監査も引いています。
+   *    ★引かないと、★**馬を 8.32m 先で測り**、発走直後はその分の動きも見落とします（R-30）。
+   */
+  const horses = visual.map((horse) => ({ gate: horse.gate, s: startShownMeters(horse.meters, displaySec), w: horse.w ?? course.widthM / 2 }));
   const scene = resolveBroadcastV2Scene(course, horses, { width: W, height: H }, winnerFinished);
   const basis = cameraBasis(scene.camera);
   const anchors = new Map();

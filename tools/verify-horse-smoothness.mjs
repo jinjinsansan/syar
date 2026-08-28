@@ -19,9 +19,16 @@
 import { readFileSync } from 'node:fs';
 import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt } from '@star/race-engine';
 import {
+  broadcastV2StartLagM,
   cameraBasis, knotsFor, ovalCourse, posOf, project, ratesForTarget,
   replayPositionModel, resolveBroadcastV2Scene, targetDisplaySec, timeWarpFor, withFinishRunOut,
 } from '@star/render';
+
+
+/** ★立ち上がりの基準にする走速（m/s）。★`page.tsx` と同じ値 */
+const RACE_SPEED_MPS = 15.6;
+const startShownMeters = (meters, raceDisplaySec) =>
+  Math.max(0, meters - broadcastV2StartLagM(raceDisplaySec, RACE_SPEED_MPS));
 
 const W = 1280, H = 720, FIELD = 12, DIST = 1600, SEED = 42, FPS = 30;
 const POOL = JSON.parse(readFileSync('apps/web/src/lib/watch-pool.json', 'utf8'));
@@ -58,7 +65,12 @@ for (let t = 0; t <= warp.displaySec; t += 1 / FPS) {
   const sec = warp.raceSecAt(t);
   const at = model.at(sec);
   const vis = withFinishRunOut(at, (g) => finishSec.get(g), sec, DIST, 0);
-  const horses = vis.map((h) => ({ gate: h.gate, s: h.meters, w: h.w, staminaRatio: 1 }));
+  /**
+   * ★**発走の遅れを引く**（`page.tsx` の `startShownMeters` と同じ）。
+   * ⚠️ ★この道具は 2026-08-28 まで引いていませんでした。★画面も監査も引いています。
+   *    ★引かないと、★**馬を 8.32m 先で測り**、発走直後はその分の動きも見落とします（R-30）。
+   */
+  const horses = vis.map((h) => ({ gate: h.gate, s: startShownMeters(h.meters, t), w: h.w, staminaRatio: 1 }));
   const scene = resolveBroadcastV2Scene(course, horses, { width: W, height: H }, false, { raceDisplaySec: t });
   const basis = cameraBasis(scene.camera);
   for (const h of horses) {
