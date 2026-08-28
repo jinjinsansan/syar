@@ -34,7 +34,7 @@ import {
   replayPositionModel, finalOrderOf, withFinishRunOut, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
   phaseOf, HORSE_LENGTH_M,
   // ★描き方は package が唯一の出どころ（この画面には持たない）
-  frameRoleOf, SHEET_V2,
+  frameRoleOf, silkRoleOf, SHEET_V2,
   raceShotAt,
   focusForRaceShot,
   drawFixed2DSideScene, fixed2DBackgroundRoleOf, fixed2DPackLayout,
@@ -234,8 +234,19 @@ function flightLiftFor(index: number, count: number): number {
  * ⚠️ ★16 進をここに持ちません。`palette.json` から役割名で引きます（アートバイブル §6）。
  *    ここに 12 色を直書きしていたことが、そもそも食い違いの原因でした。
  */
-const silksColorsFor = (pal: Record<string, string>, fieldSize: number): readonly string[] =>
-  Array.from({ length: fieldSize }, (_, index) => pal[frameRoleOf(index + 1, fieldSize)] ?? '#ffffff');
+export interface SilkColors { readonly cap: string; readonly body: string }
+/**
+ * ★**帽子＝枠色 ／ 上着＝馬ごとの色**（2026-08-28・オーナー指摘①で改訂）。
+ *   ⚠️ ★以前はどちらも枠色で、★**同じ枠の 2 頭が完全に同じ見た目**でした。
+ *      2026-08-27 に一度「現状維持」と決めましたが、実画面で不合格になりました。
+ *   ★HUD は枠色のままなので、**HUD のチップは帽子と一致**します（2026-08-22 の是正を壊さない）。
+ * ⚠️ ★16 進をここに持ちません。`palette.json` から役割名で引きます（アートバイブル §6）。
+ */
+const silksColorsFor = (pal: Record<string, string>, fieldSize: number): readonly SilkColors[] =>
+  Array.from({ length: fieldSize }, (_, index) => ({
+    cap: pal[frameRoleOf(index + 1, fieldSize)] ?? '#ffffff',
+    body: pal[silkRoleOf(index + 1, fieldSize)] ?? '#ffffff',
+  }));
 /**
  * ★表示用のレース情報（憲法 §0.1: 実在の競馬場名・レース名は使わない）。
  *   以前は実在名のプレースホルダーが直書きされていたので架空名に置換した。
@@ -442,7 +453,7 @@ const SILKS_LAYOUT_WINNER: SilksLayout = {
 };
 
 function silksOverlays(
-  image: FrameImage, source: HighQualityHorseFrame['source'], colors: readonly string[],
+  image: FrameImage, source: HighQualityHorseFrame['source'], colors: readonly SilkColors[],
   layout: SilksLayout = SILKS_LAYOUT_CROUCH,
 ): readonly NonNullable<HighQualityHorseFrame['overlay']>[] {
   const x0 = Math.round(source.x + source.width * layout.cropX);
@@ -454,10 +465,15 @@ function silksOverlays(
   if (scratchCtx === null) return [];
   scratchCtx.drawImage(image, 0, 0);
   const input = scratchCtx.getImageData(x0, y0, width, height).data;
-  return colors.map((hex, colorIndex) => {
-    const red = Number.parseInt(hex.slice(1, 3), 16);
-    const green = Number.parseInt(hex.slice(3, 5), 16);
-    const blue = Number.parseInt(hex.slice(5, 7), 16);
+  const rgbOf = (hex: string): readonly [number, number, number] => [
+    Number.parseInt(hex.slice(1, 3), 16),
+    Number.parseInt(hex.slice(3, 5), 16),
+    Number.parseInt(hex.slice(5, 7), 16),
+  ];
+  return colors.map((pair, colorIndex) => {
+    /** ★帽子と鞍布は枠色、上着は馬ごとの色（実際の競馬と同じ形・`silkRoleOf` の注記） */
+    const [capR, capG, capB] = rgbOf(pair.cap);
+    const [bodyR, bodyG, bodyB] = rgbOf(pair.body);
     const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
     const ctx = canvas.getContext('2d'); if (ctx === null) return { image: canvas, width, height, offsetXSourcePx: x0, offsetYSourcePx: y0 };
     const output = ctx.createImageData(width, height);
@@ -487,9 +503,10 @@ function silksOverlays(
       if (isSkinTone(r, g, b)) continue;
       const luminance = (r + g + b) / (3 * 255);
       const shade = 0.30 + luminance * 0.78;
-      output.data[index] = Math.min(255, red * shade);
-      output.data[index + 1] = Math.min(255, green * shade);
-      output.data[index + 2] = Math.min(255, blue * shade);
+      const useCap = helmet || saddlecloth;
+      output.data[index] = Math.min(255, (useCap ? capR : bodyR) * shade);
+      output.data[index + 1] = Math.min(255, (useCap ? capG : bodyG) * shade);
+      output.data[index + 2] = Math.min(255, (useCap ? capB : bodyB) * shade);
       output.data[index + 3] = Math.round(a * 0.94);
     }
     ctx.putImageData(output, 0, 0);
