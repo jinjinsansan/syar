@@ -143,8 +143,18 @@ describe('Broadcast V2', () => {
     const base = { backM: 44, upM: 3.5, sideM: 9, fovDeg: 5.7 } as const;
     expect(broadcastV2FinishCamera('solo', 0, base).camera.fovDeg).toBeCloseTo(5.7, 6);
     expect(broadcastV2FinishCamera('contest', 0, base, 0.66).leadFraction).toBeCloseTo(0.66, 6);
-    // 重み 1 では接戦だけが引く（22°）
-    expect(broadcastV2FinishCamera('contest', 1, base).camera.fovDeg).toBeCloseTo(22, 6);
+    /**
+     * ★重み 1 では接戦だけが引く（**15°**）。
+     * ⚠️ ★以前は **22°** でした。2026-08-28、オーナー評「ゴール前で急に迫力がなくなる」。
+     *    ★見た目の速さは画面上の地面の流れで決まり、それは馬の大きさに比例します。
+     *    実測: `finish-line` の地面の流れは `straight-contest` の **30%** しかありませんでした。
+     *    ★15° にして **52%** まで戻しています。入れるべきは「何頭でも」ではなく
+     *    ★**競り合っている数頭**で、15° の画面には走路 19.4m が入ります（上位 5 頭は約 12.5m）。
+     */
+    expect(broadcastV2FinishCamera('contest', 1, base).camera.fovDeg).toBeCloseTo(15, 6);
+    /** ★単騎のときは寄る（12°）— 接戦より狭いことを固定する */
+    expect(broadcastV2FinishCamera('solo', 1, base).camera.fovDeg)
+      .toBeLessThan(broadcastV2FinishCamera('contest', 1, base).camera.fovDeg);
   });
 
   it('注視点は両端の外れ値を除いた平均になる', () => {

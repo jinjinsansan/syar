@@ -197,10 +197,16 @@ export function auditSceneAt(built, clock, displaySec, viewport = { width: 1280,
     /** ★`climax` を渡さない／`true` 以外は**カメラ側の直しも**切ります（`page.tsx` と同じ・§8-B） */
     climaxCameraDisabled: opts.climax !== true,
     /**
-     * ★**台本 v6 は `finish-line` の「引く」枠取りを外します**（`page.tsx` と同じ・R-30）。
-     *   ⚠️ ★ここを渡さないと、測定器だけが v5 の枠取りで測ることになります。
+     * ★**台本 v6 は `finish-line` の「引く」枠取りを外します**（`page.tsx:1790` と同じ・R-30）。
+     *
+     * ⚠️ ★以前ここは**呼ぶ側が渡したときだけ**効いていました。ところが画面は
+     *    ★**台本が v6 なら必ず外します。** そのため渡し忘れた道具は
+     *    ★**画面より広い画角で測って**いました（実測: ゴール前の画角 26.0°／画面は 15°）。
+     *    ★2026-08-28、オーナー指摘「ゴール前で急に迫力がなくなる」を追う過程で発覚。
+     * → ★**台本から決めます。** 呼ぶ側の明示があればそちらを優先します。
      */
-    ...(opts.noContenderFrameShots ? { noContenderFrameShots: opts.noContenderFrameShots } : {}),
+    ...(opts.noContenderFrameShots ?? (script === 'v6' ? ['finish-line'] : undefined)
+      ? { noContenderFrameShots: opts.noContenderFrameShots ?? ['finish-line'] } : {}),
     ...(script === undefined ? {} : { script }),
   });
   return { raceSec: sec, raceDisplaySec: raceD, drawn, base, offsetByGate, winnerDone, scene };

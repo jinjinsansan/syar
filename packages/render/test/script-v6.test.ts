@@ -136,7 +136,8 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
      *    移したため、旧の 1000m / 1080m は現在 `side-drive` です（`SCRIPT_V6` の注記）。
      *    ★①1200〜1312m ／ ②1312〜1392m ／ ③1392〜1504m から取ります。
      */
-    for (const leadS of [1330, 1380]) {
+    /** ⚠️ ★②の窓は 2026-08-28 に 1312〜1392m → **1312〜1352m** へ詰めました（`SCRIPT_V6` の注記） */
+    for (const leadS of [1320, 1345]) {
       const f = frameAt(leadS, 'v6');
       expect(f.shot).toBe('homestretch-front');
       expect(f.onScreen).toBe(12);

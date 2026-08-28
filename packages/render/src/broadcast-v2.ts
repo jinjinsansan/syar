@@ -1029,7 +1029,23 @@ export const SCRIPT_V6: readonly { readonly until: number; readonly id: Broadcas
   { until: 0.750, id: 'side-drive' },           // 〜1200m  ★実時間に戻るまで引きで受ける
   // ★★ここから下だけが v6 の中身（直線 538m を 4 つに割る）
   { until: 0.820, id: 'straight-contest' },     // 〜1312m  ①せめぎ合い（競り合いを抜く）
-  { until: 0.870, id: 'homestretch-front' },    // 〜1392m  ②差し・追い込み（正面の奥行き）
+  /**
+   * ★**②の尺を 80m → 40m に詰めました**（2026-08-28・オーナー指摘）
+   *
+   *   > （残り 239m の正面カットで）急にスピードが遅くなっています
+   *
+   *   ★見た目の速さは**画面上で地面がどれだけ流れるか**で決まります。
+   *   ★実測（`tools/_groundflow.mjs`・seed 42）:
+   *
+   *        straight-contest   2279 px/s
+   *        homestretch-front ★ 113 px/s   ← ★20 分の 1
+   *
+   *   ⚠️ ★**これは構造です。** このカットは馬群の 34m 前を走る**正面追従**なので、
+   *      ★地面が横へ流れず、速さの手掛かりがほとんど出ません。★画角や大きさでは直りません。
+   *   ★それでも残すのは、★**「差してくる」は奥行きの手掛かりで成立する**からです
+   *      （このショット自身の注記）。★**要るが、長く使えない。** だから 4.7 秒 → 2.4 秒にします。
+   */
+  { until: 0.845, id: 'homestretch-front' },    // 〜1352m  ②差し・追い込み（正面の奥行き・短く）
   { until: 0.940, id: 'straight-contest' },     // 〜1504m  ③差し・追い込み（競り合いを抜く）
   { until: 1.0, id: 'finish-line' },            // 〜1600m  ④ゴール板
 ];
@@ -1552,7 +1568,21 @@ export function broadcastV2FinishCamera(
   style: BroadcastV2FinishStyle, weight: number, base: ShotCameraPreset = SIDE_TELE, baseLead = 0.78,
 ): { readonly camera: ShotCameraPreset; readonly leadFraction: number } {
   const w = Math.max(0, Math.min(1, weight));
-  const targetFov = style === 'contest' ? 22 : 12;
+  /**
+   * ★**接戦のときの画角を 22° → 15° に寄せました**（2026-08-28・オーナー指摘）
+   *
+   *   > このゴール前の馬が小さくなるのはいいのですが、急に迫力がなくなります　なぜ？
+   *
+   *   ★見た目の速さは ★**画面上で地面がどれだけ流れるか**で決まり、それは**馬の大きさに比例**します。
+   *   ★実測（`tools/_groundflow.mjs`・seed 42・台本 v6）:
+   *
+   *        straight-contest  2279 px/s（130 px/m）
+   *        finish-line     ★ 692 px/s（ 39 px/m）  ← ★30% に落ちる
+   *
+   *   ★22° は「何頭でも入る」ための値でしたが、**入れるべきは競り合っている数頭**です。
+   *   ★15° なら画面に入る走路は約 14m で、上位 5 頭の広がり（seed 42 の決着で約 12m）が収まります。
+   */
+  const targetFov = style === 'contest' ? 15 : 12;
   const targetLead = style === 'contest' ? 0.45 : 0.6;
   return {
     camera: { ...base, fovDeg: base.fovDeg + (targetFov - base.fovDeg) * w },
