@@ -1319,8 +1319,39 @@ export function broadcastV2TurnFacing(viewDeg: number): {
   return { useFront: false, squeezeX: Math.max(TURN_SIDE_SQUEEZE_MIN, Math.min(1, ratio)) };
 }
 
-/** 閃光トランジションで入るショット */
-export const FLASH_INTO: ReadonlySet<BroadcastV2ShotId> = new Set<BroadcastV2ShotId>(['side-drive']);
+/**
+ * ★**閃光トランジションで入るショット**
+ *
+ * 【★4 角の正面を足しました】（2026-08-28・裁定 `REVIEW_P4_CUT_SEAM_REOPEN_VERDICT_20260828.md` §2）
+ *
+ *   ★カットの境目で**画面上の走行方向が反転**します（`side-drive → fourth-corner-front`
+ *   で **→82 → ←19 px/m**・20 seed 全数）。→ オーナー評「**同じレースなのか分からない**」。
+ *
+ *   ⚠️ ★**閃光は反転を消しません。**「読める形にした」であって「直した」ではありません。
+ *      ★**反転は残差として台帳に残します**（裁定 §2-3 の条件 1）。
+ *      ★「4 角の反転は解決済み」と記録しないこと。
+ *
+ * 【★なぜ先例と衝突しないか】
+ *   ★`tools/audit-corner-turn.mjs:45-47` の「跳びより**向きが逆のまま**のほうが悪い」は、
+ *   ★**カット内で馬が自分の進行方向と逆を向く**＝**描画の誤り**についての判定です。
+ *   ★いまの反転は**カット間**の問題で、★**各カットの中では馬は正しく進む方を向いています。**
+ *   ★先例は後者について何も言っていません（裁定 §2-1）。
+ *
+ * 【★出口側は今日すでに閃光です】
+ *   `side-drive` が既に入っているので、`fourth-corner-front → side-drive`（出口）は掛かっています。
+ *   ★**しかも反転が強いのは入口側。** ★弱いほうにだけ掛かっている状態のほうが不自然でした。
+ *
+ * 【⚠️ ★これはショット id 単位です — 波及の差分】（裁定 §2-3 の条件 2）
+ *
+ *     台本 v4 / v5 / v6 … `side-drive → fourth-corner-front`     ★狙いどおり・各 1 箇所
+ *     台本 v3（旧）      … `fourth-corner-wide → fourth-corner-front`
+ *
+ *   ★境目単位（from→to）に変える案は採りませんでした。★現在の `side-drive` への流入
+ *   （`first-corner-front → side-drive` も含む）を**列挙し直す**ことになり、
+ *   ★**R-29「列挙は必ず漏れる」**に当たるためです。
+ */
+export const FLASH_INTO: ReadonlySet<BroadcastV2ShotId> =
+  new Set<BroadcastV2ShotId>(['side-drive', 'fourth-corner-front']);
 
 export function broadcastV2ShotAt(
   course: Course, leaderMeters: number, allFinished = false, cornerCutM = CORNER_CUT_M,
