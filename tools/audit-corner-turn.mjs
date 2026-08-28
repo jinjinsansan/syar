@@ -17,7 +17,12 @@
 import { posOf, cameraBasis, project, broadcastV2ShotById, broadcastV2TurnFacing } from '@star/render';
 import { buildAuditRace, auditClock, auditSceneAt, RACE_DEFAULTS } from './lib/race-audit-build.mjs';
 
-const W = 1280, H = 720, FPS = 30, SCRIPT = 'v5';
+const W = 1280, H = 720, FPS = 30;
+/**
+ * ★台本を選べるようにしました（2026-08-28）。★既定は画面の既定（v5）。
+ * ⚠️ ★以前は 'v5' 固定で、★**v6 にしか無いカットを一度も見ていません**でした（R-30）。
+ */
+const SCRIPT = (() => { const i = process.argv.indexOf('--script'); return i >= 0 ? process.argv[i + 1] : 'v5'; })();
 const SEED = Number(process.env.AUDIT_SEED ?? RACE_DEFAULTS.seed);
 const built = buildAuditRace({ seed: SEED });
 const clock = auditClock(built, RACE_DEFAULTS.ownGate);

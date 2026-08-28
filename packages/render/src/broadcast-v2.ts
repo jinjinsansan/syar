@@ -30,7 +30,14 @@ export interface BroadcastV2Shot {
    * ★固定カメラ（実際の競馬中継の 4 角: 直線入口の外側から、奥からこちらへ向かってくる馬群を見る）。
    *   現在の区間の終点から `sFromSegmentEnd` 先・内ラチから `w` の位置・高さ `upM` にカメラを置き、注視点だけ追う。
    */
-  readonly fixedCamera?: { readonly sFromSegmentEnd: number; readonly w: number; readonly upM: number };
+  readonly fixedCamera?: {
+    readonly sFromSegmentEnd: number; readonly w: number; readonly upM: number;
+    /** ★近づくほど大きく写す（`broadcastV2FixedFov` の `approach` の注記） */
+    readonly approach?: {
+      readonly farM: number; readonly nearM: number;
+      readonly farRatio: number; readonly nearRatio: number;
+    };
+  };
   /**
    * ★**正面追従で「馬が迫ってくる」を作る**（2026-08-28・オーナー指摘）
    *
@@ -280,7 +287,24 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
      *   ⚠️ 馬の大きさは 21% のまま（`broadcastV2FixedFov` が距離に応じて寄るため）。
      *      ★30m のときの「21%→26%」＝迫ってくる分は減りますが、**裏返りと引き換え**です。
      */
-    fixedCamera: { sFromSegmentEnd: 90, w: 22, upM: 7 },
+    /**
+     * ★**近づくほど大きく写します**（2026-08-28・オーナー判断「カットは減らさない」）
+     *
+     *   ⚠️ ★このカットは 2026-08-28 に一度**台本から外しました**（案 B）。
+     *      境目で走行方向が反転して「別のレースに見える」ためでしたが、
+     *      ★オーナー評「**どんどんカットしていけば演出の品質が下がる**」。★戻します。
+     *   ★代わりに、正面カットの速さの手掛かりである「**迫ってくる**」を作ります。
+     *     ★固定カメラなのに自動ズームが大きさを 21% で一定に保っていました（掃引表）。
+     *     ★16% → 34% に伸ばして、奥から迫る絵にします。
+     */
+    fixedCamera: {
+      sFromSegmentEnd: 90, w: 22, upM: 7,
+      /**
+       * ★カット中のカメラまでの距離は **190m → 90m**（実測）。その範囲に合わせます。
+       *   ⚠️ ★最初 150m→55m にしたら、★カットが終わるまでに伸び切らず 19.7% 止まりでした。
+       */
+      approach: { farM: 190, nearM: 90, farRatio: 0.16, nearRatio: 0.34 },
+    },
   },
   /**
    * ★**直線の正面固定カメラ**（2026-08-22・オーナー指摘「差してくるのが見えない」）
@@ -973,9 +997,20 @@ export const SCRIPT_V5: readonly { readonly until: number; readonly id: Broadcas
    *   ★**境目の反転が 2 箇所とも消えます。**
    *   ⚠️ ★引き換えに**4 角の絵を失います**（`e009b34` で「前からに戻す」と決めた画角）。
    *      ★それでも外すのは、上の優先順位（向きが逆 ＞ 跳び）がオーナー判定として明示されているためです。
-   *   ★`SHOTS['fourth-corner-front']` の定義と掃引の記録は**残しています**（台本から呼ばないだけ）。
+   *   ★`SHOTS['fourth-corner-front']` の定義と掃引の記録は**残しています**。
+   *
+   * ★★**2026-08-28、このカットを戻しました**（オーナー判断）。
+   *   > どんどんカットしていけばレース演出としての品質が下がります
+   *   ★向きの反転は残ります（→82 → ←19 px/m）。★**外して消すのではなく、
+   *     カットそのものを良くする**方針に変えました:
+   *     ★`fixedCamera.approach` で**奥から迫る**（馬が 16% → 34% に大きくなる）。
+   *     ★自動ズームが大きさを 21% で一定に保っており、★**迫る手掛かりを打ち消して**いました。
+   *   ★入りの跳びは 1023 → **911px**、画角比 0.31× → **0.42×**、向きの反転量は ←26 → **←19** に軽くなっています。
+   *   ⚠️ ★**反転そのものは残っています。** 閃光トランジションなど「角度が変わった」と
+   *      読ませる編集はまだ入れていません。
    */
-  { until: 0.604, id: 'side-drive' },           // 〜966m   ★4 角ぶんを受ける（0.540 → 0.604）
+  { until: 0.540, id: 'side-drive' },           // 〜864m   ★勝負所（真横）
+  { until: 0.604, id: 'fourth-corner-front' },  // 〜966m   ★4 角（前から・迫ってくる）
   { until: 0.940, id: 'homestretch-side' },     // 〜1504m  ★横追従へ（v4 は homestretch-front）★v5 唯一の違い
   { until: 1.0, id: 'finish-line' },            // 〜1600m  v4 と同じ
 ];
@@ -1057,6 +1092,14 @@ export const SCRIPT_V6: readonly { readonly until: number; readonly id: Broadcas
    * → ★**寄りは 1200m から。** 966〜1200m は `side-drive`（引き・注視点＝馬群）が受けます。
    *   ★あちらは注視点が先頭と同速なので、圧縮されていても後退が出ません（実測 0.1px/コマ）。
    */
+  /**
+   * ★**第4コーナーの正面カットを戻しました**（2026-08-28・オーナー判断）
+   *   ★2026-08-28 に一度外しましたが（案 B）、★「どんどんカットしていけば演出の品質が下がる」。
+   *   ★向きの反転は残ります。★代わりに `fixedCamera.approach` で
+   *     ★**奥から迫る**絵にして、正面カットとしての力を出します。
+   */
+  { until: 0.540, id: 'side-drive' },           // 〜864m   ★勝負所（真横）
+  { until: 0.604, id: 'fourth-corner-front' },  // 〜966m   ★4 角（前から・迫ってくる）
   { until: 0.750, id: 'side-drive' },           // 〜1200m  ★実時間に戻るまで引きで受ける
   // ★★ここから下だけが v6 の中身（直線 538m を 4 つに割る）
   { until: 0.820, id: 'straight-contest' },     // 〜1312m  ①せめぎ合い（競り合いを抜く）
@@ -1488,8 +1531,34 @@ export function broadcastV2StartEase(raceDisplaySec: number, rampSec = 3.0): num
  * ★固定カメラの自動ズーム（TV の望遠）: 注視点までの距離が遠いほど狭い画角。
  *   馬体（2.5m）が画面高の約 22% になる画角を基準に、6°〜上限 fovDeg の範囲。
  */
-export function broadcastV2FixedFov(distanceM: number, maxFovDeg: number): number {
-  const wantHalfHeightM = 2.5 / 0.22 / 2;               // 画面半分の高さに入れたい実寸（m）
+export function broadcastV2FixedFov(
+  distanceM: number,
+  maxFovDeg: number,
+  /**
+   * ★**近づくほど大きく写す**（2026-08-28・オーナー指摘「正面カットが遅く見える」）
+   *
+   * ⚠️ ★既定（省略時）は**従来どおり大きさ一定**です。この式は距離に関わらず
+   *    馬を画面の 22% に保つので、★**固定カメラなのに近づいても大きくなりません。**
+   *    ★掃引表の「馬高比 21% → 21%」がまさにそれで、
+   *    ★**迫ってくる手掛かりが自動ズームで打ち消されて**いました。
+   *
+   * ★渡すと、`farM` で `farRatio`、`nearM` で `nearRatio` の大きさになるよう狙いを変えます。
+   *   ★実際の中継の固定カメラは、馬が近づけば当然大きく写ります。それを戻すだけです。
+   */
+  approach?: {
+    readonly farM: number; readonly nearM: number;
+    readonly farRatio: number; readonly nearRatio: number;
+  },
+): number {
+  /** ★画面半分の高さに入れたい実寸（m）。既定は 22% 一定 */
+  const ratio = ((): number => {
+    if (approach === undefined) return 0.22;
+    const u = Math.max(0, Math.min(1,
+      (approach.farM - distanceM) / Math.max(1e-6, approach.farM - approach.nearM)));
+    const e = u * u * (3 - 2 * u);
+    return approach.farRatio + (approach.nearRatio - approach.farRatio) * e;
+  })();
+  const wantHalfHeightM = 2.5 / ratio / 2;
   const fov = 2 * Math.atan(wantHalfHeightM / Math.max(5, distanceM)) * (180 / Math.PI);
   /**
    * ★下限 2.8°（2026-08-21 に 6° から下げた）

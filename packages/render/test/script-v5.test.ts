@@ -78,14 +78,17 @@ describe('既定台本 v5', () => {
      *   ★**動かしてよいのはこの 2 つだけ**です。ほかの境界は v4 のままであることを固定します。
      */
     /**
-     * ★**2026-08-28・案 B で `fourth-corner-front` を外しました**（オーナー判断）。
-     *   ★したがって v5 は v4 より**カットが 1 つ少ない**です。以前ここは同数を固定していました。
-     *   ★理由は `broadcast-v2.ts` の `SCRIPT_V5` の注記（境目で走行方向が反転していた）。
+     * ★**2026-08-28・4 角の正面カットは台本に在ります。**
+     *
+     * ⚠️ ★同日、一度これを**外しました**（案 B）。境目で走行方向が反転して
+     *    「別のレースに見える」ためでした。★しかしオーナー評
+     *    「**どんどんカットしていけばレース演出としての品質が下がります**」で撤回。
+     *    → ★**外して消すのではなく、カットそのものを良くする**（`fixedCamera.approach`）。
+     * ★ここが `false` に戻ったら、また「減らす」で処理したということです。
      */
-    expect(SCRIPT_V5.length, '★案 B で 4 角の正面カットを外したので v4 より 1 つ少ない')
-      .toBe(SCRIPT_V4.length - 1);
+    expect(SCRIPT_V5.length).toBe(SCRIPT_V4.length);
     expect(SCRIPT_V5.some((cut) => cut.id === 'fourth-corner-front'),
-      '★4 角の正面カットは v5 の台本から外したまま（戻すと境目の反転が復活する）').toBe(false);
+      '★4 角の正面カットを台本から外さない（減らして直さない）').toBe(true);
     /**
      * ★**発走の正面カットを 240m → 100m に詰めました**（2026-08-28・案 A・オーナー指摘②）。
      *   ★正面から見ると 12 頭が横一列に並んで見え、その列ごと横へ動くため
@@ -104,7 +107,8 @@ describe('既定台本 v5', () => {
      * ★`side-drive` が 4 角ぶんを受けるので、v4 より**後ろまで延びます。**
      *   ⚠️ ★以前ここは「4 角は手前で切る」も見ていましたが、★**その 4 角自体が無くなりました。**
      */
-    expect(SCRIPT_V5[2]!.until, 'side-drive は 4 角ぶんまで受ける').toBeGreaterThan(SCRIPT_V4[2]!.until);
+    const cornerIdx = SCRIPT_V5.findIndex((r) => r.id === 'fourth-corner-front');
+    expect(cornerIdx, '★4 角が台本に在る').toBeGreaterThan(0);
     /**
      * ★**案 B は「直線の始まり」を動かしていません。**
      *   ⚠️ ★v5 の直線は **0.604** から始まります（2026-08-26 に 4 角の窓を 0.660→0.604 へ
@@ -112,11 +116,11 @@ describe('既定台本 v5', () => {
      *   ★案 B でやったのは「0.540〜0.604 を誰が受けるか」を 4 角の正面 → `side-drive` に
      *      替えただけで、★**直線の入りは 0.604 のまま**です。ここが動くと直線の尺が変わります。
      */
-    expect(SCRIPT_V5[2]!.until, '★直線の始まりは 0.604 のまま（案 B で動かしていない）').toBe(0.604);
+    expect(SCRIPT_V5[cornerIdx]!.until, '★直線の始まりは 0.604 のまま').toBe(0.604);
   });
 
   /* ⑥ 第4コーナーは真横の side-drive が受ける（案 B） */
-  it('⑥ 第4コーナーは side-drive が受ける（正面カットは 2026-08-28 に外した）', () => {
+  it('⑥ 第4コーナーは正面から（俯瞰は撤回・外すのも撤回）', () => {
     /**
      * ★経緯は 3 段あります。★**どれも「戻すと壊れる」ので固定します。**
      *   ①当初の v5 は `fourth-corner-high`（上・後ろから）→ オーナー評「ぴょんぴょんする」で撤回
@@ -128,7 +132,7 @@ describe('既定台本 v5', () => {
      *     ★カメラでは直せないことを掃引 32 通りで実測済み（`audit-corner-camera-sweep.mjs`）。
      */
     for (const r of [0.56, 0.58, 0.60]) {
-      expect(shotAt(r, scriptOf('')), `進行 ${r}`).toBe('side-drive');
+      expect(shotAt(r, scriptOf('')), `進行 ${r}`).toBe('fourth-corner-front');
       expect(shotAt(r, scriptOf('?cinematography=v4')), `進行 ${r} の旧 v4`).toBe('fourth-corner-front');
     }
     // ★俯瞰はどちらの台本にも残っていない
@@ -170,7 +174,7 @@ describe('既定台本 v5', () => {
     // ★変わってよいのはショットだけ
     // ★第4コーナーは台本で違う: v4 は正面固定、v5 は真横追従（案 B で外したため）
     expect(a.shot.id, '旧 v4 は 4 角を正面から').toBe('fourth-corner-front');
-    expect(b.shot.id, '★v5 は 4 角を真横追従で受ける（案 B）').toBe('side-drive');
+    expect(b.shot.id, '★v5 も 4 角は正面から（外すのは撤回した）').toBe('fourth-corner-front');
     /* ★台本の違いが出るのは直線だけ: 先頭 1300m（進行 81%） */
     const straight: BroadcastV2Horse[] = horses.map((h) => ({ ...h, s: h.s + 340 }));
     const c = resolveBroadcastV2Scene(course, straight, viewport, false, { script: 'v4' });

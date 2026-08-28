@@ -310,7 +310,7 @@ export function resolveBroadcastV2Scene(
       return {
         eye: { x: eyePos.x, y: eyePos.y, z: shot.fixedCamera.upM },
         target: { x: target.x, y: target.y, z: 0.8 },
-        fovY: (broadcastV2FixedFov(dist, cameraPreset.fovDeg) * Math.PI) / 180,
+        fovY: (broadcastV2FixedFov(dist, cameraPreset.fovDeg, shot.fixedCamera.approach) * Math.PI) / 180,
         width: viewport.width, height: viewport.height,
       };
     }
