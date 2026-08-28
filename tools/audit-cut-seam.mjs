@@ -47,7 +47,7 @@
  *   npx tsx tools/audit-cut-seam.mjs --seeds 42,253,90 --script v5
  */
 import { DEFAULT_RACE_BALANCE } from '@star/race-engine';
-import { cameraBasis, project, posOf } from '@star/render';
+import { cameraBasis, project, posOf, DEMO_CONTEST_GAMMA } from '@star/render';
 import { buildAuditRace, auditClock, auditSceneAt, RACE_DEFAULTS } from './lib/race-audit-build.mjs';
 
 const arg = (name, d) => {
@@ -56,11 +56,12 @@ const arg = (name, d) => {
 };
 
 /**
- * ★**既定は「実画面の既定」**です（R-30）。
- *   `apps/web/src/app/race/page.tsx:392` の `DEMO_CONTEST_GAMMA` と同じ値。
+ * ★**既定は「実画面の既定」**です（R-30 / R-31）。
+ *   ⚠️ ★以前ここは `1.3` を**自前で持って**いました（同じ値を 2 か所に持つ形）。
+ *      ★2026-08-28、`@star/render` の `DEMO_CONTEST_GAMMA` を唯一の出どころにしました。
  *   ⚠️ ★エンジン既定（`DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA` = 1.0）ではありません。
  */
-const SCREEN_GAMMA = 1.3;
+const SCREEN_GAMMA = DEMO_CONTEST_GAMMA;
 /** ★`broadcastV2ScriptFromSearch` の既定と同じ（`?cinematography` 省略時） */
 const SCREEN_SCRIPT = 'v5';
 

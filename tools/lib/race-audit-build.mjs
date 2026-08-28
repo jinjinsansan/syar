@@ -16,7 +16,7 @@ import {
   DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt,
 } from '@star/race-engine';
 import {
-  finishReplayAt, finishCrossDisplaySec, raceTotalDisplaySec,
+  DEMO_CONTEST_GAMMA, finishReplayAt, finishCrossDisplaySec, raceTotalDisplaySec,
   ovalCourse, replayPositionModel, finalOrderOf,
   knotsFor, ratesForTarget, targetDisplaySec, timeWarpFor, withFinishRunOut, finishSpeedsOf,
   broadcastV2StartLagM, broadcastV2FinishStyleOf, resolveBroadcastV2Scene,
@@ -39,6 +39,14 @@ export function auditTotalDisplaySec(clock) {
   return raceTotalDisplaySec(clock.introSec, clock.warp.displaySec, AUDIT_POST_RACE_SEC);
 }
 
+/**
+ * ★**画面の既定と同じ balance**（γ だけがエンジン既定と違う）。
+ *   ★`DEMO_CONTEST_GAMMA` は `@star/render` が唯一の出どころです（同じ値を 2 か所に持たない）。
+ */
+export const AUDIT_SCREEN_BALANCE = DEMO_CONTEST_GAMMA === DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA
+  ? DEFAULT_RACE_BALANCE
+  : { ...DEFAULT_RACE_BALANCE, TIME_GAP_SHAPE_GAMMA: DEMO_CONTEST_GAMMA };
+
 /** ★`/race` の既定と同じ */
 export const RACE_DEFAULTS = { seed: 42, ownGate: 3, distance: 1600, field: 12, trackWidthM: 20 };
 
@@ -60,8 +68,16 @@ export function buildAuditRace(opts = {}) {
     raceId: `r${seed}-turf-good`, distance: DIST, surface: 'turf',
     trackCondition: 'good', courseShape: 'oval', baseWeightKg: 55,
   };
-  /** ★比較のために写像だけ差し替えられるようにする（本番既定には手を入れない・I-5） */
-  const balance = opts.balance ?? DEFAULT_RACE_BALANCE;
+  /**
+   * ★**既定は「画面の既定」**です（2026-08-28・裁定 §6 の宿題 2 ・R-31）。
+   *
+   * ⚠️ ★以前ここは `DEFAULT_RACE_BALANCE`（＝エンジン既定の γ=1.0）でした。
+   *    ★画面は 1.3 なので、★**balance を渡していない道具 24 本が全部
+   *    オーナーと違う写像で測っていました。** 渡し忘れが**画面と違う側へ落ちる**形です。
+   * → ★**渡さなければ画面と同じ側へ落ちます。** 比較のために差し替えたいときだけ `opts.balance`。
+   * ⚠️ ★エンジン既定で測りたいときは `opts.balance: DEFAULT_RACE_BALANCE` を**明示**すること。
+   */
+  const balance = opts.balance ?? AUDIT_SCREEN_BALANCE;
   const result = resolveRace({ conditions, entrants, seed, balance });
   const { pace } = paceOf(entrants, balance);
   const boundaries = replayOf(result, (g) => entrants[g - 1].strategy, pace);

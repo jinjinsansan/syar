@@ -47,7 +47,7 @@ import {
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT, CUT_RACE_SCRIPT, GATE_FRONT_STALL_PLATES,
   finishReplayAt, finishCrossDisplaySec, FINISH_REPLAY_DISPLAY_SEC, drawFinishReplayBadge,
-  broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
+  DEMO_CONTEST_GAMMA, broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
@@ -419,7 +419,11 @@ const GOAL_HOLD_SEC = 1.0;
  *    （1000 レース × γ 1.3 / 1.6 で**着順列の不一致 0 レース**を実測済み）。
  * ⚠️ ★総差（1 着-最下位）は γ によらず同一です（定義から不変・V-17② に触れていません）。
  */
-const DEMO_CONTEST_GAMMA = 1.3;
+/**
+ * ★**定義は `@star/render` に移しました**（2026-08-28・裁定 §6 の宿題 2）。
+ *   ⚠️ ★ここと監査道具が別々に持っていたため、★**道具 24 本がエンジン既定の 1.0 で
+ *      測っていました**（画面は 1.3）。★同じ値を 2 か所に持たない（D-052 / R-31）。
+ */
 
 /**
  * ★**着差の見せ方（γ）を URL で切り替える**（P4 のデモ画面限定）
