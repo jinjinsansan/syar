@@ -49,6 +49,32 @@ describe('競り合っている場所へカメラを向ける', () => {
   });
 
   /**
+   * ★**上の検査はこれだけだと空回りします**（R-16）。
+   *
+   *   ⚠️ ★上は戻り値が**先頭そのもの（1400）**でも通ります。
+   *      ★つまり `CONTEST_MAX_LAG_M` が 0 でも 1e9 でも通る形でした。
+   *      ★**機構が死んでも片側の門は通る**ので、ここで
+   *      ★**この定数が実際に注視点を動かしていること**を固定します。
+   *
+   * ★実測（`tools/_lagprobe.mjs`）: 10m 後ろの競り合いは
+   *   上限  8m → 1400.00（先頭）/ 12m → 1398.05 / 16m → 1389.59。
+   */
+  it('★上限の値そのものが注視点を動かしている（空回りを防ぐ）', () => {
+    /** 先頭の 10m 後ろで 4 頭が競っている */
+    const xs = [1400, 1390, 1389.7, 1389.4, 1389.1];
+    const at8 = contestFocusMeters(xs, CONTEST_SIGMA_M, 8);
+    const at12 = contestFocusMeters(xs, CONTEST_SIGMA_M, 12);
+    const at16 = contestFocusMeters(xs, CONTEST_SIGMA_M, 16);
+    /** ★届かない上限なら先頭を見る */
+    expect(at8).toBe(1400);
+    /** ★上限を広げるほど後ろへ譲る（単調） */
+    expect(at12).toBeLessThan(at8);
+    expect(at16).toBeLessThan(at12);
+    /** ★広げても先頭より前は見ない */
+    expect(at16).toBeLessThanOrEqual(1400);
+  });
+
+  /**
    * ★**1 コマの跳びを作らない。** 位置を細かく動かして、注視点が連続に動くことを見ます。
    *   ⚠️ ★過去に不連続な条件（`lead - s <= maxLag`）を入れて跳ばせた実害があります。
    */
