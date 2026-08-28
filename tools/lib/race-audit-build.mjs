@@ -16,7 +16,7 @@ import {
   DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt,
 } from '@star/race-engine';
 import {
-  finishReplayAt, raceTotalDisplaySec,
+  finishReplayAt, finishCrossDisplaySec, raceTotalDisplaySec,
   ovalCourse, replayPositionModel, finalOrderOf,
   knotsFor, ratesForTarget, targetDisplaySec, timeWarpFor, withFinishRunOut,
   broadcastV2StartLagM, broadcastV2FinishStyleOf, resolveBroadcastV2Scene,
@@ -124,21 +124,28 @@ export function auditSceneAt(built, clock, displaySec, viewport = { width: 1280,
    *   ⚠️ ★本編の時間軸には触れません。区間に入ったときだけ、時間を巻き戻して
    *      同じ位置モデルをもう一度読み、専用のカットへ固定します。
    */
-  const winnerGateForReplay = (() => {
-    const row = built.result.order[0];
-    return built.entrants.find((e) => e.horseId === row.horseId)?.gate;
-  })();
   /** ★並びは 本編 → 勝馬の寄り → リプレイ → 着順ボード（`page.tsx` と同じ・指摘④） */
-  const replay = finishReplayAt(
-    raceD, clock.warp.displaySec, AUDIT_WINNER_FOLLOW_SEC,
-    clock.finishSec.get(winnerGateForReplay) ?? clock.warp.raceSecAt(clock.warp.displaySec),
+  /** ★勝馬が決勝線を通る表示秒（`page.tsx` と同じ・本編の終わりとは違う） */
+  const winnerGateForReplay = built.entrants.find(
+    (e) => e.horseId === built.result.order[0].horseId,
+  )?.gate;
+  const crossD = finishCrossDisplaySec(
+    (d) => built.model.at(clock.warp.raceSecAt(d)).find((h) => h.gate === winnerGateForReplay)?.meters ?? 0,
+    built.DIST, clock.warp.displaySec,
   );
-  const sec = replay.active ? replay.raceSec : clock.warp.raceSecAt(clampedD);
+  const replay = finishReplayAt(raceD, clock.warp.displaySec, AUDIT_WINNER_FOLLOW_SEC, crossD);
+  /**
+   * ★**リプレイ中は「本編の表示秒」を差し替えるだけ**（`page.tsx` と同じ・R-30）。
+   *   ★時間ワープ・位置モデル・発走の遅れ・ゴール後の流しが本編と同じ経路を通ります。
+   */
+  const sourceD = replay.active ? replay.sourceDisplaySec : clampedD;
+  /** ⚠️ ★`raceSecAt` は本編の範囲までしか答えません。★超えると NaN になります（実測） */
+  const sec = clock.warp.raceSecAt(Math.min(sourceD, clock.warp.displaySec));
   const at = built.model.at(sec);
-  /** ★リプレイ中はゴール後の流しを掛けません（`page.tsx` と同じ） */
-  const visual = replay.active ? at
-    : withFinishRunOut(at, (g) => clock.finishSec.get(g), sec, built.DIST,
-      Math.max(0, raceD - clock.warp.displaySec) * RUNOUT_SLOW);
+  /** ★流しの起点は、本編なら本編の終わり、リプレイなら勝馬の通過（`page.tsx` と同じ） */
+  const runoutFrom = replay.active ? crossD : clock.warp.displaySec;
+  const visual = withFinishRunOut(at, (g) => clock.finishSec.get(g), sec, built.DIST,
+    Math.max(0, sourceD - runoutFrom) * RUNOUT_SLOW);
   /**
    * ★**勝馬がゴールしたか**。`page.tsx:1558` と同じ判定です（R-30）。
    *   ⚠️ ★以前ここは `false` 固定でした。そのため**勝馬クローズアップが監査に一度も出ず**、

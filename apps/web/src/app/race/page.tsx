@@ -46,7 +46,7 @@ import {
   drawRaceTitleCard, drawStartingGate, drawStartCallBand,
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT, CUT_RACE_SCRIPT, GATE_FRONT_STALL_PLATES,
-  finishReplayAt, FINISH_REPLAY_DISPLAY_SEC, drawFinishReplayBadge,
+  finishReplayAt, finishCrossDisplaySec, FINISH_REPLAY_DISPLAY_SEC, drawFinishReplayBadge,
   broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
@@ -1564,16 +1564,32 @@ export default function RacePage(): React.JSX.Element {
      *      ★**同じ位置モデル**なので、着順・タイム・着差・払戻に触れません（憲法 3）。
      *   ⚠️ ★勝馬のゴール秒は**確定着順**から取ります（見た目の順位からではない）。
      */
-    const replayFinishSec = built.finishSec.get(built.result[0]!.gate)
-      ?? built.warp.raceSecAt(built.warp.displaySec);
     /**
      * ★**並びは 本編 → 勝馬の寄り → リプレイ → 着順ボード**（2026-08-28・オーナー指摘④）。
      *   > リプレイした後にオッズの結果を出すべき（今リプレイ前に出ている）
-     *   ⚠️ ★以前は着順ボードの**後ろ**に置いていました。結果を見せてからリプレイを出すのは順序が逆です。
      */
-    const replay = finishReplayAt(raceD, built.warp.displaySec, WINNER_FOLLOW_SEC, replayFinishSec);
+    /**
+     * ★**勝馬が決勝線を通る表示秒**。★本編の終わり（＝最後の 1 頭）とは違います。
+     *   ⚠️ ★実測（seed 42）で **2.83 秒**ずれており、本編の終わりを基準にしたら
+     *      ★リプレイが**勝馬の通過後から**始まりました。
+     */
+    const winnerGateForReplay = built.result[0]!.gate;
+    const crossD = finishCrossDisplaySec(
+      (d) => built.model.at(built.warp.raceSecAt(d)).find((h) => h.gate === winnerGateForReplay)?.meters ?? 0,
+      DIST, built.warp.displaySec,
+    );
+    const replay = finishReplayAt(raceD, built.warp.displaySec, WINNER_FOLLOW_SEC, crossD);
+    /**
+     * ★**リプレイ中は「本編の表示秒」を差し替えるだけ**にします。
+     *   ★こうすると時間ワープ・位置モデル・発走の遅れ・ゴール後の流しが
+     *   ★**本編とまったく同じ経路**を通るので、★リプレイ専用の分岐が要りません。
+     * ⚠️ ★以前はレース秒を差し替え、流しだけ切っていました。その結果
+     *    ★**ゴールの 8.3m 手前で終わって**いました（オーナー指摘「ゴールをリプレイしていますか？」）。
+     */
+    const sourceD = replay.active ? replay.sourceDisplaySec : raceD;
 
-    const sec = replay.active ? replay.raceSec : built.warp.raceSecAt(raceD);
+    /** ⚠️ ★`raceSecAt` は本編の範囲までしか答えません。★超えると NaN になります（実測） */
+    const sec = built.warp.raceSecAt(Math.min(sourceD, built.warp.displaySec));
     const at = built.model.at(sec);
     const sorted = [...at].sort((a, b) => b.meters - a.meters)
       .map((h) => ({ gate: h.gate, s: h.meters, stamina: h.staminaRatio }));
@@ -1608,12 +1624,15 @@ export default function RacePage(): React.JSX.Element {
       phase: phaseOf(DIST - lead),
       allFinished: allFinishedNow,
     });
+    /** ★流しも本編と同じ式。★`sourceD` を渡すだけでリプレイにもそのまま効きます */
     /**
-     * ★リプレイ中は**ゴール後の流しを掛けません。** 巻き戻して道中を見せているので、
-     *   ★掛けると「もう終わった馬」を流してしまいます。
+     * ★流しの起点は、本編なら「本編の終わり」、★リプレイなら「勝馬の通過」。
+     *   ⚠️ ★リプレイで本編の起点を使うと、★**勝馬が線の上で止まったまま**になります
+     *      （位置モデルは `DIST` で頭打ちで、その先を作るのがこの流しだから）。
      */
-    const visualAt = replay.active ? at
-      : withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST, Math.max(0, raceD - built.warp.displaySec) * RUNOUT_SLOW);
+    const runoutFrom = replay.active ? crossD : built.warp.displaySec;
+    const visualAt = withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST,
+      Math.max(0, sourceD - runoutFrom) * RUNOUT_SLOW);
     const visualLead = Math.max(...visualAt.map((h) => h.meters));
     const winnerGate = built.result[0]!.gate;
     /**

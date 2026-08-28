@@ -27,57 +27,100 @@ import type { Ctx2D, FontOf, Viewport2D } from './oblique-draw.js';
  */
 export const FINISH_REPLAY_DISPLAY_SEC = 4.0;
 /**
- * ★**レース時間で何秒ぶんを見せるか**（秒）。
- *   ★`FINISH_REPLAY_DISPLAY_SEC` より短いので、★**スローになります**（4.0 / 2.0 ＝ 半速）。
- *   ⚠️ ★スローは「巻き戻して見せている」ことの合図でもあります。等速だと本編の続きに見えます。
+ * ★**本編の終わりから何秒ぶんを巻き戻すか**（本編の表示秒）。
+ *   ★直線は実時間なので、2.0 秒 ≒ 34m。ゴール前の攻防がちょうど入ります。
  */
-export const FINISH_REPLAY_RACE_SEC = 2.0;
+export const FINISH_REPLAY_SOURCE_SEC = 2.0;
+/**
+ * ★**ゴール板を通り過ぎるところまで見せる**（本編の表示秒）。
+ *
+ * ⚠️ ★これが無いと**ゴールの瞬間が映りません。** 実際にそうなっていました（2026-08-28）:
+ *    ★リプレイは残り 43.1m から始まり、★**残り 8.3m で終わって**いました。
+ *    ★8.3m の正体は `broadcastV2StartLagM` が**レース中ずっと引いている発走の遅れ**
+ *    （15.6 × 1.6 ÷ 3 ＝ 8.32m）です。位置モデルは 1600m で頭打ちなので、
+ *    ★**表示位置は 1600m に永久に届きません。** 本編ではゴール後の「流し」がその先を作ります。
+ *    → ★**本編の終わりより後ろまで含める**ことで、その流しごと見せます。
+ */
+export const FINISH_REPLAY_TAIL_SEC = 0.6;
 
 export interface FinishReplayState {
   /** ★リプレイの区間にいるか */
   readonly active: boolean;
-  /** ★いま見せるレース秒（`active` のときだけ意味を持つ） */
-  readonly raceSec: number;
+  /**
+   * ★**いま見せる「本編の表示秒」**（`active` のときだけ意味を持つ）。
+   *
+   * ★★レース秒ではなく**表示秒**を返すのが要点です。★呼ぶ側はこれを本編とまったく同じ
+   *   経路（時間ワープ → 位置モデル → 発走の遅れ → ゴール後の流し）に通せばよく、
+   *   ★**リプレイ専用の分岐を持ちません。**
+   * ⚠️ ★以前はレース秒を返していました。そのため呼ぶ側が「流しを掛けない」という
+   *    ★**本編と違う扱い**を持つことになり、★ゴールの手前で切れていました。
+   */
+  readonly sourceDisplaySec: number;
   /** ★区間の進み（0→1）。テロップの出し入れに使う */
   readonly progress: number;
 }
 
-const IDLE: FinishReplayState = { active: false, raceSec: 0, progress: 0 };
+const IDLE: FinishReplayState = { active: false, sourceDisplaySec: 0, progress: 0 };
 
 /**
  * ★**表示秒 → リプレイの状態**。
  *
- * @param raceDisplaySec  イントロを除いた表示秒（`page.tsx` の `raceD`）
- * @param mainDisplaySec  本編の表示の長さ（`warp.displaySec`）
- * @param postRaceSec     本編のあとの区間（勝馬の寄り＋着順ボード）
- * @param finishRaceSec   ★**勝馬がゴールしたレース秒**。ここから遡って見せる
- *
- * ⚠️ ★`finishRaceSec` は**確定した結果**から取ること。見た目の順位から決めないこと。
+ * @param raceDisplaySec   イントロを除いた表示秒（`page.tsx` の `raceD`）
+ * @param mainDisplaySec   本編の表示の長さ（`warp.displaySec`）
+ * @param winnerFollowSec  本編のあとの勝馬の寄りの長さ（リプレイはその直後）
  */
 export function finishReplayAt(
   raceDisplaySec: number,
   mainDisplaySec: number,
-  postRaceSec: number,
-  finishRaceSec: number,
+  winnerFollowSec: number,
+  /**
+   * ★**勝馬が決勝線を通る表示秒**（`finishCrossDisplaySec` で求める）。
+   *
+   * ⚠️ ★**本編の終わり（`mainDisplaySec`）ではありません。** あれは
+   *    ★**最後の 1 頭**がゴールする時刻です。実測（seed 42）: 勝馬の通過は **35.95s**、
+   *    ★本編の終わりは **38.78s** で **2.84 秒**離れています。
+   *    ★本編の終わりを基準にしたら、リプレイは**勝馬が通り過ぎた後から**始まりました。
+   */
+  crossDisplaySec: number,
 ): FinishReplayState {
-  const from = mainDisplaySec + postRaceSec;
+  const from = mainDisplaySec + winnerFollowSec;
   const into = raceDisplaySec - from;
   if (!(into >= 0)) return IDLE;
+  const span = FINISH_REPLAY_SOURCE_SEC + FINISH_REPLAY_TAIL_SEC;
+  const endSource = crossDisplaySec + FINISH_REPLAY_TAIL_SEC;
   if (into > FINISH_REPLAY_DISPLAY_SEC) {
     /**
      * ★**区間を過ぎたら終わります。**
-     *
      * ⚠️ ★最初ここを `active: true` のままにしていました。「ゴールの瞬間で止める」つもりでしたが、
-     *    ★**リプレイが終わらず、着順ボードが最後まで出ませんでした**（実画面 55s で確認・2026-08-28）。
+     *    ★**リプレイが終わらず、着順ボードが最後まで出ませんでした**（実画面で確認・2026-08-28）。
      *    ★「止める」と「続けている」を同じ真偽値で表そうとしたのが誤りです。
-     *    ★止めるのは**レース秒**（`finishRaceSec` を返す）で足り、★区間は閉じます。
      */
-    return { active: false, raceSec: finishRaceSec, progress: 1 };
+    return { active: false, sourceDisplaySec: endSource, progress: 1 };
   }
   const progress = FINISH_REPLAY_DISPLAY_SEC <= 0 ? 1 : into / FINISH_REPLAY_DISPLAY_SEC;
-  /** ★ゴールの `FINISH_REPLAY_RACE_SEC` 秒前から、ゴールまでを等速で送る */
-  const raceSec = Math.max(0, finishRaceSec - FINISH_REPLAY_RACE_SEC * (1 - progress));
-  return { active: true, raceSec, progress };
+  /** ★ゴール前 `SOURCE` 秒から、ゴールを通り過ぎる `TAIL` 秒までを等速で送る（＝スロー） */
+  return { active: true, sourceDisplaySec: endSource - span * (1 - progress), progress };
+}
+
+/**
+ * ★**勝馬が決勝線を通る「表示秒」を求める**（二分探索・決定論）。
+ *
+ *   ★位置モデルは `distanceMeter` で頭打ちなので、★**最初に届いた時刻**を探します。
+ * ⚠️ ★`Date.now()` も乱数も使いません。渡された関数だけで決まります（憲法4）。
+ */
+export function finishCrossDisplaySec(
+  metersAtDisplaySec: (displaySec: number) => number,
+  distanceMeter: number,
+  maxDisplaySec: number,
+): number {
+  let lo = 0;
+  let hi = maxDisplaySec;
+  if (!(metersAtDisplaySec(hi) >= distanceMeter - 1e-9)) return maxDisplaySec;
+  for (let i = 0; i < 50; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (metersAtDisplaySec(mid) >= distanceMeter - 1e-9) hi = mid; else lo = mid;
+  }
+  return hi;
 }
 
 /** ★リプレイ全体の長さ（本編＋後処理のあとに足す秒数） */
