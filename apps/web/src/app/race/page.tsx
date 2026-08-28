@@ -1534,7 +1534,17 @@ export default function RacePage(): React.JSX.Element {
           gate: ownGate, role: frameRoleOf(ownGate, FIELD),
           name: HORSE_NAMES[ownGate - 1] ?? `スター${ownGate}`, jockey: JOCKEY_NAMES[ownGate - 1] ?? 'STAR騎手',
         },
-      }, d, { image: art.raceTitle, width: art.raceTitle.width, height: art.raceTitle.height });
+      }, d, { image: art.raceTitle, width: art.raceTitle.width, height: art.raceTitle.height },
+      /**
+       * ★**イントロに自馬を 1 頭出す**（2026-08-28・オーナー要望）。
+       *   ★レース中と**同じコマ集合**（`sideHighQuality`）の自馬ぶんを渡します。
+       *
+       * ⚠️ ★`sideHighQuality` は **`[馬番][コマ]`** です（`buildFrames` は
+       *    `silksByGate.map(gate => measured.map(frame => ...))` を返す）。
+       *    ★最初これを `[コマ][馬番]` と取り違え、★**コマを送るたびに別の馬**が出ました
+       *    （自馬は 3 番なのにゼッケン 11・ピンクの服が描かれた）。
+       */
+      art.sideHighQuality[ownGate - 1]);
       drawRendererBadge(ctx, renderer, 'title');
       return;
     }

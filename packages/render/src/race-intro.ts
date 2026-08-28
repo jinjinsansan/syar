@@ -93,10 +93,30 @@ export function startHorseVisualAt(gate: number, releaseProgress: number, frames
   };
 }
 
+/**
+ * ★**イントロで自馬を 1 頭出す**ための素材（2026-08-28・オーナー要望）。
+ *
+ *   > 最初の桜星賞のイントロでデモで構わないので馬を１頭出してください（自分の馬）
+ *
+ * ★レース中と**同じコマ集合**を渡します。★ここで別の絵を用意しません（同じ馬に見えないため）。
+ * ⚠️ ★`overlay` は勝負服の色替え。★渡さないと全頭が同じ灰色の服になります。
+ */
+export interface RaceIntroHorseFrame<TImage> {
+  readonly image: TImage;
+  readonly source: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  readonly referenceHeight: number;
+  readonly overlay?: {
+    readonly image: TImage; readonly width: number; readonly height: number;
+    readonly offsetXSourcePx: number; readonly offsetYSourcePx: number;
+  } | undefined;
+}
+
 export function drawRaceTitleCard<TImage>(
   ctx: Ctx2D<TImage>, pal: Palette, vp: Viewport2D, font: FontOf,
   meta: RaceIntroMeta, displaySec: number,
   background?: { readonly image: TImage; readonly width: number; readonly height: number },
+  /** ★自馬の走りコマ（`sideHighQuality` の自馬ぶん）。省略すると従来どおり馬は出ません */
+  ownHorse?: readonly RaceIntroHorseFrame<TImage>[],
 ): void {
   /**
    * ★本線（design/hud-ds/components/title-card）: 出るのは displaySec 3.0–5.6（空撮のあと）。前後 0.35 秒でフェード。
@@ -208,6 +228,42 @@ export function drawRaceTitleCard<TImage>(
       ctx.fillStyle = goldPlate(ctx, ox + ow - 14 - tw, tw, t);
       ctx.fillText(own.oddsLabel, ox + ow - 14, oyy + oh - 12);
       ctx.textAlign = 'left';
+    }
+
+    /**
+     * ★**自馬を 1 頭、パネルの上に立たせます**（2026-08-28・オーナー要望）。
+     *
+     * ⚠️ ★レース中と**同じコマ集合**を使います。ここで別の絵を用意しません。
+     * ⚠️ ★コマ送りは `displaySec` だけで決まります（`Date.now()` を使わない・憲法4）。
+     *    ★同じシード・同じ秒なら必ず同じ絵になります。
+     * ★暗幕は左 44%〜78% なので、★右側のこの位置は背景が見えたままです。板と重なりません。
+     */
+    if (ownHorse !== undefined && ownHorse.length > 0) {
+      const hrise = riseAt(local, 0.7);
+      ctx.globalAlpha = baseAlpha * Math.max(0, fade) * hrise.alpha;
+      /** ★1 秒に 11 コマ。走りの周期は素材のコマ数で決まる */
+      const idx = Math.max(0, Math.floor(Math.max(0, local) * 11)) % ownHorse.length;
+      const fr = ownHorse[idx]!;
+      const targetH = H * 0.42;
+      const scale = targetH / fr.referenceHeight;
+      const dw = fr.source.width * scale, dh = fr.source.height * scale;
+      /** ★パネルの中心より少し左。★真ん中に置くと**鼻先が画面の右端に触れます**（実測） */
+      const cx = ox + ow / 2 - 76;
+      /** ★パネルの少し上に接地させる */
+      const groundY = oyy - 18 + hrise.dy;
+      const dx = cx - dw / 2, dy = groundY - dh;
+      /** ★接地影。無いと宙に浮いて見えます */
+      ctx.fillStyle = 'rgba(3,8,4,0.34)';
+      ctx.beginPath();
+      ctx.ellipse(cx, groundY - 4, dw * 0.30, Math.max(4, dh * 0.045), 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.drawImage(fr.image, fr.source.x, fr.source.y, fr.source.width, fr.source.height, dx, dy, dw, dh);
+      if (fr.overlay !== undefined) {
+        const oxp = dx + (fr.overlay.offsetXSourcePx - fr.source.x) * scale;
+        const oyp = dy + (fr.overlay.offsetYSourcePx - fr.source.y) * scale;
+        ctx.drawImage(fr.overlay.image, 0, 0, fr.overlay.width, fr.overlay.height,
+          oxp, oyp, fr.overlay.width * scale, fr.overlay.height * scale);
+      }
     }
   }
   ctx.globalAlpha = baseAlpha;
