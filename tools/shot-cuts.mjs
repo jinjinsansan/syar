@@ -22,6 +22,12 @@ import {
   replayPositionModel, finalOrderOf, ovalCourse, obliqueProject, railPolyline,
   timeWarpFor, knotsFor, ratesForTarget, targetDisplaySec, frameRoleOf,
 } from '@star/render';
+/**
+ * ★**時間の伸縮を組む基準馬**。★画面（`page.tsx` の `useState(3)`）と同じにすること。
+ *   ⚠️ ★ここは 2026-08-28 まで **1 番固定**でした。`knotsFor` はその馬の節目を
+ *      実時間へ寄せるので、★**同じ表示秒が画面と別の瞬間を指します**（実測 2.33 秒・R-30）。
+ */
+const OWN_GATE = 3;
 
 const W = 1280, H = 720;
 const OUT = path.resolve('out/cuts');
@@ -61,7 +67,7 @@ const model = replayPositionModel({
 if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((e) => Number(e.horseId)))) {
   throw new Error('★D-059: 位置モデルの最終順が着順と違います');
 }
-const knots = knotsFor(boundaries, 1);
+const knots = knotsFor(boundaries, OWN_GATE);
 const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
 
 /* ── 背景 ───────────────────────────────── */

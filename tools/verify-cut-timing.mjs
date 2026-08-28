@@ -17,6 +17,12 @@ import {
   knotsFor, ovalCourse, ratesForTarget, replayPositionModel, resolveBroadcastV2Scene,
   targetDisplaySec, timeWarpFor,
 } from '@star/render';
+/**
+ * ★**時間の伸縮を組む基準馬**。★画面（`page.tsx` の `useState(3)`）と同じにすること。
+ *   ⚠️ ★ここは 2026-08-28 まで **1 番固定**でした。`knotsFor` はその馬の節目を
+ *      実時間へ寄せるので、★**同じ表示秒が画面と別の瞬間を指します**（実測 2.33 秒・R-30）。
+ */
+const OWN_GATE = 3;
 
 const argv = process.argv.slice(2);
 const num = (f, d) => { const i = argv.indexOf(f); return i >= 0 ? Number(argv[i + 1]) : d; };
@@ -50,7 +56,7 @@ const model = replayPositionModel({
   strategyOf: (g) => entrants[g - 1].strategy, pace, formationSeed: SEED * 2654435761,
   laneOf: (g, ml) => laneAt(g, FIELD, ml, DIST, SEED),
 });
-const knots = knotsFor(boundaries, 1);
+const knots = knotsFor(boundaries, OWN_GATE);
 const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
 
 /** 1/60 秒刻みで、そのときのカットを引く */

@@ -131,3 +131,32 @@ describe('★R-24 ガード本体（4通り）', () => {
     ).rejects.toThrow(/判断できない/);
   });
 });
+
+/**
+ * ★**時間の伸縮を組む基準馬を、画面と揃える**（2026-08-28）
+ *
+ *   ⚠️ ★`knotsFor(boundaries, gate)` は**その馬の節目を実時間へ寄せます**。
+ *      ★基準馬が画面（`page.tsx` の `useState(3)`）と違うと、
+ *      ★**同じ表示秒が別の瞬間を指します**。
+ *   ★実害: `shot-race-at.mjs` が 1 番固定で、★**画面と 2.33 秒**ずれていました。
+ *      ★オーナーへ出した静止画を、測定値と秒で照合できませんでした。
+ *
+ *   ★数え上げは必ず漏れるので（R-29）、**書式で止めます**。
+ *   ※ `1` を直接書くのを禁じるだけです。変数名で渡すのは自由です。
+ */
+describe('★道具の基準馬', () => {
+  it('★`knotsFor(..., 1)` を直書きしない', () => {
+    const dir = fileURLToPath(new URL('../../../tools/', import.meta.url));
+    const offenders: string[] = [];
+    for (const name of readdirSync(dir)) {
+      if (!name.endsWith('.mjs')) continue;
+      const text = readFileSync(new URL(name, new URL('../../../tools/', import.meta.url)), 'utf8');
+      for (const [i, line] of text.split('\n').entries()) {
+        /** ★注釈行は除く（経緯を書き残せるように） */
+        if (/^\s*(\*|\/\/)/.test(line)) continue;
+        if (/knotsFor\([^,)]+,\s*1\s*\)/.test(line)) offenders.push(`${name}:${i + 1}`);
+      }
+    }
+    expect(offenders, '★基準馬は画面と同じ 3 番にすること').toEqual([]);
+  });
+});
