@@ -9,6 +9,7 @@ import {
   FINISH_REPLAY_DISPLAY_SEC, FINISH_REPLAY_SOURCE_SEC, FINISH_REPLAY_TAIL_SEC,
   finishReplayAt, raceTotalDisplaySec,
 } from '../src/finish-replay.js';
+import { withFinishRunOut } from '../src/replay-model.js';
 
 const MAIN = 38.78;         // 本編の表示＝★最後の 1 頭がゴールする時刻（seed 42 の実測）
 const CROSS = 35.95;        // ★勝馬が決勝線を通る時刻（同・本編の終わりより 2.83 秒前）
@@ -83,5 +84,48 @@ describe('ゴール前リプレイ', () => {
 
   it('★総尺はリプレイのぶんだけ伸びる', () => {
     expect(raceTotalDisplaySec(7.8, MAIN, 8.4)).toBeCloseTo(7.8 + MAIN + 8.4 + FINISH_REPLAY_DISPLAY_SEC, 6);
+  });
+});
+
+/**
+ * ★**リプレイで馬が「がくっ」と跳ばない**（2026-08-28・オーナー指摘）
+ *
+ *   > リプレイの演出の時、ゴール前で必ず１度がくっとします
+ *
+ *   ★正体は `withFinishRunOut` の `postDisplaySec`。あれは**勝馬の通過**を基準にした値なので、
+ *   ★2 着以降が線を越えた瞬間に**その分だけ前へ飛びます**。
+ *   ★本編は `raceSec` が止まっているので起きません。リプレイは進み続けるので起きます。
+ *   ★実測（seed 42・2 着）: ★**1 コマで 1.42m（約 185px）**、速さ 14.56 → 57.04 → 14.56 m/s。
+ */
+describe('ゴール前リプレイ — 線の前後で速さが変わらない', () => {
+  const DIST = 1600;
+  /** ⚠️ ★`HorseAt` の位置は `meters` です（`s` ではない。最初 `s` と書いて NaN になりました） */
+  const horsesAt = () => [
+    { gate: 1, meters: DIST, w: 6, staminaRatio: 1 },
+    { gate: 2, meters: DIST, w: 7, staminaRatio: 1 },
+  ];
+  /** ★1 着は 100.0 秒、2 着は 0.2 秒後に通過する想定 */
+  const finishSecOf = (gate: number): number | undefined => (gate === 1 ? 100.0 : 100.2);
+  const speedOf = (): number => 16.5;
+
+  it('★2 着が線を越えた瞬間に前へ飛ばない（速さで走り抜ける）', () => {
+    /** ★2 着の通過の直前・直後 */
+    const before = withFinishRunOut(horsesAt(), finishSecOf, 100.19, DIST, 0, 14, speedOf);
+    const after = withFinishRunOut(horsesAt(), finishSecOf, 100.21, DIST, 0, 14, speedOf);
+    const b = before.find((h) => h.gate === 2)!.meters;
+    const a = after.find((h) => h.gate === 2)!.meters;
+    /** ★0.02 秒ぶんしか進まないこと（16.5 × 0.02 = 0.33m） */
+    expect(a - b).toBeLessThan(0.5);
+  });
+
+  it('★★`postDisplaySec` を渡すと 2 着が飛ぶ（これが不具合だった）', () => {
+    /**
+     * ★**この検査は「壊れ方」を固定しています。** ここが飛ばなくなったら、
+     * ★`withFinishRunOut` の意味が変わったということなので、上の対処も見直すこと。
+     */
+    const post = 0.12;   // 勝馬の通過から 0.2 秒 × RUNOUT_SLOW 0.6
+    const after = withFinishRunOut(horsesAt(), finishSecOf, 100.21, DIST, post, 14, speedOf);
+    const a = after.find((h) => h.gate === 2)!.meters;
+    expect(a - DIST, '★勝馬基準の分だけ前へ飛ぶ').toBeGreaterThan(1.0);
   });
 });

@@ -18,7 +18,7 @@ import {
 import {
   finishReplayAt, finishCrossDisplaySec, raceTotalDisplaySec,
   ovalCourse, replayPositionModel, finalOrderOf,
-  knotsFor, ratesForTarget, targetDisplaySec, timeWarpFor, withFinishRunOut,
+  knotsFor, ratesForTarget, targetDisplaySec, timeWarpFor, withFinishRunOut, finishSpeedsOf,
   broadcastV2StartLagM, broadcastV2FinishStyleOf, resolveBroadcastV2Scene,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT,
 } from '@star/render';
@@ -109,7 +109,9 @@ export function auditClock(built, ownGate = RACE_DEFAULTS.ownGate) {
     const sortedM = built.model.at(sec).map((h) => h.meters).sort((a, b) => b - a);
     if ((sortedM[0] ?? 0) >= built.DIST - 80) { finishStyle = broadcastV2FinishStyleOf(sortedM, HORSE_LENGTH_M); break; }
   }
-  return { warp, finishSec, finishStyle, introSec: RACE_INTRO_RACE_START_SEC };
+  /** ★各馬の通過時の速さ（`page.tsx` と同じ・リプレイで線の前後の速さを揃える） */
+  const finishSpeeds = finishSpeedsOf(built.model, (g) => finishSec.get(g), [...finishSec.keys()]);
+  return { warp, finishSec, finishSpeeds, finishStyle, introSec: RACE_INTRO_RACE_START_SEC };
 }
 
 /**
@@ -142,10 +144,16 @@ export function auditSceneAt(built, clock, displaySec, viewport = { width: 1280,
   /** ⚠️ ★`raceSecAt` は本編の範囲までしか答えません。★超えると NaN になります（実測） */
   const sec = clock.warp.raceSecAt(Math.min(sourceD, clock.warp.displaySec));
   const at = built.model.at(sec);
-  /** ★流しの起点は、本編なら本編の終わり、リプレイなら勝馬の通過（`page.tsx` と同じ） */
+  /**
+   * ★流しの起点は、本編なら本編の終わり、リプレイなら勝馬の通過（`page.tsx` と同じ）。
+   * ★リプレイでは各馬が**自分の速さ**で線を通り抜けます（2 着以降の跳びを消すため）。
+   */
   const runoutFrom = replay.active ? crossD : clock.warp.displaySec;
-  const visual = withFinishRunOut(at, (g) => clock.finishSec.get(g), sec, built.DIST,
-    Math.max(0, sourceD - runoutFrom) * RUNOUT_SLOW);
+  const visual = replay.active
+    ? withFinishRunOut(at, (g) => clock.finishSec.get(g), sec, built.DIST, 0, 14,
+      (g) => clock.finishSpeeds.get(g))
+    : withFinishRunOut(at, (g) => clock.finishSec.get(g), sec, built.DIST,
+      Math.max(0, sourceD - runoutFrom) * RUNOUT_SLOW);
   /**
    * ★**勝馬がゴールしたか**。`page.tsx:1558` と同じ判定です（R-30）。
    *   ⚠️ ★以前ここは `false` 固定でした。そのため**勝馬クローズアップが監査に一度も出ず**、

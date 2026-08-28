@@ -31,7 +31,7 @@ import { deriveRng } from '@star/sim-engine';
 import type { Strategy } from '@star/sim-engine';
 import type { Surface, TrackCondition } from '@star/race-engine';
 import {
-  replayPositionModel, finalOrderOf, withFinishRunOut, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
+  replayPositionModel, finalOrderOf, withFinishRunOut, finishSpeedsOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
   phaseOf, HORSE_LENGTH_M,
   // ★描き方は package が唯一の出どころ（この画面には持たない）
   frameRoleOf, silkRoleOf, SHEET_V2,
@@ -336,6 +336,8 @@ interface Built {
   /** ★確定着順と走破タイム（ゴール後の順位表示に使う） */
   readonly finishPos: ReadonlyMap<number, number>;
   readonly finishSec: ReadonlyMap<number, number>;
+  /** ★各馬がゴール線を通ったときの速さ（m/s）。リプレイの走り抜けに使う（`withFinishRunOut` の注記） */
+  readonly finishSpeeds: ReadonlyMap<number, number>;
   /**
    * ★見た目の速度の補正 Δ(d)（`visual-scroll.ts`）。背景の流れと脚の周期に使う。
    *   位置・時刻・着順には触れない（時間圧縮 D-062 はそのまま）。
@@ -851,6 +853,11 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
   const finishPos = new Map(result.order.map((e) => [Number(e.horseId), e.finishPosition]));
   const finishSec = new Map(result.order.map((e) => [Number(e.horseId), e.timeSec]));
   /**
+   * ★**各馬の通過時の速さ**。★1 レースに 1 回だけ測ります（毎コマ測ると重い）。
+   *   ★リプレイで線の前後の速さを揃えるために使います。
+   */
+  const finishSpeeds = finishSpeedsOf(model, (g) => finishSec.get(g), result.order.map((e) => Number(e.horseId)));
+  /**
    * ★**目標の表示時間から送り速さを逆算します**（`ratesForTarget`）。
    *
    * ⚠️ ★2026-08-21 まで、ここは `DEFAULT_PHASE_RATES`（道中 1.8 倍・勝負所と直線は等倍）の
@@ -915,7 +922,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     warp,
     pace,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
-    gauge, finishPos, finishSec,
+    gauge, finishPos, finishSec, finishSpeeds,
     visualScroll: buildVisualScroll(samples),
     finishStyle,
     shotChanges,
@@ -1672,8 +1679,20 @@ export default function RacePage(): React.JSX.Element {
      *      （位置モデルは `DIST` で頭打ちで、その先を作るのがこの流しだから）。
      */
     const runoutFrom = replay.active ? crossD : built.warp.displaySec;
-    const visualAt = withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST,
-      Math.max(0, sourceD - runoutFrom) * RUNOUT_SLOW);
+    /**
+     * ★**リプレイでは各馬が自分の速さで線を通り抜けます**（2026-08-28・オーナー指摘
+     *   「リプレイのゴール前で必ず 1 度がくっとする」）。
+     *
+     * ⚠️ ★`postDisplaySec` は**勝馬の通過**を基準にした値なので、
+     *    ★2 着以降が線を越えた瞬間に**その分だけ前へ飛びます**（実測 1 コマ 1.42m ＝約 185px）。
+     *    ★本編では `raceSec` が止まっているので起きません。リプレイでは進み続けるので起きます。
+     * → ★リプレイでは `postDisplaySec` を渡さず、★**各馬の通過時の速さ**で走らせます。
+     */
+    const visualAt = replay.active
+      ? withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST, 0, 14,
+        (gate) => built.finishSpeeds.get(gate))
+      : withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST,
+        Math.max(0, sourceD - runoutFrom) * RUNOUT_SLOW);
     const visualLead = Math.max(...visualAt.map((h) => h.meters));
     const winnerGate = built.result[0]!.gate;
     /**

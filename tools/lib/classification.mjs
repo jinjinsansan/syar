@@ -211,6 +211,7 @@ export const READONLY = [
   '_replaydbg.mjs',           // リプレイの表示秒・レース秒・位置の対応（読むだけ）
   '_groundflow.mjs',          // カットごとに画面上で地面が何 px/s 流れるか（見た目の速さ・読むだけ）
   '_finishstyle.mjs',         // ゴール前の展開判定と実際の画角（読むだけ）
+  '_replayjerk.mjs',          // リプレイ区間で速さが 1 コマで跳ぶ馬がいないか（読むだけ）
   '_railgeo.mjs',             // 馬の接地点とラチの画面上の並び（読むだけ）
   '_railside.mjs',            // カットごとにどちらのラチが手前か（読むだけ）
   '_nearrail.mjs',            // 手前のラチがコース上のどこで入れ替わるか（読むだけ）

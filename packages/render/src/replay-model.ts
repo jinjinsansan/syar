@@ -290,13 +290,56 @@ export function withFinishRunOut(
   distanceMeter: number,
   postDisplaySec = 0,
   speedMps = 14,
+  /**
+   * ★**その馬がゴール線を通ったときの速さ**（m/s）。省略すると `speedMps` を使います。
+   *
+   * ⚠️ ★**リプレイでは必ず渡してください**（2026-08-28・オーナー指摘
+   *    「リプレイのゴール前で必ず 1 度がくっとする」）。
+   *
+   * 【★何が起きていたか】
+   *   `elapsed = (raceSec − その馬の finishSec) + postDisplaySec` の
+   *   ★`postDisplaySec` は**勝馬の通過**を基準にした値です。本編では
+   *   `raceSec` が止まっているので問題になりませんが、★**リプレイでは
+   *   `raceSec` が進み続けます。** すると 2 着以降が線を越えた瞬間、
+   *   ★**既に正の `postDisplaySec` の分だけ前へ飛びます。**
+   *   実測（seed 42・2 着）: ★**1 コマで 1.42m（約 185px）**、速さ 14.56 → 57.04 → 14.56 m/s。
+   *
+   * ★**自分の速さでそのまま走り抜ければ、線の前後で速さが変わりません。**
+   */
+  speedOf?: (gate: number) => number | undefined,
 ): readonly HorseAt[] {
   return horses.map((horse) => {
     const finishSec = finishSecOf(horse.gate);
     if (finishSec === undefined || raceSec < finishSec) return horse;
     const elapsed = Math.max(0, raceSec - finishSec) + Math.max(0, postDisplaySec);
-    return { ...horse, meters: distanceMeter + elapsed * speedMps };
+    const v = speedOf?.(horse.gate);
+    return { ...horse, meters: distanceMeter + elapsed * (v !== undefined && v > 0 ? v : speedMps) };
   });
+}
+
+/**
+ * ★**各馬がゴール線を通ったときの速さ**（m/s）を位置モデルから測る。
+ *
+ * ⚠️ ★`Date.now()` も乱数も使いません。モデルを読むだけです（憲法4）。
+ * ★`dt` 秒手前との差から求めます。★短すぎると数値誤差、長すぎると減速を拾います。
+ */
+export function finishSpeedsOf(
+  model: PositionModel,
+  finishSecOf: (gate: number) => number | undefined,
+  gates: readonly number[],
+  dt = 0.4,
+): ReadonlyMap<number, number> {
+  const out = new Map<number, number>();
+  for (const gate of gates) {
+    const fin = finishSecOf(gate);
+    if (fin === undefined) continue;
+    const before = model.at(Math.max(0, fin - dt)).find((h) => h.gate === gate)?.meters;
+    const at = model.at(fin).find((h) => h.gate === gate)?.meters;
+    if (before === undefined || at === undefined) continue;
+    const v = (at - before) / dt;
+    if (v > 0) out.set(gate, v);
+  }
+  return out;
 }
 
 /**
