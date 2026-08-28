@@ -53,8 +53,14 @@ describe('Broadcast V2', () => {
      *   ★横から撮るかぎり「寄れば差し馬が画面外／入れれば豆粒」にしかなりません。
      *   → 直線は**正面追従**にして、走路方向の広がりを**奥行き**に変換します。
      */
+    /**
+     * ⚠️ ★**2026-08-28: `script: 'v4'` を明示するようにしました。**
+     *    ★以前は無引数で v4 が返っていました（関数の既定引数が 'v4' だった）。
+     *    ★既定引数を**画面の既定**へ倒したので（R-31）、ここは明示します。
+     *    ★この検査の本体は「**v4 に後方・俯瞰が混ざっていないこと**」です。
+     */
     const seq = [30, 400, 700, 900, 1200, 1550]
-      .map((s) => broadcastV2ShotAt(course, s).id);
+      .map((s) => broadcastV2ShotAt(course, s, false, undefined, { script: 'v4' }).id);
     expect(seq).toEqual([
       'start-front', 'first-corner-front', 'side-drive', 'fourth-corner-front',
       'homestretch-front', 'finish-line',
@@ -72,8 +78,13 @@ describe('Broadcast V2', () => {
     expect(seq).toEqual(['start-front', 'first-corner-front', 'second-corner-high', 'aerial', 'third-corner-rear', 'side-drive',
       'fourth-corner-wide', 'fourth-corner-front', 'homestretch-side', 'front-close', 'finish-line']);
     expect(broadcastV2ShotAt(course, 1600, true).id).toBe('winner-follow');
-    // 正面寄り素材が無いときは 4 角を俯瞰ワイドで代用
-    expect(broadcastV2ShotAt(course, 1050, false, undefined, { fourthCornerFront: false }).id).toBe('fourth-corner-wide');
+    /**
+     * 正面寄り素材が無いときは 4 角を俯瞰ワイドで代用。
+     * ⚠️ ★**これは v4 の振る舞い**です（1050m が v4 では 4 角）。
+     *    ★既定が v6 になったので台本を明示します（v6 では 1050m は `side-drive`）。
+     */
+    expect(broadcastV2ShotAt(course, 1050, false, undefined,
+      { script: 'v4', fourthCornerFront: false }).id).toBe('fourth-corner-wide');
   });
 
   /**

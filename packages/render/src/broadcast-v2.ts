@@ -827,8 +827,18 @@ export const SCRIPT_V3: readonly { readonly until: number; readonly id: Broadcas
 ];
 
 /** ★台本 v3 でショットが変わる先頭位置（m）。閃光を出す境目もここから引く */
+/**
+ * ⚠️ ★**この既定引数は 2026-08-28 に `'v4'` → `DEFAULT_RACE_SCRIPT` へ変えました。**
+ *
+ *   ★以前は「古い測定道具を巻き込むと範囲を超える」として `v4` のままにしていました。
+ *   ⚠️ ★その結果、`script` を渡していない道具が **20 本**あり、
+ *      ★**全部が誰も見ていない v4 を測っていました**。
+ *      ★実例: `verify-horse-smoothness.mjs` の赤（side-drive 尖り 25.5 倍）は
+ *      ★**v4 の上の赤**でした。画面はずっと v5／いま v6 です。
+ *   ★**既定は画面の側へ倒す**（R-31）。旧台本を測りたいときは明示すること。
+ */
 export function broadcastV2ScriptBoundariesM(
-  course: Course, script: BroadcastV2Script = 'v4',
+  course: Course, script: BroadcastV2Script = DEFAULT_RACE_SCRIPT,
 ): readonly { readonly meters: number; readonly id: BroadcastV2ShotId }[] {
   return scriptRowsOf(script).map((row) => ({ meters: row.until * course.distance, id: row.id }));
 }
@@ -848,7 +858,7 @@ export function broadcastV2ScriptBoundariesM(
  * → ★**台本のカットの終わり**を基準にします。カットの中では動かないので跳びません。
  */
 export function broadcastV2ShotEndM(
-  course: Course, shotId: BroadcastV2ShotId, script: BroadcastV2Script = 'v4',
+  course: Course, shotId: BroadcastV2ShotId, script: BroadcastV2Script = DEFAULT_RACE_SCRIPT,
 ): number | undefined {
   const row = scriptRowsOf(script).find((r) => r.id === shotId);
   return row === undefined ? undefined : row.until * course.distance;
@@ -1403,7 +1413,7 @@ export function broadcastV2ShotAt(
   options: { readonly fourthCornerFront?: boolean | undefined; readonly script?: BroadcastV2Script | undefined; readonly winnerRear?: boolean | undefined } = {},
 ): BroadcastV2Shot {
   if (allFinished) return options.winnerRear === true ? SHOTS['winner-follow-rear'] : SHOTS['winner-follow'];
-  const script = options.script ?? 'v4';
+  const script = options.script ?? DEFAULT_RACE_SCRIPT;
   if (script !== 'v2') {
     const rows = scriptRowsOf(script);
     const frac = Math.max(0, leaderMeters) / Math.max(1, course.distance);

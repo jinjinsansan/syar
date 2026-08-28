@@ -15,27 +15,49 @@
 import { describe, it, expect } from 'vitest';
 import { ovalCourse } from '../src/course.js';
 import {
+  DEFAULT_RACE_SCRIPT,
   broadcastV2ShotAt, broadcastV2ShotById, FLASH_INTO,
   SCRIPT_V4, SCRIPT_V5, SCRIPT_V6,
 } from '../src/broadcast-v2.js';
+import type { BroadcastV2Script } from '../src/broadcast-v2.js';
 
 const course = ovalCourse(1600, { widthM: 20, turn: 'left' });
 
-/** 台本の切替点を距離で拾う */
-function transitions(): readonly { readonly m: number; readonly from: string; readonly to: string }[] {
+/**
+ * 台本の切替点を距離で拾う。
+ *
+ * ⚠️ ★**2026-08-28: 台本を受け取るようにしました。**
+ *    ★以前は無引数で呼んでおり、★**関数の既定引数（当時 'v4'）**を歩いていました。
+ *    ★つまりこの検査は、★**画面の台本（ずっと v5）を一度も見ていません**でした。
+ */
+function transitions(script: BroadcastV2Script): readonly { readonly m: number; readonly from: string; readonly to: string }[] {
   const out: { m: number; from: string; to: string }[] = [];
-  let prev = broadcastV2ShotAt(course, 0).id;
+  let prev = broadcastV2ShotAt(course, 0, false, undefined, { script }).id;
   for (let m = 4; m <= 1600; m += 4) {
-    const id = broadcastV2ShotAt(course, m).id;
+    const id = broadcastV2ShotAt(course, m, false, undefined, { script }).id;
     if (id !== prev) { out.push({ m, from: prev, to: id }); prev = id; }
   }
   return out;
 }
 
+/**
+ * ★**台本ごとの「画角の系統が変わる切替」の本数**（実測・`tools/_xfamily.mjs`）。
+ *
+ *   v4  3 本   528m / 800m / 1504m
+ *   v5  3 本   528m / 864m / 968m
+ *   v6  5 本   528m / 864m / 968m と、★**直線の 1312m / 1392m**
+ *
+ * ⚠️ ★**v6 で増えた 2 本（1312m / 1392m）には閃光がありません。**
+ *    ★`straight-contest(side) ↔ homestretch-front(diag-front)` の往復です。
+ *    ★閃光を入れるかどうかは**見え方の判断**なので、ここでは決めません（R-16）。
+ *    ★事実として固定し、台本を触ったら必ずここを見ること。
+ */
+const CROSS_FAMILY_COUNT: Readonly<Record<string, number>> = { v4: 3, v5: 3, v6: 5 };
+
 describe('★カットの切替', () => {
   it('★★画角の系統が変わる切替は、重ねない（ハードカット）', () => {
     const overlapped: string[] = [];
-    for (const t of transitions()) {
+    for (const t of transitions(DEFAULT_RACE_SCRIPT)) {
       const va = broadcastV2ShotById(t.from as never).view;
       const vb = broadcastV2ShotById(t.to as never).view;
       if (va === vb) continue;                       // 同じ系統は重ねてよい
@@ -44,19 +66,19 @@ describe('★カットの切替', () => {
     }
     // ★ここが空でないなら、画面側が重ねている可能性がある（page.tsx の `sameFamily` を確認）
     expect(overlapped.length, '画角の違う切替が重なる指定になっています').toBeGreaterThanOrEqual(0);
-    // 台本 v4 で実際に「画角が変わる切替」がいくつあるかを固定する
-    const crossFamily = transitions().filter((t) =>
-      broadcastV2ShotById(t.from as never).view !== broadcastV2ShotById(t.to as never).view);
-    /**
-     * ★**3 本**（2026-08-22）。直線を正面固定に替え、`homestretch-side` と `front-close` を
-     *   台本から外したので、5 → 3 に減りました（切替が減るほど画は落ち着きます）。
-     *   ⚠️ 数そのものより「台本を触ったら必ずここを見る」ことが目的です。
-     */
-    expect(crossFamily.length, '画角が変わる切替の数が変わりました。台本を見直したなら更新すること').toBe(3);
+    /** ★台本ごとに固定する。★既定だけを見ていると、他の台本への変更を見逃す */
+    for (const [script, expected] of Object.entries(CROSS_FAMILY_COUNT)) {
+      const crossFamily = transitions(script as BroadcastV2Script).filter((t) =>
+        broadcastV2ShotById(t.from as never).view !== broadcastV2ShotById(t.to as never).view);
+      expect(crossFamily.length,
+        `台本 ${script}: 画角が変わる切替の数が変わりました。台本を見直したなら更新すること`).toBe(expected);
+    }
+    /** ★既定の台本が表に載っていること（新しい台本を既定にしてここを素通りさせない） */
+    expect(Object.keys(CROSS_FAMILY_COUNT)).toContain(DEFAULT_RACE_SCRIPT);
   });
 
   it('★同じ画角のまま変わる切替もある（そこは重ねてよい）', () => {
-    const same = transitions().filter((t) =>
+    const same = transitions(DEFAULT_RACE_SCRIPT).filter((t) =>
       broadcastV2ShotById(t.from as never).view === broadcastV2ShotById(t.to as never).view);
     expect(same.length, '同じ画角の切替が 1 つも無い').toBeGreaterThan(0);
     // ★発走 → 1 角は どちらも `diag-front`

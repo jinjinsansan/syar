@@ -17,6 +17,7 @@ import {
 } from './perspective-draw.js';
 import type { PerspectiveCamera } from './perspective.js';
 import {
+  DEFAULT_RACE_SCRIPT,
   broadcastV2FixedFov,
   broadcastV2SegmentSpan,
   broadcastV2ShotEndM,
@@ -302,7 +303,7 @@ export function resolveBroadcastV2Scene(
        *    カットの終わりならカットの中で動かないので、跳びません。
        *    ⚠️ 台本に無いショット（強制指定など）は従来どおり区間の終点を使います。
        */
-      const shotEnd = broadcastV2ShotEndM(course, shot.id, options.script ?? 'v4');
+      const shotEnd = broadcastV2ShotEndM(course, shot.id, options.script ?? DEFAULT_RACE_SCRIPT);
       const anchorEnd = shotEnd ?? broadcastV2SegmentSpan(course, leaderS).end;
       const eyePos = posOf(course, anchorEnd + shot.fixedCamera.sFromSegmentEnd, shot.fixedCamera.w);
       const target = posOf(course, atS, focusW);

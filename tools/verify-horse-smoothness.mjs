@@ -61,6 +61,18 @@ const finishSec = new Map(boundaries.map((b) => [b.gate, b.finishSec]));
 /** 枠番ごとに、カット内での「移動量の変化」を集める */
 const agg = new Map();
 const prev = new Map();
+/**
+ * ★**同じ名前のカットが 2 回出る台本への対応**（2026-08-28）。
+ *
+ * ⚠️ ★この道具はキーを `ショットID#枠番` にしていました。
+ *    ★v6 は `side-drive` も `straight-contest` も**2 回出ます**。
+ *    ★すると間の別カットを**飛び越えて前のコマと比べ**、
+ *    ★**カットの切替を「馬が飛んだ」として数えていました**
+ *    （実例: straight-contest で尖り **1859 倍**。実体は 1392m のカット）。
+ * ★**連続している区間ごと**に番号を振り、これをキーに入れます。
+ */
+let runIndex = 0;
+let runShotId;
 for (let t = 0; t <= warp.displaySec; t += 1 / FPS) {
   const sec = warp.raceSecAt(t);
   const at = model.at(sec);
@@ -73,11 +85,12 @@ for (let t = 0; t <= warp.displaySec; t += 1 / FPS) {
   const horses = vis.map((h) => ({ gate: h.gate, s: startShownMeters(h.meters, t), w: h.w, staminaRatio: 1 }));
   const scene = resolveBroadcastV2Scene(course, horses, { width: W, height: H }, false, { raceDisplaySec: t });
   const basis = cameraBasis(scene.camera);
+  if (scene.shot.id !== runShotId) { runIndex += 1; runShotId = scene.shot.id; }
   for (const h of horses) {
     const p = posOf(course, h.s, h.w);
     const foot = project(scene.camera, basis, { x: p.x, y: p.y, z: 0 });
     const head = project(scene.camera, basis, { x: p.x, y: p.y, z: 2.5 });
-    const key = `${scene.shot.id}#${h.gate}`;
+    const key = `${scene.shot.id}#${runIndex}#${h.gate}`;
     if (foot === undefined || head === undefined || foot.depth <= 2) { prev.delete(key); continue; }
     const size = Math.abs(foot.y - head.y);
     // ★画面の内側にいる間だけ（端は投影が暴れる）
