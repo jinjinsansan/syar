@@ -37,9 +37,18 @@ const hex = (k) => {
   if (typeof v !== 'string') throw new Error(`★palette.json に ${k} がありません`);
   return [parseInt(v.slice(1, 3), 16), parseInt(v.slice(3, 5), 16), parseInt(v.slice(5, 7), 16)];
 };
-const LIGHT = hex('dirt-0');
+/**
+ * ★**輝度の幅を苝の板に合わせる**（2026-08-29）。
+ *
+ * ⚠️ ★ 1 枚目は `dirt-2`〜`dirt-0`（輝度 87〜153）に載せ、さらに 0.78 倍に圧縮しました。
+ *    実測: ★**列方向（進行方向）の sd が 1.88**。苝の板は **3.31**。★半分でした。
+ *    ★見た目の速さは地面の流れで決まるので、★**走りがぎこちなく見えました**
+ *    （オーナー評・2026-08-29。地面タイルを直したあとも残っていた）。
+ * ★暗い側を `dirt-3` まで下げ、明るい側を上げて、圧縮もやめます。
+ */
+const LIGHT = [0xd2, 0xb8, 0x96];   // ★乾いた砂（`dirt-0` より明るい）
 const BASE = hex('dirt-1');
-const DARK = hex('dirt-2');
+const DARK = hex('dirt-3');         // ★湿った砂・轍（`dirt-2` より暗い）
 
 /** ★種を固定した線形合同法（憲法 4） */
 let seed = 20260828 >>> 0;
@@ -72,9 +81,12 @@ for (const [src, dst] of PAIRS) {
   for (let i = 0; i < data.data.length; i += 4) {
     if (data.data[i + 3] < 8) continue;   // ★透明はそのまま（板の形を動かさない）
     const l = 0.299 * data.data[i] + 0.587 * data.data[i + 1] + 0.114 * data.data[i + 2];
-    /** ★0〜1 に正規化し、真ん中を少し持ち上げる（芝は暗部が広いので、そのままだと重くなる） */
-    let t = (l - lo) / span;
-    t = Math.min(1, Math.max(0, t * 0.78 + 0.16));
+    /**
+     * ★ 0〜1 に正規化する。
+     *   ⚠️ ★ここで**圧縮しない**こと（上の註記）。
+     *      ★圧縮すると**地面の流れが読めなくなり**、走りがぎこちなく見えます。
+     */
+    const t = Math.min(1, Math.max(0, (l - lo) / span));
     let r; let g; let b;
     if (t < 0.5) {
       const k = t / 0.5;

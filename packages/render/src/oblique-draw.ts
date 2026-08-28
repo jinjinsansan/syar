@@ -73,6 +73,17 @@ export interface Ctx2D<TImage = unknown> {
    * ★任意（両環境にある）。接地影のように**画像を変形して描く**ときだけ使う。
    *   無い環境では変形を伴う描画を省く（落ちない）。
    */
+  /**
+   * ★**放射状の濃淡**（2026-08-29）。★砂煙の**縁を消す**ために使います。
+   *
+   * ⚠️ ★`globalAlpha` だけでは**内側も外側も同じ濃さ**になり、
+   *    ★縁が硬くて**「丸いポンポン」に見えます**（オーナー評・2026-08-29）。
+   * ★ブラウザも `@napi-rs/canvas` も持っていますが、
+   *   ★**無い実装でも壊れないように任意**にしてあります（呼ぶ側が見て分岐する）。
+   */
+  createRadialGradient?(
+    x0: number, y0: number, r0: number, x1: number, y1: number, r1: number,
+  ): { addColorStop(offset: number, color: string): void };
   save?(): void;
   restore?(): void;
   transform?(a: number, b: number, c: number, d: number, e: number, f: number): void;

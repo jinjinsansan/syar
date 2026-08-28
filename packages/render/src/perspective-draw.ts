@@ -517,6 +517,18 @@ export function drawPerspectiveWorld(
 export const HORSE_HEIGHT_M = 2.5;
 
 /**
+ * ★**`#rrggbb` を `rgba(...)` にする**（砂煙の放射状の濃淡用）。
+ *   ★`globalAlpha` だけだと**内側も外側も同じ濃さ**になり、縁が硬くなります。
+ *   ⚠️ ★`#rgb` の短い形式は受けません（渡す側で揃えてください）。
+ */
+function rgbaOf(hex: string, alpha: number): string {
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
+}
+
+/**
  * ★**太陽**（設計 1-8・参考映像 1.2 #13）
  *
  * 【参考で見えていること】
@@ -915,26 +927,59 @@ export function drawPerspectiveHorses<TImage>(
       const phase = (((frameIndex % cycle) + cycle) % cycle) / cycle;
       /** ★尾を引く長さ（m）。★長すぎると後続が見えなくなります */
       const PLUME_M = 6.0;
-      const PUFFS = 9;
+      const PUFFS = 14;
+      const dust = opts.trackEffect.dustColor ?? opts.trackEffect.color;
       for (let i = 0; i < PUFFS; i += 1) {
         /** ★古さ（0=出たばかり … 1=消える）。★位相を足して連続にする */
         const age = (i + phase) / PUFFS;
         const jig = ((d.h.gate * 13 + i * 7) % 11) / 11;
         const back = 0.55 + age * PLUME_M;
-        const rise = 0.20 + age * 0.85;
+        /** ★高さを粒ごとにちらす（並んだ丸に見えないように） */
+        const rise = 0.14 + age * 0.80 + (jig - 0.5) * 0.30;
         const lateral = (jig - 0.5) * (0.45 + age * 1.30);
         const q = P(d.s - back, d.h.w + lateral);
         if (q.depth <= 2) continue;
         /** ⚠️ ★大きすぎると**砂煙ではなく壁**になります（不透明度 1 で確かめ済み） */
-        const rx = q.pxPerM * (0.20 + age * 0.52 + jig * 0.10);
+        const rx = q.pxPerM * (0.16 + age * 0.46 + jig * 0.14);
         const ry = rx * (0.52 + jig * 0.16);
         /** ★消え方は後半ほど早く（尾が鑑を引かないように） */
         const fade = (1 - age) * (1 - age);
-        ctx.globalAlpha = Math.min(0.42, 0.46 * fade * Math.min(1, kickup * 4.5));
-        ctx.fillStyle = opts.trackEffect.dustColor ?? opts.trackEffect.color;
-        ctx.beginPath();
-        ctx.ellipse(q.x, q.y - rise * q.pxPerM, rx, ry, 0, 0, Math.PI * 2);
-        ctx.fill();
+        const a = Math.min(0.50, 0.56 * fade * Math.min(1, kickup * 4.5));
+        /**
+         * ★**縁をでかして、砂煙にする**（2026-08-29）。
+         *
+         * ⚠️ ★均一な塗りで楺円を塗ると、★**縁が硬くて「丸いポンポン」に見えます**
+         *    （オーナー評・2026-08-29）。★砂煙には縁がありません。
+         * ★中心から外へ 0 へ落ちる**放射状の濃淡**で塗ります。
+         *   ★円しか作れないので、★**縦に縮めて**楺円にします。
+         */
+        const cx = q.x;
+        const cy = q.y - rise * q.pxPerM;
+        /**
+         * ★**一つ一つは真丸**にします。
+         *   ★楺円にすると、円形の濃淡を楺円で切ることになり、
+         *   ★**上下だけ縁が残ります**。
+         *   ★煙全体の平たさは、粒ごとの**高さをちらす**ことで出します。
+         */
+        const grad = ctx.createRadialGradient === undefined
+          ? undefined : ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+        if (grad === undefined) {
+          /** ★濃淡が無い実装では従来どおりの均一な塗り（描かないより良い） */
+          ctx.globalAlpha = a;
+          ctx.fillStyle = dust;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          grad.addColorStop(0, rgbaOf(dust, a));
+          grad.addColorStop(0.45, rgbaOf(dust, a * 0.66));
+          grad.addColorStop(1, rgbaOf(dust, 0));
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, rx, rx, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       ctx.globalAlpha = 1;
     }
