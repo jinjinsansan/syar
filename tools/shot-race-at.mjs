@@ -295,6 +295,11 @@ const layerImages = await Promise.all(manifest.layers.map(async (l) => {
   const img = await loadImage(path.join(PX, l.file));
   return l.name === 'stand' ? withCrowd(img) : img;
 }));
+/** ★ダート版の地面の層（2026-08-28）。★無ければ undefined で、苝の板に落ちます */
+const dirtLayerImages = await Promise.all(manifest.layers.map(async (l) => {
+  const file = (manifest.dirtLayers ?? {})[l.name];
+  return file === undefined ? undefined : loadImage(path.join(PX, file));
+}));
 const layerTexture = (name, pxPerM) => {
   const i = manifest.layers.findIndex((l) => l.name === name);
   if (i < 0) return undefined;
@@ -314,10 +319,17 @@ const objectImages = await Promise.all(manifest.objects.map((o) => loadImage(pat
 const parallaxBackstretch = {
   plateWidth: manifest.plateWidth,
   plateHeight: manifest.plateHeight,
-  layers: manifest.layers.map((l, i) => ({
-    image: layerImages[i], width: layerImages[i].width, height: layerImages[i].height,
-    plateY0: l.plateY0, plateY1: l.plateY1, depthOffsetM: l.depthOffsetM,
-  })),
+  /**
+   * ★**馬場で地面の層を差し替える**（2026-08-28）。★`page.tsx` と同じ規則（R-30）。
+   *   ★ダート版が無い層は苝のままです。
+   */
+  layers: manifest.layers.map((l, i) => {
+    const img = SURFACE === 'dirt' && dirtLayerImages[i] !== undefined ? dirtLayerImages[i] : layerImages[i];
+    return {
+      image: img, width: img.width, height: img.height,
+      plateY0: l.plateY0, plateY1: l.plateY1, depthOffsetM: l.depthOffsetM,
+    };
+  }),
   // ★画面と同じ条件: 発馬機の側面切り出し（start-*）は使わない
   objects: manifest.objects
     .map((o, i) => ({ o, image: objectImages[i] }))

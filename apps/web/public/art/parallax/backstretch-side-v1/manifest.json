@@ -166,5 +166,10 @@
       "tileHeight": 208,
       "pxPerM": 90
     }
+  },
+  "dirtLayers": {
+    "turf-far": "dirt-far.png",
+    "turf-mid": "dirt-mid.png",
+    "turf-near": "dirt-near.png"
   }
 }

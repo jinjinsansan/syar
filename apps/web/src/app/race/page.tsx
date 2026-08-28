@@ -972,6 +972,8 @@ export default function RacePage(): React.JSX.Element {
     winnerRearHighQuality?: readonly (readonly HighQualityHorseFrame[])[];
     /** ★向正面ショット用のループ多層パララックス（`tools/split-parallax-layers.mjs` の出力） */
     parallaxBackstretch: ParallaxPlate<FrameImage>;
+    /** ★ダート版の地面の板（2026-08-28） */
+    parallaxBackstretchDirt: ParallaxPlate<FrameImage>;
     /** ★コーナー・斜めショット用のテクスチャ付き透視ワールド素材（芝タイル・遠景パノラマ） */
     texturedWorld: TexturedWorldAssets<FrameImage>;
     /** ★承認水準（一体・高解像度）の方向別素材が揃っているか */
@@ -1085,6 +1087,11 @@ export default function RacePage(): React.JSX.Element {
             name: string; file: string; plateY0: number; anchorXRatio: number; worldS: number | 'finish'; depthOffsetM: number;
             zOrder?: 'behind' | 'front'; worldW?: number; anchorYRatio?: number; scale?: number;
           }[];
+          /**
+           * ★**ダート戦で差し替える層**（2026-08-28）。層名 → 差し替え先のファイル名。
+           *   ★無ければ苝の板のままです。
+           */
+          dirtLayers?: Record<string, string>;
           world: {
             turf: { file: string; tileWidth: number; tileHeight: number; pxPerM: number };
             /** ★ダートの地面（2026-08-28）。★無ければ苝に落ちる */
@@ -1123,6 +1130,22 @@ export default function RacePage(): React.JSX.Element {
       };
       const parallaxRaw = await Promise.all(parallaxManifest.layers.map((layer) =>
         loadImg(`/art/parallax/backstretch-side-v1/${layer.file}?v=${ASSET_VERSION}`)));
+      /**
+       * ★**ダート版の地面の板**（2026-08-28）。
+       *
+       *   ★側面は**焼き込み済みの板**なので、★苝の層をダートの層へ
+       *   ★**差し替える**だけです（`manifest.dirtLayers`）。
+       *   ⚠️ ★層を**増やしません**。増やすと苝のときも余分に描くことになります。
+       *   ★読めなければ苝の板のままです（画面が壊れない側へ・R-27）。
+       *   ★追加で読むのは 3 枚（1500×約90px）だけです。
+       */
+      const dirtLayerFiles = parallaxManifest.dirtLayers ?? {};
+      const parallaxDirtRaw = await Promise.all(parallaxManifest.layers.map((layer) => {
+        const file = dirtLayerFiles[layer.name];
+        return file === undefined
+          ? Promise.resolve(null)
+          : loadImg(`/art/parallax/backstretch-side-v1/${file}?v=${ASSET_VERSION}`).catch(() => null);
+      }));
       const parallaxImages: FrameImage[] = parallaxRaw.map((image, index) =>
         parallaxManifest.layers[index]?.name === 'stand' ? bakeCrowd(image) : image);
       const objectImages = await Promise.all(parallaxManifest.objects.map((object) =>
@@ -1176,13 +1199,16 @@ export default function RacePage(): React.JSX.Element {
           ...(standTex !== undefined ? { stand: standTex } : {}),
         },
       };
-      const parallaxBackstretch: ParallaxPlate<FrameImage> = {
+      /** ★馬場で層の絵を選ぶ。★ダート版が無い層は苝のまま */
+      const plateImageAt = (index: number, dirt: boolean): FrameImage =>
+        (dirt ? parallaxDirtRaw[index] ?? parallaxImages[index]! : parallaxImages[index]!);
+      const plateOf = (dirt: boolean): ParallaxPlate<FrameImage> => ({
         plateWidth: parallaxManifest.plateWidth,
         plateHeight: parallaxManifest.plateHeight,
         layers: parallaxManifest.layers.map((layer, index) => ({
-          image: parallaxImages[index]!,
-          width: imgW(parallaxImages[index]!),
-          height: imgH(parallaxImages[index]!),
+          image: plateImageAt(index, dirt),
+          width: imgW(plateImageAt(index, dirt)),
+          height: imgH(plateImageAt(index, dirt)),
           plateY0: layer.plateY0,
           plateY1: layer.plateY1,
           depthOffsetM: layer.depthOffsetM,
@@ -1201,7 +1227,10 @@ export default function RacePage(): React.JSX.Element {
           ...(object.anchorYRatio !== undefined ? { anchorYRatio: object.anchorYRatio } : {}),
           ...(object.scale !== undefined ? { scale: object.scale } : {}),
         })),
-      };
+      });
+      const parallaxBackstretch = plateOf(false);
+      /** ★ダート版の板。★差し替える層が 1 つも無ければ苝と同じものになります */
+      const parallaxBackstretchDirt = plateOf(true);
       const loaded = await Promise.all([
         loadImg(`/art/race-title-spring-v1.png?v=${ASSET_VERSION}`),
         loadImg(`/art/race-narrator-v1.png?v=${ASSET_VERSION}`),
@@ -1527,6 +1556,7 @@ export default function RacePage(): React.JSX.Element {
           })(), SILKS_LAYOUT_WINNER),
         } : {}),
         parallaxBackstretch,
+        parallaxBackstretchDirt,
       };
       setReady(true);
     };
@@ -2052,7 +2082,11 @@ export default function RacePage(): React.JSX.Element {
          *   その範囲を含むよう anchor を 1.0（窓を下端まで）にする。
          */
         parallaxPlate: sceneToDraw.shot.view === 'side'
-          ? { plate: art.parallaxBackstretch, zoom: 1.14, verticalAnchor: 1.0, scrollM: sceneToDraw.focusS + visualDelta }
+          ? {
+            /** ★馬場で板を選ぶ（2026-08-28）。★地面の層だけが差し替わります */
+            plate: surface === 'dirt' ? art.parallaxBackstretchDirt : art.parallaxBackstretch,
+            zoom: 1.14, verticalAnchor: 1.0, scrollM: sceneToDraw.focusS + visualDelta,
+          }
           : undefined,
         // ★横視点以外（コーナー後方・俯瞰・斜め前）はテクスチャ付き透視ワールド（背景が実際に動く）
         texturedWorld: sceneToDraw.shot.view === 'side' ? undefined : art.texturedWorld,
