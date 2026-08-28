@@ -23,11 +23,24 @@ const SCRIPT = arg('script', 'v6');
  */
 const GAMMA = Number(arg('gamma', DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA));
 if (!(GAMMA > 0)) throw new Error(`★--gamma が正の数ではありません: ${GAMMA}`);
+  /**
+   * ⚠️ ★**`undefined` を渡してはいけません**（2026-08-28）。
+   *    ★`buildAuditRace` の既定は**画面の既定（γ=1.3）**に変わりました（R-31）。
+   *    ★`undefined` だとそちらへ落ち、★**印字した γ と実際に測った γ が食い違います。**
+   *    ★実際にこの道具が「γ=1（本番の既定）」と印字しながら 1.3 で測っていました。
+   */
 const BALANCE = GAMMA === DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA
-  ? undefined
+  ? DEFAULT_RACE_BALANCE
   : { ...DEFAULT_RACE_BALANCE, TIME_GAP_SHAPE_GAMMA: GAMMA };
 
-console.log(`台本=${SCRIPT}  γ=${GAMMA}${BALANCE ? '' : '（★本番の既定）'}  演出=なし（馬は動かしていません）\n`);
+/** ★R-8: 何で測ったかを毎回出す。★`BALANCE` の有無ではなく**値そのもの**から出す */
+console.log(`台本=${SCRIPT}  γ=${GAMMA.toFixed(2)}`
+  + `${GAMMA === DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA ? '（★エンジンの既定）' : ''}`
+  + `  演出=なし（馬は動かしていません）
+`);
+
+/** ★０ コマだった seed。★1 つでもあれば異常終了する（下） */
+const emptySeeds = [];
 for (const seed of SEEDS) {
   const built = buildAuditRace({ seed, balance: BALANCE });
   const clock = auditClock(built);
@@ -82,6 +95,21 @@ for (const seed of SEEDS) {
     if (on >= 3) sec3 += 1 / FPS;
     if (on >= 4) sec4 += 1 / FPS;
   }
+  /**
+   * ★**1 コマも出ていないのは「異常なし」ではありません**（R-3 / R-21）。
+   *
+   * ⚠️ ★以前はここを素通りしており、`frames = 0` のとき
+   *    ★**跳び 0.00m/コマ・割合 NaN%** と出て、★**「異常なし」に見えて**いました。
+   *    ★台本にこのカットが無ければ（v5 など）、全 seed がそうなります。
+   * ★**測れなかったことを、測った結果として扱わない。**
+   */
+  if (frames === 0) {
+    emptySeeds.push(seed);
+    console.log(`seed ${String(seed).padStart(3)}  ★★このカット（straight-contest）が 1 コマも出ていません`);
+    console.log(`   ★台本 ${SCRIPT} にこのカットがあるか確かめてください（v5 には在りません）。`);
+    console.log('   ★数字は出しません。0.00 や NaN% を「異常なし」と読ませないためです。');
+    continue;
+  }
   const cutSec = frames / FPS;
   console.log(`seed ${String(seed).padStart(3)}  競り合いカット 計 ${cutSec.toFixed(1)}秒`);
   console.log(`   ★画面に描かれる頭数（着外も含む）: 最大 ${maxOnAll} 頭 / 平均 ${(sumOnAll / Math.max(1, frames)).toFixed(1)} 頭`);
@@ -89,4 +117,13 @@ for (const seed of SEEDS) {
     ` / 3 頭以上 ${sec3.toFixed(1)}秒 / 4 頭以上 ${sec4.toFixed(1)}秒`);
   console.log(`   ★注視点が馬から離れる最大量 ${maxJump.toFixed(2)}m/コマ（${jumpAt.toFixed(2)}s）` +
     `  ／ 注視点の 1 コマ移動そのものは最大 ${maxAbs.toFixed(2)}m（馬もほぼ同じだけ進みます）`);
+}
+
+/* ── ★0 コマだった seed があれば異常終了する ─────────────── */
+if (emptySeeds.length > 0) {
+  console.log(`
+★★${emptySeeds.length} / ${SEEDS.length} seed で straight-contest が 1 コマも出ていません`);
+  console.log(`   seed: ${emptySeeds.join(', ')}`);
+  console.log('   ★これは「異常なし」ではありません。終了コードを 1 にします（R-3 / R-21）。');
+  process.exitCode = 1;
 }

@@ -30,9 +30,10 @@ const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ?
  *     γ を上げると先頭付近が締まり、`frameContenders` が**寄る**ので馬は大きくなります。
  *     ここを切り替えられないと、指摘②の原因に届きません。
  */
-const GAMMA = Number(arg('gamma', 1));
-const BALANCE = GAMMA === 1
-  ? undefined
+/** ★既定値を 1 と書き直さない。★エンジンの既定が動いたとき、★**黙ってずれます**（R-30） */
+const GAMMA = Number(arg('gamma', DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA));
+const BALANCE = GAMMA === DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA
+  ? DEFAULT_RACE_BALANCE
   : { ...DEFAULT_RACE_BALANCE, TIME_GAP_SHAPE_GAMMA: GAMMA };
 const W = 1280;
 const H = 720;
@@ -126,6 +127,16 @@ for (const script of SCRIPTS) {
       cs.push(f.ratios.length);
       fs.push(f.fovDeg);
     }
+  }
+  /**
+   * ★**1 コマも揃わなかったなら、それは「異常なし」ではありません**（R-3 / R-21）。
+   * ⚠️ ★`qOf` は空なら 0 を返し、`Math.min(...[])` は Infinity になります。
+   *    ★そのまま印字すると **`0.0%`** と並び、★**測れなかったことが見えません。**
+   */
+  if (hs.length === 0) {
+    console.log(`  ${script.padEnd(4)}  ★★ショット ${shotId} が 1 コマも出ていません（台本を確かめてください）`);
+    process.exitCode = 1;
+    continue;
   }
   const sh = [...hs].sort((a, b) => a - b);
   const h50 = qOf(sh, 0.5);
