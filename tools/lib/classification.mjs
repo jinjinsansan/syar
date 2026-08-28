@@ -214,6 +214,9 @@ export const READONLY = [
   '_replayjerk.mjs',          // リプレイ区間で速さが 1 コマで跳ぶ馬がいないか（読むだけ）
   '_gammacheck.mjs',          // γ が着差を実際に変えているか（読むだけ）
   '_seamlook.mjs',            // 境目の前後で先頭馬が画面のどこに・どの大きさでいるか（読むだけ）
+  '_leadoff.mjs',             // 先頭が画面の外に出ている瞬間を列挙する（読むだけ）
+  '_frameat.mjs',             // ある表示秒にどの馬が画面のどこにいるか（読むだけ）
+  '_clockcmp.mjs',            // 静止画の道具と監査の時計がずれていないか（読むだけ）
   '_screenspan.mjs',          // 画面に入る走路は何 m か（「9.2m」の出どころ・読むだけ）
   '_lagprobe.mjs',            // CONTEST_MAX_LAG_M が実際に注視点を動かしているか（読むだけ）
   '_poolspread.mjs',          // デモの出走表が同格帯になっているか（能力幅・読むだけ）

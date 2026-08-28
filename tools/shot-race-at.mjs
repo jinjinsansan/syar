@@ -27,7 +27,7 @@ import {
   DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt,
 } from '@star/race-engine';
 import {
-  BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES, HORSE_HEIGHT_M,
+  BROADCAST_STRIDE_M, DEMO_CONTEST_GAMMA, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES, HORSE_HEIGHT_M,
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
   paintCrowd, seatMaskFromPixels, seatBandFromPixels,
   cameraBasis, drawBroadcastV2Scene, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
@@ -63,7 +63,7 @@ function measureShot(course, camera, horses, width, height) {
   return { medianPx: median, ratio: median / height, inside, total: horses.length };
 }
 
-const W = 1280, H = 720, FIELD = 12, DIST = 1600, SEED = 42;
+const W = 1280, H = 720, FIELD = 12, DIST = 1600;
 const ART = path.resolve('apps/web/public/art');
 const OUT = path.resolve('out/race-at');
 /**
@@ -93,16 +93,42 @@ const flag = (name, dflt) => { const i = argv.indexOf(name); return i >= 0 ? Num
  * ★既定は**画面の既定**（v5）にします。エンジン側の既定ではありません。
  */
 const SCRIPT = (() => { const i = argv.indexOf('--script'); return i >= 0 ? argv[i + 1] : 'v5'; })();
+/** ★どのレースを描くか。★以前は 42 固定でした */
+const SEED = flag('--seed', 42);
+/**
+ * ★**着差の見せ方（γ）**。
+ *
+ * ⚠️ ★以前この道具は `DEFAULT_RACE_BALANCE`（γ=1.0）固定でした。
+ *    ★画面の既定は `DEMO_CONTEST_GAMMA`（=1.3）なので、
+ *    ★**画面と別のレースを描いていました**（R-30 / R-31）。
+ * ★既定は**画面側**に倒します。エンジン既定で描きたいときは `--gamma 1` を明示すること。
+ */
+const GAMMA = flag('--gamma', DEMO_CONTEST_GAMMA);
+const BALANCE = GAMMA === DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA
+  ? DEFAULT_RACE_BALANCE
+  : { ...DEFAULT_RACE_BALANCE, TIME_GAP_SHAPE_GAMMA: GAMMA };
 const INTRO_SEC = 7.8;  // race-intro.ts の RACE_INTRO_RACE_START_SEC
 /**
  * ⚠️ ★`--shot` / `--fov` の**値**を秒数と取り違えないこと。
  *    取り違えると、指定していない時刻の絵が黙って 1 枚増えます（実際に増えました）。
  */
+/**
+ * ★**オプションの値を「秒数」と取り違えないための除外**。
+ *
+ *   ⚠️ ★ここは 2026-08-28 まで**名前を並べた一覧**でした。
+ *      ★新しいオプションを足してこの一覧に入れ忘れると、
+ *      ★**その値が黙って秒数になり、指定していない時刻の絵が 1 枚増えます**。
+ *      ★実際に `--seed 14 --gamma 1.6` を足した直後、**14 秒と 1.6 秒の絵が増えました**。
+ * ★一覧をやめ、**`--` で始まるものの次**を一律で値と見なします（数え上げは必ず漏れる・R-29）。
+ *   ※ `--noblur` のような値を取らないオプションの次は、それ自体が `--` で始まるか
+ *     秒数なので、次が数字なら値と見なされます。★値を取らないオプションは
+ *     ★**秒数より後ろに書くか、先頭にまとめて書くこと**。
+ */
+const VALUELESS = new Set(['--noblur']);
 const optionValueIndexes = new Set();
-for (const name of ['--shot', '--fov', '--exposure', '--from', '--to', '--step', '--script']) {
-  const i = argv.indexOf(name);
-  if (i >= 0) optionValueIndexes.add(i + 1);
-}
+argv.forEach((a, i) => {
+  if (a.startsWith('--') && !VALUELESS.has(a)) optionValueIndexes.add(i + 1);
+});
 let displaySecs = argv
   .filter((a, i) => /^[0-9.]+$/.test(a) && !optionValueIndexes.has(i))
   .map(Number);
@@ -149,8 +175,8 @@ const conditions = {
   raceId: `c${SEED}`, distance: DIST, surface: 'turf',
   trackCondition: 'good', courseShape: 'oval', baseWeightKg: 55,
 };
-const result = resolveRace({ conditions, entrants, seed: SEED, balance: DEFAULT_RACE_BALANCE });
-const { pace } = paceOf(entrants, DEFAULT_RACE_BALANCE);
+const result = resolveRace({ conditions, entrants, seed: SEED, balance: BALANCE });
+const { pace } = paceOf(entrants, BALANCE);
 const boundaries = replayOf(result, (g) => entrants[g - 1].strategy, pace);
 if (!finalOrderMatches(result, boundaries)) throw new Error('★D-059: 映像の着順が確定着順と違います');
 const model = replayPositionModel({
