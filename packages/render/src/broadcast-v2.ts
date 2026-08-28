@@ -451,9 +451,26 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
     camera: { backM: 58, upM: 27, sideM: 19, fovDeg: 11.1 },
   },
   'side-drive': {
-    id: 'side-drive', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35, camera: SIDE_LOW,
-    // ★道中〜勝負所。隊列が伸びたら引いて、詰まったら寄る
-    frameContenders: { withinM: 11, maxFovDeg: 13 },
+    /**
+     * ★画角は **11°固定**。`SIDE_LOW`（7.6°）のままにすると、可変だった頃より**寄りすぎ**ます。
+     *   ⚠️ ★`frameContenders` は 11.3°〜9.9° を行き来していました。外して 7.6° 固定にしたら、
+     *      ★1 角からの入りで**馬の大きさが 2.10 倍**に跳びました（実測）。
+     *   ★可変だった範囲の中ほど（11°）に置くと、入りは 1.4 倍程度に収まり、
+     *     ★次の `straight-contest`（7.6°）への切り替わりが**寄っていく**動きになります。
+     */
+    id: 'side-drive', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
+    camera: { ...SIDE_LOW, fovDeg: 11 },
+    /**
+     * ★**「隊列が伸びたら引いて、詰まったら寄る」を外しました**（2026-08-28・オーナー指摘②）
+     *
+     *   > 18 秒あたりで馬がだんだん大きくなり（また小さくなる）
+     *
+     *   ★実測（`tools/_screenmove.mjs`・seed 42・台本 v6）: このカットの中で
+     *     ★**画角 11.3° → 9.9° → 10.2°**、馬の大きさが **69 → 89px/m（+27%）→ 78.7（−12%）**。
+     *   ★`frameContenders` は馬群の広がりに**毎コマ追従**するので、
+     *     ★**広がりが揺れるとズームも揺れます。** 4.33 秒のカットの中で膨らんで縮むのはこれです。
+     *   ⚠️ ★引き換えに、馬群が詰まっても寄らなくなります（画角は `SIDE_LOW` の 7.6° 固定）。
+     */
   },
   'fourth-corner-wide': {
     // ★4 角をラチのカーブごと広く（後方・高め）
@@ -987,11 +1004,33 @@ export const SCRIPT_V5: readonly { readonly until: number; readonly id: Broadcas
 export const SCRIPT_V6: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
   { until: 0.0625, id: 'start-front' },        // 〜100m   ★v5 と同一（案 A・飛び出しだけ）
   { until: 0.330, id: 'first-corner-front' },   // 〜528m   ★v5 と同一
-  { until: 0.604, id: 'side-drive' },           // 〜966m   ★v5 と同一（4 角ぶんを受ける・案 B）
+  /**
+   * ★**寄りのカットを「実時間に戻ってから」始めます**（2026-08-28・オーナー指摘②）
+   *
+   *   > 18 秒あたりで（…）馬が後退する動きがある
+   *
+   * 【★正体は時間の圧縮でした】実測（`tools/_screenmove.mjs`・seed 42）:
+   *
+   *       表示 21s  先頭 **82.0m/s**  ← ★まだ 5 倍速
+   *       表示 23s  先頭 **19.2m/s**  ← 実時間へ戻った
+   *       表示 25s  先頭  16.7m/s   ★後退 0.0px
+   *
+   *   ★**直線を実時間にする時間割の境界は 1200m（残り 400m）**なのに、
+   *     ★**直線のカットは 966m から始まって**いました。その差 **234m** が
+   *     ★**5 倍速のまま寄りのカット（117px/m）で流れ**、
+   *     ★実際には 0.6m/s の詰めが **3.1m/s** に拡大されて
+   *     ★**毎秒 360px の「後退」**に見えていました。
+   *
+   * ⚠️ ★カメラ側の対処（`CONTEST_MAX_LAG_M` を 12→6 に縮める）は**効きませんでした**（実測）。
+   *    ★注視点が速いのではなく、**時間が速い**のが原因だからです。戻しました。
+   * → ★**寄りは 1200m から。** 966〜1200m は `side-drive`（引き・注視点＝馬群）が受けます。
+   *   ★あちらは注視点が先頭と同速なので、圧縮されていても後退が出ません（実測 0.1px/コマ）。
+   */
+  { until: 0.750, id: 'side-drive' },           // 〜1200m  ★実時間に戻るまで引きで受ける
   // ★★ここから下だけが v6 の中身（直線 538m を 4 つに割る）
-  { until: 0.700, id: 'straight-contest' },     // 〜1120m  ①せめぎ合い（46%・競り合いを抜く）
-  { until: 0.790, id: 'homestretch-front' },    // 〜1264m  ②差し・追い込み（正面の奥行き）
-  { until: 0.930, id: 'straight-contest' },     // 〜1488m  ③差し・追い込み（46%・競り合いを抜く）
+  { until: 0.820, id: 'straight-contest' },     // 〜1312m  ①せめぎ合い（競り合いを抜く）
+  { until: 0.870, id: 'homestretch-front' },    // 〜1392m  ②差し・追い込み（正面の奥行き）
+  { until: 0.940, id: 'straight-contest' },     // 〜1504m  ③差し・追い込み（競り合いを抜く）
   { until: 1.0, id: 'finish-line' },            // 〜1600m  ④ゴール板
 ];
 

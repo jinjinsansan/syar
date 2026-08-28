@@ -149,13 +149,23 @@ describe('争っている馬を画面に収める', () => {
    * ★**`side-drive`（道中）は巻き込んでいないこと**（対照・指示書「一度に複数の要因を変えない」）
    *   ⚠️ ★道中は「隊列が伸びたら引く」が正しく、そこに §4-4 の構図を持ち込む理由がありません。
    */
-  it('★★道中（`side-drive`）は従来どおり（`fillFraction` も `frameLeadGroup` も無い）', () => {
-    const spec = broadcastV2ShotById('side-drive').frameContenders!;
-    expect(spec.fillFraction).toBeUndefined();
+  it('★★道中（`side-drive`）は画角を動かさない（馬群の広がりに追従しない）', () => {
+    /**
+     * ⚠️ ★**2026-08-28 に `frameContenders` を外しました**（オーナー指摘②）。
+     *    ★あれは馬群の広がりに毎コマ追従するので、★**広がりが揺れるとズームも揺れます。**
+     *    実測（seed 42・台本 v6）: 1 カットの中で画角 11.3° → 9.9° → 10.2°、
+     *    ★馬の大きさが **69 → 89px/m（+27%）→ 78.7（−12%）**。
+     *    → オーナー評「18 秒あたりで馬がだんだん大きくなり（また小さくなる）」。
+     * ★いまは `camera.fovDeg` に固定です。★**馬群がどう伸び縮みしても動きません。**
+     */
+    expect(broadcastV2ShotById('side-drive').frameContenders,
+      '★馬群追従のズームは付けない（付けるとカット内で大きさが揺れる）').toBeUndefined();
     expect(broadcastV2ShotById('side-drive').frameLeadGroup).toBeUndefined();
-    /** ★詰まっていれば従来どおり下限に張り付く */
-    expect(fovFor('side-drive', 800, [0.3, 0.6, 0.9]))
-      .toBeCloseTo(broadcastV2ShotById('side-drive').camera.fovDeg, 6);
+    /** ★どんな広がりでも `camera.fovDeg` のまま */
+    const fixed = broadcastV2ShotById('side-drive').camera.fovDeg;
+    for (const spread of [[0.3, 0.6, 0.9], [4, 9, 15], [10, 25, 40]]) {
+      expect(fovFor('side-drive', 800, spread), `広がり ${spread.join('/')}m`).toBeCloseTo(fixed, 6);
+    }
   });
 
   /**

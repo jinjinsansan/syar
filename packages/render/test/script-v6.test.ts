@@ -64,17 +64,35 @@ function frameAt(leadS: number, script: 'v5' | 'v6', spread = 1): {
 }
 
 describe('台本 v6 — 直線を 4 カットに割る', () => {
-  it('★4 角までは v5 と 1 行も違わない（変えたのは直線だけ）', () => {
-    const upToCorner = (rows: typeof SCRIPT_V6): unknown[] =>
-      rows.filter((r) => r.until <= 0.604).map((r) => [r.until, r.id]);
-    expect(upToCorner(SCRIPT_V6)).toEqual(upToCorner(SCRIPT_V5));
+  it('★1 角までは v5 と 1 行も違わない（変えたのは直線側だけ）', () => {
+    /**
+     * ⚠️ ★以前ここは「**4 角（0.604）まで**同じ」を固定していました。
+     *    ★2026-08-28、v6 の寄りカットの開始を 0.604 → **0.750** へ動かしたので成り立ちません。
+     *    ★理由は `SCRIPT_V6` の注記のとおりで、★**0.604〜0.750 は時間が 5 倍速のまま**であり、
+     *    ★そこに寄りのカットを置くと**馬が毎秒 360px 後退して見えた**ためです（オーナー指摘②）。
+     *    ★v5 は同じ区間を `homestretch-side`（引き・注視点＝馬群）で受けるので後退が出ず、動かしていません。
+     */
+    const upTo = (rows: typeof SCRIPT_V6): unknown[] =>
+      rows.filter((r) => r.until <= 0.330).map((r) => [r.until, r.id]);
+    expect(upTo(SCRIPT_V6)).toEqual(upTo(SCRIPT_V5));
   });
 
   it('★v5 の直線は 1 カット、v6 は 4 カット', () => {
-    const straight = (rows: typeof SCRIPT_V6): string[] =>
-      rows.filter((r) => r.until > 0.604).map((r) => r.id);
-    expect(straight(SCRIPT_V5)).toEqual(['homestretch-side', 'finish-line']);
-    expect(straight(SCRIPT_V6)).toEqual(['straight-contest', 'homestretch-front', 'straight-contest', 'finish-line']);
+    const straight = (rows: typeof SCRIPT_V6, from: number): string[] =>
+      rows.filter((r) => r.until > from).map((r) => r.id);
+    expect(straight(SCRIPT_V5, 0.604)).toEqual(['homestretch-side', 'finish-line']);
+    expect(straight(SCRIPT_V6, 0.750)).toEqual(['straight-contest', 'homestretch-front', 'straight-contest', 'finish-line']);
+  });
+
+  it('★v6 の寄りカットは、表示が実時間に戻ってから始まる', () => {
+    /**
+     * ★時間割が実時間へ戻る境界は**残り 400m ＝ 進行 0.750**（`replayPositionModel` の
+     *   `straightMetersLeft: 400`）。★寄りのカット（`straight-contest`）はそこから。
+     * ⚠️ ★ここを 0.750 より手前へ戻すと、オーナー指摘②の「後退」が再発します。
+     */
+    const firstContest = SCRIPT_V6.findIndex((r) => r.id === 'straight-contest');
+    expect(firstContest).toBeGreaterThan(0);
+    expect(SCRIPT_V6[firstContest - 1]!.until, '★寄りの手前の境界＝実時間に戻る 0.750').toBe(0.750);
   });
 
   it('★既定は v5 のまま。v6 は URL で明示したときだけ', () => {
@@ -89,7 +107,12 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
    *   ⚠️ ★参考: v5 は同じ場面で 12〜16% でした。
    */
   it('★直線の寄りカット（①③）で馬が画面高の 35% 以上になる', () => {
-    for (const leadS of [1000, 1080, 1320, 1440]) {
+    /**
+     * ⚠️ ★標本点は **2026-08-28 に動かしました**。寄りのカットの開始を 0.604 → 0.750 へ
+     *    移したため、旧の 1000m / 1080m は現在 `side-drive` です（`SCRIPT_V6` の注記）。
+     *    ★①1200〜1312m ／ ②1312〜1392m ／ ③1392〜1504m から取ります。
+     */
+    for (const leadS of [1220, 1300, 1400, 1490]) {
       const f = frameAt(leadS, 'v6');
       expect(f.shot).toBe('straight-contest');
       expect(f.top4HeightRatio).toBeGreaterThan(0.35);
@@ -108,7 +131,12 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
    *   （差し・追い込みは「奥から大きくなりながら上がる」で読めるため）。
    */
   it('★② の正面カットは全 12 頭を画面に入れる', () => {
-    for (const leadS of [1160, 1240]) {
+    /**
+     * ⚠️ ★標本点は **2026-08-28 に動かしました**。寄りのカットの開始を 0.604 → 0.750 へ
+     *    移したため、旧の 1000m / 1080m は現在 `side-drive` です（`SCRIPT_V6` の注記）。
+     *    ★①1200〜1312m ／ ②1312〜1392m ／ ③1392〜1504m から取ります。
+     */
+    for (const leadS of [1330, 1380]) {
       const f = frameAt(leadS, 'v6');
       expect(f.shot).toBe('homestretch-front');
       expect(f.onScreen).toBe(12);
@@ -121,7 +149,12 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
    *      重なって勝負服が破綻していました。
    */
   it('★寄りのカットで描く馬は 5 頭まで（着外も含めて）', () => {
-    for (const leadS of [1000, 1080, 1320, 1440]) {
+    /**
+     * ⚠️ ★標本点は **2026-08-28 に動かしました**。寄りのカットの開始を 0.604 → 0.750 へ
+     *    移したため、旧の 1000m / 1080m は現在 `side-drive` です（`SCRIPT_V6` の注記）。
+     *    ★①1200〜1312m ／ ②1312〜1392m ／ ③1392〜1504m から取ります。
+     */
+    for (const leadS of [1220, 1300, 1400, 1490]) {
       /** ★馬群が密集した配置（12 頭が 12m に収まる） */
       const horses = fieldAt(leadS, 0.26);
       const scene = resolveBroadcastV2Scene(course, horses, VIEWPORT, false, {
