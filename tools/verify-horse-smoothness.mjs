@@ -18,7 +18,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt } from '@star/race-engine';
-import {
+import { DEMO_CONTEST_GAMMA,
   broadcastV2StartLagM,
   cameraBasis, knotsFor, ovalCourse, posOf, project, ratesForTarget,
   replayPositionModel, resolveBroadcastV2Scene, targetDisplaySec, timeWarpFor, withFinishRunOut,
@@ -30,6 +30,12 @@ const RACE_SPEED_MPS = 15.6;
 const startShownMeters = (meters, raceDisplaySec) =>
   Math.max(0, meters - broadcastV2StartLagM(raceDisplaySec, RACE_SPEED_MPS));
 
+/**
+ * ★**画面と同じ写像で測る**（R-31）。
+ * ⚠️ ★ここは `DEFAULT_RACE_BALANCE`（γ=1.0）固定でした。画面は `DEMO_CONTEST_GAMMA`。
+ *    ★`resolveRace` と `paceOf` の**両方**に同じものを渡すこと（片方だけだと齟齬になる）。
+ */
+const BALANCE = { ...DEFAULT_RACE_BALANCE, TIME_GAP_SHAPE_GAMMA: DEMO_CONTEST_GAMMA };
 const W = 1280, H = 720, FIELD = 12, DIST = 1600, SEED = 42, FPS = 30;
 const POOL = JSON.parse(readFileSync('apps/web/src/lib/watch-pool.json', 'utf8'));
 const course = ovalCourse(DIST, { widthM: 20, turn: 'left' });
@@ -44,9 +50,9 @@ const entrants = POOL.slice(st, st + FIELD).map((h, i) => ({
 }));
 const result = resolveRace({
   conditions: { raceId: 'c', distance: DIST, surface: 'turf', trackCondition: 'good', courseShape: 'oval', baseWeightKg: 55 },
-  entrants, seed: SEED, balance: DEFAULT_RACE_BALANCE,
+  entrants, seed: SEED, balance: BALANCE,
 });
-const { pace } = paceOf(entrants, DEFAULT_RACE_BALANCE);
+const { pace } = paceOf(entrants, BALANCE);
 const boundaries = replayOf(result, (g) => entrants[g - 1].strategy, pace);
 if (!finalOrderMatches(result, boundaries)) throw new Error('着順不一致');
 const model = replayPositionModel({
