@@ -19,6 +19,8 @@
  *      同じシードなら同じリプレイになります。
  */
 
+import type { Ctx2D, FontOf, Viewport2D } from './oblique-draw.js';
+
 /**
  * ★**リプレイの表示の長さ**（秒）。
  *   ⚠️ ★長くすると「終わったのに終わらない」になります。参考の中継も決着の直後は短い。
@@ -62,8 +64,15 @@ export function finishReplayAt(
   const into = raceDisplaySec - from;
   if (!(into >= 0)) return IDLE;
   if (into > FINISH_REPLAY_DISPLAY_SEC) {
-    /** ★区間を過ぎたら**ゴールの瞬間で止めます**（そこから着順ボードへ戻る側が判断する） */
-    return { active: true, raceSec: finishRaceSec, progress: 1 };
+    /**
+     * ★**区間を過ぎたら終わります。**
+     *
+     * ⚠️ ★最初ここを `active: true` のままにしていました。「ゴールの瞬間で止める」つもりでしたが、
+     *    ★**リプレイが終わらず、着順ボードが最後まで出ませんでした**（実画面 55s で確認・2026-08-28）。
+     *    ★「止める」と「続けている」を同じ真偽値で表そうとしたのが誤りです。
+     *    ★止めるのは**レース秒**（`finishRaceSec` を返す）で足り、★区間は閉じます。
+     */
+    return { active: false, raceSec: finishRaceSec, progress: 1 };
   }
   const progress = FINISH_REPLAY_DISPLAY_SEC <= 0 ? 1 : into / FINISH_REPLAY_DISPLAY_SEC;
   /** ★ゴールの `FINISH_REPLAY_RACE_SEC` 秒前から、ゴールまでを等速で送る */
@@ -85,4 +94,46 @@ export function raceTotalDisplaySec(
   introSec: number, mainDisplaySec: number, postRaceSec: number,
 ): number {
   return introSec + mainDisplaySec + postRaceSec + FINISH_REPLAY_DISPLAY_SEC;
+}
+
+/**
+ * ★**「リプレイ」であることを画面に出す**（2026-08-28・オーナー指摘③）。
+ *
+ *   > リプレイ中にリプレイと表示されていないのでリプレイかどうかわからない（カットイン入れるべき）
+ *
+ * ★実際の中継と同じく**画面の上に出しっぱなし**にします。
+ *   ⚠️ ★点滅させません。★見た人が「いつ出たか」を探す必要が無いようにするためです。
+ * ⚠️ ★入りだけ短く溶かします（`progress` の関数なので決定論・憲法4）。
+ */
+export function drawFinishReplayBadge<TImage>(
+  ctx: Ctx2D<TImage>,
+  vp: Viewport2D,
+  font: FontOf,
+  progress: number,
+  colors: { readonly plate: string; readonly text: string; readonly accent: string },
+): void {
+  const fade = Math.max(0, Math.min(1, progress / 0.08));
+  const ease = 1 - (1 - fade) ** 3;
+  const baseAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = baseAlpha * ease;
+
+  const label = 'リプレイ';
+  const px = 26;
+  ctx.font = font(px, true);
+  const textW = ctx.measureText(label).width;
+  const padX = 22, h = 46, bar = 6;
+  const w = textW + padX * 2 + bar;
+  const x = Math.round((vp.width - w) / 2);
+  /** ★上に出す。順位表（右上）とレース名（左上）を避けて中央に置く */
+  const y = 24 - 10 * (1 - ease);
+
+  ctx.fillStyle = colors.plate;
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = colors.accent;
+  ctx.fillRect(x, y, bar, h);
+  ctx.fillStyle = colors.text;
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x + bar + (w - bar) / 2, y + h / 2 + px * 0.36);
+
+  ctx.globalAlpha = baseAlpha;
 }

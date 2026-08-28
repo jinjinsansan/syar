@@ -43,8 +43,13 @@ describe('ゴール前リプレイ', () => {
     expect(FINISH_REPLAY_DISPLAY_SEC).toBeGreaterThan(FINISH_REPLAY_RACE_SEC);
   });
 
-  it('★区間を過ぎてもゴールで止まる（その先を再生しない）', () => {
+  it('★区間を過ぎたら終わる（出しっぱなしにしない）', () => {
     const over = at(MAIN + POST + FINISH_REPLAY_DISPLAY_SEC + 5);
+    /**
+     * ⚠️ ★ここを `active: true` にしていたため、★**リプレイが終わらず着順ボードが
+     *    最後まで出ませんでした**（実画面で確認・2026-08-28）。★区間は必ず閉じること。
+     */
+    expect(over.active, '★区間を過ぎたら閉じる').toBe(false);
     expect(over.raceSec).toBeCloseTo(FINISH, 6);
     expect(over.progress).toBe(1);
   });

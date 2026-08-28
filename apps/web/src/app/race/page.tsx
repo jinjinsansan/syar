@@ -46,7 +46,7 @@ import {
   drawRaceTitleCard, drawStartingGate, drawStartCallBand,
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT, CUT_RACE_SCRIPT, GATE_FRONT_STALL_PLATES,
-  finishReplayAt, FINISH_REPLAY_DISPLAY_SEC,
+  finishReplayAt, FINISH_REPLAY_DISPLAY_SEC, drawFinishReplayBadge,
   broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
@@ -1549,7 +1549,12 @@ export default function RacePage(): React.JSX.Element {
      */
     const replayFinishSec = built.finishSec.get(built.result[0]!.gate)
       ?? built.warp.raceSecAt(built.warp.displaySec);
-    const replay = finishReplayAt(raceD, built.warp.displaySec, POST_RACE_SEC, replayFinishSec);
+    /**
+     * ★**並びは 本編 → 勝馬の寄り → リプレイ → 着順ボード**（2026-08-28・オーナー指摘④）。
+     *   > リプレイした後にオッズの結果を出すべき（今リプレイ前に出ている）
+     *   ⚠️ ★以前は着順ボードの**後ろ**に置いていました。結果を見せてからリプレイを出すのは順序が逆です。
+     */
+    const replay = finishReplayAt(raceD, built.warp.displaySec, WINNER_FOLLOW_SEC, replayFinishSec);
 
     const sec = replay.active ? replay.raceSec : built.warp.raceSecAt(raceD);
     const at = built.model.at(sec);
@@ -2100,6 +2105,20 @@ export default function RacePage(): React.JSX.Element {
         { timeSec: d, sinceSec: Math.min(hudSince, d - sectionTagRef.current.sinceSec) });
     }
     /**
+     * ★**「リプレイ」と出す**（2026-08-28・オーナー指摘③）。
+     *   > リプレイ中にリプレイと表示されていないのでリプレイかどうかわからない
+     *   ⚠️ ★HUD の描画がひととおり終わったあとに出します（順位表などに隠れないため）。
+     */
+    if (replay.active) {
+      const pal = art.pal as Record<string, string>;
+      drawFinishReplayBadge(ctx, vp, FONT, replay.progress, {
+        /** ★色は `palette.json` から引きます。この層で色を作りません（アートバイブル） */
+        plate: '#14181acc',
+        text: '#f2f2ee',
+        accent: pal['mark-gold'] ?? '#e0ac3c',
+      });
+    }
+    /**
      * ★コース図ミニマップ（左上・区間タグの下）。カットが変わっても「今どこか」が繋がる（ユーザー指摘⑥）。
      *   描画に使った位置をそのまま点にする（順位計算はしない）。
      */
@@ -2310,12 +2329,13 @@ export default function RacePage(): React.JSX.Element {
       }
 
       const afterRaceSec = Math.max(0, raceD - built.warp.displaySec);
-      const resultsT = (afterRaceSec - WINNER_FOLLOW_SEC) / RESULTS_BOARD_SEC;
+      /** ★リプレイのぶん後ろへずらす（指摘④: 結果はリプレイの**あと**） */
+      const resultsT = (afterRaceSec - WINNER_FOLLOW_SEC - FINISH_REPLAY_DISPLAY_SEC) / RESULTS_BOARD_SEC;
       /**
-       * ★**リプレイ区間では着順ボードを下ろします**（2026-08-28・オーナー要望⑤）。
-       *   ⚠️ ★以前ここは `resultsT >= 0` だけで、★**一度出たら最後まで出しっぱなし**でした。
-       *      ★リプレイを足したら、ボードが画面のほぼ全面を覆って**馬が 1 頭も見えません**でした。
-       *      （実画面で確認・`out/2d-overhead-stride/replay5`）
+       * ★リプレイ中は着順ボードを出しません。
+       *   ⚠️ ★指摘④で順序を入れ替えたので `resultsT` は元々リプレイ後にしか正になりませんが、
+       *      ★**両方で守ります。** 片方だけだと、将来どちらかを動かしたときに黙って被ります
+       *      （実際、順序が逆だったときはボードが画面のほぼ全面を覆っていました）。
        */
       if (resultsT >= 0 && !replay.active) {
         // ★着順ボード（全頭）。勝馬追従の後、レースの締め
@@ -2331,7 +2351,9 @@ export default function RacePage(): React.JSX.Element {
             distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${DIST}m ${turn === 'left' ? '左' : '右'}`,
             conditionLabel: `晴 / ${conditionLabel[trackCondition]}`,
             winTimeSec: built.finishSec.get(winnerGate),
-            secondsToNext: Math.max(0, RESULTS_BOARD_SEC - (afterRaceSec - WINNER_FOLLOW_SEC)),
+            /** ★リプレイのぶんを差し引く（指摘④で並びを変えたため。抜くと 0:00 のまま出る） */
+            secondsToNext: Math.max(0,
+              RESULTS_BOARD_SEC - (afterRaceSec - WINNER_FOLLOW_SEC - FINISH_REPLAY_DISPLAY_SEC)),
           },
           Math.min(1, resultsT * 1.6), d);
       } else {
