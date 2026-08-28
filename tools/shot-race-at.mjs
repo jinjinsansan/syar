@@ -33,6 +33,7 @@ import {
   cameraBasis, drawBroadcastV2Scene, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
   posOf, project, ratesForTarget, replayPositionModel, resolveBroadcastV2Scene,
   targetDisplaySec, timeWarpFor, withFinishRunOut, GATE_FRONT_STALL_PLATES,
+  broadcastV2StartLagM,
 } from '@star/render';
 
 /** ★書体。★画面（`page.tsx`）と同じ形にすること。ここだけ違えるとこの道具が別の絵を測る（R-30） */
@@ -96,6 +97,17 @@ const SCRIPT = (() => { const i = argv.indexOf('--script'); return i >= 0 ? argv
 /** ★どのレースを描くか。★以前は 42 固定でした */
 const SEED = flag('--seed', 42);
 /**
+ * ★**自馬の枠**。★画面（`page.tsx` の `useState(3)`）と同じにすること。
+ *
+ * ⚠️ ★ここは 2026-08-28 まで**二重に壊れて**いました。
+ *    ★時間の伸縮を組む基準馬は `knotsFor(boundaries, 1)` の**1 番固定**、
+ *    ★自馬の印だけが**4 番固定**でした。
+ *    ★`knotsFor` は**その馬の節目を実時間に寄せる**ので、基準馬が違うと
+ *    ★**同じ表示秒が別の瞬間を指します**。実測で **2.33 秒**ずれていました
+ *    （この道具の 33.47s が、画面の 35.8s）。★測定値を秒で照合できませんでした（R-30）。
+ */
+const OWN_GATE = flag('--own', 3);
+/**
  * ★**着差の見せ方（γ）**。
  *
  * ⚠️ ★以前この道具は `DEFAULT_RACE_BALANCE`（γ=1.0）固定でした。
@@ -108,6 +120,10 @@ const BALANCE = GAMMA === DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA
   ? DEFAULT_RACE_BALANCE
   : { ...DEFAULT_RACE_BALANCE, TIME_GAP_SHAPE_GAMMA: GAMMA };
 const INTRO_SEC = 7.8;  // race-intro.ts の RACE_INTRO_RACE_START_SEC
+/** ★立ち上がりの基準にする走速（m/s）。★`page.tsx` と同じ値 */
+const RACE_SPEED_MPS = 15.6;
+const startShownMeters = (meters, raceDisplaySec) =>
+  Math.max(0, meters - broadcastV2StartLagM(raceDisplaySec, RACE_SPEED_MPS));
 /**
  * ⚠️ ★`--shot` / `--fov` の**値**を秒数と取り違えないこと。
  *    取り違えると、指定していない時刻の絵が黙って 1 枚増えます（実際に増えました）。
@@ -188,7 +204,7 @@ const model = replayPositionModel({
 if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((e) => Number(e.horseId)))) {
   throw new Error('★D-059: 位置モデルの最終順が着順と違います');
 }
-const knots = knotsFor(boundaries, 1);
+const knots = knotsFor(boundaries, OWN_GATE);
 const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
 const finishSec = new Map(boundaries.map((b) => [b.gate, b.finishSec]));
 /** ★勝馬（画面と同じく「勝馬がゴールしたら」勝馬カットへ切り替える） */
@@ -347,7 +363,15 @@ for (const [index, displaySec] of displaySecs.entries()) {
    */
   const allFinished = (at.find((h) => h.gate === WINNER_GATE)?.meters ?? 0) >= DIST - 1e-6;
   const visual = withFinishRunOut(at, (g) => finishSec.get(g), sec, DIST, 0);
-  const horses = visual.map((h) => ({ gate: h.gate, s: h.meters, w: h.w, staminaRatio: h.staminaRatio ?? 1 }));
+  /**
+   * ★**発走の遅れを引く**（`page.tsx` の `startShownMeters` と同じ）。
+   *
+   * ⚠️ ★この道具は 2026-08-28 まで**これを引いていません**でした。
+   *    ★画面も監査も両方引いています。★つまりこの道具だけが
+   *    ★**馬を 8.32m 先に描いて**いました（ラチや距離標識との位置関係がずれます）。
+   */
+  const shown = visual.map((h) => ({ ...h, meters: startShownMeters(h.meters, raceD) }));
+  const horses = shown.map((h) => ({ gate: h.gate, s: h.meters, w: h.w, staminaRatio: h.staminaRatio ?? 1 }));
   const lead = Math.max(...horses.map((h) => h.s));
   const spread = Math.max(...horses.map((h) => h.w)) - Math.min(...horses.map((h) => h.w));
   // ⚠️ 第4引数は `allFinished`（真偽値）。ここに object を渡すと**常に真**になり、
@@ -425,7 +449,6 @@ for (const [index, displaySec] of displaySecs.entries()) {
    *    「オーナーと別の画」を出します（R-30。この案件で 3 回起きています）。
    *    自馬は画面と同じ 4 番、名前は同じ配列から引いています。
    */
-  const OWN_GATE = 4;
   const NAMES = ['スターライト', 'サクラブリーズ', 'ハンシンドリーム', 'ミライノツバサ', 'グリーンアロー', 'オウカノキセキ',
     'ナニワスピリット', 'ローズクイーン', 'ムラサキノホシ', 'アオバハヤテ', 'ブラウンエース', 'ピンクレディ'];
   const ranked = [...horses].sort((a, b) => b.s - a.s);
