@@ -79,6 +79,26 @@ export const CONTEST_LAG_SOFT_M = 5;
  *   ★`CONTEST_WEAK` を下回れば先頭を見る／`CONTEST_STRONG` を超えれば競り合いを見る。
  *   ★σ=4m のとき、おおむね **7m 離れれば 0 ／ 3.6m まで近づけば 1** になります。
  */
+/**
+ * ★**先頭を枠の内側に残すための余白**（m）。
+ *
+ * 【★なぜ要るか — 実測（2026-08-28）】
+ *   ★注視点は画面のほぼ中央（実測 x=629px / 中央 640px）に写ります。
+ *   ★画面に入る走路は **p50 10.9m** なので、前後 **5.45m** ずつしかありません。
+ *   → ★注視点が先頭から 5.5m ほど下がった瞬間、★**先頭が右の枠から出ます。**
+ *
+ *   ⚠️ ★実害（seed 14 / γ 1.6）: ★**32.17s〜38.37s の 6.2 秒間ずっと**、
+ *      ★字幕が「自馬・先頭 4番」と出しているのに、★**その 4 番が画面にいません**でした
+ *      （残り 185m 付近・先頭の画面 x = 1385px / 画面幅 1280px）。
+ *
+ * 【★値】
+ *   横向きの絵は **高さ `HORSE_HEIGHT_M` = 2.5m × 幅高比 1.71 ≒ 4.3m** 幅で描かれます。
+ *   ★足元の点が枠に入っていても、絵の半分は外へ出ます。★その半幅を取ります。
+ *
+ *   ⚠️ ★**画角を広げてはいけません**（馬が小さくなり「迫力がなくなる」・オーナー指摘）。
+ *      ★カットも削りません。★変えるのは**注視点が下がれる上限の決め方**だけです。
+ */
+export const CONTEST_LEAD_MARGIN_M = 2.15;
 export const CONTEST_WEAK = 0.05;
 export const CONTEST_STRONG = 0.40;
 
@@ -154,4 +174,26 @@ export function contestFocusMeters(
   const focus = lead + (sum / weight - lead) * strength;
   /** ★念のための上下限。先頭より前は見ないし、`maxLagM` より後ろへは行かない */
   return Math.max(lead - maxLagM, Math.min(lead, focus));
+}
+
+/**
+ * ★**先頭を枠の内側に残した注視点**を返す。
+ *
+ *   @param rawFocusS   競り合いだけを見た注視点（`contestFocusMeters`）
+ *   @param leaderS     先頭の位置（m）
+ *   @param halfFrameM  ★**そのカメラの px/m から求めた**画面の半幅（m）。手置きの値を渡さないこと
+ *   @param marginM     先頭の絵の半幅分の余白
+ *
+ * ★`Math.max` なので**連続**です（1 コマの跳びを作りません）。
+ * ★先頭より前は見ません（`rawFocusS` が元々 `leaderS` 以下なので自明）。
+ */
+export function contestFocusWithLeadInFrame(
+  rawFocusS: number,
+  leaderS: number,
+  halfFrameM: number,
+  marginM: number = CONTEST_LEAD_MARGIN_M,
+): number {
+  if (!(halfFrameM > 0) || !Number.isFinite(halfFrameM)) return rawFocusS;
+  const maxLagM = Math.max(0, halfFrameM - marginM);
+  return Math.max(rawFocusS, leaderS - maxLagM);
 }

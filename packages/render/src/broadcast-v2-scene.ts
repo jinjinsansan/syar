@@ -1,4 +1,4 @@
-import { contestFocusMeters } from './contest-focus.js';
+import { contestFocusMeters, contestFocusWithLeadInFrame } from './contest-focus.js';
 import { posOf, type Course } from './course.js';
 import type { Ctx2D, FontOf, Palette, SheetSpec } from './oblique-draw.js';
 import { cameraBasis, project } from './perspective.js';
@@ -347,6 +347,26 @@ export function resolveBroadcastV2Scene(
       ? focusMeters
       : horses.filter((h) => gates.includes(h.gate)).map((h) => h.s);
     focusS = contestFocusMeters(targets.length === 0 ? focusMeters : targets);
+    /**
+     * ★**先頭を枠の内側に残す**（`CONTEST_LEAD_MARGIN_M` の註記・2026-08-28）
+     *
+     *   ⚠️ ★上の注視点は競り合いだけを見ており、★**画面の幅を見ていません。**
+     *      ★そのため seed 14 で **6.2 秒間、先頭（自馬）が画面の外**に出ていました。
+     *   ★下がれる上限を**定数ではなく、そのカメラの px/m から**求めます
+     *   （馬群ショットの `halfFrameM` と同じ手の内です。★手置きの m 数を使いません）。
+     *
+     *   ★`Math.max` なので**連続**です。★このファイルが繰り返し警告している
+     *   ★「1 コマの跳び」はここでは起きません（連続な 2 つの大きい方）。
+     *   ⚠️ ★「先頭を画面に置く」処理（`broadcastV2LeadFrameFocusMeters`）は使いません。
+     *      ★あちらは先頭を**決めた位置に置きにいく**ので、後方の競り合いを抜けません。
+     *      ★ここは**枠から出さないだけ**で、入っている間は競り合いを中心に捉えたままです。
+     */
+    const probeCam = cameraAt(focusS);
+    const probe = posOf(course, focusS, focusW);
+    const projected = project(probeCam, cameraBasis(probeCam), { x: probe.x, y: probe.y, z: 0 });
+    if (projected.pxPerM > 0) {
+      focusS = contestFocusWithLeadInFrame(focusS, leaderS, (viewport.width / 2) / projected.pxPerM);
+    }
   } else if (shot.target === 'pack') {
     /**
      * ★馬群ショットの注視: 画面の半幅（m）を**そのカメラの px/m** から求め、

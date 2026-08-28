@@ -5,7 +5,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  contestFocusMeters, CONTEST_SIGMA_M, CONTEST_MAX_LAG_M, CONTEST_LAG_SOFT_M,
+  contestFocusMeters, contestFocusWithLeadInFrame,
+  CONTEST_SIGMA_M, CONTEST_MAX_LAG_M, CONTEST_LAG_SOFT_M, CONTEST_LEAD_MARGIN_M,
 } from '../src/index.js';
 
 const lead = (xs: readonly number[]): number => Math.max(...xs);
@@ -114,5 +115,59 @@ describe('競り合っている場所へカメラを向ける', () => {
   it('★定数の関係が壊れていない（緩い側 < 硬い側）', () => {
     expect(CONTEST_LAG_SOFT_M).toBeLessThan(CONTEST_MAX_LAG_M);
     expect(CONTEST_SIGMA_M).toBeGreaterThan(0);
+  });
+
+  /**
+   * ★**先頭を枠の内側に残す**（2026-08-28）
+   *
+   *   ⚠️ ★これが無い間、seed 14 で **6.2 秒間、先頭（自馬）が画面の外**にいました。
+   *      ★字幕は「自馬・先頭 4番」と出ていました（先頭の画面 x = 1385px / 幅 1280px）。
+   */
+  describe('★先頭を枠の内側に残す', () => {
+    it('★先頭が枠を出るときだけ引き戻す', () => {
+      const half = 5.45;
+      /** ★先頭のすぐ後ろで競っている — 引き戻さない */
+      expect(contestFocusWithLeadInFrame(1399, 1400, half)).toBe(1399);
+      /** ★ 6m 下がっている — 先頭が外へ出るので引き戻す */
+      const pulled = contestFocusWithLeadInFrame(1394, 1400, half);
+      expect(pulled).toBeGreaterThan(1394);
+      expect(1400 - pulled).toBeLessThanOrEqual(half - CONTEST_LEAD_MARGIN_M + 1e-9);
+    });
+
+    it('★先頭を越えて前へは行かない', () => {
+      for (const raw of [1390, 1396, 1399.9]) {
+        expect(contestFocusWithLeadInFrame(raw, 1400, 5.45)).toBeLessThanOrEqual(1400);
+      }
+    });
+
+    /**
+     * ★**1 コマの跳びを作らない。** ★`Math.max` は連続なので境目でも跳びません。
+     */
+    it('★境目をまたいでも連続', () => {
+      let prev = contestFocusWithLeadInFrame(1390, 1400, 5.45);
+      for (let raw = 1390.01; raw <= 1400; raw += 0.01) {
+        const f = contestFocusWithLeadInFrame(raw, 1400, 5.45);
+        expect(Math.abs(f - prev)).toBeLessThan(0.02);
+        prev = f;
+      }
+    });
+
+    /**
+     * ★**画面の幅が分からないときは何もしない**（勝手に引き戻さない）。
+     *   ⚠️ ★ここを 0 や NaN で引き戻すと、★**カメラが先頭に固定されて競り合いを抜けます**。
+     */
+    it('★半幅が不明ならそのまま返す', () => {
+      for (const half of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+        expect(contestFocusWithLeadInFrame(1390, 1400, half)).toBe(1390);
+      }
+    });
+
+    /**
+     * ★**余白は絵の半幅より狭くしない。**
+     *   ★横向きの絵は 2.5m × 幅高比で描かれ、実測の見えている幅は約 3.4m。
+     */
+    it('★余白が絵の半幅を下回らない', () => {
+      expect(CONTEST_LEAD_MARGIN_M).toBeGreaterThanOrEqual(1.7);
+    });
   });
 });
