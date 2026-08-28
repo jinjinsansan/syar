@@ -36,6 +36,7 @@ import {
   type BroadcastV2Script,
   type BroadcastV2Shot,
 } from './broadcast-v2.js';
+import type { ShotCameraPreset } from './shot-sequence.js';
 
 export interface BroadcastV2Horse extends PerspHorse {
   readonly finished?: boolean;
@@ -313,8 +314,22 @@ export function resolveBroadcastV2Scene(
         width: viewport.width, height: viewport.height,
       };
     }
+    /**
+     * ★**正面追従は残り距離に応じて前方距離を詰めます**（`closeIn` の注記・オーナー指摘）。
+     *   ★カメラが抜かれていく＝馬が大きくなりながら迫る、が正面カットの速さの手掛かりです。
+     * ⚠️ ★位置だけの関数なので決定論（憲法4）。★同じ場所なら必ず同じ画になります。
+     */
+    const preset = ((): ShotCameraPreset => {
+      const c = shot.closeIn;
+      if (c === undefined) return cameraPreset;
+      const left = course.distance - leaderS;
+      const u = Math.max(0, Math.min(1,
+        (c.fromMetersLeft - left) / Math.max(1e-6, c.fromMetersLeft - c.toMetersLeft)));
+      const e = u * u * (3 - 2 * u);
+      return { ...cameraPreset, backM: cameraPreset.backM + (c.nearBackM - cameraPreset.backM) * e };
+    })();
     return broadcastCamera(course, {
-      atS, atW: focusW, width: viewport.width, height: viewport.height, view: shot.view, preset: cameraPreset,
+      atS, atW: focusW, width: viewport.width, height: viewport.height, view: shot.view, preset,
     });
   };
   let focusS = broadcastV2FocusMeters(focusMeters);

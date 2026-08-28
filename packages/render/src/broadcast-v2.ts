@@ -32,6 +32,32 @@ export interface BroadcastV2Shot {
    */
   readonly fixedCamera?: { readonly sFromSegmentEnd: number; readonly w: number; readonly upM: number };
   /**
+   * ★**正面追従で「馬が迫ってくる」を作る**（2026-08-28・オーナー指摘）
+   *
+   * 【なぜ要るか】
+   *   ★見た目の速さは**画面上で地面がどれだけ流れるか**で決まります。ところが
+   *   ★**正面追従はカメラが馬群と同じ速さで走り続ける**ので、
+   *   ★地面が横へ流れず、馬も大きくなりません。実測 **113 px/s**
+   *   （真横の寄りは 2279 px/s ＝ **20 倍**）。→ オーナー評「急にスピードが遅くなっています」。
+   *
+   * 【★実際の中継はどうか】
+   *   ★正面のカメラは**馬に抜かれます。** だから馬が**どんどん大きくなりながら迫る**。
+   *   ★これが正面カットの速さの手掛かりで、★**横の流れの代わり**をしています。
+   *
+   * ⚠️ ★カットを削って解決しない。★**そのカットを良くする。**
+   *    （一度この件を「尺を詰める」で処理しましたが、★カットが減れば中継は貧しくなります）
+   *
+   * ★残り距離に応じて**前方距離を詰めます**。位置だけの関数なので決定論です（憲法4）。
+   */
+  readonly closeIn?: {
+    /** ★詰め始める残り距離（m） */
+    readonly fromMetersLeft: number;
+    /** ★いちばん近づく残り距離（m） */
+    readonly toMetersLeft: number;
+    /** ★いちばん近いときの前方距離（m）。`camera.backM` からここまで滑らかに詰める */
+    readonly nearBackM: number;
+  };
+  /**
    * ★**争っている馬を画面に収める**（2026-08-22・オーナー指摘）
    *
    * 【何が起きていたか】
@@ -293,6 +319,11 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
     id: 'homestretch-front', view: 'diag-front', target: 'pack', horseAsset: 'diag-front-v2', transitionSec: 0.4,
     camera: { backM: 32, upM: 5.5, sideM: 9, fovDeg: 18.5 },
     leadFraction: 0.60,
+    /**
+     * ★**カメラが抜かれていく**（`closeIn` の注記）。32m 前 → 14m 前まで詰めます。
+     *   ★馬は**2 倍以上に大きくなりながら**迫るので、正面でも速さが出ます。
+     */
+    closeIn: { fromMetersLeft: 290, toMetersLeft: 200, nearBackM: 10 },
   },
   'homestretch-side': {
     id: 'homestretch-side', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
@@ -1030,7 +1061,7 @@ export const SCRIPT_V6: readonly { readonly until: number; readonly id: Broadcas
   // ★★ここから下だけが v6 の中身（直線 538m を 4 つに割る）
   { until: 0.820, id: 'straight-contest' },     // 〜1312m  ①せめぎ合い（競り合いを抜く）
   /**
-   * ★**②の尺を 80m → 40m に詰めました**（2026-08-28・オーナー指摘）
+   * ★**②の尺は 80m のままです**（2026-08-28・オーナー判断で「詰める」を撤回）
    *
    *   > （残り 239m の正面カットで）急にスピードが遅くなっています
    *
@@ -1042,10 +1073,11 @@ export const SCRIPT_V6: readonly { readonly until: number; readonly id: Broadcas
    *
    *   ⚠️ ★**これは構造です。** このカットは馬群の 34m 前を走る**正面追従**なので、
    *      ★地面が横へ流れず、速さの手掛かりがほとんど出ません。★画角や大きさでは直りません。
-   *   ★それでも残すのは、★**「差してくる」は奥行きの手掛かりで成立する**からです
-   *      （このショット自身の注記）。★**要るが、長く使えない。** だから 4.7 秒 → 2.4 秒にします。
+   *   ⚠️ ★一度これを「尺を 4.7 秒 → 2.4 秒に詰める」で処理しました。★**撤回します。**
+   *      ★オーナー評「どんどんカットしていけばレース演出としての品質が下がります」。
+   *   → ★**カットは減らさず、そのカットを良くします**（`closeIn`＝カメラが抜かれて馬が迫る）。
    */
-  { until: 0.845, id: 'homestretch-front' },    // 〜1352m  ②差し・追い込み（正面の奥行き・短く）
+  { until: 0.870, id: 'homestretch-front' },    // 〜1392m  ②差し・追い込み（正面の奥行き）
   { until: 0.940, id: 'straight-contest' },     // 〜1504m  ③差し・追い込み（競り合いを抜く）
   { until: 1.0, id: 'finish-line' },            // 〜1600m  ④ゴール板
 ];

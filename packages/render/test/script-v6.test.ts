@@ -15,6 +15,7 @@ import {
   DEFAULT_RACE_SCRIPT, CUT_RACE_SCRIPT, ovalCourse,
 } from '../src/index.js';
 import { resolveBroadcastV2Scene, type BroadcastV2Horse } from '../src/broadcast-v2-scene.js';
+import { broadcastV2ShotById } from '../src/broadcast-v2.js';
 
 const DIST = 1600;
 const VIEWPORT = { width: 1280, height: 720 } as const;
@@ -82,6 +83,26 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
       rows.filter((r) => r.until > from).map((r) => r.id);
     expect(straight(SCRIPT_V5, 0.604)).toEqual(['homestretch-side', 'finish-line']);
     expect(straight(SCRIPT_V6, 0.750)).toEqual(['straight-contest', 'homestretch-front', 'straight-contest', 'finish-line']);
+  });
+
+  /**
+   * ★**カットは減らさない。そのカットを良くする。**（2026-08-28・オーナー判断）
+   *
+   *   > どんどんカットしていけばレース演出としての品質が下がります
+   *
+   *   ★正面追従（`homestretch-front`）は「急にスピードが遅くなる」と評されました。
+   *   ★一度これを**尺を詰める**で処理しましたが撤回し、★**カメラが抜かれて馬が迫る**
+   *     （`closeIn`）で直しています。★ここが消えると「詰める」に戻る退行なので固定します。
+   */
+  it('★②の正面カットは尺を削らず、カメラが詰まることで速さを出す', () => {
+    const front = SCRIPT_V6.find((r) => r.id === 'homestretch-front');
+    expect(front, '★②の正面カットを台本から外さない').toBeDefined();
+    const idx = SCRIPT_V6.findIndex((r) => r.id === 'homestretch-front');
+    const span = SCRIPT_V6[idx]!.until - SCRIPT_V6[idx - 1]!.until;
+    expect(span, '★窓は 0.05（80m）以上。詰めて誤魔化さない').toBeGreaterThanOrEqual(0.05 - 1e-9);
+    const shot = broadcastV2ShotById('homestretch-front');
+    expect(shot.closeIn, '★カメラが詰まる仕掛けを外さない').toBeDefined();
+    expect(shot.closeIn!.nearBackM).toBeLessThan(shot.camera.backM);
   });
 
   it('★v6 の寄りカットは、表示が実時間に戻ってから始まる', () => {
