@@ -129,7 +129,8 @@ function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, st
   ctx.restore();
 }
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
-const ASSET_VERSION = '54';
+/** ★素材を足したら必ず上げる。★`manifest.json` の中身を変えたときも（古いものがキャッシュされる） */
+const ASSET_VERSION = '55';
 /**
  * ★コマごとの持ち上げ量。**単位は「基準画布（高さ 1536px）での px」**。
  *
