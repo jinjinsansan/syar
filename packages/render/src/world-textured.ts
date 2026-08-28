@@ -25,6 +25,14 @@ export interface WorldStripTexture<TImage> {
 
 export interface TexturedWorldAssets<TImage> {
   readonly turf: { readonly image: TImage; readonly width: number; readonly height: number; readonly pxPerM: number };
+  /**
+   * ★**ダートの地面**（2026-08-28）。★無ければ苝を使います（従来どおり）。
+   *
+   *   ⚠️ ★ここは 2026-08-28 まで**苝 1 枚だけ**でした。
+   *      ★`surface: 'dirt'` を選んでも、★**地面は苝のまま**でした。
+   *   ★寸法も `pxPerM` も苝と同じにすること。★違えると**流れる速さが苝と変わります**。
+   */
+  readonly dirt?: { readonly image: TImage; readonly width: number; readonly height: number; readonly pxPerM: number } | undefined;
   /** 遠景の帯（横ループ）。`horizonY` は帯の中で地面が始まる行 */
   readonly panorama: { readonly image: TImage; readonly width: number; readonly height: number; readonly horizonY: number };
   /**
@@ -64,6 +72,22 @@ export interface TexturedWorldOptions {
   readonly focusW?: number;
   /** ★内馬場とダートコース（設計 2-2）。既定で描く。`false` で止める（比較用） */
   readonly infield?: boolean;
+  /**
+   * ★**走路の馬場**（2026-08-28）。★地面にどのタイルを貼るかだけを決めます。
+   *
+   * ⚠️ ★**走路の幾何には 1mm も触れません**
+   *    （裁定 `REVIEW_P4_GAMMA_V6_DIRT_VERDICT_20260828.md` §6-3）。
+   *    ★ダート戦でも馬は同じ走路（w = 0〜20）を走ります。
+   *    ★内側の褐色帯は**風景のまま**です（そこに走らせると `laneExtraM` に触れます）。
+   */
+  readonly surface?: 'turf' | 'dirt';
+  /**
+   * ★**内側の帯を逆にする**（ダート戦で内回りを苝に見せる）。
+   *   ⚠️ ★裁定 §6-3 の **[EYES]**: ダート戦だと走路も内側の帯も褐色になり、
+   *      ★**褐色の帯が 2 本並んで「どこを走っているか」が読めなくなる**恐れがあります。
+   *   ★これも**描画だけ**です。幾何は変わりません。★採否はオーナー判断。
+   */
+  readonly infieldReversed?: boolean;
 }
 
 const wrap = (a: number, n: number): number => ((a % n) + n) % n;
@@ -101,7 +125,12 @@ export function drawTexturedWorld<TImage>(
   }
 
   // ── 地面: 走査線ごとに芝タイルを貼る ────────────────────────────────
-  const turf = assets.turf;
+  /**
+   * ★**馬場でタイルを選ぶ**（2026-08-28）。
+   *   ⚠️ ★ダートの素材が渡されていなければ**苝のまま**です。
+   *      ★無いものをあることにしない（黙って別の色を作らない）。
+   */
+  const turf = opts.surface === 'dirt' && assets.dirt !== undefined ? assets.dirt : assets.turf;
   const tileM = turf.width / turf.pxPerM;      // タイル 1 枚の実寸（m）
   const tileHM = turf.height / turf.pxPerM;
   const eye = cam.eye;
@@ -147,7 +176,11 @@ export function drawTexturedWorld<TImage>(
       const q = project(cam, basis, { x: p.x, y: p.y, z: 0 });
       return { x: q.x, y: q.y, depth: q.depth };
     };
-    drawInfield(ctx, course, groundOf, { width: W, height: H }, { focusS: opts.focusS ?? 0 });
+    drawInfield(ctx, course, groundOf, { width: W, height: H }, {
+      focusS: opts.focusS ?? 0,
+      /** ★ダート戦で内側の帯を苝に反転する（裁定 §6-3 の [EYES]） */
+      ...(opts.infieldReversed === true ? { reversed: true } : {}),
+    });
   }
 
   // ── 遠くの地面ほど霞む（空気遠近）: 地平線から 140px を上向きに薄く ─────────
@@ -183,6 +216,7 @@ export function drawTexturedWorld<TImage>(
     return project(cam, basis, { x: p.x, y: p.y, z });
   };
   const NEAR = -400, FAR = course.distance + 400;
+  /** ⚠️ ★この `band` は下で `void band;` されており、★**使われていません**。★馬場分けも入れません */
   const band = (w0: number, w1: number, alpha: number, step = 10): void => {
     ctx.fillStyle = '#12220f';
     ctx.globalAlpha = alpha;
@@ -206,13 +240,26 @@ export function drawTexturedWorld<TImage>(
     ctx.globalAlpha = 1;
   };
   const WD = course.widthM;
+  /**
+   * ★**陰影と走路の色を馬場で分ける**（2026-08-28）。
+   *
+   * ⚠️ ★この 2 つは**苝の緑が直書き**されていました。
+   *    ★地面タイルをダートに差し替えても、★**上から緑を塗るのでオリーブ色になりました**。
+   *    ★実際に 1 枚目の試作がそうなりました。
+   * ★色は `palette.json` の `dirt-0` / `turf` 系と揃えています。
+   */
+  const isDirt = opts.surface === 'dirt';
+  /** ★全体を薄く落とす色（苝は深緑・ダートは深褐） */
+  const SHADE = isDirt ? '#221a12' : '#12220f';
+  /** ★走路だけを少し明るくする色（苝は若草・ダートは乾いた砂） */
+  const TRACK_TINT = isDirt ? '#c8a985' : '#9ccb55';
   // ★内外を暗くする代わりに、走路だけを少し明るく（台形が裏返らない範囲）。全体を先に薄く落とす
   ctx.globalAlpha = darken * 0.5;
-  ctx.fillStyle = '#12220f';
+  ctx.fillStyle = SHADE;
   ctx.fillRect(0, Math.max(0, Math.floor(hz)), W, H);
   ctx.globalAlpha = 1;
   const trackBand = (alpha: number): void => {
-    ctx.fillStyle = '#9ccb55';
+    ctx.fillStyle = TRACK_TINT;
     ctx.globalAlpha = alpha;
     for (let s = NEAR; s < FAR; s += 8) {
       const s2 = Math.min(s + 8, FAR);

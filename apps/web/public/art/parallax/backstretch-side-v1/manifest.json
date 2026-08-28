@@ -159,6 +159,12 @@
       "file": "world-trees.png",
       "tileWidth": 1350,
       "height": 130
+    },
+    "dirt": {
+      "file": "world-dirt.png",
+      "tileWidth": 1500,
+      "tileHeight": 208,
+      "pxPerM": 90
     }
   }
 }

@@ -145,7 +145,8 @@ const startShownMeters = (meters, raceDisplaySec) =>
  *     秒数なので、次が数字なら値と見なされます。★値を取らないオプションは
  *     ★**秒数より後ろに書くか、先頭にまとめて書くこと**。
  */
-const VALUELESS = new Set(['--noblur']);
+/** ★値を取らないオプション。★ここへ入れ忘れると★**次の秒数が食われます** */
+const VALUELESS = new Set(['--noblur', '--infield-reversed']);
 const optionValueIndexes = new Set();
 argv.forEach((a, i) => {
   if (a.startsWith('--') && !VALUELESS.has(a)) optionValueIndexes.add(i + 1);
@@ -334,11 +335,17 @@ const parallaxBackstretch = {
 };
 
 const worldTurf = await loadImage(path.join(PX, manifest.world.turf.file));
+/** ★ダートの地面（2026-08-28）。★無ければ苝のまま（従来どおり） */
+const worldDirt = manifest.world.dirt === undefined
+  ? null : await loadImage(path.join(PX, manifest.world.dirt.file));
 const worldPano = withCrowd(await loadImage(path.join(PX, manifest.world.panorama.file)));
 const worldTrees = manifest.world.trees === undefined
   ? null : await loadImage(path.join(PX, manifest.world.trees.file));
 const texturedWorld = {
   turf: { image: worldTurf, width: worldTurf.width, height: worldTurf.height, pxPerM: manifest.world.turf.pxPerM },
+  ...(worldDirt === null ? {} : {
+    dirt: { image: worldDirt, width: worldDirt.width, height: worldDirt.height, pxPerM: manifest.world.dirt.pxPerM },
+  }),
   panorama: { image: worldPano, width: worldPano.width, height: worldPano.height, horizonY: manifest.world.panorama.horizonY },
   scenery: {
     ...(layerTexture('hedge', 60) !== undefined ? { hedge: layerTexture('hedge', 60) } : {}),
@@ -429,6 +436,8 @@ for (const [index, displaySec] of displaySecs.entries()) {
     // ★ハロン棒の数字（設計 1-7）。画面と同じく書体を渡す
     poleFont: (px, bold) => `${bold ? 'bold ' : ''}${px}px JPUI, system-ui, sans-serif`,
     frameRoleOf, surface: SURFACE, condition: 'good', kickupColor: KICKUP_COLOR,
+    /** ★`--infield-reversed` で内側の帯を苝に反転する（裁定 §6-3 の [EYES] 用） */
+    ...(argv.includes('--infield-reversed') ? { infieldReversed: true } : {}),
     // ★Web 画面と同じ分岐（page.tsx: shot.view === 'side' ? undefined : texturedWorld）
     texturedWorld: scene.shot.view === 'side' ? undefined : texturedWorld,
     /**

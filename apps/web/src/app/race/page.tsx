@@ -1087,6 +1087,8 @@ export default function RacePage(): React.JSX.Element {
           }[];
           world: {
             turf: { file: string; tileWidth: number; tileHeight: number; pxPerM: number };
+            /** ★ダートの地面（2026-08-28）。★無ければ苝に落ちる */
+            dirt?: { file: string; tileWidth: number; tileHeight: number; pxPerM: number };
             panorama: { file: string; tileWidth: number; height: number; horizonY: number };
             trees?: { file: string; tileWidth: number; height: number };
           };
@@ -1125,11 +1127,19 @@ export default function RacePage(): React.JSX.Element {
         parallaxManifest.layers[index]?.name === 'stand' ? bakeCrowd(image) : image);
       const objectImages = await Promise.all(parallaxManifest.objects.map((object) =>
         loadImg(`/art/parallax/backstretch-side-v1/${object.file}?v=${ASSET_VERSION}`)));
-      const [worldTurfImg, worldPanoImg, worldTreesImg] = await Promise.all([
+      const [worldTurfImg, worldPanoImg, worldTreesImg, worldDirtImg] = await Promise.all([
         loadImg(`/art/parallax/backstretch-side-v1/${parallaxManifest.world.turf.file}?v=${ASSET_VERSION}`),
         loadImg(`/art/parallax/backstretch-side-v1/${parallaxManifest.world.panorama.file}?v=${ASSET_VERSION}`),
         parallaxManifest.world.trees !== undefined
           ? loadImg(`/art/parallax/backstretch-side-v1/${parallaxManifest.world.trees.file}?v=${ASSET_VERSION}`).catch(() => null)
+          : Promise.resolve(null),
+        /**
+         * ★**ダートの地面**（2026-08-28）。
+         *   ⚠️ ★これが無い間、`surface: 'dirt'` を選んでも★**地面は苝のまま**でした。
+         *   ★読めなければ苝に落ちます（画面が壊れない側へ・R-27）。
+         */
+        parallaxManifest.world.dirt !== undefined
+          ? loadImg(`/art/parallax/backstretch-side-v1/${parallaxManifest.world.dirt.file}?v=${ASSET_VERSION}`).catch(() => null)
           : Promise.resolve(null),
       ]);
       // ★コース沿いの立体帯: 横追従用の層タイル（生垣・樹林・スタンド）をそのままテクスチャに使う
@@ -1147,6 +1157,14 @@ export default function RacePage(): React.JSX.Element {
       const standTex = layerTexture('stand', 12);
       const texturedWorld: TexturedWorldAssets<FrameImage> = {
         turf: { image: worldTurfImg, width: worldTurfImg.naturalWidth, height: worldTurfImg.naturalHeight, pxPerM: parallaxManifest.world.turf.pxPerM },
+        ...(worldDirtImg === null || parallaxManifest.world.dirt === undefined ? {} : {
+          dirt: {
+            image: worldDirtImg,
+            width: worldDirtImg.naturalWidth,
+            height: worldDirtImg.naturalHeight,
+            pxPerM: parallaxManifest.world.dirt.pxPerM,
+          },
+        }),
         // ★遠景の帯も空席だった。同じ焼き込みを通す
         panorama: (() => {
           const baked = bakeCrowd(worldPanoImg);
@@ -2006,6 +2024,16 @@ export default function RacePage(): React.JSX.Element {
         surface,
         condition: trackCondition,
         kickupColor: surface === 'dirt' ? '#796047' : '#738b43',
+        /**
+         * ★**内側の帯を苝に反転する**（`/race?infield=turf`）。
+         *
+         *   ⚠️ ★裁定 `REVIEW_P4_GAMMA_V6_DIRT_VERDICT_20260828.md` §6-3 の **[EYES]**。
+         *      ★ダート戦だと褐色の帯が 2 本並び、★**どこを走っているかが読めなくなる**。
+         *   ★**既定は従来のまま**（反転しない）。★採否はオーナー判断待ちなので
+         *   ★明示したときだけ入ります（省略時は狭い側へ・R-27）。
+         *   ★描画だけです。★走路の幾何には触れません。
+         */
+        infieldReversed: search.includes('infield=turf'),
         /**
          * ★コーナー専用カット（3 秒程度）の 1 枚絵は、カットの進行に合わせてパン＋軽いズーム。
          *   旧 `(focusS % 400)/400` は 400m で 137px しか動かず静止に見えた。

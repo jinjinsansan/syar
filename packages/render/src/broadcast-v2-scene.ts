@@ -433,6 +433,11 @@ export function drawBroadcastV2Scene<TImage>(
     readonly surface: RenderSurface;
     readonly condition: RenderTrackCondition;
     readonly kickupColor: string;
+    /**
+     * ★**内側の帯を逆にする**（ダート戦で内回りを苝に見せる）。
+     *   ★描画だけ。★裁定 §6-3 の [EYES]。採否はオーナー判断。
+     */
+    readonly infieldReversed?: boolean | undefined;
     readonly backgroundPlate?: {
       readonly image: TImage;
       readonly width: number;
@@ -506,7 +511,18 @@ export function drawBroadcastV2Scene<TImage>(
    */
   let nearRail: (() => void) | undefined;
   if (opts.texturedWorld !== undefined) {
-    nearRail = drawTexturedWorld(ctx, course, scene.camera, opts.texturedWorld, { focusS: scene.focusS, focusW: scene.focusW }).drawNearRail;
+    /**
+     * ★**馬場を地面へ渡す**（2026-08-28）。
+     *   ⚠️ ★ここで渡していなかったので、★**`surface: 'dirt'` を選んでも
+     *      地面は苝のまま**でした（砊煙の色だけがダートになっていました）。
+     *   ★走路の幾何には触れません（裁定 §6-3）。
+     */
+    nearRail = drawTexturedWorld(ctx, course, scene.camera, opts.texturedWorld, {
+      focusS: scene.focusS,
+      focusW: scene.focusW,
+      surface: opts.surface,
+      ...(opts.infieldReversed === true ? { infieldReversed: true } : {}),
+    }).drawNearRail;
   } else if (opts.parallaxPlate !== undefined) {
     // 注視点（馬群）の px/m・深さ・画面上の進行方向を、馬と同じ透視カメラから取る
     const basis = cameraBasis(scene.camera);
