@@ -217,6 +217,8 @@ export const READONLY = [
   '_leadoff.mjs',             // 先頭が画面の外に出ている瞬間を列挙する（読むだけ）
   '_frameat.mjs',             // ある表示秒にどの馬が画面のどこにいるか（読むだけ）
   '_clockcmp.mjs',            // 静止画の道具と監査の時計がずれていないか（読むだけ）
+  '_stackgamma.mjs',         // γ 別のゴールを 1 枚に積む（out/ にしか書かない）
+  '_crossat.mjs',            // 各 γ で勝馬が線を通る表示秒と着差（読むだけ）
   '_screenspan.mjs',          // 画面に入る走路は何 m か（「9.2m」の出どころ・読むだけ）
   '_lagprobe.mjs',            // CONTEST_MAX_LAG_M が実際に注視点を動かしているか（読むだけ）
   '_poolspread.mjs',          // デモの出走表が同格帯になっているか（能力幅・読むだけ）

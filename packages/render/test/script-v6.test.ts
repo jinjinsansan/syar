@@ -116,11 +116,19 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
     expect(SCRIPT_V6[firstContest - 1]!.until, '★寄りの手前の境界＝実時間に戻る 0.750').toBe(0.750);
   });
 
-  it('★既定は v5 のまま。v6 は URL で明示したときだけ', () => {
+  /**
+   * ★**2026-08-28、v6 が既定になりました**（オーナー確定）。
+   *   ⚠️ ★以前は「既定は v5・v6 は opt-in」を固定していました。★意図して書き換えています。
+   *   ★代わりに★**切り戻しが効くこと**を固定します。こちらの方が重要です。
+   */
+  it('★既定は v6。★v5 / v4 へは URL で戻せる', () => {
     expect(broadcastV2ScriptFromSearch('')).toBe(DEFAULT_RACE_SCRIPT);
-    expect(broadcastV2ScriptFromSearch('?cinematography=v6')).toBe(CUT_RACE_SCRIPT);
+    expect(DEFAULT_RACE_SCRIPT).toBe(CUT_RACE_SCRIPT);
     expect(CUT_RACE_SCRIPT).toBe('v6');
-    expect(DEFAULT_RACE_SCRIPT).not.toBe(CUT_RACE_SCRIPT);
+    /** ★戻せること（既定へ黙って落ちない） */
+    expect(broadcastV2ScriptFromSearch('?cinematography=v5')).toBe('v5');
+    expect(broadcastV2ScriptFromSearch('?cinematography=v4')).toBe('v4');
+    expect(broadcastV2ScriptFromSearch('?cinematography=v6')).toBe('v6');
   });
 
   /**

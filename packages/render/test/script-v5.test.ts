@@ -27,22 +27,35 @@ const shotAt = (ratio: number, script: BroadcastV2Script): string =>
 /** ★URL から決まる台本（画面と同じ関数を通す・R-30） */
 const scriptOf = (search: string): BroadcastV2Script => broadcastV2ScriptFromSearch(search);
 
-describe('既定台本 v5', () => {
+describe('既定台本（2026-08-28 から v6）', () => {
   /* ① 既定が v5 */
-  it('① パラメータなしの /race は v5', () => {
-    expect(scriptOf('')).toBe('v5');
-    expect(scriptOf('?')).toBe('v5');
-    expect(scriptOf('?seed=42')).toBe('v5');
-    expect(DEFAULT_RACE_SCRIPT).toBe('v5');
+  /**
+   * ★**2026-08-28、既定を v5 → v6 へ**（オーナー確定）。
+   *   ★`DEMO_CONTEST_GAMMA = 1.6` とセットでの切替です。
+   *   ⚠️ ★この検査は以前「既定は v5」を固定していました。
+   *      ★**意図して書き換えています**（壊れたのを黙って通したのではありません）。
+   */
+  it('① パラメータなしの /race は v6', () => {
+    expect(scriptOf('')).toBe('v6');
+    expect(scriptOf('?')).toBe('v6');
+    expect(scriptOf('?seed=42')).toBe('v6');
+    expect(DEFAULT_RACE_SCRIPT).toBe('v6');
   });
 
-  /* ② 明示指定も同じ */
-  it('② cinematography=v5 も既定と同じ', () => {
-    expect(scriptOf('?cinematography=v5')).toBe(scriptOf(''));
+  /**
+   * ② ★**`?cinematography=v5` で v5 へ戻せる**こと。
+   *
+   *   ⚠️ ★ここが今回の一番危ないところです。既定を v6 にすると、
+   *      ★明示の `v5` 口を作らない限り★**`?cinematography=v5` が黙って v6 へ落ちます**。
+   *      ★切り戻しが効かないのに、URL を見ている側は戻したつもりになります。
+   */
+  it('② cinematography=v5 は v5（既定へ落ちない）', () => {
+    expect(scriptOf('?cinematography=v5')).toBe('v5');
+    expect(scriptOf('?cinematography=v5')).not.toBe(scriptOf(''));
   });
 
   /* ③ 不正値は既定へ戻る */
-  it('③ 不正なフラグ値は v5 へ戻る', () => {
+  it('③ 不正なフラグ値は既定（v6）へ戻る', () => {
     /**
      * ⚠️ ★`v6` は 2026-08-26 に**実在する台本**になったのでここから外しました
      *    （`SCRIPT_V6`・直線を 4 カットに割る）。★既定が v5 のままであることは
@@ -50,7 +63,7 @@ describe('既定台本 v5', () => {
      */
     for (const q of ['?cinematography=invalid', '?cinematography=', '?cinematography=V4',
       '?cinematography=V5', '?cinematography=V6', '?cinematography=v4-old']) {
-      expect(scriptOf(q), q).toBe('v5');
+      expect(scriptOf(q), q).toBe('v6');
     }
   });
 
@@ -141,14 +154,20 @@ describe('既定台本 v5', () => {
   });
 
   /* ⑦ homestretch-side が既定で選ばれる */
-  it('⑦ 直線で homestretch-side が選ばれる', () => {
+  /**
+   * ⚠️ ★ここは **v5 の形**を見る検査です。★以前は `scriptOf('')`（当時の既定＝v5）で
+   *    書いていましたが、★**既定が v6 になったので明示で v5 を指します**。
+   *    （v6 の直線はカットで割るので `homestretch-side` 一色ではありません。それは `script-v6.test.ts`）
+   */
+  it('⑦ v5 の直線で homestretch-side が選ばれる', () => {
+    const v5 = scriptOf('?cinematography=v5');
     for (const r of [0.70, 0.80, 0.86, 0.93]) {
-      expect(shotAt(r, scriptOf('')), `進行 ${r}`).toBe('homestretch-side');
+      expect(shotAt(r, v5), `進行 ${r}`).toBe('homestretch-side');
       expect(shotAt(r, scriptOf('?cinematography=v4')), `進行 ${r} の旧 v4`).toBe('homestretch-front');
     }
     // ★発走・1 角・道中・ゴールは両方とも同じ
     for (const r of [0.05, 0.20, 0.40, 0.98]) {
-      expect(shotAt(r, scriptOf('')), `進行 ${r}`).toBe(shotAt(r, scriptOf('?cinematography=v4')));
+      expect(shotAt(r, v5), `進行 ${r}`).toBe(shotAt(r, scriptOf('?cinematography=v4')));
     }
   });
 

@@ -607,9 +607,18 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
  * ⚠️ ★**エンジンの既定は 1.0 のままです**（`DEFAULT_RACE_BALANCE`）。
  *    ★ここはあくまで**デモ画面と、その画面を測る道具**の既定です。
  *    ★本番のサーバー確定経路には入りません（憲法 3）。
- * ⚠️ ★**採用値はオーナー判定待ち**（主軸 1.6・未確定）。決まったらこの 1 か所を変えます。
+ * 【★採用値 1.6（2026-08-28・オーナー確定）】
+ *   ★実測（seed 42・台本 v6・同じレースの決勝線・2〜5 着との差）:
+ *
+ *     γ 1.0   2.19m / 4.81m / 8.73m / 9.08m   ★勝ち馬が単騎。見せる競り合いが起きない
+ *     γ 1.3   0.94m / 2.61m / 5.62m / 5.86m
+ *     ★γ 1.6   0.40m / 1.42m / 3.65m / 3.84m   ★**上位は競り、後ろには差がつく**
+ *     γ 2.0   0.13m / 0.63m / 2.05m / 2.18m   ★ 5 着まで 0.9 馬身。毎レース大接戦になる
+ *
+ *   ★着順は 4 通りとも同じでした（実測・D-064 のとおり写像は単調）。
+ * ⚠️ ★戻したいときは**この 1 行**を変えるだけです。着順・タイム・払戻・人気には触れません。
  */
-export const DEMO_CONTEST_GAMMA = 1.3;
+export const DEMO_CONTEST_GAMMA = 1.6;
 
 /**
  * ★1 完歩の距離（m）。脚のコマ送りの周期。
@@ -731,8 +740,20 @@ export function broadcastV2SegmentSpan(course: Course, meters: number): { readon
  */
 export type BroadcastV2Script = 'v2' | 'v3' | 'v4' | 'v5' | 'v6';
 
-/** ★通常 `/race` の既定台本 */
-export const DEFAULT_RACE_SCRIPT: BroadcastV2Script = 'v5';
+/**
+ * ★通常 `/race` の既定台本。
+ *
+ * ★**2026-08-28、`v5` → `v6` へ（オーナー確定）**。
+ *   ★`v6` は最後の直線をカットで割り、★**競り合っている場所へカメラを向ける**台本です。
+ *   ★`DEMO_CONTEST_GAMMA = 1.6` とセットで設計しています。
+ * ★切り戻しは `/race?cinematography=v5`（旧々台本は `v4`）。
+ */
+export const DEFAULT_RACE_SCRIPT: BroadcastV2Script = 'v6';
+/**
+ * ★**直前の台本**。★既定を v6 にしたので、**明示で v5 へ戻せる口**が要ります。
+ *   ⚠️ ★これが無いと `?cinematography=v5` が★**黙って既定（v6）へ落ちます**。
+ */
+export const PREVIOUS_RACE_SCRIPT: BroadcastV2Script = 'v5';
 /** ★旧台本へ戻すときの値（`/race?cinematography=v4`） */
 export const LEGACY_RACE_SCRIPT: BroadcastV2Script = 'v4';
 /**
@@ -744,10 +765,11 @@ export const CUT_RACE_SCRIPT: BroadcastV2Script = 'v6';
 /**
  * ★**URL から台本を決める。**
  *
- *   - 指定なし  … `v5`（既定）
- *   - `v5`      … `v5`
+ *   - 指定なし  … `v6`（既定・2026-08-28 から）
+ *   - `v6`      … `v6`
+ *   - `v5`      … `v5`（直前の台本へ戻す）
  *   - `v4`      … 旧 v4（比較・即時切り戻し用）
- *   - 不正値    … `v5`（既定へ戻す）
+ *   - 不正値    … `v6`（既定へ戻す）
  *
  * ⚠️ ★**URL だけで決まります。** localStorage・時刻・乱数では切り替えません（憲法4）。
  */
@@ -755,9 +777,11 @@ export function broadcastV2ScriptFromSearch(search: string): BroadcastV2Script {
   const v = new URLSearchParams(search).get('cinematography');
   if (v === LEGACY_RACE_SCRIPT) return LEGACY_RACE_SCRIPT;
   /**
-   * ★**`?cinematography=v6` で「直線を 4 カットに割る」台本**（`SCRIPT_V6` の注記）。
-   *   ⚠️ ★既定は **v5 のまま**です。v6 は明示したときだけ選ばれます。
+   * ★**明示で直前の台本（v5）へ戻す口**。
+   *   ⚠️ ★既定を v6 にしたので、これが無いと
+   *      ★`?cinematography=v5` が**黙って v6 へ落ちます**（切り戻しが効かなくなる）。
    */
+  if (v === PREVIOUS_RACE_SCRIPT) return PREVIOUS_RACE_SCRIPT;
   if (v === CUT_RACE_SCRIPT) return CUT_RACE_SCRIPT;
   return DEFAULT_RACE_SCRIPT;
 }
