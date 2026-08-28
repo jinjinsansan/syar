@@ -46,6 +46,7 @@ import {
   drawRaceTitleCard, drawStartingGate, drawStartCallBand,
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT, CUT_RACE_SCRIPT, GATE_FRONT_STALL_PLATES,
+  finishReplayAt, FINISH_REPLAY_DISPLAY_SEC,
   broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
@@ -824,7 +825,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
   const winnerGate = settled[0]!;
   const course = ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn: 'left' });
   const STEP = 0.05;
-  const totalSec = RACE_INTRO_RACE_START_SEC + warp.displaySec + POST_RACE_SEC;
+  const totalSec = RACE_INTRO_RACE_START_SEC + warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
   // ★ゴール前の展開: 先頭が残り 80m に達した瞬間の位置関係
   let finishStyle: BroadcastV2FinishStyle = 'solo';
   for (let sec = 0; sec <= warp.raceSecAt(warp.displaySec) + 1e-9; sec += 0.05) {
@@ -1538,7 +1539,19 @@ export default function RacePage(): React.JSX.Element {
 
     const raceD = intro.raceDisplaySec;
 
-    const sec = built.warp.raceSecAt(raceD);
+    /**
+     * ★**ゴール前の数秒を大きく撮り直すリプレイ**（`finish-replay.ts`・オーナー要望⑤）
+     *
+     *   ★本編・勝馬の寄り・着順ボードが**全部終わったあと**に足す区間です。
+     *   ⚠️ ★本編の時間軸を 1 ミリも変えていません。ここで巻き戻して読むのは
+     *      ★**同じ位置モデル**なので、着順・タイム・着差・払戻に触れません（憲法 3）。
+     *   ⚠️ ★勝馬のゴール秒は**確定着順**から取ります（見た目の順位からではない）。
+     */
+    const replayFinishSec = built.finishSec.get(built.result[0]!.gate)
+      ?? built.warp.raceSecAt(built.warp.displaySec);
+    const replay = finishReplayAt(raceD, built.warp.displaySec, POST_RACE_SEC, replayFinishSec);
+
+    const sec = replay.active ? replay.raceSec : built.warp.raceSecAt(raceD);
     const at = built.model.at(sec);
     const sorted = [...at].sort((a, b) => b.meters - a.meters)
       .map((h) => ({ gate: h.gate, s: h.meters, stamina: h.staminaRatio }));
@@ -1573,7 +1586,12 @@ export default function RacePage(): React.JSX.Element {
       phase: phaseOf(DIST - lead),
       allFinished: allFinishedNow,
     });
-    const visualAt = withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST, Math.max(0, raceD - built.warp.displaySec) * RUNOUT_SLOW);
+    /**
+     * ★リプレイ中は**ゴール後の流しを掛けません。** 巻き戻して道中を見せているので、
+     *   ★掛けると「もう終わった馬」を流してしまいます。
+     */
+    const visualAt = replay.active ? at
+      : withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST, Math.max(0, raceD - built.warp.displaySec) * RUNOUT_SLOW);
     const visualLead = Math.max(...visualAt.map((h) => h.meters));
     const winnerGate = built.result[0]!.gate;
     /**
@@ -1699,6 +1717,8 @@ export default function RacePage(): React.JSX.Element {
         raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
         fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
         script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
+        /** ★リプレイ区間は台本の外。専用のカットへ固定します（`finish-replay.ts`） */
+        ...(replay.active ? { forceShotId: 'finish-replay' as const } : {}),
         /**
          * ★勝馬追従は**後方をやめ、真横にします**（2026-08-21・オーナー判定）。
          *
@@ -2291,7 +2311,13 @@ export default function RacePage(): React.JSX.Element {
 
       const afterRaceSec = Math.max(0, raceD - built.warp.displaySec);
       const resultsT = (afterRaceSec - WINNER_FOLLOW_SEC) / RESULTS_BOARD_SEC;
-      if (resultsT >= 0) {
+      /**
+       * ★**リプレイ区間では着順ボードを下ろします**（2026-08-28・オーナー要望⑤）。
+       *   ⚠️ ★以前ここは `resultsT >= 0` だけで、★**一度出たら最後まで出しっぱなし**でした。
+       *      ★リプレイを足したら、ボードが画面のほぼ全面を覆って**馬が 1 頭も見えません**でした。
+       *      （実画面で確認・`out/2d-overhead-stride/replay5`）
+       */
+      if (resultsT >= 0 && !replay.active) {
         // ★着順ボード（全頭）。勝馬追従の後、レースの締め
         drawResultsBoard(ctx, art.pal as Record<string, string>, vp, FONT,
           built.result.map((row) => ({
@@ -2337,10 +2363,10 @@ export default function RacePage(): React.JSX.Element {
    *   ⚠️ シークしたら**再生は止める** — 動いたままだとすぐ現在時刻に戻ってしまう。
    */
   const totalDisplaySec = built === null ? 0
-    : RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC;
+    : RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
   const seekTo = useCallback((sec: number): void => {
     if (built === null) return;
-    const t = Math.max(0, Math.min(sec, RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC));
+    const t = Math.max(0, Math.min(sec, RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC));
     setPlaying(false);
     dRef.current = t;
     setClock(Math.min(raceIntroAt(t).raceDisplaySec, built.warp.displaySec));
@@ -2357,7 +2383,7 @@ export default function RacePage(): React.JSX.Element {
     const loop = (): void => {
       const d = (performance.now() - t0Ref.current) / 1000;
       // ゴール後はランアウト→勝者紹介→正式着順まで5.2秒確保する。
-      const totalDisplaySec = RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC;
+      const totalDisplaySec = RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
       if (d >= totalDisplaySec) {
         dRef.current = totalDisplaySec;
         setClock(built.warp.displaySec);

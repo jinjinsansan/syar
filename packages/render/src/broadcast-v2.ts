@@ -11,7 +11,9 @@ export type BroadcastV2ShotId =
   // ★直線の正面固定（差してくる馬を奥行きで見せる）
   | 'homestretch-front'
   // ★競り合っている場所を大きく抜く（台本 v6・`contest-focus.ts`）
-  | 'straight-contest';
+  | 'straight-contest'
+  // ★ゴール前の数秒を大きく撮り直すリプレイ（`finish-replay.ts`・本編の後ろに繋ぐ）
+  | 'finish-replay';
 
 export type BroadcastV2HorseAssetRole = 'side-v6' | 'diag-front-v2' | 'diag-rear-v2' | 'high-diag-v2' | 'winner-v1';
 
@@ -482,6 +484,28 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
      */
     camera: { backM: 34, upM: 5, sideM: 7, fovDeg: 10 },
     /** ★直前の `finish-line` と同じ真横なので、放っておくと重なる。§5-5 はハードカット */
+    hardCutIn: true,
+  },
+  /**
+   * ★**ゴール前の数秒を大きく撮り直すリプレイ**（2026-08-28・オーナー要望⑤）
+   *
+   *   > 最後の直線で馬が小さくなるが、ゴールする数秒だけリプレイで馬を巨大化した状態でも
+   *   > 映像を繋げて欲しい
+   *
+   * ⚠️ ★**本編では使いません。** 台本の表に入れず、本編が終わったあとの
+   *    リプレイ区間でだけ `forceShotId` で呼びます（`finish-replay.ts`）。
+   * ★`target: 'contenders'` にして、争っている先頭の数頭だけを画に入れます。
+   *   引きの基準（`frameContenders`）も狭くして、★**本編のどのカットより大きく**します。
+   */
+  'finish-replay': {
+    id: 'finish-replay', view: 'side', target: 'winner', horseAsset: 'side-v6', transitionSec: 0.25,
+    /**
+     * ★据え方は**承認済みの勝馬の寄り**（`winner-follow`）と同じ 34/5/7。
+     *   ★画角だけ 10° → 8.5° に寄せて、本編のどのカットより大きくします。
+     * ⚠️ ★`frameContenders` は付けません。枠取りを乗っ取って被写体が画面の端に付きました（実測）。
+     */
+    camera: { backM: 34, upM: 5, sideM: 7, fovDeg: 8.5 },
+    /** ★着順ボードから切り替わるので、重ねずに切る */
     hardCutIn: true,
   },
 };

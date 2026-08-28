@@ -16,6 +16,7 @@ import {
   DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt,
 } from '@star/race-engine';
 import {
+  finishReplayAt, raceTotalDisplaySec,
   ovalCourse, replayPositionModel, finalOrderOf,
   knotsFor, ratesForTarget, targetDisplaySec, timeWarpFor, withFinishRunOut,
   broadcastV2StartLagM, broadcastV2FinishStyleOf, resolveBroadcastV2Scene,
@@ -24,6 +25,17 @@ import {
 
 const POOL = JSON.parse(readFileSync('apps/web/src/lib/watch-pool.json', 'utf8'));
 const STRATS = ['nige', 'senko', 'sashi', 'oikomi'];
+
+/**
+ * ★**本編のあとの区間**（`page.tsx` の `WINNER_FOLLOW_SEC` + `RESULTS_BOARD_SEC` と同じ値）。
+ *   ⚠️ ★ページの私有定数の写しです。★ずれると道具だけが別の総尺で回ります（R-30）。
+ */
+export const AUDIT_POST_RACE_SEC = 2.4 + 6;
+
+/** ★画面と同じ総尺（イントロ＋本編＋勝馬・着順ボード＋ゴール前リプレイ） */
+export function auditTotalDisplaySec(clock) {
+  return raceTotalDisplaySec(clock.introSec, clock.warp.displaySec, AUDIT_POST_RACE_SEC);
+}
 
 /** ★`/race` の既定と同じ */
 export const RACE_DEFAULTS = { seed: 42, ownGate: 3, distance: 1600, field: 12, trackWidthM: 20 };
@@ -105,10 +117,25 @@ export function auditClock(built, ownGate = RACE_DEFAULTS.ownGate) {
 export function auditSceneAt(built, clock, displaySec, viewport = { width: 1280, height: 720 }, script = undefined, opts = {}) {
   const raceD = Math.max(0, displaySec - clock.introSec);
   const clampedD = Math.min(raceD, clock.warp.displaySec);
-  const sec = clock.warp.raceSecAt(clampedD);
+  /**
+   * ★**ゴール前のリプレイ**（`finish-replay.ts`・`page.tsx` と同じ関数を通します・R-30）。
+   *   ⚠️ ★本編の時間軸には触れません。区間に入ったときだけ、時間を巻き戻して
+   *      同じ位置モデルをもう一度読み、専用のカットへ固定します。
+   */
+  const winnerGateForReplay = (() => {
+    const row = built.result.order[0];
+    return built.entrants.find((e) => e.horseId === row.horseId)?.gate;
+  })();
+  const replay = finishReplayAt(
+    raceD, clock.warp.displaySec, AUDIT_POST_RACE_SEC,
+    clock.finishSec.get(winnerGateForReplay) ?? clock.warp.raceSecAt(clock.warp.displaySec),
+  );
+  const sec = replay.active ? replay.raceSec : clock.warp.raceSecAt(clampedD);
   const at = built.model.at(sec);
-  const visual = withFinishRunOut(at, (g) => clock.finishSec.get(g), sec, built.DIST,
-    Math.max(0, raceD - clock.warp.displaySec) * RUNOUT_SLOW);
+  /** ★リプレイ中はゴール後の流しを掛けません（`page.tsx` と同じ） */
+  const visual = replay.active ? at
+    : withFinishRunOut(at, (g) => clock.finishSec.get(g), sec, built.DIST,
+      Math.max(0, raceD - clock.warp.displaySec) * RUNOUT_SLOW);
   /**
    * ★**勝馬がゴールしたか**。`page.tsx:1558` と同じ判定です（R-30）。
    *   ⚠️ ★以前ここは `false` 固定でした。そのため**勝馬クローズアップが監査に一度も出ず**、
@@ -153,6 +180,7 @@ export function auditSceneAt(built, clock, displaySec, viewport = { width: 1280,
     .sort((a, b) => a[1] - b[1])
     .map(([gate]) => gate);
   const scene = resolveBroadcastV2Scene(built.course, drawn, viewport, winnerDone, {
+    ...(replay.active ? { forceShotId: 'finish-replay' } : {}),
     finishStyle: clock.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
     raceDisplaySec: raceD, fourthCornerFront: FOURTH_CORNER_FRONT_WEB, winnerRear: false,
     leadGates,

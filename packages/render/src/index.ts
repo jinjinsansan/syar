@@ -36,6 +36,7 @@ export * from './climax-choreography.js';
  *   ⚠️ ★`climax-choreography` と違い、**位置に一切触れません**。
  */
 export * from './contest-focus.js';
+export * from './finish-replay.js';
 export * from './reference-hud.js';
 export * from './visual-scroll.js';
 export * from './world-textured.js';

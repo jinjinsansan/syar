@@ -22,7 +22,7 @@
  */
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { buildAuditRace, auditClock, auditSceneAt, RACE_DEFAULTS } from './lib/race-audit-build.mjs';
+import { buildAuditRace, auditClock, auditSceneAt, auditTotalDisplaySec, RACE_DEFAULTS } from './lib/race-audit-build.mjs';
 import { launch } from './lib/cdp.mjs';
 
 const LABEL = (() => {
@@ -45,7 +45,13 @@ const JPEG_Q = 0.95;
 /* ── 撮る時刻を決める（製品の台本がそのまま決める・こちらでは決めない） ── */
 const built = buildAuditRace({ seed: SEED });
 const clock = auditClock(built, RACE_DEFAULTS.ownGate);
-const totalSec = clock.introSec + clock.warp.displaySec;
+/**
+ * ★**総尺は共通の式から引きます**（`raceTotalDisplaySec`・D-052 / R-30）。
+ *   ⚠️ ★以前ここは `introSec + warp.displaySec` だけで、★**勝馬の寄り・着順ボード・
+ *      ゴール前リプレイを知りませんでした。** そのためリプレイ区間を指定しても
+ *      ★範囲外に丸められて **0 コマ**になりました（2026-08-28 に実際に起きた）。
+ */
+const totalSec = auditTotalDisplaySec(clock);
 let from = Infinity, to = -Infinity;
 for (let f = 0; f / FPS <= totalSec; f += 1) {
   const d = f / FPS;
