@@ -2222,7 +2222,8 @@ export default function RacePage(): React.JSX.Element {
      * ★コース図ミニマップ（左上・区間タグの下）。カットが変わっても「今どこか」が繋がる（ユーザー指摘⑥）。
      *   描画に使った位置をそのまま点にする（順位計算はしない）。
      */
-    if (v2Minimap !== undefined && !winnerFinishedNow) {
+    /** ★リプレイ中はコース図も下ろします（馬に重なるため・上の `hud` の注記と同じ理由） */
+    if (v2Minimap !== undefined && !winnerFinishedNow && !replay.active) {
       drawCourseMinimap(ctx, ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn }), art.pal as Record<string, string>, FONT,
         v2Minimap.horses, v2Minimap.focusS, { x: 40, y: 321, width: 264, height: 209 },
         // ★コース図も HUD・馬体と同じ枠色から引く（3 か所で持たない）
@@ -2242,7 +2243,16 @@ export default function RacePage(): React.JSX.Element {
     {
       // ★ゴールした瞬間からライブ HUD（順位・実況帯）を落とし、勝馬テロップだけにする（motion-spec §6）
       const hudRaw = raceHudVisibilityAt(raceD, built.warp.displaySec, allFinishedNow);
-      const hud = winnerFinishedNow ? { ...hudRaw, gauge: false, standings: false, calls: false } : hudRaw;
+      /**
+       * ★**リプレイ中は順位表（ORDER）を下ろします**（2026-08-28・オーナー指摘）。
+       *
+       * ⚠️ ★リプレイは馬を大きく見せるための区間なのに、★**その馬に HUD が重なって**いました。
+       *    ★`raceHudVisibilityAt` はリプレイを知りません（時間を巻き戻しているので
+       *    ★「レース中」と同じ扱いになります）。
+       * ★実況帯とレース名は画面の端にあり馬に重なっていないので、そのまま残します。
+       */
+      const hud = replay.active ? { ...hudRaw, standings: false }
+        : winnerFinishedNow ? { ...hudRaw, gauge: false, standings: false, calls: false } : hudRaw;
       // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）
       const g = staminaAt(built.gauge, Math.max(0, metersLeft));
 
