@@ -112,6 +112,8 @@ const SURFACE = (() => { const i = argv.indexOf('--surface'); return i >= 0 ? ar
 if (SURFACE !== 'turf' && SURFACE !== 'dirt') throw new Error(`★--surface は turf / dirt: ${SURFACE}`);
 /** ★砂煙の色。★`page.tsx:2008` と同じ値 */
 const KICKUP_COLOR = SURFACE === 'dirt' ? '#796047' : '#738b43';
+/** ★舞い上がった砂煙の色。★`page.tsx` と同じ値（R-30） */
+const DUST_COLOR = SURFACE === 'dirt' ? '#cdb494' : undefined;
 /**
  * ★**着差の見せ方（γ）**。
  *
@@ -448,6 +450,7 @@ for (const [index, displaySec] of displaySecs.entries()) {
     // ★ハロン棒の数字（設計 1-7）。画面と同じく書体を渡す
     poleFont: (px, bold) => `${bold ? 'bold ' : ''}${px}px JPUI, system-ui, sans-serif`,
     frameRoleOf, surface: SURFACE, condition: 'good', kickupColor: KICKUP_COLOR,
+    ...(DUST_COLOR === undefined ? {} : { dustColor: DUST_COLOR }),
     /** ★`--infield-reversed` で内側の帯を苝に反転する（裁定 §6-3 の [EYES] 用） */
     ...(argv.includes('--infield-reversed') ? { infieldReversed: true } : {}),
     // ★Web 画面と同じ分岐（page.tsx: shot.view === 'side' ? undefined : texturedWorld）

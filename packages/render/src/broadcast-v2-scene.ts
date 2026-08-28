@@ -433,6 +433,8 @@ export function drawBroadcastV2Scene<TImage>(
     readonly surface: RenderSurface;
     readonly condition: RenderTrackCondition;
     readonly kickupColor: string;
+    /** ★舞い上がった砂煙の色（2026-08-29）。★地面より明るくすること */
+    readonly dustColor?: string | undefined;
     /**
      * ★**内側の帯を逆にする**（ダート戦で内回りを苝に見せる）。
      *   ★描画だけ。★裁定 §6-3 の [EYES]。採否はオーナー判断。
@@ -652,7 +654,12 @@ export function drawBroadcastV2Scene<TImage>(
     coatFilterOf: opts.coatFilterOf,
     frameRoleOf: opts.frameRoleOf,
     distanceMeter: course.distance,
-    trackEffect: { surface: opts.surface, condition: opts.condition, color: opts.kickupColor },
+    trackEffect: {
+      surface: opts.surface,
+      condition: opts.condition,
+      color: opts.kickupColor,
+      ...(opts.dustColor === undefined ? {} : { dustColor: opts.dustColor }),
+    },
     motionBlur: opts.motionBlur,
   });
   // ★手前側のラチ（馬の脚が突き抜けないように、馬のあとで描く）

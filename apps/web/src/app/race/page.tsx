@@ -130,7 +130,7 @@ function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, st
 }
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 /** ★素材を足したら必ず上げる。★`manifest.json` の中身を変えたときも（古いものがキャッシュされる） */
-const ASSET_VERSION = '55';
+const ASSET_VERSION = '56';
 /**
  * ★コマごとの持ち上げ量。**単位は「基準画布（高さ 1536px）での px」**。
  *
@@ -2055,6 +2055,12 @@ export default function RacePage(): React.JSX.Element {
         surface,
         condition: trackCondition,
         kickupColor: surface === 'dirt' ? '#796047' : '#738b43',
+        /**
+         * ★**舞い上がった砂煙の色**（2026-08-29）。
+         *   ⚠️ ★地面と同じ褐（`#796047`）で描くと★**地面に溶けて見えません**。
+         *   ★`palette.json` の `dirt-0`（#b09472）よりさらに明るい砂ばこりの色。
+         */
+        dustColor: surface === 'dirt' ? '#cdb494' : undefined,
         /**
          * ★**内側の帯を苝に反転する**（`/race?infield=turf`）。
          *

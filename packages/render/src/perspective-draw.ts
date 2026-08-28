@@ -692,7 +692,17 @@ export function drawPerspectiveHorses<TImage>(
     readonly trackEffect?: {
       readonly surface: RenderSurface;
       readonly condition: RenderTrackCondition;
+      /** ★蹴が蹴り上げる**土塊・苝片**の色。★地面と同じ系統でよい */
       readonly color: string;
+      /**
+       * ★**舞い上がった砂煙の色**（2026-08-29）。★省略すると `color` を使います。
+       *
+       * ⚠️ ★砂煙を `color`（地面と同じ褐）で描くと、★**地面に溶けて見えません**。
+       *    ★実際に 1 回目は `#796047` で描いて、★**何も見えません**でした
+       *    （不透明度を 1 にすると巨大な塗りつぶしが出たので、描いてはいた）。
+       * ★空中の砂ばこりは**地面より明るい**。★明るい色を渡すこと。
+       */
+      readonly dustColor?: string | undefined;
     } | undefined;
     /**
      * ★**被写体ブラー**（参考映像 1.4／設計 1-2）
@@ -886,6 +896,48 @@ export function drawPerspectiveHorses<TImage>(
     }
     const kickup = opts.trackEffect === undefined ? 0
       : trackKickupIntensity(opts.trackEffect.surface, opts.trackEffect.condition);
+    /**
+     * ★**ダートの砂煙**（2026-08-29・オーナー要望「ダートでは砂煙が必要」）
+     *
+     * ⚠️ ★下の既存の砊煙は**蚊け出しの 5 コマだけ**で、★しかも強さが
+     *    ★良ダートで **0.22**。★地面の色が変わっただけに見えました。
+     * ★本物のダートは、★**馬の後ろに尾を引いて残り**ます。それを足します。
+     *
+     * 【★苝には入れません】
+     *   ★苝の見え方は既にオーナー承認済みです。★ここで変えてはいけません。
+     *
+     * 【★決定論】
+     *   ★`Math.random()` を使いません（憲法 4）。★散らしは枠番と番号から決めます。
+     *   ★位相はコマ番号（＝進んだ距離）から決まり、★**途切れずに続きます**。
+     */
+    if (opts.trackEffect !== undefined && opts.trackEffect.surface === 'dirt' && kickup > 0) {
+      const cycle = 8;
+      const phase = (((frameIndex % cycle) + cycle) % cycle) / cycle;
+      /** ★尾を引く長さ（m）。★長すぎると後続が見えなくなります */
+      const PLUME_M = 6.0;
+      const PUFFS = 9;
+      for (let i = 0; i < PUFFS; i += 1) {
+        /** ★古さ（0=出たばかり … 1=消える）。★位相を足して連続にする */
+        const age = (i + phase) / PUFFS;
+        const jig = ((d.h.gate * 13 + i * 7) % 11) / 11;
+        const back = 0.55 + age * PLUME_M;
+        const rise = 0.20 + age * 0.85;
+        const lateral = (jig - 0.5) * (0.45 + age * 1.30);
+        const q = P(d.s - back, d.h.w + lateral);
+        if (q.depth <= 2) continue;
+        /** ⚠️ ★大きすぎると**砂煙ではなく壁**になります（不透明度 1 で確かめ済み） */
+        const rx = q.pxPerM * (0.20 + age * 0.52 + jig * 0.10);
+        const ry = rx * (0.52 + jig * 0.16);
+        /** ★消え方は後半ほど早く（尾が鑑を引かないように） */
+        const fade = (1 - age) * (1 - age);
+        ctx.globalAlpha = Math.min(0.42, 0.46 * fade * Math.min(1, kickup * 4.5));
+        ctx.fillStyle = opts.trackEffect.dustColor ?? opts.trackEffect.color;
+        ctx.beginPath();
+        ctx.ellipse(q.x, q.y - rise * q.pxPerM, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
     if (kickup > 0) {
       /**
        * ★**芝片・土煙**は後肢が接地して蹴る局面でだけ出る（8 コマ: 06/07 が後肢接地・蹴り出し、08 で離地）。
