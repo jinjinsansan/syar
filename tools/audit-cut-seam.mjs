@@ -47,7 +47,7 @@
  *   npx tsx tools/audit-cut-seam.mjs --seeds 42,253,90 --script v5
  */
 import { DEFAULT_RACE_BALANCE } from '@star/race-engine';
-import { cameraBasis, project, posOf, DEMO_CONTEST_GAMMA } from '@star/render';
+import { DEFAULT_RACE_SCRIPT, cameraBasis, project, posOf, DEMO_CONTEST_GAMMA } from '@star/render';
 import { buildAuditRace, auditClock, auditSceneAt, RACE_DEFAULTS } from './lib/race-audit-build.mjs';
 
 const arg = (name, d) => {
@@ -63,7 +63,7 @@ const arg = (name, d) => {
  */
 const SCREEN_GAMMA = DEMO_CONTEST_GAMMA;
 /** ★`broadcastV2ScriptFromSearch` の既定と同じ（`?cinematography` 省略時） */
-const SCREEN_SCRIPT = 'v5';
+const SCREEN_SCRIPT = DEFAULT_RACE_SCRIPT;
 
 const SEEDS = String(arg('seeds', String(RACE_DEFAULTS.seed))).split(',').map((s) => Number(s.trim()));
 const SCRIPT = arg('script', SCREEN_SCRIPT);

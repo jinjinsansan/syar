@@ -160,3 +160,55 @@ describe('★道具の基準馬', () => {
     expect(offenders, '★基準馬は画面と同じ 3 番にすること').toEqual([]);
   });
 });
+
+/**
+ * ★**測定器の γ の既定を、画面の定数から引かせる**（R-31）
+ *
+ *   ⚠️ ★数値を直書きすると、★**画面の γ が動いたときに黙ってずれます**。
+ *      ★実際 2026-08-28 に γ を 1.6 へ確定した直後、
+ *      ★`audit-contest-focus.mjs` が★**「γ=1.00」と印字して測っていました**。
+ *   ★`DEMO_CONTEST_GAMMA`（またはそれを入れた別名）だけを許します。
+ */
+describe('★道具の γ の既定', () => {
+  it('★数値やエンジン既定を γ の既定にしない', () => {
+    const base = new URL('../../../tools/', import.meta.url);
+    const offenders: string[] = [];
+    for (const name of readdirSync(fileURLToPath(base))) {
+      if (!name.endsWith('.mjs')) continue;
+      const text = readFileSync(new URL(name, base), 'utf8');
+      for (const [i, line] of text.split('\n').entries()) {
+        if (/^\s*(\*|\/\/)/.test(line)) continue;
+        const m = /arg\('gamma',\s*([^)]+)\)/.exec(line);
+        if (m === null) continue;
+        const v = m[1]!.trim();
+        if (v === 'DEMO_CONTEST_GAMMA' || /GAMMA$/.test(v)) continue;
+        offenders.push(`${name}:${i + 1}  ${v}`);
+      }
+    }
+    expect(offenders, '★γ の既定は DEMO_CONTEST_GAMMA から引くこと').toEqual([]);
+  });
+});
+
+/**
+ * ★**測定器の台本の既定を、画面の定数から引かせる**（R-31）
+ *
+ *   ⚠️ ★実際 2026-08-28 に既定を v6 へ切替えた直後、
+ *      ★`audit-cut-seam.mjs` が★**`SCREEN_SCRIPT = 'v5'` の直書きで v5 を測って**いました。
+ *      ★印字は「（画面既定）」と出ていました。★印字も含めて嘘になります。
+ */
+describe('★道具の台本の既定', () => {
+  it('★台本名を直書きしない', () => {
+    const base = new URL('../../../tools/', import.meta.url);
+    const offenders: string[] = [];
+    for (const name of readdirSync(fileURLToPath(base))) {
+      if (!name.endsWith('.mjs')) continue;
+      const text = readFileSync(new URL(name, base), 'utf8');
+      for (const [i, line] of text.split('\n').entries()) {
+        if (/^\s*(\*|\/\/)/.test(line)) continue;
+        if (/arg\('script',\s*'v[0-9]'\s*\)/.test(line)) offenders.push(`${name}:${i + 1}`);
+        if (/SCREEN_SCRIPT\s*=\s*'v[0-9]'/.test(line)) offenders.push(`${name}:${i + 1}`);
+      }
+    }
+    expect(offenders, '★台本の既定は DEFAULT_RACE_SCRIPT から引くこと').toEqual([]);
+  });
+});

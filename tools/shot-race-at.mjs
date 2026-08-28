@@ -26,7 +26,7 @@ import path from 'node:path';
 import {
   DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt,
 } from '@star/race-engine';
-import {
+import { DEFAULT_RACE_SCRIPT,
   BROADCAST_STRIDE_M, DEMO_CONTEST_GAMMA, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES, HORSE_HEIGHT_M,
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
   paintCrowd, seatMaskFromPixels, seatBandFromPixels,
@@ -93,7 +93,7 @@ const flag = (name, dflt) => { const i = argv.indexOf(name); return i >= 0 ? Num
  *    ★4 角の前後を撮ると、画面には無い `fourth-corner-front` が出ます。
  * ★既定は**画面の既定**（v5）にします。エンジン側の既定ではありません。
  */
-const SCRIPT = (() => { const i = argv.indexOf('--script'); return i >= 0 ? argv[i + 1] : 'v5'; })();
+const SCRIPT = (() => { const i = argv.indexOf('--script'); return i >= 0 ? argv[i + 1] : DEFAULT_RACE_SCRIPT; })();
 /** ★どのレースを描くか。★以前は 42 固定でした */
 const SEED = flag('--seed', 42);
 /**

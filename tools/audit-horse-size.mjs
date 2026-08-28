@@ -31,7 +31,7 @@ const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ?
  *     ここを切り替えられないと、指摘②の原因に届きません。
  */
 /** ★既定値を 1 と書き直さない。★エンジンの既定が動いたとき、★**黙ってずれます**（R-30） */
-const GAMMA = Number(arg('gamma', DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA));
+const GAMMA = Number(arg('gamma', DEMO_CONTEST_GAMMA));
 const BALANCE = GAMMA === DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA
   ? DEFAULT_RACE_BALANCE
   : { ...DEFAULT_RACE_BALANCE, TIME_GAP_SHAPE_GAMMA: GAMMA };

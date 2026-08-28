@@ -5,13 +5,13 @@
  *   ⚠️ 製品コードは変更しません。時刻も乱数も使いません（憲法4）。
  */
 import { DEFAULT_RACE_BALANCE } from '@star/race-engine';
-import { CLIMAX_LEAD_COUNT, cameraBasis, posOf, project } from '@star/render';
+import { DEFAULT_RACE_SCRIPT, DEMO_CONTEST_GAMMA, CLIMAX_LEAD_COUNT, cameraBasis, posOf, project } from '@star/render';
 import { buildAuditRace, auditClock, auditSceneAt } from './lib/race-audit-build.mjs';
 
 const W = 1280, H = 720, FPS = 30;
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ? d : process.argv[i + 1]; };
 const SEEDS = String(arg('seeds', '42,14,332,474')).split(',').map(Number);
-const SCRIPT = arg('script', 'v6');
+const SCRIPT = arg('script', DEFAULT_RACE_SCRIPT);
 /**
  * ★**着差の見せ方（γ）を差し替えて測る**（`--gamma 1.3`）。
  *
@@ -21,7 +21,7 @@ const SCRIPT = arg('script', 'v6');
  *   ⚠️ ★既定は 1.0 ＝ 本番の既定（`DEFAULT_RACE_BALANCE`）そのままです。
  *      ★この道具は**本番の既定を書き換えません。** 測る間だけ差し替えます。
  */
-const GAMMA = Number(arg('gamma', DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA));
+const GAMMA = Number(arg('gamma', DEMO_CONTEST_GAMMA));
 if (!(GAMMA > 0)) throw new Error(`★--gamma が正の数ではありません: ${GAMMA}`);
   /**
    * ⚠️ ★**`undefined` を渡してはいけません**（2026-08-28）。

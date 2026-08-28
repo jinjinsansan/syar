@@ -8,13 +8,13 @@
  * ⚠️ 場面解決は実画面と同じ `auditSceneAt` を通します（R-30・式を作り直さない）。
  * ⚠️ 製品コードは変更しません。時刻も乱数も使いません（憲法4）。
  */
-import { cameraBasis, posOf, project, CLIMAX_LEAD_COUNT } from '@star/render';
+import { DEFAULT_RACE_SCRIPT, cameraBasis, posOf, project, CLIMAX_LEAD_COUNT } from '@star/render';
 import { buildAuditRace, auditClock, auditSceneAt } from './lib/race-audit-build.mjs';
 
 const W = 1280, H = 720, HORSE_H_M = 2.4;
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ? d : process.argv[i + 1]; };
 const SEEDS = String(arg('seeds', '42,14,332,474')).split(',').map(Number);
-const SCRIPT = arg('script', 'v6');
+const SCRIPT = arg('script', DEFAULT_RACE_SCRIPT);
 const CLIMAX = arg('climax', 'off') !== 'on';
 const NOFRAME = SCRIPT === 'v6' ? ['finish-line'] : undefined;
 
