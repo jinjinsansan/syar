@@ -1,1 +1,863 @@
-[{"stats":{"gt":603.2437181337547,"iq":538.4427368183347,"pw":647.9832788984821,"sp":778.8853560205705,"st":690.0673924406237},"surfaceAptitude":{"dirt":20,"turf":53},"distanceCenter":1566,"distanceRange":458,"strategyAptitude":{"nige":40,"sashi":27,"senko":87,"oikomi":40},"heavyAptitude":54,"skillGenes":[]},{"stats":{"gt":634.6294991886298,"iq":499.9486225625706,"pw":602.6223200845665,"sp":766.9026362319662,"st":547.9032176072257},"surfaceAptitude":{"dirt":57,"turf":43},"distanceCenter":2002,"distanceRange":567,"strategyAptitude":{"nige":32,"sashi":86,"senko":24,"oikomi":25},"heavyAptitude":63,"skillGenes":[]},{"stats":{"gt":650.1668624241379,"iq":457.4292778295532,"pw":628.9108027126331,"sp":762.8266310198086,"st":550.8201988885978},"surfaceAptitude":{"dirt":76,"turf":57},"distanceCenter":2064,"distanceRange":366,"strategyAptitude":{"nige":70,"sashi":37,"senko":28,"oikomi":85},"heavyAptitude":73,"skillGenes":["G_MUD"]},{"stats":{"gt":587.2209113307209,"iq":437.3483821790281,"pw":609.080730270547,"sp":746.9764548827612,"st":579.1728189077886},"surfaceAptitude":{"dirt":73,"turf":57},"distanceCenter":1990,"distanceRange":789,"strategyAptitude":{"nige":86,"sashi":77,"senko":32,"oikomi":34},"heavyAptitude":67,"skillGenes":[]},{"stats":{"gt":519.9005875675716,"iq":477.43368139465576,"pw":617.6293155825824,"sp":744.1413684558086,"st":432.8785083051265},"surfaceAptitude":{"dirt":63,"turf":69},"distanceCenter":2020,"distanceRange":558,"strategyAptitude":{"nige":37,"sashi":77,"senko":29,"oikomi":34},"heavyAptitude":62,"skillGenes":["G_ESCAPE"]},{"stats":{"gt":531.8403720365627,"iq":467.9886657530529,"pw":557.2447706935163,"sp":740.94009331021,"st":510.5123847004138},"surfaceAptitude":{"dirt":69,"turf":57},"distanceCenter":1709,"distanceRange":690,"strategyAptitude":{"nige":34,"sashi":39,"senko":68,"oikomi":91},"heavyAptitude":64,"skillGenes":[]},{"stats":{"gt":547.2398098696369,"iq":527.9962044450634,"pw":632.600396420858,"sp":740.7482113934641,"st":588.1746220926707},"surfaceAptitude":{"dirt":39,"turf":59},"distanceCenter":1787,"distanceRange":584,"strategyAptitude":{"nige":30,"sashi":80,"senko":80,"oikomi":32},"heavyAptitude":52,"skillGenes":[]},{"stats":{"gt":608.8225981471882,"iq":493.902170654306,"pw":537.8504988753461,"sp":738.0714358650043,"st":582.4550005866582},"surfaceAptitude":{"dirt":42,"turf":85},"distanceCenter":2088,"distanceRange":534,"strategyAptitude":{"nige":80,"sashi":65,"senko":28,"oikomi":36},"heavyAptitude":74,"skillGenes":[]},{"stats":{"gt":674.9554800084455,"iq":521.4209195761755,"pw":562.0667084718398,"sp":735.4438968292015,"st":578.9652724862598},"surfaceAptitude":{"dirt":68,"turf":39},"distanceCenter":2416,"distanceRange":519,"strategyAptitude":{"nige":90,"sashi":28,"senko":63,"oikomi":33},"heavyAptitude":60,"skillGenes":[]},{"stats":{"gt":603.9904278245482,"iq":558.5154769120072,"pw":588.6966681675956,"sp":731.1773990989383,"st":620.5734570988599},"surfaceAptitude":{"dirt":46,"turf":74},"distanceCenter":1875,"distanceRange":674,"strategyAptitude":{"nige":35,"sashi":79,"senko":23,"oikomi":32},"heavyAptitude":70,"skillGenes":["G_MUD"]},{"stats":{"gt":610.9263009512382,"iq":510.16640115893415,"pw":667.5637380980556,"sp":728.3812739105875,"st":529.6808697449795},"surfaceAptitude":{"dirt":63,"turf":51},"distanceCenter":2538,"distanceRange":732,"strategyAptitude":{"nige":84,"sashi":25,"senko":39,"oikomi":72},"heavyAptitude":70,"skillGenes":["G_STAYER","G_INNER"]},{"stats":{"gt":569.8999949010436,"iq":471.84466578478015,"pw":610.000589423694,"sp":726.3982485258995,"st":605.104035953473},"surfaceAptitude":{"dirt":71,"turf":69},"distanceCenter":1629,"distanceRange":556,"strategyAptitude":{"nige":83,"sashi":72,"senko":23,"oikomi":32},"heavyAptitude":60,"skillGenes":["G_INNER"]},{"stats":{"gt":617.1882499381488,"iq":508.1394017117785,"pw":666.528903431046,"sp":724.9361470576654,"st":577.575152068161},"surfaceAptitude":{"dirt":43,"turf":50},"distanceCenter":2049,"distanceRange":878,"strategyAptitude":{"nige":23,"sashi":65,"senko":77,"oikomi":37},"heavyAptitude":76,"skillGenes":[]},{"stats":{"gt":576.2547459732905,"iq":427.4643864694711,"pw":606.0800458170123,"sp":722.0394774737346,"st":393.14339609047255},"surfaceAptitude":{"dirt":58,"turf":70},"distanceCenter":2129,"distanceRange":768,"strategyAptitude":{"nige":31,"sashi":37,"senko":74,"oikomi":82},"heavyAptitude":65,"skillGenes":[]},{"stats":{"gt":596.9595185023503,"iq":553.2456718449989,"pw":708.7677067754358,"sp":721.3354677648315,"st":640.3868624759318},"surfaceAptitude":{"dirt":53,"turf":37},"distanceCenter":1151,"distanceRange":811,"strategyAptitude":{"nige":32,"sashi":23,"senko":88,"oikomi":31},"heavyAptitude":71,"skillGenes":[]},{"stats":{"gt":556.8322190248142,"iq":483.47924116268416,"pw":503.95773022406644,"sp":718.1712018132881,"st":609.8465258847765},"surfaceAptitude":{"dirt":46,"turf":57},"distanceCenter":1164,"distanceRange":687,"strategyAptitude":{"nige":32,"sashi":21,"senko":79,"oikomi":27},"heavyAptitude":61,"skillGenes":[]},{"stats":{"gt":557.7816363253269,"iq":519.8184423352875,"pw":692.7361846398404,"sp":717.7764330390655,"st":587.5279320454536},"surfaceAptitude":{"dirt":33,"turf":58},"distanceCenter":1797,"distanceRange":588,"strategyAptitude":{"nige":35,"sashi":27,"senko":67,"oikomi":80},"heavyAptitude":36,"skillGenes":[]},{"stats":{"gt":537.7879056714753,"iq":553.6698093184284,"pw":701.9797893330017,"sp":706.554186424223,"st":538.1754182962827},"surfaceAptitude":{"dirt":77,"turf":47},"distanceCenter":2195,"distanceRange":748,"strategyAptitude":{"nige":31,"sashi":93,"senko":26,"oikomi":68},"heavyAptitude":64,"skillGenes":["G_STAYER"]},{"stats":{"gt":607.1253914814703,"iq":475.24340262611383,"pw":603.4719918105778,"sp":706.4817735563903,"st":587.9051612313283},"surfaceAptitude":{"dirt":55,"turf":66},"distanceCenter":1817,"distanceRange":552,"strategyAptitude":{"nige":23,"sashi":27,"senko":89,"oikomi":25},"heavyAptitude":62,"skillGenes":[]},{"stats":{"gt":650.753724273083,"iq":504.43678332362003,"pw":622.9862020021232,"sp":704.7930724387595,"st":561.1208510235649},"surfaceAptitude":{"dirt":38,"turf":40},"distanceCenter":2035,"distanceRange":743,"strategyAptitude":{"nige":26,"sashi":24,"senko":69,"oikomi":80},"heavyAptitude":57,"skillGenes":[]},{"stats":{"gt":644.8898284442965,"iq":527.541937670449,"pw":548.1568158328546,"sp":702.1500058152158,"st":581.4352287116682},"surfaceAptitude":{"dirt":57,"turf":72},"distanceCenter":2073,"distanceRange":872,"strategyAptitude":{"nige":39,"sashi":92,"senko":32,"oikomi":26},"heavyAptitude":64,"skillGenes":[]},{"stats":{"gt":608.844421348647,"iq":513.3678259227614,"pw":601.362360826129,"sp":700.2562309566567,"st":592.4518163062796},"surfaceAptitude":{"dirt":66,"turf":83},"distanceCenter":2106,"distanceRange":723,"strategyAptitude":{"nige":30,"sashi":33,"senko":79,"oikomi":38},"heavyAptitude":50,"skillGenes":["G_MUD","G_GATE"]},{"stats":{"gt":655.867129984759,"iq":543.5205162566749,"pw":532.1732966307297,"sp":699.5804810399227,"st":599.5814973188117},"surfaceAptitude":{"dirt":57,"turf":67},"distanceCenter":2364,"distanceRange":638,"strategyAptitude":{"nige":26,"sashi":65,"senko":28,"oikomi":83},"heavyAptitude":74,"skillGenes":["G_MUD"]},{"stats":{"gt":488.35824291811366,"iq":587.9686381442847,"pw":620.1562259668048,"sp":698.4030842571565,"st":453.9657637970779},"surfaceAptitude":{"dirt":57,"turf":50},"distanceCenter":1625,"distanceRange":687,"strategyAptitude":{"nige":61,"sashi":75,"senko":25,"oikomi":28},"heavyAptitude":48,"skillGenes":["G_INNER"]},{"stats":{"gt":643.2989206349233,"iq":568.8731724741546,"pw":590.4137987969941,"sp":695.0555331243108,"st":606.5747740633243},"surfaceAptitude":{"dirt":66,"turf":55},"distanceCenter":2306,"distanceRange":723,"strategyAptitude":{"nige":24,"sashi":37,"senko":64,"oikomi":85},"heavyAptitude":49,"skillGenes":["G_MUD","G_STAYER"]},{"stats":{"gt":673.0258465564694,"iq":568.7837343607213,"pw":597.3443349630192,"sp":693.4327906925245,"st":606.3311931894287},"surfaceAptitude":{"dirt":50,"turf":62},"distanceCenter":1246,"distanceRange":471,"strategyAptitude":{"nige":34,"sashi":86,"senko":39,"oikomi":77},"heavyAptitude":73,"skillGenes":["G_STAYER"]},{"stats":{"gt":575.0349680243851,"iq":509.6808012348806,"pw":750.2973073090013,"sp":692.5837403820203,"st":575.7492417222217},"surfaceAptitude":{"dirt":48,"turf":65},"distanceCenter":1728,"distanceRange":637,"strategyAptitude":{"nige":31,"sashi":39,"senko":66,"oikomi":91},"heavyAptitude":34,"skillGenes":[]},{"stats":{"gt":554.5709736141658,"iq":503.12971585187296,"pw":660.3387956263355,"sp":691.5596626175867,"st":536.7723054872924},"surfaceAptitude":{"dirt":49,"turf":66},"distanceCenter":1192,"distanceRange":664,"strategyAptitude":{"nige":79,"sashi":35,"senko":76,"oikomi":38},"heavyAptitude":76,"skillGenes":[]},{"stats":{"gt":437.17279129910963,"iq":377.59705739327325,"pw":670.2229586122629,"sp":690.3265586513309,"st":563.4724106615503},"surfaceAptitude":{"dirt":84,"turf":73},"distanceCenter":1237,"distanceRange":684,"strategyAptitude":{"nige":23,"sashi":26,"senko":63,"oikomi":76},"heavyAptitude":77,"skillGenes":["G_ESCAPE"]},{"stats":{"gt":532.2988501538341,"iq":508.6508538451123,"pw":621.1834257614263,"sp":689.7341104362233,"st":510.25734036597686},"surfaceAptitude":{"dirt":26,"turf":48},"distanceCenter":1914,"distanceRange":684,"strategyAptitude":{"nige":34,"sashi":93,"senko":31,"oikomi":34},"heavyAptitude":44,"skillGenes":["G_ESCAPE","G_SPURT"]},{"stats":{"gt":557.948294201175,"iq":525.7638538688419,"pw":563.8967535905578,"sp":689.0589069831212,"st":464.55230865439836},"surfaceAptitude":{"dirt":44,"turf":41},"distanceCenter":2366,"distanceRange":614,"strategyAptitude":{"nige":34,"sashi":82,"senko":30,"oikomi":60},"heavyAptitude":50,"skillGenes":[]},{"stats":{"gt":510.84068996821827,"iq":448.8096611602504,"pw":497.51862445180365,"sp":686.7174739823059,"st":456.3416159326597},"surfaceAptitude":{"dirt":53,"turf":54},"distanceCenter":1375,"distanceRange":603,"strategyAptitude":{"nige":91,"sashi":26,"senko":35,"oikomi":21},"heavyAptitude":77,"skillGenes":[]},{"stats":{"gt":553.0632642026915,"iq":481.4899014150455,"pw":743.671887667973,"sp":686.1434722414383,"st":486.12270644714226},"surfaceAptitude":{"dirt":30,"turf":71},"distanceCenter":1493,"distanceRange":477,"strategyAptitude":{"nige":36,"sashi":24,"senko":72,"oikomi":95},"heavyAptitude":60,"skillGenes":[]},{"stats":{"gt":489.2933419507358,"iq":493.58736731709985,"pw":486.66605034535917,"sp":686.0755070557199,"st":455.6845077011841},"surfaceAptitude":{"dirt":37,"turf":59},"distanceCenter":2706,"distanceRange":901,"strategyAptitude":{"nige":39,"sashi":87,"senko":32,"oikomi":28},"heavyAptitude":76,"skillGenes":[]},{"stats":{"gt":580.1354936536882,"iq":572.6810750048726,"pw":720.0117797605975,"sp":685.993475373415,"st":464.7427918438441},"surfaceAptitude":{"dirt":67,"turf":84},"distanceCenter":1578,"distanceRange":629,"strategyAptitude":{"nige":37,"sashi":76,"senko":66,"oikomi":30},"heavyAptitude":39,"skillGenes":[]},{"stats":{"gt":646.0755286451217,"iq":452.74365644018815,"pw":717.9935950430744,"sp":685.9607219907815,"st":568.3895145246714},"surfaceAptitude":{"dirt":69,"turf":48},"distanceCenter":1736,"distanceRange":569,"strategyAptitude":{"nige":90,"sashi":62,"senko":31,"oikomi":36},"heavyAptitude":55,"skillGenes":["G_MUD","G_INNER"]}]
+[
+  {
+    "stats": {
+      "gt": 603.2437181337547,
+      "iq": 538.4427368183347,
+      "pw": 647.9832788984821,
+      "sp": 778.8853560205705,
+      "st": 690.0673924406237
+    },
+    "surfaceAptitude": {
+      "dirt": 20,
+      "turf": 53
+    },
+    "distanceCenter": 1566,
+    "distanceRange": 458,
+    "strategyAptitude": {
+      "nige": 40,
+      "sashi": 27,
+      "senko": 87,
+      "oikomi": 40
+    },
+    "heavyAptitude": 54,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 596.9595185023503,
+      "iq": 553.2456718449989,
+      "pw": 708.7677067754358,
+      "sp": 721.3354677648315,
+      "st": 640.3868624759318
+    },
+    "surfaceAptitude": {
+      "dirt": 53,
+      "turf": 37
+    },
+    "distanceCenter": 1151,
+    "distanceRange": 811,
+    "strategyAptitude": {
+      "nige": 32,
+      "sashi": 23,
+      "senko": 88,
+      "oikomi": 31
+    },
+    "heavyAptitude": 71,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 673.0258465564694,
+      "iq": 568.7837343607213,
+      "pw": 597.3443349630192,
+      "sp": 693.4327906925245,
+      "st": 606.3311931894287
+    },
+    "surfaceAptitude": {
+      "dirt": 50,
+      "turf": 62
+    },
+    "distanceCenter": 1246,
+    "distanceRange": 471,
+    "strategyAptitude": {
+      "nige": 34,
+      "sashi": 86,
+      "senko": 39,
+      "oikomi": 77
+    },
+    "heavyAptitude": 73,
+    "skillGenes": [
+      "G_STAYER"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 643.2989206349233,
+      "iq": 568.8731724741546,
+      "pw": 590.4137987969941,
+      "sp": 695.0555331243108,
+      "st": 606.5747740633243
+    },
+    "surfaceAptitude": {
+      "dirt": 66,
+      "turf": 55
+    },
+    "distanceCenter": 2306,
+    "distanceRange": 723,
+    "strategyAptitude": {
+      "nige": 24,
+      "sashi": 37,
+      "senko": 64,
+      "oikomi": 85
+    },
+    "heavyAptitude": 49,
+    "skillGenes": [
+      "G_MUD",
+      "G_STAYER"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 575.0349680243851,
+      "iq": 509.6808012348806,
+      "pw": 750.2973073090013,
+      "sp": 692.5837403820203,
+      "st": 575.7492417222217
+    },
+    "surfaceAptitude": {
+      "dirt": 48,
+      "turf": 65
+    },
+    "distanceCenter": 1728,
+    "distanceRange": 637,
+    "strategyAptitude": {
+      "nige": 31,
+      "sashi": 39,
+      "senko": 66,
+      "oikomi": 91
+    },
+    "heavyAptitude": 34,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 603.9904278245482,
+      "iq": 558.5154769120072,
+      "pw": 588.6966681675956,
+      "sp": 731.1773990989383,
+      "st": 620.5734570988599
+    },
+    "surfaceAptitude": {
+      "dirt": 46,
+      "turf": 74
+    },
+    "distanceCenter": 1875,
+    "distanceRange": 674,
+    "strategyAptitude": {
+      "nige": 35,
+      "sashi": 79,
+      "senko": 23,
+      "oikomi": 32
+    },
+    "heavyAptitude": 70,
+    "skillGenes": [
+      "G_MUD"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 617.1882499381488,
+      "iq": 508.1394017117785,
+      "pw": 666.528903431046,
+      "sp": 724.9361470576654,
+      "st": 577.575152068161
+    },
+    "surfaceAptitude": {
+      "dirt": 43,
+      "turf": 50
+    },
+    "distanceCenter": 2049,
+    "distanceRange": 878,
+    "strategyAptitude": {
+      "nige": 23,
+      "sashi": 65,
+      "senko": 77,
+      "oikomi": 37
+    },
+    "heavyAptitude": 76,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 557.7816363253269,
+      "iq": 519.8184423352875,
+      "pw": 692.7361846398404,
+      "sp": 717.7764330390655,
+      "st": 587.5279320454536
+    },
+    "surfaceAptitude": {
+      "dirt": 33,
+      "turf": 58
+    },
+    "distanceCenter": 1797,
+    "distanceRange": 588,
+    "strategyAptitude": {
+      "nige": 35,
+      "sashi": 27,
+      "senko": 67,
+      "oikomi": 80
+    },
+    "heavyAptitude": 36,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 674.9554800084455,
+      "iq": 521.4209195761755,
+      "pw": 562.0667084718398,
+      "sp": 735.4438968292015,
+      "st": 578.9652724862598
+    },
+    "surfaceAptitude": {
+      "dirt": 68,
+      "turf": 39
+    },
+    "distanceCenter": 2416,
+    "distanceRange": 519,
+    "strategyAptitude": {
+      "nige": 90,
+      "sashi": 28,
+      "senko": 63,
+      "oikomi": 33
+    },
+    "heavyAptitude": 60,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 646.0755286451217,
+      "iq": 452.74365644018815,
+      "pw": 717.9935950430744,
+      "sp": 685.9607219907815,
+      "st": 568.3895145246714
+    },
+    "surfaceAptitude": {
+      "dirt": 69,
+      "turf": 48
+    },
+    "distanceCenter": 1736,
+    "distanceRange": 569,
+    "strategyAptitude": {
+      "nige": 90,
+      "sashi": 62,
+      "senko": 31,
+      "oikomi": 36
+    },
+    "heavyAptitude": 55,
+    "skillGenes": [
+      "G_MUD",
+      "G_INNER"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 634.6294991886298,
+      "iq": 499.9486225625706,
+      "pw": 602.6223200845665,
+      "sp": 766.9026362319662,
+      "st": 547.9032176072257
+    },
+    "surfaceAptitude": {
+      "dirt": 57,
+      "turf": 43
+    },
+    "distanceCenter": 2002,
+    "distanceRange": 567,
+    "strategyAptitude": {
+      "nige": 32,
+      "sashi": 86,
+      "senko": 24,
+      "oikomi": 25
+    },
+    "heavyAptitude": 63,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 650.1668624241379,
+      "iq": 457.4292778295532,
+      "pw": 628.9108027126331,
+      "sp": 762.8266310198086,
+      "st": 550.8201988885978
+    },
+    "surfaceAptitude": {
+      "dirt": 76,
+      "turf": 57
+    },
+    "distanceCenter": 2064,
+    "distanceRange": 366,
+    "strategyAptitude": {
+      "nige": 70,
+      "sashi": 37,
+      "senko": 28,
+      "oikomi": 85
+    },
+    "heavyAptitude": 73,
+    "skillGenes": [
+      "G_MUD"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 610.9263009512382,
+      "iq": 510.16640115893415,
+      "pw": 667.5637380980556,
+      "sp": 728.3812739105875,
+      "st": 529.6808697449795
+    },
+    "surfaceAptitude": {
+      "dirt": 63,
+      "turf": 51
+    },
+    "distanceCenter": 2538,
+    "distanceRange": 732,
+    "strategyAptitude": {
+      "nige": 84,
+      "sashi": 25,
+      "senko": 39,
+      "oikomi": 72
+    },
+    "heavyAptitude": 70,
+    "skillGenes": [
+      "G_STAYER",
+      "G_INNER"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 650.753724273083,
+      "iq": 504.43678332362003,
+      "pw": 622.9862020021232,
+      "sp": 704.7930724387595,
+      "st": 561.1208510235649
+    },
+    "surfaceAptitude": {
+      "dirt": 38,
+      "turf": 40
+    },
+    "distanceCenter": 2035,
+    "distanceRange": 743,
+    "strategyAptitude": {
+      "nige": 26,
+      "sashi": 24,
+      "senko": 69,
+      "oikomi": 80
+    },
+    "heavyAptitude": 57,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 537.7879056714753,
+      "iq": 553.6698093184284,
+      "pw": 701.9797893330017,
+      "sp": 706.554186424223,
+      "st": 538.1754182962827
+    },
+    "surfaceAptitude": {
+      "dirt": 77,
+      "turf": 47
+    },
+    "distanceCenter": 2195,
+    "distanceRange": 748,
+    "strategyAptitude": {
+      "nige": 31,
+      "sashi": 93,
+      "senko": 26,
+      "oikomi": 68
+    },
+    "heavyAptitude": 64,
+    "skillGenes": [
+      "G_STAYER"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 547.2398098696369,
+      "iq": 527.9962044450634,
+      "pw": 632.600396420858,
+      "sp": 740.7482113934641,
+      "st": 588.1746220926707
+    },
+    "surfaceAptitude": {
+      "dirt": 39,
+      "turf": 59
+    },
+    "distanceCenter": 1787,
+    "distanceRange": 584,
+    "strategyAptitude": {
+      "nige": 30,
+      "sashi": 80,
+      "senko": 80,
+      "oikomi": 32
+    },
+    "heavyAptitude": 52,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 655.867129984759,
+      "iq": 543.5205162566749,
+      "pw": 532.1732966307297,
+      "sp": 699.5804810399227,
+      "st": 599.5814973188117
+    },
+    "surfaceAptitude": {
+      "dirt": 57,
+      "turf": 67
+    },
+    "distanceCenter": 2364,
+    "distanceRange": 638,
+    "strategyAptitude": {
+      "nige": 26,
+      "sashi": 65,
+      "senko": 28,
+      "oikomi": 83
+    },
+    "heavyAptitude": 74,
+    "skillGenes": [
+      "G_MUD"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 580.1354936536882,
+      "iq": 572.6810750048726,
+      "pw": 720.0117797605975,
+      "sp": 685.993475373415,
+      "st": 464.7427918438441
+    },
+    "surfaceAptitude": {
+      "dirt": 67,
+      "turf": 84
+    },
+    "distanceCenter": 1578,
+    "distanceRange": 629,
+    "strategyAptitude": {
+      "nige": 37,
+      "sashi": 76,
+      "senko": 66,
+      "oikomi": 30
+    },
+    "heavyAptitude": 39,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 608.844421348647,
+      "iq": 513.3678259227614,
+      "pw": 601.362360826129,
+      "sp": 700.2562309566567,
+      "st": 592.4518163062796
+    },
+    "surfaceAptitude": {
+      "dirt": 66,
+      "turf": 83
+    },
+    "distanceCenter": 2106,
+    "distanceRange": 723,
+    "strategyAptitude": {
+      "nige": 30,
+      "sashi": 33,
+      "senko": 79,
+      "oikomi": 38
+    },
+    "heavyAptitude": 50,
+    "skillGenes": [
+      "G_MUD",
+      "G_GATE"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 644.8898284442965,
+      "iq": 527.541937670449,
+      "pw": 548.1568158328546,
+      "sp": 702.1500058152158,
+      "st": 581.4352287116682
+    },
+    "surfaceAptitude": {
+      "dirt": 57,
+      "turf": 72
+    },
+    "distanceCenter": 2073,
+    "distanceRange": 872,
+    "strategyAptitude": {
+      "nige": 39,
+      "sashi": 92,
+      "senko": 32,
+      "oikomi": 26
+    },
+    "heavyAptitude": 64,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 569.8999949010436,
+      "iq": 471.84466578478015,
+      "pw": 610.000589423694,
+      "sp": 726.3982485258995,
+      "st": 605.104035953473
+    },
+    "surfaceAptitude": {
+      "dirt": 71,
+      "turf": 69
+    },
+    "distanceCenter": 1629,
+    "distanceRange": 556,
+    "strategyAptitude": {
+      "nige": 83,
+      "sashi": 72,
+      "senko": 23,
+      "oikomi": 32
+    },
+    "heavyAptitude": 60,
+    "skillGenes": [
+      "G_INNER"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 607.1253914814703,
+      "iq": 475.24340262611383,
+      "pw": 603.4719918105778,
+      "sp": 706.4817735563903,
+      "st": 587.9051612313283
+    },
+    "surfaceAptitude": {
+      "dirt": 55,
+      "turf": 66
+    },
+    "distanceCenter": 1817,
+    "distanceRange": 552,
+    "strategyAptitude": {
+      "nige": 23,
+      "sashi": 27,
+      "senko": 89,
+      "oikomi": 25
+    },
+    "heavyAptitude": 62,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 608.8225981471882,
+      "iq": 493.902170654306,
+      "pw": 537.8504988753461,
+      "sp": 738.0714358650043,
+      "st": 582.4550005866582
+    },
+    "surfaceAptitude": {
+      "dirt": 42,
+      "turf": 85
+    },
+    "distanceCenter": 2088,
+    "distanceRange": 534,
+    "strategyAptitude": {
+      "nige": 80,
+      "sashi": 65,
+      "senko": 28,
+      "oikomi": 36
+    },
+    "heavyAptitude": 74,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 587.2209113307209,
+      "iq": 437.3483821790281,
+      "pw": 609.080730270547,
+      "sp": 746.9764548827612,
+      "st": 579.1728189077886
+    },
+    "surfaceAptitude": {
+      "dirt": 73,
+      "turf": 57
+    },
+    "distanceCenter": 1990,
+    "distanceRange": 789,
+    "strategyAptitude": {
+      "nige": 86,
+      "sashi": 77,
+      "senko": 32,
+      "oikomi": 34
+    },
+    "heavyAptitude": 67,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 553.0632642026915,
+      "iq": 481.4899014150455,
+      "pw": 743.671887667973,
+      "sp": 686.1434722414383,
+      "st": 486.12270644714226
+    },
+    "surfaceAptitude": {
+      "dirt": 30,
+      "turf": 71
+    },
+    "distanceCenter": 1493,
+    "distanceRange": 477,
+    "strategyAptitude": {
+      "nige": 36,
+      "sashi": 24,
+      "senko": 72,
+      "oikomi": 95
+    },
+    "heavyAptitude": 60,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 554.5709736141658,
+      "iq": 503.12971585187296,
+      "pw": 660.3387956263355,
+      "sp": 691.5596626175867,
+      "st": 536.7723054872924
+    },
+    "surfaceAptitude": {
+      "dirt": 49,
+      "turf": 66
+    },
+    "distanceCenter": 1192,
+    "distanceRange": 664,
+    "strategyAptitude": {
+      "nige": 79,
+      "sashi": 35,
+      "senko": 76,
+      "oikomi": 38
+    },
+    "heavyAptitude": 76,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 556.8322190248142,
+      "iq": 483.47924116268416,
+      "pw": 503.95773022406644,
+      "sp": 718.1712018132881,
+      "st": 609.8465258847765
+    },
+    "surfaceAptitude": {
+      "dirt": 46,
+      "turf": 57
+    },
+    "distanceCenter": 1164,
+    "distanceRange": 687,
+    "strategyAptitude": {
+      "nige": 32,
+      "sashi": 21,
+      "senko": 79,
+      "oikomi": 27
+    },
+    "heavyAptitude": 61,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 532.2988501538341,
+      "iq": 508.6508538451123,
+      "pw": 621.1834257614263,
+      "sp": 689.7341104362233,
+      "st": 510.25734036597686
+    },
+    "surfaceAptitude": {
+      "dirt": 26,
+      "turf": 48
+    },
+    "distanceCenter": 1914,
+    "distanceRange": 684,
+    "strategyAptitude": {
+      "nige": 34,
+      "sashi": 93,
+      "senko": 31,
+      "oikomi": 34
+    },
+    "heavyAptitude": 44,
+    "skillGenes": [
+      "G_ESCAPE",
+      "G_SPURT"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 488.35824291811366,
+      "iq": 587.9686381442847,
+      "pw": 620.1562259668048,
+      "sp": 698.4030842571565,
+      "st": 453.9657637970779
+    },
+    "surfaceAptitude": {
+      "dirt": 57,
+      "turf": 50
+    },
+    "distanceCenter": 1625,
+    "distanceRange": 687,
+    "strategyAptitude": {
+      "nige": 61,
+      "sashi": 75,
+      "senko": 25,
+      "oikomi": 28
+    },
+    "heavyAptitude": 48,
+    "skillGenes": [
+      "G_INNER"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 531.8403720365627,
+      "iq": 467.9886657530529,
+      "pw": 557.2447706935163,
+      "sp": 740.94009331021,
+      "st": 510.5123847004138
+    },
+    "surfaceAptitude": {
+      "dirt": 69,
+      "turf": 57
+    },
+    "distanceCenter": 1709,
+    "distanceRange": 690,
+    "strategyAptitude": {
+      "nige": 34,
+      "sashi": 39,
+      "senko": 68,
+      "oikomi": 91
+    },
+    "heavyAptitude": 64,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 557.948294201175,
+      "iq": 525.7638538688419,
+      "pw": 563.8967535905578,
+      "sp": 689.0589069831212,
+      "st": 464.55230865439836
+    },
+    "surfaceAptitude": {
+      "dirt": 44,
+      "turf": 41
+    },
+    "distanceCenter": 2366,
+    "distanceRange": 614,
+    "strategyAptitude": {
+      "nige": 34,
+      "sashi": 82,
+      "senko": 30,
+      "oikomi": 60
+    },
+    "heavyAptitude": 50,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 519.9005875675716,
+      "iq": 477.43368139465576,
+      "pw": 617.6293155825824,
+      "sp": 744.1413684558086,
+      "st": 432.8785083051265
+    },
+    "surfaceAptitude": {
+      "dirt": 63,
+      "turf": 69
+    },
+    "distanceCenter": 2020,
+    "distanceRange": 558,
+    "strategyAptitude": {
+      "nige": 37,
+      "sashi": 77,
+      "senko": 29,
+      "oikomi": 34
+    },
+    "heavyAptitude": 62,
+    "skillGenes": [
+      "G_ESCAPE"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 437.17279129910963,
+      "iq": 377.59705739327325,
+      "pw": 670.2229586122629,
+      "sp": 690.3265586513309,
+      "st": 563.4724106615503
+    },
+    "surfaceAptitude": {
+      "dirt": 84,
+      "turf": 73
+    },
+    "distanceCenter": 1237,
+    "distanceRange": 684,
+    "strategyAptitude": {
+      "nige": 23,
+      "sashi": 26,
+      "senko": 63,
+      "oikomi": 76
+    },
+    "heavyAptitude": 77,
+    "skillGenes": [
+      "G_ESCAPE"
+    ]
+  },
+  {
+    "stats": {
+      "gt": 576.2547459732905,
+      "iq": 427.4643864694711,
+      "pw": 606.0800458170123,
+      "sp": 722.0394774737346,
+      "st": 393.14339609047255
+    },
+    "surfaceAptitude": {
+      "dirt": 58,
+      "turf": 70
+    },
+    "distanceCenter": 2129,
+    "distanceRange": 768,
+    "strategyAptitude": {
+      "nige": 31,
+      "sashi": 37,
+      "senko": 74,
+      "oikomi": 82
+    },
+    "heavyAptitude": 65,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 489.2933419507358,
+      "iq": 493.58736731709985,
+      "pw": 486.66605034535917,
+      "sp": 686.0755070557199,
+      "st": 455.6845077011841
+    },
+    "surfaceAptitude": {
+      "dirt": 37,
+      "turf": 59
+    },
+    "distanceCenter": 2706,
+    "distanceRange": 901,
+    "strategyAptitude": {
+      "nige": 39,
+      "sashi": 87,
+      "senko": 32,
+      "oikomi": 28
+    },
+    "heavyAptitude": 76,
+    "skillGenes": []
+  },
+  {
+    "stats": {
+      "gt": 510.84068996821827,
+      "iq": 448.8096611602504,
+      "pw": 497.51862445180365,
+      "sp": 686.7174739823059,
+      "st": 456.3416159326597
+    },
+    "surfaceAptitude": {
+      "dirt": 53,
+      "turf": 54
+    },
+    "distanceCenter": 1375,
+    "distanceRange": 603,
+    "strategyAptitude": {
+      "nige": 91,
+      "sashi": 26,
+      "senko": 35,
+      "oikomi": 21
+    },
+    "heavyAptitude": 77,
+    "skillGenes": []
+  }
+]
