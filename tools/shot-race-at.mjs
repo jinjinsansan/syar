@@ -107,6 +107,11 @@ const SEED = flag('--seed', 42);
  *    （この道具の 33.47s が、画面の 35.8s）。★測定値を秒で照合できませんでした（R-30）。
  */
 const OWN_GATE = flag('--own', 3);
+/** ★馬場（`--surface dirt`）。★画面の既定（`useState('turf')`）と同じ */
+const SURFACE = (() => { const i = argv.indexOf('--surface'); return i >= 0 ? argv[i + 1] : 'turf'; })();
+if (SURFACE !== 'turf' && SURFACE !== 'dirt') throw new Error(`★--surface は turf / dirt: ${SURFACE}`);
+/** ★砂煙の色。★`page.tsx:2008` と同じ値 */
+const KICKUP_COLOR = SURFACE === 'dirt' ? '#796047' : '#738b43';
 /**
  * ★**着差の見せ方（γ）**。
  *
@@ -188,7 +193,7 @@ const entrants = POOL.slice(start, start + FIELD).map((h, i) => ({
   weightKg: 55, gate: i + 1, age: 4, skillGenes: h.skillGenes,
 }));
 const conditions = {
-  raceId: `c${SEED}`, distance: DIST, surface: 'turf',
+  raceId: `c${SEED}`, distance: DIST, surface: SURFACE,
   trackCondition: 'good', courseShape: 'oval', baseWeightKg: 55,
 };
 const result = resolveRace({ conditions, entrants, seed: SEED, balance: BALANCE });
@@ -423,7 +428,7 @@ for (const [index, displaySec] of displaySecs.entries()) {
     motionBlur: noBlur ? undefined : { exposureSec, samples: MOTION_BLUR_SAMPLES, speedMpsOf },
     // ★ハロン棒の数字（設計 1-7）。画面と同じく書体を渡す
     poleFont: (px, bold) => `${bold ? 'bold ' : ''}${px}px JPUI, system-ui, sans-serif`,
-    frameRoleOf, surface: 'turf', condition: 'good', kickupColor: '#738b43',
+    frameRoleOf, surface: SURFACE, condition: 'good', kickupColor: KICKUP_COLOR,
     // ★Web 画面と同じ分岐（page.tsx: shot.view === 'side' ? undefined : texturedWorld）
     texturedWorld: scene.shot.view === 'side' ? undefined : texturedWorld,
     /**
