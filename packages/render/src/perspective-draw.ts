@@ -786,6 +786,59 @@ export function drawPerspectiveHorses<TImage>(
     })
     .sort((x, y) => y.p.depth - x.p.depth);
 
+  /**
+   * ★**後続が、前を行く馬の砂を被る**（2026-08-29・報告 §10-1「ダートの見せ場」）
+   *
+   * 【何が起きていたか】
+   *   ★砂煙は**その馬を描くついでに、その馬の下に**描かれていました。
+   *   ★`drawn` は**深さの降順**（遠→近）なので、
+   *   ★**手前にいる後続馬は、奥にいる前の馬の砂の“上”に描かれます。**
+   *   → ★各馬が自分の砂を出すだけで、★**誰も他馬の砂を被りませんでした。**
+   *
+   * 【どう直すか】
+   *   ★砂を **2 つに分けます**:
+   *     ①**蹄元の砂**（自分の絵に重なる範囲）… ★従来どおり**自分の下**。
+   *        ★ここを上に出すと、★**全馬が自分の砂で灰色に曇ります**（前の馬の砂ではない）
+   *     ②**後方に漂う砂**（自分の絵より後ろ）… ★**全馬を描いたあとに**まとめて描く
+   *   ★②は自分より**後ろの空間**にしか無いので、★**前を行く馬は被りません。**
+   *   ★被るのは、★**その砂の中に入っている後続馬だけ**です。
+   *
+   * ⚠️ ★位置・着順・タイムには触れません（憲法 3）。★描く順だけを変えます。
+   */
+  const hangingDust: {
+    readonly cx: number; readonly cy: number;
+    readonly rx: number; readonly ry: number;
+    readonly a: number; readonly depth: number; readonly color: string;
+  }[] = [];
+
+  /**
+   * ★砂の粒 1 つ。★**2 か所（自分の下・全馬の上）から同じ描き方を呼ぶ**ので関数にします。
+   *   ⚠️ ★分けて書くと必ず離れます（正典 D-052「条件は 1 か所で引く」と同じ形）。
+   */
+  const paintDustPuff = (
+    cx: number, cy: number, rx: number, ry: number, a: number, color: string,
+  ): void => {
+    const grad = ctx.createRadialGradient === undefined
+      ? undefined : ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+    if (grad === undefined) {
+      /** ★濃淡が無い実装では従来どおりの均一な塗り（描かないより良い） */
+      ctx.globalAlpha = a;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      grad.addColorStop(0, rgbaOf(color, a));
+      grad.addColorStop(0.45, rgbaOf(color, a * 0.66));
+      grad.addColorStop(1, rgbaOf(color, 0));
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, rx, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+
   for (const d of drawn) {
     const hpx = HORSE_HEIGHT_M * d.p.pxPerM;
     const wpx = hpx * (cw / opts.spec.cellH);
@@ -929,6 +982,11 @@ export function drawPerspectiveHorses<TImage>(
       const PLUME_M = 6.0;
       const PUFFS = 14;
       const dust = opts.trackEffect.dustColor ?? opts.trackEffect.color;
+      /**
+       * ★**自分の絵に重なる範囲**（m）。★ここより手前の砂は**自分の下**に置きます。
+       *   ★絵の幅を px から m に戻して半分。★手置きの m を書かない（R-31 の family）。
+       */
+      const selfClearM = (wpx / d.p.pxPerM) / 2;
       for (let i = 0; i < PUFFS; i += 1) {
         /** ★古さ（0=出たばかり … 1=消える）。★位相を足して連続にする */
         const age = (i + phase) / PUFFS;
@@ -961,25 +1019,15 @@ export function drawPerspectiveHorses<TImage>(
          *   ★**上下だけ縁が残ります**。
          *   ★煙全体の平たさは、粒ごとの**高さをちらす**ことで出します。
          */
-        const grad = ctx.createRadialGradient === undefined
-          ? undefined : ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
-        if (grad === undefined) {
-          /** ★濃淡が無い実装では従来どおりの均一な塗り（描かないより良い） */
-          ctx.globalAlpha = a;
-          ctx.fillStyle = dust;
-          ctx.beginPath();
-          ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-          ctx.fill();
-        } else {
-          grad.addColorStop(0, rgbaOf(dust, a));
-          grad.addColorStop(0.45, rgbaOf(dust, a * 0.66));
-          grad.addColorStop(1, rgbaOf(dust, 0));
-          ctx.globalAlpha = 1;
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          ctx.ellipse(cx, cy, rx, rx, 0, 0, Math.PI * 2);
-          ctx.fill();
+        /**
+         * ★**後方に漂う砂は、ここでは描かず、全馬のあとへ回します。**
+         *   ★蹄元の砂（自分の絵に重なる範囲）だけを、従来どおり自分の下に置きます。
+         */
+        if (back >= selfClearM) {
+          hangingDust.push({ cx, cy, rx, ry, a, depth: q.depth, color: dust });
+          continue;
         }
+        paintDustPuff(cx, cy, rx, ry, a, dust);
       }
       ctx.globalAlpha = 1;
     }
@@ -1134,4 +1182,16 @@ export function drawPerspectiveHorses<TImage>(
       ctx.globalAlpha = prevAlpha;
     }
   }
+
+  /**
+   * ★**後方に漂う砂を、全馬のあとに描く**（＝後続が前の馬の砂を被る）。
+   *
+   *   ★粒どうしは**深さの降順**（遠→近）で重ねます。★馬と同じ規則です。
+   *   ⚠️ ★ここへ来るのは「その馬の絵より後ろ」の粒だけなので、
+   *      ★**前を行く馬に掛かることはありません**（前の馬は、砂より前の空間にいます）。
+   */
+  for (const puff of hangingDust.sort((x, y) => y.depth - x.depth)) {
+    paintDustPuff(puff.cx, puff.cy, puff.rx, puff.ry, puff.a, puff.color);
+  }
+  if (hangingDust.length > 0) ctx.globalAlpha = 1;
 }
