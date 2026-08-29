@@ -47,7 +47,7 @@ import {
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT, CUT_RACE_SCRIPT, GATE_FRONT_STALL_PLATES,
   finishReplayAt, finishCrossDisplaySec, FINISH_REPLAY_DISPLAY_SEC, drawFinishReplayBadge,
-  DEMO_CONTEST_GAMMA, broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
+  DEMO_CONTEST_GAMMA, broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, laneAlignedFocusFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
@@ -377,6 +377,11 @@ interface HighQualityHorseFrame {
  *   `/race?cinematography=v4` で旧映像へ即座に戻せます。
  */
 const scriptFromSearch = broadcastV2ScriptFromSearch;
+/**
+ * ★**(b′) を画面から切る口**（`/race?laneFocus=off`・D-089 の条件 1）。
+ *   ★`scriptFromSearch` と同じ作法。★省略・綴り違いは既定へ落ちます（R-27）。
+ */
+const laneFocusFromSearch = laneAlignedFocusFromSearch;
 /**
  * ★**台本 v6 で `frameContenders` を使わないカット**（`broadcast-v2-scene.ts` の注記）。
  *   ⚠️ ★`side-drive` の枠取りは**残します**。あれは「詰まれば寄る」ための仕掛けで、
@@ -909,6 +914,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
       finishStyle, cornerCutM: CORNER_CUT_M_WEB, raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
       fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
       script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
+      laneAlignedFocus: laneFocusFromSearch(typeof window === 'undefined' ? '' : window.location.search),
     });
     const h = 0.05;
     const lo = Math.max(0, clampedD - h);
@@ -1871,6 +1877,7 @@ export default function RacePage(): React.JSX.Element {
         raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
         fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
         script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
+        laneAlignedFocus: laneFocusFromSearch(typeof window === 'undefined' ? '' : window.location.search),
         /** ★リプレイ区間は台本の外。専用のカットへ固定します（`finish-replay.ts`） */
         ...(replay.active ? { forceShotId: 'finish-replay' as const } : {}),
         /**
@@ -2155,6 +2162,7 @@ export default function RacePage(): React.JSX.Element {
             raceDisplaySec: d - RACE_INTRO_RACE_START_SEC, forceShotId: change.from,
             fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
             script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
+            laneAlignedFocus: laneFocusFromSearch(typeof window === 'undefined' ? '' : window.location.search),
             // ★本体と同じ設定にすること（食い違うと、重ねる直前のコマだけ別の素材になる）
             winnerRear: false,
           });

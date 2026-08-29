@@ -654,10 +654,16 @@ export const DEMO_CONTEST_GAMMA = 1.6;
 /**
  * ★**注視点を「走線に沿った長さ」で置くか**（残件 A-2 の候補 (b′)・2026-08-29）
  *
- * 【★いまは `false` です — 入っているが使われていません】
- *   ★正典 R-15「新しい機構は**入っているが使われない**状態で一度コミットする（接続前後で対照が取れる）」。
- *   ★裁定 `REVIEW_P4_A1_DIRT_CANON_VERDICT_20260829.md` §7 Q-A2-2:
- *     > ★**はい。未検証 3 点を測ってから実装してください**（もう 1 便）
+ * 【★2026-08-29、`true` にしました — 既定です】
+ *   ★裁定 `REVIEW_P4_SEAM_BPRIME_VERDICT_20260829.md`・正典 **D-089** で採用。
+ *   ★測定 3 つを通してから切り替えました（下の順序）。
+ *   ★経緯: R-15 に従い、一度 `false`（入っているが使われない）でコミットし、対照を取っています。
+ *
+ * ⚠️ 【★戻し口】★**`/race?laneFocus=off`**（`laneAlignedFocusFromSearch`）。
+ *   ★正典 D-085「★**既定を変えるときは戻せる口を同時に置き、戻せること自体を検査で固定する**」。
+ *   ★(b′) は**カメラの向け先を全カットで変える**ので、
+ *   ★**実画面でその場で比べられなければ、オーナーの判断そのものができません**（裁定 §3）。
+ *   ★戻せることは `lane-aligned-focus.test.ts` が固定しています。
  *
  * 【何をするものか】
  *   ★現行は注視点を「**中心線の弧長**で N m 手前」に置いています。
@@ -665,14 +671,18 @@ export const DEMO_CONTEST_GAMMA = 1.6;
  *   → ★カメラと馬が走路の折れ目を**同じ割合で**越えるので、★1 コマの滑りが出ません。
  *   ⚠️ ★平滑化フィルタではないので、★**遅れは出ません**（台帳の (b) とはここが違います）。
  *
- * 【★測ってから既定を変えること】★裁定 §7 が順序を指定しています:
- *   1. `race-video-invariants.test.ts` の 3 つの不変条件が 0 のままか（★先に）
- *   2. `audit-cut-seam` で新しい跳びが出ていないか（全境目・4 seed）
- *   3. `_seamslip.mjs` で全 7 距離・全 w の跳びが 0 になるか
+ * 【★切り替える前に通した測定】★裁定 §7 が順序を指定していました:
+ *   1. `race-video-invariants.test.ts` の 3 つの不変条件が 0 のままか（★先に）… ✅ 0 のまま
+ *   2. `audit-cut-seam` で新しい跳びが出ていないか（全境目・4 seed）… ✅ 中央 303px で不変
+ *   3. `_seamslip.mjs` で全 7 距離・全 w の跳びが 0 になるか … ✅ 120 通りで 15.7px → **0.0px**
+ *
+ * ⚠️ ★**①の順序指定が、実装バグを捕まえました**（`REPORT_P4_SEAM_BPRIME_20260829.md` §2）。
+ *    ★`laneArcLengthAt` の末尾が負値を足し、★注視点が **−410m** ずれていました。
+ *    ★**片道では正常に見え、往復で初めて 100m のずれが出ます**（`lane-arc-length.test.ts` で固定）。
  *
  * ⚠️ ★**道具はこの定数を読むこと**（R-31）。★`true`/`false` を道具に直書きしない。
  */
-export const LANE_ALIGNED_FOCUS_DEFAULT = false;
+export const LANE_ALIGNED_FOCUS_DEFAULT = true;
 
 /**
  * ★1 完歩の距離（m）。脚のコマ送りの周期。
@@ -838,6 +848,29 @@ export function broadcastV2ScriptFromSearch(search: string): BroadcastV2Script {
   if (v === PREVIOUS_RACE_SCRIPT) return PREVIOUS_RACE_SCRIPT;
   if (v === CUT_RACE_SCRIPT) return CUT_RACE_SCRIPT;
   return DEFAULT_RACE_SCRIPT;
+}
+
+/**
+ * ★**(b′) を画面から切る口**（`/race?laneFocus=off`・2026-08-29・D-089 の条件 1）
+ *
+ * 【なぜ要るか — この案件自身の失敗から】
+ *   ★正典 **D-085**: ★**既定を変えるときは「戻せる口」を同時に置き、戻せること自体を検査で固定する。**
+ *   ⚠️ ★裁定 `REVIEW_P4_SEAM_BPRIME_VERDICT_20260829.md` §3:
+ *      > ★(b′) は**カメラの向け先を全カットで変えます**。
+ *      > ★オーナーが実画面で「前のほうが良かった」と感じたとき、
+ *      > ★**その場で比べられなければ、判断そのものができません。**
+ *
+ * ★`?cinematography=v4` / `?climax=on` / `?infield=turf` / `?surface=dirt` と**同じ作法**です。
+ *
+ * ⚠️ ★**`off` 以外はすべて既定へ落ちます**（R-27: 縮退は狭い側・安全な側へ）。
+ *    ★綴りを間違えたときに「切れたつもりで切れていない」より、
+ *    ★**「切れなかった」ほうが気づけます**（画が変わらないので）。
+ */
+export function laneAlignedFocusFromSearch(search: string): boolean {
+  const v = new URLSearchParams(search).get('laneFocus');
+  if (v === 'off') return false;
+  if (v === 'on') return true;
+  return LANE_ALIGNED_FOCUS_DEFAULT;
 }
 
 /** ★台本 → ショット表。`v2` は表を持たないので v4 で代用（呼び出し側が使わない） */
