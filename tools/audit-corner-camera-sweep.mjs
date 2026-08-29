@@ -78,11 +78,31 @@ console.log(`★斜め前素材は α=12°（viewDeg 168°）で描かれてい�
 console.log(`★現行: カット 0.555〜0.612 / カメラ ${30}m 先\n`);
 
 const CUT_ENDS = [0.604];
-const S_FROMS = [60, 90, 120, 160];
+/**
+ * ★**5〜40m を足しました**（2026-08-29・残件 A-1）
+ *   ★60m で「カット内 1 回反転」が現れます。★これは**軸を跨いでいる**ということで、
+ *   ★映画文法では**カットの中で向きが変わるのは正当**です（境目で変わるのが不正）。
+ *   → ★もっと寄せると、★**入口も出口も → に揃う**か？を見に行きました。
+ *
+ * 【★結論: 入口は → になりません（0 箇所は到達不能）】
+ *   ★5m まで寄せても入口は ←4.2〜←6.0。★カットの始まりでは馬がまだコーナーの中にいるためで、
+ *   ★**カメラの据え位置では消せません。** 境目の反転は **1 箇所が下限**です。
+ *   ⚠️ ★しかも 30m より寄せると 168°ずれが急に悪化します（30m 12.0° → 25m 16.4° → 20m 23.2° → 5m 59.7°）。
+ *   → ★**30m / 22m を採りました**（出口の反転が消え、168°ずれは 90m の 10.2° とほぼ同等）。
+ */
+const S_FROMS = [5, 10, 20, 30, 40, 60, 90, 120, 160];
 /** ★内馬場側（負）と外側（正）の両方。走路 0〜20m の上は飛ばす */
 const CAM_WS = [-8, -6, -4, -2, 21, 22, 24, 27];
 
-console.log('  カット終  カメラ先  横位置   カット内の向き        168°ずれ  ★反転  画面の向き   馬高比(始→終)');
+/**
+ * ★**入口と出口の向きを足しました**（2026-08-29・残件 A-1）
+ *
+ * ⚠️ ★中央のコマだけでは**境目の反転**が読めません。★境目で効くのは
+ *    ★**入口の 1 コマ目**（直前の `side-drive` と比べる）と
+ *    ★**出口の最終コマ**（直後の `side-drive` と比べる）です。
+ * ★前後はどちらも `side-drive`（→82px/m）なので、★**入口・出口とも → なら境目の反転は 0 になります。**
+ */
+console.log('  カット終  カメラ先  横位置   カット内の向き        168°ずれ  ★反転  ★入口     ★出口     中央        馬高比(始→終)  ★境目の反転');
 for (const uEnd of CUT_ENDS) {
   for (const camW of CAM_WS) {
     for (const sFrom of S_FROMS) {
@@ -100,14 +120,21 @@ for (const uEnd of CUT_ENDS) {
       const a = rows[0], b = rows[rows.length - 1];
       /** ★カット全体の代表の向き（中央のコマで見る） */
       const mid = rows[Math.floor(rows.length / 2)];
+      /**
+       * ★**境目の反転**は、前後の `side-drive`（→）と符号が違うかで決まります。
+       *   ★入口が ← なら 1 箇所、出口が ← なら 1 箇所。★両方 → なら **0 箇所**。
+       */
+      const seamFlips = (a.forwardDx < 0 ? 1 : 0) + (b.forwardDx < 0 ? 1 : 0);
+      const dir = (v) => `${v > 0 ? '→' : '←'}${Math.abs(v).toFixed(1).padStart(5)}`;
       console.log(
         `  ${uEnd.toFixed(3)}   ${String(sFrom).padStart(4)}m`
         + `   ${String(camW).padStart(4)}m`
         + `   ${Math.min(...degs).toFixed(0).padStart(3)}°〜${Math.max(...degs).toFixed(0).padStart(3)}°`
         + `   ${dev.toFixed(1).padStart(9)}°`
         + `   ${flips === 0 ? ' なし' : `★${flips} 回`}`
-        + `   ${(mid.forwardDx > 0 ? '→' : '←')}${Math.abs(mid.forwardDx).toFixed(1).padStart(5)}px/m`
-        + `   ${(a.heightRatio * 100).toFixed(0).padStart(3)}%→${(b.heightRatio * 100).toFixed(0).padStart(3)}%`,
+        + `   ${dir(a.forwardDx)}  ${dir(b.forwardDx)}  ${dir(mid.forwardDx)}px/m`
+        + `   ${(a.heightRatio * 100).toFixed(0).padStart(3)}%→${(b.heightRatio * 100).toFixed(0).padStart(3)}%`
+        + `   ${seamFlips === 0 ? '  ★★0 箇所' : `  ${seamFlips} 箇所`}`,
       );
     }
   }

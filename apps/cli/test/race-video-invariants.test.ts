@@ -119,4 +119,63 @@ describe('★レース映像の不変条件（画面の既定で測る）', () =
         `seed ${seed}: ★前後で共通の馬が 0 頭の境目があります（${orphans.length} 箇所）`).toEqual([]);
     }
   });
+
+  /**
+   * ★**③ 4 角正面から「出る」境目で、走行方向が反転しない。**（2026-08-29・残件 A-1）
+   *
+   * 【★何を守っているのか】
+   *   ★4 角正面は台本で唯一 ← へ進む画で、★前後の `side-drive` は → です。
+   *   ★2026-08-29 まで**入口と出口の両方**が反転していました（4 seed 中 4 本とも 2 箇所）。
+   *   ★カメラを 90m → 30m へ寄せて、★**出口の反転を消しました**（実測 4 seed 中 0 箇所）。
+   *
+   * ⚠️ ★**入口の反転は残っています。** ★カメラの据え位置では消せないことを
+   *    掃引（5〜160m × 横 8 通り）で確かめました。★残件台帳 A-1 に「未解決」として残します。
+   *    → ★**ここで守るのは「出口の 0」だけ**です。★入口を一緒に入れると、この検査は
+   *      ★**最初から赤**になり、守るべき 0 まで一緒に見えなくなります。
+   *
+   * 【★向きの定義は道具と同じもの】（R-30: 指標を自作しない）
+   *   ★`tools/audit-cut-seam.mjs` の `screenDirection` と同じ式です（2m 先との画面 x の差 ÷ 2）。
+   */
+  it('★4 角正面から出る境目で走行方向が反転しない', () => {
+    /** ★`audit-cut-seam.mjs:103` と同じ式 */
+    const dirOf = (course: AuditCourse, scene: AuditScene, s: number, w: number): number => {
+      const camera = scene.camera as unknown as Parameters<typeof cameraBasis>[0];
+      const basis = cameraBasis(camera);
+      const c = course as unknown as Parameters<typeof posOf>[0];
+      const a = project(camera, basis, { ...posOf(c, s, w), z: 0 });
+      const b = project(camera, basis, { ...posOf(c, s + 2, w), z: 0 });
+      if (!(a.depth > 0) || !(b.depth > 0)) return 0;
+      return (b.x - a.x) / 2;
+    };
+
+    for (const seed of SEEDS) {
+      const built = buildAuditRace({ seed });
+      const clock = auditClock(built);
+      const total = clock.introSec + clock.warp.displaySec;
+      const flips: string[] = [];
+      let exits = 0;
+      let prev: { id: string; dir: number } | undefined;
+      for (let f = 0; f <= Math.ceil(total * FPS); f += 1) {
+        const d = f / FPS;
+        if (d < clock.introSec) continue;
+        const r = auditSceneAt(built, clock, d, { width: W, height: H });
+        if (r.drawn.length === 0) { prev = undefined; continue; }
+        const lead = r.drawn.reduce((b, h) => (h.s > b.s ? h : b), r.drawn[0]!);
+        const cur = { id: r.scene.shot.id, dir: dirOf(built.course, r.scene, lead.s, lead.w) };
+        if (prev !== undefined && prev.id === 'fourth-corner-front' && cur.id !== prev.id) {
+          exits += 1;
+          if (Math.sign(prev.dir) !== 0 && Math.sign(cur.dir) !== 0
+            && Math.sign(prev.dir) !== Math.sign(cur.dir)) {
+            flips.push(`${d.toFixed(2)}s ${prev.id} → ${cur.id}`
+              + `（${prev.dir.toFixed(1)} → ${cur.dir.toFixed(1)} px/m）`);
+          }
+        }
+        prev = cur;
+      }
+      /** ★出口を 1 つも拾えていないなら「異常なし」ではありません（R-3 / R-21） */
+      expect(exits, `seed ${seed}: ★4 角正面から出る境目を 1 つも拾えていません`).toBeGreaterThan(0);
+      expect(flips,
+        `seed ${seed}: ★4 角正面の出口で走行方向が反転しています`).toEqual([]);
+    }
+  });
 });
