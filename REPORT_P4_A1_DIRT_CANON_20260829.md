@@ -26,6 +26,77 @@
 
 ---
 
+## 0-2. 提出物・コミット・変更範囲
+
+### 0-2-1. ★この便の提出物
+
+| # | 文書 | 種別 | 状態 |
+|---|---|---|---|
+| 1 | `REPORT_P4_DIRT_20260829.md` | 報告 | ⚠️ ★**前便・裁定がまだ出ていません**（併せてお願いします） |
+| 2 | **本書** | 報告 | 新規 |
+| 3 | `QUESTIONS_P4_SEAM_SLIP_20260829.md` | 照会（Q-A2-1〜3） | 回答待ち |
+| 4 | `QUESTIONS_P4_SOURCE_KANJI_20260829.md` | 照会（Q-K-1〜3） | 回答待ち |
+| 5 | `STAR_SPEC_v2.0.md` の差分 | ★**正典への起票** | ★**追認が要ります**（§3） |
+| 6 | `RESIDUALS_P4_RACE_VIDEO.md` の差分 | 残件台帳 | A-1 / A-2 / C-1 を更新 |
+
+### 0-2-2. コミット（起点 `9c8f9ed` → HEAD `e0ef6df`・6 本・★未 push）
+
+```
+4e13146  照会: 走路の折れ目の跳び（残件 A-2）の判断を出す — 上限は 12px でなく 33.5px だった
+2fcbf13  正典: D-081〜D-087 と R-31 を起票する（8 日分・正典は 8/21 で時が止まっていた）
+fa65a83  註釈に別字が 47 箇所混ざっていた（grep 芝 が芝の註記を 38 件取り逃していた）
+d84841a  ダート: 後続が前の馬の砂を被る（報告 §10-1「ダートの見せ場」）
+f459d35  4 角: 出口の走行方向の反転を消す（測っていない量を最適化していた）
+e0ef6df  報告: 4 角の出口の反転 / ダートの砂被り / 正典の起票 / 照会 2 件
+```
+
+### 0-2-3. ★製品コードの実質差分は、これだけです
+
+★**振る舞いを変えたのは 2 ファイル・数行**です。残りは**註釈の別字直し**と**検査**と**道具**です。
+
+**① `packages/render/src/broadcast-v2.ts` — ★2 行**
+
+```diff
+-      sFromSegmentEnd: 90, w: 22, upM: 7,
+-      approach: { farM: 190, nearM:  90, farRatio: 0.16, nearRatio: 0.34 },
++      sFromSegmentEnd: 30, w: 22, upM: 7,
++      approach: { farM: 133, nearM:  35, farRatio: 0.16, nearRatio: 0.34 },
+```
+
+**② `packages/render/src/perspective-draw.ts` — ★描く順だけ**
+
+```diff
++  const hangingDust: { cx; cy; rx; ry; a; depth; color }[] = [];   // ★後方に漂う砂を溜める
++  const paintDustPuff = (cx, cy, rx, ry, a, color) => { …既存の塗りをそのまま関数に出した… };
+
+       // 砂粒のループの中
++      const selfClearM = (wpx / d.p.pxPerM) / 2;                   // ★自分の絵に重なる範囲（m）
++      if (back >= selfClearM) { hangingDust.push({…}); continue; } // ★後方の砂は後回し
+-      …ここで直に塗っていた…
++      paintDustPuff(cx, cy, rx, ry, a, dust);                      // ★蹄元だけ従来どおり自分の下
+
+   }   // ← 全馬のループの終わり
++  for (const puff of hangingDust.sort((x, y) => y.depth - x.depth)) paintDustPuff(…);
+```
+
+⚠️ ★**塗り方は 1 文字も変えていません**（既存の塗りを関数に出しただけ）。★変えたのは**呼ぶ順**です。
+
+### 0-2-4. 変更ファイル
+
+| 区分 | ファイル | 何を |
+|---|---|---|
+| **製品（振る舞い）** | `render/src/broadcast-v2.ts` | ★4 角の固定カメラ 2 行 |
+| **製品（振る舞い）** | `render/src/perspective-draw.ts` | ★砂を描く順 |
+| 製品（註釈のみ） | `render/src/world-textured.ts` / `infield.ts` / `broadcast-v2-scene.ts` / `web/src/app/race/page.tsx` | ★別字直し（芝ほか） |
+| 検査（新規） | `render/test/dirt-dust-order.test.ts` | 砂の描く順・5 件 |
+| 検査（追加） | `cli/test/race-video-invariants.test.ts` | ★4 角の出口の反転・1 件 |
+| 検査（追加） | `cli/test/source-integrity.test.ts` | 別字の目印・2 件 |
+| 道具 | `audit-corner-camera-sweep.mjs` | ★入口・出口の列を追加／掃引範囲を 5〜160m へ |
+| 道具（追跡外） | `_seamslip.mjs` / `_dustcover.mjs` / `_camdist.mjs` | 新規・登録簿に記載 |
+| 道具（註釈のみ） | `shot-race-at.mjs` / `bake-dirt-plates.mjs` / `lib/classification.mjs` | 別字直し・登録 |
+
+---
+
 ## 1. ★4 角の反転（残件 A-1）— 出口は消えました
 
 ### 1-1. ★原因は「測っていない量を最適化していた」ことです
@@ -244,24 +315,58 @@ npm run typecheck → クリーン（exit 0）
 
 ---
 
-## 8. 再現コマンド（すべて読取専用）
+## 8. ★独立に再実行して突き合わせてください（期待値つき）
+
+★すべて**読取専用**です。DB にも外部にも接続しません。
+★**この表の数字と違ったら、それはこちらの誤りです。** 数字を添えて差し戻してください。
+
+| # | コマンド | ★出るはずの数字 |
+|---|---|---|
+| 1 | `npx tsx tools/audit-cut-seam.mjs --seeds 42,253,90,2 --script v6` | ★走行方向が反転した境目 **4 箇所**（★**全て `side-drive → fourth-corner-front`**）<br>★`fourth-corner-front → side-drive` は **反転 なし**・跳び **595〜791px**<br>★`side-drive → fourth-corner-front` は 跳び **914〜994px**<br>★共通の馬が 0 頭の境目 **0 箇所** |
+| 2 | `npx tsx tools/audit-corner-turn.mjs --script v6` | ★`fourth-corner-front`: 向き **158°〜180°** / 1 コマ最大 **2.01°** / 素材の入替 **0 回** / ★**左右反転 1 回**（18.03s） |
+| 3 | `npx tsx tools/audit-corner-camera-sweep.mjs` | ★**入口は全 72 通りで ←**（0 箇所は到達不能）<br>★30m/22m: 入口 **←11.5** / 出口 **→33.9** / 168°ずれ **12.0°** / 馬高比 **21%→28%**<br>★90m/22m（旧）: 入口 **←23.6** / 出口 **←4.0** / ★**境目の反転 2 箇所** |
+| 4 | `npx tsx tools/_camdist.mjs` | ★カメラ距離 **133m → 35m**（`approach` の farM/nearM の根拠）<br>★軸を跨ぐのは **17.90s・179.6°**（＝ほぼ真正面） |
+| 5 | `npx tsx tools/_dustcover.mjs` | ★他馬の砂の中にいる頭数 **平均 5.5 → 7.5**（12 頭立て・8 場面） |
+| 6 | `npx tsx tools/_seamslip.mjs` | ★1600m・w=2.2・遅れ 4.24m で **12.2px**（★既存実測 12.16px と一致）<br>★上限 **33.5px ＝ 画面幅の 2.6%**（1400m・s=1000・w=0）<br>★折れ目の数 1600m で **2 箇所**／全 7 距離で **2〜6 箇所** |
+| 7 | `npm test` | ★**124 ファイル / 1223 件 PASS**（exit 0） |
+| 8 | `npm run typecheck` | ★クリーン（exit 0） |
+
+### ★検査が「直す前なら落ちる」ことも確かめてください（R-21）
+
+★**通ったことだけでは、正しい理由で通ったかは分かりません。** こちらでは次で確認しています。
+
+| 戻し方 | 落ちるはずの検査 |
+|---|---|
+| `broadcast-v2.ts` の `sFromSegmentEnd: 30` → `90` | `race-video-invariants.test.ts`「★4 角正面から出る境目で走行方向が反転しない」 |
+| `perspective-draw.ts` の `if (back >= selfClearM)` → `if (false)` | `dirt-dust-order.test.ts`「★全馬の絵を描き終えたあとに砂が描かれる」 |
+| 同上 → `if (true)` | `dirt-dust-order.test.ts`「★蹄元の砂は自分の絵より先に描かれる」 |
+
+### 実画面
 
 ```powershell
-# ★4 角（A-1）
-npx tsx tools/audit-cut-seam.mjs --seeds 42,253,90,2 --script v6
-npx tsx tools/audit-corner-camera-sweep.mjs      # ★入口・出口の列を追加した
-npx tsx tools/audit-corner-turn.mjs --script v6
-npx tsx tools/_camdist.mjs                       # ★軸を跨ぐ瞬間の角度
-
+cd apps/web ; npm run dev
+# ★4 角（入口の ←11px/m を見る）
+http://localhost:3210/race?seed=42&cinematography=v6&contest=1.6
 # ★ダートの砂被り
-npx tsx tools/_dustcover.mjs
-
-# ★A-2（走路の折れ目）
-npx tsx tools/_seamslip.mjs
-
-# ★実画面（dev サーバー: cd apps/web ; npm run dev）
 http://localhost:3210/race?seed=42&surface=dirt
 ```
+
+---
+
+## 8-2. ★判定していただきたいこと
+
+| # | 論点 | こちらの立場 |
+|---|---|---|
+| **①** | ★**正典の起票（D-081〜D-087 / R-31）の追認** | ⚠️ ★裁定 §8 は「**番号の確定は正典側の作業**」と明記しています。★オーナー指示で開発側が振りました。★**文言・番号・7 件との対応が意図どおりか**を見てください |
+| **②** | ★4 角の出口の反転を消したこと（カメラ 90m → 30m） | ★消えました（4 seed とも）。★**入口は消せないことを掃引で示しました**。★入口を残したまま閉じてよいか |
+| **③** | ★カット内の左右反転が **0 → 1 回**になったこと | ★179.6°（ほぼ真正面）で起きるので目立たない、というのがこちらの読みです。★**却下済みの機構とは別物**という §1-4 の整理が正しいか |
+| **④** | ★ダートの砂被り（描く順のみ） | ★幾何では 5.5 → 7.5 頭。★**濃さの判断は [EYES]** と考えています |
+| **⑤** | ★**Q-A2-1〜3**（走路の折れ目・別紙） | ★推奨は **(b′)**。★未検証 3 点あり |
+| **⑥** | ★**Q-K-1〜3**（註釈の別字・別紙） | ★恒久策は**共通土台なので単独の便**、と考えています |
+| **⑦** | ★番号を振っていただきたいもの 1 件 | 「注視点の上限を画面の実寸から決める」（§3-2）。★衝突を避けるため D-088 を振っていません |
+
+⚠️ ★**②③ は演出の質の判断を含みます。** ★裁定 §9 の [EYES] と同じく、**最終はオーナーの目**だと考えています。
+★こちらから出せるのは「何がどれだけ変わったか」までです。
 
 ---
 
