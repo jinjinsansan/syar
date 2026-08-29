@@ -82,6 +82,18 @@ export interface TexturedWorldOptions {
    */
   readonly surface?: 'turf' | 'dirt';
   /**
+   * ★**馬場状態**（良／稍重／重／不良）。
+   *
+   * ⚠️ ★2026-08-29 まで、★**この層は馬場状態を一度も見ていませんでした。**
+   *    ★`trackSurfacePaletteRole`（良→`dirt-0` … 不良→`dirt-3`）は既に決まっていて
+   *    ★検査まであるのに、★**画面が使う経路がそれを読んでいなかった**だけです。
+   *    ★結果、★**良でも不良でも地面が同じ**でした（変わるのは蹴り上げの量だけ）。
+   *    ★馬場状態は 25% の確率で良以外になります（`TRACK_CONDITION_CDF` 良 0.75）。
+   *
+   * ★省略時は `'good'`。★**良の絵は 1 画素も変わりません。**
+   */
+  readonly condition?: 'good' | 'yielding' | 'soft' | 'bad';
+  /**
    * ★**内側の帯を逆にする**（ダート戦で内回りを芝に見せる）。
    *   ⚠️ ★裁定 §6-3 の **[EYES]**: ダート戦だと走路も内側の帯も褐色になり、
    *      ★**褐色の帯が 2 本並んで「どこを走っているか」が読めなくなる**恐れがあります。
@@ -91,6 +103,41 @@ export interface TexturedWorldOptions {
 }
 
 const wrap = (a: number, n: number): number => ((a % n) + n) % n;
+
+/**
+ * ★**馬場状態で走路をどれだけ暗くするか**（1 = 良＝そのまま）。
+ *
+ *   ★濡れた馬場は暗くなります。★既に決まっている役割の対応
+ *   （`trackSurfacePaletteRole`: 良→`dirt-0` … 不良→`dirt-3`）と同じ向きです。
+ *
+ * ⚠️ ★**良は必ず 1** です。★良の見え方は 2026-08-29 に実画面で測って合わせたばかりなので、
+ *    ★1 ビットも動かしません（`world-textured` の前後で 0 画素差を確認済み）。
+ * ⚠️ ★省略・知らない値は**良**へ落とします（★狭い側＝何もしない側・R-27）。
+ */
+export function trackWetnessFactor(
+  condition?: 'good' | 'yielding' | 'soft' | 'bad' | undefined,
+): number {
+  switch (condition) {
+    case 'yielding': return 0.90;
+    case 'soft': return 0.80;
+    case 'bad': return 0.70;
+    default: return 1;
+  }
+}
+
+/**
+ * ★色を暗い側へ寄せる（`k = 1` なら**元の文字列をそのまま返す**）。
+ *
+ * ⚠️ ★`k === 1` で早期に返すのが要点です。★丸め誤差で 1 ビットずれると、
+ *    ★「良の絵は変えていない」と言えなくなります。
+ */
+function scaleHex(hex: string, k: number): string {
+  if (k >= 1) return hex;
+  const n = parseInt(hex.slice(1), 16);
+  const ch = (shift: number): number =>
+    Math.max(0, Math.min(255, Math.round(((n >> shift) & 0xff) * k)));
+  return `#${[ch(16), ch(8), ch(0)].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
 
 export function drawTexturedWorld<TImage>(
   ctx: Ctx2D<TImage>,
@@ -251,8 +298,18 @@ export function drawTexturedWorld<TImage>(
   const isDirt = opts.surface === 'dirt';
   /** ★全体を薄く落とす色（芝は深緑・ダートは深褐） */
   const SHADE = isDirt ? '#221a12' : '#12220f';
-  /** ★走路だけを少し明るくする色（芝は若草・ダートは乾いた砂） */
-  const TRACK_TINT = isDirt ? '#c8a985' : '#9ccb55';
+  /**
+   * ★**馬場状態で走路の明るさを落とす**（2026-08-29）。
+   *
+   *   ★濡れた馬場は**暗く**なります。★既に決まっている役割の対応
+   *   （`trackSurfacePaletteRole`: 良→`dirt-0` … 不良→`dirt-3`）と同じ向きです。
+   *
+   * ⚠️ ★**良は 1.0（＝いまの絵と 1 ビットも変わらない）**にしてあります。
+   *    ★良の見え方は 2026-08-29 に測って合わせたばかりなので、動かしません。
+   */
+  const wet = trackWetnessFactor(opts.condition);
+  /** ★走路だけを少し明るくする色（芝は若草・ダートは乾いた砂）。★濡れるほど暗い */
+  const TRACK_TINT = scaleHex(isDirt ? '#c8a985' : '#9ccb55', wet);
   // ★内外を暗くする代わりに、走路だけを少し明るく（台形が裏返らない範囲）。全体を先に薄く落とす
   ctx.globalAlpha = darken * 0.5;
   ctx.fillStyle = SHADE;

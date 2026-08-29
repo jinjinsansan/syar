@@ -558,6 +558,11 @@ export function drawBroadcastV2Scene<TImage>(
       focusS: scene.focusS,
       focusW: scene.focusW,
       surface: opts.surface,
+      /**
+       * ★**馬場状態**（2026-08-29）。⚠️ ★ここで渡していなかったので、
+       *    ★**良でも不良でも地面が同じ**でした。★良の絵は変わりません。
+       */
+      ...(opts.condition === undefined ? {} : { condition: opts.condition }),
       ...(opts.infieldReversed === true ? { infieldReversed: true } : {}),
     }).drawNearRail;
   } else if (opts.parallaxPlate !== undefined) {

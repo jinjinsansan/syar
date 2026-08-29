@@ -111,6 +111,13 @@ const OWN_GATE = flag('--own', 3);
 /** ★馬場（`--surface dirt`）。★画面の既定（`useState('turf')`）と同じ */
 const SURFACE = (() => { const i = argv.indexOf('--surface'); return i >= 0 ? argv[i + 1] : 'turf'; })();
 if (SURFACE !== 'turf' && SURFACE !== 'dirt') throw new Error(`★--surface は turf / dirt: ${SURFACE}`);
+/**
+ * ★馬場状態（`--condition yielding|soft|bad`）。★画面の既定（`useState('good')`）と同じ。
+ * ⚠️ ★ここは `'good'` が**直書き**されていました。★道具が良しか撮れないので、
+ *    ★**濡れた馬場の絵をオーナーに出せませんでした**（R-31 の家族）。
+ */
+const CONDITION = (() => { const i = argv.indexOf('--condition'); return i >= 0 ? argv[i + 1] : 'good'; })();
+if (!['good', 'yielding', 'soft', 'bad'].includes(CONDITION)) throw new Error(`★--condition は good/yielding/soft/bad: ${CONDITION}`);
 /** ★砂煙の色。★`page.tsx:2008` と同じ値 */
 const KICKUP_COLOR = SURFACE === 'dirt' ? '#796047' : '#738b43';
 /** ★舞い上がった砂煙の色。★`page.tsx` と同じ値（R-30） */
@@ -460,7 +467,7 @@ for (const [index, displaySec] of displaySecs.entries()) {
     motionBlur: noBlur ? undefined : { exposureSec, samples: MOTION_BLUR_SAMPLES, speedMpsOf },
     // ★ハロン棒の数字（設計 1-7）。画面と同じく書体を渡す
     poleFont: (px, bold) => `${bold ? 'bold ' : ''}${px}px JPUI, system-ui, sans-serif`,
-    frameRoleOf, surface: SURFACE, condition: 'good', kickupColor: KICKUP_COLOR,
+    frameRoleOf, surface: SURFACE, condition: CONDITION, kickupColor: KICKUP_COLOR,
     ...(DUST_COLOR === undefined ? {} : { dustColor: DUST_COLOR }),
     /**
      * ★浴びた砂で馬が汚れる（報告 §10-2）。★画面と同じ量を渡す（R-31）。
