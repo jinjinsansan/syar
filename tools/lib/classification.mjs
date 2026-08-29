@@ -320,7 +320,7 @@ export const READONLY = [
   'bake-sprites.mjs',
   // ★ダートの地面タイルを焼く（画像を書くだけ・DB に触れない）
   'bake-dirt-tile.mjs',
-  // ★横からの画のダート版を焼く（苝の板は読むだけ）
+  // ★横からの画のダート版を焼く（芝の板は読むだけ）
   'bake-dirt-plates.mjs',
   // ★読むだけ。自分で画面を見るための静止画
   'shot.mjs',

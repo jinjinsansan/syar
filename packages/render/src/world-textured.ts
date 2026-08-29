@@ -26,11 +26,11 @@ export interface WorldStripTexture<TImage> {
 export interface TexturedWorldAssets<TImage> {
   readonly turf: { readonly image: TImage; readonly width: number; readonly height: number; readonly pxPerM: number };
   /**
-   * ★**ダートの地面**（2026-08-28）。★無ければ苝を使います（従来どおり）。
+   * ★**ダートの地面**（2026-08-28）。★無ければ芝を使います（従来どおり）。
    *
-   *   ⚠️ ★ここは 2026-08-28 まで**苝 1 枚だけ**でした。
-   *      ★`surface: 'dirt'` を選んでも、★**地面は苝のまま**でした。
-   *   ★寸法も `pxPerM` も苝と同じにすること。★違えると**流れる速さが苝と変わります**。
+   *   ⚠️ ★ここは 2026-08-28 まで**芝 1 枚だけ**でした。
+   *      ★`surface: 'dirt'` を選んでも、★**地面は芝のまま**でした。
+   *   ★寸法も `pxPerM` も芝と同じにすること。★違えると**流れる速さが芝と変わります**。
    */
   readonly dirt?: { readonly image: TImage; readonly width: number; readonly height: number; readonly pxPerM: number } | undefined;
   /** 遠景の帯（横ループ）。`horizonY` は帯の中で地面が始まる行 */
@@ -82,7 +82,7 @@ export interface TexturedWorldOptions {
    */
   readonly surface?: 'turf' | 'dirt';
   /**
-   * ★**内側の帯を逆にする**（ダート戦で内回りを苝に見せる）。
+   * ★**内側の帯を逆にする**（ダート戦で内回りを芝に見せる）。
    *   ⚠️ ★裁定 §6-3 の **[EYES]**: ダート戦だと走路も内側の帯も褐色になり、
    *      ★**褐色の帯が 2 本並んで「どこを走っているか」が読めなくなる**恐れがあります。
    *   ★これも**描画だけ**です。幾何は変わりません。★採否はオーナー判断。
@@ -127,7 +127,7 @@ export function drawTexturedWorld<TImage>(
   // ── 地面: 走査線ごとに芝タイルを貼る ────────────────────────────────
   /**
    * ★**馬場でタイルを選ぶ**（2026-08-28）。
-   *   ⚠️ ★ダートの素材が渡されていなければ**苝のまま**です。
+   *   ⚠️ ★ダートの素材が渡されていなければ**芝のまま**です。
    *      ★無いものをあることにしない（黙って別の色を作らない）。
    */
   const turf = opts.surface === 'dirt' && assets.dirt !== undefined ? assets.dirt : assets.turf;
@@ -178,7 +178,7 @@ export function drawTexturedWorld<TImage>(
     };
     drawInfield(ctx, course, groundOf, { width: W, height: H }, {
       focusS: opts.focusS ?? 0,
-      /** ★ダート戦で内側の帯を苝に反転する（裁定 §6-3 の [EYES]） */
+      /** ★ダート戦で内側の帯を芝に反転する（裁定 §6-3 の [EYES]） */
       ...(opts.infieldReversed === true ? { reversed: true } : {}),
     });
   }
@@ -243,15 +243,15 @@ export function drawTexturedWorld<TImage>(
   /**
    * ★**陰影と走路の色を馬場で分ける**（2026-08-28）。
    *
-   * ⚠️ ★この 2 つは**苝の緑が直書き**されていました。
+   * ⚠️ ★この 2 つは**芝の緑が直書き**されていました。
    *    ★地面タイルをダートに差し替えても、★**上から緑を塗るのでオリーブ色になりました**。
    *    ★実際に 1 枚目の試作がそうなりました。
    * ★色は `palette.json` の `dirt-0` / `turf` 系と揃えています。
    */
   const isDirt = opts.surface === 'dirt';
-  /** ★全体を薄く落とす色（苝は深緑・ダートは深褐） */
+  /** ★全体を薄く落とす色（芝は深緑・ダートは深褐） */
   const SHADE = isDirt ? '#221a12' : '#12220f';
-  /** ★走路だけを少し明るくする色（苝は若草・ダートは乾いた砂） */
+  /** ★走路だけを少し明るくする色（芝は若草・ダートは乾いた砂） */
   const TRACK_TINT = isDirt ? '#c8a985' : '#9ccb55';
   // ★内外を暗くする代わりに、走路だけを少し明るく（台形が裏返らない範囲）。全体を先に薄く落とす
   ctx.globalAlpha = darken * 0.5;

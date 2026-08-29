@@ -436,7 +436,7 @@ export function drawBroadcastV2Scene<TImage>(
     /** ★舞い上がった砂煙の色（2026-08-29）。★地面より明るくすること */
     readonly dustColor?: string | undefined;
     /**
-     * ★**内側の帯を逆にする**（ダート戦で内回りを苝に見せる）。
+     * ★**内側の帯を逆にする**（ダート戦で内回りを芝に見せる）。
      *   ★描画だけ。★裁定 §6-3 の [EYES]。採否はオーナー判断。
      */
     readonly infieldReversed?: boolean | undefined;
@@ -516,7 +516,7 @@ export function drawBroadcastV2Scene<TImage>(
     /**
      * ★**馬場を地面へ渡す**（2026-08-28）。
      *   ⚠️ ★ここで渡していなかったので、★**`surface: 'dirt'` を選んでも
-     *      地面は苝のまま**でした（砊煙の色だけがダートになっていました）。
+     *      地面は芝のまま**でした（砂煙の色だけがダートになっていました）。
      *   ★走路の幾何には触れません（裁定 §6-3）。
      */
     nearRail = drawTexturedWorld(ctx, course, scene.camera, opts.texturedWorld, {

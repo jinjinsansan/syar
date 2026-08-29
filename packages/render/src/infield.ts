@@ -63,7 +63,7 @@ export interface InfieldOptions {
    * ⚠️ ★ダート戦では走路も内側の帯も褐色になり、
    *    ★**褐色の帯が 2 本並んで「どこを走っているか」が読めなくなる**恐れがあります
    *    （このファイル冒頭の「引くと画面が緑一色」の裏返し）。
-   * ★真ですと、**内側の帯を苝**にします（内回り苝／外回りダートの断面）。
+   * ★真ですと、**内側の帯を芝**にします（内回り芝／外回りダートの断面）。
    * ★**描画だけ**です。★走路の幾何は 1mm も変わりません（この関数は `void course`）。
    * ★採否はオーナー判断（裁定 §6-3 の [EYES]）。
    */
@@ -141,7 +141,7 @@ export function drawInfield(
   band(L.innerHedgeInnerW, L.innerHedgeOuterW, INFIELD_COLORS.hedge);
   // ダートコース
   /**
-   * ★**逆にするときは、内側の「ダートの周回帯」を苝にします。**
+   * ★**逆にするときは、内側の「ダートの周回帯」を芝にします。**
    *   ★帯の位置（w）は変えません。★変えるのは色とハロー目の有無だけです。
    */
   const reversed = opts.reversed === true;
@@ -155,7 +155,7 @@ export function drawInfield(
    *   ⚠️ これが無いとダートが**のっぺりした褐色の面**になり、
    *      「芝の隣に茶色い板を置いた」ようにしか見えません。
    */
-  /** ★苝に反転したときはハロー目（整地の筋）を引かない。★苝にハロー目は出ません */
+  /** ★芝に反転したときはハロー目（整地の筋）を引かない。★芝にハロー目は出ません */
   if (reversed) return;
   const harrow = Math.max(2, opts.harrowM ?? 9);
   const firstK = Math.ceil(from / harrow);

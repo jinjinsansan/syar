@@ -297,7 +297,7 @@ const layerImages = await Promise.all(manifest.layers.map(async (l) => {
   const img = await loadImage(path.join(PX, l.file));
   return l.name === 'stand' ? withCrowd(img) : img;
 }));
-/** ★ダート版の地面の層（2026-08-28）。★無ければ undefined で、苝の板に落ちます */
+/** ★ダート版の地面の層（2026-08-28）。★無ければ undefined で、芝の板に落ちます */
 const dirtLayerImages = await Promise.all(manifest.layers.map(async (l) => {
   const file = (manifest.dirtLayers ?? {})[l.name];
   return file === undefined ? undefined : loadImage(path.join(PX, file));
@@ -323,7 +323,7 @@ const parallaxBackstretch = {
   plateHeight: manifest.plateHeight,
   /**
    * ★**馬場で地面の層を差し替える**（2026-08-28）。★`page.tsx` と同じ規則（R-30）。
-   *   ★ダート版が無い層は苝のままです。
+   *   ★ダート版が無い層は芝のままです。
    */
   layers: manifest.layers.map((l, i) => {
     const img = SURFACE === 'dirt' && dirtLayerImages[i] !== undefined ? dirtLayerImages[i] : layerImages[i];
@@ -349,7 +349,7 @@ const parallaxBackstretch = {
 };
 
 const worldTurf = await loadImage(path.join(PX, manifest.world.turf.file));
-/** ★ダートの地面（2026-08-28）。★無ければ苝のまま（従来どおり） */
+/** ★ダートの地面（2026-08-28）。★無ければ芝のまま（従来どおり） */
 const worldDirt = manifest.world.dirt === undefined
   ? null : await loadImage(path.join(PX, manifest.world.dirt.file));
 const worldPano = withCrowd(await loadImage(path.join(PX, manifest.world.panorama.file)));
@@ -451,7 +451,7 @@ for (const [index, displaySec] of displaySecs.entries()) {
     poleFont: (px, bold) => `${bold ? 'bold ' : ''}${px}px JPUI, system-ui, sans-serif`,
     frameRoleOf, surface: SURFACE, condition: 'good', kickupColor: KICKUP_COLOR,
     ...(DUST_COLOR === undefined ? {} : { dustColor: DUST_COLOR }),
-    /** ★`--infield-reversed` で内側の帯を苝に反転する（裁定 §6-3 の [EYES] 用） */
+    /** ★`--infield-reversed` で内側の帯を芝に反転する（裁定 §6-3 の [EYES] 用） */
     ...(argv.includes('--infield-reversed') ? { infieldReversed: true } : {}),
     // ★Web 画面と同じ分岐（page.tsx: shot.view === 'side' ? undefined : texturedWorld）
     texturedWorld: scene.shot.view === 'side' ? undefined : texturedWorld,

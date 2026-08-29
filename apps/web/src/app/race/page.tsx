@@ -1090,12 +1090,12 @@ export default function RacePage(): React.JSX.Element {
           }[];
           /**
            * ★**ダート戦で差し替える層**（2026-08-28）。層名 → 差し替え先のファイル名。
-           *   ★無ければ苝の板のままです。
+           *   ★無ければ芝の板のままです。
            */
           dirtLayers?: Record<string, string>;
           world: {
             turf: { file: string; tileWidth: number; tileHeight: number; pxPerM: number };
-            /** ★ダートの地面（2026-08-28）。★無ければ苝に落ちる */
+            /** ★ダートの地面（2026-08-28）。★無ければ芝に落ちる */
             dirt?: { file: string; tileWidth: number; tileHeight: number; pxPerM: number };
             panorama: { file: string; tileWidth: number; height: number; horizonY: number };
             trees?: { file: string; tileWidth: number; height: number };
@@ -1134,10 +1134,10 @@ export default function RacePage(): React.JSX.Element {
       /**
        * ★**ダート版の地面の板**（2026-08-28）。
        *
-       *   ★側面は**焼き込み済みの板**なので、★苝の層をダートの層へ
+       *   ★側面は**焼き込み済みの板**なので、★芝の層をダートの層へ
        *   ★**差し替える**だけです（`manifest.dirtLayers`）。
-       *   ⚠️ ★層を**増やしません**。増やすと苝のときも余分に描くことになります。
-       *   ★読めなければ苝の板のままです（画面が壊れない側へ・R-27）。
+       *   ⚠️ ★層を**増やしません**。増やすと芝のときも余分に描くことになります。
+       *   ★読めなければ芝の板のままです（画面が壊れない側へ・R-27）。
        *   ★追加で読むのは 3 枚（1500×約90px）だけです。
        */
       const dirtLayerFiles = parallaxManifest.dirtLayers ?? {};
@@ -1159,8 +1159,8 @@ export default function RacePage(): React.JSX.Element {
           : Promise.resolve(null),
         /**
          * ★**ダートの地面**（2026-08-28）。
-         *   ⚠️ ★これが無い間、`surface: 'dirt'` を選んでも★**地面は苝のまま**でした。
-         *   ★読めなければ苝に落ちます（画面が壊れない側へ・R-27）。
+         *   ⚠️ ★これが無い間、`surface: 'dirt'` を選んでも★**地面は芝のまま**でした。
+         *   ★読めなければ芝に落ちます（画面が壊れない側へ・R-27）。
          */
         parallaxManifest.world.dirt !== undefined
           ? loadImg(`/art/parallax/backstretch-side-v1/${parallaxManifest.world.dirt.file}?v=${ASSET_VERSION}`).catch(() => null)
@@ -1200,7 +1200,7 @@ export default function RacePage(): React.JSX.Element {
           ...(standTex !== undefined ? { stand: standTex } : {}),
         },
       };
-      /** ★馬場で層の絵を選ぶ。★ダート版が無い層は苝のまま */
+      /** ★馬場で層の絵を選ぶ。★ダート版が無い層は芝のまま */
       const plateImageAt = (index: number, dirt: boolean): FrameImage =>
         (dirt ? parallaxDirtRaw[index] ?? parallaxImages[index]! : parallaxImages[index]!);
       const plateOf = (dirt: boolean): ParallaxPlate<FrameImage> => ({
@@ -1230,7 +1230,7 @@ export default function RacePage(): React.JSX.Element {
         })),
       });
       const parallaxBackstretch = plateOf(false);
-      /** ★ダート版の板。★差し替える層が 1 つも無ければ苝と同じものになります */
+      /** ★ダート版の板。★差し替える層が 1 つも無ければ芝と同じものになります */
       const parallaxBackstretchDirt = plateOf(true);
       const loaded = await Promise.all([
         loadImg(`/art/race-title-spring-v1.png?v=${ASSET_VERSION}`),
@@ -2062,7 +2062,7 @@ export default function RacePage(): React.JSX.Element {
          */
         dustColor: surface === 'dirt' ? '#cdb494' : undefined,
         /**
-         * ★**内側の帯を苝に反転する**（`/race?infield=turf`）。
+         * ★**内側の帯を芝に反転する**（`/race?infield=turf`）。
          *
          *   ⚠️ ★裁定 `REVIEW_P4_GAMMA_V6_DIRT_VERDICT_20260828.md` §6-3 の **[EYES]**。
          *      ★ダート戦だと褐色の帯が 2 本並び、★**どこを走っているかが読めなくなる**。
