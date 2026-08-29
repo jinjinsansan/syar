@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import {
   dustExposureCurve, dustIntakeRate,
   DUST_PLUME_M, DUST_PLUME_HALF_WIDTH_M, DUST_EXPOSURE_SATURATION_SEC,
+  DUST_PUFF_COUNT, dustPlumePhaseAt,
   type DustExposureHorse,
 } from '../src/dust-exposure.js';
 import { drawPerspectiveHorses } from '../src/perspective-draw.js';
@@ -219,5 +220,78 @@ describe('★汚れの描画', () => {
 
   it('★芝では 1 粒も塗らない（量を満量で渡しても）', () => {
     expect(dustPuffs('turf', () => 1)).toBe(dustPuffs('turf'));
+  });
+});
+
+/**
+ * ★**砂煙の位相は「進んだ距離」から連続で出る**（2026-08-29）
+ *
+ * 【★この検査が生まれた実害】
+ *   ⚠️ ★位相が `frameIndex`（＝**脚のコマ・8 段階**）から取られていました。
+ *      ★註記は「進んだ距離から決まり、★**途切れずに続きます**」と書いていましたが、
+ *      ★**8 段に量子化されているので続いていません**でした。
+ *   ★オーナー評「★ダートのほうが遅く感じる／ぎこちない。芝は正常」の真因です。
+ *   ★実測: ★馬が毎コマ 2.51m 進む間に、砂粒は 8 → 75 → 80 → 12 px と暴れていました。
+ *
+ * ⚠️ ★**「連続である」ことだけを見ると足りません**（R-16）。
+ *    ★定数関数（＝砂が動かない）も「連続」です。
+ *    → ★**置き去りになる速さで進んでいること**まで見ます。
+ */
+describe('★砂煙の位相（進んだ距離から連続で出る）', () => {
+  it('★0〜1 の中に収まる（負の距離でも）', () => {
+    for (const s of [0, 0.1, 3.7, 100, 1599.9]) {
+      const v = dustPlumePhaseAt(s);
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThan(1);
+    }
+    expect(dustPlumePhaseAt(-5)).toBeGreaterThanOrEqual(0);
+    expect(dustPlumePhaseAt(-5)).toBeLessThan(1);
+  });
+
+  it('★連続 — 距離を細かく刻むと位相も細かくしか動かない（★段で跳ばない）', () => {
+    /** ★1 周する距離。★この中で 1 回だけ 1→0 の巻き戻りが起きる */
+    const wrapM = DUST_PLUME_M / DUST_PUFF_COUNT;
+    const step = wrapM / 200;
+    let jumps = 0;
+    let maxSmall = 0;
+    for (let i = 1; i <= 200 * 3; i += 1) {
+      const a = dustPlumePhaseAt(100 + (i - 1) * step);
+      const b = dustPlumePhaseAt(100 + i * step);
+      const d = Math.abs(b - a);
+      if (d > 0.5) { jumps += 1; continue; }   // ★巻き戻り
+      maxSmall = Math.max(maxSmall, d);
+    }
+    /** ★巻き戻りは 1 周につき 1 回だけ（3 周ぶん見ている） */
+    expect(jumps).toBeLessThanOrEqual(3);
+    /**
+     * ★巻き戻り以外は**刻みに比例した細かい動き**でなければいけません。
+     * ⚠️ ★8 段に量子化されていると、ここが **1/8 = 0.125** になります。
+     */
+    expect(maxSmall, '★段で跳んでいる（8 段の量子化が戻っている）').toBeLessThan(0.02);
+  });
+
+  it('★砂が空中に置き去りになる速さで進む（★止まっていない・R-16）', () => {
+    /**
+     * ★置き去り（世界に張り付く）には `d(phase)/d(s) = PUFFS / PLUME_M` が要ります。
+     *   ★`age = (i + phase) / PUFFS`・`back = 0.55 + age * PLUME_M` なので、
+     *   ★これで `d(back)/d(s) = 1` ＝ 世界位置 `s - back` が一定になります。
+     */
+    const want = DUST_PUFF_COUNT / DUST_PLUME_M;
+    const ds = 1e-4;
+    const rate = (dustPlumePhaseAt(100 + ds) - dustPlumePhaseAt(100)) / ds;
+    expect(rate).toBeCloseTo(want, 3);
+    /** ⚠️ ★定数関数（砂が動かない）を弾く */
+    expect(rate).toBeGreaterThan(0);
+  });
+
+  it('★粒の世界位置が、馬が進んでも動かない（＝置き去りになっている）', () => {
+    /** ★`back` の定義をそのまま使い、粒 0 の世界位置を 2 地点で比べます */
+    const backOf = (sM: number): number => 0.55 + ((0 + dustPlumePhaseAt(sM)) / DUST_PUFF_COUNT) * DUST_PLUME_M;
+    const s0 = 100;
+    const s1 = 100 + (DUST_PLUME_M / DUST_PUFF_COUNT) * 0.4;   // ★巻き戻りを跨がない範囲
+    const world0 = s0 - backOf(s0);
+    const world1 = s1 - backOf(s1);
+    expect(Math.abs(world1 - world0), '★砂が馬に付いてきている（置き去りになっていない）')
+      .toBeLessThan(1e-9);
   });
 });

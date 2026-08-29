@@ -64,9 +64,24 @@ export function buildAuditRace(opts = {}) {
     strategy: STRATS[(i + seed) % 4], condition: 3, fatigue: 20,
     weightKg: 55, gate: i + 1, age: 4, skillGenes: h.skillGenes,
   }));
+  /**
+   * ★**馬場と馬場状態**（2026-08-29）。
+   *
+   * ⚠️ ★ここは `surface: 'turf'` と `trackCondition: 'good'` が**直書き**されていました。
+   *    → ★**ダートについて聞いても、道具は芝のレースを測っていました。**
+   *    ★`SPEED_SURFACE_MULT` が turf 1.0 / dirt 0.975 なので、★位置も速さも別物です。
+   *    ★R-31（測定器の既定は画面と同じ側へ）の家族で、★**渡し忘れではなく渡せませんでした。**
+   *
+   * ★既定は**画面の既定**（`page.tsx` の `useState('turf')` / `useState('good')`）。
+   * ★`raceId` の形も画面と同じ（`r${seed}-${surface}-${condition}`）にします
+   *   — ★ここが違うと**別のレースになります**（乱数の用途 ID）。
+   */
+  const surface = opts.surface ?? 'turf';
+  const trackCondition = opts.trackCondition ?? 'good';
+  if (surface !== 'turf' && surface !== 'dirt') throw new Error(`★surface は turf / dirt: ${surface}`);
   const conditions = {
-    raceId: `r${seed}-turf-good`, distance: DIST, surface: 'turf',
-    trackCondition: 'good', courseShape: 'oval', baseWeightKg: 55,
+    raceId: `r${seed}-${surface}-${trackCondition}`, distance: DIST, surface,
+    trackCondition, courseShape: 'oval', baseWeightKg: 55,
   };
   /**
    * ★**既定は「画面の既定」**です（2026-08-28・裁定 §6 の宿題 2 ・R-31）。
@@ -90,7 +105,7 @@ export function buildAuditRace(opts = {}) {
   if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((e) => Number(e.horseId)))) {
     throw new Error('★D-059: 位置モデルの最終順が着順と違う');
   }
-  return { seed, course, entrants, result, boundaries, model, pace, DIST, FIELD, balance };
+  return { seed, course, entrants, result, boundaries, model, pace, DIST, FIELD, balance, surface, trackCondition };
 }
 
 /* ── ★画面と同じ経路で「表示秒 → 場面」を作る ─────────── */

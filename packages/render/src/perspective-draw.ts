@@ -20,7 +20,7 @@ import {
 import type { Ctx2D, Palette } from './oblique-draw.js';
 import type { SheetSpec } from './oblique-draw.js';
 import type { ShotCameraPreset, ShotView } from './shot-sequence.js';
-import { DUST_PLUME_M } from './dust-exposure.js';
+import { DUST_PLUME_M, DUST_PUFF_COUNT, dustPlumePhaseAt } from './dust-exposure.js';
 
 /** 1頭ぶん（★位置は `PositionModel` が持つ。ここは受け取るだけ） */
 export interface PerspHorse {
@@ -988,9 +988,6 @@ export function drawPerspectiveHorses<TImage>(
      *   ★位相はコマ番号（＝進んだ距離）から決まり、★**途切れずに続きます**。
      */
     if (opts.trackEffect !== undefined && opts.trackEffect.surface === 'dirt' && kickup > 0) {
-      const cycle = 8;
-      const phase = (((frameIndex % cycle) + cycle) % cycle) / cycle;
-      /** ★尾を引く長さ（m）。★長すぎると後続が見えなくなります */
       /**
        * ★尾を引く長さ（m）。★長すぎると後続が見えなくなります。
        * ⚠️ ★**出どころは `dust-exposure.ts` の 1 か所**です（2026-08-29）。
@@ -998,8 +995,34 @@ export function drawPerspectiveHorses<TImage>(
        *    ★絵に描かれていない砂で馬が汚れます**（同じ量を 2 か所で持たない・R-30）。
        */
       const PLUME_M = DUST_PLUME_M;
-      const PUFFS = 14;
+      /** ⚠️ ★出どころは `dust-exposure.ts` の 1 か所（位相の式がこの数に依存します） */
+      const PUFFS = DUST_PUFF_COUNT;
       const dust = opts.trackEffect.dustColor ?? opts.trackEffect.color;
+      /**
+       * ★**位相は「進んだ距離」から連続で取る**（2026-08-29・オーナー指摘
+       *   「★ダートのほうが遅く感じる／ぎこちない。芝は正常」）。
+       *
+       * ⚠️ ★以前はここが `frameIndex`（＝**脚のコマ・8 段階**）から取られていました:
+       *      `const phase = ((frameIndex % 8) + 8) % 8 / 8`
+       *    ★註記は「進んだ距離から決まり、★**途切れずに続きます**」と書いていましたが、
+       *    ★**8 段に量子化されているので続いていません。**
+       *
+       * ★実測（`tools/_duststep.mjs`・seed 42・1/30 秒刻み）:
+       *    ★馬は毎コマ **2.51m ずつ滑らか**に進むのに、
+       *    ★砂粒の動きは **8 → 75 → 80 → 12 → 75 → 80 px** と暴れていました
+       *    （23 コマ中 **16 コマ**が 20px 超の跳び）。
+       *    ★脚の位相は 1 コマで **2.87 バケット**進むので、砂の位相が 2/8・3/8 と
+       *    ★不揃いに跳んで巻き戻ります。
+       *
+       * 【★なぜこの式か — 砂は空中に置き去りにされる】
+       *   ★粒の世界位置は `s - back`、`back = 0.55 + age * PLUME_M`、`age = (i + phase) / PUFFS`。
+       *   ★置き去り（＝世界に張り付く）には `d(back)/d(s) = 1` が要るので
+       *     `d(phase)/d(s) = PUFFS / PLUME_M`。
+       *   → ★`phase = s * PUFFS / PLUME_M` の小数部。
+       *   ★こうすると**砂は空中に残り、馬が離れていきます**。★実物と同じで、
+       *   ★**地面と同じ速さで後ろへ流れる**ので、見た目の速さにも効きます。
+       */
+      const phase = dustPlumePhaseAt(d.s);
       /**
        * ★**自分の絵に重なる範囲**（m）。★ここより手前の砂は**自分の下**に置きます。
        *   ★絵の幅を px から m に戻して半分。★手置きの m を書かない（R-31 の family）。
