@@ -685,6 +685,26 @@ export const DEMO_CONTEST_GAMMA = 1.6;
 export const LANE_ALIGNED_FOCUS_DEFAULT = true;
 
 /**
+ * ★**内側の帯を芝にする**（Q-3 の B 案・2026-08-29・オーナー判断で既定へ）
+ *
+ * ⚠️ 【★戻し口】★**`/race?infield=dirt`**（`infieldReversedFromSearch`）。
+ *   ★正典 D-085「★**既定を変えるときは戻せる口を同時に置き、戻せること自体を検査で固定する**」。
+ *
+ * 【何が問題だったか】
+ *   ★ダートにすると、★**走路と内側の帯が同じ褐色に溶けて、どこを走っているか読めません**
+ *   （報告 `REPORT_P4_DIRT_20260829.md` §8）。★裁定 §6-3 の懸念はそのとおりでした。
+ *   ★内側を緑にすると、★**走路が一目で分かります**。
+ *
+ * ⚠️ ★**走路の幾何には触れません**（裁定 §6-3）。
+ *    ★内回りコース案は却下されています — ★`INFIELD_LAYOUT` の帯は w = −5〜−30 の**風景**で、
+ *    ★そこに馬を走らせた瞬間に走路の幾何に触れます。★これは**帯の色だけ**の話です。
+ *
+ * ⚠️ ★**道具はこの定数を読むこと**（R-31）。★`true`/`false` を道具に直書きしない。
+ *    ★再発 9 件は、すべて既定が「呼ぶ側」にあったために起きました。
+ */
+export const INFIELD_REVERSED_DEFAULT = true;
+
+/**
  * ★1 完歩の距離（m）。脚のコマ送りの周期。
  *   実馬は 1 完歩 ≈7m（16m/s で 2.3 完歩/秒）。
  */
@@ -871,6 +891,17 @@ export function laneAlignedFocusFromSearch(search: string): boolean {
   if (v === 'off') return false;
   if (v === 'on') return true;
   return LANE_ALIGNED_FOCUS_DEFAULT;
+}
+
+/**
+ * ★内側の帯を芝にするか（`/race?infield=dirt` で従来へ戻す）。
+ *   ⚠️ ★既定は**この関数の中**から出します。★呼ぶ側に `true` を書かないこと（R-31）。
+ */
+export function infieldReversedFromSearch(search: string): boolean {
+  const v = new URLSearchParams(search).get('infield');
+  if (v === 'dirt' || v === 'off') return false;
+  if (v === 'turf' || v === 'on') return true;
+  return INFIELD_REVERSED_DEFAULT;
 }
 
 /** ★台本 → ショット表。`v2` は表を持たないので v4 で代用（呼び出し側が使わない） */

@@ -33,7 +33,7 @@ import { DEFAULT_RACE_SCRIPT,
   cameraBasis, drawBroadcastV2Scene, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
   posOf, project, ratesForTarget, replayPositionModel, resolveBroadcastV2Scene,
   targetDisplaySec, timeWarpFor, withFinishRunOut, GATE_FRONT_STALL_PLATES,
-  dustExposureCurve,
+  dustExposureCurve, INFIELD_REVERSED_DEFAULT,
   broadcastV2StartLagM,
 } from '@star/render';
 
@@ -149,7 +149,7 @@ const startShownMeters = (meters, raceDisplaySec) =>
  *     ★**秒数より後ろに書くか、先頭にまとめて書くこと**。
  */
 /** ★値を取らないオプション。★ここへ入れ忘れると★**次の秒数が食われます** */
-const VALUELESS = new Set(['--noblur', '--infield-reversed', '--no-soil']);
+const VALUELESS = new Set(['--noblur', '--infield-reversed', '--infield-dirt', '--no-soil']);
 const optionValueIndexes = new Set();
 argv.forEach((a, i) => {
   if (a.startsWith('--') && !VALUELESS.has(a)) optionValueIndexes.add(i + 1);
@@ -467,8 +467,12 @@ for (const [index, displaySec] of displaySecs.entries()) {
      *   ★`--no-soil` で切って比べられます（★既定は画面と同じ「入り」）。
      */
     ...(argv.includes('--no-soil') ? {} : { dustExposureOf: (g) => dustSoil(sec, g) }),
-    /** ★`--infield-reversed` で内側の帯を芝に反転する（裁定 §6-3 の [EYES] 用） */
-    ...(argv.includes('--infield-reversed') ? { infieldReversed: true } : {}),
+    /**
+     * ★内側の帯を芝に（Q-3 の B 案・2026-08-29 から**既定**）。
+     * ⚠️ ★**既定を道具に直書きしません**（R-31）。★`INFIELD_REVERSED_DEFAULT` を読みます。
+     *    ★`--infield-dirt` で従来（褐色のまま）に戻して比べられます。
+     */
+    infieldReversed: argv.includes('--infield-dirt') ? false : INFIELD_REVERSED_DEFAULT,
     // ★Web 画面と同じ分岐（page.tsx: shot.view === 'side' ? undefined : texturedWorld）
     texturedWorld: scene.shot.view === 'side' ? undefined : texturedWorld,
     /**

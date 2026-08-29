@@ -48,7 +48,7 @@ import {
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT, CUT_RACE_SCRIPT, GATE_FRONT_STALL_PLATES,
   finishReplayAt, finishCrossDisplaySec, FINISH_REPLAY_DISPLAY_SEC, drawFinishReplayBadge,
-  DEMO_CONTEST_GAMMA, broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, laneAlignedFocusFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
+  DEMO_CONTEST_GAMMA, broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, laneAlignedFocusFromSearch, infieldReversedFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
@@ -2098,7 +2098,11 @@ export default function RacePage(): React.JSX.Element {
          *   ★明示したときだけ入ります（省略時は狭い側へ・R-27）。
          *   ★描画だけです。★走路の幾何には触れません。
          */
-        infieldReversed: search.includes('infield=turf'),
+        /**
+         * ★内側の帯を芝に（Q-3 の B 案・既定）。★戻し口は `?infield=dirt`。
+         *   ⚠️ ★既定は `infieldReversedFromSearch` の**中**にあります（R-31）。ここに書きません。
+         */
+        infieldReversed: infieldReversedFromSearch(search),
         /**
          * ★コーナー専用カット（3 秒程度）の 1 枚絵は、カットの進行に合わせてパン＋軽いズーム。
          *   旧 `(focusS % 400)/400` は 400m で 137px しか動かず静止に見えた。
