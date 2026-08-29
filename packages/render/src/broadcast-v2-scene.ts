@@ -1,5 +1,5 @@
 import { contestFocusMeters, contestFocusWithLeadInFrame } from './contest-focus.js';
-import { posOf, type Course } from './course.js';
+import { laneArcLengthAt, posOf, sAtLaneArcLength, type Course } from './course.js';
 import type { Ctx2D, FontOf, Palette, SheetSpec } from './oblique-draw.js';
 import { cameraBasis, project } from './perspective.js';
 import { drawDistancePoles } from './distance-poles.js';
@@ -18,6 +18,7 @@ import {
 import type { PerspectiveCamera } from './perspective.js';
 import {
   DEFAULT_RACE_SCRIPT,
+  LANE_ALIGNED_FOCUS_DEFAULT,
   broadcastV2FixedFov,
   broadcastV2SegmentSpan,
   broadcastV2ShotEndM,
@@ -163,6 +164,15 @@ export function resolveBroadcastV2Scene(
      * ⚠️ ★渡さなければ**従来どおり**です（v5 の挙動は 1 ビットも変わりません）。
      */
     readonly noContenderFrameShots?: readonly BroadcastV2ShotId[];
+    /**
+     * ★**注視点を「走線に沿った長さ」で置く**（残件 A-2 の候補 (b′)・2026-08-29）
+     *
+     * ⚠️ ★**既定は `LANE_ALIGNED_FOCUS_DEFAULT`（いまは `false`）です。**
+     *    ★正典 R-15「入っているが使われない状態で一度コミットする」。
+     *    ★既定を変えるのは、裁定 §7 が指定した 3 つの測定を通してからです。
+     * ⚠️ ★道具は**この既定から引くこと**（R-31）。★`true`/`false` を直書きしない。
+     */
+    readonly laneAlignedFocus?: boolean;
   } = {},
 ): BroadcastV2Scene {
   const leaderS = horses.reduce((max, horse) => Math.max(max, horse.s), 0);
@@ -383,11 +393,30 @@ export function resolveBroadcastV2Scene(
       focusS = broadcastV2StartFocus(focusS, options.raceDisplaySec);
     }
   }
+  /**
+   * ★**注視点を「走線に沿った長さ」で置く**（残件 A-2 の候補 (b′)・★既定では効きません）
+   *
+   *   ★`focusS` は**中心線の弧長**です。★曲線では走線ごとに実移動が違うので、
+   *   ★走路の折れ目でカメラと馬が**別のコマで**越え、その 1 コマだけ滑ります（実測 12.6px）。
+   *   → ★**先頭との差を「走線に沿った長さ」で保った点**へカメラを向けます。
+   *
+   * ⚠️ ★動かすのは**カメラの向け先だけ**です。★返す `focusS` は変えません
+   *    （あちらは「何 m 地点を見ているか」という意味の値で、可視判定などに使われます）。
+   * ⚠️ ★馬の位置・着順・`laneExtraM` には触れていません（憲法 3）。
+   */
+  const laneAligned = options.laneAlignedFocus ?? LANE_ALIGNED_FOCUS_DEFAULT;
+  const cameraFocusS = ((): number => {
+    if (!laneAligned) return focusS;
+    const gapS = leaderS - focusS;
+    const aligned = sAtLaneArcLength(course, laneArcLengthAt(course, leaderS, focusW) - gapS, focusW);
+    return Number.isFinite(aligned) ? aligned : focusS;
+  })();
+
   return {
     shot,
     focusS,
     focusW,
-    camera: cameraAt(focusS),
+    camera: cameraAt(cameraFocusS),
     visibleHorses: allFinished ? leaders : visibleFor(horses, focusS, shot.maxVisible),
     cutProgress: broadcastV2CutProgress(course, leaderS, options.cornerCutM),
   };

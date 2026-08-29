@@ -20,7 +20,7 @@ import {
   ovalCourse, replayPositionModel, finalOrderOf,
   knotsFor, ratesForTarget, targetDisplaySec, timeWarpFor, withFinishRunOut, finishSpeedsOf,
   broadcastV2StartLagM, broadcastV2FinishStyleOf, resolveBroadcastV2Scene,
-  climaxDisplayPositions, CLIMAX_LEAD_COUNT,
+  climaxDisplayPositions, CLIMAX_LEAD_COUNT, LANE_ALIGNED_FOCUS_DEFAULT,
 } from '@star/render';
 
 const POOL = JSON.parse(readFileSync('apps/web/src/lib/watch-pool.json', 'utf8'));
@@ -231,6 +231,13 @@ export function auditSceneAt(built, clock, displaySec, viewport = { width: 1280,
      */
     ...(opts.noContenderFrameShots ?? (script === 'v6' ? ['finish-line'] : undefined)
       ? { noContenderFrameShots: opts.noContenderFrameShots ?? ['finish-line'] } : {}),
+    /**
+     * ★**注視点を「走線に沿った長さ」で置くか**（残件 A-2 の候補 (b′)）
+     *
+     * ⚠️ ★**既定は画面から引きます**（`LANE_ALIGNED_FOCUS_DEFAULT`・R-31）。
+     *    ★`true`/`false` を道具に直書きしないこと。渡さなければ画面と同じ側へ落ちます。
+     */
+    laneAlignedFocus: opts.laneAlignedFocus ?? LANE_ALIGNED_FOCUS_DEFAULT,
     ...(script === undefined ? {} : { script }),
   });
   return { raceSec: sec, raceDisplaySec: raceD, drawn, base, offsetByGate, winnerDone, scene };

@@ -282,6 +282,83 @@ export function posOf(course: Course, s: number, w: number): WorldPos {
   };
 }
 
+/**
+ * ★**走線 `w` に沿って実際に進む長さ**（残件 A-2 の候補 (b′)・2026-08-29）
+ *
+ * 【なぜ要るか】
+ *   ⚠️ ★`s` は**中心線の弧長**です。★同じ `Δs` でも、**曲線では走線ごとに実移動が違います**:
+ *
+ *        w=0  0.9476   w=2.2  0.9592   w=10 1.0000（中心線）   w=20 1.0524
+ *
+ *   ★直線→曲線の境目でこの比が**1 コマで階段状に変わる**ため、
+ *   ★カメラ（注視点）と馬が**別のコマで境目を越え**、その 1 コマだけ相対的に滑ります
+ *   （実測 12.6px・`ff5a261` / `QUESTIONS_P4_SEAM_SLIP_20260829.md`）。
+ *
+ * 【★この層の約束】
+ *   ★純粋関数です。★**着順にも `laneExtraM` にも触れません。**
+ *   ⚠️ ★距離ロス（着順に効く）は `laneExtraMeters` の担当で、**あちらはエンジンが引きます**（D-071）。
+ *      ★こちらは**描画がカメラを置くため**の量です。★2 つを混ぜないこと。
+ *
+ * 【★比の出どころは `posOf` と同じ式】
+ *   ★曲線での実移動は `posOf` が使う半径 `r = R + off·sgn` に比例します。
+ *   ★**同じ規則を 2 か所で持たないよう、ここに 1 本で書きます。**
+ */
+function laneRatioOf(seg: CourseSegment, offFromCentre: number): number {
+  if (seg.type !== 'corner' || seg.radius === undefined || seg.radius <= 0) return 1;
+  const sgn = seg.turn === 'right' ? -1 : 1;
+  const r = seg.radius + offFromCentre * sgn;
+  return r > 0 ? r / seg.radius : 0;
+}
+
+/**
+ * ★`s`（中心線の弧長）までに、走線 `w` が実際に進む長さ [m]。
+ *   ★走路の外（`s < 0` / 走路の終わりより先）は接線方向の延長なので比 1 です。
+ */
+export function laneArcLengthAt(course: Course, s: number, w: number): number {
+  const off = w - course.widthM / 2;
+  if (s <= 0) return s;
+  let acc = 0;
+  let out = 0;
+  for (const seg of course.segments) {
+    if (s <= acc) return out;
+    const covered = Math.min(seg.length, s - acc);
+    out += covered * laneRatioOf(seg, off);
+    acc += seg.length;
+  }
+  /**
+   * ★走路の終わりから先は最後の向きへまっすぐ（比 1）。
+   *
+   * ⚠️ ★**`Math.max(0, …)` が要ります。** ★これが無いと、`s` が走路の**内側**で終わったとき
+   *    （＝ループが早期 return せずに抜けたとき）に **`s − 全長` という負の値**を足し、
+   *    ★1600m の走路で `s=1500` が **100m 短く**返ります。
+   *    ★実害: (b′) の注視点が **−410m** ずれ、★不変条件の検査が 329 コマで割れました
+   *    （2026-08-29・裁定 §7 の「①を先に測れ」で捕まえた）。
+   */
+  return out + Math.max(0, s - acc);
+}
+
+/**
+ * ★`laneArcLengthAt` の逆。★走線に沿った長さ `len` に対応する `s` を返す。
+ *
+ * ⚠️ ★二分探索ではなく**区間ごとに閉じた形**で解きます（★誤差を持ち込まないため）。
+ * ★比は正（`r > 0`）なので単調増加で、逆は一意です。
+ */
+export function sAtLaneArcLength(course: Course, len: number, w: number): number {
+  const off = w - course.widthM / 2;
+  if (len <= 0) return len;
+  let acc = 0;
+  let seen = 0;
+  for (const seg of course.segments) {
+    const ratio = laneRatioOf(seg, off);
+    const segLen = seg.length * ratio;
+    if (ratio > 0 && len <= seen + segLen) return acc + (len - seen) / ratio;
+    seen += segLen;
+    acc += seg.length;
+  }
+  /** ★走路の終わりから先（比 1）。★`laneArcLengthAt` と同じく負を足さない */
+  return acc + Math.max(0, len - seen);
+}
+
 /** ★区間の境目（俯瞰デバッグ表示と標識に使う） */
 export function segmentStarts(course: Course): readonly { s: number; label: string }[] {
   const out: { s: number; label: string }[] = [];

@@ -80,5 +80,12 @@ export declare function auditSceneAt(
   displaySec: number,
   viewport?: { readonly width: number; readonly height: number },
   script?: string | undefined,
-  opts?: { readonly climax?: boolean },
+  opts?: {
+    readonly climax?: boolean;
+    /**
+     * ★注視点を「走線に沿った長さ」で置くか（残件 A-2 の候補 (b′)）。
+     * ⚠️ ★省略すると**画面の既定**（`LANE_ALIGNED_FOCUS_DEFAULT`）へ落ちます（R-31）。
+     */
+    readonly laneAlignedFocus?: boolean;
+  },
 ): AuditSceneResult;
