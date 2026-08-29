@@ -89,6 +89,28 @@ type RendererKind = 'v2' | 'legacy';
 function rendererFromSearch(search: string): RendererKind {
   return new URLSearchParams(search).get('renderer') === 'legacy' ? 'legacy' : 'v2';
 }
+
+/**
+ * ★**馬場**（`?surface=dirt`）と ★**馬場状態**（`?condition=yielding|soft|bad`）。
+ *
+ * ⚠️ ★2026-08-30 まで、★**この 2 つは URL から読めませんでした**（右下の選択だけ）。
+ *    ★引継ぎ書と報告書には `?surface=dirt` と書かれていましたが、★**効いていません**でした
+ *    — ★開いても芝が出ます。★私もその URL をオーナーにお渡ししました。
+ * → ★6 通り（芝/ダート × 良/稍重/重）を見比べるには URL が要ります。
+ *
+ * ⚠️ ★既定は**画面の既定**（`useState('turf')` / `useState('good')`）に落とします（R-31）。
+ *    ★知らない値でも既定へ落ち、★**黙って別のものを見せません**。
+ */
+function surfaceFromSearch(search: string): Surface {
+  return new URLSearchParams(search).get('surface') === 'dirt' ? 'dirt' : 'turf';
+}
+
+const TRACK_CONDITIONS: readonly TrackCondition[] = ['good', 'yielding', 'soft', 'bad'];
+
+function conditionFromSearch(search: string): TrackCondition {
+  const v = new URLSearchParams(search).get('condition');
+  return TRACK_CONDITIONS.find((c) => c === v) ?? 'good';
+}
 /**
  * ★一時バッジ（引継ぎ書 §1-4）— どの分岐が実ブラウザで描いたかを Canvas 上に証明する。
  *   ユーザー合格後に撤去する（§11-8）。
@@ -1060,6 +1082,9 @@ export default function RacePage(): React.JSX.Element {
   const [showEntryBoard, setShowEntryBoard] = useState(false);
   useEffect(() => {
     setRenderer(rendererFromSearch(window.location.search));
+    /** ★馬場・馬場状態も URL から（★2026-08-30・6 通りを見比べるため） */
+    setSurface(surfaceFromSearch(window.location.search));
+    setTrackCondition(conditionFromSearch(window.location.search));
     setShowEntryBoard(new URLSearchParams(window.location.search).get('entryBoard') === '1');
   }, []);
   useEffect(() => {
@@ -1234,6 +1259,12 @@ export default function RacePage(): React.JSX.Element {
           plateY0: layer.plateY0,
           plateY1: layer.plateY1,
           depthOffsetM: layer.depthOffsetM,
+          /**
+           * ★**走路の地面か**（2026-08-30）。★濡れた馬場の層はここにだけ重ねます。
+           *   ★どの層が地面かは**データ側が既に知っています** — `manifest.dirtLayers` の鍵が
+           *   ★まさに「ダートに差し替える層」＝地面の層です。★名前をここに直書きしません。
+           */
+          isGround: Object.prototype.hasOwnProperty.call(parallaxManifest.dirtLayers ?? {}, layer.name),
         })),
         // ★決勝線・審判塔は世界に固定（worldS='finish' → 距離）。発馬機の側面切り出しは正面ビルボードに置き換えたので除外
         objects: parallaxManifest.objects.filter((object) => !object.name.startsWith('start-')).map((object, index) => ({

@@ -105,38 +105,38 @@ export interface TexturedWorldOptions {
 const wrap = (a: number, n: number): number => ((a % n) + n) % n;
 
 /**
- * ★**馬場状態で走路をどれだけ暗くするか**（1 = 良＝そのまま）。
+ * ★**濡れた馬場の層の濃さ**（0 = 良＝何も重ねない）。
  *
- *   ★濡れた馬場は暗くなります。★既に決まっている役割の対応
- *   （`trackSurfacePaletteRole`: 良→`dirt-0` … 不良→`dirt-3`）と同じ向きです。
+ * 【★なぜ「色を暗くする」ではなく「層を重ねる」のか（2026-08-30）】
+ *   ⚠️ ★前は `TRACK_TINT` の色を掛け算で暗くしていました。★画面には **3〜5%** しか出ません
+ *      （実測: 芝 100/98/97/95・ダート 100/97/95/92）。
+ *      ★上塗りは合成のうち一部でしかないので、★**そこだけ暗くしても効きません。**
+ *   → ★**走路の帯そのものに濡れの層を重ねます。** ★タイルも上塗りもまとめて沈みます。
+ *   ★色は `SHADE`（芝は深緑・ダートは深褐）。★暗くなると同時に**色が濃く**なります
+ *     — ★濡れた地面は「暗いだけ」ではなく「色が濃い」ためです。
  *
- * ⚠️ ★**良は必ず 1** です。★良の見え方は 2026-08-29 に実画面で測って合わせたばかりなので、
- *    ★1 ビットも動かしません（`world-textured` の前後で 0 画素差を確認済み）。
- * ⚠️ ★省略・知らない値は**良**へ落とします（★狭い側＝何もしない側・R-27）。
+ * 【★狙い（画面での実測値）】★良を 100% として:
+ *   ★稍重 ≈ 91% ／ ★重 ≈ 82% ／ ★不良 ≈ 75%
+ *
+ * ⚠️ ★**良は必ず 0** です。★良の見え方はオーナー確認済みなので 1 ビットも動かしません。
+ * ⚠️ ★省略・知らない値は**良**へ落とします（★何もしない側・R-27）。
+ * ⚠️ ★**横視点の板もこの関数を読みます**（`parallax-plate.ts`）。
+ *    ★2 か所で別の式を持つと**正面と横で暗さが揃いません**（D-052・R-30）。
  */
-export function trackWetnessFactor(
+export function trackWetnessAlpha(
   condition?: 'good' | 'yielding' | 'soft' | 'bad' | undefined,
 ): number {
   switch (condition) {
-    case 'yielding': return 0.90;
-    case 'soft': return 0.80;
-    case 'bad': return 0.70;
-    default: return 1;
+    case 'yielding': return 0.12;
+    case 'soft': return 0.24;
+    case 'bad': return 0.34;
+    default: return 0;
   }
 }
 
-/**
- * ★色を暗い側へ寄せる（`k = 1` なら**元の文字列をそのまま返す**）。
- *
- * ⚠️ ★`k === 1` で早期に返すのが要点です。★丸め誤差で 1 ビットずれると、
- *    ★「良の絵は変えていない」と言えなくなります。
- */
-function scaleHex(hex: string, k: number): string {
-  if (k >= 1) return hex;
-  const n = parseInt(hex.slice(1), 16);
-  const ch = (shift: number): number =>
-    Math.max(0, Math.min(255, Math.round(((n >> shift) & 0xff) * k)));
-  return `#${[ch(16), ch(8), ch(0)].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+/** ★濡れの層に使う色（芝は深緑・ダートは深褐）。★`world-textured` の `SHADE` と同じ出どころ */
+export function trackWetnessColor(surface?: 'turf' | 'dirt' | undefined): string {
+  return surface === 'dirt' ? '#221a12' : '#12220f';
 }
 
 export function drawTexturedWorld<TImage>(
@@ -297,26 +297,19 @@ export function drawTexturedWorld<TImage>(
    */
   const isDirt = opts.surface === 'dirt';
   /** ★全体を薄く落とす色（芝は深緑・ダートは深褐） */
-  const SHADE = isDirt ? '#221a12' : '#12220f';
-  /**
-   * ★**馬場状態で走路の明るさを落とす**（2026-08-29）。
-   *
-   *   ★濡れた馬場は**暗く**なります。★既に決まっている役割の対応
-   *   （`trackSurfacePaletteRole`: 良→`dirt-0` … 不良→`dirt-3`）と同じ向きです。
-   *
-   * ⚠️ ★**良は 1.0（＝いまの絵と 1 ビットも変わらない）**にしてあります。
-   *    ★良の見え方は 2026-08-29 に測って合わせたばかりなので、動かしません。
-   */
-  const wet = trackWetnessFactor(opts.condition);
-  /** ★走路だけを少し明るくする色（芝は若草・ダートは乾いた砂）。★濡れるほど暗い */
-  const TRACK_TINT = scaleHex(isDirt ? '#c8a985' : '#9ccb55', wet);
+  /** ⚠️ ★出どころは `trackWetnessColor` の 1 か所（濡れの層と同じ色・D-052） */
+  const SHADE = trackWetnessColor(opts.surface);
+  /** ★走路だけを少し明るくする色（芝は若草・ダートは乾いた砂） */
+  const TRACK_TINT = isDirt ? '#c8a985' : '#9ccb55';
+  /** ★濡れの層の濃さ（良は 0）。★横視点の板にも**この関数から**渡します */
+  const wetAlpha = trackWetnessAlpha(opts.condition);
   // ★内外を暗くする代わりに、走路だけを少し明るく（台形が裏返らない範囲）。全体を先に薄く落とす
   ctx.globalAlpha = darken * 0.5;
   ctx.fillStyle = SHADE;
   ctx.fillRect(0, Math.max(0, Math.floor(hz)), W, H);
   ctx.globalAlpha = 1;
-  const trackBand = (alpha: number): void => {
-    ctx.fillStyle = TRACK_TINT;
+  const trackBand = (alpha: number, color: string = TRACK_TINT): void => {
+    ctx.fillStyle = color;
     ctx.globalAlpha = alpha;
     for (let s = NEAR; s < FAR; s += 8) {
       const s2 = Math.min(s + 8, FAR);
@@ -331,6 +324,20 @@ export function drawTexturedWorld<TImage>(
   };
   void band;
   trackBand(darken * 0.55);
+  /**
+   * ★**濡れた馬場**（2026-08-30・オーナー指示「芝・ダートそれぞれの馬場別を作って」）。
+   *
+   * ⚠️ ★前は `TRACK_TINT` の**色だけ**を暗くしていました。★画面には **3〜5%** しか出ません
+   *    （実測: 芝 100/98/97/95・ダート 100/97/95/92）。★「作った」と言える量ではありませんでした。
+   * → ★**走路の帯そのものに、濡れの層を重ねます。**
+   *   ★`SHADE`（芝は深緑・ダートは深褐）を使うので、★**暗くなると同時に色が濃くなります**
+   *   — ★濡れた地面は「暗いだけ」ではなく「色が濃い」ためです。
+   *
+   * ⚠️ ★**良は 0** です（`trackWetnessAlpha`）。★良の絵は 1 ビットも動きません。
+   * ★横視点の板にも**同じ関数から同じ量**を渡します（`parallax-plate.ts`）。
+   *   ★2 か所で別の式を持つと、★**正面と横で暗さが揃いません**（D-052・R-30）。
+   */
+  if (wetAlpha > 0) trackBand(wetAlpha, SHADE);
 
   // ── コース沿いの立体帯（生垣・樹林・スタンド）: 縦の看板状の帯を s 方向に細かく刻んで貼る ───────
   const strip = (tex: WorldStripTexture<TImage>, w: number, heightM: number, sFrom: number, sTo: number, stepM: number, alpha = 1, minDepth = 14): void => {

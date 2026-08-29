@@ -277,6 +277,30 @@ export function trackKickupIntensity(surface: RenderSurface, condition: RenderTr
   return condition === 'good' ? 0.07 : condition === 'yielding' ? 0.12 : condition === 'soft' ? 0.3 : 0.5;
 }
 
+/**
+ * ★**舞い上がる砂埃の量**（1 = 良）。★馬場が濡れるほど**減ります**。
+ *
+ * 【★なぜ減らすのか】
+ *   ⚠️ ★`trackKickupIntensity` は濡れるほど**増えます**（良 0.22 → 不良 0.86）。
+ *      ★あれは「蹄が地面を蹴り上げる量」なので増えて正しいのですが、
+ *      ★**舞い上がる砂埃**にそのまま掛けると**濡れた馬場ほど砂煙が濃く**なります。★逆です。
+ *   ★濡れた砂は**舞い上がりません。塊で飛びます。**
+ *   → ★塊（`chunks`）は `trackKickupIntensity` のまま増やし、
+ *     ★**空中の砂煙だけ**をこの係数で減らします。
+ *   ★これで ★**良は砂埃、重は暗く締まった走路に塊**という差が出ます。
+ *
+ * ⚠️ ★**良は必ず 1** です。★良の見え方はオーナー確認済みなので動かしません。
+ * ⚠️ ★省略・知らない値は**良**へ落とします（★何もしない側・R-27）。
+ */
+export function airborneDustFactor(condition?: RenderTrackCondition | undefined): number {
+  switch (condition) {
+    case 'yielding': return 0.70;
+    case 'soft': return 0.40;
+    case 'bad': return 0.25;
+    default: return 1;
+  }
+}
+
 /** 注視地点から背景の役割を決める。カメラ座標や時刻には依存しない。 */
 export function broadcastEnvironmentAt(course: Course, focusS: number): BroadcastEnvironment {
   const label = segmentAt(course, focusS).label;
@@ -1043,7 +1067,12 @@ export function drawPerspectiveHorses<TImage>(
         const ry = rx * (0.52 + jig * 0.16);
         /** ★消え方は後半ほど早く（尾が長く残らないように） */
         const fade = (1 - age) * (1 - age);
-        const a = Math.min(0.50, 0.56 * fade * Math.min(1, kickup * 4.5));
+        /**
+         * ★**濡れるほど薄く**（2026-08-30）。★濡れた砂は舞い上がらず塊で飛びます。
+         *   ⚠️ ★`kickup` だけに掛けると、★濡れた馬場ほど砂煙が濃くなって逆になります。
+         */
+        const a = Math.min(0.50, 0.56 * fade * Math.min(1, kickup * 4.5))
+          * airborneDustFactor(opts.trackEffect.condition);
         /**
          * ★**縁をでかして、砂煙にする**（2026-08-29）。
          *

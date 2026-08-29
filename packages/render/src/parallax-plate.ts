@@ -24,6 +24,14 @@ export interface ParallaxLayer<TImage> {
   readonly plateY1: number;
   /** 注視点（馬群）からの奥行き差（m）。＋は奥、−は手前 */
   readonly depthOffsetM: number;
+  /**
+   * ★**走路の地面か**（2026-08-30）。★濡れた馬場の層はここにだけ重ねます。
+   *
+   *   ★どの層が地面かは**データ側が既に知っています** — `manifest.dirtLayers` の鍵が
+   *   ★まさに「ダートに差し替える層」＝地面の層です。★呼ぶ側がそこから渡します。
+   * ⚠️ ★層の名前をこの層に書かないこと（★素材を差し替えたら合わなくなります）。
+   */
+  readonly isGround?: boolean | undefined;
 }
 
 /**
@@ -224,6 +232,13 @@ export interface ParallaxDrawOptions {
   /** 注視点が画面上で進む向き（+1=右へ, −1=左へ）。世界はその逆へ流れる */
   readonly direction: 1 | -1;
   /**
+   * ★**濡れた馬場の層の濃さ**（0 または省略で何も重ねない）。
+   *   ★`trackWetnessAlpha`（`world-textured.ts`）から渡すこと。★ここで式を作りません。
+   */
+  readonly wetAlpha?: number | undefined;
+  /** ★濡れの層の色。★`trackWetnessColor` から渡すこと（芝は深緑・ダートは深褐） */
+  readonly wetColor?: string | undefined;
+  /**
    * ★固定物体の基準（m・注視点の**真の**位置）。省略時は scrollM。
    *   層は見た目の進行距離 scrollM で流れるが、物体は馬と同じ真の位置に対して置く
    *   （物体が見える区間では anchor weight=1 で両者の増分は一致し、ずれない）。
@@ -300,6 +315,25 @@ export function drawParallaxPlate<TImage>(
     if (x > 0) x -= tileW;
     for (; x < opts.viewport.width; x += tileW) {
       ctx.drawImage(layer.image, 0, 0, layer.width, layer.height, x, y, tileW + 1, h + 1);
+    }
+    /**
+     * ★**濡れた馬場**（2026-08-30・オーナー指示「芝・ダートそれぞれの馬場別を作って」）。
+     *
+     * ⚠️ ★横視点の地面は**焼き込みの板**なので、`drawImage` では色を変えられません。
+     *    ★そのため 2026-08-29 まで、★**横のカットは馬場状態に 1 ミリも反応しませんでした**
+     *    （実測 100% / 100% / 100% / 100%・残件 A-6）。
+     * → ★層を描いたあと、★**その層の矩形にだけ**濡れの層を重ねます。
+     *   ★新しい素材は焼きません。★空・スタンド・ラチには掛かりません。
+     *
+     * ⚠️ ★濃さは `trackWetnessAlpha` から**正面と同じ量**を渡します。
+     *    ★2 か所で別の式を持つと**正面と横で暗さが揃いません**（D-052・R-30）。
+     */
+    if (layer.isGround === true && opts.wetAlpha !== undefined && opts.wetAlpha > 0) {
+      const prev = ctx.globalAlpha;
+      ctx.globalAlpha = prev * opts.wetAlpha;
+      ctx.fillStyle = opts.wetColor ?? '#12220f';
+      ctx.fillRect(0, y, opts.viewport.width, h + 1);
+      ctx.globalAlpha = prev;
     }
   }
   drawParallaxObjects(ctx, plate, opts, 'behind');

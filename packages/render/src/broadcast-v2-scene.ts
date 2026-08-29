@@ -6,7 +6,7 @@ import { drawDistancePoles } from './distance-poles.js';
 import { drawFinishPost } from './finish-post.js';
 import { drawMowStripes } from './mow-stripes.js';
 import { drawParallaxObjects, drawParallaxPlate, drawWorldBillboards, type ParallaxDrawOptions, type ParallaxPlate, type WorldBillboard } from './parallax-plate.js';
-import { drawTexturedWorld, type TexturedWorldAssets } from './world-textured.js';
+import { drawTexturedWorld, trackWetnessAlpha, trackWetnessColor, type TexturedWorldAssets } from './world-textured.js';
 import {
   broadcastCamera,
   drawPerspectiveHorses,
@@ -587,7 +587,15 @@ export function drawBroadcastV2Scene<TImage>(
       packDepthM: q0.depth,
       direction: q1.x >= q0.x ? 1 : -1,
     };
-    drawParallaxPlate(ctx, opts.parallaxPlate.plate, parallaxOpts);
+    /**
+     * ★**濡れた馬場**（2026-08-30）。★正面（テクスチャ世界）と**同じ関数から同じ量**を渡します。
+     * ⚠️ ★2 か所で別の式を持つと、★**正面と横で暗さが揃いません**（D-052・R-30）。
+     */
+    drawParallaxPlate(ctx, opts.parallaxPlate.plate, {
+      ...parallaxOpts,
+      wetAlpha: trackWetnessAlpha(opts.condition),
+      wetColor: trackWetnessColor(opts.surface),
+    });
   } else if (opts.backgroundPlate !== undefined) {
     const plate = opts.backgroundPlate;
     const zoom = Math.max(1, plate.zoom ?? 1.12);

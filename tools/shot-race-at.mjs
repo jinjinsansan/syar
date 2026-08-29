@@ -348,6 +348,8 @@ const parallaxBackstretch = {
     return {
       image: img, width: img.width, height: img.height,
       plateY0: l.plateY0, plateY1: l.plateY1, depthOffsetM: l.depthOffsetM,
+      /** ★走路の地面か（濡れた馬場の層はここにだけ）。★画面と同じく `dirtLayers` の鍵から引く */
+      isGround: Object.prototype.hasOwnProperty.call(manifest.dirtLayers ?? {}, l.name),
     };
   }),
   // ★画面と同じ条件: 発馬機の側面切り出し（start-*）は使わない
