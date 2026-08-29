@@ -32,6 +32,7 @@ import type { Strategy } from '@star/sim-engine';
 import type { Surface, TrackCondition } from '@star/race-engine';
 import {
   replayPositionModel, finalOrderOf, withFinishRunOut, finishSpeedsOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
+  dustExposureCurve,
   phaseOf, HORSE_LENGTH_M,
   // ★描き方は package が唯一の出どころ（この画面には持たない）
   frameRoleOf, silkRoleOf, SHEET_V2,
@@ -339,6 +340,12 @@ interface Built {
   readonly finishSec: ReadonlyMap<number, number>;
   /** ★各馬がゴール線を通ったときの速さ（m/s）。リプレイの走り抜けに使う（`withFinishRunOut` の注記） */
   readonly finishSpeeds: ReadonlyMap<number, number>;
+  /**
+   * ★**その馬がここまでに浴びてきた砂の量**（レース秒, 枠番）→ 0〜1（報告 §10-2）。
+   *   ★`dust-exposure.ts` が出します。★**この画面で式を作りません**（D-072 と同じ形）。
+   *   ⚠️ ★レースにつき 1 度だけ作ります。毎コマ作ると表を作り直します。
+   */
+  readonly dustSoil: (raceSec: number, gate: number) => number;
   /**
    * ★見た目の速度の補正 Δ(d)（`visual-scroll.ts`）。背景の流れと脚の周期に使う。
    *   位置・時刻・着順には触れない（時間圧縮 D-062 はそのまま）。
@@ -898,6 +905,14 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     const sortedM = at.map((h) => h.meters).sort((a, b) => b - a);
     if ((sortedM[0] ?? 0) >= DIST - 80) { finishStyle = broadcastV2FinishStyleOf(sortedM, HORSE_LENGTH_M); break; }
   }
+  /**
+   * ★**汚れ**（報告 §10-2「馬体・勝負服が汚れない」）。★レースにつき 1 度だけ表を作ります。
+   *   ⚠️ ★描画の fps では積みません。★コマ落ちで絵が変わると決定論が壊れます（憲法 4）。
+   */
+  const dustSoil = dustExposureCurve(
+    (t) => model.at(t).map((h) => ({ gate: h.gate, s: h.meters, w: h.w ?? TRACK_WIDTH_M / 2 })),
+    warp.raceSecAt(warp.displaySec),
+  );
   const samples: VisualScrollSample[] = [];
   const shotChanges: { displaySec: number; from: BroadcastV2ShotId; to: BroadcastV2ShotId }[] = [];
   let lastShot: BroadcastV2ShotId | undefined;
@@ -933,7 +948,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     warp,
     pace,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
-    gauge, finishPos, finishSec, finishSpeeds,
+    gauge, finishPos, finishSec, finishSpeeds, dustSoil,
     visualScroll: buildVisualScroll(samples),
     finishStyle,
     shotChanges,
@@ -2068,6 +2083,12 @@ export default function RacePage(): React.JSX.Element {
          *   ★`palette.json` の `dirt-0`（#b09472）よりさらに明るい砂ばこりの色。
          */
         dustColor: surface === 'dirt' ? '#cdb494' : undefined,
+        /**
+         * ★**浴びた砂で馬体・勝負服が汚れる**（報告 §10-2）。
+         *   ★量は `built.dustSoil` を**引くだけ**です。★ここで式を作りません。
+         *   ⚠️ ★芝では描画層が 1 粒も塗りません（判定は 1 か所・D-052）。
+         */
+        dustExposureOf: (gate) => built.dustSoil(sec, gate),
         /**
          * ★**内側の帯を芝に反転する**（`/race?infield=turf`）。
          *

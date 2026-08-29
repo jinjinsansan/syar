@@ -458,6 +458,12 @@ export function drawBroadcastV2Scene<TImage>(
     readonly directionalSets?: { readonly rear?: boolean; readonly front?: boolean } | undefined;
     /** ★毛色バリエーション（馬ごとの CSS filter） */
     readonly coatFilterOf?: ((gate: number) => string | undefined) | undefined;
+    /**
+     * ★**その馬がここまでに浴びてきた砂の量**（0〜1）。報告 §10-2。
+     *   ★`dustExposureCurve`（`dust-exposure.ts`）が出したものを**そのまま渡す**だけです。
+     *   ⚠️ ★渡さなければ馬は汚れません（＝従来どおり）。★ダートでしか塗りません。
+     */
+    readonly dustExposureOf?: ((gate: number) => number) | undefined;
     readonly frameRoleOf: (gate: number, fieldSize: number) => string;
     readonly surface: RenderSurface;
     readonly condition: RenderTrackCondition;
@@ -681,6 +687,7 @@ export function drawBroadcastV2Scene<TImage>(
     frameOf: opts.frameOf,
     phaseOf: opts.phaseOf,
     coatFilterOf: opts.coatFilterOf,
+    dustExposureOf: opts.dustExposureOf,
     frameRoleOf: opts.frameRoleOf,
     distanceMeter: course.distance,
     trackEffect: {

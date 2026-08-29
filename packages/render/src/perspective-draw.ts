@@ -20,6 +20,7 @@ import {
 import type { Ctx2D, Palette } from './oblique-draw.js';
 import type { SheetSpec } from './oblique-draw.js';
 import type { ShotCameraPreset, ShotView } from './shot-sequence.js';
+import { DUST_PLUME_M } from './dust-exposure.js';
 
 /** 1頭ぶん（★位置は `PositionModel` が持つ。ここは受け取るだけ） */
 export interface PerspHorse {
@@ -653,6 +654,17 @@ export function drawPerspectiveHorses<TImage>(
      *   勝負服オーバーレイと影には掛けない。無彩色（勝負服の灰、鞍布の白、脚元の黒）はほぼ変わらない。
      */
     readonly coatFilterOf?: ((gate: number) => string | undefined) | undefined;
+    /**
+     * ★**その馬がここまでに浴びてきた砂の量**（0＝きれい … 1＝満量）。報告 §10-2。
+     *
+     *   ★量は `dust-exposure.ts` の `dustExposureCurve` が出します。
+     *   ★**この層では式を作りません** — 受け取った数を塗るだけです（D-072 と同じ形）。
+     *
+     * ⚠️ ★渡さなければ**馬は汚れません**（＝従来どおり）。★既定は「呼ばれる側」に持ちません。
+     *    ★汚れは**レース全体の履歴**が要るので、★描画層だけでは出せないためです。
+     * ⚠️ ★**ダートでしか塗りません**（芝の見え方はオーナー承認済み）。
+     */
+    readonly dustExposureOf?: ((gate: number) => number) | undefined;
     /** 真横カメラ用の高解像度・個別フレーム。指定時はシートより優先する。 */
     readonly frameImages?: readonly {
       readonly image: TImage;
@@ -979,7 +991,13 @@ export function drawPerspectiveHorses<TImage>(
       const cycle = 8;
       const phase = (((frameIndex % cycle) + cycle) % cycle) / cycle;
       /** ★尾を引く長さ（m）。★長すぎると後続が見えなくなります */
-      const PLUME_M = 6.0;
+      /**
+       * ★尾を引く長さ（m）。★長すぎると後続が見えなくなります。
+       * ⚠️ ★**出どころは `dust-exposure.ts` の 1 か所**です（2026-08-29）。
+       *    ★汚れの量はこの長さの中に居た時間で決まるので、★**別の値を持つと、
+       *    ★絵に描かれていない砂で馬が汚れます**（同じ量を 2 か所で持たない・R-30）。
+       */
+      const PLUME_M = DUST_PLUME_M;
       const PUFFS = 14;
       const dust = opts.trackEffect.dustColor ?? opts.trackEffect.color;
       /**
@@ -1180,6 +1198,46 @@ export function drawPerspectiveHorses<TImage>(
         paintHorse(tail.dx * u, tail.dy * u);
       }
       ctx.globalAlpha = prevAlpha;
+    }
+
+    /**
+     * ★**浴びた砂で馬体・勝負服が汚れる**（2026-08-29・報告 §10-2「ダートの見せ場」の続き）
+     *
+     * 【★なぜ一様な膜にしないか】
+     *   ⚠️ ★均一に塗ると**縁が硬く**なり、★砂煙で 1 度やった「丸いポンポン」と同じ失敗をします。
+     *   ★実物の砂被りは**まだら**です。★`paintDustPuff` と**同じ塗り方**を使い、
+     *   ★脚と腹に散らします。
+     *
+     * 【★なぜ `filter` を使わないか】
+     *   ⚠️ ★`Ctx2D` の `filter` は**任意**です。★無い環境（監査道具）では効かないので、
+     *      ★**測定器が画面と違うものを見る**ことになります（R-30 / R-31 の再発 9 件と同じ形）。
+     *   → ★`ellipse` と `createRadialGradient` だけで塗ります。★どちらも既に使っている手です。
+     *
+     * 【★散らしは決定論】★`Math.random()` を使いません（憲法 4）。枠番と番号から決めます。
+     *
+     * ⚠️ ★着順・タイム・着差・払戻には触れません（憲法 3）。★見た目だけです。
+     */
+    if (opts.trackEffect !== undefined && opts.trackEffect.surface === 'dirt'
+      && opts.dustExposureOf !== undefined) {
+      const soil = Math.max(0, Math.min(1, opts.dustExposureOf(d.h.gate)));
+      if (soil > 0.02) {
+        const dust = opts.trackEffect.dustColor ?? opts.trackEffect.color;
+        /** ★汚れるのは**脚と腹**。★背は砂が届きません */
+        const LOW = 0.55;
+        /** ★最大 12 個。★量が少ないうちは数も少ない（＝薄い膜ではなく、点がまばら） */
+        const marks = Math.round(12 * soil);
+        for (let i = 0; i < marks; i += 1) {
+          const j1 = ((d.h.gate * 17 + i * 29) % 23) / 23;
+          const j2 = ((d.h.gate * 11 + i * 37) % 19) / 19;
+          const cx = d.p.x + (j1 - 0.5) * wpx * 0.82;
+          const cy = d.p.y - hpx * LOW * j2 * j2;
+          /** ★下ほど大きく・上ほど小さい（跳ね上がりは下から） */
+          const r = hpx * (0.030 + 0.045 * (1 - j2));
+          const a = Math.min(0.42, 0.50 * soil * (1 - j2 * 0.45));
+          paintDustPuff(cx, cy, r, r, a, dust);
+        }
+        ctx.globalAlpha = 1;
+      }
     }
   }
 

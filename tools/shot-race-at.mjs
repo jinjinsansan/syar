@@ -33,6 +33,7 @@ import { DEFAULT_RACE_SCRIPT,
   cameraBasis, drawBroadcastV2Scene, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
   posOf, project, ratesForTarget, replayPositionModel, resolveBroadcastV2Scene,
   targetDisplaySec, timeWarpFor, withFinishRunOut, GATE_FRONT_STALL_PLATES,
+  dustExposureCurve,
   broadcastV2StartLagM,
 } from '@star/render';
 
@@ -148,7 +149,7 @@ const startShownMeters = (meters, raceDisplaySec) =>
  *     ★**秒数より後ろに書くか、先頭にまとめて書くこと**。
  */
 /** ★値を取らないオプション。★ここへ入れ忘れると★**次の秒数が食われます** */
-const VALUELESS = new Set(['--noblur', '--infield-reversed']);
+const VALUELESS = new Set(['--noblur', '--infield-reversed', '--no-soil']);
 const optionValueIndexes = new Set();
 argv.forEach((a, i) => {
   if (a.startsWith('--') && !VALUELESS.has(a)) optionValueIndexes.add(i + 1);
@@ -214,6 +215,16 @@ if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((e) 
 }
 const knots = knotsFor(boundaries, OWN_GATE);
 const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
+
+/**
+ * ★**汚れ**（報告 §10-2）。★1 度だけ表を作ります。
+ * ⚠️ ★**画面（`page.tsx`）と同じものを渡さないと、この道具だけ馬がきれいなまま**になります
+ *    — ★測定器が画面と違う絵を見る形（R-30 / R-31 の再発 9 件と同じ）。
+ */
+const dustSoil = dustExposureCurve(
+  (t) => model.at(t).map((h) => ({ gate: h.gate, s: h.meters, w: h.w ?? course.widthM / 2 })),
+  warp.raceSecAt(warp.displaySec),
+);
 const finishSec = new Map(boundaries.map((b) => [b.gate, b.finishSec]));
 /** ★勝馬（画面と同じく「勝馬がゴールしたら」勝馬カットへ切り替える） */
 const WINNER_GATE = Number(result.order[0].horseId);
@@ -451,6 +462,11 @@ for (const [index, displaySec] of displaySecs.entries()) {
     poleFont: (px, bold) => `${bold ? 'bold ' : ''}${px}px JPUI, system-ui, sans-serif`,
     frameRoleOf, surface: SURFACE, condition: 'good', kickupColor: KICKUP_COLOR,
     ...(DUST_COLOR === undefined ? {} : { dustColor: DUST_COLOR }),
+    /**
+     * ★浴びた砂で馬が汚れる（報告 §10-2）。★画面と同じ量を渡す（R-31）。
+     *   ★`--no-soil` で切って比べられます（★既定は画面と同じ「入り」）。
+     */
+    ...(argv.includes('--no-soil') ? {} : { dustExposureOf: (g) => dustSoil(sec, g) }),
     /** ★`--infield-reversed` で内側の帯を芝に反転する（裁定 §6-3 の [EYES] 用） */
     ...(argv.includes('--infield-reversed') ? { infieldReversed: true } : {}),
     // ★Web 画面と同じ分岐（page.tsx: shot.view === 'side' ? undefined : texturedWorld）

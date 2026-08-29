@@ -14,6 +14,7 @@ export * from './entry-board.js';
 export * from './race-intro.js';
 export * from './perspective.js';
 export * from './perspective-draw.js';
+export * from './dust-exposure.js';
 export * from './shot-sequence.js';
 export * from './fixed-2d-draw.js';
 export * from './broadcast-v2.js';
