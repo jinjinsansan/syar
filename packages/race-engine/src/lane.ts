@@ -214,6 +214,20 @@ export function laneAt(
    *   ここを呼び出し側ごとに変えると**同じレースが別の結果になります**（憲法 4・決定論）。
    */
   revealFullRun: number = LANE_REVEAL_FULL_RUN,
+  /**
+   * ★**走路の形**（1周・直線）。★`swingScale` が「距離で割り戻す」ために要ります。
+   *
+   * ⚠️ ★**2026-08-30 以前、ここは `DEFAULT_OVAL` 固定でした。**
+   *    ★`swingScale` は spec を引数に取る設計なのに、★`laneAt` の署名に spec が無く、
+   *    ★`laneExtraM(spec)` が **venue の走路で積分するのに、積分される `w` は 1周2000m 前提**
+   *    という形になっていました。★競馬場ごとのずれは実測 **0.872〜1.490 倍**
+   *    （`tools/_lanespecgap.mjs`）。→ ★`swingScale` が担うはずの「距離によらずおおむね一定」が
+   *    ★**競馬場ごとに効いていませんでした**（天河 2000m 7.10 馬身 / 2500m 13.00 馬身）。
+   *
+   * ★**既定は `DEFAULT_OVAL`** なので、★spec を渡さない呼び出しは**いままでと 1 ビットも変わりません**
+   *   （`race.ts` も `page.tsx` も渡していません）。★競馬場ごとの形を通すのは B案 ②。
+   */
+  spec: OvalSpec = DEFAULT_OVAL,
 ): number {
   const start = laneAtStart(gate, fieldSize, widthM);
   const ranM = Math.max(0, distanceMeter - metersLeft);
@@ -253,7 +267,7 @@ export function laneAt(
   const revealRun = Math.max(0, Math.min(1, (run - REVEAL_START_RUN) / Math.max(1e-6, revealFullRun - REVEAL_START_RUN)));
   const reveal = revealRun * revealRun * (3 - 2 * revealRun);
   const swing = Math.max(0, drift * 0.85 + wave) * reveal * (widthM * 0.62)
-    * swingScale(distanceMeter, { ...DEFAULT_OVAL, widthM });
+    * swingScale(distanceMeter, { ...spec, widthM });
 
   return Math.max(0.8, Math.min(widthM - 0.8, base + swing));
 }
@@ -279,7 +293,11 @@ export function laneExtraM(
       for (let o = 0; o < seg.length; o += stepM) {
         const len = Math.min(stepM, seg.length - o);
         const s = acc + o + len / 2;
-        const w = laneAt(gate, fieldSize, distance - s, distance, seed, spec.widthM, revealFullRun);
+        /**
+         * ⚠️ ★**`spec` を最後まで渡します。** ★渡さないと、★venue の走路で積分するのに
+         *    ★`w` だけ 1周2000m 前提、という形に戻ります（★2026-08-30 まで実際にそうでした）。
+         */
+        const w = laneAt(gate, fieldSize, distance - s, distance, seed, spec.widthM, revealFullRun, spec);
         extra += (w - centre) * (len / seg.radius);
       }
     }

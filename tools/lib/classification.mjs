@@ -255,6 +255,12 @@ export const READONLY = [
   '_glosscmp.mjs',                // 照りの入/切で走路のどの行がどれだけ明るくなるか（読むだけ）
   '_condsheet.mjs',               // 馬場状態を 1 枚に並べた比較シート（読むだけ）
   '_venuelane.mjs',               // 競馬場の形を変えると V-18 ②（内外の距離差）がどれだけ動くか（読むだけ）
+  '_venuefit.mjs',                // 実際に組んである 50 鞍で V-18 ② が帯に入る競馬場の形を掃引する（読むだけ）
+  '_venuepick.mjs',               // 競馬場 10 場を V-18 ② と散らばりの検査の両方を満たす形へ選び直す（読むだけ）
+  '_venueverify.mjs',             // いま venues.ts に入っている形で 50 鞍すべてを V-18 ②と①の前身で検定（読むだけ）
+  '_revealspread.mjs',            // V-18 ② が帯を越えた原因が LANE_REVEAL_FULL_RUN にあることを測る（読むだけ）
+  '_lanespecgap.mjs',             // laneAt が spec を受け取れないことで生じる swing の倍率のずれ（読むだけ）
+  '_lanebench.mjs',               // laneExtraM の呼び出し速度（掃引が総当りで間に合うかの見積り・読むだけ）
   '_interframe.mjs',              // 隣り合うコマで地面の画素がどれだけ変わるか＝見た目の動き（読むだけ）
   '_duststep.mjs',                // 砂煙が連続に動くか段で跳ぶか（読むだけ）
   '_wetprofile.mjs',              // 濡れの層が画面のどの行に効いているか（読むだけ）
