@@ -350,15 +350,41 @@ export function drawPuddles(
        * ⚠️ ★これが無いと、★暗い本体だけが残り、★**蹄の影と同じ「暗い楕円」**に見えます
        *   — ★走路には既に馬の影が落ちているので、★見分けがつきません。
        */
-      ctx.globalAlpha = prevAlpha * Math.min(0.9, 0.35 + sky * 0.6);
-      ctx.strokeStyle = HORIZON_SKY_COLOR;
-      ctx.lineWidth = Math.max(1, (maxX - minX) * 0.012);
-      ctx.beginPath();
       const far = outline.filter((q) => q.y <= cy);
       if (far.length >= 2) {
-        ctx.moveTo(far[0]!.x, far[0]!.y);
-        for (let i = 1; i < far.length; i += 1) ctx.lineTo(far[i]!.x, far[i]!.y);
-        ctx.stroke();
+        const lw = Math.max(1, (maxX - minX) * 0.012);
+        const line = (pts: readonly { x: number; y: number }[], color: string, alpha: number, width: number): void => {
+          ctx.globalAlpha = prevAlpha * alpha;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = width;
+          ctx.beginPath();
+          ctx.moveTo(pts[0]!.x, pts[0]!.y);
+          for (let i = 1; i < pts.length; i += 1) ctx.lineTo(pts[i]!.x, pts[i]!.y);
+          ctx.stroke();
+        };
+        /**
+         * ★**水際は 2 本の線**（★2026-08-30・オーナー指示「2 をお願いします」）。
+         *
+         * ⚠️ 【★なぜ 2 本なのか】
+         *   ★オーナーの画面はキャンバスを **67%** に縮めて出します（`page.tsx` の `width: 100%`）。
+         *   ★**塗りのぼかしは縮小で消え、線だけが残ります。**
+         *   ★1 本だけだと、縮小の補間で**周りと混ざって薄くなります**。
+         *   ★**暗い線と明るい線を隣り合わせ**にすると、★どれだけ縮んでも**落差が残ります**
+         *     — ★2 つの画素が互いに薄まらないためです。
+         *
+         * 【★物としても正しい形です】
+         *   ★水際の**外**は水を吸って濃くなった土（暗い）。
+         *   ★水際の**内**は水面のふち（空を映して明るい）。★その境目が「水際」です。
+         */
+        /** ★① 外側の暗線（水を吸った土） */
+        line(far, rim, Math.min(0.9, 0.5 + sky * 0.3), lw * 1.4);
+        /** ★② 内側の明線（水面のふち）。★暗線のすぐ内側へ 1 本ぶんずらす */
+        line(
+          far.map((q) => ({ x: q.x, y: q.y + lw * 1.5 })),
+          HORIZON_SKY_COLOR,
+          Math.min(0.95, 0.42 + sky * 0.55),
+          lw,
+        );
       }
     }
   }
