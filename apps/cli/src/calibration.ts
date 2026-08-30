@@ -438,6 +438,7 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
+  { key: 'GRADED_COUNT_BY_GRADE', why: '★重賞 50 鞍の格の内訳（G1 9 / G2 14 / G3 27）。★較正定数ではなく**オーナー判断の写し**（2026-08-30・B案）。★`graded-races.test.ts` が `GRADED_RACES` と突き合わせるので、片方だけ動かすと落ちる。⚠️ ★通すために動かせる値ではない — ★動かすなら正典 §10.3 の週次頻度との噛み合わせを決め直すことになる（照会中）' },
   { key: 'TURN_REF_M', why: '★外へ膨らむ量を距離で割り戻すときの**基準点**（1600m での旋回角を 1 とする）。★較正値ではなく単位の取り方で、動かしても V-18 ② の内外差が全距離で一律に伸縮するだけ。⚠️ 割り戻し自体をやめると長距離で 13.2馬身まで積み上がり V-18 ② を超える（実測）' },
   { key: 'HORSE_LENGTH_M', why: '★1馬身 = 2.4m。**実寸の定義**（競馬ブック用語辞典・dbpedia「着差 (競馬)」）であって較正値ではない。動かすと「馬身」という単位の意味が変わる' },
   { key: 'DEFAULT_OVAL', why: '★`@star/render` の `ovalCourse` の既定（1周2000m・直線400m・幅20m）の**写し**。層の向きの都合でエンジン側にも持つが、★較正するものではなく**同期させるもの**。lane-geometry.test.ts が両者の距離ロスを突き合わせて、離れたら落とす' },

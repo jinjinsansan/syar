@@ -9,3 +9,5 @@ export * from './programme.js';
 export * from './conditions.js';
 export * from './prize.js';
 export * from './week.js';
+export * from './venues.js';
+export * from './graded-races.js';
