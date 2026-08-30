@@ -21,6 +21,7 @@ export * from './broadcast-v2.js';
 export * from './broadcast-v2-scene.js';
 export * from './parallax-plate.js';
 export * from './mow-stripes.js';
+export * from './puddles.js';
 export * from './distance-poles.js';
 export * from './crowd.js';
 export * from './infield.js';

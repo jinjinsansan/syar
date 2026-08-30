@@ -5,6 +5,7 @@ import { cameraBasis, project } from './perspective.js';
 import { drawDistancePoles } from './distance-poles.js';
 import { drawFinishPost } from './finish-post.js';
 import { drawMowStripes } from './mow-stripes.js';
+import { drawPuddles } from './puddles.js';
 import { drawParallaxObjects, drawParallaxPlate, drawWorldBillboards, type ParallaxDrawOptions, type ParallaxPlate, type WorldBillboard } from './parallax-plate.js';
 import {
   drawTexturedWorld, trackWetnessAlpha, trackWetnessColor, trackGlossAlpha, HORIZON_SKY_COLOR,
@@ -484,6 +485,12 @@ export function drawBroadcastV2Scene<TImage>(
      *   ★正面（テクスチャ世界）と横（板）の**両方**に、★同じ関数から同じ量を渡します。
      */
     readonly gloss?: boolean | undefined;
+    /**
+     * ★**水たまり**（2026-08-30・残件 A-7）。★既定で描く。`false` で止める（比較用）。
+     *   ⚠️ ★既定は**ここに書きません** — `PUDDLES_DEFAULT` から引きます（R-31）。
+     *   ★重・不良だけに出ます。★良・稍重は 1 つも描きません。
+     */
+    readonly puddles?: boolean | undefined;
     readonly backgroundPlate?: {
       readonly image: TImage;
       readonly width: number;
@@ -644,6 +651,25 @@ export function drawBroadcastV2Scene<TImage>(
   if (opts.mowStripes !== false) {
     drawMowStripes(ctx, course, projectGround,
       { width: scene.camera.width, height: scene.camera.height }, { focusS: scene.focusS });
+  }
+  /**
+   * ★**水たまり**（2026-08-30・残件 A-7）。★縞刈りと**同じ場所・同じ理由**でここに置きます。
+   *
+   *   ⚠️ ★背景の描き方は 3 通りありますが、★**どれか 1 つに足すのではなく、ここで 1 回**描きます。
+   *      ★走路の投影として描くので、地面の描き方に依らず馬と同じカメラに載ります（R-30）。
+   *   ★馬より**前**に描きます（★馬が水たまりの上を走るため）。
+   * ⚠️ ★良・稍重では 1 つも描きません（`puddleDensity`）。★良の絵は 1 ビットも動きません。
+   */
+  if (opts.puddles !== false) {
+    drawPuddles(ctx, course, projectGround,
+      { width: scene.camera.width, height: scene.camera.height },
+      {
+        focusS: scene.focusS,
+        surface: opts.surface,
+        condition: opts.condition,
+        /** ★カメラの高さは**この場面のカメラ**から取ります（手置きの数を渡さない・R-30） */
+        eyeHeightM: scene.camera.eye.z,
+      });
   }
   if (opts.distancePoles !== false) {
     // ★奥の棒は馬より先に。手前の棒は馬のあと（下の `front`）

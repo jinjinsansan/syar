@@ -227,15 +227,27 @@ export function trackGlossAlpha(
 ): number {
   const wet = trackWetnessAlpha(condition);
   if (!(wet > 0)) return 0;
+  return wet * skyReflectance(depthM, eyeHeightM) * TRACK_GLOSS_GAIN;
+}
+
+/**
+ * ★**水面がその深さで空をどれだけ映すか**（0〜1・フレネル）。
+ *
+ * ⚠️ ★**照り（`trackGlossAlpha`）と水たまり（`puddles.ts`）は、この 1 か所から引きます**（D-052）。
+ *    ★同じ「水が空を映す量」を 2 か所で持つと、★**薄い膜と水たまりで光り方が食い違います。**
+ *
+ * ★Schlick の近似（水の R0 ≈ 0.02）。★式は我々で作りません。
+ * ★`depthM` はカメラ前方の深さ、★`eyeHeightM` はカメラの高さ。
+ * ★斜辺で割るので、★カメラの足元（depth→0）では下限に落ち、★0 除算になりません。
+ */
+export function skyReflectance(depthM: number, eyeHeightM: number): number {
   const d = Math.max(0, depthM);
   const h = Math.max(0, eyeHeightM);
   const slant = Math.hypot(d, h);
   if (!(slant > 0)) return 0;
   /** ★入射角の余弦（＝見下ろし角の正弦）。★遠いほど 0 に近づく＝浅く当たる */
   const cos = Math.min(1, h / slant);
-  /** ★Schlick 近似。★水の R0 ≈ 0.02 */
-  const fresnel = 0.02 + 0.98 * ((1 - cos) ** 5);
-  return wet * fresnel * TRACK_GLOSS_GAIN;
+  return 0.02 + 0.98 * ((1 - cos) ** 5);
 }
 
 export function drawTexturedWorld<TImage>(

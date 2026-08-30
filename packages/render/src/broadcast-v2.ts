@@ -927,6 +927,29 @@ export function trackGlossFromSearch(search: string): boolean {
   return TRACK_GLOSS_DEFAULT;
 }
 
+/**
+ * ★**水たまり**（2026-08-30・残件 A-7・オーナー指示「水たまりなどに進めて」）。
+ *
+ * ⚠️ 【★戻し口】★**`/race?puddles=0`**（`puddlesFromSearch`）。★正典 D-085。
+ *
+ * 【なぜ入れたか】
+ *   ★一様な層（暗さ・照り）では ★**「濡れている」になりませんでした**
+ *   （★照りは正面のカットで **+1.3%**・目で分からない。★強くすると濡れの暗さを打ち消す）。
+ *   ★実際の不良馬場が濡れて見えるのは、★**そこだけ明るく空を映す溜まり**があるからです。
+ *   → ★**平均の明るさを動かさずに、局所の対比を作ります。**
+ *
+ * ⚠️ ★**良・稍重には 1 つも出ません**（`puddleDensity`）。★良の絵は 1 ビットも動きません。
+ * ⚠️ ★**道具はこの定数を読むこと**（R-31）。★`true`/`false` を道具に直書きしない。
+ */
+export const PUDDLES_DEFAULT = true;
+
+export function puddlesFromSearch(search: string): boolean {
+  const v = new URLSearchParams(search).get('puddles');
+  if (v === '0' || v === 'off') return false;
+  if (v === '1' || v === 'on') return true;
+  return PUDDLES_DEFAULT;
+}
+
 /** ★台本 → ショット表。`v2` は表を持たないので v4 で代用（呼び出し側が使わない） */
 function scriptRowsOf(script: BroadcastV2Script): readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] {
   if (script === 'v6') return SCRIPT_V6;
