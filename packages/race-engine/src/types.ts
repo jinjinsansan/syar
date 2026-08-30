@@ -7,6 +7,7 @@
  */
 
 import type { AbilityKey, HorseId, SkillGene, Strategy } from '@star/sim-engine';
+import type { OvalSpec } from './lane.js';
 
 // ---------------------------------------------------------------------------
 // レース条件
@@ -45,6 +46,21 @@ export interface RaceConditions {
   surface: Surface;
   trackCondition: TrackCondition;
   courseShape: CourseShape;
+  /**
+   * ★**その競馬場の走路の形**（1周・直線・幅）。★距離ロス（D-065 / D-071）が これで変わります。
+   *
+   * ⚠️ ★`courseShape`（`'straight' | 'oval'`）とは**別のもの**です。
+   *    ★あちらは「コーナーが在るか」、★こちらは「そのコーナーがどれだけ深いか」。
+   *
+   * ★**省略すると `DEFAULT_OVAL`**（1周2000m・直線400m・幅20m）。
+   *   ★渡さないレースは**いままでと 1 ビットも変わりません**。
+   *
+   * ⚠️ ★**ここは着順に効く経路です**（憲法 3・D-071）。
+   *    ★描画層にも同じ形を渡すこと。★`apps/cli/test/venue-course.test.ts` が
+   *    ★エンジン（`ovalSegments` / `laneExtraM`）と描画層（`ovalCourse` / `laneExtraMeters`）を
+   *    ★10 場ぶん突き合わせています。★片方だけ変えると落ちます。
+   */
+  course?: OvalSpec;
   /** 基準斤量からの増減を各馬が持つため、レース側は基準値のみ持つ */
   baseWeightKg: number;
 }

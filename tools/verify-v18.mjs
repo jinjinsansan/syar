@@ -15,6 +15,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { DEFAULT_RACE_BALANCE, resolveRace, laneExtraM, HORSE_LENGTH_M } from '@star/race-engine';
+import { VENUES, GRADED_RACES } from '@star/scheduler';
 
 const POOL = JSON.parse(readFileSync('apps/web/src/lib/watch-pool.json', 'utf8'));
 const argv = process.argv.slice(2);
@@ -23,6 +24,11 @@ const RACES = num('--races', 2000);
 const FIELD = num('--field', 12);
 const STRATS = ['nige', 'senko', 'sashi', 'oikomi'];
 const DISTANCES = [1200, 1600, 2000, 2400];
+/**
+ * ★`--venues` を付けると ★**競馬場 10 場 × 実際に組まれている距離**で測ります（★B案 ③）。
+ * ⚠️ ★付けないときの出力は**従来と 1 文字も変わりません**。
+ */
+const VENUE_MODE = argv.includes('--venues');
 
 /** スピアマンの順位相関 */
 function spearman(xs, ys) {
@@ -50,12 +56,15 @@ function spearman(xs, ys) {
   return sxx > 0 && syy > 0 ? sxy / Math.sqrt(sxx * syy) : 0;
 }
 
-console.log(`# ★V-18 — 枠順が結果を決めないこと・ただし距離ロスは実在すること`);
-console.log(`  ${RACES} レース × ${DISTANCES.length} 距離 / ${FIELD}頭\n`);
-
-const fails = [];
-console.log('  距離   ①枠順と着順の相関   ②内外差（馬身）        判定');
-for (const dist of DISTANCES) {
+/**
+ * ★**1 つの（距離・走路の形）を測る。**
+ *
+ * ⚠️ ★`spec` を省くと `DEFAULT_OVAL`。★**省いたときの値は 2026-08-30 以前と完全に同じ**です
+ *    （★関数に切り出しただけで、中身は 1 行も変えていません）。
+ *
+ * ★`spec` を渡すと、★**その競馬場の走路**で着順まで判定します（B案 ②）。
+ */
+function measureOne(dist, spec) {
   const gates = [];
   const places = [];
   const spreads = [];
@@ -103,25 +112,59 @@ for (const dist of DISTANCES) {
     const conditions = {
       raceId: `v18-${dist}-${r}`, distance: dist, surface: 'turf',
       trackCondition: 'good', courseShape: 'oval', baseWeightKg: 55,
+      /** ★競馬場の走路の形。★省くと `DEFAULT_OVAL`（＝従来と同じ） */
+      course: spec,
     };
     const res = resolveRace({ conditions, entrants, seed, balance: DEFAULT_RACE_BALANCE });
     for (const e of res.order) {
       gates.push(Number(e.horseId));
       places.push(e.finishPosition);
     }
-    const extras = entrants.map((e) => laneExtraM(e.gate, FIELD, dist, seed));
+    const extras = entrants.map((e) => laneExtraM(e.gate, FIELD, dist, seed, spec));
     spreads.push(Math.max(...extras) - Math.min(...extras));
   }
   const rho = spearman(gates, places);
   const meanSpread = spreads.reduce((a, b) => a + b, 0) / spreads.length;
   const lengths = meanSpread / HORSE_LENGTH_M;
-  const ok1 = Math.abs(rho) <= 0.10;
-  const ok2 = lengths >= 4 && lengths <= 12;
-  if (!ok1) fails.push(`${dist}m ① 枠順と着順の相関 ${rho.toFixed(3)}（許容 ±0.10）`);
-  if (!ok2) fails.push(`${dist}m ② 内外差 ${lengths.toFixed(1)}馬身（許容 4〜12）`);
-  console.log(`  ${String(dist).padStart(4)}m      ${(rho >= 0 ? '+' : '') + rho.toFixed(3)}  ${ok1 ? '○' : '★×'}`
-    + `      ${lengths.toFixed(1).padStart(5)} 馬身（${meanSpread.toFixed(1)}m） ${ok2 ? '○' : '★×'}`
-    + `     ${ok1 && ok2 ? 'PASS' : '★FAIL'}`);
+  return { rho, meanSpread, lengths, ok1: Math.abs(rho) <= 0.10, ok2: lengths >= 4 && lengths <= 12 };
+}
+
+const fails = [];
+
+if (VENUE_MODE) {
+  /**
+   * ★**10 場 × その競馬場に実際に組まれている距離**で測ります（★B案 ③）。
+   *
+   * ⚠️ ★ここは ★**着順まで**見ています（`resolveRace`）。★`_venueverify.mjs` の「①の前身」
+   *    （枠順と距離ロス）ではなく、★**V-18 ① そのもの**です。
+   */
+  console.log(`# ★V-18 — ★競馬場 10 場（★実際に組まれている距離だけ）`);
+  console.log(`  ${RACES} レース / ${FIELD}頭\n`);
+  console.log('  競馬場        距離   ①枠順と着順   ②内外差（馬身）      判定');
+  for (const v of VENUES) {
+    const spec = { lapM: v.lapM, homeStretchM: v.homeStretchM, widthM: v.widthM };
+    const dists = [...new Set(GRADED_RACES.filter((r) => r.venueId === v.id).map((r) => r.distanceM))].sort((a, b) => a - b);
+    for (const dist of dists) {
+      const m = measureOne(dist, spec);
+      if (!m.ok1) fails.push(`${v.name} ${dist}m ① 枠順と着順の相関 ${m.rho.toFixed(3)}（許容 ±0.10）`);
+      if (!m.ok2) fails.push(`${v.name} ${dist}m ② 内外差 ${m.lengths.toFixed(1)}馬身（許容 4〜12）`);
+      console.log(`  ${v.name.padEnd(11)} ${String(dist).padStart(4)}m   ${(m.rho >= 0 ? '+' : '') + m.rho.toFixed(3)} ${m.ok1 ? '○' : '★×'}`
+        + `      ${m.lengths.toFixed(1).padStart(5)} 馬身 ${m.ok2 ? '○' : '★×'}`
+        + `     ${m.ok1 && m.ok2 ? 'PASS' : '★FAIL'}`);
+    }
+  }
+} else {
+  console.log(`# ★V-18 — 枠順が結果を決めないこと・ただし距離ロスは実在すること`);
+  console.log(`  ${RACES} レース × ${DISTANCES.length} 距離 / ${FIELD}頭\n`);
+  console.log('  距離   ①枠順と着順の相関   ②内外差（馬身）        判定');
+  for (const dist of DISTANCES) {
+    const m = measureOne(dist, undefined);
+    if (!m.ok1) fails.push(`${dist}m ① 枠順と着順の相関 ${m.rho.toFixed(3)}（許容 ±0.10）`);
+    if (!m.ok2) fails.push(`${dist}m ② 内外差 ${m.lengths.toFixed(1)}馬身（許容 4〜12）`);
+    console.log(`  ${String(dist).padStart(4)}m      ${(m.rho >= 0 ? '+' : '') + m.rho.toFixed(3)}  ${m.ok1 ? '○' : '★×'}`
+      + `      ${m.lengths.toFixed(1).padStart(5)} 馬身（${m.meanSpread.toFixed(1)}m） ${m.ok2 ? '○' : '★×'}`
+      + `     ${m.ok1 && m.ok2 ? 'PASS' : '★FAIL'}`);
+  }
 }
 
 console.log('');

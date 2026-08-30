@@ -133,7 +133,12 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
      *      決定的に引きます（馬ごとの乱数消費数を変えないため。Provably Fair）。
      */
     const laneExtra = conditions.courseShape === 'oval'
-      ? laneExtraM(entrant.gate, fieldSize, conditions.distance, seed)
+      /**
+       * ⚠️ ★**`conditions.course` を渡します**（★2026-08-30・B案 ②）。
+       *    ★渡さないレースは `DEFAULT_OVAL` に落ちるので、★いままでと完全に同じ値です。
+       *    ★競馬場ごとの形を持つレースだけが、★その走路の距離ロスで判定されます。
+       */
+      ? laneExtraM(entrant.gate, fieldSize, conditions.distance, seed, conditions.course)
       : 0;
 
     const coefs = deterministicCoefs(
