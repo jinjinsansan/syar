@@ -11,3 +11,4 @@ export * from './prize.js';
 export * from './week.js';
 export * from './venues.js';
 export * from './graded-races.js';
+export * from './race-setup.js';

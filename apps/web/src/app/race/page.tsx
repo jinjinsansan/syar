@@ -75,8 +75,26 @@ import {
   targetDisplaySec,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
+import { raceSetupFromParam } from '@star/scheduler';
 
-const DIST = 1600;
+/**
+ * ★**どの 1 鞍を走らせるか**（`?race=<id>`・2026-08-31・B案 ④）。
+ *
+ * ⚠️ ★**走路の形は 1 か所から取ります**（`@star/scheduler` の `raceSetupFromParam`）。
+ *    ★エンジン（`conditions.course` → `laneExtraM` → **着順**）と
+ *    ★描画層（`ovalCourse`）が ★**同じ `spec` と `turn`** を使うことを、
+ *    ★`apps/cli/test/venue-course.test.ts` が 50 鞍すべてで突き合わせます（★台帳 B-6）。
+ *
+ * ★`?race=` が無いときは ★**桜星賞**（スターパーク・芝1600m・左回り・幅20m）で、
+ *   ★これは 2026-08-31 まで直書きされていた 1 鞍と**完全に同じ**です。
+ */
+const RACE_PARAM = typeof window === 'undefined' ? null
+  : new URLSearchParams(window.location.search).get('race');
+const RACE_SETUP = raceSetupFromParam(RACE_PARAM).setup;
+const DIST = RACE_SETUP.distanceM;
+/** ★走路の形。⚠️ ★エンジンにも描画層にも**これを渡します**（★別々に組まない） */
+const COURSE_SPEC = RACE_SETUP.spec;
+const COURSE_OPTS = { ...COURSE_SPEC, turn: RACE_SETUP.turn };
 /**
  * ★**走る場所の作り方の比較口**（`?lane=old|b|c|d`・2026-08-31）。★`old` は旧形。
  *   ⚠️ ★**付けなければ現行と完全に同じ**です。★オーナーが絵で選ぶためだけの口で、
@@ -284,7 +302,8 @@ const silksColorsFor = (pal: Record<string, string>, fieldSize: number): readonl
  * ★表示用のレース情報（憲法 §0.1: 実在の競馬場名・レース名は使わない）。
  *   以前は実在名のプレースホルダーが直書きされていたので架空名に置換した。
  */
-const RACE_META = { venue: 'スターパーク競馬場', raceName: '桜星賞', raceNo: '11R' } as const;
+/** ★見出し。★`?race=` が無ければ桜星賞（★直書きだったものと同じ） */
+const RACE_META = RACE_SETUP.meta;
 /** 実況アナ（架空・design/hud-ds/components/narrator-cast の A） */
 const NARRATOR_NAME = '星野 亮太';
 /** HUD が載るのは発走 0.8 秒後（motion-spec §6） */
@@ -858,6 +877,8 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
   }));
   const conditions = {
     raceId: `r${seed}-${surface}-${trackCondition}`, distance: DIST, surface,
+    /** ⚠️ ★**着順に効く経路**（憲法 3・D-071）。★描画層と同じ `COURSE_SPEC` を使う */
+    course: COURSE_SPEC,
     trackCondition, courseShape: 'oval' as const, baseWeightKg: 55,
   };
   /** ★比較用に着差の見せ方だけ差し替える（既定は `DEFAULT_RACE_BALANCE` のまま） */
@@ -874,8 +895,12 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     strategyOf: (g) => entrants[g - 1]!.strategy,
     // ★横位置はエンジンが引いたものを読むだけ（D-071）
     // ★比較用の切替口（`?lane=b|c|d`）。★付けなければ現行のまま
+    /**
+     * ⚠️ ★**走路の形（`COURSE_SPEC`）を渡します**。
+     *    ★渡さないと、★**絵は 1周2000m 前提・着順は venue の形**で食い違います（台帳 B-6）。
+     */
     laneOf: (gate, metersLeft) => laneAt(gate, entrants.length, metersLeft, DIST, seed,
-      TRACK_WIDTH_M, undefined, undefined, LANE_MODEL_PARAM),
+      COURSE_SPEC.widthM, undefined, COURSE_SPEC, LANE_MODEL_PARAM),
     pace,
     formationSeed: seed * 2654435761,
   });
@@ -928,7 +953,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
    *   ★左右回りで注視点は変わらないので、ここは左回りの course で求める。
    */
   const winnerGate = settled[0]!;
-  const course = ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn: 'left' });
+  const course = ovalCourse(DIST, COURSE_OPTS);
   const STEP = 0.05;
   const totalSec = RACE_INTRO_RACE_START_SEC + warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
   // ★ゴール前の展開: 先頭が残り 80m に達した瞬間の位置関係
@@ -1086,7 +1111,12 @@ export default function RacePage(): React.JSX.Element {
   const [clock, setClock] = useState(0);
   const [surface, setSurface] = useState<Surface>('turf');
   const [trackCondition, setTrackCondition] = useState<TrackCondition>('good');
-  const [turn, setTurn] = useState<'left' | 'right'>('left');
+  /**
+   * ★回り。★**初期値はその競馬場の回り**（`venues.ts`「回りは競馬場ごとに固定」）。
+   * ⚠️ ★回りは**描画層だけ**に効きます（`ovalSegments` は回りを見ない）。
+   *    ★だから下の選択で反転させても ★**着順は 1 ビットも変わりません**（見比べ用）。
+   */
+  const [turn, setTurn] = useState<'left' | 'right'>(RACE_SETUP.turn);
   /** ★既定は V2。`?renderer=legacy` のときだけ旧固定2D（引継ぎ書 §1-5） */
   const [renderer, setRenderer] = useState<RendererKind>('v2');
   /** ★発走前オーバーレイ「出馬表」（design/hud-ds/components/entry-board）。ゲート待機中に重ねる。`?entryBoard=1` でも開く */
@@ -1094,7 +1124,12 @@ export default function RacePage(): React.JSX.Element {
   useEffect(() => {
     setRenderer(rendererFromSearch(window.location.search));
     /** ★馬場・馬場状態も URL から（★2026-08-30・6 通りを見比べるため） */
-    setSurface(surfaceFromSearch(window.location.search));
+    /**
+     * ★**`?surface=` があればそれを、無ければそのレースの馬場**を使います。
+     *   ⚠️ ★蒼海賞（ダート）を開いて芝が出ると、★**見ているものが違います**。
+     */
+    const sp = new URLSearchParams(window.location.search).get('surface');
+    setSurface(sp === null ? RACE_SETUP.surface : surfaceFromSearch(window.location.search));
     setTrackCondition(conditionFromSearch(window.location.search));
     setShowEntryBoard(new URLSearchParams(window.location.search).get('entryBoard') === '1');
   }, []);
@@ -1660,7 +1695,7 @@ export default function RacePage(): React.JSX.Element {
        * ★空撮フライオーバー（アーケード参考映像 31 秒）: コースの上を斜めに飛ぶカメラで透視ワールドだけを描く（馬なし）。
        *   時刻 d の関数（決定論）。終わりでタイトルへ暗転で渡す。
        */
-      const course = ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn });
+      const course = ovalCourse(DIST, { ...COURSE_SPEC, turn });
       const t = Math.max(0, Math.min(1, d / RACE_INTRO_FLYOVER_SEC));
       const ease = t * t * (3 - 2 * t);
       const eyeS = -140 + ease * 620;                // 発走の手前上空から向正面の上空へ
@@ -1923,7 +1958,7 @@ export default function RacePage(): React.JSX.Element {
      */
     let v2HorseRatio = 0;
     if (renderer === 'v2') {
-      const course = ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn });
+      const course = ovalCourse(DIST, { ...COURSE_SPEC, turn });
       const scene = resolveBroadcastV2Scene(course, easedAt.map((horse) => ({
         gate: horse.gate,
         s: horse.meters,
@@ -2380,7 +2415,7 @@ export default function RacePage(): React.JSX.Element {
      */
     /** ★リプレイ中はコース図も下ろします（馬に重なるため・上の `hud` の注記と同じ理由） */
     if (v2Minimap !== undefined && !winnerFinishedNow && !replay.active) {
-      drawCourseMinimap(ctx, ovalCourse(DIST, { widthM: TRACK_WIDTH_M, turn }), art.pal as Record<string, string>, FONT,
+      drawCourseMinimap(ctx, ovalCourse(DIST, { ...COURSE_SPEC, turn }), art.pal as Record<string, string>, FONT,
         v2Minimap.horses, v2Minimap.focusS, { x: 40, y: 321, width: 264, height: 209 },
         // ★コース図も HUD・馬体と同じ枠色から引く（3 か所で持たない）
         (gate) => (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff', {

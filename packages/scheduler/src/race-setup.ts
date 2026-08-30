@@ -1,0 +1,91 @@
+/**
+ * ★**1 鞍を「走らせる形」に開く**（正典 §10.3 / D-071）
+ *
+ * 【★なぜ 1 か所に置くか】
+ *   ⚠️ ★走路の形は ★**2 か所で使われます**:
+ *     ★① エンジン … `RaceConditions.course` → `laneExtraM`（★**着順に効きます**・憲法 3）
+ *     ★② 描画層 … `ovalCourse(distance, opts)`（★絵）
+ *   ★**2 か所で別々に組むと必ず離れます**（`jostle` 0.06/0.25・走路の幅 20m/25m の前科）。
+ *
+ * ⚠️ ★実際に離れていた例（★2026-08-31 に発見）:
+ *   ★`page.tsx:931` は `ovalCourse(DIST, { turn: 'left' })` と**直書き**で、
+ *   ★他の 3 箇所は画面の `turn` 状態を使っていました。★右回りを選ぶと**片方だけ左**でした。
+ *
+ * ⚠️ ★レビュー側の指摘（台帳 B-6）:
+ *   > ★`venue-course.test.ts` は**両辺とも自分で spec を渡す**ので、
+ *   > ★**呼び出し側が渡し忘れた**ことは捕まえられない。
+ *   → ★**渡し忘れようがない形にします** — ★呼び出し側は `spec` と `turn` を
+ *   　★**この 1 つの戻り値から取る**しかありません。
+ *
+ * 【★この層の約束】★依存ゼロ・純粋関数。★時計も乱数も持ちません。
+ */
+import { GRADED_RACES, gradedRaceById, type GradedRace } from './graded-races.js';
+import { venueById, type Venue, type VenueSurface } from './venues.js';
+
+/**
+ * ★走路の形（1周・直線・幅）。
+ * ⚠️ ★`@star/race-engine` の `OvalSpec` と**同じ形**です。★依存ゼロを保つため型は持ちません
+ *    （★`apps/cli/test/venue-course.test.ts` が実際に両方へ渡して突き合わせます）。
+ */
+export interface RaceCourseSpec {
+  readonly lapM: number;
+  readonly homeStretchM: number;
+  readonly widthM: number;
+}
+
+export interface RaceSetup {
+  readonly race: GradedRace;
+  readonly venue: Venue;
+  readonly distanceM: number;
+  readonly surface: VenueSurface;
+  /** ★**エンジンへ渡すもの**（`RaceConditions.course`）。★着順に効きます */
+  readonly spec: RaceCourseSpec;
+  /** ★回り。★**描画層だけ**が使います（`ovalSegments` は回りを見ません） */
+  readonly turn: 'left' | 'right';
+  /** ★見出し */
+  readonly meta: {
+    readonly venue: string;
+    readonly raceName: string;
+    readonly raceNo: string;
+  };
+}
+
+/**
+ * ★**既定の 1 鞍**。★`?race=` が無いときはこれです。
+ * ⚠️ ★これは ★**2026-08-31 まで画面に直書きされていた 1 鞍**そのものです
+ *    （スターパーク競馬場・桜星賞・芝 1600m・左回り・幅 20m）。
+ *    → ★`?race=` を付けない画面は、★**配線の前後で 1 ビットも変わりません。**
+ */
+export const DEFAULT_RACE_ID = 'g1-ousei';
+
+/**
+ * ★重賞はその日のメインレースなので 11R。
+ * ⚠️ ★番組表（`programme.ts`）が R 番号を持つようになったら、★そちらから引くこと。
+ *    ★いまは 1 か所に置いてあるだけで、★較正値ではありません。
+ */
+const GRADED_RACE_NO = '11R';
+
+/** ★`?race=<id>` を「走らせる形」に開く。★知らない id は既定へ落とさず**投げます**（R-27） */
+export function raceSetupById(raceId: string = DEFAULT_RACE_ID): RaceSetup {
+  const race = gradedRaceById(raceId);
+  const venue = venueById(race.venueId);
+  return {
+    race,
+    venue,
+    distanceM: race.distanceM,
+    surface: race.surface,
+    spec: { lapM: venue.lapM, homeStretchM: venue.homeStretchM, widthM: venue.widthM },
+    turn: venue.turn,
+    meta: { venue: venue.name, raceName: race.name, raceNo: GRADED_RACE_NO },
+  };
+}
+
+/**
+ * ★画面から呼ぶ入口。★**知らない id は既定へ落とします**（★URL は人が打つので）。
+ * ⚠️ ★**黙って落としません** — ★落ちたことを呼び出し側が判別できるように返します（R-27 の系）。
+ */
+export function raceSetupFromParam(raw: string | null | undefined): { setup: RaceSetup; fellBack: boolean } {
+  if (raw === null || raw === undefined || raw === '') return { setup: raceSetupById(), fellBack: false };
+  const found = GRADED_RACES.some((r) => r.id === raw);
+  return { setup: raceSetupById(found ? raw : DEFAULT_RACE_ID), fellBack: !found };
+}

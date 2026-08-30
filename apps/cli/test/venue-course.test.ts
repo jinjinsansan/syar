@@ -13,7 +13,9 @@
  *    ★そこも数字で押さえます（全部同じ半径なら「10 場ある」意味がありません）。
  */
 import { describe, it, expect } from 'vitest';
-import { VENUES, GRADED_RACES, venueById } from '@star/scheduler';
+import {
+  VENUES, GRADED_RACES, venueById, raceSetupById, raceSetupFromParam, DEFAULT_RACE_ID,
+} from '@star/scheduler';
 import { ovalCourse, posOf, laneExtraMeters } from '@star/render';
 import { ovalSegments, laneAt, laneExtraM } from '@star/race-engine';
 
@@ -114,5 +116,70 @@ describe('★競馬場の形を通してもエンジンと描画層の幾何が�
           .toBeLessThan(Math.max(0.5, Math.abs(theirs) * 0.02));
       }
     }
+  });
+});
+
+/**
+ * ★**呼び出し側が走路の形を渡し忘れられない**ことを守る（★2026-08-31・台帳 B-6）
+ *
+ * ⚠️ ★レビュー側の指摘:
+ *   > ★上の検査は**両辺とも自分で `spec` を渡す**ので、
+ *   > ★**呼び出し側が渡し忘れた**ことは原理的に捕まえられない。
+ *
+ * ★実際に開いていた口: ★`apps/web/src/app/race/page.tsx` の
+ *   ★`laneOf` が `spec` を渡さず、★`ovalCourse(DIST, { turn: 'left' })` は**回りが直書き**でした。
+ *
+ * → ★**`raceSetupById` を通せば渡し忘れようがない**形にしました。
+ *   ★この検査は、★**その 1 つの戻り値から取った `spec` と `turn` が、
+ *   ★エンジンと描画層の両方で同じ走路になる**ことを 50 鞍すべてで見ます。
+ */
+describe('★1 鞍を開いた形が、エンジンと描画層で同じ走路になる', () => {
+  it('★★50 鞍すべてで、`raceSetupById` の spec が両層で一致する', () => {
+    for (const r of GRADED_RACES) {
+      const s = raceSetupById(r.id);
+      /** ★描画層は spec ＋ 回り、★エンジンは spec だけ（`ovalSegments` は回りを見ない） */
+      const course = ovalCourse(s.distanceM, { ...s.spec, turn: s.turn });
+      const mine = ovalSegments(s.distanceM, s.spec);
+      expect(mine.length, `★${s.race.name}`).toBe(course.segments.length);
+      mine.forEach((m, i) => {
+        expect(m.length, `★${s.race.name} 区間 ${i}`).toBeCloseTo(course.segments[i]!.length, 9);
+        expect(m.corner, `★${s.race.name} 区間 ${i}`).toBe(course.segments[i]!.type === 'corner');
+      });
+      expect(course.widthM, `★${s.race.name} の幅`).toBe(s.spec.widthM);
+      expect(course.distance, `★${s.race.name} の距離`).toBe(r.distanceM);
+    }
+  });
+
+  it('★★開いた形が、その競馬場・馬場・距離と食い違わない', () => {
+    for (const r of GRADED_RACES) {
+      const s = raceSetupById(r.id);
+      const v = venueById(r.venueId);
+      expect(s.distanceM).toBe(r.distanceM);
+      expect(s.surface).toBe(r.surface);
+      expect(s.turn).toBe(v.turn);
+      expect(s.spec.lapM).toBe(v.lapM);
+      expect(s.spec.homeStretchM).toBe(v.homeStretchM);
+      expect(s.spec.widthM).toBe(v.widthM);
+      expect(s.meta.venue).toBe(v.name);
+      expect(s.meta.raceName).toBe(r.name);
+    }
+  });
+
+  it('★★既定の 1 鞍は、直書きされていた画面と同じ（★配線しても画面が変わらない）', () => {
+    const s = raceSetupById();
+    expect(s.meta.venue).toBe('スターパーク競馬場');
+    expect(s.meta.raceName).toBe('桜星賞');
+    expect(s.distanceM).toBe(1600);
+    expect(s.surface).toBe('turf');
+    expect(s.turn).toBe('left');
+    expect(s.spec.widthM).toBe(20);
+  });
+
+  it('★知らない id は投げる／URL からは既定へ落ちるが、落ちたことが分かる（R-27）', () => {
+    expect(() => raceSetupById('banana')).toThrow();
+    expect(raceSetupFromParam('banana').fellBack).toBe(true);
+    expect(raceSetupFromParam('banana').setup.race.id).toBe(DEFAULT_RACE_ID);
+    expect(raceSetupFromParam(null).fellBack).toBe(false);
+    expect(raceSetupFromParam('g1-ginga').setup.race.name).toBe('銀河賞');
   });
 });
