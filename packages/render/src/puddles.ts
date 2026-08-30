@@ -83,6 +83,119 @@ function hash01(a: number, b: number, salt: number): number {
   return (h >>> 0) / 4294967296;
 }
 
+/**
+ * ★**その地点に溜まっている水の量**（0＝乾いている … 1＝水たまりの真ん中）。
+ *
+ * ★`drawPuddles` が描くのと**同じ格子・同じ形**から引きます（D-052）。
+ * ⚠️ ★**絵に無い水で跳ねてはいけません。** ★2 か所で持つと、★水たまりの無い所で水が跳ねます
+ *    — ★見ている人には理由が分かりません（★砂煙と汚れで同じ形の失敗をしています）。
+ *
+ * ★隣の格子も見ます。★水たまりは自分の格子から**はみ出す**ことがあるためです。
+ */
+export function puddleCoverAt(
+  s: number,
+  w: number,
+  condition: 'good' | 'yielding' | 'soft' | 'bad' | undefined,
+  courseWidthM: number,
+): number {
+  const density = puddleDensity(condition);
+  if (!(density > 0)) return 0;
+  const cs0 = Math.floor(s / PUDDLE_CELL_S_M);
+  const cw0 = Math.floor(w / PUDDLE_CELL_W_M);
+  let best = 0;
+  for (let ds = -1; ds <= 1; ds += 1) {
+    for (let dw = -1; dw <= 1; dw += 1) {
+      const p = puddleAt(cs0 + ds, cw0 + dw, density, courseWidthM);
+      if (p === null) continue;
+      const r = Math.hypot((s - p.s) / p.rs, (w - p.w) / p.rw);
+      if (r >= 1) continue;
+      /** ★縁では薄く、真ん中で満量（★縁で急に跳ね出すと不自然です） */
+      best = Math.max(best, Math.min(1, (1 - r) / 0.5));
+    }
+  }
+  return best;
+}
+
+/** ★1 回の蹴りで跳ぶ水の粒の数（★踏んだ量で増える） */
+export const SPLASH_MAX_DROPS = 9;
+
+/**
+ * ★**その蹴りでどれだけ水が跳ねるか**（0〜1）。
+ *
+ * ⚠️ 【★水たまりだけを見ると、ほとんど跳ねません — ★計算して分かりました】
+ *   ★水たまりが覆うのは走路の面積の **約 5%** です
+ *   （★不良: 格子の 42% × 1 つ約 8m² ÷ 70m²）。
+ *   ★12 頭のうち踏んでいるのは平均 **0.6 頭**、★蹴りの拍（8 コマ中 5 コマ）と重なるのは **0.4 頭**。
+ *   → ★**画面にはまず出ません。** ★実際、実画面で 1 粒も出ませんでした。
+ *
+ * 【★だから 2 つに分けます】
+ *   ★① **地面そのものが水を含んでいる**（重・不良）… ★どの蹴りでも少し跳ねる
+ *   ★② **水たまりを踏んだ**… ★大きく跳ねる
+ *   ⚠️ ★①は「絵に無い水」ではありません。★走路を暗くしている水そのもの
+ *      （`trackWetnessAlpha`）が、★蹄で跳ね上がっている、という同じ水の話です。
+ *
+ * ⚠️ ★**良・稍重では 0** です。★1 粒も跳ねません。
+ */
+export function splashAmountAt(
+  condition: 'good' | 'yielding' | 'soft' | 'bad' | undefined,
+  cover: number,
+): number {
+  const soaked = condition === 'bad' ? 0.35 : condition === 'soft' ? 0.18 : 0;
+  if (!(soaked > 0)) return 0;
+  return Math.max(soaked, Math.min(1, cover));
+}
+
+export function splashDropCount(amount: number): number {
+  if (!(amount > 0)) return 0;
+  return Math.max(1, Math.round(SPLASH_MAX_DROPS * Math.min(1, amount)));
+}
+
+/**
+ * ★**跳ね返りの粒 1 つ**（走路の座標での相対位置・m）。
+ *
+ * 【★なぜ塊（土）と別に持つのか】
+ *   ★土の塊は**重いので後ろへ低く**飛びます。★水は ★**軽いので高く・横へ広がります。**
+ *   ★同じ式で色だけ変えると、★**水が土のように飛び**、見ている人には「泥」に見えます。
+ *
+ * ⚠️ 【★決定論（憲法 4）】★乱数を呼びません。★枠番と粒の番号だけで決めます。
+ *    ★塊と**別の散らし方**にしてあります（★同じだと水と土がぴったり重なって 1 つに見えます）。
+ */
+export function splashDropAt(
+  gate: number,
+  index: number,
+  life: number,
+  cover: number,
+): { readonly back: number; readonly lateral: number; readonly rise: number; readonly alpha: number; readonly sizeM: number } {
+  /** ★塊は `(gate * 31 + i * 17) % 13`。★ここは別の数で、重ならないようにします */
+  const seed = ((gate * 37 + index * 23) % 17) / 17;
+  /**
+   * ⚠️ 【★粒ごとに飛行の段階をずらします — ★2026-08-30・実画面を見て直しました】
+   *   ★最初は全部の粒が**同じ段階**でした。★実画面では
+   *   ★**灰色の玉が縦に一列**に並び、★「湯気」に見えました。
+   *   ★本物の飛沫は、★**まだ上がっている粒と、もう落ちている粒が混ざります。**
+   *   → ★粒の番号だけ段階を進めます（★決定論は保ったまま）。
+   */
+  const t = Math.max(0, Math.min(1, life + index * 0.11));
+  return {
+    /** ★水は蹄の近くで跳ねます（★塊の 0.35〜3.1m より手前） */
+    back: 0.15 + t * (0.8 + seed * 0.7),
+    /** ★横へ広がります（★塊の ±0.45m より広い） */
+    lateral: (seed - 0.5) * (0.6 + t * 1.4),
+    /** ★高く上がります（★塊の 0.35〜0.8m より高い） */
+    rise: Math.sin(t * Math.PI) * (0.5 + seed * 0.75),
+    /**
+     * ★すぐ消えます（★水は散って見えなくなる）。
+     *
+     * ⚠️ 【★2026-08-30・濃くした理由】★最初は `量` にそのまま比例させました
+     *    （★地面が水を含んでいるだけのときは 0.35 倍）。★実画面では ★**ほとんど見えませんでした。**
+     *    → ★量は**粒の数**で見せ、★1 粒の濃さは**半分は残す**形にします
+     *      （★`0.5 + 0.5 × 量`）。★踏んだときとの差は、数と大きさで出ます。
+     */
+    alpha: Math.max(0, 0.85 * (1 - t) * (0.5 + 0.5 * Math.min(1, cover))),
+    sizeM: (0.035 + seed * 0.05) * (1 - t * 0.35),
+  };
+}
+
 export interface PuddleOptions {
   /** 注視点（m）。この前後だけ描く */
   readonly focusS: number;

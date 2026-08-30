@@ -21,6 +21,8 @@ import type { Ctx2D, Palette } from './oblique-draw.js';
 import type { SheetSpec } from './oblique-draw.js';
 import type { ShotCameraPreset, ShotView } from './shot-sequence.js';
 import { DUST_PLUME_M, DUST_PUFF_COUNT, dustPlumePhaseAt } from './dust-exposure.js';
+import { puddleCoverAt, splashAmountAt, splashDropAt, splashDropCount } from './puddles.js';
+import { HORIZON_SKY_COLOR } from './world-textured.js';
 
 /** 1頭ぶん（★位置は `PositionModel` が持つ。ここは受け取るだけ） */
 export interface PerspHorse {
@@ -1133,6 +1135,50 @@ export function drawPerspectiveHorses<TImage>(
           ctx.lineTo(q.x - size * 0.5, yy + size * 0.8);
           ctx.closePath();
           ctx.fill();
+        }
+        /**
+         * ★**水たまりを踏んだときの跳ね返り**（2026-08-30・残件 A-7・オーナー指示）
+         *
+         * 【★なぜ蹴りと同じ拍で出すのか】
+         *   ★水は**蹄が着いた瞬間**に跳ねます。★別の拍で出すと、★脚と水がずれて
+         *   ★「水たまりの上を滑っている」ように見えます。★だから塊と**同じ `sinceKick`** に載せます。
+         *
+         * ⚠️ 【★絵に無い水で跳ねない】
+         *   ★量は `puddleCoverAt` から引きます。★**`drawPuddles` が描くのと同じ格子・同じ形**です。
+         *   ★2 か所で持つと、★**水たまりの無い所で水が跳ねます**（D-052・R-30）。
+         *   ★同じ形の失敗を、砂煙と汚れで一度しています。
+         *
+         * ⚠️ ★良・稍重では `puddleCoverAt` が 0 を返すので、★1 粒も跳ねません。
+         */
+        const cover = puddleCoverAt(d.s, d.h.w, opts.trackEffect?.condition, course.widthM);
+        const splash = splashAmountAt(opts.trackEffect?.condition, cover);
+        if (splash > 0) {
+          const drops = splashDropCount(splash);
+          for (let i = 0; i < drops; i += 1) {
+            const drop = splashDropAt(d.h.gate, i, life, splash);
+            if (!(drop.alpha > 0.01)) continue;
+            const q = P(d.s - drop.back, d.h.w + drop.lateral);
+            if (q.depth <= 2) continue;
+            const size = Math.max(1, q.pxPerM * drop.sizeM);
+            ctx.globalAlpha = drop.alpha;
+            ctx.fillStyle = HORIZON_SKY_COLOR;
+            ctx.beginPath();
+            /** ★水滴は縦に伸びます（★丸だと「石」に見えます） */
+            ctx.ellipse(q.x, q.y - drop.rise * q.pxPerM, size * 0.7, size * 1.35, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          /** ★蹄元の**水の冠**（跳ねた直後だけ・低く横に広がる） */
+          if (life < 0.45) {
+            const q = P(d.s - 0.2, d.h.w);
+            if (q.depth > 2) {
+              ctx.globalAlpha = (0.5 - life * 0.9) * splash;
+              ctx.fillStyle = HORIZON_SKY_COLOR;
+              ctx.beginPath();
+              ctx.ellipse(q.x, q.y - q.pxPerM * 0.06, q.pxPerM * (0.18 + life * 0.55), q.pxPerM * (0.05 + life * 0.12), 0, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+          ctx.globalAlpha = 1;
         }
         // 薄い土煙（発生直後だけ）
         if (life < 0.5) {

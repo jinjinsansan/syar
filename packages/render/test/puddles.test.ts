@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  puddleDensity, puddleAt, drawPuddles,
+  puddleDensity, puddleAt, drawPuddles, puddleCoverAt, splashAmountAt, splashDropAt, splashDropCount, SPLASH_MAX_DROPS,
   PUDDLE_CELL_S_M, PUDDLE_CELL_W_M, PUDDLE_GLOSS_GAIN,
 } from '../src/puddles.js';
 import { PUDDLES_DEFAULT, puddlesFromSearch } from '../src/broadcast-v2.js';
@@ -224,6 +224,140 @@ describe('⚠️ ★入れると実際に画が変わる', () => {
       if ((alphas[i + 1] ?? 0) > (alphas[i] ?? 0)) stronger += 1;
     }
     expect(stronger, '★芯が水面より明るくない＝落差が無い').toBeGreaterThan(0);
+  });
+});
+
+describe('★跳ね返り（水たまりを踏んだとき）', () => {
+  it('⚠️ ★**良・稍重では 1 粒も跳ねない**', () => {
+    for (let s = 0; s < 600; s += 3) {
+      expect(puddleCoverAt(s, 4, 'good', course.widthM)).toBe(0);
+      expect(puddleCoverAt(s, 4, 'yielding', course.widthM)).toBe(0);
+    }
+  });
+
+  it('⚠️ ★**絵に無い水で跳ねない**（★描く形と踏む形が同じ格子から出ている）', () => {
+    /**
+     * 【★なぜこの検査が要るか】
+     *   ★同じ量を 2 か所で持つと必ず離れます（R-30）。★離れると
+     *   ★**水たまりの無い所で水が跳ねます** — ★見ている人には理由が分かりません。
+     *   ★この案件は砂煙と汚れで**同じ形の失敗**を一度しています。
+     */
+    let covered = 0;
+    for (let s = 0; s < 1400; s += 1.7) {
+      for (let w = 0.5; w < course.widthM; w += 1.3) {
+        const cover = puddleCoverAt(s, w, 'bad', course.widthM);
+        if (cover <= 0) continue;
+        covered += 1;
+        /** ★その点を含む水たまりが、★`puddleAt`（＝描く側）から本当に出てくること */
+        const cs0 = Math.floor(s / PUDDLE_CELL_S_M);
+        const cw0 = Math.floor(w / PUDDLE_CELL_W_M);
+        let found = false;
+        for (let ds = -1; ds <= 1 && !found; ds += 1) {
+          for (let dw = -1; dw <= 1 && !found; dw += 1) {
+            const p = puddleAt(cs0 + ds, cw0 + dw, puddleDensity('bad'), course.widthM);
+            if (p === null) continue;
+            if (Math.hypot((s - p.s) / p.rs, (w - p.w) / p.rw) < 1) found = true;
+          }
+        }
+        expect(found, `★(${s.toFixed(1)}, ${w.toFixed(1)}) で跳ねるのに、そこに水たまりが描かれていない`).toBe(true);
+      }
+    }
+    expect(covered, '★どこにも水が無い＝検査が空回りしている').toBeGreaterThan(20);
+  });
+
+  it('★乾いた所では跳ねない（★走路の全部が水面ではない）', () => {
+    let dry = 0;
+    for (let s = 0; s < 1400; s += 1.7) {
+      if (puddleCoverAt(s, 18, 'bad', course.widthM) === 0) dry += 1;
+    }
+    expect(dry, '★外ラチ寄りまで水浸し＝多すぎる').toBeGreaterThan(100);
+  });
+
+  it('⚠️ ★決定論 — 同じ粒は何度呼んでも同じ', () => {
+    for (const [gate, i, life] of [[3, 0, 0.2], [11, 4, 0.75]] as const) {
+      const a = splashDropAt(gate, i, life, 1);
+      const b = splashDropAt(gate, i, life, 1);
+      expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    }
+  });
+
+  it('★踏んだ量で粒が増える／踏んでいなければ 0 粒', () => {
+    expect(splashDropCount(0)).toBe(0);
+    expect(splashDropCount(1)).toBe(SPLASH_MAX_DROPS);
+    expect(splashDropCount(1)).toBeGreaterThan(splashDropCount(0.3));
+  });
+
+  it('⚠️ ★**良・稍重ではどう踏んでも 0**（★跳ねる量の側でも押さえる）', () => {
+    for (const cover of [0, 0.5, 1]) {
+      expect(splashAmountAt('good', cover)).toBe(0);
+      expect(splashAmountAt('yielding', cover)).toBe(0);
+      expect(splashAmountAt(undefined, cover)).toBe(0);
+    }
+  });
+
+  it('⚠️ ★**水たまりの外でも、重・不良なら少し跳ねる**（★これが無いとほぼ画面に出ません）', () => {
+    /**
+     * 【★この検査が生まれた実害】★最初は「水たまりを踏んだときだけ」でした。
+     * ★実画面で ★**1 粒も出ませんでした。**
+     * ★水たまりが覆うのは走路の**約 5%**（不良）。★12 頭中 0.6 頭が踏み、
+     * ★蹴りの拍（8 コマ中 5）と重なるのは **0.4 頭**。★まず出ません。
+     * → ★①地面が水を含んでいる（どの蹴りでも少し）／★②水たまりを踏んだ（大きく）の 2 段にしました。
+     * ⚠️ ★①は「絵に無い水」ではありません — ★走路を暗くしている水そのものです。
+     */
+    expect(splashAmountAt('soft', 0)).toBeGreaterThan(0);
+    expect(splashAmountAt('bad', 0)).toBeGreaterThan(splashAmountAt('soft', 0));
+    /** ★これだけあれば、蹴っている馬には必ず粒が出ます */
+    expect(splashDropCount(splashAmountAt('bad', 0))).toBeGreaterThanOrEqual(2);
+  });
+
+  it('★水たまりを踏むと大きく跳ねる（★段になっている）', () => {
+    expect(splashAmountAt('bad', 1)).toBeGreaterThan(splashAmountAt('bad', 0));
+    expect(splashDropCount(splashAmountAt('bad', 1)))
+      .toBeGreaterThan(splashDropCount(splashAmountAt('bad', 0)));
+    /** ★踏んでいないときの量より下がることはない（★水たまりが「乾かす」ことはない） */
+    for (const c of [0, 0.2, 0.5, 0.9, 1]) {
+      expect(splashAmountAt('bad', c)).toBeGreaterThanOrEqual(splashAmountAt('bad', 0));
+    }
+  });
+
+  it('★時間で消える（★水は散って見えなくなる）', () => {
+    const a = splashDropAt(5, 1, 0.1, 1).alpha;
+    const b = splashDropAt(5, 1, 0.6, 1).alpha;
+    const c = splashDropAt(5, 1, 1, 1).alpha;
+    expect(a).toBeGreaterThan(b);
+    expect(b).toBeGreaterThan(c);
+    expect(c).toBeLessThan(0.1);
+  });
+
+  it('⚠️ ★**水は土の塊より高く・横へ飛ぶ**（★同じ飛び方だと泥にしか見えません）', () => {
+    /**
+     * ★塊（`perspective-draw.ts`）の値と比べます:
+     *   ★塊 … `rise = sin(life*PI) * (0.35 + seed*0.45)` → ★最大 **0.80m**
+     *   ★塊 … `lateral = (seed - 0.5) * 0.9` → ★最大 **±0.45m**
+     */
+    let maxRise = 0, maxLateral = 0;
+    for (let g = 1; g <= 12; g += 1) {
+      for (let i = 0; i < SPLASH_MAX_DROPS; i += 1) {
+        const d = splashDropAt(g, i, 0.5, 1);
+        maxRise = Math.max(maxRise, d.rise);
+        maxLateral = Math.max(maxLateral, Math.abs(d.lateral));
+      }
+    }
+    expect(maxRise, '★水が塊より高く上がっていない').toBeGreaterThan(0.80);
+    expect(maxLateral, '★水が塊より横へ広がっていない').toBeGreaterThan(0.45);
+  });
+
+  it('★塊と同じ場所に重ならない（★散らし方が別）', () => {
+    /** ★塊の散らし `(gate*31 + i*17) % 13 / 13` と、★水の `(gate*37 + i*23) % 17 / 17` */
+    let same = 0;
+    for (let g = 1; g <= 12; g += 1) {
+      for (let i = 0; i < 6; i += 1) {
+        const chunk = ((g * 31 + i * 17) % 13) / 13;
+        const water = ((g * 37 + i * 23) % 17) / 17;
+        if (Math.abs(chunk - water) < 1e-9) same += 1;
+      }
+    }
+    expect(same, '★水と土が同じ散らしで、ぴったり重なっている').toBe(0);
   });
 });
 
