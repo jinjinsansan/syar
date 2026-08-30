@@ -65,16 +65,26 @@ export function puddleDensity(
  */
 export const PUDDLE_GLOSS_GAIN = 0.62;
 
-/** ★縁の暗い輪郭の濃さ。★水が地面に染みている縁で、★これが無いと「白い染み」に見えます */
-export const PUDDLE_RIM_ALPHA = 0.30;
+/**
+ * ★**水たまりの本体の濃さ**（＝★水の下の濡れた土。★**明るくではなく、暗くします**）。
+ *
+ * ⚠️ 【★2026-08-30・作り直した理由 — ★オーナー評「★**水たまりに見えない。色褪せた場所という感じ**」】
+ *   ★前の作りは ★**灰色（空の色）を薄く広く 3 枚重ねる**ものでした。
+ *   ★茶色い地面の上に灰色を広く乗せれば、★**文字どおり色が褪せます。** ★評のとおりでした。
+ *
+ * 【★本物の水たまりはどう見えるか】
+ *   ★水は**明るい膜**ではありません。★**暗い穴**です — ★水の下は濡れた土で、乾いた地面より暗い。
+ *   ★明るいのは ★**空を映している細い帯だけ**（＝鏡の反射）。
+ *   → ★**暗い本体 ＋ 細く明るい反射**。★この**落差**が「水」で、
+ *     ★薄い灰色を広く塗ると「褪せた土」になります。
+ */
+export const PUDDLE_BODY_ALPHA = 0.52;
 
 /**
- * ★**芯（いちばん明るいところ）の強さ**。★水面の上に、もう 1 枚だけ重ねる倍率。
- *
- * ⚠️ 【★なぜ要るか】★「縁 + 一様な水面」の 2 枚では、★実画面で ★**灰色の靄**に見えました。
- *    ★水に見えるのは ★**濃い縁 → 明るい水面 → きらりと光る芯**という**落差**があるからです。
+ * ★**空を映す帯の強さ**（★本体の上に細く乗せる）。
+ *   ★奥側（画面の上）に寄せます — ★浅く見ている側ほどよく映るためです（`skyReflectance` と同じ理由）。
  */
-export const PUDDLE_CORE_GAIN = 1.45;
+export const PUDDLE_MIRROR_GAIN = 1.7;
 
 /** ★決定論の要（`crowd.ts` と同じ形）。★乱数ではありません */
 function hash01(a: number, b: number, salt: number): number {
@@ -300,29 +310,35 @@ export function drawPuddles(
         ctx.fill();
       };
       const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-      const shrink = (k: number): { x: number; y: number }[] =>
-        outline.map((q) => ({ x: q.x + (cx - q.x) * k, y: q.y + (cy - q.y) * k }));
       const sky = skyReflectance(depth, opts.eyeHeightM);
+      /** ★奥側（画面の上）へどれだけ寄せるか。★水面の高さの半分ぶん */
+      const halfH = Math.max(1, (maxY - minY) / 2);
       /**
-       * ★**3 枚で 1 つ**にします（★2026-08-30・実画面を見て直しました）。
-       *
-       * ⚠️ ★最初は「縁 + 水面」の 2 枚でした。★実画面では ★**灰色の靄**に見えました。
-       *    ★一様に薄く明るいだけの面には、★**水の見えがありません。**
-       * → ★① 濡れて濃くなった縁 ／ ★② 空を映す水面 ／ ★③ ★**きらりと光る芯**
-       *   ★この 3 段の落差が「水」です。★平らな 1 枚では作れません。
+       * ★**細い帯**を作る。★横は少しだけ縮め、★縦は大きく潰し、★奥側へ寄せます。
+       *   ★これが「鏡が空を映している 1 本の帯」になります。
        */
-      /** ★① 縁: 水が染みて濃くなっている輪郭（★これが無いと「白い染み」に見えます） */
-      ctx.globalAlpha = prevAlpha * PUDDLE_RIM_ALPHA;
+      const lens = (kx: number, ky: number, up: number): { x: number; y: number }[] =>
+        outline.map((q) => ({ x: cx + (q.x - cx) * kx, y: cy + (q.y - cy) * ky - halfH * up }));
+      /**
+       * ⚠️ 【★2026-08-30・作り直しました — ★オーナー評「水たまりに見えない。色褪せた場所という感じ」】
+       *
+       *   ★前の作りは ★**灰色を薄く広く 3 枚**でした。★茶色の上に灰色を広く乗せたので、
+       *   ★**文字どおり色が褪せていました。**
+       * → ★① ★**暗い本体**（水の下の濡れた土）／ ★② 空を映す**細い帯**／ ★③ その中の**光る芯**
+       *   ★明るいのは②③の**細いところだけ**です。★広い面は**暗く**します。
+       */
+      /** ★① 本体: ★**暗い**（★ここを明るくすると「褪せた土」になります） */
+      ctx.globalAlpha = prevAlpha * PUDDLE_BODY_ALPHA;
       ctx.fillStyle = rim;
       path(outline);
-      /** ★② 水面: 空を映す。★奥ほど明るい（`skyReflectance` は照りと同じ 1 か所） */
-      ctx.globalAlpha = prevAlpha * Math.min(0.85, sky * PUDDLE_GLOSS_GAIN);
+      /** ★② 空を映す帯: ★奥側に細く */
+      ctx.globalAlpha = prevAlpha * Math.min(0.80, sky * PUDDLE_GLOSS_GAIN * PUDDLE_MIRROR_GAIN);
       ctx.fillStyle = HORIZON_SKY_COLOR;
-      path(shrink(0.30));
-      /** ★③ 芯: ★**いちばん明るいところ**。★水面の中でもここだけ強く空を返します */
-      ctx.globalAlpha = prevAlpha * Math.min(0.92, sky * PUDDLE_GLOSS_GAIN * PUDDLE_CORE_GAIN);
+      path(lens(0.82, 0.30, 0.42));
+      /** ★③ 芯: ★帯の中でいちばん強く返るところ */
+      ctx.globalAlpha = prevAlpha * Math.min(0.95, sky * PUDDLE_GLOSS_GAIN * PUDDLE_MIRROR_GAIN * 1.35);
       ctx.fillStyle = HORIZON_SKY_COLOR;
-      path(shrink(0.62));
+      path(lens(0.46, 0.13, 0.46));
     }
   }
   ctx.globalAlpha = prevAlpha;
