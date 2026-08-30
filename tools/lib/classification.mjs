@@ -261,6 +261,13 @@ export const READONLY = [
   '_revealspread.mjs',            // V-18 ② が帯を越えた原因が LANE_REVEAL_FULL_RUN にあることを測る（読むだけ）
   '_coursewired.mjs',             // conditions.course が着順まで届いているかを着順の変化で確かめる（読むだけ）
   '_gatebias.mjs',                // ②b（枠順由来の内外差）を独立に測り、reveal で動かないことを確かめる（読むだけ）
+  '_whoiswhere.mjs',              // その瞬間どの馬が走路のどこ（内外）に居るか（読むだけ）
+  '_railclump.mjs',               // 内ラチに何頭が完全に同じ位置で重なっているか（読むだけ）
+  '_clumpreveal.mjs',             // 前回の直し（reveal）が重なりに触れていたか（読むだけ）
+  '_lanescore.mjs',               // オーナーの過去の合否判定から「正しい絵」の条件を取り出す（読むだけ）
+  '_lanecand.mjs',                // 走る場所の作り方の候補を道具の中だけで組んで測る（読むだけ）
+  '_legacycheck.mjs',             // 旧形の分岐が変更前の式と 1 ビットも違わないか（變異試験の土台・読むだけ）
+  '_candpos.mjs',                 // 候補ごとの横位置の並び（読むだけ）
   '_spreadat.mjs',                // その地点で 12 頭が横に何 m 開いているか（EYES 用にコマと数字を並べる・読むだけ）
   '_lanespecgap.mjs',             // laneAt が spec を受け取れないことで生じる swing の倍率のずれ（読むだけ）
   '_lanebench.mjs',               // laneExtraM の呼び出し速度（掃引が総当りで間に合うかの見積り・読むだけ）

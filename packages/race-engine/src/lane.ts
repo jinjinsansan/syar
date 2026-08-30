@@ -203,8 +203,79 @@ export const REVEAL_START_RUN = 0.03;
  * 【測定の状態】掃引（下見）では 枠×ロス相関 0.013→0.011（悪化なし）／中盤の広がり 2.13m→8.19m。
  *   距離ロスのばらつきが +74% 増えるため V-4・V-17 は動きます。
  *   ★**縮小条件での V-17 測定は P4 クローズの全量実行に含めます**（この変更専用の実行は不要・裁定 §3）。
+ *
+ * ⚠️ 【★2026-08-31・この値の役割が変わりました】
+ *   ★上の説明は ★**`LANE_MODEL` が入る前のもの**です。★いまこの値が決めているのは
+ *   ★**通り道まわりの揺らぎ（`wobbleM`）の出方だけ**で、★**中盤の広がりは `LANE_MODEL.homeSpreadM` が作ります。**
+ *
+ *   ⚠️ ★**そして「2.13m→8.19m」は、苦情を直していませんでした。** ★実測すると、
+ *   ★reveal を 1.00 / 0.50 / 0.30 / 0.18 と振っても ★**内ラチに重なる頭数は 6.2 頭のまま**で、
+ *   ★動いていたのは「最外 − 最内」という**指標だけ**でした（`tools/_clumpreveal.mjs`）。
+ *   ★あの指標は「隊列の広がり」ではなく ★**「いちばん外を回った 1 頭までの距離」**だったためです。
+ *   → ★オーナー評（2026-08-31）「★**正しくないです　こんな競馬は在りません**」。
+ *   → ★**直したのは `LANE_MODEL` のほう**です。★この値は差し戻しの対象ではありません。
  */
 export const LANE_REVEAL_FULL_RUN = 0.18;
+
+/**
+ * ★**走る場所の作り方**（★比較用・2026-08-31）。
+ *
+ * ★`homeSpreadM` … ★通り道が散る幅 [m]。★内ほど混むよう `u²` で偏らせます
+ *   （★実際の競馬でも内が混み、外はまばら）。
+ * ★`wobbleM`     … ★通り道の**両側**への揺らぎ [m]。★片側だけに伸びないこと。
+ *
+ * ★**本番は下の `LANE_MODEL`（＝ `LANE_MODELS.b`）です**（★2026-08-31 にオーナーが実画面で選択）。
+ *   ★`laneAt` / `laneExtraM` に渡さなければそれが使われます。
+ */
+export interface LaneModel {
+  readonly homeSpreadM: number;
+  readonly wobbleM: number;
+  /**
+   * ★**旧形を使う**（★全馬が `RAIL_W` を目指し、★`Math.max(0, …)` で外へしか振れない）。
+   * ⚠️ ★**本番では使いません。** ★比較（`?lane=old`）と変異試験のためだけに残します。
+   * ★この形は実測で 12 頭中 6.2 頭が `RAIL_W` に小数以下まで同じ位置に積みます。
+   */
+  readonly legacy?: boolean;
+}
+
+/** ★候補（`tools/_lanecand.mjs` の B / C / D）。★`?lane=` で実画面に出して選びました */
+export const LANE_MODELS: Readonly<Record<string, LaneModel>> = {
+  b: { homeSpreadM: 7.0, wobbleM: 0.9 },
+  c: { homeSpreadM: 10.0, wobbleM: 0.9 },
+  d: { homeSpreadM: 4.5, wobbleM: 0.7 },
+};
+
+/**
+ * ★**本番の走る場所の作り方**（★2026-08-31・オーナーが実画面で B を選択）。
+ *
+ * ⚠️ ★**これは着順に効きます**（憲法 3・D-065 / D-071）。★レビュー側の裁定対象です。
+ *
+ * 【★なぜ変えたか】★オーナー評（2026-08-31）:
+ *   > ★**正しくないです　こんな競馬は在りません**
+ *
+ *   ★旧の形は `home = RAIL_W`（★全馬が同じ場所を目指す）＋ `Math.max(0, …)`（★外へしか振れない）で、
+ *   ★実測 ★**12 頭中 6.2 頭が `RAIL_W` に小数以下まで同じ位置**に積まれ、
+ *   ★2〜3 頭だけが **9〜13 頭分外**を回っていました。
+ *
+ * ⚠️ 【★2026-08-21 の直しは、この苦情に触れていませんでした】
+ *   ★あのとき動かしたのは `LANE_REVEAL_FULL_RUN`（1.0 → 0.18）で、
+ *   ★見ていた指標は「最外 − 最内」でした。★実測すると reveal を 1.00/0.50/0.30/0.18 と振っても
+ *   ★**重なりは 6.2 頭のまま**で、★指標だけが 3.95m → 9.78m に動いていました（R-16 の家族）。
+ *   → ★**指標が「隊列の広がり」ではなく「いちばん外を回った 1 頭までの距離」だった**ためです。
+ *
+ * 【★選び方】★`tools/_lanecand.mjs` で 4 案を 200 シード × 中盤 6 地点で測り、
+ *   ★`?lane=b|c|d` で**実画面のコマ**をオーナーに見ていただいて決めました（R-30）。
+ *   ★実測（中盤の平均）: ★重なり 5.14 頭 → **0 頭** ／ 最外 9.0 → **5.2 頭分**
+ *   ★枠順との相関は +0.0056 → −0.0055（★どちらも許容 0.10 の内側・枠順ゲーム化しない）
+ */
+export const LANE_MODEL: LaneModel = LANE_MODELS.b!;
+
+/**
+ * ★**旧形**（★全馬が `RAIL_W` を目指し、★外へしか振れない）。
+ * ⚠️ ★**本番では使いません。** ★比較と変異試験のためだけに残します
+ *   （`?lane=old` で実画面に出せます）。
+ */
+export const LANE_MODEL_LEGACY: LaneModel = { homeSpreadM: 0, wobbleM: 0, legacy: true };
 
 export function laneAt(
   gate: number, fieldSize: number, metersLeft: number, distanceMeter: number,
@@ -228,6 +299,24 @@ export function laneAt(
    *   （`race.ts` も `page.tsx` も渡していません）。★競馬場ごとの形を通すのは B案 ②。
    */
   spec: OvalSpec = DEFAULT_OVAL,
+  /**
+   * ★**走る場所の作り方**（★2026-08-31・比較のための切替口。★既定は現行のまま）。
+   *
+   * ⚠️ ★オーナー評（2026-08-31）:「★**正しくないです　こんな競馬は在りません**」。
+   *    ★実測すると、★**12 頭中およそ 6 頭が `RAIL_W` に小数以下まで同じ位置**で重なり、
+   *    ★2〜3 頭だけが **9〜13 頭分外**を回っていました。★下の `Math.max(0, …)` が原因です
+   *    （★swing は 0 以上にしかならないので、★drift が負の馬は必ず `RAIL_W` ちょうどに積まれる）。
+   *
+   * ⚠️ ★**2026-08-21 の直し（reveal 1.0 → 0.18）はここに触れていません。**
+   *    ★実測: reveal を 1.00 / 0.50 / 0.30 / 0.18 と振っても、
+   *    ★**重なりは 6.2 頭のまま**で、「最外 − 最内」だけが 3.95m → 9.78m に動いていました。
+   *    ★**指標だけを動かした**形です（R-16 の家族）。
+   *
+   * ★`undefined` = 現行（★本番の既定）。★値を渡すと「各馬が自分の通り道を持つ」形になります。
+   *   ⚠️ ★通り道は**シードから引き、枠に依存させません**（D-069 / D-073）。
+   * ★選定は `tools/_lanecand.mjs` と実画面のコマで行い、★決まるまで既定は変えません。
+   */
+  laneModel: LaneModel = LANE_MODEL,
 ): number {
   const start = laneAtStart(gate, fieldSize, widthM);
   const ranM = Math.max(0, distanceMeter - metersLeft);
@@ -248,7 +337,24 @@ export function laneAt(
    *   ★どの馬もラチを取りにいきます。**取れるかどうかを決めるのはレース（シード）**であって、
    *     枠ではありません。
    */
-  const home = RAIL_W;
+  /**
+   * ⚠️ ★`laneModel` を渡したときだけ、★**馬ごとに違う通り道**になります。
+   *    ★`u²` で内寄りに偏らせます（★内が混み、外はまばら）。★枠には依存させません。
+   */
+  /**
+   * ⚠️ ★**通り道の幅も距離で割り戻します**（`swingScale`）。
+   *    ★割り戻さないと、★**コーナーが多い長距離ほど距離ロスが積み上がります**。
+   *    ★実測（割り戻さない場合）: 1200m 7.3 馬身 / 1600m 8.1 / ★1★2000m 12.4 / ★2400m 15.7
+   *    → ★V-18 ②（4〜12 馬身）を長距離で超えました。
+   *    ★根拠は `swingScale` の註記と同じです — ★騎手はロスを避けようとするので、
+   *    ★**長い距離ほど早く内に入れます**。
+   * ★**1600m は基準距離なので 1.0** — ★オーナーが実画面で選んだ絵は変わりません。
+   */
+  const home = laneModel.legacy === true
+    ? RAIL_W
+    : RAIL_W + laneModel.homeSpreadM
+      * (() => { const u = stream(seed, gate, 0x51ed2701); return u * u; })()
+      * swingScale(distanceMeter, { ...spec, widthM });
   const base = start + (home - start) * settled;
 
   /** ★外を回されるか、内が空くか。シードから引き、進むほど開く */
@@ -266,6 +372,15 @@ export function laneAt(
    */
   const revealRun = Math.max(0, Math.min(1, (run - REVEAL_START_RUN) / Math.max(1e-6, revealFullRun - REVEAL_START_RUN)));
   const reveal = revealRun * revealRun * (3 - 2 * revealRun);
+  /**
+   * ⚠️ ★`Math.max(0, …)` が「重なり」の原因です（★swing は 0 以上にしかならない）。
+   *    ★`laneModel` を渡した場合は ★**通り道の両側へ揺らす**ので、ここを通りません。
+   */
+  if (laneModel.legacy !== true) {
+    const wob = Math.sin(phase + run * Math.PI * 3) * laneModel.wobbleM
+      * reveal * swingScale(distanceMeter, { ...spec, widthM });
+    return Math.max(0.8, Math.min(widthM - 0.8, base + wob));
+  }
   const swing = Math.max(0, drift * 0.85 + wave) * reveal * (widthM * 0.62)
     * swingScale(distanceMeter, { ...spec, widthM });
 
@@ -283,6 +398,8 @@ export function laneExtraM(
   stepM = 10,
   /** ★掃引の道具からだけ渡します（`laneAt` と同じ理由）。本番は既定値のみ */
   revealFullRun: number = LANE_REVEAL_FULL_RUN,
+  /** ★走る場所の作り方。★既定は本番の `LANE_MODEL`（`laneAt` と同じ） */
+  laneModel: LaneModel = LANE_MODEL,
 ): number {
   const segs = ovalSegments(distance, spec);
   const centre = spec.widthM / 2;
@@ -297,7 +414,7 @@ export function laneExtraM(
          * ⚠️ ★**`spec` を最後まで渡します。** ★渡さないと、★venue の走路で積分するのに
          *    ★`w` だけ 1周2000m 前提、という形に戻ります（★2026-08-30 まで実際にそうでした）。
          */
-        const w = laneAt(gate, fieldSize, distance - s, distance, seed, spec.widthM, revealFullRun, spec);
+        const w = laneAt(gate, fieldSize, distance - s, distance, seed, spec.widthM, revealFullRun, spec, laneModel);
         extra += (w - centre) * (len / seg.radius);
       }
     }

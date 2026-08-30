@@ -65,6 +65,27 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
       + '早めても枠順ゲーム化しない（レビュー側裁定 2026-08-21）',
   },
   {
+    key: 'LANE_MODELS',
+    file: 'packages/race-engine/src/lane.ts',
+    perturbed: "export const LANE_MODELS = { b: { homeSpreadM: 0.1, wobbleM: 0.9 }, c: { homeSpreadM: 10.0, wobbleM: 0.9 }, d: { homeSpreadM: 4.5, wobbleM: 0.7 } };",
+    affects:
+      '★V-18 / D-065 / D-071（走る場所の作り方。`homeSpreadM` を小さくすると全馬が同じ通り道へ寄り、'
+      + '★**内ラチに重なる頭数が戻ります**（★現行の形では 12 頭中 6.2 頭が `RAIL_W` に小数以下まで同じ位置）。'
+      + '★オーナー評（2026-08-31）「★**正しくないです　こんな競馬は在りません**」を受けて入れたもの。'
+      + '⚠️ ★通り道はシードから引き、★**枠に依存させません**（D-069 / D-073）。'
+      + '★値は `tools/_lanecand.mjs` の測定と実画面のコマで選びました（★先に値を決めて後から正当化しない）',
+  },
+  {
+    key: 'LANE_MODEL_LEGACY',
+    file: 'packages/race-engine/src/lane.ts',
+    perturbed: "export const LANE_MODEL_LEGACY: LaneModel = { homeSpreadM: 0, wobbleM: 0, legacy: false };",
+    affects:
+      '★検査の土台（★較正定数ではありません）。★**旧形**を保存しておくためだけの値で、'
+      + '★`lane-reveal.test.ts` の「★**旧形に戻すとこの検査は落ちる**」がこれを使います。'
+      + '⚠️ ★`legacy` を false にすると旧形が再現できなくなり、★**検査が何も守らなくなります**（★緑のまま通る）。'
+      + '★本番では使いません — ★本番は `LANE_MODEL`。`?lane=old` で実画面の新旧比較にも使います',
+  },
+  {
     key: 'REVEAL_START_RUN',
     file: 'packages/race-engine/src/lane.ts',
     perturbed: 'export const REVEAL_START_RUN = 0.5;',

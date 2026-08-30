@@ -18,7 +18,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  LANE_REVEAL_FULL_RUN, REVEAL_START_RUN, laneAt, laneAtStart, laneExtraM, TRACK_WIDTH_M,
+  LANE_REVEAL_FULL_RUN, laneAt, laneAtStart, laneExtraM, TRACK_WIDTH_M,
+  LANE_MODEL_LEGACY, RAIL_W, STALL_W_M,
 } from '../src/lane.js';
 
 const FIELD = 12;
@@ -43,13 +44,6 @@ function gateLossCorrelation(revealFullRun: number, seeds = 200): number {
     sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
   }
   return sxy / Math.sqrt(sxx * syy);
-}
-
-/** ある地点での 12 頭の横の広がり（m） */
-function spreadAt(ranM: number, seed: number, revealFullRun: number): number {
-  const ws = Array.from({ length: FIELD }, (_, i) =>
-    laneAt(i + 1, FIELD, DIST - ranM, DIST, seed, TRACK_WIDTH_M, revealFullRun));
-  return Math.max(...ws) - Math.min(...ws);
 }
 
 describe('★横位置の広がり（reveal）', () => {
@@ -79,20 +73,62 @@ describe('★横位置の広がり（reveal）', () => {
     expect(Math.abs(early)).toBeLessThan(Math.abs(now) + 0.01);
   });
 
-  it('★★reveal を早めると中盤の広がりが増える（本番の値が実際に効いている）', () => {
+  /**
+   * ★**ここからは「絵の条件」です**（★2026-08-31 に新設）。
+   *
+   * ⚠️ ★**この検査が無かったのが、在り得ない絵が出荷された理由です**（レビュー側 R-22）。
+   *    ★2026-08-21 の便は `LANE_REVEAL_FULL_RUN` を 1.0 → 0.18 にし、
+   *    ★「最外 − 最内」を 2.13m → 8.19m に上げましたが、
+   *    ★**内ラチに重なる頭数は 6.2 頭のまま**でした。
+   *    ★つまり ★**指標だけを動かしていました**（R-16 の家族）。
+   *    → ★オーナー評（2026-08-31）「★**正しくないです　こんな競馬は在りません**」。
+   *
+   * ★**「最外 − 最内」だけでは二度と判定しません。**
+   *    ★あれは「隊列の広がり」ではなく「いちばん外を回った 1 頭までの距離」です。
+   */
+  it('★★内ラチに同じ位置で重なる馬が居ない（★旧形は 12 頭中 6.2 頭）', () => {
+    let worst = 0;
+    for (let k = 0; k < 50; k += 1) {
+      const seed = 1000 + k * 7919;
+      for (const ran of [288, 500, 700, 900, 1200]) {
+        const ws = Array.from({ length: FIELD }, (_, i) =>
+          laneAt(i + 1, FIELD, DIST - ran, DIST, seed)).sort((a, b) => a - b);
+        let dup = 0;
+        for (let i = 1; i < ws.length; i += 1) if (Math.abs(ws[i]! - ws[i - 1]!) < 1e-9) dup += 1;
+        worst = Math.max(worst, dup);
+      }
+    }
+    expect(worst, '★同じ横位置に重なっている馬が居ます').toBe(0);
+  });
+
+  it('★★旧形に戻すとこの検査は落ちる（★検査が実際に効いていること）', () => {
+    let worst = 0;
+    for (let k = 0; k < 20; k += 1) {
+      const seed = 1000 + k * 7919;
+      const ws = Array.from({ length: FIELD }, (_, i) =>
+        laneAt(i + 1, FIELD, DIST - 500, DIST, seed, TRACK_WIDTH_M, undefined, undefined, LANE_MODEL_LEGACY))
+        .sort((a, b) => a - b);
+      let dup = 0;
+      for (let i = 1; i < ws.length; i += 1) if (Math.abs(ws[i]! - ws[i - 1]!) < 1e-9) dup += 1;
+      worst = Math.max(worst, dup);
+    }
+    expect(worst, '★旧形で重なりが出ないなら、上の検査は何も守っていません').toBeGreaterThan(3);
+  });
+
+  it('★★いちばん外を回る馬が「大外」の範囲に収まる', () => {
     /**
-     * ⚠️ ★比較の相手を `LANE_REVEAL_FULL_RUN` にしていたため、**本番の値を 0.18 にした瞬間に
-     *    「0.18 と 0.18 を比べる」テスト**になって落ちました。
-     *    比較の相手は**変更前の値 1.0** を直に書きます（本番値が動いても意味が変わらない）。
+     * ⚠️ ★旧形は実測で ★**9〜13 頭分外**（★走路 20m の外ラチのすぐ内側）でした。
+     *    ★実際の競馬の「大外」は 4〜6 頭分程度です。
      */
-    const BEFORE = 1.0;   // 2026-08-21 より前の挙動
-    const seed = 4242;
-    const mid = 500;
-    expect(spreadAt(mid, seed, LANE_REVEAL_FULL_RUN)).toBeGreaterThan(spreadAt(mid, seed, BEFORE) + 1);
-    // ★中盤で走路 20m のうち 8m 以上に散っていること（視覚側の下限・オーナー判定の根拠）
-    let worst = Infinity;
-    for (let ran = 300; ran <= 900; ran += 50) worst = Math.min(worst, spreadAt(ran, seed, LANE_REVEAL_FULL_RUN));
-    expect(worst).toBeGreaterThan(4);
+    let worst = 0;
+    for (let k = 0; k < 50; k += 1) {
+      const seed = 1000 + k * 7919;
+      for (const ran of [288, 500, 700, 900, 1200]) {
+        const ws = Array.from({ length: FIELD }, (_, i) => laneAt(i + 1, FIELD, DIST - ran, DIST, seed));
+        worst = Math.max(worst, (Math.max(...ws) - RAIL_W) / STALL_W_M);
+      }
+    }
+    expect(worst, '★外を回りすぎています').toBeLessThan(8);
   });
 
   it('★発走直後は枠の広がりが支配し、シード由来はまだ出ない', () => {
@@ -101,15 +137,15 @@ describe('★横位置の広がり（reveal）', () => {
      *   発走直後の広がりは**枠の広がりの名残**であって、シードではありません
      *   （裁定の指摘: 9 秒時点の 11.3m は「枠の広がりがまだ残っているだけ」）。
      */
-    const ranM = DIST * REVEAL_START_RUN * 0.5;
+    const ranM = 0;   // ★発走の瞬間
     for (let g = 1; g <= FIELD; g += 1) {
-      const a = laneAt(g, FIELD, DIST - ranM, DIST, 111, TRACK_WIDTH_M, 0.18);
-      const b = laneAt(g, FIELD, DIST - ranM, DIST, 999, TRACK_WIDTH_M, 0.18);
-      expect(a).toBeCloseTo(b, 9);   // シードを変えても同じ = swing が出ていない
+      const a = laneAt(g, FIELD, DIST - ranM, DIST, 111);
+      const b = laneAt(g, FIELD, DIST - ranM, DIST, 999);
+      expect(a).toBeCloseTo(b, 9);   // シードを変えても同じ = 枠の広がりだけ
     }
     // そして枠ごとには散っている（＝枠の広がり）
     const ws = Array.from({ length: FIELD }, (_, i) =>
-      laneAt(i + 1, FIELD, DIST - ranM, DIST, 111, TRACK_WIDTH_M, 0.18));
+      laneAt(i + 1, FIELD, DIST - ranM, DIST, 111));
     expect(Math.max(...ws) - Math.min(...ws)).toBeGreaterThan(5);
     expect(laneAtStart(1, FIELD)).toBeLessThan(laneAtStart(FIELD, FIELD));
   });

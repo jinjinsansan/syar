@@ -24,7 +24,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_RACE_BALANCE, DEFAULT_INTERVENTION_BALANCE,
   resolveRace, paceOf, replayOf, finalOrderMatches,
-  laneAt, laneAtStart, TRACK_WIDTH_M,
+  laneAt, laneAtStart, TRACK_WIDTH_M, LANE_MODELS, LANE_MODEL_LEGACY,
   aiProxyPlan, staminaTrackOf, staminaGaugeOf, staminaAt, boundaryTimesOf,
 } from '@star/race-engine';
 import { deriveRng } from '@star/sim-engine';
@@ -77,6 +77,15 @@ import {
 import POOL from '../../lib/watch-pool.json';
 
 const DIST = 1600;
+/**
+ * ★**走る場所の作り方の比較口**（`?lane=old|b|c|d`・2026-08-31）。★`old` は旧形。
+ *   ⚠️ ★**付けなければ現行と完全に同じ**です。★オーナーが絵で選ぶためだけの口で、
+ *   ★既定は変えていません（★選定後にレビュー側へ出します）。
+ */
+const LANE_MODEL_PARAM = typeof window === 'undefined' ? undefined
+  : new URLSearchParams(window.location.search).get('lane') === 'old'
+    ? LANE_MODEL_LEGACY
+    : LANE_MODELS[new URLSearchParams(window.location.search).get('lane') ?? ''];
 const FIELD = 12;
 const W = 1280;
 const H = 720;
@@ -864,7 +873,9 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     // ★道中は脚質から生成する（Q-P4-38）。走破タイムからは作らない
     strategyOf: (g) => entrants[g - 1]!.strategy,
     // ★横位置はエンジンが引いたものを読むだけ（D-071）
-    laneOf: (gate, metersLeft) => laneAt(gate, entrants.length, metersLeft, DIST, seed),
+    // ★比較用の切替口（`?lane=b|c|d`）。★付けなければ現行のまま
+    laneOf: (gate, metersLeft) => laneAt(gate, entrants.length, metersLeft, DIST, seed,
+      TRACK_WIDTH_M, undefined, undefined, LANE_MODEL_PARAM),
     pace,
     formationSeed: seed * 2654435761,
   });
