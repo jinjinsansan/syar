@@ -32,7 +32,17 @@ export interface Venue {
   readonly lapM: number;
   /** ★ゴール前の直線（m）。★`homeStretchM * 2 < lapM` でなければ `ovalCourse` が投げます */
   readonly homeStretchM: number;
-  /** ★走路の幅（m） */
+  /**
+   * ★走路の幅（m）。
+   *
+   * ⚠️ ★**2026-08-31 以降、この値は横位置の散らばりをほとんど決めません。**
+   *    ★走る場所の作り方を直した際（`LANE_MODEL`）、★通り道の幅は
+   *    ★`homeSpreadM = 7.0m` という**絶対値**で持つことにしたためです。
+   *    ★実測: 月見丘で幅 17 → 14 に狭めても、内外差は 13.1 → 12.8 馬身にしか動きません。
+   *    → ★**V-18 ② に効くのは半径です。** ★幅で調整しようとしないこと。
+   *
+   * ★いま幅が効くのは ★発走時の房の位置（`laneAtStart`）と ★内外ラチの当たり（`w` の上下限）です。
+   */
   readonly widthM: number;
   /** ★回り。★競馬場ごとに固定です（実際の競馬場と同じ） */
   readonly turn: 'left' | 'right';
@@ -53,8 +63,22 @@ export const VENUES: readonly Venue[] = [
   /** ★ダートの本場。★芝も 1 本だけ持つ */
   { id: 'shirasuna', name: '白砂競馬場', lapM: 1700, homeStretchM: 290, widthM: 18, turn: 'left', surfaces: ['dirt', 'turf'] },
   { id: 'shiokaze', name: '潮風競馬場', lapM: 1900, homeStretchM: 310, widthM: 20, turn: 'right', surfaces: ['turf', 'dirt'] },
-  /** ⚠️ ★**いちばん小さい**（1 周 1500m）。★コーナーの半径 127m — ★深い曲がりが続きます */
-  { id: 'tsukimi', name: '月見丘競馬場', lapM: 1500, homeStretchM: 350, widthM: 17, turn: 'right', surfaces: ['turf', 'dirt'] },
+  /**
+   * ⚠️ ★**いちばん小さい**（1 周 1650m・次は白砂 1700m）。★コーナーの半径 151m。
+   *
+   * ★**2026-08-31 に 1500m → 1650m へ広げました**（★B案 ①）。★理由は V-18 ② です:
+   *   ★1 周 1500m（半径 127m）だと、★この場の 4 鞍が **12.5〜13.1 馬身**で帯（4〜12）を越えます。
+   *   ★1650m にすると **10.5〜11.0 馬身**（★天井まで 1.0 の余裕）。
+   *
+   * ⚠️ ★**走路の幅では直せません。** ★実測: 幅 17 → 14 に狭めても 13.1 → 12.8 にしかなりません。
+   *    ★`LANE_MODEL.homeSpreadM`（通り道の幅 7.0m）が**絶対値で効く**ので、
+   *    ★走路の幅は横位置の散らばりをほとんど変えません（★2026-08-31 に走る場所を作り直したため）。
+   *    → ★**効くのは半径だけ**です。
+   *
+   * ★半径 151m は 10 場で**2 番目に深い**（★最深は陽光台 141.6m）ので、
+   * ★「小回りの場」という性格は保っています。
+   */
+  { id: 'tsukimi', name: '月見丘競馬場', lapM: 1650, homeStretchM: 350, widthM: 17, turn: 'right', surfaces: ['turf', 'dirt'] },
   { id: 'ginrei', name: '銀嶺競馬場', lapM: 2100, homeStretchM: 380, widthM: 21, turn: 'left', surfaces: ['turf', 'dirt'] },
   { id: 'youkou', name: '陽光台競馬場', lapM: 1750, homeStretchM: 430, widthM: 19, turn: 'left', surfaces: ['turf', 'dirt'] },
   { id: 'kirigahara', name: '霧ヶ原競馬場', lapM: 2000, homeStretchM: 470, widthM: 20, turn: 'right', surfaces: ['turf', 'dirt'] },
