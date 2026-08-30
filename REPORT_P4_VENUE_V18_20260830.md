@@ -82,8 +82,26 @@ laneExtraM(..., spec)   → ovalSegments(distance, spec)          ★venue の�
 
 ★**① は通っています。② だけが天井を越えています。** ★2000/2400 も天井まで 0.1〜0.2 馬身です。
 
-⚠️ ★**私の変更が原因ではありません** — ★`verify-v18.mjs` は `laneExtraM(gate, FIELD, dist, seed)` を
-★**spec 無し**で呼ぶので `DEFAULT_OVAL`、★そこは 1-1 の表のとおり変更前と一致しています。
+### ⚠️ ★**私の変更が原因ではないことを、直接確かめました**
+
+★論証（「spec 無しなら `DEFAULT_OVAL` なので同じはず」）ではなく、★**起点に戻して実行しました**:
+
+```powershell
+git checkout a83b2dc          # ★私の変更が 1 つも入っていない状態
+npx tsx tools/verify-v18.mjs
+```
+
+```
+  1200m      +0.069  ○       12.0 馬身（28.8m） ★×     ★FAIL
+  1600m      +0.049  ○       12.2 馬身（29.4m） ★×     ★FAIL
+  2000m      +0.042  ○       11.8 馬身（28.4m） ○     PASS
+  2400m      +0.015  ○       11.9 馬身（28.6m） ○     PASS
+```
+
+★**4 距離とも、①②が 1 桁まで現在と一致します。** ★V-18 ② は ★**この便の前から落ちていました。**
+
+★これはレビュー側が最初に確かめる点だと思ったので、★先に潰しました
+（★`git checkout a83b2dc` → 実行 → `git checkout p4/race-30sec-cuts` で復帰。★作業ツリーは元通りです）。
 
 ### 2-2. ★原因は `LANE_REVEAL_FULL_RUN`（★製品コードを触らずに測りました）
 
@@ -207,15 +225,35 @@ laneExtraM(..., spec)   → ovalSegments(distance, spec)          ★venue の�
 
 ---
 
-## 5. ★再実行（★すべて読取専用）
+## 5. ★再実行（★すべて読取専用）★— レビュー側へ
+
+★**この報告は鵜呑みにされない前提で書いています。** ★突合の順に並べます。
 
 ```powershell
 cd V:\dev\Cusor\star
-npx tsx tools/verify-v18.mjs          # ★正典の検定。★いまは ★FAIL（1200m/1600m）
-npx tsx tools/_revealspread.mjs       # ★原因（reveal を振るだけ・製品コードは触らない）
-npx tsx tools/_venueverify.mjs        # ★50 鞍の検定（200 seed）
-npm test ; npm run typecheck          # ★133 ファイル / 1336 件 / EXIT=0
+
+# ★① いちばん重要: ★「V-18 ② が落ちているのは開発側の変更のせいではないか」
+git checkout a83b2dc                  # ★この便の変更が 1 つも入っていない状態
+npx tsx tools/verify-v18.mjs          # ★★ここで既に FAIL すれば、開発側の主張は成立
+git checkout p4/race-30sec-cuts
+
+# ★② 入れた変更が「渡さなければ従来と同じ」か
+npx tsx tools/verify-v18.mjs          # ★①の出力と 1 文字も違わないこと
+npm test ; npm run typecheck          # ★133 ファイル / 1338 件 / EXIT=0
+
+# ★③ 原因（★製品コードを触らずに測る）
+npx tsx tools/_revealspread.mjs       # ★reveal 1.00 → 4.77〜6.99 ／ 0.18 → 11.84〜12.23
+
+# ★④ 判断材料（★10 場 × 実距離 = 48 通り・★時間がかかります）
+npx tsx tools/verify-v18.mjs --venues # ★① 48/48 通過 ／ ② 42/48 が帯の外
+
+# ★⑤ ④の配線が着順に届いていることの確認（★届いていなければ ④ は無意味）
+npx tsx tools/_coursewired.mjs        # ★距離ロス 300/300・着順 74/300・勝ち馬 4/300
 ```
+
+⚠️ ★`tools/_*.mjs` は `.gitignore` で追跡外です（登録簿には載せています）。
+　★レビュー側の作業ツリーには**無い**ので、★③⑤は再現できません。
+　★**②④は追跡下の `verify-v18.mjs` だけで再現できます** — ★突合はそこで足ります。
 
 ---
 
