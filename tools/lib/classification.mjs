@@ -266,6 +266,7 @@ export const READONLY = [
   '_clumpreveal.mjs',             // 前回の直し（reveal）が重なりに触れていたか（読むだけ）
   '_lanescore.mjs',               // オーナーの過去の合否判定から「正しい絵」の条件を取り出す（読むだけ）
   '_lanecand.mjs',                // 走る場所の作り方の候補を道具の中だけで組んで測る（読むだけ）
+  '_handovercheck.mjs',           // 引継ぎ書に書いた URL とレース名が実在するか（読むだけ）
   '_tsukimifit.mjs',              // 月見丘の形を帯に入れる形の総当り（⚠遅い・読むだけ）
   '_tsukimicand.mjs',             // 月見丘の候補を数個だけ直接測る（読むだけ）
   '_legacycheck.mjs',             // 旧形の分岐が変更前の式と 1 ビットも違わないか（變異試験の土台・読むだけ）
