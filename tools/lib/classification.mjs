@@ -260,6 +260,7 @@ export const READONLY = [
   '_venueverify.mjs',             // いま venues.ts に入っている形で 50 鞍すべてを V-18 ②と①の前身で検定（読むだけ）
   '_revealspread.mjs',            // V-18 ② が帯を越えた原因が LANE_REVEAL_FULL_RUN にあることを測る（読むだけ）
   '_coursewired.mjs',             // conditions.course が着順まで届いているかを着順の変化で確かめる（読むだけ）
+  '_gatebias.mjs',                // ②b（枠順由来の内外差）を独立に測り、reveal で動かないことを確かめる（読むだけ）
   '_lanespecgap.mjs',             // laneAt が spec を受け取れないことで生じる swing の倍率のずれ（読むだけ）
   '_lanebench.mjs',               // laneExtraM の呼び出し速度（掃引が総当りで間に合うかの見積り・読むだけ）
   '_interframe.mjs',              // 隣り合うコマで地面の画素がどれだけ変わるか＝見た目の動き（読むだけ）
