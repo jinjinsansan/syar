@@ -100,6 +100,12 @@ export interface TexturedWorldOptions {
    *   ★これも**描画だけ**です。幾何は変わりません。★採否はオーナー判断。
    */
   readonly infieldReversed?: boolean;
+  /**
+   * ★**濡れた走路が空を映す（照り）**（2026-08-30）。★既定で入れる。`false` で止める。
+   *   ⚠️ ★既定は**呼ぶ側に書きません** — `TRACK_GLOSS_DEFAULT`（`broadcast-v2.ts`）から引きます（R-31）。
+   *   ★戻し口は `/race?gloss=0`。★良の絵は 1 ビットも動きません（`trackGlossAlpha` が 0 を返す）。
+   */
+  readonly gloss?: boolean;
 }
 
 const wrap = (a: number, n: number): number => ((a % n) + n) % n;
@@ -115,8 +121,16 @@ const wrap = (a: number, n: number): number => ((a % n) + n) % n;
  *   ★色は `SHADE`（芝は深緑・ダートは深褐）。★暗くなると同時に**色が濃く**なります
  *     — ★濡れた地面は「暗いだけ」ではなく「色が濃い」ためです。
  *
- * 【★狙い（★本物のブラウザの画面での実測値）】★良を 100% として:
- *   ★稍重 ≈ 83% ／ ★重 ≈ 68% ／ ★不良 ≈ 59%
+ * ⚠️ 【★2026-08-30・訂正】★ここには「★狙い（本物のブラウザの画面での**実測値**）
+ *    ★稍重 ≈ 83% ／ 重 ≈ 68% ／ 不良 ≈ 59%」と書いてありました。★**実測値ではありません。**
+ *    ★実際に本物のブラウザから撮って測ると、★こうです（`tools/_condcmp.mjs`・32s 正面）:
+ *
+ *      ★芝　　 良 100% ／ 稍重 **89.1%** ／ 重 **81.8%** ／ 不良 **77.2%**
+ *      ★ダート 良 100% ／ 稍重 **88.5%** ／ 重 **80.4%** ／ 不良 **74.8%**
+ *
+ *    ★層の濃さ（0.42）から素朴に期待する 68% には**届きません**。★上に縞刈り・砂煙・馬が乗るためです
+ *    （★正面のカットで縞刈りが芝の緑のままなのは**残件 A-5**）。
+ *    → ★**註釈に書いた「狙い」を、測った値のように書かない**（引継ぎ書 §3-6「註釈は嘘をつく」）。
  *
  * ⚠️ 【★2026-08-30・強くした理由】
  *   ★最初 0.12 / 0.24 / 0.34 と置きました。★実画面で測ると**重で 87.4%**。
@@ -144,6 +158,84 @@ export function trackWetnessAlpha(
 /** ★濡れの層に使う色（芝は深緑・ダートは深褐）。★`world-textured` の `SHADE` と同じ出どころ */
 export function trackWetnessColor(surface?: 'turf' | 'dirt' | undefined): string {
   return surface === 'dirt' ? '#221a12' : '#12220f';
+}
+
+/**
+ * ★**地平線あたりの空の色**。
+ *
+ * ⚠️ ★霞（空気遠近）と、★濡れた面が映す色は **同じ出どころ**です（D-052）。
+ *    ★どちらも「地平線あたりの空がどれだけ明るいか」であって、★別の量ではありません。
+ *    ★2 か所で持つと、★片方だけ動いたときに ★**霞んだ空と、地面が映す空の色が食い違います。**
+ */
+export const HORIZON_SKY_COLOR = '#b7c1c6';
+
+/**
+ * ★**濡れた面はざらつきが残る**ので、鏡ほどは映しません。★映る量の上限側の係数。
+ *
+ * ⚠️ 【★較正条件（R-7）— ★この値は「濡れの暗さを消さない」ことで決まっています】
+ *   ★最初 **0.55** と置きました（＝ざらつきを半分だけ見込んだ数）。★実画面で測ると:
+ *
+ *     ★良 → 重（走路が写っている帯）… ★照りなし **−23.4%** ／ ★照り 0.55 **−6.6%**
+ *
+ *   ⚠️ → ★**照りが、濡れの暗さをほとんど打ち消していました。**
+ *      ★このまま出せば「★**何も変わっていません**」を**もう一度**言われる形です
+ *      （★2026-08-30 に 1 度言われています）。
+ *   ★そこで「★**濡れの暗さを 8 割方は残す**」を条件に置き直して測りました:
+ *
+ *     ★照り 0.18 … ★良 → 重 **−18.2%**（照りなしの −23.4% に対して 78%）
+ *     ★照りが足す分 … ★奥の走路 **+6.8%** ／ ★手前 **+1.6%**（＝奥ほど光る・4 倍の差）
+ *
+ *   ★測ったのは `/race?surface=dirt&condition=soft` の **35 秒**（`tools/_glosscmp.mjs`）。
+ *   ⚠️ ★**32 秒では測れません** — ★カットの境目なので、★同じ URL を 2 回撮ると帯の平均が
+ *      ★**20% 動きます**（35 秒は 2 枚が 1 ビットまで一致）。
+ *
+ * ⚠️ ★これは**較正定数**です（正典 §16.3 の 3 分類）→ ★守るのは**振る舞いのテスト**（R-14）。
+ *    ★`track-gloss.test.ts` が「白飛びしない」「奥ほど強い」を押さえています。
+ * ⚠️ ★**見え方の合否はオーナーの目**です。★ここで測れたのは「暗さを消していない」までです。
+ */
+export const TRACK_GLOSS_GAIN = 0.18;
+
+/**
+ * ★**濡れた走路が空を映す量**（0 = 映さない）。
+ *
+ * 【★なぜ要るか】
+ *   ⚠️ ★2026-08-30 まで、★濡れた馬場は「**暗くする**」だけでした（`trackWetnessAlpha`）。
+ *      ★ところが ★**暗いだけの地面は「日が翳った」ようにしか見えません。**
+ *      ★実際、開発側が実画面を見た評は「★**暗くなったとは見えても、濡れているとは見えない**」でした。
+ *   ★本物の濡れた馬場が濡れて見えるのは、★**面が空を映すから**です。
+ *
+ * 【★なぜ「遠いほど強い」のか — 手で置いた形ではありません】
+ *   ★水面と同じで、★**浅く当たるほどよく映ります**（フレネル）。
+ *   ★透視図では ★**遠い走路ほど浅く見ている**ので、★奥ほど白く光り、★手前は暗いままです。
+ *   → ★これが「暗い手前」と「白く光る奥」の**対比**を作ります。★中継の濡れた馬場と同じ形です。
+ *   ★Schlick の近似（水の R0 ≈ 0.02）をそのまま使います。★式を我々で作りません。
+ *
+ * 【★入射角の取り方】
+ *   ★`depthM` はカメラ前方の深さ（`project` の `depth`）、★`eyeHeightM` はカメラの高さです。
+ *   ★斜辺 `hypot(depth, eye)` で割るので、★**カメラの足元（depth→0）では 1**（＝真上から見る＝映らない）に落ち、
+ *   ★0 除算になりません。
+ *
+ * ⚠️ ★**良は必ず 0** です。★`trackWetnessAlpha` が 0 を返すので、★ここも 0 になります。
+ *    ★良の絵は 1 ビットも動きません。★濡れていない面は空を映しません。
+ * ⚠️ ★**横視点の板もこの関数を読みます**（`parallax-plate.ts` に関数として渡す）。
+ *    ★2 か所で式を持つと、★正面と横で照りが揃いません（D-052・R-30）。
+ */
+export function trackGlossAlpha(
+  condition: 'good' | 'yielding' | 'soft' | 'bad' | undefined,
+  depthM: number,
+  eyeHeightM: number,
+): number {
+  const wet = trackWetnessAlpha(condition);
+  if (!(wet > 0)) return 0;
+  const d = Math.max(0, depthM);
+  const h = Math.max(0, eyeHeightM);
+  const slant = Math.hypot(d, h);
+  if (!(slant > 0)) return 0;
+  /** ★入射角の余弦（＝見下ろし角の正弦）。★遠いほど 0 に近づく＝浅く当たる */
+  const cos = Math.min(1, h / slant);
+  /** ★Schlick 近似。★水の R0 ≈ 0.02 */
+  const fresnel = 0.02 + 0.98 * ((1 - cos) ** 5);
+  return wet * fresnel * TRACK_GLOSS_GAIN;
 }
 
 export function drawTexturedWorld<TImage>(
@@ -257,7 +349,8 @@ export function drawTexturedWorld<TImage>(
       const yy = Math.floor(hz) + i;
       if (yy < 0 || yy >= H) continue;
       ctx.globalAlpha = hazeAt(yy);
-      ctx.fillStyle = '#b7c1c6';
+      /** ⚠️ ★出どころは `HORIZON_SKY_COLOR` の 1 か所（濡れた面が映す空と同じ色・D-052） */
+      ctx.fillStyle = HORIZON_SKY_COLOR;
       ctx.fillRect(0, yy, W, 2);
     }
     ctx.globalAlpha = 1;
@@ -315,14 +408,22 @@ export function drawTexturedWorld<TImage>(
   ctx.fillStyle = SHADE;
   ctx.fillRect(0, Math.max(0, Math.floor(hz)), W, H);
   ctx.globalAlpha = 1;
-  const trackBand = (alpha: number, color: string = TRACK_TINT): void => {
+  /**
+   * ★走路の帯を塗る。
+   *   ★`alpha` に**関数**を渡すと、★その区画の深さ（m）から濃さを決めます
+   *   — ★照り（`trackGlossAlpha`）は**奥ほど強い**ので、一様な数では表せません。
+   *   ⚠️ ★同じ台形の刻みを 2 か所に書かないため、★**帯を描く経路はここ 1 本**です（D-052）。
+   */
+  const trackBand = (alpha: number | ((depthM: number) => number), color: string = TRACK_TINT): void => {
     ctx.fillStyle = color;
-    ctx.globalAlpha = alpha;
     for (let s = NEAR; s < FAR; s += 8) {
       const s2 = Math.min(s + 8, FAR);
       const a = P(s, 0), b2 = P(s2, 0), c = P(s2, WD), d = P(s, WD);
       if (a.depth <= 1 || b2.depth <= 1 || c.depth <= 1 || d.depth <= 1) continue;
       if (Math.max(a.x, b2.x, c.x, d.x) < -20 || Math.min(a.x, b2.x, c.x, d.x) > W + 20) continue;
+      const av = typeof alpha === 'number' ? alpha : alpha((a.depth + b2.depth) / 2);
+      if (!(av > 0.002)) continue;
+      ctx.globalAlpha = av;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y);
       ctx.closePath(); ctx.fill();
@@ -345,6 +446,24 @@ export function drawTexturedWorld<TImage>(
    *   ★2 か所で別の式を持つと、★**正面と横で暗さが揃いません**（D-052・R-30）。
    */
   if (wetAlpha > 0) trackBand(wetAlpha, SHADE);
+  /**
+   * ★**濡れた走路が空を映す（照り）**（2026-08-30）。
+   *
+   * 【★なぜ暗くするだけでは足りなかったか】
+   *   ⚠️ ★上の層は走路を**暗く**します。★しかし実画面を見ると
+   *      ★**「日が翳った」ようにしか見えません**（開発側の評・[EYES] はオーナー）。
+   *   ★濡れた面が濡れて見えるのは ★**空を映すから**です。★暗さと照りは**別の量**で、
+   *   ★片方だけでは「濡れている」になりません。
+   *
+   * 【★向き】★奥ほど浅く見ているので**奥ほど強く**光ります（`trackGlossAlpha` のフレネル）。
+   *   ★手前は暗いままなので、★**手前の暗さと奥の照りの対比**が出ます。
+   *
+   * ⚠️ ★**良は 1 ビットも動きません**（`trackGlossAlpha` が 0 を返す）。
+   * ⚠️ ★戻し口 `/race?gloss=0`。★既定は `TRACK_GLOSS_DEFAULT`（呼ぶ側が持つ・R-31）。
+   */
+  if (wetAlpha > 0 && opts.gloss !== false) {
+    trackBand((depthM) => trackGlossAlpha(opts.condition, depthM, cam.eye.z), HORIZON_SKY_COLOR);
+  }
 
   // ── コース沿いの立体帯（生垣・樹林・スタンド）: 縦の看板状の帯を s 方向に細かく刻んで貼る ───────
   const strip = (tex: WorldStripTexture<TImage>, w: number, heightM: number, sFrom: number, sTo: number, stepM: number, alpha = 1, minDepth = 14): void => {

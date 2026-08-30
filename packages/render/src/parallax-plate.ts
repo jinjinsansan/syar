@@ -239,6 +239,15 @@ export interface ParallaxDrawOptions {
   /** ★濡れの層の色。★`trackWetnessColor` から渡すこと（芝は深緑・ダートは深褐） */
   readonly wetColor?: string | undefined;
   /**
+   * ★**濡れた面が空を映す量**を、★その層の深さ（m）から返す関数。
+   *   ★`trackGlossAlpha`（`world-textured.ts`）を包んで渡すこと。★ここで式を作りません（D-052・R-30）。
+   *   ⚠️ ★**関数で受けるのは、照りが層ごとに違うから**です — ★奥の層ほど浅く見ているので強く光ります。
+   *      ★一様な数で渡すと、★正面（奥ほど強い）と横（一様）で**別の見え方**になります。
+   */
+  readonly glossAt?: ((depthM: number) => number) | undefined;
+  /** ★照りの色。★`HORIZON_SKY_COLOR` から渡すこと（霞と同じ出どころ） */
+  readonly glossColor?: string | undefined;
+  /**
    * ★固定物体の基準（m・注視点の**真の**位置）。省略時は scrollM。
    *   層は見た目の進行距離 scrollM で流れるが、物体は馬と同じ真の位置に対して置く
    *   （物体が見える区間では anchor weight=1 で両者の増分は一致し、ずれない）。
@@ -334,6 +343,25 @@ export function drawParallaxPlate<TImage>(
       ctx.fillStyle = opts.wetColor ?? '#12220f';
       ctx.fillRect(0, y, opts.viewport.width, h + 1);
       ctx.globalAlpha = prev;
+    }
+    /**
+     * ★**濡れた面が空を映す（照り）**（2026-08-30）。★暗くした**あと**に重ねます。
+     *
+     * ⚠️ ★暗くするだけでは「日が翳った」に見えます。★濡れて見えるのは空を映すからです。
+     * ★層ごとの深さ（`packDepthM + depthOffsetM`）から量を引くので、
+     *   ★**奥の層ほど強く**光ります（正面と同じ向き・同じ関数）。
+     * ⚠️ ★良では `glossAt` が 0 を返すので、★良の絵は 1 ビットも動きません。
+     */
+    if (layer.isGround === true && opts.glossAt !== undefined) {
+      const depthM = Math.max(0.5, opts.packDepthM + layer.depthOffsetM);
+      const gloss = opts.glossAt(depthM);
+      if (gloss > 0.002) {
+        const prev = ctx.globalAlpha;
+        ctx.globalAlpha = prev * gloss;
+        ctx.fillStyle = opts.glossColor ?? '#b7c1c6';
+        ctx.fillRect(0, y, opts.viewport.width, h + 1);
+        ctx.globalAlpha = prev;
+      }
     }
   }
   drawParallaxObjects(ctx, plate, opts, 'behind');

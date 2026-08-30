@@ -6,7 +6,10 @@ import { drawDistancePoles } from './distance-poles.js';
 import { drawFinishPost } from './finish-post.js';
 import { drawMowStripes } from './mow-stripes.js';
 import { drawParallaxObjects, drawParallaxPlate, drawWorldBillboards, type ParallaxDrawOptions, type ParallaxPlate, type WorldBillboard } from './parallax-plate.js';
-import { drawTexturedWorld, trackWetnessAlpha, trackWetnessColor, type TexturedWorldAssets } from './world-textured.js';
+import {
+  drawTexturedWorld, trackWetnessAlpha, trackWetnessColor, trackGlossAlpha, HORIZON_SKY_COLOR,
+  type TexturedWorldAssets,
+} from './world-textured.js';
 import {
   broadcastCamera,
   drawPerspectiveHorses,
@@ -475,6 +478,12 @@ export function drawBroadcastV2Scene<TImage>(
      *   ★描画だけ。★裁定 §6-3 の [EYES]。採否はオーナー判断。
      */
     readonly infieldReversed?: boolean | undefined;
+    /**
+     * ★**濡れた走路が空を映す（照り）**（2026-08-30）。★既定で入れる。`false` で止める（比較用）。
+     *   ⚠️ ★既定は**ここに書きません** — `TRACK_GLOSS_DEFAULT` から引きます（R-31）。
+     *   ★正面（テクスチャ世界）と横（板）の**両方**に、★同じ関数から同じ量を渡します。
+     */
+    readonly gloss?: boolean | undefined;
     readonly backgroundPlate?: {
       readonly image: TImage;
       readonly width: number;
@@ -564,6 +573,8 @@ export function drawBroadcastV2Scene<TImage>(
        */
       ...(opts.condition === undefined ? {} : { condition: opts.condition }),
       ...(opts.infieldReversed === true ? { infieldReversed: true } : {}),
+      /** ★照り（2026-08-30）。★`false` のときだけ渡す＝既定は `world-textured` 側の「入れる」 */
+      ...(opts.gloss === false ? { gloss: false } : {}),
     }).drawNearRail;
   } else if (opts.parallaxPlate !== undefined) {
     // 注視点（馬群）の px/m・深さ・画面上の進行方向を、馬と同じ透視カメラから取る
@@ -595,6 +606,14 @@ export function drawBroadcastV2Scene<TImage>(
       ...parallaxOpts,
       wetAlpha: trackWetnessAlpha(opts.condition),
       wetColor: trackWetnessColor(opts.surface),
+      /**
+       * ★**照り**（2026-08-30）。★正面と**同じ関数**から、★層の深さごとに引きます。
+       * ⚠️ ★カメラの高さは**この場面のカメラ**から取ります（手置きの数を渡さない・R-30）。
+       */
+      ...(opts.gloss === false ? {} : {
+        glossAt: (depthM: number): number => trackGlossAlpha(opts.condition, depthM, scene.camera.eye.z),
+        glossColor: HORIZON_SKY_COLOR,
+      }),
     });
   } else if (opts.backgroundPlate !== undefined) {
     const plate = opts.backgroundPlate;

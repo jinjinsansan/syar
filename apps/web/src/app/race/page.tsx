@@ -48,7 +48,7 @@ import {
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT, CUT_RACE_SCRIPT, GATE_FRONT_STALL_PLATES,
   finishReplayAt, finishCrossDisplaySec, FINISH_REPLAY_DISPLAY_SEC, drawFinishReplayBadge,
-  DEMO_CONTEST_GAMMA, broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, laneAlignedFocusFromSearch, infieldReversedFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
+  DEMO_CONTEST_GAMMA, broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, laneAlignedFocusFromSearch, infieldReversedFromSearch, trackGlossFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
@@ -2134,6 +2134,12 @@ export default function RacePage(): React.JSX.Element {
          *   ⚠️ ★既定は `infieldReversedFromSearch` の**中**にあります（R-31）。ここに書きません。
          */
         infieldReversed: infieldReversedFromSearch(search),
+        /**
+         * ★**濡れた走路が空を映す（照り）**。★戻し口は `?gloss=0`。
+         *   ⚠️ ★既定は `trackGlossFromSearch` の**中**にあります（R-31）。ここに書きません。
+         *   ★良では 0 になるので、★良の絵は 1 ビットも動きません。
+         */
+        gloss: trackGlossFromSearch(search),
         /**
          * ★コーナー専用カット（3 秒程度）の 1 枚絵は、カットの進行に合わせてパン＋軽いズーム。
          *   旧 `(focusS % 400)/400` は 400m で 137px しか動かず静止に見えた。

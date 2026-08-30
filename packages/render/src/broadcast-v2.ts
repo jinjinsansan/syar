@@ -904,6 +904,29 @@ export function infieldReversedFromSearch(search: string): boolean {
   return INFIELD_REVERSED_DEFAULT;
 }
 
+/**
+ * ★**濡れた走路が空を映す（照り）**（2026-08-30・オーナー指示「馬場の調整」）。
+ *
+ * ⚠️ 【★戻し口】★**`/race?gloss=0`**（`trackGlossFromSearch`）。
+ *   ★正典 D-085「★**既定を変えるときは戻せる口を同時に置き、戻せること自体を検査で固定する**」。
+ *
+ * 【何が問題だったか】
+ *   ★2026-08-30 まで、濡れた馬場は「**暗くする**」だけでした（`trackWetnessAlpha`）。
+ *   ★実画面の評は「★**暗くなったとは見えても、濡れているとは見えない**」。★影が落ちたように見えます。
+ *   ★濡れた面が濡れて見えるのは ★**空を映すから**で、★暗さとは**別の量**です。
+ *
+ * ⚠️ ★**良は 1 ビットも動きません**（`trackGlossAlpha` が 0 を返す）。
+ * ⚠️ ★**道具はこの定数を読むこと**（R-31）。★`true`/`false` を道具に直書きしない。
+ */
+export const TRACK_GLOSS_DEFAULT = true;
+
+export function trackGlossFromSearch(search: string): boolean {
+  const v = new URLSearchParams(search).get('gloss');
+  if (v === '0' || v === 'off') return false;
+  if (v === '1' || v === 'on') return true;
+  return TRACK_GLOSS_DEFAULT;
+}
+
 /** ★台本 → ショット表。`v2` は表を持たないので v4 で代用（呼び出し側が使わない） */
 function scriptRowsOf(script: BroadcastV2Script): readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] {
   if (script === 'v6') return SCRIPT_V6;
