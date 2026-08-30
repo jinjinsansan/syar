@@ -78,7 +78,7 @@ export const PUDDLE_GLOSS_GAIN = 0.62;
  *   → ★**暗い本体 ＋ 細く明るい反射**。★この**落差**が「水」で、
  *     ★薄い灰色を広く塗ると「褪せた土」になります。
  */
-export const PUDDLE_BODY_ALPHA = 0.52;
+export const PUDDLE_BODY_ALPHA = 0.42;
 
 /**
  * ★**空を映す帯の強さ**（★本体の上に細く乗せる）。
@@ -331,14 +331,35 @@ export function drawPuddles(
       ctx.globalAlpha = prevAlpha * PUDDLE_BODY_ALPHA;
       ctx.fillStyle = rim;
       path(outline);
-      /** ★② 空を映す帯: ★奥側に細く */
-      ctx.globalAlpha = prevAlpha * Math.min(0.80, sky * PUDDLE_GLOSS_GAIN * PUDDLE_MIRROR_GAIN);
+      /** ★② 空を映す帯: ★奥側に、★**はっきり**と */
+      ctx.globalAlpha = prevAlpha * Math.min(0.85, sky * PUDDLE_GLOSS_GAIN * PUDDLE_MIRROR_GAIN);
       ctx.fillStyle = HORIZON_SKY_COLOR;
-      path(lens(0.82, 0.30, 0.42));
+      path(lens(0.86, 0.44, 0.36));
       /** ★③ 芯: ★帯の中でいちばん強く返るところ */
-      ctx.globalAlpha = prevAlpha * Math.min(0.95, sky * PUDDLE_GLOSS_GAIN * PUDDLE_MIRROR_GAIN * 1.35);
+      ctx.globalAlpha = prevAlpha * Math.min(0.96, sky * PUDDLE_GLOSS_GAIN * PUDDLE_MIRROR_GAIN * 1.4);
       ctx.fillStyle = HORIZON_SKY_COLOR;
-      path(lens(0.46, 0.13, 0.46));
+      path(lens(0.52, 0.20, 0.40));
+      /**
+       * ★④ ★**水際の線**（縁のいちばん奥に、細く強い明線を 1 本）。
+       *
+       * ⚠️ 【★なぜ要るか — ★2026-08-30・オーナーの画面を測って分かりました】
+       *   ★画面は `width: 100%` で、★**1280px を約 860px に縮めて**表示されています（**67%**）。
+       *   ★私はずっと 100% で見て調整していました。★**塗りのぼかしは縮小で消えます。**
+       *   ★残るのは**線**です。★水際の明線は、縮小しても「ここに水の縁がある」と読めます。
+       *
+       * ⚠️ ★これが無いと、★暗い本体だけが残り、★**蹄の影と同じ「暗い楕円」**に見えます
+       *   — ★走路には既に馬の影が落ちているので、★見分けがつきません。
+       */
+      ctx.globalAlpha = prevAlpha * Math.min(0.9, 0.35 + sky * 0.6);
+      ctx.strokeStyle = HORIZON_SKY_COLOR;
+      ctx.lineWidth = Math.max(1, (maxX - minX) * 0.012);
+      ctx.beginPath();
+      const far = outline.filter((q) => q.y <= cy);
+      if (far.length >= 2) {
+        ctx.moveTo(far[0]!.x, far[0]!.y);
+        for (let i = 1; i < far.length; i += 1) ctx.lineTo(far[i]!.x, far[i]!.y);
+        ctx.stroke();
+      }
     }
   }
   ctx.globalAlpha = prevAlpha;
