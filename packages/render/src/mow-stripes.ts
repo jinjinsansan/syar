@@ -38,7 +38,31 @@ export interface MowStripeOptions {
   readonly rangeM?: number;
   readonly periodM?: number;
   readonly alpha?: number;
-  /** 走路の外側にも延ばす量（m）。内馬場・外の芝にも縞は続いている */
+  /**
+   * ★走路の外側にも延ばす量（m）。★**既定 0＝走路ちょうど**（2026-08-31・A-10）。
+   *
+   * ⚠️ ★**既定は 60 でした。** ★註記は「内馬場・外の芝にも縞は続いている」でしたが、
+   *    ★**縞の面のほうが、地面より小さい**という食い違いを作っていました:
+   *
+   *      ★内馬場の芝を描く範囲   w = **−150**（`INFIELD_LAYOUT.infieldInnerW`）
+   *      ★縞を描く範囲           w = **−60**（この値）
+   *
+   *    → ★**縞は地面より 90m 手前で終わり、その縁が「世界の何でもない線」**になります。
+   *
+   * ★実測（`tools/_gatecross.mjs`・発走のカメラ・表示 10s・seed 42）:
+   *    ★縁（w=−60）は画面 **(490,262) → (638,267)** を通り、
+   *    ★**発馬機（x 239〜678 / y 232〜323）の真上をほぼ水平に横切ります。**
+   *    ★オーナー評「★**ゲートがある地面が別の絵と交差しています**」の正体です。
+   *    ★層を止めた差分でも、縞だけが **90,920 画素（9.87%）・全幅**を変えていました。
+   *
+   * ⚠️ ★**「60 → 200 に広げて画面外へ出す」は採りません。** ★見えにくくしただけです（台帳の作法）。
+   * → ★**0 にして、縁を内ラチ・外ラチに一致させます。** ★縁が世界に在る線になるので、
+   *   ★どの画角・どのカットでも「何でもない線」が出ません。
+   *
+   * ⚠️ ★内馬場・外の地面に縞を戻したいときは、★**その面の範囲を渡して**呼ぶこと
+   *    （★`INFIELD_LAYOUT` の帯ごとに別々に呼ぶ）。★1 回の呼び出しで走路と内馬場を
+   *    ★まとめて塗ると、★**内馬場のダートコースと生垣の上にも緑の縞が乗ります**（★台帳 A-5 の家族）。
+   */
   readonly overhangM?: number;
 }
 
@@ -57,8 +81,10 @@ export function drawMowStripes(
   const alpha = opts.alpha ?? MOW_STRIPE_ALPHA;
   if (!(period > 0) || !(alpha > 0)) return;
   const range = opts.rangeM ?? 600;
-  const overhang = opts.overhangM ?? 60;
-  const w0 = -overhang;
+  /** ⚠️ ★既定 0 ＝ 走路ちょうど。★上の `overhangM` の註記に理由（A-10）を書いています */
+  const overhang = opts.overhangM ?? 0;
+  /** ⚠️ ★`-0` を作らないこと（★`Object.is(-0, 0)` は false で、検査が読みにくく落ちます） */
+  const w0 = overhang > 0 ? -overhang : 0;
   const w1 = course.widthM + overhang;
   /** ★曲線区間で帯の縁が折れないよう、縞 1 本を s 方向に刻む */
   const SUB_M = Math.max(1, period / 4);
