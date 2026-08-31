@@ -82,7 +82,17 @@ export interface WorldPos {
  */
 export function ovalCourse(
   distance: number,
-  opts?: { lapM?: number; homeStretchM?: number; widthM?: number; turn?: 'left' | 'right' },
+  opts?: {
+    lapM?: number; homeStretchM?: number; widthM?: number; turn?: 'left' | 'right';
+    /**
+     * ★**コーナーごとの半径 [m]**（★`[1角, 2角, 3角, 4角]`・★2026-08-31・段階①「器」）。
+     * ⚠️ ★省くと従来どおり（4 本とも同じ半径）。★省いたときの値は**1 ビットも変わりません**。
+     * ⚠️ ★`@star/race-engine` の `OvalSpec.cornerRadiiM` と**同じ規則**であること
+     *    （★あちらを import できません — ★この層は依存ゼロ・§14）。
+     *    ★`packages/race-engine/test/lane-geometry.test.ts` が 44 通りで突き合わせます（R-33）。
+     */
+    cornerRadiiM?: readonly [number, number, number, number];
+  },
 ): Course {
   const lapM = opts?.lapM ?? 2000;
   const homeStretchM = opts?.homeStretchM ?? 400;
@@ -91,24 +101,44 @@ export function ovalCourse(
   if (!(distance > 0)) throw new Error(`距離が不正です: ${distance}`);
   if (!(homeStretchM * 2 < lapM)) throw new Error('直線が1周より長くなっています');
 
-  /** 曲がり2つ（各180度）の合計 = 1周 − 直線2本 */
-  const bendTotal = lapM - homeStretchM * 2;
-  const radius = bendTotal / (2 * Math.PI);
-  /** ★1つの「コーナー」は90度。4つで2つの曲がりになります */
-  const cornerLen = bendTotal / 4;
+  /**
+   * ★コーナー 4 本の半径と長さ。
+   * ⚠️ ★**`@star/race-engine` の `ovalCornerPlan` と同じ規則**です（★写しであることを明示します）。
+   */
+  const plan = ((): { radii: readonly number[]; lengths: readonly number[] } => {
+    const quarter = Math.PI / 2;
+    const rs = opts?.cornerRadiiM;
+    if (rs === undefined) {
+      /** 曲がり2つ（各180度）の合計 = 1周 − 直線2本 */
+      const bendTotal = lapM - homeStretchM * 2;
+      const r = bendTotal / (2 * Math.PI);
+      /** ★1つの「コーナー」は90度。4つで2つの曲がりになります */
+      const len = bendTotal / 4;
+      return { radii: [r, r, r, r], lengths: [len, len, len, len] };
+    }
+    for (const r of rs) if (!(r > 0)) throw new Error(`コーナーの半径は正の数であること: ${JSON.stringify(rs)}`);
+    const derived = homeStretchM * 2 + quarter * rs.reduce((a, b) => a + b, 0);
+    if (Math.abs(derived - lapM) > 1e-6 * Math.max(1, lapM)) {
+      throw new Error(`1 周とコーナーの半径が食い違っています: lapM=${lapM} / 半径から導くと ${derived.toFixed(6)}`);
+    }
+    return { radii: rs, lengths: rs.map((r) => quarter * r) };
+  })();
 
   /**
    * ★ゴールを起点に**逆向き**に並べ、最後に反転します。
    *   こうすると「ゴール前が直線」「その手前が4角」が**必ず**成り立ちます。
    */
   const backward: CourseSegment[] = [];
+  /** ⚠️ ★逆向きに積むので 直線 → 4角 → 3角 → 向正面 → 2角 → 1角。★`plan` は `[1角..4角]` の順です */
+  const corner = (i: number, label: string): CourseSegment =>
+    ({ type: 'corner', length: plan.lengths[i]!, radius: plan.radii[i]!, turn, label });
   const ring: readonly CourseSegment[] = [
     { type: 'straight', length: homeStretchM, label: '直線' },
-    { type: 'corner', length: cornerLen, radius, turn, label: '4角' },
-    { type: 'corner', length: cornerLen, radius, turn, label: '3角' },
+    corner(3, '4角'),
+    corner(2, '3角'),
     { type: 'straight', length: homeStretchM, label: '向正面' },
-    { type: 'corner', length: cornerLen, radius, turn, label: '2角' },
-    { type: 'corner', length: cornerLen, radius, turn, label: '1角' },
+    corner(1, '2角'),
+    corner(0, '1角'),
   ];
   let left = distance;
   let i = 0;

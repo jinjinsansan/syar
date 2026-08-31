@@ -43,7 +43,8 @@ function gateBiasLengths(distance = DIST, revealFullRun?: number, laneModel?: ty
   for (let r = 0; r < BIAS_SEEDS; r += 1) {
     const seed = r * 2654435761 + distance;
     for (let g = 1; g <= FIELD; g += 1) {
-      sum[g - 1] += laneExtraM(g, FIELD, distance, seed, undefined, 10, revealFullRun, laneModel);
+      /** ⚠️ ★`noUncheckedIndexedAccess` が効いているので `??` で受けます（★`+=` は型が通りません） */
+      sum[g - 1] = (sum[g - 1] ?? 0) + laneExtraM(g, FIELD, distance, seed, undefined, 10, revealFullRun, laneModel);
     }
   }
   const mean = sum.map((s) => s / BIAS_SEEDS);

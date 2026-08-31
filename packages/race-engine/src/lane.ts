@@ -33,6 +33,66 @@ export interface OvalSpec {
   readonly lapM: number;
   readonly homeStretchM: number;
   readonly widthM: number;
+  /**
+   * ★**コーナーごとの半径 [m]**（★`[1角, 2角, 3角, 4角]`・★2026-08-31・段階①「器」）。
+   *
+   * ⚠️ ★**省くと従来どおり**（1 周と直線から 4 本とも同じ半径を導く）。★省いたときの値は
+   *    ★**2026-08-31 以前と 1 ビットも変わりません**（`lane-geometry.test.ts` が固定）。
+   *
+   * ★**なぜ要るか**: ★いまの模型は ★**コーナー 4 本が同一半径の楕円**しか作れません。
+   *   ★10 場を作っても違うのは「大きさ」だけでした（`tools/_terrain.mjs`）。
+   *   ★スパイラルカーブ・下りの 3〜4 角といった**型**は、★半径を独立に持てないと出せません。
+   *
+   * ⚠️ ★**1 周との整合を要求します**（★黙って辻褄を合わせません・R-27）:
+   *      `lapM === homeStretchM * 2 + (π/2) * Σ半径`
+   *    ★コーナーは 90 度なので、★半径を決めると長さも決まります。★食い違えば**投げます**。
+   *    → ★数を作るときは `ovalSpecFromCornerRadii()` を使ってください。
+   *
+   * ⚠️ ★**勾配（段階②）はここに入れません**（正典 **D-092**）。
+   */
+  readonly cornerRadiiM?: readonly [number, number, number, number];
+}
+
+/**
+ * ★**コーナーごとの半径から走路の形を作る**（★`lapM` を導出します）。
+ *   ★`cornerRadiiM` を手で書くときは**必ずこれを通すこと** — ★1 周を手計算しないため。
+ */
+export function ovalSpecFromCornerRadii(
+  homeStretchM: number, cornerRadiiM: readonly [number, number, number, number], widthM: number,
+): OvalSpec {
+  for (const r of cornerRadiiM) {
+    if (!(r > 0)) throw new Error(`コーナーの半径は正の数であること: ${JSON.stringify(cornerRadiiM)}`);
+  }
+  const lapM = homeStretchM * 2 + (Math.PI / 2) * cornerRadiiM.reduce((a, b) => a + b, 0);
+  return { lapM, homeStretchM, widthM, cornerRadiiM };
+}
+
+/**
+ * ★**走路の 4 つのコーナー**（★`[1角, 2角, 3角, 4角]` の半径と長さ）。
+ *
+ * ⚠️ ★`@star/render` の `course.ts` に**同じ規則**があります（★あちらは依存ゼロなので引けません・§14）。
+ *    ★`packages/race-engine/test/lane-geometry.test.ts` が **44 通り**で突き合わせます（R-33）。
+ */
+export function ovalCornerPlan(spec: OvalSpec): {
+  readonly radii: readonly [number, number, number, number];
+  readonly lengths: readonly [number, number, number, number];
+} {
+  const quarter = Math.PI / 2;
+  if (spec.cornerRadiiM === undefined) {
+    const bendTotal = spec.lapM - spec.homeStretchM * 2;
+    const radius = bendTotal / (2 * Math.PI);
+    const len = bendTotal / 4;
+    return { radii: [radius, radius, radius, radius], lengths: [len, len, len, len] };
+  }
+  const radii = spec.cornerRadiiM;
+  const derived = spec.homeStretchM * 2 + quarter * radii.reduce((a, b) => a + b, 0);
+  if (Math.abs(derived - spec.lapM) > 1e-6 * Math.max(1, spec.lapM)) {
+    throw new Error(
+      `1 周とコーナーの半径が食い違っています: lapM=${spec.lapM} / 半径から導くと ${derived.toFixed(6)}`
+      + '（★ovalSpecFromCornerRadii() で作ってください）',
+    );
+  }
+  return { radii, lengths: [quarter * radii[0], quarter * radii[1], quarter * radii[2], quarter * radii[3]] };
 }
 export const DEFAULT_OVAL: OvalSpec = { lapM: 2000, homeStretchM: 400, widthM: TRACK_WIDTH_M };
 
@@ -81,16 +141,19 @@ function withRunUp(segs: readonly Seg[]): readonly Seg[] {
 
 /** ★ゴールから逆向きに積み、反転する（`ovalCourse` と同じ） */
 export function ovalSegments(distance: number, spec: OvalSpec = DEFAULT_OVAL): readonly Seg[] {
-  const bendTotal = spec.lapM - spec.homeStretchM * 2;
-  const radius = bendTotal / (2 * Math.PI);
-  const cornerLen = bendTotal / 4;
+  /**
+   * ⚠️ ★**ゴールから逆向き**に積みます。★だから並びは 直線 → 4角 → 3角 → 向正面 → 2角 → 1角 です
+   *    （`ovalCornerPlan` は `[1角, 2角, 3角, 4角]` の順なので、★ここで**添字を逆に読みます**）。
+   */
+  const plan = ovalCornerPlan(spec);
+  const c = (i: number): Seg => ({ corner: true, length: plan.lengths[i]!, radius: plan.radii[i]! });
   const ring: readonly Seg[] = [
     { corner: false, length: spec.homeStretchM, radius: 0 },
-    { corner: true, length: cornerLen, radius },
-    { corner: true, length: cornerLen, radius },
+    c(3),   // ★4角
+    c(2),   // ★3角
     { corner: false, length: spec.homeStretchM, radius: 0 },
-    { corner: true, length: cornerLen, radius },
-    { corner: true, length: cornerLen, radius },
+    c(1),   // ★2角
+    c(0),   // ★1角
   ];
   const backward: Seg[] = [];
   let left = distance;

@@ -31,6 +31,12 @@ export interface RaceCourseSpec {
   readonly lapM: number;
   readonly homeStretchM: number;
   readonly widthM: number;
+  /**
+   * ★**コーナーごとの半径 [m]**（★`[1角, 2角, 3角, 4角]`・★2026-08-31・段階①「器」）。
+   * ⚠️ ★**いまはどの競馬場も持っていません**（★指示書 §3「10 場の数値を決めない」）。
+   *    ★運べることだけを通してあります。★数を入れるのは帯の見直しのあとです。
+   */
+  readonly cornerRadiiM?: readonly [number, number, number, number];
 }
 
 export interface RaceSetup {
@@ -74,7 +80,11 @@ export function raceSetupById(raceId: string = DEFAULT_RACE_ID): RaceSetup {
     venue,
     distanceM: race.distanceM,
     surface: race.surface,
-    spec: { lapM: venue.lapM, homeStretchM: venue.homeStretchM, widthM: venue.widthM },
+    spec: {
+      lapM: venue.lapM, homeStretchM: venue.homeStretchM, widthM: venue.widthM,
+      /** ⚠️ ★持っている場だけ運びます。★いまは 0 場（指示書 §3） */
+      ...(venue.cornerRadiiM === undefined ? {} : { cornerRadiiM: venue.cornerRadiiM }),
+    },
     turn: venue.turn,
     meta: { venue: venue.name, raceName: race.name, raceNo: GRADED_RACE_NO },
   };

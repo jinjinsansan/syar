@@ -30,7 +30,10 @@
 import { describe, it, expect } from 'vitest';
 import { ovalCourse, laneExtraMeters } from '@star/render';
 import { GRADED_RACES, raceSetupById, VENUES } from '@star/scheduler';
-import { laneAt, laneExtraM, ovalSegments, DEFAULT_OVAL, TRACK_WIDTH_M } from '../src/lane.js';
+import {
+  laneAt, laneExtraM, ovalSegments, DEFAULT_OVAL, TRACK_WIDTH_M,
+  ovalCornerPlan, ovalSpecFromCornerRadii,
+} from '../src/lane.js';
 
 interface Case {
   readonly key: string;
@@ -144,5 +147,95 @@ describe('★エンジンと描画層の幾何が一致する（★44 通り）'
       expect(outer, `★${c.label}: 外を回ったのに負`).toBeGreaterThan(0);
     }
     expect(TRACK_WIDTH_M / 2).toBe(10);
+  });
+});
+
+/**
+ * ★**段階①「器」— コーナーごとの半径**（2026-08-31・指示書 §1-4・正典 D-092）
+ *
+ * 【★なぜ要るか】★いまの模型は ★**コーナー 4 本が同一半径の楕円**しか作れません。
+ *   ★10 場を作っても違うのは「大きさ」だけでした（`tools/_terrain.mjs`）。
+ *   ★スパイラルカーブ・下りの 3〜4 角という**型**は、★半径を独立に持てないと出せません。
+ *
+ * ⚠️ ★**この便で 10 場の数値は決めません**（指示書 §3）。★運べることと、
+ *    ★**省いたときに 1 ビットも変わらないこと**を固定します。
+ * ⚠️ ★**勾配（段階②）は入れません**（正典 D-092）。
+ */
+describe('★段階①「器」— コーナーごとの半径', () => {
+  const STRAIGHT = 400;
+  const WIDTH = 20;
+
+  it('★★省くと従来どおり（★明示的な均等半径と完全に一致する）', () => {
+    for (const c of CASES) {
+      const implicit = ovalSegments(c.d, c.spec);
+      const plan = ovalCornerPlan(c.spec);
+      const explicitSpec = { ...c.spec, cornerRadiiM: plan.radii as [number, number, number, number] };
+      const explicit = ovalSegments(c.d, explicitSpec);
+      expect(explicit.length, `★${c.label}`).toBe(implicit.length);
+      implicit.forEach((m, i) => {
+        expect(explicit[i]!.length, `★${c.label}: 区間 ${i} の長さ`).toBeCloseTo(m.length, 9);
+        expect(explicit[i]!.radius, `★${c.label}: 区間 ${i} の半径`).toBeCloseTo(m.radius, 9);
+        expect(explicit[i]!.corner).toBe(m.corner);
+      });
+    }
+  });
+
+  it('★★コーナーごとに違う半径を持てる（★エンジンと描画層が一致する）', () => {
+    // ★3〜4 角がきつく、1〜2 角がゆるい形（★スパイラルの逆・下りの 3〜4 角の型）
+    const radii = [220, 200, 150, 140] as const;
+    const spec = ovalSpecFromCornerRadii(STRAIGHT, radii, WIDTH);
+    for (const d of [1200, 1600, 2400]) {
+      const mine = ovalSegments(d, spec);
+      const theirs = ovalCourse(d, { ...spec, turn: 'left' }).segments;
+      expect(mine.length, `★${d}m: 区間の数`).toBe(theirs.length);
+      mine.forEach((m, i) => {
+        const t = theirs[i]!;
+        expect(m.length, `★${d}m: 区間 ${i} の長さ`).toBeCloseTo(t.length, 9);
+        expect(m.corner).toBe(t.type === 'corner');
+        if (m.corner) expect(m.radius, `★${d}m: 区間 ${i} の半径`).toBeCloseTo(t.radius ?? -1, 9);
+      });
+      expect(mine.reduce((a, x) => a + x.length, 0)).toBeCloseTo(d, 6);
+    }
+    // ★半径が実際に 4 通り出ていること（★均されていたらこの器は意味がない）
+    const rs = new Set(ovalSegments(2400, spec).filter((x) => x.corner).map((x) => Math.round(x.radius)));
+    expect(rs.size, '★半径が 1 種類しか出ていません').toBeGreaterThan(1);
+  });
+
+  it('★★1 周と半径が食い違えば投げる（★黙って辻褄を合わせない・R-27）', () => {
+    const spec = ovalSpecFromCornerRadii(STRAIGHT, [200, 200, 200, 200], WIDTH);
+    const broken = { ...spec, lapM: spec.lapM + 50 };
+    expect(() => ovalSegments(1600, broken)).toThrow();
+    expect(() => ovalCourse(1600, { ...broken, turn: 'left' })).toThrow();
+    // ★正しい組では投げない（★何でも投げているのではないことの担保・R-21）
+    expect(() => ovalSegments(1600, spec)).not.toThrow();
+  });
+
+  it('★ovalSpecFromCornerRadii が 1 周を導く（★手計算させない）', () => {
+    const radii = [180, 190, 200, 210] as const;
+    const spec = ovalSpecFromCornerRadii(STRAIGHT, radii, WIDTH);
+    expect(spec.lapM).toBeCloseTo(STRAIGHT * 2 + (Math.PI / 2) * (180 + 190 + 200 + 210), 9);
+    expect(() => ovalSpecFromCornerRadii(STRAIGHT, [180, 0, 200, 210], WIDTH)).toThrow();
+  });
+
+  it('★★距離ロスが半径に反応する（★器が着順の経路まで通っている）', () => {
+    const tight = ovalSpecFromCornerRadii(STRAIGHT, [150, 150, 150, 150], WIDTH);
+    const wide = ovalSpecFromCornerRadii(STRAIGHT, [230, 230, 230, 230], WIDTH);
+    const spread = (spec: typeof tight): number => {
+      const xs = Array.from({ length: 12 }, (_, i) => laneExtraM(i + 1, 12, 1600, 4242, spec));
+      return Math.max(...xs) - Math.min(...xs);
+    };
+    // ★小回りのほうが内外差は大きい（★半径の地図 `tools/_radiusmap.mjs` と同じ向き）
+    expect(spread(tight), '★半径を変えても内外差が動かないなら、器が経路に通っていません')
+      .toBeGreaterThan(spread(wide));
+  });
+
+  /**
+   * ⚠️ ★**この便では 10 場の数値を決めていません**（指示書 §3）。
+   *    ★上限 12 の見直しが段階①の完了時に控えており、★いま決めると選び直しになります。
+   *    → ★**「まだ 0 場」であることを検査で言います。** ★数を入れた便で、この検査を直すこと。
+   */
+  it('★いまはどの競馬場もコーナーごとの半径を持っていない（★数はまだ決めていない）', () => {
+    const withRadii = VENUES.filter((v) => v.cornerRadiiM !== undefined);
+    expect(withRadii.map((v) => v.name), '★数を入れたなら、この検査と venues.ts の註記を一緒に直すこと').toEqual([]);
   });
 });
