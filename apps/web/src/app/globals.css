@@ -137,3 +137,142 @@ body[data-theme="arcade"] { min-height: 100vh; }
 /* LP（/）: main の 1180 幅を突き抜けて全幅にするブロック（ヒーロー・白帯・フッター） */
 html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
 .lp-bleed { position: relative; left: 50%; right: 50%; width: 100vw; margin-left: -50vw; margin-right: -50vw; }
+
+/* =====================================================================
+   ★モバイル（〜720px）— 2026-09-01
+   ★オーナー指示「★このアプリはモバイルアプリです。★基本的にはモバイルユーザーです」
+
+   ⚠️ ★調査（REPORT_P4_MOBILE_SURVEY_20260901.md）で分かったこと:
+      ★23 ページ中 10 ページで内容が画面の外へ出て、★`overflow-x: hidden`（下）に
+      ★**切り落とされて**いました。★横スクロールが出ないぶん、★到達する手段がありません。
+
+   ★原因は 1 つの形です: ★一覧の行が「時刻｜格｜距離｜賞金｜状態」の**表**として
+      ★`display:flex` / `flex-wrap:nowrap` で組まれ、★子が `flex: 0 0 <N>px` の固定幅を持ちます。
+      ★幅の合計が 390px を超えるので、★子が右へ押し出されます。
+
+   ⚠️ ★固定幅は `page.tsx` の **inline style** にあります。★inline はスタイルシートより強いので、
+      ★ここは `!important` でしか上書きできません。
+      ★**スコープはこの @media の中だけ**です。★デスクトップは 1 ビットも変わりません。
+
+   ⚠️ ★`overflow-x: hidden`（LP の `.lp-bleed` のために要る）は**外しません**。
+      ★外すのではなく、★**隠すものが無い状態にする**のが直しです。
+      ★合否は `scrollWidth` ではなく ★**右端を越えた要素の数**で見ます
+      （`tools/verify-mobile-layout.mjs`）。
+   ===================================================================== */
+@media (max-width: 720px) {
+  /* ★画面の縁に内容が貼りつかないように（★いままで左右の余白は 0 でした） */
+  main { padding: 0 12px; }
+
+  /*
+   * ★固定幅の板を解く。
+   *   ⚠️ ★`flex: 0 0 <N>px` は「★縮まない・★伸びない」指定です。★横に 2〜3 枚並ぶと
+   *      ★合計が画面幅を超え、★**ブラウザがページ全体をズームアウト**します
+   *      （★実測: `/entry` は 390px 要求に対し **923px** で描かれ、★42% に縮んでいました）。
+   *   ★小さいもの（〜132px: 馬番・格・状態などの列）は**そのまま**にします。★潰すと読めません。
+   *   ★**150px 以上のものだけ**を解きます。★値は実際にソースにあるものだけを並べています
+   *      （★`grep "flex: '0 0 <N>px'"` で数えた実測: 150/190/196/200/250/252/280/290/330/334/340/352）。
+   */
+  main [style*="flex:0 0 150px"], main [style*="flex:0 0 190px"], main [style*="flex:0 0 196px"],
+  main [style*="flex:0 0 200px"], main [style*="flex:0 0 230px"], main [style*="flex:0 0 250px"],
+  main [style*="flex:0 0 252px"], main [style*="flex:0 0 280px"], main [style*="flex:0 0 290px"],
+  main [style*="flex:0 0 330px"], main [style*="flex:0 0 334px"], main [style*="flex:0 0 340px"],
+  main [style*="flex:0 0 352px"], main [style*="flex:0 0 186px"] {
+    flex: 1 1 100% !important;
+    width: auto !important;
+    max-width: 100% !important;
+  }
+
+  /*
+   * ★横並びは折り返す。
+   *   ⚠️ ★React は inline style を `display:flex` の形で書き出すので、この選択子で当たります。
+   *      ★`flex-wrap: wrap` は**収まっている行では何も起きません**（★収まらない時だけ効く）。
+   */
+  main [style*="display:flex"], main [style*="display:inline-flex"],
+  header [style*="display:flex"], header [style*="display:inline-flex"] { flex-wrap: wrap; }
+
+  /*
+   * ★大きな `min-width` を解く。
+   *   ⚠️ ★`min-width: 420px` の板は 390px の画面に入りません。★入らないと
+   *      ★**ブラウザがページ全体をズームアウト**します（★`/stable/<id>` で実測）。
+   *   ★小さいもの（〜170px）はそのまま。★実際にソースにある値だけを並べます
+   *      （★`grep "minWidth: <N>"` の実測: 200 / 240 / 280 / 360 / 420）。
+   */
+  main [style*="min-width:200px"], main [style*="min-width:240px"], main [style*="min-width:280px"],
+  main [style*="min-width:360px"], main [style*="min-width:420px"] { min-width: 0 !important; }
+
+  /* ★ヘッダーのナビ（★全ページ共通）。★横一列のままだと 398px で画面に入りません */
+  header nav { flex-wrap: wrap; row-gap: 4px; }
+  header.a-band { height: auto !important; min-height: 56px; padding: 6px 12px !important; }
+
+  /*
+   * ★表は「はみ出す」のではなく「★中で横スクロールする」形にします。
+   *   ⚠️ ★`overflow-x: hidden`（html）に切られると、★表の右側に到達できません。
+   */
+  main table { display: block; width: 100%; max-width: 100%; overflow-x: auto; }
+
+  /*
+   * ★操作要素が画面より広くならないように。
+   *   ⚠️ ★`select` の内部幅は「★いちばん長い選択肢」で決まります。★`/race` のレース選択は
+   *      ★**50 鞍**を並べるので、★組版の途中で画面より広い瞬間ができます。
+   *      ★そこでブラウザが「収まらない」と判断すると、★**あとで縮んでも版面は戻りません。**
+   */
+  main select, main input, main textarea, main button, main label { max-width: 100%; }
+
+  /*
+   * ★横並びの行の「高さ」を内容に合わせる。
+   *   ⚠️ ★行は `height: 58` のように inline で高さが決まっています。★折り返して 2 行に
+   *      なると中身が箱から溢れ、★**下の行と重なって文字が二重に見えます**（★/entry で実測）。
+   *   ⚠️ ★横のはみ出しだけを測っていて、★これを 1 度見落としました。
+   *      ★`tools/verify-mobile-layout.mjs` に「★中身が箱より高い要素」の検出を足してあります。
+   *   ★`display:inline-flex`（チップ・バッジ・ボタン）には当たりません。★あちらは高さが意味を持ちます。
+   */
+  main [style*="display:flex"] { height: auto !important; }
+
+  /* ★一覧の行: 折り返す。★高さは inline の `height: 58` を解いて内容に合わせる */
+  [data-theme="arcade"] .a-row {
+    flex-wrap: wrap;
+    row-gap: 2px; column-gap: 10px;
+    padding: 10px 12px;
+    height: auto !important;
+    min-height: 56px;
+  }
+  /* ★列の固定幅を解く（★表 → 折り返す並びへ） */
+  [data-theme="arcade"] .a-row > * {
+    flex: 0 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  /* ★見出しの帯も折り返す */
+  [data-theme="arcade"] .a-band {
+    flex-wrap: wrap;
+    height: auto !important;
+    min-height: 48px;
+    padding: 6px 12px !important;
+    row-gap: 4px;
+  }
+
+  /* ★パネルの `overflow: hidden` は、折り返した中身を切ります */
+  [data-theme="arcade"] .a-panel { overflow: visible; }
+}
+
+/* ---------------------------------------------------------------------
+   ★カードの並び（★`.a-cards`）
+   ⚠️ ★列数を `page.tsx` の inline style に直書きしていました（`repeat(4, 1fr)` など 7 か所）。
+      ★直書きだと、★モバイルで **4 列のまま 1 文字ずつ縦に割れます**
+      （★実測: 「参 加 ポ イ ン ト」「サ ク ラ ブ リ ー ズ」）。
+   ★列数はここ 1 か所で決めます。★呼ぶ側は `c3` / `c8` を足すだけ。
+   ⚠️ ★`min-width: 0` で潰すのではなく、★**列を減らす**のが直しです。
+        ★潰すと「はみ出し 0」にはなりますが、★読めません（★数だけ見て 1 回そうしました）。
+   --------------------------------------------------------------------- */
+.a-cards { display: grid; gap: 16px; grid-template-columns: repeat(4, 1fr); }
+.a-cards.c3 { grid-template-columns: repeat(3, 1fr); }
+.a-cards.c8 { grid-template-columns: repeat(8, 1fr); }
+@media (max-width: 720px) {
+  .a-cards, .a-cards.c3 { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .a-cards.c8 { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 430px) {
+  .a-cards, .a-cards.c3 { grid-template-columns: 1fr; }
+  .a-cards.c8 { grid-template-columns: repeat(4, 1fr); }
+}

@@ -113,7 +113,7 @@ export default async function LandingPage(): Promise<React.ReactElement> {
           <h2 className="a-band" style={{ height: 46, padding: '0 22px', borderRadius: 10, border: '2px solid var(--a-edge)', fontSize: 26, fontWeight: 900, letterSpacing: '.06em', textShadow: '0 2px 0 rgba(0,0,0,.3)', margin: 0 }}>4 つのたのしみ</h2>
           <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)' }}>オーナー兼調教師として、牧場をひとつ預かります</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+        <div className="a-cards">
           {POINTS.map((p) => (
             <div key={p.n} style={{ display: 'flex', flexDirection: 'column', borderRadius: 10, overflow: 'hidden', background: '#fff', border: '2px solid var(--a-edge)', boxShadow: 'var(--a-shadow-sm)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 52, padding: '0 14px', backgroundImage: 'linear-gradient(#ffffff,#eef6fd)', borderBottom: '2px solid var(--a-line)' }}>
@@ -186,7 +186,7 @@ export default async function LandingPage(): Promise<React.ReactElement> {
           <h2 className="a-band" style={{ height: 46, padding: '0 22px', borderRadius: 10, border: '2px solid var(--a-edge)', fontSize: 26, fontWeight: 900, letterSpacing: '.06em', textShadow: '0 2px 0 rgba(0,0,0,.3)', margin: 0 }}>登録前に見られる画面</h2>
           <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)' }}>中継と番組表は、登録しなくても観られます</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        <div className="a-cards c3">
           {[
             { title: '番組表', img: '/lp/tool-program.jpg', body: '10 分ごとの発走予定を一覧で。次のレースと締切がすぐ分かります', href: '/races', event: 'tool_program' },
             { title: 'オッズ', img: '/lp/tool-odds.jpg', body: '人気順に並んだ単勝・複勝・馬連。支持の集まり方も見えます', href: oddsHref, event: 'tool_odds' },

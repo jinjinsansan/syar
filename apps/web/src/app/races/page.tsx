@@ -82,7 +82,7 @@ export default async function ProgramPage() {
       )}
 
       <div className="a-panel strong" style={{ marginTop: 18 }}>
-        <div className="a-band" style={{ height: 38, padding: '0 18px', gap: 14 }}>
+        <div className="a-band hide-narrow" style={{ height: 38, padding: '0 18px', gap: 14 }}>
           <span className="a-lbl" style={{ width: COL.time, flex: `0 0 ${COL.time}px`, color: '#fff' }}>発走</span>
           <span className="a-lbl" style={{ width: COL.grade, flex: `0 0 ${COL.grade}px`, color: '#fff' }}>格</span>
           <span className="a-lbl" style={{ flex: 1, minWidth: 170, color: '#fff' }}>コース</span>

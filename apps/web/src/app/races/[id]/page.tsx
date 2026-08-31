@@ -109,7 +109,7 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
 
       {/* 出走表 */}
       <div className="a-panel strong" style={{ marginTop: 16 }}>
-        <div className="a-band" style={{ height: 38, padding: '0 18px', gap: 14 }}>
+        <div className="a-band hide-narrow" style={{ height: 38, padding: '0 18px', gap: 14 }}>
           <span className="a-lbl" style={{ width: COL.gate, flex: `0 0 ${COL.gate}px`, textAlign: 'center', color: '#fff' }}>枠</span>
           <span className="a-lbl" style={{ flex: 1, minWidth: 150, color: '#fff' }}>馬名</span>
           <span className="a-lbl hide-narrow" style={{ width: COL.owner, flex: `0 0 ${COL.owner}px`, color: '#fff' }}>厩舎</span>

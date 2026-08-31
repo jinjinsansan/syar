@@ -46,7 +46,7 @@ function MiniStat({ label, value, unit, color, size = 26 }: { readonly label: st
  */
 function HomeCards({ home, ownedCount, todoCount }: { readonly home: StableHome; readonly ownedCount: number; readonly todoCount: number }): React.ReactElement {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginTop: 14 }}>
+    <div className="a-cards" style={{ marginTop: 14 }}>
       {/* ① アカウント */}
       <HomeCard
         title="アカウント"
@@ -201,7 +201,7 @@ export default async function StablePage() {
 
       {/* 所有馬一覧 */}
       <div id="horses" className="a-panel strong" style={{ marginTop: 18 }}>
-        <div className="a-band" style={{ height: 38, padding: '0 18px', gap: 14 }}>
+        <div className="a-band hide-narrow" style={{ height: 38, padding: '0 18px', gap: 14 }}>
           <span className="a-lbl" style={{ width: COL.name, flex: `0 0 ${COL.name}px`, color: '#fff' }}>馬名</span>
           <span className="a-lbl" style={{ width: COL.cls, flex: `0 0 ${COL.cls}px`, color: '#fff' }}>格</span>
           <span className="a-lbl" style={{ width: COL.stars, flex: `0 0 ${COL.stars}px`, color: '#fff' }}>素質</span>

@@ -147,7 +147,7 @@ export default function SetupPage(): React.ReactElement {
                   <span className="a-lbl">勝負服の配色</span>
                   <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>16 色から選びます（芝や土と同化しないよう、色は用意したものから選ぶ形です）</span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', gap: 12, marginTop: 12 }}>
+                <div className="a-cards c8" style={{ gap: 12, marginTop: 12 }}>
                   {SILK_COLORS.map((c) => {
                     const on = c.key === colorKey;
                     return (

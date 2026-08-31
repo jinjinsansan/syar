@@ -116,7 +116,7 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
 
       {activeTab === 'runs' && (
         <div className="a-panel strong" style={{ borderRadius: '0 10px 10px 10px', marginTop: -2 }}>
-          <div className="a-band" style={{ height: 38, padding: '0 16px', gap: 12 }}>
+          <div className="a-band hide-narrow" style={{ height: 38, padding: '0 16px', gap: 12 }}>
             <span className="a-lbl" style={{ width: RCOL.week, flex: `0 0 ${RCOL.week}px`, color: '#fff' }}>週</span>
             <span className="a-lbl" style={{ width: RCOL.date, flex: `0 0 ${RCOL.date}px`, color: '#fff' }}>日付</span>
             <span className="a-lbl" style={{ width: RCOL.race, flex: `0 0 ${RCOL.race}px`, color: '#fff' }}>レース</span>

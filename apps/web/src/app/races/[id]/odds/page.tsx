@@ -74,7 +74,7 @@ export default async function OddsPage({ params, searchParams }: {
   /** 組み合わせ券種の 3 列グリッド（セル h44・オッズ昇順で左→右→下。最有力の 1 通りだけ赤） */
   const ComboGrid = ({ list, joiner, empty }: { readonly list: readonly Row[]; readonly joiner: string; readonly empty: string }) => (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      <div className="a-cards c3" style={{ gap: 0 }}>
         {list.map((o, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, height: 44, padding: '0 14px', borderTop: '1px solid var(--a-line)', background: i % 2 === 1 ? 'var(--a-panel-2)' : '#fff' }}>
             <Combo sel={o['selection'] as number[]} joiner={joiner} />
@@ -134,7 +134,7 @@ export default async function OddsPage({ params, searchParams }: {
         <>
           {/* 単勝・複勝（人気順） */}
           <div className="a-panel strong" style={{ borderRadius: '0 10px 10px 10px', marginTop: -2 }}>
-            <div className="a-band" style={{ height: 38, padding: '0 18px', gap: 14 }}>
+            <div className="a-band hide-narrow" style={{ height: 38, padding: '0 18px', gap: 14 }}>
               <span className="a-lbl" style={{ width: 52, flex: '0 0 52px', color: '#fff' }}>人気</span>
               <span className="a-lbl" style={{ width: 44, flex: '0 0 44px', textAlign: 'center', color: '#fff' }}>枠</span>
               <span className="a-lbl" style={{ flex: '0 0 196px', color: '#fff' }}>馬名</span>

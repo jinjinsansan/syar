@@ -71,7 +71,7 @@ export default function PrizesPage(): React.ReactElement {
 
       <div style={{ display: 'flex', gap: 16, marginTop: 14, alignItems: 'flex-start' }}>
         {/* 景品カード 3 列 */}
-        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+        <div className="a-cards c3" style={{ flex: 1, minWidth: 0, gap: 14 }}>
           {list.map((p) => {
             const sel = p.id === selectedId;
             const short = balance < p.pp;
@@ -123,7 +123,7 @@ export default function PrizesPage(): React.ReactElement {
 
       {/* 交換履歴 */}
       <div className="a-panel strong" style={{ marginTop: 20 }}>
-        <div className="a-band" style={{ height: 44, padding: '0 16px', gap: 14 }}>
+        <div className="a-band hide-narrow" style={{ height: 44, padding: '0 16px', gap: 14 }}>
           <span style={{ fontSize: 17, fontWeight: 900 }}>交換履歴</span>
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 7, height: 30, padding: '0 12px', borderRadius: 8, background: '#fff', border: '2px solid var(--a-edge)' }}>
             <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--a-ink-2)' }}>交換に使った合計</span>

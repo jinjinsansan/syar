@@ -122,7 +122,7 @@ export default function TrainingPage(): React.ReactElement {
           </div>
 
           {/* メニュー 4×2 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginTop: 14 }}>
+          <div className="a-cards" style={{ gap: 12, marginTop: 14 }}>
             {TRAINING_MENUS.map((m) => {
               const sel = m.id === selectedMenu;
               const fatColor = m.fatigueDelta < 0 ? 'var(--a-green-d)' : m.fatigueDelta >= 20 ? '#a9741a' : 'var(--a-ink)';
