@@ -19,11 +19,36 @@
 import { describe, it, expect } from 'vitest';
 import {
   LANE_REVEAL_FULL_RUN, laneAt, laneAtStart, laneExtraM, TRACK_WIDTH_M,
-  LANE_MODEL_LEGACY, RAIL_W, STALL_W_M,
+  LANE_MODEL_LEGACY, RAIL_W, STALL_W_M, HORSE_LENGTH_M,
 } from '../src/lane.js';
 
 const FIELD = 12;
 const DIST = 1600;
+
+/**
+ * ★**V-18 ②b — 枠順由来の内外差（馬身）**（正典 **D-090**・2026-08-31）
+ *
+ * ★定義（裁定の文言そのまま）: ★**多数シードで均した枠間の平均差**。
+ *   ★= 枠ごとに距離ロスを多数シードで平均し、★その**枠間の最大 − 最小**を馬身にする。
+ *
+ * ⚠️ ★**1 レースごとに出して平均しないこと**（台帳 B-5）。★n=12 の偶然がそのまま残ります。
+ * ⚠️ ★**seed の本数が足りないと、雑音がそのまま「幅」として出ます。** ★実測（DEFAULT_OVAL 1600m）:
+ *      ★200 本 **0.348** ／ 500 本 **0.365** ／ ★**1000 本 0.216** ／ 2000 本 **0.216**
+ *    → ★**1000 本で落ち着きます。** ★ここを削ると、測っているのは自分の標本です。
+ * ⚠️ ★seed の作り方は `verify-v18.mjs` / `tools/_gatebias.mjs` と**同じ**にしてあります（R-30）。
+ */
+const BIAS_SEEDS = 1000;
+function gateBiasLengths(distance = DIST, revealFullRun?: number, laneModel?: typeof LANE_MODEL_LEGACY): number {
+  const sum = new Array<number>(FIELD).fill(0);
+  for (let r = 0; r < BIAS_SEEDS; r += 1) {
+    const seed = r * 2654435761 + distance;
+    for (let g = 1; g <= FIELD; g += 1) {
+      sum[g - 1] += laneExtraM(g, FIELD, distance, seed, undefined, 10, revealFullRun, laneModel);
+    }
+  }
+  const mean = sum.map((s) => s / BIAS_SEEDS);
+  return (Math.max(...mean) - Math.min(...mean)) / HORSE_LENGTH_M;
+}
 
 /** 枠と距離ロスの相関。★12 点では雑音が大きいので多数シードをプールする */
 function gateLossCorrelation(revealFullRun: number, seeds = 200): number {
@@ -148,5 +173,63 @@ describe('★横位置の広がり（reveal）', () => {
       laneAt(i + 1, FIELD, DIST - ranM, DIST, 111));
     expect(Math.max(...ws) - Math.min(...ws)).toBeGreaterThan(5);
     expect(laneAtStart(1, FIELD)).toBeLessThan(laneAtStart(FIELD, FIELD));
+  });
+});
+
+/**
+ * ★**V-18 ②b**（正典 D-090・2026-08-31・指示書 §1-2）
+ *
+ * 【★なぜ ②b が要るか】★②a（4〜12 馬身）が測る 12 馬身のうち、★枠順由来は **0.2〜0.4 馬身**です。
+ *   ★つまり ②a は「枠順の不公平」ではなく ★**「その日の trip」**を測っています（D-071 / D-073 の姿）。
+ *   → ★**「枠で決まるゲームにしない」という目的そのもの**を測るのが ②b です。
+ *
+ * ⚠️ ★**指示書 §1-2 の「旧形（`LANE_MODEL_LEGACY`）に戻すとこの検査が落ちる」は成立しません。**
+ *    ★実測（2000 本・DEFAULT_OVAL 1600m）: ★本番 **0.216** ／ ★**旧形 0.322** — ★どちらも 1 馬身の内側。
+ *    ★理由は構造です — ★**どちらの作り方も通り道をシードから引き、枠に依存させていません**（D-069 / D-073）。
+ *    ★旧形の欠陥は**内ラチへの重なり**であって**枠順の偏り**ではないので、★②b は 2 つを区別できません。
+ *    → ★**対照は `SETTLE_M` の変異**です（下）。★報告書に出しています。
+ */
+describe('★V-18 ②b — 枠順由来の内外差', () => {
+  it('★★枠間の平均差が 1 馬身以内（正典 D-090）', () => {
+    const b = gateBiasLengths();
+    expect(b, '★枠順で決まるゲームになっています').toBeLessThanOrEqual(1);
+    // ★0 になるなら、測っていないか laneExtraM が死んでいる（R-21）
+    expect(b).toBeGreaterThan(0);
+  });
+
+  /**
+   * ★**対照 — この検査が実際に効いていること**（R-14）。
+   *
+   * ⚠️ ★**距離を短くする対照は使えません。** ★`DEFAULT_OVAL` の 400m は**全部が直線**で、
+   *    ★コーナーが 1 本も無いので距離ロスが全馬 0 になります（★実際に書いて 0 になりました）。
+   *
+   * ★正典が記録している壊れ方はこれです:
+   *   > ★枠の位置に居続ける形にしたら、★**枠による偏り 35.5 馬身＝枠順で決まるゲーム**になりました。
+   *
+   * ★それを作るのは **`SETTLE_M`**（発走後どれだけで枠の位置が消えるか）で、★**定数**です。
+   * ★`SETTLE_M` は較正定数の登録簿にあり（`apps/cli/src/calibration.ts`・★変異値 **2000**）、
+   * ★`npm run mutation` がこの検査を落とします。★開発側でも手で確かめ、報告書 §5 に数字を載せます。
+   *
+   * ★ここでは ★**②b が「枠の位置がどれだけ残るか」に反応する量である**ことだけを、
+   * ★定数を触らずに固定します — ★発走直後は枠の位置そのものなので、
+   * ★**発走時の枠間の広がりは 1 馬身をはるかに超えている**（＝もし消えなければ落ちる）。
+   */
+  it('★★発走時の枠の広がりは 1 馬身をはるかに超える（★消えなければ ②b は落ちる）', () => {
+    const starts = Array.from({ length: FIELD }, (_, i) => laneAtStart(i + 1, FIELD));
+    const spreadLengths = (Math.max(...starts) - Math.min(...starts)) / HORSE_LENGTH_M;
+    // ★発走時点では枠の位置そのもの。★これが道中まで残れば ②b は一発で 1 馬身を超える
+    expect(spreadLengths, '★発走時に枠が散っていないなら、②b の対照が成り立ちません').toBeGreaterThan(4);
+  });
+
+  /**
+   * ★**演出の値（reveal）で通せないこと**（R-16・裁定の中心）。
+   *   ★②b が reveal で動くなら、★**画の都合で合否を動かせて**しまいます。
+   */
+  it('★★reveal を振っても ②b はほとんど動かない（演出でゲートを通せない）', () => {
+    const now = gateBiasLengths(DIST, LANE_REVEAL_FULL_RUN);
+    const full = gateBiasLengths(DIST, 1.0);
+    expect(Math.abs(full - now)).toBeLessThan(0.1);
+    expect(now).toBeLessThanOrEqual(1);
+    expect(full).toBeLessThanOrEqual(1);
   });
 });

@@ -13,6 +13,7 @@
   },
   "peerDependencies": {},
   "devDependencies": {
-    "@star/render": "*"
+    "@star/render": "*",
+    "@star/scheduler": "*"
   }
 }
