@@ -67,6 +67,8 @@ const RID = arg('rid', '');
 const HID = arg('hid', 'h1');
 /** ★折り返した結果を目で見るための撮影（★out/_mobile/） */
 const SHOTS = process.argv.includes('--shots');
+/** ★44px 未満の内訳を出す */
+const TAPS = process.argv.includes('--taps');
 const DYNAMIC = RID === '' ? [] : [
   [`/races/${RID}`, '★レース詳細'],
   [`/races/${RID}/bet`, '★投票'],
@@ -151,14 +153,27 @@ const MEASURE = (REQW) => `(() => {
   }
   fat.sort((a, b) => a.depth - b.depth || b.w - a.w);
   let small = 0, smallest = 9999, taps = 0;
+  /** ★どれが小さいのかを出す。★「54/56」だけでは直せません */
+  const tapsBad = new Map();
   for (const el of document.querySelectorAll('a,button,select,input,textarea,[role=button]')) {
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
     taps += 1;
     const m = Math.min(r.width, r.height);
-    if (m < 44) small += 1;
     if (m < smallest) smallest = Math.round(m);
+    if (m >= 44) continue;
+    small += 1;
+    const cls = typeof el.className === 'string' ? el.className : '';
+    const key = el.tagName + '|' + cls.slice(0, 22) + '|' + Math.round(r.width) + 'x' + Math.round(r.height);
+    const cur = tapsBad.get(key) ?? {
+      t: el.tagName.toLowerCase(), c: cls.slice(0, 22),
+      w: Math.round(r.width), h: Math.round(r.height), n: 0,
+      txt: (el.textContent || '').trim().slice(0, 14),
+    };
+    cur.n += 1;
+    tapsBad.set(key, cur);
   }
+  const tapList = [...tapsBad.values()].sort((a, b) => b.n - a.n || (a.w * a.h) - (b.w * b.h));
   let minFont = 99;
   for (const el of document.querySelectorAll('body *')) {
     if (el.children.length > 0) continue;
@@ -208,7 +223,7 @@ const MEASURE = (REQW) => `(() => {
   document.body.style.overflowX = prevBody;
   return JSON.stringify({
     vw, sw: swTrue, overflow: swTrue - vw,
-    over: over.slice(0, 3), overCount: over.length, wide: wide.slice(0, 5), wideCount: wide.length, fat: fat.slice(0, 4), fatCount: fat.length, tall: tall.slice(0, 3), tallCount: tall.length, clipped, canvases,
+    over: over.slice(0, 3), overCount: over.length, wide: wide.slice(0, 5), wideCount: wide.length, fat: fat.slice(0, 4), fatCount: fat.length, tall: tall.slice(0, 3), tallCount: tall.length, tapList: tapList.slice(0, 5), clipped, canvases,
     small, taps, smallest: smallest === 9999 ? null : smallest,
     minFont: minFont === 99 ? null : Math.round(minFont * 10) / 10,
     errored, text: document.body.innerText.trim().length,
@@ -296,6 +311,13 @@ for (const r of rows) {
       console.log(`  ${' '.repeat(20)}         ★幅 ${f.w}px  <${f.t}${f.c === '' ? '' : ` class="${f.c}"`}>`
         + `  display:${f.disp}${f.mw === '0px' || f.mw === 'auto' ? '' : ` min-width:${f.mw}`}`
         + `${f.fb === 'auto' ? '' : ` flex-basis:${f.fb}`}`);
+    }
+  }
+  if (TAPS && (r.tapList ?? []).length > 0) {
+    console.log(`  ${' '.repeat(20)}       ↳ ★44px 未満の内訳:`);
+    for (const t of r.tapList) {
+      console.log(`  ${' '.repeat(20)}         ${String(t.n).padStart(2)} 個  <${t.t}${t.c === '' ? '' : ` class="${t.c}"`}>`
+        + `  ${t.w}x${t.h}px${t.txt === '' ? '' : `  「${t.txt}」`}`);
     }
   }
   if ((r.tallCount ?? 0) > 0) {

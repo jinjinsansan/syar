@@ -228,6 +228,26 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
    */
   main [style*="display:flex"] { height: auto !important; }
 
+  /*
+   * ★指で押せる大きさにする（★Apple の指針 44px。★Material は 48dp）。
+   *   ⚠️ ★実測（着手前）: ★**23 ページ中、44px 以上の操作要素しか無いページは 1 つもありません**でした。
+   *      ★いちばん悪いのは ★**投票画面の 54 / 56**。★内訳は
+   *        ★36 個 … 32x32px のマーク（★◎○▲ の丸ボタン）★= 主犯
+   *        ★ 4 個 … 76x25px の式別（単勝・三連複…）
+   *        ★ 3 個 … 78x32px の金額（100・500…）
+   *   ★`min-height` / `min-width` は inline の `height` / `width` より**強い**ので、
+   *     ★`!important` を使わずに広げられます（★指定を消さずに下限だけ与える形）。
+   */
+  main button, main select, main [role="button"],
+  main input[type="button"], input[type="submit"], input[type="checkbox"], input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* ★文字を打つ欄は高さだけ（★幅の下限は要りません） */
+  main input[type="text"], main input[type="number"], main textarea { min-height: 44px; }
+  /* ★ヘッダーのナビも指で押せる大きさに */
+  header nav a, header a[class*="a-btn"] { min-height: 44px; display: inline-flex; align-items: center; }
+
   /* ★一覧の行: 折り返す。★高さは inline の `height: 58` を解いて内容に合わせる */
   [data-theme="arcade"] .a-row {
     flex-wrap: wrap;
