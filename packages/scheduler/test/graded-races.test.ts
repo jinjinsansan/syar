@@ -17,6 +17,7 @@ import {
   GRADED_RACES, GRADED_COUNT_BY_GRADE, gradedRaceById, raceLookKey, type Grade,
 } from '../src/graded-races.js';
 import { VENUES, venueById } from '../src/venues.js';
+import { gradedRacesByVenue } from '../src/race-setup.js';
 
 describe('★競馬場 10 場', () => {
   it('★10 場ある', () => {
@@ -169,5 +170,53 @@ describe('★重賞 50 鞍', () => {
     expect(ousei.name).toBe('桜星賞');
     expect(ousei.venueId).toBe('star-park');
     expect(ousei.distanceM).toBe(1600);
+  });
+});
+
+/**
+ * ★**画面のレース選択**（2026-08-31・オーナー指示「毎回コピペ出来ません」）
+ *
+ * 【★この検査が守るもの】
+ *   ⚠️ ★**選択肢が `GRADED_RACES` から漏れないこと**が本体です。
+ *   ★画面側で 50 鞍を組み直すと、★**鞍を足したときに選択肢だけ古くなります**
+ *   （★走路の形を 2 か所で持って離れた台帳 B-6 と同じ形）。
+ *   → ★「合計が 50」ではなく ★**「id の集合が `GRADED_RACES` と一致する」**を見ます。
+ *      ★合計だけだと、★1 鞍落として 1 鞍重複させても通ってしまいます。
+ */
+describe('★レース選択（競馬場ごとの並び）', () => {
+  it('★出てくる id の集合が GRADED_RACES と完全に一致する（★1 鞍も落ちない・重複しない）', () => {
+    const listed = gradedRacesByVenue().flatMap((v) => v.races.map((r) => r.id));
+    expect(listed.length, '★重複または欠落').toBe(GRADED_RACES.length);
+    expect(new Set(listed)).toEqual(new Set(GRADED_RACES.map((r) => r.id)));
+  });
+
+  it('★どの鞍も、自分の競馬場の下に並んでいる', () => {
+    for (const { venue, races } of gradedRacesByVenue()) {
+      for (const r of races) {
+        expect(r.venueId, `★${r.name} が ${venue.name} の下にある`).toBe(venue.id);
+      }
+    }
+  });
+
+  it('★競馬場の並びは VENUES の順（★一覧が 2 か所で違う順にならない）', () => {
+    const shown = gradedRacesByVenue().map((v) => v.venue.id);
+    expect(shown).toEqual(VENUES.filter((v) => GRADED_RACES.some((r) => r.venueId === v.id)).map((v) => v.id));
+  });
+
+  it('★競馬場の中は 格 → 距離 の順', () => {
+    const rank: Readonly<Record<Grade, number>> = { G1: 0, G2: 1, G3: 2 };
+    for (const { venue, races } of gradedRacesByVenue()) {
+      for (let i = 1; i < races.length; i += 1) {
+        const prev = races[i - 1]!;
+        const cur = races[i]!;
+        const ordered = rank[prev.grade] < rank[cur.grade]
+          || (prev.grade === cur.grade && prev.distanceM <= cur.distanceM);
+        expect(ordered, `★${venue.name}: ${prev.name} の次に ${cur.name}`).toBe(true);
+      }
+    }
+  });
+
+  it('★空の競馬場は選択肢に出さない', () => {
+    for (const v of gradedRacesByVenue()) expect(v.races.length).toBeGreaterThan(0);
   });
 });

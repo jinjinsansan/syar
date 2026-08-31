@@ -75,7 +75,7 @@ import {
   targetDisplaySec,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
-import { raceSetupFromParam } from '@star/scheduler';
+import { raceSetupFromParam, gradedRacesByVenue } from '@star/scheduler';
 
 /**
  * ★**どの 1 鞍を走らせるか**（`?race=<id>`・2026-08-31・B案 ④）。
@@ -95,6 +95,12 @@ const DIST = RACE_SETUP.distanceM;
 /** ★走路の形。⚠️ ★エンジンにも描画層にも**これを渡します**（★別々に組まない） */
 const COURSE_SPEC = RACE_SETUP.spec;
 const COURSE_OPTS = { ...COURSE_SPEC, turn: RACE_SETUP.turn };
+/**
+ * ★**レース選択の中身**（★競馬場ごとの 50 鞍）。
+ * ⚠️ ★ここで組み直しません — ★`@star/scheduler` が `VENUES` と `GRADED_RACES` から出します
+ *    （★鞍を足したときに画面だけ古くなるのを防ぐため）。
+ */
+const RACES_BY_VENUE = gradedRacesByVenue();
 /**
  * ★**走る場所の作り方の比較口**（`?lane=old|b|c|d`・2026-08-31）。★`old` は旧形。
  *   ⚠️ ★**付けなければ現行と完全に同じ**です。★オーナーが絵で選ぶためだけの口で、
@@ -2760,6 +2766,36 @@ export default function RacePage(): React.JSX.Element {
         >
           最初から
         </button>
+        {/*
+          ★**レース選択**（2026-08-31）— ★`?race=<id>` を毎回打たずに 50 鞍を切り替えるため。
+            ⚠️ ★`?race=` は**モジュール読み込み時に 1 回だけ**読む形（このファイルの先頭）なので、
+               ★state を変えるだけでは切り替わりません。★`location.search` を書いて**再読込**させます。
+            ⚠️ ★`?surface=` は鞍ごとの馬場を上書きする口なので、★鞍を変えるときは**外します**
+               （★残すと「ダートの鞍を選んだのに芝」が出ます）。★他の口（`seed` / `lane` 等）は残します。
+        */}
+        <label>
+          レース{' '}
+          <select
+            value={RACE_SETUP.race.id}
+            onChange={(e) => {
+              const params = new URLSearchParams(window.location.search);
+              params.set('race', e.target.value);
+              params.delete('surface');
+              window.location.search = params.toString();
+            }}
+            style={{ maxWidth: 320 }}
+          >
+            {RACES_BY_VENUE.map(({ venue, races }) => (
+              <optgroup key={venue.id} label={`${venue.name}（${venue.turn === 'left' ? '左' : '右'}・1周${venue.lapM}m）`}>
+                {races.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.grade} {r.name}（{r.surface === 'turf' ? '芝' : 'ダート'}{r.distanceM}m）
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
         <label>シード <input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value))} style={{ width: 70 }} /></label>
         <label>
           自馬{' '}

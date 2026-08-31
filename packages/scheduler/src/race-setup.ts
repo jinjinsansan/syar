@@ -20,7 +20,7 @@
  * 【★この層の約束】★依存ゼロ・純粋関数。★時計も乱数も持ちません。
  */
 import { GRADED_RACES, gradedRaceById, type GradedRace } from './graded-races.js';
-import { venueById, type Venue, type VenueSurface } from './venues.js';
+import { VENUES, venueById, type Venue, type VenueSurface } from './venues.js';
 
 /**
  * ★走路の形（1周・直線・幅）。
@@ -88,4 +88,36 @@ export function raceSetupFromParam(raw: string | null | undefined): { setup: Rac
   if (raw === null || raw === undefined || raw === '') return { setup: raceSetupById(), fellBack: false };
   const found = GRADED_RACES.some((r) => r.id === raw);
   return { setup: raceSetupById(found ? raw : DEFAULT_RACE_ID), fellBack: !found };
+}
+
+/** ★1 つの競馬場と、そこで組まれている鞍 */
+export interface VenueRaces {
+  readonly venue: Venue;
+  readonly races: readonly GradedRace[];
+}
+
+/**
+ * ★**競馬場ごとに 50 鞍を並べる**（★画面のレース選択のため・2026-08-31）
+ *
+ * 【★なぜ画面側に書かないか】
+ *   ★「どの競馬場にどの鞍があるか」は ★**`VENUES` と `GRADED_RACES` から決まる**ものです。
+ *   ★画面側で組み直すと、★**鞍を足したときに画面が古いまま**になります
+ *   （★走路の形を 2 か所で持って離れた B-6 と同じ形）。
+ *
+ * ⚠️ ★**並び順は `VENUES` の順です。** ★ここで並べ替えないこと —
+ *    ★競馬場の一覧が 2 か所で違う順になります。★鞍の中では格 → 距離の順に並べます。
+ *
+ * ⚠️ ★**鞍が 1 つも無い競馬場は返しません。** ★空の選択肢を出さないためです。
+ *    ★いまは 10 場すべてに鞍がありますが、★その前提を検査には書きません
+ *    （★`graded-races.test.ts` が「10 場すべてが使われていること」を別に見ています）。
+ */
+export function gradedRacesByVenue(): readonly VenueRaces[] {
+  const GRADE_ORDER: Readonly<Record<string, number>> = { G1: 0, G2: 1, G3: 2 };
+  return VENUES.map((venue) => ({
+    venue,
+    races: GRADED_RACES
+      .filter((r) => r.venueId === venue.id)
+      .slice()
+      .sort((a, b) => (GRADE_ORDER[a.grade]! - GRADE_ORDER[b.grade]!) || (a.distanceM - b.distanceM)),
+  })).filter((v) => v.races.length > 0);
 }
