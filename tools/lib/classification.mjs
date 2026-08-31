@@ -276,6 +276,7 @@ export const READONLY = [
   '_radiusmap.mjs',               // 半径を動かしたときに ①② がどう動くかの地図（読むだけ）
   '_shapecompare.mjs',            // コーナーごとの半径で走路の形がどう変わるかを並べる（読むだけ）
   'verify-shot-stability.mjs',    // B-2 その秒で撮った 1 コマが繰り返し撮って同じかを測る（読むだけ）
+  'verify-mobile-layout.mjs',     // 全ページがモバイル幅で横あふれしないかを実ブラウザで測る（読むだけ）
   '_runupmap.mjs',                // A-9 同じ競馬場の走路が距離ごとに曲げられている量を測って重ねる（読むだけ）
   '_runupshots.mjs',              // A-9 曲げられた鞍と無傷の鞍を実画面で 67% で並べる（読むだけ）
   '_a10compare.mjs',              // A-10 の前後を 1 枚に並べる（読むだけ）
