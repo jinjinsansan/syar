@@ -491,8 +491,16 @@ for (const [index, displaySec] of displaySecs.entries()) {
     parallaxPlate: scene.shot.view === 'side'
       ? { plate: parallaxBackstretch, zoom: 1.14, verticalAnchor: 1.0, scrollM: scene.focusS }
       : undefined,
+    /**
+     * ★**層を 1 つずつ止めて差分を取るための切替**（2026-08-31・A-10 の切り分け）。
+     * ⚠️ ★既定は**画面と同じ「入り」**です（R-31）。★`--no-mow` / `--no-poles` / `--no-gate` で切ります。
+     * ★オーナー評「★ゲートがある地面が別の絵と交差しています」の「別の絵」を、
+     * ★**目ではなく画素の差**で特定するために足しました。
+     */
+    ...(argv.includes('--no-mow') ? { mowStripes: false } : {}),
+    ...(argv.includes('--no-poles') ? { distancePoles: false } : {}),
     // ★発走 90m までは開いた発馬機が後ろに残る（本番と同じ条件）
-    worldBillboards: lead < 90 ? [{
+    worldBillboards: lead < 90 && !argv.includes('--no-gate') ? [{
       image: gateOpen.image, width: gateOpen.image.width, height: gateOpen.image.height,
       source: gateOpen.source, worldS: 1.6, worldW: 0.5, widthM: 14.8, zOrder: 'behind',
       /** ★番号の描き直しも画面と同じにする（R-30: 測定器が画面と違う画を見ない） */
