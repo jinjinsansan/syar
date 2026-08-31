@@ -212,3 +212,60 @@ describe('★道具の台本の既定', () => {
     expect(offenders, '★台本の既定は DEFAULT_RACE_SCRIPT から引くこと').toEqual([]);
   });
 });
+
+/**
+ * ★**同じ量を 2 か所で実装させない**（★D-052 / ★台帳 B-5）
+ *
+ *   ⚠️ ★この案件だけで **3 件**やりました:
+ *     ★① `_gatebias.mjs` に ②b の 2 つ目の実装 → ★200 本 **0.567** 対 既存 2000 本 **0.216**
+ *     ★② `_venueverify.mjs` の `spearman` の写し
+ *     ★③ `diag-gauge.mjs` の `spearman` の写し（★`lib/v18.mjs` と 1 文字も違わないもの）
+ *
+ *   ★②③ は「いま同じ」でしたが、★**それは「これからも同じ」ではありません。**
+ *     ★片方だけ直した瞬間、★**同じ名前の違う量**が 2 つになります。
+ *     ★①は実際にそうなり、★食い違いに気づくまで報告に載りました。
+ *
+ * ★測り方の実装は `tools/lib/` の 1 か所に置き、★呼ぶ側は**引く**こと。
+ */
+describe('★測り方の実装を 1 か所に（D-052）', () => {
+  /** ★関数名 → ★それを定義してよい唯一のファイル */
+  const SINGLE_SOURCE: Record<string, string> = {
+    spearman: 'lib/v18.mjs',
+  };
+
+  it('★同じ測り方を 2 か所で定義しない', () => {
+    const base = new URL('../../../tools/', import.meta.url);
+    const offenders: string[] = [];
+    /** ★`lib/` も含めて見る。★`_*.mjs`（追跡外）も**あれば**見る — 写しはそこで生えました */
+    const scan = (dir: string, prefix: string) => {
+      for (const name of readdirSync(fileURLToPath(new URL(dir, base)), { withFileTypes: true })) {
+        if (name.isDirectory()) { if (name.name === 'lib') scan(`${dir}lib/`, 'lib/'); continue; }
+        if (!name.name.endsWith('.mjs')) continue;
+        const rel = `${prefix}${name.name}`;
+        const text = readFileSync(new URL(`${dir}${name.name}`, base), 'utf8');
+        for (const [fn, home] of Object.entries(SINGLE_SOURCE)) {
+          if (rel === home) continue;
+          const re = new RegExp(`^\\s*(export\\s+)?function\\s+${fn}\\s*\\(`, 'm');
+          const line = text.split('\n').findIndex((l) => re.test(l));
+          if (line >= 0) offenders.push(`${rel}:${line + 1}  function ${fn}(  → ★${home} から引くこと`);
+        }
+      }
+    };
+    scan('', '');
+    expect(
+      offenders.join('\n'),
+      `★測り方の写しがあります。★tools/lib/ の 1 か所から import してください（D-052 / 台帳 B-5）:\n${offenders.join('\n')}`,
+    ).toBe('');
+  });
+
+  it('★見張っている関数が、その唯一のファイルに実在する（検査が空振りしていない）', () => {
+    const base = new URL('../../../tools/', import.meta.url);
+    for (const [fn, home] of Object.entries(SINGLE_SOURCE)) {
+      const text = readFileSync(new URL(home, base), 'utf8');
+      expect(
+        new RegExp(`^\\s*export\\s+function\\s+${fn}\\s*\\(`, 'm').test(text),
+        `★${home} に export された ${fn} がありません。★引越したなら SINGLE_SOURCE を直すこと`,
+      ).toBe(true);
+    }
+  });
+});

@@ -23,6 +23,14 @@ import {
 } from '@star/race-engine';
 // ★乱数は注入する（憲法4）。`Math.random` は呼ばない
 import { deriveRng } from '@star/sim-engine';
+/**
+ * ★**順位相関は 1 か所から引きます**（★D-052 / ★台帳 B-5）。
+ *   ⚠️ ★ここには `spearman` の**写し**が置いてありました（`lib/v18.mjs` と 1 文字も違わないもの）。
+ *   ★同じ量を 2 か所で実装した実例が ★**この案件だけで 3 件**あります:
+ *     ★`_gatebias.mjs` の ②b（200本 0.567 対 既存 0.216）／★`_venueverify.mjs` の ρ／★ここ。
+ *   ★写しは「いま同じ」であって「これからも同じ」ではありません。★引きます。
+ */
+import { spearman } from './lib/v18.mjs';
 
 const POOL = JSON.parse(readFileSync('apps/web/src/lib/watch-pool.json', 'utf8'));
 const argv = process.argv.slice(2);
@@ -43,30 +51,6 @@ function mulberry32(a) {
   };
 }
 
-function spearman(xs, ys) {
-  const n = xs.length;
-  const rank = (v) => {
-    const idx = v.map((x, i) => [x, i]).sort((a, b) => a[0] - b[0]);
-    const r = new Array(n);
-    for (let i = 0; i < n;) {
-      let j = i;
-      while (j + 1 < n && idx[j + 1][0] === idx[i][0]) j++;
-      const avg = (i + j) / 2 + 1;
-      for (let k = i; k <= j; k++) r[idx[k][1]] = avg;
-      i = j + 1;
-    }
-    return r;
-  };
-  const rx = rank(xs), ry = rank(ys);
-  const mx = rx.reduce((a, b) => a + b, 0) / n;
-  const my = ry.reduce((a, b) => a + b, 0) / n;
-  let sxy = 0, sxx = 0, syy = 0;
-  for (let i = 0; i < n; i++) {
-    const dx = rx[i] - mx, dy = ry[i] - my;
-    sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
-  }
-  return sxx > 0 && syy > 0 ? sxy / Math.sqrt(sxx * syy) : 0;
-}
 
 console.log('# ★ゲージの向き（D-072）— 良い馬ほど余力が多いか');
 console.log(`  ${RACES} レース × ${DISTANCES.length} 距離 / ${FIELD}頭 / AI 代行の乗り方\n`);
