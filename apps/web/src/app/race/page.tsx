@@ -1460,15 +1460,28 @@ export default function RacePage(): React.JSX.Element {
        * ★馬・騎手分離素材（Codex 生成）: 騎手なしの馬 8 コマ ＋ 騎手 2 姿勢（前傾 a/b・ガッツポーズ a/b）。
        *   全部揃ったときだけ合成コマを使い、揃わなければ従来の一体コマ。
        */
-      const horseOnlyImages = await Promise.all(Array.from({ length: 8 }, (_, i) =>
-        loadImg(`/art/horse-only-side-v6-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)));
-      const jockeyImages = await Promise.all(['jockey-crouch-a', 'jockey-crouch-b', 'jockey-celebrate-a', 'jockey-celebrate-b']
-        .map((name) => loadImg(`/art/${name}.png?v=${ASSET_VERSION}`).catch(() => null)));
       /**
        * ★2026-08-18 オーナー判定: 馬・騎手の分離合成は「馬の形・大きさがアンバランス」「勝馬の騎手が破綻」で不採用。
        *   合格していた一体素材（side-v6 8 コマ・winner-v2 8 コマ）へ戻す。素材は残すが使わない。
+       *
+       * ⚠️ ★**この定数は「使わない」だけで、「読まない」ではありませんでした**（2026-09-01 に判明）。
+       *    ★`horse-only-side-v6` 8 コマ ＋ `horse-only-diag-rear-v3` 8 コマ ＋ 騎手 5 枚を
+       *    ★**読み込んでから捨てて**いました。★実測で ★**復号後 96MB**（★このページの合計 529MB のうち）。
+       *    ★iOS Safari は 1 タブの画像メモリに厳しい上限があり、★実機でレース中継が開けません
+       *    （★オーナー報告「このページを開けません」・2026-09-01）。
+       *  → ★**定数を読み込みの前に出し、描き得ない素材は読まない**ようにしました。
+       *    ★`USE_SEPARATED_COMPOSITE` を true に戻せば、★読み込みも一緒に戻ります。
+       * ⚠️ ★**絵は 1px も変わりません。** ★これらは false の間、一度も描かれていません。
        */
       const USE_SEPARATED_COMPOSITE = false;
+      const horseOnlyImages = USE_SEPARATED_COMPOSITE
+        ? await Promise.all(Array.from({ length: 8 }, (_, i) =>
+          loadImg(`/art/horse-only-side-v6-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)))
+        : Array.from({ length: 8 }, () => null);
+      const jockeyImages = USE_SEPARATED_COMPOSITE
+        ? await Promise.all(['jockey-crouch-a', 'jockey-crouch-b', 'jockey-celebrate-a', 'jockey-celebrate-b']
+          .map((name) => loadImg(`/art/${name}.png?v=${ASSET_VERSION}`).catch(() => null)))
+        : [null, null, null, null];
       const separatedReady = USE_SEPARATED_COMPOSITE
         && horseOnlyImages.every((image): image is HTMLImageElement => image !== null)
         && jockeyImages.every((image): image is HTMLImageElement => image !== null);
@@ -1504,9 +1517,14 @@ export default function RacePage(): React.JSX.Element {
        * ★斜め後ろ（v3・高解像度）: 騎手なし 8 コマ ＋ 後方視点の前傾騎手 1 枚。騎手は pose04 の座標で描かれているので、
        *   各コマの鞍布中心の差だけ移動して合成。揃わなければ従来の低解像度 diag-rear-v2。
        */
-      const rearHorseImages = await Promise.all(Array.from({ length: 8 }, (_, i) =>
-        loadImg(`/art/horse-only-diag-rear-v3-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)));
-      const rearJockey = await loadImg(`/art/jockey-crouch-rear.png?v=${ASSET_VERSION}`).catch(() => null);
+      /** ⚠️ ★上と同じ理由で、★`USE_SEPARATED_COMPOSITE` が false の間は読み込みません（★復号後 48MB） */
+      const rearHorseImages = USE_SEPARATED_COMPOSITE
+        ? await Promise.all(Array.from({ length: 8 }, (_, i) =>
+          loadImg(`/art/horse-only-diag-rear-v3-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)))
+        : Array.from({ length: 8 }, () => null);
+      const rearJockey = USE_SEPARATED_COMPOSITE
+        ? await loadImg(`/art/jockey-crouch-rear.png?v=${ASSET_VERSION}`).catch(() => null)
+        : null;
       let composedRear: { frames: FrameImage[]; anchors: { x: number; y: number; width: number }[] } | undefined;
       if (USE_SEPARATED_COMPOSITE && rearJockey !== null && rearHorseImages.every((image): image is HTMLImageElement => image !== null)) {
         const saddles = rearHorseImages.map((image) => saddleReference(image, opaqueBounds(image), SILKS_LAYOUT_HORSE_ONLY));
