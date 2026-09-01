@@ -311,6 +311,113 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
 
   /* ★パネルの `overflow: hidden` は、折り返した中身を切ります */
   [data-theme="arcade"] .a-panel { overflow: visible; }
+
+  /* =====================================================================
+     ★TOP（LP）のヒーロー — ★**中身が下から切り落とされていました**
+     ⚠️ ★節は `height: 560px` ＋ `overflow: hidden`、★中身は `position: absolute`。
+        ★つまり ★**中身は節の高さに 1px も寄与しません。** ★モバイルでは中身のほうが高くなり、
+        ★はみ出した分が ★**そのまま切り落とされます**（★実測: 390px で **96px**・360px で **158px**）。
+        ★消えていたのは「登録は 1 分。クレジットカードは要りません」と CTA の下端です。
+     ⚠️ ★これは `overflow-x: hidden` の罠の ★**縦版**です。★切られた分は `scrollWidth` にも
+        ★「右端を越えた要素」にも出ません。→ ★**道具は「はみ出しなし」と言い続けます。**
+        ★実際、`tools/verify-mobile-layout.mjs` は 3 つの数すべてで異常なしと出していました。
+        ★見つけたのは ★**オーナーの目**です（★2026-09-01）。
+     ★直し方の順序が大事です:
+        ★① 中身を通常の流れに戻す（`position: static`）→ ★節が中身の高さを持てるようになる
+        ★② 節の高さを内容に任せる（`height: auto`）→ ★切るものが無くなる
+        ★③ 文字を画面に合わせる → ★PC の値（★ロゴ 96px・見出し 46px）は 390px に入りません
+     ⚠️ ★`overflow: hidden` は**外しません**。★`.lp-bleed` は 100vw に広がるので、
+        ★背景画像を節の外に出さないために要ります（★外すと横スクロールが生まれます）。
+     ===================================================================== */
+  .lp-bleed[style*="height:560px"], .lp-bleed[style*="height:300px"] {
+    height: auto !important;
+    padding: 24px 16px 28px;
+  }
+  /*
+   * ⚠️⚠️ ★`static` にしてはいけません（★1 度やりました）。
+   *    ★ヒーローの背景（`HeroBackdrop` の画像と覆い）は ★**絶対配置**で、★中身より**先**に在ります。
+   *    ★中身を `static` にすると ★**位置指定のある覆いのほうが上に描かれ**、
+   *    ★中身が ★**覆いの裏に回って丸ごと消えます**（★ロゴも見出しも CTA も）。
+   *    ⚠️ ★このとき ★**測定は「直った」と言います**（★切り落とし 0・はみ出し 0）。
+   *       ★消えたことは ★**絵にしか出ません。** ★数字だけ見ていたら通していました。
+   *  → ★`relative` にします。★これなら ★**通常の流れに入って節の高さを作り**、かつ ★覆いより上に描かれます。
+   *  ⚠️ ★`top: 56px` / `50px` の inline は `relative` では ★**ずらす指示**になるので、打ち消します。
+   */
+  .lp-bleed [style*="top:56px"], .lp-bleed [style*="top:50px"] {
+    position: relative !important;
+    top: 0 !important;
+    z-index: 1;
+  }
+
+  /* ★ロゴ（★上のヒーロー 96px ／ 締めのヒーロー 56px）。★字間も詰めないと 4 文字が入りません */
+  .lp-bleed [style*="font-size:96px"] { font-size: 54px !important; letter-spacing: .08em !important; }
+  .lp-bleed [style*="font-size:56px"] { font-size: 40px !important; letter-spacing: .08em !important; }
+
+  /* ★見出し 46px は 390px で 4 行になり、★左右の縁に文字が貼りつきます */
+  .lp-bleed h1 { font-size: 22px !important; margin-top: 18px !important; }
+
+  /*
+   * ★CTA の 2 つのボタンは、★折り返すと ★**左寄せ**になります
+   *   （★親の `align-items: center` は縦の話で、★折り返した行の横は `justify-content` が決めます）。
+   *   ★ロゴ・見出し・注記は中央なので、★ここだけ左に付いて列が崩れて見えます。
+   */
+  .lp-bleed [style*="top:56px"] > [style*="display:flex"],
+  .lp-bleed [style*="top:50px"] > [style*="display:flex"] { justify-content: center; }
+
+  /* ★締めヒーローの 1 行（★26px は 2 行に割れます） */
+  .lp-bleed [style*="font-size:26px"] { font-size: 17px !important; text-align: center; }
+
+  /*
+   * ★「はじめの 5 ステップ」の 2 行目だけが 3 段に割れていました。
+   *   ⚠️ ★原因は ★**説明文の長さ**です（★「迎え方は準備中です（正典の配合／入手規定に合わせます）」）。
+   *      ★中央の列は `flex-basis: auto` なので ★**内容の幅**を主張し、★右のボタンが入らず折り返します。
+   *      ★1・3・4・5 行目は説明が短いので 1 行に収まり、★**2 行目だけ違う形**になっていました。
+   *   → ★中央の列に `flex: 1 1 0` を与え、★**余った幅を取って、足りなければ縮む**形にします。
+   *   ⚠️ ★`min-width: 0` を併せて要ります（★flex 項目の既定の最小幅は「内容の最小幅」で、
+   *      ★これが無いと縮みません）。
+   */
+  #steps [style*="flex-direction:column"] { flex: 1 1 0 !important; min-width: 0 !important; }
+
+  /*
+   * ★全幅の帯は `main` の左右余白（12px）の外に出るので、★自前で余白を持たせます。
+   *   ★持たせないと、★文字が画面の縁に貼りつきます。
+   */
+  .lp-bleed[style*="height:56px"] { padding: 10px 16px; text-align: center; }
+  .lp-bleed[style*="height:120px"] { padding: 14px 16px !important; }
+}
+
+/* ---------------------------------------------------------------------
+   ★`/race` の縦向き案内（★2026-09-01・オーナー決定「A 案」）
+
+   ★映像は横 1280px 用で、★HUD の文字はキャンバスに焼かれています。
+   ★縦持ちでは 26%（★文字 3px 相当）／★横向きなら 64%（★実測）。
+   → ★**演出を 1 つも変えずに**、★縦のときだけ「横にしてください」と出します。
+
+   ⚠️ ★**幅ではなく `orientation` で決めます。**
+      ★幅だけで決めると、★小さい端末を**横**にしたときにも出ます
+      （★実測: iPhone SE の横は 667px で、★`max-width: 720px` に当たります）。
+   ⚠️ ★`max-width: 720px` を**併せて**要ります。★`orientation` だけだと、
+      ★PC で窓を縦長にしただけの人にも出ます。
+   ⚠️ ★JS の状態を持たせません。★回転は CSS が知っているので、
+      ★持たせると**回した時にズレる**状態が 1 つ増えるだけです。
+   --------------------------------------------------------------------- */
+.rotate-hint { display: none; }
+@media (orientation: portrait) and (max-width: 720px) {
+  .rotate-hint {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0 0 10px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 2px solid #8a5a06;
+    background-image: var(--a-gloss-gold);
+    color: #4a3105;
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1.6;
+  }
+  .rotate-hint b { font-size: 16px; }
 }
 
 /* ---------------------------------------------------------------------

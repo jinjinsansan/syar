@@ -55,8 +55,21 @@ function allTsx(dir: string): string[] {
  * ★定数から組み立てているものは、宣言の形が出ません（`` flex: `0 0 ${COL.name}px` ``）。
  *   ★それは下の `INDIRECT` に**定数名を書いて**除外します（★黙って通さない）。
  */
+/**
+ * ★CSS の宣言名 → ★ソース（JSX の inline style）での書かれ方。
+ *   ★`height:560px` は `height: 560` と書かれています（★単位なしの数値）。
+ * ⚠️ ★`\\b` が要ります。★無いと `height:\\s*56` が ★**`height: 560` にも当たり**、
+ *    ★消えた値を「在る」と report してしまいます（★緩い検査は嘘をつく・2026-09-01）。
+ */
+const PX_PROP: Record<string, string> = {
+  'min-width': 'minWidth',
+  height: 'height',
+  top: 'top',
+  'font-size': 'fontSize',
+};
+
 function existsInSource(decl: string, sources: string): boolean {
-  const m = /^(flex|min-width):(.+)$/.exec(decl);
+  const m = /^(flex|min-width|height|top|font-size):(.+)$/.exec(decl);
   if (m === null) return true;
   const prop = m[1] as string;
   const value = (m[2] as string).trim();
@@ -64,17 +77,42 @@ function existsInSource(decl: string, sources: string): boolean {
     /** ★`flex: '0 0 250px'` / `` `0 0 250px` `` の形 */
     return sources.includes(value);
   }
-  /** ★`min-width:420px` → `minWidth: 420` の形 */
+  /** ★`min-width:420px` → `minWidth: 420` ／ ★`height:560px` → `height: 560` の形 */
   const px = /^(\d+)px$/.exec(value)?.[1];
   if (px === undefined) return true;
   /** ⚠️ ★テンプレートリテラルの中では `\\s` と書くこと。★`\s` は「s」になり、一致しません */
-  return new RegExp(`minWidth:\\s*${px}\\b`).test(sources);
+  return new RegExp(`${PX_PROP[prop] as string}:\\s*${px}\\b`).test(sources);
 }
 
 /**
  * ★定数から組み立てていて、宣言の形がソースに出ないもの。
  *   ★**どの定数から来るかを書きます**（★書けないものは除外しません）。
  */
+/**
+ * ★**どのファイルに在るはずか**を書く（★書いたものはそのファイルの中だけで探す）。
+ *
+ * ⚠️ ★これが無いと ★**偶然の一致で緑になります。** ★実例（2026-09-01・変異試験で発覚）:
+ *    ★LP のヒーロー `height: 560` を `561` に変えても検査は通りました。
+ *    ★`apps/web/src/app/camera/page.tsx:25` の ★**`const VP = { width: 1180, height: 560 }`**
+ *    ★（★LP と何の関係もない定数）に当たっていたためです。
+ *    → ★全ソースを 1 本に繋いで探すと、★**別ページの無関係な値が身代わりになります。**
+ *    ★前便も同じ形で焼かれています（★同じ行の `width: 250,` が身代わりになった）。
+ *
+ * ★規則が CSS 側でページに限定されているもの（`.lp-bleed` / `#steps` = TOP だけ）は、
+ *   ★ここに対象ファイルを書きます。
+ */
+const SCOPE: Record<string, string> = {
+  'height:560px': 'app/page.tsx',
+  'height:300px': 'app/page.tsx',
+  'height:56px': 'app/page.tsx',
+  'height:120px': 'app/page.tsx',
+  'top:56px': 'app/page.tsx',
+  'top:50px': 'app/page.tsx',
+  'font-size:96px': 'app/page.tsx',
+  'font-size:56px': 'app/page.tsx',
+  'font-size:26px': 'app/page.tsx',
+};
+
 const INDIRECT: Record<string, string> = {
   'flex:0 0 230px': 'races/[id]/page.tsx などの COL.name = 230',
   'flex:0 0 186px': 'races/page.tsx の COL.grade = 186',
@@ -83,7 +121,14 @@ const INDIRECT: Record<string, string> = {
 
 describe('★モバイル CSS が名指ししている値が、いまもソースに在る', () => {
   const css = readFileSync(CSS, 'utf8');
-  const sources = allTsx(WEB_SRC).map((f) => readFileSync(f, 'utf8')).join('\n');
+  const files = allTsx(WEB_SRC).map((f) => ({ path: f.replace(/\\/g, '/'), text: readFileSync(f, 'utf8') }));
+  const sources = files.map((f) => f.text).join('\n');
+  /** ★`SCOPE` に書いたアンカーは、★そのファイルの中だけで探す（★身代わりを断つ） */
+  const scopedSource = (anchor: string): string => {
+    const want = SCOPE[anchor];
+    if (want === undefined) return sources;
+    return files.filter((f) => f.path.endsWith(want)).map((f) => f.text).join('\n');
+  };
   /** ★`[style*="..."]` の中身を全部拾う */
   const anchors = [...new Set([...css.matchAll(/\[style\*="([^"]+)"\]/g)].map((m) => m[1] as string))];
 
@@ -93,10 +138,10 @@ describe('★モバイル CSS が名指ししている値が、いまもソー�
 
   it('★どの値も `apps/web/src` の中に実在する', () => {
     /** ★`display:flex` のような「値」ではないものは、実在の確認をしません */
-    const measured = anchors.filter((a) => /^(flex|min-width):/.test(a));
+    const measured = anchors.filter((a) => /^(flex|min-width|height|top|font-size):/.test(a));
     const dead = measured
       .filter((a) => INDIRECT[a] === undefined)
-      .filter((a) => !existsInSource(a, sources));
+      .filter((a) => !existsInSource(a, scopedSource(a)));
     expect(
       dead.join('\n'),
       '★globals.css が名指ししている inline の値が、ソースから消えています。\n'

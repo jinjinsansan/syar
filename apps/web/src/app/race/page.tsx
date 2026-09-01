@@ -2861,6 +2861,21 @@ export default function RacePage(): React.JSX.Element {
         </div>
       )}
 
+      {/*
+        ★縦向きの案内（★2026-09-01・オーナー決定「A 案」）
+          ★映像は**横 1280px 用**に作られ、★HUD の文字は**キャンバスに焼かれています**（10〜15px の絶対値）。
+          ★縦持ちでは 1280 → 338px ＝ ★**26%**（★文字は 3px 相当で読めません）。
+          ★横向きなら 1280 → 816px ＝ ★**64%** で、★オーナーが PC で判定してきた 67%（台帳 B-3）とほぼ同じです。
+        ⚠️ ★**演出は 1 つも変えていません。** ★出す／出さないは CSS の `orientation` だけで決めます
+           （★`globals.css` の `.rotate-hint`）。★JS の状態を持たせると、★回した時にズレます。
+        ⚠️ ★これは**縦向きを読めるようにする直しではありません**。★それは HUD の版面の作り直し＝
+           ★**演出の判断**で、★別の便です（★`RACE_PRESENTATION_BASICS.md`）。
+      */}
+      <div className="rotate-hint">
+        <b>端末を横向きにしてください</b>
+        <span>映像は横長で作られています。横向きにすると 約 2.4 倍 の大きさで見られます</span>
+      </div>
+
       <canvas
         ref={canvasRef} width={W} height={H}
         style={{ width: '100%', maxWidth: W, border: '1px solid #4a453d', imageRendering: 'auto', background: '#111' }}
