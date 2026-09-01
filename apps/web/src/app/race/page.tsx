@@ -361,16 +361,30 @@ function bakeCoat(image: FrameImage, coat: CoatName): FrameImage {
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (ctx === null) return image;
   ctx.drawImage(image, 0, 0);
-  const data = ctx.getImageData(0, 0, w, h);
-  const d = data.data;
-  for (let i = 0; i < d.length; i += 4) {
-    if (d[i + 3]! < 8) continue;
-    const r = d[i]!, g = d[i + 1]!, b = d[i + 2]!;
-    if (!isHorseCoat(r, g, b)) continue;
-    const [R, G, B] = applyCoat(r, g, b, t);
-    d[i] = R; d[i + 1] = G; d[i + 2] = B;
+  /**
+   * ⚠️ ★**一度に画像全体の `ImageData` を取らないこと**（2026-09-01）。
+   *   ★`getImageData(0, 0, w, h)` は ★**キャンバスと同じ大きさの配列をもう 1 本**確保します
+   *     （★1536x1024 なら 6MB が 2 本＝ 12MB）。★`putImageData` まで両方生きています。
+   *   ★この関数は起動時に ★**4 毛色 x 8 コマ x 約 7 セット**呼ばれるので、
+   *     ★その山がそのまま瞬間最大の消費になります。
+   *   → ★**横帯に切って処理**します。★一度に生きる配列は 1 帯ぶんだけになります。
+   * ⚠️ ★**出る絵は 1px も変わりません。** ★画素ごとの変換で、帯の境目に依存しません
+   *    （★近傍を参照する処理なら、この切り方はできません）。
+   */
+  const STRIP_ROWS = 64;
+  for (let y = 0; y < h; y += STRIP_ROWS) {
+    const rows = Math.min(STRIP_ROWS, h - y);
+    const data = ctx.getImageData(0, y, w, rows);
+    const d = data.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3]! < 8) continue;
+      const r = d[i]!, g = d[i + 1]!, b = d[i + 2]!;
+      if (!isHorseCoat(r, g, b)) continue;
+      const [R, G, B] = applyCoat(r, g, b, t);
+      d[i] = R; d[i + 1] = G; d[i + 2] = B;
+    }
+    ctx.putImageData(data, 0, y);
   }
-  ctx.putImageData(data, 0, 0);
   return canvas;
 }
 
