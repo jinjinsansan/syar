@@ -101,10 +101,23 @@ const MEASURE = (REQW) => `(() => {
   document.body.style.setProperty('overflow-x', 'visible', 'important');
   void de0.offsetWidth;
   const de = document.documentElement;
+  /**
+   * ★横スクロールできる箱の中身は「★届かない」ではありません。
+   *   ★表を箱の中で横スクロールさせる直し方をしたので、★その中身を数えると**誤報**になります。
+   *   → ★祖先に overflow-x: auto/scroll があるものは除きます。
+   */
+  const inScroller = (el) => {
+    for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+      const ox = getComputedStyle(n).overflowX;
+      if (ox === 'auto' || ox === 'scroll') return true;
+    }
+    return false;
+  };
   const over = [];
   for (const el of document.querySelectorAll('body *')) {
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
+    if (inScroller(el)) continue;
     const o = Math.round(r.right - vw);
     if (o > 1) {
       const cls = typeof el.className === 'string' ? el.className : '';
@@ -212,7 +225,7 @@ const MEASURE = (REQW) => `(() => {
   for (const el of document.querySelectorAll('body *')) {
     const st = getComputedStyle(el);
     if (st.overflowY !== 'visible' || st.position === 'absolute' || st.position === 'fixed') continue;
-    if (el.scrollHeight <= el.clientHeight + 8) continue;   /* ★4px 程度は行間の丸め。★重なりとして見えるのは 8px 以上 */
+    if (el.scrollHeight <= el.clientHeight + 16) continue;   /* ★実測: 9〜15px は行間の余りで、絵では欠けていません。★重なりとして見えたのは 30px 以上 */
     if (el.clientHeight === 0) continue;
     const cls = typeof el.className === 'string' ? el.className : '';
     tall.push({ t: el.tagName.toLowerCase(), c: cls.slice(0, 22), h: el.clientHeight, sh: el.scrollHeight, disp: st.display });
@@ -252,9 +265,16 @@ try {
         width: w, height: 844, deviceScaleFactor: 2, mobile: true,
         screenWidth: w, screenHeight: 844, positionX: 0, positionY: 0, dontSetVisibleSize: false,
       });
-      const ok = await browser.goto(`${BASE}${path}`, READY, { timeoutMs: 60000, settleMs: 1200 });
+      /**
+       * ⚠️ ★`mobile: true` だけでは ★`@media (pointer: coarse)` が当たりません。
+       *   ★指で押せる大きさの検査が**素通り**します（★実測: 直したのに 15/15 のまま出た）。
+       *   → ★タッチを明示的に有効にします。
+       */
+      await browser.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+      await browser.send('Emulation.setEmitTouchEventsForMouse', { enabled: true, configuration: 'mobile' });
+      const ok = await browser.goto(`${BASE}${path}`, READY, { timeoutMs: 60000, settleMs: 2500 });
       if (!ok) { rows.push({ path, label, w, failed: '★開けませんでした' }); continue; }
-      await new Promise((r) => { setTimeout(r, 700); });
+      await new Promise((r) => { setTimeout(r, 1500); });
       let m;
       try { m = JSON.parse(String(await browser.evaluate(MEASURE(w)))); } catch (e) { m = { error: String(e).slice(0, 60) }; }
       /**

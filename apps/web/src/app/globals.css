@@ -200,6 +200,17 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   main [style*="min-width:200px"], main [style*="min-width:240px"], main [style*="min-width:280px"],
   main [style*="min-width:360px"], main [style*="min-width:420px"] { min-width: 0 !important; }
 
+  /*
+   * ★`/race` のシーク列（★撮影用）。
+   *   ⚠️ ★ここだけ ★**合算**で版面を押し広げていました。★1 つずつ消しても直りません:
+   *      ★列ごと消す → 390px ／ ★range を 1 行に → 431px ／ ★range を消す → 417px
+   *      ★`.a-num` の下限を外す → 610px ／ ★**range を 1 行に ＋ `.a-num` の下限を外す → 390px**
+   *   ★つまみ（`input[type=range]`）は ★**1 行を占める**のがモバイルでは正しい形でもあります。
+   */
+  /* ⚠️ ★`!important` が要ります。★inline の `flex: 1` が flex-basis を 0% に固定するためです */
+  main input[type="range"] { min-width: 0 !important; flex-basis: 100% !important; }
+  main .a-num { min-width: 0 !important; }
+
   /* ★ヘッダーのナビ（★全ページ共通）。★横一列のままだと 398px で画面に入りません */
   header nav { flex-wrap: wrap; row-gap: 4px; }
   header.a-band { height: auto !important; min-height: 56px; padding: 6px 12px !important; }
@@ -238,15 +249,41 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
    *   ★`min-height` / `min-width` は inline の `height` / `width` より**強い**ので、
    *     ★`!important` を使わずに広げられます（★指定を消さずに下限だけ与える形）。
    */
-  main button, main select, main [role="button"],
-  main input[type="button"], input[type="submit"], input[type="checkbox"], input[type="radio"] {
-    min-height: 44px;
-    min-width: 44px;
-  }
-  /* ★文字を打つ欄は高さだけ（★幅の下限は要りません） */
-  main input[type="text"], main input[type="number"], main textarea { min-height: 44px; }
-  /* ★ヘッダーのナビも指で押せる大きさに */
-  header nav a, header a[class*="a-btn"] { min-height: 44px; display: inline-flex; align-items: center; }
+  /*
+   * ⚠️ ★指で押せる大きさは ★**この @media（幅 720px 以下）では決めません。**
+   *    ★横向きにした瞬間に幅が 844px になり、★**指なのに小さいまま**に戻ります（★実測: 15/15）。
+   *    → ★下の `@media (pointer: coarse)` へ出しました。★**幅ではなく「指かどうか」**で決めます。
+   */
+
+  /* ★レースのキャンバスだけは画面いっぱいに（★`main` の余白 12px を打ち消す） */
+  /*
+   * ⚠️ ★キャンバスを画面いっぱいに広げる案は ★**入れていません。**
+   *    ★試したところ表示幅が変わらず（★338px のまま）、★効いていない規則を残さないためです。
+   *    ★そもそも 26% → 30% では読めるようになりません。
+   *    → ★**縦向きでは HUD の版面がモバイル用に要ります**（★演出の判断・別の便）。
+   *    → ★**横向きなら 64%**（★実測）で、★オーナーが判定してきた 67% とほぼ同じです。
+   */
+
+  /*
+   * ★投票のマークシートを 1 行に収める。
+   *   ⚠️ ★三連単は列が 3 本あり、★`56（馬番）+ 130（馬名）+ 70 x 3（マーク）= 396px`。
+   *      ★画面 390px −余白 24px = ★**366px** に ★**30px 足りず**、★3 列目（3着）だけが
+   *      ★次の行へ回って**見出しと揃わなくなって**いました。
+   *   ★馬番 56 → 44 と馬名の下限 130 → 84 で ★**338px**。★収まります。
+   *   ⚠️ ★この 2 つの値は ★**投票画面だけ**で使われています（★`grep` で確認済み）。
+   *      ★他の画面の列幅には当たりません。
+   */
+  /*
+   * ★キャンバス・画像などの「置換要素」は、★`width` 属性の**固有幅**が
+   *   ★そのまま min-content になります。★実測: `/race` のキャンバスは
+   *   ★`width: 100%` が効いていても ★**min-content 1282px**。
+   *   ★これが版面の下限を押し上げ、★**ブラウザがページ全体をズームアウト**します。
+   *   → ★`min-width: 0` で下限を外します（★表示幅は `width: 100%` のまま）。
+   */
+  main canvas, main img, main video, main iframe { min-width: 0; max-width: 100%; }
+
+  main [style*="flex:0 0 56px"] { flex: 0 0 44px !important; width: 44px !important; }
+  main [style*="min-width:130px"] { min-width: 84px !important; }
 
   /* ★一覧の行: 折り返す。★高さは inline の `height: 58` を解いて内容に合わせる */
   [data-theme="arcade"] .a-row {
@@ -295,4 +332,41 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
 @media (max-width: 430px) {
   .a-cards, .a-cards.c3 { grid-template-columns: 1fr; }
   .a-cards.c8 { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ---------------------------------------------------------------------
+   ★指で押せる大きさ（★Apple の指針 44px。★Material は 48dp）
+   ⚠️ ★**幅ではなく「指で操作する機器か」で決めます。**
+      ★幅 720px 以下で書いていたら、★横向き（844px）にした瞬間に
+      ★**指なのに 32px のまま**に戻りました（★実測 15/15）。
+   ⚠️ ★実測（着手前）: ★23 ページ中、★44px 以上の操作要素しか無いページは 1 つもありませんでした。
+      ★いちばん悪いのは投票画面の ★54 / 56（★内訳は 32x32px のマークが 36 個）。
+   ★`min-height` / `min-width` は inline の `height` / `width` より**強い**ので、
+     ★`!important` を使わずに下限だけ与えられます。
+   --------------------------------------------------------------------- */
+@media (pointer: coarse), (max-width: 720px) {
+  /*
+   * ⚠️ ★条件を 2 つ並べています。
+   *   ★`pointer: coarse` … ★**指で操作する機器**（★横向きの携帯も含む）
+   *   ★`max-width: 720px` … ★狭い画面（★`pointer` を持たない環境・★計測の担保）
+   *   ★どちらか一方だけだと漏れます: ★幅だけ → 横向きで戻る／★coarse だけ → 検証できない
+   */
+  main button, main select, main [role="button"],
+  main input[type="button"], main input[type="submit"],
+  main input[type="checkbox"], main input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* ★文字を打つ欄は高さだけ（★幅の下限は要りません） */
+  main input[type="text"], main input[type="number"], main textarea { min-height: 44px; }
+  /*
+   * ★見た目がボタンのリンク（`<a class="a-btn">` など）も同じ大きさに。
+   *   ⚠️ ★`<a>` を一律に 44px にはしません。★本文中の文字リンクまで太らせてしまいます。
+   *   ★実測: 残っていたのは 334x38px の `a.a-btn`（★あと 6px）でした。
+   */
+  main a[class*="a-btn"], main a[class*="a-chip"], main a[class*="a-badge"] {
+    min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
+  }
+  /* ★ヘッダーのリンクも指で押せる大きさに（★ナビ以外の「STAR」「中継」も含む） */
+  header a { min-height: 44px; display: inline-flex; align-items: center; }
 }
