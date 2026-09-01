@@ -1126,6 +1126,26 @@ export default function RacePage(): React.JSX.Element {
   const [ownGate, setOwnGate] = useState(3);
   const [playing, setPlaying] = useState(false);
   const [ready, setReady] = useState(false);
+  /**
+   * ★**この端末では重い初期化を始めない**（★2026-09-01・オーナー決定「仮の蓋」）
+   *
+   * 【★なぜ要るか】★実機（iOS Safari）で ★**「このページを開けません」**（★オーナー報告 2 回）。
+   *   ★測った事実（★本番ビルド・実ブラウザ・2 回とも同じ）:
+   *     ★起動時に ★**キャンバス 992 枚・628.6 メガピクセル（2,398MB）**を確保する
+   *     ★＋ 画像 151 枚・★復号後 403MB
+   *   ★スマホの 1 タブが抱えられる量ではありません。★**走り出す前、画面を出す前に落ちます。**
+   *
+   * ⚠️ ★**向きは関係ありません。** ★横にしても同じだけ確保します。
+   *    → ★先に入れた「横向きにしてください」の案内は、★**この端末では嘘になる**ので出しません。
+   *
+   * ⚠️ ★**これは直しではなく蓋です。** ★本筋は「毛色をブラウザで焼くのをやめ、
+   *    ★事前に焼いた素材を配る」こと（★`tools/bake-sprites.mjs` と同じ方式。
+   *    ★勝負服とゼッケンは既にその方式へ移してあります）。★済んだらこの蓋は外します。
+   *
+   * ★判定は ★**画面の短辺**で行います（★`pointer: coarse` だけだと、
+   *   ★タッチ対応の PC まで止めてしまいます）。★900px 以下＝ 携帯・タブレット。
+   */
+  const [tooHeavy, setTooHeavy] = useState(false);
   const [built, setBuilt] = useState<Built | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [clock, setClock] = useState(0);
@@ -1156,6 +1176,23 @@ export default function RacePage(): React.JSX.Element {
   useEffect(() => {
     let cancelled = false;
     const boot = async (): Promise<void> => {
+      /**
+       * ⚠️ ★**素材を 1 枚も読む前に降ります。**（★上の `tooHeavy` の注記）
+       *    ★読んでから判定しても、★落ちるのは読んでいる最中なので間に合いません。
+       * ★`screen` ではなく `window.inner*` を見ます（★PC のデバイスツールバーでも同じに振る舞い、
+       *   ★オーナーが F12 で確かめられるようにするため）。
+       */
+      /**
+       * ⚠️ ★`pointer: coarse` **だけでは足りません。** ★タッチ対応の Windows ノート（★1366x768）が
+       *    ★coarse かつ短辺 900px 以下に当たり、★**PC なのに止めてしまいます**。
+       *    → ★`hover: none` を足します。★マウスがある機械は `hover: hover` なので外れます。
+       *    ★携帯・タブレットだけが「触れるがマウスは無い」に該当します。
+       * ★短辺の条件も残します（★どちらか一方では、いつか別の機械で外します）。
+       */
+      const touchOnly = typeof window !== 'undefined'
+        && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+      const shortSide = typeof window === 'undefined' ? 9999 : Math.min(window.innerWidth, window.innerHeight);
+      if (touchOnly && shortSide <= 900) { setTooHeavy(true); return; }
       const pal = await fetch(`/art/palette.json?v=${ASSET_VERSION}`).then((r) => r.json());
       /**
        * ★第3便のシート（8コマ × 枠色8行）を**カットごとに2枚**。
@@ -2903,10 +2940,29 @@ export default function RacePage(): React.JSX.Element {
         ⚠️ ★これは**縦向きを読めるようにする直しではありません**。★それは HUD の版面の作り直し＝
            ★**演出の判断**で、★別の便です（★`RACE_PRESENTATION_BASICS.md`）。
       */}
-      <div className="rotate-hint">
-        <b>端末を横向きにしてください</b>
-        <span>映像は横長で作られています。横向きにすると 約 2.4 倍 の大きさで見られます</span>
-      </div>
+      {tooHeavy
+        ? (
+          /**
+           * ⚠️ ★**蓋であって直しではありません。**（★`tooHeavy` の注記）
+           *    ★「準備中」と書きます。★「非対応」と書くと、★直ったあとも
+           *    ★見る人の記憶に「スマホでは見られない」が残ります。
+           */
+          <div className="race-too-heavy">
+            <b>この画面は、いまはパソコン向けです</b>
+            <span>
+              レース映像は横 1280px の画面に合わせて作られていて、
+              スマートフォンでは読み込みきれません。パソコンからご覧ください。
+            </span>
+            <span>スマートフォン向けは準備中です。番組表・投票・厩舎はこのままご利用いただけます。</span>
+            <a className="a-btn a-btn-gold" href="/races" style={{ height: 44, marginTop: 4, fontSize: 15 }}>番組表へ</a>
+          </div>
+        )
+        : (
+          <div className="rotate-hint">
+            <b>端末を横向きにしてください</b>
+            <span>映像は横長で作られています。横向きにすると 約 2.4 倍 の大きさで見られます</span>
+          </div>
+        )}
 
       <canvas
         ref={canvasRef} width={W} height={H}

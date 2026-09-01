@@ -401,6 +401,29 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
    ⚠️ ★JS の状態を持たせません。★回転は CSS が知っているので、
       ★持たせると**回した時にズレる**状態が 1 つ増えるだけです。
    --------------------------------------------------------------------- */
+/*
+ * ★「この画面はいまはパソコン向けです」の板（★2026-09-01・仮の蓋）
+ *   ★出す/出さないは ★**JS が端末を見て決めます**（★向きでも幅でもなく、
+ *     ★重い初期化を始めてよい端末かどうか）。★CSS は見た目だけ持ちます。
+ *   ⚠️ ★`.rotate-hint` と**同時には出しません**（★出す側を JS が選びます）。
+ */
+.race-too-heavy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 2px solid #8a5a06;
+  background-image: var(--a-gloss-gold);
+  color: #4a3105;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.7;
+}
+.race-too-heavy b { font-size: 17px; }
+
 .rotate-hint { display: none; }
 @media (orientation: portrait) and (max-width: 720px) {
   .rotate-hint {
