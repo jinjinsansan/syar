@@ -241,6 +241,16 @@ const WINNER_CELEBRATE_DELAY_SEC = 0.8;
  *   ⚠️ 素材（腕を上げない鐙立ち等）が来たら `'celebrate'` に戻せます。機構は残してあります。
  */
 const WINNER_POSE: 'run' | 'celebrate' = 'run';
+/**
+ * ★**勝馬追従を後方寄りで撮るか**（`winner-follow-rear`）。
+ *
+ * ⚠️ ★この値は ★**2 か所の `resolveBroadcastV2Scene` に直書きされていました**（`winnerRear: false`）。
+ *    ★同じ意味の値を 2 か所で持つと離れます（台帳 B-6 と同じ形）。★1 か所に置きます。
+ * ⚠️ ★`false` の間、★**`winner-follow-rear` は 1 度も選ばれません。**
+ *    ★実測でも 10 場 50 鞍 × 4 シードで 0 コマでした（`tools/audit-draw-scale.mjs`）。
+ *    → ★その素材（`horse-jockey-winner-rear-v1`）は ★**読みません**（下の読み込み）。
+ */
+const WINNER_FOLLOW_REAR = false;
 /** ★その後の着順ボード（参考映像 124〜134s）: 6 秒 */
 const RESULTS_BOARD_SEC = 6;
 const POST_RACE_SEC = WINNER_FOLLOW_SEC + RESULTS_BOARD_SEC;
@@ -565,11 +575,18 @@ function silksOverlays(
   const y0 = Math.round(source.y);
   const width = Math.round(source.width * layout.cropW);
   const height = Math.round(source.height * layout.cropH);
-  const scratch = document.createElement('canvas'); scratch.width = imgW(image); scratch.height = imgH(image);
+  /**
+   * ⚠️ ★**必要な窓だけを写します**（2026-09-02）。
+   *    ★以前は素材と同じ大きさの下地を作って全部写していました。
+   *    ★焼いたアトラス（★1 枚に 8 コマ）では、★その下地が **1 枚 17MB** になります。
+   *    ★読む範囲は元から `getImageData(x0, y0, width, height)` の窓だけなので、
+   *    ★**出る画素は 1 つも変わりません。**
+   */
+  const scratch = document.createElement('canvas'); scratch.width = width; scratch.height = height;
   const scratchCtx = scratch.getContext('2d', { willReadFrequently: true });
   if (scratchCtx === null) return [];
-  scratchCtx.drawImage(image, 0, 0);
-  const input = scratchCtx.getImageData(x0, y0, width, height).data;
+  scratchCtx.drawImage(image, x0, y0, width, height, 0, 0, width, height);
+  const input = scratchCtx.getImageData(0, 0, width, height).data;
   const rgbOf = (hex: string): readonly [number, number, number] => [
     Number.parseInt(hex.slice(1, 3), 16),
     Number.parseInt(hex.slice(3, 5), 16),
@@ -845,12 +862,20 @@ function bodyCentroid(image: FrameImage, bounds: HighQualityHorseFrame['source']
  * ★接地影用のシルエットを焼く: 元コマの不透明部分を黒（α はそのまま）にし、少しぼかす。
  *   描画側（perspective-draw）はこれを地面へ潰して落とすだけ。毎フレームの色変換をしない。
  */
-function bakeShadowSilhouette(image: FrameImage, bounds: HighQualityHorseFrame['source']): HighQualityHorseFrame['shadow'] {
+function bakeShadowSilhouette(
+  image: FrameImage, bounds: HighQualityHorseFrame['source'],
+  /**
+   * ★ぼかしの半径。★原版では 3px です。
+   * ⚠️ ★**焼いた絵では同じ比率まで縮めます。** ★焼いた絵は既に縮んでいるので、
+   *    ★3px のままだと原版に掛けてから縮めた場合よりぼやけます。
+   */
+  blurPx = 3,
+): HighQualityHorseFrame['shadow'] {
   const cv = document.createElement('canvas');
   cv.width = bounds.width; cv.height = bounds.height;
   const ctx = cv.getContext('2d');
   if (ctx === null) return undefined;
-  ctx.filter = 'blur(3px)';
+  ctx.filter = `blur(${blurPx}px)`;
   ctx.drawImage(image, bounds.x, bounds.y, bounds.width, bounds.height, 0, 0, bounds.width, bounds.height);
   ctx.filter = 'none';
   ctx.globalCompositeOperation = 'source-in';
@@ -884,6 +909,45 @@ function opaqueBounds(image: FrameImage): HighQualityHorseFrame['source'] {
     width: Math.min(scratch.width, right + pad + 1) - x,
     height: Math.min(scratch.height, bottom + pad + 1) - y,
   };
+}
+
+/* ──────────────────────────────────────────────────────────────
+   ★**焼いた馬コマ**（`tools/bake-race-frames.mjs` が書き出す目録）
+
+   ★なぜ焼くか: ★`/race` は開くたびに利用者の端末で毛色を焼き直しており、
+   ★起動時に **992 枚 / 2,398MB** のキャンバスを確保していました（★スマホで開けません）。
+   ★焼いた素材では ★**毛色のキャンバスが 0 枚**になり、★画像として配られます。
+
+   ⚠️ ★**目録の数字は「焼いた px」です。** ★原版の px ではありません。
+   ────────────────────────────────────────────────────────────── */
+interface BakedTile {
+  /** ★アトラスの中のこのコマの矩形（★焼いた px） */
+  readonly x: number; readonly y: number; readonly w: number; readonly h: number;
+  /** ★胴体の基準点（★タイルの左上から・焼いた px）。★原版で探して縮めたものです */
+  readonly anchor: { readonly x: number; readonly y: number; readonly width: number };
+  /** ★鞍布が見つかったか。★見つからないコマは幅を縮尺補正に使いません */
+  readonly anchorKind: 'saddle' | 'centroid';
+  /** ★原版での不透明範囲（★勝馬の基準高さを原版の比で出すために要ります） */
+  readonly nativeBounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+}
+interface BakedSet {
+  readonly role: string;
+  readonly prefix: string;
+  readonly layout: 'crouch' | 'front' | 'rear' | 'winner';
+  /** ★焼いた px ÷ 原版 px */
+  readonly scale: number;
+  readonly nativeReferenceHeight: number;
+  readonly referenceHeight: number;
+  /** ★原版の画布の高さ（★浮きの量を 1536 基準から直すのに使います） */
+  readonly nativeCanvasHeight: number;
+  readonly atlas: { readonly width: number; readonly height: number };
+  readonly frames: readonly BakedTile[];
+  readonly coats: Readonly<Record<string, string>>;
+}
+interface BakedManifest {
+  readonly targetHorsePx: number;
+  readonly coats: readonly string[];
+  readonly sets: readonly BakedSet[];
 }
 
 function build(seed: number, ownGate: number, surface: Surface, trackCondition: TrackCondition, contestGamma: number): Built {
@@ -1065,7 +1129,15 @@ export default function RacePage(): React.JSX.Element {
     diagFrontHighQuality: readonly (readonly HighQualityHorseFrame[])[];
     diagRearHighQuality: readonly (readonly HighQualityHorseFrame[])[];
     highDiagHighQuality: readonly (readonly HighQualityHorseFrame[])[];
-    winnerHighQuality: readonly (readonly HighQualityHorseFrame[])[];
+    /**
+     * ⚠️ ★**winnerHighQuality は撤去しました**（2026-09-02）。
+     *    horse-jockey-winner-v1.png（1536x1024・復号後 6MB）を読み、
+     *    buildFrames で **12 枠ぶんの勝負服 + 影 + 毛色 4 色**まで焼いていましたが、
+     *    **どこからも読まれていませんでした**（リポジトリ全文検索で参照 0 件）。
+     *    勝馬の絵は winnerCycleHighQuality / winnerRearHighQuality / sideHighQuality から選ばれます
+     *    （libraries['winner-v1'] の組み立てを参照）。
+     * ⚠️ ★**絵は 1px も変わりません。**
+     */
     /** ★勝馬の 8 コマ（未承認のうちは undefined → 走行 8 コマで代用） */
     winnerCycleHighQuality?: readonly (readonly HighQualityHorseFrame[])[];
     /** ★勝馬の後方寄り 8 コマ（あれば勝馬追従を後方〜横の寄りにする） */
@@ -1189,10 +1261,22 @@ export default function RacePage(): React.JSX.Element {
        *    ★携帯・タブレットだけが「触れるがマウスは無い」に該当します。
        * ★短辺の条件も残します（★どちらか一方では、いつか別の機械で外します）。
        */
+      /**
+       * ★**焼いた素材で描くか**（`?baked=1`）。
+       *
+       * ⚠️ ★**既定は従来どおり**です（R-15「新しい機構は入っているが使われない状態で一度置く」）。
+       *    ★`/race?baked=1` と `/race` を ★**同じ画面で見比べられる**ようにしてあります。
+       *    ★既定を移すのは、★オーナーが見比べて決めたあとです。
+       * ⚠️ ★`?baked=1` は ★**蓋も外します。** ★蓋は「重い初期化を始めない」ための仮のもので、
+       *    ★焼いた素材で重くないことを ★**実機で確かめられなければ外せません**。
+       */
+      const bakedParam = new URLSearchParams(window.location.search).get('baked');
+      const wantBaked = bakedParam === '1';
       const touchOnly = typeof window !== 'undefined'
         && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
       const shortSide = typeof window === 'undefined' ? 9999 : Math.min(window.innerWidth, window.innerHeight);
-      if (touchOnly && shortSide <= 900) { setTooHeavy(true); return; }
+      const smallTouch = touchOnly && shortSide <= 900;
+      if (smallTouch && !wantBaked) { setTooHeavy(true); return; }
       const pal = await fetch(`/art/palette.json?v=${ASSET_VERSION}`).then((r) => r.json());
       /**
        * ★第3便のシート（8コマ × 枠色8行）を**カットごとに2枚**。
@@ -1387,6 +1471,20 @@ export default function RacePage(): React.JSX.Element {
       const parallaxBackstretch = plateOf(false);
       /** ★ダート版の板。★差し替える層が 1 つも無ければ芝と同じものになります */
       const parallaxBackstretchDirt = plateOf(true);
+      /**
+       * ⚠️ ★**代替素材（v6 / v2）は、ここでは読みません**（2026-09-02）。
+       *
+       *   この配列には **side-v6 8 コマ・diag-front-v2 8 コマ・diag-rear-v2 8 コマ・
+       *     high-diag-v2 8 コマ・winner-v1 1 枚**が並んでいました。
+       *   これらは **新しい版（v7 / v3 / v5 / v4）が揃わなかったときの代わり**です。
+       *   ところが新しい版は **5 組とも apps/web/public/art に揃っています。**
+       *     → 毎回 **読み込んでから捨てて**いました。実測 **復号後 120MB / 転送 26.8MB**。
+       *
+       *   ad47b45（描き得ない素材 96MB を読むのをやめた便）と **同じ形**です。
+       * ⚠️ ★**絵は 1px も変わりません。** 新しい版が揃っている限り、これらは一度も描かれません。
+       * **代わりが要らなくなったのではありません** — fallbackSet() で
+       *   **新しい版が欠けたときだけ**読みます（下の ?? の右側）。
+       */
       const loaded = await Promise.all([
         loadImg(`/art/race-title-spring-v1.png?v=${ASSET_VERSION}`),
         loadImg(`/art/race-narrator-v1.png?v=${ASSET_VERSION}`),
@@ -1396,19 +1494,18 @@ export default function RacePage(): React.JSX.Element {
         loadImg(`/art/race-finish-side-v2.png?v=${ASSET_VERSION}`),
         loadImg(`/art/race-corner-rear-v2.png?v=${ASSET_VERSION}`),
         loadImg(`/art/race-corner-high-v2.png?v=${ASSET_VERSION}`),
-        ...Array.from({ length: 8 }, (_, i) =>
-          loadImg(`/art/horse-jockey-side-v6-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`)),
-        ...Array.from({ length: 8 }, (_, i) =>
-          loadImg(`/art/horse-jockey-diag-front-v2-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`)),
-        ...Array.from({ length: 8 }, (_, i) =>
-          loadImg(`/art/horse-jockey-diag-rear-v2-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`)),
-        ...Array.from({ length: 8 }, (_, i) =>
-          loadImg(`/art/horse-jockey-high-diag-v2-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`)),
-        loadImg(`/art/horse-jockey-winner-v1.png?v=${ASSET_VERSION}`),
       ]);
       if (cancelled) return;
       const [raceTitle, raceNarrator, startingGate, raceBackstretch, raceCornerExit, raceFinish,
         raceCornerRear, raceCornerHigh] = loaded;
+      /**
+       * **代替素材を、要るときだけ読む。**
+       *   ?? は左が undefined のときしか右を評価しないので、
+       *   新しい版が揃っていれば **1 枚も読みません**。
+       */
+      const fallbackSet = async (prefix: string): Promise<HTMLImageElement[]> => Promise.all(
+        Array.from({ length: 8 }, (_, i) =>
+          loadImg(`/art/${prefix}-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`)));
       /**
        * ★実況の立ち絵（口パク用）。仕様 `design/hud-ds/components/narrator-cast`:
        *   表情 3（通常／熱／絶叫）× 口 2（閉／開）= 6 枚。
@@ -1494,6 +1591,143 @@ export default function RacePage(): React.JSX.Element {
         });
       };
       /**
+       * ★**焼いた素材（アトラス）から同じ形を組む。**
+       *
+       *   ★`buildFrames` との違いは ★**毛色を焼かないこと**だけです。
+       *   ★毛色は既に PNG（可逆 WebP）になっているので、★枠ごとにアトラスを差し替えるだけで済みます。
+       *   ★勝負服と接地影は ★**焼いた絵から**その場で作ります（★焼いた絵は既に縮んでいるので軽い）。
+       *
+       * ⚠️ ★**基準点は目録から取ります。探し直しません。**
+       *    ★`saddleReference` の採否は ★**画素の絶対数（400 以上）**です。
+       *    ★560px では 48 コマとも見つかります（★実測・最小 793 画素）が、
+       *    ★**目標 px を下げると静かに不採用へ落ち**（★実測で約 371px 未満）、
+       *    ★基準点が重心へ変わって ★**馬の置き場所が動きます**（R-27）。
+       *    → ★解像度の決定と基準点の当たり外れを、切り離しておきます。
+       */
+      const buildFramesFromBaked = (
+        set: BakedSet,
+        atlasByCoat: ReadonlyMap<string, HTMLImageElement>,
+        silksLayout: SilksLayout = SILKS_LAYOUT_CROUCH,
+        referenceHeightOverride?: number,
+      ): readonly (readonly HighQualityHorseFrame[])[] => {
+        const bay = atlasByCoat.get('bay');
+        if (bay === undefined) return [];
+        const sources = set.frames.map((t) => ({ x: t.x, y: t.y, width: t.w, height: t.h }));
+        const overlays = sources.map((src) => silksOverlays(bay, src, silksByGate, silksLayout));
+        /** ★ぼかしは原版で 3px。★焼いた絵は縮んでいるので同じ比率まで縮めます */
+        const shadows = sources.map((src) => bakeShadowSilhouette(bay, src, 3 * set.scale));
+        const refH = referenceHeightOverride ?? set.referenceHeight;
+        const widths = set.frames.flatMap((t) => (t.anchorKind === 'saddle' ? [t.anchor.width] : []));
+        const medianWidth = widths.length === 0 ? 0 : [...widths].sort((a, b) => a - b)[Math.floor(widths.length / 2)]!;
+        const scaleFix = (index: number): number => {
+          const t = set.frames[index];
+          if (t === undefined || t.anchorKind !== 'saddle' || medianWidth <= 0) return 1;
+          return Math.max(0.92, Math.min(1.08, t.anchor.width / medianWidth));
+        };
+        /**
+         * ★浮きの量（`HORSE_GROUND_LIFTS` / `flightLiftFor`）は ★**1536px の画布**が基準です。
+         *   ★焼いた絵では画布も同じ倍率で縮んでいるので、★その比を掛けます。
+         * ⚠️ ★`imgH(atlas)` を使ってはいけません — ★アトラスの高さは 1 コマの高さであって、
+         *    ★原版の画布の高さではありません。
+         */
+        const liftRatio = (set.nativeCanvasHeight * set.scale) / LIFT_REFERENCE_HEIGHT_PX;
+        return silksByGate.map((_, gateIndex) => {
+          const atlas = atlasByCoat.get(coatOf(gateIndex + 1)) ?? bay;
+          return set.frames.map((t, index) => ({
+            image: atlas,
+            source: sources[index]!,
+            referenceHeight: refH * scaleFix(index),
+            groundLiftSourcePx: (HORSE_GROUND_LIFTS[index] ?? 0) * liftRatio,
+            shadow: shadows[index],
+            bodyAnchorSourcePx: { x: t.x + t.anchor.x, y: t.y + t.anchor.y },
+            bodyLiftSourcePx: (t.h - t.anchor.y)
+              + flightLiftFor(index, set.frames.length) * liftRatio,
+            overlay: overlays[index]?.[gateIndex],
+          }));
+        });
+      };
+      /**
+       * ★**焼いた素材を読む。** ★1 つでも欠けたら ★**丸ごと諦めて従来の経路へ落ちます**
+       *   （★半分だけ焼いた絵で走らせない）。
+       */
+      const loadBakedLibraries = async (): Promise<Partial<Record<string, readonly (readonly HighQualityHorseFrame[])[]>> | undefined> => {
+        const manifest = await fetch(`/art/baked/manifest.json?v=${ASSET_VERSION}`)
+          .then((r) => (r.ok ? r.json() as Promise<BakedManifest> : null))
+          .catch(() => null);
+        if (manifest === null) return undefined;
+        /** ★この出走頭数で実際に要る毛色だけ読みます（★12 頭なら 7 色のうち 5 色） */
+        const needed = [...new Set(silksByGate.map((_, index) => coatOf(index + 1)))];
+        const setByRole = new Map(manifest.sets.map((set) => [set.role, set]));
+        /**
+         * ⚠️ ★**描く組だけ読みます。** ★焼いてあっても、★描画側に経路が無ければ読みません
+         *    （★原版側と同じ規則にします — ★片方だけ読むと、★何が効いているのか分からなくなります）。
+         */
+        const wantedRoles = ['side-v6', 'diag-front-v2', 'diag-rear-v2', 'high-diag-v2',
+          ...(WINNER_FOLLOW_REAR ? ['winner-rear'] : []),
+          ...(WINNER_POSE === 'celebrate' ? ['winner-cycle'] : [])];
+        const atlases = new Map<string, ReadonlyMap<string, HTMLImageElement>>();
+        for (const set of manifest.sets.filter((entry) => wantedRoles.includes(entry.role))) {
+          const pairs = await Promise.all(needed.map(async (coat) => {
+            const file = set.coats[coat];
+            if (file === undefined) return null;
+            const image = await loadImg(`/art/baked/${file}?v=${ASSET_VERSION}`).catch(() => null);
+            return image === null ? null : [coat as string, image] as const;
+          }));
+          const ok = pairs.filter((e): e is readonly [string, HTMLImageElement] => e !== null);
+          if (ok.length !== needed.length) return undefined;
+          atlases.set(set.role, new Map(ok));
+        }
+        const layoutOf = (set: BakedSet): SilksLayout => (
+          set.layout === 'front' ? SILKS_LAYOUT_FRONT
+            : set.layout === 'rear' ? SILKS_LAYOUT_REAR
+              : set.layout === 'winner' ? SILKS_LAYOUT_WINNER
+                : SILKS_LAYOUT_CROUCH);
+        const of = (role: string, referenceHeightOverride?: number) => {
+          const set = setByRole.get(role); const atlas = atlases.get(role);
+          if (set === undefined || atlas === undefined) return undefined;
+          return buildFramesFromBaked(set, atlas, layoutOf(set), referenceHeightOverride);
+        };
+        /**
+         * ★**勝馬コマの基準高さ**（`buildFrames` の呼び出し側にあった補正と同じ意味）。
+         *
+         *   ★勝馬は騎手が腕を挙げるぶん矩形が縦に長く、★高さを基準にすると馬体が 2〜3 割縮みます。
+         *   ★そこで ★**馬体の幅**で真横コマに合わせます。
+         * ⚠️ ★**幅は原版の px で比べます。** ★焼いた px は組ごとに倍率が違うので
+         *    （★真横 0.665 ／ 勝馬 0.547）、★焼いた px の比を使うと ★**別の大きさ**になります。
+         */
+        const winnerOverride = ((): number | undefined => {
+          const side = setByRole.get('side-v6'); const winner = setByRole.get('winner-cycle');
+          if (side === undefined || winner === undefined) return undefined;
+          const median = (values: number[]): number => {
+            const v = [...values].sort((x, y) => x - y); return v[Math.floor(v.length / 2)] ?? 1;
+          };
+          const sideWidthNative = median(side.frames.map((f) => f.nativeBounds.width));
+          const winnerWidthNative = median(winner.frames.map((f) => f.nativeBounds.width));
+          if (sideWidthNative <= 0) return undefined;
+          return winner.scale * winnerWidthNative * (side.nativeReferenceHeight / sideWidthNative);
+        })();
+        const out: Partial<Record<string, readonly (readonly HighQualityHorseFrame[])[]>> = {
+          'side-v6': of('side-v6'),
+          'diag-front-v2': of('diag-front-v2'),
+          'diag-rear-v2': of('diag-rear-v2'),
+          'high-diag-v2': of('high-diag-v2'),
+          ...(WINNER_FOLLOW_REAR ? { 'winner-rear': of('winner-rear') } : {}),
+          ...(WINNER_POSE === 'celebrate' ? { 'winner-cycle': of('winner-cycle', winnerOverride) } : {}),
+        };
+        /** ⚠️ ★1 つでも組めなければ従来の経路へ（R-27・欠けたまま走らせない） */
+        return Object.values(out).every((v) => v !== undefined && v.length > 0) ? out : undefined;
+      };
+      const bakedLibs = wantBaked ? await loadBakedLibraries() : undefined;
+      /**
+       * ⚠️ ★**焼いた素材が読めなかったのに蓋だけ外れている、を作らない**（R-27）。
+       *
+       *   ★`?baked=1` は蓋を外します。★ところが目録が無い・アトラスが 1 枚欠ける等で
+       *     ★`loadBakedLibraries()` が `undefined` を返すと、★**従来の重い経路へ落ちます。**
+       *   ★そのまま進むと ★**蓋が外れた携帯で、蓋が守っていたはずの初期化が始まります。**
+       *   ★「既定・縮退は狭い側へ落とす」の口です。★ここで降ります。
+       */
+      if (smallTouch && bakedLibs === undefined) { setTooHeavy(true); return; }
+      /**
        * ★勝馬の 8 コマ（騎手が立ってガッツポーズ・Codex 生成）。8 枚すべて揃ったときだけ使う。
        *   揃わない間は走行 8 コマで代用（`winnerCycleHighQuality` を undefined のまま）。
        */
@@ -1501,12 +1735,37 @@ export default function RacePage(): React.JSX.Element {
        * ★走行 16 コマ: side-v6 の 8 姿勢の間に Codex 生成の中間姿勢 mid01..08 を挟む（01, mid01, 02, mid02, …）。
        *   8 枚揃わなければ 8 コマのまま。
        */
-      const midImages = await Promise.all(Array.from({ length: 8 }, (_, i) =>
-        loadImg(`/art/horse-jockey-side-v6-mid${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)));
-      const midsReady = midImages.every((image): image is HTMLImageElement => image !== null);
-      const winnerCycleImages = await Promise.all(Array.from({ length: 8 }, (_, i) =>
-        loadImg(`/art/horse-jockey-winner-v2-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)));
-      const winnerCycleReady = winnerCycleImages.every((image): image is HTMLImageElement => image !== null);
+      /**
+       * ⚠️ ★**USE_MID_FRAMES は false です。だから読みません**（2026-09-02）。
+       *    以前はここで 8 枚読み、**USE_MID_FRAMES で捨てて**いました
+       *    （実測 **復号後 48MB / 転送 14.0MB**・1536x1024 が 8 枚）。
+       *    USE_SEPARATED_COMPOSITE と同じ形で、**定数を読み込みの前に出します**。
+       * ⚠️ ★**絵は 1px も変わりません。** true に戻せば読み込みも一緒に戻ります。
+       */
+      const USE_MID_FRAMES = false;
+      const midImages: readonly (HTMLImageElement | null)[] = USE_MID_FRAMES
+        ? await Promise.all(Array.from({ length: 8 }, (_, i) =>
+          loadImg(`/art/horse-jockey-side-v6-mid${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)))
+        : Array.from({ length: 8 }, () => null);
+      const midsReady = USE_MID_FRAMES
+        && midImages.every((image): image is HTMLImageElement => image !== null);
+      /**
+       * ⚠️ ★**`WINNER_POSE` が `'run'` の間、この 8 コマは 1 度も描かれません**（2026-09-02）。
+       *
+       *   ★描画側は `celebrating = WINNER_POSE === 'celebrate' && ...` のときだけ
+       *     `winnerCycleHighQuality` を引きます。★`'run'` では必ず `sideHighQuality` に落ちます。
+       *   ★それでも ★**8 枚読み、12 枠ぶんの勝負服・影・毛色 4 色まで焼いて**いました
+       *     （★実測 ★**復号後 48MB ＋ キャンバス 136 枚 / 385MB**）。
+       *   ★`USE_SEPARATED_COMPOSITE` / `ad47b45` と ★**同じ形**です。
+       * ⚠️ ★**絵は 1px も変わりません。** ★`WINNER_POSE` を `'celebrate'` に戻せば読み込みも戻ります。
+       */
+      const winnerCycleWanted = WINNER_POSE === 'celebrate';
+      const winnerCycleImages: readonly (HTMLImageElement | null)[] =
+        (!winnerCycleWanted || bakedLibs !== undefined) ? Array.from({ length: 8 }, () => null)
+          : await Promise.all(Array.from({ length: 8 }, (_, i) =>
+            loadImg(`/art/horse-jockey-winner-v2-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)));
+      const winnerCycleReady = winnerCycleWanted
+        && winnerCycleImages.every((image): image is HTMLImageElement => image !== null);
       /**
        * ★馬・騎手分離素材（Codex 生成）: 騎手なしの馬 8 コマ ＋ 騎手 2 姿勢（前傾 a/b・ガッツポーズ a/b）。
        *   全部揃ったときだけ合成コマを使い、揃わなければ従来の一体コマ。
@@ -1595,7 +1854,17 @@ export default function RacePage(): React.JSX.Element {
           };
         }
       }
-      const sideRefs = loaded.slice(8, 16);
+      /**
+       * ⚠️ ★**分離合成の参照コマも、使うときだけ読みます**（2026-09-02）。
+       *    ★ここは `loaded.slice(8, 16)`（★大きな読み込みの中の side-v6 8 コマ）でした。
+       *    ★`separatedReady` は `USE_SEPARATED_COMPOSITE` が false の間必ず false なので、
+       *    ★`composeCycle` は引数を見る前に `undefined` を返します。
+       * ⚠️ ★**空配列のまま渡す形にしないこと。** ★`USE_SEPARATED_COMPOSITE` を
+       *    ★true に戻した日に、★**参照コマだけが無い**状態で黙って壊れます（R-27）。
+       */
+      const sideRefs: readonly HTMLImageElement[] = separatedReady
+        ? await fallbackSet('horse-jockey-side-v6')
+        : [];
       const composedRace = composeCycle(
         [jockeyImages[0]!, jockeyImages[1]!] as [HTMLImageElement, HTMLImageElement],
         [sideRefs[0]!, sideRefs[4]!], [1, 5], SILKS_LAYOUT_CROUCH);
@@ -1647,9 +1916,21 @@ export default function RacePage(): React.JSX.Element {
        *   ★オーナー評「**背後からの馬はまともに走っていない**」— 計測も同じことを言っています。
        *   シートで作り直して **11.6% → 8.0%**。
        */
-      const rearV4 = await loadSet('horse-jockey-diag-rear-v5')
-        ?? await loadSet('horse-jockey-diag-rear-v4');
-      const winnerRear = await loadSet('horse-jockey-winner-rear-v1');
+      /**
+       * ⚠️ ★**焼いた素材で描くときは、原版の馬コマを 1 枚も読みません。**
+       *    ★ここが読み込み量の本体です（★6 組 × 8 コマ・★復号後 208MB）。
+       */
+      const loadNativeSet = async (...prefixes: readonly string[]): Promise<FrameImage[] | undefined> => {
+        if (bakedLibs !== undefined) return undefined;
+        for (const prefix of prefixes) { const got = await loadSet(prefix); if (got !== undefined) return got; }
+        return undefined;
+      };
+      const rearV4 = await loadNativeSet('horse-jockey-diag-rear-v5', 'horse-jockey-diag-rear-v4');
+      /**
+       * ⚠️ ★**`WINNER_FOLLOW_REAR` が false の間、この 8 コマは 1 度も描かれません**（2026-09-02）。
+       *    ★実測 ★**復号後 48MB ＋ キャンバス 144 枚 / 479MB**。★上と同じ形です。
+       */
+      const winnerRear = WINNER_FOLLOW_REAR ? await loadNativeSet('horse-jockey-winner-rear-v1') : undefined;
       // ★絵柄の候補を本番の画面に差し込んで見るための差し替え（P4・案 B の比較用）
       //
       //   白地や緑地に大きく置いた絵が良く見えても、**実際は縮小され、芝と柵と観客席の上に重なり、
@@ -1662,12 +1943,12 @@ export default function RacePage(): React.JSX.Element {
       const sideSetName = horseOverride !== null && /^[a-z0-9-]+$/.test(horseOverride)
         ? `horse-jockey-${horseOverride}`
         : 'horse-jockey-side-v7';
-      const sideV7 = await loadSet(sideSetName) ?? await loadSet('horse-jockey-side-v7');
+      const sideV7 = await loadNativeSet(sideSetName, 'horse-jockey-side-v7');
       const [gateClosed, gateOpen] = await Promise.all([
         loadImg(`/art/starting-gate-front-v1.png?v=${ASSET_VERSION}`).catch(() => null),
         loadImg(`/art/starting-gate-front-open-v1.png?v=${ASSET_VERSION}`).catch(() => null),
       ]);
-      const frontV3 = await loadSet('horse-jockey-diag-front-v3');
+      const frontV3 = await loadNativeSet('horse-jockey-diag-front-v3');
       // ★俯瞰は v2（271×724 の低解像度・一度も作り直していない）のままで、
       //   オーナー評「ここで一気にクオリティが下がる」の当のカットだった（2026-08-20）。
       //   真横 v7 を参照に作り直した v3 が揃えばそれを使う。
@@ -1675,49 +1956,58 @@ export default function RacePage(): React.JSX.Element {
       //   （オーナー確認・2026-08-20）。カメラ角度と体型がコマごとに流れていたため。
       //   → v4 は **8 コマを 1 枚のシートで一度に生成**し、切り出して胴体基準で揃えたもの。
       //      接地点のばらつき 22.0% → 9.9%（合格済みは 4.6〜9.6%）。
-      const highDiagV3 = await loadSet('horse-jockey-high-diag-v4')
-        ?? await loadSet('horse-jockey-high-diag-v3');
+      const highDiagV3 = await loadNativeSet('horse-jockey-high-diag-v4', 'horse-jockey-high-diag-v3');
       // ★真横は v7（一貫性を持たせて作り直した 8 コマ）が揃えばそれを、無ければ承認済み v6
-      const sidePoses: readonly FrameImage[] = composedRace ?? sideV7 ?? loaded.slice(8, 16);
+      const sidePoses: readonly FrameImage[] = bakedLibs !== undefined ? []
+        : composedRace ?? sideV7 ?? await fallbackSet('horse-jockey-side-v6');
       /**
        * ★16 コマ（中間コマ入り）は「ウサギ跳ね」と評価されたため既定は 8 コマ。
        *   中間コマは脚位置の計測で「両隣の真の中間」と確認できたものだけ後で戻す。
        */
-      const USE_MID_FRAMES = false;
-      const sideCycle: readonly FrameImage[] = midsReady && USE_MID_FRAMES
+      const sideCycle: readonly FrameImage[] = midsReady
         ? sidePoses.flatMap((pose, index) => [pose, midImages[index]!])
         : sidePoses;
-      const sideHighQuality = buildFrames(sideCycle);
-      const diagFrontHighQuality = frontV3 !== undefined
+      const sideHighQuality = bakedLibs?.['side-v6'] ?? buildFrames(sideCycle);
+      const diagFrontHighQuality = bakedLibs?.['diag-front-v2'] ?? (frontV3 !== undefined
         ? buildFrames(frontV3, undefined, SILKS_LAYOUT_FRONT)
-        : buildFrames(loaded.slice(16, 24));
-      const diagRearHighQuality = rearV4 !== undefined
+        : buildFrames(await fallbackSet('horse-jockey-diag-front-v2')));
+      const diagRearHighQuality = bakedLibs?.['diag-rear-v2'] ?? (rearV4 !== undefined
         ? buildFrames(rearV4, undefined, SILKS_LAYOUT_REAR)
         : composedRear !== undefined
           ? buildFrames(composedRear.frames, undefined, SILKS_LAYOUT_REAR, composedRear.anchors)
-          : buildFrames(loaded.slice(24, 32));
-      const highDiagHighQuality = highDiagV3 !== undefined
+          : buildFrames(await fallbackSet('horse-jockey-diag-rear-v2')));
+      const highDiagHighQuality = bakedLibs?.['high-diag-v2'] ?? (highDiagV3 !== undefined
         ? buildFrames(highDiagV3, undefined, SILKS_LAYOUT_REAR)
-        : buildFrames(loaded.slice(32, 40));
-      const winnerHighQuality = buildFrames(loaded.slice(40, 41));
+        : buildFrames(await fallbackSet('horse-jockey-high-diag-v2')));
       artRef.current = {
         pal, raceTitle: raceTitle!, raceNarrator: raceNarrator!, startingGate: startingGate!,
         ...(narratorSets !== undefined ? { narratorSets } : {}),
         raceBackstretch: raceBackstretch!, raceCornerExit: raceCornerExit!, raceFinish: raceFinish!,
         raceCornerRear: raceCornerRear!, raceCornerHigh: raceCornerHigh!,
-        sideHighQuality, diagFrontHighQuality, diagRearHighQuality, highDiagHighQuality, winnerHighQuality,
+        sideHighQuality, diagFrontHighQuality, diagRearHighQuality, highDiagHighQuality,
         /**
          * ★勝馬コマは騎手が腕を挙げるぶん外接矩形が縦に長い。矩形高さを基準にすると馬体が 2〜3 割縮むので、
          *   馬体の大きさ（矩形幅の中央値の比）で side-v6 の基準高さに合わせる。
          */
         texturedWorld,
-        directionalReady: { rear: rearV4 !== undefined, front: frontV3 !== undefined },
-        ...(winnerRear !== undefined ? { winnerRearHighQuality: buildFrames(winnerRear, undefined, SILKS_LAYOUT_REAR) } : {}),
+        /**
+         * ⚠️ ★**焼いた素材のときも「揃っている」です。**
+         *    ★ここを `rearV4 !== undefined` のままにすると、★焼いた素材では原版を読まないので
+         *    ★false に落ち、★**全カットが真横素材**になります（★絵が変わります・R-27）。
+         */
+        directionalReady: bakedLibs !== undefined
+          ? { rear: true, front: true }
+          : { rear: rearV4 !== undefined, front: frontV3 !== undefined },
+        ...(bakedLibs?.['winner-rear'] !== undefined
+          ? { winnerRearHighQuality: bakedLibs['winner-rear'] }
+          : winnerRear !== undefined ? { winnerRearHighQuality: buildFrames(winnerRear, undefined, SILKS_LAYOUT_REAR) } : {}),
         ...(gateClosed !== null && gateOpen !== null ? { gateFront: {
           closed: gateClosed, open: gateOpen,
           closedSource: opaqueBounds(gateClosed), openSource: opaqueBounds(gateOpen),
         } } : {}),
-        ...(composedWinner !== undefined ? {
+        ...(bakedLibs?.['winner-cycle'] !== undefined ? {
+          winnerCycleHighQuality: bakedLibs['winner-cycle'],
+        } : composedWinner !== undefined ? {
           // ★合成勝馬: 馬体は側面走り 8 コマそのもの（伸縮なし）、騎手はガッツポーズ 2 姿勢
           winnerCycleHighQuality: buildFrames(composedWinner, undefined, SILKS_LAYOUT_WINNER),
         } : winnerCycleReady ? {
@@ -2057,7 +2347,7 @@ export default function RacePage(): React.JSX.Element {
          *   ⚠️ 後方の素材（`winnerRearHighQuality`）は**読み込んだまま残します** —
          *      裁定が変わったときに戻せるように。使うかどうかはここだけで決めます。
          */
-        winnerRear: false,
+        winnerRear: WINNER_FOLLOW_REAR,
         /**
          * ★**主役群の馬番**（確定着順の上位 5 頭・指示書 §4-4）
          *
@@ -2353,7 +2643,7 @@ export default function RacePage(): React.JSX.Element {
             script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
             laneAlignedFocus: laneFocusFromSearch(typeof window === 'undefined' ? '' : window.location.search),
             // ★本体と同じ設定にすること（食い違うと、重ねる直前のコマだけ別の素材になる）
-            winnerRear: false,
+            winnerRear: WINNER_FOLLOW_REAR,
           });
           offCtx.clearRect(0, 0, W, H);
           drawScene(offCtx, prevScene);
