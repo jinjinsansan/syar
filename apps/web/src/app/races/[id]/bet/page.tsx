@@ -75,7 +75,7 @@ export default function BetPage(): React.ReactElement {
       <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>※ デモデータ（投票はサーバー RPC に接続するまで動きません）</p>
 
       {/* 券種タブ */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
+      <div className="rc-tabs" style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
         {BET_TYPES.map((t) => <TypeTab key={t.key} label={t.label} selected={t.key === type.key} onClick={() => switchType(t.key)} />)}
       </div>
 

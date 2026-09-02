@@ -516,6 +516,26 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
     min-width: 150px;
   }
 
+  /* =====================================================================
+     ★レース詳細（/races/[id]）の公正性 — ★**デザイン第4便**（★3 段縦積み）
+
+     ⚠️ ★3 枚は `flex: 1; min-width: 240px` でした。★上の
+        ★`main [style*="min-width:240px"] { min-width: 0 !important }` が効いて
+        ★**3 枚が横に並んだまま 1 枚 110px まで潰れ**、
+        ★ハッシュが ★**1 文字ずつ縦に割れて**いました（★実測の絵で確認）。
+     ⚠️ ★これは ★**この CSS の注記が自分で警告している失敗の 2 例目**です:
+        ★「min-width: 0 で潰すのではなく、★**列を減らす**のが直しです。
+        　★潰すと『はみ出し 0』にはなりますが、★**読めません**」
+     → ★1 枚ずつ縦に積みます。★間の矢印は下向きに回します。
+     ===================================================================== */
+
+  main .rd-seal { flex: 1 0 100% !important; }
+  main .rd-arrow {
+    width: 100% !important;
+    height: 30px;
+  }
+  main .rd-arrow > span { display: inline-block; transform: rotate(90deg); }
+
   /* ★見出しの帯も折り返す */
   [data-theme="arcade"] .a-band {
     flex-wrap: wrap;

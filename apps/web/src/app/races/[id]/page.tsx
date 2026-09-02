@@ -167,18 +167,18 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
           <span style={{ fontSize: 13, fontWeight: 900 }}>運営が結果を見てから乱数を選んでいないことを、誰でも確かめられます</span>
         </div>
         <div style={{ padding: '16px 20px 18px', backgroundImage: 'linear-gradient(#ffffff,#eef6fd)' }}>
-          <div style={{ display: 'flex', alignItems: 'stretch', flexWrap: 'wrap' }}>
+          <div className="rd-seals" style={{ display: 'flex', alignItems: 'stretch', flexWrap: 'wrap' }}>
             {/* 1 */}
-            <div style={{ flex: 1, minWidth: 240, borderRadius: 10, background: '#fff', border: '2px solid var(--a-edge)', boxShadow: 'var(--a-shadow-sm)', overflow: 'hidden' }}>
+            <div className="rd-seal" style={{ flex: 1, minWidth: 240, borderRadius: 10, background: '#fff', border: '2px solid var(--a-edge)', boxShadow: 'var(--a-shadow-sm)', overflow: 'hidden' }}>
               <div className="a-band" style={{ height: 34, padding: '0 12px', gap: 10 }}><span className="a-num" style={{ fontSize: 20 }}>1</span><span style={{ fontSize: 14, fontWeight: 900 }}>発走前に公開</span></div>
               <div style={{ padding: '12px 14px 14px' }}>
                 <div className="a-lbl">seed_commit</div>
                 <div style={{ fontFamily: MONO, fontWeight: 400, fontSize: 12, color: 'var(--a-ink)', wordBreak: 'break-all', lineHeight: 1.7, marginTop: 5 }}>{commit}</div>
               </div>
             </div>
-            <div style={{ width: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 26, fontWeight: 900, color: 'var(--a-blue-d)' }}>→</span></div>
+            <div className="rd-arrow" style={{ width: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 26, fontWeight: 900, color: 'var(--a-blue-d)' }}>→</span></div>
             {/* 2 */}
-            <div style={{ flex: 1, minWidth: 240, borderRadius: 10, background: '#fff', border: '2px solid var(--a-edge)', boxShadow: 'var(--a-shadow-sm)', overflow: 'hidden' }}>
+            <div className="rd-seal" style={{ flex: 1, minWidth: 240, borderRadius: 10, background: '#fff', border: '2px solid var(--a-edge)', boxShadow: 'var(--a-shadow-sm)', overflow: 'hidden' }}>
               <div className="a-band" style={{ height: 34, padding: '0 12px', gap: 10 }}><span className="a-num" style={{ fontSize: 20 }}>2</span><span style={{ fontSize: 14, fontWeight: 900 }}>確定後に公開</span></div>
               <div style={{ padding: '12px 14px 14px' }}>
                 <div className="a-lbl">seed_reveal</div>
@@ -187,9 +187,9 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
                 </div>
               </div>
             </div>
-            <div style={{ width: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 26, fontWeight: 900, color: 'var(--a-blue-d)' }}>→</span></div>
+            <div className="rd-arrow" style={{ width: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 26, fontWeight: 900, color: 'var(--a-blue-d)' }}>→</span></div>
             {/* 3 照合 */}
-            <div style={{ flex: 1, minWidth: 240, borderRadius: 10, boxShadow: 'var(--a-shadow-sm)', overflow: 'hidden', ...stepBox }}>
+            <div className="rd-seal" style={{ flex: 1, minWidth: 240, borderRadius: 10, boxShadow: 'var(--a-shadow-sm)', overflow: 'hidden', ...stepBox }}>
               <div className="a-band" style={{ height: 34, padding: '0 12px', gap: 10, ...stepBand }}><span className="a-num" style={{ fontSize: 20 }}>3</span><span style={{ fontSize: 14, fontWeight: 900 }}>照合</span></div>
               <div style={{ padding: '12px 14px 14px' }}>
                 <div style={{ fontFamily: MONO, fontWeight: 400, fontSize: 12, color: 'var(--a-ink)', lineHeight: 1.8 }}>SHA-256(seed_reveal)<br />＝ seed_commit</div>
