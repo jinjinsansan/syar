@@ -149,7 +149,16 @@ function conditionFromSearch(search: string): TrackCondition {
  * ★一時バッジ（引継ぎ書 §1-4）— どの分岐が実ブラウザで描いたかを Canvas 上に証明する。
  *   ユーザー合格後に撤去する（§11-8）。
  */
-let rendererBadgeHidden = false; // `?badge=0` で非表示（LP 用のキャプチャなど。描画分岐には影響しない）
+/**
+ * ★**描画方式のバッジ**（★開発用）。
+ *
+ * ⚠️ ★**既定を「出さない」に変えました**（2026-09-02）。
+ *    ★これは開発用の目印ですが、★**本番のレース映像に焼かれていました**
+ *    （★人に見せている映像に `BROADCAST V2 --:--:--` と出続けていた）。
+ *    ★`?dev=1` のとき、または `?badge=1` を明示したときだけ出します。
+ * ★`?badge=0` は従来どおり「出さない」です。
+ */
+let rendererBadgeHidden = true;
 /**
  * ★発走の見せ方。**位置に係数を掛けず、全馬から同じ距離を引きます**（2026-08-22）。
  *
@@ -172,7 +181,17 @@ function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, st
    *   直した内容が画面に出ているかの取り違えが続いたため、
    *   ★**スクリーンショットから「どの版を見ているか」が分かる**ようにします。
    */
-  const stamp = process.env.NEXT_PUBLIC_BUILD_STAMP ?? '--:--:--';
+  /**
+   * ⚠️ ★**`NEXT_PUBLIC_BUILD_STAMP` は一度も動いていませんでした**（2026-09-02 に判明）。
+   *    ★2026-08-21 に「どの版を見ているか分かるように」と入れられましたが、
+   *    ★**どこにも設定されておらず**、★画面には `--:--:--` と出続けていました。
+   *    ★**仕掛けはあり、実装され、注記もあり、それでも一度も動いていません**（R-16 の家族）。
+   * → ★**Vercel が自動で入れる値**を先に読みます。★人が設定する手順を挟みません。
+   *    ★機械での突き合わせは `/api/healthz` と `tools/verify-deployed-build.mjs` が持ちます。
+   */
+  const sha = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA;
+  const stamp = sha !== undefined && sha !== '' ? sha.slice(0, 7)
+    : process.env.NEXT_PUBLIC_BUILD_STAMP ?? 'local';
   const label = kind === 'v2' ? `BROADCAST V2 ${stamp}` : `LEGACY ${stamp}`;
   ctx.save();
   ctx.font = 'bold 15px monospace';
@@ -3117,7 +3136,9 @@ export default function RacePage(): React.JSX.Element {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    rendererBadgeHidden = params.get('badge') === '0';
+    /** ★開発卓を出すときはバッジも出す。★`?badge=1` で単独でも出せる（上の注記） */
+    rendererBadgeHidden = params.get('badge') === '0'
+      || !(params.get('dev') === '1' || params.get('badge') === '1');
     const auditSec = Number(params.get('auditSec'));
     if (Number.isFinite(auditSec) && auditSec >= 0) dRef.current = auditSec;
     render(dRef.current);
