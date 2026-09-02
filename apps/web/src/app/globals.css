@@ -425,6 +425,54 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   }
   .rc-tabs > span:not(.rc-periods) { flex: 0 0 auto; white-space: nowrap; }
   .rc-periods { margin-left: 0 !important; flex: 0 0 auto; }
+  /* =====================================================================
+     ★グローバルヘッダー（`layout.tsx` の `<header class="a-band">`）
+
+     ★PC は高さ 56px ですが、★モバイルでは折り返して ★**約 200px** になり、
+     ★最初の一画（★およそ 700px）の ★**3 割**を占めていました（★実測）。
+     ★TOP では、★これが「開いた瞬間に馬が大きく」の一番の邪魔でした。
+
+     ⚠️ ★デザイナーのモバイル版 6 画面はいずれも ★**min-height 52px の 2 段**
+        （★1 段目 ロゴと残高／★2 段目 ナビ）です。★そこへ寄せます。
+     ★TOP の頁内アンカーは ★**出しません**（★下へ送れば同じ場所に着くため）。
+     ===================================================================== */
+
+  header.a-band {
+    height: auto !important;
+    min-height: 52px;
+    padding: 8px 14px !important;
+    gap: 6px;
+  }
+  header.a-band > a:first-child { font-size: 18px !important; letter-spacing: .14em !important; }
+  header.a-band nav {
+    margin-left: 0 !important;
+    gap: 6px !important;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  header.a-band nav a {
+    height: auto !important;
+    min-height: 44px;
+    padding: 0 12px !important;
+    font-size: 12.5px !important;
+  }
+  header.a-band .a-btn {
+    height: auto !important;
+    min-height: 44px;
+    padding: 0 14px !important;
+    font-size: 13px !important;
+  }
+  /* ★TOP の頁内アンカーはモバイルでは出さない（上の注記） */
+  header.a-band .lp-nav { display: none !important; }
+
+  /*
+   * ★**つまみ（スライダー）は指で掴めません。**
+   *   ★`input[type="range"]` の既定の高さは ★**16px**（★実測・/watch の 3 つ）。
+   *   ★見た目の線は細いままでよいので、★**当たり判定だけ**を 44px にします。
+   * ★ページごとにクラスを足さず、★ここ 1 か所で決めます（★増えるたびに漏れるため）。
+   */
+  main input[type="range"] { min-height: 44px; }
+
   /*
    * ★見出しの脇や帯の中にある ★**文字だけのリンク**を、指で押せる大きさに。
    *   ★記録の「景品交換 →」／オッズの「すべて表示 →」／馬詳細の「わたしの馬」。

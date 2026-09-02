@@ -33,7 +33,16 @@ export function ArcadeNav(): React.ReactElement {
   if (path === '/') {
     return (
       <>
-        <nav style={{ display: 'flex', gap: 6, marginLeft: 24 }}>
+        {/*
+          ⚠️ ★**モバイルでは出しません**（2026-09-02・オーナー要望①）。
+             ★これは頁内アンカー（はじめての方へ／あそびかた／公正性／よくある質問）で、
+             ★モバイルでは ★**そのまま下へ送れば同じ場所に着きます。**
+             ★実測で、★このナビを含むヘッダーが ★**最初の一画の約 3 割（約 200px）**を占め、
+             ★「開いた瞬間に馬が大きく」の一番の邪魔になっていました。
+          ★デザイナーのモバイル版 TOP にも ★**グローバルヘッダーはありません**
+            （★ヒーロー自身が左上に STAR を持つ形）。★その意図に寄せます。
+        */}
+        <nav className="lp-nav" style={{ display: 'flex', gap: 6, marginLeft: 24 }}>
           {LP_LINKS.map((l, i) => <a key={l.href} href={l.href} style={pill(i === 0)}>{l.label}</a>)}
         </nav>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
