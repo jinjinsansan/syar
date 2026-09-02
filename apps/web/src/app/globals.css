@@ -313,77 +313,184 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   [data-theme="arcade"] .a-panel { overflow: visible; }
 
   /* =====================================================================
-     ★TOP（LP）のヒーロー — ★**中身が下から切り落とされていました**
-     ⚠️ ★節は `height: 560px` ＋ `overflow: hidden`、★中身は `position: absolute`。
-        ★つまり ★**中身は節の高さに 1px も寄与しません。** ★モバイルでは中身のほうが高くなり、
-        ★はみ出した分が ★**そのまま切り落とされます**（★実測: 390px で **96px**・360px で **158px**）。
-        ★消えていたのは「登録は 1 分。クレジットカードは要りません」と CTA の下端です。
-     ⚠️ ★これは `overflow-x: hidden` の罠の ★**縦版**です。★切られた分は `scrollWidth` にも
-        ★「右端を越えた要素」にも出ません。→ ★**道具は「はみ出しなし」と言い続けます。**
-        ★実際、`tools/verify-mobile-layout.mjs` は 3 つの数すべてで異常なしと出していました。
-        ★見つけたのは ★**オーナーの目**です（★2026-09-01）。
-     ★直し方の順序が大事です:
-        ★① 中身を通常の流れに戻す（`position: static`）→ ★節が中身の高さを持てるようになる
-        ★② 節の高さを内容に任せる（`height: auto`）→ ★切るものが無くなる
-        ★③ 文字を画面に合わせる → ★PC の値（★ロゴ 96px・見出し 46px）は 390px に入りません
-     ⚠️ ★`overflow: hidden` は**外しません**。★`.lp-bleed` は 100vw に広がるので、
-        ★背景画像を節の外に出さないために要ります（★外すと横スクロールが生まれます）。
+     ★TOP（LP）のモバイル — ★**デザイン第4便で組み直しました**（2026-09-02）
+
+     ★依頼: `DESIGN_HANDOFF_REQUEST_MOBILE_TOP_20260902.md`
+     ★回答: デザインシステム `design_handoff_mobile_top/components/landing-mobile`
+
+     ★真因（★こちらの実測とデザイナーの診断が一致）:
+       ★節 `height: auto`（中身なり）＋ 16:9 の絵を `cover` ＋ 文字を絶対配置で重ねる
+       → ★縦長の枠に横長の絵を入れるので ★**横 45% が切れ、馬は約 130px に縮む**
+
+     ★直し方:
+       ★① ★**節の比率を絵に合わせる**（`aspect-ratio`）。★切られる余地をそもそも無くす
+       ★② ★**文字は通常フローへ**（絶対配置をやめる）。★これが下の §3-E の直接の答え
+       ★③ ★指で押せる大きさ（44px）と `min-height` 化
+
+     ⚠️ ★**①は縦構図の新しい絵が要ります**（`/lp/hero-mobile.jpg`）。
+        ★無い間は `aspect-ratio` を掛けません — ★16:9 を 0.86:1 の枠に入れると
+        ★**横 48% しか残らず、いまより悪くなる**ためです（★`page.tsx` の `hasMobileHero`）。
+
+     ⚠️ ★**以前ここは `[style*="height:560px"]` のような属性選択子で書かれていました。**
+        ★`page.tsx` の inline の数字を 1 つ変えた日に、★**黙って効かなくなります。**
+        → ★クラスで書き直しました。
+
+     ⚠️ ★**`position: static` にしてはいけません**（★1 度やりました）。
+        ★ヒーローの背景と覆いは絶対配置で、★中身より**先**に在ります。
+        ★`static` にすると ★**中身が覆いの裏に回って丸ごと消えます**（★ロゴも見出しも CTA も）。
+        ★しかもそのとき ★**測定は「直った」と言いました**（★切り落とし 0・はみ出し 0）。
+        → ★`relative` にします。★通常の流れに入って節の高さを作り、かつ覆いより上に描かれます。
      ===================================================================== */
-  .lp-bleed[style*="height:560px"], .lp-bleed[style*="height:300px"] {
+
+  /* ★節の高さは中身なり。★固定 height ＋ 絶対配置の組み合わせを作らない（§3-E） */
+  .lp-hero {
     height: auto !important;
-    padding: 24px 16px 28px;
+    padding: 0 !important;
   }
-  /*
-   * ⚠️⚠️ ★`static` にしてはいけません（★1 度やりました）。
-   *    ★ヒーローの背景（`HeroBackdrop` の画像と覆い）は ★**絶対配置**で、★中身より**先**に在ります。
-   *    ★中身を `static` にすると ★**位置指定のある覆いのほうが上に描かれ**、
-   *    ★中身が ★**覆いの裏に回って丸ごと消えます**（★ロゴも見出しも CTA も）。
-   *    ⚠️ ★このとき ★**測定は「直った」と言います**（★切り落とし 0・はみ出し 0）。
-   *       ★消えたことは ★**絵にしか出ません。** ★数字だけ見ていたら通していました。
-   *  → ★`relative` にします。★これなら ★**通常の流れに入って節の高さを作り**、かつ ★覆いより上に描かれます。
-   *  ⚠️ ★`top: 56px` / `50px` の inline は `relative` では ★**ずらす指示**になるので、打ち消します。
-   */
-  .lp-bleed [style*="top:56px"], .lp-bleed [style*="top:50px"] {
+  /* ★縦構図の絵が置かれたときだけ、比率を絵に合わせる */
+  .lp-hero-portrait { aspect-ratio: 860 / 1000; }
+
+  .lp-hero-body {
     position: relative !important;
     top: 0 !important;
     z-index: 1;
+    align-items: stretch !important;
+    padding: 14px 16px 20px;
+    gap: 12px;
+  }
+  /* ★縦構図のときは、文字を下の帯（暗いグラデの中）へ寄せる */
+  .lp-hero-portrait .lp-hero-body {
+    position: absolute !important;
+    top: auto !important;
+    bottom: 0;
+    left: 0;
+    right: 0;
   }
 
-  /* ★ロゴ（★上のヒーロー 96px ／ 締めのヒーロー 56px）。★字間も詰めないと 4 文字が入りません */
-  .lp-bleed [style*="font-size:96px"] { font-size: 54px !important; letter-spacing: .08em !important; }
-  .lp-bleed [style*="font-size:56px"] { font-size: 40px !important; letter-spacing: .08em !important; }
-
-  /* ★見出し 46px は 390px で 4 行になり、★左右の縁に文字が貼りつきます */
-  .lp-bleed h1 { font-size: 22px !important; margin-top: 18px !important; }
-
-  /*
-   * ★CTA の 2 つのボタンは、★折り返すと ★**左寄せ**になります
-   *   （★親の `align-items: center` は縦の話で、★折り返した行の横は `justify-content` が決めます）。
-   *   ★ロゴ・見出し・注記は中央なので、★ここだけ左に付いて列が崩れて見えます。
-   */
-  .lp-bleed [style*="top:56px"] > [style*="display:flex"],
-  .lp-bleed [style*="top:50px"] > [style*="display:flex"] { justify-content: center; }
-
-  /* ★締めヒーローの 1 行（★26px は 2 行に割れます） */
-  .lp-bleed [style*="font-size:26px"] { font-size: 17px !important; text-align: center; }
+  /* ★ロゴは小さく。★馬を隠さないため（★PC 96px / 締め 56px） */
+  .lp-hero-logo { font-size: 26px !important; letter-spacing: .1em !important; }
+  .lp-hero-portrait .lp-hero-logo {
+    position: absolute;
+    left: 16px;
+    top: 14px;
+    z-index: 2;
+  }
+  .lp-hero-bottom .lp-hero-logo { font-size: 24px !important; }
 
   /*
-   * ★「はじめの 5 ステップ」の 2 行目だけが 3 段に割れていました。
-   *   ⚠️ ★原因は ★**説明文の長さ**です（★「迎え方は準備中です（正典の配合／入手規定に合わせます）」）。
-   *      ★中央の列は `flex-basis: auto` なので ★**内容の幅**を主張し、★右のボタンが入らず折り返します。
-   *      ★1・3・4・5 行目は説明が短いので 1 行に収まり、★**2 行目だけ違う形**になっていました。
-   *   → ★中央の列に `flex: 1 1 0` を与え、★**余った幅を取って、足りなければ縮む**形にします。
-   *   ⚠️ ★`min-width: 0` を併せて要ります（★flex 項目の既定の最小幅は「内容の最小幅」で、
-   *      ★これが無いと縮みません）。
+   * ★**青い覆いはモバイルでは外します。**
+   *   ★覆い ＋ ロゴ ＋ 見出し ＋ CTA が全部主役の上に載っていたのが、
+   *   ★「馬が小さい」のもう半分の原因でした。
+   * ★代わりに、★**文字の下にだけ**暗いグラデを敷きます（★上 34% ／ 下 52%）。
    */
-  #steps [style*="flex-direction:column"] { flex: 1 1 0 !important; min-width: 0 !important; }
+  .lp-hero .lp-veil { display: none; }
+  .lp-hero-shade-top,
+  .lp-hero-shade-bottom { position: absolute; left: 0; right: 0; pointer-events: none; }
+  .lp-hero-shade-top {
+    top: 0;
+    height: 34%;
+    background: linear-gradient(180deg, rgba(11, 28, 48, .55) 0%, rgba(11, 28, 48, 0) 100%);
+  }
+  .lp-hero-shade-bottom {
+    bottom: 0;
+    height: 52%;
+    background: linear-gradient(180deg, rgba(6, 14, 24, 0) 0%, rgba(6, 14, 24, .55) 30%, rgba(6, 14, 24, .92) 100%);
+  }
 
-  /*
-   * ★全幅の帯は `main` の左右余白（12px）の外に出るので、★自前で余白を持たせます。
-   *   ★持たせないと、★文字が画面の縁に貼りつきます。
-   */
-  .lp-bleed[style*="height:56px"] { padding: 10px 16px; text-align: center; }
-  .lp-bleed[style*="height:120px"] { padding: 14px 16px !important; }
+  /* ★見出し。★46px は 390px で 4 行に割れ、22px は小さすぎました。★27px が 2 行に収まります */
+  .lp-hero h1 {
+    font-size: 27px !important;
+    line-height: 1.36 !important;
+    margin: 0 !important;
+    text-align: left !important;
+  }
+  .lp-hero .lp-hero-body > span,
+  .lp-hero .lp-hero-body > div { align-self: flex-start; }
+
+  /* ★CTA は全幅・縦積み（★横並びは 360px で窮屈）。★44px 以上（§3-C） */
+  .lp-hero-cta {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    margin-top: 2px !important;
+    align-self: stretch !important;
+  }
+  .lp-hero-cta > .a-btn {
+    width: 100%;
+    height: auto !important;
+    min-height: 52px;
+    padding: 0 16px !important;
+    font-size: 17px !important;
+  }
+  .lp-hero-cta > .a-btn:not(.a-btn-gold) { min-height: 46px; font-size: 14px !important; }
+  .lp-hero-note {
+    align-self: flex-start !important;
+    margin-top: 0 !important;
+  }
+  /* ★縦構図では、注記は地の上に直接置く（★白い札は馬を隠します） */
+  .lp-hero-portrait .lp-hero-note {
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+    color: #fff !important;
+    opacity: .85;
+  }
+  .lp-hero-bottom .lp-hero-body { padding-bottom: 18px; }
+
+  /* ★役割の白帯。★固定 height をやめる（★文言が折り返しても切れない） */
+  .lp-tagline {
+    height: auto !important;
+    min-height: 56px;
+    padding: 10px 16px;
+    text-align: center;
+  }
+
+  /* ★はじめの 5 ステップ。★行の固定 height をやめ、★番号は 44px、ボタンも 44px */
+  .lp-step {
+    height: auto !important;
+    min-height: 76px;
+    padding: 12px 16px !important;
+    gap: 14px !important;
+  }
+  .lp-step-num {
+    flex: 0 0 44px;
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 22px !important;
+  }
+  .lp-step-text { min-width: 0; flex: 1 1 0; }
+  .lp-step-btn {
+    flex: 0 0 auto;
+    height: auto !important;
+    min-height: 44px;
+    padding: 0 16px !important;
+    font-size: 13px !important;
+  }
+
+  /* ★公正性。★3 つの seal を縦積みに */
+  .lp-seals { flex-direction: column !important; gap: 10px !important; }
+  .lp-fair-actions { flex-direction: column !important; align-items: stretch !important; }
+  .lp-fair-btn {
+    margin-left: 0 !important;
+    width: 100%;
+    height: auto !important;
+    min-height: 44px;
+  }
+
+  /* ★登録前に見られる画面。★ボタンは 44px 以上（§3-C） */
+  .lp-tool-btn { height: auto !important; min-height: 44px; }
+
+  /* ★フッター。★各リンクを指で押せる大きさに。★固定 height をやめる */
+  .lp-footer {
+    height: auto !important;
+    align-items: flex-start !important;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px 16px 24px !important;
+  }
+  .lp-footer-links { flex-wrap: wrap; gap: 14px 18px !important; }
+  .lp-footer-links > span { display: flex; align-items: center; min-height: 44px; }
+  .lp-footer > span:last-child { margin-left: 0 !important; }
 }
 
 /* ---------------------------------------------------------------------

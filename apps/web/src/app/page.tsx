@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { readClient } from '../lib/supabase';
 
 /** ★毎回サーバーで取り直す（ボタン先の「最新の確定レース」「次のレース」が変わるため） */
@@ -43,13 +45,38 @@ function Shot({ src, alt, h }: { readonly src: string; readonly alt: string; rea
   );
 }
 
+/**
+ * ★**モバイル用の縦構図のヒーロー画があるか**（★デザイン第4便）。
+ *
+ *   ★デザイナーの回答は ★**節の高さを `aspect-ratio: 860/1000` で決め、絵の比率と枠の比率を
+ *     最初から合わせる**というものです。★そのためには ★**縦構図の新しい絵**が要ります。
+ *
+ * ⚠️ ★**既存の `hero.jpg`（16:9 の中継キャプチャ）を縦枠に入れてはいけません。**
+ *    ★いまは枠 0.98:1 に 1.78:1 を `cover` して ★横 55% が残っていますが、
+ *    ★枠を 0.86:1 にすると ★**48% しか残りません** — ★**いまより悪くなります。**
+ * → ★絵が置かれるまでは ★**縦構図に切り替えません**（★R-27・縮退は安全な側へ）。
+ *    ★`apps/web/public/lp/hero-mobile.jpg` を置けば、★次のビルドから自動で切り替わります。
+ */
+const MOBILE_HERO = '/lp/hero-mobile.jpg';
+const hasMobileHero = existsSync(path.join(process.cwd(), 'public', 'lp', 'hero-mobile.jpg'));
+
 /** 中継 HUD の 1 コマを背景に、青→水色の覆いを重ねるヒーロー地 */
-function HeroBackdrop({ src }: { readonly src: string }): React.ReactElement {
+function HeroBackdrop({ src, mobileSrc }: { readonly src: string; readonly mobileSrc?: string }): React.ReactElement {
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
-      <div style={{ position: 'absolute', inset: 0, background: VEIL }} />
+      <picture>
+        {mobileSrc !== undefined && <source media="(max-width: 720px)" srcSet={mobileSrc} />}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
+      </picture>
+      {/*
+        ⚠️ ★**モバイルでは、この青い覆いを外します**（★デザイン第4便）。
+           ★覆い ＋ ロゴ ＋ 見出し ＋ CTA が全部主役の上に載っていたのが、
+           ★「馬が小さい」のもう半分の原因でした。★モバイルは文字の下にだけ暗いグラデを敷きます。
+      */}
+      <div className="lp-veil" style={{ position: 'absolute', inset: 0, background: VEIL }} />
+      <div className="lp-hero-shade-top" />
+      <div className="lp-hero-shade-bottom" />
     </>
   );
 }
@@ -84,24 +111,27 @@ export default async function LandingPage(): Promise<React.ReactElement> {
   return (
     <div style={{ padding: 0 }}>
       {/* 1. ヒーロー */}
-      <section className="lp-bleed" style={{ position: 'relative', height: 560, overflow: 'hidden' }}>
-        <HeroBackdrop src="/lp/hero.jpg" />
-        <div style={{ position: 'absolute', left: 0, right: 0, top: 56, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ fontSize: 96, fontWeight: 900, letterSpacing: '.14em', color: '#ffe37a', textShadow: '0 3px 0 #8a5a06, 0 6px 18px rgba(4,20,40,.5)', lineHeight: 1 }}>STAR</div>
+      <section
+        className={`lp-bleed lp-hero${hasMobileHero ? ' lp-hero-portrait' : ''}`}
+        style={{ position: 'relative', height: 560, overflow: 'hidden' }}
+      >
+        <HeroBackdrop src="/lp/hero.jpg" {...(hasMobileHero ? { mobileSrc: MOBILE_HERO } : {})} />
+        <div className="lp-hero-body" style={{ position: 'absolute', left: 0, right: 0, top: 56, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div className="lp-hero-logo" style={{ fontSize: 96, fontWeight: 900, letterSpacing: '.14em', color: '#ffe37a', textShadow: '0 3px 0 #8a5a06, 0 6px 18px rgba(4,20,40,.5)', lineHeight: 1 }}>STAR</div>
           <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', height: 34, padding: '0 18px', borderRadius: 8, background: 'rgba(4,20,40,.42)', border: '2px solid rgba(255,255,255,.7)' }}>
             <span style={{ fontSize: 14, fontWeight: 900, letterSpacing: '.14em', color: '#fff' }}>無料で遊べるオンライン競馬育成</span>
           </div>
           <h1 style={{ margin: '26px 0 0', textAlign: 'center', fontSize: 46, fontWeight: 900, color: '#fff', textShadow: '0 3px 0 rgba(4,20,40,.45)', lineHeight: 1.35 }}>
             配合して、育てて、走らせる。<br />10 分ごとに発走する、あなたの競馬場。
           </h1>
-          <div style={{ marginTop: 30, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div className="lp-hero-cta" style={{ marginTop: 30, display: 'flex', alignItems: 'center', gap: 14 }}>
             <a className="a-btn a-btn-gold" href="/signup" data-event="cta_hero_signup" style={{ height: 56, padding: '0 34px', fontSize: 20 }}>無料ではじめる</a>
             <a className="a-btn" href="/race" data-event="cta_hero_demo" style={{ height: 48, padding: '0 26px', fontSize: 16 }}>中継を観る（デモ）</a>
           </div>
-          <div style={{ marginTop: 16, fontSize: 13, fontWeight: 900, color: 'var(--a-ink)', background: 'rgba(255,255,255,.82)', border: '2px solid var(--a-edge)', borderRadius: 8, padding: '6px 14px' }}>登録は 1 分。クレジットカードは要りません</div>
+          <div className="lp-hero-note" style={{ marginTop: 16, fontSize: 13, fontWeight: 900, color: 'var(--a-ink)', background: 'rgba(255,255,255,.82)', border: '2px solid var(--a-edge)', borderRadius: 8, padding: '6px 14px' }}>登録は 1 分。クレジットカードは要りません</div>
         </div>
       </section>
-      <div className="lp-bleed" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 56, background: '#fff', borderTop: '3px solid var(--a-edge)', borderBottom: '3px solid var(--a-edge)' }}>
+      <div className="lp-bleed lp-tagline" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 56, background: '#fff', borderTop: '3px solid var(--a-edge)', borderBottom: '3px solid var(--a-edge)' }}>
         <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--a-ink)' }}>
           育成もレースも投票も。<span style={{ color: 'var(--a-blue-d)' }}>参加ポイント</span>で遊んで、<span style={{ color: '#8a5a06' }}>賞金ポイント</span>で景品と交換
         </span>
@@ -143,13 +173,13 @@ export default async function LandingPage(): Promise<React.ReactElement> {
             </span>
           </div>
           {STEPS.map((s, i) => (
-            <div key={s.title} style={{ display: 'flex', alignItems: 'center', gap: 16, height: 96, padding: '0 20px', borderTop: '1px solid var(--a-line)', background: i % 2 === 1 ? 'var(--a-panel-2)' : '#fff' }}>
-              <span className="a-num" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 52, height: 52, borderRadius: '50%', backgroundImage: 'var(--a-gloss-red)', border: '3px solid var(--a-red-d)', boxShadow: 'var(--a-shadow-sm)', fontSize: 26, color: '#fff' }}>{i + 1}</span>
-              <span style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div key={s.title} className="lp-step" style={{ display: 'flex', alignItems: 'center', gap: 16, height: 96, padding: '0 20px', borderTop: '1px solid var(--a-line)', background: i % 2 === 1 ? 'var(--a-panel-2)' : '#fff' }}>
+              <span className="a-num lp-step-num" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 52, height: 52, borderRadius: '50%', backgroundImage: 'var(--a-gloss-red)', border: '3px solid var(--a-red-d)', boxShadow: 'var(--a-shadow-sm)', fontSize: 26, color: '#fff' }}>{i + 1}</span>
+              <span className="lp-step-text" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <span style={{ fontSize: 20, fontWeight: 900 }}>{s.title}</span>
                 <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)' }}>{s.desc}</span>
               </span>
-              <a className="a-btn a-btn-blue" href={s.href} data-event={s.event} style={{ marginLeft: 'auto', height: 42, padding: '0 22px', fontSize: 15, whiteSpace: 'nowrap' }}>{s.button}</a>
+              <a className="a-btn a-btn-blue lp-step-btn" href={s.href} data-event={s.event} style={{ marginLeft: 'auto', height: 42, padding: '0 22px', fontSize: 15, whiteSpace: 'nowrap' }}>{s.button}</a>
             </div>
           ))}
         </div>
@@ -163,18 +193,18 @@ export default async function LandingPage(): Promise<React.ReactElement> {
             <span style={{ fontSize: 13, fontWeight: 900 }}>運営が結果を見てから乱数を選んでいないことを、誰でも確かめられます</span>
           </div>
           <div style={{ padding: '18px 20px', backgroundImage: 'linear-gradient(#ffffff,#eef6fd)' }}>
-            <div style={{ display: 'flex', alignItems: 'stretch', gap: 14 }}>
+            <div className="lp-seals" style={{ display: 'flex', alignItems: 'stretch', gap: 14 }}>
               <Seal step={1} title="発走前に公開" body={<>seed_commit<br />9f2c4b7e1a83d605c47e9b2f1d80a6c3…</>} />
               <Seal step={2} title="確定後に公開" body={<>seed_reveal<br />star-2026-08-19-11r-8c41f0a9e5</>} />
               <Seal step={3} title="誰でも照合" body={<>SHA-256(seed_reveal) ＝ seed_commit</>} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 14 }}>
+            <div className="lp-fair-actions" style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 14 }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px', borderRadius: 8, background: '#eefaf1', border: '2px solid var(--a-green-d)' }}>
                 <span style={{ width: 24, height: 24, borderRadius: 6, backgroundImage: 'var(--a-gloss-green)', border: '2px solid var(--a-green-d)', color: '#fff', fontSize: 14, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</span>
                 <span style={{ fontSize: 15, fontWeight: 900, color: 'var(--a-green-d)' }}>一致しました</span>
               </span>
               <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)' }}>各レースの詳細ページで、いつでも自分の手元で照合できます</span>
-              <a className="a-btn a-btn-blue" href={fairnessHref} data-event="cta_fairness" style={{ marginLeft: 'auto', height: 44, padding: '0 24px', fontSize: 15, whiteSpace: 'nowrap' }}>仕組みを見る</a>
+              <a className="a-btn a-btn-blue lp-fair-btn" href={fairnessHref} data-event="cta_fairness" style={{ marginLeft: 'auto', height: 44, padding: '0 24px', fontSize: 15, whiteSpace: 'nowrap' }}>仕組みを見る</a>
             </div>
           </div>
         </div>
@@ -197,7 +227,7 @@ export default async function LandingPage(): Promise<React.ReactElement> {
               <div style={{ padding: '12px 14px 14px' }}>
                 <Shot src={t.img} alt={`${t.title}の画面`} h={140} />
                 <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)', lineHeight: 1.7, marginTop: 10, minHeight: 44 }}>{t.body}</div>
-                <a className="a-btn" href={t.href} data-event={t.event} style={{ width: '100%', height: 42, marginTop: 4, fontSize: 14 }}>見てみる</a>
+                <a className="a-btn lp-tool-btn" href={t.href} data-event={t.event} style={{ width: '100%', height: 42, marginTop: 4, fontSize: 14 }}>見てみる</a>
               </div>
             </div>
           ))}
@@ -205,19 +235,19 @@ export default async function LandingPage(): Promise<React.ReactElement> {
       </section>
 
       {/* 6. 締めヒーロー */}
-      <section className="lp-bleed" style={{ position: 'relative', height: 300, marginTop: 40, overflow: 'hidden', borderTop: '3px solid var(--a-edge)' }}>
+      <section className="lp-bleed lp-hero lp-hero-bottom" style={{ position: 'relative', height: 300, marginTop: 40, overflow: 'hidden', borderTop: '3px solid var(--a-edge)' }}>
         <HeroBackdrop src="/lp/hero-bottom.jpg" />
-        <div style={{ position: 'absolute', left: 0, right: 0, top: 50, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: '.14em', color: '#ffe37a', textShadow: '0 3px 0 #8a5a06, 0 6px 16px rgba(4,20,40,.5)', lineHeight: 1 }}>STAR</div>
+        <div className="lp-hero-body" style={{ position: 'absolute', left: 0, right: 0, top: 50, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div className="lp-hero-logo" style={{ fontSize: 56, fontWeight: 900, letterSpacing: '.14em', color: '#ffe37a', textShadow: '0 3px 0 #8a5a06, 0 6px 16px rgba(4,20,40,.5)', lineHeight: 1 }}>STAR</div>
           <div style={{ marginTop: 14, fontSize: 26, fontWeight: 900, color: '#fff', textShadow: '0 2px 0 rgba(4,20,40,.45)' }}>次のレースは 10 分後に発走します</div>
           <a className="a-btn a-btn-gold" href="/signup" data-event="cta_footer_signup" style={{ height: 56, padding: '0 34px', fontSize: 20, marginTop: 22 }}>無料ではじめる</a>
         </div>
       </section>
 
       {/* 7. フッター */}
-      <footer className="lp-bleed" style={{ height: 120, background: 'var(--a-edge)', display: 'flex', alignItems: 'center', padding: '0 40px' }}>
+      <footer className="lp-bleed lp-footer" style={{ height: 120, background: 'var(--a-edge)', display: 'flex', alignItems: 'center', padding: '0 40px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 22, fontSize: 12, fontWeight: 900, color: '#fff' }}>
+          <div className="lp-footer-links" style={{ display: 'flex', gap: 22, fontSize: 12, fontWeight: 900, color: '#fff' }}>
             <span>運営</span><span>利用規約</span><span>プライバシー</span><span>お問い合わせ</span>
           </div>
           <div style={{ fontSize: 12, fontWeight: 900, color: 'rgba(255,255,255,.95)' }}>本サービスは参加ポイントを販売しません</div>
