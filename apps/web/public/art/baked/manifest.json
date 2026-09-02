@@ -176,7 +176,8 @@
         "seal-brown": "side-v6-seal-brown.webp",
         "blue-black": "side-v6-blue-black.webp",
         "grey": "side-v6-grey.webp"
-      }
+      },
+      "shadow": "side-v6-shadow.webp"
     },
     {
       "role": "diag-front-v2",
@@ -344,7 +345,8 @@
         "seal-brown": "diag-front-v2-seal-brown.webp",
         "blue-black": "diag-front-v2-blue-black.webp",
         "grey": "diag-front-v2-grey.webp"
-      }
+      },
+      "shadow": "diag-front-v2-shadow.webp"
     },
     {
       "role": "diag-rear-v2",
@@ -512,7 +514,8 @@
         "seal-brown": "diag-rear-v2-seal-brown.webp",
         "blue-black": "diag-rear-v2-blue-black.webp",
         "grey": "diag-rear-v2-grey.webp"
-      }
+      },
+      "shadow": "diag-rear-v2-shadow.webp"
     },
     {
       "role": "high-diag-v2",
@@ -680,7 +683,8 @@
         "seal-brown": "high-diag-v2-seal-brown.webp",
         "blue-black": "high-diag-v2-blue-black.webp",
         "grey": "high-diag-v2-grey.webp"
-      }
+      },
+      "shadow": "high-diag-v2-shadow.webp"
     },
     {
       "role": "winner-rear",
@@ -848,7 +852,8 @@
         "seal-brown": "winner-rear-seal-brown.webp",
         "blue-black": "winner-rear-blue-black.webp",
         "grey": "winner-rear-grey.webp"
-      }
+      },
+      "shadow": "winner-rear-shadow.webp"
     },
     {
       "role": "winner-cycle",
@@ -1016,7 +1021,8 @@
         "seal-brown": "winner-cycle-seal-brown.webp",
         "blue-black": "winner-cycle-blue-black.webp",
         "grey": "winner-cycle-grey.webp"
-      }
+      },
+      "shadow": "winner-cycle-shadow.webp"
     }
   ]
 }

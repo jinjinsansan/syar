@@ -1071,6 +1071,12 @@ interface BakedSet {
   readonly atlas: { readonly width: number; readonly height: number };
   readonly frames: readonly BakedTile[];
   readonly coats: Readonly<Record<string, string>>;
+  /**
+   * ★接地影のアトラス（★毛色に依らず 1 枚・★2026-09-03）。
+   * ⚠️ ★**無いこともあります。** ★この欄より前に焼いた `baked/` を読んだときです。
+   *    ★そのときは従来どおり ★**端末で焼きます**（R-27・狭い側へ倒さない）。
+   */
+  readonly shadow?: string | undefined;
 }
 interface BakedManifest {
   readonly targetHorsePx: number;
@@ -1819,13 +1825,29 @@ export default function RacePage(): React.JSX.Element {
         atlasByCoat: ReadonlyMap<string, HTMLImageElement>,
         silksLayout: SilksLayout = SILKS_LAYOUT_CROUCH,
         referenceHeightOverride?: number,
+        shadowAtlas?: HTMLImageElement,
       ): readonly (readonly HighQualityHorseFrame[])[] => {
         const bay = atlasByCoat.get('bay');
         if (bay === undefined) return [];
         const sources = set.frames.map((t) => ({ x: t.x, y: t.y, width: t.w, height: t.h }));
         const overlays = sources.map((src) => silksOverlays(bay, src, silksByGate, silksLayout));
-        /** ★ぼかしは原版で 3px。★焼いた絵は縮んでいるので同じ比率まで縮めます */
-        const shadows = sources.map((src) => bakeShadowSilhouette(bay, src, 3 * set.scale));
+        /**
+         * ★**接地影**（★2026-09-03・オーナー判断 A「原寸のまま焼く」）。
+         *
+         *   ★焼いたアトラスがあれば ★**そのまま指します**（★キャンバス 0 枚）。
+         *   ★`sourceX` / `sourceY` は 2026-09-03 に描画側へ足した口です（`f8128a9`）。
+         *   ★無ければ従来どおり端末で焼きます（★ぼかしは原版で 3px なので、
+         *   ★焼いた絵では同じ比率 `3 × scale` まで縮めます）。
+         *
+         * ⚠️ ★**焼いた影と端末で焼いた影は、画素が一致しません。**
+         *    ★ぼかしがブラウザ（Skia）と焼き出し（libvips）で別の実装だからです。
+         */
+        const shadows = sources.map((src) => (shadowAtlas === undefined
+          ? bakeShadowSilhouette(bay, src, 3 * set.scale)
+          : {
+            image: shadowAtlas, width: src.width, height: src.height,
+            sourceX: src.x, sourceY: src.y,
+          }));
         const refH = referenceHeightOverride ?? set.referenceHeight;
         const widths = set.frames.flatMap((t) => (t.anchorKind === 'saddle' ? [t.anchor.width] : []));
         const medianWidth = widths.length === 0 ? 0 : [...widths].sort((a, b) => a - b)[Math.floor(widths.length / 2)]!;
@@ -1876,6 +1898,7 @@ export default function RacePage(): React.JSX.Element {
           ...(WINNER_FOLLOW_REAR ? ['winner-rear'] : []),
           ...(WINNER_POSE === 'celebrate' ? ['winner-cycle'] : [])];
         const atlases = new Map<string, ReadonlyMap<string, HTMLImageElement>>();
+        const shadowAtlases = new Map<string, HTMLImageElement>();
         for (const set of manifest.sets.filter((entry) => wantedRoles.includes(entry.role))) {
           const pairs = await Promise.all(needed.map(async (coat) => {
             const file = set.coats[coat];
@@ -1886,6 +1909,15 @@ export default function RacePage(): React.JSX.Element {
           const ok = pairs.filter((e): e is readonly [string, HTMLImageElement] => e !== null);
           if (ok.length !== needed.length) return undefined;
           atlases.set(set.role, new Map(ok));
+          /**
+           * ★接地影のアトラス。
+           * ⚠️ ★**読めなくても諦めません。** ★毛色と違い、★影は端末で焼く道が残っています。
+           *    ★ここで `undefined` を返すと、★影 1 枚のために ★**毛色まで従来経路へ落ちます**。
+           */
+          if (set.shadow !== undefined) {
+            const image = await loadImg(`/art/baked/${set.shadow}?v=${ASSET_VERSION}`).catch(() => null);
+            if (image !== null) shadowAtlases.set(set.role, image);
+          }
         }
         const layoutOf = (set: BakedSet): SilksLayout => (
           set.layout === 'front' ? SILKS_LAYOUT_FRONT
@@ -1895,7 +1927,7 @@ export default function RacePage(): React.JSX.Element {
         const of = (role: string, referenceHeightOverride?: number) => {
           const set = setByRole.get(role); const atlas = atlases.get(role);
           if (set === undefined || atlas === undefined) return undefined;
-          return buildFramesFromBaked(set, atlas, layoutOf(set), referenceHeightOverride);
+          return buildFramesFromBaked(set, atlas, layoutOf(set), referenceHeightOverride, shadowAtlases.get(role));
         };
         /**
          * ★**勝馬コマの基準高さ**（`buildFrames` の呼び出し側にあった補正と同じ意味）。

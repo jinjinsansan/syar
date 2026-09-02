@@ -39,6 +39,9 @@ interface Tile { w: number; h: number; anchorKind: string }
 interface BakedSet {
   role: string; scale: number; nativeReferenceHeight: number; referenceHeight: number;
   frames: Tile[]; coats: Record<string, string>;
+  /** ★接地影のアトラス（★2026-09-03） */
+  shadow?: string;
+  atlas?: { width: number; height: number };
 }
 interface Manifest { targetHorsePx: number; coats: string[]; sets: BakedSet[] }
 
@@ -58,6 +61,24 @@ describe('★焼いた馬コマ（`tools/bake-race-frames.mjs`）', () => {
       for (const file of Object.values(set.coats)) if (!existsSync(path.join(BAKED, file))) missing.push(file);
     }
     expect(missing, `目録にあってファイルが無い:\n  ${missing.join('\n  ')}`).toEqual([]);
+  });
+
+  /**
+   * ★**接地影が焼かれていて、画面がそれを読める形になっている**（★2026-09-03・台帳 A-12）
+   *
+   * 【★なぜ検定に置くか】
+   *   ⚠️ ★影のアトラスが無くても ★**画面は落ちません。** ★従来どおり端末で焼きます（R-27）。
+   *      ★つまり ★**焼き忘れは緑のまま通ります**（R-16 の家族）。
+   *      ★実際 2026-09-02 の便では「焼く仕掛けはあるが読めない」状態で 1 日置かれました。
+   *   → ★**目録に影があること**と ★**そのファイルが実在すること**を、ここで止めます。
+   */
+  it('★接地影のアトラスが 6 組ぶん焼かれていて、ファイルが実在する', () => {
+    const missing: string[] = [];
+    for (const set of manifest!.sets) {
+      if (set.shadow === undefined) { missing.push(`${set.role}: 目録に影がありません`); continue; }
+      if (!existsSync(path.join(BAKED, set.shadow))) missing.push(`${set.role}: ${set.shadow} が実在しません`);
+    }
+    expect(missing, `★影を焼き直してください: npx tsx tools/bake-race-frames.mjs / ${missing.join(' , ')}`).toEqual([]);
   });
 
   it('★引き伸ばして焼いていない（★焼いた高さ = min(目標, 原版)）', () => {

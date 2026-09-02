@@ -181,6 +181,8 @@ for (const set of SETS) {
 
   /* ── ★毛色ごとのアトラス ── */
   const coatFiles = {};
+  /** ★影を焼くための、鹿毛の焼き上がりコマ（★影は毛色に依りません） */
+  const bayCells = [];
   for (const coat of COATS) {
     const cells = [];
     for (let i = 0; i < FRAMES; i += 1) {
@@ -190,6 +192,7 @@ for (const set of SETS) {
         .extract({ left: b.x, top: b.y, width: b.width, height: b.height })
         .resize(tiles[i].w, tiles[i].h, { kernel: 'lanczos3', fit: 'fill' })
         .png().toBuffer();
+      if (coat === 'bay') bayCells.push(cell);
       cells.push({ input: cell, left: xs[i], top: 0 });
     }
     const file = `${set.role}-${coat}.webp`;
@@ -200,17 +203,49 @@ for (const set of SETS) {
     coatFiles[coat] = file;
   }
 
+  /* ── ★接地影のアトラス（★2026-09-03・オーナー判断 A「原寸のまま焼く」）── */
   /**
-   * ★**接地影は焼きません。**
+   * ★**画面側の `bakeShadowSilhouette` と同じ手順**でここで 1 回だけ焼きます。
+   *   ★① 焼き上がったコマ（★毛色は鹿毛・影は毛色に依りません）を
+   *   ★② `blur(3 × scale)` でぼかし
+   *   ★③ 不透明度はそのまま、色だけ `#07110a` に置き換える（＝ canvas の `source-in`）
    *
-   *   ★影は「そのコマの不透明部分をぼかして黒く塗った絵」で、★画面側が
-   *     `bakeShadowSilhouette` で作ります。★焼いた絵は既に縮んでいるので、
-   *     ★ぼかし半径を同じ比率（`3 * scale`）にすれば ★**原版でぼかしてから縮めたのと同じ**になります。
-   *   ★焼いて配ることもできますが、★描画側の影は ★**画像の中の一部を指す口を持っていません**
-   *     （`shadow: { image, width, height }` に切り出し位置がない）。
-   *     ★アトラスを渡せないので、★**配っても読めません。**
-   * ⚠️ ★**読めないものを配らない。** ★この便で 120MB ぶん外したのと同じ理由です。
+   * ⚠️ ★**画素は一致しません。**
+   *    ★ぼかしはブラウザ（Skia）と焼き出し（libvips）で ★**別の実装**です。
+   *    ★同じ 3px のガウスでも、丸めが違います。★どれだけ違うかは
+   *    ★`/race` の前後を撮って突き合わせた数字を報告に載せること（★勝負服の便と同じ手順）。
+   *
+   * ⚠️ ★**ぼかし半径は原版基準の 3px ではありません。** ★焼いた絵は既に縮んでいるので
+   *    ★同じ比率（`3 × scale`）まで縮めます。★3 のままだと、
+   *    ★原版でぼかしてから縮めた場合より ★**ぼやけます**（★画面側の注記と同じ理由）。
+   *
+   * 【★なぜ焼くか】★画面側は起動時に ★**1 組 8 枚のキャンバス**を作り、
+   *   ★1 枚ずつぼかして塗っていました（★6 組で 48 枚・★実測 28MB）。
+   *   ★焼けば ★**キャンバス 0 枚**になり、★画像として配られます。
    */
+  const shadowCells = [];
+  for (let i = 0; i < FRAMES; i += 1) {
+    const sigma = 3 * scale;
+    /** ⚠️ ★`sharp` は `sigma < 0.3` を受け付けません。★そこまで縮む素材は今ありません */
+    const blurred = await sharp(bayCells[i])
+      .ensureAlpha()
+      .blur(Math.max(0.3, sigma))
+      .raw().toBuffer({ resolveWithObject: true });
+    const px = blurred.data;
+    /** ★canvas の `globalCompositeOperation = 'source-in'` ＋ `fillStyle = '#07110a'` と同じ */
+    for (let k = 0; k < px.length; k += 4) { px[k] = 0x07; px[k + 1] = 0x11; px[k + 2] = 0x0a; }
+    shadowCells.push({
+      input: await sharp(px, { raw: { width: blurred.info.width, height: blurred.info.height, channels: 4 } })
+        .png().toBuffer(),
+      left: xs[i], top: 0,
+    });
+  }
+  const shadowFile = `${set.role}-shadow.webp`;
+  const shadowOut = await sharp({ create: { width: atlasW, height: atlasH, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite(shadowCells).webp(WEBP).toBuffer();
+  writeFileSync(join(OUT, shadowFile), shadowOut);
+  totalBytes += shadowOut.length;
+
 
   /**
    * ★**基準点は原版で探して、焼いた寸法に直して配ります。**
@@ -250,6 +285,11 @@ for (const set of SETS) {
     nativeCanvasHeight: natives[0].h,
     atlas: { width: atlasW, height: atlasH },
     frames, coats: coatFiles,
+    /**
+     * ★接地影のアトラス（★毛色に依らず 1 枚）。
+     * ⚠️ ★**無ければ画面は従来どおり端末で焼きます**（R-27・古い `baked/` でも動くこと）。
+     */
+    shadow: shadowFile,
   });
 
   console.log(`  ${set.role.padEnd(15)} ${set.prefix.padEnd(28)} ${String(refNative).padStart(6)}px`
@@ -258,5 +298,5 @@ for (const set of SETS) {
 }
 
 writeFileSync(join(OUT, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-console.log(`\n★書き出し ${(totalBytes / 1048576).toFixed(1)}MB（★可逆 WebP ${manifest.sets.length * COATS.length} 枚 ＋ manifest.json）`);
+console.log(`\n★書き出し ${(totalBytes / 1048576).toFixed(1)}MB（★可逆 WebP ${manifest.sets.length * COATS.length} 枚 ＋ ★影 ${manifest.sets.length} 枚 ＋ manifest.json）`);
 console.log('⚠️ ★これは原版から作った写しです。★原版は 1 枚も変えていません。');
