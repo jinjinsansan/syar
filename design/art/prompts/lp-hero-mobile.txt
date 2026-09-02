@@ -1,0 +1,75 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with reference images.
+
+GOAL
+Create ONE portrait key visual for the mobile top page (landing page) of a fictional horse-racing
+management game. Output size 860 x 1000 (portrait, 0.86 : 1).
+
+This image is the FIRST thing a new visitor sees on a phone. The horse must read as big and powerful
+the instant the page opens.
+
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- IDENTITY / STYLE / RENDERING reference — MATCH THIS. The in-game horse is rendered in realistic,
+  slightly heightened photographic style. Copy the horse's build, the tack, the jockey's posture,
+  the rendering and the lighting:
+  apps/web/public/art/horse-jockey-side-v7-pose04.png
+- WORLD / COLOUR reference (a frame of the in-game broadcast — copy the turf colour, the white rail,
+  the hedge, the stand and the flat daylight):
+  apps/web/public/lp/hero.jpg
+
+COMPOSITION — PORTRAIT. Read this section twice; TWO previous attempts failed here.
+- ONE racehorse at full gallop WITH its jockey, seen from the SIDE, travelling to the camera-RIGHT
+  (head towards the right side of the frame).
+
+- ⚠️ SIZE. Attempt 2 made the horse TOO SMALL and placed it too low, and the headline text
+  that is laid over the bottom of the frame swallowed it. The horse must be BIG:
+  from the tip of the tail to the tip of the muzzle it should span about 85% of the frame WIDTH,
+  and from the top of the jockey's helmet to the hooves about 45% of the frame HEIGHT.
+
+- ⚠️ VERTICAL PLACEMENT — this is the part that keeps going wrong.
+  The BOTTOM 45% of this image will be covered by dark gradient and text. Anything below 58% down
+  the frame will not be seen. Therefore:
+    * the top of the jockey's helmet sits about 20% down the frame
+    * the horse's HEAD and eye sit about 28-36% down the frame
+    * the HOOVES sit about 58-64% down the frame
+  Do NOT centre the horse vertically. It belongs in the UPPER-MIDDLE of the frame.
+
+- ⚠️ LEAVE BREATHING ROOM at the sides. The horse's muzzle must stop at least 8% of the frame
+  width away from the right edge. The tail must stop at least 5% away from the left edge.
+  Nothing may touch or be cut by the frame edge.
+
+- Above the horse: a band of quiet sky and the soft out-of-focus stand.
+  Below the horse: turf, running down to the bottom of the frame.
+
+- The legs must be in a clearly extended, mid-stride phase — the animal must read as MOVING, never
+  standing. Show the reach of the front legs and the drive of the hind legs.
+- The jockey is crouched low over the withers.
+
+⚠️ THE JOCKEY'S SILKS MUST BE VIVID
+The previous attempt produced a white/grey jockey and it looked washed out.
+Use ONE strong saturated colour for the silks and the cap — deep rose pink, or royal blue, or
+emerald green — with white sleeves. Plain colour blocks only: NO stripes carrying letters,
+NO emblems, NO marks of any kind. This matches the bright silks used in the in-game broadcast.
+
+BACKGROUND
+- Green turf running surface, a white running rail, a dark hedge, and — softly out of focus —
+  a grandstand and daylight sky behind. Keep the background quiet and low-contrast: it must never
+  compete with the horse.
+- Slight motion blur in the background is welcome; the horse itself stays sharp.
+
+⚠️ TEXT WILL BE PLACED OVER THIS IMAGE
+- A dark gradient will be laid over the TOP 34% and the BOTTOM 52% of the frame.
+- A headline and two buttons sit in the bottom area.
+- Therefore: do NOT put anything that must be read (the horse's face, the jockey's face) in the
+  extreme top 15% or the bottom 25% of the frame. The horse's body and legs may extend into the
+  gradients — that is fine — but the head must stay in the clear middle band.
+
+⚠️ HARD CONSTRAINTS (a violation makes the image unusable)
+- NO text of any kind anywhere in the image. No words, no letters, no numbers, no signage,
+  no banners, no scoreboard, no race name, no sponsor logos, no brand marks, no watermarks.
+  The saddle cloth must be BLANK — no number on it.
+- This is a FICTIONAL world. Do NOT depict or suggest any real racecourse, any real racing
+  organisation, any real horse, any real jockey, or any existing product or brand.
+- No people other than the single jockey. No spectators rendered in recognisable detail.
+
+OUTPUT
+- Exactly ONE PNG, 860 x 1000. Do not produce variants; produce a single final image.

@@ -122,7 +122,7 @@ export default async function LandingPage(): Promise<React.ReactElement> {
             <span style={{ fontSize: 14, fontWeight: 900, letterSpacing: '.14em', color: '#fff' }}>無料で遊べるオンライン競馬育成</span>
           </div>
           <h1 style={{ margin: '26px 0 0', textAlign: 'center', fontSize: 46, fontWeight: 900, color: '#fff', textShadow: '0 3px 0 rgba(4,20,40,.45)', lineHeight: 1.35 }}>
-            配合して、育てて、走らせる。<br />10 分ごとに発走する、あなたの競馬場。
+            配合して、育てて、走らせる。<br />10 分ごとに発走。あなたの競馬場。
           </h1>
           <div className="lp-hero-cta" style={{ marginTop: 30, display: 'flex', alignItems: 'center', gap: 14 }}>
             <a className="a-btn a-btn-gold" href="/signup" data-event="cta_hero_signup" style={{ height: 56, padding: '0 34px', fontSize: 20 }}>無料ではじめる</a>

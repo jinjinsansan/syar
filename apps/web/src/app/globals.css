@@ -706,12 +706,17 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
 
   /* ★ロゴは小さく。★馬を隠さないため（★PC 96px / 締め 56px） */
   .lp-hero-logo { font-size: 26px !important; letter-spacing: .1em !important; }
-  .lp-hero-portrait .lp-hero-logo {
-    position: absolute;
-    left: 16px;
-    top: 14px;
-    z-index: 2;
-  }
+  /*
+   * ⚠️ ★**縦構図ではヒーローの中のロゴを出しません**（2026-09-02）。
+   *    ★理由は 2 つ:
+   *    ★① ★**重なりました。** 中身は下の帯へ絶対配置しているので、
+   *       ★その中で top:14px を指定しても ★**節の上ではなく帯の上**に来ます
+   *       （★実測の絵で、肩の帯「無料で遊べるオンライン競馬育成」と重なりました）。
+   *    ★② ★**すでに出ています。** ページ上部のヘッダーが左上に STAR を出しています。
+   *       ★デザイナーのモックにヘッダーが無いのでヒーロー側に置かれていましたが、
+   *       ★こちらはヘッダーを残したので、★同じものが 2 つ並ぶことになります。
+   */
+  .lp-hero-portrait .lp-hero-logo { display: none; }
   .lp-hero-bottom .lp-hero-logo { font-size: 24px !important; }
 
   /*
@@ -734,9 +739,14 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
     background: linear-gradient(180deg, rgba(6, 14, 24, 0) 0%, rgba(6, 14, 24, .55) 30%, rgba(6, 14, 24, .92) 100%);
   }
 
-  /* ★見出し。★46px は 390px で 4 行に割れ、22px は小さすぎました。★27px が 2 行に収まります */
+  /*
+   * ★見出し。★46px は 390px で 4 行に割れ、22px は小さすぎました。
+   * ⚠️ ★27px は ★**2 行に収まりませんでした**（★こちらの実測で 3 行）。
+   *    ★デザイナーが 2026-09-02 に ★**24px ＋ 2 行目の短縮**（「10 分ごとに発走。あなたの競馬場。」）
+   *    ★で 2 行に収まることを確認し、★実測の誤りとして REQUESTS.md（R-7）に記録しています。
+   */
   .lp-hero h1 {
-    font-size: 27px !important;
+    font-size: 24px !important;
     line-height: 1.36 !important;
     margin: 0 !important;
     text-align: left !important;
@@ -916,6 +926,66 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
 .race-menu .race-controls button {
   min-height: 52px;
   font-size: 17px;
+}
+
+/* ---------------------------------------------------------------------
+   ★レース演出の入口（★デザイン第6便 ①・`components/race-menu-mobile`）
+
+   ★番組表・馬詳細・出走登録と ★**同じ語彙**（`.a-panel` ＋ `.a-band`）で組みます。
+   ⚠️ ★この板は ★**遊ぶ人の入口**です。★開発用の操作卓（`.race-controls`）は
+      ★`?dev=1` のときだけ出ます（★A 案・デザイナー推奨）。
+   --------------------------------------------------------------------- */
+.rm-entry {
+  max-width: 430px;
+  margin: 4px 0 14px;
+  border-width: 3px;
+  overflow: hidden;
+}
+.rm-entry-head { min-height: 36px; padding: 8px 14px; flex-wrap: wrap; gap: 6px; }
+.rm-entry-grade { height: 24px; padding: 0 10px; font-size: 12px; }
+.rm-entry-name { font: 900 17px var(--a-jp); }
+/* ★コース図・出走馬のカット枠（16:9）。★いまは中継の 1 コマを敷いています */
+.rm-entry-cut { position: relative; aspect-ratio: 16 / 9; background: #0b1c30; overflow: hidden; }
+.rm-entry-cut img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.rm-entry-body { padding: 14px; background-image: linear-gradient(#fff, #eef6fd); }
+.rm-entry-venue { font: 900 11.5px var(--a-jp); color: var(--a-ink-2); }
+.rm-entry-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.rm-entry-chips .a-chip { height: 24px; padding: 0 10px; font-size: 11.5px; color: var(--a-ink); }
+.rm-entry-own {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: linear-gradient(#fffdf2, #fff3cf);
+  border: 2px solid #f2b012;
+}
+.rm-entry-own-lbl { font: 900 11px var(--a-jp); color: #4a3105; }
+.rm-entry-own-name { font: 900 13px var(--a-jp); color: var(--a-ink); }
+.rm-watch {
+  width: 100%;
+  min-height: 56px;
+  height: auto;
+  font-size: 20px;
+  border: 0;
+  font-family: inherit;
+}
+.rm-watch:disabled { opacity: .5; cursor: default; }
+.rm-entry-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: center;
+  padding: 10px 14px 12px;
+  background: var(--a-ivory);
+}
+.rm-entry-foot a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font: 900 12px var(--a-jp);
+  color: var(--a-ink-2);
 }
 
 /* ---------------------------------------------------------------------

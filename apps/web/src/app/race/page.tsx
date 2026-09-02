@@ -76,6 +76,7 @@ import {
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 import { raceSetupFromParam, gradedRacesByVenue } from '@star/scheduler';
+import { FrameBadge } from '../../components/ui';
 
 /**
  * ★**どの 1 鞍を走らせるか**（`?race=<id>`・2026-08-31・B案 ④）。
@@ -320,6 +321,10 @@ const silksColorsFor = (pal: Record<string, string>, fieldSize: number): readonl
  */
 /** ★見出し。★`?race=` が無ければ桜星賞（★直書きだったものと同じ） */
 const RACE_META = RACE_SETUP.meta;
+/** ★馬場の呼び名。★画面の選択肢と同じ並び（★2 か所に別の言葉を持たない） */
+const TRACK_CONDITION_LABEL: Readonly<Record<TrackCondition, string>> = {
+  good: '良', yielding: '稍重', soft: '重', bad: '不良',
+};
 /** 実況アナ（架空・design/hud-ds/components/narrator-cast の A） */
 const NARRATOR_NAME = '星野 亮太';
 /** HUD が載るのは発走 0.8 秒後（motion-spec §6） */
@@ -1227,6 +1232,18 @@ export default function RacePage(): React.JSX.Element {
    */
   const [smallScreen, setSmallScreen] = useState(false);
   /**
+   * ★**開発用の操作卓を出すか**（`?dev=1`）— ★デザイン第6便の A 案（★デザイナー推奨）。
+   *
+   *   ⚠️ ★レース選択・シード・自馬・走路・馬場・出馬表・回りは ★**開発のために付けた操作**です。
+   *      ★遊ぶ人が選ぶものではありません（★レースと競馬場がすでに持っている値です）。
+   *      ★人に見せる画面にこれが出ていると、★**ゲームではなく開発ツールに見えます**
+   *      （★オーナー評「人はそこから判断する」）。
+   * ★**消しません。** ★`?dev=1` を付けたときだけ出します。★画面の下に戻る口も置いてあります。
+   */
+  const [devMode, setDevMode] = useState(false);
+  /** ★開発卓へ戻る口。★いま付いている `?race=` 等は残したまま `dev=1` を足します */
+  const [devHref, setDevHref] = useState('?dev=1');
+  /**
    * ★**演出を全画面で出しているか**（★携帯のみ）。
    *   ★メニューで選ぶ → 演出開始 → 全画面、★という順にします。
    * ⚠️ ★`playing` とは別に持ちます。★レースが終わると `playing` は false になりますが、
@@ -1276,6 +1293,10 @@ export default function RacePage(): React.JSX.Element {
       window.matchMedia('(hover: none) and (pointer: coarse)').matches
       && Math.min(window.innerWidth, window.innerHeight) <= 900,
     );
+    const params = new URLSearchParams(window.location.search);
+    setDevMode(params.get('dev') === '1');
+    params.set('dev', '1');
+    setDevHref(`?${params.toString()}`);
     window.addEventListener('resize', measure);
     window.addEventListener('orientationchange', measure);
     return () => {
@@ -3220,12 +3241,23 @@ export default function RacePage(): React.JSX.Element {
    *   ★指で押せる 44px を保つため、★縮尺で割った値を渡します。
    */
   const stagePx = (px: number): number => Math.round(px / Math.max(0.2, stageScale));
-  /** ★全画面のボタンの見た目（★1 か所に置く） */
+  /**
+   * ★全画面のボタンの見た目（★1 か所に置く・★デザイン第6便 ②）。
+   *   ★`rgba(4,20,40,.55)` ＋ 1px の縁 … ★**馬体の上でも読める濃さ**（★設計の指定）。
+   * ⚠️ ★**常時出します。** ★触れたら出す方式は ★**操作があることに初見で気づけない**ので、
+   *    ★デザイナーが常時表示を推奨しています。
+   */
   const stageBtnStyle = {
-    height: stagePx(44), padding: `0 ${stagePx(16)}px`, fontSize: stagePx(15),
-    border: 0, borderRadius: stagePx(6), cursor: 'pointer',
-    background: 'rgba(20,18,15,0.82)', color: '#efe9dc', fontWeight: 'bold' as const,
+    minWidth: stagePx(44), minHeight: stagePx(44),
+    padding: `0 ${stagePx(12)}px`, fontSize: stagePx(13),
+    borderRadius: stagePx(8), cursor: 'pointer',
+    border: `${Math.max(1, stagePx(1))}px solid rgba(255,255,255,0.5)`,
+    background: 'rgba(4,20,40,0.55)', color: '#fff', fontWeight: 900 as const,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
   };
+  /** ★レースが終わったか（★③ 確定後のカードを出す条件） */
+  const stageFinished = built !== null && !playing
+    && dRef.current >= RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC - 0.01;
 
   /**
    * ★**携帯では、演出を出す前にメニューを見せます**（★2026-09-02・オーナー要望②）。
@@ -3248,6 +3280,49 @@ export default function RacePage(): React.JSX.Element {
             ref={canvasRef} width={W} height={H}
             style={{ display: 'block', width: W, height: H, background: '#111' }}
           />
+          {/*
+            ★**③ 確定後**（★デザイン第6便）。★着順を半透明の暗いカードで演出の上に重ね、
+            ★「もう一度」と「メニューへ」を出します。
+            ⚠️ ★**演出を消しません。** ★最後のコマの上に重ねます（★設計の指定）。
+          */}
+          {stageFinished && (
+            <div className="rs-result" style={{
+              position: 'absolute', left: stagePx(16), right: stagePx(16), top: '50%',
+              transform: 'translateY(-50%)', padding: `${stagePx(18)}px ${stagePx(16)}px`,
+              borderRadius: stagePx(12), background: 'rgba(4,20,40,0.88)',
+              border: `${Math.max(2, stagePx(2))}px solid rgba(255,255,255,0.35)`,
+            }}>
+              <div style={{ textAlign: 'center', fontSize: stagePx(14), fontWeight: 900, color: '#ffe37a', letterSpacing: '.1em' }}>確定</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: stagePx(8), marginTop: stagePx(12) }}>
+                {built.result.slice(0, 3).map((row) => (
+                  <div key={row.gate} style={{ display: 'flex', alignItems: 'center', gap: stagePx(10) }}>
+                    <span className="a-num" style={{ width: stagePx(26), fontSize: stagePx(20), color: row.place === 1 ? '#f2b012' : '#fff' }}>{row.place}</span>
+                    <FrameBadge gate={row.gate} fieldSize={FIELD} w={stagePx(30)} h={stagePx(24)} font={stagePx(14)} />
+                    <span style={{ fontSize: stagePx(14), fontWeight: 900, color: '#fff' }}>{HORSE_NAMES[row.gate - 1] ?? `スター${row.gate}`}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: stagePx(10), marginTop: stagePx(16) }}>
+                <button
+                  type="button" onClick={() => { resetToStart(); setPlaying(true); }}
+                  style={{
+                    flex: 1, minHeight: stagePx(48), borderRadius: stagePx(9), cursor: 'pointer',
+                    background: 'rgba(255,255,255,0.14)', border: `${Math.max(2, stagePx(2))}px solid rgba(255,255,255,0.6)`,
+                    fontSize: stagePx(14), fontWeight: 900, color: '#fff',
+                  }}
+                >もう一度</button>
+                <button
+                  type="button" onClick={() => { exitBrowserFullscreen(); setPlaying(false); setStageFull(false); }}
+                  style={{
+                    flex: 1, minHeight: stagePx(48), borderRadius: stagePx(9), cursor: 'pointer',
+                    backgroundImage: 'linear-gradient(#fff0a8 0%,#ffd84a 44%,#f2b012 62%,#d98f0a 100%)',
+                    border: `${Math.max(2, stagePx(2))}px solid #8a5a06`,
+                    fontSize: stagePx(14), fontWeight: 900, color: '#4a3105',
+                  }}
+                >メニューへ</button>
+              </div>
+            </div>
+          )}
           <div style={{ position: 'absolute', top: stagePx(10), right: stagePx(10), display: 'flex', gap: stagePx(8) }}>
             <button type="button" onClick={() => setPlaying((q) => !q)} style={stageBtnStyle}>
               {playing ? '停止' : '再開'}
@@ -3275,7 +3350,7 @@ export default function RacePage(): React.JSX.Element {
     >
       <h1 style={{ fontSize: 18, margin: '4px 0 8px' }}>
         レース
-        {smallScreen ? null : <>
+        {smallScreen || !devMode ? null : <>
         <span style={{ opacity: 0.6, fontSize: 13, marginLeft: 12 }}>
           ★本番と同じエンジン → 境界時刻 → 位置モデル → {renderer === 'v2' ? 'Broadcast V2（透視カメラ中継）' : '旧固定2D描画（legacy）'}
         </span>
@@ -3287,14 +3362,52 @@ export default function RacePage(): React.JSX.Element {
         </span>
         </>}
       </h1>
-      {smallScreen && (
-        <p style={{ fontSize: 13, opacity: 0.7, margin: '0 0 10px', lineHeight: 1.7 }}>
-          レースを選んで <b>演出開始</b> を押すと、全画面で始まります。<br />
-          端末を横にすると、そのままの向きで大きく見られます。
-        </p>
+      {/*
+        ★**遊ぶ人の入口**（★デザイン第6便 ①）。
+          ★番組表・馬詳細・出走登録と同じ語彙（`.a-panel` ＋ `.a-band`）で組みます。
+        ⚠️ ★**発走時刻は出しません。** ★この画面は開発用のデモで、★時刻を持っていません。
+           ★設計には「発走 15:40」がありますが、★**無い数字を作りません。**
+           ★番組表から入る形になったら、★そのレースの時刻をここへ置きます。
+      */}
+      {!devMode && (
+        <div className="a-panel strong rm-entry" data-theme="arcade">
+          <div className="a-band rm-entry-head">
+            <span className="a-chip gold rm-entry-grade">{RACE_SETUP.race.grade}</span>
+            <span className="rm-entry-name">{RACE_META.raceName}</span>
+          </div>
+          <div className="rm-entry-cut">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/lp/hero.jpg" alt="" aria-hidden />
+          </div>
+          <div className="rm-entry-body">
+            <div className="rm-entry-venue">{RACE_META.venue}　{RACE_META.raceNo}</div>
+            <div className="rm-entry-chips">
+              <span className="a-chip">{surface === 'turf' ? '芝' : 'ダート'} {DIST}m {turn === 'left' ? '左' : '右'}</span>
+              <span className="a-chip">馬場 {TRACK_CONDITION_LABEL[trackCondition]}</span>
+              <span className="a-chip">{FIELD}頭</span>
+            </div>
+            <div className="rm-entry-own">
+              <span className="rm-entry-own-lbl">自馬</span>
+              <FrameBadge gate={ownGate} fieldSize={FIELD} w={28} h={24} font={14} />
+              <span className="rm-entry-own-name">{HORSE_NAMES[ownGate - 1] ?? `スター${ownGate}`}</span>
+            </div>
+          </div>
+          <button
+            type="button" className="a-btn a-btn-gold rm-watch"
+            disabled={!ready || built === null}
+            onClick={() => {
+              if (smallScreen) { enterBrowserFullscreen(); setStageFull(true); }
+              setPlaying(true);
+            }}
+          >{ready && built !== null ? '観る' : '読み込み中…'}</button>
+          <div className="rm-entry-foot">
+            <a href="/races">番組表から他のレースを選ぶ</a>
+            <a href={devHref}>開発用の操作を出す</a>
+          </div>
+        </div>
       )}
       {err !== null && <p style={{ color: '#e06a4a', fontWeight: 'bold' }}>★{err}</p>}
-      <div className="race-controls" style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', margin: '8px 0' }}>
+      <div className="race-controls" style={{ display: devMode ? 'flex' : 'none', gap: 16, alignItems: 'center', flexWrap: 'wrap', margin: '8px 0' }}>
         <button
           type="button"
           onClick={() => {
@@ -3382,7 +3495,7 @@ export default function RacePage(): React.JSX.Element {
           ⚠️ 実況の文字送りなど**時刻とともに積み上がるもの**は、巻き戻すと途中から積み直しになる。
              見た目の確認には支障ないが、実況の行が飛ぶことがある（撮影用途のため許容）。
       */}
-      {built !== null && !smallScreen && (
+      {built !== null && !smallScreen && devMode && (
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '0 0 8px', padding: '8px 10px', background: '#241f1a', border: '1px solid #4a453d' }}>
           <span style={{ fontSize: 12, opacity: 0.7, whiteSpace: 'nowrap' }}>撮影用シーク</span>
           {[-1, -0.1].map((d) => (
@@ -3444,7 +3557,7 @@ export default function RacePage(): React.JSX.Element {
           style={{ width: '100%', maxWidth: W, border: '1px solid #4a453d', imageRendering: 'auto', background: '#111' }}
         />
       )}
-      {!smallScreen && (
+      {!smallScreen && devMode && (
       <p style={{ fontSize: 12, opacity: 0.55, marginTop: 10, lineHeight: 1.8 }}>
         ★<b>着順はエンジンが決めたもの</b>です（開始時に D-059 のゲートを通しています）。<br />
         {renderer === 'v2'
