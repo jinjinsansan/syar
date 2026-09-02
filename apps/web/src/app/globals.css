@@ -487,6 +487,14 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   main .en-fee { order: 6; text-align: left !important; }
   main .en-deadline { order: 7; margin-left: auto; }
 
+  /*
+   * ★初回セットアップの名前欄（★デザイン第4便）。
+   * ⚠️ ★入れ物は 52px ありますが、★`<input>` 自身は ★**32px** でした（★実測）。
+   *    ★指が触れるのは入れ物でも、★**押せる大きさとして数えられるのは要素**です。
+   *    ★文字は 22px なので、★iOS の拡大（16px 未満）には当たりません。
+   */
+  main .st-name-input { min-height: 44px; }
+
   /* ★見出しの帯も折り返す */
   [data-theme="arcade"] .a-band {
     flex-wrap: wrap;
@@ -794,6 +802,11 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
    *    ★1 列は「はみ出し 0」にはなりますが、★選ぶための画面ではなくなります。
    */
   .a-cards.tr-menus { grid-template-columns: repeat(2, 1fr); }
+  /*
+   * ★景品は ★**2 列のまま**（★デザイン第4便「景品カードを 2 列グリッド」）。
+   *   ★景品は「絵を見て選ぶ」ものなので、★並べて比べられることが中身です。
+   */
+  .a-cards.pz-cards { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* ---------------------------------------------------------------------

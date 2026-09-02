@@ -71,7 +71,7 @@ export default function PrizesPage(): React.ReactElement {
 
       <div style={{ display: 'flex', gap: 16, marginTop: 14, alignItems: 'flex-start' }}>
         {/* 景品カード 3 列 */}
-        <div className="a-cards c3" style={{ flex: 1, minWidth: 0, gap: 14 }}>
+        <div className="a-cards c3 pz-cards" style={{ flex: 1, minWidth: 0, gap: 14 }}>
           {list.map((p) => {
             const sel = p.id === selectedId;
             const short = balance < p.pp;

@@ -32,6 +32,7 @@ function NameField({ label, value, onChange, placeholder }: {
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange([...e.target.value].slice(0, NAME_MAX).join(''))}
+          className="st-name-input"
           style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', font: '900 22px var(--a-jp)', color: 'var(--a-ink)' }}
         />
         <span className="a-num" style={{ marginLeft: 'auto', fontSize: 14, fontWeight: 700, color: 'var(--a-ink-3)', flex: '0 0 auto' }}>{len} / {NAME_MAX}</span>
