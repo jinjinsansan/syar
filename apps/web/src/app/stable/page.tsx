@@ -217,17 +217,17 @@ export default async function StablePage() {
           const rowStyle: React.CSSProperties = { height: 70 };
           if (todoRow) { rowStyle.backgroundImage = 'linear-gradient(#fffbe8,#fff5cf)'; rowStyle.boxShadow = 'inset 5px 0 0 #f6c21c'; }
           return (
-            <a key={h.id} href={`/stable/${h.id}`} className={`a-row${rest ? ' done' : ''}`} style={rowStyle}>
-              <span style={{ width: COL.name, flex: `0 0 ${COL.name}px`, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <a key={h.id} href={`/stable/${h.id}`} className={`a-row sh-row${rest ? ' done' : ''}`} style={rowStyle}>
+              <span className="sh-name" style={{ width: COL.name, flex: `0 0 ${COL.name}px`, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <span style={{ fontSize: 19, fontWeight: 900, color: 'var(--a-ink)' }}>{h.name}</span>
                 <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>{h.sexAge}　{h.week.kind === 'done' ? `今週 ${h.week.menu}` : rest ? '今週 休養' : '今週の指示なし'}</span>
               </span>
-              <span style={{ width: COL.cls, flex: `0 0 ${COL.cls}px` }}><ClassChip label={h.classLabel} classRank={h.classRank} /></span>
-              <span style={{ width: COL.stars, flex: `0 0 ${COL.stars}px` }}><Stars value={h.stars} size={17} /></span>
-              <span style={{ width: COL.cond, flex: `0 0 ${COL.cond}px` }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 900, color: cond.color }}><span style={{ fontSize: 16 }}>{cond.mark}</span>{cond.label}</span></span>
-              <span style={{ width: COL.fatigue, flex: `0 0 ${COL.fatigue}px` }}><FatigueBar value={h.fatigue} color={fatigueColor(h.fatigue)} /></span>
-              <span style={{ flex: 1, minWidth: 150, fontSize: 14, fontWeight: 900, color: h.nextRace === null ? 'var(--a-ink-3)' : 'var(--a-ink)' }}>{h.nextRace ?? (h.classLabel === '新馬' ? 'デビュー戦 未定' : '未定')}</span>
-              <span style={{ width: COL.week, flex: `0 0 ${COL.week}px`, display: 'flex', justifyContent: 'flex-end' }}><WeekBadge horse={h} /></span>
+              <span className="sh-cls" style={{ width: COL.cls, flex: `0 0 ${COL.cls}px` }}><ClassChip label={h.classLabel} classRank={h.classRank} /></span>
+              <span className="sh-stars" style={{ width: COL.stars, flex: `0 0 ${COL.stars}px` }}><Stars value={h.stars} size={17} /></span>
+              <span className="sh-cond" style={{ width: COL.cond, flex: `0 0 ${COL.cond}px` }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 900, color: cond.color }}><span style={{ fontSize: 16 }}>{cond.mark}</span>{cond.label}</span></span>
+              <span className="sh-fatigue" style={{ width: COL.fatigue, flex: `0 0 ${COL.fatigue}px` }}><FatigueBar value={h.fatigue} color={fatigueColor(h.fatigue)} /></span>
+              <span className="sh-next" style={{ flex: 1, minWidth: 150, fontSize: 14, fontWeight: 900, color: h.nextRace === null ? 'var(--a-ink-3)' : 'var(--a-ink)' }}>{h.nextRace ?? (h.classLabel === '新馬' ? 'デビュー戦 未定' : '未定')}</span>
+              <span className="sh-week" style={{ width: COL.week, flex: `0 0 ${COL.week}px`, display: 'flex', justifyContent: 'flex-end' }}><WeekBadge horse={h} /></span>
             </a>
           );
         })}

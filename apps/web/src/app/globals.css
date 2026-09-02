@@ -340,6 +340,51 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   .pb-cell-course { flex: 1 0 100% !important; order: 1; white-space: normal !important; }
   .pb-cell-purse { order: 1; margin-left: auto; text-align: right !important; }
 
+  /* =====================================================================
+     ★牧場ホーム（/stable）— ★**デザイン第4便**（`components/stable-home-mobile`）
+
+     ★「馬名230｜格132｜素質112｜調子118｜疲労132｜次走｜今週104」の ★**表**でした。
+     ★既存の機械的な折り返しは ★**表の体裁を保とうとして無理が出ます**（デザイナーの指摘）。
+     → ★**馬 1 頭 ＝ 1 枚のカード**に読み替えます:
+        ★1 段目 馬名（＋性齢）と、右に今週の状態
+        ★2 段目 格・素質・調子
+        ★3 段目 疲労と、右に次走
+     ⚠️ ★JSX を PC 用とモバイル用に**二重に持ちません**。★同じリンクが 2 つ出ると、
+        ★指で押せる大きさの検査が ★**隠れている側を 0px と数えて**、数字が嘘になります。
+     ===================================================================== */
+
+  .sh-row {
+    align-items: flex-start !important;
+    row-gap: 8px !important;
+    padding: 13px 14px !important;
+    min-height: 96px;
+  }
+  /*
+   * ★1 段目: 馬名と、右端に今週の状態。
+   * ⚠️ ★状態を **DOM の最後のまま**にすると、★折り返しで ★**最終行にひとりで残ります**
+   *    （★実測の絵で確認）。→ ★`order` で名前の直後へ移し、
+   *    ★`flex: 1 0 auto` で ★**行の残りを埋めさせて**、後続を次の行へ送ります。
+   */
+  /*
+   * ⚠️ ★**順序は全部に与えます。** ★一部だけ与えると、★与えていないものは
+   *    ★`order: 0` のまま ★**先頭の組に混ざります**（★1 度やりました:
+   *    ★疲労と次走が馬名の隣に来て、★かえって読めなくなりました）。
+   */
+  .sh-name { order: 0; flex: 0 1 auto !important; }
+  .sh-week { order: 1; flex: 1 0 auto !important; justify-content: flex-end; }
+  /* ★2 段目: 格・素質・調子（★小さいので 3 つ並ぶ） */
+  .sh-cls { order: 2; flex: 0 0 auto !important; }
+  .sh-stars { order: 3; flex: 0 0 auto !important; }
+  .sh-cond { order: 4; flex: 0 0 auto !important; }
+  /* ★3 段目: 疲労と次走 */
+  .sh-fatigue { order: 5; flex: 0 0 auto !important; }
+  .sh-next {
+    order: 6;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    text-align: right;
+  }
+
   /* ★見出しの帯も折り返す */
   [data-theme="arcade"] .a-band {
     flex-wrap: wrap;
