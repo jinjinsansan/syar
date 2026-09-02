@@ -54,7 +54,23 @@ export function buildAuditRace(opts = {}) {
   const seed = opts.seed ?? RACE_DEFAULTS.seed;
   const DIST = opts.distance ?? RACE_DEFAULTS.distance;
   const FIELD = opts.field ?? RACE_DEFAULTS.field;
-  const course = ovalCourse(DIST, { widthM: opts.trackWidthM ?? RACE_DEFAULTS.trackWidthM, turn: 'left' });
+  /**
+   * ★**走路の形（競馬場）を受けられるようにします**（2026-09-02）。
+   *
+   * ⚠️ ★以前は **1周 2000m / 直線 400m / 幅 20m / 左回りの固定**でした。
+   *    ★画面は `raceSetupFromParam` から **10 場・50 鞍**の形を引くので（D-071）、
+   *    ★道具は **既定の 1 場しか測れませんでした**（R-33）。
+   *
+   * ★**渡さなければ今までと 1 ビットも変わりません**。
+   *    ★既定の `DEFAULT_OVAL` は {2000, 400, 20} で、★既定の 1 鞍（スターパーク）と同じ値です。
+   *    ★`spec` を渡したときだけ、★**エンジン（`conditions.course`）と描画層と横位置の 3 つすべて**に同じ形が入ります
+   *    （★画面と同じ揃え方。★片方だけ渡す口を作らない — 台帳 B-6）。
+   */
+  const spec = opts.spec;
+  const turn = opts.turn ?? 'left';
+  const course = spec === undefined
+    ? ovalCourse(DIST, { widthM: opts.trackWidthM ?? RACE_DEFAULTS.trackWidthM, turn })
+    : ovalCourse(DIST, { ...spec, turn });
 
   const start = (seed * 13) % Math.max(1, POOL.length - FIELD);
   const entrants = POOL.slice(start, start + FIELD).map((h, i) => ({
@@ -81,6 +97,8 @@ export function buildAuditRace(opts = {}) {
   if (surface !== 'turf' && surface !== 'dirt') throw new Error(`★surface は turf / dirt: ${surface}`);
   const conditions = {
     raceId: `r${seed}-${surface}-${trackCondition}`, distance: DIST, surface,
+    /** ⚠️ ★**着順に効く経路**（憲法 3・D-071）。★描画層と同じ形を渡す */
+    ...(spec === undefined ? {} : { course: spec }),
     trackCondition, courseShape: 'oval', baseWeightKg: 55,
   };
   /**
@@ -100,12 +118,18 @@ export function buildAuditRace(opts = {}) {
   const model = replayPositionModel({
     distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
     strategyOf: (g) => entrants[g - 1].strategy, pace, formationSeed: seed * 2654435761,
-    laneOf: (gate, metersLeft) => laneAt(gate, FIELD, metersLeft, DIST, seed),
+    /** ★横位置も同じ形を見ます（`page.tsx` と同じ引数の並び） */
+    laneOf: (gate, metersLeft) => (spec === undefined
+      ? laneAt(gate, FIELD, metersLeft, DIST, seed)
+      : laneAt(gate, FIELD, metersLeft, DIST, seed, spec.widthM, undefined, spec)),
   });
   if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((e) => Number(e.horseId)))) {
     throw new Error('★D-059: 位置モデルの最終順が着順と違う');
   }
-  return { seed, course, entrants, result, boundaries, model, pace, DIST, FIELD, balance, surface, trackCondition };
+  return {
+    seed, course, entrants, result, boundaries, model, pace, DIST, FIELD, balance, surface, trackCondition,
+    ...(spec === undefined ? {} : { spec }), turn,
+  };
 }
 
 /* ── ★画面と同じ経路で「表示秒 → 場面」を作る ─────────── */
