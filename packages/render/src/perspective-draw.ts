@@ -633,13 +633,35 @@ export interface HqHorseFrame<TImage> {
   readonly referenceHeight: number;
   readonly bodyAnchorSourcePx?: { readonly x: number; readonly y: number } | undefined;
   readonly bodyLiftSourcePx?: number | undefined;
-  readonly shadow?: { readonly image: TImage; readonly width: number; readonly height: number } | undefined;
+  /**
+   * ★接地影のシルエット。
+   * ⚠️ ★`sourceX` / `sourceY` は ★**画像のどこを取るか**（★既定 0,0）。
+   *    ★1 枚に何コマも並べた絵（★アトラス）を渡すために要ります。
+   *    ★省略すれば従来どおり ★**画像全体**を取ります（★1 ビットも変わりません）。
+   * ⚠️ ★`width` / `height` は ★**取る大きさ**であって、置く大きさではありません
+   *    （★置く大きさは `source` と `referenceHeight` から決まります）。
+   */
+  readonly shadow?: {
+    readonly image: TImage; readonly width: number; readonly height: number;
+    readonly sourceX?: number | undefined; readonly sourceY?: number | undefined;
+  } | undefined;
   readonly overlay?: {
     readonly image: TImage;
     readonly width: number;
     readonly height: number;
+    /**
+     * ★**置く位置**（★素材の画布での座標）。
+     * ⚠️ ★下の `sourceX` / `sourceY` と ★**別物**です。★こちらは「どこへ置くか」、
+     *    ★あちらは「画像のどこを取るか」。★名前が似ているので取り違えないこと。
+     */
     readonly offsetXSourcePx: number;
     readonly offsetYSourcePx: number;
+    /**
+     * ★**画像のどこを取るか**（★既定 0,0）。★1 枚に 12 枠を並べた絵（★アトラス）を渡すために要ります。
+     * ★省略すれば従来どおり ★**画像全体**を取ります（★1 ビットも変わりません）。
+     */
+    readonly sourceX?: number | undefined;
+    readonly sourceY?: number | undefined;
   } | undefined;
 }
 
@@ -704,14 +726,35 @@ export function drawPerspectiveHorses<TImage>(
       readonly bodyAnchorSourcePx?: { readonly x: number; readonly y: number } | undefined;
       /** 胴体基準点から接地点までの高さ（元画像 px）。コマ間で一定＋小さな上下動を含める */
       readonly bodyLiftSourcePx?: number | undefined;
-      /** ★接地影用シルエット（`source` と同じ大きさ・黒＋α）。あれば楕円影の代わりに地面へ潰して落とす */
-      readonly shadow?: { readonly image: TImage; readonly width: number; readonly height: number } | undefined;
+      /**
+       * ★接地影のシルエット。
+       * ⚠️ ★`sourceX` / `sourceY` は ★**画像のどこを取るか**（★既定 0,0）。
+       *    ★1 枚に何コマも並べた絵（★アトラス）を渡すために要ります。
+       *    ★省略すれば従来どおり ★**画像全体**を取ります（★1 ビットも変わりません）。
+       * ⚠️ ★`width` / `height` は ★**取る大きさ**であって、置く大きさではありません
+       *    （★置く大きさは `source` と `referenceHeight` から決まります）。
+       */
+      readonly shadow?: {
+        readonly image: TImage; readonly width: number; readonly height: number;
+        readonly sourceX?: number | undefined; readonly sourceY?: number | undefined;
+      } | undefined;
       readonly overlay?: {
         readonly image: TImage;
         readonly width: number;
         readonly height: number;
+        /**
+         * ★**置く位置**（★素材の画布での座標）。
+         * ⚠️ ★下の `sourceX` / `sourceY` と ★**別物**です。★こちらは「どこへ置くか」、
+         *    ★あちらは「画像のどこを取るか」。★名前が似ているので取り違えないこと。
+         */
         readonly offsetXSourcePx: number;
         readonly offsetYSourcePx: number;
+        /**
+         * ★**画像のどこを取るか**（★既定 0,0）。★1 枚に 12 枠を並べた絵（★アトラス）を渡すために要ります。
+         * ★省略すれば従来どおり ★**画像全体**を取ります（★1 ビットも変わりません）。
+         */
+        readonly sourceX?: number | undefined;
+        readonly sourceY?: number | undefined;
       } | undefined;
     }[] | undefined;
     /** 馬番ごとの勝負服・ゼッケンを焼いた個別フレーム。 */
@@ -721,13 +764,35 @@ export function drawPerspectiveHorses<TImage>(
       readonly referenceHeight: number;
       readonly bodyAnchorSourcePx?: { readonly x: number; readonly y: number } | undefined;
       readonly bodyLiftSourcePx?: number | undefined;
-      readonly shadow?: { readonly image: TImage; readonly width: number; readonly height: number } | undefined;
+      /**
+       * ★接地影のシルエット。
+       * ⚠️ ★`sourceX` / `sourceY` は ★**画像のどこを取るか**（★既定 0,0）。
+       *    ★1 枚に何コマも並べた絵（★アトラス）を渡すために要ります。
+       *    ★省略すれば従来どおり ★**画像全体**を取ります（★1 ビットも変わりません）。
+       * ⚠️ ★`width` / `height` は ★**取る大きさ**であって、置く大きさではありません
+       *    （★置く大きさは `source` と `referenceHeight` から決まります）。
+       */
+      readonly shadow?: {
+        readonly image: TImage; readonly width: number; readonly height: number;
+        readonly sourceX?: number | undefined; readonly sourceY?: number | undefined;
+      } | undefined;
       readonly overlay?: {
         readonly image: TImage;
         readonly width: number;
         readonly height: number;
+        /**
+         * ★**置く位置**（★素材の画布での座標）。
+         * ⚠️ ★下の `sourceX` / `sourceY` と ★**別物**です。★こちらは「どこへ置くか」、
+         *    ★あちらは「画像のどこを取るか」。★名前が似ているので取り違えないこと。
+         */
         readonly offsetXSourcePx: number;
         readonly offsetYSourcePx: number;
+        /**
+         * ★**画像のどこを取るか**（★既定 0,0）。★1 枚に 12 枠を並べた絵（★アトラス）を渡すために要ります。
+         * ★省略すれば従来どおり ★**画像全体**を取ります（★1 ビットも変わりません）。
+         */
+        readonly sourceX?: number | undefined;
+        readonly sourceY?: number | undefined;
       } | undefined;
     }[])[] | undefined;
     readonly fieldSize: number;
@@ -957,7 +1022,9 @@ export function drawPerspectiveHorses<TImage>(
       // ローカル座標: 蹄の行が y=0、上へ行くほど y<0
       ctx.transform!((flip ? -1 : 1) * squeezeX, 0, -skew, -flat, d.p.x, d.p.y);
       ctx.drawImage(
-        hiForShadow.shadow.image, 0, 0, hiForShadow.shadow.width, hiForShadow.shadow.height,
+        hiForShadow.shadow.image,
+        hiForShadow.shadow.sourceX ?? 0, hiForShadow.shadow.sourceY ?? 0,
+        hiForShadow.shadow.width, hiForShadow.shadow.height,
         -anchorX, -src.height * scale, src.width * scale, src.height * scale,
       );
       ctx.restore!();
@@ -1234,7 +1301,9 @@ export function drawPerspectiveHorses<TImage>(
           const overlayX = left + (hi.overlay.offsetXSourcePx - source.x) * scale;
           const overlayY = top + (hi.overlay.offsetYSourcePx - source.y) * scale;
           ctx.drawImage(
-            hi.overlay.image, 0, 0, hi.overlay.width, hi.overlay.height,
+            hi.overlay.image,
+            hi.overlay.sourceX ?? 0, hi.overlay.sourceY ?? 0,
+            hi.overlay.width, hi.overlay.height,
             overlayX, overlayY, hi.overlay.width * scale, hi.overlay.height * scale,
           );
         }
