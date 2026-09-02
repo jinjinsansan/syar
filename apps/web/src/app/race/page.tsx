@@ -3142,6 +3142,35 @@ export default function RacePage(): React.JSX.Element {
     return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
   }, [playing, built, render]);
 
+  /**
+   * ★**ブラウザの全画面に入る**（★2026-09-02・オーナー要望）。
+   *
+   *   ★人に見てもらう画面なので、★アドレス欄や下部の帯が写らないようにします。
+   *
+   * ⚠️ ★**入れるとは限りません。** ★全画面は ★**利用者の操作の直後にしか**要求できず、
+   *    ★端末や設定によっては拒否されます。★とくに ★**iPhone の Safari は
+   *    ★任意の要素の全画面に対応していません**（★対応しているのは動画だけ・要実機確認）。
+   * → ★**失敗しても演出は始めます。** ★いまの覆い（`.race-stage-full`）が
+   *    ★画面いっぱいを占めるので、★全画面に入れない端末でも見え方は変わりません。
+   *    ★「入れたら、さらにブラウザの枠も消える」という足し算にしています（R-27・縮退は安全な側へ）。
+   */
+  const enterBrowserFullscreen = useCallback((): void => {
+    const el = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void> | void;
+    };
+    try {
+      if (typeof el.requestFullscreen === 'function') { void el.requestFullscreen().catch(() => undefined); return; }
+      if (typeof el.webkitRequestFullscreen === 'function') { void el.webkitRequestFullscreen(); }
+    } catch { /* ★拒否されても演出は始める（上の注記） */ }
+  }, []);
+  const exitBrowserFullscreen = useCallback((): void => {
+    const d = document as Document & { webkitExitFullscreen?: () => Promise<void> | void };
+    try {
+      if (d.fullscreenElement !== null && typeof d.exitFullscreen === 'function') { void d.exitFullscreen().catch(() => undefined); return; }
+      if (typeof d.webkitExitFullscreen === 'function') { void d.webkitExitFullscreen(); }
+    } catch { /* ★出られなくても畳む */ }
+  }, []);
+
   /** ★全画面のあいだは背後の頁を動かさない（★指が滑って裏がスクロールするのを止める） */
   useEffect(() => {
     if (!stageFull) return undefined;
@@ -3149,6 +3178,23 @@ export default function RacePage(): React.JSX.Element {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = before; };
   }, [stageFull]);
+  /**
+   * ⚠️ ★**ブラウザ側から全画面が解かれることがあります**（★Esc・端末の戻る・別のタブへ移動）。
+   *    ★そのとき演出だけが「全画面のつもり」で残ると、★**戻る手段が画面の外**になります。
+   * → ★解かれたら演出も畳んでメニューへ戻します。
+   */
+  useEffect(() => {
+    const onChange = (): void => {
+      if (document.fullscreenElement === null) setStageFull(false);
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    document.addEventListener('webkitfullscreenchange', onChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+      document.removeEventListener('webkitfullscreenchange', onChange);
+    };
+  }, []);
+
   /**
    * ★全画面とメニューでは ★**画布が別の場所に置き直されます**（React が張り替えます）。
    *   ★張り替えた直後の画布は空なので、★同じ表示秒でもう一度描きます。
@@ -3211,7 +3257,7 @@ export default function RacePage(): React.JSX.Element {
             </button>
             <button
               type="button"
-              onClick={() => { setPlaying(false); setStageFull(false); }}
+              onClick={() => { exitBrowserFullscreen(); setPlaying(false); setStageFull(false); }}
               style={{ ...stageBtnStyle, background: 'rgba(122,58,42,0.9)' }}
             >
               メニュー
@@ -3253,7 +3299,7 @@ export default function RacePage(): React.JSX.Element {
           type="button"
           onClick={() => {
             /** ★携帯では、開始と同時に全画面へ移ります（★メニュー → 演出） */
-            if (smallScreen) { setStageFull(true); setPlaying(true); return; }
+            if (smallScreen) { enterBrowserFullscreen(); setStageFull(true); setPlaying(true); return; }
             setPlaying((p) => !p);
           }}
           disabled={!ready || built === null}
