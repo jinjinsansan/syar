@@ -1243,6 +1243,23 @@ export default function RacePage(): React.JSX.Element {
   const [devMode, setDevMode] = useState(false);
   /** ★開発卓へ戻る口。★いま付いている `?race=` 等は残したまま `dev=1` を足します */
   const [devHref, setDevHref] = useState('?dev=1');
+  /** ★コースを選ぶ板を開いているか（★遊ぶ人の入口から開きます） */
+  const [pickerOpen, setPickerOpen] = useState(false);
+  /**
+   * ★**鞍を切り替える**（★開発卓の選択と、★入口の「ほかのコースを観る」の両方から使います）。
+   *
+   * ⚠️ ★`?race=` は ★**モジュール読み込み時に 1 回だけ**読む形なので、
+   *    ★state を変えるだけでは切り替わりません。★`location.search` を書いて再読込させます。
+   * ⚠️ ★`?surface=` は鞍ごとの馬場を上書きする口なので、★鞍を変えるときは ★**外します**
+   *    （★残すと「ダートの鞍を選んだのに芝」が出ます）。★他の口（`seed` / `dev` 等）は残します。
+   * ★**この規則を 2 か所に書きません。**（★同じものを 2 か所に持つと必ず離れます）
+   */
+  const pickRace = useCallback((raceId: string): void => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('race', raceId);
+    params.delete('surface');
+    window.location.search = params.toString();
+  }, []);
   /**
    * ★**演出を全画面で出しているか**（★携帯のみ）。
    *   ★メニューで選ぶ → 演出開始 → 全画面、★という順にします。
@@ -3400,6 +3417,43 @@ export default function RacePage(): React.JSX.Element {
               setPlaying(true);
             }}
           >{ready && built !== null ? '観る' : '読み込み中…'}</button>
+          <button
+            type="button" className="a-btn rm-pick"
+            onClick={() => { setPickerOpen((v) => !v); }}
+          >{pickerOpen ? 'コースの一覧を閉じる' : 'ほかのコースを観る'}</button>
+          {/*
+            ★**コースを選ぶ**（★2026-09-02・オーナー決定 A 案）。
+            ⚠️ ★`?dev=1` で開発卓を隠したとき、★**コースを見比べる道が 1 本も無くなりました。**
+               ★番組表は競馬場を出しておらず（`races_public` に `course_id` はあるが画面に出ていない）、
+               ★`/race` を直接開くと既定の 1 鞍に固定されます。
+            ★10 場 44 通りの走路を作り込んであるので、★**それを見せるための口**です。
+            ★一覧は `gradedRacesByVenue()`（`@star/scheduler`）から引きます。★画面で組み直しません。
+          */}
+          {pickerOpen && (
+            <div className="rm-picker">
+              {RACES_BY_VENUE.map(({ venue, races }) => (
+                <div key={venue.id} className="rm-venue">
+                  <div className="rm-venue-head">
+                    <span className="rm-venue-name">{venue.name}</span>
+                    <span className="rm-venue-spec">
+                      {venue.turn === 'left' ? '左回り' : '右回り'}・1周 {venue.lapM}m・直線 {venue.homeStretchM}m
+                    </span>
+                  </div>
+                  {races.map((r) => (
+                    <button
+                      key={r.id} type="button"
+                      className={`rm-race${r.id === RACE_SETUP.race.id ? ' on' : ''}`}
+                      onClick={() => { pickRace(r.id); }}
+                    >
+                      <span className="rm-race-grade">{r.grade}</span>
+                      <span className="rm-race-name">{r.name}</span>
+                      <span className="rm-race-cond">{r.surface === 'turf' ? '芝' : 'ダート'} {r.distanceM}m</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
           <div className="rm-entry-foot">
             <a href="/races">番組表から他のレースを選ぶ</a>
             <a href={devHref}>開発用の操作を出す</a>
@@ -3437,12 +3491,7 @@ export default function RacePage(): React.JSX.Element {
           レース{' '}
           <select
             value={RACE_SETUP.race.id}
-            onChange={(e) => {
-              const params = new URLSearchParams(window.location.search);
-              params.set('race', e.target.value);
-              params.delete('surface');
-              window.location.search = params.toString();
-            }}
+            onChange={(e) => { pickRace(e.target.value); }}
             style={{ maxWidth: 320 }}
           >
             {RACES_BY_VENUE.map(({ venue, races }) => (

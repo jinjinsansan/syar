@@ -972,6 +972,76 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   font-family: inherit;
 }
 .rm-watch:disabled { opacity: .5; cursor: default; }
+/* ---------------------------------------------------------------------
+   ★コースを選ぶ（★2026-09-02・オーナー決定 A 案）
+
+   ⚠️ ★`?dev=1` で開発卓を隠したとき、★**コースを見比べる道が 1 本も無くなりました。**
+      ★番組表は競馬場を出しておらず、★`/race` を直接開くと既定の 1 鞍に固定されます。
+   ★10 場 44 通りの走路を作り込んであるので、★それを見せるための口です。
+   --------------------------------------------------------------------- */
+.rm-pick {
+  width: 100%;
+  min-height: 48px;
+  height: auto;
+  margin-top: 1px;
+  font-size: 15px;
+  border: 0;
+  border-top: 2px solid var(--a-line);
+  border-radius: 0;
+  font-family: inherit;
+}
+.rm-picker {
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--a-panel-2);
+  border-top: 2px solid var(--a-line);
+}
+.rm-venue { border-bottom: 1px solid var(--a-line); }
+.rm-venue-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px 6px;
+  background-image: linear-gradient(#fff, #eef6fd);
+}
+.rm-venue-name { font: 900 15px var(--a-jp); color: var(--a-ink); }
+/* ★走路の形を出します。★「見比べる」のはここです */
+.rm-venue-spec { font: 900 11px var(--a-jp); color: var(--a-ink-2); }
+.rm-race {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 14px;
+  border: 0;
+  border-top: 1px solid var(--a-line);
+  background: #fff;
+  color: var(--a-ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.rm-race.on {
+  background: linear-gradient(#fffdf2, #fff3cf);
+  box-shadow: inset 5px 0 0 #f2b012;
+}
+.rm-race-grade {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 22px;
+  border-radius: 5px;
+  background-image: var(--a-gloss-gold);
+  border: 2px solid #8a5a06;
+  font: 900 11px var(--a-jp);
+  color: #4a3105;
+}
+.rm-race-name { flex: 1 1 auto; min-width: 0; font: 900 14px var(--a-jp); }
+.rm-race-cond { flex: 0 0 auto; font: 900 12px var(--a-jp); color: var(--a-ink-2); }
+
 .rm-entry-foot {
   display: flex;
   flex-wrap: wrap;
