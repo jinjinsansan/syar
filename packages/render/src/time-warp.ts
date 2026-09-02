@@ -250,8 +250,20 @@ export const GOAL_REAL_TIME_M = 400;
 export const START_REAL_TIME_M = 60;
 /** ★ゴール前の送り速さ。**1 = 実時間**（脚が実物どおりに回る） */
 export const GOAL_RATE = 1;
-/** 直線の長さ（m）。`replayPositionModel` の `straightMetersLeft` と揃えること */
-const STRAIGHT_M = 400;
+/**
+ * ★**基準の走路の直線の長さ**（m）。★桜星賞（スターパーク 1600m）の値です。
+ *
+ * ⚠️ ★**これは「どの競馬場でも 400m」という意味ではありません。**
+ *    ★10 場 50 鞍の直線は ★**290〜620m の 10 通り**あります（`tools/_terrain.mjs`）。
+ *    ★`0.25 × 距離 == 直線` が成り立つのは ★**桜星賞と月見丘カップの 2 鞍だけ**で、
+ *    ★残り 48 鞍では ★**カットと走路の区間がずれます**（★台帳 A-8・`tools/_cutgeom.mjs`）。
+ *
+ * ★以前この値は ★**この 1 か所と `page.tsx` の 2 か所**に別々に置かれ、
+ *   ★注記で「揃えること」と申し合わせていました。★申し合わせは守られません（★台帳 B-6 と同じ形）。
+ *   → ★`knotsFor` は ★**呼び出し側から必ず受け取ります**（★既定値を置きません）。
+ *   ★この定数は ★**基準の値**としてだけ残し、★「その走路の直線」は `course.homeStretchM` から取ります。
+ */
+export const REFERENCE_STRAIGHT_M = 400;
 
 /**
  * ★勝負所（残り 800〜400m）の送り速さ。**2.8 → 5.2**（2026-08-22）。
@@ -441,8 +453,17 @@ export function timeWarpFor(knots: PhaseKnots, rates: PhaseRates = DEFAULT_PHASE
  */
 export function knotsFor(
   boundaries: readonly (PhaseKnots & { readonly gate: number })[],
-  ownGate?: number,
+  ownGate: number | undefined,
+  /**
+   * ★**その走路の最後の直線の長さ**（m）。★`replayPositionModel` に渡した
+   *   ★`straightMetersLeft` と ★**同じ値**でなければなりません（★境界時刻の意味が変わります）。
+   *
+   * ⚠️ ★**既定値を置きません。** ★以前は 400 の直書きで、★呼び出し側は
+   *    ★「渡し忘れたこと」に気づけませんでした。★`course.homeStretchM` を渡してください。
+   */
+  straightM: number,
 ): PhaseKnots {
+  if (!(straightM > 0)) throw new Error(`直線の長さが不正です: ${straightM}`);
   const list = boundaries;
   if (list.length === 0) throw new Error('境界時刻がありません');
   const own = ownGate === undefined ? undefined : list.find((b) => b.gate === ownGate);
@@ -462,22 +483,29 @@ export function knotsFor(
   const lastFinish = list.reduce((mx, b) => (b.finishSec > mx ? b.finishSec : mx), base.finishSec);
   /**
    * ★ゴール前の実時間区間に入る時刻。
-   *   直線は残り `STRAIGHT_M` から始まるので、残り `GOAL_REAL_TIME_M` に達するのは
-   *   直線の経過のうち `1 - GOAL_REAL_TIME_M / STRAIGHT_M` を過ぎたあたり（等速の近似）。
+   *   直線は残り `straightM` から始まるので、残り `GOAL_REAL_TIME_M` に達するのは
+   *   直線の経過のうち `1 - GOAL_REAL_TIME_M / straightM` を過ぎたあたり（等速の近似）。
    *   ⚠️ ★**基準の馬の `finishSec`** を使います（`lastFinish` は最後の 1 頭なので、
    *      それで割ると区間が後ろにずれます）。
    */
   const straightRace = Math.max(0, base.finishSec - base.straightSec);
-  const goalSec = base.straightSec + straightRace * (1 - GOAL_REAL_TIME_M / STRAIGHT_M);
+  /**
+   * ⚠️ ★**実時間の区間は、直線より長くできません。**
+   *    ★直線 290m の走路（白砂）で `GOAL_REAL_TIME_M = 400` をそのまま割ると
+   *    ★`1 − 400/290 = −0.38` となり、★`goalSec` が `straightSec` **より前**に来ます。
+   *    ★＝「直線に入る前に実時間へ戻る」。★短い直線の場では ★**直線ぜんぶ**を実時間にします。
+   */
+  const goalM = Math.min(GOAL_REAL_TIME_M, straightM);
+  const goalSec = base.straightSec + straightRace * (1 - goalM / straightM);
   /**
    * ★発走直後の実時間区間。
    *
    * ⚠️ ★`knotsFor` は**距離を知りません**（境界時刻しか受け取らない）。
    *    距離を推測して割ると、**距離が変わったとき黙って狂います。**
-   *    → 直線（残り 400m）にかかった時間から **1m あたりの秒数**を求め、
+   *    → 直線（残り `straightM`）にかかった時間から **1m あたりの秒数**を求め、
    *      それで `START_REAL_TIME_M` を換算します。**距離に依存しません。**
    */
-  const secPerM = straightRace / STRAIGHT_M;
+  const secPerM = straightRace / straightM;
   const startRealSec = base.startSec + START_REAL_TIME_M * secPerM;
   return {
     startSec: base.startSec,

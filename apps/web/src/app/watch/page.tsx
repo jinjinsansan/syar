@@ -93,7 +93,7 @@ function build(seed: number, ownGate: number, jostle: number, cruise: number): B
 
   // ★時間配分（D-062）。★道中の送りは**見て決める数字**なので画面から変えられます
   const rates = { ...DEFAULT_PHASE_RATES, cruise };
-  const warp = timeWarpFor(knotsFor(boundaries, ownGate), rates);
+  const warp = timeWarpFor(knotsFor(boundaries, ownGate, model.straightMeters), rates);
 
   return {
     model, warp, pace, order: settled, raceSec: model.raceSec,

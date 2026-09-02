@@ -264,6 +264,8 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
   return {
     raceSec,
     distanceMeter,
+    /** ★`knotsFor` へそのまま渡すこと（`PositionModel` の注記） */
+    straightMeters: straightMetersLeft,
     at(sec: number): readonly HorseAt[] {
       return boundaries.map((b) => {
         const meters = metersOf(b, sec);

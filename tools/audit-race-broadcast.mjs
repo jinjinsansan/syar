@@ -56,7 +56,7 @@ const model = replayPositionModel({
   formationSeed: SEED * 2654435761,
 });
 if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((e) => Number(e.horseId)))) throw new Error('position model mismatch');
-const warp = timeWarpFor(knotsFor(boundaries, 3), ratesForTarget(knotsFor(boundaries, 3), targetDisplaySec(DIST)));
+const warp = timeWarpFor(knotsFor(boundaries, 3, model.straightMeters), ratesForTarget(knotsFor(boundaries, 3, model.straightMeters), targetDisplaySec(DIST)));
 const finishSec = new Map(result.order.map((entry) => [Number(entry.horseId), entry.timeSec]));
 const winnerGate = Number(result.order[0].horseId);
 const TOTAL_DISPLAY = warp.displaySec + 1.2;

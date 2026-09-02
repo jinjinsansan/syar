@@ -156,7 +156,7 @@ const startShownMeters = (meters, raceDisplaySec) =>
  *    ページの私有関数は写していません。
  */
 export function auditClock(built, ownGate = RACE_DEFAULTS.ownGate) {
-  const knots = knotsFor(built.boundaries, ownGate);
+  const knots = knotsFor(built.boundaries, ownGate, built.model.straightMeters);
   const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(built.DIST)));
   const finishSec = new Map(built.boundaries.map((b) => [b.gate, b.finishSec]));
   let finishStyle = 'solo';

@@ -12,6 +12,7 @@ import { sceneAt, sceneFrames, type PositionModel, type SceneInput, type HorseAt
 const model = (n: number): PositionModel => ({
   raceSec: 100,
   distanceMeter: 1600,
+  straightMeters: 400,
   at(sec) {
     const out: HorseAt[] = [];
     for (let g = 1; g <= n; g += 1) {
@@ -54,7 +55,7 @@ describe('★§12.8 描画抽象化', () => {
      */
     const silksAt = (meters: (g: number) => number): (string | undefined)[] => {
       const m: PositionModel = {
-        raceSec: 10, distanceMeter: 1600,
+        raceSec: 10, distanceMeter: 1600, straightMeters: 400,
         at: () => [3, 1, 2].map((g) => ({ gate: g, meters: meters(g), staminaRatio: 1 })),
       };
       return sceneAt({ ...input(), model: m }, 5).commands
@@ -92,7 +93,7 @@ describe('★§12.8 描画抽象化', () => {
   it('★速い馬ほど脚が速く回る（時刻ではなく距離でフレームを決めている）', () => {
     // 同じ時刻で、走った距離が違えばフレームも違いうる
     const fast: PositionModel = {
-      raceSec: 10, distanceMeter: 1600,
+      raceSec: 10, distanceMeter: 1600, straightMeters: 400,
       at: () => [
         { gate: 1, meters: 0, staminaRatio: 1 },
         { gate: 2, meters: 3.5, staminaRatio: 1 },

@@ -172,7 +172,7 @@ const model = replayPositionModel({
 if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((entry) => Number(entry.horseId)))) {
   throw new Error('timeline: position model mismatch');
 }
-const warp = timeWarpFor(knotsFor(boundaries, 3), ratesForTarget(knotsFor(boundaries, 3), targetDisplaySec(DIST)));
+const warp = timeWarpFor(knotsFor(boundaries, 3, model.straightMeters), ratesForTarget(knotsFor(boundaries, 3, model.straightMeters), targetDisplaySec(DIST)));
 const finishSec = new Map(result.order.map((entry) => [Number(entry.horseId), entry.timeSec]));
 const winnerGate = Number(result.order[0].horseId);
 const samples = [];

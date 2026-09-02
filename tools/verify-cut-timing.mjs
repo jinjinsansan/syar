@@ -56,7 +56,7 @@ const model = replayPositionModel({
   strategyOf: (g) => entrants[g - 1].strategy, pace, formationSeed: SEED * 2654435761,
   laneOf: (g, ml) => laneAt(g, FIELD, ml, DIST, SEED),
 });
-const knots = knotsFor(boundaries, OWN_GATE);
+const knots = knotsFor(boundaries, OWN_GATE, model.straightMeters);
 const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
 
 /** 1/60 秒刻みで、そのときのカットを引く */

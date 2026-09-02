@@ -74,12 +74,13 @@ function raceOf(seed) {
   const result = resolveRace({ conditions, entrants, seed, balance: DEFAULT_RACE_BALANCE });
   const { pace } = paceOf(entrants, DEFAULT_RACE_BALANCE);
   const boundaries = replayOf(result, (g) => entrants[g - 1].strategy, pace);
+  const model = replayPositionModel({
+    distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
+    jostle: 0.25, jostleSeed: seed * 2654435761,
+  });
   return {
-    model: replayPositionModel({
-      distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
-      jostle: 0.25, jostleSeed: seed * 2654435761,
-    }),
-    warp: timeWarpFor(knotsFor(boundaries, OWN), RATES),
+    model,
+    warp: timeWarpFor(knotsFor(boundaries, OWN, model.straightMeters), RATES),
   };
 }
 

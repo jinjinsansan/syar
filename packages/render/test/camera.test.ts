@@ -25,6 +25,7 @@ const DIST = 1600;
 const model = (n: number): PositionModel => ({
   raceSec: 100,
   distanceMeter: DIST,
+  straightMeters: 400,
   at(sec) {
     const out: HorseAt[] = [];
     for (let g = 1; g <= n; g += 1) {

@@ -48,7 +48,7 @@ const model = replayPositionModel({
   strategyOf: (g) => entrants[g - 1].strategy, pace, formationSeed: SEED * 2654435761,
   laneOf: (g, ml) => laneAt(g, FIELD, ml, DIST, SEED),
 });
-const knots = knotsFor(boundaries, 3);
+const knots = knotsFor(boundaries, 3, model.straightMeters);
 const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
 
 /** ★画面と同じ手順で `visualScroll` を組む */

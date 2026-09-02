@@ -1156,7 +1156,12 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
    *      オーナー指摘「不合格シーンは除外されていますが尺は 100 秒ありますよ？」で発覚。
    *      ★**道具が画面と同じ経路を通っているかを、毎回確かめること。**
    */
-  const knots = knotsFor(boundaries, ownGate);
+  /**
+   * ⚠️ ★**直線の長さは模型から取ります。** ★ここで数字を書かないこと。
+   *    ★以前は `time-warp.ts` の中に 400 が別に置かれ、★注記で「揃えること」と
+   *    ★申し合わせていました。★申し合わせは守られません（★台帳 B-6 と同じ形）。
+   */
+  const knots = knotsFor(boundaries, ownGate, model.straightMeters);
   const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
   /**
    * ★見た目の速度テーブル。描画と同じ手順（時計 → 位置モデル → 走り抜け → V2 注視点）で

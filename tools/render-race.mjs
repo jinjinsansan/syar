@@ -207,7 +207,7 @@ const sceneInput = {
  * ★**時間配分**（D-062）。道中は速く送り、直線は引き伸ばす。
  *   ⚠️ 着順にも境界にも触れません。**表示の時計を読み替えるだけ**です。
  */
-const warp = timeWarpFor(knotsFor(boundaries, OWN), ratesForTarget(knotsFor(boundaries, OWN), targetDisplaySec(DIST)));
+const warp = timeWarpFor(knotsFor(boundaries, OWN, model.straightMeters), ratesForTarget(knotsFor(boundaries, OWN, model.straightMeters), targetDisplaySec(DIST)));
 console.log(`  ✓ 時間配分: ${model.raceSec.toFixed(1)}秒 → 表示 ${warp.displaySec.toFixed(1)}秒`
   + `（道中 ${warp.rates?.cruise?.toFixed?.(1) ?? '—'}倍速 / 目標 ${targetDisplaySec(DIST)}秒）`);
 

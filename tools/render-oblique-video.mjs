@@ -100,7 +100,7 @@ const model = replayPositionModel({
 if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((e) => Number(e.horseId)))) {
   throw new Error('★D-059: 位置モデルの最終順が着順と違います');
 }
-const knots = knotsFor(boundaries, OWN_GATE);
+const knots = knotsFor(boundaries, OWN_GATE, model.straightMeters);
 const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
 
 /**

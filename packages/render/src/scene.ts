@@ -54,6 +54,15 @@ export interface HorseAt {
 export interface PositionModel {
   readonly raceSec: number;
   readonly distanceMeter: number;
+  /**
+   * ★**この模型が使った「最後の直線の長さ」**（m）。
+   *
+   * ⚠️ ★`knotsFor` は ★**同じ値**で境界時刻を秒/m に直します。★別の値を渡すと、
+   *    ★「直線に入る時刻」と「実時間へ戻る時刻」が食い違い、
+   *    ★寄りのカットが ★**5 倍速の中で始まります**（★2026-08-28 の「馬が後退して見える」）。
+   * → ★**模型が持って回ります。** ★呼び出し側が別に覚えて渡す形にしません（★台帳 B-6 と同じ形）。
+   */
+  readonly straightMeters: number;
   at(sec: number): readonly HorseAt[];
 }
 

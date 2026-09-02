@@ -35,7 +35,7 @@ function profile(jostle, rates) {
     distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
     jostle, jostleSeed: SEED * 2654435761,
   });
-  const warp = timeWarpFor(knotsFor(boundaries, OWN), rates);
+  const warp = timeWarpFor(knotsFor(boundaries, OWN, model.straightMeters), rates);
   const out = [];
   const dt = 0.2;
   for (let d = 0; d + dt <= warp.displaySec; d += dt) {

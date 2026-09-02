@@ -159,6 +159,40 @@ describe('★道具の基準馬', () => {
     }
     expect(offenders, '★基準馬は画面と同じ 3 番にすること').toEqual([]);
   });
+
+  /**
+   * ★**直線の長さを、道具が自分で決めない**（2026-09-02・台帳 A-8）
+   *
+   *   ⚠️ ★`knotsFor` の第 3 引数は ★**その走路の最後の直線の長さ**です。
+   *      ★これが位置模型（`replayPositionModel` の `straightMetersLeft`）と違うと、
+   *      ★「直線に入る時刻」と「実時間へ戻る時刻」が食い違い、
+   *      ★寄りのカットが ★**5 倍速の中で始まります**（★2026-08-28「馬が後退して見える」）。
+   *
+   *   ★以前は `time-warp.ts` の中に 400 が別に置かれ、★注記で「揃えること」と
+   *     ★申し合わせていました。★**申し合わせは守られません**（★台帳 B-6 と同じ形）。
+   *   → ★**模型が持って回ります。** ★道具は `model.straightMeters` を渡すこと。
+   *
+   *   ⚠️ ★10 場 50 鞍の直線は ★**290〜620m の 10 通り**です。★400 と書いた道具は、
+   *      ★48 鞍で ★**画面と違うものを測ります**（R-31）。
+   */
+  it('★`knotsFor` の直線の長さを直書きしない', () => {
+    const dir = fileURLToPath(new URL('../../../tools/', import.meta.url));
+    const offenders: string[] = [];
+    for (const name of readdirSync(dir)) {
+      if (!name.endsWith('.mjs')) continue;
+      const text = readFileSync(new URL(name, new URL('../../../tools/', import.meta.url)), 'utf8');
+      for (const [i, line] of text.split(/\r?\n/).entries()) {
+        if (/^\s*(\*|\/\/)/.test(line)) continue;
+        for (const call of line.matchAll(/knotsFor\(([^)]*)\)/g)) {
+          const args = call[1] ?? '';
+          const third = args.split(',')[2]?.trim() ?? '';
+          if (third === '') { offenders.push(`${name}:${i + 1} ★第3引数がありません`); continue; }
+          if (/^[0-9]/.test(third)) offenders.push(`${name}:${i + 1} ★数値の直書き（${third}）`);
+        }
+      }
+    }
+    expect(offenders, '★直線の長さは `model.straightMeters` から渡すこと').toEqual([]);
+  });
 });
 
 /**

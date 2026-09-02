@@ -262,7 +262,7 @@ function build(seed: number, ownGate: number): Built {
   return {
     model,
     warp: (() => {
-      const knots = knotsFor(boundaries, ownGate);
+      const knots = knotsFor(boundaries, ownGate, model.straightMeters);
       return timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
     })(),
     pace,

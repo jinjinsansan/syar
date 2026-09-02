@@ -119,7 +119,7 @@ describe('★★配分をどう変えても、着順は1頭も動かない（D-0
       DEFAULT_PHASE_RATES,
       { cruise: 12, spurt: 3, straight: 0.1 },
     ]) {
-      const w = timeWarpFor(knotsFor(boundaries, 2), rates);
+      const w = timeWarpFor(knotsFor(boundaries, 2, model.straightMeters), rates);
       // 表示の最後まで送ったとき、全馬の位置がゴール後であること
       const at = model.at(w.raceSecAt(w.displaySec));
       expect(at.every((h) => h.meters >= 1600 - 1e-6)).toBe(true);
@@ -130,12 +130,12 @@ describe('★★配分をどう変えても、着順は1頭も動かない（D-0
 
   it('★局面の折れ点は基準の馬・終点は最後の1頭', () => {
     // 局面（寄る位置）は基準の馬に合わせる ＝ カメラと揃う
-    expect(knotsFor(boundaries, 4).spurtSec).toBe(58);
-    expect(knotsFor(boundaries, 2).spurtSec).toBe(59);
+    expect(knotsFor(boundaries, 4, model.straightMeters).spurtSec).toBe(58);
+    expect(knotsFor(boundaries, 2, model.straightMeters).spurtSec).toBe(59);
     // 指定なし＝先頭（最も早くゴールした馬）を基準にする
-    expect(knotsFor(boundaries).spurtSec).toBe(59);
+    expect(knotsFor(boundaries, undefined, model.straightMeters).spurtSec).toBe(59);
     // ★居ない馬を指定したら先頭に落とす（落ちない）
-    expect(knotsFor(boundaries, 99).spurtSec).toBe(59);
+    expect(knotsFor(boundaries, 99, model.straightMeters).spurtSec).toBe(59);
 
     /**
      * ★**終点は誰を基準にしても同じ**（最後の1頭）。
@@ -143,11 +143,11 @@ describe('★★配分をどう変えても、着順は1頭も動かない（D-0
      *      後続がまだ走っている状態になります。実際にそう書いて検査に落ちました。
      */
     for (const g of [undefined, 1, 2, 3, 4, 99]) {
-      expect(knotsFor(boundaries, g).finishSec).toBe(98.2);
+      expect(knotsFor(boundaries, g, model.straightMeters).finishSec).toBe(98.2);
     }
   });
 
   it('★境界時刻がなければ止める', () => {
-    expect(() => knotsFor([])).toThrow();
+    expect(() => knotsFor([], undefined, 400)).toThrow();
   });
 });
