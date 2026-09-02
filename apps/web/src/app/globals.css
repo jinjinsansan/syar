@@ -393,6 +393,70 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   .tr-menus .a-num { font-size: 16px !important; }
   .tr-menus .a-lbl { font-size: 9.5px !important; }
 
+  /* =====================================================================
+     ★記録（/records）— ★**デザイン第4便**（`components/records-mobile`）
+
+     ★「週｜日付｜レース｜格｜馬｜条件｜着｜賞金」の 8 列表と、
+     ★「日時｜理由｜内容｜増減｜残高」の 5 列表を、★**1 件 ＝ 1 枚のカード**に読み替えます。
+     ⚠️ ★着手前の実測で ★**指で押せない操作が 7 / 13**（★タブ 42px・期間 34px）。
+        ★設計は 40px / 36px ですが、★**正典の 44px を採ります**（★依頼書 §3-C）。
+        ★設計より大きくするぶんには、★設計の意図（並びと優先順位）を損ないません。
+     ===================================================================== */
+
+  /* ★タブは横スクロール。★「参加ポイント（EP）」を省略しないため */
+  .rc-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    align-items: stretch !important;
+    gap: 6px;
+    padding-bottom: 2px;
+  }
+  .rc-tabs > a, .rc-tabs > button {
+    flex: 0 0 auto;
+    height: auto !important;
+    min-height: 44px;
+    white-space: nowrap;
+    padding: 0 14px !important;
+    font-size: 13px !important;
+  }
+  .rc-periods { margin-left: 0 !important; flex: 0 0 auto; }
+  /* 見出しの脇にある文字リンク（景品交換）も指で押せる大きさに */
+  .rc-exch {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 4px;
+  }
+  .rc-periods > a {
+    height: auto !important;
+    min-height: 44px;
+    white-space: nowrap;
+  }
+
+  /*
+   * ★戦績: ★1 段目＝週・日付・レース・格・着／★2 段目＝馬・条件・賞金
+   *
+   * ⚠️ ★**`main ` を付けています。** ★上の「150px 以上の固定幅を解く」規則が
+   *    ★`main [style*="flex:0 0 150px"]` という形で、★**こちらより強い**ためです
+   *    （★属性選択子ぶん詳しさが 1 つ上）。★付けないと ★**レース名が 1 行を占め**ます
+   *    （★実測の絵で確認）。★同じ詳しさなら、★後に書いたこちらが勝ちます。
+   */
+  main .rc-run-week { order: 0; }
+  main .rc-run-date { order: 1; }
+  main .rc-run-race { order: 2; flex: 0 1 auto !important; width: auto !important; }
+  main .rc-run-cls { order: 3; }
+  main .rc-run-place { order: 4; flex: 0 0 auto !important; text-align: right !important; }
+  main .rc-run-horse { order: 5; flex: 0 1 auto !important; min-width: 0 !important; }
+  main .rc-run-cond { order: 6; }
+  main .rc-run-prize { order: 7; flex: 1 0 auto !important; margin-left: auto; }
+
+  /* ★台帳: ★1 段目＝日時・理由・増減／★2 段目＝内容・残高 */
+  main .rc-led-at { order: 0; }
+  main .rc-led-reason { order: 1; }
+  main .rc-led-delta { order: 2; flex: 1 0 auto !important; }
+  main .rc-led-desc { order: 3; flex: 0 1 auto !important; min-width: 0 !important; width: auto !important; }
+  main .rc-led-balance { order: 4; margin-left: auto; }
+
   /* ★見出しの帯も折り返す */
   [data-theme="arcade"] .a-band {
     flex-wrap: wrap;

@@ -54,18 +54,18 @@ function Ledger({ title, gold, reasons, summary, rows, unit, empty }: {
         const inc = INC_REASONS.has(r.reason);
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'center', height: 44, padding: '0 16px', gap: 12, borderTop: '1px solid var(--a-line)', background: i % 2 === 1 ? 'var(--a-panel-2)' : '#fff' }}>
-            <span className="a-num" style={{ width: LCOL.at, flex: `0 0 ${LCOL.at}px`, fontSize: 14, color: 'var(--a-ink-3)' }}>{r.at}</span>
-            <span style={{ width: LCOL.reason, flex: `0 0 ${LCOL.reason}px` }}>
+            <span className="a-num rc-led-at" style={{ width: LCOL.at, flex: `0 0 ${LCOL.at}px`, fontSize: 14, color: 'var(--a-ink-3)' }}>{r.at}</span>
+            <span className="rc-led-reason" style={{ width: LCOL.reason, flex: `0 0 ${LCOL.reason}px` }}>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 6, fontSize: 11, fontWeight: 900,
                 backgroundImage: inc ? 'var(--a-gloss-green)' : 'linear-gradient(#fff,#e9eff5)',
                 border: `2px solid ${inc ? 'var(--a-green-d)' : 'var(--a-edge-soft)'}`, color: inc ? '#fff' : 'var(--a-ink-2)',
               }}>{r.reason}</span>
             </span>
-            <span style={{ flex: 1, minWidth: LCOL.descMin, fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.desc}</span>
+            <span className="rc-led-desc" style={{ flex: 1, minWidth: LCOL.descMin, fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.desc}</span>
             {/* 増減: 減は紙色（ink）／増は緑。PP でも増減に金は使わない（金は板の縁・帯・集計だけ） */}
-            <span className="a-num" style={{ width: LCOL.delta, flex: `0 0 ${LCOL.delta}px`, textAlign: 'right', fontSize: 24, color: r.delta > 0 ? 'var(--a-green-d)' : 'var(--a-ink)' }}>{r.delta > 0 ? `+${fmt(r.delta)}` : `−${fmt(Math.abs(r.delta))}`}</span>
-            <span style={{ width: LCOL.balance, flex: `0 0 ${LCOL.balance}px`, textAlign: 'right', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)', whiteSpace: 'nowrap' }}>残 <span className="a-num" style={{ fontSize: 17, color: 'var(--a-ink-2)' }}>{fmt(r.balance)}</span> {unit}</span>
+            <span className="a-num rc-led-delta" style={{ width: LCOL.delta, flex: `0 0 ${LCOL.delta}px`, textAlign: 'right', fontSize: 24, color: r.delta > 0 ? 'var(--a-green-d)' : 'var(--a-ink)' }}>{r.delta > 0 ? `+${fmt(r.delta)}` : `−${fmt(Math.abs(r.delta))}`}</span>
+            <span className="rc-led-balance" style={{ width: LCOL.balance, flex: `0 0 ${LCOL.balance}px`, textAlign: 'right', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)', whiteSpace: 'nowrap' }}>残 <span className="a-num" style={{ fontSize: 17, color: 'var(--a-ink-2)' }}>{fmt(r.balance)}</span> {unit}</span>
           </div>
         );
       })}
@@ -93,15 +93,15 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
         right={
           <span style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>
             <span>※ デモデータ（ログイン後は本人の台帳だけを表示します）</span>
-            <a href="/prizes" style={{ fontSize: 13, fontWeight: 900 }}>景品交換 →</a>
+            <a className="rc-exch" href="/prizes" style={{ fontSize: 13, fontWeight: 900 }}>景品交換 →</a>
           </span>
         }
       />
 
       {/* タブ（h42・選択中は青グロス＋下辺白で板と繋ぐ）＋右端の期間チップ（h34・選択中は金グロス） */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 14 }}>
+      <div className="rc-tabs" style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 14 }}>
         {TABS.map(([k, label]) => <TabButton key={k} label={label} selected={k === activeTab} href={`/records?tab=${k}&period=${activePeriod}`} />)}
-        <span style={{ display: 'flex', gap: 6, marginLeft: 'auto', paddingBottom: 4 }}>
+        <span className="rc-periods" style={{ display: 'flex', gap: 6, marginLeft: 'auto', paddingBottom: 4 }}>
           {PERIODS.map(([k, label]) => {
             const sel = k === activePeriod;
             return (
@@ -128,15 +128,15 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
           </div>
           {DEMO_RUNS.map((r, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', height: 48, padding: '0 16px', gap: 12, borderTop: '1px solid var(--a-line)', background: i % 2 === 1 ? 'var(--a-panel-2)' : '#fff' }}>
-              <span className="a-num" style={{ width: RCOL.week, flex: `0 0 ${RCOL.week}px`, fontSize: 14, color: 'var(--a-ink-3)' }}>{r.week}週</span>
-              <span className="a-num" style={{ width: RCOL.date, flex: `0 0 ${RCOL.date}px`, fontSize: 14, color: 'var(--a-ink-3)' }}>{r.date}</span>
-              <span style={{ width: RCOL.race, flex: `0 0 ${RCOL.race}px`, fontSize: 15, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.race}</span>
-              <span style={{ width: RCOL.cls, flex: `0 0 ${RCOL.cls}px` }}><ClassChip label={r.classLabel} classRank={r.classRank} h={24} font={12} /></span>
-              <span style={{ flex: 1, minWidth: RCOL.horseMin, fontSize: 15, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.horse}</span>
-              <span style={{ width: RCOL.cond, flex: `0 0 ${RCOL.cond}px`, fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)', whiteSpace: 'nowrap' }}>{r.cond}</span>
+              <span className="a-num rc-run-week" style={{ width: RCOL.week, flex: `0 0 ${RCOL.week}px`, fontSize: 14, color: 'var(--a-ink-3)' }}>{r.week}週</span>
+              <span className="a-num rc-run-date" style={{ width: RCOL.date, flex: `0 0 ${RCOL.date}px`, fontSize: 14, color: 'var(--a-ink-3)' }}>{r.date}</span>
+              <span className="rc-run-race" style={{ width: RCOL.race, flex: `0 0 ${RCOL.race}px`, fontSize: 15, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.race}</span>
+              <span className="rc-run-cls" style={{ width: RCOL.cls, flex: `0 0 ${RCOL.cls}px` }}><ClassChip label={r.classLabel} classRank={r.classRank} h={24} font={12} /></span>
+              <span className="rc-run-horse" style={{ flex: 1, minWidth: RCOL.horseMin, fontSize: 15, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.horse}</span>
+              <span className="rc-run-cond" style={{ width: RCOL.cond, flex: `0 0 ${RCOL.cond}px`, fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)', whiteSpace: 'nowrap' }}>{r.cond}</span>
               {/* 着順: 1着は 28px 赤、それ以外は 22px 紙色 */}
-              <span className="a-num" style={{ width: RCOL.place, flex: `0 0 ${RCOL.place}px`, textAlign: 'center', fontSize: r.place === 1 ? 28 : 22, color: r.place === 1 ? 'var(--a-num-rank)' : 'var(--a-ink)' }}>{r.place}</span>
-              <span style={{ width: RCOL.prize, flex: `0 0 ${RCOL.prize}px`, textAlign: 'right', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}><span className="a-num" style={{ fontSize: 20, color: r.prizePP > 0 ? 'var(--a-num-money)' : 'var(--a-ink-3)' }}>{fmt(r.prizePP)}</span> PP</span>
+              <span className="a-num rc-run-place" style={{ width: RCOL.place, flex: `0 0 ${RCOL.place}px`, textAlign: 'center', fontSize: r.place === 1 ? 28 : 22, color: r.place === 1 ? 'var(--a-num-rank)' : 'var(--a-ink)' }}>{r.place}</span>
+              <span className="rc-run-prize" style={{ width: RCOL.prize, flex: `0 0 ${RCOL.prize}px`, textAlign: 'right', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}><span className="a-num" style={{ fontSize: 20, color: r.prizePP > 0 ? 'var(--a-num-money)' : 'var(--a-ink-3)' }}>{fmt(r.prizePP)}</span> PP</span>
             </div>
           ))}
           {DEMO_RUNS.length === 0 && <p style={{ margin: 0, padding: '14px 16px', fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)', borderTop: '1px solid var(--a-line)' }}>まだ出走記録がありません</p>}
