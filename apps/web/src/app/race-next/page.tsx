@@ -27,6 +27,7 @@ import type { Strategy } from '@star/sim-engine';
 import {
   replayPositionModel, finalOrderOf, timeWarpFor, knotsFor, ratesForTarget, targetDisplaySec,
   ovalCourse, segmentStarts, HORSE_LENGTH_M, frameRoleOf,
+  homeStretchMetersOf,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 
@@ -245,7 +246,7 @@ function build(seed: number, ownGate: number): Built {
   // ★D-059 のゲート。映像が着順を作り変えていないことを、開始時に確かめます
   if (!finalOrderMatches(result, boundaries)) throw new Error('映像の着順が確定着順と違います（D-059）');
   const model = replayPositionModel({
-    distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
+    distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: homeStretchMetersOf(COURSE), boundaries,
     // ★道中は脚質から生成する（Q-P4-38）。走破タイムからは作らない
     strategyOf: (g) => entrants[g - 1]!.strategy,
     // ★横位置はエンジンが引いたものを読むだけ（D-071）

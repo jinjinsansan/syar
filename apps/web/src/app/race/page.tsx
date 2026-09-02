@@ -73,6 +73,7 @@ import {
   type CoatName,
   ratesForTarget,
   targetDisplaySec,
+  homeStretchMetersOf,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 import { raceSetupFromParam, gradedRacesByVenue } from '@star/scheduler';
@@ -1100,8 +1101,13 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
   const { pace } = paceOf(entrants, balance);
   const boundaries = replayOf(result, (g) => entrants[g - 1]!.strategy, pace);
   if (!finalOrderMatches(result, boundaries)) throw new Error('映像の着順が確定着順と違います（D-059）');
+  /**
+   * ⚠️ ★**走路より先に作ります。** ★位置模型は「最後の直線の長さ」を要ります。
+   *    ★以前はここが `400` の直書きで、★**桜星賞（400m）以外の 45 鞍で嘘**でした（台帳 A-8）。
+   */
+  const course = ovalCourse(DIST, COURSE_OPTS);
   const model = replayPositionModel({
-    distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
+    distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: homeStretchMetersOf(course), boundaries,
     // ★道中は脚質から生成する（Q-P4-38）。走破タイムからは作らない
     strategyOf: (g) => entrants[g - 1]!.strategy,
     // ★横位置はエンジンが引いたものを読むだけ（D-071）
@@ -1169,7 +1175,6 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
    *   ★左右回りで注視点は変わらないので、ここは左回りの course で求める。
    */
   const winnerGate = settled[0]!;
-  const course = ovalCourse(DIST, COURSE_OPTS);
   const STEP = 0.05;
   const totalSec = RACE_INTRO_RACE_START_SEC + warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
   // ★ゴール前の展開: 先頭が残り 80m に達した瞬間の位置関係

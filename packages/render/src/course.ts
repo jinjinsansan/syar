@@ -187,6 +187,18 @@ export function ovalCourse(
   return { distance, segments, widthM, homeStretchM, startHeading: -turned };
 }
 
+/**
+ * ★**その走路の「最後の直線」の長さ**（m）。
+ *
+ * ⚠️ ★`course.homeStretchM` を直接読まないこと。★あれは ★**1 周の作り方**の値で、
+ *    ★レース距離が直線より短いときは ★**そこまで積まれていません**
+ *    （`ovalCourse` はゴールから後ろ向きに積むので、最後の区間は `min(直線, 距離)`）。
+ * ★時間割・台本・位置模型の 3 つが ★**同じ値**を見る必要があるので、ここから取ります。
+ */
+export function homeStretchMetersOf(course: Course): number {
+  return Math.min(course.homeStretchM, course.distance);
+}
+
 /** ★`s`（スタートからの中心線距離）がどの区間にあるか */
 export function segmentAt(course: Course, s: number): CourseSegment {
   let acc = 0;

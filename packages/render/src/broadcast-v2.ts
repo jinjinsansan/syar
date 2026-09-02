@@ -1,4 +1,5 @@
-import { segmentStarts, type Course } from './course.js';
+import { homeStretchMetersOf, segmentStarts, type Course } from './course.js';
+import { GOAL_REAL_TIME_M } from './time-warp.js';
 import type { ShotCameraPreset, ShotTarget, ShotView } from './shot-sequence.js';
 
 export type BroadcastV2ShotId =
@@ -1004,7 +1005,78 @@ export const SCRIPT_V3: readonly { readonly until: number; readonly id: Broadcas
 export function broadcastV2ScriptBoundariesM(
   course: Course, script: BroadcastV2Script = DEFAULT_RACE_SCRIPT,
 ): readonly { readonly meters: number; readonly id: BroadcastV2ShotId }[] {
+  if (script === 'v6') return v6BoundariesM(course);
+  /**
+   * ⚠️ ★**旧台本（v3 / v4 / v5）は割合のままにします。**
+   *    ★`?cinematography=v5` は ★**切り戻しの道**です（`script-v6.test.ts`）。
+   *    ★見比べる相手が一緒に動いたら、★何を見比べているのか分からなくなります。
+   */
   return scriptRowsOf(script).map((row) => ({ meters: row.until * course.distance, id: row.id }));
+}
+
+/**
+ * ★**②の正面カットに必ず残す長さ**（m）。
+ *
+ *   ★2026-08-28、★このカットを「4.7 秒 → 2.4 秒に詰める」で処理しようとして
+ *   ★**オーナー判断で撤回**しました（「どんどんカットしていけば品質が下がります」）。
+ *   → ★**直線をどう割るときも、ここを先に取り置きます。**
+ */
+const STRAIGHT_FRONT_M = 80;
+
+/**
+ * ★**台本 v6 の切り替え地点を、走路の実際の形から出す**（2026-09-02・台帳 A-8）
+ *
+ * 【★何が壊れていたか】
+ *   ★以前は ★**距離の割合**で切っていました（`0.750 × 距離` から直線用のカット）。
+ *   ★これが合うのは `0.25 × 距離 == 直線` のときだけで、★**50 鞍中 2 鞍**です。
+ *   ★残り 48 鞍では、★直線用のカメラが ★**コーナーの上に据わり**ます
+ *   （★最悪 銀河賞で **371m 手前**）。★オーナー評「背景がでたらめになっています」。
+ *
+ * 【★2 つの錨】
+ *   ★① ★**寄りのカットは「表示が実時間に戻ってから」始める。**
+ *      ★戻る地点は ★**残り `min(GOAL_REAL_TIME_M, 直線)`**。
+ *      ⚠️ ★直線の頭から始めてはいけません。★直線が 400m より長い場（天河 620m ほか 19 鞍）で、
+ *         ★**5 倍速の中で寄りのカットが始まり**、★「馬が後退して見える」が再発します
+ *         （★2026-08-28 の実害）。★その手前は引きの `side-drive` が受けます。
+ *   ★② ★**その手前は、直線までの距離に対する割合**（★いまと同じ比）。
+ *      ⚠️ ★4 角のカットを 4 角の区間へ**貼り直してはいません**。
+ *         ★桜星賞でも今日 36m ぶん 3 角に食い込んでおり、★**承認済みの絵が動きます**。
+ *         ★別件として台帳に残します。
+ *
+ * 【★カットは 1 つも減りません】（★オーナー決定 2026-09-03「今のカット数が限界」）
+ *   ★直線が短い場でも 4 つのまま。★②の 80m を先に取り置き、
+ *   ★残りを ①③④ が ★**7 : 7 : 6**（★いまと同じ比）で分けます。
+ *
+ * 【★桜星賞では 1m も変わりません】
+ *   ★直線 400m ⇒ 残り 320m を 7:7:6 ⇒ ★**112 / 80 / 112 / 96** ＝ 今日と同じ。
+ */
+function v6BoundariesM(course: Course): readonly { readonly meters: number; readonly id: BroadcastV2ShotId }[] {
+  const distance = course.distance;
+  /** ★最後の直線（★`homeStretchMetersOf` の注記 — 距離が短ければ切り詰められています） */
+  const homeStretch = homeStretchMetersOf(course);
+  /** ★表示が実時間へ戻る地点（★寄りのカットはここから・上の錨①） */
+  const closeInM = Math.min(GOAL_REAL_TIME_M, homeStretch);
+  const closeStart = distance - closeInM;
+  /**
+   * ★②に取り置く長さ。★直線が極端に短いときだけ縮みます（★実データの最短は 290m なので効きません）。
+   *   ★半分を上限にするのは、★②だけで直線を食い尽くさないためです。
+   */
+  const front = Math.min(STRAIGHT_FRONT_M, closeInM * 0.5);
+  const rest = Math.max(0, closeInM - front);
+  const b1 = closeStart + rest * (7 / 20);
+  const b2 = b1 + front;
+  const b3 = b2 + rest * (7 / 20);
+  /** ★直線より手前は、★**直線までの距離に対する割合**（上の錨②）。★割る相手が変わっただけです */
+  const preRows = SCRIPT_V6.slice(0, 5);
+  const preSpan = SCRIPT_V6[4]!.until;
+  const pre = preRows.map((row) => ({ meters: closeStart * (row.until / preSpan), id: row.id }));
+  return [
+    ...pre,
+    { meters: b1, id: 'straight-contest' as BroadcastV2ShotId },
+    { meters: b2, id: 'homestretch-front' as BroadcastV2ShotId },
+    { meters: b3, id: 'straight-contest' as BroadcastV2ShotId },
+    { meters: distance, id: 'finish-line' as BroadcastV2ShotId },
+  ];
 }
 
 /**
@@ -1024,8 +1096,9 @@ export function broadcastV2ScriptBoundariesM(
 export function broadcastV2ShotEndM(
   course: Course, shotId: BroadcastV2ShotId, script: BroadcastV2Script = DEFAULT_RACE_SCRIPT,
 ): number | undefined {
-  const row = scriptRowsOf(script).find((r) => r.id === shotId);
-  return row === undefined ? undefined : row.until * course.distance;
+  /** ⚠️ ★境界は 1 か所から取ります（`broadcastV2ShotAt` の注記） */
+  const row = broadcastV2ScriptBoundariesM(course, script).find((r) => r.id === shotId);
+  return row === undefined ? undefined : row.meters;
 }
 
 /**
@@ -1579,13 +1652,19 @@ export function broadcastV2ShotAt(
   if (allFinished) return options.winnerRear === true ? SHOTS['winner-follow-rear'] : SHOTS['winner-follow'];
   const script = options.script ?? DEFAULT_RACE_SCRIPT;
   if (script !== 'v2') {
-    const rows = scriptRowsOf(script);
-    const frac = Math.max(0, leaderMeters) / Math.max(1, course.distance);
-    for (const row of rows) {
-      if (frac < row.until) {
+    /**
+     * ⚠️ ★**境界は 1 か所（`broadcastV2ScriptBoundariesM`）からしか取りません。**
+     *    ★以前はここと `broadcastV2ShotEndM` と境界一覧の ★**3 か所**が
+     *    ★それぞれ `until × 距離` を掛けていました。★走路から出す式に変えるとき、
+     *    ★1 つ書き換え忘れれば ★**カメラの据え位置だけが古い場所**に残ります。
+     */
+    const bounds = broadcastV2ScriptBoundariesM(course, script);
+    const meters = Math.max(0, leaderMeters);
+    for (const b of bounds) {
+      if (meters < b.meters) {
         // 4 角の正面固定は正面寄り素材が無いときは俯瞰ワイドで代用
-        if (row.id === 'fourth-corner-front' && options.fourthCornerFront === false) return SHOTS['fourth-corner-wide'];
-        return SHOTS[row.id];
+        if (b.id === 'fourth-corner-front' && options.fourthCornerFront === false) return SHOTS['fourth-corner-wide'];
+        return SHOTS[b.id];
       }
     }
     return SHOTS['finish-line'];
