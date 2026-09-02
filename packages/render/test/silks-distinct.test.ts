@@ -90,6 +90,13 @@ describe('勝負服の色', () => {
      *    ★横から見た伏せた騎手は、★服のいちばん広い部分がその帯です。
      */
     const page = readFileSync('apps/web/src/app/race/page.tsx', 'utf8');
-    expect(page).toContain('const useCap = saddlecloth || (helmet && !jacket);');
+    /**
+     * ⚠️ ★**この判定は 2 行に分かれました**（2026-09-02・下敷きを詰めた便）。
+     *    ★塗る所を先に 1 度だけ決め（`region`）、★12 頭はそれを読むだけになったので、
+     *    ★式そのものは `region` を作る行に移りました。★**中身は 1 文字も変えていません。**
+     *    ★どちらの行も見ます（★片方だけ残っても気づけるように）。
+     */
+    expect(page).toContain('region[mask] = (saddlecloth || (helmet && !jacket)) ? 1 : 2;');
+    expect(page).toContain('const useCap = kind === 1;');
   });
 });

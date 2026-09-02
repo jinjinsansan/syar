@@ -616,70 +616,173 @@ function silksOverlays(
     Number.parseInt(hex.slice(3, 5), 16),
     Number.parseInt(hex.slice(5, 7), 16),
   ];
+  /**
+   * ★**どの画素を塗るかは、1 度だけ決めます**（2026-09-02）。
+   *
+   * 【★なぜ】★以前は ★**同じ判定を 12 頭ぶん繰り返して**いました。
+   *    ★窓の内外・彩度・肌の判定は ★**馬番にまったく依存しません**（★依存するのは色だけ）。
+   *    ★12 回のうち 11 回は、同じ答えを出し直していたことになります。
+   *
+   * ⚠️ ★**判定を 2 か所に持ちません。** ★ここで作った `region` を 12 頭が読みます。
+   *    ★写して置くと、★片方だけ直した日に ★**別々の絵が出ます**（R-30）。
+   *
+   * ★`region` … 0 = 塗らない ／ 1 = 枠色（帽子・鞍布） ／ 2 = 馬ごとの色（上着）
+   */
+  const region = new Uint8Array(width * height);
+  const shadeOf = new Float64Array(width * height);
+  const alphaOf = new Uint8Array(width * height);
+  let minX = width; let minY = height; let maxX = -1; let maxY = -1;
+  for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+    const index = (y * width + x) * 4;
+    const r = input[index] ?? 0; const g = input[index + 1] ?? 0; const b = input[index + 2] ?? 0; const a = input[index + 3] ?? 0;
+    const nx = (x + x0 - source.x) / source.width;
+    const ny = (y + y0 - source.y) / source.height;
+    const helmet = nx >= layout.helmet[0] && nx <= layout.helmet[1] && ny <= layout.helmet[2];
+    const jacket = nx >= layout.jacket[0] && nx <= layout.jacket[1] && ny >= layout.jacket[2] && ny <= layout.jacket[3];
+    const saddlecloth = nx >= layout.saddlecloth[0] && nx <= layout.saddlecloth[1]
+      && ny >= layout.saddlecloth[2] && ny <= layout.saddlecloth[3];
+    if (!helmet && !jacket && !saddlecloth) continue;
+    const spread = Math.max(r, g, b) - Math.min(r, g, b);
+    if (a < 16 || spread > (helmet ? 62 : 34) || Math.max(r, g, b) < (helmet ? 42 : 72)) continue;
+    /**
+     * ★**肌は塗りません**（2026-08-21・オーナー評「騎手の肌の色が白いのがいる」）。
+     *
+     * ⚠️ 上の条件は「彩度が低く、暗すぎない」画素を勝負服とみなします。
+     *    明るい肌（例 231/180/148・彩度差 83）は彩度で弾かれますが、
+     *    ★**陰になった肌**（例 150/130/120・彩度差 30）は**条件を通ってしまいます。**
+     *    首すじ・手の甲・頬がここに入り、淡い勝負服だと**白く塗り潰されます。**
+     *
+     *   素材の勝負服は**無彩色の灰／白**で作らせているので（生成プロンプトで指定）、
+     *   窓の中に R>G>B の肌色相があれば、それは**肌です。**
+     */
+    if (isSkinTone(r, g, b)) continue;
+    const luminance = (r + g + b) / (3 * 255);
+    /**
+     * ★**重なった帯は「上着」が勝ちます**（2026-08-28・オーナー指摘）。
+     *
+     * ⚠️ ★兜と上着の窓は**重なっています**（`SILKS_LAYOUT_CROUCH` は
+     *    兜 ny≤0.23 / 上着 ny 0.08〜0.39 で **0.08〜0.23 が重複**）。
+     *    ★最初これを `helmet || saddlecloth` と書いたため、★**重なった帯が全部
+     *    帽子の色（＝枠色）**で塗られました。★横から見た伏せた騎手は、
+     *    ★**服のいちばん広い部分がまさにその帯**です。
+     *    → 実画面で ★**7番と8番が同じ緑・11番と12番が同じピンク**になっていました。
+     *    ⚠️ ★ゲート（`diag-front-v2`）は重なりが 0.06〜0.10 と狭いので正しく出ており、
+     *       ★オーナー評「ゲートでは違うのにレース中は同じ」はこの差でした。
+     *
+     * ★窓は「兜は上着より上」「鞍布は上着より下」という**上下の並び**で意味を持ちます。
+     *   ★重なりでは**内側（上着・鞍布）を優先**します。
+     */
+    const mask = y * width + x;
+    region[mask] = (saddlecloth || (helmet && !jacket)) ? 1 : 2;
+    shadeOf[mask] = 0.30 + luminance * 0.78;
+    alphaOf[mask] = Math.round(a * 0.94);
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  /**
+   * ★ゼッケンの数字が入る箱も、★捨ててよい範囲から外します。
+   *
+   * ⚠️ ★**書体の寸法を見積もりません。実際に一度描いて、★出た画素を測ります。**
+   *    ★見積もると、★端末の書体が違った日に ★**数字の端が欠けます**（★見積もりは
+   *    ★こちらの端末でしか確かめられません）。★下敷きは十分に広く取ってあるので、
+   *    ★測り損ねても ★**その広い箱がそのまま残る**だけです（R-27・狭い側へ倒さない）。
+   */
+  const drawsNumber = layout.number[0] >= 0;
+  const numberFont = Math.max(42, Math.round(source.height * 0.068));
+  const numberLine = Math.max(4, source.height * 0.006);
+  if (drawsNumber) {
+    const pad = Math.ceil(numberFont * 1.4 + numberLine + 4);
+    const cx = source.x + source.width * layout.number[0] - x0;
+    const cy = source.y + source.height * layout.number[1] - y0;
+    let inkX0 = -pad; let inkY0 = -pad; let inkX1 = pad; let inkY1 = pad;
+    const probe = document.createElement('canvas'); probe.width = pad * 2; probe.height = pad * 2;
+    const probeCtx = probe.getContext('2d', { willReadFrequently: true });
+    if (probeCtx !== null) {
+      probeCtx.font = `bold ${numberFont}px sans-serif`;
+      probeCtx.textAlign = 'center'; probeCtx.textBaseline = 'middle';
+      probeCtx.lineWidth = numberLine;
+      probeCtx.strokeStyle = '#000'; probeCtx.fillStyle = '#fff';
+      for (let index = 0; index < colors.length; index += 1) {
+        probeCtx.strokeText(String(index + 1), pad, pad);
+        probeCtx.fillText(String(index + 1), pad, pad);
+      }
+      const ink = probeCtx.getImageData(0, 0, pad * 2, pad * 2).data;
+      let left = pad * 2; let top = pad * 2; let right = -1; let bottom = -1;
+      for (let y = 0; y < pad * 2; y += 1) for (let x = 0; x < pad * 2; x += 1) {
+        if ((ink[(y * pad * 2 + x) * 4 + 3] ?? 0) === 0) continue;
+        if (x < left) left = x; if (x > right) right = x;
+        if (y < top) top = y; if (y > bottom) bottom = y;
+      }
+      if (right >= left && bottom >= top) {
+        inkX0 = left - pad; inkX1 = right - pad + 1;
+        inkY0 = top - pad; inkY1 = bottom - pad + 1;
+      }
+    }
+    minX = Math.min(minX, Math.floor(cx + inkX0)); maxX = Math.max(maxX, Math.ceil(cx + inkX1));
+    minY = Math.min(minY, Math.floor(cy + inkY0)); maxY = Math.max(maxY, Math.ceil(cy + inkY1));
+  }
+  /**
+   * ★**下敷きを、実際に塗る所まで詰めます**（2026-09-02・残 A-12）。
+   *
+   * 【★なぜ】★下敷きは素材の窓と同じ大きさで作っていましたが、
+   *    ★そこに絵が乗るのは ★**半分ほど**でした（★実測 34〜66%・6 組平均で 55%）。
+   *    ★12 頭ぶん抱えるので、★**残りは丸ごと空白のキャンバス**です。
+   *    ★実測（`/race?baked=1`・PC 幅）★**174MB → 130MB**。
+   *
+   * ⚠️ ★**ここは「1px も変わらない」ではありません。**（★2026-09-02・実測）
+   *    ★塗る画素は 1 つも捨てていません。★置く位置も式のうえでは同じです
+   *    （★`offsetX` が増えた分だけ切り出しが左へずれ、★差し引き 0）。
+   *    ★それでも ★**縮小の丸めが変わります** — ★ブラウザは下敷きの矩形ごと
+   *    ★縮めるので、★下敷きの大きさが変われば ★**標本の格子が動きます。**
+   *    ★実測（14/24/34 秒・1280×720）: ★違う成分 ★**0.3〜1.1%**・★最大差 ★**53/255**。
+   *    ★3 倍に拡大して並べても見分けられませんが、★**0 ではありません。**
+   *    → ★このコミットだけを戻せば、★元の画素に戻ります。
+   *
+   * ⚠️ ★1 画素も塗らないコマは ★**従来の大きさのまま**返します（R-27・狭い側へ倒さない）。
+   */
+  /**
+   * ★**透明な縁を少し残します。** ★縁で切ると、★縮小の標本が「外は透明」でなく
+   *   ★「端の色のまま」を読み、★輪郭が硬くなります。★実測で最大差が ★**111 → 53** に半減。
+   *   ★費用は ★**2MB**（★128MB → 130MB）。★これ以上広げても差は詰まりません
+   *   （★実測 24px でも最大差 15 で下げ止まり・★代わりに 146MB へ戻ります）。
+   */
+  const SILK_CROP_PAD = 2;
+  const cropX0 = maxX < 0 ? 0 : Math.max(0, minX - SILK_CROP_PAD);
+  const cropY0 = maxY < 0 ? 0 : Math.max(0, minY - SILK_CROP_PAD);
+  const cropW = maxX < 0 ? width : Math.max(1, Math.min(width, maxX + 1 + SILK_CROP_PAD) - cropX0);
+  const cropH = maxY < 0 ? height : Math.max(1, Math.min(height, maxY + 1 + SILK_CROP_PAD) - cropY0);
+  const offsetXSourcePx = x0 + cropX0;
+  const offsetYSourcePx = y0 + cropY0;
   return colors.map((pair, colorIndex) => {
     /** ★帽子と鞍布は枠色、上着は馬ごとの色（実際の競馬と同じ形・`silkRoleOf` の注記） */
     const [capR, capG, capB] = rgbOf(pair.cap);
     const [bodyR, bodyG, bodyB] = rgbOf(pair.body);
-    const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
-    const ctx = canvas.getContext('2d'); if (ctx === null) return { image: canvas, width, height, offsetXSourcePx: x0, offsetYSourcePx: y0 };
-    const output = ctx.createImageData(width, height);
-    for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
-      const index = (y * width + x) * 4;
-      const r = input[index] ?? 0; const g = input[index + 1] ?? 0; const b = input[index + 2] ?? 0; const a = input[index + 3] ?? 0;
-      const nx = (x + x0 - source.x) / source.width;
-      const ny = (y + y0 - source.y) / source.height;
-      const helmet = nx >= layout.helmet[0] && nx <= layout.helmet[1] && ny <= layout.helmet[2];
-      const jacket = nx >= layout.jacket[0] && nx <= layout.jacket[1] && ny >= layout.jacket[2] && ny <= layout.jacket[3];
-      const saddlecloth = nx >= layout.saddlecloth[0] && nx <= layout.saddlecloth[1]
-        && ny >= layout.saddlecloth[2] && ny <= layout.saddlecloth[3];
-      if (!helmet && !jacket && !saddlecloth) continue;
-      const spread = Math.max(r, g, b) - Math.min(r, g, b);
-      if (a < 16 || spread > (helmet ? 62 : 34) || Math.max(r, g, b) < (helmet ? 42 : 72)) continue;
-      /**
-       * ★**肌は塗りません**（2026-08-21・オーナー評「騎手の肌の色が白いのがいる」）。
-       *
-       * ⚠️ 上の条件は「彩度が低く、暗すぎない」画素を勝負服とみなします。
-       *    明るい肌（例 231/180/148・彩度差 83）は彩度で弾かれますが、
-       *    ★**陰になった肌**（例 150/130/120・彩度差 30）は**条件を通ってしまいます。**
-       *    首すじ・手の甲・頬がここに入り、淡い勝負服だと**白く塗り潰されます。**
-       *
-       *   素材の勝負服は**無彩色の灰／白**で作らせているので（生成プロンプトで指定）、
-       *   窓の中に R>G>B の肌色相があれば、それは**肌です。**
-       */
-      if (isSkinTone(r, g, b)) continue;
-      const luminance = (r + g + b) / (3 * 255);
-      const shade = 0.30 + luminance * 0.78;
-      /**
-       * ★**重なった帯は「上着」が勝ちます**（2026-08-28・オーナー指摘）。
-       *
-       * ⚠️ ★兜と上着の窓は**重なっています**（`SILKS_LAYOUT_CROUCH` は
-       *    兜 ny≤0.23 / 上着 ny 0.08〜0.39 で **0.08〜0.23 が重複**）。
-       *    ★最初これを `helmet || saddlecloth` と書いたため、★**重なった帯が全部
-       *    帽子の色（＝枠色）**で塗られました。★横から見た伏せた騎手は、
-       *    ★**服のいちばん広い部分がまさにその帯**です。
-       *    → 実画面で ★**7番と8番が同じ緑・11番と12番が同じピンク**になっていました。
-       *    ⚠️ ★ゲート（`diag-front-v2`）は重なりが 0.06〜0.10 と狭いので正しく出ており、
-       *       ★オーナー評「ゲートでは違うのにレース中は同じ」はこの差でした。
-       *
-       * ★窓は「兜は上着より上」「鞍布は上着より下」という**上下の並び**で意味を持ちます。
-       *   ★重なりでは**内側（上着・鞍布）を優先**します。
-       */
-      const useCap = saddlecloth || (helmet && !jacket);
+    const canvas = document.createElement('canvas'); canvas.width = cropW; canvas.height = cropH;
+    const box = { image: canvas, width: cropW, height: cropH, offsetXSourcePx, offsetYSourcePx };
+    const ctx = canvas.getContext('2d'); if (ctx === null) return box;
+    const output = ctx.createImageData(cropW, cropH);
+    for (let y = 0; y < cropH; y += 1) for (let x = 0; x < cropW; x += 1) {
+      const mask = (y + cropY0) * width + (x + cropX0);
+      const kind = region[mask] ?? 0;
+      if (kind === 0) continue;
+      const shade = shadeOf[mask] ?? 0;
+      const useCap = kind === 1;
+      const index = (y * cropW + x) * 4;
       output.data[index] = Math.min(255, (useCap ? capR : bodyR) * shade);
       output.data[index + 1] = Math.min(255, (useCap ? capG : bodyG) * shade);
       output.data[index + 2] = Math.min(255, (useCap ? capB : bodyB) * shade);
-      output.data[index + 3] = Math.round(a * 0.94);
+      output.data[index + 3] = alphaOf[mask] ?? 0;
     }
     ctx.putImageData(output, 0, 0);
-    if (layout.number[0] < 0) { ctx.putImageData(output, 0, 0); return { image: canvas, width, height, offsetXSourcePx: x0, offsetYSourcePx: y0 }; }
-    const numberX = source.x + source.width * layout.number[0] - x0;
-    const numberY = source.y + source.height * layout.number[1] - y0;
-    ctx.font = `bold ${Math.max(42, Math.round(source.height * 0.068))}px sans-serif`;
+    if (!drawsNumber) return box;
+    const numberX = source.x + source.width * layout.number[0] - offsetXSourcePx;
+    const numberY = source.y + source.height * layout.number[1] - offsetYSourcePx;
+    ctx.font = `bold ${numberFont}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.lineWidth = Math.max(4, source.height * 0.006);
+    ctx.lineWidth = numberLine;
     ctx.strokeStyle = 'rgba(0,0,0,0.78)'; ctx.strokeText(String(colorIndex + 1), numberX, numberY);
     ctx.fillStyle = '#fff'; ctx.fillText(String(colorIndex + 1), numberX, numberY);
-    return { image: canvas, width, height, offsetXSourcePx: x0, offsetYSourcePx: y0 };
+    return box;
   });
 }
 
