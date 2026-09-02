@@ -385,6 +385,14 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
     text-align: right;
   }
 
+  /*
+   * ★調教のメニュー札（★2 列に詰めるぶん、中身を設計の寸法へ）。
+   *   ★見出し 16px ／ 効果 12px ／ 副効果 11px ／ 疲労の数字 28px → 16px。
+   * ⚠️ ★数字だけ大きいまま 2 列にすると、★**数字が札からはみ出します**。
+   */
+  .tr-menus .a-num { font-size: 16px !important; }
+  .tr-menus .a-lbl { font-size: 9.5px !important; }
+
   /* ★見出しの帯も折り返す */
   [data-theme="arcade"] .a-band {
     flex-wrap: wrap;
@@ -685,6 +693,13 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
 @media (max-width: 430px) {
   .a-cards, .a-cards.c3 { grid-template-columns: 1fr; }
   .a-cards.c8 { grid-template-columns: repeat(4, 1fr); }
+  /*
+   * ★調教の 8 メニューは ★**2 列のまま**にします（★デザイン第4便: 4列x2段 → 2列x4段）。
+   * ⚠️ ★1 列に落とすと ★**縦に 8 枚**並び、★ページが 6,444px になりました（★実測）。
+   *    ★8 つを見比べて 1 つ選ぶ画面なので、★**並べて比べられること**が中身です。
+   *    ★1 列は「はみ出し 0」にはなりますが、★選ぶための画面ではなくなります。
+   */
+  .a-cards.tr-menus { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* ---------------------------------------------------------------------
