@@ -1218,6 +1218,26 @@ export default function RacePage(): React.JSX.Element {
    *   ★タッチ対応の PC まで止めてしまいます）。★900px 以下＝ 携帯・タブレット。
    */
   const [tooHeavy, setTooHeavy] = useState(false);
+  /**
+   * ★**携帯・タブレットか**（★2026-09-02・オーナー要望②）。
+   *
+   * ⚠️ ★**向きでは決めません。短辺で決めます。** ★向きで決めると、★回すたびに
+   *    ★画面の作り（メニューか全画面か）が入れ替わります。
+   * ★条件は蓋と同じ「触れるがマウスが無い ＋ 短辺 900px 以下」です（★1 か所に揃える）。
+   */
+  const [smallScreen, setSmallScreen] = useState(false);
+  /**
+   * ★**演出を全画面で出しているか**（★携帯のみ）。
+   *   ★メニューで選ぶ → 演出開始 → 全画面、★という順にします。
+   * ⚠️ ★`playing` とは別に持ちます。★レースが終わると `playing` は false になりますが、
+   *    ★そこで全画面を畳むと ★**着順ボードを見る前にメニューへ戻ります**。
+   */
+  const [stageFull, setStageFull] = useState(false);
+  /**
+   * ★**窓の実寸**（★回転と縮尺を出すため）。
+   * ⚠️ ★CSS の `100vh` は iOS で URL バーのぶんずれるので、★JS の実測を使います。
+   */
+  const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const [built, setBuilt] = useState<Built | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [clock, setClock] = useState(0);
@@ -1245,6 +1265,24 @@ export default function RacePage(): React.JSX.Element {
     setTrackCondition(conditionFromSearch(window.location.search));
     setShowEntryBoard(new URLSearchParams(window.location.search).get('entryBoard') === '1');
   }, []);
+  /**
+   * ★**端末の見立てと窓の実寸**を持つ。
+   * ⚠️ ★`smallScreen` は**最初に 1 回だけ**決めます。★回しても変えません（上の注記）。
+   */
+  useEffect(() => {
+    const measure = (): void => { setViewport({ w: window.innerWidth, h: window.innerHeight }); };
+    measure();
+    setSmallScreen(
+      window.matchMedia('(hover: none) and (pointer: coarse)').matches
+      && Math.min(window.innerWidth, window.innerHeight) <= 900,
+    );
+    window.addEventListener('resize', measure);
+    window.addEventListener('orientationchange', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
+    };
+  }, []);
   useEffect(() => {
     let cancelled = false;
     const boot = async (): Promise<void> => {
@@ -1261,21 +1299,23 @@ export default function RacePage(): React.JSX.Element {
        *    ★携帯・タブレットだけが「触れるがマウスは無い」に該当します。
        * ★短辺の条件も残します（★どちらか一方では、いつか別の機械で外します）。
        */
-      /**
-       * ★**焼いた素材で描くか**（`?baked=1`）。
-       *
-       * ⚠️ ★**既定は従来どおり**です（R-15「新しい機構は入っているが使われない状態で一度置く」）。
-       *    ★`/race?baked=1` と `/race` を ★**同じ画面で見比べられる**ようにしてあります。
-       *    ★既定を移すのは、★オーナーが見比べて決めたあとです。
-       * ⚠️ ★`?baked=1` は ★**蓋も外します。** ★蓋は「重い初期化を始めない」ための仮のもので、
-       *    ★焼いた素材で重くないことを ★**実機で確かめられなければ外せません**。
-       */
-      const bakedParam = new URLSearchParams(window.location.search).get('baked');
-      const wantBaked = bakedParam === '1';
       const touchOnly = typeof window !== 'undefined'
         && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
       const shortSide = typeof window === 'undefined' ? 9999 : Math.min(window.innerWidth, window.innerHeight);
       const smallTouch = touchOnly && shortSide <= 900;
+      /**
+       * ★**焼いた素材で描くか**。
+       *
+       *   ★`?baked=1` … 必ず使う ／ ★`?baked=0` … 必ず使わない ／ ★省略時は端末で決めます。
+       *
+       * ⚠️ ★**携帯・タブレットでは既定で使います**（2026-09-02）。
+       *    ★従来の経路は起動時に ★**キャンバス 992 枚・2,398MB** を確保し、★実機で開けません
+       *    （★蓋はそのための仮の措置でした）。★焼いた素材でなければ ★**そもそも映せません**。
+       *    ★オーナー実機確認済み（2026-09-02・縦画面で表示できることを確認）。
+       * ⚠️ ★**PC の既定は従来のまま**です（R-15）。★見比べが済むまで動かしません。
+       */
+      const bakedParam = new URLSearchParams(window.location.search).get('baked');
+      const wantBaked = bakedParam === '0' ? false : (bakedParam === '1' || smallTouch);
       if (smallTouch && !wantBaked) { setTooHeavy(true); return; }
       const pal = await fetch(`/art/palette.json?v=${ASSET_VERSION}`).then((r) => r.json());
       /**
@@ -3064,6 +3104,19 @@ export default function RacePage(): React.JSX.Element {
   const seekBy = useCallback((delta: number): void => { seekTo(dRef.current + delta); }, [seekTo]);
   // ★スライダーの位置は `dRef`（ref）では追えないので、表示用の state を並走させる
   const [seekPos, setSeekPos] = useState(0);
+  /**
+   * ★**最初から**。★全画面の中からも押せるので、★同じ処理を 2 か所に書かないためにここへ出します
+   *   （★同じものを 2 か所に持つと必ず離れます・台帳 B-6 と同じ形）。
+   */
+  const resetToStart = useCallback((): void => {
+    dRef.current = 0;
+    callRef.current = [];
+    callStartRef.current = [];
+    callKeyRef.current = '';
+    callLastSecRef.current = -Infinity;
+    sectionTagRef.current = { label: '', sinceSec: -Infinity };
+    setClock(0); setSeekPos(0); setPlaying(false); render(0);
+  }, [render]);
 
   useEffect(() => {
     if (!playing || built === null) return;
@@ -3089,10 +3142,94 @@ export default function RacePage(): React.JSX.Element {
     return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
   }, [playing, built, render]);
 
+  /** ★全画面のあいだは背後の頁を動かさない（★指が滑って裏がスクロールするのを止める） */
+  useEffect(() => {
+    if (!stageFull) return undefined;
+    const before = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = before; };
+  }, [stageFull]);
+  /**
+   * ★全画面とメニューでは ★**画布が別の場所に置き直されます**（React が張り替えます）。
+   *   ★張り替えた直後の画布は空なので、★同じ表示秒でもう一度描きます。
+   */
+  useEffect(() => { render(dRef.current); }, [stageFull, render]);
+
+  /**
+   * ★**全画面の向きと縮尺。**
+   *
+   *   ★画布は 1280x720 の横長です。★縦の画面では ★**90° 回して**埋めます
+   *     （★動画アプリの全画面と同じ振る舞い。★見る人は端末を横にします）。
+   *     ★実測 390x844 の端末で ★**馬の高さ 71px → 127px**（★画面の使用率 26% → 82%）。
+   * ⚠️ ★**端末を横にしたら回転をやめます。** ★窓が横長になったのに回したままだと、
+   *    ★二重に回って横倒しになります（★回転ロック中の人は縦のまま＝回したままが正しい）。
+   */
+  const stagePortrait = viewport.h > viewport.w;
+  const stageScale = viewport.w === 0 ? 1 : Math.min(
+    (stagePortrait ? viewport.h : viewport.w) / W,
+    (stagePortrait ? viewport.w : viewport.h) / H,
+  );
+  /**
+   * ★全画面の中に置くボタンは ★**画布と一緒に縮みます。**
+   *   ★指で押せる 44px を保つため、★縮尺で割った値を渡します。
+   */
+  const stagePx = (px: number): number => Math.round(px / Math.max(0.2, stageScale));
+  /** ★全画面のボタンの見た目（★1 か所に置く） */
+  const stageBtnStyle = {
+    height: stagePx(44), padding: `0 ${stagePx(16)}px`, fontSize: stagePx(15),
+    border: 0, borderRadius: stagePx(6), cursor: 'pointer',
+    background: 'rgba(20,18,15,0.82)', color: '#efe9dc', fontWeight: 'bold' as const,
+  };
+
+  /**
+   * ★**携帯では、演出を出す前にメニューを見せます**（★2026-09-02・オーナー要望②）。
+   *
+   *   ⚠️ ★以前は選択のプルダウンが ★**画面の上にずっと居座り**、★縦画面では
+   *      ★スクロールしないと映像に届かず、★届いても幅いっぱいの帯にしかなりませんでした。
+   *   → ★**選ぶ**（メニュー）→ ★**演出開始**（全画面）→ ★**メニューへ戻る**、の 3 状態にします。
+   */
+  if (stageFull) {
+    return (
+      <div className="race-stage-full">
+        <div
+          style={{
+            position: 'absolute', top: '50%', left: '50%', width: W, height: H,
+            transformOrigin: 'center',
+            transform: `translate(-50%, -50%) rotate(${stagePortrait ? 90 : 0}deg) scale(${stageScale})`,
+          }}
+        >
+          <canvas
+            ref={canvasRef} width={W} height={H}
+            style={{ display: 'block', width: W, height: H, background: '#111' }}
+          />
+          <div style={{ position: 'absolute', top: stagePx(10), right: stagePx(10), display: 'flex', gap: stagePx(8) }}>
+            <button type="button" onClick={() => setPlaying((q) => !q)} style={stageBtnStyle}>
+              {playing ? '停止' : '再開'}
+            </button>
+            <button type="button" onClick={() => { resetToStart(); setPlaying(true); }} style={stageBtnStyle}>
+              最初から
+            </button>
+            <button
+              type="button"
+              onClick={() => { setPlaying(false); setStageFull(false); }}
+              style={{ ...stageBtnStyle, background: 'rgba(122,58,42,0.9)' }}
+            >
+              メニュー
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <main style={{ background: '#14120f', color: '#efe9dc', padding: 14, fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }}>
+    <main
+      className={smallScreen ? 'race-menu' : undefined}
+      style={{ background: '#14120f', color: '#efe9dc', padding: 14, fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }}
+    >
       <h1 style={{ fontSize: 18, margin: '4px 0 8px' }}>
         レース
+        {smallScreen ? null : <>
         <span style={{ opacity: 0.6, fontSize: 13, marginLeft: 12 }}>
           ★本番と同じエンジン → 境界時刻 → 位置モデル → {renderer === 'v2' ? 'Broadcast V2（透視カメラ中継）' : '旧固定2D描画（legacy）'}
         </span>
@@ -3102,25 +3239,30 @@ export default function RacePage(): React.JSX.Element {
         }}>
           {renderer === 'v2' ? 'BROADCAST V2 ACTIVE' : 'LEGACY RENDERER'}
         </span>
+        </>}
       </h1>
+      {smallScreen && (
+        <p style={{ fontSize: 13, opacity: 0.7, margin: '0 0 10px', lineHeight: 1.7 }}>
+          レースを選んで <b>演出開始</b> を押すと、全画面で始まります。<br />
+          端末を横にすると、そのままの向きで大きく見られます。
+        </p>
+      )}
       {err !== null && <p style={{ color: '#e06a4a', fontWeight: 'bold' }}>★{err}</p>}
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', margin: '8px 0' }}>
+      <div className="race-controls" style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', margin: '8px 0' }}>
         <button
-          type="button" onClick={() => setPlaying((p) => !p)} disabled={!ready || built === null}
+          type="button"
+          onClick={() => {
+            /** ★携帯では、開始と同時に全画面へ移ります（★メニュー → 演出） */
+            if (smallScreen) { setStageFull(true); setPlaying(true); return; }
+            setPlaying((p) => !p);
+          }}
+          disabled={!ready || built === null}
           style={{ padding: '8px 22px', fontSize: 15, fontWeight: 'bold', cursor: 'pointer', background: playing ? '#8a4030' : '#3a6a40', color: '#fff', border: 0 }}
         >
           {playing ? '停止' : '演出開始'}
         </button>
         <button
-          type="button" onClick={() => {
-            dRef.current = 0;
-            callRef.current = [];
-            callStartRef.current = [];
-            callKeyRef.current = '';
-            callLastSecRef.current = -Infinity;
-            sectionTagRef.current = { label: '', sinceSec: -Infinity };
-            setClock(0); setSeekPos(0); setPlaying(false); render(0);
-          }}
+          type="button" onClick={resetToStart}
           style={{ padding: '8px 14px', cursor: 'pointer', background: '#3a3630', color: '#efe9dc', border: 0 }}
         >
           最初から
@@ -3194,7 +3336,7 @@ export default function RacePage(): React.JSX.Element {
           ⚠️ 実況の文字送りなど**時刻とともに積み上がるもの**は、巻き戻すと途中から積み直しになる。
              見た目の確認には支障ないが、実況の行が飛ぶことがある（撮影用途のため許容）。
       */}
-      {built !== null && (
+      {built !== null && !smallScreen && (
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '0 0 8px', padding: '8px 10px', background: '#241f1a', border: '1px solid #4a453d' }}>
           <span style={{ fontSize: 12, opacity: 0.7, whiteSpace: 'nowrap' }}>撮影用シーク</span>
           {[-1, -0.1].map((d) => (
@@ -3221,43 +3363,42 @@ export default function RacePage(): React.JSX.Element {
       )}
 
       {/*
-        ★縦向きの案内（★2026-09-01・オーナー決定「A 案」）
-          ★映像は**横 1280px 用**に作られ、★HUD の文字は**キャンバスに焼かれています**（10〜15px の絶対値）。
-          ★縦持ちでは 1280 → 338px ＝ ★**26%**（★文字は 3px 相当で読めません）。
-          ★横向きなら 1280 → 816px ＝ ★**64%** で、★オーナーが PC で判定してきた 67%（台帳 B-3）とほぼ同じです。
-        ⚠️ ★**演出は 1 つも変えていません。** ★出す／出さないは CSS の `orientation` だけで決めます
-           （★`globals.css` の `.rotate-hint`）。★JS の状態を持たせると、★回した時にズレます。
-        ⚠️ ★これは**縦向きを読めるようにする直しではありません**。★それは HUD の版面の作り直し＝
-           ★**演出の判断**で、★別の便です（★`RACE_PRESENTATION_BASICS.md`）。
+        ⚠️ ★**「端末を横向きにしてください」の案内はやめました**（★2026-09-02・オーナー要望②）。
+           ★縦画面でも全画面で出せるようになったので、★案内する内容が事実でなくなりました。
+           ★横にすれば回転が外れて素直に収まります（★どちらの持ち方でも見られます）。
       */}
-      {tooHeavy
-        ? (
-          /**
-           * ⚠️ ★**蓋であって直しではありません。**（★`tooHeavy` の注記）
-           *    ★「準備中」と書きます。★「非対応」と書くと、★直ったあとも
-           *    ★見る人の記憶に「スマホでは見られない」が残ります。
-           */
-          <div className="race-too-heavy">
-            <b>この画面は、いまはパソコン向けです</b>
-            <span>
-              レース映像は横 1280px の画面に合わせて作られていて、
-              スマートフォンでは読み込みきれません。パソコンからご覧ください。
-            </span>
-            <span>スマートフォン向けは準備中です。番組表・投票・厩舎はこのままご利用いただけます。</span>
-            <a className="a-btn a-btn-gold" href="/races" style={{ height: 44, marginTop: 4, fontSize: 15 }}>番組表へ</a>
-          </div>
-        )
-        : (
-          <div className="rotate-hint">
-            <b>端末を横向きにしてください</b>
-            <span>映像は横長で作られています。横向きにすると 約 2.4 倍 の大きさで見られます</span>
-          </div>
-        )}
+      {tooHeavy && (
+        /**
+         * ⚠️ ★**蓋であって直しではありません。**（★`tooHeavy` の注記）
+         *    ★携帯では焼いた素材が既定なので、★ここに来るのは
+         *    ★**焼いた素材が読めなかったとき**だけです（★`?baked=0` を付けたときを含む）。
+         *    ★「準備中」と書きます。★「非対応」と書くと、★直ったあとも
+         *    ★見る人の記憶に「スマホでは見られない」が残ります。
+         */
+        <div className="race-too-heavy">
+          <b>この画面は、いまはパソコン向けです</b>
+          <span>
+            レース映像は横 1280px の画面に合わせて作られていて、
+            スマートフォンでは読み込みきれません。パソコンからご覧ください。
+          </span>
+          <span>スマートフォン向けは準備中です。番組表・投票・厩舎はこのままご利用いただけます。</span>
+          <a className="a-btn a-btn-gold" href="/races" style={{ height: 44, marginTop: 4, fontSize: 15 }}>番組表へ</a>
+        </div>
+      )}
 
-      <canvas
-        ref={canvasRef} width={W} height={H}
-        style={{ width: '100%', maxWidth: W, border: '1px solid #4a453d', imageRendering: 'auto', background: '#111' }}
-      />
+      {/*
+        ⚠️ ★**携帯では、メニューに画布を置きません。**
+           ★置くと幅いっぱいの帯（★実測 390x219・★画面の 26%）が出るだけで、
+           ★「小さい」という当の苦情をメニューにも並べることになります。
+           ★演出は `演出開始` で全画面に出ます。
+      */}
+      {!smallScreen && (
+        <canvas
+          ref={canvasRef} width={W} height={H}
+          style={{ width: '100%', maxWidth: W, border: '1px solid #4a453d', imageRendering: 'auto', background: '#111' }}
+        />
+      )}
+      {!smallScreen && (
       <p style={{ fontSize: 12, opacity: 0.55, marginTop: 10, lineHeight: 1.8 }}>
         ★<b>着順はエンジンが決めたもの</b>です（開始時に D-059 のゲートを通しています）。<br />
         {renderer === 'v2'
@@ -3265,6 +3406,7 @@ export default function RacePage(): React.JSX.Element {
           : <>★旧固定2Dカメラの前景・中景・後景3帯で、距離差とレーンを表示しています（比較用 legacy）。<br /></>}
         ★横位置と距離ロスはレースエンジンが決めた値を読み、描画側では着順を変更しません。
       </p>
+      )}
     </main>
   );
 }

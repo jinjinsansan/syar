@@ -405,7 +405,7 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
  * ★「この画面はいまはパソコン向けです」の板（★2026-09-01・仮の蓋）
  *   ★出す/出さないは ★**JS が端末を見て決めます**（★向きでも幅でもなく、
  *     ★重い初期化を始めてよい端末かどうか）。★CSS は見た目だけ持ちます。
- *   ⚠️ ★`.rotate-hint` と**同時には出しません**（★出す側を JS が選びます）。
+ *   ⚠️ ★携帯では焼いた素材が既定なので、★ここに来るのは**焼いた素材が読めなかったとき**だけです。
  */
 .race-too-heavy {
   display: flex;
@@ -424,23 +424,54 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
 }
 .race-too-heavy b { font-size: 17px; }
 
-.rotate-hint { display: none; }
-@media (orientation: portrait) and (max-width: 720px) {
-  .rotate-hint {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin: 0 0 10px;
-    padding: 12px 14px;
-    border-radius: 10px;
-    border: 2px solid #8a5a06;
-    background-image: var(--a-gloss-gold);
-    color: #4a3105;
-    font-size: 13px;
-    font-weight: 900;
-    line-height: 1.6;
-  }
-  .rotate-hint b { font-size: 16px; }
+/* ---------------------------------------------------------------------
+   ★レース演出（★携帯・2026-09-02・オーナー要望②）
+
+   ★「プルダウンが画面上部に居座り、縦画面ではスクロールしないと映像に届かず、
+     届いても幅いっぱいの帯にしかならない」への直し。
+   ★**選ぶ（メニュー）→ 演出開始 → 全画面**、の順にします。
+
+   ⚠️ ★`.rotate-hint`（「端末を横向きにしてください」）は**撤去しました**。
+      ★縦画面でも全画面で出せるようになったので、★案内する内容が事実でなくなりました。
+   --------------------------------------------------------------------- */
+
+/* ★演出の器。★背後の頁を完全に覆う（★JS が body のスクロールも止めます） */
+.race-stage-full {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  overflow: hidden;
+  z-index: 60;
+}
+
+/* ★メニュー（★演出を出す前）。★縦に積んで、指で押せる大きさにする */
+.race-menu .race-controls {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+.race-menu .race-controls label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 15px;
+}
+.race-menu .race-controls select,
+.race-menu .race-controls input[type="number"] {
+  flex: 1 1 auto;
+  max-width: 64%;
+  min-height: 44px;
+  /* ⚠️ ★16px 未満だと iOS が入力のたびに画面を拡大します（★戻す操作が要る） */
+  font-size: 16px;
+}
+.race-menu .race-controls input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+}
+.race-menu .race-controls button {
+  min-height: 52px;
+  font-size: 17px;
 }
 
 /* ---------------------------------------------------------------------
