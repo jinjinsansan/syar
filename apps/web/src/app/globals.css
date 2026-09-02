@@ -300,6 +300,46 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
     min-width: 0 !important;
   }
 
+  /* =====================================================================
+     ★番組表（/races）— ★**デザイン第4便**（`components/program-board-mobile`）
+
+     ★① ★**次の発走**は横並び（時刻｜区切り｜情報｜賞金｜ボタン）でした。
+        ★モバイルでは折り返して**左に寄った塊**になり、★何が主役か分からなくなります。
+        → ★縦積みにし、★**時刻を中央上に**（64px → 48px）。★ボタンは全幅。
+     ★② ★**一覧**は 5 列の表でした。★折り返すと ★**賞金と状態が時刻の下に潜り込みます**
+        （★実測の絵で確認）。→ ★`order` で ★**1 行目＝時刻・格・状態／2 行目＝コース・賞金**に分けます。
+
+     ⚠️ ★デザイナーの実装表にある「着手前 PC 実測 +298px・49 個」は
+        ★**2026-09-01 のモバイル直しより前**の数字です。★いま測ると
+        ★横あふれ なし・44px 未満 0/17 でした。★**残っていたのは崩れではなく版面**です。
+     ===================================================================== */
+
+  .pb-next {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 16px !important;
+  }
+  .pb-next-time { text-align: center; }
+  /* ★64px は 360px 幅で他を押し出します */
+  .pb-next-time .a-num { font-size: 48px !important; }
+  .pb-next-purse { margin-left: 0 !important; }
+  .pb-next-cta { margin-left: 0 !important; }
+  .pb-next-cta > .a-btn {
+    width: 100%;
+    height: auto !important;
+    min-height: 48px;
+    padding: 0 16px !important;
+  }
+
+  /* ★一覧の行: ★1 行目＝時刻・格・状態／★2 行目＝コース・賞金 */
+  .pb-row { padding: 12px 14px !important; row-gap: 6px !important; }
+  .pb-cell-time { font-size: 24px !important; }
+  .pb-cell-status { margin-left: auto; }
+  /* ★`flex-basis: 100%` で改行させる（★2 行目の先頭） */
+  .pb-cell-course { flex: 1 0 100% !important; order: 1; white-space: normal !important; }
+  .pb-cell-purse { order: 1; margin-left: auto; text-align: right !important; }
+
   /* ★見出しの帯も折り返す */
   [data-theme="arcade"] .a-band {
     flex-wrap: wrap;

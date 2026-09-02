@@ -46,8 +46,8 @@ export default async function ProgramPage() {
               {next['status'] !== 'closed' && <Countdown untilIso={String(next['scheduled_at'])} after="締切" size={24} color="#fff" />}
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 26, padding: '20px 22px', backgroundImage: 'linear-gradient(#ffffff,#eef6fd)', flexWrap: 'wrap' }}>
-            <div style={{ textAlign: 'center' }}>
+          <div className="pb-next" style={{ display: 'flex', alignItems: 'center', gap: 26, padding: '20px 22px', backgroundImage: 'linear-gradient(#ffffff,#eef6fd)', flexWrap: 'wrap' }}>
+            <div className="pb-next-time" style={{ textAlign: 'center' }}>
               <div className="a-lbl">発走時刻</div>
               <div className="a-num" style={{ fontSize: 64, color: 'var(--a-num-time)', textShadow: '0 2px 0 #fff, 0 3px 0 var(--a-edge-soft)' }}>{formatClock(String(next['scheduled_at']))}</div>
             </div>
@@ -63,14 +63,14 @@ export default async function ProgramPage() {
                 <StatusBadge status={String(next['status'])} />
               </div>
             </div>
-            <div style={{ marginLeft: 'auto', textAlign: 'center', padding: '8px 18px', borderRadius: 10, backgroundImage: 'var(--a-gloss-gold)', border: '2px solid #8a5a06', boxShadow: 'var(--a-shadow-sm)' }}>
+            <div className="pb-next-purse" style={{ marginLeft: 'auto', textAlign: 'center', padding: '8px 18px', borderRadius: 10, backgroundImage: 'var(--a-gloss-gold)', border: '2px solid #8a5a06', boxShadow: 'var(--a-shadow-sm)' }}>
               <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.12em', color: '#4a3105' }}>1着賞金</div>
               <div style={{ marginTop: 2 }}>
                 <span className="a-num" style={{ fontSize: 38, color: '#4a3105' }}>{Number(next['purse']).toLocaleString('ja-JP')}</span>
                 <span style={{ fontSize: 13, fontWeight: 900, color: '#4a3105', marginLeft: 6 }}>PP</span>
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginLeft: 20 }}>
+            <div className="pb-next-cta" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginLeft: 20 }}>
               <a className="a-btn a-btn-gold" href={`/races/${String(next['id'])}`} style={{ height: 48, padding: '0 26px', fontSize: 18 }}>出馬表</a>
               <a className="a-btn" href={`/races/${String(next['id'])}/odds`} style={{ height: 40, padding: '0 26px', fontSize: 15 }}>オッズ</a>
             </div>
@@ -93,20 +93,20 @@ export default async function ProgramPage() {
           const done = r['status'] === 'settled' || r['status'] === 'cancelled';
           const top = Number(r['class_rank']) >= 5;
           return (
-            <a key={String(r['id'])} href={`/races/${String(r['id'])}`} className={`a-row${done ? ' done' : ''}`} style={{ height: 58 }}>
-              <span className="a-num" style={{ width: COL.time, flex: `0 0 ${COL.time}px`, fontSize: 26, color: 'var(--a-num-time)' }}>{formatClock(String(r['scheduled_at']))}</span>
-              <span style={{ width: COL.grade, flex: `0 0 ${COL.grade}px`, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <a key={String(r['id'])} href={`/races/${String(r['id'])}`} className={`a-row pb-row${done ? ' done' : ''}`} style={{ height: 58 }}>
+              <span className="a-num pb-cell-time" style={{ width: COL.time, flex: `0 0 ${COL.time}px`, fontSize: 26, color: 'var(--a-num-time)' }}>{formatClock(String(r['scheduled_at']))}</span>
+              <span className="pb-cell-grade" style={{ width: COL.grade, flex: `0 0 ${COL.grade}px`, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className={`a-chip${top ? ' gold' : ''}`} style={{ height: 24, padding: '0 10px', fontSize: 12 }}>{formatRaceTitle(Number(r['class_rank']), r['grade'] as string | null)}</span>
                 {r['grade'] ? <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{String(r['name'] ?? '')}</span> : null}
               </span>
-              <span style={{ flex: 1, minWidth: 170, fontSize: 15, fontWeight: 900, color: 'var(--a-ink)', whiteSpace: 'nowrap' }}>
+              <span className="pb-cell-course" style={{ flex: 1, minWidth: 170, fontSize: 15, fontWeight: 900, color: 'var(--a-ink)', whiteSpace: 'nowrap' }}>
                 {SURFACE_LABEL[String(r['surface'])]} {formatDistance(Number(r['distance']))}
                 <span style={{ marginLeft: 10, fontSize: 13, color: 'var(--a-ink-3)' }}>馬場 {CONDITION_LABEL[String(r['track_condition'])]}</span>
               </span>
-              <span style={{ width: COL.purse, flex: `0 0 ${COL.purse}px`, textAlign: 'right', fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)' }}>
+              <span className="pb-cell-purse" style={{ width: COL.purse, flex: `0 0 ${COL.purse}px`, textAlign: 'right', fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)' }}>
                 <span className="a-num" style={{ fontSize: 21, color: 'var(--a-num-money)' }}>{Number(r['purse']).toLocaleString('ja-JP')}</span> PP
               </span>
-              <span style={{ width: COL.status, flex: `0 0 ${COL.status}px`, display: 'flex', justifyContent: 'flex-end' }}><StatusBadge status={String(r['status'])} /></span>
+              <span className="pb-cell-status" style={{ width: COL.status, flex: `0 0 ${COL.status}px`, display: 'flex', justifyContent: 'flex-end' }}><StatusBadge status={String(r['status'])} /></span>
             </a>
           );
         })}
