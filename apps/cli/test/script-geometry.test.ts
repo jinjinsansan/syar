@@ -24,7 +24,7 @@ import { describe, expect, it } from 'vitest';
 import { GRADED_RACES, raceSetupById } from '@star/scheduler';
 import {
   ovalCourse, segmentAt, homeStretchMetersOf, broadcastV2ScriptBoundariesM,
-  broadcastV2ShotAt, SCRIPT_V6, GOAL_REAL_TIME_M,
+  broadcastV2ShotAt, broadcastV2ShotById, broadcastV2ScriptAssets, SCRIPT_V6, GOAL_REAL_TIME_M,
 } from '@star/render';
 
 /** ★「ゴール前の直線に居ること」を前提にしたカット（`tools/_cutgeom.mjs` と同じ集合） */
@@ -142,6 +142,50 @@ describe('★台本 v6 の切り替え地点', () => {
     const now = broadcastV2ScriptBoundariesM(course, 'v6');
     const old = SCRIPT_V6.map((row) => row.until * course.distance);
     expect(now.map((b) => Math.round(b.meters * 1e6) / 1e6)).toEqual(old.map((m) => Math.round(m * 1e6) / 1e6));
+  });
+
+  /**
+   * ★**読まない組を落として安全か**（★2026-09-03・台帳 A-11 / A-12）
+   *
+   * 【★なぜ要るか】
+   *   ★実測で、★台本 v6 が 50 鞍で使う素材は ★**`side-v6` 53% と `diag-front-v2` 47% だけ**でした。
+   *   ★`diag-rear-v2` と `high-diag-v2` は ★**1m も描かれません**。
+   *   → ★画面はその 2 組を ★**読まない・焼かない**ようにしました（★実測 102MB → 76MB）。
+   *
+   * ⚠️ ★**これは危ない最適化です。** ★台本に 1 行足しただけで、
+   *    ★**読んでいない組を選ぶショットが出る**ようになります。
+   *    ★そのとき画面は真横の絵を代わりに出します（★落ちはしませんが**別の絵**です）。
+   *   → ★**50 鞍 × 全 m** で、★選ばれるショットの素材が必ず一覧の中にあることを見ます。
+   */
+  it('★台本が選ぶショットの素材は、必ず「読む組」の中にある（50 鞍 × 全 m）', () => {
+    const offenders: string[] = [];
+    for (const script of ['v6', 'v5', 'v4', 'v3'] as const) {
+      const allowed = new Set(broadcastV2ScriptAssets(script));
+      for (const { name, course } of courses) {
+        for (let m = 0; m <= course.distance; m += 5) {
+          const asset = broadcastV2ShotById(broadcastV2ShotAt(course, m, false, undefined, { script }).id).horseAsset;
+          if (asset !== undefined && !allowed.has(asset)) {
+            offenders.push(`${script} ${name} ${m}m … ${asset}`);
+            break;
+          }
+        }
+      }
+    }
+    expect(offenders.slice(0, 10), '★読まない組を選ぶショットが出ています').toEqual([]);
+  });
+
+  it('★勝馬と決勝線の素材も一覧に入っている（★表に無いが必ず出る）', () => {
+    const allowed = new Set(broadcastV2ScriptAssets('v6'));
+    for (const id of ['finish-line', 'winner-follow', 'winner-follow-rear'] as const) {
+      const asset = broadcastV2ShotById(id).horseAsset;
+      if (asset !== undefined) expect(allowed.has(asset), `${id} の素材 ${asset}`).toBe(true);
+    }
+    /** ★俯瞰ワイドの代用は、代用する設定のときだけ要ります */
+    const wide = broadcastV2ShotById('fourth-corner-wide').horseAsset;
+    if (wide !== undefined) {
+      expect(allowed.has(wide), '★代用しない設定では読みません').toBe(false);
+      expect(new Set(broadcastV2ScriptAssets('v6', true)).has(wide), '★代用する設定では読みます').toBe(true);
+    }
   });
 
   /**

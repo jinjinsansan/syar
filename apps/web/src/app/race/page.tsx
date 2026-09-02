@@ -74,6 +74,7 @@ import {
   ratesForTarget,
   targetDisplaySec,
   homeStretchMetersOf,
+  broadcastV2ScriptAssets,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 import { raceSetupFromParam, gradedRacesByVenue } from '@star/scheduler';
@@ -1751,6 +1752,15 @@ export default function RacePage(): React.JSX.Element {
           : undefined;
       })();
       /** ★枠色（`palette.json` が唯一の出どころ）。HUD と同じ引き方をする */
+      /**
+       * ★**この台本が実際に描く馬素材**（2026-09-03・R-29「列挙は必ず漏れる」）。
+       * ⚠️ ★一覧をここに直書きしません。★台本そのものから引きます
+       *    （★台本を書き換えた日に、★画面側の一覧だけが古くなるため）。
+       */
+      const neededAssets = broadcastV2ScriptAssets(
+        scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
+        !FOURTH_CORNER_FRONT_WEB,
+      );
       const silksByGate = silksColorsFor(pal as Record<string, string>, FIELD);
       const buildFrames = (
         images: readonly FrameImage[],
@@ -1894,7 +1904,7 @@ export default function RacePage(): React.JSX.Element {
          * ⚠️ ★**描く組だけ読みます。** ★焼いてあっても、★描画側に経路が無ければ読みません
          *    （★原版側と同じ規則にします — ★片方だけ読むと、★何が効いているのか分からなくなります）。
          */
-        const wantedRoles = ['side-v6', 'diag-front-v2', 'diag-rear-v2', 'high-diag-v2',
+        const wantedRoles = [...neededAssets,
           ...(WINNER_FOLLOW_REAR ? ['winner-rear'] : []),
           ...(WINNER_POSE === 'celebrate' ? ['winner-cycle'] : [])];
         const atlases = new Map<string, ReadonlyMap<string, HTMLImageElement>>();
@@ -1948,11 +1958,15 @@ export default function RacePage(): React.JSX.Element {
           if (sideWidthNative <= 0) return undefined;
           return winner.scale * winnerWidthNative * (side.nativeReferenceHeight / sideWidthNative);
         })();
+        /**
+         * ⚠️ ★**この台本が描く組だけを組みます**（2026-09-03）。
+         *    ★以前は 4 組を直書きしていました。★描かない組（`diag-rear-v2` / `high-diag-v2`）まで
+         *    ★読んで焼き、★**下の「1 つでも欠けたら」で全体が従来経路へ落ちて**いました。
+         */
         const out: Partial<Record<string, readonly (readonly HighQualityHorseFrame[])[]>> = {
-          'side-v6': of('side-v6'),
-          'diag-front-v2': of('diag-front-v2'),
-          'diag-rear-v2': of('diag-rear-v2'),
-          'high-diag-v2': of('high-diag-v2'),
+          ...Object.fromEntries(neededAssets
+            .filter((role) => setByRole.has(role))
+            .map((role) => [role, of(role)])),
           ...(WINNER_FOLLOW_REAR ? { 'winner-rear': of('winner-rear') } : {}),
           ...(WINNER_POSE === 'celebrate' ? { 'winner-cycle': of('winner-cycle', winnerOverride) } : {}),
         };
@@ -2213,14 +2227,28 @@ export default function RacePage(): React.JSX.Element {
       const diagFrontHighQuality = bakedLibs?.['diag-front-v2'] ?? (frontV3 !== undefined
         ? buildFrames(frontV3, undefined, SILKS_LAYOUT_FRONT)
         : buildFrames(await fallbackSet('horse-jockey-diag-front-v2')));
-      const diagRearHighQuality = bakedLibs?.['diag-rear-v2'] ?? (rearV4 !== undefined
-        ? buildFrames(rearV4, undefined, SILKS_LAYOUT_REAR)
-        : composedRear !== undefined
-          ? buildFrames(composedRear.frames, undefined, SILKS_LAYOUT_REAR, composedRear.anchors)
-          : buildFrames(await fallbackSet('horse-jockey-diag-rear-v2')));
-      const highDiagHighQuality = bakedLibs?.['high-diag-v2'] ?? (highDiagV3 !== undefined
-        ? buildFrames(highDiagV3, undefined, SILKS_LAYOUT_REAR)
-        : buildFrames(await fallbackSet('horse-jockey-high-diag-v2')));
+      /**
+       * ★**この台本が描かない組は、組みません**（2026-09-03・実測）。
+       *
+       *   ★台本 v6 が 50 鞍で使う素材は ★**`side-v6` 53% と `diag-front-v2` 47% だけ**です。
+       *   ★`diag-rear-v2`（3 角後方）と `high-diag-v2`（空撮・2 角・4 角ワイド）を選ぶショットは
+       *   ★**v6 の表にありません** — ★1m も描かれません。
+       *   ⚠️ ★それでも ★**4 組すべてを読み、12 頭ぶんの勝負服まで焼いて**いました。
+       *   ★`?cinematography=v3` / `v2` に切り替えれば、そちらは今までどおり読みます。
+       *
+       * ⚠️ ★描かない組は ★**空**で置きます。★万一その組が選ばれても、
+       *    ★描画側は `hi === undefined` でスプライトシートに落ちます（★落ちません・R-27）。
+       */
+      const diagRearHighQuality = !neededAssets.includes('diag-rear-v2') ? []
+        : bakedLibs?.['diag-rear-v2'] ?? (rearV4 !== undefined
+          ? buildFrames(rearV4, undefined, SILKS_LAYOUT_REAR)
+          : composedRear !== undefined
+            ? buildFrames(composedRear.frames, undefined, SILKS_LAYOUT_REAR, composedRear.anchors)
+            : buildFrames(await fallbackSet('horse-jockey-diag-rear-v2')));
+      const highDiagHighQuality = !neededAssets.includes('high-diag-v2') ? []
+        : bakedLibs?.['high-diag-v2'] ?? (highDiagV3 !== undefined
+          ? buildFrames(highDiagV3, undefined, SILKS_LAYOUT_REAR)
+          : buildFrames(await fallbackSet('horse-jockey-high-diag-v2')));
       artRef.current = {
         pal, raceTitle: raceTitle!, raceNarrator: raceNarrator!, startingGate: startingGate!,
         ...(narratorSets !== undefined ? { narratorSets } : {}),
@@ -2641,11 +2669,24 @@ export default function RacePage(): React.JSX.Element {
         },
         frameImagesByGate: frames,
       });
+      /**
+       * ★**この台本が描かない組の置き場所**（2026-09-03）。
+       *
+       *   ★型は 4 組すべてを要求します。★組んでいない組には ★**真横を入れておきます。**
+       *   ⚠️ ★空配列を入れてはいけません — ★`library()` は `frames[0][0]` を読むので
+       *      ★**画面が真っ白になります**（★実際にそうなりました）。
+       *   ⚠️ ★これが実際に描かれることはありません。★ショットを選ぶ経路は
+       *      ★台本の表・`finish-line`・勝馬・俯瞰ワイドの代用だけで、
+       *      ★`neededAssets` はその全部を含みます。★`forceShotId` も
+       *      ★台本が出したショットしか渡しません（★リプレイと直前ショット）。
+       */
+      const libraryOr = (frames: readonly (readonly HighQualityHorseFrame[])[]) =>
+        library(frames.length > 0 ? frames : art.sideHighQuality);
       const libraries: BroadcastV2FrameLibraries<CanvasImageSource> = {
         'side-v6': library(art.sideHighQuality),
         'diag-front-v2': library(art.diagFrontHighQuality),
-        'diag-rear-v2': library(art.diagRearHighQuality),
-        'high-diag-v2': library(art.highDiagHighQuality),
+        'diag-rear-v2': libraryOr(art.diagRearHighQuality),
+        'high-diag-v2': libraryOr(art.highDiagHighQuality),
         /**
          * ★勝馬追従: 1 枚絵 `winner-v1` は脚が動かず「絵だけになって背景が動く」（ユーザー指摘⑥）。
          *   勝馬の 8 コマ（騎手が立ってガッツポーズ）が承認されるまでは走行 8 コマで脚を動かす。

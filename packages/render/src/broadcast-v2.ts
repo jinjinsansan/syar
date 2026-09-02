@@ -1686,6 +1686,51 @@ export function broadcastV2ShotAt(
   return SHOTS['start-follow'];
 }
 
+/**
+ * ★**その台本が実際に使う馬素材**（★重複なし・2026-09-03）
+ *
+ * 【★なぜ要るか — ★実測で分かったこと】
+ *   ★台本 v6 が 50 鞍で使う素材は ★**`side-v6` 53% と `diag-front-v2` 47% だけ**です。
+ *   ★`diag-rear-v2`（3 角後方）と `high-diag-v2`（空撮・2 角・4 角ワイド）は
+ *   ★**1m も描かれません** — ★それらを選ぶショットが v6 の表に無いからです。
+ *   ⚠️ ★それでも画面は ★**4 組すべてを読み、12 頭ぶんの勝負服まで焼いて**いました。
+ *
+ * ⚠️ ★**列挙で持たないこと**（R-29）。★台本を書き換えた日に、
+ *    ★画面側の一覧だけが古くなります。★**台本そのものから引きます。**
+ *
+ * ⚠️ ★台本 `v2` は ★**区間名で選ぶ**ので表がありません。
+ *    ★どれが出るか静的に決められないので ★**全部**を返します（R-27・狭い側へ倒さない）。
+ *
+ * @param wideSubstitute ★`fourth-corner-front` を俯瞰ワイドで代用する設定なら `true`
+ */
+export function broadcastV2ScriptAssets(
+  script: BroadcastV2Script, wideSubstitute = false,
+): readonly string[] {
+  const assetOf = (id: BroadcastV2ShotId): string | undefined => SHOTS[id].horseAsset;
+  const out = new Set<string>();
+  if (script === 'v2') {
+    for (const id of Object.keys(SHOTS) as BroadcastV2ShotId[]) {
+      const asset = assetOf(id);
+      if (asset !== undefined) out.add(asset);
+    }
+    return [...out];
+  }
+  for (const row of scriptRowsOf(script)) {
+    const asset = assetOf(row.id);
+    if (asset !== undefined) out.add(asset);
+  }
+  /** ★台本の表に無いが、★どの台本でも出るもの */
+  for (const id of ['finish-line', 'winner-follow', 'winner-follow-rear'] as BroadcastV2ShotId[]) {
+    const asset = assetOf(id);
+    if (asset !== undefined) out.add(asset);
+  }
+  if (wideSubstitute) {
+    const asset = assetOf('fourth-corner-wide');
+    if (asset !== undefined) out.add(asset);
+  }
+  return [...out];
+}
+
 /** id からショット定義を引く（ディゾルブで直前ショットを描くとき用） */
 export function broadcastV2ShotById(id: BroadcastV2ShotId): BroadcastV2Shot {
   return SHOTS[id];
