@@ -403,7 +403,11 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
         ★設計より大きくするぶんには、★設計の意図（並びと優先順位）を損ないません。
      ===================================================================== */
 
-  /* ★タブは横スクロール。★「参加ポイント（EP）」を省略しないため */
+  /*
+   * ★タブは横スクロール。★「参加ポイント（EP）」を省略しないため。
+   * ★出走登録の ★**馬タブ**も同じ形を使います（★デザイン第4便「馬タブ 横スクロール」）。
+   *   ★折り返すと 5 頭で 3 段になり、★レースの一覧が画面の外へ押し出されます。
+   */
   .rc-tabs {
     flex-wrap: nowrap !important;
     overflow-x: auto;
@@ -419,6 +423,7 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
     padding: 0 14px !important;
     font-size: 13px !important;
   }
+  .rc-tabs > span:not(.rc-periods) { flex: 0 0 auto; white-space: nowrap; }
   .rc-periods { margin-left: 0 !important; flex: 0 0 auto; }
   /* 見出しの脇にある文字リンク（景品交換）も指で押せる大きさに */
   .rc-exch {
@@ -456,6 +461,31 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   main .rc-led-delta { order: 2; flex: 1 0 auto !important; }
   main .rc-led-desc { order: 3; flex: 0 1 auto !important; min-width: 0 !important; width: auto !important; }
   main .rc-led-balance { order: 4; margin-left: auto; }
+
+  /* =====================================================================
+     ★出走登録（/entry）— ★**デザイン第4便**（`components/race-entry-mobile`）
+
+     ★「発走｜R｜格｜コース｜頭数｜出走料｜締切｜状態」の 8 列表を
+     ★**1 行 ＝ 1 レースのカード**に読み替えます:
+        ★1 段目 発走・R・格 と、右に状態
+        ★2 段目 コースと馬場・頭数
+        ★3 段目 出走料と締切
+     ===================================================================== */
+
+  main .en-row {
+    align-items: flex-start !important;
+    row-gap: 6px !important;
+    padding: 12px 14px !important;
+    min-height: 76px;
+  }
+  main .en-time { order: 0; font-size: 22px !important; }
+  main .en-no { order: 1; }
+  main .en-cls { order: 2; }
+  main .en-state { order: 3; flex: 1 0 auto !important; justify-content: flex-end !important; }
+  main .en-course { order: 4; flex: 0 1 auto !important; width: auto !important; white-space: normal !important; }
+  main .en-heads { order: 5; }
+  main .en-fee { order: 6; text-align: left !important; }
+  main .en-deadline { order: 7; margin-left: auto; }
 
   /* ★見出しの帯も折り返す */
   [data-theme="arcade"] .a-band {

@@ -41,7 +41,7 @@ export default function EntryPage(): React.ReactElement {
       <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>※ デモデータ（登録と取消はサーバー RPC に接続するまで動きません）</p>
 
       {/* 馬タブ（休養中の馬はタブに出さず末尾に理由） */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
+      <div className="rc-tabs" style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
         {horses.map((h) => <TabButton key={h.id} label={h.name} selected={h.id === horseId} onClick={() => setHorseId(h.id)} />)}
         {restCount > 0 && <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)', marginLeft: 10, paddingBottom: 6 }}>休養中の {restCount} 頭は選べません</span>}
       </div>
@@ -86,18 +86,18 @@ export default function EntryPage(): React.ReactElement {
           // 格違い・締切後は地 #e7edf3 だけで沈める（不透明度は掛けない）
           const bg = sel ? 'linear-gradient(#fffdf2,#fff3cf)' : disabled ? '#e7edf3' : i % 2 === 1 ? 'var(--a-panel-2)' : '#fff';
           return (
-            <div key={r.id} onClick={() => { if (!disabled) setRaceId(r.id); }} style={{
+            <div key={r.id} onClick={() => { if (!disabled) setRaceId(r.id); }} className="en-row" style={{
               display: 'flex', alignItems: 'center', height: 64, padding: '0 18px', gap: 14, borderTop: '1px solid var(--a-line)', color: 'var(--a-ink)',
               cursor: disabled ? 'default' : 'pointer', background: bg, boxShadow: sel ? 'inset 5px 0 0 #f2b012' : undefined,
             }}>
-              <span className="a-num" style={{ width: COL.time, flex: `0 0 ${COL.time}px`, fontSize: 26, color: 'var(--a-num-time)' }}>{r.time}</span>
-              <span className="a-num" style={{ width: COL.no, flex: `0 0 ${COL.no}px`, fontSize: 17, color: 'var(--a-ink-2)' }}>{r.raceNo}</span>
-              <span style={{ width: COL.cls, flex: `0 0 ${COL.cls}px` }}><ClassChip label={r.classLabel} classRank={r.classRank} h={24} font={12} /></span>
-              <span style={{ flex: 1, minWidth: 160, fontSize: 15, fontWeight: 900, whiteSpace: 'nowrap' }}>{r.course}<span style={{ marginLeft: 10, fontSize: 13, color: 'var(--a-ink-3)' }}>馬場 {r.going}</span></span>
-              <span className="a-num" style={{ width: COL.heads, flex: `0 0 ${COL.heads}px`, textAlign: 'right', fontSize: 17, color: 'var(--a-ink-2)' }}>{r.heads}頭</span>
-              <span style={{ width: COL.fee, flex: `0 0 ${COL.fee}px`, textAlign: 'right', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}><span className="a-num" style={{ fontSize: 21, color: 'var(--a-num-money)' }}>{r.feeEP}</span> EP</span>
-              <span style={{ width: COL.deadline, flex: `0 0 ${COL.deadline}px`, textAlign: 'right', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)', whiteSpace: 'nowrap' }}>{r.deadline === null ? '—' : `締切 ${r.deadline}`}</span>
-              <span style={{ width: COL.state, flex: `0 0 ${COL.state}px`, display: 'flex', justifyContent: 'flex-end' }}>
+              <span className="a-num en-time" style={{ width: COL.time, flex: `0 0 ${COL.time}px`, fontSize: 26, color: 'var(--a-num-time)' }}>{r.time}</span>
+              <span className="a-num en-no" style={{ width: COL.no, flex: `0 0 ${COL.no}px`, fontSize: 17, color: 'var(--a-ink-2)' }}>{r.raceNo}</span>
+              <span className="en-cls" style={{ width: COL.cls, flex: `0 0 ${COL.cls}px` }}><ClassChip label={r.classLabel} classRank={r.classRank} h={24} font={12} /></span>
+              <span className="en-course" style={{ flex: 1, minWidth: 160, fontSize: 15, fontWeight: 900, whiteSpace: 'nowrap' }}>{r.course}<span style={{ marginLeft: 10, fontSize: 13, color: 'var(--a-ink-3)' }}>馬場 {r.going}</span></span>
+              <span className="a-num en-heads" style={{ width: COL.heads, flex: `0 0 ${COL.heads}px`, textAlign: 'right', fontSize: 17, color: 'var(--a-ink-2)' }}>{r.heads}頭</span>
+              <span className="en-fee" style={{ width: COL.fee, flex: `0 0 ${COL.fee}px`, textAlign: 'right', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}><span className="a-num" style={{ fontSize: 21, color: 'var(--a-num-money)' }}>{r.feeEP}</span> EP</span>
+              <span className="en-deadline" style={{ width: COL.deadline, flex: `0 0 ${COL.deadline}px`, textAlign: 'right', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)', whiteSpace: 'nowrap' }}>{r.deadline === null ? '—' : `締切 ${r.deadline}`}</span>
+              <span className="en-state" style={{ width: COL.state, flex: `0 0 ${COL.state}px`, display: 'flex', justifyContent: 'flex-end' }}>
                 {sel ? <Pill tone="gold">選択中</Pill>
                   : r.state === 'ok' ? <Pill tone="green">登録できます</Pill>
                     : <Pill tone="grey">{r.state === 'class' ? '格が違います' : '締切後'}</Pill>}
