@@ -6,7 +6,7 @@
  *   ⚠️ 今はデモデータ。投票は `place_bet` RPC に繋ぐまで動かない。
  *   ⚠️ 憲法: 「購入」と書かない。EP を増やす導線なし。自馬出走レースは投票不可（§9.5）。不的中は静か。
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BET_TYPES, DEMO_BET_RACE } from '../../../../lib/game-demo';
 import { FrameBadge } from '../../../../components/ui';
 import { formatEntryPoints } from '../../../../lib/format';
@@ -41,6 +41,34 @@ export default function BetPage(): React.ReactElement {
   const blocked = race.ownGate !== null;
   const enough = race.epBalance >= amount;
   const sep = ordered ? '→' : '−';
+  /**
+   * ★**狭い画面では、着順を 1 列ずつ出します**（★デザイン第4便・オーナー承認 2026-09-02）。
+   *
+   *   ★三連単は「1着・2着・3着」の 3 列。★360px では 1 列 ★**約 60px** しか取れず、
+   *     ★丸を 44px 以上に保つと ★**馬名が潰れます**。
+   *   → ★1 列だけ出し、★左右送りで着順を切り替えます。
+   *
+   * ⚠️ ★**閾値の 720px は `globals.css` の `@media (max-width: 720px)` と同じ数**です。
+   *    ★片方だけ動かすと、★**版面と操作が別の幅で切り替わります**（★同じ量を 2 か所に持つ形）。
+   */
+  const NARROW_PX = 720;
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${NARROW_PX}px)`);
+    const apply = (): void => { setNarrow(mq.matches); };
+    apply();
+    mq.addEventListener('change', apply);
+    return () => { mq.removeEventListener('change', apply); };
+  }, []);
+  /** ★いま選んでいる着順（0 始まり） */
+  const [activeCol, setActiveCol] = useState(0);
+  /** ⚠️ ★券種を変えたら 1 着へ戻す。★戻さないと「3 着」のまま馬連（2 列）に入り、空の列を出します */
+  useEffect(() => { setActiveCol(0); }, [typeKey]);
+  /** ★順不同の券種（単勝・馬連など）は元から 1 列なので、送りは要りません */
+  const paged = narrow && ordered && cols > 1;
+  const shownCols = paged
+    ? [Math.min(activeCol, cols - 1)]
+    : Array.from({ length: cols }, (_, c) => c);
   const shareMax = useMemo(() => Math.max(...race.shares.map(([, p]) => p)), [race.shares]);
 
   const toggle = (gate: number, col: number): void => {
@@ -85,16 +113,44 @@ export default function BetPage(): React.ReactElement {
           <div style={{ display: 'flex', alignItems: 'center', height: 40, backgroundImage: 'linear-gradient(#fff8e1,#ffefc0)', borderBottom: '2px solid #e6c979', opacity: blocked ? .3 : 1 }}>
             <span className="a-lbl" style={{ width: 56, flex: '0 0 56px', textAlign: 'center' }}>馬番</span>
             <span className="a-lbl" style={{ flex: 1, minWidth: 130 }}>馬名</span>
-            {Array.from({ length: cols }, (_, c) => (
+            {shownCols.map((c) => (
               <span key={c} style={{ width: MARK_COL, flex: `0 0 ${MARK_COL}px`, textAlign: 'center', fontSize: 13, fontWeight: 900, color: c === 0 && ordered ? 'var(--a-red-d)' : 'var(--a-ink-2)' }}>{ordered ? `${c + 1}着` : type.label}</span>
             ))}
           </div>
+          {paged && (
+            /**
+             * ★左右送り。★いま何着を選んでいるかと、★他の着で選んだ馬を並べて出します
+             *   （★1 列しか見えないので、★**選んだものが見えなくなる**のを防ぐため）。
+             */
+            <div className="bet-pager">
+              <button
+                type="button" onClick={() => setActiveCol((c) => Math.max(0, c - 1))}
+                disabled={activeCol === 0} aria-label="前の着順"
+              >←</button>
+              <span className="bet-pager-now">{activeCol + 1} 着を選ぶ</span>
+              <button
+                type="button" onClick={() => setActiveCol((c) => Math.min(cols - 1, c + 1))}
+                disabled={activeCol >= cols - 1} aria-label="次の着順"
+              >→</button>
+              <span className="bet-pager-picked">
+                {Array.from({ length: cols }, (_, c) => {
+                  const g = picks[c];
+                  return (
+                    <button
+                      key={c} type="button" onClick={() => setActiveCol(c)}
+                      className={c === activeCol ? 'on' : undefined}
+                    >{c + 1}着 {g === null || g === undefined ? '—' : g}</button>
+                  );
+                })}
+              </span>
+            </div>
+          )}
           <div style={{ opacity: blocked ? .3 : 1, pointerEvents: blocked ? 'none' : 'auto' }}>
             {race.horses.map((h, i) => (
               <div key={h.gate} style={{ display: 'flex', alignItems: 'center', height: 44, borderTop: '1px solid var(--a-line)', background: i % 2 === 1 ? 'var(--a-panel-2)' : '#fff' }}>
                 <span style={{ width: 56, flex: '0 0 56px', display: 'flex', justifyContent: 'center' }}><FrameBadge gate={h.gate} fieldSize={race.fieldSize} w={38} h={28} font={19} /></span>
                 <span style={{ flex: 1, minWidth: 130, fontSize: 15, fontWeight: 900, color: 'var(--a-ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</span>
-                {Array.from({ length: cols }, (_, c) => {
+                {shownCols.map((c) => {
                   const on = ordered ? picks[c] === h.gate : unordered.includes(h.gate);
                   const usedElsewhere = ordered ? picks.some((g, cc) => g === h.gate && cc !== c) : (!on && unordered.length >= type.picks);
                   return (

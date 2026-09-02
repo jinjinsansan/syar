@@ -426,6 +426,59 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   .rc-tabs > span:not(.rc-periods) { flex: 0 0 auto; white-space: nowrap; }
   .rc-periods { margin-left: 0 !important; flex: 0 0 auto; }
   /* =====================================================================
+     ★投票（/races/[id]/bet）の着順送り — ★**デザイン第4便**
+
+     ★三連単は 1着・2着・3着の 3 列。★360px では 1 列 ★**約 60px** しか取れず、
+     ★丸を 44px 以上に保つと ★**馬名が潰れます**。
+     → ★1 列だけ出し、★左右送りで着順を切り替えます。
+     ⚠️ ★1 列しか見えないので、★**他の着で選んだ馬が見えなくなります。**
+        ★だから送りの帯に「1着 7 ／ 2着 3 ／ 3着 —」を並べ、
+        ★そこを押しても切り替えられるようにしています。
+     ===================================================================== */
+
+  .bet-pager {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    border-top: 2px solid var(--a-line);
+    background: var(--a-ivory);
+  }
+  .bet-pager > button {
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 2px solid var(--a-edge);
+    background-image: linear-gradient(#fff, #e3ecf3);
+    color: var(--a-ink);
+    font: 900 18px var(--a-jp);
+    cursor: pointer;
+  }
+  .bet-pager > button:disabled { opacity: .35; cursor: default; }
+  .bet-pager-now { font: 900 15px var(--a-jp); color: var(--a-ink); }
+  .bet-pager-picked {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+  }
+  .bet-pager-picked > button {
+    flex: 1 1 0;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 2px solid var(--a-edge-soft);
+    background-image: linear-gradient(#fff, #e9eff5);
+    color: var(--a-ink-2);
+    font: 900 13px var(--a-jp);
+    cursor: pointer;
+  }
+  .bet-pager-picked > button.on {
+    border-color: #8a5a06;
+    background-image: var(--a-gloss-gold);
+    color: #4a3105;
+  }
+
+  /* =====================================================================
      ★グローバルヘッダー（`layout.tsx` の `<header class="a-band">`）
 
      ★PC は高さ 56px ですが、★モバイルでは折り返して ★**約 200px** になり、
