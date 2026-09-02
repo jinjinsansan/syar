@@ -23,9 +23,9 @@ function Pedigree({ horse }: { readonly horse: HorseDetail }): React.ReactElemen
   }
   const colorOf = new Map(horse.crosses.slice(0, CROSS_PALETTE.length).map((c, i) => [c.name, CROSS_PALETTE[i]!]));
   return (
-    <div style={{ display: 'flex', height: 704, borderTop: '2px solid var(--a-edge)' }}>
+    <div className="hd-ped" style={{ display: 'flex', height: 704, borderTop: '2px solid var(--a-edge)' }}>
       {horse.pedigree.map((col, gi) => (
-        <div key={gi} style={{ flex: PED_FLEX[gi] ?? '1', display: 'flex', flexDirection: 'column' }}>
+        <div key={gi} className="hd-ped-col" style={{ flex: PED_FLEX[gi] ?? '1', display: 'flex', flexDirection: 'column' }}>
           {col.map((name, i) => {
             // ★1 代目（父・母）には付けない
             const cross = gi === 0 ? undefined : colorOf.get(name);
@@ -60,7 +60,7 @@ export default async function HorsePage({ params }: { params: Promise<{ horseId:
   return (
     <div style={{ padding: '22px 0 40px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 900, color: 'var(--a-ink-3)' }}>
-        <a href="/stable" style={{ color: 'var(--a-blue-d)' }}>わたしの馬</a><span>/</span><span style={{ color: 'var(--a-ink)' }}>{h.name}</span>
+        <a className="rc-exch" href="/stable" style={{ color: 'var(--a-blue-d)' }}>わたしの馬</a><span>/</span><span style={{ color: 'var(--a-ink)' }}>{h.name}</span>
       </div>
 
       {/* ヒーロー */}

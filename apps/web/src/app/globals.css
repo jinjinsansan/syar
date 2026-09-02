@@ -425,7 +425,12 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   }
   .rc-tabs > span:not(.rc-periods) { flex: 0 0 auto; white-space: nowrap; }
   .rc-periods { margin-left: 0 !important; flex: 0 0 auto; }
-  /* 見出しの脇にある文字リンク（景品交換）も指で押せる大きさに */
+  /*
+   * ★見出しの脇や帯の中にある ★**文字だけのリンク**を、指で押せる大きさに。
+   *   ★記録の「景品交換 →」／オッズの「すべて表示 →」／馬詳細の「わたしの馬」。
+   * ⚠️ ★どれも高さ 16〜17px でした（★実測）。★文字リンクは ★**見た目が小さいまま**なので、
+   *    ★目で見ても気づけません。★数えて初めて出ます。
+   */
   .rc-exch {
     display: inline-flex;
     align-items: center;
@@ -494,6 +499,22 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
    *    ★文字は 22px なので、★iOS の拡大（16px 未満）には当たりません。
    */
   main .st-name-input { min-height: 44px; }
+
+  /* =====================================================================
+     ★馬詳細（/stable/[horseId]）の血統表 — ★**デザイン第4便**
+
+     ★5 代を 390px に並べると 1 列あたり ★**約 78px**。★名前は 12〜15px なので、
+     ★ほとんどが「…」で切れます。⚠️ ★**これは検査に出ません** —
+     ★入れ物の中で切れているので、★はみ出しにも重なりにも現れません。
+     → ★設計の「縦スクロールカルーセル」を、★**横スクロール**で実装します。
+        ★5 代とも指で送れば全部読めます。
+     ===================================================================== */
+
+  main .hd-ped { overflow-x: auto; }
+  main .hd-ped-col {
+    flex: 0 0 150px !important;
+    min-width: 150px;
+  }
 
   /* ★見出しの帯も折り返す */
   [data-theme="arcade"] .a-band {

@@ -124,7 +124,7 @@ export default async function OddsPage({ params, searchParams }: {
       <PageTitle title={settled ? '確定オッズ' : 'オッズ'} sub={condition} right={headerRight} />
 
       {/* 券種タブ（データにある券種だけ） */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
+      <div className="rc-tabs" style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
         {visibleTabs.map((t) => (
           <TabButton key={t.key} label={t.label} selected={t.key === tab.key} href={`/races/${id}/odds?type=${t.key}`} />
         ))}
@@ -185,7 +185,7 @@ export default async function OddsPage({ params, searchParams }: {
                 <span style={{ fontSize: 15, fontWeight: 900, letterSpacing: '.1em' }}>馬連（人気上位の組み合わせ）</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, fontWeight: 900 }}>
                   <span>{quinella.length} 通りを表示</span>
-                  <a href={`/races/${id}/odds?type=quinella`} style={{ color: '#fff' }}>すべて表示 →</a>
+                  <a className="rc-exch" href={`/races/${id}/odds?type=quinella`} style={{ color: '#fff' }}>すべて表示 →</a>
                 </span>
               </div>
               <ComboGrid list={quinella} joiner="−" empty="オッズ算出中です" />
