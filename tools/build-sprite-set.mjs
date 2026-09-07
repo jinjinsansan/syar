@@ -58,6 +58,18 @@ for (let i = 1; i <= FRAMES; i += 1) {
   run(['tools/remove-chroma-key.mjs', SRC(i), `${KEYED}/${nn(i)}.png`]);
 }
 
+console.log('');
+console.log('★①-2 コマごとに揺れる白い光沢を落ち着かせる');
+/**
+ * ⚠️ ★**ここで消します**（★2026-09-07・オーナー実見）。
+ *    ★1 コマずつ生成しているので、★光沢の位置と大きさがコマごとに違い、★点滅になります。
+ *    ★画面側の「囲まれた光沢を埋める」で消そうとしたら、★判定がコマごとに反転して
+ *    ★**かえって点滅を作りました**。★素材の側で先に落ち着かせます。
+ */
+for (let i = 1; i <= FRAMES; i += 1) {
+  process.stdout.write(run(['tools/calm-highlights.mjs', `${KEYED}/${nn(i)}.png`, `${KEYED}/${nn(i)}.png`]));
+}
+
 console.log('\n★② 下地の色を検査（★落ちたら止まります）');
 try {
   process.stdout.write(run(['node_modules/tsx/dist/cli.mjs', 'tools/verify-dress-keys.mjs', `${KEYED}/{NN}.png`, String(FRAMES)]));
@@ -72,42 +84,66 @@ console.log('\n★④ 大きさと位置を揃える');
 process.stdout.write(run(['node_modules/tsx/dist/cli.mjs', 'tools/align-pose-set.mjs', `${KEYED}/{NN}.png`, `${ALIGNED}/{NN}.png`, String(FRAMES)]));
 
 console.log('\n★⑤ 剛体（帽子）で横を揃える');
-/** ★帽子＝いちばん上にある、じゅうぶん大きい白い塊 */
-async function helmetX(file) {
+/**
+ * ★**コマ間を揃える基準**（★2026-09-07）
+ *
+ * 【⚠️ ★2 回間違えました。★どちらも「測らずに決めた」からです】
+ *   ★① 「★白いいちばん上の塊＝帽子」… ★納品素材の帽子が白かった名残。
+ *      ★自前生成では ★**帽子が青・白いのはゼッケンとズボン**なので、
+ *      ★**動く白いゼッケン**を掴んでいました（★実測でその塊は横に 73px ぶれる）。
+ *   ★② 「では青い塊＝帽子」… ★コマによって上着や襟を拾い、★**さらに悪化**しました
+ *      （★顔のぶれ 横33→83px）。
+ *
+ * 【★測って決めました】★出来上がりのぶれ（★小さいほど良い）:
+ *   ★白い塊       … 顔 横56 縦57 ／ 帽子 横31 縦21
+ *   ★顔だけ       … 顔 横 0 縦 0 ／ 帽子 横51 縦58
+ *   ★帽子だけ     … 顔 横51 縦58 ／ 帽子 横 0 縦 0
+ *   ★**顔＋帽子の中点** … ★**顔 横26 縦29 ／ 帽子 横26 縦29**  ← ★採用
+ *
+ * ★オーナーの苦情は「★騎手の頭のチラつき・馬の顔のチラつき」の 2 つなので、
+ * ★その 2 点を同時に小さくする中点を基準にします。
+ * ★塊探しはやめ、★**帯の重心**にします（★塊は素材が変わると別物を掴みます）。
+ */
+async function anchorOf(file) {
   const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width: w, height: h } = info;
-  const white = new Uint8Array(w * h);
-  for (let i = 0, k = 0; i < data.length; i += 4, k += 1) {
-    if ((data[i + 3] ?? 0) < 128) continue;
-    if (Math.min(data[i] ?? 0, data[i + 1] ?? 0, data[i + 2] ?? 0) > 190) white[k] = 1;
-  }
-  const seen = new Uint8Array(w * h);
-  let best = null;
-  for (let s0 = 0; s0 < w * h; s0 += 1) {
-    if (white[s0] === 0 || seen[s0] === 1) continue;
-    const stack = [s0]; seen[s0] = 1;
-    let n = 0; let sx = 0; let sy = 0; let top = h;
-    while (stack.length > 0) {
-      const k = stack.pop();
-      const x = k % w; const y = (k - x) / w;
-      n += 1; sx += x; sy += y; if (y < top) top = y;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const nx = x + dx; const ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-        const nk = ny * w + nx;
-        if (white[nk] === 1 && seen[nk] === 0) { seen[nk] = 1; stack.push(nk); }
-      }
+  let l = 1e9; let r = -1; let t = 1e9; let b = -1;
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if ((data[(y * w + x) * 4 + 3] ?? 0) < 64) continue;
+      if (x < l) l = x; if (x > r) r = x; if (y < t) t = y; if (y > b) b = y;
     }
-    if (n < 3000) continue;
-    if (best === null || top < best.top) best = { top, cx: sx / n, cy: sy / n, n };
   }
-  if (best === null) { console.error(`  ★帽子が見つかりません: ${file}`); process.exit(1); }
-  return { cx: best.cx, cy: best.cy };
+  /** ★馬の顔＝外接矩形の右 12% の帯（★馬は右を向いています） */
+  let fx = 0; let fy = 0; let fn = 0;
+  for (let y = t; y <= b; y += 1) {
+    for (let x = Math.round(r - (r - l) * 0.12); x <= r; x += 1) {
+      if ((data[(y * w + x) * 4 + 3] ?? 0) < 64) continue;
+      fx += x; fy += y; fn += 1;
+    }
+  }
+  /** ★騎手の帽子＝上 25% の帯にある勝負服の色（★雛形が青と決めています） */
+  let cx = 0; let cy = 0; let cn = 0;
+  for (let y = t; y <= t + (b - t) * 0.25; y += 1) {
+    for (let x = l; x <= r; x += 1) {
+      const i = (y * w + x) * 4;
+      if ((data[i + 3] ?? 0) < 64) continue;
+      const R = data[i] ?? 0; const G = data[i + 1] ?? 0; const B = data[i + 2] ?? 0;
+      const mx = Math.max(R, G, B); const mn = Math.min(R, G, B); const d = mx - mn;
+      if (d === 0) continue;
+      const sat = mx === 0 ? 0 : d / mx;
+      let hue = mx === R ? ((G - B) / d) % 6 : mx === G ? (B - R) / d + 2 : (R - G) / d + 4;
+      hue *= 60; if (hue < 0) hue += 360;
+      if (sat >= 0.35 && hue >= 176 && hue <= 268) { cx += x; cy += y; cn += 1; }
+    }
+  }
+  if (fn === 0 || cn === 0) { console.error(`  ★基準が取れません: ${file}`); process.exit(1); }
+  return { cx: (fx / fn + cx / cn) / 2, cy: (fy / fn + cy / cn) / 2 };
 }
 const xs = [];
 const hys = [];
 for (let i = 1; i <= FRAMES; i += 1) {
-  const hp = await helmetX(`${ALIGNED}/${nn(i)}.png`);
+  const hp = await anchorOf(`${ALIGNED}/${nn(i)}.png`);
   xs.push(hp.cx); hys.push(hp.cy);
 }
 const meanX = xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -129,8 +165,8 @@ for (let i = 1; i <= FRAMES; i += 1) {
     Math.round(meanX - xs[i - 1]), Math.round(meanY - hys[i - 1]));
   writeFileSync(`${FINAL}/${nn(i)}.png`, c.toBuffer('image/png'));
 }
-console.log(`  ★帽子の横ぶれ ${(Math.max(...xs) - Math.min(...xs)).toFixed(1)}px → 揃えました`);
-console.log(`  ★帽子の縦ぶれ ${(Math.max(...hys) - Math.min(...hys)).toFixed(1)}px → 揃えました（★馬体が上下に振られなくなります）`);
+console.log(`  ★基準の横ぶれ ${(Math.max(...xs) - Math.min(...xs)).toFixed(1)}px → 揃えました`);
+console.log(`  ★基準の縦ぶれ ${(Math.max(...hys) - Math.min(...hys)).toFixed(1)}px → 揃えました（★馬体が上下に振られなくなります）`);
 
 console.log('\n★⑥ 受け入れ検査');
 try {

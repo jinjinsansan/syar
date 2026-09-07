@@ -120,6 +120,90 @@ const SPAN_M = 3.32;
  */
 const STRIDE_M_DEFAULT = 5.60;
 
+/**
+ * ★**芝の明るさの段階**（★2026-09-07・調査 REPORT_P4_RACE_BACKGROUND_STUDY）
+ *   ★0 = 納品のまま（★実測 明るさ 0.36〜0.45）
+ *   ★1 = 参考映像の水準（★実測 明るさ 0.72〜0.86）
+ * ⚠️ ★どれが良いかは ★**オーナーの目で決めます**。★数値では決められません。
+ */
+const TURF_STEPS = [
+  { lift: 0, flat: 0, label: '納品のまま' },
+  { lift: 1, flat: 0, label: '明るく' },
+  { lift: 1, flat: 1, label: '明るく＋平らに' },
+] as const;
+
+/**
+ * ★**奥の層を隠す境目**（★2026-09-07・調査 REPORT_P4_RACE_BACKGROUND_STUDY）
+ *   ★参考映像は、★走行中の画面に ★**空・スタンド・観客がほとんど写りません**
+ *   （★62 コマの実測: ★緑が画面の中央値 65%・★空が 5% を超えるのは 14 コマだけ）。
+ * ⚠️ ★層の名前で選びません（★素材を差し替えたら合わなくなる）。★奥行きで選びます。
+ *   ★この素材では 木立 160m・スタンド 70m ／ 植込み 30m・ラチ 18/10/-13m・芝 3/-3/-8m。
+ */
+const FAR_LAYER_M = 60;
+
+/**
+ * ★**完成候補**（★2026-09-07・レビュー裁定「オーナーにつまみの最適値を決めさせる前に、
+ *   ★開発側で推奨する完成候補を作ってください」）
+ *
+ * ⚠️ ★つまみを増やすのをやめました。★1 つずつ足していく候補にして、
+ *    ★**何が効いたか**が分かる形にします。★オーナーが選ぶのは「どの画面が良いか」だけです。
+ */
+const LOOKS = [
+  { label: '① 納品のまま', turf: 0, far: false, light: false, contact: false, bob: 0.3 },
+  { label: '② ＋芝を明るく', turf: 1, far: true, light: false, contact: false, bob: 0.3 },
+  { label: '③ ＋光を揃える', turf: 1, far: true, light: true, contact: false, bob: 0.3 },
+  { label: '④ ＋接地感', turf: 1, far: true, light: true, contact: true, bob: 0.3 },
+] as const;
+
+/**
+ * ⚠️ ★**芝を「平らに」してはいけません**（★2026-09-07・オーナー実見）
+ *   ★参考映像の芝に草の質感が無かったので、★`flattenTurf` で粒を消しました。
+ *   ★オーナー評: ★**「②③④ 全て明るさは上がりますが、ぼやけていて芝の質感がないです」**
+ *   → ★候補は ★**明るさだけ**（`turf: 1`）にします。★質感は納品のまま残します。
+ *   ★`flattenTurf` は `TURF_STEPS[2]` に残していますが、★候補からは外しています。
+ */
+
+/**
+ * ★**場の光を馬に当てる**（★2026-09-07）
+ *
+ * 【★なぜ要るか】
+ *   ★芝を明るくしたぶん、★**馬が日陰にいるように見えます**
+ *   （★レビュー評「背景の上にキャラクターを置いた印象」）。
+ *
+ * 【⚠️ ★数値の目標は立てられませんでした（★開発側の測り違い・撤回）】
+ *   ★最初「参考映像は 馬 0.53 / 芝 0.73 ＝ 比 1.37 倍」と書きましたが、
+ *   ★その箱には ★**騎手の白いズボン**が入っていました。★色（茶）で拾い直すと、
+ *   ★今度は ★**ダート（薄茶）**が混ざり 0.71 になります。
+ *   → ★圧縮された録画から馬体だけを分けることはできません。
+ *     ★**「参考映像と同じ比にした」とは言えません。**★どこが良いかはオーナーの目で決めます。
+ *
+ * 【★どう当てるか】
+ *   ★中間調だけを γ で持ち上げます。★補助光（底上げ）は使いません。
+ *   ⚠️ ★最初 γ0.65＋補助光0.14 にしたら、★**黒い輪郭線まで 0.23 に浮いて**
+ *      ★馬が灰色にぼやけました（★オーナーに見せる前に実見で気づきました）。
+ *   → ★暗い画素（★輪郭線）は触りません。★実測で輪郭は 0.04 のまま、
+ *     ★毛は 0.26〜0.32 → ★**0.34〜0.43** に上がります。
+ */
+const LIGHT_GAMMA = 0.60;
+/** ★これより暗い画素は輪郭線とみなし、★持ち上げません */
+const LIGHT_KEEP_DARK = 0.16;
+function applySceneLight(a: Uint8ClampedArray, w: number, h: number): void {
+  for (let k = 0; k < w * h; k += 1) {
+    const i = k * 4;
+    if (a[i + 3]! < 8) continue;
+    const r = a[i]!; const g = a[i + 1]!; const b = a[i + 2]!;
+    const mx = Math.max(r, g, b) / 255;
+    if (mx === 0 || mx < LIGHT_KEEP_DARK) continue;
+    const lit = Math.min(1, Math.pow(mx, LIGHT_GAMMA));
+    /** ★明るさだけ上げ、★色味の比は保ちます（★陰影と立体が壊れません） */
+    const f = lit / mx;
+    a[i] = Math.round(Math.min(255, r * f));
+    a[i + 1] = Math.round(Math.min(255, g * f));
+    a[i + 2] = Math.round(Math.min(255, b * f));
+  }
+}
+
+
 /** ★背景素材の置き場（★既存・本番の `/race` と同じもの） */
 const PARALLAX_DIR = '/art/parallax/backstretch-side-v1';
 /**
@@ -166,6 +250,183 @@ const RUNNERS = [
  *   ★これは HSL で「H と S を差し替え、L を残す」のと同じで、★**陰影と輪郭が壊れません**。
  *   ★暗い毛色（黒鹿毛など）は、★そのあと弱く乗算して沈めます。
  */
+/**
+ * ★**芝を参考映像の明るさへ寄せる**（★2026-09-07・調査 REPORT_P4_RACE_BACKGROUND_STUDY）
+ *
+ * 【★なぜ要るか — ★実測】
+ *   ★参考映像の芝 … ★明るさ 0.72〜0.86 ／ 彩度 0.44〜0.71（★#8cd765 / #7bc963）
+ *   ★STAR の芝    … ★明るさ 0.36〜0.45 ／ 彩度 0.69〜0.73（★#4b641b / #445c19）
+ *   → ★**明るさが約 2 倍**違います。★デフォルメの馬を乗せると馬だけが浮きます。
+ *
+ * 【★どの層に当てるか】
+ *   ⚠️ ★層の名前をここに書きません（★素材を差し替えたら合わなくなる）。
+ *      ★`manifest.json` の `dirtLayers`（★ダートに差し替えられる層＝地面）が
+ *      ★そのまま芝の層なので、★`isGround` の層だけに当てます。
+ *
+ * 【★強さ】
+ *   ★`t = 0` で納品のまま、★`t = 1` で参考映像の水準。★オーナーが目で決めます。
+ */
+/**
+ * ★**芝の草の粒を消して、刈り込みの帯だけ残す**（★2026-09-07）
+ *
+ * 【★なぜ要るか】
+ *   ★参考映像の芝には ★**草の質感がありません**（★62 コマ目視）。
+ *   ★幅の広い刈り込みの帯が緩く 2〜3 本走るだけです。
+ *   ★STAR の芝は写真調の草地なので、★明るくすると ★**粒が余計に目立ちます**
+ *   （★オーナー実見「芝の色だけでは難しい」）。
+ *
+ * 【★どうやるか】
+ *   ★一度小さく描いてから戻します。★細かい粒は縮小で消え、★大きな帯は残ります。
+ *   ★横は帯に沿うので強く、★縦は帯の境目を残したいので弱く縮めます。
+ */
+function flattenTurf(src: CanvasImageSource, w: number, h: number, t: number): HTMLCanvasElement {
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  const g = out.getContext('2d')!;
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = 'high';
+  if (t <= 0) { g.drawImage(src, 0, 0, w, h); return out; }
+  const small = document.createElement('canvas');
+  small.width = Math.max(1, Math.round(w / (1 + 15 * t)));
+  small.height = Math.max(1, Math.round(h / (1 + 3 * t)));
+  const sg = small.getContext('2d')!;
+  sg.imageSmoothingEnabled = true;
+  sg.imageSmoothingQuality = 'high';
+  sg.drawImage(src, 0, 0, small.width, small.height);
+  g.drawImage(small, 0, 0, w, h);
+  return out;
+}
+
+/**
+ * ★**曇天の背景を晴天にする**（★2026-09-07・オーナー実見「なぜか曇というか競馬場が暗い」）
+ *
+ * 【★なぜ暗いか】
+ *   ★背景素材はもともと ★**「芝・良・直線残り200m・逆光」**として描かれています
+ *   （★`palette.json` の `$scene`）。★曇りで逆光の場面なので、★空は白く、スタンドは暗い。
+ *
+ * 【★どう変えるか — ★測って決めました】
+ *   ★空は ★**木立の層に 70% 焼き込まれて**います（★実測。★スタンドの層は 1%）。
+ *   ★「淡くて明るい画素（彩度 0.18 未満・明るさ 0.55 超）」＝空 なので、
+ *   ★そこだけ青のグラデーションへ置き換えます。★雲の明暗は残します。
+ *   ★空でない所（★スタンド・木立・植込み）は、★中間調を少し持ち上げます。
+ * ⚠️ ★地面（芝）には当てません。★芝は別に扱います。
+ */
+/**
+ * ★晴れのときの芝の持ち上げ量（★0 = 納品のまま、1 = 参考映像の水準）。
+ *   ★実測: ★納品 0.33 → ★0.45 で **0.47** → ★1.0 で 0.61。
+ */
+const SUNNY_TURF_LIFT = 0.45;
+
+const SKY_TOP: readonly [number, number, number] = [0x3f, 0x8f, 0xd8];
+const SKY_BOTTOM: readonly [number, number, number] = [0xbf, 0xdd, 0xf2];
+function makeSunny(img: HTMLImageElement, withSky: boolean): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = img.width; c.height = img.height;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height);
+  const a = d.data;
+  const w = c.width; const h = c.height;
+  /**
+   * ★**空は「上端から繋がっている淡い明るい面」だけ**（★2026-09-07）
+   *
+   * ⚠️ ★最初は「彩度 0.18 未満・明るさ 0.55 超」を全部空としました。
+   *    ★実見すると ★**白いラチまで青く**なりました（★同じ条件に当てはまるため）。
+   * → ★上端から塗りつぶしで繋がっている所だけを空とします。
+   *   ★ラチは空と繋がっていないので侵しません。
+   */
+  const sky = new Uint8Array(w * h);
+  if (withSky) {
+    const pale = (k: number): boolean => {
+      const i = k * 4;
+      if (a[i + 3]! < 8) return false;
+      const r = a[i]!; const gg = a[i + 1]!; const b = a[i + 2]!;
+      const mx = Math.max(r, gg, b); const mn = Math.min(r, gg, b);
+      return mx / 255 > 0.55 && (mx === 0 ? 0 : (mx - mn) / mx) < 0.22;
+    };
+    const stack: number[] = [];
+    for (let x = 0; x < w; x += 1) if (pale(x)) { sky[x] = 1; stack.push(x); }
+    while (stack.length > 0) {
+      const k = stack.pop()!;
+      const x = k % w; const y = (k - x) / w;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const nx = x + dx; const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const nk = ny * w + nx;
+        if (sky[nk] === 1 || !pale(nk)) continue;
+        sky[nk] = 1; stack.push(nk);
+      }
+    }
+  }
+  for (let y = 0; y < h; y += 1) {
+    const t = h <= 1 ? 0 : y / (h - 1);
+    const r0 = SKY_TOP[0] + (SKY_BOTTOM[0] - SKY_TOP[0]) * t;
+    const g0 = SKY_TOP[1] + (SKY_BOTTOM[1] - SKY_TOP[1]) * t;
+    const b0 = SKY_TOP[2] + (SKY_BOTTOM[2] - SKY_TOP[2]) * t;
+    for (let x = 0; x < w; x += 1) {
+      const k = y * w + x; const i = k * 4;
+      if (a[i + 3]! < 8) continue;
+      const r = a[i]!; const gg = a[i + 1]!; const b = a[i + 2]!;
+      const mx = Math.max(r, gg, b);
+      const v = mx / 255;
+      if (sky[k] === 1) {
+        /** ★雲の明暗（v）は残したまま青へ */
+        const kk = 0.75 + 0.25 * ((v - 0.55) / 0.45);
+        a[i] = Math.round(Math.min(255, r0 * kk));
+        a[i + 1] = Math.round(Math.min(255, g0 * kk));
+        a[i + 2] = Math.round(Math.min(255, b0 * kk));
+        continue;
+      }
+      /** ★空でない所は、★中間調だけ少し持ち上げます（★暗い輪郭は触りません） */
+      if (v < 0.10) continue;
+      const lit = Math.min(1, Math.pow(v, 0.82));
+      const f = lit / v;
+      a[i] = Math.round(Math.min(255, r * f));
+      a[i + 1] = Math.round(Math.min(255, gg * f));
+      a[i + 2] = Math.round(Math.min(255, b * f));
+    }
+  }
+  g.putImageData(d, 0, 0);
+  return c;
+}
+
+function brightenTurf(img: HTMLCanvasElement, t: number): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = img.width; c.height = img.height;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  g.drawImage(img, 0, 0);
+  if (t <= 0) return c;
+  const d = g.getImageData(0, 0, c.width, c.height);
+  const a = d.data;
+  for (let i = 0; i < a.length; i += 4) {
+    if (a[i + 3]! < 8) continue;
+    const r = a[i]! / 255; const gg = a[i + 1]! / 255; const b = a[i + 2]! / 255;
+    const mx = Math.max(r, gg, b); const mn = Math.min(r, gg, b); const dd = mx - mn;
+    if (mx === 0) continue;
+    let hue = dd === 0 ? 0
+      : mx === r ? ((gg - b) / dd) % 6 : mx === gg ? (b - r) / dd + 2 : (r - gg) / dd + 4;
+    hue *= 60; if (hue < 0) hue += 360;
+    const sat = dd / mx;
+    /** ★緑でない画素（★ラチの白・土）は触りません */
+    if (dd !== 0 && (hue < 60 || hue > 170)) continue;
+    const v2 = Math.min(1, mx * (1 + 0.95 * t));
+    const s2 = sat * (1 - 0.25 * t);
+    const h2 = (hue + 15 * t) % 360;
+    /** ★HSV → RGB */
+    const cc = v2 * s2; const hh = h2 / 60;
+    const xx = cc * (1 - Math.abs((hh % 2) - 1)); const m = v2 - cc;
+    let rr = 0; let g2 = 0; let b2 = 0;
+    if (hh < 1) { rr = cc; g2 = xx; } else if (hh < 2) { rr = xx; g2 = cc; }
+    else if (hh < 3) { g2 = cc; b2 = xx; } else if (hh < 4) { g2 = xx; b2 = cc; }
+    else if (hh < 5) { rr = xx; b2 = cc; } else { rr = cc; b2 = xx; }
+    a[i] = Math.round((rr + m) * 255);
+    a[i + 1] = Math.round((g2 + m) * 255);
+    a[i + 2] = Math.round((b2 + m) * 255);
+  }
+  g.putImageData(d, 0, 0);
+  return c;
+}
+
 /**
  * ★**どの画素を塗り替えるか**（★毛色 / 勝負服）。★2 か所で使うのでここに 1 つだけ置きます。
  *
@@ -291,21 +552,12 @@ function skinMask(a: Uint8ClampedArray, w: number, h: number): Uint8Array {
 
 function tintOnto(
   g: CanvasRenderingContext2D, src: HTMLImageElement, colour: string,
-  w: number, h: number, mode: TintMode,
+  w: number, h: number, mode: 'coat' | 'silk',
 ): void {
   g.globalCompositeOperation = 'source-over';
   g.imageSmoothingQuality = 'high';
   g.clearRect(0, 0, w, h);
   g.drawImage(src, 0, 0, w, h);
-  if (mode === 'multiply') {
-    g.globalCompositeOperation = 'multiply';
-    g.fillStyle = colour;
-    g.fillRect(0, 0, w, h);
-    g.globalCompositeOperation = 'destination-in';
-    g.drawImage(src, 0, 0, w, h);
-    g.globalCompositeOperation = 'source-over';
-    return;
-  }
   /**
    * ★**色相で部位を選び、明るさを保って置き換えます**（★`tools/lib/dress.mjs` と同じ方式）
    *
@@ -483,9 +735,12 @@ function hexToRgb(hex: string): readonly [number, number, number] {
 /**
  * ★着色のやり方。
  *   ★`coat` … 茶系（毛）を毛色へ　★`silk` … 青（勝負服）を勝負服／枠色へ
- *   ★`multiply` … 比較用（★濁ります）
+ *
+ * ⚠️ ★かつて `multiply`（乗算）を「比較用」として切り替えられるようにしていました。
+ *    ★**外しました**（★2026-09-07・オーナー実見「着色を押すと馬の色がおかしくなっています」）。
+ *    ★押すと必ず濁る作りで、★警告も無く品質を下げるボタンでした。
+ *    ★なぜ乗算が間違いかは上の `tintOnto` の注記に残してあります。★UI には戻さないこと。
  */
-type TintMode = 'coat' | 'silk' | 'multiply';
 
 /**
  * ★1 頭ぶんの 1 層。
@@ -552,8 +807,10 @@ interface Manifest {
 interface Scenery {
   readonly plateWidth: number;
   readonly plateHeight: number;
-  readonly behind: ParallaxPlate<HTMLImageElement>;
-  readonly front: ParallaxPlate<HTMLImageElement>;
+  readonly behind: ParallaxPlate<CanvasImageSource>;
+  /** ★奥の層（★空・スタンド）を外したもの。★参考映像の走行中の構成 */
+  readonly behindNear: ParallaxPlate<CanvasImageSource>;
+  readonly front: ParallaxPlate<CanvasImageSource>;
   /** ★馬が立つ帯（★プレート px）。★地面の層のいちばん手前から取る */
   readonly groundY0: number;
   readonly groundY1: number;
@@ -589,7 +846,7 @@ export default function SpriteClient(): React.ReactElement {
    *    （★最下端 1233〜1406px）。★そこへ `FRAME_DY` を足すと**二重に跳ねます**。
    *    → ★既定を **0** にしました。★平らな素材に戻したときだけ上げてください。
    */
-  const [bob, setBob] = useState(0);
+  const [bob, setBob] = useState(0.3);
   /**
    * ★**毛色の濃さ**（★2026-09-05・オーナー指摘「色がチカチカします」）
    *
@@ -604,12 +861,17 @@ export default function SpriteClient(): React.ReactElement {
    *    （★85% で馬と騎手が透け、★奥のラチが透けて見えていました）。
    *    ★毛色の濃さは `palette.json` の色そのもので決めます。
    */
-  /** ★着色のやり方。★`color` が正・`multiply` は比較用（★濁る） */
-  const [tintMode, setTintMode] = useState<TintMode>('coat');
   /** ★1m ごとの目盛り（★滑りを測るための道具。★見た目の判定では切る） */
   const [guides, setGuides] = useState(false);
-  const stateRef = useRef({ playing, speedMps, heightRatio, quantise, strideM, bob, guides, count });
-  stateRef.current = { playing, speedMps, heightRatio, quantise, strideM, bob, guides, count };
+  /** ★完成候補（★`LOOKS` の添字）。★つまみではなく候補で選びます */
+  const [look, setLook] = useState(0);
+  /**
+   * ★天気（★2026-09-07・オーナー実見「なぜか曇というか競馬場が暗い」）
+   *   ★背景素材はもともと「逆光・薄曇り」として描かれています。
+   */
+  const [sunny, setSunny] = useState(false);
+  const stateRef = useRef({ playing, speedMps, heightRatio, quantise, strideM, bob, guides, count, look, sunny });
+  stateRef.current = { playing, speedMps, heightRatio, quantise, strideM, bob, guides, count, look, sunny };
   const travelRef = useRef(0);
 
   const reset = useCallback(() => { travelRef.current = 0; }, []);
@@ -627,7 +889,10 @@ export default function SpriteClient(): React.ReactElement {
     let raf = 0;
     /** ★[馬][コマ][層] の焼いた絵。★馬ごとに色が違うので、★馬ごとに焼きます */
     const baked: Piece[][][] = [];
-    let scenery: Scenery | null = null;
+    /** ★コマごとの蹄の位置（★画像の上からの比）。★素材から測ります */
+    const lowRatio: number[] = [];
+    /** ★芝の明るさ段階ごとの背景一式（★`TURF_STEPS` と同じ並び） */
+    let sceneries: Scenery[] | null = null;
     /** ★背景の読み込み状況（★馬と背景は別々に読むので、★先に終わった方が書きます） */
     let bgNote = '背景 読み込み中';
     /** ★素材 1 枚の横 ÷ 縦。★`sprite.json` から読みます（★正方と決めつけない） */
@@ -652,35 +917,80 @@ export default function SpriteClient(): React.ReactElement {
        * ⚠️ ★層の名前をここに書かないこと（★素材を差し替えたら合わなくなります・`parallax-plate.ts`）。
        */
       const groundNames = new Set(Object.keys(man.dirtLayers ?? {}));
-      const behind: ParallaxLayer<HTMLImageElement>[] = [];
-      const front: ParallaxLayer<HTMLImageElement>[] = [];
-      let groundY0 = 0; let groundY1 = 0;
-      man.layers.forEach((l, i) => {
-        const image = imgs[i]!;
-        const entry: ParallaxLayer<HTMLImageElement> = {
-          image, width: l.tileWidth, height: image.height,
-          plateY0: l.plateY0, plateY1: l.plateY1,
-          depthOffsetM: l.depthOffsetM, isGround: groundNames.has(l.name),
-        };
-        if (groundNames.has(l.name)) {
+      /**
+       * ★**芝の明るさの段階ごとに、背景一式を先に作っておきます**（★2026-09-07）。
+       *   ★スライダーを動かすたびに焼き直すと重いので、★段階ぶんだけ用意して切り替えます。
+       *   ★焼き直すのは地面の層だけで、★他の層は同じ画像を使い回します。
+       */
+      /** ★晴天版の層（★地面以外を 1 度だけ焼いて、★段階ぶんで使い回します） */
+      const sunnyOf = new Map<number, HTMLCanvasElement>();
+      /** ★いちばん奥の層の奥行き（★そこにだけ空が焼き込まれています・実測で 70%） */
+      const horizonM = Math.max(...man.layers.map((l) => l.depthOffsetM));
+      const built: Scenery[] = [];
+      for (const sunny of [false, true]) for (const step of TURF_STEPS) {
+       built.push((() => {
+        const behind: ParallaxLayer<CanvasImageSource>[] = [];
+        const front: ParallaxLayer<CanvasImageSource>[] = [];
+        /** ★空・スタンドなど、★参考映像では走行中に写らない奥の層 */
+        const far = new Set<ParallaxLayer<CanvasImageSource>>();
+        let groundY0 = 0; let groundY1 = 0;
+        man.layers.forEach((l, i) => {
+          const src = imgs[i]!;
+          const ground = groundNames.has(l.name);
+          let image: CanvasImageSource;
+          if (ground) {
+            /**
+             * ★**晴れなら芝も明るくします**（★2026-09-07・オーナー実見
+             *   ★「納品のまま＆芝をもう少しトーンを明るくできないですか？」）
+             *   ⚠️ ★つまみは増やしません。★空だけ晴れて芝が曇天のままだと、
+             *      ★同じ場所に見えません。★天気に連動させます。
+             *   ★候補が既にそれ以上明るくしているときは、★そちらを優先します。
+             */
+            const lift = sunny ? Math.max(step.lift, SUNNY_TURF_LIFT) : step.lift;
+            image = brightenTurf(flattenTurf(src, src.width, src.height, step.flat), lift);
+          } else if (sunny) {
+            let cached = sunnyOf.get(i);
+            if (cached === undefined) {
+              /** ★空を持つのはいちばん奥の層だけ（★名前ではなく奥行きで選びます） */
+              cached = makeSunny(src, l.depthOffsetM >= horizonM);
+              sunnyOf.set(i, cached);
+            }
+            image = cached;
+          } else {
+            image = src;
+          }
+          const entry: ParallaxLayer<CanvasImageSource> = {
+            image,
+            width: l.tileWidth, height: src.height,
+            plateY0: l.plateY0, plateY1: l.plateY1,
+            depthOffsetM: l.depthOffsetM, isGround: ground,
+          };
           /** ★いちばん手前の地面の帯を、★馬が立つ帯とします */
-          if (l.plateY1 > groundY1) { groundY0 = l.plateY0; groundY1 = l.plateY1; }
-        }
-        /**
-         * ★**馬より手前に来る層**（★ラチ）だけ、馬の後に描きます。
-         *   ★地面ではなく、★馬群（深さ 0）より手前（depthOffsetM < 0）のもの。
-         * → ★手前のラチが馬の前を横切ることで、★一気に**中継の絵**になります。
-         */
-        if (!groundNames.has(l.name) && l.depthOffsetM < 0) front.push(entry);
-        else behind.push(entry);
-      });
-      bgNote = `背景 ${behind.length}+${front.length} 層`;
-      scenery = {
-        plateWidth: man.plateWidth, plateHeight: man.plateHeight,
-        behind: { plateWidth: man.plateWidth, plateHeight: man.plateHeight, layers: behind },
-        front: { plateWidth: man.plateWidth, plateHeight: man.plateHeight, layers: front },
-        groundY0, groundY1,
-      };
+          if (ground && l.plateY1 > groundY1) { groundY0 = l.plateY0; groundY1 = l.plateY1; }
+          /**
+           * ★**馬より手前に来る層**（★ラチ）だけ、馬の後に描きます。
+           *   ★地面ではなく、★馬群（深さ 0）より手前（depthOffsetM < 0）のもの。
+           * → ★手前のラチが馬の前を横切ることで、★一気に**中継の絵**になります。
+           */
+          if (!ground && l.depthOffsetM < 0) front.push(entry);
+          else behind.push(entry);
+          if (!ground && l.depthOffsetM >= FAR_LAYER_M) far.add(entry);
+        });
+        return {
+          plateWidth: man.plateWidth, plateHeight: man.plateHeight,
+          behind: { plateWidth: man.plateWidth, plateHeight: man.plateHeight, layers: behind },
+          behindNear: {
+            plateWidth: man.plateWidth,
+            plateHeight: man.plateHeight,
+            layers: behind.filter((e) => !far.has(e)),
+          },
+          front: { plateWidth: man.plateWidth, plateHeight: man.plateHeight, layers: front },
+          groundY0, groundY1,
+        };
+       })());
+      }
+      sceneries = built;
+      bgNote = `背景 ${built[0]!.behind.layers.length}+${built[0]!.front.layers.length} 層（★奥を隠すと ${built[0]!.behindNear.layers.length}+${built[0]!.front.layers.length}）`;
     })().catch(() => { setStatus('⚠️ 背景素材を読めませんでした'); });
 
     /** ★馬（★購入リグを焼いたスプライト）を読む */
@@ -700,6 +1010,28 @@ export default function SpriteClient(): React.ReactElement {
         }
       }
       if (cancelled) return;
+      /**
+       * ★**コマごとの蹄の位置を素材から測ります**（★画像の上からの比）。
+       *   ★これが無いと、★どのコマも同じ高さに置かれ、★浮いたコマが浮いたままになります。
+       */
+      {
+        const probe = document.createElement('canvas');
+        const pg = probe.getContext('2d', { willReadFrequently: true })!;
+        for (let f = 0; f < SRC_FRAMES; f += 1) {
+          const img = raw.coat[f]!;
+          probe.width = img.width; probe.height = img.height;
+          pg.clearRect(0, 0, probe.width, probe.height);
+          pg.drawImage(img, 0, 0);
+          const d = pg.getImageData(0, 0, probe.width, probe.height).data;
+          let low = probe.height - 1;
+          for (let y = probe.height - 1; y >= 0; y -= 1) {
+            let hit = false;
+            for (let x = 0; x < probe.width; x += 1) if ((d[(y * probe.width + x) * 4 + 3] ?? 0) >= 64) { hit = true; break; }
+            if (hit) { low = y; break; }
+          }
+          lowRatio[f] = low / probe.height;
+        }
+      }
       /**
        * ★馬 × コマ × 層 で焼く（★一度だけ）。
        *   ★着色は **馬ごとに 1 枚**のキャンバスへ詰めます（★上の `CELL_PX` の注記）。
@@ -741,13 +1073,15 @@ export default function SpriteClient(): React.ReactElement {
            */
           const src = raw.coat[f]!;
           sg.clearRect(0, 0, CELL_W, CELL_H);
-          if (tintMode === 'multiply') {
-            tintOnto(sg, src, palette[r.coat] ?? '#8a6340', CELL_W, CELL_H, 'multiply');
-          } else {
-            /** ★① 茶系 → 毛色 */
-            tintOnto(sg, src, palette[r.coat] ?? '#8a6340', CELL_W, CELL_H, 'coat');
-            /** ★② 青 → 勝負服（★同じ絵の上に続けて当てる） */
-            tintInPlace(sg, palette[r.silk] ?? '#2f6fd0', CELL_W, CELL_H, 'silk');
+          /** ★① 茶系 → 毛色 */
+          tintOnto(sg, src, palette[r.coat] ?? '#8a6340', CELL_W, CELL_H, 'coat');
+          /** ★② 青 → 勝負服（★同じ絵の上に続けて当てる） */
+          tintInPlace(sg, palette[r.silk] ?? '#2f6fd0', CELL_W, CELL_H, 'silk');
+          /** ★③ 場の光（★候補が要求したときだけ） */
+          if (LOOKS[look]?.light === true) {
+            const lit = sg.getImageData(0, 0, CELL_W, CELL_H);
+            applySceneLight(lit.data, CELL_W, CELL_H);
+            sg.putImageData(lit, 0, 0);
           }
           ag.drawImage(scratch, 0, f * CELL_H);
           const row: Piece[] = [{
@@ -783,19 +1117,51 @@ export default function SpriteClient(): React.ReactElement {
        *   ★こうすると ★**地面と馬が同じ物差しで動く**ので、★背景だけ速い／遅いが起きません。
        */
       const packPxPerM = drawSize / SPAN_M;
+      /** ★芝の明るさ（★オーナーが目で決める）。★段階ぶんの背景を先に作ってあります */
+      const chosen = LOOKS[st.look] ?? LOOKS[0]!;
+      const sceneIdx = (st.sunny ? TURF_STEPS.length : 0) + chosen.turf;
+      const scenery = sceneries === null ? null
+        : (sceneries[Math.min(sceneries.length - 1, Math.max(0, sceneIdx))] ?? null);
+
+      /**
+       * ⚠️ ★**毎コマ消すこと**（★2026-09-07・オーナー実見「芝は何も変わってない」）
+       *    ★これまで一度も消していませんでした。★背景の層が画面全体を覆っていたので
+       *    ★動いていましたが、★層を 1 つでも外すと ★**前のコマの絵がそのまま残ります**。
+       *    ★実際、★「奥の層を隠す」を押しても ★**画面が変わりませんでした**
+       *    （★層は 8 → 6 に減っていたのに、★消えた場所に前のコマが残っていた）。
+       */
+      ctx.fillStyle = '#c9d6dc';
+      ctx.fillRect(0, 0, W, H);
+
+      /**
+       * ★**奥を隠すときは、カメラを走路へ寄せます**（★2026-09-07）
+       *   ★参考映像は、★空いた場所を残さず ★**芝で画面を埋めます**
+       *   （★62 コマの実測: ★緑が画面の中央値 65%）。
+       *   ★層を消しただけだと、★消えた場所に空の帯が残ります。
+       */
+      /**
+       * ⚠️ ★**寄せすぎるとぼやけます**（★2026-09-07・オーナー実見）
+       *   ★プレートは 1672px 幅で、★画面は 1150px。★拡大率 = W ÷ (1672 ÷ zoom)。
+       *     ★zoom 1.12（そのまま）… ★0.77 倍（★縮小なのでぼやけません）
+       *     ★zoom 1.90（最初の案）… ★**1.31 倍＝引き伸ばし**。★これがぼやけの一因でした
+       *     ★zoom 1.40           … ★0.96 倍（★引き伸ばさない上限）
+       *   → ★**1.40 を上限**にします。★これ以上寄せたいなら、★素材を大きく作り直すこと。
+       */
+      const plateZoom = chosen.far ? 1.40 : PLATE_ZOOM;
+      const plateAnchor = chosen.far ? 0.80 : PLATE_ANCHOR;
 
       if (scenery !== null) {
         const opts = {
           viewport: { width: W, height: H },
-          zoom: PLATE_ZOOM,
-          verticalAnchor: PLATE_ANCHOR,
+          zoom: plateZoom,
+          verticalAnchor: plateAnchor,
           /** ⚠️ ★**距離**で流すこと。★速度で流すと再現できません（`parallax-plate.ts`） */
           scrollM: travel,
           packPxPerM,
           packDepthM: PACK_DEPTH_M,
           direction: 1 as const,
         };
-        drawParallaxPlate(ctx, scenery.behind, opts);
+        drawParallaxPlate(ctx, chosen.far ? scenery.behindNear : scenery.behind, opts);
       } else {
         /** ★背景が来るまでの仮の地（★空と芝） */
         ctx.fillStyle = '#9fc6e0'; ctx.fillRect(0, 0, W, H * 0.42);
@@ -803,8 +1169,8 @@ export default function SpriteClient(): React.ReactElement {
       }
 
       /** ★プレート px → 画面 px（★`drawParallaxPlate` と同じ枠取り） */
-      const scale = W / ((scenery?.plateWidth ?? 1672) / PLATE_ZOOM);
-      const cropY0 = Math.max(0, (scenery?.plateHeight ?? 941) - H / scale) * PLATE_ANCHOR;
+      const scale = W / ((scenery?.plateWidth ?? 1672) / plateZoom);
+      const cropY0 = Math.max(0, (scenery?.plateHeight ?? 941) - H / scale) * plateAnchor;
       const plateToScreenY = (py: number): number => (py - cropY0) * scale;
       /** ★馬が立つ帯（★地面の層の中に収める） */
       const bandY0 = scenery?.groundY0 ?? 672;
@@ -859,22 +1225,68 @@ export default function SpriteClient(): React.ReactElement {
           const room = Math.max(0, W - sw);
           const x = Math.round(shown > 1 ? (room * i) / (shown - 1) : room * 0.5);
           /**
-           * ★接地点を合わせる（★画像の上から 0.920 が蹄）。
-           * ★そこへ ★**コマごとの上下動**を足します（★宙に浮く局面を戻すため）。
+           * ★**接地**（★2026-09-07・オーナー実見「馬の足は地面についていません」）
+           *
+           * 【★何が起きていたか — ★実測】
+           *   ★接地線 `FEET`（0.920）は ★**全 8 コマの中でいちばん低い蹄**の位置です。
+           *   ★そのため ★**8 コマ中 6 コマが浮きます**:
+           *     ★コマ6 0.920（接地）／コマ2 0.912／コマ4・7 0.891／コマ3 0.884
+           *     ★コマ1 0.872／★コマ5・8 0.852 ← ★馬の高さ 450px なら **31px** 浮く
+           *
+           * 【★どう直すか】
+           *   ★コマごとの蹄の位置は ★**素材から測れます**（`lowRatio`）。
+           *   ⚠️ ★かつての `FRAME_DY` は納品素材の頃の**固定表**で、★いまの素材と合いません。
+           *   ★浮きを `st.bob` の割合だけ残し、★残りは押し下げて接地させます。
+           *     ★`bob = 0` … ★全コマ接地　★`bob = 1` … ★描かれたまま（★浮いたまま）
            */
-          const dy = s * (FRAME_DY[idx] ?? 0) * st.bob;
+          const gap = FEET - (lowRatio[idx] ?? FEET);
+          const dy = s * gap * (1 - st.bob);
           const y = Math.round(groundY - s * FEET + dy);
           /**
            * ★**接地影**。★足元に影が無いと、★馬が地面から浮いて見えます。
-           *   ★宙に浮く局面（`dy` が上）では小さく薄くします。
+           *   ★宙に浮く局面では小さく薄くします。★浮きは実測値から出します。
            */
-          const lift = Math.max(0, -dy) / Math.max(1, s * 0.07);
-          ctx.globalAlpha = 0.26 * (1 - lift * 0.55);
-          ctx.fillStyle = '#1d2a17';
-          ctx.beginPath();
-          ctx.ellipse(x + sw * 0.5, groundY, sw * 0.18 * (1 - lift * 0.2), s * 0.045, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.globalAlpha = 1;
+          const lift = Math.min(1, (gap * st.bob) / 0.05);
+          if (!chosen.contact) {
+            ctx.globalAlpha = 0.26 * (1 - lift * 0.55);
+            ctx.fillStyle = '#1d2a17';
+            ctx.beginPath();
+            ctx.ellipse(x + sw * 0.5, groundY, sw * 0.18 * (1 - lift * 0.2), s * 0.045, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+          } else {
+            /**
+             * ★**影を 2 枚に分けます**（★2026-09-07・レビュー裁定「足元に重さを出す」）
+             *   ★① 体の下の柔らかい影 … ★大きく薄い。★浮くと**広がって薄く**なります
+             *   ★② 接地した蹄の直下   … ★小さく濃い。★浮くと**消えます**
+             * ⚠️ ★1 枚だけだと、★浮いても接地しても同じ影で、★重さが出ませんでした。
+             */
+            const cx = x + sw * 0.5;
+            const soft = ctx.createRadialGradient(cx, groundY, 0, cx, groundY, sw * (0.20 + lift * 0.10));
+            soft.addColorStop(0, `rgba(20,32,14,${(0.22 * (1 - lift * 0.45)).toFixed(3)})`);
+            soft.addColorStop(1, 'rgba(20,32,14,0)');
+            ctx.fillStyle = soft;
+            ctx.save();
+            ctx.translate(cx, groundY);
+            ctx.scale(1, 0.24);
+            ctx.beginPath();
+            ctx.arc(0, 0, sw * (0.20 + lift * 0.10), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+            /** ★接地している局面だけ、★蹄の下に濃い小さな影 */
+            const hard = Math.max(0, 1 - lift * 1.6);
+            if (hard > 0.02) {
+              ctx.globalAlpha = 0.42 * hard;
+              ctx.fillStyle = '#131d0e';
+              ctx.beginPath();
+              ctx.ellipse(cx + sw * 0.10, groundY, sw * 0.075, s * 0.020, 0, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.beginPath();
+              ctx.ellipse(cx - sw * 0.16, groundY, sw * 0.065, s * 0.017, 0, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.globalAlpha = 1;
+            }
+          }
           for (const p of layers) {
             /**
              * ⚠️ ★着色済みだけを描きます。
@@ -906,8 +1318,8 @@ export default function SpriteClient(): React.ReactElement {
       if (scenery !== null) {
         drawParallaxPlate(ctx, scenery.front, {
           viewport: { width: W, height: H },
-          zoom: PLATE_ZOOM,
-          verticalAnchor: PLATE_ANCHOR,
+          zoom: plateZoom,
+          verticalAnchor: plateAnchor,
           scrollM: travel,
           packPxPerM,
           packDepthM: PACK_DEPTH_M,
@@ -927,7 +1339,7 @@ export default function SpriteClient(): React.ReactElement {
     };
     raf = requestAnimationFrame(draw);
     return () => { cancelled = true; cancelAnimationFrame(raf); };
-  }, [tintMode]);
+  }, [look]);
 
   return (
     <main style={{ minHeight: '100vh', background: '#12161a', color: '#eef2f6', padding: 16, fontFamily: 'system-ui,sans-serif' }}>
@@ -962,10 +1374,29 @@ export default function SpriteClient(): React.ReactElement {
           <button type="button" onClick={() => setGuides((v) => !v)} style={{ ...btn, background: guides ? '#2f6fd0' : '#222a31' }}>
             {guides ? '1m 目盛り: 入' : '1m 目盛り: 切'}
           </button>
-          <button type="button" onClick={() => setTintMode((v) => (v === 'multiply' ? 'coat' : 'multiply'))}
-            style={{ ...btn, background: tintMode !== 'multiply' ? '#2f6fd0' : '#8e2b20' }}>
-            着色: {tintMode !== 'multiply' ? '色相で選ぶ（正）' : '乗算（濁る）'}
+          {/**
+            * ★**完成候補**（★2026-09-07・レビュー裁定）
+            *   ⚠️ ★つまみで最適値を探させないこと。★1 つずつ足した候補を出し、
+            *      ★オーナーは「どの画面が良いか」だけを選びます。
+            */}
+          <button type="button" onClick={() => setSunny((v) => !v)}
+            style={{ ...btn, background: sunny ? '#2f6fd0' : '#8e2b20' }}>
+            ★天気: {sunny ? '晴れ' : '納品（曇り・逆光）'}
           </button>
+          {LOOKS.map((l, i) => (
+            <button key={l.label} type="button" onClick={() => { setLook(i); setBob(l.bob); }}
+              style={{ ...btn, background: look === i ? '#2f6fd0' : '#39424b' }}>
+              {l.label}
+            </button>
+          ))}
+        </div>
+        {/**
+          * ⚠️ ★**つまみを消してしまっていました**（★2026-09-07・オーナー実見の直前に発覚）。
+          *    ★候補ボタンへ差し替えたとき、★閉じ括弧までまとめて消しており、
+          *    ★速さ・1 完歩・浮き・馬の高さが ★**既定値に固定**されていました。
+          *    ★候補で決めるのは見た目、★ここは検証のための道具なので残します。
+          */}
+        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 12 }}>
           <label style={{ fontSize: 12.5, fontWeight: 700 }}>
             速さ {speedMps.toFixed(1)} m/s
             <input type="range" min={4} max={20} step={0.5} value={speedMps}
@@ -974,12 +1405,12 @@ export default function SpriteClient(): React.ReactElement {
           <label style={{ fontSize: 12.5, fontWeight: 700 }}>
             ★1 完歩 {strideM.toFixed(2)} m（★滑らない所を探す）
             <input type="range" min={2.5} max={9} step={0.02} value={strideM}
-              onChange={(e) => setStrideM(Number(e.target.value))} style={{ display: 'block', width: 240, marginTop: 4 }} />
+              onChange={(e) => setStrideM(Number(e.target.value))} style={{ display: 'block', width: 220, marginTop: 4 }} />
           </label>
           <label style={{ fontSize: 12.5, fontWeight: 700 }}>
-            ★上下動 {(bob * 100).toFixed(0)}%（★0 = 納品そのまま）
-            <input type="range" min={0} max={1.6} step={0.05} value={bob}
-              onChange={(e) => setBob(Number(e.target.value))} style={{ display: 'block', width: 200, marginTop: 4 }} />
+            ★浮き {(bob * 100).toFixed(0)}%（★0 = 全コマ接地・100 = 絵のまま）
+            <input type="range" min={0} max={1} step={0.05} value={bob}
+              onChange={(e) => setBob(Number(e.target.value))} style={{ display: 'block', width: 220, marginTop: 4 }} />
           </label>
           <label style={{ fontSize: 12.5, fontWeight: 700 }}>
             馬の高さ {(heightRatio * 100).toFixed(0)}%
