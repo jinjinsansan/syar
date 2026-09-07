@@ -30,7 +30,12 @@ if (inPattern === undefined || outPattern === undefined
   console.error("使い方: node tools/align-pose-set.mjs '<入力。{NN}を含む>' '<出力。{NN}を含む>'");
   process.exit(2);
 }
-const FRAMES = 8;
+/**
+ * ★コマ数。★第 3 引数で変えられます（★既定 8 ＝ 従来の呼び出しはそのまま）。
+ * ⚠️ ★2026-09-07、★7 コマの生成物を揃えようとして「08 がありません」で止まりました。
+ *    ★8 に決め打つと、★コマ数の違う素材に当てられません。
+ */
+const FRAMES = Number(process.argv[4] ?? 8);
 const nn = (i) => String(i + 1).padStart(2, '0');
 
 /** キー色（緑）か。透過なら alpha=0 も背景 */

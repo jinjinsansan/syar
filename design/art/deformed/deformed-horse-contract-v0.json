@@ -1,0 +1,151 @@
+{
+  "$comment": "★暫定契約 v0（★生成物・手で書き換えない）。出どころは packages/render/src/deformed-horse-parts.ts。★Gate 0B を見て修正可、★オーナー承認後に v1 として固定する。",
+  "$generatedBy": "tools/emit-deformed-contract.mjs",
+  "$units": "メートル。x は進行方向が正・y は上が正・接地面が y = 0。角は反時計回りが正。",
+  "$colours": "★この契約は色を持たない。役割名だけを持ち、色は apps/web/public/art/palette.json が唯一の定義（裁定 7）。",
+  "contract": {
+    "schemaVersion": 0,
+    "codeName": "STARミニホース",
+    "totalHeightM": 1.55,
+    "torso": {
+      "lengthM": 1.06,
+      "heightM": 0.72,
+      "standCentreY": 0.712
+    },
+    "head": {
+      "lengthM": 0.5,
+      "heightM": 0.39
+    },
+    "neck": {
+      "rootX": 0.4,
+      "rootY": 0.2,
+      "lengthM": 0.34,
+      "thicknessM": 0.26
+    },
+    "tail": {
+      "rootX": -0.42,
+      "rootY": 0.16,
+      "lengthM": 0.4
+    },
+    "saddle": {
+      "x": -0.02,
+      "y": 0.3
+    },
+    "jockey": {
+      "torsoHeightM": 0.42,
+      "headRadiusM": 0.15,
+      "armLengthM": 0.34,
+      "legLengthM": 0.32,
+      "followRatio": 0.4
+    },
+    "legs": {
+      "hindFar": {
+        "upperM": 0.44,
+        "lowerM": 0.41,
+        "hip": {
+          "x": -0.42,
+          "y": -0.08
+        },
+        "plantBiasM": -0.05,
+        "liftM": 0.18
+      },
+      "hindNear": {
+        "upperM": 0.44,
+        "lowerM": 0.41,
+        "hip": {
+          "x": -0.38,
+          "y": -0.08
+        },
+        "plantBiasM": -0.05,
+        "liftM": 0.18
+      },
+      "foreFar": {
+        "upperM": 0.43,
+        "lowerM": 0.42,
+        "hip": {
+          "x": 0.38,
+          "y": -0.1
+        },
+        "plantBiasM": 0.05,
+        "liftM": 0.2
+      },
+      "foreNear": {
+        "upperM": 0.43,
+        "lowerM": 0.42,
+        "hip": {
+          "x": 0.42,
+          "y": -0.1
+        },
+        "plantBiasM": 0.05,
+        "liftM": 0.2
+      }
+    },
+    "hoof": {
+      "widthM": 0.15,
+      "heightM": 0.1
+    },
+    "shadow": {
+      "widthM": 1.3,
+      "heightM": 0.16
+    }
+  },
+  "gait": {
+    "strideM": 5,
+    "duty": 0.17,
+    "contactStart": {
+      "hindFar": 0,
+      "hindNear": 0.16,
+      "foreFar": 0.38,
+      "foreNear": 0.54
+    }
+  },
+  "partOrder": [
+    "shadow",
+    "hindLegFarUpper",
+    "hindLegFarLower",
+    "hindHoofFar",
+    "foreLegFarUpper",
+    "foreLegFarLower",
+    "foreHoofFar",
+    "jockeyLegFar",
+    "jockeyArmFar",
+    "tail",
+    "torso",
+    "neck",
+    "mane",
+    "head",
+    "earFar",
+    "earNear",
+    "muzzle",
+    "jockeyTorso",
+    "jockeyHead",
+    "hindLegNearUpper",
+    "hindLegNearLower",
+    "hindHoofNear",
+    "foreLegNearUpper",
+    "foreLegNearLower",
+    "foreHoofNear",
+    "jockeyLegNear",
+    "jockeyArmNear"
+  ],
+  "legIds": [
+    "hindFar",
+    "hindNear",
+    "foreFar",
+    "foreNear"
+  ],
+  "posture": {
+    "standBend": 0.72,
+    "flightRiseM": 0.05,
+    "stanceDipM": 0.05,
+    "standingHipHeightM": 0.612
+  },
+  "derived": {
+    "sweepHalfM": 0.425,
+    "legReachM": 0.85,
+    "legFitsOk": true,
+    "worstLeg": "hindFar",
+    "needM": 0.8148,
+    "haveM": 0.8245
+  }
+}

@@ -44,6 +44,8 @@ const CANDIDATES = [
 /** レース中に実際に描かれる幅（`page.tsx` のスプライト寸法帯） */
 const RACE_WIDTHS = [150, 220, 320] as const;
 
+import DeformedRigLab from '../../components/DeformedRigLab';
+
 export default function ArtLabPage(): React.ReactElement {
   return (
     <div style={{ padding: '22px 0 60px' }}>
@@ -55,6 +57,13 @@ export default function ArtLabPage(): React.ReactElement {
         ★<b>レース中、馬は 150〜250px 幅でしか描かれません。</b>下段の「実寸」で、
         <b>小さくしても走っている馬に見えるか</b>を見てください — ここで潰れる絵は、大きく見て良くても使えません。
       </p>
+
+      {/*
+        ★デフォルメ馬のリグ（★Gate 0B・2026-09-03）
+          ⚠️ ★これは絵柄の候補ではありません。★**動きの判定用**です。
+          ★下の「候補の比較」は従来どおりの絵柄比較で、★1 ビットも変えていません。
+      */}
+      <DeformedRigLab />
 
       {/* 実寸の比較（★これが本番の条件） */}
       <div className="a-panel strong" style={{ marginTop: 18 }}>

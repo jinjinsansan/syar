@@ -48,3 +48,12 @@ export { applyCoat, isHorseCoat, COAT_TRANSFORMS, type CoatTransform, type CoatN
 export { typedCount } from './hud-kit.js';
 export { narratorPortrait, narratorExpressionAt, narratorMouthOpenAt, narratorCastForRace, NARRATOR_NAMES, NARRATOR_ROLES, type NarratorSet, type NarratorExpression, type NarratorCast } from './narrator.js';
 export { raceCallAt, withPhasePrefix, type RaceCallPart, type RaceCallHorse, type RaceCallContext, type RaceCallLine } from './race-call.js';
+/**
+ * ★デフォルメ馬（★内部仮称「STARミニホース」・★評価モード専用・★2026-09-03）
+ *   ⚠️ ★通常のレース演出からは参照されません。★`/race` の既定は変わりません。
+ *   ★4 層分離: 部位定義（暫定契約 v0）→ リグ計算 → 姿勢モデル → 描画アダプタ
+ */
+export * from './deformed-horse-parts.js';
+export * from './deformed-horse-rig.js';
+export * from './deformed-horse-pose.js';
+export * from './deformed-horse-draw.js';

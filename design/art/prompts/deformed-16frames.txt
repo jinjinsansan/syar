@@ -1,0 +1,84 @@
+Generate ONE frame of a 16-frame gallop cycle for a deformed (chibi-proportioned) racehorse with jockey, side view, facing right. This is frame {POSE} of 16.
+
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- CHARACTER reference (THE approved design — match the face, proportions, line weight, shading and colours EXACTLY): apps/web/public/rig-lab-assets/ref/approved.png
+- MOTION reference (the approved gallop, same frame number — copy the leg phase, body arch, neck angle and height): apps/web/public/rig-lab-assets/ref/{POSE}.png
+- CONSISTENCY reference (previous frame of THIS new set, if it exists): {PREV_REF}
+
+  ★★ CRITICAL — HOW TO USE EACH REFERENCE
+  CHARACTER reference decides WHO this is: head shape, eye, muzzle, ear, body
+  proportions, leg thickness, hoof shape, mane and tail shape, bridle, saddle,
+  the jockey's face, helmet shape, goggles, line weight, shading style, colours.
+  Reproduce that character. Do NOT invent a different horse or a different jockey.
+
+  MOTION reference decides WHAT POSE this frame is in. It is a 3/4 front view and
+  it is soft and blurry — do NOT copy its camera angle, its colours, or its edges.
+  Take ONLY the pose from it: which legs are where, how the back arches, how the
+  neck reaches, how high the body sits.
+
+  CONSISTENCY reference keeps the individual, the size and the placement identical
+  to the previous frame. Do NOT copy its leg positions. This is a running cycle:
+  the legs MUST be visibly different from the previous frame.
+
+CANVAS
+- One image, ONE frame only, 1024 x 1024 pixels.
+- Background: pure saturated green (RGB 0,255,0) everywhere. No gradients, no
+  shadow on the background, no ground line, no dust, no motion blur.
+
+THE MOST IMPORTANT REQUIREMENT
+The WHOLE animal must be redrawn for this pose, not a previous frame with new legs.
+Between frames the following change:
+- the arch of the back (rounded when the legs gather, flat when the legs extend)
+- the length and angle of the neck (stretches forward and low during extension,
+  shortens and lifts during gathering)
+- the height and angle of the head
+- the height of the whole body above the frame bottom
+- the angle of the tail
+- the jockey's torso, arms and seat height
+
+A common failure to avoid: drawing one horse body once and only swapping the legs.
+That must not happen.
+
+WHAT A HORSE GALLOP IS (this matters — a previous attempt looked like a cheetah)
+- The gallop is a FOUR-BEAT gait. The four legs land one at a time, never as pairs.
+- There is exactly ONE airborne moment per stride, and during it the legs are
+  FOLDED UNDER THE BODY, not stretched fore and aft.
+- The classic "flying gallop" pose (all four legs straight, front reaching forward
+  and hind reaching back, in mid-air) does NOT occur in a real horse. Muybridge's
+  1878 photographs disproved it. Do not draw it.
+- Each leg straightens twice per stride: reaching forward just before it lands, and
+  pushing back just before it leaves the ground. In between it is folded.
+
+GROUND LINE AND ANCHOR
+- The hooves that are touching the ground in this frame must have their soles at
+  exactly 92% of the image height from the top (y = 942 of 1024).
+- Hooves that are NOT touching the ground must be clearly above that line.
+- Keep the horse's barrel (rib cage and saddle area) horizontally centred at the
+  same place in every frame, so the sheet plays back without sliding sideways.
+- The body rises and falls vertically between frames. Do NOT flatten every frame to
+  the same height — the airborne frames sit higher.
+
+COLOURS AND LATER RECOLOURING (these exact colours matter — the engine keys on them)
+- Horse coat: BAY BROWN with rich light-to-dark shading. The engine finds the coat by
+  hue (8-48 degrees) and saturation (0.18 or higher) and replaces it with one of
+  twelve coat colours, keeping the shading. So the coat must be clearly brown and
+  clearly saturated, and the shading must stay smooth and continuous.
+- Mane, tail and lower legs: BLACK (they stay black; do not make them brown).
+- Jockey silks (jacket and sleeves) and helmet: PLAIN SOLID BLUE, hue 200-260
+  degrees, saturation 0.35 or higher. No pattern, no lettering, no emblem.
+  The engine replaces this blue with each owner's colours.
+- Breeches white, boots black.
+- Saddle cloth: a plain FLAT WHITE rectangle under the saddle, with no number, no
+  text, no logo and no pattern. The engine colours it and draws the number on it.
+- The jockey's skin, goggles, gloves, saddle, bridle and reins keep their own
+  colours. Do NOT make them brown or blue.
+
+STYLE
+- Match the CHARACTER reference exactly: same cartoon deformed proportions, same
+  clean dark outline, same soft cel shading, same eye and muzzle design.
+- Hard edges against the green background. No anti-aliasing halo, no glow, no blur.
+- Readable at small size: strong silhouette, clear separation between the legs.
+- Do not draw any text, numbers, letters, logos, emblems, watermarks or signatures.
+- Do not depict any real, identifiable person, stable, organisation or branded design.
+
+Save the image as a PNG.

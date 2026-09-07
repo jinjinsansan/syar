@@ -7,10 +7,19 @@
  *   コマは 8 枚あり、方向も side / diag / rear / front と増えるので、
  *   **同じ置換を何度も手で書くと、いつか 1 枚だけ別のコマを参照します。**
  *
- * 【★連続性の参照（PREV_REF）が要点】
+ * 【★連続性の参照が要点 — ★参照は 2 つ渡します】
  *   1 コマずつ独立に作ると、**馬の体格・鞍・光の向きが少しずつ流れます**。
  *   直前のコマを参照に渡して、同じ個体・同じカメラを保たせます。
  *   → **必ず前のコマが存在してから次を作る**（並列に作らない）。
+ *
+ *   ⚠️ ★ところが「前のコマだけ」を渡すと、★**ずれが 1 コマずつ積み上がります**。
+ *      ★2026-09-07 の実測（v4・8 コマ）:
+ *        ★被写体高のばらつき **11.4%**（★合格素材 side-v7 は 9.5%）
+ *        ★隣接コマの差 平均 **39.9%**（★合格素材 side-v7 は 18.6%）
+ *      ★目で見ても ★**5〜8 コマ目で馬が細く小さくなり、別の個体**になっていました。
+ *      ★8 コマ目は「7 世代ぶんのコピーのコピー」だからです。
+ *   → ★`{ANCHOR_REF}`（★そのセットの **1 コマ目**）も一緒に渡します。
+ *     ★これで全コマが同じ 1 枚を見るので、★ずれが積み上がりません。
  *
  * 【★ここは DB に触れません】
  *   画像とプロンプトを書くだけなので分類は readonly（`tools/lib/classification.mjs` の基準）。
@@ -51,12 +60,20 @@ for (const pose of poses) {
     process.exit(1);
   }
 
-  const prompt = template.replaceAll('{POSE}', pose).replaceAll('{PREV_REF}', prevRef);
+  /** ★基準コマ（そのセットの 1 コマ目）。★ずれの積み上がりを止めるための「原本」 */
+  const anchor = outOf('01');
+  const anchorRef = (pose !== '01' && existsSync(anchor)) ? anchor : '(none — this frame is the anchor)';
+
+  const prompt = template
+    .replaceAll('{POSE}', pose)
+    .replaceAll('{PREV_REF}', prevRef)
+    .replaceAll('{ANCHOR_REF}', anchorRef);
   const promptFile = `out/gen/${short}-${pose}.prompt.txt`;
   writeFileSync(promptFile, prompt);
   console.log(`\n=== ${setName} pose${pose} ===`);
   console.log(`  雛形: ${tpl}`);
   console.log(`  連続性の参照: ${prevRef}`);
+  console.log(`  ★基準コマ: ${anchorRef}`);
 
   try {
     const log = execFileSync('node', ['tools/codex-imagegen.mjs', promptFile, out], {

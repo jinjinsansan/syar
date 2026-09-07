@@ -1,0 +1,90 @@
+Repaint frame {POSE} of an 8-frame gallop cycle as a DEFORMED (chibi-proportioned) racehorse with jockey, SIDE view facing RIGHT. This set must look like the SAME horse and jockey in every frame, and must play back as one smooth gallop.
+
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- CHARACTER reference (WHO this is — match the face, eye, muzzle, ear, body proportions, leg thickness, hoof shape, mane and tail shape, bridle, saddle, the jockey's face, helmet, goggles, line weight and shading EXACTLY): apps/web/public/rig-lab-assets/ref/approved-v4.png
+- POSE / PHASE reference (WHAT pose this frame is — copy the leg phase, the neck and head angle, the tail angle and the jockey's posture): apps/web/public/art/horse-jockey-side-v7-pose{POSE}.png
+- ANCHOR reference (frame 01 of THIS set — the master copy of the individual; the horse's
+  body size, barrel depth, neck thickness, leg thickness, head size and the jockey must
+  match THIS, not the previous frame): {ANCHOR_REF}
+- CONSISTENCY reference (previous frame of THIS set — keep the same painting style,
+  the same lighting direction and the same scale): {PREV_REF}
+
+  ★★ CRITICAL — HOW TO USE EACH REFERENCE
+  CHARACTER reference decides the DESIGN. Reproduce that character exactly.
+  Do NOT invent a different horse or a different jockey. Do NOT copy its pose.
+
+  POSE reference decides the MOTION. It is a realistic racehorse, not the design.
+  Copy ONLY the pose from it: which legs are where, how the back arches, how the
+  neck reaches, how high the body sits, where the tail streams.
+  Do NOT copy its proportions, its realism, its colours or its jockey's face.
+
+  ANCHOR reference decides the INDIVIDUAL AND THE SCALE. Every frame of this set
+  must show the SAME horse at the SAME size as the anchor: same barrel depth, same
+  neck thickness, same leg thickness, same head size, same jockey.
+  ★ Measure yourself against the ANCHOR, never against the previous frame — copying
+    a copy makes the horse drift thinner and smaller frame by frame.
+  Do NOT copy the anchor's leg positions.
+
+  CONSISTENCY reference keeps the painting style and the lighting identical.
+  Do NOT copy its leg positions — this is frame {POSE} of a cycle and the legs
+  MUST match the POSE reference for this frame.
+
+  ★ The POSE reference set is a smooth, correct racing gallop. Following it frame by
+    frame is what makes the finished set play back smoothly. Do not improvise a pose.
+
+CANVAS AND FRAMING (this decides the finished quality — do not shrink it)
+- One image, ONE frame only, 1536 x 1024 pixels (landscape).
+- The horse FILLS about 92% of the frame width: nose near the right edge, tail near
+  the left edge, hooves near the bottom, the jockey's helmet near the top.
+- Background: pure saturated green (RGB 0,255,0) everywhere. No gradients, no
+  shadow on the background, no ground line, no dust, no motion blur.
+- Draw at full detail: rich shading on the coat, clean crisp outlines, readable
+  bridle and reins. This art is displayed large, so thin or muddy linework shows.
+
+ANCHOR (this is what keeps the animation from shaking)
+- The horse's barrel (rib cage and saddle area) must sit at the SAME position and
+  the SAME size in every frame of the set. Legs, neck, head, tail and jockey move
+  around it. Match the barrel position of the POSE reference for this frame.
+- The jockey's helmet must stay at roughly the same height across the set.
+- Hooves that touch the ground in this frame rest on a horizontal ground line;
+  hooves that are in the air are clearly above it.
+
+DEFORMED PROPORTIONS (this is the design, not the pose reference's realism)
+- Short legs, round barrel, larger head, big hooves, big expressive eye — exactly as
+  in the CHARACTER reference. The POSE reference is a realistic horse; do not copy
+  its slim, long-legged build.
+- The jockey is deformed to match the horse, crouched forward over the withers.
+
+COLOURS AND LATER RECOLOURING (these exact colours matter — the engine keys on them)
+- Horse coat: BAY BROWN with rich light-to-dark shading. The engine finds the coat by
+  hue (8-48 degrees) and saturation (0.18 or higher) and replaces it with one of
+  twelve coat colours, keeping the shading. The coat must be clearly brown and
+  clearly saturated, and the shading must stay smooth and continuous.
+- Mane, tail and lower legs: BLACK (they stay black; do not make them brown).
+- Jockey silks (jacket and sleeves) and helmet: PLAIN SOLID BLUE, hue 200-260
+  degrees, saturation 0.35 or higher. No pattern, no lettering, no emblem.
+- Breeches white, boots black.
+- Saddle cloth: a plain FLAT WHITE shape under the saddle, no number, no text,
+  no logo, no pattern.
+- ★ The jockey's SKIN (face, neck, hands) must be PALE and nearly colourless — a
+  very light, almost desaturated skin tone (saturation below 0.15, brightness above
+  0.80). Shade it with soft grey, never with orange or brown.
+  ⚠️ This is not a style preference. The engine finds the horse's coat by hue 8-48
+  and saturation 0.18 or higher. Normal skin measures hue 29 / saturation 0.45 —
+  identical to a bay coat — so 100% of the jockey's face gets repainted with the
+  horse's coat colour, and on a grey or black horse the jockey's face turns grey or
+  black. Keeping the skin below saturation 0.15 is what stops that.
+  Everything else about the jockey's face stays EXACTLY as the character reference:
+  same shape, same eye, same mouth, same goggles, same line weight.
+- The goggles, gloves, saddle, bridle and reins keep their own colours. Do NOT make
+  them brown or blue.
+
+STYLE
+- Match the CHARACTER reference exactly: same clean dark outline, same soft cel
+  shading, same eye and muzzle design.
+- Hard edges against the green background. No anti-aliasing halo, no glow, no blur.
+- Readable at small size: strong silhouette, clear separation between the legs.
+- Do not draw any text, numbers, letters, logos, emblems, watermarks or signatures.
+- Do not depict any real, identifiable person, stable, organisation or branded design.
+
+Save the image as a PNG.

@@ -467,6 +467,65 @@ export const READONLY = [
   'audit-race-motion.mjs',
   // ★画像ファイルを WebP に変換して隣に置くだけ。DBには接続しない
   'build-art-webp.mjs',
+  /**
+   * ★デフォルメ馬（★内部仮称「STARミニホース」）の Gate 0（★2026-09-03）。
+   *   ★DB を一切見ない。★`@star/render` の純粋関数を読んで図形を描くだけ。
+   *   ★出力は `out/deformed-gate0/`（動画）と `design/art/deformed/`（暫定契約 v0 の JSON）のみ。
+   *   ⚠️ ★`emit-deformed-contract.mjs` はファイルを書くが、★出どころは
+   *      `packages/render/src/deformed-horse-parts.ts` の 1 か所で、★生成物を落とすだけ。
+   */
+  'render-deformed-gate0.mjs',
+  'emit-deformed-contract.mjs',
+  /**
+   * ★購入リグのテクスチャを `/rig-lab` 用に変換する（★2026-09-03）。
+   *   ★DB を見ない。★読むのは購入素材の TGA、★書くのは `apps/web/public/rig-lab-assets/`
+   *   （★`.gitignore` 済み・★本番では `/rig-lab` ごと 404）。
+   */
+  'build-rig-lab-textures.mjs',
+  /** ★購入 FBX の中身（クリップ・メッシュ・材質）を読むだけ */
+  'inspect-purchased-fbx.mjs',
+  /**
+   * ★購入クリップ 29.2 秒の棚卸し（★2026-09-03）。
+   *   ★蹄の高さ・接地・腰の上下を測るだけ。★DB も製品コードも触りません。
+   */
+  'probe-rig-clip.mjs',
+  /**
+   * ★納品スプライトの検品・修復（★2026-09-05）。★DB を見ない。
+   *   ★`repair-…` … 焼き込まれた市松模様を抜いて本物の透過へ
+   *   ★`align-…`  … 5 層に同じ変換を掛けてコマ間の揺れを揃える
+   */
+  'repair-delivered-sprites.mjs',
+  'align-delivered-sprites.mjs',
+  'align-sprites-by-rigid.mjs',
+  /**
+   * ★24 パーツを STAR のリグで動かして走行コマを焼く（★2026-09-06）。
+   *   ★DB を見ない。★読むのは納品パーツ、★書くのは tmp/ と rig-lab-assets（★.gitignore 済み）。
+   */
+  'bake-deformed-frames.mjs',
+  /** ★緑の抜き残りを測るだけ（★2026-09-07）。★DB も書き込みも無し */
+  'verify-chroma-residue.mjs',
+  /** ★無彩色の馬を着せ替える（★2026-09-07）。★DB を見ない・書くのは out/ のみ */
+  'dress-greyscale.mjs',
+  /** ★着せ替えの下地が engine の条件を満たすか測るだけ（★2026-09-07） */
+  'verify-dress-keys.mjs',
+  /**
+   * ★前肢が地面を蹴っているかを測るだけ（★2026-09-07）。★DB も書き込みも無し。
+   * ⚠️ ★この道具は ★**低い方の前蹄を 1 つだけ**追うため、★コマごとに別の脚を見ます。
+   *    ★開発側はこれを同じ脚として読み、★誤った原因を報告して撤回しました。
+   *    ★脚を 1 本ずつ追うには `measure-hoof-tracks.mjs` を使うこと。
+   */
+  'measure-foreleg-drive.mjs',
+  /**
+   * ★蹄の塊を 1 つずつ追う（★2026-09-07）。★DB も書き込みも無し。
+   * ★実測では、★側面の絵は前肢 2 本が重なって分離できません（★8 コマ中 7 コマ）。
+   * ★道具自身がそう出力するので、★その判定を無視して原因を書かないこと。
+   */
+  'measure-hoof-tracks.mjs',
+  /**
+   * ★生成コマを実機の素材まで仕上げる（★2026-09-07）。
+   *   ★DB を見ない。★読むのは out/gen、★書くのは out/ と rig-lab-assets（★.gitignore 済み）。
+   */
+  'build-sprite-set.mjs',
 ];
 
 /**

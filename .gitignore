@@ -102,3 +102,24 @@ apps/web/public/art/lab/
 #      実装は research/3d-hybrid-20260823 にある。複製手順は同ブランチの
 #      out/hybrid-pack-spike/README.txt を参照。
 /assets-spike/
+/apps/web/public/rig-lab-assets/
+
+# ★2026-09-06〜07 の外注（Manus）納品物・購入素材・作業中の出力。★リポジトリに入れません。
+#   ★理由: ★合計 1.1GB の zip とテクスチャで、★どれも成果物ではありません
+#          （★2D 馬は `tools/gen-pose-set.mjs` で自前生成する方式に切り替えました）。
+#   ⚠️ ★購入・納品素材はライセンスの範囲がここに書かれていないため、★配布しません。
+/*.zip
+/output/
+/tmp/
+/parts.json
+/parts (1).json
+/poses.json
+/poses (*).json
+/ACCEPTANCE_REPORT.json
+/validation.json
+/verification.json
+/production_record.md
+/horse_jockey_3A_approved.png
+/35＄で買った素材/
+/horse_jockey_3A *.md
+/補正レポート.md
