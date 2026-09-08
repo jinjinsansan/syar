@@ -262,7 +262,14 @@ const RACE_DIST = RACE_SETUP.distanceM;
 const RACE_FIELD = 12;
 const RACE_STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 
-function buildRace(): { model: PositionModel; straightM: number; finishPos: Map<number, number> } {
+interface RaceRow {
+  readonly gate: number; readonly place: number;
+  readonly timeSec: number; readonly margin: string;
+}
+function buildRace(): {
+  model: PositionModel; straightM: number;
+  finishPos: Map<number, number>; result: readonly RaceRow[];
+} {
   const start = (RACE_SEED * 13) % Math.max(1, POOL.length - RACE_FIELD);
   const entrants = POOL.slice(start, start + RACE_FIELD).map((h, i) => ({
     horseId: String(i + 1), stats: h.stats, surfaceAptitude: h.surfaceAptitude,
@@ -292,7 +299,17 @@ function buildRace(): { model: PositionModel; straightM: number; finishPos: Map<
   /** ★確定着順（★`climaxDisplayPositions` が要ります。★見た目の順位ではありません） */
   const finishPos = new Map<number, number>();
   result.order.forEach((e, i) => { finishPos.set(Number(e.horseId), i + 1); });
-  return { model, straightM, finishPos };
+  /**
+   * ★**着順・走破タイム・着差はエンジンのものを読むだけ**（★2026-09-08）。
+   * ⚠️ ★最初は「レース全体の秒数」を全馬に渡し、★着順も馬番順にしていました。
+   *    → ★着順ボードが ★**全馬 1:42.5・全馬 0.0 馬身差**という嘘の表になりました。
+   *    ★エンジンは `timeSec` と `marginLabel`（★前の馬との差）を持っています。
+   */
+  const rows: RaceRow[] = result.order.map((e, i) => ({
+    gate: Number(e.horseId), place: i + 1,
+    timeSec: e.timeSec, margin: e.marginLabel === '' ? '—' : e.marginLabel,
+  }));
+  return { model, straightM, finishPos, result: rows };
 }
 
 /**
@@ -326,16 +343,25 @@ const SIDE_CUTS: readonly {
   readonly lead: number;
   /** ★競り合っている所を見るか（★`focusContest`） */
   readonly contest: boolean;
+  /**
+   * ★**どの視点の素材を使うか**（★2026-09-08）。
+   *   ★`SCRIPT_V6` のショット名にそのまま合わせています:
+   *     ★`start-front` / `first-corner-front` / `fourth-corner-front` / `homestretch-front` → 斜め前
+   *     ★`side-drive` / `straight-contest` / `finish-line` → 真横
+   *   ★実測（★`broadcast-v2.ts` :1688）: ★台本 v6 が 50 鞍で使うのは
+   *   ★**真横 53% ＋ 斜め前 47%** の 2 つだけです。
+   */
+  readonly view: 'side' | 'front';
 }[] = [
-  { until: 0.0625, label: '発走', horseH: 0.283, lead: 0.55, contest: false },
-  { until: 0.330, label: '1 角（引き）', horseH: 0.200, lead: 0.60, contest: false },
-  { until: 0.540, label: '勝負所（横追従）', horseH: 0.260, lead: 0.66, contest: false },
-  { until: 0.604, label: '4 角（引き）', horseH: 0.210, lead: 0.60, contest: false },
-  { until: 0.750, label: '直線へ（横追従）', horseH: 0.260, lead: 0.66, contest: false },
-  { until: 0.820, label: 'せめぎ合い', horseH: 0.550, lead: 0.66, contest: true },
-  { until: 0.870, label: '差し・追い込み', horseH: 0.300, lead: 0.66, contest: true },
-  { until: 0.940, label: 'せめぎ合い', horseH: 0.550, lead: 0.66, contest: true },
-  { until: 1.0, label: 'ゴール板', horseH: 0.252, lead: 0.78, contest: false },
+  { until: 0.0625, label: '発走（正面）', horseH: 0.283, lead: 0.55, contest: false, view: 'front' },
+  { until: 0.330, label: '1 角（正面）', horseH: 0.200, lead: 0.60, contest: false, view: 'front' },
+  { until: 0.540, label: '勝負所（横追従）', horseH: 0.260, lead: 0.66, contest: false, view: 'side' },
+  { until: 0.604, label: '4 角（正面）', horseH: 0.210, lead: 0.60, contest: false, view: 'front' },
+  { until: 0.750, label: '直線へ（横追従）', horseH: 0.260, lead: 0.66, contest: false, view: 'side' },
+  { until: 0.820, label: 'せめぎ合い', horseH: 0.550, lead: 0.66, contest: true, view: 'side' },
+  { until: 0.870, label: '差し・追い込み（正面）', horseH: 0.300, lead: 0.66, contest: true, view: 'front' },
+  { until: 0.940, label: 'せめぎ合い', horseH: 0.550, lead: 0.66, contest: true, view: 'side' },
+  { until: 1.0, label: 'ゴール板', horseH: 0.252, lead: 0.78, contest: false, view: 'side' },
 ];
 
 /** ★カットの切り替えにかける秒数（★`broadcast-v2` の `transitionSec` と同じ 0.35 秒） */
@@ -1072,7 +1098,12 @@ export default function SpriteClient(): React.ReactElement {
     let prevCutIndex = -1;
     /** ★[馬][コマ][層] の焼いた絵。★馬ごとに色が違うので、★馬ごとに焼きます */
     /** ★頭ごとの焼き上がり。★個体タイプが違うと、★縦横比も蹄の位置も違います */
-    const baked: { pieces: Piece[][]; aspect: number; cellW: number; cellH: number; lowRatio: number[] }[] = [];
+    /**
+     * ★頭ごとの焼き上がり。★**視点ごとに 1 組**持ちます（★2026-09-08）。
+     *   ★台本 v6 が使うのは ★真横 53% ＋ 斜め前 47% の 2 つだけ（★`broadcast-v2.ts` :1688）。
+     */
+    type Baked = { pieces: Piece[][]; aspect: number; cellW: number; cellH: number; lowRatio: number[] };
+    const baked: { side: Baked; front: Baked }[] = [];
     /**
      * ★**本物のレース**（★シード固定・★1 回だけ組み立てます）。
      *   ★エンジンが着順と位置を決め、★`replayPositionModel` が道中を作り、
@@ -1219,7 +1250,9 @@ export default function SpriteClient(): React.ReactElement {
        */
       setStatus(`★${runners.length} 頭ぶんを焼いています…（数秒）`);
       const cellH = mode === 'race' ? Math.round(CELL_H / 2) : CELL_H;
-      for (const t of new Set(runners.map((r) => r.type))) {
+      const wanted: string[] = [];
+      for (const r of runners) { wanted.push(r.type, `${r.type}-front`); }
+      for (const t of new Set(wanted)) {
         const dir = TYPE_DIR(t);
         const meta: { width?: number; height?: number } = await fetch(`${dir}/sprite.json`)
           .then((r) => r.json()).catch(() => ({}));
@@ -1256,8 +1289,8 @@ export default function SpriteClient(): React.ReactElement {
 
       const scratch = document.createElement('canvas');
       const sg = scratch.getContext('2d', { willReadFrequently: true })!;
-      for (const r of runners) {
-        const src = loadedTypes.get(r.type)!;
+      const bakeOne = (r: typeof runners[number], key: string): Baked => {
+        const src = loadedTypes.get(key)!;
         const CELL_W = src.cellW;
         scratch.width = CELL_W; scratch.height = cellH;
         const atlas = document.createElement('canvas');
@@ -1290,7 +1323,10 @@ export default function SpriteClient(): React.ReactElement {
           ag.drawImage(scratch, 0, f * cellH);
           perFrame.push([{ grey: img, atlas, sx: 0, sy: f * cellH, isCoat: true }]);
         }
-        baked.push({ pieces: perFrame, aspect: src.aspect, cellW: CELL_W, cellH, lowRatio: src.lowRatio });
+        return { pieces: perFrame, aspect: src.aspect, cellW: CELL_W, cellH, lowRatio: src.lowRatio };
+      };
+      for (const r of runners) {
+        baked.push({ side: bakeOne(r, r.type), front: bakeOne(r, `${r.type}-front`) });
       }
       setStatus(`${runners.length} 頭 × ${SRC_FRAMES} コマ（★1 枚絵・色は色相で置き換え）／${bgNote}`);
     })().catch((e) => { setStatus(`⚠️ 素材を読めませんでした: ${String(e)}`); });
@@ -1457,15 +1493,33 @@ export default function SpriteClient(): React.ReactElement {
         ? (sorted[0]!.shownM + sorted[1]!.shownM) / 2
         : leadM;
       const camM = racing ? focusM - (W * cut.lead) / packPxPerM : 0;
+      /**
+       * ★**正面のカットは、馬群を画面の中央に置きます**（★2026-09-08）
+       *
+       * ⚠️ ★横位置を「内ラチからの距離」だけで決めたら、★序盤は全馬が内ラチ寄りなので
+       *    ★**馬群が画面の左端に寄りました**。★カメラは走路の中心ではなく
+       *    ★**馬群を追う**ので、★その中心を画面中央に合わせます。
+       */
+      const laneMid = racing && at.length > 0
+        ? at.reduce((m, h) => m + Math.min(1, Math.max(0, (h.w ?? 0) / RACE_SETUP.spec.widthM)), 0) / at.length
+        : 0.5;
       if (baked.length > 0) {
 
+        /**
+         * ★**描く順**。★正面のカットでは ★**先頭（奥）から**描き、★後ろの馬を上に重ねます。
+         *   ★そうしないと、★奥の馬が手前の馬を隠します。
+         */
+        if (racing && cut.view === 'front') at.sort((a, b) => b.shownM - a.shownM);
         const shown = racing ? at.length : Math.min(st.count, RUNNERS.length);
         for (let i = 0; i < shown; i += 1) {
           const r = racing ? RACE_RUNNERS[at[i]!.gate - 1]! : RUNNERS[i]!;
           const idx = racing
             ? frameIndexFor(at[i]!.shownM, r.gate, st.strideM)
             : frameIndexFor(travel, r.gate, st.strideM);
-          const set = baked[i];
+          /** ★カットが決めた視点の素材を使います（★真横／斜め前） */
+          const pair = baked[i];
+          const set = pair === undefined ? undefined
+            : (racing && cut.view === 'front' ? pair.front : pair.side);
           const layers = set?.pieces[idx];
           if (set === undefined || layers === undefined) continue;
           /**
@@ -1480,7 +1534,20 @@ export default function SpriteClient(): React.ReactElement {
           const laneT = racing
             ? Math.min(1, Math.max(0, (at[i]!.w ?? 0) / RACE_SETUP.spec.widthM))
             : (shown > 1 ? i / (shown - 1) : 0);
-          const depth = 1 - (1 - laneT) * 0.14;
+          /**
+           * ★**正面のカットでは、前後を「奥行き」で見せます**（★2026-09-08）
+           *
+           * ⚠️ ★真横の並べ方（★走行距離を横位置にする）を正面でも使うと、
+           *    ★**正面を向いた馬が横一列に並ぶ**という、★あり得ない絵になります。
+           * → ★正面では ★**前の馬ほど小さく・上に**します。
+           *   ★横位置は ★内ラチからの距離（`w`）で決めます。
+           */
+          const aheadM = racing ? Math.max(0, leadM - at[i]!.shownM) : 0;
+          /** ★先頭から 40m 後ろで 0.62 倍。★それ以上は頭打ち */
+          const frontDepth = racing && cut.view === 'front'
+            ? Math.max(0.62, 1 - Math.min(1, aheadM / 40) * 0.38)
+            : 1;
+          const depth = (1 - (1 - laneT) * 0.14) * frontDepth;
           const s = Math.round(drawSize * depth);
           /** ★横は素材の比から（★正方と決めつけない） */
           const sw = Math.round(s * set.aspect);
@@ -1489,7 +1556,15 @@ export default function SpriteClient(): React.ReactElement {
            *   ★帯は `manifest` の地面の層そのものなので、★**芝の上から外れません**。
            */
 
-          const t2 = racing ? 1 - laneT : (shown > 1 ? i / (shown - 1) : 0);
+          /**
+           * ★縦。★正面では ★**前の馬ほど上**（★奥にいる＝地平線に近い）。
+           *   ★真横では ★内ラチ側ほど上（★奥行き）。
+           */
+          const t2 = racing
+            ? (cut.view === 'front'
+              ? Math.min(1, Math.max(0, 1 - Math.min(1, aheadM / 40)))
+              : 1 - laneT)
+            : (shown > 1 ? i / (shown - 1) : 0);
           const groundY = plateToScreenY(bandY1 - 8 - t2 * (bandY1 - bandY0 - 16));
           /**
            * ★前後に散らす（★競り合い）。
@@ -1503,7 +1578,10 @@ export default function SpriteClient(): React.ReactElement {
            */
           const room = Math.max(0, W - sw);
           const x = racing
-            ? Math.round((at[i]!.shownM - camM) * packPxPerM - sw * 0.5)
+            ? (cut.view === 'front'
+              /** ★正面: 横は ★内ラチからの距離だけで決めます（★走路の幅を画面幅に写す） */
+              ? Math.round(W * (0.5 + (laneT - laneMid) * 1.5) - sw * 0.5)
+              : Math.round((at[i]!.shownM - camM) * packPxPerM - sw * 0.5))
             : Math.round(shown > 1 ? (room * i) / (shown - 1) : room * 0.5);
           /** ★画面の外は描きません（★12 頭ぶん無駄に焼かない） */
           if (racing && (x + sw < -40 || x > W + 40)) continue;
@@ -1630,40 +1708,56 @@ export default function SpriteClient(): React.ReactElement {
         const order = [...at].sort((a, b) => b.shownM - a.shownM);
         const leadS = order[0]!.shownM;
         /** ★1 馬身 = 2.4m（★`HORSE_LENGTH_M` と同じ） */
-        const rows = order.map((h) => ({
-          gate: h.gate,
-          name: RACE_RUNNERS[h.gate - 1]?.name ?? `${h.gate} 番`,
-          lengths: (leadS - h.shownM) / 2.4,
-          isOwn: h.gate === 1,
-        }));
+        /**
+         * ⚠️ ★**ゴールした馬は同じ位置で止まります**（★2026-09-08・実測）。
+         *    ★そのまま差を計算すると、★順位表が ★**全馬 0.0**になり、
+         *    ★先頭も入れ替わって見えます。
+         * → ★先頭がゴールしたら、★**エンジンの確定着順と着差**に切り替えます。
+         */
+        const passedPost = leadS >= run!.model.distanceMeter - 0.5;
+        const rows = passedPost
+          ? run!.result.slice(0, 5).map((r) => ({
+            gate: r.gate,
+            name: RACE_RUNNERS[r.gate - 1]?.name ?? `${r.gate} 番`,
+            lengths: 0,
+            timeSec: r.timeSec,
+            isOwn: r.gate === 1,
+          }))
+          : order.map((h) => ({
+            gate: h.gate,
+            name: RACE_RUNNERS[h.gate - 1]?.name ?? `${h.gate} 番`,
+            lengths: (leadS - h.shownM) / 2.4,
+            isOwn: h.gate === 1,
+          }));
         const finished = raceSecNow >= run!.model.raceSec - 0.01;
         if (!finished) {
           drawStandings(ctx, pal, vp, font, rows, RACE_FIELD, frameRoleOf, { timeSec: raceSecNow });
           drawHorseNamePlates(ctx, pal, font,
-            order.slice(0, 4).map((h, k) => ({
-              gate: h.gate,
-              name: RACE_RUNNERS[h.gate - 1]?.name ?? `${h.gate} 番`,
-              isOwn: h.gate === 1,
-              note: k === 0 ? '先頭' : undefined,
-            })),
+            (passedPost ? run!.result.slice(0, 4).map((r) => ({ gate: r.gate })) : order.slice(0, 4))
+              .map((h, k) => ({
+                gate: h.gate,
+                name: RACE_RUNNERS[h.gate - 1]?.name ?? `${h.gate} 番`,
+                isOwn: h.gate === 1,
+                note: k === 0 ? (passedPost ? '1 着' : '先頭') : undefined,
+              })),
             RACE_FIELD, frameRoleOf,
             { viewport: vp, timeSec: raceSecNow, sinceSec: raceSecNow });
         } else {
           /** ★ゴール後の着順ボード。★競馬場名・レース名は架空のものです（★憲法1） */
           drawResultsBoard(ctx, pal, vp, font,
-            order.map((h, k) => ({
-              place: k + 1,
-              gate: h.gate,
-              horseName: RACE_RUNNERS[h.gate - 1]?.name ?? `${h.gate} 番`,
-              jockeyName: `騎手 ${h.gate}`,
-              timeSec: run!.model.raceSec,
-              margin: k === 0 ? '—' : `${((order[k - 1]!.shownM - h.shownM) / 2.4).toFixed(1)} 馬身`,
-              isOwn: h.gate === 1,
+            run!.result.map((r) => ({
+              place: r.place,
+              gate: r.gate,
+              horseName: RACE_RUNNERS[r.gate - 1]?.name ?? `${r.gate} 番`,
+              jockeyName: `騎手 ${r.gate}`,
+              timeSec: r.timeSec,
+              margin: r.margin,
+              isOwn: r.gate === 1,
             })),
             RACE_FIELD, frameRoleOf,
             {
               raceName: '検証台デモ', venue: 'スターパーク', raceNo: '11R',
-              distanceLabel: `芝${RACE_DIST}m`, winTimeSec: run!.model.raceSec,
+              distanceLabel: `芝${RACE_DIST}m`, winTimeSec: run!.result[0]?.timeSec,
             },
             Math.min(1, (raceSecNow - run!.model.raceSec) / 1.2 + 1), raceSecNow);
         }

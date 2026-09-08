@@ -1,0 +1,101 @@
+Repaint frame {POSE} of an 8-frame gallop cycle as a DEFORMED (chibi-proportioned) racehorse with jockey, seen from the FRONT AND SLIGHTLY TO ONE SIDE (a three-quarter front view — the horse runs towards the camera and a little to the right). This set must look like the SAME horse and jockey in every frame, and must play back as one smooth gallop.
+
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- CHARACTER reference (WHO this is — match the face, eye, muzzle, ear, body proportions, leg thickness, hoof shape, mane and tail shape, bridle, saddle, the jockey's face, helmet, goggles, line weight and shading EXACTLY): {TYPE_REF}
+- POSE / PHASE reference (WHAT pose this frame is, AND the camera angle — copy the leg phase, the neck and head angle, the body's angle to the camera, and the jockey's posture): apps/web/public/art/horse-jockey-diag-front-v3-pose{POSE}.png
+- ANCHOR reference (frame 01 of THIS set — the master copy of the individual; the horse's
+  body size, barrel depth, neck thickness, leg thickness, head size and the jockey must
+  match THIS, not the previous frame): {ANCHOR_REF}
+- CONSISTENCY reference (previous frame of THIS set — keep the same painting style,
+  the same lighting direction and the same scale): {PREV_REF}
+
+  ★★ CRITICAL — HOW TO USE EACH REFERENCE
+  CHARACTER reference decides the DESIGN. Reproduce that character exactly.
+  Do NOT invent a different horse or a different jockey. Do NOT copy its pose.
+
+  POSE reference decides the MOTION AND THE CAMERA ANGLE. It is a realistic
+  racehorse, not the design. Copy ONLY the pose and the angle from it: which legs
+  are where, how the chest and shoulders face the camera, how the neck reaches,
+  how high the body sits, how much of the flank is visible.
+  ★ This is a THREE-QUARTER FRONT view, not a side view. The horse's chest must
+    face the camera. Both front legs are visible and overlap. The tail is mostly
+    hidden behind the body.
+  Do NOT copy its proportions, its realism, its colours or its jockey's face.
+
+  ANCHOR reference decides the INDIVIDUAL AND THE SCALE. Every frame of this set
+  must show the SAME horse at the SAME size as the anchor: same barrel depth, same
+  neck thickness, same leg thickness, same head size, same jockey.
+  ★ Measure yourself against the ANCHOR, never against the previous frame — copying
+    a copy makes the horse drift thinner and smaller frame by frame.
+  Do NOT copy the anchor's leg positions.
+
+  CONSISTENCY reference keeps the painting style and the lighting identical.
+  Do NOT copy its leg positions — this is frame {POSE} of a cycle and the legs
+  MUST match the POSE reference for this frame.
+
+  ★ The POSE reference set is a smooth, correct racing gallop seen from the front.
+    Following it frame by frame is what makes the finished set play back smoothly.
+    Do not improvise a pose and do not rotate the camera towards the side.
+
+CANVAS AND FRAMING (this decides the finished quality — do not shrink it)
+- One image, ONE frame only, 1536 x 1024 pixels (landscape).
+- The horse FILLS about 78% of the frame width and almost the full height: the
+  muzzle near the bottom-centre, the jockey's helmet near the top, hooves near the
+  bottom. A front view is TALLER AND NARROWER than a side view — do not stretch it
+  sideways to fill the frame.
+- Background: pure saturated green (RGB 0,255,0) everywhere. No gradients, no
+  shadow on the background, no ground line, no dust, no motion blur.
+- Draw at full detail: rich shading on the coat, clean crisp outlines, readable
+  bridle and reins. This art is displayed large, so thin or muddy linework shows.
+
+ANCHOR (this is what keeps the animation from shaking)
+- The horse's barrel (rib cage and saddle area) must sit at the SAME position and
+  the SAME size in every frame of the set. Legs, neck, head, tail and jockey move
+  around it. Match the barrel position of the POSE reference for this frame.
+- The jockey's helmet must stay at roughly the same height across the set.
+- Hooves that touch the ground in this frame rest on a horizontal ground line;
+  hooves that are in the air are clearly above it.
+
+DEFORMED PROPORTIONS (this is the design, not the pose reference's realism)
+- Short legs, round barrel, larger head, big hooves, big expressive eye — exactly as
+  in the CHARACTER reference. The POSE reference is a realistic horse; do not copy
+  its slim, long-legged build.
+- The jockey is deformed to match the horse, crouched forward over the withers.
+
+★ THIS INDIVIDUAL (the horse's own identity — keep it identical in every frame)
+{TYPE}
+  ⚠️ On screen the horse is only about 188 x 137 pixels, so only the OUTLINE and
+     LARGE light/dark patches are visible. Make the identity read in the silhouette
+     and in big white markings — fine detail disappears.
+  The jockey, the tack, the saddle cloth and the colours stay exactly as specified
+  elsewhere in this file. Only the horse's own build, markings and face change.
+
+COLOURS AND LATER RECOLOURING (these exact colours matter — the engine keys on them)
+- Horse coat: BAY BROWN with rich light-to-dark shading. The engine finds the coat by
+  hue (8-48 degrees) and saturation (0.18 or higher) and replaces it with one of
+  twelve coat colours, keeping the shading. The coat must be clearly brown and
+  clearly saturated, and the shading must stay smooth and continuous.
+- Mane, tail and lower legs: BLACK (they stay black; do not make them brown).
+- Jockey silks (jacket and sleeves) and helmet: PLAIN SOLID BLUE, hue 200-260
+  degrees, saturation 0.35 or higher. No pattern, no lettering, no emblem.
+- Breeches white, boots black.
+- Saddle cloth: a plain FLAT WHITE shape under the saddle, no number, no text,
+  no logo, no pattern.
+- The jockey's SKIN (face, neck, hands) keeps a normal, healthy skin tone — exactly
+  as in the CHARACTER reference. Do NOT wash it out.
+  ⚠️ An earlier version of this file asked for pale, desaturated skin, because the
+     engine's coat key (hue 8-48, saturation 0.18+) also caught the jockey's face and
+     repainted it with the horse's coat colour. That is now solved on the engine side
+     (a brightness ceiling plus proximity to the silks), so the skin must look normal.
+- The goggles, gloves, saddle, bridle and reins keep their own colours. Do NOT make
+  them brown or blue.
+
+STYLE
+- Match the CHARACTER reference exactly: same clean dark outline, same soft cel
+  shading, same eye and muzzle design.
+- Hard edges against the green background. No anti-aliasing halo, no glow, no blur.
+- Readable at small size: strong silhouette, clear separation between the legs.
+- Do not draw any text, numbers, letters, logos, emblems, watermarks or signatures.
+- Do not depict any real, identifiable person, stable, organisation or branded design.
+
+Save the image as a PNG.

@@ -24,7 +24,7 @@
  *   ★帽子は剛体なので、★そちらを基準にすると **0.8px** に収まります。
  *
  * ★実行:
- *   node tools/build-sprite-set.mjs <セット名> <コマ数> [--install]
+ *   node tools/build-sprite-set.mjs <セット名> <コマ数> [--install] [--anchor-cap]
  *   例) node tools/build-sprite-set.mjs horse-jockey-deformed-v2 16 --install
  */
 import { execFileSync } from 'node:child_process';
@@ -36,6 +36,8 @@ import { createCanvas, loadImage } from '@napi-rs/canvas';
 const [setName, framesArg] = process.argv.slice(2);
 const FRAMES = Number(framesArg ?? 16);
 const INSTALL = process.argv.includes('--install');
+/** ★コマ間を揃える基準（★`mid` = 顔＋帽子の中点／`cap` = 帽子だけ）。★視点で変えます */
+const ANCHOR = process.argv.includes('--anchor-cap') ? 'cap' : 'mid';
 if (setName === undefined) {
   console.error('使い方: node tools/build-sprite-set.mjs <セット名> <コマ数> [--install]');
   process.exit(2);
@@ -138,6 +140,19 @@ async function anchorOf(file) {
     }
   }
   if (fn === 0 || cn === 0) { console.error(`  ★基準が取れません: ${file}`); process.exit(1); }
+  /**
+   * ★**視点ごとに最良の基準が違います**（★2026-09-08・実測）
+   *
+   *   ★真横（`mid`・既定）… ★顔＋帽子の中点
+   *     ★顔 横26 縦29 ／ 帽子 横26 縦29（★白い塊を基準にすると 顔 横56 縦57）
+   *   ★斜め前（`cap`）… ★**帽子だけ**
+   *     ★帽子 横0 縦0 ／ 頭頂 **10px**（★顔＋帽子の中点だと 帽子 横32 縦30・頭頂 40px）
+   *     ★斜め前は馬体が正面を向くので、★「顔の帯」が鼻面を正しく捕まえられません。
+   *
+   * ⚠️ ★推測で選ばないこと。★`tools/measure-look-distinctness.mjs` と同じ考えで、
+   *    ★**候補を全部測ってから**決めます。
+   */
+  if (ANCHOR === 'cap') return { cx: cx / cn, cy: cy / cn };
   return { cx: (fx / fn + cx / cn) / 2, cy: (fy / fn + cy / cn) / 2 };
 }
 const xs = [];

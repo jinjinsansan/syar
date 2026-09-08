@@ -56,12 +56,20 @@ const template = readFileSync(tpl, 'utf8');
  */
 const typeArg = process.argv.indexOf('--type');
 let typeText = '(no special type — use the character reference as-is)';
+/**
+ * ★そのタイプの ★**完成済みの真横の絵**を見本にします（★2026-09-08）。
+ * ⚠️ ★承認前の原画に戻すと ★別の馬になります。★視点を足すときは、
+ *    ★**既に出来ているそのタイプの絵**を見本にすること。
+ */
+let typeRef = 'apps/web/public/rig-lab-assets/ref/approved-v4.png';
 if (typeArg > 0) {
   const name = process.argv[typeArg + 1];
   const f = `design/art/prompts/deformed-type-${name}.txt`;
   if (!existsSync(f)) { console.error(`★個体タイプがありません: ${f}`); process.exit(2); }
   typeText = readFileSync(f, 'utf8').trimEnd();
-  console.log(`★個体タイプ: ${name}`);
+  typeRef = `apps/web/public/rig-lab-assets/ref/approved-type-${name}.png`;
+  if (!existsSync(typeRef)) { console.error(`★タイプの見本がありません: ${typeRef}`); process.exit(2); }
+  console.log(`★個体タイプ: ${name}（見本 ${typeRef}）`);
 }
 /** 雛形が想定どおりの差し込み口を持っているか（黙って置換漏れにしない） */
 if (!template.includes('{POSE}')) { console.error('★雛形に {POSE} がありません'); process.exit(2); }
@@ -92,7 +100,8 @@ for (const pose of poses) {
     .replaceAll('{POSE}', pose)
     .replaceAll('{PREV_REF}', prevRef)
     .replaceAll('{ANCHOR_REF}', anchorRef)
-    .replaceAll('{TYPE}', typeText);
+    .replaceAll('{TYPE}', typeText)
+    .replaceAll('{TYPE_REF}', typeRef);
   const promptFile = `out/gen/${short}-${pose}.prompt.txt`;
   writeFileSync(promptFile, prompt);
   console.log(`\n=== ${setName} pose${pose} ===`);
