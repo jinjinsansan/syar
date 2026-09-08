@@ -102,7 +102,15 @@ apps/web/public/art/lab/
 #      実装は research/3d-hybrid-20260823 にある。複製手順は同ブランチの
 #      out/hybrid-pack-spike/README.txt を参照。
 /assets-spike/
-/apps/web/public/rig-lab-assets/
+# ⚠️ ★親ディレクトリごと除外すると、★git は中を見に行かないので `!` が効きません。
+#    ★`/*` にしてから、★入れたいものだけ `!` で戻します。
+/apps/web/public/rig-lab-assets/*
+# ★自前生成した個体タイプの素材だけは版管理に入れます（★2026-09-08）。
+#   ★理由: ★`tools/gen-pose-set.mjs` で私たちが作ったものなので、★権利の問題がありません。
+#          ★3 タイプ × 8 コマで 9.4MB。★消えると 24 回の生成をやり直しになります。
+#   ⚠️ ★購入・外注の素材は引き続き除外です。★ここへ置かないこと。
+!/apps/web/public/rig-lab-assets/types/
+!/apps/web/public/rig-lab-assets/types/**
 
 # ★2026-09-06〜07 の外注（Manus）納品物・購入素材・作業中の出力。★リポジトリに入れません。
 #   ★理由: ★合計 1.1GB の zip とテクスチャで、★どれも成果物ではありません

@@ -31,7 +31,10 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
-const [tpl, setName, ...poses] = process.argv.slice(2);
+const rawArgs = process.argv.slice(2);
+const ti = rawArgs.indexOf('--type');
+if (ti >= 0) rawArgs.splice(ti, 2);
+const [tpl, setName, ...poses] = rawArgs;
 if (tpl === undefined || setName === undefined || poses.length === 0) {
   console.error('使い方: node tools/gen-pose-set.mjs <雛形> <セット名> <コマ番号...>');
   process.exit(2);
@@ -39,6 +42,27 @@ if (tpl === undefined || setName === undefined || poses.length === 0) {
 if (!existsSync(tpl)) { console.error(`★雛形が無い: ${tpl}`); process.exit(2); }
 
 const template = readFileSync(tpl, 'utf8');
+/**
+ * ★**個体タイプ**（★2026-09-08）。★`{TYPE}` があれば、★`--type <名前>` で
+ * ★`design/art/prompts/deformed-type-<名前>.txt` を差し込みます。
+ *
+ * 【★なぜ分けるか】
+ *   ★育成・繁殖のゲームなので、★馬の見た目に個性が要ります。
+ *   ★実測: ★毛色 20 色は ★**実質 3 群**（★鹿毛↔栗毛 31・★黒鹿毛↔青毛 20 で区別できない）。
+ *   ★画面の馬は ★**188 x 137px** なので、★読めるのは ★輪郭と大きな明暗だけです。
+ *   → ★個性は ★**体つきと白い印**で作り、★1 個体タイプ = 1 セット（8 コマ）とします。
+ * ⚠️ ★印をコード側で描いてはいけません。★コマごとに位置を検出すると必ずチラつきます
+ *    （★実測: 顔は位置合わせ後でも 26px 動きます）。
+ */
+const typeArg = process.argv.indexOf('--type');
+let typeText = '(no special type — use the character reference as-is)';
+if (typeArg > 0) {
+  const name = process.argv[typeArg + 1];
+  const f = `design/art/prompts/deformed-type-${name}.txt`;
+  if (!existsSync(f)) { console.error(`★個体タイプがありません: ${f}`); process.exit(2); }
+  typeText = readFileSync(f, 'utf8').trimEnd();
+  console.log(`★個体タイプ: ${name}`);
+}
 /** 雛形が想定どおりの差し込み口を持っているか（黙って置換漏れにしない） */
 if (!template.includes('{POSE}')) { console.error('★雛形に {POSE} がありません'); process.exit(2); }
 
@@ -67,7 +91,8 @@ for (const pose of poses) {
   const prompt = template
     .replaceAll('{POSE}', pose)
     .replaceAll('{PREV_REF}', prevRef)
-    .replaceAll('{ANCHOR_REF}', anchorRef);
+    .replaceAll('{ANCHOR_REF}', anchorRef)
+    .replaceAll('{TYPE}', typeText);
   const promptFile = `out/gen/${short}-${pose}.prompt.txt`;
   writeFileSync(promptFile, prompt);
   console.log(`\n=== ${setName} pose${pose} ===`);

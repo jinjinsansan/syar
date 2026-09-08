@@ -55,6 +55,14 @@ DEFORMED PROPORTIONS (this is the design, not the pose reference's realism)
   its slim, long-legged build.
 - The jockey is deformed to match the horse, crouched forward over the withers.
 
+★ THIS INDIVIDUAL (the horse's own identity — keep it identical in every frame)
+{TYPE}
+  ⚠️ On screen the horse is only about 188 x 137 pixels, so only the OUTLINE and
+     LARGE light/dark patches are visible. Make the identity read in the silhouette
+     and in big white markings — fine detail disappears.
+  The jockey, the tack, the saddle cloth and the colours stay exactly as specified
+  elsewhere in this file. Only the horse's own build, markings and face change.
+
 COLOURS AND LATER RECOLOURING (these exact colours matter — the engine keys on them)
 - Horse coat: BAY BROWN with rich light-to-dark shading. The engine finds the coat by
   hue (8-48 degrees) and saturation (0.18 or higher) and replaces it with one of
@@ -66,16 +74,12 @@ COLOURS AND LATER RECOLOURING (these exact colours matter — the engine keys on
 - Breeches white, boots black.
 - Saddle cloth: a plain FLAT WHITE shape under the saddle, no number, no text,
   no logo, no pattern.
-- ★ The jockey's SKIN (face, neck, hands) must be PALE and nearly colourless — a
-  very light, almost desaturated skin tone (saturation below 0.15, brightness above
-  0.80). Shade it with soft grey, never with orange or brown.
-  ⚠️ This is not a style preference. The engine finds the horse's coat by hue 8-48
-  and saturation 0.18 or higher. Normal skin measures hue 29 / saturation 0.45 —
-  identical to a bay coat — so 100% of the jockey's face gets repainted with the
-  horse's coat colour, and on a grey or black horse the jockey's face turns grey or
-  black. Keeping the skin below saturation 0.15 is what stops that.
-  Everything else about the jockey's face stays EXACTLY as the character reference:
-  same shape, same eye, same mouth, same goggles, same line weight.
+- The jockey's SKIN (face, neck, hands) keeps a normal, healthy skin tone — exactly
+  as in the CHARACTER reference. Do NOT wash it out.
+  ⚠️ An earlier version of this file asked for pale, desaturated skin, because the
+     engine's coat key (hue 8-48, saturation 0.18+) also caught the jockey's face and
+     repainted it with the horse's coat colour. That is now solved on the engine side
+     (a brightness ceiling plus proximity to the silks), so the skin must look normal.
 - The goggles, gloves, saddle, bridle and reins keep their own colours. Do NOT make
   them brown or blue.
 
