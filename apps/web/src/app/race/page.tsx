@@ -56,7 +56,7 @@ import {
   cameraBasis, project, HORSE_HEIGHT_M, setHorseScale,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
-  drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
+  drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   isSkinTone,
   typedCount,
   raceCallAt,
@@ -3053,14 +3053,25 @@ export default function RacePage(): React.JSX.Element {
      */
     /** ★リプレイ中はコース図も下ろします（馬に重なるため・上の `hud` の注記と同じ理由） */
     if (v2Minimap !== undefined && !winnerFinishedNow && !replay.active) {
+      /**
+       * ★**馬にかかるときだけ薄くします**（★2026-09-09・オーナー判断）。
+       *   ★HUD は画面の 36% を覆っています（★実況の帯 20%・順位表 7.5%・コース図 6.3%・実測）。
+       *   ★常に薄くすると読めなくなるので、★**馬が箱に乗った分だけ**透かします。
+       * ⚠️ ★箱の位置はここで持っている値をそのまま渡します（★2 か所で持たない）。
+       */
+      const miniBox = { x: 40, y: 321, width: 264, height: 209 };
+      const miniHide = horseOverlapRatio(miniBox);
+      const miniPrevAlpha = ctx.globalAlpha;
+      ctx.globalAlpha = miniPrevAlpha * (1 - 0.55 * Math.min(1, miniHide * 3));
       drawCourseMinimap(ctx, ovalCourse(DIST, { ...COURSE_SPEC, turn }), art.pal as Record<string, string>, FONT,
-        v2Minimap.horses, v2Minimap.focusS, { x: 40, y: 321, width: 264, height: 209 },
+        v2Minimap.horses, v2Minimap.focusS, miniBox,
         // ★コース図も HUD・馬体と同じ枠色から引く（3 か所で持たない）
         (gate) => (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff', {
           distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${DIST}m`,
           metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
           timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
         });
+      ctx.globalAlpha = miniPrevAlpha;
     }
     drawRendererBadge(ctx, renderer, renderer === 'v2' ? v2ShotId ?? 'v2' : `legacy/${courseSection}`);
 
@@ -3192,7 +3203,13 @@ export default function RacePage(): React.JSX.Element {
         const closeUp = Math.max(0, Math.min(1, (v2HorseRatio - 0.28) / (0.45 - 0.28)));
         const ease = closeUp * closeUp * (3 - 2 * closeUp);
         const prevAlpha = ctx.globalAlpha;
-        ctx.globalAlpha = prevAlpha * (1 - 0.25 * ease);
+        /**
+         * ★**馬にかかるときだけ、さらに薄くします**（★2026-09-09・オーナー判断）。
+         *   ★既にある `closeUp`（★寄りのカットで薄く）に重ねます。
+         */
+        const rankBox = { x: vp.width - 350, y: 34, width: 314, height: 210 };
+        const rankHide = horseOverlapRatio(rankBox);
+        ctx.globalAlpha = prevAlpha * (1 - 0.25 * ease) * (1 - 0.5 * Math.min(1, rankHide * 3));
         drawStandings(ctx, art.pal as Record<string, string>, vp, FONT, rank.map((h) => ({
           gate: h.gate,
           name: HORSE_NAMES[h.gate - 1] ?? `スター${h.gate}`,

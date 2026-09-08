@@ -30,7 +30,7 @@ import { DEFAULT_RACE_SCRIPT,
   BROADCAST_STRIDE_M, DEMO_CONTEST_GAMMA, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES, HORSE_HEIGHT_M,
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
   paintCrowd, seatMaskFromPixels, seatBandFromPixels,
-  cameraBasis, drawBroadcastV2Scene, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
+  cameraBasis, drawBroadcastV2Scene, getLastShotViewDeg, finalOrderOf, frameRoleOf, knotsFor, ovalCourse,
   posOf, project, ratesForTarget, replayPositionModel, resolveBroadcastV2Scene,
   targetDisplaySec, timeWarpFor, withFinishRunOut, GATE_FRONT_STALL_PLATES,
   dustExposureCurve, INFIELD_REVERSED_DEFAULT,
@@ -519,6 +519,8 @@ for (const [index, displaySec] of displaySecs.entries()) {
       stallLabels: { ...GATE_FRONT_STALL_PLATES, font: FONT, plateColor: '#f2f2ee', textColor: '#14181a' },
     }] : undefined,
   });
+  process.stdout.write(`  ★このカットの相対角 ${getLastShotViewDeg().toFixed(0)}°
+`);
   /**
    * ★**参考映像の HUD 3 点**（設計 1-4 / 1-5 / 1-6）も描く。
    *

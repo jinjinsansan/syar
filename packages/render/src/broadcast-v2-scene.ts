@@ -447,6 +447,10 @@ function visibleFor(
 }
 
 /** Webと動画書き出しが共有するBroadcast V2の唯一の世界描画入口。 */
+/** ★直前に描いたカットの「馬とカメラの相対角（度）」。★測定用に読むだけ */
+let lastShotViewDeg = 0;
+export function getLastShotViewDeg(): number { return lastShotViewDeg; }
+
 export function drawBroadcastV2Scene<TImage>(
   ctx: Ctx2D<TImage>,
   course: Course,
@@ -716,6 +720,12 @@ export function drawBroadcastV2Scene<TImage>(
     const q1 = project(scene.camera, basis, { x: p1.x, y: p1.y, z: 0 });
     return { viewDeg: (Math.acos(cosT) * 180) / Math.PI, forwardDx: q1.x - q0.x };
   })();
+  /**
+   * ★**いまのカットで、馬がカメラに対して何度を向いているか**を外へ出します（★2026-09-09）。
+   *   ★「素材を何段作れば足りるか」を、★推測ではなく実測で決めるためです。
+   *   ⚠️ ★描画には使いません。★読むだけの窓です。
+   */
+  lastShotViewDeg = shotView.viewDeg;
   drawPerspectiveHorses(ctx, course, scene.camera, scene.visibleHorses, {
     ...library,
     frameSetOf: directional ? (horse) => {

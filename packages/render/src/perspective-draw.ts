@@ -328,6 +328,8 @@ export function drawPerspectiveWorld(
   focusS: number = distanceMeter,
   track: { readonly surface: RenderSurface; readonly condition: RenderTrackCondition } = { surface: 'turf', condition: 'good' },
 ): void {
+  /** ★このコマの控えを空にします（★HUD が「馬にかかるか」を見るため・描画には使いません） */
+  drawnBoxes = [];
   const basis = cameraBasis(cam);
   const W = cam.width;
   const hz = horizonY(cam, basis);
@@ -558,6 +560,30 @@ export function setHorseScale(v: number): void {
   horseScale = Math.max(0.4, Math.min(2.5, Number.isFinite(v) ? v : 1));
 }
 export function getHorseScale(): number { return horseScale; }
+/**
+ * ★**このコマで馬を描いた場所**（★画面 px）。★HUD が「馬にかかるか」を見るために控えます。
+ * ⚠️ ★描画には使いません。★毎コマの先頭で空にします。
+ */
+let drawnBoxes: { x: number; y: number; w: number; h: number }[] = [];
+/** ★直前のコマで馬を描いた場所を読む */
+export function getDrawnHorseBoxes(): readonly { x: number; y: number; w: number; h: number }[] {
+  return drawnBoxes;
+}
+/**
+ * ★**その箱が馬とどれだけ重なるか**（0〜1）。★HUD の濃さを決めるのに使います。
+ *   ★箱の面積のうち、★馬が乗っている割合を返します。
+ */
+export function horseOverlapRatio(box: { x: number; y: number; width: number; height: number }): number {
+  const area = Math.max(1, box.width * box.height);
+  let hit = 0;
+  for (const b of drawnBoxes) {
+    const ox = Math.max(0, Math.min(box.x + box.width, b.x + b.w) - Math.max(box.x, b.x));
+    const oy = Math.max(0, Math.min(box.y + box.height, b.y + b.h) - Math.max(box.y, b.y));
+    hit += ox * oy;
+  }
+  return Math.max(0, Math.min(1, hit / area));
+}
+
 /** ★いま使う馬の高さ（m）。★倍率込み */
 export function horseHeightM(): number { return HORSE_HEIGHT_BASE_M * horseScale; }
 
@@ -1313,6 +1339,12 @@ export function drawPerspectiveHorses<TImage>(
         const coat = opts.coatFilterOf?.(d.h.gate);
         const canFilter = coat !== undefined && 'filter' in ctx;
         if (canFilter) ctx.filter = coat;
+        /**
+         * ★**描いた場所を控えます**（★2026-09-09・オーナー指示
+         *   ★「HUD は馬にかかるときだけ薄くする」）。
+         * ⚠️ ★描画は 1 画素も変えません。★読むだけの窓です。
+         */
+        drawnBoxes.push({ x: left, y: top, w: hiW, h: hiH });
         ctx.drawImage(
           hi.image, source.x, source.y, source.width, source.height,
           left, top, hiW, hiH,
