@@ -36,7 +36,14 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { drawParallaxPlate, type ParallaxLayer, type ParallaxPlate } from '@star/render';
+import {
+  drawParallaxPlate, replayPositionModel, ovalCourse, homeStretchMetersOf,
+  climaxDisplayPositions, type ParallaxLayer, type ParallaxPlate, type PositionModel,
+} from '@star/render';
+import { resolveRace, replayOf, paceOf, DEFAULT_RACE_BALANCE, laneAt } from '@star/race-engine';
+import { raceSetupFromParam } from '@star/scheduler';
+import type { Strategy } from '@star/sim-engine';
+import POOL from '../../../lib/watch-pool.json';
 
 /**
  * ★コマ数。
@@ -230,6 +237,78 @@ const LAYERS: readonly Layer[] = ['coat', 'mane', 'silk', 'cap', 'tack'];
  * ⚠️ ★6 頭だと重なって 1 頭ずつ見えませんでした。★毛色・勝負服・帽子（枠色）が
  *    ★はっきり違う 4 組を `palette.json` から選んでいます（★16 進をここに書かない）。
  */
+/**
+ * ★**本物のレースを走らせる**（★2026-09-08）
+ *
+ * 【★なぜ検証台でやるか】
+ *   ★等間隔の 4 頭では ★**「競馬の映像として魅力的か」を判断できません**
+ *   （★レビュー裁定 2026-09-07）。★競り合い・前後の重なり・カメラの追従が要ります。
+ *   ★本番 `/race` に入れるには ★**4 視点ぶんの素材（96 回の生成）**が要るので、
+ *   ★先に ★**生成ゼロで中身だけ**を繋いで、★投資する前に確かめます。
+ *
+ * 【★新しく作らないこと】
+ *   ★隊列・前後関係・競り合いは ★**既にある層をそのまま呼びます**:
+ *     ★`replayPositionModel`（★脚質から道中を作る・走破タイムから作らない）
+ *     ★`climaxDisplayPositions`（★最後の直線の攻防。★着順は 1 ビットも変えない）
+ *   ⚠️ ★ここで位置を作り直さないこと。★作ると本番と別物になります。
+ *
+ * 【★決定論】★シードは固定です（★憲法4・`Math.random()` を呼びません）。
+ */
+const RACE_SEED = 42;
+const RACE_SETUP = raceSetupFromParam(null).setup;
+const RACE_DIST = RACE_SETUP.distanceM;
+const RACE_FIELD = 12;
+const RACE_STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
+
+function buildRace(): { model: PositionModel; straightM: number; finishPos: Map<number, number> } {
+  const start = (RACE_SEED * 13) % Math.max(1, POOL.length - RACE_FIELD);
+  const entrants = POOL.slice(start, start + RACE_FIELD).map((h, i) => ({
+    horseId: String(i + 1), stats: h.stats, surfaceAptitude: h.surfaceAptitude,
+    distanceCenter: h.distanceCenter, distanceRange: h.distanceRange,
+    strategyAptitude: h.strategyAptitude, heavyAptitude: h.heavyAptitude,
+    strategy: RACE_STRATS[(i + RACE_SEED) % 4]!, condition: 3, fatigue: 20,
+    weightKg: 55, gate: i + 1, age: 4, skillGenes: h.skillGenes,
+  }));
+  const conditions = {
+    raceId: `rig-lab-${RACE_SEED}`, distance: RACE_DIST, surface: 'turf' as const,
+    course: RACE_SETUP.spec, trackCondition: 'good' as const,
+    courseShape: 'oval' as const, baseWeightKg: 55,
+  };
+  const result = resolveRace({ conditions, entrants, seed: RACE_SEED, balance: DEFAULT_RACE_BALANCE });
+  const { pace } = paceOf(entrants, DEFAULT_RACE_BALANCE);
+  const boundaries = replayOf(result, (g) => entrants[g - 1]!.strategy, pace);
+  const course = ovalCourse(RACE_DIST, { ...RACE_SETUP.spec, turn: RACE_SETUP.turn });
+  const straightM = homeStretchMetersOf(course);
+  const model = replayPositionModel({
+    distanceMeter: RACE_DIST, spurtMetersLeft: 800, straightMetersLeft: straightM, boundaries,
+    strategyOf: (g) => entrants[g - 1]!.strategy,
+    laneOf: (gate, metersLeft) => laneAt(gate, entrants.length, metersLeft, RACE_DIST, RACE_SEED,
+      RACE_SETUP.spec.widthM, undefined, RACE_SETUP.spec),
+    pace,
+    formationSeed: RACE_SEED * 2654435761,
+  });
+  /** ★確定着順（★`climaxDisplayPositions` が要ります。★見た目の順位ではありません） */
+  const finishPos = new Map<number, number>();
+  result.order.forEach((e, i) => { finishPos.set(Number(e.horseId), i + 1); });
+  return { model, straightM, finishPos };
+}
+
+/**
+ * ★**レースに出る 12 頭の見た目**（★2026-09-08）
+ *   ★個体タイプ 3 種 × 毛色 × 勝負服を、★馬番から決めます（★決定論・乱数を使いません）。
+ *   ⚠️ ★毛色は「実質 3 群」なので、★同じ群が隣り合わないよう間を空けて配ります。
+ */
+const RACE_COATS = ['coat-kage-1', 'coat-kuri-0', 'coat-ashi-1', 'coat-ao-1'] as const;
+const RACE_TYPES = ['a', 'b', 'c'] as const;
+const RACE_RUNNERS = Array.from({ length: RACE_FIELD }, (_, i) => ({
+  gate: i + 1,
+  coat: RACE_COATS[i % RACE_COATS.length]!,
+  silk: `silk-${(i % 18) + 1}`,
+  frame: `frame-${(i % 8) + 1}`,
+  lane: i,
+  type: RACE_TYPES[i % RACE_TYPES.length]!,
+}));
+
 const RUNNERS = [
   { gate: 1, coat: 'coat-kage-1', silk: 'silk-1', frame: 'frame-3', lane: 0, type: 'a' },
   { gate: 3, coat: 'coat-kuri-0', silk: 'silk-3', frame: 'frame-4', lane: 1, type: 'b' },
@@ -876,12 +955,18 @@ export default function SpriteClient(): React.ReactElement {
   /** ★完成候補（★`LOOKS` の添字）。★つまみではなく候補で選びます */
   const [look, setLook] = useState(0);
   /**
+   * ★見せ方（★2026-09-08）
+   *   ★`line` … ★並べて見る（★素材の検品用）
+   *   ★`race` … ★**本物のレース**（★12 頭・★エンジンが決めた位置・★競り合いつき）
+   */
+  const [mode, setMode] = useState<'line' | 'race'>('line');
+  /**
    * ★天気（★2026-09-07・オーナー実見「なぜか曇というか競馬場が暗い」）
    *   ★背景素材はもともと「逆光・薄曇り」として描かれています。
    */
   const [sunny, setSunny] = useState(false);
-  const stateRef = useRef({ playing, speedMps, heightRatio, quantise, strideM, bob, guides, count, look, sunny });
-  stateRef.current = { playing, speedMps, heightRatio, quantise, strideM, bob, guides, count, look, sunny };
+  const stateRef = useRef({ playing, speedMps, heightRatio, quantise, strideM, bob, guides, count, look, sunny, mode });
+  stateRef.current = { playing, speedMps, heightRatio, quantise, strideM, bob, guides, count, look, sunny, mode };
   const travelRef = useRef(0);
 
   const reset = useCallback(() => { travelRef.current = 0; }, []);
@@ -899,7 +984,24 @@ export default function SpriteClient(): React.ReactElement {
     let raf = 0;
     /** ★[馬][コマ][層] の焼いた絵。★馬ごとに色が違うので、★馬ごとに焼きます */
     /** ★頭ごとの焼き上がり。★個体タイプが違うと、★縦横比も蹄の位置も違います */
-    const baked: { pieces: Piece[][]; aspect: number; cellW: number; lowRatio: number[] }[] = [];
+    const baked: { pieces: Piece[][]; aspect: number; cellW: number; cellH: number; lowRatio: number[] }[] = [];
+    /**
+     * ★**本物のレース**（★シード固定・★1 回だけ組み立てます）。
+     *   ★エンジンが着順と位置を決め、★`replayPositionModel` が道中を作り、
+     *   ★`climaxDisplayPositions` が最後の直線の攻防を乗せます。
+     * ⚠️ ★ここで位置を作り直しません（★作ると本番と別物になります）。
+     */
+    let race: ReturnType<typeof buildRace> | null = null;
+    try {
+      race = buildRace();
+    } catch (e) {
+      /**
+       * ⚠️ ★**レースの組み立てで転んでも、検証台ごと止めないこと**（★2026-09-08）。
+       *    ★最初これを `try` で囲まなかったため、★例外で効果全体が止まり、
+       *    ★素材の読み込みまで動かず「★素材を読み込み中…」のまま固まりました。
+       */
+      setStatus(`⚠️ レースを組み立てられません: ${String(e)}`);
+    }
     /** ★芝の明るさ段階ごとの背景一式（★`TURF_STEPS` と同じ並び） */
     let sceneries: Scenery[] | null = null;
     /** ★背景の読み込み状況（★馬と背景は別々に読むので、★先に終わった方が書きます） */
@@ -1013,12 +1115,25 @@ export default function SpriteClient(): React.ReactElement {
       }>();
       const probe = document.createElement('canvas');
       const pg = probe.getContext('2d', { willReadFrequently: true })!;
-      for (const t of new Set(RUNNERS.map((r) => r.type))) {
+      /**
+       * ★**レースのときは 12 頭ぶん焼きます**（★2026-09-08）。
+       * ⚠️ ★576px のまま 12 枚焼くと ★**1 枚 17.5MB × 12 = 210MB** になり、
+       *    ★16 コマにした日と同じでブラウザが持ちません。★レース時は 288px にします
+       *    （★12 頭なら画面での馬は小さいので、★これで足ります）。
+       */
+      const runners = mode === 'race' ? RACE_RUNNERS : (RUNNERS as readonly typeof RACE_RUNNERS[number][]);
+      /**
+       * ⚠️ ★**焼き直しに数秒かかることを画面に出します**（★2026-09-08・実測 約 8 秒）。
+       *    ★出さないと、★押しても古い頭数のままに見えます。
+       */
+      setStatus(`★${runners.length} 頭ぶんを焼いています…（数秒）`);
+      const cellH = mode === 'race' ? Math.round(CELL_H / 2) : CELL_H;
+      for (const t of new Set(runners.map((r) => r.type))) {
         const dir = TYPE_DIR(t);
         const meta: { width?: number; height?: number } = await fetch(`${dir}/sprite.json`)
           .then((r) => r.json()).catch(() => ({}));
         const asp = (meta.width ?? 1) / (meta.height ?? 1);
-        const cw = Math.round(CELL_H * asp);
+        const cw = Math.round(cellH * asp);
         const raw: HTMLImageElement[] = [];
         for (let f = 1; f <= SRC_FRAMES; f += 1) {
           raw.push(await load(`${dir}/${String(f).padStart(2, '0')}_coat.png`));
@@ -1050,10 +1165,10 @@ export default function SpriteClient(): React.ReactElement {
 
       const scratch = document.createElement('canvas');
       const sg = scratch.getContext('2d', { willReadFrequently: true })!;
-      for (const r of RUNNERS) {
+      for (const r of runners) {
         const src = loadedTypes.get(r.type)!;
         const CELL_W = src.cellW;
-        scratch.width = CELL_W; scratch.height = CELL_H;
+        scratch.width = CELL_W; scratch.height = cellH;
         const atlas = document.createElement('canvas');
         /**
          * ★幅は ★**1 列**で足ります。
@@ -1061,7 +1176,7 @@ export default function SpriteClient(): React.ReactElement {
          *    ★1 枚絵になった今は ★**列 0 にしか描いていません**。
          */
         atlas.width = CELL_W;
-        atlas.height = CELL_H * SRC_FRAMES;
+        atlas.height = cellH * SRC_FRAMES;
         const ag = atlas.getContext('2d')!;
         const perFrame: Piece[][] = [];
         for (let f = 0; f < SRC_FRAMES; f += 1) {
@@ -1070,23 +1185,23 @@ export default function SpriteClient(): React.ReactElement {
            *   ★`tools/lib/dress.mjs` と同じく、★色相で部位を選んで塗り替えます。
            */
           const img = src.raw[f]!;
-          sg.clearRect(0, 0, CELL_W, CELL_H);
+          sg.clearRect(0, 0, CELL_W, cellH);
           /** ★① 茶系 → 毛色 */
-          tintOnto(sg, img, palette[r.coat] ?? '#8a6340', CELL_W, CELL_H, 'coat');
+          tintOnto(sg, img, palette[r.coat] ?? '#8a6340', CELL_W, cellH, 'coat');
           /** ★② 青 → 勝負服（★同じ絵の上に続けて当てる） */
-          tintInPlace(sg, palette[r.silk] ?? '#2f6fd0', CELL_W, CELL_H, 'silk');
+          tintInPlace(sg, palette[r.silk] ?? '#2f6fd0', CELL_W, cellH, 'silk');
           /** ★③ 場の光（★候補が要求したときだけ） */
           if (LOOKS[look]?.light === true) {
-            const lit = sg.getImageData(0, 0, CELL_W, CELL_H);
-            applySceneLight(lit.data, CELL_W, CELL_H);
+            const lit = sg.getImageData(0, 0, CELL_W, cellH);
+            applySceneLight(lit.data, CELL_W, cellH);
             sg.putImageData(lit, 0, 0);
           }
-          ag.drawImage(scratch, 0, f * CELL_H);
-          perFrame.push([{ grey: img, atlas, sx: 0, sy: f * CELL_H, isCoat: true }]);
+          ag.drawImage(scratch, 0, f * cellH);
+          perFrame.push([{ grey: img, atlas, sx: 0, sy: f * cellH, isCoat: true }]);
         }
-        baked.push({ pieces: perFrame, aspect: src.aspect, cellW: CELL_W, lowRatio: src.lowRatio });
+        baked.push({ pieces: perFrame, aspect: src.aspect, cellW: CELL_W, cellH, lowRatio: src.lowRatio });
       }
-      setStatus(`${RUNNERS.length} 頭 × ${SRC_FRAMES} コマ（★1 枚絵・色は色相で置き換え）／${bgNote}`);
+      setStatus(`${runners.length} 頭 × ${SRC_FRAMES} コマ（★1 枚絵・色は色相で置き換え）／${bgNote}`);
     })().catch((e) => { setStatus(`⚠️ 素材を読めませんでした: ${String(e)}`); });
 
     let last = performance.now();
@@ -1185,10 +1300,40 @@ export default function SpriteClient(): React.ReactElement {
       }
 
       if (baked.length > 0) {
-        const shown = Math.min(st.count, RUNNERS.length);
+        /**
+         * ★**レースのときは、エンジンが決めた位置で描きます**（★2026-09-08）
+         *
+         * ⚠️ ★ここで位置を作り直しません。★`replayPositionModel`（★脚質から道中を作る）と
+         *    ★`climaxDisplayPositions`（★最後の直線の攻防・★着順は 1 ビットも変えない）を
+         *    ★そのまま呼びます。★作り直すと本番と別物になります。
+         *
+         * ★`travel` は「カメラが走路のどこを見ているか [m]」として使います。
+         *   ★背景も同じ値で流すので、★馬と地面が同じ物差しで動きます。
+         */
+        const run = race;
+        const racing = st.mode === 'race' && run !== null;
+        const raceSec = racing ? Math.min(run!.model.raceSec, travel / Math.max(1, st.speedMps)) : 0;
+        const atRaw = racing ? run!.model.at(raceSec) : [];
+        /** ★最後の直線の攻防（★着順は 1 ビットも変わりません） */
+        const climax = racing
+          ? climaxDisplayPositions(
+            atRaw.map((h) => ({ gate: h.gate, s: h.meters, finishPosition: run!.finishPos.get(h.gate) ?? 99 })),
+            { seed: RACE_SEED, distanceM: run!.model.distanceMeter },
+          )
+          : [];
+        const at = racing
+          ? atRaw.map((h, k) => ({ ...h, shownM: climax[k]?.s ?? h.meters }))
+          : [];
+        /** ★カメラは先頭馬の少し後ろ（★先頭が画面の右寄りに来るように） */
+        const leadM = racing ? Math.max(...at.map((h) => h.shownM)) : 0;
+        const camM = racing ? leadM - (W * 0.70) / packPxPerM : 0;
+
+        const shown = racing ? at.length : Math.min(st.count, RUNNERS.length);
         for (let i = 0; i < shown; i += 1) {
-          const r = RUNNERS[i]!;
-          const idx = frameIndexFor(travel, r.gate, st.strideM);
+          const r = racing ? RACE_RUNNERS[at[i]!.gate - 1]! : RUNNERS[i]!;
+          const idx = racing
+            ? frameIndexFor(at[i]!.shownM, r.gate, st.strideM)
+            : frameIndexFor(travel, r.gate, st.strideM);
           const set = baked[i];
           const layers = set?.pieces[idx];
           if (set === undefined || layers === undefined) continue;
@@ -1197,7 +1342,14 @@ export default function SpriteClient(): React.ReactElement {
            * ⚠️ ★1 度目は横も縦も同じ向きに増やしたので ★**階段状に並びました**。
            *    ★奥行きは**縦だけ**に効かせ、★前後の位置は競り合いで散らします。
            */
-          const depth = 1 - (shown > 1 ? i / (shown - 1) : 0) * 0.14;
+          /**
+           * ★奥のレーンほど小さく。★レースでは ★**エンジンが引いた横位置**（内ラチからの距離）
+           * ★を使います（★D-071 のとおり、★描画層で引き直しません）。
+           */
+          const laneT = racing
+            ? Math.min(1, Math.max(0, (at[i]!.w ?? 0) / RACE_SETUP.spec.widthM))
+            : (shown > 1 ? i / (shown - 1) : 0);
+          const depth = 1 - (1 - laneT) * 0.14;
           const s = Math.round(drawSize * depth);
           /** ★横は素材の比から（★正方と決めつけない） */
           const sw = Math.round(s * set.aspect);
@@ -1206,7 +1358,7 @@ export default function SpriteClient(): React.ReactElement {
            *   ★帯は `manifest` の地面の層そのものなので、★**芝の上から外れません**。
            */
 
-          const t2 = shown > 1 ? i / (shown - 1) : 0;
+          const t2 = racing ? 1 - laneT : (shown > 1 ? i / (shown - 1) : 0);
           const groundY = plateToScreenY(bandY1 - 8 - t2 * (bandY1 - bandY0 - 16));
           /**
            * ★前後に散らす（★競り合い）。
@@ -1219,7 +1371,11 @@ export default function SpriteClient(): React.ReactElement {
            * ⚠️ ★「描画幅 × 0.58」で置いていたときは、★4 頭が重なって塊になりました。
            */
           const room = Math.max(0, W - sw);
-          const x = Math.round(shown > 1 ? (room * i) / (shown - 1) : room * 0.5);
+          const x = racing
+            ? Math.round((at[i]!.shownM - camM) * packPxPerM - sw * 0.5)
+            : Math.round(shown > 1 ? (room * i) / (shown - 1) : room * 0.5);
+          /** ★画面の外は描きません（★12 頭ぶん無駄に焼かない） */
+          if (racing && (x + sw < -40 || x > W + 40)) continue;
           /**
            * ★**接地**（★2026-09-07・オーナー実見「馬の足は地面についていません」）
            *
@@ -1297,7 +1453,7 @@ export default function SpriteClient(): React.ReactElement {
              *    ★奥のラチが騎手や首を透けて横切り、★実体が薄く見えていました。
              * → ★**常に不透明で描きます。** ★毛色の濃さは、塗るときの色そのもので決めます。
              */
-            ctx.drawImage(p.atlas, p.sx, p.sy, set.cellW, CELL_H, x, y, sw, s);
+            ctx.drawImage(p.atlas, p.sx, p.sy, set.cellW, set.cellH, x, y, sw, s);
             /**
              * ⚠️ ★**ここで元の色を描き戻してはいけません**（★2026-09-07）
              *    ★かつて素材が**無彩色**だったとき、★着色対象の層に混ざっていた固定色
@@ -1335,7 +1491,7 @@ export default function SpriteClient(): React.ReactElement {
     };
     raf = requestAnimationFrame(draw);
     return () => { cancelled = true; cancelAnimationFrame(raf); };
-  }, [look]);
+  }, [look, mode]);
 
   return (
     <main style={{ minHeight: '100vh', background: '#12161a', color: '#eef2f6', padding: 16, fontFamily: 'system-ui,sans-serif' }}>
@@ -1379,6 +1535,24 @@ export default function SpriteClient(): React.ReactElement {
             style={{ ...btn, background: sunny ? '#2f6fd0' : '#8e2b20' }}>
             ★天気: {sunny ? '晴れ' : '納品（曇り・逆光）'}
           </button>
+          {/**
+            * ★**見せ方の切り替え**（★2026-09-08）
+            *   ★`並べて見る` … 素材の検品用（★等間隔・4 頭まで）
+            *   ★`レース`     … ★本物のレース（★12 頭・★エンジンが決めた位置・★競り合いつき）
+            */}
+          {/**
+            * ⚠️ ★**ボタンには「いまの状態」ではなく「選ぶもの」を書くこと**（★2026-09-08）。
+            *    ★1 つのボタンに現在のモード名を出したら、★オーナーが
+            *    ★「★4 頭しかいません」となりました。★表示が `★並べて見る` のとき
+            *    ★**それが現在のモード**で、★押すとレースに変わる — ★分かりません。
+            * → ★`1 頭 / 2 頭 / 4 頭` と同じく、★**選択肢を並べて選ばれている方を光らせます**。
+            */}
+          {([['line', '並べて見る'], ['race', 'レース（12 頭）']] as const).map(([m, label]) => (
+            <button key={m} type="button" onClick={() => setMode(m)}
+              style={{ ...btn, background: mode === m ? '#2f6fd0' : '#39424b' }}>
+              {label}
+            </button>
+          ))}
           {LOOKS.map((l, i) => (
             <button key={l.label} type="button" onClick={() => { setLook(i); setBob(l.bob); }}
               style={{ ...btn, background: look === i ? '#2f6fd0' : '#39424b' }}>
