@@ -53,7 +53,7 @@ import {
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
   paintCrowd, seatMaskFromPixels, seatBandFromPixels,
-  cameraBasis, project, HORSE_HEIGHT_M,
+  cameraBasis, project, HORSE_HEIGHT_M, setHorseScale,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
@@ -70,6 +70,7 @@ import {
   applyCoat,
   isHorseCoat,
   COAT_TRANSFORMS,
+  DEFORMED_COAT_TRANSFORMS, isDeformedHorseAsset,
   type CoatName,
   ratesForTarget,
   targetDisplaySec,
@@ -208,7 +209,7 @@ function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, st
 }
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 /** ★素材を足したら必ず上げる。★`manifest.json` の中身を変えたときも（古いものがキャッシュされる） */
-const ASSET_VERSION = '60';
+const ASSET_VERSION = '62';
 /**
  * ★コマごとの持ち上げ量。**単位は「基準画布（高さ 1536px）での px」**。
  *
@@ -388,8 +389,9 @@ const coatOf = (gate: number): CoatName => COAT_BY_GATE[(gate - 1) % COAT_BY_GAT
  * ★毛色を**焼き込んだ**画像を作る。馬体の画素だけを変換し、騎手・馬具・白斑は触らない。
  *   ⚠️ 読み込み時に 1 回だけ作ること（毎コマ画素を触ると重い）。
  */
+const deformedFrameImages = new WeakSet<FrameImage>();
 function bakeCoat(image: FrameImage, coat: CoatName): FrameImage {
-  const t = COAT_TRANSFORMS[coat];
+  const t = (deformedFrameImages.has(image) ? DEFORMED_COAT_TRANSFORMS : COAT_TRANSFORMS)[coat];
   if (t === undefined) return image;                       // 鹿毛は素材そのまま
   const w = imgW(image), h = imgH(image);
   const canvas = document.createElement('canvas');
@@ -1302,7 +1304,6 @@ export default function RacePage(): React.JSX.Element {
   } | null>(null);
   const rafRef = useRef<number | null>(null);
   /** ★ディゾルブ用のオフスクリーン（前ショットを描く） */
-  const dissolveCanvasRef = useRef<HTMLCanvasElement | null>(null);
   /**
    * ★順位表の行の位置（小数）。**順位そのものではありません。**
    *   毎コマ瞬時に並び替わると行が跳ぶので、表示時刻で補間して滑らかに動かします。
@@ -1341,6 +1342,11 @@ export default function RacePage(): React.JSX.Element {
   const cast = narratorCastForRace(seed);
   const [ownGate, setOwnGate] = useState(3);
   const [playing, setPlaying] = useState(false);
+  /**
+   * ★**馬の大きさの倍率**（★2026-09-08・オーナー指示「つまみで自由に変えられるように」）。
+   *   ⚠️ ★描画層だけの値です。★着順・位置・タイムには一切効きません（★憲法3）。
+   */
+  const [horseScale, setHorseScaleState] = useState(1);
   const [ready, setReady] = useState(false);
   /**
    * ★**この端末では重い初期化を始めない**（★2026-09-01・オーナー決定「仮の蓋」）
@@ -2162,7 +2168,11 @@ export default function RacePage(): React.JSX.Element {
         const images = await Promise.all(Array.from({ length: 8 }, (_, i) =>
           loadImg(`/art/${prefix}-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)));
         if (!images.every((image): image is HTMLImageElement => image !== null)) return undefined;
-        return images.map((image) => sharpenForDownscale(image, sharpenSigma, sharpenAmount));
+        return images.map((image) => {
+          const frame = sharpenForDownscale(image, sharpenSigma, sharpenAmount);
+          if (isDeformedHorseAsset(prefix)) deformedFrameImages.add(frame);
+          return frame;
+        });
       };
       /**
        * ★背後は v5（8 コマを 1 枚のシートで生成 → 切り出して胴体基準で整列）。
@@ -2198,13 +2208,20 @@ export default function RacePage(): React.JSX.Element {
       const horseOverride = new URLSearchParams(window.location.search).get('horse');
       const sideSetName = horseOverride !== null && /^[a-z0-9-]+$/.test(horseOverride)
         ? `horse-jockey-${horseOverride}`
-        : 'horse-jockey-side-v7';
-      const sideV7 = await loadNativeSet(sideSetName, 'horse-jockey-side-v7');
+        /**
+         * ★**デフォルメ馬（★自前生成）を既定にします**（★2026-09-08）。
+         *   ⚠️ ★`?baked=1` の経路だけ差し替えて満足していました。★PC の既定は
+         *      ★**従来の経路**（★上の注記 R-15）なので、★オーナーの画面では
+         *      ★**旧素材のまま**でした（★実測: baked 0 件／旧の原版 32 件）。
+         *   ★`loadNativeSet` は後ろを予備として受けるので、★見つからなければ元へ戻ります。
+         */
+        : 'horse-jockey-side-v8';
+      const sideV7 = await loadNativeSet(sideSetName, 'horse-jockey-side-v8', 'horse-jockey-side-v7');
       const [gateClosed, gateOpen] = await Promise.all([
         loadImg(`/art/starting-gate-front-v1.png?v=${ASSET_VERSION}`).catch(() => null),
         loadImg(`/art/starting-gate-front-open-v1.png?v=${ASSET_VERSION}`).catch(() => null),
       ]);
-      const frontV3 = await loadNativeSet('horse-jockey-diag-front-v3');
+      const frontV3 = await loadNativeSet('horse-jockey-diag-front-v4', 'horse-jockey-diag-front-v3');
       // ★俯瞰は v2（271×724 の低解像度・一度も作り直していない）のままで、
       //   オーナー評「ここで一気にクオリティが下がる」の当のカットだった（2026-08-20）。
       //   真横 v7 を参照に作り直した v3 が揃えばそれを使う。
@@ -2772,19 +2789,15 @@ export default function RacePage(): React.JSX.Element {
        *    まったく違う画角どうしを重ねるので、**12 頭が二重写し**になり、
        *    ★オーナー評「**カメラワークの切り替え時がごちゃごちゃする**」。
        *
-       * ★実際の中継は、**画角が変わるところは切り替え（ハードカット）**です。
-       *   ディゾルブは「同じ向きのまま寄る／引く」ときにだけ使います。
-       *   → **視点の系統（真横／斜め前／斜め上）が変わる切替は重ねない。**
-       *
-       * ★台本 v4 は 前→前→横→前→横→前→横 なので、**ほとんどがハードカット**になります。
-       *   （閃光で入るカットは従来どおり閃光。`FLASH_INTO`）
+       * 同じ真横カット間でも引きと寄りでは馬の位置・大きさが異なり、
+       * 0.28秒の重ね合わせで馬群が二重になる（表示22秒で確認）。
+       * 通常の切替はハードカット。指定された閃光だけを残す。
        */
-      const DISSOLVE_SEC = 0.28;
-      const sameFamily = (a: BroadcastV2ShotId, b: BroadcastV2ShotId): boolean =>
-        broadcastV2ShotById(a).view === broadcastV2ShotById(b).view;
-      const change = built.shotChanges.find((c) => c.displaySec <= d && d - c.displaySec < DISSOLVE_SEC
+      const change = built.shotChanges.find((c) => c.displaySec <= d && d - c.displaySec < 0.3
         && c.to === scene.shot.id
-        && (FLASH_INTO.has(c.to) || sameFamily(c.from, c.to))
+        // A shared view label does not mean a shared camera: blending the wide
+        // pack and close contest shots produces two overlapping copies of every horse.
+        && FLASH_INTO.has(c.to)
         /** ★このカットへは必ず切り替え（指示書 §5-5・`hardCutIn`） */
         && broadcastV2ShotById(c.to).hardCutIn !== true);
       const drawScene = (target: CanvasRenderingContext2D, sceneToDraw: typeof scene): void => drawBroadcastV2Scene(target, course, sceneToDraw, {
@@ -2910,29 +2923,6 @@ export default function RacePage(): React.JSX.Element {
           ctx.globalAlpha = Math.max(0, 1 - t) * 0.95;
           ctx.fillStyle = '#fff8ea';
           ctx.fillRect(0, 0, W, H);
-          ctx.globalAlpha = 1;
-        }
-      } else if (change !== undefined) {
-        const off = dissolveCanvasRef.current ?? (dissolveCanvasRef.current = document.createElement('canvas'));
-        if (off.width !== W || off.height !== H) { off.width = W; off.height = H; }
-        const offCtx = off.getContext('2d');
-        if (offCtx !== null) {
-          const prevScene = resolveBroadcastV2Scene(course, easedAt.map((horse) => ({
-            gate: horse.gate, s: horse.meters, w: horse.w ?? TRACK_WIDTH_M / 2, finished: horse.meters >= DIST - 1e-6,
-          })), { width: W, height: H }, winnerShotNow, {
-            finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
-            raceDisplaySec: d - RACE_INTRO_RACE_START_SEC, forceShotId: change.from,
-            fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
-            script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
-            laneAlignedFocus: laneFocusFromSearch(typeof window === 'undefined' ? '' : window.location.search),
-            // ★本体と同じ設定にすること（食い違うと、重ねる直前のコマだけ別の素材になる）
-            winnerRear: WINNER_FOLLOW_REAR,
-          });
-          offCtx.clearRect(0, 0, W, H);
-          drawScene(offCtx, prevScene);
-          const t = (d - change.displaySec) / DISSOLVE_SEC;
-          ctx.globalAlpha = Math.max(0, 1 - t * t);
-          ctx.drawImage(off, 0, 0);
           ctx.globalAlpha = 1;
         }
       }
@@ -3681,6 +3671,19 @@ export default function RacePage(): React.JSX.Element {
         >
           {playing ? '停止' : '演出開始'}
         </button>
+        {/**
+          * ★**馬の大きさのつまみ**（★2026-09-08・オーナー指示）
+          *   ★1.00 が従来どおり。★描画層の倍率なので ★**着順・位置には効きません**（★憲法3）。
+          *   ★デフォルメの馬は写真の馬と体高が違うので、★ここで合わせます。
+          */}
+        <label style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, color: '#efe9dc' }}>
+          ★馬の大きさ {horseScale.toFixed(2)} 倍
+          <input
+            type="range" min={0.4} max={2.5} step={0.05} value={horseScale}
+            onChange={(e) => { const v = Number(e.target.value); setHorseScaleState(v); setHorseScale(v); }}
+            style={{ width: 180 }}
+          />
+        </label>
         <button
           type="button" onClick={resetToStart}
           style={{ padding: '8px 14px', cursor: 'pointer', background: '#3a3630', color: '#efe9dc', border: 0 }}

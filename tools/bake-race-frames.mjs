@@ -34,7 +34,7 @@
 import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { applyCoat, isHorseCoat, COAT_TRANSFORMS } from '@star/render';
+import { applyCoat, isHorseCoat, COAT_TRANSFORMS, DEFORMED_COAT_TRANSFORMS, isDeformedHorseAsset } from '@star/render';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ? d : process.argv[i + 1]; };
 /** ★実測 512px（4 シード × 50 鞍）に 9% の余裕。★オーナー決定 2026-09-02 */
@@ -139,8 +139,8 @@ function bodyCentroid({ data, w }, bounds) {
 }
 
 /** ★毛色を**原版の解像度で**掛ける（`page.tsx` の `bakeCoat` と同じ規則・同じ関数） */
-function coated({ data, w, h }, coat) {
-  const t = COAT_TRANSFORMS[coat];
+function coated({ data, w, h }, coat, prefix) {
+  const t = (isDeformedHorseAsset(prefix) ? DEFORMED_COAT_TRANSFORMS : COAT_TRANSFORMS)[coat];
   if (t === undefined) return Buffer.from(data);          // ★鹿毛は素材そのまま
   const out = Buffer.from(data);
   for (let i = 0; i < out.length; i += 4) {
@@ -192,7 +192,7 @@ for (const set of SETS) {
     const cells = [];
     for (let i = 0; i < FRAMES; i += 1) {
       const n = natives[i], b = boundsList[i];
-      const buf = coated(n, coat);
+      const buf = coated(n, coat, set.prefix);
       const cell = await sharp(buf, { raw: { width: n.w, height: n.h, channels: 4 } })
         .extract({ left: b.x, top: b.y, width: b.width, height: b.height })
         .resize(tiles[i].w, tiles[i].h, { kernel: 'lanczos3', fit: 'fill' })

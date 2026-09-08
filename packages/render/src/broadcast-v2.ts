@@ -502,7 +502,14 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
    */
   'straight-contest': {
     id: 'straight-contest', view: 'side', target: 'pack', horseAsset: 'side-v6',
-    transitionSec: 0.35, camera: SIDE_LOW, focusContest: true,
+    /**
+     * ★先頭馬の顔が切れないよう画角を広げます（★レビュー側 codex・2026-09-08）。
+     * ⚠️ ★9.5° まで広げると ★**馬が画面高の 33.6%** になり、
+     *    ★検定「★直線の寄りカットで馬が 35% 以上」（★オーナー要求）を割りました。
+     *    ★`packages/render/test/script-v6.test.ts` が止めてくれました。
+     * → ★**9.0°** が両立点です（★7.6〜9.0 で検定は通り、★9.5 で落ちます・実測）。
+     */
+    transitionSec: 0.35, camera: { ...SIDE_LOW, fovDeg: 9.0 }, focusContest: true,
     /** ★この大きさで映すのは 4〜5 頭まで（`maxVisible` の注記・オーナー指摘） */
     maxVisible: 5,
   },

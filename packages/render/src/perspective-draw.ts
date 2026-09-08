@@ -540,8 +540,29 @@ export function drawPerspectiveWorld(
   }
 }
 
-/** 馬＋騎手のおよその高さ（m）。★大きさはこれと深さから決まります */
-export const HORSE_HEIGHT_M = 2.5;
+/**
+ * ★馬＋騎手のおよその高さ（m）。★大きさはこれと深さから決まります。
+ *
+ * ⚠️ ★**この値を直接使わないこと。** ★`horseHeightM()` を呼んでください。
+ *    ★デフォルメの馬は写真の馬と体高が違うので、★倍率で合わせられるようにしています。
+ */
+export const HORSE_HEIGHT_BASE_M = 2.5;
+
+/**
+ * ★**馬の大きさの倍率**（★2026-09-08・オーナー指示「つまみで自由に変えられるように」）。
+ *   ★1 = 従来どおり。★`setHorseScale()` で変えます。
+ * ⚠️ ★描画層の状態なので、★着順・位置には一切効きません（★憲法3）。
+ */
+let horseScale = 1;
+export function setHorseScale(v: number): void {
+  horseScale = Math.max(0.4, Math.min(2.5, Number.isFinite(v) ? v : 1));
+}
+export function getHorseScale(): number { return horseScale; }
+/** ★いま使う馬の高さ（m）。★倍率込み */
+export function horseHeightM(): number { return HORSE_HEIGHT_BASE_M * horseScale; }
+
+/** @deprecated ★`horseHeightM()` を使ってください（★倍率が効きません） */
+export const HORSE_HEIGHT_M = HORSE_HEIGHT_BASE_M;
 
 /**
  * ★**`#rrggbb` を `rgba(...)` にする**（砂煙の放射状の濃淡用）。
@@ -883,7 +904,7 @@ export function drawPerspectiveHorses<TImage>(
     }))
     .filter((d) => d.p.depth > 2)
     .filter((d) => {
-      const margin = HORSE_HEIGHT_M * d.p.pxPerM * 1.6;
+      const margin = horseHeightM() * d.p.pxPerM * 1.6;
       return d.p.x > -margin && d.p.x < cam.width + margin
         && d.p.y > -margin && d.p.y < cam.height + margin * 2;
     })
@@ -943,7 +964,7 @@ export function drawPerspectiveHorses<TImage>(
   };
 
   for (const d of drawn) {
-    const hpx = HORSE_HEIGHT_M * d.p.pxPerM;
+    const hpx = horseHeightM() * d.p.pxPerM;
     const wpx = hpx * (cw / opts.spec.cellH);
     // ★位相 → コマ: 8 コマ相当の局面番号（芝片・接地影の判定用）と、実コマ数に応じたインデックス
     const phase = opts.phaseOf !== undefined ? ((opts.phaseOf(d.h.gate) % 1) + 1) % 1 : undefined;
@@ -1003,7 +1024,7 @@ export function drawPerspectiveHorses<TImage>(
        *     c = (足元.x − 先端.x) / hpx,  d = (足元.y − 先端.y) / hpx
        */
       const ground = posOf(course, d.s, d.h.w);
-      const reach = HORSE_HEIGHT_M * sunShadowLengthPerM();
+      const reach = horseHeightM() * sunShadowLengthPerM();
       const tipPoint = project(cam, basis, {
         x: ground.x + Math.cos(SUN_AZIMUTH_RAD) * reach,
         y: ground.y + Math.sin(SUN_AZIMUTH_RAD) * reach,
@@ -1044,7 +1065,7 @@ export function drawPerspectiveHorses<TImage>(
        *    ★向きと長さは上と**同じ太陽**から引きます（2 か所で別の光を持たない）。
        */
       const shadowGround = posOf(course, d.s, d.h.w);
-      const shadowReach = HORSE_HEIGHT_M * sunShadowLengthPerM();
+      const shadowReach = horseHeightM() * sunShadowLengthPerM();
       const tip = project(cam, basis, {
         x: shadowGround.x + Math.cos(SUN_AZIMUTH_RAD) * shadowReach,
         y: shadowGround.y + Math.sin(SUN_AZIMUTH_RAD) * shadowReach,

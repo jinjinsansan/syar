@@ -44,7 +44,7 @@ export * from './visual-scroll.js';
 export * from './world-textured.js';
 export * from './minimap.js';
 export { isSkinTone } from './silks-skin.js';
-export { applyCoat, isHorseCoat, COAT_TRANSFORMS, type CoatTransform, type CoatName } from './coat.js';
+export { applyCoat, isHorseCoat, COAT_TRANSFORMS, DEFORMED_COAT_TRANSFORMS, isDeformedHorseAsset, type CoatTransform, type CoatName } from './coat.js';
 export { typedCount } from './hud-kit.js';
 export { narratorPortrait, narratorExpressionAt, narratorMouthOpenAt, narratorCastForRace, NARRATOR_NAMES, NARRATOR_ROLES, type NarratorSet, type NarratorExpression, type NarratorCast } from './narrator.js';
 export { raceCallAt, withPhasePrefix, type RaceCallPart, type RaceCallHorse, type RaceCallContext, type RaceCallLine } from './race-call.js';

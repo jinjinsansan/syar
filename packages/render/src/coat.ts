@@ -139,3 +139,33 @@ export const COAT_TRANSFORMS = {
 } as const satisfies Record<string, CoatTransform | undefined>;
 
 export type CoatName = keyof typeof COAT_TRANSFORMS;
+
+/** The character source is orange, unlike the dark bay photographic source.
+ * Calibrate each coat from that source; bay must not bypass recoloring.
+ * Both native browser frames and baked atlases use this table.
+ */
+export const DEFORMED_COAT_TRANSFORMS: Readonly<Record<CoatName, CoatTransform>> = {
+  /**
+   * ★**7 色を明るさで均等に並べます**（★2026-09-08・オーナー評「暗い 2 色が同じに見える」）
+   *
+   * ⚠️ ★前の値は暗い側が詰まっていました（★`tools/measure-coat-spread.mjs` の実測）:
+   *      ★seal-brown ↔ blue-black ★**10** ／ dark-bay ↔ seal-brown 16 ／ bay ↔ liver-chestnut 16
+   *    ★合格線は発明していません。★オーナーが「区別できない」と言った組の実測 ★**20** を線にします。
+   *
+   * ★**値は手で決めていません。** ★`tools/tune-coat-spread.mjs` が
+   *   ★**全組の最小値がいちばん大きくなる**組み合わせを探しました（★探索結果 22）。
+   * ⚠️ ★手で 1 つずつ動かすと ★**押した所が別の所で戻ります**（★実測で 3 回起きました）。
+   *    ★`dark-bay ↔ seal-brown` を離すと `seal-brown ↔ blue-black` が近づく、の繰り返しです。
+   */
+  'blue-black': { saturate: 0.30, brightness: 0.10, hueRotate: 180 },
+  'seal-brown': { saturate: 0.30, brightness: 0.28, hueRotate: -18 },
+  'dark-bay': { saturate: 0.70, brightness: 0.44, hueRotate: -9 },
+  'liver-chestnut': { saturate: 0.65, brightness: 0.62, hueRotate: -10 },
+  bay: { saturate: 0.60, brightness: 0.82, hueRotate: -5 },
+  chestnut: { saturate: 0.80, brightness: 1.02, hueRotate: 5 },
+  grey: { saturate: 0.00, brightness: 1.40 },
+};
+
+export function isDeformedHorseAsset(prefix: string): boolean {
+  return prefix === 'horse-jockey-side-v8' || prefix === 'horse-jockey-diag-front-v4';
+}
