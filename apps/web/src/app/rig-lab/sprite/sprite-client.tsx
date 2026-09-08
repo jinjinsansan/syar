@@ -38,7 +38,9 @@ import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   drawParallaxPlate, replayPositionModel, ovalCourse, homeStretchMetersOf,
-  climaxDisplayPositions, type ParallaxLayer, type ParallaxPlate, type PositionModel,
+  climaxDisplayPositions, drawStandings, drawHorseNamePlates, drawResultsBoard,
+  frameRoleOf,
+  type ParallaxLayer, type ParallaxPlate, type PositionModel,
 } from '@star/render';
 import { resolveRace, replayOf, paceOf, DEFAULT_RACE_BALANCE, laneAt } from '@star/race-engine';
 import { raceSetupFromParam } from '@star/scheduler';
@@ -294,10 +296,85 @@ function buildRace(): { model: PositionModel; straightM: number; finishPos: Map<
 }
 
 /**
+ * ★**真横だけで組んだカット割り**（★2026-09-08）
+ *
+ * 【★なぜ真横だけか】
+ *   ★本番の台本 `SCRIPT_V6` は ★**真横 53% ＋ 斜め前 47%**。★斜め前の素材はまだ無く、
+ *   ★作るには ★**4 視点 × 3 タイプ = 96 回の生成**が要ります。
+ *   → ★**投資する前に「カットが変わると競馬らしくなるか」を確かめます。**
+ *
+ * 【★数値は発明しません — ★`broadcast-v2.ts` の実測をそのまま使います】
+ *   ★同ファイル :203 の記録:
+ *     ★「★カットが切り替わると一気にクオリティが下がる」の正体は
+ *       ★**同じ絵を毎カット別の倍率で拡大縮小**していたこと（★140〜254px・1.8 倍）
+ *     ★参考映像は 1 レースの中で ★**10%（引き）〜 55%（直線の寄り）**を行き来する
+ *     ★STAR は全カットが 21.6〜27.4% に固まっていた
+ *     → ★**足りないのは「大きさ」ではなく「大きさの幅」**
+ *   ★合格と言われた 2 つ: ★`finish-line` 25.2% ／ ★`start-front` 28.3%
+ *   ★直線の寄り（`SIDE_HOMESTRETCH`）は ★**55%**
+ *
+ * 【★切り替えの位置】★`SCRIPT_V6` の距離比をそのまま使います（★時間でも乱数でもない）。
+ *
+ * ⚠️ ★コーナーは作れません。★この検証台の背景は ★**直線の視差板**で、
+ *    ★走路の曲がりを描けません。★コーナーは本番 `/race` の透視描画の仕事です。
+ */
+const SIDE_CUTS: readonly {
+  readonly until: number; readonly label: string;
+  /** ★馬の高さ（★画面高に対する割合）。★`broadcast-v2.ts` の実測値 */
+  readonly horseH: number;
+  /** ★先頭馬を画面のどこに置くか（0=左端 1=右端）。★`leadFraction` と同じ考え */
+  readonly lead: number;
+  /** ★競り合っている所を見るか（★`focusContest`） */
+  readonly contest: boolean;
+}[] = [
+  { until: 0.0625, label: '発走', horseH: 0.283, lead: 0.55, contest: false },
+  { until: 0.330, label: '1 角（引き）', horseH: 0.200, lead: 0.60, contest: false },
+  { until: 0.540, label: '勝負所（横追従）', horseH: 0.260, lead: 0.66, contest: false },
+  { until: 0.604, label: '4 角（引き）', horseH: 0.210, lead: 0.60, contest: false },
+  { until: 0.750, label: '直線へ（横追従）', horseH: 0.260, lead: 0.66, contest: false },
+  { until: 0.820, label: 'せめぎ合い', horseH: 0.550, lead: 0.66, contest: true },
+  { until: 0.870, label: '差し・追い込み', horseH: 0.300, lead: 0.66, contest: true },
+  { until: 0.940, label: 'せめぎ合い', horseH: 0.550, lead: 0.66, contest: true },
+  { until: 1.0, label: 'ゴール板', horseH: 0.252, lead: 0.78, contest: false },
+];
+
+/** ★カットの切り替えにかける秒数（★`broadcast-v2` の `transitionSec` と同じ 0.35 秒） */
+const CUT_FADE_SEC = 0.35;
+
+/**
+ * ⚠️ ★**この台では引きすぎないこと**（★2026-09-08・オーナー実見
+ *    ★「離れたカメラワークはミニチュアにしか見えない」）。
+ *
+ *   ★参考映像の引きは 10% でも「競馬場」に見えます。★コーナー・ダート・ラチが
+ *   ★**奥行きを作っている**からです。★この検証台の背景は ★**直線の視差板 1 枚**で
+ *   ★奥行きがないため、★引くと「小さい馬」にしか見えません。
+ *   → ★13% / 15% → ★**20% / 21%** に上げました。
+ *   ★本番 `/race` は透視描画なので、★そちらでは 10% まで引けるはずです。
+ */
+
+function sideCutAt(progress: number): { cut: typeof SIDE_CUTS[number]; index: number } {
+  for (let i = 0; i < SIDE_CUTS.length; i += 1) {
+    if (progress <= SIDE_CUTS[i]!.until) return { cut: SIDE_CUTS[i]!, index: i };
+  }
+  const last = SIDE_CUTS.length - 1;
+  return { cut: SIDE_CUTS[last]!, index: last };
+}
+
+/**
  * ★**レースに出る 12 頭の見た目**（★2026-09-08）
  *   ★個体タイプ 3 種 × 毛色 × 勝負服を、★馬番から決めます（★決定論・乱数を使いません）。
  *   ⚠️ ★毛色は「実質 3 群」なので、★同じ群が隣り合わないよう間を空けて配ります。
  */
+/**
+ * ★**馬名**（★2026-09-08）
+ * ⚠️ ★実在の競走馬名を使いません（★憲法1）。★色と気性の言葉から組み立てます。
+ */
+const RACE_NAMES = [
+  'アカツキノホシ', 'シラユキヒメ', 'クロガネオー', 'ミドリノカゼ',
+  'コハクノユメ', 'ソラトビマル', 'ハヤテノオト', 'ツキノシズク',
+  'コガネイナズマ', 'ユキワリソウ', 'アオイホノオ', 'ハルカゼボーイ',
+] as const;
+
 const RACE_COATS = ['coat-kage-1', 'coat-kuri-0', 'coat-ashi-1', 'coat-ao-1'] as const;
 const RACE_TYPES = ['a', 'b', 'c'] as const;
 const RACE_RUNNERS = Array.from({ length: RACE_FIELD }, (_, i) => ({
@@ -307,13 +384,14 @@ const RACE_RUNNERS = Array.from({ length: RACE_FIELD }, (_, i) => ({
   frame: `frame-${(i % 8) + 1}`,
   lane: i,
   type: RACE_TYPES[i % RACE_TYPES.length]!,
+  name: RACE_NAMES[i] ?? `${i + 1} 番`,
 }));
 
 const RUNNERS = [
-  { gate: 1, coat: 'coat-kage-1', silk: 'silk-1', frame: 'frame-3', lane: 0, type: 'a' },
-  { gate: 3, coat: 'coat-kuri-0', silk: 'silk-3', frame: 'frame-4', lane: 1, type: 'b' },
-  { gate: 5, coat: 'coat-ashi-1', silk: 'silk-12', frame: 'frame-5', lane: 2, type: 'c' },
-  { gate: 7, coat: 'coat-ao-1', silk: 'silk-2', frame: 'frame-6', lane: 3, type: 'a' },
+  { gate: 1, coat: 'coat-kage-1', silk: 'silk-1', frame: 'frame-3', lane: 0, type: 'a', name: RACE_NAMES[0]! },
+  { gate: 3, coat: 'coat-kuri-0', silk: 'silk-3', frame: 'frame-4', lane: 1, type: 'b', name: RACE_NAMES[1]! },
+  { gate: 5, coat: 'coat-ashi-1', silk: 'silk-12', frame: 'frame-5', lane: 2, type: 'c', name: RACE_NAMES[2]! },
+  { gate: 7, coat: 'coat-ao-1', silk: 'silk-2', frame: 'frame-6', lane: 3, type: 'a', name: RACE_NAMES[3]! },
 ] as const;
 
 /**
@@ -982,6 +1060,16 @@ export default function SpriteClient(): React.ReactElement {
 
     let cancelled = false;
     let raf = 0;
+    /**
+     * ★**カットの繋ぎ**（★2026-09-08・オーナー実見「カメラワークの切り替わりは唐突」）
+     *
+     *   ⚠️ ★私が繋ぎを実装していませんでした。★`broadcast-v2` は
+     *      ★`transitionSec`（★同系統の view なら 0.35 秒のディゾルブ）を持っています。
+     *   → ★切り替わる直前の画を控えておき、★0.35 秒かけて重ねて消します。
+     */
+    const prevShot = document.createElement('canvas');
+    let prevAtSec = -99;
+    let prevCutIndex = -1;
     /** ★[馬][コマ][層] の焼いた絵。★馬ごとに色が違うので、★馬ごとに焼きます */
     /** ★頭ごとの焼き上がり。★個体タイプが違うと、★縦横比も蹄の位置も違います */
     const baked: { pieces: Piece[][]; aspect: number; cellW: number; cellH: number; lowRatio: number[] }[] = [];
@@ -1004,6 +1092,8 @@ export default function SpriteClient(): React.ReactElement {
     }
     /** ★芝の明るさ段階ごとの背景一式（★`TURF_STEPS` と同じ並び） */
     let sceneries: Scenery[] | null = null;
+    /** ★HUD も同じ色を使います（★色を 2 か所で持たない） */
+    const paletteRef: { cur: Record<string, string> } = { cur: {} };
     /** ★背景の読み込み状況（★馬と背景は別々に読むので、★先に終わった方が書きます） */
     let bgNote = '背景 読み込み中';
     /** ★素材 1 枚の横 ÷ 縦。★`sprite.json` から読みます（★正方と決めつけない） */
@@ -1106,6 +1196,7 @@ export default function SpriteClient(): React.ReactElement {
     void (async () => {
       const palette: Record<string, string> = await fetch('/art/palette.json')
         .then((r) => r.json()).catch(() => ({}));
+      paletteRef.cur = palette;
       /**
        * ★**頭ごとに個体タイプの素材を読みます**（★2026-09-08）。
        *   ★同じタイプが複数いるので、★タイプ単位で 1 度だけ読み込みます。
@@ -1219,7 +1310,37 @@ export default function SpriteClient(): React.ReactElement {
        *   ★スライダーはその上での微調整です。
        */
       const fitH = ({ 1: 0.62, 2: 0.42, 3: 0.32, 4: 0.26 })[Math.min(st.count, 4)] ?? 0.26;
-      const horseH = H * fitH * (st.heightRatio / 0.36);
+      /**
+       * ★**レースの進み具合**（0〜1）。★カットの切り替えは ★`SCRIPT_V6` と同じく
+       * ★**先頭馬の走破距離**だけで決まります（★時間でも乱数でもない）。
+       */
+      const raceSecNow = race === null ? 0
+        : Math.min(race.model.raceSec, travelRef.current / Math.max(1, stateRef.current.speedMps));
+      const leadNow = race === null ? 0
+        : race.model.at(raceSecNow).reduce((m, h) => (h.meters > m ? h.meters : m), 0);
+      const raceProgress = race === null ? 0 : leadNow / race.model.distanceMeter;
+
+      /**
+       * ★**カットが馬の大きさを決めます**（★2026-09-08）
+       *   ⚠️ ★`broadcast-v2.ts` :203 の記録 —
+       *      ★「カットが切り替わると一気にクオリティが下がる」の正体は
+       *      ★**毎カット別の倍率で拡大縮小**していたこと。★だから ★倍率は
+       *      ★**カットの表が 1 か所で持ちます**（★つまみと二重に持たない）。
+       *   ★レースでないときは、これまでどおり「馬の高さ」つまみです。
+       */
+      const cutNow = st.mode === 'race' && race !== null
+        ? sideCutAt(Math.min(1, raceProgress)) : null;
+      /**
+       * ⚠️ ★**つまみを殺さないこと**（★2026-09-08・オーナー実見
+       *    ★「馬の大きさのつまみが効かないので、ミニチュアみたいになっています」）。
+       *    ★カットに大きさを持たせたとき、★つまみを無効にしてしまいました。
+       * → ★カットは ★**大きさの「幅」**を、★つまみは ★**全体の倍率**を受け持ちます。
+       *   ★つまみ 36% が等倍で、★上げれば全カットが一緒に大きくなります。
+       */
+      const heightRatio = cutNow === null
+        ? st.heightRatio
+        : cutNow.cut.horseH * (st.heightRatio / 0.36);
+      const horseH = H * fitH * (heightRatio / 0.36);
       const size = Math.round(horseH);
       const drawSize = st.quantise ? Math.round(size / 8) * 8 : size;
       /**
@@ -1299,34 +1420,44 @@ export default function SpriteClient(): React.ReactElement {
         }
       }
 
+      /**
+       * ★**レースのときは、エンジンが決めた位置で描きます**（★2026-09-08）
+       *
+       * ⚠️ ★ここで位置を作り直しません。★`replayPositionModel`（★脚質から道中を作る）と
+       *    ★`climaxDisplayPositions`（★最後の直線の攻防・★着順は 1 ビットも変えない）を
+       *    ★そのまま呼びます。★作り直すと本番と別物になります。
+       *
+       * ★`travel` は「カメラが走路のどこを見ているか [m]」として使います。
+       *   ★背景も同じ値で流すので、★馬と地面が同じ物差しで動きます。
+       */
+      const run = race;
+      const racing = st.mode === 'race' && run !== null;
+      const raceSec = racing ? Math.min(run!.model.raceSec, travel / Math.max(1, st.speedMps)) : 0;
+      const atRaw = racing ? run!.model.at(raceSec) : [];
+      /** ★最後の直線の攻防（★着順は 1 ビットも変わりません） */
+      const climax = racing
+        ? climaxDisplayPositions(
+          atRaw.map((h) => ({ gate: h.gate, s: h.meters, finishPosition: run!.finishPos.get(h.gate) ?? 99 })),
+          { seed: RACE_SEED, distanceM: run!.model.distanceMeter },
+        )
+        : [];
+      const at = racing
+        ? atRaw.map((h, k) => ({ ...h, shownM: climax[k]?.s ?? h.meters }))
+        : [];
+      /** ★カメラは先頭馬の少し後ろ（★先頭が画面の右寄りに来るように） */
+      const leadM = racing ? Math.max(...at.map((h) => h.shownM)) : 0;
+      /**
+       * ★カメラの位置。★`lead` は「先頭馬を画面のどこに置くか」で、
+       * ★`broadcast-v2` の `leadFraction` と同じ考えです。
+       * ★せめぎ合いのカットでは、★**競っている所**（上位 2 頭の中点）を中央に置きます。
+       */
+      const cut = cutNow?.cut ?? SIDE_CUTS[0]!;
+      const sorted = racing ? [...at].sort((a, b) => b.shownM - a.shownM) : [];
+      const focusM = cut.contest && sorted.length >= 2
+        ? (sorted[0]!.shownM + sorted[1]!.shownM) / 2
+        : leadM;
+      const camM = racing ? focusM - (W * cut.lead) / packPxPerM : 0;
       if (baked.length > 0) {
-        /**
-         * ★**レースのときは、エンジンが決めた位置で描きます**（★2026-09-08）
-         *
-         * ⚠️ ★ここで位置を作り直しません。★`replayPositionModel`（★脚質から道中を作る）と
-         *    ★`climaxDisplayPositions`（★最後の直線の攻防・★着順は 1 ビットも変えない）を
-         *    ★そのまま呼びます。★作り直すと本番と別物になります。
-         *
-         * ★`travel` は「カメラが走路のどこを見ているか [m]」として使います。
-         *   ★背景も同じ値で流すので、★馬と地面が同じ物差しで動きます。
-         */
-        const run = race;
-        const racing = st.mode === 'race' && run !== null;
-        const raceSec = racing ? Math.min(run!.model.raceSec, travel / Math.max(1, st.speedMps)) : 0;
-        const atRaw = racing ? run!.model.at(raceSec) : [];
-        /** ★最後の直線の攻防（★着順は 1 ビットも変わりません） */
-        const climax = racing
-          ? climaxDisplayPositions(
-            atRaw.map((h) => ({ gate: h.gate, s: h.meters, finishPosition: run!.finishPos.get(h.gate) ?? 99 })),
-            { seed: RACE_SEED, distanceM: run!.model.distanceMeter },
-          )
-          : [];
-        const at = racing
-          ? atRaw.map((h, k) => ({ ...h, shownM: climax[k]?.s ?? h.meters }))
-          : [];
-        /** ★カメラは先頭馬の少し後ろ（★先頭が画面の右寄りに来るように） */
-        const leadM = racing ? Math.max(...at.map((h) => h.shownM)) : 0;
-        const camM = racing ? leadM - (W * 0.70) / packPxPerM : 0;
 
         const shown = racing ? at.length : Math.min(st.count, RUNNERS.length);
         for (let i = 0; i < shown; i += 1) {
@@ -1479,6 +1610,66 @@ export default function SpriteClient(): React.ReactElement {
         });
       }
 
+      /**
+       * ⚠️ ★**HUD は手前のラチより後に描くこと**（★2026-09-08）。
+       *    ★先に描いたら、★**馬名プレート（画面下部）がラチに覆われて**見えませんでした。
+       */
+      /**
+       * ★**中継の体裁**（★2026-09-08・オーナー指示）
+       *
+       * ⚠️ ★新しく作りません。★`@star/render` に既にあるものを呼ぶだけです:
+       *    ★`drawStandings`（順位表）／`drawHorseNamePlates`（馬名）／`drawResultsBoard`（着順）
+       * ⚠️ ★順位は ★**画面に描いたのと同じ位置**から出します。★別に計算すると、
+       *    ★順位表と絵が食い違います（★本番 page.tsx :2535 にも同じ注記があります）。
+       */
+      if (racing && at.length > 0) {
+        const pal = paletteRef.cur;
+        const font: (px: number, bold?: boolean) => string =
+          (px, bold) => `${bold === true ? 'bold ' : ''}${px}px sans-serif`;
+        const vp = { width: W, height: H };
+        const order = [...at].sort((a, b) => b.shownM - a.shownM);
+        const leadS = order[0]!.shownM;
+        /** ★1 馬身 = 2.4m（★`HORSE_LENGTH_M` と同じ） */
+        const rows = order.map((h) => ({
+          gate: h.gate,
+          name: RACE_RUNNERS[h.gate - 1]?.name ?? `${h.gate} 番`,
+          lengths: (leadS - h.shownM) / 2.4,
+          isOwn: h.gate === 1,
+        }));
+        const finished = raceSecNow >= run!.model.raceSec - 0.01;
+        if (!finished) {
+          drawStandings(ctx, pal, vp, font, rows, RACE_FIELD, frameRoleOf, { timeSec: raceSecNow });
+          drawHorseNamePlates(ctx, pal, font,
+            order.slice(0, 4).map((h, k) => ({
+              gate: h.gate,
+              name: RACE_RUNNERS[h.gate - 1]?.name ?? `${h.gate} 番`,
+              isOwn: h.gate === 1,
+              note: k === 0 ? '先頭' : undefined,
+            })),
+            RACE_FIELD, frameRoleOf,
+            { viewport: vp, timeSec: raceSecNow, sinceSec: raceSecNow });
+        } else {
+          /** ★ゴール後の着順ボード。★競馬場名・レース名は架空のものです（★憲法1） */
+          drawResultsBoard(ctx, pal, vp, font,
+            order.map((h, k) => ({
+              place: k + 1,
+              gate: h.gate,
+              horseName: RACE_RUNNERS[h.gate - 1]?.name ?? `${h.gate} 番`,
+              jockeyName: `騎手 ${h.gate}`,
+              timeSec: run!.model.raceSec,
+              margin: k === 0 ? '—' : `${((order[k - 1]!.shownM - h.shownM) / 2.4).toFixed(1)} 馬身`,
+              isOwn: h.gate === 1,
+            })),
+            RACE_FIELD, frameRoleOf,
+            {
+              raceName: '検証台デモ', venue: 'スターパーク', raceNo: '11R',
+              distanceLabel: `芝${RACE_DIST}m`, winTimeSec: run!.model.raceSec,
+            },
+            Math.min(1, (raceSecNow - run!.model.raceSec) / 1.2 + 1), raceSecNow);
+        }
+      }
+
+
       ctx.fillStyle = 'rgba(20,28,34,.75)';
       ctx.fillRect(0, 0, 470, 62);
       ctx.fillStyle = '#eef2f6';
@@ -1486,6 +1677,40 @@ export default function SpriteClient(): React.ReactElement {
       ctx.fillText(`進行 ${travel.toFixed(1)}m  速さ ${st.speedMps.toFixed(1)}m/s`, 12, 24);
       ctx.font = '12px sans-serif';
       ctx.fillText(`1 完歩 ${st.strideM.toFixed(2)}m → ${(st.speedMps / st.strideM).toFixed(2)} 完歩/秒`, 12, 46);
+      /**
+       * ★**いまどのカットか**を出します（★2026-09-08）。
+       *   ★出さないと「切り替わったのか、たまたま絵が変わったのか」が分かりません。
+       */
+      if (cutNow !== null) {
+        ctx.fillStyle = 'rgba(20,28,34,.75)';
+        ctx.fillRect(W - 300, 0, 300, 40);
+        ctx.fillStyle = '#ffd479';
+        ctx.font = 'bold 15px sans-serif';
+        ctx.fillText(
+          `★${cutNow.index + 1}/${SIDE_CUTS.length}  ${cutNow.cut.label}`
+          + `  馬 ${(cutNow.cut.horseH * 100).toFixed(0)}%`,
+          W - 288, 25,
+        );
+      }
+
+      /**
+       * ★**カットが変わった瞬間に、直前の画を控えます**。
+       *   ★次のコマから 0.35 秒かけて上に重ねて消すと、★切り替わりが唐突でなくなります。
+       */
+      if (cutNow !== null && cutNow.index !== prevCutIndex) {
+        if (prevCutIndex >= 0) {
+          prevShot.width = W; prevShot.height = H;
+          prevShot.getContext('2d')!.drawImage(canvas, 0, 0);
+          prevAtSec = now / 1000;
+        }
+        prevCutIndex = cutNow.index;
+      }
+      const fadeT = (now / 1000 - prevAtSec) / CUT_FADE_SEC;
+      if (fadeT >= 0 && fadeT < 1 && prevShot.width > 0) {
+        ctx.globalAlpha = 1 - fadeT;
+        ctx.drawImage(prevShot, 0, 0);
+        ctx.globalAlpha = 1;
+      }
 
       raf = requestAnimationFrame(draw);
     };
@@ -1583,7 +1808,8 @@ export default function SpriteClient(): React.ReactElement {
               onChange={(e) => setBob(Number(e.target.value))} style={{ display: 'block', width: 220, marginTop: 4 }} />
           </label>
           <label style={{ fontSize: 12.5, fontWeight: 700 }}>
-            馬の高さ {(heightRatio * 100).toFixed(0)}%
+            {mode === 'race' ? '★全体の倍率' : '馬の高さ'} {(heightRatio * 100).toFixed(0)}%
+            {mode === 'race' ? '（★36% が等倍。カットごとの幅はそのまま）' : ''}
             <input type="range" min={0.12} max={0.5} step={0.01} value={heightRatio}
               onChange={(e) => setHeightRatio(Number(e.target.value))} style={{ display: 'block', width: 220, marginTop: 4 }} />
           </label>
