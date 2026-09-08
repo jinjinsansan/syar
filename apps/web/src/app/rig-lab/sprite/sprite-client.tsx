@@ -231,11 +231,21 @@ const LAYERS: readonly Layer[] = ['coat', 'mane', 'silk', 'cap', 'tack'];
  *    ★はっきり違う 4 組を `palette.json` から選んでいます（★16 進をここに書かない）。
  */
 const RUNNERS = [
-  { gate: 1, coat: 'coat-kage-1', silk: 'silk-1', frame: 'frame-3', lane: 0 },
-  { gate: 3, coat: 'coat-kuri-0', silk: 'silk-3', frame: 'frame-4', lane: 1 },
-  { gate: 5, coat: 'coat-ashi-1', silk: 'silk-12', frame: 'frame-5', lane: 2 },
-  { gate: 7, coat: 'coat-ao-1', silk: 'silk-2', frame: 'frame-6', lane: 3 },
+  { gate: 1, coat: 'coat-kage-1', silk: 'silk-1', frame: 'frame-3', lane: 0, type: 'a' },
+  { gate: 3, coat: 'coat-kuri-0', silk: 'silk-3', frame: 'frame-4', lane: 1, type: 'b' },
+  { gate: 5, coat: 'coat-ashi-1', silk: 'silk-12', frame: 'frame-5', lane: 2, type: 'c' },
+  { gate: 7, coat: 'coat-ao-1', silk: 'silk-2', frame: 'frame-6', lane: 3, type: 'a' },
 ] as const;
+
+/**
+ * ★**個体タイプの素材**（★2026-09-08）
+ *   ★育成・繁殖のゲームなので、★馬の見た目に個性が要ります。
+ *   ★実測: ★毛色 20 色は ★**実質 3 群**（★鹿毛↔栗毛 31・★黒鹿毛↔青毛 20）。
+ *   → ★個性は ★**体つきと白い印**で作り、★1 タイプ = 8 コマ 1 セットにしています。
+ *   ★見分けられるかは `tools/measure-look-distinctness.mjs` で測ります
+ *   （★下限 30.5% ／ ★A↔B 34.4%・A↔C 36.1%・B↔C 42.7%）。
+ */
+const TYPE_DIR = (t: string): string => `/rig-lab-assets/types/${t}`;
 
 /**
  * ★無彩色の層に色を乗せる。
@@ -888,17 +898,14 @@ export default function SpriteClient(): React.ReactElement {
     let cancelled = false;
     let raf = 0;
     /** ★[馬][コマ][層] の焼いた絵。★馬ごとに色が違うので、★馬ごとに焼きます */
-    const baked: Piece[][][] = [];
-    /** ★コマごとの蹄の位置（★画像の上からの比）。★素材から測ります */
-    const lowRatio: number[] = [];
+    /** ★頭ごとの焼き上がり。★個体タイプが違うと、★縦横比も蹄の位置も違います */
+    const baked: { pieces: Piece[][]; aspect: number; cellW: number; lowRatio: number[] }[] = [];
     /** ★芝の明るさ段階ごとの背景一式（★`TURF_STEPS` と同じ並び） */
     let sceneries: Scenery[] | null = null;
     /** ★背景の読み込み状況（★馬と背景は別々に読むので、★先に終わった方が書きます） */
     let bgNote = '背景 読み込み中';
     /** ★素材 1 枚の横 ÷ 縦。★`sprite.json` から読みます（★正方と決めつけない） */
     let aspect = 1;
-    const aspectRef = { cur: 1 };
-    const cell = { w: CELL_H };
 
     const load = (src: string): Promise<HTMLImageElement> => new Promise((res, rej) => {
       const img = new Image();
@@ -993,32 +1000,38 @@ export default function SpriteClient(): React.ReactElement {
       bgNote = `背景 ${built[0]!.behind.layers.length}+${built[0]!.front.layers.length} 層（★奥を隠すと ${built[0]!.behindNear.layers.length}+${built[0]!.front.layers.length}）`;
     })().catch(() => { setStatus('⚠️ 背景素材を読めませんでした'); });
 
-    /** ★馬（★購入リグを焼いたスプライト）を読む */
+    /** ★馬（★自前生成した個体タイプの素材）を読む */
     void (async () => {
       const palette: Record<string, string> = await fetch('/art/palette.json')
         .then((r) => r.json()).catch(() => ({}));
-      const meta: { width?: number; height?: number } = await fetch(`${SPRITE_DIR}/sprite.json`)
-        .then((r) => r.json()).catch(() => ({}));
-      aspect = (meta.width ?? 1) / (meta.height ?? 1);
-      const CELL_W = Math.round(CELL_H * aspect);
-      aspectRef.cur = aspect;
-      cell.w = CELL_W;
-      const raw: Record<Layer, HTMLImageElement[]> = { coat: [], mane: [], silk: [], cap: [], tack: [] };
-      for (let f = 1; f <= SRC_FRAMES; f += 1) {
-        for (const l of LAYERS) {
-          raw[l].push(await load(`${SPRITE_DIR}/${String(f).padStart(2, '0')}_${l}.png`));
-        }
-      }
-      if (cancelled) return;
       /**
-       * ★**コマごとの蹄の位置を素材から測ります**（★画像の上からの比）。
-       *   ★これが無いと、★どのコマも同じ高さに置かれ、★浮いたコマが浮いたままになります。
+       * ★**頭ごとに個体タイプの素材を読みます**（★2026-09-08）。
+       *   ★同じタイプが複数いるので、★タイプ単位で 1 度だけ読み込みます。
        */
-      {
-        const probe = document.createElement('canvas');
-        const pg = probe.getContext('2d', { willReadFrequently: true })!;
+      const loadedTypes = new Map<string, {
+        raw: HTMLImageElement[]; aspect: number; cellW: number; lowRatio: number[];
+      }>();
+      const probe = document.createElement('canvas');
+      const pg = probe.getContext('2d', { willReadFrequently: true })!;
+      for (const t of new Set(RUNNERS.map((r) => r.type))) {
+        const dir = TYPE_DIR(t);
+        const meta: { width?: number; height?: number } = await fetch(`${dir}/sprite.json`)
+          .then((r) => r.json()).catch(() => ({}));
+        const asp = (meta.width ?? 1) / (meta.height ?? 1);
+        const cw = Math.round(CELL_H * asp);
+        const raw: HTMLImageElement[] = [];
+        for (let f = 1; f <= SRC_FRAMES; f += 1) {
+          raw.push(await load(`${dir}/${String(f).padStart(2, '0')}_coat.png`));
+        }
+        if (cancelled) return;
+        /**
+         * ★**コマごとの蹄の位置を素材から測ります**（★画像の上からの比）。
+         *   ★これが無いと、★どのコマも同じ高さに置かれ、★浮いたコマが浮いたままになります。
+         * ⚠️ ★個体タイプごとに違うので、★タイプ単位で測ります。
+         */
+        const lows: number[] = [];
         for (let f = 0; f < SRC_FRAMES; f += 1) {
-          const img = raw.coat[f]!;
+          const img = raw[f]!;
           probe.width = img.width; probe.height = img.height;
           pg.clearRect(0, 0, probe.width, probe.height);
           pg.drawImage(img, 0, 0);
@@ -1029,32 +1042,23 @@ export default function SpriteClient(): React.ReactElement {
             for (let x = 0; x < probe.width; x += 1) if ((d[(y * probe.width + x) * 4 + 3] ?? 0) >= 64) { hit = true; break; }
             if (hit) { low = y; break; }
           }
-          lowRatio[f] = low / probe.height;
+          lows.push(low / probe.height);
         }
+        loadedTypes.set(t, { raw, aspect: asp, cellW: cw, lowRatio: lows });
       }
-      /**
-       * ★馬 × コマ × 層 で焼く（★一度だけ）。
-       *   ★着色は **馬ごとに 1 枚**のキャンバスへ詰めます（★上の `CELL_PX` の注記）。
-       *   ★合成は使い回しの 1 枚（`scratch`）の上で行い、★結果だけを詰め先へ写します
-       *   （★詰め先で直接合成すると、★隣のマスまで塗ってしまいます）。
-       */
+      if (cancelled) return;
+
       const scratch = document.createElement('canvas');
-      scratch.width = CELL_W; scratch.height = CELL_H;
       const sg = scratch.getContext('2d', { willReadFrequently: true })!;
-      /**
-       * ⚠️ ★**「色の付いた画素を元の色で描き戻す」1 枚は、もう作りません**（★2026-09-07）
-       *    ★素材が無彩色だった頃、★騎手の顔やゴーグルを守るために使っていました。
-       *    ★描き戻しは ★**茶色い下地では毛ごと戻ってしまう**ので 9/7 に廃止しましたが、
-       *    ★**作る処理だけが残って**いました。★焼く解像度を素材と同じ 576 に上げると、
-       *    ★これだけで ★**約 70MB** を空取りします。
-       */
       for (const r of RUNNERS) {
+        const src = loadedTypes.get(r.type)!;
+        const CELL_W = src.cellW;
+        scratch.width = CELL_W; scratch.height = CELL_H;
         const atlas = document.createElement('canvas');
         /**
          * ★幅は ★**1 列**で足ります。
          * ⚠️ ★層が 4 つあった頃の名残で `CELL_W * 4` を確保していましたが、
-         *    ★1 枚絵になった今は ★**列 0 にしか描いていません**（★下の `drawImage(scratch, 0, …)`）。
-         *    ★3/4 は空のまま場所だけ取っていました。
+         *    ★1 枚絵になった今は ★**列 0 にしか描いていません**。
          */
         atlas.width = CELL_W;
         atlas.height = CELL_H * SRC_FRAMES;
@@ -1063,18 +1067,12 @@ export default function SpriteClient(): React.ReactElement {
         for (let f = 0; f < SRC_FRAMES; f += 1) {
           /**
            * ★**素材は 1 枚絵です**（★2026-09-07）
-           *
-           * ⚠️ ★層に分かれていません。★STAR の 2D 馬はもともと 1 枚絵で、
-           *    ★`tools/lib/dress.mjs` が ★**色相で部位を選んで**塗り替えます。
-           *    ★`coat` 以外の 4 層は**空**なので、★そこを塗っても何も出ません。
-           *    ★実際、そのままだと ★**4 頭とも同じ色**になりました。
-           * → ★**同じ 1 枚に、毛色と勝負服を順に当てます。**
-           *   ★毛（茶）と勝負服（青）は色相で分かれるので、★互いを侵しません。
+           *   ★`tools/lib/dress.mjs` と同じく、★色相で部位を選んで塗り替えます。
            */
-          const src = raw.coat[f]!;
+          const img = src.raw[f]!;
           sg.clearRect(0, 0, CELL_W, CELL_H);
           /** ★① 茶系 → 毛色 */
-          tintOnto(sg, src, palette[r.coat] ?? '#8a6340', CELL_W, CELL_H, 'coat');
+          tintOnto(sg, img, palette[r.coat] ?? '#8a6340', CELL_W, CELL_H, 'coat');
           /** ★② 青 → 勝負服（★同じ絵の上に続けて当てる） */
           tintInPlace(sg, palette[r.silk] ?? '#2f6fd0', CELL_W, CELL_H, 'silk');
           /** ★③ 場の光（★候補が要求したときだけ） */
@@ -1084,12 +1082,9 @@ export default function SpriteClient(): React.ReactElement {
             sg.putImageData(lit, 0, 0);
           }
           ag.drawImage(scratch, 0, f * CELL_H);
-          const row: Piece[] = [{
-            grey: src, atlas, sx: 0, sy: f * CELL_H, isCoat: true,
-          }];
-          perFrame.push(row);
+          perFrame.push([{ grey: img, atlas, sx: 0, sy: f * CELL_H, isCoat: true }]);
         }
-        baked.push(perFrame);
+        baked.push({ pieces: perFrame, aspect: src.aspect, cellW: CELL_W, lowRatio: src.lowRatio });
       }
       setStatus(`${RUNNERS.length} 頭 × ${SRC_FRAMES} コマ（★1 枚絵・色は色相で置き換え）／${bgNote}`);
     })().catch((e) => { setStatus(`⚠️ 素材を読めませんでした: ${String(e)}`); });
@@ -1194,8 +1189,9 @@ export default function SpriteClient(): React.ReactElement {
         for (let i = 0; i < shown; i += 1) {
           const r = RUNNERS[i]!;
           const idx = frameIndexFor(travel, r.gate, st.strideM);
-          const layers = baked[i]?.[idx];
-          if (layers === undefined) continue;
+          const set = baked[i];
+          const layers = set?.pieces[idx];
+          if (set === undefined || layers === undefined) continue;
           /**
            * ★奥のレーンほど小さく・上に（★真横から見た馬群の奥行き）。
            * ⚠️ ★1 度目は横も縦も同じ向きに増やしたので ★**階段状に並びました**。
@@ -1204,7 +1200,7 @@ export default function SpriteClient(): React.ReactElement {
           const depth = 1 - (shown > 1 ? i / (shown - 1) : 0) * 0.14;
           const s = Math.round(drawSize * depth);
           /** ★横は素材の比から（★正方と決めつけない） */
-          const sw = Math.round(s * aspectRef.cur);
+          const sw = Math.round(s * set.aspect);
           /**
            * ★**地面の帯の中に**並べる（★枠 1 が手前＝下、★枠 6 が奥＝上）。
            *   ★帯は `manifest` の地面の層そのものなので、★**芝の上から外れません**。
@@ -1239,7 +1235,7 @@ export default function SpriteClient(): React.ReactElement {
            *   ★浮きを `st.bob` の割合だけ残し、★残りは押し下げて接地させます。
            *     ★`bob = 0` … ★全コマ接地　★`bob = 1` … ★描かれたまま（★浮いたまま）
            */
-          const gap = FEET - (lowRatio[idx] ?? FEET);
+          const gap = FEET - (set.lowRatio[idx] ?? FEET);
           const dy = s * gap * (1 - st.bob);
           const y = Math.round(groundY - s * FEET + dy);
           /**
@@ -1301,7 +1297,7 @@ export default function SpriteClient(): React.ReactElement {
              *    ★奥のラチが騎手や首を透けて横切り、★実体が薄く見えていました。
              * → ★**常に不透明で描きます。** ★毛色の濃さは、塗るときの色そのもので決めます。
              */
-            ctx.drawImage(p.atlas, p.sx, p.sy, cell.w, CELL_H, x, y, sw, s);
+            ctx.drawImage(p.atlas, p.sx, p.sy, set.cellW, CELL_H, x, y, sw, s);
             /**
              * ⚠️ ★**ここで元の色を描き戻してはいけません**（★2026-09-07）
              *    ★かつて素材が**無彩色**だったとき、★着色対象の層に混ざっていた固定色
