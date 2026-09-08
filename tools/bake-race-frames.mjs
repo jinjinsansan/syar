@@ -68,8 +68,13 @@ const pickSet = (...prefixes) => prefixes.find(setExists);
  *   ★画面が同じ組を引けるように控えを書き出します。
  */
 const SETS = [
-  { role: 'side-v6', layout: 'crouch', prefix: pickSet('horse-jockey-side-v7', 'horse-jockey-side-v6') },
-  { role: 'diag-front-v2', layout: 'front', prefix: pickSet('horse-jockey-diag-front-v3', 'horse-jockey-diag-front-v2') },
+  /**
+   * ★**デフォルメ馬（★自前生成）を先頭に置きます**（★2026-09-08）。
+   *   ★`pickSet` は ★**先に見つかった名前**を使うので、★外せば元の素材へ戻ります。
+   *   ★原版は `tools/publish-deformed-art.mjs` が `/art/` へ写します。
+   */
+  { role: 'side-v6', layout: 'crouch', prefix: pickSet('horse-jockey-side-v8', 'horse-jockey-side-v7', 'horse-jockey-side-v6') },
+  { role: 'diag-front-v2', layout: 'front', prefix: pickSet('horse-jockey-diag-front-v4', 'horse-jockey-diag-front-v3', 'horse-jockey-diag-front-v2') },
   { role: 'diag-rear-v2', layout: 'rear', prefix: pickSet('horse-jockey-diag-rear-v5', 'horse-jockey-diag-rear-v4', 'horse-jockey-diag-rear-v2') },
   { role: 'high-diag-v2', layout: 'rear', prefix: pickSet('horse-jockey-high-diag-v4', 'horse-jockey-high-diag-v3', 'horse-jockey-high-diag-v2') },
   { role: 'winner-rear', layout: 'rear', prefix: pickSet('horse-jockey-winner-rear-v1') },

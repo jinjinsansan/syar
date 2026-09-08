@@ -21,7 +21,7 @@
  */
 import { GlobalFonts, createCanvas, loadImage } from '@napi-rs/canvas';
 import sharp from 'sharp';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import {
   DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt,
@@ -262,9 +262,21 @@ async function library(prefix) {
     frameImages: frames,
   };
 }
+/** ★`bake-race-frames.mjs` と同じ選び方（★先に見つかった名前を使う） */
+const pickSet = (...prefixes) => prefixes.find(
+  (p) => existsSync(path.join(ART, `${p}-pose01.png`)),
+) ?? prefixes[prefixes.length - 1];
+
 const libraries = {
-  'side-v6': await library('horse-jockey-side-v7-pose'),
-  'diag-front-v2': await library('horse-jockey-diag-front-v3-pose'),
+  /**
+   * ⚠️ ★**素材名を直書きしないこと**（★2026-09-08）。
+   *    ★`tools/bake-race-frames.mjs` は `pickSet`（★先に見つかった名前）で素材を選びます。
+   *    ★ここに直書きしていたため、★デフォルメ馬へ差し替えても
+   *    ★**この撮影道具だけが旧素材を描き続けました**（★実測で気づきました）。
+   *    ★列挙を 2 か所で持つと、★片方だけが古くなります（★R-29 と同じ形）。
+   */
+  'side-v6': await library(`${pickSet('horse-jockey-side-v8', 'horse-jockey-side-v7', 'horse-jockey-side-v6')}-pose`),
+  'diag-front-v2': await library(`${pickSet('horse-jockey-diag-front-v4', 'horse-jockey-diag-front-v3', 'horse-jockey-diag-front-v2')}-pose`),
   'diag-rear-v2': await library('horse-jockey-diag-rear-v5-pose'),
   'high-diag-v2': await library('horse-jockey-high-diag-v4-pose'),
   // ★勝馬追従だけ 1 枚素材。渡さないと `spec` が undefined になって落ちる
