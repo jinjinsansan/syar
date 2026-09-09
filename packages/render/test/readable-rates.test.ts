@@ -110,9 +110,11 @@ describe('★画面の既定（readable）の時間写像', () => {
    *   ★目標には反応しません。★どちらも `READABLE_MAX_RATE = 2` を超えているので、
    *   ★**目標をどんなに緩くしても、この 2 つは切られたまま**です。
    *
-   * ★したがって ★**可読性方針は、構造上、目標の表示時間には届きません。**
-   *   ★自由度は `cruise` だけです。★尺を縮めたいなら、★上限を上げるか、
-   *   ★固定値そのものを見直すかのどちらかで、★**検定では決められません**（★裁定 §3）。
+   * ⚠️ ★**「だから目標に届かない」ではありません**（★2026-09-09・第 2 便の裁定 §3 F-4 で撤回）。
+   *    ★切られるのは ★`spurt` / `straight` の**倍率**であって、★**尺の達成可否とは別**です。
+   *    ★切ったあとの区間時間で `cruise` を逆算すれば、★**達成できる領域では目標に一致します**
+   *    （★下の「達成できる目標では、実尺が目標に合う」）。
+   *    ★合成 knots の 2400m で ★達成領域は ★約 91.23〜140.50 秒。★本番の 45.7 秒はその外です。
    */
   it('★★可読性方針では、目標を緩くしても spurt / straight は切られたまま', () => {
     for (const target of [40, 120, 260, 600]) {
@@ -252,6 +254,22 @@ describe('★画面の既定（readable）の時間写像', () => {
     const achievable = racePaceReport(k, 100, 'readable');
     expect(achievable.cappedPhases).toEqual(['spurt', 'straight']);
     expect(achievable.achieved, '★切られていても達成しうる').toBe(true);
+  });
+
+  /**
+   * ★**端にいることと、達成できないことは別**（★2026-09-09・第 3 便の裁定 §F-5）。
+   *   ★端そのものを目標にすれば ★両立します。★注記だけでなく検定でも押さえます。
+   */
+  it('★★端に張り付いていても達成しうる（★saturation と achieved は別）', () => {
+    const k = knotsOf(2400);
+    // ★達成領域の最短端（★cruise が上限）をそのまま目標にする
+    const shortest = racePaceReport(k, 200, 'readable').displaySec; // ★下限側で最長
+    const fastest = racePaceReport(k, 1, 'readable').displaySec;    // ★上限側で最短
+    for (const edge of [fastest, shortest]) {
+      const rep = racePaceReport(k, edge, 'readable');
+      expect(rep.saturation, `端 ${edge} 秒`).not.toBe(null);
+      expect(rep.achieved, `端 ${edge} 秒は達成できている`).toBe(true);
+    }
   });
 
   it('★racePaceReport の実尺が、実際に組んだ時計と一致する', () => {

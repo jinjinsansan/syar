@@ -81,8 +81,16 @@ describe('★監査道具と画面の入力の一致', () => {
     for (const hs of STRAIGHTS) {
       const built = buildAuditRace({ seed: 42, distance: 1600, spec: specOf(hs) });
       const fromAudit = auditClock(built).warp;
-      // ★画面と同じ手順（`page.tsx` の `build()` と同じ引数）
-      const knots = knotsFor(built.boundaries, 3, built.model.straightMeters);
+      /**
+       * ⚠️ ★**比較側は `built.model.straightMeters` を読まないこと**
+       *    （★2026-09-09・第 3 便の裁定 §1「21 点の照合について」）。
+       *
+       *    ★以前ここは監査モデルの値を読んでいました。★すると ★**監査側だけ 400 へ戻しても
+       *    ★比較側も 400 を読み、★同じ時計になって素通り**します。
+       *    ★モデルの出力を期待値へ流用してはいけません。
+       * → ★試験入力で指定した ★`hs` を ★そのまま期待値に使います。
+       */
+      const knots = knotsFor(built.boundaries, 3, hs);
       const fromScreenPart = raceClockFor(knots, built.DIST, 'readable');
       expect(fromScreenPart.displaySec, `直線 ${hs}m`).toBeCloseTo(fromAudit.displaySec, 9);
       for (let i = 0; i <= 20; i++) {

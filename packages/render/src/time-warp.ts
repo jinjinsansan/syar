@@ -454,10 +454,14 @@ export interface RacePaceReport {
    */
   readonly cappedPhases: readonly ('spurt' | 'straight')[];
   /**
-   * ★**道中の送りが端に張り付いたか**（★目標がその方針で届かない領域にある）。
-   *   `'max'` … ★これ以上速くできない（★目標が短すぎる）
-   *   `'min'` … ★これ以上遅くできない（★目標が長すぎる）
+   * ★**道中の送りが端に張り付いたか**。
+   *   `'max'` … ★これ以上速くできない
+   *   `'min'` … ★これ以上遅くできない
    *   `null`  … ★端ではない
+   *
+   * ⚠️ ★**端にいること自体は「達成できない」ではありません**（★2026-09-09・第 3 便の裁定 §F-5）。
+   *    ★端そのものを目標にすれば ★`saturation` あり・★`achieved` true が ★両立します。
+   *    ★達成したかは ★`achieved` だけを見ること。
    */
   readonly saturation: 'max' | 'min' | null;
   /** ★目標に合ったか（★`|overshootSec| <= toleranceSec`）。★これが達成判定です */
