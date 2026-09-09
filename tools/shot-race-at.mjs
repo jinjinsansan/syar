@@ -407,7 +407,7 @@ const gateOpen = { image: await loadImage(gateOpenFile), source: await alphaBoun
 
 mkdirSync(OUT, { recursive: true });
 const files = [];
-console.log('  表示秒   先頭m   ショット      横広がり   馬の高さ  画面比  画面内   芝の緑');
+console.log('  表示秒   先頭m   ショット      ★横広がり ★前後長  馬の高さ  画面比  画面内   芝の緑');
 console.log('  ★芝の緑: 参考 平均 約20% / 実装前の我々 約60%（報告①と同じ判定式）');
 console.log('  ★合格の finish-line は 181px / 25.2%');
 for (const [index, displaySec] of displaySecs.entries()) {
@@ -431,7 +431,15 @@ for (const [index, displaySec] of displaySecs.entries()) {
   const shown = visual.map((h) => ({ ...h, meters: startShownMeters(h.meters, raceD) }));
   const horses = shown.map((h) => ({ gate: h.gate, s: h.meters, w: h.w, staminaRatio: h.staminaRatio ?? 1 }));
   const lead = Math.max(...horses.map((h) => h.s));
-  const spread = Math.max(...horses.map((h) => h.w)) - Math.min(...horses.map((h) => h.w));
+  /**
+   * ⚠️ ★**これは「横位置の広がり」です。★前後幅ではありません**（★2026-09-09）。
+   *    ★開発側は表示の「幅」を ★**馬群の前後の長さ**と読み違え、
+   *    ★「★馬群が設計の半分以下に縮んでいる」という ★**誤った照会**を出しました
+   *    （★レビュー側の指摘で判明）。★名前を分けて、二度と取り違えないようにします。
+   */
+  const laneSpread = Math.max(...horses.map((h) => h.w)) - Math.min(...horses.map((h) => h.w));
+  /** ★**馬群の前後の長さ**（★先頭と最後方の走破距離の差） */
+  const packLengthM = lead - Math.min(...horses.map((h) => h.s));
   // ⚠️ 第4引数は `allFinished`（真偽値）。ここに object を渡すと**常に真**になり、
   //    全時刻が `winner-follow` になります（2026-08-21 に踏んだ）。
   let scene = resolveBroadcastV2Scene(
@@ -579,11 +587,11 @@ for (const [index, displaySec] of displaySecs.entries()) {
   const m = measureShot(course, scene.camera, horses, W, H);
   ctx.fillStyle = 'rgba(5,10,8,0.84)'; ctx.fillRect(18, 18, 700, 58);
   ctx.fillStyle = '#fff'; ctx.font = 'bold 20px sans-serif';
-  ctx.fillText(`${displaySec}s / ${scene.shot.id} / 馬 ${m.medianPx.toFixed(0)}px(${(m.ratio * 100).toFixed(0)}%) / 画面内 ${m.inside}/${m.total} / 横 ${spread.toFixed(1)}m`, 34, 52);
+  ctx.fillText(`${displaySec}s / ${scene.shot.id} / 馬 ${m.medianPx.toFixed(0)}px(${(m.ratio * 100).toFixed(0)}%) / 画面内 ${m.inside}/${m.total} / 横 ${laneSpread.toFixed(1)}m / ★前後 ${packLengthM.toFixed(1)}m`, 34, 52);
   const file = path.join(OUT, `${String(index + 1).padStart(2, '0')}-${displaySec}s-${scene.shot.id}.png`);
   writeFileSync(file, canvas.toBuffer('image/png'));
   files.push(file);
-  console.log(`${String(displaySec).padStart(7)}${lead.toFixed(0).padStart(8)}   ${scene.shot.id.padEnd(20)}${spread.toFixed(2).padStart(6)}${(m.medianPx.toFixed(0) + 'px').padStart(9)}${((m.ratio * 100).toFixed(1) + '%').padStart(8)}${(m.inside + '/' + m.total).padStart(8)}${(greenPct.toFixed(1) + '%').padStart(9)}`);
+  console.log(`${String(displaySec).padStart(7)}${lead.toFixed(0).padStart(8)}   ${scene.shot.id.padEnd(20)}${laneSpread.toFixed(2).padStart(6)}${packLengthM.toFixed(1).padStart(8)}${(m.medianPx.toFixed(0) + 'px').padStart(9)}${((m.ratio * 100).toFixed(1) + '%').padStart(8)}${(m.inside + '/' + m.total).padStart(8)}${(greenPct.toFixed(1) + '%').padStart(9)}`);
 }
 
 /** 一覧（2 列） */
