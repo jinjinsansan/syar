@@ -3,7 +3,7 @@
  *
  * 【★守っていること】
  *   ・**着順はエンジンが決めたもの**（開始時に D-059 のゲートを通す）
- *   ・★横位置 `w` は**エンジンが引いたもの**（D-071）。**距離ロスは着順に効いています**
+ *   ・横位置はエンジンの経路を基準に、観戦用の馬間隔補正を加える。距離ロスの計算はエンジンが担う。
  *     （D-065 は 2026-08-16 にエンジンへ入りました＝`race.ts` の `laneCoef`）
  *   ・★**描き方はこの画面に持ちません** — `@star/render` の `drawObliqueWorld` が唯一の出どころで、
  *     **動画の道具と同じ関数**を呼びます（2か所で描いたら必ず離れます）
@@ -20,7 +20,7 @@
 'use client';
 
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DEFAULT_RACE_BALANCE, DEFAULT_INTERVENTION_BALANCE,
   resolveRace, paceOf, replayOf, finalOrderMatches,
@@ -76,6 +76,8 @@ import {
   targetDisplaySec,
   homeStretchMetersOf,
   broadcastV2ScriptAssets,
+  raceGaitPhase,
+  trafficPositionModel, readableRaceRates,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 import { raceSetupFromParam, gradedRacesByVenue } from '@star/scheduler';
@@ -115,6 +117,9 @@ const LANE_MODEL_PARAM = typeof window === 'undefined' ? undefined
     ? LANE_MODEL_LEGACY
     : LANE_MODELS[new URLSearchParams(window.location.search).get('lane') ?? ''];
 const FIELD = 12;
+/** Previous motion is retained for visual comparison. */
+const LEGACY_MOTION = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('motion') === 'legacy';
 const W = 1280;
 const H = 720;
 /**
@@ -170,8 +175,8 @@ let rendererBadgeHidden = true;
  *    ② **着差が縮む** — 実際 5 馬身が発走 0.2 秒で **0.66 馬身**に見える
  *   引き算なら、速さは単調に上がり、**着差はそのまま**です。
  */
-const startShownMeters = (meters: number, raceDisplaySec: number): number =>
-  Math.max(0, meters - broadcastV2StartLagM(raceDisplaySec, RACE_SPEED_MPS));
+const startShownMeters = (meters: number, raceDisplaySec: number, rampSec = 1.6): number =>
+  Math.max(0, meters - broadcastV2StartLagM(raceDisplaySec, RACE_SPEED_MPS, rampSec));
 /** ★立ち上がりの基準にする走速（m/s）。1600m をおよそ 100 秒で走る前提 */
 const RACE_SPEED_MPS = 15.6;
 /** ★被写体ブラーの速度を求める微分幅（**レース秒**。表示秒ではない — 上の注記を読むこと） */
@@ -209,7 +214,7 @@ function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, st
 }
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 /** ★素材を足したら必ず上げる。★`manifest.json` の中身を変えたときも（古いものがキャッシュされる） */
-const ASSET_VERSION = '62';
+const ASSET_VERSION = '70';
 /**
  * ★コマごとの持ち上げ量。**単位は「基準画布（高さ 1536px）での px」**。
  *
@@ -385,6 +390,67 @@ const COAT_BY_GATE: readonly CoatName[] = [
   'liver-chestnut', 'bay', 'blue-black', 'chestnut', 'dark-bay', 'bay',
 ];
 const coatOf = (gate: number): CoatName => COAT_BY_GATE[(gate - 1) % COAT_BY_GATE.length] ?? 'bay';
+/**
+ * ★**個体タイプ**（★2026-09-09・`REPORT_P4_HORSE_TYPES_20260908.md`）
+ *
+ * 【★なぜ毛色だけでは足りないか — ★実測】
+ *   ★画面上の馬は 188x137px（★実機はさらに 67% に縮小）。★この大きさで読めるのは
+ *   ★**輪郭の形**と ★**大きな明暗のかたまり**だけです。
+ *   ★毛色 20 色の見分けやすさを測ると ★**実質 3 群**しかありません
+ *   （★鹿毛↔黒鹿毛 55・★鹿毛↔栗毛 31 … ★同系統の濃さ違いは分かりません）。
+ *
+ *   ★型A がっしり・白なし          ★型B 細身・顔と四肢の白
+ *   ★型C 小柄でずんぐり・胴の大きな白斑
+ *   ★輪郭の差 ★A↔B 34.4% / A↔C 36.1% / B↔C 42.7%（★合格線 30.5%）
+ *
+ * 【★割り当ての決め方】
+ *   ★① ★**同じ毛色の馬には違う型**を当てます（★鹿毛 5 頭が同じ馬に見えないように）。
+ *   ★② ★12 頭で ★**型が 4 頭ずつ**になるようにします。
+ *   ★③ ★その結果、★読むアトラスは ★**(型, 毛色) の実在する組だけ**で済みます
+ *      （★12 頭で 10 組。★3 型 × 7 色 = 21 組を全部読む必要はありません）。
+ *
+ * ⚠️ ★`Math.random` は使いません（★憲法4）。★枠順から引く表です。
+ * ⚠️ ★**繁殖で型を継ぐのか**は正典に無いので、★ここでは決めません
+ *    （★`QUESTIONS_P4_HORSE_TYPE_INHERITANCE_20260909.md` で照会します）。
+ */
+type HorseType = 'a' | 'b' | 'c';
+const HORSE_TYPES: readonly HorseType[] = ['a', 'b', 'c'];
+/**
+ * ⚠️ ★**型 C は、いまは出しません**（★2026-09-09・実測で判明）
+ *
+ *   ★型 C の識別点は ★「胴の大きな白斑」です。★ところが engine は
+ *   ★**鞍布を「胴の窓（x 0.27〜0.59 / y 0.34〜0.58）の中の、低彩度で明るい画素」**として
+ *   ★探します。★白斑はその窓に入るので、★**枠色で塗り潰されます。**
+ *
+ *   ★実測（★側面 8 コマ・鞍布の窓の中で「塗られる」画素）
+ *     ★型A ★63,411 ／ ★型B ★55,951 ／ ★型C ★**117,295**（★型A の 1.85 倍）
+ *
+ *   ★画面では ★1 番は白・★7 番は緑…と ★**枠色の毛布**に見えました（★目視確認済み）。
+ *   ★型 C の個性が消えるだけでなく、★毛色でも型でもないもので馬が変わって見えます。
+ *
+ * → ★**白斑を鞍布の窓の外（後躯・尾）へ移して描き直す**必要があります。
+ *   ★絵を作り直す話なので、★勝手に走らせません（★オーナー判断）。
+ * ⚠️ ★`HORSE_TYPES` からは外しません。★素材と経路は全部通してあるので、
+ *    ★描き直した型 C を置けば、★この表を戻すだけで出ます。
+ */
+const HORSE_TYPE_BY_GATE: readonly HorseType[] = [
+  'a', 'b', 'a', 'b', 'a', 'b',
+  'a', 'b', 'a', 'b', 'a', 'b',
+  'a', 'b', 'a', 'b', 'a', 'b',
+];
+const typeOf = (gate: number): HorseType => HORSE_TYPE_BY_GATE[(gate - 1) % HORSE_TYPE_BY_GATE.length] ?? 'a';
+/**
+ * ★**表に出てくる型だけ**を読みます（★2026-09-09）。
+ * ⚠️ ★使わない型まで読むと、★キャンバスと復号後の絵がそのぶん増えます。
+ *    ★実測で ★**画面が真っ黒**になったのはこれが積み上がったときです。
+ */
+const HORSE_TYPES_IN_USE: readonly HorseType[] = HORSE_TYPES.filter(
+  (t) => HORSE_TYPE_BY_GATE.includes(t));
+/**
+ * ★焼いた素材の役名の接尾。
+ * ⚠️ ★**型 A は接尾なし**です。★変えると `pickSet` と目録の戻り道が切れます。
+ */
+const roleSuffixOf = (t: HorseType): string => (t === 'a' ? '' : `-${t}`);
 /**
  * ★毛色を**焼き込んだ**画像を作る。馬体の画素だけを変換し、騎手・馬具・白斑は触らない。
  *   ⚠️ 読み込み時に 1 回だけ作ること（毎コマ画素を触ると重い）。
@@ -598,7 +664,13 @@ const SILKS_LAYOUT_WINNER: SilksLayout = {
 function silksOverlays(
   image: FrameImage, source: HighQualityHorseFrame['source'], colors: readonly SilkColors[],
   layout: SilksLayout = SILKS_LAYOUT_CROUCH,
-): readonly NonNullable<HighQualityHorseFrame['overlay']>[] {
+  /**
+   * ★**この組が受け持つ枠だけ**作ります（★2026-09-09・個体タイプ）。
+   * ⚠️ ★これが無いと、★型ごとに ★**12 頭ぶんの勝負服**を作り、
+   *    ★キャンバスが 192 枚 → ★576 枚になります（★実測: 画面が真っ黒になりました）。
+   */
+  ownsGate?: (gate: number) => boolean,
+): readonly (NonNullable<HighQualityHorseFrame['overlay']> | undefined)[] {
   const x0 = Math.round(source.x + source.width * layout.cropX);
   const y0 = Math.round(source.y);
   const width = Math.round(source.width * layout.cropW);
@@ -758,6 +830,7 @@ function silksOverlays(
   const offsetXSourcePx = x0 + cropX0;
   const offsetYSourcePx = y0 + cropY0;
   return colors.map((pair, colorIndex) => {
+    if (ownsGate !== undefined && !ownsGate(colorIndex + 1)) return undefined;
     /** ★帽子と鞍布は枠色、上着は馬ごとの色（実際の競馬と同じ形・`silkRoleOf` の注記） */
     const [capR, capG, capB] = rgbOf(pair.cap);
     const [bodyR, bodyG, bodyB] = rgbOf(pair.body);
@@ -1115,11 +1188,11 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
    *    ★以前はここが `400` の直書きで、★**桜星賞（400m）以外の 45 鞍で嘘**でした（台帳 A-8）。
    */
   const course = ovalCourse(DIST, COURSE_OPTS);
-  const model = replayPositionModel({
+  const rawModel = replayPositionModel({
     distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: homeStretchMetersOf(course), boundaries,
     // ★道中は脚質から生成する（Q-P4-38）。走破タイムからは作らない
     strategyOf: (g) => entrants[g - 1]!.strategy,
-    // ★横位置はエンジンが引いたものを読むだけ（D-071）
+    // エンジンの横位置を希望経路として読み、下の trafficPositionModel で馬間隔を保つ。
     // ★比較用の切替口（`?lane=b|c|d`）。★付けなければ現行のまま
     /**
      * ⚠️ ★**走路の形（`COURSE_SPEC`）を渡します**。
@@ -1130,6 +1203,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     pace,
     formationSeed: seed * 2654435761,
   });
+  const model = LEGACY_MOTION ? rawModel : trafficPositionModel(rawModel, COURSE_SPEC.widthM);
   const settled = result.order.map((e) => Number(e.horseId));
   if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(settled)) {
     throw new Error('位置モデルの最終順が着順と違います（D-059）');
@@ -1177,15 +1251,13 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
    *    ★申し合わせていました。★申し合わせは守られません（★台帳 B-6 と同じ形）。
    */
   const knots = knotsFor(boundaries, ownGate, model.straightMeters);
-  const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(DIST)));
+  const warp = timeWarpFor(knots, (LEGACY_MOTION ? ratesForTarget : readableRaceRates)(knots, targetDisplaySec(DIST)));
   /**
    * ★見た目の速度テーブル。描画と同じ手順（時計 → 位置モデル → 走り抜け → V2 注視点）で
    *   0.05 秒ごとに注視点を求め、時間圧縮の倍率 rate と固定物体の重みから Δ を積分する。
    *   ★左右回りで注視点は変わらないので、ここは左回りの course で求める。
    */
   const winnerGate = settled[0]!;
-  const STEP = 0.05;
-  const totalSec = RACE_INTRO_RACE_START_SEC + warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
   // ★ゴール前の展開: 先頭が残り 80m に達した瞬間の位置関係
   let finishStyle: BroadcastV2FinishStyle = 'solo';
   for (let sec = 0; sec <= warp.raceSecAt(warp.displaySec) + 1e-9; sec += 0.05) {
@@ -1201,6 +1273,23 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     (t) => model.at(t).map((h) => ({ gate: h.gate, s: h.meters, w: h.w ?? TRACK_WIDTH_M / 2 })),
     warp.raceSecAt(warp.displaySec),
   );
+  return {
+    model, warp, pace,
+    result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
+    gauge, finishPos, finishSec, finishSpeeds, dustSoil, finishStyle,
+    ...buildMotionTimeline({ model, warp, finishSec, finishStyle }, winnerGate, 1.6),
+    weightsKg: entrants.map((e) => e.weightKg),
+  };
+}
+
+/** Rebuild camera/scroll samples for a start adjustment without rebuilding the race result. */
+function buildMotionTimeline(
+  { model, warp, finishSec, finishStyle }: Pick<Built, 'model' | 'warp' | 'finishSec' | 'finishStyle'>,
+  winnerGate: number, rampSec: number,
+): Pick<Built, 'visualScroll' | 'shotChanges'> {
+  const course = ovalCourse(DIST, COURSE_OPTS);
+  const STEP = 0.05;
+  const totalSec = RACE_INTRO_RACE_START_SEC + warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
   const samples: VisualScrollSample[] = [];
   const shotChanges: { displaySec: number; from: BroadcastV2ShotId; to: BroadcastV2ShotId }[] = [];
   let lastShot: BroadcastV2ShotId | undefined;
@@ -1212,9 +1301,10 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     const visual = withFinishRunOut(at, (g) => finishSec.get(g), sec, DIST, Math.max(0, raceD - warp.displaySec) * RUNOUT_SLOW);
     const winnerDone = (at.find((h) => h.gate === winnerGate)?.meters ?? 0) >= DIST - 1e-6;
     const scene = resolveBroadcastV2Scene(course, visual.map((h) => ({
-      gate: h.gate, s: startShownMeters(h.meters, raceD), w: h.w ?? TRACK_WIDTH_M / 2, finished: h.meters >= DIST - 1e-6,
+      gate: h.gate, s: startShownMeters(h.meters, raceD, rampSec), w: h.w ?? TRACK_WIDTH_M / 2, finished: h.meters >= DIST - 1e-6,
     })), { width: W, height: H }, winnerDone, {
       finishStyle, cornerCutM: CORNER_CUT_M_WEB, raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
+      cornerTracking: !LEGACY_MOTION,
       fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
       script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
       laneAlignedFocus: laneFocusFromSearch(typeof window === 'undefined' ? '' : window.location.search),
@@ -1232,15 +1322,8 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     lastShot = scene.shot.id;
   }
   return {
-    model,
-    warp,
-    pace,
-    result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
-    gauge, finishPos, finishSec, finishSpeeds, dustSoil,
     visualScroll: buildVisualScroll(samples),
-    finishStyle,
     shotChanges,
-    weightsKg: entrants.map((e) => e.weightKg),
   };
 }
 
@@ -1311,6 +1394,7 @@ export default function RacePage(): React.JSX.Element {
   const standingsAnimRef = useRef<{ at: number; pos: Map<number, number> }>({ at: 0, pos: new Map() });
   const t0Ref = useRef(0);
   const dRef = useRef(0);
+  const auditSeekAppliedRef = useRef(false);
 
   const [seed, setSeed] = useState(42);
   /**
@@ -1347,6 +1431,15 @@ export default function RacePage(): React.JSX.Element {
    *   ⚠️ ★描画層だけの値です。★着順・位置・タイムには一切効きません（★憲法3）。
    */
   const [horseScale, setHorseScaleState] = useState(1);
+  const [horseBob, setHorseBob] = useState(1);
+  const [strideM, setStrideM] = useState(BROADCAST_STRIDE_M);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [startRampSec, setStartRampSec] = useState(1.6);
+  const [startShake, setStartShake] = useState(1);
+  useEffect(() => {
+    setHorseScale(horseScale);
+    return () => setHorseScale(1);
+  }, [horseScale]);
   const [ready, setReady] = useState(false);
   /**
    * ★**この端末では重い初期化を始めない**（★2026-09-01・オーナー決定「仮の蓋」）
@@ -1418,6 +1511,8 @@ export default function RacePage(): React.JSX.Element {
    */
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const [built, setBuilt] = useState<Built | null>(null);
+  const motionTimeline = useMemo(() => built === null ? null : startRampSec === 1.6 ? built
+    : buildMotionTimeline(built, built.result[0]!.gate, startRampSec), [built, startRampSec]);
   const [err, setErr] = useState<string | null>(null);
   const [clock, setClock] = useState(0);
   const [surface, setSurface] = useState<Surface>('turf');
@@ -1456,7 +1551,8 @@ export default function RacePage(): React.JSX.Element {
       && Math.min(window.innerWidth, window.innerHeight) <= 900,
     );
     const params = new URLSearchParams(window.location.search);
-    setDevMode(params.get('dev') === '1');
+    setDevMode(params.get('dev') === '1'
+      || (process.env.NODE_ENV === 'development' && params.get('dev') !== '0'));
     params.set('dev', '1');
     setDevHref(`?${params.toString()}`);
     window.addEventListener('resize', measure);
@@ -1773,10 +1869,18 @@ export default function RacePage(): React.JSX.Element {
         referenceHeightOverride?: number,
         silksLayout: SilksLayout = SILKS_LAYOUT_CROUCH,
         anchorsOverride?: readonly { x: number; y: number; width: number }[],
+        /**
+         * ★**この組が受け持つ枠だけ**を組みます（★2026-09-09・個体タイプ）。
+         *
+         *   ⚠️ ★これが無いと、★型ごとに ★**12 枠ぶんの毛色を焼き**、
+         *      ★キャンバスが 3 倍になります（★実測: 画面が黒いまま戻らなくなりました）。
+         *   ★受け持たない枠は空を返します。★混ぜる側はその枠を読みません。
+         */
+        ownsGate?: (gate: number) => boolean,
       ): readonly (readonly HighQualityHorseFrame[])[] => {
         const measured = images.map((image) => ({ image, source: opaqueBounds(image) }));
         const referenceHeight = referenceHeightOverride ?? Math.max(...measured.map((frame) => frame.source.height));
-        const overlays = images.map((image, index) => silksOverlays(image, measured[index]!.source, silksByGate, silksLayout));
+        const overlays = images.map((image, index) => silksOverlays(image, measured[index]!.source, silksByGate, silksLayout, ownsGate));
         /**
          * ★配置と縮尺の基準は鞍布（剛体）。
          *   - 基準点 = 鞍布中心（無ければ胴体重心）
@@ -1807,6 +1911,7 @@ export default function RacePage(): React.JSX.Element {
           return made;
         };
         return silksByGate.map((_, gateIndex) => {
+          if (ownsGate !== undefined && !ownsGate(gateIndex + 1)) return [];
           const baked = bakedFor(coatOf(gateIndex + 1));
           return measured.map((frame, frameIndex) => ({
           ...frame,
@@ -1820,6 +1925,37 @@ export default function RacePage(): React.JSX.Element {
             + flightLiftFor(frameIndex, images.length) * (imgH(frame.image) / LIFT_REFERENCE_HEIGHT_PX),
           overlay: overlays[frameIndex]?.[gateIndex],
           }));
+        });
+      };
+      /**
+       * ★**3 つの型を、枠ごとに混ぜます**（★2026-09-09）
+       *
+       *   ★`buildFrames` は ★1 組の絵から ★12 枠ぶんを作ります。★それを型ごとに 3 回まわし、
+       *   ★枠ごとに ★**その枠の型の結果**を取ります。
+       *
+       * ⚠️ ★`buildFrames` の中身は 1 行も変えていません。★接地・鞍布基準・勝負服・影の
+       *    ★決め方が型ごとにずれないようにするためです。
+       * ⚠️ ★型の絵が無ければ ★**型 A に落ちます**（★半分だけ混ざった画にしない）。
+       */
+      const buildFramesByType = (
+        byType: Readonly<Partial<Record<HorseType, readonly FrameImage[]>>>,
+        referenceHeightOverride?: number,
+        silksLayout: SilksLayout = SILKS_LAYOUT_CROUCH,
+      ): readonly (readonly HighQualityHorseFrame[])[] => {
+        const built = new Map<HorseType, readonly (readonly HighQualityHorseFrame[])[]>();
+        for (const t of HORSE_TYPES_IN_USE) {
+          const images = byType[t];
+          if (images === undefined || images.length === 0) continue;
+          /** ★型が 1 つしか無いときは全枠を受け持ちます（★型を使わない構成へ戻せるように） */
+          const only = byType.b === undefined && byType.c === undefined;
+          built.set(t, buildFrames(images, referenceHeightOverride, silksLayout, undefined,
+            only ? undefined : (gate) => typeOf(gate) === t));
+        }
+        const fallback = built.get('a') ?? [...built.values()][0];
+        if (fallback === undefined) return [];
+        return silksByGate.map((_, gateIndex) => {
+          const set = built.get(typeOf(gateIndex + 1)) ?? fallback;
+          return set[gateIndex] ?? fallback[gateIndex] ?? [];
         });
       };
       /**
@@ -1905,25 +2041,57 @@ export default function RacePage(): React.JSX.Element {
         if (manifest === null) return undefined;
         /** ★この出走頭数で実際に要る毛色だけ読みます（★12 頭なら 7 色のうち 5 色） */
         const needed = [...new Set(silksByGate.map((_, index) => coatOf(index + 1)))];
+        /**
+         * ★**型ごとに、その型の枠が実際に使う毛色だけ**読みます（★2026-09-09）
+         *
+         *   ★3 型 × 7 色を全部読むと ★21 枚。★実在する組だけなら ★**10 枚**です（★12 頭）。
+         *   ★端末の記憶量に直に効くので、★交差ではなく ★**実在する組**で引きます。
+         *
+         * ⚠️ ★`bay` は必ず入れます。★`buildFramesFromBaked` が
+         *    ★**勝負服と影を鹿毛のアトラスから作る**ためです（★無いと丸ごと空を返します）。
+         */
+        const neededFor = (t: HorseType): readonly string[] => [...new Set([
+          'bay',
+          ...silksByGate.flatMap((_, index) => (typeOf(index + 1) === t ? [coatOf(index + 1) as string] : [])),
+        ])];
         const setByRole = new Map(manifest.sets.map((set) => [set.role, set]));
         /**
          * ⚠️ ★**描く組だけ読みます。** ★焼いてあっても、★描画側に経路が無ければ読みません
          *    （★原版側と同じ規則にします — ★片方だけ読むと、★何が効いているのか分からなくなります）。
          */
-        const wantedRoles = [...neededAssets,
+        const baseRoles = [...neededAssets,
           ...(WINNER_FOLLOW_REAR ? ['winner-rear'] : []),
           ...(WINNER_POSE === 'celebrate' ? ['winner-cycle'] : [])];
+        /**
+         * ★**個体タイプの役も読みます**（★2026-09-09）。
+         *   ★台本が描く役だけを型ごとに広げます（★焼いてあっても描かない役は読みません）。
+         *   ★目録に無い型はそのまま落ちて、★その枠は型 A になります。
+         */
+        const wantedRoles = [...new Set(baseRoles.flatMap((role) => (
+          HORSE_TYPES_IN_USE.map((t) => `${role}${roleSuffixOf(t)}`).filter((r) => setByRole.has(r))
+        )))];
+        /** ★役名の末尾から型を取り出す（★型 A は接尾なし） */
+        const typeOfRole = (role: string): HorseType => (
+          role.endsWith('-b') ? 'b' : role.endsWith('-c') ? 'c' : 'a');
         const atlases = new Map<string, ReadonlyMap<string, HTMLImageElement>>();
         const shadowAtlases = new Map<string, HTMLImageElement>();
         for (const set of manifest.sets.filter((entry) => wantedRoles.includes(entry.role))) {
-          const pairs = await Promise.all(needed.map(async (coat) => {
+          /**
+           * ★型に分かれている役は ★**その型の枠の毛色だけ**。
+           * ⚠️ ★型に分かれていない役（★勝馬コマなど）は ★**全枠が使う**ので全色要ります。
+           * ⚠️ ★接尾で型を見分けています。★`-b` / `-c` で終わる役名を他に作らないこと。
+           */
+          const baseRole = set.role.replace(/-[bc]$/, '');
+          const hasVariants = HORSE_TYPES_IN_USE.some((t) => t !== 'a' && setByRole.has(`${baseRole}${roleSuffixOf(t)}`));
+          const wantedCoats = hasVariants ? neededFor(typeOfRole(set.role)) : needed;
+          const pairs = await Promise.all(wantedCoats.map(async (coat) => {
             const file = set.coats[coat];
             if (file === undefined) return null;
             const image = await loadImg(`/art/baked/${file}?v=${ASSET_VERSION}`).catch(() => null);
             return image === null ? null : [coat as string, image] as const;
           }));
           const ok = pairs.filter((e): e is readonly [string, HTMLImageElement] => e !== null);
-          if (ok.length !== needed.length) return undefined;
+          if (ok.length !== wantedCoats.length) return undefined;
           atlases.set(set.role, new Map(ok));
           /**
            * ★接地影のアトラス。
@@ -1940,10 +2108,27 @@ export default function RacePage(): React.JSX.Element {
             : set.layout === 'rear' ? SILKS_LAYOUT_REAR
               : set.layout === 'winner' ? SILKS_LAYOUT_WINNER
                 : SILKS_LAYOUT_CROUCH);
-        const of = (role: string, referenceHeightOverride?: number) => {
+        const one = (role: string, referenceHeightOverride?: number) => {
           const set = setByRole.get(role); const atlas = atlases.get(role);
           if (set === undefined || atlas === undefined) return undefined;
           return buildFramesFromBaked(set, atlas, layoutOf(set), referenceHeightOverride, shadowAtlases.get(role));
+        };
+        /**
+         * ★**3 つの型を、枠ごとに混ぜます**（★2026-09-09・原版側の `buildFramesByType` と同じ規則）
+         * ⚠️ ★型の役が無ければ ★**型 A に落ちます**（★半分だけ混ざった画にしない）。
+         */
+        const of = (role: string, referenceHeightOverride?: number) => {
+          const built = new Map<HorseType, readonly (readonly HighQualityHorseFrame[])[]>();
+          for (const t of HORSE_TYPES_IN_USE) {
+            const made = one(`${role}${roleSuffixOf(t)}`, referenceHeightOverride);
+            if (made !== undefined && made.length > 0) built.set(t, made);
+          }
+          const fallback = built.get('a') ?? [...built.values()][0];
+          if (fallback === undefined) return undefined;
+          return silksByGate.map((_, gateIndex) => {
+            const set = built.get(typeOf(gateIndex + 1)) ?? fallback;
+            return set[gateIndex] ?? fallback[gateIndex] ?? [];
+          });
         };
         /**
          * ★**勝馬コマの基準高さ**（`buildFrames` の呼び出し側にあった補正と同じ意味）。
@@ -2222,6 +2407,33 @@ export default function RacePage(): React.JSX.Element {
         loadImg(`/art/starting-gate-front-open-v1.png?v=${ASSET_VERSION}`).catch(() => null),
       ]);
       const frontV3 = await loadNativeSet('horse-jockey-diag-front-v4', 'horse-jockey-diag-front-v3');
+      /**
+       * ★**個体タイプ B・C の原版**（★2026-09-09）。★PC の既定はこちらの経路です（R-15）。
+       * ⚠️ ★焼いた素材だけ差し替えて満足した失敗を 2026-09-08 にやっています。★両方直します。
+       * ⚠️ ★無ければ `undefined` のまま。★その型の枠は ★**型 A に落ちます**。
+       */
+      /**
+       * ★`?types=0` で型を切ります（★戻り道・★読み込み量を A/B で測るため）。
+       *   ★`?types=side` / `?types=front` は ★片方だけ（★不具合の切り分け用）。
+       */
+      const typesParam = new URLSearchParams(window.location.search).get('types');
+      const wantTypes = typesParam !== '0';
+      const wantSideTypes = wantTypes && typesParam !== 'front';
+      const wantFrontTypes = wantTypes && typesParam !== 'side';
+      /** ⚠️ ★読めなかった型は ★**鍵ごと置きません**（★型 A に落ちます） */
+      const loadByType = async (want: boolean, prefixOf: (t: HorseType) => string):
+      Promise<Partial<Record<HorseType, readonly FrameImage[]>>> => {
+        const out: Partial<Record<HorseType, readonly FrameImage[]>> = {};
+        if (!want) return out;
+        for (const t of HORSE_TYPES_IN_USE) {
+          if (t === 'a') continue;
+          const got = await loadNativeSet(prefixOf(t));
+          if (got !== undefined) out[t] = got;
+        }
+        return out;
+      };
+      const sideByType = await loadByType(wantSideTypes, (t) => `horse-jockey-side-v8${t}`);
+      const frontByType = await loadByType(wantFrontTypes, (t) => `horse-jockey-diag-front-v4${t}`);
       // ★俯瞰は v2（271×724 の低解像度・一度も作り直していない）のままで、
       //   オーナー評「ここで一気にクオリティが下がる」の当のカットだった（2026-08-20）。
       //   真横 v7 を参照に作り直した v3 が揃えばそれを使う。
@@ -2240,9 +2452,16 @@ export default function RacePage(): React.JSX.Element {
       const sideCycle: readonly FrameImage[] = midsReady
         ? sidePoses.flatMap((pose, index) => [pose, midImages[index]!])
         : sidePoses;
-      const sideHighQuality = bakedLibs?.['side-v6'] ?? buildFrames(sideCycle);
+      /**
+       * ⚠️ ★**中間コマ（`midsReady`）のときは型を混ぜません。**
+       *    ★型 A だけ 16 コマ・B/C は 8 コマになり、★枠ごとにコマ数が食い違うためです。
+       *    ★`USE_MID_FRAMES` は現在 false なので、★実際にはここは通りません。
+       */
+      const sideHighQuality = bakedLibs?.['side-v6'] ?? (midsReady
+        ? buildFrames(sideCycle)
+        : buildFramesByType({ a: sideCycle, ...sideByType }));
       const diagFrontHighQuality = bakedLibs?.['diag-front-v2'] ?? (frontV3 !== undefined
-        ? buildFrames(frontV3, undefined, SILKS_LAYOUT_FRONT)
+        ? buildFramesByType({ a: frontV3, ...frontByType }, undefined, SILKS_LAYOUT_FRONT)
         : buildFrames(await fallbackSet('horse-jockey-diag-front-v2')));
       /**
        * ★**この台本が描かない組は、組みません**（2026-09-03・実測）。
@@ -2537,7 +2756,9 @@ export default function RacePage(): React.JSX.Element {
       .filter((row) => row.place >= 1 && row.place <= CLIMAX_LEAD_COUNT)
       .map((row) => row.gate);
     /** ★発走イージング（描画のみ・全馬同じ係数）。★全馬に同じ量なので前後関係は変わりません */
-    const easedAt0 = visualAt.map((horse) => ({ ...horse, meters: startShownMeters(horse.meters, raceD) }));
+    const easedAt0 = visualAt.map((horse) => ({ ...horse,
+      meters: startShownMeters(horse.meters, raceD, startRampSec),
+    }));
     /**
      * ★**最後の直線の攻防（表示専用）**（指示書 §4・`climax-choreography.ts`）
      *
@@ -2618,6 +2839,7 @@ export default function RacePage(): React.JSX.Element {
         finished: horse.meters >= DIST - 1e-6,
       })), { width: W, height: H }, winnerShotNow, {
         finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
+        cornerTracking: !LEGACY_MOTION,
         raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
         fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
         script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
@@ -2734,16 +2956,15 @@ export default function RacePage(): React.JSX.Element {
        *   → 1完歩 ≈ 7m（競走速度 16m/s で約 2.3 完歩/秒）。速い馬ほど脚が速く回り、失速も脚に出る。
        *   位相の個体差 `gate * 2.96` は据え置き。
        */
-      /**
-       * ★見た目の周期。実馬は 1 完歩 ≈7m（2.3 完歩/秒）だが、画面では跳ねて見える（ユーザー指摘「ウサギ」）。
-       *   合格に近いと評価されたゴール後の走り（≈1.6〜1.8 完歩/秒）に合わせ 9m とする。
-       */
-      const STRIDE_M = BROADCAST_STRIDE_M;
+      // 開発卓の完歩距離。既定は BROADCAST_STRIDE_M、素材との滑りを見ながら調整する。
+      const STRIDE_M = strideM;
       /**
        * ★見た目の進行距離 = 真の位置 + Δ（`visual-scroll.ts`）。時間圧縮を打ち消し、
        *   背景の流れと脚の周期を常に実馬の速さにする。ゴール前は Δ=0（決勝線と馬が一致）。
        */
-      const visualDelta = built.visualScroll.deltaAt(d);
+      const visualScroll = (motionTimeline ?? built).visualScroll;
+      const visualDelta = visualScroll.deltaAt(d);
+      const gaitDelta = visualDelta - visualScroll.deltaAt(RACE_INTRO_RACE_START_SEC);
       const metersByGate = new Map(easedAt.map((horse) => [horse.gate, horse.meters]));
       /**
        * ★被写体ブラー用の速度（m/s・設計 1-2）は **レース時計での実走速**を使います。
@@ -2778,7 +2999,7 @@ export default function RacePage(): React.JSX.Element {
        */
       const shakeT = raceD > 0 && raceD < 0.7 ? raceD / 0.7 : -1;
       if (shakeT >= 0) {
-        const amp = 5 * (1 - shakeT) * (1 - shakeT);
+        const amp = 5 * startShake * (1 - shakeT) * (1 - shakeT);
         ctx.save();
         ctx.translate(Math.sin(raceD * 61) * amp, Math.cos(raceD * 47) * amp * 0.6);
       }
@@ -2793,7 +3014,7 @@ export default function RacePage(): React.JSX.Element {
        * 0.28秒の重ね合わせで馬群が二重になる（表示22秒で確認）。
        * 通常の切替はハードカット。指定された閃光だけを残す。
        */
-      const change = built.shotChanges.find((c) => c.displaySec <= d && d - c.displaySec < 0.3
+      const change = (motionTimeline ?? built).shotChanges.find((c) => c.displaySec <= d && d - c.displaySec < 0.3
         && c.to === scene.shot.id
         // A shared view label does not mean a shared camera: blending the wide
         // pack and close contest shots produces two overlapping copies of every horse.
@@ -2805,12 +3026,13 @@ export default function RacePage(): React.JSX.Element {
         libraries,
         fieldSize: FIELD,
         directionalSets: art.directionalReady,
-        // ★ゲート待機中（raceD=0）は脚を体の下に畳んだ支持局面 pose04（index 3）で静止させる
-        frameOf: (gate) => raceD <= 0 ? 3
-          : Math.floor((((metersByGate.get(gate) ?? 0) + visualDelta) / STRIDE_M) * 8 + gate * 2.96) % 8,
+        // 待機中の位相から連続して動き出し、最初の1完歩で馬ごとの位相差を開く。
+        frameOf: (gate) => Math.floor(raceGaitPhase(raceD <= 0 ? 0
+          : (metersByGate.get(gate) ?? 0) + gaitDelta, gate, STRIDE_M) * 8),
         // ★位相（0〜1）: 8 コマ・16 コマどちらの素材でも同じ周期で回る。待機中は pose04 の位相
-        phaseOf: (gate) => raceD <= 0 ? 3.5 / 8
-          : ((((metersByGate.get(gate) ?? 0) + visualDelta) / STRIDE_M) + gate * 0.37) % 1,
+        phaseOf: (gate) => raceGaitPhase(raceD <= 0 ? 0
+          : (metersByGate.get(gate) ?? 0) + gaitDelta, gate, STRIDE_M),
+        horseBob,
         frameRoleOf,
         surface,
         condition: trackCondition,
@@ -3325,17 +3547,24 @@ export default function RacePage(): React.JSX.Element {
         }
       }
     }
-  }, [built, ownGate, surface, trackCondition, turn, renderer, showEntryBoard]);
+  }, [built, ownGate, surface, trackCondition, turn, renderer, showEntryBoard,
+    horseScale, horseBob, strideM, startRampSec, startShake, motionTimeline]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     /** ★開発卓を出すときはバッジも出す。★`?badge=1` で単独でも出せる（上の注記） */
     rendererBadgeHidden = params.get('badge') === '0'
       || !(params.get('dev') === '1' || params.get('badge') === '1');
-    const auditSec = Number(params.get('auditSec'));
-    if (Number.isFinite(auditSec) && auditSec >= 0) dRef.current = auditSec;
+    if (ready && built !== null && !auditSeekAppliedRef.current) {
+      auditSeekAppliedRef.current = true;
+      const auditSec = Number(params.get('auditSec'));
+      if (params.has('auditSec') && Number.isFinite(auditSec) && auditSec >= 0) {
+        dRef.current = auditSec;
+        setSeekPos(auditSec);
+      }
+    }
     render(dRef.current);
-  }, [render, ready]);
+  }, [render, ready, built]);
 
   /**
    * ★撮影用のシーク（開発用）。
@@ -3372,9 +3601,10 @@ export default function RacePage(): React.JSX.Element {
 
   useEffect(() => {
     if (!playing || built === null) return;
-    t0Ref.current = performance.now() - dRef.current * 1000;
+    const fromSec = dRef.current;
+    t0Ref.current = performance.now();
     const loop = (): void => {
-      const d = (performance.now() - t0Ref.current) / 1000;
+      const d = fromSec + (performance.now() - t0Ref.current) / 1000 * playbackRate;
       // ゴール後はランアウト→勝者紹介→正式着順まで5.2秒確保する。
       const totalDisplaySec = RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
       if (d >= totalDisplaySec) {
@@ -3392,7 +3622,7 @@ export default function RacePage(): React.JSX.Element {
     };
     rafRef.current = requestAnimationFrame(loop);
     return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
-  }, [playing, built, render]);
+  }, [playing, built, render, playbackRate]);
 
   /**
    * ★**ブラウザの全画面に入る**（★2026-09-02・オーナー要望）。
@@ -3675,6 +3905,47 @@ export default function RacePage(): React.JSX.Element {
         </div>
       )}
       {err !== null && <p style={{ color: '#e06a4a', fontWeight: 'bold' }}>★{err}</p>}
+      {devMode && !smallScreen && (
+        <section aria-label="レースの動き調整" style={{ padding: 12, border: '1px solid #4a453d', marginTop: 12 }}>
+          <b>レースの動き調整</b>
+          <p style={{ fontSize: 12, margin: '6px 0 12px' }}>
+            停止中もその場で反映します。上下動は 0 で全コマ接地、1 で現在の浮き。
+            再生速度は映像全体、1完歩は脚の回転に効きます。
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
+            {([
+              ['馬の大きさ', horseScale, setHorseScaleState, 0.4, 2.5, 0.05, '倍'],
+              ['上下動・浮き', horseBob, setHorseBob, 0, 2, 0.05, '倍'],
+              ['1完歩', strideM, setStrideM, 2.5, 12, 0.02, 'm'],
+              ['再生速度', playbackRate, setPlaybackRate, 0.1, 2, 0.05, '倍'],
+              ['発走の加速時間', startRampSec, setStartRampSec, 0.2, 3, 0.1, '秒'],
+              ['発走時のカメラ揺れ', startShake, setStartShake, 0, 2, 0.1, '倍'],
+            ] as const).map(([label, value, update, min, max, step, unit]) => (
+              <label key={label} style={{ fontSize: 13 }}>
+                {label} <output>{value.toFixed(2)} {unit}</output>
+                <input aria-label={label} type="range" min={min} max={max} step={step} value={value}
+                  onChange={(e) => update(Number(e.target.value))}
+                  style={{ display: 'block', width: 200, marginTop: 6 }} />
+              </label>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+            <button type="button" onClick={() => {
+              setHorseScaleState(1); setHorseBob(1); setStrideM(BROADCAST_STRIDE_M);
+              setPlaybackRate(1); setStartRampSec(1.6); setStartShake(1);
+            }}>調整を初期値に戻す</button>
+            <button type="button" disabled={!built} onClick={() => seekTo(RACE_INTRO_RACE_START_SEC - 0.2)}>ゲート発走へ</button>
+            <button type="button" disabled={!built} onClick={() => seekTo(RACE_INTRO_RACE_START_SEC + 2)}>発走後の位置取りへ</button>
+            {(['first-corner-front', 'fourth-corner-front'] as const).map((id, i) => {
+              const change = motionTimeline?.shotChanges.find((c) => c.to === id);
+              return <button key={id} type="button" disabled={!change}
+                onClick={() => { if (change) seekTo(change.displaySec + 0.1); }}>
+                {i === 0 ? '最初のコーナーへ' : '4コーナーへ'}
+              </button>;
+            })}
+          </div>
+        </section>
+      )}
       <div className="race-controls" style={{ display: devMode ? 'flex' : 'none', gap: 16, alignItems: 'center', flexWrap: 'wrap', margin: '8px 0' }}>
         <button
           type="button"
@@ -3693,14 +3964,6 @@ export default function RacePage(): React.JSX.Element {
           *   ★1.00 が従来どおり。★描画層の倍率なので ★**着順・位置には効きません**（★憲法3）。
           *   ★デフォルメの馬は写真の馬と体高が違うので、★ここで合わせます。
           */}
-        <label style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, color: '#efe9dc' }}>
-          ★馬の大きさ {horseScale.toFixed(2)} 倍
-          <input
-            type="range" min={0.4} max={2.5} step={0.05} value={horseScale}
-            onChange={(e) => { const v = Number(e.target.value); setHorseScaleState(v); setHorseScale(v); }}
-            style={{ width: 180 }}
-          />
-        </label>
         <button
           type="button" onClick={resetToStart}
           style={{ padding: '8px 14px', cursor: 'pointer', background: '#3a3630', color: '#efe9dc', border: 0 }}
@@ -3781,6 +4044,7 @@ export default function RacePage(): React.JSX.Element {
             </button>
           ))}
           <input
+            aria-label="撮影用シーク"
             type="range" min={0} max={totalDisplaySec} step={0.05} value={Math.min(seekPos, totalDisplaySec)}
             onChange={(e) => seekTo(Number(e.target.value))}
             style={{ flex: 1, minWidth: 240, accentColor: '#c8a24a' }}
@@ -3839,7 +4103,7 @@ export default function RacePage(): React.JSX.Element {
         {renderer === 'v2'
           ? <>★Broadcast V2: コース座標 (s, w) を透視カメラで投影し、区間ごとに中継カメラを切り替えています（旧版は <code>?renderer=legacy</code>）。<br /></>
           : <>★旧固定2Dカメラの前景・中景・後景3帯で、距離差とレーンを表示しています（比較用 legacy）。<br /></>}
-        ★横位置と距離ロスはレースエンジンが決めた値を読み、描画側では着順を変更しません。
+        馬同士の間隔を保つよう横の進路を調整しています。着順・走破タイムはレースエンジンの確定結果です。
       </p>
       )}
     </main>

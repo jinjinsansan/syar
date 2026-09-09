@@ -32,15 +32,49 @@ mkdirSync(`${OUT}/plain`, { recursive: true });
 
 const browser = await launch({ port: 9451, width: 1400, height: 950, timeoutMs: 20000 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const click = (t) => browser.evaluate(`(function(){var b=[].slice.call(document.querySelectorAll('button')).filter(function(x){return x.textContent.indexOf(${JSON.stringify(t)})>=0;});if(b[0]){b[0].click();return true;}return false;})()`);
+/**
+ * ⚠️ ★**文字の完全一致で押します。** ★部分一致は「ほかのコースを観る」を掴みます（★2026-09-09）。
+ */
+const click = (t) => browser.evaluate(`(function(){var b=[].slice.call(document.querySelectorAll('button')).filter(function(x){return x.textContent.trim()===${JSON.stringify(t)};});if(b[0]){b[0].click();return true;}return false;})()`);
 try {
   await browser.send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 950, deviceScaleFactor: 1, mobile: false });
-  await browser.goto('http://localhost:3210/race?dev=1', "!!document.querySelector('canvas')", { timeoutMs: 120000, settleMs: 4000 });
+  /** ★`--url` で開き先を変えられます（★`?types=0` との A/B 用・★既定は本番と同じ経路） */
+  await browser.goto(String(arg('url', 'http://localhost:3210/race?dev=1')), "!!document.querySelector('canvas')", { timeoutMs: 120000, settleMs: 4000 });
   await browser.send('Page.bringToFront');
-  for (let i = 0; i < 30; i += 1) {
-    await sleep(4000);
-    const t = await browser.evaluate("[].slice.call(document.querySelectorAll('button')).map(function(x){return x.textContent.trim();}).slice(0,1).join('')");
-    if (String(t).indexOf('読み込み中') < 0) break;
+  /**
+   * ⚠️ ★**「観る」が出るまで待ちます**（★2026-09-09・直しました）。
+   *
+   *   ★以前は ★**先頭のボタンの文字**が「読み込み中」でないことを見ていました。
+   *   ★ところが `?dev=1` では ★先頭が「調整を初期値に戻す」（開発用の操作）になり、
+   *   ★**素材を読み終える前に抜けて**しまいます。★素材が増えた日に、
+   *   ★**画面が真っ黒のまま 3 コマ撮れて**しまいました。
+   * → ★押す当のボタンそのものを待ちます。
+   */
+  /**
+   * ⚠️ ★**「観る」は完全一致で探します**（★2026-09-09）。
+   *    ★同じ画面に ★**「ほかのコースを観る」**があり、★部分一致だと ★そちらを押して
+   *    ★**コース一覧が開くだけ**でした（★キャンバスは真っ黒のまま 3 コマ撮れました）。
+   *    ★素材を読み終える前は ★「読み込み中…」という別の文字になります。
+   */
+  /**
+   * ⚠️ ★**PC では入場カード（「観る」）が出ません**（★2026-09-09 に実測して分かりました）。
+   *    ★PC の画面に出るのは ★**開発用の操作**だけです。★だから
+   *    ★**実際に使う撮影用シークのつまみ**が出るまで待ちます。
+   *
+   *    ★以前は「観る」を ★**部分一致**で探していました。★同じ画面の
+   *    ★「ほかのコースを観る」を掴んで ★**コース一覧を開くだけ**になり、
+   *    ★キャンバスが真っ黒のまま 3 コマ撮れました。
+   */
+  let ready = false;
+  for (let i = 0; i < 90; i += 1) {
+    const n = await browser.evaluate("[].slice.call(document.querySelectorAll('input[type=range]')).filter(function(x){return Number(x.max)>30;}).length");
+    if (Number(n) > 0) { ready = true; break; }
+    await sleep(2000);
+  }
+  if (!ready) {
+    console.error('★★撮影用シークのつまみが出ませんでした（★180 秒）— ★素材が組めていません');
+    await browser.close();
+    process.exit(1);
   }
   /**
    * ⚠️ ★**「観る」を押さないとレース画面が始まりません**（★2026-09-09）。
@@ -51,7 +85,22 @@ try {
    *    ★開発側は button として押そうとして失敗し続けました（★戻り値 false）。
    * → ★`?dev=1` を付けて開きます。
    */
-  await click('観る'); await sleep(2500);
+  /**
+   * ★**PC と携帯で、始め方が違います**（★2026-09-09・実測）。
+   *   ★携帯 … 入場カードの ★「観る」
+   *   ★PC  … 入場カードが出ないので、★開発用の ★「演出開始」
+   * ⚠️ ★どちらも押さないと ★**キャンバスは真っ黒のまま**で、
+   *    ★それでもシークは動くので ★**黒いコマが撮れてしまいます**。
+   */
+  /** ⚠️ ★つまみは素材より先に出ます。★早く押すと効きません（★実測）。★少し置いてから押します */
+  await sleep(8000);
+  const started = (await click('観る')) === true || (await click('演出開始')) === true;
+  if (!started) {
+    console.error('★★レースを始められませんでした（「観る」も「演出開始」も押せません）');
+    await browser.close();
+    process.exit(1);
+  }
+  await sleep(3000);
   await click('停止'); await sleep(500);
   /**
    * ★**シークで 1 コマずつ出します**（★再生しながら撮ると等速になりません）。
@@ -101,5 +150,19 @@ try {
     note: '★レースの表示秒 1 秒 = 映像 1 秒（等速）。★書き出し倍率 1.0',
     frames,
   }, null, 1));
-  console.log(`★${n} コマ（★表示秒 ${FROM}〜${TO}・${FPS}fps・★等速）→ ${OUT}/plain`);
+  /**
+   * ⚠️ ★**真っ黒なコマを「撮れた」と言わない**（★2026-09-09・実際にやりました）。
+   *    ★レースを始め損ねてもシークは動くので、★黒いまま所定の枚数が撮れます。
+   */
+  const dark = await browser.evaluate(`(function(){
+    var c=document.querySelector('canvas'); var g=c.getContext('2d');
+    var d=g.getImageData(0,0,c.width,c.height).data; var s=0;
+    for(var i=0;i<d.length;i+=4000){ s+=d[i]+d[i+1]+d[i+2]; }
+    return s/(d.length/4000)/3;
+  })()`);
+  if (Number(dark) < 8) {
+    console.error(`★★真っ黒でした（★平均輝度 ${Number(dark).toFixed(1)}）— ★レースが始まっていません。★出しません`);
+    process.exit(1);
+  }
+  console.log(`★${n} コマ（★表示秒 ${FROM}〜${TO}・${FPS}fps・★等速・★平均輝度 ${Number(dark).toFixed(0)}）→ ${OUT}/plain`);
 } finally { await browser.close(); }

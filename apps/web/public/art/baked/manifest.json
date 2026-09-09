@@ -349,6 +349,344 @@
       "shadow": "diag-front-v2-shadow.webp"
     },
     {
+      "role": "side-v6-b",
+      "prefix": "horse-jockey-side-v8b",
+      "layout": "crouch",
+      "scale": 1,
+      "nativeReferenceHeight": 507,
+      "referenceHeight": 507,
+      "nativeCanvasHeight": 576,
+      "atlas": {
+        "width": 7146,
+        "height": 507
+      },
+      "frames": [
+        {
+          "x": 0,
+          "y": 0,
+          "w": 903,
+          "h": 456,
+          "anchor": {
+            "x": 444,
+            "y": 209.5,
+            "width": 153
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 29,
+            "y": 21,
+            "width": 903,
+            "height": 456
+          }
+        },
+        {
+          "x": 903,
+          "y": 0,
+          "w": 915,
+          "h": 478,
+          "anchor": {
+            "x": 448,
+            "y": 219.5,
+            "width": 167
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 16,
+            "y": 39,
+            "width": 915,
+            "height": 478
+          }
+        },
+        {
+          "x": 1818,
+          "y": 0,
+          "w": 901,
+          "h": 481,
+          "anchor": {
+            "x": 436.5,
+            "y": 220.5,
+            "width": 164
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 31,
+            "y": 38,
+            "width": 901,
+            "height": 481
+          }
+        },
+        {
+          "x": 2719,
+          "y": 0,
+          "w": 889,
+          "h": 482,
+          "anchor": {
+            "x": 441.5,
+            "y": 219,
+            "width": 158
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 35,
+            "y": 45,
+            "width": 889,
+            "height": 482
+          }
+        },
+        {
+          "x": 3608,
+          "y": 0,
+          "w": 899,
+          "h": 471,
+          "anchor": {
+            "x": 441,
+            "y": 216.5,
+            "width": 157
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 30,
+            "y": 39,
+            "width": 899,
+            "height": 471
+          }
+        },
+        {
+          "x": 4507,
+          "y": 0,
+          "w": 870,
+          "h": 497,
+          "anchor": {
+            "x": 417.5,
+            "y": 219,
+            "width": 150
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 57,
+            "y": 31,
+            "width": 870,
+            "height": 497
+          }
+        },
+        {
+          "x": 5377,
+          "y": 0,
+          "w": 872,
+          "h": 507,
+          "anchor": {
+            "x": 426,
+            "y": 221.5,
+            "width": 151
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 49,
+            "y": 26,
+            "width": 872,
+            "height": 507
+          }
+        },
+        {
+          "x": 6249,
+          "y": 0,
+          "w": 897,
+          "h": 442,
+          "anchor": {
+            "x": 439,
+            "y": 203,
+            "width": 149
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 31,
+            "y": 28,
+            "width": 897,
+            "height": 442
+          }
+        }
+      ],
+      "coats": {
+        "bay": "side-v6-b-bay.webp",
+        "chestnut": "side-v6-b-chestnut.webp",
+        "liver-chestnut": "side-v6-b-liver-chestnut.webp",
+        "dark-bay": "side-v6-b-dark-bay.webp",
+        "seal-brown": "side-v6-b-seal-brown.webp",
+        "blue-black": "side-v6-b-blue-black.webp",
+        "grey": "side-v6-b-grey.webp"
+      },
+      "shadow": "side-v6-b-shadow.webp"
+    },
+    {
+      "role": "diag-front-v2-b",
+      "prefix": "horse-jockey-diag-front-v4b",
+      "layout": "front",
+      "scale": 1,
+      "nativeReferenceHeight": 517,
+      "referenceHeight": 517,
+      "nativeCanvasHeight": 576,
+      "atlas": {
+        "width": 3366,
+        "height": 517
+      },
+      "frames": [
+        {
+          "x": 0,
+          "y": 0,
+          "w": 486,
+          "h": 461,
+          "anchor": {
+            "x": 297,
+            "y": 179.5,
+            "width": 255
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 16,
+            "y": 22,
+            "width": 486,
+            "height": 461
+          }
+        },
+        {
+          "x": 486,
+          "y": 0,
+          "w": 403,
+          "h": 496,
+          "anchor": {
+            "x": 231.5,
+            "y": 193,
+            "width": 266
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 80,
+            "y": 19,
+            "width": 403,
+            "height": 496
+          }
+        },
+        {
+          "x": 889,
+          "y": 0,
+          "w": 400,
+          "h": 510,
+          "anchor": {
+            "x": 248,
+            "y": 198.5,
+            "width": 235
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 50,
+            "y": 17,
+            "width": 400,
+            "height": 510
+          }
+        },
+        {
+          "x": 1289,
+          "y": 0,
+          "w": 363,
+          "h": 517,
+          "anchor": {
+            "x": 201.5,
+            "y": 201.5,
+            "width": 246
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 107,
+            "y": 16,
+            "width": 363,
+            "height": 517
+          }
+        },
+        {
+          "x": 1652,
+          "y": 0,
+          "w": 382,
+          "h": 510,
+          "anchor": {
+            "x": 224.5,
+            "y": 198.5,
+            "width": 250
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 86,
+            "y": 17,
+            "width": 382,
+            "height": 510
+          }
+        },
+        {
+          "x": 2034,
+          "y": 0,
+          "w": 430,
+          "h": 471,
+          "anchor": {
+            "x": 280.5,
+            "y": 183.5,
+            "width": 256
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 34,
+            "y": 22,
+            "width": 430,
+            "height": 471
+          }
+        },
+        {
+          "x": 2464,
+          "y": 0,
+          "w": 444,
+          "h": 461,
+          "anchor": {
+            "x": 296.5,
+            "y": 179.5,
+            "width": 250
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 13,
+            "y": 22,
+            "width": 444,
+            "height": 461
+          }
+        },
+        {
+          "x": 2908,
+          "y": 0,
+          "w": 458,
+          "h": 481,
+          "anchor": {
+            "x": 245.5,
+            "y": 187,
+            "width": 236
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 58,
+            "y": 20,
+            "width": 458,
+            "height": 481
+          }
+        }
+      ],
+      "coats": {
+        "bay": "diag-front-v2-b-bay.webp",
+        "chestnut": "diag-front-v2-b-chestnut.webp",
+        "liver-chestnut": "diag-front-v2-b-liver-chestnut.webp",
+        "dark-bay": "diag-front-v2-b-dark-bay.webp",
+        "seal-brown": "diag-front-v2-b-seal-brown.webp",
+        "blue-black": "diag-front-v2-b-blue-black.webp",
+        "grey": "diag-front-v2-b-grey.webp"
+      },
+      "shadow": "diag-front-v2-b-shadow.webp"
+    },
+    {
       "role": "diag-rear-v2",
       "prefix": "horse-jockey-diag-rear-v5",
       "layout": "rear",

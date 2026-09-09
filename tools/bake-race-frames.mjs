@@ -75,6 +75,18 @@ const SETS = [
    */
   { role: 'side-v6', layout: 'crouch', prefix: pickSet('horse-jockey-side-v8', 'horse-jockey-side-v7', 'horse-jockey-side-v6') },
   { role: 'diag-front-v2', layout: 'front', prefix: pickSet('horse-jockey-diag-front-v4', 'horse-jockey-diag-front-v3', 'horse-jockey-diag-front-v2') },
+  /**
+   * ★**個体タイプ B・C**（★2026-09-09）。★育成・繁殖ゲームなので見た目に個性が要ります。
+   *
+   *   ⚠️ ★**台本 v6 が実際に描く 2 役だけ**に足します（★側面 53% ／ ★斜め前 47%）。
+   *      ★斜め後ろ・俯瞰は 1 コマも描かれないので、★型を増やしても重くなるだけです。
+   *   ⚠️ ★役名の末尾 `-b` / `-c` が型です。★型 A は末尾なし（★戻り道を切らないため）。
+   */
+  { role: 'side-v6-b', layout: 'crouch', prefix: pickSet('horse-jockey-side-v8b') },
+  /** ⚠️ ★型 C は止めています（★上と同じ理由）。★描き直したら戻します */
+  // { role: 'side-v6-c', layout: 'crouch', prefix: pickSet('horse-jockey-side-v8c') },
+  { role: 'diag-front-v2-b', layout: 'front', prefix: pickSet('horse-jockey-diag-front-v4b') },
+  // { role: 'diag-front-v2-c', layout: 'front', prefix: pickSet('horse-jockey-diag-front-v4c') },
   { role: 'diag-rear-v2', layout: 'rear', prefix: pickSet('horse-jockey-diag-rear-v5', 'horse-jockey-diag-rear-v4', 'horse-jockey-diag-rear-v2') },
   { role: 'high-diag-v2', layout: 'rear', prefix: pickSet('horse-jockey-high-diag-v4', 'horse-jockey-high-diag-v3', 'horse-jockey-high-diag-v2') },
   { role: 'winner-rear', layout: 'rear', prefix: pickSet('horse-jockey-winner-rear-v1') },

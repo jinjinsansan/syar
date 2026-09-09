@@ -23,13 +23,28 @@ const ART = 'apps/web/public/art';
 const TYPES = 'apps/web/public/rig-lab-assets/types';
 /**
  * ★どの型を原版にするか。
- * ⚠️ ★本番の焼き工程は ★**1 体型 × 毛色 7 色**という作りです。
- *    ★個体タイプ（3 体型）を本番へ通すには、★向こうの `SETS` を増やす必要があります。
- *    ★まずは ★**型 A を代表**として通し、★動くことを確かめてから増やします。
+ *
+ * ★**個体タイプ 3 種を全部出します**（★2026-09-09）。
+ *   ★型A がっしり・白なし ／ ★型B 細身・顔と四肢の白 ／ ★型C ずんぐり・胴の大きな白斑
+ *   ★見分けやすさは実測済み（★A↔B 34.4% / A↔C 36.1% / B↔C 42.7%・★合格線 30.5%）。
+ *
+ * ⚠️ ★出すのは ★**台本 v6 が実際に描く 2 役だけ**です（★側面 53% ／ ★斜め前 47%）。
+ *    ★斜め後ろ・俯瞰は台本が 1 コマも描かないので、★型を増やしても ★重くなるだけです。
+ *
+ * ⚠️ ★型 A の版名は変えません（`-v8` / `-v4`）。★変えると `pickSet` の戻り道が切れます。
  */
 const PUBLISH = [
   { from: 'a', to: 'horse-jockey-side-v8' },
   { from: 'a-front', to: 'horse-jockey-diag-front-v4' },
+  { from: 'b', to: 'horse-jockey-side-v8b' },
+  { from: 'b-front', to: 'horse-jockey-diag-front-v4b' },
+  /**
+   * ⚠️ ★**型 C は止めています**（★2026-09-09・`REPORT_P4_HORSE_TYPES_IN_RACE_20260909.md`）。
+   *    ★白斑が ★**鞍布の窓に入り、枠色で塗り潰されます**（★実測: 塗られる画素が型A の 1.85 倍）。
+   *    ★白斑を後躯・尾へ移して描き直したら、★この 2 行を戻します。
+   */
+  // { from: 'c', to: 'horse-jockey-side-v8c' },
+  // { from: 'c-front', to: 'horse-jockey-diag-front-v4c' },
 ];
 
 /**
