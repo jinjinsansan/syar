@@ -18,6 +18,7 @@ import {
 import {
   DEMO_CONTEST_GAMMA, finishReplayAt, finishCrossDisplaySec, raceTotalDisplaySec,
   ovalCourse, replayPositionModel, finalOrderOf,
+  trafficPositionModel, readableRaceRates,
   knotsFor, ratesForTarget, targetDisplaySec, timeWarpFor, withFinishRunOut, finishSpeedsOf,
   broadcastV2StartLagM, broadcastV2FinishStyleOf, resolveBroadcastV2Scene,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT, LANE_ALIGNED_FOCUS_DEFAULT,
@@ -115,7 +116,7 @@ export function buildAuditRace(opts = {}) {
   const { pace } = paceOf(entrants, balance);
   const boundaries = replayOf(result, (g) => entrants[g - 1].strategy, pace);
   if (!finalOrderMatches(result, boundaries)) throw new Error('★D-059: 着順が確定着順と違う');
-  const model = replayPositionModel({
+  const rawModel = replayPositionModel({
     distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
     strategyOf: (g) => entrants[g - 1].strategy, pace, formationSeed: seed * 2654435761,
     /** ★横位置も同じ形を見ます（`page.tsx` と同じ引数の並び） */
@@ -123,12 +124,13 @@ export function buildAuditRace(opts = {}) {
       ? laneAt(gate, FIELD, metersLeft, DIST, seed)
       : laneAt(gate, FIELD, metersLeft, DIST, seed, spec.widthM, undefined, spec)),
   });
+  const model = opts.legacyMotion === true ? rawModel : trafficPositionModel(rawModel, course.widthM);
   if (JSON.stringify(finalOrderOf(model)) !== JSON.stringify(result.order.map((e) => Number(e.horseId)))) {
     throw new Error('★D-059: 位置モデルの最終順が着順と違う');
   }
   return {
     seed, course, entrants, result, boundaries, model, pace, DIST, FIELD, balance, surface, trackCondition,
-    ...(spec === undefined ? {} : { spec }), turn,
+    ...(spec === undefined ? {} : { spec }), turn, legacyMotion: opts.legacyMotion === true,
   };
 }
 
@@ -157,7 +159,7 @@ const startShownMeters = (meters, raceDisplaySec) =>
  */
 export function auditClock(built, ownGate = RACE_DEFAULTS.ownGate) {
   const knots = knotsFor(built.boundaries, ownGate, built.model.straightMeters);
-  const warp = timeWarpFor(knots, ratesForTarget(knots, targetDisplaySec(built.DIST)));
+  const warp = timeWarpFor(knots, (built.legacyMotion ? ratesForTarget : readableRaceRates)(knots, targetDisplaySec(built.DIST)));
   const finishSec = new Map(built.boundaries.map((b) => [b.gate, b.finishSec]));
   let finishStyle = 'solo';
   for (let sec = 0; sec <= warp.raceSecAt(warp.displaySec) + 1e-9; sec += 0.05) {
@@ -256,6 +258,7 @@ export function auditSceneAt(built, clock, displaySec, viewport = { width: 1280,
     ...(replay.active ? { forceShotId: 'finish-replay' } : {}),
     finishStyle: clock.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
     raceDisplaySec: raceD, fourthCornerFront: FOURTH_CORNER_FRONT_WEB, winnerRear: false,
+    cornerTracking: !built.legacyMotion,
     leadGates,
     /** ★`climax` を渡さない／`true` 以外は**カメラ側の直しも**切ります（`page.tsx` と同じ・§8-B） */
     climaxCameraDisabled: opts.climax !== true,

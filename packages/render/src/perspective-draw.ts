@@ -13,6 +13,7 @@
  */
 
 import { posOf, segmentAt, type Course } from './course.js';
+import { scaledHorseLift } from './race-motion.js';
 import {
   cameraBasis, project, horizonY,
   type PerspectiveCamera,
@@ -849,6 +850,8 @@ export function drawPerspectiveHorses<TImage>(
      *   （8 コマと 16 コマの素材を同じ位相で回せる）。無ければ従来どおり `frameOf` の値をコマ数で割った余り。
      */
     readonly phaseOf?: ((gate: number) => number) | undefined;
+    /** Flight lift multiplier: 0 grounds every frame, 1 preserves the authored lift. */
+    readonly horseBob?: number | undefined;
     readonly frameRoleOf: (gate: number, fieldSize: number) => string;
     readonly distanceMeter: number;
     readonly trackEffect?: {
@@ -1334,7 +1337,9 @@ export function drawPerspectiveHorses<TImage>(
           ? d.p.x - (hi.bodyAnchorSourcePx.x - source.x) * scale
           : d.p.x - hiW * 0.5);
         const top = dy + (hi.bodyAnchorSourcePx !== undefined
-          ? d.p.y - (hi.bodyLiftSourcePx ?? 0) * scale - (hi.bodyAnchorSourcePx.y - source.y) * scale
+          ? d.p.y - scaledHorseLift(hi.bodyLiftSourcePx ?? 0,
+            source.y + source.height - hi.bodyAnchorSourcePx.y, opts.horseBob) * scale
+            - (hi.bodyAnchorSourcePx.y - source.y) * scale
           : d.p.y - hiH);
         const coat = opts.coatFilterOf?.(d.h.gate);
         const canFilter = coat !== undefined && 'filter' in ctx;

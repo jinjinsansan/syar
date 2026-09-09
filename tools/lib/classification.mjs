@@ -103,6 +103,13 @@ export const READONLY = [
   'render-contest-compare.mjs',
   /** ★γ を上げたときの密集の副作用（重なり・HUD の裏）を数える。読むだけ・標準出力のみ */
   'audit-contest-overlap.mjs',
+  /**
+   * ★馬同士の前後・左右の間隔と横移動の速さを、旧版（`?motion=legacy`）と新版で並べて測る
+   *   （★2026-09-09・`REPORT_P4_TRAFFIC_MOTION_20260909.md`）。
+   *   ⚠️ ★測るのは**地面の上の位置**であって、透視投影で画面上の馬体が重なるかではありません。
+   *   レース結果は読むだけ。DB にも外部にも接続しない。出力は `out/traffic-motion/audit.json` のみ。
+   */
+  'audit-traffic-motion.mjs',
   // ★編集文法の監査で使う共通部品（読取専用）
   //   cdp.mjs = Chrome DevTools Protocol の最小クライアント
   //   race-audit-build.mjs = 実画面と同じ手順でレースを 1 本組む

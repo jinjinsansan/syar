@@ -321,6 +321,17 @@ export function ratesForTarget(knots: PhaseKnots, targetSec: number): PhaseRates
   };
 }
 
+/** Keep lateral manoeuvres and changing gaps readable, even when the target duration is short. */
+export function readableRaceRates(knots: PhaseKnots, targetSec: number): PhaseRates {
+  const rates = ratesForTarget(knots, targetSec);
+  return {
+    ...rates,
+    cruise: Math.min(2, rates.cruise),
+    spurt: Math.min(2, rates.spurt),
+    straight: Math.min(2, rates.straight),
+  };
+}
+
 export function timeWarpFor(knots: PhaseKnots, rates: PhaseRates = DEFAULT_PHASE_RATES): TimeWarp {
   for (const [name, r] of [['cruise', rates.cruise], ['spurt', rates.spurt], ['straight', rates.straight]] as const) {
     if (!(r > 0) || !Number.isFinite(r)) {

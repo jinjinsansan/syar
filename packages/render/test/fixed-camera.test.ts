@@ -50,6 +50,21 @@ const rangeOf = (script: BroadcastV2Script): { start: number; end: number } => {
 const SCRIPTS: readonly BroadcastV2Script[] = [DEFAULT_RACE_SCRIPT, 'v5', 'v4'];
 
 describe('★固定カメラ（4 角正面）', () => {
+  it('追従カメラもカット終端でズームを巻き戻さない（左右回り・各台本）', () => {
+    for (const turn of ['left', 'right'] as const) for (const script of SCRIPTS) {
+      const c = ovalCourse(1600, { widthM: 20, turn });
+      const { end } = rangeOf(script);
+      const cameras = [end - 0.01, end, end + 0.01].map(s => resolveBroadcastV2Scene(c,
+        Array.from({ length: 12 }, (_, i) => ({ gate: i + 1, s: s - i * 2, w: 2 + i * 1.4 })),
+        { width: 1280, height: 720 }, false,
+        { forceShotId: 'fourth-corner-front', script, cornerTracking: true }).camera);
+      for (let i = 1; i < cameras.length; i++) {
+        const a = cameras[i - 1]!, b = cameras[i]!;
+        expect(Math.abs(b.fovY / a.fovY - 1)).toBeLessThan(0.01);
+        expect(Math.hypot(b.eye.x - a.eye.x, b.eye.y - a.eye.y)).toBeLessThan(0.1);
+      }
+    }
+  });
   it('★★カットの範囲では視点が 1 mm も動かない', () => {
     /** ★元の不具合は v4 の 800〜1056m の途中（≈895m）で起きていた。 */
     for (const script of SCRIPTS) {

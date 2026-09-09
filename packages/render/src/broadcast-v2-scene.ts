@@ -32,6 +32,7 @@ import {
   broadcastV2ContenderFov,
   broadcastV2CutProgress,
   broadcastV2ShotSpanM,
+  broadcastV2ScriptBoundariesM,
   broadcastV2FinishCamera,
   broadcastV2FocusMeters,
   broadcastV2LeadFrameFocusMeters,
@@ -183,12 +184,19 @@ export function resolveBroadcastV2Scene(
      * ⚠️ ★道具は**この既定から引くこと**（R-31）。★`true`/`false` を直書きしない。
      */
     readonly laneAlignedFocus?: boolean;
+    /** Comparison switch for the former camera that the pack crossed head-on. */
+    readonly cornerTracking?: boolean;
   } = {},
 ): BroadcastV2Scene {
   const leaderS = horses.reduce((max, horse) => Math.max(max, horse.s), 0);
-  const shot = options.forceShotId !== undefined
+  const selectedShot = options.forceShotId !== undefined
     ? broadcastV2ShotById(options.forceShotId)
     : broadcastV2ShotAt(course, leaderS, allFinished, options.cornerCutM, { fourthCornerFront: options.fourthCornerFront, script: options.script, winnerRear: options.winnerRear });
+  const trackingCorner = selectedShot.id === 'fourth-corner-front' && options.cornerTracking === true;
+  const shot: BroadcastV2Shot = trackingCorner ? (() => {
+    const { fixedCamera: _fixed, ...tracking } = selectedShot;
+    return tracking;
+  })() : selectedShot;
   // ★直線→ゴール前は展開に応じた連続ズーム（`broadcastV2FinishCamera`）
   /**
    * ★基準の画角は**ショット定義から**渡します（`shot.camera`）。
@@ -306,6 +314,23 @@ export function resolveBroadcastV2Scene(
     return weight > 1e-6 ? sum / weight : course.widthM / 2;
   })();
   const cameraAt = (atS: number): PerspectiveCamera => {
+    if (trackingCorner) {
+      const rows = broadcastV2ScriptBoundariesM(course, options.script ?? DEFAULT_RACE_SCRIPT);
+      const index = rows.findIndex(row => row.id === selectedShot.id);
+      // A forced shot may be sampled at or beyond its cut boundary. Keep its
+      // zoom on that shot's interval instead of resetting to the following cut.
+      const span = index >= 0
+        ? { start: index === 0 ? 0 : rows[index - 1]!.meters, end: rows[index]!.meters }
+        : { start: 0, end: course.distance };
+      const u = Math.max(0, Math.min(1, (leaderS - span.start) / Math.max(1, span.end - span.start)));
+      const ratio = 0.16 + 0.12 * u * u * (3 - 2 * u);
+      const distance = Math.hypot(cameraPreset.backM, cameraPreset.sideM, cameraPreset.upM - 0.8);
+      return broadcastCamera(course, {
+        atS, atW: focusW, width: viewport.width, height: viewport.height,
+        view: shot.view,
+        preset: { ...cameraPreset, fovDeg: 2 * Math.atan(2.5 / (2 * distance * ratio)) * 180 / Math.PI },
+      });
+    }
     if (shot.fixedCamera !== undefined) {
       // ★固定カメラ: 位置は区間終点基準で固定、注視点（馬群）だけを追う
       /**
@@ -473,6 +498,7 @@ export function drawBroadcastV2Scene<TImage>(
     readonly frameOf: (gate: number) => number;
     /** 走行周期の位相（0〜1）。あればコマ数に依存しない選択（perspective-draw 参照） */
     readonly phaseOf?: ((gate: number) => number) | undefined;
+    readonly horseBob?: number | undefined;
     /** ★承認水準の方向別素材が揃っている集合。揃っていない方向は真横素材で代用 */
     readonly directionalSets?: { readonly rear?: boolean; readonly front?: boolean } | undefined;
     /** ★毛色バリエーション（馬ごとの CSS filter） */
@@ -818,6 +844,7 @@ export function drawBroadcastV2Scene<TImage>(
     fieldSize: opts.fieldSize,
     frameOf: opts.frameOf,
     phaseOf: opts.phaseOf,
+    horseBob: opts.horseBob,
     coatFilterOf: opts.coatFilterOf,
     dustExposureOf: opts.dustExposureOf,
     frameRoleOf: opts.frameRoleOf,

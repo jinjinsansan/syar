@@ -10,7 +10,7 @@
  *      ★② `AuditScene` に `visibleHorses` が無い — ★描画に渡るのはこちらで、`drawn` ではない
  *      ★③ `AuditCourse` が 2 つの数だけ — ★実体は `@star/render` の `Course` そのもの
  */
-import type { Course } from '@star/render';
+import type { Course, PositionModel, Boundaries } from '@star/render';
 
 /** ★画面に描かれる 1 頭。`s` は中心線の弧長（m）、`w` は走線（m） */
 export interface AuditDrawnHorse {
@@ -55,6 +55,9 @@ export interface AuditSceneResult {
 export type AuditCourse = Course;
 
 export interface AuditBuilt {
+  readonly model: PositionModel;
+  readonly boundaries: readonly Boundaries[];
+  readonly legacyMotion: boolean;
   readonly seed: number;
   /** ★走路。★`@star/render` の `Course` そのもの（`posOf` にそのまま渡せます） */
   readonly course: Course;
@@ -93,6 +96,7 @@ export declare function buildAuditRace(opts?: {
   readonly spec?: { readonly lapM: number; readonly homeStretchM: number; readonly widthM: number };
   readonly turn?: 'left' | 'right';
   readonly balance?: unknown;
+  readonly legacyMotion?: boolean;
 }): AuditBuilt;
 
 export declare function auditClock(built: AuditBuilt, ownGate?: number): AuditClock;
