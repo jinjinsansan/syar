@@ -72,12 +72,11 @@ import {
   COAT_TRANSFORMS,
   DEFORMED_COAT_TRANSFORMS, isDeformedHorseAsset,
   type CoatName,
-  ratesForTarget,
   targetDisplaySec,
   homeStretchMetersOf,
   broadcastV2ScriptAssets,
   raceGaitPhase,
-  trafficPositionModel, readableRaceRates,
+  trafficPositionModel, ratesForPolicy, type RacePacePolicy,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 import { raceSetupFromParam, gradedRacesByVenue } from '@star/scheduler';
@@ -117,9 +116,14 @@ const LANE_MODEL_PARAM = typeof window === 'undefined' ? undefined
     ? LANE_MODEL_LEGACY
     : LANE_MODELS[new URLSearchParams(window.location.search).get('lane') ?? ''];
 const FIELD = 12;
-/** Previous motion is retained for visual comparison. */
+/**
+ * ★**従来方式へ戻す口**（`?motion=legacy`）。★見比べのために残します。
+ * ⚠️ ★この旗が見るのは★**方針の名前まで**です。★送り速さそのものの分岐は
+ *    ★`ratesForPolicy` の中だけにあります（★2026-09-09・裁定 §3 Q-1a-1）。
+ */
 const LEGACY_MOTION = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('motion') === 'legacy';
+const RACE_PACE_POLICY: RacePacePolicy = LEGACY_MOTION ? 'legacy' : 'readable';
 const W = 1280;
 const H = 720;
 /**
@@ -410,8 +414,25 @@ const coatOf = (gate: number): CoatName => COAT_BY_GATE[(gate - 1) % COAT_BY_GAT
  *      （★12 頭で 10 組。★3 型 × 7 色 = 21 組を全部読む必要はありません）。
  *
  * ⚠️ ★`Math.random` は使いません（★憲法4）。★枠順から引く表です。
- * ⚠️ ★**繁殖で型を継ぐのか**は正典に無いので、★ここでは決めません
- *    （★`QUESTIONS_P4_HORSE_TYPE_INHERITANCE_20260909.md` で照会します）。
+ *
+ * ⚠️ ★**これは映像デモ限定です。★「馬ごとに固定された外見」ではありません。**
+ *    （★2026-09-09・`REVIEW_P4_TRAFFIC_TYPES_VERDICT_20260909.md` §5）
+ *
+ *    ★裁定:
+ *      ★① ★型は ★**genotype に入れません**。★遺伝する形質という承認済み仕様はありません。
+ *         ★今回の描画修正を理由に genotype を触ることは ★**認められていません**
+ *         （★P1.5 が再開中で、★血統データ・プリシード・乱数列に影響します）。
+ *      ★② ★推奨は ★**安定した馬 ID を入力にした、バージョン付きの装飾割当**
+ *         （★`appearance-v1`）。★毛色や枠番は入力にしません。
+ *         ★同じ馬が ★別の枠・別の端末・別のレースでも ★同じ型になることを優先します。
+ *      ★③ ⚠️ ★**`build()` の `horseId: String(i + 1)` は枠位置と連動しています。**
+ *         ★ここをハッシュするだけでは ★個体固定になりません。
+ *         ★実データ側の永続 ID か、★デモプール内で安定した ID が要ります。
+ *      ★④ ★将来 C を足すとき、★単純な `% 型数` にすると ★**既存馬の型が一斉に変わります**。
+ *         ★版を維持するか、★割当そのものを保存すること。
+ *
+ *    ★繁殖で見た目を継ぐ機能は ★**別の仕様判断**です（★継承規則・既存馬への割当・
+ *    ★データ移行・乱数ストリーム分離・再プリシードと再検証が要ります）。
  */
 type HorseType = 'a' | 'b' | 'c';
 const HORSE_TYPES: readonly HorseType[] = ['a', 'b', 'c'];
@@ -1251,7 +1272,13 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
    *    ★申し合わせていました。★申し合わせは守られません（★台帳 B-6 と同じ形）。
    */
   const knots = knotsFor(boundaries, ownGate, model.straightMeters);
-  const warp = timeWarpFor(knots, (LEGACY_MOTION ? ratesForTarget : readableRaceRates)(knots, targetDisplaySec(DIST)));
+  /**
+   * ⚠️ ★**分岐をここに書かないこと**（★2026-09-09・裁定 §3 Q-1a-1）。
+   *    ★方針の選択は ★`ratesForPolicy` の中だけにあります。★監査道具も同じ関数を通ります。
+   *    ★以前ここには `(LEGACY_MOTION ? ratesForTarget : readableRaceRates)(...)` という
+   *    ★**三項演算子が画面と道具の 2 か所に写して**置かれていました。
+   */
+  const warp = timeWarpFor(knots, ratesForPolicy(knots, targetDisplaySec(DIST), RACE_PACE_POLICY));
   /**
    * ★見た目の速度テーブル。描画と同じ手順（時計 → 位置モデル → 走り抜け → V2 注視点）で
    *   0.05 秒ごとに注視点を求め、時間圧縮の倍率 rate と固定物体の重みから Δ を積分する。

@@ -18,8 +18,8 @@ import {
 import {
   DEMO_CONTEST_GAMMA, finishReplayAt, finishCrossDisplaySec, raceTotalDisplaySec,
   ovalCourse, replayPositionModel, finalOrderOf,
-  trafficPositionModel, readableRaceRates,
-  knotsFor, ratesForTarget, targetDisplaySec, timeWarpFor, withFinishRunOut, finishSpeedsOf,
+  trafficPositionModel, ratesForPolicy, racePaceReport, homeStretchMetersOf,
+  knotsFor, targetDisplaySec, timeWarpFor, withFinishRunOut, finishSpeedsOf,
   broadcastV2StartLagM, broadcastV2FinishStyleOf, resolveBroadcastV2Scene,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT, LANE_ALIGNED_FOCUS_DEFAULT,
 } from '@star/render';
@@ -50,6 +50,21 @@ export const AUDIT_SCREEN_BALANCE = DEMO_CONTEST_GAMMA === DEFAULT_RACE_BALANCE.
 
 /** ★`/race` の既定と同じ */
 export const RACE_DEFAULTS = { seed: 42, ownGate: 3, distance: 1600, field: 12, trackWidthM: 20 };
+
+/**
+ * ★**送り速さの方針**を 1 か所で決める（★2026-09-09・裁定 §3 Q-1a-1）。
+ * ★`page.tsx` の `RACE_PACE_POLICY` と★**同じ対応**です。
+ */
+export const racePacePolicyOf = (built) => (built.legacyMotion === true ? 'legacy' : 'readable');
+
+/**
+ * ★**目標と実尺の差を残す**（★2026-09-09・裁定 §3 Q-1a-4/5）。
+ * ⚠️ ★可読性の上限で切ったとき、★**目標は達成されません**。★黙って超えないこと。
+ */
+export function auditPaceReport(built, ownGate = RACE_DEFAULTS.ownGate) {
+  const knots = knotsFor(built.boundaries, ownGate, built.model.straightMeters);
+  return racePaceReport(knots, targetDisplaySec(built.DIST), racePacePolicyOf(built));
+}
 
 export function buildAuditRace(opts = {}) {
   const seed = opts.seed ?? RACE_DEFAULTS.seed;
@@ -117,7 +132,14 @@ export function buildAuditRace(opts = {}) {
   const boundaries = replayOf(result, (g) => entrants[g - 1].strategy, pace);
   if (!finalOrderMatches(result, boundaries)) throw new Error('★D-059: 着順が確定着順と違う');
   const rawModel = replayPositionModel({
-    distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries,
+    /**
+     * ★**画面と同じ直線長**（★2026-09-09・F-2・裁定 §2）。
+     * ⚠️ ★以前は `400` 固定でした。★画面は `homeStretchMetersOf(course)` を渡すので、
+     *    ★**直線の違う会場では道具と画面が別の knots を見ていました**
+     *    （★直線は 10 場 50 鞍で 290〜620m の 10 通り）。
+     * ★既定の `ovalCourse` は 400 なので、★**既定走路の数値は 1 ビットも変わりません**。
+     */
+    distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: homeStretchMetersOf(course), boundaries,
     strategyOf: (g) => entrants[g - 1].strategy, pace, formationSeed: seed * 2654435761,
     /** ★横位置も同じ形を見ます（`page.tsx` と同じ引数の並び） */
     laneOf: (gate, metersLeft) => (spec === undefined
@@ -159,7 +181,11 @@ const startShownMeters = (meters, raceDisplaySec) =>
  */
 export function auditClock(built, ownGate = RACE_DEFAULTS.ownGate) {
   const knots = knotsFor(built.boundaries, ownGate, built.model.straightMeters);
-  const warp = timeWarpFor(knots, (built.legacyMotion ? ratesForTarget : readableRaceRates)(knots, targetDisplaySec(built.DIST)));
+  /**
+   * ⚠️ ★**分岐をここに書かないこと**（★2026-09-09・裁定 §3 Q-1a-1）。
+   *    ★`page.tsx` と★**完全に同じ関数**を通します。
+   */
+  const warp = timeWarpFor(knots, ratesForPolicy(knots, targetDisplaySec(built.DIST), racePacePolicyOf(built)));
   const finishSec = new Map(built.boundaries.map((b) => [b.gate, b.finishSec]));
   let finishStyle = 'solo';
   for (let sec = 0; sec <= warp.raceSecAt(warp.displaySec) + 1e-9; sec += 0.05) {

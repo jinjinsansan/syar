@@ -54,10 +54,62 @@ describe('★表示時間の経路（メタテスト）', () => {
     expect(offenders, '固定の送り速さを渡すと `targetDisplaySec` が効きません').toEqual([]);
   });
 
-  it('★Web 画面は目標時間から送り速さを逆算している', () => {
-    const src = readFileSync(path.join(ROOT, 'apps/web/src/app/race/page.tsx'), 'utf8');
-    expect(src).toMatch(/ratesForTarget\s*\(/);
-    expect(src).toMatch(/targetDisplaySec\s*\(/);
+  /**
+   * ★**画面と監査道具は、同じ 1 つの関数で方針を選ぶこと**（★2026-09-09・裁定 §3 Q-1a-1）
+   *
+   * 【なぜ関数名を数えるだけでは足りないか】
+   *   ★以前ここは ★`page.tsx` に `ratesForTarget(` があることだけを見ていました。
+   *   ★ところが 2026-09-09、★画面と道具の両方が
+   *   ★`(LEGACY_MOTION ? ratesForTarget : readableRaceRates)(...)` という
+   *   ★**同じ三項演算子を 2 か所に写して**持つ形になりました。
+   *   ★どちらも `ratesForTarget` を含むので ★**古い検定は素通り**します。
+   *   ★片方だけ直せば静かにずれます（★台帳 B-6・★2026-08-21 の実害と同じ形）。
+   *
+   * → ★**分岐が 1 か所であること**を見ます。★呼び出し側は `ratesForPolicy` だけを通し、
+   *   ★`ratesForTarget` / `readableRaceRates` を ★**直に呼ばない**こと。
+   *
+   * ⚠️ ★これは文字列の検査なので、★**振る舞いの証拠にはなりません。**
+   *    ★新版が実際にどう動くかは ★`packages/render/test/readable-rates.test.ts` で見ます。
+   */
+  const PACE_CALLERS: readonly string[] = [
+    'apps/web/src/app/race/page.tsx',
+    'tools/lib/race-audit-build.mjs',
+  ];
+
+  it('★★画面と監査道具は、同じ `ratesForPolicy` を通っている', () => {
+    for (const rel of PACE_CALLERS) {
+      const src = readFileSync(path.join(ROOT, rel), 'utf8');
+      expect(src, `${rel} が方針の関数を通っていません`).toMatch(/ratesForPolicy\s*\(/);
+      expect(src, `${rel} が目標時間を通っていません`).toMatch(/targetDisplaySec\s*\(/);
+    }
+  });
+
+  it('★★方針の分岐が呼び出し側に写されていない（1 か所であること）', () => {
+    const offenders: string[] = [];
+    for (const rel of PACE_CALLERS) {
+      const src = readFileSync(path.join(ROOT, rel), 'utf8');
+      /**
+       * ★コメント中の言及は拾いません。★**実際に呼んでいる**形だけを見ます
+       *   （★注記でこれらの名前に触れるのは、経緯を残すために必要です）。
+       */
+      /**
+       * ⚠️ ★**`名前(` という形で探さないこと**（★2026-09-09・R-22 で判明）。
+       *    ★実際に壊れていた形は ★`(LEGACY_MOTION ? ratesForTarget : readableRaceRates)(...)` で、
+       *    ★`ratesForTarget` の直後は `(` ではなく ` : ` です。
+       *    ★`名前\s*\(` で書いた最初の版は、★**この行を 0 件と数えました**
+       *    （★直前の版 `2b4a3a8` に当てて確かめています）。
+       * → ★**名前が本文に出てくること自体**を違反とします。
+       */
+      const lines = src.split('\n').filter((l) => {
+        const code = l.replace(/^\s*(\*|\/\/).*$/, '');
+        return /(?<![.\w])(ratesForTarget|readableRaceRates)(?![\w])/.test(code);
+      });
+      if (lines.length > 0) offenders.push(`${rel}（${lines.length} 行: ${lines.map((l) => l.trim()).join(' / ')}）`);
+    }
+    expect(
+      offenders,
+      '★方針の選択は `ratesForPolicy` の中だけに置くこと（写すと片方だけ直る）',
+    ).toEqual([]);
   });
 
   it('★免除は理由つきで、対象のファイルが実在する', () => {

@@ -10,7 +10,7 @@
  *      ★② `AuditScene` に `visibleHorses` が無い — ★描画に渡るのはこちらで、`drawn` ではない
  *      ★③ `AuditCourse` が 2 つの数だけ — ★実体は `@star/render` の `Course` そのもの
  */
-import type { Course, PositionModel, Boundaries } from '@star/render';
+import type { Course, PositionModel, Boundaries, RacePacePolicy, RacePaceReport } from '@star/render';
 
 /** ★画面に描かれる 1 頭。`s` は中心線の弧長（m）、`w` は走線（m） */
 export interface AuditDrawnHorse {
@@ -100,6 +100,15 @@ export declare function buildAuditRace(opts?: {
 }): AuditBuilt;
 
 export declare function auditClock(built: AuditBuilt, ownGate?: number): AuditClock;
+
+/** ★送り速さの方針（`page.tsx` の `RACE_PACE_POLICY` と同じ対応） */
+export declare function racePacePolicyOf(built: AuditBuilt): RacePacePolicy;
+
+/**
+ * ★**目標と実尺の差**を返す（★2026-09-09・裁定 §3 Q-1a-4/5）。
+ * ⚠️ ★可読性の上限で切ったときは ★`cappedPhases` が空でなく、★目標は達成されません。
+ */
+export declare function auditPaceReport(built: AuditBuilt, ownGate?: number): RacePaceReport;
 
 /** ★画面と同じ総尺（イントロ ＋ 本編 ＋ 勝馬・着順ボード ＋ ゴール前リプレイ） */
 export declare function auditTotalDisplaySec(clock: AuditClock): number;

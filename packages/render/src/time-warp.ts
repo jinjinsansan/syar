@@ -321,15 +321,81 @@ export function ratesForTarget(knots: PhaseKnots, targetSec: number): PhaseRates
   };
 }
 
-/** Keep lateral manoeuvres and changing gaps readable, even when the target duration is short. */
+/**
+ * ★**可読性を優先した送り速さの上限**（★2026-09-09）。
+ *   ★これより速いと、★隣との間隔が変わる過程・進路を変える過程が ★1 コマ跨ぎになって読めません。
+ */
+export const READABLE_MAX_RATE = 2;
+
+/**
+ * ★目標から逆算したうえで、★どの局面も `READABLE_MAX_RATE` を超えないよう切る。
+ *
+ * ⚠️ ★**切ると目標の表示時間は満たさなくなります。** ★それは仕様です
+ *    （★「読めること」を「尺」より優先する・`REPORT_P4_TRAFFIC_MOTION_20260909.md`）。
+ *    ★どれだけ超えたかは ★`racePaceReport` で取れます。★黙って超えないこと。
+ */
 export function readableRaceRates(knots: PhaseKnots, targetSec: number): PhaseRates {
   const rates = ratesForTarget(knots, targetSec);
   return {
     ...rates,
-    cruise: Math.min(2, rates.cruise),
-    spurt: Math.min(2, rates.spurt),
-    straight: Math.min(2, rates.straight),
+    cruise: Math.min(READABLE_MAX_RATE, rates.cruise),
+    spurt: Math.min(READABLE_MAX_RATE, rates.spurt),
+    straight: Math.min(READABLE_MAX_RATE, rates.straight),
   };
+}
+
+/**
+ * ★**送り速さの方針**（★2026-09-09・`REVIEW_P4_TRAFFIC_TYPES_VERDICT_20260909.md` §3 Q-1a-1）
+ *
+ *   `'readable'` … ★既定。★逆算 → ★`READABLE_MAX_RATE` で切る
+ *   `'legacy'`   … ★従来方式。★逆算のみ（`?motion=legacy`）
+ */
+export type RacePacePolicy = 'readable' | 'legacy';
+
+/**
+ * ★**画面と道具は、必ずここを通ること。**
+ *
+ * 【★なぜ関数にするか（★2026-09-09 の実害）】
+ *   ★画面と監査道具が ★`(LEGACY_MOTION ? ratesForTarget : readableRaceRates)(...)` という
+ *   ★**同じ三項演算子を 2 か所に写して**持っていました。★片方だけ直せば静かにずれます
+ *   （★台帳 B-6 と同じ形・★2026-08-21 には実際に画面だけ `DEFAULT_PHASE_RATES` のまま残りました）。
+ *   → ★**分岐はこの 1 か所だけ**にします。
+ */
+export function ratesForPolicy(
+  knots: PhaseKnots, targetSec: number, policy: RacePacePolicy,
+): PhaseRates {
+  return policy === 'legacy' ? ratesForTarget(knots, targetSec) : readableRaceRates(knots, targetSec);
+}
+
+/** ★`racePaceReport` の戻り。★目標と実尺の差を **黙って捨てない** ための記録 */
+export interface RacePaceReport {
+  readonly policy: RacePacePolicy;
+  /** ★狙った表示時間（`targetDisplaySec`） */
+  readonly targetSec: number;
+  /** ★実際に出る本編の表示時間 */
+  readonly displaySec: number;
+  /** ★実尺 − 目標（★正なら目標より長い）*/
+  readonly overshootSec: number;
+  /** ★可読性の上限で切られた局面。★空なら目標が実現できている */
+  readonly cappedPhases: readonly ('cruise' | 'spurt' | 'straight')[];
+  readonly rates: PhaseRates;
+}
+
+/**
+ * ★**目標と、実際に出る尺と、その差**を返す（★裁定 §3 Q-1a-4/5）。
+ *
+ * ⚠️ ★「上限で切ったから目標に届かない」ことを ★**測って残す**ための関数です。
+ *    ★これが無いと、★尺が延びたことが ★どこにも記録されないまま通ります（★D-093 と同じ形）。
+ */
+export function racePaceReport(
+  knots: PhaseKnots, targetSec: number, policy: RacePacePolicy,
+): RacePaceReport {
+  const rates = ratesForPolicy(knots, targetSec, policy);
+  const uncapped = ratesForTarget(knots, targetSec);
+  const cappedPhases = (['cruise', 'spurt', 'straight'] as const)
+    .filter((p) => rates[p] < uncapped[p] - 1e-12);
+  const displaySec = timeWarpFor(knots, rates).displaySec;
+  return { policy, targetSec, displaySec, overshootSec: displaySec - targetSec, cappedPhases, rates };
 }
 
 export function timeWarpFor(knots: PhaseKnots, rates: PhaseRates = DEFAULT_PHASE_RATES): TimeWarp {

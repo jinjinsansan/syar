@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { buildAuditRace, auditClock } from './lib/race-audit-build.mjs';
+import { buildAuditRace, auditClock, auditPaceReport, auditTotalDisplaySec, racePacePolicyOf } from './lib/race-audit-build.mjs';
 import { withFinishRunOut, finalOrderOf } from '../packages/render/src/index.ts';
 
 // Measure physical ground spacing, not sprite occlusion by perspective.
@@ -26,7 +26,18 @@ for (const distance of [1200, 1600, 2400]) for (const seed of [42, 99, 14]) {
     }
     const orderPreserved = JSON.stringify(finalOrderOf(race.model))
       === JSON.stringify(race.result.order.map(h => Number(h.horseId)));
-    rows.push({ distance, seed, legacyMotion, displaySec: clock.warp.displaySec,
+    /**
+     * ★**目標と実尺の差を残す**（★2026-09-09・裁定 §3 Q-1a-5）。
+     * ⚠️ ★`displaySec` は **本編だけ**。★`totalDisplaySec` は
+     *    ★イントロ ＋ 本編 ＋ 勝馬の寄り・着順ボード ＋ ゴール前リプレイ です。
+     *    ★**別の数として並べます**（★混ぜると「尺」が何を指すか失われます）。
+     */
+    const pace = auditPaceReport(race);
+    rows.push({ distance, seed, legacyMotion, policy: racePacePolicyOf(race),
+      displaySec: clock.warp.displaySec,
+      totalDisplaySec: auditTotalDisplaySec(clock),
+      targetSec: pace.targetSec, overshootSec: pace.overshootSec,
+      cappedPhases: pace.cappedPhases, cruiseRate: pace.rates.cruise,
       overlapPairFrames, maxLateralMps, orderPreserved });
     console.log(JSON.stringify(rows.at(-1)));
   }

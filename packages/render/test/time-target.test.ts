@@ -1,7 +1,15 @@
 /**
- * ★距離ごとの時間配分（`RACE_PRESENTATION_BASICS.md` §4）
+ * ★**従来方式（`ratesForTarget` ・`?motion=legacy`）**の距離ごとの時間配分
+ * （`RACE_PRESENTATION_BASICS.md` §4）
  *
- * 【★この検査が守るもの】
+ * ⚠️ ★**このファイルは画面の既定を測っていません**（★2026-09-09・F-1・裁定 §2）。
+ *    ★画面の既定は `readableRaceRates`（★逆算してから 2 倍で切る）です。
+ *    ★ここで `displayOf` が使うのは `ratesForTarget`（★切らない）なので、
+ *    ★**「目標の表示時間に収まる」が通っても、新版の既定の証拠にはなりません。**
+ *    ★新版の振る舞いは `readable-rates.test.ts` で見ます。
+ *    ★このファイルは **削除しません** — ★従来方式は `?motion=legacy` で現役です。
+ *
+ * 【★この検査が守るもの（★いずれも従来方式について）】
  *   ① ★**どの距離でも、目標の表示時間に収まる**（長距離が 80秒になっていた）
  *   ② ★**勝負所と直線の表示時間は、距離によらず一定**
  *      （★C-6 が成立する場所なので、長距離で縮めない）
@@ -41,8 +49,8 @@ const displayOf = (d: number): number => {
   return timeWarpFor(k, ratesForTarget(k, targetDisplaySec(d))).displaySec;
 };
 
-describe('★距離ごとの時間配分', () => {
-  it('★★どの距離でも、目標の表示時間にほぼ収まる', () => {
+describe('★従来方式（legacy）の距離ごとの時間配分', () => {
+  it('★★従来方式なら、どの距離でも目標の表示時間にほぼ収まる（★画面の既定ではありません）', () => {
     for (const d of [1200, 1400, 1600, 2000, 2400, 3000, 3600]) {
       const target = targetDisplaySec(d);
       const got = displayOf(d);
