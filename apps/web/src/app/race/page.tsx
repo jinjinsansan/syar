@@ -31,7 +31,8 @@ import { deriveRng } from '@star/sim-engine';
 import type { Strategy } from '@star/sim-engine';
 import type { Surface, TrackCondition } from '@star/race-engine';
 import {
-  replayPositionModel, finalOrderOf, withFinishRunOut, finishSpeedsOf, timeWarpFor, knotsFor, DEFAULT_PHASE_RATES,
+  replayPositionModel, finalOrderOf, withFinishRunOut, finishSpeedsOf, knotsFor, DEFAULT_PHASE_RATES,
+  type TimeWarp,
   dustExposureCurve,
   phaseOf, HORSE_LENGTH_M,
   // ★描き方は package が唯一の出どころ（この画面には持たない）
@@ -72,11 +73,10 @@ import {
   COAT_TRANSFORMS,
   DEFORMED_COAT_TRANSFORMS, isDeformedHorseAsset,
   type CoatName,
-  targetDisplaySec,
   homeStretchMetersOf,
   broadcastV2ScriptAssets,
   raceGaitPhase,
-  trafficPositionModel, ratesForPolicy, type RacePacePolicy,
+  trafficPositionModel, raceClockFor, type RacePacePolicy,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 import { raceSetupFromParam, gradedRacesByVenue } from '@star/scheduler';
@@ -119,7 +119,7 @@ const FIELD = 12;
 /**
  * ★**従来方式へ戻す口**（`?motion=legacy`）。★見比べのために残します。
  * ⚠️ ★この旗が見るのは★**方針の名前まで**です。★送り速さそのものの分岐は
- *    ★`ratesForPolicy` の中だけにあります（★2026-09-09・裁定 §3 Q-1a-1）。
+ *    ★`raceClockFor` → `ratesForPolicy` の中だけにあります（★2026-09-09・裁定 §3 Q-1a-1）。
  */
 const LEGACY_MOTION = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('motion') === 'legacy';
@@ -525,7 +525,7 @@ const JOCKEY_NAMES = ['田中 守', '佐藤 翼', '山本 誠', '中村 駿', '�
 
 interface Built {
   readonly model: ReturnType<typeof replayPositionModel>;
-  readonly warp: ReturnType<typeof timeWarpFor>;
+  readonly warp: TimeWarp;
   readonly pace: 'slow' | 'middle' | 'high';
   readonly result: readonly { place: number; gate: number; margin: string }[];
   /** ★自馬のゲージ（D-072）。**エンジンが出した状態**を読むだけ */
@@ -1274,11 +1274,12 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
   const knots = knotsFor(boundaries, ownGate, model.straightMeters);
   /**
    * ⚠️ ★**分岐をここに書かないこと**（★2026-09-09・裁定 §3 Q-1a-1）。
-   *    ★方針の選択は ★`ratesForPolicy` の中だけにあります。★監査道具も同じ関数を通ります。
+   *    ★時計そのものを ★`raceClockFor` から受け取ります。★監査道具も同じ関数を通ります。
+   *    ⚠️ ★**戻り値を捨てて別の時計を使わないこと**（★F-3）。
    *    ★以前ここには `(LEGACY_MOTION ? ratesForTarget : readableRaceRates)(...)` という
    *    ★**三項演算子が画面と道具の 2 か所に写して**置かれていました。
    */
-  const warp = timeWarpFor(knots, ratesForPolicy(knots, targetDisplaySec(DIST), RACE_PACE_POLICY));
+  const warp = raceClockFor(knots, DIST, RACE_PACE_POLICY);
   /**
    * ★見た目の速度テーブル。描画と同じ手順（時計 → 位置モデル → 走り抜け → V2 注視点）で
    *   0.05 秒ごとに注視点を求め、時間圧縮の倍率 rate と固定物体の重みから Δ を積分する。

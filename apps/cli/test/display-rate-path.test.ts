@@ -65,22 +65,24 @@ describe('★表示時間の経路（メタテスト）', () => {
    *   ★どちらも `ratesForTarget` を含むので ★**古い検定は素通り**します。
    *   ★片方だけ直せば静かにずれます（★台帳 B-6・★2026-08-21 の実害と同じ形）。
    *
-   * → ★**分岐が 1 か所であること**を見ます。★呼び出し側は `ratesForPolicy` だけを通し、
-   *   ★`ratesForTarget` / `readableRaceRates` を ★**直に呼ばない**こと。
+   * → ★**呼び出し側は送り速さを自分で組まない**ことを見ます。
+   *   ★時計は `raceClockFor` から受け取り、★`timeWarpFor` / `ratesForPolicy` /
+   *   ★`ratesForTarget` / `readableRaceRates` を ★**呼び出し側では使わない**こと。
    *
    * ⚠️ ★これは文字列の検査なので、★**振る舞いの証拠にはなりません。**
-   *    ★新版が実際にどう動くかは ★`packages/render/test/readable-rates.test.ts` で見ます。
+   *    ★名前だけ残して戻り値を捨てる壊し方は ★構文木で見ます
+   *    （★`apps/cli/test/race-clock-wiring.test.ts`・★F-3）。
+   *    ★新版の振る舞いは ★`packages/render/test/readable-rates.test.ts` で見ます。
    */
   const PACE_CALLERS: readonly string[] = [
     'apps/web/src/app/race/page.tsx',
     'tools/lib/race-audit-build.mjs',
   ];
 
-  it('★★画面と監査道具は、同じ `ratesForPolicy` を通っている', () => {
+  it('★★画面と監査道具は、同じ `raceClockFor` を通っている', () => {
     for (const rel of PACE_CALLERS) {
       const src = readFileSync(path.join(ROOT, rel), 'utf8');
-      expect(src, `${rel} が方針の関数を通っていません`).toMatch(/ratesForPolicy\s*\(/);
-      expect(src, `${rel} が目標時間を通っていません`).toMatch(/targetDisplaySec\s*\(/);
+      expect(src, `${rel} が共有の時計部品を通っていません`).toMatch(/raceClockFor\s*\(/);
     }
   });
 
@@ -102,13 +104,13 @@ describe('★表示時間の経路（メタテスト）', () => {
        */
       const lines = src.split('\n').filter((l) => {
         const code = l.replace(/^\s*(\*|\/\/).*$/, '');
-        return /(?<![.\w])(ratesForTarget|readableRaceRates)(?![\w])/.test(code);
+        return /(?<![.\w])(ratesForTarget|readableRaceRates|ratesForPolicy|timeWarpFor)(?![\w])/.test(code);
       });
       if (lines.length > 0) offenders.push(`${rel}（${lines.length} 行: ${lines.map((l) => l.trim()).join(' / ')}）`);
     }
     expect(
       offenders,
-      '★方針の選択は `ratesForPolicy` の中だけに置くこと（写すと片方だけ直る）',
+      '★時計は `raceClockFor` から受け取ること（★送り速さを自分で組まない）',
     ).toEqual([]);
   });
 

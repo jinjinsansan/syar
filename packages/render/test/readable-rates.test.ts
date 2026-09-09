@@ -122,23 +122,44 @@ describe('★画面の既定（readable）の時間写像', () => {
     }
   });
 
+  /**
+   * ★**達成できる目標なら、実尺は目標に合うこと**（★2026-09-09・F-4・裁定 §3）
+   *
+   * ⚠️ ★以前はここが ★**ずれていました**。★勝負所 5.2 倍・直線 2.1 倍で組んだ区間時間から
+   *    ★道中を逆算し、★そのあとで 3 つとも 2 倍に切っていたためです。
+   *    ★切ると勝負所と直線は**伸びる**のに、★道中を**そのまま**にしていました。
+   *
+   *    ★実測（2400m・目標 100 秒）: ★旧 107.521 秒（★+7.5）→ ★新 ★**100.000 秒**
+   *
+   * ⚠️ ★「目標を延ばせば実尺も延びる」だけでは ★**この不具合を捕まえられません**
+   *    （★ずれたまま単調でありうる）。★**目標そのものに合うこと**を見ます。
+   */
+  it('★★達成できる目標では、実尺が目標に合う（★F-4）', () => {
+    const k = knotsOf(2400);
+    for (const target of [95, 100, 110, 120, 135]) {
+      const rep = racePaceReport(k, target, 'readable');
+      expect(rep.saturation, `目標 ${target} 秒は端に張り付いていないこと`).toBe(null);
+      expect(rep.achieved, `目標 ${target} 秒: 実尺 ${rep.displaySec}`).toBe(true);
+      expect(Math.abs(rep.overshootSec)).toBeLessThan(rep.toleranceSec);
+      // ★達成しても、★上限と等速区間は守られていること
+      expect(rep.rates.spurt).toBeLessThanOrEqual(READABLE_MAX_RATE + 1e-12);
+      expect(rep.rates.straight).toBeLessThanOrEqual(READABLE_MAX_RATE + 1e-12);
+      expect(rep.rates.start).toBe(GOAL_RATE);
+      expect(rep.rates.goal).toBe(GOAL_RATE);
+    }
+  });
+
   it('★★目標の変更が時計に出る（★目標引数を無視する実装を通さない）', () => {
     /**
-     * ★自由度は `cruise` だけなので、★**`cruise` が上限にも下限にも張り付いていない**
-     * ★目標で測ります。⚠️ ★張り付いている所で「目標が効くか」を測ってはいけません
+     * ★自由度は `cruise` だけなので、★**端に張り付いていない**目標で測ります。
+     * ⚠️ ★張り付いている所で「目標が効くか」を測ってはいけません
      * （★何を測っても平らで、★壊れていても通ります）。
-     */
-    /**
-     * ★2400m で `cruise` が反応する窓は ★**目標 85〜140 秒**（★2026-09-09 実測）。
-     * ⚠️ ★**本番の目標 45.7 秒はこの窓の外**（★上限 2 に張り付き）です。
-     *    ★つまり ★**いまの本番では、目標を動かしても画面の尺は 1 秒も変わりません。**
-     *    ★それが可読性方針を選んだということです（★裁定 §3 の「商品としての条件」へ）。
      */
     const k = knotsOf(2400);
     const loose = racePaceReport(k, 100, 'readable');
     const looser = racePaceReport(k, 120, 'readable');
     for (const rep of [loose, looser]) {
-      expect(rep.cappedPhases, '★cruise は切られていないこと').not.toContain('cruise');
+      expect(rep.saturation, '★端に張り付いていないこと').toBe(null);
       expect(rep.rates.cruise).toBeGreaterThan(1);
       expect(rep.rates.cruise).toBeLessThan(READABLE_MAX_RATE);
     }
@@ -160,15 +181,17 @@ describe('★画面の既定（readable）の時間写像', () => {
     expect(halved.displaySec).toBeCloseTo(atTarget.displaySec, 9);
   });
 
-  it('★★目標が実現できないときは、上限を超えて圧縮しない（★差は残る）', () => {
+  it('★★目標が達成できないときは、上限を超えて圧縮しない（★制約のほうを優先する）', () => {
     const d = 2400;
     const rep = racePaceReport(knotsOf(d), targetDisplaySec(d), 'readable');
-    // ★切られている＝目標には届かない
-    expect(rep.cappedPhases.length).toBeGreaterThan(0);
-    expect(rep.overshootSec).toBeGreaterThan(0);
+    // ★端に張り付いている＝これ以上速くできない
+    expect(rep.saturation).toBe('max');
+    expect(rep.achieved).toBe(false);
     expect(rep.displaySec).toBeGreaterThan(rep.targetSec);
     // ★それでも上限は破らない
-    for (const phase of rep.cappedPhases) expect(rep.rates[phase]).toBeLessThanOrEqual(READABLE_MAX_RATE + 1e-12);
+    for (const phase of ['cruise', 'spurt', 'straight'] as const) {
+      expect(rep.rates[phase]).toBeLessThanOrEqual(READABLE_MAX_RATE + 1e-12);
+    }
   });
 
   it('★★目標をいくら短くしても、上限より速くならない（★詰め込みで潰さない）', () => {
@@ -201,10 +224,39 @@ describe('★画面の既定（readable）の時間写像', () => {
     expect(timeWarpFor(k, legacy).displaySec).toBeLessThan(timeWarpFor(k, readable).displaySec);
   });
 
-  it('★racePaceReport は差を隠さない（★切られていれば必ず overshoot が正）', () => {
+  /**
+   * ⚠️ ★**`cappedPhases` と「目標の成否」は別のこと**（★2026-09-09・F-5・裁定 §4）
+   *
+   *   ★以前ここは「★切られていれば必ず超過が正」と書いていました。★**偽です。**
+   *   ★既定の短い目標しか走査していなかったので通っていただけです。
+   *   ★裁定が挙げた反例をそのまま検定にします。
+   */
+  it('★★「切られた」と「達成できない」を同義にしない（★F-5 の反例 2 件）', () => {
+    const k = knotsOf(2400);
+
+    // ★反例① ★`legacy`・目標 1 秒 … ★切られていないのに ★大きく超過する
+    const legacyTiny = racePaceReport(k, 1, 'legacy');
+    expect(legacyTiny.cappedPhases, '★可読性の上限を使っていないので空').toEqual([]);
+    expect(legacyTiny.saturation).toBe('max');
+    expect(legacyTiny.achieved, '★空でも達成できていない').toBe(false);
+    expect(legacyTiny.overshootSec).toBeGreaterThan(40);
+
+    // ★反例② ★`readable`・目標 150 秒 … ★切られているのに ★超過は**負**（★目標より短い）
+    const readableLong = racePaceReport(k, 150, 'readable');
+    expect(readableLong.cappedPhases).toEqual(['spurt', 'straight']);
+    expect(readableLong.saturation).toBe('min');
+    expect(readableLong.achieved).toBe(false);
+    expect(readableLong.overshootSec, '★切られていても超過が負になりうる').toBeLessThan(0);
+
+    // ★対照 ★切られていても ★達成できる場合がある（★F-4 を直したので成立します）
+    const achievable = racePaceReport(k, 100, 'readable');
+    expect(achievable.cappedPhases).toEqual(['spurt', 'straight']);
+    expect(achievable.achieved, '★切られていても達成しうる').toBe(true);
+  });
+
+  it('★racePaceReport の実尺が、実際に組んだ時計と一致する', () => {
     for (const d of DISTANCES) {
       const rep = racePaceReport(knotsOf(d), targetDisplaySec(d), 'readable');
-      if (rep.cappedPhases.length > 0) expect(rep.overshootSec).toBeGreaterThan(0);
       expect(rep.displaySec).toBeCloseTo(readableWarp(d).w.displaySec, 9);
     }
   });

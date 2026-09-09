@@ -327,20 +327,76 @@ export function ratesForTarget(knots: PhaseKnots, targetSec: number): PhaseRates
  */
 export const READABLE_MAX_RATE = 2;
 
+/** ★道中の送りの下限・上限（`ratesForTarget` と同じ値） */
+const MIN_CRUISE = 1;
+const MAX_CRUISE = 8;
+
+/**
+ * ★**その送り速さの組で、目標の表示時間になる道中の送りを求める**（★2026-09-09・F-4）。
+ *
+ * 【★なぜ解析式ではなく探索か】
+ *   ★`timeWarpFor` は ★**送り速さを段で切り替えず、滑らかに変えます**。
+ *   ★そのぶん、区間時間の足し算（解析式）と ★実際の表示秒は一致しません。
+ *   ★実測: 2400m・目標 100 秒で ★解析式は 99.616 秒（★−0.384 秒の系統誤差）。
+ *   → ★裁定 §3 F-4 の「★`timeWarpFor` の補間を含む**最終の表示秒**で」に直接答えるため、
+ *     ★**実物の写像の上で**探索します。
+ *
+ * ⚠️ ★`Math.random()` も `Date.now()` も使いません（★憲法4）。★同じ入力から必ず同じ値です。
+ * ⚠️ ★表示秒は道中の送りに対して ★**単調減少**（★速くすれば短くなる）であることを前提にします。
+ */
+function cruiseForDisplayTarget(
+  knots: PhaseKnots, targetSec: number, tail: Omit<PhaseRates, 'cruise'>,
+  minCruise: number, maxCruise: number,
+): number {
+  const secAt = (cruise: number): number => timeWarpFor(knots, { ...tail, cruise }).displaySec;
+  /** ★速くしても短くならない＝道中が無い。★探索しても意味がないので下限を返します */
+  if (Math.abs(secAt(minCruise) - secAt(maxCruise)) < 1e-9) return minCruise;
+  // ★上限でも目標に届かない／下限でも目標より短い ＝ ★**達成不能**。★制約のほうを優先します
+  if (secAt(maxCruise) >= targetSec) return maxCruise;
+  if (secAt(minCruise) <= targetSec) return minCruise;
+  let lo = minCruise, hi = maxCruise;
+  // ★80 回で幅は 2^-80。★浮動小数の刻みより十分細かい（★回数を固定＝決定論）
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2;
+    if (secAt(mid) > targetSec) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
 /**
  * ★目標から逆算したうえで、★どの局面も `READABLE_MAX_RATE` を超えないよう切る。
  *
- * ⚠️ ★**切ると目標の表示時間は満たさなくなります。** ★それは仕様です
- *    （★「読めること」を「尺」より優先する・`REPORT_P4_TRAFFIC_MOTION_20260909.md`）。
- *    ★どれだけ超えたかは ★`racePaceReport` で取れます。★黙って超えないこと。
+ * ⚠️ ★**切ったあとの区間時間で道中を逆算します**（★2026-09-09・F-4 で直しました）。
+ *
+ *   ★以前は ★`ratesForTarget`（★勝負所 5.2 倍・直線 2.1 倍で組んだ tail）から道中を逆算し、
+ *   ★そのあとで 3 つとも 2 倍に切っていました。★切ると勝負所と直線が**伸びる**のに、
+ *   ★道中を**そのまま**にしていたので、★**達成できる目標まで超過していました。**
+ *
+ *   ★実測（2400m・目標 100 秒・`knotsOf`）:
+ *     ★旧 … 道中 1.5053 → ★107.521 秒（★+7.5 秒）
+ *     ★新 … 道中 1.6998 → ★**100.000 秒**（★上限 2 も等速区間も守ったまま）
+ *
+ * ⚠️ ★**それでも目標に届かない領域はあります**（★本番の 45.7 秒など）。
+ *    ★そのときは上限のほうを優先し、★`racePaceReport` の `achieved` が false になります。
+ *    ★「切った」ことと「達成できなかった」ことは ★**別のこと**です（★F-5）。
  */
 export function readableRaceRates(knots: PhaseKnots, targetSec: number): PhaseRates {
-  const rates = ratesForTarget(knots, targetSec);
+  const base = ratesForTarget(knots, targetSec);
+  const tail = {
+    spurt: Math.min(READABLE_MAX_RATE, base.spurt),
+    straight: Math.min(READABLE_MAX_RATE, base.straight),
+    /**
+     * ⚠️ ★`PhaseRates` では ★`goal` / `start` は省略可なので、★型の上では `undefined` を含みます。
+     *    ★`ratesForTarget` は必ず `GOAL_RATE` を入れますが、★**型に頼らず**受け直します
+     *    （★`exactOptionalPropertyTypes` が有効なので、★素通しは通りません）。
+     */
+    goal: base.goal ?? GOAL_RATE,
+    start: base.start ?? GOAL_RATE,
+  };
+  const maxCruise = Math.min(READABLE_MAX_RATE, MAX_CRUISE);
   return {
-    ...rates,
-    cruise: Math.min(READABLE_MAX_RATE, rates.cruise),
-    spurt: Math.min(READABLE_MAX_RATE, rates.spurt),
-    straight: Math.min(READABLE_MAX_RATE, rates.straight),
+    ...tail,
+    cruise: cruiseForDisplayTarget(knots, targetSec, tail, MIN_CRUISE, maxCruise),
   };
 }
 
@@ -367,6 +423,17 @@ export function ratesForPolicy(
   return policy === 'legacy' ? ratesForTarget(knots, targetSec) : readableRaceRates(knots, targetSec);
 }
 
+/**
+ * ★**目標を達成したとみなす許容差**（秒）。
+ *
+ *   ★`readable` は実物の写像の上で探索するので、★達成できる領域では誤差は 1e-6 未満です。
+ *   ★`legacy` は区間時間の足し算で逆算するため、★補間のぶん ★0.4 秒ほどずれます。
+ *   → ★両方を同じ物差しで見られる値として ★0.5 秒を採ります。
+ * ⚠️ ★これは ★**「目標に合ったか」の物差し**であって、★**許容尺ではありません。**
+ *    ★何秒までなら商品として許すかは ★オーナー判断です（★裁定 §3）。
+ */
+export const RACE_PACE_TOLERANCE_SEC = 0.5;
+
 /** ★`racePaceReport` の戻り。★目標と実尺の差を **黙って捨てない** ための記録 */
 export interface RacePaceReport {
   readonly policy: RacePacePolicy;
@@ -374,28 +441,78 @@ export interface RacePaceReport {
   readonly targetSec: number;
   /** ★実際に出る本編の表示時間 */
   readonly displaySec: number;
-  /** ★実尺 − 目標（★正なら目標より長い）*/
+  /** ★実尺 − 目標（★正なら目標より長い・★負なら短い）*/
   readonly overshootSec: number;
-  /** ★可読性の上限で切られた局面。★空なら目標が実現できている */
-  readonly cappedPhases: readonly ('cruise' | 'spurt' | 'straight')[];
+  /**
+   * ★**可読性の上限で、固定値より下げた局面**（★2026-09-09・F-5 で意味を限定しました）。
+   *
+   * ⚠️ ★**これは「目標を達成したか」ではありません。** ★裁定 §4 の反例:
+   *   ★`legacy` ・目標 1 秒     … ★`cappedPhases` は ★**空**だが ★超過 +43.94 秒
+   *   ★`readable`・目標 150 秒  … ★`spurt`/`straight` が入るが ★超過 ★**−9.50 秒**（★短い）
+   *   → ★「空なら達成」も「切られていれば必ず超過が正」も ★**どちらも偽**です。
+   * ★達成したかは ★`achieved` を見ること。
+   */
+  readonly cappedPhases: readonly ('spurt' | 'straight')[];
+  /**
+   * ★**道中の送りが端に張り付いたか**（★目標がその方針で届かない領域にある）。
+   *   `'max'` … ★これ以上速くできない（★目標が短すぎる）
+   *   `'min'` … ★これ以上遅くできない（★目標が長すぎる）
+   *   `null`  … ★端ではない
+   */
+  readonly saturation: 'max' | 'min' | null;
+  /** ★目標に合ったか（★`|overshootSec| <= toleranceSec`）。★これが達成判定です */
+  readonly achieved: boolean;
+  readonly toleranceSec: number;
   readonly rates: PhaseRates;
 }
 
 /**
- * ★**目標と、実際に出る尺と、その差**を返す（★裁定 §3 Q-1a-4/5）。
+ * ★**画面の時計を作る唇一の部品**（★2026-09-09・F-3・裁定 §2）。
+ *
+ * 【★なぜ部品にするか】
+ *   ★前の便では★`ratesForPolicy` を共有しましたが、★**その戻り値を捨てても**
+ *   ★検定が通りました。★レビュー側が ★`void ratesForPolicy(...)` を残したまま
+ *   ★時計を固定倍率へ差し替えた写しを作り、★**4 判定すべてが成功**しました。
+ *
+ * ★画面も監査道具も ★**この関数の戻り値そのもの**を使います。
+ * ★同じ入力（knots・距離・方針）なら ★**同じ時計**になることを検定で照合できます。
+ */
+export function raceClockFor(
+  knots: PhaseKnots, distanceMeter: number, policy: RacePacePolicy,
+): TimeWarp {
+  return timeWarpFor(knots, ratesForPolicy(knots, targetDisplaySec(distanceMeter), policy));
+}
+
+/**
+ * ★**目標と、実際に出る尺と、その差**を返す（★裁定 §3 Q-1a-4/5・§4 F-5）。
  *
  * ⚠️ ★「上限で切ったから目標に届かない」ことを ★**測って残す**ための関数です。
  *    ★これが無いと、★尺が延びたことが ★どこにも記録されないまま通ります（★D-093 と同じ形）。
+ * ⚠️ ★**「制限あり」と「達成不能」を同義にしないこと**（★F-5）。★別のフィールドに分けてあります。
  */
 export function racePaceReport(
   knots: PhaseKnots, targetSec: number, policy: RacePacePolicy,
+  toleranceSec: number = RACE_PACE_TOLERANCE_SEC,
 ): RacePaceReport {
   const rates = ratesForPolicy(knots, targetSec, policy);
-  const uncapped = ratesForTarget(knots, targetSec);
-  const cappedPhases = (['cruise', 'spurt', 'straight'] as const)
-    .filter((p) => rates[p] < uncapped[p] - 1e-12);
+  /**
+   * ★勝負所と直線は ★**固定値**（`FIXED_SPURT_RATE` / `FIXED_STRAIGHT_RATE`）です。
+   * ★可読性方針はそれを上限で下げます。★下げたかどうかを見ます。
+   * ⚠️ ★`cruise` はここに入れません。★あれは目標から逆算する値で、
+   *    ★端に張り付いたかどうかは ★`saturation` のほうの話です（★別の制約）。
+   */
+  const cappedPhases = ([['spurt', FIXED_SPURT_RATE], ['straight', FIXED_STRAIGHT_RATE]] as const)
+    .filter(([phase, fixed]) => rates[phase] < fixed - 1e-12)
+    .map(([phase]) => phase);
+  const maxCruise = policy === 'legacy' ? MAX_CRUISE : Math.min(READABLE_MAX_RATE, MAX_CRUISE);
+  const saturation = rates.cruise >= maxCruise - 1e-12 ? 'max'
+    : rates.cruise <= MIN_CRUISE + 1e-12 ? 'min' : null;
   const displaySec = timeWarpFor(knots, rates).displaySec;
-  return { policy, targetSec, displaySec, overshootSec: displaySec - targetSec, cappedPhases, rates };
+  const overshootSec = displaySec - targetSec;
+  return {
+    policy, targetSec, displaySec, overshootSec, cappedPhases, saturation,
+    achieved: Math.abs(overshootSec) <= toleranceSec, toleranceSec, rates,
+  };
 }
 
 export function timeWarpFor(knots: PhaseKnots, rates: PhaseRates = DEFAULT_PHASE_RATES): TimeWarp {

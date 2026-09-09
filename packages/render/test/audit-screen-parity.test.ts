@@ -20,6 +20,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { buildAuditRace, auditClock, auditPaceReport } from '../../../tools/lib/race-audit-build.mjs';
+import { knotsFor, raceClockFor } from '../src/index.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const AUDIT_SRC = path.join(ROOT, 'tools/lib/race-audit-build.mjs');
@@ -63,6 +64,31 @@ describe('★監査道具と画面の入力の一致', () => {
       // ★可読性方針では上限で切られるので、★必ず目標より長くなる
       expect(rep.cappedPhases.length, `直線 ${hs}m`).toBeGreaterThan(0);
       expect(rep.overshootSec, `直線 ${hs}m`).toBeGreaterThan(0);
+    }
+  });
+
+  /**
+   * ★**画面と監査が、同じ入力から同じ時計を返すこと**（★2026-09-09・F-3・裁定 §2）
+   *
+   * ★画面は `raceClockFor(knots, DIST, policy)` を呼びます（★構文木で確認済み・
+   * ★`apps/cli/test/race-clock-wiring.test.ts`）。★ここでは ★**その部品自体**を
+   * ★画面と同じ引数で呼び、★監査道具が組んだ時計と ★突き合わせます。
+   *
+   * ⚠️ ★直線長が片方だけ 400 に戻ると、★**400m 以外の会場でここが落ちます**
+   *    （★裁定が名指しした故障）。
+   */
+  it('★★画面と監査が同じ時計を返す（★直線長が片方だけ 400 なら落ちる）', () => {
+    for (const hs of STRAIGHTS) {
+      const built = buildAuditRace({ seed: 42, distance: 1600, spec: specOf(hs) });
+      const fromAudit = auditClock(built).warp;
+      // ★画面と同じ手順（`page.tsx` の `build()` と同じ引数）
+      const knots = knotsFor(built.boundaries, 3, built.model.straightMeters);
+      const fromScreenPart = raceClockFor(knots, built.DIST, 'readable');
+      expect(fromScreenPart.displaySec, `直線 ${hs}m`).toBeCloseTo(fromAudit.displaySec, 9);
+      for (let i = 0; i <= 20; i++) {
+        const d = (fromAudit.displaySec * i) / 20;
+        expect(fromScreenPart.raceSecAt(d), `直線 ${hs}m の ${d} 秒`).toBeCloseTo(fromAudit.raceSecAt(d), 9);
+      }
     }
   });
 

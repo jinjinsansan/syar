@@ -18,8 +18,8 @@ import {
 import {
   DEMO_CONTEST_GAMMA, finishReplayAt, finishCrossDisplaySec, raceTotalDisplaySec,
   ovalCourse, replayPositionModel, finalOrderOf,
-  trafficPositionModel, ratesForPolicy, racePaceReport, homeStretchMetersOf,
-  knotsFor, targetDisplaySec, timeWarpFor, withFinishRunOut, finishSpeedsOf,
+  trafficPositionModel, raceClockFor, racePaceReport, homeStretchMetersOf,
+  knotsFor, targetDisplaySec, withFinishRunOut, finishSpeedsOf,
   broadcastV2StartLagM, broadcastV2FinishStyleOf, resolveBroadcastV2Scene,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT, LANE_ALIGNED_FOCUS_DEFAULT,
 } from '@star/render';
@@ -185,7 +185,7 @@ export function auditClock(built, ownGate = RACE_DEFAULTS.ownGate) {
    * ⚠️ ★**分岐をここに書かないこと**（★2026-09-09・裁定 §3 Q-1a-1）。
    *    ★`page.tsx` と★**完全に同じ関数**を通します。
    */
-  const warp = timeWarpFor(knots, ratesForPolicy(knots, targetDisplaySec(built.DIST), racePacePolicyOf(built)));
+  const warp = raceClockFor(knots, built.DIST, racePacePolicyOf(built));
   const finishSec = new Map(built.boundaries.map((b) => [b.gate, b.finishSec]));
   let finishStyle = 'solo';
   for (let sec = 0; sec <= warp.raceSecAt(warp.displaySec) + 1e-9; sec += 0.05) {
