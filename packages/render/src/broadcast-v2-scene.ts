@@ -31,6 +31,7 @@ import {
   broadcastV2AnchorWeight,
   broadcastV2ContenderFov,
   broadcastV2CutProgress,
+  broadcastV2ShotSpanM,
   broadcastV2FinishCamera,
   broadcastV2FocusMeters,
   broadcastV2LeadFrameFocusMeters,
@@ -56,6 +57,11 @@ export interface BroadcastV2Scene {
   readonly visibleHorses: readonly BroadcastV2Horse[];
   /** コーナー専用カットの進行率（0→1）。1 枚絵のパン・ズームに使う。カット外は 0 */
   readonly cutProgress: number;
+  /**
+   * ★**いまのカットの入口の位置**（m）。★左右の向きをカット内で一定に保つために使います
+   *   （★`broadcastV2ShotSpanM` の注記・2026-09-09）。★無いときは注視点で代用します。
+   */
+  readonly shotAnchorS?: number;
 }
 
 export interface BroadcastV2FrameLibrary<TImage> {
@@ -423,6 +429,7 @@ export function resolveBroadcastV2Scene(
     camera: cameraAt(cameraFocusS),
     visibleHorses: allFinished ? leaders : visibleFor(horses, focusS, shot.maxVisible),
     cutProgress: broadcastV2CutProgress(course, leaderS, options.cornerCutM),
+    shotAnchorS: broadcastV2ShotSpanM(course, leaderS, options.script ?? DEFAULT_RACE_SCRIPT).start,
   };
 }
 
@@ -449,6 +456,10 @@ function visibleFor(
 /** Webと動画書き出しが共有するBroadcast V2の唯一の世界描画入口。 */
 /** ★直前に描いたカットの「馬とカメラの相対角（度）」。★測定用に読むだけ */
 let lastShotViewDeg = 0;
+/** ★診断用の控え（★描画には使いません） */
+let lastDiag: unknown = null;
+/** ★直前のコマの診断用の控えを読む */
+export function getLastRaceDiagnostic(): unknown { return lastDiag; }
 export function getLastShotViewDeg(): number { return lastShotViewDeg; }
 
 export function drawBroadcastV2Scene<TImage>(
@@ -709,6 +720,21 @@ export function drawBroadcastV2Scene<TImage>(
    *   **注視点（馬群の中心）の向きを 1 回だけ求めて、全馬に同じものを使います。**
    */
   const shotView = ((): { viewDeg: number; forwardDx: number } => {
+    /**
+     * ★**左右の向きは、カットの入口で 1 回だけ決めます**（★2026-09-09）
+     *
+     *   ★据え置きカメラのカット（`fourth-corner-front` の 1 つだけ）では、
+     *   ★馬群がカメラの ★**真正面（180°）を通り抜けます**。★そこでは左右が定義できず、
+     *   ★実測で ★**12 頭が 1 コマで反転**していました（★18.2s・目視確認済み）。
+     *   ★入口の位置で決めた向きを、★カットの間ずっと使います。
+     *
+     *   ⚠️ ★追従カメラのカットには当てません。★入口はカメラのはるか後ろにあり、
+     *      ★投影がかえって狂います。★据え置きカメラは製品にこの 1 つだけです。
+     */
+    const anchorS = scene.shot.fixedCamera !== undefined && scene.shotAnchorS !== undefined
+      ? scene.shotAnchorS : scene.focusS;
+    const a0 = posOf(course, anchorS, scene.focusW);
+    const a1 = posOf(course, anchorS + 1, scene.focusW);
     const p0 = posOf(course, scene.focusS, scene.focusW);
     const p1 = posOf(course, scene.focusS + 1, scene.focusW);
     const fx = p1.x - p0.x, fy = p1.y - p0.y;
@@ -716,8 +742,8 @@ export function drawBroadcastV2Scene<TImage>(
     const fl = Math.hypot(fx, fy) || 1, vl = Math.hypot(vx, vy) || 1;
     const cosT = Math.max(-1, Math.min(1, (fx * vx + fy * vy) / (fl * vl)));
     const basis = cameraBasis(scene.camera);
-    const q0 = project(scene.camera, basis, { x: p0.x, y: p0.y, z: 0 });
-    const q1 = project(scene.camera, basis, { x: p1.x, y: p1.y, z: 0 });
+    const q0 = project(scene.camera, basis, { x: a0.x, y: a0.y, z: 0 });
+    const q1 = project(scene.camera, basis, { x: a1.x, y: a1.y, z: 0 });
     return { viewDeg: (Math.acos(cosT) * 180) / Math.PI, forwardDx: q1.x - q0.x };
   })();
   /**
@@ -726,6 +752,44 @@ export function drawBroadcastV2Scene<TImage>(
    *   ⚠️ ★描画には使いません。★読むだけの窓です。
    */
   lastShotViewDeg = shotView.viewDeg;
+  /**
+   * ★**診断用の控え**（★2026-09-09・レビュー側の指示②）
+   *   ★各馬について ★「足元」と「接線方向へ 3m 進んだ点」を ★同じカメラで投影します。
+   *   ★2 点を結べば ★**その馬が本来向くべき向き**の矢印になります。
+   *   ★あわせて、★使っている素材と、★カメラに対する角度も控えます。
+   * ⚠️ ★**描画には一切影響しません。** ★読むだけの控えです。
+   */
+  {
+    const basis2 = cameraBasis(scene.camera);
+    const useRear2 = opts.directionalSets?.rear === true && shotView.viewDeg < 60;
+    const useFront2 = opts.directionalSets?.front === true && shotView.viewDeg > 120;
+    const assetKey = useRear2 ? 'diag-rear-v2' : useFront2 ? 'diag-front-v2' : 'side-v6';
+    lastDiag = {
+      shot: scene.shot.id,
+      shotViewDeg: shotView.viewDeg,
+      asset: assetKey,
+      flip: shotView.forwardDx < 0,
+      horses: scene.visibleHorses.map((h) => {
+        const a = posOf(course, h.s, h.w);
+        const b = posOf(course, h.s + 3, h.w);
+        const qa = project(scene.camera, basis2, { x: a.x, y: a.y, z: 0 });
+        const qb = project(scene.camera, basis2, { x: b.x, y: b.y, z: 0 });
+        /** ★その馬 1 頭についての、進行方向とカメラの相対角 */
+        const fx = b.x - a.x; const fy = b.y - a.y;
+        const vx = a.x - scene.camera.eye.x; const vy = a.y - scene.camera.eye.y;
+        const cos = Math.max(-1, Math.min(1, (fx * vx + fy * vy)
+          / ((Math.hypot(fx, fy) || 1) * (Math.hypot(vx, vy) || 1))));
+        return {
+          gate: h.gate,
+          x0: qa.x, y0: qa.y, x1: qb.x, y1: qb.y,
+          ownViewDeg: (Math.acos(cos) * 180) / Math.PI,
+        };
+      }),
+    };
+    if (typeof globalThis !== 'undefined') {
+      (globalThis as { __raceDiag?: unknown }).__raceDiag = lastDiag;
+    }
+  }
   drawPerspectiveHorses(ctx, course, scene.camera, scene.visibleHorses, {
     ...library,
     frameSetOf: directional ? (horse) => {

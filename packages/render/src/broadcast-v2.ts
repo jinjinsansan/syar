@@ -1109,6 +1109,39 @@ export function broadcastV2ShotEndM(
 }
 
 /**
+ * ★**いま映しているカットが、どこからどこまでか**（m）
+ *
+ * 【★なぜ要るか — ★2026-09-09 の実測】
+ *   ★`fourth-corner-front` は ★**据え置きカメラ**で、★馬群がその正面を通り抜けます。
+ *   ★カメラに対する角度は ★**158° → 180° → 158°** と ★真正面（180°）を通ります。
+ *   ★左右どちらを向いているかは ★「進行方向を画面の横方向に投影した符号」で決めていますが、
+ *   ★**180° ではその符号は 0** です。★そこで符号が裏返り、
+ *   ★**12 頭ぜんぶが 1 コマ（0.1 秒）で左右反転**していました（★実測・目視確認済み）。
+ *
+ *   ★他の 8 カットは角度が一定（87°/158°/168° など）なので、★この現象は起きません。
+ *   ★レース全体 12 カット中、★起きていたのは ★**このカットの 18.2s の 1 か所だけ**です。
+ *
+ * → ★左右の向きは ★**カットの入口の位置**で 1 回だけ決め、★カットの間は変えません。
+ *   ★`broadcast-v2-scene.ts` の注記「向きと素材は、カットにつき 1 つだけ決めます」は
+ *   ★もともとその意図でしたが、★**左右反転だけがコマ単位のまま**残っていました。
+ *
+ * ⚠️ ★同じ `id` が台本に何度も出ます（`side-drive` は 3 回）。
+ *    ★だから ★**id ではなく、いまの位置**で区間を引きます。
+ */
+export function broadcastV2ShotSpanM(
+  course: Course, meters: number, script: BroadcastV2Script = DEFAULT_RACE_SCRIPT,
+): { readonly start: number; readonly end: number } {
+  /** ⚠️ ★境界は 1 か所から取ります（`broadcastV2ShotAt` の注記） */
+  const rows = broadcastV2ScriptBoundariesM(course, script);
+  let start = 0;
+  for (const r of rows) {
+    if (meters < r.meters) return { start, end: r.meters };
+    start = r.meters;
+  }
+  return { start, end: course.distance };
+}
+
+/**
  * ★台本 v4 — **オーナー判定（2026-08-21・12 カット全数）で合格した方向だけで構成する**
  *
  * 【判定の結果】`JUDGE_RACE_CUTS_20260821.md`
