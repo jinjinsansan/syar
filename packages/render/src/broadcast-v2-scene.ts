@@ -499,6 +499,12 @@ export function drawBroadcastV2Scene<TImage>(
     /** 走行周期の位相（0〜1）。あればコマ数に依存しない選択（perspective-draw 参照） */
     readonly phaseOf?: ((gate: number) => number) | undefined;
     readonly horseBob?: number | undefined;
+    /**
+     * ★**診断に出す素材の素性**（★2026-09-10・★指示書 B-1）。
+     *   ★描画には一切使いません。★`__raceDiag` に写すだけです。
+     *   ★役ではなく ★**実際に読めた素材の名前**・★配置の決め方・★較正値・★予備へ落ちたか。
+     */
+    readonly materialDiag?: Readonly<Record<string, unknown>> | undefined;
     /** ★承認水準の方向別素材が揃っている集合。揃っていない方向は真横素材で代用 */
     readonly directionalSets?: { readonly rear?: boolean; readonly front?: boolean } | undefined;
     /** ★毛色バリエーション（馬ごとの CSS filter） */
@@ -795,6 +801,8 @@ export function drawBroadcastV2Scene<TImage>(
       shotViewDeg: shotView.viewDeg,
       asset: assetKey,
       flip: shotView.forwardDx < 0,
+      /** ★素材の素性（★読めた名前・配置・較正・予備落ち）。★描画には使いません */
+      ...(opts.materialDiag === undefined ? {} : { material: opts.materialDiag }),
       horses: scene.visibleHorses.map((h) => {
         const a = posOf(course, h.s, h.w);
         const b = posOf(course, h.s + 3, h.w);
@@ -809,6 +817,9 @@ export function drawBroadcastV2Scene<TImage>(
           gate: h.gate,
           x0: qa.x, y0: qa.y, x1: qb.x, y1: qb.y,
           ownViewDeg: (Math.acos(cos) * 180) / Math.PI,
+          /** ★実際に描いたコマ番号と位相（★指示書 B-1・★脚の連続を追うため） */
+          frame: opts.frameOf(h.gate),
+          ...(opts.phaseOf === undefined ? {} : { phase: opts.phaseOf(h.gate) }),
         };
       }),
     };

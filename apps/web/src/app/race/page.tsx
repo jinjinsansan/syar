@@ -77,6 +77,9 @@ import {
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
+  horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
+  horseCalibrationFor, LEGACY_HORSE_CALIBRATION, type HorseMaterialCalibration,
+  type HorsePlacement, type HorsePlacementFrame, type HorsePlacementSet, type HorsePlacementMode,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 import { raceSetupFromParam, gradedRacesByVenue } from '@star/scheduler';
@@ -124,6 +127,19 @@ const FIELD = 12;
 const LEGACY_MOTION = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('motion') === 'legacy';
 const RACE_PACE_POLICY: RacePacePolicy = LEGACY_MOTION ? 'legacy' : 'readable';
+/**
+ * ★**当て込み前の配置へ戻す口**（`?placement=legacy`・★2026-09-10）。
+ *
+ *   ★修正前後を ★**同じビルドの中で**見比べるために置きます（★`?motion=legacy` と同じ作法）。
+ *   ★背景・カメラ・台本・素材が完全に同じ条件で、★配置だけが替わります。
+ *
+ * ⚠️ ★**この口は旧処理へ戻す方向にしか効きません。**
+ *    ★`'measured-ground'` を返すことはありません。★既定の画面（★引数なし）が
+ *    ★修正後であることは `race-placement-wiring.test.ts` が構文木で固定します。
+ */
+const PLACEMENT_OVERRIDE: HorsePlacementMode | undefined = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('placement') === 'legacy'
+  ? 'legacy-table' : undefined;
 const W = 1280;
 const H = 720;
 /**
@@ -1369,6 +1385,13 @@ export default function RacePage(): React.JSX.Element {
   const callLastSecRef = useRef<number>(-Infinity);
   const artRef = useRef<{
     pal: unknown;
+    /**
+     * ★**この素材の較正値**（★1 完歩・浮き・★2026-09-10）。
+     *   ★配置の決め方と ★**同じ鍵**（★実際に読めた素材の名前）から引きます。
+     */
+    calibration: HorseMaterialCalibration;
+    /** ★診断用の素材の素性（★描画には使いません・★`__raceDiag` に出ます） */
+    materialDiag: Readonly<Record<string, unknown>>;
     raceTitle: HTMLImageElement;
     raceNarrator: HTMLImageElement;
     /**
@@ -1459,9 +1482,25 @@ export default function RacePage(): React.JSX.Element {
    *   ⚠️ ★描画層だけの値です。★着順・位置・タイムには一切効きません（★憲法3）。
    */
   const [horseScale, setHorseScaleState] = useState(1);
-  const [horseBob, setHorseBob] = useState(1);
-  const [strideM, setStrideM] = useState(BROADCAST_STRIDE_M);
+  /**
+   * ★**つまみの初期値は「素材の較正値」から引きます**（★2026-09-10・★F-G4）。
+   *
+   *   ★`null` … ★素材の較正値に従う（★既定）／★数値 … ★オーナーが手で動かした値。
+   *
+   * ⚠️ ★ここに定数を書いて既定にすると、★**次の素材でまた同じ取り違えが起きます**。
+   *    ★当て込み（`ef5fd46`）は素材を運びましたが、★検証台で目で決めた
+   *    ★「1 完歩 5.60m」「浮き 30%」を運んでいませんでした。
+   */
+  const [horseBobOverride, setHorseBobOverride] = useState<number | null>(null);
+  const [strideOverrideM, setStrideOverrideM] = useState<number | null>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
+  /**
+   * ★素材の較正値。★まだ読めていなければ従来素材の値へ倒します（★R-27・狭い側）。
+   * ⚠️ ★`artRef` は ref ですが、★読み込み後に `setReady(true)` で再描画が入るので反映されます。
+   */
+  const calibration = artRef.current?.calibration ?? LEGACY_HORSE_CALIBRATION;
+  const horseBob = horseBobOverride ?? calibration.bob;
+  const strideM = strideOverrideM ?? calibration.strideM;
   const [startRampSec, setStartRampSec] = useState(1.6);
   const [startShake, setStartShake] = useState(1);
   useEffect(() => {
@@ -1905,6 +1944,11 @@ export default function RacePage(): React.JSX.Element {
          *   ★受け持たない枠は空を返します。★混ぜる側はその枠を読みません。
          */
         ownsGate?: (gate: number) => boolean,
+        /**
+         * ★**配置の決め方**（★2026-09-10）。★既定は従来のまま（★旧素材を動かさない）。
+         *   ★`'measured-ground'` を渡した組だけが ★コマ別拡縮をやめ、★実測の浮きに乗ります。
+         */
+        placementMode: HorsePlacementMode = 'legacy-table',
       ): readonly (readonly HighQualityHorseFrame[])[] => {
         const measured = images.map((image) => ({ image, source: opaqueBounds(image) }));
         const referenceHeight = referenceHeightOverride ?? Math.max(...measured.map((frame) => frame.source.height));
@@ -1917,13 +1961,37 @@ export default function RacePage(): React.JSX.Element {
          */
         const refs = anchorsOverride ?? measured.map((frame) => saddleReference(frame.image, frame.source, silksLayout));
         const anchors = measured.map((frame, index) => refs[index] ?? bodyCentroid(frame.image, frame.source));
-        const widths = refs.flatMap((ref) => (ref === undefined ? [] : [ref.width]));
-        const medianWidth = widths.length === 0 ? 0 : [...widths].sort((a, b) => a - b)[Math.floor(widths.length / 2)]!;
-        const scaleFix = (index: number): number => {
-          const ref = refs[index];
-          if (ref === undefined || medianWidth <= 0) return 1;
-          return Math.max(0.92, Math.min(1.08, ref.width / medianWidth));
-        };
+        /**
+         * ★**配置は `@star/render` の `horseFramePlacement` が決めます**（★2026-09-10・F-G1 / F-G2）。
+         *   ★ここに式を置くと、★検査もプローブも「書き写して再現」しかできない（★R-30）。
+         * ⚠️ ★`placementMode` が `'legacy-table'` の組（★旧素材）は ★**1 画素も変わりません**。
+         */
+        const placementFrames: HorsePlacementFrame[] = measured.map((frame, index) => ({
+          frameHeightSourcePx: frame.source.height,
+          anchorYSourcePx: anchors[index]!.y - frame.source.y,
+          /** ⚠️ ★幅は鞍布が取れたコマにしかありません（★胴体重心へ落ちたコマは従来も拡縮の対象外） */
+          anchorWidthSourcePx: refs[index]?.width ?? 0,
+          anchorIsSaddle: refs[index] !== undefined,
+          /** ★輪郭の下端 ÷ 原版の画布の高さ（★焼いた素材の `nativeBounds` と同じ規則） */
+          lowRatio: (frame.source.y + frame.source.height) / imgH(frame.image),
+        }));
+        const feetRatio = feetRatioOf(placementFrames.map((f) => f.lowRatio));
+        const legacyMedian = medianAnchorWidth(placementFrames);
+        const legacyLifts = measured.map((frame, index) => flightLiftFor(index, images.length)
+          * (imgH(frame.image) / LIFT_REFERENCE_HEIGHT_PX));
+        const placementOf = (index: number): HorsePlacement => horseFramePlacement(
+          placementMode === 'measured-ground'
+            ? {
+              mode: 'measured-ground', referenceHeight, feetRatio,
+              canvasHeightSourcePx: imgH(measured[index]!.image),
+            }
+            : {
+              mode: 'legacy-table', referenceHeight, feetRatio,
+              canvasHeightSourcePx: imgH(measured[index]!.image),
+              legacyMedianAnchorWidth: legacyMedian, legacyFlightLiftSourcePx: legacyLifts,
+            },
+          placementFrames[index]!, index,
+        );
         const shadows = measured.map((frame) => bakeShadowSilhouette(frame.image, frame.source));
         /**
          * ★毛色は**枠ごとに 1 回だけ焼き込みます**（2026-08-21）。
@@ -1941,18 +2009,20 @@ export default function RacePage(): React.JSX.Element {
         return silksByGate.map((_, gateIndex) => {
           if (ownsGate !== undefined && !ownsGate(gateIndex + 1)) return [];
           const baked = bakedFor(coatOf(gateIndex + 1));
-          return measured.map((frame, frameIndex) => ({
-          ...frame,
-          image: baked[frameIndex] ?? frame.image,
-          referenceHeight: referenceHeight * scaleFix(frameIndex),
-          // ★基準画布（1536px）での値を、この素材の画布の高さで比例させる（上の注記）
-          groundLiftSourcePx: (HORSE_GROUND_LIFTS[frameIndex] ?? 0) * (imgH(frame.image) / LIFT_REFERENCE_HEIGHT_PX),
-          shadow: shadows[frameIndex],
-          bodyAnchorSourcePx: anchors[frameIndex]!,
-          bodyLiftSourcePx: (frame.source.y + frame.source.height - anchors[frameIndex]!.y)
-            + flightLiftFor(frameIndex, images.length) * (imgH(frame.image) / LIFT_REFERENCE_HEIGHT_PX),
-          overlay: overlays[frameIndex]?.[gateIndex],
-          }));
+          return measured.map((frame, frameIndex) => {
+            const placed = placementOf(frameIndex);
+            return {
+              ...frame,
+              image: baked[frameIndex] ?? frame.image,
+              referenceHeight: placed.referenceHeight,
+              // ★基準画布（1536px）での値を、この素材の画布の高さで比例させる（上の注記）
+              groundLiftSourcePx: (HORSE_GROUND_LIFTS[frameIndex] ?? 0) * (imgH(frame.image) / LIFT_REFERENCE_HEIGHT_PX),
+              shadow: shadows[frameIndex],
+              bodyAnchorSourcePx: anchors[frameIndex]!,
+              bodyLiftSourcePx: placed.bodyLiftSourcePx,
+              overlay: overlays[frameIndex]?.[gateIndex],
+            };
+          });
         });
       };
       /**
@@ -1969,6 +2039,7 @@ export default function RacePage(): React.JSX.Element {
         byType: Readonly<Partial<Record<HorseType, readonly FrameImage[]>>>,
         referenceHeightOverride?: number,
         silksLayout: SilksLayout = SILKS_LAYOUT_CROUCH,
+        placementMode: HorsePlacementMode = 'legacy-table',
       ): readonly (readonly HighQualityHorseFrame[])[] => {
         const built = new Map<HorseType, readonly (readonly HighQualityHorseFrame[])[]>();
         for (const t of HORSE_TYPES_IN_USE) {
@@ -1977,7 +2048,7 @@ export default function RacePage(): React.JSX.Element {
           /** ★型が 1 つしか無いときは全枠を受け持ちます（★型を使わない構成へ戻せるように） */
           const only = byType.b === undefined && byType.c === undefined;
           built.set(t, buildFrames(images, referenceHeightOverride, silksLayout, undefined,
-            only ? undefined : (gate) => typeOf(gate) === t));
+            only ? undefined : (gate) => typeOf(gate) === t, placementMode));
         }
         const fallback = built.get('a') ?? [...built.values()][0];
         if (fallback === undefined) return [];
@@ -2029,13 +2100,6 @@ export default function RacePage(): React.JSX.Element {
             sourceX: src.x, sourceY: src.y,
           }));
         const refH = referenceHeightOverride ?? set.referenceHeight;
-        const widths = set.frames.flatMap((t) => (t.anchorKind === 'saddle' ? [t.anchor.width] : []));
-        const medianWidth = widths.length === 0 ? 0 : [...widths].sort((a, b) => a - b)[Math.floor(widths.length / 2)]!;
-        const scaleFix = (index: number): number => {
-          const t = set.frames[index];
-          if (t === undefined || t.anchorKind !== 'saddle' || medianWidth <= 0) return 1;
-          return Math.max(0.92, Math.min(1.08, t.anchor.width / medianWidth));
-        };
         /**
          * ★浮きの量（`HORSE_GROUND_LIFTS` / `flightLiftFor`）は ★**1536px の画布**が基準です。
          *   ★焼いた絵では画布も同じ倍率で縮んでいるので、★その比を掛けます。
@@ -2043,25 +2107,54 @@ export default function RacePage(): React.JSX.Element {
          *    ★原版の画布の高さではありません。
          */
         const liftRatio = (set.nativeCanvasHeight * set.scale) / LIFT_REFERENCE_HEIGHT_PX;
+        /**
+         * ★**配置は `@star/render` の `horseFramePlacement` が決めます**（★2026-09-10・F-G1 / F-G2）。
+         *   ★原版経路（`buildFrames`）と ★**同じ関数・同じ鍵（素材の名前）**を通します。
+         * ⚠️ ★`nativeBounds` は目録に既にあります。★焼き直しは要りません。
+         */
+        const placementFrames: HorsePlacementFrame[] = set.frames.map((t) => ({
+          frameHeightSourcePx: t.h,
+          anchorYSourcePx: t.anchor.y,
+          anchorWidthSourcePx: t.anchor.width,
+          anchorIsSaddle: t.anchorKind === 'saddle',
+          lowRatio: (t.nativeBounds.y + t.nativeBounds.height) / set.nativeCanvasHeight,
+        }));
+        const placementSet: HorsePlacementSet = placementModeFor(set.prefix) === 'measured-ground'
+          ? {
+            mode: 'measured-ground', referenceHeight: refH,
+            canvasHeightSourcePx: set.nativeCanvasHeight * set.scale,
+            feetRatio: feetRatioOf(placementFrames.map((f) => f.lowRatio)),
+          }
+          : {
+            mode: 'legacy-table', referenceHeight: refH,
+            canvasHeightSourcePx: set.nativeCanvasHeight * set.scale, feetRatio: 1,
+            legacyMedianAnchorWidth: medianAnchorWidth(placementFrames),
+            legacyFlightLiftSourcePx: set.frames.map((_, index) =>
+              flightLiftFor(index, set.frames.length) * liftRatio),
+          };
         return silksByGate.map((_, gateIndex) => {
           const atlas = atlasByCoat.get(coatOf(gateIndex + 1)) ?? bay;
-          return set.frames.map((t, index) => ({
-            image: atlas,
-            source: sources[index]!,
-            referenceHeight: refH * scaleFix(index),
-            groundLiftSourcePx: (HORSE_GROUND_LIFTS[index] ?? 0) * liftRatio,
-            shadow: shadows[index],
-            bodyAnchorSourcePx: { x: t.x + t.anchor.x, y: t.y + t.anchor.y },
-            bodyLiftSourcePx: (t.h - t.anchor.y)
-              + flightLiftFor(index, set.frames.length) * liftRatio,
-            overlay: overlays[index]?.[gateIndex],
-          }));
+          return set.frames.map((t, index) => {
+            const placed = horseFramePlacement(placementSet, placementFrames[index]!, index);
+            return {
+              image: atlas,
+              source: sources[index]!,
+              referenceHeight: placed.referenceHeight,
+              groundLiftSourcePx: (HORSE_GROUND_LIFTS[index] ?? 0) * liftRatio,
+              shadow: shadows[index],
+              bodyAnchorSourcePx: { x: t.x + t.anchor.x, y: t.y + t.anchor.y },
+              bodyLiftSourcePx: placed.bodyLiftSourcePx,
+              overlay: overlays[index]?.[gateIndex],
+            };
+          });
         });
       };
       /**
        * ★**焼いた素材を読む。** ★1 つでも欠けたら ★**丸ごと諦めて従来の経路へ落ちます**
        *   （★半分だけ焼いた絵で走らせない）。
        */
+      /** ★焼いた素材の「役 → 素材の名前」（★配置・較正の鍵。★`loadBakedLibraries` が埋めます） */
+      const bakedPrefixByRole = new Map<string, string>();
       const loadBakedLibraries = async (): Promise<Partial<Record<string, readonly (readonly HighQualityHorseFrame[])[]>> | undefined> => {
         const manifest = await fetch(`/art/baked/manifest.json?v=${ASSET_VERSION}`)
           .then((r) => (r.ok ? r.json() as Promise<BakedManifest> : null))
@@ -2083,6 +2176,8 @@ export default function RacePage(): React.JSX.Element {
           ...silksByGate.flatMap((_, index) => (typeOf(index + 1) === t ? [coatOf(index + 1) as string] : [])),
         ])];
         const setByRole = new Map(manifest.sets.map((set) => [set.role, set]));
+        /** ★役ではなく ★**素材の名前**で配置と較正を決めるため、★目録の対応を控えます（★2026-09-10） */
+        for (const set of manifest.sets) bakedPrefixByRole.set(set.role, set.prefix);
         /**
          * ⚠️ ★**描く組だけ読みます。** ★焼いてあっても、★描画側に経路が無ければ読みません
          *    （★原版側と同じ規則にします — ★片方だけ読むと、★何が効いているのか分からなくなります）。
@@ -2399,11 +2494,28 @@ export default function RacePage(): React.JSX.Element {
        * ⚠️ ★**焼いた素材で描くときは、原版の馬コマを 1 枚も読みません。**
        *    ★ここが読み込み量の本体です（★6 組 × 8 コマ・★復号後 208MB）。
        */
+      /**
+       * ★**どの素材名で読めたか**（★2026-09-10）。★原版経路の配置はこれを鍵にします。
+       *   ★`loadNativeSet` は後ろを予備として受けるので、★頼んだ名前と読めた名前は違いうる。
+       *   ★予備（★旧素材）へ落ちたまま新しい接地に乗せると、★別の素材に別の較正を当てることになる。
+       */
+      const resolvedNativePrefix = new Map<string, string>();
       const loadNativeSet = async (...prefixes: readonly string[]): Promise<FrameImage[] | undefined> => {
         if (bakedLibs !== undefined) return undefined;
-        for (const prefix of prefixes) { const got = await loadSet(prefix); if (got !== undefined) return got; }
+        for (const prefix of prefixes) {
+          const got = await loadSet(prefix);
+          if (got !== undefined) { resolvedNativePrefix.set(prefixes[0]!, prefix); return got; }
+        }
         return undefined;
       };
+      /**
+       * ★**全部が対象素材のときだけ**新しい接地に乗せます。
+       *   ★1 つでも予備（旧素材）へ落ちていたら組ぜんたいを従来へ倒す（★R-27・狭い側へ）。
+       */
+      const nativePlacementMode = (...keys: readonly string[]): HorsePlacementMode =>
+        keys.length > 0 && keys.every((key) =>
+          placementModeFor(resolvedNativePrefix.get(key)) === 'measured-ground')
+          ? 'measured-ground' : 'legacy-table';
       const rearV4 = await loadNativeSet('horse-jockey-diag-rear-v5', 'horse-jockey-diag-rear-v4');
       /**
        * ⚠️ ★**`WINNER_FOLLOW_REAR` が false の間、この 8 コマは 1 度も描かれません**（2026-09-02）。
@@ -2485,11 +2597,23 @@ export default function RacePage(): React.JSX.Element {
        *    ★型 A だけ 16 コマ・B/C は 8 コマになり、★枠ごとにコマ数が食い違うためです。
        *    ★`USE_MID_FRAMES` は現在 false なので、★実際にはここは通りません。
        */
+      /**
+       * ★**原版経路でも、焼いた経路と同じ配置になるように鍵を渡します**（★2026-09-10）。
+       *   ★型 B/C も含めて、★実際に読めた素材名で判定します。
+       */
+      const sideMode = PLACEMENT_OVERRIDE ?? (bakedLibs !== undefined
+        ? placementModeFor(bakedPrefixByRole.get('side-v6'))
+        : nativePlacementMode(sideSetName,
+          ...Object.keys(sideByType).map((t) => `horse-jockey-side-v8${t}`)));
+      const frontMode = PLACEMENT_OVERRIDE ?? (bakedLibs !== undefined
+        ? placementModeFor(bakedPrefixByRole.get('diag-front-v2'))
+        : nativePlacementMode('horse-jockey-diag-front-v4',
+          ...Object.keys(frontByType).map((t) => `horse-jockey-diag-front-v4${t}`)));
       const sideHighQuality = bakedLibs?.['side-v6'] ?? (midsReady
-        ? buildFrames(sideCycle)
-        : buildFramesByType({ a: sideCycle, ...sideByType }));
+        ? buildFrames(sideCycle, undefined, SILKS_LAYOUT_CROUCH, undefined, undefined, sideMode)
+        : buildFramesByType({ a: sideCycle, ...sideByType }, undefined, SILKS_LAYOUT_CROUCH, sideMode));
       const diagFrontHighQuality = bakedLibs?.['diag-front-v2'] ?? (frontV3 !== undefined
-        ? buildFramesByType({ a: frontV3, ...frontByType }, undefined, SILKS_LAYOUT_FRONT)
+        ? buildFramesByType({ a: frontV3, ...frontByType }, undefined, SILKS_LAYOUT_FRONT, frontMode)
         : buildFrames(await fallbackSet('horse-jockey-diag-front-v2')));
       /**
        * ★**この台本が描かない組は、組みません**（2026-09-03・実測）。
@@ -2514,6 +2638,37 @@ export default function RacePage(): React.JSX.Element {
           ? buildFrames(highDiagV3, undefined, SILKS_LAYOUT_REAR)
           : buildFrames(await fallbackSet('horse-jockey-high-diag-v2')));
       artRef.current = {
+        /**
+         * ★**較正値は真横の素材から引きます**（★2026-09-10・★F-G4）。
+         *   ★脚の位相は 1 頭につき 1 つで、★カットが替わっても連続します。★したがって
+         *   ★1 完歩は ★**レースにつき 1 つ**でなければならず、★台本 v6 で 53% を占める
+         *   ★真横の素材に合わせます。
+         * ⚠️ ★真横と斜め前で判定が割れたときは ★**従来へ倒します**（★R-27・狭い側）。
+         *    ★別々の較正の素材が同じ位相で混ざると、★どちらの蹄も地面と合いません。
+         */
+        calibration: horseCalibrationFor(
+          sideMode === 'measured-ground' && frontMode === 'measured-ground'
+            ? 'measured-ground' : 'legacy-table'),
+        /**
+         * ★**どの素材をどの経路で読んだか**（★2026-09-10・★指示書 B-1）。
+         *   ★予備（旧素材）へ落ちた場合も見分けられるように、★頼んだ名前と読めた名前を並べます。
+         */
+        materialDiag: {
+          path: bakedLibs !== undefined ? 'baked' : 'native',
+          placementOverride: PLACEMENT_OVERRIDE ?? null,
+          sideMode,
+          frontMode,
+          sideRequested: sideSetName,
+          sideResolved: bakedLibs !== undefined
+            ? bakedPrefixByRole.get('side-v6') ?? null
+            : resolvedNativePrefix.get(sideSetName) ?? null,
+          frontResolved: bakedLibs !== undefined
+            ? bakedPrefixByRole.get('diag-front-v2') ?? null
+            : resolvedNativePrefix.get('horse-jockey-diag-front-v4') ?? null,
+          typesLoaded: {
+            side: Object.keys(sideByType), front: Object.keys(frontByType),
+          },
+        },
         pal, raceTitle: raceTitle!, raceNarrator: raceNarrator!, startingGate: startingGate!,
         ...(narratorSets !== undefined ? { narratorSets } : {}),
         raceBackstretch: raceBackstretch!, raceCornerExit: raceCornerExit!, raceFinish: raceFinish!,
@@ -3061,6 +3216,8 @@ export default function RacePage(): React.JSX.Element {
         phaseOf: (gate) => raceGaitPhase(raceD <= 0 ? 0
           : (metersByGate.get(gate) ?? 0) + gaitDelta, gate, STRIDE_M),
         horseBob,
+        /** ★診断だけに出します（★描画は 1 画素も変わりません・★指示書 B-1） */
+        materialDiag: { ...art.materialDiag, horseBob, strideM },
         frameRoleOf,
         surface,
         condition: trackCondition,
@@ -3943,8 +4100,8 @@ export default function RacePage(): React.JSX.Element {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
             {([
               ['馬の大きさ', horseScale, setHorseScaleState, 0.4, 2.5, 0.05, '倍'],
-              ['上下動・浮き', horseBob, setHorseBob, 0, 2, 0.05, '倍'],
-              ['1完歩', strideM, setStrideM, 2.5, 12, 0.02, 'm'],
+              ['上下動・浮き', horseBob, setHorseBobOverride, 0, 2, 0.05, '倍'],
+              ['1完歩', strideM, setStrideOverrideM, 2.5, 12, 0.02, 'm'],
               ['再生速度', playbackRate, setPlaybackRate, 0.1, 2, 0.05, '倍'],
               ['発走の加速時間', startRampSec, setStartRampSec, 0.2, 3, 0.1, '秒'],
               ['発走時のカメラ揺れ', startShake, setStartShake, 0, 2, 0.1, '倍'],
@@ -3959,7 +4116,8 @@ export default function RacePage(): React.JSX.Element {
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
             <button type="button" onClick={() => {
-              setHorseScaleState(1); setHorseBob(1); setStrideM(BROADCAST_STRIDE_M);
+              /** ★「初期値」＝ ★**素材の較正値**（★`null` に戻す）。★定数へ戻さない（★2026-09-10） */
+              setHorseScaleState(1); setHorseBobOverride(null); setStrideOverrideM(null);
               setPlaybackRate(1); setStartRampSec(1.6); setStartShake(1);
             }}>調整を初期値に戻す</button>
             <button type="button" disabled={!built} onClick={() => seekTo(RACE_INTRO_RACE_START_SEC - 0.2)}>ゲート発走へ</button>

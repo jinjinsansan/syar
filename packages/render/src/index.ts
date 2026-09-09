@@ -59,3 +59,4 @@ export * from './deformed-horse-pose.js';
 export * from './deformed-horse-draw.js';
 export * from './race-motion.js';
 export * from './traffic-motion.js';
+export * from './horse-ground.js';
