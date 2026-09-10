@@ -572,6 +572,12 @@ export const READONLY = [
    *   ★DB を見ない・画像と JSON を書くだけ。★台に注入した ★**撮影用の時計**へ
    *   ★進行距離を与えて 1 コマずつ出します（★運動式は変えていません）。
    */
+  /**
+   * ★直線の見え方を撮って要約するだけ（★2026-09-10・★別セッションが追加）。
+   *   ★DB に触れず、★`out/contest-direct-review/` に画像と JSON を書くだけ。
+   */
+  'capture-contest-direct.mjs',
+  'summarize-contest-direct.mjs',
   'capture-bench-sprite.mjs',
   /**
    * ★撮った 2〜3 枚を ★**1 頭ぶん・同じ大きさ**に切り出して並べるだけ（★2026-09-10）。

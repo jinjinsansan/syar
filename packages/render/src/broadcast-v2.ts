@@ -477,7 +477,7 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
   },
   'start-front': {
     // ★発走（アーケード参考映像 39〜49s）: 正面の発馬機 → 斜め前から馬群がこちらへ飛び出す。待機中は注視点をゲート付近に固定
-    id: 'start-front', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
+    id: 'start-front', view: 'diag-front', target: 'pack', horseAsset: 'diag-front-v2', transitionSec: 0.35,
     // ゲートはビルボードで見せ、走り出した馬体は真横の新素材で統一する。
     camera: { ...SIDE_LOW, upM: 6.5, fovDeg: 16 },
   },
