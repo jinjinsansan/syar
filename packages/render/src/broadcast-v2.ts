@@ -4,6 +4,7 @@ import type { ShotCameraPreset, ShotTarget, ShotView } from './shot-sequence.js'
 
 export type BroadcastV2ShotId =
   | 'start-follow' | 'first-corner-front' | 'second-corner-high'
+  | 'opening-side-lead' | 'opening-formation' | 'opening-side-settle'
   | 'backstretch-side' | 'third-corner-rear' | 'fourth-corner-high' | 'fourth-corner-front'
   | 'homestretch-side' | 'finish-line' | 'winner-follow'
   // ★中継台本 v3（アーケード参考映像に合わせた追加ショット）
@@ -12,7 +13,7 @@ export type BroadcastV2ShotId =
   // ★直線の正面固定（差してくる馬を奥行きで見せる）
   | 'homestretch-front'
   // ★競り合っている場所を大きく抜く（台本 v6・`contest-focus.ts`）
-  | 'straight-contest'
+  | 'straight-contest' | 'straight-field'
   // ★ゴール前の数秒を大きく撮り直すリプレイ（`finish-replay.ts`・本編の後ろに繋ぐ）
   | 'finish-replay';
 
@@ -476,8 +477,9 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
   },
   'start-front': {
     // ★発走（アーケード参考映像 39〜49s）: 正面の発馬機 → 斜め前から馬群がこちらへ飛び出す。待機中は注視点をゲート付近に固定
-    id: 'start-front', view: 'diag-front', target: 'pack', horseAsset: 'diag-front-v2', transitionSec: 0.35,
-    camera: { backM: 24, upM: 2.4, sideM: 5, fovDeg: 25.6 },
+    id: 'start-front', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
+    // ゲートはビルボードで見せ、走り出した馬体は真横の新素材で統一する。
+    camera: { ...SIDE_LOW, upM: 6.5, fovDeg: 16 },
   },
   'side-low': {
     id: 'side-low', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35, camera: SIDE_LOW,
@@ -502,16 +504,32 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
    */
   'straight-contest': {
     id: 'straight-contest', view: 'side', target: 'pack', horseAsset: 'side-v6',
-    /**
-     * ★先頭馬の顔が切れないよう画角を広げます（★レビュー側 codex・2026-09-08）。
-     * ⚠️ ★9.5° まで広げると ★**馬が画面高の 33.6%** になり、
-     *    ★検定「★直線の寄りカットで馬が 35% 以上」（★オーナー要求）を割りました。
-     *    ★`packages/render/test/script-v6.test.ts` が止めてくれました。
-     * → ★**9.0°** が両立点です（★7.6〜9.0 で検定は通り、★9.5 で落ちます・実測）。
-     */
-    transitionSec: 0.35, camera: { ...SIDE_LOW, fovDeg: 9.0 }, focusContest: true,
+    // 数頭の馬体と前後差を同時に読める固定画角。途中でズームしない。
+    transitionSec: 0.35, camera: { ...SIDE_LOW, upM: 6, fovDeg: 13 }, focusContest: true,
     /** ★この大きさで映すのは 4〜5 頭まで（`maxVisible` の注記・オーナー指摘） */
     maxVisible: 5,
+  },
+  /**
+   * 発走後の位置取り。前方だけを向く素材は使わず、横から先頭と追走集団を読ませる。
+   * この区間の中央だけは `opening-formation` の不透明な隊列図になる。
+   */
+  'opening-side-lead': {
+    id: 'opening-side-lead', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
+    camera: { ...SIDE_TELE, upM: 7.5, fovDeg: 15 }, leadFraction: 0.66,
+  },
+  'opening-formation': {
+    id: 'opening-formation', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.2,
+    camera: { ...SIDE_TELE, upM: 8, fovDeg: 17 }, leadFraction: 0.60,
+  },
+  'opening-side-settle': {
+    id: 'opening-side-settle', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
+    camera: { ...SIDE_TELE, upM: 6.5, fovDeg: 13.5 }, leadFraction: 0.57,
+  },
+  'straight-field': {
+    // 直線の中間カット。追走集団を含む横の引きで、前後の寄りと区別する。
+    id: 'straight-field', view: 'side', target: 'pack', horseAsset: 'side-v6',
+    transitionSec: 0.35, camera: { ...SIDE_LOW, upM: 8, fovDeg: 16 },
+    leadFraction: 0.65,
   },
   'side-close': {
     id: 'side-close', view: 'side', target: 'contenders', horseAsset: 'side-v6', transitionSec: 0.35, camera: SIDE_CLOSE,
@@ -1074,13 +1092,14 @@ function v6BoundariesM(course: Course): readonly { readonly meters: number; read
   const b2 = b1 + front;
   const b3 = b2 + rest * (7 / 20);
   /** ★直線より手前は、★**直線までの距離に対する割合**（上の錨②）。★割る相手が変わっただけです */
-  const preRows = SCRIPT_V6.slice(0, 5);
-  const preSpan = SCRIPT_V6[4]!.until;
+  // 直線寄りの前までを比例配分する。位置取りを3カットへ分けたので、ここも同じ終端まで含める。
+  const preRows = SCRIPT_V6.slice(0, 7);
+  const preSpan = SCRIPT_V6[6]!.until;
   const pre = preRows.map((row) => ({ meters: closeStart * (row.until / preSpan), id: row.id }));
   return [
     ...pre,
     { meters: b1, id: 'straight-contest' as BroadcastV2ShotId },
-    { meters: b2, id: 'homestretch-front' as BroadcastV2ShotId },
+    { meters: b2, id: 'straight-field' as BroadcastV2ShotId },
     { meters: b3, id: 'straight-contest' as BroadcastV2ShotId },
     { meters: distance, id: 'finish-line' as BroadcastV2ShotId },
   ];
@@ -1348,60 +1367,18 @@ export const SCRIPT_V5: readonly { readonly until: number; readonly id: Broadcas
 ];
 
 /**
- * ★**台本 v6 — 最後の直線を 4 カットに割る**（2026-08-26・オーナー決定「JRA の中継のように」）
- *
- * 【★なぜ割るのか — 1 カットでは原理的に両立しないから】
- *   オーナー要求は「差し・追い込み・逃げ・先行がドラマチックに読める」＋「馬が大きい」。
- *   ⚠️ ★この 2 つは**1 つのカットでは同時に成立しません。**
- *
- *   ★実測（`REPORT_P4_2D_EXISTING_SHOT_GATE_20260824.md`・4 seed・ショットを強制して撮影）:
- *
- *     馬体が画面高の 40% ＝ 馬 2.4m が 288px ＝ ★**画面に入る走路は前後 10〜11m だけ**
- *
- *     地点        40% 級のショット      上位 4 頭が画面内
- *      直線入口    side-low 39〜41%      ★**4/4 seed で ○**
- *      直線中盤    side-low 38〜42%       1/4 seed
- *      ゴール前    side-low 38〜41%      ★**0/4 seed**（40% 級は例外なく 2 頭）
- *
- *   ★つまり**馬群は入口では密集していて、ゴールに向かって伸びます。**
- *     ゴール前で 4 頭を 40% で映すには、実際に 4 頭が 10m 以内に居なければなりません。
- *     ⚠️ 実測（`tools/audit-finish-contest.mjs`・40 本）では
- *        **4 頭以上が 2 馬身以内 = 0%** / **5 馬身以内 = 25%** です。★起きません。
- *
- * 【★だから「1 カットで全部」をやめます】
- *   ⚠️ ★v5 は直線 538m を `homestretch-side` **1 カット**で通していました。
- *      1 カットで「大きい」と「4〜5 頭」を両立させようとすると、
- *      ★**表示位置を演出でねじ曲げる**しかなくなります（それが 2026-08-26 の
- *      `climax-choreography` で、見かけの速度が **+13.3% / −14.8%** ずれました）。
- *   ★**割れば、馬を動かさずに両方見せられます。** 各カットは自分の得意な仕事だけをします。
- *
- * 【★4 つのカットの役】
- *
- *   | # | 区間 | ショット | 実測の大きさ | 何を見せるか |
- *   |---|---|---|---|---|
- *   | ① | 〜1120m | `side-low`         | **39〜41%** ・上位 4 頭 ★4/4 | ★**せめぎ合い**。密集しているうちに大きく |
- *   | ② | 〜1264m | `homestretch-front`| 18〜21% ・上位 4 頭 4/4     | ★**差し・追い込み**。奥から来る馬が大きくなりながら上がる |
- *   | ③ | 〜1488m | `side-low`         | **38〜41%** ・先頭外 0/4    | ★**逃げ粘りと決着争い**。画角固定なので大きさが揺れない |
- *   | ④ | 〜1600m | `finish-line`      | 24〜26%                     | 決勝線・審判塔 |
- *
- *   ★② を正面にするのは大きさのためではありません。**奥行きのためです。**
- *     `homestretch-front` は馬群の少し前を走る追従カメラなので、
- *     20m 後ろの馬は 6 割の大きさで写り、★**前に出るほど大きくなりながら上がって**きます。
- *     ★それが「差してくる」の見え方です（`homestretch-front` の注記）。真横では出せません。
- *
- * ⚠️ ★**4 角までは v5 と 1 行も変えていません。** v6 の違いは直線の 4 行だけです。
- * ⚠️ ★③ に `homestretch-side` を使わないのは、2026-08-26 に付いた枠取り
- *    （`withinM: 16, maxFovDeg: 22, fillFraction`）が**引くための仕掛け**だからです。
- *    v6 は割ることで引く必要が無くなりました。
- * ⚠️ ★③ に `side-drive` も使いません。あちらは `frameContenders` で**伸びると引く**ので、
- *    ★実測で **24.6%** まで下がります（① の 42% から落ちる）。`side-low` は画角が固定なので、
- *    ★馬群が伸びても**大きさが変わりません**。決着のカットで大きさが揺れないことを優先します。
- * ⚠️ ★v6 では表示位置の演出（`climax-choreography`）を**使いません**。
- *    馬はエンジンが決めた位置のまま走ります（接続は `page.tsx`）。
+ * 直線は横の寄り → 横の引き → 横の寄り → 決勝線。
+ * 2026-09-10: 数頭の攻防を追えるよう、中間の正面カットを横へ置換。
+ * カット数・切替地点・尺を維持する。馬の位置・速度・結果は変えない。
+ * 固定画角を使い、隊列の伸縮でカット中の馬体サイズが揺れないようにする。
  */
 export const SCRIPT_V6: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
   { until: 0.0625, id: 'start-front' },        // 〜100m   ★v5 と同一（案 A・飛び出しだけ）
-  { until: 0.330, id: 'first-corner-front' },   // 〜528m   ★v5 と同一
+  // 100〜528m は、横の走行 5秒相当 → 隊列図 2秒相当 → 横の走行 6秒相当に分ける。
+  // 距離比なのでコースによって秒数は変わるが、既存の終端 0.330 と全体尺は変えない。
+  { until: 0.165, id: 'opening-side-lead' },
+  { until: 0.206, id: 'opening-formation' },
+  { until: 0.330, id: 'opening-side-settle' },
   /**
    * ★**寄りのカットを「実時間に戻ってから」始めます**（2026-08-28・オーナー指摘②）
    *
@@ -1435,24 +1412,8 @@ export const SCRIPT_V6: readonly { readonly until: number; readonly id: Broadcas
   { until: 0.750, id: 'side-drive' },           // 〜1200m  ★実時間に戻るまで引きで受ける
   // ★★ここから下だけが v6 の中身（直線 538m を 4 つに割る）
   { until: 0.820, id: 'straight-contest' },     // 〜1312m  ①せめぎ合い（競り合いを抜く）
-  /**
-   * ★**②の尺は 80m のままです**（2026-08-28・オーナー判断で「詰める」を撤回）
-   *
-   *   > （残り 239m の正面カットで）急にスピードが遅くなっています
-   *
-   *   ★見た目の速さは**画面上で地面がどれだけ流れるか**で決まります。
-   *   ★実測（`tools/_groundflow.mjs`・seed 42）:
-   *
-   *        straight-contest   2279 px/s
-   *        homestretch-front ★ 113 px/s   ← ★20 分の 1
-   *
-   *   ⚠️ ★**これは構造です。** このカットは馬群の 34m 前を走る**正面追従**なので、
-   *      ★地面が横へ流れず、速さの手掛かりがほとんど出ません。★画角や大きさでは直りません。
-   *   ⚠️ ★一度これを「尺を 4.7 秒 → 2.4 秒に詰める」で処理しました。★**撤回します。**
-   *      ★オーナー評「どんどんカットしていけばレース演出としての品質が下がります」。
-   *   → ★**カットは減らさず、そのカットを良くします**（`closeIn`＝カメラが抜かれて馬が迫る）。
-   */
-  { until: 0.870, id: 'homestretch-front' },    // 〜1392m  ②差し・追い込み（正面の奥行き）
+  // 中間の80mをそのまま取り置き、真横の引きへ切り替える。
+  { until: 0.870, id: 'straight-field' },       // 〜1392m  ②追走集団を見せる横の引き（尺は維持）
   { until: 0.940, id: 'straight-contest' },     // 〜1504m  ③差し・追い込み（競り合いを抜く）
   { until: 1.0, id: 'finish-line' },            // 〜1600m  ④ゴール板
 ];

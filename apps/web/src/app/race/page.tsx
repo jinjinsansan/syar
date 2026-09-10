@@ -77,7 +77,7 @@ import {
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
-  raceCutInFor, drawCourseMapCutIn,
+  raceCutInFor, drawCourseMapCutIn, drawFormationCutIn,
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
   horseCalibrationFor, LEGACY_HORSE_CALIBRATION, type HorseMaterialCalibration,
   type HorsePlacement, type HorsePlacementFrame, type HorsePlacementSet, type HorsePlacementMode,
@@ -1477,6 +1477,8 @@ export default function RacePage(): React.JSX.Element {
     };
   } | null>(null);
   const rafRef = useRef<number | null>(null);
+  /** Canvas は毎フレーム描くが、操作部の React state は10fpsで十分。 */
+  const lastPlaybackUiSyncRef = useRef<number>(-Infinity);
   /** ★ディゾルブ用のオフスクリーン（前ショットを描く） */
   /**
    * ★順位表の行の位置（小数）。**順位そのものではありません。**
@@ -3249,8 +3251,9 @@ export default function RacePage(): React.JSX.Element {
       };
       const plate = scene.shot.id === 'finish-line' || scene.shot.id === 'winner-follow' ? art.raceFinish
         : scene.shot.id === 'homestretch-side' ? art.raceCornerExit
-          : scene.shot.id === 'third-corner-rear' ? art.raceCornerRear
-            : scene.shot.id === 'first-corner-front' || scene.shot.id === 'second-corner-high'
+        : scene.shot.id === 'third-corner-rear' ? art.raceCornerRear
+            : scene.shot.id === 'first-corner-front' || scene.shot.id === 'opening-side-lead'
+              || scene.shot.id === 'opening-formation' || scene.shot.id === 'opening-side-settle' || scene.shot.id === 'second-corner-high'
               || scene.shot.id === 'fourth-corner-high' ? art.raceCornerHigh
               : art.raceBackstretch;
       ctx.imageSmoothingEnabled = true;
@@ -3454,8 +3457,6 @@ export default function RacePage(): React.JSX.Element {
        * ⚠️ ★レース時間は止めません。★戻ったときはその時点の状態の画になります。
        * ⚠️ ★着順・走破時刻・台帳・サーバー判定には触れていません。★描画だけです。
        */
-      const cutIn = CUTIN_OFF ? undefined : raceCutInFor(scene.shot.id);
-      cutInActive = cutIn !== undefined;
       /**
        * ★このカットが始まった時刻（★台本の切り替え表から引く）。
        * ⚠️ ★`reduce` の初期値を `d` にすると ★**常に `d` が返り、経過が 0 になります**
@@ -3464,13 +3465,17 @@ export default function RacePage(): React.JSX.Element {
       const cutStartSec = (motionTimeline ?? built).shotChanges
         .filter((c) => c.to === scene.shot.id && c.displaySec <= d)
         .reduce((m, c) => Math.max(m, c.displaySec), Number.NEGATIVE_INFINITY);
+      const cutIn = CUTIN_OFF ? undefined : raceCutInFor(scene.shot.id);
+      /** 発走イベントの直後だけ、踏み出しのない全速コマを不透明な発走帯でつなぐ。 */
+      const startTransitionActive = !CUTIN_OFF && renderer === 'v2' && !replay.active && raceD > 0 && raceD < 0.8;
+      cutInActive = cutIn !== undefined || startTransitionActive;
       if (cutIn !== undefined) {
-        drawCourseMapCutIn(ctx, course, art.pal as Record<string, string>, FONT, {
+        const cutInOptions = {
           viewport: { width: W, height: H },
           /** ⚠️ ★**描画に使っている値をそのまま**渡します（★着順から作らない） */
           horses: v2Minimap.horses,
           focusS: v2Minimap.focusS,
-          frameColorOf: (gate) => (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff',
+          frameColorOf: (gate: number) => (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff',
           distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${DIST}m`,
           metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
           caption: cutIn.caption,
@@ -3481,7 +3486,19 @@ export default function RacePage(): React.JSX.Element {
            */
           /** ★カットの開始からの経過。★切り替え表に無ければ「出し切った状態」で描く（★消えるより良い） */
           sinceSec: Number.isFinite(cutStartSec) ? d - cutStartSec : 1,
-        });
+        };
+        if (cutIn.kind === 'course-map') {
+          drawCourseMapCutIn(ctx, course, art.pal as Record<string, string>, FONT, cutInOptions);
+        } else {
+          drawFormationCutIn(ctx, art.pal as Record<string, string>, FONT, {
+            viewport: cutInOptions.viewport,
+            horses: cutInOptions.horses,
+            courseWidthM: course.widthM,
+            frameColorOf: cutInOptions.frameColorOf,
+            caption: cutIn.caption,
+            sinceSec: cutInOptions.sinceSec,
+          });
+        }
         /**
          * ★**診断はカットイン中も出します**（★2026-09-10・★R-30）。
          *
@@ -3496,6 +3513,32 @@ export default function RacePage(): React.JSX.Element {
           cutIn: cutIn.kind,
           asset: null,
           horses: [],
+          material: { ...art.materialDiag, horseBob, strideM },
+        };
+      } else if (startTransitionActive) {
+        ctx.fillStyle = '#0d1218';
+        ctx.fillRect(0, 0, W, H);
+        const startText = 'スタートしました！';
+        drawStartCallBand(ctx, art.pal as Record<string, string>, vp, FONT, FIELD, true,
+          narratorPortrait(art.raceNarrator, art.narratorSets?.[cast], {
+            metersLeft: DIST, displaySec: d,
+            speaking: typedCount(startText.length, raceD) < startText.length,
+          }), {
+            timeSec: d,
+            lineStartSec: RACE_INTRO_RACE_START_SEC,
+            secondsToStart: 0,
+            narratorName: NARRATOR_NAMES[cast],
+            narratorRole: NARRATOR_ROLES[cast],
+            sinceSec: raceD,
+          });
+        // 挿入画面は0.8秒しかないため、入力演出を待たず出来事を即時に読ませる。
+        ctx.fillStyle = '#eef2f6';
+        ctx.font = FONT(Math.round(H * 0.072), true);
+        ctx.textAlign = 'center';
+        ctx.fillText(startText, Math.round(W / 2), Math.round(H * 0.43));
+        ctx.textAlign = 'left';
+        (globalThis as { __raceDiag?: unknown }).__raceDiag = {
+          shot: 'start-insert', cutIn: 'start', asset: null, horses: [],
           material: { ...art.materialDiag, horseBob, strideM },
         };
       } else {
@@ -3607,15 +3650,21 @@ export default function RacePage(): React.JSX.Element {
     };
     {
       const label = v2SectionLabel ?? sectionLabel[courseSection];
+      /**
+       * 直線の寄りは、馬体と前後差を読むための画面です。順位・隊列・コース図に加え、
+       * 左上の見出しもこの区間だけ下ろし、実況帯だけを残します。
+       * 描画対象だけの切替であり、レース結果・位置・時刻には触れません。
+       */
+      const contestFocusHud = v2ShotId === 'straight-contest' || v2ShotId === 'straight-field';
       // 初回は即表示（静止画の監査でも見える）。以後は文言が変わった瞬間からスライドイン
       if (sectionTagRef.current.label !== label) sectionTagRef.current = { label, sinceSec: sectionTagRef.current.label === '' ? d - 1 : d };
       const hudSince = raceD - HUD_SETTLE_SEC;
       // ★ゴール後はライブ HUD（見出し・区間タグ・コース図）を落とす（motion-spec §6: ゴール〜2.4s は勝馬テロップのみ）
-      if (!winnerFinishedNow) drawRaceHeadlineChip(ctx, FONT, {
+      if (!winnerFinishedNow && !contestFocusHud) drawRaceHeadlineChip(ctx, FONT, {
         raceNo: RACE_META.raceNo, raceName: RACE_META.raceName,
         distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${DIST}m`,
       }, { timeSec: d, sinceSec: hudSince });
-      if (!winnerFinishedNow) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
+      if (!winnerFinishedNow && !contestFocusHud) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
         { timeSec: d, sinceSec: Math.min(hudSince, d - sectionTagRef.current.sinceSec) });
     }
     /**
@@ -3644,19 +3693,26 @@ export default function RacePage(): React.JSX.Element {
        *   ★常に薄くすると読めなくなるので、★**馬が箱に乗った分だけ**透かします。
        * ⚠️ ★箱の位置はここで持っている値をそのまま渡します（★2 か所で持たない）。
        */
+      /** 直線の競り合いでは、馬群を読むために補助図を下ろす。 */
+      const contestFocusHud = v2ShotId === 'straight-contest' || v2ShotId === 'straight-field';
       /** ⚠️ ★カットイン中は小さいコース図を出しません（★同じ図が 2 つ並びます・★2026-09-10） */
-      const miniBox = { x: 40, y: 321, width: 264, height: 209 };
+      // 直線ではコース図を上部へ移し、追走馬の馬体を覆わない。
+      const miniBox = v2ShotId === 'straight-contest' || v2ShotId === 'straight-field'
+        ? { x: 330, y: 48, width: 200, height: 156 }
+        : { x: 40, y: 321, width: 264, height: 209 };
       const miniHide = horseOverlapRatio(miniBox);
       const miniPrevAlpha = ctx.globalAlpha;
-      ctx.globalAlpha = miniPrevAlpha * (1 - 0.55 * Math.min(1, miniHide * 3));
-      drawCourseMinimap(ctx, ovalCourse(DIST, { ...COURSE_SPEC, turn }), art.pal as Record<string, string>, FONT,
-        v2Minimap.horses, v2Minimap.focusS, miniBox,
-        // ★コース図も HUD・馬体と同じ枠色から引く（3 か所で持たない）
-        (gate) => (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff', {
-          distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${DIST}m`,
-          metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
-          timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
-        });
+      if (!contestFocusHud) {
+        ctx.globalAlpha = miniPrevAlpha * (1 - 0.55 * Math.min(1, miniHide * 3));
+        drawCourseMinimap(ctx, ovalCourse(DIST, { ...COURSE_SPEC, turn }), art.pal as Record<string, string>, FONT,
+          v2Minimap.horses, v2Minimap.focusS, miniBox,
+          // ★コース図も HUD・馬体と同じ枠色から引く（3 か所で持たない）
+          (gate) => (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff', {
+            distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${DIST}m`,
+            metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
+            timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
+          });
+      }
       ctx.globalAlpha = miniPrevAlpha;
     }
     drawRendererBadge(ctx, renderer, renderer === 'v2' ? v2ShotId ?? 'v2' : `legacy/${courseSection}`);
@@ -3669,6 +3725,7 @@ export default function RacePage(): React.JSX.Element {
     {
       // ★ゴールした瞬間からライブ HUD（順位・実況帯）を落とし、勝馬テロップだけにする（motion-spec §6）
       const hudRaw = raceHudVisibilityAt(raceD, built.warp.displaySec, allFinishedNow);
+      const contestFocusHud = v2ShotId === 'straight-contest' || v2ShotId === 'straight-field';
       /**
        * ★**リプレイ中は順位表（ORDER）を下ろします**（2026-08-28・オーナー指摘）。
        *
@@ -3677,7 +3734,7 @@ export default function RacePage(): React.JSX.Element {
        *    ★「レース中」と同じ扱いになります）。
        * ★実況帯とレース名は画面の端にあり馬に重なっていないので、そのまま残します。
        */
-      const hud = replay.active ? { ...hudRaw, standings: false }
+      const hud = replay.active || contestFocusHud ? { ...hudRaw, standings: false }
         : winnerFinishedNow ? { ...hudRaw, gauge: false, standings: false, calls: false } : hudRaw;
       // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）
       const g = staminaAt(built.gauge, Math.max(0, metersLeft));
@@ -3979,8 +4036,16 @@ export default function RacePage(): React.JSX.Element {
         return;
       }
       dRef.current = d;
-      setSeekPos(d);   // ★再生中もスライダーが追随する
-      setClock(Math.min(raceIntroAt(d).raceDisplaySec, built.warp.displaySec));
+      /**
+       * 描画はここで毎フレーム行う。一方でスライダーと時計の state 更新まで毎フレーム行うと、
+       * UI 全体の再描画が Canvas の通常再生を止める。表示は 10fps で追随させる。
+       */
+      const now = performance.now();
+      if (now - lastPlaybackUiSyncRef.current >= 100) {
+        lastPlaybackUiSyncRef.current = now;
+        setSeekPos(d);
+        setClock(Math.min(raceIntroAt(d).raceDisplaySec, built.warp.displaySec));
+      }
       render(d);
       rafRef.current = requestAnimationFrame(loop);
     };
@@ -4301,7 +4366,7 @@ export default function RacePage(): React.JSX.Element {
             }}>調整を初期値に戻す</button>
             <button type="button" disabled={!built} onClick={() => seekTo(RACE_INTRO_RACE_START_SEC - 0.2)}>ゲート発走へ</button>
             <button type="button" disabled={!built} onClick={() => seekTo(RACE_INTRO_RACE_START_SEC + 2)}>発走後の位置取りへ</button>
-            {(['first-corner-front', 'fourth-corner-front'] as const).map((id, i) => {
+            {(['opening-side-lead', 'fourth-corner-front'] as const).map((id, i) => {
               const change = motionTimeline?.shotChanges.find((c) => c.to === id);
               return <button key={id} type="button" disabled={!change}
                 onClick={() => { if (change) seekTo(change.displaySec + 0.1); }}>

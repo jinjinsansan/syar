@@ -25,7 +25,7 @@ import type { Ctx2D, FontOf, Palette } from './oblique-draw.js';
 
 /** ★カットインの種類と、そのときに出す一言 */
 export interface RaceCutIn {
-  readonly kind: 'course-map';
+  readonly kind: 'course-map' | 'formation';
   /** ★画面に出す短い説明（★一画面につき一情報・★構成案 §2） */
   readonly caption: string;
 }
@@ -37,10 +37,24 @@ export interface RaceCutIn {
  * ★2026-09-10 の着手順は ★⑤ → ③ → 55〜60 秒 → ② です。★今は ⑤ だけを載せています。
  */
 export function raceCutInFor(shotId: string): RaceCutIn | undefined {
+  if (shotId === 'opening-formation') {
+    return { kind: 'formation', caption: '現在の隊列' };
+  }
   if (shotId === 'fourth-corner-front') {
-    return { kind: 'course-map', caption: '4 コーナーを回って直線へ' };
+    // コース長や直線長で実際の位置が変わるため、ショット名だけから通過地点を断定しない。
+    return { kind: 'course-map', caption: 'コースの現在位置' };
   }
   return undefined;
+}
+
+export interface FormationCutInOptions {
+  readonly viewport: { readonly width: number; readonly height: number };
+  /** 描画に使っている現在位置。順位や着順から組み直さない。 */
+  readonly horses: readonly MinimapHorse[];
+  readonly courseWidthM: number;
+  readonly frameColorOf: (gate: number) => string;
+  readonly caption: string;
+  readonly sinceSec: number;
 }
 
 export interface CourseMapCutInOptions {
@@ -118,6 +132,62 @@ export function drawCourseMapCutIn<TImage>(
   ctx.font = font(Math.round(H * 0.042), true);
   ctx.textAlign = 'center';
   ctx.fillText(opts.caption, Math.round(W / 2), capY);
+  ctx.textAlign = 'left';
+  ctx.globalAlpha = prevAlpha;
+}
+
+/**
+ * 発走直後の隊列を示す短い挿入画面。
+ * 前後は実際の進行距離、上下は実際の走路内位置を使う。ここで着順や進路を作らない。
+ */
+export function drawFormationCutIn<TImage>(
+  ctx: Ctx2D<TImage>,
+  pal: Palette,
+  font: FontOf,
+  opts: FormationCutInOptions,
+): void {
+  const { width: W, height: H } = opts.viewport;
+  const prevAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = BACKDROP;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = BACKDROP_EDGE;
+  ctx.fillRect(0, 0, W, Math.round(H * 0.10));
+  ctx.fillRect(0, Math.round(H * 0.90), W, Math.round(H * 0.10));
+
+  const board = { x: Math.round(W * 0.14), y: Math.round(H * 0.20), width: Math.round(W * 0.72), height: Math.round(H * 0.48) };
+  ctx.fillStyle = pal['turf-2'] ?? '#263c31';
+  ctx.fillRect(board.x, board.y, board.width, board.height);
+  ctx.strokeStyle = '#d9ded2';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(board.x, board.y); ctx.lineTo(board.x + board.width, board.y);
+  ctx.lineTo(board.x + board.width, board.y + board.height); ctx.lineTo(board.x, board.y + board.height);
+  ctx.closePath(); ctx.stroke();
+  ctx.strokeStyle = 'rgba(238,242,246,0.28)';
+  ctx.lineWidth = 1;
+  for (const ratio of [0.25, 0.5, 0.75]) {
+    const x = Math.round(board.x + board.width * ratio);
+    ctx.beginPath(); ctx.moveTo(x, board.y); ctx.lineTo(x, board.y + board.height); ctx.stroke();
+  }
+
+  const lead = Math.max(...opts.horses.map((h) => h.s), 0);
+  const tail = Math.min(...opts.horses.map((h) => h.s), lead);
+  const span = Math.max(12, lead - tail);
+  const radius = Math.max(13, Math.round(Math.min(W, H) * 0.025));
+  for (const horse of opts.horses) {
+    const x = board.x + board.width * (0.08 + 0.84 * ((horse.s - tail) / span));
+    const lane = Math.max(0, Math.min(1, horse.w / Math.max(1, opts.courseWidthM)));
+    const y = board.y + board.height * (0.14 + 0.72 * lane);
+    ctx.beginPath(); ctx.ellipse(x, y, radius, radius, 0, 0, Math.PI * 2); ctx.fillStyle = opts.frameColorOf(horse.gate); ctx.fill();
+    ctx.strokeStyle = horse.own ? '#f5d56d' : '#111820'; ctx.lineWidth = horse.own ? 4 : 2; ctx.stroke();
+    ctx.fillStyle = '#111820'; ctx.font = font(Math.round(radius * 1.05), true); ctx.textAlign = 'center';
+    ctx.fillText(String(horse.gate), x, y + Math.round(radius * 0.35));
+  }
+
+  ctx.fillStyle = '#eef2f6'; ctx.font = font(Math.round(H * 0.042), true); ctx.textAlign = 'center';
+  ctx.fillText(opts.caption, Math.round(W / 2), Math.round(H * 0.13));
+  ctx.font = font(Math.round(H * 0.026), false);
+  ctx.fillText('前方', board.x + board.width - 6, board.y + board.height + Math.round(H * 0.055));
   ctx.textAlign = 'left';
   ctx.globalAlpha = prevAlpha;
 }

@@ -148,3 +148,10 @@ apps/web/public/art/horse-jockey-diag-front-v4thin-pose*.png
 # ★参考素材（★他社製品名を含むため git から外す・★2026-09-10・オーナー判断）
 # ⚠️ ★ディスクには残ります。★参照はしますが、★リポジトリには入れません（★憲法 §0.1）
 ダービースタリオン/
+
+# ★直線比較の書き出し（★別セッション・37MB・作り直せる）
+apps/web/public/contest-review/
+# ★撮影用のブラウザ一時プロファイル
+.tmp-headless-contest/
+.tmp-race-review-browser/
+.tmp-race-review-browser-2/

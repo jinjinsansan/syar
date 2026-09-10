@@ -47,6 +47,13 @@ export async function launch(opts = {}) {
   const exe = opts.exe ?? findBrowser();
   const port = opts.port ?? 9333;
   const profile = mkdtempSync(path.join(tmpdir(), 'star-audit-'));
+  let target = null;
+  /** 既に同じデバッグポートのブラウザがあれば、二重起動せずそちらを使う。 */
+  try {
+    const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+    target = list.find((t) => t.type === 'page' && (t.url === 'about:blank' || String(t.url).startsWith('http://localhost:')))
+      ?? list.find((t) => t.type === 'page' && !String(t.url).startsWith('chrome-extension://')) ?? null;
+  } catch { /* 新規起動へ */ }
   const args = [
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${profile}`,
@@ -61,20 +68,20 @@ export async function launch(opts = {}) {
     `--window-size=${opts.width ?? 1400},${opts.height ?? 1000}`,
     'about:blank',
   ];
-  const proc = spawn(exe, args, { stdio: 'ignore', detached: false });
+  const proc = target === null ? spawn(exe, args, { stdio: 'ignore', detached: false }) : undefined;
 
   /** DevTools が上がるまで待つ */
-  let target = null;
-  for (let i = 0; i < 120; i += 1) {
+  for (let i = 0; target === null && i < 120; i += 1) {
     try {
       const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-      target = list.find((t) => t.type === 'page');
+      target = list.find((t) => t.type === 'page' && (t.url === 'about:blank' || String(t.url).startsWith('http://localhost:')))
+        ?? list.find((t) => t.type === 'page' && !String(t.url).startsWith('chrome-extension://'));
       if (target !== undefined) break;
     } catch { /* まだ */ }
     await sleep(250);
   }
   if (target === null || target === undefined) {
-    proc.kill();
+    proc?.kill();
     throw new Error('★ブラウザの DevTools につながりませんでした');
   }
 
@@ -146,7 +153,7 @@ export async function launch(opts = {}) {
 
   const close = async () => {
     try { ws.close(); } catch { /* 無視 */ }
-    try { proc.kill(); } catch { /* 無視 */ }
+    try { proc?.kill(); } catch { /* 無視 */ }
     await sleep(300);
     try { rmSync(profile, { recursive: true, force: true }); } catch { /* 無視 */ }
   };

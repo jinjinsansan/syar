@@ -40,19 +40,8 @@ function transitions(script: BroadcastV2Script): readonly { readonly m: number; 
   return out;
 }
 
-/**
- * ★**台本ごとの「画角の系統が変わる切替」の本数**（実測・`tools/_xfamily.mjs`）。
- *
- *   v4  3 本   528m / 800m / 1504m
- *   v5  3 本   528m / 864m / 968m
- *   v6  5 本   528m / 864m / 968m と、★**直線の 1312m / 1392m**
- *
- * ⚠️ ★**v6 で増えた 2 本（1312m / 1392m）には閃光がありません。**
- *    ★`straight-contest(side) ↔ homestretch-front(diag-front)` の往復です。
- *    ★閃光を入れるかどうかは**見え方の判断**なので、ここでは決めません（R-16）。
- *    ★事実として固定し、台本を触ったら必ずここを見ること。
- */
-const CROSS_FAMILY_COUNT: Readonly<Record<string, number>> = { v4: 3, v5: 3, v6: 5 };
+// 直線の切替は残るが、真横同士なので方向の系統は変わらない。
+const CROSS_FAMILY_COUNT: Readonly<Record<string, number>> = { v4: 3, v5: 3, v6: 3 };
 
 describe('★カットの切替', () => {
   it('★★画角の系統が変わる切替は、重ねない（ハードカット）', () => {
@@ -81,9 +70,9 @@ describe('★カットの切替', () => {
     const same = transitions(DEFAULT_RACE_SCRIPT).filter((t) =>
       broadcastV2ShotById(t.from as never).view === broadcastV2ShotById(t.to as never).view);
     expect(same.length, '同じ画角の切替が 1 つも無い').toBeGreaterThan(0);
-    // ★発走 → 1 角は どちらも `diag-front`
-    expect(same[0]?.from).toBe('start-front');
-    expect(same[0]?.to).toBe('first-corner-front');
+    // 位置取りの三分割は横向きのまま切り替える。
+    expect(same[0]?.from).toBe('opening-side-lead');
+    expect(same[0]?.to).toBe('opening-formation');
   });
 
   it('★閃光で入るのは勝負所と 4 角の正面', () => {
