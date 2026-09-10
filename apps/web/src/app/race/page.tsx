@@ -142,6 +142,9 @@ const RACE_PACE_POLICY: RacePacePolicy = LEGACY_MOTION ? 'legacy' : 'readable';
  * ★**真横の素材だけで走らせる**（`?directional=side`・★2026-09-10・★見比べ用）。
  * ⚠️ ★既定では効きません。★カットの数・時刻・画角は変わりません（★素材の選び方だけ）。
  */
+/** ★**挿入画面を出さない**（`?cutin=off`・★2026-09-10・★見比べ用）。★既定では出します */
+const CUTIN_OFF = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('cutin') === 'off';
 const SIDE_ONLY = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('directional') === 'side';
 const PLACEMENT_OVERRIDE: HorsePlacementMode | undefined = typeof window !== 'undefined'
@@ -324,7 +327,19 @@ const POST_RACE_SEC = WINNER_FOLLOW_SEC + RESULTS_BOARD_SEC;
  * ★4 角を「奥からこちらへ向かってくる」固定カメラにするか（build 時のショット列挙にも使うので定数）。
  *   正面寄りの一体素材 diag-front-v3 が承認されたら true にする。
  */
-const FOURTH_CORNER_FRONT_WEB = true;
+/**
+ * ★**4 角を「正面寄り」で見せるか**（★既定 true）。
+ *
+ * ★`false` にすると ★`fourth-corner-wide` / `fourth-corner-high`（★引き・俯瞰）へ差し替わり、
+ * ★素材も自動で読まれます（`broadcastV2ScriptAssets` の `wideSubstitute`）。
+ *
+ * ★**`?corner=wide` で外から false にできます**（★2026-09-10・★見比べ用）。
+ *   ★参考映像はコーナーを ★**後方からの引き**（★馬が小さい）で見せており、
+ *   ★オーナー評「★何もかも真横だけではクオリティを疑われる」への候補です。
+ * ⚠️ ★既定は変えていません。★カットの数・境界も変わりません（★同じ枠の中身が替わるだけ）。
+ */
+const FOURTH_CORNER_FRONT_WEB = typeof window === 'undefined'
+  || new URLSearchParams(window.location.search).get('corner') !== 'wide';
 /**
  * ★2026-08-18: テクスチャ付き透視ワールド（`world-textured.ts`）で背景が動くようになったので、
  *   コーナー専用ショット（3角後方・4角俯瞰）を**コーナー全区間**で復活（オーナー指示「元のカメラワークを復活、ただし背景は動く」）。
@@ -3425,7 +3440,7 @@ export default function RacePage(): React.JSX.Element {
        * ⚠️ ★レース時間は止めません。★戻ったときはその時点の状態の画になります。
        * ⚠️ ★着順・走破時刻・台帳・サーバー判定には触れていません。★描画だけです。
        */
-      const cutIn = raceCutInFor(scene.shot.id);
+      const cutIn = CUTIN_OFF ? undefined : raceCutInFor(scene.shot.id);
       cutInActive = cutIn !== undefined;
       /**
        * ★このカットが始まった時刻（★台本の切り替え表から引く）。
