@@ -144,3 +144,7 @@ apps/web/public/gait-review/
 
 # ★脚の太さの検証用の試作（★2026-09-10・tmp/make-thin-legs-20260910.mjs で作り直せる）
 apps/web/public/art/horse-jockey-diag-front-v4thin-pose*.png
+
+# ★参考素材（★他社製品名を含むため git から外す・★2026-09-10・オーナー判断）
+# ⚠️ ★ディスクには残ります。★参照はしますが、★リポジトリには入れません（★憲法 §0.1）
+ダービースタリオン/
