@@ -138,3 +138,6 @@ apps/web/public/art/lab/
 /ダービースタリオン/
 /out/gen/ref-frames/
 
+
+# ★走りの見比べ台の書き出し（★2026-09-10・★45MB・作り直せるのでコミットしない）
+apps/web/public/gait-review/
