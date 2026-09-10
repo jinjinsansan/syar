@@ -61,7 +61,11 @@ const CELL_W = Math.round((CELL_H * BOX_W) / BOX_H);
 
 const sources = [
   ...argsOf('bench').map((s) => ({ kind: 'bench', dir: s.split(':')[0], id: Number(s.split(':')[1]) })),
-  ...argsOf('race').map((s) => ({ kind: 'race', dir: s.split(':')[0], id: Number(s.split(':')[1]) })),
+  /** ★`パス:馬番[:見出し]`。★見出しは条件名（★4 条件を並べるときに要ります） */
+  ...argsOf('race').map((s) => ({
+    kind: 'race', dir: s.split(':')[0], id: Number(s.split(':')[1]),
+    title: s.split(':')[2],
+  })),
 ];
 if (sources.length < 2) { console.error('★★--bench / --race を 2 つ以上指定してください'); process.exit(1); }
 
@@ -93,7 +97,7 @@ const readOf = (src, frame) => {
     box: { x: box.x, y: box.y, w: box.w, h: box.h },
     /** ★走路上の投影接地点（★本編の描画が使っているのと同じ点） */
     groundX: horse.x0, groundY: horse.y0,
-    tag: `本編 ${src.id}番`,
+    tag: src.title === undefined ? `本編 ${src.id}番` : `${src.title}（${src.id}番）`,
   };
 };
 

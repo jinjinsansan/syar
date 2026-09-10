@@ -103,6 +103,33 @@ try {
   await sleep(3000);
   await click('停止'); await sleep(500);
   /**
+   * ★**調整卓のつまみを外から設定します**（★2026-09-10・★斜め前の切り分け用）。
+   *   ★`--slider "上下動・浮き=0"` のように、★**画面の表示名**で指定します。
+   * ⚠️ ★min/max では見分けません（★「上下動・浮き」と「発走時のカメラ揺れ」は同じ 0〜2 です）。
+   *    ★つまみには `aria-label` が付いているので、★それで選びます。
+   * ⚠️ ★入ったことを読み返して確かめ、★入らなければ止まります（★設定したつもりを作らない）。
+   */
+  for (let i = 0; i < process.argv.length; i += 1) {
+    if (process.argv[i] !== '--slider') continue;
+    const [name, value] = String(process.argv[i + 1] ?? '').split('=');
+    const got = await browser.evaluate(`(function(){
+      var i=document.querySelector('input[type=range][aria-label=' + JSON.stringify(${JSON.stringify(name)}) + ']');
+      if(!i) return 'なし';
+      var set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+      set.call(i, ${JSON.stringify(String(value))});
+      i.dispatchEvent(new Event('input',{bubbles:true}));
+      i.dispatchEvent(new Event('change',{bubbles:true}));
+      return i.value;
+    })()`);
+    if (String(got) === 'なし' || Math.abs(Number(got) - Number(value)) > 1e-9) {
+      console.error(`★★つまみが設定できません: ${name} → ${got}（★狙い ${value}）`);
+      await browser.close();
+      process.exit(1);
+    }
+    console.log(`★つまみ ${name} = ${got}`);
+    await sleep(400);
+  }
+  /**
    * ★**シークで 1 コマずつ出します**（★再生しながら撮ると等速になりません）。
    *   ★`seekPos` のつまみに値を入れて、★その表示秒の絵を撮ります。
    */
