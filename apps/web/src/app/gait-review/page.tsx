@@ -322,6 +322,43 @@ export default function GaitReviewPage(): React.ReactElement {
           </p>
         </section>
 
+        <section style={{ ...card, border: '2px solid #ffd34d', background: '#221d10' }}>
+          <h2 style={h2}>⑪ ★旧 2D の場面 — ★どれを採るか選んでください</h2>
+          <p style={note}>
+            ★オーナー指示: ★<b>「2D 時代の 4 コーナー手前から曲がってくる時のシーンや、
+            ★いくつか上手くいっていたシーンをピックアップし、それを使う。
+            ★そして、そのシーンを短い尺で使う」</b>
+          </p>
+          <p style={{ ...note, color: '#ffd34d' }}>
+            ★旧 2D の描画は ★<b>いまも動きます</b>（`?renderer=legacy`）。★下は 6 区間を 4 秒ずつ切り出したものです。<br />
+            ★<b>採りたいものに ○ を、いらないものに × を付けて教えてください。</b>
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+            {([
+              ['start', '① 発走のあと', '9〜13 秒'],
+              ['first-corner', '② 1 コーナー', '18〜22 秒'],
+              ['backstretch', '③ 向正面', '28〜32 秒'],
+              ['third-corner', '④ 3 コーナー', '37〜41 秒'],
+              ['fourth-corner', '⑤ 4 コーナー', '44〜48 秒'],
+              ['straight', '⑥ 最後の直線', '53〜57 秒'],
+            ] as const).map(([id, label, at]) => (
+              <div key={id}>
+                <p style={{ ...note, margin: '0 0 4px', color: '#eef2f6' }}>
+                  <b>{label}</b> <span style={{ color: '#9fb4c6' }}>（{at}）</span>
+                </p>
+                <video src={`/gait-review/lg2d-${id}.mp4`} style={media} controls loop muted playsInline />
+              </div>
+            ))}
+          </div>
+          <p style={{ ...note, margin: '12px 0 0' }}>
+            ⚠️ ★これは ★<b>旧 2D の描画そのまま</b>です（★馬も背景も旧素材）。
+            ★新しいデフォルメ馬は出てきません。<br />
+            ⚠️ ★採用する場合、★<b>その区間だけ旧 2D の画を使う</b>という作りになります。
+            ★絵柄が混ざることになるので、★そこはオーナー判断です。<br />
+            ⚠️ ★カットの数・境界は変えません。★短い尺で使う、というご指示のとおりにします。
+          </p>
+        </section>
+
         <section style={{ ...card, marginBottom: 8 }}>
           <h2 style={h2}>★この頁が言っていないこと</h2>
           <p style={{ ...note, margin: 0 }}>
