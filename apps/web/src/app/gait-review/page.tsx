@@ -217,6 +217,31 @@ export default function GaitReviewPage(): React.ReactElement {
           </p>
         </section>
 
+        <section style={{ ...card, border: '2px solid #c9a227', background: '#1f1b12' }}>
+          <h2 style={h2}>⑨ ★演出 9 点の現状（★録画）</h2>
+          <p style={note}>
+            ★企画者の 9 点を、★今の画面がどこまで満たしているかを撮りました。<br />
+            ★<b>①ゲート・⑧優勝馬・⑨リプレイは、すでに成立しています。</b>
+            ★壊れているのは ★<b>②の一部・③・⑤</b> だけでした。
+          </p>
+          <p style={{ ...note, margin: '10px 0 6px' }}>★↓ ★イントロ〜発走（★0〜11 秒）。★①②</p>
+          <video src="/gait-review/rec-intro.mp4" style={media} controls loop muted playsInline />
+          <p style={{ ...note, margin: '10px 0 6px' }}>
+            ★↓ ★ゲート開放の細部（★5.6〜9.0 秒・★20fps）。
+            ★<b>扉は開かず、1 コマ（0.05 秒）で消えます。</b>
+          </p>
+          <video src="/gait-review/rec-gate-slow.mp4" style={media} controls loop muted playsInline />
+          <p style={{ ...note, margin: '10px 0 6px' }}>
+            ★↓ ★ゴール〜優勝馬〜リプレイ〜着順（★66〜92 秒）。★⑦⑧⑨
+          </p>
+          <video src="/gait-review/rec-tail.mp4" style={media} controls loop muted playsInline />
+          <p style={{ ...note, margin: '10px 0 0' }}>
+            ★カットの時刻: ★6〜13 ②／★13〜26 ③／★26〜37 ④／★37〜40 ⑤／★40〜49 ④／
+            ★49〜55 ⑥／★55〜60 斜め前／★60〜66 ⑥／★66〜72 ⑦／★<b>72〜77 ⑧</b>／
+            ★<b>77〜81 ⑨</b>／★81〜92 着順ボード
+          </p>
+        </section>
+
         <section style={{ ...card, marginBottom: 8 }}>
           <h2 style={h2}>★この頁が言っていないこと</h2>
           <p style={{ ...note, margin: 0 }}>
