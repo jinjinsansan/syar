@@ -137,6 +137,12 @@ const RACE_PACE_POLICY: RacePacePolicy = LEGACY_MOTION ? 'legacy' : 'readable';
  *    ★`'measured-ground'` を返すことはありません。★既定の画面（★引数なし）が
  *    ★修正後であることは `race-placement-wiring.test.ts` が構文木で固定します。
  */
+/**
+ * ★**真横の素材だけで走らせる**（`?directional=side`・★2026-09-10・★見比べ用）。
+ * ⚠️ ★既定では効きません。★カットの数・時刻・画角は変わりません（★素材の選び方だけ）。
+ */
+const SIDE_ONLY = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('directional') === 'side';
 const PLACEMENT_OVERRIDE: HorsePlacementMode | undefined = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('placement') === 'legacy'
   ? 'legacy-table' : undefined;
@@ -2757,9 +2763,22 @@ export default function RacePage(): React.JSX.Element {
          *    ★ここを `rearV4 !== undefined` のままにすると、★焼いた素材では原版を読まないので
          *    ★false に落ち、★**全カットが真横素材**になります（★絵が変わります・R-27）。
          */
-        directionalReady: bakedLibs !== undefined
-          ? { rear: true, front: true }
-          : { rear: rearV4 !== undefined, front: frontV3 !== undefined },
+        /**
+         * ★**真横の素材だけで走らせる口**（`?directional=side`・★2026-09-10）。
+         *
+         *   ★オーナー指摘「参考映像が答えにならないか」を受けて測ったところ、
+         *   ★参考映像は ★**走行の場面をすべて真横と後方で見せており、正面寄りの馬が 1 つも無い**
+         *   ★（★93 秒・14 点の標本）。★私たちの台本は ★**走行 62 秒のうち斜め前が 26 秒（42%）**。
+         *   → ★「だめ」と言われている素材を使わずに走らせたらどう見えるかを、★見比べられるようにします。
+         *
+         * ⚠️ ★**カットの数は 1 つも減りません。** ★どのカットでも真横の素材を使うだけです
+         *    （★台帳「カット数は減らさない」）。★画角と切り替えの時刻は変わりません。
+         * ⚠️ ★**既定では効きません。** ★製品の見え方は 1 画素も変えていません。
+         */
+        directionalReady: SIDE_ONLY ? { rear: false, front: false }
+          : bakedLibs !== undefined
+            ? { rear: true, front: true }
+            : { rear: rearV4 !== undefined, front: frontV3 !== undefined },
         ...(bakedLibs?.['winner-rear'] !== undefined
           ? { winnerRearHighQuality: bakedLibs['winner-rear'] }
           : winnerRear !== undefined ? { winnerRearHighQuality: buildFrames(winnerRear, undefined, SILKS_LAYOUT_REAR) } : {}),

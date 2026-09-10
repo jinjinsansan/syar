@@ -184,6 +184,39 @@ export default function GaitReviewPage(): React.ReactElement {
           </p>
         </section>
 
+        <section style={{ ...card, border: '2px solid #7fd18a', background: '#141f18' }}>
+          <h2 style={h2}>⑧ ★参考映像から — ★走行を「真横だけ」で見せたら</h2>
+          <p style={note}>
+            ★参考映像（93 秒・14 点を標本）を見たところ、★<b>走行の場面は真横と後方だけ</b>で、
+            ★<b>正面寄りの馬が 1 つも出てきません</b>。★せめぎ合いも直線も真横です。
+          </p>
+          <table style={{ fontSize: 13.5, borderCollapse: 'collapse', marginBottom: 10 }}>
+            <tbody>
+              <tr><td style={{ padding: '3px 16px 3px 0' }}>★参考映像</td>
+                <td style={{ padding: '3px 0', color: '#7fd18a' }}>★真横と後方だけ（★正面寄り 0）</td></tr>
+              <tr><td style={{ padding: '3px 16px 3px 0' }}>★私たちの台本</td>
+                <td style={{ padding: '3px 0', color: '#ff8a5c' }}>★走行 62 秒のうち ★<b>斜め前が 26 秒（42%）</b></td></tr>
+            </tbody>
+          </table>
+          <p style={{ ...note, color: '#e8c86a' }}>
+            ⚠️ ★これは ★<b>私の見立てです</b>。★「参考映像が答え」の意味がこれで合っているか、
+            ★教えてください。★違うなら捨てます。
+          </p>
+          <p style={note}>
+            ★左 ★<b>現行</b>（1 角＝斜め前の素材）／★右 ★<b>真横の素材だけ</b>。
+            ★<b>カットの数・時刻・画角は同じ</b>で、★<b>使う素材だけ</b>が違います。
+          </p>
+          <Pair base="sideonly" />
+          <p style={{ ...note, margin: '12px 0 6px' }}>★↓ ★1 レース通し（★真横の素材だけ・★早送り 5fps・★62 秒ぶん）</p>
+          <video src="/gait-review/sideonly-fullrace.mp4" style={media} controls loop muted playsInline />
+          <p style={{ ...note, margin: '8px 0 0' }}>
+            ⚠️ ★<b>カットは 7 つとも残っています</b>（★減らしていません）。<br />
+            ⚠️ ★これは ★<b>見比べるための口</b>です。★既定の画面は変えていません。<br />
+            ⚠️ ★参考映像の ★<b>絵柄・演出は真似しません</b>（★憲法 §0.1）。★見ているのは
+            ★「★走行をどの向きで見せているか」だけです。
+          </p>
+        </section>
+
         <section style={{ ...card, marginBottom: 8 }}>
           <h2 style={h2}>★この頁が言っていないこと</h2>
           <p style={{ ...note, margin: 0 }}>
