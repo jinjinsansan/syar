@@ -47,6 +47,15 @@ export const MEASURED_GROUND_PREFIXES: readonly string[] = [
   'horse-jockey-side-v8', 'horse-jockey-side-v8b', 'horse-jockey-side-v8c',
   'horse-jockey-diag-front-v4', 'horse-jockey-diag-front-v4b', 'horse-jockey-diag-front-v4c',
   /**
+   * ★**高所斜め**（★2026-09-10 に追加）。
+   *   ⚠️ ★台本 v6 が使っていなかったため、★対象から漏れていました。★4 角を引きで見せる案で
+   *      ★実際に描かれるようになった途端、★オーナー評 ★**「ぴょんぴょん どんどこ上下に跳ねる」**。
+   *   ★実測 … ★この素材は ★**幅が 17.5%% 変動**します（★真横 v8 は 3.4%%）。
+   *      ★従来の配置は ★鞍布の検出幅で毎コマ拡縮するので、★その変動がそのまま跳ねになります。
+   *   ★素材そのものは真横と同等です（★蹄の上下 6.37%% 対 6.94%%・★頭頂 3.30%% 対 2.95%%）。
+   */
+  'horse-jockey-high-diag-v4',
+  /**
    * ⚠️ ★**検証用の試作**（★2026-09-10・★オーナー評「斜め前だけ足が太過ぎる」）。
    *    ★`horse-jockey-diag-front-v4` の脚だけを横に 63% へ縮めたもの
    *    （★`tmp/make-thin-legs-20260910.mjs` で作り直せます）。

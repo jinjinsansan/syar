@@ -2722,10 +2722,15 @@ export default function RacePage(): React.JSX.Element {
           : composedRear !== undefined
             ? buildFrames(composedRear.frames, undefined, SILKS_LAYOUT_REAR, composedRear.anchors)
             : buildFrames(await fallbackSet('horse-jockey-diag-rear-v2')));
+      /** ★高所斜めも ★**実際に読めた素材の名前**で配置を決めます（★2026-09-10・★他の 2 組と同じ規則） */
+      const highMode = bakedLibs !== undefined
+        ? placementModeFor(bakedPrefixByRole.get('high-diag-v2'))
+        : nativePlacementMode('horse-jockey-high-diag-v4');
       const highDiagHighQuality = !neededAssets.includes('high-diag-v2') ? []
         : bakedLibs?.['high-diag-v2'] ?? (highDiagV3 !== undefined
-          ? buildFrames(highDiagV3, undefined, SILKS_LAYOUT_REAR)
+          ? buildFrames(highDiagV3, undefined, SILKS_LAYOUT_REAR, undefined, undefined, highMode)
           : buildFrames(await fallbackSet('horse-jockey-high-diag-v2')));
+      if (bakedLibs === undefined) builtPlacementByRole.set('high-diag-v2', highMode);
       artRef.current = {
         /**
          * ★**較正値は真横の素材から引きます**（★2026-09-10・★F-G4）。

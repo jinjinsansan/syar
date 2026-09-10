@@ -282,6 +282,38 @@ export default function GaitReviewPage(): React.ReactElement {
             ★右 ★<b>4 角の引き・宣言どおりの素材</b>（★高所斜め＝後ろ姿で曲がっていく）。
           </p>
           <Pair base="corner4" />
+          <p style={{ ...note, color: '#e8c86a', margin: '14px 0 6px' }}>
+            ⚠️ ★<b>オーナー評: ★「真上のカメラワークにした瞬間、★馬がぴょんぴょん どんどこ上下に跳ねている」</b><br />
+            ★原因が分かりました。★<b>高所斜めの素材だけ、★最初に直した不具合がそのまま残っていました。</b><br />
+            ★台本 v6 が使っていなかったため、★対象素材の一覧から漏れていたのです。
+            ★引きで見せる案で実際に描かれた途端に出ました。
+          </p>
+          <table style={{ fontSize: 13.5, borderCollapse: 'collapse', marginBottom: 10 }}>
+            <tbody>
+              {([
+                ['高所斜め v4', '6.37%', '3.30%', '★17.5%'],
+                ['真横 v8（合格）', '6.94%', '2.95%', '3.4%'],
+              ] as const).map(([n, a, b, c]) => (
+                <tr key={n}>
+                  <td style={{ padding: '3px 16px 3px 0' }}>{n}</td>
+                  <td style={{ padding: '3px 16px 3px 0', textAlign: 'right' }}>蹄 {a}</td>
+                  <td style={{ padding: '3px 16px 3px 0', textAlign: 'right' }}>頭頂 {b}</td>
+                  <td style={{ padding: '3px 0', textAlign: 'right', color: '#ff8a5c' }}>幅の変動 {c}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p style={note}>
+            ★素材そのものは真横と同等です。★しかし ★<b>幅が 17.5% 変動</b>するため、
+            ★従来の配置（★鞍布の幅で毎コマ拡縮）が ★そのまま跳ねになっていました。<br />
+            ★左 ★<b>修正前</b>／★右 ★<b>修正後</b>（★実測の接地・他の 2 組と同じ規則）。
+          </p>
+          <Pair base="cornerfix" />
+          <p style={{ ...note, margin: '8px 0 0' }}>
+            ⚠️ ★実測では ★上端の振れが ★<b>111.65px → 94.36px</b>（★15% 減）。<br />
+            ⚠️ ★<b>この数字は弱い証拠です。</b>★コーナーはカメラが振れ、★馬の奥行きも変わるので、
+            ★上端の振れにそれらが混ざります。★<b>合否はオーナーの目です。</b>
+          </p>
           <p style={{ ...note, margin: '8px 0 0' }}>
             ⚠️ ★背面は不透明にしてあります（★不合格の走行が透けないように）。<br />
             ⚠️ ★レース時間は止めていません。★40 秒でその時点の真横走行へ戻ります。<br />
