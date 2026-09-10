@@ -141,3 +141,6 @@ apps/web/public/art/lab/
 
 # ★走りの見比べ台の書き出し（★2026-09-10・★45MB・作り直せるのでコミットしない）
 apps/web/public/gait-review/
+
+# ★脚の太さの検証用の試作（★2026-09-10・tmp/make-thin-legs-20260910.mjs で作り直せる）
+apps/web/public/art/horse-jockey-diag-front-v4thin-pose*.png

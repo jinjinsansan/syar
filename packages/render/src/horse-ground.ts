@@ -46,6 +46,16 @@ export type HorsePlacementMode = 'measured-ground' | 'legacy-table';
 export const MEASURED_GROUND_PREFIXES: readonly string[] = [
   'horse-jockey-side-v8', 'horse-jockey-side-v8b', 'horse-jockey-side-v8c',
   'horse-jockey-diag-front-v4', 'horse-jockey-diag-front-v4b', 'horse-jockey-diag-front-v4c',
+  /**
+   * ⚠️ ★**検証用の試作**（★2026-09-10・★オーナー評「斜め前だけ足が太過ぎる」）。
+   *    ★`horse-jockey-diag-front-v4` の脚だけを横に 63% へ縮めたもの
+   *    （★`tmp/make-thin-legs-20260910.mjs` で作り直せます）。
+   *    ★**ここに載せるのは配置を現行と同一にするためだけ**です。★載せないと
+   *    ★従来の配置に落ち、★「脚の太さ」以外も変わって比べられません。
+   * ⚠️ ★`?front=diag-front-v4thin` を渡したときだけ読まれます。★既定では読みません。
+   * ⚠️ ★**本番の素材ではありません。** ★描き直しが入ったら、★この行と画像を消すこと。
+   */
+  'horse-jockey-diag-front-v4thin',
 ];
 
 /** ★その素材が新しい接地に乗るか。★読めなかった素材（`undefined`）は従来へ倒す（★R-27・狭い側） */

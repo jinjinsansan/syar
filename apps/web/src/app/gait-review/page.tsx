@@ -144,6 +144,46 @@ export default function GaitReviewPage(): React.ReactElement {
           </p>
         </section>
 
+        <section style={{ ...card, border: '2px solid #4dd2ff', background: '#14212a' }}>
+          <h2 style={h2}>⑦ ★試作 — ★斜め前の脚だけを細くしてみました</h2>
+          <p style={note}>
+            ★「真横は太く感じない、斜め前だけ」というお答えから、★<b>脚の太さを胴の幅と比べ</b>ました。
+          </p>
+          <table style={{ fontSize: 13.5, borderCollapse: 'collapse', marginBottom: 10 }}>
+            <tbody>
+              {([
+                ['斜め前・現行 v4', '13.4%', '不合格', '#ff8a5c'],
+                ['斜め前・現行 v4b', '11.3%', '不合格', '#ff8a5c'],
+                ['斜め前・旧 2D v2', '8.6%', '好評', '#7fd18a'],
+                ['真横・現行 v8', '7.3%', '★合格', '#7fd18a'],
+                ['★試作（脚を細く）', '★8.6%', '★これを見ていただきます', '#4dd2ff'],
+              ] as const).map(([name, value, judge, color]) => (
+                <tr key={name}>
+                  <td style={{ padding: '3px 16px 3px 0', color }}>{name}</td>
+                  <td style={{ padding: '3px 16px 3px 0', textAlign: 'right', color, fontWeight: 700 }}>{value}</td>
+                  <td style={{ padding: '3px 0', color }}>{judge}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p style={{ ...note, color: '#e8c86a' }}>
+            ⚠️ ★<b>指標を 3 つ試して、3 つ目が当たった形です。</b>★偶然かもしれません。
+            ★（★「太さ÷高さ」と「長さ÷太さ」は ★合否の順序と ★一致しませんでした。）<br />
+            → ★だから ★<b>実際に細くして、良く見えるかを確かめます。</b>
+          </p>
+          <p style={note}>
+            ★左 ★<b>現行</b>／★右 ★<b>試作（脚を 63% の幅へ）</b>。
+            ★<b>配置・浮き・1 完歩・カメラ・馬はすべて同一</b>で、★<b>脚の太さだけ</b>が違います。
+          </p>
+          <Pair base="thin" />
+          <img src="/gait-review/cycle-v4thin.jpg" alt="試作の 1 周" style={{ ...media, marginTop: 12 }} />
+          <p style={{ ...note, margin: '8px 0 0' }}>
+            ★↑ 試作の 1 周 8 コマ（★①の上段と見比べてください）。<br />
+            ⚠️ ★これは ★<b>画像処理で細くしただけの試作</b>です。★仕上がりの品質は求めていません。
+            ★<b>本番の素材ではありません。</b>★良くなるかどうかを確かめるためだけのものです。
+          </p>
+        </section>
+
         <section style={{ ...card, marginBottom: 8 }}>
           <h2 style={h2}>★この頁が言っていないこと</h2>
           <p style={{ ...note, margin: 0 }}>
