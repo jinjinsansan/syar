@@ -244,11 +244,25 @@ export function drawRaceTitleCard<TImage>(
       /** ★1 秒に 11 コマ。走りの周期は素材のコマ数で決まる */
       const idx = Math.max(0, Math.floor(Math.max(0, local) * 11)) % ownHorse.length;
       const fr = ownHorse[idx]!;
-      const targetH = H * 0.42;
+      /**
+       * ⚠️ ★**0.42 → 0.34 に縮めました**（★2026-09-11・オーナー指摘）。
+       *    > ★最初の画面の自分馬が左がはみ出ている　サイズをもう少し小さく
+       */
+      const targetH = H * 0.34;
       const scale = targetH / fr.referenceHeight;
       const dw = fr.source.width * scale, dh = fr.source.height * scale;
-      /** ★パネルの中心より少し左。★真ん中に置くと**鼻先が画面の右端に触れます**（実測） */
-      const cx = ox + ow / 2 - 76;
+      /**
+       * ★**題字の板に食い込ませません**（★2026-09-11・オーナー指摘「左がはみ出ている」）。
+       *   ★板は `px` 〜 `px + pw`（★斜度ぶん `k` が張り出す）。★そこから 18px 空けます。
+       * ⚠️ ★右も見ます。★左に入らないぶん右へ押すと、★今度は ★**鼻先が画面外**へ出ます
+       *    （★元の `-76` はそのための逃がしでした）。★どちらにも収まらなければ帯の中央に置きます。
+       */
+      const bandL = px + pw + Math.abs(k) + 18;
+      const bandR = W - 10;
+      const preferredCx = ox + ow / 2 - 76;
+      const cx = dw >= bandR - bandL
+        ? (bandL + bandR) / 2
+        : Math.min(Math.max(preferredCx, bandL + dw / 2), bandR - dw / 2);
       /** ★パネルの少し上に接地させる */
       const groundY = oyy - 18 + hrise.dy;
       const dx = cx - dw / 2, dy = groundY - dh;

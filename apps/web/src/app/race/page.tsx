@@ -77,7 +77,8 @@ import {
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
-  raceCutInFlashAt, drawLogoCutIn, LOGO_CUTIN_SEC, LOGO_MARK_COLOR,
+  raceCutInAt, RACE_CUTIN_SEC, RACE_CUTIN_AT_START,
+  drawOwnHorseCutIn, drawFormationCutIn, drawRunningStyleCutIn, drawToStraightCutIn,
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
   horseCalibrationFor, LEGACY_HORSE_CALIBRATION, type HorseMaterialCalibration,
   type HorsePlacement, type HorsePlacementFrame, type HorsePlacementSet, type HorsePlacementMode,
@@ -528,10 +529,28 @@ const HORSE_TYPES: readonly HorseType[] = ['a', 'b', 'c'];
  * ⚠️ ★`HORSE_TYPES` からは外しません。★素材と経路は全部通してあるので、
  *    ★描き直した型 C を置けば、★この表を戻すだけで出ます。
  */
+/**
+ * ⚠️ ★**型 B も、いまは出しません**（★2026-09-11・★オーナー指示）
+ *
+ *   > ★馬の種類を一旦足が白い馬を辞めてください
+ *   > ★顔が白ブチはいいですが、足が白ブチの馬を一旦使わないでください
+ *
+ *   ★型 B の識別点は ★「顔と四肢の白」です（★素材 `horse-jockey-side-v8b` を実見して確認）。
+ *   ★顔の流星は残してよいが、★**四肢の白は不可**。★ところが 2 つは ★**同じ絵に焼き込まれて**おり、
+ *   ★片方だけ外すには ★**描き直し**が要ります。→ ★指示どおり ★**一旦 出しません**。
+ *
+ * ⚠️ ★**代償を書いておきます。** ★これで 12 頭は ★**全部 型 A** になります。
+ *    ★見分けは ★**毛色 7 色だけ**に戻ります（★型を足したのは
+ *    ★「毛色 20 色でも実質 3 群しか見分けられない」という実測が理由でした）。
+ *    ★四肢の白を消した型 B を描き直せば、★この表を戻すだけで出ます。
+ *
+ * ⚠️ ★`HORSE_TYPES` からは外しません（★型 C と同じ扱い）。★素材と経路は通してあります。
+ * ★副次: ★読む型が 1 つになるので、★焼く画布もそのぶん減ります。
+ */
 const HORSE_TYPE_BY_GATE: readonly HorseType[] = [
-  'a', 'b', 'a', 'b', 'a', 'b',
-  'a', 'b', 'a', 'b', 'a', 'b',
-  'a', 'b', 'a', 'b', 'a', 'b',
+  'a', 'a', 'a', 'a', 'a', 'a',
+  'a', 'a', 'a', 'a', 'a', 'a',
+  'a', 'a', 'a', 'a', 'a', 'a',
 ];
 const typeOf = (gate: number): HorseType => HORSE_TYPE_BY_GATE[(gate - 1) % HORSE_TYPE_BY_GATE.length] ?? 'a';
 /**
@@ -588,6 +607,29 @@ function bakeCoat(image: FrameImage, coat: CoatName): FrameImage {
 }
 
 const HORSE_NAMES = ['スターライト', 'サクラブリーズ', 'ハンシンドリーム', 'ミライノツバサ', 'グリーンアロー', 'オウカノキセキ', 'ナニワスピリット', 'ローズクイーン', 'ムラサキノホシ', 'アオバハヤテ', 'ブラウンエース', 'ピンクレディ'] as const;
+/**
+ * ★**画面上の順位**（★2026-09-11・★カットインと順位表で 1 つの規則にする）。
+ *
+ * ⚠️ ★これを 2 か所に書くと、★**カットインと順位表が違う順位**を出します（★R-30）。
+ *    ★並べるのは ★**画面に描いている位置**です（★エンジンの真の位置ではありません —
+ *    ★最後の直線の攻防は表示だけ前後を動かすので、★絵と表が食い違います）。
+ * ⚠️ ★ゴールした馬だけは ★**確定着順**で並べます（★決着した瞬間から表が正しい）。
+ */
+function screenRank<T extends { readonly gate: number; readonly meters: number }>(
+  rows: readonly T[], finished: (h: T) => boolean, finishPos: ReadonlyMap<number, number>,
+): T[] {
+  return [...rows].sort((p, q) => {
+    if (finished(p) && finished(q)) {
+      return (finishPos.get(p.gate) ?? 99) - (finishPos.get(q.gate) ?? 99);
+    }
+    if (finished(p) !== finished(q)) return finished(p) ? -1 : 1;
+    return q.meters - p.meters;
+  });
+}
+/** ★脚質の表示名。★エンジンの値をそのまま日本語にするだけ（★ここで判定しない） */
+const STRATEGY_LABELS: Readonly<Record<string, string>> = {
+  nige: '逃げ', senko: '先行', sashi: '差し', oikomi: '追い込み',
+};
 const JOCKEY_NAMES = ['田中 守', '佐藤 翼', '山本 誠', '中村 駿', '高橋 蓮', '松本 拓海', '藤田 昇', '小林 亮', '伊藤 健', '吉田 直樹', '岡田 悠', '森川 浩'] as const;
 /** ★固定2D中継の基準幅 */
 
@@ -615,6 +657,8 @@ interface Built {
    *   ⚠️ ★レースにつき 1 度だけ作ります。毎コマ作ると表を作り直します。
    */
   readonly dustSoil: (raceSec: number, gate: number) => number;
+  /** ★脚質（★出走表に載せた値をそのまま。★描画側で作り直さない） */
+  readonly strategyOf: (gate: number) => string;
   /**
    * ★見た目の速度の補正 Δ(d)（`visual-scroll.ts`）。背景の流れと脚の周期に使う。
    *   位置・時刻・着順には触れない（時間圧縮 D-062 はそのまま）。
@@ -1381,6 +1425,12 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     gauge, finishPos, finishSec, finishSpeeds, dustSoil, finishStyle,
     ...buildMotionTimeline({ model, warp, finishSec, finishStyle }, winnerGate, 1.6),
     weightsKg: entrants.map((e) => e.weightKg),
+    /**
+     * ★脚質（★カットイン C / A が読む）。
+     * ⚠️ ★**ここで作り直しません。** ★出走表に載せた値をそのまま返します
+     *    （★`resolveRace` に渡したのと同じ値・★R-30）。
+     */
+    strategyOf: (gate: number): string => entrants[gate - 1]?.strategy ?? 'senko',
   };
 }
 
@@ -3474,14 +3524,15 @@ export default function RacePage(): React.JSX.Element {
         } satisfies WorldBillboard<HTMLImageElement>] : undefined,
       });
       /**
-       * ★**カットイン**（★2026-09-11・★オーナー判定 ★A「デザイン系ロゴ型」）
+       * ★**カットイン**（★2026-09-11・★オーナー判定の 2 回目）
        *
-       *   ★旧: ★カット 1 つを ★**まるごと**隊列図／コース図へ置き換えていた
-       *        → ★オーナー評「★カットインの内容がダメです」。
-       *   ★新: ★カットの ★**境目の 0.42 秒だけ**ロゴが走る。★残りは ★**その場面の走行**。
-       *   ★どこで光らせるかは ★`raceCutInFlashAt` が 1 か所で決めます（★R-30）。
+       *   ★1 回目 … カット 1 つをまるごと隊列図／コース図へ → ★「内容がダメです」
+       *   ★2 回目 … 境目で ★ロゴが 0.42 秒 → ★「あまりにもダサい。★今のカットインは使えません」
+       *   ★3 回目 … ★**その瞬間に意味のある情報だけ**を 1.2 秒（★オーナー案「毎回異なる意味のある
+       *            カットインにするのは？」）。★どこで何を出すかは `raceCutInAt` が 1 か所で決めます（★R-30）。
        * ⚠️ ★レース時間は止めません。★戻ったときはその時点の状態の画になります。
        * ⚠️ ★着順・走破時刻・台帳・サーバー判定には触れていません。★描画だけです。
+       *    ★出す数字は ★**画面が描くのに使っている値**をそのまま渡します（★着順から作らない）。
        * ⚠️ ★カットの ★**数・境界・尺は 1 つも変えていません**（★台帳「カット数は減らさない」）。
        */
       /**
@@ -3495,27 +3546,100 @@ export default function RacePage(): React.JSX.Element {
         .reduce<ShotChange | undefined>((m, c) => (m === undefined || c.displaySec > m.displaySec ? c : m), undefined);
       /** ★このカットが始まってからの秒。★切り替え表に無ければ「ずっと前から」扱い */
       const sinceCutSec = cutChange === undefined ? Number.POSITIVE_INFINITY : d - cutChange.displaySec;
+      const cutIn = CUTIN_OFF || cutChange === undefined || sinceCutSec < 0 || sinceCutSec >= RACE_CUTIN_SEC
+        ? undefined : raceCutInAt(cutChange.from, cutChange.to);
       /**
-       * ★**ロゴの一瞬**（★オーナー判定 A）。★カットの頭 `LOGO_CUTIN_SEC` 秒だけ。
-       * ⚠️ ★**どこから来たか**で判定します。★`side-drive` は台本 v6 に 2 回出るので、
-       *    ★名前だけだと ★**直線の入りでない方**でも光ってしまいます。
+       * ★**A 自馬カード**（★発走直後）。★カットの境目ではなく、★レース開始からの経過で出します。
+       * ⚠️ ★参考映像は ★発走の瞬間を ★**見せません**（★実測 5.6→6.0 秒で、踏み出しは 1 コマも無い）。
+       *    ★ここはその「間」に、★見る人がいちばん知りたいこと＝★**自分の馬**を置きます。
        */
-      const cutIn = CUTIN_OFF || cutChange === undefined || sinceCutSec < 0 || sinceCutSec >= LOGO_CUTIN_SEC
-        ? undefined : raceCutInFlashAt(cutChange.from, cutChange.to);
-      /** 発走イベントの直後だけ、踏み出しのない全速コマを不透明な発走帯でつなぐ。 */
-            /** ★発走の一瞬のカットイン。★尺は `LOGO_CUTIN_SEC` から引く（★べた書きしない・R-31） */
-      const startTransitionActive = !CUTIN_OFF && renderer === 'v2' && !replay.active
-        && raceD > 0 && raceD < LOGO_CUTIN_SEC;
-      cutInActive = cutIn !== undefined || startTransitionActive;
-      if (cutIn !== undefined) {
-        drawLogoCutIn(ctx, {
+      const startCutInActive = !CUTIN_OFF && renderer === 'v2' && !replay.active
+        && raceD > 0 && raceD < RACE_CUTIN_SEC;
+      cutInActive = cutIn !== undefined || startCutInActive;
+      if (cutInActive) {
+        /**
+         * ★カットインが読む値は ★**画面が描いている位置**から作ります（★着順から作らない）。
+         * ⚠️ ★カットインが出るのはすべて ★**道中**です（★発走直後・位置取り・4 角）。
+         *    ★誰もゴールしていないので、★確定着順は使いません。
+         */
+        const cutRank = screenRank(easedAt, () => false, built.finishPos);
+        const orderOf = (gate: number): number => cutRank.findIndex((h) => h.gate === gate) + 1;
+        const metersLeftNow = Math.max(0, DIST - Math.max(...at.map((h) => h.meters)));
+        const nameOf = (gate: number): string => HORSE_NAMES[gate - 1] ?? `スター${gate}`;
+        const frameColorOf = (gate: number): string =>
+          (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff';
+        const strategyLabelOf = (gate: number): string =>
+          STRATEGY_LABELS[built.strategyOf(gate)] ?? '先行';
+        const kind = cutIn?.kind ?? RACE_CUTIN_AT_START.kind;
+        const frame = {
           viewport: { width: W, height: H },
-          fallbackText: cutIn.text,
-          letterSpacingEm: cutIn.letterSpacingEm,
-          textColor: LOGO_MARK_COLOR,
-          sinceSec: sinceCutSec,
-          durationSec: LOGO_CUTIN_SEC,
-        });
+          sinceSec: cutIn === undefined ? raceD : sinceCutSec,
+          durationSec: RACE_CUTIN_SEC,
+          label: cutIn?.label ?? RACE_CUTIN_AT_START.label,
+          raceLabel: `${RACE_META.raceNo}　${RACE_META.raceName}`,
+          metersLeft: metersLeftNow,
+        };
+        if (kind === 'own-horse') {
+          drawOwnHorseCutIn(ctx, FONT, frame, {
+            gate: ownGate,
+            horseName: nameOf(ownGate),
+            jockeyName: JOCKEY_NAMES[ownGate - 1] ?? '騎手',
+            strategyLabel: strategyLabelOf(ownGate),
+            frameColor: frameColorOf(ownGate),
+            order: Math.max(1, orderOf(ownGate)),
+            fieldSize: FIELD,
+            /**
+             * ★走っている絵は ★**レース中と同じコマ集合**から取ります（★別の絵を用意しない）。
+             * ⚠️ ★`sideHighQuality` は ★**`[馬番][コマ]`** です。★取り違えると
+             *    ★コマを送るたびに ★**別の馬**が出ます（★2026-08-28 に実際にやりました）。
+             */
+            portrait: ((): Parameters<typeof drawOwnHorseCutIn<CanvasImageSource>>[3]['portrait'] => {
+              const set = art.sideHighQuality[ownGate - 1];
+              if (set === undefined || set.length === 0) return undefined;
+              const fr = set[Math.max(0, Math.floor(raceD * 11)) % set.length];
+              return fr === undefined ? undefined
+                : { image: fr.image, source: fr.source, overlay: fr.overlay };
+            })(),
+          });
+        } else if (kind === 'formation') {
+          drawFormationCutIn(ctx, art.pal as Record<string, string>, FONT, frame, {
+            horses: v2Minimap.horses,
+            frameColorOf,
+          });
+        } else if (kind === 'running-style') {
+          /**
+           * ★**後ろから動く脚質の馬**を名指しします。★予想ではありません
+           *   （★脚質は出走表の値、★順位は画面が描いている位置）。
+           * ⚠️ ★居なければ「居ない」と出します（★無理に埋めない）。
+           */
+          const rows = cutRank
+            .filter((h) => built.strategyOf(h.gate) === 'sashi' || built.strategyOf(h.gate) === 'oikomi')
+            .map((h) => ({
+              gate: h.gate,
+              horseName: nameOf(h.gate),
+              strategyLabel: strategyLabelOf(h.gate),
+              order: Math.max(1, orderOf(h.gate)),
+              frameColor: frameColorOf(h.gate),
+              own: h.gate === ownGate,
+            }));
+          drawRunningStyleCutIn(ctx, FONT, frame, rows);
+        } else {
+          /** ★先頭との差は ★**順位表と同じ「馬身」**で出します（★別の単位を作らない・R-30） */
+          const leadMeters = cutRank[0]?.meters ?? 0;
+          const ownMeters = cutRank.find((h) => h.gate === ownGate)?.meters ?? leadMeters;
+          drawToStraightCutIn(ctx, course, art.pal as Record<string, string>, FONT, frame, {
+            horses: v2Minimap.horses,
+            focusS: v2Minimap.focusS,
+            frameColorOf,
+            distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${DIST}m`,
+            metersLeft: metersLeftNow,
+            timeSec: d,
+            ownGate,
+            ownOrder: Math.max(1, orderOf(ownGate)),
+            ownGapLengths: Math.max(0, (leadMeters - ownMeters) / HORSE_LENGTH_M),
+            fieldSize: FIELD,
+          });
+        }
         /**
          * ★**診断はカットイン中も出します**（★2026-09-10・★R-30）。
          *
@@ -3526,31 +3650,14 @@ export default function RacePage(): React.JSX.Element {
          * → ★挿入画面のコマも ★**そのカットとして**控えます。
          */
         (globalThis as { __raceDiag?: unknown }).__raceDiag = {
-          shot: scene.shot.id,
-          cutIn: 'logo',
+          shot: cutIn === undefined ? 'start-insert' : scene.shot.id,
+          cutIn: kind,
           asset: null,
           horses: [],
           material: { ...art.materialDiag, horseBob, strideM },
         };
-      } else if (startTransitionActive) {
-        /**
-         * ★**発走の一瞬のカットイン**（★2026-09-11・★オーナー判定「A ロゴ型」）。
-         *
-         * ⚠️ ★以前はここが ★**画面全体を暗く塗るだけ**でした（★オーナー評「カットインの内容がダメ」）。
-         * ★参考映像は ★発走の瞬間を ★**見せません** — ★ゲートが空になった一拍のあと、
-         * ★後方の引きへハードカットします（★実測 5.6→6.0 秒）。★ここはその「間」を作る画です。
-         */
-        drawLogoCutIn(ctx, {
-          viewport: { width: W, height: H },
-          /**
-           * ⚠️ ★題字の素材（`race-title-spring-v1`）は ★**風景つきのタイトルカード**で、
-           *    ★0.4 秒の一瞬に出すロゴには向きませんでした（★実測・★風景だけが見える）。
-           *    → ★**文字で出します**（★オーナー案「桜星賞〜 とか STAR とか」）。
-           */
-          fallbackText: RACE_META.raceName,
-          sinceSec: raceD,
-          durationSec: LOGO_CUTIN_SEC,
-        });
+      }
+      if (startCutInActive) {
         const startText = 'スタートしました！';
         drawStartCallBand(ctx, art.pal as Record<string, string>, vp, FONT, FIELD, true,
           narratorPortrait(art.raceNarrator, art.narratorSets?.[cast], {
@@ -3570,22 +3677,19 @@ export default function RacePage(): React.JSX.Element {
          *    ★上の `drawStartCallBand` が ★**実況の帯**に出しているので、それで足ります。
          *    ★中央に出すとロゴと重なり、★実際に「ス桜星賞！」と潰れていました（★実測）。
          */
-        (globalThis as { __raceDiag?: unknown }).__raceDiag = {
-          shot: 'start-insert', cutIn: 'start', asset: null, horses: [],
-          material: { ...art.materialDiag, horseBob, strideM },
-        };
-      } else {
+      }
+      if (!cutInActive) {
         drawScene(ctx, scene);
       }
       /**
-       * ⚠️ ★**ロゴが覆う境目では、白い閃光を出しません**（★2026-09-11）。
-       *    ★閃光はこのあとに ★**上から**塗るので、★出したままだとロゴが
+       * ⚠️ ★**カットインが覆う境目では、白い閃光を出しません**（★2026-09-11）。
+       *    ★閃光はこのあとに ★**上から**塗るので、★出したままだとカットインが
        *    ★最初の 0.3 秒 ★真っ白に飛びます。★境目を読める形にする役目は
-       *    ★ロゴのカットインが引き取りました（★不透明・0.42 秒）。
+       *    ★カットインが引き取りました（★不透明・1.2 秒）。
        */
-      const flashCoveredByLogo = change !== undefined
-        && raceCutInFlashAt(change.from, change.to) !== undefined;
-      if (change !== undefined && !flashCoveredByLogo && FLASH_INTO.has(change.to)) {
+      const flashCoveredByCutIn = change !== undefined
+        && raceCutInAt(change.from, change.to) !== undefined;
+      if (change !== undefined && !flashCoveredByCutIn && FLASH_INTO.has(change.to)) {
         // ★閃光トランジション（アーケード参考映像 74 秒）: 白 → 0.3 秒で消える
         const t = (d - change.displaySec) / 0.3;
         if (t < 1) {
@@ -3701,11 +3805,11 @@ export default function RacePage(): React.JSX.Element {
       if (sectionTagRef.current.label !== label) sectionTagRef.current = { label, sinceSec: sectionTagRef.current.label === '' ? d - 1 : d };
       const hudSince = raceD - HUD_SETTLE_SEC;
       // ★ゴール後はライブ HUD（見出し・区間タグ・コース図）を落とす（motion-spec §6: ゴール〜2.4s は勝馬テロップのみ）
-      if (!winnerFinishedNow && !contestFocusHud) drawRaceHeadlineChip(ctx, FONT, {
+      if (!winnerFinishedNow && !contestFocusHud && !cutInActive) drawRaceHeadlineChip(ctx, FONT, {
         raceNo: RACE_META.raceNo, raceName: RACE_META.raceName,
         distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${DIST}m`,
       }, { timeSec: d, sinceSec: hudSince });
-      if (!winnerFinishedNow && !contestFocusHud) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
+      if (!winnerFinishedNow && !contestFocusHud && !cutInActive) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
         { timeSec: d, sinceSec: Math.min(hudSince, d - sectionTagRef.current.sinceSec) });
     }
     /**
@@ -3775,7 +3879,14 @@ export default function RacePage(): React.JSX.Element {
        *    ★「レース中」と同じ扱いになります）。
        * ★実況帯とレース名は画面の端にあり馬に重なっていないので、そのまま残します。
        */
-      const hud = replay.active || contestFocusHud ? { ...hudRaw, standings: false }
+      /**
+       * ⚠️ ★**カットイン中は、実況の帯以外の HUD を下ろします**（★2026-09-11）。
+       *    ★以前は順位表・見出し・区間タグ・名前プレートが ★**カットインの上に重なって**おり、
+       *    ★隊列図の右上が順位表で隠れ、★脚質の 1 行目が区間タグで潰れていました（★実測）。
+       *    ★実況の帯だけは残します（★オーナー「これは実況中継の枠内で出すもの」）。
+       */
+      const hud = cutInActive ? { ...hudRaw, standings: false }
+        : replay.active || contestFocusHud ? { ...hudRaw, standings: false }
         : winnerFinishedNow ? { ...hudRaw, gauge: false, standings: false, calls: false } : hudRaw;
       // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）
       const g = staminaAt(built.gauge, Math.max(0, metersLeft));
@@ -3800,13 +3911,7 @@ export default function RacePage(): React.JSX.Element {
        *   ★ゴールした馬は**確定着順**で並べるので、★**決着した瞬間から表は正しい**ままです。
        *   ★残り 60m で表示オフセットは 0 なので、★ゴール前の着差表示も本来の値に戻っています。
        */
-      const rank = [...easedAt].sort((p, q) => {
-        if (finished(p) && finished(q)) {
-          return (built.finishPos.get(p.gate) ?? 99) - (built.finishPos.get(q.gate) ?? 99);
-        }
-        if (finished(p) !== finished(q)) return finished(p) ? -1 : 1;
-        return q.meters - p.meters;
-      });
+      const rank = screenRank(easedAt, finished, built.finishPos);
       const allIn = rank[0] !== undefined && finished(rank[0]);
       /**
        * ★順位表の**行が動く速さ**だけを滑らかにします（2026-08-21）。

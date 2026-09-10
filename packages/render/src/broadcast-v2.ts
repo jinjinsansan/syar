@@ -509,7 +509,36 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
   'straight-contest': {
     id: 'straight-contest', view: 'side', target: 'pack', horseAsset: 'side-v6',
     // 数頭の馬体と前後差を同時に読める固定画角。途中でズームしない。
-    transitionSec: 0.35, camera: { ...SIDE_LOW, upM: 6, fovDeg: 13 }, focusContest: true,
+    /**
+     * ★**高さ 6.0 → 5.0m**（★2026-09-11・★オーナー ⑥「レースがつながっているように見えません」）
+     *
+     * 【★何が起きていたか — ★実測で切り分けました】
+     *   ★`side-drive` → ★`straight-contest` の継ぎ目（★表示 48 秒）で、
+     *   ★**背景が芝＋木立から、暗いスタンドへ丸ごと入れ替わって**いました。
+     *
+     *   ★最初は「直線に入るから背景が変わるのだ」と思いました。★**違いました。**
+     *   ★実際の据え位置を測ると（`resolveBroadcastV2Scene` を通して）、
+     *   ★カメラは ★**ほぼ同じ場所**にいます:
+     *       ★1198m `side-drive`       eye(-610,-424, ★3.5)  画角 11.0°
+     *       ★1205m `straight-contest` eye(-601,-424, ★6.0)  画角 13.0°
+     *   ★変わっているのは ★**高さと画角だけ**。★対照を 1 枚撮ると、
+     *   ★高さを 3.5 に戻すだけで ★**背景は繋がりました**（★画角は無関係）。
+     *   → ★高い位置から見下ろすと、★馬の向こう側に ★**遠くのスタンドが入ります**。
+     *
+     * ⚠️ ★**画角（13°）は動かしていません。** ★ここは承認済みのカットで、
+     *    ★馬の大きさを変えると別の判断（★「この大きさで映すのは 4〜5 頭まで」）に触ります。
+     *    ★直したのは ★**継ぎ目で背景が飛ぶこと**だけです。
+     * ⚠️ ★カットの位置は動かせません。★`straight-contest` の開始（★残り 400m）は
+     *    ★「表示が実時間に戻る地点」という別の錨で、★手前へ動かすと
+     *    ★「馬が後退して見える」が再発します（★`v6BoundariesM` の注記）。
+     *
+     * ⚠️ ★**最初は 4.0 にしました。★それは間違いでした。**
+     *    ★継ぎ目の検定（`script-v6.test.ts`）が、★同じ欠陥が ★**5 か所**あることと、
+     *    ★4.0 にすると ★**`contest → straight-field` が 2m → 4m へ悪化する**ことを見つけました。
+     *    → ★直線の高さを ★**一つの帯**に揃えます: `side-drive` 3.5 ／ ★ここ 5.0 ／
+     *      ★`straight-field` 6.0 ／ `finish-line` 6.0（★`SIDE_TELE`・★触っていません）。
+     */
+    transitionSec: 0.35, camera: { ...SIDE_LOW, upM: 5, fovDeg: 13 }, focusContest: true,
     /** ★この大きさで映すのは 4〜5 頭まで（`maxVisible` の注記・オーナー指摘） */
     maxVisible: 5,
   },
@@ -544,12 +573,22 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
   },
   'opening-side-settle': {
     id: 'opening-side-settle', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
-    camera: { ...SIDE_TELE, upM: 6.5, fovDeg: 13.5 }, leadFraction: 0.57,
+    /**
+     * ⚠️ ★**高さ 6.5 → 5.0m**（★2026-09-11・★オーナー ⑥）。
+     *    ★次の `side-drive`（3.5m）との跳びが ★**3.0m** あり、★直線の継ぎ目と同じ形で
+     *    ★背景が入れ替わっていました（★オーナーは指していませんが、★同じ欠陥です）。
+     */
+    camera: { ...SIDE_TELE, upM: 5, fovDeg: 13.5 }, leadFraction: 0.57,
   },
   'straight-field': {
     // 直線の中間カット。追走集団を含む横の引きで、前後の寄りと区別する。
     id: 'straight-field', view: 'side', target: 'pack', horseAsset: 'side-v6',
-    transitionSec: 0.35, camera: { ...SIDE_LOW, upM: 8, fovDeg: 16 },
+    /**
+     * ⚠️ ★**高さ 8.0 → 6.0m**（★2026-09-11・★オーナー ⑥・★上の `straight-contest` と同じ理由）。
+     *    ★直線の 4 カットを ★**一つの高さ帯**に収めます。★画角（16°）は動かしていません
+     *    （★「横の引きで追走集団を見せる」という役目と大きさは変えていません）。
+     */
+    transitionSec: 0.35, camera: { ...SIDE_LOW, upM: 6, fovDeg: 16 },
     leadFraction: 0.65,
   },
   'side-close': {
@@ -1464,7 +1503,22 @@ export const SCRIPT_V6: readonly { readonly until: number; readonly id: Broadcas
    *   ★`start-rear-far` … ★高い後方の引き（★〜100m）
    *   ★発走の瞬間そのものは ★**ロゴの 0.42 秒**が覆います（★画面側・`LOGO_CUTIN_SEC`）。
    */
-  { until: 0.010, id: 'start-front' },         // 〜16m    ★ゲート＋「空になったゲート」の一拍
+  /**
+   * ⚠️ ★**16m → 12.8m へ詰めました**（★2026-09-11・★オーナー ②-a）
+   *
+   *   > ★このゲートからの発走の瞬間が上手くいかないので、
+   *   > ★ゲート〜発走の瞬間を真横カメラワークにしたらいいのでは？
+   *
+   *   ★**真横にはできませんでした。** ★対照を撮って確かめています:
+   *   ★`view: 'side'` にすると、★発馬機のビルボードが ★**横向きの黒い塊**になり、
+   *   ★１２ 頭が ★**縦に積み上がります**（★2026-09-10 に別セッションが同じことをして
+   *   ★「ゲートが消えた」状態になったのと同じ現象）。★**真横のゲート素材が要ります**（★絵の作り直し）。
+   *
+   *   → ★いま出来るのは ★**正面で走る時間を減らすこと**です。
+   *     ★ロゴ（0.42 秒）が発走の瞬間を覆うので、★残る「正面で走る絵」は ★**約 0.22 秒**。
+   *     ★参考映像の「空になったゲート」の一拍（★実測 約 0.2 秒）と同じ長さになります。
+   */
+  { until: 0.008, id: 'start-front' },         // 〜12.8m  ★ゲート＋「空になったゲート」の一拍
   { until: 0.0625, id: 'start-rear-far' },     // 〜100m   ★高い後方の引き（★参考映像の発走直後）
   // 100〜528m は、横の走行 5秒相当 → 隊列図 2秒相当 → 横の走行 6秒相当に分ける。
   // 距離比なのでコースによって秒数は変わるが、既存の終端 0.330 と全体尺は変えない。

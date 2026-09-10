@@ -8,7 +8,7 @@ import {
   DEFAULT_RACE_SCRIPT, CUT_RACE_SCRIPT, ovalCourse,
 } from '../src/index.js';
 import { resolveBroadcastV2Scene, type BroadcastV2Horse } from '../src/broadcast-v2-scene.js';
-import { broadcastV2ShotById } from '../src/broadcast-v2.js';
+import { broadcastV2ShotById, broadcastV2ScriptBoundariesM } from '../src/broadcast-v2.js';
 
 const DIST = 1600;
 const VIEWPORT = { width: 1280, height: 720 } as const;
@@ -77,7 +77,7 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
      * ★位置取り以降の終端（0.330）は ★**動かしていません**。
      */
     expect(SCRIPT_V6.slice(0, 5).map((r) => [r.until, r.id])).toEqual([
-      [0.010, 'start-front'], [0.0625, 'start-rear-far'], [0.165, 'opening-side-lead'],
+      [0.008, 'start-front'], [0.0625, 'start-rear-far'], [0.165, 'opening-side-lead'],
       [0.206, 'opening-formation'], [0.330, 'opening-side-settle'],
     ]);
     expect(SCRIPT_V6[4]?.until).toBe(SCRIPT_V5[1]?.until);
@@ -112,6 +112,66 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
     }
   });
 
+  /**
+   * ★**真横どうしの継ぎ目で、カメラの高さが飛ばないこと**（★2026-09-11・★オーナー ⑥）
+   *
+   * 【★なぜ高さなのか — ★実測で切り分けました】
+   *   ★オーナー評「★真横カメラワークから切り替わり→真横カメラワークですが、
+   *   ★**レースがつながっているように見えません**」。
+   *   ★継ぎ目（★`side-drive` → `straight-contest`）で ★**背景が芝＋木立 → 暗いスタンド**へ
+   *   ★丸ごと入れ替わっていました。
+   *
+   *   ★「直線に入るから背景が変わるのだ」と思いましたが ★**違いました**。
+   *   ★カメラはほぼ同じ場所にいて、★**高さだけが 3.5m → 6.0m**でした。
+   *   ★高い位置から見下ろすと、★馬の向こう側に遠くのスタンドが入ります。
+   *   ★対照（高さだけ戻す）を撮ると、★背景は繋がりました。
+   *
+   * 【★1.5m という線は発明していません — ★両側を撮って決めました】
+   *   ★跳び ★**2.5m**（3.5 → 6.0）… ★背景が芝＋木立 → 暗いスタンドへ ★**入れ替わる**
+   *   ★跳び ★**1.5m**（3.5 → 5.0）… ★背景は ★**繋がる**（★3 か所とも実測）
+   *   → ★線は ★**1.5m 以下**。★これより荒くすると、飛ぶ組を通してしまいます。
+   *
+   * 【★この検定が実際に見つけたもの（★2026-09-11）】
+   *   ★オーナーが指したのは 1 か所でしたが、★同じ欠陥は ★**5 か所**ありました。
+   *   ★しかも最初の直し（`straight-contest` 6.0 → 4.0）は、★別の 2 か所を
+   *   ★**悪化させて**いました（★`contest → field` が 2m → 4m）。
+   *   → ★直線の高さを ★**一つの帯（3.5〜6.0m）**に揃えました。
+   *
+   * ⚠️ ★**「見た目が繋がっているか」は測れません。** ★ここで留めるのは
+   *    ★**その原因になった量（高さの跳び）**だけです。★合否はオーナーの目です。
+   */
+  it('★真横どうしの継ぎ目で、カメラの高さが 1.5m 以上飛ばない', () => {
+    const eyeZAt = (leadS: number): number =>
+      resolveBroadcastV2Scene(course, fieldAt(leadS), VIEWPORT, false, {
+        cornerCutM: 400, raceDisplaySec: 40, script: 'v6',
+        noContenderFrameShots: ['finish-line'] as const,
+      }).camera.eye.z;
+    const shotAt = (leadS: number): string =>
+      resolveBroadcastV2Scene(course, fieldAt(leadS), VIEWPORT, false, {
+        cornerCutM: 400, raceDisplaySec: 40, script: 'v6',
+        noContenderFrameShots: ['finish-line'] as const,
+      }).shot.id;
+
+    const offenders: string[] = [];
+    let seams = 0;
+    for (const b of broadcastV2ScriptBoundariesM(course, 'v6')) {
+      const before = b.meters - 3;
+      const after = b.meters + 3;
+      if (before <= 0 || after >= DIST) continue;
+      const from = shotAt(before); const to = shotAt(after);
+      if (from === to) continue;
+      /** ★真横どうしだけを見ます（★画角が変わる切替は、変わって当然） */
+      if (broadcastV2ShotById(from as never).view !== 'side') continue;
+      if (broadcastV2ShotById(to as never).view !== 'side') continue;
+      seams += 1;
+      const gap = Math.abs(eyeZAt(after) - eyeZAt(before));
+      if (gap > 1.5 + 1e-9) offenders.push(`${from}→${to} … ${gap.toFixed(2)}m`);
+    }
+    /** ⚠️ ★見る継ぎ目が 0 なら、★この検定は何も見ていません（★素通りを通さない・R-11） */
+    expect(seams, '★真横どうしの継ぎ目が 1 つも見つかりません').toBeGreaterThan(0);
+    expect(offenders, '★継ぎ目で高さが飛ぶと、背景が入れ替わって別のレースに見えます').toEqual([]);
+  });
+
   /** ★4 角は 3 通りから選べ、★`far` がいちばん小さいこと（★既定は従来のまま） */
   it('★4 角の撮り方は選べる（既定は従来の正面固定）', () => {
     expect(frameAt(900, 'v6').shot).toBe('fourth-corner-front');
@@ -128,7 +188,7 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
     expect(straight(SCRIPT_V5, 0.604)).toEqual(['homestretch-side', 'finish-line']);
     expect(straight(SCRIPT_V6, 0.750)).toEqual(['straight-contest', 'straight-field', 'straight-contest', 'finish-line']);
     /** ⚠️ ★頭に `start-rear-far`（0.0625）が入りました（★2026-09-11・★オーナー ②） */
-    expect(SCRIPT_V6.map(r => r.until)).toEqual([0.010, 0.0625, 0.165, 0.206, 0.33, 0.54, 0.604, 0.75, 0.82, 0.87, 0.94, 1]);
+    expect(SCRIPT_V6.map(r => r.until)).toEqual([0.008, 0.0625, 0.165, 0.206, 0.33, 0.54, 0.604, 0.75, 0.82, 0.87, 0.94, 1]);
   });
 
   // カットを削らず、既存の80mを横の引きに置き換える。
