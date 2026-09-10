@@ -107,11 +107,17 @@ const clips = loaded.map((src) => {
   const reads = src.frames.map((f) => readOf(src, f)).filter((r) => r !== null);
   if (reads.length === 0) { console.error(`★★${src.dir} に対象 ${src.id} がいません`); process.exit(1); }
   const refH = median(reads.map((r) => r.box.h));
+  /**
+   * ⚠️ ★**倍率は実際の縮小と同じ式にします**（★2026-09-10・★裁定 §5）。
+   *    ★以前は `CELL_H / (refH × BOX_H)` と書いていましたが、★実際の `resize` は
+   *    ★**丸めた枠の高さ**に対して掛かります。★わずかにずれた値を
+   *    ★「切り出し後の実測」と呼んでいました。
+   */
+  const cropH = Math.round(refH * BOX_H);
   return {
-    ...src, reads, refH,
+    ...src, reads, refH, cropH,
     cropW: Math.round(refH * BOX_W),
-    cropH: Math.round(refH * BOX_H),
-    scale: CELL_H / (refH * BOX_H),
+    scale: CELL_H / cropH,
     tag: reads[0].tag,
   };
 });
@@ -122,7 +128,7 @@ mkdirSync(`${OUT}/rows`, { recursive: true });
 const label = (c) => Buffer.from(`<svg width="${CELL_W}" height="46" xmlns="http://www.w3.org/2000/svg">
 <rect x="0" y="0" width="${CELL_W}" height="46" fill="#0d1116" fill-opacity="0.72"/>
 <text x="10" y="19" font-family="sans-serif" font-size="15" fill="#eef2f6">${c.tag}</text>
-<text x="10" y="38" font-family="sans-serif" font-size="12" fill="#9fb4c6">倍率 ${c.scale.toFixed(3)} ／ 枠 ${c.cropW}x${c.cropH}px ／ 縦は走路上の接地点</text>
+<text x="10" y="38" font-family="sans-serif" font-size="12" fill="#9fb4c6">正規化倍率 ${c.scale.toFixed(4)} ／ 枠 ${c.cropW}x${c.cropH}px ／ 縦は走路上の接地点</text>
 </svg>`);
 
 const motion = clips.map(() => []);
@@ -185,7 +191,8 @@ const report = clips.map((c, k) => ({
 }));
 writeFileSync(`${OUT}/crops.json`, `${JSON.stringify({
   boxH: BOX_H, boxW: BOX_W, groundAt: GROUND_AT, cellH: CELL_H, cellW: CELL_W, made,
-  note: '★倍率と枠はクリップにつき 1 回。★縦は走路上の接地点に合わせるので、★馬の浮きは残ります',
+  note: '★倍率と枠はクリップにつき 1 回（★条件間は「描画高さの中央値を揃える正規化」であって、'
+    + '★同じ倍率ではありません）。★縦は走路上の接地点に合わせるので、★馬の浮きは残ります',
   clips: report,
 }, null, 1)}\n`);
 
