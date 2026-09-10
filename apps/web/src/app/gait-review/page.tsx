@@ -333,6 +333,19 @@ export default function GaitReviewPage(): React.ReactElement {
             ★旧 2D の描画は ★<b>いまも動きます</b>（`?renderer=legacy`）。★下は 6 区間を 4 秒ずつ切り出したものです。<br />
             ★<b>採りたいものに ○ を、いらないものに × を付けて教えてください。</b>
           </p>
+          <p style={{ ...note, color: '#ffd34d', margin: '0 0 6px' }}>
+            ★<b>2D の桜星賞・通し（★表示秒 0〜71.4・★等速 10fps）</b><br />
+            ★<b>動画の時刻が、そのまま表示秒です。</b>★気になった所で止めて、
+            ★<b>その秒数を言ってください。</b>（★例:「44 秒から 48 秒のこの画」）
+          </p>
+          <video src="/gait-review/lg2d-full.mp4" style={media} controls playsInline />
+          <p style={{ ...note, margin: '8px 0 14px' }}>
+            ⚠️ ★<b>生の再生（`?renderer=legacy`）は壊れています。</b>★実測: ★表示秒 24.45 で
+            ★<b>タイトル画面のまま</b>でした。★この動画は ★**1 コマずつシークして**撮ったもので、
+            ★そちらは正常に描けます。★生の再生の不具合は別途。<br />
+            ⚠️ ★背景に ★<b>継ぎ目</b>が見える所があります（★例: 45 秒あたりの左端）。<br />
+            ⚠️ ★0〜71.4 秒までです（★撮影が途中で切れました）。★ゴール後は別途撮り直します。
+          </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
             {([
               ['start', '① 発走のあと', '9〜13 秒'],
