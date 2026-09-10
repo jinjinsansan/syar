@@ -143,6 +143,13 @@ const RACE_PACE_POLICY: RacePacePolicy = LEGACY_MOTION ? 'legacy' : 'readable';
  * ⚠️ ★既定では効きません。★カットの数・時刻・画角は変わりません（★素材の選び方だけ）。
  */
 /** ★**挿入画面を出さない**（`?cutin=off`・★2026-09-10・★見比べ用）。★既定では出します */
+/**
+ * ★**カットが宣言した素材を優先する**（`?asset=declared`・★2026-09-10・★見比べ用）。
+ * ⚠️ ★実測: ★`fourth-corner-wide` は `high-diag-v2`（★走り判定に合格）を宣言しているのに、
+ *    ★描画側はカット角の閾値で選ぶため ★**`diag-rear-v2`（不合格）**が使われていました。
+ */
+const HONOUR_DECLARED_ASSET = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('asset') === 'declared';
 const CUTIN_OFF = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('cutin') === 'off';
 const SIDE_ONLY = typeof window !== 'undefined'
@@ -3328,6 +3335,8 @@ export default function RacePage(): React.JSX.Element {
         horseBob,
         /** ★診断だけに出します（★描画は 1 画素も変わりません・★指示書 B-1） */
         materialDiag: { ...art.materialDiag, horseBob, strideM },
+        /** ★`?asset=declared` … ★カットが宣言した素材を優先する（★見比べ用・★既定は従来） */
+        honourDeclaredAsset: HONOUR_DECLARED_ASSET,
         frameRoleOf,
         surface,
         condition: trackCondition,

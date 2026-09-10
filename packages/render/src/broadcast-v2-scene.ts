@@ -506,6 +506,11 @@ export function drawBroadcastV2Scene<TImage>(
      *   ★役ではなく ★**実際に読めた素材の名前**・★配置の決め方・★較正値・★予備へ落ちたか。
      */
     readonly materialDiag?: Readonly<Record<string, unknown>> | undefined;
+    /**
+     * ★**カットが宣言した素材（`horseAsset`）を優先する**（★2026-09-10・★見比べ用）。
+     * ⚠️ ★既定（未指定）では従来どおり、★カット角の閾値で選びます。
+     */
+    readonly honourDeclaredAsset?: boolean | undefined;
     /** ★承認水準の方向別素材が揃っている集合。揃っていない方向は真横素材で代用 */
     readonly directionalSets?: { readonly rear?: boolean; readonly front?: boolean } | undefined;
     /** ★毛色バリエーション（馬ごとの CSS filter） */
@@ -796,7 +801,16 @@ export function drawBroadcastV2Scene<TImage>(
     const basis2 = cameraBasis(scene.camera);
     const useRear2 = opts.directionalSets?.rear === true && shotView.viewDeg < 60;
     const useFront2 = opts.directionalSets?.front === true && shotView.viewDeg > 120;
-    const assetKey = useRear2 ? 'diag-rear-v2' : useFront2 ? 'diag-front-v2' : 'side-v6';
+    /**
+     * ⚠️ ★**診断は描画と同じ規則で出すこと**（★2026-09-10・★R-30）。
+     *    ★以前はここで閾値だけから作り直しており、★`honourDeclaredAsset` を渡しても
+     *    ★診断は古い答えを返していました（★絵は変わっているのに「変わっていない」と報告）。
+     */
+    const declared2 = opts.honourDeclaredAsset === true
+      ? (scene.shot.horseAsset as BroadcastV2HorseAssetRole | undefined) : undefined;
+    const assetKey = declared2 !== undefined && opts.libraries[declared2] !== undefined
+      ? declared2
+      : useRear2 ? 'diag-rear-v2' : useFront2 ? 'diag-front-v2' : 'side-v6';
     lastDiag = {
       shot: scene.shot.id,
       shotViewDeg: shotView.viewDeg,
@@ -838,7 +852,21 @@ export function drawBroadcastV2Scene<TImage>(
        */
       const useRear = opts.directionalSets?.rear === true && shotView.viewDeg < 60;
       const useFront = opts.directionalSets?.front === true && shotView.viewDeg > 120;
-      const key: BroadcastV2HorseAssetRole = useRear ? 'diag-rear-v2' : useFront ? 'diag-front-v2' : 'side-v6';
+      /**
+       * ★**カットが宣言した素材を使う口**（★2026-09-10・★見比べ用）。
+       *
+       * ⚠️ ★実測で分かったこと: ★`fourth-corner-wide` は ★`horseAsset: 'high-diag-v2'` を
+       *    ★**宣言している**のに、★描画側はカット角の閾値だけで 3 種（後方／正面／真横）から選ぶため、
+       *    ★**`high-diag-v2` は実行時に一度も選ばれません**（★実測: 51° → 後方素材）。
+       *    ★宣言と実際が食い違ったままでした。
+       * ⚠️ ★**既定では効きません。** ★渡さなければ 1 画素も変わりません。
+       */
+      const declared = opts.honourDeclaredAsset === true
+        ? (scene.shot.horseAsset as BroadcastV2HorseAssetRole | undefined) : undefined;
+      const key: BroadcastV2HorseAssetRole = declared !== undefined
+        && opts.libraries[declared] !== undefined
+        ? declared
+        : useRear ? 'diag-rear-v2' : useFront ? 'diag-front-v2' : 'side-v6';
       const set = opts.libraries[key];
       /**
        * ★**横に縮めて向きを作るのは取り下げました**（2026-08-26・指示書 §3-1 で不合格）。
