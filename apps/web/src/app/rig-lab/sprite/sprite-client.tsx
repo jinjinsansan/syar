@@ -1511,6 +1511,11 @@ export default function SpriteClient(): React.ReactElement {
          */
         if (racing && cut.view === 'front') at.sort((a, b) => b.shownM - a.shownM);
         const shown = racing ? at.length : Math.min(st.count, RUNNERS.length);
+        /** ★このコマで描いた馬の位置（★裁定 R4 の比較用・★読むだけ） */
+        const benchDiag: {
+          lane: number; type: string; gate: number; frame: number;
+          x: number; y: number; w: number; h: number; groundY: number; travelM: number;
+        }[] = [];
         for (let i = 0; i < shown; i += 1) {
           const r = racing ? RACE_RUNNERS[at[i]!.gate - 1]! : RUNNERS[i]!;
           const idx = racing
@@ -1648,6 +1653,15 @@ export default function SpriteClient(): React.ReactElement {
               ctx.globalAlpha = 1;
             }
           }
+          /**
+           * ★**描いた場所を控えます**（★2026-09-10・★裁定 R4 の比較用）。
+           *   ★本編の `__raceDiag` と同じ、★**読むだけの窓**です。★描画は 1 画素も変えません。
+           *   ★これが無いと、★比較する道具が ★**台の置き方の式を書き写す**ことになります（★R-30）。
+           */
+          benchDiag.push({
+            lane: r.lane, type: r.type, gate: r.gate, frame: idx,
+            x, y, w: sw, h: s, groundY, travelM: travel,
+          });
           for (const p of layers) {
             /**
              * ⚠️ ★着色済みだけを描きます。
@@ -1673,6 +1687,8 @@ export default function SpriteClient(): React.ReactElement {
              */
           }
         }
+        /** ★このコマで描いた馬の位置を外へ（★裁定 R4 の比較用・★読むだけ） */
+        (globalThis as { __benchDiag?: unknown }).__benchDiag = benchDiag;
       }
 
       /** ★**手前のラチ**は馬の後に描く（★これで馬が走路の中に入ります） */
@@ -1809,7 +1825,29 @@ export default function SpriteClient(): React.ReactElement {
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
-    return () => { cancelled = true; cancelAnimationFrame(raf); };
+    /**
+     * ★**撮影用の時計**（★2026-09-10・★裁定 `REVIEW_P4_GAIT_INTEGRATION_REGRESSION_VERDICT_20260910.md` R4）
+     *
+     *   ★裁定:「★検証用の時計・シークを注入して検証台の**実際の描画**を進める。
+     *   ★**製品の運動式を撮影用に作り直さない**」。
+     *
+     * ★外から与えるのは ★**進行距離だけ**です。★コマの選び方（`frameIndexFor`）も
+     * ★接地の式も ★**1 行も変えていません**。★この台は実時間で走るので、
+     * ★そのまま撮ると各コマの間隔が一定にならず、★等速の映像になりません
+     *（★2026-09-09 に「等速でない映像を等速と報告した」事故があります）。
+     *
+     * ⚠️ ★停止してから使ってください（★再生中は毎フレーム上書きされます）。
+     * ⚠️ ★この台は開発専用です（★本番では 404）。
+     */
+    const w = globalThis as { __benchSeekM?: ((meters: number) => number) | undefined };
+    w.__benchSeekM = (meters: number): number => {
+      travelRef.current = Math.max(0, meters);
+      return travelRef.current;
+    };
+    return () => {
+      cancelled = true; cancelAnimationFrame(raf);
+      w.__benchSeekM = undefined;
+    };
   }, [look, mode]);
 
   return (

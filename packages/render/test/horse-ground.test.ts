@@ -149,7 +149,7 @@ describe('F-G2 検証台と同じ接地になる', () => {
     }
   });
 
-  it('浮き 0 は全コマ接地（★従来の見え方と 1 画素も変えない対照）', () => {
+  it('浮き 0 は全コマ接地（★**下端が地面に来る**という点についての対照）', () => {
     const set = manifest.sets.find((s) => s.role === 'side-v6')!;
     const frames = framesOf(set);
     const placementSet = measuredSet(set, frames);
@@ -183,5 +183,79 @@ describe('接地線は素材から出す', () => {
   it('組の中でいちばん低い蹄を接地線にする', () => {
     expect(feetRatioOf([0.85, 0.92, 0.88])).toBe(0.92);
     expect(feetRatioOf([])).toBe(1);
+  });
+});
+
+/**
+ * ★**本物の検証台の入力と突き合わせる**（★2026-09-10・★裁定 R3）
+ *
+ * 【★前便の何が不当だったか】
+ *   ★開発側は「検証台と 8.53e-14px で完全一致」と書きました。★しかし比較の両側に
+ *   ★**本編の測り方で出した接地線と蹄の位置**を渡していました。★同じ入力を与えた
+ *   ★2 つの式が同じ答えを返すのは当然で、★**実際の検証台と一致する証拠ではありません**。
+ *   → ★「完全一致」は撤回します。
+ *
+ * 【★ここで何を測るか】
+ *   ★検証台自身の規則で ★**原版の PNG を読み直します**（★α ≥ 64・★接地線は定数 0.920）。
+ *   ★本編は `nativeBounds`（★α < 12・余白 2px）と ★組ごとの最大値を使います。
+ *   ★**規則が違うので、差はゼロになりません。** ★その差がいくつかを定め、そこに収めます。
+ */
+describe('検証台の実入力との差（★規則が違うので 0 にはならない）', () => {
+  /**
+   * ★許容差 [px]（★名目基準高 300px のとき）。
+   *   ★由来: ★α の閾値の差（64 対 12）と ★余白 2px、★接地線の取り方（定数 0.920 対 組の最大値）。
+   *   ★レビュー側の独立計測は 1.99〜2.21px（★4 組）。★ここは 3px を上限とします。
+   */
+  const TOLERANCE_PX = 3;
+  const BENCH_FEET = 0.920;
+  const BENCH_ALPHA_MIN = 64;
+  const HPX = 300;
+  const GROUND_Y = 500;
+  const BOB = 0.3;
+
+  it.each(TARGET_ROLES)('%s は許容差の内側', async (role) => {
+    const sharp = (await import('sharp')).default;
+    const set = manifest.sets.find((s) => s.role === role)!;
+    const frames = framesOf(set);
+    const placementSet = measuredSet(set, frames);
+
+    /** ★検証台の規則で原版を読み直す（★本編の値は使わない） */
+    const benchLow: number[] = [];
+    for (let i = 1; i <= 8; i += 1) {
+      const file = path.join(ROOT, 'apps/web/public/art',
+        `${set.prefix}-pose${String(i).padStart(2, '0')}.png`);
+      const { data, info } = await sharp(file).ensureAlpha().raw()
+        .toBuffer({ resolveWithObject: true });
+      let low = info.height - 1;
+      for (let y = info.height - 1; y >= 0; y -= 1) {
+        let hit = false;
+        for (let x = 0; x < info.width; x += 1) {
+          if ((data[(y * info.width + x) * 4 + 3] ?? 0) >= BENCH_ALPHA_MIN) { hit = true; break; }
+        }
+        if (hit) { low = y; break; }
+      }
+      benchLow.push(low / info.height);
+    }
+    /** ★前提: ★原版が読めていること（★読めなければ「差 0」も成立してしまう・R-11） */
+    expect(new Set(benchLow.map((v) => v.toFixed(4))).size).toBeGreaterThan(1);
+
+    let worst = 0;
+    frames.forEach((f, i) => {
+      const placed = horseFramePlacement(placementSet, f, i);
+      const scale = HPX / placed.referenceHeight;
+      const feetFromAnchor = f.frameHeightSourcePx - f.anchorYSourcePx;
+      /** ★本編: 輪郭の上端 */
+      const mainTop = GROUND_Y
+        - scaledHorseLift(placed.bodyLiftSourcePx, feetFromAnchor, BOB) * scale
+        - f.anchorYSourcePx * scale;
+      /** ★検証台: 画布の上端 ＋ そのコマの輪郭の上端まで（★検証台自身の入力で） */
+      const canvasOnScreen = placementSet.canvasHeightSourcePx * scale;
+      const benchTop = benchCanvasTopY(GROUND_Y, canvasOnScreen, BENCH_FEET, benchLow[i]!, BOB)
+        + canvasOnScreen * (set.frames[i]!.nativeBounds.y / set.nativeCanvasHeight);
+      worst = Math.max(worst, Math.abs(mainTop - benchTop));
+    });
+    expect(worst).toBeLessThanOrEqual(TOLERANCE_PX);
+    /** ⚠️ ★**0 ではないこと**も確かめます（★同じ入力を配ってしまった前便の形の再発防止） */
+    expect(worst).toBeGreaterThan(0);
   });
 });

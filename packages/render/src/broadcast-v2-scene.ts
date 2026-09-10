@@ -15,6 +15,7 @@ import {
   broadcastCamera,
   drawPerspectiveHorses,
   drawPerspectiveWorld,
+  getDrawnHorseBoxes,
   type PerspHorse,
   type RenderSurface,
   type RenderTrackCondition,
@@ -868,6 +869,16 @@ export function drawBroadcastV2Scene<TImage>(
     },
     motionBlur: opts.motionBlur,
   });
+  /**
+   * ★**描いた矩形を診断へ写します**（★2026-09-10・★裁定 R4 の比較用）。
+   *   ★検証台（`__benchDiag`）と ★**同じ量**（画面上の x / y / 幅 / 高さ）を出すことで、
+   *   ★頭数も画角も違う 2 つの画面を、★**1 頭ぶんの同じ大きさ**で切り出して比べられます。
+   * ⚠️ ★描画は 1 画素も変わりません。★`drawPerspectiveHorses` の後でなければ空です。
+   */
+  if (lastDiag !== undefined && typeof globalThis !== 'undefined') {
+    lastDiag = { ...lastDiag, boxes: getDrawnHorseBoxes().map((b) => ({ ...b })) };
+    (globalThis as { __raceDiag?: unknown }).__raceDiag = lastDiag;
+  }
   // ★手前側のラチ（馬の脚が突き抜けないように、馬のあとで描く）
   nearRail?.();
   if (opts.distancePoles !== false) {

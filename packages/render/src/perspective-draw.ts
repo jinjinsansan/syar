@@ -565,9 +565,9 @@ export function getHorseScale(): number { return horseScale; }
  * ★**このコマで馬を描いた場所**（★画面 px）。★HUD が「馬にかかるか」を見るために控えます。
  * ⚠️ ★描画には使いません。★毎コマの先頭で空にします。
  */
-let drawnBoxes: { x: number; y: number; w: number; h: number }[] = [];
+let drawnBoxes: { x: number; y: number; w: number; h: number; gate?: number }[] = [];
 /** ★直前のコマで馬を描いた場所を読む */
-export function getDrawnHorseBoxes(): readonly { x: number; y: number; w: number; h: number }[] {
+export function getDrawnHorseBoxes(): readonly { x: number; y: number; w: number; h: number; gate?: number }[] {
   return drawnBoxes;
 }
 /**
@@ -1349,7 +1349,7 @@ export function drawPerspectiveHorses<TImage>(
          *   ★「HUD は馬にかかるときだけ薄くする」）。
          * ⚠️ ★描画は 1 画素も変えません。★読むだけの窓です。
          */
-        drawnBoxes.push({ x: left, y: top, w: hiW, h: hiH });
+        drawnBoxes.push({ x: left, y: top, w: hiW, h: hiH, gate: d.h.gate });
         ctx.drawImage(
           hi.image, source.x, source.y, source.width, source.height,
           left, top, hiW, hiH,
