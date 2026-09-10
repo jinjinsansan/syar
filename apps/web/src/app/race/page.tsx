@@ -140,6 +140,17 @@ const RACE_PACE_POLICY: RacePacePolicy = LEGACY_MOTION ? 'legacy' : 'readable';
 const PLACEMENT_OVERRIDE: HorsePlacementMode | undefined = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('placement') === 'legacy'
   ? 'legacy-table' : undefined;
+/**
+ * ★**配置の決め方は、ここ 1 か所で決めます**（★2026-09-10・★裁定 R1-a）。
+ *
+ * ⚠️ ★焼いた経路と原版経路が ★**別々に決めていました**。★焼いた経路は
+ *    ★`PLACEMENT_OVERRIDE` を見ていなかったので、★`?baked=1&placement=legacy` が
+ *    ★**新しい配置 ＋ 旧い較正（7m・bob=1）**という、★どちらでもない状態になっていました。
+ *    ★しかも診断だけは `legacy-table` と報告するので、★表示と診断も食い違っていました。
+ * → ★両方がこの関数を通ります。★決める材料は ★**実際に読めた素材の名前**と ★override だけです。
+ */
+const effectivePlacementMode = (prefix: string | undefined): HorsePlacementMode =>
+  PLACEMENT_OVERRIDE ?? placementModeFor(prefix);
 const W = 1280;
 const H = 720;
 /**
@@ -2119,7 +2130,9 @@ export default function RacePage(): React.JSX.Element {
           anchorIsSaddle: t.anchorKind === 'saddle',
           lowRatio: (t.nativeBounds.y + t.nativeBounds.height) / set.nativeCanvasHeight,
         }));
-        const placementSet: HorsePlacementSet = placementModeFor(set.prefix) === 'measured-ground'
+        /** ★実際に組んだ決め方を控えます（★診断は希望値ではなくこれを出す・★裁定 R1 条件 3） */
+        builtPlacementByRole.set(set.role, effectivePlacementMode(set.prefix));
+        const placementSet: HorsePlacementSet = effectivePlacementMode(set.prefix) === 'measured-ground'
           ? {
             mode: 'measured-ground', referenceHeight: refH,
             canvasHeightSourcePx: set.nativeCanvasHeight * set.scale,
@@ -2155,6 +2168,11 @@ export default function RacePage(): React.JSX.Element {
        */
       /** ★焼いた素材の「役 → 素材の名前」（★配置・較正の鍵。★`loadBakedLibraries` が埋めます） */
       const bakedPrefixByRole = new Map<string, string>();
+      /**
+       * ★**実際にフレームを組んだときの決め方**（★役 → 配置の決め方・★裁定 R1 条件 3）。
+       * ⚠️ ★診断はここから出します。★もう一度計算し直すと、★組んだ物と診断がずれます。
+       */
+      const builtPlacementByRole = new Map<string, HorsePlacementMode>();
       const loadBakedLibraries = async (): Promise<Partial<Record<string, readonly (readonly HighQualityHorseFrame[])[]>> | undefined> => {
         const manifest = await fetch(`/art/baked/manifest.json?v=${ASSET_VERSION}`)
           .then((r) => (r.ok ? r.json() as Promise<BakedManifest> : null))
@@ -2514,7 +2532,7 @@ export default function RacePage(): React.JSX.Element {
        */
       const nativePlacementMode = (...keys: readonly string[]): HorsePlacementMode =>
         keys.length > 0 && keys.every((key) =>
-          placementModeFor(resolvedNativePrefix.get(key)) === 'measured-ground')
+          effectivePlacementMode(resolvedNativePrefix.get(key)) === 'measured-ground')
           ? 'measured-ground' : 'legacy-table';
       const rearV4 = await loadNativeSet('horse-jockey-diag-rear-v5', 'horse-jockey-diag-rear-v4');
       /**
@@ -2624,14 +2642,20 @@ export default function RacePage(): React.JSX.Element {
        * ★**原版経路でも、焼いた経路と同じ配置になるように鍵を渡します**（★2026-09-10）。
        *   ★型 B/C も含めて、★実際に読めた素材名で判定します。
        */
-      const sideMode = PLACEMENT_OVERRIDE ?? (bakedLibs !== undefined
-        ? placementModeFor(bakedPrefixByRole.get('side-v6'))
+      const sideMode: HorsePlacementMode = bakedLibs !== undefined
+        ? builtPlacementByRole.get('side-v6') ?? effectivePlacementMode(bakedPrefixByRole.get('side-v6'))
         : nativePlacementMode(sideSetName,
-          ...Object.keys(sideByType).map((t) => `horse-jockey-side-v8${t}`)));
-      const frontMode = PLACEMENT_OVERRIDE ?? (bakedLibs !== undefined
-        ? placementModeFor(bakedPrefixByRole.get('diag-front-v2'))
+          ...Object.keys(sideByType).map((t) => `horse-jockey-side-v8${t}`));
+      const frontMode: HorsePlacementMode = bakedLibs !== undefined
+        ? builtPlacementByRole.get('diag-front-v2')
+          ?? effectivePlacementMode(bakedPrefixByRole.get('diag-front-v2'))
         : nativePlacementMode(frontSetName,
-          ...Object.keys(frontByType).map((t) => `horse-jockey-diag-front-v4${t}`)));
+          ...Object.keys(frontByType).map((t) => `horse-jockey-diag-front-v4${t}`));
+      /** ★原版経路は今この 2 つの決め方でフレームを組みます（★診断の出どころを 1 つにする） */
+      if (bakedLibs === undefined) {
+        builtPlacementByRole.set('side-v6', sideMode);
+        builtPlacementByRole.set('diag-front-v2', frontMode);
+      }
       const sideHighQuality = bakedLibs?.['side-v6'] ?? (midsReady
         ? buildFrames(sideCycle, undefined, SILKS_LAYOUT_CROUCH, undefined, undefined, sideMode)
         : buildFramesByType({ a: sideCycle, ...sideByType }, undefined, SILKS_LAYOUT_CROUCH, sideMode));
@@ -2682,8 +2706,10 @@ export default function RacePage(): React.JSX.Element {
         materialDiag: {
           path: bakedLibs !== undefined ? 'baked' : 'native',
           placementOverride: PLACEMENT_OVERRIDE ?? null,
-          sideMode,
-          frontMode,
+          /** ⚠️ ★**実際に組んだ決め方**を出します（★希望値ではない・★裁定 R1 条件 3） */
+          sideMode: builtPlacementByRole.get('side-v6') ?? null,
+          frontMode: builtPlacementByRole.get('diag-front-v2') ?? null,
+          builtPlacement: Object.fromEntries(builtPlacementByRole),
           sideRequested: sideSetName,
           frontRequested: frontSetName,
           sideResolved: bakedLibs !== undefined

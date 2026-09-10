@@ -116,6 +116,85 @@ function violationsOf(src: string): string[] {
   });
 
   /**
+   * ★⑦ 配置関数へ渡す ★**決め方そのもの**が、★素材から来ていること（★裁定 R2）。
+   *   ★`placementMode === 'measured-ground'` を ★`false && ...` にすると
+   *   ★新しい配置が常に無効になりますが、★名前は全部残ります。
+   */
+  let modeTestSeen = 0;
+  walk(sf, (n) => {
+    if (!ts.isConditionalExpression(n)) return;
+    /** ★新旧の組を選んでいる三項演算子だけを見る（★`mode: 'measured-ground'` を返す枝がある物） */
+    const picksPlacement = ts.isObjectLiteralExpression(n.whenTrue)
+      && n.whenTrue.properties.filter(ts.isPropertyAssignment).some((p) =>
+        propName(p) === 'mode' && ts.isStringLiteral(p.initializer)
+        && p.initializer.text === 'measured-ground');
+    if (!picksPlacement) return;
+    modeTestSeen += 1;
+    /**
+     * ★条件は ★**その比較そのもの**であること。★`false && ...` や `!` で包むと落ちます
+     * （★裁定 R2 が名指しした変異。★内側の比較は残るので、★節点の形で見ないと通ってしまう）。
+     */
+    const c = n.condition;
+    const ok = ts.isBinaryExpression(c)
+      && c.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+      && ts.isStringLiteral(c.right) && c.right.text === 'measured-ground'
+      && (ts.isIdentifier(c.left)
+        || (ts.isCallExpression(c.left) && ts.isIdentifier(c.left.expression)
+          && c.left.expression.text === 'effectivePlacementMode'));
+    if (!ok) bad.push(`⑦ 決め方の判定が素材から来ていない: ${c.getText().slice(0, 60)}`);
+  });
+  if (modeTestSeen < 2) bad.push(`⑦ 決め方の判定が 2 か所未満: ${modeTestSeen}`);
+
+  /**
+   * ★⑧ 接地線は素材から求めること（★`feetRatioOf` の呼び出し・★裁定 R2）。
+   * ⚠️ ★書き方が 2 通りあります（★`feetRatio: feetRatioOf(...)` と ★短縮形 `feetRatio`）。
+   *    ★短縮形のときは ★**その変数の宣言**まで辿ります。
+   */
+  const isFeetCall = (e: ts.Expression | undefined): boolean =>
+    e !== undefined && ts.isCallExpression(e) && ts.isIdentifier(e.expression)
+    && e.expression.text === 'feetRatioOf';
+  /** ⚠️ ★従来経路は接地線を使わないので `1` で構わない。★新経路だけを見る */
+  const inLegacyLiteral = (n: ts.Node): boolean =>
+    /legacy-table/.test(n.parent.getText().slice(0, 80));
+  let feetSeen = 0;
+  let feetShorthand = 0;
+  walk(sf, (n) => {
+    if (ts.isPropertyAssignment(n) && propName(n) === 'feetRatio') {
+      if (inLegacyLiteral(n)) return;
+      feetSeen += 1;
+      if (!isFeetCall(n.initializer)) {
+        bad.push(`⑧ 接地線が素材から来ていない: ${n.initializer.getText().slice(0, 50)}`);
+      }
+      return;
+    }
+    if (ts.isShorthandPropertyAssignment(n) && n.name.text === 'feetRatio') {
+      if (inLegacyLiteral(n)) return;
+      feetSeen += 1;
+      feetShorthand += 1;
+    }
+  });
+  if (feetShorthand > 0) {
+    let declOk = false;
+    walk(sf, (n) => {
+      if (!ts.isVariableDeclaration(n) || !ts.isIdentifier(n.name)) return;
+      if (n.name.text !== 'feetRatio') return;
+      if (isFeetCall(n.initializer)) declOk = true;
+    });
+    if (!declOk) bad.push('⑧ 短縮形で渡している接地線の宣言が `feetRatioOf` でない');
+  }
+  if (feetSeen < 2) bad.push(`⑧ 接地線の指定が 2 か所未満: ${feetSeen}`);
+
+  /** ★⑨ 較正値の引数が ★**決め方の変数**であること（★定数を直に渡していない・★裁定 R2） */
+  walk(sf, (n) => {
+    if (!ts.isCallExpression(n) || !ts.isIdentifier(n.expression)) return;
+    if (n.expression.text !== 'horseCalibrationFor') return;
+    const arg = n.arguments[0];
+    if (arg === undefined || !ts.isIdentifier(arg)) {
+      bad.push(`⑨ 較正値の引数が変数でない: ${arg?.getText() ?? '(無し)'}`);
+    }
+  });
+
+  /**
    * ★⑥ 比較用の口は ★**旧処理へ戻す方向にしか効かない**こと。
    *   ★`'measured-ground'` を返す枝があると、★「引数を付けたときだけ直る」状態になりうる。
    */
@@ -166,13 +245,39 @@ describe('配置の接続（構文木）', () => {
     },
     {
       label: '⑤ 配置を URL の引数で分岐させる',
-      from: 'const sideMode = PLACEMENT_OVERRIDE ?? (bakedLibs !== undefined',
-      to: 'const sideMode = (new URLSearchParams(window.location.search).get(\'ground\') === \'1\' ? \'legacy-table\' : undefined) ?? (bakedLibs !== undefined',
+      from: 'const sideMode: HorsePlacementMode = bakedLibs !== undefined',
+      to: 'const sideMode: HorsePlacementMode = new URLSearchParams(window.location.search).get(\'ground\') === \'1\' ? \'legacy-table\' : bakedLibs !== undefined',
     },
     {
       label: '⑥ 比較用の口で新しい配置を有効化する',
       from: '? \'legacy-table\' : undefined;',
       to: '? \'legacy-table\' : \'measured-ground\';',
+    },
+    /** ★以下は裁定 R2 で「素通りする」と名指しされた 4 件（★2026-09-10） */
+    {
+      label: '⑦-a 原版の新配置を常に無効化する',
+      from: "placementMode === 'measured-ground'",
+      to: "false && placementMode === 'measured-ground'",
+    },
+    {
+      label: '⑦-b 焼いた素材の新配置を常に無効化する',
+      from: "effectivePlacementMode(set.prefix) === 'measured-ground'",
+      to: "false && effectivePlacementMode(set.prefix) === 'measured-ground'",
+    },
+    {
+      label: '⑧-a 焼いた素材の接地線を素材から取らない',
+      from: 'feetRatio: feetRatioOf(placementFrames.map((f) => f.lowRatio)),',
+      to: 'feetRatio: 1,',
+    },
+    {
+      label: '⑧-b 原版の接地線を素材から取らない',
+      from: 'const feetRatio = feetRatioOf(placementFrames.map((f) => f.lowRatio));',
+      to: 'const feetRatio = 1;',
+    },
+    {
+      label: '⑨ 較正値を定数の引数で固定する',
+      from: 'horseCalibrationFor(sideMode)',
+      to: "horseCalibrationFor('legacy-table')",
     },
   ];
 
