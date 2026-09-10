@@ -2546,7 +2546,24 @@ export default function RacePage(): React.JSX.Element {
         loadImg(`/art/starting-gate-front-v1.png?v=${ASSET_VERSION}`).catch(() => null),
         loadImg(`/art/starting-gate-front-open-v1.png?v=${ASSET_VERSION}`).catch(() => null),
       ]);
-      const frontV3 = await loadNativeSet('horse-jockey-diag-front-v4', 'horse-jockey-diag-front-v3');
+      /**
+       * ★**斜め前の素材を差し替えて見比べる口**（`?front=diag-front-v2`・★2026-09-10）。
+       *
+       *   ★オーナー評（★2026-09-10）★「真横は改善した。★それ以外はぴょこぴょこ歩いているのか
+       *   ★走っているのか分からない。★**2D の時の同じカメラワークの方が走っている感がある**」。
+       *   → ★**同じカット・同じ台本で、★旧 2D 素材と見比べられるようにします。**
+       *
+       * ★実測（★8 コマ・画布に対する比・`tmp/measure-front-sets.mjs`）:
+       *   ★旧 2D `v2` … ★蹄の上下 3.04% ／ ★頭頂の上下 4.97%（★体が上下し、蹄は揃う）
+       *   ★現   `v4` … ★蹄の上下 10.24% ／ ★頭頂の上下 0.87%（★頭が止まり、蹄だけ上下する）
+       *   ★真横 `v8` … ★蹄 6.94% ／ ★頭頂 2.95%（★合格している素材）
+       * ⚠️ ★この数値は ★**素材の性質**であって、★走りの良し悪しそのものではありません。
+       */
+      const frontOverride = new URLSearchParams(window.location.search).get('front');
+      const frontSetName = frontOverride !== null && /^[a-z0-9-]+$/.test(frontOverride)
+        ? `horse-jockey-${frontOverride}`
+        : 'horse-jockey-diag-front-v4';
+      const frontV3 = await loadNativeSet(frontSetName, 'horse-jockey-diag-front-v3');
       /**
        * ★**個体タイプ B・C の原版**（★2026-09-09）。★PC の既定はこちらの経路です（R-15）。
        * ⚠️ ★焼いた素材だけ差し替えて満足した失敗を 2026-09-08 にやっています。★両方直します。
@@ -2559,7 +2576,13 @@ export default function RacePage(): React.JSX.Element {
       const typesParam = new URLSearchParams(window.location.search).get('types');
       const wantTypes = typesParam !== '0';
       const wantSideTypes = wantTypes && typesParam !== 'front';
-      const wantFrontTypes = wantTypes && typesParam !== 'side';
+      /**
+       * ⚠️ ★**素材を差し替えて見比べるときは、型を混ぜません**（★2026-09-10）。
+       *    ★型 B は `horse-jockey-diag-front-v4b`（★デフォルメ）で固定なので、
+       *    ★`?front=diag-front-v2` にしても ★**型 B の枠だけ現素材のまま**になり、
+       *    ★1 つの画に 2 世代が混ざります（★見比べにならない）。
+       */
+      const wantFrontTypes = wantTypes && typesParam !== 'side' && frontOverride === null;
       /** ⚠️ ★読めなかった型は ★**鍵ごと置きません**（★型 A に落ちます） */
       const loadByType = async (want: boolean, prefixOf: (t: HorseType) => string):
       Promise<Partial<Record<HorseType, readonly FrameImage[]>>> => {
@@ -2607,7 +2630,7 @@ export default function RacePage(): React.JSX.Element {
           ...Object.keys(sideByType).map((t) => `horse-jockey-side-v8${t}`)));
       const frontMode = PLACEMENT_OVERRIDE ?? (bakedLibs !== undefined
         ? placementModeFor(bakedPrefixByRole.get('diag-front-v2'))
-        : nativePlacementMode('horse-jockey-diag-front-v4',
+        : nativePlacementMode(frontSetName,
           ...Object.keys(frontByType).map((t) => `horse-jockey-diag-front-v4${t}`)));
       const sideHighQuality = bakedLibs?.['side-v6'] ?? (midsReady
         ? buildFrames(sideCycle, undefined, SILKS_LAYOUT_CROUCH, undefined, undefined, sideMode)
@@ -2643,12 +2666,15 @@ export default function RacePage(): React.JSX.Element {
          *   ★脚の位相は 1 頭につき 1 つで、★カットが替わっても連続します。★したがって
          *   ★1 完歩は ★**レースにつき 1 つ**でなければならず、★台本 v6 で 53% を占める
          *   ★真横の素材に合わせます。
-         * ⚠️ ★真横と斜め前で判定が割れたときは ★**従来へ倒します**（★R-27・狭い側）。
-         *    ★別々の較正の素材が同じ位相で混ざると、★どちらの蹄も地面と合いません。
+         *
+         * ⚠️ ★**斜め前の判定には従いません**（★2026-09-10 に直しました）。
+         *    ★当初は「両方が対象素材のときだけ」にしていましたが、★それだと
+         *    ★`?front=` で斜め前を旧素材に替えた瞬間に ★**真横の 1 完歩まで 7m に戻り**、
+         *    ★見比べが成立しませんでした（★交絡）。★配置の決め方は組ごとに独立しているので、
+         *    ★揃える必要があるのは ★**位相を共有する 1 完歩だけ**です。
+         *    ★食い違いは `materialDiag.frontMode` に出します。
          */
-        calibration: horseCalibrationFor(
-          sideMode === 'measured-ground' && frontMode === 'measured-ground'
-            ? 'measured-ground' : 'legacy-table'),
+        calibration: horseCalibrationFor(sideMode),
         /**
          * ★**どの素材をどの経路で読んだか**（★2026-09-10・★指示書 B-1）。
          *   ★予備（旧素材）へ落ちた場合も見分けられるように、★頼んだ名前と読めた名前を並べます。
@@ -2659,12 +2685,13 @@ export default function RacePage(): React.JSX.Element {
           sideMode,
           frontMode,
           sideRequested: sideSetName,
+          frontRequested: frontSetName,
           sideResolved: bakedLibs !== undefined
             ? bakedPrefixByRole.get('side-v6') ?? null
             : resolvedNativePrefix.get(sideSetName) ?? null,
           frontResolved: bakedLibs !== undefined
             ? bakedPrefixByRole.get('diag-front-v2') ?? null
-            : resolvedNativePrefix.get('horse-jockey-diag-front-v4') ?? null,
+            : resolvedNativePrefix.get(frontSetName) ?? null,
           typesLoaded: {
             side: Object.keys(sideByType), front: Object.keys(frontByType),
           },
