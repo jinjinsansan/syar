@@ -42,6 +42,86 @@ export interface RaceCallContext {
   readonly lineIndex: number;
   /** 枠色の役割名を引く */
   readonly frameRoleOf: (gate: number) => string;
+  /**
+   * ★**この少し前でいちばん詰めた馬の枠番**（★2026-09-11・★オーナー ⑧）。
+   *   ★`raceSurgeGate` が出したものを渡してください。★ここで探しません。
+   *
+   * ⚠️ ★**「今」と「少し前」は同じ入力から取ること**（★R-30）。
+   *    ★最初、★「今」を画面の位置・★「少し前」を真の位置で比べる形に書きました。
+   *    ★その差（最後の直線の攻防の表示ずらし）が混ざるので ★**一度も発火しません**でした。
+   */
+  readonly surgingGate?: number | undefined;
+  /**
+   * ★（★廃止予定）★少し前の走った距離。★`surgingGate` を使ってください。
+   *
+   * 【★なぜ要るか】
+   *   ★オーナー評「★真横カメラワークをここまで使うので、★最後の直線のせめぎ合い、
+   *   ★**差し、追い込み馬**、逃げ馬、激しい展開などが必要です」。
+   *
+   *   ★実測（`tools/audit-real-overtakes.mjs`・8 seed）で、★直線の追い抜きは
+   *   ★**3〜8 回**実在し、★上位 5 頭の伸びは 17〜25m → 1.3〜14.7m に詰まります。
+   *   ★カメラも映せています（`audit-contest-focus.mjs`: 主役 2 頭以上が 100%）。
+   *   ⚠️ ★足りていなかったのは ★**実況**でした。★「迫る馬」として名指ししていたのは
+   *      ★**常に 2 着馬**で、★後方から上がってきた馬の名前は ★**一度も出ません**でした。
+   *
+   * ⚠️ ★渡さなければ従来どおりです（★1 文字も変わりません）。
+   * ⚠️ ★**着順を作りません。** ★位置モデルを 2 秒前の時刻で読むだけです（★決定論・憲法 4）。
+   */
+  readonly metersAgoOf?: ((gate: number) => number | undefined) | undefined;
+}
+
+/** ★「上がってくる」と言うときに振り返る長さ（秒）。★呼ぶ側はこの値を読むこと（★R-31） */
+export const RACE_SURGE_WINDOW_SEC = 4;
+/**
+ * ★「上がってくる」と言える詰め量（m・★上の窓の間に、先頭との差が縮んだ量）。
+ *
+ * 【★測って分かったこと — ★当初の設計は成り立ちませんでした】
+ *   ★最初は「★**急に詰めた瞬間**を捕まえて『上がってきた！』と叫ぶ」つもりでした。
+ *   ★実測（6 seed・★残り 400〜120m ＝ この文が使われる区間だけ）:
+ *
+ *       窓 2 秒 … 詰め量の ★中央値 0.95〜1.67m ／ ★最大 1.26〜2.95m
+ *       窓 4 秒 … ★中央値 1.88〜3.41m ／ ★最大 2.49〜5.68m
+ *       窓 8 秒 … ★中央値 3.68〜6.69m ／ ★最大 4.84〜9.19m
+ *
+ *   ⚠️ ★**どの窓でも「中央値 ≒ 上位 1 割 ≒ 最大」**です。★つまり ★**詰め方は一定**で、
+ *      ★「ここで動いた」という ★**瞬間が存在しません**。★閾値では場面を選べません。
+ *   ⚠️ ★最初に置いた 2.5m は、★**ゴール後の見かけの詰め**（先頭が止まって他馬が進む）を
+ *      ★分布に混ぜて決めた値でした。★区間を絞ると ★**6 seed で 1 標本**しか超えませんでした。
+ *
+ * 【★どう変えたか】
+ *   ★叫ぶのをやめ、★**いちばん詰めている馬の名前を言う**ことにしました。
+ *   ★線は「詰めていない馬を名指ししない」ためだけの下限（★窓 4 秒で 2.0m ＝ 0.5m/秒）です。
+ *   ★言う相手は ★**3 番手以降**に限ります（★2 番手は既存の「◯◯が迫る」が担当）。
+ */
+export const RACE_SURGE_MIN_GAIN_M = 2.0;
+
+/**
+ * ★**この窓でいちばん詰めた馬**（★先頭以外）。★居なければ `undefined`。
+ *
+ * ⚠️ ★`now` と `ago` は ★**同じ入力**から取ってください（★画面の位置なら両方とも画面の位置）。
+ * ⚠️ ★着順を作りません。★位置を 2 点読んで引き算するだけです（★憲法 3）。
+ */
+export function raceSurgeGate(
+  now: readonly RaceCallHorse[],
+  ago: ReadonlyMap<number, number>,
+  minGainM: number = RACE_SURGE_MIN_GAIN_M,
+): number | undefined {
+  const order = [...now].sort((a, b) => b.meters - a.meters);
+  const lead = order[0];
+  if (lead === undefined) return undefined;
+  const leadAgo = ago.get(lead.gate);
+  if (leadAgo === undefined) return undefined;
+  let bestGate: number | undefined;
+  let bestGain = minGainM;
+  for (let i = 1; i < order.length; i += 1) {
+    const h = order[i]!;
+    const a = ago.get(h.gate);
+    if (a === undefined) continue;
+    /** ★先頭との差が、この窓でどれだけ縮んだか */
+    const gained = (leadAgo - a) - (lead.meters - h.meters);
+    if (gained >= bestGain) { bestGain = gained; bestGate = h.gate; }
+  }
+  return bestGate;
 }
 
 export interface RaceCallLine {
@@ -71,6 +151,32 @@ function marginWord(lengths: number): string {
  *     ③ 道中      … 先頭と、番手
  *   自馬は **4 本に 1 本**触れる（`lineIndex`）。★乱数は使わない。
  */
+/**
+ * ★**この 2 秒でいちばん詰めた馬**（★先頭より後ろにいる馬だけ）。
+ *
+ * ★「詰めた」は ★**先頭との差が縮んだ量**（m）で測ります。★順位の増減では測りません
+ *   （★団子だと 1 頭抜くだけで 3 つ動き、★離れていれば 5m 詰めても 0 のままだからです）。
+ * ⚠️ ★線は ★**2 秒で 2.0m**（★≒0.8 馬身）。★これ以下は「詰めている」と言えるほど動いていません。
+ *    ★実測から決めた線ではなく、★言い過ぎない側へ置いた目安です（★R-27）。
+ * ⚠️ ★先頭自身は返しません（★先頭が「上がってきた」は日本語として成り立ちません）。
+ */
+function surgingHorse(
+  ctx: RaceCallContext, order: readonly RaceCallHorse[],
+): { readonly horse: RaceCallHorse; readonly rank: number } | undefined {
+  /** ★渡された枠番を優先。★無ければ（旧経路）その場で探す */
+  const gate = ctx.surgingGate ?? (ctx.metersAgoOf === undefined ? undefined
+    : raceSurgeGate(order, new Map(order.flatMap((h) => {
+      const m = ctx.metersAgoOf?.(h.gate);
+      return m === undefined ? [] : [[h.gate, m] as const];
+    }))));
+  if (gate === undefined) return undefined;
+  const rank = order.findIndex((h) => h.gate === gate) + 1;
+  const horse = order[rank - 1];
+  /** ⚠️ ★先頭は返しません（★「先頭が上がってきた」は日本語として成り立ちません） */
+  if (horse === undefined || rank <= 1) return undefined;
+  return { horse, rank };
+}
+
 export function raceCallAt(ctx: RaceCallContext): RaceCallLine | undefined {
   if (ctx.horses.length === 0) return undefined;
   const order = [...ctx.horses].sort((a, b) => b.meters - a.meters);
@@ -111,18 +217,36 @@ export function raceCallAt(ctx: RaceCallContext): RaceCallLine | undefined {
       topic = gapLengths >= 2 ? 'clear' : 'hold';
     }
   } else if (metersLeft <= 400) {
-    // ★直線: 先頭と、伸びてきた馬
-    parts.push({ text: '先頭は' });
-    parts.push(nameOf(lead));
-    const closer = order[1];
-    if (closer !== undefined && gapLengths < 3) {
-      parts.push({ text: '、' });
-      parts.push(nameOf(closer));
-      parts.push({ text: 'が迫る' });
-      topic = `chase${closer.gate}`;
+    /**
+     * ★直線。
+     * ⚠️ ★**まず「上がってきた馬」を探します**（★2026-09-11・★オーナー ⑧）。
+     *    ★以前はここで ★**2 着馬**を「迫る馬」と呼んでいました。★ところが実際に湧いている
+     *    ★差し・追い込みは ★**もっと後ろから**来ます。★名前が出ないので、
+     *    ★見ている側には「何が起きたのか」が分かりませんでした。
+     */
+    /**
+     * ⚠️ ★**3 番手以降のときだけ**言います。★2 番手なら、下の「◯◯が迫る」が同じ馬を指すので、
+     *    ★同じことを 2 通りの言い方で繰り返すだけになります。
+     */
+    const surging = surgingHorse(ctx, order);
+    if (surging !== undefined && surging.rank >= 3) {
+      parts.push({ text: `${surging.rank} 番手` });
+      parts.push(nameOf(surging.horse));
+      parts.push({ text: '、後方から上がってくる' });
+      topic = `surge${surging.horse.gate}`;
     } else {
-      parts.push({ text: '、後続を離す' });
-      topic = 'lead-clear';
+      parts.push({ text: '先頭は' });
+      parts.push(nameOf(lead));
+      const closer = order[1];
+      if (closer !== undefined && gapLengths < 3) {
+        parts.push({ text: '、' });
+        parts.push(nameOf(closer));
+        parts.push({ text: 'が迫る' });
+        topic = `chase${closer.gate}`;
+      } else {
+        parts.push({ text: '、後続を離す' });
+        topic = 'lead-clear';
+      }
     }
   } else {
     // ★道中: 先頭と番手

@@ -31,7 +31,8 @@ function frameAt(leadS: number, script: 'v5' | 'v6', spread = 1,
 } {
   const horses = fieldAt(leadS, spread);
   const scene = resolveBroadcastV2Scene(course, horses, VIEWPORT, false, {
-    cornerCutM: 400, raceDisplaySec: 30, fourthCornerFront: true, script,
+    /** ⚠️ ★`fourthCornerFront` を渡しません。★**画面と同じ既定**（`far`）を歩かせます（★R-31） */
+    cornerCutM: 400, raceDisplaySec: 30, script,
     ...(cornerStyle === undefined ? {} : { cornerStyle }),
     ...(script === 'v6' ? { noContenderFrameShots: ['finish-line'] as const } : {}),
   });
@@ -93,23 +94,60 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
    * ⚠️ ★ここは ★**画面と同じ経路**（`resolveBroadcastV2Scene`）を通した幾何で見ます（★R-30）。
    *    ★画素で測った値（`tools/measure-shot-horse-size.mjs`）とは規則が違うので一致はしません。
    */
-  it('★発走直後・位置取り・コーナーは、真横の半分以下にしか描かない', () => {
+  it('★俯瞰のカットは、真横の半分以下にしか描かない', () => {
     const side = frameAt(700, 'v6');
     expect(side.shot, '★比較の相手は真横の勝負所').toBe('side-drive');
 
     const cases = [
-      { leadS: 50, shot: 'start-rear-far', style: undefined },
       { leadS: 290, shot: 'opening-formation', style: undefined },
-      { leadS: 900, shot: 'fourth-corner-far', style: 'far' as const },
+      { leadS: 900, shot: 'fourth-corner-far', style: undefined },
     ];
     for (const c of cases) {
       const f = frameAt(c.leadS, 'v6', 1, c.style);
       expect(f.shot, `${c.leadS}m`).toBe(c.shot);
+      expect(broadcastV2ShotById(c.shot as never).view, `${c.shot} は俯瞰`).toBe('high-diag');
       expect(f.top4HeightRatio, `${c.shot}: 引けていない`)
         .toBeLessThan(side.top4HeightRatio * 0.5);
       /** ⚠️ ★引きすぎて ★**何も読めない**のも駄目です（★隊列の形は残すこと） */
       expect(f.top4HeightRatio, `${c.shot}: 引きすぎ`).toBeGreaterThan(0.02);
     }
+  });
+
+  /**
+   * ★**大きく写してよいのは、承認済みの素材を使うカットだけ**（★2026-09-11・★オーナー ③④⑤）
+   *
+   * ★オーナー評「★上空からのカメラワークはいいアイデアです。★ただし ★**馬が小さ過ぎ**です。
+   *   ★しかし ★**大きくすると馬が斜め前向きになっているのが目立つ**ので、
+   *   ★上手く出来るならばしてください」。
+   *
+   * 【★どう解いたか】★**カメラを走路の真横へ回しました。**
+   *   ★高さは残したまま横へ回すと、★馬は ★**真横**を向きます。★真横素材は合格済みなので、
+   *   ★大きくしても崩れません（★`start-rear-far` 5.5% → 18.8%）。
+   * ⚠️ ★**コーナーには使えませんでした。** ★真横に回すと ★弧が消えて「コーナーに見えません」
+   *    （★実測・★撮って確認）。★コーナーは俯瞰のままなので、★小さいままです。
+   *
+   * → ★この検定が留めるのは ★**「大きい＝真横素材」**という対応です。
+   *    ★俯瞰のカットを大きくしたら、★ここが落ちます。
+   */
+  it('★真横の半分を超えて大きく写すカットは、必ず真横素材を使う', () => {
+    const side = frameAt(700, 'v6');
+    const offenders: string[] = [];
+    for (const leadS of [50, 290, 700, 900, 1250, 1350, 1450]) {
+      /**
+       * ⚠️ ★**比較用の切り替え（`?corner=front` / `?corner=wide`）は対象外**です。
+       *    ★あれは切り戻しと見比べの道で、★台帳「見比べる相手が一緒に動いたら、
+       *    ★何を見比べているのか分からなくなる」に当たります。★ここは ★**既定の道**だけを見ます。
+       */
+      for (const style of [undefined]) {
+        const f = frameAt(leadS, 'v6', 1, style);
+        if (f.top4HeightRatio <= side.top4HeightRatio * 0.5) continue;
+        const shot = broadcastV2ShotById(f.shot as never);
+        if (shot.view !== 'side' || shot.horseAsset !== 'side-v6') {
+          offenders.push(`${f.shot}（${shot.view} / ${shot.horseAsset}）`);
+        }
+      }
+    }
+    expect([...new Set(offenders)], '★承認していない素材を大きく写しています').toEqual([]);
   });
 
   /**
@@ -152,6 +190,19 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
         noContenderFrameShots: ['finish-line'] as const,
       }).shot.id;
 
+    /**
+     * ★**この検定は代理指標です。★過検出する条件が 1 つ分かっています。**
+     *
+     *   ★高さの跳びが背景を入れ替えるのは、★**2 つのカメラの距離が近いとき**です。
+     *   ★`start-rear-far`（★距離 85m・高さ 40m）→ `opening-side-lead`（★距離 45m・高さ 7.5m）は
+     *   ★跳び 32.5m ですが、★**撮って確認した限り背景は飛びません**（★`tmp/seam2`・2026-09-11）。
+     *   ★遠くから見下ろす引きと、★近くの望遠では、★同じ高さの差でも画に入る奥の物が違うためです。
+     * ⚠️ ★**「落ちたから外した」ではありません。** ★外す前にその継ぎ目を撮っています。
+     *    ★免除を足すときは ★**必ず絵で確かめてから**にしてください。
+     */
+    const CHECKED_BY_EYE: ReadonlySet<string> = new Set([
+      'start-rear-far→opening-side-lead',
+    ]);
     const offenders: string[] = [];
     let seams = 0;
     for (const b of broadcastV2ScriptBoundariesM(course, 'v6')) {
@@ -164,6 +215,7 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
       if (broadcastV2ShotById(from as never).view !== 'side') continue;
       if (broadcastV2ShotById(to as never).view !== 'side') continue;
       seams += 1;
+      if (CHECKED_BY_EYE.has(`${from}→${to}`)) continue;
       const gap = Math.abs(eyeZAt(after) - eyeZAt(before));
       if (gap > 1.5 + 1e-9) offenders.push(`${from}→${to} … ${gap.toFixed(2)}m`);
     }
@@ -173,9 +225,9 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
   });
 
   /** ★4 角は 3 通りから選べ、★`far` がいちばん小さいこと（★既定は従来のまま） */
-  it('★4 角の撮り方は選べる（既定は従来の正面固定）', () => {
-    expect(frameAt(900, 'v6').shot).toBe('fourth-corner-front');
-    expect(frameAt(900, 'v6', 1, 'front').shot).toBe('fourth-corner-front');
+  it('★4 角の撮り方は選べる（★既定は引きの俯瞰・★正面固定へ 1 手で戻せる）', () => {
+    expect(frameAt(900, 'v6').shot, '★既定は画面と同じ far').toBe('fourth-corner-far');
+    expect(frameAt(900, 'v6', 1, 'front').shot, '★切り戻しの道').toBe('fourth-corner-front');
     expect(frameAt(900, 'v6', 1, 'wide').shot).toBe('fourth-corner-wide');
     expect(frameAt(900, 'v6', 1, 'far').shot).toBe('fourth-corner-far');
     expect(frameAt(900, 'v6', 1, 'far').top4HeightRatio)

@@ -55,8 +55,14 @@ function transitions(script: BroadcastV2Script): readonly { readonly m: number; 
  *    ★そこも画角の系統が変わる切替になりました。
  *    ★（★`start-rear-far` → `opening-side-lead` は元から数えられていた 1 つの置き換えです）
  * ⚠️ ★**カットは減っていません。** ★11 → 12 に増えています（★下限は下回っていません）。
+ *
+ * ⚠️ ★**6 → 5 に戻りました**（★同じ日・★オーナー ③）。★`start-rear-far` を
+ *    ★**高い後方の俯瞰 → 高い真横**へ替えたためです（★真横素材は合格済みなので、
+ *    ★大きく写しても崩れません）。★`start-rear-far → opening-side-lead` が
+ *    ★真横どうしになり、★画角の系統が変わる切替が 1 つ減りました。
+ *    ★**カットの数は変わっていません**（★12 のまま）。
  */
-const CROSS_FAMILY_COUNT: Readonly<Record<string, number>> = { v4: 3, v5: 3, v6: 6 };
+const CROSS_FAMILY_COUNT: Readonly<Record<string, number>> = { v4: 3, v5: 3, v6: 5 };
 
 describe('★カットの切替', () => {
   it('★★画角の系統が変わる切替は、重ねない（ハードカット）', () => {

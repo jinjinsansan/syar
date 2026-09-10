@@ -567,9 +567,13 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
      * ⚠️ ★カットの数・境界・尺は変えていません。★**同じ枠の中身**が横 → 高い引きに替わっただけです。
      * ⚠️ ★`fourth-corner-far` と角度を変えてあります（★あちらは低め・こちらは真上寄り）。
      *    ★同じ絵を 2 回出すと「引き」そのものが飽きます。
+     *
+     * ⚠️ ★**8.1% → 12.4% へ寄せました**（★2026-09-11・★オーナー ③「馬が小さ過ぎ」）。
+     *    ★ここも俯瞰なので、★素材は不合格のままです。★真横の半分（14.4%）は超えません。
+     *    ★「位置取り」の情報そのものは、★カットの頭 1.2 秒の ★**隊列図**が伝えます。
      */
     id: 'opening-formation', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.2,
-    camera: { backM: 96, upM: 62, sideM: 30, fovDeg: 18.8 }, leadFraction: 0.60,
+    camera: { backM: 65, upM: 42, sideM: 20, fovDeg: 18.8 }, leadFraction: 0.60,
   },
   'opening-side-settle': {
     id: 'opening-side-settle', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
@@ -657,11 +661,19 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
      *   ★踏み出しも、正面から走る馬も、★**1 コマも映しません**。
      * ⚠️ ★ゲートは `visualLead < 90` の間ずっと世界に置かれるので、
      *    ★この引きの ★**奥に小さく残ります**（★参考映像と同じ見え方）。
-     * ⚠️ ★`fourth-corner-far` より ★**さらに引きます**（★距離 174m 相当・★見込み 6% 前後）。
-     *    ★見込みです。★採否は撮ってから決めます。
+     * 【★2026-09-11・★オーナー ③ で ★**俯瞰 → 高い「真横」**へ替えました】
+     *   > ★上空からのカメラワークはいいアイデアです。★ただし ★**馬が小さ過ぎ**です。
+     *   > ★しかし ★**大きくすると馬が斜め前向きになっているのが目立つ**ので、
+     *   > ★上手く出来るならばしてください。
+     *
+     *   ★引くしかなかったのは、★カメラを ★**走路の後ろ側**に置いていたからです。
+     *   ★後ろから見れば馬は斜め後ろを向き、★その素材は不合格のままだからです。
+     *   → ★**高さは残して、横へ回します。** ★馬は真横を向くので ★**合格済みの真横素材**が使えます。
+     *     ★大きくしても崩れません。★実測 ★**5.5% → 18.8%**。
+     * ⚠️ ★**コーナーには使えませんでした**（★`fourth-corner-far` の注記）。
      */
-    id: 'start-rear-far', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.3,
-    camera: { backM: 150, upM: 78, sideM: 40, fovDeg: 18.8 }, leadFraction: 0.58,
+    id: 'start-rear-far', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.3,
+    camera: { backM: 44, upM: 40, sideM: 60, fovDeg: 12 }, leadFraction: 0.58,
   },
   'fourth-corner-far': {
     /**
@@ -687,10 +699,16 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
      *    （★2026-09-11・★実測の絵で確認）。★走路の ★**奥に向かって**見るので、
      *    ★画の中では ★**ほぼ直線**にしか映りませんでした。
      * → ★**高さを上げ、外へ回します。** ★コーナーは ★**弧が見えて初めてコーナー**です。
-     *    ★距離はほぼ同じに保ってあるので、★馬の大きさ（★7〜8%）は変わりません。
+     *
+     * ⚠️ ★**ここだけは「高い真横」にできませんでした**（★2026-09-11・★オーナー ③④）。
+     *    ★`start-rear-far` は横へ回して合格済みの真横素材を使えるようにしましたが、
+     *    ★同じことをコーナーでやると ★**弧が消えて「ただの直線」に見えます**（★撮って確認）。
+     *    ★コーナーを見せるには俯瞰しかなく、★俯瞰の素材は不合格のままです。
+     * → ★**大きさは妥協点**です。★5.9% → ★**9.2%**（★真横の 1/3 弱）。
+     *    ★これ以上大きくすると脚さばきが読めます。★根本は素材（★3D）の話です。
      */
     id: 'fourth-corner-far', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.4,
-    camera: { backM: 70, upM: 105, sideM: 55, fovDeg: 18.8 },
+    camera: { backM: 46, upM: 69, sideM: 36, fovDeg: 18.8 },
   },
   'front-close': {
     // ★先頭争いを斜め前・寄りで（先頭の少し前・外側・低い、追従）
@@ -1822,9 +1840,21 @@ export function broadcastV2ShotAt(
       if (meters < b.meters) {
         // 4 角の正面固定は正面寄り素材が無いときは俯瞰ワイドで代用
         if (b.id === 'fourth-corner-front') {
-          /** ★明示された撮り方が最優先。★未指定なら従来の真偽値へ落ちる（★既定は不変） */
+          /**
+           * ★明示された撮り方が最優先。
+           * ⚠️ ★**台本 v6 で何も指定しなければ `far`**（★2026-09-11）。★画面の既定がそれだからです
+           *    （★R-31「既定は画面の側へ倒す」）。★以前ここは `front` に落ちており、
+           *    ★**画面と道具と検定が別々の 4 角**を見ていました。
+           * ⚠️ ★**旧台本（v3 / v4 / v5）は `front` のままにします。** ★あれは切り戻しの道で、
+           *    ★一度ここを全台本へ広げたら ★**v4 も v5 も 4 角が入れ替わり**、
+           *    ★「読まない組（`high-diag-v2`）を選ぶショットが出た」まで波及しました（★実測）。
+           * ★`fourthCornerFront` を明示した呼び出しは、★従来どおりの意味のままです
+           *   （★`true` → 正面固定 ／ ★`false` → 俯瞰ワイド）。★古い道具を巻き込みません。
+           */
           const style = options.cornerStyle
-            ?? (options.fourthCornerFront === false ? 'wide' : 'front');
+            ?? (options.fourthCornerFront === true ? 'front'
+              : options.fourthCornerFront === false ? 'wide'
+                : script === 'v6' ? 'far' : 'front');
           if (style === 'far') return SHOTS['fourth-corner-far'];
           if (style === 'wide') return SHOTS['fourth-corner-wide'];
         }

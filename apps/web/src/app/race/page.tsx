@@ -60,7 +60,7 @@ import {
   drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   isSkinTone,
   typedCount,
-  raceCallAt,
+  raceCallAt, raceSurgeGate, RACE_SURGE_WINDOW_SEC,
   withPhasePrefix,
   narratorPortrait,
   narratorCastForRace,
@@ -4047,6 +4047,30 @@ export default function RacePage(): React.JSX.Element {
         ownGate,
         lineIndex: callIndexRef.current,
         frameRoleOf: (gate: number) => frameRoleOf(gate, FIELD),
+        /**
+         * ★**この 2 秒でいちばん詰めた馬**（★2026-09-11・★オーナー ⑧「差し、追い込み馬…が必要」）。
+         *
+         *   ★実況が「迫る馬」と呼んでいたのは ★**常に 2 着馬**でした。★実際に湧いている
+         *   ★差し・追い込みは ★もっと後ろから来るので、★名前が一度も出ませんでした。
+         *
+         * ⚠️ ★**「今」と「2 秒前」を同じ入力から取ります**（★R-30）。
+         *    ★最初、★今＝画面の位置・★2 秒前＝真の位置で比べる形に書きました。
+         *    ★最後の直線の攻防は ★**表示だけ前後をずらす**ので、その差が混ざり、
+         *    ★**一度も発火しません**でした（★実測・撮って確認）。
+         *    → ★どちらも ★**真の位置モデル**から取ります。
+         * ⚠️ ★着順にも位置にも触れません。★位置を 2 点読んで引き算するだけです（★憲法 3）。
+         *    ★時刻の関数なので決定論です（★憲法 4）。
+         */
+        surgingGate: ((): number | undefined => {
+          const nowSec = built.warp.raceSecAt(Math.min(sourceD, built.warp.displaySec));
+          const agoSec = built.warp.raceSecAt(
+            Math.max(0, Math.min(sourceD, built.warp.displaySec) - RACE_SURGE_WINDOW_SEC));
+          const nowRows = built.model.at(nowSec).map((h) => ({
+            gate: h.gate, name: HORSE_NAMES[h.gate - 1] ?? `スター${h.gate}`, meters: h.meters,
+          }));
+          const agoMap = new Map(built.model.at(agoSec).map((h) => [h.gate, h.meters] as const));
+          return raceSurgeGate(nowRows, agoMap);
+        })(),
       });
       if (line !== undefined
         && hud.calls && shouldEmitRaceCall(callKeyRef.current, line.key, callLastSecRef.current, raceD)) {

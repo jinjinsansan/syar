@@ -373,34 +373,32 @@ export default function GaitReviewPage(): React.ReactElement {
         </section>
 
         <section style={card}>
-          <h2 style={h2}>⑫ ★演出の組み直し — ★①ゲート／②発走／③位置取り／④コーナー／⑤カットイン</h2>
+          <h2 style={h2}>⑫ ★スクリーンショット 8 点への対応（2026-09-11）</h2>
           <p style={note}>
-            ★参考映像を全部見て測ったことが 1 つだけあります。<br />
-            ★<b>あちらは走行を真横と後方からしか撮りません。</b>★正面から走ってくる馬は
-            ★93 秒を通して <b>1 カットもありません</b>。★発走直後とコーナーは
-            ★<b>馬が画面高の 5% 前後</b>しかない引きです。<br />
-            ★こちらは実測で <b>どこでも 18〜28%</b> でした。★大きく写すほど、
-            ★不合格の脚さばきが読めます。★<b>引けば、隊列と走路の形だけが残ります。</b>
+            ★いただいた 8 点に順に当てています。★<b>できなかったものは、できなかったと書いています。</b>
           </p>
-          <table style={{ fontSize: 13, lineHeight: 1.8, color: '#9fb4c6', borderCollapse: 'collapse', margin: '0 0 12px' }}>
+          <table style={{ fontSize: 13, lineHeight: 1.8, color: '#9fb4c6', borderCollapse: 'collapse', margin: '0 0 14px' }}>
             <thead><tr>
-              <th style={{ textAlign: 'left', padding: '2px 14px 2px 0' }}>カット</th>
-              <th style={{ textAlign: 'right', padding: '2px 14px 2px 0' }}>前</th>
-              <th style={{ textAlign: 'right', padding: '2px 14px 2px 0' }}>後</th>
-              <th style={{ textAlign: 'left', padding: '2px 0' }}>中身</th>
+              <th style={{ textAlign: 'left', padding: '2px 12px 2px 0' }}>#</th>
+              <th style={{ textAlign: 'left', padding: '2px 12px 2px 0' }}>指摘</th>
+              <th style={{ textAlign: 'left', padding: '2px 0' }}>やったこと</th>
             </tr></thead>
             <tbody>
-              {[
-                ['発走直後', '18.6%', '5.5%', '★斜め前 → ★高い後方の引き（カットを 1 つ増やした）'],
-                ['最初の位置取り', '18.0%', '8.1%', '★真横 → ★真上寄りの引き（隊列の形を読ませる）'],
-                ['4 コーナー', '19.9%', '5.9%', '★正面固定 → ★うんと引いた俯瞰'],
-                ['勝負所・直線', '23〜28%', '同じ', '★真横。★合格済みなので触っていません'],
-              ].map((r) => (
+              {([
+                ['①', 'タイトルの自馬が左にはみ出る', '0.42 → 0.34 に縮め、題字板と画面端の間へ収めた'],
+                ['②-a', 'ゲート〜発走を真横に', '★できません。真横だとゲートが黒い塊になり 12 頭が縦に積む（撮って確認）。正面で走る時間を 16m → 12.8m へ詰めた'],
+                ['②-b', '今のカットインは使えない', '意味のある 4 枚へ作り直し（下）'],
+                ['③', '上空は良い／小さ過ぎ／大きくすると斜め前が目立つ', '★カメラを走路の真横へ回した。馬は真横を向くので合格素材が使える。5.5% → 18.8%'],
+                ['④', '位置取りも同じ', '8.1% → 12.4%（俯瞰のまま。素材は不合格のまま）'],
+                ['⑤', 'コーナーも同じ', '5.9% → 9.2%。★真横に回すと弧が消えて「コーナーに見えない」ので回せない'],
+                ['⑥', '真横→真横が繋がらない', '★原因はカメラの高さ。直線の高さを一つの帯へ揃えた。同じ欠陥が 5 か所あった'],
+                ['⑦', '足が白ブチの馬をやめる', '型 B を一旦外した。★12 頭すべて型 A になり、見分けは毛色 7 色だけに戻る'],
+                ['⑧', '最後の直線に展開が要る', '★エンジンもカメラも足りていた。足りないのは実況だった（下）'],
+              ] as const).map((r) => (
                 <tr key={r[0]}>
-                  <td style={{ padding: '2px 14px 2px 0', color: '#eef2f6' }}>{r[0]}</td>
-                  <td style={{ padding: '2px 14px 2px 0', textAlign: 'right' }}>{r[1]}</td>
-                  <td style={{ padding: '2px 14px 2px 0', textAlign: 'right', color: '#ffd34d' }}>{r[2]}</td>
-                  <td style={{ padding: '2px 0' }}>{r[3]}</td>
+                  <td style={{ padding: '2px 12px 2px 0', color: '#ffd34d' }}>{r[0]}</td>
+                  <td style={{ padding: '2px 12px 2px 0', color: '#eef2f6' }}>{r[1]}</td>
+                  <td style={{ padding: '2px 0' }}>{r[2]}</td>
                 </tr>
               ))}
             </tbody>
@@ -410,42 +408,76 @@ export default function GaitReviewPage(): React.ReactElement {
             <b>★②③ 発走 → 位置取り（★表示 6〜22 秒・★等速）</b>
           </p>
           <p style={note}>
-            ★ゲート（正面・閉→開）→ ★<b>ロゴ「桜星賞」0.42 秒</b> → ★空になったゲートの一拍 →
-            ★<b>高い後方の引き</b> → ★真横 → ★<b>ロゴ「STAR」0.42 秒</b> → ★真上寄りの引き（位置取り）→ ★真横。
+            ★ゲート → ★<b>自馬カード 1.2 秒</b> → ★<b>高い「真横」</b>（★合格済みの真横素材・18.8%）
+            → ★真横 → ★<b>隊列図 1.2 秒</b> → ★真上寄りの引き → ★真横。
           </p>
-          <Pair base="staging-open" />
-          <details style={{ marginTop: 10 }}>
-            <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★前（止め絵）と ★後（止め絵）を並べて見る</summary>
-            <p style={{ ...note, margin: '8px 0 4px' }}>★↓ 前（★2026-09-11 の変更前に撮ったもの）</p>
-            <img src="/gait-review/staging-open-before.jpg" alt="発走の前" style={media} />
-            <p style={{ ...note, margin: '8px 0 4px' }}>★↓ 後</p>
-            <img src="/gait-review/staging-open-after.jpg" alt="発走の後" style={media} />
-          </details>
+          <Pair base="staging2-open" />
 
           <p style={{ ...note, margin: '18px 0 6px', color: '#eef2f6' }}>
-            <b>★④ 4 コーナー（★表示 35〜42 秒・★等速）— ★前と後</b>
+            <b>★⑤ 4 コーナー（★表示 35〜43 秒・★等速）</b>
           </p>
           <p style={note}>
-            ★<b>ロゴ「STAR」→ コーナー → ロゴ「STAR」</b>で挟んでいます（★ご指示「コーナーに入る→カットイン」）。<br />
-            ⚠️ ★<b>カットの数・境界・尺は減らしていません。</b>★頭に 1 つ増えて ★11 → 12 です。
+            ★<b>脚質のカットイン</b> → ★コーナー（引きの俯瞰・9.2%）→ ★<b>直線へのカットイン</b>。<br />
+            ⚠️ ★ここだけは ★<b>真横に回せません</b>。★回すと弧が消えて、ただの直線に見えます。
+          </p>
+          <Pair base="staging2-corner" />
+
+          <p style={{ ...note, margin: '18px 0 6px', color: '#eef2f6' }}>
+            <b>★⑧ 最後の直線（★表示 46〜58 秒・★等速）</b>
+          </p>
+          <p style={note}>
+            ★測った結果、★<b>エンジンもカメラも足りていました</b>。<br />
+            ★エンジン … 直線での追い抜き <b>3〜8 回</b>／上位 5 頭の伸びが 17〜25m → 1.3〜14.7m
+            （<code>audit-real-overtakes</code>・8 seed）<br />
+            ★カメラ … 競り合いカットで主役 2 頭以上が <b>100%</b> 画面内（<code>audit-contest-focus</code>）<br />
+            ★足りていなかったのは <b>実況</b>でした。★「迫る」と呼ぶ相手は
+            ★<b>常に 2 着馬</b>で、★後方から来る馬の名前は一度も出ませんでした。<br />
+            → ★<b>いちばん詰めている馬を、3 番手以降のときだけ一度名指し</b>します。
+            ★6 seed で確かめると、★名指しされるのは 1 頭だけで、
+            ★<b>そのうち 3 頭は実際の勝ち馬</b>でした（★seed 42 → 10 番 アオバハヤテ）。
+          </p>
+          <Pair base="staging2-straight" />
+
+          <p style={{ ...note, margin: '18px 0 6px', color: '#eef2f6' }}>
+            <b>★②-b カットイン 4 枚（★毎回ちがう中身・★1 枚 1.2 秒）</b>
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <p style={{ ...note, margin: '0 0 4px', color: '#eef2f6' }}><b>後（★既定）</b> <span style={{ color: '#9fb4c6' }}>引いた俯瞰・5.9%</span></p>
-              <video src="/gait-review/staging-corner-new-equal.mp4" style={media} controls loop muted playsInline />
-            </div>
-            <div>
-              <p style={{ ...note, margin: '0 0 4px', color: '#eef2f6' }}><b>前</b> <span style={{ color: '#9fb4c6' }}>正面固定・19.9%</span></p>
-              <video src="/gait-review/staging-corner-old-equal.mp4" style={media} controls loop muted playsInline />
-            </div>
+            {([
+              ['cutin-a-own', 'A 発走直後 — あなたの馬'],
+              ['cutin-b-formation', 'B 位置取り — 現在の隊列'],
+              ['cutin-c-style', 'C 4 角入り — ここから動く馬'],
+              ['cutin-d-straight', 'D 直線へ — 残り距離と差'],
+            ] as const).map(([id, label]) => (
+              <div key={id}>
+                <p style={{ ...note, margin: '0 0 4px', color: '#eef2f6' }}><b>{label}</b></p>
+                <img src={`/gait-review/${id}.jpg`} alt={label} style={media} />
+              </div>
+            ))}
           </div>
+          <p style={{ ...note, margin: '10px 0 0' }}>
+            ⚠️ ★<b>最後の直線には入れません</b>。★佳境でいちばん見たい場面から目を離させないためです。
+            ★⑥ の継ぎ目は ★<b>カメラの高さ</b>で解いています。
+          </p>
+
+          <p style={{ ...note, margin: '18px 0 6px', color: '#eef2f6' }}>
+            <b>★⑥ 継ぎ目 3 か所（★左＝切り替え前／右＝切り替え後）</b>
+          </p>
+          <img src="/gait-review/seam-fixed.jpg" alt="継ぎ目 3 か所" style={media} />
+          <p style={{ ...note, margin: '8px 0 0' }}>
+            ★上段＝勝負所→せめぎ合い／中段＝せめぎ合い→引き／下段＝位置取り→勝負所。
+            ★どれも背景（芝・ラチ・木立）が繋がっています。
+          </p>
+
+          <p style={{ ...note, margin: '18px 0 6px', color: '#eef2f6' }}>
+            <b>★① タイトル画面</b>
+          </p>
+          <img src="/gait-review/title-fixed.jpg" alt="タイトル画面" style={media} />
 
           <p style={{ ...note, margin: '14px 0 0' }}>
             ★開発サーバーでそのまま見る:{' '}
             <a href="/race?dev=1" style={{ color: '#4dd2ff' }}>/race?dev=1</a>（★既定）／{' '}
-            <a href="/race?dev=1&corner=front" style={{ color: '#4dd2ff' }}>?corner=front</a>（★前のコーナーへ 1 手で戻す）／{' '}
-            <a href="/race?dev=1&corner=wide" style={{ color: '#4dd2ff' }}>?corner=wide</a>（★中間）／{' '}
-            <a href="/race?dev=1&cutin=off" style={{ color: '#4dd2ff' }}>?cutin=off</a>（★ロゴを止める）
+            <a href="/race?dev=1&corner=front" style={{ color: '#4dd2ff' }}>?corner=front</a>（★前のコーナーへ戻す）／{' '}
+            <a href="/race?dev=1&cutin=off" style={{ color: '#4dd2ff' }}>?cutin=off</a>（★カットインを止める）
           </p>
         </section>
 
