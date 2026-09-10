@@ -329,7 +329,12 @@ export function drawPerspectiveWorld(
   focusS: number = distanceMeter,
   track: { readonly surface: RenderSurface; readonly condition: RenderTrackCondition } = { surface: 'turf', condition: 'good' },
 ): void {
-  /** ★このコマの控えを空にします（★HUD が「馬にかかるか」を見るため・描画には使いません） */
+  /**
+   * ★このコマの控えを空にします（★HUD が「馬にかかるか」を見るため・描画には使いません）。
+   * ⚠️ ★**ここだけでは足りません**（★2026-09-10 に実測して判明）。★背景が視差板のときは
+   *    ★この関数自体が呼ばれず、★控えが ★**コマをまたいで積み上がって**いました
+   *    （★51 コマ撮ると 1 頭につき 51 個）。→ ★`drawPerspectiveHorses` の先頭でも空にします。
+   */
   drawnBoxes = [];
   const basis = cameraBasis(cam);
   const W = cam.width;
@@ -909,6 +914,16 @@ export function drawPerspectiveHorses<TImage>(
     } | undefined;
   },
 ): void {
+  /**
+   * ★**このコマの控えを空にします**（★2026-09-10）。
+   *
+   * ⚠️ ★以前は `drawPerspectiveWorld` の中だけで空にしていました。★背景が視差板のときは
+   *    ★その関数が呼ばれないので、★控えが ★**コマをまたいで積み上がって**いました
+   *    （★実測: 51 コマ撮ると 1 頭につき 51 個・★先頭は 1 コマ目のまま）。
+   *    ★HUD の減光（`getDrawnHorseBoxes`）も、★その古い値を読んでいたことになります。
+   * ⚠️ ★1 コマの中で場面を 2 回描く（★カットの重ね合わせ）ときは、★**後の場面の控えが残ります**。
+   */
+  drawnBoxes = [];
   const basis = cameraBasis(cam);
   const cw = opts.sheetWidth / opts.spec.frames;
   const P = (s: number, w: number): ReturnType<typeof project> => {

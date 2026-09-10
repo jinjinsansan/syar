@@ -184,14 +184,20 @@ function violationsOf(src: string): string[] {
   }
   if (feetSeen < 2) bad.push(`⑧ 接地線の指定が 2 か所未満: ${feetSeen}`);
 
-  /** ★⑨ 較正値の引数が ★**決め方の変数**であること（★定数を直に渡していない・★裁定 R2） */
+  /**
+   * ★⑨ 較正値の引数が ★**素材から決まった値**であること（★定数を直に渡していない・★裁定 R2）。
+   * ⚠️ ★識別子だけに限りません。★`effectivePlacementMode(...)` の戻り値を直に渡す形も通します
+   *    （★2026-09-10・★焼いた経路はこの形です）。★弾くのは ★**文字列の直書き**です。
+   */
   walk(sf, (n) => {
     if (!ts.isCallExpression(n) || !ts.isIdentifier(n.expression)) return;
     if (n.expression.text !== 'horseCalibrationFor') return;
     const arg = n.arguments[0];
-    if (arg === undefined || !ts.isIdentifier(arg)) {
-      bad.push(`⑨ 較正値の引数が変数でない: ${arg?.getText() ?? '(無し)'}`);
-    }
+    const ok = arg !== undefined && (ts.isIdentifier(arg)
+      || (ts.isCallExpression(arg) && ts.isIdentifier(arg.expression)
+        && (arg.expression.text === 'effectivePlacementMode'
+          || arg.expression.text === 'placementModeFor')));
+    if (!ok) bad.push(`⑨ 較正値の引数が素材から来ていない: ${arg?.getText() ?? '(無し)'}`);
   });
 
   /**

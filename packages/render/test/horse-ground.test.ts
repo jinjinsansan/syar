@@ -19,6 +19,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   horseFramePlacement, feetRatioOf, medianAnchorWidth, benchCanvasTopY,
+  horseCalibrationFor, DEFORMED_HORSE_CALIBRATION, LEGACY_HORSE_CALIBRATION,
   type HorsePlacementFrame, type HorsePlacementSet,
 } from '../src/horse-ground.js';
 import { scaledHorseLift } from '../src/race-motion.js';
@@ -257,5 +258,54 @@ describe('検証台の実入力との差（★規則が違うので 0 にはな�
     expect(worst).toBeLessThanOrEqual(TOLERANCE_PX);
     /** ⚠️ ★**0 ではないこと**も確かめます（★同じ入力を配ってしまった前便の形の再発防止） */
     expect(worst).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * ★**浮きは組ごと、1 完歩はレースに 1 つ**（★2026-09-10・★裁定 R1-b）
+ *
+ * ★以前は 1 レースに 1 つの浮きを描画側へ渡していたため、★真横が新しい素材で
+ * ★斜め前が旧素材のとき、★**旧素材にも 0.3 が当たって**いました（★従来は「絵のまま」＝ 1）。
+ * ★位相の連続を理由に揃える必要があるのは ★1 完歩だけです。
+ */
+describe('浮きは組ごとに持つ', () => {
+  const set = manifest.sets.find((s) => s.role === 'side-v6')!;
+  const frames = framesOf(set);
+  const base = measuredSet(set, frames);
+  const liftOf = (placementSet: HorsePlacementSet, i: number): number => {
+    const f = frames[i]!;
+    const placed = horseFramePlacement(placementSet, f, i);
+    return placed.bodyLiftSourcePx - (f.frameHeightSourcePx - f.anchorYSourcePx);
+  };
+
+  it('組の浮き 0.3 は、つまみ 0.3 と同じ量になる（★入れ替えても同じ）', () => {
+    frames.forEach((_, i) => {
+      const bySet = liftOf({ ...base, bob: 0.3 }, i);
+      const byKnob = scaledHorseLift(
+        horseFramePlacement(base, frames[i]!, i).bodyLiftSourcePx,
+        frames[i]!.frameHeightSourcePx - frames[i]!.anchorYSourcePx, 0.3,
+      ) - (frames[i]!.frameHeightSourcePx - frames[i]!.anchorYSourcePx);
+      expect(bySet).toBeCloseTo(byKnob, 9);
+    });
+  });
+
+  it('組の浮きを変えても、★従来経路の組は 1 画素も動かない', () => {
+    const legacy: HorsePlacementSet = {
+      mode: 'legacy-table', referenceHeight: set.referenceHeight,
+      canvasHeightSourcePx: set.nativeCanvasHeight * set.scale, feetRatio: 1,
+      legacyMedianAnchorWidth: medianAnchorWidth(frames),
+      legacyFlightLiftSourcePx: frames.map((_, i) => i * 3),
+    };
+    frames.forEach((_, i) => {
+      expect(liftOf({ ...legacy, bob: 0.3 }, i)).toBe(liftOf(legacy, i));
+      expect(liftOf(legacy, i)).toBe(i * 3);
+    });
+  });
+
+  it('★較正値は 1 完歩と浮きを別々に持つ', () => {
+    expect(DEFORMED_HORSE_CALIBRATION.bob).toBe(0.3);
+    expect(LEGACY_HORSE_CALIBRATION.bob).toBe(1);
+    expect(horseCalibrationFor('legacy-table').bob).toBe(LEGACY_HORSE_CALIBRATION.bob);
+    expect(horseCalibrationFor('measured-ground').bob).toBe(DEFORMED_HORSE_CALIBRATION.bob);
   });
 });

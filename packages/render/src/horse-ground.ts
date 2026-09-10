@@ -117,6 +117,17 @@ export interface HorsePlacementSet {
   /** ★接地線（★`'measured-ground'` のみ）。★`feetRatioOf` で組から求める */
   readonly feetRatio: number;
   /**
+   * ★**この組の浮きの量**（★0 = 全コマ接地・1 = 絵のまま・★`'measured-ground'` のみ）。
+   *
+   * ⚠️ ★**組ごとに持ちます**（★2026-09-10・★裁定 R1-b）。
+   *    ★以前は 1 レースに 1 つの値を描画側へ渡していたため、★真横が新しい素材で
+   *    ★斜め前が旧素材のときに、★**旧素材にも 0.3 が当たって**いました。
+   *    ★旧素材の従来の浮きは「絵のまま（1）＋固定表」です。
+   *    ★位相の連続を理由に揃える必要があるのは ★**1 完歩だけ**で、★浮きは揃える理由がありません。
+   * ⚠️ ★画面のつまみ（`horseBob`）は、★この値に ★**掛かる倍率**として働きます。
+   */
+  readonly bob?: number | undefined;
+  /**
    * ★従来の固定表による浮き（★`'legacy-table'` のみ・★素材の画素の単位・★コマ数ぶん）。
    * ★呼ぶ側が `flightLiftFor` で作って渡す。
    */
@@ -197,10 +208,15 @@ export function horseFramePlacement(
 ): HorsePlacement {
   const feetFromAnchor = frame.frameHeightSourcePx - frame.anchorYSourcePx;
   if (set.mode === 'measured-ground') {
+    /**
+     * ★**組ごとの浮きをここで掛けます**（★2026-09-10・★裁定 R1-b）。
+     *   ★画面のつまみは ★この結果に対する倍率として、★描画側で別に掛かります。
+     */
+    const bob = set.bob ?? 1;
     return {
       referenceHeight: set.referenceHeight,
       bodyLiftSourcePx: feetFromAnchor
-        + groundGapSourcePx(set.feetRatio, frame.lowRatio, set.canvasHeightSourcePx),
+        + groundGapSourcePx(set.feetRatio, frame.lowRatio, set.canvasHeightSourcePx) * bob,
     };
   }
   return {

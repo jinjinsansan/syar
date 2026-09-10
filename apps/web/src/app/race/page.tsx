@@ -1510,7 +1510,16 @@ export default function RacePage(): React.JSX.Element {
    * ⚠️ ★`artRef` は ref ですが、★読み込み後に `setReady(true)` で再描画が入るので反映されます。
    */
   const calibration = artRef.current?.calibration ?? LEGACY_HORSE_CALIBRATION;
-  const horseBob = horseBobOverride ?? calibration.bob;
+  /**
+   * ★**画面のつまみは「素材ごとの浮き」に掛かる倍率です**（★2026-09-10・★裁定 R1-b）。
+   *
+   *   ★浮きの量そのものは ★**組ごと**にフレームへ焼き込みます（`horseFramePlacement`）。
+   *   ★以前はここで 1 レースに 1 つの値を決めて描画側へ渡していたため、
+   *   ★真横が新しい素材・斜め前が旧素材のときに ★**旧素材にも 0.3 が当たって**いました。
+   *   ★既定 1 ＝「素材ごとに決めた量のまま」。★0 で全コマ接地、★2 で倍。
+   */
+  const horseBob = horseBobOverride ?? 1;
+  /** ⚠️ ★1 完歩だけは ★**レースに 1 つ**（★位相を全カットで共有するため・★§R1-b） */
   const strideM = strideOverrideM ?? calibration.strideM;
   const [startRampSec, setStartRampSec] = useState(1.6);
   const [startShake, setStartShake] = useState(1);
@@ -1990,10 +1999,12 @@ export default function RacePage(): React.JSX.Element {
         const legacyMedian = medianAnchorWidth(placementFrames);
         const legacyLifts = measured.map((frame, index) => flightLiftFor(index, images.length)
           * (imgH(frame.image) / LIFT_REFERENCE_HEIGHT_PX));
+        /** ★浮きは ★**組ごと**（★2026-09-10・★裁定 R1-b）。★旧素材に新しい値を当てない */
+        const setBob = horseCalibrationFor(placementMode).bob;
         const placementOf = (index: number): HorsePlacement => horseFramePlacement(
           placementMode === 'measured-ground'
             ? {
-              mode: 'measured-ground', referenceHeight, feetRatio,
+              mode: 'measured-ground', referenceHeight, feetRatio, bob: setBob,
               canvasHeightSourcePx: imgH(measured[index]!.image),
             }
             : {
@@ -2137,6 +2148,8 @@ export default function RacePage(): React.JSX.Element {
             mode: 'measured-ground', referenceHeight: refH,
             canvasHeightSourcePx: set.nativeCanvasHeight * set.scale,
             feetRatio: feetRatioOf(placementFrames.map((f) => f.lowRatio)),
+            /** ★浮きは ★**組ごと**（★2026-09-10・★裁定 R1-b） */
+            bob: horseCalibrationFor(effectivePlacementMode(set.prefix)).bob,
           }
           : {
             mode: 'legacy-table', referenceHeight: refH,
@@ -2710,6 +2723,13 @@ export default function RacePage(): React.JSX.Element {
           sideMode: builtPlacementByRole.get('side-v6') ?? null,
           frontMode: builtPlacementByRole.get('diag-front-v2') ?? null,
           builtPlacement: Object.fromEntries(builtPlacementByRole),
+          /**
+           * ★**組ごとに実際に使った浮き**（★2026-09-10・★裁定 R1-b）。
+           *   ★旧素材へ落ちた組が新しい値を当てられていないことを、★ここで見分けられます。
+           *   ⚠️ ★画面のつまみ（`horseBob`）は、★この値に掛かる倍率です。
+           */
+          bobByRole: Object.fromEntries([...builtPlacementByRole]
+            .map(([role, mode]) => [role, horseCalibrationFor(mode).bob])),
           sideRequested: sideSetName,
           frontRequested: frontSetName,
           sideResolved: bakedLibs !== undefined
@@ -4147,8 +4167,8 @@ export default function RacePage(): React.JSX.Element {
         <section aria-label="レースの動き調整" style={{ padding: 12, border: '1px solid #4a453d', marginTop: 12 }}>
           <b>レースの動き調整</b>
           <p style={{ fontSize: 12, margin: '6px 0 12px' }}>
-            停止中もその場で反映します。上下動は 0 で全コマ接地、1 で現在の浮き。
-            再生速度は映像全体、1完歩は脚の回転に効きます。
+            停止中もその場で反映します。★上下動は ★**素材ごとに決めた量に掛かる倍率**です
+            （★0 で全コマ接地・1 で素材のまま・2 で倍）。再生速度は映像全体、1完歩は脚の回転に効きます。
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
             {([
