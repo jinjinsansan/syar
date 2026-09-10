@@ -77,6 +77,7 @@ import {
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
+  raceCutInFor, drawCourseMapCutIn,
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
   horseCalibrationFor, LEGACY_HORSE_CALIBRATION, type HorseMaterialCalibration,
   type HorsePlacement, type HorsePlacementFrame, type HorsePlacementSet, type HorsePlacementMode,
@@ -3092,6 +3093,8 @@ export default function RacePage(): React.JSX.Element {
     let v2SectionLabel: string | undefined;
     /** ★ミニマップ用: 注視点と描画に使った馬の位置（描画と同じ値） */
     let v2Minimap: { focusS: number; horses: { gate: number; s: number; w: number; own: boolean }[] } | undefined;
+    /** ★このコマがカットインか（★HUD 側で小さいコース図を出さないために見ます・★2026-09-10） */
+    let cutInActive = false;
     /**
      * ★自馬マーカー（設計 1-6）用: 自馬の**頭**の画面位置。
      *   ⚠️ ここで求めるのは、**馬を描いたのと同じカメラ**で投影した点でなければなりません。
@@ -3414,7 +3417,61 @@ export default function RacePage(): React.JSX.Element {
           stallLabels: { ...GATE_FRONT_STALL_PLATES, font: FONT, plateColor: '#f2f2ee', textColor: '#14181a' },
         } satisfies WorldBillboard<HTMLImageElement>] : undefined,
       });
-      drawScene(ctx, scene);
+      /**
+       * ★**カットイン**（★2026-09-10・★構成案 §1・★着手順 ⑤ → ③ → 55〜60 秒 → ②）
+       *
+       *   ★描けない区間を、★同じ尺・同じ境界のまま ★**挿入画面**へ置き換えます。
+       *   ★どのカットを置き換えるかは ★`raceCutInFor` が 1 か所で決めます（★R-30）。
+       * ⚠️ ★レース時間は止めません。★戻ったときはその時点の状態の画になります。
+       * ⚠️ ★着順・走破時刻・台帳・サーバー判定には触れていません。★描画だけです。
+       */
+      const cutIn = raceCutInFor(scene.shot.id);
+      cutInActive = cutIn !== undefined;
+      /**
+       * ★このカットが始まった時刻（★台本の切り替え表から引く）。
+       * ⚠️ ★`reduce` の初期値を `d` にすると ★**常に `d` が返り、経過が 0 になります**
+       *    （★2026-09-10 に実際にやりました。★登場アニメが透明のままで図が出ませんでした）。
+       */
+      const cutStartSec = (motionTimeline ?? built).shotChanges
+        .filter((c) => c.to === scene.shot.id && c.displaySec <= d)
+        .reduce((m, c) => Math.max(m, c.displaySec), Number.NEGATIVE_INFINITY);
+      if (cutIn !== undefined) {
+        drawCourseMapCutIn(ctx, course, art.pal as Record<string, string>, FONT, {
+          viewport: { width: W, height: H },
+          /** ⚠️ ★**描画に使っている値をそのまま**渡します（★着順から作らない） */
+          horses: v2Minimap.horses,
+          focusS: v2Minimap.focusS,
+          frameColorOf: (gate) => (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff',
+          distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${DIST}m`,
+          metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
+          caption: cutIn.caption,
+          timeSec: d,
+          /**
+           * ★このカットが始まってからの秒（★登場の動き）。
+           * ★カットの開始時刻は ★**台本の切り替え表**から引きます（★べた書きしない）。
+           */
+          /** ★カットの開始からの経過。★切り替え表に無ければ「出し切った状態」で描く（★消えるより良い） */
+          sinceSec: Number.isFinite(cutStartSec) ? d - cutStartSec : 1,
+        });
+        /**
+         * ★**診断はカットイン中も出します**（★2026-09-10・★R-30）。
+         *
+         * ⚠️ ★`__raceDiag` は `drawBroadcastV2Scene` の中で書かれます。★カットイン中は
+         *    ★その関数を呼ばないので、★**前のコマの値が残り続けます**。
+         *    ★実際に、★カット数を数える道具が ★**13 → 11** と誤って報告しました
+         *    （★カットは 1 つも減っていないのに、★挿入画面の区間が前のカットに見えた）。
+         * → ★挿入画面のコマも ★**そのカットとして**控えます。
+         */
+        (globalThis as { __raceDiag?: unknown }).__raceDiag = {
+          shot: scene.shot.id,
+          cutIn: cutIn.kind,
+          asset: null,
+          horses: [],
+          material: { ...art.materialDiag, horseBob, strideM },
+        };
+      } else {
+        drawScene(ctx, scene);
+      }
       if (change !== undefined && FLASH_INTO.has(change.to)) {
         // ★閃光トランジション（アーケード参考映像 74 秒）: 白 → 0.3 秒で消える
         const t = (d - change.displaySec) / 0.3;
@@ -3551,13 +3608,14 @@ export default function RacePage(): React.JSX.Element {
      *   描画に使った位置をそのまま点にする（順位計算はしない）。
      */
     /** ★リプレイ中はコース図も下ろします（馬に重なるため・上の `hud` の注記と同じ理由） */
-    if (v2Minimap !== undefined && !winnerFinishedNow && !replay.active) {
+    if (v2Minimap !== undefined && !winnerFinishedNow && !replay.active && !cutInActive) {
       /**
        * ★**馬にかかるときだけ薄くします**（★2026-09-09・オーナー判断）。
        *   ★HUD は画面の 36% を覆っています（★実況の帯 20%・順位表 7.5%・コース図 6.3%・実測）。
        *   ★常に薄くすると読めなくなるので、★**馬が箱に乗った分だけ**透かします。
        * ⚠️ ★箱の位置はここで持っている値をそのまま渡します（★2 か所で持たない）。
        */
+      /** ⚠️ ★カットイン中は小さいコース図を出しません（★同じ図が 2 つ並びます・★2026-09-10） */
       const miniBox = { x: 40, y: 321, width: 264, height: 209 };
       const miniHide = horseOverlapRatio(miniBox);
       const miniPrevAlpha = ctx.globalAlpha;

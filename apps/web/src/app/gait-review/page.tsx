@@ -242,6 +242,30 @@ export default function GaitReviewPage(): React.ReactElement {
           </p>
         </section>
 
+        <section style={{ ...card, border: '2px solid #7fd18a', background: '#132018' }}>
+          <h2 style={h2}>⑩ ★⑤ コーナーをカットインに置き換えました（★第一試作）</h2>
+          <p style={note}>
+            ★37〜40 秒の 3 秒（★4 角・★不合格だった斜め前の走行）を、
+            ★<b>コース図の挿入画面</b>に置き換えました。★前後を含む ★<b>34〜43 秒</b>です。
+          </p>
+          <p style={{ ...note, color: '#7fd18a' }}>
+            ★実測: ★<b>カット数 13 → 13</b>。★<b>境界は 1 つも変わっていません</b>。
+            ★挿入画面は ★37・38・39 秒の 3 コマだけ。★総尺も同じです。
+          </p>
+          <p style={note}>
+            ★見ていただきたいのは 2 点です。<br />
+            ★① ★<b>どこを走っているか分かるか</b><br />
+            ★② ★<b>走行へ戻ったとき唐突でないか</b>（★40 秒）
+          </p>
+          <Pair base="cutin-corner" />
+          <p style={{ ...note, margin: '8px 0 0' }}>
+            ⚠️ ★背面は不透明にしてあります（★不合格の走行が透けないように）。<br />
+            ⚠️ ★レース時間は止めていません。★40 秒でその時点の真横走行へ戻ります。<br />
+            ⚠️ ★着順・走破時刻・台帳・サーバー判定には触れていません。★描画だけです。<br />
+            ⚠️ ★図が読みにくければ、★線・文字・余白を調整します。★遠慮なく言ってください。
+          </p>
+        </section>
+
         <section style={{ ...card, marginBottom: 8 }}>
           <h2 style={h2}>★この頁が言っていないこと</h2>
           <p style={{ ...note, margin: 0 }}>
