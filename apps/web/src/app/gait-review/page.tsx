@@ -110,6 +110,40 @@ export default function GaitReviewPage(): React.ReactElement {
           </details>
         </section>
 
+        <section style={{ ...card, border: '1px solid #7a6a2a', background: '#1d1c15' }}>
+          <h2 style={h2}>⑥ ★脚の太さ（★オーナー評「足が太過ぎる」を測りました）</h2>
+          <p style={note}>
+            ★輪郭の下 35% の帯で、★脚 1 本の断面の幅を ★<b>輪郭の高さで割った値</b>の中央値です。
+          </p>
+          <table style={{ fontSize: 13.5, borderCollapse: 'collapse', marginBottom: 12 }}>
+            <tbody>
+              {([
+                ['斜め前・現行 v4', '9.59%', '#ff8a5c'],
+                ['斜め前・旧 2D v2', '5.45%', '#9fb4c6'],
+                ['★真横・現行 v8（★オーナー合格）', '★12.77%', '#ffd34d'],
+                ['真横・旧 v6', '6.33%', '#9fb4c6'],
+              ] as const).map(([name, value, color]) => (
+                <tr key={name}>
+                  <td style={{ padding: '3px 16px 3px 0', color }}>{name}</td>
+                  <td style={{ padding: '3px 0', textAlign: 'right', color, fontWeight: 700 }}>{value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p style={{ ...note, color: '#e8c86a' }}>
+            ⚠️ ★<b>斜め前では、ご指摘のとおり現行が旧 2D の 1.76 倍です。</b><br />
+            ⚠️ ★しかし ★<b>合格した真横（v8）のほうが、さらに太い（12.77%）</b>のです。<br />
+            → ★<b>太さだけでは、合格と不合格を説明できません。</b>
+            ★正面寄りでは脚が短く詰まって見えるため、★太さが効き方を変えている可能性があります。
+          </p>
+          <img src="/gait-review/cycle-side-v8.jpg" alt="合格した真横 v8 の 1 周" style={media} />
+          <p style={{ ...note, margin: '8px 0 0' }}>
+            ★↑ ★<b>合格した真横 v8</b>。★①の上段（斜め前 v4）と見比べてください。<br />
+            ★<b>この真横の脚も「太過ぎる」と感じますか？</b> ★それとも太さが気になるのは斜め前だけですか。<br />
+            ★この答えで、★「太さが原因」なのか「正面寄りだと太さが悪目立ちする」のかが分かれます。
+          </p>
+        </section>
+
         <section style={{ ...card, marginBottom: 8 }}>
           <h2 style={h2}>★この頁が言っていないこと</h2>
           <p style={{ ...note, margin: 0 }}>
