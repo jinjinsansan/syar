@@ -372,6 +372,83 @@ export default function GaitReviewPage(): React.ReactElement {
           </p>
         </section>
 
+        <section style={card}>
+          <h2 style={h2}>⑫ ★演出の組み直し — ★①ゲート／②発走／③位置取り／④コーナー／⑤カットイン</h2>
+          <p style={note}>
+            ★参考映像を全部見て測ったことが 1 つだけあります。<br />
+            ★<b>あちらは走行を真横と後方からしか撮りません。</b>★正面から走ってくる馬は
+            ★93 秒を通して <b>1 カットもありません</b>。★発走直後とコーナーは
+            ★<b>馬が画面高の 5% 前後</b>しかない引きです。<br />
+            ★こちらは実測で <b>どこでも 18〜28%</b> でした。★大きく写すほど、
+            ★不合格の脚さばきが読めます。★<b>引けば、隊列と走路の形だけが残ります。</b>
+          </p>
+          <table style={{ fontSize: 13, lineHeight: 1.8, color: '#9fb4c6', borderCollapse: 'collapse', margin: '0 0 12px' }}>
+            <thead><tr>
+              <th style={{ textAlign: 'left', padding: '2px 14px 2px 0' }}>カット</th>
+              <th style={{ textAlign: 'right', padding: '2px 14px 2px 0' }}>前</th>
+              <th style={{ textAlign: 'right', padding: '2px 14px 2px 0' }}>後</th>
+              <th style={{ textAlign: 'left', padding: '2px 0' }}>中身</th>
+            </tr></thead>
+            <tbody>
+              {[
+                ['発走直後', '18.6%', '5.5%', '★斜め前 → ★高い後方の引き（カットを 1 つ増やした）'],
+                ['最初の位置取り', '18.0%', '8.1%', '★真横 → ★真上寄りの引き（隊列の形を読ませる）'],
+                ['4 コーナー', '19.9%', '5.9%', '★正面固定 → ★うんと引いた俯瞰'],
+                ['勝負所・直線', '23〜28%', '同じ', '★真横。★合格済みなので触っていません'],
+              ].map((r) => (
+                <tr key={r[0]}>
+                  <td style={{ padding: '2px 14px 2px 0', color: '#eef2f6' }}>{r[0]}</td>
+                  <td style={{ padding: '2px 14px 2px 0', textAlign: 'right' }}>{r[1]}</td>
+                  <td style={{ padding: '2px 14px 2px 0', textAlign: 'right', color: '#ffd34d' }}>{r[2]}</td>
+                  <td style={{ padding: '2px 0' }}>{r[3]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <p style={{ ...note, margin: '0 0 6px', color: '#eef2f6' }}>
+            <b>★②③ 発走 → 位置取り（★表示 6〜22 秒・★等速）</b>
+          </p>
+          <p style={note}>
+            ★ゲート（正面・閉→開）→ ★<b>ロゴ「桜星賞」0.42 秒</b> → ★空になったゲートの一拍 →
+            ★<b>高い後方の引き</b> → ★真横 → ★<b>ロゴ「STAR」0.42 秒</b> → ★真上寄りの引き（位置取り）→ ★真横。
+          </p>
+          <Pair base="staging-open" />
+          <details style={{ marginTop: 10 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★前（止め絵）と ★後（止め絵）を並べて見る</summary>
+            <p style={{ ...note, margin: '8px 0 4px' }}>★↓ 前（★2026-09-11 の変更前に撮ったもの）</p>
+            <img src="/gait-review/staging-open-before.jpg" alt="発走の前" style={media} />
+            <p style={{ ...note, margin: '8px 0 4px' }}>★↓ 後</p>
+            <img src="/gait-review/staging-open-after.jpg" alt="発走の後" style={media} />
+          </details>
+
+          <p style={{ ...note, margin: '18px 0 6px', color: '#eef2f6' }}>
+            <b>★④ 4 コーナー（★表示 35〜42 秒・★等速）— ★前と後</b>
+          </p>
+          <p style={note}>
+            ★<b>ロゴ「STAR」→ コーナー → ロゴ「STAR」</b>で挟んでいます（★ご指示「コーナーに入る→カットイン」）。<br />
+            ⚠️ ★<b>カットの数・境界・尺は減らしていません。</b>★頭に 1 つ増えて ★11 → 12 です。
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <p style={{ ...note, margin: '0 0 4px', color: '#eef2f6' }}><b>後（★既定）</b> <span style={{ color: '#9fb4c6' }}>引いた俯瞰・5.9%</span></p>
+              <video src="/gait-review/staging-corner-new-equal.mp4" style={media} controls loop muted playsInline />
+            </div>
+            <div>
+              <p style={{ ...note, margin: '0 0 4px', color: '#eef2f6' }}><b>前</b> <span style={{ color: '#9fb4c6' }}>正面固定・19.9%</span></p>
+              <video src="/gait-review/staging-corner-old-equal.mp4" style={media} controls loop muted playsInline />
+            </div>
+          </div>
+
+          <p style={{ ...note, margin: '14px 0 0' }}>
+            ★開発サーバーでそのまま見る:{' '}
+            <a href="/race?dev=1" style={{ color: '#4dd2ff' }}>/race?dev=1</a>（★既定）／{' '}
+            <a href="/race?dev=1&corner=front" style={{ color: '#4dd2ff' }}>?corner=front</a>（★前のコーナーへ 1 手で戻す）／{' '}
+            <a href="/race?dev=1&corner=wide" style={{ color: '#4dd2ff' }}>?corner=wide</a>（★中間）／{' '}
+            <a href="/race?dev=1&cutin=off" style={{ color: '#4dd2ff' }}>?cutin=off</a>（★ロゴを止める）
+          </p>
+        </section>
+
         <section style={{ ...card, marginBottom: 8 }}>
           <h2 style={h2}>★この頁が言っていないこと</h2>
           <p style={{ ...note, margin: 0 }}>
@@ -379,6 +456,9 @@ export default function GaitReviewPage(): React.ReactElement {
             ★ギャロップで接地コマが 8 中いくつであるべきか、★<b>根拠を持っていません</b>。<br />
             ★v4 と v2 の違いは記述しましたが、★<b>どちらが正しいかは判定していません</b>。<br />
             ★方向（★進路と画像方向の関係）の対照は ★<b>未着手</b>です。<br />
+            ★⑫ の引きは ★<b>脚さばきを直していません</b>。★<b>小さくして見えなくしただけ</b>です。<br />
+            ★引いたコーナーが「コーナーに見えるか」は ★<b>オーナーの目でしか決まりません</b>。
+            ★弧が読めるところまでは持っていけていません。<br />
             ★1 頭・1 カット・2.5 秒の観察です。★全会場・全シードではありません。
           </p>
         </section>

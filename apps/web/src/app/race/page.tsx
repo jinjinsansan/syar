@@ -77,7 +77,7 @@ import {
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
-  raceCutInFor, drawCourseMapCutIn, drawFormationCutIn,
+  raceCutInFlashAt, drawLogoCutIn, LOGO_CUTIN_SEC, LOGO_MARK_COLOR,
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
   horseCalibrationFor, LEGACY_HORSE_CALIBRATION, type HorseMaterialCalibration,
   type HorsePlacement, type HorsePlacementFrame, type HorsePlacementSet, type HorsePlacementMode,
@@ -347,6 +347,24 @@ const POST_RACE_SEC = WINNER_FOLLOW_SEC + RESULTS_BOARD_SEC;
  */
 const FOURTH_CORNER_FRONT_WEB = typeof window === 'undefined'
   || new URLSearchParams(window.location.search).get('corner') !== 'wide';
+/**
+ * ★**4 角の撮り方**（★2026-09-11・★オーナー ④「コーナーを出来るレベルで一瞬見せる」）。
+ *
+ *   ★`?corner=far`（★**既定**）… ★うんと引いた俯瞰（★参考映像の大きさに寄せた）
+ *   ★`?corner=wide`            … 俯瞰ワイド（★従来の代用カメラ）
+ *   ★`?corner=front`           … ★従来の正面固定（★奥から迫る）★**切り戻しの道**
+ *
+ * 【★なぜ既定を替えたか】★オーナー ④「★コーナーは今のところ 1 つも上手くいっていません。
+ *   ★コーナーを ★**出来るレベル**で作ってください」。
+ *   ★不合格の中身は ★**走り方**なので、★**馬を小さくすれば消えます**（★実測 19.9% → 7.7%）。
+ * ⚠️ ★合否はオーナーの目です。★`?corner=front` で ★**1 手で戻せます**
+ *    （★台帳「映像の『真因』はオーナー確認後に書く」）。
+ */
+const CORNER_STYLE_WEB: 'front' | 'wide' | 'far' = (() => {
+  if (typeof window === 'undefined') return 'far';
+  const v = new URLSearchParams(window.location.search).get('corner');
+  return v === 'wide' || v === 'front' ? v : 'far';
+})();
 /**
  * ★2026-08-18: テクスチャ付き透視ワールド（`world-textured.ts`）で背景が動くようになったので、
  *   コーナー専用ショット（3角後方・4角俯瞰）を**コーナー全区間**で復活（オーナー指示「元のカメラワークを復活、ただし背景は動く」）。
@@ -1390,6 +1408,7 @@ function buildMotionTimeline(
       finishStyle, cornerCutM: CORNER_CUT_M_WEB, raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
       cornerTracking: !LEGACY_MOTION,
       fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
+      cornerStyle: CORNER_STYLE_WEB,
       script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
       laneAlignedFocus: laneFocusFromSearch(typeof window === 'undefined' ? '' : window.location.search),
     });
@@ -1979,7 +1998,11 @@ export default function RacePage(): React.JSX.Element {
        */
       const neededAssets = broadcastV2ScriptAssets(
         scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
-        !FOURTH_CORNER_FRONT_WEB,
+        /**
+         * ⚠️ ★`?corner=far` も ★**引きの素材（`high-diag-v2`）が要ります**。
+         *    ★これを足し忘れると、★4 角だけ ★**素材が無い**まま描かれます。
+         */
+        !FOURTH_CORNER_FRONT_WEB || CORNER_STYLE_WEB !== 'front',
       );
       const silksByGate = silksColorsFor(pal as Record<string, string>, FIELD);
       const buildFrames = (
@@ -3149,6 +3172,7 @@ export default function RacePage(): React.JSX.Element {
         cornerTracking: !LEGACY_MOTION,
         raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
         fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
+        cornerStyle: CORNER_STYLE_WEB,
         script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
         laneAlignedFocus: laneFocusFromSearch(typeof window === 'undefined' ? '' : window.location.search),
         /** ★リプレイ区間は台本の外。専用のカットへ固定します（`finish-replay.ts`） */
@@ -3450,55 +3474,48 @@ export default function RacePage(): React.JSX.Element {
         } satisfies WorldBillboard<HTMLImageElement>] : undefined,
       });
       /**
-       * ★**カットイン**（★2026-09-10・★構成案 §1・★着手順 ⑤ → ③ → 55〜60 秒 → ②）
+       * ★**カットイン**（★2026-09-11・★オーナー判定 ★A「デザイン系ロゴ型」）
        *
-       *   ★描けない区間を、★同じ尺・同じ境界のまま ★**挿入画面**へ置き換えます。
-       *   ★どのカットを置き換えるかは ★`raceCutInFor` が 1 か所で決めます（★R-30）。
+       *   ★旧: ★カット 1 つを ★**まるごと**隊列図／コース図へ置き換えていた
+       *        → ★オーナー評「★カットインの内容がダメです」。
+       *   ★新: ★カットの ★**境目の 0.42 秒だけ**ロゴが走る。★残りは ★**その場面の走行**。
+       *   ★どこで光らせるかは ★`raceCutInFlashAt` が 1 か所で決めます（★R-30）。
        * ⚠️ ★レース時間は止めません。★戻ったときはその時点の状態の画になります。
        * ⚠️ ★着順・走破時刻・台帳・サーバー判定には触れていません。★描画だけです。
+       * ⚠️ ★カットの ★**数・境界・尺は 1 つも変えていません**（★台帳「カット数は減らさない」）。
        */
       /**
-       * ★このカットが始まった時刻（★台本の切り替え表から引く）。
+       * ★このカットが始まった切り替え（★台本の切り替え表から引く）。
        * ⚠️ ★`reduce` の初期値を `d` にすると ★**常に `d` が返り、経過が 0 になります**
        *    （★2026-09-10 に実際にやりました。★登場アニメが透明のままで図が出ませんでした）。
        */
-      const cutStartSec = (motionTimeline ?? built).shotChanges
+      type ShotChange = { readonly displaySec: number; readonly from: BroadcastV2ShotId; readonly to: BroadcastV2ShotId };
+      const cutChange = (motionTimeline ?? built).shotChanges
         .filter((c) => c.to === scene.shot.id && c.displaySec <= d)
-        .reduce((m, c) => Math.max(m, c.displaySec), Number.NEGATIVE_INFINITY);
-      const cutIn = CUTIN_OFF ? undefined : raceCutInFor(scene.shot.id);
+        .reduce<ShotChange | undefined>((m, c) => (m === undefined || c.displaySec > m.displaySec ? c : m), undefined);
+      /** ★このカットが始まってからの秒。★切り替え表に無ければ「ずっと前から」扱い */
+      const sinceCutSec = cutChange === undefined ? Number.POSITIVE_INFINITY : d - cutChange.displaySec;
+      /**
+       * ★**ロゴの一瞬**（★オーナー判定 A）。★カットの頭 `LOGO_CUTIN_SEC` 秒だけ。
+       * ⚠️ ★**どこから来たか**で判定します。★`side-drive` は台本 v6 に 2 回出るので、
+       *    ★名前だけだと ★**直線の入りでない方**でも光ってしまいます。
+       */
+      const cutIn = CUTIN_OFF || cutChange === undefined || sinceCutSec < 0 || sinceCutSec >= LOGO_CUTIN_SEC
+        ? undefined : raceCutInFlashAt(cutChange.from, cutChange.to);
       /** 発走イベントの直後だけ、踏み出しのない全速コマを不透明な発走帯でつなぐ。 */
-      const startTransitionActive = !CUTIN_OFF && renderer === 'v2' && !replay.active && raceD > 0 && raceD < 0.8;
+            /** ★発走の一瞬のカットイン。★尺は `LOGO_CUTIN_SEC` から引く（★べた書きしない・R-31） */
+      const startTransitionActive = !CUTIN_OFF && renderer === 'v2' && !replay.active
+        && raceD > 0 && raceD < LOGO_CUTIN_SEC;
       cutInActive = cutIn !== undefined || startTransitionActive;
       if (cutIn !== undefined) {
-        const cutInOptions = {
+        drawLogoCutIn(ctx, {
           viewport: { width: W, height: H },
-          /** ⚠️ ★**描画に使っている値をそのまま**渡します（★着順から作らない） */
-          horses: v2Minimap.horses,
-          focusS: v2Minimap.focusS,
-          frameColorOf: (gate: number) => (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff',
-          distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${DIST}m`,
-          metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
-          caption: cutIn.caption,
-          timeSec: d,
-          /**
-           * ★このカットが始まってからの秒（★登場の動き）。
-           * ★カットの開始時刻は ★**台本の切り替え表**から引きます（★べた書きしない）。
-           */
-          /** ★カットの開始からの経過。★切り替え表に無ければ「出し切った状態」で描く（★消えるより良い） */
-          sinceSec: Number.isFinite(cutStartSec) ? d - cutStartSec : 1,
-        };
-        if (cutIn.kind === 'course-map') {
-          drawCourseMapCutIn(ctx, course, art.pal as Record<string, string>, FONT, cutInOptions);
-        } else {
-          drawFormationCutIn(ctx, art.pal as Record<string, string>, FONT, {
-            viewport: cutInOptions.viewport,
-            horses: cutInOptions.horses,
-            courseWidthM: course.widthM,
-            frameColorOf: cutInOptions.frameColorOf,
-            caption: cutIn.caption,
-            sinceSec: cutInOptions.sinceSec,
-          });
-        }
+          fallbackText: cutIn.text,
+          letterSpacingEm: cutIn.letterSpacingEm,
+          textColor: LOGO_MARK_COLOR,
+          sinceSec: sinceCutSec,
+          durationSec: LOGO_CUTIN_SEC,
+        });
         /**
          * ★**診断はカットイン中も出します**（★2026-09-10・★R-30）。
          *
@@ -3510,14 +3527,30 @@ export default function RacePage(): React.JSX.Element {
          */
         (globalThis as { __raceDiag?: unknown }).__raceDiag = {
           shot: scene.shot.id,
-          cutIn: cutIn.kind,
+          cutIn: 'logo',
           asset: null,
           horses: [],
           material: { ...art.materialDiag, horseBob, strideM },
         };
       } else if (startTransitionActive) {
-        ctx.fillStyle = '#0d1218';
-        ctx.fillRect(0, 0, W, H);
+        /**
+         * ★**発走の一瞬のカットイン**（★2026-09-11・★オーナー判定「A ロゴ型」）。
+         *
+         * ⚠️ ★以前はここが ★**画面全体を暗く塗るだけ**でした（★オーナー評「カットインの内容がダメ」）。
+         * ★参考映像は ★発走の瞬間を ★**見せません** — ★ゲートが空になった一拍のあと、
+         * ★後方の引きへハードカットします（★実測 5.6→6.0 秒）。★ここはその「間」を作る画です。
+         */
+        drawLogoCutIn(ctx, {
+          viewport: { width: W, height: H },
+          /**
+           * ⚠️ ★題字の素材（`race-title-spring-v1`）は ★**風景つきのタイトルカード**で、
+           *    ★0.4 秒の一瞬に出すロゴには向きませんでした（★実測・★風景だけが見える）。
+           *    → ★**文字で出します**（★オーナー案「桜星賞〜 とか STAR とか」）。
+           */
+          fallbackText: RACE_META.raceName,
+          sinceSec: raceD,
+          durationSec: LOGO_CUTIN_SEC,
+        });
         const startText = 'スタートしました！';
         drawStartCallBand(ctx, art.pal as Record<string, string>, vp, FONT, FIELD, true,
           narratorPortrait(art.raceNarrator, art.narratorSets?.[cast], {
@@ -3531,12 +3564,12 @@ export default function RacePage(): React.JSX.Element {
             narratorRole: NARRATOR_ROLES[cast],
             sinceSec: raceD,
           });
-        // 挿入画面は0.8秒しかないため、入力演出を待たず出来事を即時に読ませる。
-        ctx.fillStyle = '#eef2f6';
-        ctx.font = FONT(Math.round(H * 0.072), true);
-        ctx.textAlign = 'center';
-        ctx.fillText(startText, Math.round(W / 2), Math.round(H * 0.43));
-        ctx.textAlign = 'left';
+        /**
+         * ⚠️ ★**「スタートしました！」を画面中央に大書きしません**（★2026-09-11・オーナー指摘）。
+         *    ★「これは実況中継の枠内で出すものです」。
+         *    ★上の `drawStartCallBand` が ★**実況の帯**に出しているので、それで足ります。
+         *    ★中央に出すとロゴと重なり、★実際に「ス桜星賞！」と潰れていました（★実測）。
+         */
         (globalThis as { __raceDiag?: unknown }).__raceDiag = {
           shot: 'start-insert', cutIn: 'start', asset: null, horses: [],
           material: { ...art.materialDiag, horseBob, strideM },
@@ -3544,7 +3577,15 @@ export default function RacePage(): React.JSX.Element {
       } else {
         drawScene(ctx, scene);
       }
-      if (change !== undefined && FLASH_INTO.has(change.to)) {
+      /**
+       * ⚠️ ★**ロゴが覆う境目では、白い閃光を出しません**（★2026-09-11）。
+       *    ★閃光はこのあとに ★**上から**塗るので、★出したままだとロゴが
+       *    ★最初の 0.3 秒 ★真っ白に飛びます。★境目を読める形にする役目は
+       *    ★ロゴのカットインが引き取りました（★不透明・0.42 秒）。
+       */
+      const flashCoveredByLogo = change !== undefined
+        && raceCutInFlashAt(change.from, change.to) !== undefined;
+      if (change !== undefined && !flashCoveredByLogo && FLASH_INTO.has(change.to)) {
         // ★閃光トランジション（アーケード参考映像 74 秒）: 白 → 0.3 秒で消える
         const t = (d - change.displaySec) / 0.3;
         if (t < 1) {
@@ -3818,8 +3859,12 @@ export default function RacePage(): React.JSX.Element {
           timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
         });
 
-        // C: 自馬マーカー（雫型のピン・頭上を追従）
-        if (v2OwnHead !== undefined) {
+        /**
+         * C: 自馬マーカー（雫型のピン・頭上を追従）
+         * ⚠️ ★**カットイン中は出しません**（★2026-09-11）。★カットイン中は馬を描いていないので、
+         *    ★ピンだけが ★**何も無い所を指して**浮きます（★ロゴの上に緑のピンが立っていました）。
+         */
+        if (v2OwnHead !== undefined && !cutInActive) {
           drawOwnHorseMarker(ctx, FONT, v2OwnHead, ownGate,
             { topLimitY: 40, viewport: { width: W, height: H }, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC });
         }

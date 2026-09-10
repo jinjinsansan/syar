@@ -125,6 +125,11 @@ export function resolveBroadcastV2Scene(
     readonly forceShotId?: BroadcastV2ShotId;
     /** ★4 角を「奥からこちらへ」の固定カメラにする（正面寄りの素材が揃っているとき） */
     readonly fourthCornerFront?: boolean;
+    /**
+     * ★**4 角のカットを何で撮るか**（★2026-09-11・★オーナー ④）。
+     * ⚠️ ★未指定なら `fourthCornerFront` の従来判定に落ちます（★既定は 1 画素も変わりません）。
+     */
+    readonly cornerStyle?: 'front' | 'wide' | 'far' | undefined;
     /** 台本。既定は 'v5'。'v4' は URL による旧台本への切り戻し用（`?cinematography=v4`） */
     readonly script?: BroadcastV2Script;
     /** ★勝馬追従を後方寄りにする（勝馬の後方寄り素材があるとき） */
@@ -192,7 +197,7 @@ export function resolveBroadcastV2Scene(
   const leaderS = horses.reduce((max, horse) => Math.max(max, horse.s), 0);
   const selectedShot = options.forceShotId !== undefined
     ? broadcastV2ShotById(options.forceShotId)
-    : broadcastV2ShotAt(course, leaderS, allFinished, options.cornerCutM, { fourthCornerFront: options.fourthCornerFront, script: options.script, winnerRear: options.winnerRear });
+    : broadcastV2ShotAt(course, leaderS, allFinished, options.cornerCutM, { fourthCornerFront: options.fourthCornerFront, cornerStyle: options.cornerStyle, script: options.script, winnerRear: options.winnerRear });
   const trackingCorner = selectedShot.id === 'fourth-corner-front' && options.cornerTracking === true;
   const shot: BroadcastV2Shot = trackingCorner ? (() => {
     const { fixedCamera: _fixed, ...tracking } = selectedShot;

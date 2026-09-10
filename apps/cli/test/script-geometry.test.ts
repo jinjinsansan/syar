@@ -100,14 +100,22 @@ describe('★台本 v6 の切り替え地点', () => {
   });
 
   /**
-   * ★**②の正面カットの尺を、走路の都合で削らない**（★2026-08-28 オーナー判断の持ち越し）
+   * ★**②の中間カットの尺を、走路の都合で削らない**（★2026-08-28 オーナー判断の持ち越し）
+   *
+   * ⚠️ ★**見るカットの名前を `homestretch-front` → `straight-field` へ直しました**（★2026-09-11）。
+   *
+   *   ★2026-09-10、★直線の②は ★**正面固定 → 真横の引き**へ替わりました
+   *   （`SCRIPT_V6` の「直線の中間カットは尺を維持し、横の引きで追走集団を見せる」）。
+   *   ⚠️ ★そのとき ★**この検定だけが取り残され**、`findIndex` が ★**−1 を返し続けて**いました。
+   *      ★つまり ★**2026-09-10 から今日まで赤のまま**で、★誰も 80m を見ていません。
+   *   ★守る中身（★②に 80m を先に取り置く）は ★**1 つも変えていません**。名前だけを追随させます。
    */
-  it('★②の正面カットは、どの鞍でも 80m 以上ある', () => {
+  it('★②の中間カットは、どの鞍でも 80m 以上ある', () => {
     const offenders: string[] = [];
     for (const { name, course } of courses) {
       const bounds = broadcastV2ScriptBoundariesM(course, 'v6');
-      const index = bounds.findIndex((b) => b.id === 'homestretch-front');
-      expect(index, `${name} … ②の正面カットが台本にありません`).toBeGreaterThan(0);
+      const index = bounds.findIndex((b) => b.id === 'straight-field');
+      expect(index, `${name} … ②の中間カットが台本にありません`).toBeGreaterThan(0);
       const span = bounds[index]!.meters - bounds[index - 1]!.meters;
       if (span < 80 - 1e-6) offenders.push(`${name} … ${span.toFixed(1)}m`);
     }
@@ -180,12 +188,29 @@ describe('★台本 v6 の切り替え地点', () => {
       const asset = broadcastV2ShotById(id).horseAsset;
       if (asset !== undefined) expect(allowed.has(asset), `${id} の素材 ${asset}`).toBe(true);
     }
-    /** ★俯瞰ワイドの代用は、代用する設定のときだけ要ります */
+    /**
+     * ⚠️ ★**2026-09-11、★`high-diag-v2` は「読まない組」ではなくなりました**（★オーナー ②③④）。
+     *
+     *   ★以前ここは ★「俯瞰ワイドの素材は代用する設定のときだけ読む」＝ ★**既定では読まない**
+     *   ★を留めていました（★台帳 A-11 / A-12・★実測 102MB → 76MB の根拠）。
+     *   ★今日、★台本 v6 の ★**3 カット**が高所斜めを描くようになりました:
+     *     ★`start-rear-far`（発走直後の引き）／★`opening-formation`（位置取り）／★`fourth-corner-far`（4 角）
+     *   → ★**描くのだから読みます。** ★ここを `false` のままにすると、★画面は
+     *      ★その 3 カットで ★**真横の絵を代わりに出します**（★落ちませんが別の絵です）。
+     *
+     * ⚠️ ★**組が 2 → 3 に増えた分の重さは、まだ測っていません**（★報告書に未解決として残しています）。
+     *    ★台帳「side-v9 は初期化 +31% で本線に入れない」と同じ形の危険です。
+     */
     const wide = broadcastV2ShotById('fourth-corner-wide').horseAsset;
     if (wide !== undefined) {
-      expect(allowed.has(wide), '★代用しない設定では読みません').toBe(false);
-      expect(new Set(broadcastV2ScriptAssets('v6', true)).has(wide), '★代用する設定では読みます').toBe(true);
+      expect(allowed.has(wide), '★高所斜めは v6 が実際に描くので読みます').toBe(true);
     }
+    /**
+     * ★**それでも「描かない組は読まない」という規律は生きています。**
+     *   ★`diag-rear-v2`（3 角後方）は台本 v6 のどのカットも選びません。★読まないこと。
+     *   ⚠️ ★ここが緑のままなら、★最適化そのものは効いています（★組を全部読む形へ退行していない）。
+     */
+    expect(allowed.has('diag-rear-v2'), '★台本 v6 が描かない組は読みません').toBe(false);
   });
 
   /**

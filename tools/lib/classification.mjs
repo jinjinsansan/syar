@@ -578,6 +578,16 @@ export const READONLY = [
    */
   'capture-contest-direct.mjs',
   'summarize-contest-direct.mjs',
+  /**
+   * ★カットごとの馬の大きさ（画面高比）を ★**画面が描いた矩形**から読むだけ（★2026-09-11・★オーナー ④）。
+   *   ★DB に触れず、★`tmp/shot-horse-size/rows.json` を書くだけ。★レース状態も素材も変えません。
+   */
+  'measure-shot-horse-size.mjs',
+  /**
+   * ★素材を組み終えた時点の JS ヒープと画布の枚数を読むだけ（★2026-09-11・★台帳 A-11 / A-12）。
+   *   ★DB に触れず、★出力は標準出力のみ。★レース状態も素材も変えません。
+   */
+  'measure-race-heap.mjs',
   'capture-bench-sprite.mjs',
   /**
    * ★撮った 2〜3 枚を ★**1 頭ぶん・同じ大きさ**に切り出して並べるだけ（★2026-09-10）。

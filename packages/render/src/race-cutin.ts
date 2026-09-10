@@ -23,28 +23,179 @@ import type { Ctx2D, FontOf, Palette } from './oblique-draw.js';
  *   ★画面が個別に判定すると、★道具・検査・画面が別々の答えを持ちます（★R-30）。
  */
 
-/** ★カットインの種類と、そのときに出す一言 */
-export interface RaceCutIn {
-  readonly kind: 'course-map' | 'formation';
-  /** ★画面に出す短い説明（★一画面につき一情報・★構成案 §2） */
-  readonly caption: string;
+/**
+ * ★**カットインは「情報画面」をやめ、★境目で光る「ロゴの一瞬」にしました**
+ * （★2026-09-11・★オーナー判定 ★**A（デザイン系ロゴ型）**）。
+ *
+ * ★オーナー評: ★「カットインの内容がダメです。★意味あるカットインにするなら本格的に
+ *   意味あるカットインにすべきです。★意味ないカットインにするならデザイン系のロゴを
+ *   入れたようなカットインにしてください」→ ★**A**。
+ *
+ * 【★何が変わったか】
+ *   ★旧: ★カット ★1 つ（★数秒）を ★**まるごと**隊列図／コース図に置き換えていた。
+ *   ★新: ★カットの ★**境目の 0.42 秒だけ**ロゴが走り、★残りは ★**その場面の走行**を見せる。
+ *
+ * ⚠️ ★これでも ★**カットの数・境界・尺は 1 つも変わりません**（★台帳「カット数は減らさない」）。
+ *    ★変わったのは ★**同じ枠の中身**だけです。
+ * ⚠️ ★隊列図・コース図を描く関数（`drawFormationCutIn` / `drawCourseMapCutIn`）は
+ *    ★**消さずに残して**あります。★画面からは呼んでいません（★方針が戻ったときのため）。
+ */
+
+/** ★ロゴの一瞬に出す字 */
+export interface RaceCutInFlash {
+  /** ★画面中央に出す字（★レース名 or 製品のロゴ字） */
+  readonly text: string;
+  /** ★字送り（em）。★製品ロゴ（`STAR`）はトップページと同じ広い字送りにする */
+  readonly letterSpacingEm: number;
 }
 
 /**
- * ★**その カット を挿入画面に置き換えるか。**
- *
- * ⚠️ ★ここに無いカットは ★**1 画素も変わりません**。
- * ★2026-09-10 の着手順は ★⑤ → ③ → 55〜60 秒 → ② です。★今は ⑤ だけを載せています。
+ * ★製品のロゴ字。★トップページ（`apps/web/src/app/page.tsx`）と ★**同じ字・同じ字送り**。
+ * ⚠️ ★別の字を作らないこと。★ロゴが 2 種類あると、それはもうロゴではありません。
  */
-export function raceCutInFor(shotId: string): RaceCutIn | undefined {
-  if (shotId === 'opening-formation') {
-    return { kind: 'formation', caption: '現在の隊列' };
-  }
-  if (shotId === 'fourth-corner-front') {
-    // コース長や直線長で実際の位置が変わるため、ショット名だけから通過地点を断定しない。
-    return { kind: 'course-map', caption: 'コースの現在位置' };
-  }
+export const LOGO_MARK_TEXT = 'STAR';
+/** ★トップページのロゴと同じ金（`#ffe37a`） */
+export const LOGO_MARK_COLOR = '#ffe37a';
+
+/**
+ * ★**この切り替わりでロゴを光らせるか。**
+ *
+ * ⚠️ ★カットの ★**名前だけでは決められません**。★台本 v6 の `side-drive` は
+ *    ★**2 回**出てきます（★0.330〜0.540 と ★0.604〜0.750）。★光らせたいのは
+ *    ★**4 角から直線へ出る方（後者）だけ**です。★だから ★**どこから来たか**で見ます。
+ *
+ * ★2026-09-11 の光らせどころ（★オーナー ④「コーナーに入る→カットイン とか
+ *   カットイン⇒コーナーから直線へ」）:
+ *     ① `opening-side-lead` → `opening-formation` … ★位置取りへ入る
+ *     ② `side-drive` → `fourth-corner-front`      … ★コーナーへ入る
+ *     ③ `fourth-corner-front` → `side-drive`      … ★コーナーから直線へ出る
+ *   ★発走（レース開始の 0 秒）は画面側が別に出します（★`LOGO_CUTIN_SEC`）。
+ */
+export function raceCutInFlashAt(fromId: string, toId: string): RaceCutInFlash | undefined {
+  const mark = { text: LOGO_MARK_TEXT, letterSpacingEm: 0.22 } as const;
+  /**
+   * ⚠️ ★4 角のカットは ★**3 通り**あります（`fourth-corner-front` / `-wide` / `-far`）。
+   *    ★名前を 1 つだけ書くと、★撮り方を替えた日に ★**ロゴが出なくなり**、
+   *    ★代わりに白い閃光だけが残ります（★2026-09-11 に実際にそうなりました）。
+   */
+  const isCorner = (id: string): boolean => id.startsWith('fourth-corner-');
+  if (fromId === 'opening-side-lead' && toId === 'opening-formation') return mark;
+  if (fromId === 'side-drive' && isCorner(toId)) return mark;
+  if (isCorner(fromId) && toId === 'side-drive') return mark;
   return undefined;
+}
+
+/**
+ * ★**ロゴの一瞬のカットイン**（★2026-09-11・★オーナー判定「A ロゴ型」）
+ *
+ * ★オーナー評: ★「カットインは長く見せるべきではなく、★**一瞬のカッコイイカットイン**であるべき。
+ *   ★例）桜星賞〜 とか このゲームの STAR とか」
+ *
+ * 【★どう作るか】
+ *   ★情報を伝えません。★**間（ま）を作るためだけ**の画です。
+ *   ★暗い地に題字を置き、★左右から光の帯が走って抜ける。★0.3〜0.5 秒。
+ *
+ * ⚠️ ★**長く出さないこと。** ★1 秒を超えたら、それは情報画面です（★前の試作の失敗）。
+ * ⚠️ ★参考映像にこの手のカットインは出てきません。★これはオーナーの案です。
+ */
+export interface LogoCutInOptions<TImage> {
+  readonly viewport: { readonly width: number; readonly height: number };
+  /** ★題字の絵（★無ければ文字だけで出す） */
+  readonly title?: { readonly image: TImage; readonly width: number; readonly height: number } | undefined;
+  /** ★題字が無いときに出す文字 */
+  readonly fallbackText: string;
+  /**
+   * ★字送り（em）。★製品ロゴ（`STAR`）はトップページと同じ ★0.22em。
+   * ★和文のレース名は ★0（★詰めない・★字送りを入れると読みにくくなる）。
+   */
+  readonly letterSpacingEm?: number;
+  /** ★字の色（★既定はレース名用の生成り。★製品ロゴは `LOGO_MARK_COLOR`） */
+  readonly textColor?: string;
+  /** ★この画が出てからの秒 */
+  readonly sinceSec: number;
+  /** ★全体の尺（秒）。★これを超えたら呼ぶ側が出すのをやめる */
+  readonly durationSec: number;
+}
+
+/** ★ロゴのカットインの既定の尺（秒）。★道具はこの値を読むこと（★R-31） */
+export const LOGO_CUTIN_SEC = 0.42;
+
+export function drawLogoCutIn<TImage>(
+  ctx: Ctx2D<TImage>,
+  opts: LogoCutInOptions<TImage>,
+): void {
+  const { width: W, height: H } = opts.viewport;
+  const t = Math.max(0, Math.min(1, opts.sinceSec / Math.max(0.01, opts.durationSec)));
+  const prev = ctx.globalAlpha;
+  ctx.globalAlpha = 1;
+
+  /** ★① 地。★不透明（★下の走行を透かさない） */
+  ctx.fillStyle = '#0b0f14';
+  ctx.fillRect(0, 0, W, H);
+
+  /**
+   * ★② 斜めの帯。★上下から挟むように動く。
+   *   ★入り（0〜0.35）で閉じ、★抜け（0.65〜1）で開く。
+   */
+  const ease = (x: number): number => x * x * (3 - 2 * x);
+  const close = ease(Math.max(0, Math.min(1, t / 0.35)));
+  const open = ease(Math.max(0, Math.min(1, (t - 0.65) / 0.35)));
+  const band = (1 - open) * close;
+  const bandH = Math.round(H * 0.30 * band);
+  ctx.fillStyle = '#14202b';
+  ctx.fillRect(0, Math.round(H * 0.5 - bandH), W, bandH * 2);
+  ctx.fillStyle = '#c9a227';
+  ctx.fillRect(0, Math.round(H * 0.5 - bandH) - 3, W, 3);
+  ctx.fillRect(0, Math.round(H * 0.5 + bandH), W, 3);
+
+  /** ★③ 題字。★帯が閉じている間だけ出す */
+  const show = Math.max(0, Math.min(1, (t - 0.12) / 0.18)) * (1 - open);
+  if (show > 0.01) {
+    ctx.globalAlpha = show;
+    if (opts.title !== undefined) {
+      const tw = Math.round(W * 0.52);
+      const th = Math.round(tw * (opts.title.height / Math.max(1, opts.title.width)));
+      /** ⚠️ ★この `Ctx2D` の `drawImage` は ★**9 引数のみ**（★切り出し込み） */
+      ctx.drawImage(
+        opts.title.image, 0, 0, opts.title.width, opts.title.height,
+        Math.round((W - tw) / 2), Math.round((H - th) / 2), tw, th,
+      );
+    } else {
+      /** ★字。★中央よりやや上に置き、★下は実況の帯に譲る */
+      const cy = Math.round(H * 0.47);
+      const size = Math.round(H * 0.115);
+      ctx.font = `bold ${size}px system-ui, sans-serif`;
+      const gap = size * (opts.letterSpacingEm ?? 0);
+      const color = opts.textColor ?? '#f4e6b8';
+      /**
+       * ★字送りを入れるときは ★**1 字ずつ**置きます。
+       * ⚠️ ★`ctx.letterSpacing` はブラウザにしかなく、★測る側（`@napi-rs/canvas`）に
+       *    ★無いので、★画面と道具で ★**違う絵**になります（★R-30）。
+       */
+      const chars = [...opts.fallbackText];
+      const widths = chars.map((c) => ctx.measureText(c).width);
+      const total = widths.reduce((a, b) => a + b, 0) + gap * Math.max(0, chars.length - 1);
+      const put = (dx: number, dy: number, fill: string): void => {
+        ctx.fillStyle = fill;
+        ctx.textAlign = 'left';
+        let x = Math.round(W / 2 - total / 2) + dx;
+        for (let i = 0; i < chars.length; i += 1) {
+          ctx.fillText(chars[i]!, x, cy + dy);
+          x += widths[i]! + gap;
+        }
+      };
+      /** ★影で締める */
+      put(3, 4, '#0b0f14');
+      put(0, 0, color);
+      /** ★下に細い金の線 */
+      const lw = Math.round(W * 0.26 * show);
+      ctx.fillStyle = '#c9a227';
+      ctx.fillRect(Math.round(W / 2 - lw / 2), cy + Math.round(H * 0.035), lw, 3);
+      ctx.textAlign = 'left';
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.globalAlpha = prev;
 }
 
 export interface FormationCutInOptions {

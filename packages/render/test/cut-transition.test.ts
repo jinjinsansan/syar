@@ -41,7 +41,22 @@ function transitions(script: BroadcastV2Script): readonly { readonly m: number; 
 }
 
 // 直線の切替は残るが、真横同士なので方向の系統は変わらない。
-const CROSS_FAMILY_COUNT: Readonly<Record<string, number>> = { v4: 3, v5: 3, v6: 3 };
+/**
+ * ⚠️ ★**v6 を 3 → 5 に書き換えました**（★2026-09-11・★オーナー ③・★意図した変更です）。
+ *
+ *   ★オーナー評「★今は真横カメラワークのみで飽きます」。
+ *   ★`opening-formation`（★最初の位置取り）を ★**真横 → 高い引き**へ替えたので、
+ *   ★その前後 2 か所が「画角の系統が変わる切替」に増えました:
+ *     ★`opening-side-lead`(side) → `opening-formation`(high-diag)
+ *     ★`opening-formation`(high-diag) → `opening-side-settle`(side)
+ *
+ * ⚠️ ★**さらに 5 → 6**（★同じ日・★オーナー ②）。★発走を
+ *    ★`start-front`(diag-front・ゲート) → `start-rear-far`(high-diag・引き) に割ったので、
+ *    ★そこも画角の系統が変わる切替になりました。
+ *    ★（★`start-rear-far` → `opening-side-lead` は元から数えられていた 1 つの置き換えです）
+ * ⚠️ ★**カットは減っていません。** ★11 → 12 に増えています（★下限は下回っていません）。
+ */
+const CROSS_FAMILY_COUNT: Readonly<Record<string, number>> = { v4: 3, v5: 3, v6: 6 };
 
 describe('★カットの切替', () => {
   it('★★画角の系統が変わる切替は、重ねない（ハードカット）', () => {
@@ -70,9 +85,16 @@ describe('★カットの切替', () => {
     const same = transitions(DEFAULT_RACE_SCRIPT).filter((t) =>
       broadcastV2ShotById(t.from as never).view === broadcastV2ShotById(t.to as never).view);
     expect(same.length, '同じ画角の切替が 1 つも無い').toBeGreaterThan(0);
-    // 位置取りの三分割は横向きのまま切り替える。
-    expect(same[0]?.from).toBe('opening-side-lead');
-    expect(same[0]?.to).toBe('opening-formation');
+    /**
+     * ⚠️ ★**見る対を変えました**（★2026-09-11・★オーナー ③・★意図した変更です）。
+     *    ★以前は `opening-side-lead → opening-formation`（★どちらも真横）を見ていました。
+     *    ★位置取りを ★**高い引き**に替えたので、そこはハードカットになります。
+     *    ★真横のまま繋ぐ所として ★`opening-side-settle → side-drive` を見ます。
+     * ⚠️ ★順番（`same[0]`）ではなく ★**その対が在ること**で見ます。★台本の頭が動くたびに
+     *    ★落ちるテストは、★決定ではなく順番を留めているだけでした。
+     */
+    expect(same.map((t) => `${t.from}>${t.to}`))
+      .toContain('opening-side-settle>side-drive');
   });
 
   it('★閃光で入るのは勝負所と 4 角の正面', () => {

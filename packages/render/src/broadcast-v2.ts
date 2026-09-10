@@ -9,6 +9,10 @@ export type BroadcastV2ShotId =
   | 'homestretch-side' | 'finish-line' | 'winner-follow'
   // ★中継台本 v3（アーケード参考映像に合わせた追加ショット）
   | 'side-low' | 'side-close' | 'aerial' | 'side-drive' | 'fourth-corner-wide' | 'front-close'
+  /** ★4 角を ★**うんと引いて**一瞬だけ見せる（★2026-09-11・★オーナー ④・★参考映像に合わせた） */
+  | 'fourth-corner-far'
+  /** ★発走直後を ★**高い後方の引き**で（★2026-09-11・★オーナー ②・★参考映像に合わせた） */
+  | 'start-rear-far'
   | 'start-front' | 'winner-follow-rear'
   // ★直線の正面固定（差してくる馬を奥行きで見せる）
   | 'homestretch-front'
@@ -518,8 +522,25 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
     camera: { ...SIDE_TELE, upM: 7.5, fovDeg: 15 }, leadFraction: 0.66,
   },
   'opening-formation': {
-    id: 'opening-formation', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.2,
-    camera: { ...SIDE_TELE, upM: 8, fovDeg: 17 }, leadFraction: 0.60,
+    /**
+     * ★**最初の位置取りは「高い引き」で見せる**（★2026-09-11・★オーナー ③）
+     *
+     * 【★参考映像を全部見て分かったこと】
+     *   ★参考映像は ★**走行を真横と後方からしか撮りません**（★正面から走る馬は 1 コマも出ません）。
+     *   ★発走直後の位置取りは ★**高い後方の引き**で、★馬は画面高の ★**5% 前後**しかありません。
+     *   ★こちらは実測でどこでも ★**18〜28%**（★`measure-shot-horse-size.mjs`）。
+     *
+     * 【★なぜ引くと良くなるのか】
+     *   ★「位置取り」は ★**隊列の形**の情報です。★1 頭ずつの脚さばきは要りません。
+     *   ★大きく写すほど、★直せていない脚さばきが読めます
+     *   （★オーナー評「★真上のカメラワークにした瞬間 馬がぴょんぴょん跳ねている」＝★実測 25% 前後）。
+     *
+     * ⚠️ ★カットの数・境界・尺は変えていません。★**同じ枠の中身**が横 → 高い引きに替わっただけです。
+     * ⚠️ ★`fourth-corner-far` と角度を変えてあります（★あちらは低め・こちらは真上寄り）。
+     *    ★同じ絵を 2 回出すと「引き」そのものが飽きます。
+     */
+    id: 'opening-formation', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.2,
+    camera: { backM: 96, upM: 62, sideM: 30, fovDeg: 18.8 }, leadFraction: 0.60,
   },
   'opening-side-settle': {
     id: 'opening-side-settle', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
@@ -588,6 +609,49 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
     // ★4 角をラチのカーブごと広く（後方・高め）
     id: 'fourth-corner-wide', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.4,
     camera: { backM: 40, upM: 14, sideM: 13, fovDeg: 18.8 },
+  },
+  'start-rear-far': {
+    /**
+     * ★**発走直後の「高い後方の引き」**（★2026-09-11・★オーナー ②）
+     *
+     *   ★参考映像は発走の 0.2 秒後に ★**ここへハードカット**します。★馬は画面高の 5% 前後。
+     *   ★踏み出しも、正面から走る馬も、★**1 コマも映しません**。
+     * ⚠️ ★ゲートは `visualLead < 90` の間ずっと世界に置かれるので、
+     *    ★この引きの ★**奥に小さく残ります**（★参考映像と同じ見え方）。
+     * ⚠️ ★`fourth-corner-far` より ★**さらに引きます**（★距離 174m 相当・★見込み 6% 前後）。
+     *    ★見込みです。★採否は撮ってから決めます。
+     */
+    id: 'start-rear-far', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.3,
+    camera: { backM: 150, upM: 78, sideM: 40, fovDeg: 18.8 }, leadFraction: 0.58,
+  },
+  'fourth-corner-far': {
+    /**
+     * ★**4 角を「うんと引いて」一瞬だけ**（★2026-09-11・★オーナー ④）
+     *
+     * 【★なぜ引くのか】
+     *   ★オーナー評「★コーナーは今のところ 1 つも上手くいっていません」。
+     *   ★不合格の中身は ★**走り方**です（★斜め前・斜め後ろの脚さばき）。
+     *   ★参考映像を測ると、★あちらはコーナーと発走直後を ★**馬が画面高の 5% 前後**でしか
+     *   ★見せていません。★こちらは実測で ★**どこでも 18〜28%**（★`measure-shot-horse-size.mjs`）。
+     *   → ★**大きく写すほど、直せていない所が読めます。** ★引けば、隊列と走路の形だけが残ります。
+     *
+     * 【★どれだけ引くか】★馬の見かけの高さは ★カメラまでの距離に反比例します。
+     *   ★`fourth-corner-wide`（★backM 40 / upM 14 / sideM 13 ＝ 距離 44.2m）で ★**23.8%**（★実測）。
+     *   ★距離を 3 倍（★120 / 42 / 39 ＝ 132.6m）にすると ★**約 7.9%** の見込み。
+     *   ⚠️ ★見込みです。★採否は ★**撮ってから**決めます（★台帳「映像の真因はオーナー確認後」）。
+     *
+     * ⚠️ ★画角（`fovDeg`）は ★**広げていません**。★広角にすると走路が歪み、
+     *    ★コーナーの弧が「曲がって見えない」原因そのものを増やします。
+     */
+    /**
+     * ⚠️ ★**最初の据え位置（backM 120 / upM 42）は、引けてはいたが「コーナーに見えません」でした**
+     *    （★2026-09-11・★実測の絵で確認）。★走路の ★**奥に向かって**見るので、
+     *    ★画の中では ★**ほぼ直線**にしか映りませんでした。
+     * → ★**高さを上げ、外へ回します。** ★コーナーは ★**弧が見えて初めてコーナー**です。
+     *    ★距離はほぼ同じに保ってあるので、★馬の大きさ（★7〜8%）は変わりません。
+     */
+    id: 'fourth-corner-far', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.4,
+    camera: { backM: 70, upM: 105, sideM: 55, fovDeg: 18.8 },
   },
   'front-close': {
     // ★先頭争いを斜め前・寄りで（先頭の少し前・外側・低い、追従）
@@ -1093,8 +1157,17 @@ function v6BoundariesM(course: Course): readonly { readonly meters: number; read
   const b3 = b2 + rest * (7 / 20);
   /** ★直線より手前は、★**直線までの距離に対する割合**（上の錨②）。★割る相手が変わっただけです */
   // 直線寄りの前までを比例配分する。位置取りを3カットへ分けたので、ここも同じ終端まで含める。
-  const preRows = SCRIPT_V6.slice(0, 7);
-  const preSpan = SCRIPT_V6[6]!.until;
+  /**
+   * ⚠️ ★**行数を数えていた所を、★中身から引くように直しました**（★2026-09-11）。
+   *    ★以前は `SCRIPT_V6.slice(0, 7)` と `SCRIPT_V6[6]` と ★**7 という数を 2 回**書いていました。
+   *    ★台本の頭にカットを 1 つ足した日に、★**直線の手前が 1 つ切り落とされ**、
+   *    ★しかも `preSpan` が別の行を指して ★**全部の境界がずれます**（★静かに壊れる形）。
+   * → ★**直線のカットが始まる所**を名前で探し、そこまでを「手前」とします。
+   */
+  const STRAIGHT_IDS = new Set<BroadcastV2ShotId>(['straight-contest', 'straight-field', 'finish-line']);
+  const preCount = SCRIPT_V6.findIndex((row) => STRAIGHT_IDS.has(row.id));
+  const preRows = SCRIPT_V6.slice(0, preCount);
+  const preSpan = SCRIPT_V6[preCount - 1]!.until;
   const pre = preRows.map((row) => ({ meters: closeStart * (row.until / preSpan), id: row.id }));
   return [
     ...pre,
@@ -1373,7 +1446,26 @@ export const SCRIPT_V5: readonly { readonly until: number; readonly id: Broadcas
  * 固定画角を使い、隊列の伸縮でカット中の馬体サイズが揺れないようにする。
  */
 export const SCRIPT_V6: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
-  { until: 0.0625, id: 'start-front' },        // 〜100m   ★v5 と同一（案 A・飛び出しだけ）
+  /**
+   * ★**発走は「見せない」**（★2026-09-11・★オーナー ②・★参考映像を全部見て）
+   *
+   * 【★参考映像の実測（★93 秒・★480×1040）】
+   *   ★① ゲートの寄り（★低い正面）を ★**約 5 秒**
+   *   ★② ★**5.8 秒で、ゲートは空**（★馬はもう出ていて、★踏み出しは 1 コマも映らない）
+   *   ★③ ★**6.0 秒でハードカット** → ★高い後方の引き。★馬は画面高の ★**5% 前後**
+   *   ★★走行を正面から撮ったカットは ★**93 秒を通して 1 つもありません**。
+   *
+   * 【★こちらは何をしていたか】
+   *   ★`start-front`（★斜め前）が ★**100m ＝ 表示 4.5 秒**続いていました（★実測 18.6%）。
+   *   ★そこはオーナーが繰り返し不合格にしている ★**斜め前の走り**そのものです。
+   *
+   * 【★どう変えたか】★カットを ★**1 つ増やして**（★減らしていません）、参考映像の並びにします:
+   *   ★`start-front` … ゲート（★閉→開）＋ ★**空になったゲートの一拍**（★〜16m）
+   *   ★`start-rear-far` … ★高い後方の引き（★〜100m）
+   *   ★発走の瞬間そのものは ★**ロゴの 0.42 秒**が覆います（★画面側・`LOGO_CUTIN_SEC`）。
+   */
+  { until: 0.010, id: 'start-front' },         // 〜16m    ★ゲート＋「空になったゲート」の一拍
+  { until: 0.0625, id: 'start-rear-far' },     // 〜100m   ★高い後方の引き（★参考映像の発走直後）
   // 100〜528m は、横の走行 5秒相当 → 隊列図 2秒相当 → 横の走行 6秒相当に分ける。
   // 距離比なのでコースによって秒数は変わるが、既存の終端 0.330 と全体尺は変えない。
   { until: 0.165, id: 'opening-side-lead' },
@@ -1648,7 +1740,18 @@ export const FLASH_INTO: ReadonlySet<BroadcastV2ShotId> =
 
 export function broadcastV2ShotAt(
   course: Course, leaderMeters: number, allFinished = false, cornerCutM = CORNER_CUT_M,
-  options: { readonly fourthCornerFront?: boolean | undefined; readonly script?: BroadcastV2Script | undefined; readonly winnerRear?: boolean | undefined } = {},
+  options: {
+    readonly fourthCornerFront?: boolean | undefined;
+    /**
+     * ★**4 角のカットを何で撮るか**（★2026-09-11・★オーナー ④・★見比べ用）。
+     *   ★`'front'` … 従来（★奥から迫る正面固定）
+     *   ★`'wide'`  … 俯瞰ワイド（★`fourthCornerFront: false` と同じ）
+     *   ★`'far'`   … ★**うんと引く**（★参考映像の大きさに寄せた候補）
+     * ⚠️ ★未指定なら ★`fourthCornerFront` の従来どおりの判定に落ちます（★既定は変わりません）。
+     */
+    readonly cornerStyle?: 'front' | 'wide' | 'far' | undefined;
+    readonly script?: BroadcastV2Script | undefined; readonly winnerRear?: boolean | undefined;
+  } = {},
 ): BroadcastV2Shot {
   if (allFinished) return options.winnerRear === true ? SHOTS['winner-follow-rear'] : SHOTS['winner-follow'];
   const script = options.script ?? DEFAULT_RACE_SCRIPT;
@@ -1664,7 +1767,13 @@ export function broadcastV2ShotAt(
     for (const b of bounds) {
       if (meters < b.meters) {
         // 4 角の正面固定は正面寄り素材が無いときは俯瞰ワイドで代用
-        if (b.id === 'fourth-corner-front' && options.fourthCornerFront === false) return SHOTS['fourth-corner-wide'];
+        if (b.id === 'fourth-corner-front') {
+          /** ★明示された撮り方が最優先。★未指定なら従来の真偽値へ落ちる（★既定は不変） */
+          const style = options.cornerStyle
+            ?? (options.fourthCornerFront === false ? 'wide' : 'front');
+          if (style === 'far') return SHOTS['fourth-corner-far'];
+          if (style === 'wide') return SHOTS['fourth-corner-wide'];
+        }
         return SHOTS[b.id];
       }
     }

@@ -25,12 +25,14 @@ const fieldAt = (leadS: number, spread = 1): BroadcastV2Horse[] =>
   }));
 
 /** ★画面と同じ経路（`resolveBroadcastV2Scene`）を通して測る（R-30・式を作り直さない） */
-function frameAt(leadS: number, script: 'v5' | 'v6', spread = 1): {
+function frameAt(leadS: number, script: 'v5' | 'v6', spread = 1,
+  cornerStyle?: 'front' | 'wide' | 'far'): {
   shot: string; onScreen: number; leaderOnScreen: boolean; top4HeightRatio: number;
 } {
   const horses = fieldAt(leadS, spread);
   const scene = resolveBroadcastV2Scene(course, horses, VIEWPORT, false, {
     cornerCutM: 400, raceDisplaySec: 30, fourthCornerFront: true, script,
+    ...(cornerStyle === undefined ? {} : { cornerStyle }),
     ...(script === 'v6' ? { noContenderFrameShots: ['finish-line'] as const } : {}),
   });
   const basis = cameraBasis(scene.camera);
@@ -66,11 +68,58 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
      *    ★そこに寄りのカットを置くと**馬が毎秒 360px 後退して見えた**ためです（オーナー指摘②）。
      *    ★v5 は同じ区間を `homestretch-side`（引き・注視点＝馬群）で受けるので後退が出ず、動かしていません。
      */
-    expect(SCRIPT_V6.slice(0, 4).map((r) => [r.until, r.id])).toEqual([
-      [0.0625, 'start-front'], [0.165, 'opening-side-lead'],
+    /**
+     * ⚠️ ★**2026-09-11 に頭のカットを 1 つ足しました**（★オーナー ②・★意図した変更です）。
+     *    ★参考映像は発走の踏み出しを見せず、★空になったゲートの一拍のあと
+     *    ★**高い後方の引き**へハードカットします。★そこで `start-front`（★〜100m）を
+     *    ★`start-front`（★〜16m・ゲート）＋ `start-rear-far`（★〜100m・引き）へ割りました。
+     * ⚠️ ★**カットは減っていません（増えています）。** ★台帳「カット数は減らさない」は下限です。
+     * ★位置取り以降の終端（0.330）は ★**動かしていません**。
+     */
+    expect(SCRIPT_V6.slice(0, 5).map((r) => [r.until, r.id])).toEqual([
+      [0.010, 'start-front'], [0.0625, 'start-rear-far'], [0.165, 'opening-side-lead'],
       [0.206, 'opening-formation'], [0.330, 'opening-side-settle'],
     ]);
-    expect(SCRIPT_V6[3]?.until).toBe(SCRIPT_V5[1]?.until);
+    expect(SCRIPT_V6[4]?.until).toBe(SCRIPT_V5[1]?.until);
+  });
+
+  /**
+   * ★**引きのカットは、本当に引けているか**（★2026-09-11・★オーナー ②③④）
+   *
+   * 【★なぜ数で留めるか】
+   *   ★「引きにしました」は ★**カメラの数値を書き換えただけ**でも言えます。
+   *   ★`fourth-corner-wide` は ★引きのつもりの名前で、★実測 ★**23.8%**（＝真横とほぼ同じ）でした。
+   *   ★参考映像の発走直後・コーナーは ★**5% 前後**です。
+   * ⚠️ ★ここは ★**画面と同じ経路**（`resolveBroadcastV2Scene`）を通した幾何で見ます（★R-30）。
+   *    ★画素で測った値（`tools/measure-shot-horse-size.mjs`）とは規則が違うので一致はしません。
+   */
+  it('★発走直後・位置取り・コーナーは、真横の半分以下にしか描かない', () => {
+    const side = frameAt(700, 'v6');
+    expect(side.shot, '★比較の相手は真横の勝負所').toBe('side-drive');
+
+    const cases = [
+      { leadS: 50, shot: 'start-rear-far', style: undefined },
+      { leadS: 290, shot: 'opening-formation', style: undefined },
+      { leadS: 900, shot: 'fourth-corner-far', style: 'far' as const },
+    ];
+    for (const c of cases) {
+      const f = frameAt(c.leadS, 'v6', 1, c.style);
+      expect(f.shot, `${c.leadS}m`).toBe(c.shot);
+      expect(f.top4HeightRatio, `${c.shot}: 引けていない`)
+        .toBeLessThan(side.top4HeightRatio * 0.5);
+      /** ⚠️ ★引きすぎて ★**何も読めない**のも駄目です（★隊列の形は残すこと） */
+      expect(f.top4HeightRatio, `${c.shot}: 引きすぎ`).toBeGreaterThan(0.02);
+    }
+  });
+
+  /** ★4 角は 3 通りから選べ、★`far` がいちばん小さいこと（★既定は従来のまま） */
+  it('★4 角の撮り方は選べる（既定は従来の正面固定）', () => {
+    expect(frameAt(900, 'v6').shot).toBe('fourth-corner-front');
+    expect(frameAt(900, 'v6', 1, 'front').shot).toBe('fourth-corner-front');
+    expect(frameAt(900, 'v6', 1, 'wide').shot).toBe('fourth-corner-wide');
+    expect(frameAt(900, 'v6', 1, 'far').shot).toBe('fourth-corner-far');
+    expect(frameAt(900, 'v6', 1, 'far').top4HeightRatio)
+      .toBeLessThan(frameAt(900, 'v6', 1, 'wide').top4HeightRatio);
   });
 
   it('★v5 の直線は 1 カット、v6 は 4 カット', () => {
@@ -78,7 +127,8 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
       rows.filter((r) => r.until > from).map((r) => r.id);
     expect(straight(SCRIPT_V5, 0.604)).toEqual(['homestretch-side', 'finish-line']);
     expect(straight(SCRIPT_V6, 0.750)).toEqual(['straight-contest', 'straight-field', 'straight-contest', 'finish-line']);
-    expect(SCRIPT_V6.map(r => r.until)).toEqual([0.0625, 0.165, 0.206, 0.33, 0.54, 0.604, 0.75, 0.82, 0.87, 0.94, 1]);
+    /** ⚠️ ★頭に `start-rear-far`（0.0625）が入りました（★2026-09-11・★オーナー ②） */
+    expect(SCRIPT_V6.map(r => r.until)).toEqual([0.010, 0.0625, 0.165, 0.206, 0.33, 0.54, 0.604, 0.75, 0.82, 0.87, 0.94, 1]);
   });
 
   // カットを削らず、既存の80mを横の引きに置き換える。
