@@ -604,11 +604,24 @@ const TELOP = {
 } as const;
 
 const TELOP_BAND = '#16202a';
-const TELOP_BAND_ALPHA = 0.94;
+/**
+ * ★帯の濃さ。
+ *
+ * ⚠️ ★**ハンドオフの指定は 0.94（ほぼ不透明）**でした。★読みやすさを優先した値です。
+ *    ★オーナー評「★後ろが半透明になるはず」。★実際 0.94 では ★**透けて見えません**。
+ * ★3 段（0.94 / 0.80 / 0.62）を撮って見比べ、★**0.80** を既定にしました:
+ *    ★0.94 … 馬の影がうっすら分かる程度。★「半透明」には見えない
+ *    ★0.80 … 馬が帯越しにはっきり見える。★文字はまだ読める ← ★これ
+ *    ★0.62 … 芝の明暗と文字が competing し、★位置バーの点が紛れ始める
+ * ⚠️ ★**ハンドオフからの逸脱です。** ★`?telop=0.94` で指定どおりに戻せます。
+ */
+export const RACE_TELOP_BAND_ALPHA_DEFAULT = 0.80;
 const TELOP_OWN = '#f5d56d';
 
 export interface RaceTelopFrame {
   readonly viewport: { readonly width: number; readonly height: number };
+  /** ★帯の濃さ（★未指定は `RACE_TELOP_BAND_ALPHA_DEFAULT`） */
+  readonly bandAlpha?: number | undefined;
   /** ★この画が出てからの秒 */
   readonly sinceSec: number;
   /** ★全体の尺（秒） */
@@ -663,7 +676,7 @@ export function drawRaceTelopBand<TImage>(
   const prev = ctx.globalAlpha;
 
   /** ★① 帯 */
-  ctx.globalAlpha = prev * TELOP_BAND_ALPHA;
+  ctx.globalAlpha = prev * (f.bandAlpha ?? RACE_TELOP_BAND_ALPHA_DEFAULT);
   ctx.fillStyle = TELOP_BAND;
   ctx.fillRect(0, bandY, W, bandH);
   ctx.globalAlpha = prev;

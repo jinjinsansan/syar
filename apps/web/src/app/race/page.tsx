@@ -171,6 +171,15 @@ const HONOUR_DECLARED_ASSET = typeof window !== 'undefined'
  */
 const CUTIN_FULLSCREEN = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('cutin') === 'full';
+/**
+ * ★**テロップの帯の濃さ**（★`?telop=0.8` のように指定・★2026-09-11・★見比べ用）。
+ * ⚠️ ★未指定はハンドオフの指定（0.94）。★薄くするほど文字が読みにくくなります。
+ */
+const TELOP_ALPHA: number | undefined = (() => {
+  if (typeof window === 'undefined') return undefined;
+  const v = Number(new URLSearchParams(window.location.search).get('telop'));
+  return Number.isFinite(v) && v > 0 && v <= 1 ? v : undefined;
+})();
 const CUTIN_OFF = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('cutin') === 'off';
 const SIDE_ONLY = typeof window !== 'undefined'
@@ -3652,6 +3661,7 @@ export default function RacePage(): React.JSX.Element {
           sinceSec: frame.sinceSec,
           durationSec: RACE_TELOP_SEC,
           label: frame.label,
+          ...(TELOP_ALPHA === undefined ? {} : { bandAlpha: TELOP_ALPHA }),
         };
         /**
          * ⚠️ ★**テロップは世界を描いたあとに重ねます。** ★ここでは描かず、関数に包んで

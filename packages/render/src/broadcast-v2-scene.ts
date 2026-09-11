@@ -852,8 +852,8 @@ export function drawBroadcastV2Scene<TImage>(
      *    ★以前はここで閾値だけから作り直しており、★`honourDeclaredAsset` を渡しても
      *    ★診断は古い答えを返していました（★絵は変わっているのに「変わっていない」と報告）。
      */
-    /** ⚠️ ★描画と同じ規則（★俯瞰のカットは宣言に従う・★上の `overhead` と同じ） */
-    const declared2 = (opts.honourDeclaredAsset === true || scene.shot.view === 'high-diag')
+    /** ⚠️ ★描画と同じ規則（★上の `declared` と同じ・★片方だけ直さない・R-30） */
+    const declared2 = opts.honourDeclaredAsset === true
       ? (scene.shot.horseAsset as BroadcastV2HorseAssetRole | undefined) : undefined;
     const assetKey = declared2 !== undefined && opts.libraries[declared2] !== undefined
       ? declared2
@@ -923,8 +923,20 @@ export function drawBroadcastV2Scene<TImage>(
        * → ★カットが ★`view: 'high-diag'` と言っているなら、★**その宣言に従います**。
        * ⚠️ ★真横・斜め前のカットの選び方は ★**1 ビットも変えていません**（★角の閾値のまま）。
        */
-      const overhead = scene.shot.view === 'high-diag';
-      const declared = (opts.honourDeclaredAsset === true || overhead)
+      /**
+       * ⚠️ ★**取り下げました**（★2026-09-11・★オーナー指摘「★急にリアル 2D の馬が出る」）。
+       *
+       *   ★「目が見える」を直すために、★俯瞰のカットで宣言どおり `high-diag-v2` を
+       *   ★使うようにしました。★向きは合いましたが、★**絵柄が壊れました**。
+       *   ★俯瞰の素材（`horse-jockey-high-diag-v4`）は ★**写実タッチ**で、
+       *   ★他のカットのデフォルメ馬と ★**別の絵柄**です。★レースの途中で画風が変わります。
+       *   ★台帳にも同じ記録がありました（★「方向別 8 コマは真横 v6 と釣り合わず、混在は破綻と評価」）。
+       *   ★私はそれを読んでいたのに、★**絵を見る前に結線して**しまいました。
+       *
+       * → ★**素材が揃うまでは真横のまま**にします。★向きの不一致は残りますが、
+       *   ★画風が変わるよりは小さい害です。★`?asset=declared` で見比べられます。
+       */
+      const declared = opts.honourDeclaredAsset === true
         ? (scene.shot.horseAsset as BroadcastV2HorseAssetRole | undefined) : undefined;
       const key: BroadcastV2HorseAssetRole = declared !== undefined
         && opts.libraries[declared] !== undefined
