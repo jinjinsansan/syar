@@ -609,7 +609,8 @@ export function drawBroadcastV2Scene<TImage>(
     readonly startingGate?: Omit<StartingGateWorldOptions, 'focusS'> | undefined;
     /**
      * ★**馬の絵を走路の向きに合わせて回す**（★2026-09-11・★オーナー「芝に対して馬が斜め前を向いている」）。
-     * ⚠️ ★既定（未指定）では 1 度も回しません。
+     * ⚠️ ★未指定なら `DEFAULT_ALIGN_TO_TRACK`（★2026-09-11 から ★**回す**）。
+     *    ★渡す側が既定を持たないこと（★画面と道具で違う既定にしない・R-31）。
      */
     readonly alignToTrack?: boolean | undefined;
     /** ★芝の縞刈り（設計 1-3）。既定で描く。`false` で止める（素材の比較用） */
@@ -891,7 +892,7 @@ export function drawBroadcastV2Scene<TImage>(
   }
   drawPerspectiveHorses(ctx, course, scene.camera, scene.visibleHorses, {
     ...library,
-    /** ★馬の絵を走路の向きに合わせて回すか（★既定は回さない） */
+    /** ★馬の絵を走路の向きに合わせて回すか（★未指定は `DEFAULT_ALIGN_TO_TRACK`＝回す） */
     ...(opts.alignToTrack === undefined ? {} : { alignToTrack: opts.alignToTrack }),
     frameSetOf: directional ? (horse) => {
       /**

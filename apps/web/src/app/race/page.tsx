@@ -57,7 +57,7 @@ import {
   cameraBasis, project, HORSE_HEIGHT_M, setHorseScale,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
-  drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
+  drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   isSkinTone,
   typedCount,
   raceCallAt, raceSurgeGate, RACE_SURGE_WINDOW_SEC,
@@ -649,10 +649,33 @@ const GATE_BILLBOARD = false;
  *   ★オーナー評（★4 角）「★芝に対して ★**馬が斜め前を向いている**」。
  *   ★馬の絵は画面に対してまっすぐ立つ板で、★回りません。★直線はカメラで解けますが、
  *   ★**コーナーは走路が曲がっている**ので、どう構えても弧のどこかで必ずずれます。
- * ⚠️ ★既定は ★**回しません**。★`?tilt=track` を付けたときだけ回ります。
+ * ★**2026-09-11・オーナー判定「回したほうがまだマシ」で、★既定を「回す」にしました。**
+ *   ★測った値: 4 角で馬と芝の目の交差角が ★**52° → 80.5°**（★90° が直交）。
+ *   ⚠️ ★**合格ではなく「まだマシ」**です。★デフォルメの俯瞰素材という残件は動いていません。
+ * ⚠️ ★戻し口は ★`?tilt=off`。★既定値は `DEFAULT_ALIGN_TO_TRACK`（★render 側・R-31）。
+ * ⚠️ ★直線では接線がほぼ 0 なので ★**1 画素も動きません**。★動くのは弧の上だけです。
  */
-const ALIGN_TO_TRACK = typeof window !== 'undefined'
-  && new URLSearchParams(window.location.search).get('tilt') === 'track';
+const ALIGN_TO_TRACK = ((): boolean => {
+  if (typeof window === 'undefined') return DEFAULT_ALIGN_TO_TRACK;
+  const v = new URLSearchParams(window.location.search).get('tilt');
+  if (v === 'off') return false;
+  if (v === 'track') return true;
+  return DEFAULT_ALIGN_TO_TRACK;
+})();
+/**
+ * ★**地面タイルの「焼き込まれた横縞」を平したものを使う**（★2026-09-11・★見比べ用 `?grain=flat`）。
+ *
+ *   ★オーナー評「★芝の目は ★**馬が走る方向と垂直**に、逆方向へ動かないといけない。
+ *   ★しかし ★**水平**に動いている」。
+ *   ⚠️ ★実測: 芝の目は ★**2 系統**。★① `mow-stripes.ts` は走路を横切る（★向きは正しい）。
+ *      ★② 地面タイル `world-turf.png` に ★**横縞が焼き込まれている**（★向き 0°・振れ幅 28.9 階調）。
+ *      ★タイルは ★**カメラの軸**に貼るので（★`world-textured.ts`）、★② は走路がどちらを向いても
+ *      ★**常に画面の水平**＝馬の進む向きと平行に走ります。
+ * → ★`?grain=flat` で ★**② を平したタイル**（`tools/bake-turf-flat.mjs` が作る）に差し替えます。
+ * ⚠️ ★既定は変えていません。★元のタイルも消していません。
+ */
+const TURF_GRAIN_FLAT = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('grain') === 'flat';
 const HORSE_NAMES = ['スターライト', 'サクラブリーズ', 'ハンシンドリーム', 'ミライノツバサ', 'グリーンアロー', 'オウカノキセキ', 'ナニワスピリット', 'ローズクイーン', 'ムラサキノホシ', 'アオバハヤテ', 'ブラウンエース', 'ピンクレディ'] as const;
 /**
  * ★**画面上の順位**（★2026-09-11・★カットインと順位表で 1 つの規則にする）。
@@ -1938,7 +1961,11 @@ export default function RacePage(): React.JSX.Element {
       const objectImages = await Promise.all(parallaxManifest.objects.map((object) =>
         loadImg(`/art/parallax/backstretch-side-v1/${object.file}?v=${ASSET_VERSION}`)));
       const [worldTurfImg, worldPanoImg, worldTreesImg, worldDirtImg] = await Promise.all([
-        loadImg(`/art/parallax/backstretch-side-v1/${parallaxManifest.world.turf.file}?v=${ASSET_VERSION}`),
+        /** ⚠️ ★`?grain=flat` のときだけ平したタイル。★読めなければ元のタイルへ落ちます（★R-27） */
+        (TURF_GRAIN_FLAT
+          ? loadImg(`/art/parallax/backstretch-side-v1/world-turf-flat.png?v=${ASSET_VERSION}`)
+            .catch(() => loadImg(`/art/parallax/backstretch-side-v1/${parallaxManifest.world.turf.file}?v=${ASSET_VERSION}`))
+          : loadImg(`/art/parallax/backstretch-side-v1/${parallaxManifest.world.turf.file}?v=${ASSET_VERSION}`)),
         loadImg(`/art/parallax/backstretch-side-v1/${parallaxManifest.world.panorama.file}?v=${ASSET_VERSION}`),
         parallaxManifest.world.trees !== undefined
           ? loadImg(`/art/parallax/backstretch-side-v1/${parallaxManifest.world.trees.file}?v=${ASSET_VERSION}`).catch(() => null)

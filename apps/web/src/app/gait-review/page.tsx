@@ -77,17 +77,51 @@ export default function GaitReviewPage(): React.ReactElement {
           </details>
         </section>
 
-        <section style={{ ...card, border: '2px solid #ffd34d', background: '#1d1c15' }}>
-          <h2 style={{ ...h2, fontSize: 19 }}>判断 ②　4 コーナーで馬を回すか</h2>
+        <section style={{ ...card, border: '1px solid #2f6f86', background: '#13202a' }}>
+          <h2 style={{ ...h2, fontSize: 17 }}>（判定済み・実装しました）4 コーナーは「回す」</h2>
           <p style={{ ...note, fontSize: 15, color: '#eef2f6', margin: '0 0 10px' }}>
-            ★下の動画は ★<b>左＝回さない（いまの既定）／右＝回した</b>です。★どちらがよいか教えてください。
+            ★オーナー判定「★<b>回した がまだマシ</b>」（★2026-09-11）。★<b>既定を「回す」にしました。</b>
+            ★戻し口は <code>?tilt=off</code>。<br />
+            ★下は ★<b>上＝回さない（<code>?tilt=off</code>・前の既定）／下＝回した（いまの既定）</b>です。
           </p>
-          <Pair base="corner-tilt" />
+          <p style={{ ...note, margin: '0 0 10px', color: '#9fd6a0' }}>
+            ★測った値（★馬と芝の目がなす角・★90° が「馬の真横を芝の目が横切る」）:
+            ★4 コーナー ★<b>52° → 80.5°</b>。★道中の真横は接線 0° なので ★<b>1 画素も動きません</b>。
+          </p>
+          <img src="/gait-review/corner-tilt2-still.png" alt="回さない／回した（寄りの止め絵）" style={media} />
+          <p style={{ ...note, margin: '8px 0 0' }}>
+            ⚠️ ★上の 1 枚は ★<b>馬のところを切り出して 2 倍</b>にしています（★ドットは伸ばさず素のまま）。
+            ★実際の画面では ★<b>この半分の大きさ</b>です。★それが下の 1 枚と動画です。
+          </p>
+          <div style={{ height: 14 }} />
+          <img src="/gait-review/corner-tilt2-wide.png" alt="回さない／回した（画面まるごと）" style={media} />
+          <div style={{ height: 14 }} />
+          <Pair base="corner-tilt2" />
+          <p style={{ ...note, margin: '10px 0 0', color: '#e8c86a' }}>
+            ⚠️ ★<b>前に出した見比べは取り下げました。</b>★3 面あるのに説明は 2 面で、★ラベルも無く、
+            ★<b>2 面が写実タッチの俯瞰素材</b>（★同じ日に取り下げ済みのもの）で描かれていました。<br />
+            ★撮り直したこの 2 面は、★シード 42・★同じ 37.0〜39.9 秒・★同じカット（<code>fourth-corner-far</code>）・
+            ★同じデフォルメ素材（<code>side-v6</code>）で、★<b>変えたのは回すかどうかだけ</b>です
+            （★撮り直しの道具 <code>tools/capture-tilt-compare.mjs</code> が、★出す前にこの 4 点を自分で確かめます）。
+          </p>
           <p style={{ ...note, margin: '12px 0 0' }}>
             ★馬の絵は ★<b>画面に対してまっすぐ立つ板</b>で、★回りません。★コーナーは走路が曲がるので、
-            ★どう構えても向きがずれます。→ ★絵のほうを走路の接線に合わせて回す実験です。<br />
-            ★傾きは最大 25 度ほど。★<b>「回す／回さない／半分だけ」</b>のどれかで結構です。
+            ★どう構えても向きがずれます。→ ★絵のほうを走路の接線に合わせて回しています（★最大 25 度ほど）。<br />
+            ⚠️ ★<b>これは「合格」ではなく「まだマシ」です。</b>★デフォルメの俯瞰素材が要るという
+            ★残件は動いていません。
           </p>
+          <details style={{ marginTop: 10 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★芝の目を調べた記録（★案 A は効きませんでした）</summary>
+            <p style={{ ...note, margin: '8px 0 0' }}>
+              ★オーナー指摘「★芝の目が ★<b>馬の走る方向と水平</b>に動いている」。★芝の目は ★<b>2 系統</b>ありました。<br />
+              ★① <code>mow-stripes.ts</code> … 走路を横切る 10m の帯（★向きは正しい）。
+              ★② 地面タイル <code>world-turf.png</code> … ★<b>横縞が焼き込まれている</b>（★向き 0°・振れ幅 28.9 階調）。
+              ★タイルは ★<b>カメラの軸</b>に貼るので、★② は走路と無関係に画面の水平へ走ります。<br />
+              ★そこで ★<b>②を平したタイル</b>を作って当てました（<code>?grain=flat</code>）。
+              ⚠️ ★結果は ★<b>平均 1.88 階調（255 中）しか変わらず、芝の目の向きは 57° のまま</b>。
+              ★画面を支配していたのは①のほうでした。★<b>案 A は効きません。</b>★既定は変えていません。
+            </p>
+          </details>
           <details style={{ marginTop: 10 }}>
             <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★「目が見える」の件は、いま直せません（理由）</summary>
             <p style={{ ...note, margin: '8px 0 0', color: '#e8c86a' }}>
