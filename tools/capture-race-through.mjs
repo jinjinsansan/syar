@@ -169,7 +169,14 @@ try {
       console.log(`★コマの大きさ ${probe.width}x${probe.height}（★狙い ${outW}px 幅）`);
       if (probe.width !== outW) throw new Error(`★コマの幅が ${probe.width} です。★${outW} になりません`);
     }
-    const shot = r.diag?.shot ?? '（導入）';
+    /**
+     * ⚠️ ★区間に分けて撮ると、★**各区間の 1 コマ目だけ診断が空**になることがあります
+     *    （★読み込み直後は `__raceDiag` がまだ書かれていない）。★そのまま表にすると
+     *    ★**0.0 秒の「導入」**という在りもしないカットが並びます（★実測 2 件）。
+     * → ★発走前（★導入の尺）より後なら、★**直前のコマのカット名を引き継ぎます**。
+     */
+    const prevShot = rows.length === 0 ? null : rows[rows.length - 1].shot;
+    const shot = r.diag?.shot ?? (sec > 6 && prevShot !== null ? prevShot : '（導入）');
     const cutIn = r.diag?.cutIn ?? null;
     rows.push({ sec, shot, cutIn });
     if (i % 100 === 0) writeFileSync(rowsPath, JSON.stringify(rows));

@@ -52,13 +52,13 @@ export default function GaitReviewPage(): React.ReactElement {
           <h2 style={{ ...h2, fontSize: 19 }}>通し 1 本（第 1 版）　★これを見てください</h2>
           <p style={{ ...note, fontSize: 15, color: '#eef2f6', margin: '0 0 10px' }}>
             ★発走前から結果まで ★<b>86 秒・16 カット</b>を 1 本にしました（★シード 42・★画面の既定のまま）。
-            ★<b>2 倍で描いて 1920px で出しています</b>（★引き伸ばしを無くすため）。<br />
+            ★画面と ★<b>同じ 1280×720 のまま</b>（★引き伸ばしも縮小もしていません）。<br />
             ★<b>おかしいと思った秒だけ</b>教えてください（★「0:23 のここ」で結構です）。
             ★映像の ★<b>左上に時刻とカット名</b>が出ます。★絵の上には何も描いていません。
           </p>
           {/* ⚠️ ★`?v=` を上げること。★上げないと、★ブラウザが**古い映像を出し続けます**
               （★2026-09-12・★暗い導入が h264 で潰れていたのを作り直した） */}
-          <video src="/gait-review/race-through.mp4?v=3" style={media} controls loop playsInline />
+          <video src="/gait-review/race-through.mp4?v=4" style={media} controls loop playsInline />
           <details style={{ marginTop: 10 }}>
             <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★何秒がどのカットか（16 カット）</summary>
             <table style={{ ...note, borderCollapse: 'collapse', marginTop: 8, fontSize: 12.5 }}>
