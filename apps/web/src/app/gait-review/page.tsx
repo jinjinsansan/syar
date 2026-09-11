@@ -40,111 +40,83 @@ export default function GaitReviewPage(): React.ReactElement {
     <main style={wrap}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <h1 style={{ fontSize: 21, margin: '0 0 4px' }}>走りの見比べ台（★開発専用）</h1>
+        <p style={{ ...note, fontSize: 15, color: '#eef2f6' }}>
+          ★<b>今日 判断していただきたいのは、下の 2 つだけです。</b>
+          ★その下は ★<b>畳んであります</b>（★これまでの観察の記録・判断は要りません）。
+        </p>
         <p style={note}>
-          ★これは <b>観察のための頁</b>です。★どれかが「正しい」という判定ではありません。<br />
           ★<b>主観の評価は等速を先に</b>見てください。★0.25 倍は姿勢と接地を確かめるためのものです。
         </p>
 
         <section style={{ ...card, border: '2px solid #4dd2ff', background: '#14212a' }}>
-          <h2 style={h2}>★カットインを「テロップ」に変えました（★デザイナーのハンドオフ C 案）</h2>
-          <p style={note}>
-            ★<b>レース映像を止めず、隠しません。</b>★画面下部の高さ 104px の帯だけが
-            ★下から滑り出て、★1.0 秒保持し、★下へ戻ります。<br />
-            ★デザイナーの指摘がそのまま正しい内容でした ── ★この案件は
-            ★「★カットの切り替わりで別のレースに見える」と長く戦ってきたのに、
-            ★<b>従来のカットイン自身が 1.2 秒 × 4 回、画面全体を覆って新しい継ぎ目を作っていました</b>。
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {([
-              ['telop-a-own', 'A 発走直後 — あなたの馬'],
-              ['telop-b-formation', 'B 位置取り — 現在の隊列（★横 1 本の位置バー）'],
-              ['telop-c-style', 'C 4 角入り — ここから動く馬（★2 頭まで）'],
-              ['telop-d-straight', 'D 直線へ — 番手と差'],
-            ] as const).map(([id, label]) => (
-              <div key={id}>
-                <p style={{ ...note, margin: '0 0 4px', color: '#eef2f6' }}><b>{label}</b></p>
-                <img src={`/gait-review/${id}.jpg`} alt={label} style={media} />
-              </div>
-            ))}
-          </div>
-          <p style={{ ...note, margin: '12px 0 0' }}>
-            ⚠️ ★<b>帯の濃さをハンドオフの指定から変えました</b>（★オーナー評「後ろが半透明になるはず」）。
-            ★指定は ★<b>0.94（ほぼ不透明）</b>で、★実際 ★<b>透けて見えません</b>でした。
-            ★3 段を撮って見比べ、★<b>0.80</b> を既定にしています。
-            ★<code>?telop=0.94</code> で指定どおりに戻せます。
+          <h2 style={{ ...h2, fontSize: 19 }}>判断 ①　カットインの帯の濃さ</h2>
+          <p style={{ ...note, fontSize: 15, color: '#eef2f6', margin: '0 0 10px' }}>
+            ★下の 3 段を見て、★<b>どれがよいか</b>だけ教えてください。
           </p>
           <img src="/gait-review/telop-alpha.jpg" alt="帯の濃さ 3 段" style={media} />
-          <p style={{ ...note, margin: '10px 0 0' }}>
-            ★<b>デザイナーからの確認事項が 2 つあります。</b><br />
-            ★① ★<b>背景の不透明さ</b>。★元の要求は「背景は不透明」でしたが、
-            ★この案では帯の外（画面の 86%）は常に映像が見えています。<br />
-            ★② ★<b>C（動く馬）の頭数</b>。★元は 4 頭でしたが、★帯の高さでは ★<b>2 頭</b>が限度です。<br />
-            ⚠️ ★<b>B は 2D の散布図をやめ、★横 1 本の位置バー</b>に変えています。
-            ★D は ★<b>コース図を乗せていません</b>（★帯の高さでは読めないため）。<br />
-            ★従来の全画面版は ★<code>?cutin=full</code> で見られます（★消していません）。
+          <ul style={{ ...note, margin: '10px 0 0', paddingLeft: 20 }}>
+            <li>★上 ★<b>0.94</b> … デザイナーの指定。★後ろが ★<b>透けません</b></li>
+            <li>★中 ★<b>0.80</b> … ★<b>いまの既定</b>。★馬が帯越しに見えて、文字も読める</li>
+            <li>★下 ★<b>0.62</b> … よく透けるが、★文字と点が芝に紛れ始める</li>
+          </ul>
+          <p style={{ ...note, margin: '12px 0 0' }}>
+            ★カットインは ★<b>全画面をやめて、画面下の帯だけ</b>になりました（★デザイナーの C 案）。
+            ★レース映像は ★<b>止まりません・隠れません</b>。
           </p>
+          <details style={{ marginTop: 10 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★4 枚が実際に出ているところを見る</summary>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
+              {([
+                ['telop-a-own', 'A 発走直後 — あなたの馬'],
+                ['telop-b-formation', 'B 位置取り — 現在の隊列'],
+                ['telop-c-style', 'C 4 角入り — ここから動く馬'],
+                ['telop-d-straight', 'D 直線へ — 番手と差'],
+              ] as const).map(([id, label]) => (
+                <div key={id}>
+                  <p style={{ ...note, margin: '0 0 4px', color: '#eef2f6' }}><b>{label}</b></p>
+                  <img src={`/gait-review/${id}.jpg`} alt={label} style={media} />
+                </div>
+              ))}
+            </div>
+            <p style={{ ...note, margin: '10px 0 0' }}>
+              ⚠️ ★デザイナーからの確認事項 2 つ: ★① 背景は画面の 86% が常に見えます（★元の「不透明」から変更）。
+              ★② C は帯の高さの都合で ★<b>2 頭まで</b>（★元は 4 頭）。<br />
+              ★従来の全画面版は <code>?cutin=full</code> で見られます。
+            </p>
+          </details>
         </section>
 
         <section style={{ ...card, border: '2px solid #ffd34d', background: '#1d1c15' }}>
-          <h2 style={h2}>★（判断待ち）4 コーナーの馬の回転 — ★★俯瞰素材への差し替えは取り下げました</h2>
-          <p style={{ ...note, color: '#e8c86a' }}>
-            ⚠️ ★<b>「目が見える」を直すために俯瞰の素材へ差し替えたのは、取り下げました。</b>
-            ★オーナー評「★急にリアル 2D の馬の真上のカメラワークが出ます」。<br />
-            ★俯瞰の素材（<code>horse-jockey-high-diag-v4</code>）は ★<b>写実タッチ</b>で、
-            ★他のカットのデフォルメ馬と ★<b>別の絵柄</b>でした。★向きは合いましたが、
-            ★レースの途中で画風が変わります。<br />
-            ★台帳にも同じ記録がありました（★「方向別 8 コマは真横と釣り合わず、混在は破綻と評価」）。
-            ★<b>読んでいたのに、絵を見る前に結線しました。</b><br />
-            → ★素材が揃うまでは真横のままにします。★向きの不一致は残ります。
-            ★<code>?asset=declared</code> で見比べられます。
+          <h2 style={{ ...h2, fontSize: 19 }}>判断 ②　4 コーナーで馬を回すか</h2>
+          <p style={{ ...note, fontSize: 15, color: '#eef2f6', margin: '0 0 10px' }}>
+            ★下の動画は ★<b>左＝回さない（いまの既定）／右＝回した</b>です。★どちらがよいか教えてください。
           </p>
-          <img src="/gait-review/corner-reverted.jpg" alt="戻した 4 コーナー" style={media} />
-          <p style={note}>
-            ★オーナー評「★上からのカメラワークなのに、★<b>本来見えないはずの目が見えている</b>。★顔の角度が違う」。<br />
-            ★<b>原因が割れました。★素材の問題ではありませんでした。</b><br />
-            ⚠️ ★4 コーナーで実際に描いていたのは ★<b>真横の絵（side-v6）</b>でした。
-            ★カット角が ★<b>60.2°</b> で、★後方素材の閾値（60° 未満）を ★<b>わずかに外れて</b>いたためです。
-            ★横から描いた絵を上から見せていたので、★顔が横を向いて目が見えていました。<br />
-            ★俯瞰の素材（<code>horse-jockey-high-diag-v4</code>）は
-            ★<b>背中と後頭部が見える正しい絵</b>で、★台本はそれを ★<b>読み込んでもいました</b>。
-            ★選ばれていなかっただけです。<br />
-            → ★カットが「俯瞰」と言っているなら ★<b>その宣言に従う</b>ようにしました。
-          </p>
-          <div style={{ display: 'flex', gap: 18, fontSize: 13, margin: '0 0 10px', flexWrap: 'wrap' }}>
-            {([
-              ['#ff6b6b', '左上', '前（真横の絵・回転なし）★目が見えていた'],
-              ['#6bb8ff', '右上', '★俯瞰の絵にした（回転なし）'],
-              ['#ffd34d', '左下', '★俯瞰の絵＋走路の接線に回す'],
-            ] as const).map(([c, pos, name]) => (
-              <span key={pos} style={{ color: '#9fb4c6' }}>
-                <span style={{ display: 'inline-block', width: 26, height: 8, background: c, marginRight: 8, verticalAlign: 'middle' }} />
-                <b style={{ color: '#eef2f6' }}>{pos}</b> {name}
-              </span>
-            ))}
-          </div>
           <Pair base="corner-tilt" />
-          <details style={{ marginTop: 10 }}>
-            <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★止め絵で大きく見る（★同じ瞬間）</summary>
-            <p style={{ ...note, margin: '8px 0 4px' }}>★↓ 今まで（回らない）</p>
-            <img src="/gait-review/corner-tilt-off.jpg" alt="回さない" style={media} />
-            <p style={{ ...note, margin: '8px 0 4px' }}>★↓ 回した</p>
-            <img src="/gait-review/corner-tilt-on.jpg" alt="回した" style={media} />
-          </details>
-          <details style={{ marginTop: 10 }}>
-            <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★俯瞰の絵を大きく見る</summary>
-            <img src="/gait-review/corner-overhead-sprite.jpg" alt="俯瞰の絵" style={{ ...media, marginTop: 8 }} />
-          </details>
           <p style={{ ...note, margin: '12px 0 0' }}>
-            ★<b>見どころ</b>: ★右上と左下で ★<b>目が見えなくなっている</b>こと。
-            ★そして ★<b>回転（左下）は要るか要らないか</b>。<br />
-            ⚠️ ★<b>俯瞰の絵に替えたのは既定です</b>（★カットの宣言に従っただけなので、直しに当たります）。<br />
-            ⚠️ ★<b>回転はまだ既定ではありません</b>。★<code>?tilt=track</code> を付けたときだけです。
-            ★傾きは最大 25 度ほどで、★坂を駆け上がっているようにも見えます。<br />
-            ★<b>「回す／回さない／半分だけ回す」</b>を教えてください。
+            ★馬の絵は ★<b>画面に対してまっすぐ立つ板</b>で、★回りません。★コーナーは走路が曲がるので、
+            ★どう構えても向きがずれます。→ ★絵のほうを走路の接線に合わせて回す実験です。<br />
+            ★傾きは最大 25 度ほど。★<b>「回す／回さない／半分だけ」</b>のどれかで結構です。
           </p>
+          <details style={{ marginTop: 10 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★「目が見える」の件は、いま直せません（理由）</summary>
+            <p style={{ ...note, margin: '8px 0 0', color: '#e8c86a' }}>
+              ⚠️ ★俯瞰の素材へ差し替える直しは ★<b>取り下げました</b>。
+              ★オーナー評「★急にリアル 2D の馬の真上のカメラワークが出ます」。<br />
+              ★俯瞰の素材（<code>horse-jockey-high-diag-v4</code>）は ★<b>写実タッチ</b>で、
+              ★他のカットのデフォルメ馬と ★<b>別の絵柄</b>でした。★レースの途中で画風が変わります。<br />
+              ★台帳にも同じ記録がありました。★<b>読んでいたのに、絵を見る前に結線しました。</b><br />
+              → ★デフォルメの俯瞰素材が要ります。★それまでは真横のままです。
+            </p>
+            <img src="/gait-review/corner-reverted.jpg" alt="戻した 4 コーナー" style={{ ...media, marginTop: 8 }} />
+          </details>
         </section>
 
-        <section style={{ ...card, border: '1px solid #7a6a2a', background: '#1d1c15' }}>
+        <details style={{ ...card, background: '#12171c' }}>
+          <summary style={{ cursor: 'pointer', fontSize: 15, color: '#9fb4c6', fontWeight: 700 }}>
+            ★これまでの観察と判定済みの記録（★判断は要りません・クリックで開く）
+          </summary>
+
+        <section style={{ ...card, border: '1px solid #7a6a2a', background: '#1d1c15', marginTop: 14 }}>
           <h2 style={h2}>★（判定済み）4 コーナーの撮り方 — ★A も C も B も不合格</h2>
           <p style={note}>
             ★<b>同じ場面（表示 35〜43 秒）を 3 通りで撮って、並べて同時に流しています。</b><br />
@@ -647,6 +619,8 @@ export default function GaitReviewPage(): React.ReactElement {
             <a href="/race?dev=1&cutin=off" style={{ color: '#4dd2ff' }}>?cutin=off</a>（★カットインを止める）
           </p>
         </section>
+
+        </details>
 
         <section style={{ ...card, marginBottom: 8 }}>
           <h2 style={h2}>★この頁が言っていないこと</h2>
