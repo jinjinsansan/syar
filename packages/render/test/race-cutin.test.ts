@@ -16,6 +16,8 @@ import { describe, it, expect } from 'vitest';
 import {
   raceCutInAt, RACE_CUTIN_SEC, RACE_CUTIN_AT_START, drawRaceCutInFrame,
   drawOwnHorseCutIn, drawFormationCutIn, drawRunningStyleCutIn,
+  RACE_TELOP_SEC, drawRaceTelopBand, drawOwnHorseTelop, drawFormationTelop,
+  drawRunningStyleTelop, drawToStraightTelop,
 } from '../src/race-cutin.js';
 import { SCRIPT_V6 } from '../src/broadcast-v2.js';
 import type { Ctx2D } from '../src/oblique-draw.js';
@@ -264,5 +266,116 @@ describe('枠色の上の番号', () => {
       frameColorOf: () => 'rgba(10,10,10,1)',
     });
     expect(r.texts.map((t) => t.t)).toContain('7');
+  });
+});
+
+/**
+ * ★**テロップ（C 案）— ★映像を止めず、隠さない**（★2026-09-11・★デザイナーのハンドオフ）
+ *
+ * ★この案件は「★カットの切り替わりで別のレースに見える」と長く戦ってきました。
+ * ⚠️ ★ところが従来のカットインは ★**1.2 秒 × 4 回、画面全体を覆う**構造で、
+ *    ★**カットイン自身が新しい継ぎ目を持ち込んで**いました。
+ * → ★画面下部の帯だけが出入りし、★映像は流れ続けます。
+ */
+describe('★テロップ（★下三分の一）', () => {
+  const telopAt = (t: number) => ({
+    viewport: VP, sinceSec: t * RACE_TELOP_SEC, durationSec: RACE_TELOP_SEC, label: 'あなたの馬',
+  });
+
+  /** ★**これが C 案の要**です。★画面の大半は覆いません */
+  it('★帯が覆うのは画面の 15% まで（★映像は隠さない）', () => {
+    const r = recorder();
+    const box = drawRaceTelopBand(r.ctx, FONT, telopAt(0.5))!;
+    expect(box).toBeDefined();
+    expect(box.height / VP.height, '★帯が高すぎます').toBeLessThanOrEqual(0.15);
+    /** ★実況の帯（画面の下 22%）にかからないこと */
+    expect(box.y + box.height, '★実況の帯と重なります').toBeLessThan(VP.height * 0.78);
+  });
+
+  /** ⚠️ ★**全画面を塗る矩形が 1 つも無いこと**（★覆っていないことの直接の確認） */
+  it('★全画面を塗らない', () => {
+    const r = recorder();
+    drawRaceTelopBand(r.ctx, FONT, telopAt(0.5));
+    const full = r.rects.filter((x) => x.w >= VP.width && x.h >= VP.height * 0.9);
+    expect(full, '★画面全体を覆う矩形があります').toEqual([]);
+  });
+
+  /** ★下から滑り出て、★下へ戻る（★`globalAlpha` のフェードは使わない） */
+  it('★入りと抜けでは帯が下にあり、真ん中で定位置に来る', () => {
+    const bandTop = (t: number): number => {
+      const r = recorder();
+      drawRaceTelopBand(r.ctx, FONT, telopAt(t));
+      return r.rects[0]?.y ?? Number.POSITIVE_INFINITY;
+    };
+    const rest = bandTop(0.5);
+    expect(bandTop(0.02), '★入りは下から').toBeGreaterThan(rest);
+    expect(bandTop(0.98), '★抜けは下へ').toBeGreaterThan(rest);
+    expect(rest / VP.height).toBeCloseTo(0.6, 1);
+  });
+
+  it('★出し切ってからは動かない（★1.0 秒は保持）', () => {
+    const bandTop = (t: number): number => {
+      const r = recorder();
+      drawRaceTelopBand(r.ctx, FONT, telopAt(t));
+      return r.rects[0]?.y ?? -1;
+    };
+    expect(bandTop(0.2)).toBe(bandTop(0.8));
+  });
+
+  it('★タブに見出しが出る', () => {
+    const r = recorder();
+    drawRaceTelopBand(r.ctx, FONT, telopAt(0.5));
+    /** ⚠️ ★字送りを入れるので ★**1 字ずつ**置かれます */
+    expect(r.texts.map((x) => x.t).join('')).toContain('あなたの馬');
+  });
+
+  it('★A 自馬は、馬名・脚質・番手を 1 行で出す', () => {
+    const r = recorder();
+    drawOwnHorseTelop(r.ctx, FONT, telopAt(0.5), {
+      gate: 3, horseName: 'ハンシンドリーム', strategyLabel: '逃げ',
+      frameColor: '#e33', order: 1, fieldSize: 12,
+    });
+    const said = r.texts.map((x) => x.t);
+    expect(said).toContain('ハンシンドリーム');
+    expect(said).toContain('逃げ');
+    expect(said).toContain('1番手／12頭');
+    expect(said, '★枠番').toContain('3');
+  });
+
+  /** ⚠️ ★**帯の高さでは 2 頭が限度**（★デザイナーの確認事項・★元は 4 頭） */
+  it('★C 動く馬は 2 頭まで', () => {
+    const r = recorder();
+    const rows = Array.from({ length: 5 }, (_, i) => ({
+      gate: i + 1, horseName: `ウマ${i + 1}`, strategyLabel: '差し',
+      order: i + 3, frameColor: '#888', own: false,
+    }));
+    drawRunningStyleTelop(r.ctx, FONT, telopAt(0.5), rows);
+    const names = r.texts.map((x) => x.t).filter((t) => t.startsWith('ウマ'));
+    expect(names).toEqual(['ウマ1', 'ウマ2']);
+  });
+
+  it('★B 隊列は、自馬の番手と両端の目印を出す', () => {
+    const r = recorder();
+    drawFormationTelop(r.ctx, FONT, telopAt(0.5), {
+      horses: Array.from({ length: 12 }, (_, i) => ({ gate: i + 1, s: 300 - i * 3, w: 8 })),
+      ownGate: 3, ownOrder: 3,
+    });
+    const said = r.texts.map((x) => x.t);
+    expect(said).toContain('後方');
+    expect(said).toContain('先頭');
+    expect(said).toContain('あなた＝3番手');
+  });
+
+  it('★D 直線へは、番手と差を出す（★先頭なら「先頭」）', () => {
+    const mk = (order: number): string[] => {
+      const r = recorder();
+      drawToStraightTelop(r.ctx, FONT, telopAt(0.5), {
+        gate: 3, frameColor: '#e33', ownOrder: order, ownGapLengths: 1.8,
+      });
+      return r.texts.map((x) => x.t);
+    };
+    expect(mk(3)).toContain('3番手');
+    expect(mk(3)).toContain('1.8馬身');
+    expect(mk(1), '★先頭に「差」は無い').toContain('先頭');
   });
 });

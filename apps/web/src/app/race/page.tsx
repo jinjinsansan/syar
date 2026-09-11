@@ -79,6 +79,7 @@ import {
   trafficPositionModel, raceClockFor, type RacePacePolicy,
   raceCutInAt, RACE_CUTIN_SEC, RACE_CUTIN_AT_START,
   drawOwnHorseCutIn, drawFormationCutIn, drawRunningStyleCutIn, drawToStraightCutIn,
+  RACE_TELOP_SEC, drawOwnHorseTelop, drawFormationTelop, drawRunningStyleTelop, drawToStraightTelop,
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
   horseCalibrationFor, LEGACY_HORSE_CALIBRATION, type HorseMaterialCalibration,
   type HorsePlacement, type HorsePlacementFrame, type HorsePlacementSet, type HorsePlacementMode,
@@ -151,6 +152,25 @@ const RACE_PACE_POLICY: RacePacePolicy = LEGACY_MOTION ? 'legacy' : 'readable';
  */
 const HONOUR_DECLARED_ASSET = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('asset') === 'declared';
+/**
+ * ★**カットインの形**（★2026-09-11・★デザイナーのハンドオフ C 案）。
+ *
+ *   ★既定 … ★**下三分の一のテロップ**。★レース映像は止めず、隠しません。
+ *   ★`?cutin=full` … ★従来の ★**全画面の挿入画面**（★見比べ・切り戻しの道）
+ *   ★`?cutin=off`  … ★出さない
+ *
+ * 【★なぜテロップにしたか】
+ *   ★この案件は「★カットの切り替わりで別のレースに見える」と長く戦ってきました。
+ *   ⚠️ ★ところが従来のカットインは ★**1.2 秒 × 4 回、画面全体を覆う**構造で、
+ *      ★**カットイン自身が新しい継ぎ目を持ち込んで**いました。
+ *   ★オーナー評「★カットインや真横カメラワークでも切り替わりの時に繋がっていかない」の、
+ *   ★半分はこれが原因です。
+ *
+ * ⚠️ ★**元の要求「背景は不透明」からの変更です。** ★帯の中は 94% ですが、
+ *    ★画面の 86% は常に映像が見えています（★オーナー確認事項）。
+ */
+const CUTIN_FULLSCREEN = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('cutin') === 'full';
 const CUTIN_OFF = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('cutin') === 'off';
 const SIDE_ONLY = typeof window !== 'undefined'
@@ -3596,6 +3616,8 @@ export default function RacePage(): React.JSX.Element {
       const startCutInActive = !CUTIN_OFF && renderer === 'v2' && !replay.active
         && raceD > 0 && raceD < RACE_CUTIN_SEC;
       cutInActive = cutIn !== undefined || startCutInActive;
+      /** ★テロップは世界のあとに重ねるので、いったん関数に包んで持っておきます */
+      let paintTelop: (() => void) | undefined;
       if (cutInActive) {
         /**
          * ★カットインが読む値は ★**画面が描いている位置**から作ります（★着順から作らない）。
@@ -3603,6 +3625,7 @@ export default function RacePage(): React.JSX.Element {
          *    ★誰もゴールしていないので、★確定着順は使いません。
          */
         const cutRank = screenRank(easedAt, () => false, built.finishPos);
+        const minimapHorses = v2Minimap.horses;
         const orderOf = (gate: number): number => cutRank.findIndex((h) => h.gate === gate) + 1;
         const metersLeftNow = Math.max(0, DIST - Math.max(...at.map((h) => h.meters)));
         const nameOf = (gate: number): string => HORSE_NAMES[gate - 1] ?? `スター${gate}`;
@@ -3619,7 +3642,59 @@ export default function RacePage(): React.JSX.Element {
           raceLabel: `${RACE_META.raceNo}　${RACE_META.raceName}`,
           metersLeft: metersLeftNow,
         };
-        if (kind === 'own-horse') {
+        /**
+         * ★**テロップ（既定）は、世界を描いたあとに重ねます。**
+         * ⚠️ ★だから ★**世界の描画を飛ばしません**（下の `drawScene` を見てください）。
+         *    ★全画面版（`?cutin=full`）のときだけ、従来どおり世界の代わりに描きます。
+         */
+        const telopFrame = {
+          viewport: { width: W, height: H },
+          sinceSec: frame.sinceSec,
+          durationSec: RACE_TELOP_SEC,
+          label: frame.label,
+        };
+        /**
+         * ⚠️ ★**テロップは世界を描いたあとに重ねます。** ★ここでは描かず、関数に包んで
+         *    ★下の `drawScene` のあとで呼びます。★ここで描くと ★**世界の下**に潜ります。
+         */
+        paintTelop = (): void => {
+          if (kind === 'own-horse') {
+            drawOwnHorseTelop(ctx, FONT, telopFrame, {
+              gate: ownGate,
+              horseName: nameOf(ownGate),
+              strategyLabel: strategyLabelOf(ownGate),
+              frameColor: frameColorOf(ownGate),
+              order: Math.max(1, orderOf(ownGate)),
+              fieldSize: FIELD,
+            });
+          } else if (kind === 'formation') {
+            /** ⚠️ ★関数に包んだので `v2Minimap` の絞り込みが効きません。★ここで控えます */
+            drawFormationTelop(ctx, FONT, telopFrame, {
+              horses: minimapHorses,
+              ownGate,
+              ownOrder: Math.max(1, orderOf(ownGate)),
+            });
+          } else if (kind === 'running-style') {
+            drawRunningStyleTelop(ctx, FONT, telopFrame, cutRank
+              .filter((h) => built.strategyOf(h.gate) === 'sashi' || built.strategyOf(h.gate) === 'oikomi')
+              .map((h) => ({
+                gate: h.gate, horseName: nameOf(h.gate),
+                strategyLabel: strategyLabelOf(h.gate),
+                order: Math.max(1, orderOf(h.gate)),
+                frameColor: frameColorOf(h.gate), own: h.gate === ownGate,
+              })));
+          } else {
+            const leadM = cutRank[0]?.meters ?? 0;
+            const ownM = cutRank.find((h) => h.gate === ownGate)?.meters ?? leadM;
+            drawToStraightTelop(ctx, FONT, telopFrame, {
+              gate: ownGate,
+              frameColor: frameColorOf(ownGate),
+              ownOrder: Math.max(1, orderOf(ownGate)),
+              ownGapLengths: Math.max(0, (leadM - ownM) / HORSE_LENGTH_M),
+            });
+          }
+        };
+        if (CUTIN_FULLSCREEN && kind === 'own-horse') {
           drawOwnHorseCutIn(ctx, FONT, frame, {
             gate: ownGate,
             horseName: nameOf(ownGate),
@@ -3680,6 +3755,7 @@ export default function RacePage(): React.JSX.Element {
             fieldSize: FIELD,
           });
         }
+        void metersLeftNow;
         /**
          * ★**診断はカットイン中も出します**（★2026-09-10・★R-30）。
          *
@@ -3718,9 +3794,14 @@ export default function RacePage(): React.JSX.Element {
          *    ★中央に出すとロゴと重なり、★実際に「ス桜星賞！」と潰れていました（★実測）。
          */
       }
-      if (!cutInActive) {
+      /**
+       * ⚠️ ★**テロップのときは世界を描き続けます**（★2026-09-11・★C 案の要）。
+       *    ★従来の全画面版だけが、世界の代わりに挿入画面を描きます。
+       */
+      if (!cutInActive || !CUTIN_FULLSCREEN) {
         drawScene(ctx, scene);
       }
+      paintTelop?.();
       /**
        * ⚠️ ★**カットインが覆う境目では、白い閃光を出しません**（★2026-09-11）。
        *    ★閃光はこのあとに ★**上から**塗るので、★出したままだとカットインが
@@ -3845,11 +3926,11 @@ export default function RacePage(): React.JSX.Element {
       if (sectionTagRef.current.label !== label) sectionTagRef.current = { label, sinceSec: sectionTagRef.current.label === '' ? d - 1 : d };
       const hudSince = raceD - HUD_SETTLE_SEC;
       // ★ゴール後はライブ HUD（見出し・区間タグ・コース図）を落とす（motion-spec §6: ゴール〜2.4s は勝馬テロップのみ）
-      if (!winnerFinishedNow && !contestFocusHud && !cutInActive) drawRaceHeadlineChip(ctx, FONT, {
+      if (!winnerFinishedNow && !contestFocusHud && !(cutInActive && CUTIN_FULLSCREEN)) drawRaceHeadlineChip(ctx, FONT, {
         raceNo: RACE_META.raceNo, raceName: RACE_META.raceName,
         distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${DIST}m`,
       }, { timeSec: d, sinceSec: hudSince });
-      if (!winnerFinishedNow && !contestFocusHud && !cutInActive) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
+      if (!winnerFinishedNow && !contestFocusHud && !(cutInActive && CUTIN_FULLSCREEN)) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
         { timeSec: d, sinceSec: Math.min(hudSince, d - sectionTagRef.current.sinceSec) });
     }
     /**
@@ -3920,12 +4001,14 @@ export default function RacePage(): React.JSX.Element {
        * ★実況帯とレース名は画面の端にあり馬に重なっていないので、そのまま残します。
        */
       /**
-       * ⚠️ ★**カットイン中は、実況の帯以外の HUD を下ろします**（★2026-09-11）。
-       *    ★以前は順位表・見出し・区間タグ・名前プレートが ★**カットインの上に重なって**おり、
-       *    ★隊列図の右上が順位表で隠れ、★脚質の 1 行目が区間タグで潰れていました（★実測）。
-       *    ★実況の帯だけは残します（★オーナー「これは実況中継の枠内で出すもの」）。
+       * ⚠️ ★**全画面のカットイン中は、実況の帯以外の HUD を下ろします**（★2026-09-11）。
+       *    ★順位表・見出し・区間タグ・名前プレートが ★**カットインの上に重なって**いました。
+       * ⚠️ ★**テロップ（既定）では下ろしません。** ★映像が見えているので、HUD も見えていて
+       *    ★構いません。★重なるのは ★**コース図と馬名プレート**だけなので、そこだけ下ろします
+       *    （★帯は y432〜536・★コース図は y321〜530・★名前プレートは y544 付近）。
        */
-      const hud = cutInActive ? { ...hudRaw, standings: false }
+      const telopActive = cutInActive && !CUTIN_FULLSCREEN;
+      const hud = (cutInActive && CUTIN_FULLSCREEN) ? { ...hudRaw, standings: false }
         : replay.active || contestFocusHud ? { ...hudRaw, standings: false }
         : winnerFinishedNow ? { ...hudRaw, gauge: false, standings: false, calls: false } : hudRaw;
       // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）
@@ -3998,7 +4081,7 @@ export default function RacePage(): React.JSX.Element {
          *      （オーナー評「下のナレーターのあたりが崩れている」）。
          *   → **コース図の右**から画面右端までを 3 等分し、実況帯の**上**に置きます。
          */
-        drawHorseNamePlates(ctx, art.pal as Record<string, string>, FONT, plateRows, FIELD, frameRoleOf, {
+        if (!telopActive) drawHorseNamePlates(ctx, art.pal as Record<string, string>, FONT, plateRows, FIELD, frameRoleOf, {
           viewport: { width: W, height: H },
           x0: 330, x1: W - 24, bottomY: H - 176,
           timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
@@ -4009,7 +4092,7 @@ export default function RacePage(): React.JSX.Element {
          * ⚠️ ★**カットイン中は出しません**（★2026-09-11）。★カットイン中は馬を描いていないので、
          *    ★ピンだけが ★**何も無い所を指して**浮きます（★ロゴの上に緑のピンが立っていました）。
          */
-        if (v2OwnHead !== undefined && !cutInActive) {
+        if (v2OwnHead !== undefined && !(cutInActive && CUTIN_FULLSCREEN)) {
           drawOwnHorseMarker(ctx, FONT, v2OwnHead, ownGate,
             { topLimitY: 40, viewport: { width: W, height: H }, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC });
         }

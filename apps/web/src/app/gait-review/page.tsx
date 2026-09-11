@@ -45,8 +45,41 @@ export default function GaitReviewPage(): React.ReactElement {
           ★<b>主観の評価は等速を先に</b>見てください。★0.25 倍は姿勢と接地を確かめるためのものです。
         </p>
 
+        <section style={{ ...card, border: '2px solid #4dd2ff', background: '#14212a' }}>
+          <h2 style={h2}>★カットインを「テロップ」に変えました（★デザイナーのハンドオフ C 案）</h2>
+          <p style={note}>
+            ★<b>レース映像を止めず、隠しません。</b>★画面下部の高さ 104px の帯だけが
+            ★下から滑り出て、★1.0 秒保持し、★下へ戻ります。<br />
+            ★デザイナーの指摘がそのまま正しい内容でした ── ★この案件は
+            ★「★カットの切り替わりで別のレースに見える」と長く戦ってきたのに、
+            ★<b>従来のカットイン自身が 1.2 秒 × 4 回、画面全体を覆って新しい継ぎ目を作っていました</b>。
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {([
+              ['telop-a-own', 'A 発走直後 — あなたの馬'],
+              ['telop-b-formation', 'B 位置取り — 現在の隊列（★横 1 本の位置バー）'],
+              ['telop-c-style', 'C 4 角入り — ここから動く馬（★2 頭まで）'],
+              ['telop-d-straight', 'D 直線へ — 番手と差'],
+            ] as const).map(([id, label]) => (
+              <div key={id}>
+                <p style={{ ...note, margin: '0 0 4px', color: '#eef2f6' }}><b>{label}</b></p>
+                <img src={`/gait-review/${id}.jpg`} alt={label} style={media} />
+              </div>
+            ))}
+          </div>
+          <p style={{ ...note, margin: '12px 0 0' }}>
+            ★<b>デザイナーからの確認事項が 2 つあります。</b><br />
+            ★① ★<b>背景の不透明さ</b>。★元の要求は「背景は不透明」でしたが、
+            ★この案では帯の外（画面の 86%）は常に映像が見えています。★帯の中だけ 94% です。<br />
+            ★② ★<b>C（動く馬）の頭数</b>。★元は 4 頭でしたが、★帯の高さでは ★<b>2 頭</b>が限度です。<br />
+            ⚠️ ★<b>B は 2D の散布図をやめ、★横 1 本の位置バー</b>に変えています。
+            ★D は ★<b>コース図を乗せていません</b>（★帯の高さでは読めないため）。<br />
+            ★従来の全画面版は ★<code>?cutin=full</code> で見られます（★消していません）。
+          </p>
+        </section>
+
         <section style={{ ...card, border: '2px solid #ffd34d', background: '#1d1c15' }}>
-          <h2 style={h2}>★いま判断していただきたいのは、これ 1 つです — ★4 コーナーの馬</h2>
+          <h2 style={h2}>★（判断待ち）4 コーナーの馬の回転</h2>
           <p style={note}>
             ★オーナー評「★上からのカメラワークなのに、★<b>本来見えないはずの目が見えている</b>。★顔の角度が違う」。<br />
             ★<b>原因が割れました。★素材の問題ではありませんでした。</b><br />

@@ -562,3 +562,298 @@ export function drawToStraightCutIn<TImage>(
   void W;
   ctx.globalAlpha = prev;
 }
+
+/* ═══════════════════════ ★C 案 — 下三分の一テロップ ═══════════════════════ */
+
+/**
+ * ★**カットインを「全画面の挿入」から「下三分の一のテロップ」へ**
+ * （★2026-09-11・★デザイナーのハンドオフ `design_handoff_race_telop`）
+ *
+ * 【★なぜ変えるか — ★デザイナーの指摘がそのまま正しい】
+ *   ★この案件は「★**カットが切り替わった瞬間に別のレースに見える**」と長く戦ってきました。
+ *   ★ところが従来のカットインは ★**1.2 秒 × 4 回、画面全体を覆って中身に切り替える**構造で、
+ *   ★**カットイン自身が新しい継ぎ目を持ち込んで**いました。
+ *   ★オーナー評「★カットインや真横カメラワークでも切り替わりの時に繋がっていかない」は、
+ *   ★半分はこれが原因です。
+ *
+ * 【★C 案】
+ *   ★レース映像は ★**一切止めず、隠しません**。★画面下部の高さ 104px の帯だけが
+ *   ★下から滑り出て、★1.0 秒保持し、★下へ戻ります。
+ *   ★帯は既存の実況の帯（y560〜720）とは ★**別の場所**なので、同時に出ても重なりません。
+ *
+ * ⚠️ ★**元の要求「背景は不透明」からの変更です。** ★帯の中は 94% で不透明ですが、
+ *    ★画面の 86% は常に映像が見えています（★オーナー確認事項・★README に明記）。
+ * ⚠️ ★従来の全画面版は ★**消していません**。★`?cutin=full` で戻せます（★見比べの道）。
+ */
+
+/** ★テロップの尺（秒）。★入り 0.1 ／ 保持 1.0 ／ 抜け 0.1 */
+export const RACE_TELOP_SEC = 1.2;
+const TELOP_IN_SEC = 0.1;
+const TELOP_OUT_SEC = 0.1;
+
+/** ★帯・札の寸法（★1280×720 基準の比。★別の画布でも同じ割合で置く） */
+const TELOP = {
+  bandY: 432 / 720,
+  bandH: 104 / 720,
+  tabY: 402 / 720,
+  tabH: 30 / 720,
+  tabW: 230 / 1280,
+  padX: 60 / 1280,
+  /** ★台形タブの右辺の切り（下辺がここまで縮む） */
+  tabSlant: 0.08,
+} as const;
+
+const TELOP_BAND = '#16202a';
+const TELOP_BAND_ALPHA = 0.94;
+const TELOP_OWN = '#f5d56d';
+
+export interface RaceTelopFrame {
+  readonly viewport: { readonly width: number; readonly height: number };
+  /** ★この画が出てからの秒 */
+  readonly sinceSec: number;
+  /** ★全体の尺（秒） */
+  readonly durationSec: number;
+  /** ★タブに出す見出し（★`RaceCutIn.label`） */
+  readonly label: string;
+}
+
+/** ★出入りの位置（0 = 画面の外・1 = 出し切り）。★入り抜けは ease-out */
+function telopSlide(f: RaceTelopFrame): number {
+  const t = Math.max(0, f.sinceSec);
+  const d = Math.max(0.01, f.durationSec);
+  if (t >= d) return 0;
+  const easeOut = (x: number): number => 1 - (1 - x) * (1 - x);
+  if (t < TELOP_IN_SEC) return easeOut(clamp01(t / TELOP_IN_SEC));
+  if (t > d - TELOP_OUT_SEC) return easeOut(clamp01((d - t) / TELOP_OUT_SEC));
+  return 1;
+}
+
+/** ★字送りを入れて 1 字ずつ置く（★`ctx.letterSpacing` は片方の環境に無い・★R-30） */
+function spacedText<TImage>(
+  ctx: Ctx2D<TImage>, text: string, x: number, y: number, em: number,
+): void {
+  if (em <= 0) { ctx.fillText(text, x, y); return; }
+  const size = Number(/(\d+(?:\.\d+)?)px/.exec(ctx.font)?.[1] ?? 14);
+  const gap = size * em;
+  let cx = x;
+  for (const ch of [...text]) {
+    ctx.fillText(ch, cx, y);
+    cx += ctx.measureText(ch).width + gap;
+  }
+}
+
+/**
+ * ★**テロップの帯とタブを描き、中身を置く矩形を返す。**
+ *
+ * ⚠️ ★**世界の描画には一切触れません。** ★呼ぶ側は今までどおり毎コマ世界を描き、
+ *    ★そのあとにこれを重ねるだけです。
+ * @returns ★中身を置く矩形。★出ていないときは `undefined`
+ */
+export function drawRaceTelopBand<TImage>(
+  ctx: Ctx2D<TImage>, font: FontOf, f: RaceTelopFrame,
+): { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | undefined {
+  const { width: W, height: H } = f.viewport;
+  const slide = telopSlide(f);
+  if (slide <= 0.001) return undefined;
+
+  const bandH = Math.round(H * TELOP.bandH);
+  const restY = Math.round(H * TELOP.bandY);
+  /** ★画面の外（下）から滑り出る。★`globalAlpha` は使いません（★指定どおり） */
+  const bandY = Math.round(restY + (H - restY) * (1 - slide));
+  const prev = ctx.globalAlpha;
+
+  /** ★① 帯 */
+  ctx.globalAlpha = prev * TELOP_BAND_ALPHA;
+  ctx.fillStyle = TELOP_BAND;
+  ctx.fillRect(0, bandY, W, bandH);
+  ctx.globalAlpha = prev;
+  /** ★上辺に金のヘアライン（★2px・帯の内側） */
+  ctx.fillStyle = GOLD;
+  ctx.fillRect(0, bandY, W, 2);
+
+  /** ★② 台形のタブ（★右辺だけ斜めに切る＝ロワーサードの作り） */
+  const tabH = Math.round(H * TELOP.tabH);
+  const tabW = Math.round(W * TELOP.tabW);
+  const tabX = Math.round(W * TELOP.padX);
+  const tabY = bandY - tabH;
+  const slantPx = Math.round(tabW * TELOP.tabSlant);
+  ctx.fillStyle = GOLD;
+  ctx.beginPath();
+  ctx.moveTo(tabX, tabY);
+  ctx.lineTo(tabX + tabW, tabY);
+  ctx.lineTo(tabX + tabW - slantPx, tabY + tabH);
+  ctx.lineTo(tabX, tabY + tabH);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#14181a';
+  ctx.font = font(Math.round(H * (15 / 720)), true);
+  ctx.textAlign = 'left';
+  spacedText(ctx, f.label, tabX + Math.round(tabW * 0.10), tabY + Math.round(tabH * 0.70), 0.06);
+
+  return { x: tabX, y: bandY, width: W - tabX * 2, height: bandH };
+}
+
+/** ★枠の色を塗って番号を書く札（★テロップ用・★内側に金の縁） */
+function telopGatePlate<TImage>(
+  ctx: Ctx2D<TImage>, font: FontOf, x: number, y: number, size: number,
+  gate: number, color: string,
+): void {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, size, size);
+  /** ★内側の金の縁（★3px） */
+  ctx.fillStyle = TELOP_OWN;
+  ctx.fillRect(x, y, size, 3); ctx.fillRect(x, y + size - 3, size, 3);
+  ctx.fillRect(x, y, 3, size); ctx.fillRect(x + size - 3, y, 3, size);
+  ctx.fillStyle = readableOn(color);
+  ctx.font = font(Math.round(size * 0.49), true);
+  ctx.textAlign = 'center';
+  ctx.fillText(String(gate), x + size / 2, y + Math.round(size * 0.66));
+  ctx.textAlign = 'left';
+}
+
+/** ★A 自馬 — ★枠札 ＋ 馬名（主役）＋ 脚質・番手を 1 行 */
+export function drawOwnHorseTelop<TImage>(
+  ctx: Ctx2D<TImage>, font: FontOf, f: RaceTelopFrame,
+  o: { readonly gate: number; readonly horseName: string; readonly strategyLabel: string;
+    readonly frameColor: string; readonly order: number; readonly fieldSize: number },
+): void {
+  const box = drawRaceTelopBand(ctx, font, f);
+  if (box === undefined) return;
+  const H = f.viewport.height;
+  const plate = Math.round(H * (72 / 720));
+  const px = box.x;
+  const py = box.y + Math.round((box.height - plate) / 2);
+  telopGatePlate(ctx, font, px, py, plate, o.gate, o.frameColor);
+
+  const midY = box.y + Math.round(box.height * 0.66);
+  let x = px + plate + Math.round(H * (38 / 720));
+  ctx.textAlign = 'left';
+  ctx.fillStyle = PAPER;
+  ctx.font = font(Math.round(H * (52 / 720)), true);
+  ctx.fillText(o.horseName, x, midY);
+  x += ctx.measureText(o.horseName).width + Math.round(H * (26 / 720));
+  ctx.fillStyle = GOLD;
+  ctx.font = font(Math.round(H * (26 / 720)), true);
+  ctx.fillText(o.strategyLabel, x, midY);
+  x += ctx.measureText(o.strategyLabel).width + Math.round(H * (14 / 720));
+  ctx.fillStyle = PAPER70;
+  ctx.fillText(`${o.order}番手／${o.fieldSize}頭`, x, midY);
+}
+
+/**
+ * ★B 隊列 — ★**横 1 本の位置バー**（★2D の散布図はやめました）。
+ *   ★デザイナー評「★ビリヤードの玉に見えるという指摘は、この形式ではそもそも起きません」。
+ */
+export function drawFormationTelop<TImage>(
+  ctx: Ctx2D<TImage>, font: FontOf, f: RaceTelopFrame,
+  o: { readonly horses: readonly MinimapHorse[]; readonly ownGate: number; readonly ownOrder: number },
+): void {
+  const box = drawRaceTelopBand(ctx, font, f);
+  if (box === undefined) return;
+  const H = f.viewport.height;
+  const labelY = box.y + Math.round(box.height * 0.34);
+  ctx.font = font(Math.round(H * (14 / 720)), true);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = PAPER70;
+  ctx.fillText('後方', box.x, labelY);
+  ctx.textAlign = 'right';
+  ctx.fillText('先頭', box.x + box.width, labelY);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = TELOP_OWN;
+  ctx.fillText(`あなた＝${o.ownOrder}番手`, box.x + box.width / 2, labelY);
+  ctx.textAlign = 'left';
+
+  /** ★バー */
+  const barH = Math.round(H * (16 / 720));
+  const barY = box.y + Math.round(box.height * 0.52);
+  ctx.fillStyle = 'rgba(238,242,246,0.18)';
+  ctx.fillRect(box.x, barY, box.width, barH);
+
+  const tail = Math.min(...o.horses.map((h) => h.s));
+  const lead = Math.max(...o.horses.map((h) => h.s));
+  const span = Math.max(1, lead - tail);
+  for (const h of o.horses) {
+    const own = h.gate === o.ownGate;
+    const cx = box.x + box.width * ((h.s - tail) / span);
+    const r = (own ? barH * 0.69 : barH * 0.5);
+    ctx.beginPath();
+    ctx.ellipse(cx, barY + barH / 2, r, r, 0, 0, Math.PI * 2);
+    ctx.fillStyle = own ? TELOP_OWN : 'rgba(238,242,246,0.60)';
+    ctx.fill();
+  }
+}
+
+/**
+ * ★C ここから動く馬 — ★**最大 2 頭**（★帯の高さの限界・★デザイナーの確認事項）。
+ * ⚠️ ★元は 4 頭でした。★帯に収まらないので 2 頭に絞っています。
+ */
+export function drawRunningStyleTelop<TImage>(
+  ctx: Ctx2D<TImage>, font: FontOf, f: RaceTelopFrame, rows: readonly RunningStyleRow[],
+): void {
+  const box = drawRaceTelopBand(ctx, font, f);
+  if (box === undefined) return;
+  const H = f.viewport.height;
+  const midY = box.y + Math.round(box.height * 0.66);
+  ctx.textAlign = 'left';
+  const shown = rows.slice(0, 2);
+  if (shown.length === 0) {
+    ctx.fillStyle = PAPER70;
+    ctx.font = font(Math.round(H * (30 / 720)), true);
+    ctx.fillText('後方から動く馬はいません', box.x, midY);
+    return;
+  }
+  let x = box.x;
+  shown.forEach((r, i) => {
+    const nameSize = i === 0 ? 40 : 30;
+    const styleSize = i === 0 ? 26 : 20;
+    ctx.fillStyle = i === 0 ? PAPER : PAPER70;
+    ctx.font = font(Math.round(H * (nameSize / 720)), true);
+    ctx.fillText(r.horseName, x, midY);
+    x += ctx.measureText(r.horseName).width + Math.round(H * (i === 0 ? 14 : 10) / 720);
+    ctx.fillStyle = GOLD;
+    ctx.font = font(Math.round(H * (styleSize / 720)), true);
+    ctx.fillText(r.strategyLabel, x, midY);
+    x += ctx.measureText(r.strategyLabel).width;
+    if (i === 0 && shown.length > 1) {
+      ctx.fillStyle = PAPER70;
+      ctx.font = font(Math.round(H * (22 / 720)), true);
+      const sep = '　・　';
+      ctx.fillText(sep, x, midY);
+      x += ctx.measureText(sep).width;
+    }
+  });
+}
+
+/**
+ * ★D 最後の直線へ — ★番手と差を数字 2 つの 1 行に。
+ * ⚠️ ★コース図は ★**乗せません**。★帯の高さ（104px）では読めないためです（★デザイナー判断）。
+ */
+export function drawToStraightTelop<TImage>(
+  ctx: Ctx2D<TImage>, font: FontOf, f: RaceTelopFrame,
+  o: { readonly gate: number; readonly frameColor: string;
+    readonly ownOrder: number; readonly ownGapLengths: number },
+): void {
+  const box = drawRaceTelopBand(ctx, font, f);
+  if (box === undefined) return;
+  const H = f.viewport.height;
+  const plate = Math.round(H * (72 / 720));
+  const py = box.y + Math.round((box.height - plate) / 2);
+  telopGatePlate(ctx, font, box.x, py, plate, o.gate, o.frameColor);
+
+  const midY = box.y + Math.round(box.height * 0.66);
+  let x = box.x + plate + Math.round(H * (38 / 720));
+  ctx.textAlign = 'left';
+  ctx.fillStyle = PAPER;
+  ctx.font = font(Math.round(H * (48 / 720)), true);
+  const orderText = `${o.ownOrder}番手`;
+  ctx.fillText(orderText, x, midY);
+  x += ctx.measureText(orderText).width + Math.round(H * (16 / 720));
+  ctx.fillStyle = PAPER70;
+  ctx.font = font(Math.round(H * (22 / 720)), true);
+  ctx.fillText('先頭との差', x, midY);
+  x += ctx.measureText('先頭との差').width + Math.round(H * (16 / 720));
+  ctx.fillStyle = GOLD;
+  ctx.font = font(Math.round(H * (48 / 720)), true);
+  /** ⚠️ ★先頭なら「差」ではありません */
+  ctx.fillText(o.ownOrder <= 1 ? '先頭' : `${o.ownGapLengths.toFixed(1)}馬身`, x, midY);
+}
