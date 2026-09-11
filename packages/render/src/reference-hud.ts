@@ -260,13 +260,64 @@ export function drawOwnHorseMarker(
   },
 ): void {
   const vp = opts.viewport;
-  // 画面外なら描かない（端に張り付くと「そこに馬がいる」と誤読される）
-  if (!(head.x > -40 && head.x < vp.width + 40 && head.y > -60 && head.y < vp.height + 40)) return;
   const rise = riseAt(opts.sinceSec ?? 1);
   const baseAlpha = ctx.globalAlpha;
   ctx.globalAlpha = baseAlpha * rise.alpha;
   const R = 15;            // ★画面固定の大きさ
   const GAP = 12;          // 頭とピンの先の間
+  /**
+   * ★**画面の外にいるときは、縁に寄せて「どちらにいるか」を出します**
+   *   （★2026-09-12・オーナー指摘②「自分馬がレース中に常にわかるようにしてください」）。
+   *
+   * 【★何が起きていたか】★以前はここで ★**黙って描くのをやめて**いました。
+   *   ★理由は「端に張り付くと『そこに馬がいる』と誤読される」でした。★正しい心配ですが、
+   *   ★**代わりに何も出さなかった**ので、★自馬が映っていない間は ★**居場所がまったく分かりません**。
+   *   ★実測（seed 42・自馬 1 番）: ★印が出るのは ★**レースの 18.4%** だけで、
+   *   ★**11.2 〜 36.3 秒＝25.1 秒**（道中と直線のほぼ全部）★消えたままでした。
+   *   ★自馬が先頭（3 番）のときは 100% 出るので、★**後ろを走る人ほど分からない**形でした。
+   * → ★誤読を避けるため、★縁の印は ★**外向きの矢**を付けて「この先にいる」と示します。
+   *   ★画面の中にいるときの雫型とは ★**形が違う**ので、取り違えません。
+   */
+  const inFrame = head.x > -40 && head.x < vp.width + 40 && head.y > -60 && head.y < vp.height + 40;
+  if (!inFrame) {
+    const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+    /** ★矢の長さ。★縁からの余白はこれを含めること（★含めないと矢の先が 1px はみ出します） */
+    const ARROW = 11;
+    const M = R + ARROW + 1;
+    /** ⚠️ ★実況帯（画面下 146px）と隊列バーを避けます。★隠すと読めなくなるものが増えます */
+    const cx = clamp(head.x, M, vp.width - M);
+    const cy = clamp(head.y, (opts.topLimitY ?? 0) + M, vp.height - 160 - M);
+    const dx = head.x - cx, dy = head.y - cy;
+    const len = Math.hypot(dx, dy);
+    const ux = len < 1e-6 ? 0 : dx / len, uy = len < 1e-6 ? 0 : dy / len;
+    const color = opts.color ?? '#3ddc7f';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, R, R, 0, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(3,10,6,.65)'; ctx.lineWidth = 1.5; ctx.stroke();
+    /** ★外向きの矢（★`rotate` は `Ctx2D` に無いので、点をこちらで回します） */
+    if (len >= 1e-6) {
+      const tipX = cx + ux * (R + ARROW), tipY2 = cy + uy * (R + ARROW);
+      const bx = cx + ux * (R + 1), by = cy + uy * (R + 1);
+      ctx.beginPath();
+      ctx.moveTo(tipX, tipY2);
+      ctx.lineTo(bx - uy * R * 0.55, by + ux * R * 0.55);
+      ctx.lineTo(bx + uy * R * 0.55, by - ux * R * 0.55);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(3,10,6,.65)'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    ctx.font = font(14, true);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#08160d';
+    ctx.fillText(String(gate), cx, cy + 5);
+    ctx.textAlign = 'left';
+    ctx.globalAlpha = baseAlpha;
+    return;
+  }
   // ★上端の制限より上へは出さない（ピンの高さは R*1.7 + R）
   const minTipY = (opts.topLimitY ?? 0) + R * 2.7;
   const tipY = Math.max(minTipY, head.y - GAP + rise.dy);

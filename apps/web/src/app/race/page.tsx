@@ -4167,15 +4167,27 @@ export default function RacePage(): React.JSX.Element {
           timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
         });
 
-        /**
-         * C: 自馬マーカー（雫型のピン・頭上を追従）
-         * ⚠️ ★**カットイン中は出しません**（★2026-09-11）。★カットイン中は馬を描いていないので、
-         *    ★ピンだけが ★**何も無い所を指して**浮きます（★ロゴの上に緑のピンが立っていました）。
-         */
-        if (v2OwnHead !== undefined && !(cutInActive && CUTIN_FULLSCREEN)) {
-          drawOwnHorseMarker(ctx, FONT, v2OwnHead, ownGate,
-            { topLimitY: 40, viewport: { width: W, height: H }, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC });
-        }
+      }
+      /**
+       * C: 自馬マーカー（雫型のピン・頭上を追従／★画面の外では縁に寄せて矢で示す）
+       *
+       * ⚠️ ★**これだけは `hud.standings` から外します**（★2026-09-12・オーナー指摘②
+       *    ★「自分馬がレース中に ★**常にわかるように**してください」）。
+       *
+       * 【★なぜ外すか】★`hud.standings` は ★**直線の競り合い**（`straight-contest` /
+       *    ★`straight-field`）で落ちます。★馬を大きく見せるための設計ですが、
+       *    ★**いちばん自馬を見たい 13 秒**（★実測・seed 42）で印まで消えていました。
+       * 【★それでも揃えるところ】★上の註記が心配していたのは
+       *    ★「★ゴール後にこれだけが残る」形です。★そこは下の条件で明示的に閉じます
+       *    （★リプレイ中・★勝馬確定後・★全画面カットイン中は出しません）。
+       * ⚠️ ★カットイン中に出さないのは、★カットイン中は馬を描いていないので
+       *    ★ピンだけが ★**何も無い所を指して**浮くためです（★2026-09-11）。
+       */
+      const ownMarkerVisible = hudRaw.standings && !replay.active && !winnerFinishedNow
+        && !(cutInActive && CUTIN_FULLSCREEN);
+      if (ownMarkerVisible && v2OwnHead !== undefined) {
+        drawOwnHorseMarker(ctx, FONT, v2OwnHead, ownGate,
+          { topLimitY: 40, viewport: { width: W, height: H }, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC });
       }
       if (hud.standings) {
         /**

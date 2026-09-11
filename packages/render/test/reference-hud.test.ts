@@ -210,10 +210,31 @@ describe('参考映像の HUD 3 点', () => {
       expect(markerTip(71)!).toBeLessThan(tip);
     });
 
-    it('画面から外れた馬には描かない', () => {
+    /**
+     * ⚠️ ★**この検定は 2026-09-12 に要求ごと変わりました**（★オーナー指摘②）。
+     *
+     *   ★旧: 「★画面から外れた馬には ★**描かない**」
+     *       ★理由は「端に張り付くと『そこに馬がいる』と誤読される」で、心配自体は正しい。
+     *   ⚠️ ★ところが ★**代わりに何も出さなかった**ので、★自馬が映っていない間は
+     *      ★居場所がまったく分かりませんでした。★実測（seed 42・自馬 1 番）:
+     *      ★印が出るのは ★**レースの 18.4%**、★11.2〜36.3 秒＝**25.1 秒**消えたまま。
+     *   ★新: ★オーナー評「★自分馬がレース中に ★**常にわかるように**してください」。
+     *       → ★縁へ寄せ、★**外向きの矢**を付けて「この先にいる」と示す。
+     *       ★画面の中の雫型とは ★**形が違う**ので、誤読の心配は形で切り分けます。
+     *
+     *   ★詳しい振る舞いは `own-horse-marker.test.ts` で固定しています。
+     */
+    it('★画面から外れた馬は、縁に寄せて出す（★2026-09-12・旧「描かない」から変更）', () => {
       const { ctx, ops } = recorder();
       drawOwnHorseMarker(ctx as never, FONT, { x: -500, y: 400 }, 4, { viewport: VIEWPORT, sinceSec: 9 });
-      expect(ops).toHaveLength(0);
+      expect(ops.length, '★何も描かないと、自馬の居場所が分からない').toBeGreaterThan(0);
+      /** ★縁に寄せる ＝ ★描く座標は画面の中に収まる */
+      const xs = ops.flatMap((o) => (o.op === 'moveTo' || o.op === 'lineTo' || o.op === 'ellipse'
+        ? [o.args[0] as number] : []));
+      expect(Math.min(...xs)).toBeGreaterThanOrEqual(0);
+      expect(Math.max(...xs)).toBeLessThanOrEqual(VIEWPORT.width);
+      /** ★馬番は出す（★どの馬の印かが分からないと意味がない） */
+      expect(ops.some((o) => o.op === 'fillText' && o.args[0] === '4')).toBe(true);
     });
   });
 });
