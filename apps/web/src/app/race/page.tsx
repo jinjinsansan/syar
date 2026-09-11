@@ -31,7 +31,7 @@ import { deriveRng } from '@star/sim-engine';
 import type { Strategy } from '@star/sim-engine';
 import type { Surface, TrackCondition } from '@star/race-engine';
 import {
-  replayPositionModel, finalOrderOf, withFinishRunOut, finishSpeedsOf, knotsFor, DEFAULT_PHASE_RATES,
+  replayPositionModel, finalOrderOf, withFinishRunOut, finishSpeedsOf, FINISH_RUNOUT_FALLBACK_MPS, knotsFor, DEFAULT_PHASE_RATES,
   type TimeWarp,
   dustExposureCurve,
   phaseOf, HORSE_LENGTH_M,
@@ -3187,11 +3187,24 @@ export default function RacePage(): React.JSX.Element {
      *    ★本編では `raceSec` が止まっているので起きません。リプレイでは進み続けるので起きます。
      * → ★リプレイでは `postDisplaySec` を渡さず、★**各馬の通過時の速さ**で走らせます。
      */
+    /**
+     * ⚠️ ★**本編にも「通過時の速さ」を渡します**（★2026-09-12・オーナー指摘⑦
+     *    ★「ゴール前はスピードを上げているのにゴール直前で遅くなります」）。
+     *
+     * 【★何が起きていたか】★渡していなかったので、★線を越えた瞬間に
+     *    ★**保険の一定値（`FINISH_RUNOUT_FALLBACK_MPS`）へ切り替わって**いました。
+     *    ★実測（seed 42・勝馬 10 番）: ★**17.32 → 14.00 m/s＝ −19%** が 1 コマで起きます。
+     * ⚠️ ★同じ不具合は ★**2026-08-28 にリプレイ側だけ直っていました**
+     *    （★オーナー指摘「リプレイのゴール前で必ず 1 度がくっとする」）。
+     *    ★本編側に同じ直しが入っておらず、★**片方だけ直った状態**で残っていました。
+     * ★着順・走破時刻・台帳には触れていません（★描画座標だけ）。
+     */
     const visualAt = replay.active
-      ? withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST, 0, 14,
-        (gate) => built.finishSpeeds.get(gate))
+      ? withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST, 0,
+        FINISH_RUNOUT_FALLBACK_MPS, (gate) => built.finishSpeeds.get(gate))
       : withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST,
-        Math.max(0, sourceD - runoutFrom) * RUNOUT_SLOW);
+        Math.max(0, sourceD - runoutFrom) * RUNOUT_SLOW,
+        FINISH_RUNOUT_FALLBACK_MPS, (gate) => built.finishSpeeds.get(gate));
     const visualLead = Math.max(...visualAt.map((h) => h.meters));
     const winnerGate = built.result[0]!.gate;
     /**

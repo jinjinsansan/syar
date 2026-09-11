@@ -282,6 +282,17 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
 }
 
 /**
+ * ★**通過時の速さが分からないときに使う速さ**（m/s）。
+ *
+ * ⚠️ ★**これは保険であって、既定の見せ方ではありません。** ★呼ぶ側は原則
+ *    ★`speedOf`（＝`finishSpeedsOf` の結果）を渡してください。★渡さないと
+ *    ★**全馬がこの一定値に切り替わり、線の上で速さが跳びます**
+ *    （★2026-09-12・オーナー指摘⑦「ゴール直前で遅くなる」。★実測 17.32 → 14.00 m/s）。
+ * ⚠️ ★数値をここ以外に書かないこと（★R-31）。
+ */
+export const FINISH_RUNOUT_FALLBACK_MPS = 14;
+
+/**
  * ゴール到達後の表示用ランアウト。確定時刻や着順は変えず、描画座標だけを
  * 決勝線の先へ進める。先着馬ほど長く進むため、全馬が一点へ潰れない。
  */
@@ -291,7 +302,7 @@ export function withFinishRunOut(
   raceSec: number,
   distanceMeter: number,
   postDisplaySec = 0,
-  speedMps = 14,
+  speedMps = FINISH_RUNOUT_FALLBACK_MPS,
   /**
    * ★**その馬がゴール線を通ったときの速さ**（m/s）。省略すると `speedMps` を使います。
    *
