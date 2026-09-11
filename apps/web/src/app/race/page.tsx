@@ -3686,7 +3686,9 @@ export default function RacePage(): React.JSX.Element {
       /** ★このカットが始まってからの秒。★切り替え表に無ければ「ずっと前から」扱い */
       const sinceCutSec = cutChange === undefined ? Number.POSITIVE_INFINITY : d - cutChange.displaySec;
       const cutIn = CUTIN_OFF || cutChange === undefined || sinceCutSec < 0 || sinceCutSec >= RACE_CUTIN_SEC
-        ? undefined : raceCutInAt(cutChange.from, cutChange.to);
+        ? undefined : raceCutInAt(cutChange.from, cutChange.to,
+          /** ★見出しは ★**画面が出している区間名**から作ります（★カメラ名で断定しない・★R-30） */
+          { sectionLabel: v2SectionLabel });
       /**
        * ★**A 自馬カード**（★発走直後）。★カットの境目ではなく、★レース開始からの経過で出します。
        * ⚠️ ★参考映像は ★発走の瞬間を ★**見せません**（★実測 5.6→6.0 秒で、踏み出しは 1 コマも無い）。
@@ -3889,7 +3891,7 @@ export default function RacePage(): React.JSX.Element {
        *    ★カットインが引き取りました（★不透明・1.2 秒）。
        */
       const flashCoveredByCutIn = change !== undefined
-        && raceCutInAt(change.from, change.to) !== undefined;
+        && raceCutInAt(change.from, change.to, { sectionLabel: v2SectionLabel }) !== undefined;
       if (change !== undefined && !flashCoveredByCutIn && FLASH_INTO.has(change.to)) {
         // ★閃光トランジション（アーケード参考映像 74 秒）: 白 → 0.3 秒で消える
         const t = (d - change.displaySec) / 0.3;

@@ -27,36 +27,72 @@ const V6_TRANSITIONS = SCRIPT_V6.slice(1).map((row, i) => ({
   from: SCRIPT_V6[i]!.id, to: row.id,
 }));
 
+/**
+ * ⚠️ ★**ここから下の「出す場所」は 2026-09-12 に要求ごと変わりました**（★オーナー指摘①②）。
+ *
+ *   ★旧: ★位置取り（`opening-side-lead` → `opening-formation`）でも出していた。
+ *   ★オーナー評「★現在の隊列も ★**デザイナーのハンドオフ**であり、★カットイン用に作っているのに
+ *   ★**カットイン場面ではないところに出している**のも間違っています」
+ *   ★「★カットインは ★**カーブや発走の瞬間のクオリティが悪いものを隠すため**のもの。
+ *     ★今カットインを使う場所は ★**4 コーナーの部分だけ**です（★桜星賞では）。
+ *     ★しかし様々なコースではコーナーがあちこちあるので、★やはりカットインは必要です」
+ *   ★新: ★**コーナーの出入りだけ**。★どのコーナーでも当たるようにする。
+ */
 describe('カットインを出す場所', () => {
-  it('台本 v6 の中で出るのは 3 か所だけ（位置取り・コーナー入り・直線への出）', () => {
+  it('★台本 v6 の中で出るのは 2 か所だけ（★コーナー入り・コーナー明け）', () => {
     const shown = V6_TRANSITIONS.filter((t) => raceCutInAt(t.from, t.to) !== undefined)
       .map((t) => `${t.from}>${t.to}`);
     expect(shown).toEqual([
-      'opening-side-lead>opening-formation',
       'side-drive>fourth-corner-front',
       'fourth-corner-front>side-drive',
     ]);
   });
 
+  /** ⚠️ ★オーナー指摘①: ★位置取りは「カットイン場面」ではない */
+  it('★最初の位置取りでは出さない（★「現在の隊列」を取り下げた）', () => {
+    expect(raceCutInAt('opening-side-lead', 'opening-formation')).toBeUndefined();
+    expect(raceCutInAt('opening-formation', 'opening-side-settle')).toBeUndefined();
+  });
+
+  /**
+   * ⚠️ ★オーナー指摘②: ★**様々なコースではコーナーがあちこちある**。
+   *    ★以前は `fourth-corner-` しか見ていなかったので、★1〜3 角では出ませんでした。
+   */
+  it('★どのコーナーでも出る（★1 角・2 角・3 角）', () => {
+    for (const corner of ['first-corner-front', 'second-corner-high', 'third-corner-rear']) {
+      expect(raceCutInAt('side-drive', corner)?.kind, `${corner} へ入るとき`).toBe('running-style');
+      expect(raceCutInAt(corner, 'side-drive')?.kind, `${corner} から出るとき`).toBe('to-straight');
+    }
+  });
+
+  /**
+   * ⚠️ ★見出しを ★**カメラの名前から断定しない**（★計画書 §3.3）。
+   *    ★1 角を抜けた先は直線ではありません。★画面が出している区間名から作ります。
+   */
+  it('★コーナー明けの見出しは、実際にいる区間から作る', () => {
+    expect(raceCutInAt('second-corner-high', 'side-drive', { sectionLabel: '向正面' })?.label).toBe('向正面へ');
+    expect(raceCutInAt('fourth-corner-front', 'side-drive', { sectionLabel: '最後の直線' })?.label).toBe('最後の直線へ');
+  });
+
   /** ★オーナー案「★入れる度に毎回異なる意味のあるカットインに」 */
-  it('★出る 3 枚は、中身が全部違う', () => {
+  it('★出る 2 枚は、中身が全部違う', () => {
     const kinds = V6_TRANSITIONS
       .map((t) => raceCutInAt(t.from, t.to)?.kind)
       .filter((k): k is NonNullable<typeof k> => k !== undefined);
-    expect(kinds).toHaveLength(3);
-    expect(new Set(kinds).size, '★同じ中身が 2 回出ています').toBe(3);
+    expect(kinds).toHaveLength(2);
+    expect(new Set(kinds).size, '★同じ中身が 2 回出ています').toBe(2);
     /** ★発走の 1 枚を足しても、まだ全部違う */
-    expect(new Set([...kinds, RACE_CUTIN_AT_START.kind]).size).toBe(4);
+    expect(new Set([...kinds, RACE_CUTIN_AT_START.kind]).size).toBe(3);
   });
 
-  it('★4 枚それぞれに、何の画面かを言う見出しが付いている', () => {
+  it('★3 枚それぞれに、何の画面かを言う見出しが付いている', () => {
     const labels = [
       RACE_CUTIN_AT_START.label,
       ...V6_TRANSITIONS.map((t) => raceCutInAt(t.from, t.to)?.label).filter((l) => l !== undefined),
     ];
-    expect(labels).toHaveLength(4);
+    expect(labels).toHaveLength(3);
     for (const l of labels) expect((l ?? '').length).toBeGreaterThan(0);
-    expect(new Set(labels).size, '★見出しが重なっています').toBe(4);
+    expect(new Set(labels).size, '★見出しが重なっています').toBe(3);
   });
 
   /**

@@ -65,25 +65,52 @@ export const RACE_CUTIN_AT_START: RaceCutIn = { kind: 'own-horse', label: 'あ�
  * ⚠️ ★4 角のカットは 3 通りあります（`fourth-corner-front` / `-wide` / `-far`）。
  *    ★名前を 1 つだけ書くと、★撮り方を替えた日に出なくなります（★2026-09-11 に実際に起きました）。
  */
-export function raceCutInAt(fromId: string, toId: string): RaceCutIn | undefined {
-  const isCorner = (id: string): boolean => id.startsWith('fourth-corner-');
-  /** ★B ★最初の位置取りへ入る */
-  if (fromId === 'opening-side-lead' && toId === 'opening-formation') {
-    return { kind: 'formation', label: '現在の隊列' };
-  }
-  /** ★C ★コーナーへ入る */
-  if (fromId === 'side-drive' && isCorner(toId)) {
+/**
+ * ★**コーナーを見せているカットか。**
+ *
+ * ⚠️ ★`fourth-corner-` だけを見ていました（★2026-09-12 まで）。★**桜星賞の 4 角しか当たりません。**
+ *    ★オーナー評「★様々なコースではコーナーがあちこちあるので、★やはりカットインは必要です」。
+ *    ★1 角（`first-corner-front`）・2 角（`second-corner-high`）・3 角（`third-corner-rear`）でも
+ *    ★同じ素材の弱さが出るので、★**どのコーナーのカットでも**当たるようにします。
+ * ★名前を 1 つずつ並べません（★撮り方を替えた日に漏れます・★2026-09-11 に実際に起きました）。
+ */
+const isCornerShot = (id: string): boolean => id.includes('-corner-');
+
+export function raceCutInAt(
+  fromId: string, toId: string,
+  opts: {
+    /**
+     * ★**そのとき画面が出している区間名**（★`broadcastV2SectionLabel` の値）。
+     * ⚠️ ★カメラの名前から「直線へ」と断定しないため、★**画面と同じ値**を受け取ります（★R-30）。
+     *    ★1 角や 2 角を抜けた先は直線ではありません。
+     */
+    readonly sectionLabel?: string | undefined;
+  } = {},
+): RaceCutIn | undefined {
+  /**
+   * ★**コーナーへ入る**（★どのコーナーでも）。
+   * ⚠️ ★以前は `side-drive` から入るときだけでした。★他のカットから入ると出ませんでした。
+   */
+  if (!isCornerShot(fromId) && isCornerShot(toId)) {
     return { kind: 'running-style', label: 'ここから動く馬' };
   }
-  /** ★D ★コーナーから直線へ出る */
-  if (isCorner(fromId) && toId === 'side-drive') {
-    return { kind: 'to-straight', label: '最後の直線へ' };
+  /** ★**コーナーから出る**。★見出しは ★**実際にいる区間**から作ります */
+  if (isCornerShot(fromId) && !isCornerShot(toId)) {
+    const next = opts.sectionLabel;
+    const label = next === undefined || next === '' || next.includes('直線') || next === 'ゴール前'
+      ? '最後の直線へ' : `${next}へ`;
+    return { kind: 'to-straight', label };
   }
   /**
-   * ★E ★直線の継ぎ目（`side-drive` → `straight-contest` ほか）は ★**出しません**。
-   *   ★佳境でいちばん見たい場面から目を離させないためです。
-   *   ★あの継ぎ目の「繋がって見えない」は ★**カメラの高さ**を揃えて解いています
-   *   （★`broadcast-v2.ts` の `straight-contest` の注記）。
+   * ⚠️ ★**コーナー以外では出しません**（★2026-09-12・★オーナー指摘①②）。
+   *
+   *   ★オーナー評「★現在の隊列も ★**デザイナーのハンドオフ**であり、★カットイン用に作っているのに
+   *   ★**カットイン場面ではないところに出している**のも間違っています」。
+   *   ★カットインは ★**素材の質が足りていない場面（コーナー・発走の瞬間）を隠すため**のもので、
+   *   ★カメラが切り替わるたびに出すものではありません。
+   *   → ★`opening-side-lead` → `opening-formation` の「現在の隊列」は ★**取り下げました**。
+   *     ★`opening-formation` は高い引きのカメラなので、★カットインが無くても絵は成立します。
+   *   → ★直線の継ぎ目も出しません（★佳境で目を離させない）。
    */
   return undefined;
 }
