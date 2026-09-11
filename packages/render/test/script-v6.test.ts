@@ -8,7 +8,7 @@ import {
   DEFAULT_RACE_SCRIPT, CUT_RACE_SCRIPT, ovalCourse,
 } from '../src/index.js';
 import { resolveBroadcastV2Scene, type BroadcastV2Horse } from '../src/broadcast-v2-scene.js';
-import { broadcastV2ShotById, broadcastV2ScriptBoundariesM } from '../src/broadcast-v2.js';
+import { broadcastV2ShotById, broadcastV2ScriptBoundariesM, broadcastV2ScriptAssets, SCRIPT_V4 } from '../src/broadcast-v2.js';
 
 const DIST = 1600;
 const VIEWPORT = { width: 1280, height: 720 } as const;
@@ -78,7 +78,7 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
      * ★位置取り以降の終端（0.330）は ★**動かしていません**。
      */
     expect(SCRIPT_V6.slice(0, 5).map((r) => [r.until, r.id])).toEqual([
-      [0.008, 'start-front'], [0.0625, 'start-rear-far'], [0.165, 'opening-side-lead'],
+      [0.008, 'start-gate-side'], [0.0625, 'start-rear-far'], [0.165, 'opening-side-lead'],
       [0.206, 'opening-formation'], [0.330, 'opening-side-settle'],
     ]);
     expect(SCRIPT_V6[4]?.until).toBe(SCRIPT_V5[1]?.until);
@@ -98,8 +98,11 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
     const side = frameAt(700, 'v6');
     expect(side.shot, '★比較の相手は真横の勝負所').toBe('side-drive');
 
+    /**
+     * ⚠️ ★**位置取りは 2026-09-11 に俯瞰 → 高い真横へ移りました**（★オーナー
+     *    「★上空からはまだ馬が斜め前を向いています」）。★残る俯瞰はコーナーだけです。
+     */
     const cases = [
-      { leadS: 290, shot: 'opening-formation', style: undefined },
       { leadS: 900, shot: 'fourth-corner-far', style: undefined },
     ];
     for (const c of cases) {
@@ -191,18 +194,18 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
       }).shot.id;
 
     /**
-     * ★**この検定は代理指標です。★過検出する条件が 1 つ分かっています。**
+     * ★**見るのは「同じ背景の作り方」どうしの継ぎ目だけ**（★2026-09-11 に絞りました）。
      *
-     *   ★高さの跳びが背景を入れ替えるのは、★**2 つのカメラの距離が近いとき**です。
-     *   ★`start-rear-far`（★距離 85m・高さ 40m）→ `opening-side-lead`（★距離 45m・高さ 7.5m）は
-     *   ★跳び 32.5m ですが、★**撮って確認した限り背景は飛びません**（★`tmp/seam2`・2026-09-11）。
-     *   ★遠くから見下ろす引きと、★近くの望遠では、★同じ高さの差でも画に入る奥の物が違うためです。
-     * ⚠️ ★**「落ちたから外した」ではありません。** ★外す前にその継ぎ目を撮っています。
-     *    ★免除を足すときは ★**必ず絵で確かめてから**にしてください。
+     *   ★真横のカットには背景が 2 通りあります:
+     *     ★① ★1 枚絵の板（★走路を水平の帯として持つ）
+     *     ★② ★透視ワールド（★走路を実際の形で描く・`perspectiveWorld`）
+     *   ★①どうしの継ぎ目でだけ、★高さの跳びが ★**背景の入れ替え**として出ます。
+     *   ★①と②の間は ★**そもそも作りが違う**ので、★見る人にも「切り替わった」と分かります。
+     *
+     * ⚠️ ★最初は `start-rear-far → opening-side-lead` を ★**名指しで免除**していました。
+     *    ★免除が増えるほど検定は形だけになるので、★**条件で書き直しています**。
+     *    ★免除していた対は、★この条件でも外れます（★片方が透視ワールド）。
      */
-    const CHECKED_BY_EYE: ReadonlySet<string> = new Set([
-      'start-rear-far→opening-side-lead',
-    ]);
     const offenders: string[] = [];
     let seams = 0;
     for (const b of broadcastV2ScriptBoundariesM(course, 'v6')) {
@@ -214,8 +217,13 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
       /** ★真横どうしだけを見ます（★画角が変わる切替は、変わって当然） */
       if (broadcastV2ShotById(from as never).view !== 'side') continue;
       if (broadcastV2ShotById(to as never).view !== 'side') continue;
+      /**
+       * ★見るのは ★**1 枚絵の板どうし**の継ぎ目だけ（★上の注記）。
+       * ★透視ワールドは走路を実際の形で描くので、★高さを変えても背景は破綻しません。
+       */
+      if (broadcastV2ShotById(from as never).perspectiveWorld === true) continue;
+      if (broadcastV2ShotById(to as never).perspectiveWorld === true) continue;
       seams += 1;
-      if (CHECKED_BY_EYE.has(`${from}→${to}`)) continue;
       const gap = Math.abs(eyeZAt(after) - eyeZAt(before));
       if (gap > 1.5 + 1e-9) offenders.push(`${from}→${to} … ${gap.toFixed(2)}m`);
     }
@@ -413,5 +421,65 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
      */
     expect(page).toContain('const climaxDisabled = cutScript || ');
     expect(page).toContain('noContenderFrameShots: CUT_SCRIPT_NO_FRAME_SHOTS');
+  });
+});
+
+/**
+ * ★**発馬機は「形」なので、どの角度でも組み上がる**（★2026-09-11・★オーナー指示）
+ *
+ * ★オーナー評「★ゲートは真横からのゲートを作った方がいいです。★そのままゲート発走の瞬間の絵も
+ *   ★上手くいくと思いますし、★そのままの陣地取りも上手くいくと思います」。
+ *
+ * ⚠️ ★以前の発馬機は ★**正面から描いた 1 枚絵**でした。★真横にすると横向きの黒い塊になります。
+ *    ★この検定は ★**絵へ戻っていないこと**と、★発走まわりが真横であることを留めます。
+ */
+describe('★発走まわり（★世界座標の発馬機）', () => {
+  it('★ゲート・発走直後・位置取りは、すべて真横で合格済みの素材を使う', () => {
+    for (const id of ['start-gate-side', 'start-rear-far', 'opening-formation'] as const) {
+      const shot = broadcastV2ShotById(id);
+      expect(shot.view, `${id} の画角`).toBe('side');
+      expect(shot.horseAsset, `${id} の素材`).toBe('side-v6');
+    }
+  });
+
+  /**
+   * ⚠️ ★**真横なのに 1 枚絵の板で描くと、高い位置から見たとき芝が合いません**
+   *    （★オーナー ⑨「芝から出てしまっていて破綻しています」）。
+   *    ★高い真横のカットは `perspectiveWorld` を立てること。
+   */
+  it('★高い真横のカットは、透視ワールドで描く', () => {
+    for (const id of ['start-gate-side', 'start-rear-far', 'opening-formation'] as const) {
+      expect(broadcastV2ShotById(id).perspectiveWorld, `${id}`).toBe(true);
+    }
+    /** ★低い真横（勝負所・直線）は板のままでよい */
+    for (const id of ['side-drive', 'straight-contest', 'finish-line'] as const) {
+      expect(broadcastV2ShotById(id).perspectiveWorld, `${id}`).not.toBe(true);
+    }
+  });
+
+  /**
+   * ⚠️ ★**旧台本（切り戻しの道）を動かさないこと。**
+   *    ★一度 `start-front` を真横へ書き換えて、★台本 v4 の切替の数まで動きました。
+   *    ★`start-gate-side` は ★**v6 だけ**が使います。
+   */
+  it('★真横のゲートは台本 v6 だけが使う', () => {
+    expect(SCRIPT_V6.some((r) => r.id === 'start-gate-side')).toBe(true);
+    for (const rows of [SCRIPT_V5, SCRIPT_V4] as const) {
+      expect(rows.some((r) => r.id === 'start-gate-side')).toBe(false);
+      expect(rows[0]?.id, '旧台本の頭は従来どおり').toBe('start-front');
+    }
+    expect(broadcastV2ShotById('start-front').view, '旧台本の発走は従来どおり').toBe('diag-front');
+  });
+
+  /**
+   * ★**読む素材の組が増えていないこと**（★台帳 A-11 / A-12・★102MB → 76MB の最適化）。
+   * ★4 角は実行時に差し替わるので、★**差し替わった先**で数えます。
+   */
+  it('★台本 v6 が読む組は 3 つだけ（★真横・高所斜め・勝馬）', () => {
+    expect([...broadcastV2ScriptAssets('v6')].sort())
+      .toEqual(['high-diag-v2', 'side-v6', 'winner-v1']);
+    /** ★`?corner=front` へ戻したときは正面寄りの組が要ります */
+    expect([...broadcastV2ScriptAssets('v6', false)].sort())
+      .toEqual(['diag-front-v2', 'side-v6', 'winner-v1']);
   });
 });

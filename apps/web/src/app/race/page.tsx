@@ -606,6 +606,14 @@ function bakeCoat(image: FrameImage, coat: CoatName): FrameImage {
   return canvas;
 }
 
+/**
+ * ★**1 枚絵の発馬機を使うか**（★2026-09-11・★オーナー指示で `false`）。
+ *
+ *   ★`true` にすると、★2026-09-10 までの ★**正面から描いた 1 枚絵**のゲートに戻ります。
+ * ⚠️ ★戻すと ★**真横のカットでゲートが横向きの黒い塊**になります（★実測）。
+ *    ★見比べのための口で、★常用しません。
+ */
+const GATE_BILLBOARD = false;
 const HORSE_NAMES = ['スターライト', 'サクラブリーズ', 'ハンシンドリーム', 'ミライノツバサ', 'グリーンアロー', 'オウカノキセキ', 'ナニワスピリット', 'ローズクイーン', 'ムラサキノホシ', 'アオバハヤテ', 'ブラウンエース', 'ピンクレディ'] as const;
 /**
  * ★**画面上の順位**（★2026-09-11・★カットインと順位表で 1 つの規則にする）。
@@ -3478,7 +3486,12 @@ export default function RacePage(): React.JSX.Element {
          *   縦の枠取り: 望遠カメラで蹄が y≈375〜470 に来るので、芝の帯（プレート 503–762）が
          *   その範囲を含むよう anchor を 1.0（窓を下端まで）にする。
          */
-        parallaxPlate: sceneToDraw.shot.view === 'side'
+        /**
+         * ⚠️ ★**高い位置の真横は板で描けません**（★2026-09-11・★オーナー ⑨）。
+         *    ★板は走路を水平の帯として持つので、★見下ろすと ★**先頭が芝の外**に出ます。
+         *    ★そのカットは `perspectiveWorld` を立てて透視ワールドへ回します。
+         */
+        parallaxPlate: sceneToDraw.shot.view === 'side' && sceneToDraw.shot.perspectiveWorld !== true
           ? {
             /** ★馬場で板を選ぶ（2026-08-28）。★地面の層だけが差し替わります */
             plate: surface === 'dirt' ? art.parallaxBackstretchDirt : art.parallaxBackstretch,
@@ -3486,7 +3499,8 @@ export default function RacePage(): React.JSX.Element {
           }
           : undefined,
         // ★横視点以外（コーナー後方・俯瞰・斜め前）はテクスチャ付き透視ワールド（背景が実際に動く）
-        texturedWorld: sceneToDraw.shot.view === 'side' ? undefined : art.texturedWorld,
+        texturedWorld: sceneToDraw.shot.view === 'side' && sceneToDraw.shot.perspectiveWorld !== true
+          ? undefined : art.texturedWorld,
         /**
          * ★被写体ブラー（参考映像 1.4・設計 1-2）。露光 `MOTION_BLUR_EXPOSURE_SEC` の間に
          *   進んだ距離だけ、進行方向の後ろへ尾を引く。寄りのカットほど px が伸びる（px/m に比例）。
@@ -3498,7 +3512,22 @@ export default function RacePage(): React.JSX.Element {
         // ★ハロン棒の数字（設計 1-7）。書体はこの画面のものを使う
         poleFont: FONT,
         /**
-         * ★正面の発馬機ビルボード（走路 s=1.6・w 0.5〜15.3）。
+         * ★**発馬機**（★2026-09-11・★オーナー指示「真横からのゲートを作った方がいい」）。
+         *
+         *   ★絵ではなく ★**世界座標の形**で組みます（`starting-gate-world.ts`）。
+         *   → ★正面でも真横でも俯瞰でも成立します。★角度を変えるたびに絵を作り直す必要がありません。
+         * ⚠️ ★下の 1 枚絵のビルボード（`gateFront`）は ★**外しました**。
+         *    ★あれは正面から描いた絵なので、★真横にすると横向きの黒い塊になりました（★実測）。
+         * ★扉は発走から 0.25 秒かけて開きます（★時刻の関数・★憲法 4）。
+         */
+        startingGate: visualLead < 120 ? {
+          startS: 0,
+          fieldSize: FIELD,
+          closedRatio: raceD <= 0 ? 1 : Math.max(0, 1 - raceD / 0.25),
+          font: FONT,
+        } : undefined,
+        /**
+         * ★（★停止中）★正面の発馬機ビルボード（走路 s=1.6・w 0.5〜15.3）。
          *   待機中は扉閉を**馬の手前**に、開扉後は扉開を**馬の後ろ**に。発走 60m を過ぎたら描かない。
          *
          * ★2026-08-21 に素材を作り直しました。
@@ -3509,7 +3538,7 @@ export default function RacePage(): React.JSX.Element {
          *   新素材は **3.15m**、かつ**扉の上が抜けている**ので、頭と騎手が房越しに見えます。
          *   ⚠️ 縦横比は絵を差し替えるたびに黙って変わります。**`tools/verify-world-billboards.mjs` で留めています。**
          */
-        worldBillboards: art.gateFront !== undefined && visualLead < 90 ? [{
+        worldBillboards: art.gateFront !== undefined && GATE_BILLBOARD && visualLead < 90 ? [{
           image: raceD <= 0 ? art.gateFront.closed : art.gateFront.open,
           width: (raceD <= 0 ? art.gateFront.closed : art.gateFront.open).naturalWidth,
           height: (raceD <= 0 ? art.gateFront.closed : art.gateFront.open).naturalHeight,

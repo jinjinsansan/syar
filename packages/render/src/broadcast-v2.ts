@@ -13,6 +13,8 @@ export type BroadcastV2ShotId =
   | 'fourth-corner-far'
   /** ★発走直後を ★**高い後方の引き**で（★2026-09-11・★オーナー ②・★参考映像に合わせた） */
   | 'start-rear-far'
+  /** ★ゲートを ★**真横**から（★2026-09-11・★オーナー指示・★台本 v6 だけ） */
+  | 'start-gate-side'
   | 'start-front' | 'winner-follow-rear'
   // ★直線の正面固定（差してくる馬を奥行きで見せる）
   | 'homestretch-front'
@@ -32,6 +34,21 @@ export interface BroadcastV2Shot {
   readonly camera: ShotCameraPreset;
   /** 馬群が画面に収まらないとき、先頭を画面幅のどこに置くか（0〜1・進行方向側が 1）。既定 0.78 */
   readonly leadFraction?: number;
+  /**
+   * ★**真横だが「透視ワールド」で背景を描く**（★2026-09-11・★オーナー ⑨）
+   *
+   * 【★何が壊れていたか】
+   *   ★真横（`view: 'side'`）のカットは ★**1 枚絵の背景（パララックス板）**で描いています。
+   *   ★板は ★**走路を水平の帯**として持っているので、★カメラが低いうちは合います。
+   *   ⚠️ ★ところが ★**高い位置から見下ろす**と、★馬は奥行きぶん ★**斜めに並びます**。
+   *      ★板は水平のままなので、★**先頭が芝の外（ラチの向こう）に描かれます**
+   *      （★オーナー指摘「芝から出てしまっていて破綻しています」・★実測で確認）。
+   *
+   * → ★このカットだけ ★**透視ワールド**（`world-textured`）へ切り替えます。
+   *   ★あちらは走路を実際の形で描くので、★どの高さでも馬と地面が一致します。
+   * ⚠️ ★指定しなければ従来どおり板です（★既定は 1 画素も変わりません）。
+   */
+  readonly perspectiveWorld?: boolean;
   /**
    * ★固定カメラ（実際の競馬中継の 4 角: 直線入口の外側から、奥からこちらへ向かってくる馬群を見る）。
    *   現在の区間の終点から `sFromSegmentEnd` 先・内ラチから `w` の位置・高さ `upM` にカメラを置き、注視点だけ追う。
@@ -572,8 +589,9 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
      *    ★ここも俯瞰なので、★素材は不合格のままです。★真横の半分（14.4%）は超えません。
      *    ★「位置取り」の情報そのものは、★カットの頭 1.2 秒の ★**隊列図**が伝えます。
      */
-    id: 'opening-formation', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.2,
-    camera: { backM: 65, upM: 42, sideM: 20, fovDeg: 18.8 }, leadFraction: 0.60,
+    id: 'opening-formation', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.2,
+    camera: { backM: 40, upM: 60, sideM: 9, alongM: 10, fovDeg: 13 }, leadFraction: 0.60,
+    perspectiveWorld: true,
   },
   'opening-side-settle': {
     id: 'opening-side-settle', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
@@ -653,6 +671,31 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
     id: 'fourth-corner-wide', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.4,
     camera: { backM: 40, upM: 14, sideM: 13, fovDeg: 18.8 },
   },
+  'start-gate-side': {
+    /**
+     * ★**ゲートを真横から見る**（★2026-09-11・★オーナー指示）
+     *   > ★ゲートは真横からのゲートを作った方がいいです。★そのままゲート発走の瞬間の絵も
+     *   > ★上手くいくと思いますし、★そのままの陣地取りも上手くいくと思います。
+     *
+     * 【★なぜ新しいカットにしたか】
+     *   ⚠️ ★`start-front` を書き換えると、★**旧台本（v3 / v4 / v5）の 4 角や発走まで動きます**。
+     *      ★あれは切り戻しと見比べの道です（★台帳「見比べる相手が一緒に動いたら…」）。
+     *      ★実際に一度書き換えて、★台本 v4 の「画角が変わる切替」の数が動きました。
+     *   → ★**台本 v6 だけが使う別のカット**にしています。
+     *
+     * 【★真横のカメラは必ず走路の横に置かれる】
+     *   ⚠️ ★そのまま置くと、★発馬機の房は ★**カメラから見て一直線に奥へ並び**、
+     *      ★手前の 1 房が残り 11 房を隠します（★実測・★12 頭のうち 1 頭しか見えませんでした）。
+     *   → ★`alongM` で ★**走路方向へ 26m ずらします**。★房の正面が斜めに見えて 12 房とも読めます。
+     *   → ★仕切りも ★**板から枠**へ変えてあります（`starting-gate-world.ts` の注記）。
+     *
+     * ⚠️ ★真横だが ★**透視ワールド**で描きます。★1 枚絵の板は走路を水平の帯として持つので、
+     *    ★発馬機と地面が合いません（★`perspectiveWorld` の注記）。
+     */
+    id: 'start-gate-side', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.35,
+    camera: { ...SIDE_LOW, upM: 5, fovDeg: 18, alongM: 26 },
+    perspectiveWorld: true,
+  },
   'start-rear-far': {
     /**
      * ★**発走直後の「高い後方の引き」**（★2026-09-11・★オーナー ②）
@@ -674,6 +717,8 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
      */
     id: 'start-rear-far', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.3,
     camera: { backM: 44, upM: 40, sideM: 60, fovDeg: 12 }, leadFraction: 0.58,
+    /** ⚠️ ★高い位置の真横なので、★1 枚絵の板では地面が合いません（★上の注記） */
+    perspectiveWorld: true,
   },
   'fourth-corner-far': {
     /**
@@ -1536,7 +1581,7 @@ export const SCRIPT_V6: readonly { readonly until: number; readonly id: Broadcas
    *     ★ロゴ（0.42 秒）が発走の瞬間を覆うので、★残る「正面で走る絵」は ★**約 0.22 秒**。
    *     ★参考映像の「空になったゲート」の一拍（★実測 約 0.2 秒）と同じ長さになります。
    */
-  { until: 0.008, id: 'start-front' },         // 〜12.8m  ★ゲート＋「空になったゲート」の一拍
+  { until: 0.008, id: 'start-gate-side' },     // 〜12.8m  ★ゲート（真横）＋「空になったゲート」の一拍
   { until: 0.0625, id: 'start-rear-far' },     // 〜100m   ★高い後方の引き（★参考映像の発走直後）
   // 100〜528m は、横の走行 5秒相当 → 隊列図 2秒相当 → 横の走行 6秒相当に分ける。
   // 距離比なのでコースによって秒数は変わるが、既存の終端 0.330 と全体尺は変えない。
@@ -1897,8 +1942,19 @@ export function broadcastV2ShotAt(
  *
  * @param wideSubstitute ★`fourth-corner-front` を俯瞰ワイドで代用する設定なら `true`
  */
+/**
+ * ★**その台本が実際に描く素材の組**。
+ *
+ * ⚠️ ★**台本の行ではなく、★実際に選ばれるカット**で数えること（★2026-09-11）。
+ *    ★台本 v6 の 4 角の行は `fourth-corner-front` ですが、★実行時の既定は
+ *    ★`fourth-corner-far` へ差し替わります（★`broadcastV2ShotAt`）。
+ *    ★行のまま数えると ★**描く組（`high-diag-v2`）を読まず、読まない組（`diag-front-v2`）を読む**
+ *    ★という取り違えが起きます（★実測で検定が赤になりました）。
+ *
+ * @param wideSubstitute ★4 角を差し替えるか。★**既定は台本 v6 なら true**（★画面と同じ・R-31）
+ */
 export function broadcastV2ScriptAssets(
-  script: BroadcastV2Script, wideSubstitute = false,
+  script: BroadcastV2Script, wideSubstitute = script === 'v6',
 ): readonly string[] {
   const assetOf = (id: BroadcastV2ShotId): string | undefined => SHOTS[id].horseAsset;
   const out = new Set<string>();
@@ -1910,16 +1966,16 @@ export function broadcastV2ScriptAssets(
     return [...out];
   }
   for (const row of scriptRowsOf(script)) {
-    const asset = assetOf(row.id);
+    /** ★4 角は実行時に差し替わる。★**差し替わった先**の素材を数える */
+    const id = row.id === 'fourth-corner-front' && wideSubstitute
+      ? (script === 'v6' ? 'fourth-corner-far' : 'fourth-corner-wide')
+      : row.id;
+    const asset = assetOf(id);
     if (asset !== undefined) out.add(asset);
   }
   /** ★台本の表に無いが、★どの台本でも出るもの */
   for (const id of ['finish-line', 'winner-follow', 'winner-follow-rear'] as BroadcastV2ShotId[]) {
     const asset = assetOf(id);
-    if (asset !== undefined) out.add(asset);
-  }
-  if (wideSubstitute) {
-    const asset = assetOf('fourth-corner-wide');
     if (asset !== undefined) out.add(asset);
   }
   return [...out];

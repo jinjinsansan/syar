@@ -26,6 +26,7 @@ export * from './distance-poles.js';
 export * from './crowd.js';
 export * from './infield.js';
 export * from './finish-post.js';
+export * from './starting-gate-world.js';
 /** ★2D 馬群の限界テスト専用（通常のレースからは参照されない・`pack-limit.ts` の注記） */
 export * from './pack-limit.js';
 /**

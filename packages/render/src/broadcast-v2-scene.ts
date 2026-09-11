@@ -4,6 +4,7 @@ import type { Ctx2D, FontOf, Palette, SheetSpec } from './oblique-draw.js';
 import { cameraBasis, project } from './perspective.js';
 import { drawDistancePoles } from './distance-poles.js';
 import { drawFinishPost } from './finish-post.js';
+import { drawStartingGateWorld, drawStartingGateWorldFront, type StartingGateWorldOptions } from './starting-gate-world.js';
 import { drawMowStripes } from './mow-stripes.js';
 import { drawPuddles } from './puddles.js';
 import { drawParallaxObjects, drawParallaxPlate, drawWorldBillboards, type ParallaxDrawOptions, type ParallaxPlate, type WorldBillboard } from './parallax-plate.js';
@@ -575,6 +576,12 @@ export function drawBroadcastV2Scene<TImage>(
     readonly texturedWorld?: TexturedWorldAssets<TImage> | undefined;
     /** ★世界に置く看板（発馬機の正面など）。どちらの描画方式でも同じ透視カメラで置く */
     readonly worldBillboards?: readonly WorldBillboard<TImage>[] | undefined;
+    /**
+     * ★**発馬機**（★2026-09-11・★オーナー指示「真横からのゲートを作った方がいい」）。
+     *   ★絵ではなく ★**世界座標の形**なので、★正面でも真横でも俯瞰でも成立します。
+     * ⚠️ ★渡さなければ 1 画素も描きません（★既定は変わりません）。
+     */
+    readonly startingGate?: Omit<StartingGateWorldOptions, 'focusS'> | undefined;
     /** ★芝の縞刈り（設計 1-3）。既定で描く。`false` で止める（素材の比較用） */
     readonly mowStripes?: boolean | undefined;
     /**
@@ -743,6 +750,10 @@ export function drawBroadcastV2Scene<TImage>(
     drawFinishPost(ctx, course, scene.camera, { focusS: scene.focusS, font: opts.poleFont });
   }
   if (opts.worldBillboards !== undefined) drawWorldBillboards(ctx, opts.worldBillboards, projectGround, 'behind', scene.camera.width);
+  /** ★発馬機の奥側。★**馬より先**に描きます（★馬はこの上に乗ります） */
+  if (opts.startingGate !== undefined) {
+    drawStartingGateWorld(ctx, course, scene.camera, { ...opts.startingGate, focusS: scene.focusS });
+  }
   const library = opts.libraries[scene.shot.horseAsset];
   /**
    * ★方向別素材の選択: 馬ごとの「進行方向とカメラの相対角」で集合を選ぶ（俯瞰でも後方でも、その馬が
@@ -921,6 +932,10 @@ export function drawBroadcastV2Scene<TImage>(
   // ★馬の手前に立つ物体（発馬機の前枠など）
   if (opts.parallaxPlate !== undefined && parallaxOpts !== undefined) {
     drawParallaxObjects(ctx, opts.parallaxPlate.plate, parallaxOpts, 'front');
+  }
+  /** ★発馬機の前扉。★**馬のあと**に描きます（★馬が房の中にいるように見えます） */
+  if (opts.startingGate !== undefined) {
+    drawStartingGateWorldFront(ctx, course, scene.camera, { ...opts.startingGate, focusS: scene.focusS });
   }
   if (opts.worldBillboards !== undefined) drawWorldBillboards(ctx, opts.worldBillboards, projectGround, 'front', scene.camera.width);
 }
