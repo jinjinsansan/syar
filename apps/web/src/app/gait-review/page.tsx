@@ -45,6 +45,36 @@ export default function GaitReviewPage(): React.ReactElement {
           ★<b>主観の評価は等速を先に</b>見てください。★0.25 倍は姿勢と接地を確かめるためのものです。
         </p>
 
+        <section style={{ ...card, border: '2px solid #ffd34d', background: '#1d1c15' }}>
+          <h2 style={h2}>★いま判断していただきたいのは、これ 1 つです — ★4 コーナーの撮り方</h2>
+          <p style={note}>
+            ★<b>同じ場面（表示 35〜43 秒）を 3 通りで撮って、並べて同時に流しています。</b>
+            ★URL や秒を行き来する必要はありません。
+          </p>
+          <div style={{ display: 'flex', gap: 18, fontSize: 13, margin: '0 0 10px', flexWrap: 'wrap' }}>
+            {([
+              ['#ffd34d', 'A 左上', '今回の提案（カットの中で引いていく）', '馬 18.1% → 14.6%'],
+              ['#ff6b6b', 'B 右上', '前（正面固定・奥から迫る）', '馬 16.3〜24.6%'],
+              ['#6bb8ff', 'C 左下', '中間（俯瞰ワイド）', '馬 23.8%'],
+            ] as const).map(([c, pos, name, size]) => (
+              <span key={pos} style={{ color: '#9fb4c6' }}>
+                <span style={{ display: 'inline-block', width: 26, height: 8, background: c, marginRight: 8, verticalAlign: 'middle' }} />
+                <b style={{ color: '#eef2f6' }}>{pos}</b> {name} <span style={{ color: '#6f8294' }}>／ {size}</span>
+              </span>
+            ))}
+          </div>
+          <Pair base="corner-choice" />
+          <p style={{ ...note, margin: '12px 0 0' }}>
+            ★<b>見どころ</b>: ★どれが「4 コーナーを回っている」と見えるか。
+            ★そして ★<b>馬の脚さばきが気にならないのはどれか</b>。<br />
+            ⚠️ ★A は ★<b>前後のカットとの繋がり</b>を良くした代わりに、★馬が大きくなっています。
+            ★4 コーナーは俯瞰で、★その素材は不合格のままなので、★大きくすると脚が見えます。<br />
+            ⚠️ ★B は前の形です。★繋がりは悪い（縮尺の跳び ×0.53 / ×2.80）が、★正面から迫る力があります。<br />
+            ⚠️ ★C は中間です。★弧はいちばん見えますが、★馬も大きめです。<br />
+            ★<b>A / B / C のどれか、あるいは「A をもう少し小さく」</b>を教えてください。
+          </p>
+        </section>
+
         <section style={card}>
           <h2 style={h2}>① ★斜め前の素材 — ★1 周 8 コマ（★同じ倍率・止め絵）</h2>
           <p style={note}>
@@ -369,36 +399,6 @@ export default function GaitReviewPage(): React.ReactElement {
             ⚠️ ★採用する場合、★<b>その区間だけ旧 2D の画を使う</b>という作りになります。
             ★絵柄が混ざることになるので、★そこはオーナー判断です。<br />
             ⚠️ ★カットの数・境界は変えません。★短い尺で使う、というご指示のとおりにします。
-          </p>
-        </section>
-
-        <section style={{ ...card, border: '2px solid #ffd34d', background: '#1d1c15' }}>
-          <h2 style={h2}>★いま判断していただきたいのは、これ 1 つです — ★4 コーナーの撮り方</h2>
-          <p style={note}>
-            ★<b>同じ場面（表示 35〜43 秒）を 3 通りで撮って、並べて同時に流しています。</b>
-            ★URL や秒を行き来する必要はありません。
-          </p>
-          <div style={{ display: 'flex', gap: 18, fontSize: 13, margin: '0 0 10px', flexWrap: 'wrap' }}>
-            {([
-              ['#ffd34d', 'A 左上', '今回の提案（カットの中で引いていく）', '馬 18.1% → 14.6%'],
-              ['#ff6b6b', 'B 右上', '前（正面固定・奥から迫る）', '馬 16.3〜24.6%'],
-              ['#6bb8ff', 'C 左下', '中間（俯瞰ワイド）', '馬 23.8%'],
-            ] as const).map(([c, pos, name, size]) => (
-              <span key={pos} style={{ color: '#9fb4c6' }}>
-                <span style={{ display: 'inline-block', width: 26, height: 8, background: c, marginRight: 8, verticalAlign: 'middle' }} />
-                <b style={{ color: '#eef2f6' }}>{pos}</b> {name} <span style={{ color: '#6f8294' }}>／ {size}</span>
-              </span>
-            ))}
-          </div>
-          <Pair base="corner-choice" />
-          <p style={{ ...note, margin: '12px 0 0' }}>
-            ★<b>見どころ</b>: ★どれが「4 コーナーを回っている」と見えるか。
-            ★そして ★<b>馬の脚さばきが気にならないのはどれか</b>。<br />
-            ⚠️ ★A は ★<b>前後のカットとの繋がり</b>を良くした代わりに、★馬が大きくなっています。
-            ★4 コーナーは俯瞰で、★その素材は不合格のままなので、★大きくすると脚が見えます。<br />
-            ⚠️ ★B は前の形です。★繋がりは悪い（縮尺の跳び ×0.53 / ×2.80）が、★正面から迫る力があります。<br />
-            ⚠️ ★C は中間です。★弧はいちばん見えますが、★馬も大きめです。<br />
-            ★<b>A / B / C のどれか、あるいは「A をもう少し小さく」</b>を教えてください。
           </p>
         </section>
 
