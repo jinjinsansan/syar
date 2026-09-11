@@ -852,7 +852,8 @@ export function drawBroadcastV2Scene<TImage>(
      *    ★以前はここで閾値だけから作り直しており、★`honourDeclaredAsset` を渡しても
      *    ★診断は古い答えを返していました（★絵は変わっているのに「変わっていない」と報告）。
      */
-    const declared2 = opts.honourDeclaredAsset === true
+    /** ⚠️ ★描画と同じ規則（★俯瞰のカットは宣言に従う・★上の `overhead` と同じ） */
+    const declared2 = (opts.honourDeclaredAsset === true || scene.shot.view === 'high-diag')
       ? (scene.shot.horseAsset as BroadcastV2HorseAssetRole | undefined) : undefined;
     const assetKey = declared2 !== undefined && opts.libraries[declared2] !== undefined
       ? declared2
@@ -909,7 +910,21 @@ export function drawBroadcastV2Scene<TImage>(
        *    ★宣言と実際が食い違ったままでした。
        * ⚠️ ★**既定では効きません。** ★渡さなければ 1 画素も変わりません。
        */
-      const declared = opts.honourDeclaredAsset === true
+      /**
+       * ★**俯瞰のカットでは、宣言どおり俯瞰の素材を使います**（★2026-09-11・★オーナー指摘）。
+       *
+       *   ★オーナー評（★4 角）「★上からのカメラワークなのに、★**本来見えないはずの目が見えている**。
+       *   ★顔の角度が違う」。
+       *   ⚠️ ★実測すると、★4 角で実際に描いていたのは ★**`side-v6`（真横の絵）**でした。
+       *      ★カット角が ★**60.2°**で、★後方素材の閾値（60° 未満）を ★**わずかに外れて**いたためです。
+       *      ★横から描いた絵を上から見せていたので、★顔が横を向いて目が見えていました。
+       *   ★俯瞰の素材（`horse-jockey-high-diag-v4`）は ★**背中と後頭部が見える正しい絵**で、
+       *      ★台本 v6 は ★**読み込んでもいます**。★選ばれていなかっただけです。
+       * → ★カットが ★`view: 'high-diag'` と言っているなら、★**その宣言に従います**。
+       * ⚠️ ★真横・斜め前のカットの選び方は ★**1 ビットも変えていません**（★角の閾値のまま）。
+       */
+      const overhead = scene.shot.view === 'high-diag';
+      const declared = (opts.honourDeclaredAsset === true || overhead)
         ? (scene.shot.horseAsset as BroadcastV2HorseAssetRole | undefined) : undefined;
       const key: BroadcastV2HorseAssetRole = declared !== undefined
         && opts.libraries[declared] !== undefined

@@ -46,18 +46,23 @@ export default function GaitReviewPage(): React.ReactElement {
         </p>
 
         <section style={{ ...card, border: '2px solid #ffd34d', background: '#1d1c15' }}>
-          <h2 style={h2}>★いま判断していただきたいのは、これ 1 つです — ★4 コーナーの馬の向き</h2>
+          <h2 style={h2}>★いま判断していただきたいのは、これ 1 つです — ★4 コーナーの馬</h2>
           <p style={note}>
-            ★オーナー評「★A と C は ★<b>馬が斜め前を向いている、芝に対して</b>」。
-            ★<b>原因が割れました。</b>★馬の絵は ★<b>画面に対してまっすぐ立つ板</b>で、★回りません。<br />
-            ★直線は「走路が画面で水平になるようカメラを構える」で解けました（★⑨⑩）。
-            ★しかし ★<b>コーナーは走路が曲がっている</b>ので、★どう構えても弧のどこかで必ずずれます。<br />
-            → ★<b>絵のほうを、その場所の走路の接線に合わせて回してみました。</b>
+            ★オーナー評「★上からのカメラワークなのに、★<b>本来見えないはずの目が見えている</b>。★顔の角度が違う」。<br />
+            ★<b>原因が割れました。★素材の問題ではありませんでした。</b><br />
+            ⚠️ ★4 コーナーで実際に描いていたのは ★<b>真横の絵（side-v6）</b>でした。
+            ★カット角が ★<b>60.2°</b> で、★後方素材の閾値（60° 未満）を ★<b>わずかに外れて</b>いたためです。
+            ★横から描いた絵を上から見せていたので、★顔が横を向いて目が見えていました。<br />
+            ★俯瞰の素材（<code>horse-jockey-high-diag-v4</code>）は
+            ★<b>背中と後頭部が見える正しい絵</b>で、★台本はそれを ★<b>読み込んでもいました</b>。
+            ★選ばれていなかっただけです。<br />
+            → ★カットが「俯瞰」と言っているなら ★<b>その宣言に従う</b>ようにしました。
           </p>
           <div style={{ display: 'flex', gap: 18, fontSize: 13, margin: '0 0 10px', flexWrap: 'wrap' }}>
             {([
-              ['#ff6b6b', '左', '今まで（絵は回らない）'],
-              ['#ffd34d', '右', '★回した（走路の接線に合わせる）'],
+              ['#ff6b6b', '左上', '前（真横の絵・回転なし）★目が見えていた'],
+              ['#6bb8ff', '右上', '★俯瞰の絵にした（回転なし）'],
+              ['#ffd34d', '左下', '★俯瞰の絵＋走路の接線に回す'],
             ] as const).map(([c, pos, name]) => (
               <span key={pos} style={{ color: '#9fb4c6' }}>
                 <span style={{ display: 'inline-block', width: 26, height: 8, background: c, marginRight: 8, verticalAlign: 'middle' }} />
@@ -73,12 +78,17 @@ export default function GaitReviewPage(): React.ReactElement {
             <p style={{ ...note, margin: '8px 0 4px' }}>★↓ 回した</p>
             <img src="/gait-review/corner-tilt-on.jpg" alt="回した" style={media} />
           </details>
+          <details style={{ marginTop: 10 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★俯瞰の絵を大きく見る</summary>
+            <img src="/gait-review/corner-overhead-sprite.jpg" alt="俯瞰の絵" style={{ ...media, marginTop: 8 }} />
+          </details>
           <p style={{ ...note, margin: '12px 0 0' }}>
-            ★<b>見どころ</b>: ★右のほうが「芝の向きと馬の向きが合っている」と感じますか。<br />
-            ⚠️ ★回すと ★<b>坂を駆け上がっているようにも見えます</b>。★傾きは最大で 25 度ほどです。
-            ★合わないなら、★角度を半分に抑える／コーナーだけに限る、といった加減ができます。<br />
-            ⚠️ ★既定では ★<b>1 度も回していません</b>。★<code>?tilt=track</code> を付けたときだけ回ります。<br />
-            ★<b>「回す／回さない／半分だけ回す」</b>のどれかを教えてください。
+            ★<b>見どころ</b>: ★右上と左下で ★<b>目が見えなくなっている</b>こと。
+            ★そして ★<b>回転（左下）は要るか要らないか</b>。<br />
+            ⚠️ ★<b>俯瞰の絵に替えたのは既定です</b>（★カットの宣言に従っただけなので、直しに当たります）。<br />
+            ⚠️ ★<b>回転はまだ既定ではありません</b>。★<code>?tilt=track</code> を付けたときだけです。
+            ★傾きは最大 25 度ほどで、★坂を駆け上がっているようにも見えます。<br />
+            ★<b>「回す／回さない／半分だけ回す」</b>を教えてください。
           </p>
         </section>
 

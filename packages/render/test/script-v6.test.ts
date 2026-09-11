@@ -681,3 +681,45 @@ describe('★走路の接線の角度（★絵を回すときに使う）', () =
     expect(deg(forward - backward), '★前後どちらを見ても同じ傾き').toBeLessThan(2);
   });
 });
+
+/**
+ * ★**俯瞰のカットでは、俯瞰の素材を使う**（★2026-09-11・★オーナー指摘）
+ *
+ * ★オーナー評（★4 角）「★上からのカメラワークなのに、★**本来見えないはずの目が見えている**。
+ *   ★顔の角度が違う」。
+ *
+ * 【★素材の問題ではありませんでした】
+ *   ⚠️ ★実測（`__raceDiag.asset`）で、★4 角が実際に描いていたのは ★**`side-v6`（真横の絵）**。
+ *      ★カット角 ★**60.2°**が、★後方素材の閾値（60° 未満）を ★**わずかに外れて**いました。
+ *      ★横から描いた絵を上から見せていたので、★顔が横を向いて目が見えていました。
+ *   ★俯瞰の素材（`horse-jockey-high-diag-v4`）は背中と後頭部が見える正しい絵で、
+ *      ★台本 v6 は ★**読み込んでもいます**（★`broadcastV2ScriptAssets('v6')` に入っている）。
+ *      ★選ばれていなかっただけです。
+ *
+ * ⚠️ ★**閾値では直しません。** ★60 を 65 にしても、★別の会場・別の画角でまた外れます。
+ *    → ★カットが `view: 'high-diag'` と言っているなら ★**その宣言に従います**。
+ */
+describe('★俯瞰のカットが使う素材', () => {
+  it('★俯瞰のカットは、俯瞰の素材を宣言している', () => {
+    for (const id of ['fourth-corner-far', 'fourth-corner-wide', 'aerial'] as const) {
+      const shot = broadcastV2ShotById(id);
+      expect(shot.view, `${id} の画角`).toBe('high-diag');
+      expect(shot.horseAsset, `${id} の素材`).toBe('high-diag-v2');
+    }
+  });
+
+  /** ★宣言した素材が ★**実際に読み込まれている**こと（★読まなければ真横へ落ちます） */
+  it('★台本 v6 は、その俯瞰の素材を読み込んでいる', () => {
+    expect(broadcastV2ScriptAssets('v6')).toContain('high-diag-v2');
+  });
+
+  /**
+   * ⚠️ ★**真横・斜め前のカットの選び方は変えていません。**
+   *    ★宣言に従うのは俯瞰のカットだけです。
+   */
+  it('★真横のカットは真横の素材を宣言したまま', () => {
+    for (const id of ['side-drive', 'straight-contest', 'start-rear-far', 'opening-formation'] as const) {
+      expect(broadcastV2ShotById(id).horseAsset, id).toBe('side-v6');
+    }
+  });
+});
