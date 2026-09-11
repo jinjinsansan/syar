@@ -589,9 +589,17 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
      *    「★上空からはまだ馬が斜め前を向いています」）。★真横素材は合格済みです。
      *    ★走路方向へのずらしは ★**0**（★`start-rear-far` と同じ理由・そちらの注記）。
      *    ★「位置取り」の情報そのものは、★カットの頭 1.2 秒の ★**隊列図**が伝えます。
+     *
+     * ⚠️ ★**引いて望遠にしました**（★同日・★オーナー「陣地取りはもう少し自然に縦長の列に」）。
+     *    ★レースのデータは ★**すでに縦長**でした（★実測・先頭 342m の時点で
+     *    ★前後 21.6m ／ 横 5.8m ＝ ★**3.7 : 1**）。★潰していたのは ★**カメラが近い**ことです。
+     *    ★近いと、★前後に離れた馬ほど奥行きが変わって ★**上下にばらけ**、隊列が塊に見えます。
+     *    → ★距離を 45m → 122m にして、★画角を 13° → 6° に絞りました。
+     *      ★奥行きの差が相対的に小さくなり、★画面でも縦長の列になります
+     *      （★画面上の 横 : 縦 が ★2.44 → 3.54・★実測）。
      */
     id: 'opening-formation', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.2,
-    camera: { backM: 40, upM: 60, sideM: 9, alongM: 0, fovDeg: 13 }, leadFraction: 0.60,
+    camera: { backM: 100, upM: 70, sideM: 9, alongM: 0, fovDeg: 6 }, leadFraction: 0.60,
     perspectiveWorld: true,
   },
   'opening-side-settle': {

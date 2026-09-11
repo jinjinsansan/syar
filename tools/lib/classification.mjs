@@ -588,6 +588,11 @@ export const READONLY = [
    *   ★DB に触れず、★出力は標準出力のみ。★レース状態も素材も変えません。
    */
   'measure-race-heap.mjs',
+  /**
+   * ★カットごとの「画面上の進行方向」と「隊列の形」を `__raceDiag` から読むだけ（★2026-09-11）。
+   *   ★DB に触れず、★`tmp/screen-direction/rows.json` を書くだけ。★レース状態も素材も変えません。
+   */
+  'measure-screen-direction.mjs',
   'capture-bench-sprite.mjs',
   /**
    * ★撮った 2〜3 枚を ★**1 頭ぶん・同じ大きさ**に切り出して並べるだけ（★2026-09-10）。
