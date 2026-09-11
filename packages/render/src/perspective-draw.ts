@@ -727,6 +727,39 @@ export interface HorseViewInfo {
   readonly forwardDx: number;
 }
 
+/**
+ * ★**その足元で、走路が画面上どちらを向いているか**（ラジアン・★2026-09-11）。
+ *
+ * 【★なぜ要るか】
+ *   ★オーナー評（★4 角）「★芝に対して ★**馬が斜め前を向いている**」。
+ *   ★馬の絵は ★**画面に対してまっすぐ立つ板**で、★回りません。
+ *   ★直線なら走路が画面で水平になるようカメラを構えれば合いますが（★2026-09-11 に ⑨⑩ で実施）、
+ *   ★**コーナーは走路が曲がっている**ので、どう構えても弧のどこかで必ずずれます。
+ *   → ★絵のほうを、この角度だけ回します。
+ *
+ * ⚠️ ★左へ走る馬の絵は鏡像なので、★**鏡像にしたあとの「前」**（＝画面の左）を基準に返します。
+ *    ★だから直線では、右へ走っても左へ走っても ★**0 に近い値**になります。
+ * ⚠️ ★投影できない（カメラの後ろ）ときは 0 を返します（★回さない・R-27）。
+ */
+export function screenTrackAngle(
+  course: Course, cam: PerspectiveCamera, s: number, w: number, aheadM = 3,
+): number {
+  const basis = cameraBasis(cam);
+  const at = (m: number): { x: number; y: number; depth: number } => {
+    const g = posOf(course, Math.max(0, m), w);
+    return project(cam, basis, { x: g.x, y: g.y, z: 0 });
+  };
+  const a = at(s); const b = at(s + aheadM);
+  if (a.depth <= 2 || b.depth <= 2) return 0;
+  const vx = b.x - a.x, vy = b.y - a.y;
+  if (Math.abs(vx) < 1e-6 && Math.abs(vy) < 1e-6) return 0;
+  let ang = Math.atan2(vy, vx);
+  if (vx < 0) ang += Math.PI;
+  while (ang > Math.PI) ang -= 2 * Math.PI;
+  while (ang < -Math.PI) ang += 2 * Math.PI;
+  return ang;
+}
+
 export function drawPerspectiveHorses<TImage>(
   ctx: Ctx2D<TImage>,
   course: Course,
@@ -755,6 +788,13 @@ export function drawPerspectiveHorses<TImage>(
      *   勝負服オーバーレイと影には掛けない。無彩色（勝負服の灰、鞍布の白、脚元の黒）はほぼ変わらない。
      */
     readonly coatFilterOf?: ((gate: number) => string | undefined) | undefined;
+    /**
+     * ★**馬の絵を、その場所の走路の向きに合わせて回す**（★2026-09-11・★見比べ用）。
+     *
+     * ⚠️ ★既定（未指定）では ★**1 度も回しません**。★従来どおり画面に対してまっすぐ立ちます。
+     * ★回転を持たない描画環境では、指定しても回りません（★落ちない・R-27）。
+     */
+    readonly alignToTrack?: boolean | undefined;
     /**
      * ★**その馬がここまでに浴びてきた砂の量**（0＝きれい … 1＝満量）。報告 §10-2。
      *
@@ -1331,6 +1371,21 @@ export function drawPerspectiveHorses<TImage>(
     const frame = frameIndex;
     const hi = pickFrame(gateSet) ?? pickFrame(opts.frameImages);
 
+    /**
+     * ★**その馬の足元で、走路が画面上どちらを向いているか**（ラジアン・★2026-09-11）。
+     *
+     * 【★なぜ要るか】
+     *   ★オーナー評（★4 角）「★芝に対して ★**馬が斜め前を向いている**」。
+     *   ★馬の絵は ★**画面に対してまっすぐ立つ板**で、★回りません。
+     *   ★直線なら走路が画面で水平になるようカメラを構えれば合いますが（★2026-09-11 に ⑨⑩ で実施）、
+     *   ★**コーナーは走路が曲がっている**ので、どう構えても弧のどこかで必ずずれます。
+     * → ★**絵のほうを、その場所の接線に合わせて回します。**
+     *
+     * ⚠️ ★左へ走る馬の絵は鏡像なので、★**鏡像にしたあとの「前」**（＝画面の左）を基準にします。
+     */
+    const trackRot = opts.alignToTrack === true
+      ? screenTrackAngle(course, cam, d.s, d.h.w) : 0;
+
     /** ★1 枚ぶんの描画（`dx`,`dy` は画面上のずらし）。ブラーはこれを重ねて作る */
     const paintHorse = (dx: number, dy: number): void => {
       if (hi !== undefined) {
@@ -1345,8 +1400,22 @@ export function drawPerspectiveHorses<TImage>(
          */
         const px = d.p.x + dx;
         const sx = (flip ? -1 : 1) * squeezeX;
-        const mirrored = sx !== 1 && ctx.save !== undefined && ctx.restore !== undefined && ctx.transform !== undefined;
-        if (mirrored) { ctx.save!(); ctx.transform!(sx, 0, 0, 1, px * (1 - sx), 0); }
+        /**
+         * ★回転は ★**鏡像より外側**に掛けます（★先に鏡像、そのあと画面で回す）。
+         * ⚠️ ★順を逆にすると、★左へ走る馬だけ逆方向に傾きます。
+         */
+        const turning = Math.abs(trackRot) > 0.005
+          && ctx.translate !== undefined && ctx.rotate !== undefined;
+        const mirrored = (sx !== 1 || turning)
+          && ctx.save !== undefined && ctx.restore !== undefined && ctx.transform !== undefined;
+        if (mirrored) {
+          ctx.save!();
+          if (turning) {
+            const gy = d.p.y + dy;
+            ctx.translate!(px, gy); ctx.rotate!(trackRot); ctx.translate!(-px, -gy);
+          }
+          if (sx !== 1) ctx.transform!(sx, 0, 0, 1, px * (1 - sx), 0);
+        }
         // ★胴体基準点があればそれを接地点の真上 `bodyLift` に置く。無ければ従来（矩形の中心・下端）
         const left = dx + (hi.bodyAnchorSourcePx !== undefined
           ? d.p.x - (hi.bodyAnchorSourcePx.x - source.x) * scale
@@ -1363,6 +1432,8 @@ export function drawPerspectiveHorses<TImage>(
          * ★**描いた場所を控えます**（★2026-09-09・オーナー指示
          *   ★「HUD は馬にかかるときだけ薄くする」）。
          * ⚠️ ★描画は 1 画素も変えません。★読むだけの窓です。
+         * ⚠️ ★回している間も ★**回す前の矩形**を控えます。★HUD の減光にしか使わないので、
+         *    ★傾きぶんの誤差は許します（★正確にするなら 4 隅を回して囲む必要があります）。
          */
         drawnBoxes.push({ x: left, y: top, w: hiW, h: hiH, gate: d.h.gate });
         ctx.drawImage(

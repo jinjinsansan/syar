@@ -86,6 +86,14 @@ export interface Ctx2D<TImage = unknown> {
   ): { addColorStop(offset: number, color: string): void };
   save?(): void;
   restore?(): void;
+  /**
+   * ★任意（★両環境にある）。★**絵をその場で回す**ために使う（★2026-09-11）。
+   *
+   * ⚠️ ★無い環境では回しません（★落ちない・R-27）。★回さなければ従来どおり
+   *    ★画面に対してまっすぐ立った絵になります。
+   */
+  translate?(x: number, y: number): void;
+  rotate?(angle: number): void;
   transform?(a: number, b: number, c: number, d: number, e: number, f: number): void;
   /** ★任意。毛色バリエーション（馬体の色相・明度・彩度）に使う CSS filter。無い環境では無視 */
   filter?: string;

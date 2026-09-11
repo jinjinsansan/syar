@@ -614,6 +614,16 @@ function bakeCoat(image: FrameImage, coat: CoatName): FrameImage {
  *    ★見比べのための口で、★常用しません。
  */
 const GATE_BILLBOARD = false;
+/**
+ * ★**馬の絵を走路の向きに合わせて回す**（★2026-09-11・★見比べ用 `?tilt=track`）。
+ *
+ *   ★オーナー評（★4 角）「★芝に対して ★**馬が斜め前を向いている**」。
+ *   ★馬の絵は画面に対してまっすぐ立つ板で、★回りません。★直線はカメラで解けますが、
+ *   ★**コーナーは走路が曲がっている**ので、どう構えても弧のどこかで必ずずれます。
+ * ⚠️ ★既定は ★**回しません**。★`?tilt=track` を付けたときだけ回ります。
+ */
+const ALIGN_TO_TRACK = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('tilt') === 'track';
 const HORSE_NAMES = ['スターライト', 'サクラブリーズ', 'ハンシンドリーム', 'ミライノツバサ', 'グリーンアロー', 'オウカノキセキ', 'ナニワスピリット', 'ローズクイーン', 'ムラサキノホシ', 'アオバハヤテ', 'ブラウンエース', 'ピンクレディ'] as const;
 /**
  * ★**画面上の順位**（★2026-09-11・★カットインと順位表で 1 つの規則にする）。
@@ -3520,6 +3530,7 @@ export default function RacePage(): React.JSX.Element {
          *    ★あれは正面から描いた絵なので、★真横にすると横向きの黒い塊になりました（★実測）。
          * ★扉は発走から 0.25 秒かけて開きます（★時刻の関数・★憲法 4）。
          */
+        alignToTrack: ALIGN_TO_TRACK,
         startingGate: visualLead < 120 ? {
           startS: 0,
           fieldSize: FIELD,

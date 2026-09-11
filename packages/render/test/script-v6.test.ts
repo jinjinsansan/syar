@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   SCRIPT_V5, SCRIPT_V6, broadcastV2ScriptFromSearch, cameraBasis, posOf, project,
-  DEFAULT_RACE_SCRIPT, CUT_RACE_SCRIPT, ovalCourse,
+  DEFAULT_RACE_SCRIPT, CUT_RACE_SCRIPT, ovalCourse, screenTrackAngle,
 } from '../src/index.js';
 import { resolveBroadcastV2Scene, type BroadcastV2Horse } from '../src/broadcast-v2-scene.js';
 import { broadcastV2ShotById, broadcastV2ScriptBoundariesM, broadcastV2ScriptAssets, SCRIPT_V4 } from '../src/broadcast-v2.js';
@@ -626,5 +626,58 @@ describe('★カットをまたいだ縮尺の連続', () => {
 
     /** ★引き切った画角（`camera.fovDeg`）は、★振りの出より広いまま（★弧を見せる役目） */
     expect(corner.camera.fovDeg).toBeGreaterThanOrEqual(ramp.toDeg);
+  });
+});
+
+
+/**
+ * ★**馬の絵を走路の向きに合わせて回す**（★2026-09-11・★見比べ用 `?tilt=track`）
+ *
+ * ★オーナー評（★4 角）「★芝に対して ★**馬が斜め前を向いている**」。
+ *   ★馬の絵は画面に対してまっすぐ立つ板で、★回りません。
+ *   ★直線はカメラで解けましたが（★⑨⑩ で走路が画面で水平になるよう構え直した）、
+ *   ★**コーナーは走路が曲がっている**ので、どう構えても弧のどこかで必ずずれます。
+ *   → ★絵のほうを、その場所の接線の角度だけ回します。
+ *
+ * ⚠️ ★**既定では 1 度も回しません。** ★`?tilt=track` を付けたときだけです。
+ *    ★既定を変えるのはオーナー判断のあとです（★台帳「映像の真因はオーナー確認後」）。
+ */
+describe('★走路の接線の角度（★絵を回すときに使う）', () => {
+  const angleAt = (leadS: number): number => {
+    const scene = resolveBroadcastV2Scene(course, fieldAt(leadS), VIEWPORT, false, {
+      cornerCutM: 400, raceDisplaySec: 40, script: 'v6',
+      noContenderFrameShots: ['finish-line'] as const,
+    });
+    return screenTrackAngle(course, scene.camera, leadS, 10);
+  };
+  const deg = (rad: number): number => Math.abs((rad * 180) / Math.PI);
+
+  /**
+   * ★直線では ★**ほぼ 0**（★＝回す必要がない）。
+   * ★これが 0 でないなら、カメラが走路方向へずれています（★⑨⑩ で直した症状）。
+   */
+  it('★直線では 0 に近い（★回す必要が無い）', () => {
+    for (const leadS of [200, 400, 700, 1250, 1350]) {
+      expect(deg(angleAt(leadS)), `${leadS}m`).toBeLessThan(6);
+    }
+  });
+
+  /**
+   * ⚠️ ★**コーナーでは実際に傾いていること**（★検定が効いていることの確認・R-21）。
+   *    ★ここが 0 なら、★「回す」という対処そのものが不要ということになります。
+   */
+  it('★コーナーでは傾いている（★だから絵を回す意味がある）', () => {
+    expect(deg(angleAt(900)), '★4 角').toBeGreaterThan(10);
+  });
+
+  /** ⚠️ ★左右どちらへ走っても、★同じ向きの走路なら同じ角度を返すこと（★鏡像の基準） */
+  it('★左へ走る馬でも、同じ走路なら同じ角度', () => {
+    const scene = resolveBroadcastV2Scene(course, fieldAt(900), VIEWPORT, false, {
+      cornerCutM: 400, raceDisplaySec: 40, script: 'v6',
+      noContenderFrameShots: ['finish-line'] as const,
+    });
+    const forward = screenTrackAngle(course, scene.camera, 900, 10, 3);
+    const backward = screenTrackAngle(course, scene.camera, 900, 10, -3);
+    expect(deg(forward - backward), '★前後どちらを見ても同じ傾き').toBeLessThan(2);
   });
 });

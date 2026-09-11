@@ -46,10 +46,48 @@ export default function GaitReviewPage(): React.ReactElement {
         </p>
 
         <section style={{ ...card, border: '2px solid #ffd34d', background: '#1d1c15' }}>
-          <h2 style={h2}>★いま判断していただきたいのは、これ 1 つです — ★4 コーナーの撮り方</h2>
+          <h2 style={h2}>★いま判断していただきたいのは、これ 1 つです — ★4 コーナーの馬の向き</h2>
           <p style={note}>
-            ★<b>同じ場面（表示 35〜43 秒）を 3 通りで撮って、並べて同時に流しています。</b>
-            ★URL や秒を行き来する必要はありません。
+            ★オーナー評「★A と C は ★<b>馬が斜め前を向いている、芝に対して</b>」。
+            ★<b>原因が割れました。</b>★馬の絵は ★<b>画面に対してまっすぐ立つ板</b>で、★回りません。<br />
+            ★直線は「走路が画面で水平になるようカメラを構える」で解けました（★⑨⑩）。
+            ★しかし ★<b>コーナーは走路が曲がっている</b>ので、★どう構えても弧のどこかで必ずずれます。<br />
+            → ★<b>絵のほうを、その場所の走路の接線に合わせて回してみました。</b>
+          </p>
+          <div style={{ display: 'flex', gap: 18, fontSize: 13, margin: '0 0 10px', flexWrap: 'wrap' }}>
+            {([
+              ['#ff6b6b', '左', '今まで（絵は回らない）'],
+              ['#ffd34d', '右', '★回した（走路の接線に合わせる）'],
+            ] as const).map(([c, pos, name]) => (
+              <span key={pos} style={{ color: '#9fb4c6' }}>
+                <span style={{ display: 'inline-block', width: 26, height: 8, background: c, marginRight: 8, verticalAlign: 'middle' }} />
+                <b style={{ color: '#eef2f6' }}>{pos}</b> {name}
+              </span>
+            ))}
+          </div>
+          <Pair base="corner-tilt" />
+          <details style={{ marginTop: 10 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★止め絵で大きく見る（★同じ瞬間）</summary>
+            <p style={{ ...note, margin: '8px 0 4px' }}>★↓ 今まで（回らない）</p>
+            <img src="/gait-review/corner-tilt-off.jpg" alt="回さない" style={media} />
+            <p style={{ ...note, margin: '8px 0 4px' }}>★↓ 回した</p>
+            <img src="/gait-review/corner-tilt-on.jpg" alt="回した" style={media} />
+          </details>
+          <p style={{ ...note, margin: '12px 0 0' }}>
+            ★<b>見どころ</b>: ★右のほうが「芝の向きと馬の向きが合っている」と感じますか。<br />
+            ⚠️ ★回すと ★<b>坂を駆け上がっているようにも見えます</b>。★傾きは最大で 25 度ほどです。
+            ★合わないなら、★角度を半分に抑える／コーナーだけに限る、といった加減ができます。<br />
+            ⚠️ ★既定では ★<b>1 度も回していません</b>。★<code>?tilt=track</code> を付けたときだけ回ります。<br />
+            ★<b>「回す／回さない／半分だけ回す」</b>のどれかを教えてください。
+          </p>
+        </section>
+
+        <section style={{ ...card, border: '1px solid #7a6a2a', background: '#1d1c15' }}>
+          <h2 style={h2}>★（判定済み）4 コーナーの撮り方 — ★A も C も B も不合格</h2>
+          <p style={note}>
+            ★<b>同じ場面（表示 35〜43 秒）を 3 通りで撮って、並べて同時に流しています。</b><br />
+            ★オーナー判定: ★<b>A・C = 馬が斜め前を向いている ／ B = 走り方に違和感</b>。
+            ★3 つとも不合格でした。★上のカード（馬の向きを回す）は、この判定を受けた実験です。
           </p>
           <div style={{ display: 'flex', gap: 18, fontSize: 13, margin: '0 0 10px', flexWrap: 'wrap' }}>
             {([
