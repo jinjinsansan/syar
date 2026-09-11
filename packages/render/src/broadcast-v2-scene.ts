@@ -373,13 +373,38 @@ export function resolveBroadcastV2Scene(
      * ⚠️ ★位置だけの関数なので決定論（憲法4）。★同じ場所なら必ず同じ画になります。
      */
     const preset = ((): ShotCameraPreset => {
+      /**
+       * ★**カットの中で画角を振る**（★2026-09-11・★オーナー案 A・`fovRamp` の注記）。
+       * ★入りは前のカットに合わせ、★カットの中で引く（または寄る）。
+       * ⚠️ ★`cutProgress` は位置だけの関数なので決定論です（★憲法 4）。
+       */
+      const ramp = shot.fovRamp;
+      const base = ramp === undefined ? cameraPreset : ((): ShotCameraPreset => {
+        /**
+         * ⚠️ ★**「カットの進み」は台本の境界から取ります**（★`broadcastV2ShotSpanM`）。
+         *    ★`broadcastV2CutProgress` は ★**走路の「角」の区間**に対する進みで、
+         *    ★台本のカットとは別物です（★角の外では 0 を返します）。
+         *    ★最初そちらを使いかけましたが、★振れないカットが出るので取り違えです。
+         */
+        const span = broadcastV2ShotSpanM(course, leaderS, options.script ?? DEFAULT_RACE_SCRIPT);
+        const len = Math.max(1e-6, span.end - span.start);
+        const u = Math.max(0, Math.min(1, (leaderS - span.start) / len));
+        /**
+         * ⚠️ ★**立ち上がりを遅くします**（★`u * u`）。★カットの頭は
+         *    ★**カットインが覆っている**ので、★そこで振っても誰も見ていません。
+         *    ★滑らかな S 字（`u*u*(3-2u)`）だと、★見え始めた時点でもう引き切りかけていました
+         *    （★実測: 上位 5 頭の広がりが 8.4% → 10.6% にしか動かなかった）。
+         */
+        const e = u * u;
+        return { ...cameraPreset, fovDeg: ramp.fromDeg + (ramp.toDeg - ramp.fromDeg) * e };
+      })();
       const c = shot.closeIn;
-      if (c === undefined) return cameraPreset;
+      if (c === undefined) return base;
       const left = course.distance - leaderS;
       const u = Math.max(0, Math.min(1,
         (c.fromMetersLeft - left) / Math.max(1e-6, c.fromMetersLeft - c.toMetersLeft)));
       const e = u * u * (3 - 2 * u);
-      return { ...cameraPreset, backM: cameraPreset.backM + (c.nearBackM - cameraPreset.backM) * e };
+      return { ...base, backM: base.backM + (c.nearBackM - base.backM) * e };
     })();
     return broadcastCamera(course, {
       atS, atW: focusW, width: viewport.width, height: viewport.height, view: shot.view, preset,

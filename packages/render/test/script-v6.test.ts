@@ -575,3 +575,56 @@ describe('★真横のカットの走路の傾き', () => {
     expect(tiltOf(shifted), '★ずらすと傾く（★検定が見分けられている）').toBeGreaterThan(6);
   });
 });
+
+/**
+ * ★**カットをまたいだ縮尺の連続**（★2026-09-11・★オーナー案 A）
+ *
+ * ★オーナー評「★カットインや真横カメラワークでも ★**切り替わりの時にレースが
+ *   ★イメージとして繋がっていかない**」。
+ *
+ * 【★何を測るか — ★2 つ測って、片方を選びました】
+ *   ★① ★**隊列の画面上の広がり**（★上位 5 頭）… ★最初これで見ました。
+ *      ⚠️ ★発走まわりで ★**×6.79** と跳びますが、★これは ★**レースの実際の形**です。
+ *         ★実測（seed 42）で、★馬群の前後の広がりは ★発走 4 秒で 5.0m、★12 秒で 21.6m。
+ *         ★3 秒で 4 倍に伸びます。★どんなカメラでも、この変化は消せません。
+ *   ★② ★**馬の大きさ**（★＝画面の縮尺）… ★こちらは ★**カメラだけで決まります**。
+ *      ★見る人が「同じレースだ」と思う手掛かりは、★隊列の形ではなく ★**縮尺**のほうです。
+ *
+ * 【⚠️ ★合否の数字は ★**画面の実測**で出します。★ここでは出しません】
+ *   ★この検定が使える幾何（★2.4m を投影した高さ）と、★画面が実際に描く矩形は
+ *   ★**1.8 倍ずれます**（★俯瞰の素材は同じ 2.4m でも真横より大きく描かれる）。
+ *   ★ずれた物差しで合否を決めると、★画面と検定が別の答えを持ちます（★R-30）。
+ *   → ★**画面の数字は `tools/measure-shot-horse-size.mjs`** で出します。
+ *     ★2026-09-11 の実測（★既定・seed 42）:
+ *       ★勝負所 28.85% → ★4 角 入り 18.05%（★×0.63）→ ★出 14.61% → ★勝負所（★×1.97）
+ *       ★中盤は 1.04〜1.29 倍。★2 倍を超える境目はありません。
+ *   → ★ここで留めるのは ★**「画角の振りが実際に縮尺を寄せている」**という関係だけです。
+ */
+describe('★カットをまたいだ縮尺の連続', () => {
+  it('★4 角の画角の振りは、入りを前のカットへ寄せている', () => {
+    const corner = broadcastV2ShotById('fourth-corner-far');
+    expect(corner.fovRamp, '★4 角に画角の振りが入っていること').toBeDefined();
+    const ramp = corner.fovRamp!;
+    /** ★入りは寄り（前のカットに近い大きさ）、★出は引き（弧を見せる） */
+    expect(ramp.fromDeg, '★入りは出より寄っていること').toBeLessThan(ramp.toDeg);
+
+    /**
+     * ★**振りが効いていることを、同じ物差しの中で確かめます**（★R-21）。
+     *   ★カットの頭（★振りの入り）と、★カットの終わり（★振りの出）で、
+     *   ★馬の大きさが ★**実際に変わる**こと。★変わらなければ振りは効いていません。
+     */
+    const span = broadcastV2ScriptBoundariesM(course, 'v6');
+    const idx = span.findIndex((b) => b.id === 'fourth-corner-front');
+    expect(idx, '★4 角の境界が見つかりません').toBeGreaterThan(0);
+    const start = span[idx - 1]!.meters, end = span[idx]!.meters;
+    const enter = frameAt(start + 4, 'v6');
+    const exit = frameAt(end - 4, 'v6');
+    expect(enter.shot, '★入りは 4 角').toBe('fourth-corner-far');
+    expect(exit.shot, '★出も 4 角').toBe('fourth-corner-far');
+    expect(enter.top4HeightRatio, '★入りのほうが大きいこと（★寄りから引きへ）')
+      .toBeGreaterThan(exit.top4HeightRatio * 1.15);
+
+    /** ★引き切った画角（`camera.fovDeg`）は、★振りの出より広いまま（★弧を見せる役目） */
+    expect(corner.camera.fovDeg).toBeGreaterThanOrEqual(ramp.toDeg);
+  });
+});

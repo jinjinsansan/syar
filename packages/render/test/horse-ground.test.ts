@@ -214,6 +214,13 @@ describe('検証台の実入力との差（★規則が違うので 0 にはな�
   const GROUND_Y = 500;
   const BOB = 0.3;
 
+  /**
+   * ⚠️ ★**制限時間を伸ばしています**（★2026-09-11）。
+   *    ★この検定は素材 8 コマを `sharp` で復号して画素を数えます。★単独なら 0.4〜2.4 秒ですが、
+   *    ★`npm test` の並列実行では ★**既定の 5 秒**を超えて落ちることがありました（★実測で 4 回）。
+   *    ★中身の問題ではなく ★**待ち時間**の問題なので、★時間だけ伸ばします。
+   *    ★赤を「ムラだから」と見送り続けると、★本物の赤を見落とします。
+   */
   it.each(TARGET_ROLES)('%s は許容差の内側', async (role) => {
     const sharp = (await import('sharp')).default;
     const set = manifest.sets.find((s) => s.role === role)!;
@@ -258,7 +265,7 @@ describe('検証台の実入力との差（★規則が違うので 0 にはな�
     expect(worst).toBeLessThanOrEqual(TOLERANCE_PX);
     /** ⚠️ ★**0 ではないこと**も確かめます（★同じ入力を配ってしまった前便の形の再発防止） */
     expect(worst).toBeGreaterThan(0);
-  });
+  }, 30000);
 });
 
 /**

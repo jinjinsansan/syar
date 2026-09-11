@@ -81,11 +81,23 @@ try {
     const xs = v.hs.map((h) => h[0]), ys = v.hs.map((h) => h[1]);
     const spanX = Math.max(...xs) - Math.min(...xs);
     const spanY = Math.max(...ys) - Math.min(...ys);
+    /**
+     * ★**先頭 5 頭だけの広がり**（★2026-09-11）。
+     *
+     * ⚠️ ★全頭の広がりでカットを比べてはいけません。★せめぎ合いのカットは
+     *    ★**描く頭数を 5 頭に絞る**設計（`maxVisible`）なので、★12 頭のカットと
+     *    ★比べると ★**画角ではなく頭数の差**を測ってしまいます。
+     * → ★どのカットでも ★**同じ 5 頭**で比べます。★進行方向の前から 5 頭。
+     */
+    const ordered = [...v.hs].sort((a, b) => (dx > 0 ? b[0] - a[0] : a[0] - b[0])).slice(0, 5);
+    const oxs = ordered.map((h) => h[0]);
+    const top5X = ordered.length < 2 ? 0 : Math.max(...oxs) - Math.min(...oxs);
     rows.push({
       sec: Number(t.toFixed(2)), shot: v.shot, cutIn: v.cutIn,
       dirDeg: Number(((Math.atan2(dy, dx) * 180) / Math.PI).toFixed(1)),
       toRight: dx > 0,
       spanXpct: Number(((100 * spanX) / v.W).toFixed(1)),
+      top5Xpct: Number(((100 * top5X) / v.W).toFixed(1)),
       spanYpct: Number(((100 * spanY) / v.H).toFixed(1)),
       /** ★1 より大きいほど「横長」、小さいほど「縦長」（★画面の縦横比を揃えて比べる） */
       wideness: Number(((spanX / v.W) / Math.max(1e-6, spanY / v.H)).toFixed(2)),
@@ -102,16 +114,39 @@ try {
     byShot.get(r.shot).push(r);
   }
   const med = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
-  console.log('カット'.padEnd(22), '進行方向', ' 右向き', '  隊列 横%', ' 縦%', ' 横長さ');
+  console.log('カット'.padEnd(22), '進行方向', ' 右向き', ' 全頭 横%', ' 上位5頭 横%', ' 縦%', ' 横長さ');
+  const seq = [];
   for (const [k, v] of byShot) {
     const right = v.filter((r) => r.toRight).length;
+    const t5 = med(v.map((r) => r.top5Xpct));
+    seq.push({ shot: k, top5: t5 });
     console.log(
       k.padEnd(22),
       String(med(v.map((r) => r.dirDeg))).padStart(7) + '°',
       `${right}/${v.length}`.padStart(7),
-      String(med(v.map((r) => r.spanXpct))).padStart(9),
+      String(med(v.map((r) => r.spanXpct))).padStart(8),
+      String(t5).padStart(11),
       String(med(v.map((r) => r.spanYpct))).padStart(6),
       String(med(v.map((r) => r.wideness))).padStart(6));
+  }
+  /**
+   * ★**隣り合うカットの跳び**（★オーナー案 A「隣り合うカットで 2 倍以内に収める」）。
+   * ⚠️ ★カットの順に並べます（★同じ名前が 2 回出る台本があるので、★出現順で見ます）。
+   */
+  const order = [];
+  let prev = null;
+  for (const r of rows) {
+    if (r.shot === null || r.shot === prev) continue;
+    order.push(r.shot); prev = r.shot;
+  }
+  console.log('\n★隣り合うカットの跳び（★上位 5 頭の広がり）');
+  for (let i = 1; i < order.length; i += 1) {
+    const a = med(byShot.get(order[i - 1]).map((r) => r.top5Xpct));
+    const b = med(byShot.get(order[i]).map((r) => r.top5Xpct));
+    const ratio = b / Math.max(1e-6, a);
+    const bad = ratio > 2 || ratio < 0.5;
+    console.log(`  ${order[i - 1].padEnd(20)} → ${order[i].padEnd(20)} `
+      + `${String(a).padStart(6)} → ${String(b).padStart(6)}  ×${ratio.toFixed(2)}${bad ? '  ★2 倍を超えています' : ''}`);
   }
   console.log(`\n★${OUT}/rows.json`);
 } finally {
