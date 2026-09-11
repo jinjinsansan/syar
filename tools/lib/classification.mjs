@@ -37,6 +37,12 @@ export const READONLY = [
    */
   'capture-tilt-compare.mjs',
   /**
+   * ★レースを頭から終わりまで 1 本で撮る（★2026-09-12・★計画書 工程 3）。
+   *   ★`/race` を画面の既定のまま読むだけ。★出力は `out/race-through/` と見比べ台の映像のみ。
+   *   ⚠️ ★DB に触れない。★尺は画面のシークの `max` から取る（★手置きしない）。
+   */
+  'capture-race-through.mjs',
+  /**
    * ★地面タイルの焼き込み横縞を平したものを作る（★2026-09-11・★案 A）。
    *   ★`world-turf.png` を読み、★`world-turf-flat.png` を**新規に**書く。
    *   ⚠️ ★元のタイルは上書きしない。★DB に触れない。

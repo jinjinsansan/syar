@@ -41,12 +41,53 @@ export default function GaitReviewPage(): React.ReactElement {
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <h1 style={{ fontSize: 21, margin: '0 0 4px' }}>走りの見比べ台（★開発専用）</h1>
         <p style={{ ...note, fontSize: 15, color: '#eef2f6' }}>
-          ★<b>今日 判断していただきたいのは、★「判断 ②」の 1 つだけです。</b>
-          ★その下は ★<b>畳んであります</b>（★これまでの観察の記録・判断は要りません）。
+          ★<b>今日 見ていただきたいのは、いちばん上の「通し 1 本」だけです。</b>
+          ★その下は ★<b>判定済みの記録</b>です（★判断は要りません）。
         </p>
         <p style={note}>
           ★<b>主観の評価は等速を先に</b>見てください。★0.25 倍は姿勢と接地を確かめるためのものです。
         </p>
+
+        <section style={{ ...card, border: '2px solid #ffd34d', background: '#1d1c15' }}>
+          <h2 style={{ ...h2, fontSize: 19 }}>通し 1 本（第 1 版）　★これを見てください</h2>
+          <p style={{ ...note, fontSize: 15, color: '#eef2f6', margin: '0 0 10px' }}>
+            ★発走前から結果まで ★<b>86 秒・16 カット</b>を 1 本にしました（★シード 42・★画面の既定のまま）。<br />
+            ★<b>おかしいと思った秒だけ</b>教えてください（★「0:23 のここ」で結構です）。
+            ★映像の ★<b>左上に時刻とカット名</b>が出ます。★絵の上には何も描いていません。
+          </p>
+          <video src="/gait-review/race-through.mp4" style={media} controls loop playsInline />
+          <details style={{ marginTop: 10 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★何秒がどのカットか（16 カット）</summary>
+            <table style={{ ...note, borderCollapse: 'collapse', marginTop: 8, fontSize: 12.5 }}>
+              <tbody>
+                {([
+                  ['0:00.0 〜 0:05.5', '5.5秒', '（導入）'],
+                  ['0:05.5 〜 0:09.0', '3.5秒', 'start-gate-side'],
+                  ['0:09.1 〜 0:12.6', '3.5秒', 'start-rear-far'],
+                  ['0:12.7 〜 0:17.6', '4.9秒', 'opening-side-lead'],
+                  ['0:17.7 〜 0:19.6', '1.9秒', 'opening-formation'],
+                  ['0:19.7 〜 0:25.8', '6.1秒', 'opening-side-settle'],
+                  ['0:25.8 〜 0:36.5', '10.7秒', 'side-drive'],
+                  ['0:36.6 〜 0:39.9', '3.3秒', 'fourth-corner-far'],
+                  ['0:40.0 〜 0:48.0', '8.0秒', 'side-drive'],
+                  ['0:48.0 〜 0:54.4', '6.4秒', 'straight-contest'],
+                  ['0:54.5 〜 0:59.2', '4.7秒', 'straight-field'],
+                  ['0:59.2 〜 1:05.7', '6.5秒', 'straight-contest'],
+                  ['1:05.8 〜 1:11.9', '6.1秒', 'finish-line'],
+                  ['1:12.0 〜 1:16.0', '4.0秒', 'winner-follow'],
+                  ['1:16.0 〜 1:20.0', '3.9秒', 'finish-replay'],
+                  ['1:20.0 〜 1:26.0', '5.9秒', 'winner-follow'],
+                ] as const).map(([span, len, shot]) => (
+                  <tr key={span}>
+                    <td style={{ padding: '2px 12px 2px 0', color: '#ffd34d', whiteSpace: 'nowrap' }}>{span}</td>
+                    <td style={{ padding: '2px 12px 2px 0', whiteSpace: 'nowrap' }}>{len}</td>
+                    <td style={{ padding: '2px 0' }}><code>{shot}</code></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        </section>
 
         <section style={{ ...card, border: '1px solid #2f6f86', background: '#13202a' }}>
           <h2 style={{ ...h2, fontSize: 17 }}>（実装済み・判断は要りません）カットイン ＝ デザイナーの C 案</h2>
