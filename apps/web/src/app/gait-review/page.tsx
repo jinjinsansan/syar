@@ -41,29 +41,20 @@ export default function GaitReviewPage(): React.ReactElement {
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <h1 style={{ fontSize: 21, margin: '0 0 4px' }}>走りの見比べ台（★開発専用）</h1>
         <p style={{ ...note, fontSize: 15, color: '#eef2f6' }}>
-          ★<b>今日 判断していただきたいのは、下の 2 つだけです。</b>
+          ★<b>今日 判断していただきたいのは、★「判断 ②」の 1 つだけです。</b>
           ★その下は ★<b>畳んであります</b>（★これまでの観察の記録・判断は要りません）。
         </p>
         <p style={note}>
           ★<b>主観の評価は等速を先に</b>見てください。★0.25 倍は姿勢と接地を確かめるためのものです。
         </p>
 
-        <section style={{ ...card, border: '2px solid #4dd2ff', background: '#14212a' }}>
-          <h2 style={{ ...h2, fontSize: 19 }}>判断 ①　カットインの帯の濃さ</h2>
-          <p style={{ ...note, fontSize: 15, color: '#eef2f6', margin: '0 0 10px' }}>
-            ★下の 3 段を見て、★<b>どれがよいか</b>だけ教えてください。
+        <section style={{ ...card, border: '1px solid #2f6f86', background: '#13202a' }}>
+          <h2 style={{ ...h2, fontSize: 17 }}>（実装済み・判断は要りません）カットイン ＝ デザイナーの C 案</h2>
+          <p style={note}>
+            ★全画面をやめ、★<b>画面下の帯（高さ 104px）だけ</b>になりました。
+            ★レース映像は ★<b>止まりません・隠れません</b>。★帯の濃さはハンドオフの指定どおり 0.94 です。
           </p>
-          <img src="/gait-review/telop-alpha.jpg" alt="帯の濃さ 3 段" style={media} />
-          <ul style={{ ...note, margin: '10px 0 0', paddingLeft: 20 }}>
-            <li>★上 ★<b>0.94</b> … デザイナーの指定。★後ろが ★<b>透けません</b></li>
-            <li>★中 ★<b>0.80</b> … ★<b>いまの既定</b>。★馬が帯越しに見えて、文字も読める</li>
-            <li>★下 ★<b>0.62</b> … よく透けるが、★文字と点が芝に紛れ始める</li>
-          </ul>
-          <p style={{ ...note, margin: '12px 0 0' }}>
-            ★カットインは ★<b>全画面をやめて、画面下の帯だけ</b>になりました（★デザイナーの C 案）。
-            ★レース映像は ★<b>止まりません・隠れません</b>。
-          </p>
-          <details style={{ marginTop: 10 }}>
+          <details>
             <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★4 枚が実際に出ているところを見る</summary>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
               {([
@@ -81,7 +72,7 @@ export default function GaitReviewPage(): React.ReactElement {
             <p style={{ ...note, margin: '10px 0 0' }}>
               ⚠️ ★デザイナーからの確認事項 2 つ: ★① 背景は画面の 86% が常に見えます（★元の「不透明」から変更）。
               ★② C は帯の高さの都合で ★<b>2 頭まで</b>（★元は 4 頭）。<br />
-              ★従来の全画面版は <code>?cutin=full</code> で見られます。
+              ★従来の全画面版は <code>?cutin=full</code>、★帯の濃さの見比べは <code>?telop=0.8</code>。
             </p>
           </details>
         </section>
