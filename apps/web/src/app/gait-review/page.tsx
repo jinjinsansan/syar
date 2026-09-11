@@ -55,7 +55,9 @@ export default function GaitReviewPage(): React.ReactElement {
             ★<b>おかしいと思った秒だけ</b>教えてください（★「0:23 のここ」で結構です）。
             ★映像の ★<b>左上に時刻とカット名</b>が出ます。★絵の上には何も描いていません。
           </p>
-          <video src="/gait-review/race-through.mp4" style={media} controls loop playsInline />
+          {/* ⚠️ ★`?v=` を上げること。★上げないと、★ブラウザが**古い映像を出し続けます**
+              （★2026-09-12・★暗い導入が h264 で潰れていたのを作り直した） */}
+          <video src="/gait-review/race-through.mp4?v=2" style={media} controls loop playsInline />
           <details style={{ marginTop: 10 }}>
             <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9fb4c6' }}>★何秒がどのカットか（16 カット）</summary>
             <table style={{ ...note, borderCollapse: 'collapse', marginTop: 8, fontSize: 12.5 }}>

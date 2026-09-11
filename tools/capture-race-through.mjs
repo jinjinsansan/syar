@@ -129,8 +129,17 @@ try {
   writeFileSync(path.join(out, 'cuts.md'), md);
 
   const mp4 = path.join(out, 'race-through.mp4');
+  /**
+   * ⚠️ ★**暗い場面は h264 がブロックで潰れます。**
+   *    ★導入（暗いタイトル）で ★**16px の升目**が出ました（★2026-09-12・★オーナー評「絵が滲んでいます」）。
+   *    ★原因は ★**量子化**で、★元のコマは綺麗でした（★撮り直しは不要）。
+   *  ★`-crf 15`     … 暗部の階調を残す（★21 では潰れた）
+   *  ★`-tune animation` … ★2D の平らな面向け（★デブロックを弱め、線を残す）
+   *  ★`-g ${fps}`   … ★1 秒ごとに鍵コマ。★**止めて見たときにそのコマが綺麗**（★秒で指摘いただくため）
+   */
   execFileSync(ffmpeg, ['-v', 'error', '-y', '-framerate', String(fps), '-i', path.join(frameDir, 'f%05d.jpg'),
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '21', '-pix_fmt', 'yuv420p', mp4]);
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '15', '-tune', 'animation',
+    '-g', String(fps), '-pix_fmt', 'yuv420p', mp4]);
   console.log(`★書き出し ${mp4}`);
   console.log(`★カット表 ${path.join(out, 'cuts.md')}（★カット数 ${cuts.length}）`);
 
