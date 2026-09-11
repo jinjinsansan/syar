@@ -47,8 +47,20 @@ const publish = process.argv.includes('--publish');
  * ⚠️ ★描く座標は 1280×720 のままなので、★版面・文字・カット・馬の位置は変わりません
  *    （★実測: 2 倍を 1280 へ縮めて 1 倍と比べ、★平均差 1.58 階調＝縁の滑らかさだけ）。
  */
-const render2x = !process.argv.includes('--no-2x');
-const outW = Number(arg('out-width', 1920));
+/**
+ * ⚠️ ★**2 倍で描くのは取り下げました**（★2026-09-12・★オーナー評「壊したのですか？」）。
+ *    ★文字は 2.72 倍細かくなりましたが、★**画面全体の見え方が破綻**しました
+ *    （★芝・スタンドがブロック状に）。★馬は 1.12 倍しか変わらず、★得より害が大きい。
+ *    ⚠️ ★`?render=2x` は ★**製品コードからも消しました**。★残しません。
+ *    ★引き伸ばしの件（★1280 → 1674 物理 px）は ★**別の残件**として開いたままです。
+ */
+const render2x = false;
+/**
+ * ★**書き出す幅**。★既定は ★**画布と同じ**＝ 1:1 で撮ります（★0 を渡すと画布から取る）。
+ * ⚠️ ★ここを画布より大きくすると、★**撮影の時点で引き伸ばし**が起きます
+ *    （★2026-09-12 に踏みました。★1 倍の画布 1280 を 1920 で撮っていました）。
+ */
+const outWArg = Number(arg('out-width', 0));
 /**
  * ★**途中から撮り直せるようにする**（★2026-09-12）。
  * ⚠️ ★2 倍で 15fps を通しで撮ると、★**1133 コマ目（87%）でブラウザが詰まりました**
@@ -57,6 +69,13 @@ const outW = Number(arg('out-width', 1920));
  * ★`--encode-only`           … 撮らずに、★既にあるコマから映像と表だけ作る
  */
 const startSec = Number(arg('start-sec', 0));
+/**
+ * ★**区切って撮る**（★2026-09-12）。
+ * ⚠️ ★長く撮り続けると ★**ブラウザが詰まります**（★実測: 1133 / 707 / 15 コマ目で
+ *    ★`Page.captureScreenshot` がタイムアウト。★詰まる位置は毎回違います）。
+ * → ★10 秒ずつ ★**起こし直して**撮れば、★詰まっても失うのはその区間だけです。
+ */
+const endSec = Number(arg('end-sec', 0));
 const keep = process.argv.includes('--keep') || startSec > 0;
 const encodeOnly = process.argv.includes('--encode-only');
 const rowsPath = path.resolve('out/race-through/rows.json');
@@ -91,7 +110,7 @@ try {
   const count = Math.floor(total * fps);
   console.log(`★URL ${url}`);
   console.log(`★尺 ${span.min.toFixed(2)} 〜 ${span.max.toFixed(2)} 秒（★画面のシークから）／ ${fps}fps ／ ${count} コマ`);
-  console.log(`★描画 ${render2x ? '2 倍（画布 2560×1440）' : '等倍'} → ★書き出し ${outW}px 幅`);
+  console.log(`★描画 ${render2x ? '2 倍' : '等倍'}`);
 
   /**
    * ⚠️ ★**2 倍の絵を `toDataURL` で毎コマ受け取ると落ちます。**
@@ -113,14 +132,18 @@ try {
       dpr: window.devicePixelRatio, buffer: [el.width, el.height] };
   })()`);
   console.log(`★画布 ${rect.buffer.join('x')} ／ 頁の上では ${Math.round(rect.w)}x${Math.round(rect.h)} CSS px ／ dpr ${rect.dpr}`);
+  /** ★画布の画素とちょうど 1:1 で撮る（★`clip.scale` には dpr が掛かるので割る） */
+  const outW = outWArg > 0 ? outWArg : rect.buffer[0];
   const shotScale = outW / (rect.w * rect.dpr);
+  if (outW > rect.buffer[0]) throw new Error(`★画布 ${rect.buffer[0]}px より大きく撮ろうとしています（${outW}px）。★引き伸ばしになります`);
 
   /** ★前回までの行（★再開したときに表が欠けないように） */
   const rows = existsSync(rowsPath) && keep
     ? JSON.parse(readFileSync(rowsPath, 'utf8')) : [];
   const firstIndex = Math.max(0, Math.round((startSec - span.min) * fps));
   if (firstIndex > 0) console.log(`★${startSec.toFixed(2)} 秒（コマ ${firstIndex}）から撮り足します`);
-  for (let i = firstIndex; i <= count; i += 1) {
+  const lastIndex = endSec > 0 ? Math.min(count, Math.round((endSec - span.min) * fps)) : count;
+  for (let i = firstIndex; i <= lastIndex; i += 1) {
     const sec = span.min + i / fps;
     const r = await browser.evaluate(`(async () => {
       const el = document.querySelector('input[aria-label="撮影用シーク"]');
@@ -192,6 +215,7 @@ try {
   ].join('\n');
   writeFileSync(path.join(out, 'cuts.md'), md);
 
+  if (endSec > 0) { console.log(`★区間 ${startSec}〜${endSec} 秒を撮りました（★書き出しは最後にまとめて）`); await browser.close(); process.exit(0); }
   const mp4 = path.join(out, 'race-through.mp4');
   /**
    * ⚠️ ★**暗い場面は h264 がブロックで潰れます。**

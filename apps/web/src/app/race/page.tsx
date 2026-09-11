@@ -201,23 +201,6 @@ const effectivePlacementMode = (prefix: string | undefined): HorsePlacementMode 
 const W = 1280;
 const H = 720;
 /**
- * ★**画布だけを倍で持つ**（★2026-09-12・★撮影用 `?render=2x`）。
- *
- * 【★なぜ要るか】★オーナー評「★絵が滲んでいます」。★測ると ★**どこにも 1:1 がありません**でした:
- *   ★通しの映像 … 素 1280 → 表示 1116（★87.2%）／★画面は ★**dpr 1.5**
- *   → ★1116 CSS px × 1.5 ＝ ★**1674 物理 px へ引き伸ばし**。★h264 の設定では直りません。
- *
- * 【★何を変えるか】★**画布の解像度だけ**です。
- *   ★描く座標は 1280×720 のまま（`vp` は W/H）。★`ctx` を倍に掛けるので、
- *   ★**版面・文字の大きさ・カット・馬の位置は 1 つも変わりません**。★変わるのは粒の細かさだけです。
- * ⚠️ ★既定は 1 倍。★`?render=2x` を付けたときだけです（★撮影の道具が付けます）。
- */
-const RENDER_SCALE = ((): number => {
-  if (typeof window === 'undefined') return 1;
-  const v = new URLSearchParams(window.location.search).get('render');
-  return v === '2x' ? 2 : 1;
-})();
-/**
  * ★描画分岐（引継ぎ書 2026-08-17 §1）
  *   既定は Broadcast V2。旧固定2Dは `?renderer=legacy` でのみ表示する（比較用）。
  *   ⚠️ 通常 URL を旧版のままにしてはいけない（ユーザーが見る画面が変わらない）。
@@ -3022,19 +3005,6 @@ export default function RacePage(): React.JSX.Element {
     if (cv === null || art === null || built === null) return;
     const ctx = cv.getContext('2d');
     if (ctx === null) return;
-    /**
-     * ⚠️ ★`?render=2x` のときだけ、★画布の解像度と座標系を倍にします。
-     *    ★以降の描画は 1280×720 の座標のまま書けます（★どこも直さなくて済みます）。
-     *    ★`setTransform` はこの 1 か所だけです（★他所で掛け直すと二重になります）。
-     * ⚠️ ★**大きさは JSX の属性で変えられません。** ★SSR が 1280 で書き出した属性に
-     *    ★ハイドレーションで戻されます（★実測: 2x を指定しても画布は 1280 のままでした）。
-     *    → ★ここで毎コマ確かめて直します。★`canvas.width` への代入は文脈を初期化するので、
-     *      ★**変わったときだけ**代入します。
-     */
-    if (RENDER_SCALE !== 1 && cv.width !== W * RENDER_SCALE) {
-      cv.width = W * RENDER_SCALE; cv.height = H * RENDER_SCALE;
-    }
-    if (RENDER_SCALE !== 1) ctx.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, 0);
 
     const intro = raceIntroAt(d);
     const vp = { width: W, height: H };

@@ -54,7 +54,20 @@ export async function launch(opts = {}) {
     target = list.find((t) => t.type === 'page' && (t.url === 'about:blank' || String(t.url).startsWith('http://localhost:')))
       ?? list.find((t) => t.type === 'page' && !String(t.url).startsWith('chrome-extension://')) ?? null;
   } catch { /* 新規起動へ */ }
+  /**
+   * ★**画面に出しません**（★2026-09-12・★オーナー申告）。
+   *
+   * ⚠️ ★この道具は ★**起動のたびにオーナーの画面へエッジの窓を開いて**いました。
+   *    ★オーナーは ★**毎回それを縮小して作業を続けて**おられました（★ずっと前から）。
+   *    ★こちらからは見えない害で、★申告されるまで気づきませんでした。
+   * → ★**既定をヘッドレス**にします。★窓を見たいときだけ `headless: false`
+   *   （★`--show-browser` を渡す道具側で指定）。
+   * ⚠️ ★`MediaRecorder` で録る道具（`capture-contest-direct.mjs --live`）は
+   *    ★窓が要る場合があります。★その道具だけ `headless: false` を渡すこと。
+   */
+  const headless = opts.headless ?? !process.argv.includes('--show-browser');
   const args = [
+    ...(headless ? ['--headless=new', '--hide-scrollbars', '--mute-audio'] : []),
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check',
