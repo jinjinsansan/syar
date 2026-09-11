@@ -585,12 +585,13 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
      * ⚠️ ★`fourth-corner-far` と角度を変えてあります（★あちらは低め・こちらは真上寄り）。
      *    ★同じ絵を 2 回出すと「引き」そのものが飽きます。
      *
-     * ⚠️ ★**8.1% → 12.4% へ寄せました**（★2026-09-11・★オーナー ③「馬が小さ過ぎ」）。
-     *    ★ここも俯瞰なので、★素材は不合格のままです。★真横の半分（14.4%）は超えません。
+     * ⚠️ ★**俯瞰 → 高い真横へ移しました**（★2026-09-11・★オーナー ⑩
+     *    「★上空からはまだ馬が斜め前を向いています」）。★真横素材は合格済みです。
+     *    ★走路方向へのずらしは ★**0**（★`start-rear-far` と同じ理由・そちらの注記）。
      *    ★「位置取り」の情報そのものは、★カットの頭 1.2 秒の ★**隊列図**が伝えます。
      */
     id: 'opening-formation', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.2,
-    camera: { backM: 40, upM: 60, sideM: 9, alongM: 10, fovDeg: 13 }, leadFraction: 0.60,
+    camera: { backM: 40, upM: 60, sideM: 9, alongM: 0, fovDeg: 13 }, leadFraction: 0.60,
     perspectiveWorld: true,
   },
   'opening-side-settle': {
@@ -714,9 +715,19 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
      *   → ★**高さは残して、横へ回します。** ★馬は真横を向くので ★**合格済みの真横素材**が使えます。
      *     ★大きくしても崩れません。★実測 ★**5.5% → 18.8%**。
      * ⚠️ ★**コーナーには使えませんでした**（★`fourth-corner-far` の注記）。
+     *
+     * ⚠️ ★**走路方向へのずらしを 0 にしています**（★2026-09-11・★オーナー ⑨）
+     *    > ★芝の進行方向に対して、★馬が右に向いているのがおかしいです。
+     *
+     *    ★馬の絵は ★**画面に対してまっすぐ立つ板**で、★回りません。★だから走路が
+     *    ★画面上で寝ると、★馬だけが水平を向いて芝の流れと食い違います。
+     *    ★`view: 'side'` は ★`alongM` を省くと ★`sideM * 0.25` だけ勝手にずれます。
+     *    ★ここは `sideM: 60` なので ★**15m ずれて**いました。
+     * ⚠️ ★傾きは ★**ずらし × 高さ**で出ます。★低いカット（ゲート・勝負所）はずらしても
+     *    ★ほとんど傾きません（★ゲートは 26m ずらして ★3.4°）。★高いカットだけが効きます。
      */
     id: 'start-rear-far', view: 'side', target: 'pack', horseAsset: 'side-v6', transitionSec: 0.3,
-    camera: { backM: 44, upM: 40, sideM: 60, fovDeg: 12 }, leadFraction: 0.58,
+    camera: { backM: 44, upM: 30, sideM: 60, alongM: 0, fovDeg: 13 }, leadFraction: 0.58,
     /** ⚠️ ★高い位置の真横なので、★1 枚絵の板では地面が合いません（★上の注記） */
     perspectiveWorld: true,
   },

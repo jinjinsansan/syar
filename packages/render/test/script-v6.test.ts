@@ -483,3 +483,95 @@ describe('★発走まわり（★世界座標の発馬機）', () => {
       .toEqual(['diag-front-v2', 'side-v6', 'winner-v1']);
   });
 });
+
+/**
+ * ★**真横のカットは、走路が画面で「水平」に写ること**（★2026-09-11・★オーナー ⑨⑩）
+ *
+ * ★オーナー評「★芝の進行方向に対して、★**馬が右に向いているのがおかしい**です」。
+ *
+ * 【★なぜ起きるか】
+ *   ★馬の絵は ★**画面に対してまっすぐ立つ板**です（★`drawPerspectiveHorses`）。★回りません。
+ *   ★だから走路が画面上で ★**斜めに寝ると**、★馬だけが水平を向いたままになり、
+ *   ★芝の流れと馬の向きが食い違います。
+ *
+ * 【★傾きは「ずらし」と「高さ」の ★**掛け算**で出ます — ★測って分かりました】
+ *   ★`view: 'side'` のカメラは走路の真横に置かれますが、★`alongM` で前後にずらせます。
+ *   ⚠️ ★最初は「ずらしただけで傾く」と思いました。★**違いました。**
+ *      ★ゲート（★ずらし 26m・★高さ 5m）の傾きは ★**3.4°**しかありません（★実測）。
+ *      ★ずらしが同じでも ★**高いほど傾きます**。★高さだけ、ずらしだけでは傾きません。
+ *   → ★だから ★**高い真横のカットからずらしを抜き**、★低いゲートはずらしたままにしています。
+ *
+ * ★ここは ★**投影して角度を測ります**（★代理指標ではありません）。
+ */
+describe('★真横のカットの走路の傾き', () => {
+  it('★真横のカットは、走路が水平から 6 度以内', () => {
+    const offenders: string[] = [];
+    let checked = 0;
+    for (const { leadS, id } of [
+      { leadS: 50, id: 'start-rear-far' },
+      { leadS: 200, id: 'opening-side-lead' },
+      { leadS: 290, id: 'opening-formation' },
+      { leadS: 400, id: 'opening-side-settle' },
+      { leadS: 700, id: 'side-drive' },
+      { leadS: 1250, id: 'straight-contest' },
+      { leadS: 1350, id: 'straight-field' },
+    ]) {
+      const scene = resolveBroadcastV2Scene(course, fieldAt(leadS), VIEWPORT, false, {
+        cornerCutM: 400, raceDisplaySec: 30, script: 'v6',
+        noContenderFrameShots: ['finish-line'] as const,
+      });
+      expect(scene.shot.id, `${leadS}m`).toBe(id);
+      if (scene.shot.view !== 'side') continue;
+      checked += 1;
+      const basis = cameraBasis(scene.camera);
+      const w = 10;
+      const a = posOf(course, scene.focusS, w);
+      const b = posOf(course, scene.focusS + 10, w);
+      const pa = project(scene.camera, basis, { x: a.x, y: a.y, z: 0 });
+      const pb = project(scene.camera, basis, { x: b.x, y: b.y, z: 0 });
+      const deg = Math.abs((Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180) / Math.PI);
+      const tilt = Math.min(deg, 180 - deg);
+      if (tilt > 6) offenders.push(`${scene.shot.id} … ${tilt.toFixed(1)}°`);
+    }
+    /** ⚠️ ★見るカットが 0 なら、★この検定は何も見ていません（★素通りを通さない・R-11） */
+    expect(checked, '★真横のカットが 1 つも見つかりません').toBeGreaterThan(3);
+    expect(offenders, '★走路が傾くと、★馬だけが水平を向いて芝の流れと食い違います').toEqual([]);
+  });
+
+  /**
+   * ⚠️ ★**検定が効いていることを確かめます**（★R-21）。
+   *    ★実物のカットは全部 6° 以内なので、★それだけでは ★**角度を見分けられているか分かりません**。
+   *    → ★合格しているカットのカメラを ★**走路方向へ 25m ずらして**、★傾きが出ることを見ます。
+   *    ★これは ★2026-09-11 に実際に起きていた状態（★高い真横＋ずらし）そのものです。
+   */
+  it('★高い真横のカメラを走路方向へずらすと、★この検定は傾きを捕まえる', () => {
+    const scene = resolveBroadcastV2Scene(course, fieldAt(50), VIEWPORT, false, {
+      cornerCutM: 400, raceDisplaySec: 30, script: 'v6',
+      noContenderFrameShots: ['finish-line'] as const,
+    });
+    expect(scene.shot.id).toBe('start-rear-far');
+    const tiltOf = (cam: typeof scene.camera): number => {
+      const basis = cameraBasis(cam);
+      const a = posOf(course, scene.focusS, 10);
+      const b = posOf(course, scene.focusS + 10, 10);
+      const pa = project(cam, basis, { x: a.x, y: a.y, z: 0 });
+      const pb = project(cam, basis, { x: b.x, y: b.y, z: 0 });
+      const deg = Math.abs((Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180) / Math.PI);
+      return Math.min(deg, 180 - deg);
+    };
+    /** ★走路の向き（単位ベクトル）だけずらす */
+    const p0 = posOf(course, scene.focusS, 10);
+    const p1 = posOf(course, scene.focusS + 10, 10);
+    const len = Math.hypot(p1.x - p0.x, p1.y - p0.y) || 1;
+    const shifted = {
+      ...scene.camera,
+      eye: {
+        x: scene.camera.eye.x + ((p1.x - p0.x) / len) * 25,
+        y: scene.camera.eye.y + ((p1.y - p0.y) / len) * 25,
+        z: scene.camera.eye.z,
+      },
+    };
+    expect(tiltOf(scene.camera), '★いまは水平').toBeLessThanOrEqual(6);
+    expect(tiltOf(shifted), '★ずらすと傾く（★検定が見分けられている）').toBeGreaterThan(6);
+  });
+});
