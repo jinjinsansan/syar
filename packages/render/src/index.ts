@@ -43,6 +43,7 @@ export * from './finish-replay.js';
 export * from './reference-hud.js';
 export * from './visual-scroll.js';
 export * from './world-textured.js';
+export * from './pixel-scale.js';
 export * from './minimap.js';
 export { isSkinTone } from './silks-skin.js';
 export { applyCoat, isHorseCoat, COAT_TRANSFORMS, DEFORMED_COAT_TRANSFORMS, isDeformedHorseAsset, type CoatTransform, type CoatName } from './coat.js';

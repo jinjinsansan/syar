@@ -570,6 +570,12 @@ export function drawBroadcastV2Scene<TImage>(
      */
     readonly gloss?: boolean | undefined;
     /**
+     * ★**1 論理画素あたりの物理画素数**（2026-09-12・★引継ぎ書 §2 ①）。
+     *   ★地面の走査線ループだけが使います（★`world-textured.ts`）。★省略時は 1 ＝ 従来どおり。
+     *   ⚠️ ★既定は**ここに書きません** — 画面が `pixelScaleFromSearch` から引いて渡します（R-31）。
+     */
+    readonly pixelScale?: number | undefined;
+    /**
      * ★**水たまり**（2026-08-30・残件 A-7）。★既定で描く。`false` で止める（比較用）。
      *   ⚠️ ★既定は**ここに書きません** — `PUDDLES_DEFAULT` から引きます（R-31）。
      *   ★重・不良だけに出ます。★良・稍重は 1 つも描きません。
@@ -678,6 +684,11 @@ export function drawBroadcastV2Scene<TImage>(
       ...(opts.infieldReversed === true ? { infieldReversed: true } : {}),
       /** ★照り（2026-08-30）。★`false` のときだけ渡す＝既定は `world-textured` 側の「入れる」 */
       ...(opts.gloss === false ? { gloss: false } : {}),
+      /**
+       * ★**地面の走査線を物理画素で回す**（2026-09-12・★引継ぎ書 §2 ①）。
+       * ⚠️ ★ここで渡していないと、★画布だけ大きくしても ★**地面は 720 段のまま**です。
+       */
+      ...(opts.pixelScale === undefined ? {} : { pixelScale: opts.pixelScale }),
     }).drawNearRail;
   } else if (opts.parallaxPlate !== undefined) {
     // 注視点（馬群）の px/m・深さ・画面上の進行方向を、馬と同じ透視カメラから取る

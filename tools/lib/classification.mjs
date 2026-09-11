@@ -43,6 +43,12 @@ export const READONLY = [
    */
   'capture-race-through.mjs',
   /**
+   * ★画面の細かさを測る（★2026-09-12・★引継ぎ書 §3「壊していないことの測り方」）。
+   *   ★`/race` を画面の既定のまま読むだけ。★出力は `out/render-scale/` のみ。
+   *   ⚠️ ★DB に触れない。★製品のコードも変えない（★オーナーの画面と同じ 1152 CSS px・dpr 1.5 で開く）。
+   */
+  'measure-render-scale.mjs',
+  /**
    * ★地面タイルの焼き込み横縞を平したものを作る（★2026-09-11・★案 A）。
    *   ★`world-turf.png` を読み、★`world-turf-flat.png` を**新規に**書く。
    *   ⚠️ ★元のタイルは上書きしない。★DB に触れない。

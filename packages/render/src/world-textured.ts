@@ -106,6 +106,17 @@ export interface TexturedWorldOptions {
    *   ★戻し口は `/race?gloss=0`。★良の絵は 1 ビットも動きません（`trackGlossAlpha` が 0 を返す）。
    */
   readonly gloss?: boolean;
+  /**
+   * ★**1 論理画素あたりの物理画素数**（★2026-09-12・★引継ぎ書 §2 ①）。
+   *
+   *   ⚠️ ★地面は ★**走査線ごとに芝タイルを貼って**作ります（下の `:296` のループ）。
+   *      ★このループが ★**論理座標の 720 行**で回っていたため、★画布を大きくしても
+   *      ★**地面だけは 720 段のまま**引き伸ばされていました（★引継ぎ書 F-3）。
+   *   → ★貼る先の刻みだけを物理画素に合わせます。★**投影の計算は論理座標のまま**です。
+   *
+   * ★省略時は 1。★**1 のときは 1 画素も変わりません**（★刻み・開始行・貼る高さがすべて元の式に戻る）。
+   */
+  readonly pixelScale?: number;
 }
 
 const wrap = (a: number, n: number): number => ((a % n) + n) % n;
@@ -292,8 +303,20 @@ export function drawTexturedWorld<TImage>(
   const tileM = turf.width / turf.pxPerM;      // タイル 1 枚の実寸（m）
   const tileHM = turf.height / turf.pxPerM;
   const eye = cam.eye;
-  const yStart = Math.max(0, Math.floor(hz) + 1);
-  for (let y = yStart; y < H; y += 1) {
+  /**
+   * ★**貼る刻みを物理画素に合わせる**（★引継ぎ書 §2 ①）。
+   *
+   *   ★`rowStep` ＝ 物理画素 1 行ぶんの論理の高さ。★`pixelScale` が 1 なら 1 で、
+   *   ★開始行も貼る高さも元のままです（★1 画素も変わりません）。
+   * ⚠️ ★開始行は ★**物理画素の格子へ丸めます**。★半画素ずれたまま貼ると、
+   *    ★ブラウザが縁を混ぜて ★**かえって滲みます**。
+   */
+  const pxScale = Math.max(1, opts.pixelScale ?? 1);
+  const rowStep = 1 / pxScale;
+  const yStart = Math.round(Math.max(0, Math.floor(hz) + 1) * pxScale) / pxScale;
+  const rowCount = Math.max(0, Math.ceil((H - yStart) * pxScale));
+  for (let r = 0; r < rowCount; r += 1) {
+    const y = yStart + r * rowStep;
     // 画面中央列の視線が地面に当たる距離
     const b = (H / 2 - (y + 0.5)) / focal;
     const dirZ = basis.fwd.z + basis.up.z * b;
@@ -316,7 +339,7 @@ export function drawTexturedWorld<TImage>(
       const remainSrc = turf.width - u0px;
       const spanPx = Math.max(1, Math.min(W - x, remainSrc / srcPerPx));
       const sw = spanPx * srcPerPx;
-      ctx.drawImage(turf.image, u0px, sy, sw, 1, x, y, spanPx + 0.5, 1);
+      ctx.drawImage(turf.image, u0px, sy, sw, 1, x, y, spanPx + 0.5, rowStep);
       x += spanPx;
       u0px = 0;
     }
@@ -357,13 +380,20 @@ export function drawTexturedWorld<TImage>(
     return HAZE_MAX * (1 - i / HAZE_H) * (1 - i / HAZE_H);
   };
   {
-    for (let i = 0; i < HAZE_H; i += 2) {
-      const yy = Math.floor(hz) + i;
+    /**
+     * ★**かすみの帯も物理画素で刻む**（★引継ぎ書 §2 ①・★2 つ目のループ）。
+     *   ★元は「2 論理画素の帯」でした。★dpr 1.5 の画面では ★**3 物理画素**に伸ばされ、
+     *   ★濃さの段が粗く見えます。★`pixelScale` が 1 なら刻みも高さも 2 のままです。
+     */
+    const hazeStep = 2 / pxScale;
+    const hz0 = Math.round(Math.floor(hz) * pxScale) / pxScale;
+    for (let i = 0; i < HAZE_H; i += hazeStep) {
+      const yy = hz0 + i;
       if (yy < 0 || yy >= H) continue;
       ctx.globalAlpha = hazeAt(yy);
       /** ⚠️ ★出どころは `HORIZON_SKY_COLOR` の 1 か所（濡れた面が映す空と同じ色・D-052） */
       ctx.fillStyle = HORIZON_SKY_COLOR;
-      ctx.fillRect(0, yy, W, 2);
+      ctx.fillRect(0, yy, W, hazeStep);
     }
     ctx.globalAlpha = 1;
   }

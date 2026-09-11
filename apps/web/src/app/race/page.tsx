@@ -57,7 +57,7 @@ import {
   cameraBasis, project, HORSE_HEIGHT_M, setHorseScale,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
-  drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
+  drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, pixelScaleFromSearch, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   isSkinTone,
   typedCount,
   raceCallAt, raceSurgeGate, RACE_SURGE_WINDOW_SEC,
@@ -3006,6 +3006,31 @@ export default function RacePage(): React.JSX.Element {
     const ctx = cv.getContext('2d');
     if (ctx === null) return;
 
+    /**
+     * ★**画布を画面の物理画素で持つ**（★2026-09-12・★引継ぎ書 §2 ②）。
+     *
+     *   ⚠️ ★これまで画布は **1280×720** で、★画面は **1152 CSS px × dpr 1.5 ＝ 1728 物理 px**。
+     *      ★**1.35 倍に引き伸ばして**表示していました（★オーナー評「★絵が滲んでいます」）。
+     *   ★描く座標は ★**1280×720 のまま**です。★`ctx` を倍率ぶん拡大するので、
+     *      ★以下の描画コードは 1 行も変わりません。
+     *
+     * ⚠️ ★**JSX の `width` 属性では変えられません。** ★SSR が焼いた値へ
+     *    ★ハイドレーションで戻されます（★2026-09-12 に踏みました）。★描くたびにここで設定します。
+     * ⚠️ ★`canvas.width` への代入は ★**文脈の状態（変換・色・書体）を消します**。
+     *    ★大きさが変わったときだけ代入し、★変換は毎コマ入れ直します。
+     */
+    const pixelScale = pixelScaleFromSearch(
+      typeof window === 'undefined' ? '' : window.location.search,
+      typeof window === 'undefined' ? 1 : window.devicePixelRatio,
+    );
+    const bufferW = Math.round(W * pixelScale);
+    const bufferH = Math.round(H * pixelScale);
+    if (cv.width !== bufferW || cv.height !== bufferH) {
+      cv.width = bufferW;
+      cv.height = bufferH;
+    }
+    ctx.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
+
     const intro = raceIntroAt(d);
     const vp = { width: W, height: H };
     const FONT = (px: number, bold?: boolean): string =>
@@ -3028,7 +3053,7 @@ export default function RacePage(): React.JSX.Element {
         eye: { x: eye.x, y: eye.y, z: 62 - ease * 14 },
         target: { x: target.x, y: target.y, z: 0 },
         fovY: (34 * Math.PI) / 180, width: W, height: H,
-      }, art.texturedWorld);
+      }, art.texturedWorld, { pixelScale });
       // 冒頭のフェードインと終わりのフェードアウト
       const fade = t < 0.15 ? 1 - t / 0.15 : t > 0.85 ? (t - 0.85) / 0.15 : 0;
       if (fade > 0) { ctx.globalAlpha = fade; ctx.fillStyle = '#05080a'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
@@ -3529,6 +3554,11 @@ export default function RacePage(): React.JSX.Element {
          *   ★良では 0 になるので、★良の絵は 1 ビットも動きません。
          */
         gloss: trackGlossFromSearch(search),
+        /**
+         * ★**地面の走査線を物理画素で回す**（★引継ぎ書 §2 ①）。★戻し口は `?dpr=1`。
+         *   ⚠️ ★画布だけ大きくして ★**ここへ渡し忘れると、★地面だけ 720 段のまま**引き伸ばされます。
+         */
+        pixelScale,
         /**
          * ★**水たまり**（残件 A-7）。★戻し口は `?puddles=0`。
          *   ⚠️ ★既定は `puddlesFromSearch` の**中**にあります（R-31）。ここに書きません。
