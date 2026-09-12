@@ -2642,10 +2642,43 @@ export const FINISH_DEV_RAMP_FROM_M = 260;
 
 export const FINISH_CAMERA_BY_DEVELOPMENT: Readonly<Record<RaceDevelopment,
   { readonly fovDeg: number; readonly leadFraction: number }>> = {
-  'wire-to-wire': { fovDeg: 11.5, leadFraction: 0.62 },
-  stalk: { fovDeg: 15, leadFraction: 0.50 },
-  closer: { fovDeg: 19, leadFraction: 0.38 },
+  'wire-to-wire': { fovDeg: 11.0, leadFraction: 0.58 },
+  stalk: { fovDeg: 11.5, leadFraction: 0.68 },
+  closer: { fovDeg: 12.0, leadFraction: 0.78 },
 };
+
+/**
+ * ★**直線で画角を広げてよい上限**（★2026-09-12・オーナー指示②「これ以上小さくしないで」）
+ *
+ * 【★測った事実】★勝ち馬の ★**画面上の高さ**（★画面 720px・★seed 42・★既定の大きさ 0.6）:
+ *     ★`side-drive`（★合格した見え方）… ★**221〜236px**（平均 228）
+ *     ★`homestretch-side`             … ★**119〜158px**  ← ★**52〜69%**
+ *     ★`finish-line`                  … ★**131px**       ← ★**57%**
+ *   ★原因は ★`homestretch-side` の枠取りが ★**最大 22°**まで広げることです。
+ *
+ * ⚠️ ★22° は 2026-08-26 のオーナー決定「★直線で 4〜5 頭のせめぎ合いをゴールまで見せたい」
+ *    ★から来ています。★**その要求と衝突します。**
+ * → ★**上限を切り、★不足は「先頭の置き場所」で埋めます。**
+ *   ★後ろから来る馬を見せるのに、★画角を広げる以外の手があります。
+ *   ★先頭を画面の右寄りに置けば（`leadFraction` を上げる）、★**後ろが空きます。**
+ *   ★大きさを捨てずに、★後ろの馬が入ります。
+ * ⚠️ ★`development` を渡さない台本（★v5 / v6）には ★**掛かりません**。
+ */
+export const FINISH_DEV_MAX_FOV_DEG = 14;
+
+/**
+ * ★**コーナーのカットで横の広がりを詰める倍率**（★2026-09-12・オーナー指摘①）
+ *
+ *   > ★「カーブの前から映像は馬が左右にばらけすぎです。★もっと隊列のようにすれば
+ *   >   ★見た目は改善されるはず」
+ *
+ * 【★測った内訳】★桜星賞 seed 42・★画面 1280px・★12 頭・★`resolveBroadcastV2Scene`:
+ *     ★1 角 … 全体 757px ＝ 前後の差 450px ＋ ★**横位置 312px**
+ *     ★4 角 … 全体 692px ＝ 前後の差 372px ＋ ★**横位置 394px**
+ *   ★横位置を 45% に詰めると ★1 角 757→578px ／ ★4 角 692→465px。
+ * ⚠️ ★**前後の差は詰めません。** ★それはエンジンが走らせた着差です（★憲法 3）。
+ */
+export const CORNER_LANE_COMPRESS = 0.45;
 
 /**
  * ★ゴール前の展開判定（決定論・順位には触れない）。

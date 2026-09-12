@@ -146,6 +146,24 @@ export interface RaceCutInFrame {
   readonly metersLeft: number;
 }
 
+/**
+ * ★**入り／抜けは「拭き」をやめて、切り替えにします**（★2026-09-12・オーナー指摘）
+ *
+ * 【★なぜ】★オーナー評（★2026-09-12・ワイプを作ったとき）
+ *   > ★「★ワイプって ★**黒の物体が左から右に高速で動く**ものですか？」
+ *   > ★「★余計にわけがわからない印象です」
+ *   ★そして ★デザイナーのハンドオフ（`broadcast-badges`）は
+ *   ★**「禁止 … ズームブラー・回転ワイプ・★スライドは使わない」**と書いています。
+ *
+ *   ★実測（★2026-09-12・実画面 48.1 秒）: ★入りの 0.32 秒のあいだ、★画面中央に
+ *   ★**黒い帯が左右へ開く**だけの絵が出ており、★両脇にレースが残っていました。
+ *   ★オーナーが却下した動きと ★**同じもの**です。
+ *
+ * → ★0 ＝ 拭きなし（★即時）。★継ぎ目の合図は ★`raceTransitionVeil`（★ハンドオフの幕）が担います。
+ * ⚠️ ★0 以外に戻すときは、★上の 2 つを読んでからにしてください。
+ */
+const CUTIN_WIPE = 0;
+
 const ease = (x: number): number => x * x * (3 - 2 * x);
 const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
 
@@ -163,8 +181,11 @@ export function drawRaceCutInFrame<TImage>(
 ): { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | undefined {
   const { width: W, height: H } = f.viewport;
   const t = clamp01(f.sinceSec / Math.max(0.01, f.durationSec));
-  /** ★入り 16% / 抜け 16%。★間は出し切り */
-  const IN = 0.16, OUT = 0.16;
+  /** ★入り／抜け（★`CUTIN_WIPE` の註記 — ★いまは 0 ＝ 拭きなし） */
+  /** ⚠️ ★**尺を過ぎたら消えること**（★出っぱなしが 1 回目の失敗・`race-cutin.test.ts`）
+   *   ★拭きが 0 になったので、★`p` だけでは終わりを表せません */
+  if (t >= 1) return undefined;
+  const IN = CUTIN_WIPE, OUT = CUTIN_WIPE;
   const p = t < IN ? ease(t / IN) : t > 1 - OUT ? ease(clamp01((1 - t) / OUT)) : 1;
   if (p <= 0.001) return undefined;
 
@@ -239,7 +260,9 @@ export function drawRaceCutInFrame<TImage>(
 /** ★中身が出るまでの濃さ（★枠と同じ計算・★中身側でも使う） */
 function contentAlpha(f: RaceCutInFrame): number {
   const t = clamp01(f.sinceSec / Math.max(0.01, f.durationSec));
-  const IN = 0.16, OUT = 0.16;
+  /** ⚠️ ★尺を過ぎたら 0（★`drawRaceCutInFrame` と同じ終わり方にする） */
+  if (t >= 1) return 0;
+  const IN = CUTIN_WIPE, OUT = CUTIN_WIPE;
   const p = t < IN ? ease(t / IN) : t > 1 - OUT ? ease(clamp01((1 - t) / OUT)) : 1;
   return clamp01((p - 0.86) / 0.14);
 }
@@ -905,4 +928,44 @@ export function drawToStraightTelop<TImage>(
   ctx.font = font(Math.round(H * (48 / 720)), true);
   /** ⚠️ ★先頭なら「差」ではありません */
   ctx.fillText(o.ownOrder <= 1 ? '先頭' : `${o.ownGapLengths.toFixed(1)}馬身`, x, midY);
+}
+
+/**
+ * ★**画面遷移エフェクト**（★デザイナーのハンドオフ
+ *   `design/hud-ds/components/broadcast-badges/index.html`「実装座標と規則」）
+ *
+ * 【★2026-09-12・オーナー指摘「★デザイナーのハンドオフを使っていないまま」】
+ *   ★ハンドオフは ★**2 種類**を数値で指定しています:
+ *     ★カット替え … ★白 `rgba(255,255,255,.18)` を全画面に ★**3 フレーム**
+ *     ★局面替え   … ★暗緑 `rgba(4,10,7,.55)` を ★**6 フレーム**被せて入れ替え（★コーナー→直線など）
+ *     ★ゴール直後 … ★**効果なし**
+ *     ★禁止       … ★ズームブラー・★回転ワイプ・★スライド
+ *
+ * ⚠️ ★画面にあったのは ★**白 0.95 を 0.3 秒**でした（★「アーケード参考映像 74 秒」由来）。
+ *    ★ハンドオフの ★**5 倍濃く、6 倍長い**別物です。★局面替えは ★**入っていませんでした**。
+ * ⚠️ ★2026-09-12 に私が作ったワイプが外れたのは、★ハンドオフが ★**スライドを禁止**して
+ *    ★いたからです。★先に読むべきものを読んでいませんでした。
+ *
+ * ★秒に直してあります（★60fps 前提: 3 コマ = 50ms ／ 6 コマ = 100ms）。
+ *   ★描画の fps は端末で変わるので、★コマ数で数えると長さが変わります。
+ */
+export const TRANSITION_CUT = { color: '#ffffff', alpha: 0.18, sec: 0.05 } as const;
+export const TRANSITION_PHASE = { color: '#040a07', alpha: 0.55, sec: 0.10 } as const;
+
+/**
+ * ★**その境目に被せる幕**。★無ければ `undefined`。
+ *
+ * @param sinceSec ★境目からの経過（秒）
+ * @param phaseChanged ★区間名が変わったか（★`broadcastV2SectionLabel` の値で比べること・★R-30）
+ *
+ * ⚠️ ★ハンドオフは ★**一定の濃さで N コマ**と書いています。★薄れさせません
+ *    （★薄れさせると、★終わりかけの薄い幕の下で継ぎ目が見えます）。
+ */
+export function raceTransitionVeil(
+  sinceSec: number, phaseChanged: boolean,
+): { readonly color: string; readonly alpha: number } | undefined {
+  if (!Number.isFinite(sinceSec) || sinceSec < 0) return undefined;
+  const spec = phaseChanged ? TRANSITION_PHASE : TRANSITION_CUT;
+  if (sinceSec >= spec.sec) return undefined;
+  return { color: spec.color, alpha: spec.alpha };
 }

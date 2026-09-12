@@ -49,7 +49,7 @@ import {
   ovalCourse, resolveBroadcastV2Scene, drawBroadcastV2Scene, broadcastV2AnchorWeight, broadcastV2SectionLabel,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT, CUT_RACE_SCRIPT, GATE_FRONT_STALL_PLATES,
   finishReplayAt, finishCrossDisplaySec, FINISH_REPLAY_DISPLAY_SEC, drawFinishReplayBadge,
-  DEMO_CONTEST_GAMMA, broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, laneAlignedFocusFromSearch, infieldReversedFromSearch, trackGlossFromSearch, puddlesFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
+  DEMO_CONTEST_GAMMA, CORNER_LANE_COMPRESS, broadcastV2FinishStyleOf, broadcastV2StartLagM, broadcastV2ShotById, broadcastV2ScriptFromSearch, laneAlignedFocusFromSearch, infieldReversedFromSearch, trackGlossFromSearch, puddlesFromSearch, FLASH_INTO, type BroadcastV2FinishStyle, type BroadcastV2ShotId,
   BROADCAST_STRIDE_M, MOTION_BLUR_ENABLED, MOTION_BLUR_EXPOSURE_SEC, MOTION_BLUR_SAMPLES,
   // ★参考映像にあって我々に無かった HUD 3 点（設計 1-4 / 1-5 / 1-6）
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
@@ -78,7 +78,7 @@ import {
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
-  raceCutInAt, RACE_CUTIN_SEC, RACE_CUTIN_CORNER_SEC, RACE_CUTIN_AT_START,
+  raceCutInAt, raceTransitionVeil, RACE_CUTIN_SEC, RACE_CUTIN_CORNER_SEC, RACE_CUTIN_AT_START,
   drawOwnHorseCutIn, drawFormationCutIn, drawRunningStyleCutIn, drawToStraightCutIn,
   RACE_TELOP_SEC, drawOwnHorseTelop, drawFormationTelop, drawRunningStyleTelop, drawToStraightTelop,
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
@@ -3390,6 +3390,20 @@ export default function RacePage(): React.JSX.Element {
     /** ★このコマがカットインか（★HUD 側で小さいコース図を出さないために見ます・★2026-09-10） */
     let cutInActive = false;
     /**
+     * ★**その挿入画面が世界を覆うか**（★2026-09-12・オーナー指摘
+     *   ★「★カットインをなぜ使わないのか？ ★デザイナーのハンドオフを使っていないまま」）。
+     *
+     * ⚠️ ★2026-09-11 に既定を ★**下三分の一のテロップ**へ移しました。★ところが
+     *    ★全画面版（`drawToStraightCutIn` など）は ★**毎コマ描かれたまま**で、
+     *    ★そのあとの `drawScene` に ★**丸ごと上書きされて**いました。
+     *    ★＝ 描く費用だけ払って、★デザイナーの絵は 1 度も見えていません。
+     * ⚠️ ★そして ★**帯では継ぎ目を隠せません**。★コーナー→直線の境目で
+     *    ★カメラの視点が ★**14m 後ろへ跳び**、★芝の目が逆回転します（★実測・オーナー報告②）。
+     *    ★オーナーの組み立ては「★コーナー演出 → ★**カットインで誤魔化す** → ★真横」でした。
+     * → ★**コーナーの後の 1 枚だけ全画面**に戻します。★他はテロップのままです。
+     */
+    let cutInCoversWorld = false;
+    /**
      * ★自馬マーカー（設計 1-6）用: 自馬の**頭**の画面位置。
      *   ⚠️ ここで求めるのは、**馬を描いたのと同じカメラ**で投影した点でなければなりません。
      *      別に計算すると、寄ったカットでピンが馬から離れます。
@@ -3411,6 +3425,8 @@ export default function RacePage(): React.JSX.Element {
         finished: horse.meters >= DIST - 1e-6,
       })), { width: W, height: H }, winnerShotNow, {
         finishStyle: built.finishStyle, development: built.development.kind, cornerCutM: CORNER_CUT_M_WEB,
+        /** ★コーナーは隊列に見えるよう横を詰めます（★`CORNER_LANE_COMPRESS` の註記・オーナー指摘①） */
+        cornerLaneCompress: CORNER_LANE_COMPRESS,
         cornerTracking: !LEGACY_MOTION,
         raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
         fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
@@ -3594,12 +3610,7 @@ export default function RacePage(): React.JSX.Element {
        * 通常の切替はハードカット。指定された閃光だけを残す。
        */
       const change = (motionTimeline ?? built).shotChanges.find((c) => c.displaySec <= d && d - c.displaySec < 0.3
-        && c.to === scene.shot.id
-        // A shared view label does not mean a shared camera: blending the wide
-        // pack and close contest shots produces two overlapping copies of every horse.
-        && FLASH_INTO.has(c.to)
-        /** ★このカットへは必ず切り替え（指示書 §5-5・`hardCutIn`） */
-        && broadcastV2ShotById(c.to).hardCutIn !== true);
+        && c.to === scene.shot.id);
       const drawScene = (target: CanvasRenderingContext2D, sceneToDraw: typeof scene): void => drawBroadcastV2Scene(target, course, sceneToDraw, {
         palette: art.pal as Record<string, string>,
         libraries,
@@ -3807,6 +3818,8 @@ export default function RacePage(): React.JSX.Element {
         const strategyLabelOf = (gate: number): string =>
           STRATEGY_LABELS[built.strategyOf(gate)] ?? '先行';
         const kind = cutIn?.kind ?? RACE_CUTIN_AT_START.kind;
+        /** ★コーナーの後（`to-straight`）だけ全画面。★`?cutin=full` は従来どおり全部 */
+        cutInCoversWorld = CUTIN_FULLSCREEN || kind === 'to-straight';
         const frame = {
           viewport: { width: W, height: H },
           sinceSec: cutIn === undefined ? raceD : sinceCutSec,
@@ -3972,24 +3985,36 @@ export default function RacePage(): React.JSX.Element {
        * ⚠️ ★**テロップのときは世界を描き続けます**（★2026-09-11・★C 案の要）。
        *    ★従来の全画面版だけが、世界の代わりに挿入画面を描きます。
        */
-      if (!cutInActive || !CUTIN_FULLSCREEN) {
+      if (!cutInCoversWorld) {
         drawScene(ctx, scene);
       }
-      paintTelop?.();
+      /** ⚠️ ★全画面のときは帯を重ねません（★デザイナーの絵の上に別の帯が乗ります） */
+      if (!cutInCoversWorld) paintTelop?.();
       /**
        * ⚠️ ★**カットインが覆う境目では、白い閃光を出しません**（★2026-09-11）。
        *    ★閃光はこのあとに ★**上から**塗るので、★出したままだとカットインが
        *    ★最初の 0.3 秒 ★真っ白に飛びます。★境目を読める形にする役目は
        *    ★カットインが引き取りました（★不透明・1.2 秒）。
        */
-      const flashCoveredByCutIn = change !== undefined
-        && raceCutInAt(change.from, change.to, { sectionLabel: v2SectionLabel }) !== undefined;
-      if (change !== undefined && !flashCoveredByCutIn && FLASH_INTO.has(change.to)) {
-        // ★閃光トランジション（アーケード参考映像 74 秒）: 白 → 0.3 秒で消える
-        const t = (d - change.displaySec) / 0.3;
-        if (t < 1) {
-          ctx.globalAlpha = Math.max(0, 1 - t) * 0.95;
-          ctx.fillStyle = '#fff8ea';
+      /**
+       * ★**画面遷移エフェクト**（★デザイナーのハンドオフ `broadcast-badges`・★`raceTransitionVeil`）。
+       *
+       * ⚠️ ★ここには ★**白 0.95 を 0.3 秒**が入っていました（★「アーケード参考映像 74 秒」由来）。
+       *    ★ハンドオフの指定は ★白 0.18 を 3 コマ ／ ★局面替えは暗緑 0.55 を 6 コマです。
+       *    ★**5 倍濃く、6 倍長い別物**でした（★2026-09-12・オーナー指摘）。
+       * ⚠️ ★**全画面のカットインが覆う境目には出しません**（★上から塗ると絵が飛びます）。
+       * ⚠️ ★`FLASH_INTO` で行き先を絞るのはやめました。★ハンドオフは
+       *    ★「★カット替え」と「★局面替え」の ★**2 通りしか区別していません**。
+       */
+      if (change !== undefined && !cutInCoversWorld
+        && broadcastV2ShotById(change.to).hardCutIn !== true) {
+        /** ★局面が変わったか。★区間名は画面が出しているものを使います（★別定義を作らない・R-30） */
+        const phaseChanged = broadcastV2SectionLabel(course, visualLead, change.from)
+          !== broadcastV2SectionLabel(course, visualLead, change.to);
+        const veil = raceTransitionVeil(d - change.displaySec, phaseChanged);
+        if (veil !== undefined) {
+          ctx.globalAlpha = veil.alpha;
+          ctx.fillStyle = veil.color;
           ctx.fillRect(0, 0, W, H);
           ctx.globalAlpha = 1;
         }
@@ -4100,11 +4125,11 @@ export default function RacePage(): React.JSX.Element {
       if (sectionTagRef.current.label !== label) sectionTagRef.current = { label, sinceSec: sectionTagRef.current.label === '' ? d - 1 : d };
       const hudSince = raceD - HUD_SETTLE_SEC;
       // ★ゴール後はライブ HUD（見出し・区間タグ・コース図）を落とす（motion-spec §6: ゴール〜2.4s は勝馬テロップのみ）
-      if (!winnerFinishedNow && !contestFocusHud && !(cutInActive && CUTIN_FULLSCREEN)) drawRaceHeadlineChip(ctx, FONT, {
+      if (!winnerFinishedNow && !contestFocusHud && !cutInCoversWorld) drawRaceHeadlineChip(ctx, FONT, {
         raceNo: RACE_META.raceNo, raceName: RACE_META.raceName,
         distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${DIST}m`,
       }, { timeSec: d, sinceSec: hudSince });
-      if (!winnerFinishedNow && !contestFocusHud && !(cutInActive && CUTIN_FULLSCREEN)) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
+      if (!winnerFinishedNow && !contestFocusHud && !cutInCoversWorld) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
         { timeSec: d, sinceSec: Math.min(hudSince, d - sectionTagRef.current.sinceSec) });
     }
     /**
@@ -4181,8 +4206,8 @@ export default function RacePage(): React.JSX.Element {
        *    ★構いません。★重なるのは ★**コース図と馬名プレート**だけなので、そこだけ下ろします
        *    （★帯は y432〜536・★コース図は y321〜530・★名前プレートは y544 付近）。
        */
-      const telopActive = cutInActive && !CUTIN_FULLSCREEN;
-      const hud = (cutInActive && CUTIN_FULLSCREEN) ? { ...hudRaw, standings: false }
+      const telopActive = cutInActive && !cutInCoversWorld;
+      const hud = cutInCoversWorld ? { ...hudRaw, standings: false }
         : replay.active || contestFocusHud ? { ...hudRaw, standings: false }
         : winnerFinishedNow ? { ...hudRaw, gauge: false, standings: false, calls: false } : hudRaw;
       // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）
@@ -4278,7 +4303,7 @@ export default function RacePage(): React.JSX.Element {
        *    ★ピンだけが ★**何も無い所を指して**浮くためです（★2026-09-11）。
        */
       const ownMarkerVisible = hudRaw.standings && !replay.active && !winnerFinishedNow
-        && !(cutInActive && CUTIN_FULLSCREEN);
+        && !cutInCoversWorld;
       if (ownMarkerVisible && v2OwnHead !== undefined) {
         drawOwnHorseMarker(ctx, FONT, v2OwnHead, ownGate,
           { topLimitY: 40, viewport: { width: W, height: H }, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC });

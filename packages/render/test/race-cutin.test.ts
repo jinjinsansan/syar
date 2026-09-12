@@ -192,24 +192,28 @@ describe('カットインの枠', () => {
     expect(r.ctx.globalAlpha).toBe(1);
   });
 
-  /** ⚠️ ★「出ている」だけでなく ★**抜けきる**ことを見る（★出っぱなしが 1 回目の失敗） */
-  it('入りと抜けでは中身を置かない／真ん中では置く', () => {
-    expect(drawRaceCutInFrame(recorder().ctx, FONT, frameAt(0))).toBeUndefined();
-    expect(drawRaceCutInFrame(recorder().ctx, FONT, frameAt(0.5))).toBeDefined();
-    expect(drawRaceCutInFrame(recorder().ctx, FONT, frameAt(1))).toBeUndefined();
+  /**
+   * ★**拭きをやめました**（★2026-09-12・オーナー指摘・`CUTIN_WIPE` の註記）。
+   *
+   *   ★旧: 入り 16% / 抜け 16% で ★**黒い帯が中央から左右へ開く**
+   *   ★オーナー評「★黒の物体が左から右に高速で動くものですか？」「★余計にわけがわからない」
+   *   ★デザイナーのハンドオフ（`broadcast-badges`）も ★**スライド禁止**と書いています。
+   * → ★**1 コマ目から出し切り、尺の終わりで消える。**
+   *   ★継ぎ目の合図は `raceTransitionVeil`（★ハンドオフの幕）が担います。
+   */
+  it('★★1 コマ目から出し切る（拭きで中身を待たせない）', () => {
+    for (const t of [0, 0.02, 0.1, 0.5, 0.9, 0.99]) {
+      const r = recorder();
+      const box = drawRaceCutInFrame(r.ctx, FONT, frameAt(t));
+      expect(box, `${t}: 中身の矩形が出ていません`).toBeDefined();
+      expect(r.rects[0]?.w, `${t}: 背面が画面幅を覆っていません`).toBe(VP.width);
+    }
   });
 
-  /** ★拭きは中央から左右へ広がる（★`Ctx2D` に切り抜きが無いので矩形の幅で作っている） */
-  it('拭きは中央から広がる', () => {
-    const width = (t: number): number => {
-      const r = recorder();
-      drawRaceCutInFrame(r.ctx, FONT, frameAt(t));
-      return r.rects[0]?.w ?? 0;
-    };
-    expect(width(0.04)).toBeGreaterThan(0);
-    expect(width(0.04)).toBeLessThan(VP.width);
-    expect(width(0.10)).toBeGreaterThan(width(0.04));
-    expect(width(0.5)).toBe(VP.width);
+  /** ⚠️ ★「出ている」だけでなく ★**抜けきる**ことを見る（★出っぱなしが 1 回目の失敗） */
+  it('尺を過ぎたら消える', () => {
+    expect(drawRaceCutInFrame(recorder().ctx, FONT, frameAt(1))).toBeUndefined();
+    expect(drawRaceCutInFrame(recorder().ctx, FONT, frameAt(1.5))).toBeUndefined();
   });
 
   it('中身の矩形は、下の実況の帯にかからない', () => {

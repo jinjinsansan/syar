@@ -44,6 +44,7 @@ import {
   broadcastV2StartCamera,
   broadcastV2StartFocus,
   FINISH_CAMERA_BY_DEVELOPMENT,
+  FINISH_DEV_MAX_FOV_DEG,
   FINISH_DEV_RAMP_FROM_M,
   V8_FINISH_BOARD_M,
   type BroadcastV2FinishStyle,
@@ -204,6 +205,23 @@ export function resolveBroadcastV2Scene(
     readonly laneAlignedFocus?: boolean;
     /** Comparison switch for the former camera that the pack crossed head-on. */
     readonly cornerTracking?: boolean;
+    /**
+     * ★**コーナーのカットで、横の広がりを詰める倍率**（★2026-09-12・オーナー指摘①）。
+     *
+     *   > ★「カーブの前から映像は馬が左右にばらけすぎです。
+     *   >   ★**もっと隊列のようにすれば**見た目は改善されるはず」
+     *
+     *   ★1 = 詰めない（★既定・従来のまま）。★0 = 全馬が同じ横位置（★1 列）。
+     *
+     * 【★測った内訳】★桜星賞 seed 42・★画面 1280px・★12 頭:
+     *   ★1 角 … ★全体 757px ＝ ★前後の差から 450px ＋ ★**横位置から 312px**
+     *   ★4 角 … ★全体 692px ＝ ★前後の差から 372px ＋ ★**横位置から 394px**
+     * ⚠️ ★**前後の差は詰めません。** ★それはエンジンが走らせた着差そのものです（★憲法 3）。
+     *    ★詰めてよいのは ★**横位置**だけです（★走った距離でもタイムでもない）。
+     * ⚠️ ★コーナーのカットの中だけに効きます。★真横のカットでは横位置は奥行きになるので、
+     *    ★詰めると馬が重なります。
+     */
+    readonly cornerLaneCompress?: number;
   } = {},
 ): BroadcastV2Scene {
   const leaderS = horses.reduce((max, horse) => Math.max(max, horse.s), 0);
@@ -215,6 +233,20 @@ export function resolveBroadcastV2Scene(
     const { fixedCamera: _fixed, ...tracking } = selectedShot;
     return tracking;
   })() : selectedShot;
+  /**
+   * ★**コーナーのカットだけ、横の広がりを詰める**（★`cornerLaneCompress` の註記）。
+   * ⚠️ ★これ以降は ★`horses` ではなく ★`packed` を見ます。★片方だけ使うと、
+   *    ★カメラは詰めた隊列を見て、★描画は詰めていない隊列を描きます。
+   */
+  const packed: readonly BroadcastV2Horse[] = ((): readonly BroadcastV2Horse[] => {
+    const k = options.cornerLaneCompress;
+    if (k === undefined || !(k >= 0) || k >= 1) return horses;
+    if (!shot.id.includes('-corner-')) return horses;
+    if (horses.length === 0) return horses;
+    const mean = horses.reduce((a, h) => a + (h.w ?? 0), 0) / horses.length;
+    return horses.map((h) => (h.w === undefined ? h : { ...h, w: mean + (h.w - mean) * k }));
+  })();
+
   // ★直線→ゴール前は展開に応じた連続ズーム（`broadcastV2FinishCamera`）
   /**
    * ★基準の画角は**ショット定義から**渡します（`shot.camera`）。
@@ -235,10 +267,10 @@ export function resolveBroadcastV2Scene(
    */
   const contenderFov = ((): number | undefined => {
     const spec = shot.frameContenders;
-    if (spec === undefined || horses.length === 0) return undefined;
+    if (spec === undefined || packed.length === 0) return undefined;
     /** ★台本がこのカットの枠取りを要らないと言っている（`noContenderFrameShots` の注記） */
     if (options.noContenderFrameShots?.includes(shot.id) === true) return undefined;
-    const lead = horses.reduce((max, h) => Math.max(max, h.s), horses[0]!.s);
+    const lead = packed.reduce((max, h) => Math.max(max, h.s), packed[0]!.s);
     /**
      * ★**「12m 以内か否か」で数えると、馬が境目をまたいだ 1 コマで画角が跳びます。**
      *
@@ -270,8 +302,8 @@ export function resolveBroadcastV2Scene(
      */
     const framed = shot.frameLeadGroup !== true || options.climaxCameraDisabled === true
       || options.leadGates === undefined || options.leadGates.length === 0
-      ? horses
-      : horses.filter((h) => options.leadGates?.includes(h.gate) === true);
+      ? packed
+      : packed.filter((h) => options.leadGates?.includes(h.gate) === true);
     /**
      * ★**先頭は「収める相手」の中で測ります。**
      *   ⚠️ 全馬の先頭を基準にすると、主役群がまだ後ろにいる間、
@@ -306,7 +338,11 @@ export function resolveBroadcastV2Scene(
     const span = Math.max(1, FINISH_DEV_RAMP_FROM_M - V8_FINISH_BOARD_M);
     const u = Math.max(0, Math.min(1, (FINISH_DEV_RAMP_FROM_M - left) / span));
     const w = u * u * (3 - 2 * u);
-    const fromFov = contenderFov ?? basePreset.fovDeg;
+    /**
+     * ⚠️ ★**枠取りが広げた画角にも上限を掛けます**（★`FINISH_DEV_MAX_FOV_DEG` の註記）。
+     *    ★掛けないと、★直線の入口で 22° まで広がり ★**馬が真横の 52% の大きさ**になります。
+     */
+    const fromFov = Math.min(contenderFov ?? basePreset.fovDeg, FINISH_DEV_MAX_FOV_DEG);
     const baseLead = shot.leadFraction ?? 0.78;
     return {
       fovDeg: fromFov + (target.fovDeg - fromFov) * w,
@@ -317,11 +353,11 @@ export function resolveBroadcastV2Scene(
   const cameraPreset = devBlend !== undefined ? { ...basePreset, fovDeg: devBlend.fovDeg }
     : contenderFov === undefined ? basePreset : { ...basePreset, fovDeg: contenderFov };
   const leadFraction = devBlend?.leadFraction ?? finish?.leadFraction ?? shot.leadFraction;
-  const leaders = leading(horses, 1);
-  const contenders = leading(horses, Math.min(5, horses.length));
+  const leaders = leading(packed, 1);
+  const contenders = leading(packed, Math.min(5, packed.length));
   const focus = shot.target === 'leader' || shot.target === 'winner'
     ? leaders
-    : shot.target === 'contenders' ? contenders : horses;
+    : shot.target === 'contenders' ? contenders : packed;
   const focusMeters = focus.map((horse) => horse.s);
   /**
    * ★注視点の**横位置**は、先頭からの差で**なだらかに重みを付けた平均**にします。
@@ -347,7 +383,7 @@ export function resolveBroadcastV2Scene(
     /** 先頭から `FALLOFF_M` 離れるまでに重みが 1→0 へなだらかに落ちる */
     const FALLOFF_M = shot.target === 'contenders' ? 24 : 60;
     let sum = 0, weight = 0;
-    for (const horse of horses) {
+    for (const horse of packed) {
       const u = Math.max(0, Math.min(1, (top - horse.s) / FALLOFF_M));
       const w = 1 - u * u * (3 - 2 * u);          // smoothstep（端で滑らかに 0）
       sum += horse.w * w;
@@ -479,7 +515,7 @@ export function resolveBroadcastV2Scene(
     const gates = options.leadGates;
     const targets = gates === undefined || gates.length === 0
       ? focusMeters
-      : horses.filter((h) => gates.includes(h.gate)).map((h) => h.s);
+      : packed.filter((h) => gates.includes(h.gate)).map((h) => h.s);
     focusS = contestFocusMeters(targets.length === 0 ? focusMeters : targets);
     /**
      * ★**先頭を枠の内側に残す**（`CONTEST_LEAD_MARGIN_M` の註記・2026-08-28）
@@ -540,7 +576,7 @@ export function resolveBroadcastV2Scene(
     focusS,
     focusW,
     camera: cameraAt(cameraFocusS),
-    visibleHorses: allFinished ? leaders : visibleFor(horses, focusS, shot.maxVisible),
+    visibleHorses: allFinished ? leaders : visibleFor(packed, focusS, shot.maxVisible),
     cutProgress: broadcastV2CutProgress(course, leaderS, options.cornerCutM),
     shotAnchorS: broadcastV2ShotSpanM(course, leaderS, options.script ?? DEFAULT_RACE_SCRIPT).start,
   };
