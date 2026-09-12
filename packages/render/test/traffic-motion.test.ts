@@ -48,22 +48,10 @@ describe('traffic replay steering', () => {
   it('keeps the display clock at or below double speed through the spurt', () => {
     const knots = { startSec: 0, startRealSec: 4, spurtSec: 60, straightSec: 85, goalSec: 85, finishSec: 105 };
     const warp = timeWarpFor(knots, readableRaceRates(knots, 30));
-    /**
-     * ⚠️ ★**道中は 2 倍を超えます**（★2026-09-12・オーナー指示「1600m で 30 秒」）。
-     *    ★上限は局面ごとに分かれました（道中 8 倍 ／ 勝負所・直線 2 倍）。
-     *    ★この検定が見るのは名前どおり ★**勝負所から先**です。
-     * ⚠️ ★送りは段で切り替わらず ★**なだらかに**変わるので、★道中 8 倍から勝負所 2 倍へ
-     *    ★降りきるのに ★**1.04 秒**かかります（★実測・8.81 秒で 4.96 倍 → 9.85 秒で 2 倍以下）。
-     *    ★その繋ぎは除いて測ります。★除く幅を広げると検定が緩むので、★実測の値に
-     *    ★0.5 秒だけ足した ★**1.6 秒**に固定します。
-     */
-    const SPURT_BLEND_SEC = 1.6;
-    const fromSpurt = warp.displaySecAt(knots.spurtSec) + SPURT_BLEND_SEC;
     for (let d = 0; d < warp.displaySec - 0.01; d += 0.1) {
       const rate = (warp.raceSecAt(d + 0.01) - warp.raceSecAt(d)) / 0.01;
       expect(rate).toBeGreaterThan(0);
-      if (d < fromSpurt) continue;
-      expect(rate, `勝負所から先の ${d.toFixed(1)} 秒`).toBeLessThanOrEqual(2.001);
+      expect(rate).toBeLessThanOrEqual(2.001);
     }
     expect(warp.raceSecAt(warp.displaySec)).toBeCloseTo(105, 8);
   });
