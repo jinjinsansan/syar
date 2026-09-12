@@ -333,7 +333,8 @@ const RUNOUT_SLOW = 0.6;
 /**
  * ★勝馬を映す長さ（秒）。6.5 → 4.2（2026-08-22・オーナー評「騎手が喜ぶ時間が長い」）。
  */
-const WINNER_FOLLOW_SEC = 2.4;
+/** ★**2.4 → 1.6 秒**（★2026-09-13・オーナー指示「詰めましょう」） */
+const WINNER_FOLLOW_SEC = 1.6;
 
 /**
  * ★**勝馬がゴールしてから、勝利の見せ方に切り替えるまでの間**（レース秒）
@@ -372,7 +373,8 @@ const WINNER_POSE: 'run' | 'celebrate' = 'run';
  */
 const WINNER_FOLLOW_REAR = false;
 /** ★その後の着順ボード（参考映像 124〜134s）: 6 秒 */
-const RESULTS_BOARD_SEC = 6;
+/** ★**6 → 3 秒**（★2026-09-13・オーナー指示「詰めましょう」）。★着順は 5 行なので 3 秒で読めます */
+const RESULTS_BOARD_SEC = 3;
 const POST_RACE_SEC = WINNER_FOLLOW_SEC + RESULTS_BOARD_SEC;
 /**
  * ★4 角を「奥からこちらへ向かってくる」固定カメラにするか（build 時のショット列挙にも使うので定数）。

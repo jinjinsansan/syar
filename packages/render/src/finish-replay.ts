@@ -25,7 +25,12 @@ import type { Ctx2D, FontOf, Viewport2D } from './oblique-draw.js';
  * ★**リプレイの表示の長さ**（秒）。
  *   ⚠️ ★長くすると「終わったのに終わらない」になります。参考の中継も決着の直後は短い。
  */
-export const FINISH_REPLAY_DISPLAY_SEC = 4.0;
+/**
+ * ★**4.0 → 2.8 秒**（★2026-09-13・オーナー指示「詰めましょう」）。
+ * ⚠️ ★`FINISH_REPLAY_SOURCE_SEC`（2.0）＋ `FINISH_REPLAY_TAIL_SEC`（0.6）＝ 2.6 秒より
+ *    ★長くなければなりません（★`finish-replay.test.ts` が固定）。★2.8 はその下限の上です。
+ */
+export const FINISH_REPLAY_DISPLAY_SEC = 2.8;
 /**
  * ★**本編の終わりから何秒ぶんを巻き戻すか**（本編の表示秒）。
  *   ★直線は実時間なので、2.0 秒 ≒ 34m。ゴール前の攻防がちょうど入ります。

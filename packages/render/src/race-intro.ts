@@ -6,16 +6,27 @@ import {
 
 /**
  * ★導入の時間割（アーケード参考映像: 空撮フライオーバー → レース名タイトル → 発馬機正面 → 発走）
- *   0.0〜3.0  空撮フライオーバー（コースの上を飛ぶ）
- *   3.0〜5.6  タイトルカード
- *   5.6〜7.8  ゲート待機（正面の発馬機・扉閉）
- *   7.8〜     発走（開扉）
+ *   0.0〜1.6  空撮フライオーバー（コースの上を飛ぶ）
+ *   1.6〜3.2  タイトルカード
+ *   3.2〜4.4  ゲート待機（正面の発馬機・扉閉）
+ *   4.4〜     発走（開扉）
+ *
+ * ★**半分に詰めました**（★2026-09-13・オーナー指示「詰めましょう」）
+ *
+ *   ★オーナー指摘「★残っているのは発走前 7.8 秒とゴール後 12.1 秒」に対して「詰めましょう」。
+ *   ★旧: 空撮 3.0 ／ タイトル 2.6 ／ ゲート待機 2.2 ＝ ★**7.8 秒**
+ *   ★新: 空撮 1.6 ／ タイトル 1.6 ／ ゲート待機 1.2 ＝ ★**4.4 秒**（★−3.4 秒）
+ * ⚠️ ★タイトルカードは ★**デザイナーのハンドオフ**（`components/title-card`）です。
+ *    ★1.6 秒はレース名が読める下限として置いた値で、★実測ではありません。
+ *    ★これ以上短くすると読めなくなります。
+ * ⚠️ ★開扉後の 2.2 秒（`RACE_INTRO_END_SEC - RACE_INTRO_RACE_START_SEC`）は
+ *    ★**触っていません**。★参考映像の「開扉後およそ 2 秒で追走カメラへ渡る」に合わせた値です。
  */
-export const RACE_INTRO_FLYOVER_SEC = 3.0;
-export const RACE_INTRO_TITLE_END_SEC = 5.6;
-export const RACE_INTRO_RACE_START_SEC = 7.8;
+export const RACE_INTRO_FLYOVER_SEC = 1.6;
+export const RACE_INTRO_TITLE_END_SEC = 3.2;
+export const RACE_INTRO_RACE_START_SEC = 4.4;
 // 参考映像は開扉後およそ2秒で次の追走カメラへ渡る。長い横滑りを禁止する。
-export const RACE_INTRO_END_SEC = 10.0;
+export const RACE_INTRO_END_SEC = 6.6;
 
 export type RaceIntroStage = 'flyover' | 'title' | 'gate-hold' | 'gate-release' | 'race';
 

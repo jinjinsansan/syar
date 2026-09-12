@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
-  RACE_INTRO_END_SEC, RACE_INTRO_RACE_START_SEC, raceIntroAt, startHorseVisualAt,
+  RACE_INTRO_END_SEC, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_RACE_START_SEC, RACE_INTRO_TITLE_END_SEC,
+  raceIntroAt, startHorseVisualAt,
 } from '../src/index.js';
 
 describe('raceIntroAt', () => {
   it('タイトルからゲート待機へ進み、発馬までレース時計を止める', () => {
     expect(raceIntroAt(0)).toMatchObject({ stage: 'flyover', raceDisplaySec: 0 });
-    expect(raceIntroAt(5.6)).toMatchObject({ stage: 'gate-hold', raceDisplaySec: 0 });
-    expect(raceIntroAt(1.0).stage).toBe('flyover');
-    expect(raceIntroAt(4.0).stage).toBe('title');
+    /** ⚠️ ★秒を直書きしないこと（★2026-09-13 に導入を詰めたとき、★ここだけ残って赤くなりました） */
+    expect(raceIntroAt(RACE_INTRO_TITLE_END_SEC)).toMatchObject({ stage: 'gate-hold', raceDisplaySec: 0 });
+    /** ⚠️ ★ここも秒を直書きしないこと（★段の ★**真ん中**を渡します） */
+    expect(raceIntroAt(RACE_INTRO_FLYOVER_SEC / 2).stage).toBe('flyover');
+    expect(raceIntroAt((RACE_INTRO_FLYOVER_SEC + RACE_INTRO_TITLE_END_SEC) / 2).stage).toBe('title');
     expect(raceIntroAt(RACE_INTRO_RACE_START_SEC - 0.01).raceDisplaySec).toBe(0);
   });
 

@@ -31,8 +31,10 @@ const STRATS = ['nige', 'senko', 'sashi', 'oikomi'];
  * ★**本編のあとの区間**（`page.tsx` の `WINNER_FOLLOW_SEC` + `RESULTS_BOARD_SEC` と同じ値）。
  *   ⚠️ ★ページの私有定数の写しです。★ずれると道具だけが別の総尺で回ります（R-30）。
  */
-export const AUDIT_WINNER_FOLLOW_SEC = 2.4;
-export const AUDIT_RESULTS_BOARD_SEC = 6;
+/** ⚠️ ★画面の `WINNER_FOLLOW_SEC` と同じ値（★2026-09-13 に 2.4 → 1.6 へ短縮・R-31） */
+export const AUDIT_WINNER_FOLLOW_SEC = 1.6;
+/** ⚠️ ★画面の `RESULTS_BOARD_SEC` と同じ値（★2026-09-13 に 6 → 3 へ短縮・R-31） */
+export const AUDIT_RESULTS_BOARD_SEC = 3;
 export const AUDIT_POST_RACE_SEC = AUDIT_WINNER_FOLLOW_SEC + AUDIT_RESULTS_BOARD_SEC;
 
 /** ★画面と同じ総尺（イントロ＋本編＋勝馬・着順ボード＋ゴール前リプレイ） */
@@ -159,7 +161,8 @@ export function buildAuditRace(opts = {}) {
 /* ── ★画面と同じ経路で「表示秒 → 場面」を作る ─────────── */
 
 /** ★`page.tsx` と同じ定数 */
-const RACE_INTRO_RACE_START_SEC = 7.8;
+/** ⚠️ ★`race-intro.ts` の同名定数と同じ値（★2026-09-13 に 7.8 → 4.4 へ短縮・R-31） */
+const RACE_INTRO_RACE_START_SEC = 4.4;
 const RACE_SPEED_MPS = 15.6;
 const HORSE_LENGTH_M = 2.4;
 /**
