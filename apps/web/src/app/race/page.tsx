@@ -75,7 +75,7 @@ import {
   type CoatName,
   homeStretchMetersOf,
   raceDevelopmentOf, type RaceDevelopmentInfo,
-  raceEditJumpDisplaySecs,
+  raceEditJumpDisplaySecs, raceEditElisionsFor, broadcastV2ScriptBoundariesM,
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
@@ -1590,7 +1590,39 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
    *    ★以前ここには `(LEGACY_MOTION ? ratesForTarget : readableRaceRates)(...)` という
    *    ★**三項演算子が画面と道具の 2 か所に写して**置かれていました。
    */
-  const warp = raceClockFor(knots, DIST, RACE_PACE_POLICY);
+  /**
+   * ★**コーナーは全部見せ、直線だけ飛ばす**（★2026-09-12・オーナー指示・`?pace=short`）
+   *
+   *   ★コーナーの区間は ★**台本が貼った境界から**取ります（★走路を読み直さない・★R-30）。
+   *   ★`broadcastV2ScriptBoundariesM` は id に `-corner-` を含む行を返すので、
+   *   ★その行の 1 つ前の境界からその行までが ★**そのコーナーのカット**です。
+   * ⚠️ ★`'short'` 以外では ★**使われません**（★`raceClockFor` が読み捨てます）。
+   */
+  const cornerSpansM = ((): readonly { readonly fromM: number; readonly toM: number }[] => {
+    const rows = broadcastV2ScriptBoundariesM(course, scriptFromSearch(
+      typeof window === 'undefined' ? '' : window.location.search));
+    const out: { fromM: number; toM: number }[] = [];
+    let prev = 0;
+    for (const row of rows) {
+      if (row.id.includes('-corner-')) out.push({ fromM: prev, toM: row.meters });
+      prev = row.meters;
+    }
+    return out;
+  })();
+  /** ★m → レース秒。★位置モデルは単調なので、★0.05 秒刻みで走って越えた所を返します */
+  const raceSecAtMeters = (meters: number): number => {
+    for (let sec = 0; sec <= 600; sec += 0.05) {
+      if (Math.max(...model.at(sec).map((h) => h.meters)) >= meters) return sec;
+    }
+    return knots.finishSec;
+  };
+  /**
+   * ⚠️ ★**分岐をここに書かないこと**（★2026-09-09・裁定 §3 Q-1a-1）。
+   *    ★時計そのものを ★`raceClockFor` から受け取ります。★監査道具も同じ関数を通ります。
+   *    ⚠️ ★**戻り値を捨てて別の時計を使わないこと**（★F-3）。
+   */
+  const elisions = raceEditElisionsFor(knots, cornerSpansM, raceSecAtMeters);
+  const warp = raceClockFor(knots, DIST, RACE_PACE_POLICY, elisions);
   /**
    * ★見た目の速度テーブル。描画と同じ手順（時計 → 位置モデル → 走り抜け → V2 注視点）で
    *   0.05 秒ごとに注視点を求め、時間圧縮の倍率 rate と固定物体の重みから Δ を積分する。
@@ -1632,7 +1664,8 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     model, warp, pace,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
     gauge, finishPos, finishSec, finishSpeeds, dustSoil, finishStyle,
-    editJumps: raceEditJumpDisplaySecs(knots, warp),
+    /** ⚠️ ★`'short'` 以外は飛ばさないので、★跳びの位置も空にします */
+    editJumps: RACE_PACE_POLICY === 'short' ? raceEditJumpDisplaySecs(elisions, warp) : [],
     development,
     ...buildMotionTimeline({ model, warp, finishSec, finishStyle }, winnerGate, 1.6),
     weightsKg: entrants.map((e) => e.weightKg),

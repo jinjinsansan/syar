@@ -117,7 +117,19 @@ function violationsOf(
     bad.push(`★時計が共有部品から来ていません: ${t(w.clockCall.expression)}`);
   } else {
     const a = w.clockCall.arguments;
-    if (a.length !== 3) bad.push(`★時計の引数が 3 つではありません: ${a.length}`);
+    /**
+     * ⚠️ ★**4 つ目は「飛ばす区間」です**（★2026-09-12・`?pace=short`）。
+     *    ★走路のコーナーの区間は `course` が無いとわからないので、★呼び出し側から
+     *    ★渡してもらいます。★3 つか 4 つを許し、★**4 つ目があるなら中身も見ます**
+     *    ★（★固定値や別の名前を通さない）。
+     */
+    if (a.length !== 3 && a.length !== 4) {
+      bad.push(`★時計の引数が 3 つか 4 つではありません: ${a.length}`);
+    }
+    const fourth = a[3];
+    if (fourth !== undefined && !isIdent(fourth, 'elisions')) {
+      bad.push(`★第4引数が elisions ではありません: ${t(fourth)}`);
+    }
     else {
       // ★② 局面の折れ点
       if (!isIdent(a[0], 'knots')) bad.push(`★第1引数が knots ではありません: ${t(a[0])}`);
@@ -205,7 +217,7 @@ describe('★画面の時計の接続（構文木で見る）', () => {
       return violationsOf(wiringOf(src.replace(from, to), 'page.tsx'),
         { expectPolicyTernary: true, args: PAGE_ARGS });
     };
-    const CLOCK = 'const warp = raceClockFor(knots, DIST, RACE_PACE_POLICY);';
+    const CLOCK = 'const warp = raceClockFor(knots, DIST, RACE_PACE_POLICY, elisions);';
     /**
      * ⚠️ ★**方針が 3 通りになりました**（★2026-09-12・`?pace=short` を足した）。
      *    ★`LEGACY_MOTION ? 'legacy' : PACE_SHORT ? 'short' : 'readable'`

@@ -126,6 +126,57 @@ export function raceEditElisions(knots: PhaseKnots): readonly RaceElision[] {
  * ⚠️ ★画面はこの値から覆う窓を作ります。★画面側で `knots` から計算し直さないこと
  *    ★（★片方だけ直すと、★覆っていない跳びが出ます）。
  */
-export function raceEditJumpDisplaySecs(knots: PhaseKnots, warp: TimeWarp): readonly number[] {
-  return raceEditElisions(knots).map((e) => warp.displaySecAt(e.toRaceSec));
+export function raceEditJumpDisplaySecs(
+  elisions: readonly RaceElision[], warp: TimeWarp,
+): readonly number[] {
+  return normalise(elisions).map((e) => warp.displaySecAt(e.toRaceSec));
+}
+
+/**
+ * ★**コーナーは全部見せ、★直線だけ削る**（★2026-09-12・オーナー指示・★2 度目の改訂）
+ *
+ *   ★オーナー指示「★**コーナーはそのまま入れてください。** ★4 コーナーだけではなく、
+ *   ★コーナーを走る部分はコーナー＆カットインを入れればいいです」。
+ *
+ * ⚠️ ★1 度目（`raceEditElisions`）は ★**道中と勝負所をまとめて飛ばす**ものでした。
+ *    ★コーナーもその中に入るので、★コーナーが消えました（★オーナー評
+ *    ★「カーブはなくしたのですね？」）。
+ *
+ * 【★見せるもの】
+ *   ★① 発走（★`startRealSec` まで）
+ *   ★② ★**走路のコーナーのカット**（★台本が貼った区間そのまま・★右回り左回りの別なく）
+ *   ★③ 最後の直線（★`goalSec` から）
+ *   ★それ以外（★向正面などの直線）を飛ばします。
+ *
+ * ⚠️ ★飛ばす地点は ★**コーナーの入口と出口**になります。★入口は台本のコーナーのカットインが
+ *    ★覆い、★出口は `raceEditJumpDisplaySecs` の窓が覆います。★どちらも同じ絵なので
+ *    ★重なっても害はありません。
+ * ⚠️ ★`cornerSpansM` は ★**台本の境界から**渡してください（★`broadcastV2ScriptBoundariesM`）。
+ *    ★ここで走路を読み直すと、★画面が出すコーナーと食い違います（★R-30）。
+ */
+export function raceEditElisionsFor(
+  knots: PhaseKnots,
+  cornerSpansM: readonly { readonly fromM: number; readonly toM: number }[],
+  raceSecAtMeters: (meters: number) => number,
+): readonly RaceElision[] {
+  const startEnd = knots.startRealSec;
+  const goal = knots.goalSec;
+  if (startEnd === undefined || goal === undefined || !(goal > startEnd)) return [];
+  /** ★見せる区間（★レース秒）。★発走 ＋ コーナー ＋ 最後の直線 */
+  const shown: { from: number; to: number }[] = [{ from: 0, to: startEnd }];
+  for (const span of cornerSpansM) {
+    const from = Math.max(startEnd, raceSecAtMeters(span.fromM));
+    const to = Math.min(goal, raceSecAtMeters(span.toM));
+    if (to > from) shown.push({ from, to });
+  }
+  shown.push({ from: goal, to: knots.finishSec });
+  shown.sort((a, b) => a.from - b.from);
+  /** ★見せる区間の隙間が、★飛ばす区間 */
+  const out: RaceElision[] = [];
+  for (let i = 1; i < shown.length; i += 1) {
+    const gapFrom = shown[i - 1]!.to;
+    const gapTo = shown[i]!.from;
+    if (gapTo > gapFrom) out.push({ fromRaceSec: gapFrom, toRaceSec: gapTo });
+  }
+  return out;
 }

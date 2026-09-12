@@ -1,4 +1,4 @@
-import { elidedWarp, raceEditElisions } from './race-elision.js';
+import { elidedWarp, raceEditElisions, type RaceElision } from './race-elision.js';
 /**
  * ★**時間を情報量に比例して配る**（正典 D-062）
  *
@@ -495,6 +495,15 @@ export interface RacePaceReport {
  */
 export function raceClockFor(
   knots: PhaseKnots, distanceMeter: number, policy: RacePacePolicy,
+  /**
+   * ★**飛ばす区間**（★`'short'` のときだけ読みます・★2026-09-12）。
+   *
+   *   ★渡さなければ ★**発走 ＋ 最後の直線**だけを見せる形に落ちます（`raceEditElisions`）。
+   *   ★コーナーも見せるには、★走路のコーナーの区間が要ります。★それは `course` が
+   *   ★無いとわからないので、★**呼び出し側から渡してもらいます**（`raceEditElisionsFor`）。
+   * ⚠️ ★`'readable'` / `'legacy'` では ★**一切読みません**（★1 ビットも変わりません）。
+   */
+  elisions?: readonly RaceElision[],
 ): TimeWarp {
   const warp = timeWarpFor(knots, ratesForPolicy(knots, targetDisplaySec(distanceMeter), policy));
   /**
@@ -503,7 +512,8 @@ export function raceClockFor(
    *    ★使うからです（★`race-clock-wiring.test.ts` が構文木で固定）。★画面側で
    *    ★包むと、★道具が包まない時計を見て静かにずれます（★台帳 B-6 と同じ形）。
    */
-  return policy === 'short' ? elidedWarp(warp, raceEditElisions(knots)) : warp;
+  if (policy !== 'short') return warp;
+  return elidedWarp(warp, elisions ?? raceEditElisions(knots));
 }
 
 /**
