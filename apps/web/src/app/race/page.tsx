@@ -75,7 +75,7 @@ import {
   type CoatName,
   homeStretchMetersOf,
   raceDevelopmentOf, type RaceDevelopmentInfo,
-  raceEditJumpDisplaySecs, raceEditElisionsFor, broadcastV2ScriptBoundariesM,
+  raceEditJumps, raceEditElisionsFor, STRAIGHT_SHOWN_M, broadcastV2ScriptBoundariesM,
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
@@ -817,7 +817,7 @@ interface Built {
    * ★**時計の跳びが起きる表示秒**（★`?pace=short` のときだけ中身が入ります）。
    *   ★ここはカットインで覆わなければなりません（★裸の跳びは瞬間移動に見えます）。
    */
-  readonly editJumps: readonly number[];
+  readonly editJumps: readonly { readonly at: number; readonly label: string }[];
   /** ★ショット切替の時刻（表示秒）と前後の id。切替直後は前ショットとディゾルブする（ユーザー指摘⑥） */
   readonly shotChanges: readonly { readonly displaySec: number; readonly from: BroadcastV2ShotId; readonly to: BroadcastV2ShotId }[];
   /** 斤量（出馬表の表示用） */
@@ -1621,7 +1621,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
    *    ★時計そのものを ★`raceClockFor` から受け取ります。★監査道具も同じ関数を通ります。
    *    ⚠️ ★**戻り値を捨てて別の時計を使わないこと**（★F-3）。
    */
-  const elisions = raceEditElisionsFor(knots, cornerSpansM, raceSecAtMeters);
+  const elisions = raceEditElisionsFor(knots, cornerSpansM, raceSecAtMeters, STRAIGHT_SHOWN_M, DIST);
   const warp = raceClockFor(knots, DIST, RACE_PACE_POLICY, elisions);
   /**
    * ★見た目の速度テーブル。描画と同じ手順（時計 → 位置モデル → 走り抜け → V2 注視点）で
@@ -1664,8 +1664,19 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     model, warp, pace,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
     gauge, finishPos, finishSec, finishSpeeds, dustSoil, finishStyle,
-    /** ⚠️ ★`'short'` 以外は飛ばさないので、★跳びの位置も空にします */
-    editJumps: RACE_PACE_POLICY === 'short' ? raceEditJumpDisplaySecs(elisions, warp) : [],
+    /**
+     * ⚠️ ★`'short'` 以外は飛ばさないので、★跳びの位置も空にします。
+     * ⚠️ ★見出しは ★**跳んだ先の区間名**から作ります（★2026-09-13・オーナー指摘
+     *    ★「カットインで最後の直線へが常に出るのはなぜですか？」）。★決め打ちにすると
+     *    ★3 角へ跳ぶときも「最後の直線へ」と出ます。
+     */
+    editJumps: RACE_PACE_POLICY === 'short'
+      ? raceEditJumps(elisions, warp).map((j) => ({
+        at: j.atDisplaySec,
+        label: `${broadcastV2SectionLabel(course,
+          Math.max(...model.at(j.toRaceSec).map((h) => h.meters)), 'side-drive')}へ`,
+      }))
+      : [],
     development,
     ...buildMotionTimeline({ model, warp, finishSec, finishStyle }, winnerGate, 1.6),
     weightsKg: entrants.map((e) => e.weightKg),
@@ -3950,8 +3961,8 @@ export default function RacePage(): React.JSX.Element {
        * ⚠️ ★跳びの位置は `built.editJumps` から取ります。★ここで `knots` から
        *    ★計算し直さないこと（★片方だけ直すと覆えない跳びが出ます・★R-30）。
        */
-      const jumpAt = built.editJumps.find((j) => raceD >= j - RACE_CUTIN_JUMP_LEAD_SEC
-        && raceD < j + RACE_CUTIN_JUMP_LEAD_SEC);
+      const jumpAt = built.editJumps.find((j) => raceD >= j.at - RACE_CUTIN_JUMP_LEAD_SEC
+        && raceD < j.at + RACE_CUTIN_JUMP_LEAD_SEC);
       const jumpCutInActive = !CUTIN_OFF && renderer === 'v2' && !replay.active && jumpAt !== undefined;
       cutInActive = cutIn !== undefined || startCutInActive || jumpCutInActive;
       /** ★テロップは世界のあとに重ねるので、いったん関数に包んで持っておきます */
@@ -3978,10 +3989,10 @@ export default function RacePage(): React.JSX.Element {
         const frame = {
           viewport: { width: W, height: H },
           sinceSec: cutIn !== undefined ? sinceCutSec
-            : jumpAt !== undefined ? raceD - (jumpAt - RACE_CUTIN_JUMP_LEAD_SEC) : raceD,
+            : jumpAt !== undefined ? raceD - (jumpAt.at - RACE_CUTIN_JUMP_LEAD_SEC) : raceD,
           durationSec: cutIn !== undefined ? cutInSpanSec
             : jumpAt !== undefined ? RACE_CUTIN_JUMP_LEAD_SEC * 2 : RACE_CUTIN_SEC,
-          label: cutIn?.label ?? (jumpAt !== undefined ? '最後の直線へ' : RACE_CUTIN_AT_START.label),
+          label: cutIn?.label ?? jumpAt?.label ?? RACE_CUTIN_AT_START.label,
           raceLabel: `${RACE_META.raceNo}　${RACE_META.raceName}`,
           metersLeft: metersLeftNow,
         };

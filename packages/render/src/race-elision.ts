@@ -132,6 +132,30 @@ export function raceEditJumpDisplaySecs(
   return normalise(elisions).map((e) => warp.displaySecAt(e.toRaceSec));
 }
 
+/** ★跳びの位置と、★**跳んだ先の区間名**（★カットインの見出しに使います） */
+export interface RaceEditJump {
+  readonly atDisplaySec: number;
+  /** ★跳んだ先のレース秒（★呼び出し側が区間名を引くのに使います） */
+  readonly toRaceSec: number;
+}
+
+/**
+ * ★**跳びの位置と行き先**（★2026-09-13・オーナー指摘）
+ *
+ * ⚠️ ★見出しを ★**`'最後の直線へ'` に決め打ちしていました**（★オーナー評
+ *    ★「★カットインで ★**最後の直線へ が常に出る**のはなぜですか？」）。
+ *    ★3 角へ跳ぶときも 4 角へ跳ぶときも同じ見出しでした。
+ * → ★跳んだ先のレース秒を返します。★区間名は ★**画面が出している関数**
+ *   （`broadcastV2SectionLabel`）で引いてください（★別の訳語を作らない・★R-30）。
+ */
+export function raceEditJumps(
+  elisions: readonly RaceElision[], warp: TimeWarp,
+): readonly RaceEditJump[] {
+  return normalise(elisions).map((e) => ({
+    atDisplaySec: warp.displaySecAt(e.toRaceSec), toRaceSec: e.toRaceSec,
+  }));
+}
+
 /**
  * ★**コーナーは全部見せ、★直線だけ削る**（★2026-09-12・オーナー指示・★2 度目の改訂）
  *
@@ -154,22 +178,42 @@ export function raceEditJumpDisplaySecs(
  * ⚠️ ★`cornerSpansM` は ★**台本の境界から**渡してください（★`broadcastV2ScriptBoundariesM`）。
  *    ★ここで走路を読み直すと、★画面が出すコーナーと食い違います（★R-30）。
  */
+export const STRAIGHT_SHOWN_M = 250;
+
 export function raceEditElisionsFor(
   knots: PhaseKnots,
   cornerSpansM: readonly { readonly fromM: number; readonly toM: number }[],
   raceSecAtMeters: (meters: number) => number,
+  /**
+   * ★**最後の直線を、残り何 m から見せるか**（★2026-09-13・オーナー指摘）。
+   *
+   *   ★オーナー評「★**最後の直線に尺を持たせ過ぎでは？**」。
+   *   ★実測（★1 倍）: ★直線 400m は ★**25.6 秒**で、★レース本編 38.1 秒の ★**61%**でした。
+   *   ★残り 250m にすると 16.0 秒になり、★本編が ★**約 30 秒**に収まります。
+   * ⚠️ ★短くしすぎると、★直線入口の攻防（★差し・追い込みが動き出す所）が入りません。
+   *    ★展開別カメラは残り 260m から寄せ始めるので（`FINISH_DEV_RAMP_FROM_M`）、
+   *    ★250m より短くするとその演出も削れます。
+   */
+  straightShownM: number = STRAIGHT_SHOWN_M,
+  distanceMeter?: number,
 ): readonly RaceElision[] {
   const startEnd = knots.startRealSec;
   const goal = knots.goalSec;
   if (startEnd === undefined || goal === undefined || !(goal > startEnd)) return [];
+  /**
+   * ★最後の直線を見せ始めるレース秒。★`distanceMeter` を渡さなければ従来どおり
+   * ★`goalSec`（★残り `GOAL_REAL_TIME_M`）から見せます。
+   */
+  const straightFrom = distanceMeter === undefined ? goal
+    : Math.max(goal, raceSecAtMeters(Math.max(0, distanceMeter - straightShownM)));
   /** ★見せる区間（★レース秒）。★発走 ＋ コーナー ＋ 最後の直線 */
   const shown: { from: number; to: number }[] = [{ from: 0, to: startEnd }];
   for (const span of cornerSpansM) {
     const from = Math.max(startEnd, raceSecAtMeters(span.fromM));
-    const to = Math.min(goal, raceSecAtMeters(span.toM));
+    const to = Math.min(straightFrom, raceSecAtMeters(span.toM));
     if (to > from) shown.push({ from, to });
   }
-  shown.push({ from: goal, to: knots.finishSec });
+  shown.push({ from: straightFrom, to: knots.finishSec });
   shown.sort((a, b) => a.from - b.from);
   /** ★見せる区間の隙間が、★飛ばす区間 */
   const out: RaceElision[] = [];
