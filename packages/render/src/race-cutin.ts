@@ -124,6 +124,75 @@ export function raceCutInAt(
   return undefined;
 }
 
+/**
+ * ★**場面転換の合図（ワイプ）**（★2026-09-12・★オーナー指摘）
+ *
+ * 【★なぜ要るか — ★参考映像との比較で名指しされた唯一の差】
+ *   ★オーナー評「★JRA の中継も、参考映像も、★カメラワークの切り替わりがあっても
+ *   ★**ちゃんと 1 つのレースとして見えます**。★この開発サーバーは ★**切れる感覚**があります」。
+ *
+ *   ★`REPORT_P4_2D_EDIT_GRAMMAR_AUDIT_20260824.md` §19-5（★参考映像との突き合わせ）:
+ *     ★「★**場面転換の合図がない。** ★参考は勝負どころで ★**ワイプ（1.4 秒）**を入れて
+ *       ★画を切り替えます。★`/race` は ★**勝負どころ（直線）に転換の合図がありません**」
+ *   ★2026-09-12 に測り直した結果、★尺の配り方・走行方向の反転・被写体の引き継ぎは
+ *   ★参考と揃っていました。★**残っている差はこれだけ**です。
+ *
+ * 【⚠️ ★ここには 2 回別のものを試して 2 回とも外しています】
+ *   ★ディゾルブ（重ね合わせ） … ★**12 頭が二重写し** → ★「切り替え時がごちゃごちゃする」→ 撤去
+ *   ★ロゴのワイプ ………………… ★「★**ダサい**」→ 撤去
+ *   ★カットイン ………………… ★直線には**意図的に入れていません**（★「佳境で目を離させない」）
+ *
+ * 【★だからこの形にしました】
+ *   ★**重ねません**（★二重写しが起きない）。★**ロゴを出しません**。
+ *   ★**帯が横切ります**（★どの瞬間も画面の大半はレースが見えている）。
+ *   ★短くします（★佳境で目を離させない）。
+ *
+ * ⚠️ ★**最初は「中央から左右へ開く」で作って外しました**（★2026-09-12・実画面）。
+ *    ★あの形は ★**t=0 で画面を全部覆う**ので、★継ぎ目で ★**一瞬まっ黒**になりました。
+ *    ★参考映像のワイプは全面を覆いません。★**帯が通り過ぎる**だけです。
+ * ★戻し口は `?wipe=off`。
+ */
+export const RACE_WIPE_SEC = 0.35;
+
+/**
+ * ★帯の幅（★画面幅に対する比）。
+ * ⚠️ ★**1.0 にしないこと。** ★全面を覆うと継ぎ目で一瞬まっ黒になります（★2026-09-12 に踏みました）。
+ */
+export const RACE_WIPE_BAND = 0.22;
+
+/**
+ * ★カットの頭に置く拭き。★`sinceSec` が 0 のとき画面を覆い、★`RACE_WIPE_SEC` で開き切ります。
+ * ⚠️ ★`Ctx2D` に `clip` はありません。★**塗る矩形の幅**で拭きを作ります（★カットインと同じ手）。
+ */
+export function drawRaceWipe<TImage>(
+  ctx: Ctx2D<TImage>,
+  opts: {
+    readonly viewport: { readonly width: number; readonly height: number };
+    readonly sinceSec: number;
+    readonly durationSec?: number | undefined;
+  },
+): void {
+  const { width: W, height: H } = opts.viewport;
+  const dur = Math.max(0.01, opts.durationSec ?? RACE_WIPE_SEC);
+  const t = opts.sinceSec / dur;
+  if (t < 0 || t >= 1) return;
+  /**
+   * ★帯の幅。★画面の 22%。
+   * ⚠️ ★どの瞬間も ★**画面の 78% はレースが見えている**こと。★全面を覆わないための値です。
+   */
+  const bandW = Math.round(W * RACE_WIPE_BAND);
+  /** ★左端の外から右端の外へ通り過ぎる */
+  const x = Math.round(-bandW + (W + bandW) * ease(clamp01(t)));
+  const prevAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = BACKDROP;
+  ctx.fillRect(x, 0, bandW, H);
+  /** ★先頭の縁に金の細い線（★動いているのが分かる・★カットインと同じ意匠） */
+  ctx.fillStyle = GOLD;
+  ctx.fillRect(x + bandW - 2, 0, 2, H);
+  ctx.globalAlpha = prevAlpha;
+}
+
 /** ★背面の色。★不透明であることがこの画面の要件です（★走行を透かさない） */
 const BACKDROP = '#0d1218';
 const BAND = '#16202a';

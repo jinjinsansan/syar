@@ -77,7 +77,7 @@ import {
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
-  raceCutInAt, RACE_CUTIN_SEC, RACE_CUTIN_CORNER_SEC, RACE_CUTIN_AT_START,
+  raceCutInAt, RACE_CUTIN_SEC, RACE_CUTIN_CORNER_SEC, RACE_CUTIN_AT_START, RACE_WIPE_SEC, drawRaceWipe,
   drawOwnHorseCutIn, drawFormationCutIn, drawRunningStyleCutIn, drawToStraightCutIn,
   RACE_TELOP_SEC, drawOwnHorseTelop, drawFormationTelop, drawRunningStyleTelop, drawToStraightTelop,
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
@@ -182,6 +182,12 @@ const TELOP_ALPHA: number | undefined = (() => {
 })();
 const CUTIN_OFF = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('cutin') === 'off';
+/**
+ * ★**場面転換の合図（ワイプ）を止める**（★2026-09-12・★見比べ用）。
+ * ⚠️ ★既定は ★**出す**。★合図が無いことが参考映像との唯一の差でした（★上の `drawRaceWipe` の註記）。
+ */
+const WIPE_OFF = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('wipe') === 'off';
 const SIDE_ONLY = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('directional') === 'side';
 const PLACEMENT_OVERRIDE: HorsePlacementMode | undefined = typeof window !== 'undefined'
@@ -3922,6 +3928,29 @@ export default function RacePage(): React.JSX.Element {
           ctx.fillStyle = '#fff8ea';
           ctx.fillRect(0, 0, W, H);
           ctx.globalAlpha = 1;
+        }
+      }
+      /**
+       * ★**場面転換の合図（ワイプ）**（★2026-09-12・★オーナー指摘
+       *   「★カメラワークの切り替わりがあると ★**切れる感覚**があります」）。
+       *
+       * ★参考映像との突き合わせ（`REPORT_P4_2D_EDIT_GRAMMAR_AUDIT_20260824.md` §19-5）で
+       * ★名指しされた唯一の差が ★**「勝負どころに転換の合図がない」**。
+       * ★2026-09-12 に測り直しても、★尺・走行方向・被写体の引き継ぎは参考と揃っており、
+       * ★**合図だけが無い**状態でした。
+       *
+       * ⚠️ ★**合図が既にある境目には出しません**（★二重に飾らない）:
+       *    ★カットイン（★コーナー明け）／★閃光（★`FLASH_INTO`）。
+       * ★戻し口は `?wipe=off`。
+       */
+      if (!WIPE_OFF && !cutInActive) {
+        const wipeChange = (motionTimeline ?? built).shotChanges
+          .find((c) => c.to === scene.shot.id && c.displaySec <= d && d - c.displaySec < RACE_WIPE_SEC);
+        const signalled = wipeChange !== undefined
+          && (FLASH_INTO.has(wipeChange.to)
+            || raceCutInAt(wipeChange.from, wipeChange.to, { sectionLabel: v2SectionLabel }) !== undefined);
+        if (wipeChange !== undefined && !signalled) {
+          drawRaceWipe(ctx, { viewport: { width: W, height: H }, sinceSec: d - wipeChange.displaySec });
         }
       }
       if (shakeT >= 0) ctx.restore();
