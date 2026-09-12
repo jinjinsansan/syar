@@ -108,7 +108,7 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
      *    ★この検定の役目は残ります（★`?corner=far` は戻し口として生きています）。
      */
     const cases = [
-      { leadS: 900, shot: 'fourth-corner-far', style: 'far' as const },
+      { leadS: 1100, shot: 'fourth-corner-far', style: 'far' as const },
     ];
     for (const c of cases) {
       const f = frameAt(c.leadS, 'v6', 1, c.style);
@@ -256,12 +256,13 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
    *    ★前から（`diag-front`）だけが合格側でした。
    */
   it('★4 角の撮り方は選べる（★既定は正面固定・★俯瞰へ 1 手で戻せる）', () => {
-    expect(frameAt(900, 'v6').shot, '★既定は画面と同じ front').toBe('fourth-corner-front');
-    expect(frameAt(900, 'v6', 1, 'front').shot, '★明示しても同じ').toBe('fourth-corner-front');
-    expect(frameAt(900, 'v6', 1, 'wide').shot).toBe('fourth-corner-wide');
-    expect(frameAt(900, 'v6', 1, 'far').shot).toBe('fourth-corner-far');
-    expect(frameAt(900, 'v6', 1, 'far').top4HeightRatio)
-      .toBeLessThan(frameAt(900, 'v6', 1, 'wide').top4HeightRatio);
+    /** ⚠️ ★**1100m が 4 角**です（★2026-09-12 に走路の本当のコーナーへ貼り直した） */
+    expect(frameAt(1100, 'v6').shot, '★既定は画面と同じ front').toBe('fourth-corner-front');
+    expect(frameAt(1100, 'v6', 1, 'front').shot, '★明示しても同じ').toBe('fourth-corner-front');
+    expect(frameAt(1100, 'v6', 1, 'wide').shot).toBe('fourth-corner-wide');
+    expect(frameAt(1100, 'v6', 1, 'far').shot).toBe('fourth-corner-far');
+    expect(frameAt(1100, 'v6', 1, 'far').top4HeightRatio)
+      .toBeLessThan(frameAt(1100, 'v6', 1, 'wide').top4HeightRatio);
   });
 
   it('★v5 の直線は 1 カット、v6 は 4 カット', () => {
@@ -700,7 +701,7 @@ describe('★走路の接線の角度（★絵を回すときに使う）', () =
    *    ★ここが 0 なら、★「回す」という対処そのものが不要ということになります。
    */
   it('★コーナーでは傾いている（★だから絵を回す意味がある）', () => {
-    expect(deg(angleAt(900)), '★4 角').toBeGreaterThan(10);
+    expect(deg(angleAt(1100)), '★4 角').toBeGreaterThan(10);
   });
 
   /**

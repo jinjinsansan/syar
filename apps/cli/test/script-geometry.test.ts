@@ -60,7 +60,13 @@ describe('★台本 v6 の切り替え地点', () => {
     const short: string[] = [];
     for (const { name, course } of courses) {
       const bounds = broadcastV2ScriptBoundariesM(course, 'v6');
-      if (bounds.length !== expected) short.push(`${name} … ${bounds.length} / ${expected}`);
+      /**
+       * ⚠️ ★**2026-09-12 から、カットは「減らない」であって「同じ」ではありません。**
+       *    ★コーナーの数だけカットが ★**増えます**（★オーナー指示「コーナー映像がないのもおかしい」）。
+       *    ★実測: 桜星賞 12 → 13 ／ 白光記念（3600m・6 コーナー）12 → 20。
+       *    ★台帳「カット数は減らさない」は下限の話なので、★下回ったときだけ止めます。
+       */
+      if (bounds.length < expected) short.push(`${name} … ${bounds.length} / ${expected}`);
       /** ★長さ 0 のカットは「在るのに映らない」＝実質減っています */
       let prev = 0;
       for (const b of bounds) {
@@ -143,13 +149,39 @@ describe('★台本 v6 の切り替え地点', () => {
    * ★**対照**: ★承認済みの 1 鞍（桜星賞）は 1m も動かないこと。
    *   ⚠️ ★これが無いと、「50 鞍を直した」が「承認済みの 1 鞍も作り変えた」を隠します。
    */
-  it('★桜星賞（スターパーク 1600m・直線 400m）は旧の割合と 1m も違わない', () => {
+  /**
+   * ⚠️ ★**この検定は 2026-09-12 に要求ごと変わりました**（★オーナー指示）。
+   *
+   *   ★旧: 「★桜星賞は旧の割合と 1m も違わない」（★2026-09-02 の変更が承認済みの画を動かさないため）
+   *   ★新: ★**コーナーのカットは走路の本当のコーナーへ貼ります**。★桜星賞も動きます:
+   *     ★4 角のカット … 864〜966m（★割合）→ ★**1080〜1200m**（★本当の 4 角の出口）
+   *     ★3 角のカット … ★**780〜900m を新設**（★以前は 3 角に映像がありませんでした）
+   *   ★留めるのは「動かないこと」ではなく、★**コーナーのカットがコーナーの上にあること**です。
+   */
+  it('★桜星賞のコーナーのカットは、走路の本当のコーナーの上にある', () => {
     const entry = courses.find((c) => c.id === 'g1-ousei');
     expect(entry, '★桜星賞が見つかりません').toBeDefined();
     const { course } = entry!;
-    const now = broadcastV2ScriptBoundariesM(course, 'v6');
-    const old = SCRIPT_V6.map((row) => row.until * course.distance);
-    expect(now.map((b) => Math.round(b.meters * 1e6) / 1e6)).toEqual(old.map((m) => Math.round(m * 1e6) / 1e6));
+    const bounds = broadcastV2ScriptBoundariesM(course, 'v6');
+    /** ★走路のコーナー区間 */
+    const corners: { from: number; to: number }[] = [];
+    let acc = 0;
+    for (const seg of course.segments) {
+      if (seg.type === 'corner') corners.push({ from: acc, to: acc + seg.length });
+      acc += seg.length;
+    }
+    expect(corners.length, '★桜星賞のコーナー区間').toBe(2);
+    let prev = 0;
+    const cornerCuts: { from: number; to: number }[] = [];
+    for (const b of bounds) {
+      if (b.id.includes('-corner-')) cornerCuts.push({ from: prev, to: b.meters });
+      prev = b.meters;
+    }
+    expect(cornerCuts.length, '★コーナーの数だけカットがあること').toBe(corners.length);
+    for (const cut of cornerCuts) {
+      const inside = corners.some((k) => cut.from >= k.from - 1e-6 && cut.to <= k.to + 1e-6);
+      expect(inside, `★${cut.from.toFixed(0)}〜${cut.to.toFixed(0)}m がコーナーの外にあります`).toBe(true);
+    }
   });
 
   /**

@@ -99,7 +99,12 @@ describe('★固定カメラ（4 角正面）', () => {
   it('★据え位置は台本のカットの終わりから決まる', () => {
     /** ★台本ごとに違う。★既定の値を直書きしない */
     expect(broadcastV2ShotEndM(course, 'fourth-corner-front', 'v4')).toBeCloseTo(1056, 6);
-    expect(broadcastV2ShotEndM(course, 'fourth-corner-front', 'v6')).toBeCloseTo(966.4, 6);
+    /**
+     * ⚠️ ★**2026-09-12、★v6 のコーナーは走路の本当のコーナーへ貼り直しました。**
+     *    ★4 角のカットの終わりは ★966.4m（★割合）→ ★**1200m**（★4 角の出口＝直線の入口）。
+     *    ★固定カメラはこの終点に据わるので、★カメラも本当の直線入口へ移ります。
+     */
+    expect(broadcastV2ShotEndM(course, 'fourth-corner-front', 'v6')).toBeCloseTo(1200, 6);
     expect(broadcastV2ShotEndM(course, 'fourth-corner-front'))
       .toBe(broadcastV2ShotEndM(course, 'fourth-corner-front', DEFAULT_RACE_SCRIPT));
     // ★台本に無いショットは undefined（呼び出し側が区間の終点にフォールバックする）

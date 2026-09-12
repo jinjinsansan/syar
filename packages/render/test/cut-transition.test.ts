@@ -66,7 +66,14 @@ function transitions(script: BroadcastV2Script): readonly { readonly m: number; 
  * ⚠️ ★旧台本（v3 / v4 / v5）は ★**動かしていません**。★一度 `start-front` を書き換えて
  *    ★v4 の数が 3 → 4 になり、★台本 v6 専用の `start-gate-side` へ分けました。
  */
-const CROSS_FAMILY_COUNT: Readonly<Record<string, number>> = { v4: 3, v5: 3, v6: 2 };
+/**
+ * ⚠️ ★**v6 は 2 → 4 へ**（★2026-09-12・★オーナー指示「コーナー映像がないのもおかしい」）。
+ *    ★コーナーのカットを走路の本当のコーナーへ貼り、★3 角にもカットが付いたためです
+ *    （★桜星賞: `side-drive`→3 角→`side-drive`→4 角→直線 で 画角の系統が 4 回変わる）。
+ *    ★旧台本（v4 / v5）は割合のままなので 3 のままです。
+ * ★この数はコースによって変わります。★ここは ★**既定の走路（桜星賞）**を固定しています。
+ */
+const CROSS_FAMILY_COUNT: Readonly<Record<string, number>> = { v4: 3, v5: 3, v6: 4 };
 
 describe('★カットの切替', () => {
   it('★★画角の系統が変わる切替は、重ねない（ハードカット）', () => {

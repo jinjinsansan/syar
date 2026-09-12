@@ -1322,12 +1322,148 @@ function v6BoundariesM(course: Course): readonly { readonly meters: number; read
   const preSpan = SCRIPT_V6[preCount - 1]!.until;
   const pre = preRows.map((row) => ({ meters: closeStart * (row.until / preSpan), id: row.id }));
   return [
-    ...pre,
+    ...pinCornerCuts(course, pre, closeStart),
     { meters: b1, id: 'straight-contest' as BroadcastV2ShotId },
     { meters: b2, id: 'straight-field' as BroadcastV2ShotId },
     { meters: b3, id: 'straight-contest' as BroadcastV2ShotId },
     { meters: distance, id: 'finish-line' as BroadcastV2ShotId },
   ];
+}
+
+/**
+ * ★**コーナーのカットを、走路の本当のコーナーへ貼る**（★2026-09-12・★オーナー指摘）
+ *
+ * 【★何が壊れていたか — ★測ってから直しています】
+ *   ★オーナー評「★他のあらゆるコースではカーブがもっとあり、右回り・左回りもあります。
+ *   ★**コーナー映像がないのもおかしい**です」。
+ *
+ *   ★台本 v6 の直線より手前は ★**距離の割合**で切っていました。★コーナーの実際の位置を見ていません。
+ *   ★`tools/measure-corner-coverage.mjs`（★50 鞍）の実測:
+ *     ★コーナー区間 ★**161** のうち ★**108（67%）に映像が無い**
+ *     ★コーナーのカットが 4 角の外へ出ている長さ ★**1 鞍あたり平均 87m**
+ *     ★最悪 白光記念（3600m・6 コーナー）… ★**273m 全部が 4 角の外**・★5 コーナーが素通り
+ *   ⚠️ ★この件は `v6BoundariesM` の註記に ★**「別件として台帳に残します」**と書かれたまま
+ *      ★残っていました（★2026-09-02）。
+ *
+ * 【★どう直すか】★**コーナーの区間を、そのままカットの区間にします。**
+ *   ★① 走路のコーナー区間を実際の形から取る（★右回り・左回りの別なく `type === 'corner'`）
+ *   ★② その区間に重なる既存のカットを ★**前・コーナー・後ろ**に割る
+ *   ★③ 直線にいちばん近いコーナーは `fourth-corner-front`、★それ以外は `first-corner-front`
+ *      （★どちらも `diag-front`＝★2026-08-21 の全数判定で合格側だった撮り方）
+ *
+ * 【★守ること】
+ *   ⚠️ ★**カットは減りません**（★台帳「カット数は減らさない」）。★増えるだけです。
+ *   ⚠️ ★**発走の 2 カットは削りません**（★ゲートと発走直後）。★コーナーはその後ろからにします。
+ *   ⚠️ ★**短すぎる破片を作りません**。★`MIN_CUT_M` 未満になる切り方はしません
+ *      （★一瞬だけ映って消えるカットは「繋がっていない」と読まれます）。
+ */
+const MIN_CUT_M = 40;
+/**
+ * ★**1 つのコーナーのカットの上限**（m）。
+ *
+ * ⚠️ ★コーナーの区間をそのまま全部カットにすると、★短距離戦で ★**序盤の演出を飲み込みます**
+ *    （★実測: 紫水賞 1200m で ★**550m ＝ レースの 46%** が 1 本のコーナーのカットになりました）。
+ *    ★位置取りも隊列も消えます。
+ * → ★コーナーの ★**出口側**から取ります（★`fourth-corner-front` は「直線入口」のカメラなので、
+ *   ★出口側がいちばん役に立ちます）。★残りは元のカットが受けます。
+ * ★120m は、★桜星賞の 4 角のカット（★実測 102m）に近い値です（★発明していません）。
+ */
+const CORNER_CUT_MAX_M = 120;
+
+function pinCornerCuts(
+  course: Course,
+  pre: readonly { readonly meters: number; readonly id: BroadcastV2ShotId }[],
+  closeStart: number,
+): readonly { readonly meters: number; readonly id: BroadcastV2ShotId }[] {
+  /** ★既存のカットを [始点, 終点] の並びにする */
+  const cuts: { from: number; to: number; id: BroadcastV2ShotId; corner?: true; split?: true }[] = [];
+  let prev = 0;
+  for (const row of pre) { cuts.push({ from: prev, to: row.meters, id: row.id }); prev = row.meters; }
+  if (cuts.length <= 2) return pre;
+
+  /**
+   * ⚠️ ★**台本が割合で置いていたコーナーの行を、先に消します。**
+   *    ★消さないと、★貼り直したコーナーと ★**二重**になります
+   *    （★実測: 桜星賞でコーナー区間 2 に対してコーナーのカットが 3 本出ました）。
+   *    ★その区間は、★直前の（コーナーでない）カットが受けます。
+   */
+  for (let i = 0; i < cuts.length; i += 1) {
+    if (!cuts[i]!.id.includes('-corner-')) continue;
+    const before = cuts.slice(0, i).reverse().find((c) => !c.id.includes('-corner-'));
+    cuts[i]!.id = before?.id ?? 'side-drive';
+  }
+  for (let i = cuts.length - 1; i > 0; i -= 1) {
+    if (cuts[i]!.id !== cuts[i - 1]!.id) continue;
+    cuts[i - 1]!.to = cuts[i]!.to;
+    cuts.splice(i, 1);
+  }
+  if (cuts.length <= 2) return pre;
+
+  /** ★発走の 2 カットは触らない。★コーナーはその後ろから */
+  const guard = cuts[1]!.to;
+
+  /** ★走路のコーナー区間（★実際の形から） */
+  const corners: { from: number; to: number }[] = [];
+  let acc = 0;
+  for (const seg of course.segments) {
+    if (seg.type === 'corner') corners.push({ from: acc, to: acc + seg.length });
+    acc += seg.length;
+  }
+  /** ★直線のカットが始まる手前まで。★短すぎる区間は貼らない */
+  const usable = corners
+    .map((c) => ({ from: Math.max(c.from, guard), to: Math.min(c.to, closeStart) }))
+    .filter((c) => c.to - c.from >= MIN_CUT_M)
+    /** ★長いコーナーは ★**出口側**だけを使う（★序盤の演出を飲み込ませない） */
+    .map((c) => ({ from: Math.max(c.from, c.to - CORNER_CUT_MAX_M), to: c.to }));
+  if (usable.length === 0) return pre;
+
+  /** ★コーナーの区間で既存のカットを割る */
+  for (const c of usable) {
+    const out: typeof cuts = [];
+    for (const cut of cuts) {
+      const lo = Math.max(cut.from, c.from), hi = Math.min(cut.to, c.to);
+      if (hi <= lo) { out.push(cut); continue; }
+      if (lo - cut.from > 1e-9) out.push({ from: cut.from, to: lo, id: cut.id, split: true, ...(cut.corner === true ? { corner: true as const } : {}) });
+      out.push({ from: lo, to: hi, id: 'fourth-corner-front', corner: true });
+      if (cut.to - hi > 1e-9) out.push({ from: hi, to: cut.to, id: cut.id, split: true, ...(cut.corner === true ? { corner: true as const } : {}) });
+    }
+    cuts.length = 0;
+    cuts.push(...out);
+  }
+
+  /**
+   * ★**短すぎる破片を隣へ戻します。**
+   * ⚠️ ★コーナーの切れ端でも、★コーナーでない切れ端でも同じ扱いにします
+   *    （★片方だけ残すと、★40m の `side-drive` が一瞬だけ挟まります）。
+   */
+  for (let i = 0; i < cuts.length; i += 1) {
+    const cut = cuts[i]!;
+    /**
+     * ⚠️ ★**元からあったカットは掃除しません。** ★触ってよいのは ★**私が割って出た端切れ**だけです。
+     *    ★2026-09-12、★ここを全体に掛けて 2 度壊しました:
+     *      ★① ゲートのカット（12.8m）が消えた（★オーナー指示で意図的に短いカット）
+     *      ★② 涼風ステークス 1000m で `opening-formation`（38m）が消え、★カットが 12 → 11 へ
+     *    ★台帳「カット数は減らさない」は下限です。★減らす側へ倒してはいけません。
+     */
+    if (cut.split !== true) continue;
+    if (cut.to - cut.from >= MIN_CUT_M || cuts.length === 1) continue;
+    const prevCut = cuts[i - 1], nextCut = cuts[i + 1];
+    if (prevCut !== undefined) { prevCut.to = cut.to; } else if (nextCut !== undefined) { nextCut.from = cut.from; }
+    cuts.splice(i, 1);
+    i -= 1;
+  }
+  /** ★隣り合う同じカットをまとめる */
+  for (let i = cuts.length - 1; i > 0; i -= 1) {
+    if (cuts[i]!.id !== cuts[i - 1]!.id || cuts[i]!.corner !== cuts[i - 1]!.corner) continue;
+    cuts[i - 1]!.to = cuts[i]!.to;
+    cuts.splice(i, 1);
+  }
+  /** ★コーナーに名前を付ける。★直線にいちばん近いものが 4 角 */
+  const cornerIdx = cuts.map((c, i) => (c.corner === true ? i : -1)).filter((i) => i >= 0);
+  for (const [n, i] of cornerIdx.entries()) {
+    cuts[i]!.id = n === cornerIdx.length - 1 ? 'fourth-corner-front' : 'first-corner-front';
+  }
+  return cuts.map((c) => ({ meters: c.to, id: c.id }));
 }
 
 /**

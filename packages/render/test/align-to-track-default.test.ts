@@ -73,7 +73,12 @@ describe('★走路の接線へ回す（既定）', () => {
    * ⚠️ ★ここが本体です。★定数だけ true にして渡し忘れていれば、★この検定が落ちます。
    */
   it('★4 コーナーでは、引数を渡さなくても絵が回る', () => {
-    const rots = rotations(900);
+    /**
+     * ⚠️ ★**900m はもう 4 角のカットではありません**（★2026-09-12）。
+     *    ★コーナーのカットを走路の本当のコーナーへ貼り直したので、★桜星賞の 4 角は
+     *    ★**1080〜1200m**（★4 角の出口）になりました。★900m は 4 角の入口で、★まだ `side-drive` です。
+     */
+    const rots = rotations(1100);
     expect(rots.length, '★rotate が呼ばれること').toBeGreaterThan(0);
     expect(Math.max(...rots.map(deg)), '★弧の傾きぶん回る').toBeGreaterThan(10);
   });
