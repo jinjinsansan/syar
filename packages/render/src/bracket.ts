@@ -114,7 +114,19 @@ export const FRAME_LABELS: readonly string[] = ['白', '黒', '赤', '青', '黄
  *   ★12 頭立ての枠は `1,2,3,4 / 5,6 / 7,8 / 9,10 / 11,12` で、★同枠の 2 頭は ★**連番**です。
  *   → ★馬番を 4 で割った余りで配れば、★連番は必ず別の柄になります。
  */
-export const SILK_PATTERNS = ['plain', 'stripes', 'hoop', 'sash'] as const;
+/**
+ * ⚠️ ★**縦縞をやめました**（★2026-09-12・オーナー指摘①）。
+ *
+ *   > ★「騎手の勝負服に縞模様が入っています。★**規則的過ぎて UI のバグに見えます**」
+ *
+ *   ★縞は ★上着の窓（★軸に平行な矩形）を等分するので、★**画面の格子に平行な等幅の帯**に
+ *   ★なります。★布に見えず、★重ねた図形に見えます。
+ * → ★**斜めの襷（左下がり・右下がり）と一本輪**にします。★どれも走る向きに対して
+ *   ★斜めか 1 本きりなので、★格子に見えません。
+ * ⚠️ ★**4 種は必要です。** ★2 種に減らすと、★13 頭以上で ★**1 つの枠に 3〜4 頭**入る並びの
+ *    ★とき、★同じ枠の中で柄が重なります（★`silks-distinct.test.ts` が押さえています）。
+ */
+export const SILK_PATTERNS = ['plain', 'sash', 'hoop', 'sash-reverse'] as const;
 export type SilkPattern = (typeof SILK_PATTERNS)[number];
 
 /** ★馬番 → 柄。★同枠（連番）の 2 頭は必ず別の柄になります */
@@ -132,12 +144,13 @@ export function silkPatternOf(gate: number): SilkPattern {
 export function silkPatternInk(pattern: SilkPattern, jx: number, jy: number): boolean {
   if (!Number.isFinite(jx) || !Number.isFinite(jy)) return false;
   if (pattern === 'plain') return false;
-  if (pattern === 'stripes') return Math.floor(Math.max(0, Math.min(0.999, jx)) * 4) % 2 === 1;
   if (pattern === 'hoop') return jy > 0.38 && jy < 0.62;
-  return Math.abs(jx - jy) < 0.20;
+  /** ★襷。★`sash` が右下がり、★`sash-reverse` が左下がり */
+  if (pattern === 'sash-reverse') return Math.abs(jx + jy - 1) < 0.22;
+  return Math.abs(jx - jy) < 0.22;
 }
 
 /** ★画面と道具で同じ言葉を使う */
 export const SILK_PATTERN_LABEL: Readonly<Record<SilkPattern, string>> = {
-  plain: '無地', stripes: '縦縞', hoop: '一本輪', sash: '襷',
+  plain: '無地', sash: '襷', hoop: '一本輪', 'sash-reverse': '逆襷',
 };

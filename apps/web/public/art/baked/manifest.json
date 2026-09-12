@@ -216,9 +216,9 @@
           "w": 395,
           "h": 499,
           "anchor": {
-            "x": 195,
+            "x": 193.5,
             "y": 194,
-            "width": 225
+            "width": 222
           },
           "anchorKind": "saddle",
           "nativeBounds": {
@@ -234,9 +234,9 @@
           "w": 365,
           "h": 483,
           "anchor": {
-            "x": 179,
+            "x": 161.5,
             "y": 187.5,
-            "width": 207
+            "width": 172
           },
           "anchorKind": "saddle",
           "nativeBounds": {

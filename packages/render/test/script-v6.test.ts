@@ -395,7 +395,17 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
   it('★接続部: v6 は勝馬通過後もゴール板のカメラを保持する', async () => {
     const { readFileSync } = await import('node:fs');
     const page = readFileSync('apps/web/src/app/race/page.tsx', 'utf8');
-    expect(page).toContain('const goalHeld = cutScript && winnerFinishedNow && winnerAfterSec < GOAL_HOLD_SEC;');
+    /**
+     * ⚠️ ★**文字列を丸ごと固定しないこと**（★2026-09-12）。
+     *    ★台本 v8 を保持側に足した日に、★この検査だけが赤くなりました。
+     *    ★見たいのは ★**v6 が保持側に入っていること**と ★**`winnerShotNow` が
+     *    ★それに従うこと**の 2 つで、★式の書き方ではありません。
+     */
+    expect(page, 'goalHeld が v6（cutScript）を保持側に入れていること')
+      .toMatch(/const goalHeld = \(?cutScript[^;]*winnerFinishedNow[^;]*GOAL_HOLD_SEC;/s);
+    /** ★台本 v8 も保持します（★2026-09-12・オーナー指摘②「通過後に 1 着確定に」） */
+    expect(page, 'goalHeld が v8（splitStraightScript）も保持側に入れていること')
+      .toMatch(/const goalHeld = \(cutScript \|\| splitStraightScript\)/);
     expect(page).toContain('const winnerShotNow = winnerFinishedNow && !goalHeld;');
     /** ★v5 は素通し（保持しない）ままであること */
     expect(page).not.toContain('winnerFinishedNow, {');

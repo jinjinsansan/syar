@@ -44,6 +44,9 @@ import {
   broadcastV2StartCamera,
   broadcastV2StartFocus,
   FINISH_CAMERA_BY_DEVELOPMENT,
+  GOAL_SETTLE_M,
+  GOAL_SETTLE_END_M,
+  GOAL_LEAD_FRACTION,
   FINISH_DEV_MAX_FOV_DEG,
   FINISH_DEV_RAMP_FROM_M,
   V8_FINISH_BOARD_M,
@@ -352,7 +355,21 @@ export function resolveBroadcastV2Scene(
   })();
   const cameraPreset = devBlend !== undefined ? { ...basePreset, fovDeg: devBlend.fovDeg }
     : contenderFov === undefined ? basePreset : { ...basePreset, fovDeg: contenderFov };
-  const leadFraction = devBlend?.leadFraction ?? finish?.leadFraction ?? shot.leadFraction;
+  /**
+   * ★**決勝線を画面に入れる**（★2026-09-12・オーナー指摘②・`GOAL_SETTLE_M` の註記）。
+   *   ★ゴール板のカットの終わりで、★先頭を左寄りへ寄せて ★**前を空けます**。
+   *   ★通過してからも（★`left < 0`）その置き場所を保ち、★続く馬の入線を見せます。
+   * ⚠️ ★`development` を渡さない台本は ★**1 ビットも変わりません**。
+   */
+  const goalSettleLead = ((): number | undefined => {
+    if (options.development === undefined || shot.id !== 'finish-line') return undefined;
+    const from = finish?.leadFraction ?? shot.leadFraction ?? 0.78;
+    const left = course.distance - leaderS;
+    const u = Math.max(0, Math.min(1, (GOAL_SETTLE_M - left) / Math.max(1, GOAL_SETTLE_M - GOAL_SETTLE_END_M)));
+    const w = u * u * (3 - 2 * u);
+    return from + (GOAL_LEAD_FRACTION - from) * w;
+  })();
+  const leadFraction = goalSettleLead ?? devBlend?.leadFraction ?? finish?.leadFraction ?? shot.leadFraction;
   const leaders = leading(packed, 1);
   const contenders = leading(packed, Math.min(5, packed.length));
   const focus = shot.target === 'leader' || shot.target === 'winner'

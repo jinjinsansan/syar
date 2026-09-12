@@ -3369,8 +3369,24 @@ export default function RacePage(): React.JSX.Element {
      *
      * ⚠️ ★台本 v6 のときだけ保持します。**v5 の挙動は 1 ビットも変えません。**
      */
-    const goalHeld = cutScript && winnerFinishedNow && winnerAfterSec < GOAL_HOLD_SEC;
+    /**
+     * ⚠️ ★**台本 v8 でも保持します**（★2026-09-12・オーナー指摘②）。
+     *    ★オーナー評「★ゴールの瞬間の手前で 1 着案内が出ています。
+     *      ★ちゃんとゴールを猛スピードで通過後に 1 着確定にしてください」。
+     *    ★v8 は `cutScript`（v6）ではないので、★この保持が ★**掛かっていませんでした**。
+     *    ★勝ち馬が線に触れた瞬間に `winner-follow` へ飛び、★通過の絵が 1 コマもありません。
+     */
+    const goalHeld = (cutScript || splitStraightScript) && winnerFinishedNow
+      && winnerAfterSec < GOAL_HOLD_SEC;
     const winnerShotNow = winnerFinishedNow && !goalHeld;
+    /**
+     * ★**レースが終わった扱いにするのは、通過を見せ終わってから**（★2026-09-12・オーナー指摘②）。
+     *   ⚠️ ★`winnerFinishedNow` で HUD を下ろすと、★勝ち馬が線に触れた瞬間に
+     *      ★順位表・実況帯・区間名が ★**一斉に消えます**。★保持している 1 秒のあいだ
+     *      ★画面が空になり、★そのあと 1 着案内が出るので、★不具合に見えます。
+     *   ★通過の 1 秒は ★**まだレース中**として扱います（★実況もそのまま喋ります）。
+     */
+    const raceOver = winnerFinishedNow && !goalHeld;
     const contenders = visualAt.filter((h) => visualLead - h.meters <= HORSE_LENGTH_M * 2);
     const pack = visualAt.filter((h) => visualLead - h.meters <= 40);
     const focusHorses = focusForRaceShot(shot, {
@@ -4125,11 +4141,11 @@ export default function RacePage(): React.JSX.Element {
       if (sectionTagRef.current.label !== label) sectionTagRef.current = { label, sinceSec: sectionTagRef.current.label === '' ? d - 1 : d };
       const hudSince = raceD - HUD_SETTLE_SEC;
       // ★ゴール後はライブ HUD（見出し・区間タグ・コース図）を落とす（motion-spec §6: ゴール〜2.4s は勝馬テロップのみ）
-      if (!winnerFinishedNow && !contestFocusHud && !cutInCoversWorld) drawRaceHeadlineChip(ctx, FONT, {
+      if (!raceOver && !contestFocusHud && !cutInCoversWorld) drawRaceHeadlineChip(ctx, FONT, {
         raceNo: RACE_META.raceNo, raceName: RACE_META.raceName,
         distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${DIST}m`,
       }, { timeSec: d, sinceSec: hudSince });
-      if (!winnerFinishedNow && !contestFocusHud && !cutInCoversWorld) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
+      if (!raceOver && !contestFocusHud && !cutInCoversWorld) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
         { timeSec: d, sinceSec: Math.min(hudSince, d - sectionTagRef.current.sinceSec) });
     }
     /**
@@ -4151,7 +4167,7 @@ export default function RacePage(): React.JSX.Element {
      *   描画に使った位置をそのまま点にする（順位計算はしない）。
      */
     /** ★リプレイ中はコース図も下ろします（馬に重なるため・上の `hud` の注記と同じ理由） */
-    if (v2Minimap !== undefined && !winnerFinishedNow && !replay.active && !cutInActive) {
+    if (v2Minimap !== undefined && !raceOver && !replay.active && !cutInActive) {
       /**
        * ★**馬にかかるときだけ薄くします**（★2026-09-09・オーナー判断）。
        *   ★HUD は画面の 36% を覆っています（★実況の帯 20%・順位表 7.5%・コース図 6.3%・実測）。
@@ -4209,7 +4225,7 @@ export default function RacePage(): React.JSX.Element {
       const telopActive = cutInActive && !cutInCoversWorld;
       const hud = cutInCoversWorld ? { ...hudRaw, standings: false }
         : replay.active || contestFocusHud ? { ...hudRaw, standings: false }
-        : winnerFinishedNow ? { ...hudRaw, gauge: false, standings: false, calls: false } : hudRaw;
+        : raceOver ? { ...hudRaw, gauge: false, standings: false, calls: false } : hudRaw;
       // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）
       const g = staminaAt(built.gauge, Math.max(0, metersLeft));
 
@@ -4302,7 +4318,7 @@ export default function RacePage(): React.JSX.Element {
        * ⚠️ ★カットイン中に出さないのは、★カットイン中は馬を描いていないので
        *    ★ピンだけが ★**何も無い所を指して**浮くためです（★2026-09-11）。
        */
-      const ownMarkerVisible = hudRaw.standings && !replay.active && !winnerFinishedNow
+      const ownMarkerVisible = hudRaw.standings && !replay.active && !raceOver
         && !cutInCoversWorld;
       if (ownMarkerVisible && v2OwnHead !== undefined) {
         drawOwnHorseMarker(ctx, FONT, v2OwnHead, ownGate,
@@ -4464,7 +4480,12 @@ export default function RacePage(): React.JSX.Element {
           },
           Math.min(1, resultsT * 1.6), d);
       } else {
-        if (winnerFinishedNow && winnerAfterSec < 3.4) {
+        /**
+         * ⚠️ ★**通過を見せ終わるまで 1 着案内を出しません**（★2026-09-12・オーナー指摘②）。
+         *    ★`goalHeld` の間は決勝線のカメラを保持して、★続く馬の入線を見せています。
+         *    ★そこに勝馬テロップを重ねると、★「通過前に 1 着が出た」に見えます。
+         */
+        if (winnerFinishedNow && !goalHeld && winnerAfterSec < 3.4) {
           drawWinnerLowerThird(ctx, art.pal as Record<string, string>, vp, FONT,
             winnerGate, HORSE_NAMES[winnerGate - 1] ?? `スター${winnerGate}`,
             JOCKEY_NAMES[winnerGate - 1] ?? 'STAR騎手', built.finishSec.get(winnerGate),
