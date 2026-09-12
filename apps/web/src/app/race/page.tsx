@@ -78,7 +78,7 @@ import {
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
-  raceCutInAt, raceTransitionVeil, RACE_CUTIN_SEC, RACE_CUTIN_CORNER_SEC, RACE_CUTIN_AT_START,
+  raceCutInAt, raceTransitionVeil, RACE_CUTIN_SEC, RACE_CUTIN_CORNER_SEC, RACE_CUTIN_SEAM_SEC, RACE_CUTIN_AT_START,
   drawOwnHorseCutIn, drawFormationCutIn, drawRunningStyleCutIn, drawToStraightCutIn,
   RACE_TELOP_SEC, drawOwnHorseTelop, drawFormationTelop, drawRunningStyleTelop, drawToStraightTelop,
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
@@ -3842,8 +3842,21 @@ export default function RacePage(): React.JSX.Element {
        *      ★残り 2 秒をデザイナーのハンドオフのカットインにしませんか？」
        * ⚠️ ★発走の 1 枚は `RACE_CUTIN_SEC`（1.2 秒）のままです（★指示の無い所を動かさない）。
        */
+      /**
+       * ★**コーナーのカットは、そのカットの長さぶん覆います**（★2026-09-12・オーナー指示）。
+       *   ★オーナー評「★馬が曲がってくる 2 秒くらいでまたカットインを入れてください」。
+       *   ★コーナーのカットの長さは走路で決まる（★実測 1.5〜2.1 秒）ので、
+       *   ★固定の 2 秒では ★**短いコーナーで余り、長いコーナーで足りません**。
+       *   → ★**次の切り替えまで**＋`RACE_CUTIN_SEAM_SEC` を尺にします（★出口の継ぎ目も覆う）。
+       */
+      const nextChange = (motionTimeline ?? built).shotChanges
+        .filter((c) => cutChange !== undefined && c.displaySec > cutChange.displaySec)
+        .reduce<ShotChange | undefined>((m, c) => (m === undefined || c.displaySec < m.displaySec ? c : m), undefined);
+      const cutInSpanSec = cutChange === undefined || nextChange === undefined
+        ? RACE_CUTIN_CORNER_SEC
+        : Math.max(RACE_CUTIN_CORNER_SEC, nextChange.displaySec - cutChange.displaySec + RACE_CUTIN_SEAM_SEC);
       const cutIn = CUTIN_OFF || cutChange === undefined || sinceCutSec < 0
-        || sinceCutSec >= RACE_CUTIN_CORNER_SEC
+        || sinceCutSec >= cutInSpanSec
         ? undefined : raceCutInAt(cutChange.from, cutChange.to,
           /** ★見出しは ★**画面が出している区間名**から作ります（★カメラ名で断定しない・★R-30） */
           { sectionLabel: v2SectionLabel });
@@ -3878,7 +3891,7 @@ export default function RacePage(): React.JSX.Element {
         const frame = {
           viewport: { width: W, height: H },
           sinceSec: cutIn === undefined ? raceD : sinceCutSec,
-          durationSec: cutIn === undefined ? RACE_CUTIN_SEC : RACE_CUTIN_CORNER_SEC,
+          durationSec: cutIn === undefined ? RACE_CUTIN_SEC : cutInSpanSec,
           label: cutIn?.label ?? RACE_CUTIN_AT_START.label,
           raceLabel: `${RACE_META.raceNo}　${RACE_META.raceName}`,
           metersLeft: metersLeftNow,
@@ -3891,7 +3904,7 @@ export default function RacePage(): React.JSX.Element {
         const telopFrame = {
           viewport: { width: W, height: H },
           sinceSec: frame.sinceSec,
-          durationSec: cutIn === undefined ? RACE_TELOP_SEC : RACE_CUTIN_CORNER_SEC,
+          durationSec: cutIn === undefined ? RACE_TELOP_SEC : cutInSpanSec,
           label: frame.label,
           ...(TELOP_ALPHA === undefined ? {} : { bandAlpha: TELOP_ALPHA }),
         };

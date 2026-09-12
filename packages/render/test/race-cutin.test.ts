@@ -40,14 +40,16 @@ const V6_TRANSITIONS = SCRIPT_V6.slice(1).map((row, i) => ({
  */
 describe('カットインを出す場所', () => {
   /**
-   * ⚠️ ★**2026-09-12、入口のカットインは取り下げました**（★オーナー指示）。
-   *    ★オーナーの組み立て「★コーナー演出（2 秒）→ ★カットイン（2 秒）→ ★真横カメラワーク」。
-   *    ★入口にも出すと、★2 秒しかないコーナーの半分が覆われます。
+   * ⚠️ ★**出す場所を 2 度動かしています**（★2026-09-12・★どちらもオーナー指示）。
+   *    ★1 回目 … ★コーナー ★**明け**（「コーナー演出 2 秒 → カットイン 2 秒 → 真横」）
+   *    ★2 回目 … ★コーナー ★**入口**（「★馬が曲がってくる 2 秒くらいでまたカットインを
+   *              ★入れてください。★そうすれば馬の方向は気にならないはずです」）
+   *    → ★**コーナーそのものを覆います。** ★明けでは出しません（★二重になる）。
    */
-  it('★台本 v6 の中で出るのは 1 か所だけ（★コーナー明けだけ）', () => {
+  it('★台本 v6 の中で出るのは 1 か所だけ（★コーナーの入口だけ）', () => {
     const shown = V6_TRANSITIONS.filter((t) => raceCutInAt(t.from, t.to) !== undefined)
       .map((t) => `${t.from}>${t.to}`);
-    expect(shown).toEqual(['fourth-corner-front>side-drive']);
+    expect(shown).toEqual(['side-drive>fourth-corner-front']);
   });
 
   /** ⚠️ ★オーナー指摘①: ★位置取りは「カットイン場面」ではない */
@@ -60,11 +62,11 @@ describe('カットインを出す場所', () => {
    * ⚠️ ★オーナー指摘②: ★**様々なコースではコーナーがあちこちある**。
    *    ★以前は `fourth-corner-` しか見ていなかったので、★1〜3 角では出ませんでした。
    */
-  it('★どのコーナーの明けでも出る（★1 角・2 角・3 角）', () => {
+  it('★どのコーナーの入口でも出る（★1 角・2 角・3 角）', () => {
     for (const corner of ['first-corner-front', 'second-corner-high', 'third-corner-rear']) {
-      expect(raceCutInAt(corner, 'side-drive')?.kind, `${corner} から出るとき`).toBe('to-straight');
-      /** ⚠️ ★入口では出しません（★2 秒のコーナーを覆わない） */
-      expect(raceCutInAt('side-drive', corner), `${corner} へ入るとき`).toBeUndefined();
+      expect(raceCutInAt('side-drive', corner)?.kind, `${corner} へ入るとき`).toBe('to-straight');
+      /** ⚠️ ★明けでは出しません（★入口の 1 枚がコーナーごと覆うので二重になる） */
+      expect(raceCutInAt(corner, 'side-drive'), `${corner} から出るとき`).toBeUndefined();
     }
   });
 
@@ -72,9 +74,11 @@ describe('カットインを出す場所', () => {
    * ⚠️ ★見出しを ★**カメラの名前から断定しない**（★計画書 §3.3）。
    *    ★1 角を抜けた先は直線ではありません。★画面が出している区間名から作ります。
    */
-  it('★コーナー明けの見出しは、実際にいる区間から作る', () => {
-    expect(raceCutInAt('second-corner-high', 'side-drive', { sectionLabel: '向正面' })?.label).toBe('向正面へ');
-    expect(raceCutInAt('fourth-corner-front', 'side-drive', { sectionLabel: '最後の直線' })?.label).toBe('最後の直線へ');
+  it('★コーナーの見出しは、実際にいる区間から作る', () => {
+    expect(raceCutInAt('side-drive', 'second-corner-high', { sectionLabel: '第2コーナー' })?.label).toBe('第2コーナー');
+    expect(raceCutInAt('side-drive', 'fourth-corner-front', { sectionLabel: '第4コーナー' })?.label).toBe('第4コーナー');
+    /** ⚠️ ★区間名が取れないときも空の見出しにしない */
+    expect(raceCutInAt('side-drive', 'fourth-corner-front')?.label).toBe('コーナー');
   });
 
   /** ★オーナー案「★入れる度に毎回異なる意味のあるカットインに」 */
@@ -100,9 +104,10 @@ describe('カットインを出す場所', () => {
    * ⚠️ ★これが本題です。★`side-drive` は台本 v6 に ★**2 回**出てきます。
    *    ★カットの名前だけで判定すると、★**4 角明けでない方**でも出ます。
    */
-  it('同じ `side-drive` でも、コーナー明けだけに出る', () => {
-    expect(raceCutInAt('fourth-corner-front', 'side-drive')?.kind).toBe('to-straight');
+  it('同じ `side-drive` でも、コーナーへ入るときだけに出る', () => {
+    expect(raceCutInAt('side-drive', 'fourth-corner-front')?.kind).toBe('to-straight');
     expect(raceCutInAt('opening-side-settle', 'side-drive')).toBeUndefined();
+    expect(raceCutInAt('fourth-corner-front', 'side-drive')).toBeUndefined();
   });
 
   /**
@@ -112,9 +117,9 @@ describe('カットインを出す場所', () => {
    */
   it('4 角は撮り方を替えても出る（front / wide / far）', () => {
     for (const id of ['fourth-corner-front', 'fourth-corner-wide', 'fourth-corner-far']) {
-      expect(raceCutInAt(id, 'side-drive')?.kind, `出 ${id}`).toBe('to-straight');
-      /** ⚠️ ★入口では出しません（★2026-09-12・★2 秒のコーナーを覆わない） */
-      expect(raceCutInAt('side-drive', id), `入り ${id}`).toBeUndefined();
+      expect(raceCutInAt('side-drive', id)?.kind, `入り ${id}`).toBe('to-straight');
+      /** ⚠️ ★明けでは出しません（★2026-09-12・★入口の 1 枚がコーナーごと覆う） */
+      expect(raceCutInAt(id, 'side-drive'), `出 ${id}`).toBeUndefined();
     }
   });
 
