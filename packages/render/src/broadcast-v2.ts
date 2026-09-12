@@ -1072,7 +1072,7 @@ export function broadcastV2SegmentSpan(course: Course, meters: number): { readon
  *    そこまで巻き込むと今回の指示の範囲を超えるためです。
  *    画面の既定は `broadcastV2ScriptFromSearch` が決めます。
  */
-export type BroadcastV2Script = 'v2' | 'v3' | 'v4' | 'v5' | 'v6';
+export type BroadcastV2Script = 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7';
 
 /**
  * ★通常 `/race` の既定台本。
@@ -1117,6 +1117,12 @@ export function broadcastV2ScriptFromSearch(search: string): BroadcastV2Script {
    */
   if (v === PREVIOUS_RACE_SCRIPT) return PREVIOUS_RACE_SCRIPT;
   if (v === CUT_RACE_SCRIPT) return CUT_RACE_SCRIPT;
+  /**
+   * ★**切らない台本**（★2026-09-12・★`SCRIPT_V7` の註記）。
+   * ⚠️ ★既定にしていません。★台帳「カット数は減らさない」と衝突するので、
+   *    ★見比べていただくための口です。
+   */
+  if (v === 'v7') return 'v7';
   return DEFAULT_RACE_SCRIPT;
 }
 
@@ -1202,11 +1208,40 @@ export function puddlesFromSearch(search: string): boolean {
 
 /** ★台本 → ショット表。`v2` は表を持たないので v4 で代用（呼び出し側が使わない） */
 function scriptRowsOf(script: BroadcastV2Script): readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] {
+  if (script === 'v7') return SCRIPT_V7;
   if (script === 'v6') return SCRIPT_V6;
   if (script === 'v5') return SCRIPT_V5;
   if (script === 'v3') return SCRIPT_V3;
   return SCRIPT_V4;
 }
+
+/**
+ * ★**台本 v7 — ★切らない**（★2026-09-12・★オーナー指示）
+ *
+ * 【★なぜ作るか】
+ *   ★オーナー評「★**2025 の 2D 参考用**という映像を見てください。★**カメラワークの切り替わりが
+ *   ★ほとんどない**のに JRA のレースのようなつながっている印象があります。
+ *   ★そして、この映像は ★**1996 年のゲーム**の映像です」。
+ *
+ * 【★測った値】`out/refcuts`（★χ² で隣り合うコマを比べる・5fps）:
+ *   ★参考映像 …… 尺 **53.1 秒** ／ 切り替わり **実質 1 回**（★31.0 秒。★他 2 件は 52 秒台＝結果画面）
+ *   ★台本 v6 … 尺 **65.8 秒** ／ 切り替わり **14 回**
+ *   → ★**7 倍切っています。**
+ *
+ * ⚠️ ★参考は ★**転換の工夫で繋げているのではなく、そもそも切っていません**。
+ *    ★2026-09-12 はカットの繋ぎ方（画角合わせ・ワイプ）を作り続けて、★どれも外しました。
+ *    ★軸が違いました。
+ *
+ * 【★中身】★発走のゲートだけ見せ、★あとは ★**真横の追従 1 本**でゴールまで。
+ *   ★`side-drive` は走路を横から追うカメラなので、★コーナーも直線もそのまま通せます。
+ * ⚠️ ★台帳「★カット数は減らさない」（★2026-09-03 オーナー決定「今のカット数が限界」）と
+ *    ★**正面から衝突します**。★だから ★**既定にしていません**。★`?cinematography=v7` で見比べる口です。
+ */
+export const SCRIPT_V7: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
+  { until: 0.008, id: 'start-gate-side' },   // ★ゲート（★参考も発走だけは別の画）
+  { until: 0.94, id: 'side-drive' },         // ★ここから ★**切らない**（真横の追従 1 本）
+  { until: 1.0, id: 'finish-line' },         // ★ゴール板
+];
 
 export const SCRIPT_V3: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
   { until: 0.0375, id: 'start-front' },         // 〜60m   発走（正面の発馬機 → 斜め前で飛び出す）

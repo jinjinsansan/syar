@@ -102,7 +102,14 @@ describe('★表示時間の経路（メタテスト）', () => {
        *    （★直前の版 `2b4a3a8` に当てて確かめています）。
        * → ★**名前が本文に出てくること自体**を違反とします。
        */
-      const lines = src.split('\n').filter((l) => {
+      /**
+       * ⚠️ ★**行末の `\r` を落としてから見ること**（★2026-09-12）。
+       *    ★git の `core.autocrlf` で CRLF に展開されていると、下の注釈除去の
+       *    ★`.*$` が `\r` の手前で止まり、★**注釈行を違反と数えました**
+       *    （★`page.tsx` の 4 行・★実測）。★`git diff` には出ない（★正規化される）ので
+       *    ★ソース側では直せません。★見る対象は変えていません。
+       */
+      const lines = src.split(/\r?\n/).filter((l) => {
         const code = l.replace(/^\s*(\*|\/\/).*$/, '');
         return /(?<![.\w])(ratesForTarget|readableRaceRates|ratesForPolicy|timeWarpFor)(?![\w])/.test(code);
       });
