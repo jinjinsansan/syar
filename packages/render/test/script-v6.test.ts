@@ -102,8 +102,13 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
      * ⚠️ ★**位置取りは 2026-09-11 に俯瞰 → 高い真横へ移りました**（★オーナー
      *    「★上空からはまだ馬が斜め前を向いています」）。★残る俯瞰はコーナーだけです。
      */
+    /**
+     * ⚠️ ★**既定は 2026-09-12 に `front` へ戻りました**（★オーナー指示・★JUDGE_RACE_CUTS_20260821）。
+     *    ★俯瞰はもう既定ではないので ★**明示して**測ります。★「俯瞰を使うなら小さく」という
+     *    ★この検定の役目は残ります（★`?corner=far` は戻し口として生きています）。
+     */
     const cases = [
-      { leadS: 900, shot: 'fourth-corner-far', style: undefined },
+      { leadS: 900, shot: 'fourth-corner-far', style: 'far' as const },
     ];
     for (const c of cases) {
       const f = frameAt(c.leadS, 'v6', 1, c.style);
@@ -145,7 +150,19 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
         const f = frameAt(leadS, 'v6', 1, style);
         if (f.top4HeightRatio <= side.top4HeightRatio * 0.5) continue;
         const shot = broadcastV2ShotById(f.shot as never);
-        if (shot.view !== 'side' || shot.horseAsset !== 'side-v6') {
+        /**
+         * ⚠️ ★**承認済みの素材は「真横」だけではありません**（★2026-09-12・★訂正）。
+         *    ★`JUDGE_RACE_CUTS_20260821.md` の全数判定:
+         *      ★真横 `side-v6` …… ⑪ゴール ✅
+         *      ★斜め前 `diag-front-v2` … ①発走 ✅ ②1 角 ✅ ⑧4 角正面 🔶「★馬の走り方は OK」
+         *                                ⑩先頭争い 🟢ほぼ合格
+         *      ★上・後ろから ………… ③④⑤⑦⑫ ★**5 戦 5 敗**
+         *    ★この検定が本当に留めたいのは ★**「大きく写すなら上・後ろからの素材を使うな」**です。
+         *    ★以前は既定が俯瞰だったので「真横だけ」で足りていました。
+         */
+        const approved = (shot.view === 'side' && shot.horseAsset === 'side-v6')
+          || (shot.view === 'diag-front' && shot.horseAsset === 'diag-front-v2');
+        if (!approved) {
           offenders.push(`${f.shot}（${shot.view} / ${shot.horseAsset}）`);
         }
       }
@@ -232,10 +249,15 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
     expect(offenders, '★継ぎ目で高さが飛ぶと、背景が入れ替わって別のレースに見えます').toEqual([]);
   });
 
-  /** ★4 角は 3 通りから選べ、★`far` がいちばん小さいこと（★既定は従来のまま） */
-  it('★4 角の撮り方は選べる（★既定は引きの俯瞰・★正面固定へ 1 手で戻せる）', () => {
-    expect(frameAt(900, 'v6').shot, '★既定は画面と同じ far').toBe('fourth-corner-far');
-    expect(frameAt(900, 'v6', 1, 'front').shot, '★切り戻しの道').toBe('fourth-corner-front');
+  /**
+   * ★4 角は 3 通りから選べ、★`far` がいちばん小さいこと。
+   * ⚠️ ★**既定は `front`**（★2026-09-12・★オーナー指示「コーナーは全部前から」）。
+   *    ★`JUDGE_RACE_CUTS_20260821.md` の全数判定で ★**上・後ろからは 5 戦 5 敗**、
+   *    ★前から（`diag-front`）だけが合格側でした。
+   */
+  it('★4 角の撮り方は選べる（★既定は正面固定・★俯瞰へ 1 手で戻せる）', () => {
+    expect(frameAt(900, 'v6').shot, '★既定は画面と同じ front').toBe('fourth-corner-front');
+    expect(frameAt(900, 'v6', 1, 'front').shot, '★明示しても同じ').toBe('fourth-corner-front');
     expect(frameAt(900, 'v6', 1, 'wide').shot).toBe('fourth-corner-wide');
     expect(frameAt(900, 'v6', 1, 'far').shot).toBe('fourth-corner-far');
     expect(frameAt(900, 'v6', 1, 'far').top4HeightRatio)
@@ -475,12 +497,17 @@ describe('★発走まわり（★世界座標の発馬機）', () => {
    * ★**読む素材の組が増えていないこと**（★台帳 A-11 / A-12・★102MB → 76MB の最適化）。
    * ★4 角は実行時に差し替わるので、★**差し替わった先**で数えます。
    */
-  it('★台本 v6 が読む組は 3 つだけ（★真横・高所斜め・勝馬）', () => {
+  it('★台本 v6 が読む組は 3 つだけ（★真横・斜め前・勝馬）', () => {
+    /**
+     * ⚠️ ★**2026-09-12、4 角の既定が `far` → `front` へ戻りました**（★オーナー指示）。
+     *    ★読む組も ★**高所斜め → 斜め前**へ入れ替わります。★数は 3 つのまま
+     *    （★台帳 A-11 / A-12・★102MB → 76MB の最適化を壊していないこと）。
+     */
     expect([...broadcastV2ScriptAssets('v6')].sort())
-      .toEqual(['high-diag-v2', 'side-v6', 'winner-v1']);
-    /** ★`?corner=front` へ戻したときは正面寄りの組が要ります */
-    expect([...broadcastV2ScriptAssets('v6', false)].sort())
       .toEqual(['diag-front-v2', 'side-v6', 'winner-v1']);
+    /** ★`?corner=far` / `?corner=wide` へ切り替えたときは俯瞰の組が要ります */
+    expect([...broadcastV2ScriptAssets('v6', true)].sort())
+      .toEqual(['high-diag-v2', 'side-v6', 'winner-v1']);
   });
 });
 
@@ -617,8 +644,12 @@ describe('★カットをまたいだ縮尺の連続', () => {
     const idx = span.findIndex((b) => b.id === 'fourth-corner-front');
     expect(idx, '★4 角の境界が見つかりません').toBeGreaterThan(0);
     const start = span[idx - 1]!.meters, end = span[idx]!.meters;
-    const enter = frameAt(start + 4, 'v6');
-    const exit = frameAt(end - 4, 'v6');
+    /**
+     * ⚠️ ★**既定は 2026-09-12 に `front` へ戻りました。** ★画角の振りは `fourth-corner-far`
+     *    ★固有の仕掛けなので、★**明示して**測ります（★戻し口として生きています）。
+     */
+    const enter = frameAt(start + 4, 'v6', 1, 'far');
+    const exit = frameAt(end - 4, 'v6', 1, 'far');
     expect(enter.shot, '★入りは 4 角').toBe('fourth-corner-far');
     expect(exit.shot, '★出も 4 角').toBe('fourth-corner-far');
     expect(enter.top4HeightRatio, '★入りのほうが大きいこと（★寄りから引きへ）')
@@ -672,15 +703,36 @@ describe('★走路の接線の角度（★絵を回すときに使う）', () =
     expect(deg(angleAt(900)), '★4 角').toBeGreaterThan(10);
   });
 
-  /** ⚠️ ★左右どちらへ走っても、★同じ向きの走路なら同じ角度を返すこと（★鏡像の基準） */
-  it('★左へ走る馬でも、同じ走路なら同じ角度', () => {
+  /**
+   * ⚠️ ★左右どちらへ走っても、★同じ向きの走路なら同じ角度を返すこと（★鏡像の基準）。
+   *
+   * ⚠️ ★**どのカメラで測るかを明示します**（★2026-09-12）。
+   *    ★4 角の既定は `far`（★上から引き）→ `front`（★前から）へ戻りました。
+   *    ★前からのカメラは ★**遠近が強い**ので、★前後 3m の標本で角度が少しずれます。
+   *    ★実測: ★`far` 0.4° ／ ★`front` **2.77°**（★接線 28° に対して約 10%）。
+   *    ★片方の数字で両方を縛ると、★**測っていないカメラの合否**を決めてしまいます。
+   */
+  const angleGapAt = (style: 'far' | 'front'): number => {
     const scene = resolveBroadcastV2Scene(course, fieldAt(900), VIEWPORT, false, {
-      cornerCutM: 400, raceDisplaySec: 40, script: 'v6',
+      cornerCutM: 400, raceDisplaySec: 40, script: 'v6', cornerStyle: style,
       noContenderFrameShots: ['finish-line'] as const,
     });
-    const forward = screenTrackAngle(course, scene.camera, 900, 10, 3);
-    const backward = screenTrackAngle(course, scene.camera, 900, 10, -3);
-    expect(deg(forward - backward), '★前後どちらを見ても同じ傾き').toBeLessThan(2);
+    return deg(screenTrackAngle(course, scene.camera, 900, 10, 3)
+      - screenTrackAngle(course, scene.camera, 900, 10, -3));
+  };
+
+  it('★左へ走る馬でも、同じ走路なら同じ角度（★上から引きのカメラ）', () => {
+    expect(angleGapAt('far'), '★前後どちらを見ても同じ傾き').toBeLessThan(2);
+  });
+
+  it('★前からのカメラでも、前後の標本で符号が変わらない', () => {
+    const gap = angleGapAt('front');
+    /** ★遠近のぶんだけずれるが、★**向きが反転してはいけない**（★それは絵が裏返る原因） */
+    expect(gap, '★ずれは遠近のぶんに収まること').toBeLessThan(4);
+    expect(Math.sign(screenTrackAngle(course, resolveBroadcastV2Scene(course, fieldAt(900), VIEWPORT, false, {
+      cornerCutM: 400, raceDisplaySec: 40, script: 'v6', cornerStyle: 'front',
+      noContenderFrameShots: ['finish-line'] as const,
+    }).camera, 900, 10, 3)), '★前向きの標本の符号').not.toBe(0);
   });
 });
 
@@ -708,8 +760,15 @@ describe('★俯瞰のカットが宣言する素材', () => {
     }
   });
 
-  it('★台本 v6 は、その俯瞰の素材を読み込んでいる', () => {
-    expect(broadcastV2ScriptAssets('v6')).toContain('high-diag-v2');
+  /**
+   * ⚠️ ★**2026-09-12 に意味が変わりました。** ★4 角の既定が `front` へ戻ったので、
+   *    ★俯瞰の素材は ★**既定では読みません**（★描かないから）。
+   *    ★`?corner=far` / `?corner=wide` へ切り替えたときだけ読みます。
+   *    ★「描くものだけ読む」という規律は、★向きが変わっても生きています。
+   */
+  it('★俯瞰へ切り替えたときだけ、俯瞰の素材を読み込む', () => {
+    expect(broadcastV2ScriptAssets('v6'), '★既定（前から）では読まない').not.toContain('high-diag-v2');
+    expect(broadcastV2ScriptAssets('v6', true), '★俯瞰へ切り替えたら読む').toContain('high-diag-v2');
   });
 
   it('★真横のカットは真横の素材を宣言したまま', () => {

@@ -1946,10 +1946,26 @@ export function broadcastV2ShotAt(
            * ★`fourthCornerFront` を明示した呼び出しは、★従来どおりの意味のままです
            *   （★`true` → 正面固定 ／ ★`false` → 俯瞰ワイド）。★古い道具を巻き込みません。
            */
+          /**
+           * ★**v6 の既定を `far` → `front` へ**（★2026-09-12・★オーナー指示）。
+           *
+           * 【★なぜ戻すか — ★2026-08-21 の全数判定がすでに答えを出していた】
+           *   ★`JUDGE_RACE_CUTS_20260821.md` で、★オーナーが 12 カットを全数判定:
+           *     ★**前から**（`diag-front`）… ①発走 ✅ ②1 角 ✅ ⑧4 角正面 🔶「★馬の走り方は OK」
+           *     ★**上・後ろから**（`high-diag`/`diag-rear`）… ③2 角 ④空撮 ⑤3 角 ⑦4 角ワイド ⑫勝馬後方
+           *       → ★**5 戦 5 敗・例外なし**
+           *   ★判定文「★後ろから見ると脚の伸び縮みが見えず、尻の上下だけが残る。
+           *     ★**素材を作り直しても直らない**」
+           *   ⚠️ ★2026-09-12、★この記録を読まずに ★**俯瞰のデフォルメ素材を作り直し**、
+           *      ★オーナー評「★まだ顔や目が見えている方が良かった。★酷い劣化」で不合格。
+           *      ★8/21 に「作り直しても直らない」と書いてあったとおりでした。
+           * → ★コーナーは ★**前から**に統一します。★素材（デフォルメの斜め前）は既にあります。
+           * ★戻し口は `?corner=far` / `?corner=wide`。
+           */
           const style = options.cornerStyle
             ?? (options.fourthCornerFront === true ? 'front'
               : options.fourthCornerFront === false ? 'wide'
-                : script === 'v6' ? 'far' : 'front');
+                : 'front');
           if (style === 'far') return SHOTS['fourth-corner-far'];
           if (style === 'wide') return SHOTS['fourth-corner-wide'];
         }
@@ -2003,8 +2019,17 @@ export function broadcastV2ShotAt(
  *
  * @param wideSubstitute ★4 角を差し替えるか。★**既定は台本 v6 なら true**（★画面と同じ・R-31）
  */
+/**
+ * ★台本が使う馬素材の一覧。
+ *
+ * ⚠️ ★**既定は `broadcastV2ShotAt` の既定とそろえること**（★R-31・★片方だけ直さない）。
+ *    ★2026-09-12 に 4 角の既定が `far` → `front` へ戻ったので、★ここも `false`（差し替えない）へ。
+ *    ★揃っていないと、★**台本が選ぶショットの素材を画面が読み込んでいない**状態になります
+ *    （★実測: `apps/cli/test/script-geometry.test.ts` が 50 鞍で検出しました）。
+ * ★`?corner=far` / `?corner=wide` のときは、★呼ぶ側が `true` を渡します。
+ */
 export function broadcastV2ScriptAssets(
-  script: BroadcastV2Script, wideSubstitute = script === 'v6',
+  script: BroadcastV2Script, wideSubstitute = false,
 ): readonly string[] {
   const assetOf = (id: BroadcastV2ShotId): string | undefined => SHOTS[id].horseAsset;
   const out = new Set<string>();

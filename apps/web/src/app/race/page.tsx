@@ -390,10 +390,20 @@ const FOURTH_CORNER_FRONT_WEB = typeof window === 'undefined'
  * ⚠️ ★合否はオーナーの目です。★`?corner=front` で ★**1 手で戻せます**
  *    （★台帳「映像の『真因』はオーナー確認後に書く」）。
  */
+/**
+ * ★**4 角の撮り方。★既定は「前から」**（★2026-09-12・★オーナー指示「コーナーは全部前から」）。
+ *
+ * ⚠️ ★2026-09-11 に `far`（★上から引き）へ変えていましたが、★`JUDGE_RACE_CUTS_20260821.md` の
+ *    ★全数判定で ★**上・後ろからは 5 戦 5 敗**、★前からだけが合格側でした。
+ *    ★判定文「★素材を作り直しても直らない」。★2026-09-12 に俯瞰素材を作り直して不合格
+ *    （★オーナー評「★まだ顔や目が見えている方が良かった。★酷い劣化」）。
+ * ★戻し口は `?corner=far` / `?corner=wide`。
+ * ⚠️ ★既定は `broadcast-v2.ts` の `broadcastV2ShotAt` とそろえること（★R-31・★片方だけ直さない）。
+ */
 const CORNER_STYLE_WEB: 'front' | 'wide' | 'far' = (() => {
-  if (typeof window === 'undefined') return 'far';
+  if (typeof window === 'undefined') return 'front';
   const v = new URLSearchParams(window.location.search).get('corner');
-  return v === 'wide' || v === 'front' ? v : 'far';
+  return v === 'wide' || v === 'far' ? v : 'front';
 })();
 /**
  * ★2026-08-18: テクスチャ付き透視ワールド（`world-textured.ts`）で背景が動くようになったので、

@@ -201,9 +201,20 @@ describe('★台本 v6 の切り替え地点', () => {
      * ⚠️ ★**組が 2 → 3 に増えた分の重さは、まだ測っていません**（★報告書に未解決として残しています）。
      *    ★台帳「side-v9 は初期化 +31% で本線に入れない」と同じ形の危険です。
      */
+    /**
+     * ⚠️ ★**2026-09-12、★4 角の既定が `far` → `front` へ戻りました**（★オーナー指示）。
+     *    ★`JUDGE_RACE_CUTS_20260821.md` の全数判定で ★上・後ろからは 5 戦 5 敗。
+     *    → ★高所斜めは ★**既定ではもう描きません**。★だから ★**読みません**。
+     *    ★`?corner=far` / `?corner=wide` へ切り替えたときだけ読みます。
+     */
     const wide = broadcastV2ShotById('fourth-corner-wide').horseAsset;
     if (wide !== undefined) {
-      expect(allowed.has(wide), '★高所斜めは v6 が実際に描くので読みます').toBe(true);
+      expect(allowed.has(wide), '★既定（前から）では高所斜めを描かないので読みません').toBe(false);
+    }
+    /** ★代わりに、★斜め前（★4 角で実際に描く組）は読むこと */
+    const front = broadcastV2ShotById('fourth-corner-front').horseAsset;
+    if (front !== undefined) {
+      expect(allowed.has(front), '★4 角で実際に描く組は読みます').toBe(true);
     }
     /**
      * ★**それでも「描かない組は読まない」という規律は生きています。**
