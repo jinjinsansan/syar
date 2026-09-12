@@ -3919,8 +3919,18 @@ export default function RacePage(): React.JSX.Element {
       const cutInSpanSec = cutChange === undefined || nextChange === undefined
         ? RACE_CUTIN_CORNER_SEC
         : Math.max(RACE_CUTIN_CORNER_SEC, nextChange.displaySec - cutChange.displaySec + RACE_CUTIN_SEAM_SEC);
+      /**
+       * ⚠️ ★**`?pace=short` ではコーナーのカットインを出しません**（★2026-09-13・オーナー指示
+       *    ★「★コーナーの絵を見せてください」）。
+       *    ★短縮の形では直線を飛ばすので、★コーナーの ★**入口と出口の両方が跳び**です。
+       *    ★その 2 つは `editJumps` の窓（★前後 `RACE_CUTIN_JUMP_LEAD_SEC`）が覆うので、
+       *    ★コーナーのカットインを重ねる必要がありません。★重ねるとコーナーが
+       *    ★**丸ごと隠れます**（★それが 2026-09-12 の形でした）。
+       * ⚠️ ★短縮でない台本（★v6 / v8 の既定）は ★**1 ビットも変えていません**。
+       *    ★あちらは直線を飛ばさないので、★コーナーを覆うのはカットインだけです。
+       */
       const cutIn = CUTIN_OFF || cutChange === undefined || sinceCutSec < 0
-        || sinceCutSec >= cutInSpanSec
+        || sinceCutSec >= cutInSpanSec || PACE_SHORT
         ? undefined : raceCutInAt(cutChange.from, cutChange.to,
           /** ★見出しは ★**画面が出している区間名**から作ります（★カメラ名で断定しない・★R-30） */
           { sectionLabel: v2SectionLabel });
