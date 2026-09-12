@@ -35,11 +35,18 @@ describe('既定台本（2026-08-28 から v6）', () => {
    *   ⚠️ ★この検査は以前「既定は v5」を固定していました。
    *      ★**意図して書き換えています**（壊れたのを黙って通したのではありません）。
    */
-  it('① パラメータなしの /race は v6', () => {
-    expect(scriptOf('')).toBe('v6');
-    expect(scriptOf('?')).toBe('v6');
-    expect(scriptOf('?seed=42')).toBe('v6');
-    expect(DEFAULT_RACE_SCRIPT).toBe('v6');
+  /**
+   * ⚠️ ★**既定が v6 → v8 になりました**（★2026-09-13・オーナー指示
+   *    ★「本番結線で見れるようにしてください」）。★指示の履歴（★どれも上書き）:
+   *    ★2026-08-28 … v5 → ★v6 ／ ★2026-09-13 … v6 → ★**v8**
+   * ★秒や台本名を直書きせず、★`DEFAULT_RACE_SCRIPT` から引きます。
+   */
+  it('① パラメータなしの /race は既定の台本', () => {
+    for (const q of ['', '?', '?seed=42']) {
+      expect(scriptOf(q), q).toBe(DEFAULT_RACE_SCRIPT);
+    }
+    /** ⚠️ ★既定が v6 のまま戻っていたら、★2026-09-13 の指示が効いていません */
+    expect(DEFAULT_RACE_SCRIPT).toBe('v8');
   });
 
   /**
@@ -55,7 +62,7 @@ describe('既定台本（2026-08-28 から v6）', () => {
   });
 
   /* ③ 不正値は既定へ戻る */
-  it('③ 不正なフラグ値は既定（v6）へ戻る', () => {
+  it('③ 不正なフラグ値は既定へ戻る', () => {
     /**
      * ⚠️ ★`v6` は 2026-08-26 に**実在する台本**になったのでここから外しました
      *    （`SCRIPT_V6`・直線を 4 カットに割る）。★既定が v5 のままであることは
@@ -63,7 +70,7 @@ describe('既定台本（2026-08-28 から v6）', () => {
      */
     for (const q of ['?cinematography=invalid', '?cinematography=', '?cinematography=V4',
       '?cinematography=V5', '?cinematography=V6', '?cinematography=v4-old']) {
-      expect(scriptOf(q), q).toBe('v6');
+      expect(scriptOf(q), q).toBe(DEFAULT_RACE_SCRIPT);
     }
   });
 

@@ -1078,12 +1078,16 @@ export type BroadcastV2Script = 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8';
 /**
  * ★通常 `/race` の既定台本。
  *
- * ★**2026-08-28、`v5` → `v6` へ（オーナー確定）**。
- *   ★`v6` は最後の直線をカットで割り、★**競り合っている場所へカメラを向ける**台本です。
- *   ★`DEMO_CONTEST_GAMMA = 1.6` とセットで設計しています。
- * ★切り戻しは `/race?cinematography=v5`（旧々台本は `v4`）。
+ * ★**2026-09-13、`v6` → `v8` へ（オーナー指示「本番結線で見れるようにしてください」）**。
+ *   ★`v8` は ★**切らずに通し、コーナーだけ見せる**台本です（`SCRIPT_V8` の註記）。
+ *   ★`?pace=short` とセットで ★**1600m を 40.6 秒**にまとめたものが、
+ *   ★2026-09-12〜13 にオーナーと詰めた形です。
+ * ⚠️ ★台帳「★カット数は減らさない」（★2026-09-03 オーナー決定）と ★**衝突します**。
+ *    ★実測（seed 42・実画面）: ★v6 17 本 → ★v8 ＋ `pace=short` ★**12 本**。
+ *    ★上書きです。★消したのではなく、★新しい指示で置き換えています（★R-7）。
+ * ★切り戻しは `/race?cinematography=v6`（直前は `v5`・旧々は `v4`）。
  */
-export const DEFAULT_RACE_SCRIPT: BroadcastV2Script = 'v6';
+export const DEFAULT_RACE_SCRIPT: BroadcastV2Script = 'v8';
 /**
  * ★**直前の台本**。★既定を v6 にしたので、**明示で v5 へ戻せる口**が要ります。
  *   ⚠️ ★これが無いと `?cinematography=v5` が★**黙って既定（v6）へ落ちます**。
@@ -1117,6 +1121,11 @@ export function broadcastV2ScriptFromSearch(search: string): BroadcastV2Script {
    *      ★`?cinematography=v5` が**黙って v6 へ落ちます**（切り戻しが効かなくなる）。
    */
   if (v === PREVIOUS_RACE_SCRIPT) return PREVIOUS_RACE_SCRIPT;
+  /**
+   * ★**明示で v6 へ戻す口**。
+   * ⚠️ ★既定を v8 にしたので、★これが無いと `?cinematography=v6` が
+   *    ★**黙って v8 へ落ちます**（★v5 で 2026-08-28 に同じ穴を作りました）。
+   */
   if (v === CUT_RACE_SCRIPT) return CUT_RACE_SCRIPT;
   /**
    * ★**切らない台本**（★2026-09-12・★`SCRIPT_V7` の註記）。
@@ -1124,7 +1133,7 @@ export function broadcastV2ScriptFromSearch(search: string): BroadcastV2Script {
    *    ★見比べていただくための口です。
    */
   if (v === 'v7') return 'v7';
-  /** ★切らない ＋ コーナーは見せる（★`SCRIPT_V8` の註記）。★既定にはしていません */
+  /** ★切らない ＋ コーナーは見せる（★`SCRIPT_V8` の註記）。★2026-09-13 から ★**既定** */
   if (v === 'v8') return 'v8';
   return DEFAULT_RACE_SCRIPT;
 }

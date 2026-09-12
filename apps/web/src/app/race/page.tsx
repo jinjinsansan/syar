@@ -141,8 +141,14 @@ const LEGACY_MOTION = typeof window !== 'undefined'
  *   ★見せるのは ★**発走 ＋ 最後の直線 400m**（★オーナー選択）。
  * ⚠️ ★既定はまだ変えていません。★実画面を見ていただいてから決めます。
  */
-const PACE_SHORT = typeof window !== 'undefined'
-  && new URLSearchParams(window.location.search).get('pace') === 'short';
+/**
+ * ⚠️ ★**2026-09-13 から既定です**（★オーナー指示「本番結線で見れるようにしてください」）。
+ *    ★`?pace=full` で ★**取り除かない時計**（★従来の 65.8 秒）へ戻せます。
+ *    ★戻し口を残すのは、★2026-08-28 に `?cinematography=v5` が黙って既定へ落ちた
+ *    ★のと同じ穴を作らないためです。
+ */
+const PACE_SHORT = typeof window === 'undefined'
+  || new URLSearchParams(window.location.search).get('pace') !== 'full';
 const RACE_PACE_POLICY: RacePacePolicy = LEGACY_MOTION ? 'legacy' : PACE_SHORT ? 'short' : 'readable';
 /**
  * ★**当て込み前の配置へ戻す口**（`?placement=legacy`・★2026-09-10）。
@@ -4921,6 +4927,8 @@ export default function RacePage(): React.JSX.Element {
       className={smallScreen ? 'race-menu' : undefined}
       style={{ background: '#14120f', color: '#efe9dc', padding: 14, fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }}
     >
+      {/** ⚠️ ★見ている間は見出しも消します（★上と同じ理由） */}
+      {!devMode && playing ? null : (
       <h1 style={{ fontSize: 18, margin: '4px 0 8px' }}>
         レース
         {smallScreen || !devMode ? null : <>
@@ -4935,6 +4943,7 @@ export default function RacePage(): React.JSX.Element {
         </span>
         </>}
       </h1>
+      )}
       {/*
         ★**遊ぶ人の入口**（★デザイン第6便 ①）。
           ★番組表・馬詳細・出走登録と同じ語彙（`.a-panel` ＋ `.a-band`）で組みます。
@@ -4942,7 +4951,14 @@ export default function RacePage(): React.JSX.Element {
            ★設計には「発走 15:40」がありますが、★**無い数字を作りません。**
            ★番組表から入る形になったら、★そのレースの時刻をここへ置きます。
       */}
-      {!devMode && (
+      {/*
+        ⚠️ ★**見ている間は入口を消します**（★2026-09-13・オーナー指摘
+           ★「★このレース演出視聴画面に邪魔な小さい表示を消してください。
+           ★これは今も開発サーバーでもずっとあります」）。
+        ★`観る` を押すと `playing` が真になり、★レースが終わると偽に戻るので、
+        ★**終わったら入口が戻ります**（★次のレースを選ぶ道を塞ぎません）。
+      */}
+      {!devMode && !playing && (
         <div className="a-panel strong rm-entry" data-theme="arcade">
           <div className="a-band rm-entry-head">
             <span className="a-chip gold rm-entry-grade">{RACE_SETUP.race.grade}</span>

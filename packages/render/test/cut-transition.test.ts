@@ -73,7 +73,13 @@ function transitions(script: BroadcastV2Script): readonly { readonly m: number; 
  *    ★旧台本（v4 / v5）は割合のままなので 3 のままです。
  * ★この数はコースによって変わります。★ここは ★**既定の走路（桜星賞）**を固定しています。
  */
-const CROSS_FAMILY_COUNT: Readonly<Record<string, number>> = { v4: 3, v5: 3, v6: 4 };
+/**
+ * ⚠️ ★**v8 を足しました**（★2026-09-13・★既定が v6 → v8 になったため）。
+ *    ★実測（★既定の走路・桜星賞）: ★v8 は 切替 6 ／ 画角が変わる ★**4**（★v6 と同じ数）。
+ *    ★v8 は通しの真横 1 本＋コーナー 2 つなので、★切替の総数は 12 → 6 に減りますが、
+ *    ★画角の系統をまたぐのは ★**コーナーの出入り 4 回**で v6 と変わりません。
+ */
+const CROSS_FAMILY_COUNT: Readonly<Record<string, number>> = { v4: 3, v5: 3, v6: 4, v8: 4 };
 
 describe('★カットの切替', () => {
   it('★★画角の系統が変わる切替は、重ねない（ハードカット）', () => {
@@ -110,8 +116,14 @@ describe('★カットの切替', () => {
      * ⚠️ ★順番（`same[0]`）ではなく ★**その対が在ること**で見ます。★台本の頭が動くたびに
      *    ★落ちるテストは、★決定ではなく順番を留めているだけでした。
      */
+    /**
+     * ⚠️ ★**見る対を変えました**（★2026-09-13・★既定が v6 → v8 になったため）。
+     *    ★v8 に `opening-*` のカットはありません（★通しの真横 1 本にしたので）。
+     *    ★真横のまま繋ぐ所として ★`homestretch-side → finish-line` を見ます
+     *    （★どちらも `view: 'side'`・★実測）。
+     */
     expect(same.map((t) => `${t.from}>${t.to}`))
-      .toContain('opening-side-settle>side-drive');
+      .toContain('homestretch-side>finish-line');
   });
 
   it('★閃光で入るのは勝負所と 4 角の正面', () => {

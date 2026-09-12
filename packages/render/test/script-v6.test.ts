@@ -304,14 +304,19 @@ describe('台本 v6 — 直線を 4 カットに割る', () => {
    *   ⚠️ ★以前は「既定は v5・v6 は opt-in」を固定していました。★意図して書き換えています。
    *   ★代わりに★**切り戻しが効くこと**を固定します。こちらの方が重要です。
    */
-  it('★既定は v6。★v5 / v4 へは URL で戻せる', () => {
+  /**
+   * ⚠️ ★**既定は v8 になりました**（★2026-09-13）。★この検定の主題は
+   *    ★「★**v6 へ URL で戻せること**」に移ります。★`CUT_RACE_SCRIPT` は v6 のままで、
+   *    ★もう既定ではありません。
+   */
+  it('★v6 は既定ではないが、★URL で戻せる（★v5 / v4 も）', () => {
     expect(broadcastV2ScriptFromSearch('')).toBe(DEFAULT_RACE_SCRIPT);
-    expect(DEFAULT_RACE_SCRIPT).toBe(CUT_RACE_SCRIPT);
     expect(CUT_RACE_SCRIPT).toBe('v6');
+    expect(DEFAULT_RACE_SCRIPT).not.toBe(CUT_RACE_SCRIPT);
     /** ★戻せること（既定へ黙って落ちない） */
+    expect(broadcastV2ScriptFromSearch('?cinematography=v6')).toBe('v6');
     expect(broadcastV2ScriptFromSearch('?cinematography=v5')).toBe('v5');
     expect(broadcastV2ScriptFromSearch('?cinematography=v4')).toBe('v4');
-    expect(broadcastV2ScriptFromSearch('?cinematography=v6')).toBe('v6');
   });
 
   // 大きさの下限だけを守って馬群を見切れさせない。
