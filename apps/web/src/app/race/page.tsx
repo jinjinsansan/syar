@@ -401,6 +401,30 @@ const FOURTH_CORNER_FRONT_WEB = typeof window === 'undefined'
  * ★戻し口は `?corner=far` / `?corner=wide`。
  * ⚠️ ★既定は `broadcast-v2.ts` の `broadcastV2ShotAt` とそろえること（★R-31・★片方だけ直さない）。
  */
+/**
+ * ★**4 角を「据え置きカメラ」に戻す口**（`?cornercam=fixed`・★2026-09-12・★見比べ用）
+ *
+ * 【★なぜ要るか — ★オーナーのスクリーンショットから読み取ったこと】
+ *   ★2026-08-20 22:48 / 08-21 11:19 のスクリーンショット 4 枚（2 場面）。
+ *   ★どちらも `BROADCAST V2 ACTIVE` で、★**旧 2D の 1 枚絵ではありません**。
+ *   ★場面A は `[fourth-corner-front]`（★残り 574m / 543m）。
+ *
+ *   ★当時（`a50d0f8`・2026-08-21 15:15）のショット定義:
+ *     ★`camera: { backM: 42, upM: 7, sideM: 12, fovDeg: 13.6 }` … ★**今と同じ**
+ *     ★`fixedCamera: { sFromSegmentEnd: 30, w: 27, upM: 7 }`    … ★**今もある**（w は 22 へ）
+ *   → ★**数値は残っています。** ★使われていないのです。
+ *
+ * 【★何が使われていないか】
+ *   ★`resolveBroadcastV2Scene` の `trackingCorner` は、★`cornerTracking === true` のとき
+ *   ★**`fixedCamera` を捨てて追従カメラにします**。★画面は `cornerTracking: !LEGACY_MOTION`
+ *   ★＝ ★**常に true** を渡していたので、★据え置きカメラは ★**1 度も走っていません**。
+ *   ★据え置きなら馬群がカメラの前を通過するので、★ラチのカーブに沿って隊列が伸び、
+ *   ★奥の馬は小さく手前は大きく写ります（★スクリーンショットの見え方）。
+ *
+ * ⚠️ ★既定は変えていません。★オーナーが見比べて決めるための口です。
+ */
+const CORNER_CAM_FIXED = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('cornercam') === 'fixed';
 const CORNER_STYLE_WEB: 'front' | 'wide' | 'far' = (() => {
   if (typeof window === 'undefined') return 'front';
   const v = new URLSearchParams(window.location.search).get('corner');
@@ -1597,7 +1621,7 @@ function buildMotionTimeline(
       gate: h.gate, s: startShownMeters(h.meters, raceD, rampSec), w: h.w ?? TRACK_WIDTH_M / 2, finished: h.meters >= DIST - 1e-6,
     })), { width: W, height: H }, winnerDone, {
       finishStyle, cornerCutM: CORNER_CUT_M_WEB, raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
-      cornerTracking: !LEGACY_MOTION,
+      cornerTracking: !LEGACY_MOTION && !CORNER_CAM_FIXED,
       fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
       cornerStyle: CORNER_STYLE_WEB,
       script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
@@ -3443,7 +3467,7 @@ export default function RacePage(): React.JSX.Element {
         finishStyle: built.finishStyle, development: built.development.kind, cornerCutM: CORNER_CUT_M_WEB,
         /** ★コーナーは隊列に見えるよう横を詰めます（★`CORNER_LANE_COMPRESS` の註記・オーナー指摘①） */
         cornerLaneCompress: CORNER_LANE_COMPRESS,
-        cornerTracking: !LEGACY_MOTION,
+        cornerTracking: !LEGACY_MOTION && !CORNER_CAM_FIXED,
         raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
         fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
         cornerStyle: CORNER_STYLE_WEB,
