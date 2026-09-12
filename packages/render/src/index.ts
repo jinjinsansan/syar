@@ -44,6 +44,11 @@ export * from './contest-focus.js';
  *   ⚠️ ★エンジンが走らせた位置を ★**読むだけ**です。★位置も着順も作りません。
  */
 export * from './race-development.js';
+/**
+ * ★見せない区間を時計から取り除く（★オーナー指示「不要な直線を削って」）。
+ *   ⚠️ ★送りを速くするのとは ★**別物**です。★脚の回転は 1 倍のまま保たれます。
+ */
+export * from './race-elision.js';
 export * from './finish-replay.js';
 export * from './reference-hud.js';
 export * from './visual-scroll.js';

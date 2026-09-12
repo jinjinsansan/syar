@@ -1,3 +1,4 @@
+import { elidedWarp, raceEditElisions } from './race-elision.js';
 /**
  * ★**時間を情報量に比例して配る**（正典 D-062）
  *
@@ -406,7 +407,17 @@ export function readableRaceRates(knots: PhaseKnots, targetSec: number): PhaseRa
  *   `'readable'` … ★既定。★逆算 → ★`READABLE_MAX_RATE` で切る
  *   `'legacy'`   … ★従来方式。★逆算のみ（`?motion=legacy`）
  */
-export type RacePacePolicy = 'readable' | 'legacy';
+export type RacePacePolicy = 'readable' | 'legacy' | 'short';
+
+/**
+ * ★**等速のまま尺を詰める方針**（★2026-09-12・オーナー指示「不要な直線を削って」）。
+ *   ★送りは全区間 1 倍。★尺は ★**見せない区間を時計から取り除く**ことで詰めます
+ *   （`raceEditElisions`）。★脚の回転は較正どおり（★2.86 完歩/秒）のままです。
+ * ⚠️ ★`?pace=short` で入ります。★既定はまだ変えていません（★オーナー確認待ち）。
+ */
+export const ONE_TO_ONE_RATES: PhaseRates = {
+  cruise: 1, spurt: 1, straight: 1, goal: 1, start: 1,
+};
 
 /**
  * ★**画面と道具は、必ずここを通ること。**
@@ -420,6 +431,7 @@ export type RacePacePolicy = 'readable' | 'legacy';
 export function ratesForPolicy(
   knots: PhaseKnots, targetSec: number, policy: RacePacePolicy,
 ): PhaseRates {
+  if (policy === 'short') return ONE_TO_ONE_RATES;
   return policy === 'legacy' ? ratesForTarget(knots, targetSec) : readableRaceRates(knots, targetSec);
 }
 
@@ -484,7 +496,14 @@ export interface RacePaceReport {
 export function raceClockFor(
   knots: PhaseKnots, distanceMeter: number, policy: RacePacePolicy,
 ): TimeWarp {
-  return timeWarpFor(knots, ratesForPolicy(knots, targetDisplaySec(distanceMeter), policy));
+  const warp = timeWarpFor(knots, ratesForPolicy(knots, targetDisplaySec(distanceMeter), policy));
+  /**
+   * ★**`'short'` だけ、見せない区間を取り除きます**（★`race-elision.ts` の註記）。
+   * ⚠️ ★ここに置くのは、★画面も監査道具も ★**`raceClockFor` の戻り値そのもの**を
+   *    ★使うからです（★`race-clock-wiring.test.ts` が構文木で固定）。★画面側で
+   *    ★包むと、★道具が包まない時計を見て静かにずれます（★台帳 B-6 と同じ形）。
+   */
+  return policy === 'short' ? elidedWarp(warp, raceEditElisions(knots)) : warp;
 }
 
 /**

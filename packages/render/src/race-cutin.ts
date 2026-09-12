@@ -73,6 +73,13 @@ export const RACE_CUTIN_CORNER_SEC = 2.0;
  */
 export const RACE_CUTIN_SEAM_SEC = 0.4;
 
+/**
+ * ★**時計の跳びを覆う窓の半分**（秒・★2026-09-12）。
+ *   ★跳びを窓の真ん中に置くので、★覆う長さは ★**この 2 倍**です。
+ * ⚠️ ★短すぎると跳びが端に出ます。★長すぎると 30 秒のうちの持ち時間を食います。
+ */
+export const RACE_CUTIN_JUMP_LEAD_SEC = 1.0;
+
 /** ★発走直後に出すもの（★カットの境目ではなく、★レース開始からの経過で出す） */
 export const RACE_CUTIN_AT_START: RaceCutIn = { kind: 'own-horse', label: 'あなたの馬' };
 

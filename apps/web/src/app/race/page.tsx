@@ -75,10 +75,12 @@ import {
   type CoatName,
   homeStretchMetersOf,
   raceDevelopmentOf, type RaceDevelopmentInfo,
+  raceEditJumpDisplaySecs,
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
-  raceCutInAt, raceTransitionVeil, RACE_CUTIN_SEC, RACE_CUTIN_CORNER_SEC, RACE_CUTIN_SEAM_SEC, RACE_CUTIN_AT_START,
+  raceCutInAt, raceTransitionVeil, RACE_CUTIN_SEC, RACE_CUTIN_CORNER_SEC, RACE_CUTIN_SEAM_SEC,
+  RACE_CUTIN_JUMP_LEAD_SEC, RACE_CUTIN_AT_START,
   drawOwnHorseCutIn, drawFormationCutIn, drawRunningStyleCutIn, drawToStraightCutIn,
   RACE_TELOP_SEC, drawOwnHorseTelop, drawFormationTelop, drawRunningStyleTelop, drawToStraightTelop,
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
@@ -130,7 +132,18 @@ const FIELD = 12;
  */
 const LEGACY_MOTION = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('motion') === 'legacy';
-const RACE_PACE_POLICY: RacePacePolicy = LEGACY_MOTION ? 'legacy' : 'readable';
+/**
+ * ★**等速のまま尺を詰める口**（`?pace=short`・★2026-09-12・オーナー指示）
+ *
+ *   ★オーナー指示「1600m コースで 30 秒にしたい。★**不要な直線を削って**いけばいい。
+ *   ★倍速にするともうそれは別のゲームになります」。
+ *   ★送りは 1 倍のまま、★**見せない区間を時計から取り除きます**（`race-elision.ts`）。
+ *   ★見せるのは ★**発走 ＋ 最後の直線 400m**（★オーナー選択）。
+ * ⚠️ ★既定はまだ変えていません。★実画面を見ていただいてから決めます。
+ */
+const PACE_SHORT = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('pace') === 'short';
+const RACE_PACE_POLICY: RacePacePolicy = LEGACY_MOTION ? 'legacy' : PACE_SHORT ? 'short' : 'readable';
 /**
  * ★**当て込み前の配置へ戻す口**（`?placement=legacy`・★2026-09-10）。
  *
@@ -800,6 +813,11 @@ interface Built {
    *   ★最後の直線のカメラがこれを見ます。★位置にも着順にも触れません。
    */
   readonly development: RaceDevelopmentInfo;
+  /**
+   * ★**時計の跳びが起きる表示秒**（★`?pace=short` のときだけ中身が入ります）。
+   *   ★ここはカットインで覆わなければなりません（★裸の跳びは瞬間移動に見えます）。
+   */
+  readonly editJumps: readonly number[];
   /** ★ショット切替の時刻（表示秒）と前後の id。切替直後は前ショットとディゾルブする（ユーザー指摘⑥） */
   readonly shotChanges: readonly { readonly displaySec: number; readonly from: BroadcastV2ShotId; readonly to: BroadcastV2ShotId }[];
   /** 斤量（出馬表の表示用） */
@@ -1602,6 +1620,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     model, warp, pace,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
     gauge, finishPos, finishSec, finishSpeeds, dustSoil, finishStyle,
+    editJumps: raceEditJumpDisplaySecs(knots, warp),
     development,
     ...buildMotionTimeline({ model, warp, finishSec, finishStyle }, winnerGate, 1.6),
     weightsKg: entrants.map((e) => e.weightKg),
@@ -3867,7 +3886,19 @@ export default function RacePage(): React.JSX.Element {
        */
       const startCutInActive = !CUTIN_OFF && renderer === 'v2' && !replay.active
         && raceD > 0 && raceD < RACE_CUTIN_SEC;
-      cutInActive = cutIn !== undefined || startCutInActive;
+      /**
+       * ★**時計の跳びを覆う 1 枚**（★`?pace=short`・★2026-09-12・オーナー指示）
+       *
+       *   ★見せない区間を時計から取り除くと、★その地点で ★**表示秒が跳びます**。
+       *   ★裸の跳びは「馬が瞬間移動した」に見えるので、★必ず覆います。
+       *   ★跳びを窓の ★**真ん中**に置きます（★前後 `RACE_CUTIN_JUMP_LEAD_SEC`）。
+       * ⚠️ ★跳びの位置は `built.editJumps` から取ります。★ここで `knots` から
+       *    ★計算し直さないこと（★片方だけ直すと覆えない跳びが出ます・★R-30）。
+       */
+      const jumpAt = built.editJumps.find((j) => raceD >= j - RACE_CUTIN_JUMP_LEAD_SEC
+        && raceD < j + RACE_CUTIN_JUMP_LEAD_SEC);
+      const jumpCutInActive = !CUTIN_OFF && renderer === 'v2' && !replay.active && jumpAt !== undefined;
+      cutInActive = cutIn !== undefined || startCutInActive || jumpCutInActive;
       /** ★テロップは世界のあとに重ねるので、いったん関数に包んで持っておきます */
       let paintTelop: (() => void) | undefined;
       if (cutInActive) {
@@ -3885,14 +3916,17 @@ export default function RacePage(): React.JSX.Element {
           (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff';
         const strategyLabelOf = (gate: number): string =>
           STRATEGY_LABELS[built.strategyOf(gate)] ?? '先行';
-        const kind = cutIn?.kind ?? RACE_CUTIN_AT_START.kind;
+        /** ⚠️ ★跳びの 1 枚は ★**コーナーと同じ `to-straight`**（★全画面で覆う） */
+        const kind = cutIn?.kind ?? (jumpCutInActive ? 'to-straight' : RACE_CUTIN_AT_START.kind);
         /** ★コーナーの後（`to-straight`）だけ全画面。★`?cutin=full` は従来どおり全部 */
         cutInCoversWorld = CUTIN_FULLSCREEN || kind === 'to-straight';
         const frame = {
           viewport: { width: W, height: H },
-          sinceSec: cutIn === undefined ? raceD : sinceCutSec,
-          durationSec: cutIn === undefined ? RACE_CUTIN_SEC : cutInSpanSec,
-          label: cutIn?.label ?? RACE_CUTIN_AT_START.label,
+          sinceSec: cutIn !== undefined ? sinceCutSec
+            : jumpAt !== undefined ? raceD - (jumpAt - RACE_CUTIN_JUMP_LEAD_SEC) : raceD,
+          durationSec: cutIn !== undefined ? cutInSpanSec
+            : jumpAt !== undefined ? RACE_CUTIN_JUMP_LEAD_SEC * 2 : RACE_CUTIN_SEC,
+          label: cutIn?.label ?? (jumpAt !== undefined ? '最後の直線へ' : RACE_CUTIN_AT_START.label),
           raceLabel: `${RACE_META.raceNo}　${RACE_META.raceName}`,
           metersLeft: metersLeftNow,
         };

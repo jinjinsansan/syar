@@ -143,7 +143,22 @@ function violationsOf(
         bad.push(`★方針の条件が LEGACY_MOTION そのものではありません: ${t(init.condition)}`);
       }
       if (!isStringLit(init.whenTrue, 'legacy')) bad.push(`★真側が 'legacy' ではありません: ${t(init.whenTrue)}`);
-      if (!isStringLit(init.whenFalse, 'readable')) bad.push(`★偽側が 'readable' ではありません: ${t(init.whenFalse)}`);
+      /**
+       * ★**偽側は `'readable'`、★または `PACE_SHORT ? 'short' : 'readable'`**
+       *   （★2026-09-12・`?pace=short` を足した）。
+       * ⚠️ ★入れ子を無条件に許すと、★`LEGACY_MOTION ? 'legacy' : (何か)` が
+       *    ★全部通ってしまいます。★**中身まで見ます**。
+       */
+      const f = init.whenFalse;
+      if (ts.isConditionalExpression(f)) {
+        if (!isIdent(f.condition, 'PACE_SHORT')) {
+          bad.push(`★偽側の入れ子の条件が PACE_SHORT ではありません: ${t(f.condition)}`);
+        }
+        if (!isStringLit(f.whenTrue, 'short')) bad.push(`★短縮側が 'short' ではありません: ${t(f.whenTrue)}`);
+        if (!isStringLit(f.whenFalse, 'readable')) bad.push(`★既定が 'readable' ではありません: ${t(f.whenFalse)}`);
+      } else if (!isStringLit(f, 'readable')) {
+        bad.push(`★偽側が 'readable' ではありません: ${t(f)}`);
+      }
     }
   }
 
@@ -191,7 +206,12 @@ describe('★画面の時計の接続（構文木で見る）', () => {
         { expectPolicyTernary: true, args: PAGE_ARGS });
     };
     const CLOCK = 'const warp = raceClockFor(knots, DIST, RACE_PACE_POLICY);';
-    const POLICY = "LEGACY_MOTION ? 'legacy' : 'readable'";
+    /**
+     * ⚠️ ★**方針が 3 通りになりました**（★2026-09-12・`?pace=short` を足した）。
+     *    ★`LEGACY_MOTION ? 'legacy' : PACE_SHORT ? 'short' : 'readable'`
+     *    ★ここは ★**変異のもと**なので、★製品の字面と一致していなければ検定が空回りします。
+     */
+    const POLICY = "LEGACY_MOTION ? 'legacy' : PACE_SHORT ? 'short' : 'readable'";
     const STRAIGHT = 'straightMetersLeft: homeStretchMetersOf(course)';
 
     it('★① 時計を固定倍率へ置換し、正しい名前を未使用呼出だけに残す', () => {
@@ -207,7 +227,8 @@ describe('★画面の時計の接続（構文木で見る）', () => {
     });
 
     it('★③ legacy / readable の対応を入れ替える', () => {
-      expect(check(POLICY, "LEGACY_MOTION ? 'readable' : 'legacy'").length).toBeGreaterThan(0);
+      expect(check(POLICY, "LEGACY_MOTION ? 'readable' : PACE_SHORT ? 'short' : 'legacy'").length)
+        .toBeGreaterThan(0);
     });
 
     it('★④ 画面だけ直線長を 400 へ戻す', () => {
