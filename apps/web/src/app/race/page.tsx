@@ -665,12 +665,17 @@ const GATE_BILLBOARD = false;
  * ⚠️ ★戻し口は ★`?tilt=off`。★既定値は `DEFAULT_ALIGN_TO_TRACK`（★render 側・R-31）。
  * ⚠️ ★直線では接線がほぼ 0 なので ★**1 画素も動きません**。★動くのは弧の上だけです。
  */
-const ALIGN_TO_TRACK = ((): boolean => {
-  if (typeof window === 'undefined') return DEFAULT_ALIGN_TO_TRACK;
+/**
+ * ⚠️ ★**2026-09-12 から、未指定は「画角に任せる」です**（★`undefined` を渡します）。
+ *    ★`alignToTrackForView`（★render 側・★R-31）が、★上から引きのカットでだけ回します。
+ *    ★オーナー評「★前からのカットで ★**馬が傾いています**。★直立になれば改善になる気がします」。
+ */
+const ALIGN_TO_TRACK = ((): boolean | undefined => {
+  if (typeof window === 'undefined') return undefined;
   const v = new URLSearchParams(window.location.search).get('tilt');
   if (v === 'off') return false;
   if (v === 'track') return true;
-  return DEFAULT_ALIGN_TO_TRACK;
+  return undefined;
 })();
 /**
  * ★**地面タイルの「焼き込まれた横縞」を平したものを使う**（★2026-09-11・★見比べ用 `?grain=flat`）。

@@ -14,6 +14,7 @@ import {
 } from './world-textured.js';
 import {
   broadcastCamera,
+  alignToTrackForView,
   drawPerspectiveHorses,
   drawPerspectiveWorld,
   getDrawnHorseBoxes,
@@ -903,8 +904,13 @@ export function drawBroadcastV2Scene<TImage>(
   }
   drawPerspectiveHorses(ctx, course, scene.camera, scene.visibleHorses, {
     ...library,
-    /** ★馬の絵を走路の向きに合わせて回すか（★未指定は `DEFAULT_ALIGN_TO_TRACK`＝回す） */
-    ...(opts.alignToTrack === undefined ? {} : { alignToTrack: opts.alignToTrack }),
+    /**
+     * ★馬の絵を走路の向きに合わせて回すか。
+     * ★未指定なら ★**そのカットの画角から決めます**（`alignToTrackForView`・★2026-09-12）。
+     *   ★上から引き（`high-diag`）… 回す（★2026-09-11「回したほうがまだマシ」）
+     *   ★前から・真横 ………………… ★**回さない**（★オーナー評「馬が傾いています」）
+     */
+    alignToTrack: opts.alignToTrack ?? alignToTrackForView(scene.shot.view),
     frameSetOf: directional ? (horse) => {
       /**
        * ★2026-08-18: 方向別の一体素材（後方・斜め後ろ・正面・斜め前）が承認水準で揃うまで、

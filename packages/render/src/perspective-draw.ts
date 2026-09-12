@@ -782,6 +782,23 @@ export function screenTrackAngle(
  */
 export const DEFAULT_ALIGN_TO_TRACK = true;
 
+/**
+ * ★**回すのは「上から引き」のカットだけ**（★2026-09-12・★オーナー指摘）
+ *
+ * 【★なぜ画角で分けるのか】
+ *   ★上の「回したほうがまだマシ」は ★**俯瞰のカット**（`high-diag`）についての判定です。
+ *   ★そこは ★**真横の絵を上から見せている**ので、★絵と走路の向きが元から食い違っています。
+ *
+ *   ⚠️ ★2026-09-12 に 4 角の既定が ★**前から**（`diag-front`）へ戻りました。
+ *      ★前からのカットは ★**絵と走路の向きが元から合っています**。★そこで回すと、
+ *      ★オーナー評「★**馬が傾いています**。★これが直立になれば改善になる気がします」。
+ *   → ★画角で分けます。★`diag-front` と `side` では回しません。
+ * ⚠️ ★`?tilt=off` / `?tilt=track` を明示したときは、★そちらが優先します（★見比べの道）。
+ */
+export function alignToTrackForView(view: ShotView): boolean {
+  return view === 'high-diag' ? DEFAULT_ALIGN_TO_TRACK : false;
+}
+
 export function drawPerspectiveHorses<TImage>(
   ctx: Ctx2D<TImage>,
   course: Course,

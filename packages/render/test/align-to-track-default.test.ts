@@ -18,7 +18,7 @@
 import { describe, it, expect } from 'vitest';
 import { ovalCourse } from '../src/course.js';
 import { resolveBroadcastV2Scene } from '../src/broadcast-v2-scene.js';
-import { drawPerspectiveHorses, DEFAULT_ALIGN_TO_TRACK, screenTrackAngle } from '../src/perspective-draw.js';
+import { drawPerspectiveHorses, DEFAULT_ALIGN_TO_TRACK, alignToTrackForView, screenTrackAngle } from '../src/perspective-draw.js';
 
 const course = ovalCourse(1600, { widthM: 20, turn: 'left' });
 const VIEWPORT = { width: 1280, height: 720 };
@@ -107,5 +107,28 @@ describe('★走路の接線へ回す（既定）', () => {
     const rots = rotations(900, { alignToTrack: false });
     const max = rots.length === 0 ? 0 : Math.max(...rots.map(deg));
     expect(max, '★1 度も回さない').toBeLessThan(0.3);
+  });
+});
+
+/**
+ * ★**画面が実際に使う規則**（★2026-09-12・★オーナー指摘「馬が傾いています」）
+ *
+ * ⚠️ ★上の検定は `drawPerspectiveHorses` を ★**直に**呼ぶので、★既定の定数だけを見ます。
+ *    ★画面は `resolveBroadcastV2Scene` 経由で、★**カットの画角から**決めます。
+ *    ★ここを留めないと、★「定数は true のまま・画面は回していない」状態を見逃します（★R-30）。
+ *
+ * ★上から引き（`high-diag`）… 回す（★2026-09-11「回したほうがまだマシ」）
+ * ★前から（`diag-front`）・真横（`side`）… ★**回さない**
+ *   （★オーナー評「★前からのカットで馬が傾いています。★直立になれば改善になる気がします」）
+ */
+describe('★画角ごとの規則（★画面が使う側）', () => {
+  it('★上から引きでは回す', () => {
+    expect(alignToTrackForView('high-diag')).toBe(true);
+    expect(alignToTrackForView('high-diag')).toBe(DEFAULT_ALIGN_TO_TRACK);
+  });
+
+  it('★前から・真横では回さない（★傾かない）', () => {
+    expect(alignToTrackForView('diag-front')).toBe(false);
+    expect(alignToTrackForView('side')).toBe(false);
   });
 });
