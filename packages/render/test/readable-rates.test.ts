@@ -22,7 +22,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   timeWarpFor, ratesForTarget, ratesForPolicy, racePaceReport, targetDisplaySec,
-  READABLE_MAX_RATE, GOAL_RATE, GOAL_REAL_TIME_M, START_REAL_TIME_M, type PhaseKnots,
+  READABLE_MAX_RATE, READABLE_MAX_CRUISE, GOAL_RATE, GOAL_RATE_DISPLAY,
+  GOAL_REAL_TIME_M, START_REAL_TIME_M, type PhaseKnots,
 } from '../src/index.js';
 
 /**
@@ -74,13 +75,22 @@ describe('★画面の既定（readable）の時間写像', () => {
     }
   });
 
-  it('★★どの局面も可読性の上限を超えない', () => {
+  /**
+   * ⚠️ ★**上限は局面ごとに違います**（★2026-09-12・オーナー判断「1600m で 30 秒」）。
+   *    ★道中（真横カメラワーク）… ★`READABLE_MAX_CRUISE`（8）★← オーナーが削る場所に名指し
+   *    ★勝負所・直線 …………… ★`READABLE_MAX_RATE`（2）★← ここは読ませる場所なので据え置き
+   */
+  it('★★勝負所と直線は可読性の上限を超えない／道中は道中の上限まで', () => {
     for (const d of DISTANCES) {
       const k = knotsOf(d);
       const r = ratesForPolicy(k, targetDisplaySec(d), 'readable');
-      for (const phase of ['cruise', 'spurt', 'straight'] as const) {
+      for (const phase of ['spurt', 'straight'] as const) {
         expect(r[phase], `${d}m の ${phase}`).toBeLessThanOrEqual(READABLE_MAX_RATE + 1e-12);
       }
+      expect(r.cruise, `${d}m の cruise`).toBeLessThanOrEqual(READABLE_MAX_CRUISE + 1e-12);
+      /** ⚠️ ★道中が 2 倍までに戻っていたら、★30 秒の指示が効いていません */
+      expect(READABLE_MAX_CRUISE, '道中の上限が可読性の上限に戻っています')
+        .toBeGreaterThan(READABLE_MAX_RATE);
     }
   });
 
@@ -90,17 +100,28 @@ describe('★画面の既定（readable）の時間写像', () => {
       const step = w.displaySec / 400;
       for (let i = 0; i < 400; i++) {
         const rate = (w.raceSecAt((i + 1) * step) - w.raceSecAt(i * step)) / step;
-        expect(rate, `${d}m の ${i} コマ目`).toBeLessThanOrEqual(READABLE_MAX_RATE + 1e-6);
+        expect(rate, `${d}m の ${i} コマ目`).toBeLessThanOrEqual(READABLE_MAX_CRUISE + 1e-6);
       }
     }
   });
 
-  it('★★発走とゴール前は等速のまま（★可読性のために実時間を壊さない）', () => {
+  /**
+   * ⚠️ ★**「等速のまま」をやめました**（★2026-09-12・オーナー判断）。
+   *    ★オーナー指示「1600m コースで 30 秒にしたい」に対し、★ゴール前 400m を 1 倍で
+   *    ★流すと ★**それだけで 25.6 秒**になり、★30 秒は物理的に出ません（★実測）。
+   *    ★選ばれたのは「★真横 8 倍・ゴール前 2 倍・勝負所と直線は 2 倍のまま」。
+   *    ★2026-08-22 の指示「最後の直線を実時間にする」の上書きです。
+   * ★ここが見るのは ★**1 倍でないこと**ではなく、★**`GOAL_RATE_DISPLAY` に一致すること**です
+   *   （★値を 1 か所から引いているか）。
+   */
+  it('★★発走とゴール前は `GOAL_RATE_DISPLAY` で流す', () => {
     for (const d of DISTANCES) {
       const r = ratesForPolicy(knotsOf(d), targetDisplaySec(d), 'readable');
-      expect(r.start).toBe(GOAL_RATE);
-      expect(r.goal).toBe(GOAL_RATE);
+      expect(r.start).toBe(GOAL_RATE_DISPLAY);
+      expect(r.goal).toBe(GOAL_RATE_DISPLAY);
     }
+    /** ⚠️ ★1 倍に戻っていたら 30 秒の指示が効いていません */
+    expect(GOAL_RATE_DISPLAY, 'ゴール前が 1 倍に戻っています').toBeGreaterThan(GOAL_RATE);
   });
 
   /**
@@ -138,7 +159,12 @@ describe('★画面の既定（readable）の時間写像', () => {
    */
   it('★★達成できる目標では、実尺が目標に合う（★F-4）', () => {
     const k = knotsOf(2400);
-    for (const target of [95, 100, 110, 120, 135]) {
+    /**
+     * ⚠️ ★**目標の範囲を下げました**（★2026-09-12）。★道中が 8 倍まで使えるので、
+     *    ★達成できる帯そのものが短い側へ動きました。★実測（2400m）:
+     *    ★端に張り付かない帯は ★**およそ 43〜123 秒**（★以前は 95〜135 秒）。
+     */
+    for (const target of [50, 60, 80, 100, 120]) {
       const rep = racePaceReport(k, target, 'readable');
       expect(rep.saturation, `目標 ${target} 秒は端に張り付いていないこと`).toBe(null);
       expect(rep.achieved, `目標 ${target} 秒: 実尺 ${rep.displaySec}`).toBe(true);
@@ -146,8 +172,8 @@ describe('★画面の既定（readable）の時間写像', () => {
       // ★達成しても、★上限と等速区間は守られていること
       expect(rep.rates.spurt).toBeLessThanOrEqual(READABLE_MAX_RATE + 1e-12);
       expect(rep.rates.straight).toBeLessThanOrEqual(READABLE_MAX_RATE + 1e-12);
-      expect(rep.rates.start).toBe(GOAL_RATE);
-      expect(rep.rates.goal).toBe(GOAL_RATE);
+      expect(rep.rates.start).toBe(GOAL_RATE_DISPLAY);
+      expect(rep.rates.goal).toBe(GOAL_RATE_DISPLAY);
     }
   });
 
@@ -163,35 +189,40 @@ describe('★画面の既定（readable）の時間写像', () => {
     for (const rep of [loose, looser]) {
       expect(rep.saturation, '★端に張り付いていないこと').toBe(null);
       expect(rep.rates.cruise).toBeGreaterThan(1);
-      expect(rep.rates.cruise).toBeLessThan(READABLE_MAX_RATE);
+      expect(rep.rates.cruise).toBeLessThan(READABLE_MAX_CRUISE);
     }
     // ★目標を 20 秒延ばしたら、★実尺も延びること
     expect(looser.displaySec).toBeGreaterThan(loose.displaySec + 10);
   });
 
   /**
-   * ⚠️ ★**本番の目標では、目標を動かしても尺が変わりません**（★上限に張り付いているため）。
-   *    ★これは ★`targetDisplaySec` を変えて尺を詰める道が ★**塞がっている**ということです。
-   *    ★留めておかないと、★「目標を縮めたのに画面が変わらない」で ★また 1 往復を捨てます
-   *    （★2026-08-21 に同じ形の事故がありました）。
+   * ★**本番の目標が、★ようやく守られるようになりました**（★2026-09-12）。
+   *
+   * ⚠️ ★ここは以前 ★**逆のことを固定していました** — ★「本番の目標では上限に張り付くので、
+   *    ★目標を動かしても尺が変わらない」。★それは ★`targetDisplaySec` が ★**何も制御していない**
+   *    ★状態を記録したものでした（★実測: 1600m で目標 39.3 秒に対し実尺 65.8 秒）。
+   *    ★道中の上限を 8 倍にしたことで、★目標が効くようになりました。
+   * ★見るのは ★**本番の目標で達成できること**と ★**目標を動かせば尺が動くこと**の 2 つです。
    */
-  it('★★本番の目標では、目標を動かしても尺が変わらない（★上限に張り付いている）', () => {
-    const k = knotsOf(2400);
-    const atTarget = racePaceReport(k, targetDisplaySec(2400), 'readable');
-    const halved = racePaceReport(k, targetDisplaySec(2400) / 2, 'readable');
-    expect(atTarget.rates.cruise).toBe(READABLE_MAX_RATE);
-    expect(halved.displaySec).toBeCloseTo(atTarget.displaySec, 9);
+  it('★★本番の目標が守られる（★目標が効かない状態に戻っていない）', () => {
+    for (const d of [1200, 1600, 2000, 2400, 3000]) {
+      const rep = racePaceReport(knotsOf(d), targetDisplaySec(d), 'readable');
+      expect(rep.achieved, `${d}m: 目標 ${rep.targetSec} 秒 → 実尺 ${rep.displaySec.toFixed(2)} 秒`).toBe(true);
+      expect(rep.saturation, `${d}m: 端に張り付いています`).toBe(null);
+    }
   });
 
   it('★★目標が達成できないときは、上限を超えて圧縮しない（★制約のほうを優先する）', () => {
     const d = 2400;
-    const rep = racePaceReport(knotsOf(d), targetDisplaySec(d), 'readable');
+    /** ⚠️ ★本番の目標は達成できるようになったので、★**達成できない目標**を明示で渡します */
+    const rep = racePaceReport(knotsOf(d), 20, 'readable');
     // ★端に張り付いている＝これ以上速くできない
     expect(rep.saturation).toBe('max');
     expect(rep.achieved).toBe(false);
     expect(rep.displaySec).toBeGreaterThan(rep.targetSec);
     // ★それでも上限は破らない
-    for (const phase of ['cruise', 'spurt', 'straight'] as const) {
+    expect(rep.rates.cruise).toBeLessThanOrEqual(READABLE_MAX_CRUISE + 1e-12);
+    for (const phase of ['spurt', 'straight'] as const) {
       expect(rep.rates[phase]).toBeLessThanOrEqual(READABLE_MAX_RATE + 1e-12);
     }
   });
@@ -200,7 +231,8 @@ describe('★画面の既定（readable）の時間写像', () => {
     const k = knotsOf(3000);
     for (const target of [1, 5, 20]) {
       const r = ratesForPolicy(k, target, 'readable');
-      for (const phase of ['cruise', 'spurt', 'straight'] as const) {
+      expect(r.cruise).toBeLessThanOrEqual(READABLE_MAX_CRUISE + 1e-12);
+      for (const phase of ['spurt', 'straight'] as const) {
         expect(r[phase]).toBeLessThanOrEqual(READABLE_MAX_RATE + 1e-12);
       }
     }
@@ -208,9 +240,9 @@ describe('★画面の既定（readable）の時間写像', () => {
 
   it('★★「cruise も常に上限を返すだけ」の実装を通さない', () => {
     // ★目標が緩ければ `cruise` は上限未満（★ここだけが目標に反応します）
-    expect(ratesForPolicy(knotsOf(2400), 260, 'readable').cruise).toBeLessThan(READABLE_MAX_RATE);
+    expect(ratesForPolicy(knotsOf(2400), 260, 'readable').cruise).toBeLessThan(READABLE_MAX_CRUISE);
     // ★目標が厳しければ上限に張り付く
-    expect(ratesForPolicy(knotsOf(2400), 30, 'readable').cruise).toBe(READABLE_MAX_RATE);
+    expect(ratesForPolicy(knotsOf(2400), 30, 'readable').cruise).toBe(READABLE_MAX_CRUISE);
   });
 
   it('★★従来方式へ戻せる（`?motion=legacy` が別物であること）', () => {
@@ -222,8 +254,15 @@ describe('★画面の既定（readable）の時間写像', () => {
     expect(legacy.spurt).toBeGreaterThan(readable.spurt);
     // ★`legacy` は `ratesForTarget` そのもの
     expect(legacy).toEqual(ratesForTarget(k, target));
-    // ★従来方式のほうが尺は短い（★切っていないぶん詰められる）
-    expect(timeWarpFor(k, legacy).displaySec).toBeLessThan(timeWarpFor(k, readable).displaySec);
+    /**
+     * ★**尺の前後が入れ替わりました**（★2026-09-12）。
+     * ⚠️ ★以前は「従来方式のほうが短い（切っていないぶん詰められる）」でした。★いまは
+     *    ★可読性方針が ★**道中 8 倍・ゴール前 2 倍**を使うので、★そちらのほうが短くなります
+     *    （★実測 1600m: ★従来 38.5 秒 ／ ★既定 34.3 秒）。
+     * ★見たいのは ★**2 つが別物であること**で、★どちらが短いかではありません。
+     */
+    expect(timeWarpFor(k, legacy).displaySec)
+      .not.toBeCloseTo(timeWarpFor(k, readable).displaySec, 1);
   });
 
   /**

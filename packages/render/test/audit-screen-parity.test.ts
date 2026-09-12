@@ -44,16 +44,20 @@ describe('★監査道具と画面の入力の一致', () => {
   });
 
   it('★★直線長が時計まで届く（★渡しても効いていない、を通さない）', () => {
-    const secs = STRAIGHTS.map((hs) => {
-      const built = buildAuditRace({ seed: 42, distance: 1600, spec: specOf(hs) });
-      return auditClock(built).warp.displaySec;
-    });
     /**
-     * ★べた書き（400 固定）だったころは ★**3 つとも同じ値**になりました。
-     * ★互いに違うことを見れば、★「渡したが効いていない」を捕まえられます。
+     * ⚠️ ★**見る先を「尺」から「道中の送り」へ変えました**（★2026-09-12）。
+     *    ★以前は ★尺（`displaySec`）が会場で違うことを見ていました。★それが成り立って
+     *    ★いたのは ★**目標が達成できず上限に張り付いていた**からで、★直線長がそのまま
+     *    ★尺に漏れていたのです。★2026-09-12 に目標が守られるようになったので、
+     *    ★尺は ★**どの会場でも目標どおり 34.3 秒**になります（★それが正しい姿）。
+     *    ★直線長はいま ★**道中の送り**に出ます。★そこを見ます。
      */
-    const uniq = new Set(secs.map((s) => s.toFixed(6)));
-    expect(uniq.size, `表示秒が会場で変わっていません: ${secs.join(' / ')}`).toBe(STRAIGHTS.length);
+    const cruises = STRAIGHTS.map((hs) => {
+      const built = buildAuditRace({ seed: 42, distance: 1600, spec: specOf(hs) });
+      return auditPaceReport(built).rates.cruise;
+    });
+    const uniq = new Set(cruises.map((s) => s.toFixed(6)));
+    expect(uniq.size, `道中の送りが会場で変わっていません: ${cruises.join(' / ')}`).toBe(STRAIGHTS.length);
   });
 
   it('★★どの会場でも、目標と実尺の差が記録される', () => {
@@ -105,9 +109,15 @@ describe('★監査道具と画面の入力の一致', () => {
     const legacy = buildAuditRace({ seed: 42, distance: 1600, legacyMotion: true });
     expect(auditPaceReport(readable).policy).toBe('readable');
     expect(auditPaceReport(legacy).policy).toBe('legacy');
-    // ★従来方式のほうが尺は短い（★切っていないぶん詰められる）
-    expect(auditClock(legacy).warp.displaySec).toBeLessThan(auditClock(readable).warp.displaySec);
-    // ★従来方式は目標のほぼ内側
-    expect(Math.abs(auditPaceReport(legacy).overshootSec)).toBeLessThan(1.5);
+    /**
+     * ★**尺の前後が入れ替わりました**（★2026-09-12・`GOAL_RATE_DISPLAY` の註記）。
+     * ⚠️ ★以前は「従来方式のほうが短い」でした。★いまは既定が ★道中 8 倍・ゴール前 2 倍を
+     *    ★使うので、★既定のほうが短くなります（★実測 1600m: 従来 39.1 秒 ／ 既定 34.3 秒）。
+     * ★見たいのは ★**2 つが別物であること**です。
+     */
+    expect(auditClock(legacy).warp.displaySec)
+      .not.toBeCloseTo(auditClock(readable).warp.displaySec, 1);
+    /** ★従来方式は新しい目標には届きません（★`time-target.test.ts` に実測あり） */
+    expect(auditPaceReport(legacy).overshootSec).toBeGreaterThan(0);
   });
 });

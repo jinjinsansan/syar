@@ -189,7 +189,17 @@ export function targetDisplaySec(distanceMeter: number): number {
    *     ちょうど最短に置くと道中が上限に張り付き、この関数が**何も制御しなくなります**。
    */
   const d = Math.max(800, distanceMeter);
-  return 34.5 + (d - 1000) * 0.008;   // 1200→36.1 / ★1600→39.3 / 2400→45.7 / 3600→55.3
+  /**
+   * ★**引き直しました**（★2026-09-12・オーナー指示「1600m で 30 秒」・`GOAL_RATE_DISPLAY` の註記）
+   *
+   *   ★ゴール前を 2 倍にしたので、★到達できる最短（seed 42）が下がりました:
+   *     ★1000m 28.1 ／ ★1600m 33.5 ／ 2400m 40.1 ／ 3600m 51.5（★傾き 0.009 秒/m）
+   *   ★seed による幅は 1600m で ★**32.6〜33.8 秒**でした（★8 seed）。
+   *   → ★その ★**0.8 秒上**を通す 1 本の直線にします。★どの seed でも達成でき、
+   *     ★尺が seed で揺れません（★`racePaceReport.achieved` が true になること）。
+   * ⚠️ ★ちょうど最短に置くと道中が上限に張り付き、★この関数が何も制御しなくなります。
+   */
+  return 28.9 + (d - 1000) * 0.009;   // 1200→30.7 / ★1600→34.3 / 2400→41.5 / 3600→52.3
 }
 
 /**
@@ -250,6 +260,28 @@ export const GOAL_REAL_TIME_M = 400;
 export const START_REAL_TIME_M = 60;
 /** ★ゴール前の送り速さ。**1 = 実時間**（脚が実物どおりに回る） */
 export const GOAL_RATE = 1;
+
+/**
+ * ★**ゴール前と発走の送り速さ**（★2026-09-12・オーナー判断）
+ *
+ * 【★なぜ 1 倍をやめたか — ★測って選んでいただきました】
+ *   ★オーナー指示「★1600m コースで ★**30 秒**にしたい。★真横カメラワークの直線コースを
+ *   ★削って、★全体的に 30 秒に短縮してください」。
+ *
+ *   ★実測（★1600m・seed 42・レースの実時間 ★**102.5 秒**）:
+ *     ★今の既定（全局面 2 倍上限）……………………… ★**65.8 秒**（★目標 39.3 秒に +26.5 秒）
+ *     ★真横だけ 8 倍・★ゴール前は実時間のまま …… ★**47.7 秒**
+ *     ★真横 8・勝負所 4・直線 3・ゴール前 2 倍 …… ★**27.0 秒**
+ *     ★真横 8・勝負所 2・直線 2・ゴール前 2 倍 …… ★**33.5 秒** ← ★これを選択
+ *   ⚠️ ★決定的なのは ★**ゴール前 400m を 1 倍で流す 25.6 秒**です。
+ *      ★30 − 25.6 ＝ 4.4 秒しか残らないので、★**ゴール前を 1 倍のままにすると
+ *      ★30 秒は物理的に出ません**（★真横を無限に速くしても 37 秒が底）。
+ *   → ★2026-08-22 のオーナー指示「最後の直線を実時間にする」を ★**上書きします**。
+ *     ★消したのではなく、★新しい指示で置き換えています（★R-7）。
+ * ⚠️ ★2 倍でも最後の直線は ★**12 秒ぶん**見えます（★1 倍では 25.6 秒）。
+ *    ★ゴール通過が読めることは `goal3.png` の実画面で確かめています。
+ */
+export const GOAL_RATE_DISPLAY = 2;
 /**
  * ★**基準の走路の直線の長さ**（m）。★桜星賞（スターパーク 1600m）の値です。
  *
@@ -327,6 +359,17 @@ export function ratesForTarget(knots: PhaseKnots, targetSec: number): PhaseRates
  */
 export const READABLE_MAX_RATE = 2;
 
+/**
+ * ★**道中（真横カメラワーク）だけは上限を上げます**（★2026-09-12・オーナー指示）。
+ *
+ *   ★オーナー指示は ★**「真横カメラワークの直線コースを削って」**でした。★削る場所を
+ *   ★名指しされているので、★上限を上げるのは ★**道中だけ**にします。
+ *   ★勝負所と直線は ★`READABLE_MAX_RATE`（2 倍）のままです — ★そこは
+ *   ★「隣との間隔が変わる過程・進路を変える過程」を読ませる場所です（★2026-09-09）。
+ * ⚠️ ★道中に馬群の読みを求めていないわけではありません。★**優先順位の判断**です。
+ */
+export const READABLE_MAX_CRUISE = 8;
+
 /** ★道中の送りの下限・上限（`ratesForTarget` と同じ値） */
 const MIN_CRUISE = 1;
 const MAX_CRUISE = 8;
@@ -390,10 +433,14 @@ export function readableRaceRates(knots: PhaseKnots, targetSec: number): PhaseRa
      *    ★`ratesForTarget` は必ず `GOAL_RATE` を入れますが、★**型に頼らず**受け直します
      *    （★`exactOptionalPropertyTypes` が有効なので、★素通しは通りません）。
      */
-    goal: base.goal ?? GOAL_RATE,
-    start: base.start ?? GOAL_RATE,
+    /**
+     * ⚠️ ★**`base` の値（1 倍）は使いません**（★2026-09-12・`GOAL_RATE_DISPLAY` の註記）。
+     *    ★ここは「上限で切る」場所ですが、★ゴール前と発走は ★**上げる**ほうです。
+     */
+    goal: GOAL_RATE_DISPLAY,
+    start: GOAL_RATE_DISPLAY,
   };
-  const maxCruise = Math.min(READABLE_MAX_RATE, MAX_CRUISE);
+  const maxCruise = Math.min(READABLE_MAX_CRUISE, MAX_CRUISE);
   return {
     ...tail,
     cruise: cruiseForDisplayTarget(knots, targetSec, tail, MIN_CRUISE, maxCruise),
@@ -508,7 +555,7 @@ export function racePaceReport(
   const cappedPhases = ([['spurt', FIXED_SPURT_RATE], ['straight', FIXED_STRAIGHT_RATE]] as const)
     .filter(([phase, fixed]) => rates[phase] < fixed - 1e-12)
     .map(([phase]) => phase);
-  const maxCruise = policy === 'legacy' ? MAX_CRUISE : Math.min(READABLE_MAX_RATE, MAX_CRUISE);
+  const maxCruise = policy === 'legacy' ? MAX_CRUISE : Math.min(READABLE_MAX_CRUISE, MAX_CRUISE);
   const saturation = rates.cruise >= maxCruise - 1e-12 ? 'max'
     : rates.cruise <= MIN_CRUISE + 1e-12 ? 'min' : null;
   const displaySec = timeWarpFor(knots, rates).displaySec;
