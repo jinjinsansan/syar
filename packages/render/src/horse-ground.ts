@@ -79,6 +79,15 @@ export interface HorseMaterialCalibration {
   readonly strideM: number;
   /** ★浮きをどれだけ残すか（★0 = 全コマ接地・1 = 絵のまま） */
   readonly bob: number;
+  /**
+   * ★**馬の大きさの倍率の既定**（★2026-09-12・オーナー指示「既定の大きさを 0.6 に」）。
+   *
+   *   ★`setHorseScale()` に渡る値の出どころ。★画面のつまみは ★**これを上書き**します。
+   * ⚠️ ★これも ★**素材の性質**です。★デフォルメ馬は写真の馬より体高の取り方が大きく、
+   *    ★1.0 で描くと画面を占めすぎます（★オーナー実測「0.6 につまみで変えたら改善」）。
+   *    ★`strideM` / `bob` を素材ごとに置いたのと同じ理由で、★ここに置きます。
+   */
+  readonly scale: number;
 }
 
 /**
@@ -93,14 +102,14 @@ export interface HorseMaterialCalibration {
  *    ★桜星賞への当て込みは ★**素材を運んで、この 2 つを運ばなかった**。
  * ⚠️ ★次の素材でも同じことが起きないように、★**値ではなく素材との対応**をここに置く。
  */
-export const DEFORMED_HORSE_CALIBRATION: HorseMaterialCalibration = { strideM: 5.6, bob: 0.3 };
+export const DEFORMED_HORSE_CALIBRATION: HorseMaterialCalibration = { strideM: 5.6, bob: 0.3, scale: 0.6 };
 
 /**
  * ★従来素材の較正値（★浮きは「絵のまま」＝ 1）。
  * ⚠️ ★1 完歩は ★**`BROADCAST_STRIDE_M` から引く**。★ここに 7 と書くと同じ量が 2 か所になる。
  */
 export const LEGACY_HORSE_CALIBRATION: HorseMaterialCalibration = {
-  strideM: BROADCAST_STRIDE_M, bob: 1,
+  strideM: BROADCAST_STRIDE_M, bob: 1, scale: 1,
 };
 
 /** ★配置の決め方と較正値は ★**同じ鍵**（素材の名前）から引く。★片方だけ替わる状態を作らない */

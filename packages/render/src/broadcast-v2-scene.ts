@@ -1,4 +1,5 @@
 import { contestFocusMeters, contestFocusWithLeadInFrame } from './contest-focus.js';
+import type { RaceDevelopment } from './race-development.js';
 import { laneArcLengthAt, posOf, sAtLaneArcLength, type Course } from './course.js';
 import type { Ctx2D, FontOf, Palette, SheetSpec } from './oblique-draw.js';
 import { cameraBasis, project } from './perspective.js';
@@ -42,6 +43,9 @@ import {
   broadcastV2ShotAt,
   broadcastV2StartCamera,
   broadcastV2StartFocus,
+  FINISH_CAMERA_BY_DEVELOPMENT,
+  FINISH_DEV_RAMP_FROM_M,
+  V8_FINISH_BOARD_M,
   type BroadcastV2FinishStyle,
   type BroadcastV2HorseAssetRole,
   type BroadcastV2Script,
@@ -117,6 +121,12 @@ export function resolveBroadcastV2Scene(
   allFinished = false,
   options: {
     readonly finishStyle?: BroadcastV2FinishStyle;
+    /**
+     * ★**このレースがどう決まったか**（★2026-09-12・オーナー指示⑤）。
+     *   ★最後の直線でどれだけ引くかを決めます（`FINISH_CAMERA_BY_DEVELOPMENT`）。
+     * ⚠️ ★渡さなければ従来どおり `finishStyle` だけで決めます（★既存の道具を壊しません）。
+     */
+    readonly development?: RaceDevelopment;
     readonly cornerCutM?: number;
     /**
      * ★発走の統合: レース表示時間（秒・負なら待機中）。指定があると発走ショットの注視点を
@@ -212,7 +222,7 @@ export function resolveBroadcastV2Scene(
    *   この 2 ショットだけ `camera:` を変えても画面が変わりません（2026-08-22 の実害）。
    */
   const finish = (shot.id === 'homestretch-side' || shot.id === 'finish-line')
-    ? broadcastV2FinishCamera(options.finishStyle ?? 'solo', broadcastV2AnchorWeight(course, shot.id, leaderS), shot.camera, shot.leadFraction)
+    ? broadcastV2FinishCamera(options.finishStyle ?? 'solo', broadcastV2AnchorWeight(course, shot.id, leaderS), shot.camera, shot.leadFraction, options.development)
     : undefined;
   const startPreset = shot.id === 'start-follow' && options.raceDisplaySec !== undefined
     ? broadcastV2StartCamera(options.raceDisplaySec) : undefined;
@@ -281,8 +291,32 @@ export function resolveBroadcastV2Scene(
       options.climaxCameraDisabled === true ? undefined : spec.fillFraction,
     );
   })();
-  const cameraPreset = contenderFov === undefined ? basePreset : { ...basePreset, fovDeg: contenderFov };
-  const leadFraction = finish?.leadFraction ?? shot.leadFraction;
+  /**
+   * ★**直線の終わりで、枠取りの画角から「展開の画角」へなだらかに移す**
+   *   （★2026-09-12・オーナー指示⑤・`FINISH_DEV_RAMP_FROM_M` の註記）。
+   *
+   * ⚠️ ★移し終わる地点を ★**ゴール板のカットが始まる地点と同じ**（`V8_FINISH_BOARD_M`）にします。
+   *    ★ゴール板側は重み 1 で展開の値そのものなので、★境目で両側が一致します＝段差が消えます。
+   * ⚠️ ★`development` を渡さない台本（★v5 / v6 …）は ★**1 ビットも変わりません**。
+   */
+  const devBlend = ((): { readonly fovDeg: number; readonly leadFraction: number } | undefined => {
+    if (options.development === undefined || shot.id !== 'homestretch-side') return undefined;
+    const target = FINISH_CAMERA_BY_DEVELOPMENT[options.development];
+    const left = course.distance - leaderS;
+    const span = Math.max(1, FINISH_DEV_RAMP_FROM_M - V8_FINISH_BOARD_M);
+    const u = Math.max(0, Math.min(1, (FINISH_DEV_RAMP_FROM_M - left) / span));
+    const w = u * u * (3 - 2 * u);
+    const fromFov = contenderFov ?? basePreset.fovDeg;
+    const baseLead = shot.leadFraction ?? 0.78;
+    return {
+      fovDeg: fromFov + (target.fovDeg - fromFov) * w,
+      /** ⚠️ ★ショットが持たない場合は、★`finish` が使う既定（0.78）から引く（★R-27・狭い側） */
+      leadFraction: baseLead + (target.leadFraction - baseLead) * w,
+    };
+  })();
+  const cameraPreset = devBlend !== undefined ? { ...basePreset, fovDeg: devBlend.fovDeg }
+    : contenderFov === undefined ? basePreset : { ...basePreset, fovDeg: contenderFov };
+  const leadFraction = devBlend?.leadFraction ?? finish?.leadFraction ?? shot.leadFraction;
   const leaders = leading(horses, 1);
   const contenders = leading(horses, Math.min(5, horses.length));
   const focus = shot.target === 'leader' || shot.target === 'winner'

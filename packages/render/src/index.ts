@@ -39,6 +39,11 @@ export * from './climax-choreography.js';
  *   ⚠️ ★`climax-choreography` と違い、**位置に一切触れません**。
  */
 export * from './contest-focus.js';
+/**
+ * ★このレースがどう決まったか（★逃げ切り／差し／追い込み）。
+ *   ⚠️ ★エンジンが走らせた位置を ★**読むだけ**です。★位置も着順も作りません。
+ */
+export * from './race-development.js';
 export * from './finish-replay.js';
 export * from './reference-hud.js';
 export * from './visual-scroll.js';

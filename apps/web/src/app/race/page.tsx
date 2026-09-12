@@ -74,6 +74,7 @@ import {
   DEFORMED_COAT_TRANSFORMS, isDeformedHorseAsset,
   type CoatName,
   homeStretchMetersOf,
+  raceDevelopmentOf, type RaceDevelopmentInfo,
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
@@ -751,6 +752,11 @@ interface Built {
   readonly visualScroll: VisualScroll;
   /** ★ゴール前のカメラの型（接戦=引く／単独=寄る）。先頭が残り 80m に達した時点の着差から決定論的に決める */
   readonly finishStyle: BroadcastV2FinishStyle;
+  /**
+   * ★**このレースがどう決まったか**（★2026-09-12・オーナー指示②⑤）。
+   *   ★最後の直線のカメラがこれを見ます。★位置にも着順にも触れません。
+   */
+  readonly development: RaceDevelopmentInfo;
   /** ★ショット切替の時刻（表示秒）と前後の id。切替直後は前ショットとディゾルブする（ユーザー指摘⑥） */
   readonly shotChanges: readonly { readonly displaySec: number; readonly from: BroadcastV2ShotId; readonly to: BroadcastV2ShotId }[];
   /** 斤量（出馬表の表示用） */
@@ -1497,6 +1503,22 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     if ((sortedM[0] ?? 0) >= DIST - 80) { finishStyle = broadcastV2FinishStyleOf(sortedM, HORSE_LENGTH_M); break; }
   }
   /**
+   * ★**展開（逃げ切り／差し／追い込み）**（★2026-09-12・オーナー指示②⑤）。
+   *   ★**最後の直線の入口**で、★勝ち馬が何番手にいたかで決めます。
+   * ⚠️ ★勝ち馬は ★**確定着順**から取ります。★直線入口の先頭から推測すると、
+   *    ★逃げ切り以外が永久に出ません（★`raceDevelopmentOf` の註記）。
+   * ⚠️ ★判定の地点は ★**画面が直線のカメラへ入る地点と同じ**にしています。★ずらすと
+   *    ★「差し馬を追う」と決めたときにはもう差し終わっています。
+   */
+  const straightEntryM = DIST - homeStretchMetersOf(course);
+  let development = raceDevelopmentOf([], winnerGate);
+  for (let sec = 0; sec <= warp.raceSecAt(warp.displaySec) + 1e-9; sec += 0.05) {
+    const at = model.at(sec);
+    if (Math.max(...at.map((h) => h.meters)) < straightEntryM) continue;
+    development = raceDevelopmentOf(at.map((h) => ({ gate: h.gate, meters: h.meters })), winnerGate);
+    break;
+  }
+  /**
    * ★**汚れ**（報告 §10-2「馬体・勝負服が汚れない」）。★レースにつき 1 度だけ表を作ります。
    *   ⚠️ ★描画の fps では積みません。★コマ落ちで絵が変わると決定論が壊れます（憲法 4）。
    */
@@ -1508,6 +1530,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     model, warp, pace,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
     gauge, finishPos, finishSec, finishSpeeds, dustSoil, finishStyle,
+    development,
     ...buildMotionTimeline({ model, warp, finishSec, finishStyle }, winnerGate, 1.6),
     weightsKg: entrants.map((e) => e.weightKg),
     /**
@@ -1676,8 +1699,13 @@ export default function RacePage(): React.JSX.Element {
   /**
    * ★**馬の大きさの倍率**（★2026-09-08・オーナー指示「つまみで自由に変えられるように」）。
    *   ⚠️ ★描画層だけの値です。★着順・位置・タイムには一切効きません（★憲法3）。
+   *
+   * ★`null` … ★素材の較正値に従う（★既定）／★数値 … ★オーナーが手で動かした値。
+   * ⚠️ ★**ここに 0.6 と書かないこと**（★2026-09-12）。★既定は素材の性質なので
+   *    ★`HorseMaterialCalibration.scale` にあります（★`strideM` / `bob` と同じ置き方）。
+   *    ★ここに書くと、★次の素材でまた ★**素材だけ運んで値を運ばない**が起きます（★F-G4）。
    */
-  const [horseScale, setHorseScaleState] = useState(1);
+  const [horseScaleOverride, setHorseScaleState] = useState<number | null>(null);
   /**
    * ★**つまみの初期値は「素材の較正値」から引きます**（★2026-09-10・★F-G4）。
    *
@@ -1704,6 +1732,8 @@ export default function RacePage(): React.JSX.Element {
    *   ★既定 1 ＝「素材ごとに決めた量のまま」。★0 で全コマ接地、★2 で倍。
    */
   const horseBob = horseBobOverride ?? 1;
+  /** ⚠️ ★既定は ★**素材から**引きます（★上の注記）。★つまみは上書きです */
+  const horseScale = horseScaleOverride ?? calibration.scale;
   /** ⚠️ ★1 完歩だけは ★**レースに 1 つ**（★位相を全カットで共有するため・★§R1-b） */
   const strideM = strideOverrideM ?? calibration.strideM;
   const [startRampSec, setStartRampSec] = useState(1.6);
@@ -3236,6 +3266,8 @@ export default function RacePage(): React.JSX.Element {
      *     代償でした（見かけの速度が **+13.3% / −14.8%** ずれる）。カットで割れば要りません。
      */
     const cutScript = scriptFromSearch(search) === CUT_RACE_SCRIPT;
+    /** ★直線を `homestretch-side` → `finish-line` と割る台本（★v8）。★枠取りの扱いが v6 と同じ */
+    const splitStraightScript = scriptFromSearch(search) === 'v8';
     /**
      * ★**表示位置の演出（`climax-choreography`）は既定で使いません**（2026-08-27・オーナー判断）。
      *
@@ -3345,7 +3377,7 @@ export default function RacePage(): React.JSX.Element {
         w: horse.w ?? TRACK_WIDTH_M / 2,
         finished: horse.meters >= DIST - 1e-6,
       })), { width: W, height: H }, winnerShotNow, {
-        finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
+        finishStyle: built.finishStyle, development: built.development.kind, cornerCutM: CORNER_CUT_M_WEB,
         cornerTracking: !LEGACY_MOTION,
         raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
         fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
@@ -3381,7 +3413,12 @@ export default function RacePage(): React.JSX.Element {
          *   ⚠️ ★`finish-line` の `frameContenders` は v5 が直線を 1 カットで通すための仕掛けです。
          *      v6 は割っているので、付いたままだと**同じ場面で馬が 25.6% → 11.8% に縮みます**。
          */
-        ...(cutScript ? { noContenderFrameShots: CUT_SCRIPT_NO_FRAME_SHOTS } : {}),
+        /**
+         * ⚠️ ★**台本 v8 も直線を割ります**（★2026-09-12）。★`homestretch-side` → `finish-line` と
+         *    ★続くので、★v6 と同じ理由でゴール板の「引く」枠取りを外します。
+         *    ★外さないと ★**同じ場面で馬が 25.6% → 11.8% に縮みます**（★v6 で実測済み）。
+         */
+        ...(cutScript || splitStraightScript ? { noContenderFrameShots: CUT_SCRIPT_NO_FRAME_SHOTS } : {}),
       });
       v2ShotId = scene.shot.id;
       v2SectionLabel = broadcastV2SectionLabel(course, visualLead, scene.shot.id);
