@@ -1014,6 +1014,17 @@ function silksOverlays(
   const shadeOf = new Float64Array(width * height);
   const alphaOf = new Uint8Array(width * height);
   let minX = width; let minY = height; let maxX = -1; let maxY = -1;
+  /**
+   * ★**柄は「実際に塗る上着の画素」の外接矩形で割ります**（★2026-09-12・オーナー指摘）
+   *
+   * ⚠️ ★以前は ★**窓の矩形**（`layout.jacket`）で割っていました。★窓は素材全体にかかる
+   *    ★大きな矩形で、★実際に塗る画素はその中の小さな塊です。★割る相手が違うので
+   *    ★帯の角度が場所任せになり、★**前から（発走のゲート）では縦縞に見えました**
+   *    （★オーナー評「騎手の服の縦縞は消えていないのはなぜ？」）。
+   *    ★私は真横だけ見て「消えた」と判断していました。
+   * ★実測: ★窓は 前から 285×90px ／ 真横 250×148px。★塗る画素の外接矩形は別の形です。
+   */
+  let jacketX0 = width; let jacketY0 = height; let jacketX1 = -1; let jacketY1 = -1;
   for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
     const index = (y * width + x) * 4;
     const r = input[index] ?? 0; const g = input[index + 1] ?? 0; const b = input[index + 2] ?? 0; const a = input[index + 3] ?? 0;
@@ -1056,6 +1067,10 @@ function silksOverlays(
      */
     const mask = y * width + x;
     region[mask] = (saddlecloth || (helmet && !jacket)) ? 1 : 2;
+    if (region[mask] === 2) {
+      if (x < jacketX0) jacketX0 = x; if (x > jacketX1) jacketX1 = x;
+      if (y < jacketY0) jacketY0 = y; if (y > jacketY1) jacketY1 = y;
+    }
     shadeOf[mask] = 0.30 + luminance * 0.78;
     alphaOf[mask] = Math.round(a * 0.94);
     if (x < minX) minX = x; if (x > maxX) maxX = x;
@@ -1157,13 +1172,10 @@ function silksOverlays(
        * ⚠️ ★上着の窓が潰れている組（`SILKS_LAYOUT_HORSE_ONLY`）では柄を載せません
        *    （★幅 0 で割ると `jx` が非有限になり、★`silkPatternInk` が偽を返します）。
        */
-      const inkPattern = !useCap && ((): boolean => {
-        const nx = (x + cropX0 + x0 - source.x) / source.width;
-        const ny = (y + cropY0 + y0 - source.y) / source.height;
-        return silkPatternInk(pair.pattern,
-          (nx - layout.jacket[0]) / (layout.jacket[1] - layout.jacket[0]),
-          (ny - layout.jacket[2]) / (layout.jacket[3] - layout.jacket[2]));
-      })();
+      const inkPattern = !useCap && jacketX1 >= jacketX0 && jacketY1 >= jacketY0
+        && silkPatternInk(pair.pattern,
+          (x + cropX0 - jacketX0) / Math.max(1, jacketX1 - jacketX0),
+          (y + cropY0 - jacketY0) / Math.max(1, jacketY1 - jacketY0));
       const index = (y * cropW + x) * 4;
       output.data[index] = Math.min(255, (useCap ? capR : inkPattern ? trimR : bodyR) * shade);
       output.data[index + 1] = Math.min(255, (useCap ? capG : inkPattern ? trimG : bodyG) * shade);

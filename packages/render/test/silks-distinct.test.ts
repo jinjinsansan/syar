@@ -113,17 +113,45 @@ describe('勝負服の色', () => {
  * → ★見分けは ★**柄**が担います。★ここを固定します。
  */
 describe('勝負服の柄', () => {
-  it('★★帽子が同じ色になる 2 頭は、必ず柄が違う（2〜18 頭）', () => {
+  /**
+   * ⚠️ ★**見るのは「色と柄のどちらかが違う」です**（★2026-09-12・柄を 2 種に減らしたため）。
+   *    ★以前は「柄が必ず違う」まで要求していましたが、★13 頭以上では 1 つの枠に
+   *    ★3〜4 頭入るので 2 種では足りません。★そこは ★**上着の色**が全頭違うことで
+   *    ★見分けられます（`silkRoleOf` が `silk-1`〜`silk-18` を配る）。
+   * ★12 頭立て（★製品の頭数）では ★**同枠は連番**なので、★柄も必ず違います。
+   */
+  it('★★帽子が同じ色になる 2 頭は、色か柄のどちらかが違う（2〜18 頭）', () => {
     for (let field = 2; field <= 18; field += 1) {
       for (let a = 1; a <= field; a += 1) {
         for (let b = a + 1; b <= field; b += 1) {
           if (frameRoleOf(a, field) !== frameRoleOf(b, field)) continue;
-          expect(
-            silkPatternOf(a) === silkPatternOf(b) && silkRoleOf(a, field) === silkRoleOf(b, field),
-            `${field} 頭立ての ${a} 番と ${b} 番: 帽子も上着も柄も同じです`,
-          ).toBe(false);
-          expect(silkPatternOf(a), `${field} 頭立ての ${a} 番と ${b} 番は同じ枠なので柄を分けること`)
-            .not.toBe(silkPatternOf(b));
+          const sameColour = silkRoleOf(a, field) === silkRoleOf(b, field);
+          const samePattern = silkPatternOf(a) === silkPatternOf(b);
+          expect(sameColour && samePattern,
+            `${field} 頭立ての ${a} 番と ${b} 番: 帽子も上着も柄も同じです`).toBe(false);
+          if (field <= 12) {
+            expect(silkPatternOf(a), `${field} 頭立ての ${a} 番と ${b} 番は同じ枠なので柄を分けること`)
+              .not.toBe(silkPatternOf(b));
+          }
+        }
+      }
+    }
+  });
+
+  /**
+   * ⚠️ ★**縦に走る柄を入れないこと**（★2026-09-12・オーナー指摘 2 回目）。
+   *    ★素材の上着は ★**前から 240×90px**で、★その大半が帽子と肩です。★そこへ
+   *    ★縦や斜めの帯を引くと ★**肩に乗った板**に見えます（★「縦縞が消えていない」）。
+   * ★検定: ★どの柄も ★**横方向（`jx`）では変わらない**こと。
+   */
+  it('★★柄は横方向では変わらない（★縦の帯を入れない）', () => {
+    for (const pattern of SILK_PATTERNS) {
+      for (let j = 0; j <= 20; j += 1) {
+        const jy = j / 20;
+        const first = silkPatternInk(pattern, 0, jy);
+        for (let i = 0; i <= 20; i += 1) {
+          expect(silkPatternInk(pattern, i / 20, jy),
+            `${pattern}: jy=${jy.toFixed(2)} で横に変化しています（★縦の帯）`).toBe(first);
         }
       }
     }

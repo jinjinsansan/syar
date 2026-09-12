@@ -126,7 +126,26 @@ export const FRAME_LABELS: readonly string[] = ['白', '黒', '赤', '青', '黄
  * ⚠️ ★**4 種は必要です。** ★2 種に減らすと、★13 頭以上で ★**1 つの枠に 3〜4 頭**入る並びの
  *    ★とき、★同じ枠の中で柄が重なります（★`silks-distinct.test.ts` が押さえています）。
  */
-export const SILK_PATTERNS = ['plain', 'sash', 'hoop', 'sash-reverse'] as const;
+/**
+ * ⚠️ ★**斜めの襷もやめました**（★2026-09-12・オーナー指摘 2 回目）。
+ *
+ *   ★1 回目 … ★縦縞をやめ、★襷（斜め）と一本輪にした
+ *   ★2 回目 … ★オーナー評「★**騎手の服の縦縞は消えていないのはなぜ？**」
+ *
+ * 【★なぜ斜めが縦に見えたか — ★測りました】
+ *   ★塗る「上着の画素」の外接矩形は ★**前から 240×90px ／ 真横 188×124px**で、
+ *   ★しかもその大半が ★**帽子と肩**です（★騎手の背中はごく狭い）。
+ *   ★そこへ斜めの帯を引くと、★見えるのは ★**肩に乗った縦長の板**です。
+ *   ★正規化を「窓」から「塗る画素の外接矩形」へ直しても、★形そのものが変わらないので
+ *   ★同じでした（★`out/silks/pattern2.png` で確認）。
+ * → ★**横一本だけ**にします。★横の帯は肩の形に沿うので、★板に見えません。
+ *
+ * 【★2 種で足りる理由】★同じ枠の 2 頭は ★**連番**なので、★2 で割った余りが必ず違います。
+ * ⚠️ ★13 頭以上では 1 つの枠に 3〜4 頭入り、★柄が重なります。★そこは ★**上着の色**が
+ *    ★全頭違う（`silkRoleOf` が `silk-1`〜`silk-18` を配る）ので見分けられます。
+ *    ★検定は「★色と柄の ★**どちらかが違う**」を見ます。
+ */
+export const SILK_PATTERNS = ['plain', 'hoop'] as const;
 export type SilkPattern = (typeof SILK_PATTERNS)[number];
 
 /** ★馬番 → 柄。★同枠（連番）の 2 頭は必ず別の柄になります */
@@ -144,13 +163,12 @@ export function silkPatternOf(gate: number): SilkPattern {
 export function silkPatternInk(pattern: SilkPattern, jx: number, jy: number): boolean {
   if (!Number.isFinite(jx) || !Number.isFinite(jy)) return false;
   if (pattern === 'plain') return false;
-  if (pattern === 'hoop') return jy > 0.38 && jy < 0.62;
-  /** ★襷。★`sash` が右下がり、★`sash-reverse` が左下がり */
-  if (pattern === 'sash-reverse') return Math.abs(jx + jy - 1) < 0.22;
-  return Math.abs(jx - jy) < 0.22;
+  /** ★一本輪。★上着の高さの真ん中 24% を差し色にします（★横向きの帯） */
+  void jx;
+  return jy > 0.38 && jy < 0.62;
 }
 
 /** ★画面と道具で同じ言葉を使う */
 export const SILK_PATTERN_LABEL: Readonly<Record<SilkPattern, string>> = {
-  plain: '無地', sash: '襷', hoop: '一本輪', 'sash-reverse': '逆襷',
+  plain: '無地', hoop: '一本輪',
 };
