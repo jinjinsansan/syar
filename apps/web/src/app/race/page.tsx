@@ -77,7 +77,7 @@ import {
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
-  raceCutInAt, RACE_CUTIN_SEC, RACE_CUTIN_CORNER_SEC, RACE_CUTIN_AT_START, RACE_WIPE_SEC, drawRaceWipe,
+  raceCutInAt, RACE_CUTIN_SEC, RACE_CUTIN_CORNER_SEC, RACE_CUTIN_AT_START, RACE_WIPE_SEC, raceWipeEdgeX, drawRaceWipeEdge,
   drawOwnHorseCutIn, drawFormationCutIn, drawRunningStyleCutIn, drawToStraightCutIn,
   RACE_TELOP_SEC, drawOwnHorseTelop, drawFormationTelop, drawRunningStyleTelop, drawToStraightTelop,
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
@@ -1573,6 +1573,11 @@ function buildMotionTimeline(
 
 export default function RacePage(): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  /**
+   * ★**ワイプで「前のカットの絵」を描く画布**（★2026-09-12）。
+   * ⚠️ ★毎コマ作ると重いので ★**1 枚を持ち回します**。★大きさは本体の画布に合わせます。
+   */
+  const wipeCanvasRef = useRef<HTMLCanvasElement | null>(null);
   /** ★実況の行（変化したときだけ積む） */
   const callRef = useRef<readonly (readonly CallPart[])[]>([]);
   /** 各行の発話開始秒（文字送り 20 文字/秒・callRef と同じ添字） */
@@ -3345,12 +3350,17 @@ export default function RacePage(): React.JSX.Element {
     let v2HorseRatio = 0;
     if (renderer === 'v2') {
       const course = ovalCourse(DIST, { ...COURSE_SPEC, turn });
-      const scene = resolveBroadcastV2Scene(course, easedAt.map((horse) => ({
+      /**
+       * ★**場面の引数を 1 つに持ちます**（★2026-09-12）。
+       *   ★ワイプで ★**前のカットの場面**を同じ引数で組み直すためです（★式を 2 か所に持たない・R-30）。
+       */
+      const sceneHorses = easedAt.map((horse) => ({
         gate: horse.gate,
         s: horse.meters,
         w: horse.w ?? TRACK_WIDTH_M / 2,
         finished: horse.meters >= DIST - 1e-6,
-      })), { width: W, height: H }, winnerShotNow, {
+      }));
+      const sceneOptions = {
         finishStyle: built.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
         cornerTracking: !LEGACY_MOTION,
         raceDisplaySec: d - RACE_INTRO_RACE_START_SEC,
@@ -3388,7 +3398,8 @@ export default function RacePage(): React.JSX.Element {
          *      v6 は割っているので、付いたままだと**同じ場面で馬が 25.6% → 11.8% に縮みます**。
          */
         ...(cutScript ? { noContenderFrameShots: CUT_SCRIPT_NO_FRAME_SHOTS } : {}),
-      });
+      };
+      const scene = resolveBroadcastV2Scene(course, sceneHorses, { width: W, height: H }, winnerShotNow, sceneOptions);
       v2ShotId = scene.shot.id;
       v2SectionLabel = broadcastV2SectionLabel(course, visualLead, scene.shot.id);
       v2Minimap = {
@@ -3949,8 +3960,32 @@ export default function RacePage(): React.JSX.Element {
         const signalled = wipeChange !== undefined
           && (FLASH_INTO.has(wipeChange.to)
             || raceCutInAt(wipeChange.from, wipeChange.to, { sectionLabel: v2SectionLabel }) !== undefined);
-        if (wipeChange !== undefined && !signalled) {
-          drawRaceWipe(ctx, { viewport: { width: W, height: H }, sinceSec: d - wipeChange.displaySec });
+        const edgeX = wipeChange === undefined || signalled
+          ? undefined : raceWipeEdgeX(d - wipeChange.displaySec, W);
+        if (wipeChange !== undefined && edgeX !== undefined && edgeX > 0) {
+          /**
+           * ★**境目の左に「前のカットの絵」を置きます。**
+           * ⚠️ ★これがワイプです。★板で覆うのではありません
+           *    （★2026-09-12・★オーナー評「黒の物体が左から右に高速で動くもの…
+           *      ★これがあなたの言うワイプですか？」→ ★覆うだけの版は取り下げ）。
+           * ⚠️ ★**混ぜません。** ★どの画素もどちらか一方の絵です（★過去に外したディゾルブは混ぜていた）。
+           */
+          const off = wipeCanvasRef.current ?? (wipeCanvasRef.current = document.createElement('canvas'));
+          if (off.width !== cv.width || off.height !== cv.height) {
+            off.width = cv.width; off.height = cv.height;
+          }
+          const offCtx = off.getContext('2d');
+          if (offCtx !== null) {
+            offCtx.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
+            offCtx.clearRect(0, 0, W, H);
+            /** ★前のカットの場面を ★**同じ引数**で組み直します（★式を 2 か所に持たない・R-30） */
+            const prevScene = resolveBroadcastV2Scene(course, sceneHorses, { width: W, height: H },
+              winnerShotNow, { ...sceneOptions, forceShotId: wipeChange.from });
+            drawScene(offCtx, prevScene);
+            ctx.drawImage(off, 0, 0, Math.round(edgeX * pixelScale), Math.round(H * pixelScale),
+              0, 0, edgeX, H);
+          }
+          drawRaceWipeEdge(ctx, { viewport: { width: W, height: H }, x: edgeX });
         }
       }
       if (shakeT >= 0) ctx.restore();

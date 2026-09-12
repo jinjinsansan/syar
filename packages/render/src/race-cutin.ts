@@ -142,54 +142,60 @@ export function raceCutInAt(
  *   ★ロゴのワイプ ………………… ★「★**ダサい**」→ 撤去
  *   ★カットイン ………………… ★直線には**意図的に入れていません**（★「佳境で目を離させない」）
  *
- * 【★だからこの形にしました】
- *   ★**重ねません**（★二重写しが起きない）。★**ロゴを出しません**。
- *   ★**帯が横切ります**（★どの瞬間も画面の大半はレースが見えている）。
- *   ★短くします（★佳境で目を離させない）。
+ * 【★ワイプとは何か — ★2 回作り損ねてから直しました】
+ *   ⚠️ ★**ワイプは「2 つの絵を境目で分ける」ものです。**
+ *      ★境目が横切り、★その向こう側には ★**新しいカメラの絵**が出ています。
+ *      ★画面には ★**前のカットと次のカットが同時にあります**。
  *
- * ⚠️ ★**最初は「中央から左右へ開く」で作って外しました**（★2026-09-12・実画面）。
- *    ★あの形は ★**t=0 で画面を全部覆う**ので、★継ぎ目で ★**一瞬まっ黒**になりました。
- *    ★参考映像のワイプは全面を覆いません。★**帯が通り過ぎる**だけです。
+ *   ★1 回目（★中央から左右へ開く板）… ★t=0 で ★**画面が全部まっ黒**になりました。
+ *   ★2 回目（★黒い帯が通過）……… ★オーナー評「★**黒の物体が左から右に高速で動くもの**ですか？
+ *                                 ★これがあなたの言うワイプですか？」→ ★**ワイプではありません**。
+ *                                 ★1 枚の絵の上を板が通るだけで、★前後のカットを繋いでいません。
+ *   ★3 回目（★これ）………………… ★**前のカットの絵と次のカットの絵を、境目で分けます。**
+ *
+ * ⚠️ ★**重ねません。** ★どの画素も ★**どちらか一方の絵**です（★二重写しは起きません）。
+ *    ★過去に外したディゾルブは ★**混ぜて**いました。★そこが違います。
+ * ⚠️ ★**ロゴを出しません**（★「ダサい」で外した形へ戻らない）。
  * ★戻し口は `?wipe=off`。
  */
 export const RACE_WIPE_SEC = 0.35;
 
 /**
- * ★帯の幅（★画面幅に対する比）。
- * ⚠️ ★**1.0 にしないこと。** ★全面を覆うと継ぎ目で一瞬まっ黒になります（★2026-09-12 に踏みました）。
+ * ★**境目の横位置**（px）。★`undefined` なら出しません。
+ *
+ * ★画面の左端から右端へ動きます。★左は ★**前のカットの絵**、★右は ★**次のカットの絵**。
+ * ⚠️ ★出どころはここ 1 か所です（★R-31）。★画面も検定もこれを読みます。
  */
-export const RACE_WIPE_BAND = 0.22;
+export function raceWipeEdgeX(
+  sinceSec: number, width: number, durationSec = RACE_WIPE_SEC,
+): number | undefined {
+  const dur = Math.max(0.01, durationSec);
+  const t = sinceSec / dur;
+  if (t < 0 || t >= 1) return undefined;
+  return Math.round(width * ease(clamp01(t)));
+}
 
 /**
- * ★カットの頭に置く拭き。★`sinceSec` が 0 のとき画面を覆い、★`RACE_WIPE_SEC` で開き切ります。
- * ⚠️ ★`Ctx2D` に `clip` はありません。★**塗る矩形の幅**で拭きを作ります（★カットインと同じ手）。
+ * ★境目に引く細い線。★**絵は呼ぶ側が置きます**（★2 つの絵を分けるのは画面側の仕事）。
+ *
+ * ⚠️ ★線だけです。★**板で覆いません。** ★覆うとワイプではなく目隠しになります。
  */
-export function drawRaceWipe<TImage>(
+export function drawRaceWipeEdge<TImage>(
   ctx: Ctx2D<TImage>,
   opts: {
     readonly viewport: { readonly width: number; readonly height: number };
-    readonly sinceSec: number;
-    readonly durationSec?: number | undefined;
+    readonly x: number;
   },
 ): void {
   const { width: W, height: H } = opts.viewport;
-  const dur = Math.max(0.01, opts.durationSec ?? RACE_WIPE_SEC);
-  const t = opts.sinceSec / dur;
-  if (t < 0 || t >= 1) return;
-  /**
-   * ★帯の幅。★画面の 22%。
-   * ⚠️ ★どの瞬間も ★**画面の 78% はレースが見えている**こと。★全面を覆わないための値です。
-   */
-  const bandW = Math.round(W * RACE_WIPE_BAND);
-  /** ★左端の外から右端の外へ通り過ぎる */
-  const x = Math.round(-bandW + (W + bandW) * ease(clamp01(t)));
+  if (opts.x <= 0 || opts.x >= W) return;
   const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = 1;
+  /** ★金の細い線（★カットインと同じ意匠）。★内側に暗い影を 1 本置いて、境目を読ませる */
   ctx.fillStyle = BACKDROP;
-  ctx.fillRect(x, 0, bandW, H);
-  /** ★先頭の縁に金の細い線（★動いているのが分かる・★カットインと同じ意匠） */
+  ctx.fillRect(Math.max(0, opts.x - 3), 0, 3, H);
   ctx.fillStyle = GOLD;
-  ctx.fillRect(x + bandW - 2, 0, 2, H);
+  ctx.fillRect(opts.x, 0, 2, H);
   ctx.globalAlpha = prevAlpha;
 }
 

@@ -20,7 +20,7 @@
  *      ★③ ★**文字も絵も描かない**（★ロゴを出さない）
  */
 import { describe, it, expect } from 'vitest';
-import { drawRaceWipe, RACE_WIPE_SEC, RACE_WIPE_BAND } from '../src/race-cutin.js';
+import { drawRaceWipeEdge, raceWipeEdgeX, RACE_WIPE_SEC } from '../src/race-cutin.js';
 import type { Ctx2D } from '../src/oblique-draw.js';
 
 const VP = { width: 1280, height: 720 } as const;
@@ -48,80 +48,71 @@ function recorder(): {
   return { ctx: ctx as unknown as Ctx2D<unknown>, rects, texts, images };
 }
 
-/** ★その時点で画面を覆っている横幅（★帯の、画面に掛かっている部分） */
-function coveredWidth(sinceSec: number): number {
-  const r = recorder();
-  drawRaceWipe(r.ctx, { viewport: VP, sinceSec });
-  return r.rects
-    .filter((x) => x.h === VP.height && x.w > 3)   // ★金の細い線（幅 2）は除く
-    .reduce((s, x) => s + Math.max(0, Math.min(VP.width, x.x + x.w) - Math.max(0, x.x)), 0);
-}
-
-/** ★帯の左端（★通り過ぎる向きを見る） */
-function bandX(sinceSec: number): number {
-  const r = recorder();
-  drawRaceWipe(r.ctx, { viewport: VP, sinceSec });
-  const band = r.rects.find((x) => x.h === VP.height && x.w > 3);
-  return band === undefined ? Number.NaN : band.x;
-}
-
 describe('★場面転換の合図（ワイプ）', () => {
   /**
-   * ⚠️ ★**これが本題です**（★2026-09-12・実画面で踏んだ）。
-   *    ★最初は「中央から左右へ開く」形にしたので、★t=0 で ★**画面が全部まっ黒**になりました。
-   *    ★参考映像のワイプは全面を覆いません。★帯が通り過ぎるだけです。
+   * ⚠️ ★**これが本題です**（★2026-09-12・★オーナー評
+   *    「★黒の物体が左から右に高速で動くもの…★これがあなたの言うワイプですか？」）。
+   *    ★ワイプは ★**2 つの絵を境目で分ける**もので、★板で覆うものではありません。
+   *    ★この検定が留めるのは「★**境目の位置だけを決め、絵は覆わない**」ことです。
    */
-  it('★どの瞬間も、画面の大半はレースが見えている（★まっ黒にしない）', () => {
-    for (let u = 0; u <= 1; u += 0.05) {
-      const w = coveredWidth(RACE_WIPE_SEC * u);
-      /** ★丸めの 1px ぶんだけ余裕を見る（★比の話であって、1 画素の話ではない） */
-      expect(w, `${u.toFixed(2)} で覆いすぎ`).toBeLessThanOrEqual(VP.width * RACE_WIPE_BAND + 1);
-    }
-  });
-
-  it('★終わりでは 1 画素も残らない', () => {
-    expect(coveredWidth(RACE_WIPE_SEC * 2), '★過ぎたら描かない').toBe(0);
-  });
-
-  it('★帯が一方向へ通り過ぎる（★行きつ戻りつしない）', () => {
-    const xs = [0, 0.25, 0.5, 0.75, 0.99].map((u) => bandX(RACE_WIPE_SEC * u));
+  it('★境目は左端から右端へ動く（★行きつ戻りつしない）', () => {
+    const xs = [0, 0.25, 0.5, 0.75, 0.99].map((u) => raceWipeEdgeX(RACE_WIPE_SEC * u, VP.width));
+    for (const x of xs) expect(x, '★境目が出ていない').toBeDefined();
     for (let i = 1; i < xs.length; i += 1) {
       expect(xs[i]!, `${i} 番目で戻っている`).toBeGreaterThan(xs[i - 1]!);
     }
-    /** ★入りは画面の外から、★出は画面の外へ */
-    expect(xs[0]!, '★入りは左の外から').toBeLessThanOrEqual(0);
-    expect(bandX(RACE_WIPE_SEC * 0.999), '★出は右の外へ').toBeGreaterThan(VP.width - VP.width * RACE_WIPE_BAND);
+    expect(xs[0]!, '★入りは左端').toBe(0);
+    expect(xs[xs.length - 1]!, '★出は右端の近く').toBeGreaterThan(VP.width * 0.9);
+  });
+
+  it('★過ぎたら出さない／前には出さない', () => {
+    expect(raceWipeEdgeX(RACE_WIPE_SEC, VP.width), '★開き切ったら終わり').toBeUndefined();
+    expect(raceWipeEdgeX(RACE_WIPE_SEC * 2, VP.width)).toBeUndefined();
+    expect(raceWipeEdgeX(-0.1, VP.width), '★カットの前には出さない').toBeUndefined();
+  });
+
+  /**
+   * ⚠️ ★**覆わない。** ★1 回目（中央から開く板）と 2 回目（黒い帯が通過）へ戻ったら、ここが落ちます。
+   *    ★線と、その内側の細い影だけ。★画面の 2% を超えて塗らないこと。
+   */
+  it('★線だけを引く（★画面を覆わない）', () => {
+    const r = recorder();
+    drawRaceWipeEdge(r.ctx, { viewport: VP, x: Math.round(VP.width * 0.4) });
+    expect(r.rects.length, '★何も描いていない').toBeGreaterThan(0);
+    const painted = r.rects.reduce((s2, x) => s2 + x.w, 0);
+    expect(painted / VP.width, '★覆いすぎ（★板になっている）').toBeLessThan(0.02);
   });
 
   /** ⚠️ ★**重ねない**。★ディゾルブへ戻ったら、ここが落ちる */
-  it('★不透明に塗る（★下の絵を透かさない）', () => {
+  it('★不透明に塗る（★混ぜない）', () => {
     const r = recorder();
-    drawRaceWipe(r.ctx, { viewport: VP, sinceSec: RACE_WIPE_SEC * 0.4 });
-    expect(r.rects.length, '★何も描いていない').toBeGreaterThan(0);
+    drawRaceWipeEdge(r.ctx, { viewport: VP, x: 400 });
     for (const rect of r.rects) expect(rect.alpha, '★半透明で重ねている').toBe(1);
   });
 
   /** ⚠️ ★**ロゴを出さない**。★「ダサい」で外した形へ戻らないこと */
   it('★文字も絵も描かない', () => {
     const r = recorder();
-    drawRaceWipe(r.ctx, { viewport: VP, sinceSec: RACE_WIPE_SEC * 0.4 });
+    drawRaceWipeEdge(r.ctx, { viewport: VP, x: 400 });
     expect(r.texts, '★文字を描いている').toEqual([]);
     expect(r.images, '★絵を描いている').toBe(0);
   });
 
+  it('★端では線を引かない（★画面の外に出ない）', () => {
+    for (const x of [0, VP.width]) {
+      const r = recorder();
+      drawRaceWipeEdge(r.ctx, { viewport: VP, x });
+      expect(r.rects, `x=${x}`).toEqual([]);
+    }
+  });
+
   /**
    * ★**短いこと**（★佳境で目を離させない）。
-   * ⚠️ ★参考映像のワイプは 1.4 秒ですが、★あちらは ★**場面の区切り**に 1 回入れるものです。
+   * ⚠️ ★参考映像のワイプは 1.4 秒ですが、★あちらは場面の区切りに 1 回入れるものです。
    *    ★こちらは真横の継ぎ目ごとに入るので、★同じ長さにすると画面が拭きだらけになります。
    */
   it('★0.2 秒以上・0.6 秒以下', () => {
     expect(RACE_WIPE_SEC).toBeGreaterThanOrEqual(0.2);
     expect(RACE_WIPE_SEC).toBeLessThanOrEqual(0.6);
-  });
-
-  it('★負の秒では描かない（★カットの前に出さない）', () => {
-    const r = recorder();
-    drawRaceWipe(r.ctx, { viewport: VP, sinceSec: -0.1 });
-    expect(r.rects).toEqual([]);
   });
 });
