@@ -49,6 +49,12 @@ export const READONLY = [
    */
   'measure-render-scale.mjs',
   /**
+   * ★芝の目が「どちらへ動くか」を測る（★2026-09-12・★オーナー指摘③）。
+   *   ★`/race` を読むだけ。★出力は `out/turf-flow/` のみ。
+   *   ⚠️ ★DB に触れない。★製品のコードも変えない（★`?grain=flat` は既にある戻し口）。
+   */
+  'measure-turf-flow.mjs',
+  /**
    * ★地面タイルの焼き込み横縞を平したものを作る（★2026-09-11・★案 A）。
    *   ★`world-turf.png` を読み、★`world-turf-flat.png` を**新規に**書く。
    *   ⚠️ ★元のタイルは上書きしない。★DB に触れない。
