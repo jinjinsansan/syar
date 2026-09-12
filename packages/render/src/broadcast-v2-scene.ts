@@ -331,7 +331,28 @@ export function resolveBroadcastV2Scene(
         ? { start: index === 0 ? 0 : rows[index - 1]!.meters, end: rows[index]!.meters }
         : { start: 0, end: course.distance };
       const u = Math.max(0, Math.min(1, (leaderS - span.start) / Math.max(1, span.end - span.start)));
-      const ratio = 0.16 + 0.12 * u * u * (3 - 2 * u);
+      /**
+       * ★**入りの大きさを、前のカットの終わりに合わせる**（★2026-09-12・★オーナー指摘
+       *   「★真横カメラワークでの切り替わりで、一連のレースがつながっている感がありません」）。
+       *
+       * 【★測った値】`tools/measure-cut-scale.mjs`（★seed 42・★画面と同じ引数）:
+       *   ★`side-drive` の終わり … 馬の高さ **214px ＝ 画面の 29.7%**
+       *   ★ここの入り（★旧 0.16） … **118px ＝ 16%** → ★同じ馬が ★**0.58 倍**に縮む
+       *   ★位置も **720px**（★画面幅の 56%）跳ぶ（`tools/audit-cut-seam.mjs`）
+       *
+       * ⚠️ ★この枝は ★**`fovRamp` も `fixedCamera.approach` も通りません**（`trackingCorner`）。
+       *    ★2026-09-12、★その 2 つを触って ★**画角が 1° も動かず**、★ここが本体でした。
+       * ★入りを 0.28（★前のカットの終わり 29.7% とほぼ同じ）にし、
+       * ★出を 0.26（★次のカットの入り 25.6% とほぼ同じ）にします。
+       * ★伸び幅を総当たりで測って選びました（★実測・★入り／出の比）:
+       *   ★+0.10 … 0.93 / **0.67** ／ ★+0.04 … 0.92 / 0.78
+       *   ★ 0.00 … 0.91 / 0.88  ／ ★**−0.02 … 0.91 / 0.94**（★採用）
+       * ⚠️ ★「奥から迫ってくる」（★旧 16% → 28%）は ★**やめました**。
+       *    ★カットが 2 秒しかないので迫る余地が無く、★両端の跳びのほうが目に付きます。
+       *    ★戻すなら `CORNER_GROW` を正にするだけです。
+       */
+      const CORNER_ENTRY_RATIO = 0.28, CORNER_GROW = -0.02;
+      const ratio = CORNER_ENTRY_RATIO + CORNER_GROW * u * u * (3 - 2 * u);
       const distance = Math.hypot(cameraPreset.backM, cameraPreset.sideM, cameraPreset.upM - 0.8);
       return broadcastCamera(course, {
         atS, atW: focusW, width: viewport.width, height: viewport.height,

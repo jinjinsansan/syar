@@ -270,6 +270,14 @@ const SHOTS: Readonly<Record<BroadcastV2ShotId, BroadcastV2Shot>> = {
   'first-corner-front': {
     id: 'first-corner-front', view: 'diag-front', target: 'pack', horseAsset: 'diag-front-v2', transitionSec: 0.4,
     camera: { backM: 25, upM: 8.5, sideM: 10, fovDeg: 18.9 },
+    /**
+     * ★**出の大きさを次のカットへ寄せる**（★2026-09-12・★オーナー指摘
+     *   「★真横カメラワークでの切り替わりでレースがつながっている感がありません」）。
+     * ★実測（`tools/measure-cut-scale.mjs`・seed 42）: ★入り 0.94（★合っている）／
+     *   ★**出 1.21**（★185px → 次のカットの 212px へ跳ぶ）。
+     * → ★出を 16.5° に詰めて、★次のカットと同じ大きさで渡します。
+     */
+    fovRamp: { fromDeg: 18.9, toDeg: 16.5 },
   },
   'second-corner-high': {
     id: 'second-corner-high', view: 'high-diag', target: 'pack', horseAsset: 'high-diag-v2', transitionSec: 0.4,

@@ -108,7 +108,7 @@ for (let i = 1; i < rows.length; i += 1) {
 const median = (xs) => (xs.length === 0 ? 0 : [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]);
 console.log(`★seed ${SEED} ／ 境目 ${seams.length} 箇所 ／ 画面 ${W}x${H}`);
 console.log('');
-console.log('境界                                       共通馬  高さ前  高さ後   比   カメラの移動  画角比');
+console.log('境界                                       共通馬  高さ前  高さ後   比   カメラの移動  画角前  画角後');
 const out = [];
 for (const s of seams) {
   const shared = [...s.before.heightOf.keys()].filter((g) => s.after.heightOf.has(g));
@@ -119,12 +119,15 @@ for (const s of seams) {
   const eyeJump = Math.hypot(s.after.eye.x - s.before.eye.x, s.after.eye.y - s.before.eye.y,
     s.after.eye.z - s.before.eye.z);
   const fovRatio = s.after.fov / Math.max(1e-6, s.before.fov);
-  out.push({ name: `${s.before.shot} → ${s.after.shot}`, n: shared.length, hb, ha, r, eyeJump, fovRatio });
+  const degOf = (rad) => (rad * 180) / Math.PI;
+  out.push({ name: `${s.before.shot} → ${s.after.shot}`, n: shared.length, hb, ha, r, eyeJump,
+    fovRatio, fovB: degOf(s.before.fov), fovA: degOf(s.after.fov) });
 }
 for (const o of out.sort((a, b) => Math.abs(Math.log(b.r)) - Math.abs(Math.log(a.r)))) {
   console.log(`${o.name.padEnd(42).slice(0, 42)} ${String(o.n).padStart(4)}`
     + ` ${o.hb.toFixed(0).padStart(6)} ${o.ha.toFixed(0).padStart(6)}`
-    + ` ${o.r.toFixed(2).padStart(5)} ${o.eyeJump.toFixed(0).padStart(11)}m ${o.fovRatio.toFixed(2).padStart(6)}`);
+    + ` ${o.r.toFixed(2).padStart(5)} ${o.eyeJump.toFixed(0).padStart(11)}m`
+    + ` ${o.fovB.toFixed(1).padStart(6)}° ${o.fovA.toFixed(1).padStart(6)}°`);
 }
 console.log('');
 console.log('★比が 1.00 なら大きさが変わっていない。★2.00 なら 2 倍に跳んでいる。');
