@@ -89,3 +89,55 @@ export function silkRoleOf(gate: number, fieldSize: number): `silk-${number}` {
  *   ★**必ず馬番と併記**すること（アートバイブル §4・色覚多様性）。
  */
 export const FRAME_LABELS: readonly string[] = ['白', '黒', '赤', '青', '黄', '緑', '橙', '桃'];
+
+
+/**
+ * ★**勝負服の柄**（★2026-09-12・オーナー指示③「勝負服が同じ色があるので見にくい」）
+ *
+ * 【★色では足りないことを、★総当たりで確かめました】
+ *   ★`palette.json` の勝負服は 18 色ですが、★そのうち ★**8 色が枠色とまったく同じ 16 進**です
+ *   （★frame-1=silk-2 / frame-2=silk-6 / frame-3=silk-1 / frame-4=silk-3 /
+ *     ★frame-5=silk-4 / frame-6=silk-5 / frame-7=silk-7 / frame-8=silk-8）。
+ *   → ★枠色でない勝負服は ★**10 色しかありません**。★12 頭立てでは、どう選んでも
+ *     ★**2 頭以上が「別の馬の帽子と同じ色」**になります。
+ *   ★実測（★18 色から 12 色を選ぶ ★**18,564 通りの総当たり**・★CIE Lab）:
+ *     ★勝負服どうしの最小 ΔLab … ★いまの並び ★**38.8**（★最良の並びでも 27.6 で、いまより悪い）
+ *     ★枠色を含めた最小 ΔLab   … ★**どの並びでも 0.0**
+ *   → ★**色を選び直しても直りません。** ★色は今のままが最良です。
+ *
+ * 【★実際の競馬と同じ解き方】
+ *   ★同じ枠の 2 頭は ★**帽子が同じ色**です（★それが枠色の作法で、★正典 D-060）。
+ *   ★見分けるのは ★**勝負服の柄**です。★色を増やさずに見分けを増やせます。
+ *   ⚠️ ★**実在の馬主の意匠ではありません。** ★縦縞・輪・襷は競馬に限らない一般的な図形です。
+ *
+ * 【★同じ枠の 2 頭には必ず違う柄が当たること】
+ *   ★12 頭立ての枠は `1,2,3,4 / 5,6 / 7,8 / 9,10 / 11,12` で、★同枠の 2 頭は ★**連番**です。
+ *   → ★馬番を 4 で割った余りで配れば、★連番は必ず別の柄になります。
+ */
+export const SILK_PATTERNS = ['plain', 'stripes', 'hoop', 'sash'] as const;
+export type SilkPattern = (typeof SILK_PATTERNS)[number];
+
+/** ★馬番 → 柄。★同枠（連番）の 2 頭は必ず別の柄になります */
+export function silkPatternOf(gate: number): SilkPattern {
+  if (!Number.isInteger(gate) || gate < 1) throw new Error(`馬番が不正です: ${gate}`);
+  return SILK_PATTERNS[(gate - 1) % SILK_PATTERNS.length]!;
+}
+
+/**
+ * ★**その画素を差し色で塗るか**。★`jx` / `jy` は ★上着の窓の中での位置（0〜1）。
+ *
+ * ⚠️ ★細かい柄にしないこと。★画面上の上着は ★**数十 px** しかありません
+ *    （★実測・既定の大きさ 0.6 で 100〜600 画素）。★縞は 2 本に留めます。
+ */
+export function silkPatternInk(pattern: SilkPattern, jx: number, jy: number): boolean {
+  if (!Number.isFinite(jx) || !Number.isFinite(jy)) return false;
+  if (pattern === 'plain') return false;
+  if (pattern === 'stripes') return Math.floor(Math.max(0, Math.min(0.999, jx)) * 4) % 2 === 1;
+  if (pattern === 'hoop') return jy > 0.38 && jy < 0.62;
+  return Math.abs(jx - jy) < 0.20;
+}
+
+/** ★画面と道具で同じ言葉を使う */
+export const SILK_PATTERN_LABEL: Readonly<Record<SilkPattern, string>> = {
+  plain: '無地', stripes: '縦縞', hoop: '一本輪', sash: '襷',
+};

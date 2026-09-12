@@ -36,7 +36,7 @@ import {
   dustExposureCurve,
   phaseOf, HORSE_LENGTH_M,
   // ★描き方は package が唯一の出どころ（この画面には持たない）
-  frameRoleOf, silkRoleOf, SHEET_V2,
+  frameRoleOf, silkRoleOf, silkPatternOf, silkPatternInk, type SilkPattern, SHEET_V2,
   raceShotAt,
   focusForRaceShot,
   drawFixed2DSideScene, fixed2DBackgroundRoleOf, fixed2DPackLayout,
@@ -448,7 +448,14 @@ function flightLiftFor(index: number, count: number): number {
  * ⚠️ ★16 進をここに持ちません。`palette.json` から役割名で引きます（アートバイブル §6）。
  *    ここに 12 色を直書きしていたことが、そもそも食い違いの原因でした。
  */
-export interface SilkColors { readonly cap: string; readonly body: string }
+export interface SilkColors {
+  readonly cap: string;
+  readonly body: string;
+  /** ★柄の差し色（★上着より明るいか暗いかの一方）。★`silkPatternInk` が真の画素に載ります */
+  readonly trim: string;
+  /** ★柄（★`silkPatternOf` の註記 — ★同枠の 2 頭は必ず別の柄） */
+  readonly pattern: SilkPattern;
+}
 /**
  * ★**帽子＝枠色 ／ 上着＝馬ごとの色**（2026-08-28・オーナー指摘①で改訂）。
  *   ⚠️ ★以前はどちらも枠色で、★**同じ枠の 2 頭が完全に同じ見た目**でした。
@@ -457,10 +464,22 @@ export interface SilkColors { readonly cap: string; readonly body: string }
  * ⚠️ ★16 進をここに持ちません。`palette.json` から役割名で引きます（アートバイブル §6）。
  */
 const silksColorsFor = (pal: Record<string, string>, fieldSize: number): readonly SilkColors[] =>
-  Array.from({ length: fieldSize }, (_, index) => ({
-    cap: pal[frameRoleOf(index + 1, fieldSize)] ?? '#ffffff',
-    body: pal[silkRoleOf(index + 1, fieldSize)] ?? '#ffffff',
-  }));
+  Array.from({ length: fieldSize }, (_, index) => {
+    const body = pal[silkRoleOf(index + 1, fieldSize)] ?? '#ffffff';
+    /**
+     * ★**差し色は上着の明るさで決めます**（★暗い服には明るい柄・明るい服には暗い柄）。
+     * ⚠️ ★16 進をここに持ちません。★`palette.json` から役割名で引きます（アートバイブル §6）。
+     */
+    const lum = (Number.parseInt(body.slice(1, 3), 16) * 0.299
+      + Number.parseInt(body.slice(3, 5), 16) * 0.587
+      + Number.parseInt(body.slice(5, 7), 16) * 0.114) / 255;
+    return {
+      cap: pal[frameRoleOf(index + 1, fieldSize)] ?? '#ffffff',
+      body,
+      trim: (lum < 0.55 ? pal['paper-0'] : pal['ink-0']) ?? '#ffffff',
+      pattern: silkPatternOf(index + 1),
+    };
+  });
 /**
  * ★表示用のレース情報（憲法 §0.1: 実在の競馬場名・レース名は使わない）。
  *   以前は実在名のプレースホルダーが直書きされていたので架空名に置換した。
@@ -1064,6 +1083,7 @@ function silksOverlays(
     /** ★帽子と鞍布は枠色、上着は馬ごとの色（実際の競馬と同じ形・`silkRoleOf` の注記） */
     const [capR, capG, capB] = rgbOf(pair.cap);
     const [bodyR, bodyG, bodyB] = rgbOf(pair.body);
+    const [trimR, trimG, trimB] = rgbOf(pair.trim);
     const canvas = document.createElement('canvas'); canvas.width = cropW; canvas.height = cropH;
     const box = { image: canvas, width: cropW, height: cropH, offsetXSourcePx, offsetYSourcePx };
     const ctx = canvas.getContext('2d'); if (ctx === null) return box;
@@ -1074,10 +1094,23 @@ function silksOverlays(
       if (kind === 0) continue;
       const shade = shadeOf[mask] ?? 0;
       const useCap = kind === 1;
+      /**
+       * ★**上着だけに柄を載せます**（★2026-09-12・オーナー指示③・`silkPatternOf` の註記）。
+       *   ★帽子は枠色のままです（★正典 D-060・★HUD のチップと一致させ続けます）。
+       * ⚠️ ★上着の窓が潰れている組（`SILKS_LAYOUT_HORSE_ONLY`）では柄を載せません
+       *    （★幅 0 で割ると `jx` が非有限になり、★`silkPatternInk` が偽を返します）。
+       */
+      const inkPattern = !useCap && ((): boolean => {
+        const nx = (x + cropX0 + x0 - source.x) / source.width;
+        const ny = (y + cropY0 + y0 - source.y) / source.height;
+        return silkPatternInk(pair.pattern,
+          (nx - layout.jacket[0]) / (layout.jacket[1] - layout.jacket[0]),
+          (ny - layout.jacket[2]) / (layout.jacket[3] - layout.jacket[2]));
+      })();
       const index = (y * cropW + x) * 4;
-      output.data[index] = Math.min(255, (useCap ? capR : bodyR) * shade);
-      output.data[index + 1] = Math.min(255, (useCap ? capG : bodyG) * shade);
-      output.data[index + 2] = Math.min(255, (useCap ? capB : bodyB) * shade);
+      output.data[index] = Math.min(255, (useCap ? capR : inkPattern ? trimR : bodyR) * shade);
+      output.data[index + 1] = Math.min(255, (useCap ? capG : inkPattern ? trimG : bodyG) * shade);
+      output.data[index + 2] = Math.min(255, (useCap ? capB : inkPattern ? trimB : bodyB) * shade);
       output.data[index + 3] = alphaOf[mask] ?? 0;
     }
     ctx.putImageData(output, 0, 0);

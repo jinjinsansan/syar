@@ -8,7 +8,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { silkRoleOf, frameRoleOf } from '../src/bracket.js';
+import { silkRoleOf, frameRoleOf, silkPatternOf, silkPatternInk, SILK_PATTERNS } from '../src/bracket.js';
 
 const pal = JSON.parse(readFileSync('apps/web/public/art/palette.json', 'utf8')) as Record<string, string>;
 
@@ -98,5 +98,60 @@ describe('勝負服の色', () => {
      */
     expect(page).toContain('region[mask] = (saddlecloth || (helmet && !jacket)) ? 1 : 2;');
     expect(page).toContain('const useCap = kind === 1;');
+  });
+});
+
+
+/**
+ * ★**帽子が同じ 2 頭は、★柄で見分けられる**（★2026-09-12・オーナー指示③）
+ *
+ *   > ★「③ 勝負服が同じ色があるので見にくい」
+ *
+ * ★色では直せないことを総当たりで確かめてあります（`silkPatternOf` の註記）:
+ *   ★勝負服 18 色のうち ★**8 色が枠色と同じ 16 進**なので、★12 頭立てでは
+ *   ★どう選んでも「別の馬の帽子と同じ色の上着」が出ます（★18,564 通り・最小 ΔLab 0.0）。
+ * → ★見分けは ★**柄**が担います。★ここを固定します。
+ */
+describe('勝負服の柄', () => {
+  it('★★帽子が同じ色になる 2 頭は、必ず柄が違う（2〜18 頭）', () => {
+    for (let field = 2; field <= 18; field += 1) {
+      for (let a = 1; a <= field; a += 1) {
+        for (let b = a + 1; b <= field; b += 1) {
+          if (frameRoleOf(a, field) !== frameRoleOf(b, field)) continue;
+          expect(
+            silkPatternOf(a) === silkPatternOf(b) && silkRoleOf(a, field) === silkRoleOf(b, field),
+            `${field} 頭立ての ${a} 番と ${b} 番: 帽子も上着も柄も同じです`,
+          ).toBe(false);
+          expect(silkPatternOf(a), `${field} 頭立ての ${a} 番と ${b} 番は同じ枠なので柄を分けること`)
+            .not.toBe(silkPatternOf(b));
+        }
+      }
+    }
+  });
+
+  /**
+   * ⚠️ ★**柄が画素を塗り分けていることを確かめます**（★R-22）。
+   *    ★`silkPatternInk` が常に偽を返すようになっても上の検査は通ります
+   *    （★柄の「名前」しか見ていないため）。★それでは画面は無地のままです。
+   */
+  it('★★無地以外の柄は、上着の窓の中を実際に塗り分けている', () => {
+    for (const pattern of SILK_PATTERNS) {
+      let ink = 0; let bare = 0;
+      for (let i = 0; i < 20; i += 1) {
+        for (let j = 0; j < 20; j += 1) {
+          if (silkPatternInk(pattern, i / 19, j / 19)) ink += 1; else bare += 1;
+        }
+      }
+      if (pattern === 'plain') { expect(ink, '無地は塗り分けない').toBe(0); continue; }
+      expect(ink, `${pattern}: 差し色の画素がありません`).toBeGreaterThan(20);
+      expect(bare, `${pattern}: 上着の地色が残っていません`).toBeGreaterThan(20);
+    }
+  });
+
+  it('★★窓が潰れている組（幅 0）でも落ちない', () => {
+    for (const pattern of SILK_PATTERNS) {
+      expect(silkPatternInk(pattern, Number.POSITIVE_INFINITY, 0)).toBe(false);
+      expect(silkPatternInk(pattern, Number.NaN, Number.NaN)).toBe(false);
+    }
   });
 });
