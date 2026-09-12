@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  raceCutInAt, RACE_CUTIN_SEC, RACE_CUTIN_AT_START, drawRaceCutInFrame,
+  raceCutInAt, RACE_CUTIN_SEC, RACE_CUTIN_CORNER_SEC, RACE_CUTIN_AT_START, drawRaceCutInFrame,
   drawOwnHorseCutIn, drawFormationCutIn, drawRunningStyleCutIn,
   RACE_TELOP_SEC, drawRaceTelopBand, drawOwnHorseTelop, drawFormationTelop,
   drawRunningStyleTelop, drawToStraightTelop,
@@ -39,13 +39,15 @@ const V6_TRANSITIONS = SCRIPT_V6.slice(1).map((row, i) => ({
  *   ★新: ★**コーナーの出入りだけ**。★どのコーナーでも当たるようにする。
  */
 describe('カットインを出す場所', () => {
-  it('★台本 v6 の中で出るのは 2 か所だけ（★コーナー入り・コーナー明け）', () => {
+  /**
+   * ⚠️ ★**2026-09-12、入口のカットインは取り下げました**（★オーナー指示）。
+   *    ★オーナーの組み立て「★コーナー演出（2 秒）→ ★カットイン（2 秒）→ ★真横カメラワーク」。
+   *    ★入口にも出すと、★2 秒しかないコーナーの半分が覆われます。
+   */
+  it('★台本 v6 の中で出るのは 1 か所だけ（★コーナー明けだけ）', () => {
     const shown = V6_TRANSITIONS.filter((t) => raceCutInAt(t.from, t.to) !== undefined)
       .map((t) => `${t.from}>${t.to}`);
-    expect(shown).toEqual([
-      'side-drive>fourth-corner-front',
-      'fourth-corner-front>side-drive',
-    ]);
+    expect(shown).toEqual(['fourth-corner-front>side-drive']);
   });
 
   /** ⚠️ ★オーナー指摘①: ★位置取りは「カットイン場面」ではない */
@@ -58,10 +60,11 @@ describe('カットインを出す場所', () => {
    * ⚠️ ★オーナー指摘②: ★**様々なコースではコーナーがあちこちある**。
    *    ★以前は `fourth-corner-` しか見ていなかったので、★1〜3 角では出ませんでした。
    */
-  it('★どのコーナーでも出る（★1 角・2 角・3 角）', () => {
+  it('★どのコーナーの明けでも出る（★1 角・2 角・3 角）', () => {
     for (const corner of ['first-corner-front', 'second-corner-high', 'third-corner-rear']) {
-      expect(raceCutInAt('side-drive', corner)?.kind, `${corner} へ入るとき`).toBe('running-style');
       expect(raceCutInAt(corner, 'side-drive')?.kind, `${corner} から出るとき`).toBe('to-straight');
+      /** ⚠️ ★入口では出しません（★2 秒のコーナーを覆わない） */
+      expect(raceCutInAt('side-drive', corner), `${corner} へ入るとき`).toBeUndefined();
     }
   });
 
@@ -75,24 +78,22 @@ describe('カットインを出す場所', () => {
   });
 
   /** ★オーナー案「★入れる度に毎回異なる意味のあるカットインに」 */
-  it('★出る 2 枚は、中身が全部違う', () => {
+  it('★出る 1 枚と発走の 1 枚は、中身が違う', () => {
     const kinds = V6_TRANSITIONS
       .map((t) => raceCutInAt(t.from, t.to)?.kind)
       .filter((k): k is NonNullable<typeof k> => k !== undefined);
-    expect(kinds).toHaveLength(2);
-    expect(new Set(kinds).size, '★同じ中身が 2 回出ています').toBe(2);
-    /** ★発走の 1 枚を足しても、まだ全部違う */
-    expect(new Set([...kinds, RACE_CUTIN_AT_START.kind]).size).toBe(3);
+    expect(kinds).toHaveLength(1);
+    expect(new Set([...kinds, RACE_CUTIN_AT_START.kind]).size).toBe(2);
   });
 
-  it('★3 枚それぞれに、何の画面かを言う見出しが付いている', () => {
+  it('★2 枚それぞれに、何の画面かを言う見出しが付いている', () => {
     const labels = [
       RACE_CUTIN_AT_START.label,
       ...V6_TRANSITIONS.map((t) => raceCutInAt(t.from, t.to)?.label).filter((l) => l !== undefined),
     ];
-    expect(labels).toHaveLength(3);
+    expect(labels).toHaveLength(2);
     for (const l of labels) expect((l ?? '').length).toBeGreaterThan(0);
-    expect(new Set(labels).size, '★見出しが重なっています').toBe(3);
+    expect(new Set(labels).size, '★見出しが重なっています').toBe(2);
   });
 
   /**
@@ -111,8 +112,9 @@ describe('カットインを出す場所', () => {
    */
   it('4 角は撮り方を替えても出る（front / wide / far）', () => {
     for (const id of ['fourth-corner-front', 'fourth-corner-wide', 'fourth-corner-far']) {
-      expect(raceCutInAt('side-drive', id)?.kind, `入り ${id}`).toBe('running-style');
       expect(raceCutInAt(id, 'side-drive')?.kind, `出 ${id}`).toBe('to-straight');
+      /** ⚠️ ★入口では出しません（★2026-09-12・★2 秒のコーナーを覆わない） */
+      expect(raceCutInAt('side-drive', id), `入り ${id}`).toBeUndefined();
     }
   });
 
@@ -147,6 +149,8 @@ describe('カットインを出す場所', () => {
   it('★1 枚は 1 秒以上・2 秒以下', () => {
     expect(RACE_CUTIN_SEC).toBeGreaterThanOrEqual(1);
     expect(RACE_CUTIN_SEC).toBeLessThanOrEqual(2);
+    /** ★コーナーの後は 2 秒（★2026-09-12・★オーナー指示。★上限と同じ値） */
+    expect(RACE_CUTIN_CORNER_SEC).toBe(2);
   });
 });
 

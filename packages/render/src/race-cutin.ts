@@ -53,6 +53,16 @@ export interface RaceCutIn {
  */
 export const RACE_CUTIN_SEC = 1.2;
 
+/**
+ * ★**コーナーの後のカットインの尺**（秒）。
+ *
+ * ★オーナー指示（★2026-09-12）「★コーナーの前からバージョンは 4 秒の尺があります。
+ *   ★それを ★**2 秒**にして、★残り ★**2 秒**をデザイナーのハンドオフのカットインにしませんか？」
+ * ⚠️ ★発走の 1 枚（★`RACE_CUTIN_AT_START`）は ★**1.2 秒のまま**です。
+ *    ★指示はコーナーについてのものなので、★指示の無い所を一緒に動かしません。
+ */
+export const RACE_CUTIN_CORNER_SEC = 2.0;
+
 /** ★発走直後に出すもの（★カットの境目ではなく、★レース開始からの経過で出す） */
 export const RACE_CUTIN_AT_START: RaceCutIn = { kind: 'own-horse', label: 'あなたの馬' };
 
@@ -88,12 +98,11 @@ export function raceCutInAt(
   } = {},
 ): RaceCutIn | undefined {
   /**
-   * ★**コーナーへ入る**（★どのコーナーでも）。
-   * ⚠️ ★以前は `side-drive` から入るときだけでした。★他のカットから入ると出ませんでした。
+   * ⚠️ ★**コーナーへ「入る」ときは出しません**（★2026-09-12・★オーナー指示）。
+   *    ★オーナーの組み立て「★コーナー演出（数秒）→ ★カットインで誤魔化す → ★真横カメラワークへ」。
+   *    ★カットインは ★**コーナーの後**に来ます。★入口にも出すと、
+   *    ★2 秒しかないコーナーの半分が覆われます。
    */
-  if (!isCornerShot(fromId) && isCornerShot(toId)) {
-    return { kind: 'running-style', label: 'ここから動く馬' };
-  }
   /** ★**コーナーから出る**。★見出しは ★**実際にいる区間**から作ります */
   if (isCornerShot(fromId) && !isCornerShot(toId)) {
     const next = opts.sectionLabel;

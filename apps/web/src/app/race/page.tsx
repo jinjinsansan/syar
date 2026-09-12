@@ -77,7 +77,7 @@ import {
   broadcastV2ScriptAssets,
   raceGaitPhase,
   trafficPositionModel, raceClockFor, type RacePacePolicy,
-  raceCutInAt, RACE_CUTIN_SEC, RACE_CUTIN_AT_START,
+  raceCutInAt, RACE_CUTIN_SEC, RACE_CUTIN_CORNER_SEC, RACE_CUTIN_AT_START,
   drawOwnHorseCutIn, drawFormationCutIn, drawRunningStyleCutIn, drawToStraightCutIn,
   RACE_TELOP_SEC, drawOwnHorseTelop, drawFormationTelop, drawRunningStyleTelop, drawToStraightTelop,
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
@@ -3700,7 +3700,14 @@ export default function RacePage(): React.JSX.Element {
         .reduce<ShotChange | undefined>((m, c) => (m === undefined || c.displaySec > m.displaySec ? c : m), undefined);
       /** ★このカットが始まってからの秒。★切り替え表に無ければ「ずっと前から」扱い */
       const sinceCutSec = cutChange === undefined ? Number.POSITIVE_INFINITY : d - cutChange.displaySec;
-      const cutIn = CUTIN_OFF || cutChange === undefined || sinceCutSec < 0 || sinceCutSec >= RACE_CUTIN_SEC
+      /**
+       * ★**コーナーの後のカットインは 2 秒**（★2026-09-12・★オーナー指示）。
+       *    ★「★コーナーの前からバージョンは 4 秒の尺があります。★それを 2 秒にして、
+       *      ★残り 2 秒をデザイナーのハンドオフのカットインにしませんか？」
+       * ⚠️ ★発走の 1 枚は `RACE_CUTIN_SEC`（1.2 秒）のままです（★指示の無い所を動かさない）。
+       */
+      const cutIn = CUTIN_OFF || cutChange === undefined || sinceCutSec < 0
+        || sinceCutSec >= RACE_CUTIN_CORNER_SEC
         ? undefined : raceCutInAt(cutChange.from, cutChange.to,
           /** ★見出しは ★**画面が出している区間名**から作ります（★カメラ名で断定しない・★R-30） */
           { sectionLabel: v2SectionLabel });
@@ -3733,7 +3740,7 @@ export default function RacePage(): React.JSX.Element {
         const frame = {
           viewport: { width: W, height: H },
           sinceSec: cutIn === undefined ? raceD : sinceCutSec,
-          durationSec: RACE_CUTIN_SEC,
+          durationSec: cutIn === undefined ? RACE_CUTIN_SEC : RACE_CUTIN_CORNER_SEC,
           label: cutIn?.label ?? RACE_CUTIN_AT_START.label,
           raceLabel: `${RACE_META.raceNo}　${RACE_META.raceName}`,
           metersLeft: metersLeftNow,
@@ -3746,7 +3753,7 @@ export default function RacePage(): React.JSX.Element {
         const telopFrame = {
           viewport: { width: W, height: H },
           sinceSec: frame.sinceSec,
-          durationSec: RACE_TELOP_SEC,
+          durationSec: cutIn === undefined ? RACE_TELOP_SEC : RACE_CUTIN_CORNER_SEC,
           label: frame.label,
           ...(TELOP_ALPHA === undefined ? {} : { bandAlpha: TELOP_ALPHA }),
         };
