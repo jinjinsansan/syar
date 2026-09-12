@@ -1629,7 +1629,18 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
    *    ★時計そのものを ★`raceClockFor` から受け取ります。★監査道具も同じ関数を通ります。
    *    ⚠️ ★**戻り値を捨てて別の時計を使わないこと**（★F-3）。
    */
-  const elisions = raceEditElisionsFor(knots, cornerSpansM, raceSecAtMeters, STRAIGHT_SHOWN_M, DIST);
+  /**
+   * ★**発走をどこまで見せるか**（★2026-09-13・オーナー指示
+   *   ★「ゲート発送の瞬間〜陣地取りをしっかりと見せてください」）。
+   *   ★**走路の最初の直線区間の長さ**を使います（★桜星賞は 200m）。★秒で置かないのは、
+   *   ★会場によって発走の直線が違うからです（★秒だと会場ごとに切れ方が変わります）。
+   * ⚠️ ★最初の区間が直線でない走路（★コーナー発走）では、★その区間の長さをそのまま使います。
+   */
+  const startShownM = course.segments[0]?.length ?? 0;
+  const elisions = raceEditElisionsFor(knots, {
+    cornerSpansM, raceSecAtMeters, distanceMeter: DIST,
+    startShownM, straightShownM: STRAIGHT_SHOWN_M,
+  });
   const warp = raceClockFor(knots, DIST, RACE_PACE_POLICY, elisions);
   /**
    * ★見た目の速度テーブル。描画と同じ手順（時計 → 位置モデル → 走り抜け → V2 注視点）で
