@@ -5469,6 +5469,42 @@ export default function RacePage(): React.JSX.Element {
            ★「小さい」という当の苦情をメニューにも並べることになります。
            ★演出は `演出開始` で全画面に出ます。
       */}
+      {/**
+        * ★**遊ぶ人の手元にも、音と全画面の口を置く**（★2026-09-13・オーナー評
+        *   ★「★音を入れたのに音を鳴らす道具がないので何も聞こえません」）。
+        *
+        * ⚠️ ★これまで「音」のボタンは ★**開発卓（`?dev=1`）と、携帯の全画面**にしか
+        *    ★ありませんでした。★机の画面で普通に開くと ★**どこにも押す所がなく**、
+        *    ★`?sound=1` を手で付けるしか鳴らせませんでした。★私の入れ忘れです。
+        */}
+      {!smallScreen && !devMode && (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '0 0 10px' }}>
+          <button
+            type="button" onClick={() => setSoundOn((q) => !q)}
+            style={{
+              padding: '9px 16px', cursor: 'pointer', border: 0, borderRadius: 6, fontWeight: 700,
+              background: soundOn ? '#2c6b44' : '#dfe3d6', color: soundOn ? '#ffe98a' : '#3a4a40',
+            }}
+          >
+            {soundOn ? '♪ 音 入' : '♪ 音 切'}
+          </button>
+          <button
+            type="button" onClick={() => { enterBrowserFullscreen(); }}
+            style={{
+              padding: '9px 16px', cursor: 'pointer', border: '1px solid #c3cdbc', borderRadius: 6,
+              background: '#fffef9', color: '#315c45', fontWeight: 700,
+            }}
+          >全画面</button>
+          <button
+            type="button"
+            onClick={() => { audioRef.current?.reset(); resetToStart(); setPlaying(true); }}
+            style={{
+              padding: '9px 16px', cursor: 'pointer', border: '1px solid #c3cdbc', borderRadius: 6,
+              background: '#fffef9', color: '#315c45', fontWeight: 700,
+            }}
+          >もう一度</button>
+        </div>
+      )}
       {!smallScreen && (
         <canvas
           ref={canvasRef} width={W} height={H}
