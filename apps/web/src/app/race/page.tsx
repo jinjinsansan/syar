@@ -3327,6 +3327,12 @@ export default function RacePage(): React.JSX.Element {
      * ⚠️ ★合図は札で 1 回だけ。★毎コマ呼んでも 2 度は鳴りません。
      */
     if (soundOnRef.current && intro.stage !== 'race') audioRef.current?.cue('fanfare', 'intro');
+    /**
+     * ⚠️ ★**イントロが終わってから「音」を入れた回**は、★ファンファーレの出番が
+     *    ★もう過ぎています。★そこで鳴らし始めると ★**レースの途中でファンファーレ**に
+     *    ★なるので、★鳴らしません。★札だけ立てて、★次に「最初から」で戻します。
+     */
+    if (soundOnRef.current && intro.stage === 'race') audioRef.current?.skip('intro');
     const vp = { width: W, height: H };
     const FONT = (px: number, bold?: boolean): string =>
       `${bold === true ? 'bold ' : ''}${px}px system-ui, sans-serif`;
@@ -4951,6 +4957,13 @@ export default function RacePage(): React.JSX.Element {
    * ⚠️ ★**常時出します。** ★触れたら出す方式は ★**操作があることに初見で気づけない**ので、
    *    ★デザイナーが常時表示を推奨しています。
    */
+  /**
+   * ★**道具ボタンを、見ている間は隠す**（★2026-09-13・オーナー評
+   *   ★「★レース中継押すと、道具ボタンが邪魔で見にくい」）。
+   *
+   *   ★触れてから `STAGE_CONTROLS_HOLD_SEC` の間だけ出します。★触れば戻ります。
+   * ⚠️ ★**消しません。** ★消すと全画面にも音にも入れなくなります（★以前それをやりました）。
+   */
   const stageBtnStyle = {
     minWidth: stagePx(44), minHeight: stagePx(44),
     padding: `0 ${stagePx(12)}px`, fontSize: stagePx(13),
@@ -4959,6 +4972,27 @@ export default function RacePage(): React.JSX.Element {
     background: 'rgba(4,20,40,0.55)', color: '#fff', fontWeight: 900 as const,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   };
+  /**
+   * ★**道具ボタンを出しておく時間**（★秒）。★触れてからこれだけ経つと薄れて消えます。
+   * ⚠️ ★演出は 45 秒です。★ここを長くすると ★**ほぼずっと出たまま**になります。
+   */
+  const STAGE_CONTROLS_HOLD_SEC = 2.5;
+  const [controlsShown, setControlsShown] = useState(true);
+  const controlsTimerRef = useRef<number | null>(null);
+  const pokeControls = useCallback((): void => {
+    setControlsShown(true);
+    if (controlsTimerRef.current !== null) window.clearTimeout(controlsTimerRef.current);
+    controlsTimerRef.current = window.setTimeout(
+      () => setControlsShown(false), STAGE_CONTROLS_HOLD_SEC * 1000);
+  }, []);
+  useEffect(() => {
+    if (!stageFull) return undefined;
+    pokeControls();
+    return () => {
+      if (controlsTimerRef.current !== null) window.clearTimeout(controlsTimerRef.current);
+    };
+  }, [stageFull, pokeControls]);
+
   /** ★レースが終わったか（★③ 確定後のカードを出す条件） */
   const stageFinished = built !== null && !playing
     && dRef.current >= RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC - 0.01;
@@ -4972,7 +5006,21 @@ export default function RacePage(): React.JSX.Element {
    */
   if (stageFull) {
     return (
-      <div className="race-stage-full">
+      <div
+        className="race-stage-full"
+        onPointerDown={() => {
+          /**
+           * ★**最初に触れた所で、★ブラウザの本当の全画面へ入ります**（★2026-09-13・オーナー評
+           *   ★「★ブラウザの URL バーも全て全画面表示にしたい。★今はブラウザのバーが残ってしまう」）。
+           * ⚠️ ★全画面は ★**人の操作からしか入れません**（★ブラウザの決まり）。★自動開始では
+           *    ★入れないので、★画面のどこでも 1 度触れた時に入ります。
+           * ⚠️ ★iOS の Safari には ★**この口がありません**。★そこだけはバーが残ります。
+           */
+          enterBrowserFullscreen();
+          pokeControls();
+        }}
+        onPointerMove={pokeControls}
+      >
         <div
           style={{
             position: 'absolute', top: '50%', left: '50%', width: W, height: H,
@@ -5027,7 +5075,14 @@ export default function RacePage(): React.JSX.Element {
               </div>
             </div>
           )}
-          <div style={{ position: 'absolute', top: stagePx(10), right: stagePx(10), display: 'flex', gap: stagePx(8) }}>
+          <div
+            style={{
+              position: 'absolute', top: stagePx(10), right: stagePx(10), display: 'flex', gap: stagePx(8),
+              opacity: controlsShown ? 1 : 0,
+              pointerEvents: controlsShown ? 'auto' : 'none',
+              transition: 'opacity .35s ease',
+            }}
+          >
             {/*
               ★**ブラウザの全画面へ入る口**（★2026-09-13・オーナー質問
                 ★「★モバイル表示で全画面表示にするには？」）。

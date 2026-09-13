@@ -57,6 +57,11 @@ export interface RaceAudio {
   cue(id: RaceSoundId, tag: string): void;
   /** ★鳴っているものを、★時間をかけて絞る */
   fade(id: RaceSoundId, seconds: number): void;
+  /**
+   * ★**その場面は過ぎたので鳴らさない**、と札だけ立てる。
+   *   ★例: イントロが終わってから音を入れた回のファンファーレ。
+   */
+  skip(tag: string): void;
   /** ★全部止めて、★札を捨てる（★「最初から」） */
   reset(): void;
   /** ★後片付け */
@@ -73,6 +78,7 @@ export function createRaceAudio(): RaceAudio {
       resume: async () => false,
       cue() { /* ★この端末では鳴らせない */ },
       fade() { /* 同上 */ },
+      skip() { /* 同上 */ },
       reset() { /* 同上 */ },
       dispose() { /* 同上 */ },
     };
@@ -115,6 +121,17 @@ export function createRaceAudio(): RaceAudio {
   const preload = (): void => {
     for (const id of Object.keys(RACE_SOUNDS) as RaceSoundId[]) load(id);
   };
+  /**
+   * ⚠️ ★**作った時点で取りに行きます**（★2026-09-13・オーナー評
+   *    ★「★ファンファーレ音源は道具ボタンを押すとなったりならなかったりする」）。
+   *
+   *    ★以前は ★**「音」を押した時**に取りに行っていました。★ところがファンファーレの
+   *    ★出番はイントロの ★**4.4 秒**しかありません。★読み込みが間に合わなければ、
+   *    ★その回は ★**一度も鳴りません**（★下の `cue` は、読めていないときに札を立てないので、
+   *    ★場面が過ぎれば終わりです）。★押す前から取りに行けば、間に合います。
+   * ⚠️ ★`AudioContext` は止まったままでも `decodeAudioData` は動きます。★音は出ません。
+   */
+  preload();
 
   const start = (id: RaceSoundId): void => {
     const buf = buffers.get(id);
@@ -157,6 +174,8 @@ export function createRaceAudio(): RaceAudio {
       fired.add(tag);
       start(id);
     },
+
+    skip(tag: string): void { fired.add(tag); },
 
     fade(id: RaceSoundId, seconds: number): void {
       const cur = playing.get(id);
