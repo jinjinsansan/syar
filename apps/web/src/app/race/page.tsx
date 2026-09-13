@@ -90,6 +90,7 @@ import {
 import POOL from '../../lib/watch-pool.json';
 import { raceSetupFromParam, gradedRacesByVenue } from '@star/scheduler';
 import { FrameBadge } from '../../components/ui';
+import { createRaceAudio, type RaceAudio } from './race-audio.js';
 
 /**
  * ★**どの 1 鞍を走らせるか**（`?race=<id>`・2026-08-31・B案 ④）。
@@ -155,6 +156,13 @@ const LEGACY_MOTION = typeof window !== 'undefined'
  * ⚠️ ★カードの中の「ほかのコースを観る」（★10 場 44 鞍の選択）はここからしか開けません。
  *    ★消すのではなく口を残すのは、★見比べる道を塞がないためです。
  */
+/**
+ * ★**音を出すか**（★2026-09-13・オーナー指示「★馬の足元と競馬のファンファーレの BGM だけは」）。
+ * ⚠️ ★**既定は切**です（★R-27）。★`?sound=1` か、★画面の「音」ボタンで入れます。
+ *    ★ブラウザは人の操作なしに音を出させないので、★ボタンの押下が解錠を兼ねます。
+ */
+const SOUND_ON_AT_START = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('sound') === '1';
 const SHOW_ENTRY = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('entry') === '1';
 const PACE_SHORT = typeof window === 'undefined'
@@ -1772,6 +1780,22 @@ export default function RacePage(): React.JSX.Element {
   const callStartRef = useRef<readonly number[]>([]);
   /** 区間タグの文言と、それに変わった秒（スライドイン用） */
   const sectionTagRef = useRef<{ label: string; sinceSec: number }>({ label: '', sinceSec: -Infinity });
+  /**
+   * ★**蹄の音とファンファーレ**（★2026-09-13）。★描画の輪の中から呼ぶので ref に持ちます
+   *   （★state だと 1 コマごとに輪を張り替えることになります）。
+   */
+  const audioRef = useRef<RaceAudio | null>(null);
+  const [soundOn, setSoundOn] = useState(SOUND_ON_AT_START);
+  const soundOnRef = useRef(soundOn);
+  useEffect(() => {
+    audioRef.current = createRaceAudio();
+    return () => { audioRef.current?.dispose(); audioRef.current = null; };
+  }, []);
+  useEffect(() => {
+    soundOnRef.current = soundOn;
+    if (soundOn) void audioRef.current?.resume();
+    else audioRef.current?.reset();
+  }, [soundOn]);
   const callKeyRef = useRef<string>('');
   /** ★何本目の発言か。自馬に触れる間隔に使う（乱数の代わり・憲法 4） */
   const callIndexRef = useRef(0);
@@ -3294,6 +3318,15 @@ export default function RacePage(): React.JSX.Element {
     ctx.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
 
     const intro = raceIntroAt(d);
+    /**
+     * ★**ファンファーレ**（★2026-09-13・オーナー支給の音源）。
+     *
+     * ⚠️ ★**ここに置くこと。** ★イントロの間は、この下で ★**描き終えたら return します**。
+     *    ★最初これを本編の側（`winnerFinishedNow` の近く）に置き、★イントロでは
+     *    ★一度も通らないので ★**ファンファーレだけ鳴りませんでした**（★実測）。
+     * ⚠️ ★合図は札で 1 回だけ。★毎コマ呼んでも 2 度は鳴りません。
+     */
+    if (soundOnRef.current && intro.stage !== 'race') audioRef.current?.cue('fanfare', 'intro');
     const vp = { width: W, height: H };
     const FONT = (px: number, bold?: boolean): string =>
       `${bold === true ? 'bold ' : ''}${px}px system-ui, sans-serif`;
@@ -3761,6 +3794,36 @@ export default function RacePage(): React.JSX.Element {
       const visualDelta = visualScroll.deltaAt(d);
       const gaitDelta = visualDelta - visualScroll.deltaAt(RACE_INTRO_RACE_START_SEC);
       const metersByGate = new Map(easedAt.map((horse) => [horse.gate, horse.meters]));
+      /**
+       * ★**レースの音**（★2026-09-13・オーナー支給の音源）。
+       *
+       * ★鳴らす場所は ★**画面の表示秒**で決めます（★シード固定なら同じ所で鳴ります・憲法 4）。
+       * ⚠️ ★合図は ★**札で 1 回だけ**です。★毎コマ呼んでも 2 度は鳴りません。
+       * ⚠️ ★`raceD` は ★**ゲートが開いた瞬間が 0**（★イントロぶんを引いた秒）。
+       *
+       * ★① イントロ                     … ファンファーレ（★上の `intro.stage` の所で出します）
+       * ★② ゲートが開く（raceD > 0）    … ゲート音 ＋ 走行音を敷く ／ ファンファーレを絞る
+       * ★③ その直後（raceD ≧ 0.35）     … いななき（★音源名のとおりの使い方）
+       * ★④ 勝ち馬がゴール              … 走行音を絞り、群衆に渡す
+       */
+      if (soundOnRef.current) {
+        const audio = audioRef.current;
+        if (raceD > 0) {
+          /**
+           * ⚠️ ★ファンファーレは ★**16.8 秒**、★イントロは ★**4.4 秒**です。
+           *    ★最後まで鳴りません。★ここで 1.2 秒かけて絞り、★ゲート音に渡します。
+           *    ★全部聴かせるならイントロを伸ばす必要があります（★オーナー判断）。
+           */
+          audio?.fade('fanfare', 1.2);
+          audio?.cue('gate-open', 'gate');
+          audio?.cue('gallop', 'gallop');
+          if (raceD >= 0.35) audio?.cue('whinny', 'whinny');
+          if (winnerFinishedNow) {
+            audio?.fade('gallop', 1.4);
+            audio?.cue('crowd', 'crowd');
+          }
+        }
+      }
       /**
        * ★被写体ブラー用の速度（m/s・設計 1-2）は **レース時計での実走速**を使います。
        *
@@ -4974,10 +5037,29 @@ export default function RacePage(): React.JSX.Element {
             <button type="button" onClick={() => { enterBrowserFullscreen(); }} style={stageBtnStyle}>
               全画面
             </button>
+            {/*
+              ★**音の入り口**（★2026-09-13・オーナー指示
+                ★「★馬の足元と競馬のファンファーレの BGM だけは入れてもいいですか？」）。
+              ⚠️ ★**既定は切**です（★`?sound=1` でも入ります）。★ブラウザは人の操作なしに
+                 ★音を出させないので、★この押下そのものが解錠を兼ねます。
+            */}
+            <button
+              type="button" onClick={() => setSoundOn((q) => !q)}
+              style={{
+                ...stageBtnStyle,
+                ...(soundOn ? { background: 'rgba(28,92,52,0.92)', color: '#ffe98a' } : {}),
+              }}
+            >
+              {soundOn ? '音 入' : '音 切'}
+            </button>
             <button type="button" onClick={() => setPlaying((q) => !q)} style={stageBtnStyle}>
               {playing ? '停止' : '再開'}
             </button>
-            <button type="button" onClick={() => { resetToStart(); setPlaying(true); }} style={stageBtnStyle}>
+            <button
+              type="button"
+              onClick={() => { audioRef.current?.reset(); resetToStart(); setPlaying(true); }}
+              style={stageBtnStyle}
+            >
               最初から
             </button>
             <button
@@ -5166,10 +5248,25 @@ export default function RacePage(): React.JSX.Element {
           *   ★デフォルメの馬は写真の馬と体高が違うので、★ここで合わせます。
           */}
         <button
-          type="button" onClick={resetToStart}
+          type="button" onClick={() => { audioRef.current?.reset(); resetToStart(); }}
           style={{ padding: '8px 14px', cursor: 'pointer', background: '#3a3630', color: '#efe9dc', border: 0 }}
         >
           最初から
+        </button>
+        {/*
+          ★**音の入り口**（★2026-09-13・オーナー指示
+            ★「★馬の足元と競馬のファンファーレの BGM だけは入れてもいいですか？」）。
+          ⚠️ ★**既定は切**です（★`?sound=1` でも入ります）。★ブラウザは人の操作なしに
+             ★音を出させないので、★この押下そのものが解錠を兼ねます。
+        */}
+        <button
+          type="button" onClick={() => setSoundOn((q) => !q)}
+          style={{
+            padding: '8px 14px', cursor: 'pointer', border: 0,
+            background: soundOn ? '#2c6b44' : '#3a3630', color: soundOn ? '#ffe98a' : '#efe9dc',
+          }}
+        >
+          {soundOn ? '音 入' : '音 切'}
         </button>
         {/*
           ★**レース選択**（2026-08-31）— ★`?race=<id>` を毎回打たずに 50 鞍を切り替えるため。
