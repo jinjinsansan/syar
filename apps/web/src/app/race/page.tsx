@@ -1863,6 +1863,16 @@ export default function RacePage(): React.JSX.Element {
   const [ownGate, setOwnGate] = useState(3);
   const [playing, setPlaying] = useState(false);
   /**
+   * ★**一度でも「観る」を押したか**（★2026-09-13・オーナー指摘）
+   *
+   * ⚠️ ★入口カードを `playing` に紐づけていました。★`playing` はレースが終わると
+   *    ★**偽に戻る**ので、★確定ボードが出ている最中にカードが復帰していました
+   *    （★オーナー評「★なぜこの上の小さいのは消えないのですか？ ★実害はないですが、
+   *    ★すごく見栄えが悪いです」）。
+   * → ★押したら ★**出したまま**にします。★別のレースを選ぶ道は上の帯（番組表）に在ります。
+   */
+  const [watchStarted, setWatchStarted] = useState(false);
+  /**
    * ★**馬の大きさの倍率**（★2026-09-08・オーナー指示「つまみで自由に変えられるように」）。
    *   ⚠️ ★描画層だけの値です。★着順・位置・タイムには一切効きません（★憲法3）。
    *
@@ -4939,7 +4949,7 @@ export default function RacePage(): React.JSX.Element {
       style={{ background: '#14120f', color: '#efe9dc', padding: 14, fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }}
     >
       {/** ⚠️ ★見ている間は見出しも消します（★上と同じ理由） */}
-      {!devMode && playing ? null : (
+      {!devMode && watchStarted ? null : (
       <h1 style={{ fontSize: 18, margin: '4px 0 8px' }}>
         レース
         {smallScreen || !devMode ? null : <>
@@ -4969,7 +4979,7 @@ export default function RacePage(): React.JSX.Element {
         ★`観る` を押すと `playing` が真になり、★レースが終わると偽に戻るので、
         ★**終わったら入口が戻ります**（★次のレースを選ぶ道を塞ぎません）。
       */}
-      {!devMode && !playing && (
+      {!devMode && !watchStarted && (
         <div className="a-panel strong rm-entry" data-theme="arcade">
           <div className="a-band rm-entry-head">
             <span className="a-chip gold rm-entry-grade">{RACE_SETUP.race.grade}</span>
@@ -4997,6 +5007,7 @@ export default function RacePage(): React.JSX.Element {
             disabled={!ready || built === null}
             onClick={() => {
               if (smallScreen) { enterBrowserFullscreen(); setStageFull(true); }
+              setWatchStarted(true);
               setPlaying(true);
             }}
           >{ready && built !== null ? '観る' : '読み込み中…'}</button>
@@ -5091,7 +5102,7 @@ export default function RacePage(): React.JSX.Element {
           type="button"
           onClick={() => {
             /** ★携帯では、開始と同時に全画面へ移ります（★メニュー → 演出） */
-            if (smallScreen) { enterBrowserFullscreen(); setStageFull(true); setPlaying(true); return; }
+            if (smallScreen) { enterBrowserFullscreen(); setStageFull(true); setWatchStarted(true); setPlaying(true); return; }
             setPlaying((p) => !p);
           }}
           disabled={!ready || built === null}
