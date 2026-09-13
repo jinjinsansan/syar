@@ -1883,6 +1883,13 @@ export default function RacePage(): React.JSX.Element {
    */
   const [watchStarted, setWatchStarted] = useState(false);
   /**
+   * ★**入口カードを呼び戻したか**（★2026-09-13）。
+   *   ★既定ではカードを出さないので、★ステージの「メニュー」を押した先が ★**空**になります。
+   *   ★携帯はインラインのキャンバスも描かないので、★本当に何も映りません。
+   * → ★「メニュー」で ★**呼び戻せる**ようにします。★`?entry=1` と同じ状態になります。
+   */
+  const [entryRequested, setEntryRequested] = useState(false);
+  /**
    * ★**馬の大きさの倍率**（★2026-09-08・オーナー指示「つまみで自由に変えられるように」）。
    *   ⚠️ ★描画層だけの値です。★着順・位置・タイムには一切効きません（★憲法3）。
    *
@@ -2013,9 +2020,18 @@ export default function RacePage(): React.JSX.Element {
   useEffect(() => {
     if (devMode || SHOW_ENTRY) return;
     if (!ready || built === null || watchStarted) return;
+    /**
+     * ⚠️ ★**小さい画面はステージも開きます**（★2026-09-13）。
+     *    ★この画面は ★**携帯ではインラインのキャンバスを描きません**（★下の注記）。
+     *    ★入口カードを消したので、★ステージを開かないと ★**何も映りません**。
+     *    ★`stageFull` は ★**こちらの全画面レイアウト**なので、人の操作は要りません。
+     *    ★ブラウザの本当の全画面（`enterBrowserFullscreen`）は ★**人の操作が要る**ので、
+     *    ★ステージの「全画面」ボタンから入ります。
+     */
+    if (smallScreen) setStageFull(true);
     setWatchStarted(true);
     setPlaying(true);
-  }, [devMode, ready, built, watchStarted]);
+  }, [devMode, ready, built, watchStarted, smallScreen]);
   const [err, setErr] = useState<string | null>(null);
   const [clock, setClock] = useState(0);
   const [surface, setSurface] = useState<Surface>('turf');
@@ -4937,7 +4953,7 @@ export default function RacePage(): React.JSX.Element {
                   }}
                 >もう一度</button>
                 <button
-                  type="button" onClick={() => { exitBrowserFullscreen(); setPlaying(false); setStageFull(false); }}
+                  type="button" onClick={() => { exitBrowserFullscreen(); setPlaying(false); setStageFull(false); setWatchStarted(false); setEntryRequested(true); }}
                   style={{
                     flex: 1, minHeight: stagePx(48), borderRadius: stagePx(9), cursor: 'pointer',
                     backgroundImage: 'linear-gradient(#fff0a8 0%,#ffd84a 44%,#f2b012 62%,#d98f0a 100%)',
@@ -4949,6 +4965,15 @@ export default function RacePage(): React.JSX.Element {
             </div>
           )}
           <div style={{ position: 'absolute', top: stagePx(10), right: stagePx(10), display: 'flex', gap: stagePx(8) }}>
+            {/*
+              ★**ブラウザの全画面へ入る口**（★2026-09-13・オーナー質問
+                ★「★モバイル表示で全画面表示にするには？」）。
+              ⚠️ ★全画面は ★**人の操作からしか入れません**（★ブラウザの決まり）。★自動開始に
+                 ★したので、★押す場所が 1 つも無くなっていました。★ここに置きます。
+            */}
+            <button type="button" onClick={() => { enterBrowserFullscreen(); }} style={stageBtnStyle}>
+              全画面
+            </button>
             <button type="button" onClick={() => setPlaying((q) => !q)} style={stageBtnStyle}>
               {playing ? '停止' : '再開'}
             </button>
@@ -4957,7 +4982,7 @@ export default function RacePage(): React.JSX.Element {
             </button>
             <button
               type="button"
-              onClick={() => { exitBrowserFullscreen(); setPlaying(false); setStageFull(false); }}
+              onClick={() => { exitBrowserFullscreen(); setPlaying(false); setStageFull(false); setWatchStarted(false); setEntryRequested(true); }}
               style={{ ...stageBtnStyle, background: 'rgba(122,58,42,0.9)' }}
             >
               メニュー
@@ -4974,7 +4999,7 @@ export default function RacePage(): React.JSX.Element {
       style={{ background: '#14120f', color: '#efe9dc', padding: 14, fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }}
     >
       {/** ⚠️ ★見ている間は見出しも消します（★上と同じ理由） */}
-      {!devMode && (watchStarted || !SHOW_ENTRY) ? null : (
+      {!devMode && (watchStarted || !(SHOW_ENTRY || entryRequested)) ? null : (
       <h1 style={{ fontSize: 18, margin: '4px 0 8px' }}>
         レース
         {smallScreen || !devMode ? null : <>
@@ -5004,7 +5029,7 @@ export default function RacePage(): React.JSX.Element {
         ★`観る` を押すと `playing` が真になり、★レースが終わると偽に戻るので、
         ★**終わったら入口が戻ります**（★次のレースを選ぶ道を塞ぎません）。
       */}
-      {!devMode && SHOW_ENTRY && !watchStarted && (
+      {!devMode && (SHOW_ENTRY || entryRequested) && !watchStarted && (
         <div className="a-panel strong rm-entry" data-theme="arcade">
           <div className="a-band rm-entry-head">
             <span className="a-chip gold rm-entry-grade">{RACE_SETUP.race.grade}</span>
