@@ -96,7 +96,7 @@ export default function TrainingPage(): React.ReactElement {
             {horse !== null && cond !== null ? (
               <div style={{ display: 'flex', gap: 22, padding: '16px 20px', backgroundImage: 'linear-gradient(#ffffff,#eef6fd)', flexWrap: 'wrap' }}>
                 <div style={{ width: 280, flex: '0 0 280px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="tr-horse-heading" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <ClassChip label={horse.classLabel} classRank={horse.classRank} h={28} font={14} />
                     <span style={{ fontSize: 26, fontWeight: 900 }}>{horse.name}</span>
                   </div>

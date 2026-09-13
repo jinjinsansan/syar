@@ -17,7 +17,7 @@ const MARK_COL = 70;
 /** 券種タブ（選択中: 赤グロス＋下辺を白くして板と繋ぐ／未選択: 白→灰で沈む） */
 function TypeTab({ label, selected, onClick }: { readonly label: string; readonly selected: boolean; readonly onClick: () => void }): React.ReactElement {
   return (
-    <button type="button" onClick={onClick} style={{
+    <button className="story-tab" aria-pressed={selected} type="button" onClick={onClick} style={{
       display: 'flex', alignItems: 'center', height: 42, padding: '0 20px', cursor: 'pointer', fontFamily: 'inherit',
       borderRadius: '10px 10px 0 0', border: '2px solid var(--a-edge)', borderBottom: selected ? '2px solid #fff' : '2px solid var(--a-edge)',
       backgroundImage: selected ? 'var(--a-gloss-red)' : 'linear-gradient(#fff,#e3ecf3)', color: selected ? '#fff' : 'var(--a-ink-2)',

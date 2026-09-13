@@ -50,8 +50,8 @@ export function TabButton({ label, selected, onClick, href, tone = 'blue' }: {
     color: selected ? '#fff' : 'var(--a-ink-2)', fontSize: 16, fontWeight: 900,
     boxShadow: selected ? 'var(--a-inset)' : 'inset 0 -3px 4px rgba(16,36,58,.12)', position: 'relative', zIndex: selected ? 2 : 1,
   };
-  if (href !== undefined) return <a href={href} style={style}>{label}</a>;
-  return <button type="button" onClick={onClick} style={style}>{label}</button>;
+  if (href !== undefined) return <a className="story-tab" aria-current={selected ? 'page' : undefined} href={href} style={style}>{label}</a>;
+  return <button className="story-tab" aria-pressed={selected} type="button" onClick={onClick} style={style}>{label}</button>;
 }
 
 /** 現在値バー（明るい地: 地 #e3ecf3・縁 2px 濃青・塗り 青グロス・数値 青・右に「上限 nnn」12px） */
@@ -126,7 +126,7 @@ export function PageTitle({ title, sub, right }: {
   readonly title: string; readonly sub?: string | undefined; readonly right?: React.ReactNode;
 }): React.ReactElement {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+    <div className="story-page-title" style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
       <h1 className="a-band" style={{ height: 46, padding: '0 22px', borderRadius: 10, border: '2px solid var(--a-edge)', fontSize: 26, fontWeight: 900, letterSpacing: '.06em', textShadow: '0 2px 0 rgba(0,0,0,.3)', margin: 0 }}>{title}</h1>
       {sub !== undefined && <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)' }}>{sub}</span>}
       {right !== undefined && <span style={{ marginLeft: 'auto' }}>{right}</span>}

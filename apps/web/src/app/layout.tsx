@@ -1,7 +1,8 @@
 import './globals.css';
-import { ArcadeNav } from '../components/nav';
+import './story-theme.css';
+import { StoryShell } from '../components/story-shell';
 
-export const metadata = { title: 'STAR', description: 'オンライン競馬育成' };
+export const metadata = { title: '馬物語', description: '育てる。走る。つながっていく。オンライン競馬育成ゲーム' };
 
 /**
  * ★グローバルヘッダー（アーケード筐体テーマ: design/hud-ds/components/program-board［アーケード］の実装表）
@@ -14,11 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ja">
       <body data-theme="arcade">
-        <header className="a-band" style={{ height: 56, padding: '0 26px', borderBottom: '3px solid var(--a-edge)' }}>
-          <a href="/" style={{ fontSize: 20, fontWeight: 900, letterSpacing: '.22em', color: '#ffe37a', textShadow: '0 2px 0 rgba(0,0,0,.35)' }}>STAR</a>
-          <ArcadeNav />
-        </header>
-        <main>{children}</main>
+        <StoryShell>{children}</StoryShell>
       </body>
     </html>
   );

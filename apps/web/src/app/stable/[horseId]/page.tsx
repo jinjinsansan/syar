@@ -77,7 +77,7 @@ export default async function HorsePage({ params }: { params: Promise<{ horseId:
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', height: 56, padding: '0 22px', borderRadius: 10, backgroundImage: 'var(--a-gloss-gold)', border: '3px solid #8a5a06', boxShadow: 'var(--a-shadow-sm)', fontSize: 34, fontWeight: 900, color: '#4a3105', whiteSpace: 'nowrap' }}>{h.classLabel}</span>
             </div>
-            <div style={{ fontSize: 44, fontWeight: 900, marginTop: 14 }}>{h.name}</div>
+            <h1 className="story-horse-name" style={{ fontSize: 44, fontWeight: 900, margin: '14px 0 0' }}>{h.name}</h1>
             <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
               {[h.sexAge, h.coat, h.stableName, ...(sire !== undefined ? [`父 ${sire}`] : [])].map((t) => (
                 <span key={t} className="a-chip" style={{ height: 28, padding: '0 12px', fontSize: 13, color: 'var(--a-ink)' }}>{t}</span>
