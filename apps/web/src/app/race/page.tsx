@@ -147,6 +147,16 @@ const LEGACY_MOTION = typeof window !== 'undefined'
  *    ★戻し口を残すのは、★2026-08-28 に `?cinematography=v5` が黙って既定へ落ちた
  *    ★のと同じ穴を作らないためです。
  */
+/**
+ * ★**入口カードを出す口**（`?entry=1`・★2026-09-13・オーナー指示）
+ *
+ *   ★オーナー指示「★**最初の瞬間にも小さいカードが出るのも辞めて欲しい**」。
+ *   → ★既定では ★**出しません**。★用意ができ次第そのまま流し始めます。
+ * ⚠️ ★カードの中の「ほかのコースを観る」（★10 場 44 鞍の選択）はここからしか開けません。
+ *    ★消すのではなく口を残すのは、★見比べる道を塞がないためです。
+ */
+const SHOW_ENTRY = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('entry') === '1';
 const PACE_SHORT = typeof window === 'undefined'
   || new URLSearchParams(window.location.search).get('pace') !== 'full';
 const RACE_PACE_POLICY: RacePacePolicy = LEGACY_MOTION ? 'legacy' : PACE_SHORT ? 'short' : 'readable';
@@ -1991,6 +2001,21 @@ export default function RacePage(): React.JSX.Element {
   const [built, setBuilt] = useState<Built | null>(null);
   const motionTimeline = useMemo(() => built === null ? null : startRampSec === 1.6 ? built
     : buildMotionTimeline(built, built.result[0]!.gate, startRampSec), [built, startRampSec]);
+  /**
+   * ★**用意ができ次第そのまま流し始める**（★2026-09-13・オーナー指示
+   *   ★「★最初の瞬間にも小さいカードが出るのも辞めて欲しい」）。
+   *
+   *   ★入口カードを出さないので、★押す相手がありません。★素材が揃った時点で始めます。
+   * ⚠️ ★**全画面へは入りません**（★携帯）。★全画面はブラウザが ★**人の操作**を要求するので、
+   *    ★自動では入れません。★その場（ステージ）で流します。
+   * ⚠️ ★`?entry=1` と開発卓（`?dev=1`）では ★**自動で始めません**。★押して始める形のままです。
+   */
+  useEffect(() => {
+    if (devMode || SHOW_ENTRY) return;
+    if (!ready || built === null || watchStarted) return;
+    setWatchStarted(true);
+    setPlaying(true);
+  }, [devMode, ready, built, watchStarted]);
   const [err, setErr] = useState<string | null>(null);
   const [clock, setClock] = useState(0);
   const [surface, setSurface] = useState<Surface>('turf');
@@ -4949,7 +4974,7 @@ export default function RacePage(): React.JSX.Element {
       style={{ background: '#14120f', color: '#efe9dc', padding: 14, fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }}
     >
       {/** ⚠️ ★見ている間は見出しも消します（★上と同じ理由） */}
-      {!devMode && watchStarted ? null : (
+      {!devMode && (watchStarted || !SHOW_ENTRY) ? null : (
       <h1 style={{ fontSize: 18, margin: '4px 0 8px' }}>
         レース
         {smallScreen || !devMode ? null : <>
@@ -4979,7 +5004,7 @@ export default function RacePage(): React.JSX.Element {
         ★`観る` を押すと `playing` が真になり、★レースが終わると偽に戻るので、
         ★**終わったら入口が戻ります**（★次のレースを選ぶ道を塞ぎません）。
       */}
-      {!devMode && !watchStarted && (
+      {!devMode && SHOW_ENTRY && !watchStarted && (
         <div className="a-panel strong rm-entry" data-theme="arcade">
           <div className="a-band rm-entry-head">
             <span className="a-chip gold rm-entry-grade">{RACE_SETUP.race.grade}</span>
