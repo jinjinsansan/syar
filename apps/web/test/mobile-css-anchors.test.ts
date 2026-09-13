@@ -101,16 +101,22 @@ function existsInSource(decl: string, sources: string): boolean {
  * ★規則が CSS 側でページに限定されているもの（`.lp-bleed` / `#steps` = TOP だけ）は、
  *   ★ここに対象ファイルを書きます。
  */
+/**
+ * ⚠️ ★**行き先は `app/lp-arcade/page.tsx` です**（★2026-09-13 に `/` から退避）。
+ *    ★`/` は「馬物語」の LP に入れ替わりました。★`globals.css` の規則は
+ *    ★`.lp-bleed` / `#steps` で書かれているので ★**移した先でも効いています**が、
+ *    ★この表はファイル名で照合するので、★書き換えないと ★**身代わりが居ないまま赤**になります。
+ */
 const SCOPE: Record<string, string> = {
-  'height:560px': 'app/page.tsx',
-  'height:300px': 'app/page.tsx',
-  'height:56px': 'app/page.tsx',
-  'height:120px': 'app/page.tsx',
-  'top:56px': 'app/page.tsx',
-  'top:50px': 'app/page.tsx',
-  'font-size:96px': 'app/page.tsx',
-  'font-size:56px': 'app/page.tsx',
-  'font-size:26px': 'app/page.tsx',
+  'height:560px': 'app/lp-arcade/page.tsx',
+  'height:300px': 'app/lp-arcade/page.tsx',
+  'height:56px': 'app/lp-arcade/page.tsx',
+  'height:120px': 'app/lp-arcade/page.tsx',
+  'top:56px': 'app/lp-arcade/page.tsx',
+  'top:50px': 'app/lp-arcade/page.tsx',
+  'font-size:96px': 'app/lp-arcade/page.tsx',
+  'font-size:56px': 'app/lp-arcade/page.tsx',
+  'font-size:26px': 'app/lp-arcade/page.tsx',
 };
 
 const INDIRECT: Record<string, string> = {

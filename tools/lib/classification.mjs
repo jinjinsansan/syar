@@ -79,6 +79,14 @@ export const READONLY = [
    */
   'check-race-sound-dev.mjs',
   /**
+   * ★LP と内装のページを実際に開いて、★例外と見た目を記録する（★別セッション作・★2026-09-13）。
+   *   ★ヘッドレスで開いて撮るだけ。★出力は `out/` 配下。
+   *   ⚠️ ★DB に触れない（★実測: supabase / insert / update / delete いずれも 0 件）。
+   *   ⚠️ ★分類の登録漏れだったものを、★TOP の移設に合わせて登録（★R-24）。
+   */
+  'check-lp-preview.mjs',
+  'check-story-interiors.mjs',
+  /**
    * ★最後の直線で展開ごとにどれだけ引くかを測る（★2026-09-12・オーナー指示⑤）。
    *   ★画面と同じ経路（`resolveBroadcastV2Scene`）を読むだけ。★出力は標準出力のみ。
    *   ⚠️ ★DB に触れない。★合否は出さない（★閾値はオーナー判断・R-16）。

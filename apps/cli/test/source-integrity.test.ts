@@ -27,7 +27,12 @@ import { describe, expect, it } from 'vitest';
 const ROOT = new URL('../../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
 /** 中身がバイナリのもの。NUL があって当然なので走査しない */
-const BINARY_EXT = /\.(png|jpe?g|gif|webp|ico|zip|mp4|webm|pdf|woff2?|ttf|otf|tsbuildinfo)$/i;
+/**
+ * ⚠️ ★**音源を足したときに、ここへ書き足すのを忘れました**（★2026-09-13）。
+ *    ★`apps/web/public/audio/*.mp3` を入れた途端、★この検査が赤になりました
+ *    （★crowd.mp3 だけで NUL 20,196 個）。★音は「テキストでない」ので当然です。
+ */
+const BINARY_EXT = /\.(png|jpe?g|gif|webp|ico|zip|mp4|webm|mp3|wav|m4a|ogg|pdf|woff2?|ttf|otf|tsbuildinfo)$/i;
 
 /**
  * ★既知の例外は、名前で明示する（登録簿方式）。

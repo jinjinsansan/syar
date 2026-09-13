@@ -87,7 +87,7 @@ export default function HorseStory() {
   }, []);
   return <div className={`ms-page${paused ? ' ms-paused' : ''}`}>
     <nav className="ms-nav" aria-label="馬物語のナビゲーション">
-      <a className="ms-brand" href="/lp-preview">馬物語<span>UMA MONOGATARI</span></a>
+      <a className="ms-brand" href="/">馬物語<span>UMA MONOGATARI</span></a>
       <div className="ms-nav-links"><a href="#story">物語を知る</a><a href="/race">レースを観る ↗</a></div>
       <a className="ms-nav-start" href="/signup">はじめる <span>↗</span></a>
     </nav>
@@ -126,6 +126,6 @@ export default function HorseStory() {
       <div className="ms-family" aria-label="配合で次の世代へつながる血統のイメージ"><div className="ms-parents"><span>育てた強さ<small>YOUR HORSE</small></span><b>＋</b><span>新しい可能性<small>PARTNER</small></span></div><div className="ms-family-line" /><div className="ms-next"><span>THE NEXT CHAPTER</span><strong>また、新しい物語。</strong><span className="ms-star">✧</span></div></div>
     </section>
     <section className="ms-finale"><span className="ms-eyebrow">YOUR STORY STARTS HERE</span><h2>名馬になるかは、まだわからない。<br /><em>愛馬になることは、きっと。</em></h2><a className="ms-primary" href="/signup">無料で物語をはじめる <span>↗</span></a><a className="ms-login" href="/login">すでに物語をはじめた方はこちら</a></section>
-    <footer className="ms-footer"><a className="ms-brand" href="/lp-preview">馬物語<span>UMA MONOGATARI</span></a><p>育てる。走る。つながっていく。</p><a href="/">現在のTOPを見る ↗</a><small>© 馬物語</small></footer>
+    <footer className="ms-footer"><a className="ms-brand" href="/">馬物語<span>UMA MONOGATARI</span></a><p>育てる。走る。つながっていく。</p><a href="/lp-arcade">以前のTOPを見る ↗</a><small>© 馬物語</small></footer>
   </div>;
 }
