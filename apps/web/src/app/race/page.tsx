@@ -5133,8 +5133,33 @@ export default function RacePage(): React.JSX.Element {
   return (
     <main
       className={smallScreen ? 'race-menu' : undefined}
-      style={{ background: '#14120f', color: '#efe9dc', padding: 14, fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }}
+      style={devMode
+        ? { background: '#14120f', color: '#efe9dc', padding: 14, fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }
+        /**
+         * ★**遊ぶ人に出す面は、玄関と同じ色にします**（★2026-09-13・オーナー評
+         *   ★「★TOP は馬物語というグリーンな感じ ／ ★中継を押すとブルーで STAR」）。
+         * ⚠️ ★開発卓（`?dev=1`）は ★**暗いまま**です。★映像の色を見る面なので、
+         *    ★背景を明るくすると判断が狂います。
+         */
+        : { background: '#f8f7ef', color: '#203b34', padding: 14, fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }}
     >
+      {/**
+        * ★**用意している間、白紙にしない**（★2026-09-13）。
+        *   ⚠️ ★携帯では、素材が揃うまで ★**20 秒ほど何も出ません**でした。★その間に見えるのは
+        *      ★旧アーケードの青い帯だけで、★玄関（馬物語）から来た人には別のサイトに見えます。
+        */}
+      {!devMode && (built === null || !ready) && (
+        <div style={{
+          minHeight: '60vh', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 10, textAlign: 'center',
+        }}>
+          <a href="/" style={{
+            fontSize: 22, fontWeight: 700, letterSpacing: '.14em', color: '#315c45', textDecoration: 'none',
+          }}>馬物語</a>
+          <p style={{ margin: 0, color: '#52655c' }}>レースの用意をしています…</p>
+          <a href="/" style={{ marginTop: 18, color: '#42694f', fontSize: 14 }}>← もどる</a>
+        </div>
+      )}
       {/** ⚠️ ★見ている間は見出しも消します（★上と同じ理由） */}
       {!devMode && (watchStarted || !(SHOW_ENTRY || entryRequested)) ? null : (
       <h1 style={{ fontSize: 18, margin: '4px 0 8px' }}>

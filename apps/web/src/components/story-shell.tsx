@@ -18,7 +18,12 @@ const INTERIOR = ['/stable', '/training', '/races', '/entry', '/records', '/priz
  *    ★馬物語の LP は自分の `ms-nav` を持っているので、★帯が二重になります。
  *    ★`/` も同じ LP になったので、★両方ここに入れます。
  */
-const OWN_HEADER = ['/', '/lp-preview'];
+/**
+ * ⚠️ ★`/race` もここです（★2026-09-13・オーナー評
+ *    ★「★TOP は馬物語というグリーンな感じでした。★中継を押すと、ブルーで STAR と出ていました」）。
+ *    ★中継は ★**画面いっぱいの映像**なので、★上に別の帯が載ると玄関と色が食い違います。
+ */
+const OWN_HEADER = ['/', '/lp-preview', '/race'];
 
 /** Presentation boundary: racing canvases, labs and both landing pages keep their own layout. */
 export function StoryShell({ children }: { children: React.ReactNode }) {
