@@ -37,6 +37,7 @@ import {
   phaseOf, HORSE_LENGTH_M,
   // ★描き方は package が唯一の出どころ（この画面には持たない）
   frameRoleOf, silkRoleOf, silkPatternOf, silkPatternInk, type SilkPattern, SHEET_V2,
+  silksPaintable,
   raceShotAt,
   focusForRaceShot,
   drawFixed2DSideScene, fixed2DBackgroundRoleOf, fixed2DPackLayout,
@@ -58,7 +59,6 @@ import {
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, pixelScaleFromSearch, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
-  isSkinTone,
   typedCount,
   raceCallAt, raceSurgeGate, RACE_SURGE_WINDOW_SEC,
   withPhasePrefix,
@@ -980,12 +980,27 @@ const SILKS_LAYOUT_REAR: SilksLayout = {
  *   ★そこには ★鞍布（正しい）★＋ ★**両目**★＋ 面繋の飾りが入っていました。
  *   → ★`nx` の右端を ★**0.40** にします。★鞍布は左寄り（★実測 nx 0.12〜0.30）、
  *     ★頭は右（★pose01 は nx 0.6 以上・pose04 は 0.45 以上）なので、★鞍布だけが残ります。
+ *
+ * ⚠️ ★**上の「0.40」は詰めすぎでした**（★2026-09-13・オーナー評「★また縦縞模様です」）。
+ *
+ * 【★何が起きたか】
+ *   ★上の実測は ★**1 コマ（pose01）だけ**でした。★鞍布は 1 つの塊ではなく、
+ *   ★騎手の脚で ★**2 つに分かれて**写ります。★測ったのは左側だけで、
+ *   ★右側（★実測 nx 0.30〜0.45・★800〜1100 画素）は ★**窓の外**でした。
+ *   → ★右側が元の白のまま残り、★鞍布が ★**縦に割れて**見えます。
+ *
+ * 【★今度は 8 コマ全部測りました】`tools/measure-silks-window.mjs`（★`--paint` で絵も出ます）
+ *   ★鞍布（★200 画素以上の塊）… ★nx 0.20〜0.45 ／ ny 0.28〜0.48（★8 コマの合併）
+ *   ★目（★頭の白目）          … ★nx 0.61〜0.69 ／ ny 0.31〜0.40（★pose05・pose07 で観測）
+ *   → ★右端を ★**0.48** にします。★鞍布は全部入り、★目とは ★**0.13 空きます**。
+ *   ⚠️ ★確かめ方: ★新しい窓で新たに塗られる塊 41 個は ★**すべて鞍布とその縁**で、
+ *      ★目の大きさの塊（nx 0.61〜）は ★**1 つも入りません**（★実測）。
  * ⚠️ ★毛色変換（`applyCoat`）は目を対象外にするので、★**素材側では直りません**。
  *    ★1 度は素材の白目を暗くして追いかけましたが、★それは別件でした（★琥珀色の虹彩）。
  */
 const SILKS_LAYOUT_FRONT: SilksLayout = {
   cropX: 0.1, cropW: 0.8, cropH: 0.6,
-  helmet: [0.25, 0.75, 0.10], jacket: [0.15, 0.85, 0.06, 0.26], saddlecloth: [0.05, 0.40, 0.30, 0.48], number: [-1, -1],
+  helmet: [0.25, 0.75, 0.10], jacket: [0.15, 0.85, 0.06, 0.26], saddlecloth: [0.05, 0.48, 0.30, 0.50], number: [-1, -1],
 };
 /** 騎手が鐙に立って腕を挙げる勝馬コマ（winner-v2）: 矩形が縦に長く、馬体は下 6 割 */
 const SILKS_LAYOUT_WINNER: SilksLayout = {
@@ -1061,8 +1076,11 @@ function silksOverlays(
     const saddlecloth = nx >= layout.saddlecloth[0] && nx <= layout.saddlecloth[1]
       && ny >= layout.saddlecloth[2] && ny <= layout.saddlecloth[3];
     if (!helmet && !jacket && !saddlecloth) continue;
-    const spread = Math.max(r, g, b) - Math.min(r, g, b);
-    if (a < 16 || spread > (helmet ? 62 : 34) || Math.max(r, g, b) < (helmet ? 42 : 72)) continue;
+    /**
+     * ⚠️ ★**判定は `@star/render` の `silksPaintable` に置きました**（★2026-09-13・R-30）。
+     *    ★ここに式を直書きしていたので、★窓を測る道具が ★**違う式**で測っていました。
+     */
+    if (!silksPaintable(r, g, b, a, helmet)) continue;
     /**
      * ★**肌は塗りません**（2026-08-21・オーナー評「騎手の肌の色が白いのがいる」）。
      *
@@ -1074,7 +1092,6 @@ function silksOverlays(
      *   素材の勝負服は**無彩色の灰／白**で作らせているので（生成プロンプトで指定）、
      *   窓の中に R>G>B の肌色相があれば、それは**肌です。**
      */
-    if (isSkinTone(r, g, b)) continue;
     const luminance = (r + g + b) / (3 * 255);
     /**
      * ★**重なった帯は「上着」が勝ちます**（2026-08-28・オーナー指摘）。

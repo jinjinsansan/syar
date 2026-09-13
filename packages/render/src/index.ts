@@ -59,6 +59,7 @@ export { isSkinTone } from './silks-skin.js';
 export { applyCoat, isHorseCoat, COAT_TRANSFORMS, DEFORMED_COAT_TRANSFORMS, isDeformedHorseAsset, type CoatTransform, type CoatName } from './coat.js';
 export { typedCount } from './hud-kit.js';
 export { narratorPortrait, narratorExpressionAt, narratorMouthOpenAt, narratorCastForRace, NARRATOR_NAMES, NARRATOR_ROLES, type NarratorSet, type NarratorExpression, type NarratorCast } from './narrator.js';
+export { silksPaintable, SILKS_PAINT } from './silks-pixel.js';
 export { raceCallAt, withPhasePrefix, raceSurgeGate, RACE_SURGE_WINDOW_SEC, RACE_SURGE_MIN_GAIN_M, type RaceCallPart, type RaceCallHorse, type RaceCallContext, type RaceCallLine } from './race-call.js';
 /**
  * ★デフォルメ馬（★内部仮称「STARミニホース」・★評価モード専用・★2026-09-03）
