@@ -191,3 +191,31 @@ export function oddsFromProbability(kind: TicketKind, p: number, trials: number)
   const raw = (1 / debiasedProbability(p, trials)) * (1 - MARGIN[kind]);
   return floorOddsToTenths(Math.min(ODDS_CAP[kind], raw)) / 10;
 }
+
+/**
+ * ★D-096 の境界: 1.0 倍を 0.1 単位の整数で表したもの。**これ未満の目は売らない**。
+ *   較正定数ではなく正典 D-096 の写し（`calibration.ts` の EXEMPT）。
+ */
+export const EVEN_ODDS_TENTHS = 10;
+
+/** 売るか、売らないならどの規則で売らないか */
+export type SellDecision = 'sell' | 'below_min_probability' | 'below_even_odds';
+
+/**
+ * ★この目を売るか（D-035・D-096・2026-09-14・AUDIT_FIX2 BF-5）。**「売る目」の判定はここ 1 か所だけ。**
+ *
+ *   `apps/worker/src/odds.ts`（本番のオッズ表）と `apps/cli/src/v10-accounting.ts`（V-10）の**両方が、この関数だけを通る**。
+ *   ★以前は、本番が D-035 で売らない目まで V-10 が賭け金に入れていた（測定器と製品が別々に「売る目」を決めていた・R-30）。
+ *
+ *   ① D-035: `p̂ ≥ p_min`（上限に当たる目は売らない）
+ *   ② D-096: 切り捨て前のオッズが 1.0 倍以上（当たっても掛け金を下回る配当を売らない）。
+ *      判定は `floorOddsToTenths(min(ODDS_CAP, raw)) ≥ 10`。**`oddsFromProbability` の値そのものを使う**ので、
+ *      D-094 と同じ許容幅が効き、1.0 ちょうどの値が浮動小数で下に表されても「売る」側に倒れる
+ *      （境界の扱いを 2 か所で別々に書かない）。
+ */
+export function sellDecision(kind: TicketKind, pHat: number, trials: number): SellDecision {
+  // ★NaN・負の確率も「売らない」に倒す（`!(a >= b)` で比べる）
+  if (!(pHat >= minSellableProbability(kind))) return 'below_min_probability';
+  if (Math.round(oddsFromProbability(kind, pHat, trials) * 10) < EVEN_ODDS_TENTHS) return 'below_even_odds';
+  return 'sell';
+}

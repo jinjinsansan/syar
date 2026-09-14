@@ -24,8 +24,10 @@
  *     **休養に落として警告を出します**（週送りを止めるほうが害が大きいため）。
  *     ★黙って休養にしません。件数を必ず返します。
  *     ★**休養に落とすのは EP 不足（SQLSTATE `EP_SHORT_SQLSTATE`）だけ**です（監査 H-3・2026-09-14）。
- *       それ以外の例外は、その馬のその週を**進めず**に別に数え（`spendErrors`）、警報を出し、
- *       そのバッチで実行を打ち切ります（次の周で再試行。引き落としは馬×週で冪等なので二重に引かれない）。
+ *       それ以外の例外は、その馬のその週を**進めず**に別に数え（`spendErrors`）、馬ごとに警報を出します。
+ *       ★失敗した馬は**同じ実行の中では選び直しません**（バッチを選ぶ SQL から除く・照会 Q1・AUDIT_FIX2 BF-1）。
+ *         他の馬は上限まで進めます。失敗し続ける馬が 1 頭いても、世界全体の週送りを遅らせないためです。
+ *         次の周で再試行します（引き落としは馬×週で冪等なので、二重には引かれない）。
  *
  * 【★週ごとの記録は所有馬だけ】
  *   `horse_week_log` は B-1 の証拠として作りましたが、全馬×182週だと
@@ -116,11 +118,15 @@ export interface TrainingWeekResult {
   readonly epShort: number;
   /**
    * ★EP 不足**以外**の理由で引き落としが失敗し、その週を進めなかった頭数（監査 H-3）。
-   *   0 でなければ、その実行はそのバッチで打ち切っています（`incomplete` も true）。
+   *   失敗した馬は同じ実行の中では選び直さず、他の馬は上限まで進めます（AUDIT_FIX2 BF-1）。
    *   次の周で同じ馬を再試行します（引き落としは馬×週で冪等なので、二重には引かれない）。
    */
   readonly spendErrors: number;
-  /** ★上限に当たって途中で終わったか。true なら**まだ終わっていません** */
+  /**
+   * ★まだ終わっていない馬がいるか。次のどちらかなら true です（AUDIT_FIX2 BF-1）:
+   *   ① 上限（`MAX_WEEKS_PER_RUN` × バッチ数）に当たって途中で終わった
+   *   ② EP 不足以外の失敗で、週を進めなかった馬がいる（`spendErrors > 0`）
+   */
   readonly incomplete: boolean;
 }
 
@@ -171,8 +177,11 @@ export async function advanceTrainingWeeks(
   let epShort = 0;
   /** ★EP 不足以外の失敗で、その週を進めなかった頭数（監査 H-3） */
   let spendErrors = 0;
-  /** ★EP 不足以外の失敗で、この実行を打ち切ったか */
-  let stoppedOnError = false;
+  /**
+   * ★EP 不足以外の失敗が出た馬の ID（AUDIT_FIX2 BF-1）。**この実行の中では、以後のバッチで選び直さない。**
+   *   選ぶ SQL は `order by id limit` なので、除かなければ失敗し続ける馬が毎回同じバッチに選ばれ、枠を食い続ける。
+   */
+  const failedIds: string[] = [];
 
   // ★何頭いるかを先に数え、**週数 × バッチ数**で回数の上限を決める。
   //   ここを固定回数にすると、頭数が増えたときに黙って途中で止まります。
@@ -192,9 +201,10 @@ export async function advanceTrainingWeeks(
         where retired_at_week is null
           and birth_week is not null
           and last_processed_week < $1
+          and not (id = any($3::uuid[]))
         order by id
         limit $2`,
-      [target, BATCH_SIZE],
+      [target, BATCH_SIZE, failedIds],
     );
     if (r.rowCount === 0) { hitCap = false; break; }
 
@@ -251,10 +261,11 @@ export async function advanceTrainingWeeks(
             /**
              * ★EP 不足以外を休養に落とさない（監査 H-3・2026-09-14）。
              *   その馬のその週は**進めない**（状態を書かない）。次の周で再試行する。
-             *   ⚠️ 「止める／飛ばす」の最終形はオーナー判断（照会）。いまは「飛ばす ＋ このバッチで打ち切る」。
+             *   ★この実行の中では選び直さない（`failedIds` で以後のバッチから除く・照会 Q1・AUDIT_FIX2 BF-1）。
              */
             spendErrors += 1;
             skipped.add(row.id);
+            failedIds.push(row.id);
             onAlert(
               `★調教の EP 引き落としが EP 不足以外の理由で失敗しました: 馬 ${row.id} 週 ${week}` +
                 `（SQLSTATE ${spendErrorCode(e)} / ${spendErrorMessage(e)}）。この馬のこの週は進めていません`,
@@ -329,36 +340,32 @@ export async function advanceTrainingWeeks(
       const w = num(row.last_processed_week, 'last_processed_week');
       if (!weeks.includes(w)) weeks.push(w);
     }
-    if (skipped.size > 0) {
-      // ★同じ馬がすぐ次のバッチで選び直されて空回りしないよう、この実行はここで打ち切る（次の周で再試行）
-      stoppedOnError = true;
-      break;
-    }
   }
 
   /**
    * ★上限に当たったまま終わったら、**黙って終わらせません**。
    *   途中まで進んだ状態は「進んでいる」ように見えるので、
    *   気づく契機が要ります（R-21）。次の周で続きが進みます。
-   *   ★失敗で打ち切った場合は上限ではないので、下の別の警報を出します（取り違えさせない）。
    */
-  if (hitCap && !stoppedOnError) {
+  if (hitCap) {
     onAlert(
       `週送りが上限（${MAX_WEEKS_PER_RUN}週 × ${batchesPerWeek}バッチ）に達しました。` +
       `まだ締まった週に届いていない馬がいます（次の周で続けます）`,
     );
   }
-  if (stoppedOnError) {
+  if (spendErrors > 0) {
+    // ★周の終わりに件数の要約を 1 行（馬ごとの警報は上で出している・AUDIT_FIX2 BF-1）
     onAlert(
-      `★EP 不足以外の失敗で ${spendErrors} 頭の週を進めず、週送りをこのバッチで打ち切りました` +
-      `（次の周で再試行します・監査 H-3）`,
+      `★EP 不足以外の失敗で ${spendErrors} 頭の週を進めませんでした` +
+      `（この実行では選び直さず、他の馬は進めました。次の周で再試行します・監査 H-3）`,
     );
   }
   if (epShort > 0) {
     // ★黙って休養に落とさない。件数を目に付く形で出す（D-037 と同じ考え方）
     onAlert(`★EP 不足で ${epShort} 頭を休養に落としました（Q-P3-23 の裁定待ち）`);
   }
-  return { weeks, advanced, retired, epSpent, epShort, spendErrors, incomplete: hitCap };
+  // ★incomplete: 上限に当たった、または失敗で週を進めなかった馬がいる（`TrainingWeekResult` の註記・AUDIT_FIX2 BF-1）
+  return { weeks, advanced, retired, epSpent, epShort, spendErrors, incomplete: hitCap || spendErrors > 0 };
 }
 
 /** ★この実行で処理すべき週があるか（呼ぶ側のログ用） */

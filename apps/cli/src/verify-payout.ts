@@ -28,6 +28,13 @@
  *     これなら測っているもの（MC 推定の誤差）は変わらず、分散だけが下がる。
  *     採否と、A-3 の「10万レース」がこの形でよいかを照会する。
  *
+ * 【★2026-09-14・AUDIT_FIX2 BF-5・BF-6】
+ *   ① 売る目は、本番のオッズ表と同じ述語 `sellDecision` で決める（D-035・D-096）。
+ *      以前は、本番が売らない目まで賭け金に入れていた（測定器と製品が別々に「売る目」を決めていた・R-30）
+ *   ② 合否は**切り捨て前の払戻率**で出す（D-094）。切り捨て後とその差は並べるだけ
+ *   ③ 出走表間 SD と SE を出す。SE が 0.25pt に届かなければ「判定不能」（D-036・R-3）
+ *   集計と判定は `v10-accounting.ts` に切り出し、`apps/cli/test/v10-accounting.test.ts` で固定している
+ *
  * 実行: npm run verify:payout -- --races 2000 --seeds 42
  */
 
@@ -40,11 +47,7 @@ import {
   type RaceResult,
 } from '@star/race-engine';
 import {
-  MARGIN,
-  ODDS_CAP,
   TICKET_KINDS,
-  debiasedProbability,
-  oddsFromProbability,
   placeDepth,
   type TicketKind,
 } from '@star/betting';
@@ -52,6 +55,15 @@ import { generateRace, sortPoolByClass } from './race-field.js';
 import { resolveRuntimeConfig } from './config.js';
 import { runSimulation } from './simulator.js';
 import { POOL_GENERATIONS, POOL_MARES } from './measurement.js';
+import {
+  V10_SE_LIMIT,
+  V10_TOLERANCE,
+  accountRaceKind,
+  emptyKindStat,
+  judgeKind,
+  mergeKindStat,
+  type KindStat,
+} from './v10-accounting.js';
 
 // ★用途IDは集約表から取る。ここで独自採番したために race.ts の 1/2 と重なっていた
 //   （レビュー側 2026-08-07 の指摘。相関は実測で否定されたが、重なる構造は実在した）
@@ -106,27 +118,6 @@ function winningKeys(kind: TicketKind, order: readonly number[], fieldSize: numb
   }
 }
 
-interface KindStat {
-  stake: number;
-  payout: number;
-  /** MC で一度も出なかった目が的中した回数（オッズが cap になり大きく払う） */
-  unseenHits: number;
-  bets: number;
-  /** ★配当上限（§9.4）で切り詰められた**売り目**の数 */
-  cappedBets: number;
-  /** ★cap が無ければ払っていた額との差の総額 */
-  cappedLoss: number;
-  /**
-   * ★0.1 単位の切り捨て（D-094 候補・2026-09-14）で減った額の総額。
-   *   cap による損失と混ぜない（混ぜると「cap無しなら」が切り捨てのぶんまで含んでしまう）。
-   */
-  floorLoss: number;
-}
-
-function emptyStat(): KindStat {
-  return { stake: 0, payout: 0, unseenHits: 0, bets: 0, cappedBets: 0, cappedLoss: 0, floorLoss: 0 };
-}
-
 function orderOf(result: RaceResult): number[] {
   return result.order.map((r) => Number(r.horseId.replace(/^H/, '')));
 }
@@ -151,7 +142,7 @@ function runSeed(seed: number): Map<TicketKind, KindStat> {
   );
   const pool = sortPoolByClass(sim.finalPopulation ?? []);
   if (pool.length === 0) throw new Error('母集団の取得に失敗（retainFinalPopulation）');
-  const stats = new Map<TicketKind, KindStat>(TICKET_KINDS.map((k) => [k, emptyStat()]));
+  const stats = new Map<TicketKind, KindStat>(TICKET_KINDS.map((k) => [k, emptyKindStat()]));
 
   for (let raceIndex = 0; raceIndex < RACES; raceIndex += 1) {
     const race = generateRace(pool, raceIndex, deriveRng(seed, STREAM.FIELD, raceIndex));
@@ -187,81 +178,52 @@ function runSeed(seed: number): Map<TicketKind, KindStat> {
     });
     const finalOrder = orderOf(final);
 
-    // --- 全組合せに1点ずつ買う ---
+    // --- 売る目すべてに 1 点ずつ買い、確定着順で精算する ---
+    //   ★売る目は本番のオッズ表と同じ述語で決める（`sellDecision`・AUDIT_FIX2 BF-5・R-30）
     for (const kind of TICKET_KINDS) {
-      const st = stats.get(kind)!;
-      const m = counts.get(kind)!;
-      // 買える目 = MC で1回以上出た目（p=0 の目は運営が売らない想定）
-      st.stake += m.size;
-      st.bets += m.size;
-      // ★cap に当たっている売り目を数える。払戻率の下振れが「推定誤差」なのか
-      //   「§9.4 の切り詰め」なのかは、これを測らないと区別できません。
-      for (const c of m.values()) {
-        const pe = debiasedProbability(c / ODDS_TRIALS, ODDS_TRIALS);
-        if ((1 / pe) * (1 - MARGIN[kind]) > ODDS_CAP[kind]) st.cappedBets += 1;
-      }
-      for (const key of winningKeys(kind, finalOrder, fieldSize)) {
-        const c = m.get(key);
-        if (c === undefined) {
-          // 売っていない目が当たった ＝ 払戻なし。頻度を報告する（見逃すと払戻率が過大に出る）
-          st.unseenHits += 1;
-          continue;
-        }
-        const prob = c / ODDS_TRIALS;
-        // ★raw も補正後で取る。補正前の raw と比べると、cap による損失に
-        //   「バイアス補正で下がったぶん」が混ざり、cap の効果を過大に読む
-        const raw = (1 / debiasedProbability(prob, ODDS_TRIALS)) * (1 - MARGIN[kind]);
-        const beforeFloor = Math.min(ODDS_CAP[kind], raw);
-        const paid = oddsFromProbability(kind, prob, ODDS_TRIALS);
-        st.payout += paid;
-        // ★cap による損失と、0.1 単位の切り捨て（D-094 候補・2026-09-14）による損失を分けて数える。
-        //   以前は `raw > paid` の差をすべて cap の損失としていた（切り捨てが入ると混ざる）
-        if (raw > beforeFloor) st.cappedLoss += raw - beforeFloor;
-        st.floorLoss += beforeFloor - paid;
-      }
+      accountRaceKind(stats.get(kind)!, kind, counts.get(kind)!, ODDS_TRIALS, winningKeys(kind, finalOrder, fieldSize));
     }
   }
   return stats;
 }
 
-console.log(`# A-3 / V-10 払戻率（券種別・設定margin ±1%）`);
+console.log(`# A-3 / V-10 払戻率（券種別・設定margin ±${V10_TOLERANCE * 100}%・★判定値は切り捨て前の払戻率 D-094）`);
 console.log(`  races=${RACES} odds-trials=${ODDS_TRIALS} seeds=${SEEDS.join(',')}`);
 
-const total = new Map<TicketKind, KindStat>(TICKET_KINDS.map((k) => [k, emptyStat()]));
+const total = new Map<TicketKind, KindStat>(TICKET_KINDS.map((k) => [k, emptyKindStat()]));
 for (const seed of SEEDS) {
   const s = runSeed(seed);
-  for (const k of TICKET_KINDS) {
-    const a = total.get(k)!;
-    const b = s.get(k)!;
-    a.stake += b.stake;
-    a.payout += b.payout;
-    a.unseenHits += b.unseenHits;
-    a.bets += b.bets;
-    a.cappedBets += b.cappedBets;
-    a.cappedLoss += b.cappedLoss;
-    a.floorLoss += b.floorLoss;
-  }
+  for (const k of TICKET_KINDS) mergeKindStat(total.get(k)!, s.get(k)!);
 }
 
+const pct = (x: number): string => `${(x * 100).toFixed(2)}%`;
+const pt = (x: number): string => `${x * 100 >= 0 ? '+' : ''}${(x * 100).toFixed(2)}pt`;
+const runs = RACES * SEEDS.length;
+
 let allPass = true;
+let allSeReached = true;
 for (const k of TICKET_KINDS) {
   const st = total.get(k)!;
-  const rate = st.stake === 0 ? 0 : st.payout / st.stake;
-  const target = 1 - MARGIN[k];
-  const dev = rate - target;
-  const pass = Math.abs(dev) <= 0.01;
-  if (!pass) allPass = false;
+  const v = judgeKind(k, st);
+  if (!v.pass) allPass = false;
+  if (!v.seReached) allSeReached = false;
   console.log(
-    `  ${k.padEnd(16)} 払戻率 ${(rate * 100).toFixed(2)}%  目標 ${(target * 100).toFixed(0)}%  ` +
-      `乖離 ${(dev * 100 >= 0 ? '+' : '') + (dev * 100).toFixed(2)}pt  ` +
-      `売目 ${(st.bets / (RACES * SEEDS.length)).toFixed(0)}/R  ` +
-      `未発売的中 ${st.unseenHits}  cap該当 ${((st.cappedBets / Math.max(1, st.bets)) * 100).toFixed(1)}%  ` +
-      `cap無しなら ${(((st.payout + st.cappedLoss) / Math.max(1, st.stake)) * 100).toFixed(2)}%  ` +
-      `切捨て無しなら ${(((st.payout + st.floorLoss) / Math.max(1, st.stake)) * 100).toFixed(2)}%  ` +
-      `${pass ? 'PASS' : 'FAIL'}`,
+    `  ${k.padEnd(16)} ★判定値＝切り捨て前 ${pct(v.rateBeforeFloor)}（乖離 ${pt(v.rateBeforeFloor - v.target)}）  ` +
+      `切り捨て後 ${pct(v.rateAfterFloor)}  差 ${pt(v.floorDiff)}  目標 ${pct(v.target)}  ` +
+      `売目 ${(st.stake / runs).toFixed(1)}/R  ` +
+      `D-035で売らず ${(st.unsoldMinProbability.bets / runs).toFixed(1)}/R（的中 ${st.unsoldMinProbability.hits}・売っていたら払戻 ${st.unsoldMinProbability.payoutBeforeFloor.toFixed(1)}）  ` +
+      `D-096で売らず ${(st.unsoldEvenOdds.bets / runs).toFixed(1)}/R（的中 ${st.unsoldEvenOdds.hits}・売っていたら払戻 ${st.unsoldEvenOdds.payoutBeforeFloor.toFixed(1)}）  ` +
+      `未発売的中 ${st.unseenHits}  cap該当 ${st.cappedBets}  ` +
+      `出走表間SD ${v.raceSd === null ? '-' : pt(v.raceSd)}  SE ${v.se === null ? '-' : pt(v.se)}` +
+      `（${v.seReached ? `≤${V10_SE_LIMIT * 100}pt に届いた` : `★${V10_SE_LIMIT * 100}pt に届いていない`}）  ` +
+      `${v.pass ? 'PASS' : 'FAIL'}（参考: 切り捨て後で判定すると ${v.passAfterFloor ? 'PASS' : 'FAIL'}）`,
   );
 }
-console.log(`\n  V-10 総合: ${allPass ? 'PASS' : 'FAIL'}`);
+
+console.log(`\n  V-10 総合（切り捨て前で判定）: ${allPass ? 'PASS' : 'FAIL'}`);
+if (!allSeReached) {
+  console.log(`  ★SE が ${V10_SE_LIMIT * 100}pt に届いていない券種があります。**この実行は正式な V-10 ゲートではありません**（D-036）。合否は判定不能として扱ってください（R-3）`);
+}
 
 /**
  * ★**終了コードに判定を出す。**
@@ -272,5 +234,7 @@ console.log(`\n  V-10 総合: ${allPass ? 'PASS' : 'FAIL'}`);
  *   実際、再実行を `終了コード=0` で確認しかけました。
  *
  *   ⚠️ 「出力に FAIL と書いてある」は「落ちた」ではありません。R-21 と同じ形です。
+ *
+ * ★2026-09-14: 不合格は 1、**全券種が帯の内でも SE が届いていなければ 2（判定不能）**。0 を返すのは両方そろったときだけ（R-3）。
  */
-process.exit(allPass ? 0 : 1);
+process.exit(!allPass ? 1 : allSeReached ? 0 : 2);

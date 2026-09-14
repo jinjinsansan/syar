@@ -22,8 +22,8 @@ import {
   MARGIN,
   ODDS_CAP,
   debiasedProbability,
-  minSellableProbability,
   oddsFromProbability,
+  sellDecision,
   requiredOddsTrials,
   type TicketKind,
 } from '@star/betting';
@@ -97,14 +97,14 @@ export function buildOddsRows(
   if (trials <= 0) throw new Error('buildOddsRows: 試行数が 0 以下です');
   const rows: OddsRow[] = [];
   for (const [betType, m] of counts) {
-    const pMin = minSellableProbability(betType);
     for (const [key, c] of m) {
       // ★1回も出なかった目はそもそもここに現れない（= 売らない）
       const probability = c / trials;
-      // ★D-035: 上限に当たる目は売らない。
-      //   売ると、客は当たっても切り詰められた配当しか受け取れません。
-      //   ここで弾くことで、以降のオッズは**必ず上限の内側**に収まります。
-      if (probability < pMin) continue;
+      // ★売る目の判定は `sellDecision` の 1 か所だけ（V-10 と同じ述語・R-30・AUDIT_FIX2 BF-5）。
+      //   D-035: 上限に当たる目は売らない。売ると、客は当たっても切り詰められた配当しか受け取れません。
+      //          ここで弾くことで、以降のオッズは**必ず上限の内側**に収まります。
+      //   D-096: 切り捨て前のオッズが 1.0 倍を下回る目は売らない（当たっても掛け金を下回る配当を売らない）。
+      if (sellDecision(betType, probability, trials) !== 'sell') continue;
       const odds = oddsFromProbability(betType, probability, trials);
       // ★cap 判定の raw も補正後で取る。補正前と比べると、D-013 の割り戻しで
       //   下がったぶんまで「cap に当たった」と数えてしまう

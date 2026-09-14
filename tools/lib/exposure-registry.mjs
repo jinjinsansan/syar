@@ -140,18 +140,20 @@ export function judgeReads(reads) {
  *
  * 【期待値の出どころ】（指示書 AF-3 §4-1-4。手で推測して書かない）
  *   2026-09-14 **staging の実測**（`0021` 適用後・`pg_proc` の走査・`has_function_privilege`）。
- *   ⚠️ 本番は `0021` が未適用なので、`spend_training_ep` の anon が true のまま。**本番で回すと④が落ちます**
+ *   ★`place_bet`・`exchange_prize` の anon は、`0022` で剥がす指示（AUDIT_FIX2 BF-2）に合わせて false にした。
+ *     **`0022` を当てるまでは staging でも④が落ちます**。当てた後の実測で確かめる。
+ *   ⚠️ 本番は `0021`・`0022` が未適用なので、**本番で回すと④が落ちます**
  *      （それが正しい。適用はオーナーの指示で別に行う）。
  */
 /** @type {Readonly<Record<string, {anon: boolean, authenticated: boolean}>>} */
 export const EXPECTED_FUNCTION_EXECUTE = {
   // ★ガード自身。利用者の RPC から呼ばれるので authenticated だけ（`0019` が anon を明示的に外している）
   'assert_setup_complete()': { anon: false, authenticated: true },
-  // ⚠️ anon に EXECUTE が残っている（`0002`・`0008` は public だけを剥がし、anon は Supabase の既定で付いたまま）。
-  //    関数の先頭の `assert_setup_complete()` が「未認証」で弾くので、動作としては閉じているが、権限としては開いている。
-  //    ★実測どおり書く。閉じるかは照会中（REPORT_AUDIT_FIX_20260914.md）
-  'exchange_prize(bigint,uuid)': { anon: true, authenticated: true },
-  'place_bet(uuid,text,jsonb,integer,uuid)': { anon: true, authenticated: true },
+  // ★利用者が呼ぶ RPC。authenticated だけに実行させる（`0022` で anon を剥がす・照会 Q2・2026-09-14）。
+  //   以前は anon に EXECUTE が残っており（`0002`・`0008` は public だけを剥がしていた）、
+  //   先頭の `assert_setup_complete()` の検査だけで閉じていた
+  'exchange_prize(bigint,uuid)': { anon: false, authenticated: true },
+  'place_bet(uuid,text,jsonb,integer,uuid)': { anon: false, authenticated: true },
   // ★ワーカー専用（`0021`・D-095 候補）。利用者のロールには実行させない（監査 H-4）
   'spend_training_ep(uuid,bigint,integer)': { anon: false, authenticated: false },
 };

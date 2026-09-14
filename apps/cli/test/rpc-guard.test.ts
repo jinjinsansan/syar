@@ -158,6 +158,46 @@ function workerOnlyViolations(name: string, migrations: readonly Migration[]): s
   return out;
 }
 
+/**
+ * ★利用者が呼ぶ RPC の実行権限の条件（照会 Q2・AUDIT_FIX2 §2-2・2026-09-14）。**開きすぎも塞ぎすぎも落とす**（R-2）。
+ *   ① 最後の定義より後に、public と anon からの revoke がある（開きすぎ）
+ *   ② 最後の定義より後に、authenticated への grant があり、その後に authenticated からの revoke が無い（塞ぎすぎ・書き忘れ）
+ *   ③ ① の revoke より後に、public・anon への grant が無い（開き直し）
+ *   ★`create or replace` は権限を保つが、この検査は「最後の定義より後」に書かれていることを要求する
+ *     （書かれていなければ、どの付与が効いているかを移行ファイルから読めない）。
+ */
+function userRpcViolations(name: string, migrations: readonly Migration[]): string[] {
+  const def = latestFunctionBodies(migrations).get(name);
+  if (def === undefined) return [`${name}: 定義が見つからない`];
+  const out: string[] = [];
+  const after = functionPrivilegeStatements(migrations).filter(
+    (s) => s.pos > def.pos && (s.functions === 'all' || s.functions.includes(name)),
+  );
+  for (const role of ['public', 'anon']) {
+    const revokes = after.filter((s) => s.action === 'revoke' && s.roles.includes(role));
+    if (revokes.length === 0) {
+      out.push(`${name}: 最後の定義（${def.file}）より後に ${role} からの revoke が無い（開きすぎ）`);
+      continue;
+    }
+    const lastRevoke = revokes[revokes.length - 1]!.pos;
+    const regrants = after.filter((s) => s.action === 'grant' && s.roles.includes(role) && s.pos > lastRevoke);
+    if (regrants.length > 0) {
+      out.push(`${name}: revoke の後に ${role} への grant がある（開き直し・${regrants.map((g) => g.file).join(', ')}）`);
+    }
+  }
+  const authGrants = after.filter((s) => s.action === 'grant' && s.roles.includes('authenticated'));
+  const authRevokes = after.filter((s) => s.action === 'revoke' && s.roles.includes('authenticated'));
+  if (authGrants.length === 0) {
+    out.push(`${name}: 最後の定義（${def.file}）より後に authenticated への grant が無い（塞ぎすぎ・書き忘れ）`);
+  } else if (
+    authRevokes.length > 0 &&
+    authRevokes[authRevokes.length - 1]!.pos > authGrants[authGrants.length - 1]!.pos
+  ) {
+    out.push(`${name}: authenticated への grant の後に authenticated からの revoke がある（塞ぎすぎ）`);
+  }
+  return out;
+}
+
 describe('D-080 書き込み RPC のセットアップ判定', () => {
   const bodies = latestFunctionBodies();
 
@@ -252,6 +292,45 @@ describe('★ワーカー専用関数（D-095 候補・監査 H-3＋H-4）', () 
         one(`create or replace function spend_training_ep(p uuid) returns uuid language sql as $$ select auth.uid() $$;\n${revokeAll}`),
       ).join('\n'),
     ).toMatch(/auth\.uid/);
+  });
+});
+
+describe('★利用者が呼ぶ RPC の実行権限（照会 Q2・AUDIT_FIX2 BF-2）', () => {
+  it('★place_bet・exchange_prize は public・anon から剥がし、authenticated には付けている（最後の定義より後で）', () => {
+    const migrations = readMigrations();
+    const violations = USER_RPCS.flatMap((n) => userRpcViolations(n, migrations));
+    expect(violations, violations.join('\n')).toEqual([]);
+  });
+
+  it('★検査が効くこと: 開きすぎも塞ぎすぎも落ちる（R-2・R-14）', () => {
+    const def = 'create or replace function place_bet(p uuid) returns int language sql as $$ select 1 $$;\n';
+    const revoke = 'revoke all on function place_bet(uuid) from public, anon;\n';
+    const grant = 'grant execute on function place_bet(uuid) to authenticated;\n';
+    const one = (sql: string): Migration[] => [{ file: '0001_a.sql', sql }];
+
+    // 正しい形は通る
+    expect(userRpcViolations('place_bet', one(def + revoke + grant))).toEqual([]);
+    // ★開きすぎ: anon の revoke が無い
+    expect(
+      userRpcViolations('place_bet', one(`${def}revoke all on function place_bet(uuid) from public;\n${grant}`)).join('\n'),
+    ).toMatch(/anon からの revoke が無い/);
+    // ★開きすぎ: 後の移行で anon に付け直した
+    expect(
+      userRpcViolations('place_bet', [
+        { file: '0001_a.sql', sql: def + revoke + grant },
+        { file: '0002_b.sql', sql: 'grant execute on function public.place_bet(uuid) to anon;\n' },
+      ]).join('\n'),
+    ).toMatch(/anon への grant がある/);
+    // ★塞ぎすぎ: authenticated への grant が無い（書き忘れ）
+    expect(userRpcViolations('place_bet', one(def + revoke)).join('\n')).toMatch(/authenticated への grant が無い/);
+    // ★塞ぎすぎ: 付けた後に authenticated から剥がした
+    expect(
+      userRpcViolations('place_bet', one(`${def}${revoke}${grant}revoke all on function place_bet(uuid) from authenticated;\n`)).join('\n'),
+    ).toMatch(/塞ぎすぎ/);
+    // ★権限の文が再定義より前にしか無い
+    expect(userRpcViolations('place_bet', one(revoke + grant + def)).length).toBeGreaterThan(0);
+    // ★コメントの中の revoke・grant は数えない
+    expect(userRpcViolations('place_bet', one(`${def}-- ${revoke}-- ${grant}`)).length).toBe(3);
   });
 });
 

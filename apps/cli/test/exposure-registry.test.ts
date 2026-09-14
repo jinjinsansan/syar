@@ -181,9 +181,9 @@ describe('V-20 ④ 関数の EXECUTE（監査 H-4・2026-09-14）', () => {
     expect(EXPECTED_FUNCTION_EXECUTE['spend_training_ep(uuid,bigint,integer)']).toEqual({ anon: false, authenticated: false });
     // ★ガード自身は anon に実行させない（0019）
     expect(EXPECTED_FUNCTION_EXECUTE['assert_setup_complete()']?.anon).toBe(false);
-    // ★利用者の RPC は authenticated が実行できる（塞ぎすぎていない）
-    expect(EXPECTED_FUNCTION_EXECUTE['place_bet(uuid,text,jsonb,integer,uuid)']?.authenticated).toBe(true);
-    expect(EXPECTED_FUNCTION_EXECUTE['exchange_prize(bigint,uuid)']?.authenticated).toBe(true);
+    // ★利用者の RPC は authenticated だけが実行できる（anon には実行させない・0022・照会 Q2 ／ 塞ぎすぎていない）
+    expect(EXPECTED_FUNCTION_EXECUTE['place_bet(uuid,text,jsonb,integer,uuid)']).toEqual({ anon: false, authenticated: true });
+    expect(EXPECTED_FUNCTION_EXECUTE['exchange_prize(bigint,uuid)']).toEqual({ anon: false, authenticated: true });
     // ★登録簿に無い関数は、本物の登録簿でも未登録として落ちる
     expect(unregisteredFunctions(['brand_new_fn()'])).toEqual(['brand_new_fn()']);
   });

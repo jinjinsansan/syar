@@ -101,6 +101,19 @@ describe('§9.2 オッズ算出', () => {
       expect(row!.odds, k).toBeLessThan(1 / 0.1);
     }
   });
+
+  it('★D-096: オッズ 1.0 倍未満の行は作られない（当たっても掛け金を下回る目を売らない・AUDIT_FIX2 BF-5）', () => {
+    const M = ODDS_MC_TRIALS;
+    for (const kind of TICKET_KINDS) {
+      // 1 番は p = 0.95（どの券種でも 1 − margin を上回る → 1.0 倍未満）、2・3 番は売る目
+      const rows = buildOddsRows(
+        counts(kind, [['1', Math.round(M * 0.95)], ['2', Math.round(M * 0.5)], ['3', Math.round(M * 0.01)]]),
+        M,
+      );
+      expect(rows.filter((r) => r.odds < 1), kind).toEqual([]);
+      expect(rows.map((r) => r.selection[0]).sort(), kind).toEqual([2, 3]);
+    }
+  });
 });
 
 describe('§9.1 的中目の導出', () => {
