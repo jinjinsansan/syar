@@ -617,6 +617,11 @@ export interface ToStraightCutInOptions {
    * ⚠️ ★渡さなければ描きません（★v8 の画面は 1 画素も変わりません）。
    */
   readonly formationBar?: boolean | undefined;
+  /**
+   * ★**馬が画面の左へ走る版か**（★2026-09-15・右回り）。★真なら隊列バーの ★**先頭を左端**に置きます。
+   * ⚠️ ★省くと従来どおり（★先頭は右端）。
+   */
+  readonly leftward?: boolean | undefined;
 }
 
 /**
@@ -691,12 +696,13 @@ export function drawToStraightCutIn<TImage>(
     const bw = box.x + box.width - rx;
     const barH = Math.round(H * (14 / 720));
     const by = box.y + box.height - barH - Math.round(H * 0.012);
+    const leftward = o.leftward === true;
     ctx.fillStyle = PAPER70;
     ctx.font = font(Math.round(H * 0.020), true);
     ctx.textAlign = 'left';
-    ctx.fillText('後方', bx, by - Math.round(H * 0.012));
+    ctx.fillText(leftward ? '先頭' : '後方', bx, by - Math.round(H * 0.012));
     ctx.textAlign = 'right';
-    ctx.fillText('先頭', bx + bw, by - Math.round(H * 0.012));
+    ctx.fillText(leftward ? '後方' : '先頭', bx + bw, by - Math.round(H * 0.012));
     ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(238,242,246,0.18)';
     ctx.fillRect(bx, by, bw, barH);
@@ -707,7 +713,8 @@ export function drawToStraightCutIn<TImage>(
     const ordered = [...o.horses].sort((a, b) => Number(a.gate === o.ownGate) - Number(b.gate === o.ownGate));
     for (const h of ordered) {
       const own = h.gate === o.ownGate;
-      const cx = bx + bw * ((h.s - tail) / span);
+      const u = (h.s - tail) / span;
+      const cx = bx + bw * (leftward ? 1 - u : u);
       const r = own ? barH * 0.72 : barH * 0.5;
       ctx.beginPath();
       ctx.ellipse(cx, by + barH / 2, r, r, 0, 0, Math.PI * 2);
@@ -915,18 +922,23 @@ export function drawOwnHorseTelop<TImage>(
  */
 export function drawFormationTelop<TImage>(
   ctx: Ctx2D<TImage>, font: FontOf, f: RaceTelopFrame,
-  o: { readonly horses: readonly MinimapHorse[]; readonly ownGate: number; readonly ownOrder: number },
+  o: {
+    readonly horses: readonly MinimapHorse[]; readonly ownGate: number; readonly ownOrder: number;
+    /** ★馬が画面の左へ走る版か（★2026-09-15・右回り）。★真なら先頭を左端に */
+    readonly leftward?: boolean | undefined;
+  },
 ): void {
   const box = drawRaceTelopBand(ctx, font, f);
   if (box === undefined) return;
   const H = f.viewport.height;
+  const leftward = o.leftward === true;
   const labelY = box.y + Math.round(box.height * 0.34);
   ctx.font = font(Math.round(H * (14 / 720)), true);
   ctx.textAlign = 'left';
   ctx.fillStyle = PAPER70;
-  ctx.fillText('後方', box.x, labelY);
+  ctx.fillText(leftward ? '先頭' : '後方', box.x, labelY);
   ctx.textAlign = 'right';
-  ctx.fillText('先頭', box.x + box.width, labelY);
+  ctx.fillText(leftward ? '後方' : '先頭', box.x + box.width, labelY);
   ctx.textAlign = 'center';
   ctx.fillStyle = TELOP_OWN;
   ctx.fillText(`あなた＝${o.ownOrder}番手`, box.x + box.width / 2, labelY);
@@ -943,7 +955,8 @@ export function drawFormationTelop<TImage>(
   const span = Math.max(1, lead - tail);
   for (const h of o.horses) {
     const own = h.gate === o.ownGate;
-    const cx = box.x + box.width * ((h.s - tail) / span);
+    const u = (h.s - tail) / span;
+    const cx = box.x + box.width * (leftward ? 1 - u : u);
     const r = (own ? barH * 0.69 : barH * 0.5);
     ctx.beginPath();
     ctx.ellipse(cx, barY + barH / 2, r, r, 0, 0, Math.PI * 2);

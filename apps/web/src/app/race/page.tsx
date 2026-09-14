@@ -115,7 +115,17 @@ const RACE_SETUP = raceSetupFromParam(RACE_PARAM).setup;
 const DIST = RACE_SETUP.distanceM;
 /** ★走路の形。⚠️ ★エンジンにも描画層にも**これを渡します**（★別々に組まない） */
 const COURSE_SPEC = RACE_SETUP.spec;
-const COURSE_OPTS = { ...COURSE_SPEC, turn: RACE_SETUP.turn };
+/**
+ * ★**回りの向きを見比べる口**（`?turn=left|right`・★2026-09-15・オーナー指示
+ *   ★「右回りで馬が左に走りゴールするバージョンのレース演出を作ってください」）。
+ * ⚠️ ★**描画だけに効きます。** ★エンジンの走路（`COURSE_SPEC`）は回りを持たないので、★着順は 1 ビットも変わりません
+ *    （★開発卓の「回り」と同じ扱い）。★省くと鞍の回り（`RACE_SETUP.turn`）です。
+ * ⚠️ ★描画の走路はこの向きで組みます（★`COURSE_OPTS` と `turn` の初期値の 2 か所を同じ値から引く・R-30）。
+ */
+const TURN_OVERRIDE: 'left' | 'right' | undefined = typeof window === 'undefined' ? undefined
+  : ((v) => (v === 'left' || v === 'right' ? v : undefined))(new URLSearchParams(window.location.search).get('turn'));
+const RACE_TURN: 'left' | 'right' = TURN_OVERRIDE ?? RACE_SETUP.turn;
+const COURSE_OPTS = { ...COURSE_SPEC, turn: RACE_TURN };
 /**
  * ★**レース選択の中身**（★競馬場ごとの 50 鞍）。
  * ⚠️ ★ここで組み直しません — ★`@star/scheduler` が `VENUES` と `GRADED_RACES` から出します
@@ -1052,6 +1062,15 @@ function silksOverlays(
    *    ★キャンバスが 192 枚 → ★576 枚になります（★実測: 画面が真っ黒になりました）。
    */
   ownsGate?: (gate: number) => boolean,
+  /**
+   * ★**ゼッケンの番号を左右反転して書くか**（★2026-09-15・右回りの版）。
+   *   ★右回りでは馬が画面の左へ走り、★馬の絵は重ね絵ごと鏡像で描かれます（`perspective-draw.ts` の `flip`）。
+   *   ★番号をそのまま書くと ★**「10」が「01」に裏返ります**（★開発サーバーの画面で確認）。
+   *   → ★右回りのときは ★**あらかじめ裏返して**書きます。★描くときにもう一度裏返り、正しい向きで読めます。
+   * ⚠️ ★左回り（★省略）は ★1 画素も変わりません。★重ね絵の枚数も増やしません（★メモリ）。
+   * ⚠️ ★回りは ★URL の口（`?turn=`）で決まり、★切り替えは読み直します。★読み直さずに回りだけ変えると番号の向きがずれます。
+   */
+  mirrorNumber = false,
 ): readonly (NonNullable<HighQualityHorseFrame['overlay']> | undefined)[] {
   const x0 = Math.round(source.x + source.width * layout.cropX);
   const y0 = Math.round(source.y);
@@ -1318,8 +1337,11 @@ function silksOverlays(
     ctx.font = `bold ${numberFont}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.lineWidth = numberLine;
+    /** ★右回りは番号の中心を軸に左右反転して書く（★`mirrorNumber` の註記）。★中心揃えなので箱からはみ出さない */
+    if (mirrorNumber) { ctx.save(); ctx.translate(numberX, numberY); ctx.scale(-1, 1); ctx.translate(-numberX, -numberY); }
     ctx.strokeStyle = 'rgba(0,0,0,0.78)'; ctx.strokeText(String(colorIndex + 1), numberX, numberY);
     ctx.fillStyle = '#fff'; ctx.fillText(String(colorIndex + 1), numberX, numberY);
+    if (mirrorNumber) ctx.restore();
     return box;
   });
 }
@@ -2179,16 +2201,19 @@ export default function RacePage(): React.JSX.Element {
    *    ★`location.search` を書いて再読込させます（★別の読み方を作らない）。
    * ⚠️ ★いまの状態は ★**描画の後で**読みます（★`useState` の初期値にすると SSR と食い違う）。
    */
-  const [viewSwitches, setViewSwitches] = useState({ oldScript: false, intervene: false, contest: false });
+  const [viewSwitches, setViewSwitches] = useState({ oldScript: false, intervene: false, contest: false, mirrored: false });
+  /** ★鞍の回りと逆の向き（★「回り」のボタンが切り替える先） */
+  const OTHER_TURN: 'left' | 'right' = RACE_SETUP.turn === 'left' ? 'right' : 'left';
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     setViewSwitches({
       oldScript: p.get('cinematography') === 'v8',
       intervene: p.get('view') === 'intervene',
       contest: p.get('seed') === '99',
+      mirrored: p.get('turn') === OTHER_TURN,
     });
-  }, []);
-  const toggleViewParam = useCallback((key: 'cinematography' | 'view' | 'seed', onValue: string): void => {
+  }, [OTHER_TURN]);
+  const toggleViewParam = useCallback((key: 'cinematography' | 'view' | 'seed' | 'turn', onValue: string): void => {
     const params = new URLSearchParams(window.location.search);
     if (params.get(key) === onValue) params.delete(key); else params.set(key, onValue);
     window.location.search = params.toString();
@@ -2241,7 +2266,7 @@ export default function RacePage(): React.JSX.Element {
    * ⚠️ ★回りは**描画層だけ**に効きます（`ovalSegments` は回りを見ない）。
    *    ★だから下の選択で反転させても ★**着順は 1 ビットも変わりません**（見比べ用）。
    */
-  const [turn, setTurn] = useState<'left' | 'right'>(RACE_SETUP.turn);
+  const [turn, setTurn] = useState<'left' | 'right'>(RACE_TURN);
   /** ★既定は V2。`?renderer=legacy` のときだけ旧固定2D（引継ぎ書 §1-5） */
   const [renderer, setRenderer] = useState<RendererKind>('v2');
   /** ★発走前オーバーレイ「出馬表」（design/hud-ds/components/entry-board）。ゲート待機中に重ねる。`?entryBoard=1` でも開く */
@@ -2612,7 +2637,9 @@ export default function RacePage(): React.JSX.Element {
       ): readonly (readonly HighQualityHorseFrame[])[] => {
         const measured = images.map((image) => ({ image, source: opaqueBounds(image) }));
         const referenceHeight = referenceHeightOverride ?? Math.max(...measured.map((frame) => frame.source.height));
-        const overlays = images.map((image, index) => silksOverlays(image, measured[index]!.source, silksByGate, silksLayout, ownsGate));
+        const overlays = images.map((image, index) => silksOverlays(image, measured[index]!.source, silksByGate, silksLayout, ownsGate,
+          /** ★右回りは馬が左へ走り鏡像で描かれるので、番号を先に裏返す（★`silksOverlays` の `mirrorNumber`） */
+          RACE_TURN === 'right'));
         /**
          * ★配置と縮尺の基準は鞍布（剛体）。
          *   - 基準点 = 鞍布中心（無ければ胴体重心）
@@ -2743,7 +2770,9 @@ export default function RacePage(): React.JSX.Element {
         const bay = atlasByCoat.get('bay');
         if (bay === undefined) return [];
         const sources = set.frames.map((t) => ({ x: t.x, y: t.y, width: t.w, height: t.h }));
-        const overlays = sources.map((src) => silksOverlays(bay, src, silksByGate, silksLayout));
+        /** ★右回りは番号を先に裏返す（★原版の経路 `buildFrames` と同じ規則・★`silksOverlays` の `mirrorNumber`） */
+        const overlays = sources.map((src) => silksOverlays(bay, src, silksByGate, silksLayout, undefined,
+          RACE_TURN === 'right'));
         /**
          * ★**接地影**（★2026-09-03・オーナー判断 A「原寸のまま焼く」）。
          *
@@ -3842,6 +3871,12 @@ export default function RacePage(): React.JSX.Element {
     /** ★決勝線の画面の x（★写真判定の縦線・★馬と同じカメラで投影） */
     let v2GoalX: number | undefined;
     /**
+     * ★**馬が画面の左へ進んでいるか**（★2026-09-15・右回りの版）。
+     *   ★隊列バーの「先頭」を画面の馬と同じ側に置くために使います（★`drawFormationBar` の `leftward`）。
+     * ⚠️ ★馬を描くのと ★**同じカメラ**で、★注視点の 1m 先を投影して決めます（★回りの名前から決めない・R-30）。
+     */
+    let v2TravelsLeft = false;
+    /**
      * ★このカットで馬が画面高の何割を占めるか。
      *   順位表を**寄りのカットでだけ薄くする**のに使います（オーナー指摘「馬が大きくなったので
      *   順位表が邪魔」）。★カット名で分岐しません — 画角を変えたら意味が変わるので、
@@ -3933,6 +3968,11 @@ export default function RacePage(): React.JSX.Element {
         const goalGround = posOf(course, DIST, TRACK_WIDTH_M / 2);
         const goalPoint = project(scene.camera, basis, { x: goalGround.x, y: goalGround.y, z: 0 });
         if (goalPoint.depth > 2) v2GoalX = goalPoint.x;
+        const f0 = posOf(course, Math.max(0, scene.focusS), scene.focusW);
+        const f1 = posOf(course, Math.max(0, scene.focusS) + 1, scene.focusW);
+        const q0 = project(scene.camera, basis, { x: f0.x, y: f0.y, z: 0 });
+        const q1 = project(scene.camera, basis, { x: f1.x, y: f1.y, z: 0 });
+        v2TravelsLeft = q1.x < q0.x;
       }
       const library = (frames: readonly (readonly HighQualityHorseFrame[])[]) => ({
         sheet: frames[0]![0]!.image,
@@ -4428,6 +4468,7 @@ export default function RacePage(): React.JSX.Element {
               horses: minimapHorses,
               ownGate,
               ownOrder: Math.max(1, orderOf(ownGate)),
+              leftward: v2TravelsLeft,
             });
           } else if (kind === 'running-style') {
             drawRunningStyleTelop(ctx, FONT, telopFrame, cutRank
@@ -4518,7 +4559,7 @@ export default function RacePage(): React.JSX.Element {
             ownGapLengths: Math.max(0, (leadMeters - ownMeters) / HORSE_LENGTH_M),
             fieldSize: FIELD,
             /** ★台本 v9 だけ ★脚質と隊列バーを足します（★デザイナー回答 D-3「見立て」）。★v8 は 1 画素も変えない */
-            ...(sideOnlyScript ? { ownStrategyLabel: strategyLabelOf(ownGate), formationBar: true } : {}),
+            ...(sideOnlyScript ? { ownStrategyLabel: strategyLabelOf(ownGate), formationBar: true, leftward: v2TravelsLeft } : {}),
           });
         }
         void metersLeftNow;
@@ -4860,7 +4901,9 @@ export default function RacePage(): React.JSX.Element {
         drawFormationBar(ctx, art.pal as Record<string, string>, FONT,
           /** ★★隊列バーも**画面に描いた位置**で並べます（順位表・実況と同じ・食い違いを作らない） */
           easedAt.map((h) => ({ gate: h.gate, s: h.meters })), FIELD, frameRoleOf,
-          { x: 40, y: 4, width: W - 80, ownGate, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC });
+          { x: 40, y: 4, width: W - 80, ownGate, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
+            /** ★右回りで馬が左へ走る画では、先頭を左端に（★`v2TravelsLeft` の註記） */
+            leftward: v2TravelsLeft });
 
         // B: 馬名プレート（下部・固定枠）。自馬 ＋ 先頭 ＋ 2 番手
         /**
@@ -5442,6 +5485,10 @@ export default function RacePage(): React.JSX.Element {
               style={{ ...stageBtnStyle, ...(viewSwitches.contest ? { background: 'rgba(92,70,20,0.92)', color: '#ffe98a' } : {}) }}>
               {viewSwitches.contest ? '接戦' : '通常'}
             </button>
+            <button type="button" onClick={() => toggleViewParam('turn', OTHER_TURN)}
+              style={{ ...stageBtnStyle, ...(viewSwitches.mirrored ? { background: 'rgba(92,70,20,0.92)', color: '#ffe98a' } : {}) }}>
+              {turn === 'left' ? '左回り' : '右回り'}
+            </button>
             <button
               type="button"
               onClick={() => { exitBrowserFullscreen(); setPlaying(false); setStageFull(false); setWatchStarted(false); setEntryRequested(true); }}
@@ -5682,6 +5729,8 @@ export default function RacePage(): React.JSX.Element {
           ['cinematography', 'v8', viewSwitches.oldScript, '演出：新', '演出：前'],
           ['view', 'intervene', viewSwitches.intervene, '観戦', '介入'],
           ['seed', '99', viewSwitches.contest, '展開：通常', '展開：接戦'],
+          ['turn', OTHER_TURN, viewSwitches.mirrored,
+            RACE_SETUP.turn === 'left' ? '回り：左' : '回り：右', OTHER_TURN === 'left' ? '回り：左' : '回り：右'],
         ] as const).map(([key, on, active, offLabel, onLabel]) => (
           <button
             key={key} type="button" onClick={() => toggleViewParam(key, on)}
@@ -5741,7 +5790,17 @@ export default function RacePage(): React.JSX.Element {
         </label>
         <label>
           回り{' '}
-          <select value={turn} onChange={(e) => setTurn(e.target.value as 'left' | 'right')}>
+          {/*
+            ⚠️ ★**回りを変えたら読み直します**（★2026-09-15）。★ゼッケンの番号の向きは読み込み時に焼くので
+               ★（`silksOverlays` の `mirrorNumber`）、★読み直さずに回りだけ変えると ★番号が裏返ります。
+          */}
+          <select value={turn} onChange={(e) => {
+            const next = e.target.value as 'left' | 'right';
+            setTurn(next);
+            const params = new URLSearchParams(window.location.search);
+            params.set('turn', next);
+            window.location.search = params.toString();
+          }}>
             <option value="left">左回り</option><option value="right">右回り</option>
           </select>
         </label>
@@ -5851,6 +5910,8 @@ export default function RacePage(): React.JSX.Element {
             ['cinematography', 'v8', viewSwitches.oldScript, '演出：新しい形', '演出：前の形'],
             ['view', 'intervene', viewSwitches.intervene, '見る人：観戦', '見る人：自馬で介入'],
             ['seed', '99', viewSwitches.contest, '展開：通常', '展開：接戦'],
+            ['turn', OTHER_TURN, viewSwitches.mirrored,
+              RACE_SETUP.turn === 'left' ? '回り：左' : '回り：右', OTHER_TURN === 'left' ? '回り：左' : '回り：右'],
           ] as const).map(([key, on, active, offLabel, onLabel]) => (
             <button
               key={key} type="button" onClick={() => toggleViewParam(key, on)}

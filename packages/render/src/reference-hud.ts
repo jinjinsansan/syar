@@ -58,6 +58,11 @@ export function drawFormationBar(
     readonly spanM?: number | undefined;
     /** 自馬の馬番（あれば金の下線を引く） */
     readonly ownGate?: number | undefined;
+    /**
+     * ★**馬が画面の左へ走っているか**（★2026-09-15・右回りの版）。★真なら ★**先頭を左端**に置きます。
+     * ⚠️ ★省くと従来どおり（★先頭は右端）。★画面の馬の並びとバーの並びを食い違わせないための口です。
+     */
+    readonly leftward?: boolean | undefined;
   },
 ): void {
   if (horses.length === 0) return;
@@ -72,7 +77,8 @@ export function drawFormationBar(
   const lead = horses.reduce((max, h) => Math.max(max, h.s), horses[0]!.s);
   const xOf = (s: number): number => {
     const back = Math.max(0, Math.min(span, lead - s));
-    return opts.x + BADGE_W / 2 + inner * (1 - back / span);
+    /** ★左へ走る画では先頭を左端に（★`leftward` の註記） */
+    return opts.x + BADGE_W / 2 + inner * (opts.leftward === true ? back / span : 1 - back / span);
   };
 
   // ★バッジが乗る細い線（参考にも明るい 1 本が入っている）

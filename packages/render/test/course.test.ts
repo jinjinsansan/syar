@@ -169,4 +169,45 @@ describe('★コースの向き（俯瞰の作法）', () => {
     expect(b.x - a.x).toBeGreaterThan(90);
     expect(Math.abs(b.y - a.y)).toBeLessThan(1);
   });
+
+  /**
+   * ★**直線の内ラチは、左回りでも右回りでもコーナーの中心側**（★2026-09-15）。
+   *   ⚠️ ★直線の区間に回りの向きが無く、★右回りの直線だけ内ラチと外ラチが入れ替わっていました
+   *      （★真横のカメラが芝の中に置かれ、★右回りでも馬が右へ走っていた）。
+   *   ★中心は「4 角の途中の内ラチと外ラチ」から決めます（★コーナーは元から正しい）。
+   */
+  /**
+   * ★**コーナーと直線のつなぎ目で、同じ `w` の点が跳ばない**（★左回り・右回り・内ラチ・外ラチ）。
+   *   ⚠️ ★2026-09-15、★直線だけ回りの向きを持たせたら、★右回りのつなぎ目で ★横位置が反対側へ跳ぶ形になりかけました
+   *      （★コーナーの半径の式が右回りだけ逆向きだった）。★両側を同じ規則にそろえたことを固定します。
+   */
+  it('★★区間のつなぎ目で、同じ横位置の点が跳ばない（左回り・右回り）', () => {
+    for (const turn of ['left', 'right'] as const) {
+      const c = ovalCourse(1600, { widthM: 20, turn });
+      let acc = 0;
+      for (const seg of c.segments.slice(0, -1)) {
+        acc += seg.length;
+        for (const w of [0, 10, 20]) {
+          const a = posOf(c, acc - 1e-4, w), b = posOf(c, acc + 1e-4, w);
+          expect(Math.hypot(b.x - a.x, b.y - a.y), `${turn} ${seg.label} の終わり w=${w}`).toBeLessThan(0.01);
+        }
+      }
+    }
+  });
+
+  it('★★直線の内ラチは、左回りでも右回りでもコーナーの中心側（最後の直線・向正面・発走・延長）', () => {
+    for (const turn of ['left', 'right'] as const) {
+      const c = ovalCourse(1600, { widthM: 20, turn });
+      /** ★4 角の中ほどで、内ラチから外ラチへ向かう向き＝外向き */
+      const cornerMid = c.segments.slice(0, c.segments.findIndex((g) => g.label === '4角')).reduce((acc, g) => acc + g.length, 0)
+        + (c.segments.find((g) => g.label === '4角')?.length ?? 0) / 2;
+      const ci = posOf(c, cornerMid, 0), co = posOf(c, cornerMid, 20);
+      const cornerOutY = Math.sign(co.y - ci.y);
+      /** ★最後の直線は 4 角の外向きと同じ y 方向に外ラチがある（★直線は水平なので y で比べられる） */
+      for (const s of [1450, 1590, 1620]) {
+        const i = posOf(c, s, 0), o = posOf(c, s, 20);
+        expect(Math.sign(o.y - i.y), `${turn} s=${s}`).toBe(cornerOutY);
+      }
+    }
+  });
 });

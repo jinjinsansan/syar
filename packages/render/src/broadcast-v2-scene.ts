@@ -1091,7 +1091,18 @@ export function drawBroadcastV2Scene<TImage>(
         frames: set.frameImagesByGate?.[horse.gate - 1],
         flip: shotView.forwardDx < 0,
       };
-    } : undefined,
+    }
+      /**
+       * ★**勝馬のカットも、画面の左へ走るなら鏡像にします**（★2026-09-15・右回りの版）。
+       * ⚠️ ★以前は勝馬のカットに `frameSetOf` を渡しておらず、★**左右反転の口を通りませんでした**。
+       *    ★左回りでは勝馬は常に右へ走るので気づきませんでしたが、★右回りでは ★**勝馬だけ右を向いて**いました
+       *    （★開発サーバーの画面で確認）。
+       * ★絵の組は ★**勝馬専用のまま**です（★`library` をそのまま使う）。★変えるのは左右だけです。
+       */
+      : (horse) => ({
+        frames: library.frameImagesByGate?.[horse.gate - 1],
+        flip: shotView.forwardDx < 0,
+      }),
     fieldSize: opts.fieldSize,
     frameOf: opts.frameOf,
     phaseOf: opts.phaseOf,

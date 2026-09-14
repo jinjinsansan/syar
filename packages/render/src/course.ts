@@ -132,11 +132,20 @@ export function ovalCourse(
   /** ⚠️ ★逆向きに積むので 直線 → 4角 → 3角 → 向正面 → 2角 → 1角。★`plan` は `[1角..4角]` の順です */
   const corner = (i: number, label: string): CourseSegment =>
     ({ type: 'corner', length: plan.lengths[i]!, radius: plan.radii[i]!, turn, label });
+  /**
+   * ⚠️ ★**直線にも回りの向きを持たせます**（★2026-09-15・オーナー指示「右回りで馬が左に走りゴールするバージョン」）。
+   *
+   *   ★`posOf` は直線でも ★`seg.turn` を見て ★内ラチを左右どちらに置くかを決めます。
+   *   ★ところが直線の区間には `turn` が入っていなかったので、★**右回りの直線だけ内ラチと外ラチが入れ替わって**いました
+   *   （★実測・1600m の最後の直線: 内ラチ y 392 ＝中心から遠い側 ／ 外ラチ y 372 ＝中心側）。
+   *   ★真横のカメラは「外側」に置くので、★右回りでは ★**芝の中から撮り**、★馬は左回りと同じく右へ走っていました。
+   * ⚠️ ★着順には効きません。★エンジンの距離ロスはコーナーの半径だけで決まります（`@star/race-engine` の `ovalSegments`）。
+   */
   const ring: readonly CourseSegment[] = [
-    { type: 'straight', length: homeStretchM, label: '直線' },
+    { type: 'straight', length: homeStretchM, label: '直線', turn },
     corner(3, '4角'),
     corner(2, '3角'),
-    { type: 'straight', length: homeStretchM, label: '向正面' },
+    { type: 'straight', length: homeStretchM, label: '向正面', turn },
     corner(1, '2角'),
     corner(0, '1角'),
   ];
@@ -167,7 +176,7 @@ export function ovalCourse(
       const need = RUN_UP_M - straight;
       if (need <= 1e-9) { out.push(...reversed.slice(i)); break; }
       const take = Math.min(seg.length, need);
-      out.push({ type: 'straight', length: take, label: '発走' });
+      out.push({ type: 'straight', length: take, label: '発走', turn });
       straight += take;
       const rest = seg.length - take;
       if (rest > 1e-9) { out.push({ ...seg, length: rest }); out.push(...reversed.slice(i + 1)); break; }
@@ -267,7 +276,9 @@ export function posOf(course: Course, s: number, w: number): WorldPos {
    */
   if (s < 0) {
     const nx = Math.sin(heading), ny = -Math.cos(heading);
-    return { x: Math.cos(heading) * s + nx * off, y: Math.sin(heading) * s + ny * off, heading };
+    /** ★手前の延長も、★最初の区間と同じ側に内ラチを置く（★右回りで延長だけ裏返らないように） */
+    const sgn0 = course.segments[0]?.turn === 'right' ? -1 : 1;
+    return { x: Math.cos(heading) * s + nx * off * sgn0, y: Math.sin(heading) * s + ny * off * sgn0, heading };
   }
 
   for (const seg of course.segments) {
@@ -298,8 +309,13 @@ export function posOf(course: Course, s: number, w: number): WorldPos {
       if (s <= segEnd) {
         const dTheta = (within / R) * sgn;
         const th = theta0 + dTheta;
-        // ★外を回るほど半径が大きい
-        const r = R + off * sgn;
+        /**
+         * ★外を回るほど半径が大きい（★`w` は内ラチからの距離・★左回りでも右回りでも同じ意味）。
+         * ⚠️ ★以前は `R + off * sgn` で、★**右回りのコーナーだけ `w` が大きいほど中心に近い**逆向きでした
+         *    （★2026-09-15 に直線へ回りの向きを持たせたとき、★つなぎ目で横位置が反対側へ跳んで判明）。
+         *    ★距離ロス（`laneExtraMeters`・エンジン）は元から「`w` が大きいほど外」です。★それに揃えます。
+         */
+        const r = R + off;
         return {
           x: cx + Math.cos(th) * r,
           y: cy + Math.sin(th) * r,
@@ -317,9 +333,11 @@ export function posOf(course: Course, s: number, w: number): WorldPos {
   // ★走路の終わりから先は、最後の向きにまっすぐ延ばす（★1点に潰さない）
   const over = s - acc;
   const nx = Math.sin(heading), ny = -Math.cos(heading);
+  /** ★先の延長も、★最後の区間と同じ側に内ラチを置く（★決勝線の先で走路が裏返らないように） */
+  const sgnEnd = course.segments[course.segments.length - 1]?.turn === 'right' ? -1 : 1;
   return {
-    x: x + Math.cos(heading) * over + nx * off,
-    y: y + Math.sin(heading) * over + ny * off,
+    x: x + Math.cos(heading) * over + nx * off * sgnEnd,
+    y: y + Math.sin(heading) * over + ny * off * sgnEnd,
     heading,
   };
 }
@@ -347,8 +365,8 @@ export function posOf(course: Course, s: number, w: number): WorldPos {
  */
 function laneRatioOf(seg: CourseSegment, offFromCentre: number): number {
   if (seg.type !== 'corner' || seg.radius === undefined || seg.radius <= 0) return 1;
-  const sgn = seg.turn === 'right' ? -1 : 1;
-  const r = seg.radius + offFromCentre * sgn;
+  /** ★`posOf` と同じ規則（★`w` が大きいほど外・★回りの向きによらない・★2026-09-15） */
+  const r = seg.radius + offFromCentre;
   return r > 0 ? r / seg.radius : 0;
 }
 
