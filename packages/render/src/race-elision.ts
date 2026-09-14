@@ -135,8 +135,27 @@ export function raceEditJumpDisplaySecs(
 /** ★跳びの位置と、★**跳んだ先の区間名**（★カットインの見出しに使います） */
 export interface RaceEditJump {
   readonly atDisplaySec: number;
+  /** ★跳ぶ前のレース秒（★コース図で馬群を進める始点・★2026-09-14） */
+  readonly fromRaceSec: number;
   /** ★跳んだ先のレース秒（★呼び出し側が区間名を引くのに使います） */
   readonly toRaceSec: number;
+}
+
+/**
+ * ★**跳びを覆う画面で、コース図の馬群をどのレース秒まで進めるか**（★2026-09-14・オーナー判断）
+ *
+ *   > ★「コーナーを全てカットです。★ただしコース表ではコーナーを曲がるのは見せます」
+ *
+ *   ★覆う窓の入口と出口のレース秒の間を、★なだらかに進めます。
+ *   ★入口では ★**直前まで映っていた位置**、★出口では ★**直後に映る位置**に一致するので、
+ *   ★コース図と世界の間で馬が飛びません。
+ * ⚠️ ★進めるのは ★**コース図の点だけ**です（★脚は描きません）。★倍速の脚（★オーナー却下）にはなりません。
+ * ⚠️ ★位置は ★その秒の位置モデルを読むだけです（★着順・タイムに触れない・憲法 3）。
+ */
+export function raceEditSweepRaceSec(windowStartRaceSec: number, windowEndRaceSec: number, progress: number): number {
+  const p = Math.max(0, Math.min(1, Number.isFinite(progress) ? progress : 0));
+  const e = p * p * (3 - 2 * p);
+  return windowStartRaceSec + (windowEndRaceSec - windowStartRaceSec) * e;
 }
 
 /**
@@ -152,7 +171,7 @@ export function raceEditJumps(
   elisions: readonly RaceElision[], warp: TimeWarp,
 ): readonly RaceEditJump[] {
   return normalise(elisions).map((e) => ({
-    atDisplaySec: warp.displaySecAt(e.toRaceSec), toRaceSec: e.toRaceSec,
+    atDisplaySec: warp.displaySecAt(e.toRaceSec), fromRaceSec: e.fromRaceSec, toRaceSec: e.toRaceSec,
   }));
 }
 
@@ -196,21 +215,41 @@ export interface RaceEditPlan {
    *   ★`false` にすると全部のコーナーを見せます（★2026-09-12 の形）。
    */
   readonly lastCornerOnly?: boolean;
+  /**
+   * ★**最後の直線の長さ**（m・★2026-09-14）。★見せる直線を ★**これより長くしません**。
+   * ⚠️ ★渡さないと、★直線が `straightShownM` より短い走路（★最短 290m は足りるが、★距離の短い鞍）で
+   *    ★**4 角の出口を真横で映します**。★オーナー判断「コーナーを全てカット」に反します。
+   */
+  readonly homeStretchM?: number;
+  /**
+   * ★**残り何 m からゴールまでを飛ばさないか**（★2026-09-14・オーナー判断 O-1「見せ方を変えます」）。
+   *   ★自馬で介入する人は、★残り `EARLY_SPURT_METER`（900m）→ ゴールの間に
+   *   ★「仕掛け」「追う」の局面があります（★正典 §8b・D-066）。★ここを飛ばすと ★介入の瞬間が消えます。
+   * ⚠️ ★渡さなければ ★観戦だけの人の見せ方（★発走 ＋ 最後の直線）です。
+   * ⚠️ ★コーナーは ★**飛ばさずに覆います**（★画面がコース図の画面で覆う）。★この関数は時計だけを決めます。
+   */
+  readonly keepFromMetersLeft?: number;
 }
 
 export function raceEditElisionsFor(knots: PhaseKnots, plan: RaceEditPlan): readonly RaceElision[] {
   const startEnd = knots.startRealSec;
   const goal = knots.goalSec;
   if (startEnd === undefined || goal === undefined || !(goal > startEnd)) return [];
-  const straightShownM = plan.straightShownM ?? STRAIGHT_SHOWN_M;
+  /** ★見せる直線は ★**最後の直線より長くしない**（★`homeStretchM` の註記） */
+  const straightShownM = Math.min(plan.straightShownM ?? STRAIGHT_SHOWN_M,
+    plan.homeStretchM !== undefined && plan.homeStretchM > 0 ? plan.homeStretchM : Number.POSITIVE_INFINITY);
   /**
    * ★発走を見せ終わるレース秒。★走路の最初の直線の終わりまで。
    * ⚠️ ★`startRealSec`（★発走の等速が終わる地点）より ★**手前にはしません**。
    */
   const startShownTo = Math.max(startEnd, plan.raceSecAtMeters(Math.max(0, plan.startShownM)));
   /** ★最後の直線を見せ始めるレース秒 */
-  const straightFrom = Math.max(goal,
+  const straightFromShown = Math.max(goal,
     plan.raceSecAtMeters(Math.max(0, plan.distanceMeter - straightShownM)));
+  /** ★介入する人の見せ方は、★残り `keepFromMetersLeft` から見せ続ける（★`keepFromMetersLeft` の註記） */
+  const straightFrom = plan.keepFromMetersLeft === undefined || !(plan.keepFromMetersLeft > 0)
+    ? straightFromShown
+    : Math.min(straightFromShown, plan.raceSecAtMeters(Math.max(0, plan.distanceMeter - plan.keepFromMetersLeft)));
   /** ★見せるコーナー。★既定は ★**最後の 1 つだけ** */
   const corners = plan.lastCornerOnly === false ? plan.cornerSpansM : plan.cornerSpansM.slice(-1);
   /** ★見せる区間（★レース秒） */

@@ -83,6 +83,17 @@ export const RACE_CUTIN_SEAM_SEC = 0.4;
  */
 export const RACE_CUTIN_JUMP_LEAD_SEC = 0.8;
 
+/**
+ * ★**真横の直線だけの台本（v9）で、跳びを覆う窓の半分**（秒・★2026-09-14）。
+ *
+ *   ★覆う画面で ★**コース図の上の馬群がコーナーを曲がる**のを見せます（★オーナー判断
+ *   「コース表ではコーナーを曲がるのは見せます」）。★0.8 秒×2 では点が走り切る前に終わるので、
+ *   ★1.2 秒×2 ＝ ★**2.4 秒**にします。
+ * ⚠️ ★長くすると、★発走の直線と最後の直線の ★**映る時間がそのぶん減ります**（★時計は延びません）。
+ * ⚠️ ★v8（★`?cinematography=v8`）は ★`RACE_CUTIN_JUMP_LEAD_SEC` のままです（★切り戻しの道を動かさない）。
+ */
+export const RACE_COURSE_SWEEP_LEAD_SEC = 1.2;
+
 /** ★発走直後に出すもの（★カットの境目ではなく、★レース開始からの経過で出す） */
 export const RACE_CUTIN_AT_START: RaceCutIn = { kind: 'own-horse', label: 'あなたの馬' };
 
@@ -596,6 +607,16 @@ export interface ToStraightCutInOptions {
    */
   readonly ownGapLengths: number;
   readonly fieldSize: number;
+  /**
+   * ★**自馬の脚質**（★2026-09-14・デザイナー回答 D-3「見立て」）。★出走表の値をそのまま渡すこと。
+   * ⚠️ ★予想ではありません。★「この馬が来る」とは書きません。
+   */
+  readonly ownStrategyLabel?: string | undefined;
+  /**
+   * ★**横 1 本の隊列バー**（★2026-09-14・デザイナー回答 D-3）。★`horses` と ★**同じ位置**を渡すこと（★R-30）。
+   * ⚠️ ★渡さなければ描きません（★v8 の画面は 1 画素も変わりません）。
+   */
+  readonly formationBar?: boolean | undefined;
 }
 
 /**
@@ -649,6 +670,51 @@ export function drawToStraightCutIn<TImage>(
   ctx.font = font(Math.round(H * 0.070), true);
   /** ⚠️ ★先頭なら「差」ではありません。★0 秒と書かず、★先頭と書きます */
   ctx.fillText(o.ownOrder <= 1 ? '先頭' : `${o.ownGapLengths.toFixed(1)}馬身`, rx, y);
+
+  if (o.ownStrategyLabel !== undefined) {
+    y += Math.round(H * 0.075);
+    ctx.fillStyle = GOLD;
+    ctx.font = font(Math.round(H * 0.026), true);
+    ctx.fillText('脚質', rx, y);
+    y += Math.round(H * 0.062);
+    ctx.fillStyle = PAPER;
+    ctx.font = font(Math.round(H * 0.052), true);
+    ctx.fillText(o.ownStrategyLabel, rx, y);
+  }
+
+  /**
+   * ★**横 1 本の隊列バー**（★右の列の下）。★前後は ★**描いている位置**そのまま、★自馬だけ金。
+   * ⚠️ ★2D の散布図にしません（★「ビリヤードの玉」評・デザイナー判断）。
+   */
+  if (o.formationBar === true && o.horses.length > 0) {
+    const bx = rx;
+    const bw = box.x + box.width - rx;
+    const barH = Math.round(H * (14 / 720));
+    const by = box.y + box.height - barH - Math.round(H * 0.012);
+    ctx.fillStyle = PAPER70;
+    ctx.font = font(Math.round(H * 0.020), true);
+    ctx.textAlign = 'left';
+    ctx.fillText('後方', bx, by - Math.round(H * 0.012));
+    ctx.textAlign = 'right';
+    ctx.fillText('先頭', bx + bw, by - Math.round(H * 0.012));
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(238,242,246,0.18)';
+    ctx.fillRect(bx, by, bw, barH);
+    const tail = Math.min(...o.horses.map((h) => h.s));
+    const lead = Math.max(...o.horses.map((h) => h.s));
+    const span = Math.max(1, lead - tail);
+    /** ★自馬を最後に描く（★重なったときに隠れない） */
+    const ordered = [...o.horses].sort((a, b) => Number(a.gate === o.ownGate) - Number(b.gate === o.ownGate));
+    for (const h of ordered) {
+      const own = h.gate === o.ownGate;
+      const cx = bx + bw * ((h.s - tail) / span);
+      const r = own ? barH * 0.72 : barH * 0.5;
+      ctx.beginPath();
+      ctx.ellipse(cx, by + barH / 2, r, r, 0, 0, Math.PI * 2);
+      ctx.fillStyle = own ? '#f5d56d' : o.frameColorOf(h.gate);
+      ctx.fill();
+    }
+  }
   void W;
   ctx.globalAlpha = prev;
 }

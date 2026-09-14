@@ -99,6 +99,23 @@ describe('勝負服の色', () => {
     expect(page).toContain('region[mask] = (saddlecloth || (helmet && !jacket)) ? 1 : 2;');
     expect(page).toContain('const useCap = kind === 1;');
   });
+
+  /**
+   * ★**つながった塊は 1 色で塗る**（★2026-09-15・オーナー判断「柄をやめて全部直す」）。
+   *   ★窓の境目がヘルメットや上着の途中を通ると、★1 つの塊が四角く色違いに割れました
+   *   （★ヘルメット後ろの四角・★上着の下の枠色の帯）。★塊の中で多い方の色に揃えます。
+   * ⚠️ ★上の「上着が勝つ」は ★**塊を揃える前の 1 画素ずつの判定**として残っています。
+   */
+  it('★★塗る画素のつながった塊は、多い方の色 1 色に揃える', () => {
+    const page = readFileSync('apps/web/src/app/race/page.tsx', 'utf8');
+    expect(page).toContain('const kind = capCount >= bodyCount ? 1 : 2;');
+    expect(page).toContain('for (const p of members) region[p] = kind;');
+  });
+
+  it('★★柄は無地だけ（★一本輪は真横の絵で縞に見えたのでやめた）', () => {
+    expect([...SILK_PATTERNS]).toEqual(['plain']);
+    for (let gate = 1; gate <= 18; gate += 1) expect(silkPatternOf(gate)).toBe('plain');
+  });
 });
 
 
@@ -129,10 +146,13 @@ describe('勝負服の柄', () => {
           const samePattern = silkPatternOf(a) === silkPatternOf(b);
           expect(sameColour && samePattern,
             `${field} 頭立ての ${a} 番と ${b} 番: 帽子も上着も柄も同じです`).toBe(false);
-          if (field <= 12) {
-            expect(silkPatternOf(a), `${field} 頭立ての ${a} 番と ${b} 番は同じ枠なので柄を分けること`)
-              .not.toBe(silkPatternOf(b));
-          }
+          /**
+           * ⚠️ ★**「12 頭立てまでは柄が必ず違う」を外しました**（★2026-09-15・オーナー判断「柄をやめて全部直す」・★意図した変更）。
+           *    ★柄（一本輪）は真横のデフォルメ馬で 2〜3 本の縞に見えたので、★無地だけにしました。
+           *    ★同じ枠の 2 頭は ★**上着の色が必ず違う**ことで見分けます（★下の行と、上の「★帽子は枠色・上着は馬ごと」）。
+           */
+          expect(silkRoleOf(a, field), `${field} 頭立ての ${a} 番と ${b} 番は同じ枠なので上着の色を分けること`)
+            .not.toBe(silkRoleOf(b, field));
         }
       }
     }

@@ -58,6 +58,12 @@ export interface RaceAudio {
   /** ★鳴っているものを、★時間をかけて絞る */
   fade(id: RaceSoundId, seconds: number): void;
   /**
+   * ★**鳴っているものの強さを変える**（★止めない・★2026-09-14）。
+   *   ★`mult` は ★`RACE_SOUNDS` の `gain` に掛ける倍率。★`timeConstant` 秒でなだらかに近づけます。
+   * ⚠️ ★毎コマ呼んでかまいません（★近づける先を置き直すだけです）。
+   */
+  level(id: RaceSoundId, mult: number, timeConstant: number): void;
+  /**
    * ★**その場面は過ぎたので鳴らさない**、と札だけ立てる。
    *   ★例: イントロが終わってから音を入れた回のファンファーレ。
    */
@@ -78,6 +84,7 @@ export function createRaceAudio(): RaceAudio {
       resume: async () => false,
       cue() { /* ★この端末では鳴らせない */ },
       fade() { /* 同上 */ },
+      level() { /* 同上 */ },
       skip() { /* 同上 */ },
       reset() { /* 同上 */ },
       dispose() { /* 同上 */ },
@@ -188,6 +195,15 @@ export function createRaceAudio(): RaceAudio {
         cur.gain.gain.linearRampToValueAtTime(0.0001, t + s);
         cur.src.stop(t + s + 0.05);
         playing.delete(id);
+      } catch { /* 無視 */ }
+    },
+
+    level(id: RaceSoundId, mult: number, timeConstant: number): void {
+      const cur = playing.get(id);
+      if (cur === undefined) return;
+      try {
+        const target = Math.max(0, RACE_SOUNDS[id].gain * (Number.isFinite(mult) ? mult : 1));
+        cur.gain.gain.setTargetAtTime(Math.min(1.5, target), ctx.currentTime, Math.max(0.01, timeConstant));
       } catch { /* 無視 */ }
     },
 

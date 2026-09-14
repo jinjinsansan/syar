@@ -22,6 +22,7 @@ import {
   knotsFor, targetDisplaySec, withFinishRunOut, finishSpeedsOf,
   broadcastV2StartLagM, broadcastV2FinishStyleOf, resolveBroadcastV2Scene,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT, LANE_ALIGNED_FOCUS_DEFAULT,
+  finishChaseTable, DEFAULT_RACE_SCRIPT,
 } from '@star/render';
 
 const POOL = JSON.parse(readFileSync('apps/web/src/lib/watch-pool.json', 'utf8'));
@@ -197,7 +198,15 @@ export function auditClock(built, ownGate = RACE_DEFAULTS.ownGate) {
   }
   /** ★各馬の通過時の速さ（`page.tsx` と同じ・リプレイで線の前後の速さを揃える） */
   const finishSpeeds = finishSpeedsOf(built.model, (g) => finishSec.get(g), [...finishSec.keys()]);
-  return { warp, finishSec, finishSpeeds, finishStyle, introSec: RACE_INTRO_RACE_START_SEC };
+  /**
+   * ★**「追ってくる深さ」の表**（★2026-09-14・`page.tsx` の `finishChaseAt` と同じ関数・同じ入力・R-30）。
+   *   ★画面はゴール前のカメラを ★確定の 1 着ではなく ★その時刻の状態から決めます（★オーナー確認 O-7）。
+   */
+  const finishChaseAt = finishChaseTable(
+    (r) => built.model.at(r).map((h) => ({ gate: h.gate, meters: h.meters })),
+    knots.finishSec + 1,
+  );
+  return { warp, finishSec, finishSpeeds, finishStyle, finishChaseAt, introSec: RACE_INTRO_RACE_START_SEC };
 }
 
 /**
@@ -275,17 +284,18 @@ export function auditSceneAt(built, clock, displaySec, viewport = { width: 1280,
   const offsetByGate = new Map(posed.map((p) => [p.gate, p.offsetM]));
   const drawn = base.map((h, i) => ({ ...h, s: posed[i].s }));
   /**
-   * ★**主役群の馬番**（確定着順の上位 5 頭）。`page.tsx` と同じ渡し方です（R-30）。
-   *   ⚠️ ★カメラが着外の馬に引っ張られて引かないようにするためだけの情報で、
-   *      ★着順にも馬の位置にも触れません（憲法3・指示書 §4-4）。
+   * ★**画に収める相手**（★その時刻に描いている位置の上位 5 頭）。`page.tsx` の `stateLeadGates` と同じ（R-30）。
+   * ⚠️ ★**2026-09-14 まで確定着順の上位 5 頭でした。** ★ゴールの前に確定着順でカメラを決めると
+   *    ★誰が上位に来るかを構図で先に明かすので、★画面と一緒に置き換えました（★レビュー側 Q-R7）。
    */
-  const leadGates = [...finishPositionOf.entries()]
-    .filter(([, place]) => place >= 1 && place <= CLIMAX_LEAD_COUNT)
-    .sort((a, b) => a[1] - b[1])
-    .map(([gate]) => gate);
+  const leadGates = [...drawn].sort((a, b) => b.s - a.s).slice(0, CLIMAX_LEAD_COUNT).map((h) => h.gate);
+  /** ★台本を渡さなければ ★画面の既定（R-31） */
+  const effectiveScript = script ?? DEFAULT_RACE_SCRIPT;
   const scene = resolveBroadcastV2Scene(built.course, drawn, viewport, winnerDone, {
     ...(replay.active ? { forceShotId: 'finish-replay' } : {}),
     finishStyle: clock.finishStyle, cornerCutM: CORNER_CUT_M_WEB,
+    /** ★`page.tsx` と同じく、★展開の札ではなく ★その時刻の「追ってくる深さ」を渡す */
+    ...(clock.finishChaseAt === undefined ? {} : { finishChase: clock.finishChaseAt(sec) }),
     raceDisplaySec: raceD, fourthCornerFront: FOURTH_CORNER_FRONT_WEB, winnerRear: false,
     cornerTracking: !built.legacyMotion,
     leadGates,
@@ -300,7 +310,11 @@ export function auditSceneAt(built, clock, displaySec, viewport = { width: 1280,
      *    ★2026-08-28、オーナー指摘「ゴール前で急に迫力がなくなる」を追う過程で発覚。
      * → ★**台本から決めます。** 呼ぶ側の明示があればそちらを優先します。
      */
-    ...(opts.noContenderFrameShots ?? (script === 'v6' ? ['finish-line'] : undefined)
+    /**
+     * ⚠️ ★**v8・v9 も直線を割るので同じく外します**（★2026-09-14・`page.tsx` の `splitStraightScript`）。
+     *    ★以前は v6 だけを見ていたので、★既定（v8 → v9）では ★**道具だけが引く枠取りで測って**いました。
+     */
+    ...(opts.noContenderFrameShots ?? (['v6', 'v8', 'v9'].includes(effectiveScript) ? ['finish-line'] : undefined)
       ? { noContenderFrameShots: opts.noContenderFrameShots ?? ['finish-line'] } : {}),
     /**
      * ★**注視点を「走線に沿った長さ」で置くか**（残件 A-2 の候補 (b′)）

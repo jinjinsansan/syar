@@ -41,7 +41,13 @@ function recorder() {
 
 function postAt(leaderS: number) {
   const horses = Array.from({ length: 12 }, (_, i) => ({ gate: i + 1, s: leaderS - i * 3, w: 2 + (i % 4) * 2.2 }));
-  const scene = resolveBroadcastV2Scene(course, horses, VIEWPORT, false, { forceShotId: 'fourth-corner-front' });
+  /**
+   * ⚠️ ★**台本 v8 を明示します**（★2026-09-14）。★4 角の正面カットの据え位置は ★台本のカットの終わりから
+   *    ★決まります（`broadcastV2ShotEndM`）。★既定が v9（★コーナーのカットを持たない）になり、
+   *    ★台本を渡さないと ★据え位置が区間の終点へ落ちて ★ゴール板が画面に入りませんでした。
+   *    ★ここで見たいのは ★**ゴール板の描き方**で、★既定の台本ではありません。
+   */
+  const scene = resolveBroadcastV2Scene(course, horses, VIEWPORT, false, { forceShotId: 'fourth-corner-front', script: 'v8' });
   const { ctx, ops } = recorder();
   drawFinishPost(ctx as never, course, scene.camera, { focusS: scene.focusS });
   return ops;
@@ -72,7 +78,7 @@ describe('ゴール板と決勝線', () => {
     const horses = Array.from({ length: 12 }, (_, i) => ({ gate: i + 1, s: 1560 - i * 3, w: 2 + (i % 4) * 2.2 }));
     const draw = (texturedWorld: unknown) => {
       const scene = resolveBroadcastV2Scene(course, horses, VIEWPORT, false,
-        { forceShotId: texturedWorld === undefined ? 'finish-line' : 'fourth-corner-front' });
+        { forceShotId: texturedWorld === undefined ? 'finish-line' : 'fourth-corner-front', script: 'v8' });
       const { ctx, ops } = recorder();
       drawBroadcastV2Scene(ctx as never, course, scene, {
         palette: {},

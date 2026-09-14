@@ -158,7 +158,13 @@ describe('★レース映像の不変条件（画面の既定で測る）', () =
       for (let f = 0; f <= Math.ceil(total * FPS); f += 1) {
         const d = f / FPS;
         if (d < clock.introSec) continue;
-        const r = auditSceneAt(built, clock, d, { width: W, height: H });
+        /**
+         * ⚠️ ★**台本 v8 を明示します**（★2026-09-14・★意図した変更）。
+         *    ★既定が v9（★コーナーのカットを持たない・オーナー判断「コーナー演出は全カット」）になり、
+         *    ★既定では ★4 角正面の出口が ★**1 つも存在しません**。★この検査が守るのは ★4 角正面を持つ台本
+         *    ★（★切り戻しの道 v8）です。★既定に 4 角正面が無いことは下の対照で確かめます。
+         */
+        const r = auditSceneAt(built, clock, d, { width: W, height: H }, 'v8');
         if (r.drawn.length === 0) { prev = undefined; continue; }
         const lead = r.drawn.reduce((b, h) => (h.s > b.s ? h : b), r.drawn[0]!);
         const cur = { id: r.scene.shot.id, dir: dirOf(built.course, r.scene, lead.s, lead.w) };
@@ -171,6 +177,16 @@ describe('★レース映像の不変条件（画面の既定で測る）', () =
           }
         }
         prev = cur;
+      }
+      /**
+       * ★**対照: 既定（v9）では 4 角正面が一度も選ばれない**（★2026-09-14）。
+       *   ★ここが崩れたら、★既定にコーナーのカットが戻っています（★上の v8 明示の前提が崩れる）。
+       */
+      for (let f = 0; f <= Math.ceil(total * FPS); f += 3) {
+        const d = f / FPS;
+        if (d < clock.introSec) continue;
+        expect(auditSceneAt(built, clock, d, { width: W, height: H }).scene.shot.id,
+          `seed ${seed} ${d.toFixed(2)}s: ★既定の台本に 4 角正面が出ています`).not.toBe('fourth-corner-front');
       }
       /** ★出口を 1 つも拾えていないなら「異常なし」ではありません（R-3 / R-21） */
       expect(exits, `seed ${seed}: ★4 角正面から出る境目を 1 つも拾えていません`).toBeGreaterThan(0);

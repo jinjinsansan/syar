@@ -121,6 +121,12 @@ export interface HorseNamePlateRow {
   readonly isOwn?: boolean | undefined;
   /** 見出し（`自馬` / `先頭` など）。省略可 */
   readonly note?: string | undefined;
+  /**
+   * ★**勢いの段階**（★0〜3・★2026-09-14・`momentumLevels`）。★省略すると描きません。
+   * ⚠️ ★**長さが主、色は補助**です（★正典 §12.1「勝負服だけが鮮やか」・レビュー側 §5）。
+   *    ★いちばん強い段だけ ★彩度を抑えた金にします。★光らせません。
+   */
+  readonly momentum?: 0 | 1 | 2 | 3 | undefined;
 }
 
 /**
@@ -187,6 +193,17 @@ export function drawHorseNamePlates(
     }
     ctx.fillStyle = row.isOwn === true ? HUD.gold : HUD.paper;
     ctx.fillText(row.name, nx, y);
+    /**
+     * ★**勢いのバー**（★馬名の下・★デザイナー回答 D-4）。★馬体には掛かりません（★画面下部の固定枠）。
+     * ⚠️ ★段は 4 つだけです（★数字を出さない・★計測値のように見せない）。
+     */
+    if (row.momentum !== undefined) {
+      const trackW = 120, barH = 4, by = y + 7;
+      ctx.fillStyle = 'rgba(238,242,246,.18)';
+      ctx.fillRect(nx, by, trackW, barH);
+      ctx.fillStyle = row.momentum === 3 ? 'rgba(217,181,74,.95)' : 'rgba(238,242,246,.62)';
+      ctx.fillRect(nx, by, Math.round(trackW * ((row.momentum + 1) / 4)), barH);
+    }
     if (row.note !== undefined) {
       ctx.font = font(10, true);
       ctx.fillStyle = HUD.paper45;

@@ -1073,7 +1073,7 @@ export function broadcastV2SegmentSpan(course: Course, meters: number): { readon
  *    そこまで巻き込むと今回の指示の範囲を超えるためです。
  *    画面の既定は `broadcastV2ScriptFromSearch` が決めます。
  */
-export type BroadcastV2Script = 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8';
+export type BroadcastV2Script = 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8' | 'v9';
 
 /**
  * ★通常 `/race` の既定台本。
@@ -1086,8 +1086,16 @@ export type BroadcastV2Script = 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8';
  *    ★実測（seed 42・実画面）: ★v6 17 本 → ★v8 ＋ `pace=short` ★**12 本**。
  *    ★上書きです。★消したのではなく、★新しい指示で置き換えています（★R-7）。
  * ★切り戻しは `/race?cinematography=v6`（直前は `v5`・旧々は `v4`）。
+ *
+ * ★**2026-09-14、`v8` → `v9` へ（オーナー判断）**。
+ *   > ★「コーナー演出はクオリティが悪いので全カットすることにします。
+ *   >   ★つまり真横カメラワークの直線のみ」
+ *   ★`v9` は ★**コーナーのカットを 1 本も持たない**台本です（`SCRIPT_V9` の註記）。
+ *   ★コーナーに当てていた時間とカットの扱いは ★3 者の相談で B（★時計から取り除く）に決まりました
+ *   （`SYNTHESIS_RACE_SIDE_ONLY_20260914.md`）。★台帳「カット数は減らさない」は ★**上書き**です（★R-7）。
+ * ★切り戻しは `/race?cinematography=v8`（★コーナーを 1 つ見せる直前の形）。
  */
-export const DEFAULT_RACE_SCRIPT: BroadcastV2Script = 'v8';
+export const DEFAULT_RACE_SCRIPT: BroadcastV2Script = 'v9';
 /**
  * ★**直前の台本**。★既定を v6 にしたので、**明示で v5 へ戻せる口**が要ります。
  *   ⚠️ ★これが無いと `?cinematography=v5` が★**黙って既定（v6）へ落ちます**。
@@ -1133,8 +1141,13 @@ export function broadcastV2ScriptFromSearch(search: string): BroadcastV2Script {
    *    ★見比べていただくための口です。
    */
   if (v === 'v7') return 'v7';
-  /** ★切らない ＋ コーナーは見せる（★`SCRIPT_V8` の註記）。★2026-09-13 から ★**既定** */
+  /**
+   * ★切らない ＋ コーナーは見せる（★`SCRIPT_V8` の註記）。★2026-09-13〜14 の既定。
+   * ⚠️ ★既定を v9 にしたので、★これが無いと `?cinematography=v8` が ★**黙って v9 へ落ちます**。
+   */
   if (v === 'v8') return 'v8';
+  /** ★真横の直線だけ（★`SCRIPT_V9` の註記）。★2026-09-14 から ★**既定** */
+  if (v === 'v9') return 'v9';
   return DEFAULT_RACE_SCRIPT;
 }
 
@@ -1220,6 +1233,7 @@ export function puddlesFromSearch(search: string): boolean {
 
 /** ★台本 → ショット表。`v2` は表を持たないので v4 で代用（呼び出し側が使わない） */
 function scriptRowsOf(script: BroadcastV2Script): readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] {
+  if (script === 'v9') return SCRIPT_V9;
   if (script === 'v8') return SCRIPT_V8;
   if (script === 'v7') return SCRIPT_V7;
   if (script === 'v6') return SCRIPT_V6;
@@ -1301,6 +1315,29 @@ export const SCRIPT_V8: readonly { readonly until: number; readonly id: Broadcas
 ];
 
 /**
+ * ★**台本 v9 — ★真横の直線だけ**（★2026-09-14・★オーナー判断）
+ *
+ *   > ★「コーナー演出はクオリティが悪いので全カットすることにします。
+ *   >   ★つまり真横カメラワークの直線のみ。★ただしコース表ではコーナーを曲がるのは見せます」
+ *
+ * 【★中身】★ゲート → ★真横の追従（★発走の直線） → ★最後の直線 → ★ゴール板。
+ *   ★v8 からコーナーのカット（`pinCornerCuts`）だけを外した形です。
+ *   ★コーナーは ★**時計から取り除き**（★3 者の相談で B・`race-elision.ts`）、
+ *   ★その跳びは ★**コース図の上で馬群がコーナーを曲がる挿入画面**で覆います
+ *   （`drawToStraightCutIn` の `sweep`）。
+ *
+ * ⚠️ ★`side-drive` が直線の入口まで受けます。★時計を取り除かない形（`?pace=full`）では
+ *    ★**コーナーも真横の追従で映ります**。★それは比較用の口で、既定ではありません。
+ * ⚠️ ★この表の `until` も ★**境界を決めていません**（★`v9BoundariesM` が走路の形から引きます）。
+ */
+export const SCRIPT_V9: readonly { readonly until: number; readonly id: BroadcastV2ShotId }[] = [
+  { until: 0.008, id: 'start-gate-side' },   // ★ゲート
+  { until: 0.75, id: 'side-drive' },         // ★発走の直線（★その先は時計から取り除く）
+  { until: 0.94, id: 'homestretch-side' },   // ★最後の直線
+  { until: 1.0, id: 'finish-line' },         // ★ゴール板
+];
+
+/**
  * ★**ゴール板のカットの長さ**（m・★台本 v8）。
  * ⚠️ ★台本 v7 の `0.94`（★1600m で 96m）を ★**絶対値**にしました。★割合のままだと
  *    ★3600m で 216m になり、★ゴール板のカットが直線の半分を占めます。
@@ -1353,6 +1390,7 @@ export const SCRIPT_V3: readonly { readonly until: number; readonly id: Broadcas
 export function broadcastV2ScriptBoundariesM(
   course: Course, script: BroadcastV2Script = DEFAULT_RACE_SCRIPT,
 ): readonly { readonly meters: number; readonly id: BroadcastV2ShotId }[] {
+  if (script === 'v9') return v9BoundariesM(course);
   if (script === 'v8') return v8BoundariesM(course);
   if (script === 'v6') return v6BoundariesM(course);
   /**
@@ -1422,6 +1460,27 @@ function v8BoundariesM(course: Course): readonly { readonly meters: number; read
   const boardM = Math.min(V8_FINISH_BOARD_M, homeStretch * 0.25);
   return [
     ...pinCornerCuts(course, pre, closeStart, 1),
+    { meters: distance - boardM, id: 'homestretch-side' as BroadcastV2ShotId },
+    { meters: distance, id: 'finish-line' as BroadcastV2ShotId },
+  ];
+}
+
+/**
+ * ★**台本 v9 の境界**（★2026-09-14）。★`v8BoundariesM` から ★`pinCornerCuts` だけを外した形です。
+ * ⚠️ ★コーナーの行を ★**1 つも返しません**。★画面はこの一覧の `-corner-` の行から
+ *    ★「見せるコーナー」を作るので（`page.tsx` の `cornerSpansM`）、★ここが空なら
+ *    ★時計はコーナーを 1 つも残しません（★R-30・★1 か所で決める）。
+ */
+function v9BoundariesM(course: Course): readonly { readonly meters: number; readonly id: BroadcastV2ShotId }[] {
+  const distance = course.distance;
+  const homeStretch = homeStretchMetersOf(course);
+  const closeStart = distance - Math.min(GOAL_REAL_TIME_M, homeStretch);
+  const preCount = SCRIPT_V9.findIndex((row) => row.id === 'homestretch-side');
+  const preRows = SCRIPT_V9.slice(0, preCount);
+  const preSpan = SCRIPT_V9[preCount - 1]!.until;
+  const boardM = Math.min(V8_FINISH_BOARD_M, homeStretch * 0.25);
+  return [
+    ...preRows.map((row) => ({ meters: closeStart * (row.until / preSpan), id: row.id })),
     { meters: distance - boardM, id: 'homestretch-side' as BroadcastV2ShotId },
     { meters: distance, id: 'finish-line' as BroadcastV2ShotId },
   ];
@@ -2619,11 +2678,18 @@ export type BroadcastV2FinishStyle = 'contest' | 'solo';
  * 【★決め方】★引く理由は ★**「後ろから来る馬を画面に入れる」**の 1 つだけです。
  *   ★入れるべき相手が居なければ引きません。
  *
- *   | ★展開 | ★入れる相手 | ★画角 | ★先頭の位置 |
+ *   | ★展開 | ★入れる相手 | ★画角 | ★先頭の位置（★画面の横の割合） |
  *   |---|---|---|---|
- *   | ★逃げ切り | ★居ない（単騎） | ★11.5°（★寄ったまま） | ★0.62（★前を広く見せる） |
- *   | ★差し     | ★2〜4 番手の 1〜2 頭 | ★15° | ★0.50 |
- *   | ★追い込み | ★5 番手以下・★遠い | ★19° | ★0.38（★後ろを広く空ける） |
+ *   | ★逃げ切り | ★居ない（単騎） | ★11.0° | ★0.58 |
+ *   | ★差し     | ★2〜4 番手の 1〜2 頭 | ★11.5° | ★0.68 |
+ *   | ★追い込み | ★5 番手以下・★遠い | ★12.0° | ★0.78（★後ろを広く空ける） |
+ *
+ * ⚠️ ★**この表は定数の値に合わせて直しました**（★2026-09-14・レビュー側の再照会の回答 §1-2）。
+ *    ★以前の註記は 11.5°/15°/19°・0.62/0.50/0.38 で、★定数と合っていませんでした。
+ * ⚠️ ★**画面はもうこの表を使いません**（★2026-09-14・オーナー確認 O-7）。
+ *    ★展開の札は ★**確定の 1 着**から決まるので、★ゴールの前にこれで構図を決めると
+ *    ★**勝ち馬の型を先に明かします**。★画面は ★`FINISH_CAMERA_BY_CHASE`（★その時刻の状態）を使います。
+ *    ★この表は ★`development` を渡す既存の道具のために残しています。
  *
  * ⚠️ ★逃げ切りで ★**引かない**のがこの表の要点です。★オーナー評
  *    ★「ゴール前に急に引きが入り小さくなります」は、★入れる相手が居ないのに
@@ -2655,6 +2721,123 @@ export const FINISH_CAMERA_BY_DEVELOPMENT: Readonly<Record<RaceDevelopment,
   stalk: { fovDeg: 11.5, leadFraction: 0.68 },
   closer: { fovDeg: 12.0, leadFraction: 0.78 },
 };
+
+/**
+ * ★**ゴール前のカメラを「いまの状態」から決める**（★2026-09-14・オーナー確認 O-7）
+ *
+ * 【★なぜ置き換えるか】
+ *   ★レビュー側の回答（`REVIEW_CONSULT_RACE_SIDE_ONLY_FOLLOWUP_ANSWER_20260914.md` §1）:
+ *   > ★時刻 t の画・音は、★時刻 t までに描かれる状態だけの関数とする。
+ *   > ★未来の値（確定着順・1 着の馬番・着差・ゴール時刻）を入力に取らない。
+ *   ★`FINISH_CAMERA_BY_DEVELOPMENT` は ★**確定の 1 着**で先頭の置き場所を最大 256px 変えていました。
+ *   ★毎レース見ていれば「★左が空いたら追い込みが来る」と覚えられます。
+ *
+ * 【★オーナーの指示との関係】
+ *   > ★「追い込み馬がある時は引く必要がありますが、★それは展開によってカメラワークを切り替えてください」
+ *   ★オーナーは 2026-09-14 に ★これを「★**いま後ろから伸びてくる馬がいる時**」と読むことを了承しました。
+ *   → ★**画面の後ろで、先頭との差を詰めている馬がどれだけ後ろにいるか**で決めます。
+ *
+ * 【★両端の値】★展開の表の両端（★逃げ切り・追い込み）と同じです。★見え方の幅は変えていません。
+ *   ★`chase` 0 … ★追ってくる馬がいない（★寄ったまま・★前を広く）
+ *   ★`chase` 1 … ★`FINISH_CHASE_FAR_M` 後ろから詰めてくる馬がいる（★後ろを空ける）
+ */
+export const FINISH_CAMERA_BY_CHASE = {
+  none: { fovDeg: 11.0, leadFraction: 0.58 },
+  far: { fovDeg: 12.0, leadFraction: 0.78 },
+} as const;
+/** ★「詰めている」を測る過去の窓（★レース秒）。★実況の「伸びてきた馬」と同じ形です（`race-call.ts`） */
+export const FINISH_CHASE_WINDOW_SEC = 1.0;
+/** ★この窓で先頭との差をこれだけ詰めたら「追ってくる」と数え切る（m） */
+export const FINISH_CHASE_MIN_GAIN_M = 0.6;
+/** ★追ってくる馬がこれだけ後ろにいたら `chase` = 1（m・★5 馬身） */
+export const FINISH_CHASE_FAR_M = 12;
+/** ★表を引く刻み（★レース秒） */
+export const FINISH_CHASE_STEP_SEC = 0.1;
+/** ★なだらかにする過去の窓（★レース秒）。★未来は読みません */
+export const FINISH_CHASE_SMOOTH_SEC = 0.5;
+
+const chaseSmooth = (x: number): number => {
+  const t = Math.max(0, Math.min(1, x));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * ★**その瞬間の「追ってくる深さ」**（0〜1）。
+ *
+ * ⚠️ ★入力は ★**いまの位置と、窓の前の位置だけ**です。★着順・勝ち馬・ゴール時刻を受け取りません。
+ * ⚠️ ★先頭は ★**それぞれの時刻の最大値**で取ります。★「いまの先頭の馬番」の窓の前の位置を読むと、
+ *    ★先頭が入れ替わった 1 コマで値が跳びます（★最大値どうしなら連続です）。
+ * ⚠️ ★「数える／数えない」を段で切りません（★`frameContenders` の注記と同じ罠）。★詰め方と後ろの深さに
+ *    ★なだらかな重みを付けて、★いちばん深い 1 頭を取ります。
+ */
+export function finishChaseOf(
+  now: readonly { readonly gate: number; readonly meters: number }[],
+  ago: readonly { readonly gate: number; readonly meters: number }[],
+): number {
+  if (now.length < 2 || ago.length === 0) return 0;
+  const agoOf = new Map(ago.map((h) => [h.gate, h.meters] as const));
+  let lead = -Infinity;
+  for (const h of now) lead = Math.max(lead, h.meters);
+  let leadAgo = -Infinity;
+  for (const h of ago) leadAgo = Math.max(leadAgo, h.meters);
+  let best = 0;
+  for (const h of now) {
+    const gap = lead - h.meters;
+    if (!(gap > 1e-6)) continue;
+    const a = agoOf.get(h.gate);
+    if (a === undefined) continue;
+    /** ★この窓で先頭との差をどれだけ詰めたか */
+    const gained = (leadAgo - a) - gap;
+    const wGain = chaseSmooth(gained / FINISH_CHASE_MIN_GAIN_M);
+    const depth = Math.min(1, gap / FINISH_CHASE_FAR_M);
+    /** ★遠すぎる馬（★2 倍より後ろ）は画面に入れる相手に数えない */
+    const wRange = 1 - chaseSmooth((gap - FINISH_CHASE_FAR_M) / FINISH_CHASE_FAR_M);
+    best = Math.max(best, depth * wGain * wRange);
+  }
+  return best;
+}
+
+/**
+ * ★**「追ってくる深さ」の表**。★レースにつき 1 度だけ作ります（★毎コマ位置を 2 回読むと重い）。
+ *
+ * ⚠️ ★**返す関数は、渡したレース秒より未来の標本を読みません。**
+ *    ★刻み i の区間では ★標本 i−1 と i の間を補うので、★どちらも ★その秒より前です。
+ *    ★1 刻み（0.1 秒）遅れますが、★未来の位置は 1 つも入りません。
+ */
+export function finishChaseTable(
+  positionsAt: (raceSec: number) => readonly { readonly gate: number; readonly meters: number }[],
+  endRaceSec: number,
+): (raceSec: number) => number {
+  const step = FINISH_CHASE_STEP_SEC;
+  const n = Math.max(1, Math.ceil(Math.max(0, endRaceSec) / step) + 1);
+  const raw: number[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const r = i * step;
+    raw.push(finishChaseOf(positionsAt(r), positionsAt(Math.max(0, r - FINISH_CHASE_WINDOW_SEC))));
+  }
+  const k = Math.max(1, Math.round(FINISH_CHASE_SMOOTH_SEC / step));
+  const smoothed = raw.map((_, i) => {
+    let sum = 0, count = 0;
+    for (let j = Math.max(0, i - k + 1); j <= i; j += 1) { sum += raw[j]!; count += 1; }
+    return sum / count;
+  });
+  return (raceSec: number): number => {
+    if (!Number.isFinite(raceSec) || raceSec <= 0) return smoothed[0] ?? 0;
+    const x = raceSec / step;
+    const i = Math.floor(x);
+    if (i >= smoothed.length) return smoothed[smoothed.length - 1] ?? 0;
+    const prev = smoothed[Math.max(0, i - 1)]!;
+    const cur = smoothed[i]!;
+    return prev + (cur - prev) * (x - i);
+  };
+}
+
+/** ★「追ってくる深さ」→ ★画角と先頭の置き場所（★両端の間をなだらかに） */
+export function finishCameraByChase(chase: number): { readonly fovDeg: number; readonly leadFraction: number } {
+  const c = Math.max(0, Math.min(1, Number.isFinite(chase) ? chase : 0));
+  const a = FINISH_CAMERA_BY_CHASE.none, b = FINISH_CAMERA_BY_CHASE.far;
+  return { fovDeg: a.fovDeg + (b.fovDeg - a.fovDeg) * c, leadFraction: a.leadFraction + (b.leadFraction - a.leadFraction) * c };
+}
 
 /**
  * ★**直線で画角を広げてよい上限**（★2026-09-12・オーナー指示②「これ以上小さくしないで」）
@@ -2760,6 +2943,11 @@ export function broadcastV2FinishCamera(
    *   ★渡さなければ ★**従来どおり**（`finishStyle` だけで決める）。★既存の呼び出しと道具を壊しません。
    */
   development?: RaceDevelopment,
+  /**
+   * ★**その時刻の「追ってくる深さ」**（★2026-09-14・`finishChaseOf`）。
+   * ⚠️ ★渡したときは ★`development` より優先します（★画面はこちらだけを渡します）。
+   */
+  chase?: number,
 ): { readonly camera: ShotCameraPreset; readonly leadFraction: number } {
   const w = Math.max(0, Math.min(1, weight));
   /**
@@ -2783,7 +2971,8 @@ export function broadcastV2FinishCamera(
    *   ★`FINISH_CAMERA_BY_DEVELOPMENT` に 1 か所だけ置きます（★R-30）。
    * ⚠️ ★`development` が無い呼び出しは ★**1 ビットも変わりません**（従来の 2 通り）。
    */
-  const byDev = development === undefined ? undefined : FINISH_CAMERA_BY_DEVELOPMENT[development];
+  const byDev = chase !== undefined ? finishCameraByChase(chase)
+    : development === undefined ? undefined : FINISH_CAMERA_BY_DEVELOPMENT[development];
   const targetFov = byDev?.fovDeg ?? (style === 'contest' ? 15 : 12);
   const targetLead = byDev?.leadFraction ?? (style === 'contest' ? 0.45 : 0.6);
   return {

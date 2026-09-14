@@ -71,6 +71,8 @@ export interface AuditBuilt {
 export interface AuditClock {
   readonly introSec: number;
   readonly warp: { readonly displaySec: number; raceSecAt(displaySec: number): number };
+  /** ★その時刻の「追ってくる深さ」（★2026-09-14・`page.tsx` の `finishChaseAt` と同じ関数） */
+  readonly finishChaseAt?: (raceSec: number) => number;
 }
 
 export declare const RACE_DEFAULTS: {

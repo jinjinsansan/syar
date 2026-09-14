@@ -44,6 +44,7 @@ import {
   broadcastV2StartCamera,
   broadcastV2StartFocus,
   FINISH_CAMERA_BY_DEVELOPMENT,
+  finishCameraByChase,
   GOAL_SETTLE_M,
   GOAL_SETTLE_END_M,
   GOAL_LEAD_FRACTION,
@@ -131,6 +132,12 @@ export function resolveBroadcastV2Scene(
      * ⚠️ ★渡さなければ従来どおり `finishStyle` だけで決めます（★既存の道具を壊しません）。
      */
     readonly development?: RaceDevelopment;
+    /**
+     * ★**その時刻の「追ってくる深さ」**（★2026-09-14・オーナー確認 O-7・`finishChaseOf`）。
+     *   ★最後の直線でどれだけ引くかを ★**状態から**決めます。★渡したときは `development` より優先します。
+     * ⚠️ ★画面はこちらだけを渡します（★確定の 1 着から構図を決めない・レビュー側 Q-R7）。
+     */
+    readonly finishChase?: number;
     readonly cornerCutM?: number;
     /**
      * ★発走の統合: レース表示時間（秒・負なら待機中）。指定があると発走ショットの注視点を
@@ -257,7 +264,7 @@ export function resolveBroadcastV2Scene(
    *   この 2 ショットだけ `camera:` を変えても画面が変わりません（2026-08-22 の実害）。
    */
   const finish = (shot.id === 'homestretch-side' || shot.id === 'finish-line')
-    ? broadcastV2FinishCamera(options.finishStyle ?? 'solo', broadcastV2AnchorWeight(course, shot.id, leaderS), shot.camera, shot.leadFraction, options.development)
+    ? broadcastV2FinishCamera(options.finishStyle ?? 'solo', broadcastV2AnchorWeight(course, shot.id, leaderS), shot.camera, shot.leadFraction, options.development, options.finishChase)
     : undefined;
   const startPreset = shot.id === 'start-follow' && options.raceDisplaySec !== undefined
     ? broadcastV2StartCamera(options.raceDisplaySec) : undefined;
@@ -335,8 +342,11 @@ export function resolveBroadcastV2Scene(
    * ⚠️ ★`development` を渡さない台本（★v5 / v6 …）は ★**1 ビットも変わりません**。
    */
   const devBlend = ((): { readonly fovDeg: number; readonly leadFraction: number } | undefined => {
-    if (options.development === undefined || shot.id !== 'homestretch-side') return undefined;
-    const target = FINISH_CAMERA_BY_DEVELOPMENT[options.development];
+    if (shot.id !== 'homestretch-side') return undefined;
+    /** ★状態から決める値を優先（★`finishChase` の註記）。★無ければ従来の展開の表 */
+    const target = options.finishChase !== undefined ? finishCameraByChase(options.finishChase)
+      : options.development !== undefined ? FINISH_CAMERA_BY_DEVELOPMENT[options.development] : undefined;
+    if (target === undefined) return undefined;
     const left = course.distance - leaderS;
     const span = Math.max(1, FINISH_DEV_RAMP_FROM_M - V8_FINISH_BOARD_M);
     const u = Math.max(0, Math.min(1, (FINISH_DEV_RAMP_FROM_M - left) / span));
@@ -362,7 +372,7 @@ export function resolveBroadcastV2Scene(
    * ⚠️ ★`development` を渡さない台本は ★**1 ビットも変わりません**。
    */
   const goalSettleLead = ((): number | undefined => {
-    if (options.development === undefined || shot.id !== 'finish-line') return undefined;
+    if ((options.development === undefined && options.finishChase === undefined) || shot.id !== 'finish-line') return undefined;
     const from = finish?.leadFraction ?? shot.leadFraction ?? 0.78;
     const left = course.distance - leaderS;
     const u = Math.max(0, Math.min(1, (GOAL_SETTLE_M - left) / Math.max(1, GOAL_SETTLE_M - GOAL_SETTLE_END_M)));

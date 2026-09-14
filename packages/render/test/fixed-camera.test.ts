@@ -46,8 +46,14 @@ const rangeOf = (script: BroadcastV2Script): { start: number; end: number } => {
   return { start: i > 0 ? rows[i - 1]!.meters : 0, end };
 };
 
-/** ★既定は必ず見る。★v4 も残す（元の不具合が起きた台本） */
-const SCRIPTS: readonly BroadcastV2Script[] = [DEFAULT_RACE_SCRIPT, 'v5', 'v4'];
+/**
+ * ★v4 も残す（元の不具合が起きた台本）。
+ * ⚠️ ★**既定（v9）を外し、v8 を入れました**（★2026-09-14・オーナー判断「コーナー演出は全カット」）。
+ *    ★v9 は 4 角の正面カットを ★**持ちません**（★この検査が守る対象がありません）。
+ *    ★コーナーのカットを持つ台本のうち ★**切り戻しの道（v8）**を見ます。
+ *    ★既定にコーナーのカットが無いこと自体は `side-only-script.test.ts` が固定します。
+ */
+const SCRIPTS: readonly BroadcastV2Script[] = ['v8', 'v5', 'v4'];
 
 describe('★固定カメラ（4 角正面）', () => {
   it('追従カメラもカット終端でズームを巻き戻さない（左右回り・各台本）', () => {

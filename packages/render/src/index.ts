@@ -74,3 +74,4 @@ export * from './race-motion.js';
 export * from './traffic-motion.js';
 export * from './horse-ground.js';
 export * from './race-cutin.js';
+export * from './race-climax-hud.js';

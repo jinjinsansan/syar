@@ -145,7 +145,18 @@ export const FRAME_LABELS: readonly string[] = ['白', '黒', '赤', '青', '黄
  *    ★全頭違う（`silkRoleOf` が `silk-1`〜`silk-18` を配る）ので見分けられます。
  *    ★検定は「★色と柄の ★**どちらかが違う**」を見ます。
  */
-export const SILK_PATTERNS = ['plain', 'hoop'] as const;
+/**
+ * ⚠️ ★**一本輪もやめて、無地だけにしました**（★2026-09-15・オーナー判断「柄をやめて全部直す」）。
+ *
+ *   ★オーナー評「★また騎手の服に縦縞模様出ています」。★真横のデフォルメ馬（`side-v8`）では、
+ *   ★上着の塗る画素の外接矩形が ★**背中と腕にまたがる**ので、★真ん中の帯が ★背中と腕を横切り、
+ *   ★**2〜3 本の縞**に見えました（★開発サーバーの画面を拡大して確認・4・8・10・12 番）。
+ * ★同じ枠の 2 頭は ★**上着の色が必ず違う**ので（★`silkRoleOf`・`silks-distinct.test.ts`）、
+ *   ★12 頭立てまでは柄が無くても見分けられます。
+ * ⚠️ ★13 頭以上では、★1 つの枠に 3〜4 頭入っても ★上着の色は全頭違います（★同じ検査）。
+ *    ★柄を戻すなら、★真横の絵で縞に見えないことを ★**画面で確かめてから**にすること。
+ */
+export const SILK_PATTERNS = ['plain'] as const;
 export type SilkPattern = (typeof SILK_PATTERNS)[number];
 
 /** ★馬番 → 柄。★同枠（連番）の 2 頭は必ず別の柄になります */
@@ -170,5 +181,5 @@ export function silkPatternInk(pattern: SilkPattern, jx: number, jy: number): bo
 
 /** ★画面と道具で同じ言葉を使う */
 export const SILK_PATTERN_LABEL: Readonly<Record<SilkPattern, string>> = {
-  plain: '無地', hoop: '一本輪',
+  plain: '無地',
 };

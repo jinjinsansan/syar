@@ -45,8 +45,13 @@ describe('既定台本（2026-08-28 から v6）', () => {
     for (const q of ['', '?', '?seed=42']) {
       expect(scriptOf(q), q).toBe(DEFAULT_RACE_SCRIPT);
     }
-    /** ⚠️ ★既定が v6 のまま戻っていたら、★2026-09-13 の指示が効いていません */
-    expect(DEFAULT_RACE_SCRIPT).toBe('v8');
+    /**
+     * ⚠️ ★**既定が v8 → v9 になりました**（★2026-09-14・オーナー判断
+     *    ★「コーナー演出は全カット。★真横カメラワークの直線のみ」）。★意図して書き換えています。
+     *    ★v8 は `?cinematography=v8` で戻せます（★下の ②′）。
+     */
+    expect(DEFAULT_RACE_SCRIPT).toBe('v9');
+    expect(scriptOf('?cinematography=v8'), '★v8 へ戻せる（★黙って既定へ落ちない）').toBe('v8');
   });
 
   /**
@@ -157,8 +162,13 @@ describe('既定台本（2026-08-28 から v6）', () => {
      *    ★桜星賞の 4 角は 進行 **0.7125〜0.750**（★1140〜1200m）です
      *    （★2026-09-12 に尺を 4 秒 → 2 秒にしたので 120m → 60m）。
      */
+    /**
+     * ⚠️ ★**既定（v9）にはコーナーのカットがありません**（★2026-09-14・オーナー判断「コーナー演出は全カット」）。
+     *    ★4 角の正面カットが在ることは ★**v8（切り戻しの道）**で見ます。★既定では同じ地点が真横の追従です。
+     */
     for (const r of [0.72, 0.73, 0.745]) {
-      expect(shotAt(r, scriptOf('')), `進行 ${r}`).toBe('fourth-corner-front');
+      expect(shotAt(r, scriptOf('?cinematography=v8')), `進行 ${r} の v8`).toBe('fourth-corner-front');
+      expect(shotAt(r, scriptOf('')), `進行 ${r} の既定（v9）はコーナーのカットを持たない`).toBe('side-drive');
     }
     /**
      * ⚠️ ★**旧台本（v4 / v5）は割合のままです**（★切り戻しの道を動かさない）。

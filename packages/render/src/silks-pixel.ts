@@ -35,11 +35,22 @@ export const SILKS_PAINT = {
  */
 export function silksPaintable(
   r: number, g: number, b: number, a: number, helmet: boolean,
+  /**
+   * ★**肌の判定を使うか**（★2026-09-15・オーナー指示「治してください」＝鞍布のまだら）。
+   *
+   *   ★鞍布の生地の陰は ★**赤みがかったクリーム色の灰**です（★実測 side-v8: (170,155,140)・(202,188,179)）。
+   *   ★これが R>G>B なので ★**肌と判定されて塗られず**、★鞍布の縁が白いまだらに残っていました
+   *   （★side-v8 の 2 コマで 4,521 画素）。
+   * → ★**鞍布だけの窓では肌の判定を外します。** ★その窓に騎手の肌は入りません。
+   * ⚠️ ★上着と兜の窓では ★使い続けること（★首すじ・手を白く塗り潰さない・`silks-skin.ts`）。
+   * ⚠️ ★省略すると ★従来どおり使います（★測る道具の数字は変わりません）。
+   */
+  checkSkin = true,
 ): boolean {
   if (a < SILKS_PAINT.minAlpha) return false;
   const spread = Math.max(r, g, b) - Math.min(r, g, b);
   if (spread > (helmet ? SILKS_PAINT.maxSpreadHelmet : SILKS_PAINT.maxSpread)) return false;
   if (Math.max(r, g, b) < (helmet ? SILKS_PAINT.minLevelHelmet : SILKS_PAINT.minLevel)) return false;
   /** ⚠️ ★肌は塗りません（★陰になった肌は彩度で弾けません・`silks-skin.ts`） */
-  return !isSkinTone(r, g, b);
+  return !checkSkin || !isSkinTone(r, g, b);
 }

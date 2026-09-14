@@ -79,7 +79,12 @@ function transitions(script: BroadcastV2Script): readonly { readonly m: number; 
  *    ★v8 は通しの真横 1 本＋コーナー 2 つなので、★切替の総数は 12 → 6 に減りますが、
  *    ★画角の系統をまたぐのは ★**コーナーの出入り 4 回**で v6 と変わりません。
  */
-const CROSS_FAMILY_COUNT: Readonly<Record<string, number>> = { v4: 3, v5: 3, v6: 4, v8: 4 };
+/**
+ * ⚠️ ★**v9 を足しました**（★2026-09-14・★既定が v8 → v9 になったため・オーナー判断「コーナー演出は全カット」）。
+ *    ★v9 は ゲート → 真横の追従 → 最後の直線 → ゴール板 で、★**全部 `view: 'side'`** です。
+ *    ★画角の系統をまたぐ切替は ★**0**。★v8 の 4 は ★コーナーの出入りでした。
+ */
+const CROSS_FAMILY_COUNT: Readonly<Record<string, number>> = { v4: 3, v5: 3, v6: 4, v8: 4, v9: 0 };
 
 describe('★カットの切替', () => {
   it('★★画角の系統が変わる切替は、重ねない（ハードカット）', () => {

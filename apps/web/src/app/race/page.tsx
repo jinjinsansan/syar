@@ -26,6 +26,7 @@ import {
   resolveRace, paceOf, replayOf, finalOrderMatches,
   laneAt, laneAtStart, TRACK_WIDTH_M, LANE_MODELS, LANE_MODEL_LEGACY,
   aiProxyPlan, staminaTrackOf, staminaGaugeOf, staminaAt, boundaryTimesOf,
+  marginLabel,
 } from '@star/race-engine';
 import { deriveRng } from '@star/sim-engine';
 import type { Strategy } from '@star/sim-engine';
@@ -81,6 +82,11 @@ import {
   trafficPositionModel, raceClockFor, type RacePacePolicy,
   raceCutInAt, raceTransitionVeil, RACE_CUTIN_SEC, RACE_CUTIN_CORNER_SEC, RACE_CUTIN_SEAM_SEC,
   RACE_CUTIN_JUMP_LEAD_SEC, RACE_CUTIN_AT_START,
+  // ★真横の直線だけ（台本 v9・2026-09-14）
+  RACE_COURSE_SWEEP_LEAD_SEC, raceEditSweepRaceSec, broadcastV2SegmentSpan, finishChaseTable,
+  drawGoalCountdown, drawClimaxVignette, climaxVignetteAlpha, climaxHudFade,
+  momentumLevels, MOMENTUM_FROM_M, MOMENTUM_WINDOW_SEC,
+  photoFinishOf, PHOTO_FINISH_HOLD_SEC, drawPhotoFinishOverlay,
   drawOwnHorseCutIn, drawFormationCutIn, drawRunningStyleCutIn, drawToStraightCutIn,
   RACE_TELOP_SEC, drawOwnHorseTelop, drawFormationTelop, drawRunningStyleTelop, drawToStraightTelop,
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
@@ -165,6 +171,20 @@ const SOUND_ON_AT_START = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('sound') === '1';
 const SHOW_ENTRY = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('entry') === '1';
+/**
+ * ★**自馬で介入する人の見せ方を見る口**（`?view=intervene`・★2026-09-14・オーナー判断 O-1）。
+ *
+ *   > ★O-1「見せ方を変えます」 ／ ★「いずれにしても、コーナーを全てカットです。
+ *   >   ★ただしコース表ではコーナーを曲がるのは見せます」
+ *
+ *   ★介入する人は ★残り `EARLY_SPURT_METER`（900m）→ ゴールを ★**時計から取り除きません**
+ *   （★正典 §8b の「仕掛け」「追う」の局面・D-066）。★その間のコーナーは ★**コース図の画面で覆い**、
+ *   ★真横の画はコーナーでは出しません。
+ * ⚠️ ★**既定では効きません**（★観戦だけの人の見せ方）。★介入の画面そのものはまだありません。
+ *    ★見え方を先にオーナーに見ていただくための口です。★台本 v9 のときだけ効きます。
+ */
+const INTERVENE_VIEW = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('view') === 'intervene';
 const PACE_SHORT = typeof window === 'undefined'
   || new URLSearchParams(window.location.search).get('pace') !== 'full';
 const RACE_PACE_POLICY: RacePacePolicy = LEGACY_MOTION ? 'legacy' : PACE_SHORT ? 'short' : 'readable';
@@ -840,10 +860,25 @@ interface Built {
    */
   readonly development: RaceDevelopmentInfo;
   /**
+   * ★**その時刻の「追ってくる深さ」**（★レース秒 → 0〜1・★2026-09-14・オーナー確認 O-7）。
+   *   ★最後の直線のカメラは ★**これだけ**を見ます（★確定の 1 着から構図を決めない・レビュー側 Q-R7）。
+   * ⚠️ ★渡したレース秒より未来の位置は読みません（`finishChaseTable` の註記）。
+   */
+  readonly finishChaseAt: (raceSec: number) => number;
+  /**
+   * ★**写真判定の止め絵**（★台本 v9 だけ・★2026-09-14）。★接戦でなければ `undefined`。
+   *   ★判定は ★先頭が決勝線を通る瞬間の描いている位置（★レビュー側 Q-R9 の (c)）。
+   */
+  readonly photoFinish: { readonly atDisplaySec: number; readonly boardLabel: string } | undefined;
+  /**
    * ★**時計の跳びが起きる表示秒**（★`?pace=short` のときだけ中身が入ります）。
    *   ★ここはカットインで覆わなければなりません（★裸の跳びは瞬間移動に見えます）。
    */
-  readonly editJumps: readonly { readonly at: number; readonly label: string }[];
+  readonly editJumps: readonly {
+    readonly at: number; readonly label: string;
+    /** ★跳ぶ前と跳んだ先のレース秒（★コース図で馬群を進めるのに使います・★2026-09-14） */
+    readonly fromRaceSec: number; readonly toRaceSec: number;
+  }[];
   /** ★ショット切替の時刻（表示秒）と前後の id。切替直後は前ショットとディゾルブする（ユーザー指摘⑥） */
   readonly shotChanges: readonly { readonly displaySec: number; readonly from: BroadcastV2ShotId; readonly to: BroadcastV2ShotId }[];
   /** 斤量（出馬表の表示用） */
@@ -1080,7 +1115,12 @@ function silksOverlays(
      * ⚠️ ★**判定は `@star/render` の `silksPaintable` に置きました**（★2026-09-13・R-30）。
      *    ★ここに式を直書きしていたので、★窓を測る道具が ★**違う式**で測っていました。
      */
-    if (!silksPaintable(r, g, b, a, helmet)) continue;
+    /**
+     * ★**鞍布だけの窓では肌の判定を使いません**（★2026-09-15・`silksPaintable` の `checkSkin` の註記）。
+     *   ★鞍布の生地のクリーム色の陰が肌と判定され、★縁が白いまだらに残っていました。
+     * ⚠️ ★上着・兜の窓と重なる所は ★従来どおり肌を外します（★首すじ・手）。
+     */
+    if (!silksPaintable(r, g, b, a, helmet, !(saddlecloth && !jacket && !helmet))) continue;
     /**
      * ★**肌は塗りません**（2026-08-21・オーナー評「騎手の肌の色が白いのがいる」）。
      *
@@ -1118,6 +1158,52 @@ function silksOverlays(
     alphaOf[mask] = Math.round(a * 0.94);
     if (x < minX) minX = x; if (x > maxX) maxX = x;
     if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  /**
+   * ★**つながった塊は 1 色で塗ります**（★2026-09-15・オーナー判断「柄をやめて全部直す」）。
+   *
+   * 【★何が起きていたか — ★開発サーバーの画面を拡大して確認】
+   *   ★窓は四角で、★色は ★**1 画素ずつ**「どの窓に入るか」で決めていました。★真横のデフォルメ馬
+   *   ★（`side-v8`）では騎手が絵の右上に座るので、★窓の境目が ★ヘルメットや上着の途中を通ります。
+   *     ★ヘルメットの後ろの角 … ★上着の窓に入った所だけ ★上着の色（★四角い別の色）
+   *     ★上着の下の端       … ★鞍布の窓に入った所だけ ★枠色（★3 番の黄色の上着の下が赤）
+   *   ★オーナー評「★また騎手の服に縦縞模様出ています」。★窓の数字を詰め直すやり方は
+   *   ★**3 回**やり、★毎回別のコマ・別の絵ではみ出しました（★上の `SILKS_LAYOUT_FRONT` の註記）。
+   * → ★塗る画素を ★**つながった塊**に分け、★塊の中で ★**多い方の色**に揃えます。
+   *   ★ヘルメット・上着・鞍布は ★素材の上で黒い線に区切られた別の塊なので、★窓が多少ずれても割れません。
+   * ⚠️ ★塗る画素そのもの（★どこを塗るか）は ★1 つも増やしも減らしもしません。★色の割り当てだけです。
+   */
+  {
+    const seen = new Uint8Array(width * height);
+    const stack: number[] = [];
+    const members: number[] = [];
+    for (let start = 0; start < region.length; start += 1) {
+      if (region[start] === 0 || seen[start] === 1) continue;
+      members.length = 0;
+      let capCount = 0; let bodyCount = 0;
+      stack.push(start); seen[start] = 1;
+      while (stack.length > 0) {
+        const p = stack.pop()!;
+        members.push(p);
+        if (region[p] === 1) capCount += 1; else bodyCount += 1;
+        const px = p % width; const py = (p - px) / width;
+        if (px > 0 && region[p - 1] !== 0 && seen[p - 1] === 0) { seen[p - 1] = 1; stack.push(p - 1); }
+        if (px < width - 1 && region[p + 1] !== 0 && seen[p + 1] === 0) { seen[p + 1] = 1; stack.push(p + 1); }
+        if (py > 0 && region[p - width] !== 0 && seen[p - width] === 0) { seen[p - width] = 1; stack.push(p - width); }
+        if (py < height - 1 && region[p + width] !== 0 && seen[p + width] === 0) { seen[p + width] = 1; stack.push(p + width); }
+      }
+      if (capCount === 0 || bodyCount === 0) continue;
+      const kind = capCount >= bodyCount ? 1 : 2;
+      for (const p of members) region[p] = kind;
+    }
+    /** ★上着の外接矩形は ★揃えた後の色で数え直します（★柄の正規化に使う値） */
+    jacketX0 = width; jacketY0 = height; jacketX1 = -1; jacketY1 = -1;
+    for (let p = 0; p < region.length; p += 1) {
+      if (region[p] !== 2) continue;
+      const px = p % width; const py = (p - px) / width;
+      if (px < jacketX0) jacketX0 = px; if (px > jacketX1) jacketX1 = px;
+      if (py < jacketY0) jacketY0 = py; if (py > jacketY1) jacketY1 = py;
+    }
   }
   /**
    * ★ゼッケンの数字が入る箱も、★捨ててよい範囲から外します。
@@ -1672,9 +1758,19 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
    * ⚠️ ★最初の区間が直線でない走路（★コーナー発走）では、★その区間の長さをそのまま使います。
    */
   const startShownM = course.segments[0]?.length ?? 0;
+  /**
+   * ★**台本 v9（真横の直線だけ）か**（★2026-09-14）。★コーナーのカットを持たないので、
+   *   ★`cornerSpansM` は空になり、★時計は ★発走 ＋ 最後の直線だけを残します。
+   */
+  const sideOnlyBuild = scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search) === 'v9';
   const elisions = raceEditElisionsFor(knots, {
     cornerSpansM, raceSecAtMeters, distanceMeter: DIST,
     startShownM, straightShownM: STRAIGHT_SHOWN_M,
+    /** ★見せる直線を最後の直線より長くしない（★4 角の出口を真横で映さない・★2026-09-14） */
+    homeStretchM: homeStretchMetersOf(course),
+    /** ★介入する人の見せ方（`?view=intervene`・O-1）。★残り 900m からゴールまで飛ばさない */
+    ...(INTERVENE_VIEW && sideOnlyBuild
+      ? { keepFromMetersLeft: DEFAULT_INTERVENTION_BALANCE.EARLY_SPURT_METER } : {}),
   });
   const warp = raceClockFor(knots, DIST, RACE_PACE_POLICY, elisions);
   /**
@@ -1714,8 +1810,36 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     (t) => model.at(t).map((h) => ({ gate: h.gate, s: h.meters, w: h.w ?? TRACK_WIDTH_M / 2 })),
     warp.raceSecAt(warp.displaySec),
   );
+  /**
+   * ★**「追ってくる深さ」の表**（★2026-09-14・オーナー確認 O-7）。★レースにつき 1 度だけ作ります。
+   * ⚠️ ★入力は ★位置モデルだけです。★確定着順・勝ち馬・展開の札を渡しません（★レビュー側 Q-R7）。
+   */
+  const finishChaseAt = finishChaseTable(
+    (r) => model.at(r).map((h) => ({ gate: h.gate, meters: h.meters })),
+    knots.finishSec + 1,
+  );
+  /**
+   * ★**写真判定の止め絵を出すか**（★台本 v9 だけ・★レビュー側 Q-R9 の (c)）。
+   *   ★先頭が決勝線を通る瞬間の ★**描いている位置**で 1〜2 着の差を見て、★着順ボードと同じ
+   *   ★`marginLabel` で言葉にします。★クビ以内なら出します。
+   * ⚠️ ★止め絵に出す言葉は ★**着順ボードの値**（`result.order[1].marginLabel`）です（★§3-3 ④）。
+   */
+  const photoFinish = ((): Built['photoFinish'] => {
+    if (!sideOnlyBuild) return undefined;
+    const crossSec = finishSec.get(winnerGate);
+    if (crossSec === undefined) return undefined;
+    const atCross = model.at(crossSec).map((h) => ({ gate: h.gate, meters: h.meters }));
+    const second = [...atCross].sort((a, b) => b.meters - a.meters)[1];
+    if (second === undefined) return undefined;
+    const PROBE_SEC = 0.2;
+    const before = model.at(Math.max(0, crossSec - PROBE_SEC)).find((h) => h.gate === second.gate)?.meters
+      ?? second.meters;
+    const decision = photoFinishOf(atCross, (second.meters - before) / PROBE_SEC, marginLabel);
+    if (decision === undefined || !decision.show) return undefined;
+    return { atDisplaySec: warp.displaySecAt(crossSec), boardLabel: result.order[1]?.marginLabel ?? decision.label };
+  })();
   return {
-    model, warp, pace,
+    model, warp, pace, finishChaseAt, photoFinish,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
     gauge, finishPos, finishSec, finishSpeeds, dustSoil, finishStyle,
     /**
@@ -1726,13 +1850,13 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
      */
     editJumps: RACE_PACE_POLICY === 'short'
       ? raceEditJumps(elisions, warp).map((j) => ({
-        at: j.atDisplaySec,
+        at: j.atDisplaySec, fromRaceSec: j.fromRaceSec, toRaceSec: j.toRaceSec,
         label: `${broadcastV2SectionLabel(course,
           Math.max(...model.at(j.toRaceSec).map((h) => h.meters)), 'side-drive')}へ`,
       }))
       : [],
     development,
-    ...buildMotionTimeline({ model, warp, finishSec, finishStyle }, winnerGate, 1.6),
+    ...buildMotionTimeline({ model, warp, finishSec, finishStyle, finishChaseAt }, winnerGate, 1.6),
     weightsKg: entrants.map((e) => e.weightKg),
     /**
      * ★脚質（★カットイン C / A が読む）。
@@ -1745,7 +1869,7 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
 
 /** Rebuild camera/scroll samples for a start adjustment without rebuilding the race result. */
 function buildMotionTimeline(
-  { model, warp, finishSec, finishStyle }: Pick<Built, 'model' | 'warp' | 'finishSec' | 'finishStyle'>,
+  { model, warp, finishSec, finishStyle, finishChaseAt }: Pick<Built, 'model' | 'warp' | 'finishSec' | 'finishStyle' | 'finishChaseAt'>,
   winnerGate: number, rampSec: number,
 ): Pick<Built, 'visualScroll' | 'shotChanges'> {
   const course = ovalCourse(DIST, COURSE_OPTS);
@@ -1754,6 +1878,7 @@ function buildMotionTimeline(
   const samples: VisualScrollSample[] = [];
   const shotChanges: { displaySec: number; from: BroadcastV2ShotId; to: BroadcastV2ShotId }[] = [];
   let lastShot: BroadcastV2ShotId | undefined;
+  const timelineScript = scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search);
   for (let d = 0; d <= totalSec + 1e-9; d += STEP) {
     const raceD = Math.max(0, d - RACE_INTRO_RACE_START_SEC);
     const clampedD = Math.min(raceD, warp.displaySec);
@@ -1768,8 +1893,17 @@ function buildMotionTimeline(
       cornerTracking: !LEGACY_MOTION && !CORNER_CAM_FIXED,
       fourthCornerFront: FOURTH_CORNER_FRONT_WEB,
       cornerStyle: CORNER_STYLE_WEB,
-      script: scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search),
+      script: timelineScript,
       laneAlignedFocus: laneFocusFromSearch(typeof window === 'undefined' ? '' : window.location.search),
+      /**
+       * ★**画面と同じ入力を渡します**（★2026-09-14・★R-30）。
+       *   ★この表は背景の流れ（`focusS`）とカットの切り替え時刻を作ります。★画面のカメラと
+       *   ★別の入力で作ると、★画面と流れが食い違います。
+       */
+      finishChase: finishChaseAt(sec),
+      leadGates: [...visual].sort((a, b) => b.meters - a.meters).slice(0, CLIMAX_LEAD_COUNT).map((h) => h.gate),
+      ...(timelineScript === CUT_RACE_SCRIPT || timelineScript === 'v8' || timelineScript === 'v9'
+        ? { noContenderFrameShots: CUT_SCRIPT_NO_FRAME_SHOTS } : {}),
     });
     const h = 0.05;
     const lo = Math.max(0, clampedD - h);
@@ -2032,6 +2166,31 @@ export default function RacePage(): React.JSX.Element {
     const params = new URLSearchParams(window.location.search);
     params.set('race', raceId);
     params.delete('surface');
+    window.location.search = params.toString();
+  }, []);
+  /**
+   * ★**見比べの切り替えを、道具のボタンで**（★2026-09-15・オーナー指示
+   *   ★「★URL を分けずに道具でボタン分けしてください。★複雑です」）。
+   *
+   *   ★演出 … 新しい形（台本 v9）／ 前の形（`?cinematography=v8`）
+   *   ★見る人 … 観戦（既定）／ 自馬で介入（`?view=intervene`）
+   *   ★展開 … 通常（seed 42）／ 接戦（`?seed=99`）
+   * ⚠️ ★どれも ★**モジュール読み込み時に URL から読む口**なので、★`pickRace` と同じく
+   *    ★`location.search` を書いて再読込させます（★別の読み方を作らない）。
+   * ⚠️ ★いまの状態は ★**描画の後で**読みます（★`useState` の初期値にすると SSR と食い違う）。
+   */
+  const [viewSwitches, setViewSwitches] = useState({ oldScript: false, intervene: false, contest: false });
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    setViewSwitches({
+      oldScript: p.get('cinematography') === 'v8',
+      intervene: p.get('view') === 'intervene',
+      contest: p.get('seed') === '99',
+    });
+  }, []);
+  const toggleViewParam = useCallback((key: 'cinematography' | 'view' | 'seed', onValue: string): void => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get(key) === onValue) params.delete(key); else params.set(key, onValue);
     window.location.search = params.toString();
   }, []);
   /**
@@ -3419,7 +3578,18 @@ export default function RacePage(): React.JSX.Element {
       return;
     }
 
-    const raceD = intro.raceDisplaySec;
+    /**
+     * ★**写真判定の止め絵**（★台本 v9・★2026-09-14・★レビュー側 Q-R9）。
+     *   ★接戦のときだけ、★先頭が決勝線を通る瞬間の絵で ★`PHOTO_FINISH_HOLD_SEC` だけ止めます。
+     * ⚠️ ★**スローモーションではありません**（★脚さばきが読める・相談書 C-4）。★止めて、★そのあと
+     *    ★その時刻の画へ戻ります（★レース時間は止めない・★戻った先はその瞬間の状態）。
+     * ⚠️ ★着順・走破タイムに触れません。★どの表示秒の絵を描くかだけです（★憲法 3）。
+     */
+    const raceDLive = intro.raceDisplaySec;
+    const photo = built.photoFinish;
+    const photoSince = photo === undefined ? -1 : raceDLive - photo.atDisplaySec;
+    const photoHold = photo !== undefined && photoSince >= 0 && photoSince < PHOTO_FINISH_HOLD_SEC;
+    const raceD = photoHold ? photo.atDisplaySec : raceDLive;
 
     /**
      * ★**ゴール前の数秒を大きく撮り直すリプレイ**（`finish-replay.ts`・オーナー要望⑤）
@@ -3540,7 +3710,9 @@ export default function RacePage(): React.JSX.Element {
      */
     const cutScript = scriptFromSearch(search) === CUT_RACE_SCRIPT;
     /** ★直線を `homestretch-side` → `finish-line` と割る台本（★v8）。★枠取りの扱いが v6 と同じ */
-    const splitStraightScript = scriptFromSearch(search) === 'v8';
+    /** ★真横の直線だけの台本（★v9・★2026-09-14）。★直線の割り方は v8 と同じです */
+    const sideOnlyScript = scriptFromSearch(search) === 'v9';
+    const splitStraightScript = scriptFromSearch(search) === 'v8' || sideOnlyScript;
     /**
      * ★**表示位置の演出（`climax-choreography`）は既定で使いません**（2026-08-27・オーナー判断）。
      *
@@ -3557,14 +3729,13 @@ export default function RacePage(): React.JSX.Element {
      */
     const climaxDisabled = cutScript || !search.includes('climax=on');
     /**
-     * ★**主役群の馬番**（確定着順の上位 `CLIMAX_LEAD_COUNT` 頭）。
-     *   ★演出の役どころにも、直線のカメラの「収める相手」にも、同じこの集合を使います。
-     *   ⚠️ ★レース中ずっと変わらない集合です（確定着順から決めるため）。
-     *      だから「順位が入れ替わって集合ごと入れ替わり、画角が跳ぶ」ことが起きません。
+     * ⚠️ ★**直線のカメラの「収める相手」を、確定着順の上位 5 頭から外しました**（★2026-09-14）。
+     *    ★ゴールの前に ★**確定着順**でカメラを決めると、★誰が上位に来るかを構図で先に明かします
+     *    （★レビュー側 Q-R7「未来の値を入力に取らない」）。★いまは ★その時刻に描いている位置の
+     *    ★上位 5 頭です（下の `stateLeadGates`）。
+     * ★「集合ごと入れ替わって画角が跳ぶ」は起きません。★枠取りは集合の中の ★**いちばん後ろ**しか
+     *   ★使わず（`frameContenders`）、★5 番手と 6 番手が入れ替わる瞬間は ★2 頭が同じ位置にいるからです。
      */
-    const climaxLeadGates = built.result
-      .filter((row) => row.place >= 1 && row.place <= CLIMAX_LEAD_COUNT)
-      .map((row) => row.gate);
     /** ★発走イージング（描画のみ・全馬同じ係数）。★全馬に同じ量なので前後関係は変わりません */
     const easedAt0 = visualAt.map((horse) => ({ ...horse,
       meters: startShownMeters(horse.meters, raceD, startRampSec),
@@ -3595,6 +3766,9 @@ export default function RacePage(): React.JSX.Element {
       );
       return easedAt0.map((h, i) => ({ ...h, meters: posed[i]!.s }));
     })();
+    /** ★その時刻に描いている位置の上位 `CLIMAX_LEAD_COUNT` 頭（★上の註記） */
+    const stateLeadGates = [...easedAt].sort((a, b) => b.meters - a.meters)
+      .slice(0, CLIMAX_LEAD_COUNT).map((h) => h.gate);
     const winnerFinishedNow = (at.find((horse) => horse.gate === winnerGate)?.meters ?? 0) >= DIST - 1e-6;
     const winnerFinishSec = built.finishSec.get(winnerGate);
     const winnerAfterSec = winnerFinishSec === undefined ? 0 : Math.max(0, sec - winnerFinishSec);
@@ -3665,6 +3839,8 @@ export default function RacePage(): React.JSX.Element {
      *      別に計算すると、寄ったカットでピンが馬から離れます。
      */
     let v2OwnHead: { x: number; y: number } | undefined;
+    /** ★決勝線の画面の x（★写真判定の縦線・★馬と同じカメラで投影） */
+    let v2GoalX: number | undefined;
     /**
      * ★このカットで馬が画面高の何割を占めるか。
      *   順位表を**寄りのカットでだけ薄くする**のに使います（オーナー指摘「馬が大きくなったので
@@ -3680,7 +3856,12 @@ export default function RacePage(): React.JSX.Element {
         w: horse.w ?? TRACK_WIDTH_M / 2,
         finished: horse.meters >= DIST - 1e-6,
       })), { width: W, height: H }, winnerShotNow, {
-        finishStyle: built.finishStyle, development: built.development.kind, cornerCutM: CORNER_CUT_M_WEB,
+        /**
+         * ⚠️ ★**展開の札（`built.development`）を渡さなくなりました**（★2026-09-14・オーナー確認 O-7）。
+         *    ★札は確定の 1 着から決まるので、★ゴールの前に構図を決めると勝ち馬の型を明かします。
+         *    ★代わりに ★**その時刻の「追ってくる深さ」**を渡します（`finishChaseTable`）。
+         */
+        finishStyle: built.finishStyle, finishChase: built.finishChaseAt(sec), cornerCutM: CORNER_CUT_M_WEB,
         /** ★コーナーは隊列に見えるよう横を詰めます（★`CORNER_LANE_COMPRESS` の註記・オーナー指摘①） */
         cornerLaneCompress: CORNER_LANE_COMPRESS,
         cornerTracking: !LEGACY_MOTION && !CORNER_CAM_FIXED,
@@ -3710,7 +3891,7 @@ export default function RacePage(): React.JSX.Element {
          *      ★**主役 5 頭が画面幅の 2〜4 割**まで縮みます（§4-4 の要求は 60〜75%）。
          *   ⚠️ ★渡すのは馬番だけです。着順にも馬の位置にも触れません（憲法3）。
          */
-        leadGates: climaxLeadGates,
+        leadGates: stateLeadGates,
         /** ★`/race?climax=off` は**カメラ側の直しも**切ります（§8-B の「修正前」の側） */
         climaxCameraDisabled: climaxDisabled,
         /**
@@ -3746,6 +3927,12 @@ export default function RacePage(): React.JSX.Element {
           const headPoint = project(scene.camera, basis, { x: ground.x, y: ground.y, z: HORSE_HEIGHT_M });
           if (headPoint.depth > 2) v2OwnHead = { x: headPoint.x, y: headPoint.y };
         }
+      }
+      {
+        const basis = cameraBasis(scene.camera);
+        const goalGround = posOf(course, DIST, TRACK_WIDTH_M / 2);
+        const goalPoint = project(scene.camera, basis, { x: goalGround.x, y: goalGround.y, z: 0 });
+        if (goalPoint.depth > 2) v2GoalX = goalPoint.x;
       }
       const library = (frames: readonly (readonly HighQualityHorseFrame[])[]) => ({
         sheet: frames[0]![0]!.image,
@@ -3841,9 +4028,32 @@ export default function RacePage(): React.JSX.Element {
           audio?.cue('gate-open', 'gate');
           audio?.cue('gallop', 'gallop');
           if (raceD >= 0.35) audio?.cue('whinny', 'whinny');
+          /**
+           * ★**真横の直線だけ（v9）の音の組み立て**（★2026-09-14・デザイナー回答 D-7・相談書 §5-4）。
+           *   ★① 最後の直線（★残り 400m〜）… ★走行音を厚くし、★歓声を入れて積み上げる
+           *   ★② 勝ち馬が決勝線を通る ★0.15 秒前 … ★**音を抜く「溜め」**
+           *   ★③ 通過 … ★歓声を一気に上げる（★下の `winnerFinishedNow`）
+           * ⚠️ ★再生の速さは変えません（★1 倍のまま・★強さだけ）。
+           * ⚠️ ★鳴らす時刻は ★**画面に描いている先頭の位置と、表示秒**から決めます（★未来を読まない）。
+           *    ★「溜め」の時刻は ★勝ち馬が線を通る表示秒ですが、★鳴らすのは ★その 0.15 秒前に音を
+           *    ★**消す**ことだけで、★誰が勝つかは音に出ません。
+           */
+          if (sideOnlyScript && !winnerFinishedNow && !replay.active) {
+            const leftM = DIST - visualLead;
+            const build = Math.max(0, Math.min(1, 1 - leftM / 400));
+            if (raceD >= crossD - 0.15 && raceD < crossD) {
+              audio?.level('gallop', 0, 0.02);
+              audio?.level('crowd', 0, 0.02);
+            } else if (build > 0) {
+              audio?.cue('crowd', 'crowd');
+              audio?.level('gallop', 1 + 0.45 * build, 0.25);
+              audio?.level('crowd', 0.2 + 0.8 * build, 0.25);
+            }
+          }
           if (winnerFinishedNow) {
             audio?.fade('gallop', 1.4);
             audio?.cue('crowd', 'crowd');
+            if (sideOnlyScript) audio?.level('crowd', 1.2, 0.06);
           }
         }
       }
@@ -4117,10 +4327,22 @@ export default function RacePage(): React.JSX.Element {
        * ⚠️ ★跳びの位置は `built.editJumps` から取ります。★ここで `knots` から
        *    ★計算し直さないこと（★片方だけ直すと覆えない跳びが出ます・★R-30）。
        */
-      const jumpAt = built.editJumps.find((j) => raceD >= j.at - RACE_CUTIN_JUMP_LEAD_SEC
-        && raceD < j.at + RACE_CUTIN_JUMP_LEAD_SEC);
+      /**
+       * ⚠️ ★**台本 v9 は覆う窓を長くします**（★`RACE_COURSE_SWEEP_LEAD_SEC` の註記）。
+       *    ★コース図の上で馬群がコーナーを曲がり切るのを見せるためです。★v8 は従来のまま。
+       */
+      const jumpLead = sideOnlyScript ? RACE_COURSE_SWEEP_LEAD_SEC : RACE_CUTIN_JUMP_LEAD_SEC;
+      const jumpAt = built.editJumps.find((j) => raceD >= j.at - jumpLead && raceD < j.at + jumpLead);
       const jumpCutInActive = !CUTIN_OFF && renderer === 'v2' && !replay.active && jumpAt !== undefined;
-      cutInActive = cutIn !== undefined || startCutInActive || jumpCutInActive;
+      /**
+       * ★**介入する人の見せ方では、コーナーの間ずっとコース図で覆います**（`?view=intervene`・O-1）。
+       *   ★時計は飛ばしていないので、★コース図の点は ★**実時間で**コーナーを曲がります。
+       * ⚠️ ★判定は ★**描いている先頭の位置がコーナーの区間にあるか**だけです（★走路の形・★未来を読まない）。
+       */
+      const cornerCoverActive = INTERVENE_VIEW && sideOnlyScript && !CUTIN_OFF && renderer === 'v2'
+        && !replay.active && raceD > 0 && !raceOver && jumpAt === undefined
+        && broadcastV2SegmentSpan(course, visualLead).label.includes('角');
+      cutInActive = cutIn !== undefined || startCutInActive || jumpCutInActive || cornerCoverActive;
       /** ★テロップは世界のあとに重ねるので、いったん関数に包んで持っておきます */
       let paintTelop: (() => void) | undefined;
       if (cutInActive) {
@@ -4139,18 +4361,40 @@ export default function RacePage(): React.JSX.Element {
         const strategyLabelOf = (gate: number): string =>
           STRATEGY_LABELS[built.strategyOf(gate)] ?? '先行';
         /** ⚠️ ★跳びの 1 枚は ★**コーナーと同じ `to-straight`**（★全画面で覆う） */
-        const kind = cutIn?.kind ?? (jumpCutInActive ? 'to-straight' : RACE_CUTIN_AT_START.kind);
+        const kind = cutIn?.kind ?? (jumpCutInActive || cornerCoverActive ? 'to-straight' : RACE_CUTIN_AT_START.kind);
         /** ★コーナーの後（`to-straight`）だけ全画面。★`?cutin=full` は従来どおり全部 */
         cutInCoversWorld = CUTIN_FULLSCREEN || kind === 'to-straight';
+        /**
+         * ★**コース図の上で馬群を進める**（★台本 v9・★2026-09-14・オーナー判断
+         *   ★「コース表ではコーナーを曲がるのは見せます」）。
+         *   ★覆う窓の入口のレース秒から出口のレース秒まで、★点だけをなだらかに進めます
+         *   （`raceEditSweepRaceSec`）。★入口と出口で、★直前・直後に映る位置と一致します。
+         * ⚠️ ★読むのは ★**その秒の位置モデル**だけです（★着順・タイムを読まない）。
+         */
+        const sweepHorses = sideOnlyScript && jumpAt !== undefined
+          ? ((): { gate: number; s: number; w: number; own: boolean }[] => {
+            const r0 = built.warp.raceSecAt(Math.max(0, jumpAt.at - jumpLead));
+            const r1 = built.warp.raceSecAt(Math.min(built.warp.displaySec, jumpAt.at + jumpLead));
+            const r = raceEditSweepRaceSec(r0, r1, (raceD - (jumpAt.at - jumpLead)) / (jumpLead * 2));
+            return built.model.at(r).map((h) => ({
+              gate: h.gate, s: h.meters, w: h.w ?? TRACK_WIDTH_M / 2, own: h.gate === ownGate,
+            }));
+          })()
+          : undefined;
+        const sweepLeadM = sweepHorses === undefined ? undefined : Math.max(...sweepHorses.map((h) => h.s));
         const frame = {
           viewport: { width: W, height: H },
           sinceSec: cutIn !== undefined ? sinceCutSec
-            : jumpAt !== undefined ? raceD - (jumpAt.at - RACE_CUTIN_JUMP_LEAD_SEC) : raceD,
+            : jumpAt !== undefined ? raceD - (jumpAt.at - jumpLead)
+            : cornerCoverActive ? 1 : raceD,
           durationSec: cutIn !== undefined ? cutInSpanSec
-            : jumpAt !== undefined ? RACE_CUTIN_JUMP_LEAD_SEC * 2 : RACE_CUTIN_SEC,
-          label: cutIn?.label ?? jumpAt?.label ?? RACE_CUTIN_AT_START.label,
+            : jumpAt !== undefined ? jumpLead * 2
+            /** ★コーナーを覆う画面は ★コーナーを出るまで出し続けます（★尺で消さない） */
+            : cornerCoverActive ? Number.MAX_SAFE_INTEGER : RACE_CUTIN_SEC,
+          label: cutIn?.label ?? jumpAt?.label
+            ?? (cornerCoverActive ? (v2SectionLabel ?? 'コーナー') : RACE_CUTIN_AT_START.label),
           raceLabel: `${RACE_META.raceNo}　${RACE_META.raceName}`,
-          metersLeft: metersLeftNow,
+          metersLeft: sweepLeadM === undefined ? metersLeftNow : Math.max(0, DIST - sweepLeadM),
         };
         /**
          * ★**テロップ（既定）は、世界を描いたあとに重ねます。**
@@ -4251,19 +4495,30 @@ export default function RacePage(): React.JSX.Element {
           drawRunningStyleCutIn(ctx, FONT, frame, rows);
         } else {
           /** ★先頭との差は ★**順位表と同じ「馬身」**で出します（★別の単位を作らない・R-30） */
-          const leadMeters = cutRank[0]?.meters ?? 0;
-          const ownMeters = cutRank.find((h) => h.gate === ownGate)?.meters ?? leadMeters;
+          /**
+           * ★コース図で馬群を進めているときは、★番手と差も ★**その点と同じ位置**から数えます
+           *   （★図と数字が食い違わない・R-30）。
+           */
+          const shownHorses = sweepHorses ?? v2Minimap.horses;
+          const shownRank = [...shownHorses].sort((a, b) => b.s - a.s);
+          const leadMeters = shownRank[0]?.s ?? 0;
+          const ownMeters = shownRank.find((h) => h.gate === ownGate)?.s ?? leadMeters;
+          const ownOrderShown = sweepHorses === undefined
+            ? Math.max(1, orderOf(ownGate))
+            : Math.max(1, shownRank.findIndex((h) => h.gate === ownGate) + 1);
           drawToStraightCutIn(ctx, course, art.pal as Record<string, string>, FONT, frame, {
-            horses: v2Minimap.horses,
-            focusS: v2Minimap.focusS,
+            horses: shownHorses,
+            focusS: sweepLeadM ?? v2Minimap.focusS,
             frameColorOf,
             distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${DIST}m`,
-            metersLeft: metersLeftNow,
+            metersLeft: frame.metersLeft,
             timeSec: d,
             ownGate,
-            ownOrder: Math.max(1, orderOf(ownGate)),
+            ownOrder: ownOrderShown,
             ownGapLengths: Math.max(0, (leadMeters - ownMeters) / HORSE_LENGTH_M),
             fieldSize: FIELD,
+            /** ★台本 v9 だけ ★脚質と隊列バーを足します（★デザイナー回答 D-3「見立て」）。★v8 は 1 画素も変えない */
+            ...(sideOnlyScript ? { ownStrategyLabel: strategyLabelOf(ownGate), formationBar: true } : {}),
           });
         }
         void metersLeftNow;
@@ -4311,6 +4566,13 @@ export default function RacePage(): React.JSX.Element {
        */
       if (!cutInCoversWorld) {
         drawScene(ctx, scene);
+        /**
+         * ★**周辺の減光**（★台本 v9・★残り 100m から・★デザイナー回答 D-6）。
+         * ⚠️ ★世界のあと、★HUD の前に塗ります（★HUD は暗くしない）。★画面の中央は暗くしません。
+         */
+        if (sideOnlyScript && !replay.active && !raceOver) {
+          drawClimaxVignette(ctx, vp, climaxVignetteAlpha(DIST - visualLead));
+        }
       }
       /** ⚠️ ★全画面のときは帯を重ねません（★デザイナーの絵の上に別の帯が乗ります） */
       if (!cutInCoversWorld) paintTelop?.();
@@ -4492,7 +4754,9 @@ export default function RacePage(): React.JSX.Element {
       const miniHide = horseOverlapRatio(miniBox);
       const miniPrevAlpha = ctx.globalAlpha;
       if (!contestFocusHud) {
-        ctx.globalAlpha = miniPrevAlpha * (1 - 0.55 * Math.min(1, miniHide * 3));
+        ctx.globalAlpha = miniPrevAlpha * (1 - 0.55 * Math.min(1, miniHide * 3))
+          /** ★台本 v9 は ★残り 250→200m で 0.4 まで薄くします（★数は減らさない・デザイナー回答 D-5） */
+          * (sideOnlyScript ? climaxHudFade(DIST - visualLead) : 1);
         drawCourseMinimap(ctx, ovalCourse(DIST, { ...COURSE_SPEC, turn }), art.pal as Record<string, string>, FONT,
           v2Minimap.horses, v2Minimap.focusS, miniBox,
           // ★コース図も HUD・馬体と同じ枠色から引く（3 か所で持たない）
@@ -4503,6 +4767,13 @@ export default function RacePage(): React.JSX.Element {
           });
       }
       ctx.globalAlpha = miniPrevAlpha;
+    }
+    /**
+     * ★**残り距離のカウントダウン**（★台本 v9・★残り 200m から・★デザイナー回答 D-6）。
+     * ⚠️ ★数字は ★**描いている先頭の残り距離**です（★未来を読まない）。★決勝線を越えたら消えます。
+     */
+    if (sideOnlyScript && renderer === 'v2' && !raceOver && !cutInCoversWorld && !replay.active) {
+      drawGoalCountdown(ctx, FONT, { viewport: vp, metersLeft: DIST - visualLead });
     }
     drawRendererBadge(ctx, renderer, renderer === 'v2' ? v2ShotId ?? 'v2' : `legacy/${courseSection}`);
 
@@ -4592,7 +4863,21 @@ export default function RacePage(): React.JSX.Element {
           { x: 40, y: 4, width: W - 80, ownGate, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC });
 
         // B: 馬名プレート（下部・固定枠）。自馬 ＋ 先頭 ＋ 2 番手
-        const plateRows = referenceNamePlateRows(rank, ownGate, (gate) => HORSE_NAMES[gate - 1] ?? `スター${gate}`);
+        /**
+         * ★**勢い**（★台本 v9・★残り 200m から・★レビュー側 Q-R8・デザイナー回答 D-4）。
+         *   ★いま描いている位置と、★`MOMENTUM_WINDOW_SEC` 前の同じ系の位置から、★段階だけを出します。
+         * ⚠️ ★`?climax=on`（★表示位置をずらす演出）では出しません。★ずらした分が勢いに混ざります
+         *    （★レビュー側 §2・§5-2）。
+         */
+        const momentum = sideOnlyScript && climaxDisabled && !raceOver && !replay.active
+          && DIST - visualLead <= MOMENTUM_FROM_M && DIST - visualLead > 0
+          ? momentumLevels(
+            easedAt.map((h) => ({ gate: h.gate, meters: h.meters })),
+            built.model.at(Math.max(0, sec - MOMENTUM_WINDOW_SEC)).map((h) => ({ gate: h.gate, meters: h.meters })),
+          )
+          : undefined;
+        const plateRows = referenceNamePlateRows(rank, ownGate, (gate) => HORSE_NAMES[gate - 1] ?? `スター${gate}`)
+          .map((row) => (momentum === undefined ? row : { ...row, momentum: momentum.get(row.gate) }));
         /**
          * ★置き場所は**空いているところ**を明示的に渡します。
          *
@@ -4757,6 +5042,16 @@ export default function RacePage(): React.JSX.Element {
             metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
             sinceSec: raceD - HUD_SETTLE_SEC,
           });
+      }
+
+      /**
+       * ★**写真判定の止め絵に重ねる札と決勝線**（★台本 v9・★レビュー側 Q-R9）。
+       * ⚠️ ★着差の言葉は ★**着順ボードと同じ値**です（`built.photoFinish.boardLabel`）。
+       */
+      if (photoHold && photo !== undefined) {
+        drawPhotoFinishOverlay(ctx, FONT, {
+          viewport: vp, sinceSec: photoSince, goalX: v2GoalX, marginLabel: photo.boardLabel,
+        });
       }
 
       const afterRaceSec = Math.max(0, raceD - built.warp.displaySec);
@@ -5134,6 +5429,19 @@ export default function RacePage(): React.JSX.Element {
             >
               最初から
             </button>
+            {/* ★見比べの切り替え（★`toggleViewParam` の註記）。★押すと読み直します */}
+            <button type="button" onClick={() => toggleViewParam('cinematography', 'v8')}
+              style={{ ...stageBtnStyle, ...(viewSwitches.oldScript ? { background: 'rgba(92,70,20,0.92)', color: '#ffe98a' } : {}) }}>
+              {viewSwitches.oldScript ? '演出 前' : '演出 新'}
+            </button>
+            <button type="button" onClick={() => toggleViewParam('view', 'intervene')}
+              style={{ ...stageBtnStyle, ...(viewSwitches.intervene ? { background: 'rgba(92,70,20,0.92)', color: '#ffe98a' } : {}) }}>
+              {viewSwitches.intervene ? '介入' : '観戦'}
+            </button>
+            <button type="button" onClick={() => toggleViewParam('seed', '99')}
+              style={{ ...stageBtnStyle, ...(viewSwitches.contest ? { background: 'rgba(92,70,20,0.92)', color: '#ffe98a' } : {}) }}>
+              {viewSwitches.contest ? '接戦' : '通常'}
+            </button>
             <button
               type="button"
               onClick={() => { exitBrowserFullscreen(); setPlaying(false); setStageFull(false); setWatchStarted(false); setEntryRequested(true); }}
@@ -5366,6 +5674,24 @@ export default function RacePage(): React.JSX.Element {
           {soundOn ? '音 入' : '音 切'}
         </button>
         {/*
+          ★**見比べの切り替え**（★2026-09-15・オーナー指示「★URL を分けずに道具でボタン分けしてください」）。
+          ⚠️ ★開発サーバーは ★**いつも開発卓**（★`?dev=0` を付けない限り）なので、★ここにも置きます。
+             ★携帯のメニューもこの列です（★`toggleViewParam` の註記）。
+        */}
+        {([
+          ['cinematography', 'v8', viewSwitches.oldScript, '演出：新', '演出：前'],
+          ['view', 'intervene', viewSwitches.intervene, '観戦', '介入'],
+          ['seed', '99', viewSwitches.contest, '展開：通常', '展開：接戦'],
+        ] as const).map(([key, on, active, offLabel, onLabel]) => (
+          <button
+            key={key} type="button" onClick={() => toggleViewParam(key, on)}
+            style={{
+              padding: '8px 14px', cursor: 'pointer', border: 0,
+              background: active ? '#5c4614' : '#3a3630', color: active ? '#ffe98a' : '#efe9dc',
+            }}
+          >{active ? onLabel : offLabel}</button>
+        ))}
+        {/*
           ★**レース選択**（2026-08-31）— ★`?race=<id>` を毎回打たずに 50 鞍を切り替えるため。
             ⚠️ ★`?race=` は**モジュール読み込み時に 1 回だけ**読む形（このファイルの先頭）なので、
                ★state を変えるだけでは切り替わりません。★`location.search` を書いて**再読込**させます。
@@ -5520,6 +5846,21 @@ export default function RacePage(): React.JSX.Element {
               background: '#fffef9', color: '#315c45', fontWeight: 700,
             }}
           >もう一度</button>
+          {/* ★見比べの切り替え（★`toggleViewParam` の註記）。★押すと読み直します */}
+          {([
+            ['cinematography', 'v8', viewSwitches.oldScript, '演出：新しい形', '演出：前の形'],
+            ['view', 'intervene', viewSwitches.intervene, '見る人：観戦', '見る人：自馬で介入'],
+            ['seed', '99', viewSwitches.contest, '展開：通常', '展開：接戦'],
+          ] as const).map(([key, on, active, offLabel, onLabel]) => (
+            <button
+              key={key} type="button" onClick={() => toggleViewParam(key, on)}
+              style={{
+                padding: '9px 16px', cursor: 'pointer', borderRadius: 6, fontWeight: 700,
+                border: '1px solid #c3cdbc',
+                background: active ? '#5c4614' : '#fffef9', color: active ? '#ffe98a' : '#315c45',
+              }}
+            >{active ? onLabel : offLabel}</button>
+          ))}
         </div>
       )}
       {!smallScreen && (
