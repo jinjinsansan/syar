@@ -2,9 +2,18 @@
  * ★V-10 の集計と合否（AUDIT_FIX2 BF-5・BF-6・2026-09-14）
  *
  * ★測定器（V-10）と製品（本番のオッズ表）が**同じ「売る目」を見ていること自体**を検査で固定する（R-30）。
+ * ★SE は判定値と同じ比の推定量で出す（正典 §13.2・裁定 `REVIEW_AUDIT_FIX2_VERDICT_20260914.md` §3-1）。
+ *   SE の検査は公開の関数（`accountRaceKind`・`judgeKind`）だけを通す（内部の集計の持ち方に依存しない）。
  */
 import { describe, expect, it } from 'vitest';
-import { MARGIN, TICKET_KINDS, minSellableProbability, type TicketKind } from '@star/betting';
+import {
+  MARGIN,
+  ODDS_CAP,
+  TICKET_KINDS,
+  debiasedProbability,
+  minSellableProbability,
+  type TicketKind,
+} from '@star/betting';
 import { ODDS_MC_TRIALS, buildOddsRows } from '../../worker/src/odds.js';
 import {
   V10_SE_LIMIT,
@@ -63,7 +72,6 @@ describe('BF-5 V-10 の賭け金は本番と同じ「売る目」', () => {
     const rows = buildOddsRows(new Map([['win', mixedCounts('win')]]), M);
     const odds3 = rows.find((r) => r.selection[0] === 3)!.odds;
     expect(st.payout).toBeCloseTo(odds3, 10);
-    expect(st.races).toBe(1);
   });
 
   it('シードをまたいでプールしても件数と額が足し合わさる', () => {
@@ -73,7 +81,6 @@ describe('BF-5 V-10 の賭け金は本番と同じ「売る目」', () => {
     accountRaceKind(b, 'place', mixedCounts('place'), M, ['3', '4']);
     mergeKindStat(a, b);
     expect(a.stake).toBe(4);
-    expect(a.races).toBe(2);
     expect(a.unsoldEvenOdds.hits).toBe(1);
   });
 });
@@ -112,23 +119,90 @@ describe('BF-6 V-10 の合否は切り捨て前の払戻率で出す（D-094）'
     expect(v.pass).toBe(false);
     expect(Number.isNaN(v.rateBeforeFloor)).toBe(true);
   });
+});
 
-  it('★出走表間 SD と SE（D-036）: レース 2 本未満は判定不能、SE が 0.25pt を超えたら届いていない', () => {
-    const one = { ...statWith(10, 8, 0), raceRateSum: 0.8, raceRateSqSum: 0.64, races: 1 };
+describe('★SE は判定値（合計 ÷ 合計の比）と同じ推定量で出す（正典 §13.2・裁定 FIX2 §3-1）', () => {
+  /** 単勝で、確率 p の目の切り捨て前のオッズ（`accountRaceKind` と別に、検査の側で計算する） */
+  const beforeFloorOdds = (count: number): number =>
+    Math.min(ODDS_CAP.win, (1 / debiasedProbability(count / M, M)) * (1 - MARGIN.win));
+
+  /**
+   * ★売る目の数（賭け金 X）がレースごとに違う 4 レース。
+   *   等しい賭け金だけの例では「等しい重みの平均」と「比の推定量」が一致してしまい、誤りを捕まえられない。
+   */
+  const RACES: readonly { probs: readonly number[]; winner: number | null }[] = [
+    { probs: [0.3, 0.2], winner: 0 }, //                        X = 2
+    { probs: [0.05, 0.05, 0.05, 0.05, 0.05, 0.05], winner: 2 }, // X = 6
+    { probs: [0.1, 0.1, 0.1], winner: null }, //                 X = 3（外れ）
+    { probs: [0.25, 0.25, 0.25, 0.25], winner: 1 }, //           X = 4
+  ];
+
+  /** 検査の側で、レースごとの (X, Y) を作る */
+  const pairs = RACES.map((r) => {
+    const counts = r.probs.map((p) => Math.round(M * p));
+    return { x: counts.length, y: r.winner === null ? 0 : beforeFloorOdds(counts[r.winner]!), counts, winner: r.winner };
+  });
+
+  /** 正典 §13.2 の式（検査の側で独立に計算する） */
+  function ratioEstimator(): { ratio: number; sd: number; se: number } {
+    const n = pairs.length;
+    const sumX = pairs.reduce((a, p) => a + p.x, 0);
+    const sumY = pairs.reduce((a, p) => a + p.y, 0);
+    const ratio = sumY / sumX;
+    const residual = pairs.reduce((a, p) => a + (p.y - ratio * p.x) ** 2, 0);
+    const sd = Math.sqrt(residual / (n - 1)) / (sumX / n);
+    return { ratio, sd, se: sd / Math.sqrt(n) };
+  }
+
+  /** ★採らない形: レースごとの払戻率を等しい重みで平均したばらつき */
+  function equalWeightSe(): number {
+    const n = pairs.length;
+    const rates = pairs.map((p) => p.y / p.x);
+    const mean = rates.reduce((a, r) => a + r, 0) / n;
+    const sd = Math.sqrt(rates.reduce((a, r) => a + (r - mean) ** 2, 0) / (n - 1));
+    return sd / Math.sqrt(n);
+  }
+
+  function accounted(): KindStat {
+    const st = emptyKindStat();
+    for (const p of pairs) {
+      const counts = new Map(p.counts.map((c, i) => [String(i + 1), c]));
+      accountRaceKind(st, 'win', counts, M, p.winner === null ? [] : [String(p.winner + 1)]);
+    }
+    return st;
+  }
+
+  it('★前提: この例では、比の推定量と等しい重みの平均で SE がはっきり食い違う（検査が誤りを捕まえられる）', () => {
+    const { se } = ratioEstimator();
+    const eq = equalWeightSe();
+    expect(Math.abs(se - eq) / se).toBeGreaterThan(0.1);
+    // ★全レースで売る目がすべて売られている（賭け金 X が上の想定どおり）
+    expect(accounted().stake).toBe(2 + 6 + 3 + 4);
+  });
+
+  it('★judgeKind の SD・SE は、正典 §13.2 の式の値と一致し、等しい重みの平均の値とは一致しない', () => {
+    const v = judgeKind('win', accounted());
+    const expected = ratioEstimator();
+    expect(v.rateBeforeFloor).toBeCloseTo(expected.ratio, 12);
+    expect(v.raceSd).toBeCloseTo(expected.sd, 12);
+    expect(v.se).toBeCloseTo(expected.se, 12);
+    expect(Math.abs(v.se! - equalWeightSe())).toBeGreaterThan(0.01);
+  });
+
+  it('レース 1 本は判定不能 ／ 同じレースの繰り返しは SE = 0 で届く ／ 上限は 0.25pt', () => {
+    const one = emptyKindStat();
+    accountRaceKind(one, 'win', new Map([['1', Math.round(M * 0.3)], ['2', Math.round(M * 0.2)]]), M, ['1']);
     expect(judgeKind('win', one).se).toBeNull();
     expect(judgeKind('win', one).seReached).toBe(false);
 
-    // レースごとの払戻率 0.7 と 0.9（平均 0.8・SD = √0.02 ≒ 0.1414・SE = 0.1）
-    const two = { ...statWith(20, 16, 0), raceRateSum: 1.6, raceRateSqSum: 0.49 + 0.81, races: 2 };
-    const v2 = judgeKind('win', two);
-    expect(v2.raceSd).toBeCloseTo(Math.sqrt(0.02), 12);
-    expect(v2.se).toBeCloseTo(0.1, 12);
-    expect(v2.seReached).toBe(false);
-
-    // ばらつきが無ければ SE = 0 で届く
-    const flat = { ...statWith(40, 32, 0), raceRateSum: 3.2, raceRateSqSum: 4 * 0.64, races: 4 };
-    expect(judgeKind('win', flat).se).toBeCloseTo(0, 12);
-    expect(judgeKind('win', flat).seReached).toBe(true);
+    const same = emptyKindStat();
+    for (let i = 0; i < 3; i += 1) {
+      accountRaceKind(same, 'win', new Map([['1', Math.round(M * 0.3)], ['2', Math.round(M * 0.2)]]), M, ['1']);
+    }
+    // ★真の値は 0。正典 §13.2 の展開した形 ΣY² − 2R̂·ΣXY + R̂²·ΣX² は、ほぼ同じ大きさの項が打ち消し合うので
+    //   浮動小数の丸めが残る（実測 1.7e-8）。上限 0.25pt（0.0025）より 5 桁以上小さく、合否に影響しない
+    expect(judgeKind('win', same).se!).toBeLessThan(1e-6);
+    expect(judgeKind('win', same).seReached).toBe(true);
     expect(V10_SE_LIMIT).toBe(0.0025);
   });
 });

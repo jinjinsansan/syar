@@ -6,14 +6,16 @@
  *   1本ずつ直すと**必ず漏れます**し、漏れたものは
  *   「staging を指しているつもりで本番を叩く」形で現れます。
  *
- * 【★既定は本番のまま（読み取り専用ツールに限る）】
- *   `--env staging` を**明示したときだけ** staging を使います。
- *   ⚠️ 既定を staging にすると、**読み取り専用ツールが本番を見なくなり**、
- *      「本番の状態を確かめたつもりが staging だった」という
- *      **逆向きの取り違え**が起きます。
- *   ★状態を変えるツールは、そもそも `assertNotProduction` が本番を拒否します（R-24）。
- *   ★**状態を変える操作（マイグレーション）は、この既定に乗せてはいけません** —
- *     `tools/migrate.mjs` は `--env` を必須にしています（2026-08-20 の裁定）。
+ * 【★既定は廃止しました（2026-09-14・`--env` 必須）】
+ *   以前は「既定は本番（読み取り専用ツールに限る）」でした。
+ *   ★2026-09-14、開発側がその場で書いたスクリプトを `--env` 無しで流し、**本番の DB を読みました**
+ *     （読み取り専用・書き込み無し・`REPORT_AUDIT_FIX2_20260914.md` §8-1）。
+ *     コマンドに「production」の文字が無いので、道具の外の判定もすり抜けました。
+ *     監査 M-5（R-27「既定は狭い側へ」）で指摘済みの穴そのものです（裁定 `REVIEW_AUDIT_FIX2_VERDICT_20260914.md` §3-3）。
+ *   → **`--env staging` か `--env production` を明示しない限り、接続前に例外**にします。`tools/migrate.mjs` と同じ規則です。
+ *   ⚠️ 「既定を staging にする」も採りません（本番を確かめたつもりが staging だった、という逆向きの取り違えが起きる）。
+ *   ★状態を変えるツールは、これに加えて `assertNotProduction` が本番を拒否します（R-24・そのまま残す）。
+ *   ★検査: `apps/cli/test/env-loader.test.ts`（接続しない単体の検査）。
  *
  * 【★環境名を "local" から "production" に改めた経緯（2026-08-20）】
  *   旧 `secrets.local.env` の中身は `STAR_ENV=development` でしたが、
@@ -32,10 +34,16 @@ const ENV_FILES = {
   staging: 'secrets.staging.env',
 };
 
-/** `--env staging` が指定されていれば staging の env ファイル名を返す（既定は本番・上の注記） */
+/** `--env` で指定された環境の env ファイル名を返す。★`--env` が無ければ例外（既定は無い・上の注記） */
 export function envFileName(argv = process.argv) {
   const i = argv.indexOf('--env');
-  const name = i >= 0 ? argv[i + 1] : 'production';
+  const name = i >= 0 ? argv[i + 1] : null;
+  if (name === null) {
+    throw new Error(
+      '--env staging か --env production を明示してください。★既定は廃止しました（2026-09-14）— ' +
+        '省略で本番へ向く形は、手を抜いた操作が最も危険な向き先に落ちる構造です（R-27）',
+    );
+  }
   if (name === 'local') {
     throw new Error(
       '--env local は廃止しました。★"local" は環境名ではなく、実際の接続先は本番でした（2026-08-20）。' +

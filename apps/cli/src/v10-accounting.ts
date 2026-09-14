@@ -13,8 +13,13 @@
  * 【判定値】切り捨て前の払戻率（D-094: 控除率・還元率は 0.1 単位の切り捨て前の定義）。
  *   切り捨て後の払戻率とその差は、並べて出すだけで判定に使わない。
  *
- * 【SE】出走表間 SD を出し、SE = SD / √レース数 とする（D-036「出走表間 SD を出したうえでプール SE ≤ 0.25pt」）。
- *   ⚠️ 正典に SE の式そのものは無い。レースごとの払戻率を等しい重みで扱う、この実装の解釈（報告に明記する）。
+ * 【SE】正典 §13.2 の式（2026-09-14 追記・裁定 `REVIEW_AUDIT_FIX2_VERDICT_20260914.md` §3-1）:
+ *     R̂  = ΣYᵢ ÷ ΣXᵢ                                   （判定値と同じ比の推定量）
+ *     SD = √( Σ(Yᵢ − R̂·Xᵢ)² ÷ (n − 1) ) ÷ X̄           X̄ = ΣXᵢ ÷ n、n = 全レース数
+ *     SE = SD ÷ √n                                     （条件: SE ≤ 0.25pt・D-036）
+ *   `Xᵢ` ＝ レース i で売った目の数（賭け金）、`Yᵢ` ＝ そのレースの切り捨て前の払戻額。
+ *   ★以前はレースごとの払戻率 `Yᵢ/Xᵢ` を等しい重みで平均したばらつきから出しており、
+ *     売る目の数がレースごとに違うので、判定値とは**別の量**の誤差になっていた。
  *   SE が 0.25pt に届かなければ、合否は「判定不能」として扱う（R-3）。
  */
 import {
@@ -59,9 +64,16 @@ export interface KindStat {
   unsoldMinProbability: UnsoldStat;
   /** ★D-096（切り捨て前のオッズ < 1.0 倍）で売らなかった目 */
   unsoldEvenOdds: UnsoldStat;
-  /** ★出走表間のばらつき（D-036）: レースごとの切り捨て前払戻率の和・二乗和・レース数 */
-  raceRateSum: number;
-  raceRateSqSum: number;
+  /**
+   * ★SE の部品（正典 §13.2）: レースごとの賭け金 X と切り捨て前の払戻額 Y の和。
+   *   `sumX` は `stake`、`sumY` は `payout + floorLoss` と同じ量になる（検査で固定）。
+   */
+  sumX: number;
+  sumY: number;
+  sumX2: number;
+  sumY2: number;
+  sumXY: number;
+  /** 集計したレース数（★売る目が 0 のレースも数える・正典 §13.2 の n ＝ 全レース数） */
   races: number;
 }
 
@@ -71,7 +83,7 @@ export function emptyKindStat(): KindStat {
   return {
     stake: 0, payout: 0, unseenHits: 0, cappedBets: 0, cappedLoss: 0, floorLoss: 0,
     unsoldMinProbability: emptyUnsold(), unsoldEvenOdds: emptyUnsold(),
-    raceRateSum: 0, raceRateSqSum: 0, races: 0,
+    sumX: 0, sumY: 0, sumX2: 0, sumY2: 0, sumXY: 0, races: 0,
   };
 }
 
@@ -88,8 +100,11 @@ export function mergeKindStat(a: KindStat, b: KindStat): void {
     a[key].hits += b[key].hits;
     a[key].payoutBeforeFloor += b[key].payoutBeforeFloor;
   }
-  a.raceRateSum += b.raceRateSum;
-  a.raceRateSqSum += b.raceRateSqSum;
+  a.sumX += b.sumX;
+  a.sumY += b.sumY;
+  a.sumX2 += b.sumX2;
+  a.sumY2 += b.sumY2;
+  a.sumXY += b.sumXY;
   a.races += b.races;
 }
 
@@ -154,12 +169,13 @@ export function accountRaceKind(
     racePayoutBeforeFloor += beforeFloor;
   }
 
-  if (raceStake > 0) {
-    const rate = racePayoutBeforeFloor / raceStake;
-    st.raceRateSum += rate;
-    st.raceRateSqSum += rate * rate;
-    st.races += 1;
-  }
+  // ★SE の部品（正典 §13.2）。売る目が 0 のレースも n に数える
+  st.sumX += raceStake;
+  st.sumY += racePayoutBeforeFloor;
+  st.sumX2 += raceStake * raceStake;
+  st.sumY2 += racePayoutBeforeFloor * racePayoutBeforeFloor;
+  st.sumXY += raceStake * racePayoutBeforeFloor;
+  st.races += 1;
 }
 
 export interface KindVerdict {
@@ -174,9 +190,9 @@ export interface KindVerdict {
   readonly pass: boolean;
   /** 参考（切り捨て後の払戻率で判定した場合） */
   readonly passAfterFloor: boolean;
-  /** 出走表間 SD（レースが 2 本未満なら null） */
+  /** 出走表間 SD（正典 §13.2 の式。レースが 2 本未満・賭け金 0 なら null） */
   readonly raceSd: number | null;
-  /** SE = SD / √レース数（レースが 2 本未満なら null） */
+  /** SE = SD / √n（レースが 2 本未満・賭け金 0 なら null） */
   readonly se: number | null;
   /** ★SE が 0.25pt 以下か。false なら合否は判定不能（R-3） */
   readonly seReached: boolean;
@@ -185,16 +201,20 @@ export interface KindVerdict {
 /**
  * ★V-10 の判定（AUDIT_FIX2 BF-6・D-094）: `|(payout + floorLoss) / stake − (1 − margin)| ≤ 0.01`。
  *   賭け金が 0 なら不合格（判定不能を合格にしない・R-3）。
+ *   SE は正典 §13.2 の式（冒頭の註記）。
  */
 export function judgeKind(kind: TicketKind, st: KindStat): KindVerdict {
   const target = 1 - MARGIN[kind];
   let raceSd: number | null = null;
   let se: number | null = null;
-  if (st.races >= 2) {
-    const mean = st.raceRateSum / st.races;
-    const variance = Math.max(0, (st.raceRateSqSum - st.races * mean * mean) / (st.races - 1));
-    raceSd = Math.sqrt(variance);
-    se = raceSd / Math.sqrt(st.races);
+  if (st.races >= 2 && st.sumX > 0) {
+    const n = st.races;
+    const ratio = st.sumY / st.sumX;
+    // Σ(Y − R̂X)² = ΣY² − 2R̂·ΣXY + R̂²·ΣX²（丸めで負にならないよう 0 で下を切る）
+    const residual = Math.max(0, st.sumY2 - 2 * ratio * st.sumXY + ratio * ratio * st.sumX2);
+    const meanX = st.sumX / n;
+    raceSd = Math.sqrt(residual / (n - 1)) / meanX;
+    se = raceSd / Math.sqrt(n);
   }
   const seReached = se !== null && se <= V10_SE_LIMIT;
   if (st.stake === 0) {
