@@ -54,8 +54,13 @@ describe('§9.2 オッズ算出', () => {
     const [row] = buildOddsRows(counts('win', [['3', 2000]]), 10_000);
     expect(row!.probability).toBeCloseTo(0.2, 10);
     // ★保存するのは素の p̂。補正はオッズにだけ効く（表示する確率まで動かさない）
-    expect(row!.odds).toBeCloseTo((1 - MARGIN.win) / debiasedProbability(0.2, 10_000), 10);
+    // ★オッズは 0.1 単位の切り捨て（D-094 候補・2026-09-14）。切り捨て前の値との差は 0.1 未満
+    const unrounded = (1 - MARGIN.win) / debiasedProbability(0.2, 10_000); // 4.0983…
+    expect(row!.odds).toBeLessThanOrEqual(unrounded);
+    expect(row!.odds).toBeGreaterThan(unrounded - 0.1);
+    expect(row!.odds).toBe(4);
     expect(row!.odds).toBeLessThan(5 * (1 - MARGIN.win));
+    // ★切り捨てで odds < raw になっても、上限に当たったとは数えない
     expect(row!.capped).toBe(false);
   });
 

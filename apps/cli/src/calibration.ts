@@ -242,6 +242,13 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: '§9.4（配当上限。実質無限にすると1本の高配当で PP 発行が跳ねる）',
   },
   {
+    key: 'ODDS_GRID_EPSILON_TENTHS',
+    file: 'packages/betting/src/odds-tenths.ts',
+    perturbed: 'export const ODDS_GRID_EPSILON_TENTHS = 0;',
+    affects:
+      '★D-094 候補（オッズを 0.1 単位で切り捨てる・監査 H-2・2026-09-14）。格子ちょうどの値が浮動小数で下側に表されたときに 1 段下げない許容幅。0 にすると 2.3 のつもりの値が 2.2 に落ち（客に不利な向きの取り違え）、tenths / 10 の往復も例外になる。`odds-tenths.test.ts` の「格子ちょうどは下げない」が守る',
+  },
+  {
     key: 'NAME_TAIL_RATE',
     file: 'packages/sim-engine/src/naming.ts',
     perturbed: 'export const NAME_TAIL_RATE = 0;',
@@ -637,6 +644,14 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   {
     key: 'PLACE_THREE_MIN_FIELD',
     why: '正典 §9.1「出走7頭以下は複勝・ワイドを2着まで」の境界。実競馬の慣行の写しで、較正で動かす値ではない。両側の挙動を ★テストが押さえている（R-2）',
+  },
+  {
+    key: 'MAX_ODDS_TENTHS',
+    why: '★オッズ（0.1 単位の整数）として受け付ける上限（2026-09-14・監査 H-1/H-2）。DB の列型 `numeric(9,1)` の最大 99,999,999.9 倍の写しで、較正値ではない。§9.4 の上限（三連単 100,000 倍）より十分大きく、判定（V-x）を作らない。越えたら例外にする安全弁（R-3）',
+  },
+  {
+    key: 'DECIMAL_ODDS',
+    why: '★DB が返す十進の文字列（`numeric(9,1)`）の書式を表す正規表現（2026-09-14・監査 H-1）。数値ではなく書式の定義で、正規表現の中の桁数に走査が反応している。較正値ではない。受け付ける形と弾く形は `odds-tenths.test.ts` が両側から押さえる（R-2）',
   },
   {
     key: 'TICKET_ARITY',

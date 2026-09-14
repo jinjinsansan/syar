@@ -8,6 +8,7 @@
  *      勝手に動かすと経済が変わります。変更にはオーナー承認が要ります。
  */
 
+import { floorOddsToTenths } from './odds-tenths.js';
 import { TICKET_KINDS, type TicketKind } from './types.js';
 
 /** 最小購入単位（正典 §9.1: 全券種 100 EP） */
@@ -173,14 +174,20 @@ export function requiredOddsTrials(): number {
 }
 
 /**
- * オッズ = (1/p_eff) × (1 − margin)、上限で頭打ち（正典 §9.2・§9.4・D-013）
+ * オッズ = (1/p_eff) × (1 − margin)、上限で頭打ち → **0.1 単位で切り捨て**（正典 §9.2・§9.4・D-013・D-094 候補）
  *
  * ★`trials` は必須です。既定値を持たせません —
  *   補正量は M に依存するので、**呼ぶ側が「どの M で推定したか」を必ず宣言する**必要があります。
  *   既定値があると、別の M で推定した確率に誤った補正が当たっても型でも実行時でも気づけません。
+ *
+ * ★戻り値は**必ず 0.1 単位に乗ります**（オーナー決定 2026-09-14・監査 H-2）。
+ *   以前は丸めない値を返し、`numeric(9,1)` の列に入る時点で **DB が四捨五入**していました
+ *   （正典に丸め方の規則が無く、列型が勝手に決めていた・裁定 §3-5）。
+ *   表示・保存・払戻が同じ値を使うよう、**ここで切り捨てます**。
+ *   順序は「上限で頭打ち → 切り捨て」。上限値は整数なので、順序で結果は変わりません（`odds-tenths.test.ts`）。
  */
 export function oddsFromProbability(kind: TicketKind, p: number, trials: number): number {
   if (!Number.isFinite(p) || p <= 0) return ODDS_CAP[kind];
   const raw = (1 / debiasedProbability(p, trials)) * (1 - MARGIN[kind]);
-  return Math.min(ODDS_CAP[kind], raw);
+  return floorOddsToTenths(Math.min(ODDS_CAP[kind], raw)) / 10;
 }

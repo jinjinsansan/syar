@@ -5,6 +5,9 @@
  *   ① anon / authenticated に **insert / update / delete / truncate が付与されていない**こと
  *   ② 公開ビューとして登録されたもの以外は、**anon から0行**であること
  *   ③ **除外は明示の登録簿でのみ許され、登録簿に無いテーブルが現れたら落ちる**
+ *   ④ public の**関数**の EXECUTE（anon / authenticated）が登録簿どおりで、**登録簿に無い関数が現れたら落ちる**
+ *      （★2026-09-14・監査 H-4。関数の実行権限はテーブルと別に付く。
+ *        `spend_training_ep` は `0013`・`0014` が anon を剥がし忘れていた）
  *
  * 【★①が加わった経緯】
  *   前の版は「読めるか」しか測っていませんでした。**権限は読みと書きで別に付きます。**
@@ -37,6 +40,7 @@ import { loadEnv } from './lib/env.mjs';
 import {
   EXPECTED_EXPOSURE, PUBLIC_VIEW, WRITE_PRIVILEGES,
   unregistered, stale, judgeGrants, judgeReads,
+  unregisteredFunctions, staleFunctions, judgeFunctionExecute,
 } from './lib/exposure-registry.mjs';
 
 /** ★漏れたら正典の中核が壊れる列。全走査に加えて名前で狙い撃ちもする */
@@ -94,6 +98,22 @@ for (const [key, privs] of [...byObject.entries()].sort()) {
 }
 if (grants.length === 0) console.log('  （付与なし）');
 
+// ★④ 関数の EXECUTE を pg_proc から全走査する（関数名を手で並べない・R-29）
+const { rows: functionRows } = await client.query(`
+  select p.oid::regprocedure::text as fn,
+         has_function_privilege('anon', p.oid, 'EXECUTE') as anon,
+         has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+   order by 1
+`);
+console.log(`\n=== 関数の EXECUTE（public・${functionRows.length} 件） ===`);
+for (const f of functionRows) {
+  console.log(`  ${f.fn.padEnd(60)} anon=${f.anon ? 'YES' : ' - '}  authenticated=${f.authenticated ? 'YES' : ' - '}`);
+}
+if (functionRows.length === 0) console.log('  （関数なし）');
+
 // ---------------------------------------------------------------------------
 console.log('\n=== V-20 の判定 ===');
 
@@ -117,6 +137,29 @@ check(
   '★① anon / authenticated に書き込み権限が無い（TRUNCATE を含む）',
   writable.length === 0,
   writable.length === 0 ? '' : `★${writable.join(', ')}`,
+);
+
+// ④ 関数の EXECUTE（★監査 H-4。登録簿との突き合わせを先に）
+const functionNames = functionRows.map((f) => f.fn);
+const functionsMissing = unregisteredFunctions(functionNames);
+check(
+  '★④ 登録簿に無い関数が無い（新しい関数を黙って足せない）',
+  functionsMissing.length === 0,
+  functionsMissing.length === 0
+    ? ''
+    : `★未登録: ${functionsMissing.join(', ')} → tools/lib/exposure-registry.mjs の EXPECTED_FUNCTION_EXECUTE に実測の姿を書くこと`,
+);
+const functionsGone = staleFunctions(functionNames);
+check(
+  '関数の登録簿に、DB に存在しないものが残っていない',
+  functionsGone.length === 0,
+  functionsGone.length === 0 ? '' : `★登録簿にあるが DB に無い: ${functionsGone.join(', ')}`,
+);
+const functionsWrong = judgeFunctionExecute(functionRows);
+check(
+  '★④ 関数の EXECUTE が登録簿どおり（anon / authenticated）',
+  functionsWrong.length === 0,
+  functionsWrong.length === 0 ? '' : `★${functionsWrong.join(', ')}`,
 );
 
 // ② 振る舞い: 公開ビュー以外は anon から0行

@@ -116,10 +116,15 @@ interface KindStat {
   cappedBets: number;
   /** ★cap が無ければ払っていた額との差の総額 */
   cappedLoss: number;
+  /**
+   * ★0.1 単位の切り捨て（D-094 候補・2026-09-14）で減った額の総額。
+   *   cap による損失と混ぜない（混ぜると「cap無しなら」が切り捨てのぶんまで含んでしまう）。
+   */
+  floorLoss: number;
 }
 
 function emptyStat(): KindStat {
-  return { stake: 0, payout: 0, unseenHits: 0, bets: 0, cappedBets: 0, cappedLoss: 0 };
+  return { stake: 0, payout: 0, unseenHits: 0, bets: 0, cappedBets: 0, cappedLoss: 0, floorLoss: 0 };
 }
 
 function orderOf(result: RaceResult): number[] {
@@ -206,9 +211,13 @@ function runSeed(seed: number): Map<TicketKind, KindStat> {
         // ★raw も補正後で取る。補正前の raw と比べると、cap による損失に
         //   「バイアス補正で下がったぶん」が混ざり、cap の効果を過大に読む
         const raw = (1 / debiasedProbability(prob, ODDS_TRIALS)) * (1 - MARGIN[kind]);
+        const beforeFloor = Math.min(ODDS_CAP[kind], raw);
         const paid = oddsFromProbability(kind, prob, ODDS_TRIALS);
         st.payout += paid;
-        if (raw > paid) st.cappedLoss += raw - paid;
+        // ★cap による損失と、0.1 単位の切り捨て（D-094 候補・2026-09-14）による損失を分けて数える。
+        //   以前は `raw > paid` の差をすべて cap の損失としていた（切り捨てが入ると混ざる）
+        if (raw > beforeFloor) st.cappedLoss += raw - beforeFloor;
+        st.floorLoss += beforeFloor - paid;
       }
     }
   }
@@ -230,6 +239,7 @@ for (const seed of SEEDS) {
     a.bets += b.bets;
     a.cappedBets += b.cappedBets;
     a.cappedLoss += b.cappedLoss;
+    a.floorLoss += b.floorLoss;
   }
 }
 
@@ -247,6 +257,7 @@ for (const k of TICKET_KINDS) {
       `売目 ${(st.bets / (RACES * SEEDS.length)).toFixed(0)}/R  ` +
       `未発売的中 ${st.unseenHits}  cap該当 ${((st.cappedBets / Math.max(1, st.bets)) * 100).toFixed(1)}%  ` +
       `cap無しなら ${(((st.payout + st.cappedLoss) / Math.max(1, st.stake)) * 100).toFixed(2)}%  ` +
+      `切捨て無しなら ${(((st.payout + st.floorLoss) / Math.max(1, st.stake)) * 100).toFixed(2)}%  ` +
       `${pass ? 'PASS' : 'FAIL'}`,
   );
 }

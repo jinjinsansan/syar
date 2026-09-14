@@ -17,7 +17,7 @@
 
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error -- .mjs の素の JS を読む（型定義は置いていない）
-import { EXPECTED_EXPOSURE, unregistered, stale, judgeGrants, judgeReads, WRITE_PRIVILEGES, PUBLIC_VIEW, OWNER_SCOPED, CLOSED } from '../../../tools/lib/exposure-registry.mjs';
+import { EXPECTED_EXPOSURE, unregistered, stale, judgeGrants, judgeReads, WRITE_PRIVILEGES, PUBLIC_VIEW, OWNER_SCOPED, CLOSED, EXPECTED_FUNCTION_EXECUTE, unregisteredFunctions, staleFunctions, judgeFunctionExecute } from '../../../tools/lib/exposure-registry.mjs';
 
 const registered = Object.keys(EXPECTED_EXPOSURE) as string[];
 
@@ -130,5 +130,61 @@ describe('V-20 ② 読み取りの判定', () => {
 
   it('拒否された非公開テーブル（-1）は漏洩ではない', () => {
     expect(judgeReads([{ name: 'horses', rows: -1 }]).leaked).toEqual([]);
+  });
+});
+
+describe('V-20 ④ 関数の EXECUTE（監査 H-4・2026-09-14）', () => {
+  // ★判定の論理だけを固定する合成の登録簿（本物の期待値は staging の実測から書く）
+  const registry = {
+    'spend_training_ep(uuid,bigint,integer)': { anon: false, authenticated: false },
+    'place_bet(uuid,text,jsonb,integer,uuid)': { anon: false, authenticated: true },
+  };
+  const names = Object.keys(registry);
+
+  it('★登録簿に無い関数を検出する（新しい関数を黙って足せない）', () => {
+    expect(unregisteredFunctions([...names, 'brand_new_fn()'], registry)).toEqual(['brand_new_fn()']);
+    expect(unregisteredFunctions(names, registry)).toEqual([]);
+  });
+
+  it('★DB から消えたのに登録簿に残っている関数を検出する', () => {
+    expect(staleFunctions(['place_bet(uuid,text,jsonb,integer,uuid)'], registry)).toEqual([
+      'spend_training_ep(uuid,bigint,integer)',
+    ]);
+  });
+
+  it('★anon に EXECUTE が残っていたら検出する（0013・0014 が anon を剥がし忘れていた形）', () => {
+    expect(
+      judgeFunctionExecute([{ fn: 'spend_training_ep(uuid,bigint,integer)', anon: true, authenticated: false }], registry),
+    ).toEqual(['spend_training_ep(uuid,bigint,integer).EXECUTE(anon) 実測=true 期待=false']);
+  });
+
+  it('★塞ぎすぎも検出する（利用者の RPC から authenticated を剥がした形）', () => {
+    expect(
+      judgeFunctionExecute([{ fn: 'place_bet(uuid,text,jsonb,integer,uuid)', anon: false, authenticated: false }], registry),
+    ).toEqual(['place_bet(uuid,text,jsonb,integer,uuid).EXECUTE(authenticated) 実測=false 期待=true']);
+  });
+
+  it('登録簿どおりなら何も出ない／未登録の関数はここでは数えない（④の未登録は別の判定が見る）', () => {
+    expect(
+      judgeFunctionExecute(
+        [
+          { fn: 'spend_training_ep(uuid,bigint,integer)', anon: false, authenticated: false },
+          { fn: 'place_bet(uuid,text,jsonb,integer,uuid)', anon: false, authenticated: true },
+          { fn: 'brand_new_fn()', anon: true, authenticated: true },
+        ],
+        registry,
+      ),
+    ).toEqual([]);
+  });
+
+  it('★本物の登録簿: ワーカー専用の spend_training_ep は anon にも authenticated にも実行させない（staging 実測・0021 適用後）', () => {
+    expect(EXPECTED_FUNCTION_EXECUTE['spend_training_ep(uuid,bigint,integer)']).toEqual({ anon: false, authenticated: false });
+    // ★ガード自身は anon に実行させない（0019）
+    expect(EXPECTED_FUNCTION_EXECUTE['assert_setup_complete()']?.anon).toBe(false);
+    // ★利用者の RPC は authenticated が実行できる（塞ぎすぎていない）
+    expect(EXPECTED_FUNCTION_EXECUTE['place_bet(uuid,text,jsonb,integer,uuid)']?.authenticated).toBe(true);
+    expect(EXPECTED_FUNCTION_EXECUTE['exchange_prize(bigint,uuid)']?.authenticated).toBe(true);
+    // ★登録簿に無い関数は、本物の登録簿でも未登録として落ちる
+    expect(unregisteredFunctions(['brand_new_fn()'])).toEqual(['brand_new_fn()']);
   });
 });

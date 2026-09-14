@@ -20,6 +20,7 @@
 
 import {
   MARGIN,
+  ODDS_CAP,
   debiasedProbability,
   minSellableProbability,
   oddsFromProbability,
@@ -115,7 +116,9 @@ export function buildOddsRows(
         odds,
         // ★D-035 の下で `capped` は決して立ちません（上限に当たる目を売らないため）。
         //   欄は残します — 立ったら「売らない規則が効いていない」ことの証拠になります。
-        capped: raw > odds,
+        // ★上限そのものと比べる（2026-09-14）。`odds` は 0.1 単位の切り捨て値（D-094 候補）なので、
+        //   `raw > odds` と比べると、切り捨てのたびに「上限に当たった」と数えてしまう
+        capped: raw > ODDS_CAP[betType],
       });
     }
   }

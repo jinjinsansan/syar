@@ -124,3 +124,67 @@ export function judgeReads(reads) {
   }
   return { leaked, viewsUnreadable };
 }
+
+/**
+ * ★V-20 ④ — public の関数の EXECUTE（監査 H-4・指示書 AF-3 §4-1-4・2026-09-14）
+ *
+ * 【なぜ軸を足すか】
+ *   ①〜③はテーブルしか見ていませんでした。**関数の実行権限はテーブルと別に付きます。**
+ *   `spend_training_ep` は `0013`・`0014` が public と authenticated だけを剥がし、**anon が抜けていました**。
+ *   ①が入ったときと同じく、「全数」と名乗る検査が軸の一つしか走査していなかった形です（D-012）。
+ *
+ * 【登録簿の形】
+ *   key は `pg_proc.oid::regprocedure::text`（例 `spend_training_ep(uuid,bigint,integer)`）。
+ *   値は anon / authenticated が EXECUTE を**持つべきか**。
+ *   ★**登録簿に無い関数が現れたら落ちます**（③と同じ形。新しい関数を黙って足せない）。
+ *
+ * 【期待値の出どころ】（指示書 AF-3 §4-1-4。手で推測して書かない）
+ *   2026-09-14 **staging の実測**（`0021` 適用後・`pg_proc` の走査・`has_function_privilege`）。
+ *   ⚠️ 本番は `0021` が未適用なので、`spend_training_ep` の anon が true のまま。**本番で回すと④が落ちます**
+ *      （それが正しい。適用はオーナーの指示で別に行う）。
+ */
+/** @type {Readonly<Record<string, {anon: boolean, authenticated: boolean}>>} */
+export const EXPECTED_FUNCTION_EXECUTE = {
+  // ★ガード自身。利用者の RPC から呼ばれるので authenticated だけ（`0019` が anon を明示的に外している）
+  'assert_setup_complete()': { anon: false, authenticated: true },
+  // ⚠️ anon に EXECUTE が残っている（`0002`・`0008` は public だけを剥がし、anon は Supabase の既定で付いたまま）。
+  //    関数の先頭の `assert_setup_complete()` が「未認証」で弾くので、動作としては閉じているが、権限としては開いている。
+  //    ★実測どおり書く。閉じるかは照会中（REPORT_AUDIT_FIX_20260914.md）
+  'exchange_prize(bigint,uuid)': { anon: true, authenticated: true },
+  'place_bet(uuid,text,jsonb,integer,uuid)': { anon: true, authenticated: true },
+  // ★ワーカー専用（`0021`・D-095 候補）。利用者のロールには実行させない（監査 H-4）
+  'spend_training_ep(uuid,bigint,integer)': { anon: false, authenticated: false },
+};
+
+/** 登録簿に無い関数を返す（V-20 ④） */
+export function unregisteredFunctions(signatures, registry = EXPECTED_FUNCTION_EXECUTE) {
+  return signatures.filter((s) => registry[s] === undefined);
+}
+
+/** 登録簿にあるが DB に無い関数（消したのに登録簿を直し忘れた形） */
+export function staleFunctions(signatures, registry = EXPECTED_FUNCTION_EXECUTE) {
+  const present = new Set(signatures);
+  return Object.keys(registry).filter((s) => !present.has(s));
+}
+
+/**
+ * V-20 ④ — 実測の EXECUTE を登録簿と突き合わせる。
+ *
+ * ★開きすぎ（anon に残っている）も、塞ぎすぎ（利用者の RPC から authenticated を剥がした）も数えます。
+ *   守りは閉じる方向に倒れても気づきにくい（`judgeReads` の viewsUnreadable と同じ考え方）。
+ *
+ * @param {ReadonlyArray<{fn: string, anon: boolean, authenticated: boolean}>} rows
+ * @returns 食い違いの一覧（空なら合格）。★未登録の関数はここでは数えない（`unregisteredFunctions` が見る）
+ */
+export function judgeFunctionExecute(rows, registry = EXPECTED_FUNCTION_EXECUTE) {
+  const out = [];
+  for (const r of rows) {
+    const want = registry[r.fn];
+    if (want === undefined) continue;
+    for (const role of ['anon', 'authenticated']) {
+      const got = Boolean(r[role]);
+      if (got !== want[role]) out.push(`${r.fn}.EXECUTE(${role}) 実測=${got} 期待=${want[role]}`);
+    }
+  }
+  return out;
+}

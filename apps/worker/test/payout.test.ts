@@ -3,9 +3,15 @@
  *
  * DB を使わず、`settle`（純関数）に渡る値の変換だけを確かめます。
  * SQL 側は tools/verify-economy.mjs が実 DB で確かめています。
+ *
+ * ★2026-09-14: `payout.ts` の経路（DB の文字列 → tenths → 払戻額 → 書き込む値）を
+ *   偽の DB で通す検査を足しました（監査 H-1・指示書 AF-1 §2-2-5）。
+ *   純関数だけを固定しても、`payout.ts` が別の変換を通していれば防御になりません（R-1）。
  */
+import type pg from 'pg';
 import { describe, expect, it } from 'vitest';
 import { ep, hitMultiplicity, settle, type RaceOutcome } from '@star/betting';
+import { settlePayouts } from '../src/payout.js';
 
 /** payout.ts が組む outcome と同じ形（着順 → 馬番の配列） */
 const outcomeOf = (finished: { gate: number; finishPosition: number }[]): RaceOutcome => ({
@@ -64,10 +70,93 @@ describe('★§9 払戻額', () => {
     expect(s.refunded).toBe(false);
   });
 
-  it('★払戻は購入額×オッズを超えない（丸めで PP を過大発行しない）', () => {
-    for (const odds of [1.1, 3.33, 7.77, 99.99]) {
-      const s = settle({ selection: { kind: 'win', horses: [3] }, stake: ep(700), oddsAtPurchase: odds }, o);
-      expect(s.payout).toBeLessThanOrEqual(700 * odds);
+  it('★払戻は購入額×オッズと一致する（丸めで PP を過大にも過少にも発行しない）', () => {
+    // ★オッズは 0.1 単位（D-094 候補）。以前ここで使っていた 3.33・7.77・99.99 は
+    //   numeric(9,1) の列からは出てこない値で、しかも上側（≦）しか見ていなかった（裁定 §3-2）
+    for (const tenths of [11, 23, 33, 77, 999]) {
+      const s = settle({ selection: { kind: 'win', horses: [3] }, stake: ep(700), oddsAtPurchase: tenths / 10 }, o);
+      expect(s.payout).toBe(70 * tenths);
     }
+  });
+});
+
+interface BetRow {
+  id: string;
+  user_id: string;
+  bet_type: string;
+  selection: number[];
+  amount: number;
+  odds_at_purchase: string;
+}
+
+/** ★`payout.ts` の経路を通す偽の DB。馬券の select には行を返し、書き込みは記録するだけ */
+function fakeDb(bets: readonly BetRow[]): {
+  client: pg.Client;
+  writes: { sql: string; params: readonly unknown[] }[];
+} {
+  const writes: { sql: string; params: readonly unknown[] }[] = [];
+  const client = {
+    query: async (sql: string, params: readonly unknown[] = []) => {
+      if (/^\s*select id, user_id, bet_type/.test(sql)) return { rows: bets, rowCount: bets.length };
+      writes.push({ sql, params });
+      return { rows: [], rowCount: 1 };
+    },
+  };
+  return { client: client as unknown as pg.Client, writes };
+}
+
+const FINISHED = [
+  { gate: 3, finishPosition: 1 },
+  { gate: 1, finishPosition: 2 },
+  { gate: 9, finishPosition: 3 },
+];
+
+describe('★§9 払戻の経路（payout.ts・DB の文字列から浮動小数を経ずに払う）', () => {
+  it('★"2.3" × 100 EP の的中は 230 PP を書き込む（以前は 229）', async () => {
+    const { client, writes } = fakeDb([
+      { id: 'b1', user_id: 'u1', bet_type: 'win', selection: [3], amount: 100, odds_at_purchase: '2.3' },
+    ]);
+    const r = await settlePayouts(client, 'race-1', FINISHED);
+    expect(r.won).toBe(1);
+    expect(r.paid).toBe(230);
+    expect(writes.find((w) => w.sql.includes("status = 'won'"))?.params[0]).toBe(230);
+    expect(writes.find((w) => w.sql.includes('prize_points = prize_points +'))?.params[0]).toBe(230);
+  });
+
+  it('★tenths 10〜9,999 × 購入額 100・700 のすべてで、書き込む払戻額が整数の正解と一致する', async () => {
+    const bets: BetRow[] = [];
+    const tenthsOf: number[] = [];
+    for (const amount of [100, 700]) {
+      for (let t = 10; t <= 9_999; t += 1) {
+        bets.push({
+          id: `b${amount}-${t}`, user_id: 'u1', bet_type: 'win', selection: [3], amount,
+          odds_at_purchase: `${Math.floor(t / 10)}.${t % 10}`,
+        });
+        tenthsOf.push(t);
+      }
+    }
+    const { client, writes } = fakeDb(bets);
+    const r = await settlePayouts(client, 'race-1', FINISHED);
+    const wonWrites = writes.filter((w) => w.sql.includes("status = 'won'"));
+    expect(wonWrites).toHaveLength(bets.length);
+
+    let wrong = 0;
+    let expectedTotal = 0;
+    bets.forEach((b, i) => {
+      // ★正解は BigInt で出す（検査対象の変換も浮動小数も通さない）
+      const want = Number((BigInt(b.amount) * BigInt(tenthsOf[i]!)) / BigInt(10));
+      expectedTotal += want;
+      if (wonWrites[i]!.params[0] !== want) wrong += 1;
+    });
+    expect(wrong).toBe(0);
+    expect(r.paid).toBe(expectedTotal);
+  }, 60_000);
+
+  it('★0.1 単位に乗らない値が DB から来たら例外（客の馬券を黙って丸めない・R-3）', async () => {
+    const { client, writes } = fakeDb([
+      { id: 'b1', user_id: 'u1', bet_type: 'win', selection: [3], amount: 100, odds_at_purchase: '3.33' },
+    ]);
+    await expect(settlePayouts(client, 'race-1', FINISHED)).rejects.toThrow();
+    expect(writes).toEqual([]);
   });
 });

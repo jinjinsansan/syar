@@ -16,12 +16,23 @@
  * 【走査の対象】
  *   `db/migrations/*.sql` に定義されたすべての関数のうち、**最後に定義されたもの**を見ます。
  *   ★同じ関数が複数のマイグレーションで再定義されることがあるため
- *     （`spend_training_ep` は `0013` と `0014` の両方にあり、**効いているのは後のほう**）。
+ *     （`spend_training_ep` は `0013`・`0014`・`0020`・`0021` にあり、**効いているのは最後のもの**）。
  *     **前のものを見て「呼んでいない」と判定すると、直したのに落ち続けます。**
+ *
+ * 【★ワーカー専用関数（2026-09-14・監査 H-3＋H-4・D-095 候補）】
+ *   D-080 は「利用者が呼ぶ RPC」を前提にした決定でした。ワーカーだけが呼ぶ `spend_training_ep` にも
+ *   この判定を課し、それを満たすために入れた 1 行（`0020`）が、**ワーカーの呼び出しを毎回「未認証」で
+ *   弾いていました**（H-3・検査を満たすための変更が副作用の経路になった・R-26）。
+ *   → ワーカー専用関数は登録簿に載せ、`assert_setup_complete()` の代わりに次を要求します:
+ *     ① 最後の定義より後に、public・anon・authenticated からの revoke がある
+ *     ② その revoke より後に、それらのロールへの grant が無い
+ *     ③ 本体で `auth.uid()` を使わない（呼んでいるのが誰かに依存しない）
+ *   ★利用者が呼ぶ RPC（`place_bet`・`exchange_prize`）はこの登録簿に入れられません。
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { EP_SHORT_SQLSTATE, classifySpendError } from '../../worker/src/training-runner.js';
 
 const ROOT = new URL('../../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const DIR = `${ROOT}db/migrations`;
@@ -35,26 +46,114 @@ const READONLY_FUNCTIONS = [
   'assert_setup_complete',
 ];
 
-/** マイグレーションを番号順に読み、関数名 → 最後の定義本文 を作る */
-function latestFunctionBodies(): Map<string, { file: string; body: string }> {
-  const files = readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort();
-  const out = new Map<string, { file: string; body: string }>();
-  for (const f of files) {
-    const sql = readFileSync(`${DIR}/${f}`, 'utf8');
+/**
+ * ★ワーカー専用関数の登録簿（D-095 候補・裁定 §4-2）。
+ *   利用者のロールから実行できない代わりに、`assert_setup_complete()` を要求しない。
+ *   ⚠️ **利用者が呼ぶ RPC をここへ入れないこと**（入れると D-080 の判定が外れる）。
+ */
+const WORKER_ONLY_FUNCTIONS = ['spend_training_ep'];
+
+/** 利用者が呼ぶ書き込み RPC。どちらの登録簿にも入れられない */
+const USER_RPCS = ['place_bet', 'exchange_prize'];
+
+/** ワーカー専用関数から実行権限を剥がすべきロール */
+const USER_ROLES = ['public', 'anon', 'authenticated'];
+
+interface Migration {
+  readonly file: string;
+  readonly sql: string;
+}
+
+function readMigrations(): Migration[] {
+  return readdirSync(DIR)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()
+    .map((file) => ({ file, sql: readFileSync(`${DIR}/${file}`, 'utf8') }));
+}
+
+/** ★`--` のコメントを同じ長さの空白に置き換える（位置を保ったまま、コメント中の語を拾わない） */
+const blankComments = (sql: string): string => sql.replace(/--[^\n]*/g, (m) => ' '.repeat(m.length));
+
+/** 全マイグレーションを通した位置（ファイル順 → ファイル内の位置） */
+const positionOf = (fileIndex: number, offset: number): number => fileIndex * 100_000_000 + offset;
+
+interface Definition {
+  readonly file: string;
+  readonly body: string;
+  readonly pos: number;
+}
+
+/** マイグレーションを番号順に読み、関数名 → 最後の定義（本文と位置）を作る */
+function latestFunctionBodies(migrations: readonly Migration[] = readMigrations()): Map<string, Definition> {
+  const out = new Map<string, Definition>();
+  migrations.forEach(({ file, sql }, fileIndex) => {
     // `create [or replace] function [schema.]<name>(` … 次の `create ... function` か末尾まで
     //
     // ★スキーマ修飾を許すこと。`0020` は `pg_get_functiondef()` の出力なので
     //   `CREATE OR REPLACE FUNCTION public.place_bet(...)` の形になる。
     //   修飾を許さない版では **`0020` の定義を1つも拾えず、古い `0002` の定義で判定**していた
     //   （＝直したのに落ち続ける）。**走査器の取りこぼしは、対象が全部消えれば「合格」にもなる。**
+    // ★コメントの中の語は拾わない（位置は保つので、本文は元の SQL から切り出せる）
     const re = /create\s+(?:or\s+replace\s+)?function\s+(?:[a-z_][a-z0-9_]*\.)?([a-z_][a-z0-9_]*)\s*\(/gi;
-    const hits = [...sql.matchAll(re)];
+    const hits = [...blankComments(sql).matchAll(re)];
     for (let i = 0; i < hits.length; i += 1) {
-      const name = hits[i]![1]!;
+      const name = hits[i]![1]!.toLowerCase();
       const start = hits[i]!.index!;
       const end = i + 1 < hits.length ? hits[i + 1]!.index! : sql.length;
-      out.set(name, { file: f, body: sql.slice(start, end) });
+      out.set(name, { file, body: sql.slice(start, end), pos: positionOf(fileIndex, start) });
     }
+  });
+  return out;
+}
+
+interface PrivilegeStatement {
+  readonly file: string;
+  readonly pos: number;
+  readonly action: 'grant' | 'revoke';
+  /** 対象の関数名。`all functions in schema public` なら 'all' */
+  readonly functions: readonly string[] | 'all';
+  readonly roles: readonly string[];
+}
+
+/** 関数に対する grant / revoke を、全マイグレーションから位置つきで拾う（コメントは除く） */
+function functionPrivilegeStatements(migrations: readonly Migration[]): PrivilegeStatement[] {
+  const out: PrivilegeStatement[] = [];
+  const re = /\b(grant|revoke)\b[^;]*?\bon\s+(?:functions?\s+([^;]*?)|all\s+functions\s+in\s+schema\s+public)\s+(to|from)\s+([^;]+);/gi;
+  migrations.forEach(({ file, sql }, fileIndex) => {
+    for (const m of blankComments(sql).matchAll(re)) {
+      const action = m[1]!.toLowerCase() as 'grant' | 'revoke';
+      const functions = m[2] === undefined
+        ? 'all' as const
+        : [...m[2].matchAll(/(?:[a-z_][a-z0-9_]*\.)?([a-z_][a-z0-9_]*)\s*\(/gi)].map((x) => x[1]!.toLowerCase());
+      const roles = m[4]!.split(',').map((r) => r.trim().split(/\s+/)[0]!.toLowerCase()).filter((r) => r !== '');
+      out.push({ file, pos: positionOf(fileIndex, m.index!), action, functions, roles });
+    }
+  });
+  return out;
+}
+
+/** ワーカー専用関数の条件（①②③）に反するものを返す。空なら合格 */
+function workerOnlyViolations(name: string, migrations: readonly Migration[]): string[] {
+  const def = latestFunctionBodies(migrations).get(name);
+  if (def === undefined) return [`${name}: 定義が見つからない`];
+  const out: string[] = [];
+  const after = functionPrivilegeStatements(migrations).filter(
+    (s) => s.pos > def.pos && (s.functions === 'all' || s.functions.includes(name)),
+  );
+  for (const role of USER_ROLES) {
+    const revokes = after.filter((s) => s.action === 'revoke' && s.roles.includes(role));
+    if (revokes.length === 0) {
+      out.push(`${name}: 最後の定義（${def.file}）より後に ${role} からの revoke が無い`);
+      continue;
+    }
+    const lastRevoke = revokes[revokes.length - 1]!.pos;
+    const regrants = after.filter((s) => s.action === 'grant' && s.roles.includes(role) && s.pos > lastRevoke);
+    if (regrants.length > 0) {
+      out.push(`${name}: revoke の後に ${role} への grant がある（${regrants.map((g) => g.file).join(', ')}）`);
+    }
+  }
+  if (/auth\s*\.\s*uid\s*\(\s*\)/i.test(blankComments(def.body))) {
+    out.push(`${name}: 本体で auth.uid() を使っている（${def.file}）`);
   }
   return out;
 }
@@ -68,10 +167,11 @@ describe('D-080 書き込み RPC のセットアップ判定', () => {
     expect([...bodies.keys()]).toContain('place_bet');
   });
 
-  it('★すべての書き込み RPC が assert_setup_complete() を呼ぶ', () => {
+  it('★すべての書き込み RPC が assert_setup_complete() を呼ぶ（ワーカー専用関数を除く）', () => {
     const missing: string[] = [];
     for (const [name, { file, body }] of bodies) {
       if (READONLY_FUNCTIONS.includes(name)) continue;
+      if (WORKER_ONLY_FUNCTIONS.includes(name)) continue;
       if (!body.includes('assert_setup_complete()')) missing.push(`${name}（最後の定義: ${file}）`);
     }
     expect(
@@ -82,17 +182,18 @@ describe('D-080 書き込み RPC のセットアップ判定', () => {
   });
 
   it('★同じ関数が再定義されていたら、最後の定義で判定している', () => {
-    // spend_training_ep は 0013 / 0014 / 0020 にある。効いているのは 0020
+    // spend_training_ep は 0013 / 0014 / 0020 / 0021 にある。効いているのは 0021
     const s = bodies.get('spend_training_ep');
     expect(s).toBeDefined();
-    expect(s!.file.startsWith('0020')).toBe(true);
+    expect(s!.file.startsWith('0021')).toBe(true);
   });
 
   it('★スキーマ修飾された定義を拾えている（拾えないと古い定義で判定してしまう）', () => {
-    // 0020 は pg_get_functiondef の出力なので `public.place_bet(` の形
-    for (const name of ['place_bet', 'exchange_prize', 'spend_training_ep']) {
+    // 0020・0021 は pg_get_functiondef の出力なので `public.place_bet(` の形
+    for (const name of ['place_bet', 'exchange_prize']) {
       expect(bodies.get(name)?.file.startsWith('0020'), `${name} が 0020 から拾えていない`).toBe(true);
     }
+    expect(bodies.get('spend_training_ep')?.file.startsWith('0021'), 'spend_training_ep が 0021 から拾えていない').toBe(true);
   });
 
   it('除外簿に載せてよいのは状態を変えない関数だけ', () => {
@@ -100,5 +201,86 @@ describe('D-080 書き込み RPC のセットアップ判定', () => {
     for (const n of READONLY_FUNCTIONS) {
       expect(['place_bet', 'exchange_prize', 'spend_training_ep']).not.toContain(n);
     }
+  });
+});
+
+describe('★ワーカー専用関数（D-095 候補・監査 H-3＋H-4）', () => {
+  it('★登録簿の関数は、利用者のロールから実行権限を剥がし、auth.uid() を使わない', () => {
+    const migrations = readMigrations();
+    const violations = WORKER_ONLY_FUNCTIONS.flatMap((n) => workerOnlyViolations(n, migrations));
+    expect(violations, violations.join('\n')).toEqual([]);
+  });
+
+  it('★利用者が呼ぶ RPC は、ワーカー専用にも読み取り専用にも入れられない', () => {
+    for (const n of USER_RPCS) {
+      expect(WORKER_ONLY_FUNCTIONS).not.toContain(n);
+      expect(READONLY_FUNCTIONS).not.toContain(n);
+    }
+  });
+
+  it('★登録簿の関数がマイグレーションに実在する（空振りしていない）', () => {
+    const bodies = latestFunctionBodies();
+    for (const n of WORKER_ONLY_FUNCTIONS) expect(bodies.has(n), n).toBe(true);
+  });
+
+  it('★検査が効くこと: 壊れた移行の形を与えると落ちる（R-14）', () => {
+    const def = 'create or replace function spend_training_ep(p uuid) returns int language sql as $$ select 1 $$;\n';
+    const revokeAll = 'revoke all on function spend_training_ep(uuid) from public, anon, authenticated;\n';
+    const one = (sql: string): Migration[] => [{ file: '0001_a.sql', sql }];
+
+    // 正しい形は通る
+    expect(workerOnlyViolations('spend_training_ep', one(def + revokeAll))).toEqual([]);
+    // ★anon の revoke が抜けた（0013・0014 の形）
+    expect(
+      workerOnlyViolations('spend_training_ep', one(`${def}revoke all on function spend_training_ep(uuid) from public, authenticated;\n`)).join('\n'),
+    ).toMatch(/anon/);
+    // ★revoke が再定義より前にしか無い
+    expect(workerOnlyViolations('spend_training_ep', one(revokeAll + def)).length).toBeGreaterThan(0);
+    // ★revoke の後の移行で grant して戻した
+    expect(
+      workerOnlyViolations('spend_training_ep', [
+        { file: '0001_a.sql', sql: def + revokeAll },
+        { file: '0002_b.sql', sql: 'grant execute on function public.spend_training_ep(uuid) to anon;\n' },
+      ]).join('\n'),
+    ).toMatch(/grant/);
+    // ★コメントの中の revoke は数えない
+    expect(workerOnlyViolations('spend_training_ep', one(`${def}-- ${revokeAll}`)).length).toBe(3);
+    // ★本体で auth.uid() を使っている
+    expect(
+      workerOnlyViolations(
+        'spend_training_ep',
+        one(`create or replace function spend_training_ep(p uuid) returns uuid language sql as $$ select auth.uid() $$;\n${revokeAll}`),
+      ).join('\n'),
+    ).toMatch(/auth\.uid/);
+  });
+});
+
+describe('★EP 不足の SQLSTATE（関数とワーカーで同じ値・指示書 AF-3 §4-1-3）', () => {
+  it('★最後の定義の spend_training_ep は、EP 不足に EP_SHORT_SQLSTATE を付けて投げる', () => {
+    const def = latestFunctionBodies().get('spend_training_ep');
+    expect(def).toBeDefined();
+    expect(blankComments(def!.body)).toMatch(new RegExp(`errcode\\s*=\\s*'${EP_SHORT_SQLSTATE}'`, 'i'));
+  });
+
+  it('★ワーカーは SQLSTATE だけで EP 不足を見分ける（メッセージの文字列では見分けない）', () => {
+    expect(classifySpendError({ code: EP_SHORT_SQLSTATE, message: 'EP が不足している' })).toBe('ep_short');
+    // ★0020 以降の実際の失敗: 「未認証」（raise exception の既定 P0001）。以前はこれも休養に落ちていた（監査 H-3）
+    expect(classifySpendError({ code: 'P0001', message: '未認証' })).toBe('other');
+    // ★文言が EP 不足でも、SQLSTATE が無ければ EP 不足としない
+    expect(classifySpendError(new Error('EP が不足している（残高 0 / 必要 800）'))).toBe('other');
+    expect(classifySpendError({ code: '42501', message: 'permission denied for function spend_training_ep' })).toBe('other');
+    expect(classifySpendError(null)).toBe('other');
+    expect(classifySpendError('ST001')).toBe('other');
+  });
+
+  it('★SQLSTATE は 5 文字の英大文字・数字で、PostgreSQL が定める分類と重ならない', () => {
+    expect(EP_SHORT_SQLSTATE).toMatch(/^[0-9A-Z]{5}$/);
+    // PostgreSQL の付録 A「エラーコード」の分類（先頭 2 文字）
+    const pgClasses = [
+      '00', '01', '02', '03', '08', '09', '0A', '0B', '0F', '0L', '0P', '0Z', '20', '21', '22', '23', '24',
+      '25', '26', '27', '28', '2B', '2D', '2F', '34', '38', '39', '3B', '3D', '3F', '40', '42', '44', '53',
+      '54', '55', '57', '58', '72', 'F0', 'HV', 'P0', 'XX',
+    ];
+    expect(pgClasses).not.toContain(EP_SHORT_SQLSTATE.slice(0, 2));
   });
 });

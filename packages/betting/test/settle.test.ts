@@ -11,18 +11,33 @@ import {
   MARGIN,
   MIN_STAKE,
   ODDS_CAP,
+  ODDS_GRID_EPSILON_TENTHS,
   TICKET_KINDS,
   ep,
   hitMultiplicity,
   isWellFormed,
   debiasedProbability,
+  floorOddsToTenths,
   oddsFromProbability,
+  oddsTenthsFromNumber,
   placeDepth,
   settle,
   type RaceOutcome,
   type Selection,
   type Ticket,
 } from '../src/index.js';
+
+/**
+ * ★オッズが「切り捨て前の値」から 0.1 単位の切り捨てで作られていること（D-094 候補・2026-09-14）。
+ *   0.1 単位に乗り、切り捨て前の値以下で、切り捨て前の値 − 0.1 より大きい（両側・R-2）。
+ *   ★以前の `toBeCloseTo(切り捨て前の値)` が守っていたもの（控除率・補正式・上限）は、
+ *     この帯で切り捨て前の値に縛られたまま残る。
+ */
+const expectFlooredFrom = (got: number, unrounded: number): void => {
+  expect(() => oddsTenthsFromNumber(got)).not.toThrow();
+  expect(got).toBeLessThanOrEqual(unrounded + ODDS_GRID_EPSILON_TENTHS / 10);
+  expect(got).toBeGreaterThan(unrounded - 0.1);
+};
 
 /** 1着=1番, 2着=2番, ... の素直な結果 */
 const straight = (fieldSize = 12): RaceOutcome => ({
@@ -81,10 +96,8 @@ describe('§9.2 オッズ = (1/p_eff) × (1 − margin)', () => {
   it('★控除率のぶんだけ必ず 1/p を下回る（胴元が損しない）', () => {
     for (const k of TICKET_KINDS) {
       const p = 0.1;
-      expect(oddsFromProbability(k, p, M)).toBeCloseTo(
-        (1 / debiasedProbability(p, M)) * (1 - MARGIN[k]),
-        10,
-      );
+      // ★切り捨て前の値 (1/p_eff)(1 − margin) から、0.1 単位の切り捨てで作られている（D-094 候補）
+      expectFlooredFrom(oddsFromProbability(k, p, M), (1 / debiasedProbability(p, M)) * (1 - MARGIN[k]));
       expect(oddsFromProbability(k, p, M)).toBeLessThan(1 / p);
     }
   });
@@ -120,7 +133,10 @@ describe('★D-013 モンテカルロ推定量のバイアスを導出式で打�
     for (const k of TICKET_KINDS) {
       for (const pHat of [0.5, 0.1, 0.01, 0.002, 1 / M]) {
         const divided = ((1 / pHat) * (1 - MARGIN[k])) / (1 + (1 - pHat) / (M * pHat));
-        expect(oddsFromProbability(k, pHat, M)).toBeCloseTo(Math.min(ODDS_CAP[k], divided), 9);
+        // ★式変形そのもの（切り捨て前の値どうし）を 9 桁で照合する
+        expect((1 - MARGIN[k]) / debiasedProbability(pHat, M)).toBeCloseTo(divided, 9);
+        // ★製品の戻り値は、その値を頭打ち → 0.1 単位で切り捨てたもの（D-094 候補）
+        expect(oddsFromProbability(k, pHat, M)).toBe(floorOddsToTenths(Math.min(ODDS_CAP[k], divided)) / 10);
       }
     }
   });
@@ -254,15 +270,20 @@ describe('§9.1 払戻・返還', () => {
     const s = settle(bet({ kind: 'win', horses: [1] }, 3.5, 100), o);
     expect(s.hit).toBe(true);
     expect(s.payout).toBe(175);
-    // 切り捨て: 100 × 3.33 ÷ 2 = 166.5 → 166
-    expect(settle(bet({ kind: 'win', horses: [2] }, 3.33, 100), o).payout).toBe(166);
+    // 切り捨て: 100 × 3.5 ÷ 3 = 116.66… → 116（3頭同着）
+    // ★以前は 3.33 倍（÷2 = 166.5 → 166）で確かめていたが、3.33 は numeric(9,1) の列からは
+    //   出てこない値だった（裁定 §3-2）。0.1 単位のオッズで端数が出る 3 等分に置き換えた
+    const o3: RaceOutcome = { order: [1, 2, 3, 4], fieldSize: 4, deadHeats: [[1, 2, 3]] };
+    expect(settle(bet({ kind: 'win', horses: [2] }, 3.5, 100), o3).payout).toBe(116);
   });
 
-  it('★払戻が購入額×オッズを超えない（丸めで発行超過しない）', () => {
+  it('★払戻が購入額×オッズと一致する（丸めで発行超過も過少発行もしない・両側）', () => {
+    // ★以前は `toBeLessThanOrEqual` だけで、1 PP 少なく払う誤り（監査 H-1）を原理的に捕まえられなかった
     const o = straight();
-    for (const odds of [1.1, 2.7, 3.33, 99.99]) {
-      const s = settle(bet({ kind: 'win', horses: [1] }, odds, 300), o);
-      expect(s.payout).toBeLessThanOrEqual(300 * odds);
+    for (const tenths of [11, 23, 27, 33, 999]) {
+      const s = settle(bet({ kind: 'win', horses: [1] }, tenths / 10, 300), o);
+      expect(s.payout).toBeLessThanOrEqual(30 * tenths);
+      expect(s.payout).toBe(30 * tenths);
     }
   });
 });
@@ -293,7 +314,11 @@ describe('★§9.4 配当上限が実際に効いている（R-14 の振る舞�
   it('★上限に達しない確率では上限を返さない（cap が常時発動していない）', () => {
     // 常に cap を返す実装でも上の2件は通ってしまう。効いていない状態も検出する。
     // ★補正後の値。0.1 → p_eff = 0.1 + 0.9/10000、0.001 → 0.001 + 0.999/10000
-    expect(oddsFromProbability('win', 0.1, M)).toBeCloseTo(0.82 / (0.1 + 0.9 / M), 10);
-    expect(oddsFromProbability('trifecta', 0.001, M)).toBeCloseTo(0.77 / (0.001 + 0.999 / M), 10);
+    // ★戻り値はその値の 0.1 単位の切り捨て（D-094 候補）。帯で切り捨て前の値に縛る
+    expectFlooredFrom(oddsFromProbability('win', 0.1, M), 0.82 / (0.1 + 0.9 / M));
+    expectFlooredFrom(oddsFromProbability('trifecta', 0.001, M), 0.77 / (0.001 + 0.999 / M));
+    // ★上限（500 倍 / 100,000 倍）より十分下にある
+    expect(oddsFromProbability('win', 0.1, M)).toBeLessThan(500);
+    expect(oddsFromProbability('trifecta', 0.001, M)).toBeLessThan(100_000);
   });
 });

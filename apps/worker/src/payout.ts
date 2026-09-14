@@ -11,7 +11,7 @@
  *   返還（取消・除外）だけは EP で返します（§9.1）。
  */
 
-import { settle, ep, pp, type RaceOutcome, type TicketKind } from '@star/betting';
+import { settleTenths, oddsTenthsFromDecimalString, ep, pp, type RaceOutcome, type TicketKind } from '@star/betting';
 import type pg from 'pg';
 
 export interface FinishedEntry {
@@ -64,11 +64,14 @@ export async function settlePayouts(
       // ★知らない券種を黙って外れ扱いにしない。客の馬券を勝手に捨てることになる
       throw new Error(`settlePayouts: 未知の券種 ${b.bet_type}（bet=${b.id}）`);
     }
-    const s = settle(
+    const s = settleTenths(
       {
         selection: { kind, horses: b.selection },
         stake: ep(b.amount),
-        oddsAtPurchase: Number(b.odds_at_purchase),
+        // ★DB の文字列（numeric(9,1)）から、浮動小数を経ずに 0.1 単位の整数へ（監査 H-1・裁定 §3-4）。
+        //   以前の `Number(b.odds_at_purchase)` は、その時点で誤差の入口だった（100 × 2.3 → 229 PP）。
+        //   0.1 単位に乗らない値は例外にする（客の馬券を黙って丸めない・R-3）
+        oddsTenths: oddsTenthsFromDecimalString(b.odds_at_purchase),
       },
       outcome,
     );
