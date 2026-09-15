@@ -101,7 +101,12 @@ for (const pose of poses) {
     .replaceAll('{PREV_REF}', prevRef)
     .replaceAll('{ANCHOR_REF}', anchorRef)
     .replaceAll('{TYPE}', typeText)
-    .replaceAll('{TYPE_REF}', typeRef);
+    .replaceAll('{TYPE_REF}', typeRef)
+    /**
+     * ★**本番の走りのコマの接尾辞**（★2026-09-15・歩きの雛形 `deformed-8frames-walk.txt` が走りのコマを見本に使うため）。
+     *   ★本番は 型A ＝ `horse-jockey-side-v8`（★接尾辞なし）・型B ＝ `horse-jockey-side-v8b`。
+     */
+    .replaceAll('{TYPE_SUFFIX}', typeArg > 0 && process.argv[typeArg + 1] !== 'a' ? process.argv[typeArg + 1] : '');
   const promptFile = `out/gen/${short}-${pose}.prompt.txt`;
   writeFileSync(promptFile, prompt);
   console.log(`\n=== ${setName} pose${pose} ===`);

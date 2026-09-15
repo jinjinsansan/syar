@@ -6,48 +6,254 @@ import {
 } from './hud-kit.js';
 
 /**
- * ★導入の時間割（アーケード参考映像: 空撮フライオーバー → レース名タイトル → 発馬機正面 → 発走）
- *   0.0〜1.6  空撮フライオーバー（コースの上を飛ぶ）
- *   1.6〜3.2  タイトルカード
- *   3.2〜4.4  ゲート待機（正面の発馬機・扉閉）
- *   4.4〜     発走（開扉）
+ * ★**発走前の時間割**（★2026-09-15・オーナー決定「★動画の通りにします」）
  *
- * ★**半分に詰めました**（★2026-09-13・オーナー指示「詰めましょう」）
+ *   ★オーナーが競合のアーケード機を撮った動画の順番です（★相談書 `CONSULT_GAME_DESIGN_TWO_MODES_20260915.md` §1-14）:
+ *     ★人気馬の紹介 → 格とレース名 → 出馬表（背景は競馬場）→ ゲート → 発走
  *
- *   ★オーナー指摘「★残っているのは発走前 7.8 秒とゴール後 12.1 秒」に対して「詰めましょう」。
- *   ★旧: 空撮 3.0 ／ タイトル 2.6 ／ ゲート待機 2.2 ＝ ★**7.8 秒**
- *   ★新: 空撮 1.6 ／ タイトル 1.6 ／ ゲート待機 1.2 ＝ ★**4.4 秒**（★−3.4 秒）
- * ⚠️ ★タイトルカードは ★**デザイナーのハンドオフ**（`components/title-card`）です。
- *    ★1.6 秒はレース名が読める下限として置いた値で、★実測ではありません。
- *    ★これ以上短くすると読めなくなります。
- * ⚠️ ★開扉後の 2.2 秒（`RACE_INTRO_END_SEC - RACE_INTRO_RACE_START_SEC`）は
- *    ★**触っていません**。★参考映像の「開扉後およそ 2 秒で追走カメラへ渡る」に合わせた値です。
+ *   ★ 0.0〜18.0  人気馬の紹介（★3 番人気 → 2 番人気 → 1 番人気・各 6 秒）
+ *   ★18.0〜19.6  空撮（コースの上を飛ぶ・★紹介から格の紹介へのつなぎ）
+ *   ★19.6〜22.2  格の紹介（「GRADE I」→ 大きな「G I」→ 白い閃光）
+ *   ★22.2〜25.2  レース名のカード（★デザイナーのハンドオフ `components/title-card`）
+ *   ★25.2〜31.2  出馬表（全画面・★背景は競馬場の透視ワールド）
+ *   ★31.2〜32.4  ゲート待機（正面の発馬機・扉閉）
+ *   ★32.4〜      発走（開扉）
+ *
+ * ⚠️ ★秒は ★**開発側の仮置き**です（★動画は紹介 1 頭 約 9 秒・格とレース名 約 15 秒・出馬表 約 8 秒）。★オーナーの目で決めます。
+ * ⚠️ ★2026-09-13 の「★詰めましょう」（★7.8 → 4.4 秒）は、★今回のオーナー決定で ★**上書き**です（★R-7）。
+ * ⚠️ ★開扉後の 2.2 秒（`RACE_INTRO_END_SEC - RACE_INTRO_RACE_START_SEC`）は ★**触っていません**。
+ * ⚠️ ★発走の時刻は ★**この定数だけ**から引くこと（★画面・監査道具・検査が同じ値を読む・R-31）。
  */
-export const RACE_INTRO_FLYOVER_SEC = 1.6;
-export const RACE_INTRO_TITLE_END_SEC = 3.2;
-export const RACE_INTRO_RACE_START_SEC = 4.4;
+/** ★人気馬の紹介 1 頭の秒 */
+export const RACE_INTRO_PADDOCK_EACH_SEC = 6;
+/** ★紹介する頭数（★1〜3 番人気） */
+export const RACE_INTRO_PADDOCK_COUNT = 3;
+export const RACE_INTRO_PADDOCK_END_SEC = RACE_INTRO_PADDOCK_EACH_SEC * RACE_INTRO_PADDOCK_COUNT;
+/** ★空撮の始まり（＝紹介の終わり） */
+export const RACE_INTRO_FLYOVER_START_SEC = RACE_INTRO_PADDOCK_END_SEC;
+/** ★空撮の終わり（★名前は従来のまま・★意味は「空撮が終わる表示秒」） */
+export const RACE_INTRO_FLYOVER_SEC = RACE_INTRO_FLYOVER_START_SEC + 1.6;
+export const RACE_INTRO_GRADE_END_SEC = RACE_INTRO_FLYOVER_SEC + 2.6;
+export const RACE_INTRO_TITLE_START_SEC = RACE_INTRO_GRADE_END_SEC;
+export const RACE_INTRO_TITLE_END_SEC = RACE_INTRO_TITLE_START_SEC + 3;
+export const RACE_INTRO_ENTRY_END_SEC = RACE_INTRO_TITLE_END_SEC + 6;
+/** ★ゲート待機の始まり（＝出馬表の終わり） */
+export const RACE_INTRO_GATE_HOLD_SEC = RACE_INTRO_ENTRY_END_SEC;
+export const RACE_INTRO_RACE_START_SEC = RACE_INTRO_GATE_HOLD_SEC + 1.2;
 // 参考映像は開扉後およそ2秒で次の追走カメラへ渡る。長い横滑りを禁止する。
-export const RACE_INTRO_END_SEC = 6.6;
+export const RACE_INTRO_END_SEC = RACE_INTRO_RACE_START_SEC + 2.2;
 
-export type RaceIntroStage = 'flyover' | 'title' | 'gate-hold' | 'gate-release' | 'race';
+export type RaceIntroStage = 'paddock' | 'flyover' | 'grade' | 'title' | 'entry' | 'gate-hold' | 'gate-release' | 'race';
 
 export interface RaceIntroState {
   readonly stage: RaceIntroStage;
   readonly raceDisplaySec: number;
   readonly releaseProgress: number;
+  /** ★その段に入ってからの秒 */
+  readonly sinceSec: number;
+  /** ★人気馬の紹介の何頭目か（★0 始まり・★`paddock` の段だけ） */
+  readonly paddockIndex?: number | undefined;
 }
 
 export function raceIntroAt(displaySec: number): RaceIntroState {
   const d = Math.max(0, displaySec);
   const raceDisplaySec = Math.max(0, d - RACE_INTRO_RACE_START_SEC);
-  if (d < RACE_INTRO_FLYOVER_SEC) return { stage: 'flyover', raceDisplaySec: 0, releaseProgress: 0 };
-  if (d < RACE_INTRO_TITLE_END_SEC) return { stage: 'title', raceDisplaySec: 0, releaseProgress: 0 };
-  if (d < RACE_INTRO_RACE_START_SEC) return { stage: 'gate-hold', raceDisplaySec: 0, releaseProgress: 0 };
+  const held = (stage: RaceIntroStage, from: number): RaceIntroState => ({ stage, raceDisplaySec: 0, releaseProgress: 0, sinceSec: d - from });
+  if (d < RACE_INTRO_PADDOCK_END_SEC) {
+    const paddockIndex = Math.min(RACE_INTRO_PADDOCK_COUNT - 1, Math.floor(d / RACE_INTRO_PADDOCK_EACH_SEC));
+    return { ...held('paddock', paddockIndex * RACE_INTRO_PADDOCK_EACH_SEC), paddockIndex };
+  }
+  if (d < RACE_INTRO_FLYOVER_SEC) return held('flyover', RACE_INTRO_FLYOVER_START_SEC);
+  if (d < RACE_INTRO_GRADE_END_SEC) return held('grade', RACE_INTRO_FLYOVER_SEC);
+  if (d < RACE_INTRO_TITLE_END_SEC) return held('title', RACE_INTRO_TITLE_START_SEC);
+  if (d < RACE_INTRO_ENTRY_END_SEC) return held('entry', RACE_INTRO_TITLE_END_SEC);
+  if (d < RACE_INTRO_RACE_START_SEC) return held('gate-hold', RACE_INTRO_GATE_HOLD_SEC);
   if (d < RACE_INTRO_END_SEC) return {
-    stage: 'gate-release', raceDisplaySec,
+    stage: 'gate-release', raceDisplaySec, sinceSec: raceDisplaySec,
     releaseProgress: Math.min(1, raceDisplaySec / (RACE_INTRO_END_SEC - RACE_INTRO_RACE_START_SEC)),
   };
-  return { stage: 'race', raceDisplaySec, releaseProgress: 1 };
+  return { stage: 'race', raceDisplaySec, releaseProgress: 1, sinceSec: d - RACE_INTRO_END_SEC };
+}
+
+/**
+ * ★**人気の順位**（★単勝オッズの低い順・★同じオッズは馬番の若い順）。
+ * ⚠️ ★オッズは ★**渡された値をそのまま**使います（★ここで勝率やオッズを作らない）。★本番はサーバーのオッズ、★デモは画面のデモの値。
+ * ⚠️ ★人気は発走の前に分かる値なので、★ゴールより前に使っても D-098 に当たりません。
+ */
+export function popularityRanksOf(entries: readonly { readonly gate: number; readonly winOdds: number }[]): ReadonlyMap<number, number> {
+  const sorted = [...entries].sort((a, b) => (a.winOdds - b.winOdds) || (a.gate - b.gate));
+  return new Map(sorted.map((e, i) => [e.gate, i + 1]));
+}
+
+/**
+ * ★**紹介する人気馬**（★紹介の順＝ ★`count` 番人気 → 1 番人気。★動画と同じく人気の低いほうから）。
+ */
+export function paddockPicksOf(
+  entries: readonly { readonly gate: number; readonly winOdds: number }[], count = RACE_INTRO_PADDOCK_COUNT,
+): readonly { readonly gate: number; readonly winOdds: number; readonly popularity: number }[] {
+  const ranks = popularityRanksOf(entries);
+  return entries
+    .map((e) => ({ gate: e.gate, winOdds: e.winOdds, popularity: ranks.get(e.gate) ?? entries.length }))
+    .filter((e) => e.popularity <= count)
+    .sort((a, b) => b.popularity - a.popularity);
+}
+
+export interface PaddockIntroEntry {
+  readonly gate: number;
+  readonly name: string;
+  readonly jockey: string;
+  /** ★枠の色の役（`frameRoleOf`） */
+  readonly frameRole: string;
+  readonly oddsLabel: string;
+  readonly popularity: number;
+  /** ★紹介の何頭目か（★1 始まり）と全頭数 */
+  readonly order: number;
+  readonly total: number;
+}
+
+/** ★背景の絵を画面いっぱいに置く（★縦横比を保って切り抜く） */
+function drawCover<TImage>(
+  ctx: Ctx2D<TImage>, vp: Viewport2D, bg: { readonly image: TImage; readonly width: number; readonly height: number }, zoom: number, panX: number,
+): void {
+  const W = vp.width, H = vp.height;
+  const targetRatio = W / H;
+  const sourceRatio = bg.width / bg.height;
+  const sw0 = sourceRatio > targetRatio ? bg.height * targetRatio : bg.width;
+  const sh0 = sourceRatio > targetRatio ? bg.height : bg.width / targetRatio;
+  const sw = sw0 / zoom, sh = sh0 / zoom;
+  const sx = Math.max(0, Math.min(bg.width - sw, (bg.width - sw) * (0.5 + panX)));
+  const sy = (bg.height - sh) * 0.5;
+  ctx.drawImage(bg.image, sx, sy, sw, sh, 0, 0, W, H);
+}
+
+/**
+ * ★**人気馬の紹介**（★パドック風・★1 頭ぶん）。
+ *   ★背景の絵の上に ★自馬と同じコマ集合で馬を大きく歩かせ（★ゆっくりのコマ送り）、★下に枠番・馬名・騎手・単勝・「○番人気」の帯。
+ * ⚠️ ★歩きのコマはまだ無いので、★走りのコマをゆっくり送ります（★開発側の仮置き・歩きの絵は別便）。
+ * ⚠️ ★コマ送りも入り方も ★`sinceSec` だけで決まります（★憲法 4）。
+ */
+export function drawPaddockIntro<TImage>(
+  ctx: Ctx2D<TImage>, pal: Palette, vp: Viewport2D, font: FontOf,
+  entry: PaddockIntroEntry, sinceSec: number,
+  background?: { readonly image: TImage; readonly width: number; readonly height: number },
+  frames?: readonly RaceIntroHorseFrame<TImage>[],
+): void {
+  const W = vp.width, H = vp.height;
+  const each = RACE_INTRO_PADDOCK_EACH_SEC;
+  const p = Math.max(0, Math.min(1, sinceSec / each));
+  if (background !== undefined) drawCover(ctx, vp, background, 1.18, -0.18 + p * 0.36);
+  else { ctx.fillStyle = '#0b1210'; ctx.fillRect(0, 0, W, H); }
+  /** ★下を暗く（★帯を読みやすく・段で重ねる） */
+  for (let i = 0; i < 8; i += 1) {
+    ctx.fillStyle = `rgba(3,6,4,${(0.08 * (i + 1)).toFixed(3)})`;
+    ctx.fillRect(0, H * (0.5 + i * 0.0625), W, H * 0.0625 + 1);
+  }
+  const base = ctx.globalAlpha;
+  /** ★馬（★1 秒 7 コマ・★画面の中を少しずつ進む） */
+  if (frames !== undefined && frames.length > 0) {
+    const fr = frames[Math.floor(sinceSec * 7) % frames.length]!;
+    const targetH = H * 0.5;
+    const scale = targetH / fr.referenceHeight;
+    const dw = fr.source.width * scale, dh = fr.source.height * scale;
+    const cx = W * (0.36 + p * 0.22);
+    const groundY = H * 0.74;
+    ctx.fillStyle = 'rgba(3,8,4,0.34)';
+    ctx.beginPath(); ctx.ellipse(cx, groundY - 4, dw * 0.3, Math.max(4, dh * 0.045), 0, 0, Math.PI * 2); ctx.fill();
+    const dx = cx - dw / 2, dy = groundY - dh;
+    ctx.drawImage(fr.image, fr.source.x, fr.source.y, fr.source.width, fr.source.height, dx, dy, dw, dh);
+    if (fr.overlay !== undefined) {
+      ctx.drawImage(fr.overlay.image, 0, 0, fr.overlay.width, fr.overlay.height,
+        dx + (fr.overlay.offsetXSourcePx - fr.source.x) * scale, dy + (fr.overlay.offsetYSourcePx - fr.source.y) * scale,
+        fr.overlay.width * scale, fr.overlay.height * scale);
+    }
+  }
+  /** ★左上の見出し「出走馬紹介 1 / 3」 */
+  const tag = riseAt(sinceSec, 0.1);
+  ctx.globalAlpha = base * tag.alpha;
+  fillSlant(ctx, 40, 36 + tag.dy, 300, 44, HUD.glass);
+  ctx.fillStyle = HUD.goldHair; ctx.fillRect(40, 36 + tag.dy + 43, 300, 1);
+  ctx.font = font(22, true); ctx.fillStyle = HUD.gold;
+  ctx.fillText('出走馬紹介', 64, 36 + tag.dy + 30);
+  ctx.font = font(16, true); ctx.fillStyle = HUD.paper70;
+  ctx.textAlign = 'right'; ctx.fillText(`${entry.order} / ${entry.total}`, 320, 36 + tag.dy + 29); ctx.textAlign = 'left';
+  /** ★下の帯（★枠番・馬名・騎手・単勝・人気） */
+  const band = riseAt(sinceSec, 0.35);
+  ctx.globalAlpha = base * band.alpha;
+  const bx = 56, by = H - 196 + band.dy, bw = W - 112, bh = 132;
+  fillSlant(ctx, bx, by, bw, bh, HUD.glass);
+  drawGoldEdge(ctx as unknown as Ctx2D<unknown>, bx, by, bw * wipeAt(sinceSec, 0.45, 0.6), sinceSec);
+  drawFrameBadge(ctx as unknown as Ctx2D<unknown>, pal, font, entry.frameRole, String(entry.gate), bx + 36, by + 30, 70, 56, 36);
+  ctx.font = font(54, true); ctx.fillStyle = HUD.paper;
+  ctx.fillText(entry.name, bx + 130, by + 74);
+  ctx.font = font(20, true); ctx.fillStyle = HUD.paper70;
+  ctx.fillText(`騎手　${entry.jockey}`, bx + 134, by + 110);
+  /** ★単勝（★金プレート） */
+  drawLabel(ctx as unknown as Ctx2D<unknown>, font, '単勝', bx + bw - 300, by + 46, HUD.paper70);
+  ctx.font = font(46, true);
+  const ow = ctx.measureText(entry.oddsLabel).width;
+  ctx.fillStyle = goldPlate(ctx as unknown as Ctx2D<unknown>, bx + bw - 300, ow, sinceSec) as string;
+  ctx.fillText(entry.oddsLabel, bx + bw - 300, by + 98);
+  /** ★「○番人気」の丸 */
+  const mx = bx + bw - 92, my = by + bh / 2, mr = 58;
+  ctx.fillStyle = HUD.gold; ctx.beginPath(); ctx.ellipse(mx, my, mr, mr, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#12301f'; ctx.beginPath(); ctx.ellipse(mx, my, mr - 6, mr - 6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.textAlign = 'center';
+  ctx.font = font(40, true); ctx.fillStyle = HUD.paper; ctx.fillText(String(entry.popularity), mx, my + 8);
+  ctx.font = font(15, true); ctx.fillStyle = HUD.gold; ctx.fillText('番人気', mx, my + 34);
+  ctx.textAlign = 'left';
+  ctx.globalAlpha = base;
+  /** ★入りと抜け（★0.35 秒の暗転） */
+  const fade = Math.max(0, 1 - sinceSec / 0.35, 1 - (each - sinceSec) / 0.35);
+  if (fade > 0) { ctx.globalAlpha = base * Math.min(1, fade); ctx.fillStyle = '#05080a'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = base; }
+}
+
+/**
+ * ★**格の紹介**（★「GRADE I」→ 大きな「G I」→ 白い閃光）。
+ * ⚠️ ★英字は ★`GRADE_LOOKS` の `roman` を渡すこと（★格の表を 2 か所に持たない）。
+ */
+export function drawGradeIntro<TImage>(
+  ctx: Ctx2D<TImage>, vp: Viewport2D, font: FontOf, grade: { readonly roman: string }, sinceSec: number, durSec: number,
+): void {
+  const W = vp.width, H = vp.height;
+  const u = ctx as unknown as Ctx2D<unknown>;
+  ctx.fillStyle = '#06101c'; ctx.fillRect(0, 0, W, H);
+  const base = ctx.globalAlpha;
+  /** ★放射の光（★ゆっくり回る） */
+  const cx = W / 2, cy = H * 0.46, R = Math.hypot(W, H);
+  for (let i = 0; i < 24; i += 1) {
+    const a = (i / 24) * Math.PI * 2 + sinceSec * 0.25;
+    ctx.globalAlpha = base * (i % 2 === 0 ? 0.1 : 0.05);
+    ctx.fillStyle = HUD.gold;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a - 0.05) * R, cy + Math.sin(a - 0.05) * R);
+    ctx.lineTo(cx + Math.cos(a + 0.05) * R, cy + Math.sin(a + 0.05) * R);
+    ctx.closePath(); ctx.fill();
+  }
+  /** ★「GRADE I」（★左下・最初に出る） */
+  const lead = riseAt(sinceSec, 0);
+  ctx.globalAlpha = base * lead.alpha;
+  ctx.font = font(34, true); ctx.fillStyle = HUD.paper;
+  drawSpacedText(u, `GRADE ${grade.roman}`, 72, H - 88 + lead.dy, 34 * 0.3);
+  /** ★大きな「G I」（★大きく出てから収まる） */
+  const k = Math.max(0, Math.min(1, (sinceSec - 0.45) / 0.5));
+  const e = 1 - Math.pow(1 - k, 3);
+  if (k > 0) {
+    const px = Math.round(260 * (1.6 - 0.6 * e));
+    ctx.globalAlpha = base * e;
+    ctx.font = font(px, true);
+    ctx.textAlign = 'center';
+    const text = `G${grade.roman}`;
+    const tw = ctx.measureText(text).width;
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillText(text, cx + 8, cy + px * 0.36 + 8);
+    ctx.fillStyle = goldPlate(u, cx - tw / 2, tw, sinceSec) as string;
+    ctx.fillText(text, cx, cy + px * 0.36);
+    ctx.textAlign = 'left';
+  }
+  /** ★白い閃光（★最後の 0.35 秒でレース名のカードへ） */
+  const flash = Math.max(0, Math.min(1, (sinceSec - (durSec - 0.35)) / 0.35));
+  if (flash > 0) { ctx.globalAlpha = base * flash * 0.9; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H); }
+  ctx.globalAlpha = base;
 }
 
 export interface RaceIntroMeta {
@@ -149,8 +355,8 @@ export function drawRaceTitleCard<TImage>(
    *   背景は映像のまま、左 44% に暗幕 → 78% へ 0。板 left-40 top150 w820（斜度 -9°・上下辺のみ金ヘアライン）。
    *   レース名 96px 金プレート（0.7s 左からワイプ）／金の下線 5×520／距離 64px＋「m 芝・左」26px／条件 20px／格 12px 金
    */
-  const local = displaySec - RACE_INTRO_FLYOVER_SEC;
-  const fade = Math.min(1, local / 0.35, (RACE_INTRO_TITLE_END_SEC - RACE_INTRO_FLYOVER_SEC - local) / 0.35);
+  const local = displaySec - RACE_INTRO_TITLE_START_SEC;
+  const fade = Math.min(1, local / 0.35, (RACE_INTRO_TITLE_END_SEC - RACE_INTRO_TITLE_START_SEC - local) / 0.35);
   const W = vp.width, H = vp.height;
   if (background !== undefined) {
     const sourceRatio = background.width / background.height;

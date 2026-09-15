@@ -46,6 +46,12 @@ export interface EntryBoardOptions {
   readonly secondsToStart?: number | undefined;
   /** 下帯を描くか（既定 true） */
   readonly band?: boolean | undefined;
+  /**
+   * ★**暗幕と板の濃さ**（★2026-09-15・発走前の全画面の出馬表「背景には競馬場」のため）。
+   *   ★省けば従来（暗幕 0.74・板 0.9）。★全画面の出馬表は薄くして ★背景の競馬場を透かします。
+   */
+  readonly scrimAlpha?: number | undefined;
+  readonly boardAlpha?: number | undefined;
 }
 
 /** 縦組み（1 文字ずつ下へ）。中央揃え。戻り値は描いた高さ */
@@ -77,7 +83,7 @@ export function drawEntryBoard(
 
   // 暗幕（映像を透かす）
   ctx.globalAlpha = baseAlpha * Math.min(1, since / 0.25);
-  ctx.fillStyle = 'rgba(2,5,3,.74)'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = opts.scrimAlpha === undefined ? 'rgba(2,5,3,.74)' : `rgba(2,5,3,${opts.scrimAlpha})`; ctx.fillRect(0, 0, W, H);
   // タブ
   const tab = riseAt(since);
   ctx.globalAlpha = baseAlpha * tab.alpha;
@@ -86,7 +92,7 @@ export function drawEntryBoard(
   const rise = riseAt(since, 0.05);
   ctx.globalAlpha = baseAlpha * rise.alpha;
   const bx = 40, by = 56 + rise.dy, bw = W - 80, bh = 544;
-  ctx.fillStyle = HUD.board; ctx.fillRect(bx, by, bw, bh);
+  ctx.fillStyle = opts.boardAlpha === undefined ? HUD.board : `rgba(6,10,8,${opts.boardAlpha})`; ctx.fillRect(bx, by, bw, bh);
   ctx.strokeStyle = HUD.goldHair; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(bx + 0.5, by + 0.5); ctx.lineTo(bx + bw - 0.5, by + 0.5); ctx.lineTo(bx + bw - 0.5, by + bh - 0.5); ctx.lineTo(bx + 0.5, by + bh - 0.5); ctx.closePath(); ctx.stroke();
   drawGoldEdge(ctx, bx, by, bw, t);

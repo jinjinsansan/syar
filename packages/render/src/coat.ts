@@ -167,5 +167,7 @@ export const DEFORMED_COAT_TRANSFORMS: Readonly<Record<CoatName, CoatTransform>>
 };
 
 export function isDeformedHorseAsset(prefix: string): boolean {
-  return prefix === 'horse-jockey-side-v8' || prefix === 'horse-jockey-diag-front-v4';
+  return prefix === 'horse-jockey-side-v8' || prefix === 'horse-jockey-diag-front-v4'
+    /** ★パドックの歩きのコマ（★2026-09-15・同じデフォルメ馬の絵柄・`tools/publish-walk-frames.mjs`） */
+    || prefix === 'horse-jockey-side-walk-v1' || prefix === 'horse-jockey-side-walk-v1b';
 }

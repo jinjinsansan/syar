@@ -1,0 +1,69 @@
+Repaint frame {POSE} of an 8-frame WALK cycle (paddock walk, four-beat gait) as a DEFORMED (chibi-proportioned) racehorse with jockey, SIDE view facing RIGHT. This set must look like the SAME horse and jockey in every frame, and must play back as one smooth, calm walk.
+
+This is for a PADDOCK introduction scene before the race: the horse walks slowly and calmly, the jockey sits in the saddle. It is NOT a gallop.
+
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- CHARACTER reference (WHO this is — match the face, eye, muzzle, ear, body proportions, leg thickness, hoof shape, mane and tail shape, bridle, saddle, the jockey's face, helmet, goggles, line weight and shading EXACTLY): {TYPE_REF}
+- STYLE AND SCALE reference (the SAME individual type as it appears in the race right now — match its painting style, outline, colours, size in the frame and barrel position; do NOT copy its galloping legs): apps/web/public/art/horse-jockey-side-v8{TYPE_SUFFIX}-pose01.png
+- ANCHOR reference (frame 01 of THIS walk set — the master copy of the individual; body size, barrel depth, neck thickness, leg thickness, head size and the jockey must match THIS, not the previous frame): {ANCHOR_REF}
+- CONSISTENCY reference (previous frame of THIS walk set — keep the same painting style, the same lighting direction and the same scale): {PREV_REF}
+
+  ★★ CRITICAL — HOW TO USE EACH REFERENCE
+  CHARACTER reference decides the DESIGN. Reproduce that character exactly. Do NOT invent a different horse or jockey.
+  STYLE AND SCALE reference decides how big the horse is and where the barrel sits. Do NOT copy its gallop pose.
+  ANCHOR reference decides the INDIVIDUAL AND THE SCALE. Measure every frame against the ANCHOR, never against the previous frame.
+  CONSISTENCY reference keeps the painting style and lighting identical. Do NOT copy its leg positions.
+
+★ THE WALK — THIS FRAME'S LEG PHASE (a four-beat lateral walk: left hind → left fore → right hind → right fore)
+  "near" = the legs on the side facing the viewer (the horse's LEFT side). "far" = the other side (partly hidden).
+  frame 01: near hind leg just landing far forward under the belly; near fore leg vertical, carrying weight; far fore leg lifting behind; far hind leg pushing off far back.
+  frame 02: near hind leg vertical, carrying weight; near fore leg starting to lift off, hoof tipping back; far fore leg swinging forward, low; far hind leg lifting, hoof just off the ground.
+  frame 03: near fore leg swinging forward with the knee bent, hoof a little above the ground; near hind leg angled back; far hind leg swinging forward; far fore leg reaching forward, about to land.
+  frame 04: near fore leg reaching far forward, about to land; near hind leg far back, about to lift; far fore leg landed and vertical; far hind leg swinging forward under the belly.
+  frame 05: far hind leg landing far forward under the belly (mirror of frame 01); far fore leg vertical; near fore leg just landed in front; near hind leg lifting behind.
+  frame 06: far hind leg vertical; near hind leg swinging forward with the hock bent, hoof low; near fore leg vertical carrying weight; far fore leg starting to lift.
+  frame 07: near hind leg swinging forward under the belly; far fore leg swinging forward with the knee bent; near fore leg angled back; far hind leg angled back.
+  frame 08: near hind leg reaching forward, about to land; far fore leg reaching forward, about to land; near fore leg far back, about to lift; far hind leg far back.
+  - At a walk there are ALWAYS two or three hooves on the ground. Never all four in the air.
+  - Small, calm steps: hooves lift only a little. The legs never stretch out like a gallop.
+  - The head and neck nod gently down and up with each step; the tail hangs down and sways slightly. The mane lies on the neck (no wind).
+
+CANVAS AND FRAMING (this decides the finished quality — do not shrink it)
+- One image, ONE frame only, 1536 x 1024 pixels (landscape).
+- The horse fills about 88% of the frame width: nose near the right edge, tail near the left edge, hooves near the bottom, the jockey's helmet near the top.
+- Background: pure saturated green (RGB 0,255,0) everywhere. No gradients, no shadow, no ground line, no dust, no motion blur.
+- Draw at full detail: rich shading on the coat, clean crisp outlines, readable bridle and reins.
+
+ANCHOR (this is what keeps the animation from shaking)
+- The horse's barrel (rib cage and saddle area) must sit at the SAME position and the SAME size in every frame of the set.
+- The jockey's helmet stays at the same height in every frame (it only bobs a tiny bit with the walk).
+- All hooves on the ground in this frame rest on ONE horizontal ground line.
+
+★ JOCKEY POSTURE (the engine recolours the silks inside fixed windows — keep the silks where they are in the race set)
+- The jockey SITS IN THE SADDLE (seat touching the saddle), torso leaning SLIGHTLY forward — about halfway between upright and the racing crouch — hands low near the withers holding the reins, feet in the stirrups.
+- The jacket and helmet must stay roughly over the saddle area, close to where they are in the STYLE AND SCALE reference. Do NOT sit bolt upright and do NOT raise the head high above the horse's head.
+
+DEFORMED PROPORTIONS (this is the design)
+- Short legs, round barrel, larger head, big hooves, big expressive eye — exactly as in the CHARACTER reference.
+
+★ THIS INDIVIDUAL (the horse's own identity — keep it identical in every frame)
+{TYPE}
+  ⚠️ On screen the horse is shown large in this scene, but it must still read as the SAME individual as in the race.
+  The face may look calm and relaxed at the walk (ears soft), but the build, markings, mane and tail are unchanged.
+
+COLOURS AND LATER RECOLOURING (these exact colours matter — the engine keys on them)
+- Horse coat: BAY BROWN with rich light-to-dark shading. The engine finds the coat by hue (8-48 degrees) and saturation (0.18 or higher) and replaces it with one of twelve coat colours, keeping the shading.
+- Mane, tail and lower legs: BLACK, except where THIS INDIVIDUAL specifies white markings.
+- Jockey silks (jacket and sleeves) and helmet: PLAIN SOLID BLUE, hue 200-260 degrees, saturation 0.35 or higher. No pattern, no lettering, no emblem.
+- Breeches white, boots black.
+- Saddle cloth: a plain FLAT WHITE shape under the saddle, no number, no text, no logo, no pattern.
+- The jockey's SKIN keeps a normal, healthy skin tone.
+- Goggles (pushed up on the helmet), gloves, saddle, bridle and reins keep their own colours. Do NOT make them brown or blue.
+
+STYLE
+- Match the CHARACTER reference exactly: same clean dark outline, same soft cel shading, same eye and muzzle design.
+- Hard edges against the green background. No anti-aliasing halo, no glow, no blur.
+- Do not draw any text, numbers, letters, logos, emblems, watermarks or signatures.
+- Do not depict any real, identifiable person, stable, organisation or branded design.
+
+Save the image as a PNG.

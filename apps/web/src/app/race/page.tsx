@@ -60,6 +60,9 @@ import {
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, pixelScaleFromSearch, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
+  // ★発走前の流れ（★2026-09-15・オーナー決定「動画の通り」）
+  RACE_INTRO_FLYOVER_START_SEC, RACE_INTRO_GRADE_END_SEC, RACE_INTRO_ENTRY_END_SEC, RACE_INTRO_GATE_HOLD_SEC,
+  drawPaddockIntro, drawGradeIntro, paddockPicksOf, popularityRanksOf,
   typedCount,
   raceCallAt, raceSurgeGate, RACE_SURGE_WINDOW_SEC,
   withPhasePrefix,
@@ -851,6 +854,13 @@ const STRATEGY_LABELS: Readonly<Record<string, string>> = {
   nige: '逃げ', senko: '先行', sashi: '差し', oikomi: '追い込み',
 };
 const JOCKEY_NAMES = ['田中 守', '佐藤 翼', '山本 誠', '中村 駿', '高橋 蓮', '松本 拓海', '藤田 昇', '小林 亮', '伊藤 健', '吉田 直樹', '岡田 悠', '森川 浩'] as const;
+/**
+ * ★**デモの単勝オッズ**（★馬番順・★2026-09-15・発走前の「人気馬の紹介」と出馬表のため）。
+ * ⚠️ ★**馬名と同じくデモの値**です。★レースの結果・能力から作っていません（★ここで勝率やオッズを計算しない）。
+ *    ★本番はサーバーが発売前に出すオッズ（`race_odds`）を渡します。
+ * ⚠️ ★着順とは無関係です（★人気馬が勝つとは限らない・★ゴールより前に結果を読まない D-098）。
+ */
+const DEMO_WIN_ODDS = [17.5, 3.4, 9.4, 8.6, 23.0, 7.7, 43.9, 2.5, 31.2, 12.8, 55.1, 64.0] as const;
 /** ★固定2D中継の基準幅 */
 
 /**
@@ -2032,6 +2042,8 @@ export default function RacePage(): React.JSX.Element {
     /** ★診断用の素材の素性（★描画には使いません・★`__raceDiag` に出ます） */
     materialDiag: Readonly<Record<string, unknown>>;
     raceTitle: HTMLImageElement;
+    /** ★パドックの背景（★人気馬の紹介・★無ければタイトルの背景を使う） */
+    paddockBg?: HTMLImageElement | undefined;
     raceNarrator: HTMLImageElement;
     /**
      * ★口パク用の立ち絵（4 名 × 表情 3 × 口 2 ＝ 24 枚）。
@@ -2045,6 +2057,8 @@ export default function RacePage(): React.JSX.Element {
     raceCornerRear: HTMLImageElement;
     raceCornerHigh: HTMLImageElement;
     sideHighQuality: readonly (readonly HighQualityHorseFrame[])[];
+    /** ★パドックの歩きのコマ（★人気馬の紹介だけ・★無ければ走りのコマ） */
+    sideWalkHighQuality?: readonly (readonly HighQualityHorseFrame[])[] | undefined;
     diagFrontHighQuality: readonly (readonly HighQualityHorseFrame[])[];
     diagRearHighQuality: readonly (readonly HighQualityHorseFrame[])[];
     highDiagHighQuality: readonly (readonly HighQualityHorseFrame[])[];
@@ -2627,10 +2641,15 @@ export default function RacePage(): React.JSX.Element {
         loadImg(`/art/race-finish-side-v2.png?v=${ASSET_VERSION}`),
         loadImg(`/art/race-corner-rear-v2.png?v=${ASSET_VERSION}`),
         loadImg(`/art/race-corner-high-v2.png?v=${ASSET_VERSION}`),
+        /**
+         * ★**パドックの背景**（★人気馬の紹介・2026-09-15 に Codex で生成・`design/art/prompts/paddock-bg-v1.txt`）。
+         * ⚠️ ★読めなければタイトルの背景に戻します（★画面を壊さない側へ・R-27）。
+         */
+        loadImg(`/art/paddock-bg-v1.webp?v=${ASSET_VERSION}`).catch(() => null),
       ]);
       if (cancelled) return;
       const [raceTitle, raceNarrator, startingGate, raceBackstretch, raceCornerExit, raceFinish,
-        raceCornerRear, raceCornerHigh] = loaded;
+        raceCornerRear, raceCornerHigh, paddockBg] = loaded;
       /**
        * **代替素材を、要るときだけ読む。**
        *   ?? は左が undefined のときしか右を評価しないので、
@@ -3407,6 +3426,19 @@ export default function RacePage(): React.JSX.Element {
       const sideHighQuality = bakedLibs?.['side-v6'] ?? (midsReady
         ? buildFrames(sideCycle, undefined, SILKS_LAYOUT_CROUCH, undefined, undefined, sideMode)
         : buildFramesByType({ a: sideCycle, ...sideByType }, undefined, SILKS_LAYOUT_CROUCH, sideMode));
+      /**
+       * ★**パドックの歩きのコマ**（★人気馬の紹介だけ・2026-09-15・`tools/publish-walk-frames.mjs`）。
+       *   ★原版経路（PC）だけ読みます。★焼いた経路（携帯）は走りのコマのままです。
+       * ⚠️ ★8 コマ揃わなければ読みません（★紹介は走りのコマに戻る）。
+       * ⚠️ ★レースで使っている型（B など）の歩きが無いときも ★**使いません**（★紹介だけ別の馬に見えるので）。
+       * ⚠️ ★勝負服・毛色・配置は ★走りのコマと同じ `buildFramesByType` を通します（★式を 2 つ持たない）。
+       */
+      const walkA = bakedLibs === undefined ? await loadNativeSet('horse-jockey-side-walk-v1') : undefined;
+      const walkB = walkA !== undefined && sideByType.b !== undefined ? await loadNativeSet('horse-jockey-side-walk-v1b') : undefined;
+      const walkUsable = walkA !== undefined && Object.keys(sideByType).every((t) => t === 'b' && walkB !== undefined);
+      const sideWalkHighQuality = walkUsable && walkA !== undefined
+        ? buildFramesByType({ a: walkA, ...(walkB !== undefined ? { b: walkB } : {}) }, undefined, SILKS_LAYOUT_CROUCH, sideMode)
+        : undefined;
       const diagFrontHighQuality = bakedLibs?.['diag-front-v2'] ?? (frontV3 !== undefined
         ? buildFramesByType({ a: frontV3, ...frontByType }, undefined, SILKS_LAYOUT_FRONT, frontMode)
         : buildFrames(await fallbackSet('horse-jockey-diag-front-v2')));
@@ -3483,10 +3515,12 @@ export default function RacePage(): React.JSX.Element {
           },
         },
         pal, raceTitle: raceTitle!, raceNarrator: raceNarrator!, startingGate: startingGate!,
+        ...(paddockBg ? { paddockBg } : {}),
         ...(narratorSets !== undefined ? { narratorSets } : {}),
         raceBackstretch: raceBackstretch!, raceCornerExit: raceCornerExit!, raceFinish: raceFinish!,
         raceCornerRear: raceCornerRear!, raceCornerHigh: raceCornerHigh!,
         sideHighQuality, diagFrontHighQuality, diagRearHighQuality, highDiagHighQuality,
+        ...(sideWalkHighQuality !== undefined ? { sideWalkHighQuality } : {}),
         /**
          * ★勝馬コマは騎手が腕を挙げるぶん外接矩形が縦に長い。矩形高さを基準にすると馬体が 2〜3 割縮むので、
          *   馬体の大きさ（矩形幅の中央値の比）で side-v6 の基準高さに合わせる。
@@ -3597,7 +3631,8 @@ export default function RacePage(): React.JSX.Element {
      *    ★一度も通らないので ★**ファンファーレだけ鳴りませんでした**（★実測）。
      * ⚠️ ★合図は札で 1 回だけ。★毎コマ呼んでも 2 度は鳴りません。
      */
-    if (soundOnRef.current && intro.stage !== 'race') {
+    /** ★人気馬の紹介の間は鳴らさず、★空撮から鳴らす（★発走まで約 14 秒・音源は 16.8 秒・2026-09-15） */
+    if (soundOnRef.current && intro.stage !== 'race' && intro.stage !== 'paddock') {
       audioRef.current?.cue('fanfare', 'intro');
       /** ★格で強さを変える（★G1 は強く・G3 は控えめ・2026-09-15・計画書 R-1）。★毎コマ呼んでよい（`level` の註記） */
       audioRef.current?.level('fanfare', GRADE_LOOK.fanfareGain, 0.05);
@@ -3614,13 +3649,35 @@ export default function RacePage(): React.JSX.Element {
     const conditionLabel: Record<TrackCondition, string> = {
       good: '良', yielding: '稍重', soft: '重', bad: '不良',
     };
+    /**
+     * ★**人気馬の紹介**（★3 番人気 → 1 番人気・★2026-09-15・オーナー決定「動画の通り」）。
+     * ⚠️ ★人気は ★デモのオッズ（`DEMO_WIN_ODDS`）から並べるだけです。★結果・着順・能力を読みません（★D-098）。
+     */
+    if (intro.stage === 'paddock') {
+      const picks = paddockPicksOf(Array.from({ length: FIELD }, (_, i) => ({ gate: i + 1, winOdds: DEMO_WIN_ODDS[i] ?? 99.9 })));
+      const idx = Math.min(picks.length - 1, intro.paddockIndex ?? 0);
+      const pick = picks[idx];
+      if (pick !== undefined) {
+        drawPaddockIntro(ctx, art.pal as Record<string, string>, vp, FONT, {
+          gate: pick.gate, name: HORSE_NAMES[pick.gate - 1] ?? `スター${pick.gate}`,
+          jockey: JOCKEY_NAMES[pick.gate - 1] ?? 'STAR騎手', frameRole: frameRoleOf(pick.gate, FIELD),
+          oddsLabel: pick.winOdds.toFixed(1), popularity: pick.popularity, order: idx + 1, total: picks.length,
+        }, intro.sinceSec,
+        /** ★パドックの背景（★無ければタイトルの背景） */
+        ((bg) => ({ image: bg, width: bg.width, height: bg.height }))(art.paddockBg ?? art.raceTitle),
+        /** ★歩きのコマ（★無ければ走りのコマ） */
+        art.sideWalkHighQuality?.[pick.gate - 1] ?? art.sideHighQuality[pick.gate - 1]);
+      }
+      drawRendererBadge(ctx, renderer, 'paddock');
+      return;
+    }
     if (intro.stage === 'flyover' && renderer === 'v2') {
       /**
        * ★空撮フライオーバー（アーケード参考映像 31 秒）: コースの上を斜めに飛ぶカメラで透視ワールドだけを描く（馬なし）。
        *   時刻 d の関数（決定論）。終わりでタイトルへ暗転で渡す。
        */
       const course = ovalCourse(DIST, { ...COURSE_SPEC, turn });
-      const t = Math.max(0, Math.min(1, d / RACE_INTRO_FLYOVER_SEC));
+      const t = Math.max(0, Math.min(1, (d - RACE_INTRO_FLYOVER_START_SEC) / (RACE_INTRO_FLYOVER_SEC - RACE_INTRO_FLYOVER_START_SEC)));
       const ease = t * t * (3 - 2 * t);
       const eyeS = -140 + ease * 620;                // 発走の手前上空から向正面の上空へ
       const eye = posOf(course, eyeS, -60 + ease * 20);
@@ -3634,6 +3691,47 @@ export default function RacePage(): React.JSX.Element {
       const fade = t < 0.15 ? 1 - t / 0.15 : t > 0.85 ? (t - 0.85) / 0.15 : 0;
       if (fade > 0) { ctx.globalAlpha = fade; ctx.fillStyle = '#05080a'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
       drawRendererBadge(ctx, renderer, 'flyover');
+      return;
+    }
+    /** ★**格の紹介**（★「GRADE I」→「G I」→ 閃光・★英字は `GRADE_LOOKS` から） */
+    if (intro.stage === 'grade') {
+      drawGradeIntro(ctx, vp, FONT, { roman: GRADE_LOOK.roman }, intro.sinceSec, RACE_INTRO_GRADE_END_SEC - RACE_INTRO_FLYOVER_SEC);
+      drawRendererBadge(ctx, renderer, 'grade');
+      return;
+    }
+    /**
+     * ★**出馬表（全画面）**（★背景は競馬場・★2026-09-15・オーナー「出馬表（背景には競馬場）」）。
+     *   ★背景は空撮と同じ透視ワールドを ★スタンド側の低い位置から芝へ流します。★人気は ★デモのオッズから並べるだけ（★D-098）。
+     */
+    if (intro.stage === 'entry') {
+      const course = ovalCourse(DIST, { ...COURSE_SPEC, turn });
+      const t = Math.max(0, Math.min(1, intro.sinceSec / (RACE_INTRO_ENTRY_END_SEC - RACE_INTRO_TITLE_END_SEC)));
+      const ease = t * t * (3 - 2 * t);
+      const baseS = Math.max(0, DIST - 320 + ease * 200);
+      const eye = posOf(course, baseS, -38);
+      const target = posOf(course, baseS + 90, TRACK_WIDTH_M * (0.2 + ease * 0.6));
+      if (renderer === 'v2') {
+        drawTexturedWorld(ctx, course, {
+          eye: { x: eye.x, y: eye.y, z: 10 - ease * 4 },
+          target: { x: target.x, y: target.y, z: 1 },
+          fovY: (40 * Math.PI) / 180, width: W, height: H,
+        }, art.texturedWorld, { pixelScale });
+      } else { ctx.fillStyle = '#0b1210'; ctx.fillRect(0, 0, W, H); }
+      const ranks = popularityRanksOf(Array.from({ length: FIELD }, (_, i) => ({ gate: i + 1, winOdds: DEMO_WIN_ODDS[i] ?? 99.9 })));
+      drawEntryBoard(ctx, art.pal as Record<string, string>, vp, FONT,
+        Array.from({ length: FIELD }, (_, i) => ({
+          gate: i + 1, name: HORSE_NAMES[i] ?? `スター${i + 1}`, jockey: JOCKEY_NAMES[i] ?? 'STAR騎手',
+          oddsLabel: (DEMO_WIN_ODDS[i] ?? 99.9).toFixed(1), popularity: ranks.get(i + 1), isOwn: i + 1 === ownGate,
+        })), {
+          raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo,
+          distanceMeter: DIST, surfaceLabel: surface === 'turf' ? '芝' : 'ダート', turnLabel: turn === 'left' ? '左' : '右',
+          weatherLabel: '晴', conditionLabel: conditionLabel[trackCondition],
+        }, frameRoleOf, {
+          timeSec: d, sinceSec: intro.sinceSec, secondsToStart: RACE_INTRO_RACE_START_SEC - d,
+          /** ★背景の競馬場を透かす（★仮置き・オーナーの目で決める） */
+          scrimAlpha: 0.18, boardAlpha: 0.55,
+        });
+      drawRendererBadge(ctx, renderer, 'entry');
       return;
     }
     if (intro.stage === 'title' || intro.stage === 'flyover') {
@@ -4848,14 +4946,14 @@ export default function RacePage(): React.JSX.Element {
           distanceMeter: DIST, surfaceLabel: surface === 'turf' ? '芝' : 'ダート', turnLabel: turn === 'left' ? '左' : '右',
           weatherLabel: '晴', conditionLabel: conditionLabel[trackCondition],
         }, frameRoleOf, {
-          timeSec: d, sinceSec: d - RACE_INTRO_TITLE_END_SEC, secondsToStart: RACE_INTRO_RACE_START_SEC - d,
+          timeSec: d, sinceSec: d - RACE_INTRO_GATE_HOLD_SEC, secondsToStart: RACE_INTRO_RACE_START_SEC - d,
         });
       drawRendererBadge(ctx, renderer, `${intro.stage}/entry-board`);
       return;
     }
     if (v2StartHold) {
       // ★ゲート待機〜発走直後: 順位 HUD の代わりに発走の中継帯（「ゲートイン完了」→「スタートしました！」）
-      const startLineAt = intro.stage === 'gate-release' ? RACE_INTRO_RACE_START_SEC : RACE_INTRO_TITLE_END_SEC + 0.3;
+      const startLineAt = intro.stage === 'gate-release' ? RACE_INTRO_RACE_START_SEC : RACE_INTRO_GATE_HOLD_SEC + 0.3;
       const startText = intro.stage === 'gate-release' ? 'スタートしました！' : `${FIELD}頭、ゲートイン完了しました`;
       drawStartCallBand(ctx, art.pal as Record<string, string>, vp, FONT, FIELD, intro.stage === 'gate-release',
         // ★口は「文字がまだ増えている間」だけ動かす（喋っている間）
@@ -4868,7 +4966,7 @@ export default function RacePage(): React.JSX.Element {
           secondsToStart: RACE_INTRO_RACE_START_SEC - d,
           narratorName: NARRATOR_NAMES[cast],
           narratorRole: NARRATOR_ROLES[cast],
-          sinceSec: d - RACE_INTRO_TITLE_END_SEC,
+          sinceSec: d - RACE_INTRO_GATE_HOLD_SEC,
         });
       drawRendererBadge(ctx, renderer, `${intro.stage}/${v2ShotId ?? 'v2'}`);
       return;

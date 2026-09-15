@@ -23,6 +23,8 @@ import {
   broadcastV2StartLagM, broadcastV2FinishStyleOf, resolveBroadcastV2Scene,
   climaxDisplayPositions, CLIMAX_LEAD_COUNT, LANE_ALIGNED_FOCUS_DEFAULT,
   finishChaseTable, DEFAULT_RACE_SCRIPT,
+  /** ★発走の表示秒は ★`race-intro.ts` から読む（★2026-09-15 に発走前を伸ばしたとき、★ここの直書き 4.4 だけ残らないように・R-31） */
+  RACE_INTRO_RACE_START_SEC,
 } from '@star/render';
 
 const POOL = JSON.parse(readFileSync('apps/web/src/lib/watch-pool.json', 'utf8'));
@@ -168,8 +170,6 @@ export function buildAuditRace(opts = {}) {
 /* ── ★画面と同じ経路で「表示秒 → 場面」を作る ─────────── */
 
 /** ★`page.tsx` と同じ定数 */
-/** ⚠️ ★`race-intro.ts` の同名定数と同じ値（★2026-09-13 に 7.8 → 4.4 へ短縮・R-31） */
-const RACE_INTRO_RACE_START_SEC = 4.4;
 const RACE_SPEED_MPS = 15.6;
 const HORSE_LENGTH_M = 2.4;
 /**

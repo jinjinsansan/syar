@@ -1,0 +1,28 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with a reference image.
+
+GOAL
+Create ONE background painting for a horse-racing broadcast "paddock introduction" scene (the horses are introduced one by one before the race). A horse will be drawn ON TOP of this background later, walking from left to right across the lower middle of the frame.
+
+REFERENCE FILE (read it and pass it as a STYLE reference to the image generation tool)
+- STYLE reference: apps/web/public/art/race-title-spring-v1.png
+  Match its painting style exactly: the same realistic painted look, the same soft overcast daylight, the same grass texture, the same dark evergreen tree line, the same white-and-green rails, the same muted colour grading.
+  Do NOT copy its composition, its curved race track or its grandstand, and do NOT copy the pink blossom trees.
+
+SCENE
+- A PADDOCK (the parade ring next to a racecourse): an oval walking path of packed light-brown dirt/sand, seen from the side at eye level, running horizontally across the lower half of the frame.
+- The walking path is bordered by a low WHITE rail in the foreground and a low WHITE rail behind it.
+- Neat green grass inside the ring behind the far rail, with a few small trimmed shrubs.
+- In the background: a low roofed viewing terrace / pavilion (simple, modern, unbranded, dark grey roof), a row of dark evergreen trees above it, and a soft overcast sky.
+- Calm, empty, quiet: NO horses, NO people, NO spectators in the foreground. At most a few tiny, blurred silhouettes far away under the roof.
+- The lower middle of the frame (where the walking horse will be placed, roughly the band from 45% to 85% of the height) must be clear: only the walking path and the rails, nothing tall in front.
+
+CAMERA
+- Eye-level side view, horizon slightly above the middle of the frame. Slight depth of field: the far pavilion and trees are a little soft, the near rail is sharp.
+
+SEASON AND LIGHT
+- Season-neutral (no blossoms, no autumn leaves, no snow). Soft overcast daylight from the upper left, gentle shadows.
+
+OUTPUT
+- 1536 x 1024 pixels (landscape), one image, PNG.
+- Do not draw any text, numbers, letters, logos, emblems, signs, banners, advertisements, watermarks or signatures.
+- Do not depict any real, identifiable racecourse, building, organisation or branded design.
