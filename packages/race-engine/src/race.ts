@@ -16,7 +16,7 @@ import {
 import { MARGIN_LABELS, type RaceBalance } from './balance.js';
 import { baseScore, decidePace, deterministicCoefs } from './coefficients.js';
 import { resolveSkills, type SkillContext } from './skills.js';
-import { laneExtraMOnPlan, lanePlanOf } from './lane.js';
+import { DEFAULT_OVAL, laneExtraMOnPlan, lanePlanOf, type LaneRacePlan } from './lane.js';
 import type {
   Pace,
   RaceConditions,
@@ -64,6 +64,42 @@ export interface ResolveRaceParams {
    * 与えられない馬は 1（介入なし）。K-3 が生成する。
    */
   interventionMults?: ReadonlyMap<string, number>;
+  /**
+   * ★**作り済みの距離ロスの下ごしらえ**（★ES 便 ES-6・2026-09-16・回答 `REVIEW_ENGINE_LANE_SPEED_ES5_ANSWER_20260916.md` §2-1）。
+   *   ★オッズのモンテカルロは ★全試行が同じ条件なので、★`lanePlanForRace(conditions)` で試行の前に 1 回作って全試行に渡します。
+   *   ★省けば、いままでどおり中で作ります。★どちらでも結果は 1 ビットも同じです（★同じ関数で同じ値を作るだけ）。
+   * ⚠️ ★渡したときは ★**このレースの条件（`courseShape`・距離・走路の形の値）と一致するかを確かめ、食い違えば投げます**
+   *    （★別のレースの下ごしらえで計算しない・R-27）。★モジュールに覚える仕組みは持ちません（回答 §Q-2）。
+   */
+  lanePlan?: LaneRacePlan | undefined;
+}
+
+/**
+ * ★**このレースの距離ロスの下ごしらえ**（★直線のレースは `undefined`）。
+ *   ★`resolveRace` の中と ★試行の前に作る呼び出し側（`build-race.ts` 等）は ★**この関数だけ**を通します（★作り方を 2 か所に書かない・R-30）。
+ * ⚠️ ★`conditions.course` を渡します（★渡さないと場の違いが消える）。★無いレースは `DEFAULT_OVAL`（★以前と同じ）。
+ */
+export function lanePlanForRace(conditions: RaceConditions): LaneRacePlan | undefined {
+  return conditions.courseShape === 'oval' ? lanePlanOf(conditions.distance, conditions.course) : undefined;
+}
+
+/** ★作り済みの下ごしらえが、このレースの条件と一致しなければ投げる（★ES-6） */
+export function assertLanePlanMatches(plan: LaneRacePlan, conditions: RaceConditions): void {
+  const fail = (why: string): never => {
+    throw new Error(`resolveRace: 距離ロスの下ごしらえがこのレースの条件と食い違っています（${why}）`);
+  };
+  if (conditions.courseShape !== 'oval') fail(`courseShape=${conditions.courseShape} のレースに渡された`);
+  if (plan.distance !== conditions.distance) fail(`距離 ${plan.distance} ≠ ${conditions.distance}`);
+  const want = conditions.course ?? DEFAULT_OVAL;
+  const got = plan.spec;
+  if (got.lapM !== want.lapM || got.homeStretchM !== want.homeStretchM || got.widthM !== want.widthM) {
+    fail(`走路の形 ${JSON.stringify(got)} ≠ ${JSON.stringify(want)}`);
+  }
+  const gr = got.cornerRadiiM;
+  const wr = want.cornerRadiiM;
+  if ((gr === undefined) !== (wr === undefined) || (gr !== undefined && wr !== undefined && gr.some((r, i) => r !== wr[i]))) {
+    fail(`コーナーの半径 ${JSON.stringify(gr)} ≠ ${JSON.stringify(wr)}`);
+  }
 }
 
 /** §8.7 baseTime（I-SPEED-MODEL） */
@@ -115,9 +151,10 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
   /**
    * ★**距離ロスの 1 レースで一定の値**（★区間と `swingScale`・★ES 便 ES-2・2026-09-15）。
    *   ★以前は馬ごと（`laneExtraM` の中）に作り直していました。★値は同じです（`lane-fingerprint.test.ts`）。
-   * ⚠️ ★`conditions.course` を渡します（★渡さないと場の違いが消える）。★無いレースは `DEFAULT_OVAL`（★以前と同じ）。
+   * ★作り済みが渡されたら、★条件と一致するのを確かめて使います（★ES-6）。
    */
-  const lanePlan = conditions.courseShape === 'oval' ? lanePlanOf(conditions.distance, conditions.course) : undefined;
+  if (params.lanePlan !== undefined) assertLanePlanMatches(params.lanePlan, conditions);
+  const lanePlan = params.lanePlan ?? lanePlanForRace(conditions);
 
   const scored = entrants.map((entrant, index) => {
     const skillCtx: SkillContext = {

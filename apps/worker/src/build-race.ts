@@ -7,7 +7,7 @@
  */
 
 import { Rng, deriveRng, type HorseRecord } from '@star/sim-engine';
-import { DEFAULT_RACE_BALANCE, conditionsFromFrozen, resolveRace, type RaceEntrant } from '@star/race-engine';
+import { DEFAULT_RACE_BALANCE, conditionsFromFrozen, lanePlanForRace, resolveRace, type RaceEntrant } from '@star/race-engine';
 import { TICKET_KINDS, placeDepth, type TicketKind } from '@star/betting';
 import { frozenCourseOf, type FrozenCourseRecord } from '@star/scheduler';
 import { generateRace, sortPoolByClass } from '../../cli/src/race-field.js';
@@ -111,6 +111,12 @@ export function buildRace(
     TICKET_KINDS.map((k) => [k, new Map<string, number>()]),
   );
   const rng: Rng = deriveRng(seed, STREAM.ODDS, cycleIndex);
+  /**
+   * ★**距離ロスの下ごしらえは試行の前に 1 回だけ**（★ES 便 ES-6・2026-09-16）。
+   *   ★全試行が同じ `oddsConditions` なので、★試行ごとに作り直していた分（1 回 4〜7µs × 試行数）を省きます。
+   *   ★`resolveRace` は条件と一致するかを確かめてから使います（★結果は作り直す場合と 1 ビットも同じ）。
+   */
+  const lanePlan = lanePlanForRace(oddsConditions);
   for (let t = 0; t < trials; t += 1) {
     const sim = resolveRace({
       // ★凍結した走路の形から作った条件（★確定も同じ関数で作る・pg-store.ts）
@@ -118,6 +124,7 @@ export function buildRace(
       entrants: numbered,
       seed: rng.nextUint32(),
       balance: DEFAULT_RACE_BALANCE,
+      lanePlan,
     });
     const order = sim.order.map((r) => Number(r.horseId.replace(/^H/, '')));
     for (const kind of TICKET_KINDS) {

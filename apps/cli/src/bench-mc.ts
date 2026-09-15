@@ -4,7 +4,7 @@
  *   **全7券種の的中目を数える簿記**も含まれます。本番の MC は両方やります。
  */
 import { NICKS_GEN, deriveRng, VERIFY_PAYOUT_STREAM as S } from '@star/sim-engine';
-import { DEFAULT_RACE_BALANCE, resolveRace, type RaceEntrant, type RaceResult } from '@star/race-engine';
+import { DEFAULT_RACE_BALANCE, lanePlanForRace, resolveRace, type RaceEntrant, type RaceResult } from '@star/race-engine';
 import { TICKET_KINDS, placeDepth, type TicketKind } from '@star/betting';
 import { generateRace, sortPoolByClass } from './race-field.js';
 import { resolveRuntimeConfig } from './config.js';
@@ -25,6 +25,8 @@ const pool = sortPoolByClass(sim.finalPopulation ?? []);
 const race = generateRace(pool, 0, deriveRng(42, S.FIELD, 0));
 const entrants: RaceEntrant[] = race.entrants.map((e, k) => ({ ...e, horseId: `H${k + 1}` }));
 const depth = placeDepth(entrants.length);
+// ★距離ロスの下ごしらえは試行の前に 1 回（ワーカーの build-race.ts と同じ形・ES-6・R-30）
+const lanePlan = lanePlanForRace(race.conditions);
 const orderOf = (r: RaceResult): number[] => r.order.map((x) => Number(x.horseId.replace(/^H/, '')));
 
 function keysOf(kind: TicketKind, order: readonly number[]): string[] {
@@ -49,12 +51,12 @@ console.log(`# オッズ MC の実費用  ${entrants.length}頭立て / 試行 $
 
 // ★暖機。JIT が効く前の値を報告すると遅く出る
 const warm = deriveRng(42, S.ODDS, 0);
-for (let t = 0; t < 20_000; t += 1) resolveRace({ conditions: race.conditions, entrants, seed: warm.nextUint32(), balance: DEFAULT_RACE_BALANCE });
+for (let t = 0; t < 20_000; t += 1) resolveRace({ conditions: race.conditions, entrants, seed: warm.nextUint32(), balance: DEFAULT_RACE_BALANCE, lanePlan });
 
 {
   const rng = deriveRng(42, S.ODDS, 1);
   const t0 = process.hrtime.bigint();
-  for (let t = 0; t < TRIALS; t += 1) resolveRace({ conditions: race.conditions, entrants, seed: rng.nextUint32(), balance: DEFAULT_RACE_BALANCE });
+  for (let t = 0; t < TRIALS; t += 1) resolveRace({ conditions: race.conditions, entrants, seed: rng.nextUint32(), balance: DEFAULT_RACE_BALANCE, lanePlan });
   const ns = Number(process.hrtime.bigint() - t0) / TRIALS;
   console.log(`  resolveRace のみ          ${ns.toFixed(2)} μs/試行`.replace('μs', 'ns'));
   console.log(`                            = ${(ns / 1000).toFixed(2)} μs/試行`);
@@ -64,7 +66,7 @@ for (let t = 0; t < 20_000; t += 1) resolveRace({ conditions: race.conditions, e
   const rng = deriveRng(42, S.ODDS, 2);
   const t0 = process.hrtime.bigint();
   for (let t = 0; t < TRIALS; t += 1) {
-    const order = orderOf(resolveRace({ conditions: race.conditions, entrants, seed: rng.nextUint32(), balance: DEFAULT_RACE_BALANCE }));
+    const order = orderOf(resolveRace({ conditions: race.conditions, entrants, seed: rng.nextUint32(), balance: DEFAULT_RACE_BALANCE, lanePlan }));
     for (const kind of TICKET_KINDS) {
       const m = counts.get(kind)!;
       for (const key of keysOf(kind, order)) m.set(key, (m.get(key) ?? 0) + 1);

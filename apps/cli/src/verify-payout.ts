@@ -43,6 +43,7 @@ import {
 import {
   DEFAULT_RACE_BALANCE,
   conditionsFromFrozen,
+  lanePlanForRace,
   resolveRace,
   type RaceEntrant,
   type RaceResult,
@@ -174,12 +175,15 @@ function runSeed(seed: number): Map<TicketKind, KindStat> {
       TICKET_KINDS.map((k) => [k, new Map<string, number>()]),
     );
     const oddsRng = deriveRng(seed, STREAM.ODDS, raceIndex);
+    // ★距離ロスの下ごしらえは試行の前に 1 回（ワーカーの build-race.ts と同じ形・ES-6・R-30）
+    const lanePlan = lanePlanForRace(conditions);
     for (let t = 0; t < ODDS_TRIALS; t += 1) {
       const sim = resolveRace({
         conditions,
         entrants,
         seed: oddsRng.nextUint32(),
         balance: DEFAULT_RACE_BALANCE,
+        lanePlan,
       });
       const order = orderOf(sim);
       for (const kind of TICKET_KINDS) {
@@ -194,6 +198,7 @@ function runSeed(seed: number): Map<TicketKind, KindStat> {
       entrants,
       seed: deriveRng(seed, STREAM.FINAL, raceIndex).nextUint32(),
       balance: DEFAULT_RACE_BALANCE,
+      lanePlan,
     });
     const finalOrder = orderOf(final);
 

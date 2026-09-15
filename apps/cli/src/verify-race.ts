@@ -22,6 +22,7 @@ import {
   DEFAULT_RACE_BALANCE,
   aiProxyPlan,
   conditionsFromFrozen,
+  lanePlanForRace,
   optimalPlan,
   resolveIntervention,
   resolveRace,
@@ -304,6 +305,8 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     const fieldSize = race.entrants.length;
     // ★人気推定・本番確定・V-8 の差し替えは、すべて凍結した走路の形から作った同じ条件で回す
     const conditions = prod === null ? race.conditions : conditionsFromFrozen(prod.courseFrozen, race.conditions);
+    // ★距離ロスの下ごしらえはレースごとに 1 回（ワーカーの build-race.ts と同じ形・ES-6・R-30）
+    const lanePlan = lanePlanForRace(conditions);
 
     // (1) 人気を推定する（本番とは別系列・§9.2）
     //   タイブレークを含む順位付けは popularity.ts に切り出し、経路テストを掛けている（O-2）
@@ -314,6 +317,7 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
         entrants: race.entrants,
         seed: deriveRng(seed, STREAM.POPULARITY, raceIndex, t).nextUint32() >>> 0,
         balance,
+        lanePlan,
       });
       estimator.addTrial(r.order.map((o) => o.horseId));
     }
@@ -375,6 +379,7 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
       seed: decideSeed,
       balance,
       interventionMults: mults,
+      lanePlan,
     });
     const winner = result.order[0];
     if (winner === undefined) continue;
@@ -404,6 +409,7 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
         seed: decideSeed,
         balance,
         interventionMults: new Map([[own.horseId, optMult]]),
+        lanePlan,
       });
       if (result.order[0]?.horseId === own.horseId) aiWins += 1;
       if (optResult.order[0]?.horseId === own.horseId) optimalWins += 1;

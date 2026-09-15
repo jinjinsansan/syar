@@ -29,7 +29,7 @@
  * 実行: npx tsx apps/cli/src/verify-pmin.ts --races 8 --finals 100000
  */
 import { NICKS_GEN, deriveRng, VERIFY_PAYOUT_STREAM as S } from '@star/sim-engine';
-import { DEFAULT_RACE_BALANCE, resolveRace, type RaceEntrant, type RaceResult } from '@star/race-engine';
+import { DEFAULT_RACE_BALANCE, lanePlanForRace, resolveRace, type RaceEntrant, type RaceResult } from '@star/race-engine';
 import { MARGIN, TICKET_KINDS, placeDepth, type TicketKind } from '@star/betting';
 import { ODDS_MC_TRIALS, buildOddsRows, winningKeys } from '../../worker/src/odds.js';
 import { generateRace, sortPoolByClass } from './race-field.js';
@@ -73,12 +73,14 @@ for (let i = 0; i < RACES; i += 1) {
   const race = generateRace(pool, i, deriveRng(SEED, S.FIELD, i));
   const entrants: RaceEntrant[] = race.entrants.map((e, k) => ({ ...e, horseId: `H${k + 1}` }));
   const depth = placeDepth(entrants.length);
+  // ★距離ロスの下ごしらえはレースごとに 1 回（ワーカーの build-race.ts と同じ形・ES-6・R-30）
+  const lanePlan = lanePlanForRace(race.conditions);
 
   // --- オッズ算出（§9.2: 別系列） ---
   const counts = new Map<TicketKind, Map<string, number>>(TICKET_KINDS.map((k) => [k, new Map()]));
   const oddsRng = deriveRng(SEED, S.ODDS, i);
   for (let t = 0; t < MC; t += 1) {
-    const order = orderOf(resolveRace({ conditions: race.conditions, entrants, seed: oddsRng.nextUint32(), balance: DEFAULT_RACE_BALANCE }));
+    const order = orderOf(resolveRace({ conditions: race.conditions, entrants, seed: oddsRng.nextUint32(), balance: DEFAULT_RACE_BALANCE, lanePlan }));
     for (const kind of TICKET_KINDS) {
       const m = counts.get(kind)!;
       for (const key of winningKeys(kind, order, depth)) m.set(key, (m.get(key) ?? 0) + 1);
@@ -98,7 +100,7 @@ for (let i = 0; i < RACES; i += 1) {
   const beforePayout = new Map(TICKET_KINDS.map((k) => [k, total.get(k)!.payout]));
   const finalRng = deriveRng(SEED, S.FINAL, i);
   for (let t = 0; t < FINALS; t += 1) {
-    const order = orderOf(resolveRace({ conditions: race.conditions, entrants, seed: finalRng.nextUint32(), balance: DEFAULT_RACE_BALANCE }));
+    const order = orderOf(resolveRace({ conditions: race.conditions, entrants, seed: finalRng.nextUint32(), balance: DEFAULT_RACE_BALANCE, lanePlan }));
     for (const kind of TICKET_KINDS) {
       const st = total.get(kind)!;
       const table = oddsOf.get(kind)!;

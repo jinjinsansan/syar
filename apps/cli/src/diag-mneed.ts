@@ -28,7 +28,7 @@
  * 実行: npx tsx apps/cli/src/diag-mneed.ts --seed 42 --races 20
  */
 import { NICKS_GEN, deriveRng } from '@star/sim-engine';
-import { DEFAULT_RACE_BALANCE, resolveRace, type RaceEntrant, type RaceResult } from '@star/race-engine';
+import { DEFAULT_RACE_BALANCE, lanePlanForRace, resolveRace, type RaceEntrant, type RaceResult } from '@star/race-engine';
 import { MARGIN, ODDS_CAP, TICKET_KINDS, debiasedProbability, placeDepth, type TicketKind } from '@star/betting';
 import { generateRace, sortPoolByClass } from './race-field.js';
 import { resolveRuntimeConfig } from './config.js';
@@ -180,8 +180,10 @@ for (let i = 0; i < RACES; i += 1) {
   const depth = placeDepth(entrants.length);
   const counts = new Map<TicketKind, Map<string, number>>(TICKET_KINDS.map((k) => [k, new Map()]));
   const rng = deriveRng(SEED, S.ODDS, i);
+  // ★距離ロスの下ごしらえは試行の前に 1 回（ワーカーの build-race.ts と同じ形・ES-6・R-30）
+  const lanePlan = lanePlanForRace(race.conditions);
   for (let t = 0; t < REF; t += 1) {
-    const order = orderOf(resolveRace({ conditions: race.conditions, entrants, seed: rng.nextUint32(), balance: DEFAULT_RACE_BALANCE }));
+    const order = orderOf(resolveRace({ conditions: race.conditions, entrants, seed: rng.nextUint32(), balance: DEFAULT_RACE_BALANCE, lanePlan }));
     for (const kind of TICKET_KINDS) {
       const m = counts.get(kind)!;
       for (const key of keysOf(kind, order, depth)) m.set(key, (m.get(key) ?? 0) + 1);

@@ -50,6 +50,17 @@ describe('★距離ロスの区間を作る回数（ES-4）', () => {
     }
   });
 
+  it('★作り済みの下ごしらえを渡すと、何回呼んでも lanePlanOf は増えない（ES-6）', () => {
+    const conditions = cond(1600, 'oval', DEFAULT_OVAL);
+    const plan = lane.lanePlanOf(1600, DEFAULT_OVAL);
+    vi.mocked(lane.lanePlanOf).mockClear(); vi.mocked(lane.laneExtraM).mockClear();
+    for (let t = 0; t < 50; t += 1) {
+      resolveRace({ conditions, entrants: fingerprintField(18), seed: 4242 + t, balance: DEFAULT_RACE_BALANCE, lanePlan: plan });
+    }
+    expect(vi.mocked(lane.lanePlanOf).mock.calls.length).toBe(0);
+    expect(vi.mocked(lane.laneExtraM).mock.calls.length).toBe(0);
+  });
+
   it('★直線のレースは距離ロスの区間を作らない（対照）', () => {
     resolveRace({ conditions: cond(1200, 'straight'), entrants: fingerprintField(18), seed: 4242, balance: DEFAULT_RACE_BALANCE });
     expect(vi.mocked(lane.lanePlanOf).mock.calls.length).toBe(0);
