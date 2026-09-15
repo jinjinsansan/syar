@@ -385,7 +385,7 @@ function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, st
 }
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 /** ★素材を足したら必ず上げる。★`manifest.json` の中身を変えたときも（古いものがキャッシュされる） */
-const ASSET_VERSION = '70';
+const ASSET_VERSION = '71';
 /**
  * ★コマごとの持ち上げ量。**単位は「基準画布（高さ 1536px）での px」**。
  *
@@ -2940,11 +2940,14 @@ export default function RacePage(): React.JSX.Element {
        * ⚠️ ★診断はここから出します。★もう一度計算し直すと、★組んだ物と診断がずれます。
        */
       const builtPlacementByRole = new Map<string, HorsePlacementMode>();
+      /** ★読めた目録（★歩きの役を後で別に読むため・★`loadBakedLibraries` が埋めます） */
+      let bakedManifest: BakedManifest | undefined;
       const loadBakedLibraries = async (): Promise<Partial<Record<string, readonly (readonly HighQualityHorseFrame[])[]>> | undefined> => {
         const manifest = await fetch(`/art/baked/manifest.json?v=${ASSET_VERSION}`)
           .then((r) => (r.ok ? r.json() as Promise<BakedManifest> : null))
           .catch(() => null);
         if (manifest === null) return undefined;
+        bakedManifest = manifest;
         /** ★この出走頭数で実際に要る毛色だけ読みます（★12 頭なら 7 色のうち 5 色） */
         const needed = [...new Set(silksByGate.map((_, index) => coatOf(index + 1)))];
         /**
@@ -3433,10 +3436,35 @@ export default function RacePage(): React.JSX.Element {
        * ⚠️ ★レースで使っている型（B など）の歩きが無いときも ★**使いません**（★紹介だけ別の馬に見えるので）。
        * ⚠️ ★勝負服・毛色・配置は ★走りのコマと同じ `buildFramesByType` を通します（★式を 2 つ持たない）。
        */
+      /**
+       * ★**携帯（焼いた経路）の歩きのコマ**（★2026-09-15・オーナー「携帯向けもお願いします」）。
+       *   ★目録の役 `side-walk`（`tools/bake-race-frames.mjs --only side-walk`）を読みます。
+       * ⚠️ ★読む毛色は ★**紹介に出る 3 頭の毛色と鹿毛だけ**（★1 枚 約 15MB 復号後・★携帯の記憶量）。
+       *    ★他の枠は鹿毛で組まれますが ★紹介に出ないので描かれません。
+       * ⚠️ ★読めなくても ★**他の役を巻き込みません**（★紹介は走りのコマに戻る・★R-27 の「欠けたら全部落ちる」は歩きに掛けない）。
+       * ⚠️ ★型 A 以外の枠があるときは使いません（★原版経路と同じ規則・★紹介だけ別の馬に見えるので）。
+       */
+      const bakedWalk = bakedLibs === undefined || HORSE_TYPES_IN_USE.some((t) => t !== 'a') ? undefined : await (async () => {
+        const set = bakedManifest?.sets.find((entry) => entry.role === 'side-walk');
+        if (set === undefined) return undefined;
+        const picks = paddockPicksOf(Array.from({ length: FIELD }, (_, i) => ({ gate: i + 1, winOdds: DEMO_WIN_ODDS[i] ?? 99.9 })));
+        const coats = [...new Set(['bay', ...picks.map((p) => coatOf(p.gate) as string)])];
+        const pairs = await Promise.all(coats.map(async (coat) => {
+          const file = set.coats[coat];
+          if (file === undefined) return null;
+          const image = await loadImg(`/art/baked/${file}?v=${ASSET_VERSION}`).catch(() => null);
+          return image === null ? null : [coat, image] as const;
+        }));
+        const ok = pairs.filter((e): e is readonly [string, HTMLImageElement] => e !== null);
+        if (ok.length !== coats.length) return undefined;
+        const shadow = set.shadow === undefined ? null
+          : await loadImg(`/art/baked/${set.shadow}?v=${ASSET_VERSION}`).catch(() => null);
+        return buildFramesFromBaked(set, new Map(ok), SILKS_LAYOUT_CROUCH, undefined, shadow ?? undefined);
+      })();
       const walkA = bakedLibs === undefined ? await loadNativeSet('horse-jockey-side-walk-v1') : undefined;
       const walkB = walkA !== undefined && sideByType.b !== undefined ? await loadNativeSet('horse-jockey-side-walk-v1b') : undefined;
       const walkUsable = walkA !== undefined && Object.keys(sideByType).every((t) => t === 'b' && walkB !== undefined);
-      const sideWalkHighQuality = walkUsable && walkA !== undefined
+      const sideWalkHighQuality = bakedWalk !== undefined && bakedWalk.length > 0 ? bakedWalk : walkUsable && walkA !== undefined
         ? buildFramesByType({ a: walkA, ...(walkB !== undefined ? { b: walkB } : {}) }, undefined, SILKS_LAYOUT_CROUCH, sideMode)
         : undefined;
       const diagFrontHighQuality = bakedLibs?.['diag-front-v2'] ?? (frontV3 !== undefined

@@ -31,7 +31,7 @@
  *
  * 実行: npx tsx tools/bake-race-frames.mjs [--target 560] [--out apps/web/public/art/baked]
  */
-import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { applyCoat, isHorseCoat, COAT_TRANSFORMS, DEFORMED_COAT_TRANSFORMS, isDeformedHorseAsset } from '@star/render';
@@ -91,7 +91,26 @@ const SETS = [
   { role: 'high-diag-v2', layout: 'rear', prefix: pickSet('horse-jockey-high-diag-v4', 'horse-jockey-high-diag-v3', 'horse-jockey-high-diag-v2') },
   { role: 'winner-rear', layout: 'rear', prefix: pickSet('horse-jockey-winner-rear-v1') },
   { role: 'winner-cycle', layout: 'winner', prefix: pickSet('horse-jockey-winner-v2') },
+  /**
+   * ★**パドックの歩き**（★発走前の人気馬の紹介だけ・2026-09-15・オーナー「携帯向けもお願いします」）。
+   *   ★原版は `tools/publish-walk-frames.mjs` が `/art/` に置きます。★型 A だけ（★型 B は四肢が白いので出さない）。
+   * ⚠️ ★画面は ★この役が無くても動きます（★紹介は走りのコマに戻る・★他の役のように「欠けたら全部落ちる」にしない）。
+   */
+  { role: 'side-walk', layout: 'crouch', prefix: pickSet('horse-jockey-side-walk-v1') },
 ];
+
+/**
+ * ★**1 つの役だけ焼き足す口**（`--only <role>`・★2026-09-15）。
+ *   ★この道具は `baked/` を ★**消してから全部焼き直します**。★既に配っている役（★64MB）を
+ *   ★歩きを足すためだけに作り直すと、★焼いた日が違う素材が混ざり ★差分も読めません。
+ *   ★`--only` のときは ★消さず、★目録のその役だけを差し替えます（★他の役の行はそのまま）。
+ */
+const ONLY = arg('only', undefined);
+const SETS_TO_BAKE = ONLY === undefined ? SETS : SETS.filter((s) => s.role === ONLY);
+if (ONLY !== undefined && SETS_TO_BAKE.length === 0) {
+  console.error(`★--only ${ONLY}: その役はありません（${SETS.map((s) => s.role).join(' / ')}）`);
+  process.exit(2);
+}
 
 /** ★鞍布の窓（`page.tsx` の `SILKS_LAYOUT_*.saddlecloth`）。★基準点を探すためだけに使います */
 const SADDLE_WINDOW = {
@@ -167,16 +186,25 @@ function coated({ data, w, h }, coat, prefix) {
 
 const COATS = Object.keys(COAT_TRANSFORMS);
 
-if (existsSync(OUT)) rmSync(OUT, { recursive: true });
+if (ONLY === undefined && existsSync(OUT)) rmSync(OUT, { recursive: true });
 mkdirSync(OUT, { recursive: true });
 
 console.log(`★焼き出し先 ${OUT} ／ ★目標の馬高 ${TARGET}px ／ ★毛色 ${COATS.length} 色`);
 console.log('  役割            素材                          原版の馬高  倍率   タイル      枚');
 
 const manifest = { targetHorsePx: TARGET, coats: COATS, sets: [] };
+/** ★`--only` は ★既存の目録を読み、★その役の行だけ外してから焼き足す */
+if (ONLY !== undefined && existsSync(join(OUT, 'manifest.json'))) {
+  const old = JSON.parse(readFileSync(join(OUT, 'manifest.json'), 'utf8'));
+  if (old.targetHorsePx !== TARGET || JSON.stringify(old.coats) !== JSON.stringify(COATS)) {
+    console.error(`★既存の目録と目標 px・毛色が違います（目録 ${old.targetHorsePx}px ${old.coats} ／ 今 ${TARGET}px ${COATS}）。★--only で混ぜられません`);
+    process.exit(2);
+  }
+  manifest.sets = old.sets.filter((s) => s.role !== ONLY);
+}
 let totalBytes = 0;
 
-for (const set of SETS) {
+for (const set of SETS_TO_BAKE) {
   if (set.prefix === undefined) { console.log(`  ★★${set.role}: 素材が 8 枚揃っていません`); process.exitCode = 1; continue; }
   const files = Array.from({ length: FRAMES }, (_, i) => `${ART}/${set.prefix}-pose${p2(i)}.png`);
   const natives = [];
@@ -315,5 +343,6 @@ for (const set of SETS) {
 }
 
 writeFileSync(join(OUT, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-console.log(`\n★書き出し ${(totalBytes / 1048576).toFixed(1)}MB（★可逆 WebP ${manifest.sets.length * COATS.length} 枚 ＋ ★影 ${manifest.sets.length} 枚 ＋ manifest.json）`);
+/** ★枚数は ★**この回に焼いた役**で数えます（★`--only` のとき目録の全役で数えると、焼いていない分まで出る） */
+console.log(`\n★書き出し ${(totalBytes / 1048576).toFixed(1)}MB（★可逆 WebP ${SETS_TO_BAKE.length * COATS.length} 枚 ＋ ★影 ${SETS_TO_BAKE.length} 枚 ＋ manifest.json${ONLY === undefined ? '' : `・★${ONLY} だけ差し替え`}）`);
 console.log('⚠️ ★これは原版から作った写しです。★原版は 1 枚も変えていません。');

@@ -42,6 +42,12 @@ describe('★発走前の流れの配線', () => {
     expect(stageBlock('paddock')).toContain('art.sideWalkHighQuality?.[pick.gate - 1] ?? art.sideHighQuality[pick.gate - 1]');
     expect(page).toContain("loadNativeSet('horse-jockey-side-walk-v1')");
     expect(page).toMatch(/buildFramesByType\(\{ a: walkA, /);
+    /** ★携帯（焼いた経路）の歩き: ★目録の役 `side-walk` を読み、★走りと同じ `buildFramesFromBaked` を通す */
+    expect(page).toContain("entry.role === 'side-walk'");
+    expect(page).toMatch(/return buildFramesFromBaked\(set, new Map\(ok\), SILKS_LAYOUT_CROUCH/);
+    expect(page).toContain('const sideWalkHighQuality = bakedWalk !== undefined && bakedWalk.length > 0 ? bakedWalk :');
+    const bake = readFileSync(path.resolve(__dirname, '../../../tools/bake-race-frames.mjs'), 'utf8');
+    expect(bake).toContain("{ role: 'side-walk', layout: 'crouch', prefix: pickSet('horse-jockey-side-walk-v1') }");
     expect(stageBlock('entry')).toContain('popularityRanksOf(');
     expect(stageBlock('entry')).toContain('DEMO_WIN_ODDS[i]');
     /** ★全画面の出馬表は背景の競馬場を透かす（★オーナー「背景には競馬場」） */

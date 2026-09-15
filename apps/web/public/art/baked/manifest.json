@@ -1361,6 +1361,175 @@
         "grey": "winner-cycle-grey.webp"
       },
       "shadow": "winner-cycle-shadow.webp"
+    },
+    {
+      "role": "side-walk",
+      "prefix": "horse-jockey-side-walk-v1",
+      "layout": "crouch",
+      "scale": 0.5900948366701791,
+      "nativeReferenceHeight": 949,
+      "referenceHeight": 560,
+      "nativeCanvasHeight": 1024,
+      "atlas": {
+        "width": 6518,
+        "height": 560
+      },
+      "frames": [
+        {
+          "x": 0,
+          "y": 0,
+          "w": 813,
+          "h": 558,
+          "anchor": {
+            "x": 358.7776606954689,
+            "y": 251.08535300316123,
+            "width": 179.97892518440463
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 101,
+            "y": 23,
+            "width": 1378,
+            "height": 946
+          }
+        },
+        {
+          "x": 813,
+          "y": 0,
+          "w": 816,
+          "h": 559,
+          "anchor": {
+            "x": 360.84299262381455,
+            "y": 252.26554267650158,
+            "width": 180.5690200210748
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 99,
+            "y": 21,
+            "width": 1382,
+            "height": 948
+          }
+        },
+        {
+          "x": 1629,
+          "y": 0,
+          "w": 808,
+          "h": 554,
+          "anchor": {
+            "x": 357.59747102212856,
+            "y": 249.90516332982088,
+            "width": 179.97892518440463
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 105,
+            "y": 24,
+            "width": 1370,
+            "height": 938
+          }
+        },
+        {
+          "x": 2437,
+          "y": 0,
+          "w": 815,
+          "h": 554,
+          "anchor": {
+            "x": 363.20337197049525,
+            "y": 249.6101159114858,
+            "width": 179.38883034773446
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 98,
+            "y": 24,
+            "width": 1381,
+            "height": 938
+          }
+        },
+        {
+          "x": 3252,
+          "y": 0,
+          "w": 814,
+          "h": 554,
+          "anchor": {
+            "x": 363.49841938883037,
+            "y": 249.31506849315068,
+            "width": 178.79873551106428
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 98,
+            "y": 25,
+            "width": 1380,
+            "height": 938
+          }
+        },
+        {
+          "x": 4066,
+          "y": 0,
+          "w": 820,
+          "h": 560,
+          "anchor": {
+            "x": 363.49841938883037,
+            "y": 252.26554267650158,
+            "width": 181.159114857745
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 95,
+            "y": 21,
+            "width": 1389,
+            "height": 949
+          }
+        },
+        {
+          "x": 4886,
+          "y": 0,
+          "w": 814,
+          "h": 558,
+          "anchor": {
+            "x": 361.1380400421496,
+            "y": 251.38040042149632,
+            "width": 179.97892518440463
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 100,
+            "y": 22,
+            "width": 1380,
+            "height": 945
+          }
+        },
+        {
+          "x": 5700,
+          "y": 0,
+          "w": 818,
+          "h": 555,
+          "anchor": {
+            "x": 367.33403582718654,
+            "y": 249.90516332982088,
+            "width": 179.38883034773446
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 93,
+            "y": 23,
+            "width": 1386,
+            "height": 940
+          }
+        }
+      ],
+      "coats": {
+        "bay": "side-walk-bay.webp",
+        "chestnut": "side-walk-chestnut.webp",
+        "liver-chestnut": "side-walk-liver-chestnut.webp",
+        "dark-bay": "side-walk-dark-bay.webp",
+        "seal-brown": "side-walk-seal-brown.webp",
+        "blue-black": "side-walk-blue-black.webp",
+        "grey": "side-walk-grey.webp"
+      },
+      "shadow": "side-walk-shadow.webp"
     }
   ]
 }
