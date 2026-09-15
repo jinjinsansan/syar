@@ -15,6 +15,7 @@
 import type { AbilityKey, HorseRecord, Rng, Strategy } from '@star/sim-engine';
 import { ABILITY_KEYS, STRATEGIES } from '@star/sim-engine';
 import type {
+  CourseShape,
   RaceConditions,
   RaceEntrant,
   Surface,
@@ -314,7 +315,11 @@ export interface GenerateRaceOptions {
    *   ⚠️ 馬場状態（`trackCondition`）は §10.4 の分布からここで引きます。
    *      番組表は馬場状態を決めません。
    */
-  readonly programme?: { readonly surface: 'turf' | 'dirt'; readonly distance: number };
+  /**
+   * ⚠️ ★`courseShape` は**凍結した走路の形**の値（★2026-09-15・指示書 VW-1）。
+   *    ★渡すと、下の「1400m 以下の 20% を直線」は**引いてから捨てます**（★乱数の並びをずらさない）。
+   */
+  readonly programme?: { readonly surface: 'turf' | 'dirt'; readonly distance: number; readonly courseShape: CourseShape };
   /**
    * ★その馬の**現在能力**（Q-P3-29 の是正）。`undefined` を返した馬は
    *   従来どおり `potential × PLACEHOLDER_UNLOCK` を使います。
@@ -484,6 +489,19 @@ export function generateRace(
   const classLevel =
     pool.length <= bandSize ? 0.5 : bandStart / (pool.length - bandSize);
 
+  /**
+   * ★**直線コースの抽選は、本番の経路（`programme` あり）では引いてから捨てます**（★2026-09-15・指示書 VW-1）。
+   *
+   * 【何が起きていたか】
+   *   ★オッズのモンテカルロはこの値で 1400m 以下の 20% を直線として計算し、
+   *   ★確定（`pg-store.ts`）は `'oval'` を直書きしていました（★直線は距離ロス 0・枠の係数 1.0）。
+   *   → ★本番の形は**凍結した走路の形**（`programme.courseShape`）の 1 か所から来ます。
+   *
+   * ★引く条件（`distance <= 1400`）も引く位置も変えていません。★`programme` を渡さない
+   *   ★検証ハーネスの経路（V-4〜V-6 の旧来の測り方）は **1 ビットも変わりません**。
+   */
+  const drawnStraight = distance <= 1400 && rng.bool(0.2);
+
   return {
     classLevel,
     conditions: {
@@ -491,7 +509,7 @@ export function generateRace(
       distance,
       surface,
       trackCondition,
-      courseShape: distance <= 1400 && rng.bool(0.2) ? 'straight' : 'oval',
+      courseShape: opts.programme === undefined ? (drawnStraight ? 'straight' : 'oval') : opts.programme.courseShape,
       baseWeightKg: 55,
     },
     entrants,

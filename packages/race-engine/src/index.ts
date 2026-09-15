@@ -16,3 +16,4 @@ export * from './intervention.js';
 export * from './replay.js';
 export * from './watch.js';
 export * from './lane.js';
+export * from './course-frozen.js';

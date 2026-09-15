@@ -16,7 +16,10 @@ import type pg from 'pg';
 // ★副作用の import。読み込んだ時点で int8 の型変換が有効になります。
 //   `pg-store` は SQL を出す唯一の層なので、ここを通れば必ず設定済みです。
 import { assertPgTypesConfigured } from './pg-types.js';
-import type { RaceEntrant } from '@star/race-engine';
+import {
+  InvalidFrozenCourseError, conditionsFromFrozen, parseFrozenCourse,
+  type FrozenCourse, type RaceConditions, type RaceEntrant,
+} from '@star/race-engine';
 import { awardPrizes } from './prize-award.js';
 import { settlePayouts } from './payout.js';
 import { settleRace as settleRaceFair } from './settle.js';
@@ -59,14 +62,39 @@ export function toCycleIndexes(rows: readonly { cycle_index: number | string }[]
   });
 }
 
+/** ★走路の凍結が無いレースを確定したときの通報（★2026-09-15・指示書 VW §5-2） */
+export interface CourseNotFrozenAlert {
+  readonly cycleIndex: number;
+  /** ★この store を作ってからの累計 */
+  readonly count: number;
+}
+
+export interface PgStoreOptions {
+  /**
+   * ★`course_frozen` が null のレース（`0023` より前に生成）を `DEFAULT_OVAL` で確定したときに呼ぶ。
+   *   ★省くと `console.warn` に出します（★黙って落とさない・D-055 と同じ形・R-27）。
+   */
+  readonly onCourseNotFrozen?: (a: CourseNotFrozenAlert) => void;
+}
+
+const warnCourseNotFrozen = (a: CourseNotFrozenAlert): void => {
+  console.warn(
+    `[worker] ★走路の凍結が無いレースを DEFAULT_OVAL・'oval' で確定しました cycle=${a.cycleIndex} `
+      + `（累計 ${a.count} 件・0023 より前に生成されたレース）`,
+  );
+};
+
 export function createPgStore(
   client: pg.Client | pg.PoolClient,
   hash: { sha256(m: string): string; hmacSha256(k: string, m: string): string },
+  opts: PgStoreOptions = {},
 ): CycleStore {
   // ★import しただけで効くが、**効いていることを確かめる**。
   //   副作用の import は書き忘れると静かに無効になります
   //   （`cancelRace` が呼ばれていなかったのと同じ穴をここで作らない）
   assertPgTypesConfigured();
+  const onCourseNotFrozen = opts.onCourseNotFrozen ?? warnCourseNotFrozen;
+  let courseNotFrozenCount = 0;
   return {
     async serverNowMs(): Promise<number> {
       // ★ゲーム内時刻の真実は Postgres の now() のみ（§14）
@@ -112,9 +140,11 @@ export function createPgStore(
       //   確認だけに頼ると「確認 → 割り込み → 挿入」で二重になります。
       const ins = await client.query(
         `insert into races (cycle_index, name, class_rank, grade, surface, distance,
-                            track_condition, course_id, scheduled_at, seed_commit, server_seed, purse, status)
+                            track_condition, course_id, scheduled_at, seed_commit, server_seed, purse, status,
+                            course_frozen)
          values ($1, $2, $3, $4, $8, $9, $12, $10,
-                 to_timestamp($5 / 1000.0), $6, $7, $11, 'scheduled')
+                 to_timestamp($5 / 1000.0), $6, $7, $11, 'scheduled',
+                 $13::jsonb)
          on conflict (cycle_index) do nothing`,
         [
           spec.cycleIndex,
@@ -138,6 +168,11 @@ export function createPgStore(
            *     `heavy_aptitude` が一度も効いていません**（P-1 で genotype に足した形質）。
            */
           spec.conditions.trackCondition,
+          /**
+           * ★**オッズを計算した走路の形を、同じトランザクションで凍結する**（★2026-09-15・`0023`・指示書 VW §5-2）。
+           *   ★`buildRace` がモンテカルロに渡したオブジェクトそのもの。★ここで組み直さないこと。
+           */
+          JSON.stringify(spec.conditions.courseFrozen),
         ],
       );
         // ★挿入されなかった＝他プロセスが先に作った。何もせず抜ける（重複させない）
@@ -267,11 +302,13 @@ export function createPgStore(
           id: string; server_seed: string; distance: number;
           surface: string; track_condition: string; course_id: string;
           class_rank: number; grade: string | null;
+          /** ★`jsonb` なので `pg` はオブジェクトで返す（null は 0023 より前のレース） */
+          course_frozen: unknown;
         }>(
           `update races set status = 'settled', seed_reveal = server_seed
             where cycle_index = $1 and status = 'scheduled'
             returning id, server_seed, distance, surface, track_condition, course_id,
-                      class_rank, grade`,
+                      class_rank, grade, course_frozen`,
           [cycleIndex],
         );
         if (race.rowCount === 0) {
@@ -333,16 +370,45 @@ export function createPgStore(
           // ★着順の同定は馬番で行う（凍結側は元の馬の UUID を持っている）
           horseId: String(row['gate']),
         }));
+        /**
+         * ★**走路の形は凍結を読みます**（★2026-09-15・`0023`・指示書 VW §5-2）。
+         *
+         * 【何が起きていたか】
+         *   ★ここは `courseShape: 'oval'` を**直書き**し、★`course` を渡していませんでした（`DEFAULT_OVAL`）。
+         *   ★オッズ側は 1400m 以下の 20% を直線で計算していたので、★その分は**別の模型で着順を出して**いました。
+         *
+         * ★条件はオッズと**同じ関数**（`conditionsFromFrozen`）で作ります。
+         * ★`course_frozen` が null（0023 より前）… ★実際に `DEFAULT_OVAL`・`'oval'` で確定されてきた形で確定し、
+         *   ★**件数を通報します**（★黙って落とさない）。
+         * ★凍結があるのに不正 … ★確定せず `InvalidFrozenCourseError` を投げ、★開催中止・返還の経路へ。
+         */
+        const frozenRaw = r.course_frozen;
+        let conditions: RaceConditions;
+        try {
+          let frozen: FrozenCourse | null = null;
+          if (frozenRaw !== null && frozenRaw !== undefined) {
+            frozen = parseFrozenCourse(frozenRaw);
+            // ★凍結と course_id が別の場を指していたら、どちらが正しいか決まらない
+            if (frozen.venueId !== r.course_id) {
+              throw new InvalidFrozenCourseError(`venueId=${frozen.venueId} が course_id=${r.course_id} と食い違います`);
+            }
+          }
+          conditions = conditionsFromFrozen(frozen, {
+            raceId: r.id,
+            distance: r.distance,
+            surface: r.surface as 'turf' | 'dirt',
+            trackCondition: r.track_condition as 'good' | 'yielding' | 'soft' | 'bad',
+          });
+        } catch (e) {
+          if (e instanceof InvalidFrozenCourseError) {
+            await client.query('rollback');
+            throw new InvalidFrozenCourseError(`cycle=${cycleIndex}: ${e.why}`);
+          }
+          throw e;
+        }
         const res = settleRaceFair(
           {
-            conditions: {
-              raceId: r.id,
-              distance: r.distance,
-              surface: r.surface as RaceEntrant['surfaceAptitude'] extends never ? never : 'turf' | 'dirt',
-              trackCondition: r.track_condition as 'good' | 'yielding' | 'soft' | 'bad',
-              courseShape: 'oval',
-              baseWeightKg: 55,
-            },
+            conditions,
             entrants,
             serverSeed: r.server_seed,
           },
@@ -368,6 +434,11 @@ export function createPgStore(
         await settlePayouts(client, r.id, finished);
 
         await client.query('commit');
+        // ★確定が成立してから数える（★途中で落ちたレースを数えない）
+        if (frozenRaw === null || frozenRaw === undefined) {
+          courseNotFrozenCount += 1;
+          onCourseNotFrozen({ cycleIndex, count: courseNotFrozenCount });
+        }
       } catch (e) {
         await client.query('rollback');
         throw e;

@@ -11,8 +11,8 @@
  *   → ★**回さなかった日から静かに外れるゲートを置かない。**
  *
  * 【★軽い版であること】
- *   ⚠️ ★重い版（★44 通り × 2000 レース）は分単位なので、そのままは載りません。
- *   ★**`tools/verify-v18.mjs` に残します**（★判定はそちら）。★ここは既定の走路 × 4 距離です。
+ *   ⚠️ ★重い版（★本番の 70 組 × 2000 レース）は分単位なので、そのままは載りません。
+ *   ★**`tools/verify-v18.mjs` に残します**（★判定はそちら）。
  *
  *   ★本数の決め方（`tools/_v18light.mjs` / `_v18light2.mjs` で実測）:
  *
@@ -33,8 +33,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import { LANE_MODEL_LEGACY } from '@star/race-engine';
+import { VENUES, frozenCourseOf, type FrozenCourseRecord } from '@star/scheduler';
 // @ts-expect-error -- .mjs の素の JS を読む（型定義は置いていない・`exposure-registry.test.ts` と同じ作法）
-import { measureV18, loadV18Pool, V18_BAND } from '../../../tools/lib/v18.mjs';
+import { measureV18, gateBiasV18, loadV18Pool, productionV18Combos, V18_BAND } from '../../../tools/lib/v18.mjs';
 
 interface V18Row {
   readonly rho: number;
@@ -64,6 +65,7 @@ describe('★V-18 — 枠順が結果を決めないこと・ただし距離ロ�
     expect(V18_BAND.rhoMax).toBe(0.10);
     expect(V18_BAND.lengthsMin).toBe(4);
     expect(V18_BAND.lengthsMax).toBe(12);
+    expect(V18_BAND.gateBiasMax).toBe(1);
   });
 
   it('★★① 枠順と着順の順位相関が許容の内側（枠で決まるゲームにしない）', () => {
@@ -100,14 +102,83 @@ describe('★V-18 — 枠順が結果を決めないこと・ただし距離ロ�
     // ★本番がその帯に居ないこと（★両方が同じ値なら対照になっていない）
     expect(measure(1600).lengths).toBeLessThan(10);
   });
+});
+
+/**
+ * ★**本番の番組の競馬場で V-18 を CI に置く**（★2026-09-15・指示書 VW §7-1・R-32 / R-33）
+ *
+ * ⚠️ ★本番の番組は 1 週で **10 場 × 7 距離 = 70 組**を回します（`productionV18Combos`）。
+ *    ★70 組 × 600 レースは CI に載らない（★1 組 2〜6 秒）ので、★**組の選び方を場の軸で決めます**:
+ *
+ *   ★ア **月見丘・白砂**（`venues.ts` の註記「天井まで 0.8〜1.1 馬身」— ★走路の形を触る便は最初に測る 2 場）
+ *        ★… 本番の**最短（1200m）と最長（3000m）**で ① ②a（600 レース）、★最長で ②b（1000 シード）
+ *   ★イ **10 場すべて**… 本番の**最長（3000m）**で ②a（200 レース）
+ *        ★②a は 1 レースごとの内外差の**平均**なので、★① の相関ほど本数が要りません
+ *        ★（★全 70 組の重い版では、同じ場の中で距離による ②a の差は小さく、★場の差のほうが大きい — 報告書 §7-2）
+ *
+ * ★全 70 組の判定は `npx tsx tools/verify-v18.mjs`（既定＝本番の条件・2000 レース）。
+ * ★条件は**凍結した走路の形**から、確定と同じ関数（`conditionsFromFrozen`）で作ります（R-30）。
+ */
+describe('★V-18 — 本番の番組の競馬場（凍結した走路の形・場の軸で選んだ組）', () => {
+  const PRODUCTION_MIN = 1200;
+  const PRODUCTION_MAX = 3000;
+  const MUST_VENUES = ['tsukimi', 'shirasuna'] as const;
+  const AXIS_RACES = 200;
+
+  it('★組の選び方の前提: 本番の番組の距離は 1200〜3000m、10 場すべてが最長まで現れる', () => {
+    const combos = productionV18Combos() as { venueId: string; distance: number; frozen: FrozenCourseRecord }[];
+    expect(combos.length).toBe(VENUES.length * 7);
+    expect(Math.min(...combos.map((c) => c.distance))).toBe(PRODUCTION_MIN);
+    expect(Math.max(...combos.map((c) => c.distance))).toBe(PRODUCTION_MAX);
+    for (const v of VENUES) {
+      expect(combos.some((c) => c.venueId === v.id && c.distance === PRODUCTION_MAX), `★${v.name}`).toBe(true);
+    }
+    for (const id of MUST_VENUES) expect(VENUES.some((v) => v.id === id), `★${id} が居ない`).toBe(true);
+  });
+
+  it('★★ア 月見丘・白砂の最短と最長で ① ②a が帯の内側', () => {
+    for (const id of MUST_VENUES) {
+      for (const d of [PRODUCTION_MIN, PRODUCTION_MAX]) {
+        const r = measureV18(d, undefined, { races: RACES, pool, frozen: frozenCourseOf(id) }) as V18Row;
+        expect(Math.abs(r.rho), `★${id} ${d}m: ρ=${r.rho.toFixed(3)}`).toBeLessThanOrEqual(V18_BAND.rhoMax);
+        expect(r.lengths, `★${id} ${d}m: ${r.lengths.toFixed(1)} 馬身`).toBeGreaterThanOrEqual(V18_BAND.lengthsMin);
+        expect(r.lengths, `★${id} ${d}m: ${r.lengths.toFixed(1)} 馬身`).toBeLessThanOrEqual(V18_BAND.lengthsMax);
+      }
+    }
+  }, 300_000);
+
+  it('★★ア 月見丘・白砂の最長で ②b（枠間の平均差）が 1 馬身以内', () => {
+    for (const id of MUST_VENUES) {
+      const b = gateBiasV18(PRODUCTION_MAX, undefined, { frozen: frozenCourseOf(id) }) as { lengths: number };
+      expect(b.lengths, `★${id}: ${b.lengths.toFixed(3)} 馬身`).toBeLessThanOrEqual(V18_BAND.gateBiasMax);
+      expect(b.lengths).toBeGreaterThan(0);
+    }
+  }, 300_000);
+
+  it('★★イ 10 場すべての最長で ②a が帯の内側', () => {
+    for (const v of VENUES) {
+      const r = measureV18(PRODUCTION_MAX, undefined, { races: AXIS_RACES, pool, frozen: frozenCourseOf(v.id) }) as V18Row;
+      expect(r.lengths, `★${v.name}: ${r.lengths.toFixed(1)} 馬身`).toBeGreaterThanOrEqual(V18_BAND.lengthsMin);
+      expect(r.lengths, `★${v.name}: ${r.lengths.toFixed(1)} 馬身`).toBeLessThanOrEqual(V18_BAND.lengthsMax);
+    }
+  }, 300_000);
 
   /**
-   * ⚠️ ★**ここは既定の走路（`DEFAULT_OVAL`）だけ**です。
-   *    ★**10 場 × 実距離 = 44 通りは重すぎて CI に載りません** — ★`tools/verify-v18.mjs --venues` に残しています。
-   *    ★形を触る便は**必ずそちらを回すこと**（指示書 §4-3 の基準値）。
+   * ★**対照 — 凍結した形を読まないと、場ごとの違いが消えること**（R-16）。
+   *   ★凍結を渡さない（＝`DEFAULT_OVAL`）と、★白砂（1 周 1700m）と大河原（2400m）の ②a が同じ値になります。
+   *   ⚠️ ★これが成り立たないなら、★上の「場ごと」の検査は**同じ走路を 10 回測っているだけ**です。
+   *   ⚠️ ★初版は 2 つめを `expect(at()).toBe(at())` と書いていました。★同じ値を自分と比べるだけで、
+   *      ★**どう壊れても落ちない**検査でした（2026-09-15 に差し替え）。★凍結を渡さないときの値（`DEFAULT_OVAL`）と比べます。
    */
-  it('★44 通りは道具に残っていることを、この検査自身が言う', () => {
-    expect(RACES).toBeLessThan(2000);
-    expect(DISTANCES.length).toBe(4);
-  });
+  it('★★対照: 凍結を読めば場ごとに ②a が違い、凍結を渡さない値（DEFAULT_OVAL）とも違う', () => {
+    const at = (frozen?: FrozenCourseRecord): number =>
+      (measureV18(PRODUCTION_MAX, undefined, { races: CONTROL_RACES, pool, ...(frozen === undefined ? {} : { frozen }) }) as V18Row).lengths;
+    const small = at(frozenCourseOf('shirasuna'));
+    const large = at(frozenCourseOf('ookawara'));
+    const fallback = at();
+    expect(Math.abs(small - large), `★白砂 ${small.toFixed(2)} / 大河原 ${large.toFixed(2)}`).toBeGreaterThan(0.5);
+    // ★凍結を読まずに DEFAULT_OVAL に落ちる形なら、白砂も大河原も fallback と同じ値になり、ここで落ちる
+    expect(Math.max(Math.abs(small - fallback), Math.abs(large - fallback)),
+      `★白砂 ${small.toFixed(2)} / 大河原 ${large.toFixed(2)} / 凍結なし ${fallback.toFixed(2)}`).toBeGreaterThan(0.5);
+  }, 300_000);
 });

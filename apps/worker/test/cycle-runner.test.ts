@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { CYCLE_MS } from '@star/scheduler';
+import { CYCLE_MS, frozenCourseOf } from '@star/scheduler';
 import { LOCK_KEY, runCycle, type CycleStore, type RaceSpec } from '../src/cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from '../src/env.js';
 
@@ -17,8 +17,9 @@ const EMPTY_BUILD = {
   entrants: [],
   odds: [],
   conditions: {
-    surface: 'turf' as const, distance: 1600, courseId: 'C1',
+    surface: 'turf' as const, distance: 1600, courseId: 'star-park',
     trackCondition: 'good' as const,
+    courseFrozen: frozenCourseOf('star-park'),
   },
 };
 
@@ -255,6 +256,25 @@ describe('★D-056 凍結が無いレースは確定せず中止する', () => {
     expect(out.settled).toEqual([21]);
     expect(out.cancelled).toEqual([]);
     expect(ALERTS).toEqual([]);
+  });
+
+  /**
+   * ★**走路の凍結が不正**（★2026-09-15・指示書 VW §5-2）も同じ経路（中止・返還・通報）に載る。
+   *   ★名前で判定しているので、★名前を変えるとここが落ちます。
+   */
+  it('★走路の凍結が不正なら確定せず、中止して通報する', async () => {
+    ALERTS.length = 0;
+    const store = makeStore(EPOCH + 4 * 60_000);
+    store.pendingSettlements = async () => [23];
+    store.settleRace = async (i: number) => {
+      const e = new Error(`cycle=${i}: 走路の凍結が不正です`);
+      e.name = 'InvalidFrozenCourseError';
+      throw e;
+    };
+    const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    expect(out.settled).toEqual([]);
+    expect(out.cancelled).toEqual([23]);
+    expect(ALERTS.map((a) => a.cycleIndex)).toEqual([23]);
   });
 
   it('★凍結と無関係な失敗は握り潰さない（中止に化けさせない）', async () => {

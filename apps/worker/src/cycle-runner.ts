@@ -28,6 +28,7 @@ import {
 } from '@star/scheduler';
 import {
   classOf, gradeOf, prizeTierOf, purseOf,
+  type FrozenCourseRecord,
   type RaceConditions,
 } from '@star/scheduler';
 
@@ -77,6 +78,8 @@ export interface RaceSpec {
    */
   readonly conditions: RaceConditions & {
     readonly trackCondition: 'good' | 'yielding' | 'soft' | 'bad';
+    /** ★オッズを計算した走路の形（★2026-09-15・`races.course_frozen`）。★確定はこれを読む */
+    readonly courseFrozen: FrozenCourseRecord;
   };
   /** 出走表（§10.4 の同格帯から組む。D-018） */
   readonly entrants: readonly RaceEntrantSpec[];
@@ -149,6 +152,7 @@ export async function runCycle(
     // ★オッズを計算したときの条件。これを保存する（Q-P3-32）
     readonly conditions: RaceConditions & {
       readonly trackCondition: 'good' | 'yielding' | 'soft' | 'bad';
+      readonly courseFrozen: FrozenCourseRecord;
     };
   },
   /**
@@ -203,8 +207,11 @@ export async function runCycle(
          *   ★ここで握り潰すと「静かに劣化」に戻るので、**中止アラートに必ず載せます**。
          *
          *   ⚠️ 名前で判定します（`instanceof` は層をまたぐと束ね方次第で外れます）。
+         *
+         * ★**走路の凍結があるのに不正**（`InvalidFrozenCourseError`・2026-09-15・指示書 VW §5-2）も同じ扱いです。
+         *   ★読めない形で確定すると、★オッズを付けた模型と違う模型で着順を出すことになります。
          */
-        if (e instanceof Error && e.name === 'UnfrozenRaceError') {
+        if (e instanceof Error && (e.name === 'UnfrozenRaceError' || e.name === 'InvalidFrozenCourseError')) {
           const r = await store.cancelRace(idx);
           cancelled.push(idx);
           onAlert({ cycleIndex: idx, refundedBets: r.refundedBets, refundedEp: r.refundedEp });

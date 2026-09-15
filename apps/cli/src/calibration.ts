@@ -594,8 +594,24 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
     why: 'ダート開催の割合。★正典 §10.3 に規定が無いため暫定で置いた値（照会中）。芝ダート両方が出ることは ★テストが押さえる',
   },
   {
-    key: 'COURSE_IDS',
-    why: 'コースID。憲法 §0.1 に従い実在競馬場名を使わない架空名。識別子であって較正値ではない',
+    key: 'SURFACE_PERIOD',
+    why: '★馬場を決める剰余の周期 8（`(i * 3) % 8 < DIRT_RATIO * 8`）。DIRT_RATIO = 3/8 の分母そのもので、較正値ではない。★2026-09-15 に COURSE_IDS（C1〜C4）を廃し、競馬場を「その馬場のレースの通し番号」で回すために名前を付けた。10 場へ均等に配れることは ★conditions.test.ts が 1 週分数えて検査する',
+  },
+  {
+    key: 'LEGACY_CONDITIONS',
+    why: '★`verify-race.ts` の `--legacy-conditions` の真偽値（2026-09-15・指示書 VW §7-1）。数値ではなく、既定（本番の条件）と旧来の条件を切り替えるだけの旗。★走査が数字を拾うのは後続行の註記の数字で、較正値を持たない',
+  },
+  {
+    key: 'KNOWN_KEYS',
+    why: '★凍結した走路の形（course-frozen.ts）が持ってよい項目名の集合。数値ではなく、版を上げずに項目を足したら投げるための一覧。★走査が数字を拾うのは後続行の数字で、較正値を持たない。★course-frozen.test.ts が知らない項目で投げることを検査する',
+  },
+  {
+    key: 'DAY_ROTATION',
+    why: '★芝のレースが 1 日 90 本で 10 場に割り切れるとき、同じ枠に毎日同じ場が来ないよう 1 日ごとにずらす場の数（3）。10 と互いに素であることだけが要件で、結果の分布（均等）を動かす較正値ではない。★conditions.test.ts が「10 日でクラスごとの芝の本数が 10 場で等しい」を検査する',
+  },
+  {
+    key: 'BASE_WEIGHT_KG',
+    why: '★基準斤量 55kg（§8.3）。`race-field.ts` の `generateRace`・確定がこれまで直書きしていた 55 の写しで、凍結した走路の形から条件を作る関数（course-frozen.ts）が同じ値を返すために置く。較正値ではなく、★course-frozen.test.ts が 55 であることを検査する',
   },
   {
     key: 'RACES_PER_DAY',

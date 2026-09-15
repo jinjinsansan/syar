@@ -7,8 +7,9 @@
  */
 
 import { Rng, deriveRng, type HorseRecord } from '@star/sim-engine';
-import { DEFAULT_RACE_BALANCE, resolveRace, type RaceEntrant } from '@star/race-engine';
+import { DEFAULT_RACE_BALANCE, conditionsFromFrozen, resolveRace, type RaceEntrant } from '@star/race-engine';
 import { TICKET_KINDS, placeDepth, type TicketKind } from '@star/betting';
+import { frozenCourseOf, type FrozenCourseRecord } from '@star/scheduler';
 import { generateRace, sortPoolByClass } from '../../cli/src/race-field.js';
 import { ODDS_MC_TRIALS, buildOddsRows, winningKeys } from './odds.js';
 import type { OddsSpec, RaceEntrantSpec } from './cycle-runner.js';
@@ -29,6 +30,11 @@ export interface BuiltRace {
     readonly distance: number;
     readonly trackCondition: 'good' | 'yielding' | 'soft' | 'bad';
     readonly courseId: string;
+    /**
+     * ★**モンテカルロに渡した走路の形そのもの**（★2026-09-15・`races.course_frozen`・指示書 VW-3）。
+     *   ★確定・再計算はこれを読みます。★`courseId` から現在の値を引き直しません。
+     */
+    readonly courseFrozen: FrozenCourseRecord;
   };
 }
 
@@ -53,6 +59,12 @@ export function buildRace(
    */
   programme?: { readonly surface: 'turf' | 'dirt'; readonly distance: number; readonly courseId: string },
 ): BuiltRace {
+  /**
+   * ★**走路の形はここで 1 回だけ作ります**（★2026-09-15・指示書 VW §5-2）。
+   *   ① このオブジェクトから条件を作ってモンテカルロに渡し、
+   *   ② **同じオブジェクト**を返り値に載せて `createRace` が保存します（★作り直さない・R-30）。
+   */
+  const programmeFrozen = programme === undefined ? undefined : frozenCourseOf(programme.courseId);
   const sorted = sortPoolByClass(pool);
   const race = generateRace(
     sorted, cycleIndex, deriveRng(seed, STREAM.FIELD, cycleIndex),
@@ -76,9 +88,19 @@ export function buildRace(
        */
       abilityOf: (h: HorseRecord) => h.stats,
       ...(trainingStates === undefined ? {} : { trainingStateOf: (h: HorseRecord) => trainingStates.get(h.id) }),
-      ...(programme === undefined ? {} : { programme: { surface: programme.surface, distance: programme.distance } }),
+      ...(programme === undefined || programmeFrozen === undefined
+        ? {}
+        : { programme: { surface: programme.surface, distance: programme.distance, courseShape: programmeFrozen.courseShape } }),
     },
   );
+  /**
+   * ★番組表を渡さない呼び方（`tools/verify-build.mjs` など・本番のワーカーは使いません）は、
+   *   ★**これまでと同じ模型**（`DEFAULT_OVAL` ＝ スターパークと同じ値・直線は `generateRace` の抽選）を
+   *   ★**凍結して保存**します。★オッズと確定が同じ形を読むことは、こちらの経路でも崩しません。
+   */
+  const courseFrozen: FrozenCourseRecord = programmeFrozen
+    ?? { ...frozenCourseOf('star-park'), courseShape: race.conditions.courseShape };
+  const oddsConditions = conditionsFromFrozen(courseFrozen, race.conditions);
 
   // 馬番を 1..n に振る（馬券は馬番で買う）
   const numbered: RaceEntrant[] = race.entrants.map((e, i) => ({ ...e, horseId: `H${i + 1}` }));
@@ -91,7 +113,8 @@ export function buildRace(
   const rng: Rng = deriveRng(seed, STREAM.ODDS, cycleIndex);
   for (let t = 0; t < trials; t += 1) {
     const sim = resolveRace({
-      conditions: race.conditions,
+      // ★凍結した走路の形から作った条件（★確定も同じ関数で作る・pg-store.ts）
+      conditions: oddsConditions,
       entrants: numbered,
       seed: rng.nextUint32(),
       balance: DEFAULT_RACE_BALANCE,
@@ -140,7 +163,9 @@ export function buildRace(
       surface: race.conditions.surface,
       distance: race.conditions.distance,
       trackCondition: race.conditions.trackCondition,
-      courseId: programme?.courseId ?? 'C1',
+      courseId: courseFrozen.venueId,
+      // ★モンテカルロに渡したものと**同じ参照**（★作り直さない）
+      courseFrozen,
     },
   };
 }

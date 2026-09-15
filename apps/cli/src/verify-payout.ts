@@ -42,10 +42,12 @@ import {
   VERIFY_PAYOUT_STREAM, NICKS_GEN, deriveRng } from '@star/sim-engine';
 import {
   DEFAULT_RACE_BALANCE,
+  conditionsFromFrozen,
   resolveRace,
   type RaceEntrant,
   type RaceResult,
 } from '@star/race-engine';
+import { productionRaceOf } from '@star/scheduler';
 import {
   TICKET_KINDS,
   placeDepth,
@@ -85,6 +87,13 @@ const listOf = (name: string, fallback: readonly number[]): number[] => {
 const ODDS_TRIALS = argOf('odds-trials', 10_000);
 const RACES = argOf('races', 2_000);
 const SEEDS = listOf('seeds', [42]);
+/**
+ * ★**既定は本番の条件**（★2026-09-15・指示書 VW §7-1・R-31）。
+ *   ★レース番号をサイクル番号として `productionRaceOf` に通し、★番組の距離・馬場・競馬場と
+ *   ★**凍結した走路の形**（オッズと確定が同じ形を読む）で測ります。
+ *   ★`--legacy-conditions` … ★旧来の条件（`generateRace` が自分で引く距離・馬場・`DEFAULT_OVAL`・1400m 以下の 20% 直線）。比較用
+ */
+const LEGACY_CONDITIONS = argv.includes('--legacy-conditions');
 
 /** 着順から、その券種の「当たり目」のキーを作る */
 function winningKeys(kind: TicketKind, order: readonly number[], fieldSize: number): string[] {
@@ -145,7 +154,17 @@ function runSeed(seed: number): Map<TicketKind, KindStat> {
   const stats = new Map<TicketKind, KindStat>(TICKET_KINDS.map((k) => [k, emptyKindStat()]));
 
   for (let raceIndex = 0; raceIndex < RACES; raceIndex += 1) {
-    const race = generateRace(pool, raceIndex, deriveRng(seed, STREAM.FIELD, raceIndex));
+    const prod = LEGACY_CONDITIONS ? null : productionRaceOf(raceIndex);
+    const race = generateRace(
+      pool, raceIndex, deriveRng(seed, STREAM.FIELD, raceIndex), undefined, undefined, undefined,
+      prod === null ? {} : {
+        programme: {
+          surface: prod.programme.surface, distance: prod.programme.distance, courseShape: prod.courseFrozen.courseShape,
+        },
+      },
+    );
+    // ★オッズも確定も、凍結した走路の形から同じ関数で作った条件で回す（ワーカーの build-race.ts・pg-store.ts と同じ）
+    const conditions = prod === null ? race.conditions : conditionsFromFrozen(prod.courseFrozen, race.conditions);
     // 馬番を 1..n に振り直す（馬券は馬番で買う）
     const entrants: RaceEntrant[] = race.entrants.map((e, i) => ({ ...e, horseId: `H${i + 1}` }));
     const fieldSize = entrants.length;
@@ -157,7 +176,7 @@ function runSeed(seed: number): Map<TicketKind, KindStat> {
     const oddsRng = deriveRng(seed, STREAM.ODDS, raceIndex);
     for (let t = 0; t < ODDS_TRIALS; t += 1) {
       const sim = resolveRace({
-        conditions: race.conditions,
+        conditions,
         entrants,
         seed: oddsRng.nextUint32(),
         balance: DEFAULT_RACE_BALANCE,
@@ -171,7 +190,7 @@ function runSeed(seed: number): Map<TicketKind, KindStat> {
 
     // --- 本番確定（§8.6: オッズとは別系列） ---
     const final = resolveRace({
-      conditions: race.conditions,
+      conditions,
       entrants,
       seed: deriveRng(seed, STREAM.FINAL, raceIndex).nextUint32(),
       balance: DEFAULT_RACE_BALANCE,
@@ -189,6 +208,9 @@ function runSeed(seed: number): Map<TicketKind, KindStat> {
 
 console.log(`# A-3 / V-10 払戻率（券種別・設定margin ±${V10_TOLERANCE * 100}%・★判定値は切り捨て前の払戻率 D-094）`);
 console.log(`  races=${RACES} odds-trials=${ODDS_TRIALS} seeds=${SEEDS.join(',')}`);
+console.log(`  条件: ${LEGACY_CONDITIONS
+  ? '★旧来（--legacy-conditions: generateRace が引く距離・馬場・DEFAULT_OVAL・1400m 以下の 20% 直線）'
+  : '本番（productionRaceOf: 番組の距離・馬場・競馬場・凍結した走路の形）'}`);
 
 const total = new Map<TicketKind, KindStat>(TICKET_KINDS.map((k) => [k, emptyKindStat()]));
 for (const seed of SEEDS) {

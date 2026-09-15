@@ -21,13 +21,14 @@ import {
   DEFAULT_INTERVENTION_BALANCE,
   DEFAULT_RACE_BALANCE,
   aiProxyPlan,
-
+  conditionsFromFrozen,
   optimalPlan,
   resolveIntervention,
   resolveRace,
   type RaceBalance,
 } from '@star/race-engine';
 import { NICKS_GEN, deriveRng, type HorseRecord } from '@star/sim-engine';
+import { productionRaceOf } from '@star/scheduler';
 import { resolveRuntimeConfig } from './config.js';
 import {
   DEFAULT_CLASS_BAND,
@@ -93,6 +94,13 @@ const B6_WIRED = process.argv.includes('--b6-wired');
  *   **週ループが育てた現在能力**を使うか。★既定は false。
  */
 const REAL_ABILITY = process.argv.includes('--real-ability');
+/**
+ * ★**既定は本番の条件**（★2026-09-15・指示書 VW §7-1・R-31）。
+ *   ★レース番号をサイクル番号として `productionRaceOf` に通し、★番組の距離・馬場・競馬場と
+ *   ★**凍結した走路の形**（ワーカーの `build-race.ts`・`pg-store.ts` と同じ関数）で測ります。
+ *   ★`--legacy-conditions` … ★旧来の条件（`generateRace` が自分で引く距離・馬場・`DEFAULT_OVAL`・1400m 以下の 20% 直線）。比較用
+ */
+const LEGACY_CONDITIONS = process.argv.includes('--legacy-conditions');
 /**
  * ★`--pool <file>`: 本番から書き出した母集団を使う（Q-P3-39）。
  *   `tools/export-pool.mjs` が作ったファイルを読みます。
@@ -269,7 +277,13 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     REAL_POOL === null ? undefined : (h as RealPoolHorse);
 
   for (let raceIndex = 0; raceIndex < racesForSeed; raceIndex++) {
+    const prod = LEGACY_CONDITIONS ? null : productionRaceOf(raceIndex);
     const race = generateRace(pool, raceIndex, fieldRng, CLASS_BAND, UNLOCK, FLOOR, {
+      ...(prod === null ? {} : {
+        programme: {
+          surface: prod.programme.surface, distance: prod.programme.distance, courseShape: prod.courseFrozen.courseShape,
+        },
+      }),
       // ★2つの旗を独立に効かせる（1回の変更で3点測るため）
       ...(B6_WIRED
         ? {
@@ -288,13 +302,15 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     });
     sampler?.advance();
     const fieldSize = race.entrants.length;
+    // ★人気推定・本番確定・V-8 の差し替えは、すべて凍結した走路の形から作った同じ条件で回す
+    const conditions = prod === null ? race.conditions : conditionsFromFrozen(prod.courseFrozen, race.conditions);
 
     // (1) 人気を推定する（本番とは別系列・§9.2）
     //   タイブレークを含む順位付けは popularity.ts に切り出し、経路テストを掛けている（O-2）
     const estimator = new PopularityEstimator(race.entrants.map((e) => e.horseId));
     for (let t = 0; t < POPULARITY_TRIALS; t++) {
       const r = resolveRace({
-        conditions: race.conditions,
+        conditions,
         entrants: race.entrants,
         seed: deriveRng(seed, STREAM.POPULARITY, raceIndex, t).nextUint32() >>> 0,
         balance,
@@ -354,7 +370,7 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     // (3) 本番確定（AI 代行の介入を反映）
     const decideSeed = deriveRng(seed, STREAM.DECIDE, raceIndex).nextUint32() >>> 0;
     const result = resolveRace({
-      conditions: race.conditions,
+      conditions,
       entrants: race.entrants,
       seed: decideSeed,
       balance,
@@ -383,7 +399,7 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     // (4) V-8: 同じレースを「手動最適」に差し替えて勝率を比べる
     if (own !== undefined) {
       const optResult = resolveRace({
-        conditions: race.conditions,
+        conditions,
         entrants: race.entrants,
         seed: decideSeed,
         balance,
@@ -487,6 +503,9 @@ console.log(
   `レース総数=${racesPerSeed * SEEDS.length}（${SEEDS.length}シード × ${racesPerSeed}）\n` +
     `人気推定の試行数=${POPULARITY_TRIALS}（本番確定とは別系列・§9.2）\n` +
     `母集団=${POOL_GENERATIONS}ゲーム内年 × 繁殖牝馬${POOL_MARES}頭の最終年産駒\n` +
+    `条件=${LEGACY_CONDITIONS
+      ? '★旧来（--legacy-conditions: generateRace が引く距離・馬場・DEFAULT_OVAL・1400m 以下の 20% 直線）'
+      : '本番（productionRaceOf: 番組の距離・馬場・競馬場・凍結した走路の形）'}\n` +
     `RACE_RANDOM_K=${balance.RACE_RANDOM_K}${RACE_K === DEFAULT_RACE_BALANCE.RACE_RANDOM_K ? "（正典 §13.1 の値）" : `（★較正値。正典 §13.1 は ${DEFAULT_RACE_BALANCE.RACE_RANDOM_K}）`} / INTERVENTION_CAP=±${ib.INTERVENTION_CAP} / クラス幅=${CLASS_BAND}\n` +
     `⚠️ 素質開放率は P3 で置き換わるプレースホルダ（0.55〜0.85）。K の較正はこの仮定に依存する`,
 );

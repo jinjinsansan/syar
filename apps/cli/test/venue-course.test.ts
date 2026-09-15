@@ -15,9 +15,42 @@
 import { describe, it, expect } from 'vitest';
 import {
   VENUES, GRADED_RACES, venueById, raceSetupById, raceSetupFromParam, DEFAULT_RACE_ID,
+  RACES_PER_DAY, productionRaceOf,
 } from '@star/scheduler';
 import { ovalCourse, posOf, laneExtraMeters } from '@star/render';
-import { ovalSegments, laneAt, laneExtraM } from '@star/race-engine';
+import { ovalSegments, laneAt, laneExtraM, conditionsFromFrozen } from '@star/race-engine';
+
+/**
+ * ★**本番の番組に現れる（場 × 距離）の組すべて**で、★エンジンと描画層が同じ区間を作る
+ *   （★2026-09-15・指示書 VW-2 §5-1 検査 5・R-33）。
+ *
+ * ★上の検査は重賞 50 鞍の組だけでした。★本番の番組（`productionRaceOf`）は 1 週で 10 場 × 7 距離を回すので、
+ *   ★**その組に広げます**。★エンジン側は凍結から作った条件（`conditionsFromFrozen`）の `course` を使います。
+ */
+describe('★本番の番組の（場 × 距離）で、エンジンと描画層の幾何が一致する', () => {
+  it('★★1 週分の組すべてで、区間の長さと種類と半径が一致する', () => {
+    const combos = new Map<string, ReturnType<typeof productionRaceOf>>();
+    for (let i = 0; i < RACES_PER_DAY * 7; i += 1) {
+      const p = productionRaceOf(i);
+      combos.set(`${p.courseFrozen.venueId}/${p.programme.distance}`, p);
+    }
+    expect(combos.size, '★1 週で 10 場 × 7 距離が出そろう').toBe(VENUES.length * 7);
+    for (const [key, p] of combos) {
+      const c = conditionsFromFrozen(p.courseFrozen, {
+        raceId: key, distance: p.programme.distance, surface: p.programme.surface, trackCondition: 'good',
+      });
+      const mine = ovalSegments(c.distance, c.course);
+      const theirs = ovalCourse(c.distance, { ...c.course!, turn: p.courseFrozen.turn }).segments;
+      expect(mine.length, `★${key} の区間の数`).toBe(theirs.length);
+      mine.forEach((m, i) => {
+        const t = theirs[i]!;
+        expect(m.length, `★${key} 区間 ${i} の長さ`).toBeCloseTo(t.length, 9);
+        expect(m.corner, `★${key} 区間 ${i} の種類`).toBe(t.type === 'corner');
+        if (m.corner) expect(m.radius, `★${key} 区間 ${i} の半径`).toBeCloseTo(t.radius ?? -1, 9);
+      });
+    }
+  });
+});
 
 describe('★競馬場が走路として成立する', () => {
   it('★10 場すべてで `ovalCourse` が作れる', () => {

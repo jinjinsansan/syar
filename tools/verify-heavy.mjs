@@ -118,12 +118,19 @@ console.log('');
  *   道悪適性の高い馬が `soft` で順位を上げていれば、形質は効いています。
  */
 console.log('## ★直接の実験（同じ出走馬・馬場だけ変える）');
-const { resolveRace, DEFAULT_RACE_BALANCE } = await import('../packages/race-engine/src/index.ts');
+const { resolveRace, DEFAULT_RACE_BALANCE, conditionsFromFrozen } = await import('../packages/race-engine/src/index.ts');
 const { rowToHorse } = await import('../apps/worker/src/horse-repo.ts');
 
+/**
+ * ★走路の形は凍結（`races.course_frozen`・0023）から、確定と**同じ関数**で作ります（★2026-09-15・指示書 VW §6）。
+ *   ★以前は `courseShape: 'oval'` の直書き・走路の形なし（＝全レース DEFAULT_OVAL）でした。
+ *   ★null（0023 より前）の行は DEFAULT_OVAL・'oval' で、★件数を出します。
+ */
 const expRaces = (await c.query(
-  `select id, cycle_index, distance, surface from races where status = 'settled'
+  `select id, cycle_index, distance, surface, course_frozen from races where status = 'settled'
     order by cycle_index desc limit 12`)).rows;
+const legacyCourse = expRaces.filter((r) => r.course_frozen === null).length;
+console.log(`  ★走路の凍結が無い（0023 より前）ので DEFAULT_OVAL で走らせるレース: ${legacyCourse} / ${expRaces.length} 本`);
 const deltas = [];
 for (const r of expRaces) {
   const es = (await c.query(
@@ -140,15 +147,14 @@ for (const r of expRaces) {
       weightKg: Number(row.weight), gate: Number(row.gate), age: 4, skillGenes: h.skillGenes,
     };
   });
-  const base = {
-    raceId: `EXP-${r.cycle_index}`, distance: Number(r.distance),
-    surface: r.surface, courseShape: 'oval', baseWeightKg: 55,
-  };
+  const baseOf = (tc) => conditionsFromFrozen(r.course_frozen ?? null, {
+    raceId: `EXP-${r.cycle_index}`, distance: Number(r.distance), surface: r.surface, trackCondition: tc,
+  });
   // ★同じ種で2回。違うのは馬場だけ
   const seed = 20260812;
   const posOf = (tc) => {
     const out = resolveRace({
-      conditions: { ...base, trackCondition: tc }, entrants, seed, balance: DEFAULT_RACE_BALANCE,
+      conditions: baseOf(tc), entrants, seed, balance: DEFAULT_RACE_BALANCE,
     });
     return new Map(out.order.map((o) => [o.horseId, o.finishPosition]));
   };

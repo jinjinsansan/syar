@@ -18,13 +18,26 @@
  *   「凍結からエンジンを回した着順」と突き合わせます。
  *
  * 実行: npx tsx tools/verify-entrant-freeze.mjs --env staging
+ *
+ * 【★走路の凍結（0023・2026-09-15・指示書 VW §6）】
+ *   ★着順を再計算するときの条件は、★`races.course_frozen` から **`conditionsFromFrozen`**（ワーカーの確定と同じ関数）で作ります。
+ *   ★以前は `courseShape: 'oval'` を直書きし、走路の形を渡していませんでした（＝全レース `DEFAULT_OVAL`）。
+ *   ★`course_frozen` が null（0023 より前）の行は `DEFAULT_OVAL`・`'oval'` で再計算し、★件数を出します。
+ *
+ *   `--recompute-settled` … ★読むだけ。確定済みの全レースを凍結から再計算し、★保存された着順と突き合わせます（§6 検査 1）
+ *   `--ignore-course-frozen` … ★**変異の実演**（§6 検査 2）。凍結を読まず `DEFAULT_OVAL` に落とします。
+ *                             ★スターパーク以外の場のレースで食い違いが出れば、上の一致は凍結を読んだおかげです
  */
 import { createHash, createHmac } from 'node:crypto';
 import pg from 'pg';
 import { createPgStore } from '../apps/worker/src/pg-store.ts';
 import { settleRace as settleRaceFair } from '../apps/worker/src/settle.ts';
+import { conditionsFromFrozen, parseFrozenCourse } from '../packages/race-engine/src/index.ts';
 import { assertNotProduction } from './lib/guard.mjs';
 import { loadEnv } from './lib/env.mjs';
+
+const RECOMPUTE = process.argv.includes('--recompute-settled');
+const IGNORE_FROZEN = process.argv.includes('--ignore-course-frozen');
 
 const env = loadEnv();
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
@@ -42,11 +55,88 @@ const check = (ok, label, detail) => {
   if (!ok) fails.push(label);
 };
 
+/**
+ * ★レース行から、確定と**同じ関数**で条件を作る。
+ *   ★凍結と course_id が別の場を指していたら、確定（pg-store.ts）と同じく不正として投げます。
+ */
+function conditionsOfRow(row) {
+  const frozen = IGNORE_FROZEN || row.course_frozen === null ? null : parseFrozenCourse(row.course_frozen);
+  if (frozen !== null && frozen.venueId !== row.course_id) {
+    throw new Error(`cycle=${row.cycle_index}: venueId=${frozen.venueId} が course_id=${row.course_id} と食い違います`);
+  }
+  return conditionsFromFrozen(frozen, {
+    raceId: row.id,
+    distance: Number(row.distance),
+    surface: row.surface,
+    trackCondition: row.track_condition,
+  });
+}
+
+if (RECOMPUTE) {
+  console.log(`# ★確定済みのレースを凍結から再計算し、保存された着順と突き合わせる${IGNORE_FROZEN ? '（★変異: 凍結を読まない）' : ''}`);
+  console.log('');
+  const races = (await c.query(
+    `select id, cycle_index, server_seed, distance, surface, track_condition, course_id, course_frozen, created_at
+       from races where status = 'settled' order by cycle_index`,
+  )).rows;
+  const tally = { match: 0, mismatch: 0, noSnapshot: 0, legacyCourse: 0 };
+  const byVenue = new Map();
+  const mismatches = [];
+  for (const r of races) {
+    const es = (await c.query(
+      `select gate, entrant_snapshot, finish_pos from race_entries where race_id = $1 order by gate`, [r.id],
+    )).rows;
+    if (es.length === 0 || es.some((e) => e.entrant_snapshot === null || e.finish_pos === null)) {
+      tally.noSnapshot += 1;
+      continue;
+    }
+    if (r.course_frozen === null) tally.legacyCourse += 1;
+    const recomputed = settleRaceFair(
+      {
+        conditions: conditionsOfRow(r),
+        entrants: es.map((e) => ({ ...e.entrant_snapshot, horseId: String(e.gate) })),
+        serverSeed: r.server_seed,
+      },
+      hash,
+    ).order.map((o) => o.horseId).join(',');
+    const stored = [...es].sort((a, b) => a.finish_pos - b.finish_pos).map((e) => String(e.gate)).join(',');
+    const ok = recomputed === stored;
+    tally[ok ? 'match' : 'mismatch'] += 1;
+    if (!ok) {
+      mismatches.push(`cycle=${r.cycle_index} ${r.distance}m ${r.course_id} 生成 ${new Date(r.created_at).toISOString().slice(0, 10)}`
+        + ` 走路の凍結 ${r.course_frozen === null ? '無し' : '有り'} / 保存 ${stored} / 再計算 ${recomputed}`);
+    }
+    const key = r.course_frozen === null ? '(凍結なし)' : r.course_id;
+    const v = byVenue.get(key) ?? { match: 0, mismatch: 0 };
+    v[ok ? 'match' : 'mismatch'] += 1;
+    byVenue.set(key, v);
+  }
+  console.log(`  確定済み ${races.length} 本 / 一致 ${tally.match} / ★食い違い ${tally.mismatch} / 出走馬の凍結が無く飛ばした ${tally.noSnapshot}`);
+  console.log(`  ★走路の凍結が無い（0023 より前）ので DEFAULT_OVAL で再計算した行: ${tally.legacyCourse} 本`);
+  console.log('');
+  console.log('  場              一致  食い違い');
+  for (const [k, v] of [...byVenue.entries()].sort()) {
+    console.log(`  ${k.padEnd(14)} ${String(v.match).padStart(4)}  ${String(v.mismatch).padStart(6)}`);
+  }
+  if (mismatches.length > 0) {
+    console.log('');
+    console.log('  ★食い違った行:');
+    for (const m of mismatches) console.log(`    ${m}`);
+  }
+  await c.end();
+  if (IGNORE_FROZEN) {
+    console.log('');
+    console.log('★変異の実演です（合否ではありません）。スターパーク以外の場で食い違いが出ていれば、凍結を読まない形は捕まります');
+    process.exit(0);
+  }
+  process.exit(tally.mismatch === 0 && tally.match > 0 ? 0 : 1);
+}
+
 console.log('# ★出走馬の凍結（0016）が構造で守っているか');
 console.log('');
 
 const race = (await c.query(
-  `select r.id, r.cycle_index, r.server_seed, r.distance, r.surface, r.track_condition
+  `select r.id, r.cycle_index, r.server_seed, r.distance, r.surface, r.track_condition, r.course_id, r.course_frozen
      from races r
     where r.status = 'scheduled'
       and exists (select 1 from race_entries e where e.race_id = r.id and e.entrant_snapshot is not null)
@@ -58,6 +148,7 @@ if (race === undefined) {
   process.exit(2);
 }
 console.log(`  対象 cycle=${race.cycle_index}`);
+console.log(`  走路の凍結: ${race.course_frozen === null ? '★無し（0023 より前）→ DEFAULT_OVAL で再計算' : `${race.course_id}`}`);
 
 const entries = (await c.query(
   `select e.gate, e.horse_id, e.entrant_snapshot from race_entries e
@@ -93,14 +184,8 @@ console.log('【★本題】horses を壊してから確定し、凍結どおり
 // ★凍結から**自分でエンジンを回して**期待値を作る（DB の horses は一切見ない）
 const expected = settleRaceFair(
   {
-    conditions: {
-      raceId: race.id,
-      distance: Number(race.distance),
-      surface: race.surface,
-      trackCondition: race.track_condition,
-      courseShape: 'oval',
-      baseWeightKg: 55,
-    },
+    // ★確定（pg-store.ts）と同じ関数で、凍結した走路の形から作る（0023）
+    conditions: conditionsOfRow(race),
     entrants: entries.map((e) => ({ ...e.entrant_snapshot, horseId: String(e.gate) })),
     serverSeed: race.server_seed,
   },
@@ -114,14 +199,7 @@ const expected = settleRaceFair(
  */
 const brokenOrder = settleRaceFair(
   {
-    conditions: {
-      raceId: race.id,
-      distance: Number(race.distance),
-      surface: race.surface,
-      trackCondition: race.track_condition,
-      courseShape: 'oval',
-      baseWeightKg: 55,
-    },
+    conditions: conditionsOfRow(race),
     // ★壊し方: **出走馬どうしで能力を入れ替える**。
     //   「全馬を同じ値にする」は値域外で NaN になりました（実際に落ちました）。
     //   入れ替えなら値域内のまま、着順は確実に変わります。
