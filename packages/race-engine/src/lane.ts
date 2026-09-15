@@ -381,6 +381,26 @@ export function laneAt(
    */
   laneModel: LaneModel = LANE_MODEL,
 ): number {
+  return laneAtWithSwing(gate, fieldSize, metersLeft, distanceMeter, seed, widthM, revealFullRun, laneModel,
+    swingScale(distanceMeter, { ...spec, widthM }));
+}
+
+/**
+ * ★**`laneAt` の本体**（★ES 便 ES-2・2026-09-15・回答 `REVIEW_QUESTIONS_ENGINE_LANE_SPEED_ANSWER_20260915.md` §Q-2）。
+ *
+ * ★`swingScale` は ★**距離と走路の形だけ**で決まり、★刻みごとに変わりません。★以前は刻みごとに 2 回、
+ *   ★そのたびに区間を 2 回作り直していました（★1 レースで数万回・★D-071 の後の遅さの本体）。
+ *   → ★呼び出し側が 1 回計算して `swing` として渡します。
+ * ⚠️ ★**`laneAt` と `laneExtraM` はこの関数だけを通します**（★式を 2 か所に書かない・R-30）。
+ * ⚠️ ★**掛ける順番は変えていません。** ★`swingScale(...)` の呼び出しを、★同じ値の変数 `swing` に置き換えただけです
+ *    （★`wobbleM * swing` を先に掛けて持つ等は ★順番が変わるので不可・回答 §Q-2 条件 3）。
+ */
+function laneAtWithSwing(
+  gate: number, fieldSize: number, metersLeft: number, distanceMeter: number,
+  seed: number, widthM: number, revealFullRun: number, laneModel: LaneModel,
+  /** ★`swingScale(distanceMeter, spec)`（★1 レース 1 回） */
+  swing: number,
+): number {
   const start = laneAtStart(gate, fieldSize, widthM);
   const ranM = Math.max(0, distanceMeter - metersLeft);
   const run = Math.max(0, Math.min(1, ranM / Math.max(1, distanceMeter)));
@@ -417,7 +437,7 @@ export function laneAt(
     ? RAIL_W
     : RAIL_W + laneModel.homeSpreadM
       * (() => { const u = stream(seed, gate, 0x51ed2701); return u * u; })()
-      * swingScale(distanceMeter, { ...spec, widthM });
+      * swing;
   const base = start + (home - start) * settled;
 
   /** ★外を回されるか、内が空くか。シードから引き、進むほど開く */
@@ -441,13 +461,14 @@ export function laneAt(
    */
   if (laneModel.legacy !== true) {
     const wob = Math.sin(phase + run * Math.PI * 3) * laneModel.wobbleM
-      * reveal * swingScale(distanceMeter, { ...spec, widthM });
+      * reveal * swing;
     return Math.max(0.8, Math.min(widthM - 0.8, base + wob));
   }
-  const swing = Math.max(0, drift * 0.85 + wave) * reveal * (widthM * 0.62)
-    * swingScale(distanceMeter, { ...spec, widthM });
+  /** ★旧形の外への振れ（★ES-2 で引数 `swing` と名前がぶつかるので改名しただけ・★計算は同じ） */
+  const legacySwing = Math.max(0, drift * 0.85 + wave) * reveal * (widthM * 0.62)
+    * swing;
 
-  return Math.max(0.8, Math.min(widthM - 0.8, base + swing));
+  return Math.max(0.8, Math.min(widthM - 0.8, base + legacySwing));
 }
 
 /**
@@ -464,7 +485,34 @@ export function laneExtraM(
   /** ★走る場所の作り方。★既定は本番の `LANE_MODEL`（`laneAt` と同じ） */
   laneModel: LaneModel = LANE_MODEL,
 ): number {
-  const segs = ovalSegments(distance, spec);
+  return laneExtraMOnPlan(lanePlanOf(distance, spec), gate, fieldSize, seed, stepM, revealFullRun, laneModel);
+}
+
+/**
+ * ★**1 レースで一定の値**（★区間と `swingScale`・★ES 便 ES-2・2026-09-15）。
+ *   ★どちらも ★距離と走路の形だけで決まるので、★`resolveRace` は 1 レース 1 回だけ作り、★馬ごとに使い回します。
+ * ⚠️ ★**走路の形を必ず含めて作ること**（★距離だけで作ると ★場の違いが消える・回答 §Q-3 変異 ①）。
+ */
+export interface LaneRacePlan {
+  readonly distance: number;
+  readonly spec: OvalSpec;
+  readonly segs: ReturnType<typeof ovalSegments>;
+  /** ★`swingScale(distance, spec)` */
+  readonly swing: number;
+}
+
+export function lanePlanOf(distance: number, spec: OvalSpec = DEFAULT_OVAL): LaneRacePlan {
+  return { distance, spec, segs: ovalSegments(distance, spec), swing: swingScale(distance, spec) };
+}
+
+/** ★`laneExtraM` の本体（★1 レース 1 回の値 `plan` を受け取る） */
+export function laneExtraMOnPlan(
+  plan: LaneRacePlan, gate: number, fieldSize: number, seed: number,
+  stepM = 10,
+  revealFullRun: number = LANE_REVEAL_FULL_RUN,
+  laneModel: LaneModel = LANE_MODEL,
+): number {
+  const { distance, spec, segs, swing } = plan;
   const centre = spec.widthM / 2;
   let extra = 0;
   let acc = 0;
@@ -476,8 +524,9 @@ export function laneExtraM(
         /**
          * ⚠️ ★**`spec` を最後まで渡します。** ★渡さないと、★venue の走路で積分するのに
          *    ★`w` だけ 1周2000m 前提、という形に戻ります（★2026-08-30 まで実際にそうでした）。
+         *    ★いまは `spec` から作った `swing`（`plan`）を渡します（★ES-2）。
          */
-        const w = laneAt(gate, fieldSize, distance - s, distance, seed, spec.widthM, revealFullRun, spec, laneModel);
+        const w = laneAtWithSwing(gate, fieldSize, distance - s, distance, seed, spec.widthM, revealFullRun, laneModel, swing);
         extra += (w - centre) * (len / seg.radius);
       }
     }

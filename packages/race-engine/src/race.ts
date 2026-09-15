@@ -16,7 +16,7 @@ import {
 import { MARGIN_LABELS, type RaceBalance } from './balance.js';
 import { baseScore, decidePace, deterministicCoefs } from './coefficients.js';
 import { resolveSkills, type SkillContext } from './skills.js';
-import { laneExtraM } from './lane.js';
+import { laneExtraMOnPlan, lanePlanOf } from './lane.js';
 import type {
   Pace,
   RaceConditions,
@@ -112,6 +112,12 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
   const { pace, nigeCount } = paceOf(entrants, balance);
   const fieldSize = entrants.length;
   const capViolations: CapViolation[] = [];
+  /**
+   * ★**距離ロスの 1 レースで一定の値**（★区間と `swingScale`・★ES 便 ES-2・2026-09-15）。
+   *   ★以前は馬ごと（`laneExtraM` の中）に作り直していました。★値は同じです（`lane-fingerprint.test.ts`）。
+   * ⚠️ ★`conditions.course` を渡します（★渡さないと場の違いが消える）。★無いレースは `DEFAULT_OVAL`（★以前と同じ）。
+   */
+  const lanePlan = conditions.courseShape === 'oval' ? lanePlanOf(conditions.distance, conditions.course) : undefined;
 
   const scored = entrants.map((entrant, index) => {
     const skillCtx: SkillContext = {
@@ -138,7 +144,7 @@ export function resolveRace(params: ResolveRaceParams): RaceResult {
        *    ★渡さないレースは `DEFAULT_OVAL` に落ちるので、★いままでと完全に同じ値です。
        *    ★競馬場ごとの形を持つレースだけが、★その走路の距離ロスで判定されます。
        */
-      ? laneExtraM(entrant.gate, fieldSize, conditions.distance, seed, conditions.course)
+      ? laneExtraMOnPlan(lanePlan!, entrant.gate, fieldSize, seed)
       : 0;
 
     const coefs = deterministicCoefs(
