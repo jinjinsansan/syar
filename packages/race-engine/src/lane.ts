@@ -531,14 +531,143 @@ export interface LaneRacePlan {
   readonly segs: ReturnType<typeof ovalSegments>;
   /** ★`swingScale(distance, spec)` */
   readonly swing: number;
+  /**
+   * ★**同じ和の分解の 1 レース分**（★既定の `stepM`・`revealFullRun`・`laneModel` で作ったもの・★ES-5）。
+   *   ★省いた `plan`（★検査で手組みしたもの等）や、★既定でない引数で呼んだときは ★その場で作ります。
+   */
+  readonly sum?: LaneSumPlan;
 }
 
 export function lanePlanOf(distance: number, spec: OvalSpec = DEFAULT_OVAL): LaneRacePlan {
-  return { distance, spec, segs: ovalSegments(distance, spec), swing: swingScale(distance, spec) };
+  const base = { distance, spec, segs: ovalSegments(distance, spec), swing: swingScale(distance, spec) };
+  const sum = laneSumPlanOf(base, 10, LANE_REVEAL_FULL_RUN, LANE_MODEL);
+  return sum === undefined ? base : { ...base, sum };
 }
 
-/** ★`laneExtraM` の本体（★1 レース 1 回の値 `plan` を受け取る） */
+/**
+ * ★**同じ和の分解**（★ES 便 ES-5・2026-09-16・回答 `REVIEW_ENGINE_LANE_SPEED_ES3_ANSWER_20260916.md` §2・§4）。
+ *
+ * ★コーナーの刻み `k` について `c_k = len_k ÷ R_k`・`θ_k = 3π·run_k`・`r_k = reveal_k` とすると、
+ *   ★**端の clamp が掛からず、どの刻みでも隊列が落ち着いている（`settled = 1`）とき**:
+ *
+ *     laneExtraM = Σ_k (home + sin(φ + θ_k)·wobbleM·r_k·S − centre) · c_k
+ *                = (home − centre) · ΣC  +  wobbleM · S · ( sin φ · A  +  cos φ · B )
+ *
+ *     ★1 レース 1 回:  ΣC = Σ c_k   A = Σ cos θ_k · r_k · c_k   B = Σ sin θ_k · r_k · c_k
+ *     ★1 頭 1 回:      home（`laneHorseOf`）・φ
+ *
+ * ★刻みは 10m のまま・★**同じ和を並べ替えただけ**で、近似ではありません。★違いは浮動小数の足す順番による丸めだけです
+ *   （★オーナー承認 F-1・2026-09-16: ★「丸めの差だけ（≤ 1×10⁻⁹ m・着順は完全一致）」）。
+ * ⚠️ ★**前提が 1 つでも崩れたら、ループ（`laneExtraMOnPlanLoop`）で計算します**（★R-27: 分からないときは安全な側へ）:
+ *    ① ★legacy の走り方 ② ★コーナーの刻みで `ranM < SETTLE_M`（★引き込み線 P-1 が無い形）③ ★その馬が端で止められうる
+ * ⚠️ ★`run`・`reveal` は ★`laneAtOnHorse` と**同じ式・同じ順番**で作ります（★`metersLeft = distance − s` を経由する）。
+ */
+export interface LaneSumPlan {
+  readonly stepM: number;
+  readonly revealFullRun: number;
+  readonly laneModel: LaneModel;
+  /** ★Σ c_k */
+  readonly sumC: number;
+  /** ★Σ cos θ_k · r_k · c_k */
+  readonly sumA: number;
+  /** ★Σ sin θ_k · r_k · c_k */
+  readonly sumB: number;
+  /** ★コーナーの刻みでの `reveal` の最大（★端の判定に使う） */
+  readonly maxReveal: number;
+}
+
+/** ★分解の 1 レース分。★前提 ①② が崩れる形なら `undefined`（＝ループへ） */
+export function laneSumPlanOf(
+  plan: Pick<LaneRacePlan, 'distance' | 'segs'>, stepM: number, revealFullRun: number, laneModel: LaneModel,
+): LaneSumPlan | undefined {
+  if (laneModel.legacy === true) return undefined;
+  const { distance, segs } = plan;
+  let sumC = 0;
+  let sumA = 0;
+  let sumB = 0;
+  let maxReveal = 0;
+  let acc = 0;
+  for (const seg of segs) {
+    if (seg.corner && seg.radius > 0) {
+      for (let o = 0; o < seg.length; o += stepM) {
+        const len = Math.min(stepM, seg.length - o);
+        const s = acc + o + len / 2;
+        /** ★ここから `laneAtOnHorse` と同じ式 */
+        const metersLeft = distance - s;
+        const ranM = Math.max(0, distance - metersLeft);
+        const run = Math.max(0, Math.min(1, ranM / Math.max(1, distance)));
+        const settle = Math.max(0, Math.min(1, ranM / SETTLE_M));
+        /** ★前提 P-1: ★コーナーの刻みでは隊列が落ち着き切っていること */
+        if (settle !== 1) return undefined;
+        const revealRun = Math.max(0, Math.min(1, (run - REVEAL_START_RUN) / Math.max(1e-6, revealFullRun - REVEAL_START_RUN)));
+        const reveal = revealRun * revealRun * (3 - 2 * revealRun);
+        const theta = run * Math.PI * 3;
+        const c = len / seg.radius;
+        sumC += c;
+        sumA += Math.cos(theta) * reveal * c;
+        sumB += Math.sin(theta) * reveal * c;
+        if (reveal > maxReveal) maxReveal = reveal;
+      }
+    }
+    acc += seg.length;
+  }
+  return { stepM, revealFullRun, laneModel, sumC, sumA, sumB, maxReveal };
+}
+
+/**
+ * ★**その馬を分解の式で計算してよいか**（★純粋関数・★状態を持たない・★検査はこれで経路を見ます）。
+ *   ★端の判定は ★`|sin| ≤ 1` として保守的に: `home ∓ wobbleM·S·maxReveal` が ★`(0.8, widthM − 0.8)` の内側。
+ */
+export function laneExtraPathOf(
+  plan: LaneRacePlan, gate: number, fieldSize: number, seed: number,
+  stepM = 10,
+  revealFullRun: number = LANE_REVEAL_FULL_RUN,
+  laneModel: LaneModel = LANE_MODEL,
+): 'sum' | 'loop' {
+  return laneSumHorseOf(plan, gate, fieldSize, seed, stepM, revealFullRun, laneModel) === undefined ? 'loop' : 'sum';
+}
+
+function sumPlanFor(plan: LaneRacePlan, stepM: number, revealFullRun: number, laneModel: LaneModel): LaneSumPlan | undefined {
+  const pre = plan.sum;
+  if (pre !== undefined && pre.stepM === stepM && pre.revealFullRun === revealFullRun && pre.laneModel === laneModel) return pre;
+  return laneSumPlanOf(plan, stepM, revealFullRun, laneModel);
+}
+
+function laneSumHorseOf(
+  plan: LaneRacePlan, gate: number, fieldSize: number, seed: number,
+  stepM: number, revealFullRun: number, laneModel: LaneModel,
+): { readonly sum: LaneSumPlan; readonly horse: LaneHorseConst } | undefined {
+  const sum = sumPlanFor(plan, stepM, revealFullRun, laneModel);
+  if (sum === undefined) return undefined;
+  const horse = laneHorseOf(gate, fieldSize, seed, plan.spec.widthM, laneModel, plan.swing);
+  const reach = laneModel.wobbleM * plan.swing * sum.maxReveal;
+  if (!(horse.home - reach > 0.8 && horse.home + reach < plan.spec.widthM - 0.8)) return undefined;
+  return { sum, horse };
+}
+
+/**
+ * ★`laneExtraM` の本体（★1 レース 1 回の値 `plan` を受け取る）。
+ *   ★前提が成り立つ馬は分解の式、★成り立たない馬はループ（★ES-5）。
+ */
 export function laneExtraMOnPlan(
+  plan: LaneRacePlan, gate: number, fieldSize: number, seed: number,
+  stepM = 10,
+  revealFullRun: number = LANE_REVEAL_FULL_RUN,
+  laneModel: LaneModel = LANE_MODEL,
+): number {
+  const fast = laneSumHorseOf(plan, gate, fieldSize, seed, stepM, revealFullRun, laneModel);
+  if (fast === undefined) return laneExtraMOnPlanLoop(plan, gate, fieldSize, seed, stepM, revealFullRun, laneModel);
+  const { sum, horse } = fast;
+  const centre = plan.spec.widthM / 2;
+  return (horse.home - centre) * sum.sumC
+    + laneModel.wobbleM * plan.swing * (Math.sin(horse.phase) * sum.sumA + Math.cos(horse.phase) * sum.sumB);
+}
+
+/**
+ * ★**ループの経路**（★ES-3 の刻みの計算・★`884019c` と 1 ビットも同じ）。
+ *   ★分解の式の**比較の基準**と、★前提が崩れたときの**縮退先**です。★式を書き換えないこと。
+ */
+export function laneExtraMOnPlanLoop(
   plan: LaneRacePlan, gate: number, fieldSize: number, seed: number,
   stepM = 10,
   revealFullRun: number = LANE_REVEAL_FULL_RUN,

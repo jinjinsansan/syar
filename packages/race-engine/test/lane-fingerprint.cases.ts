@@ -79,25 +79,59 @@ export function fingerprintCases(): FingerprintCase[] {
 
 const num = (x: number): string => x.toString();
 
-/** ★1 つの組の指紋（★16 進 32 文字） */
-export function fingerprintOf(c: FingerprintCase): string {
-  const h = createHash('sha256');
+/** ★1 つの組の中身（★数のまま・★ES-5 で許容差つきの比較に使う） */
+export interface FingerprintSeedRow {
+  readonly order: readonly {
+    readonly horseId: string; readonly finishPosition: number; readonly finalScore: number; readonly laneExtraM: number;
+    readonly timeSec: number; readonly timeGapSec: number; readonly marginLabel: string;
+  }[];
+  /** ★`laneExtraM` を直接呼んだ値（★楕円だけ） */
+  readonly lx?: readonly number[];
+  /** ★`laneAt` を 50m 刻みで呼んだ値（★楕円のシード 0 だけ） */
+  readonly la?: readonly number[];
+}
+
+/** ★`laneExtraM` の呼び方（★`race.ts` と同じ引数）。★既定は本番の `laneExtraM` */
+export type LaneExtraOf = (gate: number, heads: number, distance: number, seed: number, course: OvalSpec | undefined) => number;
+const productionLaneExtra: LaneExtraOf = (gate, heads, distance, seed, course) => laneExtraM(gate, heads, distance, seed, course);
+
+export function fingerprintRowsOf(c: FingerprintCase, laneExtraOf: LaneExtraOf = productionLaneExtra): FingerprintSeedRow[] {
+  const rows: FingerprintSeedRow[] = [];
   const entrants = fingerprintField(c.heads);
   const spec = c.conditions.course ?? DEFAULT_OVAL;
   for (let s = 0; s < FINGERPRINT_SEEDS; s += 1) {
     const seed = 12345 + s * 7919;
     const r = resolveRace({ conditions: c.conditions, entrants, seed, balance: DEFAULT_RACE_BALANCE });
-    h.update(r.order.map((o) => [o.horseId, o.finishPosition, num(o.finalScore), num(o.laneExtraM), num(o.timeSec), num(o.timeGapSec), o.marginLabel].join(',')).join(';'));
-    if (c.conditions.courseShape !== 'oval') continue;
+    const order = r.order.map((o) => ({
+      horseId: o.horseId, finishPosition: o.finishPosition, finalScore: o.finalScore, laneExtraM: o.laneExtraM,
+      timeSec: o.timeSec, timeGapSec: o.timeGapSec, marginLabel: o.marginLabel,
+    }));
+    if (c.conditions.courseShape !== 'oval') { rows.push({ order }); continue; }
     /** ★エンジンの経路（`race.ts` と同じ引数） */
-    h.update(`|lx:${entrants.map((e) => num(laneExtraM(e.gate, c.heads, c.distance, seed, c.conditions.course))).join(',')}`);
+    const lx = entrants.map((e) => laneExtraOf(e.gate, c.heads, c.distance, seed, c.conditions.course));
     /** ★画面の経路（`laneAt` を直接・★幅と走路の形を渡す）。★重いのでシード 0 だけ */
-    if (s !== 0) continue;
-    const ws: string[] = [];
+    if (s !== 0) { rows.push({ order, lx }); continue; }
+    const la: number[] = [];
     for (const e of entrants) {
-      for (let ml = c.distance; ml >= 0; ml -= LANE_AT_STEP_M) ws.push(num(laneAt(e.gate, c.heads, ml, c.distance, seed, spec.widthM, undefined, spec)));
+      for (let ml = c.distance; ml >= 0; ml -= LANE_AT_STEP_M) la.push(laneAt(e.gate, c.heads, ml, c.distance, seed, spec.widthM, undefined, spec));
     }
-    h.update(`|la:${ws.join(',')}`);
+    rows.push({ order, lx, la });
+  }
+  return rows;
+}
+
+/** ★中身から指紋を作る（★ES-1 の `fingerprintOf` と同じ文字の並び・同じ順番で足す） */
+export function digestOfRows(rows: readonly FingerprintSeedRow[]): string {
+  const h = createHash('sha256');
+  for (const row of rows) {
+    h.update(row.order.map((o) => [o.horseId, o.finishPosition, num(o.finalScore), num(o.laneExtraM), num(o.timeSec), num(o.timeGapSec), o.marginLabel].join(',')).join(';'));
+    if (row.lx !== undefined) h.update(`|lx:${row.lx.map(num).join(',')}`);
+    if (row.la !== undefined) h.update(`|la:${row.la.map(num).join(',')}`);
   }
   return h.digest('hex').slice(0, 32);
+}
+
+/** ★1 つの組の指紋（★16 進 32 文字） */
+export function fingerprintOf(c: FingerprintCase, laneExtraOf: LaneExtraOf = productionLaneExtra): string {
+  return digestOfRows(fingerprintRowsOf(c, laneExtraOf));
 }
