@@ -401,7 +401,47 @@ function laneAtWithSwing(
   /** ★`swingScale(distanceMeter, spec)`（★1 レース 1 回） */
   swing: number,
 ): number {
+  return laneAtOnHorse(laneHorseOf(gate, fieldSize, seed, widthM, laneModel, swing),
+    metersLeft, distanceMeter, widthM, revealFullRun, laneModel, swing);
+}
+
+/**
+ * ★**馬ごとに一定の値**（★ES 便 ES-3・2026-09-15・回答 §Q-2「1 頭 1 回」）。
+ *   ★発走時の位置・落ち着き先・外への振れ・位相は ★**枠・頭数・シード・幅・走り方・swing だけ**で決まり、★刻みを引数に取りません。
+ *   ★以前は刻みごとに作り直していました（★`laneAtStart` と `stream` 3 本・★1 頭で数百回）。
+ * ⚠️ ★式は ★元の `laneAt` の本体から ★**そのまま移した**だけです（★`home` の掛ける順番も同じ・§Q-2 条件 3）。
+ */
+export interface LaneHorseConst {
+  readonly start: number;
+  readonly home: number;
+  readonly drift: number;
+  readonly phase: number;
+}
+
+function laneHorseOf(
+  gate: number, fieldSize: number, seed: number, widthM: number, laneModel: LaneModel, swing: number,
+): LaneHorseConst {
   const start = laneAtStart(gate, fieldSize, widthM);
+  const home = laneModel.legacy === true
+    ? RAIL_W
+    : RAIL_W + laneModel.homeSpreadM
+      * (() => { const u = stream(seed, gate, 0x51ed2701); return u * u; })()
+      * swing;
+  /** ★外を回されるか、内が空くか。シードから引き、進むほど開く */
+  const drift = (stream(seed, gate, 0x1b873593) - 0.5) * 2;
+  const phase = stream(seed, gate, 0x2f5c1d3b) * Math.PI * 2;
+  return { start, home, drift, phase };
+}
+
+/**
+ * ★**刻みごとの計算だけ**（★ES-3）。★馬ごとの値は `laneHorseOf`、★1 レースの値は `swing` で受け取ります。
+ * ⚠️ ★`laneAt`（`laneAtWithSwing`）と `laneExtraM`（`laneExtraMOnPlan`）は ★**この関数だけ**を通します（★R-30）。
+ */
+function laneAtOnHorse(
+  horse: LaneHorseConst, metersLeft: number, distanceMeter: number,
+  widthM: number, revealFullRun: number, laneModel: LaneModel, swing: number,
+): number {
+  const { start, home, drift, phase } = horse;
   const ranM = Math.max(0, distanceMeter - metersLeft);
   const run = Math.max(0, Math.min(1, ranM / Math.max(1, distanceMeter)));
 
@@ -433,16 +473,8 @@ function laneAtWithSwing(
    *    ★**長い距離ほど早く内に入れます**。
    * ★**1600m は基準距離なので 1.0** — ★オーナーが実画面で選んだ絵は変わりません。
    */
-  const home = laneModel.legacy === true
-    ? RAIL_W
-    : RAIL_W + laneModel.homeSpreadM
-      * (() => { const u = stream(seed, gate, 0x51ed2701); return u * u; })()
-      * swing;
   const base = start + (home - start) * settled;
 
-  /** ★外を回されるか、内が空くか。シードから引き、進むほど開く */
-  const drift = (stream(seed, gate, 0x1b873593) - 0.5) * 2;
-  const phase = stream(seed, gate, 0x2f5c1d3b) * Math.PI * 2;
   const wave = Math.sin(phase + run * Math.PI * 3) * 0.3;
   /**
    * ★**シード由来の広がりが、どこで出そろうか**（`revealFullRun` で調整）。
@@ -513,6 +545,8 @@ export function laneExtraMOnPlan(
   laneModel: LaneModel = LANE_MODEL,
 ): number {
   const { distance, spec, segs, swing } = plan;
+  /** ★馬ごとに一定の値（★1 頭 1 回・★ES 便 ES-3） */
+  const horse = laneHorseOf(gate, fieldSize, seed, spec.widthM, laneModel, swing);
   const centre = spec.widthM / 2;
   let extra = 0;
   let acc = 0;
@@ -526,7 +560,7 @@ export function laneExtraMOnPlan(
          *    ★`w` だけ 1周2000m 前提、という形に戻ります（★2026-08-30 まで実際にそうでした）。
          *    ★いまは `spec` から作った `swing`（`plan`）を渡します（★ES-2）。
          */
-        const w = laneAtWithSwing(gate, fieldSize, distance - s, distance, seed, spec.widthM, revealFullRun, laneModel, swing);
+        const w = laneAtOnHorse(horse, distance - s, distance, spec.widthM, revealFullRun, laneModel, swing);
         extra += (w - centre) * (len / seg.radius);
       }
     }
