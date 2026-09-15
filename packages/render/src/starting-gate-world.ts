@@ -30,6 +30,27 @@ export const GATE_DEPTH_M = 3.1;
 /** ★番号板の高さ（m・★天井の上） */
 export const GATE_PLATE_H_M = 0.62;
 
+/** ★発馬機の色の組 */
+export interface StartingGateColors {
+  /** ★骨組み（鋼） */
+  readonly frame: string;
+  readonly frameShade: string;
+  /** ★仕切りの板 */
+  readonly panel: string;
+  readonly panelShade: string;
+  /** ★前扉（閉じているとき） */
+  readonly door: string;
+  /** ★番号板 */
+  readonly plate: string;
+  readonly plateText: string;
+  /** ★車輪と台座 */
+  readonly base: string;
+  /** ★前の天井の桟と屋根の縁の差し色。★省くと `frame`（＝従来どおり） */
+  readonly accent?: string | undefined;
+  /** ★屋根の面。★省くと `accent`、それも無ければ `frame` */
+  readonly canopy?: string | undefined;
+}
+
 /** ★色は 1 か所に。★検査が「発馬機が出たか」を色で見分けられるようにする */
 export const GATE_WORLD_COLORS = {
   /** ★骨組み（鋼） */
@@ -45,7 +66,26 @@ export const GATE_WORLD_COLORS = {
   plateText: '#14181a',
   /** ★車輪と台座 */
   base: '#4d5651',
-} as const;
+} as const satisfies StartingGateColors;
+
+/**
+ * ★**競馬場ごとに「若干」変える口**（★2026-09-15・★オーナー「ゲートのデザインを競馬場ごとに若干変える」）。
+ *
+ * ⚠️ ★**形の骨格（房の数・高さ・奥行き・仕切りの位置）は変えません。** ★変えるのは色と小物だけです。
+ *    ★房の位置を場ごとに変えると、★発走の画と隊列の読みやすさが場ごとに変わってしまいます。
+ * ⚠️ ★省けば `GATE_WORLD_STYLE` と同じ＝★**2026-09-15 以前と 1 ビットも変わりません**
+ *    （`apps/cli/test/venue-look.test.ts` が描画の命令列で固定）。
+ */
+export interface StartingGateStyle {
+  readonly colors: StartingGateColors;
+  /** ★屋根（天井の上に張り出す板）を付けるか。★既定は付けない */
+  readonly canopy?: boolean | undefined;
+  /** ★番号板の高さの倍率。★既定 1 */
+  readonly plateScale?: number | undefined;
+}
+
+/** ★既定の見た目（★スターパーク競馬場と同じ） */
+export const GATE_WORLD_STYLE: StartingGateStyle = { colors: GATE_WORLD_COLORS };
 
 export interface StartingGateWorldOptions {
   /** ★発馬機を置く走路上の位置（m）。★ふつうは 0（発走地点） */
@@ -63,6 +103,8 @@ export interface StartingGateWorldOptions {
   readonly visibleWithinM?: number | undefined;
   /** ★番号板の文字。★省略すると板だけ */
   readonly font?: FontOf | undefined;
+  /** ★見た目（★競馬場ごと）。★省略すると `GATE_WORLD_STYLE` */
+  readonly style?: StartingGateStyle | undefined;
 }
 
 interface Projected { readonly x: number; readonly y: number; readonly depth: number }
@@ -102,6 +144,10 @@ export function drawStartingGateWorld(
 ): void {
   const within = opts.visibleWithinM ?? 140;
   if (Math.abs(opts.focusS - opts.startS) > within) return;
+  const style = opts.style ?? GATE_WORLD_STYLE;
+  const C = style.colors;
+  const accent = C.accent ?? C.frame;
+  const plateH = GATE_PLATE_H_M * (style.plateScale ?? 1);
   const basis = cameraBasis(cam);
   const W = cam.width, H = cam.height;
   const P = (s: number, w: number, z: number): Projected => {
@@ -123,7 +169,7 @@ export function drawStartingGateWorld(
   quad(ctx,
     P(back - 0.5, left - 0.4, 0), P(back - 0.5, right + 0.4, 0),
     P(front + 0.5, right + 0.4, 0), P(front + 0.5, left - 0.4, 0),
-    GATE_WORLD_COLORS.base);
+    C.base);
 
   /**
    * ── ② 仕切り（★房と房の間）───────────────────────────────
@@ -138,19 +184,19 @@ export function drawStartingGateWorld(
     const w = left + stallW * i;
     quad(ctx,
       P(back, w, 0), P(front, w, 0), P(front, w, PANEL_TOP), P(back, w, PANEL_TOP),
-      i % 2 === 0 ? GATE_WORLD_COLORS.panel : GATE_WORLD_COLORS.panelShade);
+      i % 2 === 0 ? C.panel : C.panelShade);
     /** ★柱（前と後ろ） */
     for (const s of [front, back]) {
       quad(ctx,
         P(s, w - 0.06, 0), P(s, w + 0.06, 0),
         P(s, w + 0.06, GATE_HEIGHT_M), P(s, w - 0.06, GATE_HEIGHT_M),
-        GATE_WORLD_COLORS.frame);
+        C.frame);
     }
     /** ★前後の柱をつなぐ桟（★仕切りの面に 1 本）。★横から見ると格子になる */
     quad(ctx,
       P(back, w - 0.04, GATE_HEIGHT_M * 0.64), P(front, w - 0.04, GATE_HEIGHT_M * 0.64),
       P(front, w + 0.04, GATE_HEIGHT_M * 0.64), P(back, w + 0.04, GATE_HEIGHT_M * 0.64),
-      GATE_WORLD_COLORS.frameShade);
+      C.frameShade);
   }
 
   /** ── ③ 天井の桟（★走路を横切る 1 本）───────────────────── */
@@ -161,7 +207,7 @@ export function drawStartingGateWorld(
       quad(ctx,
         P(s, w, GATE_HEIGHT_M - 0.16), P(s, w2, GATE_HEIGHT_M - 0.16),
         P(s, w2, GATE_HEIGHT_M), P(s, w, GATE_HEIGHT_M),
-        s === front ? GATE_WORLD_COLORS.frame : GATE_WORLD_COLORS.frameShade);
+        s === front ? accent : C.frameShade);
     }
   }
   /** ★前後の天井をつなぐ桟（★房ごと 1 本） */
@@ -170,7 +216,7 @@ export function drawStartingGateWorld(
     quad(ctx,
       P(back, w - 0.05, GATE_HEIGHT_M - 0.12), P(front, w - 0.05, GATE_HEIGHT_M - 0.12),
       P(front, w + 0.05, GATE_HEIGHT_M - 0.12), P(back, w + 0.05, GATE_HEIGHT_M - 0.12),
-      GATE_WORLD_COLORS.frameShade);
+      C.frameShade);
   }
 
   /** ── ④ 番号板（★天井の上・房ごと）───────────────────────── */
@@ -178,9 +224,9 @@ export function drawStartingGateWorld(
     const wc = left + stallW * (i + 0.5);
     const a = P(front, wc - stallW * 0.34, GATE_HEIGHT_M);
     const b = P(front, wc + stallW * 0.34, GATE_HEIGHT_M);
-    const c = P(front, wc + stallW * 0.34, GATE_HEIGHT_M + GATE_PLATE_H_M);
-    const d = P(front, wc - stallW * 0.34, GATE_HEIGHT_M + GATE_PLATE_H_M);
-    quad(ctx, a, b, c, d, GATE_WORLD_COLORS.plate);
+    const c = P(front, wc + stallW * 0.34, GATE_HEIGHT_M + plateH);
+    const d = P(front, wc - stallW * 0.34, GATE_HEIGHT_M + plateH);
+    quad(ctx, a, b, c, d, C.plate);
     if (opts.font === undefined) continue;
     const h = Math.abs(((a.y + b.y) - (c.y + d.y)) / 2);
     if (h < 9) continue;
@@ -190,9 +236,34 @@ export function drawStartingGateWorld(
      */
     ctx.font = opts.font(Math.max(7, Math.round(h * 0.78)), true);
     ctx.textAlign = 'center';
-    ctx.fillStyle = GATE_WORLD_COLORS.plateText;
+    ctx.fillStyle = C.plateText;
     ctx.fillText(String(i + 1), (a.x + b.x) / 2, (a.y + b.y) / 2 - h * 0.16);
     ctx.textAlign = 'left';
+  }
+
+  /**
+   * ── ⑤ 屋根（★場ごとの小物・★`style.canopy` のときだけ）──────────
+   *   ★番号板の上に張り出す薄い板です。★真横から見ると ★**両端の面**と上面が見えます。
+   *   ⚠️ ★馬の頭（2.4m）より上だけに置きます。★房の中の馬を隠しません。
+   */
+  if (style.canopy === true) {
+    const z0 = GATE_HEIGHT_M + plateH + 0.06;
+    const z1 = z0 + 0.18;
+    const sb = back - 0.25, sf = front + 0.55;
+    const wl = left - 0.35, wr = right + 0.35;
+    const roof = C.canopy ?? accent;
+    /** ★屋根を支える柱（★両端・前後） */
+    for (const w of [left - 0.2, right + 0.2]) {
+      for (const s of [front, back]) {
+        quad(ctx, P(s, w - 0.07, GATE_HEIGHT_M), P(s, w + 0.07, GATE_HEIGHT_M),
+          P(s, w + 0.07, z0), P(s, w - 0.07, z0), C.frame);
+      }
+    }
+    quad(ctx, P(sb, wl, z1), P(sb, wr, z1), P(sf, wr, z1), P(sf, wl, z1), roof);
+    for (const w of [wl, wr]) {
+      quad(ctx, P(sb, w, z0), P(sf, w, z0), P(sf, w, z1), P(sb, w, z1), accent);
+    }
+    quad(ctx, P(sf, wl, z0), P(sf, wr, z0), P(sf, wr, z1), P(sf, wl, z1), accent);
   }
   void H;
 }
@@ -212,6 +283,7 @@ export function drawStartingGateWorldFront(
   if (closed <= 0.001) return;
   const within = opts.visibleWithinM ?? 140;
   if (Math.abs(opts.focusS - opts.startS) > within) return;
+  const door = (opts.style ?? GATE_WORLD_STYLE).colors.door;
   const basis = cameraBasis(cam);
   const P = (s: number, w: number, z: number): Projected => {
     const g = posOf(course, s, w);
@@ -231,14 +303,14 @@ export function drawStartingGateWorldFront(
       quad(ctx,
         P(front, wc - 0.05, 0), P(front, wc + 0.05, 0),
         P(front, wc + 0.05, GATE_HEIGHT_M * 0.86), P(front, wc - 0.05, GATE_HEIGHT_M * 0.86),
-        GATE_WORLD_COLORS.door);
+        door);
     }
     /** ★扉の上下の桟 */
     for (const z of [GATE_HEIGHT_M * 0.30, GATE_HEIGHT_M * 0.62]) {
       quad(ctx,
         P(front, w0, z - 0.05), P(front, w1, z - 0.05),
         P(front, w1, z + 0.05), P(front, w0, z + 0.05),
-        GATE_WORLD_COLORS.door);
+        door);
     }
   }
   ctx.globalAlpha = prev;

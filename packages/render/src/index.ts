@@ -27,6 +27,11 @@ export * from './crowd.js';
 export * from './infield.js';
 export * from './finish-post.js';
 export * from './starting-gate-world.js';
+export * from './venue-look.js';
+export * from './trackside-flags.js';
+export * from './season-look.js';
+export * from './time-of-day-look.js';
+export * from './venue-scenery.js';
 /** ★2D 馬群の限界テスト専用（通常のレースからは参照されない・`pack-limit.ts` の注記） */
 export * from './pack-limit.js';
 /**

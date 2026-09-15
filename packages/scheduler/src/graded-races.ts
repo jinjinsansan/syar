@@ -56,6 +56,11 @@ export interface GradedRace {
   readonly age: AgeCondition;
   /** ★牝馬限定 */
   readonly fillies: boolean;
+  /**
+   * ★**シリーズ**（★2026-09-15・演出の「三冠 第 1 戦」などの表示）。★明示のフィールドです。
+   * ⚠️ ★レース名から推し量りません（★名前はデータの 1 フィールドで、差し替えても構造が動かないため）。
+   */
+  readonly series?: { readonly name: string; readonly leg: number } | undefined;
 }
 
 /**
@@ -69,11 +74,11 @@ export const GRADED_RACES: readonly GradedRace[] = [
   /** ★既存のデモがこのレースです。★名前を動かしません */
   { id: 'g1-ousei', name: '桜星賞', venueId: 'star-park', grade: 'G1', surface: 'turf', distanceM: 1600, month: 4, age: '3', fillies: false },
   /** ★三冠 ①（皐月の位置） */
-  { id: 'g1-seikan', name: '星冠賞', venueId: 'kirigahara', grade: 'G1', surface: 'turf', distanceM: 2000, month: 4, age: '3', fillies: false },
+  { id: 'g1-seikan', name: '星冠賞', venueId: 'kirigahara', grade: 'G1', surface: 'turf', distanceM: 2000, month: 4, age: '3', fillies: false, series: { name: '三冠', leg: 1 } },
   /** ★三冠 ②（ダービーの位置） */
-  { id: 'g1-tenkyu', name: '天穹賞', venueId: 'tenga', grade: 'G1', surface: 'turf', distanceM: 2400, month: 5, age: '3', fillies: false },
+  { id: 'g1-tenkyu', name: '天穹賞', venueId: 'tenga', grade: 'G1', surface: 'turf', distanceM: 2400, month: 5, age: '3', fillies: false, series: { name: '三冠', leg: 2 } },
   /** ★三冠 ③（菊花の位置・最長） */
-  { id: 'g1-ginga', name: '銀河賞', venueId: 'ginrei', grade: 'G1', surface: 'turf', distanceM: 3000, month: 10, age: '3', fillies: false },
+  { id: 'g1-ginga', name: '銀河賞', venueId: 'ginrei', grade: 'G1', surface: 'turf', distanceM: 3000, month: 10, age: '3', fillies: false, series: { name: '三冠', leg: 3 } },
   { id: 'g1-ryusei', name: '流星大賞典', venueId: 'tenga', grade: 'G1', surface: 'turf', distanceM: 2000, month: 10, age: '3+', fillies: false },
   { id: 'g1-kyokko', name: '極光賞', venueId: 'ookawara', grade: 'G1', surface: 'turf', distanceM: 2500, month: 12, age: '3+', fillies: false },
   { id: 'g1-suisei', name: '彗星スプリント', venueId: 'shiokaze', grade: 'G1', surface: 'turf', distanceM: 1200, month: 9, age: '3+', fillies: false },

@@ -1,4 +1,5 @@
 import type { Ctx2D, FontOf, Palette, SheetSpec, Viewport2D } from './oblique-draw.js';
+import { drawVenueCrest, drawVenueScenery, titleSceneryBand, type TitleSceneryOptions } from './venue-scenery.js';
 import {
   HUD, goldPlate, drawGoldEdge, fillSlant, strokeSlant, drawFrameBadge, drawLabel, drawSpacedText,
   riseAt, wipeAt, drawOnAir, typedCount, drawNarratorFrame, drawGoldChip,
@@ -62,6 +63,15 @@ export interface RaceIntroMeta {
   readonly startTimeLabel?: string | undefined;
   /** 頭数（右上の「12 HORSES」）。無ければ出さない */
   readonly fieldSize?: number | undefined;
+  /**
+   * ★**格と馬場の英字**（★2026-09-15・例「GRADE I ・ TURF」）。
+   * ⚠️ ★以前は全鞍 ★「GRADE I ・ TURF CHAMPIONSHIP」の直書きで、★G3 のダート戦にも出ていました。★省くと従来の文言
+   */
+  readonly gradeLabel?: string | undefined;
+  /** ★条件のチップ（★例「3歳」「牝馬限定」「三冠 第1戦」）。★格の英字の右に並べる */
+  readonly chips?: readonly string[] | undefined;
+  /** ★**競馬場の紹介 1 行**（★例「左回り　1周2200m・直線620m　10場でいちばん長い直線」）。★省くと出さない */
+  readonly venueFeature?: string | undefined;
   /** 自馬（右下の「あなたの馬」パネル）。無ければ出さない */
   readonly own?: {
     readonly gate: number; readonly role: string; readonly name: string; readonly jockey: string;
@@ -128,6 +138,11 @@ export function drawRaceTitleCard<TImage>(
   background?: { readonly image: TImage; readonly width: number; readonly height: number },
   /** ★自馬の走りコマ（`sideHighQuality` の自馬ぶん）。省略すると従来どおり馬は出ません */
   ownHorse?: readonly RaceIntroHorseFrame<TImage>[],
+  /**
+   * ★**場の景色と紋・季節と時間帯の色**（★2026-09-15・計画書 V-13 / V-15）。
+   * ⚠️ ★省けば 1 命令も変わりません。★`kind: 'default'` で色も空なら、★省いたときと同じ命令列です（★検査で固定）。
+   */
+  scenery?: TitleSceneryOptions,
 ): void {
   /**
    * ★本線（design/hud-ds/components/title-card）: 出るのは displaySec 3.0–5.6（空撮のあと）。前後 0.35 秒でフェード。
@@ -148,6 +163,17 @@ export function drawRaceTitleCard<TImage>(
   } else {
     ctx.fillStyle = '#0b1210'; ctx.fillRect(0, 0, W, H);
   }
+  /** ★場の遠景と、★季節・時間帯の色（★背景絵の上・暗幕の前＝★文字には掛からない） */
+  if (scenery !== undefined) {
+    const u = ctx as unknown as Ctx2D<unknown>;
+    drawVenueScenery(u, scenery.kind, titleSceneryBand(vp), { timeSec: displaySec, night: scenery.night });
+    for (const tint of scenery.tints) {
+      if (!(tint.alpha > 0)) continue;
+      const prevA = ctx.globalAlpha;
+      ctx.globalAlpha = prevA * tint.alpha; ctx.fillStyle = tint.color; ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = prevA;
+    }
+  }
   // 暗幕: x0–44% は rgba(3,6,4,.86)、78% へ向けて 0（グラデーションが無い環境では段で近似）
   if (typeof ctx.createLinearGradient === 'function') {
     const g = ctx.createLinearGradient(0, 0, W, 0);
@@ -164,8 +190,8 @@ export function drawRaceTitleCard<TImage>(
   const rise = riseAt(local, 0, 0.55);
   ctx.globalAlpha = baseAlpha * Math.max(0, fade) * rise.alpha;
   const t = displaySec;
-  // 板 left-40 top150 w820（斜度 -9°）。高さは中身なり（≒ 388）
-  const px = -40, py = 150 + rise.dy, pw = 820, ph = 388;
+  // 板 left-40 top150 w820（斜度 -9°）。高さは中身なり（≒ 388）。★場の紹介 1 行があるときは 1 行ぶん伸ばす
+  const px = -40, py = 150 + rise.dy, pw = 820, ph = meta.venueFeature === undefined ? 388 : 424;
   fillSlant(ctx, px, py, pw, ph, HUD.glass);
   ctx.fillStyle = HUD.goldHair;
   const k = HUD.skew * ph * 0.5;
@@ -203,7 +229,26 @@ export function drawRaceTitleCard<TImage>(
   y += 20 + 34;
   // 格 12px 字間 .34em 金
   ctx.font = font(12, true); ctx.fillStyle = HUD.gold;
-  drawSpacedText(ctx, 'GRADE I ・ TURF CHAMPIONSHIP', ix, y + 12, 12 * 0.34);
+  const gradeText = meta.gradeLabel ?? 'GRADE I ・ TURF CHAMPIONSHIP';
+  drawSpacedText(ctx, gradeText, ix, y + 12, 12 * 0.34);
+  /** ★条件のチップ（★格の英字の右に、金の細枠で並べる・2026-09-15） */
+  if (meta.chips !== undefined && meta.chips.length > 0) {
+    ctx.font = font(12, true);
+    let chipX = ix + ctx.measureText(gradeText).width + gradeText.length * 12 * 0.34 + 18;
+    for (const chip of meta.chips) {
+      ctx.font = font(14, true);
+      const cw = ctx.measureText(chip).width + 16;
+      ctx.fillStyle = 'rgba(201,162,39,.18)'; ctx.fillRect(chipX, y - 4, cw, 22);
+      ctx.fillStyle = HUD.goldHair; ctx.fillRect(chipX, y + 17, cw, 1);
+      ctx.fillStyle = HUD.paper; ctx.fillText(chip, chipX + 8, y + 12);
+      chipX += cw + 8;
+    }
+  }
+  /** ★競馬場の紹介 1 行（★2026-09-15）。★板はこの 1 行ぶん伸ばしてある（`ph`） */
+  if (meta.venueFeature !== undefined) {
+    ctx.font = font(18, true); ctx.fillStyle = 'rgba(246,242,231,.9)';
+    ctx.fillText(meta.venueFeature, ix, y + 12 + 32);
+  }
   // 頭数バッジ 右上 x1244 基準
   if (meta.fieldSize !== undefined) {
     ctx.font = font(12, true);
@@ -213,6 +258,10 @@ export function drawRaceTitleCard<TImage>(
     fillSlant(ctx, W - 36 - bw, 36, bw, bh, HUD.glass);
     strokeSlant(ctx, W - 36 - bw, 36, bw, bh, HUD.goldHair);
     drawLabel(ctx, font, label, W - 36 - bw + 16, 36 + 17, HUD.gold);
+  }
+  /** ★場の紋（★右上・頭数バッジの下・2026-09-15・計画書 V-15） */
+  if (scenery?.crest !== undefined) {
+    drawVenueCrest(ctx as unknown as Ctx2D<unknown>, scenery.kind, W - 36 - 40, 36 + 26 + 18 + 40, 80, scenery.crest);
   }
   // 自馬パネル 右下 右端 x1244・下端 y676（w296）／0.5s 遅れてライズ
   if (meta.own !== undefined) {

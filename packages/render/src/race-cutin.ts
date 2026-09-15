@@ -622,6 +622,8 @@ export interface ToStraightCutInOptions {
    * ⚠️ ★省くと従来どおり（★先頭は右端）。
    */
   readonly leftward?: boolean | undefined;
+  /** ★コース図の走路と決勝線の色（★競馬場ごと・2026-09-15）。★省くと従来 */
+  readonly courseMapColors?: { readonly track: string; readonly goal: string } | undefined;
 }
 
 /**
@@ -648,6 +650,7 @@ export function drawToStraightCutIn<TImage>(
       metersLeft: o.metersLeft,
       timeSec: o.timeSec,
       sinceSec: f.sinceSec,
+      ...(o.courseMapColors === undefined ? {} : { trackColor: o.courseMapColors.track, goalColor: o.courseMapColors.goal }),
     });
 
   /** ★右に「自馬がいま何番手で、先頭とどれだけ差があるか」 */

@@ -497,6 +497,13 @@ export function drawWinnerLowerThird(
   opts: {
     readonly role?: string | undefined; readonly stableName?: string | undefined;
     readonly animSec?: number | undefined; readonly sinceSec?: number | undefined;
+    /**
+     * ★**格の色**（★2026-09-15・G1 金／G2 銀／G3 銅）。★上縁の帯に重ねます。★省くと金のまま（従来）。
+     * ⚠️ ★ゴールの後に出る帯なので、★格を使っても結果の先出しになりません（★格はレースの前から分かる値）。
+     */
+    readonly edgeTint?: string | undefined;
+    /** ★「WINNER」の横に出すレースの名札（例「G1 流星大賞典」）。★省くと出さない（従来） */
+    readonly raceLabel?: string | undefined;
   } = {},
 ): void {
   const t = opts.animSec ?? 0;
@@ -508,9 +515,13 @@ export function drawWinnerLowerThird(
   const y = H - 180 + rise.dy;
   fillSlant(ctx, -30, y, W + 70, 180, 'rgba(4,7,5,.92)');
   drawGoldEdge(ctx, 0, y, W, t, 6);
+  if (opts.edgeTint !== undefined) {
+    ctx.fillStyle = opts.edgeTint;
+    ctx.fillRect(0, y, W, 6);
+  }
   // 左ブロック（bottom 26）
   const bx = 70;
-  drawLabel(ctx, font, 'WINNER', bx, H - 26 - 64 - 6 + rise.dy);
+  drawLabel(ctx, font, opts.raceLabel === undefined ? 'WINNER' : `WINNER　${opts.raceLabel}`, bx, H - 26 - 64 - 6 + rise.dy);
   ctx.font = font(64, true);
   const w1 = ctx.measureText('1').width;
   ctx.fillStyle = goldPlate(ctx, bx, w1, t);

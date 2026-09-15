@@ -3,24 +3,28 @@
  *
  * 【★何が起きていたか】
  *   ★`tools/lib/race-audit-build.mjs` は ★`straightMetersLeft: 400` を ★**べた書き**していました。
- *   ★画面は `homeStretchMetersOf(course)` を渡します。
- *   ★直線は ★10 場 50 鞍で ★**290〜620m の 10 通り**あるので、
- *   ★**直線の違う会場では、道具と画面が別の knots を見ていた**ことになります。
+ *   ★画面は `homeStretchMetersOf(course)` を渡していました。
  *
- * ⚠️ ★**既定走路（`ovalCourse` の 400m）では 1 ビットも変わりません。**
- *    ★だから 9 条件の測定値は前と同じです。★同じであることを「影響なし」と読まないこと —
- *    ★**測っていた 9 条件が、たまたま既定の 1 場だっただけ**です（★R-33 と同じ形）。
+ * 【★2026-09-15 の訂正】★オーナー評「★有り得ないくらいに足が早い」（★流星大賞典・天河 2000m）。
+ *   ⚠️ ★`straightMetersLeft` は ★**走路の直線の長さではなく、「境界時刻 `straightSec` が指す地点」**でした。
+ *      ★境界時刻はエンジンの `boundaryTimesOf` が ★**残り `PHASE_METERS.STRAIGHT`（400m）固定**で出します。
+ *      ★走路の直線（290〜620m）を渡すと、★400m 分の時間でその長さを走らせることになり、
+ *      ★実測で ★**天河 620m は先頭が秒速 28.9m・潮風 310m は 12.2m**（★桜星賞 400m は 17.0m）でした。
+ *   → ★画面も道具も ★`PHASE_METERS.STRAIGHT` を渡します。★「道具と画面が同じ値」は保ったまま、★値の意味を直しました。
  *
  * 【★ここで見るもの】
- *   ★① 道具が直線長をべた書きしていない（★源を見る）
- *   ★② ★**直線長が実際に時計まで届く**（★渡しても効いていない、を通さない）
- *   ★③ ★従来方式へ戻せる（`legacyMotion`）
+ *   ★① 道具が直線に入る地点をべた書きしていない（★源を見る）
+ *   ★② ★**境界時刻と同じ地点が位置模型まで届く**（★走路の直線の長さに依らない）
+ *   ★③ ★**直線の長さの違う走路でも、最後の直線の速さが桜星賞と同じ帯**（★この訂正の本体・対照つき）
+ *   ★④ 画面と監査が同じ時計を返す
+ *   ★⑤ ★従来方式へ戻せる（`legacyMotion`）
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { PHASE_METERS } from '@star/race-engine';
 import { buildAuditRace, auditClock, auditPaceReport } from '../../../tools/lib/race-audit-build.mjs';
-import { knotsFor, raceClockFor } from '../src/index.js';
+import { knotsFor, raceClockFor, replayPositionModel } from '../src/index.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const AUDIT_SRC = path.join(ROOT, 'tools/lib/race-audit-build.mjs');
@@ -28,32 +32,55 @@ const AUDIT_SRC = path.join(ROOT, 'tools/lib/race-audit-build.mjs');
 const STRAIGHTS = [290, 400, 620] as const;
 const specOf = (homeStretchM: number) => ({ lapM: 2000, homeStretchM, widthM: 20 });
 
+/** ★先頭が残り `fromLeftM` からゴールまでを走る平均の速さ（m/s）。★位置模型から 0.05 秒刻みで測る */
+function leaderSpeedOverLast(model: { at(sec: number): readonly { meters: number }[] }, distance: number, fromLeftM: number): number {
+  const lead = (sec: number): number => Math.max(...model.at(sec).map((h) => h.meters));
+  let t0 = NaN, t1 = NaN;
+  for (let sec = 0; sec <= 600; sec += 0.05) {
+    if (Number.isNaN(t0) && lead(sec) >= distance - fromLeftM) t0 = sec;
+    if (lead(sec) >= distance - 1e-6) { t1 = sec; break; }
+  }
+  return fromLeftM / (t1 - t0);
+}
+
 describe('★監査道具と画面の入力の一致', () => {
-  it('★★道具が直線長をべた書きしていない', () => {
+  it('★★道具が直線に入る地点をべた書きしていない（★エンジンの定数から取る）', () => {
     const src = readFileSync(AUDIT_SRC, 'utf8');
     const code = src.split('\n').filter((l) => !/^\s*(\*|\/\/)/.test(l)).join('\n');
-    expect(code, '★直線長は走路から取ること（画面と同じ）').not.toMatch(/straightMetersLeft:\s*\d/);
-    expect(code, '★画面と同じ関数を通すこと').toMatch(/straightMetersLeft:\s*homeStretchMetersOf\(/);
+    expect(code, '★数字を直書きしないこと').not.toMatch(/straightMetersLeft:\s*\d/);
+    expect(code, '★境界時刻を作った側と同じ定数を通すこと').toMatch(/straightMetersLeft:\s*PHASE_METERS\.STRAIGHT\b/);
   });
 
-  it('★★直線長が位置モデルまで届く', () => {
+  it('★★境界時刻と同じ地点が位置模型まで届く（★走路の直線の長さに依らない）', () => {
+    expect(PHASE_METERS.STRAIGHT).toBe(400);
     for (const hs of STRAIGHTS) {
       const built = buildAuditRace({ seed: 42, distance: 1600, spec: specOf(hs) });
-      expect(built.model.straightMeters, `直線 ${hs}m`).toBe(hs);
+      expect(built.model.straightMeters, `直線 ${hs}m`).toBe(PHASE_METERS.STRAIGHT);
     }
   });
 
-  it('★★直線長が時計まで届く（★渡しても効いていない、を通さない）', () => {
-    const secs = STRAIGHTS.map((hs) => {
-      const built = buildAuditRace({ seed: 42, distance: 1600, spec: specOf(hs) });
-      return auditClock(built).warp.displaySec;
-    });
-    /**
-     * ★べた書き（400 固定）だったころは ★**3 つとも同じ値**になりました。
-     * ★互いに違うことを見れば、★「渡したが効いていない」を捕まえられます。
-     */
-    const uniq = new Set(secs.map((s) => s.toFixed(6)));
-    expect(uniq.size, `表示秒が会場で変わっていません: ${secs.join(' / ')}`).toBe(STRAIGHTS.length);
+  /**
+   * ★**③ この訂正の本体**: ★直線の長さの違う走路でも、★最後の 250m の先頭の速さが同じ帯に入る。
+   *   ★帯は 14〜20 m/s（★桜星賞の実測 17.0m/s の前後。★エンジンの平均速度 約 16m/s）。
+   * ⚠️ ★対照: ★走路の直線の長さを渡す形（★2026-09-09〜15 の画面）では ★620m で帯を超え、★290m で帯を割る。
+   */
+  it('★★直線の長さの違う走路でも、最後の直線の速さは同じ帯（★対照: 直線の長さを渡すと外れる）', () => {
+    for (const hs of STRAIGHTS) {
+      const built = buildAuditRace({ seed: 42, distance: 2000, spec: specOf(hs) });
+      const v = leaderSpeedOverLast(built.model, built.DIST, 250);
+      expect(v, `直線 ${hs}m: 秒速 ${v.toFixed(1)}m`).toBeGreaterThanOrEqual(14);
+      expect(v, `直線 ${hs}m: 秒速 ${v.toFixed(1)}m`).toBeLessThanOrEqual(20);
+    }
+    const wrongOf = (hs: number): number => {
+      const built = buildAuditRace({ seed: 42, distance: 2000, spec: specOf(hs) });
+      const wrong = replayPositionModel({
+        distanceMeter: built.DIST, spurtMetersLeft: 800, straightMetersLeft: hs, boundaries: built.boundaries,
+        strategyOf: (g: number) => built.entrants[g - 1]!.strategy, pace: built.pace, formationSeed: built.seed * 2654435761,
+      });
+      return leaderSpeedOverLast(wrong, built.DIST, 250);
+    };
+    expect(wrongOf(620), '★対照（天河相当）が帯の中なら、この検査は何も見ていない').toBeGreaterThan(20);
+    expect(wrongOf(290), '★対照（白砂相当）が帯の中なら、この検査は何も見ていない').toBeLessThan(14);
   });
 
   it('★★どの会場でも、目標と実尺の差が記録される', () => {
@@ -73,24 +100,18 @@ describe('★監査道具と画面の入力の一致', () => {
    * ★画面は `raceClockFor(knots, DIST, policy)` を呼びます（★構文木で確認済み・
    * ★`apps/cli/test/race-clock-wiring.test.ts`）。★ここでは ★**その部品自体**を
    * ★画面と同じ引数で呼び、★監査道具が組んだ時計と ★突き合わせます。
-   *
-   * ⚠️ ★直線長が片方だけ 400 に戻ると、★**400m 以外の会場でここが落ちます**
-   *    （★裁定が名指しした故障）。
    */
-  it('★★画面と監査が同じ時計を返す（★直線長が片方だけ 400 なら落ちる）', () => {
+  it('★★画面と監査が同じ時計を返す', () => {
     for (const hs of STRAIGHTS) {
       const built = buildAuditRace({ seed: 42, distance: 1600, spec: specOf(hs) });
       const fromAudit = auditClock(built).warp;
       /**
        * ⚠️ ★**比較側は `built.model.straightMeters` を読まないこと**
        *    （★2026-09-09・第 3 便の裁定 §1「21 点の照合について」）。
-       *
-       *    ★以前ここは監査モデルの値を読んでいました。★すると ★**監査側だけ 400 へ戻しても
-       *    ★比較側も 400 を読み、★同じ時計になって素通り**します。
-       *    ★モデルの出力を期待値へ流用してはいけません。
-       * → ★試験入力で指定した ★`hs` を ★そのまま期待値に使います。
+       *    ★モデルの出力を期待値へ流用すると、★監査側だけ別の値へ戻しても素通りします。
+       * → ★画面と同じ定数 `PHASE_METERS.STRAIGHT` を ★そのまま期待値に使います。
        */
-      const knots = knotsFor(built.boundaries, 3, hs);
+      const knots = knotsFor(built.boundaries, 3, PHASE_METERS.STRAIGHT);
       const fromScreenPart = raceClockFor(knots, built.DIST, 'readable');
       expect(fromScreenPart.displaySec, `直線 ${hs}m`).toBeCloseTo(fromAudit.displaySec, 9);
       for (let i = 0; i <= 20; i++) {

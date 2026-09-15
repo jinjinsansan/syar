@@ -49,6 +49,28 @@ describe('勝負服の色', () => {
     }
   });
 
+  /**
+   * ★**8 頭立て（★2026-09-15 からの製品の頭数）は、帽子も上着も 8 頭すべて違う**
+   *   ★オーナー指示「騎手の色を全て完全に変えてください」。
+   *   ★上着どうしだけでなく ★**上着と 8 枠色（別の馬の帽子）**も離れていること。
+   * ⚠️ ★対照: ★12 頭用の並びの先頭 8 色では、上着と帽子が同じ 16 進になる（★最小 0.0）。
+   */
+  it('★★8 頭立ては上着どうし 40 以上・上着と全枠色（帽子）40 以上／帽子も全頭違う', () => {
+    const field = 8;
+    const jackets = Array.from({ length: field }, (_, i) => pal[silkRoleOf(i + 1, field)]!);
+    const caps = Array.from({ length: field }, (_, i) => pal[frameRoleOf(i + 1, field)]!);
+    expect(new Set(caps).size, '★帽子（枠色）が全頭違う').toBe(field);
+    expect(minPair(jackets)).toBeGreaterThanOrEqual(40);
+    let jacketVsCap = Infinity;
+    for (const j of jackets) for (const c of caps) jacketVsCap = Math.min(jacketVsCap, dist(j, c));
+    expect(jacketVsCap).toBeGreaterThanOrEqual(40);
+    /** ★対照（★この検査が空回りしていないこと） */
+    const old = [1, 2, 4, 5, 6, 7, 8, 9].map((n) => pal[`silk-${n}`]!);
+    let oldVsCap = Infinity;
+    for (const j of old) for (const c of caps) oldVsCap = Math.min(oldVsCap, dist(j, c));
+    expect(oldVsCap).toBeLessThan(1);
+  });
+
   it('★12 頭立ては「いちばん近い 2 色」が 30 以上（道具の目安）', () => {
     /**
      * ★`tools/pick-silk-palette.mjs` の目安は 30。

@@ -7,10 +7,35 @@
 - オーナー判断（2026-09-14 夜・原文）: 「O-1 見せ方を変えます　O-7 よい　いずれにしても　コーナーを全てカットです。ただしコース表ではコーナーを曲がるのは見せます　今回の３者の意見をまとめて　真横カメラワークの直線のみだが、ワクワクするレース演出に仕上げてください。」
 - 3 者のまとめ `SYNTHESIS_RACE_SIDE_ONLY_20260914.md`（① `REVIEW_CONSULT_RACE_SIDE_ONLY_ANSWER_20260914.md`・`REVIEW_CONSULT_RACE_SIDE_ONLY_FOLLOWUP_ANSWER_20260914.md` ／ ② Claude Design `components/race-side-only-storyboard/index.html` ／ ③ 相談書 §5）
 
-**ブランチ**: `p4/race-30sec-cuts` ／ **開始 HEAD** `319bae0` ／ **終了 HEAD** `319bae0`（未コミット）
+**ブランチ**: `p4/race-30sec-cuts` ／ **開始 HEAD** `319bae0` ／ **終了 HEAD** `57adf77`
+**コミット**: `99f3774`（真横の直線だけ・ゴール前のカメラ・服の縞と鞍布・切り替えボタン）→ `57adf77`（右回りの版）
+**タグ**: `p4-race-side-only-right-turn-20260915`（注釈付き・`57adf77`）／ **push**: 済み（2026-09-15・オーナー指示・`319bae0..57adf77`）
 
 > 凡例: **✔** ＝ テスト・型チェックで確かめた ／ **[EYES]** ＝ 画面でしか判断できない（`/race` はローカルに素材が無く、本番のプレビューでしか見え方を測れない）
 > ⚠️ **指示書の外での実装です。** オーナーの直接の指示「3 者の意見をまとめて仕上げてください」を根拠にしています。レビュー側の指示書（予告された 5 項目・再照会の回答 §4）より先に入れた部分があります（§5）。
+
+---
+
+## 0. レビュー側へ — 照合していただきたいこと
+
+> ⚠️ **指示書の外での実装です。** 根拠はオーナーの直接の指示（§6b〜§6d に原文）と、3 者のまとめ `SYNTHESIS_RACE_SIDE_ONLY_20260914.md` です。
+> 再照会の回答 §4 の予告 5 項目のうち 1〜4 を、指示書より先に入れています（5 は未着手）。
+
+| # | 照合していただきたいこと | 場所 | 再現・確かめ方 |
+|---|---|---|---|
+| R1 | **ゴール前のカメラが結果を読んでいない**（Q-R7 の線）。展開の札 → その時刻の「追ってくる深さ」、画に収める相手 → 描いている位置の上位 5 頭。監査道具も同じ入力 | `broadcast-v2.ts` `finishChaseOf`／`finishChaseTable`、`page.tsx` `stateLeadGates`、`tools/lib/race-audit-build.mjs` | `npx vitest run packages/render/test/finish-chase.test.ts apps/cli/test/finish-chase-wiring.test.ts`（反実仮想・変異 3） |
+| R2 | **`leadGates` の置き換えで画角が跳ばないか**（5 番手と 6 番手が入れ替わる瞬間）。未計測 | `broadcast-v2-scene.ts` `frameContenders` | 未計測。§5-2 の読み |
+| R3 | **見せる区間がどの鞍でもコーナーに掛からない**／介入する人の見せ方で残り 900m から飛ばさない | `race-elision.ts`、`broadcast-v2.ts` `SCRIPT_V9` | `npx vitest run apps/cli/test/side-only-script.test.ts`（全 50 鞍） |
+| R4 | **写真判定の止め方**（0.4 秒止めた後、実際の表示秒へ戻る＝止め絵の後に切り替わる）と、判定を (c) にしたこと | `race-climax-hud.ts` `photoFinishOf`、`page.tsx` `photoHold` | `npx vitest run packages/render/test/race-climax-hud.test.ts` ／ 画面は [EYES] |
+| R5 | **勢いの入力**（いま＝描いている位置、0.5 秒前＝位置モデル。既定では同じ系だが同じ関数ではない） | `page.tsx` `momentumLevels` の呼び出し | §5-4 |
+| R6 | **右回りの走路の直し**（`posOf` の直線とコーナーで `w` が逆向きだった）。**右回りの 4 場の既定の画が変わる**。エンジンの距離ロスと同じ意味にそろえた | `course.ts` `ovalCourse`／`posOf`／`laneRatioOf` | `npx vitest run packages/render/test/course.test.ts packages/race-engine/test/lane-geometry.test.ts` ／ §6d の計算値 |
+| R7 | **服の塗り方の変更**（柄を無地に・塗る塊を 1 色に揃える・鞍布の窓では肌の判定を使わない） | `bracket.ts`、`silks-pixel.ts`、`page.tsx` `silksOverlays` | `npx vitest run packages/render/test/silks-distinct.test.ts packages/render/test/silks-pixel-saddle.test.ts` |
+| R8 | **意図して書き換えた検査**（既定 v8 → v9 に伴う 6 本・柄 → 上着の色の 1 本） | §4-2・§6b | 書き換えの理由を各ファイルの註記に残してある |
+| R9 | **全体のテストを最後に通していない**。変更後の全体の実行（1677 件中 3 失敗）の後に 2 件を直し、その後は関係するファイルだけを再実行した | — | `npx vitest run`（全体）。変更前から落ちている `edit-grammar-audit.test.ts` ⑨ は保存済みデータの検査 |
+
+**オーナーの判断で決まったこと**（記録のため）: O-1 見せ方を分ける ／ O-7 「追い込み馬がある時は引く」は状態として読む ／ コーナーは全部カット・コース図では曲がるのを見せる ／ 服の柄をやめる ／ 見比べはボタンで切り替える ／ 右回りで左へ走る版を作る
+
+**レビュー側の判断を待つもの**: 実況の着差の言葉を着順ボードに揃えるか（O-9・予告 §4-5）／ 正典への D-097 などの起票（O-1・O-7 の記録）／ 計画書 §1・§8 の「カット数は減らさない」の改訂（O-2）
 
 ---
 
@@ -193,7 +218,7 @@
 - **確かめたこと**（ヘッドレス）: 3 つのボタンが出る ／ 「演出：新」を押すと `?cinematography=v8` で読み直され「演出：前」になる ／ 携帯（タッチ端末として開く）で「演出開始」→全画面の道具の列に 3 つ出る ／ 型チェック（画面）エラー 0
 - **HTTPS の警告**: 開発サーバーは http のため、Chrome の「常に安全な接続を使用する」が有効だと開くたびに警告が出る。オーナーには「サイトに移動」か設定のオフを案内した（コードでは避けられない）
 
-## 6d. 追加: 右回りで馬が左へ走ってゴールする版（2026-09-15・オーナー指示・未コミット）
+## 6d. 追加: 右回りで馬が左へ走ってゴールする版（2026-09-15・オーナー指示・コミット `57adf77`）
 
 - **オーナー指示**: 「今は左回りで馬が右に向かって走りますが、今度は真逆の右回りで馬が左に走りゴールするバージョンのレース演出を作ってください」
 - **切り分け**（右回りの鞍 `g2-shiokaze` を開発サーバーで撮影 ＋ 計算）:

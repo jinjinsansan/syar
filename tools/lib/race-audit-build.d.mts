@@ -63,6 +63,10 @@ export interface AuditBuilt {
   readonly course: Course;
   readonly DIST: number;
   readonly FIELD: number;
+  /** ★出走馬（★脚質は位置模型を組み直す検査で使います・2026-09-15） */
+  readonly entrants: readonly { readonly strategy: import('@star/sim-engine').Strategy }[];
+  /** ★ペース（★同上） */
+  readonly pace: import('@star/race-engine').Pace;
   readonly surface: 'turf' | 'dirt';
   readonly trackCondition: string;
   readonly turn: 'left' | 'right';

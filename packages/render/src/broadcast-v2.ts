@@ -1,4 +1,4 @@
-import { homeStretchMetersOf, segmentStarts, type Course } from './course.js';
+import { homeStretchMetersOf, leadingStraightMetersOf, segmentStarts, type Course } from './course.js';
 import { GOAL_REAL_TIME_M } from './time-warp.js';
 import type { ShotCameraPreset, ShotTarget, ShotView } from './shot-sequence.js';
 import type { RaceDevelopment } from './race-development.js';
@@ -2412,7 +2412,16 @@ export function broadcastV2SectionLabel(course: Course, leaderMeters: number, sh
   if (label === '向正面') return '向正面';
   if (label.includes('3角')) return '第3コーナー';
   if (label.includes('4角')) return '第4コーナー';
-  if (label === '直線') return '最後の直線';
+  /**
+   * ⚠️ ★`直線` の区間は ★最後の直線だけではありません（★2026-09-15）。
+   *    ★発走が直線の中にある鞍（★天穹賞など）は ★発走直後に「最後の直線」と出ていました。
+   *    ★長距離の 4 鞍は ★1 周目のスタンド前でも「最後の直線」と出ます（★計画書 R-5）。
+   */
+  if (label === '直線') {
+    const at = Math.max(0, leaderMeters);
+    if (at >= course.distance - homeStretchMetersOf(course) - 1e-6) return '最後の直線';
+    return at < leadingStraightMetersOf(course) - 1e-6 ? 'スタート後' : 'スタンド前';
+  }
   return 'スタート後';
 }
 

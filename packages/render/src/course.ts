@@ -208,6 +208,43 @@ export function homeStretchMetersOf(course: Course): number {
   return Math.min(course.homeStretchM, course.distance);
 }
 
+/**
+ * ★**発走からコーナーまで直線が続く長さ**（m・★2026-09-15）。
+ *   ★引き込み線（`RUN_UP_M`）は直線を ★**2 つの区間に割って**置くことがあるので、★先頭から続く直線を足し合わせます。
+ * ⚠️ ★見せる区間（`sideOnlyShownMetersOf`）と区間名（`broadcastV2SectionLabel`）が ★**同じ値**を見ます（★R-30）。
+ */
+export function leadingStraightMetersOf(course: Course): number {
+  let run = 0;
+  for (const seg of course.segments) {
+    if (seg.type !== 'straight') break;
+    run += seg.length;
+  }
+  return run;
+}
+
+/**
+ * ★**1 周目のスタンド前**（★最後の直線と同じ直線を、★ゴールの 1 周前に通る区間・m・★2026-09-15・計画書 R-5）。
+ *
+ *   ★`ovalCourse` はゴールから逆に積むので、★`直線` の区間は ★残り [0, 直線] と ★残り [1 周, 1 周 ＋ 直線] に現れます。
+ *   ★そのうち ★**発走の直線に含まれず、★最後の直線でもないもの**を返します。
+ *   ★2026-09-15 の 50 鞍では ★銀河賞・北極星カップ・大河原記念・白光記念の 4 鞍だけです（★レビュー側の回答 §0-1 と一致）。
+ * ⚠️ ★名前（`label`）で探しています。★`ovalCourse` の輪の名前を変えるときはここも見ること。
+ */
+export function firstPassStraightsMOf(course: Course): readonly { readonly fromM: number; readonly toM: number }[] {
+  const lead = leadingStraightMetersOf(course);
+  const out: { fromM: number; toM: number }[] = [];
+  let acc = 0;
+  for (const seg of course.segments) {
+    const from = acc;
+    acc += seg.length;
+    if (seg.type !== 'straight' || seg.label !== '直線') continue;
+    if (from < lead - 1e-6) continue;
+    if (acc >= course.distance - 1e-6) continue;
+    out.push({ fromM: from, toM: acc });
+  }
+  return out;
+}
+
 /** ★`s`（スタートからの中心線距離）がどの区間にあるか */
 export function segmentAt(course: Course, s: number): CourseSegment {
   let acc = 0;
@@ -258,7 +295,122 @@ export function laneExtraMeters(course: Course, fromS: number, toS: number, w: n
  *   ⚠️ `s` は**中心線上の距離**です。`w` は横位置で、**座標だけを動かします**
  *      （距離ロスは `laneExtraMeters` で別に計算します。**混ぜません**）。
  */
+/**
+ * ★**区間ごとの始点の状態**（★1 つの走路につき 1 回だけ求めて覚える・2026-09-15）。
+ *
+ * 【★なぜ要るか】★`posOfWalk` は ★**呼ぶたびに走路の最初の区間から歩き直します**（★区間の数だけ三角関数）。
+ *   ★発走のカットの透視ワールド（`world-textured.ts` の `strip`）は 1 コマに数千回呼ぶので、
+ *   ★実画面の CPU プロファイルで ★発走の前後 3.6 秒の約 30% がこの関数でした
+ *   （★オーナー評「スピードが一瞬緩む」を追う過程・★発走の前後が毎秒 7〜25 コマに落ちていた）。
+ * ★覚えるのは ★**歩き直すときに毎回同じになる値**（区間の始点の x・y・向き、コーナーの中心と始角）だけで、
+ *   ★**同じ式を同じ順番で**計算します。★結果は `posOfWalk` と ★1 ビットも変わりません（`course-pos-cache.test.ts`）。
+ */
+interface SegmentStart {
+  readonly segStart: number;
+  readonly segEnd: number;
+  readonly x: number;
+  readonly y: number;
+  readonly heading: number;
+  /** ★コーナーだけ（★曲率中心と始角） */
+  readonly cx: number;
+  readonly cy: number;
+  readonly theta0: number;
+}
+interface SegmentTable {
+  readonly starts: readonly SegmentStart[];
+  /** ★走路の終わりの状態（★決勝線の先へ延ばすため） */
+  readonly endAcc: number;
+  readonly endX: number;
+  readonly endY: number;
+  readonly endHeading: number;
+}
+const SEGMENT_TABLES = new WeakMap<Course, SegmentTable>();
+
+function segmentTableOf(course: Course): SegmentTable {
+  const hit = SEGMENT_TABLES.get(course);
+  if (hit !== undefined) return hit;
+  const starts: SegmentStart[] = [];
+  let acc = 0;
+  let x = 0, y = 0, heading = course.startHeading;
+  for (const seg of course.segments) {
+    const segStart = acc;
+    const segEnd = acc + seg.length;
+    if (seg.type === 'straight') {
+      starts.push({ segStart, segEnd, x, y, heading, cx: 0, cy: 0, theta0: 0 });
+      x += Math.cos(heading) * seg.length;
+      y += Math.sin(heading) * seg.length;
+    } else {
+      const R = seg.radius ?? 1;
+      const sgn = seg.turn === 'right' ? -1 : 1;
+      const cx = x - Math.sin(heading) * R * sgn;
+      const cy = y + Math.cos(heading) * R * sgn;
+      const theta0 = Math.atan2(y - cy, x - cx);
+      starts.push({ segStart, segEnd, x, y, heading, cx, cy, theta0 });
+      const dTheta = (seg.length / R) * sgn;
+      const th = theta0 + dTheta;
+      x = cx + Math.cos(th) * R;
+      y = cy + Math.sin(th) * R;
+      heading += dTheta;
+    }
+    acc = segEnd;
+  }
+  const table: SegmentTable = { starts, endAcc: acc, endX: x, endY: y, endHeading: heading };
+  SEGMENT_TABLES.set(course, table);
+  return table;
+}
+
 export function posOf(course: Course, s: number, w: number): WorldPos {
+  if (s < 0) return posOfWalk(course, s, w);
+  const table = segmentTableOf(course);
+  const starts = table.starts;
+  /** ★`s <= segEnd` を満たす最初の区間（★`posOfWalk` のループが返す区間と同じ） */
+  let lo = 0, hi = starts.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (s <= starts[mid]!.segEnd) hi = mid; else lo = mid + 1;
+  }
+  const wCentre = course.widthM / 2;
+  const off = w - wCentre;
+  if (lo >= starts.length) {
+    const over = s - table.endAcc;
+    const nx = Math.sin(table.endHeading), ny = -Math.cos(table.endHeading);
+    const sgnEnd = course.segments[course.segments.length - 1]?.turn === 'right' ? -1 : 1;
+    return {
+      x: table.endX + Math.cos(table.endHeading) * over + nx * off * sgnEnd,
+      y: table.endY + Math.sin(table.endHeading) * over + ny * off * sgnEnd,
+      heading: table.endHeading,
+    };
+  }
+  const seg = course.segments[lo]!;
+  const st = starts[lo]!;
+  const within = Math.max(0, Math.min(seg.length, s - st.segStart));
+  if (seg.type === 'straight') {
+    const nx = Math.sin(st.heading), ny = -Math.cos(st.heading);
+    const sgn = seg.turn === 'right' ? -1 : 1;
+    return {
+      x: st.x + Math.cos(st.heading) * within + nx * off * sgn,
+      y: st.y + Math.sin(st.heading) * within + ny * off * sgn,
+      heading: st.heading,
+    };
+  }
+  const R = seg.radius ?? 1;
+  const sgn = seg.turn === 'right' ? -1 : 1;
+  const dTheta = (within / R) * sgn;
+  const th = st.theta0 + dTheta;
+  const r = R + off;
+  return {
+    x: st.cx + Math.cos(th) * r,
+    y: st.cy + Math.sin(th) * r,
+    heading: st.heading + dTheta,
+  };
+}
+
+/**
+ * ★**区間を最初から歩いて位置を出す**（★2026-09-15 までの `posOf` そのもの）。
+ * ⚠️ ★製品は `posOf`（★区間の始点を覚える版）を使います。★これは ★発走の手前（`s < 0`）と、
+ *    ★`posOf` が 1 ビットも変わらないことを確かめる ★**検査の対照**のために残します。
+ */
+export function posOfWalk(course: Course, s: number, w: number): WorldPos {
   const wCentre = course.widthM / 2;
   const off = w - wCentre;
   let acc = 0;

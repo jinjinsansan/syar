@@ -248,6 +248,15 @@ export interface ParallaxDrawOptions {
   /** ★照りの色。★`HORIZON_SKY_COLOR` から渡すこと（霞と同じ出どころ） */
   readonly glossColor?: string | undefined;
   /**
+   * ★**地面の層に重ねる色**（★季節の色味・ダートの砂の色・2026-09-15）。★濡れの層と同じく ★地面の層の矩形にだけ重ねます。
+   * ⚠️ ★省けば 1 画素も変わりません。
+   */
+  readonly groundTints?: readonly { readonly color: string; readonly alpha: number }[] | undefined;
+  /** ★地面以外の層（空・木・スタンド・生垣・ラチ）に重ねる色（★季節の空気・2026-09-15） */
+  readonly sceneryTint?: { readonly color: string; readonly alpha: number } | undefined;
+  /** ★景色の層に `sceneryTint` の後から重ねる色（★時間帯・2026-09-15）。★省けば何も重ねない */
+  readonly sceneryTints?: readonly { readonly color: string; readonly alpha: number }[] | undefined;
+  /**
    * ★固定物体の基準（m・注視点の**真の**位置）。省略時は scrollM。
    *   層は見た目の進行距離 scrollM で流れるが、物体は馬と同じ真の位置に対して置く
    *   （物体が見える区間では anchor weight=1 で両者の増分は一致し、ずれない）。
@@ -337,6 +346,22 @@ export function drawParallaxPlate<TImage>(
      * ⚠️ ★濃さは `trackWetnessAlpha` から**正面と同じ量**を渡します。
      *    ★2 か所で別の式を持つと**正面と横で暗さが揃いません**（D-052・R-30）。
      */
+    /**
+     * ★**季節の色味・砂の色**（★2026-09-15）。★地面の層には `groundTints`、★それ以外の層には `sceneryTint`。
+     *   ★層の矩形にだけ重ねるので、★この後に描く馬・勝負服・HUD には掛かりません。★省けば何も重ねません。
+     */
+    {
+      const tints = layer.isGround === true ? (opts.groundTints ?? [])
+        : [...(opts.sceneryTint === undefined ? [] : [opts.sceneryTint]), ...(opts.sceneryTints ?? [])];
+      for (const tint of tints) {
+        if (!(tint.alpha > 0)) continue;
+        const prev = ctx.globalAlpha;
+        ctx.globalAlpha = prev * tint.alpha;
+        ctx.fillStyle = tint.color;
+        ctx.fillRect(0, y, opts.viewport.width, h + 1);
+        ctx.globalAlpha = prev;
+      }
+    }
     if (layer.isGround === true && opts.wetAlpha !== undefined && opts.wetAlpha > 0) {
       const prev = ctx.globalAlpha;
       ctx.globalAlpha = prev * opts.wetAlpha;

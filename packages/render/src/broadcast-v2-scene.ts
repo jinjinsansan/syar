@@ -4,7 +4,11 @@ import { laneArcLengthAt, posOf, sAtLaneArcLength, type Course } from './course.
 import type { Ctx2D, FontOf, Palette, SheetSpec } from './oblique-draw.js';
 import { cameraBasis, project } from './perspective.js';
 import { drawDistancePoles } from './distance-poles.js';
-import { drawFinishPost } from './finish-post.js';
+import { drawFinishPost, FINISH_POST_SIDE_HEIGHT_M, type FinishMarkerStyle } from './finish-post.js';
+import type { DistancePoleStyle } from './distance-poles.js';
+import { drawTracksideFlags, type TracksideFlagOptions } from './trackside-flags.js';
+import { drawRain, drawSeasonParticles, type AtmosphereOptions } from './season-look.js';
+import { drawVenueFog } from './venue-scenery.js';
 import { drawStartingGateWorld, drawStartingGateWorldFront, type StartingGateWorldOptions } from './starting-gate-world.js';
 import { drawMowStripes } from './mow-stripes.js';
 import { drawPuddles } from './puddles.js';
@@ -752,6 +756,28 @@ export function drawBroadcastV2Scene<TImage>(
      *   （横視点はプレートに既に絵がある）。`false` で完全に止める。
      */
     readonly finishPost?: boolean | undefined;
+    /** ★ゴールの目印の見た目（★競馬場ごと・2026-09-15）。★省くと既定（`FINISH_POST_STYLE`） */
+    readonly finishPostStyle?: FinishMarkerStyle | undefined;
+    /**
+     * ★**横視点でもコードの目印を立てる**（★2026-09-15）。★板の絵の審判塔を読まない場のためです。
+     * ⚠️ ★決勝線は描きません（★横視点の板の絵 `finish-line-*` に既にある・二重にしない）。
+     * ⚠️ ★省けば従来どおり、★横視点では 1 画素も描きません。
+     */
+    readonly finishPostInSideView?: boolean | undefined;
+    /**
+     * ★**コース脇の旗**（★競馬場ごとの色・その回の風・2026-09-15）。★省くと立てない（★従来）。
+     * ★注視点はこの関数が入れます（★呼ぶ側は渡さない）。
+     */
+    readonly tracksideFlags?: Omit<TracksideFlagOptions, 'focusS'> | undefined;
+    /**
+     * ★**季節と天気の空気**（★色味・舞うもの・雨・砂の色・2026-09-15）。★省くと 1 画素も変わりません。
+     * ⚠️ ★すべて ★**馬より先**に描きます（★勝負服・枠番・HUD に掛けない・レビュー側の回答 §4-3）。
+     */
+    readonly atmosphere?: AtmosphereOptions | undefined;
+    /** ★距離標の見た目（★競馬場ごと・2026-09-15）。★省くと既定（`DISTANCE_POLE_STYLE`） */
+    readonly poleStyle?: DistancePoleStyle | undefined;
+    /** ★芝の刈り模様（★競馬場ごと・2026-09-15）。★省くと既定（`MOW_STRIPE_PERIOD_M` / `MOW_STRIPE_ALPHA`） */
+    readonly mowStyle?: { readonly periodM: number; readonly alpha: number } | undefined;
     /**
      * ★被写体ブラー（参考映像 1.4）。`drawPerspectiveHorses` へそのまま渡す。
      *   速度は呼び出し側が**表示時刻の関数**として渡す（決定論・憲法 4）。
@@ -837,6 +863,12 @@ export function drawBroadcastV2Scene<TImage>(
      */
     drawParallaxPlate(ctx, opts.parallaxPlate.plate, {
       ...parallaxOpts,
+      /** ★季節の色味・砂の色（★2026-09-15）。★省けば何も重ねない */
+      ...(opts.atmosphere === undefined ? {} : {
+        groundTints: opts.atmosphere.groundTints,
+        ...(opts.atmosphere.sceneryTint === undefined ? {} : { sceneryTint: opts.atmosphere.sceneryTint }),
+        ...(opts.atmosphere.sceneryTints === undefined ? {} : { sceneryTints: opts.atmosphere.sceneryTints }),
+      }),
       wetAlpha: trackWetnessAlpha(opts.condition),
       wetColor: trackWetnessColor(opts.surface),
       /**
@@ -874,9 +906,26 @@ export function drawBroadcastV2Scene<TImage>(
    *      縞は**どれか 1 つに足すのではなく、ここで 1 回**描きます。
    *      走路の投影として描くので、地面の描き方に依らず馬と同じカメラに載ります（R-30）。
    */
+  /**
+   * ★**透視ワールドのカットの季節の色味**（★2026-09-15）。★板のように層で分けられないので、
+   *   ★地面の色を画面全体に 1 回だけ薄く重ねます（★馬より先・★勝負服と HUD には掛からない）。
+   */
+  if (opts.atmosphere !== undefined && opts.parallaxPlate === undefined) {
+    const prevA = ctx.globalAlpha;
+    for (const tint of opts.atmosphere.groundTints) {
+      if (!(tint.alpha > 0)) continue;
+      ctx.globalAlpha = prevA * tint.alpha;
+      ctx.fillStyle = tint.color;
+      ctx.fillRect(0, 0, scene.camera.width, scene.camera.height);
+    }
+    ctx.globalAlpha = prevA;
+  }
   if (opts.mowStripes !== false) {
     drawMowStripes(ctx, course, projectGround,
-      { width: scene.camera.width, height: scene.camera.height }, { focusS: scene.focusS });
+      { width: scene.camera.width, height: scene.camera.height }, {
+        focusS: scene.focusS,
+        ...(opts.mowStyle === undefined ? {} : { periodM: opts.mowStyle.periodM, alpha: opts.mowStyle.alpha }),
+      });
   }
   /**
    * ★**水たまり**（2026-08-30・残件 A-7）。★縞刈りと**同じ場所・同じ理由**でここに置きます。
@@ -899,7 +948,33 @@ export function drawBroadcastV2Scene<TImage>(
   }
   if (opts.distancePoles !== false) {
     // ★奥の棒は馬より先に。手前の棒は馬のあと（下の `front`）
-    drawDistancePoles(ctx, course, scene.camera, { focusS: scene.focusS, pass: 'behind', font: opts.poleFont });
+    drawDistancePoles(ctx, course, scene.camera, {
+      focusS: scene.focusS, pass: 'behind', font: opts.poleFont,
+      ...(opts.poleStyle === undefined ? {} : { style: opts.poleStyle }),
+    });
+  }
+  /** ★コース脇の旗（★場の色・その回の風）。★馬の奥にだけ立つので馬より先に描く */
+  if (opts.tracksideFlags !== undefined) {
+    drawTracksideFlags(ctx, course, scene.camera, { ...opts.tracksideFlags, focusS: scene.focusS });
+  }
+  /** ★季節の舞うもの・雨（★馬より先＝奥に描く・勝負服を隠さない・2026-09-15） */
+  if (opts.atmosphere !== undefined) {
+    const motion = {
+      viewport: { width: scene.camera.width, height: scene.camera.height },
+      timeSec: opts.atmosphere.timeSec, focusS: scene.focusS,
+      direction: parallaxOpts?.direction ?? 1,
+      windDir: opts.atmosphere.windDir, windStrength: opts.atmosphere.windStrength,
+    } as const;
+    /**
+     * ★霧（★霧の場だけ・2026-09-15・計画書 V-13）。★画面の上 45%（★スタンド・木の帯）に流し、★下へ行くほど薄く。
+     *   ★馬より先に描くので ★勝負服には掛かりません。
+     */
+    if (opts.atmosphere.fogAlpha !== undefined && opts.atmosphere.fogAlpha > 0) {
+      drawVenueFog(ctx, { width: scene.camera.width, top: 0, bottom: scene.camera.height * 0.45 },
+        { alpha: opts.atmosphere.fogAlpha, timeSec: opts.atmosphere.timeSec, focusS: scene.focusS, direction: motion.direction });
+    }
+    if (opts.atmosphere.particles !== undefined) drawSeasonParticles(ctx, opts.atmosphere.particles, motion);
+    drawRain(ctx, opts.atmosphere.rainDrops, motion);
   }
   /**
    * ★**ゴール板と決勝線**（設計 2-3）。
@@ -908,7 +983,16 @@ export function drawBroadcastV2Scene<TImage>(
    *      そこで描くと**二重**になるので、透視ワールドを使うカットだけに出します。
    */
   if (opts.finishPost !== false && opts.texturedWorld !== undefined) {
-    drawFinishPost(ctx, course, scene.camera, { focusS: scene.focusS, font: opts.poleFont });
+    drawFinishPost(ctx, course, scene.camera, {
+      focusS: scene.focusS, font: opts.poleFont,
+      ...(opts.finishPostStyle === undefined ? {} : { style: opts.finishPostStyle }),
+    });
+  } else if (opts.finishPost !== false && opts.finishPostInSideView === true) {
+    /** ★横視点（★場の目印をコードで立てる場だけ）。★決勝線は板の絵にあるので描かない */
+    drawFinishPost(ctx, course, scene.camera, {
+      focusS: scene.focusS, font: opts.poleFont, line: false, heightM: FINISH_POST_SIDE_HEIGHT_M,
+      ...(opts.finishPostStyle === undefined ? {} : { style: opts.finishPostStyle }),
+    });
   }
   if (opts.worldBillboards !== undefined) drawWorldBillboards(ctx, opts.worldBillboards, projectGround, 'behind', scene.camera.width);
   /** ★発馬機の奥側。★**馬より先**に描きます（★馬はこの上に乗ります） */
@@ -1133,7 +1217,10 @@ export function drawBroadcastV2Scene<TImage>(
   nearRail?.();
   if (opts.distancePoles !== false) {
     // ★手前の棒（馬より camera 側）は馬のあと。先に描くと馬が棒に乗って見える
-    drawDistancePoles(ctx, course, scene.camera, { focusS: scene.focusS, pass: 'front', font: opts.poleFont });
+    drawDistancePoles(ctx, course, scene.camera, {
+      focusS: scene.focusS, pass: 'front', font: opts.poleFont,
+      ...(opts.poleStyle === undefined ? {} : { style: opts.poleStyle }),
+    });
   }
   // ★馬の手前に立つ物体（発馬機の前枠など）
   if (opts.parallaxPlate !== undefined && parallaxOpts !== undefined) {

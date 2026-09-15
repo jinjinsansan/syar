@@ -26,7 +26,7 @@ import {
   resolveRace, paceOf, replayOf, finalOrderMatches,
   laneAt, laneAtStart, TRACK_WIDTH_M, LANE_MODELS, LANE_MODEL_LEGACY,
   aiProxyPlan, staminaTrackOf, staminaGaugeOf, staminaAt, boundaryTimesOf,
-  marginLabel,
+  marginLabel, PHASE_METERS,
 } from '@star/race-engine';
 import { deriveRng } from '@star/sim-engine';
 import type { Strategy } from '@star/sim-engine';
@@ -86,15 +86,17 @@ import {
   RACE_COURSE_SWEEP_LEAD_SEC, raceEditSweepRaceSec, broadcastV2SegmentSpan, finishChaseTable,
   drawGoalCountdown, drawClimaxVignette, climaxVignetteAlpha, climaxHudFade,
   momentumLevels, MOMENTUM_FROM_M, MOMENTUM_WINDOW_SEC,
-  photoFinishOf, PHOTO_FINISH_HOLD_SEC, drawPhotoFinishOverlay,
+  photoFinishOf, PHOTO_FINISH_BADGE_SEC, drawPhotoFinishOverlay, GRADE_LOOKS,
   drawOwnHorseCutIn, drawFormationCutIn, drawRunningStyleCutIn, drawToStraightCutIn,
   RACE_TELOP_SEC, drawOwnHorseTelop, drawFormationTelop, drawRunningStyleTelop, drawToStraightTelop,
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
   horseCalibrationFor, LEGACY_HORSE_CALIBRATION, type HorseMaterialCalibration,
   type HorsePlacement, type HorsePlacementFrame, type HorsePlacementSet, type HorsePlacementMode,
+  venueLookOf, sideOnlyShownMetersOf, windOf,
+  SEASON_LOOKS, seasonOf, seasonParticlesFor, rainDropsOf, timeOfDayTintsOf, VENUE_FOG_ALPHA,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
-import { raceSetupFromParam, gradedRacesByVenue } from '@star/scheduler';
+import { raceSetupFromParam, gradedRacesByVenue, timeOfDayFromParam, TIME_OF_DAYS, TIME_OF_DAY_LABELS } from '@star/scheduler';
 import { FrameBadge } from '../../components/ui';
 import { createRaceAudio, type RaceAudio } from './race-audio.js';
 
@@ -112,6 +114,14 @@ import { createRaceAudio, type RaceAudio } from './race-audio.js';
 const RACE_PARAM = typeof window === 'undefined' ? null
   : new URLSearchParams(window.location.search).get('race');
 const RACE_SETUP = raceSetupFromParam(RACE_PARAM).setup;
+/**
+ * ★**競馬場ごとの見た目**（★ゲート・ゴールの目印・2026-09-15）。
+ *   ★監査道具・検査と ★**同じ表**（`@star/render` の `venueLookOf`）から引きます（★R-30）。
+ * ⚠️ ★着順には効きません。★スターパーク（既定の鞍）は ★従来の見た目のままです。
+ */
+const VENUE_LOOK = venueLookOf(RACE_SETUP.venue.id);
+/** ★格の雰囲気（★観客の入り・勝ち馬の帯の色・イントロの英字・2026-09-15）。★`@star/render` の表から引く */
+const GRADE_LOOK = GRADE_LOOKS[RACE_SETUP.race.grade];
 const DIST = RACE_SETUP.distanceM;
 /** ★走路の形。⚠️ ★エンジンにも描画層にも**これを渡します**（★別々に組まない） */
 const COURSE_SPEC = RACE_SETUP.spec;
@@ -125,6 +135,13 @@ const COURSE_SPEC = RACE_SETUP.spec;
 const TURN_OVERRIDE: 'left' | 'right' | undefined = typeof window === 'undefined' ? undefined
   : ((v) => (v === 'left' || v === 'right' ? v : undefined))(new URLSearchParams(window.location.search).get('turn'));
 const RACE_TURN: 'left' | 'right' = TURN_OVERRIDE ?? RACE_SETUP.turn;
+/**
+ * ★**時間帯を見比べる口**（`?tod=morning|day|dusk|night`・★2026-09-15・計画書 C-1・オーナー決定 2）。
+ *   ★本番は ★発走の時刻（`timeOfDayOfScheduledAt`・日本時間）から決めます。★デモには発走の時刻が無いので、この口で切り替えます。
+ * ⚠️ ★省くと ★昼（★従来の見た目のまま）。★描画だけに効き、★着順は 1 ビットも変わりません。
+ */
+const TIME_OF_DAY = timeOfDayFromParam(typeof window === 'undefined' ? null
+  : new URLSearchParams(window.location.search).get('tod')).timeOfDay;
 const COURSE_OPTS = { ...COURSE_SPEC, turn: RACE_TURN };
 /**
  * ★**レース選択の中身**（★競馬場ごとの 50 鞍）。
@@ -141,7 +158,12 @@ const LANE_MODEL_PARAM = typeof window === 'undefined' ? undefined
   : new URLSearchParams(window.location.search).get('lane') === 'old'
     ? LANE_MODEL_LEGACY
     : LANE_MODELS[new URLSearchParams(window.location.search).get('lane') ?? ''];
-const FIELD = 12;
+/**
+ * ★**頭数**。★2026-09-15 に 12 → 8（★オーナー指示「次から馬の数を 8 頭にしてください」）。
+ *   ★8 頭立ては ★1 頭 1 枠なので ★帽子（枠色）が全頭違い、★上着は `jacket8-*` の専用 8 色です（`silkRoleOf`）。
+ * ⚠️ ★監査道具の既定の頭数（`RACE_DEFAULTS.field`）も同じ値にしてあります（★R-31）。
+ */
+const FIELD = 8;
 /**
  * ★**従来方式へ戻す口**（`?motion=legacy`）。★見比べのために残します。
  * ⚠️ ★この旗が見るのは★**方針の名前まで**です。★送り速さそのものの分岐は
@@ -880,6 +902,13 @@ interface Built {
    *   ★判定は ★先頭が決勝線を通る瞬間の描いている位置（★レビュー側 Q-R9 の (c)）。
    */
   readonly photoFinish: { readonly atDisplaySec: number; readonly boardLabel: string } | undefined;
+  /**
+   * ★**勝馬が決勝線を通る表示秒**（★1 レースに 1 回だけ求める・2026-09-15）。
+   * ⚠️ ★以前は ★毎コマ `finishCrossDisplaySec` を呼んで ★位置模型を何十回も読み直していました。
+   *    ★値はレース中ずっと同じです。★実画面の CPU プロファイルで ★発走の前後 3.6 秒のうち約 7% がこれでした
+   *    （★オーナー評「スピードが一瞬緩む」を追う過程で、★発走の前後が毎秒 15〜25 コマに落ちていた）。
+   */
+  readonly finishCrossD: number;
   /**
    * ★**時計の跳びが起きる表示秒**（★`?pace=short` のときだけ中身が入ります）。
    *   ★ここはカットインで覆わなければなりません（★裸の跳びは瞬間移動に見えます）。
@@ -1666,13 +1695,18 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
   const { pace } = paceOf(entrants, balance);
   const boundaries = replayOf(result, (g) => entrants[g - 1]!.strategy, pace);
   if (!finalOrderMatches(result, boundaries)) throw new Error('映像の着順が確定着順と違います（D-059）');
-  /**
-   * ⚠️ ★**走路より先に作ります。** ★位置模型は「最後の直線の長さ」を要ります。
-   *    ★以前はここが `400` の直書きで、★**桜星賞（400m）以外の 45 鞍で嘘**でした（台帳 A-8）。
-   */
   const course = ovalCourse(DIST, COURSE_OPTS);
+  /**
+   * ⚠️ ★**`straightMetersLeft` は「境界時刻 `straightSec` が指す地点」です。走路の直線の長さではありません。**
+   *    ★境界時刻はエンジンの `boundaryTimesOf` が ★**残り `PHASE_METERS.STRAIGHT`（400m）固定**で出します。
+   *    ★2026-09-09 から ★`homeStretchMetersOf(course)` を渡していたため、★直線 620m の天河では
+   *    ★400m 分の時間で 620m を走らせ、★先頭が秒速 28.9m・脚の回転 1.8 倍でした（★桜星賞は 17.0m）。
+   *    ★オーナー評（2026-09-15）「★倍速にしていませんか？ ★有り得ないくらいに足が早い」。
+   *    ★直線 400m のスターパークだけ食い違いが出ないので、★桜星賞では見えませんでした。
+   * ★走路の直線の長さが要る所（★コーナーを映さない判定・★カメラ）は ★`homeStretchMetersOf(course)` のままです。
+   */
   const rawModel = replayPositionModel({
-    distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: homeStretchMetersOf(course), boundaries,
+    distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: PHASE_METERS.STRAIGHT, boundaries,
     // ★道中は脚質から生成する（Q-P4-38）。走破タイムからは作らない
     strategyOf: (g) => entrants[g - 1]!.strategy,
     // エンジンの横位置を希望経路として読み、下の trafficPositionModel で馬間隔を保つ。
@@ -1779,7 +1813,12 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
    *   ★会場によって発走の直線が違うからです（★秒だと会場ごとに切れ方が変わります）。
    * ⚠️ ★最初の区間が直線でない走路（★コーナー発走）では、★その区間の長さをそのまま使います。
    */
-  const startShownM = course.segments[0]?.length ?? 0;
+  /**
+   * ⚠️ ★**2026-09-15 から距離に比例して伸ばします**（`sideOnlyShownMetersOf`・★オーナー判断）。
+   *    ★以前は `course.segments[0].length` で、★鞍によって 20m〜500m でした（★流星大賞典は 40m）。
+   *    ★監査道具・検査も同じ関数を通ります（★R-30）。
+   */
+  const { startShownM, straightShownM, firstPassSpansM } = sideOnlyShownMetersOf(course);
   /**
    * ★**台本 v9（真横の直線だけ）か**（★2026-09-14）。★コーナーのカットを持たないので、
    *   ★`cornerSpansM` は空になり、★時計は ★発走 ＋ 最後の直線だけを残します。
@@ -1787,7 +1826,12 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
   const sideOnlyBuild = scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search) === 'v9';
   const elisions = raceEditElisionsFor(knots, {
     cornerSpansM, raceSecAtMeters, distanceMeter: DIST,
-    startShownM, straightShownM: STRAIGHT_SHOWN_M,
+    startShownM, straightShownM,
+    /**
+     * ★**1 周目のスタンド前**（★長距離の 4 鞍だけ・★2026-09-15・計画書 R-5）。★台本 v9 のときだけ見せます
+     *   （★v8 はコーナーのカットで道中を見せるので渡さない）。
+     */
+    ...(sideOnlyBuild ? { midShownSpansM: firstPassSpansM } : {}),
     /** ★見せる直線を最後の直線より長くしない（★4 角の出口を真横で映さない・★2026-09-14） */
     homeStretchM: homeStretchMetersOf(course),
     /** ★介入する人の見せ方（`?view=intervene`・O-1）。★残り 900m からゴールまで飛ばさない */
@@ -1880,6 +1924,11 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     development,
     ...buildMotionTimeline({ model, warp, finishSec, finishStyle, finishChaseAt }, winnerGate, 1.6),
     weightsKg: entrants.map((e) => e.weightKg),
+    /** ★勝馬が決勝線を通る表示秒（★1 レース 1 回・`Built.finishCrossD` の註記） */
+    finishCrossD: finishCrossDisplaySec(
+      (dd) => model.at(warp.raceSecAt(dd)).find((h) => h.gate === winnerGate)?.meters ?? 0,
+      DIST, warp.displaySec,
+    ),
     /**
      * ★脚質（★カットイン C / A が読む）。
      * ⚠️ ★**ここで作り直しません。** ★出走表に載せた値をそのまま返します
@@ -2066,7 +2115,12 @@ export default function RacePage(): React.JSX.Element {
 
    */
 
-  const cast = narratorCastForRace(seed);
+  /**
+   * ★**実況者は競馬場ごとに固定**（★2026-09-15・計画書 V-8「この場はこの声」）。
+   * ⚠️ ★以前はシードで 4 名を回していました（★オーナー指示 2026-08-22「1 レースで 1 人」は守ったまま）。
+   *    ★スターパークはシード 42 で選ばれていた人（d）なので、★既定の鞍の実況者は変わりません。
+   */
+  const cast = VENUE_LOOK.cast;
   const [ownGate, setOwnGate] = useState(3);
   const [playing, setPlaying] = useState(false);
   /**
@@ -2418,8 +2472,10 @@ export default function RacePage(): React.JSX.Element {
           const data = cx.getImageData(0, 0, canvas.width, canvas.height).data;
           // ★屋根の位置は素材から見つける（数字を手で書くと、素材差し替えで黙って屋根に人が乗る）
           const band = seatBandFromPixels(data, canvas.width, canvas.height);
+          /** ★場の差し色と格の入り（★2026-09-15・`VENUE_LOOK.crowdAccents` / `GRADE_LOOK.emptyRatio`） */
           paintCrowd(cx, canvas.width, canvas.height,
-            seatMaskFromPixels(data, canvas.width, canvas.height, band));
+            seatMaskFromPixels(data, canvas.width, canvas.height, band),
+            { accentColors: VENUE_LOOK.crowdAccents, emptyRatio: GRADE_LOOK.emptyRatio });
         } catch {
           return image;   // 画素を読めない環境（CORS 等）では元のまま
         }
@@ -2521,10 +2577,20 @@ export default function RacePage(): React.JSX.Element {
           isGround: Object.prototype.hasOwnProperty.call(parallaxManifest.dirtLayers ?? {}, layer.name),
         })),
         // ★決勝線・審判塔は世界に固定（worldS='finish' → 距離）。発馬機の側面切り出しは正面ビルボードに置き換えたので除外
-        objects: parallaxManifest.objects.filter((object) => !object.name.startsWith('start-')).map((object, index) => ({
-          image: objectImages[index]!,
-          width: objectImages[index]!.naturalWidth,
-          height: objectImages[index]!.naturalHeight,
+        /**
+         * ⚠️ ★**絵の添字は、絞り込む前の並びで取ります**（★2026-09-15）。
+         *    ★以前は `filter` のあとの添字で `objectImages` を引いていました。★`start-*` が末尾にあるので
+         *    ★たまたま合っていましたが、★審判塔（先頭）を外すと ★**絵が 1 つずつずれます**。
+         * ★場の見た目がコードの目印（`VENUE_LOOK.finish.sideView === 'code'`）なら、★板の絵の審判塔を外します
+         *   （★二重に立たないように・★コードの目印は `finishPostInSideView` で立てます）。
+         */
+        objects: parallaxManifest.objects.map((object, index) => ({ object, image: objectImages[index]! }))
+          .filter(({ object }) => !object.name.startsWith('start-')
+            && !(object.name === 'finish-tower' && VENUE_LOOK.finish.sideView === 'code'))
+          .map(({ object, image }) => ({
+          image,
+          width: image.naturalWidth,
+          height: image.naturalHeight,
           plateY0: object.plateY0,
           anchorXRatio: object.anchorXRatio,
           worldS: object.worldS === 'finish' ? DIST : object.worldS,
@@ -3531,7 +3597,11 @@ export default function RacePage(): React.JSX.Element {
      *    ★一度も通らないので ★**ファンファーレだけ鳴りませんでした**（★実測）。
      * ⚠️ ★合図は札で 1 回だけ。★毎コマ呼んでも 2 度は鳴りません。
      */
-    if (soundOnRef.current && intro.stage !== 'race') audioRef.current?.cue('fanfare', 'intro');
+    if (soundOnRef.current && intro.stage !== 'race') {
+      audioRef.current?.cue('fanfare', 'intro');
+      /** ★格で強さを変える（★G1 は強く・G3 は控えめ・2026-09-15・計画書 R-1）。★毎コマ呼んでよい（`level` の註記） */
+      audioRef.current?.level('fanfare', GRADE_LOOK.fanfareGain, 0.05);
+    }
     /**
      * ⚠️ ★**イントロが終わってから「音」を入れた回**は、★ファンファーレの出番が
      *    ★もう過ぎています。★そこで鳴らし始めると ★**レースの途中でファンファーレ**に
@@ -3573,6 +3643,17 @@ export default function RacePage(): React.JSX.Element {
         weatherLabel: '晴', conditionLabel: conditionLabel[trackCondition],
         turnLabel: turn === 'left' ? '左' : '右',
         fieldSize: FIELD,
+        /**
+         * ★**格・条件・競馬場の紹介**（★2026-09-15・計画書 V-3 / R-2 / R-3）。
+         *   ★数値は `venues.ts`（★`RACE_SETUP.venue`）から、★言葉は `VENUE_LOOK.feature` から。
+         */
+        gradeLabel: `GRADE ${GRADE_LOOK.roman} ・ ${surface === 'turf' ? 'TURF' : 'DIRT'}`,
+        chips: [
+          RACE_SETUP.race.age === '2' ? '2歳' : RACE_SETUP.race.age === '3' ? '3歳' : '3歳以上',
+          ...(RACE_SETUP.race.fillies ? ['牝馬限定'] : []),
+          ...(RACE_SETUP.race.series === undefined ? [] : [`${RACE_SETUP.race.series.name} 第${RACE_SETUP.race.series.leg}戦`]),
+        ],
+        venueFeature: `${turn === 'left' ? '左回り' : '右回り'}　1周${RACE_SETUP.venue.lapM}m・直線${RACE_SETUP.venue.homeStretchM}m　${VENUE_LOOK.feature}`,
         own: {
           gate: ownGate, role: frameRoleOf(ownGate, FIELD),
           name: HORSE_NAMES[ownGate - 1] ?? `スター${ownGate}`, jockey: JOCKEY_NAMES[ownGate - 1] ?? 'STAR騎手',
@@ -3587,7 +3668,18 @@ export default function RacePage(): React.JSX.Element {
        *    ★最初これを `[コマ][馬番]` と取り違え、★**コマを送るたびに別の馬**が出ました
        *    （自馬は 3 番なのにゼッケン 11・ピンクの服が描かれた）。
        */
-      art.sideHighQuality[ownGate - 1]);
+      art.sideHighQuality[ownGate - 1],
+      /**
+       * ★**場の遠景と紋・季節と時間帯の色**（★2026-09-15・計画書 V-13 / V-15）。
+       *   ★景色が大きく映るのはタイトルカードの背景なので、★場の主題はここに描き足します（`venue-scenery.ts` の註記）。
+       */
+      {
+        kind: VENUE_LOOK.scenery,
+        tints: [SEASON_LOOKS[seasonOf(RACE_SETUP.race.month)].scenery, ...timeOfDayTintsOf(TIME_OF_DAY).scenery],
+        /** ★紋の図形は距離標の札の文字色（★札の地と必ず対比がある・★帯の色は地と同じ場がある） */
+        crest: { ground: VENUE_LOOK.poles.plate, mark: VENUE_LOOK.poles.plateText },
+        night: TIME_OF_DAY === 'night',
+      });
       drawRendererBadge(ctx, renderer, 'title');
       return;
     }
@@ -3617,8 +3709,13 @@ export default function RacePage(): React.JSX.Element {
     const raceDLive = intro.raceDisplaySec;
     const photo = built.photoFinish;
     const photoSince = photo === undefined ? -1 : raceDLive - photo.atDisplaySec;
-    const photoHold = photo !== undefined && photoSince >= 0 && photoSince < PHOTO_FINISH_HOLD_SEC;
-    const raceD = photoHold ? photo.atDisplaySec : raceDLive;
+    /**
+     * ⚠️ ★**2026-09-15 から止めません**（★オーナー判断「止めない」・`PHOTO_FINISH_BADGE_SEC` の註記）。
+     *    ★以前はここで表示秒を先頭が線を通る瞬間に 0.4 秒止め、★放すと 0.4 秒先へ跳んでいました
+     *    （★オーナー評「スピードが一瞬緩む」）。★札と決勝線の金の線だけを出します。
+     */
+    const photoShown = photo !== undefined && photoSince >= 0 && photoSince < PHOTO_FINISH_BADGE_SEC;
+    const raceD = raceDLive;
 
     /**
      * ★**ゴール前の数秒を大きく撮り直すリプレイ**（`finish-replay.ts`・オーナー要望⑤）
@@ -3637,11 +3734,8 @@ export default function RacePage(): React.JSX.Element {
      *   ⚠️ ★実測（seed 42）で **2.83 秒**ずれており、本編の終わりを基準にしたら
      *      ★リプレイが**勝馬の通過後から**始まりました。
      */
-    const winnerGateForReplay = built.result[0]!.gate;
-    const crossD = finishCrossDisplaySec(
-      (d) => built.model.at(built.warp.raceSecAt(d)).find((h) => h.gate === winnerGateForReplay)?.meters ?? 0,
-      DIST, built.warp.displaySec,
-    );
+    /** ⚠️ ★毎コマ求め直さない（★`Built.finishCrossD` の註記・2026-09-15） */
+    const crossD = built.finishCrossD;
     const replay = finishReplayAt(raceD, built.warp.displaySec, WINNER_FOLLOW_SEC, crossD);
     /**
      * ★**リプレイ中は「本編の表示秒」を差し替えるだけ**にします。
@@ -3741,6 +3835,12 @@ export default function RacePage(): React.JSX.Element {
     /** ★直線を `homestretch-side` → `finish-line` と割る台本（★v8）。★枠取りの扱いが v6 と同じ */
     /** ★真横の直線だけの台本（★v9・★2026-09-14）。★直線の割り方は v8 と同じです */
     const sideOnlyScript = scriptFromSearch(search) === 'v9';
+    /**
+     * ★**時間帯の色**（★2026-09-15・計画書 C-1）。★介入する人の見せ方では ★介入の局面（★残り 900m〜）で弱めます
+     *   （★レビュー側の回答 §4-3 条件 3）。★判定は ★描いている先頭の位置だけ（★未来を読まない）。
+     */
+    const todTints = timeOfDayTintsOf(TIME_OF_DAY,
+      INTERVENE_VIEW && sideOnlyScript && DIST - visualLead <= DEFAULT_INTERVENTION_BALANCE.EARLY_SPURT_METER);
     const splitStraightScript = scriptFromSearch(search) === 'v8' || sideOnlyScript;
     /**
      * ★**表示位置の演出（`climax-choreography`）は既定で使いません**（2026-08-27・オーナー判断）。
@@ -4064,7 +4164,8 @@ export default function RacePage(): React.JSX.Element {
            *    ★最後まで鳴りません。★ここで 1.2 秒かけて絞り、★ゲート音に渡します。
            *    ★全部聴かせるならイントロを伸ばす必要があります（★オーナー判断）。
            */
-          audio?.fade('fanfare', 1.2);
+          /** ★格で余韻の長さを変える（★G2 は従来の 1.2 秒・2026-09-15・計画書 R-1） */
+          audio?.fade('fanfare', GRADE_LOOK.fanfareFadeSec);
           audio?.cue('gate-open', 'gate');
           audio?.cue('gallop', 'gallop');
           if (raceD >= 0.35) audio?.cue('whinny', 'whinny');
@@ -4267,7 +4368,42 @@ export default function RacePage(): React.JSX.Element {
           fieldSize: FIELD,
           closedRatio: raceD <= 0 ? 1 : Math.max(0, 1 - raceD / 0.25),
           font: FONT,
+          /** ★競馬場ごとの色と小物（★2026-09-15）。★スターパークは既定と同じ値 */
+          style: VENUE_LOOK.gate,
         } : undefined,
+        /** ★ゴールの目印（★競馬場ごと・2026-09-15）。★スターパークは板の絵の審判塔のまま */
+        finishPostStyle: VENUE_LOOK.finish.style,
+        finishPostInSideView: VENUE_LOOK.finish.sideView === 'code',
+        /** ★距離標と芝の刈り模様（★競馬場ごと・2026-09-15）。★スターパークは既定と同じ値 */
+        poleStyle: VENUE_LOOK.poles,
+        mowStyle: VENUE_LOOK.mow,
+        /**
+         * ★コース脇の旗（★内ラチの内側に 40m ごと・場の色・その回の風・2026-09-15・計画書 V-7 / C-3）。★スターパークは立てない。
+         *   ★風はデモのシードから（★本番は発走の時刻から決める想定）。★揺れは表示秒の関数（★憲法 4）。
+         */
+        tracksideFlags: VENUE_LOOK.flags === undefined ? undefined
+          : { style: VENUE_LOOK.flags, ...windOf(seed), timeSec: d },
+        /**
+         * ★**季節と天気の空気**（★2026-09-15・計画書 R-6 / R-7 / C-2 / V-12）。
+         *   ★季節はレースの `month`、★雨は馬場状態、★砂の色は場の見た目（ダート戦だけ）、★舞い方は風と表示秒から。
+         */
+        atmosphere: {
+          groundTints: [
+            SEASON_LOOKS[seasonOf(RACE_SETUP.race.month)].ground,
+            ...(surface === 'dirt' && VENUE_LOOK.dirtTint !== undefined ? [VENUE_LOOK.dirtTint] : []),
+            /** ★時間帯（★昼は空・`?tod=`） */
+            ...todTints.ground,
+          ],
+          sceneryTint: SEASON_LOOKS[seasonOf(RACE_SETUP.race.month)].scenery,
+          sceneryTints: todTints.scenery,
+          /** ★舞うのは冬の雪だけ。★雨の日は雨だけ（★オーナー評 2026-09-15・`seasonParticlesFor`） */
+          particles: seasonParticlesFor(RACE_SETUP.race.month, trackCondition),
+          rainDrops: rainDropsOf(trackCondition),
+          /** ★霧（★霧の場だけ・`VenueLook.scenery`） */
+          fogAlpha: VENUE_LOOK.scenery === 'fog' ? VENUE_FOG_ALPHA : 0,
+          ...windOf(seed),
+          timeSec: d,
+        },
         /**
          * ★（★停止中）★正面の発馬機ビルボード（走路 s=1.6・w 0.5〜15.3）。
          *   待機中は扉閉を**馬の手前**に、開扉後は扉開を**馬の後ろ**に。発走 60m を過ぎたら描かない。
@@ -4552,6 +4688,8 @@ export default function RacePage(): React.JSX.Element {
             focusS: sweepLeadM ?? v2Minimap.focusS,
             frameColorOf,
             distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${DIST}m`,
+            /** ★コース図の走路と決勝線の色（★競馬場ごと・2026-09-15・計画書 V-9）。★スターパークは従来の色 */
+            courseMapColors: VENUE_LOOK.courseMap,
             metersLeft: frame.metersLeft,
             timeSec: d,
             ownGate,
@@ -4771,7 +4909,7 @@ export default function RacePage(): React.JSX.Element {
         plate: '#14181acc',
         text: '#f2f2ee',
         accent: pal['mark-gold'] ?? '#e0ac3c',
-      });
+      }, `${RACE_META.venue} ${RACE_META.raceName}`);
     }
     /**
      * ★コース図ミニマップ（左上・区間タグの下）。カットが変わっても「今どこか」が繋がる（ユーザー指摘⑥）。
@@ -5091,7 +5229,7 @@ export default function RacePage(): React.JSX.Element {
        * ★**写真判定の止め絵に重ねる札と決勝線**（★台本 v9・★レビュー側 Q-R9）。
        * ⚠️ ★着差の言葉は ★**着順ボードと同じ値**です（`built.photoFinish.boardLabel`）。
        */
-      if (photoHold && photo !== undefined) {
+      if (photoShown && photo !== undefined) {
         drawPhotoFinishOverlay(ctx, FONT, {
           viewport: vp, sinceSec: photoSince, goalX: v2GoalX, marginLabel: photo.boardLabel,
         });
@@ -5135,7 +5273,12 @@ export default function RacePage(): React.JSX.Element {
           drawWinnerLowerThird(ctx, art.pal as Record<string, string>, vp, FONT,
             winnerGate, HORSE_NAMES[winnerGate - 1] ?? `スター${winnerGate}`,
             JOCKEY_NAMES[winnerGate - 1] ?? 'STAR騎手', built.finishSec.get(winnerGate),
-            { role: frameRoleOf(winnerGate, FIELD), animSec: d, sinceSec: winnerAfterSec });
+            {
+              role: frameRoleOf(winnerGate, FIELD), animSec: d, sinceSec: winnerAfterSec,
+              /** ★格の色と名札（★ゴールの後の帯・2026-09-15・計画書 R-8） */
+              edgeTint: GRADE_LOOK.edgeTint,
+              raceLabel: `${RACE_SETUP.race.grade} ${RACE_META.raceName}`,
+            });
         }
         if (hud.result) {
           drawResultPanel(ctx, art.pal as Record<string, string>, vp, FONT,
@@ -5802,6 +5945,16 @@ export default function RacePage(): React.JSX.Element {
             window.location.search = params.toString();
           }}>
             <option value="left">左回り</option><option value="right">右回り</option>
+          </select>
+        </label>
+        <label title="デモには発走の時刻が無いので、時間帯をここで見比べます（本番は発走の時刻から）">
+          時間帯{' '}
+          <select value={TIME_OF_DAY} onChange={(e) => {
+            const params = new URLSearchParams(window.location.search);
+            params.set('tod', e.target.value);
+            window.location.search = params.toString();
+          }}>
+            {TIME_OF_DAYS.map((t) => <option key={t} value={t}>{TIME_OF_DAY_LABELS[t]}</option>)}
           </select>
         </label>
         {built !== null && <span style={{ fontSize: 13, opacity: 0.8 }}>{clock.toFixed(1)} / {built.warp.displaySec.toFixed(1)} 秒</span>}

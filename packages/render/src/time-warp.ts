@@ -682,11 +682,15 @@ export function knotsFor(
   boundaries: readonly (PhaseKnots & { readonly gate: number })[],
   ownGate: number | undefined,
   /**
-   * ★**その走路の最後の直線の長さ**（m）。★`replayPositionModel` に渡した
+   * ★**境界時刻 `straightSec` が「残り何 m」を指すか**（m）。★`replayPositionModel` に渡した
    *   ★`straightMetersLeft` と ★**同じ値**でなければなりません（★境界時刻の意味が変わります）。
    *
-   * ⚠️ ★**既定値を置きません。** ★以前は 400 の直書きで、★呼び出し側は
-   *    ★「渡し忘れたこと」に気づけませんでした。★`course.homeStretchM` を渡してください。
+   * ⚠️ ★**既定値を置きません。** ★呼び出し側が「渡し忘れたこと」に気づけるようにします。
+   * ⚠️ ★**走路の直線の長さではありません**（★2026-09-15 に訂正）。★境界時刻はエンジンの
+   *    ★`boundaryTimesOf` が ★**残り `PHASE_METERS.STRAIGHT`（400m）固定**で出します。
+   *    ★2026-09-09 から `homeStretchMetersOf(course)` を渡していたため、★直線 620m の天河では
+   *    ★400m 分の時間で 620m を走らせ、★先頭が秒速 28.9m（★桜星賞は 17.0m）で走っていました
+   *    （★オーナー評「有り得ないくらいに足が早い」）。★`PHASE_METERS.STRAIGHT` を渡してください。
    */
   straightM: number,
 ): PhaseKnots {

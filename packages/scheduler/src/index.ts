@@ -12,3 +12,4 @@ export * from './week.js';
 export * from './venues.js';
 export * from './graded-races.js';
 export * from './race-setup.js';
+export * from './time-of-day.js';

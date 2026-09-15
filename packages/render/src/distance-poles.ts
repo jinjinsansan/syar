@@ -34,6 +34,24 @@ export const DISTANCE_POLE_INSET_M = -1.1;
  */
 export const NEAR_SKIP_RATIO = 0.62;
 
+/**
+ * ★**距離標の見た目**（★競馬場ごと・2026-09-15）。
+ * ⚠️ ★省けば `DISTANCE_POLE_STYLE`（★従来の色）で、★`band` が無ければ帯を描きません（★1 画素も変わりません）。
+ */
+export interface DistancePoleStyle {
+  readonly pole: string;
+  readonly poleShade: string;
+  readonly plate: string;
+  readonly plateText: string;
+  /** ★支柱の上寄りに巻く色の帯（★場の差し色）。★省くと描かない */
+  readonly band?: string | undefined;
+}
+
+/** ★既定の見た目（★スターパーク競馬場と同じ） */
+export const DISTANCE_POLE_STYLE: DistancePoleStyle = {
+  pole: '#eef2ea', poleShade: 'rgba(12,20,14,.45)', plate: '#12281a', plateText: '#eef2ea',
+};
+
 export interface DistancePoleOptions {
   readonly focusS: number;
   /** 注視点の前後どれだけを描くか（m） */
@@ -47,6 +65,8 @@ export interface DistancePoleOptions {
   /** 数字を描くための書体。省略すると棒だけ */
   readonly font?: FontOf | undefined;
   readonly intervalM?: number | undefined;
+  /** ★見た目（★競馬場ごと）。★省略すると `DISTANCE_POLE_STYLE` */
+  readonly style?: DistancePoleStyle | undefined;
 }
 
 /**
@@ -61,6 +81,7 @@ export function drawDistancePoles(
   const interval = opts.intervalM ?? DISTANCE_POLE_INTERVAL_M;
   if (!(interval > 0)) return;
   const range = opts.rangeM ?? 500;
+  const style = opts.style ?? DISTANCE_POLE_STYLE;
   const basis = cameraBasis(cam);
   const W = cam.width, H = cam.height;
   const project3 = (x: number, y: number, z: number): ReturnType<typeof project> =>
@@ -101,9 +122,14 @@ export function drawDistancePoles(
 
     ctx.globalAlpha = prevAlpha;
     // 支柱（白）
-    ctx.fillStyle = '#eef2ea';
+    ctx.fillStyle = style.pole;
     ctx.fillRect(foot.x - poleW / 2, top.y, poleW, poleH);
-    ctx.fillStyle = 'rgba(12,20,14,.45)';
+    /** ★場の差し色の帯（★板の下・支柱の上寄り） */
+    if (style.band !== undefined) {
+      ctx.fillStyle = style.band;
+      ctx.fillRect(foot.x - poleW / 2, top.y + poleH * 0.2, poleW, Math.max(1, poleH * 0.16));
+    }
+    ctx.fillStyle = style.poleShade;
     ctx.fillRect(foot.x - poleW / 2, top.y, Math.max(0.6, poleW * 0.3), poleH);
 
     /**
@@ -115,19 +141,19 @@ export function drawDistancePoles(
     if (plateH >= 7 && opts.font !== undefined) {
       const px = foot.x - plateW / 2;
       const py = top.y - plateH * 0.12;
-      ctx.fillStyle = '#12281a';
+      ctx.fillStyle = style.plate;
       ctx.fillRect(px, py, plateW, plateH);
-      ctx.fillStyle = '#eef2ea';
+      ctx.fillStyle = style.pole;
       ctx.fillRect(px, py, plateW, Math.max(1, plateH * 0.1));
       const fontPx = Math.max(6, plateH * 0.62);
       ctx.font = opts.font(fontPx, true);
       ctx.textAlign = 'center';
-      ctx.fillStyle = '#eef2ea';
+      ctx.fillStyle = style.plateText;
       ctx.fillText(String(left), foot.x, py + plateH * 0.78);
       ctx.textAlign = 'left';
     } else if (plateH >= 3) {
       // 遠い棒は板だけ（数字は読めないので描かない）
-      ctx.fillStyle = '#12281a';
+      ctx.fillStyle = style.plate;
       ctx.fillRect(foot.x - plateW / 2, top.y, plateW, plateH);
     }
   }

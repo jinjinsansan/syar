@@ -174,12 +174,19 @@ function violationsOf(
     }
   }
 
-  // ★⑥ 直線長は ★式そのものが `homeStretchMetersOf(course)` であること
+  /**
+   * ★⑥ 位置模型の「直線に入る地点」は ★式そのものが `PHASE_METERS.STRAIGHT` であること
+   *
+   * ⚠️ ★**2026-09-15 に訂正**（★オーナー評「有り得ないくらいに足が早い」）。
+   *    ★以前ここは `homeStretchMetersOf(course)` を求めていました（★2026-09-09・F-2）。
+   *    ★ところが境界時刻 `straightSec` はエンジンが ★**残り 400m 固定**（`PHASE_METERS.STRAIGHT`）で出すので、
+   *    ★走路の直線（290〜620m）を渡すと ★**時刻と地点の意味が食い違い**、★直線 620m の天河で
+   *    ★先頭が秒速 28.9m で走っていました。★測る地点は ★**境界時刻を作った側と同じ定数**から取ります。
+   */
   const s = w.straightInit;
   if (s === undefined) bad.push('★straightMetersLeft がありません');
-  else if (!isCallTo(s, 'homeStretchMetersOf') || s.arguments.length !== 1
-    || !isIdent(s.arguments[0], 'course')) {
-    bad.push(`★直線長が homeStretchMetersOf(course) そのものではありません: ${t(s)}`);
+  else if (!isProperty(s, 'PHASE_METERS.STRAIGHT')) {
+    bad.push(`★直線に入る地点が PHASE_METERS.STRAIGHT そのものではありません: ${t(s)}`);
   }
   return bad;
 }
@@ -224,7 +231,7 @@ describe('★画面の時計の接続（構文木で見る）', () => {
      *    ★ここは ★**変異のもと**なので、★製品の字面と一致していなければ検定が空回りします。
      */
     const POLICY = "LEGACY_MOTION ? 'legacy' : PACE_SHORT ? 'short' : 'readable'";
-    const STRAIGHT = 'straightMetersLeft: homeStretchMetersOf(course)';
+    const STRAIGHT = 'straightMetersLeft: PHASE_METERS.STRAIGHT';
 
     it('★① 時計を固定倍率へ置換し、正しい名前を未使用呼出だけに残す', () => {
       expect(check(CLOCK,
@@ -260,9 +267,14 @@ describe('★画面の時計の接続（構文木で見る）', () => {
       expect(check(CLOCK, 'const warp = raceClockFor(knots, 800, RACE_PACE_POLICY);').length).toBeGreaterThan(0);
     });
 
-    it('★⑧ 走路関数を呼んで捨て、直線長は 400 を渡す', () => {
+    it('★⑧ 定数を参照して捨て、直線に入る地点は 400 を渡す', () => {
       expect(check(STRAIGHT,
-        'straightMetersLeft: (homeStretchMetersOf(course), 400)').length).toBeGreaterThan(0);
+        'straightMetersLeft: (PHASE_METERS.STRAIGHT, 400)').length).toBeGreaterThan(0);
+    });
+
+    /** ★⑨ 2026-09-09〜15 の形（★走路の直線の長さを渡す・★天河で秒速 28.9m になった） */
+    it('★⑨ 直線に入る地点へ走路の直線の長さを渡す', () => {
+      expect(check(STRAIGHT, 'straightMetersLeft: homeStretchMetersOf(course)').length).toBeGreaterThan(0);
     });
   });
 });

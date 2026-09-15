@@ -28,6 +28,10 @@ export interface MinimapOptions {
   readonly timeSec?: number | undefined;
   /** 表示開始からの秒（登場アニメ） */
   readonly sinceSec?: number | undefined;
+  /** ★走路の帯の色（★板つきの図・競馬場ごと・2026-09-15）。★省くと従来の `#4d6b40` */
+  readonly trackColor?: string | undefined;
+  /** ★決勝線と「GOAL」の色（★同上）。★省くと従来の金 */
+  readonly goalColor?: string | undefined;
 }
 
 export function drawCourseMinimap<TImage>(
@@ -84,7 +88,7 @@ export function drawCourseMinimap<TImage>(
   }
 
   // 走路の帯
-  ctx.fillStyle = opts === undefined ? (pal['turf-2'] ?? '#5f8f45') : '#4d6b40';
+  ctx.fillStyle = opts === undefined ? (pal['turf-2'] ?? '#5f8f45') : (opts.trackColor ?? '#4d6b40');
   ctx.beginPath();
   inner.forEach((p, i) => { if (i === 0) ctx.moveTo(toX(p), toY(p)); else ctx.lineTo(toX(p), toY(p)); });
   for (let i = outer.length - 1; i >= 0; i -= 1) ctx.lineTo(toX(outer[i]!), toY(outer[i]!));
@@ -102,10 +106,10 @@ export function drawCourseMinimap<TImage>(
     ctx.beginPath(); ctx.moveTo(toX(a), toY(a)); ctx.lineTo(toX(b), toY(b)); ctx.stroke();
   };
   tick(0, 'rgba(255,255,255,0.9)', 2);
-  tick(course.distance, opts === undefined ? (pal['frame-5'] ?? '#e9c94d') : HUD.gold, opts === undefined ? 2 : 3);
+  tick(course.distance, opts === undefined ? (pal['frame-5'] ?? '#e9c94d') : (opts.goalColor ?? HUD.gold), opts === undefined ? 2 : 3);
   if (opts !== undefined) {
     const g = posOf(course, course.distance, course.widthM + 1.5);
-    ctx.fillStyle = HUD.gold; ctx.font = font(11, true); ctx.textAlign = 'left';
+    ctx.fillStyle = opts.goalColor ?? HUD.gold; ctx.font = font(11, true); ctx.textAlign = 'left';
     ctx.fillText('GOAL', toX(g) + 6, toY(g) + 12);
   }
 

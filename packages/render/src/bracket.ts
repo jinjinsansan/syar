@@ -73,8 +73,17 @@ export function frameRoleOf(gate: number, fieldSize: number): `frame-${number}` 
  */
 const SILK_ORDER_12: readonly number[] = [1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 14, 17];
 
-export function silkRoleOf(gate: number, fieldSize: number): `silk-${number}` {
+export function silkRoleOf(gate: number, fieldSize: number): `silk-${number}` | `jacket8-${number}` {
   if (!Number.isInteger(gate) || gate < 1) throw new Error(`馬番が不正です: ${gate}`);
+  /**
+   * ★**8 頭立て以下は専用の 8 色**（★2026-09-15・オーナー指示「馬の数を 8 頭に・騎手の色を全て完全に変えてください」）。
+   *
+   * ⚠️ ★12 頭用の並び（`SILK_ORDER_12`）の先頭 8 色は ★**赤・白・黄・緑・黒・橙・桃・水色**で、
+   *    ★そのうち 7 色が ★**枠色（＝別の馬の帽子）と同じ 16 進**でした（★上着と帽子の最小 ΔLab 0.0）。
+   *    ★8 頭立ては ★**帽子が全頭違う**ので、★上着をすべて枠色から離せば ★**帽子も上着も 8 頭すべて違う**になります。
+   * → ★`palette.json` の `jacket8-1`〜`jacket8-8`（★上着どうし ΔLab 42.2・★上着と帽子 40.8）。
+   */
+  if (fieldSize <= 8) return `jacket8-${gate}`;
   /**
    * ⚠️ ★13 頭以上は 18 色をそのまま使います（いちばん近い 2 色は 27.5）。
    *    ★目安を下回るので、★**その頭数を出すなら色の選び直しが要ります。**

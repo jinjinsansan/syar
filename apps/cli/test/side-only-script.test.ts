@@ -16,9 +16,13 @@ import { GRADED_RACES, raceSetupFromParam } from '@star/scheduler';
 import {
   ovalCourse, broadcastV2ScriptBoundariesM, broadcastV2ScriptFromSearch, broadcastV2SectionLabel,
   DEFAULT_RACE_SCRIPT, homeStretchMetersOf, raceEditElisionsFor, raceEditSweepRaceSec,
-  STRAIGHT_SHOWN_M, type Course, type PhaseKnots, type RaceElision,
+  sideOnlyShownMetersOf, START_SHOWN_M, STRAIGHT_SHOWN_M, SHOWN_REFERENCE_DISTANCE_M,
+  type Course, type PhaseKnots, type RaceElision,
 } from '@star/render';
 import { DEFAULT_INTERVENTION_BALANCE } from '@star/race-engine';
+
+/** ★1 周目のスタンド前を見せる鞍（★レビュー側の回答 §0-1 の計算・★明示の一覧で持つ） */
+const FIRST_PASS_RACES: readonly string[] = ['g1-ginga', 'g3-hokkyokusei', 'g2-ookawara', 'g3-hakko'];
 
 /** ★合成の位置（★毎秒 16m の等速）。★見る区間の境目だけを確かめるので、速さは何でもよい */
 const MPS = 16;
@@ -47,7 +51,11 @@ function planFor(raceId: string, keep: boolean): Plan {
   };
   const elisions = raceEditElisionsFor(knots, {
     cornerSpansM, raceSecAtMeters: (m) => m / MPS, distanceMeter: distance,
-    startShownM: course.segments[0]?.length ?? 0, straightShownM: STRAIGHT_SHOWN_M,
+    /** ★画面と同じ関数（★2026-09-15・`sideOnlyShownMetersOf`） */
+    startShownM: sideOnlyShownMetersOf(course).startShownM,
+    straightShownM: sideOnlyShownMetersOf(course).straightShownM,
+    /** ★画面と同じく ★1 周目のスタンド前を渡す（★台本 v9・2026-09-15） */
+    midShownSpansM: sideOnlyShownMetersOf(course).firstPassSpansM,
     homeStretchM: homeStretchMetersOf(course),
     ...(keep ? { keepFromMetersLeft: DEFAULT_INTERVENTION_BALANCE.EARLY_SPURT_METER } : {}),
   });
@@ -99,8 +107,11 @@ describe('★真横の直線だけ（台本 v9）', () => {
           if (overlap > 0.5) bad.push(`${r.id}: 見せる ${shown.from.toFixed(0)}–${shown.to.toFixed(0)}m が ${c.label} ${c.from.toFixed(0)}–${c.to.toFixed(0)}m に ${overlap.toFixed(1)}m 掛かる`);
         }
       }
-      /** ★対照: ★跳びは 1 か所で、★発走と最後の直線は見せている（★全部飛ばして通していない） */
-      expect(plan.elisions.length, `${r.id} の跳びの数`).toBe(1);
+      /**
+       * ★対照: ★跳びの数は ★**鞍ごとの期待値**（★R-33・レビュー側の回答 §2 条件 1）。
+       *   ★1 周目のスタンド前を見せる 4 鞍は 2 か所、★それ以外は 1 か所。★発走と最後の直線は見せている。
+       */
+      expect(plan.elisions.length, `${r.id} の跳びの数`).toBe(FIRST_PASS_RACES.includes(r.id) ? 2 : 1);
       expect(shownRangesM(plan).at(-1)!.to, `${r.id}`).toBeCloseTo(plan.distance, 6);
     }
     expect(bad).toEqual([]);
@@ -131,6 +142,35 @@ describe('★真横の直線だけ（台本 v9）', () => {
     const spectate = planFor(GRADED_RACES[0]!.id, false);
     const skipsNearGoal = spectate.elisions.some((e) => e.toRaceSec * MPS > spectate.distance - keepM);
     expect(skipsNearGoal).toBe(true);
+  });
+
+  /**
+   * ★**⑥ 見せる長さは距離に比例して伸びる**（★2026-09-15・オーナー判断「距離に比例して伸ばす」）
+   *   ★オーナー評「★桜星賞で 1600m で 30 秒で作ってるので ★2000m ならばもう少し長くなりませんか？」
+   * ⚠️ ★対照: ★以前の決め方（`course.segments[0].length`）では ★流星大賞典の発走が 40m だった。
+   */
+  it('★★⑥ 桜星賞は 200m・250m のまま／他の鞍は距離に比例し、直線が続く長さを超えない（★全鞍）', () => {
+    expect(START_SHOWN_M).toBe(200);
+    expect(STRAIGHT_SHOWN_M).toBe(250);
+    expect(SHOWN_REFERENCE_DISTANCE_M).toBe(1600);
+    const courseOf = (id: string): Course => {
+      const s = raceSetupFromParam(id).setup;
+      return ovalCourse(s.distanceM, { ...s.spec, turn: s.turn });
+    };
+    expect(sideOnlyShownMetersOf(courseOf('g1-ousei'))).toEqual({ startShownM: 200, straightShownM: 250, firstPassSpansM: [] });
+    const ryusei = courseOf('g1-ryusei');
+    expect(ryusei.segments[0]!.length, '★対照: 以前の決め方では 40m').toBe(40);
+    expect(sideOnlyShownMetersOf(ryusei).startShownM).toBeCloseTo(250, 6);
+    expect(sideOnlyShownMetersOf(ryusei).straightShownM).toBeCloseTo(312.5, 6);
+    for (const r of GRADED_RACES) {
+      const course = courseOf(r.id);
+      const { startShownM, straightShownM } = sideOnlyShownMetersOf(course);
+      let run = 0;
+      for (const seg of course.segments) { if (seg.type !== 'straight') break; run += seg.length; }
+      const scale = course.distance / 1600;
+      expect(startShownM, `${r.id}`).toBeCloseTo(Math.min(run, 200 * scale), 6);
+      expect(straightShownM, `${r.id}`).toBeCloseTo(Math.min(homeStretchMetersOf(course), 250 * scale), 6);
+    }
   });
 
   it('★⑤ 切り戻しの道（v8）はコーナーのカットを持ったまま', () => {

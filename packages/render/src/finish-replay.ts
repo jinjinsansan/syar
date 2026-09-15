@@ -159,13 +159,15 @@ export function drawFinishReplayBadge<TImage>(
   font: FontOf,
   progress: number,
   colors: { readonly plate: string; readonly text: string; readonly accent: string },
+  /** ★見出しに添える場名・レース名（★2026-09-15・例「天河競馬場 流星大賞典」）。★省くと「リプレイ」だけ（従来） */
+  subLabel?: string,
 ): void {
   const fade = Math.max(0, Math.min(1, progress / 0.08));
   const ease = 1 - (1 - fade) ** 3;
   const baseAlpha = ctx.globalAlpha;
   ctx.globalAlpha = baseAlpha * ease;
 
-  const label = 'リプレイ';
+  const label = subLabel === undefined ? 'リプレイ' : `リプレイ　${subLabel}`;
   const px = 26;
   ctx.font = font(px, true);
   const textW = ctx.measureText(label).width;

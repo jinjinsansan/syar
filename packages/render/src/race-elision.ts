@@ -1,4 +1,5 @@
 import type { PhaseKnots, TimeWarp } from './time-warp.js';
+import { firstPassStraightsMOf, homeStretchMetersOf, leadingStraightMetersOf, type Course } from './course.js';
 
 /**
  * ★**見せない区間を「飛ばす」**（★2026-09-12・オーナー指示）
@@ -199,6 +200,58 @@ export function raceEditJumps(
  */
 export const STRAIGHT_SHOWN_M = 250;
 
+/** ★発走を見せる長さの基準（m・★桜星賞 1600m の値）。★距離に比例して伸ばします（`sideOnlyShownMetersOf`） */
+export const START_SHOWN_M = 200;
+/** ★見せる長さの基準にする距離（m）。★桜星賞（オーナーが本編 約 30 秒で承認した鞍） */
+export const SHOWN_REFERENCE_DISTANCE_M = 1600;
+
+/**
+ * ★**真横の直線だけ（台本 v9）で、発走と最後の直線を何 m 見せるか**（★2026-09-15・オーナー判断）
+ *
+ * 【★なぜ要るか】★オーナー評（流星大賞典・天河 2000m）:
+ *   > ★これ 30 秒あります？ ★あまりにも短くないですか？ ★桜星賞で 1600m で 30 秒で作ってるので
+ *   > ★2000m ならばもう少し長くなりませんか？
+ *
+ *   ⚠️ ★それまで発走は ★**走路の最初の区間の長さ**（`course.segments[0].length`）でした。
+ *      ★引き込み線（`withRunUp`）は直線を ★**2 つの区間に割って**置くことがあり、★最初の区間は
+ *      ★鞍によって ★**20m〜500m**（★流星大賞典 40m ＝ 2.5 秒・★桜星賞 200m ＝ 12.1 秒）でした。
+ *      ★距離で尺を伸ばす決まりもありませんでした。
+ *
+ * 【★どう決めるか】★オーナー判断 2026-09-15「★距離に比例して伸ばす」:
+ *   ★発走 … `START_SHOWN_M × 距離 ÷ 1600`。★ただし ★**発走からコーナーまで直線が続く長さ**まで。
+ *   ★最後の直線 … `STRAIGHT_SHOWN_M × 距離 ÷ 1600`。★ただし ★**最後の直線の長さ**まで。
+ *   → ★桜星賞は 200m・250m のまま（★1 ビットも変わりません）。★どちらも ★コーナーには掛かりません。
+ */
+export function sideOnlyShownMetersOf(course: Course): {
+  readonly startShownM: number;
+  readonly straightShownM: number;
+  readonly firstPassSpansM: readonly { readonly fromM: number; readonly toM: number }[];
+} {
+  const scale = course.distance / SHOWN_REFERENCE_DISTANCE_M;
+  return {
+    startShownM: Math.min(leadingStraightMetersOf(course), START_SHOWN_M * scale),
+    straightShownM: Math.min(homeStretchMetersOf(course), STRAIGHT_SHOWN_M * scale),
+    /** ★1 周目のスタンド前（★長距離の 3 幕・`FIRST_PASS_SHOWN_M`） */
+    firstPassSpansM: firstPassStraightsMOf(course).map((s) => ({
+      fromM: Math.max(s.fromM, s.toM - FIRST_PASS_SHOWN_M), toM: s.toM,
+    })),
+  };
+}
+
+/**
+ * ★**1 周目のスタンド前を何 m 見せるか**（★2026-09-15・計画書 R-5・★開発側の仮置き・★オーナーの目で決める）。
+ *
+ *   ★長距離の 4 鞍は ★最後の直線と同じ直線を ★ゴールの 1 周前にも通ります。★そこも ★**直線**なので、
+ *   ★コーナーを映さずに真横で見せられます（★発走 → 1 周目のスタンド前 → 最後の直線 の 3 幕）。
+ *   ★見せるのは ★**その直線の終わり（＝決勝線の前を通る所）までの 200m**（★約 12 秒）です。
+ * ⚠️ ★レビュー側の条件（回答 §2）:
+ *    ★① 跳びが 2 か所になる → ★検査は鞍ごとの跳びの数を見る（`side-only-script.test.ts` ②）
+ *    ★② 1 周目は ★勢いのバー・展開の見出しを出さない（★勢いは残り 200m から・★ここは残り 2100m より手前）
+ *    ★③ D-062「道中は情報が少ない」→ ★長く見せない（★何秒かは [EYES]）
+ * ⚠️ ★距離では伸ばしません（★4 鞍とも 3000m 以上で、★伸ばすと道中が長くなる）。
+ */
+export const FIRST_PASS_SHOWN_M = 200;
+
 export interface RaceEditPlan {
   /** ★台本が貼ったコーナーのカット（★`broadcastV2ScriptBoundariesM` の `-corner-` の行） */
   readonly cornerSpansM: readonly { readonly fromM: number; readonly toM: number }[];
@@ -229,6 +282,11 @@ export interface RaceEditPlan {
    * ⚠️ ★コーナーは ★**飛ばさずに覆います**（★画面がコース図の画面で覆う）。★この関数は時計だけを決めます。
    */
   readonly keepFromMetersLeft?: number;
+  /**
+   * ★**道中で見せる直線**（m・★2026-09-15・計画書 R-5「1 周目のスタンド前」）。★`sideOnlyShownMetersOf` の `firstPassSpansM` を渡します。
+   * ⚠️ ★渡さなければ ★**1 ビットも変わりません**（★発走 ＋ 最後の直線）。
+   */
+  readonly midShownSpansM?: readonly { readonly fromM: number; readonly toM: number }[];
 }
 
 export function raceEditElisionsFor(knots: PhaseKnots, plan: RaceEditPlan): readonly RaceElision[] {
@@ -254,7 +312,7 @@ export function raceEditElisionsFor(knots: PhaseKnots, plan: RaceEditPlan): read
   const corners = plan.lastCornerOnly === false ? plan.cornerSpansM : plan.cornerSpansM.slice(-1);
   /** ★見せる区間（★レース秒） */
   const shown: { from: number; to: number }[] = [{ from: 0, to: startShownTo }];
-  for (const span of corners) {
+  for (const span of [...corners, ...(plan.midShownSpansM ?? [])]) {
     const from = Math.max(startShownTo, plan.raceSecAtMeters(span.fromM));
     const to = Math.min(straightFrom, plan.raceSecAtMeters(span.toM));
     if (to > from) shown.push({ from, to });

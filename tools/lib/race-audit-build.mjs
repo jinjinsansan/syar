@@ -13,7 +13,7 @@
  */
 import { readFileSync } from 'node:fs';
 import {
-  DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt,
+  DEFAULT_RACE_BALANCE, resolveRace, paceOf, replayOf, finalOrderMatches, laneAt, PHASE_METERS,
 } from '@star/race-engine';
 import {
   DEMO_CONTEST_GAMMA, finishReplayAt, finishCrossDisplaySec, raceTotalDisplaySec,
@@ -52,7 +52,8 @@ export const AUDIT_SCREEN_BALANCE = DEMO_CONTEST_GAMMA === DEFAULT_RACE_BALANCE.
   : { ...DEFAULT_RACE_BALANCE, TIME_GAP_SHAPE_GAMMA: DEMO_CONTEST_GAMMA };
 
 /** ★`/race` の既定と同じ */
-export const RACE_DEFAULTS = { seed: 42, ownGate: 3, distance: 1600, field: 12, trackWidthM: 20 };
+/** ⚠️ ★`field` は画面（`page.tsx` の `FIELD`）と同じ値（★2026-09-15 に 12 → 8・オーナー指示・R-31） */
+export const RACE_DEFAULTS = { seed: 42, ownGate: 3, distance: 1600, field: 8, trackWidthM: 20 };
 
 /**
  * ★**送り速さの方針**を 1 か所で決める（★2026-09-09・裁定 §3 Q-1a-1）。
@@ -142,7 +143,12 @@ export function buildAuditRace(opts = {}) {
      *    （★直線は 10 場 50 鞍で 290〜620m の 10 通り）。
      * ★既定の `ovalCourse` は 400 なので、★**既定走路の数値は 1 ビットも変わりません**。
      */
-    distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: homeStretchMetersOf(course), boundaries,
+    /**
+     * ⚠️ ★**2026-09-15 に訂正**: ★ここは「境界時刻 `straightSec` が指す地点」で、★エンジンの
+     *    ★`PHASE_METERS.STRAIGHT`（400m）です。★走路の直線の長さを渡すと ★直線の長い場で馬が速すぎます
+     *    （★天河 620m で秒速 28.9m）。★`page.tsx` と同じ値（★`race-clock-wiring.test.ts` が構文木で固定）。
+     */
+    distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: PHASE_METERS.STRAIGHT, boundaries,
     strategyOf: (g) => entrants[g - 1].strategy, pace, formationSeed: seed * 2654435761,
     /** ★横位置も同じ形を見ます（`page.tsx` と同じ引数の並び） */
     laneOf: (gate, metersLeft) => (spec === undefined

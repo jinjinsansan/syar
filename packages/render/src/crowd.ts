@@ -50,23 +50,32 @@ export interface CrowdOptions {
   readonly alpha?: number | undefined;
   /** 空席の割合（0〜1）。0 だと隙間なく埋まって不自然 */
   readonly emptyRatio?: number | undefined;
+  /**
+   * ★**差し色 4 色**（★競馬場ごと・2026-09-15）。★服の「はっきりした色」だけを差し替えます。
+   * ⚠️ ★肌・淡色・灰紺茶の比率は変えません（★変えると紙吹雪に見えます）。★省くと `CROWD_ACCENT_COLORS`（従来）
+   */
+  readonly accentColors?: readonly string[] | undefined;
 }
 
-/**
- * ★観客の粒の色。**明るい肌・白・淡色の服が主で、時々はっきりした色**。
- *   参考の粒は遠目には「暗い塊に明るい斑」で、彩度の高い色は少数です。
- *   ⚠️ 派手な色を均等に混ぜると**紙吹雪**に見えます。
- */
-const CROWD_COLORS: readonly string[] = [
+/** ★観客の粒の色のうち、肌・淡色と灰・紺・茶（★差し色より前の 22 色） */
+const CROWD_BASE_COLORS: readonly string[] = [
   // 肌・淡色（いちばん多い）
   '#c3ae95', '#d2c1ab', '#b39c82', '#dcd0bd', '#a8917a', '#c9b6a0',
   '#c3ae95', '#d2c1ab', '#b39c82', '#dcd0bd', '#a8917a', '#c9b6a0',
   // 灰・紺・茶の服
   '#7f8894', '#646d79', '#939aa3', '#535b65', '#6b6257', '#8a8076',
   '#7f8894', '#646d79', '#939aa3', '#535b65',
-  // 差し色（少数）
-  '#a04a44', '#3d648f', '#b2882f', '#48664a',
 ];
+
+/** ★既定の差し色（少数）。★スターパーク競馬場と同じ */
+export const CROWD_ACCENT_COLORS: readonly string[] = ['#a04a44', '#3d648f', '#b2882f', '#48664a'];
+
+/**
+ * ★観客の粒の色。**明るい肌・白・淡色の服が主で、時々はっきりした色**。
+ *   参考の粒は遠目には「暗い塊に明るい斑」で、彩度の高い色は少数です。
+ *   ⚠️ 派手な色を均等に混ぜると**紙吹雪**に見えます。
+ */
+const CROWD_COLORS: readonly string[] = [...CROWD_BASE_COLORS, ...CROWD_ACCENT_COLORS];
 
 /** 座標とシードから 0〜1 を決める（乱数ではない・同じ入力なら同じ値） */
 function hash01(x: number, y: number, seed: number): number {
@@ -104,6 +113,8 @@ export function paintCrowd(
   const dot = Math.max(1, opts.dotPx ?? 1);
   const alpha = opts.alpha ?? 0.86;
   const empty = Math.min(0.9, Math.max(0, opts.emptyRatio ?? 0.1));
+  /** ★差し色だけ差し替える（★省けば従来の 26 色の並びそのもの） */
+  const palette = opts.accentColors === undefined ? CROWD_COLORS : [...CROWD_BASE_COLORS, ...opts.accentColors];
   const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = prevAlpha * alpha;
   let placed = 0;
@@ -121,7 +132,7 @@ export function paintCrowd(
       if (!(weight > 0)) continue;
       // ★暗いところほど空席が増える（＝屋根の下がまばらになる）
       if (hash01(x, y, seed + 13) < 1 - weight * (1 - empty)) continue;
-      const color = CROWD_COLORS[Math.floor(hash01(x, y, seed + 29) * CROWD_COLORS.length) % CROWD_COLORS.length]!;
+      const color = palette[Math.floor(hash01(x, y, seed + 29) * palette.length) % palette.length]!;
       ctx.globalAlpha = prevAlpha * alpha * (0.4 + 0.6 * weight);
       ctx.fillStyle = color;
       ctx.fillRect(x, y, dot, dot);
