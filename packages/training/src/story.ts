@@ -92,11 +92,64 @@ export function storyLineOf(event: StoryEvent): string {
  * ⚠️ ★**並べ替えは安定**（★同じ週の出来事は渡された順のまま）。★保存の順を物語の順にします。
  */
 export function storyOf(events: readonly StoryEvent[]): readonly string[] {
-  return [...events]
+  return storyLinesOf(events).map((l) => l.text);
+}
+
+/**
+ * ★**物語の 1 行**（★文 ＋ 種類 ＋ 週）。
+ *
+ * ⚠️ ★`storyOf` は ★**文だけ**を返すので、★**種類が落ちます**
+ *    （★2026-09-16 に気づきました。★デザイナーのカード `components/horse-story` は
+ *    ★**種類ごとに色分けしたラベル**を出すので、★文だけでは作れません）。
+ * ⚠️ ★画面が文から種類を**推測**する形にはしないこと（★「初勝利」という語を含むか、等）。
+ *    ★文言を直した日に色が外れます。
+ * ★`sameWeekAsPrev` … ★**同じ週の続きの行か**（★カードは「同じ週の最初の行だけ週番号を出す」）。
+ */
+export interface StoryLine {
+  readonly type: StoryEventType;
+  readonly week: number;
+  readonly text: string;
+  readonly sameWeekAsPrev: boolean;
+}
+
+/**
+ * ★**物語を「行」で返す**（★並べ替えは `storyOf` と同じ・安定）。
+ * ⚠️ ★`storyOf` はこれを呼んで文だけを取り出します（★並べ替えを 2 本持たない）。
+ */
+export function storyLinesOf(events: readonly StoryEvent[]): readonly StoryLine[] {
+  const sorted = [...events]
     .map((e, i) => ({ e, i }))
     .sort((a, b) => (a.e.week - b.e.week) || (a.i - b.i))
-    .map(({ e }) => storyLineOf(e));
+    .map(({ e }) => e);
+  return sorted.map((e, i) => ({
+    type: e.type,
+    week: e.week,
+    text: storyLineOf(e),
+    sameWeekAsPrev: i > 0 && sorted[i - 1]!.week === e.week,
+  }));
 }
+
+/**
+ * ★**種類の短い名前**（★カードの色分けラベルに出す語）。
+ * ⚠️ ★**文そのものではありません**（★文は `storyLineOf`）。★ラベルは短く、文は説明です。
+ */
+export const STORY_EVENT_LABEL: Readonly<Record<StoryEventType, string>> = {
+  birth: '誕生',
+  'first-training': '初調教',
+  debut: 'デビュー',
+  'first-win': '初勝利',
+  'trait-discovered': '適性判明',
+  injury: '故障',
+  comeback: '復帰',
+  'graded-win': '重賞勝ち',
+  'top-grade-win': '最高格勝ち',
+  'jockey-bond': '名コンビ',
+  'career-high': '自己最高',
+  'final-race': 'ラストラン',
+  retirement: '引退',
+  'first-offspring': '初産駒',
+  'offspring-win': '産駒の勝利',
+};
 
 /**
  * ★**レースが終わったときに残す出来事**（★(a) 第 5 便-4・2026-09-16・§18 LR-7）
