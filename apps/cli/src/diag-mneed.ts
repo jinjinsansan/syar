@@ -28,7 +28,8 @@
  * 実行: npx tsx apps/cli/src/diag-mneed.ts --seed 42 --races 20
  */
 import { NICKS_GEN, deriveRng } from '@star/sim-engine';
-import { DEFAULT_RACE_BALANCE, lanePlanForRace, resolveRace, type RaceEntrant, type RaceResult } from '@star/race-engine';
+import { DEFAULT_RACE_BALANCE, conditionsFromFrozen, lanePlanForRace, resolveRace, type RaceEntrant, type RaceResult } from '@star/race-engine';
+import { productionRaceOf } from '@star/scheduler';
 import { MARGIN, ODDS_CAP, TICKET_KINDS, debiasedProbability, placeDepth, type TicketKind } from '@star/betting';
 import { generateRace, sortPoolByClass } from './race-field.js';
 import { resolveRuntimeConfig } from './config.js';
@@ -82,6 +83,25 @@ const NO_DEBIAS = argv.includes('--no-debias');
  *     稀な目の扱いを1箇所で決めれば両方閉じます。
  */
 const PMIN = argv.includes('--pmin');
+/**
+ * ★**見る券種を絞る**（★切り分け専用・2026-09-16・Q-V10-3）。
+ *
+ * ★R-21 の見張りは ★**券種ごとに必要な参照 MC が違う**のに、★全券種を一度に要求します。
+ *   ★`trio` の `p_min = 7.7e-5` は参照 26 万回を要求しますが、
+ *   ★`place` の `p_min = 8.2e-3` は ★**参照 2,440 回で足ります**（★10 万なら十分）。
+ * → ★`place` だけを見るときに、★`trio` の要求で止まらないようにします。
+ * ⚠️ ★**見張りを弱めていません** — ★絞った券種については同じ条件で判定します。
+ *    ★絞らなければ従来どおり全券種を要求します。
+ */
+const KINDS: readonly TicketKind[] = (() => {
+  const i = argv.indexOf('--kinds');
+  if (i < 0) return TICKET_KINDS;
+  const want = (argv[i + 1] ?? '').split(',').filter((s) => s.length > 0);
+  const bad = want.filter((k) => !(TICKET_KINDS as readonly string[]).includes(k));
+  if (bad.length > 0) throw new Error(`--kinds に知らない券種があります: ${bad.join(',')}`);
+  if (want.length === 0) throw new Error('--kinds が空です');
+  return want as TicketKind[];
+})();
 /** 打ち切りを無視できるとみなす M·p_min（設計余裕）。M ≧ λ* × ODDS_CAP / (1−margin) */
 const LAMBDA_STAR = num('lambda', 30);
 const pMinOf = (kind: TicketKind): number => (1 - MARGIN[kind]) / ODDS_CAP[kind];
@@ -172,18 +192,39 @@ function keysOf(kind: TicketKind, order: readonly number[], depth: number): stri
 }
 const orderOf = (r: RaceResult): number[] => r.order.map((x) => Number(x.horseId.replace(/^H/, '')));
 
+/**
+ * ★**既定は本番の条件**（★2026-09-16・Q-V10-3 の切り分け）。
+ *
+ * ⚠️ ★**以前この道具は `generateRace` が自分で引く旧来の条件で計算していました。**
+ *    ★一方 `verify-payout.ts` / `verify-pmin.ts` は ★**本番条件**（番組の距離・馬場・競馬場・
+ *    ★凍結した走路の形）で測ります。→ ★**両者が別の出走表を見ていました**（★R-30 の家族）。
+ *    ★「厳密計算では −0.05pt、実測では −1.26pt」を比べるには、★まず同じ土俵にする必要があります。
+ * ★`--legacy-conditions` … ★旧来の条件に戻す（比較用・`verify-payout.ts` と同じ名前）
+ */
+const LEGACY_CONDITIONS = argv.includes('--legacy-conditions');
+
 // --- 参照 MC で真の確率をつくる ---
 const refProbs = new Map<TicketKind, number[]>(TICKET_KINDS.map((k) => [k, []]));
 for (let i = 0; i < RACES; i += 1) {
-  const race = generateRace(pool, i, deriveRng(SEED, S.FIELD, i));
+  const prod = LEGACY_CONDITIONS ? null : productionRaceOf(i);
+  const race = generateRace(
+    pool, i, deriveRng(SEED, S.FIELD, i), undefined, undefined, undefined,
+    prod === null ? {} : {
+      programme: {
+        surface: prod.programme.surface, distance: prod.programme.distance, courseShape: prod.courseFrozen.courseShape,
+      },
+    },
+  );
+  /** ★オッズも確定も、凍結した走路の形から同じ関数で作った条件で回す（`verify-payout.ts` と同じ） */
+  const conditions = prod === null ? race.conditions : conditionsFromFrozen(prod.courseFrozen, race.conditions);
   const entrants: RaceEntrant[] = race.entrants.map((e, k) => ({ ...e, horseId: `H${k + 1}` }));
   const depth = placeDepth(entrants.length);
   const counts = new Map<TicketKind, Map<string, number>>(TICKET_KINDS.map((k) => [k, new Map()]));
   const rng = deriveRng(SEED, S.ODDS, i);
   // ★距離ロスの下ごしらえは試行の前に 1 回（ワーカーの build-race.ts と同じ形・ES-6・R-30）
-  const lanePlan = lanePlanForRace(race.conditions);
+  const lanePlan = lanePlanForRace(conditions);
   for (let t = 0; t < REF; t += 1) {
-    const order = orderOf(resolveRace({ conditions: race.conditions, entrants, seed: rng.nextUint32(), balance: DEFAULT_RACE_BALANCE, lanePlan }));
+    const order = orderOf(resolveRace({ conditions, entrants, seed: rng.nextUint32(), balance: DEFAULT_RACE_BALANCE, lanePlan }));
     for (const kind of TICKET_KINDS) {
       const m = counts.get(kind)!;
       for (const key of keysOf(kind, order, depth)) m.set(key, (m.get(key) ?? 0) + 1);
@@ -206,7 +247,8 @@ for (let i = 0; i < RACES; i += 1) {
 //   前回この区別をせず、参照 10万で「M=100万なら三連単 −0.00pt」と出しました。
 const REF_COUNTS_AT_PMIN = 20;
 if (PMIN) {
-  for (const kind of TICKET_KINDS) {
+  /** ★見る券種だけを要求する（★絞らなければ全券種・見張りは弱めていない） */
+  for (const kind of KINDS) {
     const need = REF_COUNTS_AT_PMIN / pMinOf(kind);
     if (REF < need) {
       throw new Error(
@@ -235,7 +277,7 @@ if (NO_DEBIAS) console.log(`  ⚠️ --no-debias: D-013 の補正を外してい
 if (PMIN) {
   console.log(`  ★--pmin: D-035（p_min 未満の目は発売しない）を適用。λ* = ${LAMBDA_STAR}`);
   console.log(`  ${'券種'.padEnd(16)} ${'p_min'.padStart(10)} ${'必要な M'.padStart(12)}`);
-  for (const kind of TICKET_KINDS) {
+  for (const kind of KINDS) {
     const pm = pMinOf(kind);
     console.log(`  ${kind.padEnd(16)} ${pm.toExponential(2).padStart(10)} ${Math.ceil(LAMBDA_STAR / pm).toLocaleString().padStart(12)}`);
   }
@@ -245,7 +287,7 @@ console.log(`  ${'券種'.padEnd(16)} ${'目数/R'.padStart(7)} ${TARGETS.map((m
 
 /** ★売られる目の数も出す。D-035 は「買えなくなる目」を作るので、製品影響を数字にする */
 const soldPerRace = new Map<TicketKind, number>();
-for (const kind of TICKET_KINDS) {
+for (const kind of KINDS) {
   const ps = refProbs.get(kind)!;
   if (ps.length === 0) throw new Error(`${kind}: 参照確率が空です（R-21）`);
   const cells: string[] = [];
@@ -270,7 +312,7 @@ for (const kind of TICKET_KINDS) {
 console.log(`
   ★売られる目（M=${TARGETS[TARGETS.length - 1]!.toLocaleString()}）`);
 console.log(`  ${'券種'.padEnd(16)} ${'参照で観測'.padStart(11)} ${'売られる'.padStart(10)} ${'売られない'.padStart(11)}`);
-for (const kind of TICKET_KINDS) {
+for (const kind of KINDS) {
   const seen = refProbs.get(kind)!.length / RACES;
   const sold = soldPerRace.get(kind)!;
   console.log(
