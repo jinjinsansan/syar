@@ -70,6 +70,24 @@ export interface InterventionBalance {
   IQ_WINDOW_FULL: number;
 
   /**
+   * ★**騎手が判定窓を広げる割合**（★D-110 ①・**この便は 0**）。
+   *   ★広げるときは ★**AI 代行にも同じ幅**を与えます（★`resolveIntervention` に同じ騎手を渡す）。
+   *   ★こうすると **V-8（AI 代行 ÷ 手動最適 93〜97%）の比が保たれ**、D-105 ⑥ とも衝突しません。
+   */
+  JOCKEY_WINDOW_EFFECT: number;
+  /**
+   * ★**気性難の馬が暴走する素の率**（★D-110 ②・**この便は 0**）。
+   * ⚠️ ★「率」を本当に引くなら ★**乱数の注入**が要ります（★憲法 4）。
+   *    ★いまは ★**期待値**として倍率に載せる形にしてあり、★0 なので 1 ビットも動きません。
+   *    → ★**照会 Q-GB4-2**（★率で引くか・期待値で載せるか）。
+   */
+  RUNAWAY_BASE: number;
+  /** ★**暴走したときに引く量**（★D-110 ②・**この便は 0**） */
+  RUNAWAY_PENALTY: number;
+  /** ★**騎手が暴走を抑える強さ**（★D-110 ②・**この便は 0**） */
+  JOCKEY_CALM_EFFECT: number;
+
+  /**
    * ★ゲージが減りはじめる残距離（I-STAMINA-WINDOW）。
    *
    * 【正典の不整合】§8b.2 の数値をレース全体（2000m ≒ 120秒）に当てると、
@@ -139,6 +157,12 @@ export const DEFAULT_INTERVENTION_BALANCE: InterventionBalance = {
   TAP_RATE_CAP: 15,
 
   IQ_WINDOW_FULL: 1000,
+
+  // ★騎手（D-110）。★**この便はすべて 0**（★効かせる便で V-13・V-9a・V-8 を取り直す）
+  JOCKEY_WINDOW_EFFECT: 0,
+  RUNAWAY_BASE: 0,
+  RUNAWAY_PENALTY: 0,
+  JOCKEY_CALM_EFFECT: 0,
 
   STAMINA_BASE_DRAIN: 60,
   STAMINA_WINDOW_METER: 800,
@@ -345,6 +369,50 @@ export interface InterventionHorse {
   st: number;
   condition: number;
   fatigue: number;
+  /**
+   * ★**気性 0〜100**（★高いほど気性難・§5.2）。★D-110 ② の「暴走」の入力。
+   * ⚠️ ★**省略できます**（★この便は `RUNAWAY_BASE` が 0 なので、渡しても渡さなくても 1 ビット同じ）。
+   */
+  temper?: number | undefined;
+}
+
+/**
+ * ★**介入に渡す騎手**（★D-110 ④・⑤）。
+ * ⚠️ ★**出走登録で凍結した値を渡します**（★名簿を引き直さない・D-105 ④）。
+ * ⚠️ ★`race-engine` は `scheduler` に依存しないので、★**数値だけ**を受け取ります
+ *    （★`FrozenJockey` をそのまま渡せる形にしてあります）。
+ */
+export interface InterventionJockey {
+  /** ★暴走の抑え 0〜1（★この便は効かない＝`JOCKEY_CALM_EFFECT` が 0） */
+  readonly calm: number;
+}
+
+/**
+ * ★**騎手が広げた判定窓の倍率**（★D-110 ①）。
+ * ⚠️ ★**AI 代行にも同じ値を渡すこと**（★渡さないと V-8 の比が騎手ごとに変わります）。
+ * ★この便は `JOCKEY_WINDOW_EFFECT` が 0 なので ★**常に 1**（★掛けても 1 ビット同じ）。
+ */
+export function jockeyWindowMultOf(
+  jockey: InterventionJockey | null,
+  balance: InterventionBalance,
+): number {
+  if (jockey === null) return 1;
+  return 1 + balance.JOCKEY_WINDOW_EFFECT * jockey.calm;
+}
+
+/**
+ * ★**暴走の期待値**（★D-110 ②）。★気性難ほど高く、★騎手が抑える。
+ * ★この便は `RUNAWAY_BASE` が 0 なので ★**常に 0**。
+ * ⚠️ ★**AI 代行は暴走しません**（★呼ぶ側が AI の経路でこれを足さない）。
+ *    ★だから「人が操作するほど騎手の価値が高い」形になります（★裁定 §3-2 の 2）。
+ */
+export function runawayRiskOf(
+  temper: number,
+  jockey: InterventionJockey | null,
+  balance: InterventionBalance,
+): number {
+  const calm = jockey === null ? 0 : jockey.calm;
+  return balance.RUNAWAY_BASE * (temper / 100) * (1 - balance.JOCKEY_CALM_EFFECT * calm);
 }
 
 export interface InterventionOutcome {
@@ -359,6 +427,8 @@ export interface InterventionOutcome {
   interventionMult: number;
   /** ゴール時点の残スタミナ（負なら途中で尽きている） */
   staminaLeft: number;
+  /** ★暴走の期待値（★D-110 ②・**この便は常に 0**） */
+  runawayRisk: number;
 }
 
 /**
@@ -371,9 +441,14 @@ export function startBonusOf(
   errorMs: number,
   iq: number,
   balance: InterventionBalance,
+  /**
+   * ★騎手が広げた窓の倍率（★D-110 ①・既定 1 ＝ 騎手なし）。
+   * ⚠️ ★**AI 代行にも同じ値を渡します**（★手動だけに渡すと V-8 が騎手ごとに変わる）。
+   */
+  jockeyWindowMult = 1,
 ): number {
   const iqWindow = (iq / balance.IQ_WINDOW_FULL) * balance.LAG_WINDOW_MS;
-  const window = balance.LAG_WINDOW_MS + iqWindow;
+  const window = (balance.LAG_WINDOW_MS + iqWindow) * jockeyWindowMult;
   // ★猶予幅の内側を一律満点にすると、AI 代行がほぼ常に満点を取り V-8/V-9 の較正余地が消える。
   //   誤差0を頂点に猶予幅で下限へ落ちる連続関数にし、猶予幅の意味は「IQ で判定が緩む」に残す。
   const t = clamp(Math.abs(errorMs) / window, 0, 1);
@@ -433,8 +508,19 @@ export function resolveIntervention(
   /** レース距離 m。★D-017 で消費がレース時間に対する割合になったので必要 */
   distanceMeter: number,
   balance: InterventionBalance,
+  /**
+   * ★**凍結した騎手**（★D-110 ④・既定 `null` ＝ 騎手なし）。
+   * ⚠️ ★**AI 代行の経路でも同じ騎手を渡すこと**（★判定窓は同じ幅・裁定 §3-2 の 1）。
+   * ★この便は効果がすべて 0 なので、★渡しても渡さなくても 1 ビット同じです。
+   */
+  jockey: InterventionJockey | null = null,
 ): InterventionOutcome {
-  const startBonus = startBonusOf(plan.startErrorMs, horse.iq, balance);
+  const startBonus = startBonusOf(
+    plan.startErrorMs,
+    horse.iq,
+    balance,
+    jockeyWindowMultOf(jockey, balance),
+  );
   const spurtBonus = spurtBonusOf(plan.spurtAtMeter, balance);
   const driveBonus = driveBonusOf(plan.driveTapsPerSec, horse.gt, balance);
 
@@ -457,8 +543,16 @@ export function resolveIntervention(
   const emptyAtMeter = emptyAtMeterOf(gauge);
   const ranEmpty = emptyAtMeter !== null && emptyAtMeter > balance.STAMINA_EMPTY_METER;
 
+  /**
+   * ★**暴走**（★D-110 ②）。★この便は `RUNAWAY_BASE` も `RUNAWAY_PENALTY` も 0 なので
+   * ★`runawayPenalty` は ★**ちょうど 0**、★`x - 0 === x` なので ★**丸めの差も出ません**。
+   */
+  const runawayRisk = runawayRiskOf(horse.temper ?? 0, jockey, balance);
+  const runawayPenalty = runawayRisk * balance.RUNAWAY_PENALTY;
+
   const rawMult =
-    1 + startBonus + spurtBonus + driveBonus + (ranEmpty ? balance.EMPTY_GAUGE_PENALTY : 0);
+    1 + startBonus + spurtBonus + driveBonus + (ranEmpty ? balance.EMPTY_GAUGE_PENALTY : 0)
+    - runawayPenalty;
   const interventionMult = clamp(
     rawMult,
     1 - balance.INTERVENTION_CAP,
@@ -473,6 +567,7 @@ export function resolveIntervention(
     rawMult,
     interventionMult,
     staminaLeft,
+    runawayRisk,
   };
 }
 

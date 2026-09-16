@@ -23,6 +23,15 @@ export interface Jockey {
   readonly name: string;
   /** ★出走 1 回あたりの料金 [EP]（★§10.4 の登録料と同じ形のシンク） */
   readonly feeEP: number;
+  /**
+   * ★**暴走の抑え 0〜1**（★第 4 便・D-110 ②）。
+   * ★騎手の値打ちは ★**判定窓の広さではなく「暴走の抑え」で出します**（★裁定 §3-2 の 2）。
+   *   ★窓を広げるだけだと ★**AI 代行にも同じ幅を与える**ので（D-110 ①）差が出ないためです。
+   * ⚠️ ★**この便では着順に効きません** — ★`race-engine` 側の `JOCKEY_CALM_EFFECT` と
+   *    `RUNAWAY_BASE` が ★**どちらも 0** です。★ここに並ぶ値は「★どちらが上手いか」の**順序の宣言**で、
+   *    ★効かせる便で ★料金との関係（上限つき）と一緒に決め直します（D-105 ③）。
+   */
+  readonly calm: number;
 }
 
 /**
@@ -33,12 +42,12 @@ export interface Jockey {
  *    ★効かせる便で ★料金と効果の関係（上限つき）を決めます（D-105 ③）。
  */
 export const JOCKEYS: readonly Jockey[] = [
-  { id: 'j-aoi', name: '青井 はやと', feeEP: 200 },
-  { id: 'j-kurata', name: '倉田 みなと', feeEP: 200 },
-  { id: 'j-shinozaki', name: '篠崎 れん', feeEP: 300 },
-  { id: 'j-tsuji', name: '辻 さやか', feeEP: 300 },
-  { id: 'j-himura', name: '桧村 たくみ', feeEP: 400 },
-  { id: 'j-narita', name: '成田 ゆう', feeEP: 400 },
+  { id: 'j-aoi', name: '青井 はやと', feeEP: 200, calm: 0.2 },
+  { id: 'j-kurata', name: '倉田 みなと', feeEP: 200, calm: 0.2 },
+  { id: 'j-shinozaki', name: '篠崎 れん', feeEP: 300, calm: 0.4 },
+  { id: 'j-tsuji', name: '辻 さやか', feeEP: 300, calm: 0.4 },
+  { id: 'j-himura', name: '桧村 たくみ', feeEP: 400, calm: 0.6 },
+  { id: 'j-narita', name: '成田 ゆう', feeEP: 400, calm: 0.6 },
 ];
 
 export function jockeyById(id: JockeyId): Jockey | undefined {
@@ -82,13 +91,23 @@ export interface FrozenJockey {
   readonly bond: number;
   /** ★着順への効果（★この便は 0。★効かせる便でここに値が入る） */
   readonly effect: number;
+  /**
+   * ★**暴走の抑え 0〜1**（★第 4 便・D-110 ④「★凍結から介入の判定に渡す」）。
+   * ⚠️ ★これは ★**`InterventionJockey`（`@star/race-engine`）にそのまま渡せる形**です。
+   *    ★`race-engine` は `scheduler` に依存しないので、★数値だけが渡ります。
+   * ⚠️ ★**この便では着順に効きません**（★`JOCKEY_CALM_EFFECT` も `RUNAWAY_BASE` も 0）。
+   */
+  readonly calm: number;
 }
 
 /** ★登録の時点で凍結する（★名簿の値をその場で写す） */
 export function freezeJockey(id: JockeyId, rides: number): FrozenJockey {
   const j = jockeyById(id);
   if (j === undefined) throw new Error(`騎手が名簿にいません: ${id}`);
-  return { v: 1, jockeyId: j.id, name: j.name, feeEP: j.feeEP, bond: jockeyBondAfterRides(rides), effect: JOCKEY_EFFECT };
+  return {
+    v: 1, jockeyId: j.id, name: j.name, feeEP: j.feeEP,
+    bond: jockeyBondAfterRides(rides), effect: JOCKEY_EFFECT, calm: j.calm,
+  };
 }
 
 /**

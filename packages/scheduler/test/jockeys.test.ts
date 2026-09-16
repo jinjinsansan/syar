@@ -27,8 +27,16 @@ describe('★騎手（GB-3・D-105）', () => {
     for (const j of JOCKEYS) {
       expect(j.name.length, j.id).toBeGreaterThan(0);
       expect(j.feeEP, `${j.name} の料金`).toBeGreaterThan(0);
-      /** ★賞金からの差し引き（報酬率）を持たない — ★持てば「PP を払って勝ちやすさを買う」形になる */
-      expect(Object.keys(j).sort()).toEqual(['feeEP', 'id', 'name']);
+      /**
+       * ★賞金からの差し引き（報酬率）を持たない — ★持てば「PP を払って勝ちやすさを買う」形になる。
+       * ⚠️ ★**2026-09-16・第 4 便で `calm` が増えました**（★D-110 ②「暴走の抑え」）。
+       *    ★この錨は ★**意図して付け替えたもの**です。★`calm` は 0〜1 の**順序の宣言**で、
+       *    ★`race-engine` の `JOCKEY_CALM_EFFECT`・`RUNAWAY_BASE` が ★**どちらも 0** のあいだは着順に効きません
+       *    （★対照は `apps/cli/test/jockey-window-no-effect.test.ts` が実際に判定を回して取ります）。
+       */
+      expect(Object.keys(j).sort()).toEqual(['calm', 'feeEP', 'id', 'name']);
+      expect(j.calm, `${j.name} の抑え`).toBeGreaterThanOrEqual(0);
+      expect(j.calm, `${j.name} の抑え`).toBeLessThanOrEqual(1);
     }
     /** ★記帳は EP の台帳の語（`0001_init.sql` の閉じた集合の 1 つ） */
     expect(['inflow', 'training', 'entry_fee', 'bet', 'refund', 'stud_fee']).toContain(JOCKEY_FEE_LEDGER_REASON);
@@ -38,7 +46,8 @@ describe('★騎手（GB-3・D-105）', () => {
   it('③ ★出走登録で凍結する（★名簿を引き直さずに読める形）', () => {
     const j = JOCKEYS[0]!;
     const frozen = freezeJockey(j.id, 2);
-    expect(frozen).toEqual({ v: 1, jockeyId: j.id, name: j.name, feeEP: j.feeEP, bond: 2, effect: 0 });
+    /** ⚠️ ★`calm` は第 4 便で増えた（★D-110 ④「凍結から介入の判定に渡す」・上の ② の註記と同じ理由） */
+    expect(frozen).toEqual({ v: 1, jockeyId: j.id, name: j.name, feeEP: j.feeEP, bond: 2, effect: 0, calm: j.calm });
     /** ★凍結だけで確定に必要な値がそろう（★id から引き直さなくても名前と料金が分かる） */
     expect(frozen.name).toBe(j.name);
     expect(frozen.feeEP).toBe(j.feeEP);

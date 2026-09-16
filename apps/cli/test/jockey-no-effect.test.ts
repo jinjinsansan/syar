@@ -61,9 +61,15 @@ describe('★騎手は着順に効かない（GB-3 の対照）', () => {
     const frozen = JOCKEYS.map((j) => freezeJockey(j.id, 4));
     const inputs = frozen.map((f) => Object.keys(f).sort().join(','));
     expect(new Set(inputs).size, '★凍結の形は騎手によらず同じ').toBe(1);
-    /** ★凍結に効果以外の「強さ」が入っていない（★入れた日にここが落ちる） */
+    /**
+     * ★凍結に効果以外の「強さ」が入っていない（★入れた日にここが落ちる）。
+     * ⚠️ ★**2026-09-16・第 4 便で `calm` が増えました**（★D-110 ②「暴走の抑え」・④「凍結から渡す」）。
+     *    ★この錨は ★**意図して付け替えたもの**です。★`calm` は `race-engine` の
+     *    ★`JOCKEY_CALM_EFFECT`・`RUNAWAY_BASE` が ★**どちらも 0** なので着順に効きません
+     *    （★対照は `jockey-window-no-effect.test.ts` が実際に判定を回して取ります）。
+     */
     for (const f of frozen) {
-      expect(Object.keys(f).sort()).toEqual(['bond', 'effect', 'feeEP', 'jockeyId', 'name', 'v']);
+      expect(Object.keys(f).sort()).toEqual(['bond', 'calm', 'effect', 'feeEP', 'jockeyId', 'name', 'v']);
       expect(f.effect).toBe(0);
     }
   });
