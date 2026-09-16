@@ -157,6 +157,9 @@ export const EXPECTED_FUNCTION_EXECUTE = {
   // ★出走登録（`0024`・D-104 の「同じレースに 1 人 2 頭まで」と D-105 の騎手の凍結）。
   //   利用者が呼ぶ RPC なので authenticated だけ（`0024` で public・anon を剥がしている）
   'enter_race(uuid,uuid,text,jsonb,uuid)': { anon: false, authenticated: true },
+  // ★馬の購入（`0025`・D-102）。★価格は出品の行から取り、利用者は申告できない（憲法 3）。
+  //   利用者が呼ぶ RPC なので authenticated だけ（`0025` で public・anon を剥がしている）
+  'buy_horse(uuid,uuid)': { anon: false, authenticated: true },
   // ★ワーカー専用（`0021`・D-095 候補）。利用者のロールには実行させない（監査 H-4）
   'spend_training_ep(uuid,bigint,integer)': { anon: false, authenticated: false },
 };
