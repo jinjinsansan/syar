@@ -17,6 +17,7 @@ import {
   STABLE_GRADES, DEFAULT_STABLE_GRADE, MENUS, MENU_IDS,
   type HorseTraits, type MenuId, type StableGrade,
 } from '@star/training';
+import { stableGradeOf } from '../../../apps/worker/src/training-runner.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const RUNNER = readFileSync(path.join(ROOT, 'apps/worker/src/training-runner.ts'), 'utf8');
@@ -104,6 +105,26 @@ describe('★厩舎の格の週送りへの配線（D-103）', () => {
     expect(RUNNER).toMatch(/grade,/);
     /** ★知らない格を黙って既定にしない（★警報を出す） */
     expect(RUNNER).toMatch(/厩舎の格が名簿にありません/);
+  });
+
+  it('★値が無い格では警報を出さず、知らない語のときだけ出す（★警報で他の警報を埋めない）', () => {
+    /**
+     * ⚠️ ★**2026-09-16 に踏みました。** ★`undefined` を「知らない語」と見なして**毎頭に警報**を出し、
+     *    ★`training-runner-skip` の「失敗した馬の警報は 1 回だけ」が落ちました。
+     *    ★値が無いのは「格を入れる前の行」であって、★異常ではありません（★既定は倍率 1.0）。
+     */
+    const alerts: string[] = [];
+    expect(stableGradeOf(null, (m) => alerts.push(m), 'h1')).toBe(DEFAULT_STABLE_GRADE);
+    expect(stableGradeOf(undefined, (m) => alerts.push(m), 'h1')).toBe(DEFAULT_STABLE_GRADE);
+    expect(alerts, '★値が無いだけで警報を出している').toEqual([]);
+    /** ★知らない語のときは出す（★列の CHECK を外した日に気づく） */
+    expect(stableGradeOf('platinum', (m) => alerts.push(m), 'h1')).toBe(DEFAULT_STABLE_GRADE);
+    expect(alerts.length).toBe(1);
+    expect(alerts[0]).toContain('platinum');
+    /** ★名簿にある格はそのまま通る */
+    for (const g of STABLE_GRADES) {
+      expect(stableGradeOf(g, () => { throw new Error('警報が出た'); }, 'h1')).toBe(g);
+    }
   });
 
   it('⑤ ★週送りの対象から引退馬を外している（★§18 LR-3・記録だけの馬を進めない）', () => {

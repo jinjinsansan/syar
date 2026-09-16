@@ -150,12 +150,21 @@ interface Row {
 }
 
 /**
- * ★DB の文字列 → 格（★知らない値は**黙って既定にしません**）。
+ * ★DB の文字列 → 格（★**知らない語**は黙って既定にしません）。
  * ⚠️ ★`0024` の CHECK が閉じていますが、★読む側でも閉じておきます
  *    （★列の CHECK を外した日に、黙って強い格として扱われないため）。
+ * ⚠️ ★**値が無い（null・undefined）ときは警報を出しません** — ★`0024` より前の行や、
+ *    ★この列を読まない経路があるためです。★既定の `bronze` は倍率 1.0 で、
+ *    ★格を入れる前と 1 ビット同じなので、★黙って強くなることはありません。
+ *    ★（2026-09-16: ★`undefined` を「知らない語」と見なして**毎頭に警報を出し**、
+ *      ★`training-runner-skip` の「警報は 1 回だけ」が落ちました。）
  */
-export function stableGradeOf(v: string | null, onAlert: (msg: string) => void, horseId: string): StableGrade {
-  if (v === null) return DEFAULT_STABLE_GRADE;
+export function stableGradeOf(
+  v: string | null | undefined,
+  onAlert: (msg: string) => void,
+  horseId: string,
+): StableGrade {
+  if (v === null || v === undefined) return DEFAULT_STABLE_GRADE;
   if ((STABLE_GRADES as readonly string[]).includes(v)) return v as StableGrade;
   onAlert(`★厩舎の格が名簿にありません: 馬 ${horseId} の ${v}（既定の ${DEFAULT_STABLE_GRADE} で進めます）`);
   return DEFAULT_STABLE_GRADE;
