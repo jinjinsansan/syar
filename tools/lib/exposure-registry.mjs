@@ -160,6 +160,9 @@ export const EXPECTED_FUNCTION_EXECUTE = {
   // ★馬の購入（`0025`・D-102）。★価格は出品の行から取り、利用者は申告できない（憲法 3）。
   //   利用者が呼ぶ RPC なので authenticated だけ（`0025` で public・anon を剥がしている）
   'buy_horse(uuid,uuid)': { anon: false, authenticated: true },
+  // ★馬を手放す（`0026`・D-102 ③）。★戻る額はサーバーが決める（★買った額 × 方針の割合）。
+  //   利用者が呼ぶ RPC なので authenticated だけ（`0026` で public・anon を剥がしている）
+  'sell_horse(uuid,uuid)': { anon: false, authenticated: true },
   // ★ワーカー専用（`0021`・D-095 候補）。利用者のロールには実行させない（監査 H-4）
   'spend_training_ep(uuid,bigint,integer)': { anon: false, authenticated: false },
 };

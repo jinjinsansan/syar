@@ -83,7 +83,17 @@ describe('★馬の購入の移行（0025・D-102）', () => {
 
   it('⑧ ★移行の番号が連番で、1 つの移行で 1 つのことだけ（出走登録と購入を混ぜない）', () => {
     const files = readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort();
-    expect(files.at(-1)).toBe(MIGRATION);
+    /**
+     * ⚠️ ★**以前は「`0025` が最後の移行」と主張していました**（★2026-09-16・第 5 便-3 で付け替え）。
+     *    ★`0026`（手放す経路）を足した日に落ちましたが、★これは ★**この検査の主張が広すぎた**ためです
+     *    — ★見たいのは「番号が連番で、購入の移行に別のことを混ぜていない」ことであって、
+     *    ★「これが最後」ではありません（★後続の移行を足すたびに落ちる形は、錨として役に立ちません）。
+     */
+    expect(files, '★購入の移行が名簿にある').toContain(MIGRATION);
+    const numbers = files.map((f) => Number(f.slice(0, 4)));
+    for (const [i, n] of numbers.entries()) {
+      expect(n, `★移行の番号が連番でない: ${files[i]}`).toBe(i + 1);
+    }
     /** ★0025 に出走登録の RPC を混ぜていない */
     expect(body).not.toMatch(/function public\.enter_race/i);
     expect(body).not.toMatch(/function public\.place_bet/i);

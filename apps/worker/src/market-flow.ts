@@ -17,7 +17,7 @@
 
 import type pg from 'pg';
 import { starsOfPotential, type AbilityKey } from '@star/sim-engine';
-import { marketStockAlert, planListings, LISTED_BANDS, LISTINGS_PER_BAND } from '@star/scheduler';
+import { marketStockAlert, planListings, sellBackEP, LISTED_BANDS, LISTINGS_PER_BAND } from '@star/scheduler';
 
 /** ★1 回に見る NPC プールの上限（★全件走査を避ける。★帯を埋めるには十分な数） */
 export const MARKET_POOL_LIMIT = 5000;
@@ -106,14 +106,20 @@ export async function refreshMarketListings(
         );
       }
       if (plan.add.length > 0) {
+        /**
+         * ★**手放したときに戻る額も、ここで書きます**（★`0026`・D-102 ③）。
+         *   ★割合（`SELL_BACK_RATE`）を SQL に書かないためです（★D-052・二重帳簿にしない）。
+         * ⚠️ ★`sell_horse` は ★**この行の値**で戻します。★値が無い行は手放せません。
+         */
         await client.query(
-          `insert into horse_market_listing (horse_id, stars, price_ep)
-           select * from unnest($1::uuid[], $2::numeric[], $3::int[])
+          `insert into horse_market_listing (horse_id, stars, price_ep, sell_back_ep)
+           select * from unnest($1::uuid[], $2::numeric[], $3::int[], $4::int[])
            on conflict do nothing`,
           [
             plan.add.map((l) => l.horseId),
             plan.add.map((l) => l.stars),
             plan.add.map((l) => l.priceEP),
+            plan.add.map((l) => sellBackEP(l.priceEP)),
           ],
         );
       }

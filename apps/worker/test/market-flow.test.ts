@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { ABILITY_KEYS } from '@star/sim-engine';
-import { LISTED_BANDS, LISTINGS_PER_BAND, MARKET_STOCK_MIN, priceOfStars } from '@star/scheduler';
+import { LISTED_BANDS, LISTINGS_PER_BAND, MARKET_STOCK_MIN, priceOfStars, sellBackEP } from '@star/scheduler';
 import { refreshMarketListings } from '../src/market-flow.js';
 
 const SRC = readFileSync(path.join(path.resolve(__dirname, '..'), 'src/market-flow.ts'), 'utf8');
@@ -29,7 +29,7 @@ const MEAN_FOR_STARS: Readonly<Record<string, number>> = {
 };
 
 interface FakeHorse { id: string; potential: Record<string, number>; listed: boolean }
-interface FakeListing { horse_id: string; stars: number; active: boolean; price_ep: number }
+interface FakeListing { horse_id: string; stars: number; active: boolean; price_ep: number; sell_back_ep: number }
 
 /** ★帯ごとに `per` 頭ずつ NPC 馬を作る（★出品ではない。★プールの中身） */
 function makePool(per: number): FakeHorse[] {
@@ -78,7 +78,10 @@ function fakeDb(pool: FakeHorse[], listings: FakeListing[]): {
         const ids = params[0] as string[];
         const stars = params[1] as number[];
         const prices = params[2] as number[];
-        ids.forEach((id, i) => listings.push({ horse_id: id, stars: stars[i]!, price_ep: prices[i]!, active: true }));
+        const backs = params[3] as number[];
+        ids.forEach((id, i) => listings.push({
+          horse_id: id, stars: stars[i]!, price_ep: prices[i]!, sell_back_ep: backs[i]!, active: true,
+        }));
         return { rows: [], rowCount: ids.length };
       }
       throw new Error(`偽の DB が想定していない SQL: ${sql.slice(0, 60)}`);
@@ -102,6 +105,14 @@ describe('★出品を作る経路（D-102・第 5 便-2）', () => {
       expect(rows.length, `★${band} の口数`).toBe(LISTINGS_PER_BAND);
       /** ★価格は `priceOfStars` が出した値そのもの（★SQL が計算していない） */
       for (const row of rows) expect(row.price_ep, `★${band} の価格`).toBe(priceOfStars(band));
+      /**
+       * ★**手放したときに戻る額も TS が書く**（★`0026`・D-102 ③）。
+       * ⚠️ ★**買った額より小さい**こと（★等しい・大きいと EP の蛇口になります）。
+       */
+      for (const row of rows) {
+        expect(row.sell_back_ep, `★${band} の戻り`).toBe(sellBackEP(priceOfStars(band)));
+        expect(row.sell_back_ep).toBeLessThan(row.price_ep);
+      }
     }
   });
 
