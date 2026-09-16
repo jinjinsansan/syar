@@ -8,8 +8,10 @@
  */
 import { useMemo, useState } from 'react';
 import { DEMO_HORSES, conditionView, fatigueColor, sortStable } from '../../lib/stable';
-import { DEMO_ENTRY_RACES, STRATEGY_OPTIONS, entryCandidates } from '../../lib/game-demo';
+import { DEMO_ENTRY_RACES, STRATEGY_OPTIONS, entryCandidates, DEMO_JOCKEY_RIDES } from '../../lib/game-demo';
 import { Capsule, ClassChip, FatigueBar, PageTitle, Pill, TabButton } from '../../components/ui';
+/** ★騎手を選ぶ（★D12-4・D-105 ④「出走登録で凍結する」） */
+import { JockeyPicker } from '../../components/jockey-picker';
 
 const WEEK_NO = 32;
 const EP_BALANCE = 4200;
@@ -22,6 +24,11 @@ export default function EntryPage(): React.ReactElement {
   const [horseId, setHorseId] = useState(horses[0]?.id ?? '');
   const [raceId, setRaceId] = useState<string | null>(DEMO_ENTRY_RACES.find((r) => r.state === 'ok')?.id ?? null);
   const [strategy, setStrategy] = useState('sashi');
+  /**
+   * ★**選んだ騎手**（★D12-4・D-105 ④「出走登録で凍結する」）。
+   * ⚠️ ★この便では ★**着順に効きません**（★`JOCKEY_EFFECT` が 0）。
+   */
+  const [jockeyId, setJockeyId] = useState<string | null>(null);
   const horse = horses.find((h) => h.id === horseId) ?? null;
   const race = DEMO_ENTRY_RACES.find((r) => r.id === raceId) ?? null;
   // 登録できる → 格違い → 締切後 の順（消さない）
@@ -148,6 +155,19 @@ export default function EntryPage(): React.ReactElement {
             <div style={{ width: 2, alignSelf: 'stretch', background: 'var(--a-line)' }} className="hide-narrow" />
             <div style={{ width: 340, flex: '0 0 340px', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 44, borderBottom: '1px solid var(--a-line)' }}><span className="a-lbl">斤量</span><span><span className="a-num" style={{ fontSize: 30, color: 'var(--a-ink)' }}>{race.weightKg.toFixed(1)}</span> <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>kg</span></span></div>
+              {/*
+                ★**騎手を選ぶ**（★D12-4・D-105）。★脚質の次・料金の前に置きます
+                （★騎手の料金が出走料に足されるので、★料金を見る前に選ぶ順序）。
+                ⚠️ ★この便では ★**着順に効きません**（★部品の側で明言しています）。
+              */}
+              <JockeyPicker
+                horseName={horse?.name ?? ''}
+                raceName={`${race.raceNo}　${race.classLabel}`}
+                rides={DEMO_JOCKEY_RIDES}
+                selectedId={jockeyId}
+                onSelect={setJockeyId}
+              />
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 44, borderBottom: '1px solid var(--a-line)' }}><span className="a-lbl">出走料</span><span><span className="a-num" style={{ fontSize: 30, color: 'var(--a-num-money)' }}>{race.feeEP}</span> <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>EP</span></span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 44, borderBottom: '1px solid var(--a-line)' }}><span className="a-lbl">登録後の残り</span><span><span className="a-num" style={{ fontSize: 30, color: 'var(--a-num-time)' }}>{(EP_BALANCE - race.feeEP).toLocaleString('ja-JP')}</span> <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>EP</span></span></div>
               {/* §9.5 憲法の明示 — 登録前から常時表示し、登録後も残す */}

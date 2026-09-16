@@ -195,3 +195,12 @@ export const DEMO_PP_BALANCE = 18600;
 export function entryCandidates(horses: readonly StableHorse[]): StableHorse[] {
   return horses.filter((h) => h.week.kind !== 'rest');
 }
+
+/**
+ * ★**デモの騎乗回数**（★D12-4・親密度の見本）。
+ * ⚠️ ★本番は ★**出走登録で凍結した騎手の id** から数えます（★画面では数えない）。
+ *    ★ここは画面の見本のための値です。
+ */
+export const DEMO_JOCKEY_RIDES: Readonly<Record<string, number>> = {
+  'j-aoi': 6, 'j-kurata': 3, 'j-shinozaki': 1, 'j-tsuji': 0, 'j-himura': 4, 'j-narita': 0,
+};
