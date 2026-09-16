@@ -14,3 +14,4 @@ export * from './graded-races.js';
 export * from './race-setup.js';
 export * from './time-of-day.js';
 export * from './ownership.js';
+export * from './jockeys.js';
