@@ -434,13 +434,14 @@ SE は 1/√（レース数）で減ります。probe の SE から、**0.25pt �
   - 1 回目: `TRAINING_BAR_MAX`・`CONDITION_STEPS`（GB-1）
   - 2 回目: `CAREER_ASSUMPTION`（GB-6）
   - まとめて登録したもの: `OWNERSHIP_LIMITS`・`ENTRIES_PER_OWNER_MAX`（GB-2）／`JOCKEY_EFFECT`・`JOCKEY_BOND_MAX`・`JOCKEYS`（GB-3）／★の刻み 4 つ・市場の 4 つ（GB-4）／`STABLE_GRADE_MULT`・`STABLE_GRADE_LABEL`（GB-5）
-- ⚠️ **較正定数の登録簿に 1 回落ちました**（`calibration-registry.test.ts`）。新しく `export` した数 `TRAINING_BAR_MAX`・`CONDITION_STEPS` が未登録だったためです。**どちらも正典の写し**（能力の値域 0〜1000・調子の段階 1〜5）なので、`apps/cli/src/calibration.ts` の `EXEMPT` に**理由付きで**載せました（較正値としては登録していません）
 
 ## 3. 触ったもの
 
 | 触った | 触っていない |
 |---|---|
-| `packages/training/src/{menus,view,index}.ts`・`packages/training/test/menu-view.test.ts`・`apps/cli/test/training-view-wiring.test.ts`・`apps/web/{package.json,src/lib/game-demo.ts,src/app/training/page.tsx}` | `packages/race-engine/src`・`packages/sim-engine/src`・較正定数・`ODDS_MC_TRIALS`・`CYCLE_MS`・正典・本番 DB・ワーカーの配備 |
+| **`packages/training/src/`**（`menus`・`view`・`grade`・`index`）・**`packages/scheduler/src/`**（`ownership`・`jockeys`・`horse-market`・`index`）・★**`packages/sim-engine/src/`**（`stars.ts` を**新設**・`index`）・`apps/cli/src/`（`calibration`・`economy-balance`）・`apps/web/`（`package.json`・`src/lib/game-demo.ts`・`src/app/training/page.tsx`）・各 `test/` 9 ファイル | `packages/race-engine/src`（**1 行も変えていない**）・較正定数の**値**・`ODDS_MC_TRIALS`・`LAMBDA_STAR`・`ODDS_CAP`・`CYCLE_MS`・`LANE_MODEL`・正典・本番 DB・ワーカーの配備 |
+
+- ★**【2026-09-16 訂正・GC-1】** 初版はこの表の「触っていない」列に `packages/sim-engine/src` を入れていましたが、**GB-4 で `stars.ts` を新設しています**（★表示の算出）。**自己矛盾していたので直しました**（裁定 `REVIEW_GAME_BODY_1_VERDICT_20260916.md` §2）。`git diff --stat d3159f2..HEAD -- packages/sim-engine/src` に出ます
 
 ## 3b. ★着順に効くものを入れていないこと（指示書 §7 の必須項目）✔
 
