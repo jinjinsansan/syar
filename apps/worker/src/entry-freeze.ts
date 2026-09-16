@@ -58,6 +58,13 @@ interface PendingRow {
   jockey_frozen: { feeEP?: number } | null;
   /** ★馬の行（`rowToHorse` に渡す） */
   horse: Record<string, unknown> | null;
+  /**
+   * ★**引退した週**（★null なら現役）。
+   * ⚠️ ★`enter_race` は登録の時点で引退を弾きますが、★**登録の後・発走の前に引退する**ことは
+   *    ★実際に起こります（★週送りで 260 週に達する／致命的な故障・§7.1・§7.5）。
+   *    ★そのまま凍結すると ★**引退した馬が走ります**。→ ★その馬だけ取消にします（D-111 ③）。
+   */
+  retired_at_week: string | number | null;
   /** ★レースの条件（凍結を組むのに要る） */
   distance: number;
   surface: string;
@@ -79,6 +86,7 @@ export async function freezePendingEntries(
     `select e.id as entry_id, e.race_id, r.cycle_index, e.horse_id, e.gate, e.weight, e.strategy,
             e.jockey_frozen,
             to_jsonb(h.*) as horse,
+            h.retired_at_week,
             r.distance, r.surface, r.track_condition
        from race_entries e
        join races r on r.id = e.race_id
@@ -105,6 +113,14 @@ export async function freezePendingEntries(
     let why = '';
     try {
       if (row.horse === null) throw new Error('馬の行がありません');
+      /**
+       * ★**登録の後・発走の前に引退した馬は走らせません**（★D-111 ③）。
+       * ⚠️ ★`enter_race` は登録時に弾きますが、★その後に引退することは実際に起こります
+       *    （★週送りで 260 週に達する／致命的な故障）。★ここで止めないと引退馬が走ります。
+       */
+      if (row.retired_at_week !== null && row.retired_at_week !== undefined) {
+        throw new Error('登録の後に引退しました');
+      }
       const horse = rowToHorse(row.horse);
       /** ★シードは既存の系列から（★レースと枠で決まる・時計も Math.random も読まない） */
       const rng: Rng = deriveRng(Number(row.cycle_index), FREEZE_STREAM, row.gate);

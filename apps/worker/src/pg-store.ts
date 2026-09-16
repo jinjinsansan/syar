@@ -351,9 +351,19 @@ export function createPgStore(
          *    ★生涯の記録（§18）を馬ごとに残すのに要ります（★着順の計算には使いません）。
          */
         const es = await client.query<Record<string, unknown>>(
+          /**
+           * ⚠️ ★**取消（除外）の行を外します**（★2026-09-16・GE-1・正典 **D-111 ③**）。
+           *
+           * ★取消にしても `entrant_snapshot` は **null のまま**です。
+           * ★この 1 行が無いと、★**取消の行まで「凍結が無い」と数えて**しまい、
+           * ★下の `unfrozen > 0` で ★**レースごと開催中止**になります
+           * — ★D-111 で直したはずの結末に、そのまま戻ります。
+           * ★レビュー側の指摘（`REVIEW_GAME_BODY_5_VERDICT_20260916.md` §8-1）。
+           */
           `select e.gate, e.weight, e.strategy, e.entrant_snapshot, e.horse_id, e.jockey_frozen
              from race_entries e
-            where e.race_id = $1 order by e.gate`,
+            where e.race_id = $1 and e.scratched_at is null
+            order by e.gate`,
           [r.id],
         );
         if (es.rowCount === 0) {

@@ -50,6 +50,13 @@ interface Entry {
   entry_id: string; horse_id: string; gate: number;
   snapshot: unknown; scratched_at: string | null; scratch_reason: string | null;
   jockeyFee: number; horse: Record<string, unknown> | null;
+  /**
+   * ★**引退した週**（★null なら現役）。
+   * ⚠️ ★`enter_race` は登録時に引退を弾きますが、★**登録の後・発走の前に引退する**ことは
+   *    ★実際に起こります（★週送りで 260 週に達する／致命的な故障・§7.1・§7.5）。
+   *    ★そのまま凍結すると ★**引退した馬が走ります**。
+   */
+  retired_at_week?: number | null;
 }
 
 function fakeDb(entries: Entry[], ledger: { key: string; delta: number }[]): pg.Client {
@@ -65,7 +72,7 @@ function fakeDb(entries: Entry[], ledger: { key: string; delta: number }[]): pg.
           .map((e) => ({
             entry_id: e.entry_id, race_id: uuid(500), cycle_index: '5682',
             horse_id: e.horse_id, gate: e.gate, weight: 55, strategy: 'senko',
-            jockey_frozen: { feeEP: e.jockeyFee }, horse: e.horse,
+            jockey_frozen: { feeEP: e.jockeyFee }, horse: e.horse, retired_at_week: e.retired_at_week ?? null,
             distance: 1600, surface: 'turf', track_condition: 'good',
           }));
         return { rows, rowCount: rows.length };
@@ -150,6 +157,27 @@ describe('★出走登録の凍結と取消（D-111）', () => {
     expect(r2.scratched).toBe(0);
     expect(r2.refundedEp).toBe(0);
     expect(ledger.length).toBe(1);
+  });
+
+  it('★★登録の後に引退した馬は取消になる（★本番で最も起こりやすい取消・D-111 ③）', async () => {
+    /**
+     * ⚠️ ★**これが GE-3 の実演でも使う経路です。**
+     *    ★`enter_race` は登録時に引退を弾きますが、★**登録の後・発走の前に引退する**ことは
+     *    ★実際に起こります（★週送りで 260 週に達する／致命的な故障）。
+     *    ★ここで止めないと ★**引退した馬が走ります**。
+     */
+    const entries = makeEntries();
+    /** ★2 頭目は馬の行が読める（現役の形）が、★引退している */
+    entries[1]!.horse = horseRow(BROKEN);
+    entries[1]!.retired_at_week = 300;
+    const alerts: string[] = [];
+    const r = await freezePendingEntries(fakeDb(entries, []), (m) => alerts.push(m));
+
+    expect(r.frozen, '★現役の 1 頭は凍結される').toBe(1);
+    expect(r.scratched, '★引退した 1 頭だけ取消').toBe(1);
+    expect(entries[0]!.scratched_at, '★現役の馬まで取消になっている').toBeNull();
+    expect(entries[1]!.scratch_reason).toContain('登録の後に引退しました');
+    expect(entries[1]!.snapshot, '★引退した馬に凍結が書かれている').toBeNull();
   });
 
   it('⑥ ★乱数源も時計も持たない（★憲法 4・D-112 ① と同じ縛り）', () => {
