@@ -7,6 +7,7 @@
 export * from './menus.js';
 export * from './view.js';
 export * from './grade.js';
+export * from './story.js';
 export * from './growth.js';
 export * from './condition.js';
 export * from './injury.js';

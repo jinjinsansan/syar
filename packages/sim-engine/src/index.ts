@@ -18,4 +18,5 @@ export * from './founders.js';
 export * from './naming.js';
 export * from './stable.js';
 export * from './stars.js';
+export * from './discovery.js';
 export * from './streams.js';
