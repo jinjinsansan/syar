@@ -84,7 +84,17 @@ async function main(): Promise<void> {
   const pool = await loadRaceablePool(client);
   console.log(`[worker] 出走可能な馬 ${pool.length} 頭`);
 
-  const store = createPgStore(client, hash);
+  /**
+   * ★`epochMs` を渡すのは ★**生涯の記録（§18）のゲーム内の週**のためです。
+   *   ⚠️ ★渡さないと物語を書きません（★週が分からないまま 0 週で書かない・`pg-store.ts` の註記）。
+   */
+  const store = createPgStore(client, hash, {
+    epochMs: cfg.epochMs,
+    onStoryError: (e) => console.error(
+      `[worker] ★生涯の記録の書き込みに失敗 cycle=${e.cycleIndex}: ${e.message}` +
+      `（★確定と払戻は済んでいます。記録は着順にも経済にも効きません・§18 LR-5）`,
+    ),
+  });
   let stopping = false;
   let failures = 0;
   /** ★日次集計は1日1回でよい。毎周やると DB を無駄に叩く */

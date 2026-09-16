@@ -99,6 +99,66 @@ export function storyOf(events: readonly StoryEvent[]): readonly string[] {
 }
 
 /**
+ * ★**レースが終わったときに残す出来事**（★(a) 第 5 便-4・2026-09-16・§18 LR-7）
+ *
+ * 【★この関数の約束】
+ *   ★**決定論**（★確定した着順と、その馬のそれまでの戦績から導く。★乱数も時刻も読まない・憲法 4）。
+ *   ★**着順にも経済にも効きません**（★LR-5。★読み取り専用の記録を作るだけ）。
+ *   ⚠️ ★**ゴールより前に呼びません**（★D-098 の家族。★呼ぶ側は確定の後で呼ぶ）。
+ *
+ * 【★なぜ「文」を返さないか】
+ *   ★保存するのは ★**種類と値**だけです（★`0024` の註記どおり）。★文は `storyLineOf` が組み立てます。
+ *   ★文を保存すると、★文言を直した日に ★**過去の行だけ古い文のまま**残ります。
+ */
+export type RaceGrade = 'G1' | 'G2' | 'G3';
+
+export interface RaceStoryInput {
+  /** ★このレースの着順（1 着 = 1） */
+  readonly finishPosition: number;
+  /** ★このレースの格（★重賞でなければ null） */
+  readonly grade: RaceGrade | null;
+  /** ★このレースより**前**の出走回数（★0 ならデビュー戦） */
+  readonly runsBefore: number;
+  /** ★このレースより**前**の勝ち数（★0 で 1 着なら初勝利） */
+  readonly winsBefore: number;
+  /** ★このレースより**前**の、同じ騎手での騎乗回数（★親密度の上限に届いた回で「名コンビ」） */
+  readonly ridesWithJockeyBefore: number;
+  /** ★親密度が頭打ちになる騎乗回数（★`JOCKEY_BOND_MAX` を呼ぶ側が渡す・★二重帳簿にしない） */
+  readonly bondMaxRides: number;
+  /** ★ゲーム内の週 */
+  readonly week: number;
+  readonly raceName: string;
+  readonly jockeyName?: string | undefined;
+}
+
+/**
+ * ★出来事を ★**`STORY_EVENT_TYPES` の順**で返します（★同じ入力なら同じ並び）。
+ * ⚠️ ★**同じレースで複数の出来事が出ます**（★例: 初勝利かつ重賞勝ち）。
+ * ⚠️ ★**最高格（G1）を勝った回は `graded-win` と `top-grade-win` の両方**を残します
+ *    （★物語は「重賞を勝った」ことも「最高格を勝った」ことも語るため）。
+ */
+export function raceStoryEvents(input: RaceStoryInput): readonly StoryEvent[] {
+  const base = {
+    week: input.week,
+    raceName: input.raceName,
+    finishPosition: input.finishPosition,
+    ...(input.jockeyName === undefined ? {} : { jockeyName: input.jockeyName }),
+  };
+  const out: StoryEvent[] = [];
+  const won = input.finishPosition === 1;
+  if (input.runsBefore === 0) out.push({ type: 'debut', ...base });
+  if (won && input.winsBefore === 0) out.push({ type: 'first-win', ...base });
+  if (won && input.grade !== null) out.push({ type: 'graded-win', ...base });
+  if (won && input.grade === 'G1') out.push({ type: 'top-grade-win', ...base });
+  /** ★親密度が頭打ちに「達した回」だけ残す（★以後は毎回残さない） */
+  if (input.jockeyName !== undefined
+    && input.ridesWithJockeyBefore + 1 === input.bondMaxRides) {
+    out.push({ type: 'jockey-bond', ...base });
+  }
+  return out;
+}
+
+/**
  * ★**記録だけの馬か**（★LR-2・LR-3）。
  *   ★引退して、繁殖にも種牡馬にも上がらなかった馬（★功労馬）は ★**記録だけ**です。
  *   → ★**所有上限に数えない**（LR-2）・★**週送りの対象にしない**（LR-3）。

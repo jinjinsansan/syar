@@ -24,8 +24,10 @@ import { awardPrizes } from './prize-award.js';
 import { settlePayouts } from './payout.js';
 import { settleRace as settleRaceFair } from './settle.js';
 import type { CycleStore, RaceSpec } from './cycle-runner.js';
-import { overdueBefore } from '@star/scheduler';
+import { overdueBefore, weekIndexAt } from '@star/scheduler';
 import { cancelRace as cancelRaceImpl } from './cancel.js';
+// ★生涯の記録（正典 §18・移行 `0024`）。★確定の中から呼びます（LR-7「レースが終わった後」）
+import { writeRaceStory } from './story-flow.js';
 
 /**
  * ★`cycle_index` は bigint なので、`pg` は**文字列で返します**。
@@ -75,6 +77,14 @@ export interface PgStoreOptions {
    *   ★省くと `console.warn` に出します（★黙って落とさない・D-055 と同じ形・R-27）。
    */
   readonly onCourseNotFrozen?: (a: CourseNotFrozenAlert) => void;
+  /**
+   * ★ゲーム内の週を出すための基準時刻（★`env.ts` の `epochMs`）。
+   *   ★生涯の記録（§18）に残す ★**ゲーム内の週**に使います（★実時刻は書かない・憲法 4）。
+   * ⚠️ ★**省くと物語を書きません**（★週が分からないまま 0 週として書くと、記録が黙って壊れます）。
+   */
+  readonly epochMs?: number;
+  /** ★生涯の記録の書き込みに失敗したときの通報（★確定は止めない・§18 LR-5「記録は着順より軽い」） */
+  readonly onStoryError?: (e: { cycleIndex: number; message: string }) => void;
 }
 
 const warnCourseNotFrozen = (a: CourseNotFrozenAlert): void => {
@@ -94,6 +104,14 @@ export function createPgStore(
   //   （`cancelRace` が呼ばれていなかったのと同じ穴をここで作らない）
   assertPgTypesConfigured();
   const onCourseNotFrozen = opts.onCourseNotFrozen ?? warnCourseNotFrozen;
+  /** ★生涯の記録の週を出す基準（★省かれたら物語を書かない・`PgStoreOptions` の註記） */
+  const epochMs = opts.epochMs;
+  const onStoryError = opts.onStoryError ?? ((e: { cycleIndex: number; message: string }): void => {
+    console.error(
+      `[worker] ★生涯の記録の書き込みに失敗 cycle=${e.cycleIndex}: ${e.message}` +
+      `（★確定と払戻は済んでいます・§18 LR-5）`,
+    );
+  });
   let courseNotFrozenCount = 0;
   return {
     async serverNowMs(): Promise<number> {
@@ -302,13 +320,15 @@ export function createPgStore(
           id: string; server_seed: string; distance: number;
           surface: string; track_condition: string; course_id: string;
           class_rank: number; grade: string | null;
+          /** ★レース名（★生涯の記録に残す・§18。★架空名のみ・§0.1） */
+          name: string;
           /** ★`jsonb` なので `pg` はオブジェクトで返す（null は 0023 より前のレース） */
           course_frozen: unknown;
         }>(
           `update races set status = 'settled', seed_reveal = server_seed
             where cycle_index = $1 and status = 'scheduled'
             returning id, server_seed, distance, surface, track_condition, course_id,
-                      class_rank, grade, course_frozen`,
+                      class_rank, grade, name, course_frozen`,
           [cycleIndex],
         );
         if (race.rowCount === 0) {
@@ -325,8 +345,13 @@ export function createPgStore(
          *   結合を残すと「一部だけ最新値で上書き」が書けてしまい、
          *   2回読む構造に戻れます。**読む対象を1つにして、戻れなくします。**
          */
+        /**
+         * ⚠️ ★`e.horse_id` と `e.jockey_frozen` は ★**`race_entries` 自身の列**です。
+         *    ★`horses` との結合ではないので、D-056 の「凍結だけを読む」に触れません。
+         *    ★生涯の記録（§18）を馬ごとに残すのに要ります（★着順の計算には使いません）。
+         */
         const es = await client.query<Record<string, unknown>>(
-          `select e.gate, e.weight, e.strategy, e.entrant_snapshot
+          `select e.gate, e.weight, e.strategy, e.entrant_snapshot, e.horse_id, e.jockey_frozen
              from race_entries e
             where e.race_id = $1 order by e.gate`,
           [r.id],
@@ -432,6 +457,49 @@ export function createPgStore(
 
         // --- 馬券の精算（§9）。EP で買い PP で払い戻す ---
         await settlePayouts(client, r.id, finished);
+
+        /**
+         * --- ★生涯の記録（正典 §18・LR-7）---
+         *
+         * ★**確定と同じトランザクション**で書きます（★「着順はあるのに物語が無い」を作らない）。
+         * ★**ゴールの後**に書いています（★D-098 の家族）。
+         * ⚠️ ★**記録の失敗で確定を巻き戻しません**（★LR-5「記録は着順にも経済にも効かない」）。
+         *    ★通報だけして先に進みます — ★物語が 1 行欠けることより、
+         *    ★確定と払戻が止まるほうが害が大きいからです（D-038 と同じ考え方）。
+         * ⚠️ ★`epochMs` を渡していなければ ★**書きません**（★週が分からないまま 0 週で書かない）。
+         */
+        if (epochMs !== undefined) {
+          try {
+            const byGate = new Map(es.rows.map((row) => [Number(row['gate']), row]));
+            const runners = finished.map((f) => {
+              const row = byGate.get(f.gate);
+              const frozen = (row?.['jockey_frozen'] ?? null) as { jockeyId?: string; name?: string } | null;
+              return {
+                horseId: String(row?.['horse_id'] ?? ''),
+                finishPosition: f.finishPosition,
+                ...(frozen?.name === undefined ? {} : { jockeyName: frozen.name }),
+                ...(frozen?.jockeyId === undefined ? {} : { jockeyId: frozen.jockeyId }),
+              };
+            }).filter((x) => x.horseId !== '');
+            /**
+             * ★週は ★**Postgres の `now()`** から出します（★ワーカーの時計を使わない・§14）。
+             *   ⚠️ ★同じトランザクションの中なので、★`now()` は確定の開始時刻で固定です
+             *     （★1 レースの中で週がまたがりません）。
+             */
+            const nowRow = await client.query<{ ms: string }>(
+              `select (extract(epoch from now()) * 1000)::bigint::text as ms`,
+            );
+            await writeRaceStory(client, {
+              raceId: r.id,
+              raceName: r.name,
+              grade: (r.grade as 'G1' | 'G2' | 'G3' | null),
+              week: weekIndexAt(Number(nowRow.rows[0]!.ms), epochMs),
+              runners,
+            });
+          } catch (e) {
+            onStoryError({ cycleIndex, message: (e as Error).message });
+          }
+        }
 
         await client.query('commit');
         // ★確定が成立してから数える（★途中で落ちたレースを数えない）
