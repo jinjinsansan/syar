@@ -45,6 +45,31 @@ describe('★行数を日次で見る（§18 LR-10）', () => {
     expect(MAIN).not.toMatch(/setInterval\s*\([^)]*story/i);
   });
 
+  it('②-2 ★★失敗しても他の日次の処理を巻き込まない（★2026-09-17 の点検で見つけた）', () => {
+    /**
+     * ⚠️ ★`lastAggregated = today` は `recordStoryRows` より**前**にあります。
+     *    ★だから投げても ★**その日はもう呼ばれません**。★それ自体は許容します（★記録は
+     *    ★着順にも経済にも効かない・LR-5）が、★**後ろの処理まで道連れにしてはいけません**。
+     * ★隣の `refreshMarketListings`・`syncStableGradePrices` は個別に try/catch で囲まれています。
+     *    ★同じ形にしていないと、★移行 0029 が当たっていない DB で
+     *    ★**市場の出品と厩舎の格の値段が毎日止まります**。
+     */
+    /**
+     * ⚠️ ★**import 行から切り出さないこと**（★2026-09-17 にこれで誤判定しました）。
+     *    ★`indexOf('recordUnlockDistribution')` は **30 行目の import** に当たり、
+     *    ★`refreshMarketListings` の import までの数十文字しか見ていませんでした。
+     *    → ★**呼び出しの形**（`await 〜(`）で切り出します。
+     */
+    const from = MAIN.indexOf('await recordUnlockDistribution(');
+    const to = MAIN.indexOf('await refreshMarketListings(');
+    expect(from, '★日次の枠の呼び出しが見つからない').toBeGreaterThan(0);
+    expect(to, '★出品の更新の呼び出しが見つからない').toBeGreaterThan(from);
+    const between = MAIN.slice(from, to);
+    expect(between, '★行数の記録が日次の枠に無い').toContain('recordStoryRows');
+    expect(between, '★★独自の try/catch で囲んでいない（★後ろの処理を巻き込む）')
+      .toMatch(/try\s*\{[\s\S]*recordStoryRows[\s\S]*catch/);
+  });
+
   it('③ ★閾値を置いていない（★裁定: 線を引かない）', () => {
     /** ★「これを超えたら警報」に当たる比較を持たない */
     expect(FLOW).not.toMatch(/rows\s*[><]=?\s*\d/);

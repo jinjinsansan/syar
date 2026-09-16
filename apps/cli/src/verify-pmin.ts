@@ -40,7 +40,10 @@
  *     ★**等しい重みで平均**しており、★2026-09-14 に `verify-payout.ts` 側では捨てた形でした。
  *   ⚠️ ★**較正定数は 1 つも動かしていません**（`margin`・`ODDS_MC_TRIALS`・`LAMBDA_STAR`・`ODDS_CAP`）。
  *
- * 実行: npm run verify:pmin -- --races 8 --finals 100000
+ * 実行: `npx tsx apps/cli/src/verify-pmin.ts --races 8 --finals 100000`
+ *   ⚠️ ★**`npm run` で呼ばないでください。** ★PowerShell では `--` が落ち、★npm が `--races` を
+ *      ★自身の設定として食べ、★値だけが位置引数として残ります（★2026-09-17 に実際に起きました）。
+ *      ★いまは `assertKnownArgs` が**走る前に投げます**が、★そもそも直接呼ぶのが確実です。
  */
 import { NICKS_GEN, deriveRng, VERIFY_PAYOUT_STREAM as S } from '@star/sim-engine';
 import { DEFAULT_RACE_BALANCE, lanePlanForRace, resolveRace, type RaceEntrant, type RaceResult } from '@star/race-engine';

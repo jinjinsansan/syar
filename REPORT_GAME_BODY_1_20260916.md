@@ -342,7 +342,7 @@ PP 発行 31,200 / PP 消費 6,000 / 純発行 25,200
 ★指示書 `REVIEW_VENUE_WIRING_MEASURE_INSTRUCTIONS_20260916.md` §1 の M-4。**オーナーの別ターミナルの予定でしたが、ES 便でエンジンが速くなったので開発側で流しました**（所要 **2 分 25 秒**・15:06:34 → 15:08:59）。
 
 ```
-npm run verify:payout -- --races 500 --seeds 42
+npx tsx apps/cli/src/verify-payout.ts --races 500 --seeds 42
 races=500 odds-trials=10000 seeds=42 ／ 条件: 本番（凍結した走路の形）
 V-10 総合（切り捨て前で判定）: FAIL・exit 1
 ★SE が 0.25pt に届いていない券種があります。**この実行は正式な V-10 ゲートではありません**（D-036）

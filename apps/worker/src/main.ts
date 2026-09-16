@@ -237,8 +237,22 @@ async function main(): Promise<void> {
          * ★2026-09-16 に ★**15 種のうち 2 種しか書かれていない**ことが、★測って初めて分かりました。
          *   ★だから ★**「止まった」を捕まえられること**が大事です（★増えすぎより、増えないほうが起きています）。
          */
-        const story = await recordStoryRows(client, today);
-        console.log(`[worker] ${formatStoryDay(story, STORY_EVENT_TYPES)}`);
+        /**
+         * ⚠️ ★**独自の try/catch で囲みます**（★隣の出品の更新・格の値段と同じ形）。
+         *    ★囲まないと、★`story_daily` が無い DB（★移行 `0029` 未適用）で投げた瞬間に
+         *    ★**この後ろの出品の更新と格の値段の更新まで、毎日まとめて止まります**。
+         *    ★しかも出るのは「日次集計に失敗」の 1 行だけで、★何が止まったか読めません。
+         * ⚠️ ★記録は ★**着順にも経済にも効きません**（§18 LR-5）。★止めてよい側です。
+         */
+        try {
+          const story = await recordStoryRows(client, today);
+          console.log(`[worker] ${formatStoryDay(story, STORY_EVENT_TYPES)}`);
+        } catch (e) {
+          console.error(
+            `[worker] ★生涯の記録の行数を残せませんでした: ${(e as Error).message}` +
+            `（★移行 0029 が当たっていない可能性。★他の日次の処理は続けます・§18 LR-10）`,
+          );
+        }
         console.log(
           `[worker] 日次集計を更新 date=${today}` +
           (u === null ? ' / 開放率: 対象0頭'
