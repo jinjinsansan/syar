@@ -20,7 +20,6 @@
     "worker": "tsx --env-file=secrets.staging.env apps/worker/src/main.ts",
     "build:web": "npm -w @star/web exec next build",
     "verify:payout": "tsx apps/cli/src/verify-payout.ts",
-    "verify:pmin": "tsx apps/cli/src/verify-pmin.ts",
     "blocklist:build": "tsx apps/cli/src/blocklist-build.ts",
     "test": "vitest run",
     "inventory": "node tools/inventory/measure.mjs",

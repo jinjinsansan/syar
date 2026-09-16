@@ -50,6 +50,7 @@ import { generateRace, sortPoolByClass } from './race-field.js';
 import { resolveRuntimeConfig } from './config.js';
 import { runSimulation } from './simulator.js';
 import { POOL_GENERATIONS, POOL_MARES } from './measurement.js';
+import { assertKnownArgs } from './cli-args.js';
 import {
   V10_SE_LIMIT,
   V10_TOLERANCE,
@@ -61,6 +62,13 @@ import {
 } from './v10-accounting.js';
 
 const argv = process.argv.slice(2);
+/**
+ * ★**引数を取りこぼしたまま既定値で走らない**（★2026-09-17 の事故）。
+ * ⚠️ ★`npm run verify:pmin -- --races 40` は ★**PowerShell では壊れます**（★`--` が落ち、
+ *    ★npm が `--races` を食べ、★`40` だけが残って ★**既定の 100 レース**で走り出しました）。
+ * → ★`npx tsx apps/cli/src/verify-pmin.ts --races 40` で呼んでください。
+ */
+assertKnownArgs(argv, { valueFlags: ['--seed', '--races', '--finals', '--odds-trials'], switches: [] }, 'verify-pmin');
 const num = (n: string, d: number): number => {
   const i = argv.indexOf(`--${n}`);
   const v = i >= 0 ? Number(argv[i + 1]) : NaN;

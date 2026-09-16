@@ -58,6 +58,7 @@ import { generateRace, sortPoolByClass } from './race-field.js';
 import { resolveRuntimeConfig } from './config.js';
 import { runSimulation } from './simulator.js';
 import { POOL_GENERATIONS, POOL_MARES } from './measurement.js';
+import { assertKnownArgs } from './cli-args.js';
 import {
   V10_SE_LIMIT,
   V10_TOLERANCE,
@@ -73,6 +74,16 @@ import {
 const STREAM = VERIFY_PAYOUT_STREAM;
 
 const argv = process.argv.slice(2);
+/**
+ * ★**引数を取りこぼしたまま既定値で走らない**（★2026-09-17 の事故・`verify-pmin` と同じ形）。
+ * ⚠️ ★`npm run verify:payout -- --races 500` は ★**PowerShell では壊れます**（★`--` が落ちる）。
+ * → ★`npx tsx apps/cli/src/verify-payout.ts --races 500` で呼んでください。
+ */
+assertKnownArgs(
+  argv,
+  { valueFlags: ['--odds-trials', '--races', '--seeds'], switches: ['--legacy-conditions'] },
+  'verify-payout',
+);
 const argOf = (name: string, fallback: number): number => {
   const i = argv.indexOf(`--${name}`);
   const v = i >= 0 ? Number(argv[i + 1]) : NaN;
