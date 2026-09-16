@@ -6,6 +6,7 @@
   "type": "module",
   "dependencies": {
     "@star/race-engine": "*",
+    "@star/scheduler": "*",
     "@star/sim-engine": "*"
   }
 }
