@@ -30,9 +30,22 @@
 - ⚠️ 距離 2600m の中止 1 本がある — `DISTANCE_MENU` に無い距離なので、**番組表を渡さない経路**（`tools/diag-insert.mjs` 等の `buildRace(pool, i, …)` 引数 5 つ）で作られた行です。この経路は距離も馬場も `generateRace` が自分で引きます
 - **本番: 未実施**。指示書 §2-1「オーナーの指示があってから 1 回だけ」。同じスクリプトを `--env production` で流します（付録 A）
 
-### 0-2. 大きさ（staging の出走馬の凍結で、手元で計算）
+### 0-2. 大きさ（staging の出走馬の凍結で、手元で計算）✔（★2026-09-16 追記・VC-4 の 2）
 
-（TBD: `vw0-mc.mts` の結果）
+staging の確定済み・1400m 以下の 5 本（cycle 5594・5587・5586・5580・5579）で、同じ出走馬・各 200,000 試行を `'oval'` と `'straight'` の 2 通りに振りました（`REPORT_VENUE_WIRING_MEASURE_20260916.md` §3）。
+
+| 券種 | 当たり目の確率の差 平均 | 最大 | 直線でオッズ → 楕円で確定したときの払戻率（切り捨て前） | 設定との差 |
+|---|---|---|---|---|
+| win | 0.593% | 2.869% | 81.07%（設定 82.0%） | −0.93pt |
+| place | 1.200% | 3.016% | 80.32%（設定 82.0%） | −1.68pt |
+| quinella_place | 0.282% | 3.094% | 78.67%（設定 80.0%） | −1.33pt |
+| quinella | 0.111% | 1.846% | 77.98%（設定 80.0%） | −2.02pt |
+| exacta | 0.059% | 1.177% | 77.89%（設定 80.0%） | −2.11pt |
+| trio | 0.030% | 1.393% | 73.82%（設定 77.0%） | −3.18pt |
+| trifecta | 0.006% | 0.483% | 69.93%（設定 77.0%） | −7.07pt |
+
+- **ずれる向きは常に払戻が足りない側**でした。staging の馬券は 0 枚なので、実害の算定ではありません
+- △ ②には測り方自体の誤差（オッズ 200,000 試行・確定 20,000 回）も含みます
 
 ---
 
@@ -58,7 +71,10 @@
 | 検査 | `packages/scheduler/test/conditions.test.ts`・`apps/cli/test/course-frozen.test.ts`（新規）・`apps/cli/test/venue-course.test.ts`・`apps/worker/test/course-frozen-wiring.test.ts`（新規）・`apps/worker/test/cycle-runner.test.ts` | §3〜§6 |
 
 - ⚠️ `apps/cli/package.json` の依存に `@star/scheduler` はありません（`verify-race.ts`・`verify-payout.ts` が今回から引く）。ワークスペースのリンクで解決され、`tsc` と `tsx` は通ります（✔）。依存の宣言を足すかはレビュー側の判断に（§0-3 の表に無いので触っていません）
-- `git diff --numstat 57adf77`（TBD）
+- `git diff --numstat 57adf77 80c4eb3`（★2026-09-16 追記・VC-4 の 1）: **36 ファイル・+3,630 行 / −220 行**
+  - うち **コードと SQL は 23 ファイル・+1,457 / −218**、**文書は 13 ファイル・+2,173 / −2**（文書には本便の指示書・報告書のほか、同じコミットに入ったレビュー側の回答・裁定も含みます）
+  - 行数の多い順（上位）: `REPORT_VENUE_WIRING_20260915.md` +364 ／ `DEV_INSTRUCTIONS_VENUE_WIRING_20260915.md` +266 ／ `apps/worker/test/course-frozen-wiring.test.ts` +217
+  - ⚠️ この数は**コミット `80c4eb3` の中身全体**で、作者別の内訳ではありません（CLAUDE.md の作法）
 
 ### 1-2. 凍結から条件を作る関数の置き場所と層の向き（§5-3）
 
@@ -185,11 +201,25 @@ races.course_frozen jsonb  -- 名前は指示書のまま
 
 ## 6. VW-5 正典のゲートを測る道具
 
+> ⚠️ **【2026-09-16 訂正・VC-4 の 3】中断の原因**: 本節はこの中断を「メモリ不足」と書いていましたが、**正しくは Windows Update の自動再起動**です（照会 `QUESTIONS_ENGINE_LANE_SPEED_20260915.md` §3-1 の註記が正しく、本報告の記述が誤りでした）。なお、2026-09-14 の V-10（約 10 時間半）と staging のレース生成（約 1 時間 45 分）の強制終了は**メモリ不足**で、こちらは別件です。★**両方を「メモリ不足」とひとまとめにしたため、本当の一因（エンジンの遅さ）が見えにくくなっていました**（ES 便で解消）。
+>
 > ⚠️ **計測の中断（2026-09-15 04:14）**: V-18 の本番 70 組・VW-0 のモンテカルロ・V-17 一式を**裏で同時に**流していたところ、開発側のセッションが落ちました。V-17 だけ完走し、V-18 は 70 組中 23 組で途切れ、VW-0 は 0 件です。楕円の `resolveRace` は 1 試行 約 6.7ms（他の計算と並走中の実測・直線は 約 30µs）で、VW-0 の `--trials 200000` × 2 通り × 5 本は数時間の見積りでした。以後、重い計算は 1 本ずつ流し、数十分を超えるものはオーナーのターミナルに回します。
 
 ### 6-1. V-4・V-5・V-6
 
-⏸ **流していません。** 所要を見積もったところ、既定（60,000 レース × 1 レース 502 回の `resolveRace`）で **1 条件 約 21 時間**の計算でした（楕円の `resolveRace` が 1 回 約 2.5ms・D-071 の前は 61µs）。エンジンの遅さは照会 `QUESTIONS_ENGINE_LANE_SPEED_20260915.md` に出しました。その回答が出るまでの既定（Q-1）により、**直った後に流します**。V-18 の残り 47 組と VW-0 の大きさも同じ扱いです。
+✔ **【2026-09-16 追記・VC-4 の 6】流しました**（`REPORT_VENUE_WIRING_MEASURE_20260916.md` §2）。**2 条件で合わせて 約 27 分**（ES 便でエンジンが速くなったため）。
+
+| # | 帯 | 本番の条件 | 旧来の条件 | 動いた量 | 判定 |
+|---|---|---|---|---|---|
+| V-4 | 30〜34% | **31.37%** | 31.26% | +0.11pt | どちらも PASS |
+| V-5 | 60〜65% | **62.18%** | 62.31% | −0.13pt | どちらも PASS |
+| V-6 | 0.5〜2% | **1.15%** | 1.21% | −0.06pt | どちらも PASS |
+
+⚠️ 頭数別では **8 頭立てが 2.38%** で帯の上限を 0.38pt 超えます（旧来の条件でも同じ向き）。判定はプール値で、定数は動かしていません。
+
+---
+
+（以下は 2026-09-15 時点の記述）⏸ **流していません。** 所要を見積もったところ、既定（60,000 レース × 1 レース 502 回の `resolveRace`）で **1 条件 約 21 時間**の計算でした（楕円の `resolveRace` が 1 回 約 2.5ms・D-071 の前は 61µs）。エンジンの遅さは照会 `QUESTIONS_ENGINE_LANE_SPEED_20260915.md` に出しました。その回答が出るまでの既定（Q-1）により、**直った後に流します**。V-18 の残り 47 組と VW-0 の大きさも同じ扱いです。
 
 ### 6-2. V-17 ✔（2026-09-15 04:08 開始・`DAY_ROTATION` の是正の後の作業ツリー）
 
@@ -248,11 +278,11 @@ races.course_frozen jsonb  -- 名前は指示書のまま
 |---|---|---|---|
 | 1 | 開発側 | `npx tsx tools/migrate.mjs --env staging` | ✔ 適用前: `course_frozen` 列なし・未適用 1 件（`0023` だけ）・食い違い 0 ／ 適用後: `jsonb`・null 可・**39 行すべて null**・`schema_migrations` にチェックサム `2713146306897bb8…`（2026-09-14T19:01:27Z） |
 | 2 | 開発側 | `npx tsx tools/verify-anon-exposure.mjs --env staging` | ✔ **V-20 11 件中 11 件合格**（ビューを変えていない） |
-| 3 | **オーナー** | `npx tsx tools/seed-races.mjs --env staging --races 26` | ⏳ 未 — **26 本**は §3-2 の「10 場が出そろう連続本数の最大」。⚠️ 所要時間は `seed-races.mjs` の註記に **1 本 80〜96 秒**と **236〜976 秒**の 2 つの実績があり、26 本で**約 35 分〜7 時間**。短くするなら `--trials 10000`（売る目の数が変わるのでオッズの妥当性には使えないが、走路の凍結と再計算の確認には影響しない・staging の馬券は 0 枚）。どちらにするかはオーナー判断 |
-| 4 | 開発側 | 生成されたレースの `course_frozen` を読み、10 場・全件 `'oval'`・値が `venues.ts` と一致 | ⏳ 3 の後 |
-| 5 | **オーナー** | `npx tsx tools/settle-races.mjs --env staging` | ⏳ 未 |
-| 6 | 開発側 | `npx tsx tools/verify-entrant-freeze.mjs --env staging --recompute-settled` で新しい行が全件一致 ／ `--ignore-course-frozen` で食い違いが出る | ⏳ 5 の後 |
-| 7 | 開発側 | 既存の null 行が確定されたら通報の件数 | ⏳ 5 の出力（`[worker] ★走路の凍結が無いレースを…累計 n 件`）。staging の発売中の null 行は 2 本 |
+| 3 | 開発側（オーナーの指示で） | `npx tsx tools/seed-races.mjs --env staging --races 26 --trials 10000` | ✔ **完了**（2026-09-16・`REPORT_STAGING_DEMO_20260916.md`）。**26 本・1 本 約 2 秒**。★**【VC-4 の 4】所要の見積りを実測に置き換えました**: 古い註記の「1 本 80〜96 秒」「236〜976 秒」は D-071 の前後のもので、いまの値ではありません。**本番と同じ 3,896,104 試行なら 1 本 約 110 秒**（計算: ES-6 の試行 1 回 約 28µs × 3.9M ＋ 出走表の生成などの固定分 約 2 秒） |
+| 4 | 開発側 | 生成されたレースの `course_frozen` を読み、10 場・全件 `'oval'`・値が `venues.ts` と一致 | ✔ **完了**: 26 本すべて凍結あり・全件 `'oval'`・`frozenCourseOf` と完全一致・**10 場すべて**（`REPORT_STAGING_DEMO_20260916.md` §2） |
+| 5 | 開発側（オーナーの指示で） | `npx tsx tools/settle-races.mjs --env staging --from-cycle 5573` | ✔ **完了**: 26 本確定。`--from-cycle` で以前からの未確定 2 本には触れていません |
+| 6 | 開発側 | `npx tsx tools/verify-entrant-freeze.mjs --env staging --recompute-settled` で新しい行が全件一致 ／ `--ignore-course-frozen` で食い違いが出る | ✔ **完了**: 新しい 26 本は**全件一致** ／ 変異は**天河 1400m で食い違う**（同 §3・§4） |
+| 7 | 開発側 | 既存の null 行が確定されたら通報の件数 | ✔ **完了**: 凍結の無い行は **7 本**（`--recompute-settled` の出力。今回の 26 本はすべて凍結あり）。既知の食い違い cycle 686・868 は増えていません |
 
 ---
 
@@ -292,7 +322,7 @@ races.course_frozen jsonb  -- 名前は指示書のまま
 | 4 | `npx tsx tools/verify-v18.mjs` | 70 組すべて PASS（⚠️ 未完。出た 23 組はすべて PASS・残り 47 組は未計測・§6-3） |
 | 5 | `npx tsx tools/verify-v17.mjs` ／ `--legacy-conditions` | どちらも V-17 PASS（①②）・exit 0 ✔ |
 | 6 | `npx tsx tools/verify-v17-time.mjs` ／ `--legacy-conditions` | 旧来 1 本・本番 10 場とも ①② ✅・exit 0 ✔ |
-| 7 | `npm run verify:race` ／ `-- --legacy-conditions` | TBD（§6-1） |
+| 7 | `npm run verify:race` ／ `-- --legacy-conditions` | ✔ **どちらも V-4〜V-6 PASS**（本番 31.37% / 62.18% / 1.15%・旧来 31.26% / 62.31% / 1.21%・2 条件で 約 27 分・§6-1） |
 | 8 | `npx tsx tools/migrate.mjs --env staging` | 「未適用のものはありません」 |
 | 9 | `npx tsx tools/verify-anon-exposure.mjs --env staging` | V-20 11/11 |
 
