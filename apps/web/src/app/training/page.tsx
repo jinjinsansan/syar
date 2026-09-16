@@ -6,7 +6,7 @@
  *   ⚠️ 今はデモデータ。指示の書き込み（spend_training_ep）と週送りはサーバー RPC に繋ぐまで押しても何も起きない。
  *   ⚠️ 疲労の遷移・注意文・警告帯の条件はサーバーが返す前提（ここでは見本の値）。画面で式を作らない。
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   TRAINING_AXES, TRAINING_INTENSITIES, TRAINING_AXIS_LABEL, TRAINING_INTENSITY_LABEL,
   trainingBarsOf, raceWeekMarkOf, RACE_WEEK_LABEL,
@@ -16,6 +16,22 @@ import { TRAINING_MENUS, trainingMenusOfView, DEMO_TRAINING_ABILITY, DEFAULT_TRA
 import { Capsule, ClassChip, FatigueBar, PageTitle, Pill, StatBar, Stars } from '../../components/ui';
 
 const WEEK_NO = 32;
+
+/**
+ * ★**狭い画面ではスマホ縦の版を出します**（★デザイナーのカード `components/training-mobile`・D12-1・2026-09-16）。
+ *
+ * ⚠️ ★閾値の 720px は `globals.css` の `@media (max-width: 720px)` と**同じ数**です
+ *    （★`races/[id]/bet/page.tsx` と同じ作法。★片方だけ動かすと版面と操作が別の幅で切り替わります）。
+ * ⚠️ ★**PC 版は今回変えません**（★カードの実装表「PC 版（/training）は今回変更しない」）。
+ */
+const NARROW_PX = 720;
+
+/** ★強度ごとの見出しの重さ（★弱 → 強で背景と文字が重くなる・カードの実装表の値） */
+const INTENSITY_HEAD: Readonly<Record<string, { readonly bg: string; readonly border: string; readonly color: string; readonly weight: number; readonly size: number }>> = {
+  weak: { bg: 'linear-gradient(#fff,#e9eff5)', border: 'var(--a-edge-soft)', color: 'var(--a-ink-2)', weight: 700, size: 12.5 },
+  mid: { bg: 'linear-gradient(#eaf3fb,#cfe0ee)', border: 'var(--a-edge)', color: 'var(--a-ink)', weight: 900, size: 13.5 },
+  strong: { bg: 'linear-gradient(#ffe9e7,#ffb7b0)', border: '#a81a13', color: '#a81a13', weight: 900, size: 14.5 },
+};
 
 /** 疲労の数値色（18px は large text 扱いにならないため黄は濃い #8a5a06）: ≤30 緑／≤60 #8a5a06／>60 赤 */
 function fatigueNumColor(f: number): string {
@@ -48,6 +64,180 @@ export default function TrainingPage(): React.ReactElement {
   const cond = horse === null ? null : conditionView(horse.condition);
   const selectable = horses.filter((h) => h.week.kind !== 'rest');
   const canInstruct = horse !== null && menu !== null;
+
+  /** ★狭い画面か（★`globals.css` の `@media (max-width: 720px)` と同じ数） */
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${NARROW_PX}px)`);
+    const apply = (): void => { setNarrow(mq.matches); };
+    apply();
+    mq.addEventListener('change', apply);
+    return () => { mq.removeEventListener('change', apply); };
+  }, []);
+
+  /**
+   * ★**スマホ縦の版**（★デザイナーのカード `components/training-mobile`・D12-1）。
+   * ⚠️ ★枠の割り当て（体・心 × 弱中強）・3 本のバー・出走前後の印は ★**`@star/training` から引きます**
+   *    （★画面に表を持たない・`apps/cli/test/training-view-wiring.test.ts` が構文木で見ています）。
+   */
+  if (narrow) {
+    return (
+      <div style={{ padding: '0 0 28px' }}>
+        <div className="a-band" style={{ height: 52, padding: '0 16px', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>調教</span>
+          <span style={{ fontSize: 12, fontWeight: 900 }}>第 {WEEK_NO} 週</span>
+        </div>
+
+        {/* ★馬の選択（横スクロール・未指示は右上に赤丸） */}
+        <div style={{ display: 'flex', gap: 8, padding: '12px 14px 0', overflowX: 'auto' }}>
+          {horses.map((h) => {
+            const sel = h.id === selectedHorse;
+            const rest = h.week.kind === 'rest';
+            return (
+              <span
+                key={h.id}
+                onClick={() => { if (!rest) setSelectedHorse(h.id); }}
+                style={{
+                  flex: '0 0 auto', position: 'relative', display: 'flex', alignItems: 'center', minHeight: 38,
+                  padding: '0 14px', borderRadius: 9, whiteSpace: 'nowrap', cursor: rest ? 'default' : 'pointer',
+                  border: sel ? '2px solid #8a5a06' : '2px solid var(--a-edge-soft)',
+                  backgroundImage: sel ? 'var(--a-gloss-gold)' : 'linear-gradient(#fff,#e9eff5)',
+                  opacity: rest ? 0.55 : 1,
+                }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 900, color: sel ? '#4a3105' : 'var(--a-ink-2)' }}>{h.name}</span>
+                {h.week.kind === 'todo' && (
+                  <span style={{ position: 'absolute', right: -3, top: -3, width: 10, height: 10, borderRadius: '50%', background: '#d62f26', border: '2px solid #fff' }} />
+                )}
+              </span>
+            );
+          })}
+        </div>
+
+        {/* ★選択中の馬 */}
+        {horse !== null && cond !== null && (
+          <div className="a-panel" style={{ margin: '12px 14px 0', borderWidth: 3 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px 8px' }}>
+              <ClassChip label={horse.classLabel} classRank={horse.classRank} h={24} font={11.5} />
+              <span style={{ fontSize: 19, fontWeight: 900 }}>{horse.name}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px 10px' }}>
+              {/* ★素質は★だけ（★数値も「上限までの割合」も出さない・§5.5・§12.4） */}
+              <span className="a-lbl" style={{ fontSize: 11 }}>素質</span>
+              <Stars value={horse.stars} size={17} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 14px 14px' }}>
+              {bars.map((b) => (b.kind === 'ability' ? (
+                /* ★能力は棒（伸びるもの） */
+                <div key={b.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 64, flex: '0 0 64px', fontSize: 12.5, fontWeight: 900, color: 'var(--a-ink-2)' }}>{b.label}</span>
+                  <span style={{ position: 'relative', flex: 1, height: 14, borderRadius: 7, background: '#e3ecf3', border: '2px solid var(--a-edge)', overflow: 'hidden' }}>
+                    <span style={{ display: 'block', width: `${Math.max(0, Math.min(100, (b.value / b.max) * 100))}%`, height: '100%', backgroundImage: 'var(--a-gloss-blue)' }} />
+                  </span>
+                </div>
+              ) : (
+                /* ★調子は状態。★形を変えて能力と混同させない（ドット＋語） */
+                <div key={b.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 64, flex: '0 0 64px', fontSize: 12.5, fontWeight: 900, color: 'var(--a-ink-2)' }}>{b.label}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, height: 14 }}>
+                    <span style={{ width: 14, height: 14, flex: '0 0 14px', borderRadius: '50%', background: cond.color, border: `2px solid ${cond.color}` }} />
+                    <span style={{ fontSize: 15, fontWeight: 900, color: cond.color }}>{cond.label}</span>
+                  </span>
+                </div>
+              )))}
+            </div>
+            {/* ★出走の前の週・後の週（★印が無い馬はこの帯を出さない） */}
+            {raceMarkLabel !== null && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 38, padding: '0 14px', background: 'var(--a-ivory)', borderTop: '2px solid var(--a-line)' }}>
+                <span style={{ display: 'flex', alignItems: 'center', height: 22, padding: '0 9px', borderRadius: 6, backgroundImage: 'var(--a-gloss-blue)', border: '1px solid var(--a-edge)', fontSize: 11, fontWeight: 900, color: '#fff' }}>
+                  {raceMarkLabel}
+                </span>
+                {horse.nextRace !== null && (
+                  <span style={{ fontSize: 11.5, fontWeight: 900, color: 'var(--a-ink-2)' }}>{horse.nextRace} に向けて仕上げます</span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ★6 枡（体・心 × 弱中強）。★割り当ては @star/training の写像から */}
+        {TRAINING_AXES.map((axis) => (
+          <div key={axis} style={{ padding: '16px 14px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+              <span className={axis === 'mind' ? 'a-band a-band-red' : 'a-band'} style={{ height: 30, padding: '0 12px', borderRadius: 8, fontSize: 14, fontWeight: 900 }}>
+                {TRAINING_AXIS_LABEL[axis]}
+              </span>
+              <span style={{ fontSize: 11.5, fontWeight: 900, color: 'var(--a-ink-2)' }}>
+                {axis === 'body' ? '力を作る調教' : '状態を整える調教'}
+              </span>
+            </div>
+            {/* ★体の「中」だけ 3 枚なので、その列を広く取る */}
+            <div style={{ display: 'grid', gridTemplateColumns: axis === 'body' ? '1fr 1.4fr 1fr' : '1fr 1fr 1fr', gap: 8 }}>
+              {TRAINING_INTENSITIES.map((intensity) => {
+                const head = INTENSITY_HEAD[intensity]!;
+                return (
+                  <div key={intensity} style={{ display: 'flex', flexDirection: 'column', borderRadius: 9, overflow: 'hidden', background: '#f4f9fd', border: '2px solid var(--a-edge)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 24, backgroundImage: head.bg, borderBottom: `2px solid ${head.border}` }}>
+                      <span style={{ fontSize: head.size, fontWeight: head.weight, color: head.color, letterSpacing: '.08em' }}>
+                        {TRAINING_INTENSITY_LABEL[intensity]}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, flex: 1 }}>
+                      {trainingMenusOfView(axis, intensity).map((m) => {
+                        const sel = m.id === selectedMenu;
+                        const warn = m.banner !== undefined;
+                        return (
+                          <div
+                            key={m.id}
+                            onClick={() => setSelectedMenu(m.id)}
+                            style={{
+                              position: 'relative', display: 'flex', flexDirection: 'column', gap: 3, padding: '9px 10px',
+                              borderRadius: 9, background: '#fff', cursor: 'pointer', minHeight: 38,
+                              border: sel ? '3px solid #8a5a06' : '2px solid var(--a-edge)', boxShadow: 'var(--a-shadow-sm)',
+                            }}
+                          >
+                            {warn && (
+                              <span style={{ position: 'absolute', right: 8, top: 8, display: 'flex', alignItems: 'center', height: 18, padding: '0 7px', borderRadius: 5, backgroundImage: 'linear-gradient(#ffe270,#f6c21c 52%,#d99f06)', border: '1px solid #a9741a', fontSize: 9.5, fontWeight: 900, color: '#4a3105' }}>
+                                注意
+                              </span>
+                            )}
+                            <span style={{ fontSize: 14, fontWeight: 900 }}>{m.name}</span>
+                            <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--a-green-d)' }}>{m.main}</span>
+                            <span style={{ fontSize: 10.5, fontWeight: 900, color: m.fatigueDelta < 0 ? 'var(--a-green-d)' : '#8a5a06' }}>
+                              疲労 {m.fatigueDelta > 0 ? `+${m.fatigueDelta}` : `−${Math.abs(m.fatigueDelta)}`}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {/* ★指示バー（★画面の下端に常時） */}
+        <div style={{ position: 'sticky', bottom: 0, marginTop: 18, padding: '12px 14px', background: 'var(--a-panel)', borderTop: '3px solid var(--a-edge)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {horse !== null && menu !== null ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 900 }}>{menu.name}　を指示</span>
+                <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>
+                  疲労 <span className="a-num" style={{ fontSize: 15, color: fatigueNumColor(horse.fatigue) }}>{horse.fatigue}→{Math.max(0, horse.fatigue + menu.fatigueDelta)}</span>
+                </span>
+              </div>
+              <span className="a-btn a-btn-gold" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 50, fontSize: 16 }} title="サーバー接続まで押せません">
+                この馬に指示する（{menu.ep} EP）
+              </span>
+            </>
+          ) : (
+            <span style={{ fontSize: 13.5, fontWeight: 900, color: 'var(--a-ink-2)' }}>馬とメニューを選んでください</span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '22px 0 40px' }}>
