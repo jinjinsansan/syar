@@ -1,5 +1,6 @@
 import { demoStableRepo, conditionView, fatigueColor, type HorseDetail } from '../../../lib/stable';
 import { FatigueBar, StatBar, Stars } from '../../../components/ui';
+import { HorseResume } from '../../../components/horse-resume';
 
 export const revalidate = 0;
 
@@ -58,7 +59,14 @@ export default async function HorsePage({ params }: { params: Promise<{ horseId:
   const isTopGrade = (grade: string): boolean => grade.startsWith('重賞') || grade.startsWith('オープン');
 
   return (
-    <div style={{ padding: '22px 0 40px' }}>
+    <>
+      {/*
+        ★**スマホ縦は履歴書型**（★D13-2・デザイナーのカード `components/horse-resume`）。
+        ⚠️ ★出し分けは `globals.css` の 1 つの媒体条件が持ちます（★`show-narrow` と `hide-narrow` は対）。
+      */}
+      <div className="show-narrow"><HorseResume horse={h} /></div>
+
+      <div className="hide-narrow" style={{ padding: '22px 0 40px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 900, color: 'var(--a-ink-3)' }}>
         <a className="rc-exch" href="/stable" style={{ color: 'var(--a-blue-d)' }}>わたしの馬</a><span>/</span><span style={{ color: 'var(--a-ink)' }}>{h.name}</span>
       </div>
@@ -226,6 +234,7 @@ export default async function HorsePage({ params }: { params: Promise<{ horseId:
         ))}
         {h.training.length === 0 && <p style={{ padding: '14px', fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)', borderTop: '1px solid var(--a-line)' }}>今週が最初の週です</p>}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

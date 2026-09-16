@@ -15,8 +15,11 @@
 
 import { JOCKEYS, JOCKEY_BOND_MAX, jockeyBondAfterRides } from '@star/scheduler';
 
-/** ★親密度の言葉（★数値ではなく段で見せる。★頭打ちに達したら言う） */
-function bondLabel(bond: number): string {
+/**
+ * ★親密度の言葉（★数値ではなく段で見せる。★頭打ちに達したら言う）。
+ * ⚠️ ★**馬詳細（D13-2）の「主戦騎手」も同じ言葉を使います** — ★あちらで組み直さないため公開しています（★D-052）。
+ */
+export function bondLabel(bond: number): string {
   if (bond >= JOCKEY_BOND_MAX) return '頭打ち';
   if (bond === 0) return 'これから';
   return bond >= JOCKEY_BOND_MAX - 2 ? '良好' : 'ふつう';

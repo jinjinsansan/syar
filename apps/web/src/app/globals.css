@@ -71,8 +71,16 @@ main { max-width: 1180px; margin: 0 auto; padding: 0; }
 .welcome { animation: welcome .6s ease-out both; }
 @keyframes welcome { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 
+/*
+ * ★広い画面だけに出す（`hide-narrow`）と ★狭い画面だけに出す（`show-narrow`）の対。
+ * ⚠️ ★**同じ 1 つの媒体条件の中に両方を書きます。** ★別々の `@media` に書くと、
+ *    ★境目を片方だけ動かした日に ★**両方出る幅／両方消える幅**ができます
+ *    （★馬詳細は PC 版とスマホ縦版の 2 枚を持つので、★どちらの事故も画面が壊れて見えます）。
+ */
+.show-narrow { display: none; }
 @media (max-width: 900px) {
   .hide-narrow { display: none !important; }
+  .show-narrow { display: block; }
 }
 
 /* ===== アーケード筐体テーマ（Web 画面用・明るい）— 正本 design/hud-ds/styles.css [data-theme="arcade"] =====

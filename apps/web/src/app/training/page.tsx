@@ -11,6 +11,7 @@ import {
   TRAINING_AXES, TRAINING_INTENSITIES, TRAINING_AXIS_LABEL, TRAINING_INTENSITY_LABEL,
   trainingBarsOf, raceWeekMarkOf, RACE_WEEK_LABEL,
   trainingResultTierOf, TRAINING_RESULT_LABEL, GAIN_JITTER,
+  trainingStreakOf, TRAINING_STREAK_WEEKS,
 } from '@star/training';
 import { sortStable, conditionView, DEMO_HORSES } from '../../lib/stable';
 import { TRAINING_MENUS, trainingMenusOfView, DEMO_TRAINING_ABILITY, DEFAULT_TRAINING_ABILITY, demoFatigueNote } from '../../lib/game-demo';
@@ -103,6 +104,16 @@ export default function TrainingPage(): React.ReactElement {
     normal: { bg: '#fff', border: 'var(--a-edge-soft)', color: 'var(--a-ink-2)', size: 16 },
   };
   const tierStyle = TIER_STYLE[resultTier]!;
+  /**
+   * ★**「2 週続けて良い仕上がりです」**（★デザイナーが **2026-09-16 に 3 週 → 2 週**へ確定）。
+   *
+   * ⚠️ ★**週数を画面に書きません**（★`TRAINING_STREAK_WEEKS` が唯一の出どころ・D-052）。
+   *    ★3 週連続は 0.46%（約 216 週に 1 回）で、★現役 182 週では ★**1 回も出ない馬が多数**でした。
+   * ⚠️ ★**煽る要素を足しません** — ★加点・積み上げ・カウントダウンは置きません（★カードの禁止事項）。
+   * ★デモ: ★前の週も上振れだった列にしています（★段を切り替えるとバッジの出入りが見えます）。
+   */
+  const recentTiers = [resultTier, trainingResultTierOf(GAIN_JITTER.max)] as const;
+  const streak = trainingStreakOf(recentTiers, TRAINING_STREAK_WEEKS);
   const note = horse === null ? null : demoFatigueNote(horse.fatigue);
   const cond = horse === null ? null : conditionView(horse.condition);
   const selectable = horses.filter((h) => h.week.kind !== 'rest');
@@ -243,6 +254,14 @@ export default function TrainingPage(): React.ReactElement {
                 </span>
               ))}
             </div>
+            {/* ★続いたときだけ、控えめに 1 行（★カードの指定） */}
+            {streak && (
+              <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: '#fff8ea', border: '1.5px solid #d9b25a' }}>
+                <span style={{ fontSize: 12.5, fontWeight: 900, color: '#8a5a06' }}>
+                  {TRAINING_STREAK_WEEKS}週続けて良い仕上がりです
+                </span>
+              </div>
+            )}
           </div>
         )}
 

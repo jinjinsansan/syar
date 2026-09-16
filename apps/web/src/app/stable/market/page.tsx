@@ -16,6 +16,7 @@
 import { useState } from 'react';
 import { LISTED_BANDS, LISTINGS_PER_BAND, priceOfStars, sellBackEP } from '@star/scheduler';
 import { Stars } from '../../../components/ui';
+import { DEMO_MARKET_STOCK_BY_BAND } from '../../../lib/game-demo';
 
 export default function MarketPage(): React.ReactElement {
   const [picked, setPicked] = useState<{ readonly band: number; readonly slot: number } | null>(null);
@@ -34,7 +35,13 @@ export default function MarketPage(): React.ReactElement {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px 0' }}>
-        {LISTED_BANDS.map((band) => (
+        {LISTED_BANDS.map((band, bandIndex) => {
+          /**
+           * ★**残っている口数**（★`null` は満口。★本番はサーバーが数えます）。
+           * ⚠️ ★**下限を割ると 0 口になります**（★正典 D-102 ⑤）。★そのときも ★**帯は広げない・消さない**。
+           */
+          const stock = DEMO_MARKET_STOCK_BY_BAND[bandIndex] ?? LISTINGS_PER_BAND;
+          return (
           <div key={band} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 14px 16px', borderRadius: 14, background: '#fff', border: '2px solid var(--a-edge)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Stars value={band} size={20} />
@@ -45,17 +52,45 @@ export default function MarketPage(): React.ReactElement {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {Array.from({ length: LISTINGS_PER_BAND }, (_, slot) => {
+                /**
+                 * ★**居ない枠は「今は　いません」の静かな空欄**（★デザイナーの回答・2026-09-16）。
+                 * ⚠️ ★**「残り 0」という数字を出しません** — ★数えさせると「補充を待つ」煽りになります。
+                 * ⚠️ ★**枠そのものは残します**（★枡を詰めて帯を広げない・D-102 ⑤）。
+                 */
+                if (slot >= stock) {
+                  return (
+                    <div
+                      key={slot}
+                      style={{
+                        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+                        padding: '10px 6px', borderRadius: 10, minHeight: 96,
+                        background: 'var(--a-ivory)', border: '1.5px dashed var(--a-edge-soft)',
+                      }}
+                    >
+                      <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--a-ink-3)', textAlign: 'center', lineHeight: 1.5 }}>
+                        今は<br />いません
+                      </span>
+                    </div>
+                  );
+                }
                 const sel = picked !== null && picked.band === band && picked.slot === slot;
                 return (
                   <div
                     key={slot}
                     onClick={() => { setPicked({ band, slot }); }}
                     style={{
+                      position: 'relative',
                       flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, padding: '10px 6px', borderRadius: 10, cursor: 'pointer',
                       background: 'var(--a-panel-2)',
                       border: sel ? '2px solid #8a5a06' : '1.5px solid var(--a-line)',
                     }}
                   >
+                    {/* ★欠けている帯の先頭にだけ、残りの口数を控えめに（★満口の帯には出さない） */}
+                    {slot === 0 && stock < LISTINGS_PER_BAND && (
+                      <span style={{ position: 'absolute', right: 5, top: 5, display: 'flex', alignItems: 'center', height: 16, padding: '0 6px', borderRadius: 5, backgroundImage: 'var(--a-gloss-yellow)', border: '1px solid #a9741a', fontSize: 9, fontWeight: 900, color: '#4a3105' }}>
+                        残り{stock}
+                      </span>
+                    )}
                     <div style={{ width: '100%', aspectRatio: '1', borderRadius: 8, background: 'linear-gradient(160deg,#7d94a8,#5f8f45)', opacity: 0.85 }} />
                     {/* ★個体ごとの違いを匂わせない（★同じ型の繰り返し） */}
                     <span style={{ fontSize: 11.5, fontWeight: 900, whiteSpace: 'nowrap' }}>{slot + 1} 頭目</span>
@@ -64,7 +99,8 @@ export default function MarketPage(): React.ReactElement {
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ★引き直しの欲求を先回りして鎮める（★「もう一度探す」は置かない） */}

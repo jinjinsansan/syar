@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   trainingResultTierOf, trainingStreakOf,
-  TRAINING_RESULT_THRESHOLDS, TRAINING_RESULT_LABEL,
+  TRAINING_RESULT_THRESHOLDS, TRAINING_RESULT_LABEL, TRAINING_STREAK_WEEKS,
   GAIN_JITTER,
 } from '../src/index.js';
 
@@ -73,5 +73,19 @@ describe('★調教の結果の段（D12-2）', () => {
     expect(p ** 2).toBeCloseTo(0.0278, 4);
     expect(p ** 3).toBeCloseTo(0.0046, 4);
     expect(1 / p ** 3).toBeGreaterThan(182);
+  });
+
+  it('⑤ ★週数は 2 週（★デザイナーが 2026-09-16 に確定・★現役の間に出る側を採った）', () => {
+    const p = share(TRAINING_RESULT_THRESHOLDS.up, GAIN_JITTER.max);
+    /** ★現役 182 週（★§7.1 の 3 歳〜引退）の間に ★**1 回以上出る**週数であること */
+    const CAREER_WEEKS = 182;
+    expect(CAREER_WEEKS * p ** TRAINING_STREAK_WEEKS, '★現役の間に一度も出ない週数を選んでいる').toBeGreaterThan(1);
+    /**
+     * ★**1 つ増やすと出なくなる**ことも見ます（★「2 でも 3 でも通る」検査にしない・R-16）。
+     * ⚠️ ★これが ★**3 週を採らなかった理由そのもの**です。
+     */
+    expect(CAREER_WEEKS * p ** (TRAINING_STREAK_WEEKS + 1), '★1 つ増やしても現役の間に出てしまう').toBeLessThan(1);
+    /** ★毎週出る形にもしない（★2 週未満を選んでいない） */
+    expect(TRAINING_STREAK_WEEKS).toBeGreaterThan(1);
   });
 });

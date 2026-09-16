@@ -204,3 +204,16 @@ export function entryCandidates(horses: readonly StableHorse[]): StableHorse[] {
 export const DEMO_JOCKEY_RIDES: Readonly<Record<string, number>> = {
   'j-aoi': 6, 'j-kurata': 3, 'j-shinozaki': 1, 'j-tsuji': 0, 'j-himura': 4, 'j-narita': 0,
 };
+
+/**
+ * ★**デモの在庫**（★D12-5・馬市場。★添字は `LISTED_BANDS` の並びと同じ）。
+ *
+ * ★`null` ＝ ★**満口**（★`LISTINGS_PER_BAND` を ★**ここに写さない**・D-052）。
+ * ★数値 ＝ ★その帯に残っている口数。
+ *
+ * ⚠️ ★本番は ★**サーバーが数えた口数**です（★画面でも見本でも数えません）。
+ * ⚠️ ★**下限を割った帯は 0 口になります**（★正典 D-102 ⑤。★帯は広げない・消さない）。
+ *    → ★最後の帯を「残り 1」にして、★**満口の帯・欠けた帯・空の枡**が 1 画面で見えるようにしています
+ *      （★デザイナーの回答 2026-09-16: ★空の枡は点線グレーで「今は いません」。★「残り 0」は出さない）。
+ */
+export const DEMO_MARKET_STOCK_BY_BAND: readonly (number | null)[] = [null, null, null, null, 1];

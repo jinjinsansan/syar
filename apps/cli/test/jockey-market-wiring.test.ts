@@ -115,4 +115,27 @@ describe('★馬を迎える（D12-5・D-102）', () => {
     expect(MARKET).toContain('手放すと戻るのは');
     expect(MARKET).toMatch(/back\.toLocaleString\(\)/);
   });
+
+  it('★★0 口になった枠は静かな空欄（★「残り 0」を出さず、帯も広げない・D-102 ⑤）', () => {
+    /**
+     * ★デザイナーの回答（2026-09-16）:
+     *   ★「残り1」バッジは出す／★0 口の枠は ★**点線グレーの「今は　いません」**に置き換える／
+     *   ★**「残り 0」の数字は出さない**／★帯そのものは広げない・消さない。
+     */
+    expect(MARKET).toContain('いません');
+    expect(MARKET).toContain('残り');
+    for (const bad of ['残り0', '残り 0', '残り{0}', '売り切れ', '完売', '補充']) {
+      expect(MARKET, `★0 を数えさせる語がある: ${bad}`).not.toContain(bad);
+    }
+    /**
+     * ★**枠を詰めていない**こと（★枡の数は `LISTINGS_PER_BAND` のまま・帯を広げない）。
+     * ⚠️ ★在庫で `Array.from` の長さを変えると ★**帯が縮みます**（★D-102 ⑤ の「広げない」の裏側）。
+     */
+    expect(MARKET).toMatch(/length:\s*LISTINGS_PER_BAND/);
+    expect(MARKET, '★在庫で枡の数を変えている').not.toMatch(/length:\s*stock/);
+    /** ★在庫は引いてくる（★画面で数えない・本番はサーバーの値） */
+    expect(MARKET).toMatch(/DEMO_MARKET_STOCK_BY_BAND/);
+    /** ★空欄の判定は枠の番号と在庫の比較 1 か所だけ（★別の条件を増やさない） */
+    expect(MARKET).toMatch(/slot\s*>=\s*stock/);
+  });
 });
