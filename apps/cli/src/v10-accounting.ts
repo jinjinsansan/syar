@@ -178,6 +178,52 @@ export function accountRaceKind(
   st.races += 1;
 }
 
+/**
+ * ★**レース内で確定を多数引いたものを「1 レース 1 標本」に畳む**（★`verify-pmin.ts` 用・2026-09-16）。
+ *
+ * 【★なぜ要るか】
+ *   ★`verify-pmin` は 1 レースにつきオッズを 1 回作り、★**確定を `finals` 回**引きます（分散低減）。
+ *   ★そのまま `accountRaceKind` を `finals` 回呼ぶと、★`races` が `RACES × finals` になり、
+ *   ★**SE がレース内の分散で薄まります** — ★正典 D-036 が禁じている形です
+ *   （★「1 つの出走表を 10 万回引いても、★**出走表間のばらつきは 1 標本のまま**」）。
+ *
+ * 【★畳み方】
+ *   ★**比に効く量**（賭け金・払戻・切り捨ての損失・SE の部品）は ★**`finals` で割って
+ *   「確定 1 回ぶん」に正規化**し、★`races` は **1 だけ**増やします。
+ *   ★**件数**（上限に当たった売り目・未発売の的中・売らなかった目）は ★**割らずに足します**
+ *   — ★これは「何回起きたか」の報告で、★比の分母ではありません（★出力に延べであると明記すること）。
+ *
+ * ⚠️ ★`race.sumX2` などを ★**そのまま使えません**（★レース内の各確定の二乗和なので）。
+ *    ★正規化した (X, Y) から作り直します。
+ */
+export function foldRaceSample(parent: KindStat, race: KindStat, finals: number): void {
+  if (!Number.isFinite(finals) || finals <= 0) {
+    throw new Error(`foldRaceSample: 確定の回数が不正です (${finals})`);
+  }
+  /** ★このレースの「確定 1 回ぶん」の賭け金と払戻 */
+  const x = race.sumX / finals;
+  const y = race.sumY / finals;
+  parent.stake += race.stake / finals;
+  parent.payout += race.payout / finals;
+  parent.floorLoss += race.floorLoss / finals;
+  parent.cappedLoss += race.cappedLoss / finals;
+  /** ★件数は延べのまま足す（★比の分母ではない） */
+  parent.unseenHits += race.unseenHits;
+  parent.cappedBets += race.cappedBets;
+  for (const key of ['unsoldMinProbability', 'unsoldEvenOdds'] as const) {
+    parent[key].bets += race[key].bets;
+    parent[key].hits += race[key].hits;
+    parent[key].payoutBeforeFloor += race[key].payoutBeforeFloor;
+  }
+  parent.sumX += x;
+  parent.sumY += y;
+  parent.sumX2 += x * x;
+  parent.sumY2 += y * y;
+  parent.sumXY += x * y;
+  /** ★★レースは 1 本（★確定を何回引いても 1 標本） */
+  parent.races += 1;
+}
+
 export interface KindVerdict {
   readonly target: number;
   /** ★判定値（切り捨て前の払戻率・D-094） */

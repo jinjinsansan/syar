@@ -53,7 +53,10 @@ export interface OddsRow {
 /**
  * 出走順（1着から）の列から、券種ごとの的中目を返す。
  * ★`verify-payout.ts` と同じ規則。二重管理を避けるため、将来は共通化する
- *   （今は依存方向の都合で複製している。★L-2 の予備軍として記録しておく）
+ *   （今は依存方向の都合で複製している）。
+ * ⚠️ ★**2026-09-16 訂正**: ★以前ここに「**L-2 の予備軍**」と書いていましたが、
+ *    ★正典 §17.1 の **L-2 は景品表示法**で、★**この複製とは無関係**でした。
+ *    ★台帳の記号を確かめずに引いたものです。★複製そのものは残っています（★D-052 の対象）。
  */
 export function winningKeys(kind: TicketKind, order: readonly number[], placeDepth: number): string[] {
   const sorted = (xs: number[]): string => [...xs].sort((a, b) => a - b).join('-');

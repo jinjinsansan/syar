@@ -20,6 +20,7 @@ import {
   V10_TOLERANCE,
   accountRaceKind,
   emptyKindStat,
+  foldRaceSample,
   judgeKind,
   mergeKindStat,
   type KindStat,
@@ -118,6 +119,79 @@ describe('BF-6 V-10 の合否は切り捨て前の払戻率で出す（D-094）'
     const v = judgeKind('win', emptyKindStat());
     expect(v.pass).toBe(false);
     expect(Number.isNaN(v.rateBeforeFloor)).toBe(true);
+  });
+});
+
+/**
+ * ★**レース内の多数引きを 1 標本に畳む**（★`verify-pmin.ts` の分散低減・2026-09-16）。
+ *
+ * 【★見ている壊れ方】
+ *   ① ★確定を `finals` 回引いたぶん **`races` が増え、SE がレース内の分散で薄まる**（★D-036 が禁じる形）
+ *   ② ★畳むと**比（判定値）が変わる**（★正規化の取り違え）
+ *   ③ ★件数（未発売の的中・上限に当たった売り目）まで割って**起きた回数が読めなくなる**
+ */
+describe('★確定の多数引きは「1 レース 1 標本」に畳む（D-036）', () => {
+  const M2 = ODDS_MC_TRIALS;
+  const counts = mixedCounts('place');
+
+  it('① ★確定を何回引いても races は 1 だけ増える（★SE がレース内で薄まらない）', () => {
+    const race = emptyKindStat();
+    const FINALS = 100;
+    for (let t = 0; t < FINALS; t += 1) accountRaceKind(race, 'place', counts, M2, ['3']);
+    expect(race.races, '★前提: レース内では finals 回ぶん積まれている').toBe(FINALS);
+
+    const parent = emptyKindStat();
+    foldRaceSample(parent, race, FINALS);
+    expect(parent.races, '★畳んだ後は 1 標本').toBe(1);
+  });
+
+  it('② ★畳んでも比（判定値）が変わらない', () => {
+    const FINALS = 7;
+    const race = emptyKindStat();
+    for (let t = 0; t < FINALS; t += 1) accountRaceKind(race, 'place', counts, M2, ['3']);
+    const parent = emptyKindStat();
+    foldRaceSample(parent, race, FINALS);
+    /** ★同じ内容を 1 回だけ積んだもの（★畳んだ結果はこれと一致するはず） */
+    const once = emptyKindStat();
+    accountRaceKind(once, 'place', counts, M2, ['3']);
+    expect(judgeKind('place', parent).rateBeforeFloor)
+      .toBeCloseTo(judgeKind('place', once).rateBeforeFloor, 12);
+    expect(parent.stake).toBeCloseTo(once.stake, 12);
+    expect(parent.payout).toBeCloseTo(once.payout, 12);
+  });
+
+  it('③ ★件数は割らない（★何回起きたかが読める）', () => {
+    const FINALS = 5;
+    const race = emptyKindStat();
+    /** ★'1' は D-035 で売らない目・'4' は D-096 で売らない目・'9' は MC で出なかった目 */
+    for (let t = 0; t < FINALS; t += 1) accountRaceKind(race, 'place', counts, M2, ['1', '4', '9']);
+    const parent = emptyKindStat();
+    foldRaceSample(parent, race, FINALS);
+    expect(parent.unseenHits, '★未発売の的中は延べで数える').toBe(FINALS);
+    expect(parent.unsoldMinProbability.hits).toBe(FINALS);
+    expect(parent.unsoldEvenOdds.hits).toBe(FINALS);
+  });
+
+  it('★★レース間のばらつきが残る（★1 レースを何回引いても判定不能のまま）', () => {
+    /**
+     * ★同じ出走表を何回引いても ★**出走表間のばらつきは 1 標本のまま**（D-036 の本文）。
+     * ★畳んだ結果が 1 標本なら、★`judgeKind` は SE を出せない（`races >= 2` が条件）。
+     */
+    const race = emptyKindStat();
+    for (let t = 0; t < 1000; t += 1) accountRaceKind(race, 'place', counts, M2, ['3']);
+    const parent = emptyKindStat();
+    foldRaceSample(parent, race, 1000);
+    expect(judgeKind('place', parent).se, '★1 レースでは SE を出さない').toBeNull();
+    expect(judgeKind('place', parent).seReached).toBe(false);
+
+    /** ★★畳まずに積むと「1000 レース」に見えてしまう（★これが直した壊れ方） */
+    expect(judgeKind('place', race).se, '★畳まなければ SE が出てしまう').not.toBeNull();
+  });
+
+  it('★不正な回数で畳まない（★0 割りを黙って通さない）', () => {
+    expect(() => foldRaceSample(emptyKindStat(), emptyKindStat(), 0)).toThrow();
+    expect(() => foldRaceSample(emptyKindStat(), emptyKindStat(), -1)).toThrow();
+    expect(() => foldRaceSample(emptyKindStat(), emptyKindStat(), Number.NaN)).toThrow();
   });
 });
 
