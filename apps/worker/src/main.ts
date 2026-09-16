@@ -28,6 +28,8 @@ import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
 import { recordUnlockDistribution, unlockDrift } from './unlock-flow.js';
+import { formatStoryDay, recordStoryRows } from './story-daily.js';
+import { STORY_EVENT_TYPES } from '@star/training';
 import { MARKET_TARGET_LISTINGS, refreshMarketListings } from './market-flow.js';
 import { syncStableGradePrices } from './grade-flow.js';
 import { freezePendingEntries } from './entry-freeze.js';
@@ -226,6 +228,17 @@ async function main(): Promise<void> {
          *   **測定時からずれたらゲートを測り直す**ための記録です。
          */
         const u = await recordUnlockDistribution(client, today);
+        /**
+         * ★**生涯の記録の行数も毎日残す**（★正典 §18 **LR-10**・移行 `0029`・2026-09-16）。
+         *
+         * ⚠️ ★**閾値は置きません**（★裁定 `REVIEW_STORY_GROWTH_VERDICT_20260916.md`）。
+         *    ★見るのは「★急に増えた／★**急に止まった**」という変化です。
+         * ⚠️ ★**新しい仕組みを作りません** — ★この日次の枠に 1 本足すだけです。
+         * ★2026-09-16 に ★**15 種のうち 2 種しか書かれていない**ことが、★測って初めて分かりました。
+         *   ★だから ★**「止まった」を捕まえられること**が大事です（★増えすぎより、増えないほうが起きています）。
+         */
+        const story = await recordStoryRows(client, today);
+        console.log(`[worker] ${formatStoryDay(story, STORY_EVENT_TYPES)}`);
         console.log(
           `[worker] 日次集計を更新 date=${today}` +
           (u === null ? ' / 開放率: 対象0頭'
