@@ -160,7 +160,42 @@ export interface GrowthInput {
  * ★**`current ≤ potential` はここで閉じます。**
  *   到達したら `potential` そのものを入れます（浮動小数で僅かに超えるのを防ぐ）。
  */
+/**
+ * ★**その週に引いた「伸びの乱数」**（★D12-2 の結果の演出が読む値・2026-09-16）。
+ *
+ * 【★なぜ返すか】
+ *   ★デザイナーのカード（`components/training-result`）は
+ *   ★「**乱数 1.13 以上 → GREAT**」という段で結果を見せます。
+ *   ⚠️ ★ところが ★**この乱数は週の記録に載っていませんでした**。
+ *      ★画面が伸び幅から逆算しようとすると、
+ *      ★`BASE_GAIN × menuCoef × 成長曲線 × 気性 × 調子 × headroom` を**画面側で再計算**することになり、
+ *      ★**二重帳簿**（D-052）になります。
+ *   → ★**引いた値をそのまま返します**（★新しい抽選は足していません・D-101 の条件どおり）。
+ *
+ * ⚠️ ★形質ごとに引く `jitter` は ★**能力ごとに違う値**です。★演出が見るのは
+ *    ★**その週の代表値 1 つ**なので、★`grow` は ★**最初に引いた 1 つ**を返します
+ *    （★`ABILITY_KEYS` の先頭＝`sp`。★並びは固定なので、同じシードなら必ず同じ値です）。
+ */
+export interface GrowthOutcome {
+  readonly next: Record<AbilityKey, number>;
+  /** ★その週の伸びの乱数の代表値（★`GAIN_JITTER` の範囲＝0.85〜1.15） */
+  readonly jitter: number;
+}
+
+/**
+ * ★`grow` と同じ計算をして、★**伸びの乱数も返す**版。
+ * ⚠️ ★`grow` はこれを呼んで `next` だけを返します（★計算を 2 本持たない）。
+ */
+export function growWithOutcome(input: GrowthInput, rng: Rng): GrowthOutcome {
+  const out = growImpl(input, rng);
+  return out;
+}
+
 export function grow(input: GrowthInput, rng: Rng): Record<AbilityKey, number> {
+  return growImpl(input, rng).next;
+}
+
+function growImpl(input: GrowthInput, rng: Rng): GrowthOutcome {
   const { menu, ageWeeks, growth, temper, condition, current, potential } = input;
   /** ★格の倍率（★既定 1。★`x * 1 === x` なので丸めの差も出ません） */
   const gainMult = input.gainMult ?? 1;
@@ -180,10 +215,13 @@ export function grow(input: GrowthInput, rng: Rng): Record<AbilityKey, number> {
   // ★気性の係数は**週に1回**引く。形質ごとに引くと、同じ週で馬の気性が形質ごとに変わる
   const tc = temperCoef(temper, rng);
   const out = {} as Record<AbilityKey, number>;
-  for (const key of ABILITY_KEYS) {
+  /** ★その週の代表値（★最初に引いたもの＝`ABILITY_KEYS` の先頭）。★演出だけが読む */
+  let firstJitter = 1;
+  for (const [i, key] of ABILITY_KEYS.entries()) {
     const cur = current[key];
     const pot = potential[key];
     const jitter = rng.range(GAIN_JITTER.min, GAIN_JITTER.max);
+    if (i === 0) firstJitter = jitter;
     const gain = BASE_GAIN * menuCoef(menu, key) * gc * tc * cc * headroom(cur, pot) * jitter * gainMult;
     const next = cur + Math.max(0, gain);
     // ★不変条件（正典 §7.3・B-4）: current は potential を超えない。
@@ -192,7 +230,7 @@ export function grow(input: GrowthInput, rng: Rng): Record<AbilityKey, number> {
     //     成長関数に任せると、休養中・引退後など**成長を通らない週で不変条件が破れます**。
     out[key] = next >= pot ? pot : next;
   }
-  return out;
+  return { next: out, jitter: firstJitter };
 }
 
 /** そのメニューの疲労変化（§7.2 の表の写し） */

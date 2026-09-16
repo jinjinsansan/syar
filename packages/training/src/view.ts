@@ -68,6 +68,52 @@ export function raceWeekMarkOf(
   return 'none';
 }
 
+/**
+ * ★**調教の結果の段**（★D12-2・デザイナーのカード `components/training-result`・2026-09-16）
+ *
+ * 【★新しい抽選を足していません】（★正典 D-101）
+ *   ★見ているのは ★**既存の伸びの乱数**（`GAIN_JITTER` ＝ 0.85〜1.15）の**上側だけ**です。
+ *   ★`rng.range` は一様なので、★割合は境目から計算だけで出ます:
+ *     ★**GREAT 6.67%**（15 週に 1 回）／★**UP 10.00%**（10 週に 1 回）／通常 83.33%
+ *
+ * ⚠️ ★**境目を画面に持たせません。** ★画面はこの関数を呼ぶだけです（★D-052・二重帳簿にしない）。
+ * ⚠️ ★**較正定数ではありません** — ★動かすと「良い報せ」の頻度が変わるだけで、
+ *    ★伸びそのもの（V-14）は 1 ビットも動きません。
+ */
+export type TrainingResultTier = 'great' | 'up' | 'normal';
+
+export const TRAINING_RESULT_THRESHOLDS = {
+  /** ★これ以上で GREAT（★上位 6.67%） */
+  great: 1.13,
+  /** ★これ以上で UP（★次の 10.00%） */
+  up: 1.10,
+} as const;
+
+export function trainingResultTierOf(jitter: number): TrainingResultTier {
+  if (jitter >= TRAINING_RESULT_THRESHOLDS.great) return 'great';
+  if (jitter >= TRAINING_RESULT_THRESHOLDS.up) return 'up';
+  return 'normal';
+}
+
+export const TRAINING_RESULT_LABEL: Readonly<Record<TrainingResultTier, string>> = {
+  great: '絶好調の仕上がり',
+  up: '良い仕上がり',
+  normal: '通常の仕上がり',
+};
+
+/**
+ * ★**続けて良い仕上がりだったか**（★デザイナーのカードの「N 週続けて」バッジ）。
+ *
+ * ⚠️ ★**何週で出すかを決め打ちしません**（★カードは 3 週と書いていますが、
+ *    ★UP 以上は 16.7% なので ★**3 週連続は 0.46%＝約 216 週に 1 回**でほとんど出ません。
+ *    ★2 週なら 2.8%（36 週に 1 回）です。★照会中なので、★呼ぶ側が週数を渡す形にします）。
+ * ★`recent` … ★直近の段（★**新しいものが先頭**）。
+ */
+export function trainingStreakOf(recent: readonly TrainingResultTier[], need: number): boolean {
+  if (need <= 0 || recent.length < need) return false;
+  return recent.slice(0, need).every((t) => t !== 'normal');
+}
+
 export const RACE_WEEK_LABEL: Readonly<Record<RaceWeekMark, string | null>> = {
   'race-week': '今週が出走',
   'before-race': '次走の前の調教',

@@ -43,7 +43,7 @@ import type { AbilityKey, GrowthType, Rng, Sex } from '@star/sim-engine';
 import { ABILITY_KEYS } from '@star/sim-engine';
 import { LIFECYCLE_WEEKS, canTrain, lifeStageAt, type LifeStage } from '@star/scheduler';
 import { MENUS, type MenuId } from './menus.js';
-import { fatigueDelta, grow } from './growth.js';
+import { fatigueDelta, growWithOutcome } from './growth.js';
 import { DEFAULT_STABLE_GRADE, gradeEpCost, gradeGainMult, type StableGrade } from './grade.js';
 import { nextCondition, weeklyFatigue } from './condition.js';
 import {
@@ -129,6 +129,14 @@ export interface WeekLog {
   } | null;
   /** 能力の増減（成長＋イベント）。★0 の形質も含める（「動かなかった」も記録） */
   readonly gain: Record<AbilityKey, number>;
+  /**
+   * ★**その週の伸びの乱数**（★D12-2 の結果の演出が読む・2026-09-16）。
+   *   ★`GAIN_JITTER`（0.85〜1.15）の範囲。★段は `trainingResultTierOf` が決めます。
+   * ⚠️ ★**成長しなかった週は `null`**（★故障した週・育成できない週・休養）。
+   *    ★0 や 1 を入れません — ★「引かなかった」と「1.0 を引いた」は違います。
+   * ⚠️ ★**新しい抽選ではありません**（★`grow` が既に引いていた値を載せただけ・D-101）。
+   */
+  readonly gainJitter: number | null;
   readonly fatigue: number;
   readonly condition: number;
   /** この週に引退したなら、その決定 */
@@ -215,6 +223,8 @@ export function advanceWeek(input: AdvanceWeekInput): AdvanceWeekResult {
   let menu: MenuId = input.menu;
   let epSpent = 0;
   let injuryProb = 0;
+  /** ★その週の伸びの乱数（★成長しなかった週は null のまま） */
+  let gainJitter: number | null = null;
   let injuryLog: WeekLog['injury'] = null;
   let eventLog: WeekLog['event'] = null;
   const resting = week < restUntilWeek;
@@ -255,7 +265,7 @@ export function advanceWeek(input: AdvanceWeekInput): AdvanceWeekResult {
       };
     } else {
       // ── ④ 成長（§7.3）──────────────────────────────────
-      current = grow(
+      const grown = growWithOutcome(
         {
           menu,
           ageWeeks: week,
@@ -269,6 +279,9 @@ export function advanceWeek(input: AdvanceWeekInput): AdvanceWeekResult {
         },
         rngFor(TRAIN_STREAM.GROWTH),
       );
+      current = grown.next;
+      /** ★引いた乱数を週の記録に載せる（★画面が伸び幅から逆算しないため・D-052） */
+      gainJitter = grown.jitter;
       // ── ⑤ 疲労（§7.2 + D-046）───────────────────────────
       fatigue = weeklyFatigue(fatigue, fatigueDelta(menu));
       // ── ⑥ 調子の再判定（§7.4）──────────────────────────
@@ -350,6 +363,7 @@ export function advanceWeek(input: AdvanceWeekInput): AdvanceWeekResult {
       injury: injuryLog,
       event: eventLog,
       gain,
+      gainJitter,
       fatigue,
       condition,
       retired: retirement,
