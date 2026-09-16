@@ -29,6 +29,7 @@ import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
 import { recordUnlockDistribution, unlockDrift } from './unlock-flow.js';
 import { MARKET_TARGET_LISTINGS, refreshMarketListings } from './market-flow.js';
+import { syncStableGradePrices } from './grade-flow.js';
 import { runSelfcheck } from './selfcheck.js';
 import { runSchemacheck } from './schemacheck.js';
 import { CANCEL_AFTER_START_MS, classOf, conditionsOf, gradeOf } from '@star/scheduler';
@@ -251,6 +252,18 @@ async function main(): Promise<void> {
           );
         } catch (e) {
           console.error('[worker] 出品の更新に失敗:', (e as Error).message);
+        }
+
+        /**
+         * ── ★厩舎の格の値段を書く（★D-103 ④・移行 `0027`）───────────
+         *   ★値段は TS 側（`GRADE_UNLOCK_EP`）が持ち、★SQL には数を書きません（D-052）。
+         *   ★値が同じなら書きません（★冪等）。
+         */
+        try {
+          const g = await syncStableGradePrices(client);
+          if (g.written > 0) console.log(`[worker] 厩舎の格の値段を更新 ${g.written} 行`);
+        } catch (e) {
+          console.error('[worker] 厩舎の格の値段の更新に失敗:', (e as Error).message);
         }
       }
     } catch (e) {

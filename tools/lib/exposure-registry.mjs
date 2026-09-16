@@ -163,6 +163,9 @@ export const EXPECTED_FUNCTION_EXECUTE = {
   // ★馬を手放す（`0026`・D-102 ③）。★戻る額はサーバーが決める（★買った額 × 方針の割合）。
   //   利用者が呼ぶ RPC なので authenticated だけ（`0026` で public・anon を剥がしている）
   'sell_horse(uuid,uuid)': { anon: false, authenticated: true },
+  // ★厩舎の格を 1 段上げる（`0027`・D-103 ④）。★値段は表の行から取る（利用者は申告できない）。
+  //   利用者が呼ぶ RPC なので authenticated だけ（`0027` で public・anon を剥がしている）
+  'unlock_stable_grade(uuid,uuid)': { anon: false, authenticated: true },
   // ★ワーカー専用（`0021`・D-095 候補）。利用者のロールには実行させない（監査 H-4）
   'spend_training_ep(uuid,bigint,integer)': { anon: false, authenticated: false },
 };

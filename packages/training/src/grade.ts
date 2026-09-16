@@ -40,6 +40,37 @@ export const STABLE_GRADE_MULT: Readonly<Record<StableGrade, number>> = {
 /** ★格の既定（★入る前と同じ振る舞い） */
 export const DEFAULT_STABLE_GRADE: StableGrade = 'bronze';
 
+/**
+ * ★**格を 1 段上げるのに要る EP**（★(a) 第 5 便-5・D-103 ④「お金で格を上げない。EP での解放は可」）。
+ *
+ * ⚠️ ★**金銭で買える経路は作りません**（★憲法 2。★EP は遊んで貯める点で、買えません）。
+ * ⚠️ ★較正定数ですが ★**値そのものをゲートにしません**（★GB-6 の収支の取り直しで、
+ *    ★この額込みの 1 キャリアの収支を報告します）。
+ * ★置き方: ★上の格が買うのは ★**強さではなく時間**（★EP あたりの伸びはどの格でも同じ・`gainPerEpRatio`）。
+ *   ★だから「何週ぶんの調教費に相当するか」で置いています
+ *   — ★シルバーは約 40 週・ゴールドは約 120 週ぶんの調教費に相当する額です。
+ */
+export const GRADE_UNLOCK_EP: Readonly<Record<Exclude<StableGrade, 'bronze'>, number>> = {
+  silver: 20_000,
+  gold: 60_000,
+};
+
+/** ★次の格（★ゴールドの次は無い） */
+export function nextGrade(grade: StableGrade): StableGrade | null {
+  const i = STABLE_GRADES.indexOf(grade);
+  return i < 0 || i + 1 >= STABLE_GRADES.length ? null : STABLE_GRADES[i + 1]!;
+}
+
+/**
+ * ★**いまの格から 1 段上げる値段**（★上が無ければ null）。
+ * ⚠️ ★**飛び級はできません**（★ブロンズから直接ゴールドにしない — ★合計額が変わってしまう）。
+ */
+export function unlockPriceEP(grade: StableGrade): number | null {
+  const next = nextGrade(grade);
+  if (next === null || next === 'bronze') return null;
+  return GRADE_UNLOCK_EP[next];
+}
+
 /** ★その格での調教費 [EP]（★§7.2 の表 × 格の倍率） */
 export function gradeEpCost(menu: MenuId, grade: StableGrade = DEFAULT_STABLE_GRADE): number {
   return Math.round(MENUS[menu].epCost * STABLE_GRADE_MULT[grade]);
