@@ -92,6 +92,61 @@ export const MENUS: Readonly<Record<MenuId, MenuSpec>> = {
 /** ★指示を出さない週の扱い（正典 §7.1: 「軽め調整」扱い） */
 export const DEFAULT_MENU: MenuId = 'light';
 
+/**
+ * ★**画面の見せ方「体・心 × 強度」への写像**（★GB-1・2026-09-16・正典 §7.2 の註記・D-101・オーナー決定 T-4）。
+ *
+ * 【★何をしていて、何をしていないか】
+ *   ★**見せ方だけ**です。★**週の進み方・成長式・疲労・故障・EP は 1 ミリも変えません**
+ *   （★だから V-14・V-15・V-7a/V-7b は「変わらないこと」を示すだけで足ります・D-101）。
+ *   ★**新しい乱数・倍率・確率を足しません**。「当たり」の演出は ★既存の伸びの乱数の上側を見せるだけです。
+ *
+ * ⚠️ ★**写像はここ 1 か所**です（★D-052・R-30）。★画面（`apps/web`）・監査の道具・検査は ★**この関数を引くこと**。
+ *    ★画面側に同じ表を複製すると、★**片方だけ直した日に画面と検査が離れます**
+ *    （★`v18` の ②b を 2 通りに実装して 0.567 対 0.216 と食い違わせた前科・台帳 B-5）。
+ *
+ * ⚠️ ★**層の向き**: ★`@star/training` は依存ゼロの純粋な層で、★画面がこちらを引きます（★逆ではない）。
+ */
+export type TrainingAxis = 'body' | 'mind';
+export type TrainingIntensity = 'weak' | 'mid' | 'strong';
+
+export const TRAINING_AXES: readonly TrainingAxis[] = ['body', 'mind'];
+export const TRAINING_INTENSITIES: readonly TrainingIntensity[] = ['weak', 'mid', 'strong'];
+
+/** ★画面の見出し（正典 §7.2 の註記の表記） */
+export const TRAINING_AXIS_LABEL: Readonly<Record<TrainingAxis, string>> = { body: '体', mind: '心' };
+export const TRAINING_INTENSITY_LABEL: Readonly<Record<TrainingIntensity, string>> = { weak: '弱', mid: '中', strong: '強' };
+
+export interface MenuView {
+  readonly axis: TrainingAxis;
+  readonly intensity: TrainingIntensity;
+}
+
+/**
+ * ★正典 §7.2 の註記の写し:
+ *   ★**体**: 軽め調整（弱）→ 坂路・ウッドチップ・プール（中）→ 追い切り（強）
+ *   ★**心**: 休養（弱）→ ゲート練習（中）→ 併せ馬（強）
+ */
+export const MENU_VIEW: Readonly<Record<MenuId, MenuView>> = {
+  light:   { axis: 'body', intensity: 'weak' },
+  hill:    { axis: 'body', intensity: 'mid' },
+  wood:    { axis: 'body', intensity: 'mid' },
+  pool:    { axis: 'body', intensity: 'mid' },
+  hard:    { axis: 'body', intensity: 'strong' },
+  rest:    { axis: 'mind', intensity: 'weak' },
+  gate:    { axis: 'mind', intensity: 'mid' },
+  partner: { axis: 'mind', intensity: 'strong' },
+};
+
+/** ★そのメニューが画面でどの枡に入るか */
+export function menuViewOf(menu: MenuId): MenuView {
+  return MENU_VIEW[menu];
+}
+
+/** ★その枡に入るメニュー（★`MENU_IDS` の順。★どの枡にも 1 つ以上ある — 検査で固定） */
+export function menusOfView(axis: TrainingAxis, intensity: TrainingIntensity): readonly MenuId[] {
+  return MENU_IDS.filter((id) => MENU_VIEW[id].axis === axis && MENU_VIEW[id].intensity === intensity);
+}
+
 /** メニューが能力 `key` に与える係数 */
 export function menuCoef(menu: MenuId, key: AbilityKey): number {
   const m = MENUS[menu];

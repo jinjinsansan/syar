@@ -7,15 +7,15 @@
  *   ⚠️ 疲労の遷移・注意文・警告帯の条件はサーバーが返す前提（ここでは見本の値）。画面で式を作らない。
  */
 import { useMemo, useState } from 'react';
+import {
+  TRAINING_AXES, TRAINING_INTENSITIES, TRAINING_AXIS_LABEL, TRAINING_INTENSITY_LABEL,
+  trainingBarsOf, raceWeekMarkOf, RACE_WEEK_LABEL,
+} from '@star/training';
 import { sortStable, conditionView, DEMO_HORSES } from '../../lib/stable';
-import { TRAINING_MENUS, DEMO_TRAINING_STATS, demoFatigueNote } from '../../lib/game-demo';
+import { TRAINING_MENUS, trainingMenusOfView, DEMO_TRAINING_ABILITY, DEFAULT_TRAINING_ABILITY, demoFatigueNote } from '../../lib/game-demo';
 import { Capsule, ClassChip, FatigueBar, PageTitle, Pill, StatBar, Stars } from '../../components/ui';
 
 const WEEK_NO = 32;
-const DEFAULT_STATS = [
-  { label: 'スピード', value: 500, capRatio: 0.7 }, { label: 'スタミナ', value: 500, capRatio: 0.7 }, { label: 'パワー', value: 500, capRatio: 0.7 },
-  { label: '根性', value: 500, capRatio: 0.7 }, { label: '賢さ', value: 500, capRatio: 0.7 },
-];
 
 /** 疲労の数値色（18px は large text 扱いにならないため黄は濃い #8a5a06）: ≤30 緑／≤60 #8a5a06／>60 赤 */
 function fatigueNumColor(f: number): string {
@@ -36,7 +36,14 @@ export default function TrainingPage(): React.ReactElement {
   const menu = TRAINING_MENUS.find((m) => m.id === selectedMenu) ?? null;
   const todo = horses.filter((h) => h.week.kind === 'todo');
   const allDone = todo.length === 0;
-  const stats = horse === null ? DEFAULT_STATS : (DEMO_TRAINING_STATS[horse.id] ?? DEFAULT_STATS);
+  /**
+   * ★3 本のバー（スピード・スタミナ・コンディション）は **`@star/training` の 1 か所**が作ります（D-101・R-30）。
+   * ⚠️ ★素質（`potential`）も「上限までの割合」も渡しません（正典 §5.5・§12.4）。
+   */
+  const bars = horse === null ? [] : trainingBarsOf(DEMO_TRAINING_ABILITY[horse.id] ?? DEFAULT_TRAINING_ABILITY, horse.condition);
+  /** ★出走の前の週・後の週の導線（★週の進み方・成長式は変えない。どの週かを言うだけ） */
+  const raceMark = horse === null ? 'none' : raceWeekMarkOf(horse.nextRace === null ? null : 1, null);
+  const raceMarkLabel = RACE_WEEK_LABEL[raceMark];
   const note = horse === null ? null : demoFatigueNote(horse.fatigue);
   const cond = horse === null ? null : conditionView(horse.condition);
   const selectable = horses.filter((h) => h.week.kind !== 'rest');
@@ -96,10 +103,15 @@ export default function TrainingPage(): React.ReactElement {
             {horse !== null && cond !== null ? (
               <div style={{ display: 'flex', gap: 22, padding: '16px 20px', backgroundImage: 'linear-gradient(#ffffff,#eef6fd)', flexWrap: 'wrap' }}>
                 <div style={{ width: 280, flex: '0 0 280px' }}>
-                  <div className="tr-horse-heading" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="tr-horse-heading" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     <ClassChip label={horse.classLabel} classRank={horse.classRank} h={28} font={14} />
                     <span style={{ fontSize: 26, fontWeight: 900 }}>{horse.name}</span>
+                    {/* ★出走の前の週・後の週を強調する（D-101） */}
+                    {raceMarkLabel !== null && <Pill tone="gold">{raceMarkLabel}</Pill>}
                   </div>
+                  {horse.nextRace !== null && (
+                    <div style={{ marginTop: 8, fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>次走 {horse.nextRace}</div>
+                  )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}><span className="a-lbl">素質</span><Stars value={horse.stars} size={19} /></div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
                     <span className="a-lbl">調子</span>
@@ -111,8 +123,26 @@ export default function TrainingPage(): React.ReactElement {
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 280, borderLeft: '2px solid var(--a-line)', paddingLeft: 20 }}>
-                  {stats.map((s) => (
-                    <StatBar key={s.label} label={s.label} value={s.value} cap={Math.round(s.capRatio * 1000)} />
+                  {/* ★能力（伸ばすもの）。★素質の数値・上限までの割合は出さない（§5.5・§12.4） */}
+                  {bars.filter((b) => b.kind === 'ability').map((b) => (
+                    <StatBar key={b.key} label={b.label} value={b.value} cap={b.max} />
+                  ))}
+                  {/* ★コンディションは能力ではなく状態。同じ物差しに並べない */}
+                  {bars.filter((b) => b.kind === 'state').map((b) => (
+                    <div key={b.key} style={{ display: 'flex', alignItems: 'center', gap: 12, height: 34 }}>
+                      <span className="a-lbl" style={{ width: 96 }}>{b.label}</span>
+                      <span style={{ display: 'inline-flex', gap: 4 }}>
+                        {Array.from({ length: b.max }, (_, i) => (
+                          <span key={i} style={{
+                            width: 16, height: 14, borderRadius: 4, border: '2px solid var(--a-edge)',
+                            backgroundImage: i < b.value ? 'var(--a-gloss-green)' : 'linear-gradient(#fff,#e6edf4)',
+                          }} />
+                        ))}
+                      </span>
+                      {cond !== null && (
+                        <span style={{ fontSize: 13, fontWeight: 900, color: cond.color }}>{cond.mark} {cond.label}</span>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -121,9 +151,23 @@ export default function TrainingPage(): React.ReactElement {
             )}
           </div>
 
-          {/* メニュー 4×2 */}
-          <div className="a-cards tr-menus" style={{ gap: 12, marginTop: 14 }}>
-            {TRAINING_MENUS.map((m) => {
+          {/* ★メニュー: 体・心 × 強度（D-101）。★枠の割り当ては @star/training の写像 1 か所から引く */}
+          {TRAINING_AXES.map((axis) => (
+          <div key={axis} className="a-panel" style={{ marginTop: 14 }}>
+            <div className="a-band" style={{ height: 34, padding: '0 14px', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 15, fontWeight: 900, letterSpacing: '.1em' }}>{TRAINING_AXIS_LABEL[axis]}を鍛える</span>
+              <span style={{ fontSize: 12, fontWeight: 900 }}>弱 → 強</span>
+            </div>
+            <div style={{ display: 'flex', gap: 12, padding: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              {TRAINING_INTENSITIES.map((intensity) => (
+                <div key={intensity} style={{ flex: '1 1 250px', minWidth: 250 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    <Pill tone={intensity === 'strong' ? 'red' : intensity === 'mid' ? 'yellow' : 'grey'}>
+                      {TRAINING_INTENSITY_LABEL[intensity]}
+                    </Pill>
+                  </div>
+                  <div style={{ display: 'grid', gap: 10 }}>
+            {trainingMenusOfView(axis, intensity).map((m) => {
               const sel = m.id === selectedMenu;
               const fatColor = m.fatigueDelta < 0 ? 'var(--a-green-d)' : m.fatigueDelta >= 20 ? '#a9741a' : 'var(--a-ink)';
               const showBanner = m.banner !== undefined && (m.banner.kind === 'bad' || (horse !== null && horse.fatigue > 50));
@@ -154,7 +198,12 @@ export default function TrainingPage(): React.ReactElement {
                 </div>
               );
             })}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
+          ))}
 
           {/* 指示バー */}
           <div className="a-panel" style={{ marginTop: 14 }}>

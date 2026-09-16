@@ -1,0 +1,76 @@
+/**
+ * ★**調教の画面に出す値**（★GB-1・2026-09-16・正典 §7.2 の註記・D-101）
+ *
+ * 【★なぜエンジン側に置くか】
+ *   ★画面・監査の道具・検査が ★**同じ関数**を引くためです（★D-052・R-30）。
+ *   ★画面側に同じ式を書くと、★片方だけ直した日に離れます（★台帳 B-5）。
+ *   ⚠️ ★層の向きは ★`画面 → @star/training` の一方向です（★ここから画面を引きません）。
+ *
+ * 【★`potential` を出さない】（★正典 §5.5・§12.4・D-101 の註記）
+ *   ⚠️ ★**素質は本人にも数値で見せません。** ★だから ★この関数は ★**`stats` と調子しか受け取りません。**
+ *   ★「上限までの割合」も受け取りません（★割合は `potential` を割り戻せば数値が復元できるため）。
+ *   ★★の判定は ★**禁止語の走査ではなく入力の形**で見ます（★D-098 の検査で踏んだ穴と同じ形にしない）。
+ */
+
+import type { AbilityKey } from '@star/sim-engine';
+
+/** ★能力の見せ方の最大値（★正典 §5 の能力は 0〜1000 の目盛り） */
+export const TRAINING_BAR_MAX = 1000;
+/** ★調子の段階（★正典 §7.4 の 1〜5） */
+export const CONDITION_STEPS = 5;
+
+export type TrainingBarKind = 'ability' | 'state';
+
+export interface TrainingBar {
+  readonly key: string;
+  readonly label: string;
+  /** ★能力は 0〜`TRAINING_BAR_MAX`、★調子は 1〜`CONDITION_STEPS` */
+  readonly value: number;
+  readonly max: number;
+  /** ★`ability` ＝ 伸ばすもの ／ ★`state` ＝ その週の状態（★能力ではない） */
+  readonly kind: TrainingBarKind;
+}
+
+/**
+ * ★**調教の画面の 3 本のバー**（★スピード・スタミナ・コンディション）。
+ *
+ * ⚠️ ★コンディション（調子）は ★**能力ではなく状態**なので、★`kind: 'state'` で分けて返します
+ *    （★同じ物差しに並べると「調子も鍛えて伸ばすもの」に見えるため）。
+ * ⚠️ ★引数は ★**`stats` と調子だけ**です（★`potential` も「上限までの割合」も受け取りません）。
+ */
+export function trainingBarsOf(
+  stats: Readonly<Record<AbilityKey, number>>,
+  condition: number,
+): readonly TrainingBar[] {
+  return [
+    { key: 'sp', label: 'スピード', value: stats.sp, max: TRAINING_BAR_MAX, kind: 'ability' },
+    { key: 'st', label: 'スタミナ', value: stats.st, max: TRAINING_BAR_MAX, kind: 'ability' },
+    { key: 'condition', label: 'コンディション', value: condition, max: CONDITION_STEPS, kind: 'state' },
+  ];
+}
+
+/**
+ * ★**出走の前の週・後の週**（★D-101「画面の導線で強調する」）。
+ *
+ * ★`weeksToNextRace` … ★次走までの週数（★今週が出走週なら 0・★予定が無ければ `null`）
+ * ★`weeksSinceLastRace` … ★前走からの週数（★まだ走っていなければ `null`）
+ * ⚠️ ★**週の進み方は変えません。** ★どの週かを言うだけです。
+ */
+export type RaceWeekMark = 'before-race' | 'after-race' | 'race-week' | 'none';
+
+export function raceWeekMarkOf(
+  weeksToNextRace: number | null,
+  weeksSinceLastRace: number | null,
+): RaceWeekMark {
+  if (weeksToNextRace === 0) return 'race-week';
+  if (weeksToNextRace === 1) return 'before-race';
+  if (weeksSinceLastRace === 1) return 'after-race';
+  return 'none';
+}
+
+export const RACE_WEEK_LABEL: Readonly<Record<RaceWeekMark, string | null>> = {
+  'race-week': '今週が出走',
+  'before-race': '次走の前の調教',
+  'after-race': '次走の後の調教',
+  none: null,
+};

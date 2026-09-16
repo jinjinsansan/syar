@@ -5,42 +5,76 @@
  *     （ここに式を持たない）。実データ化は Auth と RPC（spend_training_ep / place_bet / exchange_prize）が画面に繋がってから。
  *   ⚠️ 憲法 §0.2: EP と PP を合算しない。「購入」「チャージ」「換金」「円」を使わない。馬券は「投票」。
  */
+import {
+  MENUS, MENU_IDS, menuViewOf, menusOfView,
+  type MenuId, type MenuView, type TrainingAxis, type TrainingIntensity,
+} from '@star/training';
 import type { StableHorse } from './stable';
 
 // ---------------------------------------------------------------------------
 // 調教
 // ---------------------------------------------------------------------------
 export interface TrainingMenu {
-  readonly id: string;
+  readonly id: MenuId;
   readonly name: string;
   readonly main: string;
   /** 副効果（無ければ '—'） */
   readonly sub: string;
   readonly fatigueDelta: number;
   readonly ep: number;
+  /** ★見せ方の枡（体・心 × 弱中強）。★写像は `@star/training` の 1 か所から引く */
+  readonly view: MenuView;
   /** 警告帯（サーバーが返す文言。画面では色の割り当てだけ） */
   readonly banner?: { readonly kind: 'warn' | 'bad'; readonly text: string } | undefined;
 }
 
-/** 正典 §7.2 の 8 メニュー（値は初期値・§13 で調整） */
-export const TRAINING_MENUS: readonly TrainingMenu[] = [
-  { id: 'hill', name: '坂路', main: 'スピード＋　パワー＋', sub: '—', fatigueDelta: 18, ep: 300 },
-  { id: 'wood', name: 'ウッドチップ', main: 'スタミナ＋　根性＋', sub: '—', fatigueDelta: 15, ep: 300 },
-  { id: 'pool', name: 'プール', main: 'スタミナ＋', sub: '疲労 −5', fatigueDelta: 6, ep: 400 },
-  { id: 'gate', name: 'ゲート練習', main: '賢さ＋', sub: '出遅れ率 ↓', fatigueDelta: 8, ep: 200 },
-  { id: 'pair', name: '併せ馬', main: '根性＋　賢さ＋', sub: '気性 −2', fatigueDelta: 20, ep: 500, banner: { kind: 'warn', text: '疲労が高い馬には注意' } },
-  { id: 'sharp', name: '追い切り', main: '全能力＋　係数 1.6', sub: '故障率 ↑↑', fatigueDelta: 32, ep: 800, banner: { kind: 'bad', text: '故障リスク 高' } },
-  { id: 'light', name: '軽め調整', main: '全能力＋　係数 0.3', sub: '—', fatigueDelta: 4, ep: 100 },
-  { id: 'rest', name: '休養', main: '疲労 −35', sub: '気性 −5', fatigueDelta: -35, ep: 0 },
-];
-
-export interface TrainingStats { readonly label: string; readonly value: number; readonly capRatio: number }
-export const DEMO_TRAINING_STATS: Readonly<Record<string, readonly TrainingStats[]>> = {
-  h3: [
-    { label: 'スピード', value: 612, capRatio: 0.76 }, { label: 'スタミナ', value: 548, capRatio: 0.70 }, { label: 'パワー', value: 571, capRatio: 0.72 },
-    { label: '根性', value: 498, capRatio: 0.64 }, { label: '賢さ', value: 603, capRatio: 0.78 },
-  ],
+/**
+ * ★**説明の文言だけ**（★正典 §7.2 の主効果・副効果の言い換え）。
+ * ⚠️ ★**名前・疲労・EP・見せ方の枡は `@star/training` から引きます**（★ここに写しを持たない・D-052・R-30）。
+ *    ★以前はこのファイルに 8 行の表を持っており、★エンジン側と離れうる形でした（★GB-1 で是正）。
+ */
+const MENU_TEXT: Readonly<Record<MenuId, { readonly main: string; readonly sub: string; readonly banner?: { readonly kind: 'warn' | 'bad'; readonly text: string } }>> = {
+  hill: { main: 'スピード＋　パワー＋', sub: '—' },
+  wood: { main: 'スタミナ＋　根性＋', sub: '—' },
+  pool: { main: 'スタミナ＋', sub: '疲労 −5' },
+  gate: { main: '賢さ＋', sub: '出遅れ率 ↓' },
+  partner: { main: '根性＋　賢さ＋', sub: '気性 −2', banner: { kind: 'warn', text: '疲労が高い馬には注意' } },
+  hard: { main: '全能力＋　係数 1.6', sub: '故障率 ↑↑', banner: { kind: 'bad', text: '故障リスク 高' } },
+  light: { main: '全能力＋　係数 0.3', sub: '—' },
+  rest: { main: '疲労 −35', sub: '気性 −5' },
 };
+
+/** 正典 §7.2 の 8 メニュー（★値も枡もエンジン側の 1 か所から） */
+export const TRAINING_MENUS: readonly TrainingMenu[] = MENU_IDS.map((id): TrainingMenu => {
+  const spec = MENUS[id];
+  const text = MENU_TEXT[id];
+  return {
+    id, name: spec.label, main: text.main, sub: text.sub,
+    fatigueDelta: spec.fatigue, ep: spec.epCost, view: menuViewOf(id),
+    ...(text.banner === undefined ? {} : { banner: text.banner }),
+  };
+});
+
+/** ★体・心 × 弱中強 の枡に入るメニュー（★画面の並びもこの関数から） */
+export function trainingMenusOfView(axis: TrainingAxis, intensity: TrainingIntensity): readonly TrainingMenu[] {
+  return menusOfView(axis, intensity).map((id) => TRAINING_MENUS.find((m) => m.id === id)!);
+}
+
+/**
+ * ★調教の画面が出す能力（★サーバーが返す `stats` の見本）。
+ * ⚠️ ★**素質（`potential`）も「上限までの割合」も持ちません**（★正典 §5.5・§12.4・D-101）。
+ *    ★画面のバーは `trainingBarsOf(stats, condition)` が作ります（★`@star/training` の 1 か所）。
+ */
+export const DEMO_TRAINING_ABILITY: Readonly<Record<string, Readonly<Record<'sp' | 'st' | 'pw' | 'gt' | 'iq', number>>>> = {
+  h1: { sp: 842, st: 706, pw: 768, gt: 655, iq: 721 },
+  h2: { sp: 733, st: 690, pw: 712, gt: 640, iq: 655 },
+  h3: { sp: 612, st: 548, pw: 571, gt: 498, iq: 603 },
+  h4: { sp: 540, st: 505, pw: 522, gt: 470, iq: 515 },
+  h5: { sp: 470, st: 452, pw: 441, gt: 430, iq: 462 },
+  h6: { sp: 388, st: 372, pw: 365, gt: 358, iq: 401 },
+};
+/** ★既定（見本が無い馬） */
+export const DEFAULT_TRAINING_ABILITY = { sp: 500, st: 500, pw: 500, gt: 500, iq: 500 } as const;
 /** 疲労に応じた注意文（サーバーの値。ここではデモ） */
 export function demoFatigueNote(fatigue: number): string | null {
   if (fatigue > 60) return '疲労が高い状態です。重いメニューは故障につながります';

@@ -14,7 +14,8 @@
     "three": "^0.185.1",
     "@star/race-engine": "*",
     "@star/render": "*",
-    "@star/sim-engine": "*"
+    "@star/sim-engine": "*",
+    "@star/training": "*"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",
