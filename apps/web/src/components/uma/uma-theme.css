@@ -1,0 +1,122 @@
+/*
+ * ★**馬物語 UI の共通トークン**（★R-14・2026-09-17・引き渡し資料 §5・§6）
+ *
+ * 【★arcade テーマと混ぜない】（★資料 §4.2 の A-2）
+ *   ⚠️ ★`layout.tsx` が `<body data-theme="arcade">` を付けており、
+ *      ★`globals.css`（約 6 万文字）に `[data-theme="arcade"] a{}`・`.a-btn`・`.a-panel`・
+ *      ★`.a-num`・`.frame` があります。★**それらを 1 つも使いません。**
+ *   → ★この UI は ★**自分の最上位 div に `data-theme="uma"`** を付け、
+ *     ★スタイルは ★**すべて `[data-theme="uma"]` の下**に閉じます。
+ *   ⚠️ ★**arcade は消しません**（★既存画面が使っています）。
+ *
+ * 【★値の出どころ】★引き渡し資料 §6 の写しです。★画面側に数を散らさないため、
+ *   ★色・影・角丸はここに 1 か所で置きます（★D-052）。
+ */
+
+[data-theme='uma'] {
+  /* 地・線 */
+  --u-navy: #0a2340;
+  --u-navy-deep: #061a33;
+  --u-panel: rgba(10, 35, 64, 0.72);
+  --u-panel-strong: rgba(10, 35, 64, 0.9);
+  --u-edge: #123f6b;
+  --u-edge-light: #3c6d99;
+  --u-edge-mid: #2a5c8c;
+  /* 文字 */
+  --u-ink-light: #fbf7ec;
+  --u-ink-light-2: #e6eef6;
+  --u-ink-light-3: #cfe0ee;
+  --u-ink-dark: #10243a;
+  --u-ink-dark-2: #4a6178;
+  --u-ink-dark-3: #25384a;
+  /* 金 */
+  --u-gold: #f6c21c;
+  --u-gold-deep: #d98f0a;
+  --u-gold-ink: #a9741a;
+  --u-gold-pale: #ffe483;
+  --u-gold-plate: linear-gradient(100deg, #fff6b0 0%, #f3cf34 30%, #d99f14 48%, #ffe483 62%, #fff6b0 100%);
+  /* 青・緑・赤・橙 */
+  --u-blue: #1a6fd4;
+  --u-blue-deep: #0f56ab;
+  --u-blue-pale: #5fa9ee;
+  --u-green: #2f9e4f;
+  --u-green-deep: #1e7a3a;
+  --u-gauge: #2fa35c;
+  --u-red: #f06a5f;
+  --u-orange: #f08219;
+  /* EP（青緑） */
+  --u-ep: #57c8a8;
+  --u-ep-ink: #cfeee4;
+  --u-ep-num: #eafaf4;
+  /* 紙 */
+  --u-paper: #fbf7ec;
+  --u-paper-2: #f4f1e6;
+  --u-paper-3: #fffdf6;
+  --u-rule: #dcd7c6;
+  --u-rule-2: #c9c2ab;
+  /* 影 */
+  --u-shadow-card: 0 3px 0 rgba(10, 35, 64, 0.5);
+  --u-shadow-blur: 0 12px 20px rgba(8, 18, 8, 0.4);
+  --u-inset: inset 0 3px 0 rgba(255, 255, 255, 0.65);
+  /* 下端の安全領域（アプリ化） */
+  --u-safe-bottom: 34px;
+
+  font-family: 'M PLUS Rounded 1c', system-ui, sans-serif;
+  font-weight: 800;
+  color: var(--u-ink-light);
+  box-sizing: border-box;
+}
+
+[data-theme='uma'] * { box-sizing: border-box; }
+[data-theme='uma'] a { color: inherit; text-decoration: none; }
+[data-theme='uma'] button { font: inherit; cursor: pointer; }
+[data-theme='uma'] a:focus-visible,
+[data-theme='uma'] button:focus-visible { outline: 3px solid var(--u-gold); outline-offset: 3px; }
+
+/* ★数字は Saira Condensed ＋ 等幅（順位・残り時間・ポイント・オッズ） */
+[data-theme='uma'] .u-num {
+  font-family: 'Saira Condensed', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* ─────────────────────────────────────────────────────────
+   ★動き（★すべて停止の対象・資料 §5-7）
+   ⚠️ ★停止しても**情報が欠けない**こと（★速度線は 0% から不透明・通知は即表示）。
+   ───────────────────────────────────────────────────────── */
+@keyframes u-sheen { 0% { background-position: 190% 0; } 100% { background-position: -90% 0; } }
+@keyframes u-scroll { to { background-position-x: -300px; } }
+@keyframes u-led { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@keyframes u-rush {
+  0%, 100% { transform: translateY(0) scale(1); }
+  24% { transform: translateY(-15px) scale(1.02); }
+  60% { transform: translateY(2px) scale(0.995); }
+}
+@keyframes u-idle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes u-dust {
+  0% { transform: translate(0, 0) scale(0.45); opacity: 0.9; }
+  100% { transform: translate(-96px, -30px) scale(1.8); opacity: 0; }
+}
+@keyframes u-clod {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  100% { transform: translate(-120px, -56px) rotate(-200deg); opacity: 0; }
+}
+@keyframes u-streak {
+  0% { transform: translateX(45%); opacity: 0.9; }
+  70% { opacity: 0.9; }
+  100% { transform: translateX(-170%); opacity: 0; }
+}
+@keyframes u-notice { from { transform: translateY(-10px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/*
+ * ★**停止**。★`.u-paused` を最上位に付けると配下の動きが止まります。
+ * ⚠️ ★`animation-play-state` ではなく **`animation: none`** で止めます
+ *    — ★`play-state` だと途中の姿で固まり、★速度線が消えて見えることがあります。
+ */
+[data-theme='uma'].u-paused *,
+[data-theme='uma'] .u-paused * { animation: none !important; transition: none !important; }
+
+/* ★端末の設定が「動きを減らす」なら、★JS が来る前から止める */
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='uma'] * { animation: none !important; transition: none !important; }
+}

@@ -4,7 +4,8 @@
  * ★出走登録 — 正本 design/hud-ds/components/race-entry［アーケード］
  *   馬タブ → 出走できるレース一覧 → 確認パネル（脚質・斤量・出走料・登録）。
  *   ⚠️ 今はデモデータ。登録・取消はサーバー RPC に繋ぐまで動かない。可否（格・締切）はサーバー判断を表示するだけ。
- *   ⚠️ §9.5: 自馬が出走するレースの馬券は投票できない旨を登録前から常時表示。
+ *   ⚠️ §9.5: 自分の馬が出るレースは投票できない旨を登録前から常時表示。
+ *      ★2026-09-17: ★画面の語を「投票」に統一（★引き渡し資料 §2-2・A-4）。
  */
 import { useMemo, useState } from 'react';
 import { DEMO_HORSES, conditionView, fatigueColor, sortStable } from '../../lib/stable';
@@ -171,7 +172,7 @@ export default function EntryPage(): React.ReactElement {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 44, borderBottom: '1px solid var(--a-line)' }}><span className="a-lbl">出走料</span><span><span className="a-num" style={{ fontSize: 30, color: 'var(--a-num-money)' }}>{race.feeEP}</span> <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>EP</span></span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 44, borderBottom: '1px solid var(--a-line)' }}><span className="a-lbl">登録後の残り</span><span><span className="a-num" style={{ fontSize: 30, color: 'var(--a-num-time)' }}>{(EP_BALANCE - race.feeEP).toLocaleString('ja-JP')}</span> <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>EP</span></span></div>
               {/* §9.5 憲法の明示 — 登録前から常時表示し、登録後も残す */}
-              <div style={{ marginTop: 12, padding: '11px 13px', borderRadius: 8, background: '#eaf3fb', border: '2px solid #9fc0dc' }}><span style={{ fontSize: 13, fontWeight: 900, color: 'var(--a-ink)', lineHeight: 1.6 }}>この馬が出走するレースの馬券は投票できません</span></div>
+              <div style={{ marginTop: 12, padding: '11px 13px', borderRadius: 8, background: '#eaf3fb', border: '2px solid #9fc0dc' }}><span style={{ fontSize: 13, fontWeight: 900, color: 'var(--a-ink)', lineHeight: 1.6 }}>自分の馬が出るレースは投票できません</span></div>
               <span className={`a-btn a-btn-gold${enough ? '' : ' off'}`} style={{ height: 52, marginTop: 12, fontSize: 18, ...(enough ? {} : { opacity: .4 }) }} title="サーバー接続まで押せません">登録する（{race.feeEP} EP）</span>
               {!enough && <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-red-d)', marginTop: 6 }}>参加ポイントが足りません</div>}
             </div>

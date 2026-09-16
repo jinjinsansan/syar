@@ -23,7 +23,13 @@ const INTERIOR = ['/stable', '/training', '/races', '/entry', '/records', '/priz
  *    ★「★TOP は馬物語というグリーンな感じでした。★中継を押すと、ブルーで STAR と出ていました」）。
  *    ★中継は ★**画面いっぱいの映像**なので、★上に別の帯が載ると玄関と色が食い違います。
  */
-const OWN_HEADER = ['/', '/lp-preview', '/race'];
+/**
+ * ⚠️ ★**馬物語 UI（R-14・2026-09-17）の画面もここです。**
+ *    ★どの画面も ★**自前の上段バー**（戻る／画面名／停止スイッチ）を持つので、
+ *    ★入れないと ★**帯が二重**になります（★引き渡し資料 §4.2 の A-1）。
+ *    ★併せて下端 34px の安全領域も、各画面が自分で持ちます。
+ */
+const OWN_HEADER = ['/', '/lp-preview', '/race', '/home', '/howto'];
 
 /** Presentation boundary: racing canvases, labs and both landing pages keep their own layout. */
 export function StoryShell({ children }: { children: React.ReactNode }) {

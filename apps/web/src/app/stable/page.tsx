@@ -131,7 +131,7 @@ function HomeCards({ home, ownedCount, todoCount }: { readonly home: StableHome;
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           <MiniStat label="自馬の出走予定" value={home.myEntries} unit="件" color={home.myEntries > 0 ? 'var(--a-num-time)' : 'var(--a-ink-3)'} size={24} />
-          <MiniStat label="投票中の馬券" value={home.pendingBets} unit="件" color={home.pendingBets > 0 ? 'var(--a-num-time)' : 'var(--a-ink-3)'} size={24} />
+          <MiniStat label="投票中" value={home.pendingBets} unit="件" color={home.pendingBets > 0 ? 'var(--a-num-time)' : 'var(--a-ink-3)'} size={24} />
         </div>
         <a className={`a-btn a-btn-blue${home.liveOpen ? '' : ' off'}`} href="/race" style={{ width: '100%', height: 40, marginTop: 12, fontSize: 13, whiteSpace: 'nowrap' }} title={home.liveOpen ? '' : '発走 3 分前から観られます'}>中継を観る</a>
       </HomeCard>
