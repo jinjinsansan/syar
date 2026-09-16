@@ -40,8 +40,8 @@ import { createHash } from 'node:crypto';
 import { ABILITY_KEYS, deriveRng, type AbilityKey, type Rng } from '@star/sim-engine';
 import { weekIndexAt, weeksToProcess } from '@star/scheduler';
 import {
-  DEFAULT_MENU, MENUS, advanceWeek,
-  type HorseTraits, type MenuId, type TrainingState,
+  DEFAULT_MENU, DEFAULT_STABLE_GRADE, STABLE_GRADES, advanceWeek, gradeEpCost,
+  type HorseTraits, type MenuId, type StableGrade, type TrainingState,
 } from '@star/training';
 
 /**
@@ -145,6 +145,20 @@ interface Row {
   condition: string | number;
   rest_until_week: string | number | null;
   career_ended: boolean;
+  /** ★厩舎の格（`0024` で追加・既定 `bronze`・D-103） */
+  stable_grade: string | null;
+}
+
+/**
+ * ★DB の文字列 → 格（★知らない値は**黙って既定にしません**）。
+ * ⚠️ ★`0024` の CHECK が閉じていますが、★読む側でも閉じておきます
+ *    （★列の CHECK を外した日に、黙って強い格として扱われないため）。
+ */
+export function stableGradeOf(v: string | null, onAlert: (msg: string) => void, horseId: string): StableGrade {
+  if (v === null) return DEFAULT_STABLE_GRADE;
+  if ((STABLE_GRADES as readonly string[]).includes(v)) return v as StableGrade;
+  onAlert(`★厩舎の格が名簿にありません: 馬 ${horseId} の ${v}（既定の ${DEFAULT_STABLE_GRADE} で進めます）`);
+  return DEFAULT_STABLE_GRADE;
 }
 
 /** ★numeric は文字列で返る。NaN のまま進めない */
@@ -196,7 +210,8 @@ export async function advanceTrainingWeeks(
   for (let iter = 0; iter < maxIterations; iter += 1) {
     const r = await client.query<Row>(
       `select id, owner_id, sex, growth, temper, durability, potential, stats,
-              birth_week, last_processed_week, fatigue, condition, rest_until_week, career_ended
+              birth_week, last_processed_week, fatigue, condition, rest_until_week, career_ended,
+              stable_grade
          from horses
         where retired_at_week is null
           and birth_week is not null
@@ -243,10 +258,15 @@ export async function advanceTrainingWeeks(
         birthTemper: state.temper,
       };
       let menu = defaultMenu(age, state.fatigue);
+      /**
+       * ★厩舎の格（★D-103・`0024` の列）。★既定 `bronze` は倍率 1.0 で、★格を入れる前と 1 ビット同じ。
+       * ⚠️ ★**伸びと費用に同じ倍率**が掛かります（★EP あたりの伸びはどの格でも同じ）。
+       */
+      const grade = stableGradeOf(row.stable_grade, onAlert, row.id);
 
       // ── EP（G-6）。★NPC 馬は null が返るので課金されない ──────
       if (row.owner_id !== null) {
-        const cost = MENUS[menu].epCost;
+        const cost = gradeEpCost(menu, grade);
         try {
           const res = await client.query<{ bal: string | null }>(
             'select spend_training_ep($1, $2, $3) as bal', [row.id, week, cost],
@@ -280,6 +300,7 @@ export async function advanceTrainingWeeks(
         state,
         traits,
         menu,
+        grade,
         // ★B-1 が通す経路と同じ条件（§7.6 のイベントを引く）
         enableEvents: true,
         rngFor: (stream: number): Rng => deriveRng(seed, stream, week),

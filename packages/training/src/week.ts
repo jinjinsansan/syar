@@ -43,7 +43,8 @@ import type { AbilityKey, GrowthType, Rng, Sex } from '@star/sim-engine';
 import { ABILITY_KEYS } from '@star/sim-engine';
 import { LIFECYCLE_WEEKS, canTrain, lifeStageAt, type LifeStage } from '@star/scheduler';
 import { MENUS, type MenuId } from './menus.js';
-import { epCost, fatigueDelta, grow } from './growth.js';
+import { fatigueDelta, grow } from './growth.js';
+import { DEFAULT_STABLE_GRADE, gradeEpCost, gradeGainMult, type StableGrade } from './grade.js';
 import { nextCondition, weeklyFatigue } from './condition.js';
 import {
   applyInjury,
@@ -150,6 +151,13 @@ export interface AdvanceWeekInput {
   readonly chooseEvent?: (def: EventDef) => string | undefined;
   /** 功労馬として引退させるか（§7.1・条件は照会中 Q-P3-18/19） */
   readonly preferHonored?: boolean;
+  /**
+   * ★**厩舎の格**（★§6.7・D-103。★既定 `bronze` ＝ 格を入れる前と **1 ビット同じ**）。
+   * ★上の格は ★**1 週あたり多く伸びるが、そのぶん調教費も高い** — ★EP あたりの伸びは同じです
+   *   （★`gainPerEpRatio(grade) === 1.0`・`grade.test.ts` の対照 ②）。
+   * ⚠️ ★得られるのは ★**時間**（少ない週で同じところまで行ける）で、★強さではありません。
+   */
+  readonly grade?: StableGrade | undefined;
 }
 
 export interface AdvanceWeekResult {
@@ -194,6 +202,8 @@ export function advanceWeek(input: AdvanceWeekInput): AdvanceWeekResult {
   }
 
   const week = state.ageWeeks;
+  /** ★厩舎の格（★既定 `bronze` ＝ 倍率 1.0） */
+  const grade: StableGrade = input.grade ?? DEFAULT_STABLE_GRADE;
   const stage = lifeStageAt(week);
   const before = { ...state.current } as Record<AbilityKey, number>;
 
@@ -216,7 +226,8 @@ export function advanceWeek(input: AdvanceWeekInput): AdvanceWeekResult {
   } else {
     // ── ② 休養中ならメニューを強制（§7.5）──────────────────
     if (resting) menu = 'rest';
-    epSpent = epCost(menu);
+    /** ★費用は格の表から（★§7.2 の表 × 格の倍率・既定 `bronze` は 1.0 で元と同じ） */
+    epSpent = gradeEpCost(menu, grade);
 
     // ── ③ 故障判定（§7.5）────────────────────────────────
     injuryProb = injuryProbability({
@@ -253,6 +264,8 @@ export function advanceWeek(input: AdvanceWeekInput): AdvanceWeekResult {
           condition,
           current,
           potential,
+          /** ★格の伸びの倍率（★費用にも同じ倍率が掛かる・D-103 ②） */
+          gainMult: gradeGainMult(grade),
         },
         rngFor(TRAIN_STREAM.GROWTH),
       );

@@ -142,6 +142,13 @@ export interface GrowthInput {
   readonly condition: number;
   readonly current: Readonly<Record<AbilityKey, number>>;
   readonly potential: Readonly<Record<AbilityKey, number>>;
+  /**
+   * ★**伸びの倍率**（★厩舎の格・§6.7・D-103。★既定 1 ＝ 格を入れる前と 1 ビット同じ）。
+   * ⚠️ ★**`potential` には掛かりません**（★天井は動かない・`current ≤ potential` は下で閉じる）。
+   * ⚠️ ★**費用にも同じ倍率が掛かります**（★`gradeEpCost`）。★片方だけに掛けると
+   *    ★「同じ EP で上の格が強い」形になり、D-103 ② と V-14 ③ が落ちます。
+   */
+  readonly gainMult?: number | undefined;
 }
 
 /**
@@ -155,6 +162,8 @@ export interface GrowthInput {
  */
 export function grow(input: GrowthInput, rng: Rng): Record<AbilityKey, number> {
   const { menu, ageWeeks, growth, temper, condition, current, potential } = input;
+  /** ★格の倍率（★既定 1。★`x * 1 === x` なので丸めの差も出ません） */
+  const gainMult = input.gainMult ?? 1;
   // ★不変条件が既に破れていたら、**黙って直さず落とす**（D-045）。
   //   ここで静かに切り下げると、故障の恒久ダメージが「成長の副作用」として現れ、
   //   原因が効果の場所に書かれていない状態になります。
@@ -175,7 +184,7 @@ export function grow(input: GrowthInput, rng: Rng): Record<AbilityKey, number> {
     const cur = current[key];
     const pot = potential[key];
     const jitter = rng.range(GAIN_JITTER.min, GAIN_JITTER.max);
-    const gain = BASE_GAIN * menuCoef(menu, key) * gc * tc * cc * headroom(cur, pot) * jitter;
+    const gain = BASE_GAIN * menuCoef(menu, key) * gc * tc * cc * headroom(cur, pot) * jitter * gainMult;
     const next = cur + Math.max(0, gain);
     // ★不変条件（正典 §7.3・B-4）: current は potential を超えない。
     //   ★ここは**成長で超えない**ことだけを担保します。
