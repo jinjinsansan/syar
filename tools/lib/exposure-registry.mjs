@@ -154,6 +154,9 @@ export const EXPECTED_FUNCTION_EXECUTE = {
   //   先頭の `assert_setup_complete()` の検査だけで閉じていた
   'exchange_prize(bigint,uuid)': { anon: false, authenticated: true },
   'place_bet(uuid,text,jsonb,integer,uuid)': { anon: false, authenticated: true },
+  // ★出走登録（`0024`・D-104 の「同じレースに 1 人 2 頭まで」と D-105 の騎手の凍結）。
+  //   利用者が呼ぶ RPC なので authenticated だけ（`0024` で public・anon を剥がしている）
+  'enter_race(uuid,uuid,text,jsonb,uuid)': { anon: false, authenticated: true },
   // ★ワーカー専用（`0021`・D-095 候補）。利用者のロールには実行させない（監査 H-4）
   'spend_training_ep(uuid,bigint,integer)': { anon: false, authenticated: false },
 };

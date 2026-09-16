@@ -229,11 +229,21 @@ describe('D-080 書き込み RPC のセットアップ判定', () => {
   });
 
   it('★スキーマ修飾された定義を拾えている（拾えないと古い定義で判定してしまう）', () => {
-    // 0020・0021 は pg_get_functiondef の出力なので `public.place_bet(` の形
-    for (const name of ['place_bet', 'exchange_prize']) {
-      expect(bodies.get(name)?.file.startsWith('0020'), `${name} が 0020 から拾えていない`).toBe(true);
+    /**
+     * ★`0020` 以降は `pg_get_functiondef()` の出力なので `public.place_bet(` の形です。
+     * ⚠️ ★**ファイル名を決め打ちしません**（★2026-09-16 に直しました）。
+     *    ★以前は「最後の定義は `0020`」と書いていましたが、★`0024` で `place_bet` を
+     *    ★§9.5 どおりに再定義した日に落ちました。★**見たいのは「修飾された形を拾えること」**で、
+     *    ★どのファイルが最後かは便ごとに変わります（★`spend_training_ep` も `0013`→`0021` と動いた）。
+     */
+    for (const name of ['place_bet', 'exchange_prize', 'spend_training_ep']) {
+      const def = bodies.get(name);
+      expect(def, `${name} の定義が拾えていない`).toBeDefined();
+      expect(/create\s+or\s+replace\s+function\s+public\./i.test(def!.body), `${name} がスキーマ修飾の形で拾えていない（${def!.file}）`).toBe(true);
     }
-    expect(bodies.get('spend_training_ep')?.file.startsWith('0021'), 'spend_training_ep が 0021 から拾えていない').toBe(true);
+    /** ★対照: 修飾を許さない走査だと、この形は 1 つも拾えない（★昔それで古い定義を見ていた） */
+    const unqualified = /create\s+(?:or\s+replace\s+)?function\s+[a-z_][a-z0-9_]*\s*\(/i;
+    expect(unqualified.test(bodies.get('place_bet')!.body), '★place_bet の最後の定義は修飾されている前提').toBe(false);
   });
 
   it('除外簿に載せてよいのは状態を変えない関数だけ', () => {
