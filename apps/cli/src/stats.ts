@@ -16,6 +16,27 @@ export function sd(values: readonly number[]): number {
   return Math.sqrt(acc / values.length);
 }
 
+/**
+ * ★**不偏の標準偏差**（★÷ (n−1)）。★2026-09-16・V-13 の SE を出すために追加（D-112 ③）。
+ *
+ * ⚠️ ★上の `sd` は ★**母標準偏差**（÷ n）です。★標本から母集団の散らばりを推定するときは
+ *    ★こちらを使います。★n が大きければ差は無視できますが、★**式の意味が違う**ので分けます
+ *    （★黙って流用すると、少ない標本で SE を過小に報告します）。
+ */
+export function sdSample(values: readonly number[]): number {
+  if (values.length < 2) return 0;
+  const m = mean(values);
+  let acc = 0;
+  for (const v of values) acc += (v - m) * (v - m);
+  return Math.sqrt(acc / (values.length - 1));
+}
+
+/** ★**平均の標準誤差**（★不偏 SD ÷ √n）。★判定に使う側がここから引く（★式を 2 か所に書かない） */
+export function standardError(values: readonly number[]): number {
+  if (values.length < 2) return 0;
+  return sdSample(values) / Math.sqrt(values.length);
+}
+
 export function min(values: readonly number[]): number {
   if (values.length === 0) return 0;
   let out = Number.POSITIVE_INFINITY;

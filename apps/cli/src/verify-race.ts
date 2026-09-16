@@ -46,7 +46,7 @@ import { runSimulation } from './simulator.js';
 import { toSafeJson } from './json-safe.js';
 import * as MC from './measurement.js';
 import { PopularityEstimator } from './popularity.js';
-import { mean, round, sd } from './stats.js';
+import { mean, round, sd, standardError } from './stats.js';
 
 import { buildTrainingStateSampler } from './training-state.js';
 // ---------------------------------------------------------------------------
@@ -184,6 +184,13 @@ interface SeedResult {
   optimalMultMean: number;
   /** V-13: 早すぎる仕掛けの倍率平均（最適との差が「巧拙が出るか」の指標） */
   earlyMultMean: number;
+  /**
+   * ★**V-13 の対標本の差**（★D-112 ③・2026-09-16）。
+   *   ★**同じ馬・同じレース**で「最適 − 早仕掛け」を 1 つ取った列です。
+   * ⚠️ ★**平均どうしの引き算ではありません** — ★暴走を率で引くと散るので、
+   *    ★対標本にしないと「馬の差」が「仕掛けの差」に混ざります。
+   */
+  v13PairedGaps: number[];
   aiWinRate: number;
   optimalWinRate: number;
   meanF: number;
@@ -257,6 +264,11 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
   const aiMults: number[] = [];
   const optimalMults: number[] = [];
   const earlyMults: number[] = [];
+  /**
+   * ★**V-13 の対標本の差**（★D-112 ③）。★同じ馬・同じレースで「最適 − 早仕掛け」を 1 つずつ。
+   * ⚠️ ★平均どうしの引き算に戻さないこと（★馬の差が仕掛けの差に混ざります）。
+   */
+  const v13PairedGaps: number[] = [];
   let aiWins = 0;
   let optimalWins = 0;
   let interventionRaces = 0;
@@ -360,6 +372,11 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
         ib,
       );
       earlyMults.push(early.interventionMult);
+      /**
+       * ★**対標本の差を、その場で 1 つ取る**（★D-112 ③）。
+       *   ★`opt` と `early` は ★**同じ馬・同じ距離・同じ調子**で、★仕掛けだけが違います。
+       */
+      v13PairedGaps.push(opt.interventionMult - early.interventionMult);
       aiMult = ai.interventionMult;
       optMult = opt.interventionMult;
       aiMults.push(aiMult);
@@ -431,6 +448,7 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     aiMultMean: mean(aiMults),
     optimalMultMean: mean(optimalMults),
     earlyMultMean: mean(earlyMults),
+    v13PairedGaps,
     aiWinRate: aiWins / Math.max(1, interventionRaces),
     optimalWinRate: optimalWins / Math.max(1, interventionRaces),
     meanF,
@@ -538,7 +556,37 @@ const multMax = Math.max(...results.map((r) => r.interventionMax));
 const aiMult = mean(results.map((r) => r.aiMultMean));
 const optMult = mean(results.map((r) => r.optimalMultMean));
 const earlyMult = mean(results.map((r) => r.earlyMultMean));
-const v13Gap = optMult - earlyMult;
+/**
+ * ★**V-13 は対標本の差で測る**（★2026-09-16・正典 **D-112 ③**）。
+ *
+ * ⚠️ ★旧: `optMult - earlyMult`（★**平均どうしの引き算**）。
+ *    ★暴走を率で引くと同じ入力でも散るので、★この形だと「馬の差」が「仕掛けの差」に混ざり、
+ *    ★散り具合も持てません（★たまたまで合否が動く）。
+ * ★新: ★**同じ馬・同じレースで取った差**を集め、★平均・SE・0 から何 SE 離れているかを出します。
+ */
+const v13Gaps = results.flatMap((r) => r.v13PairedGaps);
+const v13Gap = v13Gaps.length === 0 ? 0 : mean(v13Gaps);
+/**
+ * ★SE は `stats.js` の `standardError` から出す（★式をここに 2 本目として書かない）。
+ * ⚠️ ★`sd`（母標準偏差・÷ n）ではなく ★**不偏**（÷ (n−1)）を使います — ★標本から推定するため。
+ */
+const v13Se = standardError(v13Gaps);
+/**
+ * ★**散らないとみなす SE の下限**。
+ *
+ * ⚠️ ★2026-09-16 に踏みました: ★「SE が **0 ちょうど**なら散らない」と書いたところ、
+ *    ★実データでは ★**丸め残り（5.8×10⁻¹⁷ 程度）**が残り、`0.2 ÷ 5.8e-17` で
+ *    ★**3.46×10¹⁵ σ** という無意味な数字が出力に出ました。
+ *    ★**検査は緑でした** — ★人工の列（すべて同じ値）では丸め残りが出ないためです。
+ * → ★**「0 か」ではなく「無視できるほど小さいか」**で見ます。
+ *   ★倍率は 0.90〜1.10 の範囲なので、★1×10⁻¹² は「差が無い」と言ってよい大きさです。
+ */
+const V13_SE_FLOOR = 1e-12;
+/** ★差が 0 から何 SE 離れているか（★散らないなら、効果量だけで見る） */
+const v13Spread = v13Se < V13_SE_FLOOR;
+const v13Sigma = v13Spread ? Infinity : v13Gap / v13Se;
+/** ★参考: 旧来の「平均どうしの引き算」（★報告に併記して、形を変えた影響を見せる） */
+const v13GapOld = optMult - earlyMult;
 const v8Ratio = optMult === 0 ? 0 : aiMult / optMult;
 const aiWin = mean(results.map((r) => r.aiWinRate));
 const optWin = mean(results.map((r) => r.optimalWinRate));
@@ -581,9 +629,15 @@ const checks: { id: string; label: string; value: string; pass: boolean }[] = [
   },
   {
     id: 'V-13',
-    label: '仕掛けの巧拙が結果に出る（最適 − 早仕掛けの倍率差）',
-    value: String(round(v13Gap, 4)),
-    pass: v13Gap >= GATES.V13_MIN_GAP,
+    label: '仕掛けの巧拙が結果に出る（★対標本の差・平均と SE。D-112 ③）',
+    value: `${round(v13Gap, 4)}±${v13Spread ? '0' : round(v13Se, 5)}（${v13Spread ? '散らない' : `${round(v13Sigma, 1)}σ`}・n=${v13Gaps.length}）`,
+    /**
+     * ★**効果量と有意性の両方**で見ます。
+     *   ★効果量だけだと「意味の無いほど小さい差」が標本数で有意になり、
+     *   ★有意性だけだと「大きいが偶然かもしれない差」が通ります。
+     * ⚠️ ★`minSigma`（3）は ★**正典に無い値**です（§13.2 は「有意な差」としか書いていない）。★照会中。
+     */
+    pass: v13Gap >= GATES.V13_MIN_GAP && v13Sigma >= MC.V13_MEASUREMENT.minSigma,
   },
   {
     id: 'V-12a',
@@ -604,6 +658,17 @@ console.log('-'.repeat(78));
 for (const c of checks) {
   console.log(`${pad(c.id, 6)} ${pad(c.label, 44)} ${pad(c.value, 16)}  ${verdict(c.pass)}`);
 }
+
+console.log('');
+console.log('--- ★V-13 の測り方を改めた影響（D-112 ③・2026-09-16）---');
+console.log(`  ★対標本の差（新）: ${round(v13Gap, 4)}  SE ${v13Spread ? '0' : round(v13Se, 5)}  ` +
+  `${v13Spread ? '（散らない＝効果が 0 の便）' : `${round(v13Sigma, 1)}σ`}  n=${v13Gaps.length}`);
+if (v13Spread && v13Se > 0) {
+  console.log(`  ※ 実際の SE は ${v13Se.toExponential(1)}（★浮動小数の丸め残り）。★${V13_SE_FLOOR.toExponential(0)} 未満は「散らない」として扱います。`);
+}
+console.log(`  平均どうしの引き算（旧）: ${round(v13GapOld, 4)}  ★参考値（合否には使いません）`);
+console.log('  ※ 旧は「最適の平均 − 早仕掛けの平均」で、★散り具合を持たず、馬の差が仕掛けの差に混ざりました。');
+console.log(`  ※ 合否は ★効果量（≥ ${GATES.V13_MIN_GAP}）と ★有意性（≥ ${MC.V13_MEASUREMENT.minSigma}σ）の両方。σ の線は照会中（Q-GB5-2）。`);
 
 console.log('');
 console.log('--- 人気別の勝率（1番人気から・シード平均） ---');

@@ -244,17 +244,56 @@ describe('★V-13 仕掛けの巧拙', () => {
   /** 距離は §8.4 の実効域から取る。★平均速度は不要になりました（Q-P4-45） */
   const DIST = 2000;
 
-  it('★早すぎるスパートは最適な仕掛けより倍率が低い（差は 0.03 以上）', () => {
-    const horse = neutralIntervener();
-    const best = resolveIntervention(horse, optimalPlan(B), DIST, B);
-    const early = resolveIntervention(
-      horse,
-      { ...optimalPlan(B), spurtAtMeter: B.EARLY_SPURT_METER * 1.6 },
-      DIST,
-      B,
-    );
-    // 較正定数を閾値に使わない（D-018 の教訓・自己検出の回避）。リテラルで押さえる。
-    expect(best.interventionMult - early.interventionMult).toBeGreaterThan(0.03);
+  /**
+   * ★**多数回の平均で測る**（★2026-09-16・正典 **D-112 ③**）。
+   *
+   * 【★なぜ形を変えたか】
+   *   ★D-112 で「暴走」を ★**率で引く**ことになりました。★同じ入力でも引きの結果で散ります。
+   *   ★1 回の比較で合否を決める形は、★散る世界では「たまたま」で通ったり落ちたりします。
+   *   → ★**同じ馬・同じ距離で仕掛けだけを変えた対標本**を多数取り、★平均と SE で見ます。
+   * ⚠️ ★**いまはまだ効果が 0** なので散りません（★すべての差が同じ値になります）。
+   *    ★それでもこの形にしておくのは、★**効かせる便で測り方を変えると前後が比べられない**からです。
+   */
+  const pairedGaps = (n: number): number[] => {
+    const out: number[] = [];
+    for (let i = 0; i < n; i += 1) {
+      /** ★馬を少しずつ変える（★1 頭だけで測ると、その馬に固有の差を見ることになる） */
+      const horse: InterventionHorse = {
+        iq: 300 + ((i * 37) % 700), gt: 300 + ((i * 53) % 700), st: 300 + ((i * 71) % 700),
+        condition: 1 + (i % 5), fatigue: (i * 13) % 80, temper: (i * 17) % 100,
+      };
+      const best = resolveIntervention(horse, optimalPlan(B), DIST, B);
+      const early = resolveIntervention(
+        horse,
+        { ...optimalPlan(B), spurtAtMeter: B.EARLY_SPURT_METER * 1.6 },
+        DIST,
+        B,
+      );
+      out.push(best.interventionMult - early.interventionMult);
+    }
+    return out;
+  };
+
+  const meanOf = (xs: readonly number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const seOf = (xs: readonly number[]): number => {
+    if (xs.length < 2) return 0;
+    const m = meanOf(xs);
+    const v = xs.reduce((a, b) => a + (b - m) ** 2, 0) / (xs.length - 1);
+    return Math.sqrt(v / xs.length);
+  };
+
+  it('★早すぎるスパートは最適な仕掛けより倍率が低い（★多数回の平均・効果量と SE の両方）', () => {
+    const gaps = pairedGaps(200);
+    const m = meanOf(gaps);
+    const se = seOf(gaps);
+    /**
+     * ★**効果量**: 較正定数を閾値に使わない（D-018 の教訓・自己検出の回避）。リテラルで押さえる。
+     * ★**有意性**: 差が 0 から離れていること。★SE が 0（散らない）ときは効果量だけで見る。
+     */
+    expect(m, '★平均の差が小さすぎる').toBeGreaterThan(0.03);
+    if (se > 0) expect(m / se, '★差が 0 から離れていない').toBeGreaterThan(3);
+    /** ★個々の引きでも「早仕掛けのほうが良い」が起きないこと（★向きが反転しない） */
+    expect(gaps.every((g) => g > 0), '★早仕掛けのほうが良い標本がある').toBe(true);
   });
 
   it('★どの距離でも巧拙の差が消えない（時間比例スタミナ・D-017）', () => {
