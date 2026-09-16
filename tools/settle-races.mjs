@@ -36,7 +36,26 @@ const hash = {
   sha256: (m) => createHash('sha256').update(m, 'utf8').digest('hex'),
   hmacSha256: (k, m) => createHmac('sha256', k).update(m, 'utf8').digest('hex'),
 };
-const store = createPgStore(c, hash);
+/**
+ * ★`epochMs` を渡すのは ★**生涯の記録（正典 §18）のゲーム内の週**のためです。
+ *
+ * ⚠️ ★**渡さないと物語を 1 行も書きません**（★`pg-store.ts` の註記どおり、
+ *    ★週が分からないまま 0 週で書かないため）。★2026-09-16、この道具は
+ *    ★`createPgStore(c, hash)` のままで、★**確定しても記録が残らない**状態でした。
+ * ★本番のワーカーは `STAR_EPOCH_ISO`（`env.ts`）から作ります。★同じ値をここでも使います。
+ */
+const epochIso = env.STAR_EPOCH_ISO;
+if (epochIso === undefined || Number.isNaN(Date.parse(epochIso))) {
+  console.error('★STAR_EPOCH_ISO が環境ファイルにありません（生涯の記録の週が出せません）');
+  process.exit(2);
+}
+const store = createPgStore(c, hash, {
+  epochMs: Date.parse(epochIso),
+  onStoryError: (e) => console.error(
+    `  ★生涯の記録の書き込みに失敗 cycle=${e.cycleIndex}: ${e.message}` +
+    '（★確定と払戻は済んでいます・§18 LR-5）',
+  ),
+});
 
 const targets = (await c.query(
   `select cycle_index, track_condition from races
