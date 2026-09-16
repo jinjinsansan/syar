@@ -82,6 +82,12 @@ function fakeDb() {
       if (s.startsWith('insert into race_odds')) return { rows: [], rowCount: 1 };
       if (s.startsWith('update races set status')) return settleRow === null ? { rows: [], rowCount: 0 } : { rows: [settleRow], rowCount: 1 };
       if (s.startsWith('select e.gate')) return { rows: settleEntrants, rowCount: settleEntrants.length };
+      /**
+       * ★取消（除外）の枠（★2026-09-16・正典 D-111 ③・移行 `0028`）。
+       * ★この偽の DB では取消が無いので 0 行。★製品側はこれを `settlePayouts` に渡す
+       *   （★渡さないと取消馬を含む馬券が「外れ」になり、客の EP が返らない）。
+       */
+      if (s.startsWith('select gate from race_entries')) return { rows: [], rowCount: 0 };
       if (s.startsWith('update race_entries')) return { rows: [], rowCount: 1 };
       throw new Error(`偽の DB が知らない SQL: ${s.slice(0, 60)}`);
     },

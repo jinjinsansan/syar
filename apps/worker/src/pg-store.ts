@@ -455,8 +455,19 @@ export function createPgStore(
         // --- 賞金（§11.1）。★PP の主な発行源（§9.3）---
         await awardPrizes(client, r.id, r.class_rank, r.grade, finished);
 
-        // --- 馬券の精算（§9）。EP で買い PP で払い戻す ---
-        await settlePayouts(client, r.id, finished);
+        /**
+         * --- 馬券の精算（§9）。EP で買い PP で払い戻す ---
+         *
+         * ★**取消（除外）になった馬の馬番を渡します**（★正典 D-111 ③・§9.1・移行 `0028`）。
+         * ⚠️ ★**渡さないと、取消馬を含む馬券が「外れ」になり、客の EP が返りません**
+         *    （★`settlePayouts` の既定は空配列で、★2026-09-16 までここは渡していませんでした）。
+         *    ★`payout.ts` の註記どおり、`settle()` が返す 3 状態の `refunded` を殺す形です。
+         */
+        const scratchedRows = await client.query<{ gate: number }>(
+          `select gate from race_entries where race_id = $1 and scratched_at is not null`,
+          [r.id],
+        );
+        await settlePayouts(client, r.id, finished, scratchedRows.rows.map((x) => Number(x.gate)));
 
         /**
          * --- ★生涯の記録（正典 §18・LR-7）---

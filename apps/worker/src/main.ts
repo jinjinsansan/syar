@@ -30,6 +30,7 @@ import { advanceTrainingWeeks } from './training-runner.js';
 import { recordUnlockDistribution, unlockDrift } from './unlock-flow.js';
 import { MARKET_TARGET_LISTINGS, refreshMarketListings } from './market-flow.js';
 import { syncStableGradePrices } from './grade-flow.js';
+import { freezePendingEntries } from './entry-freeze.js';
 import { runSelfcheck } from './selfcheck.js';
 import { runSchemacheck } from './schemacheck.js';
 import { CANCEL_AFTER_START_MS, classOf, conditionsOf, gradeOf } from '@star/scheduler';
@@ -132,6 +133,26 @@ async function main(): Promise<void> {
        *
        * ⚠️ **どちらか片方だけを外さないこと。** 外すなら両方です。
        */
+      /**
+       * ── ★出走登録の凍結を埋める（★正典 D-111 ②③・移行 `0028`）──────────
+       *
+       *   ★`enter_race` は受付までなので、★**凍結はここで、生成と同じ関数で書きます**。
+       *   ★発走前に埋まらない馬は ★**その馬だけ取消**にし、★レースは止めません（D-111 ③）。
+       *   ⚠️ ★**確定より前**に置きます（★確定に間に合わないと D-056 でレースごと中止になる）。
+       *   ★失敗しても周を止めません（A-1）。ただし黙らせません。
+       */
+      try {
+        const f = await freezePendingEntries(client, (m) => console.error(`[worker] ★${m}`));
+        if (f.frozen > 0 || f.scratched > 0) {
+          console.log(
+            `[worker] 出走登録の凍結 ${f.frozen} 頭 / 取消 ${f.scratched} 頭` +
+            `${f.refundedEp > 0 ? ` / 返金 ${f.refundedEp.toLocaleString()} EP` : ''}`,
+          );
+        }
+      } catch (e) {
+        console.error('[worker] 出走登録の凍結に失敗:', (e as Error).message);
+      }
+
       const trainingStates = await loadTrainingStates(client);
       const out = await runCycle(
         store,

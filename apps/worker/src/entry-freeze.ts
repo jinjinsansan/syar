@@ -1,0 +1,178 @@
+/**
+ * ★**出走登録した馬の凍結を書き、埋まらない馬を取消にする**（★正典 **D-111**・移行 `0028`）
+ *
+ * 【★なぜこの層が要るか】
+ *   ★`enter_race`（`0024`）は ★**受付まで**です（枠・料金・凍結待ちの行）。★凍結は書きません。
+ *   ★確定側は ★**1 頭でも凍結が無ければレースごと開催中止・全ベット返還**（D-056）なので、
+ *   ★そのままだと ★**利用者が登録しただけで、他の客の馬券まで消えます**。
+ *
+ * 【★D-111 の形】
+ *   ②★**凍結はワーカーが、レース生成と同じ関数で書く**（★出どころを 1 か所に保つ・D-052・R-30）
+ *   ③★**発走前に凍結の無い馬が残っていたら、その馬だけを取消**にし、★**レースは止めない**
+ *     → §9.1 の「取消・除外馬を含む馬券は全額返還（EP）」に載る
+ *   ④**D-056 は最後の安全網として残す**（★この層は何も外しません）
+ *   ⑤★**取消の理由を出し、登録料と騎手の料金を返す**（★`ep_ledger` の `refund`）
+ *
+ * ⚠️ ★**1 頭の不備で他の客の馬券まで消すのは釣り合いが取れていない**（裁定 §1-4 の 3）。
+ * ⚠️ ★乱数も時刻も読みません（★時刻は Postgres の `now()`・憲法 4）。
+ */
+
+import type pg from 'pg';
+import { deriveRng, type Rng } from '@star/sim-engine';
+import { rowToHorse } from './horse-repo.js';
+/**
+ * ★**生成側と同じ変換**（★`build-race.ts:13` と同じ相対の引き方）。
+ * ⚠️ ★ここで組み直さないこと（★D-052・R-30。★生成側と確定側で別の形になります）。
+ */
+import { toEntrant } from '../../cli/src/race-field.js';
+
+/**
+ * ★乱数の用途 ID（★`toEntrant` が開放率を 1 回引くため）。
+ * ⚠️ ★**新しい乱数源を作りません**（★憲法 4・D-112 ①と同じ縛り）。
+ *    ★レースの `cycle_index` と枠から決まるので、★**何度回しても同じ凍結**になります。
+ * ⚠️ ★ここで引いた開放率は ★**実データの能力で上書きされます**（`overrides.stats`）。
+ *    ★引いてから捨てるのは `toEntrant` の約束（Q-P3-29）で、★並びをずらさないためです。
+ */
+export const FREEZE_STREAM = 71;
+
+/** ★登録料（`0024` の `enter_race` と同じ値）。★騎手の料金は凍結から読む */
+export const ENTRY_FEE_EP = 200;
+
+export interface FreezeResult {
+  /** ★凍結を書いた頭数 */
+  readonly frozen: number;
+  /** ★取消にした頭数 */
+  readonly scratched: number;
+  /** ★返した EP の合計 */
+  readonly refundedEp: number;
+}
+
+interface PendingRow {
+  entry_id: string;
+  race_id: string;
+  cycle_index: string;
+  horse_id: string;
+  gate: number;
+  weight: string | number;
+  strategy: string;
+  jockey_frozen: { feeEP?: number } | null;
+  /** ★馬の行（`rowToHorse` に渡す） */
+  horse: Record<string, unknown> | null;
+  /** ★レースの条件（凍結を組むのに要る） */
+  distance: number;
+  surface: string;
+  track_condition: string;
+}
+
+/**
+ * ★発走が近いレースの「凍結待ち」の行を埋める。
+ *
+ * ★`beforeStartMs` … ★発走の何ミリ秒前までを対象にするか（★既定 15 分）。
+ *   ★`enter_race` の締切は発走 60 分前（§10.4）なので、★締切後・発走前に必ず 1 回は通ります。
+ */
+export async function freezePendingEntries(
+  client: pg.Client | pg.PoolClient,
+  onAlert: (msg: string) => void,
+  beforeStartMs = 15 * 60_000,
+): Promise<FreezeResult> {
+  const rows = await client.query<PendingRow>(
+    `select e.id as entry_id, e.race_id, r.cycle_index, e.horse_id, e.gate, e.weight, e.strategy,
+            e.jockey_frozen,
+            to_jsonb(h.*) as horse,
+            r.distance, r.surface, r.track_condition
+       from race_entries e
+       join races r on r.id = e.race_id
+       left join horses h on h.id = e.horse_id
+      where e.entrant_snapshot is null
+        and e.scratched_at is null
+        and r.status = 'scheduled'
+        and r.scheduled_at <= now() + ($1::bigint || ' milliseconds')::interval
+      order by r.cycle_index, e.gate`,
+    [beforeStartMs],
+  );
+  if (rows.rowCount === 0) return { frozen: 0, scratched: 0, refundedEp: 0 };
+
+  let frozen = 0;
+  let scratched = 0;
+  let refundedEp = 0;
+
+  for (const row of rows.rows) {
+    /**
+     * ★凍結を組む。★**生成と同じ関数**（`entrantFromHorse`）を通します
+     *   — ★ここで組み直すと、★生成側と確定側で別の形になります（D-052・R-30）。
+     */
+    let snapshot: Record<string, unknown> | null = null;
+    let why = '';
+    try {
+      if (row.horse === null) throw new Error('馬の行がありません');
+      const horse = rowToHorse(row.horse);
+      /** ★シードは既存の系列から（★レースと枠で決まる・時計も Math.random も読まない） */
+      const rng: Rng = deriveRng(Number(row.cycle_index), FREEZE_STREAM, row.gate);
+      snapshot = toEntrant(horse, rng, {
+        gate: row.gate,
+        weightKg: Number(row.weight),
+        strategy: row.strategy as Parameters<typeof toEntrant>[2] extends { strategy?: infer S } ? S : never,
+        /** ★能力は DB の現在値（★生成側と同じく実データを使う・Q-P3-29） */
+        stats: horse.stats,
+      }) as unknown as Record<string, unknown>;
+    } catch (e) {
+      why = (e as Error).message;
+    }
+
+    await client.query('begin');
+    try {
+      if (snapshot !== null) {
+        await client.query(
+          `update race_entries set entrant_snapshot = $1::jsonb where id = $2`,
+          [JSON.stringify(snapshot), row.entry_id],
+        );
+        frozen += 1;
+      } else {
+        /**
+         * ★**その馬だけを取消**（★レースは止めない・D-111 ③）。
+         * ★理由を残します（★黙って消さない・D-111 ⑤）。
+         */
+        const reason = `出走に必要な記録を作れませんでした（${why}）`;
+        await client.query(
+          `update race_entries set scratched_at = now(), scratch_reason = $1 where id = $2`,
+          [reason, row.entry_id],
+        );
+        scratched += 1;
+
+        /**
+         * ★**登録料と騎手の料金を返す**（★D-111 ⑤・§9.1 の返還と同じ考え方）。
+         * ⚠️ ★**EP で返します**（★PP で返すと EP→PP の経路ができる・憲法 §0.2）。
+         * ★冪等: ★同じ登録に対して二度返しません（`dedupe_key`）。
+         */
+        const fee = ENTRY_FEE_EP + Number(row.jockey_frozen?.feeEP ?? 0);
+        const owner = (await client.query<{ owner_id: string | null }>(
+          `select owner_id from horses where id = $1`, [row.horse_id])).rows[0];
+        if (owner?.owner_id != null && fee > 0) {
+          const key = `scratch:${row.entry_id}`;
+          const dup = await client.query(`select 1 from ep_ledger where dedupe_key = $1`, [key]);
+          if (dup.rowCount === 0) {
+            const bal = (await client.query<{ entry_points: string }>(
+              `update users set entry_points = entry_points + $1 where id = $2 returning entry_points`,
+              [fee, owner.owner_id])).rows[0];
+            await client.query(
+              `insert into ep_ledger (user_id, delta, balance_after, reason, ref_id, dedupe_key)
+               values ($1, $2, $3, 'refund', $4, $5)`,
+              [owner.owner_id, fee, Number(bal!.entry_points), row.race_id, key],
+            );
+            refundedEp += fee;
+          }
+        }
+        onAlert(
+          `★出走を取消しました cycle=${row.cycle_index} 枠 ${row.gate}（馬 ${row.horse_id}）: ${reason}` +
+          `。★レースは止めていません（D-111 ③）。料金 ${fee} EP を返しました`,
+        );
+      }
+      await client.query('commit');
+    } catch (e) {
+      await client.query('rollback');
+      throw e;
+    }
+  }
+
+  return { frozen, scratched, refundedEp };
+}
