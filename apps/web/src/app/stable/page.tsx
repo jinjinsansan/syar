@@ -1,9 +1,24 @@
 import { demoStableRepo, sortStable, conditionView, fatigueColor, type StableHome, type StableHorse } from '../../lib/stable';
 import { ClassChip, FatigueBar, PageTitle, Stars } from '../../components/ui';
+import { STABLE_GRADE_LABEL, type StableGrade } from '@star/training';
+import { OWNERSHIP_LIMITS } from '@star/scheduler';
+import { StableGradePanel } from '../../components/stable-grade-panel';
+
+/**
+ * ★**格ごとの色**（★D12-6・デザイナーのカード `components/stable-roster`）。
+ * ⚠️ ★**名前（ブロンズ等）は持ちません** — ★`STABLE_GRADE_LABEL` から引きます（★D-052）。
+ *    ★ここにあるのは見た目だけです。
+ */
+const GRADE_TONE: Readonly<Record<StableGrade, { readonly bg: string; readonly border: string; readonly color: string }>> = {
+  bronze: { bg: '#f3e9dd', border: '#8a6a4a', color: '#5a4326' },
+  silver: { bg: '#eef2f6', border: '#6b7d8c', color: '#33414c' },
+  gold: { bg: '#fff3d6', border: '#a9741a', color: '#4a3105' },
+};
 
 export const revalidate = 0;
 
-const COL = { name: 230, cls: 132, stars: 112, cond: 118, fatigue: 132, week: 104 } as const;
+/** ⚠️ ★`cls` は ★**格のチップが増えた**ぶん広げました（★132 → 212・2026-09-16・D12-6） */
+const COL = { name: 230, cls: 212, stars: 112, cond: 118, fatigue: 132, week: 104 } as const;
 
 /**
  * ★牧場ホーム（わたしの馬）— 正本 design/hud-ds/components/stable-home［アーケード］
@@ -157,7 +172,11 @@ export default async function StablePage() {
     <div style={{ padding: '22px 0 40px' }}>
       <PageTitle
         title="わたしの馬"
-        sub={`所有 ${view.horses.length} 頭`}
+        /**
+         * ★**現役の所有上限**（★D-104・§6.7）。★上限の数は `@star/scheduler` から引きます
+         *   （★画面に 30 を直書きしない・D-052）。
+         */
+        sub={`${view.horses.length} / ${OWNERSHIP_LIMITS.active} 頭　残り ${Math.max(0, OWNERSHIP_LIMITS.active - view.horses.length)} 頭`}
         right={(
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 40, padding: '0 16px', borderRadius: 10, background: '#fff', border: '2px solid var(--a-edge)', boxShadow: 'var(--a-shadow-sm)' }}>
             <span className="a-lbl">第</span><span className="a-num" style={{ fontSize: 26, color: 'var(--a-num-time)' }}>{view.weekNo}</span><span className="a-lbl">週</span>
@@ -222,7 +241,13 @@ export default async function StablePage() {
                 <span style={{ fontSize: 19, fontWeight: 900, color: 'var(--a-ink)' }}>{h.name}</span>
                 <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>{h.sexAge}　{h.week.kind === 'done' ? `今週 ${h.week.menu}` : rest ? '今週 休養' : '今週の指示なし'}</span>
               </span>
-              <span className="sh-cls" style={{ width: COL.cls, flex: `0 0 ${COL.cls}px` }}><ClassChip label={h.classLabel} classRank={h.classRank} /></span>
+              <span className="sh-cls" style={{ width: COL.cls, flex: `0 0 ${COL.cls}px`, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <ClassChip label={h.classLabel} classRank={h.classRank} />
+                {/* ★厩舎の格（★D12-6）。★名前は `@star/training` から引く（★画面に表を持たない） */}
+                <span style={{ display: 'flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 6, background: GRADE_TONE[h.stableGrade].bg, border: `1.5px solid ${GRADE_TONE[h.stableGrade].border}`, fontSize: 10.5, fontWeight: 900, color: GRADE_TONE[h.stableGrade].color, whiteSpace: 'nowrap' }}>
+                  {STABLE_GRADE_LABEL[h.stableGrade]}
+                </span>
+              </span>
               <span className="sh-stars" style={{ width: COL.stars, flex: `0 0 ${COL.stars}px` }}><Stars value={h.stars} size={17} /></span>
               <span className="sh-cond" style={{ width: COL.cond, flex: `0 0 ${COL.cond}px` }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 900, color: cond.color }}><span style={{ fontSize: 16 }}>{cond.mark}</span>{cond.label}</span></span>
               <span className="sh-fatigue" style={{ width: COL.fatigue, flex: `0 0 ${COL.fatigue}px` }}><FatigueBar value={h.fatigue} color={fatigueColor(h.fatigue)} /></span>
@@ -236,6 +261,14 @@ export default async function StablePage() {
           <p style={{ color: 'var(--a-ink-2)', fontWeight: 900, padding: '16px 20px', fontSize: 14 }}>まだ所有している馬がいません。新しい 1 頭を無償で迎えると牧場が始まります</p>
         )}
       </div>
+
+      {/*
+        ★**厩舎の格**（★D12-6・D-103）。★押せる部分なのでクライアント部品に切り出しています。
+        ⚠️ ★倍率も値段も部品が `@star/training` から引きます（★この画面に表を持たない）。
+      */}
+      {horses[0] !== undefined && (
+        <StableGradePanel horseName={horses[0].name} grade={horses[0].stableGrade} />
+      )}
     </div>
   );
 }
