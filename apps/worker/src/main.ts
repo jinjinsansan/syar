@@ -28,6 +28,7 @@ import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
 import { recordUnlockDistribution, unlockDrift } from './unlock-flow.js';
+import { MARKET_TARGET_LISTINGS, refreshMarketListings } from './market-flow.js';
 import { runSelfcheck } from './selfcheck.js';
 import { runSchemacheck } from './schemacheck.js';
 import { CANCEL_AFTER_START_MS, classOf, conditionsOf, gradeOf } from '@star/scheduler';
@@ -220,6 +221,26 @@ async function main(): Promise<void> {
                 '。V-4/V-5/V-6 はこの分布の上に立っているので、測り直してください（D-053）',
             );
           }
+        }
+
+        /**
+         * ── ★馬の購入の出品を作り直す（★D-102・移行 `0025`）───────────
+         *
+         *   ★★と価格は ★**TS 側**（`starsOf` / `priceOfStars`）が出して行に書きます。
+         *   ★SQL には式を書きません（★D-052・二重帳簿にしない）。
+         *   ★在庫が下限を割ったら ★**警報だけ**出し、★帯は広げません（D-102 ⑤）。
+         *
+         *   ★集計と同じ「1 日 1 回」に置きます（★毎周やると DB を無駄に叩く）。
+         *   ★失敗しても周を止めません（A-1）。ただし黙らせません。
+         */
+        try {
+          const m = await refreshMarketListings(client, (msg) => console.error(`[worker] ★${msg}`));
+          console.log(
+            `[worker] 出品を更新 在庫${m.available}頭 / 下ろし${m.deactivated} / 追加${m.added}` +
+            `（目安 ${MARKET_TARGET_LISTINGS} 口）${m.stockOk ? '' : ' ★在庫が下限を割っています'}`,
+          );
+        } catch (e) {
+          console.error('[worker] 出品の更新に失敗:', (e as Error).message);
         }
       }
     } catch (e) {

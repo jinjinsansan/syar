@@ -87,6 +87,64 @@ export function listingsFromPool(
 }
 
 /**
+ * ★**出品する★の帯**（★D-102 ③）。
+ * ⚠️ ★較正値ではなく ★**品揃えの決め**です。★★5.0 と★1.0〜1.5 を出していないのは、
+ *    ★上は「配合で狙うもの」を買えてしまい（§1.1「血をつなぐ」が薄まる）、
+ *    ★下は誰も買わないためです。★動かすと ★**買える帯**が変わります（★着順には入りません）。
+ */
+export const LISTED_BANDS: readonly number[] = [2.0, 2.5, 3.0, 3.5, 4.0];
+
+/**
+ * ★**帯ごとに出しておく口数**。
+ * ⚠️ ★較正値ではなく ★**品揃えの決め**。★多くすると「選び直し」に近づくので、少なく保ちます（D-102 ③）。
+ */
+export const LISTINGS_PER_BAND = 3;
+
+/**
+ * ★**出品の入れ替えの計画**（★D-102 ②③⑤）。
+ *
+ * ★`pool` … ★いま買える NPC の現役馬（★呼ぶ側が★を付けて渡す）
+ * ★`active` … ★いま出ている出品
+ *
+ * ★**下ろすもの**: ①プールから消えた馬（★買われた・引退した）②★が変わった馬
+ *   （★故障の恒久ダメージで素質が下がると★も下がる。★見た目と価格がずれたまま売らない）
+ * ★**足すもの**: ★帯ごとに `LISTINGS_PER_BAND` に足りないぶん
+ *
+ * ⚠️ ★**乱数を持ちません**（★渡された順に前から取る）。★同じ入力なら同じ計画です。
+ */
+export interface ListingPlan {
+  readonly add: readonly MarketListing[];
+  readonly deactivate: readonly string[];
+}
+
+export function planListings(
+  pool: readonly { readonly horseId: string; readonly stars: number }[],
+  active: readonly { readonly horseId: string; readonly stars: number }[],
+): ListingPlan {
+  const poolStars = new Map(pool.map((h) => [h.horseId, h.stars]));
+  const deactivate: string[] = [];
+  const keptByBand = new Map<number, number>();
+  const listed = new Set<string>();
+  for (const a of active) {
+    const now = poolStars.get(a.horseId);
+    if (now === undefined || now !== a.stars) { deactivate.push(a.horseId); continue; }
+    listed.add(a.horseId);
+    keptByBand.set(a.stars, (keptByBand.get(a.stars) ?? 0) + 1);
+  }
+  const add: MarketListing[] = [];
+  for (const band of LISTED_BANDS) {
+    const need = LISTINGS_PER_BAND - (keptByBand.get(band) ?? 0);
+    if (need <= 0) continue;
+    const candidates = pool.filter((h) => !listed.has(h.horseId));
+    for (const l of listingsFromPool(candidates, band, need)) {
+      add.push(l);
+      listed.add(l.horseId);
+    }
+  }
+  return { add, deactivate };
+}
+
+/**
  * ★**在庫の下限の見張り**（★D-102 ⑤）。
  * ★下限を割ったら ★**警報を返します**（★黙って帯を広げたり、候補を作ったりしない・D-079 ⑦）。
  */
