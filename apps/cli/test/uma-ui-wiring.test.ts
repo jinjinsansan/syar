@@ -42,8 +42,31 @@ describe('★馬物語 UI の配線（R-14）', () => {
    * ★**画面の側も見ます**（★部品だけ直して画面が古い、を防ぐ）。
    * ★`data-theme="uma"` を持つ画面は、★この UI の一員として同じ規律に従います。
    */
-  const SCREENS = ['home', 'howto', 'earn', 'watch-race', 'odds', 'exchange', 'mypage', 'vote', 'train'] as const;
+  /**
+   * ★**client の画面**（★停止スイッチを自分で持つ）。
+   * ⚠️ ★`odds` は ★**サーバー部品**に変えました（★実データを読むため）。★見せ方は
+   *    ★`components/uma/uma-odds-view.tsx`（client）が持ち、★そちらに停止スイッチがあります。
+   *    → ★**ここに入れると「停止スイッチが無い」で落ちます**。★別に見ます（下の SERVER_SCREENS）。
+   */
+  const SCREENS = ['home', 'howto', 'earn', 'watch-race', 'exchange', 'mypage', 'vote', 'train'] as const;
   const screenCode = SCREENS.map((s) => ({ name: s, code: strip(read(`apps/web/src/app/${s}/page.tsx`)) }));
+  /** ★**サーバーの画面**（★読み取りだけ・★見せ方は client の部品に渡す） */
+  const SERVER_SCREENS = ['odds/page.tsx', 'odds/[id]/page.tsx'] as const;
+  const serverCode = SERVER_SCREENS.map((s) => ({ name: s, code: strip(read(`apps/web/src/app/${s}`)) }));
+
+  it('★★サーバーの画面は読むだけ（★`use client` を付けない・§14.3）', () => {
+    for (const { name, code } of serverCode) {
+      expect(code, `★${name} が client 部品になっている（★サーバーで読めない）`).not.toMatch(/'use client'/);
+      /** ★禁止語と arcade の痕跡は、サーバーの画面にも同じ規律 */
+      for (const bad of ['購入', 'チャージ', '換金', '課金', '馬券', '商品交換']) {
+        expect(code, `★${name} に禁止語「${bad}」`).not.toContain(bad);
+      }
+    }
+    /** ★入口は「次の 1 本」へ送るだけ（★デモの出馬表を持たない） */
+    const entry = serverCode[0]!.code;
+    expect(entry).toMatch(/redirect\(/);
+    expect(entry, '★入口がデモの出馬表を持っている').not.toMatch(/アオバハヤテ|コトブキノホシ/);
+  });
 
   it('★★画面が共通部品を使っている（★各画面で組み直していない・D-052）', () => {
     for (const { name, code } of screenCode) {
@@ -87,6 +110,26 @@ describe('★馬物語 UI の配線（R-14）', () => {
 
     const mypage = strip(read('apps/web/src/app/mypage/page.tsx'));
     expect(mypage, '★厩舎を引いていない').toMatch(/DEMO_HORSES/);
+  });
+
+  /**
+   * ★**読み取りは「読むだけ」**（★正典 §14.3: Vercel はフロントと読み取り系だけ）。
+   * ⚠️ ★画面でオッズや確率を計算すると、★アプリ化で書き直しになります。
+   */
+  it('★★実データの画面は読むだけ（★計算も判定も持たない・§14.3）', () => {
+    const page = strip(read('apps/web/src/app/odds/[id]/page.tsx'));
+    /** ★見せ方は client の部品に渡す（★停止スイッチが `useState` を使うため） */
+    expect(page).toMatch(/UmaOddsView/);
+    /** ★公開ビューから読む（★実体テーブルは anon では読めない） */
+    expect(page).toMatch(/races_public/);
+    expect(page).toMatch(/race_entries_public/);
+    expect(page).toMatch(/race_odds_public/);
+    /** ★読み取りの失敗を黙って空にしない（★R-21） */
+    expect(page).toMatch(/ReadError/);
+    /** ★オッズを画面で作らない（★確率から計算する式を持たない） */
+    expect(page, '★画面でオッズを計算している').not.toMatch(/1\s*\/\s*\w*probability|MARGIN|debiased/i);
+    /** ★service_role を持ち込まない（★RLS を素通りする） */
+    expect(page).not.toContain('service_role');
   });
 
   it('★★中継のラッパーは race/page.tsx を改造していない（★資料 §4.1）', () => {
