@@ -34,6 +34,11 @@ const SCREENS: readonly { readonly path: string; readonly label: string }[] = [
   { path: '/train', label: '育成' },
   { path: '/mypage', label: 'わたしの馬' },
   { path: '/exchange', label: '交換' },
+  // ★TOP の「はじめる」「ログイン」の飛び先（★2026-09-18 追加・裁定 §6 手順 7）
+  //   ⚠️ ★**この 2 つが一覧から漏れていたため、旧テーマのまま本番に出た**。
+  //      ★利用者が TOP から最初に押す 2 か所を、確認の対象から外していた。
+  { path: '/signup', label: 'はじめる（登録）' },
+  { path: '/login', label: 'ログイン' },
 ];
 
 /**

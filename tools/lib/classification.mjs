@@ -33,6 +33,8 @@ export const READONLY = [
   // ★既存の利用者から「経路の印」（auth.identities）を読むだけ。SELECT のみ・何も作らない
   //   （D-113 ③・裁定 REVIEW_AUTH_EMAIL_PASSWORD_VERDICT_20260918 §2）
   'read-auth-identities.mjs',
+  // ★認証の設定の現在値を読む（GET /auth/v1/settings 1 本）。E-6・E-8 の判定に使う（裁定 C-3）
+  'read-auth-settings.mjs',
   /**
    * ★デザイナーのカードを配信先へ写す（★2026-09-17・オーナー指示
    *   ★「★デザイナーが作った全てのページを（略）開発サーバーで見れるように」）。
