@@ -30,6 +30,9 @@
 
 /** 読むだけ。本番に向けてよい */
 export const READONLY = [
+  // ★既存の利用者から「経路の印」（auth.identities）を読むだけ。SELECT のみ・何も作らない
+  //   （D-113 ③・裁定 REVIEW_AUTH_EMAIL_PASSWORD_VERDICT_20260918 §2）
+  'read-auth-identities.mjs',
   /**
    * ★デザイナーのカードを配信先へ写す（★2026-09-17・オーナー指示
    *   ★「★デザイナーが作った全てのページを（略）開発サーバーで見れるように」）。
@@ -750,6 +753,9 @@ export const STATE_CHANGING = [
   'verify-unlock-daily.mjs',
   // ★V-19 の DB 側（#5/#6/#10/#15）。auth ユーザーと identity 行を作って一意制約と RLS を叩く（後片付けあり）
   'verify-v19-db.mjs',
+  // ★auth.identities に行ができるかの確認（D-113 ③・裁定 REVIEW_AUTH_EMAIL_PASSWORD_VERDICT_20260918 §2）。
+  //   anon キーの signUp で利用者を 1 人作り、最後に消す（後片付けあり）
+  'probe-auth-identities.mjs',
   // ★staging の馬を実際に育てる（誕生週をずらして週送りを回す）
   'age-horses.mjs',
   // ★合成集団で経済を一巡させる（V-11 の②）

@@ -28,7 +28,8 @@
 ## 技術スタック（正典 §14/§15）
 
 - ロジックは `packages/` に純粋 TypeScript で置く（`sim-engine` は依存ゼロ・Node/React に依存しない）
-- Web は Next.js（Vercel）/ DB・認証は Supabase / ゲームループは常時稼働ワーカー（Render）/ 静的アセットは Cloudflare R2
+- Web は Next.js（Vercel）/ DB・認証は Supabase / ゲームループは常時稼働ワーカー（**VPS 上の systemd `star-worker`**。配備は `tools/deploy.sh` が `/opt/star-current` のリンクを張り替える方式で、**Git の push では入れ替わらない**）/ 静的アセットは Cloudflare R2
+  - ⚠️ **ここは 2026-09-14 の監査（`REPORT_AUDIT_20260914.md:142`）で「Render」が誤りと指摘されていたのに直っておらず、2026-09-18 に開発側が再び「push すればワーカーも入れ替わる」と誤って報告した**（裁定 `REVIEW_AUTH_EMAIL_PASSWORD_VERDICT_20260918.md` §4）
 - **Next.js の Route Handler にビジネスロジックを書かない**（アプリ化で書き直しになる）
 - TypeScript strict・`any` 禁止
 
