@@ -29,7 +29,7 @@ const INTERIOR = ['/stable', '/training', '/races', '/entry', '/records', '/priz
  *    ★入れないと ★**帯が二重**になります（★引き渡し資料 §4.2 の A-1）。
  *    ★併せて下端 34px の安全領域も、各画面が自分で持ちます。
  */
-const OWN_HEADER = ['/', '/lp-preview', '/race', '/home', '/howto'];
+const OWN_HEADER = ['/', '/lp-preview', '/race', '/home', '/howto', '/earn', '/watch-race'];
 
 /** Presentation boundary: racing canvases, labs and both landing pages keep their own layout. */
 export function StoryShell({ children }: { children: React.ReactNode }) {

@@ -50,6 +50,13 @@ export default function HomePage(): React.ReactElement {
   };
 
   const horse = DEMO_HORSES[index]!;
+  /**
+   * ★**自馬がそのレースに出走しているか**（★資料 §9 の `ownHorseRuns`）。
+   * ⚠️ ★本番は ★**サーバーの出走登録から**決まります。★画面で判定しません。
+   * ★いまはデモ: ★**選んでいる馬が 1 頭目のときだけ**出走中として、★両方の見え方を確かめられるようにします
+   *   （★片方しか作らないと、★§9.5 の分岐が**画面に一度も出ません**）。
+   */
+  const ownHorseRuns = index === 0;
   const move = (step: number): void => {
     setIndex((i) => (i + step + DEMO_HORSES.length) % DEMO_HORSES.length);
   };
@@ -84,12 +91,29 @@ export default function HomePage(): React.ReactElement {
         width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
         <div style={{ position: 'absolute', left: 14, right: 14, top: 6 }}>
-          <NoticeBar
-            kind="soon"
-            text="第12R 発走まで 3:20（芝1600m・12頭）"
-            actionLabel="投票する"
-            actionHref="/races"
-          />
+          {/*
+            ★通知は ★**サーバーのレース状態から決まります**（★資料 §9）。★いまはデモの切り替えです。
+            ⚠️ ★**自馬が出走するときは投票の導線を出しません**（★正典 §9.5）。
+               ★出すのは「レースを見る」だけで、★**理由を省略しません**。
+            ⚠️ ★「レースを見る」は必ず `/watch-race`（案内）を通します（★オーナー判定 B-1）。
+               ★`/race` を直接指すと、★案内 1 枚が飛ばされ、★終了後の戻り先も決まりません。
+          */}
+          {ownHorseRuns ? (
+            <NoticeBar
+              kind="own"
+              text="第12R に自分の馬が出走しています"
+              sub="自分の馬が出るレースは投票できません（レースは観戦できます）"
+              actionLabel="レースを見る"
+              actionHref="/watch-race"
+            />
+          ) : (
+            <NoticeBar
+              kind="soon"
+              text="第12R 発走まで 3:20（芝1600m・12頭）"
+              actionLabel="投票する"
+              actionHref="/races"
+            />
+          )}
         </div>
 
         {/* ★馬ステージ（★全幅ブリード） */}

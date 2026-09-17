@@ -38,6 +38,47 @@ describe('★馬物語 UI の配線（R-14）', () => {
     expect(umaFiles).toContain('uma-top.tsx');
   });
 
+  /**
+   * ★**画面の側も見ます**（★部品だけ直して画面が古い、を防ぐ）。
+   * ★`data-theme="uma"` を持つ画面は、★この UI の一員として同じ規律に従います。
+   */
+  const SCREENS = ['home', 'howto', 'earn', 'watch-race'] as const;
+  const screenCode = SCREENS.map((s) => ({ name: s, code: strip(read(`apps/web/src/app/${s}/page.tsx`)) }));
+
+  it('★★画面が共通部品を使っている（★各画面で組み直していない・D-052）', () => {
+    for (const { name, code } of screenCode) {
+      expect(code, `★${name} が uma の部品を使っていない`).toMatch(/from '\.\.\/\.\.\/components\/uma\/uma-parts'/);
+      expect(code, `★${name} に停止スイッチが無い`).toMatch(/useMotionPaused/);
+      expect(code, `★${name} が uma テーマを宣言していない`).toContain('data-theme="uma"');
+      /** ★下端の安全領域（★アプリ化） */
+      expect(code, `★${name} に下端 34px の安全領域が無い`).toContain('--u-safe-bottom');
+    }
+  });
+
+  it('★画面にも禁止語・arcade の痕跡が無い', () => {
+    for (const { name, code } of screenCode) {
+      for (const bad of ['購入', 'チャージ', '換金', '課金', '馬券', '商品交換']) {
+        expect(code, `★${name} に禁止語「${bad}」`).not.toContain(bad);
+      }
+      expect(code, `★${name} が arcade のトークンを引いている`).not.toMatch(/var\(--a-/);
+      expect(code, `★${name} が EP+PP を足している`).not.toMatch(/ep\s*\+\s*pp|pp\s*\+\s*ep/i);
+    }
+  });
+
+  it('★★中継のラッパーは race/page.tsx を改造していない（★資料 §4.1）', () => {
+    const wrapper = strip(read('apps/web/src/app/watch-race/page.tsx'));
+    /** ★入口は `/race` へ送るだけ（★B-2 の既定） */
+    expect(wrapper).toContain("'/race'");
+    /**
+     * ★**全画面 API と回転をラッパー側で掛けない**（★`/race` が持っている・A-3）。
+     * ★二重に掛けると回転が二重になります。
+     */
+    expect(wrapper, '★ラッパーが全画面 API を呼んでいる').not.toMatch(/requestFullscreen|webkitRequestFullscreen/);
+    expect(wrapper, '★ラッパーが回転を掛けている').not.toMatch(/rotate\(\s*90deg/);
+    /** ★16:9 の枠を先に確保している（★映像を引き伸ばさない・資料 §4.4） */
+    expect(wrapper).toMatch(/aspectRatio:\s*'16 \/ 9'/);
+  });
+
   it('① ★禁止語を増やしていない（★購入・チャージ・換金・円・課金／馬券・商品交換）', () => {
     for (const { name, code } of umaCode) {
       for (const bad of ['購入', 'チャージ', '換金', '課金', '馬券', '商品交換']) {
@@ -72,8 +113,12 @@ describe('★馬物語 UI の配線（R-14）', () => {
 
   it('④ ★★共通ヘッダーが二重に載らない（★A-1・`OWN_HEADER` に入れる）', () => {
     const shell = strip(read('apps/web/src/components/story-shell.tsx'));
-    /** ★自前の上段バーを持つ画面は、すべて OWN_HEADER 側に入れる */
-    for (const route of ['/home', '/howto']) {
+    /**
+     * ★自前の上段バーを持つ画面は、★**すべて** OWN_HEADER 側に入れる。
+     * ⚠️ ★2026-09-17: ★`/earn`・`/watch-race` を作ったのに ★**入れ忘れました**
+     *    （★報告書には「足した」と書いていました）。→ ★**画面を足したらここも足す**。
+     */
+    for (const route of ['/home', '/howto', '/earn', '/watch-race']) {
       expect(shell, `★${route} が OWN_HEADER に無い（★帯が二重になる）`).toContain(`'${route}'`);
     }
     expect(shell).toMatch(/OWN_HEADER\.includes\(pathname\)/);
