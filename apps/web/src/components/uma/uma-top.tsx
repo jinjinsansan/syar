@@ -70,19 +70,31 @@ export default function UmaTop(): React.ReactElement {
       }}>
         <div style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
           {/* ★耳（★2 つ）。★文字の上に少しはみ出させます */}
-          {([['left', '20%'], ['right', '20%']] as const).map(([side, off]) => (
+          {([['left', '11%'], ['right', '11%']] as const).map(([side, off]) => (
             <span key={side} aria-hidden style={{
-              /** ⚠️ ★耳は ★**字に食い込ませます**（★離すと浮いて見えます・★2026-09-17 の実測） */
-              position: 'absolute', top: 'clamp(-20px,-3.6cqw,-9px)', [side]: off,
-              width: 'clamp(24px,4.6cqw,48px)', height: 'clamp(30px,5.8cqw,60px)',
-              background: 'var(--u-ink-dark)',
+              /**
+               * 🔴 ★**耳は目より外側・上に置きます**（★2026-09-17・撮って分かりました）。
+               *    ★最初 目と同じ辺りに置いたところ、★**耳が目の後ろに隠れ**、
+               *    ★先だけが脇から覗く形になりました。→ ★外へ 9%・上へ 10px ずらします。
+               */
+              position: 'absolute', top: 'clamp(-34px,-6.2cqw,-16px)', [side]: off,
+              width: 'clamp(30px,5.8cqw,60px)', height: 'clamp(40px,7.6cqw,78px)',
+              /**
+               * 🔴 ★**馬の毛色にします**（★2026-09-17・オーナー指摘
+               *   ★「★ありえないことになっています」）。
+               *   ★最初 濃紺（`--u-ink-dark`）で塗ったので、★**青い小さな三角**にしか見えず、
+               *   ★耳として読めませんでした。★中継の馬の毛色（鹿毛）に合わせます。
+               */
+              background: '#8a4a1e',
               /** ★耳の形（★先が尖り、根元が広い） */
-              clipPath: 'polygon(50% 0%, 88% 72%, 72% 100%, 28% 100%, 12% 72%)',
-              transform: side === 'left' ? 'rotate(-13deg)' : 'rotate(13deg)',
+              clipPath: 'polygon(50% 0%, 86% 70%, 74% 100%, 26% 100%, 14% 70%)',
+              transform: side === 'left' ? 'rotate(-15deg)' : 'rotate(15deg)',
+              filter: 'drop-shadow(0 3px 3px rgba(8,18,8,.45))',
             }}>
+              {/* ★耳の内側（★薄い桃色。★中継の馬と同じ作り） */}
               <span style={{
-                position: 'absolute', left: '26%', right: '26%', top: '22%', bottom: '14%',
-                background: '#b8794a',
+                position: 'absolute', left: '28%', right: '28%', top: '20%', bottom: '16%',
+                background: '#d79a72',
                 clipPath: 'polygon(50% 0%, 92% 74%, 70% 100%, 30% 100%, 8% 74%)',
               }} />
             </span>
@@ -110,7 +122,7 @@ export default function UmaTop(): React.ReactElement {
                *    ★**字が読めなくなり**ました。→ ★字の ★**上の余白**に置きます。
                */
               position: 'absolute', top: 'clamp(-14px,-2.6cqw,-6px)', [side]: off,
-              width: 'clamp(32px,6.2cqw,66px)', aspectRatio: '116 / 86',
+              width: 'clamp(32px,6.2cqw,66px)', aspectRatio: '86 / 76',
               background: "url('/art/uma/title-eye.webp') no-repeat center/contain",
               /** ★右の目は左右を反転（★1 枚の素材で 2 つ作る） */
               transform: side === 'right' ? 'scaleX(-1)' : undefined,
@@ -164,8 +176,14 @@ export default function UmaTop(): React.ReactElement {
          * ★狭い画面だけさらに大きく（★390px のとき **406px ＝ 画面いっぱい**。
          *   ★鼻先と尾が少し外へ出て、★迫力が出ます。★親が隠すので欠けては見えません）。
          */
-        position: 'absolute', right: '-3%', bottom: '17%',
-        width: 'clamp(406px,104cqw,560px)', aspectRatio: '970 / 576',
+        /**
+         * ⚠️ ★芝を ★**中継の板どおり**にしたので、★手前の芝は画面の 9.6% しかありません。
+         *    ★馬の足元の余白が広く、★モバイルでは ★**相対的に小さく見えて**いました。
+         *    → ★狭い画面では ★さらに大きく（★390px のとき **445px**）、★位置も上げます。
+         * ⚠️ ★**PC は変えません**（★`114cqw` は 1280px で 1459px ＝ ★必ず 560px で頭打ち）。
+         */
+        position: 'absolute', right: '-5%', bottom: '24%',
+        width: 'clamp(445px,114cqw,560px)', aspectRatio: '970 / 576',
         transformOrigin: 'bottom center',
         /**
          * ⚠️ ★**跳ねは付けません**（★2026-09-17）。★1 枚絵だったときの名残で
