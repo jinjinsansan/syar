@@ -191,14 +191,28 @@ describe('★馬物語 UI の配線（R-14）', () => {
         expect(code, `★${name} が旧ルート ${old} を指している`).not.toContain(`Href="${old}"`);
       }
     }
-    /** ★アーケード側のナビも新しい入口へ向ける（★旧い画面に着いた人を出す） */
-    const nav = strip(read('apps/web/src/components/nav.tsx'));
-    for (const route of ['/home', '/vote', '/mypage', '/train', '/exchange']) {
-      expect(nav, `★ナビが ${route} を指していない`).toContain(`href: '${route}'`);
+    /**
+     * ★旧い画面のナビも新しい入口へ向ける（★旧い画面に着いた人を出す）。
+     *
+     * 🔴 ★2026-09-17: ★**ナビは 2 つあります。** ★最初 `nav.tsx` だけ見て
+     *    ★「★旧い画面からも出られます」と報告しました。★**嘘でした。**
+     *    ★旧い画面（`/stable`・`/training`・`/races`・`/records`・`/prizes`・`/login`・
+     *    ★`/signup`・`/setup`）が出すのは ★**`story-shell.tsx` の `LINKS`** で、
+     *    ★`nav.tsx` の `ArcadeNav` は ★**ほぼ開発用の画面にしか出ません**。
+     *    → ★**両方を見ます。** ★片方だけ直すと、この検査が素通りさせます。
+     */
+    const navs = [
+      { name: 'nav.tsx（ArcadeNav）', code: strip(read('apps/web/src/components/nav.tsx')) },
+      { name: 'story-shell.tsx（旧い画面の帯）', code: strip(read('apps/web/src/components/story-shell.tsx')) },
+    ];
+    for (const { name, code } of navs) {
+      for (const route of ['/home', '/vote', '/mypage', '/train', '/exchange']) {
+        expect(code, `★${name} が ${route} を指していない`).toContain(`href: '${route}'`);
+      }
+      /** ★中継は ★**案内 1 枚を通す**（★`/race` を直接指すと出口が決まらない・B-1） */
+      expect(code, `★${name} が中継の案内を飛ばして \`/race\` を直接指している`)
+        .toContain('href="/watch-race"');
     }
-    /** ★中継は ★**案内 1 枚を通す**（★`/race` を直接指すと出口が決まらない・B-1） */
-    expect(nav, '★ナビが中継の案内を飛ばして `/race` を直接指している')
-      .toContain('href="/watch-race"');
   });
 
   it('① ★禁止語を増やしていない（★購入・チャージ・換金・円・課金／馬券・商品交換）', () => {

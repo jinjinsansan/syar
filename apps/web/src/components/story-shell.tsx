@@ -3,12 +3,29 @@
 import { usePathname } from 'next/navigation';
 import { ArcadeNav } from './nav';
 
+/**
+ * ★**新しい画面へ切り替えました**（★2026-09-17・オーナー指示「★また新ルートに切り替えてください」）。
+ *
+ * ⚠️ ★**ナビはこの作業ツリーに 2 つあります。**
+ *    ① ★`nav.tsx` の `ArcadeNav` — ★下の `themed` が**偽**のときだけ出ます
+ *       （★`INTERIOR` にも `OWN_HEADER` にも入らない画面＝★ほぼ開発用の画面）
+ *    ② ★**この `LINKS`** — ★`INTERIOR` の画面（★`/stable`・`/training`・`/races`・`/records`・
+ *       ★`/prizes`・`/login`・`/signup`・`/setup`）＝ ★**旧い画面のほぼ全部**はこちらが出ます
+ *
+ * 🔴 ★2026-09-17: ★①だけ直して「★旧い画面に着いた人はナビから出られます」と報告しました。
+ *    ★**嘘でした。** ★旧い画面のナビは 1 本も変わっていませんでした。★開発サーバーの
+ *    ★`/records` を実際に引いて、★新しい行き先が 1 本も出ていないことで分かりました。
+ *    → ★**ナビを直すときは、必ず両方**。★検査も両方を見ます。
+ *
+ * ⚠️ ★`paths` は「★完全一致 か `prefix/` で始まる」で見ます。★`'/train'` だけでは
+ *    ★`/training` に当たりません（★別語）。★**旧い道も並べて**、旧い画面でも現在地が光るようにします。
+ */
 const LINKS = [
-  { href: '/stable', label: 'わたしの牧場', paths: ['/stable'] },
-  { href: '/training', label: '育てる', paths: ['/training'] },
-  { href: '/races', label: '番組表・オッズ', paths: ['/races', '/entry'] },
-  { href: '/records', label: '記録', paths: ['/records'] },
-  { href: '/prizes', label: '景品', paths: ['/prizes'] },
+  { href: '/home', label: 'ホーム', paths: ['/home'] },
+  { href: '/vote', label: 'レース', paths: ['/vote', '/races', '/entry', '/odds'] },
+  { href: '/mypage', label: 'わたしの馬', paths: ['/mypage', '/stable'] },
+  { href: '/train', label: '育てる', paths: ['/train', '/training'] },
+  { href: '/exchange', label: '交換', paths: ['/exchange', '/records', '/prizes'] },
 ];
 const INTERIOR = ['/stable', '/training', '/races', '/entry', '/records', '/prizes', '/login', '/signup', '/setup', '/design-preview'];
 /**
@@ -57,7 +74,12 @@ export function StoryShell({ children }: { children: React.ReactNode }) {
           return <a key={link.href} href={link.href} aria-current={active ? 'page' : undefined}>{link.label}</a>;
         })}
       </nav>
-      <a className="story-watch" href="/race">▷ レースを観る</a>
+      {/*
+        ★**案内 1 枚を通します**（★2026-09-17・ハンドオフ B-1）。
+        ⚠️ ★`/race` を直接指すと ★**案内が飛ばされ**、★終了後の戻り先も決まりません
+           （★`/race` は「どこから来たか」を知りません）。
+      */}
+      <a className="story-watch" href="/watch-race">▷ レースを観る</a>
     </header>
     <main id="story-content" className="story-content">
       <div className="story-breadcrumb"><a href="/">馬物語</a><span aria-hidden="true">／</span><span>あなたの物語のつづき</span></div>
