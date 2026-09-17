@@ -759,6 +759,9 @@ export const STATE_CHANGING = [
   // ★signUp が通るメールのドメインを 1 つ見つける。通ったドメインで利用者を 1 人作り、その場で消す
   //   （example.com と test.local が弾かれたため。1 つ通れば止める）
   'probe-signup-domain.mjs',
+  // ★調査で意図せず作った利用者を消す。--email か --created-after で対象を絞り、--yes が無ければ下見だけ
+  //   （2026-09-18、429 の中身を見るつもりの呼び出しが 200 を返して利用者が 1 人できた）
+  'cleanup-probe-user.mjs',
   // ★staging の馬を実際に育てる（誕生週をずらして週送りを回す）
   'age-horses.mjs',
   // ★合成集団で経済を一巡させる（V-11 の②）
