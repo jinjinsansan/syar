@@ -16,8 +16,8 @@ export default function SignupPage(): React.ReactElement {
           それまでは番組表・中継・オッズ・記録を登録なしで見られます。参加ポイントを販売することはありません。<br />
           登録後の流れ: 1 牧場名を決める → 2 最初の馬を迎える → 3 調教を指示する → 4 出走登録する → 5 中継を観る
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <a className="a-btn a-btn-gold" href="/race" style={{ height: 44, padding: '0 22px', fontSize: 15 }}>中継を観る（デモ）</a>
-            <a className="a-btn" href="/races" style={{ height: 44, padding: '0 22px', fontSize: 15 }}>番組表を見る</a>
+            <a className="a-btn a-btn-gold" href="/watch-race" style={{ height: 44, padding: '0 22px', fontSize: 15 }}>中継を観る（デモ）</a>
+            <a className="a-btn" href="/home" style={{ height: 44, padding: '0 22px', fontSize: 15 }}>ダッシュボードへ</a>
           </div>
         </div>
       </div>

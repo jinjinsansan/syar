@@ -124,7 +124,7 @@ export default function HowToPage(): React.ReactElement {
         position: 'relative', flex: '0 0 auto', display: 'flex', flexWrap: 'wrap', gap: 10,
         padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
-        <BigButton tone="gold" label="育成モードへ" sub="まずは 1 回、調教してみる" href="/training" grow="1.4 1 210px" />
+        <BigButton tone="gold" label="育成モードへ" sub="まずは 1 回、調教してみる" href="/train" grow="1.4 1 210px" />
         <BigButton tone="ivory" label="ダッシュボード" sub="いつでも戻れます" href="/home" grow="1 1 130px" />
       </div>
     </div>

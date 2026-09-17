@@ -11,7 +11,7 @@ export default function LoginPage(): React.ReactElement {
           ログイン機能の導入後に使えるようになります。それまでは番組表・中継・オッズ・記録を登録なしで見られます。
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
             <a className="a-btn a-btn-gold" href="/" style={{ height: 44, padding: '0 22px', fontSize: 15 }}>トップへ戻る</a>
-            <a className="a-btn" href="/races" style={{ height: 44, padding: '0 22px', fontSize: 15 }}>番組表を見る</a>
+            <a className="a-btn" href="/home" style={{ height: 44, padding: '0 22px', fontSize: 15 }}>ダッシュボードへ</a>
           </div>
         </div>
       </div>

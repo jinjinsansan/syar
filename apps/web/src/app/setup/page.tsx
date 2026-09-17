@@ -250,8 +250,8 @@ export default function SetupPage(): React.ReactElement {
               参加ポイント <span className="a-num" style={{ fontSize: 20, color: 'var(--a-blue-d)' }}>{granted.grantedEP.toLocaleString('ja-JP')}</span> EP を受け取りました
             </span>
             <span style={{ marginLeft: 'auto', display: 'flex', gap: 12 }}>
-              <a className="a-btn" href="/stable" style={{ height: 46, padding: '0 22px', fontSize: 15, whiteSpace: 'nowrap' }}>牧場を見る</a>
-              <a className="a-btn a-btn-gold" href="/training" style={{ height: 52, padding: '0 30px', fontSize: 18, whiteSpace: 'nowrap' }}>調教へ</a>
+              <a className="a-btn" href="/mypage" style={{ height: 46, padding: '0 22px', fontSize: 15, whiteSpace: 'nowrap' }}>牧場を見る</a>
+              <a className="a-btn a-btn-gold" href="/train" style={{ height: 52, padding: '0 30px', fontSize: 18, whiteSpace: 'nowrap' }}>調教へ</a>
             </span>
           </div>
         </div>

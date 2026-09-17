@@ -41,7 +41,7 @@ export default function EarnPage(): React.ReactElement {
         kind="soon"
         text="第12R 発走まで 3:20。受け取った参加ポイントはすぐ投票に使えます。"
         actionLabel="投票する"
-        actionHref="/races"
+        actionHref="/vote"
       />
 
       {/* ★EP のカプセル＋常設の注記（★PP は稼げないと明言） */}

@@ -117,6 +117,35 @@ import { createRaceAudio, type RaceAudio } from './race-audio.js';
 const RACE_PARAM = typeof window === 'undefined' ? null
   : new URLSearchParams(window.location.search).get('race');
 const RACE_SETUP = raceSetupFromParam(RACE_PARAM).setup;
+
+/**
+ * ★**中継の出口**（★2026-09-17・オーナー指示「★中継の出口も ★ハンドオフ通りにしてください」）
+ *
+ * 【★ハンドオフ B-1 の形】
+ *   ★「レースを見る」→ ★案内 1 枚（`/watch-race`）→ ★全画面で中継 → ★**終了後は必ずダッシュボードへ**。
+ *   ★この画面は ★**どこから来たかを知りません**でした。★そこで `?return=` で ★**戻り先を渡します**。
+ *
+ * 【★なぜ「完全一致の名簿」か】
+ *   ⚠️ ★`?return=` をそのまま `location.href` に入れると、★**外部の URL へ飛ばせます**
+ *      （★いわゆる開いた転送口）。★`/` 始まりの検査だけでは `//悪い所` が通ります。
+ *   → ★**ここに書いた行き先以外は受け取りません**（★増やすときはここに足す）。
+ *
+ * ⚠️ ★`?return=` が ★**無いとき**は、★これまでどおり ★**この画面のメニューへ戻ります**
+ *    （★`/race` を直接開くデモの道を壊さない）。
+ */
+const RETURN_ROUTES: Readonly<Record<string, string>> = {
+  '/home': 'ダッシュボードへ',
+  '/vote': '投票へ戻る',
+  '/odds': 'オッズへ戻る',
+  '/mypage': 'わたしの馬へ戻る',
+};
+const RETURN_TO: string | null = (() => {
+  if (typeof window === 'undefined') return null;
+  const v = new URLSearchParams(window.location.search).get('return');
+  return v !== null && Object.prototype.hasOwnProperty.call(RETURN_ROUTES, v) ? v : null;
+})();
+/** ★出口のボタンの文字（★戻り先が決まっていないときは、これまでの「メニューへ」） */
+const RETURN_LABEL = RETURN_TO === null ? 'メニューへ' : RETURN_ROUTES[RETURN_TO]!;
 /**
  * ★**競馬場ごとの見た目**（★ゲート・ゴールの目印・2026-09-15）。
  *   ★監査道具・検査と ★**同じ表**（`@star/render` の `venueLookOf`）から引きます（★R-30）。
@@ -5688,14 +5717,19 @@ export default function RacePage(): React.JSX.Element {
                   }}
                 >もう一度</button>
                 <button
-                  type="button" onClick={() => { exitBrowserFullscreen(); setPlaying(false); setStageFull(false); setWatchStarted(false); setEntryRequested(true); }}
+                  type="button" onClick={() => {
+                    exitBrowserFullscreen();
+                    /** ★案内から来たときは ★**必ず戻り先へ送ります**（★ハンドオフ B-1） */
+                    if (RETURN_TO !== null) { window.location.href = RETURN_TO; return; }
+                    setPlaying(false); setStageFull(false); setWatchStarted(false); setEntryRequested(true);
+                  }}
                   style={{
                     flex: 1, minHeight: stagePx(48), borderRadius: stagePx(9), cursor: 'pointer',
                     backgroundImage: 'linear-gradient(#fff0a8 0%,#ffd84a 44%,#f2b012 62%,#d98f0a 100%)',
                     border: `${Math.max(2, stagePx(2))}px solid #8a5a06`,
                     fontSize: stagePx(14), fontWeight: 900, color: '#4a3105',
                   }}
-                >メニューへ</button>
+                >{RETURN_LABEL}</button>
               </div>
             </div>
           )}
@@ -5760,10 +5794,15 @@ export default function RacePage(): React.JSX.Element {
             </button>
             <button
               type="button"
-              onClick={() => { exitBrowserFullscreen(); setPlaying(false); setStageFull(false); setWatchStarted(false); setEntryRequested(true); }}
+              onClick={() => {
+                    exitBrowserFullscreen();
+                    /** ★案内から来たときは ★**必ず戻り先へ送ります**（★ハンドオフ B-1） */
+                    if (RETURN_TO !== null) { window.location.href = RETURN_TO; return; }
+                    setPlaying(false); setStageFull(false); setWatchStarted(false); setEntryRequested(true);
+                  }}
               style={{ ...stageBtnStyle, background: 'rgba(122,58,42,0.9)' }}
             >
-              メニュー
+              {RETURN_TO === null ? 'メニュー' : RETURN_LABEL}
             </button>
           </div>
         </div>
@@ -6139,8 +6178,9 @@ export default function RacePage(): React.JSX.Element {
             レース映像は横 1280px の画面に合わせて作られていて、
             スマートフォンでは読み込みきれません。パソコンからご覧ください。
           </span>
-          <span>スマートフォン向けは準備中です。番組表・投票・厩舎はこのままご利用いただけます。</span>
-          <a className="a-btn a-btn-gold" href="/races" style={{ height: 44, marginTop: 4, fontSize: 15 }}>番組表へ</a>
+          <span>スマートフォン向けは準備中です。投票・育成・わたしの馬はこのままご利用いただけます。</span>
+          {/* ★行き先を新しい画面へ（★2026-09-17・オーナー指示「★新ルートに切り替えてください」） */}
+          <a className="a-btn a-btn-gold" href="/home" style={{ height: 44, marginTop: 4, fontSize: 15 }}>ダッシュボードへ</a>
         </div>
       )}
 

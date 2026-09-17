@@ -134,8 +134,13 @@ describe('★馬物語 UI の配線（R-14）', () => {
 
   it('★★中継のラッパーは race/page.tsx を改造していない（★資料 §4.1）', () => {
     const wrapper = strip(read('apps/web/src/app/watch-race/page.tsx'));
-    /** ★入口は `/race` へ送るだけ（★B-2 の既定） */
-    expect(wrapper).toContain("'/race'");
+    /**
+     * ★入口は `/race` へ送るだけ（★B-2 の既定）。
+     * ⚠️ ★2026-09-17: ★送り先に `?return=/home` を足したので、★この行は
+     *    ★**`'/race'` の完全一致では落ちます**（★自分の変更で自分の検査を壊しました）。
+     *    → ★**前方一致**で見ます。★出口そのものは下の「★中継の出口」で固定します。
+     */
+    expect(wrapper).toMatch(/'\/race(\?[^']*)?'/);
     /**
      * ★**全画面 API と回転をラッパー側で掛けない**（★`/race` が持っている・A-3）。
      * ★二重に掛けると回転が二重になります。
@@ -144,6 +149,56 @@ describe('★馬物語 UI の配線（R-14）', () => {
     expect(wrapper, '★ラッパーが回転を掛けている').not.toMatch(/rotate\(\s*90deg/);
     /** ★16:9 の枠を先に確保している（★映像を引き伸ばさない・資料 §4.4） */
     expect(wrapper).toMatch(/aspectRatio:\s*'16 \/ 9'/);
+  });
+
+  /**
+   * ★**中継の出口**（★2026-09-17・オーナー指示「★中継の出口も ★ハンドオフ通りにしてください」）。
+   *
+   * 【★見ている壊れ方】
+   *   ① ★案内が ★**戻り先を渡していない** → ★中継の後、★`/race` の中のメニューに ★**取り残されます**
+   *   ② ★`/race` 側の ★**名簿に無い**行き先を渡す → ★黙って無視され、★①と同じ姿になります
+   *   ③ ★`/` 始まりの検査だけで受ける → ★`//外部の所` が通り、★**開いた転送口**になります
+   */
+  it('★★中継の出口が案内の戻り先へ送る（★ハンドオフ B-1）', () => {
+    const wrapper = strip(read('apps/web/src/app/watch-race/page.tsx'));
+    expect(wrapper, '★案内が戻り先を渡していない（★出口がダッシュボードへ向かない）')
+      .toContain("'/race?return=/home'");
+
+    const race = strip(read('apps/web/src/app/race/page.tsx'));
+    expect(race, '★戻り先の名簿が無い').toMatch(/const RETURN_ROUTES/);
+    expect(race, '★名簿に `/home` が無い（★渡しても黙って無視される）').toMatch(/'\/home':/);
+    /** ★③ ★**完全一致でだけ**受ける（★前方一致や `startsWith('/')` にしない） */
+    expect(race, '★戻り先を完全一致で受けていない（★開いた転送口になる）')
+      .toMatch(/hasOwnProperty\.call\(RETURN_ROUTES/);
+    /** ★出口のボタンが、★**押されたら戻り先へ送る** */
+    expect(race, '★出口が戻り先を見ていない')
+      .toMatch(/if \(RETURN_TO !== null\) \{ window\.location\.href = RETURN_TO; return; \}/);
+  });
+
+  /**
+   * ★**新しいルートへ切り替えた**（★2026-09-17・オーナー指示「★また新ルートに切り替えてください」）。
+   *
+   * ⚠️ ★旧い画面（`/races`・`/stable`・`/training`・`/records`・`/prizes`）は ★**消していません**。
+   *    ★ここで固定するのは「★**新しい画面から旧い道へ落ちない**」ことだけです。
+   * ⚠️ ★`/stable/…`・`/records` は ★**詳細**として残しています（★新 UI に対応画面が無い）。
+   *    ★だから名簿に入れていません（★入れると今のまま落ちます・★照会 Q-UI-7）。
+   */
+  it('★★新しい画面が旧いルートへ落ちない（★新ルートへの切り替え）', () => {
+    const LEGACY = ['/races', '/training', '/prizes'] as const;
+    for (const { name, code } of [...screenCode, ...serverCode]) {
+      for (const old of LEGACY) {
+        expect(code, `★${name} が旧ルート ${old} を指している`).not.toContain(`href="${old}"`);
+        expect(code, `★${name} が旧ルート ${old} を指している`).not.toContain(`Href="${old}"`);
+      }
+    }
+    /** ★アーケード側のナビも新しい入口へ向ける（★旧い画面に着いた人を出す） */
+    const nav = strip(read('apps/web/src/components/nav.tsx'));
+    for (const route of ['/home', '/vote', '/mypage', '/train', '/exchange']) {
+      expect(nav, `★ナビが ${route} を指していない`).toContain(`href: '${route}'`);
+    }
+    /** ★中継は ★**案内 1 枚を通す**（★`/race` を直接指すと出口が決まらない・B-1） */
+    expect(nav, '★ナビが中継の案内を飛ばして `/race` を直接指している')
+      .toContain('href="/watch-race"');
   });
 
   it('① ★禁止語を増やしていない（★購入・チャージ・換金・円・課金／馬券・商品交換）', () => {

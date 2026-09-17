@@ -23,8 +23,15 @@
 import { useEffect, useState } from 'react';
 import { Backdrop, BigButton, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 
-/** ★接続先（★B-2 の既定）。★変えるときは報告の §2 も直すこと */
-const BROADCAST_HREF = '/race';
+/**
+ * ★接続先（★B-2 の既定）。★変えるときは報告の §2 も直すこと。
+ *
+ * ★`?return=/home` は ★**出口の指定**です（★2026-09-17・B-1 の「★終了後は必ずダッシュボードへ」）。
+ *   ★`/race` 側は ★**完全一致の名簿**でだけ受け取ります（★`race/page.tsx` の `RETURN_ROUTES`）。
+ *   ⚠️ ★ここを変えたら ★**名簿にも足す**こと。★名簿に無い行き先は ★**黙って無視**され、
+ *      ★これまでどおり `/race` の中のメニューへ戻ります（★出口が消えたように見えます）。
+ */
+const BROADCAST_HREF = '/race?return=/home';
 
 export default function WatchRacePage(): React.ReactElement {
   const [paused, toggle] = useMotionPaused();

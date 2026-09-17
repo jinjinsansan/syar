@@ -1,11 +1,24 @@
 'use client';
 import { usePathname } from 'next/navigation';
 
+/**
+ * ★**新しい画面へ切り替えました**（★2026-09-17・オーナー指示「★新ルートに切り替えてください」）。
+ *
+ * ★ここは ★**アーケード側（旧）の画面にだけ**出るナビです（★馬物語の画面は自前の帯を持ちます
+ *   — `components/story-shell.tsx` の `OWN_HEADER`）。★行き先を新しい画面へ向け直すことで、
+ *   ★旧い画面に着いた人も ★**新しい入口へ出られます**。
+ *
+ * ⚠️ ★**旧い画面は消していません**（`/races`・`/stable`・`/training`・`/records`）。
+ *    ★見比べと差し戻しのために残します。★消すかどうかは ★**別の判断**です（★報告の照会 Q-UI-7）。
+ * ⚠️ ★`match` は ★**旧い道も現在地として光らせます**（★`/stable/…` の詳細から来たときに
+ *    ★どこにも居ないように見せない）。
+ */
 const APP_LINKS: ReadonlyArray<{ href: string; label: string; match: (p: string) => boolean }> = [
-  { href: '/races', label: '番組表', match: (p) => p.startsWith('/races') },
-  { href: '/stable', label: 'わたしの馬', match: (p) => p.startsWith('/stable') },
-  { href: '/training', label: '育成', match: (p) => p.startsWith('/training') || p.startsWith('/entry') },
-  { href: '/records', label: '記録', match: (p) => p.startsWith('/records') || p.startsWith('/prizes') },
+  { href: '/home', label: 'ホーム', match: (p) => p === '/home' },
+  { href: '/vote', label: 'レース', match: (p) => p.startsWith('/vote') || p.startsWith('/races') || p.startsWith('/odds') },
+  { href: '/mypage', label: 'わたしの馬', match: (p) => p.startsWith('/mypage') || p.startsWith('/stable') },
+  { href: '/train', label: '育成', match: (p) => p.startsWith('/train') || p.startsWith('/entry') },
+  { href: '/exchange', label: '交換', match: (p) => p.startsWith('/exchange') || p.startsWith('/records') || p.startsWith('/prizes') },
 ];
 /** LP（未ログインの `/`）のナビ — ページ内アンカー */
 const LP_LINKS: ReadonlyArray<{ href: string; label: string }> = [
@@ -57,7 +70,12 @@ export function ArcadeNav(): React.ReactElement {
       <nav style={{ display: 'flex', gap: 6, marginLeft: 24 }}>
         {APP_LINKS.map((l) => <a key={l.href} href={l.href} style={pill(l.match(path))}>{l.label}</a>)}
       </nav>
-      <a href="/race" style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 900, color: 'rgba(255,255,255,.95)' }}>中継（デモ）</a>
+      {/*
+        ★**案内 1 枚を通します**（★2026-09-17・ハンドオフ B-1）。
+        ⚠️ ★以前はここから `/race` を直接指していました。★それだと ★**案内が飛ばされ**、
+           ★終了後の戻り先も決まりません（★`/race` は「どこから来たか」を知らないため）。
+      */}
+      <a href="/watch-race" style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 900, color: 'rgba(255,255,255,.95)' }}>中継（デモ）</a>
     </>
   );
 }

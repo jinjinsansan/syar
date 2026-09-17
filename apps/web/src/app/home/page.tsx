@@ -111,7 +111,7 @@ export default function HomePage(): React.ReactElement {
               kind="soon"
               text="第12R 発走まで 3:20（芝1600m・12頭）"
               actionLabel="投票する"
-              actionHref="/races"
+              actionHref="/vote"
             />
           )}
         </div>
