@@ -42,7 +42,7 @@ describe('★馬物語 UI の配線（R-14）', () => {
    * ★**画面の側も見ます**（★部品だけ直して画面が古い、を防ぐ）。
    * ★`data-theme="uma"` を持つ画面は、★この UI の一員として同じ規律に従います。
    */
-  const SCREENS = ['home', 'howto', 'earn', 'watch-race'] as const;
+  const SCREENS = ['home', 'howto', 'earn', 'watch-race', 'odds', 'exchange', 'mypage', 'vote', 'train'] as const;
   const screenCode = SCREENS.map((s) => ({ name: s, code: strip(read(`apps/web/src/app/${s}/page.tsx`)) }));
 
   it('★★画面が共通部品を使っている（★各画面で組み直していない・D-052）', () => {
@@ -118,7 +118,7 @@ describe('★馬物語 UI の配線（R-14）', () => {
      * ⚠️ ★2026-09-17: ★`/earn`・`/watch-race` を作ったのに ★**入れ忘れました**
      *    （★報告書には「足した」と書いていました）。→ ★**画面を足したらここも足す**。
      */
-    for (const route of ['/home', '/howto', '/earn', '/watch-race']) {
+    for (const route of ['/home', '/howto', '/earn', '/watch-race', '/odds', '/exchange', '/mypage', '/vote', '/train']) {
       expect(shell, `★${route} が OWN_HEADER に無い（★帯が二重になる）`).toContain(`'${route}'`);
     }
     expect(shell).toMatch(/OWN_HEADER\.includes\(pathname\)/);

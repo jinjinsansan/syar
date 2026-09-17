@@ -168,11 +168,15 @@ export default function HomePage(): React.ReactElement {
         gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10,
         padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
-        <BigButton tone="gold" label="育成モード" sub="調教・休養・体調" href="/training" grow="1 1 150px" />
-        <BigButton tone="blue" label="投票モード" sub="出馬表・マークシート" href="/races" grow="1 1 150px" />
-        <BigButton tone="ivory" label="マイページ" sub="厩舎・成績・血統" href="/stable" grow="1 1 150px" />
+        {/*
+          ⚠️ ★行き先は ★**馬物語 UI の新しいルート**です（★`/training`・`/races`・`/stable`・`/prizes` は
+             ★arcade 版が生きており、★**同じ URL を奪うと既存が消えます**。★切り替えはオーナー判断・報告 §3）。
+        */}
+        <BigButton tone="gold" label="育成モード" sub="調教・休養・体調" href="/train" grow="1 1 150px" />
+        <BigButton tone="blue" label="投票モード" sub="出馬表・マークシート" href="/vote" grow="1 1 150px" />
+        <BigButton tone="ivory" label="マイページ" sub="厩舎・成績・血統" href="/mypage" grow="1 1 150px" />
         <BigButton tone="ivory" label="ポイントを稼ぐ" sub="動画を見る・オファー" href="/earn" grow="1 1 150px" />
-        <BigButton tone="ivory" label="景品交換" sub="賞金ポイントで交換" href="/prizes" grow="1 1 150px" />
+        <BigButton tone="ivory" label="景品交換" sub="賞金ポイントで交換" href="/exchange" grow="1 1 150px" />
         <BigButton tone="ivory" label="使い方" sub="はじめての方へ" href="/howto" grow="1 1 150px" />
       </div>
     </div>
