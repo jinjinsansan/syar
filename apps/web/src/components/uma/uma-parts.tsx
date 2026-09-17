@@ -483,9 +483,18 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
           */}
           {/* ★内柵は `depthOffsetM +10` → ★1.13s（★中継の公式から） */}
           <ParallaxStrip src="/art/uma/inner-rail.webp" top="19.8%" height={26} dur={1.13} filter="brightness(1.12)" />
+          {/*
+            🔴 ★**上端の白い光を消しました**（★2026-09-17・PC で 1 本残っていた横帯）。
+
+            ★近景の始まり（y=262）には ★**ぼかしが 2 枚**重なっていました:
+              ★① `rgba(18,40,20,.34)` … ★遠近の沈み（★奥を暗く）— ★**要ります**
+              ★② `rgba(255,255,255,.18)` … ★上端の白い光 — ★**これが帯に見えていました**
+            ★②は芝に段があった頃の名残で、★段を無くしたいまは ★**境目を光らせるだけ**でした。
+            → ★白い光をやめ、★下の沈みだけ残します。
+          */}
           <div style={{
             position: 'absolute', left: 0, right: 0, top: '36.4%', bottom: 0,
-            background: 'linear-gradient(rgba(255,255,255,.18),rgba(255,255,255,0) 26%,rgba(12,26,14,.1) 70%,rgba(12,26,14,.28) 100%)',
+            background: 'linear-gradient(rgba(12,26,14,0) 0%,rgba(12,26,14,.1) 70%,rgba(12,26,14,.28) 100%)',
           }} />
           {/* ★前柵は `depthOffsetM −13` → ★0.48s（★いちばん手前なのでいちばん速い） */}
           <ParallaxStrip src="/art/uma/front-rail.webp" bottom={0} height={120} dur={0.48} position="top" filter="brightness(1.06) saturate(1.04)" />
