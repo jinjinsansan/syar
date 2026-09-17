@@ -25,6 +25,26 @@ import { Backdrop, MotionToggle, useMotionPaused } from './uma-parts';
  */
 const GALLOP_SEC = 0.62;
 
+/**
+ * ★**タイトルロゴ**（★2026-09-17・`uma_monogatari_logo_package.zip`）
+ *
+ * ★同梱の指示書（`CLAUDE_CODE_INSTRUCTIONS.md`）の要求:
+ *   ★「★案 5 は後からすぐ切り替えられる状態で保持」
+ *   ★「★画像パスまたは **定数の差し替えだけ**で変更できる構造に」
+ *   ★「★**不要な UI トグルや本番画面上の切替ボタンは追加しない**」
+ * → ★**この定数 1 行**を `LOGO_01` に変えるだけで案 1 に切り替わります。
+ *
+ * ⚠️ ★指示書の文面は「まず案 1」でしたが、★**オーナーが画で示したのは案 5**でした。
+ *    ★食い違ったので確認し、★**案 5 を先に**と判断をいただきました（★2026-09-17）。
+ *
+ * ★縦横比（★指示書 7「絶対に崩さない」）: ★案 5 = 845×340 ／ ★案 1 = 865×548。
+ *   ★`aspectRatio` を必ず添え、★`height: auto` 相当にして ★**CLS を防ぎます**（★指示書 10）。
+ */
+const LOGO_05 = { src: '/art/uma/logo-05.webp', w: 845, h: 340 } as const;
+const LOGO_01 = { src: '/art/uma/logo-01.webp', w: 865, h: 548 } as const;
+/** ★★ここを `LOGO_01` にすると案 1 になります（★他は 1 行も触りません） */
+const LOGO = LOGO_05;
+
 export default function UmaTop(): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
   return (
@@ -64,90 +84,46 @@ export default function UmaTop(): React.ReactElement {
            → ★素材を開いて目で確かめてから切り出しました。
       */}
       {/*
-        ★**題字＝金の札＋耳（＋目）**（★2026-09-17・引き渡し資料 `タイトルロゴ２案.zip` §8-1）
+        ★**題字＝ロゴ画像**（★2026-09-17・`uma_monogatari_logo_package.zip`）
 
-        🔴 ★**仕様が 11 分で正反対に変わりました。**
-           ★19:25 の資料 … ★「★**札なし・白抜き文字**＋耳と目」が確定。金プレートは却下
-           ★19:36 の資料 … ★「★**金の札＋耳**」が確定。★**白抜き文字版は却下**
-           → ★いまは ★**後者**が正本です。★前者の実装（多重アウトライン 10 本）は捨てました。
+        🔴 ★**仕様がこの日 3 回変わりました。**
+           ★19:25 …「★札なし・白抜き文字＋耳と目」（★金プレートは却下）
+           ★19:36 …「★金の札＋耳」（★白抜き版は却下）
+           ★20:03 …「★**ロゴ画像に差し替え**」（★同梱の指示書「★現在の黄色い馬物語バッジを削除」）
+           → ★金の札・耳・目は ★**すべて外しました**。
 
-        ⚠️ ★**目は 2 案あり、オーナーの最終決定待ち**です（★資料が明記）。
-           ★`TopE3.dc.html`＝目あり ／ ★`TopE3-no-eyes.dc.html`＝目なし。
-           ★ここでは ★**目あり**で作っています。★なしにする場合は
-           ★下の「★目（★目あり版のみ）」の `<span>` の中身を消すだけです。
-        ⚠️ ★金グロスと艶の動きは ★**既存の `--u-gold-plate` と `u-sheen` が資料と完全一致**
-           ★していました（★値を突き合わせて確認）。★新しく足していません。
+        ⚠️ ★指示書の文面は「まず案 1」でしたが、★**オーナーが画で示したのは案 5**でした。
+           ★食い違ったので確認し、★**案 5 を先に**と判断をいただきました。
+        ⚠️ ★指示書が禁じているので、★**画面に切替ボタンは出しません**。
+           ★案 1 へは ★上の `LOGO` の定数 1 行を `LOGO_01` に変えるだけです。
+
+        ★守っているもの（★指示書の番号）:
+          ★7 縦横比を崩さない … ★`aspectRatio` を ★**素材の実寸**から与える
+          ★8 PC とモバイルの両方 … ★`clamp` で自然に縮む（★固定 px に依らない）
+          ★10 CLS を防ぐ … ★`aspectRatio` があるので ★**読み込み前から高さが決まります**
+          ★11 読み上げ … ★`alt` を付ける（★`aria-hidden` にしない）
+          ★9 馬と重ならない … ★上限 `560px`・★`top:12%`（★馬は右下・`bottom:24%`）
       */}
       <div style={{
-        /** ★ブロック（★資料: `top:13%`・縦 flex・中央寄せ・**`gap:0`**・`padding:0 14px`） */
-        position: 'absolute', left: 0, right: 0, top: '13%',
+        position: 'absolute', left: 0, right: 0, top: '12%',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, padding: '0 14px',
       }}>
-        <div style={{
-          position: 'relative', border: '6px solid #0a2340', borderRadius: 22,
-          boxShadow: '0 8px 0 #12200f, 0 18px 30px rgba(8,18,8,.5)',
-          backgroundImage: 'var(--u-gold-plate)', backgroundSize: '240% 100%',
-          animation: 'u-sheen 5s linear infinite', padding: '12px 28px 16px',
-        }}>
-          <h1 style={{
-            position: 'relative', margin: 0,
-            display: 'flex', alignItems: 'flex-start', whiteSpace: 'nowrap',
-            fontSize: 'clamp(58px,20cqw,126px)', lineHeight: 1.02, letterSpacing: '.03em',
-            color: '#10243a', textShadow: '0 3px 0 rgba(255,255,255,.6)',
-          }}>
-            {/*
-              ★**耳**（★資料の確定値）。★`h1` を基準に絶対配置した ★**CSS の三角形**で、
-              ★**札の上に突き出します**（`top:-.62em` / `-.47em`）。
-              ⚠️ ★内側は ★**`#f6c21c`（金）**です（★白抜き版の `#fbf7ec` ではありません）。
-            */}
-            {([
-              { key: 'l-out', left: '.30em', top: '-.62em', side: '.22em', h: '.52em', c: '#0a2340', anim: 'e2Ear 2.8s ease-in-out infinite' },
-              { key: 'l-in', left: '.36em', top: '-.47em', side: '.16em', h: '.36em', c: '#f6c21c', anim: 'e2Ear 2.8s ease-in-out infinite' },
-              { key: 'r-out', left: '.82em', top: '-.62em', side: '.22em', h: '.52em', c: '#0a2340', anim: 'e2EarR 2.8s ease-in-out -.5s infinite' },
-              { key: 'r-in', left: '.88em', top: '-.47em', side: '.16em', h: '.36em', c: '#f6c21c', anim: 'e2EarR 2.8s ease-in-out -.5s infinite' },
-            ] as const).map((E) => (
-              <span key={E.key} aria-hidden style={{
-                position: 'absolute', left: E.left, top: E.top, width: 0, height: 0,
-                borderLeft: `${E.side} solid transparent`,
-                borderRight: `${E.side} solid transparent`,
-                borderBottom: `${E.h} solid ${E.c}`,
-                transformOrigin: 'bottom center', animation: E.anim,
-              }} />
-            ))}
+        <img
+          src={LOGO.src}
+          alt="馬物語 — UMA MONOGATARI"
+          width={LOGO.w}
+          height={LOGO.h}
+          style={{
+            display: 'block', width: 'clamp(280px,64cqw,560px)', height: 'auto',
+            aspectRatio: `${LOGO.w} / ${LOGO.h}`,
+            filter: 'drop-shadow(0 8px 14px rgba(8,18,8,.45))',
+          }}
+        />
 
-            {/*
-              ★**目（★目あり版のみ）**。★「馬」の字を包む `span` を基準に絶対配置した ★**丸**です。
-              ⚠️ ★**画像ではありません。** ★私は中継の素材から目を切り出して貼り、
-                 ★四角い板になって「★ありえないことになっています」と指摘されました。
-              ⚠️ ★外径を小さくすると ★**白目が痩せて瞳だけが目立ちます**（★資料の註記・73% が正）。
-            */}
-            <span style={{ position: 'relative' }}>
-              馬
-              {([
-                { key: 'near', left: '.207em', top: '.259em', d: '.379em', delay: '' },
-                { key: 'far', left: '.586em', top: '.276em', d: '.33em', delay: ' -.15s' },
-              ] as const).map((E) => (
-                <span key={E.key} aria-hidden style={{
-                  position: 'absolute', left: E.left, top: E.top, width: E.d, height: E.d,
-                  borderRadius: '50%', background: '#fbf7ec', border: '.052em solid #0a2340',
-                  boxSizing: 'border-box', animation: `e2Blink 5.2s ease-in-out${E.delay} infinite`,
-                }} />
-              ))}
-              {([
-                { key: 'near-p', left: '.31em', top: '.345em', d: '.12em' },
-                { key: 'far-p', left: '.672em', top: '.362em', d: '.103em' },
-              ] as const).map((E) => (
-                <span key={E.key} aria-hidden style={{
-                  position: 'absolute', left: E.left, top: E.top, width: E.d, height: E.d,
-                  borderRadius: '50%', background: '#0a2340',
-                }} />
-              ))}
-            </span>
-            <span>物語</span>
-          </h1>
-        </div>
-
-        {/* ★副題（★資料の確定値。★地 `#0a2340`・縁 `#f6c21c`） */}
+        {/*
+          ★副題は ★**残します**。★指示書は「★黄色いバッジ**だけ**を置き換え」
+          ★「★タイトル周辺以外への変更を最小限に」なので、★消す指示はありません。
+        */}
         <div style={{
           marginTop: 'clamp(10px,2.4cqw,16px)',
           padding: '8px 16px', background: '#0a2340', border: '4px solid #f6c21c',

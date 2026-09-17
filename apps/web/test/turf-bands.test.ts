@@ -155,41 +155,50 @@ describe('★TOP の背景（中継の板と同じ組み方）', () => {
    * ⚠️ ★目は ★**2 案（あり／なし）でオーナーの最終決定待ち**です。
    *    ★いまは「あり」。★「なし」に決まったら、この検査の ★③ を外します。
    */
-  it('★★題字が資料の確定値どおり（★金の札＋耳＋目）', () => {
+  /**
+   * ★**題字はロゴ画像**（★2026-09-17・`uma_monogatari_logo_package.zip`）。
+   *
+   * 🔴 ★仕様がこの日 ★**3 回**変わりました:
+   *    ★19:25 …「札なし・白抜き文字＋耳と目」（★金プレートは却下）
+   *    ★19:36 …「金の札＋耳」（★白抜き版は却下）
+   *    ★20:03 …「★**ロゴ画像に差し替え**」（★黄色い札を削除）
+   *    → ★この検査も ★**いちばん新しい正本**で固定します。
+   */
+  it('★★題字がロゴ画像になっている（★黄色い札は削除）', () => {
     const top = read('src/components/uma/uma-top.tsx');
 
-    /** ★① ★金の札（★却下された白抜き版に戻っていないこと） */
-    expect(top, '★金の札になっていない').toContain('u-gold-plate');
-    expect(top, '★艶の動きが無い').toContain('u-sheen 5s linear infinite');
-    expect(top, '★却下された白抜き版に戻っている（★金の段）').not.toContain('0 .241em 0 #d99f14');
-    expect(top, '★却下された白抜き版に戻っている（★縁取り）').not.toContain('WebkitTextStroke');
-    expect(top, '★字の色が資料と違う').toContain("color: '#10243a'");
-    expect(top, '★字の影が資料と違う').toContain("textShadow: '0 3px 0 rgba(255,255,255,.6)'");
-    expect(top, '★行の高さが資料と違う（1.02）').toContain('lineHeight: 1.02');
-    expect(top, '★ブロックの位置が資料と違う（13%）').toContain("top: '13%'");
+    /** ★① ★**黄色い札をやめた**（★指示書 1「現在の黄色い馬物語バッジを削除」） */
+    expect(top, '★金の札が残っている').not.toContain('u-gold-plate');
+    expect(top, '★耳が残っている').not.toMatch(/e2Ear/);
+    expect(top, '★目が残っている').not.toMatch(/e2Blink/);
 
-    /** ★② ★耳は ★**CSS の三角形**・★札の上に突き出す・★内側は金 */
-    expect(top, '★耳が自作の多角形に戻っている').not.toContain('clipPath');
-    expect(top, '★耳の外側が資料と違う').toContain("h: '.52em'");
-    expect(top, '★耳の内側が資料と違う').toContain("h: '.36em'");
-    expect(top, '★耳が札の上に出ていない').toContain("top: '-.62em'");
-    expect(top, '★耳の内側の色が資料と違う（金）').toContain("c: '#f6c21c'");
-    expect(top, '★耳が揺れない').toMatch(/e2Ear 2\.8s/);
-    expect(top, '★右耳の遅れが無い').toMatch(/e2EarR 2\.8s ease-in-out -\.5s/);
+    /** ★② ★ロゴ画像を使っている・★`alt` がある（★指示書 11） */
+    expect(top, '★ロゴ画像を使っていない').toContain('/art/uma/logo-05.webp');
+    expect(top, '★alt が無い（★読み上げに届かない）').toMatch(/alt="馬物語/);
 
-    /** ★③ ★目（★目あり版）。★**画像に戻っていないこと** */
-    expect(top, '★目が画像に戻っている').not.toContain('title-eye');
-    expect(top, '★手前の白目の大きさが資料と違う').toContain("d: '.379em'");
-    expect(top, '★奥の白目の大きさが資料と違う').toContain("d: '.33em'");
-    expect(top, '★まばたきが無い').toMatch(/e2Blink 5\.2s/);
+    /**
+     * ★③ ★**縦横比を崩さない**（★指示書 7）／★**CLS を防ぐ**（★指示書 10）。
+     *    ★`aspectRatio` を素材の実寸から与えます。
+     */
+    expect(top, '★縦横比の指定が無い（★CLS が出る）').toMatch(/aspectRatio: `\$\{LOGO\.w\} \/ \$\{LOGO\.h\}`/);
 
-    /** ★④ ★副題（★資料の確定値・★地は濃紺・縁は金） */
-    expect(top, '★副題の間隔が資料と違う').toContain("marginTop: 'clamp(10px,2.4cqw,16px)'");
-    expect(top, '★副題の縁が資料と違う（金）').toContain("border: '4px solid #f6c21c'");
+    /**
+     * ★④ ★**定数 1 つ**で案 1 に切り替わる（★指示書「画面上にトグルを出さない」）。
+     */
+    expect(top, '★案 1 を保持していない').toContain("src: '/art/uma/logo-01.webp'");
+    expect(top, '★切り替えが定数になっていない').toMatch(/const LOGO = LOGO_05;/);
+    expect(top, '★画面に切替ボタンを出している').not.toMatch(/logo=1|切り替え/);
+  });
 
-    const css = read('src/components/uma/uma-theme.css');
-    for (const k of ['e2Ear', 'e2EarR', 'e2Blink']) {
-      expect(css, `★${k} のキーフレームが無い`).toContain(`@keyframes ${k}`);
+  it('★★ロゴの素材が実在し、縦横比が実寸と合っている', () => {
+    const top = read('src/components/uma/uma-top.tsx');
+    for (const [name, w, h] of [['logo-05', 845, 340], ['logo-01', 865, 548]] as const) {
+      expect(
+        () => readFileSync(path.join(ROOT, `apps/web/public/art/uma/${name}.webp`)),
+        `★${name}.webp が無い（★題字が消える）`,
+      ).not.toThrow();
+      /** ⚠️ ★実寸と食い違うと ★**縦横比が崩れます**（★指示書 7） */
+      expect(top, `★${name} の実寸が素材と違う`).toContain(`w: ${w}, h: ${h}`);
     }
   });
 

@@ -151,16 +151,15 @@
   12.5%, 100%  { opacity: 0; }
 }
 
-/**
- * ★**題字の耳とまばたき**（★2026-09-17・引き渡し資料 `TopE3.dc.html:24-26` の写し）
- *
- * ⚠️ ★**数値は資料の確定値です。★勝手に変えません**（★README §8-1）。
- *    ★私は一度これを読まずに ★自分で耳と目を作り、★オーナーに
- *    ★「★ありえないことになっています」「★ぜんぜんダメ」と言われました。
- */
-@keyframes e2Ear  { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(4deg); } }
-@keyframes e2EarR { 0%, 100% { transform: rotate(6deg); }  50% { transform: rotate(18deg); } }
-@keyframes e2Blink { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+/*
+  🔴 ★**題字の耳とまばたき（`e2Ear` / `e2EarR` / `e2Blink`）は廃止しました**
+     （★2026-09-17 20:03・オーナーが ★**ロゴ画像**を置き、
+      ★同梱の指示書が「★現在の黄色い馬物語バッジを削除」と指定したため）。
+
+  ⚠️ ★この日、題字の仕様は ★**3 回**変わりました:
+     ★19:25「札なし・白抜き文字＋耳と目」→ ★19:36「金の札＋耳」→ ★20:03「ロゴ画像」。
+  ★使う所は 0 件（★tsx を grep して確認）。★規則ごと消します（★空の規則を残さない）。
+*/
 @keyframes u-led { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 @keyframes u-rush {
   0%, 100% { transform: translateY(0) scale(1); }
