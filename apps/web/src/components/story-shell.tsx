@@ -58,7 +58,16 @@ const OWN_HEADER = [
 export function StoryShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? '/';
   const themed = INTERIOR.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
-  if (OWN_HEADER.includes(pathname)) return <>{children}</>;
+  /**
+   * 🔴 ★**前方一致で見ます**（★2026-09-17・オーナー指摘
+   *   ★「★デザイナーが以前作った STAR というデザインはもう使わないので反映すら不要」）。
+   *
+   * ⚠️ ★以前は ★**完全一致**（`includes(pathname)`）でした。★`/odds` は入っていたのに
+   *    ★`/odds/demo` が外れ、★**アーケードの青い「STAR」の帯が馬物語の画面に載って**いました
+   *    （★配信 HTML で `class="a-band"` と `STAR</a>` を実測）。
+   * → ★**その下の階層もまとめて自前の見出し扱い**にします。
+   */
+  if (OWN_HEADER.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return <>{children}</>;
   if (!themed) return <>
     <header className="a-band" style={{ height: 56, padding: '0 26px', borderBottom: '3px solid var(--a-edge)' }}>
       <a href="/" style={{ fontSize: 20, fontWeight: 900, letterSpacing: '.22em', color: '#ffe37a', textShadow: '0 2px 0 rgba(0,0,0,.35)' }}>STAR</a>

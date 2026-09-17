@@ -257,7 +257,20 @@ describe('★馬物語 UI の配線（R-14）', () => {
     for (const route of ['/home', '/howto', '/earn', '/watch-race', '/odds', '/exchange', '/mypage', '/vote', '/train']) {
       expect(shell, `★${route} が OWN_HEADER に無い（★帯が二重になる）`).toContain(`'${route}'`);
     }
-    expect(shell).toMatch(/OWN_HEADER\.includes\(pathname\)/);
+    /**
+     * 🔴 ★**前方一致で見ていること**を固定します（★2026-09-17）。
+     *
+     * ⚠️ ★以前は `OWN_HEADER.includes(pathname)` ＝ ★**完全一致**でした。
+     *    ★`/odds` は名簿に在るのに ★`/odds/demo` が外れ、
+     *    ★**アーケードの青い「STAR」の帯が馬物語の画面に載って**いました
+     *    （★配信 HTML で `class="a-band"` を実測・★オーナー指摘）。
+     * ⚠️ ★この検査は ★**完全一致の書き方を名指しで固定していた**ので、
+     *    ★直した側が落ちました。★**検査が古い書き方を守っていました。**
+     */
+    expect(shell, '★完全一致に戻っている（★下の階層に帯が載る）')
+      .not.toMatch(/OWN_HEADER\.includes\(pathname\)/);
+    expect(shell, '★前方一致で見ていない')
+      .toMatch(/OWN_HEADER\.some\(\(p\) => pathname === p \|\| pathname\.startsWith/);
   });
 
   it('⑤ ★停止スイッチが常設されている（★資料 §2-9・§5-7）', () => {

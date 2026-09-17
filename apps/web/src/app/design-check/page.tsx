@@ -43,18 +43,18 @@ const SCREENS: readonly { readonly path: string; readonly label: string }[] = [
  *    ★**中身がありません**ので入れていません（★空の枠を並べても確認になりません）。
  */
 const CARDS: readonly { readonly slug: string; readonly group: string; readonly label: string; readonly w: number }[] = [
-  { slug: 'landing', group: 'Web', label: 'TOP（LP）［アーケード］', w: 1280 },
-  { slug: 'program-board', group: 'Web', label: '番組表（トップ）', w: 1280 },
-  { slug: 'odds-board', group: 'Web', label: 'オッズ', w: 1280 },
-  { slug: 'bet-sheet', group: 'Web', label: '投票（マークシート）', w: 1280 },
-  { slug: 'race-detail', group: 'Web', label: 'レース詳細＋公正性の検証', w: 1280 },
-  { slug: 'race-entry', group: 'Web', label: '出走登録', w: 1280 },
-  { slug: 'stable-home', group: 'Web', label: '牧場ホーム（わたしの馬）', w: 1280 },
-  { slug: 'horse-detail', group: 'Web', label: '馬詳細', w: 1280 },
-  { slug: 'training', group: 'Web', label: '調教（週送り）', w: 1280 },
-  { slug: 'records', group: 'Web', label: '記録', w: 1280 },
-  { slug: 'prize-exchange', group: 'Web', label: '景品交換', w: 1280 },
-  { slug: 'setup', group: 'Web', label: '初回セットアップ（2ステップ）', w: 1280 },
+  /*
+    🔴 ★**アーケード（青い「STAR」）の 12 枚は外しました**（★2026-09-17・オーナー指摘
+      ★「★デザイナーが以前作った STAR というデザインはもう使わないので反映すら不要」
+      ★「★同じくこのブルー系の表示はもう使わない。★新しいハンドオフ通りです」）。
+
+    ★外したもの（★`data-theme="arcade"` の 12 枚）:
+      ★landing・program-board・odds-board・bet-sheet・race-detail・race-entry・
+      ★stable-home・horse-detail・training・records・prize-exchange・setup
+    ⚠️ ★**ファイルは消していません**（`design/hud-ds` に残っています）。★一覧に出さないだけです。
+    ⚠️ ★残した 17 枚は ★**中継の HUD と本線の画面**で、★どれもアーケードのテーマを持ちません。
+       ★中継 HUD は合格済みなので、そのまま確認できるようにしておきます。
+  */
   { slug: 'screen-live', group: 'Screens', label: '【本線】フル画面／レース中', w: 1280 },
   { slug: 'title-card', group: 'Screens', label: '【本線】レース名タイトル（発走前）', w: 1280 },
   { slug: 'entry-board', group: 'Screens', label: '出馬表（発走前オーバーレイ）', w: 1280 },

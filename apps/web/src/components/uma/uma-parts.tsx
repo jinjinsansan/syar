@@ -364,13 +364,35 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
         ⚠️ ★縦は 1 枚を引き伸ばします。★芝の筋がやわらかく溶けますが、
            ★**等間隔の線が出るよりは良い**と判断しました（★オーナーの目で最終判断）。
       */}
-      <div style={{
-        position: 'absolute', left: 0, right: 0, top: `${regionTop}%`, bottom: 0,
-        background: "url('/art/uma/turf-near.webp') repeat-x center",
-        backgroundSize: '150cqw 100%',
-        filter: top ? 'brightness(1.1) saturate(1.04)' : 'brightness(.88) saturate(1.02)',
-        animation: `u-turf ${top ? '.62s' : '.7s'} linear infinite`,
-      }} />
+      {/*
+        🔴 ★**第 3 稿。★第 2 稿も間違いでした**（★2026-09-17・オーナー指摘
+          ★「★芝の動きがおかしいです」「★芝の動きが悪い」）。
+
+        ★第 1 稿 … ★遠近 4 段。★段の境目が ★**明るい横線**として出ました。
+        ★第 2 稿 … ★段をやめて ★**1 枚**に。★線は消えましたが、★**地面全体が同じ速さで滑ります**。
+                  ★手前も奥も同じ速さなので、★**動きとして間違い**です。
+                  → ★私は「線」を消すことだけを見て、★**速さの遠近を捨てていました**。
+
+        → ★第 3 稿: ★**速さの違う 3 枚を、ぼかして重ねます**。
+          ★どの枚も領域の全体を覆い、★`mask` の濃淡で ★上／中／下に効かせます。
+          ★**境目が無い**ので線は出ず、★**速さは縦に連続して変わります**。
+        ⚠️ ★`mask-image` は Safari のために `-webkit-` も併記します。
+      */}
+      {([
+        { dur: top ? 1.8 : 2.0, mask: 'linear-gradient(to bottom, #000 0%, #000 16%, transparent 46%)' },
+        { dur: top ? 1.05 : 1.2, mask: 'linear-gradient(to bottom, transparent 10%, #000 32%, #000 54%, transparent 80%)' },
+        { dur: top ? 0.6 : 0.68, mask: 'linear-gradient(to bottom, transparent 44%, #000 74%, #000 100%)' },
+      ] as const).map((L) => (
+        <div key={L.dur} style={{
+          position: 'absolute', left: 0, right: 0, top: `${regionTop}%`, bottom: 0,
+          background: "url('/art/uma/turf-near.webp') repeat-x center",
+          backgroundSize: '150cqw 100%',
+          filter: top ? 'brightness(1.1) saturate(1.04)' : 'brightness(.88) saturate(1.02)',
+          animation: `u-turf ${L.dur}s linear infinite`,
+          maskImage: L.mask,
+          WebkitMaskImage: L.mask,
+        }} />
+      ))}
       {/* ★遠近（★奥ほど沈む）。★**境目を作らない**ので、線が出ません */}
       <div style={{
         position: 'absolute', left: 0, right: 0, top: `${regionTop}%`, bottom: 0,

@@ -40,13 +40,36 @@ describe('★デザイン確認の一覧', () => {
     expect(realCards().length, '★中身のあるカードが 1 枚も無い').toBeGreaterThan(20);
   });
 
-  it('★★一覧が正本と 1 対 1（★足りない／余分が無い）', () => {
+  /**
+   * 🔴 ★**アーケード（青い「STAR」）の 12 枚は、もう一覧に出しません**（★2026-09-17・オーナー指摘
+   *   ★「★STAR というデザインはもう使わないので**反映すら不要**」
+   *   ★「★このブルー系の表示はもう使わない。★**新しいハンドオフ通り**です」）。
+   * ⚠️ ★ファイルは `design/hud-ds` に残っています。★**一覧に出さないだけ**です。
+   *    ★だから「1 対 1」では見ません。★**「余分が無い」と「アーケードが出ていない」**の 2 つで見ます。
+   */
+  const ARCADE = (): readonly string[] => realCards().filter((s) => {
+    const html = readFileSync(path.join(COMPONENTS, s, 'index.html'), 'utf8');
+    return html.includes('data-theme="arcade"');
+  });
+
+  it('★★一覧に、正本の無いカードが混ざっていない（★空の枠が見える）', () => {
     const real = realCards();
+    const extra = listedSlugs().filter((s) => !real.includes(s));
+    expect(extra, `★一覧に在るのに正本が無い: ${extra.join(', ')}`).toEqual([]);
+  });
+
+  it('★★アーケード（青い STAR）のカードを一覧に出していない', () => {
+    const arcade = ARCADE();
+    expect(arcade.length, '★アーケードのカードが 1 枚も見つからない（★検査が空振り）').toBeGreaterThan(5);
+    const leaked = listedSlugs().filter((s) => arcade.includes(s));
+    expect(leaked, `★もう使わないアーケードのカードが一覧に出ている: ${leaked.join(', ')}`).toEqual([]);
+  });
+
+  it('★★アーケード以外の正本は、すべて一覧に出ている', () => {
+    const arcade = ARCADE();
     const listed = listedSlugs();
-    const missing = real.filter((s) => !listed.includes(s));
-    const extra = listed.filter((s) => !real.includes(s));
+    const missing = realCards().filter((s) => !arcade.includes(s) && !listed.includes(s));
     expect(missing, `★正本に在るのに一覧に出ていない（★オーナーが見られない）: ${missing.join(', ')}`).toEqual([]);
-    expect(extra, `★一覧に在るのに正本が無い（★空の枠が見える）: ${extra.join(', ')}`).toEqual([]);
   });
 
   /**
