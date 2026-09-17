@@ -346,6 +346,16 @@ const PLATE_LAYERS = [
   { src: 'front-rail', y: 80.98, h: 19.02, dur: 0.48 },
 ] as const;
 
+/**
+ * ★**TOP 以外の画面で、芝をゆっくりにする倍率**（★2026-09-17・オーナー指示
+ *   ★「★今は早すぎて、サイトを見るユーザーの目が疲れてしまいます」）。
+ *
+ * ★TOP は ★**一瞬見る看板**なので速さが要ります。★他の 9 画面は ★**読む・選ぶ画面**で、
+ * ★同じ速さだと目が休まりません。★「★動いているのがわかればいい」が求められた速さです。
+ * ⚠️ ★**全層に同じ倍率**を掛けます。★層ごとの比（★中継の公式から出した遠近）は崩しません。
+ */
+const SCREEN_SLOWDOWN = 5;
+
 export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' | 'top' }): React.ReactElement {
   const top = variant === 'top';
   /*
@@ -385,13 +395,25 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
         ⚠️ ★`back-rails` は ★**これまで使っていませんでした**（★`uma/` に写していなかった）。
         ★秒数はすべて中継の公式から（★`depthOffsetM`）。
       */}
+      {/*
+        ★**TOP 以外は、ずっとゆっくり流します**（★2026-09-17・オーナー指示
+          ★「★ダッシュボード・使い方・ポイントを稼ぐ・中継の入口・オッズ・投票・育成・
+          ★わたしの馬・交換 の芝の動きをもっとゆっくりに。★動いているのがわかればいいです。
+          ★**今は早すぎて、サイトを見るユーザーの目が疲れてしまいます**」）。
+
+        ★TOP は ★**一瞬見る看板**なので速さが要りますが、★他の 9 画面は
+        ★**読む・選ぶ画面**です。★同じ速さだと目が休まりません。
+        ⚠️ ★**層ごとの比は崩しません**（★中継の公式から出した遠近）。
+           ★全部に同じ倍率を掛けるので、★遠近の関係はそのままです。
+        ★手前の芝は 0.62 秒 → ★**3.1 秒**で 1 周。★木立は 5.35 秒 → ★**27 秒**。
+      */}
       {PLATE_LAYERS.map((L) => (
         <ParallaxStrip
           key={L.src}
           src={`/art/parallax/backstretch-side-v1/${L.src}.webp`}
           top={`${L.y}%`}
           height={`${L.h}%`}
-          dur={L.dur}
+          dur={L.dur * (top ? 1 : SCREEN_SLOWDOWN)}
           position="bottom"
           filter={top ? 'saturate(1.04) brightness(1.06)' : 'saturate(1.02) brightness(.9)'}
         />
