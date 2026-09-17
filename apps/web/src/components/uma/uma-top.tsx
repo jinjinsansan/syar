@@ -69,22 +69,42 @@ export default function UmaTop(): React.ReactElement {
         }}>そだてる ・ とうひょう ・ かけぬける</div>
       </div>
 
-      {/* ★馬（★騎手あり＝オーナー判定で可） */}
+      {/*
+        ★**馬（真横 6 コマ）**（★2026-09-17・オーナー指示
+          ★「★真横カメラワーク６コマに差し替えて（略）★レース演出さながらの TOP ページにします」）
+
+        【★なぜ差し替えたか】
+          ⚠️ ★以前は `chibi-horse.png`（900×929・★**斜め前向きの 1 枚絵**・★脚のコマは 1 枚）を
+             ★`u-rush`（★上下に跳ねるだけ）で動かしていました。★背景の芝は ★**真横に流れる**ので、
+             ★「★その場で足踏みしている正面の馬」に見えていました（★オーナー指摘・2026-09-17）。
+          ★`horse-gallop.webp`（**1320×140＝220×140 の 6 コマ**）は ★**真横・右向き**で、
+             ★背景の流れ・速度線・砂煙（★どれも左へ）と ★**向きが揃います**。
+
+        ⚠️ ★**`u-rush` の跳ねは外しました。** ★6 コマに上下動が入っているので、
+           ★重ねると ★**二重に跳ねます**。
+        ⚠️ ★中継用の `horse-jockey-side-v9b-*` は ★**使いません**（★引き渡し資料 §4.4
+           ★「★チビ馬と混ぜないこと」）。★これは TOP 用に納品された別の絵です。
+      */}
       <div aria-hidden style={{
-        position: 'absolute', right: '3%', bottom: 305, height: 'clamp(300px,30cqw,384px)',
-        aspectRatio: '900 / 929', transformOrigin: 'bottom center',
-        animation: 'u-rush .95s ease-in-out infinite',
+        position: 'absolute', right: '4%', bottom: '27%',
+        width: 'clamp(240px,34cqw,440px)', aspectRatio: '220 / 140',
+        transformOrigin: 'bottom center',
       }}>
-        <span style={{ position: 'absolute', left: '8%', right: '8%', bottom: -16, height: 28, borderRadius: '50%', background: 'rgba(14,26,12,.5)', filter: 'blur(6px)' }} />
-        <span style={{ position: 'absolute', left: '-4%', bottom: '2%', width: '22%', aspectRatio: '1', borderRadius: '50%', background: 'rgba(228,226,208,.5)', filter: 'blur(8px)', animation: 'u-dust .95s linear infinite' }} />
-        <span style={{ position: 'absolute', left: '6%', bottom: 0, width: '15%', aspectRatio: '1', borderRadius: '50%', background: 'rgba(228,226,208,.38)', filter: 'blur(7px)', animation: 'u-dust .95s linear -.32s infinite' }} />
-        <span style={{ position: 'absolute', left: '17%', bottom: '1%', width: '11%', aspectRatio: '1', borderRadius: '50%', background: 'rgba(228,226,208,.28)', filter: 'blur(6px)', animation: 'u-dust .95s linear -.64s infinite' }} />
-        <span style={{ position: 'absolute', left: '14%', bottom: '3%', width: 11, height: 8, borderRadius: 3, background: '#2c4522', animation: 'u-clod .95s linear -.1s infinite' }} />
-        <span style={{ position: 'absolute', left: '24%', bottom: '1%', width: 8, height: 7, borderRadius: 3, background: '#37541f', animation: 'u-clod .95s linear -.55s infinite' }} />
+        <span style={{ position: 'absolute', left: '14%', right: '14%', bottom: -10, height: 22, borderRadius: '50%', background: 'rgba(14,26,12,.5)', filter: 'blur(6px)' }} />
+        {/* ★砂煙と土くれは ★**後ろ（左）へ**飛びます（★真横・右向きに合わせる） */}
+        <span style={{ position: 'absolute', left: '-6%', bottom: '2%', width: '16%', aspectRatio: '1', borderRadius: '50%', background: 'rgba(228,226,208,.5)', filter: 'blur(8px)', animation: 'u-dust .62s linear infinite' }} />
+        <span style={{ position: 'absolute', left: '6%', bottom: 0, width: '11%', aspectRatio: '1', borderRadius: '50%', background: 'rgba(228,226,208,.38)', filter: 'blur(7px)', animation: 'u-dust .62s linear -.2s infinite' }} />
+        <span style={{ position: 'absolute', left: '18%', bottom: '1%', width: '8%', aspectRatio: '1', borderRadius: '50%', background: 'rgba(228,226,208,.28)', filter: 'blur(6px)', animation: 'u-dust .62s linear -.42s infinite' }} />
+        <span style={{ position: 'absolute', left: '12%', bottom: '4%', width: 11, height: 8, borderRadius: 3, background: '#2c4522', animation: 'u-clod .62s linear -.08s infinite' }} />
+        <span style={{ position: 'absolute', left: '22%', bottom: '2%', width: 8, height: 7, borderRadius: 3, background: '#37541f', animation: 'u-clod .62s linear -.36s infinite' }} />
         <span style={{
           position: 'absolute', inset: 0,
-          background: "url('/art/uma/chibi-horse.png') no-repeat bottom center/contain",
-          filter: 'saturate(.95) brightness(.97) drop-shadow(0 8px 12px rgba(10,20,8,.35))',
+          backgroundImage: "url('/art/uma/horse-gallop.webp')",
+          backgroundRepeat: 'no-repeat',
+          /** ★6 コマを横に並べ、★`steps(6)` で 1 コマずつ送ります（★`u-gallop` の註記を参照） */
+          backgroundSize: '600% 100%',
+          animation: 'u-gallop .62s steps(6) infinite',
+          filter: 'saturate(1.02) drop-shadow(0 8px 12px rgba(10,20,8,.35))',
         }} />
       </div>
 

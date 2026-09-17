@@ -86,6 +86,35 @@
    ───────────────────────────────────────────────────────── */
 @keyframes u-sheen { 0% { background-position: 190% 0; } 100% { background-position: -90% 0; } }
 @keyframes u-scroll { to { background-position-x: -300px; } }
+
+/**
+ * ★**走り（真横 6 コマ）**（★2026-09-17・オーナー指示「★真横カメラワーク６コマに差し替えて」）
+ *
+ * ★`horse-gallop.webp` は **1320×140 の 6 コマ**（★1 コマ 220×140）。
+ * ★`background-size: 600% 100%` で 6 コマ分を横に並べ、★`steps(6)` で 1 コマずつ送ります。
+ *
+ * ⚠️ ★終点を **120%** にしてあります。★`steps(6)` は終点を含めず
+ *    ★**6 等分の頭**を出すので、★終点 100% だと 0/16.7/33.3/50/66.7/83.3% となり
+ *    ★**コマの境界に乗りません**。★120% にすると 0/20/40/60/80/100% になり、
+ *    ★6 コマにちょうど揃います。
+ */
+@keyframes u-gallop { from { background-position-x: 0%; } to { background-position-x: 120%; } }
+
+/**
+ * ★**芝の流れ**（★2026-09-17）
+ *
+ * ⚠️ ★`u-scroll` は **-300px** しか動かさないので、★タイル幅（1500px）の途中で輪に戻ります。
+ *    ★芝のような一様な模様では目立ちませんが、★**継ぎ目の跳ねが必ず出ます**。
+ * → ★ここでは ★**タイル 1 枚ぶんちょうど**（`150cqw`）動かすので、★跳ねが出ません。
+ *    ★`cqw` は TOP の最上位（`containerType: inline-size`）を基準にした横幅の 1% です。
+ */
+@keyframes u-turf { to { background-position-x: -150cqw; } }
+
+/**
+ * ★**刈り跡**（★2026-09-17・オーナー指示「★芝をあなたが治してください」）
+ * ★1 周期 120px を ★**ちょうど 120px** 流すので、★こちらも継ぎ目が出ません。
+ */
+@keyframes u-mow { to { background-position-x: -120px; } }
 @keyframes u-led { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 @keyframes u-rush {
   0%, 100% { transform: translateY(0) scale(1); }

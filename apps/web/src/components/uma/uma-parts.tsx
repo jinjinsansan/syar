@@ -17,6 +17,12 @@
 
 import { useEffect, useState } from 'react';
 import './uma-theme.css';
+/**
+ * ★近景の芝の段割りは ★**計算だけを別ファイル**に置いています（★2026-09-17）。
+ * ★このファイルは `'use client'` で CSS も取り込むため、★検査から取り込めません。
+ * → ★`turf-bands.ts` に置いて、★`apps/web/test/turf-bands.test.ts` で確かめます。
+ */
+import { nearBands } from './turf-bands';
 
 /** ★停止の状態。★端末が「動きを減らす」なら**初期から停止**（★資料 §5-7 の 1） */
 export function useMotionPaused(): readonly [boolean, () => void] {
@@ -251,6 +257,8 @@ export function BigButton({ tone, label, sub, href, onClick, grow }: {
  */
 export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' | 'top' }): React.ReactElement {
   const top = variant === 'top';
+  /** ★近景が始まる高さ（★TOP は内柵の下から・★画面版はもっと上から） */
+  const regionTop = top ? 42 : 26;
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
       <div style={{
@@ -271,11 +279,37 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
           filter: 'brightness(1.1) saturate(1.05)', animation: 'u-scroll 1.6s linear infinite',
         }} />
       )}
+      {/*
+        ★**近景の芝（遠近 4 段）**（★2026-09-17）。★各段は ★**縦に 1 枚だけ**なので、
+        ★以前のような等間隔の横筋（★タイルの継ぎ目）が出ません。
+        ⚠️ ★`backgroundSize` の横を ★**`150cqw`**（★画面幅の 1.5 倍）にし、
+           ★`u-turf` が ★**ちょうど 1 枚ぶん**流すので、★輪に戻るときの跳ねも出ません。
+      */}
+      {nearBands(regionTop).map((row, i) => (
+        <div key={row.top} style={{
+          position: 'absolute', left: 0, right: 0, top: `${row.top}%`, height: `${row.height}%`,
+          background: "url('/art/uma/turf-near.webp') repeat-x center",
+          backgroundSize: '150cqw 100%',
+          filter: top
+            ? `brightness(${(1.04 + i * 0.035).toFixed(3)}) saturate(1.04)`
+            : `brightness(${(0.84 + i * 0.035).toFixed(3)}) saturate(1.02)`,
+          animation: `u-turf ${row.dur}s linear infinite`,
+          /** ★段の頭にごく薄い光。★境目が「継ぎ目」でなく ★**遠近の線**に見えます */
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
+        }} />
+      ))}
+      {/*
+        ★**刈り跡**（★2026-09-17・オーナー指示「★芝をあなたが治してください」）。
+        ★競馬場の芝は横切る向きに刈り跡が入ります。★真横から見ると
+        ★**縦の帯が流れていく**ので、★速さの手がかりにもなります。
+        ⚠️ ★**これは見た目の足し算です。** ★要らなければ ★この `<div>` を消すだけで戻せます。
+      */}
       <div style={{
-        position: 'absolute', left: 0, right: 0, top: top ? '42%' : '26%', bottom: 0,
-        background: "url('/art/uma/turf-near.webp') repeat center", backgroundSize: '1500px 90px',
-        filter: top ? 'brightness(1.13) saturate(1.04)' : 'brightness(.92) saturate(1.02)',
-        animation: `u-scroll ${top ? '.85s' : '.9s'} linear infinite`,
+        position: 'absolute', left: 0, right: 0, top: `${regionTop}%`, bottom: 0,
+        backgroundImage: 'repeating-linear-gradient(90deg,rgba(255,255,255,.06) 0 60px,rgba(6,26,10,.06) 60px 120px)',
+        backgroundSize: '120px 100%',
+        animation: `u-mow ${top ? '.62s' : '.7s'} linear infinite`,
+        mixBlendMode: 'soft-light',
       }} />
       {top ? (
         <>
