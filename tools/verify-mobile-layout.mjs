@@ -130,18 +130,50 @@ const MEASURE = (REQW) => `(() => {
     }
     return false;
   };
+  /**
+   * ★**流れる背景の「2 枚目」は、はみ出していて当たり前**（★2026-09-17）。
+   *
+   *   ⚠️ ★馬物語の背景は ★**同じ幅の箱を 2 枚**並べ、★片方を 0 → −100%、
+   *      ★もう片方を +100% → 0 へ動かして流しています（★継ぎ目を出さないため）。
+   *      ★2 枚目は ★**常に画面の右外に半分居ます**。★親が「overflow:hidden」で隠すので
+   *      ★**目には見えません**。
+   *   ⚠️ ★これを「切落し」に数えると、★9 画面すべてで ★**9 個ずつ**出て、
+   *      ★**本当の崩れがその中に埋もれます**（★実際に 2 回、私はこれを
+   *      ★「馬を大きくしたせい」と読み違えました）。
+   *   ★一方、★「hidden」を数えること自体は ★**わざと**です（★下の clipped の註記）。
+   *      ★切り落とされた内容は「スクロールが出ないぶんもっと悪い」ので、消しません。
+   *   → ★**分けて数えます。** ★「隠れた親の中に居て、★自分が動いている背景の層」だけ
+   *     ★hiddenFx に回し、★それ以外は従来どおり over（切落し）に数えます。
+   * ⚠️ ★**この註記の中でバッククォートを使わないこと。** ★ここは MEASURE の
+   *    ★テンプレート文字列の中なので、★**文字列がそこで閉じてファイル全体が壊れます**
+   *    （★2026-09-17 に実際に壊しました。★同型は今日 3 度目）。
+   */
+  const inHidden = (el) => {
+    for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+      const ox = getComputedStyle(n).overflowX;
+      if (ox === 'hidden' || ox === 'clip') return true;
+    }
+    return false;
+  };
   const over = [];
+  const hiddenFx = [];
   for (const el of document.querySelectorAll('body *')) {
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
     if (inScroller(el)) continue;
     const o = Math.round(r.right - vw);
     if (o > 1) {
+      const st = getComputedStyle(el);
       const cls = typeof el.className === 'string' ? el.className : '';
-      over.push({ t: el.tagName.toLowerCase(), c: cls.slice(0, 28), w: Math.round(r.width), o });
+      const row = { t: el.tagName.toLowerCase(), c: cls.slice(0, 28), w: Math.round(r.width), o };
+      /* ★動いている（animation-name がある）背景の層で、★隠れた親の中に居るもの */
+      const isMovingLayer = st.animationName !== 'none' && st.backgroundImage !== 'none' && inHidden(el);
+      if (isMovingLayer) { row.anim = st.animationName; hiddenFx.push(row); continue; }
+      over.push(row);
     }
   }
   over.sort((a, b) => b.o - a.o);
+  hiddenFx.sort((a, b) => b.o - a.o);
   /**
    * ★はみ出した葉ノードを並べても直せません。★直す相手は ★**幅を作っている容器**です。
    *   ★自分の幅が画面より広い要素だけを、★外側から順に拾います。
@@ -254,6 +286,8 @@ const MEASURE = (REQW) => `(() => {
   return JSON.stringify({
     vw, sw: swTrue, overflow: swTrue - vw,
     over: over.slice(0, 3), overCount: over.length, wide: wide.slice(0, 5), wideCount: wide.length, fat: fat.slice(0, 4), fatCount: fat.length, tall: tall.slice(0, 3), tallCount: tall.length, tapList: tapList.slice(0, 5), clipped, canvases,
+    /** ★隠れた親の中で動いている背景の層（★切落しではない・上の註記） */
+    hiddenFx: hiddenFx.slice(0, 3), hiddenFxCount: hiddenFx.length,
     small, taps, smallest: smallest === 9999 ? null : smallest,
     minFont: minFont === 99 ? null : Math.round(minFont * 10) / 10,
     errored, text: document.body.innerText.trim().length,
@@ -362,6 +396,15 @@ for (const r of rows) {
     for (const t of r.tall) {
       console.log(`  ${' '.repeat(20)}         <${t.t}${t.c === '' ? '' : ` class="${t.c}"`}> 箱 ${t.h}px / 中身 ${t.sh}px  ★+${t.sh - t.h}px`);
     }
+  }
+  /**
+   * ★**隠れた演出は、崩れとは別に出します**（★2026-09-17）。
+   *   ★流れる背景の 2 枚目は ★**常に画面の右外に半分居る**のが正しい姿です。
+   *   ★黙って消すと「数えていない」のか「無い」のか分からないので、★行にして見せます。
+   */
+  if ((r.hiddenFxCount ?? 0) > 0) {
+    const names = [...new Set((r.hiddenFx ?? []).map((h) => h.anim))].join(', ');
+    console.log(`  ${' '.repeat(20)}       ↳ （★隠れた演出 ${r.hiddenFxCount} 個＝流れる背景の 2 枚目。${names}。★崩れではありません）`);
   }
   if (r.overCount > 0) {
     for (const o of (r.wide ?? [])) {
