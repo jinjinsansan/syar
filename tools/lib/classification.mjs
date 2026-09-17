@@ -756,6 +756,9 @@ export const STATE_CHANGING = [
   // ★auth.identities に行ができるかの確認（D-113 ③・裁定 REVIEW_AUTH_EMAIL_PASSWORD_VERDICT_20260918 §2）。
   //   anon キーの signUp で利用者を 1 人作り、最後に消す（後片付けあり）
   'probe-auth-identities.mjs',
+  // ★signUp が通るメールのドメインを 1 つ見つける。通ったドメインで利用者を 1 人作り、その場で消す
+  //   （example.com と test.local が弾かれたため。1 つ通れば止める）
+  'probe-signup-domain.mjs',
   // ★staging の馬を実際に育てる（誕生週をずらして週送りを回す）
   'age-horses.mjs',
   // ★合成集団で経済を一巡させる（V-11 の②）
