@@ -315,7 +315,7 @@ function ParallaxStrip({ src, top, height, dur, position = 'center', filter, bot
 export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' | 'top' }): React.ReactElement {
   const top = variant === 'top';
   /** ★近景が始まる高さ（★TOP は内柵の下から・★画面版はもっと上から） */
-  const regionTop = top ? 42 : 26;
+  const regionTop = top ? 36.4 : 26;
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
       {/*
@@ -334,15 +334,20 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
       */}
       {(top
         ? [
-          { src: 'trees', y: 0, h: 13, dur: 5.35 },
-          { src: 'stand', y: 13, h: 9, dur: 2.82 },
-          { src: 'hedge', y: 22, h: 4, dur: 1.69 },
+          { src: 'trees', y: 0, h: 10, dur: 5.35 },
+          { src: 'stand', y: 10, h: 7, dur: 2.82 },
+          { src: 'hedge', y: 17, h: 3.4, dur: 1.69 },
         ]
         : [
           { src: 'trees', y: 0, h: 10, dur: 6.0 },
           { src: 'stand', y: 10, h: 7, dur: 3.2 },
           { src: 'hedge', y: 17, h: 3, dur: 1.9 },
         ]
+      /**
+       * ⚠️ ★**縦の配分は画面の高さに対する %** です。★モバイル（390×844）は縦に長いので、
+       *    ★同じ % でも ★**遠景の帯が厚くなり、題字に迫って窮屈**に見えます
+       *    （★オーナー指摘・2026-09-17）。★TOP 側は上を詰めました。
+       */
       ).map((L) => (
         <ParallaxStrip
           key={L.src}
@@ -359,20 +364,27 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
         ⚠️ ★以前は `u-scroll`（★タイル幅の途中で輪に戻るので ★**跳ねます**）＋
            ★当てずっぽうの秒数（2.8s / 1.6s）でした。
       */}
+      {/*
+        ⚠️ ★奥の芝は ★**近景と明るさを揃えます**（★2026-09-17・オーナー指摘
+           ★「★モバイルの芝に横の境目が 1 本ある」）。
+        ★以前は `turf-far` が 1.07・`turf-mid` が 1.10・近景が 1.10 と ★**段違い**で、
+        ★縦に長い画面ほど ★**その境目が帯として見えて**いました。
+        → ★3 つとも同じ明るさにし、★遠近は ★**近景の縦のぼかし**だけで作ります。
+      */}
       <ParallaxStrip
         src="/art/uma/turf-far.webp"
-        top={top ? '26%' : '20%'}
+        top={top ? '20.4%' : '20%'}
         height={top ? '7%' : '6%'}
         dur={0.93}
-        filter={top ? 'brightness(1.07) saturate(1.05)' : 'brightness(.9)'}
+        filter={top ? 'brightness(1.1) saturate(1.04)' : 'brightness(.88) saturate(1.02)'}
       />
       {top && (
         <ParallaxStrip
           src="/art/uma/turf-mid.webp"
-          top="33%"
+          top="27.4%"
           height="9%"
           dur={0.76}
-          filter="brightness(1.1) saturate(1.05)"
+          filter="brightness(1.1) saturate(1.04)"
         />
       )}
       {/*
@@ -442,20 +454,25 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
       }} />
       {top ? (
         <>
-          <div style={{
-            position: 'absolute', left: '6%', top: '2%', height: '25%', aspectRatio: '62 / 282',
-            background: "url('/art/uma/finish-tower.webp') no-repeat bottom center/contain", filter: 'brightness(1.08)',
-          }} />
+          {/*
+            🔴 ★**審判塔は消しました**（★2026-09-17・オーナー指摘
+              ★「★左奥に鉄塔があるが動かないので削除してください」）。
+
+            ★中継では `manifest.json` の `objects` として ★**走路上の距離に立つ**ので、
+            ★カメラが動けば一緒に流れます。★TOP は世界を持たないため、
+            ★1 か所に貼るしかなく、★**そこだけ止まって見えて**いました。
+            ⚠️ ★素材（`uma/finish-tower.webp`）は残してあります。
+          */}
           {/*
             ★内柵も流します（★2026-09-17）。★観客席と芝だけ動いて
             ★**中間の柵が貼り付く**と、かえって不自然に見えます。
             ★奥の芝（2.8s）とほぼ同じ速さにします。
           */}
           {/* ★内柵は `depthOffsetM +10` → ★1.13s（★中継の公式から） */}
-          <ParallaxStrip src="/art/uma/inner-rail.webp" top="25.4%" height={30} dur={1.13} filter="brightness(1.12)" />
+          <ParallaxStrip src="/art/uma/inner-rail.webp" top="19.8%" height={26} dur={1.13} filter="brightness(1.12)" />
           <div style={{
-            position: 'absolute', left: 0, right: 0, top: '42%', bottom: 0,
-            background: 'linear-gradient(rgba(255,255,255,.3),rgba(255,255,255,0) 26%,rgba(12,26,14,.1) 70%,rgba(12,26,14,.28) 100%)',
+            position: 'absolute', left: 0, right: 0, top: '36.4%', bottom: 0,
+            background: 'linear-gradient(rgba(255,255,255,.18),rgba(255,255,255,0) 26%,rgba(12,26,14,.1) 70%,rgba(12,26,14,.28) 100%)',
           }} />
           {/* ★前柵は `depthOffsetM −13` → ★0.48s（★いちばん手前なのでいちばん速い） */}
           <ParallaxStrip src="/art/uma/front-rail.webp" bottom={0} height={120} dur={0.48} position="top" filter="brightness(1.06) saturate(1.04)" />

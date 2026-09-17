@@ -172,12 +172,15 @@
  *    ★親に `overflow: hidden` があるので目には見えませんが、★**要素は画面外に在ります**。
  * → ★**画面の中から**始め、★出現は `opacity` で作ります。★見た目の流れは変わりません。
  */
-@keyframes u-streak {
-  0% { transform: translateX(0); opacity: 0; }
-  8% { opacity: 0.9; }
-  70% { opacity: 0.9; }
-  100% { transform: translateX(-170%); opacity: 0; }
-}
+/*
+  🔴 ★**速度線（`u-streak`）は廃止しました**（★2026-09-17・オーナー指摘
+    ★「★手前の芝がなぜか半透明の何かがある」）。
+
+  ★芝の段の境目を消して地面が落ち着いたぶん、★白い横帯だけが残り、
+  ★**何なのか分からないもの**として見えていました。
+  ★速さの手がかりは ★背景 3 層と ★馬の 8 コマが担います。
+  ⚠️ ★使う所は 0 件（grep で確認）。★規則ごと消します（★空の規則を残さない）。
+*/
 @keyframes u-notice { from { transform: translateY(-10px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /*

@@ -38,21 +38,14 @@ export default function UmaTop(): React.ReactElement {
     >
       <Backdrop variant="top" />
 
-      {/* ★速度線（★停止しても 0% から不透明＝消えない・資料 §5-7 の 4） */}
-      <div aria-hidden>
-        {[
-          { top: '47%', width: '54%', height: 10, alpha: 0.8, dur: '.8s', delay: '0s' },
-          { top: '58%', width: '66%', height: 13, alpha: 0.62, dur: '.66s', delay: '-.2s' },
-          { top: '70%', width: '46%', height: 10, alpha: 0.45, dur: '.95s', delay: '-.5s' },
-        ].map((s) => (
-          <span key={s.top} style={{
-            position: 'absolute', right: 0, top: s.top, width: s.width, height: s.height,
-            borderRadius: s.height / 2,
-            background: `linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,${s.alpha}) 55%,rgba(255,255,255,0))`,
-            animation: `u-streak ${s.dur} linear ${s.delay} infinite`,
-          }} />
-        ))}
-      </div>
+      {/*
+        🔴 ★**速度線は消しました**（★2026-09-17・オーナー指摘
+          ★「★手前の芝がなぜか半透明の何かがある」）。
+
+        ★芝の段の境目を消して地面が落ち着いたぶん、★白い横帯だけが残り、
+        ★**何なのか分からないもの**として見えていました。★速さの手がかりは
+        ★背景 3 層と馬の 8 コマが担うので、★この線は要りません。
+      */}
 
       {/* ★題字（金プレート）＋副題の丸札 */}
       <div style={{
@@ -103,8 +96,14 @@ export default function UmaTop(): React.ReactElement {
            ★**webp（1 枚 56KB）**にしました。
       */}
       <div aria-hidden style={{
-        position: 'absolute', right: '2%', bottom: '25%',
-        width: 'clamp(250px,40cqw,520px)', aspectRatio: '970 / 576',
+        /**
+         * ★**馬を主役にします**（★2026-09-17・オーナー指摘
+         *   ★「★はじめる・ログインボタンを小さくし、★馬を主役にしてください」）。
+         * ★狭い画面ほど ★**画面幅に対して大きく**なるよう、下限を上げました
+         *   （★390px のとき 300px ＝ 画面の 77%）。
+         */
+        position: 'absolute', right: '2%', bottom: '21%',
+        width: 'clamp(300px,44cqw,560px)', aspectRatio: '970 / 576',
         transformOrigin: 'bottom center',
         /**
          * ⚠️ ★**跳ねは付けません**（★2026-09-17）。★1 枚絵だったときの名残で
@@ -141,19 +140,26 @@ export default function UmaTop(): React.ReactElement {
         background: 'linear-gradient(rgba(8,20,10,0) 0%,rgba(8,20,10,.44) 42%,rgba(8,20,10,.66) 100%)',
       }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center', width: '100%', maxWidth: 900, margin: '0 auto' }}>
+          {/*
+            ★**ボタンは小さくしました**（★2026-09-17・オーナー指摘）。
+            ⚠️ ★ただし ★**44px は下回りません**（★指で押せる大きさ・★実ブラウザの診断が見ています）。
+               ★高さ 92px 固定 → ★`clamp(56px, 11cqw, 88px)`。★390px のとき **56px**。
+          */}
           <a href="/signup" style={{
-            flex: '1.3 1 260px', maxWidth: 470, minHeight: 92, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '6px solid var(--u-navy)', borderRadius: 10,
+            flex: '1.3 1 180px', maxWidth: 470, minHeight: 'clamp(56px,11cqw,88px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '5px solid var(--u-navy)', borderRadius: 10,
             backgroundImage: 'linear-gradient(#58c079 0%,#2f9e4f 46%,#1b6f34 100%)',
-            boxShadow: '0 10px 0 #0a2340, 0 16px 24px rgba(8,18,8,.42), inset 0 4px 0 rgba(255,255,255,.6)',
-            color: '#fff', fontSize: 'clamp(30px,7.6cqw,40px)', textShadow: '0 3px 0 rgba(0,0,0,.32)',
+            boxShadow: '0 7px 0 #0a2340, 0 12px 20px rgba(8,18,8,.42), inset 0 3px 0 rgba(255,255,255,.6)',
+            color: '#fff', fontSize: 'clamp(20px,4.6cqw,38px)', textShadow: '0 3px 0 rgba(0,0,0,.32)',
           }}>はじめる</a>
           <a href="/login" style={{
-            flex: '1 1 220px', maxWidth: 380, minHeight: 92, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '6px solid var(--u-navy)', borderRadius: 10,
+            flex: '1 1 150px', maxWidth: 380, minHeight: 'clamp(56px,11cqw,88px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '5px solid var(--u-navy)', borderRadius: 10,
             backgroundImage: 'linear-gradient(#ffffff 0%,#e6eef6 100%)',
-            boxShadow: '0 10px 0 rgba(10,35,64,.9), 0 16px 24px rgba(8,18,8,.42), inset 0 4px 0 #fff',
-            color: 'var(--u-ink-dark)', fontSize: 'clamp(27px,6.6cqw,36px)',
+            boxShadow: '0 7px 0 rgba(10,35,64,.9), 0 12px 20px rgba(8,18,8,.42), inset 0 3px 0 #fff',
+            color: 'var(--u-ink-dark)', fontSize: 'clamp(18px,4.1cqw,34px)',
           }}>ログイン</a>
         </div>
         <div style={{ marginTop: 12, textAlign: 'center', fontSize: 'clamp(12px,3cqw,15px)', color: 'var(--u-ink-light)' }}>
