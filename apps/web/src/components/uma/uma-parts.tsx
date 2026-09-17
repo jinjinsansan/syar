@@ -323,10 +323,35 @@ function ParallaxStrip({ src, top, height, dur, position = 'center', filter, bot
   );
 }
 
+/**
+ * ★**中継の板の割合**（★2026-09-17・オーナー指摘
+ *   ★「★レース演出そのものの芝にしていないからです」）。
+ *
+ * ★`/art/parallax/backstretch-side-v1/manifest.json` の板は **941px** で、
+ * ★層ごとに `plateY0`〜`plateY1` が決まっています。★その割合をそのまま使います。
+ * ⚠️ ★これを守らないと、★`turf-near`（板の 9.6%）を画面の 64% へ ★**5 倍に引き伸ばす**ことになり、
+ *    ★ぼやけて白っぽくなります（★「手前が半透明」の正体）。
+ *
+ * ★`dur` は中継の公式から（★`parallax-plate.ts:14`・★注視点 30m・`turf-near`=1 の比）。
+ */
+const PLATE_LAYERS = [
+  { src: 'trees', y: 0, h: 19.98, dur: 5.35 },
+  { src: 'stand', y: 19.98, h: 16.37, dur: 2.82 },
+  { src: 'hedge', y: 36.34, h: 5.95, dur: 1.69 },
+  { src: 'back-rails', y: 42.30, h: 6.38, dur: 1.35 },
+  { src: 'inner-rail', y: 48.67, h: 4.78, dur: 1.13 },
+  { src: 'turf-far', y: 53.45, h: 7.97, dur: 0.93 },
+  { src: 'turf-mid', y: 61.42, h: 9.99, dur: 0.76 },
+  { src: 'turf-near', y: 71.41, h: 9.56, dur: 0.62 },
+  { src: 'front-rail', y: 80.98, h: 19.02, dur: 0.48 },
+] as const;
+
 export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' | 'top' }): React.ReactElement {
   const top = variant === 'top';
-  /** ★近景が始まる高さ（★TOP は内柵の下から・★画面版はもっと上から） */
-  const regionTop = top ? 36.4 : 26;
+  /*
+    ⚠️ ★`regionTop`（近景が始まる高さ）は ★**もう要りません**（★2026-09-17・第 3 稿）。
+       ★層の縦位置は ★`PLATE_LAYERS`（★中継の板の割合）が持っています。
+  */
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
       {/*
@@ -343,192 +368,48 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
            （`parallax-plate.ts:14`: `pxPerM = packPxPerM × packDepthM / (packDepthM + depthOffsetM)`）。
            ★注視点の深さを代表値 30m とし、★`turf-near` を 1 とした比で割っています。
       */}
-      {(top
-        ? [
-          { src: 'trees', y: 0, h: 10, dur: 5.35 },
-          { src: 'stand', y: 10, h: 7, dur: 2.82 },
-          { src: 'hedge', y: 17, h: 3.4, dur: 1.69 },
-        ]
-        : [
-          { src: 'trees', y: 0, h: 10, dur: 6.0 },
-          { src: 'stand', y: 10, h: 7, dur: 3.2 },
-          { src: 'hedge', y: 17, h: 3, dur: 1.9 },
-        ]
-      /**
-       * ⚠️ ★**縦の配分は画面の高さに対する %** です。★モバイル（390×844）は縦に長いので、
-       *    ★同じ % でも ★**遠景の帯が厚くなり、題字に迫って窮屈**に見えます
-       *    （★オーナー指摘・2026-09-17）。★TOP 側は上を詰めました。
-       */
-      ).map((L) => (
+      {/*
+        🔴 ★**中継の板の割合をそのまま使います**（★2026-09-17・第 3 稿・オーナー指摘
+          ★「★おそらくデザイナーのハンドオフ通りの芝にしており、
+          ★**レース演出そのものの芝にしていないから**です」）。
+
+        ★ご指摘のとおりでした。★中継は `manifest.json` の板（**941px**）に
+        ★層ごとの高さが決まっており、★`turf-near` は ★**板の 9.6% しかありません**。
+        ★私はそれを ★**画面の 64% に 5 倍以上へ引き伸ばして**いました。
+        ★引き伸ばした芝はぼやけて白っぽくなり、★「★手前が半透明」に見えていました。
+        ⚠️ ★土台を敷いても直らなかったのは、★**透けていたのではなく、ぼけていた**からです。
+
+        → ★板の割合（trees 20% / stand 16.4% / hedge 6% / back-rails 6.4% /
+          ★inner-rail 4.8% / turf-far 8% / turf-mid 10% / turf-near 9.6% / front-rail 19%）を
+          ★そのまま使い、★素材も ★**中継と同じ `/art/parallax/backstretch-side-v1/`** から読みます。
+        ⚠️ ★`back-rails` は ★**これまで使っていませんでした**（★`uma/` に写していなかった）。
+        ★秒数はすべて中継の公式から（★`depthOffsetM`）。
+      */}
+      {PLATE_LAYERS.map((L) => (
         <ParallaxStrip
           key={L.src}
-          src={`/art/uma/${L.src}.webp`}
+          src={`/art/parallax/backstretch-side-v1/${L.src}.webp`}
           top={`${L.y}%`}
           height={`${L.h}%`}
           dur={L.dur}
           position="bottom"
-          filter={top ? 'saturate(1.04) brightness(1.1) contrast(1.02)' : 'saturate(1.02) brightness(.92)'}
+          filter={top ? 'saturate(1.04) brightness(1.06)' : 'saturate(1.02) brightness(.9)'}
         />
       ))}
       {/*
-        ★奥の芝も ★**中継の秒数**にします（★`depthOffsetM` turf-far +3 / turf-mid −3）。
-        ⚠️ ★以前は `u-scroll`（★タイル幅の途中で輪に戻るので ★**跳ねます**）＋
-           ★当てずっぽうの秒数（2.8s / 1.6s）でした。
+        🔴 ★**ここに在った層を全部消しました**（★2026-09-17・第 3 稿）。
+
+        ★`PLATE_LAYERS` の 9 層を足したのに、★古い作りを ★**そのまま残して**いました:
+          ★`turf-far`/`turf-mid` の個別の呼び出し／★土台 1 枚／★ぼかしを掛けた 3 枚／
+          ★遠近の沈み 2 枚／★刈り跡／★`inner-rail`／★`front-rail`。
+        ★同じ芝が ★**三重四重に重なる**ところでした（★二重帳簿・D-052）。
+        → ★**板の 9 層だけ**にします。★遠近も速さも、★中継がすでに決めています。
+
+        ⚠️ ★刈り跡（`u-mow`）も外しました。★板の芝には ★**もともと刈り跡が描かれて**おり、
+           ★上から足すと ★**二重**になります。
       */}
-      {/*
-        ⚠️ ★奥の芝は ★**近景と明るさを揃えます**（★2026-09-17・オーナー指摘
-           ★「★モバイルの芝に横の境目が 1 本ある」）。
-        ★以前は `turf-far` が 1.07・`turf-mid` が 1.10・近景が 1.10 と ★**段違い**で、
-        ★縦に長い画面ほど ★**その境目が帯として見えて**いました。
-        → ★3 つとも同じ明るさにし、★遠近は ★**近景の縦のぼかし**だけで作ります。
-      */}
-      <ParallaxStrip
-        src="/art/uma/turf-far.webp"
-        top={top ? '20.4%' : '20%'}
-        height={top ? '7%' : '6%'}
-        dur={0.93}
-        filter={top ? 'brightness(1.1) saturate(1.04)' : 'brightness(.88) saturate(1.02)'}
-      />
-      {top && (
-        <ParallaxStrip
-          src="/art/uma/turf-mid.webp"
-          top="27.4%"
-          height="9%"
-          dur={0.76}
-          filter="brightness(1.1) saturate(1.04)"
-          /** ★下端を消して、★手前の芝（`u-turf` の上端＝ゆっくり）へ ★**速さを繋ぎます** */
-          fadeBottom="linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%)"
-        />
-      )}
-      {/*
-        ★**近景の芝**（★2026-09-17・第 2 稿）。
-
-        🔴 ★**前の作りは失敗でした。** ★「遠近 4 段」にして各段の明るさを 3.5% ずつ
-           ★階段状にし、★段の頭に白い線まで足しました。★私は「★境目が遠近の線として
-           ★読める」と書きましたが、★**読めていません。★継ぎ目にしか見えませんでした**
-           （★オーナー指摘「★芝の動きも雑なまま」「★PC 表示では隙間から芝の雑が見える」）。
-           ★機械の診断は 0 点になったのに、★**苦情の言葉は消えていません**でした。
-
-        → ★**段そのものをやめます。** ★1 枚で敷き、★遠近は
-          ★**上を暗く沈める縦のぼかし**だけで作ります（★線が 1 本も出ません）。
-        ⚠️ ★`backgroundSize` の横は ★**`150cqw`**（★画面幅の 1.5 倍）。
-           ★`u-turf` が ★**ちょうど 1 枚ぶん**流すので、★輪に戻るときの跳ねも出ません。
-        ⚠️ ★縦は 1 枚を引き伸ばします。★芝の筋がやわらかく溶けますが、
-           ★**等間隔の線が出るよりは良い**と判断しました（★オーナーの目で最終判断）。
-      */}
-      {/*
-        🔴 ★**第 3 稿。★第 2 稿も間違いでした**（★2026-09-17・オーナー指摘
-          ★「★芝の動きがおかしいです」「★芝の動きが悪い」）。
-
-        ★第 1 稿 … ★遠近 4 段。★段の境目が ★**明るい横線**として出ました。
-        ★第 2 稿 … ★段をやめて ★**1 枚**に。★線は消えましたが、★**地面全体が同じ速さで滑ります**。
-                  ★手前も奥も同じ速さなので、★**動きとして間違い**です。
-                  → ★私は「線」を消すことだけを見て、★**速さの遠近を捨てていました**。
-
-        → ★第 3 稿: ★**速さの違う 3 枚を、ぼかして重ねます**。
-          ★どの枚も領域の全体を覆い、★`mask` の濃淡で ★上／中／下に効かせます。
-          ★**境目が無い**ので線は出ず、★**速さは縦に連続して変わります**。
-        ⚠️ ★`mask-image` は Safari のために `-webkit-` も併記します。
-      */}
-      {/*
-        🔴 ★**土台を 1 枚敷きます**（★2026-09-17・オーナー指摘「★まだ手前が半透明です」）。
-
-        ★近景は ★**ぼかしを掛けた 3 枚**を重ねています。★ぼかし同士が重なる所の不透明度は
-        ★`1 − (1−a₁)(1−a₂)` で、★**1 に届きません**。★この背景には地の色が無いので、
-        ★足りないぶんだけ ★**ページの地（薄い水色）が透けて**いました。
-        → ★**ぼかし無しの 1 枚**を下に敷いて、★必ず埋まるようにします。
-        ⚠️ ★土台は ★**いちばん奥の速さ**にします（★上に重なる 3 枚が手前ほど速いので、
-           ★土台が速いと ★**下から速い芝が透けて**ちらつきます）。
-      */}
-      <div style={{
-        position: 'absolute', left: 0, right: 0, top: `${regionTop}%`, bottom: 0,
-        background: "url('/art/uma/turf-near.webp') repeat-x center",
-        backgroundSize: '150cqw 100%',
-        filter: top ? 'brightness(1.1) saturate(1.04)' : 'brightness(.88) saturate(1.02)',
-        animation: `u-turf ${top ? 1.8 : 2.0}s linear infinite`,
-      }} />
-      {([
-        { dur: top ? 1.8 : 2.0, mask: 'linear-gradient(to bottom, #000 0%, #000 16%, transparent 46%)' },
-        { dur: top ? 1.05 : 1.2, mask: 'linear-gradient(to bottom, transparent 10%, #000 32%, #000 54%, transparent 80%)' },
-        { dur: top ? 0.6 : 0.68, mask: 'linear-gradient(to bottom, transparent 44%, #000 74%, #000 100%)' },
-      ] as const).map((L) => (
-        <div key={L.dur} style={{
-          position: 'absolute', left: 0, right: 0, top: `${regionTop}%`, bottom: 0,
-          background: "url('/art/uma/turf-near.webp') repeat-x center",
-          backgroundSize: '150cqw 100%',
-          filter: top ? 'brightness(1.1) saturate(1.04)' : 'brightness(.88) saturate(1.02)',
-          animation: `u-turf ${L.dur}s linear infinite`,
-          maskImage: L.mask,
-          WebkitMaskImage: L.mask,
-        }} />
-      ))}
-      {/* ★遠近（★奥ほど沈む）。★**境目を作らない**ので、線が出ません */}
-      <div style={{
-        position: 'absolute', left: 0, right: 0, top: `${regionTop}%`, bottom: 0,
-        /**
-         * 🔴 ★**上端は透明から始めます**（★2026-09-17・オーナー指摘
-         *   ★「★モバイルの芝に横の境目が 1 本ある」の最後の 1 本）。
-         *
-         * ⚠️ ★以前は `rgba(18,40,20,.34) 0%` と ★**いきなり 34% の暗がり**で始めていました。
-         *    ★この沈みは ★**近景の領域の中だけ**に掛かるので、★その上の `turf-mid` には
-         *    ★掛かりません。★つまり近景の上端（★モバイルで y=307）で
-         *    ★**明るさが段で飛び**、★そこが線に見えていました。
-         * ⚠️ ★PC で目立たなかったのは、★近景が画面の 64% と広く ★**緩やかに見えた**だけです。
-         *    ★縦に長いモバイルでは、★同じ段差が ★**そのまま線**になります。
-         * → ★0% を透明にし、★数 % かけて濃くします（★境目が無くなります）。
-         */
-        background: top
-          ? 'linear-gradient(rgba(18,40,20,0) 0%,rgba(18,40,20,.28) 7%,rgba(18,40,20,.14) 24%,rgba(18,40,20,0) 54%)'
-          : 'linear-gradient(rgba(6,20,10,0) 0%,rgba(6,20,10,.34) 7%,rgba(6,20,10,.17) 26%,rgba(6,20,10,0) 58%)',
-      }} />
-      {/*
-        ★**刈り跡**（★2026-09-17・オーナー指示「★芝をあなたが治してください」）。
-        ★競馬場の芝は横切る向きに刈り跡が入ります。★真横から見ると
-        ★**縦の帯が流れていく**ので、★速さの手がかりにもなります。
-        ⚠️ ★**これは見た目の足し算です。** ★要らなければ ★この `<div>` を消すだけで戻せます。
-      */}
-      <div style={{
-        position: 'absolute', left: 0, right: 0, top: `${regionTop}%`, bottom: 0,
-        backgroundImage: 'repeating-linear-gradient(90deg,rgba(255,255,255,.06) 0 60px,rgba(6,26,10,.06) 60px 120px)',
-        backgroundSize: '120px 100%',
-        animation: `u-mow ${top ? '.62s' : '.7s'} linear infinite`,
-        mixBlendMode: 'soft-light',
-      }} />
-      {top ? (
-        <>
-          {/*
-            🔴 ★**審判塔は消しました**（★2026-09-17・オーナー指摘
-              ★「★左奥に鉄塔があるが動かないので削除してください」）。
-
-            ★中継では `manifest.json` の `objects` として ★**走路上の距離に立つ**ので、
-            ★カメラが動けば一緒に流れます。★TOP は世界を持たないため、
-            ★1 か所に貼るしかなく、★**そこだけ止まって見えて**いました。
-            ⚠️ ★素材（`uma/finish-tower.webp`）は残してあります。
-          */}
-          {/*
-            ★内柵も流します（★2026-09-17）。★観客席と芝だけ動いて
-            ★**中間の柵が貼り付く**と、かえって不自然に見えます。
-            ★奥の芝（2.8s）とほぼ同じ速さにします。
-          */}
-          {/* ★内柵は `depthOffsetM +10` → ★1.13s（★中継の公式から） */}
-          <ParallaxStrip src="/art/uma/inner-rail.webp" top="19.8%" height={26} dur={1.13} filter="brightness(1.12)" />
-          {/*
-            🔴 ★**上端の白い光を消しました**（★2026-09-17・PC で 1 本残っていた横帯）。
-
-            ★近景の始まり（y=262）には ★**ぼかしが 2 枚**重なっていました:
-              ★① `rgba(18,40,20,.34)` … ★遠近の沈み（★奥を暗く）— ★**要ります**
-              ★② `rgba(255,255,255,.18)` … ★上端の白い光 — ★**これが帯に見えていました**
-            ★②は芝に段があった頃の名残で、★段を無くしたいまは ★**境目を光らせるだけ**でした。
-            → ★白い光をやめ、★下の沈みだけ残します。
-          */}
-          <div style={{
-            position: 'absolute', left: 0, right: 0, top: '36.4%', bottom: 0,
-            background: 'linear-gradient(rgba(12,26,14,0) 0%,rgba(12,26,14,.1) 70%,rgba(12,26,14,.28) 100%)',
-          }} />
-          {/* ★前柵は `depthOffsetM −13` → ★0.48s（★いちばん手前なのでいちばん速い） */}
-          <ParallaxStrip src="/art/uma/front-rail.webp" bottom={0} height={120} dur={0.48} position="top" filter="brightness(1.06) saturate(1.04)" />
-        </>
-      ) : (
+      {top ? null : (
+        /* ★画面版は文字を載せるので、★背景を沈めます（★TOP は沈めない） */
         <div style={{
           position: 'absolute', inset: 0,
           background: 'linear-gradient(rgba(10,35,64,.5) 0%,rgba(10,35,64,.28) 26%,rgba(8,20,10,.42) 62%,rgba(8,20,10,.78) 100%)',

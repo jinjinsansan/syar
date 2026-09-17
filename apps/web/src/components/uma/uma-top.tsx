@@ -47,30 +47,81 @@ export default function UmaTop(): React.ReactElement {
         ★背景 3 層と馬の 8 コマが担うので、★この線は要りません。
       */}
 
-      {/* ★題字（金プレート）＋副題の丸札 */}
+      {/*
+        ★**題字＝札なし・白抜き文字＋耳と目**（★2026-09-17・オーナー指示
+          ★「★タイトルをスクリーンショットのように ★**耳と目**をつけてください」
+          ★「★目は ★**レース演出の馬の目**を使ってください」
+          ★「★デザイナーに依頼しましたがうまくできないのであなたがやってください」）
+
+        ★デザイナー案 4「★札なし・白抜き文字＋耳と目」の形です。
+        ★札で背景を塞がないぶん、★観客席や木立が透けて見えます。
+
+        ⚠️ ★目は ★**中継の素材から切り出したもの**です
+           （`horse-jockey-side-v8-pose05.png` の x 757〜873 / y 144〜230 → `uma/title-eye.webp`）。
+           ★描き起こしていません。★中継と同じ目です。
+        ⚠️ ★最初 `race/page.tsx:1107` の実測値（nx 0.61〜0.69）をそのまま当てて、
+           ★**胴と手綱**を切り出しました。★あの数字は ★**別のコマ・別の座標系**の話でした。
+           → ★素材を開いて目で確かめてから切り出しました。
+      */}
       <div style={{
-        position: 'absolute', left: 0, right: 0, top: '10%',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '0 14px',
+        position: 'absolute', left: 0, right: 0, top: '9%',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(6px,1.4cqw,12px)',
+        padding: '0 14px',
       }}>
-        <div style={{
-          position: 'relative', border: '6px solid var(--u-navy)', borderRadius: 22,
-          boxShadow: '0 8px 0 #12200f, 0 18px 30px rgba(8,18,8,.5)',
-          backgroundImage: 'var(--u-gold-plate)', backgroundSize: '240% 100%',
-          animation: 'u-sheen 5s linear infinite', padding: '12px 28px 16px',
-        }}>
+        <div style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+          {/* ★耳（★2 つ）。★文字の上に少しはみ出させます */}
+          {([['left', '20%'], ['right', '20%']] as const).map(([side, off]) => (
+            <span key={side} aria-hidden style={{
+              /** ⚠️ ★耳は ★**字に食い込ませます**（★離すと浮いて見えます・★2026-09-17 の実測） */
+              position: 'absolute', top: 'clamp(-20px,-3.6cqw,-9px)', [side]: off,
+              width: 'clamp(24px,4.6cqw,48px)', height: 'clamp(30px,5.8cqw,60px)',
+              background: 'var(--u-ink-dark)',
+              /** ★耳の形（★先が尖り、根元が広い） */
+              clipPath: 'polygon(50% 0%, 88% 72%, 72% 100%, 28% 100%, 12% 72%)',
+              transform: side === 'left' ? 'rotate(-13deg)' : 'rotate(13deg)',
+            }}>
+              <span style={{
+                position: 'absolute', left: '26%', right: '26%', top: '22%', bottom: '14%',
+                background: '#b8794a',
+                clipPath: 'polygon(50% 0%, 92% 74%, 70% 100%, 30% 100%, 8% 74%)',
+              }} />
+            </span>
+          ))}
+
           <h1 style={{
             /**
-             * ⚠️ ★`lineHeight` は **1.02 → 1.18**（★2026-09-17）。
-             *    ★1.02 だと箱が 128.5px なのに ★**日本語の字面は 148px** で、
-             *    ★実ブラウザの診断が「★中身が箱より高い（+19px）」と拾いました。
-             *    ★欧文の行送りのつもりで詰めると、★和文は字面がはみ出します。
+             * ⚠️ ★`lineHeight` は **1.18**。★1.02 だと ★**和文の字面がはみ出します**
+             *    （★実ブラウザの診断が「中身が箱より高い +19px」と拾いました）。
              */
             margin: 0, fontSize: 'clamp(58px,20cqw,126px)', lineHeight: 1.18, letterSpacing: '.03em',
-            whiteSpace: 'nowrap', color: 'var(--u-ink-dark)', textShadow: '0 3px 0 rgba(255,255,255,.6)',
+            whiteSpace: 'nowrap', color: '#fff',
+            /** ★白抜き（★濃紺の縁取り＋落ち影）。★札が無いので、★縁で背景から浮かせます */
+            WebkitTextStroke: 'clamp(3px,0.7cqw,7px) var(--u-navy)',
+            paintOrder: 'stroke fill',
+            textShadow: '0 6px 0 rgba(10,35,64,.55), 0 14px 26px rgba(8,18,8,.45)',
           }}>馬物語</h1>
+
+          {/* ★目（★2 つ・★中継の素材そのもの）。★文字の上に重ねます */}
+          {([['left', '24%'], ['right', '24%']] as const).map(([side, off]) => (
+            <span key={side} aria-hidden style={{
+              /**
+               * 🔴 ★**目は字に乗せません**（★2026-09-17・撮って分かりました）。
+               *    ★最初 `top: 4px` に置いたところ、★`馬` と `物` の上に乗って
+               *    ★**字が読めなくなり**ました。→ ★字の ★**上の余白**に置きます。
+               */
+              position: 'absolute', top: 'clamp(-14px,-2.6cqw,-6px)', [side]: off,
+              width: 'clamp(32px,6.2cqw,66px)', aspectRatio: '116 / 86',
+              background: "url('/art/uma/title-eye.webp') no-repeat center/contain",
+              /** ★右の目は左右を反転（★1 枚の素材で 2 つ作る） */
+              transform: side === 'right' ? 'scaleX(-1)' : undefined,
+              filter: 'drop-shadow(0 3px 4px rgba(8,18,8,.5))',
+            }} />
+          ))}
         </div>
+
         <div style={{
-          padding: '8px 16px', background: 'var(--u-navy)', border: '4px solid var(--u-gold)',
+          padding: 'clamp(5px,1.1cqw,9px) clamp(12px,2.6cqw,20px)',
+          background: 'var(--u-navy)', border: 'clamp(2px,.5cqw,4px) solid var(--u-gold)',
           borderRadius: 999, fontSize: 'clamp(11px,2.9cqw,16px)', letterSpacing: '.12em',
           whiteSpace: 'nowrap', color: 'var(--u-ink-light)',
         }}>そだてる ・ とうひょう ・ かけぬける</div>
@@ -107,8 +158,14 @@ export default function UmaTop(): React.ReactElement {
          *    ★上限 560px はそのまま。★`92cqw` は 1280px のとき 1178px なので ★**必ず 560px で頭打ち**です。
          * ★狭い画面だけ大きくします（★390px のとき **360px ＝ 画面の 92%**）。
          */
-        position: 'absolute', right: '1%', bottom: '19%',
-        width: 'clamp(360px,92cqw,560px)', aspectRatio: '970 / 576',
+        /**
+         * ⚠️ ★**PC は変えません**（★オーナー「★PC 表示は馬とタイトルがいいバランスです」）。
+         *    ★`104cqw` は 1280px のとき 1331px なので ★**必ず 560px で頭打ち**です。
+         * ★狭い画面だけさらに大きく（★390px のとき **406px ＝ 画面いっぱい**。
+         *   ★鼻先と尾が少し外へ出て、★迫力が出ます。★親が隠すので欠けては見えません）。
+         */
+        position: 'absolute', right: '-3%', bottom: '17%',
+        width: 'clamp(406px,104cqw,560px)', aspectRatio: '970 / 576',
         transformOrigin: 'bottom center',
         /**
          * ⚠️ ★**跳ねは付けません**（★2026-09-17）。★1 枚絵だったときの名残で
