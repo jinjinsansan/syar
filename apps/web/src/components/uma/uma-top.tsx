@@ -63,79 +63,96 @@ export default function UmaTop(): React.ReactElement {
            ★**胴と手綱**を切り出しました。★あの数字は ★**別のコマ・別の座標系**の話でした。
            → ★素材を開いて目で確かめてから切り出しました。
       */}
+      {/*
+        ★**題字＝金の札＋耳（＋目）**（★2026-09-17・引き渡し資料 `タイトルロゴ２案.zip` §8-1）
+
+        🔴 ★**仕様が 11 分で正反対に変わりました。**
+           ★19:25 の資料 … ★「★**札なし・白抜き文字**＋耳と目」が確定。金プレートは却下
+           ★19:36 の資料 … ★「★**金の札＋耳**」が確定。★**白抜き文字版は却下**
+           → ★いまは ★**後者**が正本です。★前者の実装（多重アウトライン 10 本）は捨てました。
+
+        ⚠️ ★**目は 2 案あり、オーナーの最終決定待ち**です（★資料が明記）。
+           ★`TopE3.dc.html`＝目あり ／ ★`TopE3-no-eyes.dc.html`＝目なし。
+           ★ここでは ★**目あり**で作っています。★なしにする場合は
+           ★下の「★目（★目あり版のみ）」の `<span>` の中身を消すだけです。
+        ⚠️ ★金グロスと艶の動きは ★**既存の `--u-gold-plate` と `u-sheen` が資料と完全一致**
+           ★していました（★値を突き合わせて確認）。★新しく足していません。
+      */}
       <div style={{
-        position: 'absolute', left: 0, right: 0, top: '9%',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(6px,1.4cqw,12px)',
-        padding: '0 14px',
+        /** ★ブロック（★資料: `top:13%`・縦 flex・中央寄せ・**`gap:0`**・`padding:0 14px`） */
+        position: 'absolute', left: 0, right: 0, top: '13%',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, padding: '0 14px',
       }}>
-        <div style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-          {/* ★耳（★2 つ）。★文字の上に少しはみ出させます */}
-          {([['left', '11%'], ['right', '11%']] as const).map(([side, off]) => (
-            <span key={side} aria-hidden style={{
-              /**
-               * 🔴 ★**耳は目より外側・上に置きます**（★2026-09-17・撮って分かりました）。
-               *    ★最初 目と同じ辺りに置いたところ、★**耳が目の後ろに隠れ**、
-               *    ★先だけが脇から覗く形になりました。→ ★外へ 9%・上へ 10px ずらします。
-               */
-              position: 'absolute', top: 'clamp(-34px,-6.2cqw,-16px)', [side]: off,
-              width: 'clamp(30px,5.8cqw,60px)', height: 'clamp(40px,7.6cqw,78px)',
-              /**
-               * 🔴 ★**馬の毛色にします**（★2026-09-17・オーナー指摘
-               *   ★「★ありえないことになっています」）。
-               *   ★最初 濃紺（`--u-ink-dark`）で塗ったので、★**青い小さな三角**にしか見えず、
-               *   ★耳として読めませんでした。★中継の馬の毛色（鹿毛）に合わせます。
-               */
-              background: '#8a4a1e',
-              /** ★耳の形（★先が尖り、根元が広い） */
-              clipPath: 'polygon(50% 0%, 86% 70%, 74% 100%, 26% 100%, 14% 70%)',
-              transform: side === 'left' ? 'rotate(-15deg)' : 'rotate(15deg)',
-              filter: 'drop-shadow(0 3px 3px rgba(8,18,8,.45))',
-            }}>
-              {/* ★耳の内側（★薄い桃色。★中継の馬と同じ作り） */}
-              <span style={{
-                position: 'absolute', left: '28%', right: '28%', top: '20%', bottom: '16%',
-                background: '#d79a72',
-                clipPath: 'polygon(50% 0%, 92% 74%, 70% 100%, 30% 100%, 8% 74%)',
-              }} />
-            </span>
-          ))}
-
+        <div style={{
+          position: 'relative', border: '6px solid #0a2340', borderRadius: 22,
+          boxShadow: '0 8px 0 #12200f, 0 18px 30px rgba(8,18,8,.5)',
+          backgroundImage: 'var(--u-gold-plate)', backgroundSize: '240% 100%',
+          animation: 'u-sheen 5s linear infinite', padding: '12px 28px 16px',
+        }}>
           <h1 style={{
-            /**
-             * ⚠️ ★`lineHeight` は **1.18**。★1.02 だと ★**和文の字面がはみ出します**
-             *    （★実ブラウザの診断が「中身が箱より高い +19px」と拾いました）。
-             */
-            margin: 0, fontSize: 'clamp(58px,20cqw,126px)', lineHeight: 1.18, letterSpacing: '.03em',
-            whiteSpace: 'nowrap', color: '#fff',
-            /** ★白抜き（★濃紺の縁取り＋落ち影）。★札が無いので、★縁で背景から浮かせます */
-            WebkitTextStroke: 'clamp(3px,0.7cqw,7px) var(--u-navy)',
-            paintOrder: 'stroke fill',
-            textShadow: '0 6px 0 rgba(10,35,64,.55), 0 14px 26px rgba(8,18,8,.45)',
-          }}>馬物語</h1>
+            position: 'relative', margin: 0,
+            display: 'flex', alignItems: 'flex-start', whiteSpace: 'nowrap',
+            fontSize: 'clamp(58px,20cqw,126px)', lineHeight: 1.02, letterSpacing: '.03em',
+            color: '#10243a', textShadow: '0 3px 0 rgba(255,255,255,.6)',
+          }}>
+            {/*
+              ★**耳**（★資料の確定値）。★`h1` を基準に絶対配置した ★**CSS の三角形**で、
+              ★**札の上に突き出します**（`top:-.62em` / `-.47em`）。
+              ⚠️ ★内側は ★**`#f6c21c`（金）**です（★白抜き版の `#fbf7ec` ではありません）。
+            */}
+            {([
+              { key: 'l-out', left: '.30em', top: '-.62em', side: '.22em', h: '.52em', c: '#0a2340', anim: 'e2Ear 2.8s ease-in-out infinite' },
+              { key: 'l-in', left: '.36em', top: '-.47em', side: '.16em', h: '.36em', c: '#f6c21c', anim: 'e2Ear 2.8s ease-in-out infinite' },
+              { key: 'r-out', left: '.82em', top: '-.62em', side: '.22em', h: '.52em', c: '#0a2340', anim: 'e2EarR 2.8s ease-in-out -.5s infinite' },
+              { key: 'r-in', left: '.88em', top: '-.47em', side: '.16em', h: '.36em', c: '#f6c21c', anim: 'e2EarR 2.8s ease-in-out -.5s infinite' },
+            ] as const).map((E) => (
+              <span key={E.key} aria-hidden style={{
+                position: 'absolute', left: E.left, top: E.top, width: 0, height: 0,
+                borderLeft: `${E.side} solid transparent`,
+                borderRight: `${E.side} solid transparent`,
+                borderBottom: `${E.h} solid ${E.c}`,
+                transformOrigin: 'bottom center', animation: E.anim,
+              }} />
+            ))}
 
-          {/* ★目（★2 つ・★中継の素材そのもの）。★文字の上に重ねます */}
-          {([['left', '24%'], ['right', '24%']] as const).map(([side, off]) => (
-            <span key={side} aria-hidden style={{
-              /**
-               * 🔴 ★**目は字に乗せません**（★2026-09-17・撮って分かりました）。
-               *    ★最初 `top: 4px` に置いたところ、★`馬` と `物` の上に乗って
-               *    ★**字が読めなくなり**ました。→ ★字の ★**上の余白**に置きます。
-               */
-              position: 'absolute', top: 'clamp(-14px,-2.6cqw,-6px)', [side]: off,
-              width: 'clamp(32px,6.2cqw,66px)', aspectRatio: '86 / 76',
-              background: "url('/art/uma/title-eye.webp') no-repeat center/contain",
-              /** ★右の目は左右を反転（★1 枚の素材で 2 つ作る） */
-              transform: side === 'right' ? 'scaleX(-1)' : undefined,
-              filter: 'drop-shadow(0 3px 4px rgba(8,18,8,.5))',
-            }} />
-          ))}
+            {/*
+              ★**目（★目あり版のみ）**。★「馬」の字を包む `span` を基準に絶対配置した ★**丸**です。
+              ⚠️ ★**画像ではありません。** ★私は中継の素材から目を切り出して貼り、
+                 ★四角い板になって「★ありえないことになっています」と指摘されました。
+              ⚠️ ★外径を小さくすると ★**白目が痩せて瞳だけが目立ちます**（★資料の註記・73% が正）。
+            */}
+            <span style={{ position: 'relative' }}>
+              馬
+              {([
+                { key: 'near', left: '.207em', top: '.259em', d: '.379em', delay: '' },
+                { key: 'far', left: '.586em', top: '.276em', d: '.33em', delay: ' -.15s' },
+              ] as const).map((E) => (
+                <span key={E.key} aria-hidden style={{
+                  position: 'absolute', left: E.left, top: E.top, width: E.d, height: E.d,
+                  borderRadius: '50%', background: '#fbf7ec', border: '.052em solid #0a2340',
+                  boxSizing: 'border-box', animation: `e2Blink 5.2s ease-in-out${E.delay} infinite`,
+                }} />
+              ))}
+              {([
+                { key: 'near-p', left: '.31em', top: '.345em', d: '.12em' },
+                { key: 'far-p', left: '.672em', top: '.362em', d: '.103em' },
+              ] as const).map((E) => (
+                <span key={E.key} aria-hidden style={{
+                  position: 'absolute', left: E.left, top: E.top, width: E.d, height: E.d,
+                  borderRadius: '50%', background: '#0a2340',
+                }} />
+              ))}
+            </span>
+            <span>物語</span>
+          </h1>
         </div>
 
+        {/* ★副題（★資料の確定値。★地 `#0a2340`・縁 `#f6c21c`） */}
         <div style={{
-          padding: 'clamp(5px,1.1cqw,9px) clamp(12px,2.6cqw,20px)',
-          background: 'var(--u-navy)', border: 'clamp(2px,.5cqw,4px) solid var(--u-gold)',
+          marginTop: 'clamp(10px,2.4cqw,16px)',
+          padding: '8px 16px', background: '#0a2340', border: '4px solid #f6c21c',
           borderRadius: 999, fontSize: 'clamp(11px,2.9cqw,16px)', letterSpacing: '.12em',
-          whiteSpace: 'nowrap', color: 'var(--u-ink-light)',
+          whiteSpace: 'nowrap', color: '#fbf7ec',
         }}>そだてる ・ とうひょう ・ かけぬける</div>
       </div>
 

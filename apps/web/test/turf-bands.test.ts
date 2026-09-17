@@ -137,14 +137,60 @@ describe('★TOP の背景（中継の板と同じ組み方）', () => {
    * ★**題字は札なし・白抜き＋耳と目**（★オーナー指示・デザイナー案 4）。
    * ⚠️ ★目は ★**中継の素材から切り出したもの**で、描き起こしではありません。
    */
-  it('★★題字が札なし・白抜き＋耳と目', () => {
+  /**
+   * ★**題字は引き渡し資料（`TopE3.dc.html`）の確定値**（★2026-09-17・オーナー指示
+   *   ★「★ぜんぜんダメなので デザイナーのハンドオフ タイトルロゴ ZIP を置きました。
+   *   ★これを実装を開始してください」）。
+   *
+   * 🔴 ★私は資料を読まずに ★自分で耳と目を作り、★2 度作り直して 2 度とも駄目でした
+   *    （★四角い板の目／★青い三角の耳）。★**正本の値を写すだけ**が正解でした。
+   */
+  /**
+   * ★**題字は引き渡し資料（`タイトルロゴ２案.zip` §8-1）の確定値**。
+   *
+   * 🔴 ★**仕様が 11 分で正反対に変わりました**（★2026-09-17）。
+   *    ★19:25 … 「札なし・白抜き文字＋耳と目」が確定・金プレートは却下
+   *    ★19:36 … 「**金の札＋耳**」が確定・**白抜き文字版は却下**
+   *    → ★この検査も ★**後者**で固定します。★白抜き版に戻っていないことも見ます。
+   * ⚠️ ★目は ★**2 案（あり／なし）でオーナーの最終決定待ち**です。
+   *    ★いまは「あり」。★「なし」に決まったら、この検査の ★③ を外します。
+   */
+  it('★★題字が資料の確定値どおり（★金の札＋耳＋目）', () => {
     const top = read('src/components/uma/uma-top.tsx');
-    expect(top, '★金の札に戻っている').not.toContain('u-gold-plate');
-    expect(top, '★白抜きになっていない').toContain('WebkitTextStroke');
-    expect(top, '★耳が無い').toContain('clipPath');
-    expect(top, '★目が無い').toContain('title-eye.webp');
-    /** ★1 枚の素材を反転して 2 つにしている（★左右で別素材を持たない） */
-    expect(top, '★右目の反転が無い').toContain('scaleX(-1)');
+
+    /** ★① ★金の札（★却下された白抜き版に戻っていないこと） */
+    expect(top, '★金の札になっていない').toContain('u-gold-plate');
+    expect(top, '★艶の動きが無い').toContain('u-sheen 5s linear infinite');
+    expect(top, '★却下された白抜き版に戻っている（★金の段）').not.toContain('0 .241em 0 #d99f14');
+    expect(top, '★却下された白抜き版に戻っている（★縁取り）').not.toContain('WebkitTextStroke');
+    expect(top, '★字の色が資料と違う').toContain("color: '#10243a'");
+    expect(top, '★字の影が資料と違う').toContain("textShadow: '0 3px 0 rgba(255,255,255,.6)'");
+    expect(top, '★行の高さが資料と違う（1.02）').toContain('lineHeight: 1.02');
+    expect(top, '★ブロックの位置が資料と違う（13%）').toContain("top: '13%'");
+
+    /** ★② ★耳は ★**CSS の三角形**・★札の上に突き出す・★内側は金 */
+    expect(top, '★耳が自作の多角形に戻っている').not.toContain('clipPath');
+    expect(top, '★耳の外側が資料と違う').toContain("h: '.52em'");
+    expect(top, '★耳の内側が資料と違う').toContain("h: '.36em'");
+    expect(top, '★耳が札の上に出ていない').toContain("top: '-.62em'");
+    expect(top, '★耳の内側の色が資料と違う（金）').toContain("c: '#f6c21c'");
+    expect(top, '★耳が揺れない').toMatch(/e2Ear 2\.8s/);
+    expect(top, '★右耳の遅れが無い').toMatch(/e2EarR 2\.8s ease-in-out -\.5s/);
+
+    /** ★③ ★目（★目あり版）。★**画像に戻っていないこと** */
+    expect(top, '★目が画像に戻っている').not.toContain('title-eye');
+    expect(top, '★手前の白目の大きさが資料と違う').toContain("d: '.379em'");
+    expect(top, '★奥の白目の大きさが資料と違う').toContain("d: '.33em'");
+    expect(top, '★まばたきが無い').toMatch(/e2Blink 5\.2s/);
+
+    /** ★④ ★副題（★資料の確定値・★地は濃紺・縁は金） */
+    expect(top, '★副題の間隔が資料と違う').toContain("marginTop: 'clamp(10px,2.4cqw,16px)'");
+    expect(top, '★副題の縁が資料と違う（金）').toContain("border: '4px solid #f6c21c'");
+
+    const css = read('src/components/uma/uma-theme.css');
+    for (const k of ['e2Ear', 'e2EarR', 'e2Blink']) {
+      expect(css, `★${k} のキーフレームが無い`).toContain(`@keyframes ${k}`);
+    }
   });
 
   it('★★参照している素材が実在する', () => {
@@ -156,9 +202,9 @@ describe('★TOP の背景（中継の板と同じ組み方）', () => {
       const p = path.join(ROOT, `apps/web/public/art/parallax/backstretch-side-v1/${L.name}.webp`);
       expect(() => readFileSync(p), `★${L.name}.webp が無い（★層が欠ける）`).not.toThrow();
     }
-    expect(
-      () => readFileSync(path.join(ROOT, 'apps/web/public/art/uma/title-eye.webp')),
-      '★題字の目が無い',
-    ).not.toThrow();
+    /*
+      ⚠️ ★題字の目は ★**素材ではなく CSS の丸**です（★資料 `TopE3.dc.html`）。
+         ★私が切り出した `title-eye.webp` は削除しました。★ここで実在を求めません。
+    */
   });
 });

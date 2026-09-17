@@ -150,6 +150,17 @@
   0%,   12.49% { opacity: 1; }
   12.5%, 100%  { opacity: 0; }
 }
+
+/**
+ * ★**題字の耳とまばたき**（★2026-09-17・引き渡し資料 `TopE3.dc.html:24-26` の写し）
+ *
+ * ⚠️ ★**数値は資料の確定値です。★勝手に変えません**（★README §8-1）。
+ *    ★私は一度これを読まずに ★自分で耳と目を作り、★オーナーに
+ *    ★「★ありえないことになっています」「★ぜんぜんダメ」と言われました。
+ */
+@keyframes e2Ear  { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(4deg); } }
+@keyframes e2EarR { 0%, 100% { transform: rotate(6deg); }  50% { transform: rotate(18deg); } }
+@keyframes e2Blink { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
 @keyframes u-led { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 @keyframes u-rush {
   0%, 100% { transform: translateY(0) scale(1); }
