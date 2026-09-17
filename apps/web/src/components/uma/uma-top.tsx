@@ -102,8 +102,13 @@ export default function UmaTop(): React.ReactElement {
          * ★狭い画面ほど ★**画面幅に対して大きく**なるよう、下限を上げました
          *   （★390px のとき 300px ＝ 画面の 77%）。
          */
-        position: 'absolute', right: '2%', bottom: '21%',
-        width: 'clamp(300px,44cqw,560px)', aspectRatio: '970 / 576',
+        /**
+         * ⚠️ ★**PC は変えません**（★オーナー「★PC 表示は馬とタイトルがいいバランスです」）。
+         *    ★上限 560px はそのまま。★`92cqw` は 1280px のとき 1178px なので ★**必ず 560px で頭打ち**です。
+         * ★狭い画面だけ大きくします（★390px のとき **360px ＝ 画面の 92%**）。
+         */
+        position: 'absolute', right: '1%', bottom: '19%',
+        width: 'clamp(360px,92cqw,560px)', aspectRatio: '970 / 576',
         transformOrigin: 'bottom center',
         /**
          * ⚠️ ★**跳ねは付けません**（★2026-09-17）。★1 枚絵だったときの名残で

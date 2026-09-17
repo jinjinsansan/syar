@@ -430,6 +430,23 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
           ★**境目が無い**ので線は出ず、★**速さは縦に連続して変わります**。
         ⚠️ ★`mask-image` は Safari のために `-webkit-` も併記します。
       */}
+      {/*
+        🔴 ★**土台を 1 枚敷きます**（★2026-09-17・オーナー指摘「★まだ手前が半透明です」）。
+
+        ★近景は ★**ぼかしを掛けた 3 枚**を重ねています。★ぼかし同士が重なる所の不透明度は
+        ★`1 − (1−a₁)(1−a₂)` で、★**1 に届きません**。★この背景には地の色が無いので、
+        ★足りないぶんだけ ★**ページの地（薄い水色）が透けて**いました。
+        → ★**ぼかし無しの 1 枚**を下に敷いて、★必ず埋まるようにします。
+        ⚠️ ★土台は ★**いちばん奥の速さ**にします（★上に重なる 3 枚が手前ほど速いので、
+           ★土台が速いと ★**下から速い芝が透けて**ちらつきます）。
+      */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, top: `${regionTop}%`, bottom: 0,
+        background: "url('/art/uma/turf-near.webp') repeat-x center",
+        backgroundSize: '150cqw 100%',
+        filter: top ? 'brightness(1.1) saturate(1.04)' : 'brightness(.88) saturate(1.02)',
+        animation: `u-turf ${top ? 1.8 : 2.0}s linear infinite`,
+      }} />
       {([
         { dur: top ? 1.8 : 2.0, mask: 'linear-gradient(to bottom, #000 0%, #000 16%, transparent 46%)' },
         { dur: top ? 1.05 : 1.2, mask: 'linear-gradient(to bottom, transparent 10%, #000 32%, #000 54%, transparent 80%)' },
