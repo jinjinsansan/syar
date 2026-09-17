@@ -76,25 +76,31 @@ export default function UmaTop(): React.ReactElement {
       </div>
 
       {/*
-        ★**馬（真横 6 コマ）**（★2026-09-17・オーナー指示
-          ★「★真横カメラワーク６コマに差し替えて（略）★レース演出さながらの TOP ページにします」）
+        ★**馬（デフォルメ・真横）**（★2026-09-17・第 2 稿）
 
-        【★なぜ差し替えたか】
-          ⚠️ ★以前は `chibi-horse.png`（900×929・★**斜め前向きの 1 枚絵**・★脚のコマは 1 枚）を
-             ★`u-rush`（★上下に跳ねるだけ）で動かしていました。★背景の芝は ★**真横に流れる**ので、
-             ★「★その場で足踏みしている正面の馬」に見えていました（★オーナー指摘・2026-09-17）。
-          ★`horse-gallop.webp`（**1320×140＝220×140 の 6 コマ**）は ★**真横・右向き**で、
-             ★背景の流れ・速度線・砂煙（★どれも左へ）と ★**向きが揃います**。
+        【★経緯】
+          ★① 元は `chibi-horse.png`（900×929・★**斜め前向き**・脚のコマ 1 枚）でした。
+             ★背景の芝は真横に流れるので、★「その場で足踏みする正面の馬」に見えていました。
+          ★② そこで `horse-gallop.webp`（220×140 の 6 コマ）に替え、★脚は動くようになりました。
+          🔴 ★③ ★**オーナー指摘「★馬が違います」**（★2026-09-17）。★②は ★**写実のスプライト**で、
+             ★合格をいただいたダッシュボードの ★**デフォルメのキャラクターとは別系統**でした。
+             ★しかも 1 コマ 220×140 を 2 倍に拡大していたので、★輪郭も甘くなっていました。
 
-        ⚠️ ★**`u-rush` の跳ねは外しました。** ★6 コマに上下動が入っているので、
-           ★重ねると ★**二重に跳ねます**。
-        ⚠️ ★中継用の `horse-jockey-side-v9b-*` は ★**使いません**（★引き渡し資料 §4.4
-           ★「★チビ馬と混ぜないこと」）。★これは TOP 用に納品された別の絵です。
+        → ★`chibi-side.webp`（**1431×767**）に差し替えました。★デフォルメ・真横・右向きで、
+          ★ダッシュボードと ★**同じ絵柄**です。★背景の流れ・速度線・砂煙（どれも左へ）とも揃います。
+
+        ⚠️ ★**脚は動きません。** ★元絵 `horse-jockey-chibi-gallop-frame01.png` の生成指示に
+           ★「★**8 コマの gallop の frame 01（アンカー）**」とあり、★**残り 7 コマが未作成**です。
+           ★揃ったら `steps(8)` のコマ送りに戻します（★オーナー判断 ⓐ→ⓒ・依頼 R-15 §4）。
+        ⚠️ ★緑背景は `tools/remove-chroma-key.mjs` で抜き、
+           ★`tools/verify-chroma-residue.mjs` で ★**輪郭から離れた緑 0px（合格）**を確かめました。
       */}
       <div aria-hidden style={{
-        position: 'absolute', right: '4%', bottom: '27%',
-        width: 'clamp(240px,34cqw,440px)', aspectRatio: '220 / 140',
+        position: 'absolute', right: '2%', bottom: '25%',
+        width: 'clamp(250px,40cqw,520px)', aspectRatio: '1431 / 767',
         transformOrigin: 'bottom center',
+        /** ★1 枚絵なので、★ごく軽い上下だけ付けます（★脚は動きません・下の註記） */
+        animation: 'u-idle 2.6s ease-in-out infinite',
       }}>
         <span style={{ position: 'absolute', left: '14%', right: '14%', bottom: -10, height: 22, borderRadius: '50%', background: 'rgba(14,26,12,.5)', filter: 'blur(6px)' }} />
         {/* ★砂煙と土くれは ★**後ろ（左）へ**飛びます（★真横・右向きに合わせる） */}
@@ -105,12 +111,8 @@ export default function UmaTop(): React.ReactElement {
         <span style={{ position: 'absolute', left: '22%', bottom: '2%', width: 8, height: 7, borderRadius: 3, background: '#37541f', animation: 'u-clod .62s linear -.36s infinite' }} />
         <span style={{
           position: 'absolute', inset: 0,
-          backgroundImage: "url('/art/uma/horse-gallop.webp')",
-          backgroundRepeat: 'no-repeat',
-          /** ★6 コマを横に並べ、★`steps(6)` で 1 コマずつ送ります（★`u-gallop` の註記を参照） */
-          backgroundSize: '600% 100%',
-          animation: 'u-gallop .62s steps(6) infinite',
-          filter: 'saturate(1.02) drop-shadow(0 8px 12px rgba(10,20,8,.35))',
+          background: "url('/art/uma/chibi-side.webp') no-repeat bottom center/contain",
+          filter: 'drop-shadow(0 10px 14px rgba(10,20,8,.38))',
         }} />
       </div>
 

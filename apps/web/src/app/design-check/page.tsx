@@ -29,6 +29,7 @@ const SCREENS: readonly { readonly path: string; readonly label: string }[] = [
   { path: '/earn', label: 'ポイントを稼ぐ' },
   { path: '/watch-race', label: '中継の入口' },
   { path: '/odds/demo?demo=1', label: 'オッズ（見本）' },
+  /* ★画面を足したら、ここと `story-shell.tsx` の OWN_HEADER の両方に足すこと */
   { path: '/vote', label: '投票' },
   { path: '/train', label: '育成' },
   { path: '/mypage', label: 'わたしの馬' },

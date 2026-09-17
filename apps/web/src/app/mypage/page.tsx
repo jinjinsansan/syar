@@ -18,7 +18,7 @@
 
 import { useState } from 'react';
 import {
-  Backdrop, BigButton, EpCapsule, NoticeBar, PpCapsule, TopBar, useMotionPaused,
+  Backdrop, BigButton, ChibiHorse, EpCapsule, NoticeBar, PpCapsule, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
 import { DEMO_HORSES, sortStable } from '../../lib/stable';
 import { DEMO_RUNS } from '../../lib/game-demo';
@@ -128,8 +128,29 @@ export default function MyPage(): React.ReactElement {
           ))}
         </div>
 
-        {/* ★成績＋血統表 */}
+        {/* ★選んだ 1 頭＋成績＋血統表 */}
         <div style={{ flex: '1 1 250px', minWidth: 0, maxWidth: 430, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/*
+            ★**選んだ馬を大きく出します**（★2026-09-17・オーナー指示
+              ★「★わたしの馬ページにも自分の馬が出るようにしたい」）。
+
+            ⚠️ ★この画面には ★**馬の絵が 1 枚もありませんでした**（★名簿と数字だけ）。
+            ⚠️ ★**これは仮置きです。** ★本来は `horse-detail-mobile` というカードの領分ですが、
+               ★そのカードが ★**こちらに届いていません**（★依頼 R-15 の §1）。
+               ★カードが来たら、★この枠ごと差し替えます。
+            ⚠️ ★ダッシュボードと ★**同じ部品**を使います（★絵柄を 2 つに増やさない・D-052）。
+          */}
+          <div style={{
+            position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+            minHeight: 190, padding: '6px 10px 0', overflow: 'hidden',
+            border: '2px solid rgba(251,247,236,.28)', borderRadius: 12, background: 'var(--u-panel)',
+          }}>
+            <span style={{
+              position: 'absolute', left: 11, top: 8, fontSize: 11, letterSpacing: '.08em',
+              color: 'var(--u-ink-light-3)',
+            }}>{horse.name}</span>
+            <ChibiHorse running={false} width={230} height={186} />
+          </div>
           <div style={{ padding: '8px 11px', border: '2px solid rgba(251,247,236,.28)', borderRadius: 12, background: 'var(--u-panel)' }}>
             <div style={{ fontSize: 11, letterSpacing: '.08em', color: 'var(--u-ink-light-3)' }}>これまでの成績</div>
             <div style={{ display: 'flex', marginTop: 6 }}>

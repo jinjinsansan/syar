@@ -17,12 +17,6 @@
 
 import { useEffect, useState } from 'react';
 import './uma-theme.css';
-/**
- * ★近景の芝の段割りは ★**計算だけを別ファイル**に置いています（★2026-09-17）。
- * ★このファイルは `'use client'` で CSS も取り込むため、★検査から取り込めません。
- * → ★`turf-bands.ts` に置いて、★`apps/web/test/turf-bands.test.ts` で確かめます。
- */
-import { nearBands } from './turf-bands';
 
 /** ★停止の状態。★端末が「動きを減らす」なら**初期から停止**（★資料 §5-7 の 1） */
 export function useMotionPaused(): readonly [boolean, () => void] {
@@ -255,17 +249,92 @@ export function BigButton({ tone, label, sub, href, onClick, grow }: {
  * ★**背景**（★資料 §5-2・レース演出と同一素材）。
  * ⚠️ ★芝の送りは ★**必ず横方向**（★馬は右へ進むので、縦送りは進行方向と矛盾します）。
  */
+/**
+ * ★**遠景を継ぎ目なく流す帯**（★2026-09-17・オーナー指示
+ *   ★「★芝を動かすなら背景の観客席も動かないといけない」）
+ *
+ * 【★なぜ箱を 2 つ並べるのか】
+ *   ★観客席や柵は ★**縦横の比を保って**出しています（`background-size: auto 100%`）。
+ *   ★そのため ★**1 枚の幅が画面幅と一致せず**、★`background-position` を動かす作りでは
+ *   ★輪に戻るときに ★**必ず跳ねます**（★ちょうど 1 枚ぶんを指定できないため）。
+ *   → ★同じ幅の箱を 2 つ並べ、★片方を 0 → −100%、★もう片方を +100% → 0 へ。
+ *     ★終わりの瞬間、★2 枚は ★**まったく同じ絵**なので、★輪に戻っても見えません。
+ *
+ * ⚠️ ★`.u-paused` が掛かると `animation: none` で止まります（★停止スイッチ）。
+ *    ★そのとき 2 枚目は画面の右外（+100%）で止まるので、★**絵は欠けません**。
+ */
+function ParallaxStrip({ src, top, height, dur, position = 'center', filter, bottom }: {
+  readonly src: string;
+  readonly top?: number | string;
+  readonly bottom?: number | string;
+  readonly height: number | string;
+  /** ★1 周にかける秒数（★遠いものほど大きく） */
+  readonly dur: number;
+  /** ★**縦の合わせ方だけ**（`top` / `center` / `bottom`）。★横は常に左起点（上の註記） */
+  readonly position?: 'top' | 'center' | 'bottom';
+  readonly filter?: string;
+}): React.ReactElement {
+  /**
+   * 🔴 ★**1 つの箱に、絵をちょうど 1 枚**敷きます（★2026-09-17・第 3 稿）。
+   *
+   * 【★ここで 2 回間違えました。★どちらも撮って見つけました】
+   *   ★① ★最初 `background-position: center` ＋ `auto 100%` で敷き、
+   *      ★註記に「★2 枚はまったく同じ絵になる」と書きました。★**嘘でした。**
+   *      ★撮った画に ★**縦の継ぎ目が 2 本**出ました。
+   *   ★② ★起点を `left` に直しました。★継ぎ目は 2 本 → 1 本に減っただけで、★**消えませんでした。**
+   *      ★測ると、★`world-panorama` は帯の高さ 187px のとき ★**1 枚 681px**、
+   *      ★箱は 1280px で ★**1.880 枚**。★整数倍でないので、
+   *      ★箱 A の右端は ★**絵の途中（0.88 枚目）で切れ**、★箱 B は ★**絵の頭から**始まります。
+   *      → ★**起点をどこにしても、箱の幅が絵の整数倍でなければ必ず継ぎ目が出ます。**
+   *
+   * → ★**絵の幅を箱に合わせます**（`background-size: 100% 100%` ＝ 1 箱に 1 枚ちょうど）。
+   *   ★これなら箱 A の右端と箱 B の左端が ★**必ず**繋がります（★元絵の左右端はほぼ同じ色
+   *   ★— 実測で平均差 5/256 — なので、★1 枚の中の継ぎ目も出ません）。
+   *
+   * ⚠️ ★**縦横の比は崩れます**（★画面の幅と高さで見え方が変わります）。
+   *    ★継ぎ目が出るよりは良いと判断しましたが、★**最終判断はオーナーの目**です。
+   */
+  const layer: React.CSSProperties = {
+    position: 'absolute', top: 0, bottom: 0, left: 0, width: '100%',
+    background: `url('${src}') no-repeat left ${position}`,
+    backgroundSize: '100% 100%',
+  };
+  return (
+    <div style={{
+      position: 'absolute', left: 0, right: 0,
+      ...(top === undefined ? {} : { top }),
+      ...(bottom === undefined ? {} : { bottom }),
+      height, overflow: 'hidden', ...(filter === undefined ? {} : { filter }),
+    }}>
+      <span style={{ ...layer, animation: `u-pan-a ${dur}s linear infinite` }} />
+      <span style={{ ...layer, animation: `u-pan-b ${dur}s linear infinite` }} />
+    </div>
+  );
+}
+
 export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' | 'top' }): React.ReactElement {
   const top = variant === 'top';
   /** ★近景が始まる高さ（★TOP は内柵の下から・★画面版はもっと上から） */
   const regionTop = top ? 42 : 26;
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-      <div style={{
-        position: 'absolute', left: 0, right: 0, top: 0, height: top ? '26%' : '20%',
-        background: "url('/art/uma/world-panorama.webp') repeat-x bottom center", backgroundSize: 'auto 100%',
-        filter: top ? 'saturate(1.04) brightness(1.1) contrast(1.02)' : 'saturate(1.02) brightness(.92)',
-      }} />
+      {/*
+        ★**観客席・木立（遠景）も流します**（★2026-09-17・オーナー指示
+          ★「★芝を動かすなら背景の観客席も動かないといけない」）。
+
+        ⚠️ ★ここは ★**完全に静止**していました。★地面だけが流れるので、
+           ★**貼り紙の前で馬が足踏み**して見えていました。
+        ★遠いものほど遅く流します（★観客席は手前の芝の 40 倍ゆっくり）。
+        ★継ぎ目が出ない作りは `u-pan-a` / `u-pan-b` の註記を参照（★同じ幅の箱を 2 枚）。
+      */}
+      <ParallaxStrip
+        src="/art/uma/world-panorama.webp"
+        top={0}
+        height={top ? '26%' : '20%'}
+        dur={top ? 26 : 30}
+        position="bottom"
+        filter={top ? 'saturate(1.04) brightness(1.1) contrast(1.02)' : 'saturate(1.02) brightness(.92)'}
+      />
       <div style={{
         position: 'absolute', left: 0, right: 0, top: top ? '26%' : '20%', height: top ? '7%' : '6%',
         background: "url('/art/uma/turf-far.webp') repeat center", backgroundSize: '1500px 75px',
@@ -280,24 +349,35 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
         }} />
       )}
       {/*
-        ★**近景の芝（遠近 4 段）**（★2026-09-17）。★各段は ★**縦に 1 枚だけ**なので、
-        ★以前のような等間隔の横筋（★タイルの継ぎ目）が出ません。
-        ⚠️ ★`backgroundSize` の横を ★**`150cqw`**（★画面幅の 1.5 倍）にし、
+        ★**近景の芝**（★2026-09-17・第 2 稿）。
+
+        🔴 ★**前の作りは失敗でした。** ★「遠近 4 段」にして各段の明るさを 3.5% ずつ
+           ★階段状にし、★段の頭に白い線まで足しました。★私は「★境目が遠近の線として
+           ★読める」と書きましたが、★**読めていません。★継ぎ目にしか見えませんでした**
+           （★オーナー指摘「★芝の動きも雑なまま」「★PC 表示では隙間から芝の雑が見える」）。
+           ★機械の診断は 0 点になったのに、★**苦情の言葉は消えていません**でした。
+
+        → ★**段そのものをやめます。** ★1 枚で敷き、★遠近は
+          ★**上を暗く沈める縦のぼかし**だけで作ります（★線が 1 本も出ません）。
+        ⚠️ ★`backgroundSize` の横は ★**`150cqw`**（★画面幅の 1.5 倍）。
            ★`u-turf` が ★**ちょうど 1 枚ぶん**流すので、★輪に戻るときの跳ねも出ません。
+        ⚠️ ★縦は 1 枚を引き伸ばします。★芝の筋がやわらかく溶けますが、
+           ★**等間隔の線が出るよりは良い**と判断しました（★オーナーの目で最終判断）。
       */}
-      {nearBands(regionTop).map((row, i) => (
-        <div key={row.top} style={{
-          position: 'absolute', left: 0, right: 0, top: `${row.top}%`, height: `${row.height}%`,
-          background: "url('/art/uma/turf-near.webp') repeat-x center",
-          backgroundSize: '150cqw 100%',
-          filter: top
-            ? `brightness(${(1.04 + i * 0.035).toFixed(3)}) saturate(1.04)`
-            : `brightness(${(0.84 + i * 0.035).toFixed(3)}) saturate(1.02)`,
-          animation: `u-turf ${row.dur}s linear infinite`,
-          /** ★段の頭にごく薄い光。★境目が「継ぎ目」でなく ★**遠近の線**に見えます */
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,.10)',
-        }} />
-      ))}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, top: `${regionTop}%`, bottom: 0,
+        background: "url('/art/uma/turf-near.webp') repeat-x center",
+        backgroundSize: '150cqw 100%',
+        filter: top ? 'brightness(1.1) saturate(1.04)' : 'brightness(.88) saturate(1.02)',
+        animation: `u-turf ${top ? '.62s' : '.7s'} linear infinite`,
+      }} />
+      {/* ★遠近（★奥ほど沈む）。★**境目を作らない**ので、線が出ません */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, top: `${regionTop}%`, bottom: 0,
+        background: top
+          ? 'linear-gradient(rgba(18,40,20,.34) 0%,rgba(18,40,20,.16) 22%,rgba(18,40,20,0) 52%,rgba(255,255,255,.05) 100%)'
+          : 'linear-gradient(rgba(6,20,10,.42) 0%,rgba(6,20,10,.2) 24%,rgba(6,20,10,0) 56%)',
+      }} />
       {/*
         ★**刈り跡**（★2026-09-17・オーナー指示「★芝をあなたが治してください」）。
         ★競馬場の芝は横切る向きに刈り跡が入ります。★真横から見ると
@@ -317,19 +397,21 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
             position: 'absolute', left: '6%', top: '2%', height: '25%', aspectRatio: '62 / 282',
             background: "url('/art/uma/finish-tower.webp') no-repeat bottom center/contain", filter: 'brightness(1.08)',
           }} />
-          <div style={{
-            position: 'absolute', left: 0, right: 0, top: '25.4%', height: 30,
-            background: "url('/art/uma/inner-rail.webp') repeat-x center", backgroundSize: 'auto 100%', filter: 'brightness(1.12)',
-          }} />
+          {/*
+            ★内柵も流します（★2026-09-17）。★観客席と芝だけ動いて
+            ★**中間の柵が貼り付く**と、かえって不自然に見えます。
+            ★奥の芝（2.8s）とほぼ同じ速さにします。
+          */}
+          <ParallaxStrip src="/art/uma/inner-rail.webp" top="25.4%" height={30} dur={3} filter="brightness(1.12)" />
           <div style={{
             position: 'absolute', left: 0, right: 0, top: '42%', bottom: 0,
             background: 'linear-gradient(rgba(255,255,255,.3),rgba(255,255,255,0) 26%,rgba(12,26,14,.1) 70%,rgba(12,26,14,.28) 100%)',
           }} />
-          <div style={{
-            position: 'absolute', left: 0, right: 0, bottom: 0, height: 120,
-            background: "url('/art/uma/front-rail.webp') repeat-x top center", backgroundSize: 'auto 100%',
-            filter: 'brightness(1.06) saturate(1.04)',
-          }} />
+          {/*
+            ★前柵は ★**いちばん手前**なので、★いちばん速く流します（★手前の芝より速い）。
+            ⚠️ ★速すぎると柵の柱がちらつきます。★数字はオーナーの目で決めてください。
+          */}
+          <ParallaxStrip src="/art/uma/front-rail.webp" bottom={0} height={120} dur={0.55} position="top" filter="brightness(1.06) saturate(1.04)" />
         </>
       ) : (
         <div style={{

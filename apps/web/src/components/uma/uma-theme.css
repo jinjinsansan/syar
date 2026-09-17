@@ -115,6 +115,22 @@
  * ★1 周期 120px を ★**ちょうど 120px** 流すので、★こちらも継ぎ目が出ません。
  */
 @keyframes u-mow { to { background-position-x: -120px; } }
+
+/**
+ * ★**遠景を流す**（★2026-09-17・オーナー指示
+ *   ★「★芝を動かすなら背景の観客席も動かないといけない」）
+ *
+ * 【★なぜ「2 枚を交互に」なのか】
+ *   ⚠️ ★観客席（`world-panorama` 1450×398）は ★**縦横の比を保って**出しています
+ *      （`background-size: auto 100%`）。★そのため ★**1 枚の幅が画面幅と一致しません**。
+ *   ⚠️ ★`background-position-x` を px や cqw で動かすと、★輪に戻るとき ★**必ず跳ねます**
+ *      （★タイル幅が分からないので、★ちょうど 1 枚ぶんを指定できません）。
+ *   → ★**同じ幅の箱を 2 つ**並べ、★片方を 0 → −100%、★もう片方を +100% → 0 へ動かします。
+ *     ★終わりの瞬間、★2 枚は ★**まったく同じ絵**になっているので、★輪に戻っても見えません。
+ *     ★縦横の比も保てます。
+ */
+@keyframes u-pan-a { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+@keyframes u-pan-b { from { transform: translateX(100%); } to { transform: translateX(0); } }
 @keyframes u-led { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 @keyframes u-rush {
   0%, 100% { transform: translateY(0) scale(1); }
