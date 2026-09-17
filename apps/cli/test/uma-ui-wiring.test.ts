@@ -65,6 +65,30 @@ describe('★馬物語 UI の配線（R-14）', () => {
     }
   });
 
+  /**
+   * ★**画面が名簿を直書きしていない**（★D-052・R-30）。
+   * ⚠️ ★2026-09-17: ★`/train` に 6 メニュー、★`/vote` に 12 行の出馬表、★`/mypage` に 3 頭を
+   *    ★**画面へ直書き**していました。★正典 §7.2 の名簿は **8 件**で、★画面だけ別物でした。
+   *    → ★**引く形**に直し、★ここで固定します。
+   */
+  it('★★画面が名簿を直書きしていない（★D-052・二重帳簿にしない）', () => {
+    const train = strip(read('apps/web/src/app/train/page.tsx'));
+    expect(train, '★調教のメニューを引いていない').toMatch(/TRAINING_MENUS/);
+    /** ★正典の名簿に無いメニュー名を画面に書いていない */
+    for (const invented of ['馬房で様子見', '軽めの調整']) {
+      expect(train, `★正典に無いメニュー名「${invented}」を画面に書いている`).not.toContain(invented);
+    }
+
+    const vote = strip(read('apps/web/src/app/vote/page.tsx'));
+    expect(vote, '★出馬表を引いていない').toMatch(/DEMO_BET_RACE/);
+    expect(vote, '★騎手の名簿を引いていない').toMatch(/JOCKEYS/);
+    /** ★自馬の判定は出どころから（★画面で真偽値を作らない・§9.5） */
+    expect(vote, '★自馬の枠を引いていない').toMatch(/ownGate/);
+
+    const mypage = strip(read('apps/web/src/app/mypage/page.tsx'));
+    expect(mypage, '★厩舎を引いていない').toMatch(/DEMO_HORSES/);
+  });
+
   it('★★中継のラッパーは race/page.tsx を改造していない（★資料 §4.1）', () => {
     const wrapper = strip(read('apps/web/src/app/watch-race/page.tsx'));
     /** ★入口は `/race` へ送るだけ（★B-2 の既定） */

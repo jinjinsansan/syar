@@ -18,9 +18,11 @@
  */
 
 import { useState } from 'react';
+import { JOCKEYS } from '@star/scheduler';
 import {
   Backdrop, BigButton, NoticeBar, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
+import { DEMO_BET_RACE } from '../../lib/game-demo';
 
 /** ★枠色 1〜8（★正典 `--f1`〜`--f8` の写し・★変更禁止） */
 const FRAME_COLORS = ['#f5f5f5', '#191919', '#d62828', '#1446b4', '#fad728', '#148c46', '#f08219', '#f596be'] as const;
@@ -29,29 +31,42 @@ const DARK_TEXT_FRAMES = new Set([1, 5, 8]);
 /** ★1 頭あたりに使う参加ポイント（★資料 §8-4） */
 const EP_PER_PICK = 10;
 
-const ROWS = [
-  { no: 1, frame: 1, name: 'アオバハヤテ', jockey: '青井 はやと', odds: '3.4', mine: false },
-  { no: 2, frame: 1, name: 'コトブキノホシ', jockey: '倉田 みなと', odds: '5.8', mine: false },
-  { no: 3, frame: 2, name: 'ライトニングボウ', jockey: '篠崎 れん', odds: '7.2', mine: false },
-  { no: 4, frame: 2, name: 'ミライノツバサ', jockey: '辻 さとる', odds: '9.9', mine: false },
-  { no: 5, frame: 3, name: 'セイランオー', jockey: '日村 かなた', odds: '12.4', mine: false },
-  { no: 6, frame: 3, name: 'ハナカゼマル', jockey: '成田 いずみ', odds: '16.8', mine: false },
-  { no: 7, frame: 4, name: 'ハルカゼノオト', jockey: '青井 はやと', odds: '21.5', mine: true },
-  { no: 8, frame: 4, name: 'ゲンブノツルギ', jockey: '倉田 みなと', odds: '28.0', mine: false },
-  { no: 9, frame: 5, name: 'トキメキステップ', jockey: '篠崎 れん', odds: '35.6', mine: false },
-  { no: 10, frame: 6, name: 'ホクトリュウセイ', jockey: '辻 さとる', odds: '48.2', mine: false },
-  { no: 11, frame: 7, name: 'シラユキノヒメ', jockey: '日村 かなた', odds: '66.0', mine: false },
-  { no: 12, frame: 8, name: 'カガヤキボシ', jockey: '成田 いずみ', odds: '92.3', mine: false },
-] as const;
+/**
+ * ★**出馬表は `DEMO_BET_RACE` から引きます**（★D-052・R-30）。
+ *
+ * ⚠️ ★**2026-09-17 の訂正**: ★最初、★馬名・騎手名・オッズを ★**画面に 12 行書いていました**。
+ *    ★既に `lib/game-demo.ts` の `DEMO_BET_RACE` が ★**同じ出馬表**を持っており、
+ *    ★**2 か所に別の名簿**ができていました。→ ★引く形に直しました。
+ * ⚠️ ★`ownGate`（★自馬の枠番）も ★**あちらが持っています**（★§9.5 の判定の出どころ）。
+ *    ★画面で真偽値を作りません。
+ * ★騎手は `@star/scheduler` の名簿から（★画面に名前を書かない・D-105）。
+ */
+const FRAME_OF = (gate: number, fieldSize: number): number => {
+  /** ★枠は馬番から決まります（★8 枠に均等割り・★正典 §9.1 の慣行） */
+  const perFrame = Math.ceil(fieldSize / 8);
+  return Math.min(8, Math.ceil(gate / perFrame));
+};
 
 export default function VotePage(): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
   const [picks, setPicks] = useState<readonly number[]>([]);
   /**
-   * ★**自分の馬がこのレースに出走しているか**（★本番はサーバーの出走登録から）。
-   * ★デモでは 7 番が自馬なので `true`。★両方の見え方を確かめられるよう、★切り替えも置きます。
+   * ★**自分の馬の枠番**（★出どころは `DEMO_BET_RACE.ownGate`・★本番はサーバーの出走登録）。
+   * ⚠️ ★画面で真偽値を作りません（★§9.5 の判定は 1 か所から）。
+   * ★デモの `ownGate` は `null` なので、★**両方の見え方**を確かめられるよう切り替えを置きます。
    */
-  const [ownHorseRuns, setOwnHorseRuns] = useState(true);
+  const [ownGate, setOwnGate] = useState<number | null>(DEMO_BET_RACE.ownGate ?? 7);
+  const ownHorseRuns = ownGate !== null;
+  /** ★出馬表（★馬名は `DEMO_BET_RACE`・騎手は `JOCKEYS`・枠は馬番から） */
+  const rows = DEMO_BET_RACE.horses.map((h, i) => ({
+    no: h.gate,
+    frame: FRAME_OF(h.gate, DEMO_BET_RACE.fieldSize),
+    name: h.name,
+    jockey: JOCKEYS[i % JOCKEYS.length]!.name,
+    /** ★単勝は見本の値（★実データは `odds-board.tsx` の構造から・次便） */
+    odds: (3.4 + i * 7.3).toFixed(1),
+    mine: h.gate === ownGate,
+  }));
 
   const toggleRow = (no: number): void => {
     if (ownHorseRuns) return; // ★§9.5: 触っても変わらない
@@ -116,7 +131,7 @@ export default function VotePage(): React.ReactElement {
             <span style={{ width: 34, flex: '0 0 auto', textAlign: 'center' }}>印</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))' }}>
-            {ROWS.map((r, i) => {
+            {rows.map((r, i) => {
               const on = picks.includes(r.no);
               return (
                 <button
@@ -188,7 +203,7 @@ export default function VotePage(): React.ReactElement {
           {/* ★デモの切り替え（★両方の見え方を確かめるため。★本番はサーバーが決めます） */}
           <button
             type="button"
-            onClick={() => { setOwnHorseRuns((v) => !v); setPicks([]); }}
+            onClick={() => { setOwnGate((g) => (g === null ? 7 : null)); setPicks([]); }}
             style={{
               minHeight: 44, borderRadius: 8, border: '2px solid rgba(251,247,236,.28)',
               background: 'transparent', color: 'var(--u-ink-light-3)', fontSize: 11,
