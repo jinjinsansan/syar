@@ -199,8 +199,17 @@ export default function UmaTop(): React.ReactElement {
          *    → ★狭い画面では ★さらに大きく（★390px のとき **445px**）、★位置も上げます。
          * ⚠️ ★**PC は変えません**（★`114cqw` は 1280px で 1459px ＝ ★必ず 560px で頭打ち）。
          */
-        position: 'absolute', right: '-5%', bottom: '24%',
-        width: 'clamp(445px,114cqw,560px)', aspectRatio: '970 / 576',
+        /**
+         * 🔴 ★**画面の外へ出しません**（★2026-09-17・オーナー指摘
+         *   ★「★PC 表示側 馬の顔半分が右で切れている ／ モバイル側 馬のハナが右に少し切れている」）。
+         *
+         * ⚠️ ★私は「迫力が出る」と考えて `right: -5%` と `114cqw` を入れ、
+         *    ★**顔と鼻先を切り落として**いました。★大きさより ★**顔が出ていること**が先です。
+         * ★`98cqw` は 390px のとき 382px（★画面の 98%）で ★**ちょうど収まります**。
+         *    ★1280px では 1254px になるので ★**必ず 560px で頭打ち**（★PC の見え方は変えません）。
+         */
+        position: 'absolute', right: '1%', bottom: '24%',
+        width: 'clamp(360px,98cqw,560px)', aspectRatio: '970 / 576',
         transformOrigin: 'bottom center',
         /**
          * ⚠️ ★**跳ねは付けません**（★2026-09-17）。★1 枚絵だったときの名残で
