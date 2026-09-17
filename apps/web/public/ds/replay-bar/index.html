@@ -1,0 +1,67 @@
+<!-- @dsCard group="HUD" name="リプレイ操作（シークバー）" subtitle="区間マーカー・速度・カメラ切替" viewport="1280x1195" -->
+<title>リプレイ操作</title>
+<link rel="stylesheet" href="../../styles.css">
+<div class="stage" style="width:1280px;height:720px">
+<div class="turf"></div><div class="ph"></div><div class="ph-l" style="top:32%">リプレイ映像（斜め前カメラ）</div>
+<div style="position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 15%,rgba(0,0,0,0),rgba(2,5,3,.5))"></div>
+<!-- 左上 REPLAY -->
+<div style="position:absolute;left:40px;top:34px;display:flex;align-items:center;gap:10px">
+<div style="display:flex;align-items:center;gap:8px;background:#2f6fd0;transform:skewX(-9deg);padding:4px 14px"><span class="unskew" style="font:900 13px var(--jp);letter-spacing:.18em">REPLAY</span></div>
+<div style="display:flex;align-items:center;background:var(--glass);border:1px solid var(--gold-hair);transform:skewX(-9deg);padding:4px 14px"><span class="unskew" style="font:700 14px var(--jp)">桜星賞　11R</span></div>
+</div>
+<!-- 右上 カメラ名 -->
+<div style="position:absolute;right:40px;top:34px;display:flex;align-items:center;background:var(--glass);border:1px solid var(--gold-hair);transform:skewX(-9deg);padding:4px 16px"><span class="unskew" style="font:700 14px var(--jp)"><span style="color:var(--gold)">CAM 3</span>　斜め前</span></div>
+<!-- 操作パネル y564 h156 -->
+<div style="position:absolute;left:0;top:564px;width:1280px;height:156px;background:var(--band)"><div class="edge"></div></div>
+<!-- シークバー -->
+<div style="position:absolute;left:40px;top:604px;width:1200px">
+<div style="position:relative;height:10px;background:rgba(255,255,255,.12)">
+<div class="bar" style="width:44%;height:10px"></div>
+<div style="position:absolute;left:44%;top:-5px;width:4px;height:20px;background:var(--paper);margin-left:-2px"></div>
+<div style="position:absolute;left:0%;top:-6px;width:2px;height:22px;background:rgba(246,242,231,.5)"></div><div style="position:absolute;left:22%;top:-6px;width:2px;height:22px;background:rgba(246,242,231,.5)"></div><div style="position:absolute;left:44%;top:-6px;width:2px;height:22px;background:rgba(246,242,231,.5)"></div><div style="position:absolute;left:60%;top:-6px;width:2px;height:22px;background:rgba(246,242,231,.5)"></div><div style="position:absolute;left:76%;top:-6px;width:2px;height:22px;background:rgba(246,242,231,.5)"></div><div style="position:absolute;left:100%;top:-6px;width:2px;height:22px;background:rgba(246,242,231,.5)"></div>
+</div>
+<div style="position:relative;height:22px;margin-top:6px">
+<span style="position:absolute;left:0%;transform:translateX(0);font:700 11px var(--jp);color:var(--paper-45);white-space:nowrap">発走</span><span style="position:absolute;left:22%;transform:translateX(-50%);font:700 11px var(--jp);color:var(--paper-45);white-space:nowrap">向正面</span><span style="position:absolute;left:44%;transform:translateX(-50%);font:700 11px var(--jp);color:var(--gold);white-space:nowrap">3コーナー</span><span style="position:absolute;left:60%;transform:translateX(-50%);font:700 11px var(--jp);color:var(--paper-45);white-space:nowrap">4コーナー</span><span style="position:absolute;left:76%;transform:translateX(-50%);font:700 11px var(--jp);color:var(--paper-45);white-space:nowrap">最後の直線</span><span style="position:absolute;left:100%;transform:translateX(-100%);font:700 11px var(--jp);color:var(--paper-45);white-space:nowrap">ゴール</span>
+</div>
+</div>
+<!-- 操作行 y664 -->
+<div style="position:absolute;left:40px;top:660px;display:flex;align-items:center;gap:18px">
+<div style="display:flex;align-items:center;justify-content:center;width:44px;height:36px;background:var(--gold)"><span style="display:block;width:0;height:0;border-left:12px solid #12140f;border-top:8px solid transparent;border-bottom:8px solid transparent;margin-left:3px"></span></div>
+<div style="display:flex;gap:8px">
+<div style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;background:rgba(7,10,8,.86);border:1px solid var(--gold-hair);font:700 13px var(--jp)">◀◀</div>
+<div style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;background:rgba(7,10,8,.86);border:1px solid var(--gold-hair);font:700 13px var(--jp)">▶▶</div>
+</div>
+<span class="num" style="font-size:20px">0:41<span style="color:var(--paper-45);font-size:16px"> / 1:34</span></span>
+<div style="display:flex;gap:6px;margin-left:10px">
+<div style="display:flex;align-items:center;height:30px;background:rgba(7,10,8,.86);border:1px solid var(--rule);padding:0 12px"><span class="num" style="font-size:14px;color:var(--paper-70)">×0.25</span></div>
+<div style="display:flex;align-items:center;height:30px;background:rgba(7,10,8,.86);border:1px solid var(--rule);padding:0 12px"><span class="num" style="font-size:14px;color:var(--paper-70)">×0.5</span></div>
+<div style="display:flex;align-items:center;height:30px;background:var(--gold);padding:0 12px"><span class="num" style="font-size:14px;color:#12140f">×1</span></div>
+<div style="display:flex;align-items:center;height:30px;background:rgba(7,10,8,.86);border:1px solid var(--rule);padding:0 12px"><span class="num" style="font-size:14px;color:var(--paper-70)">×2</span></div>
+</div>
+</div>
+<!-- カメラタブ 右 -->
+<div style="position:absolute;right:40px;top:660px;display:flex;gap:8px">
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:86px;height:36px;background:rgba(7,10,8,.86);border:1px solid var(--gold-hair)"><span class="num" style="font-size:12px;color:var(--paper-45)">CAM 1</span><span style="font:700 12px var(--jp);color:var(--paper)">追走</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:86px;height:36px;background:rgba(7,10,8,.86);border:1px solid var(--gold-hair)"><span class="num" style="font-size:12px;color:var(--paper-45)">CAM 2</span><span style="font:700 12px var(--jp);color:var(--paper)">真後</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:86px;height:36px;background:var(--gold);border:1px solid var(--gold)"><span class="num" style="font-size:12px;color:#12140f">CAM 3</span><span style="font:700 12px var(--jp);color:#12140f">斜め前</span></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:86px;height:36px;background:rgba(7,10,8,.86);border:1px solid var(--gold-hair)"><span class="num" style="font-size:12px;color:var(--paper-45)">CAM 4</span><span style="font:700 12px var(--jp);color:var(--paper)">高所</span></div>
+</div>
+<div style="position:absolute;left:40px;top:576px;display:flex;align-items:center;gap:14px"><span class="lbl" style="color:var(--gold)">リプレイ</span><span style="font:700 13px var(--jp);color:var(--paper-70)">残り <span class="num" style="font-size:17px">520</span>m 付近　—　自馬 7番 は 3 番手</span></div>
+</div>
+<div style="width:1280px;padding:24px 32px 32px;background:#0c100d;font:400 13px ui-monospace,Menlo,monospace;color:var(--paper-70);line-height:1.85">
+<div style="font:700 22px var(--jp);color:var(--gold);margin-bottom:2px">実装座標と挙動（1280×720 Canvas）</div>
+<div style="font:700 14px var(--jp);color:var(--paper);margin-bottom:14px">確定・払戻画面の「リプレイ」から入る。レース中の HUD は出さない（順位・実況帯は消す）。カメラだけを自由に選べる状態。</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 40px">
+<div>REPLAY バッジ x40 y34 h26・地 #2f6fd0・斜度 -9°・字間 .18em／隣にレース名チップ（暗地＋金ヘアライン）</div>
+<div>カメラ名　　　右上 x1240 基準 h26／「CAM n」を金、名称を紙色</div>
+<div>操作パネル　　y564 h156 全幅・地 rgba(3,7,5,.86)・上縁 金4px（帯は傾けない＝操作物なので水平）</div>
+<div>現在地表示　　x40 y576「リプレイ」12px 金＋残り距離と自馬の位置 13px</div>
+<div>シークバー　　x40 y604 1200×10／地 rgba(255,255,255,.12)／再生済みは金グラデ／ノブ 4×20 紙色</div>
+<div>区間マーカー　発走 0% / 向正面 22% / 3コーナー 44% / 4コーナー 60% / 最後の直線 76% / ゴール 100%／目盛 2×22 rgba(246,242,231,.5)／ラベル 11px（現在区間だけ金）</div>
+<div>マーカーの意味 位置は<b style="color:var(--paper)">距離の比</b>（course.distance に対する s の比）。時間の比にしない（脚色で伸び縮みする）</div>
+<div>再生／一時停止 x40 y660 44×36 金ベタ・記号は #12140f／▶ は三角 12px、一時停止は 4px 幅の2本</div>
+<div>コマ送り　　　36×36 を2つ（◀◀ / ▶▶）。1 タップ = 0.2 秒（12 フレーム）</div>
+<div>時間　　　　　現在 20px／全体 16px 45%／表記は m:ss（レースは 3 分未満）</div>
+<div>速度　　　　　h30 チップ ×0.25 / ×0.5 / ×1 / ×2。選択中は金ベタ＋#12140f。<b style="color:var(--paper)">コマ送りは距離で回すので、速度を変えても脚の運びは崩れない</b></div>
+<div>カメラタブ　　右 86×36 を4つ・間 8px／選択中は金ベタ／切替時は白 18% フラッシュ 3 フレーム（カット替えと同じ）</div>
+<div>キー操作　　　Space 再生停止／← → コマ送り／1〜4 カメラ／M マーカー間ジャンプ</div>
+<div>終了　　　　　「確定へ戻る」は操作パネルの外（右上のカメラ名の下）に置く。再生終了で自動的に確定画面へ戻す</div>
+</div>
+</div>

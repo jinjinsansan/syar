@@ -27,7 +27,8 @@ export default async function OddsEntryPage() {
     .select('*')
     .order('scheduled_at', { ascending: true })
     .limit(48);
-  if (error) return <ReadError message={error.message} />;
+  /** ⚠️ ★`theme="uma"` を渡す（★渡さないとアーケードの帯の中に裸の 1 行が出ます・2026-09-17） */
+  if (error) return <ReadError message={error.message} theme="uma" />;
 
   const races = (data ?? []) as Row[];
   /** ★発売中か締切済みの最も近い 1 本（★確定したレースのオッズは「次」ではない） */

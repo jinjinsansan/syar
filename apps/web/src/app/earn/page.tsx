@@ -108,7 +108,7 @@ export default function EarnPage(): React.ReactElement {
                     <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--u-green-deep)' }}>EP</span>
                   </span>
                   <span style={{
-                    display: 'inline-block', marginTop: 3, padding: '1px 6px', borderRadius: 999, fontSize: 9, fontWeight: 700,
+                    display: 'inline-block', marginTop: 3, padding: '1px 6px', borderRadius: 999, fontSize: 10, fontWeight: 700,
                     background: w.done ? '#e7e9ec' : '#e4efe7', color: w.done ? 'var(--u-ink-dark-2)' : 'var(--u-green-deep)',
                   }}>{w.left}</span>
                 </span>

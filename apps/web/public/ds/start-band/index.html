@@ -1,0 +1,44 @@
+<!-- @dsCard group="HUD" name="まもなく発走 帯" subtitle="ゲートイン〜開扉／カウントダウンと実況" viewport="1280x1000" -->
+<title>まもなく発走 帯</title>
+<link rel="stylesheet" href="../../styles.css">
+<div class="stage" style="width:1280px;height:720px">
+<div class="turf"></div><div class="ph"></div><div class="ph-l" style="top:34%">発馬機 正面（ゲート待機）</div>
+<div style="position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 20%,rgba(0,0,0,0),rgba(2,5,3,.55))"></div>
+<!-- 帯 y616 h104 -->
+<div style="position:absolute;left:-40px;top:616px;width:1371px;height:104px;background:var(--glass);transform:skewX(-9deg);overflow:hidden;animation:riseSk .5s cubic-bezier(.2,.85,.2,1) both">
+<div class="edge"></div>
+</div>
+<!-- ナレーター x36 y548 150×172 -->
+<div style="position:absolute;left:36px;top:548px;width:150px;height:172px;background:#1b241d;border:1px solid var(--gold-hair);border-bottom:0;overflow:hidden">
+<div class="ph"></div>
+<div style="position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);text-align:center;font:400 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;color:rgba(255,255,255,.62)">実況アナ<br>立ち絵（口パク2枚）</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:30px;background:rgba(4,7,5,.92);border-top:1px solid var(--gold-hair);display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-size:10px;font-weight:700;letter-spacing:.2em;color:var(--gold)">実況</span><span style="font:700 15px var(--jp)">星野 亮太</span></div>
+</div>
+<!-- まもなく発走チップ＋ON AIR x206 y632 -->
+<div style="position:absolute;left:206px;top:632px;display:flex;align-items:center;gap:14px">
+<div style="display:flex;align-items:center;background:var(--gold);transform:skewX(-9deg);padding:4px 14px"><span class="unskew" style="font:900 16px var(--jp);color:#12140f;letter-spacing:.06em">まもなく発走</span></div>
+<div class="onair"><div style="width:7px;height:7px;background:#fff;border-radius:50%;animation:onair 1.1s ease-in-out infinite"></div><span style="font-size:11px;font-weight:700;letter-spacing:.2em">ON AIR</span></div>
+<div class="lv"><i></i><i style="animation-delay:.08s"></i><i style="animation-delay:.16s"></i><i style="animation-delay:.24s"></i><i style="animation-delay:.32s"></i><i style="animation-delay:.4s"></i></div>
+</div>
+<!-- 実況 x206 y668 -->
+<div class="say" style="position:absolute;left:206px;top:668px;font:900 28px/40px var(--jp);white-space:nowrap;text-shadow:0 2px 8px rgba(0,0,0,.6)"><span class="num" style="font-size:36px;color:var(--gold)">12</span>頭、ゲートイン完了しました</div>
+<!-- カウントダウン 右端 x1244 -->
+<div style="position:absolute;right:36px;top:626px;width:150px;text-align:right">
+<div class="lbl">発走まで</div>
+<div class="num plate" style="font-size:64px;transform:skewX(-9deg)">0:12</div>
+</div>
+</div>
+<div style="width:1280px;padding:24px 32px 32px;background:#0c100d;font:400 13px ui-monospace,Menlo,monospace;color:var(--paper-70);line-height:1.85">
+<div style="font:700 22px var(--jp);color:var(--gold);margin-bottom:2px">実装座標（1280×720・左上原点）</div>
+<div style="font:700 14px var(--jp);color:var(--paper);margin-bottom:14px">出るのは displaySec 5.6–7.8（ゲート待機）と 7.8 以降の開扉直後。開扉では文言だけ差し替え、帯は動かさない。</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 40px">
+<div>帯　　　　　　y616 h104（宣言 left-40 w1371・斜度 -9°）／上縁 金4px／地 rgba(7,10,8,.86)</div>
+<div>ナレーター　　x36 y548 150×172（レース中の帯と同一座標。差し替えない）</div>
+<div>まもなく発走　x206 y632 h26／地 金ベタ／文字 16px #12140f（金地の上は必ず暗い文字）</div>
+<div>ON AIR　　　　チップの右 14px／音声レベル 6本はその右 14px</div>
+<div>実況　　　　　x206 y668 28px/40／20文字/秒で左から出す<br>　　待機中「12頭、ゲートイン完了しました」→ 開扉「スタートしました！」に差し替え</div>
+<div>カウントダウン 右端 x1244 基準 w150／ラベル 12px y626／数字 64px 金プレート 斜度 -9°／1.0s の2ステップ点滅（残り5秒以下は 0.5s に速める）</div>
+<div>開扉の瞬間　　白 rgba(255,255,255,.18) 全画面フラッシュ 3フレーム。帯とカウントダウンは同時に消す（数字は 0:00 で止めない）</div>
+<div>参考　　　　　既存 drawStartCallBand は 帯 h104・実況ラベル 15px・本文 27px。本線では実況を 28px に上げ、カウントダウンを追加</div>
+</div>
+</div>

@@ -1,0 +1,49 @@
+<!-- @dsCard group="Motion" name="スプライトシート仕様" subtitle="セル寸法・接地点・行の並び・命名（絵の受け入れ条件）" viewport="1080x1210" -->
+<title>スプライトシート仕様</title>
+<link rel="stylesheet" href="../../styles.css">
+<style>.h{font:700 20px var(--jp);color:var(--gold);margin:0 0 8px}.p{font:700 14px var(--jp);line-height:1.9;margin:0 0 10px}.m{font:400 13px ui-monospace,Menlo,monospace;color:var(--paper-70);line-height:1.85}.t{width:100%;border-collapse:collapse;font:400 13px ui-monospace,Menlo,monospace;margin-bottom:26px}.t th{text-align:left;color:var(--gold);border-bottom:1px solid var(--hair);padding:6px 12px 6px 0}.t td{border-bottom:1px solid var(--rule);padding:6px 12px 6px 0;color:var(--paper)}.warn{border-left:3px solid #d62828;padding-left:12px;font:700 14px var(--jp);line-height:1.8;margin-bottom:26px}</style>
+<div style="width:1080px;padding:28px 32px 40px;background:#0c100d">
+<div class="lbl">STAR レース中継 HUD / Motion</div>
+<div style="font:700 36px var(--jp);margin:6px 0 6px">スプライトシート仕様</div>
+<div class="m" style="margin-bottom:26px">SheetSpec（oblique-draw.ts）に 1:1 で対応。絵が上がったらここの表に 1 行足すだけで載る形にしておく。</div>
+
+<div class="h">1. 既存シートの実測値</div>
+<table class="t"><tr><th style="width:230px">シート</th><th style="width:80px">コマ</th><th style="width:140px">セル高</th><th style="width:180px">接地点（比）</th><th>用途</th></tr>
+<tr><td>side v5（個別 PNG 8枚）</td><td>8</td><td>300（シート 2172×300／1コマ 271.5）</td><td>不透明領域から自動測定・下端揃え</td><td>真横・発走。現行の主素材</td></tr>
+<tr><td>SHEET_REAR</td><td>8</td><td>506</td><td>0.50 / 1.0</td><td>追走（馬群の後ろ）</td></tr>
+<tr><td>SHEET_DIAG_FRONT_V1</td><td>4</td><td>274</td><td>263/453 / 1.0</td><td>斜め前の中継カメラ</td></tr>
+<tr><td>SHEET_HIGH_DIAG_V1</td><td>4</td><td>202</td><td>226/397 / 1.0</td><td>高所斜め俯瞰</td></tr>
+<tr><td>SHEET_DIAG_REAR_V1</td><td>4</td><td>249</td><td>284/425 / 1.0</td><td>斜め後方</td></tr>
+<tr><td>SHEET_FAR</td><td>8</td><td>76</td><td>0.50 / 1.0</td><td>引き（別に描き起こす。縮小流用しない）</td></tr>
+</table>
+
+<div class="h">2. 新しいシートを納品するときの受け入れ条件</div>
+<div class="p">① 1 行 = 8 コマ（斜め視点は 4 コマ）を横並び。行を増やす場合は「上から枠色 1→8」の順。<br>
+② コマ幅は整数。シート幅 = コマ幅 × コマ数（端に余白を入れない）。<br>
+③ 接地点は全コマで同一。脚を畳んだコマだけ体高が変わる（脈動する）状態は不可。<br>
+④ 表示倍率の基準は「8 枚中の最大不透明高」。これを referenceHeight として一定にする。<br>
+⑤ 透過 PNG。クロマキー原版から抜いた場合、被写体内部にキー色が残っていないこと。<br>
+⑥ 勝負服・ゼッケン・枠色は差し替え可能な構造（別レイヤーか無地マスク）を保つ。<br>
+⑦ 8 コマは pose01 → pose08 → pose01 が連続する完歩 1 周期。飛びがないこと。</div>
+
+<div class="h">3. 命名</div>
+<div class="m" style="margin-bottom:26px">horse-jockey-&lt;view&gt;-v&lt;n&gt;-pose&lt;01..08&gt;.png　　view = side / rear / diag-front / diag-rear / high-diag / far<br>
+シート化: horse-jockey-&lt;view&gt;-v&lt;n&gt;-sheet.png（1 行 × コマ数）<br>
+マスク: 同名 + -mask-silks.png / -mask-bib.png</div>
+
+<div class="h">4. 行と枠色の対応（描画側の規約）</div>
+<div class="m" style="margin-bottom:20px">row = Number(frameRoleOf(gate, fieldSize).slice(6)) − 1　→ 0..7 が枠色 1..8。<br>
+枠色は「帽子・鞍布」に載る色。馬体色は行で変えない（毛色は filter か別素材で）。</div>
+<div style="display:flex;gap:0;margin-bottom:26px">
+<div style="flex:1;height:34px;background:#f5f5f5"></div><div style="flex:1;height:34px;background:#191919"></div><div style="flex:1;height:34px;background:#d62828"></div><div style="flex:1;height:34px;background:#1446b4"></div><div style="flex:1;height:34px;background:#fad728"></div><div style="flex:1;height:34px;background:#148c46"></div><div style="flex:1;height:34px;background:#f08219"></div><div style="flex:1;height:34px;background:#f596be"></div>
+</div>
+
+<div class="warn">⚠ 寄り用シートを縮小して引きに使わない（半端な倍率で画素格子が合わず輪郭が濁る）。引きは SHEET_FAR として別に描く。<br>
+⚠ セル寸法・コマ数を描画コードに直書きしない。必ず SheetSpec 経由で渡す。</div>
+
+<div class="h">5. 未制作分（優先順）</div>
+<div class="m">P0: 横向き馬体のみ 8コマ ／ 横向き騎手のみ 8コマ ／ ゼッケン無地マスク ／ 勝負服カラーマスク ／ 馬具共通レイヤー<br>
+P1: 斜め後方・真後方・斜め前方・高所斜めの各 8コマ（現行 4コマ素材の置き換え）<br>
+P2: 状態差分（発馬直後の低い姿勢／道中省エネ／直線追い込み／疲労／勝者流し）<br>
+　　※ 状態差分が入るまで mode は cruise / drive / celebrate の 3 値だけで運用する</div>
+</div>

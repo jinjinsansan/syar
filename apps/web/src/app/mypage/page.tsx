@@ -111,7 +111,7 @@ export default function MyPage(): React.ReactElement {
                 <span style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--u-ink-dark-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.sexAge}・{h.classLabel}</span>
               </span>
               <span style={{ flex: '0 0 auto', textAlign: 'right' }}>
-                <span style={{ display: 'block', fontSize: 9, letterSpacing: '.08em', color: 'var(--u-ink-dark-2)' }}>賞金</span>
+                <span style={{ display: 'block', fontSize: 10, letterSpacing: '.08em', color: 'var(--u-ink-dark-2)' }}>賞金</span>
                 <span className="u-num" style={{ display: 'block', fontSize: 16, color: 'var(--u-ink-dark)' }}>{h.prizePP.toLocaleString('ja-JP')}</span>
               </span>
               <span style={{ flex: '0 0 auto', display: 'flex', gap: 2, alignItems: 'flex-end', height: 14 }}>

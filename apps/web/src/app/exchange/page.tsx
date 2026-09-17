@@ -124,7 +124,7 @@ export default function ExchangePage(): React.ReactElement {
                   <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--u-gold-ink)' }}>PP</span>
                   {/* ★在庫は色＋文字（★色だけで意味を運ばない） */}
                   <span style={{
-                    padding: '1px 6px', borderRadius: 999, fontSize: 9, fontWeight: 700,
+                    padding: '1px 6px', borderRadius: 999, fontSize: 10, fontWeight: 700,
                     background: it.stock === null ? '#e4efe7' : '#f6e7cf',
                     color: it.stock === null ? 'var(--u-green-deep)' : '#8a5a06',
                   }}>{it.stock === null ? '在庫あり' : `のこり ${it.stock}`}</span>

@@ -58,7 +58,13 @@ export default function UmaTop(): React.ReactElement {
           animation: 'u-sheen 5s linear infinite', padding: '12px 28px 16px',
         }}>
           <h1 style={{
-            margin: 0, fontSize: 'clamp(58px,20cqw,126px)', lineHeight: 1.02, letterSpacing: '.03em',
+            /**
+             * ⚠️ ★`lineHeight` は **1.02 → 1.18**（★2026-09-17）。
+             *    ★1.02 だと箱が 128.5px なのに ★**日本語の字面は 148px** で、
+             *    ★実ブラウザの診断が「★中身が箱より高い（+19px）」と拾いました。
+             *    ★欧文の行送りのつもりで詰めると、★和文は字面がはみ出します。
+             */
+            margin: 0, fontSize: 'clamp(58px,20cqw,126px)', lineHeight: 1.18, letterSpacing: '.03em',
             whiteSpace: 'nowrap', color: 'var(--u-ink-dark)', textShadow: '0 3px 0 rgba(255,255,255,.6)',
           }}>馬物語</h1>
         </div>

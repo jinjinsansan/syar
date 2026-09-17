@@ -134,9 +134,48 @@ export function PageTitle({ title, sub, right }: {
   );
 }
 
-/** 読み取り失敗の表示（★空リストにしない。障害が「レースが無い」に見える） */
-export function ReadError({ message }: { readonly message: string }): React.ReactElement {
-  return <p style={{ color: 'var(--bad)', padding: '24px 40px' }}>読み取りに失敗しました: {message}</p>;
+/**
+ * 読み取り失敗の表示（★空リストにしない。障害が「レースが無い」に見える）
+ *
+ * ⚠️ ★2026-09-17: ★これは ★**裸の `<p>`** でした。★`/odds/[id]` が読み取りに失敗すると、
+ *    ★画面の中身が ★**この 1 行だけ**になり、★アーケードの共通帯の中に出ていました
+ *    （★配信されている HTML で確認: `data-theme="uma"` が **0 回**）。
+ *    ★つまり ★**デザイナーの画面が丸ごと消えて**いました。
+ * → ★`theme` を渡せるようにし、★馬物語の画面では ★**その見た目のまま**出します。
+ */
+export function ReadError({ message, theme }: {
+  readonly message: string;
+  readonly theme?: 'uma';
+}): React.ReactElement {
+  if (theme !== 'uma') {
+    return <p style={{ color: 'var(--bad)', padding: '24px 40px' }}>読み取りに失敗しました: {message}</p>;
+  }
+  return (
+    <div data-theme="uma" style={{
+      minHeight: '100dvh', background: 'var(--u-navy)', color: 'var(--u-ink-light)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      fontFamily: "'M PLUS Rounded 1c', system-ui, sans-serif", fontWeight: 800,
+    }}>
+      <div style={{ textAlign: 'center', maxWidth: 560 }}>
+        <p style={{ margin: 0, fontSize: 16 }}>いまこのレースの数字を読めませんでした。</p>
+        <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 500, color: 'var(--u-ink-light-3)', wordBreak: 'break-word' }}>
+          {message}
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 16 }}>
+          <a href="/odds/demo?demo=1" style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: 44,
+            padding: '0 18px', borderRadius: 10, border: '3px solid var(--u-navy)',
+            backgroundImage: 'linear-gradient(#ffd84a,#f2b012)', color: 'var(--u-ink-dark)', fontSize: 14,
+          }}>見本のオッズを見る</a>
+          <a href="/home" style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: 44,
+            padding: '0 18px', borderRadius: 10, border: '3px solid var(--u-navy)',
+            backgroundImage: 'linear-gradient(#ffffff,#e6eef6)', color: 'var(--u-ink-dark)', fontSize: 14,
+          }}>ダッシュボードへ</a>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** 素質 ★（0.5 刻み）。満 = 金／半 = 金を左 50% だけ重ねる／空 = 28%。数値は出さない */

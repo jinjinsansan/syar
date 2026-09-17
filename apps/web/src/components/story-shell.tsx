@@ -50,6 +50,8 @@ const OWN_HEADER = [
   '/', '/lp-preview', '/race',
   /** ★馬物語 UI（R-14・2026-09-17）。★**画面を足したらここも足す**（★2 度入れ忘れました） */
   '/home', '/howto', '/earn', '/watch-race', '/odds', '/exchange', '/mypage', '/vote', '/train',
+  /** ★デザイン確認の一覧（★2026-09-17）。★自前の見出しを持つので帯を足さない */
+  '/design-check',
 ];
 
 /** Presentation boundary: racing canvases, labs and both landing pages keep their own layout. */

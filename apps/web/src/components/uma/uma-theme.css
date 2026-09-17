@@ -130,8 +130,19 @@
   0% { transform: translate(0, 0) rotate(0); opacity: 1; }
   100% { transform: translate(-120px, -56px) rotate(-200deg); opacity: 0; }
 }
+/**
+ * ★**速度線**。
+ *
+ * ⚠️ ★2026-09-17: ★始点が `translateX(45%)` で、★**画面の右外から入って**いました。
+ *    ★実ブラウザの診断（`tools/verify-mobile-layout.mjs`）が
+ *    ★**「はみ出した要素 1 個」**として拾い、★TOP だけが唯一「切落し」判定でした
+ *    （★幅 1280 で `<span>` 幅 845px が右へ +115px）。
+ *    ★親に `overflow: hidden` があるので目には見えませんが、★**要素は画面外に在ります**。
+ * → ★**画面の中から**始め、★出現は `opacity` で作ります。★見た目の流れは変わりません。
+ */
 @keyframes u-streak {
-  0% { transform: translateX(45%); opacity: 0.9; }
+  0% { transform: translateX(0); opacity: 0; }
+  8% { opacity: 0.9; }
   70% { opacity: 0.9; }
   100% { transform: translateX(-170%); opacity: 0; }
 }

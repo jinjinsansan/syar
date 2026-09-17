@@ -78,7 +78,7 @@ export function TopBar({ title, backHref, home = false, paused, onToggle }: {
       {home ? (
         <div style={{ ...PLATE, display: 'flex', alignItems: 'baseline', gap: 8, padding: '7px 12px' }}>
           <span style={{ fontSize: 19, letterSpacing: '.04em' }}>馬物語</span>
-          <span style={{ fontSize: 9, letterSpacing: '.16em', color: '#6b4d06' }}>HOME</span>
+          <span style={{ fontSize: 10, letterSpacing: '.16em', color: '#6b4d06' }}>HOME</span>
         </div>
       ) : (
         <a href={backHref ?? '/home'} style={{ ...PLATE, display: 'flex', alignItems: 'center', minHeight: 44, padding: '0 13px', fontSize: 13, whiteSpace: 'nowrap' }}>
