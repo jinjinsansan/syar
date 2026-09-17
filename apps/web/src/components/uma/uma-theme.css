@@ -131,6 +131,22 @@
  */
 @keyframes u-pan-a { from { transform: translateX(0); } to { transform: translateX(-100%); } }
 @keyframes u-pan-b { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+/**
+ * ★**走り（中継と同じ 8 コマ）**（★2026-09-17・オーナー指摘
+ *   ★「★既にレース演出で使っている素材がありますよね？ ★それを使えばいいだけでは？？」）
+ *
+ * ★中継は `horse-jockey-side-v8-pose01〜08`（970×576・真横）を使っています。
+ * ⚠️ ★これは ★**1 枚のシートではなく 8 枚の別ファイル**なので、
+ *    ★`steps()` の背景送りでは組めません。→ ★**8 枚を重ねて、順に 1 枚だけ見せます**。
+ * ⚠️ ★切り替えは ★**瞬時**でなければなりません（★溶けると 2 コマが重なって濁ります）。
+ *    ★だから各コマは「12.5% の間だけ不透明、あとは透明」を ★**階段**で切り替えます。
+ * ⚠️ ★遅れは `animation-delay` で 1/8 ずつずらします（★`u-frame` は 1 本で足ります）。
+ */
+@keyframes u-frame {
+  0%,   12.49% { opacity: 1; }
+  12.5%, 100%  { opacity: 0; }
+}
 @keyframes u-led { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 @keyframes u-rush {
   0%, 100% { transform: translateY(0) scale(1); }

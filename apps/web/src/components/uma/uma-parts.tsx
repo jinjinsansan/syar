@@ -319,34 +319,61 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
       {/*
-        ★**観客席・木立（遠景）も流します**（★2026-09-17・オーナー指示
-          ★「★芝を動かすなら背景の観客席も動かないといけない」）。
+        ★**遠景を中継と同じ 3 層に分けます**（★2026-09-17・第 2 稿・オーナー指摘
+          ★「★既にレース演出で使っている素材がありますよね？」）。
 
-        ⚠️ ★ここは ★**完全に静止**していました。★地面だけが流れるので、
-           ★**貼り紙の前で馬が足踏み**して見えていました。
-        ★遠いものほど遅く流します（★観客席は手前の芝の 40 倍ゆっくり）。
-        ★継ぎ目が出ない作りは `u-pan-a` / `u-pan-b` の註記を参照（★同じ幅の箱を 2 枚）。
+        🔴 ★第 1 稿は `world-panorama.webp` の ★**1 枚**を流していました。
+           ★木立も観客席も生垣も ★**同じ速さ**なので、★遠近が付きません。
+        → ★中継（`/art/parallax/backstretch-side-v1/manifest.json`）は
+          ★`trees` / `stand` / `hedge` の ★**3 層**に分け、★層ごとに `depthOffsetM` を
+          ★持っています。★`uma/` にも ★**同じ 3 枚が既に在りました**（★使っていなかっただけ）。
+
+        ⚠️ ★秒数は ★**当てずっぽうをやめ**、★中継の公式から出しました
+           （`parallax-plate.ts:14`: `pxPerM = packPxPerM × packDepthM / (packDepthM + depthOffsetM)`）。
+           ★注視点の深さを代表値 30m とし、★`turf-near` を 1 とした比で割っています。
+      */}
+      {(top
+        ? [
+          { src: 'trees', y: 0, h: 13, dur: 5.35 },
+          { src: 'stand', y: 13, h: 9, dur: 2.82 },
+          { src: 'hedge', y: 22, h: 4, dur: 1.69 },
+        ]
+        : [
+          { src: 'trees', y: 0, h: 10, dur: 6.0 },
+          { src: 'stand', y: 10, h: 7, dur: 3.2 },
+          { src: 'hedge', y: 17, h: 3, dur: 1.9 },
+        ]
+      ).map((L) => (
+        <ParallaxStrip
+          key={L.src}
+          src={`/art/uma/${L.src}.webp`}
+          top={`${L.y}%`}
+          height={`${L.h}%`}
+          dur={L.dur}
+          position="bottom"
+          filter={top ? 'saturate(1.04) brightness(1.1) contrast(1.02)' : 'saturate(1.02) brightness(.92)'}
+        />
+      ))}
+      {/*
+        ★奥の芝も ★**中継の秒数**にします（★`depthOffsetM` turf-far +3 / turf-mid −3）。
+        ⚠️ ★以前は `u-scroll`（★タイル幅の途中で輪に戻るので ★**跳ねます**）＋
+           ★当てずっぽうの秒数（2.8s / 1.6s）でした。
       */}
       <ParallaxStrip
-        src="/art/uma/world-panorama.webp"
-        top={0}
-        height={top ? '26%' : '20%'}
-        dur={top ? 26 : 30}
-        position="bottom"
-        filter={top ? 'saturate(1.04) brightness(1.1) contrast(1.02)' : 'saturate(1.02) brightness(.92)'}
+        src="/art/uma/turf-far.webp"
+        top={top ? '26%' : '20%'}
+        height={top ? '7%' : '6%'}
+        dur={0.93}
+        filter={top ? 'brightness(1.07) saturate(1.05)' : 'brightness(.9)'}
       />
-      <div style={{
-        position: 'absolute', left: 0, right: 0, top: top ? '26%' : '20%', height: top ? '7%' : '6%',
-        background: "url('/art/uma/turf-far.webp') repeat center", backgroundSize: '1500px 75px',
-        filter: top ? 'brightness(1.07) saturate(1.05)' : 'brightness(.9)',
-        animation: `u-scroll ${top ? '2.8s' : '3.4s'} linear infinite`,
-      }} />
       {top && (
-        <div style={{
-          position: 'absolute', left: 0, right: 0, top: '33%', height: '9%',
-          background: "url('/art/uma/turf-mid.webp') repeat center", backgroundSize: '1500px 94px',
-          filter: 'brightness(1.1) saturate(1.05)', animation: 'u-scroll 1.6s linear infinite',
-        }} />
+        <ParallaxStrip
+          src="/art/uma/turf-mid.webp"
+          top="33%"
+          height="9%"
+          dur={0.76}
+          filter="brightness(1.1) saturate(1.05)"
+        />
       )}
       {/*
         ★**近景の芝**（★2026-09-17・第 2 稿）。
@@ -424,16 +451,14 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
             ★**中間の柵が貼り付く**と、かえって不自然に見えます。
             ★奥の芝（2.8s）とほぼ同じ速さにします。
           */}
-          <ParallaxStrip src="/art/uma/inner-rail.webp" top="25.4%" height={30} dur={3} filter="brightness(1.12)" />
+          {/* ★内柵は `depthOffsetM +10` → ★1.13s（★中継の公式から） */}
+          <ParallaxStrip src="/art/uma/inner-rail.webp" top="25.4%" height={30} dur={1.13} filter="brightness(1.12)" />
           <div style={{
             position: 'absolute', left: 0, right: 0, top: '42%', bottom: 0,
             background: 'linear-gradient(rgba(255,255,255,.3),rgba(255,255,255,0) 26%,rgba(12,26,14,.1) 70%,rgba(12,26,14,.28) 100%)',
           }} />
-          {/*
-            ★前柵は ★**いちばん手前**なので、★いちばん速く流します（★手前の芝より速い）。
-            ⚠️ ★速すぎると柵の柱がちらつきます。★数字はオーナーの目で決めてください。
-          */}
-          <ParallaxStrip src="/art/uma/front-rail.webp" bottom={0} height={120} dur={0.55} position="top" filter="brightness(1.06) saturate(1.04)" />
+          {/* ★前柵は `depthOffsetM −13` → ★0.48s（★いちばん手前なのでいちばん速い） */}
+          <ParallaxStrip src="/art/uma/front-rail.webp" bottom={0} height={120} dur={0.48} position="top" filter="brightness(1.06) saturate(1.04)" />
         </>
       ) : (
         <div style={{

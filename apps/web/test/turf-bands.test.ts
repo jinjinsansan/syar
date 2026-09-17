@@ -61,10 +61,31 @@ describe('★TOP の背景', () => {
   it('★★観客席・柵が止まっていない（★地面だけ流れない）', () => {
     const parts = read('src/components/uma/uma-parts.tsx');
     expect(parts, '★遠景を流す部品が無い').toMatch(/function ParallaxStrip/);
-    for (const src of ['world-panorama.webp', 'inner-rail.webp', 'front-rail.webp']) {
+    /**
+     * 🔴 ★**`world-panorama.webp` はもう使いません**（★2026-09-17・第 2 稿）。
+     *    ★1 枚だと木立も観客席も生垣も ★**同じ速さ**で、★遠近が付きませんでした。
+     *    ★中継（`parallax/backstretch-side-v1/manifest.json`）と同じく
+     *    ★`trees` / `stand` / `hedge` の ★**3 層**に分けました。
+     *
+     * ⚠️ ★この検査は ★**2 度、実装に合っていませんでした**。
+     *    ★① ★古い 1 枚の作り（`world-panorama`）を名指しで固定していた
+     *    ★② ★`trees.webp` という ★**連続した文字列を探していた**。★実装は
+     *       ★`src={\`/art/uma/${L.src}.webp\`}` と ★**組み立てて**いるので、
+     *       ★ソースにその綴りは存在しません。★**実装は正しく、検査が当たっていませんでした。**
+     *    ★`OWN_HEADER` の件に続いて ★**同じ形の失敗が今日 4 度目**です。
+     * → ★**実装の書き方に合わせて見ます**（★名前の並びと、組み立ての式）。
+     */
+    expect(parts, '★遠景を組み立てで流していない').toContain('/art/uma/${L.src}.webp');
+    for (const name of ['trees', 'stand', 'hedge']) {
+      expect(parts, `★遠景の層 ${name} が無い（★1 枚に戻ると遠近が消える）`)
+        .toContain(`{ src: '${name}',`);
+    }
+    for (const src of ['inner-rail.webp', 'front-rail.webp', 'turf-far.webp']) {
       expect(parts, `★${src} が流れていない（★貼り付いて見える）`)
         .toMatch(new RegExp(`ParallaxStrip[\\s\\S]{0,200}${src.replace('.', '\\.')}`));
     }
+    /** ★もう使わない 1 枚に戻っていないこと */
+    expect(parts, '★遠景が 1 枚（world-panorama）に戻っている').not.toContain('world-panorama');
     /**
      * ★継ぎ目を出さない作り（★同じ幅の箱を 2 枚・★片方は +100% から）。
      * ⚠️ ★`background-position` を動かす作りでは、★タイル幅が分からないので **必ず跳ねます**。
@@ -80,21 +101,44 @@ describe('★TOP の背景', () => {
    * ★**TOP の馬はデフォルメ・真横**（★オーナー指摘「★馬が違います」→ ⓐ を採用）。
    * ⚠️ ★脚は動きません。★元絵は「★8 コマの frame 01」で、★**残り 7 コマが未作成**です。
    */
-  it('★★TOP の馬がデフォルメ・真横になっている', () => {
+  /**
+   * ★**TOP の馬は「レースに出ている馬」と同じ素材**（★2026-09-17・オーナー指摘
+   *   ★「★既にレース演出で使っている素材がありますよね？ ★それを使えばいいだけでは？？」）。
+   *
+   * 🔴 ★ここまで 3 回外しました（★斜め 1 枚 → 写実 6 コマ → 細身のデフォルメ）。
+   *    ★どれも ★**`/race` が何を読んでいるかを調べる前に選んだ**ためです。
+   */
+  it('★★TOP の馬が中継と同じ素材（side-v8 の 8 コマ）', () => {
     const top = read('src/components/uma/uma-top.tsx');
-    expect(top, '★斜め前向きの 1 枚絵に戻っている').not.toContain('chibi-horse.png');
-    expect(top, '★写実のスプライトに戻っている（★絵柄が別系統）').not.toContain('horse-gallop.webp');
-    expect(top, '★デフォルメの真横を使っていない').toContain('chibi-side.webp');
-    /** ⚠️ ★中継用の真横スプライトは混ぜない（★引き渡し資料 §4.4） */
-    expect(top, '★中継用のスプライトを混ぜている').not.toMatch(/horse-jockey-side-v9b/);
+    for (const wrong of ['chibi-horse.png', 'horse-gallop.webp', 'chibi-side.webp']) {
+      expect(top, `★外した素材に戻っている: ${wrong}`).not.toContain(wrong);
+    }
+    expect(top, '★中継の素材を使っていない').toContain('horse-jockey-side-v8-pose0');
+    /** ★8 コマ全部を重ねている（★1 枚だけだと脚が止まります） */
+    expect(top, '★8 コマになっていない').toMatch(/\[1, 2, 3, 4, 5, 6, 7, 8\]/);
+    /** ⚠️ ★止めたとき 8 枚が重なって濁らないよう、★1 枚目以外は素の値を透明に */
+    expect(top, '★止めると 8 枚が重なって濁る').toMatch(/opacity: n === 1 \? 1 : 0/);
+    const css = read('src/components/uma/uma-theme.css');
+    expect(css, '★コマの切り替えが瞬時でない（★2 コマが溶けて濁る）')
+      .toMatch(/u-frame[\s\S]{0,120}12\.49%[\s\S]{0,60}opacity: 1/);
   });
 
   /** ★素材が実在する（★参照だけ直して置き忘れる、を防ぐ） */
   it('★★参照している素材が実在する', () => {
     const ROOT = path.resolve(HERE, '../../..');
-    for (const f of ['chibi-side.webp', 'world-panorama.webp', 'inner-rail.webp', 'front-rail.webp', 'turf-near.webp']) {
+    /**
+     * ⚠️ ★ここは ★**もう使わない `world-panorama.webp`** を見ていました（★2026-09-17）。
+     *    ★通ってはいましたが ★**空振り**です（★在っても使っていないので、画面は守れません）。
+     *    → ★**いま実際に使う 7 枚**に差し替えます。
+     */
+    for (const f of ['trees.webp', 'stand.webp', 'hedge.webp', 'inner-rail.webp', 'front-rail.webp', 'turf-far.webp', 'turf-near.webp']) {
       const p = path.join(ROOT, 'apps/web/public/art/uma', f);
       expect(() => readFileSync(p), `★${f} が置かれていない（★画面が欠ける）`).not.toThrow();
+    }
+    /** ★中継の 8 コマ（★webp。★png のままだと 1 枚 460KB で TOP が重くなります） */
+    for (let n = 1; n <= 8; n += 1) {
+      const p = path.join(ROOT, `apps/web/public/art/horse-jockey-side-v8-pose0${n}.webp`);
+      expect(() => readFileSync(p), `★pose0${n}.webp が無い（★tools/build-art-webp.mjs）`).not.toThrow();
     }
   });
 });

@@ -17,6 +17,14 @@
 
 import { Backdrop, MotionToggle, useMotionPaused } from './uma-parts';
 
+/**
+ * ★**1 完歩にかける秒数**（★8 コマで 1 周）。
+ * ⚠️ ★中継は ★**走った距離**からコマを決めます（`raceGaitPhase(travelM, gate, strideM) * 8`・
+ *    ★時間ではなく距離＝決定論のため）。★TOP は世界を持たないので ★**秒で回します**。
+ *    ★見た目の速さはオーナーの目で決めてください。
+ */
+const GALLOP_SEC = 0.62;
+
 export default function UmaTop(): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
   return (
@@ -76,31 +84,33 @@ export default function UmaTop(): React.ReactElement {
       </div>
 
       {/*
-        ★**馬（デフォルメ・真横）**（★2026-09-17・第 2 稿）
+        ★**馬＝中継と同じ素材**（★2026-09-17・第 4 稿）
 
-        【★経緯】
-          ★① 元は `chibi-horse.png`（900×929・★**斜め前向き**・脚のコマ 1 枚）でした。
-             ★背景の芝は真横に流れるので、★「その場で足踏みする正面の馬」に見えていました。
-          ★② そこで `horse-gallop.webp`（220×140 の 6 コマ）に替え、★脚は動くようになりました。
-          🔴 ★③ ★**オーナー指摘「★馬が違います」**（★2026-09-17）。★②は ★**写実のスプライト**で、
-             ★合格をいただいたダッシュボードの ★**デフォルメのキャラクターとは別系統**でした。
-             ★しかも 1 コマ 220×140 を 2 倍に拡大していたので、★輪郭も甘くなっていました。
+        🔴 ★**ここまで 3 回外しました。★どれも「手元の素材を調べずに選んだ」ためです。**
+          ★① `chibi-horse.png`（斜め前向き・1 枚）… ★芝は真横に流れるのに正面を向いていた
+          ★② `horse-gallop.webp`（220×140 の 6 コマ）… ★脚は動いたが ★**絵柄が別系統**
+          ★③ `chibi-side.webp`（デフォルメ真横）… ★生成指示が `slender`・`light and elegant` で
+             ★**細すぎ**た。★しかも「がっしりの真横は手元に無い」と報告し、
+             ★**オーナーに「何を迷子になっているのですか？」と指摘された**
 
-        → ★`chibi-side.webp`（**1431×767**）に差し替えました。★デフォルメ・真横・右向きで、
-          ★ダッシュボードと ★**同じ絵柄**です。★背景の流れ・速度線・砂煙（どれも左へ）とも揃います。
+        → ★**答えは最初から在りました。** ★`/race` は
+          ★`horse-jockey-side-v8-pose01〜08`（**970×576・真横・8 コマ**）を描いています。
+          ★これが「★レースに出ている馬」そのものです。★体型も向きもコマ数も揃います。
 
-        ⚠️ ★**脚は動きません。** ★元絵 `horse-jockey-chibi-gallop-frame01.png` の生成指示に
-           ★「★**8 コマの gallop の frame 01（アンカー）**」とあり、★**残り 7 コマが未作成**です。
-           ★揃ったら `steps(8)` のコマ送りに戻します（★オーナー判断 ⓐ→ⓒ・依頼 R-15 §4）。
-        ⚠️ ★緑背景は `tools/remove-chroma-key.mjs` で抜き、
-           ★`tools/verify-chroma-residue.mjs` で ★**輪郭から離れた緑 0px（合格）**を確かめました。
+        ⚠️ ★私は ★**`/race` が何を読んでいるかを調べる前に、新しい絵を選んで・作って**いました。
+           ★既存の画面が使っている素材を先に見ること。
+        ⚠️ ★png は 1 枚 460KB（8 枚で 3.7MB）なので、★`tools/build-art-webp.mjs` で
+           ★**webp（1 枚 56KB）**にしました。
       */}
       <div aria-hidden style={{
         position: 'absolute', right: '2%', bottom: '25%',
-        width: 'clamp(250px,40cqw,520px)', aspectRatio: '1431 / 767',
+        width: 'clamp(250px,40cqw,520px)', aspectRatio: '970 / 576',
         transformOrigin: 'bottom center',
-        /** ★1 枚絵なので、★ごく軽い上下だけ付けます（★脚は動きません・下の註記） */
-        animation: 'u-idle 2.6s ease-in-out infinite',
+        /**
+         * ⚠️ ★**跳ねは付けません**（★2026-09-17）。★1 枚絵だったときの名残で
+         *    ★`u-idle` を残していましたが、★8 コマには ★**上下動が入っている**ので、
+         *    ★重ねると ★**二重に跳ねます**（★第 2 稿で `u-rush` を外したのと同じ理由）。
+         */
       }}>
         <span style={{ position: 'absolute', left: '14%', right: '14%', bottom: -10, height: 22, borderRadius: '50%', background: 'rgba(14,26,12,.5)', filter: 'blur(6px)' }} />
         {/* ★砂煙と土くれは ★**後ろ（左）へ**飛びます（★真横・右向きに合わせる） */}
@@ -109,11 +119,20 @@ export default function UmaTop(): React.ReactElement {
         <span style={{ position: 'absolute', left: '18%', bottom: '1%', width: '8%', aspectRatio: '1', borderRadius: '50%', background: 'rgba(228,226,208,.28)', filter: 'blur(6px)', animation: 'u-dust .62s linear -.42s infinite' }} />
         <span style={{ position: 'absolute', left: '12%', bottom: '4%', width: 11, height: 8, borderRadius: 3, background: '#2c4522', animation: 'u-clod .62s linear -.08s infinite' }} />
         <span style={{ position: 'absolute', left: '22%', bottom: '2%', width: 8, height: 7, borderRadius: 3, background: '#37541f', animation: 'u-clod .62s linear -.36s infinite' }} />
-        <span style={{
-          position: 'absolute', inset: 0,
-          background: "url('/art/uma/chibi-side.webp') no-repeat bottom center/contain",
-          filter: 'drop-shadow(0 10px 14px rgba(10,20,8,.38))',
-        }} />
+        {/*
+          ★**中継と同じ 8 コマ**を重ねて、★順に 1 枚だけ見せます（★`u-frame` の註記）。
+          ⚠️ ★止めると（`.u-paused`）★`animation: none` で ★**全部 opacity 1**になり、
+             ★8 枚が重なって濁ります。→ ★**1 枚目以外は `opacity: 0` を素の値**にしておきます。
+        */}
+        {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+          <span key={n} style={{
+            position: 'absolute', inset: 0,
+            background: `url('/art/horse-jockey-side-v8-pose0${n}.webp') no-repeat bottom center/contain`,
+            filter: 'drop-shadow(0 10px 14px rgba(10,20,8,.38))',
+            opacity: n === 1 ? 1 : 0,
+            animation: `u-frame ${GALLOP_SEC}s steps(1,end) ${((n - 1) * GALLOP_SEC) / 8}s infinite`,
+          }} />
+        ))}
       </div>
 
       {/* ★下端のボタン 2 つ（★44px 以上・下端 34px の安全領域） */}
