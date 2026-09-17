@@ -263,7 +263,7 @@ export function BigButton({ tone, label, sub, href, onClick, grow }: {
  * ⚠️ ★`.u-paused` が掛かると `animation: none` で止まります（★停止スイッチ）。
  *    ★そのとき 2 枚目は画面の右外（+100%）で止まるので、★**絵は欠けません**。
  */
-function ParallaxStrip({ src, top, height, dur, position = 'center', filter, bottom }: {
+function ParallaxStrip({ src, top, height, dur, position = 'center', filter, bottom, fadeBottom }: {
   readonly src: string;
   readonly top?: number | string;
   readonly bottom?: number | string;
@@ -273,6 +273,16 @@ function ParallaxStrip({ src, top, height, dur, position = 'center', filter, bot
   /** ★**縦の合わせ方だけ**（`top` / `center` / `bottom`）。★横は常に左起点（上の註記） */
   readonly position?: 'top' | 'center' | 'bottom';
   readonly filter?: string;
+  /**
+   * ★**下端へ向かって消すぼかし**（★`mask-image` の値）。
+   *
+   * ⚠️ ★2026-09-17: ★モバイルで ★**芝に横の境目が 1 本**残っていました（★オーナー指摘）。
+   *    ★測ると `turf-mid` の下端 **y=307** で `turf-near` に切り替わっており、
+   *    ★`turf-mid` は ★**層全体が一様に 0.76s**、★`turf-near` は ★**縦のぼかしで上ほど遅い**。
+   *    → ★**明るさではなく「速さの段差」**が線に見えていました。
+   * → ★奥の層の下端を消して、★手前の層と ★**速さが連続して見える**ようにします。
+   */
+  readonly fadeBottom?: string;
 }): React.ReactElement {
   /**
    * 🔴 ★**1 つの箱に、絵をちょうど 1 枚**敷きます（★2026-09-17・第 3 稿）。
@@ -298,6 +308,7 @@ function ParallaxStrip({ src, top, height, dur, position = 'center', filter, bot
     position: 'absolute', top: 0, bottom: 0, left: 0, width: '100%',
     background: `url('${src}') no-repeat left ${position}`,
     backgroundSize: '100% 100%',
+    ...(fadeBottom === undefined ? {} : { maskImage: fadeBottom, WebkitMaskImage: fadeBottom }),
   };
   return (
     <div style={{
@@ -385,6 +396,8 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
           height="9%"
           dur={0.76}
           filter="brightness(1.1) saturate(1.04)"
+          /** ★下端を消して、★手前の芝（`u-turf` の上端＝ゆっくり）へ ★**速さを繋ぎます** */
+          fadeBottom="linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%)"
         />
       )}
       {/*
