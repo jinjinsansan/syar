@@ -35,7 +35,7 @@ import { syncStableGradePrices } from './grade-flow.js';
 import { freezePendingEntries } from './entry-freeze.js';
 import { runSelfcheck } from './selfcheck.js';
 import { runSchemacheck } from './schemacheck.js';
-import { CANCEL_AFTER_START_MS, CYCLE_MS, classOf, conditionsOf, gradeOf, weekIndexAt } from '@star/scheduler';
+import { CANCEL_AFTER_START_MS, CYCLE_MS, classOf, conditionsOf, gradeOf, weekIndexAt, weekStartMs } from '@star/scheduler';
 // ★投票の上限の正（★2026-09-19・BT-1。★ワーカーが `bet_limits` に書き、RPC はその行を読む）
 import {
   BET_CAP_PER_KIND_EP, BET_CAP_PER_RACE_EP, BET_CAP_PER_DAY_EP, BET_CAP_OWN_RACE_EP,
@@ -377,10 +377,20 @@ async function main(): Promise<void> {
        *    ★`updated_at` が古ければ ★**ワーカーが止まっている**と分かる形にするためです。
        *    ★「週が進んだときだけ書く」と、★**4 時間古いのが正常**になり、★止まったのと区別できません。
        */
+      /**
+       * ★**週の始まりの実時刻も書きます**（★2026-09-19・**UI-4**・移行 `0048`）。
+       *   ★`/records` は台帳を「今週」で絞りますが、★台帳が持つのは `created_at`（実時刻）だけです。
+       *   ★画面に epoch を渡さずに済ませるため、★**変換した結果**をここに置きます
+       *   （★BT-6 ② が「ワーカーが `day_started_at` を毎周書く」と定めたのと同じ形）。
+       * ⚠️ ★**`game_week` と同じ週番号から導きます**（★2 通りの導き方を作らない・D-052）。
+       */
+      const weekIndex = weekIndexAt(nowMs, cfg.epochMs);
       await client.query(
-        `insert into world_state (id, game_week, updated_at) values (true, $1, now())
-         on conflict (id) do update set game_week = excluded.game_week, updated_at = excluded.updated_at`,
-        [weekIndexAt(nowMs, cfg.epochMs)],
+        `insert into world_state (id, game_week, week_started_at, updated_at)
+         values (true, $1, to_timestamp($2 / 1000.0), now())
+         on conflict (id) do update set game_week = excluded.game_week,
+           week_started_at = excluded.week_started_at, updated_at = excluded.updated_at`,
+        [weekIndex, weekStartMs(weekIndex, cfg.epochMs)],
       );
 
       /**

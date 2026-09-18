@@ -24,6 +24,7 @@ import {
   isOnSale,
   phaseAt,
   racesToPrepare,
+  weekIndexAt,
   type Phase,
 } from '@star/scheduler';
 import {
@@ -66,6 +67,11 @@ export interface RaceSpec {
    * ⚠️ ★**SQL に時間の式を書かないため**にここから渡します（D-052・D-103 ④）。
    */
   readonly entryDeadlineAtMs: number;
+  /**
+   * ★**ゲーム内の何週めか**（★2026-09-19・**UI-4**）。★世界時計と同じ `weekIndexAt()` で決めます。
+   * ⚠️ ★SQL にも画面にも週の式を書かないため、★ここから渡します（D-052・D-103 ④）。
+   */
+  readonly gameWeek: number;
   /** §8.6 のコミット。発走前に公開する */
   readonly seedCommit: string;
   /**
@@ -272,6 +278,16 @@ export async function runCycle(
          *   ★**登録できる窓が 1 分もありませんでした**（★照会 Q-ENTRY-1）。
          */
         entryDeadlineAtMs: cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.publish,
+        /**
+         * ★**ゲーム内の何週めか**（★2026-09-19・**UI-4**・移行 `0046`）。
+         *   ★`/records` の戦績は「◯週」を出しますが、★**画面は週を導けません** —
+         *   ★開催の起点（`epochMs`）と 1 週の長さを渡すと ★**画面が時計を持ちます**
+         *   （★UI1-10 で `world_state` を作ったときと同じ判断）。
+         * ⚠️ 🔴 ★**`cycleIndex / CYCLES_PER_WEEK` で割らないこと。**
+         *   ★世界時計（`main.ts`）は ★**時刻から**週を決めています。★2 通りの導き方を置くと、
+         *   ★ずれたときにどちらが正か言えません（D-052）。★**同じ `weekIndexAt()` を使います。**
+         */
+        gameWeek: weekIndexAt(cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.start, epochMs),
         conditions: built.conditions,
         entrants: built.entrants,
         odds: built.odds,

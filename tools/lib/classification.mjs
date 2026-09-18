@@ -484,6 +484,8 @@ export const READONLY = [
   '_strip.mjs', '_webpcost.mjs',
   // ★anon で何が読めるかの全数確認（§8.6 server_seed・§12.4 potential）。select のみ
   'verify-anon-exposure.mjs',
+  // ★既知の赤の照合（★RD-2・2026-09-19）。★npm test を流して名前を突き合わせるだけ。DB に触らない
+  'verify-known-red.mjs',
   'a3-converge.mjs',
   // ★読むだけ。ゲージ（余力）が正しい向きを向いているかを見る
   'diag-gauge.mjs',
@@ -904,6 +906,7 @@ export const COMPONENT = [
   { file: 'lib/dress.mjs', why: '★勝負服の配色を描くための部品（★映像の道具が使う）' },
   { file: 'lib/env.mjs', why: '★接続先の選択を 1 か所にまとめた部品。★`--env` 必須の規則はここが持つ' },
   { file: 'lib/exposure-registry.mjs', why: '★公開の登録簿（★どの表・RPC を誰に開けるか）。★V-20 が読む表で、道具ではない' },
+  { file: 'lib/known-red.mjs', why: '★いま赤いと分かっている検査の登録簿（★RD-2・2026-09-19）。★verify-known-red.mjs が読む表で、道具ではない' },
   { file: 'lib/guard.mjs', why: '★`assertNotProduction` の本体。★状態を変える道具が呼ぶ部品' },
   { file: 'lib/guard.d.mts', why: '★`assertNotProduction` の型宣言（★`any` を使わないために置く）。★実行されません' },
   { file: 'lib/pixel-font.mjs', why: '★画像に文字を焼くための点字の表（★映像の道具が使う）' },

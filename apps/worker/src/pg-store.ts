@@ -162,10 +162,10 @@ export function createPgStore(
         `insert into races (cycle_index, name, class_rank, grade, surface, distance,
                             track_condition, course_id, scheduled_at, seed_commit, server_seed, purse, status,
                             course_frozen, min_wins, max_wins, entry_fee_ep, weight_kg,
-                            entry_deadline_at)
+                            entry_deadline_at, game_week)
          values ($1, $2, $3, $4, $8, $9, $12, $10,
                  to_timestamp($5 / 1000.0), $6, $7, $11, 'scheduled',
-                 $13::jsonb, $14, $15, $16, $17, to_timestamp($18 / 1000.0))
+                 $13::jsonb, $14, $15, $16, $17, to_timestamp($18 / 1000.0), $19)
          on conflict (cycle_index) do nothing`,
         [
           spec.cycleIndex,
@@ -208,6 +208,12 @@ export function createPgStore(
           BASE_WEIGHT_KG,
           /** ★登録の締切（★2026-09-19・ED-1）。★正は TS の `PHASE_OFFSET_MS.publish` */
           spec.entryDeadlineAtMs,
+          /**
+           * ★**ゲーム内の何週めか**（★2026-09-19・**UI-4**・移行 `0046`）。
+           *   ★正は TS の `weekIndexAt()` — ★世界時計（`world_state.game_week`）と**同じ関数**です。
+           * ⚠️ 🔴 ★**SQL 側で `cycle_index` から割り出さないこと**（★2 通りの導き方・D-052）。
+           */
+          spec.gameWeek,
         ],
       );
         // ★挿入されなかった＝他プロセスが先に作った。何もせず抜ける（重複させない）
