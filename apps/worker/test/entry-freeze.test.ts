@@ -59,7 +59,15 @@ interface Entry {
   retired_at_week?: number | null;
 }
 
-function fakeDb(entries: Entry[], ledger: { key: string; delta: number }[]): pg.Client {
+/**
+ * @param feeOnRow ★`races.entry_fee_ep`（★**行の値**）。★返金はここから作られるはず
+ *   （★2026-09-19・D-117 DS-7 の切り出しで直した穴。★以前は自前の定数 200 でした）
+ */
+function fakeDb(
+  entries: Entry[],
+  ledger: { key: string; delta: number }[],
+  feeOnRow: number = ENTRY_FEE_EP,
+): pg.Client {
   const client = {
     query: async (sql: string, params: readonly unknown[] = []) => {
       if (sql === 'begin' || sql === 'commit' || sql === 'rollback') return { rows: [], rowCount: 0 };
@@ -87,6 +95,9 @@ function fakeDb(entries: Entry[], ledger: { key: string; delta: number }[]): pg.
         e.scratched_at = '2026-09-16T00:00:00Z';
         e.scratch_reason = params[0] as string;
         return { rows: [], rowCount: 1 };
+      }
+      if (sql.includes('select entry_fee_ep from races')) {
+        return { rows: [{ entry_fee_ep: feeOnRow }], rowCount: 1 };
       }
       if (sql.includes('select owner_id from horses')) {
         return { rows: [{ owner_id: OWNER }], rowCount: 1 };
@@ -187,6 +198,28 @@ describe('★出走登録の凍結と取消（D-111）', () => {
     /** ★変換は生成側と同じ関数（★ここで組み直さない・D-052） */
     expect(CODE).toMatch(/toEntrant/);
     expect(CODE).not.toMatch(/horseId:\s*.*,\s*stats:\s*\{/);
+  });
+
+  /**
+   * 🔴 ★**返す額は「行に書いてある登録料」から来ているか**（★2026-09-19・D-117 DS-7 の切り出しで直した穴）
+   *
+   * ★取る側（`enter_race`・`0041`/`0042`）は ★**`races.entry_fee_ep` の行の値**を取ります。
+   * ★返す側は ★**自前の定数 200** から作っていました（D-052 の写し）。
+   * ★値が一致しているあいだは ★**どちらの実装でも緑**になるので、
+   *   ★**行の値を 200 から動かして**、★返す額が付いてくるかを見ます（★対照）。
+   */
+  it('⑤ ★返す額は `races.entry_fee_ep`（行の値）から来る — ★定数 200 ではない', async () => {
+    const entries = makeEntries();
+    const ledger: { key: string; delta: number }[] = [];
+    // ★行の登録料を 200 → 250 に動かす（★定数のままなら 200 + 300 = 500 で落ちる）
+    const r = await freezePendingEntries(fakeDb(entries, ledger, 250), () => {});
+    expect(r.refundedEp).toBe(250 + 300);
+    expect(ledger[0]!.delta).toBe(550);
+    // ★対照: ★行が 200 のときは今までどおり 500
+    const entries2 = makeEntries();
+    const ledger2: { key: string; delta: number }[] = [];
+    const r2 = await freezePendingEntries(fakeDb(entries2, ledger2, 200), () => {});
+    expect(r2.refundedEp).toBe(500);
   });
 
   it('★安全網（D-056）を外していない（★確定側の中止の分岐に触れていない）', () => {

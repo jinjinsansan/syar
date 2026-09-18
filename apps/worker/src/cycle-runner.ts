@@ -18,12 +18,14 @@
  */
 
 import {
+  MAX_FILLS_PER_CYCLE,
   PHASE_OFFSET_MS,
   cycleIndexAt,
   cycleStartMs,
+  entryDeadlineMs,
   isOnSale,
   phaseAt,
-  racesToPrepare,
+  racesToAnnounce,
   weekIndexAt,
   type Phase,
 } from '@star/scheduler';
@@ -42,8 +44,31 @@ export interface CycleStore {
   unlock(key: number): Promise<void>;
   /** そのサイクル番号のレースが既に存在するか */
   raceExists(cycleIndex: number): Promise<boolean>;
-  /** レースを作る（オッズ算出まで含む） */
+  /** レースを作る（オッズ算出まで含む）。★= 公示 → 組成 を続けて行う */
   createRace(spec: RaceSpec): Promise<void>;
+  /**
+   * ★**公示**（★2026-09-19・**D-117** ①）。★`races` の行だけ作る（`status = 'announced'`）。
+   *   ★出走表もオッズもまだありません。★ここから登録（`enter_race`）を受け付けます。
+   */
+  announceRace(spec: AnnounceSpec): Promise<void>;
+  /** ★組成を待っているレースの番号（`status = 'announced'`）。★小さい順 */
+  announcedRaces(): Promise<number[]>;
+  /**
+   * ★**公示のとき書いた条件**（★D-117）。★組成はこれを読み直します。
+   *   ⚠️ ★引き直さないこと（D-052）。★特に `courseFrozen` は**公示の時点の凍結**です。
+   *   ★その番号のレースが無い／公示済みでなければ `null`。
+   */
+  announcedConditions(cycleIndex: number): Promise<AnnouncedRace | null>;
+  /**
+   * ★**登録された馬**（★D-117 ②・**DS-2**）。★`race_entries` に既に行がある馬の id。
+   *   ★組成は**この馬を必ず出走表に入れます**（★登録したのに走れないことがない）。
+   */
+  registeredHorses(cycleIndex: number): Promise<readonly string[]>;
+  /**
+   * ★**組成**（★D-117 ②）。★出走表とオッズを入れ、★`status` を `scheduled` にします。
+   *   ★登録済みの行は**更新**し（`jockey_frozen`・`client_token` を保つ）、★残りを挿入します。
+   */
+  fillRace(cycleIndex: number, spec: FillSpec): Promise<void>;
   /** 確定していない、発走時刻を過ぎたレースの番号 */
   pendingSettlements(nowMs: number): Promise<number[]>;
   settleRace(cycleIndex: number): Promise<void>;
@@ -98,6 +123,31 @@ export interface RaceSpec {
   readonly odds: readonly OddsSpec[];
 }
 
+/**
+ * ★**公示で書くもの**（★2026-09-19・**D-117** ①）。
+ *   ★`RaceSpec` から出走表とオッズを抜いたものです。
+ * ⚠️ ★**抜いたのであって、別に定義していません** — ★項目が増えたら両方に入ります（D-052）。
+ */
+export type AnnounceSpec = Omit<RaceSpec, 'entrants' | 'odds'>;
+
+/** ★**公示のとき書いた条件**（★D-117 ②が読み直す） */
+export interface AnnouncedRace {
+  readonly cycleIndex: number;
+  readonly conditions: RaceSpec['conditions'];
+}
+
+/** ★**組成で書くもの**（★2026-09-19・**D-117** ②） */
+export interface FillSpec {
+  readonly entrants: readonly RaceEntrantSpec[];
+  readonly odds: readonly OddsSpec[];
+  /**
+   * ★**すでに `race_entries` に行がある馬**（★プレイヤーが登録した馬）。
+   *   ★この馬は**挿入ではなく更新**します（★`jockey_frozen` と `client_token` を消さない）。
+   * ⚠️ ★`entrants` に必ず含まれていること — ★含まれていなければ `fillRace` が投げます。
+   */
+  readonly registered: readonly string[];
+}
+
 export interface RaceEntrantSpec {
   readonly horseId: string;
   readonly gate: number;
@@ -135,8 +185,24 @@ export interface CycleOutcome {
   readonly cycleIndex: number;
   readonly phase: Phase;
   readonly onSale: boolean;
-  /** 実際に作ったレース（既にあったものは含まない） */
-  readonly created: readonly number[];
+  /**
+   * ★**組成まで終わったレース**（★2026-09-19・**D-117** ②）。
+   *   ⚠️ ★旧名 `created`。★D-117 で生成が 2 段になったので、★**どちらの段か**を名前で言います。
+   */
+  readonly filled: readonly number[];
+  /** ★**公示したレース**（★D-117 ①・★既にあったものは含まない） */
+  readonly announced: readonly number[];
+  /**
+   * ★**締切を過ぎているのに、この周では組成しなかったレース**（★**DS-8**）。
+   *   ★`MAX_FILLS_PER_CYCLE` に当たった分です。★**0 でない周が続いたら遅れています**。
+   */
+  readonly fillDeferred: readonly number[];
+  /**
+   * ★**発売開始までに組成が終わらず、中止にしたレース**（★**DS-6/DS-7**）。
+   *   ★馬券は 1 枚も売れていません（`place_bet` は `scheduled` だけ）。
+   *   ★返すのは**登録料と騎手の料金**です。★0 でない周は必ず調査対象。
+   */
+  readonly fillFailed: readonly number[];
   /** 既にあったので作らなかったレース */
   readonly skipped: readonly number[];
   readonly settled: readonly number[];
@@ -157,14 +223,25 @@ export async function runCycle(
   store: CycleStore,
   epochMs: number,
   seeds: SeedSource,
-  build: (cycleIndex: number) => {
+  /**
+   * ★**公示の条件を決める**（★2026-09-19・**D-117** ①）。
+   *   ★番組表（`conditionsOf`）＋ ★馬場状態（`announceConditions`）。★出走馬は見ません。
+   * ⚠️ ★**乱数を引くのはここ 1 回だけ**です。★組成は行から読み直します（D-052）。
+   */
+  announce: (cycleIndex: number) => RaceSpec['conditions'],
+  /**
+   * ★**出走表とオッズを作る**（★2026-09-19・**D-117** ②）。
+   *
+   * @param conditions ★**公示の行から読んだ条件**（★引き直さない・R-30）
+   * @param registered ★**登録済みの馬**（★必ず出走表に入れること・DS-2）
+   */
+  build: (
+    cycleIndex: number,
+    conditions: RaceSpec['conditions'],
+    registered: readonly string[],
+  ) => {
     readonly entrants: readonly RaceEntrantSpec[];
     readonly odds: readonly OddsSpec[];
-    // ★オッズを計算したときの条件。これを保存する（Q-P3-32）
-    readonly conditions: RaceConditions & {
-      readonly trackCondition: 'good' | 'yielding' | 'soft' | 'bad';
-      readonly courseFrozen: FrozenCourseRecord;
-    };
   },
   /**
    * ★開催中止が起きたときの通報（正典 D-037）。
@@ -182,11 +259,15 @@ export async function runCycle(
   if (!locked) {
     return {
       nowMs, cycleIndex, phase, onSale,
-      created: [], skipped: [], settled: [], cancelled: [], lockBusy: true,
+      filled: [], announced: [], fillDeferred: [], fillFailed: [],
+      skipped: [], settled: [], cancelled: [], lockBusy: true,
     };
   }
 
-  const created: number[] = [];
+  const filled: number[] = [];
+  const announced: number[] = [];
+  const fillDeferred: number[] = [];
+  const fillFailed: number[] = [];
   const skipped: number[] = [];
   const settled: number[] = [];
   const cancelled: number[] = [];
@@ -245,39 +326,32 @@ export async function runCycle(
       onAlert({ cycleIndex: idx, refundedBets: r.refundedBets, refundedEp: r.refundedEp });
     }
 
-    // --- 3. 先行生成（§10.2: 2レース先まで） ---
-    for (const idx of racesToPrepare(nowMs, epochMs)) {
+    // --- 3. ★公示（★D-117 ①・§10.2）---
+    //
+    // ★`ANNOUNCE_AHEAD_RACES` 先まで、★**枠と条件だけ**の行を作ります。
+    //   ★ここから `enter_race` が登録を受け付けます（★窓は 12 分）。
+    //   ★出走表もオッズもまだ無いので、★1 本あたりの費用はほぼゼロです。
+    for (const idx of racesToAnnounce(nowMs, epochMs)) {
       // ★ロックを取れていても存在確認する。ロックは同時実行を防ぐだけで、
       //   「前回の自分が既に作った」ことは防げない
       if (await store.raceExists(idx)) {
         skipped.push(idx);
         continue;
       }
-      /**
-       * ★**オッズを計算したときの条件をそのまま保存します**（Q-P3-32 の是正）。
-       *
-       * 【何が起きていたか】
-       *   ここは `conditionsOf(idx)` を保存し、`build(idx)` は
-       *   `generateRace` が**自分で引いた**条件でオッズを計算していました。
-       *   本番で 1/7 しか一致せず、**別のレースのオッズ**を売っていました。
-       *   → 条件の出所を `build` の返り値**ひとつ**にします。
-       */
-      const built = build(idx);
-      await store.createRace({
+      await store.announceRace({
         cycleIndex: idx,
         raceClass: classOf(idx),
         grade: gradeOf(idx),
         // ★発走時刻もサイクル番号から決める。再起動しても同じ時刻になる
         scheduledAtMs: cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.start,
         /**
-         * ★**登録の締切**（★2026-09-19・**ED-1**・移行 `0041`）。
-         *   ★**publish（出走表の公開）より前**で締め切ります —
-         *   ★公開した出走表が嘘にならないように。
-         * 🔴 ★旧は `enter_race` が `interval '60 minutes'` と直書きしており、
-         *   ★レースの行が生まれるのは発走の 12 分前なので、
-         *   ★**登録できる窓が 1 分もありませんでした**（★照会 Q-ENTRY-1）。
+         * ★**登録の締切**（★2026-09-19・**D-117**）。
+         *   🔴 ★旧は `cycleStart + publish`（★ED-1・`0041`）でした。★それだと締切から
+         *     ★発売開始まで **30 秒**しかなく、★オッズ（70〜98 秒）が入りません。
+         *   ★今は ★**`entryDeadlineMs()` の 1 か所**が決めます（★`cycleStart(N-2)`）。
+         *   ★締切から発売開始まで ★**13 分**あります。
          */
-        entryDeadlineAtMs: cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.publish,
+        entryDeadlineAtMs: entryDeadlineMs(idx, epochMs),
         /**
          * ★**ゲーム内の何週めか**（★2026-09-19・**UI-4**・移行 `0046`）。
          *   ★`/records` の戦績は「◯週」を出しますが、★**画面は週を導けません** —
@@ -288,19 +362,85 @@ export async function runCycle(
          *   ★ずれたときにどちらが正か言えません（D-052）。★**同じ `weekIndexAt()` を使います。**
          */
         gameWeek: weekIndexAt(cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.start, epochMs),
-        conditions: built.conditions,
-        entrants: built.entrants,
-        odds: built.odds,
+        /**
+         * ★**公示の時点で条件を決め、行に書きます**（★D-117）。
+         *   ★`races.track_condition` は not null なので、★ここで 1 つ決まります。
+         *   ★組成は**この行を読み直します** — ★引き直しません（D-052・R-30）。
+         */
+        conditions: announce(idx),
         purse: purseOf(prizeTierOf(classOf(idx), gradeOf(idx))),
         seedCommit: seeds.seedCommit(idx),
         serverSeed: seeds.serverSeed(idx),
       });
-      created.push(idx);
+      announced.push(idx);
+    }
+
+    // --- 4. ★組成（★D-117 ②・**DS-6/7/8/9**）---
+    //
+    // ★締切を過ぎた公示から順に、★登録馬 ＋ NPC で出走表を作り、★オッズを付けます。
+    // ★ここで初めて `scheduled` になり、★発売できる状態になります。
+    for (const idx of await store.announcedRaces()) {
+      /**
+       * ★**締切前は触りません**（★登録を受け付けている最中）。
+       * ⚠️ ★時刻の判定は ★**ここ（TS）だけ**です。★`announcedRaces()` は絞りません（D-052）。
+       */
+      if (nowMs < entryDeadlineMs(idx, epochMs)) continue;
+
+      /**
+       * ★**発売開始までに組成が終わらなかった**（★**DS-6/DS-7**）。
+       *
+       * ★DS-6: ★売りません。★これは自動的に守られています —
+       *   ★`place_bet` は `scheduled` だけを受けるので、★組成前のレースは 1 枚も売れません。
+       * ★DS-7: ★**中止にして、登録料と騎手の料金を返します**（★D-111 ③⑤ の経路）。
+       *   ★馬券は無いので `refundedBets` は 0 です。
+       *
+       * ⚠️ ★**組成より先に判定します。** ★後ろに置くと、★間に合わないレースに
+       *    ★`MAX_FILLS_PER_CYCLE` を 1 枠使ってから捨てることになります。
+       */
+      if (nowMs >= cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.salesOpen) {
+        const r = await store.cancelRace(idx);
+        fillFailed.push(idx);
+        // ★黙って中止にしない（D-037 と同じ形）
+        onAlert({ cycleIndex: idx, refundedBets: r.refundedBets, refundedEp: r.refundedEp });
+        continue;
+      }
+
+      /**
+       * ★**1 周で組成する本数の上限**（★**DS-9**）。
+       *   ★超えた分は `fillDeferred` に載せて ★**次の周に回します**（★DS-8 で数えられる）。
+       * ⚠️ ★`break` ではなく続けます — ★後ろにいる「もう間に合わない」レースを
+       *    ★この周で中止にする必要があるからです（★上の DS-6/7）。
+       */
+      if (filled.length >= MAX_FILLS_PER_CYCLE) {
+        fillDeferred.push(idx);
+        continue;
+      }
+
+      /**
+       * ★**公示の行から条件を読みます**（★引き直さない・D-052・R-30）。
+       *   ★null は「その番号が `announced` でなくなった」＝ 他のプロセスが組成した、です。
+       */
+      const announcedRace = await store.announcedConditions(idx);
+      if (announcedRace === null) continue;
+
+      /** ★**登録した馬は必ず入れます**（★**DS-2**）。★`fillRace` が入っているか確かめます */
+      const registered = await store.registeredHorses(idx);
+      const built = build(idx, announcedRace.conditions, registered);
+      await store.fillRace(idx, {
+        entrants: built.entrants,
+        odds: built.odds,
+        registered,
+      });
+      filled.push(idx);
     }
   } finally {
     // ★必ず解放する。落ちたままだと次の周が永久にロック待ちになる
     await store.unlock(LOCK_KEY.CYCLE);
   }
 
-  return { nowMs, cycleIndex, phase, onSale, created, skipped, settled, cancelled, lockBusy: false };
+  return {
+    nowMs, cycleIndex, phase, onSale,
+    filled, announced, fillDeferred, fillFailed,
+    skipped, settled, cancelled, lockBusy: false,
+  };
 }

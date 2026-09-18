@@ -10,7 +10,7 @@ import { Rng, deriveRng, type HorseRecord } from '@star/sim-engine';
 import { DEFAULT_RACE_BALANCE, conditionsFromFrozen, lanePlanForRace, resolveRace, type RaceEntrant } from '@star/race-engine';
 import { TICKET_KINDS, placeDepth, type TicketKind } from '@star/betting';
 import { frozenCourseOf, selectEligible, type FrozenCourseRecord, type RaceClass } from '@star/scheduler';
-import { FIELD_SIZE, generateRace, sortPoolByClass } from '../../cli/src/race-field.js';
+import { FIELD_SIZE, announcedTrackCondition, generateRace, sortPoolByClass } from '../../cli/src/race-field.js';
 import { ODDS_MC_TRIALS, buildOddsRows, winningKeys } from './odds.js';
 import type { OddsSpec, RaceEntrantSpec } from './cycle-runner.js';
 
@@ -53,6 +53,42 @@ export interface BuiltRace {
 }
 
 /**
+ * ★**公示（announce）の時点で決まる条件**（★2026-09-19・**D-117**）。
+ *
+ * ★D-117 で生成は 2 段になりました:
+ *   ① ★**公示** … ★`races` の行だけ作る（★4 レース先まで）。★登録を受け付ける
+ *   ② ★**組成** … ★締切のあと、★登録した馬を入れて出走表とオッズを作る（★2 レース先）
+ *
+ * ★`races.track_condition` は **not null** なので、★① の時点で 1 つ決まっている必要があります。
+ * ★ここが決めた値を行に書き、★② は**行から読み直して**使います（★D-052・正は行 1 つ）。
+ *
+ * ⚠️ ★**`buildRace` と同じ stream の同じ位置**を読みます（`announcedTrackCondition`）。
+ *    ★したがって「公示で書いた値」と「組成が引いたはずの値」は一致します。
+ *    ★それでも ② は**引き直さず行を読みます** — ★一致を前提にした設計にしないためです。
+ *
+ * @param seed 開催全体のマスターシード（サイクル番号ではない）
+ */
+export function announceConditions(
+  seed: number,
+  cycleIndex: number,
+  programme: { readonly surface: 'turf' | 'dirt'; readonly distance: number; readonly courseId: string },
+): BuiltRace['conditions'] {
+  /**
+   * ★**走路の形はここで凍結します**（★公示の時点）。
+   *   ★組成はこの値を行から読んで使うので、★間に走路表が変わっても
+   *   ★プレイヤーが見たコースとモンテカルロが使うコースは同じです。
+   */
+  const courseFrozen = frozenCourseOf(programme.courseId);
+  return {
+    surface: programme.surface,
+    distance: programme.distance,
+    trackCondition: announcedTrackCondition(deriveRng(seed, STREAM.FIELD, cycleIndex)),
+    courseId: courseFrozen.venueId,
+    courseFrozen,
+  };
+}
+
+/**
  * @param seed 開催全体のマスターシード（サイクル番号ではない）
  * @param trials モンテカルロ試行数。テストでは小さくする
  */
@@ -71,7 +107,25 @@ export function buildRace(
    * ★番組表が決めた条件（§10.3・`conditionsOf` の出力）。
    *   渡すと距離と馬場をそれに合わせ、**使った条件を返り値に載せます**。
    */
-  programme?: { readonly surface: 'turf' | 'dirt'; readonly distance: number; readonly courseId: string },
+  programme?: {
+    readonly surface: 'turf' | 'dirt';
+    readonly distance: number;
+    readonly courseId: string;
+    /**
+     * ★**公示済みの馬場状態**（★2026-09-19・**D-117**）。
+     *   ★渡すと ★`races.track_condition`（公示のとき書いた値）をそのまま使います。
+     *   ★渡さなければ従来どおり `generateRace` が引きます。
+     */
+    readonly trackCondition?: 'good' | 'yielding' | 'soft' | 'bad';
+    /**
+     * ★**公示で凍結した走路の形**（★2026-09-19・**D-117**）。
+     *
+     * ⚠️ ★凍結の意味は「★**ある時点の値を留める**」ことです。★組成のときに
+     *    ★`frozenCourseOf(courseId)` を引き直すと、★公示の行に書いた値と食い違いえます
+     *    （★その間に走路表が変われば）。★**行に書いたものを渡してください**（R-30）。
+     */
+    readonly courseFrozen?: FrozenCourseRecord;
+  },
   /**
    * ★**出走資格**（★CL-3・指示書 `DEV_INSTRUCTIONS_RACE_CLASS_20260918.md`）。
    *
@@ -88,7 +142,8 @@ export function buildRace(
    *   ① このオブジェクトから条件を作ってモンテカルロに渡し、
    *   ② **同じオブジェクト**を返り値に載せて `createRace` が保存します（★作り直さない・R-30）。
    */
-  const programmeFrozen = programme === undefined ? undefined : frozenCourseOf(programme.courseId);
+  const programmeFrozen =
+    programme === undefined ? undefined : (programme.courseFrozen ?? frozenCourseOf(programme.courseId));
   /**
    * ★**資格の層**（CL-3）。★**選抜の手前**に置きます:
    *   ★プール全体 → ★**資格で絞る（ここ）** → 素質順に並べる → `classBand` の窓 → 出走馬
@@ -126,7 +181,15 @@ export function buildRace(
       ...(trainingStates === undefined ? {} : { trainingStateOf: (h: HorseRecord) => trainingStates.get(h.id) }),
       ...(programme === undefined || programmeFrozen === undefined
         ? {}
-        : { programme: { surface: programme.surface, distance: programme.distance, courseShape: programmeFrozen.courseShape } }),
+        : {
+            programme: {
+              surface: programme.surface,
+              distance: programme.distance,
+              courseShape: programmeFrozen.courseShape,
+              // ★D-117: 公示済みの馬場状態。★無ければ `generateRace` が引く（従来どおり）
+              ...(programme.trackCondition === undefined ? {} : { trackCondition: programme.trackCondition }),
+            },
+          }),
     },
   );
   /**

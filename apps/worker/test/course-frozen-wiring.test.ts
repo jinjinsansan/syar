@@ -69,6 +69,24 @@ function fakeDb() {
         return { rows: [], rowCount: 1 };
       }
       if (s.startsWith('select id from races')) return { rows: [{ id: `race-${String(params[0])}` }], rowCount: 1 };
+      /**
+       * ★2026-09-19・**D-117**: ★生成が ★**公示 → 組成**の 2 段になりました。
+       *   ★`createRace` は ★`announceRace` → `fillRace` を続けて呼ぶだけです。
+       *   ★組成は ★行を掴んで（`for update`）★`announced` であることを確かめてから入れます。
+       */
+      if (s.startsWith('select id, status from races')) {
+        const cycle = Number(params[0]);
+        return saved.has(cycle)
+          ? { rows: [{ id: `race-${String(cycle)}`, status: 'announced' }], rowCount: 1 }
+          : { rows: [], rowCount: 0 };
+      }
+      // ★組成の後に「出走表の数が合うか」を確かめる（★締切後の登録を弾く・D-117）
+      if (s.startsWith('select count(*)::text as n from race_entries')) {
+        const cycle = Number(String(params[0]).replace('race-', ''));
+        return { rows: [{ n: String(saved.get(cycle)?.entrants.length ?? 0) }], rowCount: 1 };
+      }
+      // ★組成が終わって発売できる状態にする（★`update races set status` の settle 側より前に置く）
+      if (s.includes("set status = 'scheduled'")) return { rows: [], rowCount: 1 };
       if (s.startsWith('insert into race_entries')) {
         const id = String(params[0]);
         const cycle = Number(id.replace('race-', ''));

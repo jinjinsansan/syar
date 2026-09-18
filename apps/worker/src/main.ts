@@ -21,7 +21,7 @@ import { assertPgTypesConfigured } from './pg-types.js';
 import { APPLICATION_NAME, formatResources, sampleResources } from './resources.js';
 import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
-import { buildRace } from './build-race.js';
+import { announceConditions, buildRace } from './build-race.js';
 import { aggregateDay } from './daily-flow.js';
 import { loadRaceablePool, loadTrainingStates, loadWinsByHorse } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
@@ -191,13 +191,41 @@ async function main(): Promise<void> {
         store,
         cfg.epochMs,
         seeds,
-        (i) => {
+        /**
+         * ★**公示の条件**（★2026-09-19・**D-117** ①）。★番組表 ＋ 馬場状態。
+         *   ★出走馬も母集団も見ません。★ここで引いた馬場状態が行に書かれ、
+         *   ★組成（下）は**その行を読み直します**（D-052）。
+         */
+        (i) => announceConditions(cfg.epochMs, i, conditionsOf(i, classOf(i), gradeOf(i))),
+        (i, conditions, registered) => {
           const raceClass = classOf(i);
           const built = buildRace(pool, i, cfg.epochMs, undefined, trainingStates,
-            // ★番組表（§10.3）が距離・馬場・コースを決める（Q-P3-32）
-            conditionsOf(i, raceClass, gradeOf(i)),
+            {
+              // ★番組表（§10.3）が距離・馬場・コースを決める（Q-P3-32）
+              ...conditionsOf(i, raceClass, gradeOf(i)),
+              /**
+               * ★**公示の行から読んだ馬場と走路**（★D-117・引き直さない・R-30）。
+               *   ★公示のときプレイヤーに見せたものと ★**同じもの**でオッズを計算します。
+               */
+              trackCondition: conditions.trackCondition,
+              courseFrozen: conditions.courseFrozen,
+            },
             // ★資格の層（★CL-3）。★選抜（能力の帯）はこの下でそのまま働きます
             { raceClass, winsOf: (h) => winsByHorse.get(h.id) ?? 0 });
+          /**
+           * 🔴 ★**登録した馬が出走表に入っているか**（★D-117 **DS-2**）。
+           * ⚠️ ★まだ `buildRace` に「必ず入れる馬」を渡していません（★次の段）。
+           *    ★入っていなければ `fillRace` が投げます — ★**黙って落としません**。
+           */
+          if (registered.length > 0) {
+            const missing = registered.filter((h) => !built.entrants.some((e) => e.horseId === h));
+            if (missing.length > 0) {
+              console.error(
+                `[worker] 🔴 ★登録した ${missing.length} 頭が出走表に入りません cycle=${i}` +
+                  `（★DS-2 未実装・組成は失敗します）`,
+              );
+            }
+          }
           // 🔴 ★**資格を広げたら黙って通さない**（★D-079 ⑦ と同じ形・CL-3）
           if (built.eligibility !== null && built.eligibility.widenedSteps > 0) {
             console.error(
@@ -241,7 +269,10 @@ async function main(): Promise<void> {
       const cycleMs = Date.now() - started;
       console.log(
         `[worker] cycle=${out.cycleIndex} phase=${out.phase} ` +
-          `生成=[${out.created.join(',')}] 既存=${out.skipped.length} ` +
+          `公示=[${out.announced.join(',')}] 生成=[${out.filled.join(',')}] 既存=${out.skipped.length} ` +
+          // ★★遅れ（DS-8）と間に合わなかったレース（DS-7）。★0 でない周は調査対象
+          (out.fillDeferred.length > 0 ? `★組成待ち=[${out.fillDeferred.join(',')}] ` : '') +
+          (out.fillFailed.length > 0 ? `🔴組成間に合わず中止=[${out.fillFailed.join(',')}] ` : '') +
           `確定=[${out.settled.join(',')}] ` +
           // ★1 周に対する割合も出す。秒数だけだと余裕が読み取れません。
           // 🔴 ★**ここは 600000（10 分）の直書きでした**（★2026-09-18・T-13 で発見）。

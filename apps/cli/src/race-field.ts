@@ -321,7 +321,22 @@ export interface GenerateRaceOptions {
    * ⚠️ ★`courseShape` は**凍結した走路の形**の値（★2026-09-15・指示書 VW-1）。
    *    ★渡すと、下の「1400m 以下の 20% を直線」は**引いてから捨てます**（★乱数の並びをずらさない）。
    */
-  readonly programme?: { readonly surface: 'turf' | 'dirt'; readonly distance: number; readonly courseShape: CourseShape };
+  readonly programme?: {
+    readonly surface: 'turf' | 'dirt';
+    readonly distance: number;
+    readonly courseShape: CourseShape;
+    /**
+     * ★**公示済みの馬場状態**（★2026-09-19・**D-117**）。
+     *
+     * ★D-117 で生成は 2 段（★公示 announce → ★組成 fill）になりました。
+     *   ★`races.track_condition` は **not null** なので、★公示の時点で 1 つ決まります。
+     *   ★決めるのは `announcedTrackCondition()`（★下）で、★**同じ stream の同じ位置**を読みます。
+     *
+     * ★渡されたらそれを使い、★**抽選自体は引いてから捨てます**
+     *   （★距離・馬場と同じ形。★乱数の並びを 1 ビットも動かさないため）。
+     */
+    readonly trackCondition?: TrackCondition;
+  };
   /**
    * ★その馬の**現在能力**（Q-P3-29 の是正）。`undefined` を返した馬は
    *   従来どおり `potential × PLACEHOLDER_UNLOCK` を使います。
@@ -336,6 +351,60 @@ export interface GenerateRaceOptions {
    *    ★`verify-race` の `--field-min` / `--field-max` から渡します。
    */
   readonly fieldSizeRange?: { readonly min: number; readonly max: number };
+}
+
+/** 抽選値を馬場状態に直す（§10.4 の分布）。★純関数 — 乱数を引きません */
+export function trackConditionFrom(roll: number): TrackCondition {
+  return roll < TRACK_CONDITION_CDF.good
+    ? 'good'
+    : roll < TRACK_CONDITION_CDF.yielding
+      ? 'yielding'
+      : roll < TRACK_CONDITION_CDF.soft
+        ? 'soft'
+        : 'bad';
+}
+
+/**
+ * ★**出走表を作る前に引く 4 つ**（★2026-09-19・**D-117**）。
+ *
+ * ★`generateRace` の冒頭そのものです。★**別に切り出したのは、公示（announce）が
+ *   出走馬を決める前に馬場状態を決められるようにするため**です（★`races.track_condition` は not null）。
+ *
+ * ★成立する理由:
+ *   ① ★`Rng.int` / `Rng.pick` / `Rng.float` は ★**どれもちょうど 1 回**しか `float()` を消費しません
+ *      （★`int` は `min + floor(float() * span)`。★棄却サンプリングではない — ★確認済み）。
+ *   ② ★`fieldSize` だけが `poolLen` に依存しますが、★**依存するのは値であって消費数ではありません**。
+ *   ③ ★stream は `deriveRng(seed, STREAM.FIELD, cycleIndex)` — ★サイクル番号だけで決まります。
+ *   → ★公示と組成が**同じ stream の同じ位置**を読むので、★馬場状態は必ず一致します。
+ *
+ * ⚠️ ★**ここに引く順を足したら、公示と組成の両方が一緒に動きます**（★それが狙いです）。
+ *    ★逆に `generateRace` の**この呼び出しより前**に乱数を足すと**静かにずれます**。
+ *    ★`announce-fill-same-going.test.ts` がその 1 点だけを見張っています。
+ */
+function drawRacePrefix(
+  rng: Rng,
+  sizeMin: number,
+  sizeMax: number,
+  poolLen: number,
+): { fieldSize: number; distance: number; surface: Surface; trackCondition: TrackCondition } {
+  const fieldSize = rng.int(sizeMin, Math.min(sizeMax, poolLen));
+  const distance = rng.pick(DISTANCES);
+  const surface = rng.pick(SURFACES);
+  const trackCondition = trackConditionFrom(rng.float());
+  return { fieldSize, distance, surface, trackCondition };
+}
+
+/**
+ * ★**公示の時点の馬場状態**（★2026-09-19・**D-117**）。
+ *
+ * ★`generateRace` と**同じ stream**（`deriveRng(seed, STREAM.FIELD, cycleIndex)`）を渡すこと。
+ * ★母集団は要りません — ★上の ② のとおり、★頭数の**値**は馬場状態に影響しないからです。
+ *
+ * ⚠️ ★この値は **DB の `races.track_condition` に書かれ、組成はそれを読み直します**（D-052）。
+ *    ★組成の側で引き直して突き合わせる形にはしていません — ★**正は行 1 つ**です。
+ */
+export function announcedTrackCondition(rng: Rng): TrackCondition {
+  return drawRacePrefix(rng, FIELD_SIZE.MIN, FIELD_SIZE.MAX, FIELD_SIZE.MAX).trackCondition;
 }
 
 export function generateRace(
@@ -356,7 +425,6 @@ export function generateRace(
   // ★頭数の範囲（★既定は正典 §10.4 の 8〜18。★CF-7 で測るときだけ呼ぶ側が渡す）
   const sizeMin = opts.fieldSizeRange?.min ?? FIELD_SIZE.MIN;
   const sizeMax = opts.fieldSizeRange?.max ?? FIELD_SIZE.MAX;
-  const fieldSize = rng.int(sizeMin, Math.min(sizeMax, pool.length));
   /**
    * ★番組表（§10.3）が距離と馬場を決めているなら、それに従います（Q-P3-32 の是正）。
    *
@@ -372,20 +440,12 @@ export function generateRace(
    *   P1 のゲート（V-4/V-5/V-6）は `programme` を渡さない経路で測っているので、
    *   **引いてから捨てる**ことで、そちらの結果を1ビットも動かしません。
    */
-  const drawnDistance = rng.pick(DISTANCES);
-  const drawnSurface = rng.pick(SURFACES);
-  const distance = opts.programme?.distance ?? drawnDistance;
-  const surface = opts.programme?.surface ?? drawnSurface;
-  // 良馬場が大半（稍重・重は少数）
-  const conditionRoll = rng.float();
-  const trackCondition: TrackCondition =
-    conditionRoll < TRACK_CONDITION_CDF.good
-      ? 'good'
-      : conditionRoll < TRACK_CONDITION_CDF.yielding
-        ? 'yielding'
-        : conditionRoll < TRACK_CONDITION_CDF.soft
-          ? 'soft'
-          : 'bad';
+  const drawn = drawRacePrefix(rng, sizeMin, sizeMax, pool.length);
+  const fieldSize = drawn.fieldSize;
+  const distance = opts.programme?.distance ?? drawn.distance;
+  const surface = opts.programme?.surface ?? drawn.surface;
+  // ★公示済みなら公示の値（D-117）。無ければ抽選（良馬場が大半・稍重/重は少数）
+  const trackCondition: TrackCondition = opts.programme?.trackCondition ?? drawn.trackCondition;
 
   // クラス帯（能力順の連続した窓）から重複なしで fieldSize 頭を引く。
   // ★`pool` は能力昇順に並んでいる前提（`sortPoolByClass`）。並んでいなければクラス分けは効かない

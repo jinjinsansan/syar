@@ -20,7 +20,7 @@ import { BASE_WEIGHT_KG, InvalidFrozenCourseError, conditionsFromFrozen, parseFr
 import { awardPrizes } from './prize-award.js';
 import { settlePayouts } from './payout.js';
 import { settleRace as settleRaceFair } from './settle.js';
-import type { CycleStore, RaceSpec } from './cycle-runner.js';
+import type { AnnounceSpec, AnnouncedRace, CycleStore, FillSpec, RaceSpec } from './cycle-runner.js';
 import { ENTRY_FEE_EP, overdueBefore, weekIndexAt, winsRangeFor } from '@star/scheduler';
 import { cancelRace as cancelRaceImpl } from './cancel.js';
 // ★生涯の記録（正典 §18・移行 `0024`）。★確定の中から呼びます（LR-7「レースが終わった後」）
@@ -110,7 +110,12 @@ export function createPgStore(
     );
   });
   let courseNotFrozenCount = 0;
-  return {
+  /**
+   * ⚠️ ★**名前を付けて返します**（★2026-09-19・D-117）。
+   *    ★`createRace` が `announceRace` / `fillRace` を呼ぶので、★`this` に頼らないためです
+   *    （★分解代入で渡されると `this` が消えます）。
+   */
+  const store: CycleStore = {
     async serverNowMs(): Promise<number> {
       // ★ゲーム内時刻の真実は Postgres の now() のみ（§14）
       const r = await client.query<{ ms: string }>(
@@ -148,12 +153,34 @@ export function createPgStore(
      *   → トランザクションで、途中で落ちれば全部消えるようにします（A-5 と同じ構造）。
      */
     async createRace(spec: RaceSpec): Promise<void> {
-      await client.query('begin');
-      try {
+      /**
+       * ★**公示 → 組成 を続けて行うだけ**（★2026-09-19・**D-117**）。
+       *
+       * ★D-117 でレースの行の挿入は `announceRace` の 1 か所になりました。
+       *   ★ここで別に `insert into races` を書くと、★**同じものを 2 通りに書く**ことになります（D-052）。
+       *
+       * ⚠️ ★**トランザクションは 2 つに分かれます。** ★間で落ちると
+       *    ★「出走表の無い `announced` のレース」が残ります。
+       *    ★これは D-117 の**正常な中間状態**で、★次の周の組成が拾います
+       *    （★`announcedRaces()` が返す）。★以前の「オッズの無い `scheduled`」とは違い、
+       *    ★`place_bet` から見えません（★発売は `scheduled` から）。
+       *
+       * ★使うのは `tools/seed-races.mjs` と検査だけです。★本番のワーカーは 2 段で呼びます。
+       */
+      await store.announceRace(spec);
+      await store.fillRace(spec.cycleIndex, {
+        entrants: spec.entrants,
+        odds: spec.odds,
+        // ★一括で作る経路には、登録済みの馬はいません
+        registered: [],
+      });
+    },
+
+    async announceRace(spec: AnnounceSpec): Promise<void> {
       // ★on conflict do nothing: 存在確認と挿入の間に割り込まれても二重にならない。
       //   確認（raceExists）は無駄な生成計算を避けるためで、**一意性の担保はこちら**。
       //   確認だけに頼ると「確認 → 割り込み → 挿入」で二重になります。
-      const ins = await client.query(
+      await client.query(
         /**
          * ★`min_wins` / `max_wins` は ★**出走資格**（CL-4・移行 `0033`）。
          *   ★段（新馬/1勝/…/オープン）→ 数 の変換は `winsRangeFor()` の 1 か所だけが持ち、
@@ -164,7 +191,7 @@ export function createPgStore(
                             course_frozen, min_wins, max_wins, entry_fee_ep, weight_kg,
                             entry_deadline_at, game_week)
          values ($1, $2, $3, $4, $8, $9, $12, $10,
-                 to_timestamp($5 / 1000.0), $6, $7, $11, 'scheduled',
+                 to_timestamp($5 / 1000.0), $6, $7, $11, 'announced',
                  $13::jsonb, $14, $15, $16, $17, to_timestamp($18 / 1000.0), $19)
          on conflict (cycle_index) do nothing`,
         [
@@ -216,14 +243,147 @@ export function createPgStore(
           spec.gameWeek,
         ],
       );
-        // ★挿入されなかった＝他プロセスが先に作った。何もせず抜ける（重複させない）
-        if (ins.rowCount === 0) {
+    },
+
+    async announcedRaces(): Promise<number[]> {
+      /**
+       * ★**組成を待っているレース**（★2026-09-19・**D-117** ②）。
+       *   ★時刻で絞りません — ★「まだ組成していない」ものを**全部**返します。
+       *   ★呼ぶ側（`cycle-runner`）が「締切を過ぎたか」で選びます（★時間の式を SQL に書かない・D-052）。
+       */
+      const r = await client.query<{ cycle_index: number }>(
+        `select cycle_index from races where status = 'announced' order by cycle_index`,
+      );
+      return toCycleIndexes(r.rows);
+    },
+
+    async announcedConditions(cycleIndex: number): Promise<AnnouncedRace | null> {
+      const r = await client.query<{
+        surface: string; distance: number; track_condition: string;
+        course_id: string; course_frozen: unknown;
+      }>(
+        `select surface, distance, track_condition, course_id, course_frozen
+           from races where cycle_index = $1 and status = 'announced'`,
+        [cycleIndex],
+      );
+      const row = r.rows[0];
+      if (row === undefined) return null;
+      /**
+       * ⚠️ ★**公示のときに凍結した走路の形をそのまま返します**（★引き直さない・R-30）。
+       *    ★`course_frozen` が無い行は ★**組成しません** — ★`0023` より前の行だけがそうで、
+       *    ★D-117 の経路では必ず入ります。★黙って `DEFAULT_OVAL` に落とすと、
+       *    ★公示で見せたコースと違う模型でオッズが付きます。
+       */
+      const frozen = parseFrozenCourse(row.course_frozen);
+      if (frozen === null) {
+        throw new Error(
+          `cycle=${cycleIndex} の公示に course_frozen がありません（★組成できません・D-117）`,
+        );
+      }
+      return {
+        cycleIndex,
+        conditions: {
+          surface: row.surface as 'turf' | 'dirt',
+          distance: Number(row.distance),
+          trackCondition: row.track_condition as 'good' | 'yielding' | 'soft' | 'bad',
+          courseId: row.course_id,
+          courseFrozen: frozen,
+        },
+      };
+    },
+
+    async registeredHorses(cycleIndex: number): Promise<readonly string[]> {
+      /**
+       * ★**公示のあいだに `enter_race` が入れた行**（★D-117 ②・**DS-2**）。
+       *   ★`gate` は暫定（`max+1`）で、★組成が振り直します。
+       */
+      const r = await client.query<{ horse_id: string }>(
+        `select e.horse_id
+           from race_entries e join races r on r.id = e.race_id
+          where r.cycle_index = $1
+          order by e.gate`,
+        [cycleIndex],
+      );
+      return r.rows.map((x) => x.horse_id);
+    },
+
+    async fillRace(cycleIndex: number, spec: FillSpec): Promise<void> {
+      await client.query('begin');
+      try {
+        /**
+         * ★**行を掴んでから状態を確かめます**（★`for update`）。
+         *   ★2 つのワーカーが同じレースを組成しても、★後の 1 つは `announced` でなくなっているので抜けます。
+         */
+        const r = await client.query<{ id: string; status: string }>(
+          `select id, status from races where cycle_index = $1 for update`,
+          [cycleIndex],
+        );
+        const row = r.rows[0];
+        if (row === undefined) {
+          await client.query('rollback');
+          throw new Error(`cycle=${cycleIndex} のレースがありません（★公示より先に組成しています）`);
+        }
+        // ★既に組成済み。★冪等に抜けます（★二重に出走表を入れない）
+        if (row.status !== 'announced') {
           await client.query('rollback');
           return;
         }
-        const raceId = (await client.query<{ id: string }>(
-          'select id from races where cycle_index = $1', [spec.cycleIndex],
-        )).rows[0]!.id;
+        const raceId = row.id;
+
+        /**
+         * ★**登録済みの馬は更新、それ以外は挿入**（★2026-09-19・**D-117** ②）。
+         *
+         *   ★登録の行には `jockey_frozen` と `client_token` が入っています。
+         *   ★消して入れ直すと、★**払った出走料と結び付いた行が消えます**。
+         *
+         * ⚠️ ★`race_entries` に `(race_id, gate)` の一意制約はありません（`0001`）。
+         *    ★あれば一括の振り直しが途中で衝突しますが、★無いので 1 文で済みます。
+         */
+        const registered = new Set(spec.registered);
+        const missing = spec.registered.filter(
+          (h) => !spec.entrants.some((e) => e.horseId === h),
+        );
+        if (missing.length > 0) {
+          await client.query('rollback');
+          /**
+           * ★**登録したのに出走表に入っていない**（★DS-2 が守れていない）。
+           *   ★黙って落とすと「登録できたのに走らない馬」になります（R-16）。
+           */
+          throw new Error(
+            `cycle=${cycleIndex}: 登録済みの ${missing.length} 頭が出走表にありません`
+              + `（${missing.slice(0, 3).join(', ')}…・D-117 DS-2）`,
+          );
+        }
+
+        const toUpdate = spec.entrants.filter((e) => registered.has(e.horseId));
+        const toInsert = spec.entrants.filter((e) => !registered.has(e.horseId));
+
+        if (toUpdate.length > 0) {
+          const upd = await client.query(
+            `update race_entries e
+                set gate = v.gate, weight = v.weight, strategy = v.strategy,
+                    popularity = v.popularity, entrant_snapshot = v.snapshot
+               from (select * from unnest($2::uuid[], $3::int[], $4::numeric[], $5::text[], $6::int[], $7::jsonb[])
+                       as t(horse_id, gate, weight, strategy, popularity, snapshot)) v
+              where e.race_id = $1 and e.horse_id = v.horse_id`,
+            [
+              raceId,
+              toUpdate.map((e) => e.horseId),
+              toUpdate.map((e) => e.gate),
+              toUpdate.map((e) => e.weightKg),
+              toUpdate.map((e) => e.strategy),
+              toUpdate.map((e) => e.popularity ?? null),
+              toUpdate.map((e) => (e.snapshot === undefined ? null : JSON.stringify(e.snapshot))),
+            ],
+          );
+          // ★R-21: 更新が 0 行なら「登録が消えた」。★黙って進めない
+          if (upd.rowCount !== toUpdate.length) {
+            await client.query('rollback');
+            throw new Error(
+              `cycle=${cycleIndex}: 登録済み ${toUpdate.length} 行のうち ${upd.rowCount ?? 0} 行しか更新できません`,
+            );
+          }
+        }
 
         /**
          * --- 出走表（§10.4 の同格帯から。D-018: 無作為だと V-4 が壊れる）---
@@ -231,22 +391,40 @@ export function createPgStore(
          * ★1行ずつではなく**一括**で入れます（2026-08-11・A-1 の余裕のため）。
          *   下のオッズと同じ理由です。
          */
-        await client.query(
-          `insert into race_entries (race_id, horse_id, gate, weight, strategy, popularity, entrant_snapshot)
-           select $1, t.horse_id, t.gate, t.weight, t.strategy, t.popularity, t.snapshot
-             from unnest($2::uuid[], $3::int[], $4::numeric[], $5::text[], $6::int[], $7::jsonb[])
-               as t(horse_id, gate, weight, strategy, popularity, snapshot)`,
-          [
-            raceId,
-            spec.entrants.map((e) => e.horseId),
-            spec.entrants.map((e) => e.gate),
-            spec.entrants.map((e) => e.weightKg),
-            spec.entrants.map((e) => e.strategy),
-            spec.entrants.map((e) => e.popularity ?? null),
-            // ★オッズ計算に使った出走馬を凍結（0016）。確定はこれを使う
-            spec.entrants.map((e) => (e.snapshot === undefined ? null : JSON.stringify(e.snapshot))),
-          ],
+        if (toInsert.length > 0) {
+          await client.query(
+            `insert into race_entries (race_id, horse_id, gate, weight, strategy, popularity, entrant_snapshot)
+             select $1, t.horse_id, t.gate, t.weight, t.strategy, t.popularity, t.snapshot
+               from unnest($2::uuid[], $3::int[], $4::numeric[], $5::text[], $6::int[], $7::jsonb[])
+                 as t(horse_id, gate, weight, strategy, popularity, snapshot)`,
+            [
+              raceId,
+              toInsert.map((e) => e.horseId),
+              toInsert.map((e) => e.gate),
+              toInsert.map((e) => e.weightKg),
+              toInsert.map((e) => e.strategy),
+              toInsert.map((e) => e.popularity ?? null),
+              // ★オッズ計算に使った出走馬を凍結（0016）。確定はこれを使う
+              toInsert.map((e) => (e.snapshot === undefined ? null : JSON.stringify(e.snapshot))),
+            ],
+          );
+        }
+
+        /**
+         * ★**出走表が出走表と一致しているか**（★D-117・R-30）。
+         *   ★締切のあとに `enter_race` が滑り込んでいれば、★ここで数が合いません。
+         *   ★合わないまま `scheduled` にすると、★**オッズの付いていない馬が走ります**。
+         */
+        const n = await client.query<{ n: string }>(
+          `select count(*)::text as n from race_entries where race_id = $1`, [raceId],
         );
+        if (Number(n.rows[0]!.n) !== spec.entrants.length) {
+          await client.query('rollback');
+          throw new Error(
+            `cycle=${cycleIndex}: 出走表 ${spec.entrants.length} 頭に対し `
+              + `race_entries が ${n.rows[0]!.n} 行です（★締切後の登録を疑う・D-117）`,
+          );
+        }
 
         /**
          * --- オッズ（§9.2）---
@@ -277,6 +455,15 @@ export function createPgStore(
             spec.odds.map((o) => o.odds),
             spec.odds.map((o) => o.capped),
           ],
+        );
+
+        /**
+         * ★**ここで初めて発売できる状態になります**（★D-117）。
+         *   ★`place_bet` は `scheduled` しか受けないので、★オッズが入るまで 1 枚も売れません。
+         */
+        await client.query(
+          `update races set status = 'scheduled' where id = $1 and status = 'announced'`,
+          [raceId],
         );
         await client.query('commit');
       } catch (e) {
@@ -557,6 +744,7 @@ export function createPgStore(
       }
     },
   };
+  return store;
 }
 
 /** クラス → class_rank（正典 §10.3 の順序） */

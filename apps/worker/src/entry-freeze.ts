@@ -25,6 +25,8 @@ import { rowToHorse } from './horse-repo.js';
  * ⚠️ ★ここで組み直さないこと（★D-052・R-30。★生成側と確定側で別の形になります）。
  */
 import { toEntrant } from '../../cli/src/race-field.js';
+// ★取消と返金（★D-111 ③⑤）。★D-117 DS-7 と同じ関数を通します（D-052）
+import { scratchEntry } from './scratch.js';
 
 /**
  * ★乱数の用途 ID（★`toEntrant` が開放率を 1 回引くため）。
@@ -35,8 +37,18 @@ import { toEntrant } from '../../cli/src/race-field.js';
  */
 export const FREEZE_STREAM = 71;
 
-/** ★登録料（`0024` の `enter_race` と同じ値）。★騎手の料金は凍結から読む */
-export const ENTRY_FEE_EP = 200;
+/**
+ * ★登録料（`0024` の `enter_race` と同じ値）。★騎手の料金は凍結から読む
+ *
+ * 🔴 ★**この定数はもう使いません**（★2026-09-19・D-117 DS-7 の切り出しで見つけた穴）。
+ *   ★取る側は `races.entry_fee_ep`（★行の値・EF-2）、★返す側はこの 200 —
+ *   ★**2 通りの写し**でした（D-052）。★今は両方 200 なので壊れていませんが、
+ *   ★`packages/scheduler/src/entry-fee.ts` を変えると ★**取る額だけが動きます**。
+ *   → ★返金は `scratch.ts` が ★**行から読みます**。
+ *
+ * ⚠️ ★**再輸出として残します**（★検査が読んでいるため）。★正は `@star/scheduler`。
+ */
+export { ENTRY_FEE_EP } from '@star/scheduler';
 
 export interface FreezeResult {
   /** ★凍結を書いた頭数 */
@@ -149,35 +161,27 @@ export async function freezePendingEntries(
          * ★理由を残します（★黙って消さない・D-111 ⑤）。
          */
         const reason = `出走に必要な記録を作れませんでした（${why}）`;
-        await client.query(
-          `update race_entries set scratched_at = now(), scratch_reason = $1 where id = $2`,
-          [reason, row.entry_id],
+        /**
+         * ★**取消と返金は 1 か所**（★2026-09-19・D-117 DS-7 で `scratch.ts` に切り出し）。
+         *   ★D-117 の「組成が間に合わなかったレース」も同じ関数を通ります（D-052）。
+         */
+        const sc = await scratchEntry(
+          client,
+          {
+            entryId: row.entry_id,
+            raceId: row.race_id,
+            horseId: row.horse_id,
+            jockeyFeeEP: Number(row.jockey_frozen?.feeEP ?? 0),
+          },
+          reason,
         );
         scratched += 1;
-
+        refundedEp += sc.refundedEp;
         /**
-         * ★**登録料と騎手の料金を返す**（★D-111 ⑤・§9.1 の返還と同じ考え方）。
-         * ⚠️ ★**EP で返します**（★PP で返すと EP→PP の経路ができる・憲法 §0.2）。
-         * ★冪等: ★同じ登録に対して二度返しません（`dedupe_key`）。
+         * ★**返した額をそのまま言います**（★D-111 ⑤）。
+         * ⚠️ ★`0` は「★既に返してあった」か「★NPC の馬」です — ★**取りっぱぐれではありません**。
          */
-        const fee = ENTRY_FEE_EP + Number(row.jockey_frozen?.feeEP ?? 0);
-        const owner = (await client.query<{ owner_id: string | null }>(
-          `select owner_id from horses where id = $1`, [row.horse_id])).rows[0];
-        if (owner?.owner_id != null && fee > 0) {
-          const key = `scratch:${row.entry_id}`;
-          const dup = await client.query(`select 1 from ep_ledger where dedupe_key = $1`, [key]);
-          if (dup.rowCount === 0) {
-            const bal = (await client.query<{ entry_points: string }>(
-              `update users set entry_points = entry_points + $1 where id = $2 returning entry_points`,
-              [fee, owner.owner_id])).rows[0];
-            await client.query(
-              `insert into ep_ledger (user_id, delta, balance_after, reason, ref_id, dedupe_key)
-               values ($1, $2, $3, 'refund', $4, $5)`,
-              [owner.owner_id, fee, Number(bal!.entry_points), row.race_id, key],
-            );
-            refundedEp += fee;
-          }
-        }
+        const fee = sc.refundedEp;
         onAlert(
           `★出走を取消しました cycle=${row.cycle_index} 枠 ${row.gate}（馬 ${row.horse_id}）: ${reason}` +
           `。★レースは止めていません（D-111 ③）。料金 ${fee} EP を返しました`,

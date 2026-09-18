@@ -13,15 +13,12 @@ import { assertEnvironmentMatches, loadConfig } from '../src/env.js';
  * ★空の出走表。Q-P3-32 で `build` の戻り値に `conditions` が加わったので、
  *   ここでも返します。**A-2 は生成の冪等性を見るので中身は問いません。**
  */
-const EMPTY_BUILD = {
-  entrants: [],
-  odds: [],
-  conditions: {
-    surface: 'turf' as const, distance: 1600, courseId: 'star-park',
-    trackCondition: 'good' as const,
-    courseFrozen: frozenCourseOf('star-park'),
-  },
+const CONDITIONS = {
+  surface: 'turf' as const, distance: 1600, courseId: 'star-park',
+  trackCondition: 'good' as const,
+  courseFrozen: frozenCourseOf('star-park'),
 };
+const EMPTY_BUILD = { entrants: [], odds: [] };
 
 const EPOCH = 1_700_000_000_000;
 
@@ -37,6 +34,8 @@ const IN_FIRST_CYCLE = EPOCH + Math.floor(CYCLE_MS * 0.4);
 /** テスト用の seed 源。★決定論（同じサイクルからは同じ値） */
 /** テスト用の出走表・オッズ（中身は問わない。runCycle は素通しするだけ） */
 const BUILD = () => (EMPTY_BUILD);
+/** ★公示の条件（★D-117 ①）。★乱数は引かない — ★中身は問わない */
+const ANNOUNCE = () => CONDITIONS;
 
 const SEEDS = {
   serverSeed: (i: number) => `seed-${i}`,
@@ -49,26 +48,43 @@ const ALERT = (a: { cycleIndex: number; refundedBets: number; refundedEp: number
   ALERTS.push(a);
 };
 
-/** 記録つきの偽ストア。**同じレースが2回作られたら記録に残る** */
+/**
+ * 記録つきの偽ストア。**同じレースが2回作られたら記録に残る**
+ *
+ * ★2026-09-19・**D-117**: ★生成が ★**公示（announce）→ 組成（fill）** の 2 段になりました。
+ *   ★`announceLog` / `fillLog` を別に取ります（★どちらの段で二重になったかを言えるように）。
+ */
 function makeStore(nowMs: number) {
+  /** ★公示済み（★`status = 'announced'`） */
+  const announcedSet = new Set<number>();
+  /** ★組成済み（★`status = 'scheduled'`） */
   const races = new Set<number>();
-  const createLog: number[] = [];
+  const announceLog: number[] = [];
+  const fillLog: number[] = [];
   const settleLog: number[] = [];
   const cancelLog: number[] = [];
   /** ★処理された順序をそのまま記録する（D-038 の順序を検査するため） */
   const order: string[] = [];
   let overdue: number[] = [];
   let locked = false;
+  /** ★`registeredHorses` が返すもの（★DS-2 の検査で差し替える） */
+  const registered = new Map<number, readonly string[]>();
   const store: CycleStore & {
-    createLog: number[];
+    announceLog: number[];
+    fillLog: number[];
     settleLog: number[];
     cancelLog: number[];
     order: string[];
     races: Set<number>;
+    announcedSet: Set<number>;
+    registered: Map<number, readonly string[]>;
     setOverdue: (xs: number[]) => void;
   } = {
     races,
-    createLog,
+    announcedSet,
+    registered,
+    announceLog,
+    fillLog,
     settleLog,
     cancelLog,
     order,
@@ -84,11 +100,29 @@ function makeStore(nowMs: number) {
     unlock: async () => {
       locked = false;
     },
-    raceExists: async (i: number) => races.has(i),
+    // ★公示だけでも「もう在る」。★`racesToAnnounce` が飛ばす条件はこちら
+    raceExists: async (i: number) => races.has(i) || announcedSet.has(i),
     createRace: async (s: RaceSpec) => {
-      order.push('create');
-      createLog.push(s.cycleIndex);
-      races.add(s.cycleIndex);
+      await store.announceRace(s);
+      await store.fillRace(s.cycleIndex, { entrants: s.entrants, odds: s.odds, registered: [] });
+    },
+    announceRace: async (s) => {
+      order.push('announce');
+      announceLog.push(s.cycleIndex);
+      announcedSet.add(s.cycleIndex);
+    },
+    announcedRaces: async () => [...announcedSet].sort((a, b) => a - b),
+    announcedConditions: async (i: number) =>
+      announcedSet.has(i) ? { cycleIndex: i, conditions: CONDITIONS } : null,
+    registeredHorses: async (i: number) => registered.get(i) ?? [],
+    fillRace: async (i: number, spec) => {
+      order.push('fill');
+      // ★`fillRace` の約束: ★登録した馬が出走表に無ければ投げる（★DS-2）
+      const missing = spec.registered.filter((h) => !spec.entrants.some((e) => e.horseId === h));
+      if (missing.length > 0) throw new Error(`登録済みの ${missing.length} 頭が出走表にありません`);
+      fillLog.push(i);
+      announcedSet.delete(i);
+      races.add(i);
     },
     pendingSettlements: async () => [],
     settleRace: async (i: number) => {
@@ -100,6 +134,8 @@ function makeStore(nowMs: number) {
       order.push('cancel');
       cancelLog.push(i);
       overdue = overdue.filter((x) => x !== i); // 中止済みはもう返らない（冪等）
+      // ★D-117: ★組成が間に合わず中止したレースは、もう公示でもない
+      announcedSet.delete(i);
       return { refundedBets: 3, refundedEp: 3000 };
     },
   };
@@ -110,28 +146,28 @@ describe('★A-2 冪等性（壊して確かめる）', () => {
   it('★同じ時刻で何度回しても、レースは一度しか作られない', async () => {
     const now = IN_FIRST_CYCLE;
     const store = makeStore(now);
-    for (let i = 0; i < 10; i += 1) await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    for (let i = 0; i < 10; i += 1) await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
     // 10周しても作成は最初の1回ぶんだけ（先行2レース）
-    expect(store.createLog).toEqual([1, 2]);
-    expect(new Set(store.createLog).size).toBe(store.createLog.length);
+    expect(store.fillLog).toEqual([1, 2]);
+    expect(new Set(store.fillLog).size).toBe(store.fillLog.length);
   });
 
   it('★「再起動」しても作り直さない（ストアは残り、プロセスだけ落ちた想定）', async () => {
     const store = makeStore(IN_FIRST_CYCLE);
-    await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
-    const before = [...store.createLog];
+    await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
+    const before = [...store.fillLog];
     // プロセスが落ちて上がり直しても、runCycle をもう一度呼ぶだけ
-    await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
-    await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
-    expect(store.createLog).toEqual(before);
+    await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
+    await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
+    expect(store.fillLog).toEqual(before);
   });
 
   it('★ロックが取れないときは何もせず戻る（例外にしない）', async () => {
     const store = makeStore(IN_FIRST_CYCLE);
     store.tryLock = async () => false;
-    const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    const out = await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
     expect(out.lockBusy).toBe(true);
-    expect(out.created).toEqual([]);
+    expect(out.filled).toEqual([]);
     // ★例外にすると再起動ループになり A-1（24時間稼働）が壊れる
   });
 
@@ -141,26 +177,27 @@ describe('★A-2 冪等性（壊して確かめる）', () => {
     store.unlock = async () => {
       unlocked = true;
     };
-    store.createRace = async () => {
+    // ★D-117: ★`runCycle` は `createRace` を呼びません。★組成で落とします
+    store.fillRace = async () => {
       throw new Error('生成失敗');
     };
-    await expect(runCycle(store, EPOCH, SEEDS, BUILD, ALERT)).rejects.toThrow('生成失敗');
+    await expect(runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT)).rejects.toThrow('生成失敗');
     expect(unlocked).toBe(true);
   });
 
   it('★時刻が進めば新しいレースだけを作る（既存は作り直さない）', async () => {
     const store = makeStore(IN_FIRST_CYCLE);
-    await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
-    expect(store.createLog).toEqual([1, 2]);
+    await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
+    expect(store.fillLog).toEqual([1, 2]);
     store.serverNowMs = async () => IN_FIRST_CYCLE + CYCLE_MS;
-    await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
     // 次のサイクルでは 3 だけが増える（2 は既存）
-    expect(store.createLog).toEqual([1, 2, 3]);
+    expect(store.fillLog).toEqual([1, 2, 3]);
   });
 
   it('★ワーカーの時計を使わない（serverNowMs だけを見る）', async () => {
     const store = makeStore(IN_FIRST_CYCLE);
-    const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    const out = await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
     expect(out.nowMs).toBe(IN_FIRST_CYCLE);
     expect(out.cycleIndex).toBe(0);
   });
@@ -210,10 +247,20 @@ describe('★D-038 確定を生成より先に処理する', () => {
     store.setOverdue([99]);
     // 確定すべきレースがある状態にする
     store.pendingSettlements = async () => [7];
-    await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
     // ★「生成より前に確定がある」ではなく**並びそのもの**を見る。
     //   前者だと生成が0本の周でも通ってしまい、順序を検査したことになりません。
-    expect(store.order).toEqual(['settle', 'cancel', 'create', 'create']);
+    /**
+     * ★2026-09-19・**D-117**: ★生成が ★**公示 ×4 → 組成 ×2** に割れました。
+     *   ★`announce` が 4 本なのは `ANNOUNCE_AHEAD_RACES = 4`、
+     *   ★`fill` が 2 本なのは `MAX_FILLS_PER_CYCLE = 2`（★DS-9）。
+     * ⚠️ ★**確定と中止が先にある**ことは変わりません（D-038）。
+     */
+    expect(store.order).toEqual([
+      'settle', 'cancel',
+      'announce', 'announce', 'announce', 'announce',
+      'fill', 'fill',
+    ]);
   });
 
   it('★確定が先なので、生成に時間がかかっても確定は待たされない', async () => {
@@ -225,7 +272,7 @@ describe('★D-038 確定を生成より先に処理する', () => {
       settledWhenCreating = store.settleLog.length > 0;
       return EMPTY_BUILD;
     };
-    await runCycle(store, EPOCH, SEEDS, build, ALERT);
+    await runCycle(store, EPOCH, SEEDS, ANNOUNCE, build, ALERT);
     expect(settledWhenCreating).toBe(true);
   });
 });
@@ -250,7 +297,7 @@ describe('★D-056 凍結が無いレースは確定せず中止する', () => {
     const store = makeStore(IN_FIRST_CYCLE);
     store.pendingSettlements = async () => [21];
     store.settleRace = async (i: number) => { throw unfrozen(i); };
-    const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    const out = await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
     expect(out.settled).toEqual([]);          // ① 結果を出していない
     expect(out.cancelled).toEqual([21]);      // ② 中止に載った
     expect(store.cancelLog).toEqual([21]);
@@ -261,7 +308,7 @@ describe('★D-056 凍結が無いレースは確定せず中止する', () => {
     ALERTS.length = 0;
     const store = makeStore(IN_FIRST_CYCLE);
     store.pendingSettlements = async () => [21];
-    const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    const out = await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
     expect(out.settled).toEqual([21]);
     expect(out.cancelled).toEqual([]);
     expect(ALERTS).toEqual([]);
@@ -280,7 +327,7 @@ describe('★D-056 凍結が無いレースは確定せず中止する', () => {
       e.name = 'InvalidFrozenCourseError';
       throw e;
     };
-    const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    const out = await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
     expect(out.settled).toEqual([]);
     expect(out.cancelled).toEqual([23]);
     expect(ALERTS.map((a) => a.cycleIndex)).toEqual([23]);
@@ -290,7 +337,7 @@ describe('★D-056 凍結が無いレースは確定せず中止する', () => {
     const store = makeStore(IN_FIRST_CYCLE);
     store.pendingSettlements = async () => [22];
     store.settleRace = async () => { throw new Error('DB が落ちた'); };
-    await expect(runCycle(store, EPOCH, SEEDS, BUILD, ALERT)).rejects.toThrow('DB が落ちた');
+    await expect(runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT)).rejects.toThrow('DB が落ちた');
     // ★中止に載せてしまうと、DB 障害が「開催中止」として静かに返還され続けます
     expect(store.cancelLog).toEqual([]);
   });
@@ -301,7 +348,7 @@ describe('★D-037 確定できないレースを期限で中止し EP を返す
     ALERTS.length = 0;
     const store = makeStore(IN_FIRST_CYCLE);
     store.setOverdue([11, 12]);
-    const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    const out = await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
     expect(out.cancelled).toEqual([11, 12]);
     expect(store.cancelLog).toEqual([11, 12]);
     // ★黙って返還しない。通報が無ければ原因が調査されない（D-037）
@@ -312,7 +359,7 @@ describe('★D-037 確定できないレースを期限で中止し EP を返す
   it('★期限内なら中止しない（境界の両側・R-2）', async () => {
     const store = makeStore(IN_FIRST_CYCLE);
     store.setOverdue([]); // まだ期限に達していない
-    const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    const out = await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
     expect(out.cancelled).toEqual([]);
     expect(store.cancelLog).toEqual([]);
   });
@@ -320,8 +367,8 @@ describe('★D-037 確定できないレースを期限で中止し EP を返す
   it('★二度回しても二重に返還しない（冪等）', async () => {
     const store = makeStore(IN_FIRST_CYCLE);
     store.setOverdue([21]);
-    await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
-    await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
+    await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
+    await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
     expect(store.cancelLog).toEqual([21]);
   });
 });

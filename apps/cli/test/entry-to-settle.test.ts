@@ -200,6 +200,13 @@ function fakeDb(entries: Entry[], opts: { readonly honorScratch?: boolean } = {}
         e.scratch_reason = params[0] as string;
         return { rows: [], rowCount: 1 };
       }
+      /**
+       * ★**返す額は行から読む**（★2026-09-19・D-117 DS-7 で `scratch.ts` に切り出したときに直した）。
+       *   ★以前は `entry-freeze.ts` が自前の定数 200 を使っていました（D-052 の写し）。
+       */
+      if (s.includes('select entry_fee_ep from races')) {
+        return { rows: [{ entry_fee_ep: 200 }], rowCount: 1 };
+      }
       if (s.includes('select owner_id from horses')) return { rows: [{ owner_id: OWNER }], rowCount: 1 };
       if (s.includes('from ep_ledger where dedupe_key')) return { rows: [], rowCount: 0 };
       if (s.includes('update users set entry_points')) return { rows: [{ entry_points: '100000' }], rowCount: 1 };
