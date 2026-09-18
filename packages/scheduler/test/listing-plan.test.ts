@@ -30,10 +30,13 @@ describe('★価格の帯（★T11-1 ①②）', () => {
     }
   });
 
-  it('★価格 → 帯', () => {
-    expect(priceTierOf(3_000)).toBe(0);
-    expect(priceTierOf(3_999)).toBe(0);
-    expect(priceTierOf(4_000)).toBe(1);
+  it('★価格 → 帯（★境目の両側・R-2）', () => {
+    /** ⚠️ ★**境目の数を写さない**（★測って決め直す値なので、★写すと 2 か所になる・D-052） */
+    expect(priceTierOf(PRICE_TIERS_EP[0]!)).toBe(0);
+    for (let t = 1; t < PRICE_TIERS_EP.length; t += 1) {
+      expect(priceTierOf(PRICE_TIERS_EP[t]! - 1), `帯 ${t} の手前`).toBe(t - 1);
+      expect(priceTierOf(PRICE_TIERS_EP[t]!), `帯 ${t} の先頭`).toBe(t);
+    }
     expect(priceTierOf(1_000_000)).toBe(PRICE_TIERS_EP.length - 1);
   });
 
