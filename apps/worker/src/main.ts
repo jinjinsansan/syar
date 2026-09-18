@@ -22,6 +22,9 @@ import { APPLICATION_NAME, formatResources, sampleResources } from './resources.
 import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
 import { announceConditions, buildRace } from './build-race.js';
+import { drawEntryLottery, lotteryScratchReason } from './entry-lottery.js';
+import { scratchEntry } from './scratch.js';
+import { FIELD_SIZE } from '../../cli/src/race-field.js';
 import { aggregateDay } from './daily-flow.js';
 import { loadHorsesByIds, loadRaceablePool, loadTrainingStates, loadWinsByHorse } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
@@ -205,7 +208,44 @@ async function main(): Promise<void> {
            * ⚠️ ★引けなければ投げます — ★組成は止まります。★黙って落とすと
            *    ★「登録できたのに走らない馬」になり、★料金だけ取られます（R-16）。
            */
-          const registeredHorses = await loadHorsesByIds(client, registered);
+          /**
+           * ★**上限を超えていたら完全抽選**（★正典 §10.4:1321・**LT-1〜LT-4**）。
+           *   ★18 頭以内なら何もしません（★「プレイヤー馬を優先し」＝全員走る）。
+           * ⚠️ ★**賞金上位優先にしません** — ★正典が名指しで禁じています（★新規が離脱する）。
+           */
+          const lot = drawEntryLottery(registered, FIELD_SIZE.MAX, i);
+          if (lot.excluded.length > 0) {
+            /**
+             * 🔴 ★**弾かれたうえに料金を取られるのが、いちばん悪い**（**LT-3**）。
+             *   ★取消と返金は `scratch.ts` の 1 か所を通します（★D-111 ③⑤ と同じ関数・D-052）。
+             * ⚠️ ★ここは `build` の中なので、★**組成のトランザクションの外**です。
+             *    ★返金が済んでから出走表を作ります（★冪等なので、途中で落ちても二重には返しません）。
+             */
+            const reason = lotteryScratchReason(registered.length, FIELD_SIZE.MAX);
+            for (const horseId of lot.excluded) {
+              const row = (await client.query<{ id: string; jockey_frozen: { feeEP?: number } | null }>(
+                `select e.id, e.jockey_frozen from race_entries e
+                   join races r on r.id = e.race_id
+                  where r.cycle_index = $1 and e.horse_id = $2`, [i, horseId])).rows[0];
+              if (row === undefined) throw new Error(`cycle=${i}: 落選した馬 ${horseId} の登録が見つかりません`);
+              const raceId = (await client.query<{ id: string }>(
+                `select id from races where cycle_index = $1`, [i])).rows[0]!.id;
+              await client.query('begin');
+              try {
+                await scratchEntry(client, {
+                  entryId: row.id, raceId, horseId,
+                  jockeyFeeEP: Number(row.jockey_frozen?.feeEP ?? 0),
+                }, reason);
+                await client.query('commit');
+              } catch (e) { await client.query('rollback'); throw e; }
+            }
+            // ★黙って落とさない（**LT-4**。★本人には `scratch_reason` が届く）
+            console.error(
+              `[worker] ★出走の抽選 cycle=${i}: 登録 ${registered.length} 頭 → 出走 ${lot.selected.length} 頭 / `
+                + `落選 ${lot.excluded.length} 頭（★完全抽選・§10.4）。★落選分は登録料と騎手の料金を返しました`,
+            );
+          }
+          const registeredHorses = await loadHorsesByIds(client, lot.selected);
           const built = buildRace(pool, i, cfg.epochMs, undefined, trainingStates,
             {
               // ★番組表（§10.3）が距離・馬場・コースを決める（Q-P3-32）
@@ -230,8 +270,8 @@ async function main(): Promise<void> {
            * 🔴 ★**登録した馬が出走表に入っているか**（★D-117 **DS-2**）。
            *   ★`fillRace` も同じことを見ますが、★**ここで先に言います**（★どの段で落ちたか分かるように）。
            */
-          if (registered.length > 0) {
-            const missing = registered.filter((h) => !built.entrants.some((e) => e.horseId === h));
+          if (lot.selected.length > 0) {
+            const missing = lot.selected.filter((h) => !built.entrants.some((e) => e.horseId === h));
             if (missing.length > 0) {
               console.error(
                 `[worker] 🔴 ★登録した ${missing.length} 頭が出走表に入りません cycle=${i}` +
@@ -247,7 +287,7 @@ async function main(): Promise<void> {
                 `（★そのクラスの馬が足りていません。★流量を見てください・CL-7）`,
             );
           }
-          return built;
+          return { entrants: built.entrants, odds: built.odds, excluded: lot.excluded };
         },
         // ★開催中止は黙って通さない（正典 D-037）。
         //   静かに返還されると原因が調査されないまま繰り返します。

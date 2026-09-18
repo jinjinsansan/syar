@@ -84,9 +84,11 @@ function fake(nowMs: number, alreadyAnnounced: readonly number[] = []): Fake {
 const BUILD_KEEPING = async (_i: number, _c: RaceSpec['conditions'], registered: readonly string[]) => ({
   entrants: registered.map((h, k) => ({ horseId: h, gate: k + 1, weightKg: 55, strategy: 'senko' })),
   odds: [],
+  // ★抽選（§10.4・LT-1）は 18 頭を超えたときだけ。★この検査では起きない
+  excluded: [],
 });
 /** 🔴 ★登録馬を落とす `build`（★DS-2 が守られていない実装・★対照） */
-const BUILD_DROPPING = async () => ({ entrants: [], odds: [] });
+const BUILD_DROPPING = async () => ({ entrants: [], odds: [], excluded: [] });
 
 const NOOP = (): void => {};
 

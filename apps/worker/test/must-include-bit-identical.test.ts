@@ -131,6 +131,7 @@ describe('MI-3 登録した馬は能力の帯の外からでも席に着く', ()
     expect(() =>
       generateRace(ALL, 1, deriveRng(SEED, STREAM_FIELD, 1), undefined, undefined, undefined, { mustInclude: many }),
     ).toThrow(/上限 18 頭を超えています/);
+    // ★これは「届かないはずの番人」です（★上流の `entry-lottery.ts` が 18 頭に絞る）
     // ★対照: ★ちょうど 18 頭なら通る（★境界の反対側・R-2）
     expect(() =>
       generateRace(ALL, 1, deriveRng(SEED, STREAM_FIELD, 1), undefined, undefined, undefined, {

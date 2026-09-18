@@ -416,7 +416,13 @@ export function createPgStore(
          *   ★合わないまま `scheduled` にすると、★**オッズの付いていない馬が走ります**。
          */
         const n = await client.query<{ n: string }>(
-          `select count(*)::text as n from race_entries where race_id = $1`, [raceId],
+          /**
+           * ⚠️ ★**取消の行は数えません**（★2026-09-19・§10.4 の完全抽選・LT-1）。
+           *    ★抽選に外れた馬の行は残っていますが（★理由と返金の記録なので消しません）、
+           *    ★**出走はしません**。★数えると必ず食い違います。
+           */
+          `select count(*)::text as n from race_entries
+            where race_id = $1 and scratched_at is null`, [raceId],
         );
         if (Number(n.rows[0]!.n) !== spec.entrants.length) {
           await client.query('rollback');

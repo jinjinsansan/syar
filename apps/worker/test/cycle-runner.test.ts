@@ -18,7 +18,7 @@ const CONDITIONS = {
   trackCondition: 'good' as const,
   courseFrozen: frozenCourseOf('star-park'),
 };
-const EMPTY_BUILD = { entrants: [], odds: [] };
+const EMPTY_BUILD = { entrants: [], odds: [], excluded: [] };
 
 const EPOCH = 1_700_000_000_000;
 

@@ -242,6 +242,13 @@ export async function runCycle(
   ) => Promise<{
     readonly entrants: readonly RaceEntrantSpec[];
     readonly odds: readonly OddsSpec[];
+    /**
+     * ★**抽選に外れた馬**（★正典 §10.4 の完全抽選・**LT-1〜LT-4**）。
+     *   ★登録が 18 頭を超えたときだけ空でなくなります。
+     * ⚠️ ★返金と理由の通知は ★**`build` の側が済ませています**（★D-111 ③⑤ の経路）。
+     *    ★ここは「出走しない」ことを `fillRace` に伝えるだけです。
+     */
+    readonly excluded: readonly string[];
   }>,
   /**
    * ★開催中止が起きたときの通報（正典 D-037）。
@@ -433,7 +440,12 @@ export async function runCycle(
       await store.fillRace(idx, {
         entrants: built.entrants,
         odds: built.odds,
-        registered,
+        /**
+         * ★**抽選に外れた馬を外します**（★§10.4・LT-1）。
+         *   ★外れた馬は `build` の側で取消・返金済みなので、★出走表に入っていません。
+         *   ★ここで引かないと `fillRace` が「登録したのに出走表にない」で投げます。
+         */
+        registered: registered.filter((h) => !built.excluded.includes(h)),
       });
       filled.push(idx);
     }
