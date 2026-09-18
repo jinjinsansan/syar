@@ -23,7 +23,7 @@ import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
 import { announceConditions, buildRace } from './build-race.js';
 import { aggregateDay } from './daily-flow.js';
-import { loadRaceablePool, loadTrainingStates, loadWinsByHorse } from './horse-repo.js';
+import { loadHorsesByIds, loadRaceablePool, loadTrainingStates, loadWinsByHorse } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
@@ -197,8 +197,15 @@ async function main(): Promise<void> {
          *   ★組成（下）は**その行を読み直します**（D-052）。
          */
         (i) => announceConditions(cfg.epochMs, i, conditionsOf(i, classOf(i), gradeOf(i))),
-        (i, conditions, registered) => {
+        async (i, conditions, registered) => {
           const raceClass = classOf(i);
+          /**
+           * ★**登録した馬の行**（★D-117 **DS-2**）。★`pool` には入っていません
+           *   （★`pool` は `owner_id is null` ＝ NPC だけ）。★名指しで読みます。
+           * ⚠️ ★引けなければ投げます — ★組成は止まります。★黙って落とすと
+           *    ★「登録できたのに走らない馬」になり、★料金だけ取られます（R-16）。
+           */
+          const registeredHorses = await loadHorsesByIds(client, registered);
           const built = buildRace(pool, i, cfg.epochMs, undefined, trainingStates,
             {
               // ★番組表（§10.3）が距離・馬場・コースを決める（Q-P3-32）
@@ -211,18 +218,24 @@ async function main(): Promise<void> {
               courseFrozen: conditions.courseFrozen,
             },
             // ★資格の層（★CL-3）。★選抜（能力の帯）はこの下でそのまま働きます
-            { raceClass, winsOf: (h) => winsByHorse.get(h.id) ?? 0 });
+            { raceClass, winsOf: (h) => winsByHorse.get(h.id) ?? 0 },
+            /**
+             * ★**登録した馬を必ず入れる**（★2026-09-19・**D-117 DS-2**）。
+             * ⚠️ ★`pool` は `owner_id is null` で絞っているので、★登録馬はそこにいません。
+             *    ★**別に読みます**（`loadHorsesByIds`）。★読めなければ組成を止めます —
+             *    ★黙って落とすと「登録できたのに走らない馬」になります（R-16）。
+             */
+            registeredHorses);
           /**
            * 🔴 ★**登録した馬が出走表に入っているか**（★D-117 **DS-2**）。
-           * ⚠️ ★まだ `buildRace` に「必ず入れる馬」を渡していません（★次の段）。
-           *    ★入っていなければ `fillRace` が投げます — ★**黙って落としません**。
+           *   ★`fillRace` も同じことを見ますが、★**ここで先に言います**（★どの段で落ちたか分かるように）。
            */
           if (registered.length > 0) {
             const missing = registered.filter((h) => !built.entrants.some((e) => e.horseId === h));
             if (missing.length > 0) {
               console.error(
                 `[worker] 🔴 ★登録した ${missing.length} 頭が出走表に入りません cycle=${i}` +
-                  `（★DS-2 未実装・組成は失敗します）`,
+                  `（★DS-2・組成は失敗します）`,
               );
             }
           }

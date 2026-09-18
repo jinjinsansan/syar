@@ -239,10 +239,10 @@ export async function runCycle(
     cycleIndex: number,
     conditions: RaceSpec['conditions'],
     registered: readonly string[],
-  ) => {
+  ) => Promise<{
     readonly entrants: readonly RaceEntrantSpec[];
     readonly odds: readonly OddsSpec[];
-  },
+  }>,
   /**
    * ★開催中止が起きたときの通報（正典 D-037）。
    *   **既定を「何もしない」にしません。** 黙って返還されると原因が調査されないので、
@@ -425,7 +425,11 @@ export async function runCycle(
 
       /** ★**登録した馬は必ず入れます**（★**DS-2**）。★`fillRace` が入っているか確かめます */
       const registered = await store.registeredHorses(idx);
-      const built = build(idx, announcedRace.conditions, registered);
+      /**
+       * ⚠️ ★**`await` します**（★2026-09-19・D-117 DS-2）。★組成は ★**登録した馬の行を読む**必要があり、
+       *    ★それは `pool`（NPC だけ）に入っていないからです。★呼ぶ側が DB を引きます。
+       */
+      const built = await build(idx, announcedRace.conditions, registered);
       await store.fillRace(idx, {
         entrants: built.entrants,
         odds: built.odds,

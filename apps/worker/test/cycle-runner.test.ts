@@ -33,7 +33,7 @@ const IN_FIRST_CYCLE = EPOCH + Math.floor(CYCLE_MS * 0.4);
 
 /** テスト用の seed 源。★決定論（同じサイクルからは同じ値） */
 /** テスト用の出走表・オッズ（中身は問わない。runCycle は素通しするだけ） */
-const BUILD = () => (EMPTY_BUILD);
+const BUILD = async () => (EMPTY_BUILD);
 /** ★公示の条件（★D-117 ①）。★乱数は引かない — ★中身は問わない */
 const ANNOUNCE = () => CONDITIONS;
 
@@ -268,7 +268,7 @@ describe('★D-038 確定を生成より先に処理する', () => {
     const store = makeStore(IN_FIRST_CYCLE);
     store.pendingSettlements = async () => [7];
     let settledWhenCreating = false;
-    const build = () => {
+    const build = async () => {
       settledWhenCreating = store.settleLog.length > 0;
       return EMPTY_BUILD;
     };

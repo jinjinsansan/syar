@@ -136,6 +136,17 @@ export function buildRace(
    *    ★ここは**その手前に資格の層を足すだけ**です（★D-018・V-4 を守る）。
    */
   eligibility?: { readonly raceClass: RaceClass; readonly winsOf: (h: HorseRecord) => number },
+  /**
+   * ★**必ず出走させる馬**（★2026-09-19・**D-117 DS-2**）。
+   *   ★プレイヤーが登録した馬です。★`pool` に無くてもかまいません
+   *   （★配備の `pool` は `owner_id is null` で絞られているので、★実際に無いのが普通です）。
+   *
+   * ⚠️ ★**資格の層（`selectEligible`）も、クラス帯の窓も通しません。**
+   *    ★資格は `enter_race` が登録の時点で見ています（★段は合っている）。
+   *    ★合わないのは**能力の帯**で、★そこは V-4 の較正に効きます（★取り直しが要る）。
+   * ⚠️ ★渡さなければ 1 ビットも変わりません（★乱数の消費も同じ）。
+   */
+  mustInclude?: readonly HorseRecord[],
 ): BuiltRace {
   /**
    * ★**走路の形はここで 1 回だけ作ります**（★2026-09-15・指示書 VW §5-2）。
@@ -178,6 +189,8 @@ export function buildRace(
        *   ★`unlock_daily` が毎日分布を記録します。ここがずれたら P1 のゲートを測り直します。
        */
       abilityOf: (h: HorseRecord) => h.stats,
+      // ★D-117 DS-2: ★登録した馬を先に席に着ける（★渡されなければ従来どおり）
+      ...(mustInclude === undefined || mustInclude.length === 0 ? {} : { mustInclude }),
       ...(trainingStates === undefined ? {} : { trainingStateOf: (h: HorseRecord) => trainingStates.get(h.id) }),
       ...(programme === undefined || programmeFrozen === undefined
         ? {}

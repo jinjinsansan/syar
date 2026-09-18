@@ -156,6 +156,40 @@ export async function loadRaceablePool(
 }
 
 /**
+ * ★**id を名指しで馬を読む**（★2026-09-19・**D-117 DS-2**）。
+ *
+ * 【★なぜ別に要るか】
+ *   ★`loadRaceablePool` は ★**NPC だけ**（`owner_id is null`）を返します。★それは正しい形です —
+ *   ★充填に使う集合だからです。★ところが ★**登録した馬はプレイヤーの馬**なので、そこにいません。
+ *   → ★組成のときに ★**名指しで読みます**。
+ *
+ * ⚠️ ★**引けなかった id があれば投げます**（R-21・R-16）。
+ *    ★黙って落とすと「登録できたのに走らない馬」になり、★料金だけ取られます。
+ * ⚠️ ★世代・引退・所有では**絞りません**。★資格は `enter_race` が登録の時点で見ており、
+ *    ★登録の後に引退した馬は `entry-freeze` が取消にします（D-111 ③）。
+ *    ★ここで重ねて絞ると、★**どちらが落としたのか分からなくなります**。
+ */
+export async function loadHorsesByIds(
+  client: pg.Client | pg.PoolClient,
+  ids: readonly string[],
+): Promise<HorseRecord[]> {
+  if (ids.length === 0) return [];
+  const r = await client.query<Record<string, unknown>>(
+    `select * from horses where id = any($1::uuid[]) order by id`,
+    [ids],
+  );
+  if (r.rows.length !== ids.length) {
+    const got = new Set(r.rows.map((x) => String(x['id'])));
+    const missing = ids.filter((i) => !got.has(i));
+    throw new Error(
+      `loadHorsesByIds: ${missing.length} 頭が引けません（${missing.slice(0, 3).join(', ')}…）`
+        + '★登録した馬が horses にありません（D-117 DS-2）',
+    );
+  }
+  return r.rows.map(rowToHorse);
+}
+
+/**
  * ★B-6（D-050）: 出走馬の調子・疲労を DB から読む（0010 の列）。
  *
  * 【なぜ `HorseRecord` に入れないか】

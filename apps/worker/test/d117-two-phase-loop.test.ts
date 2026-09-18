@@ -81,12 +81,12 @@ function fake(nowMs: number, alreadyAnnounced: readonly number[] = []): Fake {
 }
 
 /** ★登録馬をそのまま出走表に入れる `build`（★DS-2 が守られている実装） */
-const BUILD_KEEPING = (_i: number, _c: RaceSpec['conditions'], registered: readonly string[]) => ({
+const BUILD_KEEPING = async (_i: number, _c: RaceSpec['conditions'], registered: readonly string[]) => ({
   entrants: registered.map((h, k) => ({ horseId: h, gate: k + 1, weightKg: 55, strategy: 'senko' })),
   odds: [],
 });
 /** 🔴 ★登録馬を落とす `build`（★DS-2 が守られていない実装・★対照） */
-const BUILD_DROPPING = () => ({ entrants: [], odds: [] });
+const BUILD_DROPPING = async () => ({ entrants: [], odds: [] });
 
 const NOOP = (): void => {};
 

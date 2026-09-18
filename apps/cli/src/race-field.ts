@@ -351,6 +351,19 @@ export interface GenerateRaceOptions {
    *    ★`verify-race` の `--field-min` / `--field-max` から渡します。
    */
   readonly fieldSizeRange?: { readonly min: number; readonly max: number };
+  /**
+   * ★**必ず出走させる馬**（★2026-09-19・**D-117 DS-2**）。
+   *
+   * ★プレイヤーが登録した馬です。★**クラス帯の窓（D-018）を通さず、先に席に着けます。**
+   *   ★資格（`min_wins`/`max_wins`）は `enter_race` が既に見ているので**段は合って**いますが、
+   *   ★**能力の帯**は合いません。★V-4 はその帯の狭さで較正されているので、
+   *   ★ここに馬が入る経路では ★**V-4 を取り直す必要があります**（★PO-5 と同じ話）。
+   *
+   * ⚠️ ★**渡さなければ 1 ビットも変わりません**（★乱数の消費も同じ）。
+   *    ★P1 のゲート（V-4/V-5/V-6）はこれを渡さない経路で測っています。
+   * ⚠️ ★`pool` に同じ馬がいても**二重に入りません**（★id で外します）。
+   */
+  readonly mustInclude?: readonly HorseRecord[];
 }
 
 /** 抽選値を馬場状態に直す（§10.4 の分布）。★純関数 — 乱数を引きません */
@@ -441,7 +454,23 @@ export function generateRace(
    *   **引いてから捨てる**ことで、そちらの結果を1ビットも動かしません。
    */
   const drawn = drawRacePrefix(rng, sizeMin, sizeMax, pool.length);
-  const fieldSize = drawn.fieldSize;
+  /**
+   * ★**必ず出走させる馬**（★D-117 **DS-2**）。★渡されなければ空で、★以下はすべて従来どおりです。
+   *
+   * 🔴 ★**上限を超える登録には答えがありません**（★照会 `QUESTIONS_DS2_20260919.md`）。
+   *   ★正典 §10.4 は 1 レース 8〜18 頭。★19 人めが登録したらどうするか（★抽選・賞金順・先着）は
+   *   ★書かれていません。★**推測で「先着を採る」を決めません** — ★投げます（R-27・黙って落とさない）。
+   *   ✔ ★今日この経路は動きません: ★staging の `race_entries` 981 行のうち
+   *     ★**プレイヤー所有馬は 0 頭**（★2026-09-19 実測）。★機能がまだ繋がっていないためです。
+   */
+  const forced = opts.mustInclude ?? [];
+  if (forced.length > sizeMax) {
+    throw new Error(
+      `generateRace: 必ず出走させる馬が ${forced.length} 頭で、上限 ${sizeMax} 頭を超えています`
+        + '（★除外の決め方が未定・QUESTIONS_DS2_20260919.md）',
+    );
+  }
+  const fieldSize = Math.max(drawn.fieldSize, forced.length);
   const distance = opts.programme?.distance ?? drawn.distance;
   const surface = opts.programme?.surface ?? drawn.surface;
   // ★公示済みなら公示の値（D-117）。無ければ抽選（良馬場が大半・稍重/重は少数）
@@ -465,16 +494,24 @@ export function generateRace(
   //   実測で 8頭 21.4% / 18頭 3.4%・平均 10.97頭（仕様どおりなら各9.1%・平均13.00）。
   //   **頭数が減れば1頭あたりの勝率は機械的に上がる**ので、V-4/V-6 の較正が
   //   この意図せぬ副作用の上に乗っていた。**候補を多めに引き、絞ったあとも頭数は維持する。**
-  const candidateCount = Math.min(bandSize, fieldSize * OVERSAMPLE_RATIO);
-  const picked: HorseRecord[] = [];
+  /**
+   * ★**残りの席ぶんだけ候補を引きます**（★D-117 DS-2）。
+   *   ★`forced` が空なら `fieldSize * OVERSAMPLE_RATIO` — ★従来と同じ式です。
+   */
+  const candidateCount = Math.min(bandSize, Math.max(0, fieldSize - forced.length) * OVERSAMPLE_RATIO);
+  /** ★**必ず出走させる馬を先頭に置きます**（★空なら `[]` ＝ 従来どおり） */
+  const picked: HorseRecord[] = [...forced];
+  const forcedIds = new Set(forced.map((h) => h.id));
   const used = new Set<number>();
   let attempts = 0;
-  while (picked.length < candidateCount) {
+  while (picked.length < forced.length + candidateCount) {
     const idx = bandStart + rng.int(0, bandSize - 1);
     attempts += 1;
     if (used.has(idx)) continue;
     const horse = pool[idx];
     if (horse === undefined) continue;
+    // ★もう席に着いている馬は引かない（★二重出走・D-117 DS-2）
+    if (forcedIds.has(horse.id)) continue;
     // ★出走馬は「その馬に向いた馬場のレース」に出る（正典 §10.4:
     //   自馬の出走レースはオーナーが選んでエントリーする）。
     //   これが無いと**芝もダートも走れる万能型が一方的に得**をして、
@@ -536,6 +573,12 @@ export function generateRace(
   //   最も素直なのは「弱すぎる馬を別の候補と差し替える」で、これは
   //   「勝ち目のない馬は出走してこない」という現実の番組の姿そのもの。
   const withStrength = candidates.map((e) => ({ e, s: entryStrength(e, distance, surface) }));
+  /**
+   * ★**先頭 `forced.length` 頭は「必ず出走させる馬」**（★D-117 DS-2）。
+   *   ★下の床の引き直しで ★**この席は差し替えません** — ★登録した馬が消えてしまいます。
+   *   ★`forced` が空なら `forcedN = 0` で、★以下はすべて従来と同じ式です。
+   */
+  const forcedN = forced.length;
   const chosen = withStrength.slice(0, Math.min(fieldSize, withStrength.length));
   // ★差し替え先は**強い順**に使う。ランダムな候補から取ると弱い馬を弱い馬に替えるだけで、
   //   床がほとんど効かない（実測で床 0.78 と 0.86 の差が 0.3pp しか出なかった）
@@ -545,7 +588,8 @@ export function generateRace(
     for (const x of chosen) if (x.s > best) best = x.s;
     let weakestIndex = -1;
     let weakest = Number.POSITIVE_INFINITY;
-    for (let i = 0; i < chosen.length; i++) {
+    // ★`forcedN` から始める＝★必ず出走させる馬は「いちばん弱い席」に選ばれない
+    for (let i = forcedN; i < chosen.length; i++) {
       const s = chosen[i]?.s ?? 0;
       if (s < weakest) {
         weakest = s;
