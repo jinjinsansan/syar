@@ -24,7 +24,7 @@ import {
   type RaceBalance,
 } from '@star/race-engine';
 import type { HorseId, HorseRecord, Rng } from '@star/sim-engine';
-import { generateRace, sortPoolByClass } from './race-field.js';
+import { generateRace, sortPoolByClass, type GenerateRaceOptions } from './race-field.js';
 
 /**
  * 着順ごとの賞金（プレースホルダ・正典 §11 未執筆）。
@@ -64,6 +64,16 @@ export function runSeason(
   rng: Rng,
   racesPerHorse: number,
   balance: RaceBalance = { ...DEFAULT_RACE_BALANCE, RACE_RANDOM_K: CALIBRATED_RACE_RANDOM_K },
+  /**
+   * ★出走表の作り方（`generateRace` にそのまま渡す）。
+   *
+   * ★**渡さなければ従来どおり**です（K-4 の選抜も V-1/V-3 も 1 ビットも動きません）。
+   * ★渡す側の用途: ★**育て終わった能力で走らせる**（`abilityOf: (h) => h.stats`）。
+   *   ★これは**本番のワーカーと同じ渡し方**です（`apps/worker/src/build-race.ts:89`）。
+   *   ⚠️ ★渡さないと `potential × PLACEHOLDER_UNLOCK` の**仮定値**で走り、
+   *      ★「育成の効き」を測る道具が**育成を見ていない**ことになります（R-30）。
+   */
+  opts: GenerateRaceOptions = {},
 ): void {
   if (pool.length < 8) return; // 出走頭数（§10.4 の下限）に満たない年は開催しない
 
@@ -72,7 +82,7 @@ export function runSeason(
   const raceCount = Math.max(1, Math.round((pool.length * racesPerHorse) / 13));
 
   for (let i = 0; i < raceCount; i++) {
-    const race = generateRace(sorted, i, rng);
+    const race = generateRace(sorted, i, rng, undefined, undefined, undefined, opts);
     const result = resolveRace({
       conditions: race.conditions,
       entrants: race.entrants,

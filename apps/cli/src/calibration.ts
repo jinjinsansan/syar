@@ -445,6 +445,10 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
     why: "★V-7 の測定条件を決めるための実測ツール（P3 指示書 §4）。SEED/HORSES は標本の取り方、TRAIN_STREAM は乱数の用途ID（既存4表と重ならない61〜の帯）。★このツールは判定を出さず、定義の候補ごとの数字を並べるだけなので、通すために動かせる値がない",
   },
   {
+    pattern: 'apps/cli/src/verify-initial-band\.ts',
+    why: "★帯の下のゲート（D-079 ④「初期馬が適切な育成でキャリア中に 1 勝」）の測定ハーネス。HORSES は標本の取り方、SEGMENTS は現役 156 週（raceableFrom〜retireAt）の割り方で、1 区間あたりの出走数は正典 §7.1 の CAREER_RACE_LIMIT を SEGMENTS で割って導く。★判定を通すために動かせる値ではない — ★そもそも本ツールは合否を出さない（合格線が正典・裁定に無いため・照会 Q-BAND-01）。★育成方針も測る側では選ばず training-career.ts の APPROPRIATE_POLICY を引く",
+  },
+  {
     pattern: 'apps/cli/src/verify-v14\.ts',
     why: "★V-14（D-044）の測定ハーネス。SEED/HORSES は標本の取り方で、TRAIN_STREAM は乱数の用途ID（既存4表と重ならない61〜の帯）。いずれも判定を通すために動かせる値ではない。★ただし DOMINANCE_MARGIN（『大きく上回らない』を +2pt と定義した値）だけは判定そのものを決めるので、較正定数として別に登録している",
   },
@@ -609,6 +613,10 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   {
     key: 'DIAGNOSTIC_STREAM',
     why: '乱数ストリームの用途ID（切り分け用の診断ツール専用・本番経路では使わない）。同上',
+  },
+  {
+    key: 'VERIFY_BAND_STREAM',
+    why: '乱数ストリームの用途ID（★帯の下のゲート・D-079 ④ の測定ハーネス）。同上。★育成の週送り（TRAIN_STREAM 61〜64）と本番ワーカーの出走表（build-race.ts の 61・62）が登録簿の外で 61 番台を使っているため、71 番台を取っている',
   },
   {
     key: 'ALL_STREAM_TABLES',

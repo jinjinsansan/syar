@@ -77,6 +77,19 @@ export const DIAGNOSTIC_STREAM = {
 } as const;
 
 /**
+ * 検証ハーネス（★帯の下のゲート・D-079 ④「初期馬が適切な育成でキャリア中に 1 勝」）
+ *
+ * ⚠️ ★61〜64 は育成の週送り（`@star/training` の `TRAIN_STREAM`）、61〜62 は本番ワーカーの
+ *    出走表とオッズ（`apps/worker/src/build-race.ts`）が**この表の外で**使っています。
+ *    ★**どちらもこの登録簿に載っていません**（2026-09-18 に確認・本便の対象外として報告）。
+ *    → ★衝突を避けるため、この harness は **71 番台**を取ります。
+ */
+export const VERIFY_BAND_STREAM = {
+  /** キャリアの区間ごとのレース（出走表の抽選と着順の乱数を `runSeason` がここから引く） */
+  RACE: 71,
+} as const;
+
+/**
  * 全 ID の一覧。★重複はここで検出する。
  *
  * ⚠️ ID を足したらこの配列にも入れること。入れ忘れると重複検査を素通りするので、
@@ -90,6 +103,7 @@ export const ALL_STREAM_TABLES = {
   VERIFY_PAYOUT_STREAM,
   PRESEED_STREAM,
   DIAGNOSTIC_STREAM,
+  VERIFY_BAND_STREAM,
 } as const;
 
 /** 重複している ID があれば返す（無ければ空） */

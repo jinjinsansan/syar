@@ -13,6 +13,7 @@ import {
   GENETICS_STREAM,
   PRESEED_STREAM,
   RACE_STREAM,
+  VERIFY_BAND_STREAM,
   VERIFY_PAYOUT_STREAM,
   VERIFY_RACE_STREAM,
   deriveRng,
@@ -35,11 +36,12 @@ describe('乱数ストリーム ID の一意性', () => {
       VERIFY_PAYOUT_STREAM,
       PRESEED_STREAM,
       DIAGNOSTIC_STREAM,
+      VERIFY_BAND_STREAM,
     ]) {
       expect(registered.has(t)).toBe(true);
     }
     // 表の数そのものも押さえる（増やしたらこのテストが落ち、登録を促す）
-    expect(Object.keys(ALL_STREAM_TABLES).length).toBe(6);
+    expect(Object.keys(ALL_STREAM_TABLES).length).toBe(7);
   });
 
   it('★すべての ID が正の整数（0 や小数だと衝突の元になる）', () => {

@@ -33,17 +33,15 @@
  *
  * 実行: npm run verify:v14 -- --horses 400 --seed 42
  */
-import {
-  ABILITY_KEYS, NICKS_GEN, deriveRng, type AbilityKey, type HorseRecord, type Rng,
-} from '@star/sim-engine';
-import {
-  DEFAULT_MENU, MENU_IDS, advanceWeek, initialState, menuCoef,
-  type HorseTraits, type MenuId, type TrainingState,
-} from '@star/training';
-import { LIFECYCLE_WEEKS } from '@star/scheduler';
+import { NICKS_GEN } from '@star/sim-engine';
+import { MENU_IDS, menuCoef } from '@star/training';
 import { resolveRuntimeConfig } from './config.js';
 import { runSimulation } from './simulator.js';
 import { POOL_GENERATIONS, POOL_MARES } from './measurement.js';
+// ★育成方針と週送りは `training-career.ts` が唯一の出どころです（2026-09-18 に切り出し）。
+//   ★帯の下のゲート（D-079 ④）が**同じ経路**を通るため。★写して 2 か所に持たない（D-052）。
+//   ✔ 切り出しの前後で本ツールの出力が一致することを実測で確認しています。
+import { runCareer, type CareerResult, type Policy } from './training-career.js';
 
 const argv = process.argv.slice(2);
 const num = (n: string, d: number): number => {
@@ -56,121 +54,6 @@ const HORSES = num('horses', 400);
 
 /** ★週進行の乱数の用途ID。既存4表（1〜52）と重ならない 61〜 の帯（指示書 §2） */
 
-/** 育成方針 */
-type Policy = 'neglect' | 'balanced' | 'hard_only';
-
-/**
- * その週のメニューを決める。
- * ★放置は「指示を出さない週＝軽め調整」（§7.1）。
- */
-function chooseMenu(policy: Policy, week: number, fatigue: number): MenuId {
-  if (policy === 'neglect') return DEFAULT_MENU;
-  if (policy === 'hard_only') {
-    // ★追い切り偏重。疲労が振り切れたら休むしかない（そうしないと確実に故障する）
-    return fatigue >= 85 ? 'rest' : 'hard';
-  }
-  // バランス型: 疲労を見ながら回す
-  if (fatigue >= 70) return 'rest';
-  const cycle = week % 4;
-  if (cycle === 0) return 'hard';
-  if (cycle === 1) return 'hill';
-  if (cycle === 2) return 'wood';
-  return 'light';
-}
-
-interface CareerResult {
-  /** 引退時の素質開放率（current/potential の平均） */
-  readonly unlock: number;
-  readonly injuries: number;
-  readonly careerEnded: boolean;
-  readonly epSpent: number;
-  /** 現役週数（早期引退なら短い） */
-  readonly weeks: number;
-  /** ★分解用: メニュー別の週数 */
-  readonly menuWeeks: Record<MenuId, number>;
-  /** ★分解用: 故障の休養に費やした週数 */
-  readonly injuryRestWeeks: number;
-  /** ★分解用: 調子の平均 */
-  readonly conditionMean: number;
-  /** ★分解用: 疲労の平均 */
-  readonly fatigueMean: number;
-  /** ★分解用: 恒久ダメージで失われた potential の割合 */
-  readonly potentialLost: number;
-}
-
-/**
- * 1頭を78週から260週まで通す。
- *
- * ★**`advanceWeek`（週送りの合成器）を通します**（2026-08-11 の載せ替え）。
- *   以前はこの関数が**自前の週ループ**を持っており、
- *   - §7.6 のイベントを一度も引かない
- *   - §7.2 の気性変化（temperDelta）を適用しない
- *   状態で測っていました。**較正した経路と、遊びの経路が別物**だったということです。
- *   R-23 は「いつの証拠か」でしたが、これは「**どの経路の証拠か**」の失効です。
- *
- * ★平均の取り方を旧ループに合わせています（調子・疲労は**その週を進める前**の値）。
- *   ここを後の値に変えると、載せ替え以外の理由で数字が動きます。
- */
-function runCareer(horse: HorseRecord, policy: Policy, horseIndex: number): CareerResult {
-  const traits: HorseTraits = {
-    sex: horse.sex, growth: horse.growth,
-    injuryRateMult: horse.injuryRateMult, birthTemper: horse.temper,
-  };
-  let state: TrainingState = {
-    ...initialState({
-      potential: horse.potential, current: horse.stats,
-      durability: horse.durability, temper: horse.temper,
-    }),
-    ageWeeks: LIFECYCLE_WEEKS.trainableFrom,
-  };
-
-  let injuries = 0;
-  let epSpent = 0;
-  const menuWeeks = Object.fromEntries(MENU_IDS.map((m) => [m, 0])) as Record<MenuId, number>;
-  const potential0 = { ...horse.potential } as Record<AbilityKey, number>;
-  let injuryRestWeeks = 0;
-  let condSum = 0;
-  let fatSum = 0;
-  let weeksCounted = 0;
-
-  while (state.retirement === null) {
-    const week = state.ageWeeks;
-    // ★進める「前」の値を積む（旧ループと同じ）
-    condSum += state.condition;
-    fatSum += state.fatigue;
-    weeksCounted += 1;
-
-    const r = advanceWeek({
-      state,
-      traits,
-      menu: chooseMenu(policy, week, state.fatigue),
-      // ★B-1 が通す経路と同じ条件で測る。false に戻すと
-      //   「較正した経路と遊びの経路が別物」に逆戻りします
-      enableEvents: true,
-      rngFor: (stream: number): Rng => deriveRng(SEED, stream, horseIndex * 1000 + week),
-    });
-    menuWeeks[r.log.menu] += 1;
-    if (r.log.resting) injuryRestWeeks += 1;
-    if (r.log.injury !== null) injuries += 1;
-    epSpent += r.log.epSpent;
-    state = r.state;
-  }
-
-  const { potential, current } = state;
-  let sum = 0;
-  for (const k of ABILITY_KEYS) sum += potential[k] > 0 ? current[k] / potential[k] : 0;
-  let lost = 0;
-  for (const k of ABILITY_KEYS) lost += potential0[k] > 0 ? 1 - potential[k] / potential0[k] : 0;
-  return {
-    unlock: sum / ABILITY_KEYS.length,
-    injuries, careerEnded: state.careerEnded, epSpent,
-    weeks: state.ageWeeks - LIFECYCLE_WEEKS.trainableFrom,
-    menuWeeks, injuryRestWeeks,
-    conditionMean: weeksCounted > 0 ? condSum / weeksCounted : 0,
-    fatigueMean: weeksCounted > 0 ? fatSum / weeksCounted : 0,
-    potentialLost: lost / ABILITY_KEYS.length,
-  };
-}
 
 const { balance, founders } = resolveRuntimeConfig();
 const sim = runSimulation(
@@ -196,7 +79,7 @@ console.log(`  ${'方針'.padEnd(14)} ${'開放率'.padStart(8)} ${'SD'.padStart
 
 const results: Record<Policy, CareerResult[]> = { neglect: [], balanced: [], hard_only: [] };
 for (const policy of ['neglect', 'balanced', 'hard_only'] as const) {
-  for (let i = 0; i < pool.length; i += 1) results[policy].push(runCareer(pool[i]!, policy, i));
+  for (let i = 0; i < pool.length; i += 1) results[policy].push(runCareer(pool[i]!, policy, i, SEED));
   const rs = results[policy];
   const u = rs.map((r) => r.unlock * 100);
   const label = { neglect: '放置(軽めのみ)', balanced: 'バランス型', hard_only: '追い切り偏重' }[policy];

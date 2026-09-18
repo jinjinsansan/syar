@@ -29,6 +29,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p apps/web",
     "build:worker": "esbuild apps/worker/src/main.ts --bundle --platform=node --format=cjs --target=node22 --outfile=dist/worker.cjs --external:pg-native",
     "verify:v14": "tsx apps/cli/src/verify-v14.ts",
+    "verify:band": "tsx apps/cli/src/verify-initial-band.ts",
     "verify:v7": "tsx apps/cli/src/verify-v7.ts",
     "dev:web": "npm -w @star/web run dev",
     "bake:sprites": "tsx tools/bake-sprites.mjs",
