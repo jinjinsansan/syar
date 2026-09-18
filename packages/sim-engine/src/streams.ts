@@ -87,6 +87,8 @@ export const DIAGNOSTIC_STREAM = {
 export const VERIFY_BAND_STREAM = {
   /** キャリアの区間ごとのレース（出走表の抽選と着順の乱数を `runSeason` がここから引く） */
   RACE: 71,
+  /** ★自馬の登録（申し込み・完全抽選・追加した出走馬の条件。★世界の側と系列を混ぜない） */
+  ENTRY: 72,
 } as const;
 
 /**

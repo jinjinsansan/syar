@@ -446,7 +446,7 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
   },
   {
     pattern: 'apps/cli/src/verify-initial-band\.ts',
-    why: "★帯の下のゲート（D-079 ④「初期馬が適切な育成でキャリア中に 1 勝」）の測定ハーネス。HORSES は標本の取り方、SEGMENTS は現役 156 週（raceableFrom〜retireAt）の割り方で、1 区間あたりの出走数は正典 §7.1 の CAREER_RACE_LIMIT を SEGMENTS で割って導く。★判定を通すために動かせる値ではない — ★そもそも本ツールは合否を出さない（合格線が正典・裁定に無いため・照会 Q-BAND-01）。★育成方針も測る側では選ばず training-career.ts の APPROPRIATE_POLICY を引く",
+    why: "★帯の下のゲート（D-079 ④「初期馬が適切な育成でキャリア中に 1 勝」）の測定ハーネス。HORSES は標本の取り方、SEGMENTS は現役 156 週（raceableFrom〜retireAt）の割り方で、1 区間あたりの申し込み数は正典 §7.1 の CAREER_RACE_LIMIT を SEGMENTS で割って導く。★LOTTERY_SURPLUS は正典 1317 の完全抽選が実際に働くための超過分（★一様なのでどの帯にも偏らない。0 にすると抽選が死んでいても数字が変わらない・R-16）。★MATCH_TOLERANCE は --choice matched のときだけ効く測定の自由変数で、★**判定に効くことが実測で分かっている**（★1.0 が 7.7% と 41.0% に分かれる）ため、★正典に固定してもらうよう照会 Q-BAND-04 に出している（R-12）。★判定を通すために動かせる値ではない — ★そもそも本ツールは合否を出さない（合格線が正典・裁定に無いため・照会 Q-BAND-01）。★育成方針も測る側では選ばず training-career.ts の APPROPRIATE_POLICY を引く",
   },
   {
     pattern: 'apps/cli/src/verify-v14\.ts',

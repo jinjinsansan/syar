@@ -22,9 +22,10 @@ import {
   DEFAULT_RACE_BALANCE,
   resolveRace,
   type RaceBalance,
+  type RaceEntrant,
 } from '@star/race-engine';
 import type { HorseId, HorseRecord, Rng } from '@star/sim-engine';
-import { generateRace, sortPoolByClass, type GenerateRaceOptions } from './race-field.js';
+import { generateRace, sortPoolByClass, type GenerateRaceOptions, type GeneratedRace } from './race-field.js';
 
 /**
  * 着順ごとの賞金（プレースホルダ・正典 §11 未執筆）。
@@ -74,18 +75,39 @@ export function runSeason(
    *      ★「育成の効き」を測る道具が**育成を見ていない**ことになります（R-30）。
    */
   opts: GenerateRaceOptions = {},
+  /**
+   * ★**自馬の登録**（正典 §10.4・裁定 `REVIEW_INITIAL_BAND_GATE_VERDICT_20260918.md` BG-1）。
+   *
+   * ★本番の `enter_race`（`db/migrations/0024_entry_rpc_and_story.sql:172-174`）は
+   *   ★**生成済みのレースに `gate = max+1` で追加**します。★出走表の窓（`classBand`）を経ません。
+   * → ★ここは**その形の写し**です。★出走表を作ったあとに、呼ぶ側が返した出走馬を**足します**。
+   *
+   * ⚠️ ★**渡さなければ従来どおり**（K-4 の選抜も V-1/V-3 も 1 ビットも動きません）。
+   * ⚠️ ★**頭数の上限と抽選は呼ぶ側の責任**です（正典 1317「上限超過は完全抽選」）。
+   *    ★ここは「返ってきた馬をそのまま足す」だけで、★**測定の方針を持ちません。**
+   */
+  entriesFor?: (race: GeneratedRace, raceIndex: number) => readonly RaceEntrant[],
+  /**
+   * ★レース数を呼ぶ側が決める（★既定は従来どおり「1 頭 `racesPerHorse` 走ぶん」）。
+   *   ★自馬の登録を使うときは、★**申し込みを捌けるだけの本数**が要ります
+   *   （★本番は 1 日 144 本に対し出走可能な馬が数千頭で、★**枠は余っている側**です）。
+   */
+  raceCountOverride?: number,
 ): void {
   if (pool.length < 8) return; // 出走頭数（§10.4 の下限）に満たない年は開催しない
 
   const sorted = sortPoolByClass(pool);
   // 各馬が概ね racesPerHorse 回走るだけのレース数（平均13頭立てとして）
-  const raceCount = Math.max(1, Math.round((pool.length * racesPerHorse) / 13));
+  const raceCount = raceCountOverride ?? Math.max(1, Math.round((pool.length * racesPerHorse) / 13));
 
   for (let i = 0; i < raceCount; i++) {
     const race = generateRace(sorted, i, rng, undefined, undefined, undefined, opts);
+    // ★自馬の登録（BG-1）。★渡されなければ出走表はそのまま
+    const added = entriesFor?.(race, i) ?? [];
+    const entrants = added.length === 0 ? race.entrants : [...race.entrants, ...added];
     const result = resolveRace({
       conditions: race.conditions,
-      entrants: race.entrants,
+      entrants,
       seed: rng.nextUint32() >>> 0,
       balance,
     });
