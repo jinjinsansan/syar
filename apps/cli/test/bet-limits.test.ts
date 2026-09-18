@@ -161,6 +161,25 @@ describe('★BT-5: 券種を省けない', () => {
     expect(mine, '★未認証を通している').toMatch(/未認証/);
   });
 
+  it('🔴 ★**CK-2**: ★画面が「あと何 EP」を**出している**', () => {
+    /**
+     * 🔴 ★**2026-09-19 に自分で見つけた形**（★裁定 `REVIEW_UI4_PREP_VERDICT_20260919.md` §1）。
+     *   ★BT-1〜BT-4 は ★**「画面が上限を持たない」**を達成していましたが、
+     *   ★`0044` で読んだ値は ★**どこにも表示されていませんでした**（`grep allowance` が page.tsx に 0 件）。
+     *   → ★★**「持たせない」は検査で固定できる。★「出す」は検査が無いと誰も気づかない。**
+     *     ★いちばん綺麗に空っぽな画面が満点を取ってしまいます。
+     * → ★**対で見ます。**
+     */
+    const page = readFileSync(path.join(ROOT, 'apps/web/src/app/races/[id]/bet/page.tsx'), 'utf8');
+    const live = page.replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+    expect(live, '★残りの数を出していない').toMatch(/\{allowance\.remainingEP\.toLocaleString/);
+    expect(live, '★効いている上限の名前を出していない').toMatch(/\{allowance\.bindingLabel\}/);
+    /** ★0 のときは「達しています」と言う（★名前だけでは伝わらない） */
+    expect(live, '★残り 0 のときの言い方が無い').toMatch(/allowance\.remainingEP === 0/);
+    /** ★読めなかったことも出す（★黙って消さない・R-16） */
+    expect(live, '★問い合わせの失敗を出していない').toMatch(/\{allowanceError\}/);
+  });
+
   it('★画面が券種ごとに聞き直している', () => {
     const screen = readFileSync(path.join(ROOT, 'apps/web/src/lib/bet-screen.ts'), 'utf8');
     const page = readFileSync(path.join(ROOT, 'apps/web/src/app/races/[id]/bet/page.tsx'), 'utf8');

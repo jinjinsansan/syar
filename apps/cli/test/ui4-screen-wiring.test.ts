@@ -101,6 +101,38 @@ describe('★① 判定はサーバーが持つ（★画面が持たない）', 
   });
 });
 
+describe('★CK-2: 「持たせない」の対になる「出している」', () => {
+  /**
+   * 🔴 ★**「持たせない」は検査で固定できます。★「出す」は検査が無いと誰も気づきません**
+   *    （★裁定 `REVIEW_UI4_PREP_VERDICT_20260919.md` §1）。
+   *    ★`0044` で「あと何 EP」を読んでいたのに ★**どこにも表示していなかった**のが原形です。
+   *    → ★**上の「〜を持っていない」と対で、★「〜を出している」を置きます。**
+   */
+  it('🔴 ★景品: ★名前・必要 PP・残高・履歴を出している', () => {
+    expect(PRIZE_PAGE, '★景品の名前を出していない').toMatch(/\{p\.name\}/);
+    expect(PRIZE_PAGE, '★必要 PP を出していない').toMatch(/\{p\.costPP\.toLocaleString/);
+    expect(PRIZE_PAGE, '★残高を出していない').toMatch(/\{balance\.toLocaleString/);
+    expect(PRIZE_PAGE, '★履歴を出していない').toMatch(/\{h\.prizeName\}/);
+    expect(PRIZE_PAGE, '★状態の言葉を出していない').toMatch(/PRIZE_STATUS_LABEL\[h\.status\]/);
+    expect(PRIZE_PAGE, '★交換のボタンが押せない（★見せているだけ）').toMatch(/onClick=\{\(\) => \{ void submit\(\); \}\}/);
+  });
+
+  it('🔴 ★記録: ★週・着順・頭数・理由の言葉・残高を出している', () => {
+    expect(REC_VIEW, '★週を出していない').toMatch(/r\.gameWeek === null \? '—'/);
+    expect(REC_VIEW, '★着順を出していない').toMatch(/\{r\.place\}/);
+    expect(REC_VIEW, '★頭数を出していない').toMatch(/\{r\.fieldSize\}/);
+    expect(REC_VIEW, '★理由の言葉を出していない').toMatch(/\{r\.reasonLabel\}/);
+    expect(REC_VIEW, '★残高を出していない').toMatch(/fmt\(r\.balance\)/);
+    /** ★合計は台帳から（★1 走あたりには割れないが、合計は出せる） */
+    expect(REC_VIEW, '★獲得賞金の合計を出していない').toMatch(/fmt\(prizeTotal\)/);
+  });
+
+  it('🔴 ★出していない列を、黙って消さずに言っている', () => {
+    /** ⚠️ ★「源が無いので出さない」を ★**画面にも書きます**（★読む人には消えたようにしか見えない） */
+    expect(REC_VIEW, '★賞金列が無い理由を書いていない').toMatch(/1 走ごとの賞金は表示していません/);
+  });
+});
+
 describe('★⑤ 冪等キー（★二重交換を作らない）', () => {
   it('🔴 ★1 回作って持ち続ける', () => {
     expect(PRIZE_PAGE, '★状態として持っていない').toMatch(/useState\(\(\) => crypto\.randomUUID\(\)\)/);
