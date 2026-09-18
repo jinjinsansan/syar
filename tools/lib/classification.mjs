@@ -40,6 +40,11 @@ export const READONLY = [
    *   ★select だけ。DB を変えません（★資格のある馬の数と、1 日の枠の本数を突き合わせるだけ）。
    */
   'measure-class-flow.mjs',
+  /**
+   * ★1 周の読み込みの所要を頭数に対して測る（CF-5・裁定 REVIEW_CF1_STEADY_STATE_VERDICT_20260918）。
+   *   ★select だけ。DB を変えません（★上限を振って伸びを見るだけ）。
+   */
+  'measure-cycle-load.mjs',
   'bench-odds-entrants.mjs',
   'bench-odds-cost.mjs',
   // ★既存の利用者から「経路の印」（auth.identities）を読むだけ。SELECT のみ・何も作らない
