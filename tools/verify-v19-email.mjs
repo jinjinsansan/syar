@@ -259,21 +259,100 @@ try {
     }
   }
 
-  console.log('\n=== ⑤⑬⑭ E-1〜E-5・E-7: 登録を伴うもの ===');
+  /*
+    ★★確認メールを飛ばさずに測れる項目（2026-09-18 に実測して判明）
+
+    当初は ⑤・E-1〜E-5・E-7 をまとめて `--with-signup` の陰に置いていた。
+    ★**しかし、これらの多くは `admin.auth.admin.createUser` で測れる** —
+    管理 API は**確認メールを送らない**のに、**パスワードの検証は迂回しない**
+    （✔ 実測: 2 文字のパスワードが `Password should be at least 6 characters.` で弾かれた）。
+
+    ★**迂回するものと、しないものを取り違えない**ことが肝心:
+      迂回する … メール確認（`email_confirm: true` で確認済みにできる → E-6 は signUp 経路が要る）
+      迂回しない … パスワードの最低要件（E-7）・漏洩パスワード（E-5）・メールの重複（⑤）
+  */
+  console.log('\n=== ⑤ 同一メールで 2 回 → ユーザーは 1 つ（読み替え）===');
+  {
+    const em = `dup-${Date.now().toString(36)}@test.local`;
+    const pw = 'v19-dup-only-7f2b9d-Aa1!';
+    const a = await admin.auth.admin.createUser({ email: em, password: pw, email_confirm: true });
+    if (a.error !== null) {
+      rec('⑤', '★同じメールの 2 人目が弾かれる', 'ng', `1 人目を作れず検査不能: ${a.error.message}`);
+    } else {
+      created.push(a.data.user.id);
+      const b = await admin.auth.admin.createUser({ email: em, password: pw, email_confirm: true });
+      if (b.error === null) created.push(b.data.user.id);
+      rec('⑤', '★同じメールの 2 人目が弾かれる', b.error !== null ? 'ok' : 'ng',
+        b.error !== null ? b.error.message : '🔴 2 人目が通った（同じメールで 2 口座）');
+    }
+  }
+
+  console.log('\n=== E-7 パスワードの最低要件 ===');
+  {
+    const em = `e7-${Date.now().toString(36)}@test.local`;
+    const r = await admin.auth.admin.createUser({ email: em, password: 'ab', email_confirm: true });
+    if (r.error === null) created.push(r.data.user.id);
+    rec('E-7', '★短すぎるパスワードが拒否される', r.error !== null ? 'ok' : 'ng',
+      r.error !== null ? r.error.message : '🔴 2 文字が通った');
+  }
+
+  console.log('\n=== E-5 漏洩済みパスワードの拒否 ===');
+  {
+    const em = `e5-${Date.now().toString(36)}@test.local`;
+    // ★既知の漏洩パスワード。HaveIBeenPwned 連携が有効なら弾かれる
+    const r = await admin.auth.admin.createUser({ email: em, password: 'password123', email_confirm: true });
+    if (r.error === null) created.push(r.data.user.id);
+    rec('E-5', '★漏洩済みパスワードが拒否される', r.error !== null ? 'ok' : 'ng',
+      r.error !== null ? r.error.message
+        : '🔴 password123 が通った（Supabase の「漏洩パスワードの拒否」が無効）→ 管理画面で有効にする');
+  }
+
+  console.log('\n=== E-4 パスワード変更の後、既存セッションが失効すること ===');
+  {
+    /*
+      ★**本番で起こる経路で測る**（裁定 C-3）。
+        管理 API の `updateUserById` ではなく、**利用者自身の `updateUser`** で変える。
+        ★セッションを 2 つ作り、片方で変えて、**もう片方のトークンがまだ通るか**を見る。
+    */
+    const em = `e4-${Date.now().toString(36)}@test.local`;
+    const pw = 'v19-e4-only-7f2b9d-Aa1!';
+    const u = await admin.auth.admin.createUser({ email: em, password: pw, email_confirm: true });
+    if (u.error !== null) {
+      rec('E-4', '★パスワード変更で他のセッションが失効する', 'ng', `利用者を作れず検査不能: ${u.error.message}`);
+    } else {
+      created.push(u.data.user.id);
+      const mk = () => createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const a = mk(); const b = mk();
+      const sa = await a.auth.signInWithPassword({ email: em, password: pw });
+      const sb = await b.auth.signInWithPassword({ email: em, password: pw });
+      if (sa.data.session === null || sb.data.session === null) {
+        rec('E-4', '★パスワード変更で他のセッションが失効する', 'ng', 'セッションを 2 つ作れず検査不能');
+      } else {
+        const up = await a.auth.updateUser({ password: `${pw}X2` });
+        if (up.error !== null) {
+          rec('E-4', '★パスワード変更で他のセッションが失効する', 'ng', `変更できず検査不能: ${up.error.message}`);
+        } else {
+          const res = await callRpcWith(sb.data.session.access_token, 'assert_setup_complete', {});
+          const revoked = res.status === 401;
+          rec('E-4', '★パスワード変更で他のセッションが失効する', revoked ? 'ok' : 'ng',
+            revoked ? `HTTP ${res.status}（失効した）`
+              : `🔴 まだ通る（HTTP ${res.status} ${res.body}）— 乗っ取られた側を締め出せない`);
+        }
+      }
+    }
+  }
+
+  console.log('\n=== 残り: 登録の経路が要るもの ===');
   if (!withSignup) {
-    for (const [id, label] of [
-      ['⑤', '同一メールで 2 回登録 → ユーザーは 1 つ'],
-      ['⑬', '同時ログインで auth ユーザー 1・口座 1'],
-      ['⑭', 'セットアップ RPC を 2 回 → 口座・初期 EP・初期馬が 1 つだけ'],
-      ['E-1', '総当たりに率の制限がある'],
-      ['E-2', '再設定リンクが 1 回限り・期限切れで拒否'],
-      ['E-3', '旧アドレスの確認なしにメール変更が成立しない'],
-      ['E-4', 'パスワード変更の後に既存セッションが失効'],
-      ['E-5', '漏洩済みパスワードの拒否'],
-      ['E-7', '最低要件を満たさないパスワードの拒否'],
-    ]) rec(id, label, 'skip', '★--with-signup で実施（確認メールの送信上限に当たるため既定では飛ばす）');
-  } else {
-    rec('未実装', '登録を伴う項目', 'skip', '★手順 6 の実装と同じ便で書く（測り方は道具の註記に記載）');
+    for (const [id, label, why] of [
+      ['⑬', '同時ログインで auth ユーザー 1・口座 1', '★口座の作成（セットアップ RPC）が要る'],
+      ['⑭', 'セットアップ RPC を 2 回 → 口座・初期 EP・初期馬が 1 つだけ', '★セットアップ RPC が未実装（照会 Q-SETUP-05）'],
+      ['E-1', '総当たりに率の制限がある', '★連続して叩くので、確認メールの上限とは別に失敗ログが増える'],
+      ['E-2', '再設定リンクが 1 回限り・期限切れで拒否', '★再設定メールの送信が要る（上限に当たる）'],
+      ['E-3', '旧アドレスの確認なしにメール変更が成立しない', '★メール変更の確認メールが要る（上限に当たる）'],
+    ]) rec(id, label, 'skip', why);
   }
 
   console.log('\n=== ⑨⑪ ===');
