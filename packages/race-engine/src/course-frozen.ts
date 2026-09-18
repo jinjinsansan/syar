@@ -109,8 +109,16 @@ function ovalSpecOf(f: FrozenCourse): OvalSpec {
   };
 }
 
-/** ★基準斤量（§8.3）。★`race-field.ts` の `generateRace` と同じ 55 */
-const BASE_WEIGHT_KG = 55;
+/**
+ * ★**基準斤量**（§8.3）。
+ *
+ * 【★2026-09-19・**EF-1** で export にしました】
+ *   🔴 ★旧はここだけが持つ非公開の定数で、★**同じ 55 が 4 か所にありました**:
+ *     ① ここ ② `race-field.ts` の `generateRace`（3 か所） ③ `enter_race`（SQL の直書き）
+ *   → ★**ここが正**です（★較正の登録簿に `BASE_WEIGHT_KG` として登録済み）。
+ *   ⚠️ ★**値は変えていません**（EF-4）。★出どころを 1 つにしただけです。
+ */
+export const BASE_WEIGHT_KG = 55;
 
 export interface FrozenRaceBase {
   readonly raceId: string;

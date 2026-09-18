@@ -16,15 +16,12 @@ import type pg from 'pg';
 // ★副作用の import。読み込んだ時点で int8 の型変換が有効になります。
 //   `pg-store` は SQL を出す唯一の層なので、ここを通れば必ず設定済みです。
 import { assertPgTypesConfigured } from './pg-types.js';
-import {
-  InvalidFrozenCourseError, conditionsFromFrozen, parseFrozenCourse,
-  type FrozenCourse, type RaceConditions, type RaceEntrant,
-} from '@star/race-engine';
+import { BASE_WEIGHT_KG, InvalidFrozenCourseError, conditionsFromFrozen, parseFrozenCourse, type FrozenCourse, type RaceConditions, type RaceEntrant } from '@star/race-engine';
 import { awardPrizes } from './prize-award.js';
 import { settlePayouts } from './payout.js';
 import { settleRace as settleRaceFair } from './settle.js';
 import type { CycleStore, RaceSpec } from './cycle-runner.js';
-import { overdueBefore, weekIndexAt, winsRangeFor } from '@star/scheduler';
+import { ENTRY_FEE_EP, overdueBefore, weekIndexAt, winsRangeFor } from '@star/scheduler';
 import { cancelRace as cancelRaceImpl } from './cancel.js';
 // ★生涯の記録（正典 §18・移行 `0024`）。★確定の中から呼びます（LR-7「レースが終わった後」）
 import { writeRaceStory } from './story-flow.js';
@@ -164,10 +161,10 @@ export function createPgStore(
          */
         `insert into races (cycle_index, name, class_rank, grade, surface, distance,
                             track_condition, course_id, scheduled_at, seed_commit, server_seed, purse, status,
-                            course_frozen, min_wins, max_wins)
+                            course_frozen, min_wins, max_wins, entry_fee_ep, weight_kg)
          values ($1, $2, $3, $4, $8, $9, $12, $10,
                  to_timestamp($5 / 1000.0), $6, $7, $11, 'scheduled',
-                 $13::jsonb, $14, $15)
+                 $13::jsonb, $14, $15, $16, $17)
          on conflict (cycle_index) do nothing`,
         [
           spec.cycleIndex,
@@ -199,6 +196,15 @@ export function createPgStore(
           // ★出走資格（CL-4）。★段 → 数 の変換は eligibility.ts の 1 か所だけ
           winsRangeFor(spec.raceClass).min,
           winsRangeFor(spec.raceClass).max,
+          /**
+           * ★**出走料と斤量**（★2026-09-19・**EF-2**・移行 `0039`）。
+           *   🔴 ★旧: ★**`enter_race` が SQL に直書き**していました（`v_fee := 200` / `weight ... 55`）。
+           *   ★新: ★**TypeScript が正**で、★ここが行に書き、★RPC はその行の値で払わせます
+           *     （★D-103 ④ の先例。★`horse_market_listing.price_ep` と同じ形）。
+           * ⚠️ ★**値は変えていません**（EF-4）。★出どころを 1 つにしただけです。
+           */
+          ENTRY_FEE_EP,
+          BASE_WEIGHT_KG,
         ],
       );
         // ★挿入されなかった＝他プロセスが先に作った。何もせず抜ける（重複させない）

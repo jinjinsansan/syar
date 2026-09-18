@@ -21,6 +21,8 @@ import type {
   Surface,
   TrackCondition,
 } from '@star/race-engine';
+// ★基準斤量は ★**`@star/race-engine` の 1 か所**から引く（★2026-09-19・EF-1。★旧はここだけで 3 か所に 55 を直書き）
+import { BASE_WEIGHT_KG } from '@star/race-engine';
 
 /**
  * 素質開放率のプレースホルダ（指示書 §3 の例示に従う）。
@@ -113,7 +115,7 @@ export function toEntrant(
     strategy: overrides.strategy ?? bestStrategy,
     condition: overrides.condition ?? 3,
     fatigue: overrides.fatigue ?? 0,
-    weightKg: overrides.weightKg ?? 55,
+    weightKg: overrides.weightKg ?? BASE_WEIGHT_KG,
     gate: overrides.gate ?? 1,
     age: overrides.age ?? 4,
     skillGenes: horse.skillGenes.slice(),
@@ -460,7 +462,7 @@ export function generateRace(
         condition: trained?.condition ?? rng.int(2, 4),
         fatigue: trained?.fatigue ?? 0,
         age: rng.int(3, 5),
-        weightKg: 55 + rng.range(-2, 2),
+        weightKg: BASE_WEIGHT_KG + rng.range(-2, 2),
       },
       unlockRange,
     );
@@ -522,7 +524,7 @@ export function generateRace(
       surface,
       trackCondition,
       courseShape: opts.programme === undefined ? (drawnStraight ? 'straight' : 'oval') : opts.programme.courseShape,
-      baseWeightKg: 55,
+      baseWeightKg: BASE_WEIGHT_KG,
     },
     entrants,
   };
