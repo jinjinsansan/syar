@@ -38,6 +38,8 @@
  *   npx tsx tools/verify-v19-email.mjs --env staging                 … 登録を伴わない分だけ
  *   npx tsx tools/verify-v19-email.mjs --env staging --with-signup   … 全部（★上限に注意）
  */
+import { randomUUID } from 'node:crypto';
+
 import pg from 'pg';
 import { createClient } from '@supabase/supabase-js';
 
@@ -344,11 +346,151 @@ try {
     }
   }
 
+  console.log('\n=== ⑭ セットアップ RPC を 2 回 → 口座・初期 EP・初期馬が 1 つだけ ===');
+  {
+    /*
+      ★**V-19 ⑭ の本体は「同一トランザクションだったこと」の確認**です
+        （裁定 `REVIEW_SETUP_RPC_VERDICT_20260820.md` §5）。
+        ★**「`users` の insert が落ちた」だけでは足りません** —
+        **初期 EP も初期馬も付いていないこと**を見ます。
+
+      ★`0031` は `upsert` を書いていないので、2 回目は `users` の主キーで落ちます。
+        単一の関数＝単一のトランザクションなので、★**落ちれば台帳も馬も戻るはず**。
+        ★そこを**実測**します（「戻るはず」で済ませない）。
+    */
+    const id = `v14-${Date.now().toString(36)}`;
+    const em = `${id}@test.local`;
+    const pw = 'v19-setup-only-7f2b9d-Aa1!';
+    const u = await admin.auth.admin.createUser({ email: em, password: pw, email_confirm: true });
+    if (u.error !== null) {
+      rec('⑭', '★2 回目は全ロールバック', 'ng', `利用者を作れず検査不能: ${u.error.message}`);
+    } else {
+      const uid = u.data.user.id;
+      created.push(uid);
+      const anon3 = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const si = await anon3.auth.signInWithPassword({ email: em, password: pw });
+      if (si.error !== null || si.data.session === null) {
+        rec('⑭', '★2 回目は全ロールバック', 'ng', `トークンを取れず検査不能: ${si.error?.message}`);
+      } else {
+        const token = si.data.session.access_token;
+        // ★候補の馬を 1 頭選ぶ（★呼ぶ側が選ぶ・★で絞るのは本番のワーカーの役目）
+        const cand = await client.query(
+          `select h.id from horses h
+            where h.owner_id is null and h.npc_stable_id is not null and h.retired_at_week is null
+              and not exists (select 1 from race_entries e where e.horse_id = h.id and e.finish_pos is not null)
+            order by h.id limit 1`,
+        );
+        const horseId = cand.rows[0]?.id ?? null;
+        if (horseId === null) {
+          rec('⑭', '★2 回目は全ロールバック', 'ng', '初期馬の候補が 0 頭（★在庫の下限監視・D-079 ⑧）');
+        } else {
+          const mkArgs = (tok) => ({
+            p_display_name: 'けんさ', p_stable_name: 'けんさ牧場',
+            p_silk_color: 'vermilion', p_silk_sleeve: 'white',
+            p_horse_id: horseId, p_client_token: tok,
+          });
+          // ★1 回目（★冪等キーは 2 回目と**別**にする。同じだと「冪等で返った」になり ⑭ を測れない）
+          const first = await callRpcWith(token, 'create_account', mkArgs(randomUUID()));
+          rec('⑭-a', '★1 回目は成功する（対照）', first.status === 200 ? 'ok' : 'ng',
+            `HTTP ${first.status} ${first.body}`);
+
+          // ★2 回目（★別の冪等キー ＝「再送」ではなく「二重実行」）
+          const second = await callRpcWith(token, 'create_account', mkArgs(randomUUID()));
+          const rejected = second.status !== 200;
+
+          // ★★本体: 初期 EP も初期馬も**増えていない**こと
+          const st = await client.query(
+            `select (select count(*)::int from users where id = $1) as accounts,
+                    (select coalesce(sum(delta), 0)::bigint from ep_ledger where user_id = $1) as ep,
+                    (select count(*)::int from horses where owner_id = $1) as horses`,
+            [uid],
+          );
+          const s = st.rows[0];
+          const clean = Number(s.accounts) === 1 && Number(s.ep) === 2000 && Number(s.horses) === 1;
+          rec('⑭', '★2 回目は拒まれ、EP も馬も増えていない', rejected && clean ? 'ok' : 'ng',
+            `2 回目=HTTP ${second.status} ／ 口座 ${s.accounts} ・EP ${s.ep} ・馬 ${s.horses}`
+            + (clean ? '（★1／2000／1 が期待どおり）' : ' 🔴 ★期待は 1／2000／1'));
+
+          /*
+            ★**⑭-b は「別の利用者」で測ります。**
+
+            ⚠️ 最初はこの利用者で同じ冪等キーを 2 回投げる形に書きましたが、
+            ★**その時点で口座は ⑭-a で既にできている**ので、★1 回目から `users` の主キーで落ち、
+            ★**冪等の枝に一度も入らないまま EP が 2000 のまま**になります。
+            → ★**冪等が壊れていても緑になる**（★「別の理由で通った ✅」・R-16 の家族）。
+
+            ★**正しくは、口座を持たない利用者で「1 回目＝成功／2 回目＝同じキー」を測る。**
+          */
+          const em2 = `v14b-${Date.now().toString(36)}@test.local`;
+          const u2 = await admin.auth.admin.createUser({ email: em2, password: pw, email_confirm: true });
+          if (u2.error !== null) {
+            rec('⑭-b', '★同じ冪等キーの再送で二度付与しない', 'ng', `2 人目を作れず検査不能: ${u2.error.message}`);
+          } else {
+            const uid2 = u2.data.user.id;
+            created.push(uid2);
+            const anon4 = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+              auth: { autoRefreshToken: false, persistSession: false },
+            });
+            const si2 = await anon4.auth.signInWithPassword({ email: em2, password: pw });
+            const cand2 = await client.query(
+              `select h.id from horses h
+                where h.owner_id is null and h.npc_stable_id is not null and h.retired_at_week is null
+                  and not exists (select 1 from race_entries e where e.horse_id = h.id and e.finish_pos is not null)
+                order by h.id limit 1`,
+            );
+            const horse2 = cand2.rows[0]?.id ?? null;
+            if (si2.data.session === null || horse2 === null) {
+              rec('⑭-b', '★同じ冪等キーの再送で二度付与しない', 'ng', '2 人目のトークンか候補が取れず検査不能');
+            } else {
+              const t2 = si2.data.session.access_token;
+              const key = randomUUID();
+              const args2 = {
+                p_display_name: 'けんさ2', p_stable_name: 'けんさ牧場2',
+                p_silk_color: 'blue', p_silk_sleeve: 'black',
+                p_horse_id: horse2, p_client_token: key,
+              };
+              const b1 = await callRpcWith(t2, 'create_account', args2);
+              const b2 = await callRpcWith(t2, 'create_account', args2);   // ★同じキー＝再送
+              const st2 = await client.query(
+                `select coalesce(sum(delta), 0)::bigint as ep,
+                        (select count(*)::int from horses where owner_id = $1) as horses
+                   from ep_ledger where user_id = $1`,
+                [uid2],
+              );
+              const okB = Number(st2.rows[0].ep) === 2000 && Number(st2.rows[0].horses) === 1
+                && b1.status === 200 && b2.status === 200;
+              rec('⑭-b', '★同じ冪等キーの再送は成功を返し、二度付与しない', okB ? 'ok' : 'ng',
+                `1 回目=HTTP ${b1.status} ／ 再送=HTTP ${b2.status} ／ EP ${st2.rows[0].ep} ・馬 ${st2.rows[0].horses}`
+                + (okB ? '（★2000／1 が期待どおり＝冪等の枝に入っている）' : ' 🔴 ★期待は 200／200／2000／1'));
+              await client.query(
+                `update horses set owner_id = null,
+                        npc_stable_id = (select id from npc_stables order by id limit 1)
+                  where owner_id = $1`,
+                [uid2],
+              );
+              await anon4.auth.signOut();
+            }
+          }
+
+          // ★片付け: 馬を NPC に戻す（★利用者は finally で消える。馬は残ると在庫が減る）
+          await client.query(
+            `update horses set owner_id = null,
+                    npc_stable_id = (select id from npc_stables order by id limit 1)
+              where owner_id = $1`,
+            [uid],
+          );
+          await anon3.auth.signOut();
+        }
+      }
+    }
+  }
+
   console.log('\n=== 残り: 登録の経路が要るもの ===');
   if (!withSignup) {
     for (const [id, label, why] of [
-      ['⑬', '同時ログインで auth ユーザー 1・口座 1', '★口座の作成（セットアップ RPC）が要る'],
-      ['⑭', 'セットアップ RPC を 2 回 → 口座・初期 EP・初期馬が 1 つだけ', '★セットアップ RPC が未実装（照会 Q-SETUP-05）'],
+      ['⑬', '同時ログインで auth ユーザー 1・口座 1', '★同時実行を仕込む必要があり、別に書く'],
       ['E-1', '総当たりに率の制限がある', '★連続して叩くので、確認メールの上限とは別に失敗ログが増える'],
       ['E-2', '再設定リンクが 1 回限り・期限切れで拒否', '★再設定メールの送信が要る（上限に当たる）'],
       ['E-3', '旧アドレスの確認なしにメール変更が成立しない', '★メール変更の確認メールが要る（上限に当たる）'],
@@ -360,10 +502,50 @@ try {
     '★Edge Function を作らない経路なので、Supabase Auth 自身が唯一の発行者。手順 6 で「自前の発行口が無いこと」を構文木で見る');
   rec('⑪', '★本番経路で固定すること', 'skip', '★手順 6 で、画面が実際に呼ぶ口を構文木で見る');
 } finally {
+  /*
+    ★★片付けの順番が要ります（2026-09-18 に漏らして学びました）
+
+    ⚠️ 最初は `admin.auth.admin.deleteUser(id)` を呼ぶだけでした。
+    ★**口座（`users`）がある利用者は、それでは消えません** —
+    ★**D-078 が `users` → `auth.users` を `NO ACTION` に保つ**と決めているためです
+    （「口座は台帳と PP を持つので勝手に消えてはならない」）。★設計どおりの拒否です。
+
+    🔴 ★**しかも私の道具は「✅ 消しました」と表示していました。**
+       ★消えていないのに成功と出る＝**片付けの経路の「別の理由で通った ✅」**。
+       ★`tools/lib/env.mjs` の註記が警告していた「**検証用の口座が残り、
+       §11.2 の実経済の指標に混ざる**」形そのものです。
+
+    → ★**順番を「馬を NPC に返す → 台帳 → 口座 → auth 利用者」にし、
+      ★消えたことを実測してから表示します。**
+  */
   console.log('\n=== 片付け ===');
   for (const id of created) {
+    // ★① 馬を NPC に返す（★排他制約があるので owner と npc を同じ 1 回で入れ替える）
+    await client.query(
+      `update horses set owner_id = null,
+              npc_stable_id = (select id from npc_stables order by id limit 1)
+        where owner_id = $1`,
+      [id],
+    );
+    // ★② 台帳 → ③ 口座（★口座を消さないと ④ が FK で拒まれる）
+    await client.query('delete from ep_ledger where user_id = $1', [id]);
+    await client.query('delete from pp_ledger where user_id = $1', [id]);
+    await client.query('delete from users where id = $1', [id]);
+    // ★④ auth 利用者
     const d = await admin.auth.admin.deleteUser(id);
-    console.log(`  ${d.error === null ? '✅ 消しました' : `🔴 消せず: ${d.error.message}`} ${id}`);
+    // ★★実際に消えたかを DB で確かめてから表示する（★戻り値だけを信じない）
+    const left = await client.query('select count(*)::int n from auth.users where id = $1', [id]);
+    const gone = Number(left.rows[0].n) === 0;
+    console.log(`  ${gone ? '✅ 消えました' : `🔴 残っています: ${d.error?.message ?? '理由不明'}`} ${id}`);
+  }
+  // ★★残骸の総量を出す（★1 人ずつの成否だけ見ていると、前の実行の残りに気づかない）
+  {
+    const rest = await client.query(
+      `select (select count(*)::int from users) as accounts,
+              (select count(*)::int from horses where owner_id is null and npc_stable_id is null) as orphans`,
+    );
+    const r = rest.rows[0];
+    console.log(`  残っている口座 ${r.accounts} 行 ／ 孤児の馬 ${r.orphans} 頭（★どちらも 0 が期待どおり）`);
   }
   await client.end();
 }
