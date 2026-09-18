@@ -81,10 +81,27 @@ export async function loadRaceablePool(
      *     ★こちらは**生成の側**です）。
      *
      * ⚠️ ★**出走馬の顔ぶれが変わります** → ★V-4・V-5・V-6・V-18 の取り直しは **CL-6** に含まれます。
+     *
+     * 🔴 ★**`owner_id is null` を 2026-09-19 に足しました**（★**EN-1**・裁定
+     *   ★`REVIEW_ENTRY_GUARDS_VERDICT_20260919.md`）。
+     *
+     *   🔴 ★**所有馬が生成プールに入っていました** —
+     *     ★**登録していない自分の馬が、窓に選ばれて勝手にレースに出ます**
+     *     （★料金も脚質も騎手も無し）。★そのあと本人が登録しても、
+     *     ★`enter_race` の冇等の早期 return がその行を返すだけです。
+     *
+     *   ★★**正典 1318 行**: 「1レース 8〜18頭。★プレイヤー馬を優先し、★**残りを NPC 馬で充填**」
+     *   → ★**充填の側は NPC だけ**です。★D-117（登録 → 生成 の順序）を直した後も、
+     *     ★**ここが NPC 専用であるのは正しい形**です（★捨て仕事になりません）。
+     *
+     *   ✔ ★**実害を先に数えました**: ★staging で ★**所有馬 0 頭**。
+     *     → ★**行の集合が 1 頭も変わらない**ので、★V-4/V-5/V-6 の取り直しは要りません。
+     *     🔴 ★**1 頭でもできた翻日には、取り直しが要る作業に化けます**（★`/setup` を繋いだ今日が期限でした）。
      */
     `select * from horses
       where generation >= (select max(generation) - 2 from horses)
         and retired_at_week is null
+        and owner_id is null
       order by id
       limit $1`,
     [limit],

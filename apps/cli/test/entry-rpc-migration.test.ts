@@ -84,8 +84,21 @@ describe('★第 3 便の移行（0024）', () => {
     expect(def.body).toMatch(/2 頭まで/);
     /** ★引退した馬は登録できない */
     expect(def.body).toMatch(/retired_at_week\s+is\s+not\s+null/i);
-    /** ★発走 60 分前で締め切る（§10.4） */
-    expect(def.body).toMatch(/60 minutes/);
+    /**
+     * ★**締切を見ている**（§10.4）。
+     *
+     * 🔴 ★旧: `toMatch(/60 minutes/)`。★**2026-09-19・ED-1 で `interval '60 minutes'` は消えました**
+     *    （★締切はレースの行に書かれた `entry_deadline_at`・移行 `0041`）。
+     * ⚠️ 🔴 ★**それでも ED-1 の便では緑のままでした** —
+     *    ★`0041` の★**註記に「旧は `interval '60 minutes'`」と書いた**ので、
+     *    ★`def.body`（★註記を含む）に一致していました。
+     *    ★**緑だったのは狙った機構ではなく、註記の文字列です**。
+     *    → ★`0042` で註記が消えて初めて落ちました。
+     * → ★**註記を落としてから、★いまの規則を見ます**。
+     */
+    const live = def.body.replace(/--[^\n]*/g, ' ');
+    expect(live, '★締切を行から読んでいない').toMatch(/now\(\)\s*>=\s*v_race\.entry_deadline_at/);
+    expect(live, '★SQL に時間を直書きしている').not.toMatch(/interval\s*'[0-9]+\s*minutes?'/i);
   });
 
   it('★② -b 出走資格を見る（★CL-4・2026-09-18）', () => {

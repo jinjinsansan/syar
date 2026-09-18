@@ -160,3 +160,73 @@ describe('★EF-1: TS 側の写しが 1 つになっている', () => {
     expect(src, '★baseWeightKg に数を直書きしている').not.toMatch(/baseWeightKg:\s*\d/i);
   });
 });
+
+
+/**
+ * ★**出走登録の門番**（★EN-1・EN-2・EN-3・2026-09-19）
+ *   ★裁定 `REVIEW_ENTRY_GUARDS_VERDICT_20260919.md`
+ */
+describe('★EN-1: 所有馬は生成プールに入らない', () => {
+  const repo = readFileSync(path.join(ROOT, 'apps/worker/src/horse-repo.ts'), 'utf8');
+
+  it('🔴 ★`loadRaceablePool` が `owner_id is null` で絞っている', () => {
+    /**
+     * 🔴 ★旧は絞っておらず、★**登録していない自分の馬が窓に選ばれて勝手に出走**しました
+     *    （★料金も脚質も騎手も無し）。★正典 1318「残りを **NPC 馬で充填**」。
+     */
+    const fn = repo.slice(repo.indexOf('export async function loadRaceablePool'));
+    const sql = fn.slice(fn.indexOf('`select * from horses'), fn.indexOf('[limit]'));
+    expect(sql, '★所有馬を除いていない').toContain('owner_id is null');
+    /** ★引退の除外（CL-3）も残っている */
+    expect(sql, '★引退馬を除いていない').toContain('retired_at_week is null');
+  });
+});
+
+describe('★EN-2: 権限の検査が冪等の検査より前にある', () => {
+  const { body } = lastEnterRace();
+  const live = stripComments(body);
+
+  it('🔴 ★「自分の馬か」が、再送の早期 return より前にある', () => {
+    /**
+     * 🔴 ★旧は後ろにあり、★**他人の馬の id を渡すと例外なしでその行の id が返って**いました
+     *    （★`security definer` なので RLS も効きません）。
+     * ★**権限の検査は、何よりも先に。**
+     */
+    const owner = live.indexOf('自分の馬ではありません');
+    const idempotent = live.indexOf('if found then return v_entry_id');
+    expect(owner, '★所有の検査が見つからない').toBeGreaterThan(0);
+    expect(idempotent, '★冪等の早期 return が見つからない').toBeGreaterThan(0);
+    expect(owner, '★所有の検査が冪等の後ろにある').toBeLessThan(idempotent);
+  });
+
+  it('★引退の検査も前にある（★同じ理由）', () => {
+    const retired = live.indexOf('引退した馬は登録できません');
+    const idempotent = live.indexOf('if found then return v_entry_id');
+    expect(retired).toBeGreaterThan(0);
+    expect(retired).toBeLessThan(idempotent);
+  });
+});
+
+describe('★EN-3: `client_token` を要求して捨てていない', () => {
+  const { body } = lastEnterRace();
+  const live = stripComments(body);
+
+  it('🔴 ★記録している（★宣言している鍵と、効いている鍵を一致させる第一歩）', () => {
+    /**
+     * 🔴 ★旧は `p_client_token` が **2 か所**（宣言／null なら raise）にしか出ず、
+     *    ★**どこにも保存されていません**でした。★効いていた鍵は `(race_id, horse_id)`。
+     *    ★この食い違いが、★`0039` で**存在しない列を参照する書き換え**を招きました。
+     */
+    expect(live, '★client_token を保存していない').toMatch(/insert into race_entries[\s\S]{0,300}client_token/);
+    expect(live, '★値を渡していない').toMatch(/p_client_token\s*\)/);
+  });
+
+  it('★列と一意索引がある（★`bets` と同じ形）', () => {
+    const all = readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()
+      .map((f) => stripComments(readFileSync(path.join(MIGRATIONS, f), 'utf8'))).join('\n');
+    expect(all).toMatch(/alter table race_entries add column if not exists client_token uuid/i);
+    expect(all, '★一意索引が無い').toMatch(/unique index[\s\S]{0,120}race_entries \(horse_id, client_token\)/i);
+    /** ★生成が作った行（null）を縛らない */
+    expect(all).toMatch(/race_entries \(horse_id, client_token\) where client_token is not null/i);
+  });
+});
