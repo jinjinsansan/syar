@@ -9,6 +9,20 @@
  *   `horses.owner_id` が null なら NPC です。払う相手がいません。
  *   ⚠️ ここで「払ったことにする」と `point_flow_daily` の PP 発行量が過大に出ます。
  *      監視が誤った経済を測ることになるので、**実際に発行した分だけ**を記録します。
+ *
+ * 【★★2026-09-19・PR-1 — ★**賞金の「発生」と「発行」を分けました**（移行 `0049`）】
+ *   🔴 ★旧は ★**発行（`pp_ledger`）しか記録していませんでした**。
+ *     ★`pp_ledger.user_id` は `not null` で、★NPC 馬は上の `continue` で飛ばされるため、
+ *     ★★**NPC 馬の獲得賞金がどこにも存在しませんでした。**
+ *   🔴 ★これが **T-11** を塞いでいました:
+ *     ★**D-102 ③** は出品価格を ★§10.5 の式〔`3,000 + G1勝利数 × 8,000 + 総獲得賞金 / 20`〕で決め、
+ *     ★**D-102 ②** は売る馬を ★**NPC 世界から取る**と定めています。
+ *     → ★式が必要とする「総獲得賞金」は ★**まさに存在しない側**でした（★D-107 も同じ式）。
+ *   ★新:
+ *     ★**発生** … `race_entries.prize_pp`。★**誰の馬かに関わらず**、着順から決まる額を書く（★一次資料）
+ *     ★**発行** … `pp_ledger` ＋ `users.prize_points`。★**利用者の馬のときだけ**（★今までどおり）
+ *   ⚠️ ★**二重帳簿ではありません** — ★意味が違い、★NPC 馬では ★**一致しません**（★発生あり・発行なし）。
+ *   ⚠️ ★額は `prizeFor()` が決めます。★**賞金表を SQL に写しません**（D-052・EF-2 と同じ形）。
  */
 
 import type pg from 'pg';
@@ -49,6 +63,16 @@ export async function awardPrizes(
     );
     const row = r.rows[0];
     if (row === undefined) throw new Error(`awardPrizes: gate ${f.gate} の出走馬が見つかりません`);
+
+    /**
+     * ★★**発生を先に書く**（★2026-09-19・**PR-1**・移行 `0049`）。
+     * ⚠️ ★**NPC 馬にも書きます** — ★下の `continue` より**前**に置いているのはそのためです。
+     *    ★ここを `continue` の後ろに移すと、★**T-11 の価格式がまた源を失います**。
+     */
+    await client.query(
+      `update race_entries set prize_pp = $1 where race_id = $2 and gate = $3`,
+      [amount, raceId, f.gate],
+    );
 
     // ★NPC 馬（owner_id が null）には払わない。払う相手がいない
     if (row.owner_id === null) continue;
