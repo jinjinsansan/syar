@@ -149,6 +149,13 @@ export function judgeReads(reads) {
 export const EXPECTED_FUNCTION_EXECUTE = {
   // ★ガード自身。利用者の RPC から呼ばれるので authenticated だけ（`0019` が anon を明示的に外している）
   'assert_setup_complete()': { anon: false, authenticated: true },
+  // ★初回セットアップ（`0031`・D-074/D-075/D-079・V-19 ⑭）。利用者が呼ぶので authenticated だけ。
+  //   ★`assert_setup_complete()` は呼べない（口座を作る側で順序が逆・D-080 の対象外）。
+  //   代わりの 3 条件は `apps/cli/test/rpc-guard.test.ts` の第三の登録簿が検査する
+  'create_account(text,text,text,text,uuid,uuid)': { anon: false, authenticated: true },
+  // ★初期馬の候補かの判定（`0031`）。読み取りだけ。★「戦績 0」は暫定の定義で、
+  //   クラス分けの便で共通の述語に置き換える（裁定 REVIEW_SETUP_PREDICATE_VERDICT_20260918 条件 2）
+  'is_initial_horse_candidate(uuid)': { anon: false, authenticated: true },
   // ★利用者が呼ぶ RPC。authenticated だけに実行させる（`0022` で anon を剥がす・照会 Q2・2026-09-14）。
   //   以前は anon に EXECUTE が残っており（`0002`・`0008` は public だけを剥がしていた）、
   //   先頭の `assert_setup_complete()` の検査だけで閉じていた

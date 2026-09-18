@@ -44,6 +44,9 @@ const DIR = `${ROOT}db/migrations`;
 const READONLY_FUNCTIONS = [
   // ガード自身。呼ぶ側であって呼ばれる側なので、自分を呼ばない
   'assert_setup_complete',
+  // ★初期馬の候補かの判定（`0031`）。`language sql stable` で**状態を変えない**
+  //   （★書き込む関数をここに入れられないよう、下の「除外簿に載せてよいのは…」が弾く）
+  'is_initial_horse_candidate',
 ];
 
 /**
@@ -52,6 +55,27 @@ const READONLY_FUNCTIONS = [
  *   ⚠️ **利用者が呼ぶ RPC をここへ入れないこと**（入れると D-080 の判定が外れる）。
  */
 const WORKER_ONLY_FUNCTIONS = ['spend_training_ep'];
+
+/**
+ * ★**第三の登録簿 — 口座を作る側の RPC**（2026-09-18・裁定
+ *   `REVIEW_SETUP_PREDICATE_VERDICT_20260918.md` §3-2）。
+ *
+ * 【なぜ既存の 2 つに入れられないか】
+ *   除外簿 … ★**状態を変えない関数だけ**（下の「除外簿に載せてよいのは…」が弾く）→ これは書き込む
+ *   ワーカー専用簿 … ★**利用者から実行できず `auth.uid()` を使わない**こと → これは両方する
+ *   ★上の `USER_RPCS` の註記が「利用者が呼ぶ書き込み RPC は、どちらにも入れられない」と明言している
+ *
+ * 【なぜ `assert_setup_complete()` を呼べないか】
+ *   あれは `users` 行の存在を要求する（`0019`）。★**この簿の RPC はその行を作る側**なので順序が逆で、
+ *   呼べば必ず自分で落ちる。`0030` 以降は `email_confirmed_at` も要求するため、なおさら。
+ *
+ * 【★だから「代わりに要求すること」を検査で固定する】
+ *   ⚠️ ★**簿に載せるだけで中身を要求しないと、「例外にした」が「無検査にした」になる**（R-16）。
+ *   ① `auth.uid()` が null なら弾く
+ *   ② ★`email_confirmed_at` を**この RPC 自身の中でも**確認する（D-113 ④・設定 1 枚に頼らない）
+ *   ③ `dedupe_key` で冪等（`0025`・`0026` と同形）
+ */
+const ACCOUNT_CREATING_FUNCTIONS = ['create_account'];
 
 /** 利用者が呼ぶ書き込み RPC。どちらの登録簿にも入れられない */
 const USER_RPCS = ['place_bet', 'exchange_prize'];
@@ -73,6 +97,27 @@ function readMigrations(): Migration[] {
 
 /** ★`--` のコメントを同じ長さの空白に置き換える（位置を保ったまま、コメント中の語を拾わない） */
 const blankComments = (sql: string): string => sql.replace(/--[^\n]*/g, (m) => ' '.repeat(m.length));
+
+/**
+ * ★`comment on … is '…';` 文を落とす（2026-09-18）。
+ *
+ * 【なぜ要るか】
+ *   関数の本文は「次の `create function` まで」で切り出すので、★**直後の `comment on` 文も含まれます**。
+ *   その**文字列リテラル**に関数名を書くと（★説明としてはむしろ望ましい）、
+ *   ★`blankComments` は `--` しか消さないため**リテラルが残り**、
+ *   「その関数を呼んでいる」と**誤って判定**します。
+ *   ★実例: `0031` の `comment on function create_account(...) is '…assert_setup_complete() は呼ばない…'`
+ *   で、**呼んでいないのに「呼んでいる」と出ました**。
+ *
+ * 【★`blankComments` 自体は変えないこと】
+ *   あれは 7 か所から呼ばれており、★**文字列リテラルが残ることを前提にした検査があります**
+ *   （★`errcode = '…'` を見ている箇所）。リテラルを一律に消すと**別の検査が静かに通ります**。
+ *   → ★**必要な検査だけがこれを使う。**
+ *
+ * ⚠️ ★註記の語を言い換えて検出器を黙らせる形は採りません（D-108 ③）。**構造の側で直します。**
+ */
+const stripFunctionComments = (sql: string): string =>
+  blankComments(sql).replace(/\bcomment\s+on\b[\s\S]*?;/gi, (m) => ' '.repeat(m.length));
 
 /** 全マイグレーションを通した位置（ファイル順 → ファイル内の位置） */
 const positionOf = (fileIndex: number, offset: number): number => fileIndex * 100_000_000 + offset;
@@ -212,6 +257,8 @@ describe('D-080 書き込み RPC のセットアップ判定', () => {
     for (const [name, { file, body }] of bodies) {
       if (READONLY_FUNCTIONS.includes(name)) continue;
       if (WORKER_ONLY_FUNCTIONS.includes(name)) continue;
+      // ★口座を作る側は呼べない（呼べば必ず自分で落ちる）。代わりの 3 条件を下の describe が検査する
+      if (ACCOUNT_CREATING_FUNCTIONS.includes(name)) continue;
       if (!body.includes('assert_setup_complete()')) missing.push(`${name}（最後の定義: ${file}）`);
     }
     expect(
@@ -251,6 +298,80 @@ describe('D-080 書き込み RPC のセットアップ判定', () => {
     for (const n of READONLY_FUNCTIONS) {
       expect(['place_bet', 'exchange_prize', 'spend_training_ep']).not.toContain(n);
     }
+  });
+});
+
+describe('★口座を作る側の RPC（第三の登録簿・裁定 REVIEW_SETUP_PREDICATE_VERDICT_20260918 §3-2）', () => {
+  const bodies = latestFunctionBodies();
+
+  it('★登録簿の関数がマイグレーションに実在する（空振りしていない）', () => {
+    // ★0 件は「全部合格」に見える。走査器が動いていることを先に確かめる（R-11）
+    for (const n of ACCOUNT_CREATING_FUNCTIONS) {
+      expect(bodies.get(n), `★${n} の定義がマイグレーションに無い`).toBeDefined();
+    }
+  });
+
+  it('★除外簿・ワーカー専用簿と重ならない（区分が曖昧にならないこと）', () => {
+    for (const n of ACCOUNT_CREATING_FUNCTIONS) {
+      expect(READONLY_FUNCTIONS).not.toContain(n);
+      expect(WORKER_ONLY_FUNCTIONS).not.toContain(n);
+    }
+  });
+
+  it('★assert_setup_complete() を呼んでいないこと（呼べば必ず自分で落ちる）', () => {
+    for (const n of ACCOUNT_CREATING_FUNCTIONS) {
+      const def = bodies.get(n);
+      if (def === undefined) continue;
+      expect(
+        // ★`comment on` の文字列リテラルまで落としてから見る（★説明文を「呼んでいる」と読まない）
+        stripFunctionComments(def.body).includes('assert_setup_complete()'),
+        `★${n} が assert_setup_complete() を呼んでいます。`
+          + '★あれは users 行の存在を要求しますが、この RPC はその行を作る側で順序が逆です',
+      ).toBe(false);
+    }
+  });
+
+  /**
+   * ★**ここが本体です。**
+   *   簿に載せるだけだと「例外にした」が「無検査にした」になります（R-16）。
+   *   `assert_setup_complete()` の代わりに、裁定 §3-2 の 3 条件を本文に要求します。
+   */
+  it('★代わりの 3 条件を本文で満たしている（①未認証を弾く ②メール確認 ③冪等）', () => {
+    const violations: string[] = [];
+    for (const n of ACCOUNT_CREATING_FUNCTIONS) {
+      const def = bodies.get(n);
+      if (def === undefined) { violations.push(`${n}: 定義が見つからない`); continue; }
+      // ★註記と `comment on` の説明文を消してから見る
+      //   （★**説明文に語があるだけで合格になる**のを防ぐ。★3 条件はすべて実コード側に要る）
+      const body = stripFunctionComments(def.body);
+
+      // ① auth.uid() が null なら弾く
+      if (!/auth\s*\.\s*uid\s*\(\s*\)/i.test(body)) {
+        violations.push(`${n}: auth.uid() を使っていない（${def.file}）`);
+      } else if (!/is\s+null[\s\S]{0,200}raise\s+exception/i.test(body)) {
+        violations.push(`${n}: auth.uid() が null のときに raise exception が無い（${def.file}）`);
+      }
+
+      // ② ★メール確認を、この RPC 自身の中でも確認する（D-113 ④・設定 1 枚に頼らない）
+      if (!/email_confirmed_at/i.test(body)) {
+        violations.push(`${n}: email_confirmed_at を確認していない（${def.file}）`);
+      }
+      // ★OIDC 経路を巻き込まないこと（裁定 C-3-1）。メール経路に限って課しているか
+      if (!/auth\s*\.\s*identities/i.test(body)) {
+        violations.push(`${n}: 経路を auth.identities で判定していない＝OIDC の利用者も弾く恐れ（${def.file}）`);
+      }
+
+      // ③ dedupe_key で冪等
+      if (!/dedupe_key/i.test(body)) {
+        violations.push(`${n}: dedupe_key による冪等が無い（${def.file}）`);
+      }
+
+      // ★V-19 ⑭: upsert を書かない（2 回目は落ちて全ロールバック）
+      if (/on\s+conflict/i.test(body)) {
+        violations.push(`${n}: on conflict がある（★upsert を書かない・V-19 ⑭）（${def.file}）`);
+      }
+    }
+    expect(violations, violations.join('\n')).toEqual([]);
   });
 });
 
