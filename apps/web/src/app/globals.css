@@ -180,7 +180,10 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
    *   ★**150px 以上のものだけ**を解きます。★値は実際にソースにあるものだけを並べています
    *      （★`grep "flex: '0 0 <N>px'"` で数えた実測: 150/190/196/200/250/252/280/290/330/334/340/352）。
    */
-  main [style*="flex:0 0 150px"], main [style*="flex:0 0 190px"], main [style*="flex:0 0 196px"],
+  /* ⚠️ ★`190px` は 2026-09-19 に外しました — ★`/setup` の脚質の枠が唯一の使い手で、
+     ★UI1-8 で **その枠ごと消えました**（★脚質は `horses` に無い）。
+     ★残しておくと `mobile-css-anchors.test.ts` が「黙って効かない規則」として落とします。 */
+  main [style*="flex:0 0 150px"], main [style*="flex:0 0 196px"],
   main [style*="flex:0 0 200px"], main [style*="flex:0 0 230px"], main [style*="flex:0 0 250px"],
   main [style*="flex:0 0 252px"], main [style*="flex:0 0 280px"], main [style*="flex:0 0 290px"],
   main [style*="flex:0 0 330px"], main [style*="flex:0 0 334px"], main [style*="flex:0 0 340px"],
