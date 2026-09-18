@@ -88,6 +88,17 @@ export interface Distribution {
   readonly heldByTier: Readonly<Record<string, number>>;
   /** ★資格者が 8 頭に満たず開けなかった本数（★格ごと） */
   readonly skippedByTier: Readonly<Record<string, number>>;
+  /** ★平均頭数（★**PO-6**: ★`pool.length` で頭打ちになるので 13.46 ではない） */
+  readonly meanFieldSize: number;
+  /**
+   * ★**「4 勝以上」を同時に持つ頭数の推移**（★**PO-6**）。
+   * 🔴 ★open と graded の資格は `winsRangeFor` で ** min = 4 ** 。
+   *    ★この頭数が 8 を割ると ★**上級のレースが開けません**。
+   * ★番組表の 1 日ごとに数えます。
+   */
+  readonly upperEligibleByDay: readonly number[];
+  /** ★引退して入れ替わった頭数（★世代交代が動いている証拠） */
+  readonly retired: number;
 }
 
 /**
@@ -111,6 +122,14 @@ export function runCohort(
    *    → ★成立率は ★**育成なし（下限）と育成あり（上限）の 2 つ**で挟んで報告します。
    */
   train: boolean,
+  /**
+   * ★**open / graded の資格の下限を上書きする**（★**測定専用**・PO-6）。
+   *
+   * ⚠️ 🔴 ★**既定は `winsRangeFor('open').min`（★正典の値）です。**
+   *    ★ここを渡すのは ★**「3 勝以上にしたらどうなるか」を測るときだけ**で、
+   *    ★**実装を変えるものではありません**（★正典の改訂はオーナー判断）。
+   */
+  openMinOverride: number | null,
 ): Distribution {
   const rng = deriveRng(seed, 0);
   const pool: HorseRecord[] = [];
@@ -160,10 +179,27 @@ export function runCohort(
    */
   const races = days * RACES_PER_DAY;
   let held = 0;
+  let starts = 0;
+  let nextId = poolSize;
+  let retiredCount = 0;
+  const upperEligibleByDay: number[] = [];
+  /** ★open / graded の資格の下限（★数を写さない・D-052） */
+  const upperMin = openMinOverride ?? winsRangeFor('open').min;
   const heldByTier: Record<string, number> = {};
   const skippedByTier: Record<string, number> = {};
 
   for (let idx = 0; idx < races; idx += 1) {
+    /** ★番組表の 1 日ごとに「4 勝以上」を数える（★PO-6） */
+    if (idx % RACES_PER_DAY === 0) {
+      let n = 0;
+      for (const h of pool) {
+        const c = careers.get(h.id);
+        if (c === undefined) continue;
+        if (c.starts >= maxStarts) continue;
+        if (c.wins >= upperMin) n += 1;
+      }
+      upperEligibleByDay.push(n);
+    }
     const raceClass = classOf(idx);
     const grade = gradeOf(idx);
     const tier = tierOf(raceClass, grade);
@@ -177,7 +213,9 @@ export function runCohort(
       const wins = c?.wins ?? 0;
       const starts = c?.starts ?? 0;
       if (starts >= maxStarts) return false;
-      if (wins < range.min) return false;
+      /** ★測定専用の上書き（★open / graded だけ・既定では何も変わりません） */
+      const rangeMin = range.max === null ? upperMin : range.min;
+      if (wins < rangeMin) return false;
       if (range.max !== null && wins > range.max) return false;
       return true;
     });
@@ -192,6 +230,7 @@ export function runCohort(
       seed: rng.nextUint32() >>> 0,
       balance,
     });
+    starts += result.order.length;
     for (const row of result.order) {
       const c = careerOf(row.horseId);
       c.starts += 1;
@@ -201,6 +240,32 @@ export function runCohort(
       }
       c.earnings += prizeFor(tier, row.finishPosition);
       c.priceAfterEachStart.push(npcStudFee(c.g1Wins, c.earnings));
+      /**
+       * ★★**世代交代**（★**PO-6**・2026-09-19）。
+       * 🔴 ★これが無いと、★**全頭が同じ日にデビューした 1 コホート**になります。
+       *    ★「4 勝以上を同時に持つ頭数」は ★**0 から増える途中**だけを見ることになり、
+       *    ★**定常の数ではありません**（★実測で 11 頭しか出ませんでした）。
+       * → ★**引退したその場で、新しい馬を 1 頭入れます**。
+       *   ★これで、★**キャリアのあらゆる段階の馬が混ざる**集団になります。
+       */
+      if (c.starts >= maxStarts) {
+        const at = pool.findIndex((h) => h.id === row.horseId);
+        if (at >= 0) {
+          nextId += 1;
+          const fresh = createFounder({
+            id: `h${nextId}` as HorseId,
+            sex: nextId % 2 === 0 ? 'male' : 'female',
+            sireLine: `L${nextId % 12}` as never,
+            birthYear: 0,
+            rng,
+            balance: DEFAULT_BALANCE,
+            founders: FOUNDERS,
+          });
+          pool[at] = fresh;
+          if (train) trained.set(fresh.id, runCareer(fresh, APPROPRIATE_POLICY, nextId, seed).stats);
+          retiredCount += 1;
+        }
+      }
     }
   }
 
@@ -224,7 +289,8 @@ export function runCohort(
     prices.push(c.priceAfterEachStart[k]!);
     i += 1;
   }
-  return { pool: poolSize, races: held, ran, prices: prices.sort((a, b) => a - b), g1Winners, totalStarts, heldByTier, skippedByTier };
+  return { pool: poolSize, races: held, ran, prices: prices.sort((a, b) => a - b), g1Winners, totalStarts, heldByTier, skippedByTier,
+    meanFieldSize: held === 0 ? 0 : starts / held, upperEligibleByDay, retired: retiredCount };
 }
 
 /** ★コマンドとして流したとき */
@@ -239,17 +305,29 @@ if (isMain) {
   const seed = arg('seed', 42);
   const maxStarts = arg('starts', CAREER_RACE_LIMIT);
   const train = process.argv.includes('--train');
+  const openMin = process.argv.includes('--open-min') ? arg('open-min', 4) : null;
 
   console.log('# ★定常での出品価格の分布（★T11-1 ②\'・シミュレータで測定）');
   console.log(`  集団 ${poolSize} 頭 / シード ${seed} / 1 頭 ${maxStarts} 走まで（★CAREER_RACE_LIMIT = ${CAREER_RACE_LIMIT}）`
-    + ` / 番組表 ${days} 日（${days * RACES_PER_DAY} レース・★キャリア 1 本分）`);
+    + ` / 番組表 ${days} 日（${days * RACES_PER_DAY} レース）`
+    + (openMin === null ? '' : ` / 🔴 **open の資格を ${openMin} 勝以上に上書き**（★測定専用）`));
   console.log(train
     ? '  ★**育成あり**（runCareer で育て終わった能力で走る・★上限側の見積り）/ 引退と世代交代・配合は入っていません'
     : '  ⚠️ ★育成なし（★下限側の見積り・`--train` で入れられます）/ 引退・世代交代・配合も入っていません');
 
-  const d = runCohort(poolSize, seed, maxStarts, days, train);
+  const d = runCohort(poolSize, seed, maxStarts, days, train, openMin);
   console.log(`\n  開催 ${d.races} レース / 走った馬 ${d.ran} 頭 / ★G1 を勝った馬 ${d.g1Winners} 頭`
     + `（${((d.g1Winners / Math.max(1, d.ran)) * 100).toFixed(1)}%）`);
+  console.log(`  ★平均頭数 ${d.meanFieldSize.toFixed(2)}`
+    + ` / ★入れ替わった馬 ${d.retired.toLocaleString('ja-JP')} 頭（★世代交代）`);
+  {
+    const half = Math.floor(d.upperEligibleByDay.length / 2);
+    const tail = d.upperEligibleByDay.slice(half);
+    const mean = tail.length === 0 ? 0 : tail.reduce((a, b) => a + b, 0) / tail.length;
+    console.log(`  ★「4 勝以上」を同時に持つ頭数（★**PO-6**）: 後半の平均 ${mean.toFixed(0)} 頭`
+      + ` / 最後 ${d.upperEligibleByDay[d.upperEligibleByDay.length - 1] ?? 0} 頭 / 最大 ${Math.max(...d.upperEligibleByDay, 0)} 頭`);
+    console.log(`     日ごと: ${d.upperEligibleByDay.join(' ')}`);
+  }
   console.log(`  ★成立率 ${((d.races / (days * RACES_PER_DAY)) * 100).toFixed(1)}%`
     + `（開催 ${d.races} / 予定 ${days * RACES_PER_DAY}）`
     + ` / ★延べ出走 ${d.totalStarts.toLocaleString('ja-JP')}`
