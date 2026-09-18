@@ -35,7 +35,10 @@ import { syncStableGradePrices } from './grade-flow.js';
 import { freezePendingEntries } from './entry-freeze.js';
 import { runSelfcheck } from './selfcheck.js';
 import { runSchemacheck } from './schemacheck.js';
-import { CANCEL_AFTER_START_MS, CYCLE_MS, classOf, conditionsOf, gradeOf, weekIndexAt, weekStartMs } from '@star/scheduler';
+import {
+  CANCEL_AFTER_START_MS, CYCLE_MS, classOf, conditionsOf, gradeOf,
+  weekIndexAt, weekStartMs, dayIndexAt, dayStartMs,
+} from '@star/scheduler';
 // ★投票の上限の正（★2026-09-19・BT-1。★ワーカーが `bet_limits` に書き、RPC はその行を読む）
 import {
   BET_CAP_PER_KIND_EP, BET_CAP_PER_RACE_EP, BET_CAP_PER_DAY_EP, BET_CAP_OWN_RACE_EP,
@@ -244,9 +247,26 @@ async function main(): Promise<void> {
     // --- 日次集計（§4.6・§11.2）---
     //   ★サーバー時刻の日付で判定する。ワーカーの時計は使わない
     try {
-      const today = (await client.query<{ d: string }>('select current_date::text as d')).rows[0]!.d;
+      /**
+       * 🔴 ★**2026-09-19・BT-6 ②⑤ — ★「1 日」を `current_date` で決めるのをやめました。**
+       *
+       *   ★旧: `select current_date::text` — ★**セッションの TimeZone** にしたがいます。
+       *   ★`bet_allowance`（PostgREST の接続）は `date_trunc('day', now())` を使っていて、
+       *   ★★**同じ「1 日」のつもりで、別々に切れうる 2 つ**でした。
+       *   → ★**`dayIndexAt` / `dayStartMs` の 1 本から引きます**（★`week_started_at` と同じ形）。
+       * ⚠️ ★日付の文字列は ★**見出しだけ**に使います（★範囲の判定は境目の瞬間で行います）。
+       */
+      const dayNowMs = Number(
+        (await client.query<{ ms: string }>(
+          'select (extract(epoch from now()) * 1000)::bigint as ms',
+        )).rows[0]!.ms,
+      );
+      const dayIdx = dayIndexAt(dayNowMs, cfg.epochMs);
+      const dayFromMs = dayStartMs(dayIdx, cfg.epochMs);
+      const dayToMs = dayStartMs(dayIdx + 1, cfg.epochMs);
+      const today = new Date(dayFromMs).toISOString().slice(0, 10);
       if (today !== lastAggregated) {
-        await aggregateDay(client, today);
+        await aggregateDay(client, today, new Date(dayFromMs).toISOString(), new Date(dayToMs).toISOString());
         lastAggregated = today;
         /**
          * ★開放率の分布も毎日残す（レビュー側裁定 2026-08-12）。
@@ -385,12 +405,19 @@ async function main(): Promise<void> {
        * ⚠️ ★**`game_week` と同じ週番号から導きます**（★2 通りの導き方を作らない・D-052）。
        */
       const weekIndex = weekIndexAt(nowMs, cfg.epochMs);
+      /**
+       * ★**「1 日」の境目も、同じ 1 本から書きます**（★2026-09-19・**BT-6 ②⑤**・移行 `0050`）。
+       *   ★`bet_allowance` は ★**この行を読むだけ**になりました（★`date_trunc` をやめた）。
+       * ⚠️ ★**ワーカー自身の日次の判定も `dayIndexAt`** から引いています（★上の日次集計）。
+       *    ★片方だけ直すと「直した」という記憶だけが残ります（★裁定 BT-6 ⑤）。
+       */
       await client.query(
-        `insert into world_state (id, game_week, week_started_at, updated_at)
-         values (true, $1, to_timestamp($2 / 1000.0), now())
+        `insert into world_state (id, game_week, week_started_at, day_started_at, updated_at)
+         values (true, $1, to_timestamp($2 / 1000.0), to_timestamp($3 / 1000.0), now())
          on conflict (id) do update set game_week = excluded.game_week,
-           week_started_at = excluded.week_started_at, updated_at = excluded.updated_at`,
-        [weekIndex, weekStartMs(weekIndex, cfg.epochMs)],
+           week_started_at = excluded.week_started_at,
+           day_started_at = excluded.day_started_at, updated_at = excluded.updated_at`,
+        [weekIndex, weekStartMs(weekIndex, cfg.epochMs), dayStartMs(dayIndexAt(nowMs, cfg.epochMs), cfg.epochMs)],
       );
 
       /**

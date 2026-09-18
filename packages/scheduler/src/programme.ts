@@ -14,8 +14,12 @@ export type RaceClass = 'maiden' | 'win1' | 'win2' | 'win3' | 'open' | 'graded';
 /** 重賞の格 */
 export type Grade = 'G1' | 'G2' | 'G3';
 
-/** 1 日（実時間 24 時間）のミリ秒 */
-const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * 1 日（実時間 24 時間）のミリ秒。
+ * ⚠️ ★**2026-09-19・BT-6 ②⑤ で公開しました** — ★`dayStartMs` が使い、
+ *    ★ワーカーが `world_state.day_started_at` に書きます。★同じ値を 2 か所に置かないため。
+ */
+export const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * ★1 日のレース数 ＝ **1 サイクル 1 レース × 1 日のサイクル数**（★`CYCLE_MS` から導出）。
@@ -121,6 +125,32 @@ export function slotOfDay(cycleIndex: number): number {
 /** 通算の日数（起点日を 0 とする） */
 export function dayIndex(cycleIndex: number): number {
   return Math.floor(cycleIndex / RACES_PER_DAY);
+}
+
+/**
+ * ★**いまが起点から何日めか**（★**BT-6 ②⑤**・2026-09-19）。
+ *
+ * 【🔴 ★なぜ要るか — ★「1 日」が 2 か所で別々に決まっていました】
+ *   ★① `bet_allowance`（SQL）… `date_trunc('day', now())`
+ *   ★② ワーカー（`main.ts`）… `current_date`
+ *   ★どちらも ★**セッションの TimeZone** にしたがい、★**宣言した場所がありません**。
+ *   ★さらに ★**接続が違います**（★PostgREST と node-postgres）。
+ *   → ★★**同じ「1 日」のつもりで、別々に切れうる 2 つ**でした。
+ *
+ * 【★どう解くか】
+ *   ★**ここを 1 本の正とします。** ★ワーカーが毎周 `world_state.day_started_at` に書き、
+ *   ★SQL も ★**その行を読むだけ**にします（★`week_started_at`（`0048`）と同じ形）。
+ *   ⚠️ ★SQL に `date_trunc` も `current_date` も書きません。
+ *
+ * ⚠️ ★`weekIndexAt` と同じ数え方です（★どちらも epoch からの経過時間）。
+ */
+export function dayIndexAt(nowMs: number, epochMs: number): number {
+  return Math.floor((nowMs - epochMs) / DAY_MS);
+}
+
+/** ★その日が実時刻でいつ始まったか [ms]（★`weekStartMs` と同じ形） */
+export function dayStartMs(index: number, epochMs: number): number {
+  return epochMs + index * DAY_MS;
 }
 
 /**

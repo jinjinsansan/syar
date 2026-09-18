@@ -266,7 +266,7 @@ describe('★言葉（★「達しています」と書かない）', () => {
   });
 });
 
-describe('★BT-6 ①: 「1 日」の境目（★測定の記録）', () => {
+describe('★BT-6: 「1 日」の境目は 1 本だけ', () => {
   /**
    * 🔴 ★**SQL と TS で「1 日」の定義が別々**です。
    *   ★SQL … `date_trunc('day', now())`（★DB の TimeZone にしたがう暦日）
@@ -284,10 +284,43 @@ describe('★BT-6 ①: 「1 日」の境目（★測定の記録）', () => {
    *     ★接続の仕方で変わりえます。
    * → ★**BT-6 ② は AL-11 に合流**（★裁定 §6 の順）。★ここは ★**前提が動いたら落ちる**ようにします。
    */
-  it('🔴 ★前提が動いたら気づく（★epoch が 00:00Z ちょうどであること）', () => {
-    const ALL = allMigrationsBody();
-    expect(ALL, '★SQL 側の「1 日」が date_trunc でなくなった（★BT-6 ② が入ったなら、この検査を消すこと）')
-      .toMatch(/date_trunc\('day', now\(\)\)/);
+  it('🔴 ★**BT-6 ②**: ★生きている SQL に `date_trunc` も `current_date` も無い', () => {
+    /**
+     * 🔴 ★**2026-09-19 に向きを変えました。**
+     *   ★旧: 「★`date_trunc('day', now())` が**ある**こと」を見て、前提が動いたら落とす形。
+     *   ★新: ★**BT-6 ② を入れたので、★無いことを見ます。**
+     * ⚠️ ★**生きている定義だけ**を見ます（★古い定義は重なって残る・R-19）。
+     */
+    const users = liveFunctionsMatching(/date_trunc\(\s*'day'|current_date/i);
+    expect(users, `★「1 日」を自分で決めている関数: ${users.join(', ')}`).toEqual([]);
+  });
+
+  it('🔴 ★**BT-6 ⑤**: ★`bet_allowance` もワーカーも、同じ 1 本から引く', () => {
+    /**
+     * ★正 ＝ `dayIndexAt` / `dayStartMs`（`packages/scheduler/src/programme.ts`）。
+     *   ★ワーカーが `world_state.day_started_at` に書き、★SQL はその行を読むだけ。
+     * 🔴 ★**片方だけ直すと「直した」という記憶だけが残ります**（★裁定 BT-6 ⑤）。
+     */
+    const alw = lastFunctionBody('bet_allowance').body;
+    expect(alw, '★SQL が「1 日」を自分で決めている').not.toMatch(/date_trunc|current_date/i);
+    expect(alw, '★行から読んでいない').toMatch(/day_started_at[\s\S]{0,40}from world_state/);
+    expect(alw, '★行が無いときに通している（R-27）').toMatch(/v_day_from is null[\s\S]{0,160}raise exception/);
+
+    const worker = readFileSync(path.join(ROOT, 'apps/worker/src/main.ts'), 'utf8');
+    const live = worker.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+    expect(live, '★ワーカーが current_date で日を判定している').not.toMatch(/current_date/);
+    expect(live, '★ワーカーが同じ 1 本から引いていない').toMatch(/dayIndexAt\(/);
+    expect(live, '★境目を行に書いていない').toMatch(/day_started_at = excluded\.day_started_at/);
+
+    /**
+     * ★日次集計も、日付の文字列ではなく**境目の瞬間**で切る。
+     * ⚠️ 🔴 ★**註記を落としてから見ます**（★CK-1 の家族）— ★このファイルの註記には
+     *    ★**「旧は `$1::date` にキャストしていました」**と書いてあり、★生で見ると赤になります。
+     */
+    const flowLive = readFileSync(path.join(ROOT, 'apps/worker/src/daily-flow.ts'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+    expect(flowLive, '★日付の文字列を範囲の判定に使っている').not.toMatch(/\$1::date/);
+    expect(flowLive, '★境目の瞬間で切っていない').toMatch(/\$1::timestamptz and [a-z]\.created_at < \$2::timestamptz/);
   });
 
   it('🔴 ★移行のどこにもタイムゾーンの宣言が無いことを、実物で確かめる', () => {

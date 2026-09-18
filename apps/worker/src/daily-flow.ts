@@ -43,7 +43,15 @@ const SCOPE_SQL: Readonly<Record<FlowScope, string>> = {
  */
 async function collectFlow(
   client: pg.Client | pg.PoolClient,
-  date: string,
+  /**
+   * ★**その日の始まり** [ISO]（★**BT-6 ②⑤**・2026-09-19）。
+   * 🔴 ★旧は `date: string` を `$1::date` にキャストしていました — ★**セッションの TimeZone**
+   *    にしたがうので、★接続ごとに別の時刻で切れます（★`bet_allowance` と同じ穴）。
+   * → ★**境目の瞬間そのもの**を渡します。★正は `dayStartMs`（`@star/scheduler`）。
+   */
+  from: string,
+  /** ★その日の終わり [ISO]（★`from + DAY_MS`。★次の日の始まり） */
+  to: string,
   scope: FlowScope,
 ): Promise<PointFlowInput> {
   const where = SCOPE_SQL[scope];
@@ -55,11 +63,11 @@ async function collectFlow(
             coalesce(sum(b.payout), 0)::text as payout
        from bets b
        join users u on u.id = b.user_id
-      where b.created_at >= $1::date and b.created_at < ($1::date + interval '1 day')
+      where b.created_at >= $1::timestamptz and b.created_at < $2::timestamptz
         and b.status <> 'refunded'
         and ${where}
       group by b.bet_type`,
-    [date],
+    [from, to],
   );
   const byKind: Partial<Record<TicketKind, TicketDayTotals>> = {};
   for (const r of bets.rows) {
@@ -73,10 +81,10 @@ async function collectFlow(
   const ep = await client.query<{ reason: string; total: string }>(
     `select l.reason, sum(l.delta)::text as total from ep_ledger l
        join users u on u.id = l.user_id
-      where l.created_at >= $1::date and l.created_at < ($1::date + interval '1 day')
+      where l.created_at >= $1::timestamptz and l.created_at < $2::timestamptz
         and ${where}
       group by l.reason`,
-    [date],
+    [from, to],
   );
   let epInflow = 0;
   let epBurnedOther = 0;
@@ -91,10 +99,10 @@ async function collectFlow(
   const pp = await client.query<{ reason: string; total: string }>(
     `select l.reason, sum(l.delta)::text as total from pp_ledger l
        join users u on u.id = l.user_id
-      where l.created_at >= $1::date and l.created_at < ($1::date + interval '1 day')
+      where l.created_at >= $1::timestamptz and l.created_at < $2::timestamptz
         and ${where}
       group by l.reason`,
-    [date],
+    [from, to],
   );
   let ppPrize = 0;
   let ppExchanged = 0;
@@ -117,9 +125,28 @@ async function collectFlow(
  * ★内部口座は**別掲**します（0009・§11.2）。除外して消すと、
  *   口座に印を付けるだけで流量を隠せてしまいます。
  */
-export async function aggregateDay(client: pg.Client | pg.PoolClient, date: string): Promise<void> {
-  const player = summarizeDay(await collectFlow(client, date, 'player'));
-  const internal = summarizeDay(await collectFlow(client, date, 'internal'));
+/**
+ * ★1 日ぶんを集計する。
+ *
+ * @param date ★`point_flow_daily` の見出しに使う日付（★表示と一意の鍵）
+ * @param from ★その日の始まり [ISO]（★**境目の瞬間**・`dayStartMs`）
+ * @param to   ★その日の終わり [ISO]（★次の日の始まり）
+ *
+ * 🔴 ★**2026-09-19・BT-6 ②⑤ で `from` / `to` を分けました。**
+ *   ★旧は `date` を `$1::date` にキャストして範囲を作っていました。
+ *   ★それは ★**セッションの TimeZone** にしたがうので、★`bet_allowance` の `date_trunc` と
+ *   ★**別の時刻で切れえます**（★接続が違うため）。
+ *   → ★**境目は `dayStartMs` が決め、★ここは受け取るだけ**にします。
+ * ⚠️ ★`date` は ★**見出しだけ**に使います（★範囲の判定には使いません）。
+ */
+export async function aggregateDay(
+  client: pg.Client | pg.PoolClient,
+  date: string,
+  from: string,
+  to: string,
+): Promise<void> {
+  const player = summarizeDay(await collectFlow(client, from, to, 'player'));
+  const internal = summarizeDay(await collectFlow(client, from, to, 'internal'));
 
   // ★R-21: 区分の合計が全体と一致することを確かめる。
   //   `users` に結合できない行があると**黙って両方から漏れます**。
@@ -127,22 +154,22 @@ export async function aggregateDay(client: pg.Client | pg.PoolClient, date: stri
   const total = await client.query<{ bets: string; ep: string; pp: string }>(
     `select
        (select count(*) from bets b
-         where b.created_at >= $1::date and b.created_at < ($1::date + interval '1 day'))::text as bets,
+         where b.created_at >= $1::timestamptz and b.created_at < $2::timestamptz)::text as bets,
        (select count(*) from ep_ledger l
-         where l.created_at >= $1::date and l.created_at < ($1::date + interval '1 day'))::text as ep,
+         where l.created_at >= $1::timestamptz and l.created_at < $2::timestamptz)::text as ep,
        (select count(*) from pp_ledger l
-         where l.created_at >= $1::date and l.created_at < ($1::date + interval '1 day'))::text as pp`,
-    [date],
+         where l.created_at >= $1::timestamptz and l.created_at < $2::timestamptz)::text as pp`,
+    [from, to],
   );
   const split = await client.query<{ bets: string; ep: string; pp: string }>(
     `select
        (select count(*) from bets b join users u on u.id = b.user_id
-         where b.created_at >= $1::date and b.created_at < ($1::date + interval '1 day'))::text as bets,
+         where b.created_at >= $1::timestamptz and b.created_at < $2::timestamptz)::text as bets,
        (select count(*) from ep_ledger l join users u on u.id = l.user_id
-         where l.created_at >= $1::date and l.created_at < ($1::date + interval '1 day'))::text as ep,
+         where l.created_at >= $1::timestamptz and l.created_at < $2::timestamptz)::text as ep,
        (select count(*) from pp_ledger l join users u on u.id = l.user_id
-         where l.created_at >= $1::date and l.created_at < ($1::date + interval '1 day'))::text as pp`,
-    [date],
+         where l.created_at >= $1::timestamptz and l.created_at < $2::timestamptz)::text as pp`,
+    [from, to],
   );
   for (const k of ['bets', 'ep', 'pp'] as const) {
     if (total.rows[0]![k] !== split.rows[0]![k]) {
