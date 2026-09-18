@@ -131,17 +131,27 @@ try {
       ` / ${wins.rows} 頭（race_entries ${entryRows.toLocaleString()} 行）`,
   );
   /**
-   * ★**CF-8: 列にする判定基準**（★裁定 REVIEW_CF5_CF6_VERDICT_20260918）。
+   * ★**CF-8: 列にする「見直しの合図」**（★裁定 REVIEW_CF5_CF6_VERDICT_20260918・受理 REVIEW_CF7_VERDICT_20260918）。
    *   ★`race_entries` は**増え続けます**（★1 日 480R × 13.5 頭 ＝ 約 6,500 行/日 ＝ **年 237 万行**）。
    *   ★**先に線を引いておけば、その日に気づけます。**
+   *
+   * ⚠️ ★**この線はゲートではありません**（★D-054 の形）。★**「いつ見直すか」の合図**です。
+   *    ★超えたからといって何かが不合格になるわけではありません。★**値そのものをゲートにしないこと。**
+   *
+   * ⚠️ ★**200 ms の根拠は「毎周 1 回 × 1 日の周の数」です。** ★いまは 3 分サイクル（1 日 480 周）で
+   *    ★200 ms × 480 ＝ **96 秒/日**の DB 時間として置きました。
+   *    ★**サイクルが変われば分母が変わります**（★案 C の 6 分なら 1 日 240 周 ＝ 48 秒/日）。
+   *    ★**線は据え置きでよい**（裁定）— ★**分母が変わったことだけ、ここに書いて残します。**
    */
+  const CYCLES_PER_DAY_NOW = 480; // ★3 分サイクル（★案 C の 6 分なら 240。★分母が変わることの記録）
   const WINS_DB_MS_LIMIT = 200;
   const WINS_ROWS_LIMIT = 5_000_000;
   const overMs = winsDb > WINS_DB_MS_LIMIT;
   const overRows = entryRows > WINS_ROWS_LIMIT;
   console.log(
-    `    ★CF-8 の線: DB 側 ${WINS_DB_MS_LIMIT} ms ／ race_entries ${WINS_ROWS_LIMIT.toLocaleString()} 行` +
-      ` → ${overMs || overRows ? '🔴 ★**超えました。列にしてください**' : '✅ まだ内側'}` +
+    `    ★CF-8 の合図: DB 側 ${WINS_DB_MS_LIMIT} ms（★1 日 ${CYCLES_PER_DAY_NOW} 周 ＝ ${((WINS_DB_MS_LIMIT * CYCLES_PER_DAY_NOW) / 1000).toFixed(0)} 秒/日）` +
+      ` ／ race_entries ${WINS_ROWS_LIMIT.toLocaleString()} 行` +
+      ` → ${overMs || overRows ? '🔴 ★**見直しの合図が出ました（列にすることを検討）**' : '✅ まだ内側'}` +
       `（★いま DB 側 ${((winsDb / WINS_DB_MS_LIMIT) * 100).toFixed(0)}% ／ 行数 ${((entryRows / WINS_ROWS_LIMIT) * 100).toFixed(2)}%）`,
   );
   console.log('');
