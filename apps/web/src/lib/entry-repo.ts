@@ -31,6 +31,17 @@ export interface EntryRaceRow {
   readonly minWins: number | null;
   readonly maxWins: number | null;
   readonly status: string;
+  /**
+   * ★**登録の締切**（`0041`・ED-1）。★null は「締切の情報が無い」＝登録不可。
+   * ⚠️ ★**画面で計算しません**（★正典 §14「画面は時計を持たない」）。
+   */
+  readonly entryDeadlineAtMs: number | null;
+  /** ★出走料 [EP]（`0039`・EF-3）。★null は登録不可 */
+  readonly entryFeeEP: number | null;
+  /** ★斤量 [kg]（`0039`・EF-3） */
+  readonly weightKg: number | null;
+  /** ★R 番号のもと（`0040`・EF-5）。★`slotOfDay(cycleIndex)` で導く */
+  readonly cycleIndex: number;
 }
 
 /**
@@ -41,11 +52,16 @@ export interface EntryRaceRow {
  * ⚠️ ★**締切の判定は `scheduled_at` から**（★§10.4「発走 60 分前まで」）。
  *    ★画面の時計は信用しません — ★**サーバーから来た時刻**と、★呼ぶ側が渡す「いま」で比べます。
  */
-export const ENTRY_DEADLINE_MS = 60 * 60 * 1000;
-
 export function entryStateOf(race: EntryRaceRow, wins: number, nowMs: number): EntryState {
   if (race.status !== 'scheduled') return 'closed';
-  if (race.scheduledAtMs - nowMs <= ENTRY_DEADLINE_MS) return 'closed';
+  /**
+   * 🔴 ★**締切を画面で計算しません**（★2026-09-19・**ED-1**）。
+   *   ★旧: `scheduledAtMs - 60 分`。★これは ★**SQL の `interval '60 minutes'` の写し**でした。
+   *   ★新: ★**サーバーが行に書いた `entry_deadline_at`** を読むだけ。
+   * ⚠️ ★無い場合は **closed**（R-27: 分からないなら狭い側。★`enter_race` も同じ）。
+   */
+  if (race.entryDeadlineAtMs === null) return 'closed';
+  if (nowMs >= race.entryDeadlineAtMs) return 'closed';
   // ★資格の情報が無いレースは登録できない（★R-27: 分からないなら狭い側。`0033` と同じ）
   if (race.minWins === null) return 'class';
   if (wins < race.minWins) return 'class';
@@ -82,6 +98,10 @@ export interface MyHorseRow {
   readonly stableGrade: string;
   readonly retiredAtWeek: number | null;
   readonly careerEnded: boolean;
+  /** ★勝利数（`0040`・★`enter_race` と同じ数え方） */
+  readonly wins: number;
+  /** ★出走数（`0040`） */
+  readonly starts: number;
 }
 
 export interface EntryRepo {
@@ -103,7 +123,9 @@ export const supabaseEntryRepo: EntryRepo = {
   async listRaces(limit = 40) {
     const { data, error } = await readClient()
       .from('races_public')
-      .select('id, scheduled_at, class_rank, surface, distance, track_condition, course_id, min_wins, max_wins, status')
+      // ⚠️ ★**1 つの文字列リテラルにすること** — ★supabase-js はこの中身を ★**型の層で読んでいます**。
+      //    ★連結すると推論が外れ、★`GenericStringError` になって列が全部見えなくなります。
+      .select('id, scheduled_at, class_rank, surface, distance, track_condition, course_id, min_wins, max_wins, status, entry_deadline_at, entry_fee_ep, weight_kg, cycle_index')
       .eq('status', 'scheduled')
       .order('scheduled_at', { ascending: true })
       .limit(limit);
@@ -120,13 +142,19 @@ export const supabaseEntryRepo: EntryRepo = {
       minWins: r.min_wins === null || r.min_wins === undefined ? null : Number(r.min_wins),
       maxWins: r.max_wins === null || r.max_wins === undefined ? null : Number(r.max_wins),
       status: String(r.status),
+      entryDeadlineAtMs: r.entry_deadline_at === null || r.entry_deadline_at === undefined
+        ? null
+        : new Date(String(r.entry_deadline_at)).getTime(),
+      entryFeeEP: r.entry_fee_ep === null || r.entry_fee_ep === undefined ? null : Number(r.entry_fee_ep),
+      weightKg: r.weight_kg === null || r.weight_kg === undefined ? null : Number(r.weight_kg),
+      cycleIndex: Number(r.cycle_index),
     }));
   },
 
   async listMyHorses() {
     const { data, error } = await authClient()
       .from('my_horses')
-      .select('id, name, sex, condition, fatigue, stable_grade, retired_at_week, career_ended')
+      .select('id, name, sex, condition, fatigue, stable_grade, retired_at_week, career_ended, wins, starts')
       .order('name', { ascending: true });
     if (error !== null) throw new Error(`my_horses を読めませんでした: ${error.message}`);
     return (data ?? []).map((h) => ({
@@ -138,6 +166,8 @@ export const supabaseEntryRepo: EntryRepo = {
       stableGrade: String(h.stable_grade),
       retiredAtWeek: h.retired_at_week === null || h.retired_at_week === undefined ? null : Number(h.retired_at_week),
       careerEnded: Boolean(h.career_ended),
+      wins: Number(h.wins),
+      starts: Number(h.starts),
     }));
   },
 

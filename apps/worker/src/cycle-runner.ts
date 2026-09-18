@@ -61,6 +61,11 @@ export interface RaceSpec {
   readonly grade: ReturnType<typeof gradeOf>;
   /** 発走時刻（サイクル番号から決まる。★ワーカーの時計を使わない） */
   readonly scheduledAtMs: number;
+  /**
+   * ★**登録の締切**（★2026-09-19・**ED-1**）。★publish より前。
+   * ⚠️ ★**SQL に時間の式を書かないため**にここから渡します（D-052・D-103 ④）。
+   */
+  readonly entryDeadlineAtMs: number;
   /** §8.6 のコミット。発走前に公開する */
   readonly seedCommit: string;
   /**
@@ -258,6 +263,15 @@ export async function runCycle(
         grade: gradeOf(idx),
         // ★発走時刻もサイクル番号から決める。再起動しても同じ時刻になる
         scheduledAtMs: cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.start,
+        /**
+         * ★**登録の締切**（★2026-09-19・**ED-1**・移行 `0041`）。
+         *   ★**publish（出走表の公開）より前**で締め切ります —
+         *   ★公開した出走表が嘘にならないように。
+         * 🔴 ★旧は `enter_race` が `interval '60 minutes'` と直書きしており、
+         *   ★レースの行が生まれるのは発走の 12 分前なので、
+         *   ★**登録できる窓が 1 分もありませんでした**（★照会 Q-ENTRY-1）。
+         */
+        entryDeadlineAtMs: cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.publish,
         conditions: built.conditions,
         entrants: built.entrants,
         odds: built.odds,

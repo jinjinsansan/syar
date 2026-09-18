@@ -161,10 +161,11 @@ export function createPgStore(
          */
         `insert into races (cycle_index, name, class_rank, grade, surface, distance,
                             track_condition, course_id, scheduled_at, seed_commit, server_seed, purse, status,
-                            course_frozen, min_wins, max_wins, entry_fee_ep, weight_kg)
+                            course_frozen, min_wins, max_wins, entry_fee_ep, weight_kg,
+                            entry_deadline_at)
          values ($1, $2, $3, $4, $8, $9, $12, $10,
                  to_timestamp($5 / 1000.0), $6, $7, $11, 'scheduled',
-                 $13::jsonb, $14, $15, $16, $17)
+                 $13::jsonb, $14, $15, $16, $17, to_timestamp($18 / 1000.0))
          on conflict (cycle_index) do nothing`,
         [
           spec.cycleIndex,
@@ -205,6 +206,8 @@ export function createPgStore(
            */
           ENTRY_FEE_EP,
           BASE_WEIGHT_KG,
+          /** ★登録の締切（★2026-09-19・ED-1）。★正は TS の `PHASE_OFFSET_MS.publish` */
+          spec.entryDeadlineAtMs,
         ],
       );
         // ★挿入されなかった＝他プロセスが先に作った。何もせず抜ける（重複させない）

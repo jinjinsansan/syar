@@ -135,6 +135,8 @@ async function buildAndSave(db: ReturnType<typeof fakeDb>, cycle: number) {
   const store = createPgStore(db.client, hash, { onCourseNotFrozen: () => undefined });
   await store.createRace({
     cycleIndex: cycle, raceClass: p.raceClass, grade: p.grade, scheduledAtMs: 0,
+    // ★登録の締切（★2026-09-19・ED-1）。★この検査は走路の凍結を見るものなので、値は何でもよい
+    entryDeadlineAtMs: 0,
     seedCommit: 'c', serverSeed: 'a'.repeat(64), purse: 0,
     conditions: built.conditions, entrants: built.entrants, odds: built.odds,
   });

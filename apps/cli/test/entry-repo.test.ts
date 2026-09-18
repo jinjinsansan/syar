@@ -11,14 +11,21 @@
  */
 import { describe, it, expect } from 'vitest';
 import { isEligibleFor, winsRangeFor } from '@star/scheduler';
-import {
-  ENTRY_DEADLINE_MS, entryStateOf, readEntryError, type EntryRaceRow,
-} from '../../web/src/lib/entry-repo.js';
+import { entryStateOf, readEntryError, type EntryRaceRow } from '../../web/src/lib/entry-repo.js';
 
 const NOW = 1_700_000_000_000;
+/**
+ * ★**締切はサーバーが行に書いた値**（★2026-09-19・**ED-1**・移行 `0041`）。
+ * 🔴 ★旧は画面が `scheduledAtMs - 60 分` で計算していました —
+ *   ★それは SQL の `interval '60 minutes'` の写しで、★**画面が時計を持つ**形でした（§14）。
+ */
 const race = (over: Partial<EntryRaceRow> = {}): EntryRaceRow => ({
   id: 'r1',
-  scheduledAtMs: NOW + 3 * 60 * 60 * 1000, // ★3 時間後（★締切の外）
+  scheduledAtMs: NOW + 3 * 60 * 60 * 1000, // ★3 時間後
+  entryDeadlineAtMs: NOW + 60 * 60 * 1000, // ★締切は 1 時間後（★まだ登録できる）
+  entryFeeEP: 200,
+  weightKg: 55,
+  cycleIndex: 1,
   classRank: 2,
   surface: 'turf',
   distance: 1600,
@@ -51,11 +58,19 @@ describe('UI-1 出走できるかの判定', () => {
     expect(entryStateOf(race({ minWins: null, maxWins: null }), 1, NOW)).toBe('class');
   });
 
-  it('★締切の両側（★発走 60 分前ちょうどは締切・R-2）', () => {
-    const at = (msBefore: number): EntryRaceRow => race({ scheduledAtMs: NOW + msBefore });
-    expect(entryStateOf(at(ENTRY_DEADLINE_MS + 1000), 1, NOW)).toBe('ok');
-    expect(entryStateOf(at(ENTRY_DEADLINE_MS), 1, NOW)).toBe('closed'); // ★ちょうどは締切
-    expect(entryStateOf(at(ENTRY_DEADLINE_MS - 1000), 1, NOW)).toBe('closed');
+  it('★締切の両側（★ちょうどは締切・R-2）', () => {
+    /**
+     * ★締切は ★**行に書かれた値**です（ED-1）。★`enter_race` も `now() >= entry_deadline_at`
+     * ★と見ており、★**ちょうどは両方とも「締切」**です。
+     */
+    const at = (deadlineMs: number): EntryRaceRow => race({ entryDeadlineAtMs: deadlineMs });
+    expect(entryStateOf(at(NOW + 1000), 1, NOW)).toBe('ok');
+    expect(entryStateOf(at(NOW), 1, NOW)).toBe('closed');       // ★ちょうどは締切
+    expect(entryStateOf(at(NOW - 1000), 1, NOW)).toBe('closed');
+  });
+
+  it('🔴 ★締切の情報が無いレースは出られない（★R-27・`enter_race` と同じ）', () => {
+    expect(entryStateOf(race({ entryDeadlineAtMs: null }), 1, NOW)).toBe('closed');
   });
 
   it('★発走を過ぎた・中止になったレースは closed', () => {

@@ -82,6 +82,18 @@ describe('★EF-2: SQL に値を直書きしていない', () => {
     expect(live).toMatch(/v_race\.entry_fee_ep\s+is\s+null[\s\S]{0,200}raise\s+exception/i);
     expect(live).toMatch(/v_race\.weight_kg\s+is\s+null[\s\S]{0,200}raise\s+exception/i);
   });
+
+  it('🔴 ④ ★締切も行から取っている（★ED-1・★SQL に時間を直書きしない）', () => {
+    /**
+     * 🔴 ★旧: `scheduled_at <= now() + interval '60 minutes'`。
+     *   ★レースの行が生まれるのは発走の 12 分前（`LOOKAHEAD_RACES` 2 × `CYCLE_MS` 6 分）なので、
+     *   ★**どのレースも生まれた瞬間に「締切後」**でした（★照会 Q-ENTRY-1）。
+     * ★新: ★**行に書かれた `entry_deadline_at`**（★正は TS の `PHASE_OFFSET_MS.publish`）。
+     */
+    expect(live, '★SQL に時間を直書きしている').not.toMatch(/interval\s*'[0-9]+\s*minutes?'/i);
+    expect(live, '★行の締切を見ていない').toMatch(/now\(\)\s*>=\s*v_race\.entry_deadline_at/);
+    expect(live).toMatch(/v_race\.entry_deadline_at\s+is\s+null[\s\S]{0,200}raise\s+exception/i);
+  });
 });
 
 describe('★EF-2: ワーカーが TS の定数を書いている', () => {
@@ -91,6 +103,9 @@ describe('★EF-2: ワーカーが TS の定数を書いている', () => {
     expect(src).toMatch(/ENTRY_FEE_EP/);
     expect(src).toMatch(/BASE_WEIGHT_KG/);
     expect(src).toMatch(/entry_fee_ep,\s*weight_kg/);
+    /** ★締切も行に書く（★ED-1） */
+    expect(src).toMatch(/entry_deadline_at/);
+    expect(src).toMatch(/spec\.entryDeadlineAtMs/);
   });
 
   it('🔴 ★別の数を書いていない（★定数を通している）', () => {
