@@ -25,7 +25,21 @@ const sqlOf = (f: string): string => readFileSync(path.join(DIR, f), 'utf8');
 /** ★`--` のコメントを空白に（★コメントの中の語を拾わない） */
 const blank = (s: string): string => s.replace(/--[^\n]*/g, (m) => ' '.repeat(m.length));
 
-const VIEW_FILE = '0034_my_horses_view.sql';
+/**
+ * ★**`my_horses` を最後に定義した移行ファイル**を探します。
+ *
+ * ⚠️ 🔴 ★**ファイル名を名指しで固めていました**（★`'0034_my_horses_view.sql'`・★2026-09-19 に改めました）。
+ *    ★`create or replace view` は重なるので、★**後の移行で列を足すと、
+ *    ★この検査は古い定義を見続けます** — ★**緑なのに何も見ていない**形です。
+ *    ★新しい列は分類されずに通り、★素質が漏れても気づけません。
+ *    → ★**最後の定義を探します**（R-19: 走査範囲の自動追従）。
+ */
+function viewFile(): string {
+  const hits = files.filter((f) => /create\s+or\s+replace\s+view\s+my_horses\s+as/i.test(blank(sqlOf(f))));
+  expect(hits.length, '★my_horses の定義が 1 つも無い（★走査が空・R-21）').toBeGreaterThan(0);
+  return hits[hits.length - 1]!;
+}
+const VIEW_FILE = viewFile();
 
 /** ★`horses` の全列（★`create table` ＋ 後から足した `alter table` を移行ファイルから集める） */
 function horsesColumns(): Set<string> {
@@ -107,7 +121,11 @@ describe('0034 自分の馬のビュー（UI-1 の前提）', () => {
   });
 
   it('★anon には出さない・authenticated にだけ select を与える', () => {
-    const sql = blank(sqlOf(VIEW_FILE));
+    /**
+     * ⚠️ ★権限は ★**定義を置き換えても保たれます**（`create or replace view`）。
+     *    → ★**最後の定義のファイルではなく、★全移行を見ます**。
+     */
+    const sql = files.map((f) => blank(sqlOf(f))).join('\n');
     expect(sql).toMatch(/revoke\s+all\s+on\s+my_horses\s+from\s+public,\s*anon/i);
     expect(sql).toMatch(/grant\s+select\s+on\s+my_horses\s+to\s+authenticated/i);
     // ★anon に grant していないこと
