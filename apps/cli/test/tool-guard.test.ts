@@ -24,7 +24,13 @@ import { PRODUCTION_OPS, READONLY, STATE_CHANGING, allClassified } from '../../.
 import { assertNotProduction } from '../../../tools/lib/guard.mjs';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-const toolFiles = readdirSync(`${ROOT}tools`).filter((f) => f.endsWith('.mjs'));
+/**
+ * ⚠️ ★**`.mjs` だけ見ていました**（★2026-09-19・T-10 の後始末で気づきました）。
+ *   ★`tools/` には `.ts` の道具もあり（`measure-turf-grain.ts`）、
+ *   ★**拡子を変えるだけで分類簿をすり抜けられました**（★R-24 が防ぎたかった形そのもの）。
+ * → ★**`.mjs` と `.ts` の両方**を見ます。★`lib/` は道具ではなく部品なので含みません。
+ */
+const toolFiles = readdirSync(`${ROOT}tools`).filter((f) => f.endsWith('.mjs') || f.endsWith('.ts'));
 
 /** 最小限の偽クライアント */
 const fake = (impl: () => Promise<{ rows: { environment: string }[] }>) =>

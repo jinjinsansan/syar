@@ -39,6 +39,19 @@ export const READONLY = [
    * ★勝ち上がりの流量を測る（CL-7・指示書 DEV_INSTRUCTIONS_RACE_CLASS_20260918）。
    *   ★select だけ。DB を変えません（★資格のある馬の数と、1 日の枠の本数を突き合わせるだけ）。
    */
+  /**
+   * ★帯（段）の分布を見る（★T-10 の後始末・裁定 `REVIEW_T10_STARS_24_VERDICT_20260918.md`）。
+   *   ★DB に触りません（★エンジンを回してプールの段を数えるだけ・出力はログのみ）。
+   *   ★`tmp/` から移しました（★`tmp/` は gitignore で次の人に残らない・AL-6 と同じ理由）。
+   *   ⚠️ ★AL-11（較正の取り直し）で使います — ★帯が 24 段になり、束ね方を決める材料になります。
+   */
+  'probe-band-histogram.ts',
+  /**
+   * ★芝の粒を測る（★映像の便）。★画像を読むだけで DB に触りません。
+   *   ⚠️ ★**2026-09-19 まで分類簿に載っていませんでした** — ★検査が `.mjs` だけを見ていたためです
+   *      （★`tool-guard.test.ts` の走査を `.ts` にも広げて、ここに載せました・R-24）。
+   */
+  'measure-turf-grain.ts',
   'measure-class-flow.mjs',
   /**
    * ★1 周の読み込みの所要を頭数に対して測る（CF-5・裁定 REVIEW_CF1_STEADY_STATE_VERDICT_20260918）。
