@@ -20,7 +20,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { COMPONENT, NOT_A_TOOL, PRODUCTION_OPS, READONLY, STATE_CHANGING, allClassified } from '../../../tools/lib/classification.mjs';
+import { COMPONENT, NOT_A_TOOL, PRODUCTION_OPS, READONLY, SOURCE_MUTATING, STATE_CHANGING, allClassified } from '../../../tools/lib/classification.mjs';
 import { assertNotProduction } from '../../../tools/lib/guard.mjs';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -69,7 +69,7 @@ describe('★R-24 ツールの分類（メタテスト）', () => {
     const missing = toolFiles.filter((f) => !classified.has(f));
     expect(
       missing,
-      `分類の登録漏れ。tools/lib/classification.mjs の READONLY / STATE_CHANGING / PRODUCTION_OPS / NOT_A_TOOL / COMPONENT のどれかに載せてください（★「対象外」も「部品」も分類の 1 つです・TG-2 / TG-3）:\n  ${missing.join('\n  ')}`,
+      `分類の登録漏れ。tools/lib/classification.mjs の READONLY / STATE_CHANGING / PRODUCTION_OPS / NOT_A_TOOL / COMPONENT / SOURCE_MUTATING のどれかに載せてください（★「対象外」も「部品」も分類の 1 つです・TG-2 / TG-3）:\n  ${missing.join('\n  ')}`,
     ).toEqual([]);
   });
 
@@ -82,6 +82,23 @@ describe('★R-24 ツールの分類（メタテスト）', () => {
   it('★「部品」にも理由が書いてある（TG-3）', () => {
     for (const e of COMPONENT) {
       expect(e.why.length, `${e.file} の理由が短すぎます`).toBeGreaterThan(20);
+    }
+  });
+
+  it('★「ソースを書き換える」にも理由が書いてある（TG-4）', () => {
+    for (const e of SOURCE_MUTATING) {
+      expect(e.why.length, `${e.file} の理由が短すぎます`).toBeGreaterThan(20);
+    }
+  });
+
+  it('🔴 ★ソースを書き換える道具を「読取専用」に戻さない（TG-4）', () => {
+    /**
+     * ★**「だいたい読取専用」を 1 つ許すと、次に同じ理由で 2 つ目が入ります。**
+     * ⚠️ ★READONLY の裏取りは ★**SQL の書き込み文**しか見ていないので、
+     *    ★ソースを書き換える道具を戻しても ★**黙って通ります**。★だからここで見ます。
+     */
+    for (const e of SOURCE_MUTATING) {
+      expect(READONLY, `★${e.file} が読取専用に戻っています`).not.toContain(e.file);
     }
   });
 

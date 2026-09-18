@@ -35,6 +35,13 @@ export const EXPECTED_EXPOSURE = {
   race_entries_public: PUBLIC_VIEW,
   race_odds_public: PUBLIC_VIEW,
   prize_catalog_public: PUBLIC_VIEW,
+  /**
+   * ★いまが何週か（★2026-09-19・移行 `0038`・**UI1-10**）。
+   *   ★画面が ★**開催の起点と 1 週の長さを持たない**ためのもの（★正典 §14）。
+   *   ★出るのは ★**週番号と「最後に書かれてからの秒数」だけ**です。
+   *   ★未ログインでも番組表は見られるので（`races_public`）、★週番号を隠す意味はありません。
+   */
+  world_state_public: PUBLIC_VIEW,
 
   // ── 本人スコープ（RLS のポリシーで自分の行だけ。select のみ） ──
   // ★users は revoke all にしない（S-2: revoke が勝ってポリシーが打ち消され、
@@ -56,6 +63,8 @@ export const EXPECTED_EXPOSURE = {
   race_entries: CLOSED,
   race_odds: CLOSED,
   prize_catalog: CLOSED,
+  // ★実体表は閉じる（★公開ビュー `world_state_public` 経由だけ・移行 `0038`）
+  world_state: CLOSED,
   // ★horses は potential / genotype を持つ（§12.4「本人にも数値を見せない」・§5.5）
   horses: CLOSED,
   // ★どの LINE アカウントがどの口座かの対応表（D-078）。本人にも見せる理由がない
@@ -175,6 +184,15 @@ export const EXPECTED_FUNCTION_EXECUTE = {
   //   ★`assert_setup_complete()` は呼べない（口座を作る側で順序が逆・D-080 の対象外）。
   //   代わりの 3 条件は `apps/cli/test/rpc-guard.test.ts` の第三の登録簿が検査する
   'create_account(text,text,text,text,uuid,uuid)': { anon: false, authenticated: true },
+  /**
+   * ★初期馬の候補の集合と、そこから 1 頭選ぶ関数（★2026-09-19・移行 `0037`・UI1-1/UI1-6）。
+   *   🔴 ★**利用者には渡しません**（`revoke all ... from public, anon, authenticated`）。
+   *   ★`create_account` の中からだけ呼ばれます — ★画面に渡すと
+   *   ★**「選ぶ → 渡す」の 2 本立て**になり、★間に割り込まれて別の馬になりえます
+   *   （★照会 `QUESTIONS_UI_SETUP_HORSE_20260918.md` §2 の案 B の穴）。
+   */
+  'initial_horse_candidates(uuid)': { anon: false, authenticated: false },
+  'pick_initial_horse()': { anon: false, authenticated: false },
   // ★初期馬の候補かの判定（`0031`）。読み取りだけ。★「戦績 0」は暫定の定義で、
   //   クラス分けの便で共通の述語に置き換える（裁定 REVIEW_SETUP_PREDICATE_VERDICT_20260918 条件 2）
   'is_initial_horse_candidate(uuid)': { anon: false, authenticated: true },

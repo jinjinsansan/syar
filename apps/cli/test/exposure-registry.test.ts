@@ -65,9 +65,18 @@ describe('V-20 登録簿の中身（★正典の要求と直結する項目）',
     expect(EXPECTED_EXPOSURE['npc_stables']).toBe(CLOSED);
   });
 
-  it('公開ビューは4つで、いずれも _public 接尾辞', () => {
+  it('公開ビューは5つで、いずれも _public 接尾辞', () => {
+    /**
+     * ⚠️ ★**一覧を名指しで書いています**（★数だけではなく）。
+     *    ★★**公開ビューを 1 つ増やすのは、★外に出すものを増やすということ**です。
+     *    ★ここが赤くなったら、★**名前を足す前に「未ログインに見せてよいか」を決めてください。
+     * ★`world_state_public`（★2026-09-19・UI1-10）: ★週番号と「最後に書かれてからの秒数」だけ。
+     *    ★番組表が既に未ログインで見られるので（`races_public`）、★週番号を隠す意味はない。
+     */
     const views = Object.entries(EXPECTED_EXPOSURE).filter(([, k]) => k === PUBLIC_VIEW).map(([n]) => n);
-    expect(views.sort()).toEqual(['prize_catalog_public', 'race_entries_public', 'race_odds_public', 'races_public']);
+    expect(views.sort()).toEqual([
+      'prize_catalog_public', 'race_entries_public', 'race_odds_public', 'races_public', 'world_state_public',
+    ]);
     for (const v of views) expect(v.endsWith('_public')).toBe(true);
   });
 });

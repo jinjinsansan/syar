@@ -35,7 +35,7 @@ import { syncStableGradePrices } from './grade-flow.js';
 import { freezePendingEntries } from './entry-freeze.js';
 import { runSelfcheck } from './selfcheck.js';
 import { runSchemacheck } from './schemacheck.js';
-import { CANCEL_AFTER_START_MS, CYCLE_MS, classOf, conditionsOf, gradeOf } from '@star/scheduler';
+import { CANCEL_AFTER_START_MS, CYCLE_MS, classOf, conditionsOf, gradeOf, weekIndexAt } from '@star/scheduler';
 
 /** 1周の間隔。★サイクル長より短くする（1サイクルを取りこぼさないため） */
 export const TICK_MS = 60_000;
@@ -362,6 +362,23 @@ async function main(): Promise<void> {
           'select (extract(epoch from now()) * 1000)::bigint as ms',
         )).rows[0]!.ms,
       );
+      /**
+       * ★**いまが何週かを書き出す**（★2026-09-19・**UI1-10**・移行 `0038`）。
+       *
+       *   ★画面は ★**開催の起点（epoch）も 1 週の長さも知りません** —
+       *   ★知ってしまうと ★**画面が時計を持つ**ことになります（★正典 §14・憲法 3）。
+       *   → ★**ここで書き**、★画面は `world_state_public` を読むだけにします。
+       *
+       * ⚠️ ★**週が進むかどうかに関わらず、毎周書きます**。
+       *    ★`updated_at` が古ければ ★**ワーカーが止まっている**と分かる形にするためです。
+       *    ★「週が進んだときだけ書く」と、★**4 時間古いのが正常**になり、★止まったのと区別できません。
+       */
+      await client.query(
+        `insert into world_state (id, game_week, updated_at) values (true, $1, now())
+         on conflict (id) do update set game_week = excluded.game_week, updated_at = excluded.updated_at`,
+        [weekIndexAt(nowMs, cfg.epochMs)],
+      );
+
       const t = await advanceTrainingWeeks(client, nowMs, cfg.epochMs,
         (m) => console.error(`[worker] ★${m}`));
       if (t.advanced > 0) {
