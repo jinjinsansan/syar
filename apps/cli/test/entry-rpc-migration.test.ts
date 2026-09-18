@@ -59,7 +59,12 @@ describe('★第 3 便の移行（0024）', () => {
 
   it('② ★出走登録は同じレースに 2 頭まで（3 頭目を拒否）・引退馬と締切を見る', () => {
     const def = lastDefinitionOf('enter_race');
-    expect(def.file).toBe(MIGRATION);
+    /**
+     * ★**2026-09-18・CL-4 で最後の定義が `0033` に移りました**（★出走資格を足した便）。
+     *   ★`0024` は書き換えていません（`migrate.mjs` が適用済みファイルの改変を拒みます）。
+     *   ★ここが `0024` に戻っていたら、★**資格の無い版が最後の定義になっている**ということです。
+     */
+    expect(def.file).toBe('0033_race_class_eligibility.sql');
     expect(def.body).toMatch(/assert_setup_complete\(\)/);
     /** ★2 頭まで（★`>= 2` で 3 頭目を拒否） */
     expect(def.body).toMatch(/v_mine\s*>=\s*2/);
@@ -68,6 +73,25 @@ describe('★第 3 便の移行（0024）', () => {
     expect(def.body).toMatch(/retired_at_week\s+is\s+not\s+null/i);
     /** ★発走 60 分前で締め切る（§10.4） */
     expect(def.body).toMatch(/60 minutes/);
+  });
+
+  it('★② -b 出走資格を見る（★CL-4・2026-09-18）', () => {
+    const def = lastDefinitionOf('enter_race');
+    /** ★レースに保存された範囲と、確定した 1 着の数を比べる */
+    expect(def.body).toMatch(/finish_pos\s*=\s*1/);
+    expect(def.body).toMatch(/v_race\.min_wins/);
+    expect(def.body).toMatch(/v_race\.max_wins/);
+    /** 🔴 ★資格の情報が無いレースは**通さない**（★R-27: 分からないなら狭い側） */
+    expect(def.body).toMatch(/min_wins\s+is\s+null/i);
+    expect(def.body).toMatch(/出走資格の情報がありません/);
+    /** ★画面が区別できるよう、資格の拒否には専用の errcode を付ける */
+    expect(def.body).toMatch(/errcode\s*=\s*'ST002'/);
+    /**
+     * 🔴 ★**段の定義（勝利数 → クラス）を SQL に写していないこと**（★D-052）。
+     *   ★`class_rank = 2 なら 1 勝` のような表がここに現れたら、★二重帳簿になっています。
+     */
+    expect(def.body).not.toMatch(/class_rank/);
+    expect(def.body).not.toMatch(/maiden|win1|win2|win3/);
   });
 
   it('③ ★騎手は凍結して保存し、料金は EP の台帳の語で記帳する（D-105 ②④）', () => {

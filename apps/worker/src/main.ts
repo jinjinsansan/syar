@@ -23,7 +23,7 @@ import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
 import { buildRace } from './build-race.js';
 import { aggregateDay } from './daily-flow.js';
-import { loadRaceablePool, loadTrainingStates } from './horse-repo.js';
+import { loadRaceablePool, loadTrainingStates, loadWinsByHorse } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
@@ -156,13 +156,32 @@ async function main(): Promise<void> {
       }
 
       const trainingStates = await loadTrainingStates(client);
+      /**
+       * ★**出走資格に使う勝利数**（★CL-1/CL-3）。★周に 1 回だけ読み、その周の全レースで使い回します。
+       *   ⚠️ ★`horses` に勝利数の列は無いので `race_entries` から数えます（`finish_pos = 1`）。
+       */
+      const winsByHorse = await loadWinsByHorse(client);
       const out = await runCycle(
         store,
         cfg.epochMs,
         seeds,
-        (i) => buildRace(pool, i, cfg.epochMs, undefined, trainingStates,
-          // ★番組表（§10.3）が距離・馬場・コースを決める（Q-P3-32）
-          conditionsOf(i, classOf(i), gradeOf(i))),
+        (i) => {
+          const raceClass = classOf(i);
+          const built = buildRace(pool, i, cfg.epochMs, undefined, trainingStates,
+            // ★番組表（§10.3）が距離・馬場・コースを決める（Q-P3-32）
+            conditionsOf(i, raceClass, gradeOf(i)),
+            // ★資格の層（★CL-3）。★選抜（能力の帯）はこの下でそのまま働きます
+            { raceClass, winsOf: (h) => winsByHorse.get(h.id) ?? 0 });
+          // 🔴 ★**資格を広げたら黙って通さない**（★D-079 ⑦ と同じ形・CL-3）
+          if (built.eligibility !== null && built.eligibility.widenedSteps > 0) {
+            console.error(
+              `[worker] ★出走資格を広げました cycle=${i} class=${built.eligibility.raceClass} ` +
+                `広げた段数=${built.eligibility.widenedSteps} 資格のある馬=${built.eligibility.poolSize} 頭` +
+                `（★そのクラスの馬が足りていません。★流量を見てください・CL-7）`,
+            );
+          }
+          return built;
+        },
         // ★開催中止は黙って通さない（正典 D-037）。
         //   静かに返還されると原因が調査されないまま繰り返します。
         //   ⚠️ ここは「客の金が戻った」記録です。**必ず目に付く形で残すこと。**

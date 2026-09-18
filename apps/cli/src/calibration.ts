@@ -556,6 +556,10 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   { key: 'CYCLES_PER_WEEK', why: '正典 D-007（1週=4時間・1サイクル=10分）から決まる導出値 24。★別々に書くと片方だけ動いて静かにずれるので CYCLE_MS から導出しており、week.test.ts が正典の値と一致することを守る' },
   { key: 'WEEKS_PER_DAY', why: '正典 §7.1「1日6週」の導出値。テストがリテラル 6 と一致することを守る' },
   { key: 'WEEK_MS', why: '正典 D-007「1ゲーム内週 = リアル4時間」の導出値' },
+  { key: 'CLASS_BY_WINS', why: '★勝利数 → 段の対応（新馬/1勝/2勝/3勝。4 勝以上は open）。★正典 §10.3 のクラスそのもので、較正で動かす値ではない。'
+    + '★CL-1（2026-09-18・指示書 DEV_INSTRUCTIONS_RACE_CLASS_20260918）で 1 か所に切り出した。★eligibility.test.ts が表と関数の一致を見る' },
+  { key: 'CLASS_RANK', why: '★段の高さ（maiden 0 〜 open 4・graded は馬の側では open と同じ層）。★順序の写しで較正値ではない。'
+    + '★資格を下へ広げるときの段数の数え方に使う（CL-3）' },
   { key: 'MINUTES_PER_SLOT', why: '★1 枠の分数（CYCLE_MS / 60,000 の導出値）。単位の換算そのもので、較正で動かす値ではない。'
     + '★2026-09-18・D-007 改訂 ④ で G1_SLOTS を時刻から導くために置いた' },
   { key: 'G1_HOURS_JST', why: '★G1 を置く時刻（日本時間 09/13/20 時）。正典 §10.3「G1 は視聴の集まる時間帯に固定し告知を打つ」の写しで、'

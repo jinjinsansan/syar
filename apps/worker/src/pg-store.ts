@@ -24,7 +24,7 @@ import { awardPrizes } from './prize-award.js';
 import { settlePayouts } from './payout.js';
 import { settleRace as settleRaceFair } from './settle.js';
 import type { CycleStore, RaceSpec } from './cycle-runner.js';
-import { overdueBefore, weekIndexAt } from '@star/scheduler';
+import { overdueBefore, weekIndexAt, winsRangeFor } from '@star/scheduler';
 import { cancelRace as cancelRaceImpl } from './cancel.js';
 // ★生涯の記録（正典 §18・移行 `0024`）。★確定の中から呼びます（LR-7「レースが終わった後」）
 import { writeRaceStory } from './story-flow.js';
@@ -157,12 +157,17 @@ export function createPgStore(
       //   確認（raceExists）は無駄な生成計算を避けるためで、**一意性の担保はこちら**。
       //   確認だけに頼ると「確認 → 割り込み → 挿入」で二重になります。
       const ins = await client.query(
+        /**
+         * ★`min_wins` / `max_wins` は ★**出走資格**（CL-4・移行 `0033`）。
+         *   ★段（新馬/1勝/…/オープン）→ 数 の変換は `winsRangeFor()` の 1 か所だけが持ち、
+         *   ★**DB には数だけを書きます**（★SQL に段の定義を写さない・D-052）。
+         */
         `insert into races (cycle_index, name, class_rank, grade, surface, distance,
                             track_condition, course_id, scheduled_at, seed_commit, server_seed, purse, status,
-                            course_frozen)
+                            course_frozen, min_wins, max_wins)
          values ($1, $2, $3, $4, $8, $9, $12, $10,
                  to_timestamp($5 / 1000.0), $6, $7, $11, 'scheduled',
-                 $13::jsonb)
+                 $13::jsonb, $14, $15)
          on conflict (cycle_index) do nothing`,
         [
           spec.cycleIndex,
@@ -191,6 +196,9 @@ export function createPgStore(
            *   ★`buildRace` がモンテカルロに渡したオブジェクトそのもの。★ここで組み直さないこと。
            */
           JSON.stringify(spec.conditions.courseFrozen),
+          // ★出走資格（CL-4）。★段 → 数 の変換は eligibility.ts の 1 か所だけ
+          winsRangeFor(spec.raceClass).min,
+          winsRangeFor(spec.raceClass).max,
         ],
       );
         // ★挿入されなかった＝他プロセスが先に作った。何もせず抜ける（重複させない）

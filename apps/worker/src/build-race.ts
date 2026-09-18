@@ -9,8 +9,8 @@
 import { Rng, deriveRng, type HorseRecord } from '@star/sim-engine';
 import { DEFAULT_RACE_BALANCE, conditionsFromFrozen, lanePlanForRace, resolveRace, type RaceEntrant } from '@star/race-engine';
 import { TICKET_KINDS, placeDepth, type TicketKind } from '@star/betting';
-import { frozenCourseOf, type FrozenCourseRecord } from '@star/scheduler';
-import { generateRace, sortPoolByClass } from '../../cli/src/race-field.js';
+import { frozenCourseOf, selectEligible, type FrozenCourseRecord, type RaceClass } from '@star/scheduler';
+import { FIELD_SIZE, generateRace, sortPoolByClass } from '../../cli/src/race-field.js';
 import { ODDS_MC_TRIALS, buildOddsRows, winningKeys } from './odds.js';
 import type { OddsSpec, RaceEntrantSpec } from './cycle-runner.js';
 
@@ -36,6 +36,20 @@ export interface BuiltRace {
      */
     readonly courseFrozen: FrozenCourseRecord;
   };
+  /**
+   * ★**出走資格で絞った結果**（★CL-3・指示書 `DEV_INSTRUCTIONS_RACE_CLASS_20260918.md`）。
+   *   ★`eligibility` を渡さなかった呼び方では `null`（★従来どおりの振る舞い）。
+   *
+   * ⚠️ ★**`widenedSteps > 0` は「資格を下の段へ広げた」ことを意味します**（★枯渇）。
+   *    ★呼ぶ側が**記録し、警報を出す**こと（★黙って広げない・D-079 ⑦ と同じ形）。
+   */
+  readonly eligibility: {
+    readonly raceClass: RaceClass;
+    /** 資格のある馬の数（★広げた後） */
+    readonly poolSize: number;
+    /** ★下へ広げた段数（0 ＝ 広げていない） */
+    readonly widenedSteps: number;
+  } | null;
 }
 
 /**
@@ -58,6 +72,16 @@ export function buildRace(
    *   渡すと距離と馬場をそれに合わせ、**使った条件を返り値に載せます**。
    */
   programme?: { readonly surface: 'turf' | 'dirt'; readonly distance: number; readonly courseId: string },
+  /**
+   * ★**出走資格**（★CL-3・指示書 `DEV_INSTRUCTIONS_RACE_CLASS_20260918.md`）。
+   *
+   * ★渡すと、★**出走表を作る前にプールを資格で絞ります**（★戦績クラスがちょうど一致する馬だけ）。
+   *   ★渡さなければ**従来どおり**（★P1 のゲートを測る経路を 1 ビットも動かさないため）。
+   *
+   * ⚠️ ★**選抜（`sortPoolByClass` の並べ替えと `classBand` の窓）には触りません** —
+   *    ★ここは**その手前に資格の層を足すだけ**です（★D-018・V-4 を守る）。
+   */
+  eligibility?: { readonly raceClass: RaceClass; readonly winsOf: (h: HorseRecord) => number },
 ): BuiltRace {
   /**
    * ★**走路の形はここで 1 回だけ作ります**（★2026-09-15・指示書 VW §5-2）。
@@ -65,7 +89,19 @@ export function buildRace(
    *   ② **同じオブジェクト**を返り値に載せて `createRace` が保存します（★作り直さない・R-30）。
    */
   const programmeFrozen = programme === undefined ? undefined : frozenCourseOf(programme.courseId);
-  const sorted = sortPoolByClass(pool);
+  /**
+   * ★**資格の層**（CL-3）。★**選抜の手前**に置きます:
+   *   ★プール全体 → ★**資格で絞る（ここ）** → 素質順に並べる → `classBand` の窓 → 出走馬
+   *
+   * ⚠️ ★足りなければ `selectEligible` が**下の段へ 1 段ずつ広げ、その幅を返します**。
+   *    ★**黙って広げません** — ★返り値に載せるので、呼ぶ側が記録して警報を出します。
+   */
+  const selection =
+    eligibility === undefined
+      ? null
+      : selectEligible(eligibility.raceClass, pool, eligibility.winsOf, FIELD_SIZE.MIN);
+  const eligiblePool = selection === null ? pool : selection.pool;
+  const sorted = sortPoolByClass(eligiblePool);
   const race = generateRace(
     sorted, cycleIndex, deriveRng(seed, STREAM.FIELD, cycleIndex),
     undefined, undefined, undefined,
@@ -174,5 +210,10 @@ export function buildRace(
       // ★モンテカルロに渡したものと**同じ参照**（★作り直さない）
       courseFrozen,
     },
+    // ★資格で絞った結果（★呼ぶ側が記録・警報に使う。★渡されなければ null）
+    eligibility:
+      selection === null || eligibility === undefined
+        ? null
+        : { raceClass: eligibility.raceClass, poolSize: selection.pool.length, widenedSteps: selection.widenedSteps },
   };
 }

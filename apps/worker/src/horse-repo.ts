@@ -122,3 +122,30 @@ export async function loadTrainingStates(
   }
   return out;
 }
+
+/**
+ * ★**馬ごとの勝利数を読む**（★CL-1・指示書 `DEV_INSTRUCTIONS_RACE_CLASS_20260918.md`）。
+ *
+ * 【★なぜ表から数えるのか】
+ *   ⚠️ ★**`horses` に勝利数の列はありません**（✔ `0001_init.sql:138` の `g1_wins` は **G1 勝利数のみ**）。
+ *   → ★`race_entries` の **`finish_pos = 1`** を数えます（★CL-1 の指示どおり）。
+ *   ★**確定した行だけが数に入ります** — ★`finish_pos` が書かれるのは確定時の 1 か所だけで
+ *     （`pg-store.ts:459`）、★登録しただけの行・取消の行（`0028` の `scratched_at`）は
+ *     ★`finish_pos` が null のままなので、★**自動的に除かれます**（★`0031` と同じ根拠）。
+ *
+ * ⚠️ ★**重ければ列にする**、と指示書にあります。★いまは 1 レースあたり 1 回の集計で足ります
+ *    （★周に 1 回だけ読み、その周のすべてのレース生成で使い回します）。
+ */
+export async function loadWinsByHorse(
+  client: pg.Client | pg.PoolClient,
+): Promise<Map<string, number>> {
+  const r = await client.query<{ horse_id: string; wins: string }>(
+    `select horse_id, count(*) as wins
+       from race_entries
+      where finish_pos = 1
+      group by horse_id`,
+  );
+  const out = new Map<string, number>();
+  for (const row of r.rows) out.set(row.horse_id, Number(row.wins));
+  return out;
+}
