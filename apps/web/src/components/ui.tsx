@@ -178,21 +178,19 @@ export function ReadError({ message, theme }: {
   );
 }
 
-/** 素質 ★（0.5 刻み）。満 = 金／半 = 金を左 50% だけ重ねる／空 = 28%。数値は出さない */
-export function Stars({ value, size = 15 }: { readonly value: number; readonly size?: number }): React.ReactElement {
-  const items: React.ReactNode[] = [];
-  for (let i = 1; i <= 5; i += 1) {
-    if (value >= i) items.push(<span key={i} style={{ color: '#f2b012', textShadow: '0 1px 0 #8a5a06' }}>★</span>);
-    else if (value >= i - 0.5) items.push(
-      <span key={i} style={{ position: 'relative', display: 'inline-block' }}>
-        <span style={{ color: '#c9d7e2' }}>★</span>
-        <span style={{ position: 'absolute', left: 0, top: 0, width: '50%', overflow: 'hidden', color: '#f2b012', textShadow: '0 1px 0 #8a5a06' }}>★</span>
-      </span>,
-    );
-    else items.push(<span key={i} style={{ color: '#c9d7e2' }}>★</span>);
-  }
-  return <span style={{ display: 'inline-flex', fontSize: size, letterSpacing: '.04em', lineHeight: 1 }}>{items}</span>;
-}
+/**
+ * 🔴 ★**`Stars` の部品は 2026-09-18 に削除しました**（**D-114 ②** / T-10・AL-2）。
+ *
+ *   ★旧: ★`potential` を ★**★1〜5（半星あり）＝ 9 段**に丸めて画面に出していました。
+ *   ★新: ★**素質は数値も段も出しません。** ★内部は 24 段で、★**帯としてだけ**使います。
+ *   ★プレイヤーが強さを推し量る手がかりは ★**オッズと戦績だけ**です。
+ *
+ * ⚠️ ★**途中の形（「段を粗くして見せる」「帯の名前で見せる」）も取りません** —
+ *    ★粗くしても「素質の代用品」になるだけです（D-116 ① と同じ警戒）。
+ *    ★育った実感は ★**D-116 の 4 層**（状態／成長／発見／物語）が担います。
+ *
+ * ⚠️ ★**この部品を戻さないでください。** ★戻すなら正典の D-114 を先に改訂してください。
+ */
 
 /** 格チップ（h24）。重賞・オープン（classRank ≥ 5）は金ベタ、それ以下は薄地＋1px 罫 */
 export function ClassChip({ label, classRank, h = 24, font = 12 }: { readonly label: string; readonly classRank: number; readonly h?: number; readonly font?: number }): React.ReactElement {

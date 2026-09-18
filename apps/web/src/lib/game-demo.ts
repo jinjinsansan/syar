@@ -217,3 +217,17 @@ export const DEMO_JOCKEY_RIDES: Readonly<Record<string, number>> = {
  *      （★デザイナーの回答 2026-09-16: ★空の枡は点線グレーで「今は いません」。★「残り 0」は出さない）。
  */
 export const DEMO_MARKET_STOCK_BY_BAND: readonly (number | null)[] = [null, null, null, null, 1];
+
+/**
+ * ★**見本の値段**（★`/stable/market` の見本・★EP）。
+ *
+ * 【★なぜ画面で計算しないのか】
+ *   ★旧: ★画面が `LISTED_BANDS`（★の帯）を並べて `priceOfStars(band)` で値段を出していました。
+ *   🔴 ★新: ★**帯（段）を画面の層に渡さない**（★2026-09-18・**D-114 ②**・T-10・AL-2）。
+ *     ★買う人に見えるのは ★**馬そのもの（戦績・オッズ）と値段**だけです。
+ *
+ * ⚠️ ★**見本です**。★本番は `horse_market_listing.price_ep`（★サーバーが書いた行）を読みます。
+ * 🔴 ★**T-11 でこの画面ごと変わります** — ★D-102 ③（2026-09-18 改訂）で
+ *    ★候補は「走った実績のある馬」になり、★値段は §10.5 の式（戦績）から決まります。
+ */
+export const DEMO_MARKET_PRICES_EP: readonly number[] = [4087, 5130, 6174, 6870, 7913];

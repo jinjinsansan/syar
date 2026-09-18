@@ -4,9 +4,10 @@
  * ★偽の DB で `refreshMarketListings` を**本物のまま**回します（★計画の純関数 `planListings` も本物）。
  *
  * 【★見ている壊れ方】
- *   ① ★**★や価格を SQL 側で決める**（★D-052・二重帳簿。★画面と DB で★が食い違う）
+ *   ① ★**帯や価格を SQL 側で決める**（★D-052・二重帳簿。★画面と DB で帯が食い違う）
  *   ② ★**買われた馬・引退した馬の出品が残る**（★買えない馬が並ぶ）
- *   ③ ★**★が変わった馬の出品が残る**（★故障で素質が下がると★も下がる。★見た目と価格がずれる）
+ *   ③ ★**帯が変わった馬の出品が残る**（★故障で素質が下がると帯も下がる。★中身と価格がずれる）
+ *   🔴 ☇ ★**出品の行に段が載る**（★2026-09-18・**D-114 ②**・T-10・AL-2・移行 `0036`）
  *   ④ ★**冪等でない**（★呼ぶたびに出品が増える）
  *   ⑤ ★**在庫が下限を割ったときに黙って帯を広げる**（★D-102 ⑤・D-079 ⑦）
  *   ⑥ ★**馬を作ってしまう**（★D-102 ②「売る馬は NPC 世界から取る」）
@@ -16,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { ABILITY_KEYS } from '@star/sim-engine';
+import { STAR_BAND_WIDTH, STAR_THRESHOLDS, starScaleOfBand } from '@star/sim-engine';
 import { LISTED_BANDS, LISTINGS_PER_BAND, MARKET_STOCK_MIN, priceOfStars, sellBackEP } from '@star/scheduler';
 import { refreshMarketListings } from '../src/market-flow.js';
 
@@ -23,20 +25,29 @@ const SRC = readFileSync(path.join(path.resolve(__dirname, '..'), 'src/market-fl
 
 const uuid = (i: number): string => `00000000-0000-0000-0000-${String(i).padStart(12, '0')}`;
 
-/** ★★ごとの素質の平均（`stars.ts` の境目の内側を取る） */
-const MEAN_FOR_STARS: Readonly<Record<string, number>> = {
-  '2.0': 480, '2.5': 530, '3.0': 580, '3.5': 630, '4.0': 680,
+/**
+ * ★**段 → 素質の平均**（★`stars.ts` の境目の内側を取る）。
+ * ⚠️ ★**境目の実物から引きます**（★数字を写すと、★刻みを変えた日に黙って別の帯を測ります・R-19）。
+ *    ★`bandOfPotential` は「平均以下の境目の数」なので、★**段 b（b≧1）の内側は `STAR_THRESHOLDS[b-1]` の少し上**です。
+ */
+const meanForBand = (band: number): number => {
+  const from = STAR_THRESHOLDS[band - 1];
+  if (from === undefined) throw new Error(`段 ${band} の内側を取れません（★段 0 は境目の下）`);
+  return from + STAR_BAND_WIDTH / 2;
 };
+/** ★その段の価格（★本体と同じ道順で出す） */
+const priceOfBand = (band: number): number => priceOfStars(starScaleOfBand(band));
 
 interface FakeHorse { id: string; potential: Record<string, number>; listed: boolean }
-interface FakeListing { horse_id: string; stars: number; active: boolean; price_ep: number; sell_back_ep: number }
+// ⚠️ ★**`stars` 列はありません**（★移行 `0036` で落としました）
+interface FakeListing { horse_id: string; active: boolean; price_ep: number; sell_back_ep: number }
 
 /** ★帯ごとに `per` 頭ずつ NPC 馬を作る（★出品ではない。★プールの中身） */
 function makePool(per: number): FakeHorse[] {
   const out: FakeHorse[] = [];
   let i = 0;
   for (const band of LISTED_BANDS) {
-    const mean = MEAN_FOR_STARS[band.toFixed(1)]!;
+    const mean = meanForBand(band);
     for (let k = 0; k < per; k += 1, i += 1) {
       out.push({
         id: uuid(i),
@@ -65,7 +76,7 @@ function fakeDb(pool: FakeHorse[], listings: FakeListing[]): {
         return { rows, rowCount: rows.length };
       }
       if (sql.includes('from horse_market_listing where active')) {
-        const rows = listings.filter((l) => l.active).map((l) => ({ horse_id: l.horse_id, stars: l.stars }));
+        const rows = listings.filter((l) => l.active).map((l) => ({ horse_id: l.horse_id, price_ep: l.price_ep }));
         return { rows, rowCount: rows.length };
       }
       if (sql.includes('update horse_market_listing set active = false')) {
@@ -75,12 +86,13 @@ function fakeDb(pool: FakeHorse[], listings: FakeListing[]): {
         return { rows: [], rowCount: n };
       }
       if (sql.includes('insert into horse_market_listing')) {
+        /** 🔴 ★**列は 3 つだけ**（★`stars` を戻すとここが合わなくなります・D-114 ②） */
+        expect(sql, '★出品に段を書かない').not.toMatch(/\bstars\b/);
         const ids = params[0] as string[];
-        const stars = params[1] as number[];
-        const prices = params[2] as number[];
-        const backs = params[3] as number[];
+        const prices = params[1] as number[];
+        const backs = params[2] as number[];
         ids.forEach((id, i) => listings.push({
-          horse_id: id, stars: stars[i]!, price_ep: prices[i]!, sell_back_ep: backs[i]!, active: true,
+          horse_id: id, price_ep: prices[i]!, sell_back_ep: backs[i]!, active: true,
         }));
         return { rows: [], rowCount: ids.length };
       }
@@ -91,7 +103,7 @@ function fakeDb(pool: FakeHorse[], listings: FakeListing[]): {
 }
 
 describe('★出品を作る経路（D-102・第 5 便-2）', () => {
-  it('★帯ごとに口数まで出品し、★と価格は TS の関数が出した値と一致する', async () => {
+  it('★帯ごとに口数まで出品し、価格は TS の関数が出した値と一致する', async () => {
     const pool = makePool(5);
     const listings: FakeListing[] = [];
     const { client } = fakeDb(pool, listings);
@@ -101,16 +113,16 @@ describe('★出品を作る経路（D-102・第 5 便-2）', () => {
     expect(r.added).toBe(LISTED_BANDS.length * LISTINGS_PER_BAND);
     expect(r.deactivated).toBe(0);
     for (const band of LISTED_BANDS) {
-      const rows = listings.filter((l) => l.active && l.stars === band);
-      expect(rows.length, `★${band} の口数`).toBe(LISTINGS_PER_BAND);
-      /** ★価格は `priceOfStars` が出した値そのもの（★SQL が計算していない） */
-      for (const row of rows) expect(row.price_ep, `★${band} の価格`).toBe(priceOfStars(band));
+      const rows = listings.filter((l) => l.active && l.price_ep === priceOfBand(band));
+      expect(rows.length, `段 ${band} の口数`).toBe(LISTINGS_PER_BAND);
+      /** 🔴 ★出品の行に段が無い（D-114 ②） */
+      for (const row of rows) expect(Object.keys(row).sort()).toEqual(['active', 'horse_id', 'price_ep', 'sell_back_ep']);
       /**
        * ★**手放したときに戻る額も TS が書く**（★`0026`・D-102 ③）。
        * ⚠️ ★**買った額より小さい**こと（★等しい・大きいと EP の蛇口になります）。
        */
       for (const row of rows) {
-        expect(row.sell_back_ep, `★${band} の戻り`).toBe(sellBackEP(priceOfStars(band)));
+        expect(row.sell_back_ep, `段 ${band} の戻り`).toBe(sellBackEP(priceOfBand(band)));
         expect(row.sell_back_ep).toBeLessThan(row.price_ep);
       }
     }
@@ -144,20 +156,21 @@ describe('★出品を作る経路（D-102・第 5 便-2）', () => {
     expect(listings.filter((l) => l.active).length).toBe(LISTED_BANDS.length * LISTINGS_PER_BAND);
   });
 
-  it('③ ★★が変わった馬の出品を下ろす（★故障で素質が下がった馬を、前の値段で売らない）', async () => {
+  it('③ ★帯が変わった馬の出品を下ろす（★故障で素質が下がった馬を、前の値段で売らない）', async () => {
     const pool = makePool(5);
     const listings: FakeListing[] = [];
     const { client } = fakeDb(pool, listings);
     await refreshMarketListings(client, () => {});
-    const target = listings.find((l) => l.active && l.stars === 4.0)!;
+    const top = LISTED_BANDS[LISTED_BANDS.length - 1]!;
+    const target = listings.find((l) => l.active && l.price_ep === priceOfBand(top))!;
     const horse = pool.find((h) => h.id === target.horse_id)!;
-    /** ★素質が下がる（★§7.5 の恒久ダメージ）→ ★が下がる */
-    horse.potential = Object.fromEntries(ABILITY_KEYS.map((a) => [a, MEAN_FOR_STARS['2.0']!]));
+    /** ★素質が下がる（★§7.5 の恒久ダメージ）→ 帯が下がる */
+    horse.potential = Object.fromEntries(ABILITY_KEYS.map((a) => [a, meanForBand(LISTED_BANDS[0]!)]));
 
     const r = await refreshMarketListings(client, () => {});
     expect(r.deactivated).toBe(1);
-    expect(listings.find((l) => l.horse_id === target.horse_id && l.stars === 4.0)!.active).toBe(false);
-    /** ★下がった★の帯で売られてもいない（★同じ馬が別の値段で並ばない） */
+    expect(listings.find((l) => l.horse_id === target.horse_id && l.price_ep === priceOfBand(top))!.active).toBe(false);
+    /** ★下がった帯で売られてもいない（★同じ馬が別の値段で並ばない） */
     const still = listings.filter((l) => l.active && l.horse_id === target.horse_id);
     expect(still.length).toBeLessThanOrEqual(1);
   });
@@ -172,9 +185,10 @@ describe('★出品を作る経路（D-102・第 5 便-2）', () => {
 
     expect(r.stockOk).toBe(false);
     expect(alerts.some((a) => a.includes('在庫が下限を割りました'))).toBe(true);
-    /** ★出ている★は名簿の帯だけ（★黙って広げていない） */
-    const bands = new Set(listings.filter((l) => l.active).map((l) => l.stars));
-    for (const b of bands) expect(LISTED_BANDS).toContain(b);
+    /** ★出ている価格は名簿の帯のものだけ（★黙って広げていない） */
+    const priced = new Set(listings.filter((l) => l.active).map((l) => l.price_ep));
+    const allowed = new Set(LISTED_BANDS.map(priceOfBand));
+    for (const p of priced) expect(allowed.has(p), `名簿に無い価格 ${p}`).toBe(true);
     /** ★足りない帯は足りないまま（★埋めるために別の帯から持ってこない） */
     expect(r.added).toBeLessThanOrEqual(LISTED_BANDS.length * LISTINGS_PER_BAND);
   });
@@ -186,13 +200,18 @@ describe('★出品を作る経路（D-102・第 5 便-2）', () => {
     expect(SRC).toMatch(/order by id/);
   });
 
-  it('① ★★と価格の式を SQL に書いていない（★D-052・二重帳簿にしない）', () => {
-    /** ★★の境目（`stars.ts`）と ★1 つあたりの価格（`horse-market.ts`）が SQL の文字列に無い */
-    for (const leak of ['420', '470', '520', '570', '620', '670', '720', '800', '2000']) {
+  it('① ★帯と価格の式を SQL に書いていない（★D-052・二重帳簿にしない）', () => {
+    /**
+     * ★帯の境目（`stars.ts`）と ★目盛 1 つあたりの価格（`horse-market.ts`）が SQL の文字列に無い。
+     * ⚠️ ★**境目は実物から引きます**（★手書きの一覧にすると、24 段化のような変更で黙って空振りします・R-19）。
+     */
+    for (const leak of [...STAR_THRESHOLDS.map(String), '2000']) {
       expect(SRC.includes(`'${leak}`), `★算出が SQL に写っている: ${leak}`).toBe(false);
     }
-    /** ★★は `starsOfPotential`、価格は `priceOfStars` から取る */
-    expect(SRC).toMatch(/starsOfPotential/);
+    /** ★帯は `bandOfPotential`、価格は `priceOfStars` から取る */
+    expect(SRC).toMatch(/bandOfPotential/);
     expect(SRC).toMatch(/planListings/);
+    /** 🔴 ★出品の insert に `stars` が無い（★移行 `0036`・D-114 ②） */
+    expect(SRC).not.toMatch(/insert into horse_market_listing[^`]*\bstars\b/);
   });
 });

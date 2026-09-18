@@ -45,14 +45,16 @@ export function sleeveHex(sleeve: Sleeve, bodyHex: string): string {
 /** 名前の最大長（表示名・牧場名とも） */
 export const NAME_MAX = 12;
 
-/** 付与される初期馬（サーバーが user_id から決定的に導く・D-074）。素質は ★ のみ */
+/**
+ * 付与される初期馬（サーバーが決定的に導く・D-074）。
+ * ⚠️ ★**素質は持ちません**（★2026-09-18・**D-114 ②**・T-10・AL-2）。
+ */
 export interface InitialHorse {
   readonly name: string;
   readonly sexAge: string;
   readonly coat: string;
   readonly stableName: string;
   readonly classLabel: string;
-  readonly stars: number;
   readonly strategy: 'nige' | 'senko' | 'sashi' | 'oikomi';
 }
 
@@ -77,7 +79,7 @@ export interface SetupRepo {
 export const demoSetupRepo: SetupRepo = {
   create: async () => ({
     ok: true,
-    horse: { name: 'ハツユキノオト', sexAge: '牝2', coat: '栗毛', stableName: '高瀬厩舎', classLabel: '新馬', stars: 3.5, strategy: 'senko' },
+    horse: { name: 'ハツユキノオト', sexAge: '牝2', coat: '栗毛', stableName: '高瀬厩舎', classLabel: '新馬', strategy: 'senko' },
     grantedEP: 2000,
     dailyEP: 200,
   }),

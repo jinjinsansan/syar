@@ -88,12 +88,17 @@ describe('★履歴書型の馬詳細の配線（D13-2）', () => {
     expect(DEMO).not.toMatch(/しました。|勝ちました|生まれました/);
   });
 
-  it('④ ★素質の数値・上限までの割合を出していない（★★と段だけ）', () => {
+  it('🔴 ④ ★素質を一切出していない（★数値も段も）', () => {
+    /**
+     * 【★2026-09-18・**D-114 ②**・T-10・AL-2 で向きが反転しました】
+     *   ★旧: ★**数値は出さず、★だけ出す**（★`<Stars` を**要求**していました）。
+     *   ★新: ★**段も出しません**。★強さの手がかりは★**オッズと戦績だけ**。
+     */
     for (const bad of ['potential', '素質の数値', '上限まで', 'unlockRate', 'capRatio']) {
       expect(CODE, `★素質が漏れている: ${bad}`).not.toContain(bad);
       expect(DEMO, `★素質が漏れている（デモ）: ${bad}`).not.toContain(bad);
     }
-    expect(CODE).toMatch(/<Stars/);
+    expect(CODE, '★★の部品が戻っている').not.toMatch(/<Stars/);
   });
 
   it('⑤ ★騎手に強さの差を匂わせない（★親密度の言葉も組み直さない）', () => {

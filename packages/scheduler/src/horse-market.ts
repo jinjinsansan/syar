@@ -1,14 +1,21 @@
 /**
  * ★**馬の購入**（★GB-4・2026-09-16・正典 §3.3・§6・§10.5・**D-102**・オーナー決定 T-5）
  *
- * 【★この便では純関数と検査だけ】（★指示書 `DEV_INSTRUCTIONS_GAME_BODY_1_20260916.md` §4）
- *   ★**DB の書き込みと RPC は次の便**です（★利用者向け RPC はまだ 1 つも無い）。
- *   ★ここにあるのは ★**候補の選び方・値付け・在庫の見張り**の純関数だけで、★DB も時刻も乱数も持ちません。
+ * 【★2026-09-18・**T-10**（D-114）で「★」を外しました】
+ *   ★旧: ★**★表示（1〜5・半星）が同じ帯**から候補を出し、★**★から値付け**していました。
+ *   ★新: ★**帯は内部の 24 段**（★`@star/sim-engine` の `bandOfPotential`）で、★**外に出しません**（D-114 ②）。
+ *        → ★`MarketListing` は ★**段を持ちません**（★持つと `horse_market_listing` 経由で漏れます）。
+ *
+ * 🔴 ★**値付けは次の便（T-11）で消えます。**
+ *   ★**D-102 ③（2026-09-18 改訂）**: ★候補は「走った実績のある馬」、★**価格は §10.5 の NPC 種牡馬の式**
+ *   〔3,000 ＋ G1 勝利数 × 8,000 ＋ 総獲得賞金 ÷ 20〕**から決め、素質を入力に取らない**。
+ *   → ★**`priceOfStars` / `LISTED_BANDS` / `LISTINGS_PER_BAND` は T-11 で削除されます。**
+ *     ★T-10 では ★**値付けの水準を動かさない**ことだけを守ります（★便の順 §6: T-10 は着順にも経済にも効かせない）。
  *
  * 【★D-102 の条件をどう満たすか】
  *   ① ★**EP で買う。PP では買わせない** … ★この層は EP の額しか返しません（★PP を表す型も引数もありません）
  *   ② ★**売る馬は NPC 世界から取る** … ★候補は ★**渡された現役プールから選ぶだけ**で、★ここで馬を作りません
- *   ③ ★**振り直しが成立しない** … ★候補は ★**★表示が同じ帯**から出し（`starsOf`）、★手放して戻る EP は買った額の `SELL_BACK_RATE`
+ *   ③ ★**振り直しが成立しない** … ★候補は ★**同じ帯**から出し、★手放して戻る EP は買った額の `SELL_BACK_RATE`
  *   ④ ★**配合より割高** … ★§1.1「血をつなぐ」を中核に保つため、★価格は ★配合の費用より高く置きます（§4-1 の註記）
  *   ⑤ ★**在庫の下限監視** … ★`marketStockAlert` が下限を割ったことを返します（★黙って帯を広げない・D-079 ⑦）
  */
@@ -17,21 +24,21 @@
  * ⚠️ ★**この層は馬の記録（`HorseRecord`）を知りません。**
  *    ★`@star/scheduler` は ★**依存ゼロ**（`package.json` の `dependencies: {}`）で、
  *    ★`@star/sim-engine` を引くとその約束が壊れます。
- *    → ★**★は呼び出し側が `starsOf`（`@star/sim-engine`）で出して渡します。**
- *      ★算出は 1 か所（`stars.ts`）のままで、★この層は「★ → 価格・帯・在庫」だけを持ちます。
+ *    → ★**段は呼び出し側が `bandOfPotential`（`@star/sim-engine`）で出して渡します。**
+ *      ★算出は 1 か所（`stars.ts`）のままで、★この層は「段 → 品揃え・在庫」だけを持ちます。
  */
 
 /**
- * ★**★1 つあたりの価格 [EP]**（★較正定数・D-102 ④）。
+ * ★**目盛 1 つあたりの価格 [EP]**（★較正定数・D-102 ④）。
  *
  * ⚠️ ★**値そのものをゲートにしません**（★指示書 §4）。★GB-6 の収支の取り直しで、
- *    ★この額込みの 1 キャリアの収支と ★「同じ EP での期待する★」を報告します。
- * ★置き方: ★★3.0 の馬で 6,000 EP（★デイリー 200 EP の 30 日分・初期 EP 2,000 の 3 倍）。
+ *    ★この額込みの 1 キャリアの収支を報告します。
+ * ★置き方: ★目盛 3.0 の馬で 6,000 EP（★デイリー 200 EP の 30 日分・初期 EP 2,000 の 3 倍）。
  *   ★**配合（種付料）より割高**という条件は、★**種付料の式が正典にも実装にも無い**ため、
  *   ★いまは ★**下限として `MIN_PRICE_EP` を置き、比較は GB-6 の収支で報告**します（★§4-1 の註記・△）。
  */
 export const STAR_PRICE_EP = 2000;
-/** ★最低価格 [EP]（★どんなに★が低くてもこれ以下では売らない） */
+/** ★最低価格 [EP]（★どんなに低い帯でもこれ以下では売らない） */
 export const MIN_PRICE_EP = 3000;
 /**
  * ★**手放したときに戻る割合**（★D-102 ③「買った額より十分小さく」）。
@@ -41,20 +48,24 @@ export const SELL_BACK_RATE = 0.2;
 /** ★NPC の現役プールの在庫の下限（★D-102 ⑤・D-079 ⑧） */
 export const MARKET_STOCK_MIN = 200;
 
-/** ★出品（★NPC 世界の馬を、買える形で見せたもの） */
+/**
+ * ★**出品**（★NPC 世界の馬を、買える形で見せたもの）。
+ * ⚠️ ★**段を持ちません**（★D-114 ②。★持つと `horse_market_listing` と公開ビュー経由で外に出ます）。
+ *    ★買う人に見えるのは ★**馬そのもの（戦績・オッズ）と価格**だけです。
+ */
 export interface MarketListing {
   readonly horseId: string;
-  /** ★見せるのは★だけ（★素質の数値は出さない・§5.5） */
-  readonly stars: number;
   readonly priceEP: number;
 }
 
 /**
- * ★**値付け**（★★から決める・★素質の数値は使わない）。
- * ⚠️ ★★が同じなら ★**価格も同じ**です（★価格から中身を読めないように）。
+ * ★**値付け**（★目盛から決める・★素質の数値は使わない）。
+ *
+ * 🔴 ★**T-11 で消えます**（★上の註記）。★`starScale` は `@star/sim-engine` の `starScaleOfBand(band)`。
+ * ⚠️ ★同じ帯なら ★**価格も同じ**です（★価格から中身を読めないように）。
  */
-export function priceOfStars(stars: number): number {
-  return Math.max(MIN_PRICE_EP, Math.round(stars * STAR_PRICE_EP));
+export function priceOfStars(starScale: number): number {
+  return Math.max(MIN_PRICE_EP, Math.round(starScale * STAR_PRICE_EP));
 }
 
 /** ★手放したときに戻る EP（★買った額より十分小さい） */
@@ -65,34 +76,42 @@ export function sellBackEP(paidEP: number): number {
 /**
  * ★**候補を選ぶ**（★D-102 ②③）。
  *
- * ★`pool` … ★NPC の現役プール（★この関数は馬を作りません）
- * ★`stars` … ★出す★の帯（★`starsOf` と同じ量で選ぶ — ★見た目と中身の帯を一致させる）
+ * ★`pool` … ★NPC の現役プール（★この関数は馬を作りません）。★段は呼ぶ側が付けて渡します
+ * ★`band` … ★出す帯の**段番号**（★`bandOfPotential` と同じ量 — ★整数の等値で比べます）
  * ★`count` … ★見せる頭数
+ * ★`priceEP` … ★その帯の価格（★この層は段 → 目盛の換算を持てないので、呼ぶ側が出します）
  * ⚠️ ★**並べ替えも抽選もしません**（★乱数を持たない層）。★呼び出し側が渡した順に、帯に合う馬を前から取ります。
- *    ★「毎回違う候補を見せる」ための抽選は ★DB の便で入れますが、★**帯が同じなので観測できる差は出ません**。
  */
 export function listingsFromPool(
-  pool: readonly { readonly horseId: string; readonly stars: number }[],
-  stars: number,
+  pool: readonly { readonly horseId: string; readonly band: number }[],
+  band: number,
   count: number,
+  priceEP: number,
 ): MarketListing[] {
-  const price = priceOfStars(stars);
   const out: MarketListing[] = [];
   for (const h of pool) {
     if (out.length >= count) break;
-    if (h.stars !== stars) continue;
-    out.push({ horseId: h.horseId, stars, priceEP: price });
+    if (h.band !== band) continue;
+    out.push({ horseId: h.horseId, priceEP });
   }
   return out;
 }
 
 /**
- * ★**出品する★の帯**（★D-102 ③）。
- * ⚠️ ★較正値ではなく ★**品揃えの決め**です。★★5.0 と★1.0〜1.5 を出していないのは、
- *    ★上は「配合で狙うもの」を買えてしまい（§1.1「血をつなぐ」が薄まる）、
- *    ★下は誰も買わないためです。★動かすと ★**買える帯**が変わります（★着順には入りません）。
+ * ★**出品する帯**（★段番号・D-102 ③）。
+ *
+ * ⚠️ ★較正値ではなく ★**品揃えの決め**です。★上（最上位の帯）と下（最下位の帯）を出していないのは、
+ *    ★上は「配合で狙うもの」を買えてしまい（§1.1「血をつなぐ」が薄まる）、★下は誰も買わないためです。
+ *
+ * 【★2026-09-18・T-10 の置き換え（★新しく決めたのではなく、**同じ帯を新しい粒度で書き直した**もの）】
+ *   ★旧: ★`[2.0, 2.5, 3.0, 3.5, 4.0]`（★9 段のうち 5 帯）。
+ *   ★新: ★**24 段のうち、旧の 5 つの値にいちばん近い段**（★四捨五入・3.0 の同値は上へ）:
+ *     ★段 6 ＝ 目盛 2.04 ／ 段 9 ＝ 2.57 ／ 段 12 ＝ 3.09 ／ 段 14 ＝ 3.43 ／ 段 17 ＝ 3.96
+ *   → ★**口数（5 帯 × 3 ＝ 15 口）も価格の水準（4,087〜7,913 EP・旧 4,000〜8,000 EP）も変えていません。**
+ *   ⚠️ ★**段 6〜17 を全部出すと 12 帯 × 3 ＝ 36 口**になり、★D-102 ③「選び直しが成立しない」に近づきます。
+ *      ★そのため ★**帯の数を 5 のまま保ちました**（★T-11 がこの仕組みごと差し替えます）。
  */
-export const LISTED_BANDS: readonly number[] = [2.0, 2.5, 3.0, 3.5, 4.0];
+export const LISTED_BANDS: readonly number[] = [6, 9, 12, 14, 17];
 
 /**
  * ★**帯ごとに出しておく口数**。
@@ -103,11 +122,14 @@ export const LISTINGS_PER_BAND = 3;
 /**
  * ★**出品の入れ替えの計画**（★D-102 ②③⑤）。
  *
- * ★`pool` … ★いま買える NPC の現役馬（★呼ぶ側が★を付けて渡す）
- * ★`active` … ★いま出ている出品
+ * ★`pool` … ★いま買える NPC の現役馬（★呼ぶ側が段を付けて渡す）
+ * ★`active` … ★いま出ている出品（★**段は持ちません** — ★DB にも段を置かないため・D-114 ②）
+ * ★`priceOfBand` … ★段 → 価格（★呼ぶ側が `priceOfStars(starScaleOfBand(band))` を渡す）
  *
- * ★**下ろすもの**: ①プールから消えた馬（★買われた・引退した）②★が変わった馬
- *   （★故障の恒久ダメージで素質が下がると★も下がる。★見た目と価格がずれたまま売らない）
+ * ★**下ろすもの**: ①プールから消えた馬（★買われた・引退した）②★**価格が変わった馬**
+ *   （★故障の恒久ダメージで素質が下がると帯が下がり、★価格も下がる。★見た目と価格がずれたまま売らない）
+ *   ⚠️ ★旧は「段が変わったか」で見ていました。★**段を DB に置かなくなったので、価格で見ます** —
+ *      ★価格は段の関数なので、★**段が変われば価格が変わります**（★同じ判定です）。
  * ★**足すもの**: ★帯ごとに `LISTINGS_PER_BAND` に足りないぶん
  *
  * ⚠️ ★**乱数を持ちません**（★渡された順に前から取る）。★同じ入力なら同じ計画です。
@@ -118,25 +140,26 @@ export interface ListingPlan {
 }
 
 export function planListings(
-  pool: readonly { readonly horseId: string; readonly stars: number }[],
-  active: readonly { readonly horseId: string; readonly stars: number }[],
+  pool: readonly { readonly horseId: string; readonly band: number }[],
+  active: readonly { readonly horseId: string; readonly priceEP: number }[],
+  priceOfBand: (band: number) => number,
 ): ListingPlan {
-  const poolStars = new Map(pool.map((h) => [h.horseId, h.stars]));
+  const poolBand = new Map(pool.map((h) => [h.horseId, h.band]));
   const deactivate: string[] = [];
   const keptByBand = new Map<number, number>();
   const listed = new Set<string>();
   for (const a of active) {
-    const now = poolStars.get(a.horseId);
-    if (now === undefined || now !== a.stars) { deactivate.push(a.horseId); continue; }
+    const band = poolBand.get(a.horseId);
+    if (band === undefined || priceOfBand(band) !== a.priceEP) { deactivate.push(a.horseId); continue; }
     listed.add(a.horseId);
-    keptByBand.set(a.stars, (keptByBand.get(a.stars) ?? 0) + 1);
+    keptByBand.set(band, (keptByBand.get(band) ?? 0) + 1);
   }
   const add: MarketListing[] = [];
   for (const band of LISTED_BANDS) {
     const need = LISTINGS_PER_BAND - (keptByBand.get(band) ?? 0);
     if (need <= 0) continue;
     const candidates = pool.filter((h) => !listed.has(h.horseId));
-    for (const l of listingsFromPool(candidates, band, need)) {
+    for (const l of listingsFromPool(candidates, band, need, priceOfBand(band))) {
       add.push(l);
       listed.add(l.horseId);
     }

@@ -1,5 +1,5 @@
 import { demoStableRepo, conditionView, fatigueColor, type HorseDetail } from '../../../lib/stable';
-import { FatigueBar, StatBar, Stars } from '../../../components/ui';
+import { FatigueBar, StatBar } from '../../../components/ui';
 import { HorseResume } from '../../../components/horse-resume';
 
 export const revalidate = 0;
@@ -91,9 +91,8 @@ export default async function HorsePage({ params }: { params: Promise<{ horseId:
                 <span key={t} className="a-chip" style={{ height: 28, padding: '0 12px', fontSize: 13, color: 'var(--a-ink)' }}>{t}</span>
               ))}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
-              <span className="a-lbl">素質</span><Stars value={h.stars} size={26} /><span style={{ fontSize: 13, fontWeight: 900, color: 'var(--a-ink-3)' }}>★{h.stars}（生涯変わりません）</span>
-            </div>
+            {/* ⚠️ ★**素質の行を取りました**（★2026-09-18・D-114 ②・T-10・AL-2）。
+                🔴 ★ここは★の絵だけでなく ★**「★3.5」と数値を直接出していました**。 */}
           </div>
           <div style={{ width: 2, alignSelf: 'stretch', background: 'var(--a-line)' }} className="hide-narrow" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

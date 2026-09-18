@@ -22,7 +22,7 @@ import {
 } from '@star/sim-engine';
 import { JOCKEYS, jockeyBondAfterRides } from '@star/scheduler';
 import { bondLabel } from './jockey-picker';
-import { ClassChip, Stars } from './ui';
+import { ClassChip } from './ui';
 import { conditionView, fatigueColor, type HorseDetail } from '../lib/stable';
 import { DEMO_DISCOVERY } from '../lib/horse-story-demo';
 import {
@@ -64,9 +64,7 @@ export function HorseResume({ horse }: { readonly horse: HorseDetail }): React.R
           <span style={{ fontSize: 20, fontWeight: 900 }}>{horse.name}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px 12px' }}>
-          {/* ★素質は★だけ（★数値も上限までの割合も出さない） */}
-          <span className="a-lbl" style={{ fontSize: 11 }}>素質</span>
-          <Stars value={horse.stars} size={17} />
+          {/* ⚠️ ★**素質の★を取りました**（★2026-09-18・D-114 ②・T-10・AL-2） */}
           <span style={{ fontSize: 10.5, fontWeight: 900, color: 'var(--a-ink-3)', marginLeft: 6 }}>{horse.sexAge}・{horse.coat}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '0 14px 12px', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>

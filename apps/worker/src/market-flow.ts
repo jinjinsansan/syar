@@ -2,9 +2,10 @@
  * ★**出品を作る**（★ゲーム本体 (a) 第 5 便-2・2026-09-16・正典 §6・**D-102**・移行 `0025`）
  *
  * 【★なぜワーカーが書くか】（★`0025` の註記と同じ理由）
- *   ★★と価格は ★**`@star/sim-engine` の `starsOf` と `@star/scheduler` の `priceOfStars`** が出します。
- *   ★同じ式を SQL にも書くと ★**画面と DB で★が食い違う日**が来ます（★D-052・二重帳簿）。
- *   → ★**サーバー（ここ）が出品の行に★と価格を書き**、★RPC（`buy_horse`）は**その行の値で**払わせます。
+ *   ★帯（段）と価格は ★**`@star/sim-engine` の `bandOfPotential` と `@star/scheduler` の `priceOfStars`** が出します。
+ *   ★同じ式を SQL にも書くと ★**画面と DB で帯が食い違う日**が来ます（★D-052・二重帳簿）。
+ *   → ★**サーバー（ここ）が出品の行に価格を書き**、★RPC（`buy_horse`）は**その行の値で**払わせます。
+ *   ⚠️ ★**段は行に書きません**（★2026-09-18・D-114 ②・移行 `0036` で `stars` 列を落としました）。
  *   ⚠️ ★利用者は価格を申告できません（★憲法 3・`0025` が `revoke insert` 済み）。
  *
  * 【★この層がしないこと】
@@ -16,8 +17,17 @@
  */
 
 import type pg from 'pg';
-import { starsOfPotential, type AbilityKey } from '@star/sim-engine';
-import { marketStockAlert, planListings, sellBackEP, LISTED_BANDS, LISTINGS_PER_BAND } from '@star/scheduler';
+import { bandOfPotential, starScaleOfBand, type AbilityKey } from '@star/sim-engine';
+import {
+  marketStockAlert, planListings, priceOfStars, sellBackEP, LISTED_BANDS, LISTINGS_PER_BAND,
+} from '@star/scheduler';
+
+/**
+ * ★**段 → 価格 [EP]**。
+ * 🔴 ★**T-11 で消えます** — ★D-102 ③（2026-09-18 改訂）で価格は §10.5 の式（戦績）から決まり、
+ *   ★**素質を入力に取らなくなります**。★ここはそれまでの繋ぎです。
+ */
+const priceOfBand = (band: number): number => priceOfStars(starScaleOfBand(band));
 
 /** ★1 回に見る NPC プールの上限（★全件走査を避ける。★帯を埋めるには十分な数） */
 export const MARKET_POOL_LIMIT = 5000;
@@ -68,7 +78,7 @@ export async function refreshMarketListings(
       limit $1`,
     [MARKET_POOL_LIMIT],
   );
-  const pool = poolRes.rows.map((r) => ({ horseId: r.id, stars: starsOfPotential(potentialOf(r)) }));
+  const pool = poolRes.rows.map((r) => ({ horseId: r.id, band: bandOfPotential(potentialOf(r)) }));
 
   // ★在庫は**プール全体の数**で見る（★上限で切った数ではない）
   const countRes = await client.query<{ n: string }>(
@@ -86,13 +96,14 @@ export async function refreshMarketListings(
   }
 
   // ── ② いま出ている出品 ────────────────────────────────
-  const activeRes = await client.query<{ horse_id: string; stars: string | number }>(
-    `select horse_id, stars from horse_market_listing where active order by horse_id`,
+  //   ⚠️ ★**段は読みません**（★`0036` で列ごと落としました）。★帯が変わったかは ★**価格で見ます**
+  const activeRes = await client.query<{ horse_id: string; price_ep: string | number }>(
+    `select horse_id, price_ep from horse_market_listing where active order by horse_id`,
   );
-  const active = activeRes.rows.map((r) => ({ horseId: r.horse_id, stars: Number(r.stars) }));
+  const active = activeRes.rows.map((r) => ({ horseId: r.horse_id, priceEP: Number(r.price_ep) }));
 
   // ── ③ 計画（★純関数・DB を知らない）───────────────────────
-  const plan = planListings(pool, active);
+  const plan = planListings(pool, active, priceOfBand);
 
   // ── ④ 反映（★1 トランザクション）──────────────────────────
   if (plan.deactivate.length > 0 || plan.add.length > 0) {
@@ -112,12 +123,11 @@ export async function refreshMarketListings(
          * ⚠️ ★`sell_horse` は ★**この行の値**で戻します。★値が無い行は手放せません。
          */
         await client.query(
-          `insert into horse_market_listing (horse_id, stars, price_ep, sell_back_ep)
-           select * from unnest($1::uuid[], $2::numeric[], $3::int[], $4::int[])
+          `insert into horse_market_listing (horse_id, price_ep, sell_back_ep)
+           select * from unnest($1::uuid[], $2::int[], $3::int[])
            on conflict do nothing`,
           [
             plan.add.map((l) => l.horseId),
-            plan.add.map((l) => l.stars),
             plan.add.map((l) => l.priceEP),
             plan.add.map((l) => sellBackEP(l.priceEP)),
           ],

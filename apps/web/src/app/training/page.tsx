@@ -15,7 +15,7 @@ import {
 } from '@star/training';
 import { sortStable, conditionView, DEMO_HORSES } from '../../lib/stable';
 import { TRAINING_MENUS, trainingMenusOfView, DEMO_TRAINING_ABILITY, DEFAULT_TRAINING_ABILITY, demoFatigueNote } from '../../lib/game-demo';
-import { Capsule, ClassChip, FatigueBar, PageTitle, Pill, StatBar, Stars } from '../../components/ui';
+import { Capsule, ClassChip, FatigueBar, PageTitle, Pill, StatBar } from '../../components/ui';
 
 const WEEK_NO = 32;
 
@@ -175,11 +175,7 @@ export default function TrainingPage(): React.ReactElement {
               <ClassChip label={horse.classLabel} classRank={horse.classRank} h={24} font={11.5} />
               <span style={{ fontSize: 19, fontWeight: 900 }}>{horse.name}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px 10px' }}>
-              {/* ★素質は★だけ（★数値も「上限までの割合」も出さない・§5.5・§12.4） */}
-              <span className="a-lbl" style={{ fontSize: 11 }}>素質</span>
-              <Stars value={horse.stars} size={17} />
-            </div>
+            {/* ⚠️ ★**素質の行を取りました**（★2026-09-18・D-114 ②・T-10・AL-2） */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 14px 14px' }}>
               {bars.map((b) => (b.kind === 'ability' ? (
                 /* ★能力は棒（伸びるもの） */
@@ -416,7 +412,7 @@ export default function TrainingPage(): React.ReactElement {
                   {horse.nextRace !== null && (
                     <div style={{ marginTop: 8, fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>次走 {horse.nextRace}</div>
                   )}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}><span className="a-lbl">素質</span><Stars value={horse.stars} size={19} /></div>
+                  {/* ⚠️ ★**素質の行を取りました**（★2026-09-18・D-114 ②・T-10・AL-2） */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
                     <span className="a-lbl">調子</span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 900, color: cond.color }}><span style={{ fontSize: 17 }}>{cond.mark}</span>{cond.label}</span>

@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { PageTitle, Stars, StyleChip } from '../../components/ui';
+import { PageTitle, StyleChip } from '../../components/ui';
 import {
   NAME_MAX, SILK_COLORS, SLEEVES, sleeveHex, demoSetupRepo,
   type InitialHorse, type SetupError, type Sleeve,
@@ -227,13 +227,9 @@ export default function SetupPage(): React.ReactElement {
                 <span className="a-chip" style={{ height: 28, padding: '0 12px', fontSize: 13, color: 'var(--a-ink)' }}>{granted.horse.stableName}</span>
               </div>
               <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
-                <div style={{ flex: 1, padding: '12px 16px', borderRadius: 10, background: '#fff', border: '2px solid var(--a-edge)' }}>
-                  <span className="a-lbl">素質</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
-                    <Stars value={granted.horse.stars} size={26} />
-                    <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>生涯変わりません</span>
-                  </div>
-                </div>
+                {/* ⚠️ ★**素質の枚を取りました**（★2026-09-18・D-114 ②・T-10・AL-2）。
+                    ★ここに何を置くかは ★**デザイナー便**で決めます（2026-09-15 オーナー指示）。
+                    ★開発側で代わりの見せ方を作らないため、★**空けたまま**にしてあります。 */}
                 <div style={{ width: 190, flex: '0 0 190px', padding: '12px 16px', borderRadius: 10, background: '#fff', border: '2px solid var(--a-edge)' }}>
                   <span className="a-lbl">脚質</span>
                   <div style={{ marginTop: 8 }}><StyleChip strategy={granted.horse.strategy} h={30} font={14} /></div>

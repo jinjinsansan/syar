@@ -6,15 +6,15 @@
  *   ② ★**勝率・得意距離など着順に効くと読める数値**を出す（★D-105 ③）
  *   ③ ★**名簿・値段・戻り額を画面に直書き**する（★D-052。★正典を直した日に画面だけ古くなる）
  *   ④ ★**引き直しを煽る**（★「もう一度探す」等・D-102 ③）
- *   ⑤ ★**素質の数値**が出る（★§5.5。★出せるのは★だけ）
+ *   ⑤ 🔴 ★**素質が出る**（★2026-09-18・**D-114 ②**・T-10・AL-2。
+ *     ★旧は「数値は出さず★だけ出す」でしたが、★**段も出しません**）
  *   ⑥ ★**「購入」「円」**の語を使う（★依頼書の指定。★「迎える」で統一）
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import {
-  JOCKEYS, JOCKEY_BOND_MAX, LISTED_BANDS, LISTINGS_PER_BAND, priceOfStars, sellBackEP,
-} from '@star/scheduler';
+import { JOCKEYS, JOCKEY_BOND_MAX, LISTINGS_PER_BAND, sellBackEP } from '@star/scheduler';
+import { DEMO_MARKET_PRICES_EP } from '../../web/src/lib/game-demo.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const strip = (s: string): string => s
@@ -62,9 +62,16 @@ describe('★騎手を選ぶ（D12-4・D-105）', () => {
 });
 
 describe('★馬を迎える（D12-5・D-102）', () => {
-  it('③ ★帯・口数・値段・戻り額を画面に直書きしていない', () => {
-    expect(MARKET).toMatch(/LISTED_BANDS\.map/);
-    expect(MARKET).toMatch(/priceOfStars\(band\)/);
+  it('③ ★口数・値段・戻り額を画面に直書きしていない', () => {
+    /**
+     * ⚠️ ★2026-09-18・T-10（D-114 ②）で ★**帯（段）を画面に渡さなくなりました**。
+     *    ★旧は `LISTED_BANDS.map` と `priceOfStars(band)` を画面で回していましたが、
+     *    ★**それ自体が「段を画面の層へ渡す口」**です。
+     * ★いまは ★**値段の並び**を回します（見本は `DEMO_MARKET_PRICES_EP`・本番は `price_ep`）。
+     */
+    expect(MARKET).toMatch(/DEMO_MARKET_PRICES_EP\.map/);
+    expect(MARKET, '★段を画面で回している').not.toMatch(/LISTED_BANDS/);
+    expect(MARKET, '★画面で値付けしている').not.toMatch(/priceOfStars/);
     expect(MARKET).toMatch(/sellBackEP\(/);
     expect(MARKET).toMatch(/LISTINGS_PER_BAND/);
     /**
@@ -74,19 +81,18 @@ describe('★馬を迎える（D12-5・D-102）', () => {
      * ★**値段と戻り額**（4,000〜8,000・800〜1,600）は見た目の数と桁が違うので、★そちらは値で見ます。
      */
     const literals = num(MARKET);
-    for (const b of LISTED_BANDS) {
-      expect(literals, `★値段が画面に写っている: ${priceOfStars(b)}`).not.toContain(priceOfStars(b));
-      expect(literals, `★戻り額が画面に写っている: ${sellBackEP(priceOfStars(b))}`).not.toContain(sellBackEP(priceOfStars(b)));
+    for (const price of DEMO_MARKET_PRICES_EP) {
+      expect(literals, `★値段が画面に写っている: ${price}`).not.toContain(price);
+      expect(literals, `★戻り額が画面に写っている: ${sellBackEP(price)}`).not.toContain(sellBackEP(price));
     }
     /**
      * ★帯と口数は「引いているか」で見る（★値では見分けられない）。
      * ★帯の並びを画面に書いていない／口数を画面の数で回していないことを、★形で見ます。
      */
-    expect(MARKET).not.toMatch(/\[\s*2(\.0)?\s*,\s*2\.5\s*,/);
     expect(MARKET).toMatch(/length:\s*LISTINGS_PER_BAND/);
     /** ★参考: 名簿の側の値（★画面と食い違っていないことの確認） */
     expect(LISTINGS_PER_BAND).toBeGreaterThan(0);
-    expect(LISTED_BANDS.length).toBeGreaterThan(1);
+    expect(DEMO_MARKET_PRICES_EP.length).toBeGreaterThan(1);
   });
 
   it('④ ★引き直しを煽っていない（★「もう一度探す」を置かない）', () => {
@@ -94,14 +100,28 @@ describe('★馬を迎える（D12-5・D-102）', () => {
       expect(MARKET, `★引き直しの語がある: ${bad}`).not.toContain(bad);
     }
     /** ★先回りして鎮める一文がある */
-    expect(MARKET).toContain('違う★は出ません');
+    expect(MARKET).toContain('違う値段は出ません');
   });
 
-  it('⑤ ★素質の数値を出していない（★★だけ）', () => {
+  it('🔴 ⑤ ★素質を一切出していない（★数値も段も・D-114 ②）', () => {
     for (const bad of ['potential', '素質の数値', '上限まで']) {
       expect(MARKET, `★素質が漏れている: ${bad}`).not.toContain(bad);
     }
-    expect(MARKET).toMatch(/<Stars/);
+    /**
+     * 🔴 ★**★の部品を使っていない**（★2026-09-18・D-114 ②。★旧は逆に `<Stars` を**要求**していました）。
+     * ⚠️ ★部品そのものも `components/ui.tsx` から削除済みです（★置き場が無い形にする・R-29）。
+     */
+    expect(MARKET, '★★の部品が戻っている').not.toMatch(/<Stars/);
+    /**
+     * ★**段を出す口そのものが無い**ことを、★**入力の形**で見ます（D-108 ③ の作法）。
+     * ⚠️ ★**「band」という語で見てはいけません** — ★`className="a-band"`（見出しの帯）に当たります
+     *    （★禁止語の一覧で書かない・D-108 ③。★ここで 1 度踏みました）。
+     * → ★**段がある層（`@star/sim-engine`）を引いていないか**と、
+     *   ★**段を返す・受け取る名前を呼んでいないか**で見ます。
+     */
+    for (const gate of ['@star/sim-engine', 'LISTED_BANDS', 'priceOfStars', 'starScaleOfBand', 'bandOfPotential', 'bandOf', 'STAR_']) {
+      expect(MARKET, `★段を出す口を引いている: ${gate}`).not.toContain(gate);
+    }
   });
 
   it('⑥ ★「購入」「円」を使わず「迎える」で統一している', () => {

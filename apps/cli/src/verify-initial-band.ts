@@ -24,7 +24,7 @@
  *   → ★`generateRace` の引数・既定値には**触っていません**（★V-4〜V-6 の取り直しは発生しません）。
  *
  * 【★測る量は★の算出量と同一（裁定 §2-①）】
- *   ★は `starsOfPotential`（`packages/sim-engine/src/stars.ts`）だけが出します。★**付与時の素質**から。
+ *   ★帯（段）は `bandOfPotential`（`packages/sim-engine/src/stars.ts`）だけが出します。★**付与時の素質**から。
  *
  * 【★育成は V-14 と同じ経路】
  *   `training-career.ts` の `runCareer`。「適切な育成」＝ `APPROPRIATE_POLICY`（`balanced`）。
@@ -42,7 +42,7 @@
  *       npm run verify:band -- --seeds 42
  */
 import {
-  ABILITY_KEYS, NICKS_GEN, VERIFY_BAND_STREAM, deriveRng, starsOfPotential,
+  ABILITY_KEYS, NICKS_GEN, VERIFY_BAND_STREAM, deriveRng, bandOfPotential,
   type AbilityKey, type HorseId, type HorseRecord, type Rng,
 } from '@star/sim-engine';
 import type { RaceEntrant } from '@star/race-engine';
@@ -301,8 +301,10 @@ for (const seed of SEEDS) {
   for (const policy of [APPROPRIATE_POLICY, 'neglect'] as const) {
     for (let i = 0; i < pool.length; i += 1) trained[policy].push(runCareer(pool[i]!, policy, i, seed));
   }
-  // ★★は**付与時の素質**から（育成前）。★唯一の出どころ `starsOfPotential`
-  const starsOf = pool.map((h) => starsOfPotential(h.potential));
+  // ★帯（段）は**付与時の素質**から（育成前）。★唯一の出どころ `bandOfPotential`
+  //   ⚠️ ★2026-09-18・D-114 で **24 段の整数**になりました（旧は★ 1〜5 の 0.5 刻み）。
+  //      ★帯は★**内部のもの**で、★画面には出ません（D-114 ②③）。
+  const bandOf = pool.map((h) => bandOfPotential(h.potential));
 
   const retireOf = (rs: CareerResult[]): ReadonlyMap<HorseId, number> =>
     new Map(pool.map((h, i) => [h.id, rs[i]!.retireWeek]));
@@ -319,10 +321,10 @@ for (const seed of SEEDS) {
   const armB = runCareers(fieldB, retireOf(trained.neglect), seed);
 
   // --- 腕 3（対照 B・BG-5）: ★その帯だけ放置・他は適切な育成 ---
-  const present = [...new Set(starsOf)].sort((a, b) => a - b);
+  const present = [...new Set(bandOf)].sort((a, b) => a - b);
   const armCByBand = new Map<number, Map<HorseId, CareerRecord>>();
   for (const band of present) {
-    const pick = (i: number): CareerResult => (starsOf[i] === band ? trained.neglect[i]! : trained[APPROPRIATE_POLICY][i]!);
+    const pick = (i: number): CareerResult => (bandOf[i] === band ? trained.neglect[i]! : trained[APPROPRIATE_POLICY][i]!);
     const mixed = pool.map((h, i) => raced(h, pick(i)));
     const mixedRetire = new Map<HorseId, number>(pool.map((h, i) => [h.id, pick(i).retireWeek]));
     armCByBand.set(band, runCareers(mixed, mixedRetire, seed).careers);
@@ -330,11 +332,11 @@ for (const seed of SEEDS) {
 
   // --- 集計（★シードをまたいでプールしてから最後に 1 回だけ割る） ---
   for (let i = 0; i < pool.length; i += 1) {
-    const row = rowOf(starsOf[i]!);
+    const row = rowOf(bandOf[i]!);
     const pid = playerIdOf(pool[i]!.id);
     const a = armA.careers.get(pid) ?? emptyCareer();
     const b = armB.careers.get(pid) ?? emptyCareer();
-    const c = armCByBand.get(starsOf[i]!)?.get(pid) ?? emptyCareer();
+    const c = armCByBand.get(bandOf[i]!)?.get(pid) ?? emptyCareer();
     row.n += 1;
     row.starts += a.starts;
     row.wins += a.wins;
@@ -367,10 +369,10 @@ console.log(`        ★レースの選び方: **${CHOICE}**` +
 console.log(`        ★申し込みは ${SEGMENTS} 区間 × ${ENTRIES_PER_SEGMENT} 回 ＝ キャリア上限 ${CAREER_RACE_LIMIT} 戦（正典 §7.1）`);
 console.log(`        ★上限 ${FIELD_SIZE.MAX} 頭を超えたら**完全抽選**で落とす（正典 1317・賞金上位を優先しない）`);
 console.log(`  能力: ★育て終わった stats（本番のワーカーと同じ渡し方・build-race.ts:89）`);
-console.log(`  ★: starsOfPotential（★付与時の素質から。★の唯一の出どころ・裁定 §2-①）`);
+console.log(`  帯: bandOfPotential（★付与時の素質から・24 段の整数・D-114・裁定 §2-①）`);
 console.log('');
 console.log(
-  `  ${'★'.padEnd(6)}${'頭数'.padStart(6)}${'1勝以上'.padStart(9)}${'±SE'.padStart(7)}` +
+  `  ${'段'.padEnd(6)}${'頭数'.padStart(6)}${'1勝以上'.padStart(9)}${'±SE'.padStart(7)}` +
     `${'平均出走'.padStart(9)}${'勝率/走'.padStart(9)}${'早期引退'.padStart(9)}` +
     `   ${'[対照A] 全頭放置'.padStart(16)}${'[対照B] この帯だけ放置'.padStart(22)}`,
 );
@@ -397,7 +399,7 @@ for (const k of keys) {
   };
   const diff = ((r.winners.neglect_band - r.winners.appropriate) / Math.max(1, r.n)) * 100;
   console.log(
-    `  ${`★${k.toFixed(1)}`.padEnd(6)}${String(r.n).padStart(6)}${pct(r.winners.appropriate, r.n).padStart(9)}` +
+    `  ${`段${String(k).padStart(3)}`.padEnd(6)}${String(r.n).padStart(6)}${pct(r.winners.appropriate, r.n).padStart(9)}` +
       `${sePt(r.winners.appropriate, r.n).padStart(6)}pt` +
       `${(r.starts / Math.max(1, r.n)).toFixed(1).padStart(9)}` +
       `${(r.starts === 0 ? '—' : (r.wins / r.starts).toFixed(3)).padStart(9)}` +

@@ -1,5 +1,5 @@
 import { demoStableRepo, sortStable, conditionView, fatigueColor, type StableHome, type StableHorse } from '../../lib/stable';
-import { ClassChip, FatigueBar, PageTitle, Stars } from '../../components/ui';
+import { ClassChip, FatigueBar, PageTitle } from '../../components/ui';
 import { STABLE_GRADE_LABEL, type StableGrade } from '@star/training';
 import { OWNERSHIP_LIMITS } from '@star/scheduler';
 import { StableGradePanel } from '../../components/stable-grade-panel';
@@ -18,7 +18,9 @@ const GRADE_TONE: Readonly<Record<StableGrade, { readonly bg: string; readonly b
 export const revalidate = 0;
 
 /** ⚠️ ★`cls` は ★**格のチップが増えた**ぶん広げました（★132 → 212・2026-09-16・D12-6） */
-const COL = { name: 230, cls: 212, stars: 112, cond: 118, fatigue: 132, week: 104 } as const;
+// ⚠️ ★`stars` の列は 2026-09-18・D-114 ②・T-10・AL-2 で取りました（★幅は他の列へ分配し直さず、★次走の列が広がります）。
+//    ★代わりに何を出すかはデザイナー便で決めます。2026-09-15 オーナー指示。
+const COL = { name: 230, cls: 212, cond: 118, fatigue: 132, week: 104 } as const;
 
 /**
  * ★牧場ホーム（わたしの馬）— 正本 design/hud-ds/components/stable-home［アーケード］
@@ -223,7 +225,6 @@ export default async function StablePage() {
         <div className="a-band hide-narrow" style={{ height: 38, padding: '0 18px', gap: 14 }}>
           <span className="a-lbl" style={{ width: COL.name, flex: `0 0 ${COL.name}px`, color: '#fff' }}>馬名</span>
           <span className="a-lbl" style={{ width: COL.cls, flex: `0 0 ${COL.cls}px`, color: '#fff' }}>格</span>
-          <span className="a-lbl" style={{ width: COL.stars, flex: `0 0 ${COL.stars}px`, color: '#fff' }}>素質</span>
           <span className="a-lbl" style={{ width: COL.cond, flex: `0 0 ${COL.cond}px`, color: '#fff' }}>調子</span>
           <span className="a-lbl" style={{ width: COL.fatigue, flex: `0 0 ${COL.fatigue}px`, color: '#fff' }}>疲労</span>
           <span className="a-lbl" style={{ flex: 1, minWidth: 150, color: '#fff' }}>次走</span>
@@ -248,7 +249,6 @@ export default async function StablePage() {
                   {STABLE_GRADE_LABEL[h.stableGrade]}
                 </span>
               </span>
-              <span className="sh-stars" style={{ width: COL.stars, flex: `0 0 ${COL.stars}px` }}><Stars value={h.stars} size={17} /></span>
               <span className="sh-cond" style={{ width: COL.cond, flex: `0 0 ${COL.cond}px` }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 900, color: cond.color }}><span style={{ fontSize: 16 }}>{cond.mark}</span>{cond.label}</span></span>
               <span className="sh-fatigue" style={{ width: COL.fatigue, flex: `0 0 ${COL.fatigue}px` }}><FatigueBar value={h.fatigue} color={fatigueColor(h.fatigue)} /></span>
               <span className="sh-next" style={{ flex: 1, minWidth: 150, fontSize: 14, fontWeight: 900, color: h.nextRace === null ? 'var(--a-ink-3)' : 'var(--a-ink)' }}>{h.nextRace ?? (h.classLabel === '新馬' ? 'デビュー戦 未定' : '未定')}</span>

@@ -4,23 +4,27 @@
  * ★**馬を迎える**（★D12-5・2026-09-16・正典 **D-102**・デザイナーのカード `components/jockey-market`）
  *
  * 【★この画面が守ること】
- *   ★**出るのは★と値段だけ**（★素質の数値は出さない・§5.5）
- *   ★**値段は★だけで決まる**（★同じ★なら値段も同じ＝値段から中身を読めない）
+ *   🔴 ★**出るのは値段だけ**（★2026-09-18・**D-114 ②**・T-10・AL-2。
+ *     ★旧は「★と値段」でしたが、★**素質の段は画面に出しません**）
+ *   ★**同じ値段の中ではどの 1 頭を迎えても同じ**（★値段から中身を読めない）
  *   ★**引き直しを煽らない**（★「もう一度探す」を置かない・D-102 ③）
  *   ★**手放すと戻るのは払った額の一部だけ**（★数字で明示）
  *
- * ⚠️ ★帯・口数・値段・戻り額は ★**すべて `@star/scheduler` から引きます**（★画面に表を持たない・D-052）。
+ * ⚠️ ★口数と戻り額は ★**`@star/scheduler` から引きます**（★画面に表を持たない・D-052）。
+ * ⚠️ ★**値段は見本の値**です（`DEMO_MARKET_PRICES_EP`）— ★本番は `horse_market_listing.price_ep` を読みます。
+ *    ★画面で `priceOfStars(段)` を計算していましたが、★**段を画面に渡す口**になるのでやめました。
+ * 🔴 ★**T-11 でこの画面ごと変わります**（★候補＝走った実績のある馬・★値段＝§10.5 の式）。★見た目はデザイナー便。
  * ⚠️ ★**「購入」ではなく「迎える」**（★金銭を想起させない語・依頼書の指定）。
  */
 
 import { useState } from 'react';
-import { LISTED_BANDS, LISTINGS_PER_BAND, priceOfStars, sellBackEP } from '@star/scheduler';
-import { Stars } from '../../../components/ui';
-import { DEMO_MARKET_STOCK_BY_BAND } from '../../../lib/game-demo';
+import { LISTINGS_PER_BAND, sellBackEP } from '@star/scheduler';
+import { DEMO_MARKET_PRICES_EP, DEMO_MARKET_STOCK_BY_BAND } from '../../../lib/game-demo';
 
 export default function MarketPage(): React.ReactElement {
-  const [picked, setPicked] = useState<{ readonly band: number; readonly slot: number } | null>(null);
-  const price = picked === null ? null : priceOfStars(picked.band);
+  // ⚠️ ★選んだものを ★**値段と枠**で持ちます（★旧は `band`＝素質の段でした・D-114 ②）
+  const [picked, setPicked] = useState<{ readonly priceEP: number; readonly slot: number } | null>(null);
+  const price = picked === null ? null : picked.priceEP;
   const back = price === null ? null : sellBackEP(price);
 
   return (
@@ -30,23 +34,24 @@ export default function MarketPage(): React.ReactElement {
       </div>
 
       <div style={{ padding: '12px 16px 0', fontSize: 11.5, fontWeight: 900, color: 'var(--a-ink-2)', lineHeight: 1.7 }}>
-        ★{LISTED_BANDS[0]} 〜 ★{LISTED_BANDS[LISTED_BANDS.length - 1]} の {LISTED_BANDS.length} 帯・帯ごとに {LISTINGS_PER_BAND} 頭。
-        <b style={{ color: 'var(--a-ink)' }}>値段は★だけで決まります</b>（同じ★なら中身も同じ確からしさです）。
+        {DEMO_MARKET_PRICES_EP.length} つの値段・それぞれ {LISTINGS_PER_BAND} 頭。
+        <b style={{ color: 'var(--a-ink)' }}>同じ値段の中なら、どの 1 頭を迎えても同じです</b>。
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px 0' }}>
-        {LISTED_BANDS.map((band, bandIndex) => {
+        {DEMO_MARKET_PRICES_EP.map((priceEP, rowIndex) => {
           /**
            * ★**残っている口数**（★`null` は満口。★本番はサーバーが数えます）。
            * ⚠️ ★**下限を割ると 0 口になります**（★正典 D-102 ⑤）。★そのときも ★**帯は広げない・消さない**。
            */
-          const stock = DEMO_MARKET_STOCK_BY_BAND[bandIndex] ?? LISTINGS_PER_BAND;
+          const stock = DEMO_MARKET_STOCK_BY_BAND[rowIndex] ?? LISTINGS_PER_BAND;
           return (
-          <div key={band} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 14px 16px', borderRadius: 14, background: '#fff', border: '2px solid var(--a-edge)' }}>
+          <div key={priceEP} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 14px 16px', borderRadius: 14, background: '#fff', border: '2px solid var(--a-edge)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Stars value={band} size={20} />
+              {/* ⚠️ ★**★（素質の段）を取りました**。★見出しは値段だけです（D-114 ②） */}
+              <span />
               <span>
-                <span className="a-num" style={{ fontSize: 20, color: 'var(--a-num-money)' }}>{priceOfStars(band).toLocaleString()}</span>
+                <span className="a-num" style={{ fontSize: 20, color: 'var(--a-num-money)' }}>{priceEP.toLocaleString()}</span>
                 <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--a-ink-2)' }}> EP</span>
               </span>
             </div>
@@ -73,11 +78,11 @@ export default function MarketPage(): React.ReactElement {
                     </div>
                   );
                 }
-                const sel = picked !== null && picked.band === band && picked.slot === slot;
+                const sel = picked !== null && picked.priceEP === priceEP && picked.slot === slot;
                 return (
                   <div
                     key={slot}
-                    onClick={() => { setPicked({ band, slot }); }}
+                    onClick={() => { setPicked({ priceEP, slot }); }}
                     style={{
                       position: 'relative',
                       flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, padding: '10px 6px', borderRadius: 10, cursor: 'pointer',
@@ -106,7 +111,7 @@ export default function MarketPage(): React.ReactElement {
       {/* ★引き直しの欲求を先回りして鎮める（★「もう一度探す」は置かない） */}
       <div style={{ margin: '14px 16px 0', padding: '11px 13px', borderRadius: 9, background: '#fff8ea', border: '2px solid #d9b25a' }}>
         <span style={{ fontSize: 11.5, fontWeight: 900, color: '#4a3105', lineHeight: 1.7 }}>
-          同じ★の中でどの 1 頭を迎えても、値段は変わりません。時間をおいても違う★は出ません
+同じ値段の中でどの 1 頭を迎えても、得するものは変わりません。時間をおいても違う値段は出ません
         </span>
       </div>
 
@@ -118,7 +123,7 @@ export default function MarketPage(): React.ReactElement {
           </div>
           <div style={{ padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Stars value={picked.band} size={20} />
+              {/* ⚠️ ★**★を取りました**（D-114 ②） */}
               <span style={{ marginLeft: 'auto' }}>
                 <span className="a-num" style={{ fontSize: 22, color: 'var(--a-num-money)' }}>{price.toLocaleString()}</span>
                 <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--a-ink-2)' }}> EP</span>

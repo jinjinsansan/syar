@@ -20,8 +20,8 @@ export interface StableHorse {
   /** 格（1..6）。5 以上（オープン・重賞）は金チップ */
   readonly classRank: number;
   readonly classLabel: string;
-  /** 素質 ★（0.5 刻み・1〜5） */
-  readonly stars: number;
+  // ⚠️ ★**素質（`stars` / 段）は持ちません** — ★2026-09-18・**D-114 ②**・T-10・AL-2。
+  //    ★型に列があると「埋めるために読む」が起きるので、★**型から消してあります**。
   readonly condition: Condition;
   readonly fatigue: number;
   readonly nextRace: string | null;
@@ -136,12 +136,12 @@ export const DEMO_HORSES: readonly StableHorse[] = [
    *    ★h1 = 今週出走（0）／h2 = 次走前（1）／h3 = 出走あと（前走から 1）／h4 = 印なし。
    *    ★以前は週数を持っておらず、★`race-week` と `after-race` が**画面に一度も出ませんでした**。
    */
-  { id: 'h1', name: 'サクラブリーズ', sexAge: '牝4', classRank: 6, classLabel: '重賞 GIII', stars: 4.5, condition: 5, fatigue: 24, nextRace: '桜星賞（8/22）', weeksToNextRace: 0, weeksSinceLastRace: 8, stableGrade: 'gold', week: { kind: 'done', menu: '追い切り' }, prizePP: 4520 },
-  { id: 'h2', name: 'ホクトリュウセイ', sexAge: '牡5', classRank: 5, classLabel: 'オープン', stars: 4, condition: 4, fatigue: 41, nextRace: '若草賞（8/24）', weeksToNextRace: 1, weeksSinceLastRace: 6, stableGrade: 'bronze', week: { kind: 'done', menu: '坂路' }, prizePP: 3100 },
-  { id: 'h3', name: 'トキメキステップ', sexAge: '牝3', classRank: 3, classLabel: '2勝クラス', stars: 3.5, condition: 3, fatigue: 58, nextRace: null, weeksToNextRace: null, weeksSinceLastRace: 1, stableGrade: 'silver', week: { kind: 'todo' }, prizePP: 900 },
-  { id: 'h4', name: 'ゲンブノツルギ', sexAge: '牡4', classRank: 2, classLabel: '1勝クラス', stars: 3, condition: 2, fatigue: 72, nextRace: null, weeksToNextRace: null, weeksSinceLastRace: null, stableGrade: 'bronze', week: { kind: 'todo' }, prizePP: 400 },
-  { id: 'h5', name: 'シラユキノヒメ', sexAge: '牝3', classRank: 1, classLabel: '未勝利', stars: 2.5, condition: 3, fatigue: 12, nextRace: '新緑賞（8/23）', weeksToNextRace: 1, weeksSinceLastRace: null, stableGrade: 'bronze', week: { kind: 'done', menu: 'ウッドチップ' }, prizePP: 0 },
-  { id: 'h6', name: 'カガヤキボシ', sexAge: '牡2', classRank: 1, classLabel: '新馬', stars: 5, condition: 4, fatigue: 8, nextRace: null, weeksToNextRace: null, weeksSinceLastRace: null, stableGrade: 'bronze', week: { kind: 'rest' }, prizePP: 0 },
+  { id: 'h1', name: 'サクラブリーズ', sexAge: '牝4', classRank: 6, classLabel: '重賞 GIII', condition: 5, fatigue: 24, nextRace: '桜星賞（8/22）', weeksToNextRace: 0, weeksSinceLastRace: 8, stableGrade: 'gold', week: { kind: 'done', menu: '追い切り' }, prizePP: 4520 },
+  { id: 'h2', name: 'ホクトリュウセイ', sexAge: '牡5', classRank: 5, classLabel: 'オープン', condition: 4, fatigue: 41, nextRace: '若草賞（8/24）', weeksToNextRace: 1, weeksSinceLastRace: 6, stableGrade: 'bronze', week: { kind: 'done', menu: '坂路' }, prizePP: 3100 },
+  { id: 'h3', name: 'トキメキステップ', sexAge: '牝3', classRank: 3, classLabel: '2勝クラス', condition: 3, fatigue: 58, nextRace: null, weeksToNextRace: null, weeksSinceLastRace: 1, stableGrade: 'silver', week: { kind: 'todo' }, prizePP: 900 },
+  { id: 'h4', name: 'ゲンブノツルギ', sexAge: '牡4', classRank: 2, classLabel: '1勝クラス', condition: 2, fatigue: 72, nextRace: null, weeksToNextRace: null, weeksSinceLastRace: null, stableGrade: 'bronze', week: { kind: 'todo' }, prizePP: 400 },
+  { id: 'h5', name: 'シラユキノヒメ', sexAge: '牝3', classRank: 1, classLabel: '未勝利', condition: 3, fatigue: 12, nextRace: '新緑賞（8/23）', weeksToNextRace: 1, weeksSinceLastRace: null, stableGrade: 'bronze', week: { kind: 'done', menu: 'ウッドチップ' }, prizePP: 0 },
+  { id: 'h6', name: 'カガヤキボシ', sexAge: '牡2', classRank: 1, classLabel: '新馬', condition: 4, fatigue: 8, nextRace: null, weeksToNextRace: null, weeksSinceLastRace: null, stableGrade: 'bronze', week: { kind: 'rest' }, prizePP: 0 },
 ];
 
 function detailOf(h: StableHorse): HorseDetail {
