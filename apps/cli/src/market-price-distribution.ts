@@ -34,7 +34,7 @@
  *   `npx tsx apps/cli/src/market-price-distribution.ts [--pool 3000] [--days 26] [--seed 42] [--starts 24]`
  */
 import {
-  classOf, gradeOf, winsRangeFor, prizeFor, npcStudFee,
+  classOf, gradeOf, winsRangeFor, prizeFor, npcStudFee, dailyProgramme, RACES_BY_CLASS,
   PRICE_TIERS_EP, LISTINGS_PER_TIER, priceTierOf, CAREER_RACE_LIMIT, RACES_PER_DAY,
   type RaceClass, type PrizeTier,
 } from '@star/scheduler';
@@ -130,7 +130,19 @@ export function runCohort(
    *    ★**実装を変えるものではありません**（★正典の改訂はオーナー判断）。
    */
   openMinOverride: number | null,
+  /**
+   * ★**クラス別のレース数を上書きする**（★**測定専用**・**CC-3**）。
+   * ⚠️ ★既定は正典 §10.3 の写し（`RACES_BY_CLASS`）。★合計は 240 のままでなければ投げます。
+   */
+  mixOverride: Readonly<Record<string, number>> | null,
 ): Distribution {
+  /**
+   * ★番組表は ★**1 回だけ**作ります。
+   * ⚠️ ★`classOf(idx)` を引数無しで呼ぶと ★**毎回番組表を組み直します**（★既定引数）。
+   */
+  const programme = dailyProgramme(
+    (mixOverride ?? RACES_BY_CLASS) as Readonly<Record<RaceClass, number>>,
+  );
   const rng = deriveRng(seed, 0);
   const pool: HorseRecord[] = [];
   for (let i = 0; i < poolSize; i += 1) {
@@ -200,8 +212,8 @@ export function runCohort(
       }
       upperEligibleByDay.push(n);
     }
-    const raceClass = classOf(idx);
-    const grade = gradeOf(idx);
+    const raceClass = classOf(idx, programme);
+    const grade = gradeOf(idx, programme);
     const tier = tierOf(raceClass, grade);
     const range = winsRangeFor(raceClass);
     /**
@@ -306,16 +318,29 @@ if (isMain) {
   const maxStarts = arg('starts', CAREER_RACE_LIMIT);
   const train = process.argv.includes('--train');
   const openMin = process.argv.includes('--open-min') ? arg('open-min', 4) : null;
+  /**
+   * ★**段の枠の比を振る**（★**CC-3/CC-4**・測定専用）。
+   * ★`--mix maiden,win1,win2,win3,open,graded`（★合計 240）。
+   */
+  const mixArg = process.argv.indexOf('--mix') >= 0 ? process.argv[process.argv.indexOf('--mix') + 1] : undefined;
+  const mix = mixArg === undefined ? null : (() => {
+    const v = mixArg.split(',').map(Number);
+    if (v.length !== 6 || v.some((x) => !Number.isInteger(x) || x < 0)) {
+      throw new Error('--mix は maiden,win1,win2,win3,open,graded の 6 つの整数');
+    }
+    return { maiden: v[0]!, win1: v[1]!, win2: v[2]!, win3: v[3]!, open: v[4]!, graded: v[5]! };
+  })();
 
   console.log('# ★定常での出品価格の分布（★T11-1 ②\'・シミュレータで測定）');
   console.log(`  集団 ${poolSize} 頭 / シード ${seed} / 1 頭 ${maxStarts} 走まで（★CAREER_RACE_LIMIT = ${CAREER_RACE_LIMIT}）`
     + ` / 番組表 ${days} 日（${days * RACES_PER_DAY} レース）`
-    + (openMin === null ? '' : ` / 🔴 **open の資格を ${openMin} 勝以上に上書き**（★測定専用）`));
+    + (openMin === null ? '' : ` / 🔴 **open の資格を ${openMin} 勝以上に上書き**（★測定専用）`)
+    + (mix === null ? '' : ` / 🔴 **段の枠を上書き** ${JSON.stringify(mix)}（★測定専用）`));
   console.log(train
     ? '  ★**育成あり**（runCareer で育て終わった能力で走る・★上限側の見積り）/ 引退と世代交代・配合は入っていません'
     : '  ⚠️ ★育成なし（★下限側の見積り・`--train` で入れられます）/ 引退・世代交代・配合も入っていません');
 
-  const d = runCohort(poolSize, seed, maxStarts, days, train, openMin);
+  const d = runCohort(poolSize, seed, maxStarts, days, train, openMin, mix);
   console.log(`\n  開催 ${d.races} レース / 走った馬 ${d.ran} 頭 / ★G1 を勝った馬 ${d.g1Winners} 頭`
     + `（${((d.g1Winners / Math.max(1, d.ran)) * 100).toFixed(1)}%）`);
   console.log(`  ★平均頭数 ${d.meanFieldSize.toFixed(2)}`

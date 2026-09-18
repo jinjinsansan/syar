@@ -162,7 +162,21 @@ export function dayStartMs(index: number, epochMs: number): number {
  *   各クラスを1日の中に均等に散らします。
  *   ⚠️ 正典に配置の規定は無いので、これは解釈です（照会に出します）。
  */
-export function dailyProgramme(): RaceClass[] {
+export function dailyProgramme(
+  /**
+   * ★**クラス別のレース数**（★既定は正典 §10.3 の写し `RACES_BY_CLASS`）。
+   *
+   * ⚠️ 🔴 ★**ここを渡すのは「測る」ときだけ**です（★**CC-3**・2026-09-19・`fieldSizeRange` の先例）。
+   *    ★**本番の経路は既定のまま**で、★渡した実行だけが変わります。
+   *    ★正典 §10.3 の比を変えるのは ★**正典の改訂**で、★オーナー判断です。
+   * ⚠️ ★合計が `RACES_PER_DAY` と一致しないと ★**投げます**（★黙って枠を余らせない・R-27）。
+   */
+  mix: Readonly<Record<RaceClass, number>> = RACES_BY_CLASS,
+): RaceClass[] {
+  const total = (Object.values(mix) as number[]).reduce((a, b) => a + b, 0);
+  if (total !== RACES_PER_DAY) {
+    throw new Error(`dailyProgramme: クラス別R数の合計が ${total}（${RACES_PER_DAY} でなければいけません）`);
+  }
   const slots: (RaceClass | null)[] = Array.from({ length: RACES_PER_DAY }, () => null);
 
   // 1. G1 は時刻固定（§10.3）。ここだけは散らさない
@@ -172,7 +186,7 @@ export function dailyProgramme(): RaceClass[] {
   const order: RaceClass[] = ['graded', 'open', 'win3', 'win2', 'win1', 'maiden'];
   for (const cls of order) {
     const already = slots.filter((x) => x === cls).length;
-    const need = RACES_BY_CLASS[cls] - already;
+    const need = mix[cls] - already;
     if (need <= 0) continue;
     // 等間隔に置き、埋まっていたら次の空きへ送る（先に置いたクラスを壊さない）
     const step = RACES_PER_DAY / need;
