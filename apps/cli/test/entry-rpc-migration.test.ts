@@ -87,8 +87,28 @@ describe('★第 3 便の移行（0024）', () => {
     expect(sql).toMatch(/create table if not exists horse_story_event/i);
     /** ★書き込みは剥がす（★利用者の delete で記録が消えない） */
     expect(sql).toMatch(/revoke\s+insert,\s*update,\s*delete,\s*truncate\s+on\s+horse_story_event\s+from\s+anon,\s*authenticated/i);
-    /** ★読み取りは誰でも（LR-6「他人の馬の物語も見える」） */
-    expect(sql).toMatch(/grant\s+select\s+on\s+horse_story_event\s+to\s+anon,\s*authenticated/i);
+    /**
+     * 🔴 ★**2026-09-18 に反転しました**（裁定 `REVIEW_ANON_EXPOSURE_VERDICT_20260918.md` AE-3）。
+     *
+     * ★以前ここは `grant select on horse_story_event to anon, authenticated` を**要求**していました
+     *   （★「読み取りは誰でも・LR-6『他人の馬の物語も見える』」という理由で）。
+     *
+     * ★**要求してはいけません。** 理由:
+     *   ① ★`0018_lock_public_grants.sql:52` が「**実体テーブルには一切 grant しない**」と宣言している
+     *   ② ★V-20 ② の合格条件は「**公開ビューとして明示登録されたもの以外は anon から 0 行**」で、
+     *      ★**中身の性質ではなく、ビューとして登録されているか**で書かれている（正典 1654 行）
+     *   ③ ★`detail` は `jsonb` なので、★**列を足さなくても中身が増える**
+     *
+     * ★**LR-6 は取り下げていません** — ★公開が要るようになったら
+     *   ★**`*_public` ビューを作ります**（正典 410 行・`races_public` と同じ形）。
+     *   ★今は `apps/web` がこの表を 1 度も読んでいません（✔ 裁定 §1 の実測）。
+     *
+     * ⚠️ ★**この検査が、書いた瞬間の誤りを 3 便続けて凍結していました**（裁定 §3）。
+     *    ★移行ファイルの文字列を写す検査は「あるべき姿」を書くもので、「今そうなっている姿」ではありません。
+     */
+    expect(blank(sqlOf('0032_close_anon_table_grants.sql'))).toMatch(
+      /revoke\s+all\s+on\s+horse_story_event\s+from\s+anon,\s*authenticated/i,
+    );
     /** ★文章そのものは保存しない（★種類と値だけ。文は storyLineOf が組み立てる・LR-4） */
     expect(sql).not.toMatch(/\btext_ja\b|\bsentence\b|\bstory_text\b/i);
   });

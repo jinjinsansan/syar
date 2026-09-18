@@ -29,7 +29,15 @@ describe('★厩舎の格の解放の移行（0027・D-103 ④）', () => {
     expect(body).toMatch(/select price_ep into v_price from stable_grade_price where grade = v_next/i);
     /** ★利用者は読むだけ */
     expect(body).toMatch(/revoke insert, update, delete, truncate on stable_grade_price from anon, authenticated/i);
-    expect(body).toMatch(/grant select on stable_grade_price to anon, authenticated/i);
+    /**
+     * 🔴 ★**2026-09-18 に反転**（裁定 `REVIEW_ANON_EXPOSURE_VERDICT_20260918.md` AE-3）。
+     * ★以前は `grant select on stable_grade_price to anon, authenticated` を**要求**していました。
+     * ★3 便続けて同じ形になったのは、★**前の便の検査を手本にしたから**です（裁定 §3）。
+     * ★格と価格は公開してよい中身ですが、★`0018:52` の宣言と V-20 ②（**ビューとして登録されているか**で判定）に反します。
+     */
+    expect(blank(readFileSync(path.join(DIR, '0032_close_anon_table_grants.sql'), 'utf8'))).toMatch(
+      /revoke\s+all\s+on\s+stable_grade_price\s+from\s+anon,\s*authenticated/i,
+    );
   });
 
   it('② ★EP だけで払う（★PP・賞金に触れない）', () => {

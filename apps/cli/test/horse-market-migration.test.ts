@@ -63,7 +63,16 @@ describe('★馬の購入の移行（0025・D-102）', () => {
     expect(body).not.toMatch(/listing[\s\S]{0,200}potential/i);
     /** ★利用者は読むだけ（★書き込みを剥がす） */
     expect(body).toMatch(/revoke insert, update, delete, truncate on horse_market_listing from anon, authenticated/i);
-    expect(body).toMatch(/grant select on horse_market_listing to anon, authenticated/i);
+    /**
+     * 🔴 ★**2026-09-18 に反転**（裁定 `REVIEW_ANON_EXPOSURE_VERDICT_20260918.md` AE-3）。
+     * ★以前は `grant select on horse_market_listing to anon, authenticated` を**要求**していました。
+     * ★`0018:52` の宣言（実体テーブルには一切 grant しない）と V-20 ②（公開ビュー以外は anon から 0 行）に反します。
+     * ★**この検査は `0024` の検査を手本にして書かれ、誤りごと写っていました**（裁定 §3）。
+     * ★★と価格は「公開してよい中身」ですが、★**中身ではなく形の問題**です（公開が要るなら `*_public` ビュー・正典 410 行）。
+     */
+    expect(blank(readFileSync(path.join(DIR, '0032_close_anon_table_grants.sql'), 'utf8'))).toMatch(
+      /revoke\s+all\s+on\s+horse_market_listing\s+from\s+anon,\s*authenticated/i,
+    );
   });
 
   it('⑥ ★★の算出や価格の式を SQL に写していない（★二重帳簿にしない・D-052）', () => {
