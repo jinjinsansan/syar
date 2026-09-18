@@ -46,7 +46,9 @@ import {
   type AbilityKey, type HorseId, type HorseRecord, type Rng,
 } from '@star/sim-engine';
 import type { RaceEntrant } from '@star/race-engine';
-import { CAREER_RACE_LIMIT, LIFECYCLE_WEEKS } from '@star/scheduler';
+import {
+  CAREER_RACE_LIMIT, LIFECYCLE_WEEKS, classOf, isEligibleFor, selectEligible,
+} from '@star/scheduler';
 import { resolveRuntimeConfig } from './config.js';
 import { runSimulation } from './simulator.js';
 import { FIELD_SIZE, toEntrant, type GeneratedRace } from './race-field.js';
@@ -160,6 +162,8 @@ function runCareers(
     const active = world.filter((h) => (retireWeekOf.get(h.id) ?? 0) > segStart);
     if (active.length < FIELD_SIZE.MIN) continue; // ★§10.4 の下限。開催しない
 
+    /** ★番組表の通し番号（★区間ごとに進める。★1 日の内訳がそのまま出るように） */
+    const segmentBase = s * 1000;
     /** ★この区間に残っている申し込み枠（★落選しても減りません） */
     const remaining = new Map<HorseId, number>(active.map((h) => [h.id, ENTRIES_PER_SEGMENT]));
     const entryRng = deriveRng(seed, VERIFY_BAND_STREAM.ENTRY, s);
@@ -174,10 +178,22 @@ function runCareers(
       return a.slice(0, k);
     };
 
-    const entriesFor = (race: GeneratedRace): readonly RaceEntrant[] => {
+    /**
+     * ★**そのレースのクラス**（★番組表・§10.3）。★`classOf` は本番と同じものです。
+     *   ★区間ごとに通し番号を進めるので、★1 日の内訳（新馬 140 / 1勝 120 / …）がそのまま出ます。
+     */
+    const raceClassAt = (raceIndex: number): ReturnType<typeof classOf> => classOf(segmentBase + raceIndex);
+    /** ★その馬の**いまの勝利数**（★キャリアの途中で段が上がる） */
+    const winsOf = (h: HorseRecord): number => careers.get(playerIdOf(h.id))?.wins ?? 0;
+
+    const entriesFor = (race: GeneratedRace, raceIndex: number): readonly RaceEntrant[] => {
       const open = FIELD_SIZE.MAX - race.entrants.length;
       if (open <= 0) return [];
-      let waiting = active.filter((h) => (remaining.get(h.id) ?? 0) > 0);
+      const raceClass = raceClassAt(raceIndex);
+      // ★**出走資格**（★CL-1 の述語。★自分の段のレースにしか申し込めない）
+      let waiting = active.filter(
+        (h) => (remaining.get(h.id) ?? 0) > 0 && isEligibleFor(raceClass, winsOf(h)),
+      );
       if (CHOICE === 'matched') {
         // ★自分と同じくらいの相手が集まっている番組だけに申し込む（★勝ち目のあるレースを選ぶ）
         let fieldSum = 0;
@@ -229,6 +245,12 @@ function runCareers(
       { abilityOf: (h: HorseRecord) => h.stats },
       entriesFor,
       raceCount,
+      /**
+       * ★**世界の側も資格で絞る**（★本番の `buildRace` と同じ形・CL-3）。
+       *   ★絞ってから並べ替え・窓に入ります。★足りなければ下へ広げます（★`selectEligible`）。
+       */
+      (raceIndex) =>
+        selectEligible(raceClassAt(raceIndex), active, (h) => winsOf(h), FIELD_SIZE.MIN).pool,
     );
   }
   return { careers, entry };

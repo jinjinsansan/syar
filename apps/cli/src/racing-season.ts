@@ -93,6 +93,15 @@ export function runSeason(
    *   （★本番は 1 日 480 本〔D-007 改訂〕に対し出走可能な馬が数千頭で、★**枠は余っている側**です）。
    */
   raceCountOverride?: number,
+  /**
+   * ★**レースごとの出走候補**（★CL-8・(c) の下ごしらえ・2026-09-18）。
+   *
+   * ★本番のワーカーは ★**レースのクラスで資格を絞ってから**出走表を作ります
+   *   （`apps/worker/src/build-race.ts` の `eligibility` → `selectEligible`）。
+   * ★渡すと、★**そのレースの候補をここで差し替えます**（★並べ替えと窓はその下でそのまま働きます）。
+   * ⚠️ ★**渡さなければ従来どおり**（★プール全体から窓で引く）。★K-4 の選抜も V-1/V-3 も動きません。
+   */
+  poolFor?: (raceIndex: number) => readonly HorseRecord[],
 ): void {
   if (pool.length < 8) return; // 出走頭数（§10.4 の下限）に満たない年は開催しない
 
@@ -101,7 +110,10 @@ export function runSeason(
   const raceCount = raceCountOverride ?? Math.max(1, Math.round((pool.length * racesPerHorse) / 13));
 
   for (let i = 0; i < raceCount; i++) {
-    const race = generateRace(sorted, i, rng, undefined, undefined, undefined, opts);
+    // ★レースごとの候補（★資格で絞る・CL-8）。★渡されなければプール全体
+    const candidates = poolFor === undefined ? sorted : sortPoolByClass(poolFor(i));
+    if (candidates.length < 8) continue; // ★§10.4 の下限に満たないレースは開催しない
+    const race = generateRace(candidates, i, rng, undefined, undefined, undefined, opts);
     // ★自馬の登録（BG-1）。★渡されなければ出走表はそのまま
     const added = entriesFor?.(race, i) ?? [];
     const entrants = added.length === 0 ? race.entrants : [...race.entrants, ...added];
