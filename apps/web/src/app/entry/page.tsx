@@ -7,51 +7,119 @@
  *   ⚠️ §9.5: 自分の馬が出るレースは投票できない旨を登録前から常時表示。
  *      ★2026-09-17: ★画面の語を「投票」に統一（★引き渡し資料 §2-2・A-4）。
  */
-import { useMemo, useState } from 'react';
-import { DEMO_HORSES, conditionView, fatigueColor, sortStable } from '../../lib/stable';
-import { DEMO_ENTRY_RACES, STRATEGY_OPTIONS, entryCandidates, DEMO_JOCKEY_RIDES } from '../../lib/game-demo';
+import { useEffect, useMemo, useState } from 'react';
+import { conditionView, fatigueColor, type Condition } from '../../lib/stable';
+import { STRATEGY_OPTIONS, DEMO_JOCKEY_RIDES } from '../../lib/game-demo';
+import { loadEntryScreen, toEntryRaceView, type EntryScreenData } from '../../lib/entry-screen';
 import { Capsule, ClassChip, FatigueBar, PageTitle, Pill, TabButton } from '../../components/ui';
 /** ★騎手を選ぶ（★D12-4・D-105 ④「出走登録で凍結する」） */
 import { JockeyPicker } from '../../components/jockey-picker';
 
-const WEEK_NO = 32;
-const EP_BALANCE = 4200;
+/**
+ * 🔴 ★**見た目は仮です**（★2026-09-19・**UI1-8**）。
+ *   ★読み込み中・失敗の見せ方は ★**デザイナー便**で決めます（2026-09-15 オーナー指示）。
+ *   ★ここにあるのは ★**「あるか無いか」の側**だけです —
+ *   ★表示が無いと ★**結線が正しいかを確かめられず**、★失敗が黙って消えます（R-16）。
+ *   ⚠️ ★**これを「デザイン」と思わないでください。**
+ */
+//    ★上の註記のとおりです。★定数は置きません（★使わない値を置くと、★何かを切り替えているように読めます）。
 
 /** 一覧の列幅（固定列は flex:0 0 <幅>） */
 const COL = { time: 70, no: 42, cls: 112, heads: 54, fee: 88, deadline: 104, state: 126 } as const;
 
 export default function EntryPage(): React.ReactElement {
-  const horses = useMemo(() => entryCandidates(sortStable(DEMO_HORSES)), []);
-  const [horseId, setHorseId] = useState(horses[0]?.id ?? '');
-  const [raceId, setRaceId] = useState<string | null>(DEMO_ENTRY_RACES.find((r) => r.state === 'ok')?.id ?? null);
+  /**
+   * ★**本番データ**（★2026-09-19・UI1）。★読み込み中と失敗を ★**必ず出します**。
+   * ⚠️ ★失敗を空配列にしない（★「レースが無い」に見えてしまう・R-16）。
+   */
+  const [data, setData] = useState<EntryScreenData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  /**
+   * ★**「いま」は 1 回だけ固定します**（★描画のたびに動くと締切の表示が揃いません）。
+   * ⚠️ ★これは ★**画面の時計**ですが、★**締切そのものはサーバーが書いた値**です（ED-1）。
+   *    ★ここで使うのは「あと何分か」の表示だけで、★**判定は RPC がします**。
+   */
+  const [nowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    let alive = true;
+    loadEntryScreen()
+      .then((d) => {
+        if (!alive) return;
+        setData(d);
+        // ★最初の 1 頭を選んだ状態にする（★タブがどれも選ばれていないと読めない）
+        setHorseId((cur) => (cur === '' ? (d.horses[0]?.id ?? '') : cur));
+      })
+      .catch((e: unknown) => { if (alive) setLoadError(e instanceof Error ? e.message : String(e)); });
+    return () => { alive = false; };
+  }, []);
+
+  const horses = data?.horses ?? [];
+  const [horseId, setHorseId] = useState('');
+  const [raceId, setRaceId] = useState<string | null>(null);
   const [strategy, setStrategy] = useState('sashi');
   /**
    * ★**選んだ騎手**（★D12-4・D-105 ④「出走登録で凍結する」）。
    * ⚠️ ★この便では ★**着順に効きません**（★`JOCKEY_EFFECT` が 0）。
    */
   const [jockeyId, setJockeyId] = useState<string | null>(null);
-  const horse = horses.find((h) => h.id === horseId) ?? null;
-  const race = DEMO_ENTRY_RACES.find((r) => r.id === raceId) ?? null;
-  // 登録できる → 格違い → 締切後 の順（消さない）
-  const order = { ok: 0, class: 1, closed: 2 } as const;
-  const races = [...DEMO_ENTRY_RACES].sort((a, b) => order[a.state] - order[b.state] || a.time.localeCompare(b.time));
-  const cond = horse === null ? null : conditionView(horse.condition);
-  const restCount = DEMO_HORSES.length - horses.length;
-  const enough = race === null ? false : EP_BALANCE >= race.feeEP;
+  const horse = horses.find((h) => h.id === horseId) ?? horses[0] ?? null;
+  /**
+   * ★**出走できるかは「選んでいる馬」ごとに変わります**（★勝利数で資格が決まる）。
+   * ★そのたびに組み直します（★`toEntryRaceView` は純粋な変換）。
+   */
+  const races = useMemo(() => {
+    if (data === null) return [];
+    const wins = horse?.wins ?? 0;
+    const order = { ok: 0, class: 1, closed: 2 } as const;
+    return data.raceRows
+      .map((r) => toEntryRaceView(r, data.headsByRace.get(r.id) ?? 0, wins, nowMs))
+      .sort((a, b) => order[a.state] - order[b.state] || a.time.localeCompare(b.time));
+  }, [data, horse?.wins, nowMs]);
+  const race = races.find((r) => r.id === raceId) ?? null;
+  /**
+   * ⚠️ ★`condition` は DB では `int` ですが、★画面の `Condition` は 1〜5 のリテラル型です。
+   *    ★**範囲外は黙って通さず、★真ん中に寄せます**（★DB 側に制約があるので本来起きません）。
+   */
+  const condValue = Math.min(5, Math.max(1, Math.round(horse?.condition ?? 3))) as Condition;
+  const cond = horse === null ? null : conditionView(condValue);
+  const epBalance = data?.epBalance ?? 0;
+  const enough = race === null ? false : epBalance >= race.feeEP;
 
   return (
     <div style={{ padding: '22px 0 40px' }}>
       <PageTitle
         title="出走登録"
         sub="出走料は参加ポイント（EP）から支払われます"
-        right={<Capsule label="週" value={String(WEEK_NO)} />}
+        right={<Capsule label="週" value={String(data?.gameWeek ?? '—')} />}
       />
-      <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>※ デモデータ（登録と取消はサーバー RPC に接続するまで動きません）</p>
+      {/* 🔴 ★見た目は仮（UI1-8）。★データは本番です */}
+      <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>
+        ※ 見た目は仮です（デザイナー便で差し替わります）。データは本番のサーバーから読んでいます
+        {data !== null && data.staleSeconds > 600 && (
+          <span style={{ color: 'var(--a-red-d)' }}>／⚠️ 世界の更新が {Math.floor(data.staleSeconds / 60)} 分前で止まっています</span>
+        )}
+      </p>
+
+      {/* 🔴 ★読み込み中と失敗を必ず出す（UI1-9・★黙って消さない） */}
+      {loadError !== null && (
+        <div style={{ margin: '12px 0 0', padding: '10px 13px', borderRadius: 8, background: '#ffeceb', border: '2px solid var(--a-red-d)' }}>
+          <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-red-d)', lineHeight: 1.7 }}>読み込めませんでした: {loadError}</span>
+        </div>
+      )}
+      {data === null && loadError === null && (
+        <p style={{ margin: '12px 0 0', fontSize: 13, fontWeight: 900, color: 'var(--a-ink-3)' }}>読み込んでいます…</p>
+      )}
+      {data !== null && horses.length === 0 && (
+        <p style={{ margin: '12px 0 0', fontSize: 13, fontWeight: 900, color: 'var(--a-ink-3)' }}>出走させられる馬がいません</p>
+      )}
 
       {/* 馬タブ（休養中の馬はタブに出さず末尾に理由） */}
       <div className="rc-tabs" style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
         {horses.map((h) => <TabButton key={h.id} label={h.name} selected={h.id === horseId} onClick={() => setHorseId(h.id)} />)}
-        {restCount > 0 && <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)', marginLeft: 10, paddingBottom: 6 }}>休養中の {restCount} 頭は選べません</span>}
+        {/* ⚠️ ★**休養中の除外はまだ入れていません** — ★`my_horses` に「今週の調教」が無く、
+            ★`rest_until_week` と「いまの週」で判定できますが、★**本当に出せないのかは
+            ★`enter_race` が決めます**（★画面で先回りして違う判定をすると CL-4 の形になります）。 */}
       </div>
 
       {/* 選択中の馬（タブと接続） */}
@@ -70,7 +138,9 @@ export default function EntryPage(): React.ReactElement {
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 22, fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)', whiteSpace: 'nowrap' }}>
               <span>調子 <span style={{ color: cond.color }}>{cond.mark} {cond.label}</span></span>
-              <span>今週の指示 <span style={{ color: horse.week.kind === 'done' ? 'var(--a-ink)' : 'var(--a-ink-3)' }}>{horse.week.kind === 'done' ? horse.week.menu : '未指示'}</span></span>
+              {/* ⚠️ ★**「今週の指示」は出せません** — ★`horses` に `training_menu` の列がありません
+                  （★`/setup` の毛色・脚質と同じ、★**デモの作り物**でした）。★報告済み。 */}
+              <span>戦績 <span style={{ color: 'var(--a-ink)' }}>{horse.starts} 戦 {horse.wins} 勝</span></span>
             </div>
           </div>
         </div>
@@ -164,13 +234,15 @@ export default function EntryPage(): React.ReactElement {
               <JockeyPicker
                 horseName={horse?.name ?? ''}
                 raceName={`${race.raceNo}　${race.classLabel}`}
+                /* ⚠️ ★**騎乗回数はまだ見本です** — ★`race_entries.jockey_frozen` は CLOSED で、
+                   ★画面から数える口がありません（★報告済み）。 */
                 rides={DEMO_JOCKEY_RIDES}
                 selectedId={jockeyId}
                 onSelect={setJockeyId}
               />
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 44, borderBottom: '1px solid var(--a-line)' }}><span className="a-lbl">出走料</span><span><span className="a-num" style={{ fontSize: 30, color: 'var(--a-num-money)' }}>{race.feeEP}</span> <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>EP</span></span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 44, borderBottom: '1px solid var(--a-line)' }}><span className="a-lbl">登録後の残り</span><span><span className="a-num" style={{ fontSize: 30, color: 'var(--a-num-time)' }}>{(EP_BALANCE - race.feeEP).toLocaleString('ja-JP')}</span> <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>EP</span></span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 44, borderBottom: '1px solid var(--a-line)' }}><span className="a-lbl">登録後の残り</span><span><span className="a-num" style={{ fontSize: 30, color: 'var(--a-num-time)' }}>{(epBalance - race.feeEP).toLocaleString('ja-JP')}</span> <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>EP</span></span></div>
               {/* §9.5 憲法の明示 — 登録前から常時表示し、登録後も残す */}
               <div style={{ marginTop: 12, padding: '11px 13px', borderRadius: 8, background: '#eaf3fb', border: '2px solid #9fc0dc' }}><span style={{ fontSize: 13, fontWeight: 900, color: 'var(--a-ink)', lineHeight: 1.6 }}>自分の馬が出るレースは投票できません</span></div>
               <span className={`a-btn a-btn-gold${enough ? '' : ' off'}`} style={{ height: 52, marginTop: 12, fontSize: 18, ...(enough ? {} : { opacity: .4 }) }} title="サーバー接続まで押せません">登録する（{race.feeEP} EP）</span>

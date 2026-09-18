@@ -102,6 +102,8 @@ export interface MyHorseRow {
   readonly wins: number;
   /** ★出走数（`0040`） */
   readonly starts: number;
+  /** ★誕生週（★年齢は「いまの週」との差で出す・UI1-10） */
+  readonly birthWeek: number | null;
 }
 
 export interface EntryRepo {
@@ -168,6 +170,8 @@ export const supabaseEntryRepo: EntryRepo = {
       careerEnded: Boolean(h.career_ended),
       wins: Number(h.wins),
       starts: Number(h.starts),
+      // ★この経路では読みません（★年齢を使うのは `entry-screen.ts` の側）
+      birthWeek: null,
     }));
   },
 
