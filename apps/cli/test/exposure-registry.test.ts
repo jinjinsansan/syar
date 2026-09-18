@@ -65,7 +65,7 @@ describe('V-20 登録簿の中身（★正典の要求と直結する項目）',
     expect(EXPECTED_EXPOSURE['npc_stables']).toBe(CLOSED);
   });
 
-  it('公開ビューは5つで、いずれも _public 接尾辞', () => {
+  it('公開ビューは8つで、いずれも _public 接尾辞', () => {
     /**
      * ⚠️ ★**一覧を名指しで書いています**（★数だけではなく）。
      *    ★★**公開ビューを 1 つ増やすのは、★外に出すものを増やすということ**です。
@@ -75,7 +75,9 @@ describe('V-20 登録簿の中身（★正典の要求と直結する項目）',
      */
     const views = Object.entries(EXPECTED_EXPOSURE).filter(([, k]) => k === PUBLIC_VIEW).map(([n]) => n);
     expect(views.sort()).toEqual([
-      'prize_catalog_public', 'race_entries_public', 'race_odds_public', 'races_public', 'world_state_public',
+      'horse_market_listing_public', 'horse_story_event_public', 'prize_catalog_public',
+      'race_entries_public', 'race_odds_public', 'races_public',
+      'stable_grade_price_public', 'world_state_public',
     ]);
     for (const v of views) expect(v.endsWith('_public')).toBe(true);
   });

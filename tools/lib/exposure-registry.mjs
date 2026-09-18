@@ -42,6 +42,15 @@ export const EXPECTED_EXPOSURE = {
    *   ★未ログインでも番組表は見られるので（`races_public`）、★週番号を隠す意味はありません。
    */
   world_state_public: PUBLIC_VIEW,
+  /**
+   * ★UI-3 の公開ビュー 3 本（★2026-09-19・移行 `0043`）。
+   *   ★`0032`（AE-1）で実体表を閉じたとき、★裁定が★**「公開が要るようになった今、
+   *   ★`*_public` ビューを作る番」**と書いています（★正典 410 行の形）。
+   * ⚠️ ★どれも ★**出す列を 1 列ずつ理由つきで選んでいます**（★`0034` と同じ作法・R-29）。
+   */
+  horse_market_listing_public: PUBLIC_VIEW,
+  stable_grade_price_public: PUBLIC_VIEW,
+  horse_story_event_public: PUBLIC_VIEW,
 
   // ── 本人スコープ（RLS のポリシーで自分の行だけ。select のみ） ──
   // ★users は revoke all にしない（S-2: revoke が勝ってポリシーが打ち消され、
