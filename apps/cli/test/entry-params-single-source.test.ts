@@ -174,11 +174,18 @@ describe('★EN-1: 所有馬は生成プールに入らない', () => {
      * 🔴 ★旧は絞っておらず、★**登録していない自分の馬が窓に選ばれて勝手に出走**しました
      *    （★料金も脚質も騎手も無し）。★正典 1318「残りを **NPC 馬で充填**」。
      */
+    /**
+     * ⚠️ 🔴 ★**2026-09-19・PO-2 で述語を `RACEABLE_WHERE` に切り出しました**。
+     *    ★SQL の文字列を直に見ると、★**切り出した日に黙って空振りします**。
+     *    → ★**述語の定義の側**を見て、★**読む側がそれを引いていること**も併せて見ます。
+     */
+    const where = repo.slice(repo.indexOf('const RACEABLE_WHERE'), repo.indexOf('RACEABLE_POOL_LIMIT'));
+    expect(where.length, '★述語の定義が読めていない（★走査が空・R-21）').toBeGreaterThan(50);
+    expect(where, '★所有馬を除いていない').toContain('owner_id is null');
     const fn = repo.slice(repo.indexOf('export async function loadRaceablePool'));
-    const sql = fn.slice(fn.indexOf('`select * from horses'), fn.indexOf('[limit]'));
-    expect(sql, '★所有馬を除いていない').toContain('owner_id is null');
+    expect(fn, '★読む側がその述語を引いていない').toContain('${RACEABLE_WHERE}');
     /** ★引退の除外（CL-3）も残っている */
-    expect(sql, '★引退馬を除いていない').toContain('retired_at_week is null');
+    expect(where, '★引退馬を除いていない').toContain('retired_at_week is null');
   });
 });
 
