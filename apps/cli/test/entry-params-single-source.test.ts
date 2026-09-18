@@ -179,7 +179,15 @@ describe('★EN-1: 所有馬は生成プールに入らない', () => {
      *    ★SQL の文字列を直に見ると、★**切り出した日に黙って空振りします**。
      *    → ★**述語の定義の側**を見て、★**読む側がそれを引いていること**も併せて見ます。
      */
-    const where = repo.slice(repo.indexOf('const RACEABLE_WHERE'), repo.indexOf('RACEABLE_POOL_LIMIT'));
+    /**
+     * 🔴 ★**終わりは「次の定数の名前」で探さないこと**（★2026-09-19・PO-4 で踏みました）。
+     *    ★`RACEABLE_POOL_LIMIT` を ★**上の註記の中に書いた**瞬間、★終わりが始まりより前に来て
+     *    ★走査が空になりました。★`length > 50` の番人（R-21）が拾いましたが、
+     *    ★**註記を書いただけでテストが落ちる**のは検査の側の弱さです。
+     *    → ★**宣言そのものの終わり**（★テンプレート文字列を閉じる `` `; ``）まで取ります。
+     */
+    const start = repo.indexOf('const RACEABLE_WHERE');
+    const where = repo.slice(start, repo.indexOf('`;', start) + 2);
     expect(where.length, '★述語の定義が読めていない（★走査が空・R-21）').toBeGreaterThan(50);
     expect(where, '★所有馬を除いていない').toContain('owner_id is null');
     const fn = repo.slice(repo.indexOf('export async function loadRaceablePool'));
