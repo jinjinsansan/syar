@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { PageTitle, StyleChip } from '../../components/ui';
+import { PageTitle } from '../../components/ui';
 import {
-  NAME_MAX, SILK_COLORS, SLEEVES, sleeveHex, demoSetupRepo,
+  NAME_MAX, SILK_COLORS, SLEEVES, sleeveHex, supabaseSetupRepo,
   type InitialHorse, type SetupError, type Sleeve,
 } from '../../lib/setup';
 
@@ -42,7 +42,23 @@ function NameField({ label, value, onChange, placeholder }: {
 }
 
 /** エラー行 — 入力欄の直下に該当する 1 件だけを出す（重複と NG ワードは同時に出ない） */
-function ErrorRow({ error, onRetry }: { readonly error: SetupError; readonly onRetry: () => void }): React.ReactElement {
+function ErrorRow(
+  { error, message, onRetry }:
+  { readonly error: SetupError; readonly message: string | null; readonly onRetry: () => void },
+): React.ReactElement {
+  /**
+   * 🔴 ★**UI1-9: 失敗を握り潰しません。**
+   *   ★当てはまらないものは ★**サーバーの文言をそのまま**出します。
+   *   ★言い換えると、★**直すべき所が画面から見えなくなります**（R-16）。
+   */
+  if (error === 'other') {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, padding: '9px 12px', borderRadius: 8, background: '#ffeceb', border: '2px solid var(--a-red-d)' }}>
+        <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-red-d)', lineHeight: 1.7 }}>{message ?? '登録できませんでした（理由が返っていません）'}</span>
+        <button type="button" className="a-btn" onClick={onRetry} style={{ height: 30, padding: '0 14px', fontSize: 12, marginLeft: 'auto', flex: '0 0 auto' }}>もう一度</button>
+      </div>
+    );
+  }
   if (error === 'network') {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, padding: '9px 12px', borderRadius: 8, background: '#fff6d6', border: '2px solid #a9741a' }}>
@@ -96,6 +112,12 @@ export default function SetupPage(): React.ReactElement {
   const [colorKey, setColorKey] = useState('blue');
   const [sleeve, setSleeve] = useState<Sleeve>('white');
   const [error, setError] = useState<SetupError | null>(null);
+  const [errorText, setErrorText] = useState<string | null>(null);
+  /**
+   * ★**冇等キー**（V-19 ⑭）。⚠️ ★**送るたびに作り直さないこと** —
+   *   ★作り直すと ★**2 回目も通ってしまいます**。★1 回だけ作って持ち続けます。
+   */
+  const [clientToken] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [granted, setGranted] = useState<{ horse: InitialHorse; grantedEP: number; dailyEP: number } | null>(null);
 
@@ -105,12 +127,12 @@ export default function SetupPage(): React.ReactElement {
 
   const submit = async (): Promise<void> => {
     if (!canSubmit) return;
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setErrorText(null);
     try {
-      const r = await demoSetupRepo.create({ displayName, stableName, colorKey, sleeve });
+      const r = await supabaseSetupRepo.create({ displayName, stableName, colorKey, sleeve, clientToken });
       if (r.ok) { setGranted({ horse: r.horse, grantedEP: r.grantedEP, dailyEP: r.dailyEP }); setStep(2); }
-      else setError(r.error);
-    } catch { setError('network'); }
+      else { setError(r.error); setErrorText(r.message ?? null); }
+    } catch (e) { setError('network'); setErrorText(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   };
 
@@ -127,7 +149,12 @@ export default function SetupPage(): React.ReactElement {
           </span>
         )}
       />
-      <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>※ デモ（ログインとセットアップ RPC の導入まで、送信してもサーバーには保存されません）</p>
+      {/* 🔴 ★**仮の表示です**（★2026-09-19・**UI1-8**）。
+          ★読み込み中・失敗の見せ方は ★**デザイナー便で決めます**（2026-09-15 オーナー指示）。
+          ★ここにあるのは ★**「あるか無いか」の側**だけです —
+          ★表示が無いと ★**結線が正しいかを確かめられず**、★失敗が黙って消えます（R-16）。
+          ⚠️ ★**これを「デザイン」と思わないでください。** */}
+      <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>※ 見た目は仮です（デザイナー便で差し替わります）。送信は本番のサーバーに届きます</p>
 
       {step === 1 && (
         <div className="a-panel strong rise" style={{ marginTop: 14 }}>
@@ -142,7 +169,7 @@ export default function SetupPage(): React.ReactElement {
                 <NameField label="表示名" value={displayName} onChange={setDisplayName} placeholder="たかせ みのる" />
                 <NameField label="牧場名" value={stableName} onChange={setStableName} placeholder="サクラ牧場" />
               </div>
-              {error !== null && <ErrorRow error={error} onRetry={submit} />}
+              {error !== null && <ErrorRow error={error} message={errorText} onRetry={submit} />}
               <div style={{ marginTop: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
                   <span className="a-lbl">勝負服の配色</span>
@@ -222,21 +249,27 @@ export default function SetupPage(): React.ReactElement {
                 <span style={{ fontSize: 36, fontWeight: 900, color: 'var(--a-ink)' }}>{granted.horse.name}</span>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-                <span className="a-chip" style={{ height: 28, padding: '0 12px', fontSize: 13, color: 'var(--a-ink)' }}>{granted.horse.sexAge}</span>
-                <span className="a-chip" style={{ height: 28, padding: '0 12px', fontSize: 13, color: 'var(--a-ink)' }}>{granted.horse.coat}</span>
-                <span className="a-chip" style={{ height: 28, padding: '0 12px', fontSize: 13, color: 'var(--a-ink)' }}>{granted.horse.stableName}</span>
+                <span className="a-chip" style={{ height: 28, padding: '0 12px', fontSize: 13, color: 'var(--a-ink)' }}>{granted.horse.sex}</span>
+                {/* 🔴 ★**毛色・年齢・厩舎名のチップを取りました**（★2026-09-19・UI1-8）。
+                    ★`horses` に **毛色の列がありません**（★「栗毛」は画面の作り物でした）。
+                    ★年齢は **今が何週か**を画面が知らないと出せません。
+                    ★**無い列を作って埋めません** — ★何を出すかは報告済みです。 */}
               </div>
               <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
                 {/* ⚠️ ★**素質の枚を取りました**（★2026-09-18・D-114 ②・T-10・AL-2）。
                     ★ここに何を置くかは ★**デザイナー便**で決めます（2026-09-15 オーナー指示）。
                     ★開発側で代わりの見せ方を作らないため、★**空けたまま**にしてあります。 */}
-                <div style={{ width: 190, flex: '0 0 190px', padding: '12px 16px', borderRadius: 10, background: '#fff', border: '2px solid var(--a-edge)' }}>
-                  <span className="a-lbl">脚質</span>
-                  <div style={{ marginTop: 8 }}><StyleChip strategy={granted.horse.strategy} h={30} font={14} /></div>
-                </div>
+                {/* 🔴 ★**脚質の枠を取りました**（★2026-09-19・UI1-8）。
+                    ★脚質は `horses` に無く、★**出走登録のたびに選ぶもの**です（`race_entries.strategy`）。
+                    ★ここに固定の脚質を出すと、★**馬の性質のように読めます**。 */}
               </div>
               <div style={{ marginTop: 16, padding: '12px 14px', borderRadius: 8, background: '#eaf3fb', border: '2px solid #9fc0dc' }}>
-                <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--a-ink)', lineHeight: 1.7 }}>最初の 1 頭は無償です。引退や引き直しをしても同じ馬が迎えられます</span>
+                {/* 🔴 ★**文言を直しました**（★2026-09-19・UI1-8）。
+                    ★旧:「引き直しをしても**同じ馬**が迎えられます」
+                    🔴 ★これは **実装と違います** — ★`0037` は **無作為に 1 頭**引きます。
+                    ★**D-079 ① が user_id から導く形を明示的に禁じています**（★振り直しの動機そのものを作るため）。
+                    ★止めているのは **決定性ではなく「観測できる差が無いこと」**（D-079 ②・D-114）。 */}
+                <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--a-ink)', lineHeight: 1.7 }}>最初の 1 頭は無償です。どの 1 頭が来ても、できることは変わりません</span>
               </div>
             </div>
           </div>
