@@ -16,7 +16,10 @@
  */
 import pg from 'pg';
 import { loadEnv } from './lib/env.mjs';
-import { RACES_BY_CLASS, RACES_PER_DAY, raceClassOfWins, winsRangeFor } from '@star/scheduler';
+import {
+  CAREER_RACE_LIMIT, LIFECYCLE_WEEKS, RACES_BY_CLASS, RACES_PER_DAY, WEEKS_PER_DAY,
+  raceClassOfWins, winsRangeFor,
+} from '@star/scheduler';
 
 /** ★出走表の平均頭数（★`race-field.ts` の註記と同じ「平均13頭立て」） */
 const AVG_FIELD = 13;
@@ -106,6 +109,58 @@ try {
     `    → 1 頭あたり ${openHorses > 0 ? (openNeed / openHorses).toFixed(2) : '—'} 回/日` +
       `${openHorses === 0 ? '  🔴 ★埋められません（★「重賞＝オープン馬」の読みが成立しません）' : ''}`,
   );
+  console.log('');
+  // ── ★CF-1: 定常状態が存在するか（★裁定 REVIEW_RACE_CLASS_FLOW_VERDICT_20260918）──
+  //    ⚠️ ★数字は**写さず、コードの定数から独立に**計算します（R-13）。
+  const fieldRes = await client.query(
+    `select avg(n)::float8 as avg_field, count(*)::int as races from (
+       select race_id, count(*)::int as n from race_entries
+        where finish_pos is not null group by race_id
+     ) t`,
+  );
+  const measuredField = fieldRes.rows[0]?.avg_field ?? null;
+  const settledRaces = fieldRes.rows[0]?.races ?? 0;
+  const aliveRes = await client.query(
+    `select count(*)::int n from horses
+      where generation >= (select max(generation) - 2 from horses) and retired_at_week is null`,
+  );
+  const alive = aliveRes.rows[0]?.n ?? 0;
+
+  /** ★現役の週数（★正典 §7.1・862 行「104〜260週が現役期間」＝ コードの LIFECYCLE_WEEKS） */
+  const racingWeeks = LIFECYCLE_WEEKS.retireAt - LIFECYCLE_WEEKS.raceableFrom;
+  const field = measuredField ?? AVG_FIELD;
+
+  console.log('');
+  console.log('  ★CF-1 定常状態が存在するか（★回す前に出す・裁定の条件）');
+  console.log(
+    `    平均頭数: ${measuredField === null ? `${AVG_FIELD}（★実測なし・既定）` : `${measuredField.toFixed(2)}（★確定した ${settledRaces} レースの実測）`}`,
+  );
+  for (const [label, weeks] of [
+    [`正典 §7.1（${LIFECYCLE_WEEKS.raceableFrom}〜${LIFECYCLE_WEEKS.retireAt}週＝${racingWeeks}週）`, racingWeeks],
+    ['D-007 改訂の文（現役 90 週）', 90],
+  ]) {
+    const k = (CAREER_RACE_LIMIT / weeks) * WEEKS_PER_DAY;
+    let total = 0;
+    const parts = [];
+    for (const c of ['maiden', 'win1', 'win2', 'win3', 'open', 'graded']) {
+      const n = ((RACES_BY_CLASS[c] ?? 0) * field) / k;
+      total += n;
+      if (c !== 'graded') parts.push(`${LABEL[c]} ${Math.round(n)}`);
+    }
+    const margin = ((alive - total) / Math.max(1, alive)) * 100;
+    console.log(
+      `    ${label}: k=${k.toFixed(2)} 走/日 → 要る頭数 合計 ★**${Math.round(total)}**` +
+        `（${parts.join(' / ')}・オープン＋重賞 ${Math.round(((RACES_BY_CLASS.open + RACES_BY_CLASS.graded) * field) / k)}）`,
+    );
+    console.log(
+      `      母数（現役）${alive} 頭に対して ${((total / Math.max(1, alive)) * 100).toFixed(1)}%` +
+        `  → ${total <= alive ? `✅ 存在しうる（余裕 ${margin.toFixed(1)}%）` : '🔴 ★存在しない（母数が足りない）'}`,
+    );
+    console.log(
+      `      ⚠️ ★ただし loadRaceablePool は **上限 3,000 頭**しか読みません` +
+        ` → ${total <= 3000 ? '✅ 上限の内側' : '🔴 ★上限を超える（★読まれない馬は枠を埋められない）'}`,
+    );
+  }
   console.log('');
   console.log(`  ★未出走の馬（初期馬の候補になりうる・CL-5'）: ${unraced} 頭 / ${poolIds.length} 頭`);
   console.log(`  ★参考: 資格の範囲（winsRangeFor）… ` +
