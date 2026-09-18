@@ -14,8 +14,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  npcStudFee, sellBackEP, marketStockAlert, canBuyWithEP,
-  MIN_PRICE_EP, SELL_BACK_RATE, MARKET_STOCK_MIN,
+  npcStudFee, sellBackEP, marketStockAlert, canBuyWithEP, planListings, priceTierOf,
+  MIN_PRICE_EP, SELL_BACK_RATE, MARKET_STOCK_MIN, PRICE_TIERS_EP, LISTINGS_PER_TIER,
 } from '../src/index.js';
 
 describe('★馬の購入（D-102・T-11）', () => {
@@ -79,5 +79,64 @@ describe('★馬の購入（D-102・T-11）', () => {
     expect(marketStockAlert(MARKET_STOCK_MIN - 1).ok, '★下限割れ').toBe(false);
     const alert = marketStockAlert(10);
     expect(alert).toEqual({ ok: false, available: 10, min: MARKET_STOCK_MIN });
+  });
+
+  /**
+   * 🔴 ★**MK-2**（2026-09-19）: ★**総数の下限では、棚の欠品を検出できません。**
+   *
+   * ✔ ★staging の実測（★この形をそのまま写しています）:
+   *   ★候補 **732 頭**（★下限 200 の 3.7 倍）なのに、
+   *   ★帯 0 = 656 / 帯 1 = 56 / 帯 2 = 18 / ★**帯 3 = 2** / ★**帯 4 = 0** で、★**5 段のうち 2 段が空**。
+   *
+   * ★`marketStockAlert` は ✅ を返し、★`planListings` は ★**その帯を黙って飛ばします**
+   *   （`candidates.length === 0` で `continue`）。
+   * → ★欠品を数えるのは ★`refreshMarketListings` の **`shortfall`**（T11-1 ②）の仕事です。
+   *   ★**役割が違う 2 つを、同じ線で見ないこと。**
+   */
+  it('🔴 ★MK-2 在庫の下限が ✅ でも、棚は空きうる（★別の信号であること）', () => {
+    /** ★staging の実測と同じ形の候補（★帯 3 に 2 頭・帯 4 に 0 頭） */
+    const pool: { horseId: string; priceEP: number }[] = [];
+    let k = 0;
+    const put = (n: number, priceEP: number): void => {
+      for (let i = 0; i < n; i += 1) { pool.push({ horseId: `h${k}`, priceEP }); k += 1; }
+    };
+    put(656, 3_000);   // 帯 0
+    put(56, 3_300);    // 帯 1
+    put(18, 3_700);    // 帯 2
+    put(2, 4_500);     // 帯 3 ← 3 口に足りない
+    // 帯 4（7,600 EP 以上）は 0 頭
+    expect(pool.length).toBe(732);
+
+    // ★総数の下限は ✅ を返す
+    expect(marketStockAlert(pool.length).ok, '★候補 732 頭は下限 200 を超えている').toBe(true);
+
+    // ★それでも棚は埋まらない
+    const plan = planListings(pool, [], 0);
+    const addedByTier = new Map<number, number>();
+    for (const a of plan.add) {
+      const t = priceTierOf(a.priceEP);
+      addedByTier.set(t, (addedByTier.get(t) ?? 0) + 1);
+    }
+    expect(addedByTier.get(0)).toBe(LISTINGS_PER_TIER);
+    expect(addedByTier.get(1)).toBe(LISTINGS_PER_TIER);
+    expect(addedByTier.get(2)).toBe(LISTINGS_PER_TIER);
+    expect(addedByTier.get(3), '★帯 3 は 2 頭しかいない').toBe(2);
+    expect(addedByTier.get(4), '★帯 4 は 1 口も出ない').toBeUndefined();
+    // ★5 段 × 3 口 = 15 口のはずが 11 口
+    expect(plan.add.length).toBe(11);
+    expect(plan.add.length).toBeLessThan(PRICE_TIERS_EP.length * LISTINGS_PER_TIER);
+  });
+
+  /**
+   * ★**上の帯が空なのは、価格の式ではなく入力（世界の若さ）です**（★MK-2・入力を先に見る）。
+   * ✔ ★staging: ★重賞は **G3 が 2 件で G1 が 0 件** → `g1_wins > 0` が 0 頭なのは**正しい**。
+   */
+  it('★帯 4（7,600 EP）に届くのに何が要るか（★式から逆算する）', () => {
+    // ★G1 を 1 つ勝てば 3,000 + 8,000 = 11,000 EP で、★一気に帯 4
+    expect(npcStudFee(1, 0)).toBe(11_000);
+    expect(priceTierOf(npcStudFee(1, 0))).toBe(PRICE_TIERS_EP.length - 1);
+    // ★G1 が 0 勝なら、★総獲得 92,000 PP が要る（★7,600 = 3,000 + 92,000/20）
+    expect(npcStudFee(0, 92_000)).toBe(7_600);
+    expect(priceTierOf(npcStudFee(0, 91_999))).toBeLessThan(PRICE_TIERS_EP.length - 1);
   });
 });
