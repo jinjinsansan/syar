@@ -65,10 +65,54 @@ export function rowToHorse(row: Record<string, unknown>): HorseRecord {
  * ★現役だけを対象にする。繁殖に上がった馬や祖先まで含めると、
  *   出走表に「もう走らない馬」が混ざります。
  */
+/**
+ * ★**生成プールの「現役」の述語**（★**PO-4**・2026-09-19）。
+ *
+ * 🔴 ⚠️ ★**いま実装には「現役」が 2 つあります。**
+ *   ★① ここ … `generation >= max(generation) - 2 and retired_at_week is null and owner_id is null`
+ *   ★② `market-flow` … `owner_id is null and npc_stable_id is not null and retired_at_week is null`
+ *   ✔ ★staging の実測（2026-09-19）: ★**① = 4,389 頭 / ② = 7,333 頭**（★① は ② の部分集合）。
+ *   → ★★**レースの母数と、市場の在庫の母数が別**です。
+ * ⚠️ ★どちらを「現役」と呼ぶかは ★**正典 §10.5 の話**で、★**AL-11 の便で決めます**（PO-4）。
+ *    ★ここで勝手に揃えると ★**出走馬の顔ぶれが変わり**、★V-4・V-5・V-6 を三度測ることになります。
+ */
+const RACEABLE_WHERE = `generation >= (select max(generation) - 2 from horses)
+        and retired_at_week is null
+        and owner_id is null`;
+
+/**
+ * ★**1 回に読む上限**。
+ *
+ * 🔴 ⚠️ ★**2026-09-19 時点で、これは黙って切っています**（★**PO-2**）。
+ *   ✔ ★staging の実測: ★条件に合うのは **4,389 頭**、★読むのは **3,000 頭** →
+ *     ★★**1,389 頭（32%）が一度も出走表に載りません。**
+ *   ⚠️ ★`order by id` なので ★**毎回おなじ 1,389 頭**です（★「たまたま今日出なかった」ではない）。
+ * → ★**この便では値を変えません** — ★上げると ★**出走馬の顔ぶれが変わり**、
+ *   ★V-4・V-5・V-6 の取り直しが要ります（★裁定: **AL-11 と D-117 の便に合流。三度測らない**）。
+ * → ★**代わりに、切ったことを黙らないようにしました**（★下の `onTruncated`）。
+ */
+export const RACEABLE_POOL_LIMIT = 3000;
+
 export async function loadRaceablePool(
   client: pg.Client | pg.PoolClient,
-  limit = 3000,
+  limit = RACEABLE_POOL_LIMIT,
+  /**
+   * ★**上限で切ったときに呼ばれます**（★**PO-2**・★黙らせない）。
+   * ⚠️ ★渡さなくても動きますが、★**渡さないと「1,389 頭が走れない」ことが誰にも見えません**。
+   */
+  onTruncated?: (eligible: number, used: number) => void,
 ): Promise<HorseRecord[]> {
+  /**
+   * ★**先に数えます**（★R-21: 0 件を「該当なし」と読まない・★切れたことを見えるようにする）。
+   * ⚠️ ★`where` は ★**`RACEABLE_WHERE` の 1 か所**から引きます（★2 か所に書くとずれます・D-052）。
+   */
+  if (onTruncated !== undefined) {
+    const cnt = await client.query<{ n: string }>(
+      `select count(*)::text as n from horses where ${RACEABLE_WHERE}`,
+    );
+    const eligible = Number(cnt.rows[0]!.n);
+    if (eligible > limit) onTruncated(eligible, limit);
+  }
   const r = await client.query(
     /**
      * 🔴 ★**`retired_at_week is null` を 2026-09-18 に足しました**（★CL-3 の便）。
@@ -99,9 +143,7 @@ export async function loadRaceablePool(
      *     🔴 ★**1 頭でもできた翻日には、取り直しが要る作業に化けます**（★`/setup` を繋いだ今日が期限でした）。
      */
     `select * from horses
-      where generation >= (select max(generation) - 2 from horses)
-        and retired_at_week is null
-        and owner_id is null
+      where ${RACEABLE_WHERE}
       order by id
       limit $1`,
     [limit],

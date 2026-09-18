@@ -99,7 +99,19 @@ async function main(): Promise<void> {
    *   → ★**週送りが進んだ後に読み直します**（★下のループの中）。
    * ⚠️ ★`const` のまま ★**中身を入れ替えます**（★`buildRace` に渡す参照を保つため）。
    */
-  const pool = await loadRaceablePool(client);
+  /**
+   * ★★**上限で切ったら黙らない**（★**PO-2**・2026-09-19）。
+   * ✔ ★staging の実測: ★条件に合う **4,389 頭** のうち ★**3,000 頭しか読みません**。
+   *   ★`order by id` なので ★**毎回おなじ 1,389 頭が一度も出走表に載りません**。
+   * ⚠️ ★上限を上げるのは **AL-11 / D-117 の便**（★顔ぶれが変わる → V-4/V-5/V-6 の取り直し）。
+   */
+  const onPoolTruncated = (eligible: number, used: number): void => {
+    console.error(
+      `[worker] ★出走可能な馬を上限で切りました ${eligible} 頭中 ${used} 頭`
+      + `（★残り ${eligible - used} 頭は一度も出走表に載りません・PO-2）`,
+    );
+  };
+  const pool = await loadRaceablePool(client, undefined, onPoolTruncated);
   console.log(`[worker] 出走可能な馬 ${pool.length} 頭`);
 
   /**
@@ -479,7 +491,7 @@ async function main(): Promise<void> {
          */
         try {
           const before = pool.length;
-          const fresh = await loadRaceablePool(client);
+          const fresh = await loadRaceablePool(client, undefined, onPoolTruncated);
           pool.length = 0;
           // ⚠️ ★`push(...fresh)` は使いません（★引数の数に上限があり、★プールが育つと落ちます）
           for (const h of fresh) pool.push(h);

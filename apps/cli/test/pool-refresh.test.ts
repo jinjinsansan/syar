@@ -27,14 +27,14 @@ const REPO = strip(readFileSync(path.join(ROOT, 'apps/worker/src/horse-repo.ts')
 describe('★EN-4 ②: 週送りの後に読み直す', () => {
   it('★走査が空振りしていない（R-21）', () => {
     expect(MAIN.length).toBeGreaterThan(5000);
-    expect(MAIN, '★起動時の読み込みが無い').toMatch(/const pool = await loadRaceablePool\(client\)/);
+    expect(MAIN, '★起動時の読み込みが無い').toMatch(/const pool = await loadRaceablePool\(/);
   });
 
   it('🔴 ① ★ループの中でも読み直している', () => {
-    const decl = 'const pool = await loadRaceablePool(client)';
+    const decl = 'const pool = await loadRaceablePool(';
     const first = MAIN.indexOf(decl);
     /** ⚠️ ★**宣言そのものを跨いで**探します（★同じ 1 行を「2 回目」と数えない） */
-    const again = MAIN.indexOf('loadRaceablePool(client)', first + decl.length);
+    const again = MAIN.indexOf('loadRaceablePool(', first + decl.length);
     expect(again, '🔴 ★読み直しが 1 か所しかない（★起動時だけ）').toBeGreaterThan(-1);
     /** ★中身を入れ替えている（★`buildRace` に渡す参照を保つ） */
     expect(MAIN, '★中身を入れ替えていない').toMatch(/pool\.length = 0/);
@@ -46,9 +46,9 @@ describe('★EN-4 ②: 週送りの後に読み直す', () => {
      * ★引退も購入も繁殖も ★**週送りで起きます**。
      * ⚠️ ★毎周読むと DB を無駄に叩き、★週送りが無かった周は 1 ビットも変わりません。
      */
-    const decl = 'const pool = await loadRaceablePool(client)';
+    const decl = 'const pool = await loadRaceablePool(';
     const gate = MAIN.indexOf('t.advanced > 0');
-    const again = MAIN.indexOf('loadRaceablePool(client)', MAIN.indexOf(decl) + decl.length);
+    const again = MAIN.indexOf('loadRaceablePool(', MAIN.indexOf(decl) + decl.length);
     expect(gate, '★週送りの判定が無い（★走査が空・R-21）').toBeGreaterThan(-1);
     expect(again, '🔴 ★週送りの判定より前で読み直している（★毎周になっている）').toBeGreaterThan(gate);
   });
@@ -80,5 +80,34 @@ describe('★EN-4 ②: 週送りの後に読み直す', () => {
      */
     expect(MAIN, '★読み直した頭数を出していない')
       .toMatch(/出走可能な馬を読み直しました \$\{before\} → \$\{pool\.length\} 頭/);
+  });
+});
+
+describe('★PO-2: 上限で切ったら黙らない', () => {
+  it('🔴 ★切ったことを呼ぶ側に知らせる口がある', () => {
+    /**
+     * ✔ ★staging の実測（2026-09-19）: ★条件に合う **4,389 頭**のうち ★**3,000 頭しか読みません**。
+     *    ★`order by id` なので ★**毎回おなじ 1,389 頭（32%）が一度も出走表に載りません**。
+     * ⚠️ ★**上限そのものはこの便で変えません** — ★上げると出走馬の顔ぶれが変わり、
+     *    ★V-4・V-5・V-6 の取り直しが要ります（★AL-11 / D-117 の便に合流・三度測らない）。
+     */
+    expect(REPO, '★切ったことを知らせる口が無い').toMatch(/onTruncated\?:/);
+    expect(REPO, '★先に数えていない').toMatch(/select count\(\*\)::text as n from horses where/);
+    expect(REPO, '★上限と比べていない').toMatch(/if \(eligible > limit\) onTruncated/);
+  });
+
+  it('🔴 ★`where` を 2 か所に書いていない（D-052）', () => {
+    /** ★数える側と読む側が別々の `where` を持つと、★「切れた」の判定がずれます */
+    expect(REPO, '★述語が 1 か所になっていない').toMatch(/const RACEABLE_WHERE = /);
+    const wheres = [...REPO.matchAll(/generation >= \(select max\(generation\) - 2 from horses\)/g)];
+    expect(wheres.length, `★述語が ${wheres.length} か所にある`).toBe(1);
+  });
+
+  it('🔴 ★ワーカーが実際に受け取って出している（★CK-2）', () => {
+    expect(MAIN, '★口を渡していない').toMatch(/loadRaceablePool\(client, undefined, onPoolTruncated\)/);
+    expect(MAIN, '★切れたことを出していない').toMatch(/出走可能な馬を上限で切りました/);
+    /** ★読み直しの側にも渡している（★起動時だけ知らせても意味がない） */
+    const hits = [...MAIN.matchAll(/onPoolTruncated\)/g)];
+    expect(hits.length, '★起動時と読み直しの両方に渡していない').toBe(2);
   });
 });
