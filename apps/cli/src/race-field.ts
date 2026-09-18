@@ -325,6 +325,15 @@ export interface GenerateRaceOptions {
    *   従来どおり `potential × PLACEHOLDER_UNLOCK` を使います。
    */
   readonly abilityOf?: (horse: HorseRecord) => Record<AbilityKey, number> | undefined;
+  /**
+   * ★**出走頭数の範囲**（★CF-7・2026-09-18）。★渡さなければ `FIELD_SIZE`（8〜18）のままです。
+   *
+   * ★案 E「平均頭数を 13.46 → 8 に下げる」が成立するかを測るために足しました
+   *   （★裁定 `REVIEW_CF5_CF6_VERDICT_20260918.md`）。
+   * ⚠️ ★**これは較正定数を動かす口です。** ★既定では絶対に効かせません — ★渡した実行だけが変わります。
+   *    ★`verify-race` の `--field-min` / `--field-max` から渡します。
+   */
+  readonly fieldSizeRange?: { readonly min: number; readonly max: number };
 }
 
 export function generateRace(
@@ -342,7 +351,10 @@ export function generateRace(
   if (pool.length < FIELD_SIZE.MIN) {
     throw new Error(`generateRace: 母集団が少なすぎる (${pool.length}頭)`);
   }
-  const fieldSize = rng.int(FIELD_SIZE.MIN, Math.min(FIELD_SIZE.MAX, pool.length));
+  // ★頭数の範囲（★既定は正典 §10.4 の 8〜18。★CF-7 で測るときだけ呼ぶ側が渡す）
+  const sizeMin = opts.fieldSizeRange?.min ?? FIELD_SIZE.MIN;
+  const sizeMax = opts.fieldSizeRange?.max ?? FIELD_SIZE.MAX;
+  const fieldSize = rng.int(sizeMin, Math.min(sizeMax, pool.length));
   /**
    * ★番組表（§10.3）が距離と馬場を決めているなら、それに従います（Q-P3-32 の是正）。
    *

@@ -113,9 +113,10 @@ try {
    */
   const training = await ms(`select id, condition, fatigue from horses`);
   const trainingDb = await dbMs(`select id, condition, fatigue from horses`);
-  const wins = await ms(
-    `select horse_id, count(*)::int as wins from race_entries where finish_pos = 1 group by horse_id`,
-  );
+  const winsSql = `select horse_id, count(*)::int as wins from race_entries where finish_pos = 1 group by horse_id`;
+  const wins = await ms(winsSql);
+  const winsDb = await dbMs(winsSql);
+  const entryRows = (await client.query(`select count(*)::int n from race_entries`)).rows[0].n;
 
   console.log('');
   console.log(`  ★伸び（★DB 側）: 1 頭あたり **${(slope * 1000).toFixed(2)} μs** ＋ 固定 ${intercept.toFixed(1)} ms`);
@@ -125,7 +126,24 @@ try {
     `  調子・疲労の読み込み（loadTrainingStates と同じ SQL）: 網こみ ${training.ms.toFixed(0)} ms / ★DB 側 ${trainingDb.toFixed(1)} ms / ${training.rows} 頭`,
   );
   console.log(`    ⚠️ ★この SQL には **where がありません** — ★引退馬も繁殖馬も含む**全頭**を毎周読んでいます`);
-  console.log(`  勝利数の集計（CL-1 で追加）: ${wins.ms.toFixed(0)} ms / ${wins.rows} 頭`);
+  console.log(
+    `  勝利数の集計（CL-1 で追加）: 網こみ ${wins.ms.toFixed(0)} ms / ★DB 側 ${winsDb.toFixed(1)} ms` +
+      ` / ${wins.rows} 頭（race_entries ${entryRows.toLocaleString()} 行）`,
+  );
+  /**
+   * ★**CF-8: 列にする判定基準**（★裁定 REVIEW_CF5_CF6_VERDICT_20260918）。
+   *   ★`race_entries` は**増え続けます**（★1 日 480R × 13.5 頭 ＝ 約 6,500 行/日 ＝ **年 237 万行**）。
+   *   ★**先に線を引いておけば、その日に気づけます。**
+   */
+  const WINS_DB_MS_LIMIT = 200;
+  const WINS_ROWS_LIMIT = 5_000_000;
+  const overMs = winsDb > WINS_DB_MS_LIMIT;
+  const overRows = entryRows > WINS_ROWS_LIMIT;
+  console.log(
+    `    ★CF-8 の線: DB 側 ${WINS_DB_MS_LIMIT} ms ／ race_entries ${WINS_ROWS_LIMIT.toLocaleString()} 行` +
+      ` → ${overMs || overRows ? '🔴 ★**超えました。列にしてください**' : '✅ まだ内側'}` +
+      `（★いま DB 側 ${((winsDb / WINS_DB_MS_LIMIT) * 100).toFixed(0)}% ／ 行数 ${((entryRows / WINS_ROWS_LIMIT) * 100).toFixed(2)}%）`,
+  );
   console.log('');
   console.log('  ⚠️ ★これは**読み込みの側だけ**です。★週送りの書き込みと、オッズの MC（AL-6）は含みません。');
   console.log('  ⚠️ ★**本当の 1 周は、配備して journalctl の「周=」を読むのが唯一の方法**です（R-28）。');

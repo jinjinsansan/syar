@@ -556,6 +556,10 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   { key: 'CYCLES_PER_WEEK', why: '正典 D-007（1週=4時間・1サイクル=10分）から決まる導出値 24。★別々に書くと片方だけ動いて静かにずれるので CYCLE_MS から導出しており、week.test.ts が正典の値と一致することを守る' },
   { key: 'WEEKS_PER_DAY', why: '正典 §7.1「1日6週」の導出値。テストがリテラル 6 と一致することを守る' },
   { key: 'WEEK_MS', why: '正典 D-007「1ゲーム内週 = リアル4時間」の導出値' },
+  { key: 'FIELD_MIN', why: '★verify-race の掃引用の引数（--field-min）。★既定は FIELD_SIZE.MIN で、渡さない実行は 1 ビットも変わらない。'
+    + '★CF-7（2026-09-18・裁定 REVIEW_CF5_CF6_VERDICT_20260918）で「平均 8 頭にすると V-4/V-5/V-6 が同時に外れるか」を測るために足した。'
+    + '★較正値そのものではなく、★較正定数（FIELD_SIZE）を掃引するための口' },
+  { key: 'FIELD_MAX', why: '★同上（--field-max）。★FIELD_SIZE.MAX が既定。★実測: 8〜8 にすると V-4 39.17% / V-5 73.07% / V-6 2.63% で 3 つとも FAIL' },
   { key: 'CLASS_BY_WINS', why: '★勝利数 → 段の対応（新馬/1勝/2勝/3勝。4 勝以上は open）。★正典 §10.3 のクラスそのもので、較正で動かす値ではない。'
     + '★CL-1（2026-09-18・指示書 DEV_INSTRUCTIONS_RACE_CLASS_20260918）で 1 か所に切り出した。★eligibility.test.ts が表と関数の一致を見る' },
   { key: 'CLASS_RANK', why: '★段の高さ（maiden 0 〜 open 4・graded は馬の側では open と同じ層）。★順序の写しで較正値ではない。'

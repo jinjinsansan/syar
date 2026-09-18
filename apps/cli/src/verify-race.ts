@@ -41,6 +41,7 @@ import {
   PLACEHOLDER_UNLOCK,
   generateRace,
   sortPoolByClass,
+  FIELD_SIZE,
 } from './race-field.js';
 import { runSimulation } from './simulator.js';
 import { toSafeJson } from './json-safe.js';
@@ -135,6 +136,13 @@ const CLASS_BAND = parseNumber('--class-band', DEFAULT_CLASS_BAND);
 /** 素質開放率のプレースホルダ範囲（P3 の育成モデルで置き換わる・R-7） */
 /** 能力レンジの床（掃引用）。既定は較正値 */
 const FLOOR = parseNumber('--field-floor', FIELD_STRENGTH_FLOOR);
+/**
+ * ★**出走頭数の範囲**（★CF-7・2026-09-18）。★既定は正典 §10.4 の 8〜18。
+ *   ★案 E（平均頭数を下げる）が V-4・V-6 を壊さないかを測るときだけ渡します。
+ *   ⚠️ ★**渡さない実行は 1 ビットも変わりません。**
+ */
+const FIELD_MIN = parseNumber('--field-min', FIELD_SIZE.MIN);
+const FIELD_MAX = parseNumber('--field-max', FIELD_SIZE.MAX);
 /** V-6 が対象にする下位ランク数（2026-08-06 改訂: 最下位1頭 → 下位3ランクの平均） */
 const LONGSHOT_RANKS = parseNumber('--longshot-ranks', MC.LONGSHOT_RANKS);
 /** 案D: 裾の厚さ（掃引用） */
@@ -292,6 +300,8 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
   for (let raceIndex = 0; raceIndex < racesForSeed; raceIndex++) {
     const prod = LEGACY_CONDITIONS ? null : productionRaceOf(raceIndex);
     const race = generateRace(pool, raceIndex, fieldRng, CLASS_BAND, UNLOCK, FLOOR, {
+      // ★CF-7: 頭数の範囲（★既定なら `FIELD_SIZE` と同じ値が入るので振る舞いは変わらない）
+      fieldSizeRange: { min: FIELD_MIN, max: FIELD_MAX },
       ...(prod === null ? {} : {
         programme: {
           surface: prod.programme.surface, distance: prod.programme.distance, courseShape: prod.courseFrozen.courseShape,
