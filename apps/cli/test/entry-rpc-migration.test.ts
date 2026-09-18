@@ -45,7 +45,14 @@ const MIGRATION = '0024_entry_rpc_and_story.sql';
 describe('★第 3 便の移行（0024）', () => {
   it('① ★place_bet の最後の定義は「自馬を全頭含む」になっている（§9.5-3）', () => {
     const def = lastDefinitionOf('place_bet');
-    expect(def.file, '★最後の定義は 0024').toBe(MIGRATION);
+    /**
+     * ⚠️ 🔴 ★**ファイル名を名指しで固めていました**（★`toBe(MIGRATION)`・★2026-09-19 に改めました）。
+     *    ★このファイルの `enter_race` 側で ★**同じ形を直したときに、★こちらを見落としました**。
+     *    ★**「1 か所直した」は「その 1 か所を直した」だけ**です。
+     *    → ★`place_bet` は `0002` → `0020` → `0024` と重なっています。
+     *      ★見るべきは ★**`0020`（セットアップ判定を入れた便）より後にある**ことだけです。
+     */
+    expect(def.file.localeCompare('0020_rpc_setup_guard.sql') > 0, `★最後の定義が ${def.file}`).toBe(true);
     /** ★「含まない自馬が 1 頭でもあれば拒否」の形（★どれか 1 頭でよい形では無いこと） */
     expect(def.body).toMatch(/not\s*\(\s*p_selection\s*@>\s*to_jsonb\(e\.gate\)\s*\)/i);
     expect(def.body).toMatch(/自馬を全頭含む/);
