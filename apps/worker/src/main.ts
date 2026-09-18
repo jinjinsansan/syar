@@ -2,7 +2,7 @@
  * ワーカー本体（正典 §14 / 合格基準 A-1）
  *
  * 【止まらないことが仕事】
- *   A-1 は「10分サイクルが無人で24時間回り続けること」です。
+ *   A-1 は「★サイクル（★D-007 改訂で 3 分）が無人で24時間回り続けること」です。
  *   ★したがって**落ちない**ことより、**落ちても戻る**ことを設計します:
  *     - 1周の失敗でプロセスを終了しない（次の周で回復しうる）
  *     - 起動時の検査（環境ガード）だけは失敗させる（続けると壊れる）
@@ -35,7 +35,7 @@ import { syncStableGradePrices } from './grade-flow.js';
 import { freezePendingEntries } from './entry-freeze.js';
 import { runSelfcheck } from './selfcheck.js';
 import { runSchemacheck } from './schemacheck.js';
-import { CANCEL_AFTER_START_MS, classOf, conditionsOf, gradeOf } from '@star/scheduler';
+import { CANCEL_AFTER_START_MS, CYCLE_MS, classOf, conditionsOf, gradeOf } from '@star/scheduler';
 
 /** 1周の間隔。★サイクル長より短くする（1サイクルを取りこぼさないため） */
 export const TICK_MS = 60_000;
@@ -198,8 +198,11 @@ async function main(): Promise<void> {
         `[worker] cycle=${out.cycleIndex} phase=${out.phase} ` +
           `生成=[${out.created.join(',')}] 既存=${out.skipped.length} ` +
           `確定=[${out.settled.join(',')}] ` +
-          // ★1周600秒に対する割合も出す。秒数だけだと余裕が読み取れません
-          `周=${(cycleMs / 1000).toFixed(1)}s(${((cycleMs / 600000) * 100).toFixed(1)}%) ` +
+          // ★1 周に対する割合も出す。秒数だけだと余裕が読み取れません。
+          // 🔴 ★**ここは 600000（10 分）の直書きでした**（★2026-09-18・T-13 で発見）。
+          //   ★D-007 改訂で 1 周が 3 分になっても割合だけ 10 分基準のままになり、
+          //   ★**配備後に読む「周の使用率」が 1/3.3 に見える**ところでした（★R-28 で読む数字そのもの）。
+          `周=${(cycleMs / 1000).toFixed(1)}s(${((cycleMs / CYCLE_MS) * 100).toFixed(1)}%) ` +
           `${formatResources(res)}` +
           // ★0件のときは出さない。毎周 中止=[] と出ると、実際に起きた周が埋もれます
           `${out.cancelled.length > 0 ? ` ★中止=[${out.cancelled.join(',')}]` : ''}` +
@@ -324,7 +327,8 @@ async function main(): Promise<void> {
      *
      *   ★毎周呼びますが、**進むのは週が締まったときだけ**です
      *   （`weeksToProcess` が空を返せば何もしません）。
-     *   サイクルは10分、週は24サイクル = 4時間なので、24周に1回だけ動きます。
+     *   ★サイクルは 3 分、週は `CYCLES_PER_WEEK` = 80 サイクル = 4 時間なので、★80 周に 1 回だけ動きます
+     *   （★2026-09-18・D-007 改訂。★どちらも定数から導くので、この数え方は式に従います）。
      *
      *   ★レースの生成・確定より**後**に置いています。
      *     前に置くと、7,000頭の週送りが終わるまで確定が待たされます。

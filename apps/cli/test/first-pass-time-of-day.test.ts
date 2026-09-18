@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  GRADED_RACES, raceSetupFromParam, G1_SLOTS,
+  GRADED_RACES, raceSetupFromParam, G1_SLOTS, MINUTES_PER_SLOT,
   TIME_OF_DAYS, TIME_OF_DAY_BANDS, JST_OFFSET_MINUTES, DEMO_TIME_OF_DAY,
   timeOfDayAtJstMinute, timeOfDayOfScheduledAt, timeOfDayFromParam,
 } from '@star/scheduler';
@@ -96,8 +96,8 @@ describe('★時間帯（★発走の時刻から・日本時間）', () => {
     expect([...froms].sort((a, b) => a - b)).toEqual(froms);
     expect(froms[0]).toBe(0);
     expect(JST_OFFSET_MINUTES).toBe(540);
-    /** ★1 枠 10 分（`G1_SLOTS` の註記） */
-    expect(G1_SLOTS.map((s) => timeOfDayAtJstMinute(s * 10))).toEqual(['morning', 'day', 'night']);
+    /** ★1 枠の分数は**サイクルから導く**（★2026-09-18・D-007 改訂。★10 と直書きすると 3 分で嘘になる） */
+    expect(G1_SLOTS.map((s) => timeOfDayAtJstMinute(s * MINUTES_PER_SLOT))).toEqual(['morning', 'day', 'night']);
     /** ★UTC 2026-09-15 11:00 ＝ 日本時間 20:00 → 夜 ／ UTC 04:00 ＝ 日本時間 13:00 → 昼 */
     expect(timeOfDayOfScheduledAt(Date.UTC(2026, 8, 15, 11, 0))).toBe('night');
     expect(timeOfDayOfScheduledAt(Date.UTC(2026, 8, 15, 4, 0))).toBe('day');

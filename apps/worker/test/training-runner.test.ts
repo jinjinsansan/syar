@@ -14,11 +14,15 @@
  *   （DB を通す確認は `tools/verify-training-week.mjs` が staging で行います）。
  */
 import { describe, expect, it } from 'vitest';
-import { CYCLE_MS, weekIndexAt, weeksToProcess } from '@star/scheduler';
+import { CYCLE_MS, CYCLES_PER_WEEK, weekIndexAt, weeksToProcess } from '@star/scheduler';
 import { MENUS } from '@star/training';
 import { MAX_WEEKS_PER_RUN, defaultMenu } from '../src/training-runner.js';
 
-const WEEK = CYCLE_MS * 24;
+/**
+ * ★1 ゲーム内週の実時間。★**サイクル数は定数から引きます**（★`24` の直書きをやめました）。
+ *   ★D-007 改訂（2026-09-18・3 分 × 80 本）で 24 は嘘になり、★この検査の週番号が全部ずれました。
+ */
+const WEEK = CYCLE_MS * CYCLES_PER_WEEK;
 
 describe('B-5 週番号は時刻から決まる', () => {
   it('★同じ時刻・同じ進捗なら、何度呼んでも同じ週の並びになる', () => {

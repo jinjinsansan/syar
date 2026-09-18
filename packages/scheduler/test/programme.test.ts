@@ -21,22 +21,23 @@ import {
 } from '../src/index.js';
 
 describe('§10.3 正典との一致', () => {
-  it('1日144R', () => {
-    expect(RACES_PER_DAY).toBe(144);
+  it('★1日480R（D-007 改訂・2026-09-18）', () => {
+    expect(RACES_PER_DAY).toBe(480);
   });
 
-  it('★クラス別R数の合計が144（どれかを増やしたら別を減らす必要がある）', () => {
+  it('★クラス別R数の合計が480（どれかを増やしたら別を減らす必要がある）', () => {
     const sum = Object.values(RACES_BY_CLASS).reduce((a, b) => a + b, 0);
     expect(sum).toBe(RACES_PER_DAY);
   });
 
-  it('クラス別R数（新馬42 / 1勝36 / 2勝24 / 3勝18 / OP15 / 重賞9）', () => {
-    expect(RACES_BY_CLASS.maiden).toBe(42);
-    expect(RACES_BY_CLASS.win1).toBe(36);
-    expect(RACES_BY_CLASS.win2).toBe(24);
-    expect(RACES_BY_CLASS.win3).toBe(18);
-    expect(RACES_BY_CLASS.open).toBe(15);
-    expect(RACES_BY_CLASS.graded).toBe(9);
+  it('★クラス別R数（新馬140 / 1勝120 / 2勝80 / 3勝60 / OP50 / 重賞30）', () => {
+    // ★正典 §10.3 の表の写し（★2026-09-18・D-007 改訂で 480R に振り直し）
+    expect(RACES_BY_CLASS.maiden).toBe(140);
+    expect(RACES_BY_CLASS.win1).toBe(120);
+    expect(RACES_BY_CLASS.win2).toBe(80);
+    expect(RACES_BY_CLASS.win3).toBe(60);
+    expect(RACES_BY_CLASS.open).toBe(50);
+    expect(RACES_BY_CLASS.graded).toBe(30);
   });
 
   it('重賞の週次頻度（G1=3 / G2=8 / G3=20）', () => {
@@ -55,7 +56,7 @@ describe('§10.3 正典との一致', () => {
 describe('§10.3 番組表の構成', () => {
   const programme = dailyProgramme();
 
-  it('★144枠がすべて埋まる（短い配列を黙って返さない）', () => {
+  it('★480枠がすべて埋まる（短い配列を黙って返さない）', () => {
     expect(programme.length).toBe(RACES_PER_DAY);
     expect(programme.every((c) => c !== undefined)).toBe(true);
   });
@@ -88,15 +89,15 @@ describe('§10.3 番組表の構成', () => {
 describe('§10.3 サイクル番号からの引き当て', () => {
   it('日をまたいでも枠が循環する', () => {
     expect(slotOfDay(0)).toBe(0);
-    expect(slotOfDay(143)).toBe(143);
-    expect(slotOfDay(144)).toBe(0);
+    expect(slotOfDay(479)).toBe(479);
+    expect(slotOfDay(480)).toBe(0);
     expect(dayIndex(0)).toBe(0);
-    expect(dayIndex(143)).toBe(0);
-    expect(dayIndex(144)).toBe(1);
+    expect(dayIndex(479)).toBe(0);
+    expect(dayIndex(480)).toBe(1);
   });
 
   it('★同じサイクル番号からは必ず同じクラス・格が出る（A-2 の前提）', () => {
-    for (const i of [0, 54, 143, 144, 1000, 5000]) {
+    for (const i of [0, 180, 479, 480, 1000, 5000]) {
       expect(classOf(i)).toBe(classOf(i));
       expect(gradeOf(i)).toBe(gradeOf(i));
     }

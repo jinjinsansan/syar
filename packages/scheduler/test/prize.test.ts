@@ -2,7 +2,7 @@
  * §11.1 賞金テーブル。★§9.3「PP の主な稼ぎ口は賞金」を支える。
  */
 import { describe, expect, it } from 'vitest';
-import { PRIZE_TABLE, prizeFor, prizeTierOf, purseOf, RACES_BY_CLASS, classOf, gradeOf } from '../src/index.js';
+import { PRIZE_TABLE, prizeFor, prizeTierOf, purseOf, RACES_BY_CLASS, RACES_PER_DAY, classOf, gradeOf } from '../src/index.js';
 
 describe('§11.1 賞金テーブルが正典と一致', () => {
   it('G1 の賞金', () => {
@@ -54,15 +54,25 @@ describe('§11.1 賞金テーブルが正典と一致', () => {
 
 describe('★§9.3 PP の主な稼ぎ口は賞金でなければならない', () => {
   it('★1日の賞金総額が、馬券の理論的な PP 発行量を大きく上回る', () => {
-    // 1日の賞金総額（144R の番組表どおり）
+    // ★1日の賞金総額（★本数は `RACES_PER_DAY` から引く。★直書きしない — D-007 改訂で 144 → 480 になった）
     let daily = 0;
-    for (let i = 0; i < 144; i += 1) daily += purseOf(prizeTierOf(classOf(i), gradeOf(i)));
+    for (let i = 0; i < RACES_PER_DAY; i += 1) daily += purseOf(prizeTierOf(classOf(i), gradeOf(i)));
 
     // 馬券の払戻は「売上 × (1 − margin)」。売上が賞金と同規模なら払戻は8割程度。
     // ★つまり賞金が主な稼ぎ口であるためには、**売上が賞金総額を大きく超えない**
     //   必要がある。ここでは賞金総額そのものが十分に大きいことを確認する。
     expect(daily).toBeGreaterThan(1_000_000);
-    // クラス別R数（新馬42本）が効いて、下位クラスに厚く配られる
-    expect(RACES_BY_CLASS.maiden).toBe(42);
+
+    // ★下位クラスに厚く配られる（★新馬・未勝利が最も本数が多い）。
+    //   ★**本数そのものは `programme.test.ts` が正典の写しとして押さえる**ので、
+    //   ★ここでは「厚い」という**性質**だけを見ます（★同じ数を 2 か所で持たない・D-052）
+    expect(RACES_BY_CLASS.maiden).toBe(Math.max(...Object.values(RACES_BY_CLASS)));
   });
+
+  /**
+   * ⚠️ ★**この便（T-13）で 1 日の賞金総額は 3.3 倍になりました**（144R → 480R）。
+   *   ★上の下限（100 万）は「賞金が十分に大きい」ことの床であって、★**較正ではありません**。
+   *   ★経済の較正の取り直し（V-11・§3.4 の収支・D-075 の額）は
+   *   ★**D-007 改訂 ⑥ / AL-11 で GB-6 と 1 回にまとめる**と決まっています（★二度測らない）。
+   */
 });

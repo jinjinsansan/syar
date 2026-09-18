@@ -100,7 +100,7 @@ export function conditionsOf(cycleIndex: number, raceClass: RaceClass, grade: Gr
   // ★その馬場を持つ場が無ければ投げる（★黙って別の馬場の場へ落とさない・R-27）
   if (eligible.length === 0) throw new Error(`conditionsOf: ${surface} を持つ競馬場がありません`);
   const n = eligible.length;
-  // ★1 日の本数（★144 は周期 8 で割り切れるので、どの日も同じ本数）
+  // ★1 日の本数（★`RACES_PER_DAY` から引く。★480 も周期 8 で割り切れるので、どの日も同じ本数）
   const perDay = surfaceOrdinal(RACES_PER_DAY, surface);
   const day = Math.floor(i / RACES_PER_DAY);
   const shift = perDay % n === 0 ? day * DAY_ROTATION : 0;

@@ -215,7 +215,7 @@ function runCareers(
 
     /**
      * ★本数は「申し込みを捌けるだけ」用意します。
-     * ★本番は 1 日 144 本に対し出走可能な馬が数千頭で、★**枠は余っている側**です
+     * ★本番は 1 日 480 本（D-007 改訂）に対し出走可能な馬が数千頭で、★**枠は余っている側**です
      *   （★`generateRace` の窓から出る空き枠は 1 レースあたり平均 5 前後）。
      */
     const raceCount = Math.max(1, Math.ceil((active.length * ENTRIES_PER_SEGMENT) / 4));

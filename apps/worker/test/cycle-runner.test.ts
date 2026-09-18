@@ -25,6 +25,15 @@ const EMPTY_BUILD = {
 
 const EPOCH = 1_700_000_000_000;
 
+/**
+ * ★**サイクル 0 の中の時刻**（★発売中の相）。
+ *
+ * ★以前は `EPOCH + 4 * 60_000` を直に書いていましたが、★**「4 分」はサイクルが 10 分だった頃の値**で、
+ *   ★D-007 改訂（3 分）では**サイクル 1 に入ってしまい**、★`racesToPrepare` の期待が [1,2] から [2,3] にずれました。
+ * → ★**サイクル長から取ります**（★10 分なら 4:00・3 分なら 1:12。★どちらも発売中の相）。
+ */
+const IN_FIRST_CYCLE = EPOCH + Math.floor(CYCLE_MS * 0.4);
+
 /** テスト用の seed 源。★決定論（同じサイクルからは同じ値） */
 /** テスト用の出走表・オッズ（中身は問わない。runCycle は素通しするだけ） */
 const BUILD = () => (EMPTY_BUILD);
@@ -99,7 +108,7 @@ function makeStore(nowMs: number) {
 
 describe('★A-2 冪等性（壊して確かめる）', () => {
   it('★同じ時刻で何度回しても、レースは一度しか作られない', async () => {
-    const now = EPOCH + 4 * 60_000;
+    const now = IN_FIRST_CYCLE;
     const store = makeStore(now);
     for (let i = 0; i < 10; i += 1) await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
     // 10周しても作成は最初の1回ぶんだけ（先行2レース）
@@ -108,7 +117,7 @@ describe('★A-2 冪等性（壊して確かめる）', () => {
   });
 
   it('★「再起動」しても作り直さない（ストアは残り、プロセスだけ落ちた想定）', async () => {
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
     const before = [...store.createLog];
     // プロセスが落ちて上がり直しても、runCycle をもう一度呼ぶだけ
@@ -118,7 +127,7 @@ describe('★A-2 冪等性（壊して確かめる）', () => {
   });
 
   it('★ロックが取れないときは何もせず戻る（例外にしない）', async () => {
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     store.tryLock = async () => false;
     const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
     expect(out.lockBusy).toBe(true);
@@ -127,7 +136,7 @@ describe('★A-2 冪等性（壊して確かめる）', () => {
   });
 
   it('★処理中に例外が出てもロックを解放する（次の周が永久待ちにならない）', async () => {
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     let unlocked = false;
     store.unlock = async () => {
       unlocked = true;
@@ -140,19 +149,19 @@ describe('★A-2 冪等性（壊して確かめる）', () => {
   });
 
   it('★時刻が進めば新しいレースだけを作る（既存は作り直さない）', async () => {
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
     expect(store.createLog).toEqual([1, 2]);
-    store.serverNowMs = async () => EPOCH + CYCLE_MS + 4 * 60_000;
+    store.serverNowMs = async () => IN_FIRST_CYCLE + CYCLE_MS;
     await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
     // 次のサイクルでは 3 だけが増える（2 は既存）
     expect(store.createLog).toEqual([1, 2, 3]);
   });
 
   it('★ワーカーの時計を使わない（serverNowMs だけを見る）', async () => {
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
-    expect(out.nowMs).toBe(EPOCH + 4 * 60_000);
+    expect(out.nowMs).toBe(IN_FIRST_CYCLE);
     expect(out.cycleIndex).toBe(0);
   });
 
@@ -197,7 +206,7 @@ describe('★A-7 環境ガード', () => {
 
 describe('★D-038 確定を生成より先に処理する', () => {
   it('★確定 → 中止 → 生成 の順で処理される', async () => {
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     store.setOverdue([99]);
     // 確定すべきレースがある状態にする
     store.pendingSettlements = async () => [7];
@@ -209,7 +218,7 @@ describe('★D-038 確定を生成より先に処理する', () => {
 
   it('★確定が先なので、生成に時間がかかっても確定は待たされない', async () => {
     // 生成1本に相当する時間を測る代わりに、生成の中で確定済みかを確認する
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     store.pendingSettlements = async () => [7];
     let settledWhenCreating = false;
     const build = () => {
@@ -238,7 +247,7 @@ describe('★D-056 凍結が無いレースは確定せず中止する', () => {
 
   it('★凍結が無ければ確定せず、中止して通報する', async () => {
     ALERTS.length = 0;
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     store.pendingSettlements = async () => [21];
     store.settleRace = async (i: number) => { throw unfrozen(i); };
     const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
@@ -250,7 +259,7 @@ describe('★D-056 凍結が無いレースは確定せず中止する', () => {
 
   it('★対照: 凍結があれば普通に確定する（上の検査が空振りでない）', async () => {
     ALERTS.length = 0;
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     store.pendingSettlements = async () => [21];
     const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
     expect(out.settled).toEqual([21]);
@@ -264,7 +273,7 @@ describe('★D-056 凍結が無いレースは確定せず中止する', () => {
    */
   it('★走路の凍結が不正なら確定せず、中止して通報する', async () => {
     ALERTS.length = 0;
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     store.pendingSettlements = async () => [23];
     store.settleRace = async (i: number) => {
       const e = new Error(`cycle=${i}: 走路の凍結が不正です`);
@@ -278,7 +287,7 @@ describe('★D-056 凍結が無いレースは確定せず中止する', () => {
   });
 
   it('★凍結と無関係な失敗は握り潰さない（中止に化けさせない）', async () => {
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     store.pendingSettlements = async () => [22];
     store.settleRace = async () => { throw new Error('DB が落ちた'); };
     await expect(runCycle(store, EPOCH, SEEDS, BUILD, ALERT)).rejects.toThrow('DB が落ちた');
@@ -290,7 +299,7 @@ describe('★D-056 凍結が無いレースは確定せず中止する', () => {
 describe('★D-037 確定できないレースを期限で中止し EP を返す', () => {
   it('★期限切れのレースを中止し、通報する', async () => {
     ALERTS.length = 0;
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     store.setOverdue([11, 12]);
     const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
     expect(out.cancelled).toEqual([11, 12]);
@@ -301,7 +310,7 @@ describe('★D-037 確定できないレースを期限で中止し EP を返す
   });
 
   it('★期限内なら中止しない（境界の両側・R-2）', async () => {
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     store.setOverdue([]); // まだ期限に達していない
     const out = await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
     expect(out.cancelled).toEqual([]);
@@ -309,7 +318,7 @@ describe('★D-037 確定できないレースを期限で中止し EP を返す
   });
 
   it('★二度回しても二重に返還しない（冪等）', async () => {
-    const store = makeStore(EPOCH + 4 * 60_000);
+    const store = makeStore(IN_FIRST_CYCLE);
     store.setOverdue([21]);
     await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
     await runCycle(store, EPOCH, SEEDS, BUILD, ALERT);
