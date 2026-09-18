@@ -773,6 +773,19 @@ export const READONLY = [
  *   メタテストが、ここに載っているのに呼んでいないファイルを落とします。
  */
 export const STATE_CHANGING = [
+  /**
+   * ★初期馬の絞り方を実測する（★2026-09-19・UI1-7・
+   *   裁定 `REVIEW_UI1_SELECTION_RULE_VERDICT_20260919.md`）。
+   *
+   * 【★データは変えないのに、なぜここか】
+   *   ★最後に `rollback` するので ★**1 ビットも残しません**。
+   *   🔴 ★しかし `pick_initial_horse()` は `for update` で ★**数千行の錠を数分間掴ります**。
+   *   ★本番でやると ★**ワーカーを待たせます**（★サイクルは 6 分）。
+   *   → ★**「読むだけなら本番でもよい」は、錠を掴る読み方には当てはまりません。**
+   *   ★`assertNotProduction` を呼んでいます（★この簿の条件）。
+   */
+  'verify-initial-horse-distribution.mjs',
+
   // ★中で状態を変えるツールを流すので、これ自体も状態を変える
   'audit-tools.mjs',
   'fix-purse.mjs',

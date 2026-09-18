@@ -47,6 +47,13 @@ const READONLY_FUNCTIONS = [
   // ★初期馬の候補かの判定（`0031`）。`language sql stable` で**状態を変えない**
   //   （★書き込む関数をここに入れられないよう、下の「除外簿に載せてよいのは…」が弾く）
   'is_initial_horse_candidate',
+  /**
+   * ★初期馬の候補の集合（`0037`・UI1-1）。`language sql stable` で**状態を変えない**。
+   *   ★`is_initial_horse_candidate` はこれに id を渡すだけの包みになったので、★**同じ区分**です。
+   * ⚠️ ★利用者からも呼べません（`revoke all ... from public, anon, authenticated`）が、
+   *    ★区分の根拠は★**「状態を変えない」**の方です。
+   */
+  'initial_horse_candidates',
 ];
 
 /**
@@ -54,7 +61,20 @@ const READONLY_FUNCTIONS = [
  *   利用者のロールから実行できない代わりに、`assert_setup_complete()` を要求しない。
  *   ⚠️ **利用者が呼ぶ RPC をここへ入れないこと**（入れると D-080 の判定が外れる）。
  */
-const WORKER_ONLY_FUNCTIONS = ['spend_training_ep'];
+const WORKER_ONLY_FUNCTIONS = [
+  'spend_training_ep',
+  /**
+   * ★初期馬を 1 頭選ぶ（`0037`・UI1-6）。
+   *   ★**除外簿に入れない理由**: ★`volatile` で、★`for update ... skip locked` で**行を掴みます**。
+   *     ★台帳を動かしませんが、★「状態を変えない」と名乗るべきではありません。
+   *   ★**この簿の条件を満たす**: ① 利用者ロールから実行できない（★定義の後に
+   *     ★`public` / `anon` / `authenticated` を revoke）② 本体で `auth.uid()` を使わない。
+   * ⚠️ ★**呼ぶのはワーカーではなく `create_account` です**（★簿の名前は「利用者から呼べない」の意）。
+   *    ★画面に渡すと★**「選ぶ → 渡す」の 2 本立て**になり、★間に割り込まれて別の馬になりえます
+   *    （★照会 `QUESTIONS_UI_SETUP_HORSE_20260918.md` §2 の案 B の穴）。
+   */
+  'pick_initial_horse',
+];
 
 /**
  * ★**第三の登録簿 — 口座を作る側の RPC**（2026-09-18・裁定
@@ -197,7 +217,18 @@ function workerOnlyViolations(name: string, migrations: readonly Migration[]): s
       out.push(`${name}: revoke の後に ${role} への grant がある（${regrants.map((g) => g.file).join(', ')}）`);
     }
   }
-  if (/auth\s*\.\s*uid\s*\(\s*\)/i.test(blankComments(def.body))) {
+  /**
+   * ⚠️ ★**`stripFunctionComments` を使います**（★`blankComments` では不足・2026-09-19）。
+   *    ★本文は「次の `create function` まで」で切り出すので、★**直後の `comment on` 文も含みます**。
+   *    ★`blankComments` は `--` しか消さないため、★**文字列リテラルが残ります**。
+   *    🔴 ★実例: `0037` の `comment on function pick_initial_horse() is '…auth.uid() のハッシュは
+   *    ★D-079 ① が禁じている…'` で、★**使っていないのに「使っている」と出ました**
+   *    （★`0031` の `create_account` で起きたのと全く同じ形・上の註記）。
+   * ★**註記の語を言い換えて検出器を黙らせません**（D-108 ③）。★**構造の側で直します。**
+   * ★この検査は文字列リテラルを見ていないので、★落としても弱くなりません
+   *   （★`errcode = '…'` を見ている検査は `blankComments` のままです）。
+   */
+  if (/auth\s*\.\s*uid\s*\(\s*\)/i.test(stripFunctionComments(def.body))) {
     out.push(`${name}: 本体で auth.uid() を使っている（${def.file}）`);
   }
   return out;
