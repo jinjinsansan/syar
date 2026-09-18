@@ -800,6 +800,15 @@ export const STATE_CHANGING = [
    */
   'verify-initial-horse-distribution.mjs',
 
+  /**
+   * ★過去の走りに `race_entries.prize_pp` を埋め戻す（★2026-09-19・PR-1 の後始末・T-11 の前提）。
+   *   ★額は `prizeFor()` が決める（★賞金表を SQL に写さない・D-052）。
+   *   ⚠️ ★既に入っている行は触らない／★`pp_ledger` には触らない
+   *      （★過去に発行しなかった PP を、いま発行したことにはできない）。
+   *   ★既定は**下見だけ**で、★`--write` を付けたときだけ書く。
+   */
+  'backfill-entry-prize.mjs',
+
   // ★中で状態を変えるツールを流すので、これ自体も状態を変える
   'audit-tools.mjs',
   'fix-purse.mjs',
