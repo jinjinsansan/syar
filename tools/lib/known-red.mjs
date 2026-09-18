@@ -28,13 +28,26 @@
  *    ★「見ていない」で、★この登録簿より悪い状態です（★R-16）。
  */
 export const KNOWN_RED = [
-  // 例:
-  // {
-  //   test: 'packages/render/test/edit-grammar-audit.test.ts > 編集文法の監査 > ⑨ seed 分類を現 HEAD で再確認している',
-  //   why: '…',
-  //   owner: 'dev',
-  //   until: '2026-09-30',
-  // },
+  {
+    test: 'packages/render/test/edit-grammar-audit.test.ts > 編集文法の監査 🔴 ⑭ 撮影が、いまの画面より古くない',
+    why: '★`out/2d-edit-grammar/race-captures.json` は 2026-08-24 の撮影で、★画面（packages/render/src・apps/web/src）は'
+      + '★その後 台本 v6 → v7 → v8 → v9 と変わっている。★⑩「実ブラウザ経路から撮っている」は 26 日前の撮影を見て緑だった。'
+      + '🔴 ★この検査は 2026-09-19 に**足した時点で赤**で、★「すでに悪い状態を見えるようにした」もの（★裁定 RD-4 ③）。'
+      + '★撮り直しは `tools/capture-edit-grammar-race.mjs`。★開発側からは流さない — ★人の画面にブラウザの窓が開く。',
+    owner: 'owner',
+    until: '2026-09-26',
+  },
+  {
+    test: 'packages/render/test/existing-shot-gate.test.ts > 既存ショット適性ゲート 🔴 ⑫ 測定が、いまの画面より古くない',
+    why: '★`out/2d-existing-shot-gate/` は 2026-08-24 の測定で、★画面の最後の変更（`cfc3ad1`）は 2026-09-15。'
+      + '🔴 ★26 日前の画面を見て 10 件が緑だった（★RD-4 ② の「もう片方」）。'
+      + '⚠️ ★この検査の ② は `332 = contest` / `474 = solo` を**種の番号で固定**している — '
+      + '★`edit-grammar-audit` で同じ固定が古くなっていた（RD-3）ので、★測り直すと**ここも落ちる見込み**。'
+      + '★そのときは「両方の型が 1 つ以上ある」に直すこと。'
+      + '★測り直しは `tools/audit-existing-shot-gate.mjs`。★開発側からは流さない（★ブラウザの窓）。',
+    owner: 'owner',
+    until: '2026-09-26',
+  },
 ];
 
 /**

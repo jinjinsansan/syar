@@ -5,8 +5,10 @@
  * ⚠️ ★ここで採否は決めません。**ゲートが成立しているか**だけを見ます。
  */
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+// @ts-expect-error — ★道具側の部品（`.mjs`）
+import { newestCommitISO } from '../../../tools/lib/provenance.mjs';
 
 const OUT = path.resolve('out/2d-existing-shot-gate');
 
@@ -156,5 +158,35 @@ describe('既存ショット適性ゲート', () => {
         expect(r.reasons.length, `${r.shotId} に理由が無い`).toBeGreaterThan(0);
       }
     }
+  });
+
+  /* ⑫ 測定が、いまの画面のものである（★RD-4 ③・RD-5 ②） */
+  it('🔴 ⑫ 測定が、いまの画面より古くない', () => {
+    /**
+     * 🔴 ★**2026-09-19 に足しました。★足した時点で赤です。**
+     *
+     * 【★なぜ赤にするか】
+     *   ★この検査が読む `out/2d-existing-shot-gate/` は ★**2026-08-24** の測定です。
+     *   ★`packages/render/src` の最後の変更は ★**2026-09-15**（`cfc3ad1`）で、
+     *   ★その間に ★**台本 v6 → v7 → v8 → v9** が入っています。
+     *   → ★★**26 日前の画面を見て緑**でした。★これは「緑」ではなく ★**「何も言っていない」**です。
+     *
+     * 【⚠️ ★ここでは hash を使いません（★**RD-5 ②**）】
+     *   ★この測定は ★**ブラウザの撮影**が要り、★検査の中で作り直せません。
+     *   ★hash を突き合わせると ★**常に赤**になり、★既知の赤の登録簿が常時埋まった状態 ＝
+     *   ★**RD-2 の意味が消えます**。
+     *   → ★**「測った後に画面が動いたか」**だけを見ます。★測り直せば緑に戻り、★戻ったままです。
+     *
+     * ⚠️ ★**`tools/lib/known-red.mjs` に登録されています**（★担当・期限つき）。
+     *    ★測り直したら ★**登録を消してください**（★消し忘れは `verify:red` が落とします）。
+     */
+    const measured = statSync(path.join(OUT, 'measurements.json')).mtime.toISOString();
+    const src = newestCommitISO(['packages/render/src', 'apps/web/src']);
+    expect(
+      measured >= src,
+      `★測定 ${measured.slice(0, 10)} は、画面の最後の変更 ${src.slice(0, 10)} より古いです。`
+      + '★`tools/audit-existing-shot-gate.mjs` を**オーナーの端末で**流し直してください'
+      + '（★ここからは流しません — ★人の画面にブラウザの窓が開きます）',
+    ).toBe(true);
   });
 });

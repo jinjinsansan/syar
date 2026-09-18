@@ -12,6 +12,7 @@ import {
   broadcastV2FinishStyleOf, broadcastV2ShotById, cameraBasis, posOf, project,
 } from '@star/render';
 import { buildAuditRace, auditClock, auditSceneAt, RACE_DEFAULTS } from './lib/race-audit-build.mjs';
+import { provenanceOf } from './lib/provenance.mjs';
 
 const OUT = path.resolve('out/2d-edit-grammar');
 mkdirSync(OUT, { recursive: true });
@@ -184,7 +185,19 @@ const ALL_SHOT_IDS = allShotIds();
 console.log(`定義ショット ${ALL_SHOT_IDS.length} 個: ${ALL_SHOT_IDS.join(' ')}
 `);
 
-const out = { generatedFrom: 'resolveBroadcastV2Scene（実画面と同じ場面解決）', step: STEP, viewport: { W, H }, seeds: [] };
+/**
+ * ★**何から作ったかを書き残す**（★RD-4 ③・2026-09-19）。
+ *   🔴 ★この生成物は `.gitignore` の下にあり、★**1 週間前のものを読んだまま緑**だったことがあります。
+ *   ★検査は `_provenance.sourceHash` を ★**いまのソースの hash** と突き合わせ、ずれていたら作り直します。
+ * ⚠️ ★**依存する場所を名指しで渡します**（★分類は `built.model`＝レースの計算から出ます）。
+ */
+const PROVENANCE_INPUTS = [
+  'packages',
+  'apps/cli/src',
+  'tools/lib/race-audit-build.mjs',
+  'tools/audit-edit-grammar-race.mjs',
+];
+const out = { generatedFrom: 'resolveBroadcastV2Scene（実画面と同じ場面解決）', _provenance: provenanceOf(PROVENANCE_INPUTS), step: STEP, viewport: { W, H }, seeds: [] };
 
 for (const spec of SEEDS) {
   const built = buildAuditRace({ seed: spec.seed });

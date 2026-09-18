@@ -915,6 +915,7 @@ export const COMPONENT = [
   { file: 'lib/dress.mjs', why: '★勝負服の配色を描くための部品（★映像の道具が使う）' },
   { file: 'lib/env.mjs', why: '★接続先の選択を 1 か所にまとめた部品。★`--env` 必須の規則はここが持つ' },
   { file: 'lib/exposure-registry.mjs', why: '★公開の登録簿（★どの表・RPC を誰に開けるか）。★V-20 が読む表で、道具ではない' },
+  { file: 'lib/provenance.mjs', why: '★生成物に「何から作ったか」を書き残す部品（★RD-4 ③・2026-09-19）。★道具が hash を埋め、★検査がいまのソースと突き合わせる。★道具ではない' },
   { file: 'lib/known-red.mjs', why: '★いま赤いと分かっている検査の登録簿（★RD-2・2026-09-19）。★verify-known-red.mjs が読む表で、道具ではない' },
   { file: 'lib/guard.mjs', why: '★`assertNotProduction` の本体。★状態を変える道具が呼ぶ部品' },
   { file: 'lib/guard.d.mts', why: '★`assertNotProduction` の型宣言（★`any` を使わないために置く）。★実行されません' },

@@ -5,8 +5,11 @@
  * ⚠️ ★ここで採否は決めません。**監査が成立しているか**だけを見ます。
  */
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+// @ts-expect-error — ★道具側の部品（`.mjs`）
+import { sourceHash, newestCommitISO } from '../../../tools/lib/provenance.mjs';
 
 const OUT = path.resolve('out/2d-edit-grammar');
 
@@ -16,8 +19,72 @@ function load(name: string): Record<string, any> {
   return JSON.parse(readFileSync(f, 'utf8')) as Record<string, any>;
 }
 
+/**
+ * ★**古い生成物で緑にならないようにする**（★**RD-4 ③**・2026-09-19）。
+ *
+ * 【🔴 ★何が起きていたか】
+ *   ★この検査の題は「★seed 分類を**現 HEAD で**再確認している」です。
+ *   ★ところが読んでいたのは `.gitignore` の下の ★**2026-09-12 の生成物**でした。
+ *   ★その間に走路の凍結（`80c4eb3`）や ES-2〜ES-6、台本 v7/v8/v9 が入っています。
+ *   🔴 ★**2 つの主張（接戦代表・独走代表）が両方とも古く**、★どちらも偽のまま緑でした。
+ *   ★入力が**無い**ときは落ちます（`load` が投げる）。★**「有るが古い」ときだけ**が穴でした。
+ *
+ * 【★どう塞ぐか】
+ *   ★道具が `_provenance.sourceHash`（★依存するソースの hash）を書きます。
+ *   ★ここで ★**いまのソースの hash と突き合わせ**、★ずれていたら ★**その場で作り直します**（★12 秒）。
+ *   ★平時は hash を数えるだけ（★ほぼ 0 秒）で、★render を触った後だけ作り直しが走ります。
+ *
+ * ⚠️ 🔴 ★**作り直せるのは `race-edl.json` だけ**です。
+ *    ★`race-captures.json` / `reference-edl.json` / `comparison.json` は
+ *    ★**ブラウザの撮影**が要り、★2026-08-24 のままです（★別途 報告済み）。
+ */
+function freshRaceEdl(): Record<string, any> {
+  const f = path.join(OUT, 'race-edl.json');
+  const want = sourceHash(PROVENANCE_INPUTS).hash;
+  const got = existsSync(f)
+    ? (JSON.parse(readFileSync(f, 'utf8')) as { _provenance?: { sourceHash?: string } })._provenance?.sourceHash
+    : undefined;
+  if (got === want) return load('race-edl.json');
+
+  const why = got === undefined ? '記録が無い' : 'ソースが変わっている';
+  console.log(`[edit-grammar-audit] ★race-edl.json を作り直します（${why}）…`);
+  const r = spawnSync(process.execPath, [
+    path.resolve('node_modules/tsx/dist/cli.mjs'), 'tools/audit-edit-grammar-race.mjs',
+  ], { encoding: 'utf8' });
+  if (r.status !== 0) {
+    throw new Error(`★race-edl.json を作り直せませんでした（${r.status}）: ${r.stderr?.slice(0, 400)}`);
+  }
+  const after = load('race-edl.json');
+  const now = (after as { _provenance?: { sourceHash?: string } })._provenance?.sourceHash;
+  // 🔴 ★作り直したのに合わないなら、★依存の名指しが間違っています。★黙って進めない（R-27）
+  if (now !== want) {
+    throw new Error('★作り直しても hash が合いません（★PROVENANCE_INPUTS の名指しを見直すこと）');
+  }
+  return after;
+}
+
+/**
+ * ⚠️ ★**道具の側と同じ並びでなければいけません**（★`tools/audit-edit-grammar-race.mjs`）。
+ *    ★ずれると、★作り直しても hash が合わず、★上の検査が落ちて知らせます。
+ *
+ * 【🔴 ★**RD-5** — ★なぜ列挙をやめたか（2026-09-19）】
+ *   ★最初は `packages/render/src` など ★**依存しそうな場所を数えて**書いていました。
+ *   🔴 ★しかし ★**今日のずれを作ったのは `80c4eb3`（走路の凍結）と ES-2〜ES-6** で、
+ *      ★どちらも `packages/render` の**外**です。
+ *   → ★★**列挙が 1 つ足りないだけで、`_provenance` は「新しい」と嘘をつきます。**
+ *     ★**古さを見る仕掛けが、古さを保証する** — ★いまより悪い状態です。
+ *   → ★**既定を閉じます**（R-29）。★`packages` 全部と `apps/cli/src` を見ます。
+ *   ⚠️ ★広すぎて作り直しが頻繁に走るほうが、★**嘘をつくより安い**（★12 秒）。
+ */
+const PROVENANCE_INPUTS = [
+  'packages',
+  'apps/cli/src',
+  'tools/lib/race-audit-build.mjs',
+  'tools/audit-edit-grammar-race.mjs',
+];
+
 const ref = load('reference-edl.json');
-const race = load('race-edl.json');
+const race = freshRaceEdl();
 const caps = load('race-captures.json');
 const cmp = load('comparison.json');
 
@@ -246,5 +313,36 @@ describe('編集文法の監査', () => {
     expect(ref.method).toBe('manual-read');
     expect(Array.isArray(ref.limitations)).toBe(true);
     expect(ref.limitations.length).toBeGreaterThan(0);
+  });
+
+  /* ⑭ 撮影が、いまの画面のものである（★RD-4 ③・RD-5 ②） */
+  it('🔴 ⑭ 撮影が、いまの画面より古くない', () => {
+    /**
+     * 🔴 ★**2026-09-19 に足しました。★足した時点で赤です。**
+     *
+     * 【★なぜ赤にするか】
+     *   ★⑩「実ブラウザ経路から撮っている」は ★**2026-08-24 の撮影**を見て緑でした。
+     *   ★その後 `packages/render/src` と `apps/web/src` は ★**何度も変わって**います
+     *   （★台本 v6 → v7 → v8 → v9）。
+     *   → ★★**これは「緑」ではなく「何も言っていない」**です。
+     *     ★赤にするのは ★**すでに悪い状態を見えるようにするだけ**です（★裁定 RD-4 ③ ①）。
+     *
+     * 【⚠️ ★ここでは hash を使いません（★**RD-5 ②**）】
+     *   ★撮影は ★**作り直せません**（★ブラウザが要り、★人の画面に窓が開きます）。
+     *   ★hash の突き合わせを付けると ★**常に赤**になり、★登録簿が常時埋まった状態 ＝
+     *   ★**RD-2 の意味が消えます**。
+     *   → ★**「撮った後に画面が動いたか」**だけを見ます。★撮り直せば緑に戻り、★戻ったままです。
+     *
+     * ⚠️ ★**この検査は `tools/lib/known-red.mjs` に登録されています**（★担当・期限つき）。
+     *    ★撮り直したら ★**登録を消してください**（★消し忘れは `verify:red` が落とします）。
+     */
+    const shot = statSync(path.join(OUT, 'race-captures.json')).mtime.toISOString();
+    const src = newestCommitISO(['packages/render/src', 'apps/web/src']);
+    expect(
+      shot >= src,
+      `★撮影 ${shot.slice(0, 10)} は、画面の最後の変更 ${src.slice(0, 10)} より古いです。`
+      + '★`tools/capture-edit-grammar-race.mjs` を**オーナーの端末で**流し直してください'
+      + '（★ここからは流しません — ★人の画面にブラウザの窓が開きます）',
+    ).toBe(true);
   });
 });
