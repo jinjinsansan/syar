@@ -552,6 +552,78 @@ user_identities: 0 行
 | E-2・E-3 | **再設定／メール変更の確認メール**が要る（**上限に当たる**） |
 | ⑨⑪ | ✅ **構文木で固定済み**（§9-10・`auth-wiring.test.ts` 7 本緑） |
 
+## 9-12. ✅ 手順 6 完了: 初回セットアップ RPC（`0031`・staging 適用済み）
+
+裁定 `REVIEW_SETUP_PREDICATE_VERDICT_20260918.md`（**(a) 採用・条件 4 つ**）に従いました。
+
+| 条件 | どう満たしたか |
+|---|---|
+| **1** 既にある書き方を使う | 候補は `market-flow.ts` と**同一の SQL**／戦績 0 は `story-flow.ts:71` の先例どおり `finish_pos is not null`／移管は `0025`・`0026` と同形／台帳の語は **`inflow`**（`0027` の制約に**既にある語**。新設せず） |
+| **2** 暫定であることを註記 | RPC の `comment on` と冒頭に、★**クラス分けの便で共通の述語に置き換え、V-4・V-5・V-6・V-18 を取り直す**ことを明記 |
+| **3** 第三の登録簿 ＋ 中身の検査 | `ACCOUNT_CREATING_FUNCTIONS` を新設し `:210` から除外。★代わりに **①`auth.uid()` の null 弾き ②`email_confirmed_at` を自身でも確認（`auth.identities` で経路を判定し OIDC を巻き込まない）③`dedupe_key` の冪等** を本文に要求。★併せて **V-19 ⑭ として `on conflict` の不在**も見ます |
+| **4** V-20 の登録簿 | ✔ staging 実測で 2 関数とも `anon= - / authenticated=YES`・「登録簿に無い関数が無い」緑 |
+
+### ★検査が本当に噛むことを、変異で確かめました
+
+`email_confirmed_at` の確認を消すと **3 条件の検査だけが赤くなり**（17 passed / 1 failed）、控えから復元しました。
+★**緑であること自体を合格の根拠にしていません**（§9-8 で一度踏んだ形）。
+
+### 🔴 途中で踏んだ罠を 1 件記録します
+
+**`comment on function … is '…'` の文字列リテラルが、関数の本文に混ざります**
+（本文の切り出しは「次の `create function` まで」なので）。
+★`blankComments` は `--` しか消さないため、**説明文の中の `assert_setup_complete()` を「呼んでいる」と誤判定**しました。
+
+→ ★**`stripFunctionComments` を足して構造の側で直しました。**
+⚠️ ★**`blankComments` 自体は変えていません** — 7 か所から呼ばれ、**`errcode = '…'` のリテラルが残ることを前提にした検査**があるためです。
+★**註記の語を言い換えて検出器を黙らせる形は採りませんでした**（D-108 ③）。
+
+### 勝負服の配色の器を足しました（★オーナー承認済み）
+
+★**D-074 が入力項目として明記しているのに、列がどこにもありませんでした。**
+`users` に `silk_color` / `silk_sleeve` を `0009`（`account_type`）と同じ形で追加。
+★値の一覧は**画面側（`setup.ts` の `SILK_COLORS`）が唯一の出どころ**なので、DB 側は**空でないことと袖の 3 択**だけを制約にしています（二重管理にしない・D-052）。
+
+## 9-13. 🔴 別件の露出を 3 件見つけました（★本便では直しません）
+
+★**`0018` は「実体テーブルには一切 grant しない」と宣言**し、`revoke all on all tables` ＋
+`alter default privileges` で閉じています。★**その後の 3 つの移行が、実体テーブルを anon に開けています。**
+
+```
+0024:97  grant select on horse_story_event   to anon, authenticated;
+0025:57  grant select on horse_market_listing to anon, authenticated;
+0027:46  grant select on stable_grade_price  to anon, authenticated;
+```
+
+✔ staging 実測: **3 表とも anon から 1 行ずつ読めます**（V-20 ② 不合格）。
+✔ **登録簿にも 1 件も載っていません**（V-20 ③ 不合格）。
+✔ **過去の報告・裁定に記録が見当たりません** — ★つまり**誰も気づいていない露出**です。
+
+★**§14.3「読み取りはビュー経由に一本化」と `0018` の方針に正面から反します。**
+
+| | |
+|---|---|
+| 🔴 **本番** | ✅ **露出はありません**（②③ とも緑）。★`0024`・`0025`・`0027` が**本番未適用**のため |
+| **性質** | `stable_grade_price` は格と価格（**公開してよい種類**）／`horse_market_listing` は★と価格（同様）／⚠️ **`horse_story_event` は `detail jsonb` を持ち、中身次第で §12.4 に触れます** |
+
+★**本便では直しません**（裁定 §4 が別件の欠陥に定めた「直さず記録だけ」に倣います）。
+★ただし **V-20 は恒久ゲート**で、★**本番に `0024` 以降を当てた瞬間に露出が現実になります**。
+→ 🔴 ★**本番への適用より前に、この 3 件の扱いを決めてください。**
+
+### ★本番の V-20 が 2 件赤いこと（★素性を分けて報告します）
+
+```
+🔴 登録簿にあるが DB に無い: create_account, is_initial_horse_candidate,
+   enter_race, buy_horse, sell_horse, unlock_stable_grade
+🔴 anon の EXECUTE: exchange_prize, place_bet, spend_training_ep が実測 true
+```
+
+| | |
+|---|---|
+| ★**4 件は今夜以前から**赤い | `enter_race`・`buy_horse`・`sell_horse`・`unlock_stable_grade` は `0024`〜`0027` が**本番未適用**のため |
+| ★**2 件は私が増やしました** | `create_account`・`is_initial_horse_candidate` を登録簿に載せたぶん。★**新しい欠陥ではなく、登録の結果**です |
+| ★**anon の EXECUTE** | **`0022` 未適用による既知**。★登録簿の註記自身が「本番で回すと④が落ちる。**それが正しい**」と予告しています |
+
 ## 10. 開発側が次にすること
 
 **裁定が出るまで認証の実装に着手しません。** 裁定後は、
