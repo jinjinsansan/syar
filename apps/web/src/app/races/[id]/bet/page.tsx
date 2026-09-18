@@ -3,11 +3,12 @@
 /**
  * ★投票（馬券・マークシート風）— 正本 design/hud-ds/components/bet-sheet［アーケード］
  *   券種タブ（グロス）→ 馬番グリッド（32px の真円を金で塗る）→ 金額（EP・100 単位）→ 確認。右に「みんなの投票状況」（オッズに影響しない）。
- *   ⚠️ 今はデモデータ。投票は `place_bet` RPC に繋ぐまで動かない。
+ *   🔴 ★**2026-09-19・UI-2 で本番に繋ぎました**。★**見た目は仮**（★UI1-8 と同じ扱い・デザイナー便で差し替わります）。
  *   ⚠️ 憲法: 「購入」と書かない。EP を増やす導線なし。自馬出走レースは投票不可（§9.5）。不的中は静か。
  */
 import { useEffect, useMemo, useState } from 'react';
 import { BET_TYPES, DEMO_BET_RACE } from '../../../../lib/game-demo';
+import { loadBetScreen, placeBet, oddsKey, type BetScreenData } from '../../../../lib/bet-screen';
 import { FrameBadge } from '../../../../components/ui';
 import { formatEntryPoints } from '../../../../lib/format';
 
@@ -27,7 +28,52 @@ function TypeTab({ label, selected, onClick }: { readonly label: string; readonl
 }
 
 export default function BetPage(): React.ReactElement {
-  const race = DEMO_BET_RACE;
+  /**
+   * ★**本番データ**（★2026-09-19・UI-2）。★読み込み中と失敗を ★**必ず出します**。
+   * ⚠️ ★失敗を空にしない（★「出馬表が無い」に見えてしまう・R-16）。
+   */
+  const [data, setData] = useState<BetScreenData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [betError, setBetError] = useState<string | null>(null);
+  const [placed, setPlaced] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  /**
+   * ★**冇等キー**。⚠️ ★**送るたびに作り直さないこと**— ★作り直すと ★**2 回目も通ります**。
+   *    ★投票が 1 回通ったら、★**次の投票用に新しい鍵を作ります**（★連続して買えなくなるため）。
+   */
+  const [clientToken, setClientToken] = useState(() => crypto.randomUUID());
+
+  useEffect(() => {
+    let alive = true;
+    loadBetScreen(null)
+      .then((d) => { if (alive) setData(d); })
+      .catch((e: unknown) => { if (alive) setLoadError(e instanceof Error ? e.message : String(e)); });
+    return () => { alive = false; };
+  }, []);
+
+  /**
+   * ⚠️ ★**見本と本番を混ぜています**（★UI1-8 の形）。
+   *    ★本番から来るのは ★**出馬表・オッズ・残高・自馬の枠番**。
+   *    🔴 ★**みんなの投票状況（`shares`）と 1 回の上限（`capPerBet`）は見本のまま**です —
+   *    ★前者は公開する口が無く、★後者は `place_bet` が持っていて ★**画面が持つと二重帳簿**になります。
+   *    ★上限に当たったことは ★**RPC の文言**で分かります。
+   */
+  const live = data?.race ?? null;
+  const race = {
+    ...DEMO_BET_RACE,
+    id: live?.id ?? DEMO_BET_RACE.id,
+    raceNo: live?.classLabel ?? DEMO_BET_RACE.raceNo,
+    raceName: live?.raceName ?? DEMO_BET_RACE.raceName,
+    cond: live?.cond ?? DEMO_BET_RACE.cond,
+    deadline: live?.time ?? DEMO_BET_RACE.deadline,
+    fieldSize: live?.entries.length ?? DEMO_BET_RACE.fieldSize,
+    horses: live === null
+      ? DEMO_BET_RACE.horses
+      : live.entries.map((e) => ({ gate: e.gate, name: e.horseName })),
+    ownGate: data === null ? null : (data.ownGates[0] ?? null),
+    epBalance: data?.epBalance ?? DEMO_BET_RACE.epBalance,
+  };
+
   const [typeKey, setTypeKey] = useState('trifecta');
   const type = BET_TYPES.find((t) => t.key === typeKey) ?? BET_TYPES[0]!;
   /** picks[col] = gate。順不同の券種は列 0 に複数入れる */
@@ -39,6 +85,33 @@ export default function BetPage(): React.ReactElement {
   const selection: number[] = ordered ? picks.slice(0, type.picks).filter((g): g is number => g !== null) : unordered;
   const complete = selection.length === type.picks;
   const blocked = race.ownGate !== null;
+  /** ★オッズ（★サーバーが計算した値。★画面では計算しない・§9.2） */
+  const currentOdds = live === null || !complete
+    ? null
+    : live.odds.get(oddsKey(typeKey, selection)) ?? null;
+
+  /** ★投票する（★判定はすべて `place_bet` が持っています） */
+  const submit = async (): Promise<void> => {
+    if (live === null || !complete || busy) return;
+    setBusy(true); setBetError(null); setPlaced(null);
+    try {
+      const r = await placeBet({
+        raceId: live.id, betType: typeKey, selection, amount, clientToken,
+      });
+      if (r.ok) {
+        setPlaced(r.betId);
+        // ★次の投票用に新しい鍵（★同じ鍵では 2 回目が通らない）
+        setClientToken(crypto.randomUUID());
+      } else {
+        // 🔴 ★**原文をそのまま**（★上限も §9.5 も RPC が持っています）
+        setBetError(r.failure.message);
+      }
+    } catch (e) {
+      setBetError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   const enough = race.epBalance >= amount;
   const sep = ordered ? '→' : '−';
   /**
@@ -95,6 +168,13 @@ export default function BetPage(): React.ReactElement {
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         <h1 className="a-band" style={{ height: 46, padding: '0 22px', borderRadius: 10, border: '2px solid var(--a-edge)', fontSize: 26, fontWeight: 900, letterSpacing: '.06em', textShadow: '0 2px 0 rgba(0,0,0,.3)', margin: 0 }}>投票</h1>
         <span style={{ fontSize: 15, fontWeight: 900, color: 'var(--a-ink)' }}>{race.raceNo}　{race.raceName}　{race.cond}　{race.fieldSize}頭</span>
+        {/* 🔴 ★読み込み中と失敗を必ず出す（★UI1-9） */}
+        {data === null && loadError === null && (
+          <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)', marginLeft: 10 }}>読み込んでいます…</span>
+        )}
+        {loadError !== null && (
+          <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-red-d)', marginLeft: 10 }}>読み込めませんでした: {loadError}</span>
+        )}
         <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 10, height: 44, padding: '0 18px', borderRadius: 10, backgroundImage: 'var(--a-gloss-red)', border: '2px solid var(--a-red-d)', boxShadow: 'var(--a-shadow-sm)' }}>
           <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '.1em', color: '#fff' }}>締切まで</span>
           <span className="a-num" style={{ fontSize: 30, color: '#fff' }}>{race.deadline}</span>
@@ -217,10 +297,33 @@ export default function BetPage(): React.ReactElement {
                 <span>1 回の上限 <span className="a-num" style={{ fontSize: 16, color: 'var(--a-ink)' }}>{race.capPerBet.toLocaleString('ja-JP')}</span> EP</span>
                 <span>投票後の残り <span className="a-num" style={{ fontSize: 16, color: 'var(--a-num-time)' }}>{Math.max(0, race.epBalance - amount).toLocaleString('ja-JP')}</span> EP</span>
               </div>
-              <span className={`a-btn a-btn-gold${complete && enough ? '' : ' off'}`} style={{ width: '100%', height: 52, marginTop: 14, fontSize: 17 }} title="サーバー接続まで押せません">
-                {type.label}に {formatEntryPoints(amount)} を投票する
-              </span>
+              {/* ★オッズ（★サーバーが計算した値・§9.2。★画面では計算しません） */}
+              {currentOdds !== null && (
+                <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)', marginTop: 8 }}>
+                  この買い目のオッズ <span className="a-num" style={{ fontSize: 18, color: 'var(--a-ink)' }}>{currentOdds.toFixed(1)}</span> 倍
+                </div>
+              )}
+              <button
+                type="button"
+                className={`a-btn a-btn-gold${complete && enough && !busy && live !== null ? '' : ' off'}`}
+                style={{ width: '100%', height: 52, marginTop: 14, fontSize: 17, cursor: 'pointer', fontFamily: 'inherit' }}
+                onClick={() => { void submit(); }}
+                disabled={!complete || !enough || busy || live === null}
+              >
+                {busy ? '送っています…' : `${type.label}に ${formatEntryPoints(amount)} を投票する`}
+              </button>
               {!enough && <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-red-d)', marginTop: 6 }}>参加ポイントが足りません</div>}
+              {/* 🔴 ★**失敗を握り潰さない**（★UI1-9 と同じ作法。★原文をそのまま出す） */}
+              {betError !== null && (
+                <div style={{ marginTop: 8, padding: '9px 12px', borderRadius: 8, background: '#ffeceb', border: '2px solid var(--a-red-d)' }}>
+                  <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-red-d)', lineHeight: 1.7 }}>{betError}</span>
+                </div>
+              )}
+              {placed !== null && (
+                <div style={{ marginTop: 8, padding: '9px 12px', borderRadius: 8, background: '#eaf3fb', border: '2px solid #9fc0dc' }}>
+                  <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink)', lineHeight: 1.7 }}>投票しました</span>
+                </div>
+              )}
               <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)', marginTop: 10, lineHeight: 1.7 }}>締切後は取消できません。参加ポイントは投票時に引かれ、的中すると賞金ポイント（PP）で払戻されます</div>
             </div>
           </div>
