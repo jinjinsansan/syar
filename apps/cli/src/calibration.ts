@@ -556,6 +556,8 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   { key: 'CYCLES_PER_WEEK', why: '正典 D-007（1週=4時間・1サイクル=10分）から決まる導出値 24。★別々に書くと片方だけ動いて静かにずれるので CYCLE_MS から導出しており、week.test.ts が正典の値と一致することを守る' },
   { key: 'WEEKS_PER_DAY', why: '正典 §7.1「1日6週」の導出値。テストがリテラル 6 と一致することを守る' },
   { key: 'WEEK_MS', why: '正典 D-007「1ゲーム内週 = リアル4時間」の導出値' },
+  { key: 'DAY_MS', why: '★実時間 1 日のミリ秒（24×60×60×1000）。単位の換算そのもので、較正で動かす値ではない。'
+    + '★AL-9（2026-09-18）で RACES_PER_DAY を CYCLE_MS から導くために置いた（D-100・裁定 REVIEW_CONSULT_ARCADE_LOOP_ANSWER_20260918）' },
   { key: 'LIFECYCLE_WEEKS', why: '正典 §7.1 のタイムライン表（78/104/260週）の写し。ルールそのもので較正で動かす値ではない' },
   { key: 'CAREER_RACE_LIMIT', why: '正典 §7.1「キャリア上限 24戦」の写し' },
   {

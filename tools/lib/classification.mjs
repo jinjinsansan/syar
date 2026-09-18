@@ -30,6 +30,13 @@
 
 /** 読むだけ。本番に向けてよい */
 export const READONLY = [
+  /**
+   * ★AL-6（裁定 REVIEW_CONSULT_ARCADE_LOOP_ANSWER_20260918）の測定器 2 本。
+   *   ★DB に触りません（★エンジンを回して時間を測るだけ・出力はローカルの JSON とログ）。
+   *   ★レビュー側が独立に再実行できるよう tmp/ から移しました（★tmp/ は gitignore で次の人に残らない）。
+   */
+  'bench-odds-entrants.mjs',
+  'bench-odds-cost.mjs',
   // ★既存の利用者から「経路の印」（auth.identities）を読むだけ。SELECT のみ・何も作らない
   //   （D-113 ③・裁定 REVIEW_AUTH_EMAIL_PASSWORD_VERDICT_20260918 §2）
   'read-auth-identities.mjs',
