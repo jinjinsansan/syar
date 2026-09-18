@@ -44,6 +44,11 @@ export const EXPECTED_EXPOSURE = {
   ep_ledger: OWNER_SCOPED,
   pp_ledger: OWNER_SCOPED,
   prize_exchanges: OWNER_SCOPED,
+  // ★自分の馬のビュー（★2026-09-18・移行 0034・UI-1 の前提）。
+  //   ★`horses` は CLOSED のままで、★出してよい列だけを選んだビューを別に作った（正典 410 行の作法）。
+  //   ★`where owner_id = auth.uid()` で自分の行だけ・★authenticated にだけ grant（anon には出さない）。
+  //   ★列の仕分けは apps/cli/test/my-horses-view.test.ts が「全列の分類」を要求して守る。
+  my_horses: OWNER_SCOPED,
 
   // ── 閉鎖（クライアントが直接読む理由がない） ──
   // 実体テーブルは公開ビュー経由でのみ読ませる
