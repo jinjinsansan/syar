@@ -53,6 +53,31 @@ export const READONLY = [
    *   → ★探す文字をコードポイントから組み立てる形に直してあります。
    */
   'scan-control-chars.mjs',
+  /**
+   * ★テスト棚卸しの実行時計測（N-2 / R-10）。★**DB に一切触れません**。
+   * ⚠️ ★ただし ★**本番ソースに一時的にプローブを 1 行挿し、必ず撤去します**
+   *    （★挿入・撤去とも「実際に文字列が変化したか」を assert する・M-1 の空振り事故対策）。
+   * ⚠️ ★**この簿の「読取専用」は「DB を変えない」の意**です。★ソースを触る道具が
+   *    ★ここに入るのは正確とは言えません（★分類の粒度の話としてレビュー側に照会中）。
+   */
+  'inventory/measure.mjs',
+  /**
+   * ★変異試験ハーネス（O-4 / R-11）。★**DB に一切触れません**。
+   * ⚠️ ★`measure.mjs` と同じく ★**ソースを一時的に壊して戻します**（★それが目的の道具です）。
+   */
+  'mutation/run.mjs',
+  /**
+   * ★較正定数を壊して V-ゲートが落ちるかを実測する（Q-P3-42）。★**DB に一切触れません**。
+   * ⚠️ ★同上（★ソースを一時的に壊して戻す）。
+   */
+  'mutation/gates.mjs',
+  /** ★較正定数の一覧を出す（★変異試験の入力）。★読むだけ・DB に触れない */
+  'mutation/dump-calibration.ts',
+  /**
+   * ★参考映像を Blender で描くスクリプト。★**Blender が実行します**（★node ではありません）。
+   * ★DB にも網にも触れず、★画像を書き出すだけです。
+   */
+  'blender/race_render.py',
   'probe-band-histogram.ts',
   /**
    * ★芝の粒を測る（★映像の便）。★画像を読むだけで DB に触りません。
@@ -869,6 +894,45 @@ export const PRODUCTION_OPS = [
  * ⚠️ ★ここに載せてよいのは ★**実行されないもの**（データ・設定）だけです。
  *    ★実行されるなら、★**DB に触らなくても**上の 3 つのどれかです。
  */
+/**
+ * ★**部品**（★2026-09-19・**TG-3**・裁定 `REVIEW_UI1_VERDICT_20260919.md`）。
+ *
+ * 【★なぜディレクトリごと除外をやめたか】
+ *   ★旧: `tools/` の ★**直下だけ**を見ていました。
+ *   🔴 ★→ ★**「部品だからディレクトリに置く」ですり抜けられます。**
+ *      ★**拡子で絞るのと同じ形**です（★今日その列挙をやめたばかりでした）。
+ *   ★実際、旧版の註記は自分で「中身は対象外のまま ＝ **残っている穴**」と書いていました。
+ *   → ★**`tools/` 配下を再帰で全部**対象にし、★**部品も理由付きで簿に載せます。**
+ *
+ * 【★ここに載せてよいもの】
+ *   ★**他の道具から import されるだけで、単体では走らせないもの。**
+ *   ⚠️ ★**単体で走らせるなら部品ではありません** — ★DB に触らなくても
+ *      READONLY / STATE_CHANGING / PRODUCTION_OPS のどれかです。
+ */
+export const COMPONENT = [
+  { file: 'lib/args.mjs', why: '★コマンドライン引数の解析。★2026-08-20 に本番へ余計な移行を当てた事故の後、切り出した部品' },
+  { file: 'lib/cdp.mjs', why: '★Chrome DevTools Protocol の細口（★映像の撮影の道具が使う）。★単体では走らせない' },
+  { file: 'lib/classification.mjs', why: '★この分類簿そのもの。★道具ではなく、道具を分類する表' },
+  { file: 'lib/classification.d.mts', why: '★分類簿の型宣言（★`any` を使わないために置く）。★実行されない' },
+  { file: 'lib/dress.mjs', why: '★勝負服の配色を描くための部品（★映像の道具が使う）' },
+  { file: 'lib/env.mjs', why: '★接続先の選択を 1 か所にまとめた部品。★`--env` 必須の規則はここが持つ' },
+  { file: 'lib/exposure-registry.mjs', why: '★公開の登録簿（★どの表・RPC を誰に開けるか）。★V-20 が読む表で、道具ではない' },
+  { file: 'lib/guard.mjs', why: '★`assertNotProduction` の本体。★状態を変える道具が呼ぶ部品' },
+  { file: 'lib/guard.d.mts', why: '★`assertNotProduction` の型宣言（★`any` を使わないために置く）。★実行されません' },
+  { file: 'lib/pixel-font.mjs', why: '★画像に文字を焼くための点字の表（★映像の道具が使う）' },
+  { file: 'lib/race-audit-build.mjs', why: '★映像の監査で使うレースの組み立て。★道具から呼ばれる部品' },
+  { file: 'lib/race-audit-build.d.mts', why: '★`race-audit-build.mjs` の型宣言（★`any` を使わないため）。★実行されません' },
+  { file: 'lib/v18.mjs', why: '★V-18（内外差）の判定で使う幾何の部品。★道具から呼ばれる' },
+  {
+    file: 'inventory/probe-setup.ts',
+    why: '★テスト棚卸しの vitest セットアップ（N-2 / R-10）。★`vitest.probe.config.ts` が読み込む部品で、単体では走らせない',
+  },
+  {
+    file: 'inventory/vitest.probe.config.ts',
+    why: '★その vitest の設定。★`measure.mjs` が vitest に渡す。★設定であって道具ではない',
+  },
+];
+
 export const NOT_A_TOOL = [
   {
     file: 'race-reference-shots.json',
@@ -891,5 +955,6 @@ export function allClassified() {
     ...STATE_CHANGING,
     ...PRODUCTION_OPS.map((x) => x.file),
     ...NOT_A_TOOL.map((x) => x.file),
+    ...COMPONENT.map((x) => x.file),
   ];
 }

@@ -20,7 +20,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { NOT_A_TOOL, PRODUCTION_OPS, READONLY, STATE_CHANGING, allClassified } from '../../../tools/lib/classification.mjs';
+import { COMPONENT, NOT_A_TOOL, PRODUCTION_OPS, READONLY, STATE_CHANGING, allClassified } from '../../../tools/lib/classification.mjs';
 import { assertNotProduction } from '../../../tools/lib/guard.mjs';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -31,23 +31,31 @@ const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
  * → ★**`.mjs` と `.ts` の両方**を見ます。★`lib/` は道具ではなく部品なので含みません。
  */
 /**
- * ★**`tools/` 直下のファイルを 1 つ残らず対象にする**（★2026-09-19・**TG-1**・
- * 裁定 `REVIEW_UI1_SELECTION_RULE_VERDICT_20260919.md`）。
+ * ★**`tools/` 配下のファイルを 1 つ残らず対象にする**（★2026-09-19・**TG-1 → TG-3**・
+ * 裁定 `REVIEW_UI1_SELECTION_RULE_VERDICT_20260919.md` / `REVIEW_UI1_VERDICT_20260919.md`）。
  *
- * 【★拡子で絞っていた頃の壊れ方】
+ * 【★絞っていた頃の壊れ方・3 世代】
  *   ★旧①: `.mjs` だけ → ★**`measure-turf-grain.ts` が以前から漏れていました**。
- *   ★旧②: `.mjs` と `.ts` → 🔴 ★**これも列挙です**。★`.mts` や `.sh` を置いた日に同じ穴が開きます
+ *   ★旧②: `.mjs` と `.ts` → 🔴 ★**これも列挙**。★`.mts` や `.sh` を置いた日に同じ穴
  *     （★実際 `deploy.sh` は **本番に向ける道具**なのに対象外でした）。
- *   → ★**拡子で絞るのをやめました**。★新しい種類のファイルを置いただけでここが赤くなります。
+ *   ★旧③: ★**直下だけ** → 🔴 ★**「部品だからディレクトリに置く」ですり抜けられます**
+ *     （★拡子で絞るのと同じ形です。★旧③ の註記は自分で「残っている穴」と書いていました）。
+ *   → ★**再帰で全部見ます**。★分類は `tools/` からの相対パス（例: `lib/args.mjs`）。
  *
- * ⚠️ ★**除外は 2 つだけ**で、★どちらも理由があります（R-29: 既定を閉じて必要なものだけ開ける）:
- *   ① ★**ディレクトリ**（`lib/`・`blender/`・`inventory/`・`mutation/`）— ★直下の道具を見る検査です。
- *     ⚠️ ★中身はこの検査の対象外のままです（★**残っている穴**。★必要になったときに広げます）。
- *   ② ★**`.` 始まり**（★編集器が置く隠しファイル）。
+ * ⚠️ ★**除外は 1 つだけ**になりました（R-29）: ★**`.` 始まり**
+ *    （★編集器が置く隠しファイルと、★`inventory/.probe.jsonl` のような実行時の成果物）。
  */
-const toolFiles = readdirSync(`${ROOT}tools`, { withFileTypes: true })
-  .filter((e) => e.isFile() && !e.name.startsWith('.'))
-  .map((e) => e.name);
+function toolFilesUnder(dir: string, prefix = ''): string[] {
+  const out: string[] = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.name.startsWith('.')) continue;
+    const rel = prefix === '' ? e.name : `${prefix}/${e.name}`;
+    if (e.isDirectory()) out.push(...toolFilesUnder(`${dir}/${e.name}`, rel));
+    else if (e.isFile()) out.push(rel);
+  }
+  return out;
+}
+const toolFiles = toolFilesUnder(`${ROOT}tools`);
 
 /** 最小限の偽クライアント */
 const fake = (impl: () => Promise<{ rows: { environment: string }[] }>) =>
@@ -61,7 +69,7 @@ describe('★R-24 ツールの分類（メタテスト）', () => {
     const missing = toolFiles.filter((f) => !classified.has(f));
     expect(
       missing,
-      `分類の登録漏れ。tools/lib/classification.mjs の READONLY / STATE_CHANGING / PRODUCTION_OPS / NOT_A_TOOL のどれかに載せてください（★「対象外」も分類の 1 つです・TG-2）:\n  ${missing.join('\n  ')}`,
+      `分類の登録漏れ。tools/lib/classification.mjs の READONLY / STATE_CHANGING / PRODUCTION_OPS / NOT_A_TOOL / COMPONENT のどれかに載せてください（★「対象外」も「部品」も分類の 1 つです・TG-2 / TG-3）:\n  ${missing.join('\n  ')}`,
     ).toEqual([]);
   });
 
@@ -69,6 +77,17 @@ describe('★R-24 ツールの分類（メタテスト）', () => {
     for (const e of NOT_A_TOOL) {
       expect(e.why.length, `${e.file} の理由が短すぎます`).toBeGreaterThan(20);
     }
+  });
+
+  it('★「部品」にも理由が書いてある（TG-3）', () => {
+    for (const e of COMPONENT) {
+      expect(e.why.length, `${e.file} の理由が短すぎます`).toBeGreaterThan(20);
+    }
+  });
+
+  it('★配下のディレクトリも見ている（TG-3・★走査が直下で止まっていない）', () => {
+    expect(toolFiles.some((f) => f.includes('/')), '★直下しか見ていません').toBe(true);
+    expect(toolFiles, '★lib/ の中身を見ていません').toContain('lib/classification.mjs');
   });
 
   it('★分類簿に載っているファイルが実在する（消えたツールが残っていない）', () => {
@@ -86,7 +105,9 @@ describe('★R-24 ツールの分類（メタテスト）', () => {
      * ★**外しても守られるもの**: 上の検査（作業ツリーにあるのに未登録なら落ちる）はそのまま効くので、
      *   ★**分類されていないツールが混入する経路は閉じたまま**です。R-24 の目的はこちらです。
      */
-    const ghosts = allClassified().filter((f) => !f.startsWith('_') && !actual.has(f));
+    // ⚠️ ★`_` 始まりの判定は ★**基底名**で見ます（★TG-3 で分類が相対パスになったため）
+    const basename = (f: string): string => f.slice(f.lastIndexOf('/') + 1);
+    const ghosts = allClassified().filter((f) => !basename(f).startsWith('_') && !actual.has(f));
     expect(ghosts, `存在しないファイルが分類簿にあります:\n  ${ghosts.join('\n  ')}`).toEqual([]);
   });
 

@@ -136,6 +136,7 @@ const blankComments = (sql: string): string => sql.replace(/--[^\n]*/g, (m) => '
  *
  * ⚠️ ★註記の語を言い換えて検出器を黙らせる形は採りません（D-108 ③）。**構造の側で直します。**
  */
+/** ⚠️ ★`latestFunctionBodies` と `functionPrivilegeStatements` の両方が使います */
 const stripFunctionComments = (sql: string): string =>
   blankComments(sql).replace(/\bcomment\s+on\b[\s\S]*?;/gi, (m) => ' '.repeat(m.length));
 
@@ -159,8 +160,13 @@ function latestFunctionBodies(migrations: readonly Migration[] = readMigrations(
     //   修飾を許さない版では **`0020` の定義を1つも拾えず、古い `0002` の定義で判定**していた
     //   （＝直したのに落ち続ける）。**走査器の取りこぼしは、対象が全部消えれば「合格」にもなる。**
     // ★コメントの中の語は拾わない（位置は保つので、本文は元の SQL から切り出せる）
+    //
+    // ⚠️ ★**`stripFunctionComments` を使います**（★2026-09-19・裁定 `REVIEW_UI1_VERDICT_20260919.md`）。
+    //    ★`comment on … is '…create or replace function foo(…)…'` と註記に書くと、
+    //    ★**存在しない関数を登録してしまいます**（★本文の切り出しもずれます）。
+    //    ★位置は同じ長さの空白で保たれるので、★`sql.slice` は元の SQL のままで正しく動きます。
     const re = /create\s+(?:or\s+replace\s+)?function\s+(?:[a-z_][a-z0-9_]*\.)?([a-z_][a-z0-9_]*)\s*\(/gi;
-    const hits = [...blankComments(sql).matchAll(re)];
+    const hits = [...stripFunctionComments(sql).matchAll(re)];
     for (let i = 0; i < hits.length; i += 1) {
       const name = hits[i]![1]!.toLowerCase();
       const start = hits[i]!.index!;
@@ -180,12 +186,17 @@ interface PrivilegeStatement {
   readonly roles: readonly string[];
 }
 
-/** 関数に対する grant / revoke を、全マイグレーションから位置つきで拾う（コメントは除く） */
+/**
+ * ★関数に対する grant / revoke を、全マイグレーションから位置つきで拾う（コメントは除く）。
+ * ⚠️ ★**`stripFunctionComments` を使います**（★2026-09-19）— ★註記に
+ *    ★`'…revoke all on function foo() from anon…'` と書くと、★**実際には無い権限の文を
+ *    ★拾ってしまいます**（★逆に「閉じている」と誤認する形です）。
+ */
 function functionPrivilegeStatements(migrations: readonly Migration[]): PrivilegeStatement[] {
   const out: PrivilegeStatement[] = [];
   const re = /\b(grant|revoke)\b[^;]*?\bon\s+(?:functions?\s+([^;]*?)|all\s+functions\s+in\s+schema\s+public)\s+(to|from)\s+([^;]+);/gi;
   migrations.forEach(({ file, sql }, fileIndex) => {
-    for (const m of blankComments(sql).matchAll(re)) {
+    for (const m of stripFunctionComments(sql).matchAll(re)) {
       const action = m[1]!.toLowerCase() as 'grant' | 'revoke';
       const functions = m[2] === undefined
         ? 'all' as const
