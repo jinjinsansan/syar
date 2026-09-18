@@ -24,6 +24,16 @@
  *   ⚠️ ★**確認メールの送信に上限がある**（2026-09-18 に 8 回で HTTP 429）。
  *      ★**登録を伴う項目は `--with-signup` を付けたときだけ**動かす。既定では飛ばす。
  *
+ * 【⚠️ `fetch failed` で落ちたら、まず網を疑う】
+ *   2026-09-18、この道具が `TypeError: fetch failed` / `ConnectTimeoutError`（10 秒）で落ちた。
+ *   ★**コードの誤りでも Supabase の障害でもなく、その回線の DNS が遅かっただけ**だった。
+ *   実測: 名前解決に **11.2〜11.4 秒**（★接続時間のほぼ全部）。**GitHub も本番サイトも同じく約 11 秒**で、
+ *   **行き先によらなかった**。★**Node の `fetch` は接続の待ちが既定 10 秒**なので、
+ *   **11 秒かかる回線では必ず落ちる**（`curl --max-time 15` は通るので食い違って見える）。
+ *   → オーナーが Wi-Fi を替えたところ **0.004〜0.11 秒**になり、そのまま通った。
+ *   ★**待ち時間を延ばす細工はしていない**（いま 0.6 秒で通るので要らない）。
+ *     **また落ちたら `curl -w '%{time_namelookup}'` を 3 回測る**。そこが 10 秒に近ければ網が原因。
+ *
  * 実行:
  *   npx tsx tools/verify-v19-email.mjs --env staging                 … 登録を伴わない分だけ
  *   npx tsx tools/verify-v19-email.mjs --env staging --with-signup   … 全部（★上限に注意）
@@ -170,14 +180,83 @@ try {
 
   console.log('\n=== E-6b: DB 側にも重なっているか（裁定 C-3・設定 1 枚に頼らない）===');
   {
+    // ★① 構文の確認（★弱い。これだけを合格の根拠にしない）
     const r = await client.query(`
       select prosrc from pg_proc
        where proname = 'assert_setup_complete' and pronamespace = 'public'::regnamespace
     `);
     const src = r.rows[0]?.prosrc ?? '';
-    const guards = /email_confirmed_at/.test(src);
-    rec('E-6b', '★セットアップ RPC が未確認の利用者を拒否する', guards ? 'ok' : 'ng',
-      guards ? '' : '★未実装（手順 6 で入れる）。設定だけに頼ると、設定を戻された瞬間に素通りする');
+    const hasGuard = /email_confirmed_at/.test(src);
+    rec('E-6b-1', '（参考）関数の本文に確認の判定がある', hasGuard ? 'ok' : 'ng',
+      hasGuard ? '★これは字があるだけ。②で実際に拒否されることを測る' : '★未実装（移行 0030）');
+
+    /*
+      ★② 実測（★こちらが本体）
+
+      裁定 C-3-2 の警告: 「`createUser({ email_confirm: true })` で作った利用者では
+      **確認済みしかいないので E-6 は必ず通る**」。
+      ★**`email_confirm: false`** で作れば、**`email_confirmed_at` が null** かつ
+      **`auth.identities` に `provider='email'` の行ができる**
+      （✔ 2026-09-18 に staging で実測）。→ **通常の登録と同じ状態**を、
+      ★**確認メールの送信上限に当たらずに**作れる。
+
+      ⚠️ ★未確認の利用者がサインインできるかは設定次第。できない場合はトークンが取れないので、
+         **それ自体が防御として働いている**。その旨を detail に書いて区別する。
+    */
+    /*
+      ★★測り方をこう組む理由（2026-09-18・一度しくじった）
+
+      最初は `createUser({ email_confirm: false })` で未確認の利用者を作り、
+      そのままサインインしようとした。→ **`Email not confirmed` でサインインが弾かれ**、
+      「トークンが出ないので通れない」を **✅ と記録してしまった**。
+
+      🔴 **それは移行 0030 が働いた証明になっていない。**
+         止めていたのは **Supabase の設定**で、`assert_setup_complete` まで**到達していない**。
+         設定を戻されればサインインでき、そのとき DB 側が効くかは**測れていない**。
+         ★**裁定 C-3 が求めた「設定 1 枚に頼らない」の検証にならない**（R-16 の家族＝別の理由で通る）。
+
+      → ★**確認済みで作ってトークンを取り、そのあと DB で `email_confirmed_at` を null に戻す。**
+        トークンは有効なまま、DB 上だけが未確認になるので、**0030 が効くかを直接測れる**。
+    */
+    const id = `e6b-${Date.now().toString(36)}`;
+    const em = `${id}@test.local`;
+    const pw = 'e6b-only-7f2b9d-Aa1!';
+    // ★① 確認済みで作る（★サインインを通すため。ここは意図的に email_confirm: true）
+    const u = await admin.auth.admin.createUser({ email: em, password: pw, email_confirm: true });
+    if (u.error !== null) {
+      rec('E-6b', '★未確認の利用者は書き込み RPC を通れない', 'ng', `利用者を作れず検査不能: ${u.error.message}`);
+    } else {
+      const uid = u.data.user.id;
+      created.push(uid);
+      const anon2 = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const si = await anon2.auth.signInWithPassword({ email: em, password: pw });
+      if (si.error !== null || si.data.session === null) {
+        rec('E-6b', '★未確認の利用者は書き込み RPC を通れない', 'ng',
+          `トークンを取れず検査不能: ${si.error?.message ?? 'セッションなし'}`);
+      } else {
+        const token = si.data.session.access_token;
+
+        // ★② 対照: 確認済みのままなら「未セットアップ」まで進むこと
+        //    （これが無いと「何を渡しても確認で落ちる」状態を合格と読んでしまう）
+        const before = await callRpcWith(token, 'assert_setup_complete', {});
+        const reachedSetup = /未セットアップ/.test(before.body);
+        rec('E-6b-2', '★対照: 確認済みなら確認の判定を通り抜ける', reachedSetup ? 'ok' : 'ng',
+          `HTTP ${before.status} ${before.body}`);
+
+        // ★③ DB 上だけ未確認に戻す（トークンは有効なまま）
+        await client.query('update auth.users set email_confirmed_at = null where id = $1', [uid]);
+        const after = await callRpcWith(token, 'assert_setup_complete', {});
+        const byConfirm = /確認/.test(after.body);
+        const bySetup = /未セットアップ/.test(after.body);
+        rec('E-6b', '★未確認に戻すと、同じトークンでも書き込み RPC が拒否される', byConfirm ? 'ok' : 'ng',
+          byConfirm
+            ? `HTTP ${after.status} ${after.body}`
+            : `🔴 ${bySetup ? '「未セットアップ」で落ちた＝確認の判定が働いていない（設定だけに頼った状態）' : '拒否されなかった'} — HTTP ${after.status} ${after.body}`);
+        await anon2.auth.signOut();
+      }
+    }
   }
 
   console.log('\n=== ⑤⑬⑭ E-1〜E-5・E-7: 登録を伴うもの ===');
