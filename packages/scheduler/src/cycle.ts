@@ -156,6 +156,54 @@ export function racesToPrepare(nowMs: number, epochMs: number): number[] {
 }
 
 /**
+ * ★**枠を先に告知しておくサイクル数**（★**D-117**・2026-09-19・裁定 `REVIEW_D117_SHAPE_VERDICT_20260919.md`）。
+ *
+ * 【🔴 ★なぜ 2 段に割るのか — ★時間が足りませんでした】
+ *   ★D-117 の形は ★**登録（締切）→ 抽選 → 生成 → publish → 発走**。
+ *   ★ところが ★**登録する相手のレースの行は、生成のときに初めて作られて**いました。
+ *   ✔ ★測りました: ★締切（`cycleStart + publish` ＝ 0:30）から発売開始（1:00）までは ★**30 秒**。
+ *     ★オッズは ★**1 レース 70〜98 秒**（★本番機換算・AL-6）／★160 秒（★開発機）。
+ *   → ★★**「重い」ではなく「入らない」**。★順序を入れ替えるだけでは成立しません。
+ *
+ * 【★どう解くか】★**行を 2 段に割ります**
+ *   ★① **announce**（★ここ・`ANNOUNCE_AHEAD_RACES` 先）… ★枠・条件・締切だけ。★出走馬もオッズも無い
+ *   ★② **fill**（★`LOOKAHEAD_RACES` 先）… ★プレイヤー馬 ＋ NPC の充填 ＋ オッズ ＋ 公開
+ *
+ * ★窓（登録できる長さ）＝ `(ANNOUNCE_AHEAD_RACES - LOOKAHEAD_RACES)` サイクル ＝ ★**12 分**（6 分 × 2）。
+ * ★fill の持ち時間 ＝ 締切から発売開始まで ＝ ★**2 サイクル ＋ 1 分 ＝ 13 分**（★98 秒に対し 8 倍）。
+ *
+ * ⚠️ ★**窓の長さは物理の制約ではありません** — ★番組表は純関数なので、★どこまで先でも作れます。
+ *    ★12 分は ★**当座の既定**で、★重賞を狙って出せるようにするなら延ばします（★DS-5・オーナー判断）。
+ */
+export const ANNOUNCE_AHEAD_RACES = 4;
+
+/**
+ * ★このサイクルで ★**枠だけ作っておくべき**レースのサイクル番号（★**D-117** の announce）。
+ * ⚠️ ★`racesToPrepare`（fill）より ★**先**を返します。★重なる部分は呼ぶ側が「もう在る」で飛ばします。
+ */
+export function racesToAnnounce(nowMs: number, epochMs: number): number[] {
+  const current = cycleIndexAt(nowMs, epochMs);
+  const out: number[] = [];
+  for (let i = 1; i <= ANNOUNCE_AHEAD_RACES; i += 1) out.push(current + i);
+  return out;
+}
+
+/**
+ * ★**登録の締切**（★**D-117**・2026-09-19）。
+ *
+ * ★**fill が始められるいちばん早い瞬間**です — ★`racesToPrepare` が
+ * ★そのレースを返し始めるサイクルの開始時刻（★`cycleStart(N - LOOKAHEAD_RACES)`）。
+ *
+ * 🔴 ★**`publish` ではありません**（★ED-1・`0041` の当座の形）。
+ *   ★`publish` のままだと ★**締切の後にオッズを計算する時間が 30 秒**しかなく、
+ *   ★D-117 の目的（★**オッズが自馬を含む**）が達成できません。
+ * ⚠️ ★**この 1 か所だけが締切を決めます**（★SQL にも画面にも時間の式を書かない・D-052・D-103 ④）。
+ */
+export function entryDeadlineMs(cycleIndex: number, epochMs: number): number {
+  return cycleStartMs(cycleIndex - LOOKAHEAD_RACES, epochMs);
+}
+
+/**
  * 生成失敗時の扱い（§10.2）。
  *
  * ★**結果の事後差し替えは絶対にしない**（§8.6）。
