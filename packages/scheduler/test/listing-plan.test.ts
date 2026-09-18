@@ -1,115 +1,131 @@
 /**
- * ★**出品の入れ替えの計画**（★ゲーム本体 (a) 第 5 便-2・2026-09-16・正典 **D-102 ②③⑤**）
+ * ★**出品の入れ替えの計画**（★D-102・**T-11**・2026-09-19）
+ *   ★裁定 `REVIEW_T11_ANSWER_VERDICT_20260919.md`
  *
- * 【★2026-09-18・T-10（D-114 ②）で「★」が消えました】
- *   ★帯は ★**内部の 24 段の整数**になり、★`MarketListing` は ★**段を持ちません**。
- *   → ★「段が変わった馬を下ろす」は ★**価格で見ます**（★価格は段の関数なので同じ判定）。
+ * 【★T-11 で変わったこと】
+ *   ★旧: ★**素質の帯**で候補を選び、★**帯から値付け**していました。
+ *   ★新: ★**価格の帯**で並べ、★価格は §10.5 の式（★呼ぶ側が `npcStudFee` で出す）。
  *
  * 【★見ている壊れ方】
- *   ① ★帯ごとの口数を超えて出す（★「選び直し」に近づく・D-102 ③）
- *   ② ★プールから消えた馬を下ろさない（★買われた馬が並び続ける）
- *   ③ ★帯が変わった馬を下ろさない（★中身と価格がずれる）
- *   ④ ★同じ馬を二重に出す
- *   ⑤ ★足りない帯を、別の帯の馬で埋める（★帯の意味が壊れる）
- *   ⑥ ★呼ぶたびに違う結果になる（★乱数を持たない層なのに順序が揺れる）
- *   ⑦ 🔴 ★**出品の行に段が載る**（★D-114 ②。★`horse_market_listing` 経由で外に出る）
+ *   ① 🔴 ★**棚に素質が戻る**（★T11-1 ①。★「どの棚にいるか」が帯を教える ＝ 逆算の復活）
+ *   ② 🔴 ★**価格が動いたら下ろす**（★T11-2 ①。★毎日 総入れ替えになる）
+ *   ③ 🔴 ★**帯が埋まらないとき、別の帯から埋める**（★D-102 ⑤ と同じ作法で、黙って広げない）
+ *   ④ 🔴 ★**毎日同じ馬が出る**（★T11-1 ③）
  */
 import { describe, it, expect } from 'vitest';
 import {
-  planListings, listingsFromPool,
-  LISTED_BANDS, LISTINGS_PER_BAND,
+  planListings, listingDrift, priceTierOf,
+  PRICE_TIERS_EP, LISTINGS_PER_TIER, MIN_PRICE_EP,
 } from '../src/index.js';
 
-const horse = (id: string, band: number) => ({ horseId: id, band });
-/** ★帯ごとに `per` 頭のプール */
-const pool = (per: number) => LISTED_BANDS.flatMap((b) =>
-  Array.from({ length: per }, (_, i) => horse(`h-${b}-${i}`, b)));
+/** ★その帯の真ん中あたりの価格 */
+const inTier = (t: number): number => PRICE_TIERS_EP[t]! + 10;
+const cand = (id: string, priceEP: number): { horseId: string; priceEP: number } => ({ horseId: id, priceEP });
 
-/**
- * ★**段 → 価格**の見本（★呼ぶ側が渡すもの。★本番は `priceOfStars(starScaleOfBand(band))`）。
- * ⚠️ ★段ごとに違う値であることだけが要ります（★「帯が変わった＝価格が変わった」を成り立たせるため）。
- */
-const priceOfBand = (band: number): number => 3000 + band * 100;
-
-describe('★出品の計画（D-102）', () => {
-  it('① ★空から始めると、帯ごとにちょうど口数ぶん出す', () => {
-    const plan = planListings(pool(5), [], priceOfBand);
-    expect(plan.deactivate).toEqual([]);
-    expect(plan.add.length).toBe(LISTED_BANDS.length * LISTINGS_PER_BAND);
-    for (const b of LISTED_BANDS) {
-      const rows = plan.add.filter((l) => l.priceEP === priceOfBand(b));
-      expect(rows.length, `段 ${b}`).toBe(LISTINGS_PER_BAND);
+describe('★価格の帯（★T11-1 ①②）', () => {
+  it('★帯は昇順で、下限は最低価格と同じ', () => {
+    expect(PRICE_TIERS_EP[0]).toBe(MIN_PRICE_EP);
+    for (let i = 1; i < PRICE_TIERS_EP.length; i += 1) {
+      expect(PRICE_TIERS_EP[i]!, `帯 ${i}`).toBeGreaterThan(PRICE_TIERS_EP[i - 1]!);
     }
   });
 
-  it('🔴 ⑦ ★出品の行に段が載らない（★D-114 ②・`horse_market_listing` へ漏らさない）', () => {
-    const plan = planListings(pool(5), [], priceOfBand);
-    for (const l of plan.add) {
-      expect(Object.keys(l).sort(), '★出品が持つ列').toEqual(['horseId', 'priceEP']);
-    }
+  it('★価格 → 帯', () => {
+    expect(priceTierOf(3_000)).toBe(0);
+    expect(priceTierOf(3_999)).toBe(0);
+    expect(priceTierOf(4_000)).toBe(1);
+    expect(priceTierOf(1_000_000)).toBe(PRICE_TIERS_EP.length - 1);
   });
 
-  it('② ★プールから消えた馬を下ろす（★買われた・引退した）', () => {
-    const p = pool(5);
-    const first = planListings(p, [], priceOfBand);
-    const active = first.add.map((l) => ({ horseId: l.horseId, priceEP: l.priceEP }));
-    /** ★1 頭がプールから消える */
-    const gone = active[0]!;
-    const shrunk = p.filter((h) => h.horseId !== gone.horseId);
-    const plan = planListings(shrunk, active, priceOfBand);
-    expect(plan.deactivate).toEqual([gone.horseId]);
-    /** ★空いた 1 口を同じ帯から埋める */
-    expect(plan.add.length).toBe(1);
-    expect(plan.add[0]!.priceEP).toBe(gone.priceEP);
+  it('🔴 ★下限を割る価格は投げる（★式を通っていない値・R-27）', () => {
+    expect(() => priceTierOf(2_999)).toThrow();
+    expect(() => priceTierOf(Number.NaN)).toThrow();
   });
 
-  it('③ ★帯が変わった馬を下ろす（★中身と価格をずらさない）', () => {
-    const p = pool(5);
-    const top = LISTED_BANDS[LISTED_BANDS.length - 1]!;
-    const bottom = LISTED_BANDS[0]!;
-    const active = planListings(p, [], priceOfBand).add.map((l) => ({ horseId: l.horseId, priceEP: l.priceEP }));
-    const changed = active.find((a) => a.priceEP === priceOfBand(top))!;
-    /** ★素質が下がって最下位の帯になった */
-    const p2 = p.map((h) => (h.horseId === changed.horseId ? horse(h.horseId, bottom) : h));
-    const plan = planListings(p2, active, priceOfBand);
-    expect(plan.deactivate).toContain(changed.horseId);
-    /** ★下ろした馬を、同じ回に別の帯で出し直さない */
-    expect(plan.add.some((l) => l.horseId === changed.horseId)).toBe(false);
+  it('🔴 ★① 計画に素質を渡す口が無い（★T11-1 ①）', () => {
+    /**
+     * ⚠️ ★**型で縛ります。** ★`MarketCandidate` に段・帯・素質の欄があれば、
+     *    ★いつか並べ替えに使われます。★引数の数でも見ます。
+     */
+    expect(planListings.length, '★引数が増えている（★素質を渡していないか）').toBe(3);
+  });
+});
+
+describe('★② 価格が動いても下ろさない（★T11-2 ①）', () => {
+  it('🔴 ★出ている馬の価格が変わっても、下ろさない', () => {
+    const active = [{ horseId: 'a', priceEP: inTier(0) }];
+    /** ★同じ馬が、いまは別の帯の価格になっている */
+    const pool = [cand('a', inTier(3))];
+    const plan = planListings(pool, active, 0);
+    expect(plan.deactivate, '★価格が変わっただけで下ろしている').toEqual([]);
   });
 
-  it('④ ★同じ馬を二重に出さない', () => {
-    const plan = planListings(pool(5), [], priceOfBand);
-    const ids = plan.add.map((l) => l.horseId);
-    expect(new Set(ids).size).toBe(ids.length);
+  it('★プールから消えた馬は下ろす（★買われた・引退した）', () => {
+    const plan = planListings([], [{ horseId: 'a', priceEP: inTier(0) }], 0);
+    expect(plan.deactivate).toEqual(['a']);
   });
 
-  it('⑤ ★足りない帯を別の帯の馬で埋めない（★帯の意味を保つ）', () => {
-    const scarce = LISTED_BANDS[2]!;
-    /** ★その帯の馬が 1 頭しかいない */
-    const p = [...pool(5).filter((h) => h.band !== scarce), horse('only-one', scarce)];
-    const plan = planListings(p, [], priceOfBand);
-    const got = plan.add.filter((l) => l.priceEP === priceOfBand(scarce));
-    expect(got.length).toBe(1);
-    expect(got[0]!.horseId).toBe('only-one');
-    /** ★他の帯は満たされている（★足りない帯の穴埋めに使われていない） */
-    for (const b of LISTED_BANDS.filter((x) => x !== scarce)) {
-      expect(plan.add.filter((l) => l.priceEP === priceOfBand(b)).length, `段 ${b}`).toBe(LISTINGS_PER_BAND);
-    }
+  it('🔴 ★ずれは数として出す（★凍結は「気づかない」を作りやすい・R-16）', () => {
+    const active = [{ horseId: 'a', priceEP: 3_000 }, { horseId: 'b', priceEP: 5_000 }];
+    const pool = [cand('a', 3_250), cand('b', 5_000)];
+    const drift = listingDrift(active, pool);
+    expect(drift).toEqual([{ horseId: 'a', listedEP: 3_000, currentEP: 3_250, diffEP: 250 }]);
+  });
+});
+
+describe('★帯ごとに 3 口まで（★D-102 ③「選び直しが成立しない」）', () => {
+  it('★足りないぶんだけ足す', () => {
+    const pool = ['a', 'b', 'c', 'd'].map((id) => cand(id, inTier(0)));
+    const plan = planListings(pool, [{ horseId: 'a', priceEP: inTier(0) }], 0);
+    expect(plan.add).toHaveLength(LISTINGS_PER_TIER - 1);
+    expect(plan.add.map((l) => l.horseId)).not.toContain('a');
   });
 
-  it('⑥ ★同じ入力なら同じ計画（★乱数を持たない）', () => {
-    const p = pool(5);
-    expect(planListings(p, [], priceOfBand)).toEqual(planListings(p, [], priceOfBand));
-    /** ★候補の取り方も渡された順（★`listingsFromPool` と同じ約束） */
-    const b = LISTED_BANDS[2]!;
-    expect(listingsFromPool(p, b, 2, priceOfBand(b)).map((l) => l.horseId)).toEqual([`h-${b}-0`, `h-${b}-1`]);
+  it('★満口なら足さない（★冪等）', () => {
+    const active = ['a', 'b', 'c'].map((id) => ({ horseId: id, priceEP: inTier(0) }));
+    const pool = ['a', 'b', 'c', 'd'].map((id) => cand(id, inTier(0)));
+    expect(planListings(pool, active, 0).add).toEqual([]);
   });
 
-  it('★すでに満たされていれば何もしない（★冪等）', () => {
-    const p = pool(5);
-    const active = planListings(p, [], priceOfBand).add.map((l) => ({ horseId: l.horseId, priceEP: l.priceEP }));
-    const plan = planListings(p, active, priceOfBand);
-    expect(plan.add).toEqual([]);
-    expect(plan.deactivate).toEqual([]);
+  it('🔴 ★③ 帯が埋まらなくても、別の帯から埋めない', () => {
+    /** ★帯 0 に 1 頭しかいない。★帯 1 には 5 頭 */
+    const pool = [cand('a', inTier(0)), ...['b', 'c', 'd', 'e', 'f'].map((id) => cand(id, inTier(1)))];
+    const plan = planListings(pool, [], 0);
+    const byTier = new Map<number, number>();
+    for (const l of plan.add) byTier.set(priceTierOf(l.priceEP), (byTier.get(priceTierOf(l.priceEP)) ?? 0) + 1);
+    expect(byTier.get(0), '★帯 0 は 1 頭しかいないので 1 口').toBe(1);
+    expect(byTier.get(1), '★帯 1 から余分に埋めている').toBe(LISTINGS_PER_TIER);
+  });
+
+  it('★1 頭が 2 つの帯に出ない', () => {
+    const pool = ['a', 'b', 'c'].map((id) => cand(id, inTier(0)));
+    const plan = planListings(pool, [], 0);
+    expect(new Set(plan.add.map((l) => l.horseId)).size).toBe(plan.add.length);
+  });
+});
+
+describe('★④ 毎日同じ馬にならない（★T11-1 ③）', () => {
+  const pool = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => cand(id, inTier(0)));
+
+  it('🔴 ★起点が変わると顔ぶれが変わる', () => {
+    const first = planListings(pool, [], 0).add.map((l) => l.horseId);
+    const later = planListings(pool, [], 3).add.map((l) => l.horseId);
+    expect(first).not.toEqual(later);
+  });
+
+  it('★同じ起点なら同じ結果（★再現できる・憲法 4）', () => {
+    expect(planListings(pool, [], 7).add).toEqual(planListings(pool, [], 7).add);
+  });
+
+  it('🔴 ★起点が負・小数なら投げる（★黙って 0 にしない・R-27）', () => {
+    expect(() => planListings(pool, [], -1)).toThrow();
+    expect(() => planListings(pool, [], 1.5)).toThrow();
+  });
+
+  it('★候補が 3 頭以下なら、起点が変わっても同じ顔ぶれ（★全員出る）', () => {
+    const few = ['a', 'b', 'c'].map((id) => cand(id, inTier(0)));
+    const s0 = [...planListings(few, [], 0).add.map((l) => l.horseId)].sort();
+    const s5 = [...planListings(few, [], 5).add.map((l) => l.horseId)].sort();
+    expect(s0).toEqual(s5);
   });
 });

@@ -18,7 +18,7 @@
  */
 
 import { useState } from 'react';
-import { LISTINGS_PER_BAND, sellBackEP } from '@star/scheduler';
+import { LISTINGS_PER_TIER, sellBackEP } from '@star/scheduler';
 import { DEMO_MARKET_PRICES_EP, DEMO_MARKET_STOCK_BY_BAND } from '../../../lib/game-demo';
 
 export default function MarketPage(): React.ReactElement {
@@ -34,7 +34,7 @@ export default function MarketPage(): React.ReactElement {
       </div>
 
       <div style={{ padding: '12px 16px 0', fontSize: 11.5, fontWeight: 900, color: 'var(--a-ink-2)', lineHeight: 1.7 }}>
-        {DEMO_MARKET_PRICES_EP.length} つの値段・それぞれ {LISTINGS_PER_BAND} 頭。
+        {DEMO_MARKET_PRICES_EP.length} つの値段・それぞれ {LISTINGS_PER_TIER} 頭。
         <b style={{ color: 'var(--a-ink)' }}>同じ値段の中なら、どの 1 頭を迎えても同じです</b>。
       </div>
 
@@ -44,7 +44,7 @@ export default function MarketPage(): React.ReactElement {
            * ★**残っている口数**（★`null` は満口。★本番はサーバーが数えます）。
            * ⚠️ ★**下限を割ると 0 口になります**（★正典 D-102 ⑤）。★そのときも ★**帯は広げない・消さない**。
            */
-          const stock = DEMO_MARKET_STOCK_BY_BAND[rowIndex] ?? LISTINGS_PER_BAND;
+          const stock = DEMO_MARKET_STOCK_BY_BAND[rowIndex] ?? LISTINGS_PER_TIER;
           return (
           <div key={priceEP} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 14px 16px', borderRadius: 14, background: '#fff', border: '2px solid var(--a-edge)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -56,7 +56,7 @@ export default function MarketPage(): React.ReactElement {
               </span>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              {Array.from({ length: LISTINGS_PER_BAND }, (_, slot) => {
+              {Array.from({ length: LISTINGS_PER_TIER }, (_, slot) => {
                 /**
                  * ★**居ない枠は「今は　いません」の静かな空欄**（★デザイナーの回答・2026-09-16）。
                  * ⚠️ ★**「残り 0」という数字を出しません** — ★数えさせると「補充を待つ」煽りになります。
@@ -91,7 +91,7 @@ export default function MarketPage(): React.ReactElement {
                     }}
                   >
                     {/* ★欠けている帯の先頭にだけ、残りの口数を控えめに（★満口の帯には出さない） */}
-                    {slot === 0 && stock < LISTINGS_PER_BAND && (
+                    {slot === 0 && stock < LISTINGS_PER_TIER && (
                       <span style={{ position: 'absolute', right: 5, top: 5, display: 'flex', alignItems: 'center', height: 16, padding: '0 6px', borderRadius: 5, backgroundImage: 'var(--a-gloss-yellow)', border: '1px solid #a9741a', fontSize: 9, fontWeight: 900, color: '#4a3105' }}>
                         残り{stock}
                       </span>

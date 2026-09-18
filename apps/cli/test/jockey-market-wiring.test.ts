@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { JOCKEYS, JOCKEY_BOND_MAX, LISTINGS_PER_BAND, sellBackEP } from '@star/scheduler';
+import { JOCKEYS, JOCKEY_BOND_MAX, LISTINGS_PER_TIER, sellBackEP } from '@star/scheduler';
 import { DEMO_MARKET_PRICES_EP } from '../../web/src/lib/game-demo.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -73,10 +73,10 @@ describe('★馬を迎える（D12-5・D-102）', () => {
     expect(MARKET, '★段を画面で回している').not.toMatch(/LISTED_BANDS/);
     expect(MARKET, '★画面で値付けしている').not.toMatch(/priceOfStars/);
     expect(MARKET).toMatch(/sellBackEP\(/);
-    expect(MARKET).toMatch(/LISTINGS_PER_BAND/);
+    expect(MARKET).toMatch(/LISTINGS_PER_TIER/);
     /**
      * ⚠️ ★**帯と口数はリテラル一致で見ません**（★2026-09-16 にこれで誤検出しました）。
-     *    ★`LISTED_BANDS[0]` は **2.0**、`LISTINGS_PER_BAND` は **3** で、
+     *    ★`LISTED_BANDS[0]` は **2.0**、`LISTINGS_PER_TIER` は **3** で、
      *    ★`gap: 2`・`borderWidth: 3` のような**見た目の数**と一致します。
      * ★**値段と戻り額**（4,000〜8,000・800〜1,600）は見た目の数と桁が違うので、★そちらは値で見ます。
      */
@@ -89,9 +89,9 @@ describe('★馬を迎える（D12-5・D-102）', () => {
      * ★帯と口数は「引いているか」で見る（★値では見分けられない）。
      * ★帯の並びを画面に書いていない／口数を画面の数で回していないことを、★形で見ます。
      */
-    expect(MARKET).toMatch(/length:\s*LISTINGS_PER_BAND/);
+    expect(MARKET).toMatch(/length:\s*LISTINGS_PER_TIER/);
     /** ★参考: 名簿の側の値（★画面と食い違っていないことの確認） */
-    expect(LISTINGS_PER_BAND).toBeGreaterThan(0);
+    expect(LISTINGS_PER_TIER).toBeGreaterThan(0);
     expect(DEMO_MARKET_PRICES_EP.length).toBeGreaterThan(1);
   });
 
@@ -148,10 +148,10 @@ describe('★馬を迎える（D12-5・D-102）', () => {
       expect(MARKET, `★0 を数えさせる語がある: ${bad}`).not.toContain(bad);
     }
     /**
-     * ★**枠を詰めていない**こと（★枡の数は `LISTINGS_PER_BAND` のまま・帯を広げない）。
+     * ★**枠を詰めていない**こと（★枡の数は `LISTINGS_PER_TIER` のまま・帯を広げない）。
      * ⚠️ ★在庫で `Array.from` の長さを変えると ★**帯が縮みます**（★D-102 ⑤ の「広げない」の裏側）。
      */
-    expect(MARKET).toMatch(/length:\s*LISTINGS_PER_BAND/);
+    expect(MARKET).toMatch(/length:\s*LISTINGS_PER_TIER/);
     expect(MARKET, '★在庫で枡の数を変えている').not.toMatch(/length:\s*stock/);
     /** ★在庫は引いてくる（★画面で数えない・本番はサーバーの値） */
     expect(MARKET).toMatch(/DEMO_MARKET_STOCK_BY_BAND/);

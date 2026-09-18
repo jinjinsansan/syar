@@ -206,9 +206,9 @@ export const DEMO_JOCKEY_RIDES: Readonly<Record<string, number>> = {
 };
 
 /**
- * ★**デモの在庫**（★D12-5・馬市場。★添字は `LISTED_BANDS` の並びと同じ）。
+ * ★**デモの在庫**（★D12-5・馬市場。★添字は `PRICE_TIERS_EP` の並びと同じ（★T-11 で価格の帯に））。
  *
- * ★`null` ＝ ★**満口**（★`LISTINGS_PER_BAND` を ★**ここに写さない**・D-052）。
+ * ★`null` ＝ ★**満口**（★`LISTINGS_PER_TIER` を ★**ここに写さない**・D-052）。
  * ★数値 ＝ ★その帯に残っている口数。
  *
  * ⚠️ ★本番は ★**サーバーが数えた口数**です（★画面でも見本でも数えません）。

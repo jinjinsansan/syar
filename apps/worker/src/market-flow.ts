@@ -1,33 +1,34 @@
 /**
- * ★**出品を作る**（★ゲーム本体 (a) 第 5 便-2・2026-09-16・正典 §6・**D-102**・移行 `0025`）
+ * ★**出品を作る**（★正典 §6・**D-102**・移行 `0025`／★2026-09-19・**T-11**）
+ *
+ * 【★2026-09-19・T-11 で変わったこと】
+ *   ★旧: ★**素質の帯**（`bandOfPotential`）で候補を選び、★**帯から値付け**していました。
+ *   ★新（**D-102 ③**・2026-09-18 改訂）:
+ *     ★**候補** … ★**走った実績のある馬**（★`is_initial_horse_candidate` の補集合＝`finish_pos is not null` が 1 つ以上）
+ *     ★**価格** … ★**§10.5 の式** `npcStudFee(G1勝利数, 総獲得賞金)`
+ *     ★**品揃え** … ★**価格の帯** 5 段 × 3 口（★**素質の帯では並べません**・T11-1 ①）
  *
  * 【★なぜワーカーが書くか】（★`0025` の註記と同じ理由）
- *   ★帯（段）と価格は ★**`@star/sim-engine` の `bandOfPotential` と `@star/scheduler` の `priceOfStars`** が出します。
- *   ★同じ式を SQL にも書くと ★**画面と DB で帯が食い違う日**が来ます（★D-052・二重帳簿）。
+ *   ★式は ★**`@star/scheduler` の `npcStudFee`** が持ちます。★同じ式を SQL にも書くと
+ *   ★**画面と DB で値が食い違う日**が来ます（★D-052・二重帳簿）。
  *   → ★**サーバー（ここ）が出品の行に価格を書き**、★RPC（`buy_horse`）は**その行の値で**払わせます。
- *   ⚠️ ★**段は行に書きません**（★2026-09-18・D-114 ②・移行 `0036` で `stars` 列を落としました）。
  *   ⚠️ ★利用者は価格を申告できません（★憲法 3・`0025` が `revoke insert` 済み）。
  *
  * 【★この層がしないこと】
  *   ⚠️ ★**馬を作りません**（★D-102 ②「売る馬は NPC 世界から取る」）。
- *   ⚠️ ★**乱数も時刻も使いません**（★憲法 4）。★並びは `order by id` で決まります。
+ *   ⚠️ ★**乱数も時刻も使いません**（★憲法 4）。★並べ替えの起点は `world_state.game_week` から取ります。
  *   ⚠️ ★**在庫が下限を割っても、黙って帯を広げません**（★D-102 ⑤・D-079 ⑦）。★警報を出すだけです。
+ *   ⚠️ ★**引退馬を入れません**（★**T11-3**）— ★§10.5 は引退した NPC 名馬を**種牡馬市場**へ流すと定めており、
+ *      ★2 つの経路で同じ馬を売ると ★**在庫が二重に数えられ**、★D-102 ⑤ の下限監視が壊れます。
  *
- * 【★冪等】★同じ状態で何度呼んでも同じ行になります（★足りないぶんだけ足す）。
+ * 【★冪等】★同じ状態・同じ `game_week` で何度呼んでも同じ行になります。
  */
 
 import type pg from 'pg';
-import { bandOfPotential, starScaleOfBand, type AbilityKey } from '@star/sim-engine';
 import {
-  marketStockAlert, planListings, priceOfStars, sellBackEP, LISTED_BANDS, LISTINGS_PER_BAND,
+  marketStockAlert, planListings, listingDrift, npcStudFee, sellBackEP,
+  PRICE_TIERS_EP, LISTINGS_PER_TIER, priceTierOf,
 } from '@star/scheduler';
-
-/**
- * ★**段 → 価格 [EP]**。
- * 🔴 ★**T-11 で消えます** — ★D-102 ③（2026-09-18 改訂）で価格は §10.5 の式（戦績）から決まり、
- *   ★**素質を入力に取らなくなります**。★ここはそれまでの繋ぎです。
- */
-const priceOfBand = (band: number): number => priceOfStars(starScaleOfBand(band));
 
 /** ★1 回に見る NPC プールの上限（★全件走査を避ける。★帯を埋めるには十分な数） */
 export const MARKET_POOL_LIMIT = 5000;
@@ -35,30 +36,30 @@ export const MARKET_POOL_LIMIT = 5000;
 export interface MarketRefreshResult {
   /** ★買える NPC の現役馬の数（★在庫） */
   readonly available: number;
+  /** ★そのうち「走った実績のある馬」（★D-102 ③ の候補） */
+  readonly candidates: number;
   /** ★下ろした出品の数 */
   readonly deactivated: number;
   /** ★足した出品の数 */
   readonly added: number;
   /** ★在庫が下限を割っているか（★割っていれば警報を出している） */
   readonly stockOk: boolean;
+  /**
+   * ★**埋まらなかった帯**（★**T11-1 ②**）。
+   * 🔴 ★**黙って別の帯から埋めません**（★D-102 ⑤ と同じ作法）。★数として出します。
+   */
+  readonly shortfall: readonly { readonly tier: number; readonly fromEP: number; readonly missing: number }[];
+  /**
+   * ★**凍結した額と、いまの式の額のずれ**（★**T11-2 ①**）。
+   * ⚠️ ★凍結は「気づかない」を作りやすいので（R-16）、★最大のずれを出します。
+   */
+  readonly maxDriftEP: number;
 }
 
 interface PoolRow {
   id: string;
-  potential: Record<string, number>;
-}
-
-const ABILITY_KEYS: readonly AbilityKey[] = ['sp', 'st', 'pw', 'gt', 'iq'];
-
-/** ★jsonb の素質を数にする（★numeric が文字列で返る経路に備える・`loadTrainingStates` と同じ作法） */
-function potentialOf(row: PoolRow): Record<AbilityKey, number> {
-  const out = {} as Record<AbilityKey, number>;
-  for (const k of ABILITY_KEYS) {
-    const v = Number(row.potential[k]);
-    if (!Number.isFinite(v)) throw new Error(`market-flow: 馬 ${row.id} の素質 ${k} を数値として読めません`);
-    out[k] = v;
-  }
-  return out;
+  g1_wins: number | string;
+  earnings: string | number;
 }
 
 /**
@@ -70,15 +71,28 @@ export async function refreshMarketListings(
   client: pg.Client | pg.PoolClient,
   onAlert: (msg: string) => void,
 ): Promise<MarketRefreshResult> {
-  // ── ① いま買える NPC の現役馬（★所有が無く・NPC 厩舎にいて・引退していない）──
+  /**
+   * ── ① 候補（★D-102 ③「走った実績のある馬」）──
+   * ⚠️ ★**`is_initial_horse_candidate` の補集合**です（`0031`/`0037` と同じ述語）。
+   *    ★付与（初期馬）と購入が ★**ちょうど補集合**になります。
+   * ⚠️ ★`prize_pp` が null の行（★`0049` より前・★埋め戻していない）は ★**0 として数えません** —
+   *    ★`sum` が null を飛ばすので、★「まだ書いていない」が「0 稼いだ」に化けません。
+   */
   const poolRes = await client.query<PoolRow>(
-    `select id, potential from horses
-      where owner_id is null and npc_stable_id is not null and retired_at_week is null
-      order by id
+    `select h.id, h.g1_wins,
+            coalesce((select sum(e.prize_pp) from race_entries e
+                       where e.horse_id = h.id and e.prize_pp is not null), 0)::bigint as earnings
+       from horses h
+      where h.owner_id is null and h.npc_stable_id is not null and h.retired_at_week is null
+        and exists (select 1 from race_entries e where e.horse_id = h.id and e.finish_pos is not null)
+      order by h.id
       limit $1`,
     [MARKET_POOL_LIMIT],
   );
-  const pool = poolRes.rows.map((r) => ({ horseId: r.id, band: bandOfPotential(potentialOf(r)) }));
+  const pool = poolRes.rows.map((r) => ({
+    horseId: r.id,
+    priceEP: npcStudFee(Number(r.g1_wins), Number(r.earnings)),
+  }));
 
   // ★在庫は**プール全体の数**で見る（★上限で切った数ではない）
   const countRes = await client.query<{ n: string }>(
@@ -95,17 +109,28 @@ export async function refreshMarketListings(
     );
   }
 
-  // ── ② いま出ている出品 ────────────────────────────────
-  //   ⚠️ ★**段は読みません**（★`0036` で列ごと落としました）。★帯が変わったかは ★**価格で見ます**
+  // ── ② いま出ている出品（★凍結された価格）────────────────────
   const activeRes = await client.query<{ horse_id: string; price_ep: string | number }>(
     `select horse_id, price_ep from horse_market_listing where active order by horse_id`,
   );
   const active = activeRes.rows.map((r) => ({ horseId: r.horse_id, priceEP: Number(r.price_ep) }));
 
-  // ── ③ 計画（★純関数・DB を知らない）───────────────────────
-  const plan = planListings(pool, active, priceOfBand);
+  /**
+   * ── ③ 並べ替えの起点（★**T11-1 ③**「毎日同じ 3 頭にならない」）──
+   * ⚠️ ★**時計を持ちません**（★憲法 4）。★ワーカーが毎周書いた `world_state.game_week` を読むだけです。
+   * ⚠️ ★行が無ければ ★**0** で進めます（★止める理由ではない。★並びが固定になるだけ）。
+   */
+  const weekRes = await client.query<{ game_week: string | number }>(
+    'select game_week from world_state where id',
+  );
+  const rotation = Number(weekRes.rows[0]?.game_week ?? 0);
 
-  // ── ④ 反映（★1 トランザクション）──────────────────────────
+  // ── ④ 計画（★純関数・DB を知らない）───────────────────────
+  const plan = planListings(pool, active, rotation);
+  const drift = listingDrift(active, pool);
+  const maxDriftEP = drift.reduce((m, d) => Math.max(m, Math.abs(d.diffEP)), 0);
+
+  // ── ⑤ 反映（★1 トランザクション）──────────────────────────
   if (plan.deactivate.length > 0 || plan.add.length > 0) {
     await client.query('begin');
     try {
@@ -118,9 +143,10 @@ export async function refreshMarketListings(
       }
       if (plan.add.length > 0) {
         /**
-         * ★**手放したときに戻る額も、ここで書きます**（★`0026`・D-102 ③）。
+         * ★**手放したときに戻る額も、ここで書きます**（★`0026`・D-102 ③・**T11-4**）。
          *   ★割合（`SELL_BACK_RATE`）を SQL に書かないためです（★D-052・二重帳簿にしない）。
-         * ⚠️ ★`sell_horse` は ★**この行の値**で戻します。★値が無い行は手放せません。
+         * ⚠️ ★`sell_horse` は ★**この行の値**で戻します。★**いまの式の値では戻しません** —
+         *    ★勝たせて売ると ★**EP が増える経路**になり、★憲法 2 の前提が崩れます。
          */
         await client.query(
           `insert into horse_market_listing (horse_id, price_ep, sell_back_ep)
@@ -140,13 +166,41 @@ export async function refreshMarketListings(
     }
   }
 
+  /**
+   * ── ⑥ 埋まらなかった帯を数える（★**T11-1 ②**）──
+   * 🔴 ★**黙って別の帯から埋めません。** ★数として出し、★警報を出します。
+   *    ★在庫の下限監視（D-102 ⑤）と同じ作法です。
+   */
+  const afterRes = await client.query<{ price_ep: string | number }>(
+    'select price_ep from horse_market_listing where active',
+  );
+  const byTier = new Map<number, number>();
+  for (const r of afterRes.rows) {
+    const t = priceTierOf(Number(r.price_ep));
+    byTier.set(t, (byTier.get(t) ?? 0) + 1);
+  }
+  const shortfall: { tier: number; fromEP: number; missing: number }[] = [];
+  for (let t = 0; t < PRICE_TIERS_EP.length; t += 1) {
+    const missing = LISTINGS_PER_TIER - (byTier.get(t) ?? 0);
+    if (missing > 0) shortfall.push({ tier: t, fromEP: PRICE_TIERS_EP[t]!, missing });
+  }
+  if (shortfall.length > 0) {
+    onAlert(
+      '★価格の帯が埋まりませんでした（★帯を広げず、そのまま出しています・T11-1 ②）: '
+      + shortfall.map((s) => `帯${s.tier}（${s.fromEP.toLocaleString('ja-JP')} EP〜）あと ${s.missing} 口`).join(' / '),
+    );
+  }
+
   return {
     available,
+    candidates: pool.length,
     deactivated: plan.deactivate.length,
     added: plan.add.length,
     stockOk: stock.ok,
+    shortfall,
+    maxDriftEP,
   };
 }
 
-/** ★出しておく口数の目安（★ログ用。★帯の数 × 帯ごとの口数） */
-export const MARKET_TARGET_LISTINGS = LISTED_BANDS.length * LISTINGS_PER_BAND;
+/** ★出しておく口数の目安（★ログ用。★価格の帯の数 × 帯ごとの口数） */
+export const MARKET_TARGET_LISTINGS = PRICE_TIERS_EP.length * LISTINGS_PER_TIER;

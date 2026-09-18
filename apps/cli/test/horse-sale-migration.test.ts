@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { SELL_BACK_RATE, sellBackEP, priceOfStars } from '@star/scheduler';
+import { SELL_BACK_RATE, sellBackEP, npcStudFee } from '@star/scheduler';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const DIR = path.join(ROOT, 'db/migrations');
@@ -62,7 +62,9 @@ describe('★手放す経路の移行（0026・D-102 ③）', () => {
     expect(body).not.toMatch(/v_paid\s*\*/);
     /** ★参考: TS 側の値（★この検査が SQL と TS の両方を見ていることの明示） */
     expect(SELL_BACK_RATE).toBeGreaterThan(0);
-    expect(sellBackEP(priceOfStars(3.0))).toBeLessThan(priceOfStars(3.0));
+    /** 🔴 ★T-11: ★価格は ★**§10.5 の式**から（★★からではない） */
+    const price = npcStudFee(0, 100_000);
+    expect(sellBackEP(price)).toBeLessThan(price);
   });
 
   it('⑦ ★NPC 世界へ戻す（★所有と NPC 厩舎の排他を保つ・`0001` の CHECK）', () => {

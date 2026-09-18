@@ -47,10 +47,20 @@ describe('★① 書き込みの位置（★NPC を飛ばす前・★賞金 0 �
   });
 
   it('🔴 ★PR-2: ★確定した全頭ぶんを書いている（★賞金で絞っていない）', () => {
-    /** ★渡すのは `finished` から作った配列そのもの（★`filter` を挟んでいない） */
+    /**
+     * ★渡すのは `finished` から作った配列そのもの（★`filter` を挟んでいない）。
+     * ⚠️ 🔴 ★**「`finished.filter` がどこにも無い」では見られません**（★2026-09-19 に踏みました）。
+     *    ★**PR-4**（G1 勝利数）が `finished.filter((f) => f.finishPosition === 1)` を使うので、
+     *    ★別の正しい `filter` で赤になります。
+     *    → ★**`prize_pp` に渡す 2 本の配列そのもの**を見ます。
+     */
     expect(LIVE, '★全頭ぶんの枠番を渡していない').toMatch(/const gates = finished\.map\(\(f\) => f\.gate\)/);
     expect(LIVE, '★全頭ぶんの額を渡していない').toMatch(/const amounts = finished\.map\(\(f\) => prizeFor\(/);
-    expect(LIVE, '★賞金で絞っている（★0 が書かれない）').not.toMatch(/finished\.filter/);
+    /** ★その 2 行に `filter` が挟まっていない（★挟むと 0 が書かれなくなる） */
+    const gatesLine = /const gates = finished[^\n]*/.exec(LIVE)?.[0] ?? '';
+    const amountsLine = /const amounts = finished[^\n]*/.exec(LIVE)?.[0] ?? '';
+    expect(gatesLine, '★枠番を絞っている').not.toContain('filter');
+    expect(amountsLine, '★額を絞っている').not.toContain('filter');
   });
 
   it('🔴 ★書けた行数が合わないなら投げる（R-27）', () => {

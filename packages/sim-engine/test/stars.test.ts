@@ -10,8 +10,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  bandOfPotential, bandOf, sameBand, starScaleOfBand,
-  STAR_STEPS, STAR_MIN, STAR_MAX, STAR_STEP, STAR_THRESHOLDS, STAR_BAND_FROM, STAR_BAND_WIDTH,
+  bandOfPotential, bandOf, sameBand,
+  STAR_STEPS, STAR_THRESHOLDS, STAR_BAND_FROM, STAR_BAND_WIDTH,
 } from '../src/index.js';
 
 const pot = (mean: number) => ({ sp: mean, st: mean, pw: mean, gt: mean, iq: mean });
@@ -73,31 +73,9 @@ describe('★素質の段（D-114）', () => {
 });
 
 /**
- * ★**目盛（1.0〜5.0）**。
- * 🔴 ★**T-11 で消える繋ぎ**です（★値付け 1 か所だけが読みます）。
- * ★ここで見ているのは ★**T-10 で価格の水準を動かしていないこと**です（★便の順 §6: T-10 は経済に効かせない）。
+ * 🔴 ★**2026-09-19・T-11 で「段 → 目盛（1.0〜5.0）」を落としました**。
+ *   ★この目盛は ★**NPC 出品の値付け 1 か所**のためだけに残していました。
+ *   ★D-102 ③ で価格が ★**§10.5 の式**から決まるようになり、★使う側が消えました。
+ *   → ★**橋を残すと、いつかまた渡されます**ので、★関数ごと消しました（R-29）。
+ * ⚠️ ★**段（24 段）は残ります**（★D-114 ③・初期馬の付与と在庫の下限監視）。
  */
-describe('★段 → 目盛（T-11 までの繋ぎ）', () => {
-  it('① ★目盛は 1.0〜5.0 に収まり、両端がちょうど STAR_MIN / STAR_MAX', () => {
-    expect(starScaleOfBand(0)).toBe(STAR_MIN);
-    expect(starScaleOfBand(STAR_STEPS - 1)).toBeCloseTo(STAR_MAX, 10);
-    for (let b = 0; b < STAR_STEPS; b += 1) {
-      const v = starScaleOfBand(b);
-      expect(v, `段 ${b}`).toBeGreaterThanOrEqual(STAR_MIN);
-      expect(v, `段 ${b}`).toBeLessThanOrEqual(STAR_MAX);
-    }
-  });
-
-  it('② ★1 段ぶんの幅は STAR_STEP', () => {
-    for (let b = 1; b < STAR_STEPS; b += 1) {
-      expect(starScaleOfBand(b) - starScaleOfBand(b - 1), `段 ${b}`).toBeCloseTo(STAR_STEP, 10);
-    }
-  });
-
-  it('🔴 ③ ★段の外を渡したら落ちる（★黙って丸めない）', () => {
-    expect(() => starScaleOfBand(-1)).toThrow();
-    expect(() => starScaleOfBand(STAR_STEPS)).toThrow();
-    /** ★小数の段は「帯を小数で比べている」印なので、★通さない */
-    expect(() => starScaleOfBand(3.5)).toThrow();
-  });
-});

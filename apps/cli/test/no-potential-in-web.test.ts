@@ -55,10 +55,6 @@ const LEAKS: Readonly<Record<string, string>> = {
   bandOfPotential: '★素質 → 段。★段そのものを返す',
   bandOf: '★馬 → 段',
   sameBand: '★2 頭が同じ帯か。★段の比較を画面でできてしまう',
-  STAR_MIN: '★目盛の下限（T-11 で消える）',
-  STAR_MAX: '★目盛の上限（T-11 で消える）',
-  STAR_STEP: '★1 段ぶんの目盛（T-11 で消える）',
-  starScaleOfBand: '★段 → 目盛。★段を渡す口（T-11 で消える）',
 
   // ── 遺伝子型そのもの（§12.4「本人にも見せない」）──
   Genotype: '★遺伝子型',

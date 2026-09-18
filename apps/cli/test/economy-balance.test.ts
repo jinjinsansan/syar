@@ -8,8 +8,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { MENUS, MENU_IDS, STABLE_GRADES, gradeEpCost } from '@star/training';
-import { JOCKEYS, priceOfStars, sellBackEP } from '@star/scheduler';
-import { careerBalance, meanWeeklyTrainingEP, meanJockeyFeeEP, starsPerEP, CAREER_ASSUMPTION } from '../src/economy-balance.js';
+import { JOCKEYS, npcStudFee, sellBackEP } from '@star/scheduler';
+import { careerBalance, meanWeeklyTrainingEP, meanJockeyFeeEP, CAREER_ASSUMPTION } from '../src/economy-balance.js';
 
 describe('★1 キャリアの収支（GB-6）', () => {
   it('① ★額は実装の 1 か所から引く（★道具に数を書き写していない）', () => {
@@ -26,19 +26,21 @@ describe('★1 キャリアの収支（GB-6）', () => {
   });
 
   it('② ★収支の内訳がそろっている（★購入・騎手・格が入っている）', () => {
-    const b = careerBalance('bronze', 3);
+    /** 🔴 ★T-11: ★価格は ★**§10.5 の式**から来ます（★★からではない） */
+    const price = npcStudFee(0, 100_000);
+    const b = careerBalance('bronze', price);
     expect(b.trainingEP).toBeLessThan(0);
     expect(b.entryEP).toBe(-CAREER_ASSUMPTION.entryFeeEP * CAREER_ASSUMPTION.starts);
     expect(b.jockeyEP, '★騎手の料金が入っている（D-105）').toBeLessThan(0);
-    expect(b.purchaseEP, '★購入が入っている（D-102）').toBe(-priceOfStars(3));
-    expect(b.sellBackEP, '★手放したときの戻り').toBe(sellBackEP(priceOfStars(3)));
+    expect(b.purchaseEP, '★購入が入っている（D-102）').toBe(-price);
+    expect(b.sellBackEP, '★手放したときの戻り').toBe(sellBackEP(price));
     /** ★支出計は内訳の合計（★取りこぼしが無い） */
     expect(b.totalEP).toBe(b.trainingEP + b.entryEP + b.jockeyEP + b.breedingEP + b.purchaseEP + b.sellBackEP);
   });
 
   it('③ ★格を上げると支出は増えるが、EP あたりの伸びは変わらない（★D-103 ②）', () => {
-    const bronze = careerBalance('bronze', 3);
-    const gold = careerBalance('gold', 3);
+    const bronze = careerBalance('bronze', npcStudFee(0, 100_000));
+    const gold = careerBalance('gold', npcStudFee(0, 100_000));
     expect(Math.abs(gold.trainingEP)).toBeGreaterThan(Math.abs(bronze.trainingEP));
     /** ★増えたのは調教費だけ（★購入・登録料・騎手・配合は格によらない） */
     expect(gold.entryEP).toBe(bronze.entryEP);
@@ -47,14 +49,22 @@ describe('★1 キャリアの収支（GB-6）', () => {
     expect(gold.breedingEP).toBe(bronze.breedingEP);
   });
 
-  it('④ ★同じ EP での期待する★（★D-102 ④ の報告の材料）', () => {
-    /** ★★が高いほど 1 EP あたりの★は下がる（★高い馬ほど割高＝配合を中核に保つ向き） */
-    let prev = Infinity;
-    for (const s of [2, 3, 4, 5]) {
-      const v = starsPerEP(s);
-      expect(v, `★${s}`).toBeLessThanOrEqual(prev);
+  it('🔴 ④ ★「同じ EP での期待する★」はもう出せない（★T-11）', () => {
+    /**
+     * 🔴 ★**2026-09-19・T-11 で成立しなくなりました**。
+     *   ★D-102 ④ は「同じ EP での期待する★を報告する」と定めていますが、
+     *   ★D-102 ③（2026-09-18 改訂）で ★**価格が素質を入力に取らなくなり**ました。
+     *   → ★**価格から★を逆算できません**。★**それが ③ の目的**（「逆算が原理的に起きない」）です。
+     *   🔴 ★**③ と ④ が矛盾しています** — ★照会中（`QUESTIONS_T11_20260919.md`）。
+     * → ★代わりに ★**戦績が良いほど高い**こと（★式の単調性）を見ます。
+     */
+    let prev = -Infinity;
+    for (const e of [0, 20_000, 100_000, 500_000]) {
+      const v = npcStudFee(0, e);
+      expect(v, `総獲得賞金 ${e}`).toBeGreaterThanOrEqual(prev);
       prev = v;
     }
-    expect(starsPerEP(3)).toBeCloseTo(3 / priceOfStars(3), 12);
+    /** ★G1 の方が重い（★8,000 EP 対 総獲得賞金/20） */
+    expect(npcStudFee(1, 0)).toBeGreaterThan(npcStudFee(0, 100_000));
   });
 });

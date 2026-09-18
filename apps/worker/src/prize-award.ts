@@ -83,7 +83,42 @@ export async function awardPrizes(
     }
   }
 
-  // ★★② 発行（★利用者の馬だけ。★ここは今までどおり）
+  /**
+   * ★★**② G1 の勝利数を増やす**（★2026-09-19・**PR-4**・★PR-1 の双子）。
+   *
+   * 【🔴 ★何が無かったか】
+   *   ✔ `horses.g1_wins` は ★**`0001:138` で宣言され、`seed-world.mjs` が初期値を入れ、
+   *      `my_horses` が出し、`horse-repo` が読む**のに、
+   *   🔴 ★★**どこも増やしていませんでした**（★全ソースを走査して `update … g1_wins` は 0 件）。
+   *
+   * 【🔴 ★なぜ T-11 を塞ぐか】
+   *   ★§10.5 の式は〔`3,000 + G1勝利数 × 8,000 + 総獲得賞金/20`〕。
+   *   ★**G1 1 勝 ＝ 8,000 EP** で、★総獲得賞金の項（★1 勝で約 100〜900 EP）より ★**桁が大きい**。
+   *   → ★増えないと ★**全馬が 3,000 EP 付近に固まり**、★棚に段差ができません。
+   *   ✔ ★実測（staging・2026-09-19）: ★候補 732 頭が ★**全員 G1 0 勝**、★価格の幅は 3,000〜4,620 EP。
+   *
+   * ⚠️ ★**NPC 馬も増やします**（★PR-1 と同じ理由 — ★D-102 ③ の価格式が要るのは NPC の側）。
+   * ⚠️ ★**G1 のときだけ**問い合わせます（★1 周 10 分の予算・D-071）。
+   * ⚠️ ★**同着は両方 1 着**です（★`finish_pos = 1` が複数ありえます）。★どちらも 1 勝と数えます。
+   */
+  if (tier === 'G1') {
+    const winners = finished.filter((f) => f.finishPosition === 1).map((f) => f.gate);
+    if (winners.length === 0) {
+      // ★1 着がいない G1 は異常。★黙って進めない（R-27）
+      throw new Error(`awardPrizes: G1 なのに 1 着がいません（race ${raceId}）`);
+    }
+    const won = await client.query(
+      `update horses h set g1_wins = h.g1_wins + 1
+         from race_entries e
+        where e.race_id = $1 and e.gate = any($2::int[]) and h.id = e.horse_id`,
+      [raceId, winners],
+    );
+    if (won.rowCount !== winners.length) {
+      throw new Error(`awardPrizes: g1_wins を増やせたのは ${won.rowCount} 頭（1 着は ${winners.length} 頭）`);
+    }
+  }
+
+  // ★★③ 発行（★利用者の馬だけ。★ここは今までどおり）
   for (const f of finished) {
     const amount = prizeFor(tier, f.finishPosition);
     if (amount <= 0) continue;

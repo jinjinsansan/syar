@@ -89,28 +89,15 @@ export function sameBand(a: Pick<HorseRecord, 'potential'>, b: Pick<HorseRecord,
 }
 
 /**
- * ★**段 → 1.0〜5.0 の目盛**。
+ * 🔴 ★**2026-09-19・T-11 で「段 → 1.0〜5.0 の目盛」を落としました**
+ *   （`starScaleOfBand` / `STAR_MIN` / `STAR_MAX` / `STAR_STEP`）。
  *
- * 🔴 ★**T-11 までの繋ぎです。★新しい呼び出しを増やさないでください。**
- *   ★いま使っているのは ★**NPC 出品の値付け 1 か所だけ**です（`@star/scheduler` の `priceOfStars`）。
- *   ★**D-102 ③（2026-09-18 改訂・T-11）で、価格は §10.5 の NPC 種牡馬の式**
- *   〔3,000 ＋ G1 勝利数 × 8,000 ＋ 総獲得賞金 ÷ 20〕**から決め、素質を入力に取らなくなります。**
- *   → ★**そのとき、この関数は消えます。**
+ *   ★この目盛は ★**NPC 出品の値付け 1 か所のためだけ**に残していました。
+ *   ★**D-102 ③**（2026-09-18 改訂）で価格は ★**§10.5 の式**
+ *   〔`3,000 + G1勝利数 × 8,000 + 総獲得賞金/20`〕から決まり、
+ *   ★**素質を入力に取らなくなりました**。
+ *   → ★**段 → 価格の橋を残すと、いつかまた渡されます**ので消しました（R-29）。
  *
- * 【★なぜ 1.0〜5.0 を残しているか】
- *   ★`priceOfStars(x) = max(3000, round(x × 2000))` が目盛を読むので、
- *   ★**段番号（0〜23）をそのまま渡すと馬の価格が最大 4.8 倍になります。**
- *   ★T-10 は「見せ方と帯」の便で ★**着順にも経済にも効かせない**と決まっているため（便の順 §6・4）、
- *   ★**目盛を保って価格の水準を動かしません。**
+ * ⚠️ ★**段（`bandOfPotential` の 24 段）は残ります** — ★**D-114 ③**が
+ *    ★初期馬の付与（D-079）と ★**在庫の下限監視**（D-079 ⑧）に使うと定めています。
  */
-export const STAR_MIN = 1;
-export const STAR_MAX = 5;
-/** ★1 段ぶんの目盛の幅（★導出値。★24 段なら 4 ÷ 23 ≈ 0.174） */
-export const STAR_STEP = (STAR_MAX - STAR_MIN) / (STAR_STEPS - 1);
-
-export function starScaleOfBand(band: number): number {
-  if (!Number.isInteger(band) || band < 0 || band >= STAR_STEPS) {
-    throw new Error(`段は 0〜${STAR_STEPS - 1} の整数です: ${band}`);
-  }
-  return STAR_MIN + band * STAR_STEP;
-}
