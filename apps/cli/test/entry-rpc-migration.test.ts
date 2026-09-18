@@ -58,10 +58,17 @@ describe('★第 3 便の移行（0024）', () => {
     expect(def.body).toMatch(/自馬を全頭含む/);
     /** ★D-080: 先頭のセットアップ判定が残っている（★土台から写しているか） */
     expect(def.body).toMatch(/assert_setup_complete\(\)/);
-    /** ★上限の検査も残っている（★土台を写さずに書くと消える） */
-    for (const cap of ['30000', '50000', '500000', '5000']) {
-      expect(def.body, `★上限 ${cap} が消えている`).toContain(cap);
+    /**
+     * 🔴 ★**2026-09-19・BT-1/BT-2 で上限の場所が変わりました**。
+     *   ★旧: ★`place_bet` に 4 つの数が直書きされていることを**要求**していました。
+     *   ★新: ★**数は `bet_limits`、規則は `bet_allowance()`** — ★直書きが**無いこと**を要求します。
+     *   ★土台を写せずに書いてしまった場合は、★**`bet_allowance()` の呼び出しが消える**ので捕まえられます。
+     */
+    const live = def.body.replace(/--[^\n]*/g, ' ');
+    for (const cap of ['30000', '50000', '500000']) {
+      expect(live, `★上限 ${cap} が直書きに戻っている`).not.toContain(cap);
     }
+    expect(live, '★bet_allowance() を呼んでいない').toMatch(/bet_allowance\(/);
   });
 
   it('② ★出走登録は同じレースに 2 頭まで（3 頭目を拒否）・引退馬と締切を見る', () => {

@@ -54,6 +54,13 @@ const READONLY_FUNCTIONS = [
    *    ★区分の根拠は★**「状態を変えない」**の方です。
    */
   'initial_horse_candidates',
+  /**
+   * ★あと何 EP 投票できるか（`0044`・`0045`・BT-1/BT-2）。`language plpgsql stable` で**状態を変えない**。
+   *   ★`place_bet`（書き込む側）が `assert_setup_complete()` を呼んでおり、★こちらは**その中から呼ばれます**。
+   * ⚠️ ★利用者からは呼べません（`revoke all ... from public, anon, authenticated`）が、
+   *    ★区分の根拠は★**「状態を変えない」**の方です。
+   */
+  'bet_allowance',
 ];
 
 /**

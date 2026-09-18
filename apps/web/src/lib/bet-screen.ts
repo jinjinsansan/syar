@@ -27,6 +27,13 @@ export interface BetEntryView {
   readonly popularity: number | null;
   /** ★所有者の表示名（★NPC は厩舎の冠名。★`owner_id` は出ない） */
   readonly ownerLabel: string | null;
+  /**
+   * ★**これは自分の馬か**（★`0044`・**BT-3**）。
+   * 🔴 ★旧は ★**馬名で突き合わせて**いました — ★`horses.name` に**一意制約はありません**
+   *    （★staging は 7,370 / 7,370 で**たまたま**一致しているだけ）。★**測っていない前提**でした。
+   * ★いまは ★**サーバーが `auth.uid()` で判定した結果**を読むだけです（★BT-0）。
+   */
+  readonly isMine: boolean;
 }
 
 /** ★1 レースぶん */
@@ -58,6 +65,17 @@ export interface BetScreenData {
    * ⚠️ ★**判定は `place_bet` がします**。★ここは ★**「どれが自分の馬か」を見せる**ためだけです。
    */
   readonly ownGates: readonly number[];
+  /**
+   * ★**あと何 EP 投票できるか**（★`0044`・BT-1）。
+   * ⚠️ ★**上限そのものは持ちません** — ★画面に渡すのは「判断の結果」だけです（BT-0）。
+   * ⚠️ ★`bindingLabel` は ★**「いま効いている上限の名前」**であって、★**「達した」ではありません**
+   *    （★達したかどうかは `remainingEP === 0` かどうかで、★画面が言います）。
+   */
+  readonly allowance: {
+    readonly remainingEP: number;
+    readonly binding: string;
+    readonly bindingLabel: string;
+  } | null;
 }
 
 const RACE_COLUMNS = 'id, name, grade, class_rank, surface, distance, track_condition, scheduled_at, status, cycle_index';
@@ -81,23 +99,33 @@ export async function loadBetScreen(raceId: string | null): Promise<BetScreenDat
   const r = racesRes.data?.[0];
   if (r === undefined) {
     const [userRes] = await Promise.all([auth.from('users').select('entry_points').limit(1)]);
-    return { race: null, epBalance: Number(userRes.data?.[0]?.entry_points ?? 0), ownGates: [] };
+    return {
+      race: null,
+      epBalance: Number(userRes.data?.[0]?.entry_points ?? 0),
+      ownGates: [],
+      // ★レースが無ければ「あと何 EP」も無い（★0 と混ぜない）
+      allowance: null,
+    };
   }
 
   const id = String(r.id);
   const [entriesRes, oddsRes, userRes, mineRes] = await Promise.all([
     read.from('race_entries_public')
-      .select('gate, horse_name, strategy, weight, popularity, owner_label')
+      .select('gate, horse_name, strategy, weight, popularity, owner_label, is_mine')
       .eq('race_id', id).order('gate', { ascending: true }),
     read.from('race_odds_public').select('bet_type, selection, odds').eq('race_id', id),
     auth.from('users').select('entry_points, stable_name').limit(1),
-    // ★自分の馬の名前（★`race_entries_public` に `horse_id` が無いので、★名前で突き合わせます）
-    auth.from('my_horses').select('name'),
+    /**
+     * ★あと何 EP 投票できるか（★`0044`・**BT-1**）。
+     * ⚠️ ★**上限そのものは受け取りません** — ★受け取ると画面が `min` を取り、
+     *    ★**優先順位という第 5 の知識**を持ちます（BT-0）。
+     */
+    auth.from('my_bet_allowance').select('race_id, remaining_ep, binding, binding_label').eq('race_id', id),
   ]);
   if (entriesRes.error !== null) throw new Error(`race_entries_public を読めませんでした: ${entriesRes.error.message}`);
   if (oddsRes.error !== null) throw new Error(`race_odds_public を読めませんでした: ${oddsRes.error.message}`);
   if (userRes.error !== null) throw new Error(`users を読めませんでした: ${userRes.error.message}`);
-  if (mineRes.error !== null) throw new Error(`my_horses を読めませんでした: ${mineRes.error.message}`);
+  if (mineRes.error !== null) throw new Error(`my_bet_allowance を読めませんでした: ${mineRes.error.message}`);
 
   const entries: BetEntryView[] = (entriesRes.data ?? []).map((e) => ({
     gate: Number(e.gate),
@@ -106,6 +134,7 @@ export async function loadBetScreen(raceId: string | null): Promise<BetScreenDat
     weight: Number(e.weight),
     popularity: e.popularity === null || e.popularity === undefined ? null : Number(e.popularity),
     ownerLabel: e.owner_label === null || e.owner_label === undefined ? null : String(e.owner_label),
+    isMine: Boolean(e.is_mine),
   }));
 
   const odds = new Map<string, number>();
@@ -115,14 +144,12 @@ export async function loadBetScreen(raceId: string | null): Promise<BetScreenDat
   }
 
   /**
-   * ★**自分の馬の枠番**。
-   * ⚠️ 🔴 ★**名前で突き合わせています** — ★`race_entries_public` に `horse_id` が無いためです。
-   *    ★馬名は一意（★`0001` の一意制約）なので今は成立しますが、★**弱い突き合わせ**です。
-   *    ★**判定そのものは `place_bet` が `horse_id` で行います**ので、★ここが外れても
-   *    ★**買えない買い目が買えるようにはなりません**（★見せ方が弱くなるだけ）。
+   * ★**自分の馬の枠番**（★`is_mine` はサーバーが `auth.uid()` で判定した結果・BT-3）。
+   * 🔴 ★旧は ★**馬名で突き合わせて**いました。★`horses.name` に一意制約は無く、
+   *    ★**測っていない前提**でした（★裁定 `REVIEW_BET_LIMITS_VERDICT_20260919.md` §3）。
    */
-  const myNames = new Set((mineRes.data ?? []).map((h) => String(h.name)));
-  const ownGates = entries.filter((e) => myNames.has(e.horseName)).map((e) => e.gate);
+  const ownGates = entries.filter((e) => e.isMine).map((e) => e.gate);
+  const allowanceRow = mineRes.data?.[0];
 
   return {
     race: {
@@ -139,6 +166,15 @@ export async function loadBetScreen(raceId: string | null): Promise<BetScreenDat
     },
     epBalance: Number(userRes.data?.[0]?.entry_points ?? 0),
     ownGates,
+    /**
+     * ★あと何 EP 投票できるか（★BT-1）。★**「判断の結果」だけ**を受け取ります。
+     * ⚠️ ★行が無い（★未ログイン・受付が終わった）ときは null。★**0 と混ぜません**。
+     */
+    allowance: allowanceRow === undefined ? null : {
+      remainingEP: Number(allowanceRow.remaining_ep),
+      binding: String(allowanceRow.binding),
+      bindingLabel: String(allowanceRow.binding_label),
+    },
   };
 }
 

@@ -36,6 +36,10 @@ import { freezePendingEntries } from './entry-freeze.js';
 import { runSelfcheck } from './selfcheck.js';
 import { runSchemacheck } from './schemacheck.js';
 import { CANCEL_AFTER_START_MS, CYCLE_MS, classOf, conditionsOf, gradeOf, weekIndexAt } from '@star/scheduler';
+// ★投票の上限の正（★2026-09-19・BT-1。★ワーカーが `bet_limits` に書き、RPC はその行を読む）
+import {
+  BET_CAP_PER_KIND_EP, BET_CAP_PER_RACE_EP, BET_CAP_PER_DAY_EP, BET_CAP_OWN_RACE_EP,
+} from '@star/betting';
 
 /** 1周の間隔。★サイクル長より短くする（1サイクルを取りこぼさないため） */
 export const TICK_MS = 60_000;
@@ -377,6 +381,27 @@ async function main(): Promise<void> {
         `insert into world_state (id, game_week, updated_at) values (true, $1, now())
          on conflict (id) do update set game_week = excluded.game_week, updated_at = excluded.updated_at`,
         [weekIndexAt(nowMs, cfg.epochMs)],
+      );
+
+      /**
+       * ★**投票の上限を書き出す**（★2026-09-19・**BT-1 / BT-4**・移行 `0044`）。
+       *
+       *   ★★**正 ＝ `@star/betting` の `BET_CAP_*`**。★`place_bet` はこの行の値で判定します
+       *   （★D-103 ④ の先例。★旧は SQL に 4 つ直書きしていました）。
+       *
+       * ⚠️ ★**値が変わらなくても毎周書きます**（BT-4 ①・UI1-10 と同じ理由）。
+       *    ★「変わったときだけ」だと ★**止まったのと区別できません**（R-16）。
+       * ⚠️ ★**古い行は通してよい**（BT-4 ③）— ★上限は時間で変わる値ではありません。
+       *    ★古さで弾く形にすると、★**ワーカーが落ちた瞬間に誰も投票できなくなります**。
+       */
+      await client.query(
+        `insert into bet_limits (id, per_kind_ep, per_race_ep, per_day_ep, own_race_ep, updated_at)
+         values (true, $1, $2, $3, $4, now())
+         on conflict (id) do update set
+           per_kind_ep = excluded.per_kind_ep, per_race_ep = excluded.per_race_ep,
+           per_day_ep = excluded.per_day_ep, own_race_ep = excluded.own_race_ep,
+           updated_at = excluded.updated_at`,
+        [BET_CAP_PER_KIND_EP, BET_CAP_PER_RACE_EP, BET_CAP_PER_DAY_EP, BET_CAP_OWN_RACE_EP],
       );
 
       const t = await advanceTrainingWeeks(client, nowMs, cfg.epochMs,

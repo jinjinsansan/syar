@@ -65,6 +65,12 @@ export const EXPECTED_EXPOSURE = {
   //   ★`where owner_id = auth.uid()` で自分の行だけ・★authenticated にだけ grant（anon には出さない）。
   //   ★列の仕分けは apps/cli/test/my-horses-view.test.ts が「全列の分類」を要求して守る。
   my_horses: OWNER_SCOPED,
+  /**
+   * ★あと何 EP 投票できるか（★2026-09-19・移行 `0044`・**BT-1**）。
+   *   ★画面に渡すのは ★**「判断の結果」**だけです（★上限そのものは渡しません）。
+   *   ★`auth.uid()` で絞り、★`authenticated` にだけ grant。
+   */
+  my_bet_allowance: OWNER_SCOPED,
 
   // ── 閉鎖（クライアントが直接読む理由がない） ──
   // 実体テーブルは公開ビュー経由でのみ読ませる
@@ -72,6 +78,8 @@ export const EXPECTED_EXPOSURE = {
   race_entries: CLOSED,
   race_odds: CLOSED,
   prize_catalog: CLOSED,
+  // ★上限の置き場（★移行 `0044`）。★画面は `my_bet_allowance` 経由だけ
+  bet_limits: CLOSED,
   // ★実体表は閉じる（★公開ビュー `world_state_public` 経由だけ・移行 `0038`）
   world_state: CLOSED,
   // ★horses は potential / genotype を持つ（§12.4「本人にも数値を見せない」・§5.5）
@@ -202,6 +210,12 @@ export const EXPECTED_FUNCTION_EXECUTE = {
    */
   'initial_horse_candidates(uuid)': { anon: false, authenticated: false },
   'pick_initial_horse()': { anon: false, authenticated: false },
+  /**
+   * ★あと何 EP 投票できるかを計算する（★2026-09-19・**BT-2**）。
+   *   🔴 ★**規則を 2 か所に書かないため**の関数で、★`place_bet` と `my_bet_allowance` が呼びます。
+   *   ★利用者には渡しません — ★画面が直に呼べると、★**他人の `p_user` を渡せます**。
+   */
+  'bet_allowance(uuid,uuid,text)': { anon: false, authenticated: false },
   // ★初期馬の候補かの判定（`0031`）。読み取りだけ。★「戦績 0」は暫定の定義で、
   //   クラス分けの便で共通の述語に置き換える（裁定 REVIEW_SETUP_PREDICATE_VERDICT_20260918 条件 2）
   'is_initial_horse_candidate(uuid)': { anon: false, authenticated: true },

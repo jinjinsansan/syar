@@ -45,10 +45,15 @@ describe('★① 判定はサーバーが持つ（★画面が持たない）', 
   const { body } = lastPlaceBet();
   const rpc = body.replace(/--[^\n]*/g, ' ');
 
-  it('★上限・§9.5 は `place_bet` が持っている（★走査が空振りしていない・R-21）', () => {
-    expect(rpc, '★1 レース 1 種の上限が無い').toMatch(/30000|30,000/);
-    expect(rpc, '★1 レース合計の上限が無い').toMatch(/50000|50,000/);
-    expect(rpc, '★1 日合計の上限が無い').toMatch(/500000|500,000/);
+  it('★判定はサーバーが持っている（★走査が空振りしていない・R-21）', () => {
+    /**
+     * 🔴 ★**2026-09-19・BT-1/BT-2 で上限の場所が変わりました**。
+     *   ★旧: `place_bet` が 4 つの数を SQL に直書き。
+     *   ★新: ★**数は `bet_limits`、規則は `bet_allowance()`**。★`place_bet` はそれを呼ぶ。
+     * ⚠️ ★この検査は「画面が持っていないこと」を見るのが仕事です。
+     *    ★上限そのものの置き場は `bet-limits.test.ts` が見ます。
+     */
+    expect(rpc, '★bet_allowance を呼んでいない').toMatch(/bet_allowance\(/);
     expect(rpc, '★自馬のレースの判定が無い').toMatch(/自馬/);
   });
 
@@ -124,8 +129,9 @@ describe('★自馬のレース（§9.5）', () => {
     /**
      * ⚠️ ★画面が `ownGates` を使うのは ★**印を付けるため**で、
      *    ★**買えるかどうかの最終判定は `place_bet`** です。
-     * ⚠️ 🔴 ★突き合わせが ★**馬名**なのは弱い形です（★`race_entries_public` に `horse_id` が無いため）。
-     *    ★外れても「買えない買い目が買える」ようにはなりません（★RPC が `horse_id` で見ます）。
+     * 🔴 ★**2026-09-19・BT-3 で馬名の突き合わせをやめました**。
+     *    ★`horses.name` に★**一意制約はありません**（★開発側が確かめずに「一意」と書いていました）。
+     *    → ★いまは ★**`race_entries_public.is_mine`**（★サーバーが `auth.uid()` で判定）を読みます。
      */
     expect(LIVE_SCREEN).toContain('ownGates');
     expect(LIVE_SCREEN, '★画面側で §9.5 を判定している').not.toMatch(/9\.5[\s\S]{0,40}return false/);
