@@ -25,18 +25,41 @@ const AWARD = readFileSync(path.join(ROOT, 'apps/worker/src/prize-award.ts'), 'u
 const LIVE = AWARD.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
 const ALL = allMigrationsBody();
 
-describe('★① 書き込みの位置（★NPC を飛ばす前）', () => {
-  it('🔴 ★`prize_pp` の update が、NPC を飛ばす `continue` より前にある', () => {
-    const upd = LIVE.indexOf('update race_entries set prize_pp');
-    const skip = LIVE.indexOf('row.owner_id === null');
+describe('★① 書き込みの位置（★NPC を飛ばす前・★賞金 0 を飛ばす前）', () => {
+  it('🔴 ★`prize_pp` の update が、どの `continue` よりも前にある', () => {
+    /**
+     * 🔴 ★**2026-09-19・PR-2 で形が変わりました。**
+     *   ★旧: ループの中で 1 頭ずつ `update`。★`if (amount <= 0) continue` の**後ろ**だったので、
+     *        ★賞金 0 の行は ★**書かれず null のまま**でした。
+     *   ★新: ★**ループの外で、確定した全頭ぶんを 1 文**（`unnest`）。
+     *        → ★どの `continue` よりも構造的に前で、★**0 も書きます**。
+     */
+    const upd = LIVE.indexOf('update race_entries e set prize_pp');
+    const skipZero = LIVE.indexOf('if (amount <= 0) continue');
+    const skipNpc = LIVE.indexOf('row.owner_id === null');
     expect(upd, '★prize_pp を書いていない').toBeGreaterThan(-1);
-    expect(skip, '★NPC を飛ばす判定が無い（★走査が空・R-21）').toBeGreaterThan(-1);
-    expect(upd, '🔴 ★NPC を飛ばした後に書いている ＝ ★NPC の賞金がまた存在しなくなる')
-      .toBeLessThan(skip);
+    expect(skipZero, '★賞金 0 を飛ばす判定が無い（★走査が空・R-21）').toBeGreaterThan(-1);
+    expect(skipNpc, '★NPC を飛ばす判定が無い（★走査が空・R-21）').toBeGreaterThan(-1);
+    expect(upd, '🔴 ★賞金 0 を飛ばした後に書いている ＝ ★null の意味が 2 つになる（PR-2）')
+      .toBeLessThan(skipZero);
+    expect(upd, '🔴 ★NPC を飛ばした後に書いている ＝ ★NPC の賞金がまた存在しなくなる（PR-1）')
+      .toBeLessThan(skipNpc);
   });
 
-  it('★額は `prizeFor()` が決めた同じ値（★別に計算し直していない）', () => {
-    expect(LIVE, '★prizeFor の結果を渡していない').toMatch(/prize_pp = \$1[\s\S]{0,120}\[amount,/);
+  it('🔴 ★PR-2: ★確定した全頭ぶんを書いている（★賞金で絞っていない）', () => {
+    /** ★渡すのは `finished` から作った配列そのもの（★`filter` を挟んでいない） */
+    expect(LIVE, '★全頭ぶんの枠番を渡していない').toMatch(/const gates = finished\.map\(\(f\) => f\.gate\)/);
+    expect(LIVE, '★全頭ぶんの額を渡していない').toMatch(/const amounts = finished\.map\(\(f\) => prizeFor\(/);
+    expect(LIVE, '★賞金で絞っている（★0 が書かれない）').not.toMatch(/finished\.filter/);
+  });
+
+  it('🔴 ★書けた行数が合わないなら投げる（R-27）', () => {
+    expect(LIVE, '★行数を確かめていない').toMatch(/wrote\.rowCount !== finished\.length[\s\S]{0,200}throw new Error/);
+  });
+
+  it('★1 周 10 分の予算（D-071）— ★ループの中で 1 頭ずつ書いていない', () => {
+    /** ⚠️ ★18 頭立てで 18 回往復すると、★確定の経路が重くなります */
+    expect(LIVE, '★unnest で 1 文にまとめていない').toMatch(/unnest\(\$2::int\[\], \$3::bigint\[\]\)/);
   });
 });
 

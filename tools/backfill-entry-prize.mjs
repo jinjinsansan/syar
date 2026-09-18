@@ -8,10 +8,13 @@
  *   → ★**TypeScript から読み、★行に書きます。** ★移行（`0049`）は列を作るだけです。
  *
  * 【★何を埋めるか】
- *   ★`finish_pos is not null` かつ ★`prize_pp is null` の行だけ。
+ *   ★`finish_pos is not null` かつ ★`prize_pp is null` の行 ★**すべて**。
  *   ⚠️ ★**すでに入っている行は触りません**（★ワーカーが書いた値を上書きしない）。
  *   ⚠️ ★NPC 馬も埋めます（★T-11 の価格式が必要とするのはそちら・PR-1）。
- *   ⚠️ ★`prizeFor` が 0 を返す着順（★6 着以下）は ★**書きません**（★ワーカーと同じ扱い）。
+ *   ⚠️ 🔴 ★**賞金 0 の着順にも `0` を書きます**（★**PR-2**・★ワーカーと同じ扱い）。
+ *      ★書かずに飛ばすと、★`null` に ★**「まだ書いていない」と「書いたが 0」の 2 つの意味**ができ、
+ *      ★**二度流したときに同じ結果になると言えなくなります**。
+ *      → ★いまは ★**`null` ＝ まだ書いていない**の 1 つだけ。★対象は「確定済みで `prize_pp` が null」と一言で言えます。
  *
  * 【★`pp_ledger` には触りません】
  *   ★あちらは ★**実際に発行した PP** です。★過去に発行しなかったものを、
@@ -59,19 +62,18 @@ try {
   console.log(`★確定した走り ${total} 行 / ★埋め戻しの対象（prize_pp が null）${rows.length} 行`);
   if (total === 0) { console.error('🔴 ★確定した走りが 1 行もありません（★走査が空・R-21）'); process.exit(2); }
 
-  let willWrite = 0;
   let zero = 0;
   const byTier = new Map();
   const updates = [];
   for (const r of rows) {
     const tier = tierFromDb(Number(r.class_rank), r.grade);
     const amount = prizeFor(tier, Number(r.finish_pos));
-    if (amount <= 0) { zero += 1; continue; }
-    willWrite += 1;
-    byTier.set(tier, (byTier.get(tier) ?? 0) + amount);
+    // 🔴 ★PR-2: ★**0 も書きます**（★飛ばすと null の意味が 2 つになる）
+    if (amount <= 0) zero += 1;
+    else byTier.set(tier, (byTier.get(tier) ?? 0) + amount);
     updates.push([amount, r.race_id, Number(r.gate)]);
   }
-  console.log(`★書く行 ${willWrite} / ★賞金 0 で書かない行 ${zero}`);
+  console.log(`★書く行 ${updates.length}（★うち賞金 0 が ${zero} 行・★0 も書きます・PR-2）`);
   for (const [t, sum] of [...byTier].sort()) console.log(`    ${t.padEnd(7)} 合計 ${sum.toLocaleString('ja-JP')} PP`);
 
   if (!write) { console.log('\n（★下見だけでした。★書くには --write を付けてください）'); }
@@ -86,7 +88,12 @@ try {
     const left = (await c.query(
       `select count(*)::int as n from race_entries
         where finish_pos is not null and prize_pp is null`)).rows[0].n;
-    console.log(`\n✅ ★書きました ${updates.length} 行 / ★残った null ${left} 行（★賞金 0 の着順ぶん）`);
+    console.log(`\n✅ ★書きました ${updates.length} 行 / ★残った null ${left} 行`);
+    // 🔴 ★PR-2: ★二度流しても同じ結果になる（★残りは 0 でなければならない）
+    if (left !== 0) {
+      console.error('🔴 ★null が残っています。★「まだ書いていない」と「書いたが 0」が混ざります（PR-2）');
+      process.exit(1);
+    }
   }
 } finally {
   await c.end();

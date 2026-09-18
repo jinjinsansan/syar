@@ -166,6 +166,18 @@ function fakeDb(entries: Entry[], opts: { readonly honorScratch?: boolean } = {}
           ? { rows: [], rowCount: 0 }
           : { rows: [{ horse_id: e.horse_id, owner_id: null }], rowCount: 1 };
       }
+      /**
+       * ★**賞金の「発生」を書く 1 文**（★2026-09-19・PR-1/**PR-2**・`prize-award.ts`）。
+       * ⚠️ ★`awardPrizes` は ★**書けた行数が確定の頭数と合わなければ投げます**（R-27）。
+       *    ★ここで 0 行を返すと、★**確定そのものが落ちます**（★実際に落ちました）。
+       * ★渡された枠番の配列を受け取り、★その頭数を返します。
+       */
+      if (s.startsWith('update race_entries e set prize_pp')) {
+        const gates = params[1] as number[];
+        // ★実物と同じく「そのレースにある枠だけ」が書けた行になる
+        const n = gates.filter((g) => entries.some((e) => e.gate === g)).length;
+        return { rows: [], rowCount: n };
+      }
       /** ★馬券は空（★この検査の対象ではない） */
       if (s.includes('from bets') || s.includes('insert into pp_ledger') || s.includes('update users set prize_points')) {
         return { rows: [], rowCount: 0 };

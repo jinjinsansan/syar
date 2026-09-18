@@ -50,6 +50,40 @@ export async function awardPrizes(
   let paid = 0;
   let horses = 0;
 
+  /**
+   * ★★**① 発生を、確定した全頭ぶん 1 文で書く**（★2026-09-19・**PR-1** ＋ **PR-2**・移行 `0049`）。
+   *
+   * ⚠️ ★**NPC 馬にも書きます**（★T-11 の価格式が必要とするのはそちら）。
+   * ⚠️ 🔴 ★**賞金 0 の着順にも `0` を書きます**（★**PR-2**）。
+   *    ★旧は `if (amount <= 0) continue;` で ★**書かずに飛ばして**いました。
+   *    → ★`null` に意味が 2 つできます: ★①まだ書いていない（`0049` より前）★②書いたが 0 だった。
+   *      ★**埋め戻しの道具が 2 つを区別できず**、★二度流したときに同じ結果になると言えません。
+   *    → ★いまは ★**`null` ＝ まだ書いていない**、★**`0` ＝ 賞金が出なかった**の 1 対 1 です。
+   *    ⚠️ ★`0049` の制約は `0` を許します（`prize_pp is null or prize_pp >= 0`）。
+   *
+   * ⚠️ ★**ループの外で 1 文**にしているのは、★**1 周 10 分の予算**のためです（D-071）。
+   *    ★18 頭立てで 18 回 `update` を投げると、★確定の経路が重くなります。
+   *    ★`unnest` で枠番と額の組を渡し、★**1 回の往復**で済ませます。
+   * ⚠️ ★`pp_ledger` には ★**1 行も足しません**（`0001:10`「実際に発行した分だけを記録します」）。
+   */
+  if (finished.length > 0) {
+    const gates = finished.map((f) => f.gate);
+    const amounts = finished.map((f) => prizeFor(tier, f.finishPosition));
+    const wrote = await client.query(
+      `update race_entries e set prize_pp = v.amount
+         from (select * from unnest($2::int[], $3::bigint[]) as t(gate, amount)) v
+        where e.race_id = $1 and e.gate = v.gate`,
+      [raceId, gates, amounts],
+    );
+    // ★書けた行数が合わないのは、出走表と確定の食い違い。★黙って進めない（R-27）
+    if (wrote.rowCount !== finished.length) {
+      throw new Error(
+        `awardPrizes: prize_pp を書けたのは ${wrote.rowCount} 行（確定は ${finished.length} 頭）`,
+      );
+    }
+  }
+
+  // ★★② 発行（★利用者の馬だけ。★ここは今までどおり）
   for (const f of finished) {
     const amount = prizeFor(tier, f.finishPosition);
     if (amount <= 0) continue;
@@ -63,16 +97,6 @@ export async function awardPrizes(
     );
     const row = r.rows[0];
     if (row === undefined) throw new Error(`awardPrizes: gate ${f.gate} の出走馬が見つかりません`);
-
-    /**
-     * ★★**発生を先に書く**（★2026-09-19・**PR-1**・移行 `0049`）。
-     * ⚠️ ★**NPC 馬にも書きます** — ★下の `continue` より**前**に置いているのはそのためです。
-     *    ★ここを `continue` の後ろに移すと、★**T-11 の価格式がまた源を失います**。
-     */
-    await client.query(
-      `update race_entries set prize_pp = $1 where race_id = $2 and gate = $3`,
-      [amount, raceId, f.gate],
-    );
 
     // ★NPC 馬（owner_id が null）には払わない。払う相手がいない
     if (row.owner_id === null) continue;

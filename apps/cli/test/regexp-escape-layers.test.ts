@@ -19,28 +19,29 @@
  *   ⚠️ ★正規表現リテラル（`/\b/`）は対象外です — ★そちらは 1 本で正しい。
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../../..');
-/**
- * ⚠️ ★**自分たちのソースだけを見ます。**
- *    ★リポジトリの直下には ★`.tmp-headless-contest/` のような
- *    ★**ブラウザのプロファイル**（★拡張機能の他社コード）が残っており、
- *    ★そこを読むと ★**他人のコードで赤になります**（★実際になりました）。
- */
-const ROOTS = ['apps', 'packages', 'tools'];
-const SKIP = new Set(['node_modules', '.git', '.next', 'dist', 'out', 'coverage', 'tmp']);
-const EXT = new Set(['.ts', '.tsx', '.mts', '.mjs', '.js', '.cjs']);
 
-function sources(dir: string, acc: string[] = []): string[] {
-  for (const e of readdirSync(dir)) {
-    if (SKIP.has(e) || e.startsWith('.')) continue;
-    const p = path.join(dir, e);
-    if (statSync(p).isDirectory()) sources(p, acc);
-    else if (EXT.has(path.extname(e))) acc.push(p);
-  }
-  return acc;
+/**
+ * ★**対象は「git が追跡しているもの」だけ**（★**TM-1**・2026-09-19）。
+ *
+ * 🔴 ★旧は ★**除外の一覧**（`node_modules` / `.next` / …）を持っていました。
+ *    ★リポジトリ直下に `.tmp-headless-contest/` など ★**ブラウザのプロファイル**
+ *    （★他社の拡張機能コード・合わせて 1.68 GB）があり、★**他人のコードで赤**になりました。
+ * ⚠️ ★そこで除外を足すのは ★**向きが逆**です — ★除外の一覧は必ず育ち、
+ *    ★いつか ★**本物を除外します**（R-29: 既定を閉じ、必要なものだけ開ける）。
+ * → ★**`git ls-files`** ＝ ★追跡されているものだけを見ます。★生成物も他人の物も最初から入りません。
+ */
+const EXT = new Set(['.ts', '.tsx', '.mts', '.mjs', '.js', '.cjs']);
+function trackedSources(): readonly string[] {
+  const out = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' })
+    .split('\n').filter(Boolean)
+    .filter((f) => EXT.has(path.extname(f)))
+    .filter((f) => /^(apps|packages|tools)\//.test(f));
+  return out.map((f) => path.join(ROOT, f));
 }
 
 /**
@@ -121,7 +122,7 @@ function regexpArgs(src: string): readonly { readonly text: string; readonly ind
 const ODD_ESCAPE = /(^|[^\\])(\\\\)*\\([bBsSdDwWfv0])/;
 
 describe('★正規表現を文字列で組むときのエスケープ', () => {
-  const files = ROOTS.flatMap((r) => sources(path.join(ROOT, r)));
+  const files = trackedSources();
 
   it('★走査が空振りしていない（R-21）', () => {
     expect(files.length, '★ソースを 1 つも読めていない').toBeGreaterThan(100);
