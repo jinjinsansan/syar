@@ -254,6 +254,25 @@ describe('★出品を作る経路（D-102・T-11）', () => {
     expect(SRC).toMatch(/game_week/);
   });
 
+  it('🔴 ★**MK-1**: ★候補と在庫の数え方が同じ述語を使っている', () => {
+    /**
+     * 🔴 ★**2026-09-19・MK-1**。★旧は ★**在庫の監視だけ `exists(raced)` が抜けて**いました。
+     * ✔ ★staging の実測: ★**監視 7,333 頭 / 実際に買える候補 732 頭**（★**10.0 倍**）。
+     * 🔴 ★下限は 200 頭なので、★**候補が 200 を割っても監視は黙っていました**。
+     *
+     * ⚠️ ★**偽の DB では見られません** — ★`select count(*)` を 1 つの枝で受けて
+     *    ★`pool.length` を返すので、★**述語が違っても同じ数が返ります**。
+     *    → ★**源の側で見ます**（★述語が 1 か所から引かれていること）。
+     */
+    expect(LIVE, '★述語が 1 か所になっていない').toMatch(/const CANDIDATE_WHERE = /);
+    /** ★`exists(raced)` を直書きしているのは 1 か所だけ */
+    const hits = [...LIVE.matchAll(/finish_pos is not null/g)];
+    expect(hits.length, `★述語が ${hits.length} か所にある`).toBe(1);
+    /** ★候補を読む側と、数える側の両方がそれを引いている */
+    const uses = [...LIVE.matchAll(/\$\{CANDIDATE_WHERE\}/g)];
+    expect(uses.length, '★両方が同じ述語を引いていない').toBe(2);
+  });
+
   it('① ★価格の式を SQL に書いていない（★D-052・二重帳簿にしない）', () => {
     /** ★§10.5 の係数が SQL の文字列に無い */
     for (const leak of ['8000', '8_000', '/ 20', '3000']) {

@@ -30,6 +30,17 @@ import {
   PRICE_TIERS_EP, LISTINGS_PER_TIER, priceTierOf,
 } from '@star/scheduler';
 
+/**
+ * ★**候補の述語**（★**MK-1**・2026-09-19）。
+ *
+ * ★D-102 ③「走った実績のある馬」＝ `is_initial_horse_candidate` の補集合。
+ * 🔴 ⚠️ ★**出品を選ぶ側と、在庫を数える側で、必ず同じものを使います。**
+ *    ★違うと ★**下限監視が、守るべきものと違うものを見ます**（★実際に 10 倍ずれていました）。
+ * ⚠️ ★別名 `h` を前提にしています（★呼ぶ側で `from horses h` と書くこと）。
+ */
+const CANDIDATE_WHERE = `h.owner_id is null and h.npc_stable_id is not null and h.retired_at_week is null
+        and exists (select 1 from race_entries e where e.horse_id = h.id and e.finish_pos is not null)`;
+
 /** ★1 回に見る NPC プールの上限（★全件走査を避ける。★帯を埋めるには十分な数） */
 export const MARKET_POOL_LIMIT = 5000;
 
@@ -83,8 +94,7 @@ export async function refreshMarketListings(
             coalesce((select sum(e.prize_pp) from race_entries e
                        where e.horse_id = h.id and e.prize_pp is not null), 0)::bigint as earnings
        from horses h
-      where h.owner_id is null and h.npc_stable_id is not null and h.retired_at_week is null
-        and exists (select 1 from race_entries e where e.horse_id = h.id and e.finish_pos is not null)
+      where ${CANDIDATE_WHERE}
       order by h.id
       limit $1`,
     [MARKET_POOL_LIMIT],
@@ -94,10 +104,18 @@ export async function refreshMarketListings(
     priceEP: npcStudFee(Number(r.g1_wins), Number(r.earnings)),
   }));
 
-  // ★在庫は**プール全体の数**で見る（★上限で切った数ではない）
+  /**
+   * ★在庫は**プール全体の数**で見る（★上限で切った数ではない）。
+   *
+   * 🔴 ★**2026-09-19・MK-1 で直しました。**
+   *   ★旧: ★**3 条件だけ**（★`exists(raced)` が抜けていた）。
+   *   ✔ ★staging の実測: ★**監視は 7,333 頭、実際に買える候補は 732 頭**（★**10.0 倍**）。
+   *   🔴 ★下限は 200 頭なので、★**候補が 200 を割っても、監視は 7,333 と言い続けました**。
+   *   → ★★**D-102 ⑤ の下限監視が、守るべきものと違うものを見ていました。**
+   * → ★**候補と同じ述語を 1 か所から**引きます（★PO-2 で `RACEABLE_WHERE` にしたのと同じ直し）。
+   */
   const countRes = await client.query<{ n: string }>(
-    `select count(*)::text as n from horses
-      where owner_id is null and npc_stable_id is not null and retired_at_week is null`,
+    `select count(*)::text as n from horses h where ${CANDIDATE_WHERE}`,
   );
   const available = Number(countRes.rows[0]!.n);
   const stock = marketStockAlert(available);
