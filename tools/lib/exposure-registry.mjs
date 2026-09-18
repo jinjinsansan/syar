@@ -66,11 +66,11 @@ export const EXPECTED_EXPOSURE = {
   //   ★列の仕分けは apps/cli/test/my-horses-view.test.ts が「全列の分類」を要求して守る。
   my_horses: OWNER_SCOPED,
   /**
-   * ★あと何 EP 投票できるか（★2026-09-19・移行 `0044`・**BT-1**）。
-   *   ★画面に渡すのは ★**「判断の結果」**だけです（★上限そのものは渡しません）。
-   *   ★`auth.uid()` で絞り、★`authenticated` にだけ grant。
+   * ★自分の馬の確定した出走（★2026-09-19・移行 `0046`・**UI-4**）。
+   *   ★`my_horses` と同じ作法 — ★`where h.owner_id = auth.uid()`・★`authenticated` にだけ grant。
+   *   ★素質・現在能力・適性の生値は 1 つも出しません（D-114）。
    */
-  my_bet_allowance: OWNER_SCOPED,
+  my_runs: OWNER_SCOPED,
 
   // ── 閉鎖（クライアントが直接読む理由がない） ──
   // 実体テーブルは公開ビュー経由でのみ読ませる
@@ -216,6 +216,14 @@ export const EXPECTED_FUNCTION_EXECUTE = {
    *   ★利用者には渡しません — ★画面が直に呼べると、★**他人の `p_user` を渡せます**。
    */
   'bet_allowance(uuid,uuid,text)': { anon: false, authenticated: false },
+  /**
+   * ★画面が読む「あと何 EP 投票できるか」（★2026-09-19・移行 `0047`・**BT-5**）。
+   *   🔴 ★`0044` では ★**ビュー**でした。★ビューは引数を取れず ★**券種を渡せない**ため、
+   *      ★`null` を渡していて ★**全券種の合計を 1 券種とみなして**いました（★誤った数を表示）。
+   *      → ★`0047` で ★**関数**にし、★券種を必須にしました。
+   *   ★`auth.uid()` を自分で見るので、★`p_user` を受け取りません（★他人の分を聞けない）。
+   */
+  'my_bet_allowance(uuid,text)': { anon: false, authenticated: true },
   // ★初期馬の候補かの判定（`0031`）。読み取りだけ。★「戦績 0」は暫定の定義で、
   //   クラス分けの便で共通の述語に置き換える（裁定 REVIEW_SETUP_PREDICATE_VERDICT_20260918 条件 2）
   'is_initial_horse_candidate(uuid)': { anon: false, authenticated: true },

@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { BET_TYPES, DEMO_BET_RACE } from '../../../../lib/game-demo';
-import { loadBetScreen, placeBet, oddsKey, type BetScreenData } from '../../../../lib/bet-screen';
+import { loadBetScreen, loadBetAllowance, placeBet, oddsKey, type BetScreenData, type BetAllowance } from '../../../../lib/bet-screen';
 import { FrameBadge } from '../../../../components/ui';
 import { formatEntryPoints } from '../../../../lib/format';
 
@@ -42,6 +42,13 @@ export default function BetPage(): React.ReactElement {
    *    ★投票が 1 回通ったら、★**次の投票用に新しい鍵を作ります**（★連続して買えなくなるため）。
    */
   const [clientToken, setClientToken] = useState(() => crypto.randomUUID());
+  /**
+   * ★**あと何 EP 投票できるか**（★`0047`・BT-1/**BT-5**）。
+   * ⚠️ ★**券種ごとに違う答え**なので、★**券種を選び直すたびに聞き直します**。
+   *    ★`0044` は券種を渡さずに 1 度だけ読んでいて、★**誤った数を返していました**。
+   */
+  const [allowance, setAllowance] = useState<BetAllowance | null>(null);
+  const [allowanceError, setAllowanceError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -112,6 +119,21 @@ export default function BetPage(): React.ReactElement {
       setBusy(false);
     }
   };
+  /**
+   * ★**券種が変わったら聞き直す**（★BT-5）。★投票が 1 回通ったあと（`placed`）も聞き直します。
+   * ⚠️ ★失敗を null にしません（★「上限が無い」に見えてしまう・R-16）。★別に出します。
+   */
+  useEffect(() => {
+    let alive = true;
+    const id = data?.race?.id ?? null;
+    if (id === null) { setAllowance(null); return; }
+    setAllowanceError(null);
+    loadBetAllowance(id, typeKey)
+      .then((a) => { if (alive) setAllowance(a); })
+      .catch((e: unknown) => { if (alive) { setAllowance(null); setAllowanceError(e instanceof Error ? e.message : String(e)); } });
+    return () => { alive = false; };
+  }, [data?.race?.id, typeKey, placed]);
+
   const enough = race.epBalance >= amount;
   const sep = ordered ? '→' : '−';
   /**
@@ -297,6 +319,21 @@ export default function BetPage(): React.ReactElement {
                 <span>1 回の上限 <span className="a-num" style={{ fontSize: 16, color: 'var(--a-ink)' }}>{race.capPerBet.toLocaleString('ja-JP')}</span> EP</span>
                 <span>投票後の残り <span className="a-num" style={{ fontSize: 16, color: 'var(--a-num-time)' }}>{Math.max(0, race.epBalance - amount).toLocaleString('ja-JP')}</span> EP</span>
               </div>
+              {/**
+                * ★**あと何 EP**（★`0047`・BT-1/BT-5）。★サーバーが出した ★**判断の結果**だけを出します。
+                * ⚠️ ★`bindingLabel` は ★**効いている上限の名前**であって「達した」ではありません（★`0045`）。
+                *    ★「達した」かどうかは ★**残りが 0 か**で、★ここで言います。
+                */}
+              {allowance !== null && (
+                <div style={{ fontSize: 12, fontWeight: 900, marginTop: 8, color: allowance.remainingEP === 0 ? 'var(--a-red-d)' : 'var(--a-ink-2)' }}>
+                  {allowance.remainingEP === 0
+                    ? `${allowance.bindingLabel}に達しています`
+                    : <>この券種であと <span className="a-num" style={{ fontSize: 16, color: 'var(--a-ink)' }}>{allowance.remainingEP.toLocaleString('ja-JP')}</span> EP（{allowance.bindingLabel}）</>}
+                </div>
+              )}
+              {allowanceError !== null && (
+                <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-red-d)', marginTop: 8 }}>{allowanceError}</div>
+              )}
               {/* ★オッズ（★サーバーが計算した値・§9.2。★画面では計算しません） */}
               {currentOdds !== null && (
                 <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)', marginTop: 8 }}>

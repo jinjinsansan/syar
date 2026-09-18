@@ -10,9 +10,10 @@
  * ⚠️ ★**見た目は見ません**（★UI1-8 と同じ扱い）。★「あるか無いか」だけです。
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { oddsKey, readBetError } from '../../web/src/lib/bet-screen.js';
+import { lastFunctionBody } from './lib/sql-source.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const PAGE = readFileSync(path.join(ROOT, 'apps/web/src/app/races/[id]/bet/page.tsx'), 'utf8');
@@ -24,26 +25,12 @@ const strip = (s: string): string => s
 const LIVE_PAGE = strip(PAGE);
 const LIVE_SCREEN = strip(SCREEN);
 
-/** ★`place_bet` の最後の定義（★`0002` → `0020` → `0024` と重なっている） */
-function lastPlaceBet(): { file: string; body: string } {
-  const dir = path.join(ROOT, 'db/migrations');
-  let found: { file: string; body: string } | null = null;
-  for (const file of readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
-    const sql = readFileSync(path.join(dir, file), 'utf8');
-    const re = /create\s+(?:or\s+replace\s+)?function\s+(?:public\s*\.\s*)?place_bet\s*\(/gi;
-    for (const m of sql.matchAll(re)) {
-      const rest = sql.slice(m.index);
-      const next = rest.slice(1).search(/create\s+(?:or\s+replace\s+)?function\s/i);
-      found = { file, body: next === -1 ? rest : rest.slice(0, next + 1) };
-    }
-  }
-  if (found === null) throw new Error('★place_bet の定義がありません（★走査が空・R-21）');
-  return found;
-}
-
 describe('★① 判定はサーバーが持つ（★画面が持たない）', () => {
-  const { body } = lastPlaceBet();
-  const rpc = body.replace(/--[^\n]*/g, ' ');
+  /**
+   * ⚠️ ★**註記は `stripSqlComments()` が落としています**（★CK-1・2026-09-19）。
+   *    ★ここには**自前の走査を置きません** — ★4 回とも「自前の走査が註記を見ていた」ことが原因でした。
+   */
+  const rpc = lastFunctionBody('place_bet').body;
 
   it('★判定はサーバーが持っている（★走査が空振りしていない・R-21）', () => {
     /**
@@ -54,7 +41,12 @@ describe('★① 判定はサーバーが持つ（★画面が持たない）', 
      *    ★上限そのものの置き場は `bet-limits.test.ts` が見ます。
      */
     expect(rpc, '★bet_allowance を呼んでいない').toMatch(/bet_allowance\(/);
-    expect(rpc, '★自馬のレースの判定が無い').toMatch(/自馬/);
+    /**
+     * 🔴 ★旧は `/自馬/` を見ていました — ★**註記にしか無い語**で、
+     *    ★註記を落とすと消えます（★CK-1 の 5 例目になるところでした）。
+     *    → ★**本文にある形**（§9.5 の所有者判定）を見ます。
+     */
+    expect(rpc, '★自馬のレースの判定が無い').toMatch(/h\.owner_id\s*=\s*v_user/);
   });
 
   it('🔴 ★画面が上限の数を持っていない', () => {

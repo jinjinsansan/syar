@@ -65,17 +65,46 @@ export interface BetScreenData {
    * ⚠️ ★**判定は `place_bet` がします**。★ここは ★**「どれが自分の馬か」を見せる**ためだけです。
    */
   readonly ownGates: readonly number[];
-  /**
-   * ★**あと何 EP 投票できるか**（★`0044`・BT-1）。
-   * ⚠️ ★**上限そのものは持ちません** — ★画面に渡すのは「判断の結果」だけです（BT-0）。
-   * ⚠️ ★`bindingLabel` は ★**「いま効いている上限の名前」**であって、★**「達した」ではありません**
-   *    （★達したかどうかは `remainingEP === 0` かどうかで、★画面が言います）。
-   */
-  readonly allowance: {
-    readonly remainingEP: number;
-    readonly binding: string;
-    readonly bindingLabel: string;
-  } | null;
+}
+
+/**
+ * ★**あと何 EP 投票できるか**（★`0047`・BT-1/**BT-5**）。
+ * ⚠️ ★**上限そのものは持ちません** — ★画面に渡すのは「判断の結果」だけです（BT-0）。
+ * ⚠️ ★`bindingLabel` は ★**「いま効いている上限の名前」**であって、★**「達した」ではありません**
+ *    （★達したかどうかは `remainingEP === 0` かどうかで、★画面が言います）。
+ */
+export interface BetAllowance {
+  readonly remainingEP: number;
+  readonly binding: string;
+  readonly bindingLabel: string;
+}
+
+/**
+ * ★**券種を渡して、あと何 EP かを聞く**（★`my_bet_allowance(race_id, bet_type)`・**BT-5**）。
+ *
+ * 🔴 ★**券種を省けません**。★`0044` はビューから `null` を渡していて、
+ *    ★**「全券種の合計を 1 券種とみなす」**答えになっていました
+ *    （★単勝 10,000 ＋ 複勝 10,000 の人に、★新しい券種の残りを ★**10,000 と表示**。★本当は 30,000）。
+ *    ★裁定 `REVIEW_BET_ALLOWANCE_VERDICT_20260919.md` §2。
+ * → ★**券種を選び直すたびに呼び直します。**
+ *
+ * ⚠️ ★ログインしていなければ ★**呼びません**（★RPC は `未認証` で落ちます）。
+ *    ★`/vote` はログアウトでも見られる画面なので、★**無い**を null で表します。
+ */
+export async function loadBetAllowance(raceId: string, betType: string): Promise<BetAllowance | null> {
+  const auth = authClient();
+  const { data: sess } = await auth.auth.getSession();
+  if (sess.session === null) return null;
+  const { data, error } = await auth.rpc('my_bet_allowance', { p_race_id: raceId, p_bet_type: betType });
+  // ⚠️ ★失敗を null にしません（★「上限が無い」に見えてしまう・R-16）
+  if (error !== null) throw new Error(`my_bet_allowance を呼べませんでした: ${error.message}`);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (row === undefined || row === null) return null;
+  return {
+    remainingEP: Number(row.remaining_ep),
+    binding: String(row.binding),
+    bindingLabel: String(row.binding_label),
+  };
 }
 
 const RACE_COLUMNS = 'id, name, grade, class_rank, surface, distance, track_condition, scheduled_at, status, cycle_index';
@@ -103,29 +132,25 @@ export async function loadBetScreen(raceId: string | null): Promise<BetScreenDat
       race: null,
       epBalance: Number(userRes.data?.[0]?.entry_points ?? 0),
       ownGates: [],
-      // ★レースが無ければ「あと何 EP」も無い（★0 と混ぜない）
-      allowance: null,
     };
   }
 
   const id = String(r.id);
-  const [entriesRes, oddsRes, userRes, mineRes] = await Promise.all([
+  /**
+   * ⚠️ ★**「あと何 EP」はここでは読みません**（★**BT-5**・`0047`）。
+   *    ★券種ごとに違う答えなので、★**券種が決まってから `loadBetAllowance()` で聞きます**。
+   *    ★`0044` はここで券種を渡さずに読んでいて、★**誤った数を出していました**。
+   */
+  const [entriesRes, oddsRes, userRes] = await Promise.all([
     read.from('race_entries_public')
       .select('gate, horse_name, strategy, weight, popularity, owner_label, is_mine')
       .eq('race_id', id).order('gate', { ascending: true }),
     read.from('race_odds_public').select('bet_type, selection, odds').eq('race_id', id),
     auth.from('users').select('entry_points, stable_name').limit(1),
-    /**
-     * ★あと何 EP 投票できるか（★`0044`・**BT-1**）。
-     * ⚠️ ★**上限そのものは受け取りません** — ★受け取ると画面が `min` を取り、
-     *    ★**優先順位という第 5 の知識**を持ちます（BT-0）。
-     */
-    auth.from('my_bet_allowance').select('race_id, remaining_ep, binding, binding_label').eq('race_id', id),
   ]);
   if (entriesRes.error !== null) throw new Error(`race_entries_public を読めませんでした: ${entriesRes.error.message}`);
   if (oddsRes.error !== null) throw new Error(`race_odds_public を読めませんでした: ${oddsRes.error.message}`);
   if (userRes.error !== null) throw new Error(`users を読めませんでした: ${userRes.error.message}`);
-  if (mineRes.error !== null) throw new Error(`my_bet_allowance を読めませんでした: ${mineRes.error.message}`);
 
   const entries: BetEntryView[] = (entriesRes.data ?? []).map((e) => ({
     gate: Number(e.gate),
@@ -149,7 +174,6 @@ export async function loadBetScreen(raceId: string | null): Promise<BetScreenDat
    *    ★**測っていない前提**でした（★裁定 `REVIEW_BET_LIMITS_VERDICT_20260919.md` §3）。
    */
   const ownGates = entries.filter((e) => e.isMine).map((e) => e.gate);
-  const allowanceRow = mineRes.data?.[0];
 
   return {
     race: {
@@ -166,15 +190,6 @@ export async function loadBetScreen(raceId: string | null): Promise<BetScreenDat
     },
     epBalance: Number(userRes.data?.[0]?.entry_points ?? 0),
     ownGates,
-    /**
-     * ★あと何 EP 投票できるか（★BT-1）。★**「判断の結果」だけ**を受け取ります。
-     * ⚠️ ★行が無い（★未ログイン・受付が終わった）ときは null。★**0 と混ぜません**。
-     */
-    allowance: allowanceRow === undefined ? null : {
-      remainingEP: Number(allowanceRow.remaining_ep),
-      binding: String(allowanceRow.binding),
-      bindingLabel: String(allowanceRow.binding_label),
-    },
   };
 }
 
