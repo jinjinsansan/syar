@@ -70,8 +70,21 @@ export async function loadRaceablePool(
   limit = 3000,
 ): Promise<HorseRecord[]> {
   const r = await client.query(
+    /**
+     * 🔴 ★**`retired_at_week is null` を 2026-09-18 に足しました**（★CL-3 の便）。
+     *
+     *   ★上の註記は「**現役だけを対象にする**」と書いていましたが、★**SQL がそれを見ていませんでした**
+     *   （✔ Q-SETUP-05 の裁定 §4 が「註釈と実装が食い違っている・クラス分けの便でまとめて直す」と指示）。
+     *   ✔ ★**実害を先に数えました**（★裁定 §4 の「便の冒頭で数えてから直す」）:
+     *     ★staging で**読み込む 3,000 頭のうち 19 頭が引退済み**（★プール条件に合う 4,414 頭では 25 頭）。
+     *   → ★**引退した馬が出走表に載りうる状態**でした（★D-111 ⑥ は「登録の後に引退した馬」を塞ぎましたが、
+     *     ★こちらは**生成の側**です）。
+     *
+     * ⚠️ ★**出走馬の顔ぶれが変わります** → ★V-4・V-5・V-6・V-18 の取り直しは **CL-6** に含まれます。
+     */
     `select * from horses
       where generation >= (select max(generation) - 2 from horses)
+        and retired_at_week is null
       order by id
       limit $1`,
     [limit],

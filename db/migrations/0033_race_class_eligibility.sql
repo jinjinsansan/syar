@@ -5,7 +5,7 @@
 -- 【★この移行が入れるもの】
 --   ① `races` に ★**そのレースに出るために要る勝利数の範囲**（`min_wins` / `max_wins`）
 --   ② `enter_race` に ★**出走資格の判定**（★自馬の登録にも効かせる・CL-4）
---   ③ `is_initial_horse_candidate` を ★**CL-1 の述語（＝ 0 勝 ＝ 新馬・未勝利）**で書き直す（CL-5）
+--   ③ `is_initial_horse_candidate` を ★**CL-1 の述語の上に「未出走」を重ねた形**に書き直す（CL-5'）
 --
 -- 【★なぜ「範囲」を列に持つのか — ★段の定義を SQL に写さないため】
 --   ★勝利数 → 段（新馬 / 1勝 / 2勝 / 3勝 / オープン）の対応は
@@ -165,13 +165,19 @@ revoke all on function public.enter_race(uuid, uuid, text, jsonb, uuid) from pub
 grant execute on function public.enter_race(uuid, uuid, text, jsonb, uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- ③ 初期馬の候補を CL-1 の述語で書き直す（CL-5）
+-- ③ 初期馬の候補（CL-5'）— ★**CL-1 の述語（0 勝）の上に「未出走」を重ねる**
 --
---   ⚠️ ★**意味が変わります。** `0031` は「**まだ 1 度も確定した出走が無い**」（＝未出走）でしたが、
---      ★CL-1 の段では **新馬・未勝利 ＝ 0 勝**です（★正典 §10.3 が 1 行で「新馬・未勝利」と書いています）。
---   → ★**走ったが勝っていない馬も候補に入ります**（★候補は増えます。★報告で実測します）。
---   ★これで ★**「付与された馬が新馬戦に出られない」**が原理的に起きません
---      （★D-079 ⑥ が求めた「出走資格の述語と同じもの」）。
+--   ★**述語は再利用します**（D-079 ⑥「付与された馬が新馬戦に出られない」を原理的に起こさない）。
+--   ★`未出走 ⊂ 0 勝` なので、★**付与を未出走に狭めても、新馬戦には必ず出られます。**
+--
+-- 【★なぜ「0 勝」ではなく「未出走」に狭めるのか】（★裁定 `REVIEW_RACE_CLASS_1_VERDICT_20260918.md`）
+--   ★**2026-09-18 の D-114 が前提を動かしました** — ★素質を見せなくなったので、
+--   ★**戦績がいまや「観測できる差」そのもの**です。
+--     ・未出走の馬     … ★**何も分からない**
+--     ・10 戦 0 勝の馬 … ★**弱いと分かっている**
+--   → ★同じ「0 勝」でも**新規プレイヤーの間に観測できる差が生まれます**（★D-079 ② が禁じたもの）。
+--   ⚠️ ★**開発側は当初「0 勝」で書きました**（★§10.3 が「新馬・未勝利」を 1 行で書いているため）。
+--      ★レビュー側が D-114 との噛み合わせで差し戻し、★**この形が正**です。
 -- ---------------------------------------------------------------------------
 create or replace function is_initial_horse_candidate(p_horse_id uuid)
 returns boolean
@@ -186,18 +192,24 @@ as $$
        and h.owner_id is null
        and h.npc_stable_id is not null
        and h.retired_at_week is null
-       -- ★0 勝（★新馬・未勝利。★CL-1 の maiden と同じ）
+       -- ★① 新馬・未勝利（＝ 0 勝）。★CL-1 の述語と同じもの（★D-079 ⑥ の再利用）
        and not exists (
          select 1 from race_entries e
           where e.horse_id = h.id and e.finish_pos = 1
+       )
+       -- ★② ★さらに「未出走」に狭める（★上の註記・D-114 で戦績が観測できる差になったため）
+       and not exists (
+         select 1 from race_entries e
+          where e.horse_id = h.id and e.finish_pos is not null
        )
   );
 $$;
 
 comment on function is_initial_horse_candidate(uuid) is
   '★初期馬の候補か（D-074/D-079）。★2026-09-18・CL-5 で暫定を置き換えた — '
-  '★08-20 裁定 §3-① は撤回され、Q-SETUP-05 の裁定で「付与の側だけで暫定定義」としていたものを、'
-  '★クラス分けの便（CL-1）の述語に合わせた。★新馬・未勝利 ＝ 0 勝（race_entries の finish_pos = 1 が無い）。'
+  '★① CL-1 の述語（0 勝 ＝ 新馬・未勝利。D-079 ⑥ の「出走資格の述語を再利用」）に加え、'
+  '★② 未出走に狭める（D-114 で素質を見せなくなり、戦績が「観測できる差」になったため・D-079 ②）。'
+  '★未出走 ⊂ 0 勝 なので、狭めても新馬戦には必ず出られる。'
   '★段の定義は packages/scheduler/src/eligibility.ts が持つ';
 
 revoke all on function is_initial_horse_candidate(uuid) from public, anon;

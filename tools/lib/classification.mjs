@@ -35,6 +35,11 @@ export const READONLY = [
    *   ★DB に触りません（★エンジンを回して時間を測るだけ・出力はローカルの JSON とログ）。
    *   ★レビュー側が独立に再実行できるよう tmp/ から移しました（★tmp/ は gitignore で次の人に残らない）。
    */
+  /**
+   * ★勝ち上がりの流量を測る（CL-7・指示書 DEV_INSTRUCTIONS_RACE_CLASS_20260918）。
+   *   ★select だけ。DB を変えません（★資格のある馬の数と、1 日の枠の本数を突き合わせるだけ）。
+   */
+  'measure-class-flow.mjs',
   'bench-odds-entrants.mjs',
   'bench-odds-cost.mjs',
   // ★既存の利用者から「経路の印」（auth.identities）を読むだけ。SELECT のみ・何も作らない

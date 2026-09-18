@@ -87,6 +87,17 @@ const DAY_ROTATION = 3;
  *   ⚠️ ★`raceClass` は競馬場の決定に使いません（★距離の決定に `grade` を使うだけ）。
  */
 export function conditionsOf(cycleIndex: number, raceClass: RaceClass, grade: Grade | null): RaceConditions {
+  /**
+   * 🔴 ★**クラスは条件の決定には使いません。使うのは出走資格だけ**です
+   *   （★`packages/scheduler/src/eligibility.ts`・★2026-09-18・CL-2'）。
+   *
+   * ★**この 1 行は「捨てている」のではなく「ここでは使わない」という宣言**です。
+   *   ⚠️ ★無言で捨てていたため、★**次に読んだ人が「クラス分けが壊れている」と読みました**
+   *      （★実際、Q-SETUP-05 の裁定でそう読まれました）。★だから理由を書きます。
+   *
+   * ★**距離・馬場をクラスで寄せる規定は正典にありません**（★`grade` で距離を長めに寄せるのは §10.3 にあります）。
+   *   ★寄せるなら正典の根拠が要ります（★開発側では決めません）。
+   */
   void raceClass;
   const i = ((cycleIndex % 1_000_000) + 1_000_000) % 1_000_000;
 
