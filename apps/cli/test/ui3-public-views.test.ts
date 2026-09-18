@@ -170,17 +170,51 @@ describe('★UI-3 の公開ビュー（`0043`）', () => {
   });
 
   it('🔴 ★実体テーブルは閉じたまま（★`0032` を開け直していない）', () => {
+    /**
+     * 🔴 ★**2026-09-19 に作り直しました**（★裁定 `REVIEW_UI4_PREP_VERDICT_20260919.md` §3 の
+     *    ★「他の『全移行を grep する検査』も同じ病気を持っていないか数えてください」を受けて）。
+     *
+     * 【★何が壊れていたか — ★2 つ】
+     *   ① 🔴 ★`const after = ALL.slice(ALL.indexOf('0032') >= 0 ? 0 : 0)` — ★**両方の枝が `0`**。
+     *      ★つまり ★**`ALL.slice(0)` ＝ ALL そのもの**で、★「`0032` より後」は ★**一度も実装されていませんでした**。
+     *      ★さらに `ALL.indexOf('0032')` は ★**本文に文字列 `0032` があるか**を見ており、
+     *      ★ファイルの境目ではありません。
+     *   ② 🔴 ★「全移行で ≦1 件」は ★**移行が積み重なる設計では数えられません**（R-19 の家族）。
+     *
+     * ✔ ★**数えました**（2026-09-19）:
+     *     ★`grant select on <表> to anon` は ★**全移行で 1 件ずつ**（`0024`/`0025`/`0027`）、
+     *     ★**`0032` より後は 0 件**。
+     *
+     * → ★**ファイルの並びで切り、★0 件を要求します。** ★「≦1」は「たまたま 1 だから通る」形でした。
+     */
+    const at32 = files.findIndex((f) => f.startsWith('0032'));
+    expect(at32, '★0032 が見つかりません（★走査が空・R-21）').toBeGreaterThan(-1);
+    const after = files.slice(at32 + 1).map((f) => blank(sqlOf(f))).join('\n');
+    expect(after.length, '★0032 より後の移行が読めていない').toBeGreaterThan(100);
+
     for (const { table } of VIEWS) {
-      /** ★`0032` より後に `grant select on <表> to anon` が無いこと */
-      const after = ALL.slice(ALL.indexOf('0032') >= 0 ? 0 : 0);
-      const re = new RegExp(`grant[^;]*\\bselect\\b[^;]*on ${table}\\b[^;]*anon`, 'i');
-      const hits = [...after.matchAll(new RegExp(re.source, 'gi'))];
+      const re = new RegExp(`grant[^;]*\\bselect\\b[^;]*on ${table}\\b[^;]*anon`, 'gi');
+      const hits = [...after.matchAll(re)].map((m) => m[0]);
       /**
        * ⚠️ ★`0024`/`0025`/`0027` の**古い grant** は残っています（★ファイルは書き換えない）。
        *    ★効いているのは ★**`0032` の `revoke all`（★後勝ち）**です。
-       *    → ★**「最後に何が効いているか」は V-20 が生きている DB で測ります**（★静的な検査で保証しない）。
+       *    → ★ここは ★**「その後に開け直していないか」**だけを見ます。
+       *    ★**「最後に何が効いているか」は V-20 が生きている DB で測ります**（★静的な検査で保証しない）。
        */
-      expect(hits.length, `★${table} の grant が想定より多い（★新しく開け直していないか）`).toBeLessThanOrEqual(1);
+      expect(hits, `★${table} を 0032 より後に開け直している`).toEqual([]);
+    }
+  });
+
+  it('★この検査が空振りしていない（★`0032` より前には確かに grant がある）', () => {
+    /**
+     * ⚠️ ★上の検査は「0 件」を要求します。★**何も見ていなくても 0 件**です（R-21）。
+     *    → ★**前半には 1 件ずつあること**を対にして確かめます。
+     */
+    const at32 = files.findIndex((f) => f.startsWith('0032'));
+    const before = files.slice(0, at32).map((f) => blank(sqlOf(f))).join('\n');
+    for (const { table } of VIEWS) {
+      const re = new RegExp(`grant[^;]*\\bselect\\b[^;]*on ${table}\\b[^;]*anon`, 'gi');
+      expect([...before.matchAll(re)].length, `★${table} の古い grant が見つからない（★走査器が壊れている）`).toBe(1);
     }
   });
 });
