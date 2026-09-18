@@ -43,9 +43,10 @@ import {
 } from '@star/race-engine';
 import {
   createFounder, deriveRng, DEFAULT_BALANCE, FOUNDERS,
-  type HorseId, type HorseRecord,
+  type HorseId, type HorseRecord, type AbilityKey,
 } from '@star/sim-engine';
-import { generateRace, sortPoolByClass } from './race-field.js';
+import { generateRace, sortPoolByClass, type GenerateRaceOptions } from './race-field.js';
+import { runCareer, APPROPRIATE_POLICY } from './training-career.js';
 
 /**
  * ★段 → 賞金の格（★`apps/worker/src/prize-award.ts` の `tierFromDb` と同じ対応）。
@@ -77,6 +78,8 @@ export interface Distribution {
   readonly ran: number;
   readonly prices: readonly number[];
   readonly g1Winners: number;
+  /** ★延べ出走数（★**GR-3/GR-4**: ★PO-1 の「1 日の延べ出走」の入力） */
+  readonly totalStarts: number;
   /**
    * ★**格ごとに何本開催されたか**。
    * 🔴 ★対照として必須です — ★**「G1 を勝った馬が少ない」のが**
@@ -91,7 +94,24 @@ export interface Distribution {
  * ★**1 コホートのキャリアを走らせる**。
  * ★`maxStarts` 走で引退（★正典 `CAREER_RACE_LIMIT`）。
  */
-export function runCohort(poolSize: number, seed: number, maxStarts: number, days: number): Distribution {
+export function runCohort(
+  poolSize: number,
+  seed: number,
+  maxStarts: number,
+  days: number,
+  /**
+   * ★**育成を入れるか**（★**GR-4**・2026-09-19）。
+   *
+   * ★入れない（既定）… ★`generateRace` の仮定値 `potential × PLACEHOLDER_UNLOCK`（0.55〜0.85）で走ります。
+   * ★入れる          … ★`runCareer`（★較正した週送りの経路そのもの）で 1 頭ずつ育て、
+   *                     ★**育て終わった能力**でレースに出します（★本番のワーカーと同じ渡し方）。
+   *
+   * ⚠️ ★**近似です**: ★本番は ★**走りながら育つ**ので、★キャリアの序盤は能力が低いはずです。
+   *    ★ここは ★**最初から育て終わった能力**で走らせるので、★**上限側の見積り**になります。
+   *    → ★成立率は ★**育成なし（下限）と育成あり（上限）の 2 つ**で挟んで報告します。
+   */
+  train: boolean,
+): Distribution {
   const rng = deriveRng(seed, 0);
   const pool: HorseRecord[] = [];
   for (let i = 0; i < poolSize; i += 1) {
@@ -105,6 +125,20 @@ export function runCohort(poolSize: number, seed: number, maxStarts: number, day
       founders: FOUNDERS,
     }));
   }
+  /**
+   * ★**育て終わった能力**（★GR-4）。★`runCareer` は較正した週送りの合成器を通ります。
+   * ⚠️ ★`APPROPRIATE_POLICY`（`balanced`）で育てます — ★V-14 の較正と同じ方針です。
+   */
+  const trained = new Map<HorseId, Record<AbilityKey, number>>();
+  if (train) {
+    for (let i = 0; i < pool.length; i += 1) {
+      const r = runCareer(pool[i]!, APPROPRIATE_POLICY, i, seed);
+      trained.set(pool[i]!.id, r.stats);
+    }
+  }
+  const raceOpts: GenerateRaceOptions = train
+    ? { abilityOf: (h) => trained.get(h.id) }
+    : {};
   const careers = new Map<HorseId, Career>();
   const careerOf = (id: HorseId): Career => {
     let c = careers.get(id);
@@ -151,7 +185,7 @@ export function runCohort(poolSize: number, seed: number, maxStarts: number, day
     held += 1;
     heldByTier[tier] = (heldByTier[tier] ?? 0) + 1;
 
-    const race = generateRace(sortPoolByClass(candidates), idx, rng);
+    const race = generateRace(sortPoolByClass(candidates), idx, rng, undefined, undefined, undefined, raceOpts);
     const result = resolveRace({
       conditions: race.conditions,
       entrants: race.entrants,
@@ -179,16 +213,18 @@ export function runCohort(poolSize: number, seed: number, maxStarts: number, day
   const prices: number[] = [];
   let ran = 0;
   let g1Winners = 0;
+  let totalStarts = 0;
   let i = 0;
   for (const c of careers.values()) {
     if (c.starts === 0) continue;
     ran += 1;
+    totalStarts += c.starts;
     if (c.g1Wins > 0) g1Winners += 1;
     const k = i % c.starts;               // ★キャリアの進み具合を散らす（★乱数を使わない）
     prices.push(c.priceAfterEachStart[k]!);
     i += 1;
   }
-  return { pool: poolSize, races: held, ran, prices: prices.sort((a, b) => a - b), g1Winners, heldByTier, skippedByTier };
+  return { pool: poolSize, races: held, ran, prices: prices.sort((a, b) => a - b), g1Winners, totalStarts, heldByTier, skippedByTier };
 }
 
 /** ★コマンドとして流したとき */
@@ -202,15 +238,22 @@ if (isMain) {
   const days = arg('days', 26);
   const seed = arg('seed', 42);
   const maxStarts = arg('starts', CAREER_RACE_LIMIT);
+  const train = process.argv.includes('--train');
 
   console.log('# ★定常での出品価格の分布（★T11-1 ②\'・シミュレータで測定）');
   console.log(`  集団 ${poolSize} 頭 / シード ${seed} / 1 頭 ${maxStarts} 走まで（★CAREER_RACE_LIMIT = ${CAREER_RACE_LIMIT}）`
     + ` / 番組表 ${days} 日（${days * RACES_PER_DAY} レース・★キャリア 1 本分）`);
-  console.log('  ⚠️ ★育成・引退・世代交代・配合は入っていません（★分布の形を見る道具です）');
+  console.log(train
+    ? '  ★**育成あり**（runCareer で育て終わった能力で走る・★上限側の見積り）/ 引退と世代交代・配合は入っていません'
+    : '  ⚠️ ★育成なし（★下限側の見積り・`--train` で入れられます）/ 引退・世代交代・配合も入っていません');
 
-  const d = runCohort(poolSize, seed, maxStarts, days);
+  const d = runCohort(poolSize, seed, maxStarts, days, train);
   console.log(`\n  開催 ${d.races} レース / 走った馬 ${d.ran} 頭 / ★G1 を勝った馬 ${d.g1Winners} 頭`
     + `（${((d.g1Winners / Math.max(1, d.ran)) * 100).toFixed(1)}%）`);
+  console.log(`  ★成立率 ${((d.races / (days * RACES_PER_DAY)) * 100).toFixed(1)}%`
+    + `（開催 ${d.races} / 予定 ${days * RACES_PER_DAY}）`
+    + ` / ★延べ出走 ${d.totalStarts.toLocaleString('ja-JP')}`
+    + `（★1 日 ${Math.round(d.totalStarts / days).toLocaleString('ja-JP')} ・★1 頭 ${(d.totalStarts / Math.max(1, d.ran)).toFixed(1)} 走）`);
 
   const q = (p: number): number => d.prices[Math.min(d.prices.length - 1, Math.floor(d.prices.length * p))]!;
   console.log('\n  ★価格の分位点 [EP]:');
