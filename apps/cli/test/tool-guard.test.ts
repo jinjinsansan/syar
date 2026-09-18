@@ -20,7 +20,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { PRODUCTION_OPS, READONLY, STATE_CHANGING, allClassified } from '../../../tools/lib/classification.mjs';
+import { NOT_A_TOOL, PRODUCTION_OPS, READONLY, STATE_CHANGING, allClassified } from '../../../tools/lib/classification.mjs';
 import { assertNotProduction } from '../../../tools/lib/guard.mjs';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -30,20 +30,45 @@ const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
  *   ★**拡子を変えるだけで分類簿をすり抜けられました**（★R-24 が防ぎたかった形そのもの）。
  * → ★**`.mjs` と `.ts` の両方**を見ます。★`lib/` は道具ではなく部品なので含みません。
  */
-const toolFiles = readdirSync(`${ROOT}tools`).filter((f) => f.endsWith('.mjs') || f.endsWith('.ts'));
+/**
+ * ★**`tools/` 直下のファイルを 1 つ残らず対象にする**（★2026-09-19・**TG-1**・
+ * 裁定 `REVIEW_UI1_SELECTION_RULE_VERDICT_20260919.md`）。
+ *
+ * 【★拡子で絞っていた頃の壊れ方】
+ *   ★旧①: `.mjs` だけ → ★**`measure-turf-grain.ts` が以前から漏れていました**。
+ *   ★旧②: `.mjs` と `.ts` → 🔴 ★**これも列挙です**。★`.mts` や `.sh` を置いた日に同じ穴が開きます
+ *     （★実際 `deploy.sh` は **本番に向ける道具**なのに対象外でした）。
+ *   → ★**拡子で絞るのをやめました**。★新しい種類のファイルを置いただけでここが赤くなります。
+ *
+ * ⚠️ ★**除外は 2 つだけ**で、★どちらも理由があります（R-29: 既定を閉じて必要なものだけ開ける）:
+ *   ① ★**ディレクトリ**（`lib/`・`blender/`・`inventory/`・`mutation/`）— ★直下の道具を見る検査です。
+ *     ⚠️ ★中身はこの検査の対象外のままです（★**残っている穴**。★必要になったときに広げます）。
+ *   ② ★**`.` 始まり**（★編集器が置く隠しファイル）。
+ */
+const toolFiles = readdirSync(`${ROOT}tools`, { withFileTypes: true })
+  .filter((e) => e.isFile() && !e.name.startsWith('.'))
+  .map((e) => e.name);
 
 /** 最小限の偽クライアント */
 const fake = (impl: () => Promise<{ rows: { environment: string }[] }>) =>
   ({ query: impl }) as unknown as Parameters<typeof assertNotProduction>[0];
 
 describe('★R-24 ツールの分類（メタテスト）', () => {
-  it('★tools/*.mjs はすべて分類簿に載っている', () => {
+  it('★tools/ 直下のファイルはすべて分類簿に載っている（TG-1）', () => {
+    /** ★走査が空だと、★**何も見ていないのに緑**になります（R-21） */
+    expect(toolFiles.length, '★tools/ の走査が空').toBeGreaterThan(50);
     const classified = new Set(allClassified());
     const missing = toolFiles.filter((f) => !classified.has(f));
     expect(
       missing,
-      `分類の登録漏れ。tools/lib/classification.mjs の READONLY / STATE_CHANGING / PRODUCTION_OPS のどれかに載せてください:\n  ${missing.join('\n  ')}`,
+      `分類の登録漏れ。tools/lib/classification.mjs の READONLY / STATE_CHANGING / PRODUCTION_OPS / NOT_A_TOOL のどれかに載せてください（★「対象外」も分類の 1 つです・TG-2）:\n  ${missing.join('\n  ')}`,
     ).toEqual([]);
+  });
+
+  it('★「道具ではない」にも理由が書いてある（TG-2）', () => {
+    for (const e of NOT_A_TOOL) {
+      expect(e.why.length, `${e.file} の理由が短すぎます`).toBeGreaterThan(20);
+    }
   });
 
   it('★分類簿に載っているファイルが実在する（消えたツールが残っていない）', () => {

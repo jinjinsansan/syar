@@ -45,6 +45,14 @@ export const READONLY = [
    *   ★`tmp/` から移しました（★`tmp/` は gitignore で次の人に残らない・AL-6 と同じ理由）。
    *   ⚠️ ★AL-11（較正の取り直し）で使います — ★帯が 24 段になり、束ね方を決める材料になります。
    */
+  /**
+   * ★機械編集の後始末 — ★制御文字・見えない空白が混ざっていないか走査する
+   *   （★2026-09-19・裁定 `REVIEW_UI1_SELECTION_RULE_VERDICT_20260919.md`。★レビュー側も使います）。
+   *   ★ファイルを読むだけです。★DB にも網にも触れません（`--changed` は `git status` を 1 回呼ぶだけ）。
+   * 🔴 ★**道具自身が最初に自分を赤くしました** — ★註記の「例」が実体の不可視文字になっていました。
+   *   → ★探す文字をコードポイントから組み立てる形に直してあります。
+   */
+  'scan-control-chars.mjs',
   'probe-band-histogram.ts',
   /**
    * ★芝の粒を測る（★映像の便）。★画像を読むだけで DB に触りません。
@@ -827,12 +835,48 @@ export const STATE_CHANGING = [
 /** 本番に向けることが目的のもの。★理由を必ず書く（空欄で登録できない） */
 export const PRODUCTION_OPS = [
   {
+    file: 'deploy.sh',
+    why: '★VPS への配備そのもの（★正典 §14/§15・`/opt/star-current` のリンクを張り替える）。★本番に向けられなければ意味がない。⚠️ ★**Git の push では入れ替わりません** — ★このスクリプトを走らせない限り古いワーカーが動き続けます（★監査 `REPORT_AUDIT_20260914.md:142` と裁定 `REVIEW_AUTH_EMAIL_PASSWORD_VERDICT_20260918.md` §4 で 2 度誤報された篇所）',
+  },
+  {
     file: 'migrate.mjs',
     why: '★スキーマ移行そのもの。本番に適用できなければ意味がない。★機械的な検出では「読取専用」に見える（DDL は .sql 側にあり、ツール本体に SQL 文字列が無い）ので、ここに明示しないと静かに誤分類される',
   },
 ];
 
-/** 全分類を平らにする（メタテスト用） */
+/**
+ * ★**道具ではないもの**（★2026-09-19・**TG-2**・裁定 `REVIEW_UI1_SELECTION_RULE_VERDICT_20260919.md`）。
+ *
+ * 【★なぜ「対象外」も簿に書くのか】
+ *   ★**「対象外」も分類の 1 つ**だからです。★簿に無いものを黙って見逃す形にすると、
+ *   ★**新しいファイルが「たぶん対象外だろう」で素通り**します（★R-24 が防ぎたかった形）。
+ *   → ★`tools/` 直下のファイルは ★**1 つ残らず**、READONLY / STATE_CHANGING /
+ *     PRODUCTION_OPS / NOT_A_TOOL のどれかに、★**理由付きで**載ります。
+ *
+ * ⚠️ ★ここに載せてよいのは ★**実行されないもの**（データ・設定）だけです。
+ *    ★実行されるなら、★**DB に触らなくても**上の 3 つのどれかです。
+ */
+export const NOT_A_TOOL = [
+  {
+    file: 'race-reference-shots.json',
+    why: '★参考映像の切り出し位置のデータ（★映像の便）。★実行されません。★読むのは `tools/_*.mjs` の側で、そちらが分類の対象です',
+  },
+  {
+    file: 'star-worker.service',
+    why: '★VPS の systemd のユニット定義（★正典 §14/§15 の `star-worker`）。★実行されるのは VPS 上の systemd で、★ここから走らせるものではありません。★配備は `deploy.sh` が行います',
+  },
+];
+
+/**
+ * ★**全分類を平らにする**（メタテスト用）。
+ * ⚠️ ★`NOT_A_TOOL` も含めます — ★**「載っているか」の判定に使うため**です
+ *    （★`STATE_CHANGING` の見張りや `READONLY` の裏取りには使いません。★あちらは実行されるものだけが対象）。
+ */
 export function allClassified() {
-  return [...READONLY, ...STATE_CHANGING, ...PRODUCTION_OPS.map((x) => x.file)];
+  return [
+    ...READONLY,
+    ...STATE_CHANGING,
+    ...PRODUCTION_OPS.map((x) => x.file),
+    ...NOT_A_TOOL.map((x) => x.file),
+  ];
 }
