@@ -191,7 +191,17 @@ describe('★EN-1: 所有馬は生成プールに入らない', () => {
     expect(where.length, '★述語の定義が読めていない（★走査が空・R-21）').toBeGreaterThan(50);
     expect(where, '★所有馬を除いていない').toContain('owner_id is null');
     const fn = repo.slice(repo.indexOf('export async function loadRaceablePool'));
-    expect(fn, '★読む側がその述語を引いていない').toContain('${RACEABLE_WHERE}');
+    /**
+     * ⚠️ ★**2026-09-19・AL-11 で述語に差し替え口を付けました**（`where` 引数）。
+     *    ★読む側が引くのは `${where}` ですが、★**既定は `RACEABLE_WHERE`** です。
+     *    → ★見るのは 2 つ: ★① 引いているのは引数（★SQL の写しではない）
+     *                      ★② ★**既定がすり替わっていない**（★測定用の口が既定で開いていない）
+     */
+    expect(fn, '★読む側が述語を引いていない（★SQL を書き起こしている？）').toContain('${where}');
+    expect(fn, '🔴 ★既定が `RACEABLE_WHERE` でない（★測定用の口が既定で開いている）')
+      .toContain('where: string = RACEABLE_WHERE');
+    /** ★対照: ★`ACTIVE_WHERE`（測定用の広いほう）が既定になっていない */
+    expect(fn, '🔴 ★既定が ACTIVE_WHERE にすり替わっている').not.toContain('where: string = ACTIVE_WHERE');
     /** ★引退の除外（CL-3）も残っている */
     expect(where, '★引退馬を除いていない').toContain('retired_at_week is null');
   });

@@ -99,8 +99,20 @@ export function rowToHorse(row: Record<string, unknown>): HorseRecord {
  *    ★**AL-11 の便**（`RACEABLE_POOL_LIMIT` の 3,000 と一緒に）で 1 回だけ測ります。
  *    ★そのとき見るべき副作用: ★プールが 4,389 → 7,333 になると ★**上級条件の枯渇（CC-4）が緩む**かもしれません。
  */
-const RACEABLE_WHERE = `generation >= (select max(generation) - 2 from horses)
+export const RACEABLE_WHERE = `generation >= (select max(generation) - 2 from horses)
         and retired_at_week is null
+        and owner_id is null`;
+
+/**
+ * ★**「現役」そのもの**（★**PO-4** の答え・★2026-09-19）。★上から `generation` の 1 行を外したもの。
+ *
+ * ⚠️ 🔴 ★**本番はこれを使っていません。** ★`loadRaceablePool` の既定は `RACEABLE_WHERE` のままです。
+ *    ★これは ★**AL-11 の便で「揃えたらどうなるか」を測るための口**で、
+ *    ★`tools/export-pool.mjs --predicate active` が明示的に渡したときだけ効きます
+ *    （★`fieldSizeRange`・`mustInclude` と同じ作法 — ★**既定では絶対に効かせない**）。
+ * ✔ ★実測（staging・2026-09-19）: ★`RACEABLE_WHERE` 4,389 頭 / ★こちら 7,333 頭。
+ */
+export const ACTIVE_WHERE = `retired_at_week is null
         and owner_id is null`;
 
 /**
@@ -124,6 +136,15 @@ export async function loadRaceablePool(
    * ⚠️ ★渡さなくても動きますが、★**渡さないと「1,389 頭が走れない」ことが誰にも見えません**。
    */
   onTruncated?: (eligible: number, used: number) => void,
+  /**
+   * ★**述語の差し替え口**（★**AL-11** の測定用・★2026-09-19）。
+   *
+   * ⚠️ 🔴 ★**既定では絶対に効きません。** ★渡した実行だけが変わります
+   *    （★`fieldSizeRange`・`mustInclude` と同じ作法）。
+   * ★渡してよいのは ★**このファイルが export している述語だけ**です
+   *   （`RACEABLE_WHERE` / `ACTIVE_WHERE`）。★SQL をここに書き起こさないこと（D-052）。
+   */
+  where: string = RACEABLE_WHERE,
 ): Promise<HorseRecord[]> {
   /**
    * ★**先に数えます**（★R-21: 0 件を「該当なし」と読まない・★切れたことを見えるようにする）。
@@ -131,7 +152,7 @@ export async function loadRaceablePool(
    */
   if (onTruncated !== undefined) {
     const cnt = await client.query<{ n: string }>(
-      `select count(*)::text as n from horses where ${RACEABLE_WHERE}`,
+      `select count(*)::text as n from horses where ${where}`,
     );
     const eligible = Number(cnt.rows[0]!.n);
     if (eligible > limit) onTruncated(eligible, limit);
@@ -166,7 +187,7 @@ export async function loadRaceablePool(
      *     🔴 ★**1 頭でもできた翻日には、取り直しが要る作業に化けます**（★`/setup` を繋いだ今日が期限でした）。
      */
     `select * from horses
-      where ${RACEABLE_WHERE}
+      where ${where}
       order by id
       limit $1`,
     [limit],
