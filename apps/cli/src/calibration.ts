@@ -473,6 +473,22 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
   {
+    key: 'STUD_FEE_BASE_EP',
+    why: '★NPC 種牡馬の式の基礎額（`packages/scheduler/src/stud-fee.ts`・**正典 §10.5・1354 行**）。'
+      + '🔴 ★**較正定数ではありません** — ★正典に `3,000 + G1勝利数 × 8,000 + 総獲得賞金/20` と'
+      + '**そのまま書かれている数**です。★動かすなら**正典の改訂**であって、較正の掃引ではありません。'
+      + '★D-102 ③（購入価格）と D-107（種付料の目安）が同じ式を読みます',
+  },
+  {
+    key: 'STUD_FEE_PER_G1_EP',
+    why: '★NPC 種牡馬の式の G1 1 勝あたり（★同上・正典 §10.5・1354 行）。★正典に書かれた数で、較正値ではない',
+  },
+  {
+    key: 'STUD_FEE_EARNINGS_DIVISOR',
+    why: '★NPC 種牡馬の式の「総獲得賞金 ÷ 20」（★同上・正典 §10.5・1354 行）。'
+      + '⚠️ ★PP を EP の規模に合わせる割り算も兼ねています（★正典のとおり）。★正典に書かれた数で、較正値ではない',
+  },
+  {
     key: 'STEP_WEEKS',
     why: '★成長段階の 1 区切り [週]（`packages/scheduler/src/growth-stage.ts`・D-116 ①）。'
       + '🔴 ★**導出値です** — ★`(LIFECYCLE_WEEKS.retireAt - raceableFrom) / 4`。★数を置いていません。'
