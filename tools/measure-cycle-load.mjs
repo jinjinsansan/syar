@@ -143,7 +143,7 @@ try {
    *    ★**サイクルが変われば分母が変わります**（★案 C の 6 分なら 1 日 240 周 ＝ 48 秒/日）。
    *    ★**線は据え置きでよい**（裁定）— ★**分母が変わったことだけ、ここに書いて残します。**
    */
-  const CYCLES_PER_DAY_NOW = 480; // ★3 分サイクル（★案 C の 6 分なら 240。★分母が変わることの記録）
+  const CYCLES_PER_DAY_NOW = 240; // ★6 分サイクル（★D-007 再改訂）。★分母はサイクル長で変わる
   const WINS_DB_MS_LIMIT = 200;
   const WINS_ROWS_LIMIT = 5_000_000;
   const overMs = winsDb > WINS_DB_MS_LIMIT;
