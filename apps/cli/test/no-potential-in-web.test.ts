@@ -141,6 +141,17 @@ const SAFE_REASONS: Readonly<Record<string, string>> = {
   innateTraitsOf: '★先天個性を導く', LONG_DISTANCE_M: '★長距離の線', LEARNED_STEPS: '★後天の刻み',
   CareerInput: '★戦績の入力の型', careerInputOf: '★戦績から入力を作る', learnedTraitsOf: '★後天特性を導く',
   traitsOf: '★両方をまとめて導く', learnedTraitsGained: '★新たに得たもの',
+  // ★成長の層のうち、★**能力の側**（D-116 ②③。★段階は `@star/scheduler` にあります）
+  GROWTH_TELL_MIN: '★この幅より小さい変化は言わない（D-116 ③）。★幅であって素質ではない',
+  ABILITY_GROWTH_LABEL: '★能力の言い換え（★名前だけ。§5 の公開情報）',
+  /**
+   * ⚠️ ★`growthTellsOf` は ★**`stats` を 2 つ受け取ります**が、★**返すのは能力の名前だけ**です
+   *    （★数値も差も返しません・D-116 ②）。★`potential` を受け取らないので、★**開放率を作れません**。
+   * 🔴 ★ただし ★**呼ぶ側が `stats` を持っていること**が前提です —
+   *    ★画面は `stats` を読めません（`my_horses` に無い）ので、
+   *    ★**これを使えるのはサーバー側だけ**です。
+   */
+  growthTellsOf: '★前と今を比べて「伸びた能力の名前」だけを返す。★数値を返さない',
   // ★乱数の流れの登録簿（憲法 4）
   GENETICS_STREAM: '★流れの id', RACE_STREAM: '★同上', VERIFY_RACE_STREAM: '★同上',
   VERIFY_PAYOUT_STREAM: '★同上', PRESEED_STREAM: '★同上', DIAGNOSTIC_STREAM: '★同上',

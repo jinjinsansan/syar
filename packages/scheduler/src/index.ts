@@ -18,3 +18,4 @@ export * from './ownership.js';
 export * from './jockeys.js';
 export * from './horse-market.js';
 export * from './entry-fee.js';
+export * from './growth-stage.js';
