@@ -32,7 +32,12 @@
  *
  * 【★使い方】
  *   `npx tsx apps/cli/src/market-price-distribution.ts [--pool 3000] [--days 26] [--seed 42] [--starts 24]`
+ *
+ *   ★**`--pool-file <json>`**（★**CC-1 ⑤ ①'**・2026-09-19）… ★素質の分布を配備の集団から取る。
+ *     ★キャリアは全頭 0 戦から。★`--train` とは併せられません。
  */
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import {
   classOf, gradeOf, winsRangeFor, prizeFor, npcStudFee, dailyProgramme, RACES_BY_CLASS,
   PRICE_TIERS_EP, LISTINGS_PER_TIER, priceTierOf, CAREER_RACE_LIMIT, RACES_PER_DAY,
@@ -135,6 +140,24 @@ export function runCohort(
    * ⚠️ ★既定は正典 §10.3 の写し（`RACES_BY_CLASS`）。★合計は 240 のままでなければ投げます。
    */
   mixOverride: Readonly<Record<string, number>> | null,
+  /**
+   * ★**素質の分布を、配備の集団から取る**（★**CC-1 ⑤ ①'**・2026-09-19・レビュー側の案）。
+   *
+   * 【🔴 ★なぜ「分布の出どころ」としてだけ使うのか】
+   *   ★CC-1 ⑤ の字義は「★**D の集団で上級の成立率を取り直す**」でした。
+   *   ⚠️ ★ところが D のプール（`out/al11/pool-D-active-3000.json`）は
+   *     ★**引退週・キャリア・戦績を持たない静的なスナップショット**です。
+   *     ★「26 日 走らせる」には ★**キャリアの初期化をどう与えるか**の決めが要り、
+   *     ★★**そこは正典にありません。★初期化を発明すると、その発明が答えを決めます**
+   *     （★MI-3 の「典型的なプレイヤー馬は定義できない」と同じ形）。
+   *   → ★**素質（`potential`）の分布だけ**を D から取り、★**キャリアは全頭 0 戦から**。
+   *     ★合成との違いが ★**材料（素質の分布）だけ**になります。
+   *
+   * ⚠️ ★**`--train` とは併せません** — ★育成は `stats` から始めるので、
+   *    ★D の馬は ★**途中の `stats`** を持っており、★「0 戦から」でなくなります。
+   * ⚠️ ★頭数は ★**渡された配列の長さ**になります（★`poolSize` は無視されます）。
+   */
+  poolOverride: readonly HorseRecord[] | null = null,
 ): Distribution {
   /**
    * ★番組表は ★**1 回だけ**作ります。
@@ -145,16 +168,25 @@ export function runCohort(
   );
   const rng = deriveRng(seed, 0);
   const pool: HorseRecord[] = [];
-  for (let i = 0; i < poolSize; i += 1) {
-    pool.push(createFounder({
-      id: `h${i}` as HorseId,
-      sex: i % 2 === 0 ? 'male' : 'female',
-      sireLine: `L${i % 12}` as never,
-      birthYear: 0,
-      rng,
-      balance: DEFAULT_BALANCE,
-      founders: FOUNDERS,
-    }));
+  if (poolOverride !== null) {
+    /**
+     * ★**素質の分布は配備の集団から**（★CC-1 ⑤ ①'）。★キャリアは下の `careers` が 0 から作ります。
+     * ⚠️ ★**乱数は 1 つも引きません** — ★合成のときと ★**乱数列がずれます**。
+     *    ★だから ★**合成と 1 対 1 で引き算できません**（★AB-1 と同じ但し書き）。
+     */
+    pool.push(...poolOverride);
+  } else {
+    for (let i = 0; i < poolSize; i += 1) {
+      pool.push(createFounder({
+        id: `h${i}` as HorseId,
+        sex: i % 2 === 0 ? 'male' : 'female',
+        sireLine: `L${i % 12}` as never,
+        birthYear: 0,
+        rng,
+        balance: DEFAULT_BALANCE,
+        founders: FOUNDERS,
+      }));
+    }
   }
   /**
    * ★**育て終わった能力**（★GR-4）。★`runCareer` は較正した週送りの合成器を通ります。
@@ -192,7 +224,8 @@ export function runCohort(
   const races = days * RACES_PER_DAY;
   let held = 0;
   let starts = 0;
-  let nextId = poolSize;
+  /** ⚠️ ★`poolSize` ではなく **実際の頭数** から続き番号を振る（★`--pool-file` で長さが変わる） */
+  let nextId = pool.length;
   let retiredCount = 0;
   const upperEligibleByDay: number[] = [];
   /** ★open / graded の資格の下限（★数を写さない・D-052） */
@@ -301,7 +334,7 @@ export function runCohort(
     prices.push(c.priceAfterEachStart[k]!);
     i += 1;
   }
-  return { pool: poolSize, races: held, ran, prices: prices.sort((a, b) => a - b), g1Winners, totalStarts, heldByTier, skippedByTier,
+  return { pool: pool.length, races: held, ran, prices: prices.sort((a, b) => a - b), g1Winners, totalStarts, heldByTier, skippedByTier,
     meanFieldSize: held === 0 ? 0 : starts / held, upperEligibleByDay, retired: retiredCount };
 }
 
@@ -340,7 +373,33 @@ if (isMain) {
     ? '  ★**育成あり**（runCareer で育て終わった能力で走る・★上限側の見積り）/ 引退と世代交代・配合は入っていません'
     : '  ⚠️ ★育成なし（★下限側の見積り・`--train` で入れられます）/ 引退・世代交代・配合も入っていません');
 
-  const d = runCohort(poolSize, seed, maxStarts, days, train, openMin, mix);
+  /**
+   * ★**`--pool-file`**（★**CC-1 ⑤ ①'**・2026-09-19）。★素質の分布の出どころだけを差し替えます。
+   * ⚠️ ★`--train` とは併せられません（★育成は `stats` から始まり、★「0 戦から」でなくなる）。
+   */
+  const pfi = process.argv.indexOf('--pool-file');
+  let poolOverride: HorseRecord[] | null = null;
+  if (pfi >= 0) {
+    const file = process.argv[pfi + 1];
+    if (file === undefined) throw new Error('--pool-file にファイル名がありません');
+    if (train) {
+      throw new Error(
+        '--pool-file と --train は併せられません'
+          + '（★育成は stats から始まるので「キャリア 0 戦から」でなくなります・CC-1 ⑤ ダッシュ案）',
+      );
+    }
+    const raw: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    if (!Array.isArray(raw) || raw.length === 0) {
+      throw new Error(`--pool-file: ${file} が馬の配列ではありません（★0 件を「該当なし」と読まない・R-21）`);
+    }
+    poolOverride = raw as HorseRecord[];
+    const sha = createHash('sha256').update(readFileSync(file)).digest('hex').slice(0, 12);
+    console.log(`  🔴 ★**素質の分布は ${file} から**（★sha256:${sha}・${poolOverride.length} 頭・★CC-1 ⑤ ①'）`);
+    console.log('     ⚠️ ★キャリアは全頭 0 戦から。★**合成との違いは素質の分布だけ**です。');
+    console.log('     ⚠️ ★乱数の引き方が合成と違う（★初代を作らない）ので、★**1 対 1 では引き算できません**（AB-1）。');
+  }
+
+  const d = runCohort(poolSize, seed, maxStarts, days, train, openMin, mix, poolOverride);
   console.log(`\n  開催 ${d.races} レース / 走った馬 ${d.ran} 頭 / ★G1 を勝った馬 ${d.g1Winners} 頭`
     + `（${((d.g1Winners / Math.max(1, d.ran)) * 100).toFixed(1)}%）`);
   console.log(`  ★平均頭数 ${d.meanFieldSize.toFixed(2)}`

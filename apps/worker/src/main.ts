@@ -23,7 +23,7 @@ import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
 import { announceConditions, buildRace } from './build-race.js';
 import { drawEntryLottery, lotteryScratchReason } from './entry-lottery.js';
-import { scratchEntry } from './scratch.js';
+import { scratchEntry, scratchRetiredEntries } from './scratch.js';
 import { FIELD_SIZE } from '../../cli/src/race-field.js';
 import { aggregateDay } from './daily-flow.js';
 // ★日次の枝の結果を行に残す（★DL-2・移行 0052）。★止める仕組みではない
@@ -227,7 +227,41 @@ async function main(): Promise<void> {
            *   ★18 頭以内なら何もしません（★「プレイヤー馬を優先し」＝全員走る）。
            * ⚠️ ★**賞金上位優先にしません** — ★正典が名指しで禁じています（★新規が離脱する）。
            */
-          const lot = drawEntryLottery(registered, FIELD_SIZE.MAX, i);
+          /**
+           * 🔴 ★**登録の後・発走の前に引退した馬を、先に取消にします**
+           *   （★正典 **D-111 ③**・★**DS-5 ③**・2026-09-19）。
+           *
+           * 【★なぜ抽選より前か】
+           *   ★引退した馬が抽選に残ると、★**走らない馬が 1 枠 使って、走れる馬を落とします**。
+           * 【★なぜ組成より前か】
+           *   ★§10.4 は「残りを NPC 馬で充填」なので、★**空いた枠は自然に埋まります**。
+           *
+           * ✔ ★これが無い間、★**D-111 ③ は一度も動いていませんでした**
+           *   （★`entry-freeze` は `entrant_snapshot is null` しか見ず、
+           *    ★`fillRace` が登録の行にそれを書くため。★実 DB で確認・`verify-ds5-retire-scratch.mjs`）。
+           *
+           * ⚠️ ★**組成のトランザクションの外**です（★落選の返金と同じ形）。
+           *    ★返金が済んでから出走表を作ります（★`scratchEntry` は冪等なので二重には返しません）。
+           */
+          let registeredNow = registered;
+          {
+            await client.query('begin');
+            let ret;
+            try {
+              ret = await scratchRetiredEntries(client, i, '登録の後に引退しました');
+              await client.query('commit');
+            } catch (e) { await client.query('rollback'); throw e; }
+            if (ret.scratched > 0) {
+              const gone = new Set(ret.horseIds);
+              registeredNow = registered.filter((h) => !gone.has(h));
+              // ★黙って落とさない（★D-111 ⑤。★本人には `scratch_reason` が届く）
+              console.error(
+                `[worker] ★登録の後に引退した ${ret.scratched} 頭を取消 cycle=${i}`
+                  + `（★登録料と騎手の料金 ${ret.refundedEp.toLocaleString()} EP を返しました・D-111 ③）`,
+              );
+            }
+          }
+          const lot = drawEntryLottery(registeredNow, FIELD_SIZE.MAX, i);
           if (lot.excluded.length > 0) {
             /**
              * 🔴 ★**弾かれたうえに料金を取られるのが、いちばん悪い**（**LT-3**）。
@@ -235,7 +269,7 @@ async function main(): Promise<void> {
              * ⚠️ ★ここは `build` の中なので、★**組成のトランザクションの外**です。
              *    ★返金が済んでから出走表を作ります（★冪等なので、途中で落ちても二重には返しません）。
              */
-            const reason = lotteryScratchReason(registered.length, FIELD_SIZE.MAX);
+            const reason = lotteryScratchReason(registeredNow.length, FIELD_SIZE.MAX);
             for (const horseId of lot.excluded) {
               const row = (await client.query<{ id: string; jockey_frozen: { feeEP?: number } | null }>(
                 `select e.id, e.jockey_frozen from race_entries e
@@ -255,7 +289,7 @@ async function main(): Promise<void> {
             }
             // ★黙って落とさない（**LT-4**。★本人には `scratch_reason` が届く）
             console.error(
-              `[worker] ★出走の抽選 cycle=${i}: 登録 ${registered.length} 頭 → 出走 ${lot.selected.length} 頭 / `
+              `[worker] ★出走の抽選 cycle=${i}: 登録 ${registeredNow.length} 頭 → 出走 ${lot.selected.length} 頭 / `
                 + `落選 ${lot.excluded.length} 頭（★完全抽選・§10.4）。★落選分は登録料と騎手の料金を返しました`,
             );
           }

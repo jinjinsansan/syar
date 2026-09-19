@@ -145,3 +145,81 @@ export async function scratchAllEntries(
   }
   return { scratched, refundedEp };
 }
+
+/**
+ * ★**登録の後・発走の前に引退した馬を取消にする**（★正典 **D-111 ③**・★**DS-5 ③**・2026-09-19）
+ *
+ * 【🔴 ★なぜ、ここに要るのか — ★D-111 ③ は一度も動いていませんでした】
+ *   ★引退を見ていたのは ★**`entry-freeze.ts` の 1 か所だけ**でした。
+ *   ★その掃き出しの `where` は ★**`e.entrant_snapshot is null`**。
+ *   ★ところが ★**`fillRace` は登録済みの行に `entrant_snapshot` を書きます**（`pg-store.ts:377`）。
+ *   → ★★**組成が済んだ登録の行を、掃き出しは二度と見ません。**
+ *   ✔ ★実 DB で確かめました（`tools/verify-ds5-retire-scratch.mjs`・2026-09-19）:
+ *     ★組成の後 **0 件** ／ ★対照（組成していない行）**1 件** → ★**`where` は生きているのに届いていない**。
+ *
+ *   ⚠️ ★`horse-repo.ts` の註記は「★登録の後に引退した馬は `entry-freeze` が取消にします」と
+ *      ★書いていました。★**書いてあるだけで、届いていませんでした**（★R-16）。
+ *
+ * 【★なぜ「組成の前」か】
+ *   ★§10.4 は「★プレイヤー馬を優先し、★**残りを NPC 馬で充填**」です。
+ *   → ★**組成の前に取消にすれば、★空いた枠は自然に NPC で埋まります。**
+ *   ★組成の後だと、★**1 頭 少ないまま走る**か、★出走表を組み直すことになります。
+ *
+ * 【⚠️ ★DS-5 ② で、これが常態になりました】
+ *   ★G1 の登録の窓は **3 時間 48 分 ＝ 1 ゲーム内週の 95%**（★12 分のときは 10%）。
+ *   → ★**登録と発走の間に週送りが入るのが普通**になり、★260 週到達と致命的な故障を跨ぎます。
+ *
+ * 【🔴 ⚠️ ★**まだ残る窓** — ★**DS-5 ④**（★塞いだつもりにならないこと）】
+ *   ★この関数が塞ぐのは ★**登録 → 組成**（★G1 なら 3 時間 48 分）だけです。
+ *   🔴 ★**組成 → 発走（12 分）は残ります。** ★その馬は既に凍結を持っているので、
+ *     ★`entry-freeze` は相変わらず外します。★**D-111 ④（D-056 の安全網）も拾いません**
+ *     — ★あれは「★**凍結が無い**」を見るもので、★引退した馬は凍結を持っています。
+ *   → ★**発走の直前にもう 1 度 見る**形が要ります（★**DS-5 ⑤**・★人を迎える前に）。
+ *   ⚠️ ★いま利用者は 0 人なので急ぎませんが、★**塞いだのは 95% であって 100% ではありません。**
+ *
+ * @returns ★取消にした頭数と返した EP、★そして ★**取り除いた馬の id**（★呼ぶ側が登録から外すため）
+ */
+export async function scratchRetiredEntries(
+  client: pg.Client | pg.PoolClient,
+  cycleIndex: number,
+  reason: string,
+): Promise<{ scratched: number; refundedEp: number; horseIds: readonly string[] }> {
+  const rows = (await client.query<{
+    id: string; race_id: string; horse_id: string;
+    jockey_frozen: { feeEP?: number } | null; retired_at_week: string | number;
+  }>(
+    `select e.id, e.race_id, e.horse_id, e.jockey_frozen, h.retired_at_week
+       from race_entries e
+       join races r on r.id = e.race_id
+       join horses h on h.id = e.horse_id
+      where r.cycle_index = $1
+        and e.scratched_at is null
+        and h.retired_at_week is not null
+      order by e.gate`,
+    [cycleIndex],
+  )).rows;
+
+  let scratched = 0;
+  let refundedEp = 0;
+  const horseIds: string[] = [];
+  for (const row of rows) {
+    /**
+     * ⚠️ ★**理由に週を入れます**（★本人に届く文・D-111 ⑤）。
+     *    ★「取消になった」だけだと、★なぜかが分かりません。
+     */
+    const r = await scratchEntry(
+      client,
+      {
+        entryId: row.id,
+        raceId: row.race_id,
+        horseId: row.horse_id,
+        jockeyFeeEP: Number(row.jockey_frozen?.feeEP ?? 0),
+      },
+      `${reason}（${row.retired_at_week} 週で引退しました）`,
+    );
+    if (r.scratched) scratched += 1;
+    refundedEp += r.refundedEp;
+    horseIds.push(row.horse_id);
+  }
+  return { scratched, refundedEp, horseIds };
+}

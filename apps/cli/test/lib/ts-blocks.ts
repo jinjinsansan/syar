@@ -92,3 +92,49 @@ export function isInOwnTry(block: string, needle: string): boolean {
     if (body.includes(needle) && /^\}\s*catch/.test(tail)) return true;
   }
 }
+
+/**
+ * ★**関数の本体**を返す（★戻り値の型の `{` を掴まないように）。
+ *
+ * 【🔴 ★なぜ `blockBodyAfter` で足りないか — ★2026-09-19 にこれで落ちました】
+ *   ★`blockBodyAfter(src, 'export async function scratchRetiredEntries')` は、
+ *   ★目印の**後ろの最初の `{`** を開き括弧とみなします。★ところが署名はこうです:
+ *
+ *     `): Promise<{ scratched: number; refundedEp: number; horseIds: readonly string[] }>`
+ *                 ↑ ★**ここを掴みます**
+ *
+ *   → ★切り出しが ★**戻り値の型**になり、★本体を 1 文字も見ませんでした。
+ *   ⚠️ ★**落ちたから気づけました。** ★もし本体に無い語を探していたら、
+ *      ★`not.toContain` の側が ★**通ってしまいます**（★中身が空なので必ず通る）。
+ *
+ * 【★どう見分けるか】★本体の `{` は、★**直前の非空白が `)` か `>` か識別子**です。
+ *   ★型の `{` は ★**`<` `,` `(` `|` `&` `:` の直後**に来ます。→ ★そちらを飛ばします。
+ * ⚠️ ★構文解析ではありません。★見分けられない形が出たら、★**投げます**（★黙って外さない）。
+ */
+export function functionBodyAfter(src: string, marker: string): string {
+  const at = src.indexOf(marker);
+  if (at < 0) throw new Error(`★切り出しの目印が見つかりません: ${marker}`);
+  if (src.indexOf(marker, at + marker.length) >= 0) {
+    throw new Error(`★目印が 2 か所以上にあります: ${marker}`);
+  }
+  /** ★型の `{` の直前に来る文字（★これらの後ろの `{` は本体ではない） */
+  const TYPE_LEAD = new Set(['<', ',', '(', '|', '&', ':', '=']);
+  let i = src.indexOf('{', at + marker.length);
+  while (i >= 0) {
+    let j = i - 1;
+    while (j >= 0 && /\s/.test(src[j]!)) j -= 1;
+    if (!TYPE_LEAD.has(src[j] ?? '')) break;
+    i = src.indexOf('{', i + 1);
+  }
+  if (i < 0) throw new Error(`★本体の { が見つかりません: ${marker}`);
+  let depth = 0;
+  for (let k = i; k < src.length; k += 1) {
+    const ch = src[k];
+    if (ch === '{') depth += 1;
+    else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return src.slice(i + 1, k);
+    }
+  }
+  throw new Error(`★本体が閉じていません: ${marker}`);
+}

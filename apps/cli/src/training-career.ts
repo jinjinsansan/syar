@@ -102,6 +102,18 @@ export function runCareer(
   policy: Policy,
   horseIndex: number,
   seed: number,
+  /**
+   * ★**その週が済んだときの `stats` を覗く**（★任意・★**GB-1 ④**・2026-09-19）。
+   *
+   * 【★なぜ引数で足すのか】
+   *   ★「育った実感」を何回 言うかを測るには、★**一生ぶんの週ごとの `stats`** が要ります。
+   *   🔴 ★別に週ループを書くと ★**測る経路と較正した経路が別物**になります
+   *     （★2026-08-11 に、まさにそれで §7.6 のイベントを引かないまま測っていました）。
+   *   → ★**同じループから覗きます**（R-30・「測定器は評価者と同じ入力を見る」）。
+   *
+   * ⚠️ ★**渡しても振る舞いは 1 ビットも変わりません**（★読むだけ・乱数を消費しません）。
+   */
+  onWeek?: (week: number, stats: Readonly<Record<AbilityKey, number>>) => void,
 ): CareerResult {
   const traits: HorseTraits = {
     sex: horse.sex, growth: horse.growth,
@@ -145,6 +157,7 @@ export function runCareer(
     if (r.log.injury !== null) injuries += 1;
     epSpent += r.log.epSpent;
     state = r.state;
+    onWeek?.(week, state.current as Record<AbilityKey, number>);
   }
 
   const { potential, current } = state;

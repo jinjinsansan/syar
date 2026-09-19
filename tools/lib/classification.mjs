@@ -867,6 +867,19 @@ export const STATE_CHANGING = [
   'verify-registered-excludes-scratched.mjs',
 
   /**
+   * ★**登録の後・発走の前に引退した馬は、取消になるか**（★**DS-5 ③**・**D-111 ③**・2026-09-19）。
+   *
+   * 🔴 ★これが見つけたもの: ★**`entry-freeze` は、登録された馬を一度も見ません。**
+   *   ★組成の前 … `r.status` が `announced` ≠ `scheduled` → 外れる
+   *   ★組成の後 … `e.entrant_snapshot` が非 null        → 外れる
+   *   → ★★**掛かる瞬間が存在せず、★引退した馬がそのまま走っていました。**
+   * ✅ ★直し（`scratchRetiredEntries`・組成の前）が通ることも、★同じ道具で見ます（⑧〜⑪）。
+   * ⚠️ ★**取引の中で `horses` と `users` を書きます**（★引退・所有・返金）。★最後に rollback し、
+   *    ★SB-3 が「途中の確定が無い」ことを見ます。★`assertNotProduction` を呼びます。
+   */
+  'verify-ds5-retire-scratch.mjs',
+
+  /**
    * ★**私が staging に残した検査データを消す**（★2026-09-19・後始末）。
    * 🔴 ★`verify-ds7-cancel.mjs` が `rollback` したつもりで確定していた分
    *   （★レース 2 件・所有馬 2 頭・`public.users` 1 人・`ep_ledger` 1,000 EP）。
