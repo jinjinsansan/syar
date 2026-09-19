@@ -76,7 +76,7 @@ export const TEMPER_COEF_RANGE = {
 /** `temper` の値域（正典 §5.2: 0..100・高いほど気性難）。★正典の写し */
 export const TEMPER_RANGE = { min: 0, max: 100 } as const;
 
-/** 正典 §7.3: conditionCoef は 0.7〜1.3。★幅は正典の写し（対応は下で決める） */
+/** 正典 §7.3: `conditionCoef`（★コード上は `conditionCoefForTraining`）は 0.7〜1.3。★幅は正典の写し（対応は下で決める） */
 export const CONDITION_COEF_RANGE = { min: 0.7, max: 1.3 } as const;
 
 /** 正典 §7.3 の成長曲線（週齢 → 係数）。★正典の表の写し */
@@ -125,10 +125,18 @@ export function temperCoef(temper: number, rng: Rng): number {
 }
 
 /**
- * 調子による係数（§7.3）。
+ * 調子による係数（§7.3）。★**0.7〜1.3**。
  * ★condition 0..5 を 0.7〜1.3 に**線形**で対応させます（正典は幅だけを与えています）。
+ *
+ * 🔴 ★**コード上の名前だけ `conditionCoefForTraining` です**（★正典の名前は `conditionCoef` のまま）。
+ *   ★`@star/race-engine` の `conditionCoefForRace`（正典 §8.3・★**0.88〜1.10**）と
+ *   ★**同じ名前で別の量**だったため、★2026-09-19（`COND-COEF-SAME-NAME`）に分けました。
+ *
+ * ⚠️ 🔴 ★**統合しないでください。** ★幅が違います（0.7〜1.3 ≠ 0.88〜1.10）。
+ *   ★こちらは**育成**の週次計算に、★あちらは**レース**の能力補正に入ります。
+ *   ★同じ 0..5 を入れても ★**別の数が出るのが正しい**です。
  */
-export function conditionCoef(condition: number): number {
+export function conditionCoefForTraining(condition: number): number {
   const c = Math.max(0, Math.min(5, condition));
   const { min, max } = CONDITION_COEF_RANGE;
   return min + ((max - min) * c) / 5;
@@ -219,7 +227,7 @@ function growImpl(input: GrowthInput, rng: Rng): GrowthOutcome {
     }
   }
   const gc = growthCoef(growth, ageWeeks);
-  const cc = conditionCoef(condition);
+  const cc = conditionCoefForTraining(condition);
   // ★気性の係数は**週に1回**引く。形質ごとに引くと、同じ週で馬の気性が形質ごとに変わる
   const tc = temperCoef(temper, rng);
   const out = {} as Record<AbilityKey, number>;

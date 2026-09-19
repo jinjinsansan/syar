@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_RACE_BALANCE,
-  conditionCoef,
+  conditionCoefForRace,
   fatigueCoef,
   resolveRace,
   weightCoef,
@@ -47,8 +47,8 @@ describe('O-7 係数が負にならない（符号反転でスコアの意味が
 });
 
 describe('O-7 NaN が係数を素通りしない', () => {
-  it('conditionCoef は NaN を返さない', () => {
-    expect(Number.isNaN(conditionCoef(Number.NaN, B))).toBe(false);
+  it('conditionCoefForRace は NaN を返さない', () => {
+    expect(Number.isNaN(conditionCoefForRace(Number.NaN, B))).toBe(false);
   });
 
   it('★経路: 調子が NaN の馬がいても着順が壊れない', () => {

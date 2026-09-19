@@ -19,7 +19,7 @@ import {
   ageCoef,
   averageSpeedMps,
   baseScore,
-  conditionCoef,
+  conditionCoefForRace,
   decidePace,
   distanceAptitude,
   distanceBandOf,
@@ -179,7 +179,7 @@ describe('§8.3 乗算補正10種', () => {
     }
   });
 
-  it('🔴 ★conditionCoef は調子 **0〜5** で 0.88〜1.10（★R-2・★**M-9** で 1..5 から直した）', () => {
+  it('🔴 ★conditionCoefForRace は調子 **0〜5** で 0.88〜1.10（★R-2・★**M-9** で 1..5 から直した）', () => {
     /**
      * 🔴 ★**2026-09-19・M-9**: ★ここは ★**1..5** を固定していました。
      *   ★正典 §7.4 と育成（`@star/training` の `CONDITION_RANGE`）は ★**0..5** なので、
@@ -189,17 +189,17 @@ describe('§8.3 乗算補正10種', () => {
      * ⚠️ ★**この検査を「新しい値に合わせて」書き換えたのではありません** —
      *    ★**正典の値域に合わせました。** ★根拠は §7.4（0..5）であって、実装ではありません。
      */
-    expect(conditionCoef(0, B)).toBeCloseTo(0.88, 10);
-    expect(conditionCoef(5, B)).toBeCloseTo(1.1, 10);
+    expect(conditionCoefForRace(0, B)).toBeCloseTo(0.88, 10);
+    expect(conditionCoefForRace(5, B)).toBeCloseTo(1.1, 10);
     /** ★中央（2.5）が真ん中。★段は整数なので 2 と 3 が挟む */
-    expect(conditionCoef(2, B)).toBeCloseTo(0.968, 10);
-    expect(conditionCoef(3, B)).toBeCloseTo(1.012, 10);
+    expect(conditionCoefForRace(2, B)).toBeCloseTo(0.968, 10);
+    expect(conditionCoefForRace(3, B)).toBeCloseTo(1.012, 10);
     /** 🔴 ★**0 と 1 が別の値になったこと**（★M-9 の目的そのもの） */
-    expect(conditionCoef(1, B)).toBeCloseTo(0.924, 10);
-    expect(conditionCoef(1, B)).not.toBeCloseTo(conditionCoef(0, B), 10);
+    expect(conditionCoefForRace(1, B)).toBeCloseTo(0.924, 10);
+    expect(conditionCoefForRace(1, B)).not.toBeCloseTo(conditionCoefForRace(0, B), 10);
     // 値域外もクランプされる
-    expect(conditionCoef(-1, B)).toBeCloseTo(0.88, 10);
-    expect(conditionCoef(9, B)).toBeCloseTo(1.1, 10);
+    expect(conditionCoefForRace(-1, B)).toBeCloseTo(0.88, 10);
+    expect(conditionCoefForRace(9, B)).toBeCloseTo(1.1, 10);
   });
 
   it('fatigueCoef = 1 - fatigue/500（正典 §8.3 の式そのもの）', () => {

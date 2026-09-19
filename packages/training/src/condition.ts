@@ -88,7 +88,7 @@ export function applyFatigue(current: number, delta: number): number {
  * 週ごとの調子の再判定（正典 §7.4）。
  *
  * ★`rand(-1, +1)` は**整数**として扱います。`condition` は 0..5 の段階値なので、
- *   実数を足すと段階でなくなり、`conditionCoef` の対応（0..5 → 0.7〜1.3）も崩れます。
+ *   実数を足すと段階でなくなり、`conditionCoefForTraining` の対応（0..5 → 0.7〜1.3）も崩れます。
  *   ★正典に「整数」とは書かれていないので、照会に上げます。
  */
 export function nextCondition(fatigue: number, rng: Rng): number {

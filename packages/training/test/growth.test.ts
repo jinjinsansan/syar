@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { ABILITY_KEYS, deriveRng, type AbilityKey } from '@star/sim-engine';
 import {
   BASE_GAIN, GROWTH_CURVE, MENUS, MENU_IDS, TEMPER_COEF_RANGE,
-  conditionCoef, epCost, fatigueDelta, grow, growthCoef, headroom, menuCoef, temperCoef,
+  conditionCoefForTraining, epCost, fatigueDelta, grow, growthCoef, headroom, menuCoef, temperCoef,
 } from '../src/index.js';
 
 const rec = (v: number): Record<AbilityKey, number> =>
@@ -173,12 +173,12 @@ describe('§7.2/§7.3 の写しが正典と一致する', () => {
 
 describe('§7.3 調子と気性', () => {
   it('★調子が良いほど伸びる（0.7〜1.3 の範囲に収まる）', () => {
-    expect(conditionCoef(0)).toBeCloseTo(0.7, 10);
-    expect(conditionCoef(5)).toBeCloseTo(1.3, 10);
-    expect(conditionCoef(3)).toBeGreaterThan(conditionCoef(2));
+    expect(conditionCoefForTraining(0)).toBeCloseTo(0.7, 10);
+    expect(conditionCoefForTraining(5)).toBeCloseTo(1.3, 10);
+    expect(conditionCoefForTraining(3)).toBeGreaterThan(conditionCoefForTraining(2));
     // 範囲外を渡しても飛び出さない
-    expect(conditionCoef(-3)).toBeCloseTo(0.7, 10);
-    expect(conditionCoef(99)).toBeCloseTo(1.3, 10);
+    expect(conditionCoefForTraining(-3)).toBeCloseTo(0.7, 10);
+    expect(conditionCoefForTraining(99)).toBeCloseTo(1.3, 10);
   });
 
   const spread = (temper: number): number => {

@@ -200,6 +200,11 @@ describe('NT-3 開いている指摘の登録簿', () => {
        */
       'DS-5 ④': '★`9f7f36a`: ★確定の直前に `scratchRetiredBeforeStart`。★実 DB 15 件 全通・★検査 5 件。'
         + '★残る限界（★発走から確定までの表示の遅れ）は ★正典 §10.4 の「承知している限界」へ',
+      'COND-COEF-SAME-NAME': '★関数を `conditionCoefForRace`（§8.3・0.88〜1.10）／'
+        + '`conditionCoefForTraining`（§7.3・0.7〜1.3）に改名した（★**統合はしていない**）。'
+        + '★内訳（`breakdown`）の**欄**の名前は `conditionCoef` のまま（★正典の名前）。'
+        + '★`package-export-collision.test.ts` が ★**両 package の同名の輸出を 0 件に固定**する。'
+        + '★改名の直前は 1 件（`conditionCoef`）だったことを ★`git show HEAD:` の中身で実測済み',
     };
     for (const [id, how] of Object.entries(settled)) {
       expect(ids.has(id), `★${id} が簿に戻っています（★${how}）`).toBe(false);

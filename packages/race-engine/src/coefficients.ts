@@ -146,8 +146,22 @@ export function strategyCoef(
   return paceEffect * aptEffect;
 }
 
-/** §8.3 conditionCoef（I-CONDITION-MAP） */
-export function conditionCoef(condition: number, balance: RaceBalance): number {
+/**
+ * 正典 §8.3 の `conditionCoef`（I-CONDITION-MAP）。★**0.88〜1.10**。
+ *
+ * 🔴 ★**コード上の名前だけ `conditionCoefForRace` です**（★正典の名前は `conditionCoef` のまま）。
+ *   ★`@star/training` の `conditionCoefForTraining`（正典 §7.3・★**0.7〜1.3**）と
+ *   ★**同じ名前で別の量**だったため、★2026-09-19（`COND-COEF-SAME-NAME`）に分けました。
+ *   ★どちらも `export *` で出ているので、★同じ名前のままだと
+ *   ★**両方を取り込んだ側で、★どちらが入ったか読めなくなります。**
+ *
+ * ⚠️ 🔴 ★**統合しないでください。** ★幅が違います（0.88〜1.10 ≠ 0.7〜1.3）。
+ *   ★「同じ式に見える」のは ★**線形という形が同じだけ**で、★量は別物です。
+ *
+ * ⚠️ ★内訳（`breakdown`）の**欄の名前**は `conditionCoef` のままです（★正典の名前に合わせています）。
+ *   ★ここで変えたのは ★**関数の名前だけ**です。
+ */
+export function conditionCoefForRace(condition: number, balance: RaceBalance): number {
   const span = balance.CONDITION_MAX - balance.CONDITION_MIN;
   const t = clamp((condition - balance.CONDITION_MIN) / span, 0, 1);
   return balance.CONDITION_COEF_MIN + t * (balance.CONDITION_COEF_MAX - balance.CONDITION_COEF_MIN);
@@ -243,7 +257,7 @@ export function deterministicCoefs(
     surfaceCoef: surfaceCoef(entrant.surfaceAptitude, params.surface, balance),
     trackConditionCoef: trackConditionCoef(entrant.heavyAptitude, params.trackCondition, balance),
     strategyCoef: strategyCoef(entrant.strategy, entrant.strategyAptitude, params.pace, balance),
-    conditionCoef: conditionCoef(entrant.condition, balance),
+    conditionCoef: conditionCoefForRace(entrant.condition, balance),
     fatigueCoef: fatigueCoef(entrant.fatigue, balance),
     weightCoef: weightCoef(entrant.weightKg, params.baseWeightKg, balance),
     gateCoef: gateCoef(
