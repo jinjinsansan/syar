@@ -510,6 +510,15 @@ export const READONLY = [
   // ★読むだけ。本番の馬をそのまま書き出してハーネスに食わせる
   'export-pool.mjs',
   /**
+   * ★**集団が動いているのか、動いていないのか**を数える（★2026-09-19・WK-1/WK-2・読むだけ）。
+   * 🔴 ★私は「7,333 → 7,332 の 1 頭減り」から「★ワーカーが動いている」と書きました。
+   *   ✔ ★数えたら `world_state` は **0 行**（★ワーカーは一度も動いていない）で、
+   *     ★減った原因は ★**私の検査が残したデータ**でした。★推測せずに数えるための道具です。
+   */
+  'diag-pool-drift.mjs',
+  /** ★私が staging に残したものを数える（★2026-09-19・読むだけ・`cleanup-ds7-leak.mjs` の下見に対応） */
+  'diag-my-leak.mjs',
+  /**
    * ★**コミットの前に通す門**（★2026-09-19）。★`typecheck` と `verify:red` を 1 つのコマンドで走らせ、
    *   ★**自分の終了コードを中の判定そのものにする**。★DB には一切触れません。
    *
@@ -819,6 +828,36 @@ export const STATE_CHANGING = [
    */
   'backfill-entry-prize.mjs',
 
+  /**
+   * ★**偽の DB が写している述語を、実 DB で確かめる 3 本**（★**FK-5**・2026-09-19）。
+   *
+   * 【★`rollback` するのに、なぜここか】
+   *   ★`verify-initial-horse-distribution.mjs` と同じ理由です。
+   *   ★取引の中では ★**本当に書きます**（`races` / `race_entries` / `horses.owner_id` /
+   *   ★`auth.users`）し、★`for update` で錠も掴ります。
+   *   🔴 ★**READONLY に置こうとしたら、簿の検定に止められました** — ★書き込み文があるので。
+   *      ★**「rollback するから読むだけ」は、この簿の基準ではありません。** ★止められたのが正しい。
+   *   ★3 本とも `assertNotProduction` を呼んでいます（★この簿の条件）。
+   *
+   * 【★なぜ要るか】★`CycleStore` の偽物は SQL を見ません（★層が上）。
+   *   ★**本物の述語を手で写すしかなく、写し間違えたら黙って素通しします**
+   *   （★2026-09-19 に `cancelRace` の `status = 'scheduled'` で実際に素通ししました）。
+   *   → ★**写しのある検査には、実 DB の 1 本を対にします**（FK-5）。
+   * ⚠️ ★**`tmp/` に置いていたものを移しました** — ★`tmp/` は gitignore なので、
+   *    ★**対にしたつもりが、次のセッションには消えていました。**
+   */
+  'verify-d117-fill.mjs',
+  'verify-ds7-cancel.mjs',
+  'verify-registered-excludes-scratched.mjs',
+
+  /**
+   * ★**私が staging に残した検査データを消す**（★2026-09-19・後始末）。
+   * 🔴 ★`verify-ds7-cancel.mjs` が `rollback` したつもりで確定していた分
+   *   （★レース 2 件・所有馬 2 頭・`public.users` 1 人・`ep_ledger` 1,000 EP）。
+   * ★既定は下見だけ。★`--write` で消します。★`assertNotProduction` を呼びます。
+   */
+  'cleanup-ds7-leak.mjs',
+
   // ★中で状態を変えるツールを流すので、これ自体も状態を変える
   'audit-tools.mjs',
   'fix-purse.mjs',
@@ -928,6 +967,7 @@ export const COMPONENT = [
   { file: 'lib/provenance.mjs', why: '★生成物に「何から作ったか」を書き残す部品（★RD-4 ③・2026-09-19）。★道具が hash を埋め、★検査がいまのソースと突き合わせる。★道具ではない' },
   { file: 'lib/known-red.mjs', why: '★いま赤いと分かっている検査の登録簿（★RD-2・2026-09-19）。★verify-known-red.mjs が読む表で、道具ではない' },
   { file: 'lib/guard.mjs', why: '★`assertNotProduction` の本体。★状態を変える道具が呼ぶ部品' },
+  { file: 'lib/sandbox-tx.mjs', why: '★**自分で `begin`/`commit` する関数を、外側の取引に閉じ込める包み**（★2026-09-19）。🔴 ★PostgreSQL に入れ子の取引は無いので、★内側の `commit` は**外側ごと確定**させる。★`verify-ds7-cancel.mjs` がそれで staging を汚した。★検査の道具で、★製品では使わない' },
   { file: 'lib/guard.d.mts', why: '★`assertNotProduction` の型宣言（★`any` を使わないために置く）。★実行されません' },
   { file: 'lib/pixel-font.mjs', why: '★画像に文字を焼くための点字の表（★映像の道具が使う）' },
   { file: 'lib/race-audit-build.mjs', why: '★映像の監査で使うレースの組み立て。★道具から呼ばれる部品' },
