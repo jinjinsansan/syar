@@ -17,6 +17,14 @@ await assertNotProduction(c, 'verify-a6.mjs');
 const uid='00000000-0000-4000-8000-00000000a6a6';
 // ★パラメータを使う SQL と使わない SQL を混ぜて一律に [uid] を渡すと
 //   exec_bind_message で落ちる（bind するパラメータ数が合わない）。個別に呼ぶ。
+/**
+ * ★片付け。🔴 ★**消した後に残りを数えて返します**（★**TL-1**・2026-09-19）。
+ *
+ * ⚠️ ★`delete from horses` は危なく見えますが、★**この道具が自分で作った馬**だけです
+ *   （★下の `insert into horses` で作り、★`owner_id` はこの道具の `uid`）。
+ *   ★NPC の馬を取っていないので、★`STABLE-1-SKEW` の形にはなりません。
+ * @returns {Promise<number>} ★残りの合計行数
+ */
 const clean = async () => {
   await c.query(`delete from ep_ledger where user_id=$1`, [uid]);
   await c.query(`delete from bets where user_id=$1`, [uid]);
@@ -25,6 +33,12 @@ const clean = async () => {
   await c.query(`delete from horses where owner_id=$1`, [uid]);
   await c.query(`delete from races where name like 'A6-%'`);
   await c.query(`delete from users where id=$1`, [uid]);
+  const q = async (sql, pp = []) => Number((await c.query(sql, pp)).rows[0].n);
+  return (await q(`select count(*)::int as n from ep_ledger where user_id=$1`, [uid]))
+    + (await q(`select count(*)::int as n from bets where user_id=$1`, [uid]))
+    + (await q(`select count(*)::int as n from horses where owner_id=$1`, [uid]))
+    + (await q(`select count(*)::int as n from races where name like 'A6-%'`))
+    + (await q(`select count(*)::int as n from users where id=$1`, [uid]));
 };
 await clean();
 await c.query(`insert into auth.users (id,instance_id,aud,role,email,encrypted_password,created_at,updated_at) values ($1,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','a6@test.local','x',now(),now()) on conflict (id) do nothing`,[uid]);
@@ -50,5 +64,9 @@ const r3=await tryBuy(own,'[1]',5000);
 console.log(`③ 自馬レースで累計 6,000EP: ${r3==='OK'?'⚠️ 上限を超えられた':'拒否 → '+r3.slice(0,40)}`);
 const r4=await tryBuy(other,'[5]',1000);
 console.log(`④ 自馬が出ないレース: ${r4==='OK'?'OK（買える）':'⚠️ '+r4.slice(0,40)}`);
-console.log(`\n★A-6: ${r1!=='OK'&&r2==='OK'&&r3!=='OK'&&r4==='OK'?'PASS':'FAIL'}`);
-await clean(); await c.end();
+const leftA6 = await clean();
+if (leftA6 > 0) console.log(`🔴 ★検証用の行が ${leftA6} 行 残っています`);
+const okA6 = r1!=='OK'&&r2==='OK'&&r3!=='OK'&&r4==='OK'&&leftA6===0;
+console.log(`\n★A-6: ${okA6?'PASS':'FAIL'}`);
+await c.end();
+if (!okA6) process.exitCode = 1;

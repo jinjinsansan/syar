@@ -117,8 +117,52 @@ export const RESTORE_PRIZE = {
   },
 };
 
+/**
+ * ★`verify-a7.mjs` の控え。
+ *
+ * 【🔴 ★これがいちばん危ない】
+ *   ★この道具は ** `app_environment` を丸ごと消します**（★A-7 の門が働くことを確かめるため）。
+ *   ★元の宣言は ** メモリの `original` だけ**でした。
+ *
+ * 🔴 ★**殺されるとどうなるか** — ★馬が 1 頭 消えるのとは訳が違います:
+ *   ★`assertEnvironmentMatches` は宣言が無ければ ** 投げます**（`apps/worker/src/env.ts:78`・既定値で救いません）。
+ *   → ★★**ワーカーも、★状態を変える道具 全部も、★起動できなくなります**（fail-closed・R-27）。
+ *   ⚠️ ★シグナルは捕まえていますが、★**SIGKILL・電源断・OOM では走りません**。
+ *   → ★そのとき ** 戻す値を知っているのは、★死んだプロセスだけ**でした。
+ *
+ * ⚠️ ★`environment` が `null`（★元から無かった）なら、★**消したままが正しい**です。
+ */
+export const RESTORE_A7 = {
+  snapshot: 'verify-a7',
+  tool: 'verify-a7.mjs',
+  /**
+   * @param {{ query: (sql: string, params: readonly unknown[]) => Promise<{ rowCount: number | null }> }} client
+   * @param {{ environment: string | null }} data
+   * @returns {Promise<{ rows: number }>}
+   */
+  async restore(client, data) {
+    if (data.environment === null) {
+      // ★元から無かった。★消してあるのが元の姿です。
+      const r = await client.query('delete from app_environment where true', []);
+      return { rows: r.rowCount ?? 0 };
+    }
+    /**
+     * ⚠️ ★**1 文で**戻します（★`singleton` は一意なので upsert が使えます）。
+     *   ★`delete` → `insert` の 2 文にすると、★**間で死んだときに空になります**。
+     *   ★そこがこの道具では致命的です。
+     */
+    const r = await client.query(
+      `insert into app_environment (singleton, environment) values (true, $1)
+         on conflict (singleton) do update set environment = excluded.environment`,
+      [data.environment],
+    );
+    return { rows: r.rowCount ?? 0 };
+  },
+};
+
 /** ★道具の名前 → ★戻し方。★**1 本ずつ**足します（★まとめて書かない） */
 export const TOOL_RESTORES = Object.freeze({
   'verify-g6.mjs': RESTORE_G6,
   'verify-prize.mjs': RESTORE_PRIZE,
+  'verify-a7.mjs': RESTORE_A7,
 });

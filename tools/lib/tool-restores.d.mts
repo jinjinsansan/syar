@@ -39,5 +39,16 @@ export declare const RESTORE_PRIZE: ToolRestore<{
   readonly uid: string;
 }>;
 
+/**
+ * ★`verify-a7.mjs`: ★`app_environment` の宣言を戻す。
+ *
+ * 🔴 ★**これを失うと、★ワーカーも状態を変える道具 全部も起動できなくなります**
+ *   （★`assertEnvironmentMatches` が投げる・fail-closed）。
+ * ⚠️ ★`environment` が `null` なら「元から無かった」＝ ★**消したままが正しい**。
+ */
+export declare const RESTORE_A7: ToolRestore<{
+  readonly environment: string | null;
+}>;
+
 /** ★道具の名前 → ★戻し方 */
 export declare const TOOL_RESTORES: Readonly<Record<string, ToolRestore<never>>>;

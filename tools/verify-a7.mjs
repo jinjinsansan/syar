@@ -8,6 +8,8 @@ import { assertEnvironmentMatches } from '../apps/worker/src/env.ts';
 
 import { assertNotProduction } from './lib/guard.mjs';
 import { loadEnv } from './lib/env.mjs';
+import { takeSnapshot, readSnapshot, dropSnapshot } from './lib/snapshot-file.mjs';
+import { RESTORE_A7 } from './lib/tool-restores.mjs';
 const env = loadEnv();
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 await c.connect();
@@ -22,8 +24,35 @@ const check = (declared, onDb) => { try { assertEnvironmentMatches(declared, onD
 //   このスクリプトを流すだけで**次の再起動からワーカーが起動しなくなる**状態でした
 //   （A-7 のガードが正しく働くぶん、確実に止まります）。
 //   「この DB は development」という**古い前提**がコメントごと残っていたのが原因です。
+/**
+ * 🔴 ★**前の実行が残した控えを、★何より先に戻す**（★**SB-6**・2026-09-19）。
+ *
+ * 🔴 ★**ここを元の宣言を読むより前に置くこと。**
+ *   ★前回が殺されていると `app_environment` は空で、
+ *   ★そのまま読むと `original = null` になり、★**「元から無かった」と誤認して
+ *   ★空のまま確定させます**。★順番がこの道具の安全です。
+ *
+ * ⚠️ ★`assertNotProduction` は上で通していますが、★それも `app_environment` を読みます。
+ *   ★空だとそこで投げるので、★その場合はこの行まで来ません —
+ *   ★そのときは ** 手で戻す**ことになります（★控えは `tmp/snapshots/verify-a7.json`）。
+ *   🔴 ★**その手順を下の案内に出します。**
+ */
+const leftA7 = readSnapshot(RESTORE_A7.snapshot);
+if (leftA7 !== null) {
+  const { rows } = await RESTORE_A7.restore(c, leftA7.data);
+  console.log(`★前の実行（${leftA7.takenAt}）の控えから宣言を戻しました: ${leftA7.data.environment ?? '（無し）'}（${rows} 行）`);
+  dropSnapshot(RESTORE_A7.snapshot);
+}
+
 const original = (await c.query(`select environment from app_environment`)).rows[0]?.environment ?? null;
 console.log(`（元の宣言: ${original ?? 'なし'}）`);
+
+/**
+ * 🔴 ★**壊す前に、★プロセスの外へ控える**（★**SB-6**）。
+ * ⚠️ ★下の `original`（メモリ）はそのまま使いますが、★**それは控えではありません**。
+ *   ★控えはこのファイルのほうです。★メモリは SIGKILL で消えます。
+ */
+takeSnapshot(RESTORE_A7.snapshot, { environment: original });
 
 const restore = async () => {
   await c.query(`delete from app_environment`);
@@ -62,5 +91,15 @@ await restore();
 done = true;
 const back = (await c.query(`select environment from app_environment`)).rows[0]?.environment ?? null;
 console.log(`★後片付け: 宣言を ${back} に戻しました（元 ${original}）`);
+/**
+ * 🔴 ★**戻ったことを確かめてから控えを捨てる**（★**SB-6**）。
+ *   ★戻っていなければ ** わざと残します** — ★残骸が「まだ戻っていない」の印です。
+ */
+if (back === original) {
+  dropSnapshot(RESTORE_A7.snapshot);
+} else {
+  console.log(`🔴 ★控えを残します（tmp/snapshots/${RESTORE_A7.snapshot}.json） — ★次の実行が戻します。`);
+  console.log('   ★もし他の道具も起動しないなら、★そのファイルの environment を app_environment に手で入れてください。');
+}
 await c.end();
 if (!ok || back !== original) process.exit(1);

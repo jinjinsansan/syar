@@ -58,4 +58,11 @@ if (!ok) {
 }
 
 await admin.query(`delete from races where name in ('A4-SCHEDULED','A4-SETTLED')`);
+/** 🔴 ★**片付いたことを数える**（★**TL-1**・2026-09-19。★旧は `delete` を呼ぶだけだった） */
+const leftA4 = Number((await admin.query(
+  `select count(*)::int as n from races where name in ('A4-SCHEDULED','A4-SETTLED')`)).rows[0].n);
+if (leftA4 > 0) {
+  console.log(`🔴 ★検証用のレースが ${leftA4} 行 残っています`);
+  process.exitCode = 1;
+}
 await admin.end();

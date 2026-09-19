@@ -18,12 +18,22 @@ await c.connect();
 await assertNotProduction(c, 'verify-a5.mjs');
 
 const uid = '00000000-0000-4000-8000-00000000a5a5';
+/**
+ * ★片付け。🔴 ★**消した後に残りを数えて返します**（★**TL-1**・2026-09-19）。
+ * ⚠️ ★旧は呼ぶだけで、★**残っていても誰も気づきませんでした**。
+ * @returns {Promise<number>} ★残りの合計行数（★0 が正しい）
+ */
 const cleanup = async () => {
   await c.query(`delete from ep_ledger where user_id=$1`, [uid]);
   await c.query(`delete from bets where user_id=$1`, [uid]);
   await c.query(`delete from race_odds where race_id in (select id from races where name='A5-TEST')`);
   await c.query(`delete from races where name='A5-TEST'`);
   await c.query(`delete from users where id=$1`, [uid]);
+  const q = async (sql, pp = []) => Number((await c.query(sql, pp)).rows[0].n);
+  return (await q(`select count(*)::int as n from ep_ledger where user_id=$1`, [uid]))
+    + (await q(`select count(*)::int as n from bets where user_id=$1`, [uid]))
+    + (await q(`select count(*)::int as n from races where name='A5-TEST'`))
+    + (await q(`select count(*)::int as n from users where id=$1`, [uid]));
 };
 await cleanup();
 
@@ -71,6 +81,8 @@ console.log(`\n② 再送: 同じ馬券ID=${same}  EP=${await bal()} 馬券=${aw
 const idemOk = same && (await bal()) === 99000 && (await bets()) === 1 && (await ledger()) === 1;
 console.log(`   ★冪等性: ${idemOk ? 'PASS — 1回しか引かれていない' : 'FAIL'}`);
 
-console.log(`\n★A-5: ${atomicOk && idemOk ? 'PASS' : 'FAIL'}`);
-await cleanup();
+const leftA5 = await cleanup();
+if (leftA5 > 0) console.log(`🔴 ★検証用の行が ${leftA5} 行 残っています`);
+console.log(`\n★A-5: ${atomicOk && idemOk && leftA5 === 0 ? 'PASS' : 'FAIL'}`);
 await c.end();
+if (!(atomicOk && idemOk && leftA5 === 0)) process.exitCode = 1;
