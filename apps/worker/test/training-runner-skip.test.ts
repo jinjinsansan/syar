@@ -18,6 +18,13 @@ import { describe, expect, it } from 'vitest';
 import { ABILITY_KEYS } from '@star/sim-engine';
 import { WEEK_MS, weekIndexAt } from '@star/scheduler';
 import { BATCH_SIZE, EP_SHORT_SQLSTATE, MAX_WEEKS_PER_RUN, advanceTrainingWeeks } from '../src/training-runner.js';
+// ★FK-6: ★偽物が読んでいない述語を、★製品の文面で見張るため
+import { readFileSync } from 'node:fs';
+import nodePath from 'node:path';
+
+const SRC = readFileSync(nodePath.join(nodePath.resolve(__dirname, '..'), 'src/training-runner.ts'), 'utf8');
+/** ★註記を外した本文（★註記の中の語に一致して緑にしない・CK-1） */
+const LIVE = SRC.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
 
 const EXCLUDE_CLAUSE = 'not (id = any($3::uuid[]))';
 const TARGET = 300;
@@ -155,4 +162,28 @@ describe('BF-1 週送りで失敗した馬だけを飛ばす（照会 Q1）', ()
     expect(r.epShort).toBe(PENDING);
     for (const s of selects) expect((s.params[2] as string[] | undefined) ?? []).not.toContain(SHORT_ID);
   }, 120_000);
+});
+
+/**
+ * 🔴 ★**週送りが対象を絞る述語**（★2026-09-19・**FK-6** が「偽物は読んでいない」と数えた）
+ *
+ * ★偽の DB は行を配列で持つので、★`where` を真似ていません（★それ自体は悪くない）。
+ * 🔴 ★しかし ★**どちらも誰も見ていませんでした** → ★消えても気づけません:
+ *   ★`retired_at_week is null` … ★引退した馬を育て続ける（★§7.1 の寿命を越えて伸びる）
+ *   ★`birth_week is not null`  … ★誕生週の無い馬で齢を計算する（★NaN が入りうる）
+ */
+describe('🔴 FK-6 週送りの対象を絞る述語（★製品の文面で見張る）', () => {
+  it('★引退した馬は対象にしない', () => {
+    expect(LIVE, '🔴 ★引退で絞っていない（★引退後も育ち続ける）').toMatch(/retired_at_week is null/);
+  });
+
+  it('★誕生週の無い馬は対象にしない', () => {
+    expect(LIVE, '🔴 ★birth_week で絞っていない（★齢が計算できない馬が混ざる）')
+      .toMatch(/birth_week is not null/);
+  });
+
+  it('★走査が空でない（R-21・★註記を外して本文が残っていること）', () => {
+    expect(LIVE.length).toBeGreaterThan(500);
+    expect(LIVE, '★SQL が 1 つも残っていない').toMatch(/select/i);
+  });
 });

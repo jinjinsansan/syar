@@ -12,6 +12,11 @@ import type pg from 'pg';
 import { describe, expect, it } from 'vitest';
 import { ep, hitMultiplicity, settle, type RaceOutcome } from '@star/betting';
 import { settlePayouts } from '../src/payout.js';
+// ★FK-4: ★偽物の前提（製品がその句を持っていること）が古くなっていないかを見るため
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
+const SRC = path.resolve(__dirname, '..', 'src');
 
 /** payout.ts が組む outcome と同じ形（着順 → 馬番の配列） */
 const outcomeOf = (finished: { gate: number; finishPosition: number }[]): RaceOutcome => ({
@@ -81,6 +86,11 @@ describe('★§9 払戻額', () => {
 });
 
 interface BetRow {
+  /**
+   * ★**精算の状態**（★FK-4・2026-09-19）。★省けば `pending`。
+   *   ★`payout.ts` は `status = 'pending'` だけを引くので、★それ以外は流れてこないはず。
+   */
+  status?: string;
   id: string;
   user_id: string;
   bet_type: string;
@@ -110,6 +120,11 @@ function fakeDb(bets: readonly BetRow[]): {
 } {
   const writes: { sql: string; params: readonly unknown[] }[] = [];
   /**
+   * ★**製品が守るべき述語**（★FK-4）。★偽物は ★**写さず、在るかどうかを読みます**。
+   * ⚠️ ★`payout.ts` の文面を変えたら、★ここも合わせること（★合わなければ下の変異の検査が落ちます）。
+   */
+  const PENDING_CLAUSE = "status = 'pending'";
+  /**
    * ★**製品が出す文の一覧**（`apps/worker/src/payout.ts`）。
    * ⚠️ ★ここに無い文が来たら投げます。★製品が文を足したら、★**必ずここにも足すこと**。
    */
@@ -125,7 +140,25 @@ function fakeDb(bets: readonly BetRow[]): {
   const client = {
     query: async (sql: string, params: readonly unknown[] = []) => {
       // ★① 読み: ★pending の馬券を引く 1 本だけ
-      if (/^\s*select id, user_id, bet_type/.test(sql)) return { rows: bets, rowCount: bets.length };
+      if (/^\s*select id, user_id, bet_type/.test(sql)) {
+        /**
+         * 🔴 ★**述語を「写す」のではなく「読んで従う」**（★**FK-4**・2026-09-19・
+         *   ★`entry-to-settle.test.ts` の `SCRATCH_CLAUSE` と同じ形）。
+         *
+         * ★旧: ★**`sql` の `where` を見ずに全部返して**いました。
+         *   → ★`payout.ts` から `and status = 'pending'` を消しても ★**検査は緑のまま**。
+         *   ⚠️ ★それが消えると ★**確定済みの馬券にもう一度 払います**（★二重払戻）。
+         *     ★`payout.ts` の註記が「★pending だけ。★既に精算済みの馬券は触らない」と
+         *     ★明記しているところです。
+         *
+         * ★新: ★**製品の SQL にその句が在るときだけ、偽物も従う。**
+         *   → ★句を消すと ★**偽物が従わなくなり、★`status` が pending でない馬券まで流れて落ちます**。
+         *   ★**写し間違いが起きません**（★写していないので）。
+         */
+        const honorsPending = sql.includes(PENDING_CLAUSE);
+        const usable = honorsPending ? bets.filter((b) => (b.status ?? 'pending') === 'pending') : bets;
+        return { rows: usable, rowCount: usable.length };
+      }
       // ★② 書き: ★知っている文だけ。★`rowCount` は「1 行に効いた」を素直に返す
       if (KNOWN_WRITES.some((re) => re.test(sql))) {
         writes.push({ sql, params });
@@ -194,5 +227,60 @@ describe('★§9 払戻の経路（payout.ts・DB の文字列から浮動小数
     ]);
     await expect(settlePayouts(client, 'race-1', FINISHED)).rejects.toThrow();
     expect(writes).toEqual([]);
+  });
+});
+
+/**
+ * 🔴 ★**FK-4: `status = 'pending'` が消えたら落ちるか**（★2026-09-19・★変異の検査）
+ *
+ * ★`payout.ts` の註記:
+ *   > ★pending だけ。★既に精算済みの馬券は触らない（★二重払戻の防止）
+ *
+ * 🔴 ★旧の偽物は ★**`where` を見ずに全部返して**いたので、★この句を消しても緑のままでした。
+ *   → ★★**「守っている」ことを、★守らせてから確かめます。**
+ */
+describe('🔴 FK-4 二重払戻の防止（★製品の述語を読んで従う）', () => {
+  /** ★既に `won` で精算済みの馬券。★製品は引いてこないはず */
+  const SETTLED: BetRow = {
+    id: 'b-done', user_id: 'u1', bet_type: 'win', selection: [3],
+    amount: 100, odds_at_purchase: '2.0', status: 'won',
+  };
+  const PENDING: BetRow = {
+    id: 'b-new', user_id: 'u1', bet_type: 'win', selection: [3],
+    amount: 100, odds_at_purchase: '2.0', status: 'pending',
+  };
+
+  it('★製品が pending の絞りを持っていれば、精算済みは流れてこない', async () => {
+    const { client, writes } = fakeDb([PENDING, SETTLED]);
+    const r = await settlePayouts(client, 'race-1', FINISHED);
+    // ★pending の 1 枚だけが的中して払われる
+    expect(r.won).toBe(1);
+    expect(r.paid).toBe(200);
+    expect(writes.filter((w) => w.sql.includes("status = 'won'")).length).toBe(1);
+  });
+
+  it('🔴 ★**変異**: 製品から pending の絞りを外すと、精算済みにも払ってしまう', async () => {
+    /**
+     * ★偽物は ★**製品の SQL にその句が在るかどうか**で振る舞いを変えます。
+     *   → ★ここでは「句が無い製品」を真似て、★**二重払戻が起きること**を見せます。
+     *   → ★つまり ★**この検査は、句が消えたら上のテストが落ちることの証拠**です。
+     */
+    const { client } = fakeDb([PENDING, SETTLED]);
+    const raw = (client as unknown as { query: (s: string) => Promise<{ rows: BetRow[] }> });
+    // ★句を外した SQL を直に投げる（★製品が退化した状態）
+    const got = await raw.query(
+      'select id, user_id, bet_type, selection, amount, odds_at_purchase from bets where race_id = $1 for update',
+    );
+    expect(got.rows.length, '★句が無ければ、精算済みも流れてくる').toBe(2);
+    // ★対照: ★句が在れば 1 枚だけ
+    const ok = await raw.query(
+      "select id, user_id, bet_type, selection, amount, odds_at_purchase from bets where race_id = $1 and status = 'pending' for update",
+    );
+    expect(ok.rows.length, '★句が在れば pending だけ').toBe(1);
+  });
+
+  it('★製品の文面に、いまもその句が在る（★偽物の前提が古くなっていないこと）', () => {
+    const src = readFileSync(path.join(SRC, 'payout.ts'), 'utf8');
+    expect(src, '🔴 ★`payout.ts` から pending の絞りが消えています').toContain("status = 'pending'");
   });
 });

@@ -246,6 +246,29 @@ describe('★出品を作る経路（D-102・T-11）', () => {
     expect(SRC, '★引退で絞っていない').toMatch(/retired_at_week is null/);
   });
 
+  /**
+   * 🔴 ★**候補の集合を決める 2 つの述語**（★2026-09-19・**FK-6** が「どこでも守られていない」と数えた）。
+   *
+   *   ★`MK-1` は ★**在庫の下限が、候補より 10 倍広い集合を数えていた**という欠陥でした。
+   *   ✔ ★候補を決めているのは `CANDIDATE_WHERE` の 4 つで、★そのうち
+   *     ★`finish_pos is not null`（⑦）と `retired_at_week is null`（⑧）だけが見張られていて、
+   *     🔴 ★**`owner_id is null` と `npc_stable_id is not null` は誰も見ていませんでした。**
+   *   → ★どちらが消えても ★**MK-1 と同じ「広すぎる集合」が戻ります**（★プレイヤーの馬や、
+   *     ★厩舎に属さない馬が候補に入る）。
+   */
+  it('🔴 ⑧-2 ★候補は「NPC 厩舎の馬」かつ「所有者のいない馬」だけ（★MK-1 が戻らないこと）', () => {
+    expect(LIVE, '🔴 ★所有者のいる馬を候補から外していない（★プレイヤーの馬が売りに出る）')
+      .toMatch(/owner_id is null/);
+    expect(LIVE, '🔴 ★NPC 厩舎の馬に限っていない（★MK-1 の「10 倍広い集合」が戻る）')
+      .toMatch(/npc_stable_id is not null/);
+    /** ★対照: ★4 つが**同じ 1 か所**（`CANDIDATE_WHERE`）に在ること（★D-052・MK-1 の直しそのもの） */
+    const where = LIVE.slice(LIVE.indexOf('CANDIDATE_WHERE'));
+    expect(where.length, '★`CANDIDATE_WHERE` が見つからない').toBeGreaterThan(50);
+    for (const p of ['owner_id is null', 'npc_stable_id is not null', 'retired_at_week is null', 'finish_pos is not null']) {
+      expect(where.slice(0, 400), `★${p} が CANDIDATE_WHERE の中に無い`).toContain(p);
+    }
+  });
+
   it('⑥ ★馬を作らない・乱数と時刻を読まない（★D-102 ②・憲法 4）', () => {
     expect(LIVE).not.toMatch(/insert into horses/i);
     expect(LIVE).not.toMatch(/Math\.random|Date\.now/);
