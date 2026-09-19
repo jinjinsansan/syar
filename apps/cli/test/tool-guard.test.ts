@@ -18,6 +18,7 @@
  *     **見た目からは決まらないので、明示した登録簿を検査します。**
  */
 import { readFileSync, readdirSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { COMPONENT, NOT_A_TOOL, PRODUCTION_OPS, READONLY, SOURCE_MUTATING, STATE_CHANGING, allClassified } from '../../../tools/lib/classification.mjs';
@@ -45,17 +46,35 @@ const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
  * ⚠️ ★**除外は 1 つだけ**になりました（R-29）: ★**`.` 始まり**
  *    （★編集器が置く隠しファイルと、★`inventory/.probe.jsonl` のような実行時の成果物）。
  */
-function toolFilesUnder(dir: string, prefix = ''): string[] {
-  const out: string[] = [];
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    if (e.name.startsWith('.')) continue;
-    const rel = prefix === '' ? e.name : `${prefix}/${e.name}`;
-    if (e.isDirectory()) out.push(...toolFilesUnder(`${dir}/${e.name}`, rel));
-    else if (e.isFile()) out.push(rel);
-  }
-  return out;
+/**
+ * 🔴 ★**2026-09-19・CI-3 — ★「ディスクにある」ではなく「★版管理にある」で数えます。**
+ *
+ * 【★何が起きたか】★**CI の 1 回目で、この検査が赤くなりました。★手元では緑でした。**
+ *   ✔ ★`.gitignore:68` に ★**`tools/_*.mjs`**。★映像の作業で作った使い捨ての計測器 **113 本**が
+ *     ★**この機械にだけ**在り、★分類簿にも **113 件**載っていました。
+ *   → ★CI は新しいクローンなので ★**そのファイルがありません**。
+ *     ★下の「読取専用に書き込み文が無いか」が `readFileSync` で ★**ENOENT を投げます**。
+ *   → ★★**分類簿が、★この機械にしか無いものを分類していました。**
+ *
+ * 【★なぜ「版管理にある」が正しいか】
+ *   ★R-24 が守りたいのは ★**「配られる道具が、黙って本番に向かないこと」**です。
+ *   ★`.gitignore` されたファイルは ★**配られません**（★レビューもされません）。
+ *   → ★**分類簿が統べるのはリポジトリ**で、★**個人の作業場ではありません**。
+ *
+ * ⚠️ ★**穴は残ります**: ★`git add` するまでは分類されなくても通ります。
+ *    ★**そこを塞ぐのが CI** です（★CI は追跡されたものしか見ません）。★手元 ＝ CI になりました。
+ * ⚠️ ★`git` が無い環境では ★**投げます**（★空の一覧で緑にしない・R-21）。
+ */
+function trackedToolFiles(): string[] {
+  const out = execSync('git ls-files tools', { cwd: ROOT, encoding: 'utf8' }).trim();
+  if (out === '') throw new Error('★`git ls-files tools` が空です（★走査が壊れています・R-21）');
+  return out.split(String.fromCharCode(10))
+    .map((p) => p.replace(/^tools\//, ''))
+    /** ★`.` 始まりは編集器の置き土産と実行時の成果物（★従来どおり外す） */
+    .filter((p) => p !== '' && !p.split('/').some((seg) => seg.startsWith('.')))
+    .sort();
 }
-const toolFiles = toolFilesUnder(`${ROOT}tools`);
+const toolFiles = trackedToolFiles();
 
 /** 最小限の偽クライアント */
 const fake = (impl: () => Promise<{ rows: { environment: string }[] }>) =>
@@ -107,25 +126,50 @@ describe('★R-24 ツールの分類（メタテスト）', () => {
     expect(toolFiles, '★lib/ の中身を見ていません').toContain('lib/classification.mjs');
   });
 
-  it('★分類簿に載っているファイルが実在する（消えたツールが残っていない）', () => {
-    const actual = new Set(toolFiles);
+  it('🔴 ★分類簿に載っているものは、★版管理にある（★ゴーストを残さない・CI-3）', () => {
     /**
-     * ★**`_` 始まり（使い捨ての計測用）はこの検査から外します**（2026-08-27・オーナー判断）。
+     * 🔴 ★**2026-09-19・CI-3 — ★除外をやめました。**
      *
-     * ⚠️ ★`.gitignore:68` が `tools/_*.mjs` を**追跡外**にしているのに、分類簿は追跡されています。
-     *    したがって**新規クローンでは登録済みの `_*.mjs` が 1 つも存在せず**、
-     *    ★**この検査は綺麗なチェックアウトから通りませんでした**（実測 38 件がゴースト）。
-     *    いま通っていたのは、★**作業ツリーにたまたまそのファイルが在るから**にすぎません
-     *    （R-28「リポジトリという名のプログラムを測っている」と同じ形）。
+     * 【★ここに何が書いてあったか】
+     *   > ★`.gitignore:68` が `tools/_*.mjs` を追跡外にしているのに、分類簿は追跡されています。
+     *   > ★したがって**新規クローンでは登録済みの `_*.mjs` が 1 つも存在せず**、
+     *   > ★**この検査は綺麗なチェックアウトから通りませんでした**（実測 38 件がゴースト）。
      *
-     * ★**外して失われるもの**: `_*.mjs` の登録が消えたあとも簿に残り続けます。
-     * ★**外しても守られるもの**: 上の検査（作業ツリーにあるのに未登録なら落ちる）はそのまま効くので、
-     *   ★**分類されていないツールが混入する経路は閉じたまま**です。R-24 の目的はこちらです。
+     *   ★★**問題は分かっていました。★そして「この検査から `_*` を外す」で閉じました。**
+     *   → ★**ゴーストは残ったまま**で、★38 件が **113 件**に増えていました。
+     *   → ★そして ★**隣の検査**（「読取専用に書き込み文が無いか」）は `readFileSync` するので、
+     *     ★**新しいクローンで ENOENT を投げます**。★**CI の 1 回目がそれで赤くなりました。**
+     *
+     * 【★どう直したか】★**除外ではなく、★簿から 113 件を消しました。**
+     *   ★分類簿が統べるのは ★**リポジトリ**で、★個人の作業場ではありません。
+     *   ★`_*.mjs` は `.gitignore` されており、★**配られず、レビューもされません**。
+     *
+     * ⚠️ ★**これで手元と CI が同じものを見ます。** ★`toolFiles` も `git ls-files` から引いています。
      */
-    // ⚠️ ★`_` 始まりの判定は ★**基底名**で見ます（★TG-3 で分類が相対パスになったため）
-    const basename = (f: string): string => f.slice(f.lastIndexOf('/') + 1);
-    const ghosts = allClassified().filter((f) => !basename(f).startsWith('_') && !actual.has(f));
-    expect(ghosts, `存在しないファイルが分類簿にあります:\n  ${ghosts.join('\n  ')}`).toEqual([]);
+    const actual = new Set(toolFiles);
+    const ghosts = allClassified().filter((f) => !actual.has(f));
+    expect(ghosts, `★版管理に無いものが分類簿にあります（★この機械にしか無い）: ${ghosts.join(' / ')}`)
+      .toEqual([]);
+    /** 🔴 ★対照: ★簿が空でない（★全部消して緑、を防ぐ） */
+    expect(allClassified().length, '★分類簿が空').toBeGreaterThan(200);
+  });
+
+  it('🔴 ★分類簿のどのファイルも、実際に読める（★CI で ENOENT にならない）', () => {
+    /**
+     * 🔴 ★**これが CI の 1 回目で落ちた形そのもの**です。
+     *    ★上の検査が「除外」で逃げていたので、★**下の検査が代わりに落ちました**
+     *    （★しかも `readFileSync` の ENOENT なので、★**何が悪いか読めません**）。
+     *    → ★**ここで名指しで落とします。**
+     */
+    const unreadable: string[] = [];
+    for (const f of allClassified()) {
+      try {
+        readFileSync(`${ROOT}tools/${f}`, 'utf8');
+      } catch {
+        unreadable.push(f);
+      }
+    }
+    expect(unreadable, `★分類簿にあるのに読めません: ${unreadable.join(' / ')}`).toEqual([]);
   });
 
   it('★状態を変えるツールは必ず assertNotProduction を呼ぶ', () => {

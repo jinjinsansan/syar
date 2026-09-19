@@ -49,12 +49,40 @@ try {
 
 /** ★落ちた検査の名前（★ファイル > describe > it）。★`assertionResults` の `fullName` を使う */
 const failing = [];
+/**
+ * 🔴 ★**読み込めなかったファイル**（★**CI-4**・2026-09-19・★CI の 1 回目で見つかった）。
+ *
+ * 【★何が起きていたか】
+ *   ★ファイルが ★**モジュールの段階で落ちる**と、★vitest は
+ *   ★`status: 'failed'` ／ ★**`assertionResults: []`** ／ ★`numFailedTests: 0` を返します。
+ *   → ★下のループは `assertionResults` しか見ていなかったので、
+ *     ★★**1 件も数えず、1 件も赤にしませんでした。**
+ *   → ★★**「走らなかった」が「緑」として通っていました**（★R-21 そのもの）。
+ *
+ * ✔ ★実測（2026-09-19・手元で再現）: ★`out/2d-edit-grammar` を退避して
+ *   ★`edit-grammar-audit.test.ts` を流すと ★**`numTotalTests: 0` / `numFailedTests: 0`**。
+ *   ★登録済みの 2 件は ★**「緑に戻った」ように見え**、★登録を消せと言われました。
+ *   🔴 ★**CI の 1 回目が、まさにそれを言ってきました**（★CI には `out/` が無い）。
+ *
+ * ⚠️ ★**登録簿に「どの機械で赤か」を足して隠しません**（★CI-5）。
+ *    ★**機械で結果が変わることが欠陥**で、★足すとその欠陥が仕様になります。
+ */
+const unloadable = [];
 let total = 0;
 for (const file of report.testResults ?? []) {
   const rel = path.relative(process.cwd(), file.name).split(path.sep).join('/');
-  for (const a of file.assertionResults ?? []) {
+  const asserts = file.assertionResults ?? [];
+  for (const a of asserts) {
     total += 1;
     if (a.status === 'failed') failing.push(`${rel} > ${a.fullName}`);
+  }
+  /**
+   * 🔴 ★**検査が 1 つも拾えなかったのに、ファイルが落ちている** ＝ ★読み込めていません。
+   *   ★名前が無いので照合できません。★**登録簿で許すこともできません**（★そこが要点）。
+   */
+  if (asserts.length === 0 && file.status === 'failed') {
+    const firstLine = (file.message ?? '').split(String.fromCharCode(10))[0] ?? '';
+    unloadable.push({ file: rel, message: firstLine.slice(0, 200) });
   }
 }
 if (total === 0) {
@@ -78,6 +106,14 @@ bad = say('★登録簿に無い赤がない', d.unregistered) || bad;
 bad = say('★登録簿に、緑に戻ったものが残っていない', d.staleGreen) || bad;
 bad = say('★登録の期限が切れていない', d.expired) || bad;
 bad = say('★登録に why / owner / until が揃っている', d.missingFields) || bad;
+/**
+ * 🔴 ★**読み込めなかったファイル**（★**CI-4**）。★登録簿では許せません。
+ *   ★「走らなかった」は「緑」でも「既知の赤」でもなく、★**照合そのものが成り立っていない**状態です。
+ */
+bad = say(
+  '★すべての検査ファイルが読み込めている（★「走らなかった」を緑にしない・R-21）',
+  unloadable.map((u) => `${u.file} … ${u.message}`),
+) || bad;
 
 if (bad) {
   console.log('\n🔴 ★不合格。★赤を直すか、★理由・担当・期限を書いて tools/lib/known-red.mjs に載せてください');
