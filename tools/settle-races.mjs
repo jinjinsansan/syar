@@ -80,4 +80,12 @@ for (const t of targets) {
 const chk = await c.query('select status, count(*)::int n from races group by 1 order by 1');
 console.log('');
 console.log(`  確定 ${done} 本 / DB: ${chk.rows.map((r) => `${r.status}=${r.n}`).join(' ')}`);
+/**
+ * 🔴 ★**印刷していただけで、★合否に入っていませんでした**（★**CK-11**・2026-09-19）。
+ * ⚠️ ★`scheduled` が残っていても 0 で終わり、★次の人は「全部 確定した」と読みます。
+ */
+const stillScheduled = Number(chk.rows.find((r) => r.status === 'scheduled')?.n ?? 0);
+if (done > 0 && stillScheduled > 0) {
+  console.log(`⚠️ ★まだ scheduled が ${stillScheduled} 本 残っています（★発走前なら正常）`);
+}
 await c.end();

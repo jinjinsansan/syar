@@ -137,6 +137,17 @@ const chk = await c.query(
 );
 console.log('');
 console.log(`  作成 ${made} 本 / DB: ${chk.rows.map((r) => `${r.status}=${r.n}`).join(' ')}`);
+/**
+ * 🔴 ★**印刷していただけで、★合否に入っていませんでした**（★**CK-11**・2026-09-19）。
+ *   ★作ったつもりの本数と、★DB に実際に在る本数を ★**並べておいて比べていません**でした。
+ * ⚠️ ★DB の合計には**前から在るレース**も含まれるので、★**一致を要求しません** —
+ *   ★見るのは ★**作ったはずなのに DB の合計がそれを下回る**場合だけです。
+ */
+const dbTotal = chk.rows.reduce((a, r) => a + Number(r.n), 0);
+if (made > 0 && dbTotal < made) {
+  console.log(`🔴 ★${made} 本 作ったはずなのに、DB の合計が ${dbTotal} 本しかありません`);
+  process.exitCode = 1;
+}
 const sale = await c.query(
   `select count(*)::int n from races where status = 'scheduled' and scheduled_at > now()`,
 );

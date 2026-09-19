@@ -33,6 +33,11 @@ for (const s of NPC_STABLES) {
 }
 const r = await c.query('select count(*)::int n from npc_stables');
 console.log(`投入 ${n} 件 / DB 上 ${r.rows[0].n} 件`);
+/** 🔴 ★**2 つの数を並べておいて、★比べていませんでした**（★**CK-11**・2026-09-19） */
+if (Number(r.rows[0].n) !== n) {
+  console.log(`🔴 ★投入 ${n} 件 に対して DB は ${r.rows[0].n} 件です`);
+  process.exitCode = 1;
+}
 
 // ★憲法 §0.1 の確認: 冠名が実在の牧場名でないこと（すべて造語）
 const p = await c.query('select prefix from npc_stables order by id limit 5');

@@ -25,4 +25,13 @@ for (const r of rows) {
 }
 const z = (await c.query(`select count(*)::int n from races where purse = 0`)).rows[0].n;
 console.log(`\n★purse=0 のレース: ${z}件（0 であること）`);
+/**
+ * 🔴 ★**期待を文章で書いて、★機械で見ていませんでした**（★**CK-11**・2026-09-19）。
+ *   ★上の印刷に「0 であること」と書いてありながら、★**0 でなくても終了コード 0** でした。
+ *   ★★**数えると、★その数で落ちるは別**です。
+ */
+if (z !== 0) {
+  console.log(`🔴 ★purse=0 が ${z} 件 残っています`);
+  process.exitCode = 1;
+}
 await c.end();
