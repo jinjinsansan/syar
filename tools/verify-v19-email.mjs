@@ -99,6 +99,24 @@ function tamper(token, how) {
   throw new Error(`未知の改竄: ${how}`);
 }
 
+/**
+ * 🔴 ★**この道具が作るメールの接頭辞**（★`TOOL-SNAPSHOT-IN-MEMORY` の答え・2026-09-19）。
+ *
+ * ★この道具は `v19e-${Date.now()}` のように **実行ごとに違う id** を作ります。
+ * ★殺されるとその id は消えますが、★**接頭辞はここ（ソース）に在ります**。
+ * → ★★**控えを足すより、★引き方を直すほうが強い**（★控えは壊れる・★道具も 1 本 減る）。
+ *
+ * ⚠️ 🔴 ** ただし `like` は広く消しすぎます**（★R-29 の族の、★消す側）。
+ *   → ★★**消す前に数え、★見込みを超えたら消さずに落ちます。**
+ *   ★例: ★この実行が作った数より多ければ、★**別の実行か別のものが入っています**。
+ *
+ * ⚠️ ★`@test.local` だけでは絞りません — ★他の道具も使っています
+ *   （`a5@test.local` / `a6@test.local` / `prize@test.local` など）。★**接頭辞で絞ります。**
+ */
+const EMAIL_PREFIXES = ['v19e-', 'e6b-', 'dup-', 'e7-', 'e5-', 'e4-', 'v14-', 'v14b-'];
+/** ★`like` の型（★`_` と `%` は接頭辞に含まれないので escape 不要） */
+const EMAIL_LIKE = EMAIL_PREFIXES.map((x) => `${x}%@test.local`);
+
 const created = [];
 try {
   console.log('\n=== ★対象外（理由とともに明記する・裁定 §3-1）===');
@@ -580,6 +598,41 @@ try {
     rec('片付け', '★検証用の馬を 1 頭も残さない（★元の厩舎へ戻す）',
       strayHorses === 0 && Number(r.orphans) === 0 ? 'ok' : 'ng',
       `元の厩舎が分からないままの馬 ${strayHorses} 頭 ／ 孤児 ${r.orphans} 頭`);
+  }
+
+  /**
+   * 🔴 ★**接頭辞で、★殺された前の実行の残りを掠う**（★`TOOL-SNAPSHOT-IN-MEMORY`）。
+   *
+   * ⚠️ 🔴 ★**消す前に数えます。★見込みを超えたら消しません。**
+   *   ★見込み ＝ ★**この実行が作った数**（`created.length`）。
+   *   ★それを超えていたら、★**別の実行か別のものが入っています** —
+   *   ★こちらで消す資格がありません。★数えて出して、★人に渡します。
+   */
+  {
+    const found = (await client.query(
+      `select id::text as id, email from auth.users where email like any($1::text[]) order by created_at`,
+      [EMAIL_LIKE],
+    )).rows;
+    if (found.length === 0) {
+      rec('掠い', '★接頭辞で引いても残り物が無い', 'ok', `接頭辞 ${EMAIL_PREFIXES.length} 種`);
+    } else if (found.length > created.length) {
+      // 🔴 ★見込み超え。★**消さない。**
+      rec('掠い', '🔴 ★見込みより多いので**消しません**', 'ng',
+        `接頭辞に当たる ${found.length} 件 > この実行が作った ${created.length} 件`
+        + ` ／ ${found.slice(0, 5).map((x) => x.email).join(' ')}${found.length > 5 ? ' …' : ''}`);
+    } else {
+      for (const u of found) {
+        await client.query('delete from ep_ledger where user_id = $1', [u.id]);
+        await client.query('delete from pp_ledger where user_id = $1', [u.id]);
+        await client.query('delete from users where id = $1', [u.id]);
+        await admin.auth.admin.deleteUser(u.id);
+      }
+      const still = Number((await client.query(
+        `select count(*)::int as n from auth.users where email like any($1::text[])`, [EMAIL_LIKE],
+      )).rows[0].n);
+      rec('掠い', '★接頭辞で引いた残り物を消した', still === 0 ? 'ok' : 'ng',
+        `${found.length} 件 消して、★残り ${still} 件`);
+    }
   }
   await client.end();
 }
