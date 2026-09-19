@@ -106,7 +106,7 @@ export const TOOL_AFTERMATH = {
   'synthetic-bettor.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: users / auth.users / bets / ep_ledger / pp_ledger を消す。数えていない（:173 の照合は賭けの検査であって片付けの照合ではない）' },
   'verify-a2.mjs': { mode: 'restores', why: '自前の照合：作った番号だけを消し、★**残存 0 件とレース総数が開始時と同じ**でなければ exit 1（:135）。⚠️ 2026-09-19 まで pending としていましたが ★**分類の誤り**でした', countedBy: 'left !== 0 || after !== before' },
   'verify-b1.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: horse_week_log を消す。数えていない' },
-  'verify-g6.mjs': { mode: 'restores', why: '自前の照合：台帳・口座・所有馬の残行と ★**所属厩舎が元の値に戻ったか**を数え、違えば fails に積む。🔴 2026-09-19 に直した：以前は `npc_stable_id = 1` と ★**決め打ち**しており、★元が 1 でない馬を取ったら ★**黙って 1 番厩舎へ移していた**（★staging の厩舎は 1..12+ で各 170〜280 頭）', countedBy: 'if (!cleanOk) fails.push' },
+  'verify-g6.mjs': { mode: 'restores', why: '自前の照合：台帳・口座・所有馬の残行と ★**所属厩舎が元の値に戻ったか**を数え、違えば fails に積む。🔴 2026-09-19 に直した：以前は `npc_stable_id = 1` と ★**決め打ち**しており、★元が 1 でない馬を取ったら ★**黙って 1 番厩舎へ移していた**（★staging の厩舎は 1..12+ で各 170〜280 頭）。✅ ★**2026-09-19（SB-6）**: ★控えを ★`tmp/snapshots/verify-g6.json` に置くようにした（★付け替えの**前**に置き、★戻ったことを数えた**後**に捨てる）。★**殺されても次の実行が戻す**。★戻し方は `lib/tool-restores.mjs` の `RESTORE_G6`、★検査は `tool-restores-g6.test.ts`（8 件）。⚠️ 🔴 ★**実 DB では確かめていない**（★偽の client）', countedBy: 'if (!cleanOk) fails.push' },
   'verify-a4.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: races を消す。数えていない' },
   'verify-a5.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: races / race_odds / bets / ep_ledger / users を消す。数えていない' },
   'verify-a6.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: races / race_entries / race_odds / bets / ep_ledger / users と、自分で作った馬 1 頭（owner_id で限定）を消す。数えていない。自分で insert した馬だけなので実在の馬は消さない' },

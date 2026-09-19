@@ -21,6 +21,8 @@ import pg from 'pg';
 import { MENUS } from '../packages/training/src/index.ts';
 import { assertNotProduction } from './lib/guard.mjs';
 import { loadEnv } from './lib/env.mjs';
+import { takeSnapshot, readSnapshot, dropSnapshot } from './lib/snapshot-file.mjs';
+import { RESTORE_G6 } from './lib/tool-restores.mjs';
 
 const UID = '00000000-0000-0000-0000-0000000000g6'.replace('g6', 'a6');
 const START_EP = 1_000_000;
@@ -42,6 +44,23 @@ console.log('# G-6: 調教の EP 消費を ep_ledger に記帳する');
 console.log('');
 
 // ── 準備 ────────────────────────────────────────────────
+/**
+ * 🔴 ★**前の実行が殺されて残したものを、★いちばん先に戻す**（★**SB-6**・2026-09-19）。
+ *
+ * ⚠️ ★**下の `owner_id = null` より前**でなければいけません。
+ *   ★`npc_stable_id` を戻さずに `owner_id` を外すと ★**両方 null** になり、
+ *   ★`horses_owner_xor_npc` に当たります。★順番がこの道具の安全です。
+ */
+const left = readSnapshot(RESTORE_G6.snapshot);
+if (left !== null) {
+  const { rows } = await RESTORE_G6.restore(c, left.data);
+  console.log(
+    `  ★前の実行（${left.takenAt}）が残した馬を戻しました: `
+      + `${left.data.horseId} → 厩舎 ${left.data.npcStableId}（${rows} 行）`,
+  );
+  dropSnapshot(RESTORE_G6.snapshot);
+}
+
 await c.query('update horses set owner_id = null where owner_id = $1', [UID]);
 await c.query('delete from ep_ledger where user_id = $1', [UID]);
 await c.query('delete from users where id = $1', [UID]);
@@ -72,6 +91,19 @@ const before = (await c.query(
 )).rows[0];
 if (before === undefined) throw new Error('★NPC の馬が 1 頭もいません');
 const ORIGINAL_STABLE = before.npc_stable_id;
+
+/**
+ * 🔴 ★**控えをプロセスの外へ**（★**SB-6**・2026-09-19）。★**付け替える前**に置きます。
+ *
+ * ⚠️ ★変えてから置くと、★**間で殺されたときに控えが無い**。★ここの 2 行の順が全部です。
+ * ⚠️ ★`ORIGINAL_STABLE`（メモリ）は下の照合でそのまま使いますが、★**それは控えではありません** —
+ *   ★控えはこのファイルのほうです。★メモリは殺されたら消えます。
+ */
+takeSnapshot(RESTORE_G6.snapshot, {
+  horseId: before.id,
+  npcStableId: ORIGINAL_STABLE,
+  uid: UID,
+});
 
 const pickPlayer = await c.query(
   `update horses set owner_id = $1, npc_stable_id = null
@@ -228,6 +260,19 @@ console.log(
     + `${stableOk ? '✅ 戻った' : '🔴 戻っていない'}`,
 );
 if (!cleanOk) fails.push('後片付け（戻っていない）');
+
+/**
+ * 🔴 ★**控えを捨てるのは、★戻ったことを数えた後**（★**SB-6**・2026-09-19）。
+ *
+ * ⚠️ ★戻っていないのに捨てると、★**次の実行が戻す手がかりを失います。**
+ *   ★`stableOk` が偽なら ★**わざと残します** — ★残骸が在ること自体が
+ *   ★「まだ戻っていない」の印です（★`SH-1‴`: ★守られたことは見えない。★残骸だけが痕跡）。
+ */
+if (stableOk) {
+  dropSnapshot(RESTORE_G6.snapshot);
+} else {
+  console.log(`  🔴 ★控えを残します（tmp/snapshots/${RESTORE_G6.snapshot}.json）— ★次の実行が戻します`);
+}
 
 console.log('');
 console.log(fails.length === 0

@@ -959,6 +959,8 @@ export const COMPONENT = [
   { file: 'lib/sandbox-tx.mjs', why: '★**自分で `begin`/`commit` する関数を、外側の取引に閉じ込める包み**（★2026-09-19）。🔴 ★PostgreSQL に入れ子の取引は無いので、★内側の `commit` は**外側ごと確定**させる。★`verify-ds7-cancel.mjs` がそれで staging を汚した。★検査の道具で、★製品では使わない' },
   { file: 'lib/snapshot-file.d.mts', why: '★`lib/snapshot-file.mjs` の型（★**SB-6**・2026-09-19）。★`classification.d.mts` / `tool-aftermath.d.mts` と同じ作法で、★道具ではなく部品。★中身は写さず、★形だけ（D-052）' },
   { file: 'lib/snapshot-file.mjs', why: '★**元に戻すための控えを、★プロセスの外（`tmp/snapshots/`）に置く**（★**SB-6**・2026-09-19）。🔴 ★`verify-v11-synthetic.mjs` が `timeout` の SIGTERM で殺され、★控え（`STABLE_OF`）が**メモリごと消えて**、★**馬 9 頭の所属厩舎を永久に失った**（★`horses_owner_xor_npc` が `owner_id` を付けた時点で `npc_stable_id` を消すため）。⚠️ ★シグナルを捕まえるだけでは足りない — ★`SIGKILL`・電源断・OOM では走らない。★**書いて `fsync` してから `rename`**（★殺されても中身が届いている）。⚠️ ★**未検証**: ★本当に殺して確かめてはいない。★検査が見ているのは「別のプロセスから読めるか」まで。★検査の道具で、★製品では使わない' },
+  { file: 'lib/tool-restores.d.mts', why: '★`lib/tool-restores.mjs` の型（★**SB-6**・2026-09-19）。★`snapshot-file.d.mts` と同じ作法で、★道具ではなく部品。★中身（表）は `.mjs` が持つ（D-052）' },
+  { file: 'lib/tool-restores.mjs', why: '★**殺された道具が残した状態を、★次の実行が戻す**手続きの表（★**SB-6**・2026-09-19）。★`snapshot-file.mjs` は控えを置くところまでで、★戻す手は別に要る。🔴 ★道具の本体は先頭で DB に繋ぐので検査から `import` できない → ★**繋がない部品として外に出し、★偽の client で検査から実際に走らせる**。⚠️ ★**実 DB では確かめていない**（★確かめると `STABLE-1-SKEW` を測っている母集団を自分で動かす）。★`restore` は**冪等**であることを検査が要求する。★検査の道具で、★製品では使わない' },
   { file: 'lib/guard.d.mts', why: '★`assertNotProduction` の型宣言（★`any` を使わないために置く）。★実行されません' },
   { file: 'lib/pixel-font.mjs', why: '★画像に文字を焼くための点字の表（★映像の道具が使う）' },
   { file: 'lib/race-audit-build.mjs', why: '★映像の監査で使うレースの組み立て。★道具から呼ばれる部品' },
