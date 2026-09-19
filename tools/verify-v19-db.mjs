@@ -155,6 +155,13 @@ try {
   await cleanup();
   const left = await client.query('select count(*)::int as n from user_identities where subject = any($1)', [[SUB_A, SUB_B]]);
   console.log(`  残った試験用の行: ${left.rows[0].n}`);
+  /**
+   * 🔴 ★**数えていたのに、★合否に入っていませんでした**（★**TL-1**・2026-09-19）。
+   *   ★印刷していたので「数えている」に見えますが、★**残っていても終了コード 0** でした。
+   *   ★★**数えると、★その数で落ちるは別**です。
+   */
+  record('片付け', '★試験用の user_identities を 1 行も残さない',
+    Number(left.rows[0].n) === 0, `残り ${left.rows[0].n} 行`);
   await client.end();
 }
 

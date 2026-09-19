@@ -35,6 +35,7 @@ import pg from 'pg';
 
 import { assertNotProduction } from './lib/guard.mjs';
 import { loadEnv } from './lib/env.mjs';
+import { reportLeftovers } from './lib/leftovers.mjs';
 const env = loadEnv();
 
 /** ★固定 UUID。毎回同じ利用者になるので、あとから集計と除外の両方ができる */
@@ -74,8 +75,20 @@ async function clean() {
 
 if (CLEAN) {
   await clean();
+  /**
+   * 🔴 ★**片付いたことを数える**（★**TL-1**・2026-09-19）。
+   *   ⚠️ ★`clean()` は「後片付け完了」と印刷していましたが、★**見ていませんでした**。
+   *   ★`--clean` はこの道具の唯一の片付け口なので、★ここで落ちないと誰も気づきません。
+   */
+  await reportLeftovers(c, [
+    { label: 'pp_ledger', sql: 'select count(*)::int as n from pp_ledger where user_id=$1', params: [UID] },
+    { label: 'ep_ledger', sql: 'select count(*)::int as n from ep_ledger where user_id=$1', params: [UID] },
+    { label: 'bets', sql: 'select count(*)::int as n from bets where user_id=$1', params: [UID] },
+    { label: 'users', sql: 'select count(*)::int as n from users where id=$1', params: [UID] },
+    { label: 'auth.users', sql: 'select count(*)::int as n from auth.users where id=$1', params: [UID] },
+  ], 'synthetic-bettor.mjs --clean');
   await c.end();
-  process.exit(0);
+  process.exit(process.exitCode ?? 0);
 }
 
 // --- 利用者を用意する（冪等） ---

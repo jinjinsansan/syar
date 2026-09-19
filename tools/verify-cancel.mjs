@@ -27,6 +27,7 @@ requireRow(
 );
 
 const uid = '00000000-0000-4000-8000-0000000ca4ce';
+import { reportLeftovers } from './lib/leftovers.mjs';
 const clean = async () => {
   await c.query('delete from ep_ledger where user_id=$1',[uid]);
   await c.query('delete from bets where user_id=$1',[uid]);
@@ -91,7 +92,14 @@ check(!r2.cancelled, '④ 二重中止で二度目は何もしない');
 check(pp === 0, '⑤ 返還で PP が増えていない（EP→PP の変換が無い・憲法②）', `PP=${pp}`);
 check(raceStatus === 'cancelled', '⑥ レースが cancelled になっている', raceStatus);
 
-await clean(); await c.end();
+await clean();
+/** 🔴 ★**片付いたことを数える**（★**TL-1**・2026-09-19。★旧は呼ぶだけだった） */
+await reportLeftovers(c, [
+  { label: 'ep_ledger', sql: `select count(*)::int as n from ep_ledger where user_id=$1`, params: [uid] },
+  { label: 'bets', sql: `select count(*)::int as n from bets where user_id=$1`, params: [uid] },
+  { label: 'users', sql: `select count(*)::int as n from users where id=$1`, params: [uid] },
+], 'verify-cancel.mjs');
+await c.end();
 console.log('');
 console.log(fails.length === 0
   ? `★§10.2 開催中止: PASS — 6項目すべて成立（${odds.length}枚 / ${r1.refundedEp.toLocaleString()} EP 返還）`

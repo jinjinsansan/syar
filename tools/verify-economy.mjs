@@ -32,6 +32,7 @@ const hash = {
 };
 
 const uid = '00000000-0000-4000-8000-0000000ec0c0';
+import { reportLeftovers } from './lib/leftovers.mjs';
 const clean = async () => {
   await c.query(`delete from pp_ledger where user_id=$1`,[uid]);
   await c.query(`delete from ep_ledger where user_id=$1`,[uid]);
@@ -129,6 +130,14 @@ check(before === after && ppRows === Number(ppPayout?.n ?? 0),
   '⑧ 二重確定で PP が増えない', `PP ${before.toLocaleString()} → ${after.toLocaleString()} / 台帳 ${ppRows} 行`);
 
 await clean();
+/** 🔴 ★**片付いたことを数える**（★**TL-1**・2026-09-19） */
+const cleanOkEco = await reportLeftovers(c, [
+  { label: 'pp_ledger', sql: `select count(*)::int as n from pp_ledger where user_id=$1`, params: [uid] },
+  { label: 'ep_ledger', sql: `select count(*)::int as n from ep_ledger where user_id=$1`, params: [uid] },
+  { label: 'bets', sql: `select count(*)::int as n from bets where user_id=$1`, params: [uid] },
+  { label: 'users', sql: `select count(*)::int as n from users where id=$1`, params: [uid] },
+], 'verify-economy.mjs');
+if (!cleanOkEco) fails.push('片付け（残っている）');
 await c.end();
 console.log('');
 console.log(fails.length === 0

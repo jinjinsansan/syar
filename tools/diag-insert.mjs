@@ -25,6 +25,7 @@ import { ODDS_MC_TRIALS } from '../apps/worker/src/odds.ts';
 import { loadRaceablePool, loadTrainingStates } from '../apps/worker/src/horse-repo.ts';
 import { assertNotProduction } from './lib/guard.mjs';
 import { loadEnv } from './lib/env.mjs';
+import { reportLeftovers } from './lib/leftovers.mjs';
 
 const arg = (n, d) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -167,6 +168,13 @@ console.log(`  一括    : ${(msNew / 1000).toFixed(1)} 秒`);
 console.log(`  ★${(msOld / Math.max(1, msNew)).toFixed(0)} 倍速く、${((msOld - msNew) / 1000).toFixed(1)} 秒短縮`);
 
 await cleanup();
+/** 🔴 ★**片付いたことを数える**（★**TL-1**・2026-09-19） */
+const cleanOkDi = await reportLeftovers(c, [
+  { label: 'races', sql: 'select count(*)::int as n from races where cycle_index = any($1)', params: [[CYCLE, CYCLE + 1]] },
+  { label: 'race_entries', sql: 'select count(*)::int as n from race_entries e join races r on r.id = e.race_id where r.cycle_index = any($1)', params: [[CYCLE, CYCLE + 1]] },
+  { label: 'race_odds', sql: 'select count(*)::int as n from race_odds o join races r on r.id = o.race_id where r.cycle_index = any($1)', params: [[CYCLE, CYCLE + 1]] },
+], 'diag-insert.mjs');
+if (!cleanOkDi) fails.push('片付け（残っている）');
 await c.end();
 console.log('');
 console.log(fails.length === 0 ? '★一括投入: PASS — 行は1つも変わっていません' : `★一括投入: FAIL — ${fails.join(' / ')}`);

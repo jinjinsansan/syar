@@ -28,6 +28,7 @@ await assertNotProduction(c, 'verify-flow.mjs');
 const PLAYER = '00000000-0000-4000-8000-00000000f10f';
 const INTERNAL = '00000000-0000-4000-8000-00000000f1f1';
 const IDS = [PLAYER, INTERNAL];
+import { reportLeftovers } from './lib/leftovers.mjs';
 
 const clean = async () => {
   await c.query('delete from pp_ledger where user_id = any($1)', [IDS]);
@@ -147,6 +148,15 @@ const idem = String(r.pp_issued) === String(r2.pp_issued) && String(r.pp_issued_
 console.log(`  PP 発行 ${r.pp_issued}/${r.pp_issued_internal} → ${r2.pp_issued}/${r2.pp_issued_internal}  ${idem ? 'PASS（増えない）' : 'FAIL'}`);
 
 await clean();
+/** 🔴 ★**片付いたことを数える**（★**TL-1**・2026-09-19） */
+const cleanOkFlow = await reportLeftovers(c, [
+  { label: 'pp_ledger', sql: `select count(*)::int as n from pp_ledger where user_id = any($1)`, params: [IDS] },
+  { label: 'ep_ledger', sql: `select count(*)::int as n from ep_ledger where user_id = any($1)`, params: [IDS] },
+  { label: 'bets', sql: `select count(*)::int as n from bets where user_id = any($1)`, params: [IDS] },
+  { label: 'users', sql: `select count(*)::int as n from users where id = any($1)`, params: [IDS] },
+  { label: 'auth.users', sql: `select count(*)::int as n from auth.users where id = any($1)`, params: [IDS] },
+  { label: 'point_flow_daily(today)', sql: `select count(*)::int as n from point_flow_daily where date = $1`, params: [today] },
+], 'verify-flow.mjs');
 done = true;
 await c.end();
-if (!ok || !idem) process.exit(1);
+if (!ok || !idem || !cleanOkFlow) process.exit(1);

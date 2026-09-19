@@ -15,6 +15,7 @@ await c.connect();
 await assertNotProduction(c, 'verify-exchange.mjs');
 
 const uid = '00000000-0000-4000-8000-000000000e11';
+import { reportLeftovers } from './lib/leftovers.mjs';
 const clean = async () => {
   await c.query(`delete from prize_exchanges where user_id=$1`,[uid]);
   await c.query(`delete from pp_ledger where user_id=$1`,[uid]);
@@ -64,4 +65,12 @@ console.log(`★P-1 現金の品目: ${cash}`);
 
 const ok = a.ok && b.ok && b.id===a.id && !cRes.ok && ep===0 && cash.startsWith('拒否');
 console.log(`\n★§11.3: ${ok?'PASS':'FAIL'}`);
-await clean(); await c.end();
+await clean();
+/** 🔴 ★**片付いたことを数える**（★**TL-1**・2026-09-19） */
+await reportLeftovers(c, [
+  { label: 'prize_exchanges', sql: `select count(*)::int as n from prize_exchanges where user_id=$1`, params: [uid] },
+  { label: 'pp_ledger', sql: `select count(*)::int as n from pp_ledger where user_id=$1`, params: [uid] },
+  { label: 'users', sql: `select count(*)::int as n from users where id=$1`, params: [uid] },
+  { label: 'prize_catalog(TEST-%)', sql: `select count(*)::int as n from prize_catalog where name like 'TEST-%'` },
+], 'verify-exchange.mjs');
+await c.end();

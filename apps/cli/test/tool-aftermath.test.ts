@@ -100,8 +100,8 @@ describe('TL-1 状態を変える道具の後始末', () => {
      * ⚠️ 🔴 ★**この数を上げてはいけません。** ★上げるのは「直せなかった」ことの宣言です。
      */
     const pending = Object.entries(TOOL_AFTERMATH).filter(([, e]) => e.mode === 'pending');
-    // ★verify-prize / verify-v10-bets / verify-v19-email / verify-a7 を restores へ、★cleanup-ds7-leak / verify-a4 / verify-a5 / verify-a6 を consumes へ（16→8・2026-09-19）。🔴 ★下げたら戻さない
-    const PENDING_RATCHET = 8;
+    // 🔴 ★2026-09-19に **16 → 0**。★状態を変える道具 47 本が、★全部 自分の片付けを数えるようになった。⚠️ ★**戻さない**（★新しい道具は最初から数えること）。🔴 ★下げたら戻さない
+    const PENDING_RATCHET = 0;
     expect(pending.length, `🔴 ★pending が ${pending.length} 本（★ラチェットは ${PENDING_RATCHET}）。`
       + '★減らしたなら、この数も下げてください。★増やしたなら、戻してください')
       .toBe(PENDING_RATCHET);
