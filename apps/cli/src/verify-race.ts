@@ -28,6 +28,7 @@ import {
   optimalPlan,
   resolveIntervention,
   resolveRace,
+  baseScore,
   type RaceBalance,
 } from '@star/race-engine';
 import { NICKS_GEN, deriveRng, type HorseRecord } from '@star/sim-engine';
@@ -207,6 +208,8 @@ interface SeedResult {
   meanF: number;
   durabilityGap: number;
   poolSize: number;
+  /** ★レース内の能力の変動係数（SD ÷ 平均）の平均。★判定には使わない */
+  fieldAbilityCv: number;
   /** 出走頭数 → その頭数のレース数（正典 §10.4 の分布を確認する・Q-4） */
   fieldSizeCounts: Record<number, number>;
   /** 出走頭数 → 最低人気の勝利数（P-4: 裾が頭数によらず生きているか） */
@@ -283,6 +286,9 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
   let aiWins = 0;
   let optimalWins = 0;
   let interventionRaces = 0;
+  /** 🔴 ★レース内の能力の CV（★判定には使わない・2026-09-20） */
+  let fieldCvSum = 0;
+  let fieldCvN = 0;
 
   const fieldRng = deriveRng(seed, STREAM.FIELD);
 
@@ -332,6 +338,23 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     const conditions = prod === null ? race.conditions : conditionsFromFrozen(prod.courseFrozen, race.conditions);
     // ★距離ロスの下ごしらえはレースごとに 1 回（ワーカーの build-race.ts と同じ形・ES-6・R-30）
     const lanePlan = lanePlanForRace(conditions);
+
+    /**
+     * 🔴 ★**レース内の能力の散らばり**を数える（★2026-09-20・`PROD-NEVER-AGED`）。
+     *   ★本番のレース内 CV は **7.23%**（`tools/diag-field-dispersion.mjs`）。
+     *   ★それが広いのか狭いのかは、★**比べる相手**が無いと言えません。
+     * ⚠️ ★**判定には使いません**。★出力に 1 行 足すだけです。
+     * ⚠️ ★`baseScore(stats, 距離)` で採ります（★**R-30**）。
+     */
+    if (race.entrants.length >= 3) {
+      const bs = race.entrants.map((e) => baseScore(e.stats, conditions.distance));
+      const bm = bs.reduce((a, b) => a + b, 0) / bs.length;
+      if (bm > 0) {
+        const bsd = Math.sqrt(bs.reduce((a, b) => a + (b - bm) ** 2, 0) / (bs.length - 1));
+        fieldCvSum += bsd / bm;
+        fieldCvN += 1;
+      }
+    }
 
     // (1) 人気を推定する（本番とは別系列・§9.2）
     //   タイブレークを含む順位付けは popularity.ts に切り出し、経路テストを掛けている（O-2）
@@ -448,6 +471,7 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
 
   const denom = Math.max(1, racesForSeed);
   return {
+    fieldAbilityCv: fieldCvN > 0 ? fieldCvSum / fieldCvN : 0,
     seed,
     races: racesForSeed,
     favoriteWinRate: favoriteWins / denom,
@@ -833,6 +857,7 @@ console.log(
  */
 const favRates = results.map((r) => r.favoriteWinRate);
 console.log(
+  `  ★レース内の能力の変動係数（SD ÷ 平均）: **${(mean(results.map((r) => r.fieldAbilityCv)) * 100).toFixed(2)}%**（★判定には使いません。★本番は 7.23% — tools/diag-field-dispersion.mjs）\n` +
   `  シード間の 1番人気勝率のばらつき: ★不偏SD(÷n-1) ${pct(sdSample(favRates))}` +
   ` / 母SD(÷n) ${pct(sd(favRates))}` +
   ` → ★**平均の SE ${pct(standardError(favRates))}**（★前後比較はこれで割ること）`,

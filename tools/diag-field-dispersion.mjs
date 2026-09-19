@@ -125,6 +125,52 @@ console.log(monotone
     + '\n     ★育たない世界では「勝つ」がほぼ乱数なので、★上のクラスに居るのは'
     + '\n     ★**たまたま勝った馬**であって、★強い馬ではない、という筋と合います。');
 
+/**
+ * 🔴 ★**分解**（★2026-09-20）。
+ *
+ * ✔ ★`baseScore` は**重み付き和**（`coefficients.ts:57-60`）で、
+ *   ★素質開放率 `u` は**馬ごとに 1 回**引かれて**5 能力すべてに同じ倍率**で掛かる。
+ *   → ★**`baseScore(potential × u) = u × baseScore(potential)`** が**厳密に**成り立つ。
+ *
+ * ⚠️ 🔴 ** CV は「計算した集合の中」でしか意味を持ちません。**
+ *   ★レース内の CV と、★集団全体の CV は別の量です。★両方 出します。
+ */
+console.log('');
+console.log('【④ 🔴 分解: 能力の散らばりは、素質か、生まれつきの当たり外れか】');
+const pots = (await c.query(`
+  select h.potential, h.stats from horses h where h.retired_at_week is null`)).rows;
+/** ⚠️ ★距離は集団全体では決まらないので、★**中距離 1600m** で揃えて比べます */
+const D = 1600;
+const potScores = pots.map((r) => baseScore(r.potential, D));
+const statScores = pots.map((r) => baseScore(r.stats, D));
+const unlocks = pots.map((r, i) => (potScores[i] === 0 ? 0 : statScores[i] / potScores[i]));
+console.log(`  ★集団全体 CV(baseScore(potential))  = **${(cv(potScores) * 100).toFixed(2)}%**   (n=${pots.length})`);
+console.log(`  ★集団全体 CV(baseScore(stats))      = **${(cv(statScores) * 100).toFixed(2)}%**`);
+console.log(`  ★集団全体 CV(素質開放率)              = **${(cv(unlocks) * 100).toFixed(2)}%**  (平均 ${mean(unlocks).toFixed(4)})`);
+
+/** 🔴 ★レース内の potential の CV（★分解が解けるのはこちら） */
+const potRows = (await c.query(`
+  select r.id::text as race_id, r.distance, h.potential
+    from race_entries e
+    join races r on r.id = e.race_id
+    join horses h on h.id = e.horse_id
+   where r.status = 'settled' and e.finish_pos is not null`)).rows;
+const potByRace = new Map();
+for (const r of potRows) {
+  if (!potByRace.has(r.race_id)) potByRace.set(r.race_id, []);
+  potByRace.get(r.race_id).push(baseScore(r.potential, Number(r.distance)));
+}
+const inRacePot = [...potByRace.values()].filter((x) => x.length >= 3).map(cv);
+const inRacePotCv = mean(inRacePot) * 100;
+console.log(`  ★レース内   CV(baseScore(potential))  = **${inRacePotCv.toFixed(2)}%**`);
+
+const inRaceStatCv = mean(races.map((r) => cv(r.scores))) * 100;
+const uCv = cv(unlocks) * 100;
+console.log('');
+console.log(`  ★照合: √(レース内 stats² − 開放率²) = √(${inRaceStatCv.toFixed(2)}² − ${uCv.toFixed(2)}²) = ${Math.sqrt(Math.max(0, inRaceStatCv ** 2 - uCv ** 2)).toFixed(2)}%`);
+console.log(`  ★実測のレース内 CV(potential)                      = ${inRacePotCv.toFixed(2)}%`);
+console.log('  ⚠️ ★この 2 つが近ければ、★分解（u と potential が独立）は合っています。');
+
 await c.end();
 console.log('');
 console.log('⚠️ ★1 行も書いていません（`select` のみ）。');
