@@ -14,7 +14,7 @@
  * 実行: `npx tsx apps/cli/src/economy-balance.ts [--g1 0] [--earnings 0]`（★T-11 で `--stars` を廃止）
  */
 import { MENUS, MENU_IDS, STABLE_GRADES, gradeEpCost, type StableGrade, type MenuId } from '@star/training';
-import { JOCKEYS, npcStudFee, sellBackEP, MIN_PRICE_EP } from '@star/scheduler';
+import { CAREER_RACE_LIMIT, JOCKEYS, npcStudFee, sellBackEP, MIN_PRICE_EP } from '@star/scheduler';
 
 /**
  * ★**キャリアの想定**（★正典 §3.4 の表の前提の写し）。
@@ -23,8 +23,15 @@ import { JOCKEYS, npcStudFee, sellBackEP, MIN_PRICE_EP } from '@star/scheduler';
 export const CAREER_ASSUMPTION = {
   /** ★現役の週数（★§3.4「現役約 90 週」） */
   weeks: 90,
-  /** ★出走数（★§3.4「24 戦」） */
-  starts: 24,
+  /**
+   * ★**出走数**（★正典 §7.1 の `CAREER_RACE_LIMIT`）。
+   *
+   * 🔴 ⚠️ ★**2026-09-19 まで `24` を直書き**していました（D-052 の写し）。
+   *    ★**CC-1 ③ で上限が 24 → 40 に変わったとき、★ここだけが 24 のまま古くなる**ところでした。
+   *    → ★**正典の定数を引きます。** ★「§3.4 が 24 戦を仮定して書いた」ことは、★§3.4 の側の話です。
+   * ⚠️ ★したがって ★**§3.4 の収支は取り直しが要ります**（★24 戦の前提で書かれた表なので）。
+   */
+  starts: CAREER_RACE_LIMIT,
   /** ★出走登録料 [EP]（★§10.4） */
   entryFeeEP: 200,
   /** ★配合費（自家種牡馬）[EP]（★§3.4 の表の写し） */

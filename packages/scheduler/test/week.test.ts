@@ -121,7 +121,13 @@ describe('§7.1 馬の一生の段階', () => {
     expect(LIFECYCLE_WEEKS.trainableFrom).toBe(78);
     expect(LIFECYCLE_WEEKS.raceableFrom).toBe(104);
     expect(LIFECYCLE_WEEKS.retireAt).toBe(260);
-    expect(CAREER_RACE_LIMIT).toBe(24);
+    /**
+     * ★**2026-09-19・CC-1 ③ で 24 → 40**（★オーナー決定）。
+     *   ✔ ★理由: 上級条件が資格者不足で 4〜5 割 中止になっていた（PO-6/CC-4）。
+     *     ★プールの大きさは効かず（PO-7: 3,000 でも 7,333 でも「4 勝以上」は 7.7 頭）、
+     *     ★キャリア長が梃子だった（24 → 40 で成立率 86.2% → 99.1%）。
+     */
+    expect(CAREER_RACE_LIMIT).toBe(40);
   });
 
   it('★調教できるのは 78〜259週（引退後はできない）', () => {
