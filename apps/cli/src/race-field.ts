@@ -366,6 +366,27 @@ export interface GenerateRaceOptions {
   readonly mustInclude?: readonly HorseRecord[];
 }
 
+/**
+ * ★**`bandSize` の床が効かなくなる母集団の大きさ**（★**VP-5**・2026-09-19）。
+ *
+ * ```
+ * bandSize = min(n, max(fieldSize × OVERSAMPLE_RATIO, round(n × classBand)))
+ * ```
+ * ★**小さい集団では左の項（床）が勝ちます。** ★そのとき帯は `classBand`（6%）ではありません。
+ *
+ * ✔ ★実測（2026-09-19）: ★合成 400 頭は帯 **39 頭 ＝ 9.8%**（★床）／★配備 3,000 頭は **180 頭 ＝ 6.0%**。
+ *   ★レースの中の素質の幅は **109.0 対 91.0** で、★**合成のほうが 19.8% 広い**。
+ * 🔴 → ★★**母集団がこの値より小さいと、配備では起きない「広い帯」で測ることになります。**
+ *   ★V-4 は帯が広いほど上がる（D-018）ので、★**ゲートが甘く出ます**。
+ *
+ * ⚠️ ★**較正定数ではありません** — ★`FIELD_SIZE` / `OVERSAMPLE_RATIO` / `classBand` から**導きます**
+ *    （★数を別に置くと、★3 つのどれかを動かしたときに黙ってずれます・D-052）。
+ */
+export function oversampleFloorPoolSize(classBand: number = DEFAULT_CLASS_BAND): number {
+  const meanFieldSize = (FIELD_SIZE.MIN + FIELD_SIZE.MAX) / 2;
+  return Math.ceil((meanFieldSize * OVERSAMPLE_RATIO) / classBand);
+}
+
 /** 抽選値を馬場状態に直す（§10.4 の分布）。★純関数 — 乱数を引きません */
 export function trackConditionFrom(roll: number): TrackCondition {
   return roll < TRACK_CONDITION_CDF.good

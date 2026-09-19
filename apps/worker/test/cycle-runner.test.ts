@@ -130,10 +130,25 @@ function makeStore(nowMs: number) {
       settleLog.push(i);
     },
     overdueRaces: async () => overdue,
+    /**
+     * 🔴 ★**本物の述語を写します**（★2026-09-19・**FK-3**）。
+     *   ★本物（`cancel.ts`）は `where cycle_index = $1 and status in ('scheduled','announced')` で、
+     *   ★**どちらでもない番号には 0 行**です。★無条件に成功を返す偽物は、
+     *   ★**本物が `'scheduled'` だけを見ていた欠陥を素通し**しました（★実際に素通しした）。
+     */
     cancelRace: async (i: number) => {
+      /**
+       * ⚠️ ★`pendingSettlements` が返す番号も ★**本物では `status = 'scheduled'`** です
+       *    （★そういう条件で引いているので）。★だから中止できます。
+       *    ★検査が `pendingSettlements` を差し替えるので、★ここでも同じ扱いにします。
+       */
+      const pending = await store.pendingSettlements(0);
+      const known = races.has(i) || announcedSet.has(i) || overdue.includes(i) || pending.includes(i);
+      if (!known) return { refundedBets: 0, refundedEp: 0 };
       order.push('cancel');
       cancelLog.push(i);
       overdue = overdue.filter((x) => x !== i); // 中止済みはもう返らない（冪等）
+      races.delete(i);
       // ★D-117: ★組成が間に合わず中止したレースは、もう公示でもない
       announcedSet.delete(i);
       return { refundedBets: 3, refundedEp: 3000 };

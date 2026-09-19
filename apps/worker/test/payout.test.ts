@@ -89,17 +89,53 @@ interface BetRow {
   odds_at_purchase: string;
 }
 
-/** ★`payout.ts` の経路を通す偽の DB。馬券の select には行を返し、書き込みは記録するだけ */
+/**
+ * ★`payout.ts` の経路を通す偽の DB。馬券の select には行を返し、書き込みは記録するだけ
+ *
+ * 【🔴 ★**FK-3**（2026-09-19）: ★この偽物には ★**「知らない SQL」の番人がありませんでした**】
+ *   ★旧: ★**どんな SQL でも** `writes` に積んで `{ rows: [], rowCount: 1 }` を返す。
+ *   → ★`payout.ts` が ★**読みを 1 つ足した**ら、★偽物は**黙って 0 行**を返し、
+ *     ★製品は「該当なし」として進み、★**検査は緑のまま**になります。
+ *   → ★★同じ形で `cancelRace`（`status = 'scheduled'` だけ）と
+ *     ★`registeredHorses`（取消を返す）を**今日 2 件**見落としました。
+ *
+ * 【★直した形】
+ *   ★① ★**知っている文だけを受ける。知らない文は投げる**（★足したら、ここに 1 行足す）
+ *   ★② ★**`rowCount` を嘘にしない**（★旧は何でも 1 を返していた）
+ *   ★③ ★**読みと書きを分ける**（★読みを書きとして記録すると、`writes` の検査が緩む）
+ */
 function fakeDb(bets: readonly BetRow[]): {
   client: pg.Client;
   writes: { sql: string; params: readonly unknown[] }[];
 } {
   const writes: { sql: string; params: readonly unknown[] }[] = [];
+  /**
+   * ★**製品が出す文の一覧**（`apps/worker/src/payout.ts`）。
+   * ⚠️ ★ここに無い文が来たら投げます。★製品が文を足したら、★**必ずここにも足すこと**。
+   */
+  const KNOWN_WRITES = [
+    /^\s*update bets set status = 'refunded'/,
+    /^\s*update users set entry_points = entry_points \+/,
+    /^\s*insert into ep_ledger/,
+    /^\s*update bets set status = 'won', payout =/,
+    /^\s*update users set prize_points = prize_points \+/,
+    /^\s*insert into pp_ledger/,
+    /^\s*update bets set status = 'lost'/,
+  ];
   const client = {
     query: async (sql: string, params: readonly unknown[] = []) => {
+      // ★① 読み: ★pending の馬券を引く 1 本だけ
       if (/^\s*select id, user_id, bet_type/.test(sql)) return { rows: bets, rowCount: bets.length };
-      writes.push({ sql, params });
-      return { rows: [], rowCount: 1 };
+      // ★② 書き: ★知っている文だけ。★`rowCount` は「1 行に効いた」を素直に返す
+      if (KNOWN_WRITES.some((re) => re.test(sql))) {
+        writes.push({ sql, params });
+        return { rows: [], rowCount: 1 };
+      }
+      /**
+       * 🔴 ★**知らない文**。★黙って空を返しません（★それが FK-3 で潰した穴）。
+       *   ★製品が読みを足したなら、★**この偽物が何を返すべきかを決めてから**足すこと。
+       */
+      throw new Error(`偽の DB が想定していない SQL: ${sql.trim().slice(0, 80)}`);
     },
   };
   return { client: client as unknown as pg.Client, writes };

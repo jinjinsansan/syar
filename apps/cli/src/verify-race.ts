@@ -15,6 +15,8 @@
  */
 
 import { readFileSync } from 'node:fs';
+// ★測定の素性を刻むため（★VP-8）。★母集団のファイルの中身そのものを指す
+import { createHash } from 'node:crypto';
 import { VERIFY_RACE_STREAM } from '@star/sim-engine';
 import {
   CALIBRATED_RACE_RANDOM_K,
@@ -41,6 +43,7 @@ import {
   PLACEHOLDER_UNLOCK,
   generateRace,
   sortPoolByClass,
+  oversampleFloorPoolSize,
   FIELD_SIZE,
 } from './race-field.js';
 import { runSimulation } from './simulator.js';
@@ -531,6 +534,49 @@ function pct(x: number): string {
 
 const racesPerSeed = Math.max(1, Math.round(TOTAL_RACES / SEEDS.length));
 const started = Date.now();
+
+/**
+ * ★**この測定が何であるかを、結果そのものに刻む**（★**VP-8**・2026-09-19）。
+ *
+ * 【🔴 ★なぜ道具にするか】
+ *   ★`measurement.ts` は「★最後に渡したのは 2026-09-16（V-4 **32.32%**）」と書いていました。
+ *   ★私はそれを今日の 30.21% から引いて「★3 日で −2.11pp 動いた」と報告しかけました。
+ *   ✔ ★確かめたら ★**日付・旗・母集団の 3 つが違いました**（`--real-ability --b6-wired` ／
+ *     ★`docs/pool-staging.json` は 2026-08-12 の書き出し ／ 開放率 71.3% 対 78.1%）。
+ *   → ★★**「3 つとも併記する」という手順は忘れられます。** ★出力に刻めば忘れられません。
+ *
+ * ⚠️ ★`Date.now()` は ★**測定の記録**にだけ使います（★ゲームの判断には使いません・憲法 4）。
+ */
+function provenance(): string {
+  const flags = [
+    B6_WIRED ? '--b6-wired' : null,
+    REAL_ABILITY ? '--real-ability' : null,
+    LEGACY_CONDITIONS ? '--legacy-conditions' : null,
+  ].filter((x) => x !== null);
+  const poolIdx = process.argv.indexOf('--pool');
+  const poolFile = poolIdx >= 0 ? process.argv[poolIdx + 1] : undefined;
+  let poolLine: string;
+  if (poolFile === undefined) {
+    poolLine = `★合成 ${POOL_MARES} 頭（POOL_MARES × POOL_GENERATIONS ${POOL_GENERATIONS} 年）`
+      + (POOL_MARES < oversampleFloorPoolSize()
+        ? ` ⚠️ ★${oversampleFloorPoolSize()} 頭未満 ＝ OVERSAMPLE の床が効く regime（VP-5/VP-7）` : '');
+  } else {
+    /** ★**ファイルの中身そのもの**を指す（★名前を使い回しても別物だと分かる） */
+    const digest = createHash('sha256').update(readFileSync(poolFile)).digest('hex').slice(0, 12);
+    const n = REAL_POOL?.length ?? 0;
+    poolLine = `★--pool ${poolFile}（sha256:${digest}・${n} 頭）`
+      + (n < oversampleFloorPoolSize() ? ` ⚠️ ★${oversampleFloorPoolSize()} 頭未満 ＝ 床の regime` : '');
+  }
+  return [
+    '=== ★この測定の素性（★VP-8: 別の実行と引き算する前に、3 つとも一致しているか見ること）===',
+    `  ★日付   : ${new Date().toISOString()}`,
+    `  ★旗     : ${flags.length === 0 ? '（既定・旗なし）' : flags.join(' ')}`,
+    `  ★母集団 : ${poolLine}`,
+    `  ★標本   : ${SEEDS.length} シード × ${racesPerSeed} ＝ ${racesPerSeed * SEEDS.length} レース`,
+    '',
+  ].join('\n');
+}
+console.log(provenance());
 
 // ★R-8: 既定から外れた設定を冒頭で自己申告する
 console.log(
