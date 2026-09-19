@@ -100,6 +100,41 @@ describe('CK-4 切り出した断片への否定の表明', () => {
     ).toBe('');
   });
 
+  /**
+   * 🔴 ★**CK-6**（★2026-09-19・★CK-4 の規則を差し替え）
+   *
+   * ★CK-4 は「★断片が空でないこと」を見ていました。🔴 ★**それでは足りません。**
+   * ✔ ★`bet-limits.test.ts` で実際に踏んだ形:
+   *   ```js
+   *   const at = worker.indexOf('insert into bet_limits');   // ★見つからないと −1
+   *   const before = worker.slice(Math.max(0, at - 400), at); // ★slice(0, −1)
+   *   ```
+   *   → ★★**空になりません。★「ファイル全体から最後の 1 文字を除いたもの」**です。
+   *   → ★**空ではなく「まったく別のもの」を見ながら通ります。**
+   *
+   * ⚠️ ★`Math.max(0, …)` は「負の添字を防ぐ」つもりの書き方ですが、
+   *    ★**実際には「見つからなかった」を隠します**。★**親切な既定が、失敗を消している**形（R-27 の家族）。
+   *
+   * → ★**見るのは「空か」ではなく「`indexOf` が見つけたか」。** ★`=== -1` を先に弾くこと。
+   */
+  it('🔴 ★CK-6 `indexOf` の結果を `Math.max(0, …)` で救うなら、★先に −1 を弾いている', () => {
+    const files = execFileSync('git', ['ls-files', '*.test.ts'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n').filter((f) => f.length > 0);
+    const ng: string[] = [];
+    for (const f of files) {
+      const src = stripComments(readFileSync(path.join(ROOT, f), 'utf8'));
+      for (const m of src.matchAll(/\.slice\([^)\n]*Math\.max\(\s*0\s*,\s*(\w+)/g)) {
+        const v = m[1]!;
+        /** ⚠️ ★ループの添字（`for (let i = 0; …)`）は `indexOf` 由来ではないので数えません */
+        const fromIndexOf = new RegExp(`(const|let)\\s+${v}\\s*=\\s*[\\w.]+\\.indexOf\\(`).test(src);
+        if (!fromIndexOf) continue;
+        const guarded = new RegExp(`expect\\(\\s*${v}\\b[^\\n]*\\)[^\\n]*toBeGreaterThan\\(\\s*-1\\s*\\)`).test(src);
+        if (!guarded) ng.push(`${f}: 「${v}」が −1 のまま Math.max(0, …) で救われています`);
+      }
+    }
+    expect(ng.join('\n'), '★見つからなかったことを、Math.max が隠しています').toBe('');
+  });
+
   it('★全文への否定は数えない（★安全なので・★対照）', () => {
     /**
      * ✔ ★否定の表明は全体で 280 を超えますが、★**危ないのは断片に当てているものだけ**です。
