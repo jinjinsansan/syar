@@ -77,15 +77,29 @@ for (const t of targets) {
   console.log(`  cycle ${t.cycle_index} ... 確定（馬場 ${t.track_condition}）`);
 }
 
+/**
+ * 🔴 ★**範囲を絞って数える**（★**CK-11′**・2026-09-20・レビュー側の指摘）。
+ *
+ * ⚠️ ★旧: ★`select status, count(*) from races group by 1`（★**where 無し＝全レース**）を
+ *   ★印刷するだけでした。★私は「`scheduled` が残っても発走前なら正常だから
+ *   ★落とせない」と書きましたが — ★★**それは範囲を絞っていないから落とせないだけ**でした。
+ *
+ * ★この道具は `cycle_index >= FROM` の分を ** 一つ残らず**確定させます（★上の for は飛ばしません）。
+ * → ★★**FROM 以降に `scheduled` が残ったら異常。** ★FROM より前は範囲外。
+ *
+ * ★**CK-11′**: ★「落とせない」の理由が ★**「正常な分が混ざるから」**のときは、
+ *   ★**混ざらないように絞れば落とせる。** ★絞らずに警告へ逃げない。
+ */
 const chk = await c.query('select status, count(*)::int n from races group by 1 order by 1');
 console.log('');
-console.log(`  確定 ${done} 本 / DB: ${chk.rows.map((r) => `${r.status}=${r.n}`).join(' ')}`);
-/**
- * 🔴 ★**印刷していただけで、★合否に入っていませんでした**（★**CK-11**・2026-09-19）。
- * ⚠️ ★`scheduled` が残っていても 0 で終わり、★次の人は「全部 確定した」と読みます。
- */
-const stillScheduled = Number(chk.rows.find((r) => r.status === 'scheduled')?.n ?? 0);
-if (done > 0 && stillScheduled > 0) {
-  console.log(`⚠️ ★まだ scheduled が ${stillScheduled} 本 残っています（★発走前なら正常）`);
+console.log(`  確定 ${done} 本 / DB 全体: ${chk.rows.map((r) => `${r.status}=${r.n}`).join(' ')}`);
+
+const leftInRange = Number((await c.query(
+  `select count(*)::int as n from races where status = 'scheduled' and cycle_index >= $1`, [FROM],
+)).rows[0].n);
+console.log(`  ★cycle ${FROM} 以降の scheduled: ${leftInRange} 本（★0 が正しい）`);
+if (leftInRange > 0) {
+  console.log(`🔴 ★${done} 本 確定したはずなのに、★cycle ${FROM} 以降に scheduled が ${leftInRange} 本 残っています`);
+  process.exitCode = 1;
 }
 await c.end();
