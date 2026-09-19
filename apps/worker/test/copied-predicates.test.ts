@@ -44,6 +44,17 @@ interface CopiedPredicate {
  */
 const COPIED: readonly CopiedPredicate[] = [
   {
+    /**
+     * ★**DS-5 ④**（★発走の前に引退していた馬の取消）。
+     *   ★偽物は `races.has(i)`（＝ `status = 'scheduled'`）で切っています —
+     *   ★**確定済みのレースには何もしない**という本物の述語の写し。
+     */
+    fake: 'apps/worker/test/cycle-runner.test.ts',
+    method: 'scratchRetiredBeforeStart',
+    real: { file: 'apps/worker/src/pg-store.ts', contains: "where cycle_index = $1 and status = 'scheduled'" },
+    provenBy: 'tools/verify-ds5-before-start-scratch.mjs',
+  },
+  {
     fake: 'apps/worker/test/d117-two-phase-loop.test.ts',
     method: 'cancelRace',
     real: { file: 'apps/worker/src/cancel.ts', contains: "status in ('scheduled', 'announced')" },

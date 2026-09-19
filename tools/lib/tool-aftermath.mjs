@@ -33,6 +33,7 @@ export const TOOL_AFTERMATH = {
   'verify-ds7-cancel.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },
   'verify-registered-excludes-scratched.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },
   'verify-ds5-retire-scratch.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },
+  'verify-ds5-before-start-scratch.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },
   'verify-gb1-growth-tell.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },
   'cleanup-ds7-leak.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
   'verify-sandbox-detects-commit.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },

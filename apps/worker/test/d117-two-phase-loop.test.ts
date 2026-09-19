@@ -69,6 +69,14 @@ function fake(nowMs: number, alreadyAnnounced: readonly number[] = []): Fake {
       done.add(i);
     },
     pendingSettlements: async () => [],
+    /**
+     * ★**確定するレースが無いので、ここは呼ばれません**（★FK-5）。
+     *   ⚠️ ★呼ばれたら ** 投げます** — ★黙って 0 を返すと、
+     *   ★DS-5 ④ が動いていないのに検査が緑になります。
+     */
+    scratchRetiredBeforeStart: async (i: number) => {
+      throw new Error(`この検査は確定を扱いません（cycle=${i}）`);
+    },
     settleRace: async () => {},
     overdueRaces: async () => [],
     /**

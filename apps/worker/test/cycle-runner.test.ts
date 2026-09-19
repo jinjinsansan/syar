@@ -63,6 +63,10 @@ function makeStore(nowMs: number) {
   const fillLog: number[] = [];
   const settleLog: number[] = [];
   const cancelLog: number[] = [];
+  /** ★DS-5 ④: 発走前の引退確認を呼んだ番号と、その時取消になる頭数 */
+  const retireCheckLog: number[] = [];
+  const retired = new Map<number, number>();
+  let retireSkip = false;
   /** ★処理された順序をそのまま記録する（D-038 の順序を検査するため） */
   const order: string[] = [];
   let overdue: number[] = [];
@@ -78,6 +82,9 @@ function makeStore(nowMs: number) {
     races: Set<number>;
     announcedSet: Set<number>;
     registered: Map<number, readonly string[]>;
+    retireCheckLog: number[];
+    retired: Map<number, number>;
+    setRetireSkip: (v: boolean) => void;
     setOverdue: (xs: number[]) => void;
   } = {
     races,
@@ -88,6 +95,11 @@ function makeStore(nowMs: number) {
     settleLog,
     cancelLog,
     order,
+    retireCheckLog,
+    retired,
+    setRetireSkip: (v: boolean) => {
+      retireSkip = v;
+    },
     setOverdue: (xs: number[]) => {
       overdue = xs;
     },
@@ -125,6 +137,19 @@ function makeStore(nowMs: number) {
       races.add(i);
     },
     pendingSettlements: async () => [],
+    /**
+     * ★**本物の述語を写します**（★**FK-5**・DS-5 ④）。
+     *   ★本物（`pg-store.ts`）は `status = 'scheduled'` のレースだけを見、
+     *   ★**確定済みのレースには何もしません**（★払戻の後に結果を消さない）。
+     *   ★`retired` に入っている番号だけを 1 頭取消にします。
+     */
+    scratchRetiredBeforeStart: async (i: number) => {
+      order.push('retire-check');
+      retireCheckLog.push(i);
+      if (!races.has(i)) return { scratched: 0, refundedEp: 0, skipped: false };
+      const n = retired.get(i) ?? 0;
+      return { scratched: n, refundedEp: n * 500, skipped: retireSkip };
+    },
     settleRace: async (i: number) => {
       order.push('settle');
       settleLog.push(i);
@@ -270,9 +295,13 @@ describe('★D-038 確定を生成より先に処理する', () => {
      *   ★`announce` が 4 本なのは `ANNOUNCE_AHEAD_RACES = 4`、
      *   ★`fill` が 2 本なのは `MAX_FILLS_PER_CYCLE = 2`（★DS-9）。
      * ⚠️ ★**確定と中止が先にある**ことは変わりません（D-038）。
+     *
+     * ★2026-09-19・**DS-5 ④**: ★確定の前に `retire-check` が 1 本 入りました。
+     *   🔴 ★**確定の前でなければ意味がありません** — ★後に置くと
+     *   ★引退した馬が走ってから取消になります。★並びそのもので固定します。
      */
     expect(store.order).toEqual([
-      'settle', 'cancel',
+      'retire-check', 'settle', 'cancel',
       'announce', 'announce', 'announce', 'announce',
       'fill', 'fill',
     ]);
@@ -289,6 +318,64 @@ describe('★D-038 確定を生成より先に処理する', () => {
     };
     await runCycle(store, EPOCH, SEEDS, ANNOUNCE, build, ALERT);
     expect(settledWhenCreating).toBe(true);
+  });
+});
+
+describe('★DS-5 ④ 発走の前に引退していた馬を、確定の前に取消にする', () => {
+  /**
+   * 🔴 ★**組成 → 発走（12 分）の窓**です（★D-111 ③⑥）。
+   *   ★その馬は凍結を持っているので、★`entry-freeze` も D-111 ④ も拾いません。
+   *
+   * ⚠️ ★ここで見るのは **配線**だけです。★**どの馬を取消にするかの判断（発走時刻の週）**は
+   *    ★`tools/verify-ds5-before-start-scratch.mjs` が ★**実 DB** で見ます（★FK-5）。
+   */
+  it('🔴 ★確定の**前**に引退を見る（★順序が逆なら、引退した馬が走ってから取消になる）', async () => {
+    const store = makeStore(IN_FIRST_CYCLE);
+    store.races.add(7);
+    store.pendingSettlements = async () => [7];
+    await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
+    const i = store.order.indexOf('retire-check');
+    const j = store.order.indexOf('settle');
+    expect(i, '★引退の確認が呼ばれていない').toBeGreaterThanOrEqual(0);
+    expect(i, '★確定の後に見ている').toBeLessThan(j);
+  });
+
+  it('★取消にした頭数が周の結果に出る（★黙って通さない・D-111 ⑤）', async () => {
+    const store = makeStore(IN_FIRST_CYCLE);
+    store.races.add(7);
+    store.retired.set(7, 2);
+    store.pendingSettlements = async () => [7];
+    const out = await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
+    expect(out.scratchedBeforeStart).toBe(2);
+    expect(out.settled).toEqual([7]);
+  });
+
+  it('★対照: 引退が 0 頭なら 0 と出る（★上の検査が空振りでない）', async () => {
+    const store = makeStore(IN_FIRST_CYCLE);
+    store.races.add(7);
+    store.pendingSettlements = async () => [7];
+    const out = await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
+    expect(out.scratchedBeforeStart).toBe(0);
+    expect(out.retireCheckSkipped).toEqual([]);
+  });
+
+  it('🔴 ★見送ったときは番号が残る（★`epochMs` が無い周を黙って通さない・R-16）', async () => {
+    const store = makeStore(IN_FIRST_CYCLE);
+    store.races.add(7);
+    store.setRetireSkip(true);
+    store.pendingSettlements = async () => [7];
+    const out = await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
+    expect(out.retireCheckSkipped).toEqual([7]);
+  });
+
+  it('🔴 ★引退の確認が投げたら、確定に進まない（★引退した馬を走らせない）', async () => {
+    ALERTS.length = 0;
+    const store = makeStore(IN_FIRST_CYCLE);
+    store.races.add(7);
+    store.pendingSettlements = async () => [7];
+    store.scratchRetiredBeforeStart = async () => { throw new Error('取消に失敗'); };
+    await expect(runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT)).rejects.toThrow('取消に失敗');
+    expect(store.settleLog, '★取消が落ちたのに確定している').toEqual([]);
   });
 });
 

@@ -375,6 +375,14 @@ async function main(): Promise<void> {
           (out.fillDeferred.length > 0 ? `★組成待ち=[${out.fillDeferred.join(',')}] ` : '') +
           (out.fillFailed.length > 0 ? `🔴組成間に合わず中止=[${out.fillFailed.join(',')}] ` : '') +
           `確定=[${out.settled.join(',')}] ` +
+          /**
+           * ★**発走の前に引退していて取消にした頭数**（★**DS-5 ④**・D-111 ③⑥）。
+           *   ⚠️ ★0 のときは出しません（★毎周 0 と出ると、起きた周が埋もれます）。
+           */
+          (out.scratchedBeforeStart > 0
+            ? `★発走前の引退で取消=${out.scratchedBeforeStart}頭 ` : '') +
+          (out.retireCheckSkipped.length > 0
+            ? `🔴発走前の引退確認を見送り=[${out.retireCheckSkipped.join(',')}] ` : '') +
           // ★1 周に対する割合も出す。秒数だけだと余裕が読み取れません。
           // 🔴 ★**ここは 600000（10 分）の直書きでした**（★2026-09-18・T-13 で発見）。
           //   ★D-007 改訂で 1 周が 3 分になっても割合だけ 10 分基準のままになり、

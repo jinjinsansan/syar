@@ -778,6 +778,21 @@ export const STATE_CHANGING = [
   'verify-ds5-retire-scratch.mjs',
 
   /**
+   * ★**組成 → 発走の間に引退した馬は、確定の前に取消になるか**（★**DS-5 ④**・D-111 ③⑥・2026-09-19）。
+   *
+   * 🔴 ★**主眼は「取消になる」ではなく、「広げすぎていない」ほう**です。
+   *   ★確定は発走より後に走るので、★「いま引退しているか」で切ると
+   *   ★**レースの最中／後に引退した馬まで取消**になり、★**走った馬の結果を消します**。
+   *   → ★対照を 3 つ置きます: ★発走の後に引退／★確定済みのレース／★`epochMs` が無いとき。
+   *
+   * ✅ ★**SQL を写していません** — ★製品の `createPgStore().scratchRetiredBeforeStart` をそのまま呼びます。
+   *   ⚠️ ★そのため ** `npx tsx` で呼ぶこと**（★TypeScript を読み込みます）。
+   * ⚠️ ★**取引の中で `horses`・`race_entries`・`races` を書きます**。★最後に rollback し、
+   *    ★SB-3 が「途中の確定が無い」ことを見ます。★`assertNotProduction` を呼びます。
+   */
+  'verify-ds5-before-start-scratch.mjs',
+
+  /**
    * ★**「前に言ったときの能力」が、言った週にだけ動くか**（★**GB-1 ④⑤⑥**・移行 `0053`・2026-09-19）。
    *
    * 🔴 ★これが見るもの: ★`training-runner` の一括更新は `unnest($14::jsonb[], $15::bigint[])` で

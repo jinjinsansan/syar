@@ -25,6 +25,7 @@ import { ENTRY_FEE_EP, overdueBefore, weekIndexAt, winsRangeFor } from '@star/sc
 import { cancelRace as cancelRaceImpl } from './cancel.js';
 // ★生涯の記録（正典 §18・移行 `0024`）。★確定の中から呼びます（LR-7「レースが終わった後」）
 import { writeRaceStory } from './story-flow.js';
+import { scratchRetiredEntries } from './scratch.js';
 
 /**
  * ★`cycle_index` は bigint なので、`pg` は**文字列で返します**。
@@ -540,6 +541,50 @@ export function createPgStore(
      *   既に settled なら最初の update が0行になり、そこで抜けます。
      *   A-5 の place_bet と同じ構造です。
      */
+    /**
+     * 🔴 ★**発走の直前に、もう 1 度 引退を見ます**（★**DS-5 ④**・正典 **D-111 ③⑥**・2026-09-19）。
+     *
+     * 【★塞ぐ窓】
+     *   ★`main.ts` の抽選前の取消が塞ぐのは ★**登録 → 組成**までです。
+     *   🔴 ★**組成 → 発走（12 分）**に引退した馬は、★**凍結を持っているので誰も拾いません**
+     *     （★`entry-freeze` も D-111 ④ も「凍結が**無い**」を見るため）。→ ★**引退した馬が走ります。**
+     *
+     * 【🔴 ★なぜ `scheduled_at` の週で切るか】
+     *   ★確定は ★**発走より後**に走ります。★「いま引退しているか」で切ると、
+     *   ★**レースの最中／後に引退した馬まで取消**になり、★**走った馬の結果を消し、
+     *   ★その馬を含む馬券を返してしまいます**（§9.1）。★それは別の欠陥です。
+     *   → ★**発走時刻が属するゲーム内週まで**に引退していた馬だけを取消にします。
+     *
+     * 【⚠️ ★`epochMs` が無いとき】
+     *   ★週が出せないので ★**何もしません**（★`writeRaceStory` と同じ作法・★0 週で切らない）。
+     *   ★ただし ★**黙って見送りません**（R-16）— ★呼ぶ側が `skipped` を受け取ります。
+     *
+     * ★取消と返金は `scratch.ts` の 1 本を通します（★D-052・冪等）。
+     */
+    async scratchRetiredBeforeStart(
+      cycleIndex: number,
+    ): Promise<{ scratched: number; refundedEp: number; skipped: boolean }> {
+      if (epochMs === undefined) return { scratched: 0, refundedEp: 0, skipped: true };
+      /**
+       * ⚠️ ★**まだ確定していないレースだけ**を見ます。
+       *    ★確定済みのレースを取消にすると、★払戻の後に結果を消すことになります。
+       */
+      const race = await client.query<{ ms: string }>(
+        `select (extract(epoch from scheduled_at) * 1000)::bigint::text as ms
+           from races where cycle_index = $1 and status = 'scheduled'`,
+        [cycleIndex],
+      );
+      if (race.rowCount === 0) return { scratched: 0, refundedEp: 0, skipped: false };
+      const startWeek = weekIndexAt(Number(race.rows[0]!.ms), epochMs);
+      await client.query('begin');
+      try {
+        const out = await scratchRetiredEntries(
+          client, cycleIndex, '発走の前に引退しました', startWeek,
+        );
+        await client.query('commit');
+        return { scratched: out.scratched, refundedEp: out.refundedEp, skipped: false };
+      } catch (e) { await client.query('rollback'); throw e; }
+    },
     async settleRace(cycleIndex: number): Promise<void> {
       await client.query('begin');
       try {

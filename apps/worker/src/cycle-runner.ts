@@ -71,6 +71,20 @@ export interface CycleStore {
   fillRace(cycleIndex: number, spec: FillSpec): Promise<void>;
   /** 確定していない、発走時刻を過ぎたレースの番号 */
   pendingSettlements(nowMs: number): Promise<number[]>;
+  /**
+   * 🔴 ★**発走の前に引退していた馬を取消にする**（★**DS-5 ④**・正典 **D-111 ③⑥**・2026-09-19）。
+   *
+   *   ★組成 → 発走（12 分）に引退した馬は ★**凍結を持っているので誰も拾いません**
+   *   （★`entry-freeze` も D-111 ④ も「凍結が**無い**」を見るため）。
+   *   → ★**確定の直前にもう 1 度 見ます。**
+   *
+   * ⚠️ ★**「いま引退しているか」ではありません** — ★確定は発走より後に走るので、
+   *    ★それだと ★**走った馬の結果まで消します**。★実装は発走時刻の週で切ります。
+   * ★`skipped` … ★週が出せず見送ったとき（★黙って見送らない・R-16）。
+   */
+  scratchRetiredBeforeStart(
+    cycleIndex: number,
+  ): Promise<{ scratched: number; refundedEp: number; skipped: boolean }>;
   settleRace(cycleIndex: number): Promise<void>;
   /**
    * ★確定できないまま `CANCEL_AFTER_START_MS` を過ぎたレースの番号（D-037）。
@@ -206,6 +220,16 @@ export interface CycleOutcome {
   /** 既にあったので作らなかったレース */
   readonly skipped: readonly number[];
   readonly settled: readonly number[];
+  /**
+   * ★**発走の前に引退していて取消にした頭数**（★**DS-5 ④**・D-111 ③⑥）。
+   *   ⚠️ ★**0 でない周は、その馬を含む馬券が §9.1 で返っています。★黙って通さないこと。**
+   */
+  readonly scratchedBeforeStart: number;
+  /**
+   * ★**週が出せず、発走前の引退確認を見送ったレースの番号**（★DS-5 ④・R-16）。
+   *   🔴 ★**0 でない周は、引退した馬が走りえます。** ★`epochMs` が渡っていません。
+   */
+  readonly retireCheckSkipped: readonly number[];
   /** ★確定できず開催中止にしたレース（D-037）。★0 でない周は必ず調査対象 */
   readonly cancelled: readonly number[];
   /** ロックが取れずに何もしなかった */
@@ -268,6 +292,7 @@ export async function runCycle(
       nowMs, cycleIndex, phase, onSale,
       filled: [], announced: [], fillDeferred: [], fillFailed: [],
       skipped: [], settled: [], cancelled: [], lockBusy: true,
+      scratchedBeforeStart: 0, retireCheckSkipped: [],
     };
   }
 
@@ -277,6 +302,9 @@ export async function runCycle(
   const fillFailed: number[] = [];
   const skipped: number[] = [];
   const settled: number[] = [];
+  /** ★DS-5 ④: 発走の前に引退していて取消にした頭数と、見送ったレース */
+  let scratchedBeforeStart = 0;
+  const retireCheckSkipped: number[] = [];
   const cancelled: number[] = [];
   try {
     // --- 1. 確定と払戻（★生成より先に。正典 D-038） ---
@@ -295,6 +323,20 @@ export async function runCycle(
     //      この順序は**速度ではなく正しさ**の問題になります。そのときに読み直すこと。
     for (const idx of await store.pendingSettlements(nowMs)) {
       try {
+        /**
+         * 🔴 ★**確定の前に、発走前の引退をもう 1 度 見ます**（★**DS-5 ④**・D-111 ③⑥）。
+         *
+         * ★組成の前の取消（`main.ts`）が塞ぐのは ★**登録 → 組成**までです。
+         * ★**組成 → 発走**に引退した馬は凍結を持っているので、★誰も拾いません。
+         *
+         * ⚠️ ★**確定と同じトランザクションにしません。** ★`settleRace` は自分で `commit` します
+         *    （★入れ子の取引はありません — ★内側の `commit` が外側ごと確定させます）。
+         *    ★取消は冪等なので、★確定が落ちても二重には返しません。
+         * ⚠️ ★**失敗したら確定に進みません**（★引退した馬を走らせない）。
+         */
+        const ret = await store.scratchRetiredBeforeStart(idx);
+        if (ret.skipped) retireCheckSkipped.push(idx);
+        scratchedBeforeStart += ret.scratched;
         await store.settleRace(idx);
         settled.push(idx);
       } catch (e) {
@@ -458,5 +500,6 @@ export async function runCycle(
     nowMs, cycleIndex, phase, onSale,
     filled, announced, fillDeferred, fillFailed,
     skipped, settled, cancelled, lockBusy: false,
+    scratchedBeforeStart, retireCheckSkipped,
   };
 }
