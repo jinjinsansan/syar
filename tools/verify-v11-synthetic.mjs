@@ -38,6 +38,21 @@
  *   §11.2 の実経済の指標を汚さないためです（0009）。
  *   ★したがって**②の判定は internal を対象に**行います（監視とは逆）。
  *
+ * 【⚠️ 🔴 ★**2026-09-19: 控えを外に出しました。★ただし実 DB で確かめていません**】
+ *   ★`STABLE_OF`（★`owner_id` を付ける前の厩舎）を、★`tmp/snapshots/verify-v11-synthetic.json`
+ *   ★にも書きます（★**SB-6**）。★次に起動したとき、★**前の実行が残した控えを先に戻します。**
+ *
+ *   🔴 ★なぜ要るか: ★2026-09-19、★この道具が `timeout` の SIGTERM で殺され、
+ *     ★`clean()` が走らず、★**控えがメモリごと消えて、★馬 9 頭の元の厩舎を永久に失いました。**
+ *     ★シグナルを捕まえる形にもしましたが、★**SIGKILL・電源断・OOM では走りません。**
+ *
+ *   🔴 ⚠️ ★**この差し替えは、★実 DB で動かして確かめていません。**
+ *     ★確かめるには ★**この道具を実際に流す必要があり、★流すと集団が 8 週 進みます**
+ *     （★`POOL-DRAIN` の時計が動く・★較正の母集団が変わる）。
+ *   → ★**実 DB での検証は、★`POOL-DRAIN` の手当てか、★staging の作り直しと同じ便で。**
+ *     ★**単独で流さないこと** — ★流すたびに、★**測る土台が動きます。**
+ *   ⚠️ ★**「直った」と読まないこと**（★`NT-9` と同じ形: ★書いた ≠ 届いた）。
+ *
  * 実行: npx tsx tools/verify-v11-synthetic.mjs --env staging
  */
 import { createHash, createHmac, randomUUID } from 'node:crypto';
@@ -47,6 +62,7 @@ import { advanceTrainingWeeks } from '../apps/worker/src/training-runner.ts';
 import { weekIndexAt } from '../packages/scheduler/src/index.ts';
 import { assertNotProduction } from './lib/guard.mjs';
 import { loadEnv, requireRow } from './lib/env.mjs';
+import { takeSnapshot, readSnapshot, dropSnapshot } from './lib/snapshot-file.mjs';
 
 /** ★合成プレイヤー。固定の UUID にして、流し直しても同じ口座を使う */
 const UIDS = [
@@ -103,7 +119,29 @@ const TEST_CYCLE_BASE = 900000;
  * ★**`owner_id` を付ける前の厩舎を控える**（★**SY-2**）。★`clean()` がここから戻します。
  * ⚠️ ★控えずに `owner_id` を付けると、★`horses_owner_xor_npc` が `npc_stable_id` を消し、★**戻せません**。
  */
+const SNAPSHOT = 'verify-v11-synthetic';
 const STABLE_OF = new Map();
+/**
+ * 🔴 ★**前の実行が残した控えが在れば、★先に戻します**（★**SB-6**）。
+ *   ★控えが在る ＝ ★**前の実行は片付けずに死んでいます**。
+ */
+{
+  const left = readSnapshot(SNAPSHOT);
+  const rows = left?.data?.stables ?? [];
+  if (rows.length > 0) {
+    console.log(`  ⚠️ ★前の実行の控えが残っています（${left.takenAt}・${rows.length} 頭）。★先に戻します`);
+    for (const [hid, sid] of rows) {
+      await c.query('update horses set owner_id = null, npc_stable_id = $2 where id = $1', [hid, sid]);
+    }
+    const back = (await c.query(
+      'select count(*)::int n from horses where id = any($1::uuid[]) and npc_stable_id is null',
+      [rows.map((r) => r[0])],
+    )).rows[0].n;
+    if (Number(back) !== 0) throw new Error(`★前の実行の控えを戻せません（${back} 頭が null のまま）`);
+    console.log('  ✅ ★戻しました（★数えて確かめました）');
+    dropSnapshot(SNAPSHOT);
+  }
+}
 const source = requireRow(
   (await c.query(
     `select r.id, r.cycle_index, r.class_rank, r.grade from races r
@@ -154,6 +192,8 @@ const clean = async () => {
   await c.query('delete from auth.users where id = any($1)', [UIDS]);
   // ★検証用に作ったダミー景品も消す（実カタログを汚さない）
   await c.query("delete from prize_catalog where name like '★検証用ダミー景品%'");
+  /** ★控えを捨てるのは、★**戻した後**（★TL-1 の `restores`） */
+  dropSnapshot(SNAPSHOT);
 };
 await clean();
 
@@ -248,7 +288,14 @@ for (let k = 0; k < ents.length - 1; k += 1) {
    *   ★控えずに消すと ★**戻せません**（★私は 2 頭ぶん失いました）。
    */
   const before = (await c.query('select npc_stable_id from horses where id = $1', [ents[k].horse_id])).rows[0];
-  if (before?.npc_stable_id != null) STABLE_OF.set(ents[k].horse_id, before.npc_stable_id);
+  if (before?.npc_stable_id != null) {
+    STABLE_OF.set(ents[k].horse_id, before.npc_stable_id);
+    /**
+     * 🔴 ★**変える前に、外へ書く**（★**SB-6**）。
+     *   ★順序が逆だと、★**間で殺されたときに控えが無い**。
+     */
+    takeSnapshot(SNAPSHOT, { stables: [...STABLE_OF] });
+  }
   await c.query('update horses set owner_id = $1, npc_stable_id = null where id = $2',
     [UIDS[k % UIDS.length], ents[k].horse_id]);
 }
