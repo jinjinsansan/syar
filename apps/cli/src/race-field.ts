@@ -317,6 +317,20 @@ export function entryStrength(entrant: RaceEntrant, distance: number, surface: S
 /** ★B-6（D-050）: 出走馬の実際の育成状態を渡すための口 */
 export interface GenerateRaceOptions {
   /**
+   * 🔴 ★**調子を全頭この値に固定する**（★2026-09-20・`PROD-NEVER-AGED` の実験用）。
+   *
+   *   ★本番は `condition` が ** 全頭 3**です（★育成が一度も走っていないため）。
+   *   ★オッズは同じ出走表を `resolveRace` で回して作るので、
+   *   ★**オッズは condition を「見て」います**。
+   *   → ★調子の散らばりは ** 雑音ではなく信号**です（★**CN-15**）。
+   *   → ★固定するとその信号が消え、★1 番人気が勝ちにくくなるはず。
+   *
+   * ⚠️ 🔴 ** 乱数は引いて捨てます**（★下の実装）。
+   *   ★引かないと乱数列がずれ、★**調子以外も全部別のレースになります**。
+   *   ★それでは「調子だけを変えた」になりません。
+   */
+  readonly fixedCondition?: number;
+  /**
    * その馬のいまの調子・疲労（§7.4）。`undefined` を返した馬は従来どおりの仮定値。
    * ★レースごとに違う値を返してよい（現実には毎週引き直される）。
    */
@@ -596,7 +610,19 @@ export function generateRace(
          * ✔ ★乱数の引き方は変わりません（★どちらも 3 幅の整数を 1 回）。
          *   → ★**V-4 は 1 ビットも動かないはず**です。★検査で固定しました。
          */
-        condition: trained?.condition ?? nextCondition(0, rng),
+        /**
+         * 🔴 ★`nextCondition` は ** 必ず呼びます**（★固定するときも）。
+         *   ★呼ばないと乱数列がずれて、★**別のレースになってしまいます**。
+         */
+        /**
+         * 🔴 ★`??` は**短絡**するので、★`opts.fixedCondition ?? … ?? nextCondition(0, rng)` と書くと
+         *   ★**固定したときに `nextCondition` が呼ばれず、★乱数列がずれます**。
+         *   → ★それでは「調子だけを変えた」にならず、★**別のレース**になります。
+         *   → ★**必ず引いてから捨てます**（★引く位置も元のまま）。
+         */
+        condition: ((drawn: number) => opts.fixedCondition ?? trained?.condition ?? drawn)(
+          nextCondition(0, rng),
+        ),
         fatigue: trained?.fatigue ?? 0,
         age: rng.int(3, 5),
         weightKg: BASE_WEIGHT_KG + rng.range(-2, 2),

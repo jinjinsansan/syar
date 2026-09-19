@@ -152,10 +152,24 @@ const LONGSHOT_RANKS = parseNumber('--longshot-ranks', MC.LONGSHOT_RANKS);
 /** 案D: 裾の厚さ（掃引用） */
 const TAIL_P = parseNumber('--tail-p', DEFAULT_RACE_BALANCE.TAIL_MIX_P);
 const TAIL_M = parseNumber('--tail-m', DEFAULT_RACE_BALANCE.TAIL_MIX_M);
+
 const UNLOCK = {
   MIN: parseNumber('--unlock-min', PLACEHOLDER_UNLOCK.MIN),
   MAX: parseNumber('--unlock-max', PLACEHOLDER_UNLOCK.MAX),
 };
+
+/**
+ * 🔴 ★**調子を全頭この値に固定**（★2026-09-20・`PROD-NEVER-AGED` の実験）。
+ *   ★本番は `condition` が全頭 3。★オッズは condition を見ているので、
+ *   ★その散らばりは**雑音ではなく信号**（★**CN-15**）。
+ * ⚠️ ★渡さなければ ** 1 ビットも変わりません**。
+ */
+const fixedConditionArg = (() => {
+  const i = process.argv.indexOf('--fixed-condition');
+  if (i < 0) return undefined;
+  const v = Number(process.argv[i + 1]);
+  return Number.isFinite(v) ? v : undefined;
+})();
 
 /** 乱数系列の用途（K-2 の系列独立性。ここでも混ぜない） */
 // ★用途IDは集約表から取る。11〜14 の帯を取っていたのはここだけで、
@@ -311,6 +325,7 @@ function runSeed(seed: number, racesForSeed: number): SeedResult {
     const race = generateRace(pool, raceIndex, fieldRng, CLASS_BAND, UNLOCK, FLOOR, {
       // ★CF-7: 頭数の範囲（★既定なら `FIELD_SIZE` と同じ値が入るので振る舞いは変わらない）
       fieldSizeRange: { min: FIELD_MIN, max: FIELD_MAX },
+      ...(fixedConditionArg === undefined ? {} : { fixedCondition: fixedConditionArg }),
       ...(prod === null ? {} : {
         programme: {
           surface: prod.programme.surface, distance: prod.programme.distance, courseShape: prod.courseFrozen.courseShape,
@@ -575,6 +590,7 @@ function provenance(): string {
   const flags = [
     B6_WIRED ? '--b6-wired' : null,
     REAL_ABILITY ? '--real-ability' : null,
+    fixedConditionArg === undefined ? null : `--fixed-condition ${fixedConditionArg}`,
     LEGACY_CONDITIONS ? '--legacy-conditions' : null,
   ].filter((x) => x !== null);
   const poolIdx = process.argv.indexOf('--pool');
