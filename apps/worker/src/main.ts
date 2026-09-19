@@ -18,6 +18,7 @@ import { createHash, createHmac, randomBytes } from 'node:crypto';
 import pg from 'pg';
 // ★最初に読み込む。DB へ最初のクエリを出す前に型変換を有効にする必要があります
 import { assertPgTypesConfigured } from './pg-types.js';
+import { DB_SSL, assertSslModeDoesNotWeaken } from './db-ssl.js';
 import { APPLICATION_NAME, formatResources, sampleResources } from './resources.js';
 import { runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
@@ -57,9 +58,16 @@ export const MAX_CONSECUTIVE_FAILURES = 10;
 
 async function main(): Promise<void> {
   const cfg = loadConfig();
+  // 🔴 ★`sslmode=no-verify` 等が固定を打ち消すので、★繋ぐ前に見ます（AUDIT-TLS）
+  assertSslModeDoesNotWeaken(cfg.databaseUrl);
   const client = new pg.Client({
     connectionString: cfg.databaseUrl,
-    ssl: { rejectUnauthorized: false },
+    // 🔴 ★**証明書を固定して検証します**（★`AUDIT-TLS`・2026-09-20・オーナー承認）。
+    //    ★旧は `{ rejectUnauthorized: false }` で、★暗号化はされていましたが
+    //    ★**中間者を防げていませんでした**。
+    //    ⚠️ ★Supabase は **自前の私的 CA** を使うので、★`true` にするだけでは通りません
+    //    （★`SELF_SIGNED_CERT_IN_CHAIN`）。★**CA を渡す必要があります**。
+    ssl: DB_SSL,
     // ★名前は付けるが、**数えるのには使えません**。
     //   Supabase のプーラ（Supavisor）が application_name を上書きするため、
     //   Postgres 側からはこの名前が見えません（実測で確認）。

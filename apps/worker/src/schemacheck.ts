@@ -23,6 +23,7 @@
 import { readdirSync } from 'node:fs';
 import pg from 'pg';
 import { loadConfig } from './env.js';
+import { DB_SSL, assertSslModeDoesNotWeaken } from './db-ssl.js';
 
 export async function runSchemacheck(): Promise<{ ok: boolean; report: string[] }> {
   const out: string[] = [];
@@ -38,9 +39,16 @@ export async function runSchemacheck(): Promise<{ ok: boolean; report: string[] 
   out.push(`  リリースに含まれるマイグレーション: ${files.length} 件`);
 
   const cfg = loadConfig();
+  // 🔴 ★`sslmode=no-verify` 等が固定を打ち消すので、★繋ぐ前に見ます（AUDIT-TLS）
+  assertSslModeDoesNotWeaken(cfg.databaseUrl);
   const client = new pg.Client({
     connectionString: cfg.databaseUrl,
-    ssl: { rejectUnauthorized: false },
+    // 🔴 ★**証明書を固定して検証します**（★`AUDIT-TLS`・2026-09-20・オーナー承認）。
+    //    ★旧は `{ rejectUnauthorized: false }` で、★暗号化はされていましたが
+    //    ★**中間者を防げていませんでした**。
+    //    ⚠️ ★Supabase は **自前の私的 CA** を使うので、★`true` にするだけでは通りません
+    //    （★`SELF_SIGNED_CERT_IN_CHAIN`）。★**CA を渡す必要があります**。
+    ssl: DB_SSL,
   });
   await client.connect();
   try {
