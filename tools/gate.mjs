@@ -79,6 +79,13 @@ const results = [
   ['★配る物を作る（dist/worker.cjs・D-043）', npmRun('★配る物を作る（dist/worker.cjs・D-043）', 'build:worker')],
   ['★型検査（tsc・strict）', npmRun('★型検査（tsc・strict）', 'typecheck')],
   ['★検査と赤の照合（vitest ＋ 登録簿）', npmRun('★検査と赤の照合（vitest ＋ 登録簿）', 'verify:red')],
+  /**
+   * 🔴 ★**まだ直っていない指摘の期限**（★**NT-3**・2026-09-19）。
+   *   ★`REPORT_AUDIT_20260914.md` の 22 項目のうち ★**12 件が 5 日 そのまま**でした。
+   *   ★報告書は期限を持ちません。★**期限を持たせ、切れたら門で落とします。**
+   * ⚠️ ★数秒で終わります（★検査は流しません。★簿の期限を見るだけ）。
+   */
+  ['★開いている指摘の期限（NT-3）', npmRun('★開いている指摘の期限（NT-3）', 'verify:open')],
 ];
 
 process.stdout.write('\n=== ★門の結果 ===\n');

@@ -92,7 +92,7 @@ if (total === 0) {
 
 /** ⚠️ ★今日はここで 1 回だけ作り、★照合の関数には**渡します**（★純粋に保つ） */
 const todayIso = new Date().toISOString().slice(0, 10);
-const d = diffAgainstRegistry(failing, todayIso);
+const d = diffAgainstRegistry(failing, todayIso, undefined, unloadable);
 
 console.log(`\n=== 赤の照合（★検査 ${total} 件・赤 ${failing.length} 件・登録 ${KNOWN_RED.length} 件） ===`);
 const say = (label, list) => {
@@ -107,13 +107,18 @@ bad = say('★登録簿に、緑に戻ったものが残っていない', d.stal
 bad = say('★登録の期限が切れていない', d.expired) || bad;
 bad = say('★登録に why / owner / until が揃っている', d.missingFields) || bad;
 /**
- * 🔴 ★**読み込めなかったファイル**（★**CI-4**）。★登録簿では許せません。
- *   ★「走らなかった」は「緑」でも「既知の赤」でもなく、★**照合そのものが成り立っていない**状態です。
+ * 🔴 ★**読み込めなかったファイル**（★**CI-4** → ★**CI-8** で簿に載せられるようにしました）。
+ *
+ * ★「走らなかった」は「緑」でも「既知の赤」でもなく、★**照合そのものが成り立っていない**状態です。
+ * ✅ ★ただし ★**物の理由**（★「この生成物はブラウザの撮影が要る」）なら、
+ *   ★`KNOWN_UNLOADABLE` に ★**理由・担当・期限つき**で載せられます。
+ * 🔴 ★**機械の理由**（★「CI では通らない」）は載せられません（★**CI-5**）—
+ *   ★機械差は**欠陥**で、★載せると**欠陥が仕様になります**。
  */
-bad = say(
-  '★すべての検査ファイルが読み込めている（★「走らなかった」を緑にしない・R-21）',
-  unloadable.map((u) => `${u.file} … ${u.message}`),
-) || bad;
+bad = say('★簿に無い「読み込めないファイル」がない（★CI-4）', d.unregisteredUnloadable) || bad;
+bad = say('★「読み込めない」の登録の期限が切れていない', d.unloadableExpired) || bad;
+bad = say('★「読み込めない」の登録に why / owner / until が揃っている', d.unloadableMissing) || bad;
+bad = say('🔴 ★「機械が違うから」を理由にしていない（★CI-5）', d.machineExcuses) || bad;
 
 if (bad) {
   console.log('\n🔴 ★不合格。★赤を直すか、★理由・担当・期限を書いて tools/lib/known-red.mjs に載せてください');

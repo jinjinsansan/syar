@@ -68,6 +68,12 @@ function definitionsByFunction(): Map<string, string[]> {
  */
 const PINNED: Readonly<Record<string, string>> = {
   'entry-scratch-migration.test.ts': '0028_entry_scratch.sql',
+  /**
+   * ★**GB-1 ④⑤⑥ の配線**（★2026-09-19）。★`0053` は ★**列を足すだけ**の移行で、
+   *   ★`create or replace function` を持たないので ★**後から置き換えられません**。
+   *   → ★`pinned`（★本文を読む）で正しく、★③ が後の置き換えを見張ります。
+   */
+  'growth-tell-wiring.test.ts': '0053_growth_tell_baseline.sql',
   'horse-market-migration.test.ts': '0025_horse_market.sql',
   'horse-sale-migration.test.ts': '0026_horse_sale.sql',
   'stable-grade-unlock-migration.test.ts': '0027_stable_grade_unlock.sql',

@@ -378,6 +378,12 @@ export const READONLY = [
   'verify-anon-exposure.mjs',
   // ★既知の赤の照合（★RD-2・2026-09-19）。★npm test を流して名前を突き合わせるだけ。DB に触らない
   'verify-known-red.mjs',
+  /**
+   * ★**まだ直っていない指摘の期限を見る**（★**NT-3**・2026-09-19）。
+   * ★**DB に繋ぎません。** ★簿（`lib/open-findings.mjs`）の `until` と書き漏れを見るだけ。
+   * ★門（`tools/gate.mjs`）から呼ばれます。★`verify-known-red.mjs` の隣に置きます。
+   */
+  'verify-open-findings.mjs',
   'a3-converge.mjs',
   // ★読むだけ。ゲージ（余力）が正しい向きを向いているかを見る
   'diag-gauge.mjs',
@@ -772,6 +778,18 @@ export const STATE_CHANGING = [
   'verify-ds5-retire-scratch.mjs',
 
   /**
+   * ★**「前に言ったときの能力」が、言った週にだけ動くか**（★**GB-1 ④⑤⑥**・移行 `0053`・2026-09-19）。
+   *
+   * 🔴 ★これが見るもの: ★`training-runner` の一括更新は `unnest($14::jsonb[], $15::bigint[])` で
+   *   ★**配列の並びを 1 つ間違えると、★別の馬の基準を書きます**（★`fillRace` の `$1..$19` と同じ形の危うさ）。
+   *   ★型の検査でも偽の DB でも出ません。→ ★**2 頭ぶんを一度に書いて、混ざらないこと**まで見ます。
+   * ★GB-1 ⑤（★言わなかった週は 1 ビットも動かない）と、★その対照（★言った週は動く）も見ます。
+   * ⚠️ ★取引の中で `horses` を書きます。★最後に rollback し、★SB-3 が途中の確定を見ます。
+   *    ★`assertNotProduction` を呼びます。
+   */
+  'verify-gb1-growth-tell.mjs',
+
+  /**
    * ★**私が staging に残した検査データを消す**（★2026-09-19・後始末）。
    * 🔴 ★`verify-ds7-cancel.mjs` が `rollback` したつもりで確定していた分
    *   （★レース 2 件・所有馬 2 頭・`public.users` 1 人・`ep_ledger` 1,000 EP）。
@@ -917,6 +935,7 @@ export const COMPONENT = [
   { file: 'lib/env.mjs', why: '★接続先の選択を 1 か所にまとめた部品。★`--env` 必須の規則はここが持つ' },
   { file: 'lib/exposure-registry.mjs', why: '★公開の登録簿（★どの表・RPC を誰に開けるか）。★V-20 が読む表で、道具ではない' },
   { file: 'lib/provenance.mjs', why: '★生成物に「何から作ったか」を書き残す部品（★RD-4 ③・2026-09-19）。★道具が hash を埋め、★検査がいまのソースと突き合わせる。★道具ではない' },
+  { file: 'lib/open-findings.mjs', why: '★まだ直っていない指摘の登録簿（★**NT-3**・2026-09-19）。★`verify-open-findings.mjs` が読む表で、道具ではない。🔴 ★`REPORT_AUDIT_20260914.md` の 22 項目のうち 12 件が 5 日 そのままだったので、★**期限を持たせて門で落とす**形にした。★報告書は期限を持たない' },
   { file: 'lib/known-red.mjs', why: '★いま赤いと分かっている検査の登録簿（★RD-2・2026-09-19）。★verify-known-red.mjs が読む表で、道具ではない' },
   { file: 'lib/guard.mjs', why: '★`assertNotProduction` の本体。★状態を変える道具が呼ぶ部品' },
   { file: 'lib/sandbox-tx.mjs', why: '★**自分で `begin`/`commit` する関数を、外側の取引に閉じ込める包み**（★2026-09-19）。🔴 ★PostgreSQL に入れ子の取引は無いので、★内側の `commit` は**外側ごと確定**させる。★`verify-ds7-cancel.mjs` がそれで staging を汚した。★検査の道具で、★製品では使わない' },

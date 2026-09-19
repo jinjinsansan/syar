@@ -37,7 +37,7 @@
 
 import type pg from 'pg';
 import { createHash } from 'node:crypto';
-import { ABILITY_KEYS, deriveRng, type AbilityKey, type Rng } from '@star/sim-engine';
+import { ABILITY_KEYS, deriveRng, growthTellsOf, type AbilityKey, type Rng } from '@star/sim-engine';
 import { weekIndexAt, weeksToProcess } from '@star/scheduler';
 import {
   DEFAULT_MENU, DEFAULT_STABLE_GRADE, STABLE_GRADES, advanceWeek, gradeEpCost,
@@ -147,6 +147,12 @@ interface Row {
   career_ended: boolean;
   /** ★厩舎の格（`0024` で追加・既定 `bronze`・D-103） */
   stable_grade: string | null;
+  /**
+   * ★**前に言ったときの能力**（★`0053`・**GB-1 ④⑤⑥**）。★`null` ＝ まだ基準が無い。
+   * ⚠️ ★`growth_told_week` と ★**必ず一緒に動きます**（★`0053` の CHECK）。
+   */
+  growth_told_stats: Record<string, number> | null;
+  growth_told_week: string | number | null;
 }
 
 /**
@@ -220,7 +226,8 @@ export async function advanceTrainingWeeks(
     const r = await client.query<Row>(
       `select id, owner_id, sex, growth, temper, durability, potential, stats,
               birth_week, last_processed_week, fatigue, condition, rest_until_week, career_ended,
-              stable_grade
+              stable_grade,
+              growth_told_stats, growth_told_week
          from horses
         where retired_at_week is null
           and birth_week is not null
@@ -237,7 +244,15 @@ export async function advanceTrainingWeeks(
       restUntil: number | null; careerEnded: boolean;
       retiredAt: number | null; role: string | null; reason: string | null;
       potential: string; stats: string; durability: number; temper: number;
+      /**
+       * ★**「前に言ったときの能力」**（★**GB-1 ④⑤⑥**・移行 `0053`）。
+       * 🔴 ★**言った週にだけ**新しい値を入れます。★言わなかった週は ★**今の値をそのまま戻します**
+       *    （★更新しないのと同じ。★毎週 動かすと累積が週次になります・GB-1 ⑤）。
+       */
+      toldStats: string | null; toldWeek: number | null;
     }[] = [];
+    /** ★この周で「前より○○できるようになった」と言えた馬（★通報のため） */
+    const told: { id: string; keys: string[] }[] = [];
     /** ★EP 不足以外の失敗で、このバッチで週を進めなかった馬（監査 H-3） */
     const skipped = new Set<string>();
 
@@ -317,9 +332,51 @@ export async function advanceTrainingWeeks(
       advanced += 1;
       if (out.state.retirement !== null) retired += 1;
 
+      /**
+       * ★**「前より○○できるようになった」**（★**GB-1 ④**・2026-09-19・オーナー決定）。
+       *
+       * 【★GB-1 ⑥ — ★初回の基準】★**持ち主のものになった時点の `stats`**。
+       *   ★`growth_told_stats` が `null` の馬には ★**この週を進める前の値**を入れます。
+       *   ✔ ★成長は週送りでしか起きないので、★その値は ★**取得した瞬間の値そのもの**です。
+       *   🔴 ★`buy_horse` など **3 つの RPC には書きません**（★写しが 3 つできる・D-052）。
+       *
+       * 【🔴 ★GB-1 ⑤ — ★言ったときにだけ書く】
+       *   ★言わなかった週は ★**基準を動かしません**。★動かすと ★**累積が週次と同じもの**になります
+       *   （✔ `growth-tell-frequency.test.ts`: ★毎週 +5 の馬は 週次 0 回 ／ 累積 10 回）。
+       *
+       * ⚠️ ★**NPC には言いません**（★持ち主がいないので「前より」の起点がありません）。
+       * ⚠️ ★**着順にも経済にも入りません**（§18 LR-5）。★失敗しても週送りは止めません。
+       */
+      let toldStats: string | null = null;
+      let toldWeek: number | null = null;
+      /** ★自馬だけ（★切り出しの目印。★上の EP の枝と同じ条件だが、★別の話です） */
+      const isOwned = row.owner_id !== null;
+      if (isOwned) {
+        const base = row.growth_told_stats === null || row.growth_told_stats === undefined
+          /** ★GB-1 ⑥: ★**この週を進める前の値**＝取得した瞬間の値 */
+          ? (state.current as Record<AbilityKey, number>)
+          : numRec(row.growth_told_stats, 'growth_told_stats');
+        const keys = growthTellsOf(base, out.state.current as Record<AbilityKey, number>);
+        if (row.growth_told_stats === null || row.growth_told_stats === undefined) {
+          /** ★初回は ★**基準を置くだけ**。★この週は言いません（★取得した瞬間との差はまだ 0） */
+          toldStats = JSON.stringify(base);
+          toldWeek = week;
+        } else if (keys.length > 0) {
+          toldStats = JSON.stringify(out.state.current);
+          toldWeek = week + 1;
+          told.push({ id: row.id, keys });
+        } else {
+          /** 🔴 ★言わなかった週は ★**そのまま戻す**（★GB-1 ⑤） */
+          toldStats = JSON.stringify(numRec(row.growth_told_stats, 'growth_told_stats'));
+          toldWeek = num(row.growth_told_week, 'growth_told_week');
+        }
+      }
+
       updates.push({
         id: row.id,
         last: week + 1,
+        toldStats,
+        toldWeek,
         fatigue: out.state.fatigue,
         condition: out.state.condition,
         restUntil: out.state.restUntilWeek < 0 ? null : birth + out.state.restUntilWeek,
@@ -348,12 +405,15 @@ export async function advanceTrainingWeeks(
          potential = t.potential,
          stats = t.stats,
          durability = t.durability,
-         temper = t.temper
+         temper = t.temper,
+         growth_told_stats = t.told_stats,
+         growth_told_week = t.told_week
        from unnest($1::uuid[], $2::bigint[], $3::numeric[], $4::smallint[], $5::bigint[],
                    $6::boolean[], $7::bigint[], $8::text[], $9::text[],
-                   $10::jsonb[], $11::jsonb[], $12::numeric[], $13::numeric[])
+                   $10::jsonb[], $11::jsonb[], $12::numeric[], $13::numeric[],
+                   $14::jsonb[], $15::bigint[])
          as t(id, last, fatigue, condition, rest_until, career_ended, retired_at,
-              role, reason, potential, stats, durability, temper)
+              role, reason, potential, stats, durability, temper, told_stats, told_week)
        where h.id = t.id`,
       [
         updates.map((u) => u.id), updates.map((u) => u.last),
@@ -362,8 +422,17 @@ export async function advanceTrainingWeeks(
         updates.map((u) => u.retiredAt), updates.map((u) => u.role), updates.map((u) => u.reason),
         updates.map((u) => u.potential), updates.map((u) => u.stats),
         updates.map((u) => u.durability), updates.map((u) => u.temper),
+        updates.map((u) => u.toldStats), updates.map((u) => u.toldWeek),
       ],
     );
+    /**
+     * ★**黙って落とさない**（★D-116・§18 LR-5）。★言えた馬を数で残します。
+     * ⚠️ ★**能力の名前は出しません**（★標準出力にも符号列を作らない・D-114 ②）。
+     *    ★出すのは ★**頭数だけ**です。
+     */
+    if (told.length > 0) {
+      console.log(`[worker] ★「前より○○できるようになった」を ${told.length} 頭に（★GB-1 ④）`);
+    }
     // ★このバッチで進めた週を記録する（バッチごとに違いうる）
     for (const row of r.rows) {
       if (skipped.has(row.id)) continue; // ★進めなかった馬の週は「処理した週」に数えない

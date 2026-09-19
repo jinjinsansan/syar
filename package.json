@@ -14,6 +14,7 @@
     "simulate": "tsx apps/cli/simulate.ts",
     "verify": "tsx apps/cli/src/verify.ts",
     "verify:red": "node tools/verify-known-red.mjs",
+    "verify:open": "node tools/verify-open-findings.mjs",
     "verify:distance": "tsx apps/cli/src/sweep-distance.ts",
     "verify:race": "tsx apps/cli/src/verify-race.ts",
     "preseed": "tsx apps/cli/src/preseed-run.ts",

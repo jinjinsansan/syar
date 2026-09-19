@@ -9,6 +9,8 @@ import {
   MARGIN,
   MARGIN_ALERT_THRESHOLD,
   isPpNetHealthy,
+  isPpNetNotUnhealthy,
+  ppNetHealth,
   summarizeDay,
   type PointFlowInput,
 } from '../src/index.js';
@@ -108,7 +110,58 @@ describe('§11.2 / V-11 PP の純発行量', () => {
     expect(isPpNetHealthy(d)).toBe(false);
   });
 
-  it('発行ゼロの日は健全（ゼロ除算にしない）', () => {
-    expect(isPpNetHealthy(summarizeDay(base))).toBe(true);
+  /**
+   * 🔴 ★**2026-09-19・M-8' — ★この検査が、欠陥を「仕様」として守っていました。**
+   *
+   * 【★何が書いてあったか】
+   *   > `it('発行ゼロの日は健全（ゼロ除算にしない）', … expect(isPpNetHealthy(…)).toBe(true))`
+   *
+   *   ★**ゼロ除算を避けるのは正しい**。★ところが ★**避け方が「健全と答える」**でした。
+   *   → ★★**「経済が存在しない日」を健全と判定する形**（★監査 **M-8**・2026-09-14・R-16 ／ V-11）。
+   *   ✔ ★実測（DL-1・2026-09-19）: ★`point_flow_daily` は **1 か月 0 行**。
+   *     ★★**その 1 か月、この関数は「健全」と言い続ける形**でした。
+   *
+   * 【🔴 ★いちばん重いところ】
+   *   ★監査はコードを指しました。★**しかし、この検査が「そうあるべき」と書いていました。**
+   *   → ★**直そうとした人は、まずこの検査を落とします。** ★そして「仕様だ」と読んで戻します。
+   *   → ★★**検査が欠陥を守っていた**、という形です。
+   *
+   * 【★直し】★**3 状態に**（★レビュー側 **M-8'**）: ★健全 ／ 不健全 ／ ★**測れていない**。
+   */
+  it('🔴 ★★発行ゼロの日は「測れていない」（★「健全」ではない・M-8）', () => {
+    const zero = summarizeDay(base);
+    expect(zero.ppIssued, '★前提: この日は PP が 1 も出ていない').toBe(0);
+    expect(ppNetHealth(zero), '🔴 ★発行ゼロを「健全」と答えています（★M-8 そのもの）')
+      .toBe('unmeasured');
+    /** ★対照: ★測れている日は、ちゃんと 2 つに分かれる */
+    expect(ppNetHealth(summarizeDay({ ...base, ppPrize: 100, ppExchanged: 98 }))).toBe('healthy');
+    expect(ppNetHealth(summarizeDay({ ...base, ppPrize: 1_000_000, ppExchanged: 0 }))).toBe('unhealthy');
+  });
+
+  it('★ゼロ除算はしていない（★避け方を変えただけで、割ってはいない）', () => {
+    /** ⚠️ ★元の検査の**正しい狙い**はこちらでした。★そこは保ちます */
+    expect(() => ppNetHealth(summarizeDay(base))).not.toThrow();
+    expect(Number.isNaN(summarizeDay(base).ppNet)).toBe(false);
+  });
+
+  it('★「止めるべきか」は測れていない日で止めない（★`isPpNetNotUnhealthy`）', () => {
+    /**
+     * ⚠️ ★**どちらに倒すかは呼ぶ側が決めること**です。
+     *    ★この関数は「止めるべきか」だけを答え、★測れていない日では止めません。
+     * 🔴 ★**「健全だったか」を知りたいなら `ppNetHealth()` を直接 見ること。**
+     */
+    expect(isPpNetNotUnhealthy(summarizeDay(base)), '★測れていない日で止めている').toBe(true);
+    expect(isPpNetNotUnhealthy(summarizeDay({ ...base, ppPrize: 1_000_000, ppExchanged: 0 })))
+      .toBe(false);
+  });
+
+  it('★旧 `isPpNetHealthy` は真偽値を 1 ビットも変えていない（★挙動は据え置き）', () => {
+    for (const d of [
+      summarizeDay(base),
+      summarizeDay({ ...base, ppPrize: 100, ppExchanged: 98 }),
+      summarizeDay({ ...base, ppPrize: 1_000_000, ppExchanged: 0 }),
+    ]) {
+      expect(isPpNetHealthy(d)).toBe(isPpNetNotUnhealthy(d));
+    }
   });
 });
