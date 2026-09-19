@@ -557,8 +557,8 @@ describe('§8.7 着順・着差・タイム', () => {
       B.RACE_RANDOM_K * Math.sqrt(1 - B.TAIL_MIX_P + B.TAIL_MIX_P * B.TAIL_MIX_M ** 2);
     expect(sd).toBeGreaterThan(theoretical * 0.9);
     expect(sd).toBeLessThan(theoretical * 1.1);
-    // 正典 §13.1（D-016）の値そのもの
-    expect(B.RACE_RANDOM_K).toBe(0.22);
+    // ★正典 §13.1 の値そのもの（★D-016 → D-021 → ★2026-09-19 のオーナー決定で 0.237）
+    expect(B.RACE_RANDOM_K).toBe(0.237);
   });
 
   it('介入倍率が finalScore に掛かる（§8.7 の式の第3項）', () => {
