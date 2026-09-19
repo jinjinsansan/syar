@@ -192,18 +192,37 @@ describe('★EN-1: 所有馬は生成プールに入らない', () => {
     expect(where, '★所有馬を除いていない').toContain('owner_id is null');
     const fn = repo.slice(repo.indexOf('export async function loadRaceablePool'));
     /**
-     * ⚠️ ★**2026-09-19・AL-11 で述語に差し替え口を付けました**（`where` 引数）。
-     *    ★読む側が引くのは `${where}` ですが、★**既定は `RACEABLE_WHERE`** です。
+     * ⚠️ ★**2026-09-19・AL-11 で述語に差し替え口を付け、★PO-4 ① で既定を差し替えました**。
+     *    ★旧の既定 … `RACEABLE_WHERE`（`generation >= max-2` を含む）
+     *    ✅ ★新の既定 … ★**`ACTIVE_WHERE`**（`retired_at_week is null and owner_id is null` だけ）
+     *
+     *    🔴 ★理由は V ではありません — ★**`generation` が「現役」を意味していなかった**（PO-4）。
+     *      ✔ 差 2,944 頭はまるごと `generation` の 1 行／`birth_week` は全頭 −160。
+     *      ✔ V-4 は入れた後（＝ D）で **31.006%・下限まで 6.9 SE・PASS**（VP-9）。
+     *      ⚠️ ★**「V は動かない」とは言えません**（A→D は 2.04σ）。★「入れた結果 D になった」まで。
+     *
      *    → ★見るのは 2 つ: ★① 引いているのは引数（★SQL の写しではない）
-     *                      ★② ★**既定がすり替わっていない**（★測定用の口が既定で開いていない）
+     *                      ★② ★**既定が意図した述語である**（★黙ってすり替わっていない）
      */
     expect(fn, '★読む側が述語を引いていない（★SQL を書き起こしている？）').toContain('${where}');
-    expect(fn, '🔴 ★既定が `RACEABLE_WHERE` でない（★測定用の口が既定で開いている）')
-      .toContain('where: string = RACEABLE_WHERE');
-    /** ★対照: ★`ACTIVE_WHERE`（測定用の広いほう）が既定になっていない */
-    expect(fn, '🔴 ★既定が ACTIVE_WHERE にすり替わっている').not.toContain('where: string = ACTIVE_WHERE');
-    /** ★引退の除外（CL-3）も残っている */
-    expect(where, '★引退馬を除いていない').toContain('retired_at_week is null');
+    expect(fn, '🔴 ★既定が `ACTIVE_WHERE` でない（★PO-4 ① が戻されている？）')
+      .toContain('where: string = ACTIVE_WHERE');
+    /** ★対照: ★旧の既定に戻っていない（★黙って `generation` の絞りが復活していない） */
+    expect(fn, '🔴 ★既定が RACEABLE_WHERE に戻っている').not.toContain('where: string = RACEABLE_WHERE');
+    /**
+     * ★引退の除外（CL-3）は ★**どちらの述語にも**残っていること。
+     * ⚠️ ★`where` は `RACEABLE_WHERE` の本文を切り出したもの（上）。★`ACTIVE_WHERE` も併せて見ます。
+     */
+    expect(where, '★引退馬を除いていない（RACEABLE_WHERE）').toContain('retired_at_week is null');
+    const activeStart = repo.indexOf('export const ACTIVE_WHERE');
+    expect(activeStart, '★`ACTIVE_WHERE` が見つからない').toBeGreaterThan(-1);
+    const active = repo.slice(activeStart, repo.indexOf('`;', activeStart) + 2);
+    expect(active.length, '★`ACTIVE_WHERE` の切り出しが空').toBeGreaterThan(20);
+    expect(active, '★引退馬を除いていない（ACTIVE_WHERE）').toContain('retired_at_week is null');
+    expect(active, '🔴 ★所有馬を除いていない（★プレイヤーの馬が NPC の充填に混ざる・EN-1）')
+      .toContain('owner_id is null');
+    expect(active, '🔴 ★`generation` の絞りが混ざっている（★PO-4 ① で外したもの）')
+      .not.toContain('generation');
   });
 });
 

@@ -137,14 +137,30 @@ export async function loadRaceablePool(
    */
   onTruncated?: (eligible: number, used: number) => void,
   /**
-   * ★**述語の差し替え口**（★**AL-11** の測定用・★2026-09-19）。
+   * ★**出走できる馬の述語**（★**PO-4 ①**・2026-09-19 に既定を差し替えました）。
    *
-   * ⚠️ 🔴 ★**既定では絶対に効きません。** ★渡した実行だけが変わります
-   *    （★`fieldSizeRange`・`mustInclude` と同じ作法）。
-   * ★渡してよいのは ★**このファイルが export している述語だけ**です
-   *   （`RACEABLE_WHERE` / `ACTIVE_WHERE`）。★SQL をここに書き起こさないこと（D-052）。
+   * 【★何が変わったか】
+   *   ★旧の既定 … `RACEABLE_WHERE`（★`generation >= max-2` を含む）
+   *   ✅ ★新の既定 … ★**`ACTIVE_WHERE`**（★`retired_at_week is null and owner_id is null` だけ）
+   *
+   * 【★採った理由 — ★V ではありません】
+   *   🔴 ★**`generation` は「現役」を意味していませんでした**（★PO-4）。
+   *   ✔ ★差 2,944 頭は ★**まるごと `generation` の 1 行**（★`npc_stable_id` による差は 0 頭）。
+   *   ✔ ★`birth_week` は**全頭 −160**なので、★この行が外していたのは
+   *     ★**「歳を取った馬」ではなく「遺伝的に前の世代の馬」**でした。
+   *   ✔ ★正典 §7.1 に照らすと、★`raceableFrom 104` ≦ 齢（188〜221 週）< `retireAt 260` で
+   *     ★**7,333 頭すべてが現役**です。
+   *
+   * 【★V は壊れないことを確かめてから入れました（★VP-9・8 シード × 120,000 レース）】
+   *   ✔ ★入れた後の姿 ＝ ★**D**（`ACTIVE_WHERE` ＋ 上限 3,000）: ★**V-4 31.006%・下限まで 6.9 SE・PASS**。
+   *   ⚠️ 🔴 ★**「V は動かない」とは言えません**（★A→D は **2.04σ**）。
+   *      ★言えるのは ★**「入れた結果 D になった」**までです。
+   *   🔴 ★**以後の前後比較は D が基準**です（★A ではありません）。
+   *
+   * ⚠️ ★`RACEABLE_WHERE` は ★**測定用に残してあります**（`export-pool.mjs --predicate raceable`）。
+   *    ★渡してよいのは ★**このファイルが export している述語だけ**です。★SQL をここに書き起こさないこと（D-052）。
    */
-  where: string = RACEABLE_WHERE,
+  where: string = ACTIVE_WHERE,
 ): Promise<HorseRecord[]> {
   /**
    * ★**先に数えます**（★R-21: 0 件を「該当なし」と読まない・★切れたことを見えるようにする）。
