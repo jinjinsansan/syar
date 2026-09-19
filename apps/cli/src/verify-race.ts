@@ -587,7 +587,26 @@ console.log(
       ? '★旧来（--legacy-conditions: generateRace が引く距離・馬場・DEFAULT_OVAL・1400m 以下の 20% 直線）'
       : '本番（productionRaceOf: 番組の距離・馬場・競馬場・凍結した走路の形）'}\n` +
     `RACE_RANDOM_K=${balance.RACE_RANDOM_K}${RACE_K === DEFAULT_RACE_BALANCE.RACE_RANDOM_K ? "（正典 §13.1 の値）" : `（★較正値。正典 §13.1 は ${DEFAULT_RACE_BALANCE.RACE_RANDOM_K}）`} / INTERVENTION_CAP=±${ib.INTERVENTION_CAP} / クラス幅=${CLASS_BAND}\n` +
-    `⚠️ 素質開放率は P3 で置き換わるプレースホルダ（0.55〜0.85）。K の較正はこの仮定に依存する`,
+    /**
+     * 🔴 ★**実際に使った値を出します**（★2026-09-20）。
+     *   ⚠️ ★ここは `0.55〜0.85` を**決め打ちで**印刷していました — ★`--unlock-min` / `--unlock-max` で
+     *     ★変えても表示が変わらず、★**出力ファイルが自分の条件について嘘をつきます**。
+     *   ★あとから証拠を読む人は、★この 1 行で条件を判断します。
+     */
+    `⚠️ 素質開放率 ${UNLOCK.MIN}〜${UNLOCK.MAX}`
+      + `${UNLOCK.MIN === PLACEHOLDER_UNLOCK.MIN && UNLOCK.MAX === PLACEHOLDER_UNLOCK.MAX
+        ? '（P3 で置き換わるプレースホルダ・既定）'
+        : `（★--unlock-min/max で指定。★既定は ${PLACEHOLDER_UNLOCK.MIN}〜${PLACEHOLDER_UNLOCK.MAX}）`}`
+      + `。K の較正はこの仮定に依存する`
+      /**
+       * ⚠️ 🔴 ★**「`--pool` なら効かない」は誤りでした**（★2026-09-20・書いた直後に自分で気づきました）。
+       *   ✔ ★`race-field.ts:98` は `stats[key] = overrides.stats?.[key] ?? horse.potential[key] * unlock;`。
+       *   ★`overrides.stats` が入るのは ★**`--real-ability` のときだけ**（`verify-race.ts` の `abilityOf`）。
+       *   → ★★**`--pool` を渡しても、★`--real-ability` が無ければ素質開放率は効きます。**
+       *     ★プール file が供給するのは `potential`（と `--b6-wired` のときの `__training`）であって、
+       *     ★**育った `stats` ではありません。**
+       */
+      + `${REAL_ABILITY ? '／⚠️ ★--real-ability なので、★馬の stats をそのまま使い、★この値は効きません' : ''}`,
 );
 console.log('');
 
