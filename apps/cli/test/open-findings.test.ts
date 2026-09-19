@@ -200,6 +200,14 @@ describe('NT-3 開いている指摘の登録簿', () => {
        */
       'DS-5 ④': '★`9f7f36a`: ★確定の直前に `scratchRetiredBeforeStart`。★実 DB 15 件 全通・★検査 5 件。'
         + '★残る限界（★発走から確定までの表示の遅れ）は ★正典 §10.4 の「承知している限界」へ',
+      'CLEANUP-NO-RECORD': '★`tools/*.mjs` の `delete from` を全走査し、★**自分が作った行以外を消しうる 7 本**を確定。'
+        + '★`cleanup-ds7-leak` / `verify-unlock-daily` / `verify-flow` は ★**消す前の内容を出す**ようにした。'
+        + '★`verify-sy1-clone` / `verify-v11-synthetic`（`cycle_index >= 900000` の試験専用領域）と '
+        + '★`seed-world`（世界の作り直し）と `verify-a7`（控えで復元）は ★**要らない理由を書いた**。'
+        + '🔴 ★閉じた決め手は ★**機械が止めるようにしたこと** — `tools/lib/broad-deletes.mjs` の登録簿と '
+        + '★`broad-deletes.test.ts`（5 件）が、★**新しい広い `delete` を黙って足せなくする**（★全数登録＋件数のラチェット）。'
+        + '⚠️ ★「危ないか」は機械に判定させない（★同じ日に検出の網を 3 回 書き直して、★網のほうが壊れると分かった）。'
+        + '★機械は**形だけ**を拾い、★危ないかどうかは人が登録簿に書く',
       'CALIB-MARGIN': '★`RACE_RANDOM_K` 0.22 → **0.237**（オーナー決定・案 2・`db85cfe`）の後、'
         + '★確定の 8 シード × 120,000 レースで測った（`evidence/20260919-condition-fatigue/v4-k0237-8seed-20260919.txt`）。'
         + '🔴 ★**オーナー決定②（帯の外が 0 でなければ余裕を足す）の条件が満たされた**: '

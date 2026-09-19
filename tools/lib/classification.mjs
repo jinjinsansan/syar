@@ -966,6 +966,8 @@ export const COMPONENT = [
   { file: 'lib/tool-restores.d.mts', why: '★`lib/tool-restores.mjs` の型（★**SB-6**・2026-09-19）。★`snapshot-file.d.mts` と同じ作法で、★道具ではなく部品。★中身（表）は `.mjs` が持つ（D-052）' },
   { file: 'lib/tool-restores.mjs', why: '★**殺された道具が残した状態を、★次の実行が戻す**手続きの表（★**SB-6**・2026-09-19）。★`snapshot-file.mjs` は控えを置くところまでで、★戻す手は別に要る。🔴 ★道具の本体は先頭で DB に繋ぐので検査から `import` できない → ★**繋がない部品として外に出し、★偽の client で検査から実際に走らせる**。⚠️ ★**実 DB では確かめていない**（★確かめると `STABLE-1-SKEW` を測っている母集団を自分で動かす）。★`restore` は**冪等**であることを検査が要求する。★検査の道具で、★製品では使わない' },
   { file: 'lib/leftovers.mjs', why: '★**片付いたことを数える**部品（★**TL-1**・2026-09-19）。🔴 ★`delete` を呼んだは「消えた」ではない（★外部キー・権限・`where` の書き間違いで 0 行しか消えない）。★同じ形を 16 回 書くと 16 通りの微妙に違う形になり、★**何本かは数えたのに合否に入れ忘れます**（★`verify-v19-db` が実際にそうでした）。→ ★数え方と「0 でなければ落ちる」を 1 か所に。⚠️ ★`process.exit()` は呼ばず `process.exitCode` を立てるだけ（★呼ぶ側にまだ片付けが残ることがある）。★道具ではなく部品' },
+  { file: 'lib/broad-deletes.d.mts', why: '★`lib/broad-deletes.mjs` の型（★`CLEANUP-NO-RECORD`・2026-09-19）。★`classification.d.mts` / `tool-aftermath.d.mts` と同じ作法で、★道具ではなく部品。★中身（一覧）は `.mjs` が持つ（D-052）' },
+  { file: 'lib/broad-deletes.mjs', why: '★**自分が作った行以外を消す `delete` の登録簿**（★`CLEANUP-NO-RECORD`・2026-09-19）。🔴 ★**「危ないか」を機械に判定させない** — ★同じ日に検出の網を 3 回 書き直し（★精度 20%→探しているものを落とす→使える）、★**網のほうが壊れる**と分かった。→ ★機械は**形だけ**（★条件なし／範囲比較／`date =`）を拾い、★危ないかどうかは人がここに書く。★`known-red` / `open-findings` と同じ作法。★`broad-deletes.test.ts` が全数登録と件数のラチェットを要求する。★道具ではなく表' },
   { file: 'lib/guard.d.mts', why: '★`assertNotProduction` の型宣言（★`any` を使わないために置く）。★実行されません' },
   { file: 'lib/pixel-font.mjs', why: '★画像に文字を焼くための点字の表（★映像の道具が使う）' },
   { file: 'lib/race-audit-build.mjs', why: '★映像の監査で使うレースの組み立て。★道具から呼ばれる部品' },
