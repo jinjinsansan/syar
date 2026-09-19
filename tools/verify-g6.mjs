@@ -86,10 +86,42 @@ await c.query(
  * 🔴 ★以前は後片付けで `npc_stable_id = 1` と ** 決め打ち**していました —
  *    ★元が 1 でなければ、★**この道具を流すたびに馬が 1 番厢舎へ黙って移っていました。**
  */
-const before = (await c.query(
-  'select id, name, npc_stable_id from horses where npc_stable_id is not null order by id limit 1',
-)).rows[0];
-if (before === undefined) throw new Error('★NPC の馬が 1 頭もいません');
+/**
+ * 🔴 ★**馬を選べるようにしました**（★2026-09-20）。
+ *
+ * 【★なぜ選べる必要があるか】
+ *   ★既定の `order by id limit 1` は ** 毎回 同じ馬**で、
+ *   ✔ ⁖2026-09-19 に実 DB で流したところ、★**その馬の元の厩舎がたまたま 1** でした。
+ *   → ★★**「元の値を戻した」と「1 を決め打ちした」が区別できませんでした**（★**R-30**）。
+ *   → ★`--stable-not 1` で ** 厩舎 1 以外**の馬を取れば、★区別がつきます。
+ *
+ * ★`--horse <id>`     … ★馬を名指しする
+ * ★`--stable-not <n>` … ★その厩舎**以外**から取る
+ */
+const argOf = (name) => {
+  const i = process.argv.indexOf(name);
+  return i >= 0 ? process.argv[i + 1] : null;
+};
+const wantHorse = argOf('--horse');
+const stableNot = argOf('--stable-not');
+
+const pickSql = wantHorse !== null
+  ? ['select id, name, npc_stable_id from horses where id = $1', [wantHorse]]
+  : stableNot !== null
+    ? ['select id, name, npc_stable_id from horses where npc_stable_id is not null'
+       + ' and npc_stable_id <> $1 order by id limit 1', [Number(stableNot)]]
+    : ['select id, name, npc_stable_id from horses where npc_stable_id is not null order by id limit 1', []];
+
+const before = (await c.query(pickSql[0], pickSql[1])).rows[0];
+if (before === undefined) {
+  throw new Error(wantHorse !== null
+    ? `★馬 ${wantHorse} が見つかりません`
+    : '★条件に合う NPC の馬が 1 頭もいません');
+}
+if (before.npc_stable_id === null) {
+  // 🔴 ★所属厩舎が無い馬を取ると、★控えに null が入ります。
+  throw new Error(`★馬 ${before.id} は所属厩舎がありません（★既に誰かの所有馬かもしれません）`);
+}
 const ORIGINAL_STABLE = before.npc_stable_id;
 
 /**
