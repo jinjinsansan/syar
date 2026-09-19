@@ -49,6 +49,17 @@ const clean = async () => {
   // ★`today` はこの関数より後で定義されるので、ここで引き直す
   //   （そのまま参照すると TDZ で ReferenceError になり、後片付けが丸ごと落ちます）
   const d = (await c.query('select current_date::text d')).rows[0].d;
+  /**
+   * 🔴 ★**消す前に、★何を消すのかを出す**（★`CLEANUP-NO-RECORD`・2026-09-19）。
+   *
+   * ⚠️ 🔴 ★`point_flow_daily` は ★**§11.2 の実経済の指標**です。
+   *   ★この道具が作った行ではなく、★**今日分の集計**を消します。
+   *   ★取り直せる値ですが、★**消したことがどこにも残らない**のが問題でした。
+   */
+  const priorFlow = (await c.query('select * from point_flow_daily where date = $1', [d])).rows[0] ?? null;
+  console.log(priorFlow === null
+    ? `  ★今日（${d}）の point_flow_daily は元からありません`
+    : `  ★消す前の point_flow_daily（${d}）: ${JSON.stringify(priorFlow)}`);
   await c.query('delete from point_flow_daily where date = $1', [d]);
 };
 

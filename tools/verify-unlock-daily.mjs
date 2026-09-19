@@ -36,6 +36,17 @@ console.log('# 開放率の日次記録');
 console.log('');
 
 const today = (await c.query('select current_date::text d')).rows[0].d;
+/**
+ * 🔴 ★**消す前に、★何を消すのかを出す**（★`CLEANUP-NO-RECORD`・2026-09-19）。
+ *
+ * ⚠️ ★ここで消すのは ★**この道具が作った行ではありません** —
+ *   ★**ワーカーが計算した、★今日の分布**です。★直後に取り直しますが、
+ *   ★**消した値と取り直した値が違うとき、★違ったことが分からない**のが問題でした。
+ */
+const priorUnlock = (await c.query('select * from unlock_daily where date = $1', [today])).rows[0] ?? null;
+console.log(priorUnlock === null
+  ? `  ★今日（${today}）の unlock_daily は元からありません`
+  : `  ★消す前の unlock_daily（${today}）: ${JSON.stringify(priorUnlock)}`);
 await c.query('delete from unlock_daily where date = $1', [today]);
 
 // ── ① 記録する ──────────────────────────────────────────
