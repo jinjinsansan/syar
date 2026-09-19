@@ -408,6 +408,11 @@ export const READONLY = [
   //    🔴 ★この数字を**較正の根拠に使わないこと** — ★本番の馬は育っていない（`PROD-NEVER-AGED`）。
   //    ★言えるのは「模型と実物がどれだけ離れているか」まで。
   'diag-live-gates.mjs',
+  // ★読むだけ（`select` のみ）。★**1 レースの中の能力の散らばり**を測る（2026-09-20）。
+  //    ★V-4 を決めている当の量に降りるための道具（★V-4 は遠い量）。
+  //    ⚠️ ★能力は `baseScore(stats, distance)` で採る（★R-30: ★レースに渡された値）。
+  //    ⚠️ ★本番に限っては、★馬が一度も育っていないので ** 今の stats ＝ 当時の stats**。
+  'diag-field-dispersion.mjs',
   'diag-worker-alive.mjs',
   'diag-stable-census.mjs',
   'diag-printed-only-counts.mjs',
