@@ -7,10 +7,17 @@
  *   ★**マークシートの画面が、これまで存在しませんでした**（★資料 §4.3）。
  *   ★`/races/[id]/bet` は arcade 版の別デザインで、★**同じ URL を奪いません**。
  *
- * 【★正典 §9.5 — 自分の馬が出るレース】
- *   ⚠️ ★**投票できません。** ★行は押せず、★主ボタンは灰色、★使う EP は「—」、
- *      ★通知は「レースを見る」だけ、★**理由を必ず併記**します。
- *      ★「押せない」だけにすると、★**なぜ押せないか分かりません**。
+ * 【★正典 §9.5 — 自分の馬が出るレース】★**VT-1 ①**・2026-09-19・オーナー決定
+ *   🔴 ★**この画面は「投票できません」としていました。★正典はそう書いていません。**
+ *     ★§9.5 が書いているのは ★**買い目の条件**です:
+ *       ★1. ★自馬を**含む**券しか買えない ／ ★2. ★1 レース **5,000 EP** まで ／
+ *       ★3. ★自馬が複数なら ★**全頭を含む**組合せのみ
+ *     → ★★**マークシートは普通に満たせます**（★1 頭 10 EP・18 頭でも **180 EP** ＝ 上限の 3.6%）。
+ *   ✅ ★**サーバーは最初から正しく守っています** — ✔ `place_bet`（★最後の定義は移行 `0044`）が
+ *     ★`not (p_selection @> to_jsonb(e.gate))` で全頭を確かめ、★金額は `bet_allowance()` が見ます。
+ *   ⚠️ 🔴 ★**画面が独自の規則を持たないこと。** ★判定は `checkOwnRaceSelection`（`@star/betting`）
+ *     ★**1 か所**から引きます（★D-052・BT-0「材料でなく結果を渡す」）。
+ *   ⚠️ ★**「押せない」だけにしない** — ★理由（どの馬が入っていないか）を必ず出します。
  *
  * 【★L-8（ストア審査）】
  *   ★単勝は ★**灰色**。★倍率を大きく・赤く・光らせません。★「儲かる」等を書きません。
@@ -22,6 +29,7 @@ import { JOCKEYS } from '@star/scheduler';
 import {
   Backdrop, BigButton, NoticeBar, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
+import { BET_CAP_OWN_RACE_EP, checkOwnRaceSelection, ownRaceReasonText } from '@star/betting';
 import { DEMO_BET_RACE } from '../../lib/game-demo';
 
 /** ★枠色 1〜8（★正典 `--f1`〜`--f8` の写し・★変更禁止） */
@@ -30,6 +38,9 @@ const DARK_TEXT_FRAMES = new Set([1, 5, 8]);
 
 /** ★1 頭あたりに使う参加ポイント（★資料 §8-4） */
 const EP_PER_PICK = 10;
+
+/** ★自馬が出るレースの上限（★数は `@star/betting` から。★画面に数を書かない・D-052） */
+const OWN_RACE_CAP_LABEL = BET_CAP_OWN_RACE_EP.toLocaleString('en-US');
 
 /**
  * ★**出馬表は `DEMO_BET_RACE` から引きます**（★D-052・R-30）。
@@ -57,6 +68,11 @@ export default function VotePage(): React.ReactElement {
    */
   const [ownGate, setOwnGate] = useState<number | null>(DEMO_BET_RACE.ownGate ?? 7);
   const ownHorseRuns = ownGate !== null;
+  /**
+   * ★**このレースに出ている自分の馬の馬番**（★D-104 で 1 人 2 頭まで出せます）。
+   * ⚠️ ★デモは 1 頭ですが、★判定は ★**複数でも同じ関数**が見ます（★§9.5-3）。
+   */
+  const ownGates = ownGate === null ? [] : [ownGate];
   /** ★出馬表（★馬名は `DEMO_BET_RACE`・騎手は `JOCKEYS`・枠は馬番から） */
   const rows = DEMO_BET_RACE.horses.map((h, i) => ({
     no: h.gate,
@@ -68,11 +84,22 @@ export default function VotePage(): React.ReactElement {
     mine: h.gate === ownGate,
   }));
 
+  /**
+   * ⚠️ 🔴 ★**自馬の行も押せます。** ★§9.5 は「選べない」ではなく「**含めること**」です。
+   *    ★外したら ★**理由を出して、出せなくします**（★下の `check`）。
+   *    ★ここで外せなくすると、★**画面が正典より狭い規則**を持つことになります。
+   */
   const toggleRow = (no: number): void => {
-    if (ownHorseRuns) return; // ★§9.5: 触っても変わらない
     setPicks((p) => (p.includes(no) ? p.filter((x) => x !== no) : [...p, no]));
   };
-  const useEp = ownHorseRuns ? '—' : String(picks.length * EP_PER_PICK);
+  const epTotal = picks.length * EP_PER_PICK;
+  /**
+   * ★**§9.5 の判定は `@star/betting` の 1 か所から**（★画面で組み立てない・BT-0）。
+   * ⚠️ ★これは ★**「なぜ出せないか」を言うため**のもので、★最後に弾くのはサーバーです（憲法 3）。
+   */
+  const check = checkOwnRaceSelection(picks, ownGates, epTotal);
+  const blocked = picks.length === 0 || !check.ok;
+  const useEp = String(epTotal);
 
   return (
     <div
@@ -91,7 +118,7 @@ export default function VotePage(): React.ReactElement {
         <NoticeBar
           kind="own"
           text="第12R に自分の馬が出走しています"
-          sub="自分の馬が出るレースは投票できません（レースは観戦できます）"
+          sub={`自分の馬（${ownGates.join('・')} 番）を必ず含めてください（1 レース ${OWN_RACE_CAP_LABEL} EP まで）`}
           actionLabel="レースを見る"
           actionHref="/watch-race"
         />
@@ -138,13 +165,11 @@ export default function VotePage(): React.ReactElement {
                   key={r.no}
                   type="button"
                   onClick={() => { toggleRow(r.no); }}
-                  disabled={ownHorseRuns}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6, minHeight: 46, padding: '0 10px', textAlign: 'left',
                     border: 'none', borderBottom: '1px solid var(--u-rule)',
-                    background: ownHorseRuns ? '#eceff1' : on ? '#fff4cf' : i % 2 === 1 ? 'var(--u-paper-2)' : 'var(--u-paper)',
-                    opacity: ownHorseRuns ? 0.72 : 1,
-                    cursor: ownHorseRuns ? 'not-allowed' : 'pointer',
+                    background: on ? '#fff4cf' : i % 2 === 1 ? 'var(--u-paper-2)' : 'var(--u-paper)',
+                    cursor: 'pointer',
                   }}
                 >
                   <span style={{ width: 78, flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -182,7 +207,7 @@ export default function VotePage(): React.ReactElement {
           <div style={{ padding: '8px 11px', border: '2px solid rgba(251,247,236,.28)', borderRadius: 12, background: 'var(--u-panel)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 11, letterSpacing: '.08em', color: 'var(--u-ink-light-3)' }}>マークシート</span>
-              <span style={{ marginLeft: 'auto', fontSize: 12 }}>{ownHorseRuns ? '選べません' : `${picks.length} 頭を選択中`}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 12 }}>{picks.length} 頭を選択中</span>
             </div>
             <div style={{ marginTop: 6, display: 'flex', alignItems: 'baseline', gap: 8 }}>
               <span style={{ fontSize: 11, color: 'var(--u-ink-light-3)' }}>使う参加ポイント</span>
@@ -196,9 +221,10 @@ export default function VotePage(): React.ReactElement {
             </div>
           </div>
           <div style={{ padding: '8px 11px', border: '2px solid rgba(251,247,236,.28)', borderRadius: 12, background: 'var(--u-panel)', fontSize: 12, fontWeight: 500, lineHeight: 1.6 }}>
-            {ownHorseRuns
-              ? '自分の馬が出走しているため、このレースには投票できません（正典 §9.5）。レースは観戦できます。'
-              : `1 頭につき ${EP_PER_PICK} EP を使います。出走登録の出走料とは別枠です。`}
+            {/* 🔴 ★「押せない」だけにしない。★理由（どの馬が入っていないか）を出す */}
+            {check.ok
+              ? `1 頭につき ${EP_PER_PICK} EP を使います。出走登録の出走料とは別枠です。`
+              : ownRaceReasonText(check)}
           </div>
           {/* ★デモの切り替え（★両方の見え方を確かめるため。★本番はサーバーが決めます） */}
           <button
@@ -218,13 +244,18 @@ export default function VotePage(): React.ReactElement {
         position: 'relative', flex: '0 0 auto', display: 'flex', flexWrap: 'wrap', gap: 10,
         padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
-        {ownHorseRuns ? (
-          <BigButton tone="disabled" label="投票はできません" sub="自分の馬が出走しているため" grow="1.4 1 210px" />
+        {blocked ? (
+          <BigButton
+            tone="disabled"
+            label="投票する（マークシート）"
+            sub={picks.length === 0 ? '馬を選んでください' : ownRaceReasonText(check)}
+            grow="1.4 1 210px"
+          />
         ) : (
           <BigButton
             tone="blue"
             label="投票する（マークシート）"
-            sub={`${picks.length} 頭 ／ ${picks.length * EP_PER_PICK} EP を使います`}
+            sub={`${picks.length} 頭 ／ ${epTotal} EP を使います`}
             grow="1.4 1 210px"
           />
         )}

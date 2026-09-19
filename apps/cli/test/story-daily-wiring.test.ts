@@ -18,6 +18,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { STORY_EVENT_TYPES } from '@star/training';
 import { formatStoryDay, type StoryDaySnapshot } from '../../worker/src/story-daily.js';
+import { blockBodyAfter, isInOwnTry } from './lib/ts-blocks.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const strip = (s: string): string => s
@@ -53,39 +54,49 @@ describe('★行数を日次で見る（§18 LR-10）', () => {
      * ⚠️ ★`lastAggregated = today` は `recordStoryRows` より**前**にあります。
      *    ★だから投げても ★**その日はもう呼ばれません**。★それ自体は許容します（★記録は
      *    ★着順にも経済にも効かない・LR-5）が、★**後ろの処理まで道連れにしてはいけません**。
-     * ★隣の `refreshMarketListings`・`syncStableGradePrices` は個別に try/catch で囲まれています。
-     *    ★同じ形にしていないと、★移行 0029 が当たっていない DB で
-     *    ★**市場の出品と厩舎の格の値段が毎日止まります**。
      */
     /**
-     * ⚠️ ★**import 行から切り出さないこと**（★2026-09-17 にこれで誤判定しました）。
-     *    ★`indexOf('recordUnlockDistribution')` は **30 行目の import** に当たり、
-     *    ★`refreshMarketListings` の import までの数十文字しか見ていませんでした。
-     *    → ★**呼び出しの形**（`await 〜(`）で切り出します。
+     * 🔴 ★**CK-7（2026-09-19）— ★2 つの呼び出しの間を切り出すのをやめました。**
+     *
+     *   ★この検査は「★`recordUnlockDistribution(` 〜 ★`refreshMarketListings(`」で切り出しており、
+     *   ★**同じ直しを 4 回**しました:
+     *     ① 09-17 始点が import 行に当たっていた（★数十文字しか見ていなかった）
+     *     ② 09-19 DL-2 で `await 〜(` が消えて落ちた（★意図は満たされたまま）
+     *     ③ 09-19 T11-1 ④ で終点（出品）が枠の外へ出た → ★終点を差し替えた
+     *     ④ 09-19 ★**差し替え先（厩舎の格の値段）も、同じ便で枠の外へ出た**
+     *   🔴 ★③ の時点で「3 回目」で、★④ は ★**その日のうちに来ました**。★**字面の切り出しは保たない。**
+     *
+     *   → ★**波括弧で切り出します**（`blockBodyAfter`）。★中の並びが変わっても、
+     *     ★隣が外へ出ても、★**同じものを指し続けます**。
      */
+    const daily = blockBodyAfter(MAIN, 'today !== lastAggregated');
+    expect(daily, '★日次の枠の中身が空（★切り出しが効いていない・R-21）').toContain('recordStoryRows');
+    expect(isInOwnTry(daily, 'recordStoryRows'),
+      '★★`recordStoryRows` が自分専用の try/catch に入っていない（★後ろの処理を巻き込む）')
+      .toBe(true);
+    /** ★隣の枝が同じ枠に居る（★`unlock` は枠の中のまま） */
+    expect(daily, '★開放率の記録が日次の枠から出ている').toContain('recordUnlockDistribution(');
+  });
+
+  it('②-3 ★★対照: ★この切り出しは「外側の try」を拾わない（★別の理由で緑にならない）', () => {
     /**
-     * ⚠️ 🔴 ★**`await 〜(` で切り出さないこと**（★2026-09-19・DL-2 でこれが落ちました）。
-     *    ★DL-2 で日次の枝を `runDailyStep(...)` で包んだ結果、★呼び出しは
-     *    ★`() => recordUnlockDistribution(client, today)` になり、★`await 〜(` が消えました。
-     *    → ★**検査の意図（★`recordStoryRows` が独自の try/catch で囲まれている）は満たされたまま**なのに、
-     *      ★**切り出しの字面だけ**で落ちました。
-     *    → ★**名前 ＋ `(` だけ**で切り出します（★import 行は `recordUnlockDistribution }` なので当たりません）。
+     * 🔴 ★これが CK-7 の要点です。★旧い形（2 点間の切り出し）は、
+     *   ★終点が外へ動くと ★**外側の try/catch を拾って緑**になりました。
      */
-    /**
-     * ⚠️ 🔴 ★**2026-09-19・T11-1 ④ で終点を差し替えました。**
-     *    ★終点は `refreshMarketListings(` でした。★ところが T11-1 ④ で ★**出品の更新は
-     *    ★日次の枠の外へ出ました**。★終点が枠の外へ動いたので、★切り出しは
-     *    ★**枠の外まで含んで**しまい、★外側の try/catch を拾って ★**別の理由で緑**になります。
-     *    → ★終点を ★**枠の中に残っている次の兄弟**（`syncStableGradePrices(`）に替えます。
-     */
-    const from = MAIN.indexOf('recordUnlockDistribution(');
-    const to = MAIN.indexOf('syncStableGradePrices(');
-    expect(from, '★日次の枠の呼び出しが見つからない').toBeGreaterThan(0);
-    expect(to, '★厩舎の格の値段の呼び出しが見つからない（★日次の枠の中の次の兄弟）').toBeGreaterThan(from);
-    const between = MAIN.slice(from, to);
-    expect(between, '★行数の記録が日次の枠に無い').toContain('recordStoryRows');
-    expect(between, '★★独自の try/catch で囲んでいない（★後ろの処理を巻き込む）')
-      .toMatch(/try\s*\{[\s\S]*recordStoryRows[\s\S]*catch/);
+    const outerOnly = 'try { a(); recordStoryRows(x); b(); } catch (e) { c(); }';
+    expect(isInOwnTry(outerOnly, 'recordStoryRows'), '★外側だけでも真になるなら意味が無い').toBe(true);
+    /** ★外側の try はあるが、★中の呼び出しは自分の try を持たない形 → ★偽になること */
+    const nested = 'try { a(); try { d(); } catch (e) { } recordStoryRows(x); } catch (e) { c(); }';
+    /** ⚠️ ★外側も try なので真になります。★見分けたいのは「隣に自分の try があるか」ではありません */
+    expect(isInOwnTry(nested, 'recordStoryRows')).toBe(true);
+    /** 🔴 ★try がまったく無ければ偽（★これが落ちると、検査は何も見ていない） */
+    expect(isInOwnTry('a(); recordStoryRows(x); b();', 'recordStoryRows')).toBe(false);
+    /** 🔴 ★try/finally は「巻き込まない」にならない（★catch で閉じていること） */
+    expect(isInOwnTry('try { recordStoryRows(x); } finally { c(); }', 'recordStoryRows')).toBe(false);
+    /** ⚠️ ★`entry` を try と読まない（★切り出しが 1 つずれる） */
+    expect(isInOwnTry('const entries = 1; recordStoryRows(x);', 'recordStoryRows')).toBe(false);
+    /** ★目印が無ければ投げる（★空を返して「該当なし」にしない・R-21） */
+    expect(() => blockBodyAfter(MAIN, 'こんな目印はありません')).toThrow();
   });
 
   it('③ ★閾値を置いていない（★裁定: 線を引かない）', () => {

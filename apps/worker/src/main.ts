@@ -140,6 +140,12 @@ async function main(): Promise<void> {
    * ★起動のたびに `''` に戻るので、★**起動後の最初の周で必ず 1 回**並びます。
    */
   let lastMarketDay = '';
+  /**
+   * ★**厩舎の格の値段の日付**（★2026-09-19・T11-1 ④ の掃き出し）。
+   * ⚠️ ★`lastMarketDay` と**共有しません**。★共有すると、★出品が落ちた日に値段も止まります
+   *    （★いま直しているのと同じ形を、★1 段 下で作ることになります）。
+   */
+  let lastGradePriceDay = '';
 
   // ★SIGTERM で綺麗に止める。処理の途中で殺されないよう、周の切れ目で抜ける
   //   （A-2 があるので途中で殺されても壊れませんが、無駄な再計算を避けます）
@@ -475,18 +481,6 @@ async function main(): Promise<void> {
             );
           }
         }
-
-        /**
-         * ── ★厩舎の格の値段を書く（★D-103 ④・移行 `0027`）───────────
-         *   ★値段は TS 側（`GRADE_UNLOCK_EP`）が持ち、★SQL には数を書きません（D-052）。
-         *   ★値が同じなら書きません（★冪等）。
-         */
-        try {
-          const g = await syncStableGradePrices(client);
-          if (g.written > 0) console.log(`[worker] 厩舎の格の値段を更新 ${g.written} 行`);
-        } catch (e) {
-          console.error('[worker] 厩舎の格の値段の更新に失敗:', (e as Error).message);
-        }
       }
     } catch (e) {
       // ★集計の失敗でループを止めない（A-1 が壊れる）。ただし黙らせない
@@ -528,6 +522,37 @@ async function main(): Promise<void> {
       }
     } catch (e) {
       console.error('[worker] 出品の更新に失敗:', (e as Error).message);
+    }
+
+    /**
+     * ── ★厩舎の格の値段を書く（★D-103 ④・移行 `0027`）───────────
+     *   ★値段は TS 側（`GRADE_UNLOCK_EP`）が持ち、★SQL には数を書きません（D-052）。
+     *   ★値が同じなら書きません（★冪等）。
+     *
+     * 【🔴 ★なぜここへ出したか — ★出品と**まったく同じ形**でした】
+     *   ★これは日次の枠の中（★深さ 2）にあり、★`aggregate` / `unlock` / `story` の
+     *   ★**いずれかが投げると到達しません**。★DL-1 の 1 か月、★**値段も更新されていなかった**
+     *   ★可能性があります（★レビュー側が数えて見つけました・2026-09-19）。
+     *   ⚠️ ★**1 か所直して終わりにしない。** ★出品だけ外へ出して、ここを残していました。
+     *
+     * 【🔴 もう 1 つの穴】★`runDailyStep` に**包まれていませんでした**。
+     *   ★自前の try/catch で握って `console.error` を出すだけなので、
+     *   ★**理由は標準出力にしか残りません** — ★**DL-2 が塞いだはずの穴**です。
+     *   → ★包みます。★`runDailyStep` は投げ直すので、★外側の try/catch はそのまま残します。
+     */
+    try {
+      if (dayIdx !== null && today !== lastGradePriceDay) {
+        lastGradePriceDay = today;
+        const g = await runDailyStep(
+          // ★名前は移行 `0052` の註記に挙げた語に合わせます（`aggregate / unlock / story / market / grade`）
+          client, dayIdx, 'grade',
+          () => syncStableGradePrices(client),
+          (r) => r.written,
+        );
+        if (g.written > 0) console.log(`[worker] 厩舎の格の値段を更新 ${g.written} 行`);
+      }
+    } catch (e) {
+      console.error('[worker] 厩舎の格の値段の更新に失敗:', (e as Error).message);
     }
 
     /**

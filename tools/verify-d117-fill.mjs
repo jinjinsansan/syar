@@ -77,6 +77,31 @@ try {
        from race_entries_public where race_id = $1`, [raceId])).rows[0];
   must(hidden.all_ === 1 && hidden.with_gate === 0, `公示のあいだ枠は隠れる（★DF-3・${hidden.with_gate}/${hidden.all_}）`);
 
+  console.log('--- ③.5 公示の条件を読み直す（announcedConditions の SQL そのまま・★FK-5）---');
+  /**
+   * ★偽物（`d117-two-phase-loop.test.ts`）は `announcedSet.has(i) ? {...} : null` と**写して**います。
+   *   → ★本物が本当に `status = 'announced'` で絞っていることを、★実 DB で見ます。
+   */
+  const cond = (await c.query(
+    `select surface, distance, track_condition, course_id, course_frozen
+       from races where cycle_index = $1 and status = 'announced'`, [CY])).rows[0];
+  must(cond !== undefined, '公示中は条件が読める');
+  must(cond?.track_condition === 'good', `公示のときの馬場をそのまま返す（${cond?.track_condition}）`);
+  must(cond?.course_frozen !== null, '★凍結した走路を返す（★引き直さない・R-30）');
+
+  console.log('--- ③.6 raceExists は status を見ない（★FK-5）---');
+  /**
+   * ★偽物は `done.has(i) || announcedSet.has(i)`（★**どちらの段でも真**）と写しています。
+   *   → ★本物に status の条件が**無い**ことを、★実 DB で確かめます
+   *     （★もし `status = 'scheduled'` で絞っていたら、★公示済みの番号をもう一度 公示します）。
+   */
+  const existsAnnounced = Number((await c.query(
+    `select count(*)::text as n from races where cycle_index = $1`, [CY])).rows[0].n);
+  must(existsAnnounced === 1, `★announced の段でも 1 と数える（${existsAnnounced}）`);
+  const existsNone = Number((await c.query(
+    `select count(*)::text as n from races where cycle_index = $1`, [CY + 77])).rows[0].n);
+  must(existsNone === 0, `★対照: 無い番号は 0（${existsNone}）`);
+
   console.log('--- ④ 組成（fillRace の SQL そのまま）---');
   const lock = (await c.query(
     `select id, status from races where cycle_index = $1 for update`, [CY])).rows[0];
@@ -128,6 +153,18 @@ try {
   const again = await c.query(
     `update races set status = 'scheduled' where id = $1 and status = 'announced'`, [raceId]);
   must(again.rowCount === 0, `もう announced ではないので 0 行（${again.rowCount}）`);
+
+  console.log('--- ⑦ 組成が済んだら条件は読めない（★announcedConditions の述語そのもの・FK-5）---');
+  /**
+   * 🔴 ★ここが述語の中身です。★`status = 'announced'` を落とすと、
+   *   ★**組成済みのレースまで「まだ公示中」に見え**、★二度目の組成に入ります。
+   */
+  const condAfter = (await c.query(
+    `select 1 from races where cycle_index = $1 and status = 'announced'`, [CY])).rowCount;
+  must(condAfter === 0, `★scheduled になったら 0 行（${condAfter}）`);
+  const existsAfter = Number((await c.query(
+    `select count(*)::text as n from races where cycle_index = $1`, [CY])).rows[0].n);
+  must(existsAfter === 1, `★対照: raceExists は scheduled でも 1（${existsAfter}）`);
 
   console.log(failed === 0 ? '\n✅ 全部通りました' : `\n🔴 ${failed} 件が落ちました`);
 } finally {

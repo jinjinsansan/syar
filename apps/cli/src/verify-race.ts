@@ -50,7 +50,7 @@ import { runSimulation } from './simulator.js';
 import { toSafeJson } from './json-safe.js';
 import * as MC from './measurement.js';
 import { PopularityEstimator } from './popularity.js';
-import { mean, round, sd, standardError } from './stats.js';
+import { mean, round, sd, sdSample, standardError } from './stats.js';
 
 import { buildTrainingStateSampler } from './training-state.js';
 // ---------------------------------------------------------------------------
@@ -797,7 +797,27 @@ console.log(`  AI代行の倍率平均: ${round(aiMult, 4)} / 手動最適: ${ro
 console.log(
   `  自馬の勝率 AI代行 ${pct(aiWin)} / 手動最適 ${pct(optWin)} → 勝率比 ${pct(v8WinRatio)}`,
 );
-console.log(`  シード間の 1番人気勝率のばらつき(SD): ${pct(sd(results.map((r) => r.favoriteWinRate)))}`);
+/**
+ * ★**シード間のばらつき**（★**VP-10**・2026-09-19）。
+ *
+ * 【🔴 ★なぜ 2 つ出すか — ★報告と道具で数が食い違いました】
+ *   ★ここは `sd`（★**母標準偏差**・÷ n）を出していました。★ところが ★**判定に使う `standardError`
+ *   ★は `sdSample`（÷ n−1）から引きます**。★同じ「SD」という名前で ★**別の量**が 2 つありました。
+ *   ✔ ★実測（★2026-09-19・D プール・8 シード）: ★**母 0.39pp ／ 不偏 0.414pp**（★6% の差）。
+ *   🔴 ★`REPORT_BASELINE_D_20260919.md` は **0.414**、★この道具の画面は **0.39** を出しており、
+ *     ★**同じ実行の同じ量が、2 つの数で世に出ていました**。
+ *   ⚠️ ★`stats.ts` 自身が「★黙って流用すると、少ない標本で SE を過小に報告します」と
+ *     ★註記していたのに、★**その流用がここに在りました**。
+ *
+ * → ★**両方を、名前を付けて出します。** ★前後比較に使うのは ★**不偏のほう**です
+ *   （★母集団ではなく、★「もっとシードを振ったら」を推定しているため）。
+ */
+const favRates = results.map((r) => r.favoriteWinRate);
+console.log(
+  `  シード間の 1番人気勝率のばらつき: ★不偏SD(÷n-1) ${pct(sdSample(favRates))}` +
+  ` / 母SD(÷n) ${pct(sd(favRates))}` +
+  ` → ★**平均の SE ${pct(standardError(favRates))}**（★前後比較はこれで割ること）`,
+);
 
 const elapsed = (Date.now() - started) / 1000;
 console.log('');

@@ -178,15 +178,13 @@ export function racesToPrepare(nowMs: number, epochMs: number): number[] {
 export const ANNOUNCE_AHEAD_RACES = 4;
 
 /**
- * ★このサイクルで ★**枠だけ作っておくべき**レースのサイクル番号（★**D-117** の announce）。
- * ⚠️ ★`racesToPrepare`（fill）より ★**先**を返します。★重なる部分は呼ぶ側が「もう在る」で飛ばします。
+ * ★**`racesToAnnounce` はここにはありません** — ★`announce-window.ts` に移りました
+ * （★**DS-5 ②**・2026-09-19）。
+ *
+ * ★格ごとに窓の長さが変わったので、★`gradeOf`（`programme.ts`）が要ります。
+ * ★`programme.ts` はこのファイルを読んでいるので、★逆向きに読むと循環します。
+ * ⚠️ ★**ここに写しを置かないこと**（D-052）。★窓の長さを持つのは `ANNOUNCE_AHEAD_BY_GRADE` だけです。
  */
-export function racesToAnnounce(nowMs: number, epochMs: number): number[] {
-  const current = cycleIndexAt(nowMs, epochMs);
-  const out: number[] = [];
-  for (let i = 1; i <= ANNOUNCE_AHEAD_RACES; i += 1) out.push(current + i);
-  return out;
-}
 
 /**
  * ★**登録の締切**（★**D-117**・2026-09-19）。
