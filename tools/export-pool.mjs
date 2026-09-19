@@ -22,18 +22,51 @@
  */
 import { writeFileSync } from 'node:fs';
 import pg from 'pg';
-import { loadRaceablePool, loadTrainingStates } from '../apps/worker/src/horse-repo.ts';
+import { ACTIVE_WHERE, RACEABLE_WHERE, loadRaceablePool, loadTrainingStates } from '../apps/worker/src/horse-repo.ts';
 import { ABILITY_KEYS } from '../packages/sim-engine/src/index.ts';
 import { loadEnv } from './lib/env.mjs';
 
 const i = process.argv.indexOf('--out');
 const OUT = i >= 0 ? process.argv[i + 1] : 'docs/pool-staging.json';
 
+/**
+ * ★**AL-11 の 3 本を書き出すための口**（★2026-09-19）。★既定は**いまの配備そのもの**です。
+ *
+ *   `--predicate raceable`（既定） … `RACEABLE_WHERE`（★世代 max-2 以上）
+ *   `--predicate active`           … `ACTIVE_WHERE`（★`retired_at_week is null` だけ・PO-4）
+ *   `--limit <n>`（既定 3,000）     … `RACEABLE_POOL_LIMIT`（★PO-2 で切っている値）
+ *
+ * ⚠️ ★**既定を変えていません。** ★何も渡さなければ、★今までと 1 行も違わない出力になります。
+ */
+const pi = process.argv.indexOf('--predicate');
+const PREDICATE = pi >= 0 ? process.argv[pi + 1] : 'raceable';
+if (PREDICATE !== 'raceable' && PREDICATE !== 'active') {
+  throw new Error(`--predicate は raceable か active（受け取った: ${PREDICATE}）`);
+}
+const li = process.argv.indexOf('--limit');
+const LIMIT = li >= 0 ? Number(process.argv[li + 1]) : undefined;
+if (LIMIT !== undefined && !Number.isInteger(LIMIT)) throw new Error('--limit は整数');
+const WHERE = PREDICATE === 'active' ? ACTIVE_WHERE : RACEABLE_WHERE;
+
 const env = loadEnv();
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await c.connect();
 
-const pool = await loadRaceablePool(c);
+/**
+ * ★**切ったら黙らない**（★PO-2）。★AL-11 の B/C は上限を外して呼ぶので、
+ *   ★切られていたら「上限を外したつもりで切れていた」に気づけません。
+ */
+let truncated = null;
+const pool = await loadRaceablePool(
+  c,
+  LIMIT ?? undefined,
+  (eligible, used) => { truncated = { eligible, used }; },
+  WHERE,
+);
+console.log(`[export-pool] 述語=${PREDICATE} / 上限=${LIMIT ?? '既定(3000)'} → ★${pool.length} 頭`);
+if (truncated !== null) {
+  console.log(`[export-pool] ⚠️ ★上限で切りました: 条件に合うのは ${truncated.eligible} 頭、読んだのは ${truncated.used} 頭`);
+}
 const states = await loadTrainingStates(c);
 const ages = new Map(
   (await c.query(
