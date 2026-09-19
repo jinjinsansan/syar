@@ -71,10 +71,17 @@ describe('★行数を日次で見る（§18 LR-10）', () => {
      *      ★**切り出しの字面だけ**で落ちました。
      *    → ★**名前 ＋ `(` だけ**で切り出します（★import 行は `recordUnlockDistribution }` なので当たりません）。
      */
+    /**
+     * ⚠️ 🔴 ★**2026-09-19・T11-1 ④ で終点を差し替えました。**
+     *    ★終点は `refreshMarketListings(` でした。★ところが T11-1 ④ で ★**出品の更新は
+     *    ★日次の枠の外へ出ました**。★終点が枠の外へ動いたので、★切り出しは
+     *    ★**枠の外まで含んで**しまい、★外側の try/catch を拾って ★**別の理由で緑**になります。
+     *    → ★終点を ★**枠の中に残っている次の兄弟**（`syncStableGradePrices(`）に替えます。
+     */
     const from = MAIN.indexOf('recordUnlockDistribution(');
-    const to = MAIN.indexOf('refreshMarketListings(');
+    const to = MAIN.indexOf('syncStableGradePrices(');
     expect(from, '★日次の枠の呼び出しが見つからない').toBeGreaterThan(0);
-    expect(to, '★出品の更新の呼び出しが見つからない').toBeGreaterThan(from);
+    expect(to, '★厩舎の格の値段の呼び出しが見つからない（★日次の枠の中の次の兄弟）').toBeGreaterThan(from);
     const between = MAIN.slice(from, to);
     expect(between, '★行数の記録が日次の枠に無い').toContain('recordStoryRows');
     expect(between, '★★独自の try/catch で囲んでいない（★後ろの処理を巻き込む）')

@@ -134,6 +134,12 @@ async function main(): Promise<void> {
   let failures = 0;
   /** ★日次集計は1日1回でよい。毎周やると DB を無駄に叩く */
   let lastAggregated = '';
+  /**
+   * ★**出品の更新の日付**（★**T11-1 ④**・2026-09-19）。★`lastAggregated` とは**別に持ちます**。
+   * 🔴 ★同じ変数にすると、★`aggregateDay` が落ちた日は ★**店が開きません**（★DL-1 で実際に起きた形）。
+   * ★起動のたびに `''` に戻るので、★**起動後の最初の周で必ず 1 回**並びます。
+   */
+  let lastMarketDay = '';
 
   // ★SIGTERM で綺麗に止める。処理の途中で殺されないよう、周の切れ目で抜ける
   //   （A-2 があるので途中で殺されても壊れませんが、無駄な再計算を避けます）
@@ -351,26 +357,44 @@ async function main(): Promise<void> {
     }
     // --- 日次集計（§4.6・§11.2）---
     //   ★サーバー時刻の日付で判定する。ワーカーの時計は使わない
+    /**
+     * 🔴 ★**2026-09-19・BT-6 ②⑤ — ★「1 日」を `current_date` で決めるのをやめました。**
+     *
+     *   ★旧: `select current_date::text` — ★**セッションの TimeZone** にしたがいます。
+     *   ★`bet_allowance`（PostgREST の接続）は `date_trunc('day', now())` を使っていて、
+     *   ★★**同じ「1 日」のつもりで、別々に切れうる 2 つ**でした。
+     *   → ★**`dayIndexAt` / `dayStartMs` の 1 本から引きます**（★`week_started_at` と同じ形）。
+     * ⚠️ ★日付の文字列は ★**見出しだけ**に使います（★範囲の判定は境目の瞬間で行います）。
+     */
+    /**
+     * 🔴 ★**try の外に出しません**（★2026-09-19・T11-1 ④ の見直し）。
+     *   ★この時刻取得は ★**周のループ本体の直下**にあります。
+     *   ★裸で置くと、★DB が一瞬 落ちただけで ★**`while` を突き抜けてワーカーが死にます**。
+     *   → ★引くところだけ囲み、★**引けなければ日次を 1 周 見送ります**（★次の周で回復しうる）。
+     * ⚠️ ★`today = ''` のまま先へ進めてはいけません。
+     *   ★`lastAggregated` が実日付だと `'' !== '2026-09-19'` が真になり、
+     *   ★**空の日付で集計を走らせます**。★だから `dayIdx === null` で両方とも飛ばします。
+     */
+    let dayIdx: number | null = null;
+    let dayFromMs = 0;
+    let dayToMs = 0;
+    let today = '';
     try {
-      /**
-       * 🔴 ★**2026-09-19・BT-6 ②⑤ — ★「1 日」を `current_date` で決めるのをやめました。**
-       *
-       *   ★旧: `select current_date::text` — ★**セッションの TimeZone** にしたがいます。
-       *   ★`bet_allowance`（PostgREST の接続）は `date_trunc('day', now())` を使っていて、
-       *   ★★**同じ「1 日」のつもりで、別々に切れうる 2 つ**でした。
-       *   → ★**`dayIndexAt` / `dayStartMs` の 1 本から引きます**（★`week_started_at` と同じ形）。
-       * ⚠️ ★日付の文字列は ★**見出しだけ**に使います（★範囲の判定は境目の瞬間で行います）。
-       */
       const dayNowMs = Number(
         (await client.query<{ ms: string }>(
           'select (extract(epoch from now()) * 1000)::bigint as ms',
         )).rows[0]!.ms,
       );
-      const dayIdx = dayIndexAt(dayNowMs, cfg.epochMs);
-      const dayFromMs = dayStartMs(dayIdx, cfg.epochMs);
-      const dayToMs = dayStartMs(dayIdx + 1, cfg.epochMs);
-      const today = new Date(dayFromMs).toISOString().slice(0, 10);
-      if (today !== lastAggregated) {
+      dayIdx = dayIndexAt(dayNowMs, cfg.epochMs);
+      dayFromMs = dayStartMs(dayIdx, cfg.epochMs);
+      dayToMs = dayStartMs(dayIdx + 1, cfg.epochMs);
+      today = new Date(dayFromMs).toISOString().slice(0, 10);
+    } catch (e) {
+      console.error('[worker] ★日次の日付を引けませんでした（この周は日次を見送ります）:', (e as Error).message);
+    }
+
+    try {
+      if (dayIdx !== null && today !== lastAggregated) {
         /**
          * ★**枝ごとに「入った・通った・落ちた」を行に残します**（★2026-09-19・**DL-2**・移行 `0052`）。
          *
@@ -453,27 +477,6 @@ async function main(): Promise<void> {
         }
 
         /**
-         * ── ★馬の購入の出品を作り直す（★D-102・移行 `0025`）───────────
-         *
-         *   ★帯（段）と価格は ★**TS 側**（`bandOfPotential` / `priceOfStars`）が出し、
-         *   ★**行には価格だけ**を書きます（★段は書きません — D-114 ②・移行 `0036`）。
-         *   ★SQL には式を書きません（★D-052・二重帳簿にしない）。
-         *   ★在庫が下限を割ったら ★**警報だけ**出し、★帯は広げません（D-102 ⑤）。
-         *
-         *   ★集計と同じ「1 日 1 回」に置きます（★毎周やると DB を無駄に叩く）。
-         *   ★失敗しても周を止めません（A-1）。ただし黙らせません。
-         */
-        try {
-          const m = await refreshMarketListings(client, (msg) => console.error(`[worker] ★${msg}`));
-          console.log(
-            `[worker] 出品を更新 在庫${m.available}頭 / 下ろし${m.deactivated} / 追加${m.added}` +
-            `（目安 ${MARKET_TARGET_LISTINGS} 口）${m.stockOk ? '' : ' ★在庫が下限を割っています'}`,
-          );
-        } catch (e) {
-          console.error('[worker] 出品の更新に失敗:', (e as Error).message);
-        }
-
-        /**
          * ── ★厩舎の格の値段を書く（★D-103 ④・移行 `0027`）───────────
          *   ★値段は TS 側（`GRADE_UNLOCK_EP`）が持ち、★SQL には数を書きません（D-052）。
          *   ★値が同じなら書きません（★冪等）。
@@ -488,6 +491,43 @@ async function main(): Promise<void> {
     } catch (e) {
       // ★集計の失敗でループを止めない（A-1 が壊れる）。ただし黙らせない
       console.error('[worker] 日次集計に失敗:', (e as Error).message);
+    }
+
+    /**
+     * ── ★**店を開ける**（★**T11-1 ④**・2026-09-19）────────────────
+     *
+     * 【🔴 ★なぜ日次の枠から出したか】
+     *   ★出品の更新は、もともと ★**`if (today !== lastAggregated)` の中**にありました。
+     *   ★`lastAggregated = today` は `aggregateDay` の**後ろ**で置かれ、
+     *   ★`aggregateDay` が落ちると ★**そこで止まって、★出品まで届きません**。
+     *   🔴 ✔ ★実際に起きていました: ★`point_flow_daily` は **0 行**（★DL-1）。
+     *     → ★★**aggregate が落ちていた期間、★店は一度も開いていなかった**ことになります。
+     *   ⚠️ ★「開店初日に 1 頭も買えない」は、★**初日だけの話ではありませんでした。**
+     *
+     * 【★中身は変えていません】★D-102・移行 `0025`。
+     *   ★帯（段）と価格は ★**TS 側**（`bandOfPotential` / `priceOfStars`）が出し、
+     *   ★**行には価格だけ**を書きます（★段は書きません — D-114 ②・移行 `0036`）。
+     *   ★在庫が下限を割ったら ★**警報だけ**出し、★帯は広げません（D-102 ⑤）。
+     *
+     * 【★直し方】★**自分の日付を持ちます。** ★集計の成否に依存しません。
+     *   ★`lastMarketDay` は起動のたびに `''` に戻るので、★**起動後の最初の周で必ず 1 回**並べます。
+     *   ★その後は ★**1 日 1 回のまま**です（★毎周やると DB を無駄に叩く）。
+     */
+    try {
+      if (dayIdx !== null && today !== lastMarketDay) {
+        lastMarketDay = today;
+        const m = await runDailyStep(
+          client, dayIdx, 'market',
+          () => refreshMarketListings(client, (msg) => console.error(`[worker] ★${msg}`)),
+          (r) => r.added,
+        );
+        console.log(
+          `[worker] 出品を更新 在庫${m.available}頭 / 下ろし${m.deactivated} / 追加${m.added}` +
+          `（目安 ${MARKET_TARGET_LISTINGS} 口）${m.stockOk ? '' : ' ★在庫が下限を割っています'}`,
+        );
+      }
+    } catch (e) {
+      console.error('[worker] 出品の更新に失敗:', (e as Error).message);
     }
 
     /**
