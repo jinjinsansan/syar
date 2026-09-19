@@ -110,7 +110,7 @@ export const TOOL_AFTERMATH = {
   'verify-a4.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: races を消す。数えていない' },
   'verify-a5.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: races / race_odds / bets / ep_ledger / users を消す。数えていない' },
   'verify-a6.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: races / race_entries / race_odds / bets / ep_ledger / users と、自分で作った馬 1 頭（owner_id で限定）を消す。数えていない。自分で insert した馬だけなので実在の馬は消さない' },
-  'verify-a7.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: app_environment を全消しして、控えた値を書き戻す。数えていない。控えはメモリなので殺されると戻らない（TOOL-SNAPSHOT-IN-MEMORY）。ただし空のときの既定は production なので、戻らなければ他の道具は止まる側に倒れる（fail-closed・R-27）' },
+  'verify-a7.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: app_environment を全消しして、控えた値を書き戻す。数えていない。控えはメモリなので殺されると戻らない（TOOL-SNAPSHOT-IN-MEMORY）。★空（null）なら `assertEnvironmentMatches` が投げる（`apps/worker/src/env.ts:78`）。★既定値で救わない。★戻らなければ他の道具は起動できない（fail-closed・R-27）。⚠️ 🔴 ★ここに「既定は production」を足さないこと — ★既定は後で変えられる。★投げるほうが強い（✔ `pg-store.ts:831` は null を返すだけで、production とは言わない）' },
   'verify-cancel.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: bets / ep_ledger / users を消す。数えていない' },
   'verify-db.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'verify-economy.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: bets / ep_ledger / pp_ledger / users を消す。数えていない' },
