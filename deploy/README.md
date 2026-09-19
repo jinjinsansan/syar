@@ -74,7 +74,21 @@ DATABASE_URL=          # ★Session pooler（aws-0-....pooler.supabase.com:5432�
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 STAR_EPOCH_ISO=        # ★決めたら運用中に動かさない
+STAR_SEED_SECRET=      # ★任意。★無くても起動する（★下の註記）
 ```
+
+### ⚠️ `STAR_SEED_SECRET` について（★監査 M-4・2026-09-19）
+
+★**任意です。★無くても起動します**（★警告だけ出ます）。★起動ごとに作り直されます。
+
+✔ ★**公正性の検証は壊れません**（★`fairness.ts:102`）:
+★`seed_commit` と `server_seed` は ★**同じ 1 本の insert で行に入り**（`pg-store.ts:189-196`）、
+★検証は ★**両方とも行から読みます。★秘密を使いません。**
+→ ★**秘密が起動ごとに変わっても、★過去のレースの検証は通ります。**
+
+⚠️ ★**固定する利点**: ★起動をまたいで同じ列が出ます（★再現・調査のとき）。
+🔴 ★**fail-closed にしない理由**: ★いま `STAR_SEED_SECRET` は ★**本番にも staging にも在りません**。
+★必須にすると ★**止まるのは本番ではなく staging** です（★監査 M-4 の裁定）。
 
 ⚠️ **Direct connection（`db.xxxxx.supabase.co`）は IPv6 専用**で、VPS によっては
 到達できません。**Session pooler**（ポート 5432）を使ってください。
