@@ -100,7 +100,7 @@ describe('TL-1 状態を変える道具の後始末', () => {
      * ⚠️ 🔴 ★**この数を上げてはいけません。** ★上げるのは「直せなかった」ことの宣言です。
      */
     const pending = Object.entries(TOOL_AFTERMATH).filter(([, e]) => e.mode === 'pending');
-    const PENDING_RATCHET = 17;
+    const PENDING_RATCHET = 16;
     expect(pending.length, `🔴 ★pending が ${pending.length} 本（★ラチェットは ${PENDING_RATCHET}）。`
       + '★減らしたなら、この数も下げてください。★増やしたなら、戻してください')
       .toBe(PENDING_RATCHET);
@@ -129,10 +129,17 @@ describe('TL-1 状態を変える道具の後始末', () => {
        * ⚠️ ★この語の一覧は ★**簿（自分で書く文）に対するもの**です —
        *    ★任意の源に対する列挙ではないので、★R-29 の漏れ方とは別です。
        */
-      const declaresLoss = /戻せません|戻りません|戻らない|永久に/.test(e.why);
+      /**
+       * 🔴 ★**文を grep しない**（★2026-09-19 に直しました）。
+       *   ⚠️ ★最初は `why` に「戻せません」等があるかを見ていましたが、
+       *   ★`seed-world` の「戻す手段は**ありません**」が当たらず落ちました（★R-29 の漏れ）。
+       * → ★**語を増やさず、★`notRestored` という欄を置きます**（★宣言させる・AU-7）。
+       */
+      const declaresLoss = typeof e.notRestored === 'string' && e.notRestored.length > 0;
       if (/delete from|clean\s*\(|cleanup\s*\(/.test(src) && !declaresLoss) wrong.push(f);
     }
-    expect(wrong, `★consumes と名乗っているのに片付けの形跡があります（★pending では？）: ${wrong.join(' / ')}`)
+    // ⚠️ ★文の中にバッククォートを書かない（★テンプレート文字列が閉じる・★今日 2 度目）
+    expect(wrong, `★consumes で片付けの形跡があるのに、★notRestored（★何が戻らないか）が書かれていません: ${wrong.join(' / ')}`)
       .toEqual([]);
   });
 });
