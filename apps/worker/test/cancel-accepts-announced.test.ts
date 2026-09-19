@@ -65,3 +65,41 @@ describe('DS-7 中止は announced も受ける', () => {
     expect(cancelSrc).not.toMatch(/ENTRY_FEE_EP/);
   });
 });
+
+/**
+ * ★**取消の馬を「登録した馬」として返していないか**（★2026-09-19・D-117 DS-2）
+ *
+ * 🔴 ★返すと: ★もう走らないと決まった馬を「必ず入れる馬」として出走表に押し込み、
+ *   ★`fillRace` の件数照合（★取消でない行だけを数える）が**必ず食い違って投げます**。
+ *   → ★そのレースは永久に組成できず、★DS-7 で中止。★**1 頭の取消がレースごと落とします**
+ *     （★D-111 ③ が避けたかったことそのもの）。
+ *
+ * ★取消が付く道は 2 つあり、★**どちらも組成より前に起こりえます**:
+ *   ① `entry-freeze` … 登録の後に引退した馬
+ *   ② `entry-lottery` … 落選（★取消は組成の取引の外で先に確定するので、やり直すとき残っている）
+ *
+ * ★実 DB での確認は `tmp/verify-registered-excludes-scratched.mjs`（★staging で全項目 ✅）。
+ */
+describe('DS-2 registeredHorses は取消を返さない', () => {
+  const storeSrc = stripComments(readFileSync(path.join(SRC, 'pg-store.ts'), 'utf8'));
+
+  it('★`registeredHorses` の SQL が読める（R-21）', () => {
+    const i = storeSrc.indexOf('async registeredHorses');
+    expect(i, '★`registeredHorses` が無い').toBeGreaterThan(0);
+    const body = storeSrc.slice(i, storeSrc.indexOf('},', i));
+    expect(body.length).toBeGreaterThan(100);
+    expect(body).toContain('from race_entries e join races r');
+  });
+
+  it('🔴 ★`scratched_at is null` で絞っている', () => {
+    const i = storeSrc.indexOf('async registeredHorses');
+    const body = storeSrc.slice(i, storeSrc.indexOf('},', i));
+    expect(body).toMatch(/scratched_at is null/);
+  });
+
+  it('★`fillRace` の件数照合も取消を数えない（★両側が揃っていること）', () => {
+    const i = storeSrc.indexOf('async fillRace');
+    const body = storeSrc.slice(i, storeSrc.indexOf('\n    },', i));
+    expect(body).toMatch(/count\(\*\)::text as n from race_entries[\s\S]{0,80}scratched_at is null/);
+  });
+});

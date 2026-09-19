@@ -296,11 +296,23 @@ export function createPgStore(
       /**
        * ★**公示のあいだに `enter_race` が入れた行**（★D-117 ②・**DS-2**）。
        *   ★`gate` は暫定（`max+1`）で、★組成が振り直します。
+       *
+       * 🔴 ★**取消の行は返しません**（★2026-09-19・`scratched_at is null`）。
+       *   ★返すと、★**もう走らないと決まった馬を「必ず入れる馬」として出走表に押し込みます**。
+       *   ★そして `fillRace` の件数照合は**取消でない行だけ**を数えるので、★**必ず食い違って投げます**
+       *   → ★そのレースは永久に組成できず、★DS-7 で中止になります。
+       *   ★**1 頭の取消が、レースごと落とします**（★D-111 ③ が避けたかったことそのもの）。
+       *
+       * ★取消が付く道は 2 つあり、★**どちらも組成より前に起こりえます**:
+       *   ① `entry-freeze` … 登録の後に引退した馬（D-111 ③）
+       *   ② `entry-lottery` … 上限超過で落選した馬（§10.4・LT-1）。
+       *      ★落選の取消は ★**組成のトランザクションの外**で先に確定するので、
+       *      ★組成が途中で落ちて次の周にやり直すとき、★ここに残っています。
        */
       const r = await client.query<{ horse_id: string }>(
         `select e.horse_id
            from race_entries e join races r on r.id = e.race_id
-          where r.cycle_index = $1
+          where r.cycle_index = $1 and e.scratched_at is null
           order by e.gate`,
         [cycleIndex],
       );
