@@ -212,6 +212,33 @@ console.log(`  ★①の余り（273 − 他の平均）: ${excess === null ? '?
 console.log(`  → ★説明できる割合: ${excess ? ((attributable[0].n / excess) * 100).toFixed(0) : '?'}%`);
 console.log('  ⚠️ ★残りは説明していません（★`race_entries` が消えたレース／★別の経路／★偶然の上振れ）。');
 
+// ── ⑧ `--dump-ids`: ★当たった馬の id を出す（★記録のため） ──────────────
+/**
+ * 🔴 ★**レビュー側の裁定（2026-09-19・`04feada`）**: ★staging の 66 頭は ★**直しません**。
+ *   ★そのかわり ★**今日時点の id と、★それを引く問い合わせの両方**を `evidence/` に残します。
+ *   ★**id だけだと引退で古くなり、★問い合わせだけだと今日の姿が消える。★両方。**
+ *
+ * ⚠️ ★問い合わせを ★**この道具の中**に置くのが要点です — ★`evidence/` の txt に写すと、
+ *   ★コードが変わっても txt は変わらず、★**どちらが本当か分からなくなります**。
+ */
+if (process.argv.includes('--dump-ids')) {
+  const ids = await q(`
+    select h.id::text as id, h.name, h.birth_week
+      from horses h
+     where h.npc_stable_id = 1 and h.retired_at_week is null
+       and exists (
+         select 1 from race_entries re
+          where re.horse_id = h.id
+            and re.race_id in (
+              select re2.race_id from race_entries re2 join horses h2 on h2.id = re2.horse_id
+               where h2.npc_stable_id = 1 group by re2.race_id having count(*) >= 5))
+     order by h.id`);
+  console.log('');
+  console.log(`【⑧ 当たった馬の id（${ids.length} 頭・★${new Date().toISOString().slice(0, 10)} 時点）】`);
+  console.log('id\tname\tbirth_week');
+  for (const r of ids) console.log(`${r.id}\t${r.name}\t${r.birth_week}`);
+}
+
 await c.end();
 console.log('');
 console.log('⚠️ ★この道具は 1 行も書いていません（★`select` のみ）。★判定は書きません — ★数だけ出します。');
