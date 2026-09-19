@@ -518,6 +518,10 @@ export const READONLY = [
   'diag-pool-drift.mjs',
   /** ★私が staging に残したものを数える（★2026-09-19・読むだけ・`cleanup-ds7-leak.mjs` の下見に対応） */
   'diag-my-leak.mjs',
+  /** ★台帳に掃除しそこねた行が無いか（★2026-09-19・**SB-2**・読むだけ）。★孤児と `ref_id` の迷子も数える */
+  'diag-ledger-orphans.mjs',
+  /** ★確定したレースがいつ作られたか（★2026-09-19・SB-1 ③・読むだけ）。★ワーカー由来か検査由来かを分ける手がかり */
+  'diag-settled-provenance.mjs',
   /**
    * ★**コミットの前に通す門**（★2026-09-19）。★`typecheck` と `verify:red` を 1 つのコマンドで走らせ、
    *   ★**自分の終了コードを中の判定そのものにする**。★DB には一切触れません。
@@ -857,6 +861,15 @@ export const STATE_CHANGING = [
    * ★既定は下見だけ。★`--write` で消します。★`assertNotProduction` を呼びます。
    */
   'cleanup-ds7-leak.mjs',
+
+  /**
+   * ★**SB-3 の見張りが、本当に「途中の確定」を見つけるか**（★2026-09-19・対照つき）。
+   * ⚠️ ★実データに触りません（★一時表だけ）。★それでも `create temporary table` は書き込み文なので、
+   *    ★簿の基準どおりここに置きます（★`assertNotProduction` も呼びます）。
+   * 🔴 ★**対照（②わざと commit して 🔴 を出させる）が本体**です — ★それが無いと、
+   *    ★「いつでも ✅ を返す実装」と見分けが付きません。
+   */
+  'verify-sandbox-detects-commit.mjs',
 
   // ★中で状態を変えるツールを流すので、これ自体も状態を変える
   'audit-tools.mjs',

@@ -19,14 +19,14 @@ import { cancelRace } from '../apps/worker/src/cancel.ts';
  *   → ★この検査は 2026-09-19 に ★**staging を汚しました**（★レース 2 件・所有馬 2 頭・1,000 EP）。
  *   → ★取引の文を横取りする包みを渡します。★確定するかは**外側だけ**が決めます。
  */
-import { sandboxTx } from './lib/sandbox-tx.mjs';
+import { sandboxTx, beginSandbox, endSandbox } from './lib/sandbox-tx.mjs';
 
 const env = loadEnv();
 console.log('接続先:', env.STAR_ENV);
 const c = new pg.Client({ connectionString: env.DATABASE_URL });
 await c.connect();
 await assertNotProduction(c, 'verify-ds7-cancel.mjs');
-await c.query('begin');
+const __tx = await beginSandbox(c);
 
 let failed = 0;
 const must = (b, m) => { console.log(`  ${b ? '✅' : '🔴'} ${m}`); if (!b) failed += 1; };
@@ -121,7 +121,7 @@ try {
 
   console.log(failed === 0 ? '\n✅ 全部通りました' : `\n🔴 ${failed} 件が落ちました`);
 } finally {
-  await c.query('rollback');
+  await endSandbox(c, __tx);
   // ★本当に戻ったかを確かめる（★「rollback した」と書くだけにしない）
   const left = Number((await c.query(
     `select count(*)::int as n from races where cycle_index >= 200000`)).rows[0].n);

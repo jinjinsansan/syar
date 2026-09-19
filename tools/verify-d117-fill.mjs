@@ -11,13 +11,15 @@ import pg from 'pg';
 import { loadEnv } from './lib/env.mjs';
 // ★取引の中で書くので、本番からは締め出す（R-24・最後に rollback しても錠は掴る）
 import { assertNotProduction } from './lib/guard.mjs';
+// ★SB-3: 印を使わずに「途中で確定していないか」を確かめる
+import { beginSandbox, endSandbox } from './lib/sandbox-tx.mjs';
 
 const env = loadEnv();
 console.log('接続先:', env.STAR_ENV);
 const c = new pg.Client({ connectionString: env.DATABASE_URL });
 await c.connect();
 await assertNotProduction(c, 'verify-d117-fill.mjs');
-await c.query('begin');
+const __tx = await beginSandbox(c);
 
 const ok = (b, m) => console.log(`  ${b ? '✅' : '🔴'} ${m}`);
 let failed = 0;
@@ -129,7 +131,7 @@ try {
 
   console.log(failed === 0 ? '\n✅ 全部通りました' : `\n🔴 ${failed} 件が落ちました`);
 } finally {
-  await c.query('rollback');
+  await endSandbox(c, __tx);
   await c.end();
   console.log('（rollback しました）');
 }

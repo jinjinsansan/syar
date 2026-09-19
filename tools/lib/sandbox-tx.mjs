@@ -55,3 +55,51 @@ export function sandboxTx(client) {
   };
   return { client: /** @type {import('pg').Client} */ (/** @type {unknown} */ (wrapped)), swallowed };
 }
+
+/**
+ * ★**取引が途中で確定していないか、印を使わずに確かめる**（★**SB-3**・2026-09-19）
+ *
+ * 【🔴 ★なぜ印では足りないか】
+ *   ★`verify-ds7-cancel.mjs` は「`cycle_index >= 200000` が 0 件か」で確かめました。
+ *   ★それは ★**その検査の印**です。★検査ごとに印を決めると、★**印の無いものが漏れます**。
+ *
+ * 【★`txid_current()` なら、どの検査でも同じ 1 行で効きます】
+ *   ★内側の `commit` が発火すると外側の取引は終わり、★次の文は**新しい取引**で走ります。
+ *   → ★★**`txid` が変わることが、「途中で確定した」の定義そのもの**です。
+ *
+ * ⚠️ ★`txid_current()` は**呼んだ時点で取引 ID を確定させます**（★それが狙いです）。
+ *
+ * 使い方:
+ * ```js
+ * const tx = await beginSandbox(c);
+ * try { … } finally { await endSandbox(c, tx); }   // ★rollback ＋ 確定していないことの確認
+ * ```
+ */
+export async function beginSandbox(client) {
+  await client.query('begin');
+  const r = await client.query('select txid_current()::text as t');
+  return { txid: r.rows[0].t };
+}
+
+/**
+ * ★`rollback` して、★**その前に取引が入れ替わっていないか**を確かめる。
+ *
+ * @returns {Promise<{ committed: boolean, before: string, after: string }>}
+ *   `committed` が true なら ★**途中で確定しています**（★`rollback` は何も戻していません）
+ */
+export async function endSandbox(client, tx) {
+  let after = '(読めず)';
+  try {
+    after = (await client.query('select txid_current()::text as t')).rows[0].t;
+  } catch {
+    // ★取引が壊れていても rollback は試す
+  }
+  await client.query('rollback');
+  const committed = after !== tx.txid;
+  console.log(
+    committed
+      ? `🔴 ★途中で確定しています（取引 ${tx.txid} → ${after}）。★rollback は何も戻していません`
+      : `✅ ★戻りました（取引 ${tx.txid} のまま・★途中の commit なし）`,
+  );
+  return { committed, before: tx.txid, after };
+}
