@@ -26,6 +26,8 @@ import { drawEntryLottery, lotteryScratchReason } from './entry-lottery.js';
 import { scratchEntry } from './scratch.js';
 import { FIELD_SIZE } from '../../cli/src/race-field.js';
 import { aggregateDay } from './daily-flow.js';
+// ★日次の枝の結果を行に残す（★DL-2・移行 0052）。★止める仕組みではない
+import { runDailyStep } from './daily-run-log.js';
 import { loadHorsesByIds, loadRaceablePool, loadTrainingStates, loadWinsByHorse } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
@@ -369,14 +371,29 @@ async function main(): Promise<void> {
       const dayToMs = dayStartMs(dayIdx + 1, cfg.epochMs);
       const today = new Date(dayFromMs).toISOString().slice(0, 10);
       if (today !== lastAggregated) {
-        await aggregateDay(client, today, new Date(dayFromMs).toISOString(), new Date(dayToMs).toISOString());
+        /**
+         * ★**枝ごとに「入った・通った・落ちた」を行に残します**（★2026-09-19・**DL-2**・移行 `0052`）。
+         *
+         * 🔴 ★日次ブロックは失敗しても `console.error` を 1 行 出して**続けます**（A-1・★この設計は正しい）。
+         *   → ★**理由は標準出力にしか出ず、★1 か月 誰も気づきませんでした**
+         *     （✔ `point_flow_daily` 0 行／`story_daily` 0 行／`unlock_daily` は 08-13 が最後）。
+         * ⚠️ ★**止める仕組みではありません。** ★後から DB に問えるようにするだけです。
+         */
+        await runDailyStep(client, dayIdx, 'aggregate', async () => {
+          await aggregateDay(client, today, new Date(dayFromMs).toISOString(), new Date(dayToMs).toISOString());
+        });
         lastAggregated = today;
         /**
          * ★開放率の分布も毎日残す（レビュー側裁定 2026-08-12）。
          *   P1 のゲートはこの分布の上に立っているので、
          *   **測定時からずれたらゲートを測り直す**ための記録です。
          */
-        const u = await recordUnlockDistribution(client, today);
+        const u = await runDailyStep(
+          client, dayIdx, 'unlock',
+          () => recordUnlockDistribution(client, today),
+          // ★**「落ちなかった」と「書いた」は別**。★対象 0 頭の成功をここで見分ける
+          (r) => (r === null ? 0 : 1),
+        );
         /**
          * ★**生涯の記録の行数も毎日残す**（★正典 §18 **LR-10**・移行 `0029`・2026-09-16）。
          *
@@ -394,7 +411,11 @@ async function main(): Promise<void> {
          * ⚠️ ★記録は ★**着順にも経済にも効きません**（§18 LR-5）。★止めてよい側です。
          */
         try {
-          const story = await recordStoryRows(client, today);
+          const story = await runDailyStep(
+            client, dayIdx, 'story',
+            () => recordStoryRows(client, today),
+            (r) => r.rows,
+          );
           console.log(`[worker] ${formatStoryDay(story, STORY_EVENT_TYPES)}`);
         } catch (e) {
           console.error(

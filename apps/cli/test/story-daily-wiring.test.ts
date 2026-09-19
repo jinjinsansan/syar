@@ -60,8 +60,16 @@ describe('★行数を日次で見る（§18 LR-10）', () => {
      *    ★`refreshMarketListings` の import までの数十文字しか見ていませんでした。
      *    → ★**呼び出しの形**（`await 〜(`）で切り出します。
      */
-    const from = MAIN.indexOf('await recordUnlockDistribution(');
-    const to = MAIN.indexOf('await refreshMarketListings(');
+    /**
+     * ⚠️ 🔴 ★**`await 〜(` で切り出さないこと**（★2026-09-19・DL-2 でこれが落ちました）。
+     *    ★DL-2 で日次の枝を `runDailyStep(...)` で包んだ結果、★呼び出しは
+     *    ★`() => recordUnlockDistribution(client, today)` になり、★`await 〜(` が消えました。
+     *    → ★**検査の意図（★`recordStoryRows` が独自の try/catch で囲まれている）は満たされたまま**なのに、
+     *      ★**切り出しの字面だけ**で落ちました。
+     *    → ★**名前 ＋ `(` だけ**で切り出します（★import 行は `recordUnlockDistribution }` なので当たりません）。
+     */
+    const from = MAIN.indexOf('recordUnlockDistribution(');
+    const to = MAIN.indexOf('refreshMarketListings(');
     expect(from, '★日次の枠の呼び出しが見つからない').toBeGreaterThan(0);
     expect(to, '★出品の更新の呼び出しが見つからない').toBeGreaterThan(from);
     const between = MAIN.slice(from, to);
