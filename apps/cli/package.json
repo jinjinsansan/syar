@@ -5,8 +5,11 @@
   "description": "STAR P0 CLI: 100-generation genetics simulator",
   "type": "module",
   "dependencies": {
+    "@star/betting": "*",
     "@star/race-engine": "*",
+    "@star/render": "*",
     "@star/scheduler": "*",
-    "@star/sim-engine": "*"
+    "@star/sim-engine": "*",
+    "@star/training": "*"
   }
 }

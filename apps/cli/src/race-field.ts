@@ -23,6 +23,13 @@ import type {
 } from '@star/race-engine';
 // ★基準斤量は ★**`@star/race-engine` の 1 か所**から引く（★2026-09-19・EF-1。★旧はここだけで 3 か所に 55 を直書き）
 import { BASE_WEIGHT_KG } from '@star/race-engine';
+/**
+ * ★**調子の既定をここで持たない**（★**COND-DEFAULT-TWO**・D-052・2026-09-19）。
+ *   🔴 以前は `?? 3`（`toEntrant`）と `rng.int(2, 4)`（出走表）の ** 2 つ**があり、
+ *     ★**値も違いました**。★どちらが使われたかで測定が変わります。
+ *   ✅ ★どちらも ★**正典 §7.4 の 1 つの式から導きます**（`packages/training/src/condition.ts`）。
+ */
+import { CONDITION_BASE, nextCondition } from '@star/training';
 
 /**
  * 素質開放率のプレースホルダ（指示書 §3 の例示に従う）。
@@ -113,7 +120,11 @@ export function toEntrant(
     // ★D-015: 道悪適性は genotype から遺伝する（P1 までは中立値の固定だった）
     heavyAptitude: horse.heavyAptitude,
     strategy: overrides.strategy ?? bestStrategy,
-    condition: overrides.condition ?? 3,
+    /**
+     * ★既定は ★**正典 §7.4 の `CONDITION_BASE`**（★数をここに書かない・COND-DEFAULT-TWO）。
+     *   ⚠️ ★`3` と書くと、★正典が基準値を動かしたときに ★**ここだけが取り残されます**。
+     */
+    condition: overrides.condition ?? CONDITION_BASE,
     fatigue: overrides.fatigue ?? 0,
     weightKg: overrides.weightKg ?? BASE_WEIGHT_KG,
     gate: overrides.gate ?? 1,
@@ -577,7 +588,15 @@ export function generateRace(
       rng,
       {
         ...(ability === undefined ? {} : { stats: ability }),
-        condition: trained?.condition ?? rng.int(2, 4),
+        /**
+         * ★育成状態が無い経路の既定は ★**`nextCondition(0, rng)`**。
+         *   ✅ ★疲労 0 の馬が §7.4 で引くのと ★**同じ式・同じ幅**です（{2,3,4}）。
+         *   ⚠️ ★`rng.int(2, 4)` と書くと、★正典の式とのつながりが切れます
+         *     （★`CONDITION_BASE` や `FATIGUE_PER_CONDITION_STEP` を動かしても、★ここだけ動きません）。
+         * ✔ ★乱数の引き方は変わりません（★どちらも 3 幅の整数を 1 回）。
+         *   → ★**V-4 は 1 ビットも動かないはず**です。★検査で固定しました。
+         */
+        condition: trained?.condition ?? nextCondition(0, rng),
         fatigue: trained?.fatigue ?? 0,
         age: rng.int(3, 5),
         weightKg: BASE_WEIGHT_KG + rng.range(-2, 2),
