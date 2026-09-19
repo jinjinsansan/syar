@@ -24,7 +24,7 @@ import { DISTANCE_MENU, VENUES, frozenCourseOf } from '@star/scheduler';
 import type { Strategy } from '@star/sim-engine';
 import {
   resolveRace, DEFAULT_RACE_BALANCE, DEFAULT_OVAL, conditionsFromFrozen, laneAt, laneExtraM,
-  ovalSpecFromCornerRadii, type OvalSpec, type RaceConditions, type RaceEntrant,
+  ovalSpecFromCornerRadii, type OvalSpec, type RaceBalance, type RaceConditions, type RaceEntrant,
 } from '../src/index.js';
 import { neutralEntrant } from './helpers.js';
 
@@ -95,13 +95,26 @@ export interface FingerprintSeedRow {
 export type LaneExtraOf = (gate: number, heads: number, distance: number, seed: number, course: OvalSpec | undefined) => number;
 const productionLaneExtra: LaneExtraOf = (gate, heads, distance, seed, course) => laneExtraM(gate, heads, distance, seed, course);
 
-export function fingerprintRowsOf(c: FingerprintCase, laneExtraOf: LaneExtraOf = productionLaneExtra): FingerprintSeedRow[] {
+export function fingerprintRowsOf(
+  c: FingerprintCase,
+  laneExtraOf: LaneExtraOf = productionLaneExtra,
+  /**
+   * ★**使う較正値**（★2026-09-19・**M-9** のときに足しました）。
+   *
+   * 🔴 ★以前は `DEFAULT_RACE_BALANCE` を直書きしていました。
+   *   → ★**較正を 1 つ変えるだけで、★指紋が全部 落ちました**（★M-9 で 182 組）。
+   *   ★しかしこの番人の主張は ★**「`lane.ts` の 2 経路が一致する」**であって、
+   *   ★**較正値の主張ではありません** — ★測定器が主張と違う入力を読んでいました（**R-30**）。
+   * → ★①（過去との繋がり）は ★**凍結した較正**で、★②（2 経路の一致）は ★**生きた較正**で回します。
+   */
+  balance: RaceBalance = DEFAULT_RACE_BALANCE,
+): FingerprintSeedRow[] {
   const rows: FingerprintSeedRow[] = [];
   const entrants = fingerprintField(c.heads);
   const spec = c.conditions.course ?? DEFAULT_OVAL;
   for (let s = 0; s < FINGERPRINT_SEEDS; s += 1) {
     const seed = 12345 + s * 7919;
-    const r = resolveRace({ conditions: c.conditions, entrants, seed, balance: DEFAULT_RACE_BALANCE });
+    const r = resolveRace({ conditions: c.conditions, entrants, seed, balance });
     const order = r.order.map((o) => ({
       horseId: o.horseId, finishPosition: o.finishPosition, finalScore: o.finalScore, laneExtraM: o.laneExtraM,
       timeSec: o.timeSec, timeGapSec: o.timeGapSec, marginLabel: o.marginLabel,

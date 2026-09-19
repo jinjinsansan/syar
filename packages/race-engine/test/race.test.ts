@@ -179,12 +179,26 @@ describe('§8.3 乗算補正10種', () => {
     }
   });
 
-  it('conditionCoef は調子1〜5で 0.88〜1.10（R-2）', () => {
-    expect(conditionCoef(1, B)).toBeCloseTo(0.88, 10);
-    expect(conditionCoef(5, B)).toBeCloseTo(1.1, 10);
-    expect(conditionCoef(3, B)).toBeCloseTo(0.99, 10);
-    // 値域外もクランプされる
+  it('🔴 ★conditionCoef は調子 **0〜5** で 0.88〜1.10（★R-2・★**M-9** で 1..5 から直した）', () => {
+    /**
+     * 🔴 ★**2026-09-19・M-9**: ★ここは ★**1..5** を固定していました。
+     *   ★正典 §7.4 と育成（`@star/training` の `CONDITION_RANGE`）は ★**0..5** なので、
+     *   ★★**調子 0 と 1 が同じ係数（0.88）**になっていました。
+     *   ✔ ★staging の現役 7,333 頭のうち ★**62.30%（0 が 30.53% / 1 が 31.77%）が同じ係数**を共有。
+     *
+     * ⚠️ ★**この検査を「新しい値に合わせて」書き換えたのではありません** —
+     *    ★**正典の値域に合わせました。** ★根拠は §7.4（0..5）であって、実装ではありません。
+     */
     expect(conditionCoef(0, B)).toBeCloseTo(0.88, 10);
+    expect(conditionCoef(5, B)).toBeCloseTo(1.1, 10);
+    /** ★中央（2.5）が真ん中。★段は整数なので 2 と 3 が挟む */
+    expect(conditionCoef(2, B)).toBeCloseTo(0.968, 10);
+    expect(conditionCoef(3, B)).toBeCloseTo(1.012, 10);
+    /** 🔴 ★**0 と 1 が別の値になったこと**（★M-9 の目的そのもの） */
+    expect(conditionCoef(1, B)).toBeCloseTo(0.924, 10);
+    expect(conditionCoef(1, B)).not.toBeCloseTo(conditionCoef(0, B), 10);
+    // 値域外もクランプされる
+    expect(conditionCoef(-1, B)).toBeCloseTo(0.88, 10);
     expect(conditionCoef(9, B)).toBeCloseTo(1.1, 10);
   });
 
@@ -246,7 +260,8 @@ describe('§8.3 乗算補正10種', () => {
     expect(bd.distanceAptitudeCoef).toBeCloseTo(1.05, 10); // 距離中心ちょうど → 適性100
     expect(bd.surfaceCoef).toBeCloseTo(0.875, 10);
     expect(bd.trackConditionCoef).toBe(1.0);
-    expect(bd.conditionCoef).toBeCloseTo(0.99, 10);
+    /** 🔴 ★**M-9**（2026-09-19）で `0.99 → 1.012`。★調子 3 の写像が `(3−1)/4` から `3/5` に変わった */
+    expect(bd.conditionCoef).toBeCloseTo(1.012, 10);
     expect(bd.fatigueCoef).toBe(1);
     expect(bd.weightCoef).toBe(1);
     expect(bd.ageCoef).toBeCloseTo(1.0, 10);

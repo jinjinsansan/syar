@@ -37,6 +37,9 @@ const {
 } = await import('./lane-fingerprint.cases.js');
 type Rows = ReturnType<typeof fingerprintRowsOf>;
 type Case = ReturnType<typeof fingerprintCases>[number];
+/** ★②（★生きた較正で 2 経路を突き合わせる）に使う。★①は凍結した値を使う */
+const { DEFAULT_RACE_BALANCE } = await import('../src/index.js');
+type RaceBalance = typeof DEFAULT_RACE_BALANCE;
 
 const file = JSON.parse(readFileSync(new URL('./lane-fingerprint.expected.json', import.meta.url), 'utf8')) as {
   engineCommit: string; heads: number[]; seeds: number; laneAtStepM: number; cases: number; expected: Record<string, string>;
@@ -47,21 +50,51 @@ const LANE_TOL_M = 1e-9;
 const SCORE_REL_TOL = 1e-12;
 const TIME_TOL_SEC = 1e-9;
 
-/** ★ループの経路で回す（★`resolveRace` の中も・★`laneExtraM` を直接呼ぶ所も） */
-function loopRowsOf(c: Case): Rows {
+/**
+ * ★**凍結した較正**（★`884019c` 時点の値・★2026-09-19 に分けました）。
+ *
+ * 🔴 ★以前は①も②も `DEFAULT_RACE_BALANCE` を読んでいました。
+ *   → ★**M-9（`CONDITION_MIN` 1→0）だけで、★① が 182 組 落ちました。**
+ *   ★この番人の主張は ★**「同じ入力なら `lane.ts` の 2 経路は 1 ビットも同じ」**であって、
+ *   ★**較正値の主張ではありません** — ★守備範囲の外で落ちる番人でした（**R-30**）。
+ *   ⚠️ 🔴 ★そのままにすると、★**較正のたびに誰かが作り直し**、★作り直した瞬間に
+ *     ★`884019c` との繋がりが切れ、★**番人は何も守らなくなります。**
+ *
+ * → ★**①＝凍結した較正（過去との繋がり）** ★**②＝生きた較正（2 経路がいま一致するか）**の 2 本立て。
+ * ⚠️ ★**どちらか片方だけだと、★較正を動かすたびに片目になります。**
+ * ⚠️ ★`lane-fingerprint.balance.json` は ★**更新しない**（★JSON の `__provenance` にも書いてあります）。
+ */
+const frozen = JSON.parse(
+  readFileSync(new URL('./lane-fingerprint.balance.json', import.meta.url), 'utf8'),
+) as { __provenance: { engineCommit: string }; balance: RaceBalance };
+const FROZEN_BALANCE = frozen.balance;
+
+/**
+ * ★ループの経路で回す（★`resolveRace` の中も・★`laneExtraM` を直接呼ぶ所も）。
+ * ★`balance` を受け取ります — ★①は凍結、★②は生きた値。
+ */
+function loopRowsOf(c: Case, balance: RaceBalance): Rows {
   mode.loop = true;
   try {
     return fingerprintRowsOf(c, (gate, heads, distance, seed, course) =>
-      lane.laneExtraMOnPlanLoop(lane.lanePlanOf(distance, course), gate, heads, seed));
+      lane.laneExtraMOnPlanLoop(lane.lanePlanOf(distance, course), gate, heads, seed), balance);
   } finally {
     mode.loop = false;
   }
 }
 
-const loopMemo = new Map<string, Rows>();
-const loopRows = (c: Case): Rows => {
-  let r = loopMemo.get(c.key);
-  if (r === undefined) { r = loopRowsOf(c); loopMemo.set(c.key, r); }
+/** ★①用（凍結） */
+const frozenMemo = new Map<string, Rows>();
+const frozenLoopRows = (c: Case): Rows => {
+  let r = frozenMemo.get(c.key);
+  if (r === undefined) { r = loopRowsOf(c, FROZEN_BALANCE); frozenMemo.set(c.key, r); }
+  return r;
+};
+/** ★②用（生きた較正） */
+const liveMemo = new Map<string, Rows>();
+const liveLoopRows = (c: Case): Rows => {
+  let r = liveMemo.get(c.key);
+  if (r === undefined) { r = loopRowsOf(c, DEFAULT_RACE_BALANCE); liveMemo.set(c.key, r); }
   return r;
 };
 
@@ -76,10 +109,29 @@ describe('★距離ロスの指紋（ES 便）', () => {
     expect(cases.length).toBe((10 + 3) * 7 * 2);
   });
 
+  it('★凍結した較正の素性があり、★①と②が別の値を見ている（★VP-8）', () => {
+    /**
+     * 🔴 ★**これが無いと、★②を①と同じ凍結値に戻しても誰も気づきません。**
+     *   ★そうなると ★**「いまの較正で 2 経路が一致するか」を見る目が消えます**（★片目になる）。
+     */
+    expect(frozen.__provenance.engineCommit, '★凍結値に「いつの値か」が無い').toBe(file.engineCommit);
+    /** ★凍結値と生きた値の違いを数えて出す（★黙って同じにならない） */
+    const keys = Object.keys(FROZEN_BALANCE) as (keyof RaceBalance)[];
+    const diff = keys.filter((k) => JSON.stringify(FROZEN_BALANCE[k]) !== JSON.stringify(DEFAULT_RACE_BALANCE[k]));
+    console.log(`[指紋] 凍結値と生きた値の違い: ${diff.length} 項目${diff.length > 0 ? ` (${diff.join(', ')})` : ''}`);
+    /**
+     * ⚠️ ★**違いが 0 でも落としません** — ★較正を元に戻しただけかもしれない。
+     *    ★落とすのは ★**凍結値と生きた値が、★同じオブジェクトになったとき**だけ。
+     *    ★それは ★**分けたはずの 2 本が 1 本に戻った**ということだから。
+     */
+    expect(FROZEN_BALANCE, '★凍結値が生きた値そのものになっている（★①と②が同じものを見る）')
+      .not.toBe(DEFAULT_RACE_BALANCE);
+  });
+
   it(`① ★ループの経路は、すべての組で直す前のコミット（${file.engineCommit}）と 1 ビットも同じ指紋`, () => {
     const mismatches: string[] = [];
     for (const c of fingerprintCases()) {
-      const got = digestOfRows(loopRows(c));
+      const got = digestOfRows(frozenLoopRows(c));
       if (got !== file.expected[c.key]) mismatches.push(`${c.key}: 期待 ${file.expected[c.key]} ／ いま ${got}`);
     }
     expect(mismatches.slice(0, 20), `★指紋が ${mismatches.length} 組で変わった`).toEqual([]);
@@ -92,7 +144,7 @@ describe('★距離ロスの指紋（ES 便）', () => {
     let worstTime = 0;
     let differing = 0;
     for (const c of fingerprintCases()) {
-      const ref = loopRows(c);
+      const ref = liveLoopRows(c);
       const got = fingerprintRowsOf(c);
       expect(got.length).toBe(ref.length);
       for (let s = 0; s < ref.length; s += 1) {

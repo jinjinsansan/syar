@@ -1,0 +1,64 @@
+{
+  "__provenance": {
+    "engineCommit": "884019c",
+    "why": "lane-fingerprint (ES-1 / ES-5) の入力を凍結する。DEFAULT_RACE_BALANCE を読むと較正を変えるたびに指紋が落ちる（R-30）",
+    "doNotUpdate": "この値は更新しない。更新すると 884019c との繋がりが切れ、指紋は「前に誰かが作り直したとき」としか比べなくなる",
+    "writtenAt": "2026-09-19",
+    "writtenBy": "M-9（CONDITION_MIN 1→0）で指紋が 182 組 落ちたため。この JSON の CONDITION_MIN は 884019c の値（1）"
+  },
+  "balance": {
+    "RACE_RANDOM_K": 0.22,
+    "INTERVENTION_CAP": 0.1,
+    "TAIL_MIX_P": 0.03,
+    "TAIL_MIX_M": 5,
+    "SKILL_FIRE_BASE": 0.4,
+    "SKILL_FIRE_IQ_DIV": 2000,
+    "DISTANCE_COEF_MIN": 0.75,
+    "DISTANCE_COEF_MAX": 1.05,
+    "SURFACE_COEF_MIN": 0.7,
+    "SURFACE_COEF_MAX": 1.05,
+    "TRACK_COND_COEF_MIN": 0.88,
+    "TRACK_COND_COEF_MAX": 1.05,
+    "TRACK_COND_SEVERITY": {
+      "good": 0,
+      "yielding": 0.4,
+      "soft": 0.7,
+      "bad": 1
+    },
+    "CONDITION_COEF_MIN": 0.88,
+    "CONDITION_COEF_MAX": 1.1,
+    "CONDITION_MIN": 1,
+    "CONDITION_MAX": 5,
+    "STRATEGY_APT_COEF_MIN": 0.85,
+    "STRATEGY_APT_COEF_MAX": 1.05,
+    "FATIGUE_DIV": 500,
+    "WEIGHT_PER_KG": 0.008,
+    "GATE_MAX_EDGE": 0.02,
+    "GATE_FULL_DISTANCE": 1200,
+    "GATE_ZERO_DISTANCE": 2800,
+    "AGE_COEF_2": 0.88,
+    "AGE_COEF_4": 1,
+    "AGE_COEF_5_END": 0.96,
+    "STRAIGHT_METERS": 400,
+    "STAYER_SKILL_DISTANCE": 2400,
+    "STAYER_ST_BONUS": 0.15,
+    "MUD_SKILL_COEF": 1.06,
+    "INNER_SKILL_MAX_GATE": 4,
+    "PACE_HIGH_NIGE_COUNT": 3,
+    "PACE_SLOW_NIGE_COUNT": 1,
+    "BASE_SPEED_MPS": 16.6,
+    "SPEED_SURFACE_MULT": {
+      "turf": 1,
+      "dirt": 0.975
+    },
+    "SPEED_CONDITION_MULT": {
+      "good": 1,
+      "yielding": 0.99,
+      "soft": 0.975,
+      "bad": 0.96
+    },
+    "SPEED_DISTANCE_DECAY_PER_1000M": 0.022,
+    "TIME_GAP_FACTOR": 0.045,
+    "TIME_GAP_SHAPE_GAMMA": 1
+  }
+}
