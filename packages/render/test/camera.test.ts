@@ -160,6 +160,12 @@ describe('★カメラの実装が、隠せない構造になっている（メ�
     expect(start).toBeGreaterThan(0);
     expect(end).toBeGreaterThan(start);
     const block = code.slice(start, end);
+    /**
+     * ⚠️ ★上の 2 つの添字の番人（`start > 0` / `end > start`）で、★**空でないことは既に保証**されています。
+     *    ★それでも長さを書くのは、★**下が否定の表明だから**です（★CK-4）。
+     *    ★空の断片に否定を当てると ★**素通しで緑**になるので、★どの検査も同じ形で番人を置きます。
+     */
+    expect(block.length, '★切り出しが空（★下の否定の表明が素通しになる）').toBeGreaterThan(10);
     for (const forbidden of [' z ', ' z*', 'z)', 'cam']) {
       expect(block).not.toContain(forbidden);
     }

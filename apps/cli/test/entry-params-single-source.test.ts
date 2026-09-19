@@ -190,7 +190,14 @@ describe('★EN-1: 所有馬は生成プールに入らない', () => {
     const where = repo.slice(start, repo.indexOf('`;', start) + 2);
     expect(where.length, '★述語の定義が読めていない（★走査が空・R-21）').toBeGreaterThan(50);
     expect(where, '★所有馬を除いていない').toContain('owner_id is null');
-    const fn = repo.slice(repo.indexOf('export async function loadRaceablePool'));
+    const fnAt = repo.indexOf('export async function loadRaceablePool');
+    expect(fnAt, '★`loadRaceablePool` の宣言が見つからない').toBeGreaterThan(-1);
+    const fn = repo.slice(fnAt);
+    /**
+     * ⚠️ ★**下に否定の表明があります**（`not.toContain('where: string = RACEABLE_WHERE')`）。
+     *    ★切り出しが空なら ★**素通しで緑**になるので、★先に空でないことを確かめます（★CK-4）。
+     */
+    expect(fn.length, '★切り出しが空（★下の否定の表明が素通しになる）').toBeGreaterThan(200);
     /**
      * ⚠️ ★**2026-09-19・AL-11 で述語に差し替え口を付け、★PO-4 ① で既定を差し替えました**。
      *    ★旧の既定 … `RACEABLE_WHERE`（`generation >= max-2` を含む）

@@ -204,7 +204,14 @@ describe('★BT-4 ①: ワーカーが毎周書く', () => {
      * ⚠️ ★`if (changed)` のような分岐で囲まれていないこと。
      */
     const at = worker.indexOf('insert into bet_limits');
+    /**
+     * 🔴 ⚠️ ★**`at === -1` だと、断片が「ファイル全体から最後の 1 文字を除いたもの」になります**
+     *    （`slice(Math.max(0, -401), -1)`）。★下の否定の表明は ★**別のものを見ていながら通り**ます（★CK-4）。
+     *    → ★**見つかったことを先に確かめます。**
+     */
+    expect(at, '★`insert into bet_limits` が見つからない（★文面が変わった？）').toBeGreaterThan(-1);
     const before = worker.slice(Math.max(0, at - 400), at);
+    expect(before.length, '★切り出しが空（★否定の表明が素通しになる）').toBeGreaterThan(20);
     expect(before, '★条件付きで書いている').not.toMatch(/if\s*\([^)]*chang/i);
     expect(worker.slice(at, at + 600)).toMatch(/on conflict \(id\) do update/);
   });
