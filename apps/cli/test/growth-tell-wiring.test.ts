@@ -60,7 +60,15 @@ describe('GB-1 ④⑤⑥ 育った実感の配線', () => {
     const body = functionBodyAfter(RUNNER, 'if (isOwned)');
     /** ★`null` のとき `state.current`（★進める前）を使う。★`out.state.current`（★進めた後）ではない */
     expect(body).toMatch(/growth_told_stats === null[\s\S]{0,200}?state\.current/);
-    const first = body.slice(0, body.indexOf('keys.length > 0'));
+    /**
+     * ⚠️ ★**切り出せたことを先に確かめます**（★**CK-3**）。
+     *    ★`indexOf` が -1 なら `slice(0, -1)` になり、★**ほぼ全文**を見てしまいます。
+     *    ★否定の検査（`not.toMatch`）は ★**切り出しが空でも通る**ので、★ここが要ります。
+     */
+    const at = body.indexOf('keys.length > 0');
+    expect(at, '★「言った」枝が見つからない（★切り出しが壊れている・R-21）').toBeGreaterThan(0);
+    const first = body.slice(0, at);
+    expect(first.length, '★初回の枝の切り出しが空').toBeGreaterThan(50);
     expect(first, '🔴 ★初回の基準に「進めた後」の値を使っている')
       .not.toMatch(/\?\s*\(out\.state\.current/);
   });

@@ -15,11 +15,30 @@ export type StarEnv = 'production' | 'staging' | 'development';
 export interface WorkerConfig {
   readonly env: StarEnv;
   readonly databaseUrl: string;
-  readonly supabaseUrl: string;
-  readonly serviceRoleKey: string;
   /** 開催の起点（epoch ミリ秒）。★運用中に動かすとサイクル番号が付け替わる */
   readonly epochMs: number;
 }
+
+/**
+ * 🔴 ★**`SUPABASE_SERVICE_ROLE_KEY` と `SUPABASE_URL` の要求をやめました**
+ *    （★2026-09-19・★監査 **AUDIT-SERVICE-ROLE**・**AU-1** で読み手を数えたうえで）。
+ *
+ * 【✔ ★数えた結果】
+ *   ★`serviceRoleKey` … ★`env.ts` の**外で 1 度も読まれていません**
+ *   ★`supabaseUrl`    … ★**同じく 0 件**（★監査が挙げていたのは前者だけですが、★同じ形でした）
+ *   ★ワーカーは ★**`DATABASE_URL` で Postgres に直接つなぎます**（`pg`）。
+ *     ★Supabase の HTTP API（PostgREST）は使いません。
+ *
+ * 【🔴 ★なぜ「要らない」で済まさないか】
+ *   ★`service_role` は ★**RLS を素通りする鍵**です。
+ *   ★必須にすると、★**使わない場所にも置かせる**ことになります
+ *   （★`deploy/README.md` は `/etc/star/worker.env` に書けと言っています）。
+ *   → ★**読まないものを要求しない。** ★露出はそれだけ減ります。
+ *
+ * ⚠️ ★**env ファイルから消せとは言っていません。** ★余分にあっても害はありません。
+ *    ★変えたのは ★**「無いと起動しない」をやめた**ことだけです。
+ * ⚠️ ★将来 PostgREST を使う便が来たら、★**そのとき必要な場所で読むこと**（★ここで先に要求しない）。
+ */
 
 const KNOWN: readonly StarEnv[] = ['production', 'staging', 'development'];
 
@@ -45,8 +64,6 @@ export function loadConfig(source: Record<string, string | undefined> = process.
   return {
     env,
     databaseUrl: need('DATABASE_URL'),
-    supabaseUrl: need('SUPABASE_URL'),
-    serviceRoleKey: need('SUPABASE_SERVICE_ROLE_KEY'),
     epochMs,
   };
 }

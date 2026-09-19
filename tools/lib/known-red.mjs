@@ -115,7 +115,33 @@ export function diffAgainstRegistry(
 ) {
   const known = new Map(registry.map((r) => [r.test, r]));
   const unregistered = failing.filter((t) => !known.has(t));
-  const staleGreen = registry.filter((r) => !failing.includes(r.test)).map((r) => r.test);
+  /**
+   * 🔴 ★**読み込めないと簿に書いてあるファイルの検査は、「緑に戻った」と数えません**
+   *    （★**CI-9**・2026-09-19・レビュー側が押す前に止めてくれました）。
+   *
+   * 【★何が起きるところだったか】
+   *   ★`KNOWN_RED` の 2 件は、★**`KNOWN_UNLOADABLE` の 2 ファイルの中の検査**です。
+   *   ★CI（生成物なし）… ★ファイルが読み込めない → ★名前は `failing` に**入らない**
+   *     → ★**`staleGreen` が 2 件 発火 → 門が落ちる**
+   *   ★手元（生成物あり）… ★走って赤 → `failing` に入る → ★通る
+   *   → ★★**「手元で緑・CI で赤」。**
+   *
+   * 【🔴 ★今朝 直したのと同じ読み違いでした】
+   *   ★`verify-known-red.mjs` は `file.assertionResults` だけを読み、
+   *   ★**モジュールが読み込めない ＝ 検査 0 件 ＝「走らなかった」を「緑」**と数えていました（★CI-4）。
+   *   ★**同じ読み違いが、★登録簿の層にも在りました。**
+   *   → ★★**「走らなかった」は「緑になった」ではありません。**
+   *
+   * ⚠️ ★これは `staleUnloadable` を入れるのとは**違います**。
+   *    ★あちらは「読み込めるようになったのに残っている」を落とす話で、★**機械差になります**。
+   *    ★こちらは ★**「読み込めないと簿に書いてある物を、緑に戻ったと数えない」**だけ。
+   *    ★機械差を作りません。★古い登録を落とすのは ★**期限（`until`）**のまま残ります。
+   */
+  const unloadableFiles = unloadableRegistry.map((r) => r.file);
+  const inUnloadableFile = (t) => unloadableFiles.some((f) => t.startsWith(f));
+  const staleGreen = registry
+    .filter((r) => !failing.includes(r.test) && !inUnloadableFile(r.test))
+    .map((r) => r.test);
   const expired = registry.filter((r) => r.until < todayIso).map((r) => `${r.test}（期限 ${r.until}）`);
   const missingFields = registry
     .filter((r) => !r.test || !r.why || !r.owner || !r.until)
@@ -154,6 +180,12 @@ export function diffAgainstRegistry(
   /**
    * 🔴 ★**CI-5**: ★「機械が違うから」を理由にしていないか。
    *   ★**機械で結果が変わることが欠陥**で、★載せると ★**その欠陥が仕様になります**。
+   */
+  /**
+   * ⚠️ 🔴 ★**この 4 語は網羅ではありません**（★**R-29**・列挙は必ず漏れます）。
+   *    ★例えば `why` に「ローカルにしか無い生成物」と書けば ★**通ります**。
+   *    → ★**検査が守っている、と思わないこと。** ★ここが拾うのは ★**うっかり**だけで、
+   *      ★**判断そのものは人が下します**（★物の理由か、機械の理由か）。
    */
   const machineExcuses = unloadableRegistry
     .filter((r) => /機械が違う|CI では通らない|手元では緑|CI だけ/.test(String(r.why)))

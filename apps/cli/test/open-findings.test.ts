@@ -140,19 +140,42 @@ describe('NT-3 開いている指摘の登録簿', () => {
       .toContain('verify-open-findings.mjs');
   });
 
-  it('★監査の 12 件が入っている（★この簿を作った理由そのもの）', () => {
+  it('★監査から来た指摘が、★**開いている間は簿に居る**（★この簿を作った理由そのもの）', () => {
     /**
-     * ⚠️ ★**件数ではなく、★名前で見ます**（★数だけだと、別のものを足して埋められます）。
+     * ⚠️ ★**件数ではなく名前で見ます**（★数だけだと、別のものを足して埋められます）。
+     * ⚠️ ★**この一覧は減ります。** ★直したら簿から外し、★ここからも外します。
+     *    ★それが「直った」の記録です（★`known-red` と違い、機械が判定できないため）。
      */
     const ids = new Set(OPEN_FINDINGS.map((e) => e.id));
-    for (const id of ['M-4', 'M-9', 'AUDIT-TLS', 'AUDIT-SERVICE-ROLE', 'AUDIT-RANDOM-K']) {
+    for (const id of ['M-4', 'M-9', 'AUDIT-TLS', 'AUDIT-ZIP', 'AUDIT-CLAUDE-MD']) {
       expect(ids.has(id), `★監査の ${id} が簿にありません`).toBe(true);
     }
+  });
+
+  it('🔴 ★★片付いたものが簿に戻ってきていない（★「直した」の記録）', () => {
     /**
-     * ✅ ★**`M-8` は 2026-09-19 に直したので、★簿から外しました**（`ppNetHealth` の 3 状態）。
      * 🔴 ★**戻ってきたら、それは直っていないということ**です。
-     *    ★`point-flow.ts` が `unmeasured` を返すことは、★`point-flow.test.ts` が見ています。
+     *    ★どれも ★**2026-09-19 に、理由を分けて**片付けました:
      */
-    expect(ids.has('M-8'), '★M-8 が簿に戻っています（★直したはず）').toBe(false);
+    const ids = new Set(OPEN_FINDINGS.map((e) => e.id));
+    const settled: Readonly<Record<string, string>> = {
+      /** ★直した（★3 状態に）。⚠️ ★ただし実害は元から無かった（★呼び手 0・本物の V-11 は別） */
+      'M-8': '★`ppNetHealth` の 3 状態。★実体は `verify-v11-synthetic.mjs:353` が塞いでいた',
+      /** ★直した（★必須から外した） */
+      'AUDIT-SERVICE-ROLE': '★`WorkerConfig` から外した（★`supabaseUrl` も同じく読み手 0 だった）',
+      /** 🔴 ★**取り下げ** — ★監査の主張が誤りだった */
+      'AUDIT-CANON-0.26': '🔴 ★取り下げ。★正典 §13.1:1560 は **0.22** で一致していた（★0.26 は D-016 の経緯の行・AU-2）',
+      /** ★消した（★合っていない写しは、無い写しより悪い） */
+      'AUDIT-RANDOM-K-COPY': '★`sim-engine` の `RACE_RANDOM_K: 0.12` を削除',
+      /** ★直した（★雛形どおりで Web が動くように） */
+      'AUDIT-ENV-ANON': '★`.env.example` を `NEXT_PUBLIC_` 付きに',
+      /** ★直した（★註記のほうが事実と違った） */
+      'AUDIT-NEXT-CONFIG': '★`next.config.mjs` の註記を事実に（★禁じているのは「作ること」でなく「ロジックを置くこと」）',
+      /** ★直した（★ルート直下だけ） */
+      'AUDIT-WAV': '★`.gitignore` に `/*.wav`（★製品の音を巻き込まない）',
+    };
+    for (const [id, how] of Object.entries(settled)) {
+      expect(ids.has(id), `★${id} が簿に戻っています（★${how}）`).toBe(false);
+    }
   });
 });

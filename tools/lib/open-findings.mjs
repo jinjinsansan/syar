@@ -99,61 +99,25 @@ export const OPEN_FINDINGS = [
   },
   {
     id: 'M-9',
-    what: '★調子の値域の食い違い（育成 0..5 ／ `race-engine` の `CONDITION_MIN: 1`・`balance.ts:489`）',
-    why: '★**調子 0 と 1 が同じ補正**になる。🔴 ★**着順に入る**ので、直すと較正が動く。'
-      + '→ ★**AL-11 と同じ扱い**（★前後を測ってから入れる）。★レビュー側の指示',
+    what: '🔴 ★調子の値域の食い違い（★育成は 0..5 ／ race-engine は `CONDITION_MIN: 1`・`balance.ts:489`）',
+    why: '✔ ★**AU-1 で読み手を数えました**: ★`packages/race-engine/src/coefficients.ts:151-152` が読みます。'
+      + '★`t = clamp((condition - CONDITION_MIN) / span, 0, 1)` なので、'
+      + '★**`condition` が 0 でも 1 でも `t = 0`** — ★★**調子 0 と 1 が同じ補正**です。'
+      + '🔴 ★**着順に入ります**（★M-4 や M-8 と違い、★これは本当に効いています）。'
+      + '→ ★直すと較正が動くので ★**AL-11 と同じ扱い**（★前後を測ってから入れる）',
     owner: 'dev',
     until: '2026-09-30',
   },
   {
     id: 'AUDIT-TLS',
-    what: '★DB 接続で TLS 証明書を検証していない（`apps/worker/src/main.ts:62` ／ `tools/migrate.mjs:106`）',
-    why: '★`rejectUnauthorized: false`。🔴 ★**本番の接続に触る**ので、'
-      + '★CA（Supabase）を確かめずに `true` にすると**ワーカーが起動しなくなります**。'
-      + '→ ★**WK-5（staging の常駐）待ち**。★staging で確かめてから',
+    what: '★DB 接続で TLS 証明書を検証していない（`rejectUnauthorized: false`）',
+    why: '✔ ★**AU-1 で数え直しました**: ★監査は 3 か所と書いていましたが、★実際は ★**52 ファイル**です。'
+      + '★製品（`apps/worker/src`）は **2 か所**（`main.ts:62` / `schemacheck.ts:43`）で、★残りは `tools/`。'
+      + '→ ★★**1 行の直しではありません。** ★接続の作り方を 1 か所にまとめる（★共通の helper）話になります。'
+      + '🔴 ★**本番の接続に触ります。** ★CA（Supabase）を確かめずに `true` にすると'
+      + '★**ワーカーが起動しなくなります**。→ ★**WK-5（staging の常駐）待ち。★staging で確かめてから**',
     owner: 'dev',
-    until: '2026-10-03',
-  },
-  {
-    id: 'AUDIT-SERVICE-ROLE',
-    what: '★worker が使っていない `SUPABASE_SERVICE_ROLE_KEY` を**必須**にしている（`apps/worker/src/env.ts:49`）',
-    why: '✔ ★`serviceRoleKey` は `env.ts` の**外で 1 度も読まれない**（走査で確認）。'
-      + '★必須から外すと ★**露出が減ります**（★RLS を素通りする鍵を、要らない場所に置かない）。★軽い',
-    owner: 'dev',
-    until: '2026-09-22',
-  },
-  {
-    id: 'AUDIT-RANDOM-K',
-    what: '★`packages/sim-engine/src/balance.ts:78` の `RACE_RANDOM_K: 0.12`（★較正値は race-engine 側の 0.22）',
-    why: '🔴 ★**0.12 は D-016 が「1番人気 51.6%」と実測した頃の値**（★D-021 で 0.22 に再較正）。'
-      + '★**写しが残っている**（D-052）。⚠️ ★**どちらが生きているかを先に数えること** — '
-      + '★消す前に、★`sim-engine` 側の 0.12 を読んでいる経路が無いことを確かめる',
-    owner: 'dev',
-    until: '2026-09-22',
-  },
-  {
-    id: 'AUDIT-NEXT-CONFIG',
-    what: '★`apps/web/next.config.mjs` の「Route Handler を作りません」が事実と違う',
-    why: '✔ ★`apps/web/src/app/api/` に **`healthz`** と **`rig-lab`** が実在する。'
-      + '★CLAUDE.md も「Route Handler にビジネスロジックを書かない」と書いており、'
-      + '★**「作らない」と「ロジックを書かない」がずれている**。★註記を事実に合わせる',
-    owner: 'dev',
-    until: '2026-09-26',
-  },
-  {
-    id: 'AUDIT-ENV-ANON',
-    what: '★`.env.example` の `SUPABASE_ANON_KEY` と、Web が読む `NEXT_PUBLIC_SUPABASE_ANON_KEY` が食い違う',
-    why: '★手順どおりに `.env` を作ると ★**Web が鍵を読めません**。★書き写す人が 1 度 詰まる',
-    owner: 'dev',
-    until: '2026-09-26',
-  },
-  {
-    id: 'AUDIT-WAV',
-    what: '★`.gitignore` がルートの `*.wav` を除外していない',
-    why: '✔ ★いま未追跡の wav は **0 本**なので**即座の危険はない**。'
-      + '★ただし `git add -A` を打った日に入ります（★CLAUDE.md が `git add -A` を禁じているのも同じ理由）',
-    owner: 'dev',
-    until: '2026-09-26',
+    until: '2026-10-31',
   },
   {
     id: 'AUDIT-ZIP',
@@ -172,37 +136,17 @@ export const OPEN_FINDINGS = [
     until: '2026-10-03',
   },
   {
-    id: 'AUDIT-CANON-0.26',
-    what: '★正典 §13.1 の `RACE_RANDOM_K 0.26` が実装（0.22）と食い違う',
-    why: '✔ ★検査の題は直っている（「再較正値 0.22（正典 §13.1 は 0.26・改訂依頼中）」）。'
-      + '★残っているのは**正典側**。★**正典の改訂はレビュー側／オーナー**',
+    id: 'AUDIT-CANON-BASE-GAIN',
+    what: '🔴 ★正典 §13.1 の `BASE_GAIN: 12` / `INJURY_BASE: 0.0018` が、★**生きている値と食い違う**',
+    why: '✔ ★**AU-2 で § の表を読みました**（★決定表の行ではなく）:'
+      + '★`STAR_SPEC_v2.0.md:1555-1557` は **12 / 0.0018**。'
+      + '★生きているのは `packages/training/src/growth.ts:36` の **`BASE_GAIN = 7.8`** と、'
+      + '★`packages/training/src/injury.ts:59` の **`INJURY_BASE_PROB = 0.0013`**。'
+      + '★D-045 / D-047 が `BASE_GAIN` を下げたのに、★**正典 §13.1 の表が追随していません**。'
+      + '🔴 ★`RACE_RANDOM_K` は D-053 で「記録のほうを改める」と裁定して §13.1 を 0.22 に直しました。'
+      + '★**こちらは同じ手当てがされていません。** ★正典の改訂はレビュー側／オーナー',
     owner: 'review',
-    until: '2026-10-03',
-  },
-
-  {
-    id: 'M-9-ledger',
-    what: '🔴 ★`packages/betting/src/point-flow.ts` は ★**門が読んでいない第二の帳簿**（★D-052）',
-    why: '✔ ★呼び手を数えました（★**AU-1**）: ★製品コード **0** ／ 門・ツール **0** ／ 自分の検査だけ。'
-      + '★**本物の V-11 は `tools/verify-v11-synthetic.mjs:353`** で、'
-      + '★`check(ppIssued > 0 && ppConsumed > 0, …)` と ★**最初から fail-closed**。'
-      + '→ ★**配線するなら `ppNetHealth()`（3 状態）を使うこと。** '
-      + '🔴 ★`isPpNetHealthy`（後方互換の別名）に配線すると、★**そのとき初めて M-8 の穴が開きます**',
-    owner: 'dev',
     until: '2026-10-31',
-    /**
-     * ★**NT-4**: ★機械が確かめられる述語（★任意）。★**偽になったら「消し忘れ」として落とします**。
-     *
-     * ⚠️ 🔴 ★**`() => true` を置かないこと。** ★それは「通るだけの述語」で、
-     *    ★**今日ずっと見てきた「緑の理由が違う」の作り方そのもの**です。
-     *    → ★書けないなら ★**書かない**（★この欄は任意です）。
-     *
-     * ★ここでは ★**「`point-flow.ts` の関数を、製品コードも門も呼んでいない」**を数えます。
-     *   ★呼ばれ始めたら ★**この指摘は別のもの**（★配線された）になるので、★簿を書き直す必要があります。
-     */
-    stillOpen: ({ grepCount }) => grepCount('isPpNetHealthy|ppNetHealth|isPpNetNotUnhealthy', {
-      exclude: /point-flow\.(ts|test\.ts)$|open-findings/,
-    }) === 0,
   },
 
   // ───────── 2026-09-19 に見つけて、まだ塞いでいないもの ─────────
