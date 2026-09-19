@@ -27,6 +27,8 @@ import { loadEnv } from './lib/env.mjs';
 import { assertNotProduction } from './lib/guard.mjs';
 
 const WRITE = process.argv.includes('--write');
+import { mkdirSync, writeFileSync } from 'node:fs';
+
 const env = loadEnv();
 console.log('接続先:', env.STAR_ENV, WRITE ? '／★--write（消します）' : '／下見だけ（★--write で消します）');
 const c = new pg.Client({ connectionString: env.DATABASE_URL });
@@ -56,6 +58,31 @@ if (!WRITE) {
   console.log('\n（下見だけ。★消すには --write）');
   await c.end();
   process.exit(0);
+}
+
+/**
+ * 🔴 ★**消す前に、★何を消すのかを識別子で控える**（★`CLEANUP-NO-RECORD`・2026-09-19）。
+ *
+ * ⚠️ ★**戻すためではありません**（★漏れの掃除なので戻す必要は無い）。
+ *   ★**「本当にそれだけを消したか」を、★後から人が確かめられるように**するためです。
+ * ⚠️ ★端末に出すだけだと、★窓を閉じたときに消えます。★**ファイルにも残します。**
+ */
+const doomed = {
+  takenAt: new Date().toISOString(),
+  races: (await c.query(`select id::text as id, cycle_index from races where cycle_index >= 100000 order by id`)).rows,
+  users: (await c.query(`select id::text as id, display_name from public.users where display_name = 'DS7 検査' order by id`)).rows,
+  horses: (await c.query(`select id::text as id from horses h where h.id in (${OWNED}) order by id`)).rows,
+  authUsers: (await c.query(`select id::text as id, email from auth.users where email = 'ds7@example.invalid' order by id`)).rows,
+};
+const RECORD_DIR = 'evidence/cleanup-ds7-leak';
+mkdirSync(RECORD_DIR, { recursive: true });
+const recordPath = `${RECORD_DIR}/${doomed.takenAt.replace(/[:.]/g, '-')}.json`;
+writeFileSync(recordPath, JSON.stringify(doomed, null, 2), 'utf8');
+console.log(`
+=== ★消すものの控え（${recordPath}）===`);
+for (const [k, v] of Object.entries(doomed)) {
+  if (k === 'takenAt') continue;
+  console.log(`  ${k}: ${v.length} 件 ${v.slice(0, 6).map((x) => x.id.slice(0, 8)).join(' ')}${v.length > 6 ? ' …' : ''}`);
 }
 
 await c.query('begin');
@@ -91,8 +118,31 @@ try {
 }
 
 console.log('\n=== 後始末のあと ===');
-console.log(`  races（cycle_index >= 100000）: ${await n(`select count(*)::int as n from races where cycle_index >= 100000`)}`);
-console.log(`  public.users（DS7 検査）      : ${await n(`select count(*)::int as n from public.users where display_name = 'DS7 検査'`)}`);
-console.log(`  所有者の付いた馬（全体）      : ${await n(`select count(*)::int as n from horses where owner_id is not null`)}`);
+/**
+ * 🔴 ★**片付いたことを数える**（★**TL-1**・2026-09-19）。
+ *   ⚠️ ★以前は ** 数を印刷するだけ**で、★**残っていても終了コード 0** でした。
+ *   ★`delete` を呼んだは「消えた」ではありません。
+ */
+const after = {
+  races: await n(`select count(*)::int as n from races where cycle_index >= 100000`),
+  users: await n(`select count(*)::int as n from public.users where display_name = 'DS7 検査'`),
+  ledger: await n(`select count(*)::int as n from ep_ledger l join public.users u on u.id = l.user_id where u.display_name = 'DS7 検査'`),
+  authUsers: await n(`select count(*)::int as n from auth.users where email = 'ds7@example.invalid'`),
+};
+for (const [k, v] of Object.entries(after)) console.log(`  ${k}: ${v}`);
+console.log(`  ★所有者の付いた馬（全体）      : ${await n(`select count(*)::int as n from horses where owner_id is not null`)}`);
 console.log(`  ★ACTIVE_WHERE の頭数         : ${await n(`select count(*)::int as n from horses where retired_at_week is null and owner_id is null`)}`);
 await c.end();
+
+if (WRITE) {
+  const left = Object.entries(after).filter(([, v]) => v > 0);
+  if (left.length > 0) {
+    console.log(`
+🔴 ★消えていません: ${left.map(([k, v]) => `${k} ${v}`).join(' / ')}`);
+    console.log(`   ★消す前の控え: ${recordPath}`);
+    process.exitCode = 1;
+  } else {
+    console.log(`
+✅ ★全部 0 件です（★消す前の控え: ${recordPath}）`);
+  }
+}

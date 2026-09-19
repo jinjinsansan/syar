@@ -163,3 +163,7 @@ apps/web/public/contest-review/
 .tmp-headless-contest/
 .tmp-race-review-browser/
 .tmp-race-review-browser-2/
+
+# ★`cleanup-ds7-leak.mjs` が実行時に書く「消したものの控え」（★CLEANUP-NO-RECORD・2026-09-19）
+#   ★機械ごとに違う実行の記録なので、★版管理には入れない（★中身は identifiers）
+/evidence/cleanup-ds7-leak/

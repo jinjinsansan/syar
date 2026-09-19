@@ -35,7 +35,7 @@ export const TOOL_AFTERMATH = {
   'verify-ds5-retire-scratch.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },
   'verify-ds5-before-start-scratch.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },
   'verify-gb1-growth-tell.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },
-  'cleanup-ds7-leak.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: races / race_entries / race_odds / ep_ledger / public.users / auth.users を消す（DS-7 の漏れの掃除）。数えていない' },
+  'cleanup-ds7-leak.mjs': { mode: 'consumes', why: '★DS-7 の漏れの掃除。★消すもの: races / race_entries / race_odds / ep_ledger / public.users / auth.users。✅ ★**2026-09-19（TL-1 ＋ CLEANUP-NO-RECORD）**: ★① 消す前に ★**何を消すのかを識別子で控える**（`evidence/cleanup-ds7-leak/<時刻>.json` ＋ 端末にも出す）。★② 消した後の残り件数を数え、★**0 でなければ終了コード 1**（★旧は数を印刷するだけで、★残っていても 0 で終わっていた）。⚠️ ★控えは**戻すためではありません** — ★漏れの掃除なので戻す必要が無く、★「本当にそれだけを消したか」を後から人が確かめるためです', notRestored: '🔴 ★**2 頭の元の `npc_stable_id`**。★`horses_owner_xor_npc` があるので `owner_id` を付けた時点で消えており、★`birth_snapshot` にも控えが無い。★`md5(id)` で 40 厩舎に散らすので「厩舎に属している」ことだけが戻る（★`race_entries_public.owner_label` が 2 頭だけ別名になる）。⚠️ ★これは**決め打ちの 1 ではない**（★`STABLE-1-SKEW` を作らない形）' },
   'verify-sandbox-detects-commit.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },
   'verify-sy1-clone.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },
   'diag-dl1-daily.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },
