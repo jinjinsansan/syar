@@ -3,6 +3,7 @@
  *   「掃引する前に、解析で決まるものを先に決める」— K×床の掃引で
  *   「探索空間に次元が足りない」と分かったのと同じ轍を避けます。
  */
+import { BASE_GAIN } from '@star/training';
 import { NICKS_GEN, ABILITY_KEYS } from '@star/sim-engine';
 import { resolveRuntimeConfig } from './config.js';
 import { runSimulation } from './simulator.js';
@@ -31,8 +32,17 @@ console.log(`  potential  平均 ${mean(pots).toFixed(1)}  5% ${q(pots,0.05).toF
 console.log(`  stats(初期) 平均 ${mean(stats).toFixed(1)}  5% ${q(stats,0.05).toFixed(1)}  95% ${q(stats,0.95).toFixed(1)}`);
 console.log(`  素質開放率  平均 ${mean(rates).toFixed(3)}`);
 
-// ★正典 §7.3 の式で、係数がすべて 1 のときに何週で上限に達するか
-const BASE_GAIN = 12;
+/**
+ * ★正典 §7.3 の式で、係数がすべて 1 のときに何週で上限に達するか。
+ *
+ * 🔴 ★**2026-09-19 まで、ここは `const BASE_GAIN = 12;` と書いていました。**
+ *   ★正典 §13.1 が `BASE_GAIN` を **7.8** に直した（★D-045 / D-047 の追随）ので、
+ *   ★この道具は ★**「★正典の式」と名乗って、★正典に無い 12 を表示していました**（★**R-30**）。
+ *   → ★**測定器が、実物と違う入力を読んでいた**形です。
+ *
+ * ⚠️ 🔴 ★**ここで 7.8 と書き直しません。** ★それは ★**4 つ目の写し**になります（D-052）。
+ *    → ★`@star/training` から ★**import します**（★生きた台帳はそこ 1 つ）。
+ */
 const HEADROOM_EXP = 0.7;
 const pot = mean(pots);
 let cur = mean(stats);

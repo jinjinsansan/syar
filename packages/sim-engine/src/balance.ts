@@ -65,29 +65,22 @@ export const BALANCE = {
   INITIAL_UNLOCK_MIN: 0.28,
   INITIAL_UNLOCK_MAX: 0.35,
 
-  // 育成 (§7) —— P3 で使用（P0 では未使用）
-  BASE_GAIN: 12,
-  HEADROOM_EXP: 0.7,
-  // ⚠️ INJURY_BASE は §7.5 で `1000 / durability` を掛ける前提であり、
-  //    **丈夫さの集団水準が創始値 650 近傍にあること**を暗黙の基準にしている。
-  //    回帰中心を誤って 450 にしていた間は故障率が約1.44倍になっていた（D-009 で是正）。
-  //    丈夫さの水準を動かす変更をするときは、この定数の較正もやり直すこと（P1 への申し送り）。
-  INJURY_BASE: 0.0018,
-
-  // ★レース (§8) の `RACE_RANDOM_K` は、★**2026-09-19 にここから消しました**（AUDIT-RANDOM-K）。
-  //   ★§13.1 は **0.22** なのに写しは **0.12** のままで、★**読み手が 0** でした
-  //   （✔ `resolveRace` を呼ぶ全経路が `DEFAULT_RACE_BALANCE` を渡す）。
-  //   ★合っていない写しは、無い写しより悪い（★権威ありげに見えて値が違う）。
-  //   → ★生きているのは `@star/race-engine` の **`CALIBRATED_RACE_RANDOM_K = 0.22`** 1 つだけ。
-  //   ⚠️ ★**「P1 用の定数が抜けている」と思って戻さないこと。**
-
-  // 介入 (§8b・D-006) —— P1 で使用（P0 では未使用）
-  INTERVENTION_CAP: 0.1,
-  AI_PROXY_TARGET: 0.95,
-  LAG_WINDOW_MS: 150,
-  TAP_RATE_CAP: 15,
-  STAMINA_SPURT_DRAIN: 3.0,
-  EARLY_SPURT_METER: 900,
+  // ★育成 (§7)・レース (§8)・介入 (§8b) の写経は、★**2026-09-19 にここから消しました**
+  //   （★AUDIT-CANON-BASE-GAIN・**AU-1 をメンバーごとに当てた結果**）。
+  //
+  //   ✔ ★読み手を 1 つずつ数えました: ★`BASE_GAIN` / `HEADROOM_EXP` / `INJURY_BASE` /
+  //     ★`RACE_RANDOM_K` / 介入の 6 つ — ★**どれも読み手 0** でした。
+  //     ★`DEFAULT_BALANCE` は ★**遺伝のメンバーだけ**を拾っており（下を参照）、
+  //     ★`INTERVENTION_CAP` などを読んでいるのは ★**race-engine の balance** です（別物）。
+  //   🔴 ★そして ★**値が古くなっていました**: ★`BASE_GAIN: 12`（★正典 §13.1 は **7.8**）／
+  //     ★`INJURY_BASE: 0.0018`（★生きているのは `injury.ts` の **0.0013**）。
+  //     ★**合っていない写しは、無い写しより悪い**（★権威ありげに見えて値が違う）。
+  //
+  //   ★生きた台帳の在り処:
+  //     ★育成 … `@star/training` の `BASE_GAIN` / `HEADROOM_EXPONENT` / `INJURY_BASE_PROB`
+  //     ★レース・介入 … `@star/race-engine` の `DEFAULT_RACE_BALANCE`
+  //   ⚠️ ★**「P1/P3 用の定数が抜けている」と思って戻さないこと。**
+  //   ⚠️ ★**遺伝のメンバーは残っています**（★`phenotype.ts` が読んでいます・★生きています）。
 } as const;
 
 // ---------------------------------------------------------------------------
