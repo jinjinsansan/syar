@@ -1,6 +1,24 @@
 # VPS へのデプロイ手順
 
-> 正典 §14.2 は「常時稼働ワーカー（**Render Background Worker 等**）」で実装先を固定していません。
+> ---
+> # 🔴 ⚠️ **2026-09-19・WK-5 — この文書は古く、危険でした。**
+>
+> 🔴 ★**この README は §5 で `deploy/star-worker.service` を入れろと書いていました。**
+> ★その unit は ★**2026-08-09 に 7 分の停止を起こした形そのもの**です:
+>   ★`ExecStart=/opt/star/node_modules/.bin/tsx apps/worker/src/main.ts`
+>   → ★`npm ci --omit=dev` が `tsx` を消す → ★**203/EXEC で即死**（★正典 **D-043**）。
+>
+> ⚠️ ★**2026-09-14 の監査が既に指摘していました**（`REPORT_AUDIT_20260914.md:127`）。
+>    ★**直っていませんでした。** ★**指摘されたのに直っていない、が 2 度目**です
+>    （★CLAUDE.md が「Render の記述」で同じことを書いています）。
+>
+> ✅ ★**unit は `tools/star-worker.service` の 1 本だけ**になりました（★`deploy/` の写しは削除）。
+> ✅ ★**配備は `tools/deploy.sh`**（★リリース木 ＋ シンボリックリンク切替）。
+>    ★**`git pull` でも `git push` でも入れ替わりません。**
+> ---
+
+> ⚠️ ★**「Render」は誤りです**（★2026-09-14 の監査・CLAUDE.md）。★配備先は ★**VPS の systemd `star-worker`** です。
+> 正典 §14.2 は実装先を固定していません。
 > 要求は **常時稼働・任意の実行時間・状態が前進すること**の3点で、VPS はこれを満たします。
 > 名指しで禁止されているのは **Vercel Cron と pg_cron** だけです（実行保証が弱い・§14.2）。
 
@@ -75,12 +93,22 @@ insert into app_environment (singleton, environment) values (true, 'production')
 
 ## 5. 起動
 
+> 🔴 ⚠️ ★**`deploy/star-worker.service` は削除しました**（★2026-09-19・WK-5）。
+>   ★ここには ★**7 分停止を起こした形**（`node_modules/.bin/tsx` ＋ `/opt/star`）が
+>   ★残ったままで、★**この手順がそれを入れろと言っていました**。
+
 ```bash
-sudo install -m 644 /opt/star/deploy/star-worker.service /etc/systemd/system/
+# ★unit は tools/ の 1 本だけ（★D-052・2 か所に持たない）
+sudo install -m 644 /opt/star/tools/star-worker.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now star-worker
 journalctl -u star-worker -f
 ```
+
+⚠️ ★`tools/star-worker.service` は ★**`/opt/star-current/dist/worker.cjs`**（★素の node・バンドル済み）を
+起動します。★**`/opt/star` ではありません。** ★`/opt/star-current` は `tools/deploy.sh` が
+張り替える symlink で、★**稼働中プロセスの木を書き換えない**ための構造です。
+★ここを `/opt/star` に戻すと、★木を置き換える配備に逆戻りします。
 
 ## 6. A-1 / A-2 の実測
 
