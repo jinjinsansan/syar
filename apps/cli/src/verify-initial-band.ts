@@ -53,7 +53,7 @@ import { resolveRuntimeConfig } from './config.js';
 import { runSimulation } from './simulator.js';
 import { FIELD_SIZE, toEntrant, type GeneratedRace } from './race-field.js';
 import { emptyCareer, runSeason, type CareerRecord } from './racing-season.js';
-import { POOL_GENERATIONS, POOL_MARES, VERIFY_SEEDS } from './measurement.js';
+import { POOL_GENERATIONS, POOL_MARES, VERIFY_SEEDS, entriesPerSegment } from './measurement.js';
 import { APPROPRIATE_POLICY, runCareer, type CareerResult, type Policy } from './training-career.js';
 
 const argv = process.argv.slice(2);
@@ -81,8 +81,28 @@ const HORSES = num('horses', POOL_MARES);
  *   → ★故障による早期引退が、そのまま**出走機会の減少**として効きます。
  */
 const SEGMENTS = 6;
-/** ★1 区間あたりの申し込み数 ＝ キャリア上限（正典 §7.1 `CAREER_RACE_LIMIT`）÷ 区間数 */
-const ENTRIES_PER_SEGMENT = CAREER_RACE_LIMIT / SEGMENTS;
+/**
+ * ★**区間ごとの申し込み数**（★合計 ＝ キャリア上限・正典 §7.1 `CAREER_RACE_LIMIT`）。
+ *
+ * 【🔴 ★以前は割り算 1 つでした — ★そして 2 戦 超えていました】
+ *   ★`CAREER_RACE_LIMIT / SEGMENTS` は、★24 のときは **4**（整数）でした。
+ *   ★**CC-1 ③ で 40 になり**、40 ÷ 6 ＝ **6.666…** で割り切れなくなりました。
+ *   ★残り枠は `> 0` で判定して 1 ずつ引くので、★**0.667 でもう 1 回 通り**ました
+ *   → 🔴 ★**1 区間 7 回 × 6 ＝ 42 戦**。★上限 40 を 2 戦 超えていました
+ *     （★表示は「キャリア上限 40 戦」と出ていたので、★**表示が嘘をついていました**）。
+ *
+ * 【✅ ★端数は ★**後ろの区間へ**配る（6,6,7,7,7,7）】
+ *   ⚠️ ★**前に寄せてはいけません。** ★上の註記のとおり
+ *   ★**区間の頭で引退済みの馬は登録しません** — ★故障で早く引退する馬ほど
+ *   ★**前の区間しか使えません**。★前に寄せると ★**その馬に多く枠を与える**ことになり、
+ *   ★帯の下のゲートが ★**甘く**なります（★**R-27**: 狭い側に倒す）。
+ *
+ * ⚠️ ★**`SEGMENTS` を 40 の約数に変える道は採りません** —
+ *    ★6 は恆意の数ではなく ★**156 週 ＝ 半年 × 6**。★変えると半年という区切りが消えます。
+ * ⚠️ ★**`floor` で 36 戦にする道も採りません** — ★測っているのは
+ *    ★「上限まで使った馬が 1 勝できるか」なので、★36 では **別の問い**になります。
+ */
+const ENTRIES_BY_SEGMENT = entriesPerSegment(CAREER_RACE_LIMIT, SEGMENTS);
 /**
  * ★**抽選が実際に働くための超過分**（★測定条件・BG-2）。
  *
@@ -165,7 +185,8 @@ function runCareers(
     /** ★番組表の通し番号（★区間ごとに進める。★1 日の内訳がそのまま出るように） */
     const segmentBase = s * 1000;
     /** ★この区間に残っている申し込み枠（★落選しても減りません） */
-    const remaining = new Map<HorseId, number>(active.map((h) => [h.id, ENTRIES_PER_SEGMENT]));
+    const entriesHere = ENTRIES_BY_SEGMENT[s]!;
+    const remaining = new Map<HorseId, number>(active.map((h) => [h.id, entriesHere]));
     const entryRng = deriveRng(seed, VERIFY_BAND_STREAM.ENTRY, s);
 
     /** ★一様に k 頭選ぶ（★完全抽選。★賞金や能力で並べない・正典 1317） */
@@ -234,12 +255,12 @@ function runCareers(
      * ★本番は 1 日 480 本（D-007 改訂）に対し出走可能な馬が数千頭で、★**枠は余っている側**です
      *   （★`generateRace` の窓から出る空き枠は 1 レースあたり平均 5 前後）。
      */
-    const raceCount = Math.max(1, Math.ceil((active.length * ENTRIES_PER_SEGMENT) / 4));
+    const raceCount = Math.max(1, Math.ceil((active.length * entriesHere) / 4));
     runSeason(
       active,
       careers,
       deriveRng(seed, VERIFY_BAND_STREAM.RACE, s),
-      ENTRIES_PER_SEGMENT,
+      entriesHere,
       undefined,
       // ★本番のワーカーと同じ（`build-race.ts:89`）。育て終わった能力で走る
       { abilityOf: (h: HorseRecord) => h.stats },
@@ -366,7 +387,8 @@ console.log(`  出走: ★**本番の enter_race と同じ「生成済みのレ�
 console.log(`        ★レースの選び方: **${CHOICE}**` +
   (CHOICE === 'matched' ? `（自分と同じくらいの相手の番組・幅 ±${(MATCH_TOLERANCE * 100).toFixed(0)}%）` : '（無差別・番組の格を見ない）') +
   ` ← ★正典に無い自由変数（R-12・--choice で切替）`);
-console.log(`        ★申し込みは ${SEGMENTS} 区間 × ${ENTRIES_PER_SEGMENT} 回 ＝ キャリア上限 ${CAREER_RACE_LIMIT} 戦（正典 §7.1）`);
+console.log(`        ★申し込みは ${SEGMENTS} 区間 × [${ENTRIES_BY_SEGMENT.join(',')}] ＝ キャリア上限 ${CAREER_RACE_LIMIT} 戦（正典 §7.1）`);
+console.log(`        ⚠️ ★端数は**後ろの区間**へ（★早期引退の馬に多く枠を与えない・R-27）`);
 console.log(`        ★上限 ${FIELD_SIZE.MAX} 頭を超えたら**完全抽選**で落とす（正典 1317・賞金上位を優先しない）`);
 console.log(`  能力: ★育て終わった stats（本番のワーカーと同じ渡し方・build-race.ts:89）`);
 console.log(`  帯: bandOfPotential（★付与時の素質から・24 段の整数・D-114・裁定 §2-①）`);

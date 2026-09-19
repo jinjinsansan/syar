@@ -197,3 +197,37 @@ export const V7_MEASUREMENT = {
    */
   horses: 1800,
 } as const;
+
+/**
+ * ★**キャリア上限を、区間へ配る**（★**CC-1 ⑤ 波及**・2026-09-19）。
+ *
+ * 【🔴 ★なぜ関数にしたか — ★割り算 1 つで 2 戦 超えていました】
+ *   ★`verify-initial-band.ts` は `CAREER_RACE_LIMIT / SEGMENTS` を区間ごとの枠にしていました。
+ *   ★24 ÷ 6 ＝ 4（整数）でしたが、★**CC-1 ③ で 40 になり 6.666…** に。
+ *   ★残り枠は `> 0` で判定して 1 ずつ引くので、★**0.667 でもう 1 回 通り**、
+ *   → 🔴 ★**1 区間 7 回 × 6 ＝ 42 戦。★上限を 2 戦 超えていました**（★表示は「40 戦」と出ていた）。
+ *
+ * 【✅ ★端数は **後ろの区間**へ】
+ *   ⚠️ ★前に寄せてはいけません。★`verify-initial-band.ts` は
+ *   ★**区間の頭で引退済みの馬を登録しません**（★故障による早期引退を出走機会の減少として効かせるため）。
+ *   → ★**早く引退する馬ほど前の区間しか使えない**ので、★前に寄せると ★**その馬に多く枠を与える**ことになり、
+ *     ★帯の下のゲートが ★**甘く**なります（★**R-27**: 狭い側に倒す）。
+ *
+ * ⚠️ ★**`SEGMENTS` を上限の約数に変える道は採りません** — ★6 は恣意の数ではなく
+ *    ★**現役 156 週 ＝ 半年 × 6**。★変えると半年という区切りが消えます。
+ * ⚠️ ★**`floor` で切り捨てる道も採りません** — ★測っているのは
+ *    ★「上限まで使った馬が 1 勝できるか」なので、★少なく測ると**別の問い**になります。
+ *
+ * @throws ★合計が `total` と違えば投げます（★次に上限を動かした人が、ここで止まる）
+ */
+export function entriesPerSegment(total: number, segments: number): readonly number[] {
+  if (!Number.isInteger(total) || total <= 0) throw new Error(`★キャリア上限が整数の正数でありません: ${total}`);
+  if (!Number.isInteger(segments) || segments <= 0) throw new Error(`★区間数が整数の正数でありません: ${segments}`);
+  const base = Math.floor(total / segments);
+  const extra = total - base * segments;
+  const xs = Array.from({ length: segments }, (_, i) => (i >= segments - extra ? base + 1 : base));
+  const sum = xs.reduce((a, b) => a + b, 0);
+  // 🔴 ★**合計を数える。** ★今回 42 になったのは「割り算の結果を誰も数えなかった」から
+  if (sum !== total) throw new Error(`★区間ごとの申し込みの合計 ${sum} が、上限 ${total} と違います（${xs.join('+')}）`);
+  return xs;
+}
