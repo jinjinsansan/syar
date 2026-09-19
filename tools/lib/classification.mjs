@@ -884,6 +884,13 @@ export const STATE_CHANGING = [
    */
   'verify-sy1-clone.mjs',
 
+  /**
+   * ★**DL-1: 日次の 3 つの関数が動くかを、実 DB で通す**（★2026-09-19・rollback ＋ txid の見張り付き）。
+   *   ★`aggregateDay` / `recordUnlockDistribution` / `recordStoryRows`。★どれも自分で取引を張りません。
+   * ⚠️ ★**「落ちなかった」と「書いた」は別**なので、★行数を前後で数えます。
+   */
+  'diag-dl1-daily.mjs',
+
   // ★中で状態を変えるツールを流すので、これ自体も状態を変える
   'audit-tools.mjs',
   'fix-purse.mjs',
