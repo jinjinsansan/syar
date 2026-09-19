@@ -377,12 +377,15 @@ try {
         const token = si.data.session.access_token;
         // ★候補の馬を 1 頭選ぶ（★呼ぶ側が選ぶ・★で絞るのは本番のワーカーの役目）
         const cand = await client.query(
-          `select h.id from horses h
+          // 🔴 ★**npc_stable_id も一緒に読む**（★2026-09-19）。★owner_id を入れたら行から消える。
+          `select h.id, h.npc_stable_id from horses h
             where h.owner_id is null and h.npc_stable_id is not null and h.retired_at_week is null
               and not exists (select 1 from race_entries e where e.horse_id = h.id and e.finish_pos is not null)
             order by h.id limit 1`,
         );
         const horseId = cand.rows[0]?.id ?? null;
+        /** 🔴 ★元の厩舎。★「いちばん若い厩舎」に返すと STABLE-1-SKEW を作る */
+        const horseStable = cand.rows[0]?.npc_stable_id ?? null;
         if (horseId === null) {
           rec('⑭', '★2 回目は全ロールバック', 'ng', '初期馬の候補が 0 頭（★在庫の下限監視・D-079 ⑧）');
         } else {
@@ -435,12 +438,14 @@ try {
             });
             const si2 = await anon4.auth.signInWithPassword({ email: em2, password: pw });
             const cand2 = await client.query(
-              `select h.id from horses h
+              `select h.id, h.npc_stable_id from horses h
                 where h.owner_id is null and h.npc_stable_id is not null and h.retired_at_week is null
                   and not exists (select 1 from race_entries e where e.horse_id = h.id and e.finish_pos is not null)
                 order by h.id limit 1`,
             );
             const horse2 = cand2.rows[0]?.id ?? null;
+            /** 🔴 ★元の厩舎（★同上） */
+            const horse2Stable = cand2.rows[0]?.npc_stable_id ?? null;
             if (si2.data.session === null || horse2 === null) {
               rec('⑭-b', '★同じ冪等キーの再送で二度付与しない', 'ng', '2 人目のトークンか候補が取れず検査不能');
             } else {
@@ -464,22 +469,22 @@ try {
               rec('⑭-b', '★同じ冪等キーの再送は成功を返し、二度付与しない', okB ? 'ok' : 'ng',
                 `1 回目=HTTP ${b1.status} ／ 再送=HTTP ${b2.status} ／ EP ${st2.rows[0].ep} ・馬 ${st2.rows[0].horses}`
                 + (okB ? '（★2000／1 が期待どおり＝冪等の枝に入っている）' : ' 🔴 ★期待は 200／200／2000／1'));
+              // 🔴 ★**元の厩舎へ**戻す（★旧は「いちばん若い厩舎」＝実質厩舎 1 へ寄せていた）
               await client.query(
-                `update horses set owner_id = null,
-                        npc_stable_id = (select id from npc_stables order by id limit 1)
+                `update horses set owner_id = null, npc_stable_id = $2
                   where owner_id = $1`,
-                [uid2],
+                [uid2, horse2Stable],
               );
               await anon4.auth.signOut();
             }
           }
 
           // ★片付け: 馬を NPC に戻す（★利用者は finally で消える。馬は残ると在庫が減る）
+          // 🔴 ★**元の厩舎へ**戻す（★同上）
           await client.query(
-            `update horses set owner_id = null,
-                    npc_stable_id = (select id from npc_stables order by id limit 1)
+            `update horses set owner_id = null, npc_stable_id = $2
               where owner_id = $1`,
-            [uid],
+            [uid, horseStable],
           );
           await anon3.auth.signOut();
         }
@@ -518,15 +523,40 @@ try {
     → ★**順番を「馬を NPC に返す → 台帳 → 口座 → auth 利用者」にし、
       ★消えたことを実測してから表示します。**
   */
+  /**
+   * 🔴 ★**元の厩舎が分からないまま残った馬の数**（★2026-09-19・`STABLE-1-SKEW`）。
+   *   ★**0 でなければ不合格**にします — ★黙って別の厩舎に入れない代わりに、★必ず人に届けます。
+   */
+  let strayHorses = 0;
   console.log('\n=== 片付け ===');
   for (const id of created) {
-    // ★① 馬を NPC に返す（★排他制約があるので owner と npc を同じ 1 回で入れ替える）
-    await client.query(
-      `update horses set owner_id = null,
-              npc_stable_id = (select id from npc_stables order by id limit 1)
-        where owner_id = $1`,
-      [id],
-    );
+    /**
+     * 🔴 ★**ここでは馬を返しません**（★2026-09-19・`STABLE-1-SKEW`）。
+     *
+     *   ★旧: `npc_stable_id = (select id from npc_stables order by id limit 1)`
+     *   → ★**「いちばん若い厩舎」＝ 実質 厩舎 1**。★元の厩舎ではありません。
+     *     ★`verify-prize.mjs` の `npc_stable_id = 1` と ★**同じ誤り**で、★副問い合わせに化けていたため
+     *     ★`npc_stable_id\s*=\s*1` の走査から漏れていました（★網が狭すぎた）。
+     *
+     *   ★馬を返すのは ★**元の厩舎を知っている 2 か所**（`horseStable` / `horse2Stable`）の仕事です。
+     *   → ★ここに来る時点で所有馬が残っていたら、★**元の厩舎が分かりません。**
+     *     ★**黙って別の厩舎に入れず、★数えて出します**（★`R-21`: ★「戻せない」を「片付いた」に落とさない）。
+     */
+    const stillOwned = Number((await client.query(
+      'select count(*)::int as n from horses where owner_id = $1', [id],
+    )).rows[0].n);
+    if (stillOwned > 0) {
+      strayHorses += stillOwned;
+      console.log(`  🔴 ★${id} が馬を ${stillOwned} 頭 持ったままです — ★元の厩舎が分かりません。`);
+      console.log('     ★「いちばん若い厩舎」に入れると STABLE-1-SKEW を作り直します。★手で決めてください。');
+      /**
+       * ⚠️ ★**口座は消しません。** ★`horses.owner_id` が `users` を指しているので、
+       *   ★馬を持ったまま口座を消すと外部キーに当たります。
+       *   ★そして ★**消してしまうと、★どの馬が誰のものだったかも消えます。**
+       *   → ★**残したまま報告します。** ★人が決めるための材料をここで壊さない。
+       */
+      continue;
+    }
     // ★② 台帳 → ③ 口座（★口座を消さないと ④ が FK で拒まれる）
     await client.query('delete from ep_ledger where user_id = $1', [id]);
     await client.query('delete from pp_ledger where user_id = $1', [id]);
@@ -546,6 +576,10 @@ try {
     );
     const r = rest.rows[0];
     console.log(`  残っている口座 ${r.accounts} 行 ／ 孤児の馬 ${r.orphans} 頭（★どちらも 0 が期待どおり）`);
+    // 🔴 ★**数えただけで終わらせない**（★**TL-1**）。★合否に入れる。
+    rec('片付け', '★検証用の馬を 1 頭も残さない（★元の厩舎へ戻す）',
+      strayHorses === 0 && Number(r.orphans) === 0 ? 'ok' : 'ng',
+      `元の厩舎が分からないままの馬 ${strayHorses} 頭 ／ 孤児 ${r.orphans} 頭`);
   }
   await client.end();
 }

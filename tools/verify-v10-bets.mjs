@@ -55,12 +55,28 @@ const hash = {
 const n = (v) => (v === null || v === undefined ? 0 : Number(v));
 const jp = (v) => Math.round(v).toLocaleString();
 
+/**
+ * ★片付け。★**消した後に、★残っていないことを数えて返します**（★**TL-1**・2026-09-19）。
+ *
+ * ⚠️ ★以前は ★**呼ぶだけ**で、★残っていても誰も気づきませんでした（★`pending`）。
+ *   ★「`delete` を呼んだ」は「消えた」ではありません — ★外部キーや権限で黙って 0 行のこともあります。
+ * @returns {Promise<Record<string, number>>} ★表ごとの**残り**行数（★0 が並ぶのが正しい）
+ */
 const clean = async () => {
   for (const t of ['pp_ledger', 'ep_ledger', 'bets']) {
     await c.query(`delete from ${t} where user_id = $1`, [UID]);
   }
   await c.query('delete from users where id = $1', [UID]);
   await c.query('delete from auth.users where id = $1', [UID]);
+
+  /** 🔴 ★**消した先を、★同じ関数の中で数える**（★別の場所に置くと、★片方だけ直される） */
+  const left = {};
+  for (const t of ['pp_ledger', 'ep_ledger', 'bets']) {
+    left[t] = n((await c.query(`select count(*)::int as n from ${t} where user_id = $1`, [UID])).rows[0].n);
+  }
+  left['users'] = n((await c.query('select count(*)::int as n from users where id = $1', [UID])).rows[0].n);
+  left['auth.users'] = n((await c.query('select count(*)::int as n from auth.users where id = $1', [UID])).rows[0].n);
+  return left;
 };
 
 const fails = [];
@@ -158,10 +174,18 @@ console.log('    win で約287万レース要ります（1本約100秒＝約9年
 console.log('  → **オッズ表が正しく（verify-v10-db の p×odds）、払戻が表どおりなら（上の④）、');
 console.log('     実現率は定義から従います。** そちらが本番経路の実質的な保証です。');
 
-await clean();
+/**
+ * 🔴 ★**片付いたことを数える**（★**TL-1** の `countedBy`・2026-09-19）。
+ *   ⚠️ ★以前はここが `await clean();` の 1 行で、★**残っていても緑のまま**でした。
+ */
+const left = await clean();
+const leftTotal = Object.values(left).reduce((a, b) => a + b, 0);
+check(leftTotal === 0, '⑦ 検証用の行が 1 つも残っていない',
+  Object.entries(left).map(([t, v]) => `${t} ${v}`).join(' / '));
+
 await c.end();
 console.log('');
 console.log(fails.length === 0
-  ? `★V-10（実際の馬券・本番経路）: PASS — 6項目すべて成立（${placed}枚）`
+  ? `★V-10（実際の馬券・本番経路）: PASS — 7項目すべて成立（${placed}枚）`
   : `★V-10（実際の馬券・本番経路）: FAIL — ${fails.join(' / ')}`);
 process.exit(fails.length === 0 ? 0 : 1);

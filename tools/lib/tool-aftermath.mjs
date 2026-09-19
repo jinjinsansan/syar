@@ -64,7 +64,7 @@ export const TOOL_AFTERMATH = {
   'verify-v19-db.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: user_identities を消す。数えていない' },
   'probe-auth-identities.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'probe-signup-domain.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
-  'verify-v19-email.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: users / ep_ledger / pp_ledger を消す。数えていない' },
+  'verify-v19-email.mjs': { mode: 'restores', why: '🔴 ★**2026-09-19: `STABLE-1-SKEW` と同じ誤りが 3 か所 在った** — ★`npc_stable_id = (select id from npc_stables order by id limit 1)`（★「いちばん若い厩舎」＝ 実質 **厩舎 1**）で馬を返していた。⚠️ ★副問い合わせに化けていたため、★`npc_stable_id\\s*=\\s*1` の走査から**漏れていた**（★網が狭すぎた）。⚠️ ★ただし規模は小さい: ★候補は `order by h.id limit 1` で**毎回 同じ馬**なので、★`verify-prize` のように増え続けない（★`verify-g6` と同型で 1〜2 頭で飽和）。✅ ★直した: ★候補を引くときに `npc_stable_id` も一緒に読み、★**元の厩舎へ**返す（2 か所）。★片付けの総ざらいの 1 か所は ★**返すのをやめ、残っていたら数えて不合格**にした（★元の厩舎を知らない場所で値を決めない）。⚠️ ★口座も消さない（★`horses.owner_id` の FK に当たるうえ、★**消すと誰のものだったかも消える**）。✅ ★TL-1: ★`rec(\'片付け\', …)` で合否に入れた。⚠️ 🔴 ★**実 DB では確かめていない**', countedBy: "rec('片付け', '★検証用の馬を 1 頭も残さない（★元の厩舎へ戻す）'," },
   'cleanup-probe-user.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'age-horses.mjs': {
     mode: 'consumes',
@@ -92,7 +92,7 @@ export const TOOL_AFTERMATH = {
     notRestored: '★集団全体の育成週（★最大 8 週 × 4 バッチ ＝ 32 週）。★行は戻りますが、★育った能力は戻りません',
     countedBy: 'leftovers.length === 0',
   },
-  'verify-v10-bets.mjs': { mode: 'pending', why: '★片付けるが、★片付いたことを数えていない。★消すもの: users / auth.users を消す。数えていない' },
+  'verify-v10-bets.mjs': { mode: 'restores', why: '✅ ★**2026-09-19（TL-1）**: ★`clean()` が消した後に ★**残り行数を表ごとに数えて返す**ようにし、★⑦ で合否に入れた（`pp_ledger` / `ep_ledger` / `bets` / `users` / `auth.users`）。★旧は `await clean();` の 1 行で、★**残っていても緑のまま**だった。⚠️ ★控えは要らない（★固定の `UID` で引く。★`randomUUID()` は賭けの冪等鍵で、★片付けには使わない）。⚠️ 🔴 ★**実 DB では確かめていない**', countedBy: "check(leftTotal === 0, '⑦ 検証用の行が 1 つも残っていない'," },
   'seed-stables.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'seed-world.mjs': {
     mode: 'consumes',
