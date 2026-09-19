@@ -45,24 +45,59 @@ export const TOOL_AFTERMATH = {
   'diag-insert.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
   'seed-races.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'settle-races.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
-  'verify-training-week.mjs': { mode: 'restores', why: '片付けたことを数えている' },
-  'verify-entrant-freeze.mjs': { mode: 'restores', why: '片付けたことを数えている' },
+  'verify-training-week.mjs': {
+    mode: 'consumes',
+    why: '🔴 ★**staging の現役馬全頭の `last_processed_week` を WEEKS 週ぶん巻き戻し、戻しません**。'
+      + '★その後週送りを流すので ★**同じ週を二度 育てる**ことになり、'
+      + '★道具自身が ★**「能力は戻しません（戻す手段がありません）」**と書いています（:83）。'
+      + '⚠️ ★**消費するのは「行」ではなく ★能力の分布そのもの**です — '
+      + '★較正（V-4 など）は staging の馬を書き出して測るので、'
+      + '🔴 ★**この道具を流すと、後の較正の母集団が変わります**。'
+      + '🔴 ⚠️ ★2026-09-19 まで `restores` と名乗っていました — ★検査の語の一覧に '
+      + '★**「巻き戻」が入っていた**からです。★しかしこの「巻き戻し」は '
+      + '★**自分の書き込みを戻す**意味ではなく、★**馬の時計を巻き戻す**意味でした'
+      + '（★**緑が別の理由で出ていた** — R-29）',
+  },
+  'verify-entrant-freeze.mjs': { mode: 'restores', why: '片付けたことを数えている', countedBy: 'notRestored.length === 0' },
   'verify-unfrozen-cancel.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
-  'verify-unlock-daily.mjs': { mode: 'restores', why: '片付けたことを数えている' },
+  'verify-unlock-daily.mjs': { mode: 'restores', why: '片付けたことを数えている', countedBy: 'restored.n === direct.horses' },
   'verify-v19-db.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
   'probe-auth-identities.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'probe-signup-domain.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'verify-v19-email.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
   'cleanup-probe-user.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
-  'age-horses.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
-  'verify-v11-synthetic.mjs': { mode: 'restores', why: '片付けたことを数えている' },
+  'age-horses.mjs': {
+    mode: 'consumes',
+    why: '🔴🔴 ★**現役馬 全頭の `birth_week` と `last_processed_week` を ★単一の値に書き換え、'
+      + '★追いつくまで `advanceTrainingWeeks` を繰り返します**（`:70-72`・`:82-`）。★**戻せません。**'
+      + '★消費するもの: ★**年齢のばらつきそのもの**（★全頭が同じ生年になる）と ★**能力の分布**。'
+      + '🔴 ★**staging の現役 7,333 頭が全頭 `birth_week = -160`** なのは、★**この道具の跡と思われます**'
+      + '（★`birthWeek = closedWeek - TARGET_AGE`、TARGET_AGE の既定 182 なら closedWeek = 22。'
+      + '★いまの週は 253 なので ★約 231 週 ＝ 38.5 日 前 — ★世界の種まき（2026-08-10）とほぼ一致）。'
+      + '⚠️ ★**推定です**（★実行記録は残っていません）。'
+      + '→ ★**`POOL-DRAIN` の「全頭同じ生年」と `SEED-LOCKSTEP` の「位相が揃っている」は、'
+      + '★**製品の欠陥ではなく道具の跡の可能性**があります（★供給が無いことは別に真）',
+  },
+  'verify-v11-synthetic.mjs': {
+    mode: 'consumes',
+    why: '🔴 ★**集団全体の週送りを走らせます**（`:243` で `advanceTrainingWeeks(c, ...)`）。'
+      + '✔ ★実測（2026-09-19）: ★**延べ 64,000 頭・EP 消費 28,800**。'
+      + '★消費するのは ★**能力の分布そのもの**で、★`clean()` は行を消すだけで ★**育った能力は戻せません**。'
+      + '🔴 ★**較正の母集団（`pool-D-active-3000.json`）は staging から書き出したもの**なので、'
+      + '★この道具を流すと ★**次に書き出した集団が別物になります**。'
+      + '✅ ★自分が作った行（レース・馬券・台帳・口座・所属厩舎）は `clean()` が戻し、'
+      + '★戻ったことを ⑧ で数えます。⚠️ ★**それは行だけ**です。'
+      + '🔴 ⚠️ ★2026-09-19、★私はこれを ★**`restores` に分類しかけました** — ★行の残存だけを数えて。'
+      + '★**行が 0 でも、集団は 8 週 進んでいます**（★緑が別の理由で出る形を、★私が新しく作りかけた）',
+    countedBy: 'leftovers.length === 0',
+  },
   'verify-v10-bets.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
   'seed-stables.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'seed-world.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
   'synthetic-bettor.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
-  'verify-a2.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
+  'verify-a2.mjs': { mode: 'restores', why: '自前の照合：作った番号だけを消し、★**残存 0 件とレース総数が開始時と同じ**でなければ exit 1（:135）。⚠️ 2026-09-19 まで pending としていましたが ★**分類の誤り**でした', countedBy: 'left !== 0 || after !== before' },
   'verify-b1.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
-  'verify-g6.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
+  'verify-g6.mjs': { mode: 'restores', why: '自前の照合：台帳・口座・所有馬の残行と ★**所属厩舎が元の値に戻ったか**を数え、違えば fails に積む。🔴 2026-09-19 に直した：以前は `npc_stable_id = 1` と ★**決め打ち**しており、★元が 1 でない馬を取ったら ★**黙って 1 番厩舎へ移していた**（★staging の厩舎は 1..12+ で各 170〜280 頭）', countedBy: 'if (!cleanOk) fails.push' },
   'verify-a4.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
   'verify-a5.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
   'verify-a6.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
@@ -72,6 +107,6 @@ export const TOOL_AFTERMATH = {
   'verify-economy.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
   'verify-exchange.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
   'verify-flow.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
-  'verify-overdue.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
+  'verify-overdue.mjs': { mode: 'restores', why: '自前の照合：`残存 ${left} 件` を数え、★`left !== 0` なら exit 1（:101）。⚠️ 2026-09-19 まで pending としていましたが ★**分類の誤り**でした', countedBy: 'left !== 0' },
   'verify-prize.mjs': { mode: 'pending', why: '片付けるが、片付いたことを数えていない' },
 };

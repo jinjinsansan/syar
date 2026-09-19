@@ -1,4 +1,17 @@
 /**
+ * 🔴🔴 ★**この道具は、staging の集団全体を ★週送りで進めます（戻せません）**
+ *
+ * ★流す前に読むこと。★これは ★**`consumes`**（TL-1）です。
+ * ★消費するのは行ではなく ★**能力の分布そのもの**です。
+ *
+ * 🔴 ★**較正（V-4 / V-5 / V-6）は staging の馬を書き出して測ります**
+ *    （`out/al11/pool-*.json`）。→ ★**これを流すと、★次に書き出した集団は別物になります。**
+ *
+ * ⚠️ ★**流すなら、★流したことを記録に残してください** —
+ *    ★2026-09-19、★**「母集団が動いていないか」を調べながら、その母集団を自分で動かしました。**
+ *    ★DB からは「流したか」を後から判別できません。
+ */
+/**
  * ★V-11 の② を「合成集団」で成立させる（P3 クローズ条件4・レビュー側裁定）
  *
  * 【裁定】
@@ -114,27 +127,6 @@ const dropTestRace = async () => {
   await c.query(`delete from races where cycle_index >= $1`, [TEST_CYCLE_BASE]);
 };
 await dropTestRace();
-await c.query(
-  `insert into races (cycle_index, name, class_rank, grade, surface, distance, track_condition,
-                      course_id, scheduled_at, seed_commit, server_seed, purse, status, course_frozen,
-                      min_wins, max_wins, entry_fee_ep, weight_kg, entry_deadline_at, game_week)
-   select $1, '★V-11 検査用', class_rank, grade, surface, distance, track_condition,
-          course_id, now() + interval '30 minutes', seed_commit, server_seed, purse, 'scheduled', course_frozen,
-          min_wins, max_wins, entry_fee_ep, weight_kg, now() + interval '5 minutes', game_week
-     from races where id = $2`, [TEST_CYCLE, source.id]);
-await c.query(
-  `insert into race_entries (race_id, horse_id, gate, weight, strategy, popularity, entrant_snapshot)
-   select (select id from races where cycle_index = $1), horse_id, gate, weight, strategy, popularity, entrant_snapshot
-     from race_entries where race_id = $2 and scratched_at is null`, [TEST_CYCLE, source.id]);
-await c.query(
-  `insert into race_odds (race_id, bet_type, selection, probability, odds, capped)
-   select (select id from races where cycle_index = $1), bet_type, selection, probability, odds, capped
-     from race_odds where race_id = $2`, [TEST_CYCLE, source.id]);
-const race = requireRow(
-  (await c.query(`select id, cycle_index, class_rank, grade from races where cycle_index = $1`, [TEST_CYCLE])).rows[0],
-  '写したレース', '★写しに失敗しました',
-);
-console.log(`  ★検査用のレースを作りました: cycle=${race.cycle_index}（写し元 cycle=${source.cycle_index}）`);
 
 // ── 後片付け（★先に流して、再実行できるようにする）──────────
 const clean = async () => {
@@ -166,6 +158,36 @@ const clean = async () => {
 await clean();
 
 /**
+ * 🔴 ★**写しは `clean()` のあとに作ります**（★直し・2026-09-19）。
+ *
+ * ⚠️ ★以前は ★**写しを作ったあとで `clean()` を呼んでいました**。
+ *    ★`clean()` は `dropTestRace()` を呼ぶので、★**作ったばかりのレースをその場で消していました。**
+ *    → 🔴 ★`race` の行は手元に残るので、★**「写しに失敗しました」とは出ず**、
+ *      ★先の「出走 0 頭では足りません」で落ちていました（★原因から遠い場所で落ちる形）。
+ */
+await c.query(
+  `insert into races (cycle_index, name, class_rank, grade, surface, distance, track_condition,
+                      course_id, scheduled_at, seed_commit, server_seed, purse, status, course_frozen,
+                      min_wins, max_wins, entry_fee_ep, weight_kg, entry_deadline_at, game_week)
+   select $1, '★V-11 検査用', class_rank, grade, surface, distance, track_condition,
+          course_id, now() + interval '30 minutes', seed_commit, server_seed, purse, 'scheduled', course_frozen,
+          min_wins, max_wins, entry_fee_ep, weight_kg, now() + interval '5 minutes', game_week
+     from races where id = $2`, [TEST_CYCLE, source.id]);
+await c.query(
+  `insert into race_entries (race_id, horse_id, gate, weight, strategy, popularity, entrant_snapshot)
+   select (select id from races where cycle_index = $1), horse_id, gate, weight, strategy, popularity, entrant_snapshot
+     from race_entries where race_id = $2 and scratched_at is null`, [TEST_CYCLE, source.id]);
+await c.query(
+  `insert into race_odds (race_id, bet_type, selection, probability, odds, capped)
+   select (select id from races where cycle_index = $1), bet_type, selection, probability, odds, capped
+     from race_odds where race_id = $2`, [TEST_CYCLE, source.id]);
+const race = requireRow(
+  (await c.query(`select id, cycle_index, class_rank, grade from races where cycle_index = $1`, [TEST_CYCLE])).rows[0],
+  '写したレース', '★写しに失敗しました',
+);
+console.log(`  ★検査用のレースを作りました: cycle=${race.cycle_index}（写し元 cycle=${source.cycle_index}）`);
+
+/**
  * ★途中で落ちても後片付けします（R-18）。
  *   前に verify-economy などで「作った後に落ちて行が残る」を踏んでいます。
  */
@@ -181,6 +203,14 @@ const bail = async (why) => {
     process.exit(1);
   }
 };
+/**
+ * 🔴 ★**信号も捕まえます**（★2026-09-19・★**MD-5**）。
+ *   ⚠️ ★以前は例外だけでした。★`timeout` の SIGTERM で殺され、★**`clean()` が走らず**
+ *   ★合成口座 3 つ・検査用レース・★**所有された馬 9 頭**が残りました。
+ *   🔴 ★そして `STABLE_OF`（控え）は **メモリ** なので、★**9 頭の元の厩舎は永久に失われました**。
+ *   → ★信号を捕まえるのは ★**応急処置**です。★本筋は ★**控えをメモリに置かない**こと（★未実施）。
+ */
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => void bail(sig));
 process.on('uncaughtException', (e) => void bail(`例外(${e.message})`));
 process.on('unhandledRejection', (e) => void bail(`例外(${(e && e.message) || e})`));
 
@@ -362,6 +392,34 @@ console.log('    実集団（監視側）で②が不成立なのは「利用者
 
 // ★判定に使った数字を取り終えてから片付ける（先に消すと測れない）
 await clean();
+
+/**
+ * 🔴 ★**片付いたことを数える**（★**TL-1**・2026-09-19）。
+ *
+ * ⚠️ ★これまでは `clean()` を ** 呼ぶだけ**でした。
+ *    🔴 ★**呼んだこと ≠ 片付いたこと**です — ★途中で落ちても、
+ *    ★外部キーで削除が拒まれても、★**緑のままでした**。
+ */
+const leftovers = [];
+for (const [t, sql, params] of [
+  ['races(検査用)', `select count(*)::int n from races where cycle_index >= $1`, [TEST_CYCLE_BASE]],
+  ['bets', `select count(*)::int n from bets where user_id = any($1)`, [UIDS]],
+  ['ep_ledger', `select count(*)::int n from ep_ledger where user_id = any($1)`, [UIDS]],
+  ['pp_ledger', `select count(*)::int n from pp_ledger where user_id = any($1)`, [UIDS]],
+  ['users', `select count(*)::int n from users where id = any($1)`, [UIDS]],
+  ['所有馬', `select count(*)::int n from horses where owner_id = any($1)`, [UIDS]],
+]) {
+  const left = n((await c.query(sql, params)).rows[0].n);
+  if (left !== 0) leftovers.push(`${t}=${left}`);
+}
+/** ★厩舎を控えた馬が、★**控えどおりの厩舎に戻ったか** */
+for (const [hid, sid] of STABLE_OF) {
+  const row = (await c.query('select npc_stable_id from horses where id = $1', [hid])).rows[0];
+  if (String(row?.npc_stable_id) !== String(sid)) leftovers.push(`厩舎(${String(hid).slice(0, 8)})=${row?.npc_stable_id}≠${sid}`);
+}
+check(leftovers.length === 0, '⑧ ★片付いた（★残っていない・TL-1）',
+  leftovers.length === 0 ? '残存 0' : `★残存: ${leftovers.join(' / ')}`);
+
 void madePrize;
 await c.end();
 console.log('');

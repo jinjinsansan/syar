@@ -60,11 +60,24 @@ await c.query(
 );
 
 // ★NPC 馬を1頭だけプレイヤー所有にする（専用の馬を作らない・§10.5）
+/**
+ * 🔴 ★**元の所属厩舎を先に読む**（★**TL-1**・2026-09-19）。
+ *
+ * ⚠️ ★`update` の `returning` は ** 更新後**の行を返すので、★**null しか取れません**。
+ * 🔴 ★以前は後片付けで `npc_stable_id = 1` と ** 決め打ち**していました —
+ *    ★元が 1 でなければ、★**この道具を流すたびに馬が 1 番厢舎へ黙って移っていました。**
+ */
+const before = (await c.query(
+  'select id, name, npc_stable_id from horses where npc_stable_id is not null order by id limit 1',
+)).rows[0];
+if (before === undefined) throw new Error('★NPC の馬が 1 頭もいません');
+const ORIGINAL_STABLE = before.npc_stable_id;
+
 const pickPlayer = await c.query(
   `update horses set owner_id = $1, npc_stable_id = null
-     where id = (select id from horses where npc_stable_id is not null order by id limit 1)
+     where id = $2
    returning id, name`,
-  [UID],
+  [UID, before.id],
 );
 const horse = pickPlayer.rows[0];
 const npcHorse = (await c.query(
@@ -187,12 +200,34 @@ check(negRaised !== null, '⑧b 負の額は拒否される（調教で EP が�
 // ── 後片付け ──────────────────────────────────────────
 console.log('');
 console.log('【後片付け】');
-await c.query('update horses set owner_id = null, npc_stable_id = 1 where owner_id = $1', [UID]);
+// 🔴 ★**元の厢舎に戻す**（★決め打ちの 1 にしない）
+await c.query(
+  'update horses set owner_id = null, npc_stable_id = $2 where owner_id = $1',
+  [UID, ORIGINAL_STABLE],
+);
 await c.query('delete from ep_ledger where user_id = $1', [UID]);
 await c.query('delete from users where id = $1', [UID]);
 await c.query('delete from auth.users where id = $1', [UID]);
-const left = await c.query('select count(*)::int n from ep_ledger where user_id = $1', [UID]);
-console.log(`  検証用の口座と台帳を削除しました（残 ${left.rows[0].n} 行）`);
+
+/**
+ * 🔴 ★**戻ったことを数える**（★**TL-1** の `restores`）。
+ *   ⚠️ ★以前は ** 残行数を印刷するだけ**で、★**失敗しても緑のまま**でした。
+ */
+const leftLedger = n((await c.query('select count(*)::int n from ep_ledger where user_id = $1', [UID])).rows[0].n);
+const leftUser = n((await c.query('select count(*)::int n from users where id = $1', [UID])).rows[0].n);
+const leftOwned = n((await c.query('select count(*)::int n from horses where owner_id = $1', [UID])).rows[0].n);
+const restored = (await c.query('select npc_stable_id from horses where id = $1', [horse.id])).rows[0];
+const stableOk = String(restored?.npc_stable_id) === String(ORIGINAL_STABLE);
+const cleanOk = leftLedger === 0 && leftUser === 0 && leftOwned === 0 && stableOk;
+console.log(
+  `  検証用の口座と台帳を削除しました`
+    + `（台帳 ${leftLedger} / 口座 ${leftUser} / 所有馬 ${leftOwned} 行）`,
+);
+console.log(
+  `  所属厩舎: ${ORIGINAL_STABLE} → ${restored?.npc_stable_id} `
+    + `${stableOk ? '✅ 戻った' : '🔴 戻っていない'}`,
+);
+if (!cleanOk) fails.push('後片付け（戻っていない）');
 
 console.log('');
 console.log(fails.length === 0

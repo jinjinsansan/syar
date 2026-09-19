@@ -58,9 +58,22 @@ describe('TL-1 状態を変える道具の後始末', () => {
     for (const [f, e] of Object.entries(TOOL_AFTERMATH)) {
       if (e.mode !== 'restores') continue;
       const src = readFileSync(path.join(ROOT, 'tools', f), 'utf8');
+      /**
+       * 🔴 ★**語の一覧で見ない**（★**R-29**: ★列挙は必ず漏れる）。
+       *
+       * ⚠️ ★2026-09-19、★この検査は `verify-a2.mjs` を ★**誤って落としました** —
+       *    ★あの道具は `left !== 0 || after !== before` で exit 1 していますが、
+       *    ★**語の一覧にその言い回しが無かった**だけでした。
+       * → ★**語を足すのではなく、★簿の側に ★`countedBy`（★引用）を持たせます**。
+       *    ★AU-7 と同じ形: ★**主張には引用を付ける**。★コードが変われば ★**引用が壊れて落ちます**。
+       */
       const counted = src.includes('beginSandbox')
-        || /巻き戻|restored|戻りました|片付いた|残っていない/.test(src);
-      expect(counted, `🔴 ${f}: restores と名乗っているのに、戻したことを数えていません`).toBe(true);
+        || (e.countedBy !== undefined && src.includes(e.countedBy));
+      expect(
+        counted,
+        `🔴 ${f}: restores と名乗っているのに、戻したことを数えた証拠がありません。`
+          + `★`+`sandboxTx を使うか、★簿の ` + `countedBy に ★**その行の写し**を書いてください`,
+      ).toBe(true);
     }
   });
 
@@ -87,7 +100,7 @@ describe('TL-1 状態を変える道具の後始末', () => {
      * ⚠️ 🔴 ★**この数を上げてはいけません。** ★上げるのは「直せなかった」ことの宣言です。
      */
     const pending = Object.entries(TOOL_AFTERMATH).filter(([, e]) => e.mode === 'pending');
-    const PENDING_RATCHET = 20;
+    const PENDING_RATCHET = 17;
     expect(pending.length, `🔴 ★pending が ${pending.length} 本（★ラチェットは ${PENDING_RATCHET}）。`
       + '★減らしたなら、この数も下げてください。★増やしたなら、戻してください')
       .toBe(PENDING_RATCHET);
@@ -107,7 +120,17 @@ describe('TL-1 状態を変える道具の後始末', () => {
     for (const [f, e] of Object.entries(TOOL_AFTERMATH)) {
       if (e.mode !== 'consumes') continue;
       const src = readFileSync(path.join(ROOT, 'tools', f), 'utf8');
-      if (/delete from|clean\s*\(|cleanup\s*\(/.test(src)) wrong.push(f);
+      /**
+       * ⚠️ ★**片付けているだけでは `pending` とは言えません**（★2026-09-19 に緩めました）。
+       *
+       * 🔴 ★`verify-v11-synthetic` は ★**自分が作った行を `clean()` で戻しながら**、
+       *    ★**集団全体の週送り（8 週）を消費**します。★**両方ありえます。**
+       * → ★片付けの形跡がある `consumes` には、★**「何が戻らないか」を簿に書かせます**。
+       * ⚠️ ★この語の一覧は ★**簿（自分で書く文）に対するもの**です —
+       *    ★任意の源に対する列挙ではないので、★R-29 の漏れ方とは別です。
+       */
+      const declaresLoss = /戻せません|戻りません|戻らない|永久に/.test(e.why);
+      if (/delete from|clean\s*\(|cleanup\s*\(/.test(src) && !declaresLoss) wrong.push(f);
     }
     expect(wrong, `★consumes と名乗っているのに片付けの形跡があります（★pending では？）: ${wrong.join(' / ')}`)
       .toEqual([]);

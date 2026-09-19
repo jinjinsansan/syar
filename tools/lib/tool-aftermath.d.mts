@@ -20,6 +20,14 @@ export interface Aftermath {
   readonly mode: AftermathMode;
   /** ★なぜその作法なのか（★`consumes` なら**何を消費するか**） */
   readonly why: string;
+  /**
+   * ★`restores` のうち ★**`sandboxTx` を使わないもの**に必須。
+   *
+   * ★**戻ったことを数えている行の写し**（★道具の源にそのまま含まれること）。
+   * 🔴 ★語の一覧で探す形は **R-29 で漏れました** — ★`verify-a2.mjs` を誤って落とした。
+   * → ★**主張に引用を付ける**（AU-7）。★コードが変われば引用が壊れ、★検査が落ちます。
+   */
+  readonly countedBy?: string;
 }
 
 /** ★`tools/` からの相対パス → 後始末の作法 */
