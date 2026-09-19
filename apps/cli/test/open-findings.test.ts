@@ -147,7 +147,12 @@ describe('NT-3 開いている指摘の登録簿', () => {
      *    ★それが「直った」の記録です（★`known-red` と違い、機械が判定できないため）。
      */
     const ids = new Set(OPEN_FINDINGS.map((e) => e.id));
-    for (const id of ['M-4', 'M-9', 'AUDIT-TLS', 'AUDIT-ZIP', 'AUDIT-CLAUDE-MD']) {
+    /**
+     * ⚠️ ★**`M-9` は 2026-09-19 に外しました**（★下の `settled` へ移動）。
+     *    ★この一覧から外すときは ★**`settled` に「どう片付けたか」を書くこと** —
+     *    ★**両方から消すと、★黙って落としたのと同じ**になります。
+     */
+    for (const id of ['M-4', 'AUDIT-TLS', 'AUDIT-ZIP', 'AUDIT-CLAUDE-MD']) {
       expect(ids.has(id), `★監査の ${id} が簿にありません`).toBe(true);
     }
   });
@@ -173,6 +178,19 @@ describe('NT-3 開いている指摘の登録簿', () => {
       'AUDIT-NEXT-CONFIG': '★`next.config.mjs` の註記を事実に（★禁じているのは「作ること」でなく「ロジックを置くこと」）',
       /** ★直した（★ルート直下だけ） */
       'AUDIT-WAV': '★`.gitignore` に `/*.wav`（★製品の音を巻き込まない）',
+      /**
+       * ★直した ＋ ★**測った**（★コードだけでなく、★効かないことまで確かめた）。
+       * ★`4cefcdc` で `CONDITION_MIN: 1 → 0`（★正典 §7.4 と `@star/training` と
+       * ★`growth.ts:131` の 3 つとも 0..5 だった。★外れていたのは race-engine だけ）。
+       * ★`6635e23` で 8 シード × 15,000 レースを測り、★前後の差 **−0.045pp ± 0.087（−0.52 SE）**。
+       */
+      'M-9': '★`CONDITION_MIN: 0` に（`4cefcdc`）＋ ★8 シードで測った（`6635e23`・差は −0.52 SE ＝ 0 と区別できない）',
+      /**
+       * ⚠️ ★**監査から来たものではありません**（★D-117 / DS-5 の便）。★ここに置くのは
+       * ★**簿から落としたものが、★黙って戻ってこないようにする**ためです。
+       */
+      'DS-5 ④': '★`9f7f36a`: ★確定の直前に `scratchRetiredBeforeStart`。★実 DB 15 件 全通・★検査 5 件。'
+        + '★残る限界（★発走から確定までの表示の遅れ）は ★正典 §10.4 の「承知している限界」へ',
     };
     for (const [id, how] of Object.entries(settled)) {
       expect(ids.has(id), `★${id} が簿に戻っています（★${how}）`).toBe(false);
