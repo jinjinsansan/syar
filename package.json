@@ -34,7 +34,8 @@
     "verify:v7": "tsx apps/cli/src/verify-v7.ts",
     "dev:web": "npm -w @star/web run dev",
     "bake:sprites": "tsx tools/bake-sprites.mjs",
-    "sync:ds": "node tools/sync-ds.mjs"
+    "sync:ds": "node tools/sync-ds.mjs",
+    "gate": "node tools/gate.mjs"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^1.0.6",

@@ -71,9 +71,19 @@ function fake(nowMs: number, alreadyAnnounced: readonly number[] = []): Fake {
     pendingSettlements: async () => [],
     settleRace: async () => {},
     overdueRaces: async () => [],
+    /**
+     * 🔴 ★**本物の述語を写します**（★2026-09-19）。
+     *   ★旧はここで無条件に `cancelled.push` していました。★本物は
+     *   ★`where ... status in ('scheduled','announced')` なので、★どちらでもない番号は **0 行**です。
+     *   ★無条件に成功を返す偽物だと、★**本物が 'scheduled' だけを見ていた欠陥を素通し**します
+     *   （★実際に素通ししました）。
+     */
     cancelRace: async (i) => {
+      const was = announcedSet.has(i) || done.has(i);
+      if (!was) return { refundedBets: 0, refundedEp: 0 };
       cancelled.push(i);
       announcedSet.delete(i);
+      done.delete(i);
       return { refundedBets: 0, refundedEp: 400 };
     },
   };

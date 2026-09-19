@@ -19,6 +19,8 @@
  */
 
 import type pg from 'pg';
+// ★取消と返金は 1 か所（★D-111 ③⑤・D-117 DS-7 と同じ関数・D-052）
+import { scratchAllEntries } from './scratch.js';
 
 export interface CancelResult {
   readonly cancelled: boolean;
@@ -37,11 +39,21 @@ export async function cancelRace(
 ): Promise<CancelResult> {
   await client.query('begin');
   try {
-    // ★確定済みのレースは中止にしない。結果の事後差し替えになる（§8.6）
-    const race = await client.query<{ id: string }>(
+    /**
+     * ★確定済みのレースは中止にしない。結果の事後差し替えになる（§8.6）
+     *
+     * 🔴 ★**`announced` も受けます**（★2026-09-19・**D-117 DS-7**）。
+     *   ★旧は `status = 'scheduled'` だけでした。★D-117 で「★組成が間に合わなかったレース」
+     *   ★（`announced` のまま発売開始を過ぎたもの）を中止する経路ができたのに、
+     *   ★**この 1 行のせいで黙って 0 行を返して**いました。
+     *   → ★中止にならず `announced` のまま残り、★`announcedRaces()` が**毎周それを返し**、
+     *     ★**毎周「中止しました」と通報しながら、実際には何も起きない**ところでした。
+     * ⚠️ ★`settled` は入れません（★結果の事後差し替え）。
+     */
+    const race = await client.query<{ id: string; was: string }>(
       `update races set status = 'cancelled'
-        where cycle_index = $1 and status = 'scheduled'
-        returning id`,
+        where cycle_index = $1 and status in ('scheduled', 'announced')
+        returning id, status as was`,
       [cycleIndex],
     );
     if (race.rowCount === 0) {
@@ -74,8 +86,26 @@ export async function cancelRace(
       refundedEp += Number(b.amount);
     }
 
+    /**
+     * 🔴 ★**登録料と騎手の料金も返します**（★2026-09-19・**D-117 DS-7**・D-111 ⑤）。
+     *
+     *   ★馬券は `place_bet` が `scheduled` しか受けないので、★組成前のレースには 1 枚もありません。
+     *   ★**取られているのは登録料です。** ★上のループは馬券しか見ていないので、
+     *   ★**中止にしても登録料が返らない**ところでした。
+     * ⚠️ ★`scratchAllEntries` は ★**取消でない行だけ**を対象にし、★`dedupe_key` で二度払いを防ぎます。
+     *    ★組成済みのレース（NPC が入っている）でも、★所有者のいない馬には返金しません。
+     */
+    const scratched = await scratchAllEntries(
+      client, raceId,
+      `レースが開催中止になりました（cycle=${cycleIndex}・§9.1・D-037/D-117 DS-7）`,
+    );
+
     await client.query('commit');
-    return { cancelled: true, refundedBets: bets.rowCount ?? 0, refundedEp };
+    return {
+      cancelled: true,
+      refundedBets: bets.rowCount ?? 0,
+      refundedEp: refundedEp + scratched.refundedEp,
+    };
   } catch (e) {
     await client.query('rollback');
     throw e;
