@@ -200,6 +200,12 @@ describe('NT-3 開いている指摘の登録簿', () => {
        */
       'DS-5 ④': '★`9f7f36a`: ★確定の直前に `scratchRetiredBeforeStart`。★実 DB 15 件 全通・★検査 5 件。'
         + '★残る限界（★発走から確定までの表示の遅れ）は ★正典 §10.4 の「承知している限界」へ',
+      'TOOL-SNAPSHOT-IN-MEMORY': '★控えをプロセスの外へ出した（`tools/lib/snapshot-file.mjs`）。'
+        + '★要ると分かった 3 本（`verify-v11-synthetic` / `verify-g6` / `verify-prize` / `verify-a7`）に入れ、'
+        + '★`verify-g6` は **厩舎 36 の実 DB で通りました**（★決め打ちでないことを区別できる形で）。'
+        + '🔴 ★**残りは 2 つに切り出しました**（★2026-09-20・レビュー側の裁定）: '
+        + '★`SNAPSHOT-PRIZE-UNVERIFIED`（★前提が無い）と `VERIFY-A7-REDESIGN`（★流さないと決めた）。'
+        + '⚠️ ★**期限を延ばして逃げず、★状態の違うものを分けました**',
       'CLEANUP-NO-RECORD': '★`tools/*.mjs` の `delete from` を全走査し、★**自分が作った行以外を消しうる 7 本**を確定。'
         + '★`cleanup-ds7-leak` / `verify-unlock-daily` / `verify-flow` は ★**消す前の内容を出す**ようにした。'
         + '★`verify-sy1-clone` / `verify-v11-synthetic`（`cycle_index >= 900000` の試験専用領域）と '
