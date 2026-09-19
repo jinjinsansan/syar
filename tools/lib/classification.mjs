@@ -935,6 +935,8 @@ export const COMPONENT = [
   { file: 'lib/env.mjs', why: '★接続先の選択を 1 か所にまとめた部品。★`--env` 必須の規則はここが持つ' },
   { file: 'lib/exposure-registry.mjs', why: '★公開の登録簿（★どの表・RPC を誰に開けるか）。★V-20 が読む表で、道具ではない' },
   { file: 'lib/provenance.mjs', why: '★生成物に「何から作ったか」を書き残す部品（★RD-4 ③・2026-09-19）。★道具が hash を埋め、★検査がいまのソースと突き合わせる。★道具ではない' },
+  { file: 'lib/tool-aftermath.d.mts', why: '★`lib/tool-aftermath.mjs` の型（★TL-1・2026-09-19）。★`classification.d.mts` と同じ作法で、★道具ではなく部品。★中身（一覧）は `.mjs` が持つ（D-052）' },
+  { file: 'lib/tool-aftermath.mjs', why: '★状態を変える道具の「後始末の作法」の簿（★TL-1・2026-09-19）。★`restores`／`consumes`／`pending` の 3 値で、★`tool-aftermath.test.ts` が全数分類を要求する。★道具ではない表' },
   { file: 'lib/open-findings.d.mts', why: '★`lib/open-findings.mjs` の型（★NT-3・2026-09-19）。★`classification.d.mts` / `guard.d.mts` と同じ作法で、★道具ではなく部品。★中身（一覧）は `.mjs` が持つ（D-052）' },
   { file: 'lib/open-findings.mjs', why: '★まだ直っていない指摘の登録簿（★**NT-3**・2026-09-19）。★`verify-open-findings.mjs` が読む表で、道具ではない。🔴 ★`REPORT_AUDIT_20260914.md` の 22 項目のうち 12 件が 5 日 そのままだったので、★**期限を持たせて門で落とす**形にした。★報告書は期限を持たない' },
   { file: 'lib/known-red.mjs', why: '★いま赤いと分かっている検査の登録簿（★RD-2・2026-09-19）。★verify-known-red.mjs が読む表で、道具ではない' },
