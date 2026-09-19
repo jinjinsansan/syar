@@ -70,7 +70,55 @@ export const RESTORE_G6 = {
   },
 };
 
+/**
+ * ★`verify-prize.mjs` の控え。
+ *
+ * 【🔴 ★これが `STABLE-1-SKEW` の正体でした（★2026-09-19・実測）】
+ *   ★この道具は ★**出走表の「最終枠を除く全頭」**（★1 回 17 頭 前後）をプレイヤー所有にし、
+ *   ★後片付けで ★**`npc_stable_id = 1` と決め打ち**して返していました（★`535db6e` 以来）。
+ *   → ★**1 回 流すたびに、★17 頭が いろいろな厩舎から 厩舎 1 へ 一方向に移ります。**
+ *
+ *   ✔ ★staging の跡（★読むだけの `diag-stable1-skew.mjs` で実測）:
+ *     ★**6 本のレースで「厩舎 1 の頭数 ＝ 出走頭数 − 1」ちょうど**
+ *     （17/18・12/13・10/11・9/10・9/10・7/8。★すべて `settled`）。
+ *     ★**他の 39 厩舎では 0 本**。★偶然では出ません。
+ *     ★厩舎 1 の余り 92 頭 のうち ★**66 頭（72%）**がこの 6 本で説明できます。
+ *
+ * 【🔴 ★`verify-g6` より悪い形でした】
+ *   ★`verify-g6` は ★**元の値をメモリに持っていました**（★殺されると失う）。
+ *   ★こちらは ★**元の値を読んでさえいません** — ★**いつ流しても失われます。**
+ *   → ★だから ★「殺されなければ大丈夫」ではなく、★**毎回 壊していました。**
+ */
+export const RESTORE_PRIZE = {
+  snapshot: 'verify-prize',
+  tool: 'verify-prize.mjs',
+  /**
+   * @param {{ query: (sql: string, params: readonly unknown[]) => Promise<{ rowCount: number | null }> }} client
+   * @param {{ horses: readonly (readonly [string, number | string])[], uid: string }} data
+   *   ★`horses` は `[馬 id, 元の npc_stable_id]` の組。★**厩舎は馬ごとに違います**
+   * @returns {Promise<{ rows: number }>}
+   */
+  async restore(client, data) {
+    /**
+     * ⚠️ ★**1 頭ずつではなく 1 文で**当てます（★`unnest` の組）。
+     *   ★1 頭ずつだと、★途中で死んだときに ★**一部だけ戻った状態**が残ります。
+     * ⚠️ ★`owner_id` を外すのと `npc_stable_id` を戻すのは同じ 1 文（★`RESTORE_G6` と同じ理由）。
+     */
+    if (data.horses.length === 0) return { rows: 0 };
+    const r = await client.query(
+      `update horses h
+          set owner_id = null, npc_stable_id = t.stable
+         from unnest($1::uuid[], $2::int[]) as t(id, stable)
+        where h.id = t.id
+          and (h.owner_id is not null or h.npc_stable_id is distinct from t.stable)`,
+      [data.horses.map((x) => x[0]), data.horses.map((x) => Number(x[1]))],
+    );
+    return { rows: r.rowCount ?? 0 };
+  },
+};
+
 /** ★道具の名前 → ★戻し方。★**1 本ずつ**足します（★まとめて書かない） */
 export const TOOL_RESTORES = Object.freeze({
   'verify-g6.mjs': RESTORE_G6,
+  'verify-prize.mjs': RESTORE_PRIZE,
 });

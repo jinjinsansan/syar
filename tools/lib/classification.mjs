@@ -385,6 +385,10 @@ export const READONLY = [
    */
   'verify-open-findings.mjs',
   'a3-converge.mjs',
+  // 🔴 ★読むだけ（`select` のみ）。★`STABLE-1-SKEW` の原因を、★跡を消さずに探す（2026-09-19）。
+  //    ★簿に「直さないこと — 原因が分かる前に動かすと跡が消えます」と在るので、1 行も書かない。
+  //    ✔ ★これで原因が出ました: ★`verify-prize.mjs` の `npc_stable_id = 1` の決め打ち。
+  'diag-stable1-skew.mjs',
   // ★読むだけ。ゲージ（余力）が正しい向きを向いているかを見る
   'diag-gauge.mjs',
   // ★読むだけ。映像に抜き差し（追い抜き・先頭交代）があるかを数える

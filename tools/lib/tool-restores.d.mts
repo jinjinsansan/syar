@@ -32,5 +32,12 @@ export declare const RESTORE_G6: ToolRestore<{
   readonly uid: string;
 }>;
 
+/** ★`verify-prize.mjs`: ★出走表の「最終枠を除く全頭」を、★**それぞれ元の厩舎へ**戻す */
+export declare const RESTORE_PRIZE: ToolRestore<{
+  /** ★`[馬 id, 元の npc_stable_id]` の組。★厩舎は馬ごとに違う */
+  readonly horses: readonly (readonly [string, number | string])[];
+  readonly uid: string;
+}>;
+
 /** ★道具の名前 → ★戻し方 */
 export declare const TOOL_RESTORES: Readonly<Record<string, ToolRestore<never>>>;
