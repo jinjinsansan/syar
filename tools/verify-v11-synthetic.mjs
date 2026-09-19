@@ -65,18 +65,96 @@ const check = (ok, label, detail) => {
 console.log('# V-11 の② を合成集団で成立させる（P3 のゲート）');
 console.log('');
 
-// ── 前提: これから発走するレースが要る ──────────────────────
-const race = requireRow(
+/**
+ * ★**自分のレースを 1 本 作ります**（★2026-09-19・**SY-1**）。
+ *
+ * 【🔴 ★旧は「発売中のレースを 1 本 取って確定させる」形でした】
+ *   ```
+ *   where status = 'scheduled' and scheduled_at > now() order by cycle_index limit 1
+ *   …
+ *   await store.settleRace(race.cycle_index)     ← ★自分で commit する
+ *   ```
+ *   ★`settleRace` は自分で `begin`/`commit` するので、★**確定は残ります**。
+ *   ★`clean()` は自分が作った `users`/`bets`/台帳しか消さないので、★**レースは戻りません**。
+ *   → ★★**流すたびに、発売中のレースを 1 本 永久に消費していました。**
+ *   ✔ ★実測（2026-09-19）: ★**発走予定より前に確定したレースが 5 件**あります（★この形の印）。
+ *
+ * 【★直し方 — ★`clean()` が「自分が作ったものだけ消す」なら、★使うのも自分が作ったものにする】
+ *   ★既に確定したレースの ★**出走表とオッズを、新しいレースに写します**。
+ *   ★`entrant_snapshot` も `course_frozen` も `server_seed` も写すので、
+ *   ★`settleRace` は本物と同じ経路で動きます。★`cycle_index` は `TEST_CYCLE_BASE` 以上にします。
+ * ⚠️ ★**本物のレースには一切 触りません**（★読むだけ）。
+ */
+const TEST_CYCLE_BASE = 900000;
+/**
+ * ★**`owner_id` を付ける前の厩舎を控える**（★**SY-2**）。★`clean()` がここから戻します。
+ * ⚠️ ★控えずに `owner_id` を付けると、★`horses_owner_xor_npc` が `npc_stable_id` を消し、★**戻せません**。
+ */
+const STABLE_OF = new Map();
+const source = requireRow(
   (await c.query(
-    `select id, cycle_index, class_rank, grade from races
-      where status = 'scheduled' and scheduled_at > now() order by cycle_index limit 1`,
+    `select r.id, r.cycle_index, r.class_rank, r.grade from races r
+      where r.status = 'settled'
+        and exists (select 1 from race_entries e where e.race_id = r.id and e.entrant_snapshot is not null)
+        and exists (select 1 from race_odds o where o.race_id = r.id)
+      order by r.cycle_index desc limit 1`,
   )).rows[0],
-  'これから発走する発売中のレース', 'seed-races でレースを作ってから流してください',
+  '写し元にできる確定済みのレース', 'seed-races と確定を一度 流してから',
 );
+const TEST_CYCLE = Number(
+  (await c.query(`select greatest($1::bigint, coalesce(max(cycle_index),0) + 1) as n from races where cycle_index >= $1`,
+    [TEST_CYCLE_BASE])).rows[0].n,
+);
+
+/** ★写したレースを消す（★`clean()` から呼ぶ） */
+const dropTestRace = async () => {
+  await c.query(`delete from horse_story_event where race_id in (select id from races where cycle_index >= $1)`, [TEST_CYCLE_BASE]);
+  await c.query(`delete from race_odds where race_id in (select id from races where cycle_index >= $1)`, [TEST_CYCLE_BASE]);
+  await c.query(`delete from race_entries where race_id in (select id from races where cycle_index >= $1)`, [TEST_CYCLE_BASE]);
+  await c.query(`delete from races where cycle_index >= $1`, [TEST_CYCLE_BASE]);
+};
+await dropTestRace();
+await c.query(
+  `insert into races (cycle_index, name, class_rank, grade, surface, distance, track_condition,
+                      course_id, scheduled_at, seed_commit, server_seed, purse, status, course_frozen,
+                      min_wins, max_wins, entry_fee_ep, weight_kg, entry_deadline_at, game_week)
+   select $1, '★V-11 検査用', class_rank, grade, surface, distance, track_condition,
+          course_id, now() + interval '30 minutes', seed_commit, server_seed, purse, 'scheduled', course_frozen,
+          min_wins, max_wins, entry_fee_ep, weight_kg, now() + interval '5 minutes', game_week
+     from races where id = $2`, [TEST_CYCLE, source.id]);
+await c.query(
+  `insert into race_entries (race_id, horse_id, gate, weight, strategy, popularity, entrant_snapshot)
+   select (select id from races where cycle_index = $1), horse_id, gate, weight, strategy, popularity, entrant_snapshot
+     from race_entries where race_id = $2 and scratched_at is null`, [TEST_CYCLE, source.id]);
+await c.query(
+  `insert into race_odds (race_id, bet_type, selection, probability, odds, capped)
+   select (select id from races where cycle_index = $1), bet_type, selection, probability, odds, capped
+     from race_odds where race_id = $2`, [TEST_CYCLE, source.id]);
+const race = requireRow(
+  (await c.query(`select id, cycle_index, class_rank, grade from races where cycle_index = $1`, [TEST_CYCLE])).rows[0],
+  '写したレース', '★写しに失敗しました',
+);
+console.log(`  ★検査用のレースを作りました: cycle=${race.cycle_index}（写し元 cycle=${source.cycle_index}）`);
 
 // ── 後片付け（★先に流して、再実行できるようにする）──────────
 const clean = async () => {
-  await c.query('update horses set owner_id = null, npc_stable_id = 1 where owner_id = any($1)', [UIDS]);
+  /**
+   * 🔴 ★**`npc_stable_id = 1` の決め打ちをやめました**（★2026-09-19・**SY-2**）。
+   *   ★`horses_owner_xor_npc` があるので、★`owner_id` を付けた時点で ★**元の厩舎は失われます**。
+   *   ★私は同じ穴を `verify-ds7-cancel` で踏み、★**2 頭の所属厩舎を永久に失いました**
+   *   （★`REPORT_SANDBOX_SB1_SB4_20260919.md` §4）。
+   *   → ★**この道具は、`owner_id` を付ける前に元の厩舎を控えます**（★下の `STABLE_OF`）。
+   *   ⚠️ ★控えが無い馬（★前の実行で既に失われた等）は ★**`md5(id)` で散らします** — ★1 に寄せません。
+   */
+  for (const [hid, sid] of STABLE_OF) {
+    await c.query('update horses set owner_id = null, npc_stable_id = $2 where id = $1', [hid, sid]);
+  }
+  await c.query(`update horses h set owner_id = null, npc_stable_id = (
+                   select s.id from npc_stables s order by s.id
+                    offset (('x' || substr(md5(h.id::text), 1, 8))::bit(32)::bigint
+                            % (select count(*) from npc_stables)) limit 1)
+                  where h.owner_id = any($1)`, [UIDS]);
+  await dropTestRace();
   for (const t of ['prize_exchanges', 'pp_ledger', 'ep_ledger', 'bets']) {
     await c.query(`delete from ${t} where user_id = any($1)`, [UIDS]);
   }
@@ -134,6 +212,13 @@ const ents = (await c.query(
 if (ents.length < 4) throw new Error(`出走 ${ents.length} 頭では足りません`);
 // ★最終枠は NPC のまま残す（「所有していない馬には払わない」を同時に見るため）
 for (let k = 0; k < ents.length - 1; k += 1) {
+  /**
+   * 🔴 ★**元の厩舎を控えてから `owner_id` を付けます**（★**SY-2**）。
+   *   ★`horses_owner_xor_npc` があるので、★付けた瞬間に `npc_stable_id` は消えます。
+   *   ★控えずに消すと ★**戻せません**（★私は 2 頭ぶん失いました）。
+   */
+  const before = (await c.query('select npc_stable_id from horses where id = $1', [ents[k].horse_id])).rows[0];
+  if (before?.npc_stable_id != null) STABLE_OF.set(ents[k].horse_id, before.npc_stable_id);
   await c.query('update horses set owner_id = $1, npc_stable_id = null where id = $2',
     [UIDS[k % UIDS.length], ents[k].horse_id]);
 }
