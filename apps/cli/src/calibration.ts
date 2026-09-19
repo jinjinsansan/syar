@@ -468,6 +468,15 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
     pattern: 'apps/cli/src/verify-payout\.ts',
     why: 'A-3/V-10 の測定ハーネスの実行条件（レース数・MC試行数）。--races / --odds-trials で明示上書きし、実行条件を出力の冒頭に自己申告する（R-8）。MC試行数の既定 10,000 は正典 §9.2 の写し',
   },
+  {
+    pattern: 'apps/cli/src/verify-mi4-own-horse\.ts',
+    why: '★**MI-4** の測定ハーネスの実行条件（★2026-09-19・裁定 `REVIEW_PO4_AND_CK4_VERDICT_20260919.md` §4）。'
+      + '★RACES / SEED / TRIALS / POOL_FILE はすべて **推定の分散だけ**を動かし、★期待値を動かさない。'
+      + '★判定するのは「★自馬に上限いっぱい張ったときの期待収支が負か」で、★**負であることは控除率（§9.4 の 18%）が決めて**おり、'
+      + '★ここの値をいじって通せるものではない（R-12）。★素性（日付・母集団・sha256・標本）を出力の冒頭に自己申告する（★VP-8）。'
+      + '⚠️ ★**自馬は `stats` で選ぶ**（`potential` ではない） — ★`buildRace` が `abilityOf: h.stats` を渡すため。'
+      + '★最初 `potential` で選んだら 1 番人気が 41.67% しか出ず、★`stats` に直したら **95.83%** になった（★最悪ケースの定義を誤っていた）',
+  },
 ];
 
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
