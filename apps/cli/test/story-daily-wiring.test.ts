@@ -39,7 +39,10 @@ describe('★行数を日次で見る（§18 LR-10）', () => {
      * ★`lastAggregated` で 1 日 1 回に絞っている既存の枠の中にあること。
      * ★呼び出しが枠の外にあると、★毎周 DB を叩きます。
      */
-    const block = MAIN.slice(MAIN.indexOf('lastAggregated = today'));
+    const at = MAIN.indexOf('lastAggregated = today');
+    expect(at, '★日次の枠（lastAggregated = today）が見つからない').toBeGreaterThan(-1);
+    const block = MAIN.slice(at);
+    expect(block.length, '★切り出しが空').toBeGreaterThan(20);
     expect(block, '★日次の枠の中で呼んでいない').toMatch(/recordStoryRows/);
     /** ★新しいタイマー・新しい常駐を作っていない */
     expect(MAIN).not.toMatch(/setInterval\s*\([^)]*story/i);

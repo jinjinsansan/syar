@@ -84,13 +84,26 @@ describe('★V-19 ⑪ 本番経路で固定すること', () => {
 
   it('★readClient はセッションを持たない（読み取りにセッションを紛れ込ませない）', () => {
     const src = supabaseTs();
-    const readBody = src.slice(src.indexOf('export function readClient'), src.indexOf('export function authClient'));
+    /**
+     * 🔴 ⚠️ ★**切り出しが空だと、下の「入っていない」は素通しで緑になります**（★CK-3・2026-09-19）。
+     *    ★否定の表明（`not.toMatch`）は ★**空文字にも当たりません**。
+     *    → ★**切り出せたことを先に確かめます**（R-21）。
+     */
+    const from = src.indexOf('export function readClient');
+    const to = src.indexOf('export function authClient');
+    expect(from, '★readClient の宣言が見つからない').toBeGreaterThan(-1);
+    expect(to, '★authClient の宣言が readClient より後に無い').toBeGreaterThan(from);
+    const readBody = src.slice(from, to);
+    expect(readBody.length, '★切り出しが空（★否定の表明が素通しになる）').toBeGreaterThan(20);
     expect(readBody, '★readClient に persistSession が入っています').not.toMatch(/persistSession/);
   });
 
   it('★authClient は寿命管理をライブラリに任せる（D-113 ②・自前で抱えない）', () => {
     const src = supabaseTs();
-    const authBody = src.slice(src.indexOf('export function authClient'));
+    const at = src.indexOf('export function authClient');
+    expect(at, '★authClient の宣言が見つからない').toBeGreaterThan(-1);
+    const authBody = src.slice(at);
+    expect(authBody.length, '★切り出しが空').toBeGreaterThan(20);
     expect(authBody, '★autoRefreshToken の指定が無い').toMatch(/autoRefreshToken:\s*true/);
     expect(authBody, '★persistSession の指定が無い').toMatch(/persistSession:\s*true/);
   });
