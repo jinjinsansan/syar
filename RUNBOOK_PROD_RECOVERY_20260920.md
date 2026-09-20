@@ -191,6 +191,36 @@ production 中央 48〜51 ms ／ staging 219 ms（read-only・select 1）
 
 ### ② 移行 33 件を当てる 🔴 **許可 A**
 
+#### 🔴 ②の前に — **稼働中の関数定義の照合**（★`0021` が自分で要求しているもの）
+
+```bash
+npx tsx tools/verify-live-function.mjs --env production \n  --function spend_training_ep --expect db/migrations/0020_rpc_setup_guard.sql
+```
+- `db/migrations/0021` の冒頭が **「稼働中の定義を照合してから適用すること・照合前に適用しないこと」**
+  と自分で書いています。**半年 実施されていませんでした。**
+- ✅ ファイル同士の照合は済み: `0021` ＝ `0020` ＋ **文書化された 2 変更だけ**
+  （`assert_setup_complete()` の削除 ／ `using errcode = 'ST001'` の追加）。
+- **期待する md5: `b9f344581ffdb9df47f207597ac46869`**（`0020` の再掲から計算）。
+- ⚠️ 🔴 **staging の md5 と比べないこと。** staging は 53/53 で「当てた後」、本番は 20/53 で「当てる前」。
+  **一致しないのが正常**で、並べると「手で書き換えられていた」と誤報します。
+- 同じ出力で **接続ロール**も見えます（`0032` の `revoke ... from anon, authenticated` が
+  ワーカーに効かないことの確認）。⚠️ ワーカーは間欠で繋ぐので **映るまで 2〜3 回**。
+  **映らなかったことを「無害」と読まないこと**（CK-14）。
+
+#### ✅ 33 件の走査結果 — **旧ワーカー（2026-08-20 の束）を止めるものは無い**
+
+| 危ない形 | 判定 |
+|---|---|
+| `races.status` の許可リスト張り替え（0051） | ✅ 旧ワーカーが書くのは `scheduled`/`settled`/`cancelled` の 3 つだけ。新リストに在る |
+| `ep_ledger.reason` の張り替え ×3（0025/26/27） | ✅ 旧ワーカーの `ep_ledger` 書き込みは 2 箇所・すべて `refund`。`prize` は **`pp_ledger` 側**だった |
+| 新しい check 制約（0028/39/49/53） | ✅ すべて**新しい列**に付く。旧ワーカーは書かない（null で通る） |
+| `drop column`/`view`/`function`（0036/0047） | ✅ 馬市場と利用者向け RPC。旧ワーカーは触らない |
+| 旧ワーカーが呼ぶ DB 関数 | ✅ `spend_training_ep` 1 本だけ。`0021` は**同じ形** (uuid,bigint,integer) |
+
+✅ **移行を当てると、止まるどころか直るものが在ります。** `0021` がそれで、`0020` 以降
+ワーカーは `assert_setup_complete()` で毎回 例外になり、**持ち馬が全頭 休養に落ちていました**（監査 H-3）。
+
+
 ```bash
 npx tsx tools/migrate.mjs --env production      # ★先に下見の出力を読む
 ```
