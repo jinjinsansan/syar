@@ -727,12 +727,37 @@ export function createPgStore(
           finishPosition: o.finishPosition,
           timeSec: o.timeSec,
         }));
+        /**
+         * 🔴 ★**着順は 1 度しか書きません**（★正典 §17.3 **F-3**・2026-09-20）。
+         *
+         * 【★なぜ `and finish_pos is null` を足すか】
+         *   ✔ ★**二度 確定できないことは、既に守られています** — ★上の
+         *     ★`update races set status = 'settled' … where status = 'scheduled'` が 0 行なら
+         *     ★`rollback` して戻ります。★**ここは多層防御の 2 枚目**です。
+         *   🔴 ★しかし ★**`finish_pos` の変更を記録する引金も表も 0 件**でした
+         *     （★`F3-NO-RESULT-AUDIT`）。★**列の側には何の守りもありませんでした。**
+         *   → ★**製品の経路が結果を上書きできない**ことだけは、★1 行で閉じられます。
+         *   ⚠️ ★**手で流す SQL は、これでは止まりません。** ★そちらは再計算で示します（★F-1/F-2 と同じ作法）。
+         *
+         * 【★0 行だったら投げる理由】
+         *   ★状態遷移が守っているので、★ここが 0 行になるのは
+         *   ★**① 出走表の行が無い ② 既に着順が入っている** のどちらかです。
+         *   ★どちらも ★**結果が記録されないまま確定する**ことを意味します。
+         *   → ★**投げます**（★この取引は巻き戻るので、★確定しないほうが安全・**R-27**）。
+         */
         for (const f of finished) {
-          await client.query(
+          const wrote = await client.query(
             `update race_entries set finish_pos = $1, finish_time = $2
-              where race_id = $3 and gate = $4`,
+              where race_id = $3 and gate = $4 and finish_pos is null`,
             [f.finishPosition, f.timeSec, r.id, f.gate],
           );
+          if (wrote.rowCount === 0) {
+            throw new Error(
+              `settleRace: ★着順を書けませんでした（race=${r.id} 枠=${f.gate}）。`
+                + '★出走表の行が無いか、★既に着順が入っています。'
+                + '★このまま確定すると ★**結果が記録されないレース**ができるので止めます（F-3）。',
+            );
+          }
         }
 
         // --- 賞金（§11.1）。★PP の主な発行源（§9.3）---

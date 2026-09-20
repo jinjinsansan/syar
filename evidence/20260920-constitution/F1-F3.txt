@@ -1,0 +1,38 @@
+# §17.3 公正性の証明 F-1 / F-2 / F-3（2026-09-20・読むだけ・本番）
+
+## F-1 ★検証手順が公開されている  → ✅ 成立
+races_public の列（本番・実測）:
+  class_rank / course_id / distance / grade / id / name / purse / scheduled_at
+  / ★seed_commit / ★seed_reveal / status / surface / track_condition
+確定したレース 6,141 / うち seed_reveal が出ている ★6,141（100%）
+
+画面 apps/web/src/app/races/[id]/page.tsx:46-52
+  ★表示するだけでなく、★実際に SHA-256 / HMAC を計算して照合している
+  ★「不一致」も必ず出す（一致だけを出す作りではない）
+⚠️ races_public は 0002（≤0020）で定義 → ★本番にも在る（移行の遅れの影響を受けない）
+
+## F-2 ★seed + 介入ログ → 同じ着順  → ⚠️ 今日は成立／介入を入れた日に壊れる
+race_entries_public の列（本番・実測）:
+  race_id / gate / horse_name / strategy / weight / popularity
+  / finish_pos / finish_time / owner_label
+  → ★intervention_log は ★**公開されていない**
+
+race_entries 79,859 行:
+  intervention_log 有り ★0 ／ intervention_mult 有り ★0
+  → ★介入はまだ 1 度も使われていない。★だから今日は seed だけで再計算できる
+
+🔴 §17.3 F-2 は「介入がある以上、seed だけでは再現の証明にならない」と書いている
+   → 介入を入れた日に、外から再現できなくなる
+✅ 直し方は同じビューの中に在る:
+   finish_pos は case when status='settled' then … else null end で確定後だけ出す
+   → intervention_log にも同じ形を当てるだけ
+
+## F-3 ★結果の事後差し替えが一度も無い  → ⚠️ 経路は閉じた／「無かった」は示せない
+✅ 書く経路は 1 本（apps/worker/src/pg-store.ts）
+✅ 二度 確定できない（select … for update ＋ status 'scheduled' → 'settled'）
+✅ ★2026-09-20 に足した: and finish_pos is null ＋ 0 行なら throw
+   （変異で確認: 守りを外すと検査が落ちる）
+🔴 監査証跡は 0 件。列に不変の制約も無い
+   → 手で update すれば跡を残さず着順を変えられる
+   ⚠️ 起きたとは言っていない。★起きていないことを示せない、と言っている
+→ 案③（seed_reveal から誰でも再計算して示す）を採る裁定。定期に走らせる形が要る
