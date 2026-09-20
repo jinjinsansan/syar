@@ -20,7 +20,8 @@
 【C-4】★実在競走馬名の NG リストが**配線されている**
       🔴 ★この項目は ★**「実在名がゼロ」を証明しません**。★配線だけを見ます
   🔴 C-4 ① 🔴 ★NG リストのハッシュ表が**在りません**  data/ng-names.hash
-  🔴 C-4 ② 🔴 ★NG 判定を**素通し**にしている経路が在る  ./apps/cli/src/preseed-run.ts（strict=false） / ./apps/cli/src/preseed-verify.ts（strict=false） / ./apps/cli/test/preseed.test.ts / ./evidence/20260920-world-supply/count-preseed-world.mjs / ./tools/seed-world.mjs / ./tools/verify-world.mjs
+  ✓ C-4 ② ★世界を作る道具は、★旗を立てないと止まる形になっている
+  ⚠️ C-4 ③ ★測る道具は素通しで走れます（★警告は出ます・★人が見るもの）  ./apps/cli/src/preseed-run.ts / ./apps/cli/src/preseed-verify.ts
 
 【C-5】★他社製品の固有名称
       🔴 ★**語の走査は原理的にできません** — ★探す語をここに書くこと自体が違反です
@@ -29,9 +30,8 @@
   ⚠️ C-5 ★**これは C-5 の確認ではありません**（★人の目視が要ります・★機械では閉じられません）
 
 === ★判定 ===
-  🔴 不合格 2 件 / ⚠️ 人が見るもの 2 件
+  🔴 不合格 1 件 / ⚠️ 人が見るもの 3 件
      🔴 C-4 ① 🔴 ★NG リストのハッシュ表が**在りません**
-     🔴 C-4 ② 🔴 ★NG 判定を**素通し**にしている経路が在る
 
 🔴 ★**この道具が緑でも「憲法を守っている」ではありません。**
    ★C-4 は配線だけ、★C-5 は機械では閉じられません（★上に書いたとおり）。

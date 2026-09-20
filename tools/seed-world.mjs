@@ -29,6 +29,7 @@
  */
 import pg from 'pg';
 import { ALLOW_ALL_NAMES, NPC_STABLES } from '../packages/sim-engine/src/index.ts';
+import { loadNameBlocklist } from '../apps/cli/src/name-blocklist.ts';
 import { DEFAULT_PRESEED_OPTIONS, preseedNicks, runPreseed } from '../apps/cli/src/preseed.ts';
 import {
   LIFECYCLE_WEEKS, birthWeekOf, rankByStableKey, weekIndexAt,
@@ -51,13 +52,51 @@ const GENERATIONS = Number(POS[1] ?? 50);
  */
 const CATCH_UP = !process.argv.includes('--no-catch-up');
 
+/**
+ * 🔴 ★**実在競走馬名の NG 判定**（★憲法 §0.1 / 正典 §17.2 **C-4**・2026-09-20）。
+ *
+ * 【★何が起きていたか】
+ *   ⚠️ ★旧: ★`blocklist: ALLOW_ALL_NAMES` を**直に渡していました**。
+ *     → ★★**この道具が作る世界の名前は、★一度も NG 判定を通っていません。**
+ *   ✔ ★`apps/cli/src/name-blocklist.ts` は ★**既定で厳格**（★ハッシュ表が無ければ投げる）。
+ *     ★★**呼ぶ側が素通しにしていただけ**でした。★註記は「★本番では禁止」と書いていました。
+ *
+ * 【★なぜ旗を「立てないと止まる」側にするか】
+ *   🔴 ★**旗が無いと素通し、では駄目です。★旗を立てないと止まる、が正しい**（★**R-27**）。
+ *   ★`tools/age-horses.mjs` の `--flatten` と同じ作法です。
+ *
+ * ⚠️ ★**過大に読まないこと**: ★名前は音節を並べて作るので ★**実在名を参照する経路はありません**。
+ *    ★ここが守るのは ★**偶然の一致を拾う網**です。
+ */
+const ALLOW_ALL = process.argv.includes('--allow-all-names');
+
 const env = loadEnv();
+
+/**
+ * ★NG 判定を組み立てる。★**旗が無ければ、ここで投げます**（★`loadNameBlocklist` の既定が厳格）。
+ */
+let nameBlocklist;
+let ngSize = 0;
+if (ALLOW_ALL) {
+  console.log('');
+  console.log('🔴🔴 ★**--allow-all-names: ★実在競走馬名の NG 判定をしません**（★憲法 §0.1 / C-4）');
+  console.log('   ★この世界の名前は ★**未検査**です。★弁護士に見せる構成に使わないでください。');
+  console.log('   ★印を `evidence/world-build/` に残します。');
+  console.log('');
+  nameBlocklist = ALLOW_ALL_NAMES;
+} else {
+  // ★ハッシュ表が無ければ投げます（★既定 strict）。★それが正しい
+  const ng = loadNameBlocklist();
+  nameBlocklist = ng.blocklist;
+  ngSize = ng.size;
+  console.log(`  ✅ ★実在馬名 NG リスト ${ngSize} 件 を突合します（★憲法 §0.1）`);
+}
 
 console.log(`# プリシード世界の投入  seed=${SEED} generations=${GENERATIONS}`);
 const t0 = Date.now();
 const pre = runPreseed({
   ...DEFAULT_PRESEED_OPTIONS, seed: SEED, generations: GENERATIONS,
-  nicks: preseedNicks(SEED, NPC_STABLES), blocklist: ALLOW_ALL_NAMES,
+  nicks: preseedNicks(SEED, NPC_STABLES), blocklist: nameBlocklist,
 });
 console.log(`  生成 ${pre.world.all.size} 頭（${((Date.now()-t0)/1000).toFixed(1)}秒）`);
 
@@ -341,5 +380,33 @@ check(d.active_birth_weeks >= 100, '③ ★現役の `birth_week` が散って�
 
 await c.end();
 console.log('');
+/**
+ * ★**この世界が、どう作られたか**を残します（★2026-09-20）。
+ * 🔴 ★とくに ★**名前が検査されたか**。★後から「この世界は未検査だった」と読めるように。
+ * ⚠️ ★DB の列にしたいところですが、★本番は移行が 33 件 未適用なので ★**移行を足しません**。
+ *    ★ファイルに残します（★移行が追いついたら列へ移すこと）。
+ */
+{
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  mkdirSync('evidence/world-build', { recursive: true });
+  const stamp = new Date(nowMs).toISOString().replace(/[:.]/g, '-');
+  const path = `evidence/world-build/${stamp}.json`;
+  writeFileSync(path, `${JSON.stringify({
+    builtAtIso: new Date(nowMs).toISOString(),
+    seed: SEED,
+    generations: GENERATIONS,
+    referenceWeek,
+    inserted: n,
+    tally,
+    catchUp: CATCH_UP,
+    /** 🔴 ★名前が検査されたか（★0 件 かつ allowAll なら**未検査**） */
+    nameBlocklistSize: ngSize,
+    nameCheckSkipped: ALLOW_ALL,
+  }, null, 2)}
+`, 'utf8');
+  console.log(`  ★世界の素性を残しました: ${path}`);
+  if (ALLOW_ALL) console.log('  🔴 ★**nameCheckSkipped: true** — ★この世界の名前は未検査です');
+}
+
 console.log(fails.length === 0 ? '★世界を作りました' : `★FAIL — ${fails.join(' / ')}`);
 process.exit(fails.length === 0 ? 0 : 1);

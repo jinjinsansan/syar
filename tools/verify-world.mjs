@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { ALLOW_ALL_NAMES, NPC_STABLES } from '../packages/sim-engine/src/index.ts';
+import { loadNameBlocklist } from '../apps/cli/src/name-blocklist.ts';
 import { DEFAULT_PRESEED_OPTIONS, preseedNicks, runPreseed } from '../apps/cli/src/preseed.ts';
 import { lineConcentration } from '../apps/cli/src/pedigree-audit.ts';
 
@@ -14,6 +15,19 @@ import { loadEnv, positionals } from './lib/env.mjs';
 /** ★フラグ（--env など）を除いた位置引数 */
 const POS = positionals();
 const SEED = Number(POS[0] ?? 1231);
+
+/**
+ * 🔴 ★**NG 判定を素通しにするなら、★旗で言うこと**（★憲法 §0.1 / §17.2 **C-4**・2026-09-20）。
+ *
+ * ⚠️ ★この道具が測るのは ★**系統集中と近交係数**で、★名前は結果に入りません。
+ *    ★それでも旗にするのは、★★**「素通しが既定」を 1 か所でも残すと、★そこから広がる**ためです
+ *    （★実際 `seed-world.mjs` がそうでした）。
+ */
+const ALLOW_ALL = process.argv.includes('--allow-all-names');
+if (!ALLOW_ALL) {
+  // ★ハッシュ表が無ければ投げます（★既定 strict）
+  loadNameBlocklist();
+}
 const pre = runPreseed({
   ...DEFAULT_PRESEED_OPTIONS, seed: SEED, generations: 50,
   nicks: preseedNicks(SEED, NPC_STABLES), blocklist: ALLOW_ALL_NAMES,

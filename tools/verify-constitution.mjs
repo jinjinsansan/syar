@@ -132,16 +132,39 @@ if (!existsSync(HASH)) {
   if (n === 0) ng('C-4 ① ★ハッシュ表が空です', HASH);
   else ok('C-4 ① ★ハッシュ表が在る', `${n} 件`);
 }
-/** 🔴 ★世界を作る経路が「全部 許す」を注いでいないか */
+/**
+ * 🔴 ★**世界を作る経路**が「全部 許す」を注いでいないか。
+ *
+ * ⚠️ ★**測る道具と分けます**（★2026-09-20・レビュー側の裁定）。
+ *   ★`preseed-run` / `preseed-verify` は ★**世界を作らず、数を出すだけ**で、
+ *   ★しかも ★**0 件なら警告を出しています**。★ここで落とすと、★測れなくなります。
+ *   🔴 ★対して ★**DB に世界を書く道具**が素通しなら、★それは本番に残ります。
+ *
+ * ⚠️ ★**語を持っているだけの file は外します** — ★登録簿・検査・この道具自身。
+ *    ★（★2026-09-20: ★簿に「`blocklist: ALLOW_ALL_NAMES` が素通し」と**書いた**ら、
+ *      ★★その記述自身が当たりました。★今日 3 度目の「註記が網に掛かる」形です）
+ */
+const WORLD_BUILDERS = /(seed-world|verify-world)\.mjs$/;
+/** ★語を説明しているだけのもの */
+const TALKS_ABOUT = /(\/lib\/|\/test\/|verify-constitution\.mjs$|\/evidence\/)/;
 const allowAll = [];
+const measureOnly = [];
 for (const f of codeFiles) {
+  if (TALKS_ABOUT.test(f)) continue;
   const src = readFileSync(f, 'utf8');
   const live = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/[^\n]*/gm, ' ');
-  if (/blocklist:\s*ALLOW_ALL_NAMES/.test(live)) allowAll.push(f);
-  if (/loadNameBlocklist\([^)]*,\s*false\s*\)/.test(live)) allowAll.push(`${f}（strict=false）`);
+  const bypass = /blocklist:\s*ALLOW_ALL_NAMES/.test(live)
+    || /loadNameBlocklist\([^)]*,\s*false\s*\)/.test(live);
+  if (!bypass) continue;
+  // ★旗を立てないと止まる形なら、★素通しではありません
+  const gated = /--allow-all-names/.test(live);
+  if (WORLD_BUILDERS.test(f)) { if (!gated) allowAll.push(f); } else measureOnly.push(f);
 }
-if (allowAll.length > 0) ng('C-4 ② 🔴 ★NG 判定を**素通し**にしている経路が在る', allowAll.join(' / '));
-else ok('C-4 ② ★素通しにしている経路が無い');
+if (allowAll.length > 0) ng('C-4 ② 🔴 ★**世界を作る道具**が素通しにしている', allowAll.join(' / '));
+else ok('C-4 ② ★世界を作る道具は、★旗を立てないと止まる形になっている');
+if (measureOnly.length > 0) {
+  warn('C-4 ③ ★測る道具は素通しで走れます（★警告は出ます・★人が見るもの）', measureOnly.join(' / '));
+}
 
 console.log('');
 console.log('【C-5】★他社製品の固有名称');
