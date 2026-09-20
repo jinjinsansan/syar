@@ -55,6 +55,14 @@ export const READONLY = [
    */
   'diag-horses-refs.mjs',
   /**
+   * ★**読まれているのに誰も書かない列**を数える（★**DB-1**・2026-09-20）。
+   *   🔴 ★**DB に繋ぎません** — ★`db/migrations/*.sql` と原文だけを見る**静的**な道具です
+   *   （★だから CI でも走ります）。★出力はログのみ。
+   *   ✔ ★`horses` で ★**2 本**（`bred_this_year` / `coverings_this_year`）。
+   *   ✔ ★併せて ★**書く側が `tools/` にしか無い列 23 本**も出します（★`POOL-SUPPLY` の姿）。
+   */
+  'diag-write-never.mjs',
+  /**
    * ★AL-6（裁定 REVIEW_CONSULT_ARCADE_LOOP_ANSWER_20260918）の測定器 2 本。
    *   ★DB に触りません（★エンジンを回して時間を測るだけ・出力はローカルの JSON とログ）。
    *   ★レビュー側が独立に再実行できるよう tmp/ から移しました（★tmp/ は gitignore で次の人に残らない）。

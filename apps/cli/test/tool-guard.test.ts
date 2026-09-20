@@ -205,7 +205,34 @@ describe('★R-24 ツールの分類（メタテスト）', () => {
       expect(write.test(sample), `★検出器がこれを見逃します: ${sample}`).toBe(true);
     }
 
-    const lying = READONLY.filter((f) => write.test(readFileSync(`${ROOT}tools/${f}`, 'utf8')));
+    /**
+     * 🔴 ★**註記は外します**（★2026-09-20）。
+     *
+     *   ⚠️ ★`broad-deletes.test.ts` は最初から外していました。★**こちらだけ外していません**でした。
+     *   ✔ ★そのため ★**SQL を「読む・数える」道具が、★SQL を「書く」道具に見えて**いました。
+     *     ★2026-09-20 だけで ★**3 回**踏みました:
+     *     ★① `verify-anon-exposure`（`truncate`・★2026-08-20 に検出器を絞って解決）
+     *     ★② `diag-horses-refs`（★消す順を**印刷**していた・★言い換えで解決）
+     *     ★③ `diag-write-never`（★移行から列名を拾う**正規表現**の中の `alter table`）
+     *   → ★★**註記の中の SQL は実行されません。** ★外して構いません。
+     *   ⚠️ ★**文字列の中の SQL は外しません** — ★そこは実行されうるので。
+     */
+    const stripComments = (src: string): string => src.split('\n')
+      .filter((l) => {
+        const t = l.trimStart();
+        return !t.startsWith('*') && !t.startsWith('//') && !t.startsWith('/*');
+      })
+      .join('\n');
+
+    // ★外しすぎていないことを、ここで確かめる（★R-14）
+    expect(write.test(stripComments('await c.query("delete from horses")')),
+      '★文字列の中の書き込みまで外した').toBe(true);
+    expect(write.test(stripComments('// ★delete from horses の話')),
+      '★註記が外れていない').toBe(false);
+
+    const lying = READONLY.filter(
+      (f) => write.test(stripComments(readFileSync(`${ROOT}tools/${f}`, 'utf8'))),
+    );
     expect(lying, `読取専用と分類されているのに書き込み文があります:\n  ${lying.join('\n  ')}`).toEqual([]);
   });
 
