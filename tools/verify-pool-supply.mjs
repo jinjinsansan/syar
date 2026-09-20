@@ -334,9 +334,6 @@ const check = (ok, label, detail) => {
   console.log(`  ${ok ? '✓' : '🔴'} ${label}  ${detail}`);
 };
 
-const n = steady.length;
-const born = steady.reduce((a, s) => a + s.debuted, 0);
-const gone = steady.reduce((a, s) => a + s.retired, 0);
 /**
  * 🔴 ★**最初の 2 年は捨てます**（★立ち上がり）。
  *   ★生まれた仔が出走できるのは ★**2 年 後**（`raceableFrom` 104 週）なので、
@@ -346,6 +343,9 @@ const gone = steady.reduce((a, s) => a + s.retired, 0);
 const BURN_IN = 2 * 52;
 const steady = series.slice(BURN_IN);
 const diffs = steady.map((s) => s.debuted - s.retired);
+const n = steady.length;
+const born = steady.reduce((a, s) => a + s.debuted, 0);
+const gone = steady.reduce((a, s) => a + s.retired, 0);
 const mean = diffs.reduce((a, b) => a + b, 0) / n;
 const sd = Math.sqrt(diffs.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, n - 1));
 const se = sd / Math.sqrt(n);
