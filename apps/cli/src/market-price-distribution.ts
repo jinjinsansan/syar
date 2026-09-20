@@ -102,6 +102,12 @@ export interface Distribution {
    * ★番組表の 1 日ごとに数えます。
    */
   readonly upperEligibleByDay: readonly number[];
+  /**
+   * ★**実際に使った資格の下限**（★**CK-12**・2026-09-20）。
+   * 🔴 ★印刷する側が `4` と**書き写して**いました。★`--open-min` で変えても表示は 4 のまま。
+   * → ★**使った値を持ち回ります**（★印刷のために数を写さない）。
+   */
+  readonly upperMin: number;
   /** ★引退して入れ替わった頭数（★世代交代が動いている証拠） */
   readonly retired: number;
 }
@@ -335,7 +341,8 @@ export function runCohort(
     i += 1;
   }
   return { pool: pool.length, races: held, ran, prices: prices.sort((a, b) => a - b), g1Winners, totalStarts, heldByTier, skippedByTier,
-    meanFieldSize: held === 0 ? 0 : starts / held, upperEligibleByDay, retired: retiredCount };
+    meanFieldSize: held === 0 ? 0 : starts / held, upperEligibleByDay, upperMin,
+    retired: retiredCount };
 }
 
 /** ★コマンドとして流したとき */
@@ -408,7 +415,7 @@ if (isMain) {
     const half = Math.floor(d.upperEligibleByDay.length / 2);
     const tail = d.upperEligibleByDay.slice(half);
     const mean = tail.length === 0 ? 0 : tail.reduce((a, b) => a + b, 0) / tail.length;
-    console.log(`  ★「4 勝以上」を同時に持つ頭数（★**PO-6**）: 後半の平均 ${mean.toFixed(0)} 頭`
+    console.log(`  ★「${d.upperMin} 勝以上」を同時に持つ頭数（★**PO-6**）: 後半の平均 ${mean.toFixed(0)} 頭`
       + ` / 最後 ${d.upperEligibleByDay[d.upperEligibleByDay.length - 1] ?? 0} 頭 / 最大 ${Math.max(...d.upperEligibleByDay, 0)} 頭`);
     console.log(`     日ごと: ${d.upperEligibleByDay.join(' ')}`);
   }

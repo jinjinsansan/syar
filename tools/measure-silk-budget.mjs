@@ -101,7 +101,8 @@ console.log('');
 
 const silkPx = px.filter((p) => p.silk).length;
 console.log('【判定】');
-console.log(`  ★勝負服に使える画素: 約 ${silkPx} 画素（32×32 の ${((silkPx / (SIZE * SIZE)) * 100).toFixed(1)}%）`);
+// ★CK-12: ★`--size` で変えられる値を、印刷側に書き写さない（★旧: `32×32` と直書き）
+console.log(`  ★勝負服に使える画素: 約 ${silkPx} 画素（${SIZE}×${SIZE} の ${((silkPx / (SIZE * SIZE)) * 100).toFixed(1)}%）`);
 if (silkPx < 12) {
   console.log('  ★★少なすぎます。色替えだけでは18頭を見分けられない可能性が高いです');
 } else {

@@ -77,7 +77,8 @@ const scale = TARGET_W === null ? 1 : TARGET_W / (meta.width / FRAMES);
 const cw = Math.round((meta.width / FRAMES) * scale);
 const ch = Math.round(meta.height * scale);
 
-console.log('# ★本番シートを焼く（8コマ × 8枠色）');
+// ★CK-12: ★コマ数は `--frames` で変わる（★枠色の 8 は固定）
+console.log(`# ★本番シートを焼く（${FRAMES}コマ × 8枠色）`);
 console.log(`  入力 ${inFile}  ${meta.width} × ${meta.height}`);
 console.log(`  出力 1コマ ${cw} × ${ch}　シート ${cw * FRAMES} × ${ch * 8}\n`);
 
