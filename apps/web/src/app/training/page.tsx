@@ -13,7 +13,8 @@ import {
   trainingResultTierOf, TRAINING_RESULT_LABEL, GAIN_JITTER,
   trainingStreakOf, TRAINING_STREAK_WEEKS,
 } from '@star/training';
-import { sortStable, conditionView, DEMO_HORSES } from '../../lib/stable';
+import { sortStable, conditionView, DEMO_HORSES, type StableHorse } from '../../lib/stable';
+import { supabaseStableRepo } from '../../lib/stable-repo';
 import { TRAINING_MENUS, trainingMenusOfView, DEMO_TRAINING_ABILITY, DEFAULT_TRAINING_ABILITY, demoFatigueNote } from '../../lib/game-demo';
 import { Capsule, ClassChip, FatigueBar, PageTitle, Pill, StatBar } from '../../components/ui';
 
@@ -47,8 +48,42 @@ function WeekPill({ kind }: { readonly kind: 'todo' | 'done' | 'rest' }): React.
 }
 
 export default function TrainingPage(): React.ReactElement {
-  const horses = useMemo(() => sortStable(DEMO_HORSES), []);
-  const [selectedHorse, setSelectedHorse] = useState<string | null>(horses.find((h) => h.week.kind === 'todo')?.id ?? null);
+  /**
+   * 🔴 ★**2026-09-20: ★馬の一覧を本物に繋ぎました**（★オーナー指示「データ繋ぐのは OK です」）。
+   *   ⚠️ ★**見た目は 1 行も変えていません。** ★変えたのは ★どこから馬を取るかだけです。
+   *
+   * 🔴 ★**指示の保存は繋いでいません。★理由: ★保存先が在りません。**
+   *   ✔ ★現物（`apps/worker/src/training-runner.ts:319`）: ★ワーカーは ★**`defaultMenu(age, fatigue)`**
+   *     ★で ★**自分でメニューを決めます**。★**利用者が選んだメニューを読む経路がありません。**
+   *   ★`horse_week_log.menu_chosen`（`0011`）は ★**ワーカーが「何を選んだか」を書く記録**で、
+   *     ★**指示の入れ物ではありません**。
+   *   → ★★**いま `spend_training_ep` を呼ぶと、★EP だけ減って調教は変わりません。**
+   *     ★★それは「繋がっていない」より悪い。★だから繋ぎません。
+   *   → ★`TRAINING-INSTRUCTION-NOT-READ` として起票しました。
+   */
+  const [loaded, setLoaded] = useState<readonly StableHorse[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const view = await supabaseStableRepo.stable();
+        if (alive) setLoaded(view.horses);
+      } catch (e) {
+        // 🔴 ★黙って見本に落としません。★理由を残します
+        console.error('[training] ★本物の馬を読めませんでした（見本に落とします）', e);
+        if (alive) setLoaded(DEMO_HORSES);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+  const horses = useMemo(() => sortStable(loaded ?? DEMO_HORSES), [loaded]);
+  const [selectedHorse, setSelectedHorse] = useState<string | null>(null);
+  // ★読み込めたら、★未指示の先頭を選びます（★見た目は変えません）
+  useEffect(() => {
+    if (selectedHorse === null && horses.length > 0) {
+      setSelectedHorse(horses.find((h) => h.week.kind === 'todo')?.id ?? horses[0]!.id);
+    }
+  }, [horses, selectedHorse]);
   const [selectedMenu, setSelectedMenu] = useState<string | null>('hill');
   const horse = horses.find((h) => h.id === selectedHorse) ?? null;
   const menu = TRAINING_MENUS.find((m) => m.id === selectedMenu) ?? null;
