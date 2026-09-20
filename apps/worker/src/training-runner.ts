@@ -291,6 +291,27 @@ export async function advanceTrainingWeeks(
     /** ★EP 不足以外の失敗で、このバッチで週を進めなかった馬（監査 H-3） */
     const skipped = new Set<string>();
 
+    /**
+     * 🔴 ★**利用者が選んだ献立を読みます**（★2026-09-20・`TRAINING-INSTRUCTION-NOT-READ`）。
+     *
+     *   ⚠️ ★これまで ★**誰も読んでいませんでした。** ★画面で選べるのに、★ワーカーは
+     *     ★`defaultMenu` で自分で決めていました（★選んだ意味がありませんでした）。
+     *   ★指示が無い週は ★**既定の献立で調教します**（★裁定 (a)）。
+     *     ★理由: ★世界は時計で動きます。★他の馬は進みます。★**待てません。**
+     *   ⚠️ ★**まとめて 1 回で読みます**（★1 頭ずつ引くと往復が頭数ぶん増えます）。
+     */
+    const orderOf = new Map<string, string>();
+    {
+      const ids = r.rows.map((x) => String(x.id));
+      const weeks = r.rows.map((x) => Number(x.last_processed_week));
+      const o = await client.query<{ horse_id: string; menu: string }>(
+        'select horse_id, menu from training_orders'
+          + ' where (horse_id, week) in (select * from unnest($1::uuid[], $2::bigint[]))',
+        [ids, weeks],
+      );
+      for (const x of o.rows) orderOf.set(String(x.horse_id), String(x.menu));
+    }
+
     for (const row of r.rows) {
       const birth = num(row.birth_week, 'birth_week');
       const last = num(row.last_processed_week, 'last_processed_week');
@@ -316,7 +337,13 @@ export async function advanceTrainingWeeks(
         injuryRateMult: 1,
         birthTemper: state.temper,
       };
-      let menu = defaultMenu(age, state.fatigue);
+      /**
+       * 🔴 ★**利用者の指示が在ればそれを使い、★無ければ既定**（★裁定 (a)）。
+       *   ⚠️ ★指示が在っても ★**下の疲労の分岐で `rest` に落ちることがあります** —
+       *     ★それは規則（★§7.4）であって、★指示を無視しているのではありません。
+       */
+      const ordered = orderOf.get(String(row.id)) ?? null;
+      let menu = (ordered ?? defaultMenu(age, state.fatigue)) as ReturnType<typeof defaultMenu>;
       /**
        * ★厩舎の格（★D-103・`0024` の列）。★既定 `bronze` は倍率 1.0 で、★格を入れる前と 1 ビット同じ。
        * ⚠️ ★**伸びと費用に同じ倍率**が掛かります（★EP あたりの伸びはどの格でも同じ）。

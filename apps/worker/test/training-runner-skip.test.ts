@@ -117,6 +117,11 @@ function fakeDb(horses: FakeHorse[]): {
         });
         return { rows: [], rowCount: ids.length };
       }
+      /**
+       * ★**利用者の指示**（★`0057`・2026-09-20）。★この検査では ★**指示なし**を返します。
+       *   ⚠️ ★指示が在る場合の挙動は ★別の検査の仕事です（★ここは「失敗した馬だけ飛ばす」を見る）。
+       */
+      if (sql.includes('from training_orders')) return { rows: [], rowCount: 0 };
       throw new Error(`偽の DB が想定していない SQL: ${sql.slice(0, 60)}`);
     },
   };

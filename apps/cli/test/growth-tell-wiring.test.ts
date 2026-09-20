@@ -152,18 +152,35 @@ describe('GB-1 ④⑤⑥ 育った実感の配線', () => {
      * ★1 つでもずれると ★**別の馬の基準を書きます**（★`fillRace` の `$1..$19` と同じ形）。
      * ⚠️ ★型検査でも偽の DB でも出ません。
      */
+    /**
+     * 🔴 ★**一括更新の文だけを切り出してから見ます**（★2026-09-20 に直しました）。
+     *   ⚠️ ★旧は ★**ファイル全体**から `from unnest(` を探していました。
+     *     → ★`training_orders` を読む問い合わせ（★別の `unnest`）が手前に入った瞬間、
+     *       ★**非貪欲の一致がそこから始まり、★`$N` を 17 個 数えました**（★本当は 15）。
+     *   → ★★**網が、★狙っていない文に食いついていました。**
+     *   ✅ ★`update horses h set` から後ろだけを見ます。
+     */
+    /**
+     * 🔴 ★**番人**: ★`indexOf` が -1 でも `slice(-1)` は ★**最後の 1 文字**、
+     *   ★`slice(RUNNER.indexOf(...))` で見つからなければ ★**末尾 1 文字**になります。
+     *   ⚠️ ★最初に書いた `toContain('as t(')` では ★**見つからなくても通る場合**があります。
+     *     ★`source-slicing-guard` が捕まえました（★CK-3）。★★切り出しは、まず見つけたことを確かめる。
+     */
+    const at = RUNNER.indexOf('update horses h set');
+    expect(at, '★一括更新の文が見つからない').toBeGreaterThan(-1);
+    const UPDATE = RUNNER.slice(at);
     /** ★`as t(...)` の名前 */
-    const names = /as t\(([\s\S]*?)\)\s*where h\.id = t\.id/.exec(RUNNER)?.[1];
+    const names = /as t\(([\s\S]*?)\)\s*where h\.id = t\.id/.exec(UPDATE)?.[1];
     expect(names, '★`as t(...)` が見つからない').toBeDefined();
     const cols = names!.split(',').map((x) => x.trim()).filter((x) => x !== '');
 
     /** ★`unnest(...)` の `$N::型[]` */
-    const un = /from unnest\(([\s\S]*?)\)\s*as t\(/.exec(RUNNER)?.[1];
+    const un = /from unnest\(([\s\S]*?)\)\s*as t\(/.exec(UPDATE)?.[1];
     expect(un, '★`unnest(...)` が見つからない').toBeDefined();
     const params = [...un!.matchAll(/\$(\d+)::/g)].map((m) => Number(m[1]));
 
     /** ★値の並び（★`updates.map((u) => u.xxx)`） */
-    const argsBlock = RUNNER.slice(RUNNER.indexOf('where h.id = t.id'));
+    const argsBlock = UPDATE.slice(UPDATE.indexOf('where h.id = t.id'));
     const values = [...argsBlock.matchAll(/updates\.map\(\(u\) => u\.(\w+)\)/g)].map((m) => m[1]!);
 
     expect(cols.length, '★名前が拾えていない（R-21）').toBeGreaterThan(10);

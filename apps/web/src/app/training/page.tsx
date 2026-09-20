@@ -15,6 +15,7 @@ import {
 } from '@star/training';
 import { sortStable, conditionView, DEMO_HORSES, type StableHorse } from '../../lib/stable';
 import { supabaseStableRepo } from '../../lib/stable-repo';
+import { authClient, readClient } from '../../lib/supabase';
 import { TRAINING_MENUS, trainingMenusOfView, DEMO_TRAINING_ABILITY, DEFAULT_TRAINING_ABILITY, demoFatigueNote } from '../../lib/game-demo';
 import { Capsule, ClassChip, FatigueBar, PageTitle, Pill, StatBar } from '../../components/ui';
 
@@ -45,6 +46,18 @@ function WeekPill({ kind }: { readonly kind: 'todo' | 'done' | 'rest' }): React.
   if (kind === 'todo') return <Pill tone="yellow">未指示</Pill>;
   if (kind === 'done') return <Pill tone="green">指示済み</Pill>;
   return <Pill tone="grey">休養中</Pill>;
+}
+
+/**
+ * ★**指示する週**（★`world_state_public`・★画面で計算しません）。
+ *   ⚠️ ★サーバーが「その週は処理済み」と判断したら弾きます（★`0057` の RPC）。
+ *     ★画面が締切を判定しません（★2 か所に規則を置かない）。
+ */
+async function currentWeekForOrder(): Promise<number> {
+  const { data, error } = await readClient()
+    .from('world_state_public').select('game_week').limit(1);
+  if (error !== null) throw new Error(`world_state_public を読めませんでした: ${error.message}`);
+  return Number(data?.[0]?.game_week ?? 0);
 }
 
 export default function TrainingPage(): React.ReactElement {
@@ -153,6 +166,33 @@ export default function TrainingPage(): React.ReactElement {
   const cond = horse === null ? null : conditionView(horse.condition);
   const selectable = horses.filter((h) => h.week.kind !== 'rest');
   const canInstruct = horse !== null && menu !== null;
+  /**
+   * 🔴 ★**指示をサーバーへ送ります**（★2026-09-20・`0057` の `set_training_order`）。
+   *   ⚠️ ★**EP はここで減りません。** ★減るのは ★**ワーカーが実際に調教したとき**です。
+   *     ★★そうしないと「EP だけ減って何も起きない」が起きます。
+   *   ★所有の確認と締切（★処理済みの週へは書けない）は ★**サーバー側**（憲法 §0.2-4）。
+   */
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
+  const instruct = async (): Promise<void> => {
+    if (horse === null || menu === null || sending) return;
+    setSending(true);
+    try {
+      const week = await currentWeekForOrder();
+      const { error } = await authClient().rpc('set_training_order', {
+        p_horse_id: horse.id, p_week: week, p_menu: menu.id,
+      });
+      if (error !== null) throw new Error(error.message);
+      setSent(horse.id);
+    } catch (e) {
+      // 🔴 ★黙って成功に見せません
+      console.error('[training] ★指示を保存できませんでした', e);
+      setSent(null);
+      window.alert('指示を保存できませんでした');
+    } finally {
+      setSending(false);
+    }
+  };
 
   /** ★狭い画面か（★`globals.css` の `@media (max-width: 720px)` と同じ数） */
   const [narrow, setNarrow] = useState(false);
@@ -555,8 +595,13 @@ export default function TrainingPage(): React.ReactElement {
                 <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)' }}>馬とメニューを選んでください</span>
               )}
               <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
-                <span className={canInstruct ? 'a-btn a-btn-gold' : 'a-btn a-btn-gold off'} style={{ height: 48, padding: '0 22px', fontSize: 17, whiteSpace: 'nowrap' }} title="サーバー接続まで押せません">
-                  {horse?.week.kind === 'done' ? '指示を変更する' : 'この馬に指示する'}{menu !== null ? `（${menu.ep} EP）` : ''}
+                <span
+                  className={canInstruct && !sending ? 'a-btn a-btn-gold' : 'a-btn a-btn-gold off'}
+                  style={{ height: 48, padding: '0 22px', fontSize: 17, whiteSpace: 'nowrap', cursor: canInstruct ? 'pointer' : undefined }}
+                  title="指示しない週は、既定の献立で調教されます"
+                  onClick={() => { void instruct(); }}
+                >
+                  {sent === horse?.id ? '指示しました' : horse?.week.kind === 'done' ? '指示を変更する' : 'この馬に指示する'}{menu !== null ? `（${menu.ep} EP）` : ''}
                 </span>
                 <span className={allDone ? 'a-btn' : 'a-btn off'} style={{ height: 48, padding: '0 18px', fontSize: 15, whiteSpace: 'nowrap' }} title={allDone ? 'サーバー接続まで押せません' : '全頭に指示すると押せます'}>週を進める</span>
               </div>
