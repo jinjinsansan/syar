@@ -7,6 +7,7 @@
   "main": "./src/main.ts",
   "dependencies": {
     "@star/betting": "*",
+    "@star/breeding": "*",
     "@star/race-engine": "*",
     "@star/scheduler": "*",
     "@star/sim-engine": "*",

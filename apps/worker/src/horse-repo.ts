@@ -52,8 +52,17 @@ export function rowToHorse(row: Record<string, unknown>): HorseRecord {
     nicksMultiplier: Number(need<number>('nicks_multiplier')),
     pedigreeCache: new Map(Object.entries((row['pedigree_cache'] as Record<string, number[]>) ?? {})),
     foalCount: Number(row['foal_count'] ?? 0),
-    coveringsThisYear: 0,
-    bredThisYear: false,
+    /**
+     * 🔴 ★**2026-09-20 まで `0` / `false` を決め打ちしていました**（★**G-3** / **DB-1**）。
+     *   → ★`canMate` は ★**この 2 つを見て**「年 1 回」と「種付上限」を判定します。
+     *     ★決め打ちだと ★**判定が永久に素通り**し、★年に何度でも産めます。
+     * ⚠️ ★**列を選んでいない呼び出し元**（★レース生成など）は `undefined` になります。
+     *   ★そこでは使われない値なので `0` / `false` に落としますが、
+     *   ★★**配合で使う側は、★列が在ることを自分で確かめてください**
+     *   （`breeding-runner.ts` の `assertBreedingColumns`）。
+     */
+    coveringsThisYear: Number(row['coverings_this_year'] ?? 0),
+    bredThisYear: Boolean(row['bred_this_year'] ?? false),
     g1Wins: Number(row['g1_wins'] ?? 0),
     breedingRecord: null,
   } as HorseRecord;

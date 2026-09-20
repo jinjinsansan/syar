@@ -33,6 +33,7 @@ import { loadHorsesByIds, loadRaceablePool, loadTrainingStates, loadWinsByHorse 
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
+import { runBreedingWeek } from './breeding-runner.js';
 import { recordUnlockDistribution, unlockDrift } from './unlock-flow.js';
 import { formatStoryDay, recordStoryRows } from './story-daily.js';
 import { STORY_EVENT_TYPES } from '@star/training';
@@ -684,6 +685,23 @@ async function main(): Promise<void> {
 
       const t = await advanceTrainingWeeks(client, nowMs, cfg.epochMs,
         (m) => console.error(`[worker] ★${m}`));
+      /**
+       * ★**定常運転の供給**（`POOL-SUPPLY`・2026-09-20）。★週送りの**後**に呼びます。
+       *
+       * 🔴 ★これが無いと ★**引退だけが動き、★生まれません**。
+       *   ✔ ★実測（本番・2026-09-20）: ★作り直し直後 2,400 頭 → ★週送り 1 回で 2,379 頭。
+       * ⚠️ ★**同じ週を二度 呼んでも増えません**（★`unique (dam_id, birth_week)` が最後の砦）。
+       * ⚠️ ★止まったら ★**投げます**（★fail-closed）。★A-1 のとおり周は続きますが、
+       *    ★記録には残ります。
+       */
+      const b = await runBreedingWeek(client, nowMs, cfg.epochMs,
+        (m) => console.error(`[worker] ★${m}`));
+      if (b.born > 0 || b.noSire > 0 || b.yearReset) {
+        console.log(
+          `[worker] 配合 週=${b.week} 生まれた${b.born}頭 / 相手なし${b.noSire}頭`
+          + ` / 既に居た${b.alreadyThere}頭${b.yearReset ? ' / ★年次カウンタを戻しました' : ''}`,
+        );
+      }
       if (t.advanced > 0) {
         console.log(
           `[worker] 週送り 週=${t.weeks.join(',')} ` +
