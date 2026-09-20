@@ -335,13 +335,33 @@ const check = (ok, label, detail) => {
 };
 
 /**
- * 🔴 ★**最初の 2 年は捨てます**（★立ち上がり）。
- *   ★生まれた仔が出走できるのは ★**2 年 後**（`raceableFrom` 104 週）なので、
- *   ★最初の 2 年は ★**入る数が構造的に 0** です。★そこを混ぜると釣り合いは測れません。
- *   ⚠️ ★これは ★**発明した数ではありません** — ★`raceableFrom` から来ています。
+ * 🔴 ★**立ち上がりの長さを、★構造から決めます**（★2026-09-20・★6 年 回して分かりました）。
+ *
+ * 【★6 年では足りませんでした】
+ *   ✔ ★実測（★6 年・立ち上がり 2 年を捨てた場合）:
+ *     ★出走年齢に達した **3,194 頭**（798/年）／★引退 **1,600 頭**（400/年）→ ★差 +7.66/週。
+ *   🔴 ★これは ★**供給が多すぎる**のではありません。★**引退がまだ来ていない**だけです:
+ *     ★世界の最初の馬は 3 年で引退し切ります。★**自前で生まれた仔が引退するのは**
+ *     ★生まれて ★**5 年 後**（`retireAt` 260 週）。★6 年では ★**その谷しか見えません。**
+ *   ✅ ★捨てる長さ ＝ ★**`retireAt`（5 年）**。★自前の仔が 1 頭も引退していない期間です。
+ *   ✅ ★測る長さ ＝ ★**最低 1 回の現役期間**（`CAREER_WEEKS`・3 年）。
+ *   → ★★**最低 8 年。** ★★これは発明した数ではなく、★寿命の定数から出ています。
+ *
+ * ⚠️ ★短い窓で回したときは ★**「不合格」ではなく「判定不能」**にします（★`CK-14`）。
+ *   ★★測れていないものを「落ちた」と書かない。
  */
-const BURN_IN = 2 * 52;
+const BURN_IN = LIFECYCLE_WEEKS.retireAt;
+const MIN_WINDOW = LIFECYCLE_WEEKS.retireAt - LIFECYCLE_WEEKS.raceableFrom;
 const steady = series.slice(BURN_IN);
+if (steady.length < MIN_WINDOW) {
+  console.log('');
+  console.log(`🔴 ★**判定できません。** ★窓が短すぎます`);
+  console.log(`   ★捨てる ${BURN_IN} 週（自前の仔が 1 頭も引退していない期間）`
+    + ` ＋ 測る ${MIN_WINDOW} 週（現役 1 期）＝ ★**最低 ${((BURN_IN + MIN_WINDOW) / 52).toFixed(0)} 年**`);
+  console.log(`   ★いまの窓: ${series.length} 週（★うち測れるのは ${steady.length} 週）`);
+  console.log('   → ★`--years 10` などで回し直してください');
+  process.exit(2);
+}
 const diffs = steady.map((s) => s.debuted - s.retired);
 const n = steady.length;
 const born = steady.reduce((a, s) => a + s.debuted, 0);
