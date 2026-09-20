@@ -43,6 +43,12 @@ export const READONLY = [
    */
   'measure-catchup-cost.mjs',
   /**
+   * ★DB の 1 往復にかかる時間を測る（★2026-09-20・`CATCHUP-TOO-SLOW`）。
+   *   🔴 ★**`select 1` しか投げません** — ★行を作らず、変えず、消しません。
+   *   ★本番に向けても安全です（★実際に production / staging の両方で流しました）。
+   */
+  'diag-db-roundtrip.mjs',
+  /**
    * ★AL-6（裁定 REVIEW_CONSULT_ARCADE_LOOP_ANSWER_20260918）の測定器 2 本。
    *   ★DB に触りません（★エンジンを回して時間を測るだけ・出力はローカルの JSON とログ）。
    *   ★レビュー側が独立に再実行できるよう tmp/ から移しました（★tmp/ は gitignore で次の人に残らない）。

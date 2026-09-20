@@ -58,6 +58,32 @@ console.log(`★本番の SHA  : ${sha ?? '（出ていません）'}`);
 console.log(`★枝 / 環境    : ${ref ?? '—'} / ${env ?? '—'}　（応答時刻 ${at ?? '—'}）`);
 
 /**
+ * ★**見たことを記録する**（★2026-09-20・**DP-1** / 正典 §17 の **O-6**）。
+ *
+ * 🔴 ★**なぜ要るか**: ★この道具は ★**人が回したときしか走りません**。
+ *    ★**回さなかった日から、★静かに無検査**になります（★これが `DP-1` そのもの）。
+ *    ✔ ★そして実際に **3 回** 起きました: ★8 日（2026-08-20 頃）／
+ *      ★13 日（2026-09-02・★オーナーが気づいた）／★1 か月（2026-09-20・VPS 側）。
+ *    → ★**回した事実を版管理に残し、★それが古びたら検定が落ちる**形にします。
+ *      ★`apps/cli/test/prod-build-freshness.test.ts` が時計で見ます。
+ *
+ * ⚠️ ★**一致しなくても記録します。** ★「見に行った」ことが記録の中身で、
+ *    ★「一致した」ことではありません（★食い違いを隠すために記録を止めない）。
+ */
+if (process.argv.includes('--record')) {
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  mkdirSync('evidence/prod-build', { recursive: true });
+  writeFileSync('evidence/prod-build/last-check.json', `${JSON.stringify({
+    checkedAt: new Date().toISOString(),
+    base: BASE,
+    localHead: expected,
+    prod: { sha: sha ?? null, ref: ref ?? null, env: env ?? null },
+    matched: sha === expected,
+  }, null, 2)}\n`, 'utf8');
+  console.log('★記録しました: evidence/prod-build/last-check.json');
+}
+
+/**
  * ⚠️ ★**`sha` が無いときは「一致」と言いません**（R-3・判定不能は FAIL へ）。
  *    ★Vercel 以外で動いている／システム環境変数が切られている、のどちらかです。
  */

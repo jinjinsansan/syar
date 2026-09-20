@@ -1,0 +1,33 @@
+# O-7 anon の権限（2026-09-20・読むだけ）
+
+## 関数の EXECUTE
+production:  anon=YES auth=YES  exchange_prize(bigint,uuid)
+             anon=YES auth=YES  place_bet(uuid,text,jsonb,integer,uuid)
+             anon=YES auth= -   spend_training_ep(uuid,bigint,integer)
+staging:     anon= -  auth=YES  exchange_prize / place_bet
+             anon= -  auth= -   spend_training_ep
+
+## 悪用できるか（★読んで判断。★呼んでいません）
+3 つとも SECURITY DEFINER で、本体の 1 行目が perform assert_setup_complete()。
+assert_setup_complete() は auth.uid() が null なら「未認証」で raise する。
+→ anon の uid は null なので、★いまは弾かれる。
+🔴 ただし多層防御が 1 枚 欠けている。★その 1 行を書き忘れた関数が 1 つ出た日に開く。
+
+## V-20 の全体
+=== V-20 の判定 ===
+  ✅ ★③ 登録簿に無いオブジェクトが無い（新しいテーブルを黙って足せない）
+  🔴 登録簿に、DB に存在しないものが残っていない
+       ★登録簿にあるが DB に無い: world_state_public, horse_market_listing_public, stable_grade_price_public, horse_story_event_public, my_horses, my_runs, bet_limits, world_state, horse_story_event, horse_market_listing, stable_grade_price, story_daily
+  ✅ ★① anon / authenticated に書き込み権限が無い（TRUNCATE を含む）
+  ✅ ★④ 登録簿に無い関数が無い（新しい関数を黙って足せない）
+  🔴 関数の登録簿に、DB に存在しないものが残っていない
+       ★登録簿にあるが DB に無い: create_account(text,text,text,text,uuid,uuid), initial_horse_candidates(uuid), pick_initial_horse(), bet_allowance(uuid,uuid,text), my_bet_allowance(uuid,text), is_initial_horse_candidate(uuid), enter_race(uuid,uuid,text,jsonb,uuid), buy_horse(uuid,uuid), sell_horse(uuid,uuid), unlock_stable_grade(uuid,uuid)
+  🔴 ★④ 関数の EXECUTE が登録簿どおり（anon / authenticated）
+       ★exchange_prize(bigint,uuid).EXECUTE(anon) 実測=true 期待=false, place_bet(uuid,text,jsonb,integer,uuid).EXECUTE(anon) 実測=true 期待=false, spend_training_ep(uuid,bigint,integer).EXECUTE(anon) 実測=true 期待=false
+  ✅ ★② 公開ビュー以外は anon から0行
+  ✅ 公開ビューは anon から読める（塞ぎすぎていない）
+  ✅ ★races.server_seed が anon から読めない（§8.6 Provably Fair）
+  ✅ ★horses.potential が anon から読めない（§12.4 本人にも数値を見せない）
+  ✅ ★horses.genotype が anon から読めない（§5.5 生値を送らない）
+
+=== 🔴 V-20 不合格 3 件（11 件中・環境 production） ===
