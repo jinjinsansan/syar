@@ -30,6 +30,7 @@ import { createHash, createHmac } from 'node:crypto';
 import { settleRace } from '../apps/worker/src/settle.ts';
 import { conditionsFromFrozen } from '../packages/race-engine/src/index.ts';
 import { loadEnv } from './lib/env.mjs';
+import { exitWithVerdict, verdictOf } from './lib/counted-verdict.mjs';
 
 const argNum = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ? d : Number(process.argv[i + 1]); };
 const LIMIT = argNum('limit', 500);
@@ -196,15 +197,20 @@ console.log('🔴 ★**「一致した」と「照合できない」を混ぜな
 console.log('   ★この道具は ★**照合できた本数**しか保証しません。');
 
 /**
- * 🔴 ★**1 本も照合していないのに 0 を返さない**（★**CK-14**・2026-09-20）。
+ * 🔴 ★**判定は部品に任せます**（★**CK-14**・`tools/lib/counted-verdict.mjs`）。
  *
- * ⚠️ ★5 つ目の箱を足した直後、★この道具は ★**全部を「版不明」に落として 0 を返しました**。
- *   ★★食い違い 0 本 ＝ 合格、に見えます。★★**機能が消えた状態が満点**です。
- * → ★**照合できた本数が 0 なら、★判定不能（終了コード 2）**を返します。
+ * ⚠️ ★最初はここに `process.exit(mismatches.length === 0 ? 0 : 1)` と書いていました。
+ *   ★5 つ目の箱を足した直後、★**全部が「版不明」に落ちて 0 を返しました**
+ *   （★★1 本も照合していないのに「合格」）。
+ * → ★**「0 件 通過」を合格として返せない部品**に通します。
  */
-if (checked === 0) {
-  console.log('');
-  console.log('🔴🔴 ★**1 本も照合していません。★これは「合格」ではありません（判定不能）。**');
-  process.exit(2);
-}
-process.exit(mismatches.length === 0 ? 0 : 1);
+exitWithVerdict(verdictOf({
+  checked,
+  failed: mismatches.length,
+  label: '★着順の再計算による照合（F-3）',
+  skipped: {
+    '版不明': unknownVersion.length,
+    '入力が欠けている': skipped.length,
+    '凍結が無い（対象外）': total - races.length,
+  },
+}));
