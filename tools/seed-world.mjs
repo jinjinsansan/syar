@@ -208,7 +208,7 @@ function lifeColumns(preseedId) {
  *   ★**手で書いた順は、★増えた日に黙って古くなります。**
  *   → ★★**`pg_constraint` から毎回 引きます。** ★増えた表は自動で入ります。
  */
-async function deleteAllHorses() {
+async function deleteAllHorses(roots) {
   const edges = (await c.query(`
     select src.relname as child, tgt.relname as parent, con.confdeltype as on_delete
       from pg_constraint con
@@ -231,7 +231,15 @@ async function deleteAllHorses() {
       walk(ch);
     }
   };
-  walk('horses');
+  /**
+   * ★**根を複数 取れます**（★2026-09-20・案 A）。
+   *
+   * ⚠️ ★根そのものも `mustEmpty` に入れます（★`horses` だけは最後に別で消していたので、
+   *    ★そこは呼ぶ側の形を保ちます）。
+   */
+  for (const root of roots) walk(root);
+  // ★根どうしの依存（★`race_entries` は `races` の子でもある）を順に反映させる
+  for (const root of roots) if (root !== 'horses') mustEmpty.add(root);
 
   const order = [];
   const placed = new Set();
@@ -254,18 +262,58 @@ async function deleteAllHorses() {
   await c.query('begin');
   try {
     for (const t of order) {
+      /**
+       * ★**1 文ごとに時間を出します**（★2026-09-20）。
+       * 🔴 ★`race_odds` は staging で **1,550 万行** 規模です。
+       *    ★★**本番で初めて「30 分 かかる」を知らないため**に、★ここで毎回 測ります。
+       */
+      const t0 = process.hrtime.bigint();
       const res = await c.query(`delete from ${t}`);
-      console.log(`  ★先に空にしました: ${t}（${(res.rowCount ?? 0).toLocaleString()} 行）`);
+      const sec = Number(process.hrtime.bigint() - t0) / 1e9;
+      console.log(`  ★先に空にしました: ${t}（${(res.rowCount ?? 0).toLocaleString()} 行 / ${sec.toFixed(1)}秒）`);
+      wipedCounts[t] = res.rowCount ?? 0;
     }
     const res = await c.query('delete from horses');
     console.log(`  既存の馬を削除しました（${(res.rowCount ?? 0).toLocaleString()} 頭）`);
+    wipedCounts['horses'] = res.rowCount ?? 0;
     await c.query('commit');
   } catch (e) {
     await c.query('rollback');
     throw e;
   }
 }
-await deleteAllHorses();
+/**
+ * 🔴 ★**`races` / `race_odds` も消すか**（★案 A・裁定 2026-09-20）。
+ *
+ * 【★なぜ要るか】
+ *   ★`horses` を消すのに必要なのは `race_entries` までで、★`races` と `race_odds` は**残ります**。
+ *   ✔ ★実測（2026-09-20・本番）: ★`races` **6,152 行** ／ `race_odds` **15,490,715 行**。
+ *   → ★★**出走馬が 1 頭も居ない「確定済みレース」が 6,152 本**残ります。
+ *
+ * 【★消す理由（★裁定の 4 つ）】
+ *   ★① ★出走馬が 1 頭も居ないレースは ★**履歴ではなく、壊れた行**
+ *   ★② ★`races_public` は `race_entries` と結合する → ★**空のレースが画面に並ぶ**
+ *   ★③ ★`entrant_snapshot` が 0 なので ★**F-3 で照合できない ＝ 何の証拠にもならない**
+ *   ★④ ★2026-08-20 のエンジンの記録 → ★**今日のエンジンの記録として読めない**
+ *   ✔ ★そして ★**困る人が 1 人も居ません**（★本番実測: users 0 / bets 0 / 台帳 0）。
+ *
+ * 【⚠️ ★なぜ既定で消さないのか】
+ *   ★`horses` の作り直しに ★**必要ではない**からです。
+ *   ★★**「ついでに消す」を既定にすると、★消す範囲が黙って広がります。**
+ *   → ★**明示した人だけが消せる形**にします（★`--flatten` / `--allow-all-names` と同じ作法）。
+ */
+const WIPE_RACES = process.argv.includes('--wipe-races');
+/** ★消した行数（★後で `evidence/world-build/` に残します） */
+const wipedCounts = {};
+await deleteAllHorses(WIPE_RACES ? ['horses', 'races'] : ['horses']);
+if (!WIPE_RACES) {
+  const left = await c.query(
+    'select (select count(*) from races)::int r, (select count(*) from race_odds)::int o',
+  );
+  console.log(`  ⚠️ ★--wipe-races なし: ★races ${left.rows[0].r.toLocaleString()} 行 / `
+    + `race_odds ${left.rows[0].o.toLocaleString()} 行 が ★**残ります**`);
+  console.log('     🔴 ★出走馬の居ない確定済みレースが残ると、★画面に空の行が並びます');
+}
 
 // UUID はアプリ側で振り、プリシードの ID と対応づける
 const uuid = new Map();
@@ -402,6 +450,9 @@ console.log('');
     /** 🔴 ★名前が検査されたか（★0 件 かつ allowAll なら**未検査**） */
     nameBlocklistSize: ngSize,
     nameCheckSkipped: ALLOW_ALL,
+    /** 🔴 ★**消す前の数**（★行は消すが、★記録は残す・`STABLE-1-SKEW` と同じ作法） */
+    wipedCounts,
+    wipedRaces: WIPE_RACES,
   }, null, 2)}
 `, 'utf8');
   console.log(`  ★世界の素性を残しました: ${path}`);
