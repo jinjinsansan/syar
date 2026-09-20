@@ -482,8 +482,41 @@ async function deleteAllHorses(roots) {
 const WIPE_RACES = process.argv.includes('--wipe-races');
 /** ★追いつきの最中に引退した頭数（★下の判定②で使います） */
 let retiredDuringCatchUp = 0;
+/**
+ * 🔴 ★**素性は「始める前」に書きます**（★2026-09-20・レビュー側の指摘）。
+ *   ★本番の作り直しで ★**判定 4 つを全部 通した後**に落ち（★`ReferenceError`）、
+ *   ★素性を最後に書いていたので ★**何も残りませんでした**（★`nameCheckSkipped` を含む）。
+ *   🔴 ★★**証跡は成功したときだけのものではありません。★落ちたときこそ要ります。**
+ */
+const provenancePath = `evidence/world-build/${
+  new Date(nowMs).toISOString().replace(/[:.]/g, '-')}.json`;
+/** ★素性を書く（★`phase` を差し替えながら 2 回 呼びます） */
+async function writeProvenance(phase, extra = {}) {
+  const fs = await import('node:fs');
+  fs.mkdirSync('evidence/world-build', { recursive: true });
+  fs.writeFileSync(provenancePath, `${JSON.stringify({
+    phase,
+    builtAtIso: new Date(nowMs).toISOString(),
+    seed: SEED,
+    generations: GENERATIONS,
+    referenceWeek,
+    nameBlocklistSize: ngSize,
+    nameCheckSkipped: ALLOW_ALL,
+    environment: dbEnvironment,
+    yesProduction: YES_PRODUCTION,
+    wipeWorld: WIPE_WORLD,
+    expectHorses: EXPECT_HORSES,
+    wipedRaces: WIPE_RACES,
+    catchUp: CATCH_UP,
+    ...extra,
+  }, null, 2)}
+`, 'utf8');
+  return provenancePath;
+}
 /** ★消した行数（★後で `evidence/world-build/` に残します） */
 const wipedCounts = {};
+// 🔴 ★**消す前に、★何をしようとしているかを残します**（★落ちても残るように）
+console.log(`  ★素性を先に書きました（★これから始めます）: ${await writeProvenance('started')}`);
 await deleteAllHorses(WIPE_RACES ? ['horses', 'races'] : ['horses']);
 if (!WIPE_RACES) {
   const left = await c.query(
@@ -719,35 +752,19 @@ console.log('');
 {
   const { mkdirSync, writeFileSync } = await import('node:fs');
   mkdirSync('evidence/world-build', { recursive: true });
-  const stamp = new Date(nowMs).toISOString().replace(/[:.]/g, '-');
-  const path = `evidence/world-build/${stamp}.json`;
-  writeFileSync(path, `${JSON.stringify({
-    builtAtIso: new Date(nowMs).toISOString(),
-    seed: SEED,
-    generations: GENERATIONS,
-    referenceWeek,
+  // ★終わったので「どうなったか」を追記します（★`started` を上書き）
+  const written = await writeProvenance('done', {
     inserted: n,
     tally,
-    catchUp: CATCH_UP,
     /** 🔴 ★接続が切れて繋ぎ直した回数（★0 でなければ ②b は判定不能） */
     reconnects,
     /** 🔴 ★**落ちた検査と、★判定できなかった検査**（★合格の側に落とさない） */
     checksFailed: fails,
     checksUndecided: undecided,
-    /** 🔴 ★名前が検査されたか（★0 件 かつ allowAll なら**未検査**） */
-    nameBlocklistSize: ngSize,
-    nameCheckSkipped: ALLOW_ALL,
     /** 🔴 ★**消す前の数**（★行は消すが、★記録は残す・`STABLE-1-SKEW` と同じ作法） */
     wipedCounts,
-    wipedRaces: WIPE_RACES,
-    /** 🔴 ★**本番に向けて流したか**（★後から読めるように） */
-    environment: dbEnvironment,
-    yesProduction: YES_PRODUCTION,
-    wipeWorld: WIPE_WORLD,
-    expectHorses: EXPECT_HORSES,
-  }, null, 2)}
-`, 'utf8');
-  console.log(`  ★世界の素性を残しました: ${path}`);
+  });
+  console.log(`  ★世界の素性を残しました: ${written}`);
   if (ALLOW_ALL) console.log('  🔴 ★**nameCheckSkipped: true** — ★この世界の名前は未検査です');
 }
 
