@@ -37,7 +37,21 @@ function broadDeleteSites(src: string): string[] {
   });
   const body = lines.join('\n');
 
-  for (const m of body.matchAll(/delete\s+from\s+[\w.${}]+([^;]*)/gi)) {
+  /**
+   * 🔴 ★**左に語の切れ目を要求します**（★2026-09-20）。
+   *
+   *   ⚠️ ★これが無いと、★**識別子の末尾**を文の頭と読み違えます。★実例:
+   *   ```sql
+   *   select con.confdeltype as on_delete
+   *     from pg_constraint con          -- ★`on_delete` ＋ 改行 ＋ `from …` で当たっていた
+   *   ```
+   *   ★`tools/diag-horses-refs.mjs`（★**読むだけの道具**）が、★これで
+   *   ★「条件なしの全消しが 1 件」と数えられました。
+   *
+   *   ★`tool-guard.test.ts` が `truncate` で同じ直しをしています
+   *   （★「語で弾くと、★**書き込みを検査する道具が書き込む道具に見える**」）。★同じ形です。
+   */
+  for (const m of body.matchAll(/(?<![\w$])delete\s+from\s+[\w.${}]+([^;]*)/gi)) {
     const tail = m[1] ?? '';
     // ★述語の切れ目まで（★次の `)` や引用符の閉じで十分）
     const pred = tail.slice(0, 160);
@@ -50,6 +64,27 @@ function broadDeleteSites(src: string): string[] {
 }
 
 describe('★CLEANUP-NO-RECORD: 自分が作った行以外を消す delete', () => {
+  /**
+   * 🔴 ★**網そのものを試す**（★R-14: ★検出器は自分自身を検査しない）。
+   *   ★2026-09-20 に左の語境界を足したので、★**拾うものと拾わないものを両方**置きます。
+   */
+  it('★網が、★拾うべきものを拾い、★識別子を拾わない', () => {
+    // ★拾うべき
+    expect(broadDeleteSites('await c.query("delete from horses")').length,
+      '★条件なしの全消しを見逃した').toBe(1);
+    expect(broadDeleteSites('await c.query(`delete from ${t}`)').length,
+      '★表名が変数でも拾う').toBe(1);
+    expect(broadDeleteSites("q('delete from races where cycle_index >= 900000')").length,
+      '★範囲比較を見逃した').toBe(1);
+    // ★拾ってはいけない
+    expect(broadDeleteSites('q("delete from races where id = $1")'),
+      '★自分の行だけを消すものを拾った').toEqual([]);
+    expect(
+      broadDeleteSites('q(`select con.confdeltype as on_delete\n  from pg_constraint con`)'),
+      '🔴 ★識別子 `on_delete` の末尾を文の頭と読み違えた',
+    ).toEqual([]);
+  });
+
   const files = execSync('git ls-files tools', { cwd: ROOT, encoding: 'utf8' })
     .trim().split('\n')
     .filter((f) => f.endsWith('.mjs') && !f.startsWith('tools/lib/'))

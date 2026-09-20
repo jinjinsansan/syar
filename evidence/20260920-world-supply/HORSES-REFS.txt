@@ -1,0 +1,59 @@
+# horses を参照する表と、消す順（2026-09-20・読むだけ）
+
+## production（移行 20/53・いまの姿）
+# `horses` を参照している外部キー
+
+  ★NO ACTION  horses.horses_dam_id_fkey
+  ★NO ACTION  horses.horses_sire_id_fkey
+  ★NO ACTION  race_entries.race_entries_horse_id_fkey
+  ✅ CASCADE  horse_week_log.horse_week_log_horse_id_fkey
+
+  ★外部キー 4 本 / 表 3 種類
+  🔴 ★**削除を止めるもの（cascade でも set null でもない）: 3 本**
+
+【★いま行が在るか】★在れば `horses` の全件 削除はそこで落ちます
+  🔴 horses                       7,355 行
+  🔴 race_entries                 79,762 行
+
+  🔴🔴 ★**`horses` の全件 削除は落ちます。** ★2 表に行が在ります:
+     horses(7,355) / race_entries(79,762)
+  → ★**子から順に消すか、★cascade を足す移行を書くか**を先に決めること。
+
+【★消す順の案】★`horses` から下流へ推移的に辿り、★葉から並べたもの
+  1. race_entries               を空にする  -- 79,762 行
+  2. horses を空にする
+
+  ⚠️ ★**1 つの取引（transaction）で**流すこと。★途中で落ちたら全部 戻すため。
+  ⚠️ ★**ワーカーを止めてから**流すこと。★動いていると、消している間に増えます。
+
+## staging（53/53 ＝ 移行後の本番の姿）
+# `horses` を参照している外部キー
+
+  ★NO ACTION  horse_market_listing.horse_market_listing_horse_id_fkey
+  ★NO ACTION  horse_story_event.horse_story_event_horse_id_fkey
+  ★NO ACTION  horses.horses_dam_id_fkey
+  ★NO ACTION  horses.horses_sire_id_fkey
+  ★NO ACTION  race_entries.race_entries_horse_id_fkey
+  ✅ CASCADE  horse_week_log.horse_week_log_horse_id_fkey
+
+  ★外部キー 6 本 / 表 5 種類
+  🔴 ★**削除を止めるもの（cascade でも set null でもない）: 5 本**
+
+【★いま行が在るか】★在れば `horses` の全件 削除はそこで落ちます
+  🔴 horse_market_listing         15 行
+  🔴 horse_story_event            77 行
+  🔴 horses                       7,370 行
+  🔴 race_entries                 981 行
+
+  🔴🔴 ★**`horses` の全件 削除は落ちます。** ★4 表に行が在ります:
+     horse_market_listing(15) / horse_story_event(77) / horses(7,370) / race_entries(981)
+  → ★**子から順に消すか、★cascade を足す移行を書くか**を先に決めること。
+
+【★消す順の案】★`horses` から下流へ推移的に辿り、★葉から並べたもの
+  1. race_entries               を空にする  -- 981 行
+  2. horse_story_event          を空にする  -- 77 行
+  3. horse_market_listing       を空にする  -- 15 行
+  4. horses を空にする
+
+  ⚠️ ★**1 つの取引（transaction）で**流すこと。★途中で落ちたら全部 戻すため。
+  ⚠️ ★**ワーカーを止めてから**流すこと。★動いていると、消している間に増えます。

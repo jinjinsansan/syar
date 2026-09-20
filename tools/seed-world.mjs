@@ -149,8 +149,84 @@ function lifeColumns(preseedId) {
   };
 }
 
-await c.query('delete from horses');
-console.log('  既存の馬を削除しました');
+/**
+ * 🔴 ★**`delete from horses` の 1 文では落ちます**（★2026-09-20・レビュー側が指摘・★実測で確認）。
+ *
+ * ✔ ★**実測**（`tools/diag-horses-refs.mjs`・★読むだけ）:
+ *   ★`horses` を止める形で参照している外部キー … ★**本番 3 本 / staging 5 本**
+ *   ★行が在る表 … ★**本番 `race_entries` 79,746 行 ／ staging は さらに
+ *     `horse_story_event` 77・`horse_market_listing` 15**。
+ *   ★`on delete cascade` が付いているのは ★**`horse_week_log` の 1 本だけ**。
+ *   → ★★**空の DB でしか通っていませんでした。**
+ *
+ * 【★`cascade` を足さない理由】
+ *   ★「消しやすくするため」に製品の制約を緩めることになります。
+ *   ★`cascade` にすると、★**将来 馬を 1 頭 消したときに、★その馬のレース記録が黙って消えます**。
+ *   → ★**順に消します**（★レビュー側も同じ判断）。
+ *
+ * 【★順を手で書かない理由（★D-052）】
+ *   ★表はこれからも増えます（★移行 33 件 で 2 つ 増えました）。
+ *   ★**手で書いた順は、★増えた日に黙って古くなります。**
+ *   → ★★**`pg_constraint` から毎回 引きます。** ★増えた表は自動で入ります。
+ */
+async function deleteAllHorses() {
+  const edges = (await c.query(`
+    select src.relname as child, tgt.relname as parent, con.confdeltype as on_delete
+      from pg_constraint con
+      join pg_class src on src.oid = con.conrelid
+      join pg_class tgt on tgt.oid = con.confrelid
+      join pg_namespace ns on ns.oid = src.relnamespace
+     where con.contype = 'f' and ns.nspname = 'public'`)).rows;
+  const childrenOf = new Map();
+  for (const e of edges) {
+    // ★cascade / set null は DB が面倒を見る。★自己参照は 1 文の delete の中で解ける
+    if (e.on_delete === 'c' || e.on_delete === 'n' || e.child === e.parent) continue;
+    if (!childrenOf.has(e.parent)) childrenOf.set(e.parent, new Set());
+    childrenOf.get(e.parent).add(e.child);
+  }
+  const mustEmpty = new Set();
+  const walk = (t) => {
+    for (const ch of childrenOf.get(t) ?? []) {
+      if (mustEmpty.has(ch)) continue;
+      mustEmpty.add(ch);
+      walk(ch);
+    }
+  };
+  walk('horses');
+
+  const order = [];
+  const placed = new Set();
+  for (let guard = 0; guard < 50 && order.length < mustEmpty.size; guard += 1) {
+    for (const t of mustEmpty) {
+      if (placed.has(t)) continue;
+      if ([...(childrenOf.get(t) ?? [])].every((x) => !mustEmpty.has(x) || placed.has(x))) {
+        order.push(t); placed.add(t);
+      }
+    }
+  }
+  if (order.length < mustEmpty.size) {
+    throw new Error(
+      `seed-world: 消す順を決められません（★環があります）: `
+        + `${[...mustEmpty].filter((t) => !placed.has(t)).join(', ')}`,
+    );
+  }
+
+  // 🔴 ★**1 つの取引で**。★途中で落ちたら全部 戻す（★半分 消えた世界を残さない）
+  await c.query('begin');
+  try {
+    for (const t of order) {
+      const res = await c.query(`delete from ${t}`);
+      console.log(`  ★先に空にしました: ${t}（${(res.rowCount ?? 0).toLocaleString()} 行）`);
+    }
+    const res = await c.query('delete from horses');
+    console.log(`  既存の馬を削除しました（${(res.rowCount ?? 0).toLocaleString()} 頭）`);
+    await c.query('commit');
+  } catch (e) {
+    await c.query('rollback');
+    throw e;
+  }
+}
+await deleteAllHorses();
 
 // UUID はアプリ側で振り、プリシードの ID と対応づける
 const uuid = new Map();

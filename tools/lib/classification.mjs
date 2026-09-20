@@ -49,6 +49,12 @@ export const READONLY = [
    */
   'diag-db-roundtrip.mjs',
   /**
+   * ★`horses` を参照している表を数え、★消す順を出す（★2026-09-20・世界の作り直しの前提）。
+   *   🔴 ★**`pg_constraint` と `count(*)` しか見ません** — ★1 行も作らず、変えず、消しません。
+   *   ★順を**印刷するだけ**で、★消しません（★消すのは `seed-world.mjs`）。
+   */
+  'diag-horses-refs.mjs',
+  /**
    * ★AL-6（裁定 REVIEW_CONSULT_ARCADE_LOOP_ANSWER_20260918）の測定器 2 本。
    *   ★DB に触りません（★エンジンを回して時間を測るだけ・出力はローカルの JSON とログ）。
    *   ★レビュー側が独立に再実行できるよう tmp/ から移しました（★tmp/ は gitignore で次の人に残らない）。
