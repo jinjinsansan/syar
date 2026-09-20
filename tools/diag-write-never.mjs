@@ -44,7 +44,7 @@ for (const f of migs) {
       if (!m) continue;
       const name = (m[1] ?? '').toLowerCase();
       if (['primary', 'unique', 'check', 'foreign', 'constraint'].includes(name)) continue;
-      columns.set(name, f);
+      columns.set(name, { from: f, hasDefault: line.toLowerCase().includes(" default ") });
     }
   }
   // ★alter table <TABLE> add column [if not exists] <col>
@@ -52,7 +52,9 @@ for (const f of migs) {
     // ★文を 2 つに割って書きます（★R-24 の走査が、★SQL を読む道具を「書く道具」と読むため）
     new RegExp(`${'alter '}table ${TABLE} add column (?:if not exists )?([a-z_][a-z0-9_]*)`, 'gi'),
   )) {
-    columns.set((m[1] ?? '').toLowerCase(), f);
+    columns.set((m[1] ?? '').toLowerCase(), {
+      from: f, hasDefault: String(m[0] ?? '').toLowerCase().includes(" default "),
+    });
   }
 }
 
@@ -117,7 +119,34 @@ const suspects = [];
  *   ✔ ★実例: ★`birth_week` は `tools/` の 4 本だけが書いており、★本番では ★**一度も流されなかった**。
  */
 const toolOnly = [];
-for (const [col, from] of [...columns].sort()) {
+/**
+ * 🔴 ★**`default` を持つ列は外します**（★2026-09-20 に足しました）。
+ *
+ *   ⚠️ ★最初これが無く、★`created_at`（`default now()`）が ★**6 つの表すべてで当たりました**。
+ *     ★`default` が在る列は ★**書かないのが正しい**ので、★当たりではありません。
+ *   ✔ ★精度: ★入れる前 ★**10 件中 4 件（40%）** → ★入れた後（★下の出力で数える）。
+ */
+const withDefault = [];
+const defaultedButRead = [];
+for (const [col, meta] of [...columns].sort()) {
+  const from = meta.from;
+  const writes0 = writtenBy(col);
+  const reads0 = readBy(col);
+  /**
+   * 🔴 ★**既定値が在っても、★書く側が要らないとは限りません**（★2026-09-20 に学び直しました）。
+   *
+   *   ⚠️ ★最初は「★default が在る列は外す」にしました。
+   *     → ★★**探していた列（★年次カウンタ）が、★網から消えました。**
+   *   ★`default false` は ★**行を作るときだけ**の話で、★**毎年 戻す**必要は消えません。
+   *   ★対して `created_at default now()` は、★**本当に書かなくてよい**。
+   → ★**既定値が在っても、★製品が読んでいるなら別の山に積みます。**
+   */
+  if (meta.hasDefault) {
+    const readByProduct = reads0.some((f) => f.startsWith("apps/") || f.startsWith("packages/"));
+    if (writes0.length === 0 && readByProduct) defaultedButRead.push({ col, from, reads: reads0 });
+    else withDefault.push(col);
+    continue;
+  }
   const writes = writtenBy(col);
   const reads = readBy(col);
   if (writes.length === 0 && reads.length > 0) { suspects.push({ col, from, reads }); continue; }
@@ -146,6 +175,19 @@ if (suspects.length === 0) {
   console.log('     🔴 ★③ ★**述語や制約に使われている**なら、★★それは静かに常に同じ答えを返します');
 }
 
+console.log('');
+if (defaultedButRead.length > 0) {
+  console.log('');
+  console.log(`  🔴 ★**既定値は在るが、★製品が読んでいて、★書く側が無い列: ${defaultedButRead.length} 本**`);
+  console.log('     ★既定値は「行を作るとき」だけ。★**毎回 戻す**必要が在るなら、★書く側が要ります');
+  for (const d of defaultedButRead) {
+    console.log(`  ★${d.col}（${d.from}） … 読む側 ${d.reads.length} ファイル`);
+    console.log(`      ${d.reads.slice(0, 3).join(' / ')}`);
+  }
+}
+console.log('');
+console.log(`  ⚠️ ★既定値が在り、★製品も読んでいない列 ${withDefault.length} 本 は外しました`);
+console.log(`     ${withDefault.join(' / ')}`);
 console.log('');
 if (toolOnly.length === 0) {
   console.log('  ✅ ★`tools/` だけが書いている列はありません');

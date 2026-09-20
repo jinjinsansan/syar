@@ -544,6 +544,29 @@ export const OPEN_FINDINGS = [
     until: '2026-10-11',
   },
   {
+    id: 'CAP-VIOLATIONS-DISCARDED',
+    what: '🔴 ★**エンジンは「不正の兆候かもしれない」記録を作って、★捨てています**。'
+      + '★`race_entries.cap_violations` 列は在るのに、★**誰も書きません**（★`DB-1` の 5 例目）',
+    why: '✔ ★**実測**（2026-09-20・★静的・`tools/diag-write-never.mjs --table race_entries`）:'
+      + '★`cap_violations` は ★**読む側が在るのに、★書く SQL が 0 件**。'
+      + '✔ ★筋を確かめました: ★`packages/race-engine/src/race.ts:254` の註記が'
+      + '★**「クランプは黙って行わず `capViolations` に記録する（★不正の兆候かもしれないため）」**と書き、'
+      + '★`:258` で積み、★`:342` で ★**`resolveRace` の戻り値に入れて返しています**。'
+      + '🔴 ★しかし ★**`apps/worker/src` で `capViolations` を読む箇所は 0 件**。'
+      + '→ ★★**作って、返して、★受け取らずに捨てています。** ★列は空のままです。'
+      + '⚠️ ★**過大に読まないこと**: ★これは「不正が起きている」ではありません。'
+      + '★**起きたとき気づく手立てが無い**、という話です（★`F3-NO-RESULT-AUDIT` と同じ形）。'
+      + '🔴 ★**`PROD-NEVER-AGED` の族の 5 例目**です:'
+      + '★① `birth_week` ② `retired_at_week` ③ 年次カウンタ ④ NG リスト ⑤ ★これ。'
+      + '★★**5 件とも「仕組みは在る・読む側も在る・誰も繋がなかった」。**'
+      + '✅ ★**直すのは安いはず**: ★`resolveRace` は既に返しています。'
+      + '★`settleRace` が着順を書くのと同じ取引で、★1 列 足すだけです。'
+      + '⏸ ★**いま直しません** — ★`race_entries` に書く経路（`pg-store.ts`）は '
+      + '★**F-3 で触ったばかり**なので、★裁定を仰ぎます（★同じ場所を 2 度 触らない）',
+    owner: 'review',
+    until: '2026-10-31',
+  },
+  {
     id: 'COUNTER-NEVER-WRITTEN',
     what: '🔴 ★**`bred_this_year` / `coverings_this_year` は、★誰も書きません**（★列は在る・★`canMate` は見る）。'
       + '★**2 年目から、★全繁殖牝馬が「今年まだ配合していない」まま**になります',
