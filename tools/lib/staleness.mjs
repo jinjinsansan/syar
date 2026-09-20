@@ -76,6 +76,33 @@ export function ageDays(record, nowMs) {
  */
 export const STALENESS = [
   {
+    what: 'o7-staging',
+    label: '★V-20 / O-7（★公開ビュー以外が anon に開いていないこと）を staging で流した日',
+    maxAgeDays: 14,
+    how: 'npx tsx tools/verify-anon-exposure.mjs --env staging --record',
+    why: '🔴 ★**2026-09-20、★この検査は正しかったのに、★誰も流していませんでした。**'
+      + '✔ ★`0052` は staging に先に当たっていたのに、★`daily_run_log` の未登録が'
+      + '★★**本番へ当てた日に初めて**落ちました（★V-20 ③）。'
+      + '★★検査は在った。★正しかった。★**流していないだけ**でした — ★`DP-1` そのものです。'
+      + '⚠️ ★14 日 にした根拠は ★**移行が入る間隔**です（★33 件が 1 日で入った日が在る）。'
+      + '★露出は ★**表や関数が増えた日に変わる**ので、★移行より短い間隔で見る必要があります。'
+      + '⚠️ ★環境ごとに別の記録にしています（★staging を流して本番の記録が新しくなる、を防ぐ）',
+  },
+  {
+    what: 'o7-production',
+    label: '★V-20 / O-7 を ★**本番**で流した日',
+    maxAgeDays: 14,
+    pending: true,
+    until: '2026-09-27',
+    how: 'npx tsx tools/verify-anon-exposure.mjs --env production --record',
+    why: '⚠️ ★**まだ記録が在りません。** ★本番への接続は ★**この開発セッションの権限層が止める**ので'
+      + '（★読むだけでも `[Production Reads]` で拒否）、★オーナーに実行を依頼しています。'
+      + '✔ ★**判定そのものは 2026-09-20 に本番で通っています**（★V-20 合格・11 件中）。'
+      + '★足りないのは ★**`--record` を付けた実行**だけです。'
+      + '🔴 ★**期限までに記録が付かなければ落ちます。** ★そのとき `pending` を外して active にします。'
+      + '★★`pending` を「言い訳の置き場」にしないこと',
+  },
+  {
     what: 'prod-build',
     label: '★本番で動いているビルドの版（O-6 / DP-1）',
     maxAgeDays: 7,

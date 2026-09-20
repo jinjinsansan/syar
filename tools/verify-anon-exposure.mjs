@@ -37,6 +37,7 @@ import pg from 'pg';
 import { createClient } from '@supabase/supabase-js';
 
 import { loadEnv } from './lib/env.mjs';
+import { writeCheck } from './lib/staleness.mjs';
 import {
   EXPECTED_EXPOSURE, PUBLIC_VIEW, WRITE_PRIVILEGES,
   unregistered, stale, judgeGrants, judgeReads,
@@ -194,4 +195,25 @@ await client.end();
 
 const ng = results.filter((r) => !r.ok);
 console.log(`\n=== ${ng.length === 0 ? 'V-20 合格' : `🔴 V-20 不合格 ${ng.length} 件`}（${results.length} 件中・環境 ${environment}） ===`);
+
+/**
+ * 🔴 ★**見に行った事実を残す**（★`DP-1` / `--record`・2026-09-20 に足しました）。
+ *
+ * 【★なぜ足したか】
+ *   ⚠️ ★`0052` は staging に先に当たっていたのに、★**誰もこの検査を流していませんでした。**
+ *     → ★`daily_run_log` の未登録が、★**本番に当てた日に初めて**落ちました。
+ *   ★★**検査は在った。★正しかった。★流していないだけ**でした（★`DP-1` そのもの）。
+ *   → ★**流した日付を残し、★古びたら `staleness.test.ts` が落とします。**
+ * ⚠️ ★環境ごとに別の記録にします（★staging を流して本番の記録が新しくなる、を防ぐ）。
+ */
+if (process.argv.includes('--record')) {
+  const recorded = writeCheck({
+    what: `o7-${environment}`,
+    env: environment,
+    ok: ng.length === 0,
+    detail: { checked: results.length, failed: ng.length },
+    nowIso: new Date().toISOString(),
+  });
+  console.log(`  ★記録しました: ${recorded}`);
+}
 process.exit(ng.length === 0 ? 0 : 1);

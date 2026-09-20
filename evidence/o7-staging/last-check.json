@@ -1,0 +1,10 @@
+{
+  "checkedAt": "2026-09-20T10:46:30.680Z",
+  "what": "o7-staging",
+  "env": "staging",
+  "ok": true,
+  "detail": {
+    "checked": 11,
+    "failed": 0
+  }
+}

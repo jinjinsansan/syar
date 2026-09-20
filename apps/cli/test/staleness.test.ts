@@ -100,7 +100,7 @@ describe('🔴 ★記録が古びたら落ちる（DP-1）', () => {
   it('🔴 ★登録が黙って減らない（★CK-16・★見張りが静かに消えない）', () => {
     expect(items.length, '🔴 ★`STALENESS` の項目が減っています。'
       + '★減らしてよいなら、★この数も一緒に直してください（★人が判断した印）')
-      .toBeGreaterThanOrEqual(5);
+      .toBeGreaterThanOrEqual(7);
   });
 
   /**
