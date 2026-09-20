@@ -216,10 +216,42 @@ async function deleteAllHorses(roots) {
       join pg_class tgt on tgt.oid = con.confrelid
       join pg_namespace ns on ns.oid = src.relnamespace
      where con.contype = 'f' and ns.nspname = 'public'`)).rows;
+  /**
+   * 🔴 ★**`truncate` では、★`cascade` の辺も数えます**（★2026-09-20・★演習 2 回目が落ちて分かった）。
+   *
+   * 【★何が起きたか】
+   *   ★旧: ★「`cascade` / `set null` は DB が面倒を見る」として ★**辺を外していました**。
+   *     ★それは ★**`delete` の話としては正しい**（★DB が自動で処理します）。
+   *   🔴 ★しかし ★**`truncate` は違います**:
+   *   ```
+   *   error: cannot truncate a table referenced in a foreign key constraint
+   *   detail: Table "horse_week_log" references "horses".
+   *   ```
+   *   ★`truncate` は ★**参照している表が在るだけで拒みます**（★削除時の動作に関係なく）。
+   *
+   * 【🔴 ★学んだこと】
+   *   ★★**機構を変えると、★効く規則も変わります。**
+   *   ★集合の作り方は `delete` の意味に合わせて書いてあり、★`truncate` には合っていませんでした。
+   *   → ★**`truncate` なら、★参照している表を 1 つ残らず集合に入れます。**
+   *
+   * ⚠️ ★**`cascade` を付けて済ませません。** ★★名前を全部 並べます —
+   *    ★`cascade` は ★**集合の外まで巻き込みうる**からです。
+   */
   const childrenOf = new Map();
+  /** ★`truncate` のためだけに足した辺（★出力に出して、★違いを見えるようにします） */
+  const addedForTruncate = new Set();
   for (const e of edges) {
-    // ★cascade / set null は DB が面倒を見る。★自己参照は 1 文の delete の中で解ける
-    if (e.on_delete === 'c' || e.on_delete === 'n' || e.child === e.parent) continue;
+    // ★自己参照は 1 文の中で解けます（★truncate は 1 文なので問題になりません）
+    if (e.child === e.parent) continue;
+    const managedByDb = e.on_delete === 'c' || e.on_delete === 'n';
+    if (managedByDb) {
+      addedForTruncate.add(`${e.child} → ${e.parent}（${e.on_delete === 'c' ? 'cascade' : 'set null'}）`);
+      // 🔴 ★`set null` は、★`delete` なら「列を null にする」だけ。★`truncate` は**行ごと消えます**
+      if (e.on_delete === 'n') {
+        console.log(`  ⚠️ 🔴 ★${e.child} は ${e.parent} を set null で参照しています。`);
+        console.log('     ★`delete` なら列が null になるだけですが、★**truncate では行ごと消えます**。');
+      }
+    }
     if (!childrenOf.has(e.parent)) childrenOf.set(e.parent, new Set());
     childrenOf.get(e.parent).add(e.child);
   }
@@ -287,6 +319,11 @@ async function deleteAllHorses(roots) {
    *    ★`sire_id` / `dam_id` の索引は ★**配合の血統辿りにも効く**はずなので、★別に起票しました。
    */
   const all = [...order, 'horses'];
+  if (addedForTruncate.size > 0) {
+    console.log(`  ⚠️ ★\`truncate\` のために足した参照 ${addedForTruncate.size} 本`
+      + '（★`delete` なら DB が面倒を見るもの）:');
+    for (const a of addedForTruncate) console.log(`     ${a}`);
+  }
   const before = {};
   for (const t of all) {
     before[t] = Number((await c.query(`select count(*)::int n from ${t}`)).rows[0].n);

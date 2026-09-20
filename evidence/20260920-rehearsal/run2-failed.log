@@ -1,0 +1,78 @@
+[env] 接続先: secrets.staging.env
+
+🔴🔴 ★**--allow-all-names: ★実在競走馬名の NG 判定をしません**（★憲法 §0.1 / C-4）
+   ★この世界の名前は ★**未検査**です。★弁護士に見せる構成に使わないでください。
+   ★印を `evidence/world-build/` に残します。
+
+# プリシード世界の投入  seed=20260833 generations=50
+  生成 40755 頭（154.5秒）
+  投入対象 7370 頭（現役+繁殖+5代の祖先）
+V:\dev\Cusor\star\node_modules\pg\lib\client.js:652
+          Error.captureStackTrace(err)
+                ^
+
+error: cannot truncate a table referenced in a foreign key constraint
+    at V:\dev\Cusor\star\node_modules\pg\lib\client.js:652:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async deleteAllHorses (V:\dev\Cusor\star\tools\seed-world.mjs:298:5)
+    at async <anonymous> (V:\dev\Cusor\star\tools\seed-world.mjs:335:1) {
+  length: 254,
+  severity: 'ERROR',
+  code: '0A000',
+  detail: 'Table "horse_week_log" references "horses".',
+  hint: 'Truncate table "horse_week_log" at the same time, or use TRUNCATE ... CASCADE.',
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'heap.c',
+  line: '3221',
+  routine: 'heap_truncate_check_FKs'
+}
+
+Node.js v22.16.0
+
+[exited with code 1]
+
+────────────────────────────────────────────────
+# 診断（2026-09-20・演習 2 回目）
+
+## 落ちた場所
+truncate table … の 1 文:
+  error: cannot truncate a table referenced in a foreign key constraint
+  detail: Table "horse_week_log" references "horses".
+
+## 🔴 原因 — ★機構を変えたら、効く規則も変わっていた
+消す集合の作り方は ★**`delete` の意味**に合わせて書いてあった:
+  「cascade / set null は DB が面倒を見るので、辺を外す」
+  → ★delete としては正しい（★DB が自動で処理する）
+
+★しかし truncate は違う:
+  ★**参照している表が在るだけで拒む**（★削除時の動作に関係なく）
+  → ★horse_week_log（on delete cascade）を外していたので落ちた
+
+★★**同じ「消す」でも、★delete と truncate では集合が違う。**
+★★1 回目の直し（delete → truncate）で、★集合の作り方を直し忘れていた。
+
+## 直し
+truncate のときは ★**参照している表を 1 つ残らず**集合に入れる。
+  ⚠️ ★cascade を付けて済ませない。★名前を全部 並べる
+     （★cascade は集合の外まで巻き込みうる）
+  ⚠️ ★set null の辺が在れば ★**警告を出す**
+     （★delete なら列が null になるだけだが、★truncate は行ごと消える。
+       ★いまは 0 件だが、★増えた日に気づけるように）
+  ✅ ★truncate のために足した辺を ★**出力に出す**（★違いが見えるように）
+
+## 直した後の集合（★staging で確認・8 表）
+  bets / horse_market_listing / horse_story_event / horse_week_log
+  / race_entries / race_odds / races / horses
+→ ★horse_week_log が加わった（★1 回目は外していた）
+
+## ⚠️ 測定（★参考）
+  プリシードの生成 … 1 回目 72.4 秒 ／ 2 回目 ★154.5 秒
+  → ★機械の都合で 2 倍 揺れる。★所要を語るときは 1 回の値で言わないこと
