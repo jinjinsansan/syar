@@ -20,4 +20,6 @@ export * from './jockeys.js';
 export * from './horse-market.js';
 export * from './entry-fee.js';
 export * from './growth-stage.js';
+export * from './birth-week.js';
+export * from './pool-size.js';
 export * from './stud-fee.js';

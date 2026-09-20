@@ -19,7 +19,16 @@
  *   ハーネス（`training-state.ts`）は**キャリアの中央**の標本で
  *   平均 73.8% / SD 11.0pt でした。こちらも**同じ週齢**まで育てて比べます。
  *
- * 実行: npx tsx tools/age-horses.mjs --env staging [--age 182]
+ * 【🔴 ★2026-09-20 — ★この道具が `SEED-LOCKSTEP` を作っていました】
+ *   ★下の `update` は ★**全頭に同じ `birth_week`** を書きます。★それがこの道具の目的です
+ *   （★「同じ週齢まで育てて比べる」ため）。★しかし ★**世界を作る用途で流されると**、
+ *   ★★**現役 7,333 頭が全頭 同じ位相**になり、★献立も疲労も調子も集団まるごと動きます。
+ *   ✔ ★実測（staging・2026-09-19）: ★`birth_week` の種類は ★**1 つだけ**（−160）。
+ *
+ *   → ★**`--flatten` を明示しないと、★揃えません**（★**R-27**: ★既定は狭い側へ）。
+ *   → ★世界を作るのは ★**`tools/seed-world.mjs`** の仕事です（★あちらは案 B-3 で散らします）。
+ *
+ * 実行: npx tsx tools/age-horses.mjs --env staging --flatten [--age 182]
  */
 import pg from 'pg';
 import { advanceTrainingWeeks } from '../apps/worker/src/training-runner.ts';
@@ -27,9 +36,23 @@ import { LIFECYCLE_WEEKS, weekIndexAt } from '../packages/scheduler/src/index.ts
 import { assertNotProduction } from './lib/guard.mjs';
 import { loadEnv } from './lib/env.mjs';
 
+/**
+ * 🔴 ★**週齢を揃えてよいか**（★2026-09-20・`SEED-LOCKSTEP`）。
+ *   ★明示しない限り揃えません。★**黙って世界を平らにしない**ため。
+ */
+const FLATTEN = process.argv.includes('--flatten');
 const i = process.argv.indexOf('--age');
 /** ★キャリアの中央（78 と 260 の中点は 169 だが、ハーネスの標本はデビュー以降の中央 = 182） */
 const TARGET_AGE = i >= 0 ? Number(process.argv[i + 1]) : 182;
+
+if (!FLATTEN) {
+  throw new Error(
+    'age-horses: ★この道具は ★**全頭の birth_week を同じ値に揃えます**（★それが目的です）。'
+      + '★しかし世界を作る用途で流すと、★現役の全頭が同じ位相になります（★SEED-LOCKSTEP）。'
+      + '★揃えてよいなら ★`--flatten` を付けてください。'
+      + '★世界を作りたいのなら、★使うのは `tools/seed-world.mjs` です（★あちらは 52 週へ散らします）。',
+  );
+}
 
 /** ★ハーネスの前提（`training-state.ts` の実測）。ここに届くかを見る */
 const HARNESS = { meanUnlock: 0.738, sdUnlock: 0.110 };

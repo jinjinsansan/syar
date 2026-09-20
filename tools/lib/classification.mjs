@@ -36,6 +36,13 @@
  */
 export const READONLY = [
   /**
+   * ★育成の追いつきの所要を測る（★決め C・2026-09-20・`POOL-DRAIN`）。
+   *   🔴 ★**DB に繋ぎません** — ★`pg` を import すらしません。
+   *   ★合成の馬に `advanceWeek`（★製品の純関数）を回して 1 頭週あたりの CPU を測り、
+   *   ★案 B-3 で決まる頭週の総数（★算術）に掛けるだけです。★出力はログのみ。
+   */
+  'measure-catchup-cost.mjs',
+  /**
    * ★AL-6（裁定 REVIEW_CONSULT_ARCADE_LOOP_ANSWER_20260918）の測定器 2 本。
    *   ★DB に触りません（★エンジンを回して時間を測るだけ・出力はローカルの JSON とログ）。
    *   ★レビュー側が独立に再実行できるよう tmp/ から移しました（★tmp/ は gitignore で次の人に残らない）。
