@@ -109,7 +109,12 @@ describe('★CK-12: 旗で変えられる値を、定数のまま印刷しない
     ).toEqual([]);
   });
 
-  it('🔴 ★件数が増えたら落ちる（★既存のファイルに黙って足せない）', () => {
+  /**
+   * ⚠️ ★**題は「増えたら」ですが、★中身は `!==` なので ★減った側も落ちます**（★**CK-16**）。
+   *   ★題を中身に合わせました（★2026-09-20）。★片側だけ見る網は、
+   *   ★**「網が見なくなった」を「直った」と読みます。**
+   */
+  it('🔴 ★件数が変わったら落ちる（★増えても減っても・★CK-16）', () => {
     const registry = PRINTED_DEFAULTS as Record<string, { sites: number; why: string }>;
     const grew: string[] = [];
     for (const [f, sites] of found) {
