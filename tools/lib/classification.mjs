@@ -85,6 +85,13 @@ export const READONLY = [
    *   ✔ ★2026-09-20 実測: ★staging ✅ / ★production は ★**③ の対照が落ちる**
    *     （★`my_horses` が無い ＝ `SCHEMA-DRIFT-PROD` の姿）。
    */
+  /**
+   * ★**確定した着順を、★保存された seed から再計算して照合する**（★F-3 案③・2026-09-20）。
+   *   🔴 ★**読むだけ**（★`select` のみ）。★`--record` のときだけ `evidence/` に 1 ファイル書く。
+   *   ⚠️ ★**いまは判定に使えません** — ★どの版が確定させたかの記録が無く、
+   *     ★食い違いが「書き換え」か「版の差」か分けられません（★`F3-RECOMPUTE-NEEDS-VERSION`）。
+   */
+  'verify-race-recompute.mjs',
   'verify-c6-owner-exposure.mjs',
   /**
    * ★AL-6（裁定 REVIEW_CONSULT_ARCADE_LOOP_ANSWER_20260918）の測定器 2 本。
