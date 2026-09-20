@@ -1,4 +1,19 @@
-import { demoStableRepo, sortStable, conditionView, fatigueColor, type StableHome, type StableHorse } from '../../lib/stable';
+'use client';
+
+/**
+ * 🔴 ★**2026-09-20: ★本物のデータに繋ぎました**（★オーナー指示「データ繋ぐのは OK です」）。
+ *
+ *   ⚠️ ★**見た目は 1 行も変えていません。** ★変えたのは ★**どこからデータを取るか**だけです。
+ *   ★`'use client'` にした理由: ★`my_horses` は ★**ログインした本人の行だけ**を返すので
+ *     （★`where owner_id = auth.uid()`）、★セッションを持つ側で読む必要があります。
+ *     ★`/entry` も同じ作りです。
+ *   🔴 ★**読めなかったら見本に落とします。★ただし黙って落としません** —
+ *     ★`view.demo` が true になり、★**画面に「デモデータ」の帯が出ます**（★`CK-14`）。
+ *     ★★「帯が出ない＝繋がった」ではなく、★★「帯が出る＝本物が来ていない」を見てください。
+ */
+import { useEffect, useState } from 'react';
+import { demoStableRepo, sortStable, conditionView, fatigueColor, type StableHome, type StableHorse, type StableView } from '../../lib/stable';
+import { supabaseStableRepo } from '../../lib/stable-repo';
 import { ClassChip, FatigueBar, PageTitle } from '../../components/ui';
 import { STABLE_GRADE_LABEL, type StableGrade } from '@star/training';
 import { OWNERSHIP_LIMITS } from '@star/scheduler';
@@ -164,8 +179,25 @@ function StatCard({ label, value, unit, color }: { readonly label: string; reado
   );
 }
 
-export default async function StablePage() {
-  const view = await demoStableRepo.stable();
+export default function StablePage() {
+  const [view, setView] = useState<StableView | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const real = await supabaseStableRepo.stable();
+        if (alive) setView(real);
+      } catch (e) {
+        // 🔴 ★黙って見本に落としません。★理由を残し、★帯を出します
+        console.error('[stable] ★本物のデータを読めませんでした（見本に落とします）', e);
+        const demo = await demoStableRepo.stable();
+        if (alive) setView(demo);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+  // ★読み込み中に、★新しい見た目を足しません（★デザイナーの領域）
+  if (view === null) return null;
   const horses = sortStable(view.horses);
   const todo = horses.filter((h) => h.week.kind === 'todo');
   const allDone = todo.length === 0;

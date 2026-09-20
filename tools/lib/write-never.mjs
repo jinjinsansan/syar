@@ -36,9 +36,22 @@ export const WRITE_NEVER = {
       + '★`marginLabel` や CSS の margin に当たっています。★**追いません**（★網の限界として記録）',
   },
   horses: {
-    known: ['bred_this_year', 'coverings_this_year'],
-    why: '🔴 ★**当たりです。** ★`canMate` が読むのに、★書く SQL が 0 件（★簿 `COUNTER-NEVER-WRITTEN`）。'
-      + '★既定値（`default false` / `default 0`）は ★**行を作るときだけ**の話で、'
-      + '★**毎年 戻す**必要は消えません。→ ★`POOL-SUPPLY` の実装と同じ便で繋ぎます',
+    /**
+     * ✅ ★**2026-09-20 に繋がりました。★登録を空にします。**
+     *   ★`bred_this_year` / `coverings_this_year` は ★`canMate` が読むのに、
+     *   ★**書く SQL が 0 件**でした（★簿 `COUNTER-NEVER-WRITTEN`）。
+     *   ✅ ★`apps/worker/src/breeding-runner.ts` が ★**書く側**になりました
+     *     （★配合のたびに ＋1、★年の変わり目に 0 へ戻す）。
+     *   🔴 ★そして ★**読む側も決め打ちでした** — ★`rowToHorse` が
+     *     ★`bredThisYear: false` / `coveringsThisYear: 0` を固定で返していました。
+     *     → ★★**「書く側が無い」と「読む側が決め打ち」は、★同じ結果を生みます**
+     *     （★どちらでも判定が素通りする）。★★この検査は前者しか見ていません。
+     *   ⚠️ ★後者を見る網は ★**まだ在りません**（★`STABLE-SCREEN-GAPS` とは別件）。
+     */
+    known: [],
+    why: '✅ ★2026-09-20 に繋がりました（★`breeding-runner.ts` が書く側）。'
+      + '★空のまま残します — ★**次に「読む側だけ在る列」が出たら、★ここが落ちて気づけます**。'
+      + '🔴 ★併せて分かったこと: ★**「書く側が無い」と「読む側が決め打ち」は同じ結果**を生みます。'
+      + '★この網は ★**前者しか見ていません**（★`rowToHorse` の決め打ちは拾えませんでした）',
   },
 };

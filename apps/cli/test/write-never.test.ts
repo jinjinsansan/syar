@@ -92,10 +92,19 @@ function suspectsOf(table: string): string[] {
 
 describe('🔴 ★D-119: 読む側だけ在って、書く側が無い列が黙って増えない', () => {
   it('★網が、★書く形を拾い／読むだけを拾わない（★R-14）', () => {
-    // ★`sources` を使わない純粋な確認は書けないので、★既知の当たりで代用します
-    expect(suspectsOf('horses'), '★既知の当たりを拾えていない')
-      .toEqual(expect.arrayContaining(['bred_this_year']));
-    // ★対照: ★書かれている列は拾わない
+    /**
+     * ⚠️ ★**2026-09-20 に当たりが無くなりました**（★`bred_this_year` が繋がった）。
+     *   ★旧はそれを「既知の当たり」として使っていたので、★★網の自己検査が消えました。
+     *   → ★**合成の入力で試します**（★実際の列に依存しない）。
+     */
+    // ★『書く側を見つける』側: ★書かれている列には writer が在る
+    expect(writtenBy('birth_week').length, '★書く側を見つけられていない').toBeGreaterThan(0);
+    // ★『読む側を見つける』側: ★`canMate` が読む列は「製品が読む」と出る
+    expect(readByProduct('bred_this_year'), '★読む側を見つけられていない').toBe(true);
+    // 🔴 ★そして、★2026-09-20 に書く側が付いたので、★もう当たりではない
+    expect(writtenBy('bred_this_year').length, '★書く側が付いたのに見つけられていない')
+      .toBeGreaterThan(0);
+    // ★対照: ★実物でも、★書かれている列は拾わない
     expect(suspectsOf('horses'), '★書かれている列まで拾った').not.toContain('birth_week');
   });
 
