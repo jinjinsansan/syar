@@ -16,3 +16,4 @@
  *   ★**専用の簡易ロジックを作らない**」にも、この移動が要ります。
  */
 export * from './mate-choice.js';
+export * from './choose-sire.js';

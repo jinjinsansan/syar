@@ -26,8 +26,6 @@ import {
   NPC_STABLES,
   applyMatingCounters,
   breed,
-  calcInbreedCoefficient,
-  canMate,
   createFounder,
   deriveRng,
   generateHorseName,
@@ -52,7 +50,7 @@ export {
   INBREED_PENALTY_WEIGHT, HOME_SIRE_BONUS,
   policyFit, mateScore, mateScoreWithInbreeding, stableScore,
 } from '@star/breeding';
-import { SIRE_CHOICE_TOP_K, mateScoreWithInbreeding, stableScore } from '@star/breeding';
+import { buildSireAncestorIndex, pickSire, rankSires, stableScore } from '@star/breeding';
 
 // ★用途IDは集約表から取る（番号の重複を型で禁じる）
 const STREAM = PRESEED_STREAM;
@@ -318,52 +316,28 @@ export function runPreseed(opts: PreseedOptions): PreseedResult {
     // ★近交回避（F-1）の計算量対策: 祖先ID → その祖先を持つ種牡馬 の逆引き索引。
     //   素直に書くと 800牝馬 × 200種牡馬 の集合照合が毎年走る（50世代で 800万回）。
     //   索引は年に1回・種牡馬200頭ぶんだけ作ればよい。
-    const sireIdsByAncestor = new Map<string, string[]>();
-    for (const sid of stallionIds) {
-      const rec = all.get(sid)!.record;
-      // 種牡馬自身も牝馬の祖先になり得る
-      for (const aid of [rec.id, ...rec.pedigreeCache.keys()]) {
-        const list = sireIdsByAncestor.get(aid);
-        if (list === undefined) sireIdsByAncestor.set(aid, [sid]);
-        else list.push(sid);
-      }
-    }
+    const sireIdsByAncestor = buildSireAncestorIndex(
+      stallionIds.map((sid) => all.get(sid)!.record),
+    );
     for (const mareId of mareIds) {
       const mare = all.get(mareId)!;
       const stable = stableOf.get(mareId) ?? (stables[0] as Stable);
       // 厩舎の評価軸で上位 SIRE_CHOICE_TOP_K 頭を候補にし、牝馬ごとに順番に割り振る。
       // 1頭に絞ると父方の有効個体数が厩舎数まで落ちる（実測: 毎年40頭）。
-      const ranked: { id: string; score: number }[] = [];
-      // ★共通祖先を1頭も持たない相手は F=0 と**確定する**ので経路計算をしない。
-      //   近似ではなく厳密な絞り込み（索引に載らない = 共通祖先なし = F=0）。
-      const related = new Set<string>();
-      for (const aid of mare.record.pedigreeCache.keys()) {
-        for (const sid of sireIdsByAncestor.get(aid) ?? []) related.add(sid);
-      }
-      // 牝馬自身も共通祖先になり得る（父×娘）
-      for (const sid of sireIdsByAncestor.get(mare.record.id) ?? []) related.add(sid);
-
-      for (const sid of stallionIds) {
-        const sire = all.get(sid)!.record;
-        if (!canMate(sire, mare.record, balance, year).ok) continue;
-        // ★F-1: 近交係数を**決定経路で**参照する（R-17: 監査で見ているだけでは保存されない）
-        // ⚠️ ここに (種牡馬, 牝馬) → F のキャッシュを置いたが**遅くなった**（7.7s → 11.0s）。
-        //    同じ組は年内に一度しか評価されないのでヒットせず、Map の overhead だけが乗る。
-        //    「繰り返し計算しているはず」という見立てが実測で否定されたので外した。
-        const f = related.has(sid)
-          ? calcInbreedCoefficient(sire, mare.record, lookup, balance.PEDIGREE_DEPTH).F
-          : 0;
-        ranked.push({
-          id: sid,
-          score: mateScoreWithInbreeding(sire, stable, f, stableOf.get(sid)?.id === stable.id),
-        });
-      }
-      if (ranked.length === 0) continue; // 相手がいない年は産まない（黙って規則を曲げない）
-      ranked.sort((a, b) => (b.score !== a.score ? b.score - a.score : a.id.localeCompare(b.id)));
+      const ranked = rankSires({
+        mare: mare.record,
+        stable,
+        stallions: stallionIds.map((sid) => all.get(sid)!.record),
+        isHome: (sid) => stableOf.get(sid)?.id === stable.id,
+        lookup,
+        balance,
+        year,
+        ancestorIndex: sireIdsByAncestor,
+      });
       const turn = mareTurn.get(stable.id) ?? 0;
       mareTurn.set(stable.id, turn + 1);
-      const pick = ranked[(turn % SIRE_CHOICE_TOP_K) % ranked.length]!;
-      const best: string = pick.id;
+      const best = pickSire(ranked, turn);
+      if (best === null) continue;   // ★相手がいない年は産まない（黙って規則を曲げない）
 
       const sire = all.get(best)!.record;
       serial += 1;
