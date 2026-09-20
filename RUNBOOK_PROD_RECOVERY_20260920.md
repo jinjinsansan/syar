@@ -222,8 +222,24 @@ npx tsx tools/verify-live-function.mjs --env production \n  --function spend_tra
 
 
 ```bash
-npx tsx tools/migrate.mjs --env production      # ★先に下見の出力を読む
+# ★① 下見（★何も書きません。★当たる順番と件数だけ出ます）
+npx tsx tools/migrate.mjs --env production --plan
+# ★② 当てる（★`--yes-production` が要ります）
+npx tsx tools/migrate.mjs --env production --yes-production
 ```
+- 🔴 **`--plan` は 2026-09-20 に足しました。** それまで**この行は存在しない機能を指していました**
+  （手順書が「先に下見の出力を読む」と書いているのに、下見の口が無かった）。
+- ⚠️ **1 ファイル = 1 取引です。** 途中で落ちると **そこまでは適用済みのまま残ります**（全部は戻りません）。
+  → 落ちたら、**どこまで入ったかを `--plan` で数え直してから**次を決めること。
+
+✅ **②の前提は 2026-09-20 に全部 揃いました**（本番で実測）:
+
+| 前提 | 実測 |
+|---|---|
+| `0021` が要求する「稼働中の定義の照合」 | ✅ md5 `b9f344581ffdb9df47f207597ac46869` が**一致**（手で書き換えられていない） |
+| `0032` の `revoke ... from anon, authenticated` がワーカーに当たらないか | ✅ 本番で `anon` / `authenticated` / `service_role` は**すべて NOLOGIN**。どのクライアントもそのロールでは繋げない |
+| 33 件に旧ワーカーを止めるものが無いか | ✅ 5 観点で走査済み（上の表） |
+| staging 通し演習 | ✅ 終了コード 0（①′） |
 - ⚠️ `migrate.mjs` は**適用済みファイルの書き換えを拒みます**（正しい挙動）
 - ⚠️ **`races.course_frozen` が入ります** — D-065 の 2 次元走路。ここから距離ロスが効き始めます
 

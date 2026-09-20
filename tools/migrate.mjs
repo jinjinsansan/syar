@@ -241,6 +241,35 @@ if (target.length === 0) {
 }
 console.log(`未適用 ${target.length} 件 / 全 ${files.length} 件`);
 
+/**
+ * 🔴 ★**下見（★何も書かずに、★当たる順番だけ出す）**（★2026-09-20 に足しました）。
+ *
+ * 【★なぜ在るか】
+ *   ⚠️ ★`RUNBOOK_PROD_RECOVERY_20260920.md` の ② は ★**「★先に下見の出力を読む」**と
+ *     ★書いてありました。★**その口が無いのに。** → ★手順書が、★存在しない機能を指していました。
+ *   ✔ ★本番では ★**33 件**が当たります。★1 ファイル = 1 取引なので、★途中で落ちると
+ *     ★★**そこまでは適用済みのまま残ります**（★全部は戻りません）。
+ *     → ★**当たる順番と件数を、★書く前に人の目で見る**だけの値打ちがあります。
+ * ⚠️ ★`--plan` に ★`--yes-production` は要りません（★何も書かないため）。
+ */
+if (switches.has('--plan')) {
+  console.log('');
+  console.log('★--plan: ★**何も書きません。** ★当たる順番だけ出します:');
+  let planNo = 0;
+  for (const f of target) {
+    planNo += 1;
+    const sql = readFileSync(`db/migrations/${f}`, 'utf8');
+    const lines = sql.split('\n').length;
+    console.log(`  ${String(planNo).padStart(2, ' ')}. ${f}（${lines} 行 / sha ${sha(sql).slice(0, 8)}）`);
+  }
+  console.log('');
+  console.log(`★${target.length} 件。⚠️ ★1 ファイル = 1 取引です。`
+    + '★途中で落ちると、★**そこまでは適用済みのまま残ります**（★全部は戻りません）');
+  console.log('★当てるときは --plan を外して --yes-production を付けてください');
+  await client.end();
+  process.exit(0);
+}
+
 for (const f of target) {
   const sql = readFileSync(`db/migrations/${f}`, 'utf8');
   process.stdout.write(`  ${f} ... `);
