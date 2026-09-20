@@ -268,6 +268,10 @@ const client = {
 // ── ③ 回す ────────────────────────────────────────────
 const series = [];
 const alertSeen = new Set();
+/** ★年ごとの内訳（★「相手なし」を数えていませんでした） */
+let yearNoSire = 0;
+let yearDue = 0;
+let yearBorn = 0;
 const t1 = Date.now();
 for (let w = REFERENCE_WEEK + 1; w <= REFERENCE_WEEK + YEARS * 52; w += 1) {
   bornThisWeek = 0;
@@ -299,7 +303,10 @@ for (let w = REFERENCE_WEEK + 1; w <= REFERENCE_WEEK + YEARS * 52; w += 1) {
       && x.record.sex === 'female' && x.foalCount < 8
       && Math.floor((w - x.birthWeek) / 52) >= 6).length;
     console.log(`    週 ${w}: 種牡馬 ${studs.length} / 繁殖牝馬 ${dams.length}`
-      + ` / うち産める ${able} / 控え ${pool} / 種付 計 ${cov} / 今年 配合済 ${bred}`);
+      + ` / うち産める ${able} / 控え ${pool} / 今年 配合済 ${bred}`);
+    console.log(`           ★この 1 年: 番が来た ${yearDue} / 生まれた ${yearBorn}`
+      + ` / 相手なし ${yearNoSire}`);
+    yearNoSire = 0; yearDue = 0; yearBorn = 0;
   }
   /**
    * ⚠️ ★**投げたら、★そのまま落とします**（★fail-closed を握りつぶさない）。
@@ -310,11 +317,14 @@ for (let w = REFERENCE_WEEK + 1; w <= REFERENCE_WEEK + YEARS * 52; w += 1) {
    *   ★`breeding-runner` は「★繁殖牝馬が足りません」を `onAlert` で出します。
    *   ★★捨てていたので、★**足りていないことが 2 回の測定で見えませんでした。**
    */
-  await runBreedingWeek(
+  const res = await runBreedingWeek(
     client, (w + 1) * WEEK_MS, 0,
     (m) => { if (!alertSeen.has(m)) { alertSeen.add(m); console.log(`    ⚠️ ${m}`); } },
     undefined, POLICY,
   );
+  yearNoSire += res.noSire;
+  yearDue += res.eligible + res.noSire;
+  yearBorn += res.born;
   /**
    * 🔴 ★**「現役」を数え直しました**（★2026-09-20・★6 年 回して気づきました）。
    *
