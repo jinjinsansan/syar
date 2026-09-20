@@ -694,8 +694,13 @@ async function main(): Promise<void> {
        * ⚠️ ★止まったら ★**投げます**（★fail-closed）。★A-1 のとおり周は続きますが、
        *    ★記録には残ります。
        */
+      /**
+       * ⚠️ ★**平均出走頭数は `FIELD_SIZE` から**渡します（★`build-race.ts` と同じ出どころ）。
+       *   ★ここから繁殖牝馬の頭数が決まるので、★**画面にも道具にも書かない**（★D-052）。
+       */
       const b = await runBreedingWeek(client, nowMs, cfg.epochMs,
-        (m) => console.error(`[worker] ★${m}`));
+        (m) => console.error(`[worker] ★${m}`),
+        undefined, 'random', (FIELD_SIZE.MIN + FIELD_SIZE.MAX) / 2);
       if (b.born > 0 || b.noSire > 0 || b.yearReset) {
         console.log(
           `[worker] 配合 週=${b.week} 生まれた${b.born}頭 / 相手なし${b.noSire}頭`

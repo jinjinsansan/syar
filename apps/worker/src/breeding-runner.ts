@@ -160,7 +160,15 @@ export async function runBreedingWeek(
   onAlert: (message: string) => void,
   balance: BalanceConfig = DEFAULT_BALANCE,
   policy: PromotionPolicy = 'random',
-  meanFieldSize = 12,
+  /**
+   * 🔴 ★**既定を置きません**（★2026-09-20・★私は一度 `= 12` と書いていました）。
+   *   ★この数から ★**繁殖牝馬の頭数**が決まります（`requiredBroodmares`）。
+   *   ✔ ★実測でそれが出ました: ★`12` だと繁殖牝馬 **624 頭**・現役は **1,872 頭**へ収束。
+   *     ★★世界は「私が書いた 12」に向かって縮んでいました。
+   *   ✅ ★正しい出どころは ★**`FIELD_SIZE`**（`apps/cli/src/race-field.ts`・★8〜18）。
+   *     ★呼ぶ側が ★**そこから渡します**（★`main.ts`）。★ここで決めません。
+   */
+  meanFieldSize: number,
 ): Promise<BreedingWeekResult> {
   /** ★「締まった週」。★いまの週はまだ締まっていないので使いません */
   const week = weekIndexAt(nowMs, epochMs) - 1;

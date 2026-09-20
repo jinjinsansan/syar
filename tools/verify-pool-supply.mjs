@@ -26,9 +26,10 @@ import { ALLOW_ALL_NAMES, NPC_STABLES } from '../packages/sim-engine/src/index.t
 import { DEFAULT_PRESEED_OPTIONS, preseedNicks, runPreseed } from '../apps/cli/src/preseed.ts';
 import { lineConcentration } from '../apps/cli/src/pedigree-audit.ts';
 import {
-  LIFECYCLE_WEEKS, birthWeekOf, rankByStableKey,
+  LIFECYCLE_WEEKS, birthWeekOf, rankByStableKey, requiredActivePool, requiredBroodmares,
 } from '../packages/scheduler/src/index.ts';
 import { runBreedingWeek } from '../apps/worker/src/breeding-runner.ts';
+import { FIELD_SIZE } from '../apps/cli/src/race-field.ts';
 
 import { createHash } from 'node:crypto';
 
@@ -46,6 +47,12 @@ const POLICY = (() => {
 })();
 const SEED = arg('seed', 20260833);
 const WEEK_MS = 4 * 60 * 60 * 1000;
+/**
+ * 🔴 ★**平均出走頭数**。★`FIELD_SIZE`（8〜18）から。★ここで数を決めません。
+ *   ⚠️ ★私は一度 製品側に `= 12` と書き、★世界がその数へ縮んでいました
+ *     （★繁殖牝馬 624・現役 1,872 へ収束）。
+ */
+const MEAN_FIELD = (FIELD_SIZE.MIN + FIELD_SIZE.MAX) / 2;
 
 console.log(`# ★POOL-SUPPLY の合否  ${YEARS} ゲーム内年 / 種 ${SEED} / 上げ方 ${POLICY}`);
 console.log('  ⚠️ ★引退は年齢だけ（★故障と調教は入っていません）→ ★釣り合いは上振れ側の評価です');
@@ -331,7 +338,7 @@ for (let w = REFERENCE_WEEK + 1; w <= REFERENCE_WEEK + YEARS * 52; w += 1) {
   const res = await runBreedingWeek(
     client, (w + 1) * WEEK_MS, 0,
     (m) => { if (!alertSeen.has(m)) { alertSeen.add(m); console.log(`    ⚠️ ${m}`); } },
-    undefined, POLICY,
+    undefined, POLICY, MEAN_FIELD,
   );
   yearNoSire += res.noSire;
   yearDue += res.eligible + res.noSire;
@@ -388,6 +395,17 @@ const check = (ok, label, detail) => {
  * ⚠️ ★短い窓で回したときは ★**「不合格」ではなく「判定不能」**にします（★`CK-14`）。
  *   ★★測れていないものを「落ちた」と書かない。
  */
+/**
+ * 🔴 ★**的は「種の 2,400」ではなく、★導出した必要数**です（★2026-09-20）。
+ *   ✔ ★実測: ★世界は ★**導出した数へ収束**しました（★現役 1,872 ＝ 繁殖牝馬 624 × 3 年）。
+ *     ★★私はそれを「減っている」と読んで ★**不合格 2 件**と報告していました。
+ *     ★★減っていたのではなく、★**私が書いた 12 に向かって縮んでいた**のです。
+ *   ✅ ★必要数と比べます。★★初期値と比べません。
+ */
+const REQUIRED_POOL = requiredActivePool(MEAN_FIELD);
+const REQUIRED_MARES = requiredBroodmares(MEAN_FIELD);
+console.log(`  ★導出した必要数: 現役 ${REQUIRED_POOL} 頭 / 繁殖牝馬 ${REQUIRED_MARES} 頭`
+  + `（★平均出走頭数 ${MEAN_FIELD}）`);
 const BURN_IN = LIFECYCLE_WEEKS.retireAt;
 const MIN_WINDOW = LIFECYCLE_WEEKS.retireAt - LIFECYCLE_WEEKS.raceableFrom;
 const steady = series.slice(BURN_IN);
@@ -419,7 +437,9 @@ console.log(`  … （立ち上がり 2 年を除く）出走年齢に達した 
 check(Math.abs(mean) <= 2 * se || Math.abs(mean) < 0.5,
   '① ★週あたり「出走年齢に達した − 引退した」が 0 と区別できない',
   `平均 ${mean.toFixed(3)} / 2SE ${(2 * se).toFixed(3)}`);
-check(slope > -0.5, '② ★現役の頭数が単調に減っていない', `傾き ${slope.toFixed(4)} 頭/週`);
+check(last.active >= REQUIRED_POOL,
+  '② ★現役が★導出した必要数を下回っていない（★初期値とは比べません）',
+  `最後 ${last.active} 頭 / 必要 ${REQUIRED_POOL} 頭 / 傾き ${slope.toFixed(4)} 頭/週`);
 const weeks = new Set([...rows.values()].filter((x) => x.retiredAtWeek === null).map((x) => x.birthWeek % 52));
 check(weeks.size >= 50, '③ ★生まれた週が散っている（★B-3 が保たれている）', `${weeks.size} 種類 / 52`);
 const lines = lineConcentration(
