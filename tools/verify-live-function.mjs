@@ -123,12 +123,36 @@ if (rows.length === 0) {
  */
 console.log('');
 console.log(`  ★このセッションのロール: ${(await q('select current_user u'))[0].u}`);
-console.log('  ★いま繋いでいるロール（★ワーカーは間欠なので、★映るまで繰り返すこと）:');
+/**
+ * 🔴 ★**`anon` / `authenticated` で「繋げるのか」を先に見ます**（★2026-09-20 に足しました）。
+ *
+ *   ⚠️ ★旧: ★`pg_stat_activity` を `distinct` で並べるだけでした。★これでは決まりません:
+ *     ★① ★`distinct` は ★**自分の接続と他人の接続を混ぜます**（★`postgres / Supavisor` が
+ *        ★ワーカーなのか、★この道具自身なのか区別が付かない）。
+ *     ★② ★ワーカーは間欠なので、★**映らないことがある**（★それを「無害」と読むのが `CK-14`）。
+ *   ✅ ★**`rolcanlogin` は 1 回で決まります**: ★`anon` / `authenticated` が ★**ログインできない**なら、
+ *     ★どのクライアントも ★**そのロールでは繋げません** → ★`0032` の
+ *     ★`revoke ... from anon, authenticated` は ★**直に繋ぐワーカーに当たりようがない**。
+ */
+console.log('  ★ログインできるロール（★`0032` の revoke が誰に当たるか）:');
 for (const r of await q(
-  `select distinct usename, application_name, backend_type
-     from pg_stat_activity where datname = current_database() order by 1, 2`,
+  `select rolname, rolcanlogin from pg_roles
+    where rolname in ('anon', 'authenticated', 'authenticator', 'postgres', 'service_role')
+    order by 1`,
 )) {
-  console.log(`     ${r.usename} / ${r.application_name || '(名前なし)'} / ${r.backend_type}`);
+  const mark = r.rolcanlogin ? '★繋げる' : '✅ ★繋げない（NOLOGIN）';
+  console.log(`     ${r.rolname}: ${mark}`);
+}
+console.log('  ★いま繋いでいる相手（★自分の接続は除外・★件数つき）:');
+for (const r of await q(
+  `select usename, application_name, backend_type, count(*)::int n,
+          min(backend_start)::text since
+     from pg_stat_activity
+    where datname = current_database() and pid <> pg_backend_pid()
+    group by 1, 2, 3 order by 1, 2`,
+)) {
+  console.log(`     ${r.usename} / ${r.application_name || '(名前なし)'}`
+    + ` / ${r.backend_type} … ${r.n} 本（最古 ${r.since}）`);
 }
 
 await c.end();
