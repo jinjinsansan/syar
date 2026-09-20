@@ -65,4 +65,52 @@ console.log('    ★① `select 1` は ★**いちばん軽い往復**。★`upd
 console.log('    ★② ここは開発機からの測定。★ワーカーは VPS から繋ぐので経路が違う');
 console.log('    ★③ 実際の追いつきは `select`（★バッチごと）も挟む');
 
+/**
+ * ★**並べたら速くなるか**（★`--parallel`・2026-09-20）
+ *
+ * 【★なぜ `advanceTrainingWeeks` そのもので測らないか】
+ *   🔴 ★あれは ★**DB に書きます**。★本番にも staging にも書かないと決めているので、★流せません。
+ *   → ★**書かずに測れる部分だけ**を測ります: ★**往復が並列で縮むか**。
+ *
+ * 【⚠️ ★これが答えていること／いないこと】
+ *   ✅ ★答える: ★**往復（＝ 所要の 99%）は、★接続を並べると縮むか**
+ *   🔴 ★答えない: ★`update` の競合・索引の更新・WAL・接続数の上限・DB 側の CPU。
+ *     ★**実物はこれより悪くなります。** ★上限の見積もりとしてだけ使ってください。
+ */
+if (process.argv.includes('--parallel')) {
+  const M = argNum('per-conn', 30);
+  console.log('');
+  console.log('【★並べたら縮むか】★`select 1` だけ・★書きません');
+  console.log(`  ★1 接続あたり ${M} 回。★接続数を変えて、★同じ総数にかかる時間を比べます`);
+  const run = async (conns) => {
+    const clients = [];
+    for (let i = 0; i < conns; i += 1) {
+      const cc = new pg.Client({
+        connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: false },
+      });
+      await cc.connect();
+      await cc.query('select 1'); // ★温め
+      clients.push(cc);
+    }
+    const t = process.hrtime.bigint();
+    await Promise.all(clients.map(async (cc) => {
+      for (let i = 0; i < M; i += 1) await cc.query('select 1');
+    }));
+    const sec = Number(process.hrtime.bigint() - t) / 1e9;
+    await Promise.all(clients.map((cc) => cc.end()));
+    return sec;
+  };
+  const base = await run(1);
+  console.log(`  ★接続 1 本 … ${(base * 1000 / M).toFixed(1)} ms/文（${base.toFixed(2)} 秒で ${M} 文）`);
+  for (const k of [4, 8]) {
+    const sec = await run(k);
+    const perStmt = (sec * 1000) / (M * k);
+    console.log(`  ★接続 ${k} 本 … ${perStmt.toFixed(1)} ms/文`
+      + `（${sec.toFixed(2)} 秒で ${M * k} 文）→ ★**${(base * 1000 / M / perStmt).toFixed(1)} 倍**`);
+  }
+  console.log('');
+  console.log('  ⚠️ 🔴 ★**`update` ではありません。** ★競合も WAL も入っていません。');
+  console.log('     ★実物はこれより悪くなります。★**上限の見積もり**としてだけ使うこと。');
+}
+
 await c.end();

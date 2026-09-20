@@ -122,16 +122,46 @@ console.log('    ③ ★この機械と本番機の差');
 console.log('  → ★★**「この秒数で終わる」と読まないでください。**');
 console.log('');
 
-// ── ④ 支配するのは DB の往復（★仮定を置いた算術。★測っていません） ──
-console.log('🔴【★支配するのは DB の往復】★**CPU は問題ではありませんでした**');
-console.log(`  ★CPU は ${cpuSec.toFixed(0)} 秒。★一方 \`update\` は ★**${horseWeeks.toLocaleString()} 回**です。`);
-console.log('  ⚠️ ★**1 往復にかかる時間は測っていません**（★DB に繋がないため）。★仮定を置きます:');
-for (const ms of [0.5, 1, 3, 5]) {
-  const s = (horseWeeks * ms) / 1000;
-  console.log(`    ★1 往復 ${ms} ms なら … ★${(s / 60).toFixed(1)} 分`);
-}
-console.log('  → ★★**効く梃子は CPU ではなく、★往復の回数です。**');
-console.log('    ★一括更新（★1 文で複数頭）に変えれば桁で縮みますが、');
-console.log('    ★それは ★**`advanceTrainingWeeks` の作りを変える話**なので、★この便ではしません。');
+// ── ④ 往復の回数（★🔴 2026-09-20 に数え直しました） ──────────
+/**
+ * 🔴🔴 ★**訂正（2026-09-20）— ★私は往復の回数を 1,000 倍 近く 多く見ていました。**
+ *
+ *   ⚠️ ★旧: ★「`update` は `horseWeeks` 回 ＝ 248,328 回」→ ★3.3〜15 時間。
+ *   ✔ ★**現物を読み直しました**（`apps/worker/src/training-runner.ts:431-452`）:
+ *     ★更新は ★**`update horses h … from unnest($1::uuid[], …) where h.id = t.id`**。
+ *     → ★★**1 文で最大 `BATCH_SIZE` 頭（2,000 頭）をまとめて書きます。**
+ *   → ★★**1 頭 1 往復ではありませんでした。★既に一括更新になっていました。**
+ *
+ *   ★1 周（iteration）の往復は ★**2 回**（★選ぶ 1 ＋ 書く 1）。
+ *   ★`spend_training_ep` は ★**`owner_id !== null` のときだけ**なので、★NPC では 0 回。
+ *
+ * 🔴 ★**なぜ間違えたか**: ★往復 1 回の時間は測ったのに、★**回数のほうは数えず、
+ *    ★「1 頭週 ＝ 1 往復」と思い込みました**。★**掛け算の片方だけ測って桁を外した**形です
+ *    （★`AU-25` を自分で立てた直後に、★同じ形の反対側を踏みました）。
+ */
+const BATCH_SIZE = 2000;
+const MAX_WEEKS_PER_RUN = 8;
+/** ★1 周で進むのは「最大 BATCH_SIZE 頭 × 1 週」 */
+const iterations = Math.ceil(horseWeeks / BATCH_SIZE);
+const batchesPerWeek = Math.max(1, Math.ceil(activeHorses / BATCH_SIZE));
+/** ★1 回の呼び出しで回せる周の上限 */
+const calls = Math.ceil(iterations / (MAX_WEEKS_PER_RUN * batchesPerWeek));
+/** ★周ごとに 2 回（選ぶ・書く）＋ 呼び出しごとに 2 回（頭数を数える） */
+const roundTrips = iterations * 2 + calls * 2;
+
+console.log('🔴【★往復の回数】★**1 頭 1 往復ではありません**（★2026-09-20 に数え直し）');
+console.log(`  ★更新は \`update … from unnest(…)\` で ★**1 文 最大 ${BATCH_SIZE} 頭**`);
+console.log(`  ★周 ${iterations.toLocaleString()} 回（${horseWeeks.toLocaleString()} 頭週 ÷ ${BATCH_SIZE}）`
+  + ` × 2 往復 ＋ 呼び出し ${calls} 回 × 2`);
+console.log(`  → ★**往復 約 ${roundTrips.toLocaleString()} 回**`);
 console.log('');
+console.log('  ★実測の 1 往復（`tools/diag-db-roundtrip.mjs`・2026-09-20）を当てると:');
+for (const [name, ms] of [['production', 50], ['staging', 219]]) {
+  console.log(`    ★${name}（中央 ${ms} ms）… ★**${((roundTrips * ms) / 1000).toFixed(0)} 秒**`);
+}
+console.log(`  ★CPU は ${cpuSec.toFixed(0)} 秒。→ ★**合わせて 1 分 前後**`);
+console.log('');
+console.log('  ⚠️ ★**旧の見積もり（3.3〜15 時間）は誤りでした。**');
+console.log('     ★往復 1 回の時間は測ったのに、★**回数を数えずに「1 頭週 ＝ 1 往復」と置いた**ため。');
+console.log('  ⚠️ ★これも見積もりです。★`update` 1 文が 2,000 頭ぶんなら往復は長くなります（★未測定）。');
 console.log('  → ★実際の所要は ★**staging で 1 回 流して測る**しかありません（★未実施）。');
