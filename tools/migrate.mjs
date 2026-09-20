@@ -28,7 +28,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import pg from 'pg';
-import { parseArgs } from './lib/args.mjs';
+import { needsYesProduction, parseArgs } from './lib/args.mjs';
 
 /**
  * ★接続先は**必ず明示する**（2026-08-20 の裁定で既定を廃止）。
@@ -64,7 +64,12 @@ if (envName === 'local') {
 const envFile = ENV_FILES[envName];
 if (envFile === undefined) throw new Error(`--env は production か staging です（受け取った値: ${envName}）`);
 // ★本番だけは、もう一段の明示を要求する（打ち間違いでは到達できない形にする）
-if (envName === 'production' && !switches.has('--yes-production')) {
+// ⚠️ ★何も書かない `--plan` だけは免除（★判定は `needsYesProduction`・組み合わせは検査で回す）
+if (needsYesProduction(envName, {
+  plan: switches.has('--plan'),
+  baseline: flag('baseline') !== null,
+  repair: process.argv.includes('--repair-checksum'),
+}) && !switches.has('--yes-production')) {
   throw new Error(
     '本番に適用するには --yes-production も付けてください。' +
       '★「--env を書いた」だけでは、staging のつもりで production と打った場合を止められません',

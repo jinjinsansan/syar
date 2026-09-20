@@ -54,3 +54,22 @@ export function parseArgs(argv, valueFlags) {
   }
   return { flags, switches, positionals };
 }
+
+/**
+ * 🔴 ★**本番に向けるとき `--yes-production` を要るか**（★2026-09-20）。
+ *
+ * 【★なぜ純関数にしたか】
+ *   ⚠️ ★`migrate.mjs` に ★**下見（`--plan`）**を足したとき、★「`--yes-production` は要りません」と
+ *     ★書いたのに、★**門がその手前で投げて動きませんでした。**
+ *   🔴 ★原因は ★**試した場所**です: ★staging で試したので、★**門が効かない側でしか確かめていません**。
+ *     → ★★**差が出ない環境で確かめて、★差が出る環境の話を書いた。**
+ *   → ★**判定を関数に出して、★組み合わせを検査で回します**（★`migrate-guard.test.ts`）。
+ *
+ * ⚠️ ★免除するのは ★**何も書かない `--plan` だけ**です。
+ *    ★`--baseline`（★記録を書く）や `--repair-checksum`（★記録を直す）と併せたら ★**免除しません**。
+ */
+export function needsYesProduction(envName, { plan = false, baseline = false, repair = false } = {}) {
+  if (envName !== 'production') return false;
+  if (plan && !baseline && !repair) return false;  // ★何も書かない
+  return true;
+}
