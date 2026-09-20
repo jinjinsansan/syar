@@ -38,6 +38,7 @@ import { advanceTrainingWeeks } from '../apps/worker/src/training-runner.ts';
 
 import { assertNotProduction } from './lib/guard.mjs';
 import { loadEnv, positionals } from './lib/env.mjs';
+import { VERDICT } from './lib/counted-verdict.mjs';
 
 /** ★フラグ（--env など）を除いた位置引数 */
 const POS = positionals();
@@ -119,10 +120,48 @@ console.log(`  投入対象 ${need.size} 頭（現役+繁殖+5代の祖先）`);
 const rows = [...need].map((id) => pre.world.all.get(id)).filter(Boolean)
   .sort((a, b) => a.record.generation - b.record.generation);
 
-const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
-await c.connect();
-// ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
-await assertNotProduction(c, 'seed-world.mjs');
+/**
+ * 🔴 ★**接続が落ちても、★プロセスごと死なないようにします**（★2026-09-20・★演習 4 回目）。
+ *
+ * 【★何が起きたか】
+ *   ★追いつきの最中に ★`Connection terminated unexpectedly` で落ちました。
+ *   ⚠️ ★問題は ★**落ち方**です: ★`pg.Client` の `error` を ★**誰も受けていません**でした。
+ *     → ★Node が ★**`Unhandled error event` でプロセスを殺します**（★途中で止まる）。
+ *   ✔ ★**実測**（★落ちた後の staging・★読むだけ）: ★世界は建っている（★7,370 頭・
+ *     ★`birth_week` 欠け 0）のに、★**いちばん遅い馬の週齢 78 / 基準 258**。★引退 3 頭。
+ *   🔴 ★本番で同じことが起きると、★**作り直しを最初からやり直す**ことになります
+ *     （★本番は `race_odds` 15.5M 行 を消すところから）。
+ *
+ * 【★接続先】★`pooler.supabase.com:5432`（★Supavisor 経由）。★切れるのはここです。
+ *
+ * ⚠️ ★**繋ぎ直しても「合格」にはしません。** ★落ちた周に済んだ分は DB に残り、
+ *    ★戻り値としては数えられないので、★下の ②b は ★**判定不能**にします（★CK-14）。
+ */
+let c;
+/** ★繋ぎ直した回数（★0 でなければ ②b は判定不能） */
+let reconnects = 0;
+const RECONNECT_MAX = 5;
+/** ★受けるだけ。★ここで投げ直すと `unhandledRejection` になります */
+function onClientError(e) {
+  console.log(`  ⚠️ ★接続の異常: ${e.message}`);
+}
+/** ★「接続が落ちた」かどうか。⚠️ ★文法の誤りや制約違反と混ぜないこと */
+function isConnectionLost(e) {
+  const m = String(e?.message ?? '');
+  return m.includes('Connection terminated')
+    || m.includes('Client has encountered a connection error')
+    || m.includes('server closed the connection')
+    || e?.code === 'ECONNRESET' || e?.code === 'EPIPE' || e?.code === '57P01';
+}
+async function connectDb() {
+  c = new pg.Client({ connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+  c.on('error', onClientError);
+  await c.connect();
+  // ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
+  // 🔴 ★繋ぎ直したときも★必ず通します（★門を 1 度きりにしない）
+  await assertNotProduction(c, 'seed-world.mjs');
+}
+await connectDb();
 
 // ─────────────────────────────────────────────────────────
 // ★生まれた週・引退を決める（★決め A ＋ B-3）
@@ -457,7 +496,21 @@ if (!CATCH_UP) {
   for (;;) {
     rounds += 1;
     if (rounds > 400) throw new Error('seed-world: 400 回 呼んでも追いつきません（上限）');
-    const r = await advanceTrainingWeeks(c, nowMs, EPOCH, (m) => console.log(`    ★警報: ${m}`));
+    let r;
+    try {
+      r = await advanceTrainingWeeks(c, nowMs, EPOCH, (m) => console.log(`    ★警報: ${m}`));
+    } catch (e) {
+      if (!isConnectionLost(e) || reconnects >= RECONNECT_MAX) throw e;
+      reconnects += 1;
+      process.stdout.write('\r                                                        \r');
+      console.log(`  ⚠️ ★接続が切れました（${e.code ?? e.message}）。`
+        + `★繋ぎ直して続けます ${reconnects}/${RECONNECT_MAX}`);
+      console.log('     ⚠️ ★この周の分は数え直せません（★追いつきは取引を張らず、'
+        + '★済んだ分を DB に残します）→ ★**②b は判定不能**になります');
+      try { await c.end(); } catch { /* ★既に切れています */ }
+      await connectDb();
+      continue;
+    }
     advanced += r.advanced;
     retiredDuringCatchUp += r.retired;
     if (r.advanced === 0) break;
@@ -482,37 +535,69 @@ const chk = await c.query(`select count(*)::int total,
   count(*) filter (where sire_id is not null)::int with_sire,
   count(distinct sire_line)::int lines,
   count(*) filter (where retired_at_week is null)::int active,
+  count(*) filter (where retirement_reason = 'age')::int aged_retired,
   count(*) filter (where birth_week is null)::int no_birth_week,
   count(distinct birth_week) filter (where retired_at_week is null)::int active_birth_weeks
   from horses`);
 console.log('  DB:', JSON.stringify(chk.rows[0]));
 
 const fails = [];
+/**
+ * 🔴 ★**判定できなかった検査を、★合格の側に落とさない**（★CK-14・`counted-verdict` と同じ語彙）。
+ *   ⚠️ ★世界を作るのは一発勝負なので、★**1 件でも判定できなければ終了コード 2**にします。
+ */
+const undecided = [];
 const check = (ok, label, detail) => {
   console.log(`  ${ok ? '✓' : '★'} ${label}${detail ? `  ${detail}` : ''}`);
   if (!ok) fails.push(label);
+};
+const undecide = (label, why) => {
+  console.log(`  ？ ${label}  ★判定不能: ${why}`);
+  undecided.push(label);
 };
 const d = chk.rows[0];
 check(d.no_birth_week === 0, '① ★`birth_week` が無い馬が 0 頭（★PROD-NEVER-AGED）',
   `${d.no_birth_week} 頭`);
 /**
- * 🔴 ★**追いつきの最中に引退した馬を、★数に入れます**（★2026-09-20・★演習 3 回目で直しました）。
+ * 🔴 ★**②a — ★投入が「引退」を書いたか**（★`SEED-NOT-RETIRED` の本体・2026-09-20）。
  *
- * 【★何が起きたか】
- *   ★演習 3 回目、★作り直しは通ったのに ★**この検査だけが落ちました**（★DB 2,388 / 期待 2,400）。
- *   ✔ ★差の 12 頭は ★**追いつきの最中に致命的故障で引退した馬**でした（★実測: `injured` 12）。
- *     ★種牡馬 200 → **206** ／ 繁殖牝馬 800 → **806**（★＋12）— ★`retirement.ts` が役割を付けています。
- *   → ★★**壊れていたのは世界ではなく、★私の検査でした。**
- *
- * 【★なぜ間違えたか】
- *   ★`advanceTrainingWeeks` は ★**本番と同じ経路**です。★§7.5 の故障も起きます。
- *   ★「作った数 ＝ 残る数」と書いた時点で、★**育成が何も起こさないことを仮定**していました。
- *   ⚠️ ★**引退が 0 でないと落ちる検査は、★引退が動いていることを罰します**（★`CK-14` の裏）。
+ *   ★旧い ② は ★**頭数だけ**を見ていました。★しかし頭数は、
+ *   ★`現役 ＝ 総数 − 引退` なので ★**DB から引き直すと恒真になります**（★何も言っていない）。
+ *   ✔ ★中身が在るのはこちら: ★**投入時に引退と書いた頭数が、★そのまま残っているか**。
+ *     ★元の不具合（★引退 4,970 頭が「現役」になっていた）なら、★ここが 0 になります。
+ *   ⚠️ ★追いつきの最中に**寿命で**引退する馬が出ると、ここが増えて落ちます。
+ *     ★実測ではまだ 0 件（★落ちるのは `career_ending_injury` だけ）。★落ちたら中身を見ること。
  */
-check(d.active + retiredDuringCatchUp === tally.active,
-  '② ★現役 ＋ 追いつき中の引退 が、★プリシード世界の現役と一致（★SEED-NOT-RETIRED）',
-  `DB ${d.active} ＋ 引退 ${retiredDuringCatchUp} ＝ ${d.active + retiredDuringCatchUp}`
-    + ` / プリシード ${tally.active}`);
+const seededRetired = rows.length - tally.active;
+check(d.aged_retired === seededRetired,
+  '②a ★投入時に「引退」と書いた馬が、★DB でもそのまま引退（★SEED-NOT-RETIRED）',
+  `reason=age ${d.aged_retired} 頭 / 期待 ${seededRetired} 頭`);
+/**
+ * 🔴 ★**②b — ★追いつきが返した数と、★DB を突き合わせる**（★2026-09-20・★演習 3 回目で直した）。
+ *
+ *   ★演習 3 回目、★作り直しは通ったのに ★**この検査だけが落ちました**（★DB 2,388 / 期待 2,400）。
+ *   ✔ ★差の 12 頭は ★**追いつきの最中に致命的故障で引退した馬**でした。
+ *     ★種牡馬 200 → **206** ／ 繁殖牝馬 800 → **806** — ★`retirement.ts` が役割を付けています。
+ *   → ★★**壊れていたのは世界ではなく、★私の検査でした。**
+ *   ⚠️ ★**引退が 0 でないと落ちる検査は、★引退が動いていることを罰します**（★`CK-14` の裏）。
+ *
+ * 【★これだけが「独立した 2 つ目の目」です】
+ *   ★左辺は DB、★右辺は ★**追いつきの戻り値**。★別の経路で数えているから意味があります。
+ *   🔴 ★だから ★**接続が切れた後は判定できません** — ★落ちた周に済んだ分は DB に残り、
+ *     ★戻り値には入らないからです（★追いつきは取引を張りません）。
+ */
+if (!CATCH_UP) {
+  undecide('②b ★追いつきが返した引退の数と、★DB が合う',
+    '★--no-catch-up（★追いつきを流していないので、★突き合わせるものがありません）');
+} else if (reconnects > 0) {
+  undecide('②b ★追いつきが返した引退の数と、★DB が合う',
+    `★接続が ${reconnects} 回 切れました（★落ちた周に済んだ分は戻り値に入っていません）`);
+} else {
+  check(d.active + retiredDuringCatchUp === tally.active,
+    '②b ★現役 ＋ 追いつき中の引退 が、★プリシード世界の現役と一致',
+    `DB ${d.active} ＋ 引退 ${retiredDuringCatchUp} ＝ ${d.active + retiredDuringCatchUp}`
+      + ` / プリシード ${tally.active}`);
+}
 check(d.active_birth_weeks >= 100, '③ ★現役の `birth_week` が散っている（★SEED-LOCKSTEP）',
   `${d.active_birth_weeks} 種類`);
 
@@ -537,6 +622,11 @@ console.log('');
     inserted: n,
     tally,
     catchUp: CATCH_UP,
+    /** 🔴 ★接続が切れて繋ぎ直した回数（★0 でなければ ②b は判定不能） */
+    reconnects,
+    /** 🔴 ★**落ちた検査と、★判定できなかった検査**（★合格の側に落とさない） */
+    checksFailed: fails,
+    checksUndecided: undecided,
     /** 🔴 ★名前が検査されたか（★0 件 かつ allowAll なら**未検査**） */
     nameBlocklistSize: ngSize,
     nameCheckSkipped: ALLOW_ALL,
@@ -549,5 +639,15 @@ console.log('');
   if (ALLOW_ALL) console.log('  🔴 ★**nameCheckSkipped: true** — ★この世界の名前は未検査です');
 }
 
-console.log(fails.length === 0 ? '★世界を作りました' : `★FAIL — ${fails.join(' / ')}`);
-process.exit(fails.length === 0 ? 0 : 1);
+if (fails.length > 0) {
+  console.log(`★FAIL — ${fails.join(' / ')}`);
+  process.exit(VERDICT.FAIL);
+}
+if (undecided.length > 0) {
+  console.log(`★判定不能 — ${undecided.join(' / ')}`);
+  console.log('   ⚠️ ★**これは「合格」ではありません。** ★世界は建っている可能性が高いですが、');
+  console.log('   ★確かめきれていません。★緑が要るなら、★もう一度 作り直してください。');
+  process.exit(VERDICT.UNDECIDABLE);
+}
+console.log('★世界を作りました');
+process.exit(VERDICT.PASS);
