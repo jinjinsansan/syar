@@ -6,6 +6,7 @@
   "type": "module",
   "dependencies": {
     "@star/betting": "*",
+    "@star/breeding": "*",
     "@star/race-engine": "*",
     "@star/render": "*",
     "@star/scheduler": "*",

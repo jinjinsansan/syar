@@ -129,25 +129,29 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
   },
   {
     key: 'INBREED_PENALTY_WEIGHT',
-    file: 'apps/cli/src/preseed.ts',
+    // 🔴 ★2026-09-20 に `@star/breeding` へ移しました（★G-2・コピーではありません）
+    file: 'packages/breeding/src/mate-choice.ts',
     perturbed: 'export const INBREED_PENALTY_WEIGHT = 0;',
     affects: 'V-12a / D-026（NPC配合AIの近交回避。0 にすると近交を割り引かなくなり平均F が 0.031 → 0.070 に上がる）',
   },
   {
     key: 'POLICY_FIT_WEIGHT',
-    file: 'apps/cli/src/preseed.ts',
+    // 🔴 ★2026-09-20 に `@star/breeding` へ移しました（★G-2・コピーではありません）
+    file: 'packages/breeding/src/mate-choice.ts',
     perturbed: 'export const POLICY_FIT_WEIGHT = 0;',
     affects: 'N-4 / D-025（厩舎方針が配合相手の評価に効く強さ。0 にすると D-025 以前の無差別選択に戻る）',
   },
   {
     key: 'DISTANCE_FIT_SPAN',
-    file: 'apps/cli/src/preseed.ts',
+    // 🔴 ★2026-09-20 に `@star/breeding` へ移しました（★G-2・コピーではありません）
+    file: 'packages/breeding/src/mate-choice.ts',
     perturbed: 'export const DISTANCE_FIT_SPAN = 100000;',
     affects: 'D-025（距離方針の効く幅。極端に広げると全馬が適合扱いになり距離の個性が消える）',
   },
   {
     key: 'STABLE_EMPHASIS_WEIGHT',
-    file: 'apps/cli/src/preseed.ts',
+    // 🔴 ★2026-09-20 に `@star/breeding` へ移しました（★G-2・コピーではありません）
+    file: 'packages/breeding/src/mate-choice.ts',
     perturbed: 'export const STABLE_EMPHASIS_WEIGHT = 1.0;',
     affects: 'N-4（厩舎方針が選抜に効く強さ。1.0 にすると 40厩舎が同じ馬を選び系統が潰れる）',
   },

@@ -156,3 +156,31 @@ export function rankByStableKey(keys: readonly string[]): Map<string, number> {
   }
   return out;
 }
+
+/**
+ * 🔴 ★**ゲーム内の「年」は、ここから引きます**（★2026-09-20・裁定 Q-3）。
+ *
+ * 【★なぜ 1 か所に置くか】
+ *   ★`horses.birth_year`（★生まれた年）と ★`bred_this_year`（★今年 配合したか）は、
+ *   ★**同じ「年」**を指していなければ噛み合いません。
+ *   ⚠️ ★別々に `Math.floor(week / 52)` と書くと、★**片方を直した日にもう片方が黙って古びます**
+ *     （★2026-09-20 に 4 回 見た形）。→ ★**両方がここを呼びます**（★**D-052**）。
+ *
+ * ⚠️ ★これは ★**基準の週からの通し年**です。★実時間の暦ではありません（★1 週 = 実 4 時間）。
+ */
+export function gameYearOf(week: number): number {
+  if (!Number.isInteger(week)) {
+    throw new Error(`game-year: 週は整数で渡してください（受け取った値: ${week}）`);
+  }
+  return Math.floor(week / WEEKS_PER_YEAR);
+}
+
+/**
+ * ★**その週が、年の変わり目か**（★年次カウンタを 0 に戻す所）。
+ *
+ * ⚠️ ★`week === 0` も「変わり目」です（★世界の最初の週）。
+ *    ★呼ぶ側が「前の週」を持っているなら `gameYearOf` を 2 回 比べるほうが確実です。
+ */
+export function isGameYearStart(week: number): boolean {
+  return gameYearOf(week) * WEEKS_PER_YEAR === week;
+}
