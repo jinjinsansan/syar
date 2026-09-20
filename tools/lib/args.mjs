@@ -73,3 +73,47 @@ export function needsYesProduction(envName, { plan = false, baseline = false, re
   if (plan && !baseline && !repair) return false;  // ★何も書かない
   return true;
 }
+
+/**
+ * 🔴 ★**本番の世界を作り直してよいか**（★2026-09-20・運用簿 ④・レビュー側の裁定）。
+ *
+ * 【★なぜ旗 1 つでは足りないか】
+ *   ⚠️ ★今日 `migrate.mjs --env production --yes-production` を打ちました。
+ *     → ★★**次に打つ人は、★同じ指で `seed-world --env production --yes-production` を打ちます。**
+ *     ★`migrate` は前へ進めるだけ。★`seed-world` は ★**世界を消します。★指は区別しません。**
+ *
+ * 【★だから「写せない物」を 1 つ 要求します】
+ *   ★言葉の旗は ★**手順書から貼れます**。★★数は貼れません — ★**その場で数えないと合いません。**
+ *   → ★★**`--expect-horses` が、★いまの実数と合わなければ通しません。**
+ *     ★`verify-prod-exposure` の `--expect protected|open` と同じ形です。
+ *
+ * 【★戻り値】★問題があれば ★**理由の文字列**、★無ければ `null`。
+ *   ⚠️ ★**頭数が違うのは「間違い」ではなく「あなたの想定と違う」**ので、★呼ぶ側は
+ *     ★**終了コード 2（判定不能）**で終わること（★1 ではない）。
+ */
+export function productionOptInProblem({
+  environment, yesProduction = false, wipeWorld = false,
+  expectHorses = null, actualHorses = null,
+}) {
+  if (environment !== 'production') return null;   // ★本番以外は、この関門を作らない
+  if (!yesProduction) {
+    return '本番の世界を作り直すには --yes-production が要ります'
+      + '（★--env を書いただけでは、staging のつもりで production と打った場合を止められません）';
+  }
+  if (!wipeWorld) {
+    return '本番では --wipe-world も要ります'
+      + '（★migrate と同じ指で打てないように、★この道具だけの旗を 1 つ 立てさせます）';
+  }
+  if (!Number.isInteger(expectHorses)) {
+    return '本番では --expect-horses <いまの頭数> が要ります'
+      + '（★数は手順書から写せません。★その場で数えた人だけが通れます）';
+  }
+  if (!Number.isInteger(actualHorses)) {
+    return 'いまの頭数を数えられませんでした（★数えられないなら通しません）';
+  }
+  if (expectHorses !== actualHorses) {
+    return `--expect-horses ${expectHorses} と、いまの実数 ${actualHorses} が違います`
+      + '（★世界が想定と違います。★**間違いではなく「見てから来い」**です）';
+  }
+  return null;
+}

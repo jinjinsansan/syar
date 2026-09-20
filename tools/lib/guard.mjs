@@ -24,7 +24,22 @@
  * @param {import('pg').Client} client 接続済みのクライアント
  * @param {string} tool ツール名（メッセージに出す）
  */
-export async function assertNotProduction(client, tool) {
+/**
+ * 🔴 ★**`allowProduction` について**（★2026-09-20・運用簿 ④・レビュー側の裁定）。
+ *
+ *   ★本番の世界を作り直す段が在り、★そこでは ★**本番に書くことが目的**です。
+ *   ★門は ★**消しません。★明示の宣言が要る形にするだけ**です
+ *   （★`migrate.mjs` に同じ扉が在り、★2026-09-20 にそれで移行 33 件を当てました）。
+ *
+ * ⚠️ ★**緩むのは 1 か所だけです。** ★次の 2 つは ★`allowProduction` でも ★**止まります**:
+ *   ★① ★`app_environment` を ★**読めない**（★本番かどうか判断できない）
+ *   ★② ★宣言が ★**無い**（★「宣言が無い＝本番でない」ではない）
+ *   → ★★**分からないときは、★許可の旗が在っても止まる**（★fail-closed）。
+ *
+ * ⚠️ ★呼ぶ側は ★**旗 1 つで渡さないこと。** ★`seed-world.mjs` は
+ *   ★`productionOptInProblem()`（★旗 2 つ ＋ ★いまの頭数）を先に通してから渡します。
+ */
+export async function assertNotProduction(client, tool, { allowProduction = false } = {}) {
   let environment = null;
   try {
     const r = await client.query('select environment from app_environment');
@@ -42,7 +57,7 @@ export async function assertNotProduction(client, tool) {
         `★「宣言が無い＝本番でない」とは限らないので実行しません（R-24）`,
     );
   }
-  if (environment === 'production') {
+  if (environment === 'production' && !allowProduction) {
     throw new Error(
       `${tool} は状態を変えるツールです。★接続先の DB は "production" 宣言なので実行しません（R-24）。` +
         `staging の DATABASE_URL に向けてください`,

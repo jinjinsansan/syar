@@ -39,6 +39,7 @@ import { advanceTrainingWeeks } from '../apps/worker/src/training-runner.ts';
 import { assertNotProduction } from './lib/guard.mjs';
 import { loadEnv, positionals } from './lib/env.mjs';
 import { VERDICT } from './lib/counted-verdict.mjs';
+import { productionOptInProblem } from './lib/args.mjs';
 
 /** ★フラグ（--env など）を除いた位置引数 */
 const POS = positionals();
@@ -70,6 +71,30 @@ const CATCH_UP = !process.argv.includes('--no-catch-up');
  *    ★ここが守るのは ★**偶然の一致を拾う網**です。
  */
 const ALLOW_ALL = process.argv.includes('--allow-all-names');
+
+/**
+ * 🔴 ★**本番に向けるときの関門**（★2026-09-20・運用簿 ④・レビュー側の裁定）。
+ *
+ *   ★この道具は ★**世界そのものを作り直します**。★`R-24` の門は残したまま、
+ *   ★本番だけ ★**旗 2 つ ＋ 写せない数 1 つ**を要求します:
+ *     ★`--yes-production` … ★`migrate.mjs` と同じ二段目
+ *     ★`--wipe-world`     … ★**この道具だけの旗**（★migrate と同じ指で打てないように）
+ *     ★`--expect-horses N`… 🔴 ★**いまの頭数**。★合わなければ通しません
+ *
+ * 【★なぜ数を要求するか】
+ *   ★★**言葉の旗は手順書から写せます。★数は写せません。**
+ *   → ★**その場で数えた人だけが通れます**（★`verify-prod-exposure --expect` と同じ形）。
+ *   ⚠️ ★数が違うときは ★**終了コード 2（判定不能）**です（★1 ではない）。
+ *     ★「間違っている」のではなく ★**「あなたの想定と世界が違う ＝ 見てから来い」**だからです。
+ */
+const YES_PRODUCTION = process.argv.includes('--yes-production');
+const WIPE_WORLD = process.argv.includes('--wipe-world');
+const EXPECT_HORSES = (() => {
+  const i = process.argv.indexOf('--expect-horses');
+  if (i < 0) return null;
+  const n = Number(process.argv[i + 1]);
+  return Number.isInteger(n) ? n : null;
+})();
 
 const env = loadEnv();
 
@@ -159,7 +184,34 @@ async function connectDb() {
   await c.connect();
   // ★状態を変えるツールなので、本番に向いていたら実行しない（R-24）
   // 🔴 ★繋ぎ直したときも★必ず通します（★門を 1 度きりにしない）
-  await assertNotProduction(c, 'seed-world.mjs');
+    // ★① ★まず「分からないなら止まる」を通す（★読めない／宣言が無い は旗が在っても止まる）
+  const environment = await assertNotProduction(c, 'seed-world.mjs',
+    { allowProduction: YES_PRODUCTION });
+  // ★② 🔴 ★本番なら、★ここが本当の関門。★**ここまで 1 行も書いていません**
+  if (environment === 'production') {
+    const actualHorses = Number(
+      (await c.query('select count(*)::int n from horses')).rows[0].n,
+    );
+    const problem = productionOptInProblem({
+      environment, yesProduction: YES_PRODUCTION, wipeWorld: WIPE_WORLD,
+      expectHorses: EXPECT_HORSES, actualHorses,
+    });
+    if (problem !== null) {
+      console.error('');
+      console.error(`🔴 ★本番には通しません: ${problem}`);
+      console.error(`   ★いまの頭数は ${actualHorses} です（★読むだけで数えました）`);
+      console.error('   ★通る形: --env production --yes-production --wipe-world'
+        + ` --expect-horses ${actualHorses}`);
+      await c.end();
+      process.exit(VERDICT.UNDECIDABLE);
+    }
+    console.log('');
+    console.log('🔴🔴 ★**本番の世界を作り直します**');
+    console.log(`   ★いまの ${actualHorses} 頭と、★レース・オッズは ★**戻りません**。`);
+    console.log('   ★控え: 2026-09-19 18:55 (+0000)・★日次のみ（★PITR なし）。');
+    console.log('   ⚠️ ★戻すと ★**今日の移行 33 件も一緒に戻ります**。★細かくは戻せません。');
+    console.log('');
+  }
 }
 await connectDb();
 
@@ -675,6 +727,11 @@ console.log('');
     /** 🔴 ★**消す前の数**（★行は消すが、★記録は残す・`STABLE-1-SKEW` と同じ作法） */
     wipedCounts,
     wipedRaces: WIPE_RACES,
+    /** 🔴 ★**本番に向けて流したか**（★後から読めるように） */
+    environment,
+    yesProduction: YES_PRODUCTION,
+    wipeWorld: WIPE_WORLD,
+    expectHorses: EXPECT_HORSES,
   }, null, 2)}
 `, 'utf8');
   console.log(`  ★世界の素性を残しました: ${path}`);
