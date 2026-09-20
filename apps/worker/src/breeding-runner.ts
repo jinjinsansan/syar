@@ -205,12 +205,26 @@ export async function runBreedingWeek(
    *     ★★役割の名前が実態と食い違ったまま枠を持つ ＝ ★**「引退済みなのに現役」4,970 頭と同じ形**。
    *   ✅ ★降ろした事実を残します（★`retirement_reason`）。★後から「なぜ功労馬か」が読めます。
    */
-  const demoted = await client.query(
+  /**
+   * 🔴 ★**入れ替えは年の変わり目だけ**にします（★2026-09-20・★10 年 回して分かりました）。
+   *
+   * 【★毎週 入れ替えていたら、★供給が 5% 足りませんでした】
+   *   ✔ ★実測（★10 年・立ち上がり 5 年を捨てて 5 年 測定）:
+   *     ★出走年齢に達した **748/年** 対 ★引退 **785/年** → ★**−37/年（−4.7%）**。
+   *     ★現役が 2,400 → **2,214** へ。★傾き −1.23 頭/週。
+   *   🔴 ★原因: ★**年の途中で上げた牝馬は、★その年の「自分の番」が既に過ぎています。**
+   *     ★→ ★その年は産めません。★枠は埋まっているのに、★産駒は出ません。
+   *   ✅ ★**年の変わり目にまとめて入れ替えれば、★全頭が丸 1 年 在籍します。**
+   * ⚠️ ★尽きた牝馬は年内も役割のまま残りますが、★`canMate` が弾くので産みません。
+   *   → ★だから ★**枠の数え方は「まだ産める牝馬」**にします（★下の `have`）。
+   */
+  const atYearStart = gameYearOf(week - 1) !== year;
+  const demoted = atYearStart ? await client.query(
     "update horses set retirement_role = 'honored',"
       + " retirement_reason = 'mare_lifetime_foals'"
       + " where retirement_role = 'broodmare' and foal_count >= $1",
     [balance.MARE_LIFETIME_FOALS],
-  );
+  ) : { rowCount: 0 };
   const retiredFromBreeding = demoted.rowCount ?? 0;
 
   /**
@@ -221,11 +235,13 @@ export async function runBreedingWeek(
    */
   const target = requiredBroodmares(meanFieldSize);
   const haveRow = await client.query<{ n: string }>(
-    "select count(*)::text n from horses where retirement_role = 'broodmare'",
+    "select count(*)::text n from horses where retirement_role = 'broodmare'"
+      + ' and foal_count < $1',
+    [balance.MARE_LIFETIME_FOALS],
   );
   const have = Number(haveRow.rows[0]?.n ?? 0);
   let promoted = 0;
-  if (have < target) {
+  if (atYearStart && have < target) {
     const want = target - have;
     /**
      * ⚠️ ★**素質の合計**を「成績」の代わりに使います（★上の `PromotionPolicy` の註記）。
@@ -267,7 +283,7 @@ export async function runBreedingWeek(
     }
   }
 
-  const yearReset = gameYearOf(week - 1) !== year;
+  const yearReset = atYearStart;
   if (yearReset) {
     await client.query(
       'update horses set bred_this_year = false, coverings_this_year = 0'

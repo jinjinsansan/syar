@@ -163,7 +163,9 @@ const client = {
       return { rows: [], rowCount: n };
     }
     if (sql.includes("count(*)::text n from horses where retirement_role = 'broodmare'")) {
-      const n = [...rows.values()].filter((r) => r.role === 'broodmare').length;
+      // ★数えるのは「まだ産める牝馬」（★尽きた馬は枠に数えない）
+      const n = [...rows.values()]
+        .filter((r) => r.role === 'broodmare' && r.foalCount < params[0]).length;
       return { rows: [{ n: String(n) }], rowCount: 1 };
     }
     if (sql.includes("retirement_role = 'honored' and sex = 'female'")) {
