@@ -267,6 +267,7 @@ const client = {
 
 // ── ③ 回す ────────────────────────────────────────────
 const series = [];
+const alertSeen = new Set();
 const t1 = Date.now();
 for (let w = REFERENCE_WEEK + 1; w <= REFERENCE_WEEK + YEARS * 52; w += 1) {
   bornThisWeek = 0;
@@ -292,14 +293,28 @@ for (let w = REFERENCE_WEEK + 1; w <= REFERENCE_WEEK + YEARS * 52; w += 1) {
     const dams = [...rows.values()].filter((x) => x.role === 'broodmare');
     const cov = studs.reduce((a2, x) => a2 + x.coveringsThisYear, 0);
     const bred = dams.filter((x) => x.bredThisYear).length;
+    // ★**産める牝馬**（★役割だけでは分からない）
+    const able = dams.filter((x) => x.foalCount < 8).length;
+    const pool = [...rows.values()].filter((x) => x.role === 'honored'
+      && x.record.sex === 'female' && x.foalCount < 8
+      && Math.floor((w - x.birthWeek) / 52) >= 6).length;
     console.log(`    週 ${w}: 種牡馬 ${studs.length} / 繁殖牝馬 ${dams.length}`
-      + ` / 種付 計 ${cov} / 今年 配合済 ${bred}`);
+      + ` / うち産める ${able} / 控え ${pool} / 種付 計 ${cov} / 今年 配合済 ${bred}`);
   }
   /**
    * ⚠️ ★**投げたら、★そのまま落とします**（★fail-closed を握りつぶさない）。
    *   ★2026-09-20、★ここが週 312 で発火し ★**繁殖牝馬の生涯上限**を見つけました。
    */
-  await runBreedingWeek(client, (w + 1) * WEEK_MS, 0, () => {}, undefined, POLICY);
+  /**
+   * 🔴 ★**警報を握りつぶしません**（★2026-09-20・★自分で `() => {}` にしていました）。
+   *   ★`breeding-runner` は「★繁殖牝馬が足りません」を `onAlert` で出します。
+   *   ★★捨てていたので、★**足りていないことが 2 回の測定で見えませんでした。**
+   */
+  await runBreedingWeek(
+    client, (w + 1) * WEEK_MS, 0,
+    (m) => { if (!alertSeen.has(m)) { alertSeen.add(m); console.log(`    ⚠️ ${m}`); } },
+    undefined, POLICY,
+  );
   /**
    * 🔴 ★**「現役」を数え直しました**（★2026-09-20・★6 年 回して気づきました）。
    *
