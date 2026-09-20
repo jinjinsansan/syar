@@ -199,9 +199,13 @@ async function connectDb() {
     if (problem !== null) {
       console.error('');
       console.error(`🔴 ★本番には通しません: ${problem}`);
-      console.error(`   ★いまの頭数は ${actualHorses} です（★読むだけで数えました）`);
+      // 🔴 ★**実数を出さないこと**（★2026-09-20・レビュー側の指摘）。
+      //   ★出すと ★1 回 失敗して ★**画面の数を写す**だけになり、★「見る」が起きません。
+      //   → ★★**数は出さない。★数え方を出す。**
       console.error('   ★通る形: --env production --yes-production --wipe-world'
-        + ` --expect-horses ${actualHorses}`);
+        + ' --expect-horses <いまの頭数>');
+      console.error('   ★いまの頭数は、★自分で数えてください:');
+      console.error('     select count(*) from horses;');
       await c.end();
       process.exit(VERDICT.UNDECIDABLE);
     }

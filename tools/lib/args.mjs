@@ -87,6 +87,9 @@ export function needsYesProduction(envName, { plan = false, baseline = false, re
  *   → ★★**`--expect-horses` が、★いまの実数と合わなければ通しません。**
  *     ★`verify-prod-exposure` の `--expect protected|open` と同じ形です。
  *
+ * 🔴 ★**理由の文に、★いまの実数を書かないこと。**
+ *   ★書くと ★**1 回 失敗して画面の数を写す**だけになり、★「見る」が起きません。
+ *
  * 【★戻り値】★問題があれば ★**理由の文字列**、★無ければ `null`。
  *   ⚠️ ★**頭数が違うのは「間違い」ではなく「あなたの想定と違う」**ので、★呼ぶ側は
  *     ★**終了コード 2（判定不能）**で終わること（★1 ではない）。
@@ -112,8 +115,12 @@ export function productionOptInProblem({
     return 'いまの頭数を数えられませんでした（★数えられないなら通しません）';
   }
   if (expectHorses !== actualHorses) {
-    return `--expect-horses ${expectHorses} と、いまの実数 ${actualHorses} が違います`
-      + '（★世界が想定と違います。★**間違いではなく「見てから来い」**です）';
+    // 🔴 ★**実数をここに書かないこと。**（★2026-09-20・レビュー側の指摘）
+    //   ★書くと ★1 回 失敗して ★**画面の数を写す**だけになり、★手間が 1 往復 増えるだけです。
+    //   ★★`--expect-horses` は「数を当てる」ためではなく ★**「数を見に行かせる」**ためです。
+    return `--expect-horses ${expectHorses} と、いまの実数が違います`
+      + '（★世界が想定と違います。★**間違いではなく「見てから来い」**です。'
+      + '★実数はここには出しません）';
   }
   return null;
 }

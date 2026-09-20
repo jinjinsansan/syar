@@ -264,12 +264,17 @@ npx tsx tools/verify-anon-exposure.mjs --env production
 - ②で直る**見込み**。**「当てたから直ったはず」で閉じない**
 - ✅ 合格するまで **④に進まない**（弁護士に見せる前提・§17 O-7）
 
-### ③′ ワーカーを止める 🔴 **オーナーが実行**（★VPS）
+### ③′ ワーカーを止める 🔴 **開発側が実行**（★VPS）
 
 ```bash
-sudo systemctl stop star-worker        # ★オーナーの操作。私は VPS に入りません
-systemctl is-active star-worker        # → inactive を確認してから先へ
+ssh -i ~/.ssh/pax_vps root@162.43.29.102 \
+  "systemctl stop star-worker; sleep 3; systemctl is-active star-worker"   # → inactive
 ```
+- 🔴 **2026-09-20 に「オーナーが実行」から変えました。** オーナーの明示の許可（「VPS はあなたが
+  操作しますよね？」→ 私が確認 →「はい」）と、レビュー側の同意によります。
+  止める／戻すは**繰り返せる**操作で、`systemctl is-active` で確かめられるためです。
+  ⚠️ **⑥（配備）はオーナーのままです** — あちらは束が入れ替わるので性質が違います。
+- ⚠️ 🔴 **「SSH が通ると分かった」＝「自由に使ってよい」ではありません。** この段だけの話です。
 - 🔴 **止めないと、消している最中に新しいレースと出走表が作られます**
   （★古いワーカーは 6 分ごとにレースを作り、確定させています）
 - → **消し終わったつもりが終わっていない**状態になります
@@ -323,8 +328,31 @@ wc -c backup_20260920.sql      # ★0 バイトでないことを見る（★取
 # ★① 先に消す順と行数を見る（★読むだけ）
 npx tsx tools/diag-horses-refs.mjs --env production
 # ★② 作り直す（★約 6〜8 分・★staging で実測）
-npx tsx tools/seed-world.mjs --env production --wipe-races --allow-all-names
+#   🔴 ★<いまの頭数> は **その場で数える**こと。★手順書から写さない
+#      psql なら: select count(*) from horses;
+npx tsx tools/seed-world.mjs --env production \
+  --yes-production --wipe-world --expect-horses <いまの頭数> \
+  --allow-all-names --wipe-races
 ```
+
+#### 🔴 本番だけの関門（★2026-09-20 に足しました）
+
+`seed-world.mjs` は `R-24` の門（`assertNotProduction`）で**本番を拒みます**。**それは正しい設計**
+なので門は消さず、`migrate.mjs` と同じ**明示の二段**にしたうえで、**もう 2 つ**要求します。
+
+| 要求 | なぜ |
+|---|---|
+| `--yes-production` | `migrate.mjs` と同じ二段目 |
+| `--wipe-world` | **この道具だけの旗**。`migrate` と同じ指で打てないように |
+| 🔴 `--expect-horses <いまの頭数>` | **言葉の旗は手順書から写せる。数は写せない。** その場で数えた人だけが通る |
+
+- ⚠️ **緩むのは 1 か所だけ**です。`app_environment` が**読めない**ときと**宣言が無い**ときは、
+  旗が在っても**止まります**（fail-closed）。
+- ⚠️ 数が合わないときは **終了コード 2（判定不能）**。「間違い」ではなく「**見てから来い**」だからです。
+- 🔴 **失敗の文は、正しい数を教えません。** 教えると「1 回 失敗して画面の数を写す」だけになり、
+  **見る**が起きないからです。数え方（`select count(*) from horses;`）だけを出します。
+- ✔ **本番で 3 通り止まることを確かめてあります**（旗なし＝1 ／ `--wipe-world` 不足＝2 ／ 数違い＝2）。
+  **いずれも 1 行も書いていません。**
 
 #### 🔴 この世界が何であるかを、先に書きます
 
