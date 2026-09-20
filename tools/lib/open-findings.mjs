@@ -415,6 +415,36 @@ export const OPEN_FINDINGS = [
     until: '2026-10-04',
   },
   {
+    id: 'NG-NAMES-UNWIRED',
+    what: '🔴🔴 ★**実在競走馬名の NG リストが、★一度も繋がっていません**（★正典 §17.2 **C-4** 不合格）。'
+      + '★**世界を作る道具が「全部 許す」を注いでいます**。★弁護士ゲートの前提条件です',
+    why: '✔ ★**実測**（2026-09-20・★読むだけ・`tools/verify-constitution.mjs`・'
+      + '`evidence/20260920-constitution/C1-C5.txt`）: ★全 4,137 ファイルを走査'
+      + '（★`git ls-files` ではなく ★**追跡外も歩きました** — ★§17.2 が `rg -uu` と指定・**M-6**）。'
+      + '🔴 ★**① ハッシュ表が在りません**: ★`data/ng-names.hash` が**無い**。★`data/` 自体が在りません。'
+      + '🔴 ★**② 素通しの経路が 6 本**: ★`tools/seed-world.mjs` と `tools/verify-world.mjs` が '
+      + '★**`blocklist: ALLOW_ALL_NAMES`** を渡し、★`apps/cli/src/preseed-run.ts` と '
+      + '★`preseed-verify.ts` が **`loadNameBlocklist(undefined, false)`**（★strict 無効）で呼んでいます。'
+      + '⚠️ 🔴 ★**`name-blocklist.ts` 自身が「本番では禁止」と書いています**'
+      + '（★`strict=false` の註記）。★**その禁止が守られていません。**'
+      + '🔴 ★**波及**: ★いま本番に居る **7,355 頭**の名前は、★**NG 判定を一度も通っていません。**'
+      + '⚠️ ★**過大に書かないこと**: ★名前は音節を並べて作るので ★**実在名を参照する経路はありません**。'
+      + '★危険は「★**偶然の一致を拾う網が無い**」ことであって、★実在名を書いたことではありません。'
+      + '★一致がいくつ在るかは ★**リストが無いので測れません**（★測るにはリストが要ります）。'
+      + '🔴 ★**そして、これは `PROD-NEVER-AGED` と同じ形の 4 例目**です: '
+      + '★**仕組みが在り、註記も在り、★誰も繋がなかった**（★列・警報・検査・そして今回は憲法の担保）。'
+      + '--- 🔴 ★**直し方（★オーナーの作業が要ります）** ---'
+      + '★① ★**オーナーが平文リストを `data/ng-names.txt` に置く**（★`.gitignore` 済み・'
+      + '★平文をリポジトリに置くと、★それ自体が §0.1 違反になります）'
+      + '★② `npm run blocklist:build` → ★`data/ng-names.hash`（★これはコミット可）'
+      + '★③ ★`seed-world.mjs` / `verify-world.mjs` を ★**`loadNameBlocklist()`（strict 既定）**へ。'
+      + '★④ ★`preseed-run` / `preseed-verify` の `strict=false` を外す'
+      + '🔴 ★**⑤ 作り直しの前に②を済ませること** — ★`RUNBOOK_PROD_RECOVERY_20260920.md` に'
+      + '★**止まる場所**として足しました（★④ の関門）。★でないと ★**また未検査の世界を作ります**',
+    owner: 'owner',
+    until: '2026-10-11',
+  },
+  {
     id: 'COUNTER-NEVER-WRITTEN',
     what: '🔴 ★**`bred_this_year` / `coverings_this_year` は、★誰も書きません**（★列は在る・★`canMate` は見る）。'
       + '★**2 年目から、★全繁殖牝馬が「今年まだ配合していない」まま**になります',

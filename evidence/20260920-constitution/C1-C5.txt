@@ -1,0 +1,37 @@
+# ★憲法の遵守（正典 §17.2）— ★読むだけ・★DB に繋ぎません
+
+  ★走査: 全 4138 ファイル（うちコード 1285）
+  ⚠️ ★`node_modules` / `.git` / `.next` / `dist` / `out` / `tmp` は外しています
+
+【C-1】★参加ポイント（EP）を金で買う経路が無い
+      ★語彙（0027_stable_grade_unlock.sql）: inflow / training / entry_fee / bet / refund / stud_fee / horse_purchase / horse_sale / stable_grade
+  ✓ C-1 ① ★語彙に「金で買う」を表す値が無い  9 種
+  ✓ C-1 ② ★理由は `check` で閉じている（★任意の文字列を書けない）  0027_stable_grade_unlock.sql
+  ✓ C-1 ③ ★決済 SDK の依存が無い  package.json 12 件
+
+【C-2】★賞金ポイント（PP）→ 現金・暗号資産の経路が無い
+      ★語彙（0001_init.sql）: prize / payout / prize_exchange
+  ✓ C-2 ★語彙に「現金・暗号資産」を表す値が無い  3 種
+
+【C-3】★ポイントのユーザー間 譲渡が無い
+  ⚠️ C-3 ★譲渡らしい語が在ります（★人が見ること）  ./db/migrations/0001_init.sql, ./db/migrations/0007_prize_exchange.sql
+      ⚠️ ★種付料はサービス対価であって譲渡ではありません（★§10.5・★除外は正しい）
+
+【C-4】★実在競走馬名の NG リストが**配線されている**
+      🔴 ★この項目は ★**「実在名がゼロ」を証明しません**。★配線だけを見ます
+  🔴 C-4 ① 🔴 ★NG リストのハッシュ表が**在りません**  data/ng-names.hash
+  🔴 C-4 ② 🔴 ★NG 判定を**素通し**にしている経路が在る  ./apps/cli/src/preseed-run.ts（strict=false） / ./apps/cli/src/preseed-verify.ts（strict=false） / ./apps/cli/test/preseed.test.ts / ./evidence/20260920-world-supply/count-preseed-world.mjs / ./tools/seed-world.mjs / ./tools/verify-world.mjs
+
+【C-5】★他社製品の固有名称
+      🔴 ★**語の走査は原理的にできません** — ★探す語をここに書くこと自体が違反です
+      → ★確かめられるのは「★廃棄済み文書がコードから参照されていないこと」だけです
+  ✓ C-5 ★廃棄済み文書（SPEC.md / AI_PROMPT.md）をコードが参照していない
+  ⚠️ C-5 ★**これは C-5 の確認ではありません**（★人の目視が要ります・★機械では閉じられません）
+
+=== ★判定 ===
+  🔴 不合格 2 件 / ⚠️ 人が見るもの 2 件
+     🔴 C-4 ① 🔴 ★NG リストのハッシュ表が**在りません**
+     🔴 C-4 ② 🔴 ★NG 判定を**素通し**にしている経路が在る
+
+🔴 ★**この道具が緑でも「憲法を守っている」ではありません。**
+   ★C-4 は配線だけ、★C-5 は機械では閉じられません（★上に書いたとおり）。
