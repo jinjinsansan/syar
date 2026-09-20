@@ -286,12 +286,23 @@ for (let w = REFERENCE_WEEK + 1; w <= REFERENCE_WEEK + YEARS * 52; w += 1) {
     if (w - r.birthWeek < LIFECYCLE_WEEKS.retireAt) continue;
     r.retiredAtWeek = w;
     retiredThisWeek += 1;
-    // ★役割: ★繁殖に上げる数は「空き」で決めます（★牝は繁殖牝馬 800 を保つ・牡は種牡馬 200）
-    const mares = [...rows.values()].filter((x) => x.role === 'broodmare').length;
-    const studs = [...rows.values()].filter((x) => x.role === 'stallion').length;
-    if (r.record.sex === 'female') r.role = mares < 800 ? 'broodmare' : 'honored';
-    else r.role = studs < 200 ? 'stallion' : 'honored';
+    /**
+     * 🔴 ★**引退した馬は、★いったん全部 `honored` にします**（★2026-09-20 に直しました）。
+     *
+     *   ⚠️ ★旧: ★ここで「繁殖牝馬が 800 未満なら broodmare」と ★**ハーネスが足していました**。
+     *     → ★★製品（`breeding-runner`）も年の変わり目に足すので、★**二重管理**でした。
+     *     ✔ ★実測でそれが出ました: ★年の途中で役割の頭数が 800 → 677 と動き、
+     *       ★★「番が来た」が年 679〜799 とばらつきました（★本来は年 800 で一定のはず）。
+     *   ✅ ★**繁殖牝馬の枠は、★製品だけが決めます。** ★ハーネスは引退させるだけ。
+     *   ⚠️ ★種牡馬は製品が管理していないので、★ここで配ります（★200 頭を保つ）。
+     */
+    if (r.record.sex === 'female') r.role = 'honored';
+    else {
+      const studs = [...rows.values()].filter((x) => x.role === 'stallion').length;
+      r.role = studs < 200 ? 'stallion' : 'honored';
+    }
   }
+
   if ((w - REFERENCE_WEEK) % 52 === 0) {
     const studs = [...rows.values()].filter((x) => x.role === 'stallion');
     const dams = [...rows.values()].filter((x) => x.role === 'broodmare');
