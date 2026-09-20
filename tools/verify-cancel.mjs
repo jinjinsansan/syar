@@ -100,6 +100,38 @@ await reportLeftovers(c, [
   { label: 'users', sql: `select count(*)::int as n from users where id=$1`, params: [uid] },
 ], 'verify-cancel.mjs');
 await c.end();
+
+/**
+ * ★**見に行った事実を残す**（★正典 §17.7 **O-4** / **DP-1**・2026-09-20）。
+ *
+ * 【★なぜ要るか】
+ *   ★この道具は ★**6 項目**で確かめます（★「EP が全額戻った」を含む）。★検査としては十分です。
+ *   🔴 ★足りなかったのは ★**「いつ通ったか」**でした。
+ *     ★★**手で流す道具は、★流さなかった日から静かに無検査になります**（★DP-1）。
+ *
+ * 【⚠️ ★本番では永久に流せません】
+ *   ★この道具は ★**DB の状態を変えます**（★口座と馬券を作る）。
+ *   → ★★**「本番で確かめた」とは永久に言えません。** ★staging で確かめた、までです（★R-21）。
+ */
+if (process.argv.includes('--record')) {
+  const { writeCheck } = await import('./lib/staleness.mjs');
+  const where = process.argv.indexOf('--env');
+  const path = writeCheck({
+    what: 'refund',
+    env: where < 0 ? null : process.argv[where + 1],
+    // 🔴 ★落ちても書きます（★食い違いを隠すために記録を止めさせない）
+    ok: fails.length === 0,
+    detail: {
+      bets: odds.length,
+      refundedEp: r1.refundedEp,
+      failed: fails,
+      note: '★staging でしか流せない（★状態を変えるため）。★本番で確かめたとは言えない',
+    },
+    nowIso: new Date().toISOString(),
+  });
+  console.log(`★記録しました: ${path}`);
+}
+
 console.log('');
 console.log(fails.length === 0
   ? `★§10.2 開催中止: PASS — 6項目すべて成立（${odds.length}枚 / ${r1.refundedEp.toLocaleString()} EP 返還）`

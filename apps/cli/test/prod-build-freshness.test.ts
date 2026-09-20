@@ -43,28 +43,15 @@ export const MAX_AGE_DAYS = 7;
 const HOW = '★直し方: `npx tsx tools/verify-deployed-build.mjs'
   + ' --base https://star-two-chi.vercel.app --record`';
 
-describe('🔴 ★本番の版を、★7 日より長く見ないでいない（DP-1 / O-6）', () => {
+/**
+ * 🔴 ★**古さを見る役は、★ここから外しました**（★2026-09-20・**D-052**）。
+ *   ★`apps/cli/test/staleness.test.ts` が ★**4 件まとめて**古さを見ます。
+ *   ★ここに残すのは ★**この記録に固有の中身**だけです（★URL の形・★sha が在るか・★口が在るか）。
+ *   ⚠️ ★**同じことを 2 か所で見ると、★片方を直した日にもう片方が古びます。**
+ */
+describe('★本番の版の記録 — ★中身（★古さは staleness.test.ts が見ます）', () => {
   it('★記録が在る', () => {
     expect(existsSync(RECORD), `★${RECORD} が在りません。${HOW}`).toBe(true);
-  });
-
-  it('🔴 ★記録が **7 日** より古くない（★時計で落ちる）', () => {
-    const raw = JSON.parse(readFileSync(RECORD, 'utf8')) as { checkedAt?: unknown };
-    expect(typeof raw.checkedAt, '★checkedAt が文字列でない').toBe('string');
-    const at = Date.parse(raw.checkedAt as string);
-    expect(Number.isFinite(at), `★checkedAt を時刻として読めない: ${String(raw.checkedAt)}`).toBe(true);
-    const ageDays = (Date.now() - at) / 86_400_000;
-    expect(
-      ageDays,
-      `★本番の版を ${ageDays.toFixed(1)} 日 確かめていません（上限 ${MAX_AGE_DAYS} 日）。${HOW}`,
-    ).toBeLessThan(MAX_AGE_DAYS);
-  });
-
-  it('⚠️ ★未来の日付を受け付けない（★時計をずらして黙らせられないように）', () => {
-    const raw = JSON.parse(readFileSync(RECORD, 'utf8')) as { checkedAt: string };
-    const at = Date.parse(raw.checkedAt);
-    /** ★1 時間ぶんは時計のずれとして許す */
-    expect(at, '★記録の時刻が未来です').toBeLessThan(Date.now() + 3_600_000);
   });
 
   it('★記録に、★どの URL の何を見たかが入っている（★中身の無い記録で緑にしない）', () => {

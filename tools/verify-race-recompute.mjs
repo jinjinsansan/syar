@@ -76,6 +76,19 @@ let checked = 0;
 let matched = 0;
 const mismatches = [];
 const skipped = [];
+/**
+ * 🔴 ★**5 つ目の箱: 版不明**（★裁定 2026-09-20・`F3-RECOMPUTE-NEEDS-VERSION`）。
+ *
+ * ★どの版のエンジンが確定させたか分からないレースは、
+ * ★★**「一致」にも「不一致」にも数えません。**
+ * ⚠️ ★今日の `22.58%` は、★★**版の違うものを引き算して 9 時間 追いかけました。**
+ *   ★同じ混乱を、★この道具の出力で作らないためです。
+ * ⚠️ ★`races.engine_version` は ★**まだ在りません**（★配備と同じ便で入れます）。
+ *   ★入るまでは ★**全部ここに落ちます** — ★それが正しい姿です。
+ */
+const unknownVersion = [];
+/** ★いまの版（★`engine_version` 列が入ったら、★これと比べます） */
+const CURRENT_VERSION = process.env['VERCEL_GIT_COMMIT_SHA'] ?? null;
 
 for (const r of races) {
   const es = (await c.query(
@@ -98,6 +111,16 @@ for (const r of races) {
     });
   } catch (e) {
     skipped.push({ id: r.id, why: `走路を組めない: ${e.message}` });
+    continue;
+  }
+
+  /**
+   * 🔴 ★**版が分からないレースは、★照合しません**（★5 つ目の箱）。
+   * ★`engine_version` 列が無い間は、★`r.engine_version` が `undefined` なので全部ここに来ます。
+   */
+  if (r.engine_version === undefined || r.engine_version === null
+      || CURRENT_VERSION === null || r.engine_version !== CURRENT_VERSION) {
+    unknownVersion.push({ id: r.id, stored: r.engine_version ?? null, current: CURRENT_VERSION });
     continue;
   }
 
@@ -133,6 +156,13 @@ console.log(`  🔴 ★食い違い      ${mismatches.length} 本`);
 console.log(`  ⚠️ ★照合できない  ${skipped.length} 本（★入力が欠けている）`);
 console.log(`  ⚠️ ★そもそも対象外 ${(total - races.length).toLocaleString()} 本`
   + '（★凍結が無い ＝ ★**原理的に再計算できない**）');
+console.log(`  ⚠️ 🔴 ★版不明        ${unknownVersion.length} 本`
+  + '（★どの版が確定させたか分からない ＝ ★**照合しない**）');
+if (unknownVersion.length > 0 && CURRENT_VERSION === null) {
+  console.log('     🔴 ★`VERCEL_GIT_COMMIT_SHA` が無いので、★いまの版が分かりません。');
+  console.log('     ★`races.engine_version` 列も、★まだ在りません（★配備と同じ便で入れます）。');
+  console.log('     → ★★**この状態では 1 本も照合できません。★それが正しい姿です。**');
+}
 for (const m of mismatches.slice(0, 5)) {
   console.log(`     🔴 ${m.id}`);
   console.log(`        保存 ${m.stored}`);
@@ -152,6 +182,7 @@ if (RECORD) {
     matched,
     mismatched: mismatches.length,
     skipped: skipped.length,
+    unknownVersion: unknownVersion.length,
     /** 🔴 ★**照合できなかった本数**。★0 に見せない（★R-21） */
     notRecomputable: total - races.length,
   }, null, 2)}\n`, 'utf8');
@@ -163,4 +194,17 @@ await c.end();
 console.log('');
 console.log('🔴 ★**「一致した」と「照合できない」を混ぜないこと**（★**R-21**）。');
 console.log('   ★この道具は ★**照合できた本数**しか保証しません。');
+
+/**
+ * 🔴 ★**1 本も照合していないのに 0 を返さない**（★**CK-14**・2026-09-20）。
+ *
+ * ⚠️ ★5 つ目の箱を足した直後、★この道具は ★**全部を「版不明」に落として 0 を返しました**。
+ *   ★★食い違い 0 本 ＝ 合格、に見えます。★★**機能が消えた状態が満点**です。
+ * → ★**照合できた本数が 0 なら、★判定不能（終了コード 2）**を返します。
+ */
+if (checked === 0) {
+  console.log('');
+  console.log('🔴🔴 ★**1 本も照合していません。★これは「合格」ではありません（判定不能）。**');
+  process.exit(2);
+}
 process.exit(mismatches.length === 0 ? 0 : 1);
