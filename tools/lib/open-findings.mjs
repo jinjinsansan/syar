@@ -994,6 +994,25 @@ export const OPEN_FINDINGS = [
     owner: 'dev',
     until: '2026-10-03',
   },
+  {
+    id: 'PROD-LONGLIVED-CONN',
+    what: '🔴 ★**本番に、★6 週間 開いたままの接続が 1 本 在ります。★それが何かを、★私たちは知りません。**',
+    why: '✔ ★**実測**（2026-09-20・★`tools/verify-live-function.mjs --env production`・★読むだけ）: '
+      + '★`pg_stat_activity` から ★**自分の pid を除いて**数えると、'
+      + '★`postgres / Supavisor / client backend` が ★**1 本**、'
+      + '★`backend_start` が ★**2026-08-08 23:45:23+00**（★6 週間 前）。'
+      + '⚠️ ★**staging には同じ行が在りません**（★除外後は 0 本）。'
+      + '🔴 ★**「たぶんワーカーでしょう」と書きません。** ★確かめていないからです。'
+      + '★ワーカー（VPS の systemd `star-worker`）なら繋ぎっぱなしの設計として正常ですが、'
+      + '★★**そうでないなら、★何か分からないものが本番に繋いでいます。**'
+      + '⚠️ ★**いま止める理由にはしていません**: ★`0032` の判断には影響しません'
+      + '（★`anon` / `authenticated` / `service_role` は本番でも **NOLOGIN** なので、'
+      + '★どのクライアントもそのロールでは繋げない＝ revoke はワーカーに当たりようがない）。'
+      + '★**確かめ方**: ★VPS で `ss -tnp` か `systemctl status star-worker` を見るか、'
+      + '★ワーカー側に `application_name` を付けて名乗らせる（★後者なら次からは 1 目で分かります）',
+    owner: 'owner',
+    until: '2026-10-31',
+  },
 ];
 
 /**
