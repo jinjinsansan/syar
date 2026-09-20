@@ -46,6 +46,22 @@ production 中央 48〜51 ms ／ staging 219 ms（read-only・select 1）
 ⚠️ **この数字は一度 間違えました**（3.3 時間と報告 → 往復の回数を数え直して 13 秒）。
 **`update` は `unnest` で 1 文 2,000 頭**なので、1 頭 1 往復ではありません。
 
+### ①′ 🔴🔴 **staging で通しで 1 回 演習する**（★★本番に触る前）
+
+> レビュー側の指摘 4 件には無い段ですが、**いちばん安いのでここに置きます。**
+
+- ②〜⑤ を **staging に対して同じ順で流す**
+- 🔴🔴 **ここが ② より前にあることが要点です**（★2026-09-20・レビュー側の指摘で移しました）。
+  ★もとは ③‴ に置いており、★**演習で問題が見つかったときには本番はもう触られている**形でした。
+  ✔ **移せます**: staging は既に **53/53** なので、演習は ② に依存しません。**移す費用はゼロ。**
+- ★staging は **53/53 適用済み**＝**移行後の本番と同じ姿**で、
+  しかも **`horse_market_listing` / `horse_story_event` にも行が在る**（本番にはまだ無い）
+  → ★**本番より条件が厳しい**。ここで通れば本番でも通る見込み
+- ✅ ここで分かること: **本当に消せるか／所要（1 分 の見込みの答え合わせ）／判定 3 つが出るか**
+- ⚠️ **staging に流すのも承認の要る操作**です（★許可 **B′**）
+- ✅ ここで **自己参照（`sire_id` / `dam_id`）が 1 文の全消しで解けるか**も分かります
+  （★ここだけは書かずに確かめる方法が無く、**実測していません**）
+
 ### ② 移行 33 件を当てる 🔴 **許可 A**
 
 ```bash
@@ -84,17 +100,6 @@ pg_dump --data-only -t horses -t race_entries -t races … > backup_20260920.sql
 - ⚠️ 🔴 **「たぶん Supabase が取っている」で進めないこと。**
   確かめて、時刻を書く（★今日ずっと言ってきた「在るはず」で通さない、そのもの）
 
-### ③‴ 🔴 **staging で通しで 1 回 演習する**（★開発側の追加）
-
-> レビュー側の指摘 4 件には無い段ですが、**いちばん安いのでここに置きます。**
-
-- ②〜⑤ を **staging に対して同じ順で流す**
-- ★staging は **53/53 適用済み**＝**移行後の本番と同じ姿**で、
-  しかも **`horse_market_listing` / `horse_story_event` にも行が在る**（本番にはまだ無い）
-  → ★**本番より条件が厳しい**。ここで通れば本番でも通る見込み
-- ✅ ここで分かること: **本当に消せるか／所要（1 分 の見込みの答え合わせ）／判定 3 つが出るか**
-- ⚠️ **staging に流すのも承認の要る操作**です（★許可 B′）
-
 ### ④ 世界を作り直す 🔴 **許可 B**
 
 ```bash
@@ -118,14 +123,62 @@ npx tsx tools/seed-world.mjs      --env production    # ★約 1 分 の見込�
 
 **⑤ 作り直しの実測（読むだけ）**
 
+**(a) 現役の側** — `POOL-CLIFF` / `PROD-NEVER-AGED`
+
 ```sql
-select count(*) filter (where retired_at_week is null)            as 現役,
-       count(distinct birth_week) filter (where retired_at_week is null) as 週の種類,
-       count(*) filter (where birth_week is null)                 as 週なし
+select count(*) filter (where retired_at_week is null)                    as 現役,
+       count(distinct birth_week) filter (where retired_at_week is null)  as 週の種類,
+       count(*) filter (where birth_week is null)                         as 週なし
   from horses;
 ```
 - 期待: **現役 2,400 / 週の種類 156 / 週なし 0**
-- → これが出たら **`POOL-CLIFF` を閉じられます**
+
+**(b) 引退の側** — `SEED-NOT-RETIRED` 🔴 **ここを見ないと、今日いちばん重い発見が確かめられません**
+
+```sql
+select count(*) filter (where retired_at_week is not null)                as 引退済み,
+       count(*) filter (where retirement_role = 'stallion')               as 種牡馬,
+       count(*) filter (where retirement_role = 'broodmare')              as 繁殖牝馬,
+       count(*) filter (where retirement_role = 'honored')                as 功労馬,
+       count(*) filter (where retired_at_week is not null
+                          and retirement_role is null)                    as 役割なし
+  from horses;
+```
+- 期待: **引退済み 4,970 / 種牡馬 200 / 繁殖牝馬 800 / 功労馬 3,970 / 役割なし 0**
+- 🔴 **引退済みが 0 なら、`SEED-NOT-RETIRED` は直っていません**
+  （★いまの本番は 7,355 頭 **全部が現役**。★そのうち 67% は走り終えた馬です）
+
+**(c) 予言 3 の答え合わせ** — 🔴 **直す前に記録した予言です。ここで確かめないと誰も確かめません**
+
+```sql
+select count(*) as n, avg(u) as 平均, min(u) as 最小, max(u) as 最大
+  from (select (select sum((value)::numeric) from jsonb_each_text(stats))
+             / nullif((select sum((value)::numeric) from jsonb_each_text(potential)), 0) as u
+          from horses where retired_at_week is null) t
+ where u is not null;
+```
+
+| | 素質開放率 |
+|---|---|
+| **修正前の本番**（2026-09-20 実測） | **0.3149**（範囲 **0.2790〜0.3509** ＝ 創始値そのもの） |
+| ハーネスの既定 | 0.70 |
+| D-053 が確かめた条件 | 0.713 |
+| いまの staging | 0.8005 |
+
+- **期待: 0.3149 より上がる**（★向きだけ・**AU-7′**）
+- 🔴 **動かなければ、④ が効いていません**（育成が回っていない）
+- ⚠️ **単一の目標値は置きません。** 作り直した世界の馬は
+  **週齢 104〜259 に散っている**（案 B-3）ので、**全頭 182 週で測った 0.713 とは揃いません。**
+  「0.713 に一致すること」を合否にしないこと
+
+**(d) ⚠️ V-4 / V-5 / V-6 は、ここでは測れません**
+
+- **レースが 1 本も走っていません**（④で `race_entries` を消しています）
+- → **⑦ の後、何周か回してから**別に測ること
+- 🔴 そのとき **同じ版どうしで比べる**こと（**AU-21**）。
+  いまの帯は 2026-08-20 のエンジンの数字です（`SCHEMA-DRIFT-PROD`）
+
+→ (a)(b)(c) が揃ったら **`POOL-CLIFF`・`SEED-NOT-RETIRED`・`PROD-NEVER-AGED` を閉じられます**
 
 ### ⑥ ワーカーを配備 🔴 **許可 C**
 
