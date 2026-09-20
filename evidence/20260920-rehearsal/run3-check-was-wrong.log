@@ -1,0 +1,42 @@
+# 演習 3 回目（staging・2026-09-20）— ★作り直しは通り、★落ちたのは私の検査
+
+実行: npx tsx tools/seed-world.mjs --env staging --allow-all-names --wipe-races
+[env] 接続先: secrets.staging.env   ← ★staging です（★loadEnv の既定は本番・毎回 --env を明示）
+
+## ★結果（★抜粋）
+  生成 40755 頭（179.3秒）
+  投入対象 7370 頭（現役+繁殖+5代の祖先）
+  ⚠️ ★`truncate` のために足した参照 2 本:
+     horse_week_log → horses（cascade）
+     user_identities → users（cascade）   ← ★この行は後で絞りました（★集合の親だけ出す）
+  ★空にしました: race_entries 981 / horse_week_log 260 / horse_story_event 77 /
+                 horse_market_listing 15 / bets 0 / race_odds 162,568 / races 73 / horses 7,370
+  ★1 文の truncate で 0.3 秒（★合計 171,344 行）
+  投入 7370 頭 完了 ／ ★基準の週 258
+  ★現役 2400 頭 / 種牡馬 200 / 繁殖牝馬 800 / 功労馬 3970
+  ★16 回で追いつきました（延べ 247,735 頭週 / 引退 12 頭 / 276秒）
+  DB: {"total":7370,"with_sire":6980,"lines":40,"active":2388,
+       "no_birth_week":0,"active_birth_weeks":156}
+  ✓ ① ★`birth_week` が無い馬が 0 頭（★PROD-NEVER-AGED）  0 頭
+  ★ ② ★現役の頭数がプリシード世界と一致  DB 2388 / プリシード 2400   ← ★FAIL
+  ✓ ③ ★現役の `birth_week` が散っている（★SEED-LOCKSTEP）  156 種類
+  [exited with code 1]
+
+## 診断 — ★世界は正しく、★検査が間違っていました
+✔ ★差の 12 頭を ★**DB に問い合わせて**特定しました:
+    retirement_reason = 'career_ending_injury' … **12 頭**（★追いつきの最中）
+    retirement_reason = 'age' … 4,970 頭（★投入時に転記した分）
+    retirement_role が null の引退馬 … **0 頭**
+    種牡馬 200 → **206** ／ 繁殖牝馬 800 → **806**（★＋12・`retirement.ts` が役割を付けた）
+  → ★2,388 ＋ 12 ＝ ★**2,400**。★プリシード世界と一致します。
+
+🔴 ★間違いの形: ★検査が ★**「作った数 ＝ 残る数」**と書いてあり、
+   ★それは ★**育成が何も起こさないことを仮定**していました。
+   ★`advanceTrainingWeeks` は本番と同じ経路なので、★§7.5 の致命的故障が起きます。
+   ⚠️ ★**引退が 0 でないと落ちる検査は、★引退が動いていることを罰します**（★`CK-14` の裏）。
+✅ ★直し: ★② を ★**現役 ＋ 追いつき中の引退 ＝ プリシードの現役**に変えました。
+   ★`retiredDuringCatchUp` は ★**追いつきの戻り値の合計**で、★別勘定にしていません。
+
+## ★ついでに確かめた（★予測 3 の確認）
+  素質開放率: ★投入直後 **0.3149** → ★追いつき後 **0.6852**（★範囲 0.3311〜0.9735）
+  → ★「4 歳が創始のままの能力で立つ」問題は ★**追いつきで解けています**（★決め C）。

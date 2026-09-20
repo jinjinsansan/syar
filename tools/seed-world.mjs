@@ -319,10 +319,19 @@ async function deleteAllHorses(roots) {
    *    ★`sire_id` / `dam_id` の索引は ★**配合の血統辿りにも効く**はずなので、★別に起票しました。
    */
   const all = [...order, 'horses'];
-  if (addedForTruncate.size > 0) {
-    console.log(`  ⚠️ ★\`truncate\` のために足した参照 ${addedForTruncate.size} 本`
+  /**
+   * ⚠️ ★**消す集合に関係する辺だけを出します**（★2026-09-20・★演習 3 回目の出力で気づいた）。
+   *
+   *   🔴 ★旧は ★**DB 全体の cascade / set null の辺**を並べていました。
+   *     ★実際の出力: ★`user_identities → users（cascade）` — ★**`users` は消していません**。
+   *   → ★★**消していない表の話を「足した」と書くのは、★嘘です。**
+   *   → ★**親が集合に入っている辺だけ**に絞ります。
+   */
+  const relevant = [...addedForTruncate].filter((a) => all.includes(a.split(' → ')[1]?.split('（')[0]));
+  if (relevant.length > 0) {
+    console.log(`  ⚠️ ★\`truncate\` のために足した参照 ${relevant.length} 本`
       + '（★`delete` なら DB が面倒を見るもの）:');
-    for (const a of addedForTruncate) console.log(`     ${a}`);
+    for (const a of relevant) console.log(`     ${a}`);
   }
   const before = {};
   for (const t of all) {
@@ -367,6 +376,8 @@ async function deleteAllHorses(roots) {
  *   → ★**明示した人だけが消せる形**にします（★`--flatten` / `--allow-all-names` と同じ作法）。
  */
 const WIPE_RACES = process.argv.includes('--wipe-races');
+/** ★追いつきの最中に引退した頭数（★下の判定②で使います） */
+let retiredDuringCatchUp = 0;
 /** ★消した行数（★後で `evidence/world-build/` に残します） */
 const wipedCounts = {};
 await deleteAllHorses(WIPE_RACES ? ['horses', 'races'] : ['horses']);
@@ -443,13 +454,12 @@ if (!CATCH_UP) {
   const tCatch = process.hrtime.bigint();
   let rounds = 0;
   let advanced = 0;
-  let retired = 0;
   for (;;) {
     rounds += 1;
     if (rounds > 400) throw new Error('seed-world: 400 回 呼んでも追いつきません（上限）');
     const r = await advanceTrainingWeeks(c, nowMs, EPOCH, (m) => console.log(`    ★警報: ${m}`));
     advanced += r.advanced;
-    retired += r.retired;
+    retiredDuringCatchUp += r.retired;
     if (r.advanced === 0) break;
     if (rounds % 10 === 0) {
       const p = (await c.query(
@@ -462,7 +472,7 @@ if (!CATCH_UP) {
   const sec = Number(process.hrtime.bigint() - tCatch) / 1e9;
   process.stdout.write('\r                                                        \r');
   console.log(`  ★${rounds} 回で追いつきました`
-    + `（延べ ${advanced.toLocaleString()} 頭週 / 引退 ${retired} 頭 / ${sec.toFixed(0)}秒）`);
+    + `（延べ ${advanced.toLocaleString()} 頭週 / 引退 ${retiredDuringCatchUp} 頭 / ${sec.toFixed(0)}秒）`);
 }
 
 // ─────────────────────────────────────────────────────────
@@ -485,8 +495,24 @@ const check = (ok, label, detail) => {
 const d = chk.rows[0];
 check(d.no_birth_week === 0, '① ★`birth_week` が無い馬が 0 頭（★PROD-NEVER-AGED）',
   `${d.no_birth_week} 頭`);
-check(d.active === tally.active, '② ★現役の頭数がプリシード世界と一致（★SEED-NOT-RETIRED）',
-  `DB ${d.active} / プリシード ${tally.active}`);
+/**
+ * 🔴 ★**追いつきの最中に引退した馬を、★数に入れます**（★2026-09-20・★演習 3 回目で直しました）。
+ *
+ * 【★何が起きたか】
+ *   ★演習 3 回目、★作り直しは通ったのに ★**この検査だけが落ちました**（★DB 2,388 / 期待 2,400）。
+ *   ✔ ★差の 12 頭は ★**追いつきの最中に致命的故障で引退した馬**でした（★実測: `injured` 12）。
+ *     ★種牡馬 200 → **206** ／ 繁殖牝馬 800 → **806**（★＋12）— ★`retirement.ts` が役割を付けています。
+ *   → ★★**壊れていたのは世界ではなく、★私の検査でした。**
+ *
+ * 【★なぜ間違えたか】
+ *   ★`advanceTrainingWeeks` は ★**本番と同じ経路**です。★§7.5 の故障も起きます。
+ *   ★「作った数 ＝ 残る数」と書いた時点で、★**育成が何も起こさないことを仮定**していました。
+ *   ⚠️ ★**引退が 0 でないと落ちる検査は、★引退が動いていることを罰します**（★`CK-14` の裏）。
+ */
+check(d.active + retiredDuringCatchUp === tally.active,
+  '② ★現役 ＋ 追いつき中の引退 が、★プリシード世界の現役と一致（★SEED-NOT-RETIRED）',
+  `DB ${d.active} ＋ 引退 ${retiredDuringCatchUp} ＝ ${d.active + retiredDuringCatchUp}`
+    + ` / プリシード ${tally.active}`);
 check(d.active_birth_weeks >= 100, '③ ★現役の `birth_week` が散っている（★SEED-LOCKSTEP）',
   `${d.active_birth_weeks} 種類`);
 
