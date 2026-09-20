@@ -1,0 +1,35 @@
+# §17 の残り F-4 / O-2 / O-4（2026-09-20・読むだけ・静的）
+
+## どう探したか（★次の人が同じ網で安心しないように）
+F-4 … `odds_at_purchase` を書く箇所と読む箇所を全文検索し、払戻が現在のオッズを
+       参照していないことを、払戻の実装まで辿って確かめた
+O-2 … `heartbeat` / `死活` / `liveness` / `worker_health` を apps・db・tools で検索
+O-4 … 中止と返金の実装（`refund`）と、それを確かめる道具・検査を検索
+
+## F-4 ★固定オッズ（odds_at_purchase が購入時に確定）  → ✅ 成立
+db/migrations/0001_init.sql:226   odds_at_purchase numeric(9,1) ★not null
+place_bet（0002 → … → 0045）      insert の列に odds_at_purchase が必ず在る
+apps/worker/src/payout.ts:51-74   ★払戻は odds_at_purchase を読む
+                                  ★oddsTenthsFromDecimalString で整数（十分の一）に直す
+                                  註記: 旧 Number(b.odds_at_purchase) は「誤差の入口だった」
+packages/betting/src/settle.ts:5  ★「払戻は oddsAtPurchase だけを使う
+                                    （★現在のオッズを参照しない・§9.2）」
+
+→ ★後からオッズ式を直しても、既存の馬券の配当は変わらない。★F-4 は成立。
+
+## O-2 ★ワーカーの死活監視  → 🔴 ★仕組みが無い
+heartbeat / 死活 / liveness / worker_health … ★**0 件**（apps・db・tools すべて）
+在るのは tools/diag-worker-alive.mjs ★**手で流す道具**だけ
+
+🔴 これが WORKER-STALL-0916（staging が 2026-09-16 から停止）を
+   ★3 日間 誰も気づかなかった理由。
+   ★DP-1 そのもの:「ある行為をしたときだけ走る検査は、その行為をしない期間は無検査」
+⚠️ 正典 §17.7 O-2 は「★10 分サイクルの生命線」と書いている
+
+## O-4 ★障害時の「レース不成立＋全額返還」  → ⚠️ 仕組みは在る／いつ確かめたか不明
+apps/worker/src/cancel.ts ほかに実装が在る
+tools/verify-cancel.mjs が ★6 項目で確かめる（★「③ EP が全額戻った」を含む）
+
+⚠️ ただし ★**手で流す道具**で、★DB の状態を変える（STATE_CHANGING）。
+   → ★門に入れられない。★最後にいつ通ったかの記録も無い
+   → ★O-2 と同じ DP-1 の形。★staging が止まっているので、いまは流せない
