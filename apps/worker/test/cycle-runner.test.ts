@@ -300,9 +300,15 @@ describe('★D-038 確定を生成より先に処理する', () => {
      *   🔴 ★**確定の前でなければ意味がありません** — ★後に置くと
      *   ★引退した馬が走ってから取消になります。★並びそのもので固定します。
      */
+    /**
+     * ⚠️ ★2026-09-20・**`ANNOUNCE-G2-G3`**: ★`announce` が **4 本 → 5 本** になりました。
+     *   ★G2 を 1 週の半分（20）・G3 を 4 分の 1（10）に延ばしたためで、
+     *   ★**並びは変わっていません**（retire-check → settle → cancel → announce… → fill）。
+     * ⚠️ ★**数を緩めません**（★`toContain` などにすると、★並びの見張りが死にます）。
+     */
     expect(store.order).toEqual([
       'retire-check', 'settle', 'cancel',
-      'announce', 'announce', 'announce', 'announce',
+      'announce', 'announce', 'announce', 'announce', 'announce',
       'fill', 'fill',
     ]);
   });

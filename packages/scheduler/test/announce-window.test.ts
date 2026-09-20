@@ -48,22 +48,94 @@ describe('DS-5 ② 重賞だけ告知を先に出す', () => {
     expect(WEEK_MS).toBe(4 * 60 * 60 * 1000);
   });
 
-  it('② ★★G2・G3・重賞以外は 12 分のまま（★狭いほうへ倒す・R-27）', () => {
+  it('② ✅ ★G2 は 1 週の半分・G3 は 4 分の 1（★2026-09-20 オーナー決定・案 1）', () => {
     /**
-     * 🔴 ★DS-5 ② の文に挙がっているのは **G1 だけ**です。
-     *    ★G2・G3 の長さは正典にも判断にも書かれていないので、★延ばしません。
-     *    ⚠️ ★決まったら `ANNOUNCE_AHEAD_BY_GRADE` の 1 行を変えるだけです。
+     * 🔴 ★**数で書かないこと**を見ます（★`20` / `10` と直接 書いたら、
+     *   ★`CYCLES_PER_WEEK` が動いた日に意味が変わります）。
+     * ⚠️ ★旧は「G2・G3 は 12 分のまま（狭いほうへ倒す・R-27）」でした。
+     *   ★照会に出して**決まった**ので延ばしました。★倒していた判断自体は正しかったです。
      */
-    expect(ANNOUNCE_AHEAD_BY_GRADE.G2).toBe(ANNOUNCE_AHEAD_RACES);
-    expect(ANNOUNCE_AHEAD_BY_GRADE.G3).toBe(ANNOUNCE_AHEAD_RACES);
-    /** ★窓（登録できる長さ）＝ 告知 − 組成 ＝ 2 サイクル ＝ 12 分 */
+    expect(ANNOUNCE_AHEAD_BY_GRADE.G2).toBe(CYCLES_PER_WEEK / 2);
+    expect(ANNOUNCE_AHEAD_BY_GRADE.G3).toBe(CYCLES_PER_WEEK / 4);
+    /** ★実時間: ★G2 = 2 時間 ／ G3 = 1 時間 */
+    expect(ANNOUNCE_AHEAD_BY_GRADE.G2 * CYCLE_MS).toBe(WEEK_MS / 2);
+    expect(ANNOUNCE_AHEAD_BY_GRADE.G3 * CYCLE_MS).toBe(WEEK_MS / 4);
+    expect(ANNOUNCE_AHEAD_BY_GRADE.G2 * CYCLE_MS).toBe(2 * 60 * 60 * 1000);
+    expect(ANNOUNCE_AHEAD_BY_GRADE.G3 * CYCLE_MS).toBe(1 * 60 * 60 * 1000);
+    /** ★重賞以外は**据え置き**（★延ばしたのは重賞だけ・★対照） */
+    let plainC = -1;
+    for (let i = 0; i < 1000; i += 1) if (gradeOf(i) === null) { plainC = i; break; }
+    expect(plainC, '★重賞でないサイクルが無い').toBeGreaterThan(-1);
+    expect(announceAheadFor(plainC)).toBe(ANNOUNCE_AHEAD_RACES);
     expect((ANNOUNCE_AHEAD_RACES - LOOKAHEAD_RACES) * CYCLE_MS).toBe(12 * 60 * 1000);
+  });
+
+  it('🔴 ★D-111 ③⑥: ★**告知だけで組成前**の窓が、★格ごとにどれだけ在るか', async () => {
+    /**
+     * 🔴 ★レビュー側の条件: ★「★延ばすと `D-111 ③⑥`（取消と返金）が G2/G3 でも
+     *   ★**常用の経路**になる。★その経路が本当に動くかを検査で示せ」。
+     *
+     * ⚠️ 🔴 ★**調べた結果、★言い方を 1 つ直します**:
+     *   ✔ ★取消の経路（`cycle-runner.ts:356` / `:372`）には ★**格の条件が 1 つもありません**。
+     *     ★`UnfrozenRaceError` / `InvalidFrozenCourseError` / `overdueRaces` で動きます。
+     *   ✔ ★`announced` のレースを取消せることは ★**既に検査が在ります**
+     *     （`apps/worker/test/cancel-accepts-announced.test.ts`・★実物の SQL を見る形）。
+     *   → ★★**「新しく通る道」ではありません。★道は同じです。**
+     *   → ★★**新しいのは「その道に乗りうる時間」**です。★そこを数で留めます。
+     *
+     * ★**告知だけで組成前の窓** ＝ `announceAheadFor(g) − LOOKAHEAD_RACES`:
+     *   ★G1 38 サイクル ／ ★G2 **18** ／ ★G3 **8** ／ ★重賞以外 2
+     *   ⚠️ ★延ばす前は ★**G2・G3 とも 2** でした → ★**G2 は 9 倍、G3 は 4 倍**。
+     */
+    for (const g of ['G1', 'G2', 'G3'] as const) {
+      const onlyAnnounced = ANNOUNCE_AHEAD_BY_GRADE[g] - LOOKAHEAD_RACES;
+      expect(onlyAnnounced, `★${g} に「告知だけ」の窓が無い`).toBeGreaterThan(0);
+    }
+    expect(ANNOUNCE_AHEAD_BY_GRADE.G2 - LOOKAHEAD_RACES).toBe(18);
+    expect(ANNOUNCE_AHEAD_BY_GRADE.G3 - LOOKAHEAD_RACES).toBe(8);
+    /** ★重賞以外は据え置きの 2（★対照） */
+    expect(ANNOUNCE_AHEAD_RACES - LOOKAHEAD_RACES).toBe(2);
+
+    /** 🔴 ★取消の経路に**格の条件が無い**ことを、★製品の文面で見る（★FK-6） */
+    const { readFileSync } = await import('node:fs');
+    const { default: nodePath } = await import('node:path');
+    const root = nodePath.resolve(__dirname, '../../..');
+    const runner = readFileSync(nodePath.join(root, 'apps/worker/src/cycle-runner.ts'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ');
+    /**
+     * 🔴 ★**番人**（★**CK-3 / CK-4**）: ★切り出しが空だと、★否定の表明は**素通しで緑**になります。
+     *   ★`indexOf` が −1 を返したら、★`slice` は別の場所を切り出します。
+     */
+    const cancelAt = runner.indexOf('cancelRace(idx)');
+    expect(cancelAt, '★取消の呼び出しが見つかりません').toBeGreaterThan(-1);
+    const cancelPart = runner.slice(Math.max(0, cancelAt - 800), cancelAt + 400);
+    expect(cancelPart.length, '★切り出しが空です').toBeGreaterThan(0);
+    expect(cancelPart, '🔴 ★取消の経路に格の条件が入っています').not.toMatch(/gradeOf|G1|G2|G3/);
+  });
+
+  it('🔴 ★割り切れなければ落ちる（★黙って切り捨てない・AL-9）', async () => {
+    /**
+     * 🔴 ★`CYCLES_PER_WEEK` は D-007 で動いてきました（★10 分 → 3 分 → 6 分）。
+     *   ★4 の倍数でない日に ★**黙って切り捨てられると、★誰も気づきません**。
+     * ⚠️ ★ここでは**式そのもの**を見ます（★実装が割り切れを見ているか）。
+     */
+    expect(CYCLES_PER_WEEK % 4, '★いまの CYCLES_PER_WEEK が 4 で割り切れない').toBe(0);
+    const { readFileSync } = await import('node:fs');
+    const { default: nodePath } = await import('node:path');
+    const src = readFileSync(
+      nodePath.join(nodePath.resolve(__dirname, '..'), 'src/announce-window.ts'), 'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, ' ');
+    expect(src, '★割り切れの検査が無い').toMatch(/CYCLES_PER_WEEK % denominator !== 0/);
+    expect(src, '★投げていない').toMatch(/throw new Error/);
+    /** 🔴 ★数を直接 書いていないこと（★`G2: 20` のような形が戻っていない） */
+    expect(src, '🔴 ★G2 に数が直接 書かれています').not.toMatch(/G2:\s*\d/);
+    expect(src, '🔴 ★G3 に数が直接 書かれています').not.toMatch(/G3:\s*\d/);
   });
 
   it('★`announceAheadFor` が格で分かれる（★対照つき）', () => {
     expect(announceAheadFor(firstCycleOfGrade('G1'))).toBe(CYCLES_PER_WEEK);
-    expect(announceAheadFor(firstCycleOfGrade('G2'))).toBe(ANNOUNCE_AHEAD_RACES);
-    expect(announceAheadFor(firstCycleOfGrade('G3'))).toBe(ANNOUNCE_AHEAD_RACES);
+    expect(announceAheadFor(firstCycleOfGrade('G2'))).toBe(CYCLES_PER_WEEK / 2);
+    expect(announceAheadFor(firstCycleOfGrade('G3'))).toBe(CYCLES_PER_WEEK / 4);
     /** ★重賞でないサイクルを 1 本 探して、既定であること */
     let plain = -1;
     for (let i = 0; i < 1000; i += 1) if (gradeOf(i) === null) { plain = i; break; }
@@ -108,10 +180,24 @@ describe('DS-5 ② 重賞だけ告知を先に出す', () => {
     expect(racesToAnnounce(at(g1 - 1), EPOCH), '★直前で消えた').toContain(g1);
   });
 
-  it('② ★★G3 は、その 5 本前には**まだ**返らない（★延びていないことの対照）', () => {
+  it('② ✅ ★G3 は 10 本前から返り、★11 本前には返らない（★境界）', () => {
+    /**
+     * ⚠️ ★旧は「5 本前には**まだ**返らない（延びていないことの対照）」でした。
+     *   ★延ばしたので、★**境界が動いた**ことをここで留めます。
+     */
     const g3 = firstCycleOfGrade('G3', 100);
-    expect(racesToAnnounce(at(g3 - ANNOUNCE_AHEAD_RACES), EPOCH)).toContain(g3);
-    expect(racesToAnnounce(at(g3 - ANNOUNCE_AHEAD_RACES - 1), EPOCH), '🔴 ★G3 まで延びている').not.toContain(g3);
+    const w = CYCLES_PER_WEEK / 4;
+    expect(racesToAnnounce(at(g3 - w), EPOCH), '★10 本前で入っていない').toContain(g3);
+    expect(racesToAnnounce(at(g3 - w - 1), EPOCH), '★11 本前から入っている').not.toContain(g3);
+    /** ★直前まで消えない */
+    expect(racesToAnnounce(at(g3 - 1), EPOCH), '★直前で消えた').toContain(g3);
+  });
+
+  it('② ✅ ★G2 は 20 本前から返り、★21 本前には返らない（★境界）', () => {
+    const g2 = firstCycleOfGrade('G2', 100);
+    const w = CYCLES_PER_WEEK / 2;
+    expect(racesToAnnounce(at(g2 - w), EPOCH), '★20 本前で入っていない').toContain(g2);
+    expect(racesToAnnounce(at(g2 - w - 1), EPOCH), '★21 本前から入っている').not.toContain(g2);
   });
 
   it('★★並ぶ本数が増えすぎない（★「出走馬もオッズも無いレース」が画面に何本 並ぶか）', () => {
@@ -128,14 +214,20 @@ describe('DS-5 ② 重賞だけ告知を先に出す', () => {
       if (n > ANNOUNCE_AHEAD_RACES) five += 1;
     }
     /**
-     * ✔ ★実測（2026-09-19・5,000 サイクル）: ★**最大 5 本**（★6 本は一度も出ません）。
-     *   ★93.5% の周は **4 本のまま**で、★**6.5% の周だけ 5 本**になります。
-     *   ★G1 は 625 サイクルに 1 本、★窓は 40 サイクルなので、★**2 本 同時には入りません**。
-     * 🔴 ★`+2` ではなく ★**`+1`** で押さえます（★緩い上限は「通るだけの検査」です・R-16）。
+     * ✔ ★**実測（2026-09-20・20,000 サイクル・★G2/G3 を延ばした後）**:
+     *   ★**最大 6 本**（★4 本 45.4% ／ 5 本 47.4% ／ ★**6 本 7.1%**）。
+     *
+     * ⚠️ 🔴 ★**延ばした代償が、ここに出ています。**
+     *   ★延ばす前（★2026-09-19・G2/G3 が 12 分だった頃）は
+     *   ★**最大 5 本**（★4 本 93.5% ／ 5 本 6.5%）でした。
+     *   → ★★**「出走馬もオッズも無いレース」が画面に並ぶ本数が、★ほぼ倍になりました。**
+     *   → ★★**これは欠陥ではなく、★オーナー決定（案 1）の代償**です。★数として残します。
+     *
+     * 🔴 ★実測の **6** で押さえます（★緩い上限は「通るだけの検査」です・R-16）。
      */
-    expect(worst, `★1 周に ${worst} 本 並びます（★G1 が 2 本 重なっています）`)
-      .toBe(ANNOUNCE_AHEAD_RACES + 1);
-    expect(five / N, '★5 本になる周が多すぎます').toBeLessThan(0.10);
+    expect(worst, `★1 周に ${worst} 本 並びます（★延ばした後の実測は 6 本）`)
+      .toBe(ANNOUNCE_AHEAD_RACES + 2);
+    expect(five / N, '★4 本より多い周が増えすぎています').toBeLessThan(0.60);
     expect(five, '★対照: 5 本の周が 1 つも無い（★G1 の窓が効いていない）').toBeGreaterThan(0);
   });
 

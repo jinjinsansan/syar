@@ -111,11 +111,18 @@ const BUILD_DROPPING = async () => ({ entrants: [], odds: [], excluded: [] });
 const NOOP = (): void => {};
 
 describe('D-117 ① 公示', () => {
-  it(`★${ANNOUNCE_AHEAD_RACES} レース先まで枠だけ作る`, async () => {
+  it(`★重賞以外は ${ANNOUNCE_AHEAD_RACES} レース先まで、★重賞はその格の窓まで枠だけ作る`, async () => {
     const f = fake(EPOCH + Math.floor(CYCLE_MS * 0.4));
     const out = await runCycle(f.store, EPOCH, SEEDS, ANNOUNCE, BUILD_KEEPING, NOOP);
-    expect(out.announced).toEqual([1, 2, 3, 4]);
-    expect(out.announced.length).toBe(ANNOUNCE_AHEAD_RACES);
+    /**
+     * ⚠️ ★2026-09-20・**`ANNOUNCE-G2-G3`**: ★**cycle 20（G2）が増えました**。
+     *   ★G2 の告知を 1 週の半分（**20 サイクル**）に延ばしたので、
+     *   ★cycle 0 から見て ★**20 先の G2 が告知の範囲に入ります**。
+     *   ★重賞以外の 1〜4 は据え置きです（★延ばしたのは重賞だけ）。
+     */
+    expect(out.announced).toEqual([1, 2, 3, 4, 20]);
+    /** ★重賞以外 4 本 ＋ ★窓に入った重賞 1 本（cycle 20 の G2） */
+    expect(out.announced.length).toBe(ANNOUNCE_AHEAD_RACES + 1);
   });
 
   it('★締切は `entryDeadlineMs` が決める（★`publish` の 30 秒ではない）', async () => {
@@ -149,7 +156,13 @@ describe('D-117 ② 組成', () => {
     const out = await runCycle(f.store, EPOCH, SEEDS, ANNOUNCE, BUILD_KEEPING, NOOP);
     expect(out.filled).toEqual([1, 2]);
     // ★3・4 は公示だけで残る
-    expect([...f.announcedSet].sort((a, b) => a - b)).toEqual([3, 4]);
+    /**
+     * ⚠️ ★2026-09-20・**`ANNOUNCE-G2-G3`**: ★**cycle 20（G2）が増えました**。
+     *   ★G2 の告知を 1 週の半分（**20 サイクル**）に延ばしたので、
+     *   ★cycle 0 から見て ★**20 先の G2 が告知の範囲に入ります**。
+     *   ★重賞以外の 1〜4 は据え置きです（★延ばしたのは重賞だけ）。
+     */
+    expect([...f.announcedSet].sort((a, b) => a - b)).toEqual([3, 4, 20]);
   });
 
   it('★**DS-2** 登録した馬は出走表に入る', async () => {
