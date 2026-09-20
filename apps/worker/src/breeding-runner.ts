@@ -11,15 +11,14 @@
  *   ★毎週、★**その週に割り当てられた繁殖牝馬**（★B-3 と同じ層化）に仔を産ませます。
  *   ★相手の選び方は `@star/breeding`（★プリシードと**同じ手続き**・★§10.5）。
  *
- * 【🔴 ★年の扱い — ★照会を出します（Q-5）】
- *   ⚠️ ★`horses.birth_year` には ★**プリシードの年（0〜50）**が入っています。
- *     ★一方 `birth_week` は ★**ゲームの週**です。★**尺度が違います。**
- *   → ★★**この道具は `birth_week` だけを年の出どころにします**（`gameYearOf`）。
- *   🔴 ★結果として ★**DB に 2 つの尺度の `birth_year` が混ざります**
- *     （★創始世代はプリシードの年、★これから生まれる仔はゲームの年）。
- *     ★**黙って混ぜたくないので照会に出します。**
- *   ✔ ★いま困らない理由: ★年齢判定は `birth_week` からしか引いていません。
- */
+ * 【✅ ★年の扱い — ★Q-5 は解けました（★2026-09-20・★本番を数えました）】
+ *   ⚠️ ★`horses.birth_year` は ★**プリシードの年**、★`birth_week` は ★**ゲームの週**。★尺度が違います。
+ *   ✔ ★**実測**（★本番 7,370 頭・読むだけ）:
+ *     ★`birth_year - floor(birth_week/52)` … ★**最小 46 / 最大 46 / 平均 46.00**
+ *     → ★★**ずれではなく、★全馬で同じ定数差**でした。★**変換できます。**
+ *   ✅ ★だから ★**年齢は `birth_week` から引き**（★ここの `withGameYear`）、
+ *     ★**保存する `birth_year` は、★既存の行と同じ尺度に合わせます**（★下の `yearOffset`）。
+ *   🔴 ★差が定数でなければ ★**投げます**（★世界が既に混ざっている＝直してから動かす）。 */
 import type pg from 'pg';
 
 import type { BalanceConfig, HorseRecord, Stable } from '@star/sim-engine';
@@ -147,6 +146,28 @@ export async function runBreedingWeek(
    *   → ★書かないと ★**2 年目から `canMate` の判定が壊れます**
    *     （★全牝馬が「今年まだ配合していない」ままで、★年に何度でも産めます）。
    */
+  /**
+   * 🔴 ★**保存する `birth_year` の尺度を、★世界から測ります**（★Q-5）。
+   *   ★既存の行は ★`gameYearOf(birth_week) + 46` になっていました（★本番の実測）。
+   *   ★**46 を書きません** — ★世界ごとに違いうるので、★**その場で数えます**。
+   *   🔴 ★定数でなければ投げます（★min ≠ max ＝ ★既に混ざっている）。
+   */
+  const offRow = (await client.query<{ mn: string | null; mx: string | null }>(
+    'select min(birth_year - floor(birth_week/52.0))::int mn,'
+      + ' max(birth_year - floor(birth_week/52.0))::int mx'
+      + ' from horses where birth_week is not null',
+  )).rows[0];
+  const mn = offRow?.mn === null || offRow?.mn === undefined ? null : Number(offRow.mn);
+  const mx = offRow?.mx === null || offRow?.mx === undefined ? null : Number(offRow.mx);
+  if (mn !== null && mx !== null && mn !== mx) {
+    throw new Error(
+      `breeding-runner: ★birth_year の尺度が既に混ざっています（★差 ${mn}〜${mx}）。`
+        + '★どちらに揃えるかを決めてから動かしてください（★Q-5）',
+    );
+  }
+  /** ★保存する年 ＝ ゲームの年 ＋ 既存の行と同じずれ（★世界が空なら 0） */
+  const yearOffset = mn ?? 0;
+
   const yearReset = gameYearOf(week - 1) !== year;
   if (yearReset) {
     await client.query(
@@ -283,7 +304,7 @@ export async function runBreedingWeek(
       dam: mare,
       seed,
       generation: Math.max(sire.generation, mare.generation) + 1,
-      birthYear: year,
+      birthYear: year + yearOffset,
       lookup,
       balance,
       nicks,
@@ -300,7 +321,7 @@ export async function runBreedingWeek(
        on conflict (dam_id, birth_week) do nothing`,
       [
         foalId, numericStableId(stable), `${stable.prefix}${foalId.slice(0, 6)}`,
-        foal.sex, year, foal.generation,
+        foal.sex, year + yearOffset, foal.generation,
         sireId, mare.id, foal.sireLine, foal.damSireLine,
         JSON.stringify(foal.genotype), JSON.stringify(foal.potential), JSON.stringify(foal.stats),
         foal.unlockRate, JSON.stringify(foal.surfaceAptitude), foal.distanceCenter,
