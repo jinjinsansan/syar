@@ -145,13 +145,46 @@ if (!existsSync(HASH)) {
  *      ★★その記述自身が当たりました。★今日 3 度目の「註記が網に掛かる」形です）
  */
 const WORLD_BUILDERS = /(seed-world|verify-world)\.mjs$/;
-/** ★語を説明しているだけのもの */
-const TALKS_ABOUT = /(\/lib\/|\/test\/|verify-constitution\.mjs$|\/evidence\/)/;
+/**
+ * 🔴 ★**外す場所は、★名前で書きます**（★**CK-13** の対の手当て・2026-09-20）。
+ *
+ * ⚠️ ★最初は ★**`/lib/` `/test/` `/evidence/` をディレクトリごと**外していました。
+ *   ★レビュー側の指摘: ★★**その中に本物が住んだ日、★網は見ません。**
+ *   ★今日ずっと見てきた形そのものです（★`RACEABLE_WHERE` の蓋・★`Math.max(0, …)`）。
+ * → ★**1 件ずつ名前で書き、★なぜ本物が住まないかを 1 行 添えます。**
+ * → ★**増えたら落ちます**（★下の照合）。★黙って外す場所が広がりません。
+ */
+const TALKS_ABOUT = [
+  {
+    file: './tools/lib/open-findings.mjs',
+    why: '★簿。★`NG-NAMES-UNWIRED` の本文が「素通しの例」として語を**引用**している。'
+      + '★ここは表であって実行経路ではない（★`classification.mjs` が「道具ではなく表」と分類済み）',
+  },
+  {
+    file: './apps/cli/test/preseed.test.ts',
+    why: '★検査。★`ALLOW_ALL_NAMES` を**わざと注いで**プリシードの他の性質を測る。'
+      + '★ここで NG 判定を要求すると、★ハッシュ表が無い CI で検査が落ちる',
+  },
+  {
+    file: './evidence/20260920-world-supply/count-preseed-world.mjs',
+    why: '★証拠。★2026-09-20 に数えたときの**そのままの写し**（★`seed-world.mjs:38-48` と同じ手順）。'
+      + '★DB に繋がず数を数えるだけで、★世界を作らない',
+  },
+  {
+    file: './tools/verify-constitution.mjs',
+    why: '★この道具自身。★探す語を持っているのは、★**探すため**',
+  },
+];
+const excluded = new Map(TALKS_ABOUT.map((e) => [e.file, e.why]));
+/** ★外したのに、★もう語を持っていないもの（★ゴースト） */
+const staleExclusions = new Set(excluded.keys());
 const allowAll = [];
 const measureOnly = [];
 for (const f of codeFiles) {
-  if (TALKS_ABOUT.test(f)) continue;
-  const src = readFileSync(f, 'utf8');
+  const srcAll = readFileSync(f, 'utf8');
+  const mentions = /blocklist:\s*ALLOW_ALL_NAMES|loadNameBlocklist\([^)]*,\s*false\s*\)/.test(srcAll);
+  if (excluded.has(f)) { if (mentions) staleExclusions.delete(f); continue; }
+  const src = srcAll;
   const live = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/[^\n]*/gm, ' ');
   const bypass = /blocklist:\s*ALLOW_ALL_NAMES/.test(live)
     || /loadNameBlocklist\([^)]*,\s*false\s*\)/.test(live);
@@ -164,6 +197,13 @@ if (allowAll.length > 0) ng('C-4 ② 🔴 ★**世界を作る道具**が素通�
 else ok('C-4 ② ★世界を作る道具は、★旗を立てないと止まる形になっている');
 if (measureOnly.length > 0) {
   warn('C-4 ③ ★測る道具は素通しで走れます（★警告は出ます・★人が見るもの）', measureOnly.join(' / '));
+}
+// 🔴 ★外した場所を**名前で出す**（★黙って外さない・**CK-13**）
+console.log(`      ★走査から外した file: ${excluded.size} 件（★1 件ずつ理由つき）`);
+for (const e of TALKS_ABOUT) console.log(`        - ${e.file}`);
+if (staleExclusions.size > 0) {
+  ng('C-4 ④ ★外したのに、★もう語を持っていない file が在る（★ゴースト）',
+    [...staleExclusions].join(' / '));
 }
 
 console.log('');

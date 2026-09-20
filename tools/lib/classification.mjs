@@ -72,6 +72,14 @@ export const READONLY = [
    */
   'verify-constitution.mjs',
   /**
+   * ★**C-6: 持ち主本人にも素質の生値が出ていないか**（★正典 §17.2・§12.4・D-114・2026-09-20）。
+   *   🔴 ★**読むだけ** — ★`information_schema` と `has_column_privilege` だけ。★1 行も変えません。
+   *   ★`verify-anon-exposure` は **anon**、★こちらは ★**`authenticated`（本人）**を見ます。
+   *   ✔ ★2026-09-20 実測: ★staging ✅ / ★production は ★**③ の対照が落ちる**
+   *     （★`my_horses` が無い ＝ `SCHEMA-DRIFT-PROD` の姿）。
+   */
+  'verify-c6-owner-exposure.mjs',
+  /**
    * ★AL-6（裁定 REVIEW_CONSULT_ARCADE_LOOP_ANSWER_20260918）の測定器 2 本。
    *   ★DB に触りません（★エンジンを回して時間を測るだけ・出力はローカルの JSON とログ）。
    *   ★レビュー側が独立に再実行できるよう tmp/ から移しました（★tmp/ は gitignore で次の人に残らない）。

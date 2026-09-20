@@ -1,0 +1,43 @@
+# C-6 本人への露出（2026-09-20・読むだけ）
+
+## staging
+# C-6 ★持ち主本人にも、素質の生値が出ていないか（★読むだけ）
+
+【①】★`horses` の列に、★`authenticated` の select が付いていないか
+  ✓ ① ★authenticated は horses.genotype を読めない
+  ✓ ① ★authenticated は horses.potential を読めない
+  ✓ ① ★authenticated は horses.stats を読めない
+  ✓ ① ★authenticated は horses.unlock_rate を読めない
+  ✓ ① ★authenticated は horses.birth_snapshot を読めない
+
+【②】★持ち主向けのビューの列（★`my_horses` など）
+  ✓ ② ★生値の列を持つビューは無い  10 個を調べた
+
+【③】★**対照** — ★星で見せる経路が在るか（★塞ぎすぎていないこと）
+  ✓ ③ ★持ち主向けのビューが在る  horse_market_listing_public / my_horses / horse_story_event_public
+
+=== ★C-6 判定: ✅ 合格 ===
+⚠️ ★これは ★**この環境の姿**です。★本番は移行が遅れているので、★別に測ること。
+
+## production
+# C-6 ★持ち主本人にも、素質の生値が出ていないか（★読むだけ）
+
+【①】★`horses` の列に、★`authenticated` の select が付いていないか
+  ✓ ① ★authenticated は horses.genotype を読めない
+  ✓ ① ★authenticated は horses.potential を読めない
+  ✓ ① ★authenticated は horses.stats を読めない
+  ✓ ① ★authenticated は horses.unlock_rate を読めない
+  ✓ ① ★authenticated は horses.birth_snapshot を読めない
+
+【②】★持ち主向けのビューの列（★`my_horses` など）
+  ✓ ② ★生値の列を持つビューは無い  4 個を調べた
+
+【③】★**対照** — ★星で見せる経路が在るか（★塞ぎすぎていないこと）
+  🔴 ③ ★持ち主が自分の馬を見る経路が 1 つも無い（★塞ぎすぎ）
+
+=== ★C-6 判定: 🔴 不合格 1 件 ===
+⚠️ ★これは ★**この環境の姿**です。★本番は移行が遅れているので、★別に測ること。
+
+## 本番に在るビュー（4 個だけ）
+prize_catalog_public / race_entries_public / race_odds_public / races_public
+→ my_horses（0034）も my_runs（0046）も無い。配信中の画面はそれを読む
