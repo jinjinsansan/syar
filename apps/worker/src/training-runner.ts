@@ -218,6 +218,41 @@ export async function advanceTrainingWeeks(
     'select count(*)::text as n from horses where retired_at_week is null and birth_week is not null',
   );
   const total = Number(totalRow.rows[0]!.n);
+
+  /**
+   * 🔴 ★**`birth_week` が無い馬は、★ここで黙って落ちます**（★2026-09-20・`PROD-NEVER-AGED`）。
+   *
+   * 【★何が起きたか】
+   *   ✔ ★本番（2026-09-19 実測）: ★現役 **7,355 頭**・★`birth_week` 有り **0 頭**。
+   *     → ★上の `total` が **0**。→ ★下の `select` が 0 行。→ ★`hitCap = false` で **break**。
+   *     → ★★**育成は「走っているが何もしていない」。★例外も出ない。★記録も残らない。**
+   *   ★3 日で 6,066 レースが走り、★**誰も気づきませんでした**（★**R-16**: ★機構が止まって全部 緑）。
+   *
+   * 【★なぜ投げるのか】
+   *   ★`onAlert` で済ませません。★**警報は読まれないことがあります**。
+   *   ★**現役馬が居るのに 1 頭も育てられない**のは、★世界が壊れている状態です。
+   *   → ★★**fail-closed**（★R-27: ★既定は狭い側へ）。
+   *
+   * ⚠️ ★**現役が 0 頭なら投げません** — ★それは「まだ世界が無い」だけで、★壊れてはいません。
+   */
+  const activeRow = await client.query<{ n: string }>(
+    'select count(*)::text as n from horses where retired_at_week is null',
+  );
+  const active = Number(activeRow.rows[0]!.n);
+  if (active > 0 && total === 0) {
+    throw new Error(
+      `advanceTrainingWeeks: ★現役 ${active} 頭 のうち、★birth_week を持つ馬が 0 頭です。`
+        + '★このままでは育成が 1 頭も進まず、★例外も出ずに静かに終わります（PROD-NEVER-AGED）。'
+        + '★世界を作る経路が birth_week を書いていないか、★age-horses 相当が流れていません。',
+    );
+  }
+  if (total < active) {
+    // ⚠️ ★一部だけ欠けている場合。★投げませんが、★**黙らせません**（★数を出す）。
+    onAlert(
+      `★birth_week が無い現役馬が ${active - total} 頭 います（現役 ${active} 頭 中）。`
+        + '★その馬は育成から静かに外れています（PROD-NEVER-AGED）。',
+    );
+  }
   const batchesPerWeek = Math.max(1, Math.ceil(total / BATCH_SIZE));
   const maxIterations = MAX_WEEKS_PER_RUN * batchesPerWeek;
   let hitCap = true;
