@@ -435,6 +435,8 @@ const { randomUUID } = await import('node:crypto');
 for (const h of rows) uuid.set(h.record.id, randomUUID());
 
 const stableId = (sid) => Number(String(sid).replace(/\D/g, ''));
+/** ★投入にかかった時間（★運用簿の「作り直し全体に何分か」の内訳） */
+const tInsert = process.hrtime.bigint();
 let n = 0;
 const tally = { active: 0, stallion: 0, broodmare: 0, honored: 0 };
 for (const h of rows) {
@@ -464,7 +466,8 @@ for (const h of rows) {
   n += 1;
   if (n % 2000 === 0) process.stdout.write(`\r  投入 ${n}/${rows.length}`);
 }
-console.log(`\r  投入 ${n} 頭 完了            `);
+console.log(`\r  投入 ${n} 頭 完了            `
+  + `（${(Number(process.hrtime.bigint() - tInsert) / 1e9).toFixed(1)}秒）`);
 console.log(`  ★基準の週 ${referenceWeek}`);
 console.log(`  ★現役 ${tally.active} 頭 / 種牡馬 ${tally.stallion} / 繁殖牝馬 ${tally.broodmare}`
   + ` / 功労馬 ${tally.honored}`);
@@ -515,11 +518,20 @@ if (!CATCH_UP) {
     retiredDuringCatchUp += r.retired;
     if (r.advanced === 0) break;
     if (rounds % 10 === 0) {
+      /**
+       * 🔴 ★**旧: `min(last_processed_week - birth_week)`** は ★「いちばん遅い馬」ではなく
+       *   ★**いちばん若い馬の週齢**でした（★2 歳なら 104。★追いつき済みでも 104 のまま）。
+       *   → ★★進み具合を見ているつもりで、★**動かない数を見ていました。**
+       *   ✅ ★見るべきは ★**基準の週に届いていない頭数**です。
+       */
       const p = (await c.query(
-        `select min(last_processed_week - birth_week)::int mn
+        `select min(last_processed_week)::int mn,
+                count(*) filter (where last_processed_week < $1)::int behind
            from horses where retired_at_week is null and birth_week is not null`,
+        [referenceWeek],
       )).rows[0];
-      process.stdout.write(`\r    ${rounds} 回目 … いちばん遅い馬の週齢 ${p.mn}      `);
+      process.stdout.write(`\r    ${rounds} 回目 … まだ届いていない馬 ${p.behind} 頭`
+        + `（いちばん遅い週 ${p.mn} / 基準 ${referenceWeek}）   `);
     }
   }
   const sec = Number(process.hrtime.bigint() - tCatch) / 1e9;
@@ -649,5 +661,5 @@ if (undecided.length > 0) {
   console.log('   ★確かめきれていません。★緑が要るなら、★もう一度 作り直してください。');
   process.exit(VERDICT.UNDECIDABLE);
 }
-console.log('★世界を作りました');
+console.log(`★世界を作りました（★全体 ${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
 process.exit(VERDICT.PASS);
