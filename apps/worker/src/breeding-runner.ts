@@ -27,10 +27,20 @@ import {
 } from '@star/sim-engine';
 import { buildSireAncestorIndex, pickSire, rankSires } from '@star/breeding';
 import {
-  LIFECYCLE_WEEKS, gameYearOf, rankByStableKey, strataOffsetWeeks, weekIndexAt,
+  LIFECYCLE_WEEKS, gameYearOf, requiredBroodmares, weekIndexAt,
 } from '@star/scheduler';
 
 import { rowToHorse } from './horse-repo.js';
+
+/**
+ * ★**誰を繁殖牝馬に上げるか**（★2026-09-20・裁定 ③ は ★**測ってから**決めます）。
+ *   ⚠️ ★`top` / `weighted` は ★**系統を集中させるはず**です（★D-025 / D-026）。
+ *     ★`tools/verify-pool-supply.mjs` が 3 通りを回して、★有効系統数を並べます。
+ *   ⚠️ 🔴 ★**「成績」の代わりに素質の合計を使っています** — ★`horses` に戦績は
+ *     ★`g1_wins` しか無く、★NPC はほぼ 0 だからです（★測る意味が出ません）。
+ *     ★★**集中の強さを測るには、★いちばん効く軸で測るのが正しい**と判断しました。
+ */
+export type PromotionPolicy = 'random' | 'weighted' | 'top';
 
 export interface BreedingWeekResult {
   /** ★どの週を処理したか */
@@ -45,6 +55,10 @@ export interface BreedingWeekResult {
   readonly alreadyThere: number;
   /** ★年の変わり目で年次カウンタを戻したか */
   readonly yearReset: boolean;
+  /** ★生涯上限に達して繁殖から降ろした頭数 */
+  readonly retiredFromBreeding: number;
+  /** ★繁殖に上げた頭数 */
+  readonly promoted: number;
 }
 
 /**
@@ -55,8 +69,16 @@ export interface BreedingWeekResult {
  *   ⚠️ 🔴 ★**足りない列を既定値で埋めません。** ★`Proxy` で、★**想定外の列を読んだら投げます**。
  *     ★将来 別の列を見るようになったら、★**黙って間違えるのではなく落ちます**。
  */
+/**
+ * 🔴 ★**`genotype` も要ります**（★2026-09-20・★番人が教えてくれました）。
+ *   ✔ ★現物: `packages/sim-engine/src/genetics.ts:212-217` — ★**§6.3 大物覚醒**は
+ *     ★**5 代以内の祖先の `genotype`** を見て、★いちばん高いアレルを探します。
+ *   → ★★「血統をたどるだけ」ではありませんでした。★**祖先の遺伝子まで読みます。**
+ *   ⚠️ ★`Proxy` を置いていなければ、★`undefined.gt` で落ちるか、★**黙って 0 扱い**でした。
+ *     ★★大物覚醒が静かに効かなくなります（★誰も気づきません）。
+ */
 const PEDIGREE_FIELDS: ReadonlySet<string> = new Set([
-  'id', 'sireId', 'damId', 'inbreedCoeff', 'pedigreeCache',
+  'id', 'sireId', 'damId', 'inbreedCoeff', 'pedigreeCache', 'genotype',
 ]);
 
 function pedigreeOnlyRecord(row: Record<string, unknown>): HorseRecord {
@@ -68,6 +90,8 @@ function pedigreeOnlyRecord(row: Record<string, unknown>): HorseRecord {
     pedigreeCache: new Map(
       Object.entries((row['pedigree_cache'] as Record<string, number[]>) ?? {}),
     ),
+    // 🔴 ★§6.3 大物覚醒が祖先の遺伝子を見ます（★上の註記）
+    genotype: row['genotype'],
   };
   return new Proxy(light, {
     get(target, prop) {
@@ -135,6 +159,8 @@ export async function runBreedingWeek(
   epochMs: number,
   onAlert: (message: string) => void,
   balance: BalanceConfig = DEFAULT_BALANCE,
+  policy: PromotionPolicy = 'random',
+  meanFieldSize = 12,
 ): Promise<BreedingWeekResult> {
   /** ★「締まった週」。★いまの週はまだ締まっていないので使いません */
   const week = weekIndexAt(nowMs, epochMs) - 1;
@@ -168,6 +194,79 @@ export async function runBreedingWeek(
   /** ★保存する年 ＝ ゲームの年 ＋ 既存の行と同じずれ（★世界が空なら 0） */
   const yearOffset = mn ?? 0;
 
+  /**
+   * 🔴 ★**尽きた牝馬を、★繁殖から降ろします**（★2026-09-20・裁定 ①）。
+   *
+   *   ✔ ★**測って見つけました**: ★6 年 回すと ★**週 312 で供給が止まりました**
+   *     （★`canMate` の `dam.foalCount >= MARE_LIFETIME_FOALS`）。
+   *   ✔ ★本番の実測: ★繁殖牝馬 800 頭の `foal_count` は 0〜7 に分布し、
+   *     ★残りは Σ(8 − foal_count) ＝ **4,579 頭ぶん** ＝ ★**約 5.7 年で枯渇**。
+   *   🔴 ★そして ★**尽きた牝馬は繁殖牝馬のまま枠を占め続けていました。**
+   *     ★★役割の名前が実態と食い違ったまま枠を持つ ＝ ★**「引退済みなのに現役」4,970 頭と同じ形**。
+   *   ✅ ★降ろした事実を残します（★`retirement_reason`）。★後から「なぜ功労馬か」が読めます。
+   */
+  const demoted = await client.query(
+    "update horses set retirement_role = 'honored',"
+      + " retirement_reason = 'mare_lifetime_foals'"
+      + " where retirement_role = 'broodmare' and foal_count >= $1",
+    [balance.MARE_LIFETIME_FOALS],
+  );
+  const retiredFromBreeding = demoted.rowCount ?? 0;
+
+  /**
+   * 🔴 ★**空いた枠を埋めます**（★裁定 ②: ★数は導出する。★書かない）。
+   *   ★`requiredBroodmares` ＝ 現役の必要数 ÷ 現役年数（★1 頭 年 1 産なので、これが同時必要数）。
+   *   ★上げる相手は ★**引退した牝馬で、★まだ産める馬**（★功労馬から戻します）。
+   *   ⚠️ ★誰を上げるかは `policy`。★**決め打ちせず、★測ってから決めます**（★裁定 ③）。
+   */
+  const target = requiredBroodmares(meanFieldSize);
+  const haveRow = await client.query<{ n: string }>(
+    "select count(*)::text n from horses where retirement_role = 'broodmare'",
+  );
+  const have = Number(haveRow.rows[0]?.n ?? 0);
+  let promoted = 0;
+  if (have < target) {
+    const want = target - have;
+    /**
+     * ⚠️ ★**素質の合計**を「成績」の代わりに使います（★上の `PromotionPolicy` の註記）。
+     *   ★`random` は ★**週から決まる並び**（★`Math.random()` を呼ばない・憲法 §1-4）。
+     */
+    const order = policy === 'random'
+      ? "order by md5(id::text || $3::text)"
+      : policy === 'top'
+        ? "order by ability desc, id"
+        : "order by md5(id::text || $3::text)::text, ability desc";
+    const cand = await client.query<{ id: string }>(
+      'select id, (select sum((value)::numeric) from jsonb_each_text(potential)) ability'
+        + " from horses where retirement_role = 'honored' and sex = 'female'"
+        + ' and foal_count < $1 and retirement_reason <> $4'
+        /**
+         * 🔴 ★**産める年齢の馬だけ上げます**（★2026-09-20・★測って見つけました）。
+         *   ✔ ★引退は ★**5 歳**（★`LIFECYCLE_WEEKS.retireAt` ＝ 260 週）。
+         *   ✔ ★繁殖できるのは ★**6 歳から**（★`MIN_BREEDING_AGE_YEARS`）。
+         *   → ★★**引退した直後の牝馬は、★1 年間 産めません。**
+         *   ⚠️ ★上げてしまうと、★その枠は ★**1 年 空回り**します
+         *     （★実測: ★週 310 で「相手あり 0 / 相手なし 15」— ★`canMate` が全部 弾いた）。
+         */
+        + ' and (($5::bigint - birth_week) / 52) >= $6'
+        + ` ${order} limit $2`,
+      [
+        balance.MARE_LIFETIME_FOALS, want, String(week), 'mare_lifetime_foals',
+        week, balance.MIN_BREEDING_AGE_YEARS,
+      ],
+    );
+    if (cand.rowCount !== null && cand.rowCount > 0) {
+      const up = await client.query(
+        "update horses set retirement_role = 'broodmare' where id = any($1::uuid[])",
+        [cand.rows.map((r) => r.id)],
+      );
+      promoted = up.rowCount ?? 0;
+    }
+    if (promoted < want) {
+      onAlert(`★繁殖牝馬が足りません（要 ${target} / 在 ${have} / 上げられた ${promoted}）`);
+    }
+  }
+
   const yearReset = gameYearOf(week - 1) !== year;
   if (yearReset) {
     await client.query(
@@ -182,16 +281,37 @@ export async function runBreedingWeek(
   const mareIds = mareRows.rows.map((r) => r.id);
   if (mareIds.length === 0) {
     onAlert('★繁殖牝馬が 1 頭も居ません（★世界がまだ出来ていないか、★役割が付いていない）');
-    return { week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, yearReset };
+    return {
+      week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, yearReset,
+      retiredFromBreeding, promoted,
+    };
   }
-  /** ★B-3 と同じ層化。★初期投入と定常運転が**同じ規則で散る** */
-  const ranks = rankByStableKey(mareIds);
+  /**
+   * 🔴 ★**配合する週は、★馬ごとに固定します**（★2026-09-20・★測って直しました）。
+   *
+   * 【★最初は B-3 と同じ「順位」で配っていました。★それが壊れました】
+   *   ★`strataOffsetWeeks(rank, size)` は ★**集合の中の順位**から週を決めます。
+   *   ⚠️ ★繁殖牝馬は ★**毎週 入れ替わります**（★尽きた馬を降ろし、★新しい馬を上げる）。
+   *   → ★★**集合が変わると順位が変わり、★同じ馬の「番」が毎週 動きます。**
+   *   ✔ ★実測: ★週 310 で ★**15 頭 全部が「相手なし」**（★今年もう産んだ馬が、★また番に来た）。
+   *   ✅ ★**馬の id から決めます。** ★集合が変わっても ★**その馬の番は動きません**。
+   *   ⚠️ ★毎週きっかり 1/52 ではなくなります（★平均 15.4・散らばりあり）が、
+   *     ★**年あたりの総数は変わりません**。★`verify-pool-supply` が釣り合いを見ます。
+   */
   const dueIds: string[] = [];
-  for (const [id, rank] of ranks) {
-    if (strataOffsetWeeks(rank, mareIds.length) === ((week % 52) + 52) % 52) dueIds.push(id);
+  {
+    const { createHash } = await import('node:crypto');
+    const target = ((week % 52) + 52) % 52;
+    for (const id of mareIds) {
+      const h = createHash('sha256').update(`mare-week|${id}`, 'utf8').digest('hex');
+      if (parseInt(h.slice(0, 8), 16) % 52 === target) dueIds.push(id);
+    }
   }
   if (dueIds.length === 0) {
-    return { week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, yearReset };
+    return {
+      week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, yearReset,
+      retiredFromBreeding, promoted,
+    };
   }
 
   /**
@@ -241,7 +361,7 @@ export async function runBreedingWeek(
   const light = new Map<string, HorseRecord>();
   if (ancestorIds.size > 0) {
     const rows = await client.query(
-      'select id, sire_id, dam_id, inbreed_coeff, pedigree_cache from horses'
+      'select id, sire_id, dam_id, inbreed_coeff, pedigree_cache, genotype from horses'
         + ' where id = any($1::uuid[])',
       [[...ancestorIds]],
     );
@@ -367,5 +487,5 @@ export async function runBreedingWeek(
         + ` / 相手なし ${noSire} 頭 / 生まれた 0 頭`,
     );
   }
-  return { week, eligible, born, noSire, alreadyThere, yearReset };
+  return { week, eligible, born, noSire, alreadyThere, yearReset, retiredFromBreeding, promoted };
 }

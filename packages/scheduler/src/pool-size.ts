@@ -30,6 +30,7 @@
 
 import { RACES_PER_DAY } from './programme.js';
 import { CAREER_RACE_LIMIT, LIFECYCLE_WEEKS, WEEKS_PER_DAY } from './week.js';
+import { WEEKS_PER_YEAR } from './birth-week.js';
 
 /** ★現役でいられる週数（★正典 §7.1: `104〜260` ＝ **156 週**）。★導出値 */
 export const CAREER_WEEKS = LIFECYCLE_WEEKS.retireAt - LIFECYCLE_WEEKS.raceableFrom;
@@ -81,4 +82,61 @@ export function poolHeadroom(
     spare: actualPool - required,
     ratioMinusOne: actualPool / required - 1,
   };
+}
+
+/**
+ * ★**同時に必要な繁殖牝馬の頭数**（★2026-09-20・`BROODMARE-POOL-NOT-REFILLED`）。
+ *
+ * 【🔴 ★なぜ導出するか — ★数を書かない】
+ *   ★いまの世界は繁殖牝馬 **800 頭**です。★これは ★**プリシードが決めた数**で、
+ *   ★製品側に出どころがありませんでした。
+ *   ✔ ★算術で置き直すと ★**偶然ではありません**:
+ *     ★現役 2,400 ÷ 現役年数 3 年 ＝ ★**毎年 800 頭 引退 → 800 頭 生まれる必要**
+ *     ★1 頭の牝馬は ★**年 1 回**（★`canMate` の「年 1 回のみ受胎」）
+ *     → ★★**同時に必要な繁殖牝馬 ＝ 年に要る産駒数 ＝ 800**
+ *   → ★★**書かずに導きます。** ★`CC-1` のような改訂が来ても ★**自動で追随**します
+ *     （★`D-007` の 3,500 が的のまま残った轍を踏まない）。
+ *
+ * ⚠️ ★**現役年数**は `CAREER_WEEKS`（★出走可 → 引退）から引きます。★暦ではありません。
+ */
+export function requiredBroodmares(meanFieldSize: number): number {
+  const careerYears = CAREER_WEEKS / WEEKS_PER_YEAR;
+  return Math.ceil(requiredActivePool(meanFieldSize) / careerYears);
+}
+
+/**
+ * ★**毎年 入れ替える繁殖牝馬の頭数**。
+ *
+ *   ★1 頭は生涯 `MARE_LIFETIME_FOALS` 頭しか産めません（★§6.7）。
+ *   → ★★**毎年 `必要頭数 ÷ 生涯上限` だけ、★新しい牝馬に入れ替わります。**
+ *
+ * ⚠️ ★**生涯上限はここに書きません** — ★`@star/sim-engine` の `BalanceConfig` が持っています。
+ *    ★呼ぶ側が渡してください（★この packages は依存ゼロです）。
+ */
+export function annualBroodmareReplacement(
+  meanFieldSize: number,
+  mareLifetimeFoals: number,
+): number {
+  if (!Number.isInteger(mareLifetimeFoals) || mareLifetimeFoals <= 0) {
+    throw new Error(`pool-size: 生涯産駒数が正の整数ではありません（${mareLifetimeFoals}）`);
+  }
+  return Math.ceil(requiredBroodmares(meanFieldSize) / mareLifetimeFoals);
+}
+
+/**
+ * ⚠️ 🔴 ★**種牡馬の頭数（200）は、★導出できませんでした**（★2026-09-20・★正直に書きます）。
+ *
+ *   ★繁殖牝馬は ★**「年に要る産駒数」から一意に決まります**（★1 頭 年 1 産）。
+ *   ★種牡馬は違います: ★1 頭が年 `STALLION_BASE_COVERINGS`（20）回 付けられるので、
+ *   ★**必要最小は 800 ÷ 20 ＝ 40 頭**です。★★200 はその 5 倍。
+ *   → ★★**この 5 倍は「足りるか」ではなく「★系統が潰れないか」で決まる数**です（★D-025 / D-026）。
+ *     ★実測でも、★使われた種牡馬は年 40 頭でした（★`mate-choice.ts` の註記）。
+ *   → ★★**有効系統数から決まる数なので、★頭数の算術では導けません。**
+ *     ★導出できないものを、★無理に式にしません。
+ */
+export function minimumStallions(meanFieldSize: number, coveringsPerStallion: number): number {
+  if (!Number.isInteger(coveringsPerStallion) || coveringsPerStallion <= 0) {
+    throw new Error(`pool-size: 年間種付上限が正の整数ではありません（${coveringsPerStallion}）`);
+  }
+  return Math.ceil(requiredBroodmares(meanFieldSize) / coveringsPerStallion);
 }

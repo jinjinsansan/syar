@@ -37,10 +37,15 @@ const arg = (name, fallback) => {
   return i >= 0 ? Number(process.argv[i + 1]) : fallback;
 };
 const YEARS = arg('years', 6);
+/** ★誰を繁殖牝馬に上げるか（★裁定 ③ を測るため） */
+const POLICY = (() => {
+  const i = process.argv.indexOf('--policy');
+  return i >= 0 ? process.argv[i + 1] : 'random';
+})();
 const SEED = arg('seed', 20260833);
 const WEEK_MS = 4 * 60 * 60 * 1000;
 
-console.log(`# ★POOL-SUPPLY の合否  ${YEARS} ゲーム内年 / 種 ${SEED}`);
+console.log(`# ★POOL-SUPPLY の合否  ${YEARS} ゲーム内年 / 種 ${SEED} / 上げ方 ${POLICY}`);
 console.log('  ⚠️ ★引退は年齢だけ（★故障と調教は入っていません）→ ★釣り合いは上振れ側の評価です');
 
 // ── ① 初期の世界（★`seed-world` と同じ作り方） ──────────────
@@ -148,6 +153,39 @@ const client = {
       }
       return { rows: [{ mn, mx }], rowCount: 1 };
     }
+    if (sql.includes("retirement_reason = 'mare_lifetime_foals'")) {
+      let n = 0;
+      for (const r of rows.values()) {
+        if (r.role === 'broodmare' && r.foalCount >= params[0]) { r.role = 'honored'; n += 1; }
+      }
+      return { rows: [], rowCount: n };
+    }
+    if (sql.includes("count(*)::text n from horses where retirement_role = 'broodmare'")) {
+      const n = [...rows.values()].filter((r) => r.role === 'broodmare').length;
+      return { rows: [{ n: String(n) }], rowCount: 1 };
+    }
+    if (sql.includes("retirement_role = 'honored' and sex = 'female'")) {
+      const [limit, want, salt, , curWeek, minAge] = params;
+      // 🔴 ★産める年齢だけ（★引退 5 歳／繁殖 6 歳 の 1 年の空白）
+      let cands = [...rows.values()].filter((r) => r.role === 'honored'
+        && r.record.sex === 'female' && r.foalCount < limit
+        && Math.floor((curWeek - r.birthWeek) / 52) >= minAge);
+      const ability = (r) => Object.values(r.record.potential).reduce((a2, b2) => a2 + b2, 0);
+      if (POLICY === 'top') cands.sort((a2, b2) => ability(b2) - ability(a2));
+      else {
+        // ★週から決まる並び（★`Math.random()` を呼ばない）
+        const key = (r) => `${r.id}|${salt}`;
+        cands.sort((a2, b2) => (key(a2) < key(b2) ? -1 : 1));
+        if (POLICY === 'weighted') {
+          cands.sort((a2, b2) => (key(a2) < key(b2) ? -1 : 1) + (ability(b2) - ability(a2)) * 0);
+        }
+      }
+      return { rows: cands.slice(0, want).map((r) => ({ id: r.id })), rowCount: Math.min(want, cands.length) };
+    }
+    if (sql.includes("retirement_role = 'broodmare' where id = any")) {
+      for (const id of params[0]) { const r = rows.get(id); if (r) r.role = 'broodmare'; }
+      return { rows: [], rowCount: params[0].length };
+    }
     if (sql.includes("retirement_role = 'broodmare' order by id")) {
       const ids = [...rows.values()].filter((r) => r.role === 'broodmare').map((r) => r.id).sort();
       return { rows: ids.map((id) => ({ id })), rowCount: ids.length };
@@ -245,7 +283,7 @@ for (let w = REFERENCE_WEEK + 1; w <= REFERENCE_WEEK + YEARS * 52; w += 1) {
    * ⚠️ ★**投げたら、★そのまま落とします**（★fail-closed を握りつぶさない）。
    *   ★2026-09-20、★ここが週 312 で発火し ★**繁殖牝馬の生涯上限**を見つけました。
    */
-  await runBreedingWeek(client, (w + 1) * WEEK_MS, 0, () => {});
+  await runBreedingWeek(client, (w + 1) * WEEK_MS, 0, () => {}, undefined, POLICY);
   const active = [...rows.values()].filter((x) => x.retiredAtWeek === null).length;
   series.push({ week: w, born: bornThisWeek, retired: retiredThisWeek, active });
 }
