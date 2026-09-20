@@ -552,6 +552,30 @@ const chk = await c.query(`select count(*)::int total,
   count(distinct birth_week) filter (where retired_at_week is null)::int active_birth_weeks
   from horses`);
 console.log('  DB:', JSON.stringify(chk.rows[0]));
+/**
+ * ★**実現率を、★正典が記録した量で出します**（★2026-09-20・★`AU-21`: 同じもので測ったか）。
+ *
+ *   ★D-053 註記が記録した production の値 ★**0.3149** は
+ *   ★**`mean(stats ÷ potential)`・★能力値 1 つ 1 票**（★n=36,775 能力値）です。
+ *   🔴 ★馬ごとの平均でも、★集団の和の比でもありません（★育った後は 0.005 ずれます）。
+ *   🔴 ★そして ★**`unlock_rate` 列は育成では書き換わりません**（★遺伝の定数）。
+ *   → ★★**次に測る人が別の量を測らないように、★ここで出しておきます。**
+ * ⚠️ ★これは ★**合否ではありません**（★予言 3 は向きだけを見る・★`AU-7'`）。
+ */
+const realized = async (where) => (await c.query(
+  `select round(avg(r)::numeric, 4) mean, count(*)::int n
+     from (select (s.value::numeric / nullif(p.value::numeric, 0)) r
+             from horses h,
+                  lateral jsonb_each_text(h.stats) s,
+                  lateral jsonb_each_text(h.potential) p
+            where s.key = p.key and ${where}) t`,
+)).rows[0];
+const rAll = await realized('true');
+const rActive = await realized('h.retired_at_week is null');
+console.log(`  ★実現率 mean(stats/potential)（★能力値ごと）:`
+  + ` 全馬 ${rAll.mean}（n=${rAll.n}） / 現役 ${rActive.mean}（n=${rActive.n}）`);
+console.log('     ⚠️ ★比べる相手は production の 0.3149（★同じ量・★全馬の取り方）。'
+  + '★`unlock_rate` 列ではありません');
 
 const fails = [];
 /**
@@ -592,6 +616,12 @@ check(d.aged_retired === seededRetired,
  *     ★種牡馬 200 → **206** ／ 繁殖牝馬 800 → **806** — ★`retirement.ts` が役割を付けています。
  *   → ★★**壊れていたのは世界ではなく、★私の検査でした。**
  *   ⚠️ ★**引退が 0 でないと落ちる検査は、★引退が動いていることを罰します**（★`CK-14` の裏）。
+ *
+ * 【🔴 ★右辺 2,400 の出どころ — ★ここが独立性の全てです】
+ *   ★`tally.active` は ★**プリシード世界（純関数 `runPreseed`）を数えた値**で、
+ *   ★**DB からは 1 度も引いていません**（★`lifeColumns()` の戻り値を投入前に数えるだけ）。
+ *   🔴 ★もし右辺も DB から引いたら、★`現役 ＋ 引退 ＝ 総数` は ★**恒真**になります
+ *     （★旧い ② がまさにそれでした）。★**ここを DB に替えないこと。**
  *
  * 【★これだけが「独立した 2 つ目の目」です】
  *   ★左辺は DB、★右辺は ★**追いつきの戻り値**。★別の経路で数えているから意味があります。
