@@ -165,6 +165,14 @@ const rows = [...need].map((id) => pre.world.all.get(id)).filter(Boolean)
 let c;
 /** ★繋ぎ直した回数（★0 でなければ ②b は判定不能） */
 let reconnects = 0;
+/**
+ * 🔴 ★**接続先の申告**（★`connectDb()` の中で決まるので、★外から見える所に置きます）。
+ *   ⚠️ ★2026-09-20、★これを `connectDb()` の中の `const` にしていたため、
+ *     ★**作り直しが全部 終わった後**、★素性を書き出す所で
+ *     ★`ReferenceError: environment is not defined` で落ちました。
+ *     ★★世界は無事でしたが、★**素性の記録（`nameCheckSkipped` を含む）が残りませんでした。**
+ */
+let dbEnvironment = null;
 const RECONNECT_MAX = 5;
 /** ★受けるだけ。★ここで投げ直すと `unhandledRejection` になります */
 function onClientError(e) {
@@ -187,6 +195,7 @@ async function connectDb() {
     // ★① ★まず「分からないなら止まる」を通す（★読めない／宣言が無い は旗が在っても止まる）
   const environment = await assertNotProduction(c, 'seed-world.mjs',
     { allowProduction: YES_PRODUCTION });
+  dbEnvironment = environment;
   // ★② 🔴 ★本番なら、★ここが本当の関門。★**ここまで 1 行も書いていません**
   if (environment === 'production') {
     const actualHorses = Number(
@@ -732,7 +741,7 @@ console.log('');
     wipedCounts,
     wipedRaces: WIPE_RACES,
     /** 🔴 ★**本番に向けて流したか**（★後から読めるように） */
-    environment,
+    environment: dbEnvironment,
     yesProduction: YES_PRODUCTION,
     wipeWorld: WIPE_WORLD,
     expectHorses: EXPECT_HORSES,
