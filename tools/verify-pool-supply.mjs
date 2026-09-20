@@ -371,6 +371,11 @@ for (let w = REFERENCE_WEEK + 1; w <= REFERENCE_WEEK + YEARS * 52; w += 1) {
 console.log(`  ★${series.length} 週 回しました（${((Date.now() - t1) / 1000).toFixed(1)}秒）`);
 
 // ── ④ 判定 ────────────────────────────────────────────
+/**
+ * ⚠️ ★**使う前に置く**（★2026-09-20・★同じ間違いを 2 度 しました:
+ *   ★`steady` も `last` も、★定義より前で使って `ReferenceError` を出しました）。
+ */
+const last = steady[steady.length - 1];
 const fails = [];
 let checked = 0;
 const check = (ok, label, detail) => {
@@ -406,7 +411,19 @@ const REQUIRED_POOL = requiredActivePool(MEAN_FIELD);
 const REQUIRED_MARES = requiredBroodmares(MEAN_FIELD);
 console.log(`  ★導出した必要数: 現役 ${REQUIRED_POOL} 頭 / 繁殖牝馬 ${REQUIRED_MARES} 頭`
   + `（★平均出走頭数 ${MEAN_FIELD}）`);
-const BURN_IN = LIFECYCLE_WEEKS.retireAt;
+/**
+ * 🔴 ★**立ち上がりをもう 1 期 のばします**（★2026-09-20・★実測が「まだ足りない」と言いました）。
+ *
+ *   ✔ ★10 年（★捨てる 5 年）で: ★番が来た＝生まれた ＝ **674〜680/年**（★導出値 676 と一致）。
+ *     ★それでも ★**入 676/年 対 出 715/年**（★−0.746/週）。
+ *   🔴 ★出が多いのは ★**種の世界のこだま**です: ★1 年目に生まれた 798 頭が 6 年目に引退し、
+ *     ★2 年目の ~750 頭が 7 年目に…と、★**先細りの世代が順に引退**してきます。
+ *     ★★供給は既に 676 で一定なのに、★引退側だけがまだ大きい。
+ *   ✅ ★捨てる長さ ＝ ★`retireAt`（5 年）★＋ `CAREER_WEEKS`（3 年）＝ **8 年**。
+ *     ★こだまが抜けるまでです。★測るのはさらに ★**1 期（3 年）** → ★**最低 11 年**。
+ *   ⚠️ ★どれも寿命の定数から出しています。★発明した数はありません。
+ */
+const BURN_IN = LIFECYCLE_WEEKS.retireAt + (LIFECYCLE_WEEKS.retireAt - LIFECYCLE_WEEKS.raceableFrom);
 const MIN_WINDOW = LIFECYCLE_WEEKS.retireAt - LIFECYCLE_WEEKS.raceableFrom;
 const steady = series.slice(BURN_IN);
 if (steady.length < MIN_WINDOW) {
@@ -448,6 +465,5 @@ const lines = lineConcentration(
 check(lines.effective >= 5, '④ 🔴 ★有効系統数 ≥ 5（★D-026）',
   `有効 ${lines.effective.toFixed(2)} / 実数 ${lines.count} / 最大占有 ${(lines.topShare * 100).toFixed(1)}%`);
 
-const last = steady[steady.length - 1];
 console.log(`  … 最後の週: 現役 ${last.active} 頭（★初期 ${pre.world.activeIds.length} 頭）`);
 exitWithVerdict(verdictOf({ checked, failed: fails.length, label: '★POOL-SUPPLY の釣り合い' }));
