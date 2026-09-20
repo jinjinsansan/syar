@@ -36,6 +36,19 @@ export interface SettleResult {
   /** 公開する値（§8.6） */
   readonly seedReveal: string;
   readonly finalSeed: string;
+  /**
+   * 🔴 ★**範囲外の介入倍率が来て、★クランプした記録**（★O-3・2026-09-20 に足しました）。
+   *
+   * 【★なぜ足したか — ★ここが捨てていた場所です】
+   *   ✔ ★`packages/race-engine/src/race.ts:254` は「★クランプは黙って行わず記録する
+   *     （★**不正の兆候かもしれない**ため）」と書き、★`:342` で返しています。
+   *   🔴 ★しかし ★**この包み（`settleRace`）が、★戻り値を組み立てるときに落として**いました。
+   *     → ★`race_entries.cap_violations` 列（`0001_init.sql:204`）は ★**空のまま**。
+   *   → ★★**作って、返して、★受け取る手前で捨てていた。**
+   *
+   * ⚠️ ★**空配列が普通です**（★介入が無ければ何も起きません）。
+   */
+  readonly capViolations: readonly { horseId: string; received: number; applied: number }[];
 }
 
 /**
@@ -60,5 +73,7 @@ export function settleRace(input: SettleInput, hash: HashProvider): SettleResult
     // ★reveal は server_seed そのもの。検証者は sha256(reveal) == commit を確かめる
     seedReveal: input.serverSeed,
     finalSeed,
+    // 🔴 ★エンジンが返したものを、★そのまま通します（★落とさない）
+    capViolations: result.capViolations,
   };
 }

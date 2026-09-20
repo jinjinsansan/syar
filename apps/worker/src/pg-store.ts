@@ -745,11 +745,33 @@ export function createPgStore(
          *   ★どちらも ★**結果が記録されないまま確定する**ことを意味します。
          *   → ★**投げます**（★この取引は巻き戻るので、★確定しないほうが安全・**R-27**）。
          */
+        /**
+         * 🔴 ★**範囲外入力の記録を、★捨てずに残します**（★2026-09-20・`CAP-VIOLATIONS-DISCARDED`）。
+         *
+         * 【★何が起きていたか】
+         *   ✔ ★`packages/race-engine/src/race.ts:254` は
+         *     ★**「クランプは黙って行わず `capViolations` に記録する（★不正の兆候かもしれないため）」**
+         *     と書き、★`:342` で ★**戻り値に入れて返して**いました。
+         *   🔴 ★しかし ★**受け取る側が 0 件**。★`race_entries.cap_violations`（`0001_init.sql:204`）は
+         *     ★**列が在るのに、★誰も書きませんでした**。
+         *   → ★★**作って、返して、捨てていた。** ★他の 4 件（★値が入らない）より悪い形です。
+         *
+         * 【★なぜ「後で」にしないか】
+         *   ✔ ★介入は ★**まだ 1 度も使われていません**（★本番 79,859 行 で 0 件）。
+         *   → ★★**いま繋げば、★「最初の介入の日」から残ります。★後だと最初の何回かが永久に欠けます。**
+         *
+         * ⚠️ ★**この便は「残す」までです。** ★**警報は鳴らしません** —
+         *    ★鳴らして何をするかが決まっていないので（★別項）。
+         */
+        const capByGate = new Map(
+          res.capViolations.map((v) => [Number(v.horseId), v] as const),
+        );
         for (const f of finished) {
+          const cap = capByGate.get(f.gate) ?? null;
           const wrote = await client.query(
-            `update race_entries set finish_pos = $1, finish_time = $2
+            `update race_entries set finish_pos = $1, finish_time = $2, cap_violations = $5
               where race_id = $3 and gate = $4 and finish_pos is null`,
-            [f.finishPosition, f.timeSec, r.id, f.gate],
+            [f.finishPosition, f.timeSec, r.id, f.gate, cap === null ? null : JSON.stringify(cap)],
           );
           if (wrote.rowCount === 0) {
             throw new Error(
