@@ -233,6 +233,22 @@ export async function runBreedingWeek(
   for (const s of stallions) full.set(s.id, s);
   const lookup = (id: string): HorseRecord | undefined => full.get(id) ?? light.get(id);
 
+  /**
+   * ★**配合の相性表**（★§6.6・`0054` の `nicks`）。
+   *   ⚠️ ★空でも `getNicksMultiplier` は 1 を返すので動きますが、★**世界の過去と食い違います**
+   *     （★プリシードは表が在る前提で 50 世代 配合しています）。
+   *   → ★`seed-world` が ★**プリシードと同じ表**を転記します。★ここはそれを読むだけです。
+   */
+  const nicksRows = await client.query<{ sire_line: string; dam_sire_line: string; multiplier: string }>(
+    'select sire_line, dam_sire_line, multiplier from nicks',
+  );
+  const nicks = new Map<string, number>(
+    nicksRows.rows.map((r) => [`${r.sire_line}|${r.dam_sire_line}`, Number(r.multiplier)]),
+  );
+  if (nicks.size === 0) {
+    onAlert('★相性表（nicks）が空です。★全組み合わせ 1.00 で配合します（★§6.6 の帯の下端）');
+  }
+
   const ancestorIndex = buildSireAncestorIndex(stallions);
   const turnOf = new Map<string, number>();
   let born = 0;
@@ -270,7 +286,7 @@ export async function runBreedingWeek(
       birthYear: year,
       lookup,
       balance,
-      nicks: new Map(),
+      nicks,
     });
 
     const ins = await client.query(

@@ -120,9 +120,16 @@ if (ALLOW_ALL) {
 
 console.log(`# プリシード世界の投入  seed=${SEED} generations=${GENERATIONS}`);
 const t0 = Date.now();
+/**
+ * 🔴 ★**配合の相性表**（★§6.6）。★`runPreseed` に渡すのと ★**同じものを DB にも入れます**
+ *   （★2026-09-20・`POOL-SUPPLY` ①）。
+ *   ⚠️ ★入れないと、★**世界の「過去」には相性が在り、「未来」には無い**ことになります
+ *     （★`getNicksMultiplier` は表に無ければ 1 を返すので、★動きはします）。
+ */
+const nicksTable = preseedNicks(SEED, NPC_STABLES);
 const pre = runPreseed({
   ...DEFAULT_PRESEED_OPTIONS, seed: SEED, generations: GENERATIONS,
-  nicks: preseedNicks(SEED, NPC_STABLES), blocklist: nameBlocklist,
+  nicks: nicksTable, blocklist: nameBlocklist,
 });
 console.log(`  生成 ${pre.world.all.size} 頭（${((Date.now()-t0)/1000).toFixed(1)}秒）`);
 
@@ -566,6 +573,25 @@ for (const h of rows) {
 }
 console.log(`\r  投入 ${n} 頭 完了            `
   + `（${(Number(process.hrtime.bigint() - tInsert) / 1e9).toFixed(1)}秒）`);
+/**
+ * ★**相性表を DB へ転記します**（★発明ではなく転記・★`0054` の `nicks`）。
+ *   🔴 ★**種も一緒に記録します** — ★どの種から出た表かが分からなくなると、
+ *     ★**二度と同じ表を作れません**（★憲法 §1-4）。
+ *   ⚠️ ★`§6.6` は「運営が編集可能」と書いています。★編集しても `source_seed` は元のまま残します。
+ */
+{
+  await c.query('truncate table nicks');
+  const keys = [...nicksTable.keys()];
+  const sires = keys.map((k) => k.split('|')[0]);
+  const damSires = keys.map((k) => k.split('|')[1]);
+  const mults = keys.map((k) => nicksTable.get(k));
+  await c.query(
+    `insert into nicks (sire_line, dam_sire_line, multiplier, source_seed)
+     select * from unnest($1::text[], $2::text[], $3::numeric[], $4::bigint[])`,
+    [sires, damSires, mults, keys.map(() => SEED)],
+  );
+  console.log(`  ★相性表を入れました ${keys.length} 組（★種 ${SEED}）`);
+}
 console.log(`  ★基準の週 ${referenceWeek}`);
 console.log(`  ★現役 ${tally.active} 頭 / 種牡馬 ${tally.stallion} / 繁殖牝馬 ${tally.broodmare}`
   + ` / 功労馬 ${tally.honored}`);
