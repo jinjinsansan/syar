@@ -30,6 +30,8 @@ import {
 } from '../packages/scheduler/src/index.ts';
 import { runBreedingWeek } from '../apps/worker/src/breeding-runner.ts';
 
+import { createHash } from 'node:crypto';
+
 import { exitWithVerdict, verdictOf } from './lib/counted-verdict.mjs';
 
 const arg = (name, fallback) => {
@@ -177,7 +179,19 @@ const client = {
         const key = (r) => `${r.id}|${salt}`;
         cands.sort((a2, b2) => (key(a2) < key(b2) ? -1 : 1));
         if (POLICY === 'weighted') {
-          cands.sort((a2, b2) => (key(a2) < key(b2) ? -1 : 1) + (ability(b2) - ability(a2)) * 0);
+          /**
+           * 🔴 ★**ここは 1 度 壊れていました**（★2026-09-20）: `… * 0` と書いてしまい、
+           *   ★能力の項が消えて ★**`random` と 1 ビット同じ結果**を出していました。
+           *   ✔ ★気づけたのは ★**2 通りの数が完全に一致した**からです（★対照が効いた）。
+           * ★重みづけ: ★順位に能力の順位を混ぜます（★上位ほど当たりやすいが、決まらない）。
+           */
+          const abilityRank = new Map();
+          [...cands].sort((a2, b2) => ability(b2) - ability(a2))
+            .forEach((r, idx) => abilityRank.set(r.id, idx));
+          const noise = new Map(cands.map((r) => [r.id,
+            parseInt(createHash('sha256').update(key(r)).digest('hex').slice(0, 6), 16) % cands.length]));
+          cands.sort((a2, b2) =>
+            (abilityRank.get(a2.id) + noise.get(a2.id)) - (abilityRank.get(b2.id) + noise.get(b2.id)));
         }
       }
       return { rows: cands.slice(0, want).map((r) => ({ id: r.id })), rowCount: Math.min(want, cands.length) };
@@ -284,8 +298,30 @@ for (let w = REFERENCE_WEEK + 1; w <= REFERENCE_WEEK + YEARS * 52; w += 1) {
    *   ★2026-09-20、★ここが週 312 で発火し ★**繁殖牝馬の生涯上限**を見つけました。
    */
   await runBreedingWeek(client, (w + 1) * WEEK_MS, 0, () => {}, undefined, POLICY);
-  const active = [...rows.values()].filter((x) => x.retiredAtWeek === null).length;
-  series.push({ week: w, born: bornThisWeek, retired: retiredThisWeek, active });
+  /**
+   * 🔴 ★**「現役」を数え直しました**（★2026-09-20・★6 年 回して気づきました）。
+   *
+   *   ⚠️ ★旧: ★`retiredAtWeek === null`（★引退していない馬ぜんぶ）。
+   *     → ★★**生まれたばかりの 0〜1 歳が入ります。** ★出走できないのに「現役」に数えていました。
+   *   ✔ ★実測でそれが出ました: ★6 年後に ★**3,748 頭**（★初期 2,400）。★毎週 +5.99 頭。
+   *     ★★「増えている」のではなく、★**走れない馬を数えていた**だけでした。
+   *   ✅ ★`requiredActivePool` が言う「現役」は ★**出走できる馬**です
+   *     （★`raceableFrom` 104 週 以上・`retireAt` 260 週 未満）。★そちらで数えます。
+   *
+   * ⚠️ ★**釣り合いも数え直します**: ★入るのは「生まれた数」ではなく
+   *   ★**その週に出走できる年齢になった数**（★2 年 遅れて入ってきます）。
+   */
+  let racing = 0;
+  let debuted = 0;
+  for (const x of rows.values()) {
+    if (x.retiredAtWeek !== null) continue;
+    const ageW = w - x.birthWeek;
+    if (ageW >= LIFECYCLE_WEEKS.raceableFrom) racing += 1;
+    if (ageW === LIFECYCLE_WEEKS.raceableFrom) debuted += 1;
+  }
+  series.push({
+    week: w, born: bornThisWeek, retired: retiredThisWeek, active: racing, debuted,
+  });
 }
 console.log(`  ★${series.length} 週 回しました（${((Date.now() - t1) / 1000).toFixed(1)}秒）`);
 
@@ -298,24 +334,32 @@ const check = (ok, label, detail) => {
   console.log(`  ${ok ? '✓' : '🔴'} ${label}  ${detail}`);
 };
 
-const n = series.length;
-const born = series.reduce((a, s) => a + s.born, 0);
-const gone = series.reduce((a, s) => a + s.retired, 0);
-const diffs = series.map((s) => s.born - s.retired);
+const n = steady.length;
+const born = steady.reduce((a, s) => a + s.debuted, 0);
+const gone = steady.reduce((a, s) => a + s.retired, 0);
+/**
+ * 🔴 ★**最初の 2 年は捨てます**（★立ち上がり）。
+ *   ★生まれた仔が出走できるのは ★**2 年 後**（`raceableFrom` 104 週）なので、
+ *   ★最初の 2 年は ★**入る数が構造的に 0** です。★そこを混ぜると釣り合いは測れません。
+ *   ⚠️ ★これは ★**発明した数ではありません** — ★`raceableFrom` から来ています。
+ */
+const BURN_IN = 2 * 52;
+const steady = series.slice(BURN_IN);
+const diffs = steady.map((s) => s.debuted - s.retired);
 const mean = diffs.reduce((a, b) => a + b, 0) / n;
 const sd = Math.sqrt(diffs.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, n - 1));
 const se = sd / Math.sqrt(n);
 
 /** ★現役の頭数の傾き（★単純な最小二乗） */
 const xm = (n - 1) / 2;
-const ym = series.reduce((a, s) => a + s.active, 0) / n;
+const ym = steady.reduce((a, s) => a + s.active, 0) / n;
 let sxy = 0; let sxx = 0;
-series.forEach((s, i) => { sxy += (i - xm) * (s.active - ym); sxx += (i - xm) ** 2; });
+steady.forEach((s, i) => { sxy += (i - xm) * (s.active - ym); sxx += (i - xm) ** 2; });
 const slope = sxy / sxx;
 
-console.log(`  … 入った ${born} 頭 / 出た ${gone} 頭 / 週あたりの差 ${mean.toFixed(3)} ± ${se.toFixed(3)}（SE）`);
+console.log(`  … （立ち上がり 2 年を除く）出走年齢に達した ${born} 頭 / 引退 ${gone} 頭 / 週あたりの差 ${mean.toFixed(3)} ± ${se.toFixed(3)}（SE）`);
 check(Math.abs(mean) <= 2 * se || Math.abs(mean) < 0.5,
-  '① ★週あたり「入る − 出る」が 0 と区別できない',
+  '① ★週あたり「出走年齢に達した − 引退した」が 0 と区別できない',
   `平均 ${mean.toFixed(3)} / 2SE ${(2 * se).toFixed(3)}`);
 check(slope > -0.5, '② ★現役の頭数が単調に減っていない', `傾き ${slope.toFixed(4)} 頭/週`);
 const weeks = new Set([...rows.values()].filter((x) => x.retiredAtWeek === null).map((x) => x.birthWeek % 52));
@@ -326,6 +370,6 @@ const lines = lineConcentration(
 check(lines.effective >= 5, '④ 🔴 ★有効系統数 ≥ 5（★D-026）',
   `有効 ${lines.effective.toFixed(2)} / 実数 ${lines.count} / 最大占有 ${(lines.topShare * 100).toFixed(1)}%`);
 
-const last = series[series.length - 1];
+const last = steady[steady.length - 1];
 console.log(`  … 最後の週: 現役 ${last.active} 頭（★初期 ${pre.world.activeIds.length} 頭）`);
 exitWithVerdict(verdictOf({ checked, failed: fails.length, label: '★POOL-SUPPLY の釣り合い' }));
