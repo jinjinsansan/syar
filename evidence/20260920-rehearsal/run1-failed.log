@@ -1,0 +1,86 @@
+[env] 接続先: secrets.staging.env
+
+🔴🔴 ★**--allow-all-names: ★実在競走馬名の NG 判定をしません**（★憲法 §0.1 / C-4）
+   ★この世界の名前は ★**未検査**です。★弁護士に見せる構成に使わないでください。
+   ★印を `evidence/world-build/` に残します。
+
+# プリシード世界の投入  seed=20260833 generations=50
+  生成 40755 頭（72.4秒）
+  投入対象 7370 頭（現役+繁殖+5代の祖先）
+  ★先に空にしました: race_entries（981 行 / 0.2秒）
+  ★先に空にしました: horse_story_event（77 行 / 0.2秒）
+  ★先に空にしました: horse_market_listing（15 行 / 0.2秒）
+  ★先に空にしました: bets（0 行 / 0.2秒）
+  ★先に空にしました: race_odds（162,568 行 / 1.6秒）
+  ★先に空にしました: races（73 行 / 1.7秒）
+V:\dev\Cusor\star\node_modules\pg\lib\client.js:652
+          Error.captureStackTrace(err)
+                ^
+
+error: canceling statement due to statement timeout
+    at V:\dev\Cusor\star\node_modules\pg\lib\client.js:652:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async deleteAllHorses (V:\dev\Cusor\star\tools\seed-world.mjs:276:17)
+    at async <anonymous> (V:\dev\Cusor\star\tools\seed-world.mjs:308:1) {
+  length: 226,
+  severity: 'ERROR',
+  code: '57014',
+  detail: undefined,
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: 'SQL statement "SELECT 1 FROM ONLY "public"."horses" x WHERE $1 OPERATOR(pg_catalog.=) "sire_id" FOR KEY SHARE OF x"',
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'postgres.c',
+  line: '3405',
+  routine: 'ProcessInterrupts'
+}
+
+Node.js v22.16.0
+
+[exited with code 1]
+
+────────────────────────────────────────────────
+# 診断（2026-09-20・開発側）
+
+## 落ちた場所
+delete from horses の ★自己参照の外部キー検査:
+  SELECT 1 FROM ONLY "public"."horses" x WHERE $1 = "sire_id" FOR KEY SHARE OF x
+  → statement timeout（57014）
+
+## 原因
+horses の索引は 4 つだけ:
+  horses_pkey / horses_active_idx / horses_owner_idx / horses_sire_line_idx
+→ ★sire_id にも dam_id にも索引が無い
+→ 7,370 行を消すあいだ、★1 行ごとに 2 回の全表走査
+   ≒ 7,370 × 2 × 7,370 ＝ ★約 1 億回 の行走査 → 時間切れ
+
+## 🔴 私の見立ては外れていた
+手順書の測定項目 3「自己参照が 1 文の delete で解けるか」に、私はこう書いていた:
+  「自己参照は 1 文の delete の中で解ける」
+★★外れ。PostgreSQL は削除した行 1 つずつに RI 検査を走らせる。
+★同じ文の中で参照元も消えていても、★検査そのものは走る。
+→ ★★**書かずに確かめる方法が無い、と書いた項目が、★まさにそこで落ちた。**
+→ ★演習を本番より先に置いた判断が、★そのまま効いた。
+
+## ✅ 得られた測定（★演習の収穫）
+  race_entries          981 行 … 0.2 秒
+  horse_story_event      77 行 … 0.2 秒
+  horse_market_listing   15 行 … 0.2 秒
+  bets                    0 行 … 0.2 秒
+  race_odds         162,568 行 … ★1.6 秒
+  races                  73 行 … 1.7 秒
+→ ★本番の race_odds は 15,490,715 行（★staging の 95 倍）
+   ★1.6 秒 × 95 ＝ ★**約 152 秒（2.5 分）**
+   ⚠️ ★**外挿である**（★R-28）。★行あたり一定と仮定している
+
+## ✅ 壊れていない
+巻き戻りを実測で確認（★演習の前と 1 行も違わない）:
+  horses 7,370 / race_entries 981 / races 73 / race_odds 162,568
+  / horse_story_event 77 / horse_market_listing 15
+→ ★begin … rollback が効いた

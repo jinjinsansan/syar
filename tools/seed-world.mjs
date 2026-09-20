@@ -259,23 +259,50 @@ async function deleteAllHorses(roots) {
   }
 
   // 🔴 ★**1 つの取引で**。★途中で落ちたら全部 戻す（★半分 消えた世界を残さない）
+  /**
+   * 🔴 ★**`delete` ではなく `truncate` を使います**（★2026-09-20・★演習が落ちて分かった）。
+   *
+   * 【★何が起きたか — ★staging の演習 1 回目】
+   *   ★子の表は全部 速く消えました（★`race_odds` 162,568 行 が **1.6 秒**）。
+   *   🔴 ★しかし ★**`delete from horses` が時間切れ**（★57014）。★落ちた場所は:
+   *   ```
+   *   SELECT 1 FROM ONLY "public"."horses" x WHERE $1 = "sire_id" FOR KEY SHARE OF x
+   *   ```
+   *   ✔ ★原因（★実測）: ★`horses` の索引は 4 つだけで、
+   *     ★**`sire_id` にも `dam_id` にも索引がありません**。
+   *   → ★7,370 行を消すあいだ ★**1 行ごとに 2 回の全表走査** ≒ ★**約 1 億回**の行走査。
+   *
+   * 【🔴 ★私の見立ては外れていました】
+   *   ★手順書に「★自己参照は 1 文の delete の中で解ける」と書きました。★**外れ**です。
+   *   ★PostgreSQL は ★**削除した行 1 つずつに RI 検査を走らせます**。
+   *   ★同じ文の中で参照元も消えていても、★**検査そのものは走ります**。
+   *
+   * 【★なぜ `truncate` でよいか】
+   *   ★`truncate` は ★**1 行ごとの外部キー検査をしません**（★表ごと空にするため）。
+   *   🔴 ★**`cascade` は付けません。** ★消す集合は `pg_constraint` から閉じるまで辿ってあるので、
+   *     ★**その集合を全部 並べれば足ります**。→ ★★**巻き込みが原理的に起きません。**
+   *   ⚠️ ★`truncate` も ★**取引の中で巻き戻せます**（★PostgreSQL）。★1 回目の巻き戻りは実測済み。
+   *
+   * ⚠️ ★**索引を足す案は採っていません**（★こちらの判断ではないため）。
+   *    ★`sire_id` / `dam_id` の索引は ★**配合の血統辿りにも効く**はずなので、★別に起票しました。
+   */
+  const all = [...order, 'horses'];
+  const before = {};
+  for (const t of all) {
+    before[t] = Number((await c.query(`select count(*)::int n from ${t}`)).rows[0].n);
+  }
   await c.query('begin');
   try {
-    for (const t of order) {
-      /**
-       * ★**1 文ごとに時間を出します**（★2026-09-20）。
-       * 🔴 ★`race_odds` は staging で **1,550 万行** 規模です。
-       *    ★★**本番で初めて「30 分 かかる」を知らないため**に、★ここで毎回 測ります。
-       */
-      const t0 = process.hrtime.bigint();
-      const res = await c.query(`delete from ${t}`);
-      const sec = Number(process.hrtime.bigint() - t0) / 1e9;
-      console.log(`  ★先に空にしました: ${t}（${(res.rowCount ?? 0).toLocaleString()} 行 / ${sec.toFixed(1)}秒）`);
-      wipedCounts[t] = res.rowCount ?? 0;
+    const t0 = process.hrtime.bigint();
+    // ★1 文で、★閉じた集合を全部（★`cascade` 無し）
+    await c.query(`truncate table ${all.join(', ')}`);
+    const sec = Number(process.hrtime.bigint() - t0) / 1e9;
+    for (const t of all) {
+      console.log(`  ★空にしました: ${t}（${before[t].toLocaleString()} 行）`);
+      wipedCounts[t] = before[t];
     }
-    const res = await c.query('delete from horses');
-    console.log(`  既存の馬を削除しました（${(res.rowCount ?? 0).toLocaleString()} 頭）`);
-    wipedCounts['horses'] = res.rowCount ?? 0;
+    console.log(`  ★1 文の truncate で ${sec.toFixed(1)} 秒`
+      + `（★合計 ${Object.values(before).reduce((a, b) => a + b, 0).toLocaleString()} 行）`);
     await c.query('commit');
   } catch (e) {
     await c.query('rollback');

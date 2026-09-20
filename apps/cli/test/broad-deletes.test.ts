@@ -51,6 +51,19 @@ function broadDeleteSites(src: string): string[] {
    *   ★`tool-guard.test.ts` が `truncate` で同じ直しをしています
    *   （★「語で弾くと、★**書き込みを検査する道具が書き込む道具に見える**」）。★同じ形です。
    */
+  /**
+   * 🔴 ★**`truncate` も拾います**（★2026-09-20 に足しました）。
+   *
+   *   ⚠️ ★`seed-world.mjs` を `delete` から `truncate` に変えた瞬間、
+   *     ★**この登録簿から静かに消えました**（★「登録簿に在るのに拾えません」で落ちた）。
+   *   → ★★**機構を変えると、★安全網の外へ出られてしまう。**
+   *   ★`truncate` は `delete` より ★**広い**ので、★拾わない理由がありません。
+   *   ⚠️ ★`truncate` に `where` は書けないので、★**常に「条件なし」**です。
+   */
+  for (const m of body.matchAll(/(?<![\w$])truncate\s+(?:table\s+)?[\w.${},"\s]+/gi)) {
+    hits.push(`条件なし(truncate): ${String(m[0]).slice(0, 60).replace(/\s+/g, ' ')}`);
+  }
+
   for (const m of body.matchAll(/(?<![\w$])delete\s+from\s+[\w.${}]+([^;]*)/gi)) {
     const tail = m[1] ?? '';
     // ★述語の切れ目まで（★次の `)` や引用符の閉じで十分）
@@ -83,6 +96,12 @@ describe('★CLEANUP-NO-RECORD: 自分が作った行以外を消す delete', ()
       broadDeleteSites('q(`select con.confdeltype as on_delete\n  from pg_constraint con`)'),
       '🔴 ★識別子 `on_delete` の末尾を文の頭と読み違えた',
     ).toEqual([]);
+    // 🔴 ★`truncate` も拾う（★機構を変えて網の外へ出られないように）
+    expect(broadDeleteSites('await c.query(`truncate table ${xs}`)').length,
+      '🔴 ★truncate を見逃した（★delete より広いのに）').toBe(1);
+    expect(broadDeleteSites('q("truncate horses")').length, '★truncate を見逃した').toBe(1);
+    expect(broadDeleteSites('// ★truncate table horses の話'),
+      '★註記の truncate を拾った').toEqual([]);
   });
 
   const files = execSync('git ls-files tools', { cwd: ROOT, encoding: 'utf8' })
@@ -130,6 +149,30 @@ describe('★CLEANUP-NO-RECORD: 自分が作った行以外を消す delete', ()
       }
     }
     expect(grown, `🔴 ★箇所が増えています:\n   ${grown.join('\n   ')}`).toEqual([]);
+  });
+
+  /**
+   * ⚠️ ★**減った側も見ます**（★2026-09-20 に足しました）。
+   *
+   *   ★旧は `sites.length > e.sites` だけで、★**減ったときは黙って通って**いました。
+   *   ✔ ★実例: ★`seed-world.mjs` を `delete` 2 件 → `truncate` 1 件 に変えたとき、
+   *     ★**登録簿は 2 のまま**で、★誰も気づきませんでした。
+   *   → ★★**増える側だけ見る網は、★半分しか見ていません。**
+   *     ★減るのは「直った」ことが多いので ★**落とさず、★数を合わせろと言います**。
+   */
+  it('⚠️ ⑥ ★箇所の数が減ったら、★登録簿を合わせる（★古びさせない）', () => {
+    const shrunk: string[] = [];
+    for (const [f, sites] of found) {
+      const e = BROAD_DELETES[f];
+      if (e !== undefined && sites.length < e.sites) {
+        shrunk.push(`${f}: 登録 ${e.sites} → 実測 ${sites.length}（${sites.join(' / ')}）`);
+      }
+    }
+    expect(
+      shrunk,
+      '⚠️ ★箇所が減りました。★登録簿の sites を合わせ、★records も直してください:\n'
+        + `   ${shrunk.join('\n   ')}`,
+    ).toEqual([]);
   });
 
   it('⑤ ★`records` に中身がある（★空で登録して閉じない・NT-2）', () => {
