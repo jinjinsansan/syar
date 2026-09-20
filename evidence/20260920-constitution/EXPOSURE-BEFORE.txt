@@ -1,0 +1,30 @@
+# ★公開中のサイトの露出（★読むだけ・HTTP GET のみ）
+  ★宛先 https://star-two-chi.vercel.app
+  ★期待する状態: ★**open**
+  ★bypass token: ★無し
+
+【🔴 ★外に出してはいけないページ】
+  🔴 /art-lab             200（★期待 404）
+  🔴 /design-check        200（★期待 404）
+  ✓ /design-preview      404（★期待 404）
+  🔴 /race-quality-lab    200（★期待 404）
+  🔴 /race-world-lab      200（★期待 404）
+  🔴 /lp-preview          200（★期待 404）
+  🔴 /still               200（★期待 404）
+  🔴 /camera              200（★期待 404）
+  ✓ /gait-review         404（★期待 404）
+
+【✅ ★対照 — ★塞ぎすぎていないか】
+  ✓ /home                200（★期待 200）
+  ✓ /                    200（★期待 200）
+
+  🔴 ★期待と違ったもの:
+     /art-lab → 200
+     /design-check → 200
+     /race-quality-lab → 200
+     /race-world-lab → 200
+     /lp-preview → 200
+     /still → 200
+     /camera → 200
+
+🔴 ★不合格 7 件 / ★判定できた 11 件（★公開中のサイトの露出（★期待 open））

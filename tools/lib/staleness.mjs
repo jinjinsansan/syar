@@ -80,7 +80,29 @@ export const STALENESS = [
     label: '★本番で動いているビルドの版（O-6 / DP-1）',
     maxAgeDays: 7,
     how: 'npx tsx tools/verify-deployed-build.mjs --base https://star-two-chi.vercel.app --record',
-    why: '✔ ★根拠は 3 件の実測（★8 日 / 13 日 / 1 か月）。★**いちばん短い 8 日より短く**',
+    why: '✔ ★根拠は 3 件の実測（★8 日 / 13 日 / 1 か月）。★**いちばん短い 8 日より短く**。'
+      + '--- ⚠️ 🔴 ★**Deployment Protection を入れたら、★ここが通らなくなります** ---'
+      + '★`/api/healthz` も閉じるためです。★そのときの手は 2 つ:'
+      + '★① ★**Protection Bypass for Automation の token** を使う（★`verify-deployed-build` が通り続ける・★推す）'
+      + '★② ★**この項目を `pending` にする**（★理由「Deployment Protection のため一時停止」＋'
+      + '　★**期限は「復旧完了 ＋ 3 日」**）。'
+      + '🔴 ★★**この項目を消さないこと。** ★消すと、★`DP-1` の仕掛けがその日から無くなります',
+  },
+  {
+    what: 'prod-exposure',
+    label: '★公開中のサイトが、★意図した範囲しか開いていない（★①検索避け ②開発用ページ）',
+    maxAgeDays: 7,
+    pending: true,
+    until: '2026-10-11',
+    how: 'npx tsx tools/verify-prod-exposure.mjs --base <URL> --expect protected|open --record',
+    why: '⏸ ★**まだ塞いでいません**（★2026-09-20 実測: ★`/art-lab` など **7 ページが 200**・'
+      + '★`noindex` は全ページ **0 回**）。'
+      + '✅ ★**採った手は Vercel の Deployment Protection**（★コミット 0・★1 クリックで戻る・'
+      + '★塞ぎ漏れが原理的に起きない）。★**オーナーの操作**です。'
+      + '⚠️ ★道具は ★**`--expect` を必須**にしています — ★★見つけた世界をそのまま合格にしないため'
+      + '（★保護が外れた日も「合格」になってしまう）。'
+      + '⚠️ ★対照を同じ検査に入れています（★**CK-14**）: ★`open` なら `/home` が 200、'
+      + '★`protected` なら bypass 付きで 200（★bypass が無ければ「全部 閉じた」の確認まで）',
   },
   {
     what: 'race-recompute',
