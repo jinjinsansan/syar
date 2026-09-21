@@ -34,6 +34,7 @@ import { exitWithVerdict, verdictOf, VERDICT } from './lib/counted-verdict.mjs';
 import { runBreedingWeek } from '../apps/worker/src/breeding-runner.ts';
 import { DEFAULT_PRESEED_OPTIONS } from '../apps/cli/src/preseed.ts';
 import { FIELD_SIZE } from '../apps/cli/src/race-field.ts';
+import { CYCLE_MS } from '../packages/scheduler/src/index.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const WEEK_ARG = (() => {
@@ -74,14 +75,18 @@ const check = (ok, label, detail) => {
 const alerts = [];
 let result = null;
 let threw = null;
+/** ★配合 1 週の所要（★周の予算と照らします） */
+let elapsedMs = 0;
 await c.query('begin');
 try {
+  const t0 = process.hrtime.bigint();
   result = await runBreedingWeek(
     c, nowMs, EPOCH,
     (m) => { alerts.push(m); },
     undefined, 'top', (FIELD_SIZE.MIN + FIELD_SIZE.MAX) / 2,
     DEFAULT_PRESEED_OPTIONS.mares,
   );
+  elapsedMs = Number(process.hrtime.bigint() - t0) / 1e6;
 
   // ② 生まれた仔の参照が uuid か（★取引の中で読みます）
   const foals = await q(
@@ -118,6 +123,25 @@ try {
 
 for (const m of alerts) console.log(`  ⚠️ ★警報: ${m}`);
 if (threw !== null) console.log(`  🔴 ★落ちた場所:\n${String(threw.stack ?? threw).split('\n').slice(0, 6).join('\n')}`);
+
+/**
+ * 🔴 ★**周の予算に収まるか**（★2026-09-21）。
+ *
+ * ⚠️ ★配合は ★**週送りの後**に呼ばれます（`main.ts`）。
+ *   ★つまり ★**周の所要に乗ります**。★周は `CYCLE_MS`。
+ * 🔴 ★**前に 1 度、★配備して本番を落としました**（★2026-09-21）。
+ *   ★そのときは例外でしたが、★**遅すぎても同じことが起きます**。
+ * ⚠️ ★ここで見るのは ★**配合だけ**です。★週送り本体とレースの分は別。
+ *   ★だから ★**余裕を広く取ります**（★周の 10% を線にします）。
+ */
+const BUDGET_RATIO = 0.10;
+const budgetMs = CYCLE_MS * BUDGET_RATIO;
+check(elapsedMs > 0 && elapsedMs <= budgetMs,
+  `④ 🔴 ★配合 1 週 が、★周の ${(BUDGET_RATIO * 100).toFixed(0)}% に収まる`,
+  elapsedMs <= 0
+    ? '🔴 ★測れていません（★①で落ちた）'
+    : `★${elapsedMs.toFixed(0)}ms / ★線 ${budgetMs.toFixed(0)}ms`
+      + `（★周 ${(CYCLE_MS / 1000).toFixed(0)}s の ${(elapsedMs / CYCLE_MS * 100).toFixed(2)}%）`);
 
 // ③ 戻っていること
 const after = Number((await q('select count(*)::int n from horses'))[0].n);
