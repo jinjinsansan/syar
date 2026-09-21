@@ -21,6 +21,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 /**
  * ★**`npx` を使いません。** ★Windows で `spawnSync npx.cmd EINVAL` になります
@@ -79,6 +80,46 @@ function npmRun(label, script, extraEnv = {}) {
  *    ★向こうに書くと ★**手元と CI で門が 2 つ**になり、★片方だけ直ります（D-052）。
  *    ★`.github/workflows/gate.yml` が呼ぶのは `npm run gate` の 1 本だけ、を保ちます。
  */
+/**
+ * 🔴 ★**`next build` は、★追跡されているファイルを書き換えます**（★2026-09-21・★入れた直後に出ました）。
+ *
+ * 【★何が起きたか】
+ *   ★門に `build:web` を入れた 1 回目で、★`git status` に 2 件 出ました:
+ *     ★`apps/web/next-env.d.ts` … `./.next/types/routes.d.ts` → `./.next-gate/…` に書き換え
+ *     ★`apps/web/tsconfig.json` … `include` に `.next-gate/types/**` を追加（★並びも変える）
+ *   🔴 ★**門を流すたびに作業ツリーが汚れます。**
+ *   🔴 ★しかも ★**それを commit すると、★Vercel（`.next`）が参照できない道を指します。**
+ *     ★★門を守るために入れたものが、★本番を壊す形です。
+ *   ⚠️ ★共有ツリーなので（★CLAUDE.md）、★**黙って汚さないこと**が特に重い。
+ *
+ * 【★どう解くか】
+ *   ★**ビルドの前に写しを取り、★後で書き戻します**（★`git checkout` は使いません —
+ *   ★人が意図して直した内容まで巻き戻す恐れがあるため。★**写しは「直前の実物」**です）。
+ *   ★書き戻したときは ★**必ず言います**（★黙って戻すのも、黙って汚すのと同じ）。
+ */
+const NEXT_REWRITES = ['apps/web/next-env.d.ts', 'apps/web/tsconfig.json'];
+
+function buildWeb() {
+  const before = new Map();
+  for (const f of NEXT_REWRITES) {
+    if (existsSync(f)) before.set(f, readFileSync(f, 'utf8'));
+  }
+  const code = npmRun('★画面を作る（build:web・R-28）', 'build:web',
+    { STAR_NEXT_DIST_DIR: '.next-gate' });
+  const restored = [];
+  for (const [f, text] of before) {
+    if (!existsSync(f)) continue;
+    if (readFileSync(f, 'utf8') === text) continue;
+    writeFileSync(f, text);
+    restored.push(f);
+  }
+  if (restored.length > 0) {
+    process.stdout.write(`  ⚠️ ★next build が書き換えたので戻しました: ${restored.join(' / ')}\n`);
+    process.stdout.write('     ★（出力先を分けているため。★作業ツリーは汚しません）\n');
+  }
+  return code;
+}
+
 const results = [
   ['★配る物を作る（dist/worker.cjs・D-043）', npmRun('★配る物を作る（dist/worker.cjs・D-043）', 'build:worker')],
   ['★型検査（tsc・strict）', npmRun('★型検査（tsc・strict）', 'typecheck')],
@@ -104,8 +145,7 @@ const results = [
    *    ★網は ★**秒で落ちて原因を名指し**します。★ビルドは ★**2 分かかるが漏れません**。
    *    ★★どちらも要ります（★網が先に落ちれば、★2 分 待たずに原因が分かります）。
    */
-  ['★画面を作る（build:web・R-28）',
-    npmRun('★画面を作る（build:web・R-28）', 'build:web', { STAR_NEXT_DIST_DIR: '.next-gate' })],
+  ['★画面を作る（build:web・R-28）', buildWeb()],
   ['★検査と赤の照合（vitest ＋ 登録簿）', npmRun('★検査と赤の照合（vitest ＋ 登録簿）', 'verify:red')],
   /**
    * 🔴 ★**まだ直っていない指摘の期限**（★**NT-3**・2026-09-19）。
