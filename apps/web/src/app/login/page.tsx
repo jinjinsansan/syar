@@ -139,16 +139,21 @@ export default function LoginPage(): React.ReactElement {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {/* ★`onClick` に `undefined` を渡さない（`exactOptionalPropertyTypes: true`）。
                 ★**渡さない**ことと「`undefined` を渡す」ことは別物なので、条件付きで展開する */}
             <BigButton
               tone={canSubmit ? 'gold' : 'disabled'}
               label={state === 'sending' ? '確認しています…' : 'ログイン'}
-              grow="1.2"
+              grow="0 0 auto"
               {...(canSubmit ? { onClick: () => { void submit(); } } : {})}
             />
-            <BigButton tone="ivory" label="はじめる（登録）" href="/signup" />
+            <a href="/forgot-password" style={{ alignSelf: 'center', color: 'var(--u-gold)', fontSize: 15, fontWeight: 900, padding: '9px 12px' }}>
+              パスワードを忘れた方
+            </a>
+            <a href="/signup" style={{ alignSelf: 'center', color: 'var(--u-ink)', fontSize: 15, fontWeight: 900, padding: '9px 12px' }}>
+              アカウントを作る
+            </a>
           </div>
         </div>
 

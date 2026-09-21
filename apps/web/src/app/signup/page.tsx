@@ -31,15 +31,6 @@ import { authClient } from '../../lib/supabase';
 /** ★パスワードの最低要件（V-19 E-7）。★サーバー側でも弾かれるが、先に画面で伝える */
 const PW_MIN = 8;
 
-/** 登録後の流れ（★文言だけ・画面で計算しない） */
-const STEPS: readonly { readonly n: string; readonly label: string }[] = [
-  { n: '1', label: '牧場の名前を決める' },
-  { n: '2', label: '最初の馬を迎える' },
-  { n: '3', label: '調教を指示する' },
-  { n: '4', label: 'レースに登録する' },
-  { n: '5', label: '中継を観る' },
-];
-
 type State = 'form' | 'sending' | 'sent';
 
 export default function SignupPage(): React.ReactElement {
@@ -169,17 +160,19 @@ export default function SignupPage(): React.ReactElement {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {/* ★`onClick` に `undefined` を渡さない（`exactOptionalPropertyTypes: true`）。
                     ★**渡さない**ことと「`undefined` を渡す」ことは別物なので、条件付きで展開する */}
                 <BigButton
                   tone={canSubmit ? 'gold' : 'disabled'}
                   label={state === 'sending' ? '送信しています…' : 'アカウントを作る'}
                   sub="確認のメールが届きます"
-                  grow="1.2"
+                  grow="0 0 auto"
                   {...(canSubmit ? { onClick: () => { void submit(); } } : {})}
                 />
-                <BigButton tone="ivory" label="ログイン" href="/login" />
+                <a href="/login" style={{ alignSelf: 'center', color: 'var(--u-gold)', fontSize: 15, fontWeight: 900, padding: '9px 12px' }}>
+                  アカウントをお持ちの方はログイン
+                </a>
               </div>
 
               <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--u-ink)', opacity: .9, lineHeight: 1.8 }}>
@@ -188,22 +181,8 @@ export default function SignupPage(): React.ReactElement {
               </div>
             </div>
 
-            {/* ★登録後の流れ */}
-            <div style={{ flex: '0 0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
-              {STEPS.map((s) => (
-                <div key={s.n} style={{
-                  flex: '0 0 auto', borderRadius: 12, padding: '12px 14px',
-                  background: 'rgba(8,18,8,.5)', border: '2px solid var(--u-edge)',
-                  display: 'flex', alignItems: 'center', gap: 10,
-                }}>
-                  <span style={{
-                    flex: '0 0 auto', width: 30, height: 30, borderRadius: '50%',
-                    background: 'var(--u-gold)', color: '#1a2410',
-                    display: 'grid', placeItems: 'center', fontSize: 15, fontWeight: 900,
-                  }}>{s.n}</span>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--u-ink)' }}>{s.label}</span>
-                </div>
-              ))}
+            <div style={{ borderRadius: 12, padding: '14px 16px', background: 'rgba(8,18,8,.5)', border: '2px solid var(--u-edge)', color: 'var(--u-ink)', fontSize: 14, fontWeight: 800, lineHeight: 1.8 }}>
+              登録後、届いたメールでアドレスを確認してください。確認が済んだらログインして、牧場の設定に進めます。
             </div>
           </>
         )}

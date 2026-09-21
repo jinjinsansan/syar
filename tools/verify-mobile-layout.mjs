@@ -68,6 +68,8 @@ const PAGES = [
   ['/setup', '★初回セットアップ'],
   ['/login', '★ログイン'],
   ['/signup', '★新規登録'],
+  ['/forgot-password', '★再設定メール'],
+  ['/reset-password', '★新しいパスワード'],
   ['/race-next', '★次走'],
   ['/course', '★コース（研究）'],
   ['/camera', '★カメラ（研究）'],

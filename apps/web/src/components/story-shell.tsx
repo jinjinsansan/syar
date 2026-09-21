@@ -70,7 +70,7 @@ const OWN_HEADER = [
    *   ★（★`uma-parts` を使う面が ★`OWN_HEADER` に在ること）。★4 度目は起きません。
    */
   '/home', '/howto', '/earn', '/watch-race', '/odds', '/exchange', '/mypage', '/vote', '/train',
-  '/login', '/signup', '/setup',
+  '/login', '/signup', '/forgot-password', '/reset-password', '/setup',
   /** ★デザイン確認の一覧（★2026-09-17）。★自前の見出しを持つので帯を足さない */
   '/design-check',
 ];
