@@ -4,6 +4,13 @@ import { useState } from 'react';
 import { Backdrop, BigButton, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { authClient } from '../../lib/supabase';
 
+function toJa(message: string): string {
+  if (/email rate limit exceeded/i.test(message)) {
+    return 'メールの送信回数が上限に達しました。時間をおいて、もう一度お試しください。';
+  }
+  return message;
+}
+
 export default function ForgotPasswordPage(): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
   const [email, setEmail] = useState('');
@@ -20,7 +27,7 @@ export default function ForgotPasswordPage(): React.ReactElement {
       const { error: authError } = await authClient().auth.resetPasswordForEmail(email.trim(), {
         redirectTo: `${window.location.origin}/reset-password`,
       });
-      if (authError) setError(authError.message);
+      if (authError) setError(toJa(authError.message));
       else setSent(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
