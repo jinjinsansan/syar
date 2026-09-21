@@ -44,7 +44,15 @@ console.log(`# ★移行が届いたか  接続先の申告: ${
 
 // ── ① 記録の数（★`migrate.mjs` の「完了」を DB で裏取りする） ──────────
 const mig = (await q('select count(*)::int n, max(filename) last from schema_migrations'))[0];
-check(mig.n === 53, '① ★移行が 53 件 記録されている（★道具の出力ではなく DB で）',
+/**
+ * 🔴 ★**数を書きません**（★2026-09-21 に直しました）。
+ *   ⚠️ ★`53` と書いてあり、★移行を 6 件 当てた瞬間に ★**正しい状態で落ちました**。
+ *   ✅ ★`db/migrations/*.sql` を数えます。★増えたら自動で追随します。
+ */
+const { readdirSync } = await import('node:fs');
+const fileCount = readdirSync('db/migrations').filter((f) => f.endsWith('.sql')).length;
+check(mig.n === fileCount,
+  `① ★移行が ${fileCount} 件（★db/migrations の数）記録されている（★道具の出力ではなく DB で）`,
   `${mig.n} 件 / 最後 ${mig.last}`);
 
 // ── ② 画面が読むビューが在る（★0034 / 0046） ─────────────────────
