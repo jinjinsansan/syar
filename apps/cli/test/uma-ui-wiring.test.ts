@@ -165,16 +165,25 @@ describe('★馬物語 UI の配線（R-14）', () => {
     const wrapper = strip(read('apps/web/src/app/watch-race/page.tsx'));
     expect(wrapper, '★案内が戻り先を渡していない（★出口がダッシュボードへ向かない）')
       .toContain("'/race?return=/home'");
+    expect(wrapper, '★未ログインの観客がログイン必須のダッシュボードへ送られる')
+      .toContain("'/race?return=/watch-race'");
 
     const race = strip(read('apps/web/src/app/race/page.tsx'));
     expect(race, '★戻り先の名簿が無い').toMatch(/const RETURN_ROUTES/);
     expect(race, '★名簿に `/home` が無い（★渡しても黙って無視される）').toMatch(/'\/home':/);
+    expect(race, '★名簿にゲストの観戦入口が無い').toMatch(/'\/watch-race':/);
     /** ★③ ★**完全一致でだけ**受ける（★前方一致や `startsWith('/')` にしない） */
     expect(race, '★戻り先を完全一致で受けていない（★開いた転送口になる）')
       .toMatch(/hasOwnProperty\.call\(RETURN_ROUTES/);
     /** ★出口のボタンが、★**押されたら戻り先へ送る** */
     expect(race, '★出口が戻り先を見ていない')
       .toMatch(/if \(RETURN_TO !== null\) \{ window\.location\.href = RETURN_TO; return; \}/);
+  });
+
+  it('★未ログインの観客は TOP から観戦案内へ進める', () => {
+    const top = strip(read('apps/web/src/components/uma/uma-top.tsx'));
+    expect(top).toContain('href="/watch-race"');
+    expect(top).toContain('登録なしでレース演出を観る');
   });
 
   /**

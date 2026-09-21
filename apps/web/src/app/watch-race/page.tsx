@@ -25,6 +25,7 @@
 import { useEffect, useState } from 'react';
 import { Backdrop, BigButton, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
+import { authClient } from '../../lib/supabase';
 
 /**
  * ★接続先（★B-2 の既定）。★変えるときは報告の §2 も直すこと。
@@ -35,17 +36,26 @@ import { RaceStrip } from '../../components/uma/race-strip';
  *      ★これまでどおり `/race` の中のメニューへ戻ります（★出口が消えたように見えます）。
  */
 const BROADCAST_HREF = '/race?return=/home';
+const GUEST_BROADCAST_HREF = '/race?return=/watch-race';
 
 export default function WatchRacePage(): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
   /** ★いま縦持ちか（★案内を出すかの判断だけに使う。★JS で回しません） */
   const [portrait, setPortrait] = useState(true);
+  const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia('(orientation: portrait)');
     const apply = (): void => { setPortrait(mq.matches); };
     apply();
     mq.addEventListener('change', apply);
     return () => { mq.removeEventListener('change', apply); };
+  }, []);
+  useEffect(() => {
+    let active = true;
+    void authClient().auth.getSession().then(({ data }) => {
+      if (active) setSignedIn(data.session !== null);
+    }).catch(() => { if (active) setSignedIn(false); });
+    return () => { active = false; };
   }, []);
 
   return (
@@ -58,7 +68,7 @@ export default function WatchRacePage(): React.ReactElement {
       }}
     >
       <Backdrop />
-      <TopBar title="レースを見る" paused={paused} onToggle={toggle} />
+      <TopBar title="レースを見る" backHref={signedIn ? '/home' : '/'} paused={paused} onToggle={toggle} />
       <RaceStrip />
 
       <div style={{
@@ -78,14 +88,16 @@ export default function WatchRacePage(): React.ReactElement {
             上の帯は実際の開催情報です。全画面の映像は現在、演出確認用のデモです。
             実レースの着順は開催情報の「詳細」から確認できます。
           </p>
-          {/* ★16:9 の枠を先に確保する（★映像を引き伸ばさない・資料 §4.4） */}
-          <div aria-hidden style={{
-            marginTop: 12, width: '100%', aspectRatio: '16 / 9', borderRadius: 8,
-            border: '2px solid rgba(251,247,236,.28)', background: 'var(--u-navy-deep)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 12, fontWeight: 500, color: 'var(--u-ink-light-3)',
+          {/* ★本編の入口でも使う既存の絵。映像は次の画面で自動再生する。 */}
+          <div style={{
+            position: 'relative', marginTop: 12, width: '100%', aspectRatio: '16 / 9', borderRadius: 8,
+            border: '2px solid rgba(251,247,236,.28)', background: 'var(--u-navy-deep)', overflow: 'hidden',
           }}>
-            演出デモの画面がここに出ます
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/lp/hero.jpg" alt="" style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }} />
+            <span style={{ position: 'absolute', left: 10, bottom: 10, padding: '5px 9px', borderRadius: 6, background: 'var(--u-panel-strong)', fontSize: 12 }}>
+              レース演出 · デモ
+            </span>
           </div>
         </div>
       </div>
@@ -94,8 +106,8 @@ export default function WatchRacePage(): React.ReactElement {
         position: 'relative', flex: '0 0 auto', display: 'flex', flexWrap: 'wrap', gap: 10,
         padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
-        <BigButton tone="blue" label="演出デモを見る" sub="実際のレース結果とは連動していません" href={BROADCAST_HREF} grow="1.4 1 210px" />
-        <BigButton tone="ivory" label="ダッシュボード" sub="いつでも戻れます" href="/home" grow="1 1 130px" />
+        <BigButton tone="blue" label="レース演出を観る" sub="ログイン不要・映像はデモ" href={signedIn ? BROADCAST_HREF : GUEST_BROADCAST_HREF} grow="1.4 1 210px" />
+        <BigButton tone="ivory" label={signedIn ? 'ダッシュボード' : 'トップへ戻る'} sub="いつでも戻れます" href={signedIn ? '/home' : '/'} grow="1 1 130px" />
       </div>
     </div>
   );

@@ -135,6 +135,7 @@ const RACE_SETUP = raceSetupFromParam(RACE_PARAM).setup;
  */
 const RETURN_ROUTES: Readonly<Record<string, string>> = {
   '/home': 'ダッシュボードへ',
+  '/watch-race': '観戦へ戻る',
   '/vote': '投票へ戻る',
   '/odds': 'オッズへ戻る',
   '/mypage': 'わたしの馬へ戻る',
@@ -5776,7 +5777,7 @@ export default function RacePage(): React.JSX.Element {
             <button type="button" onClick={() => setPlaying((q) => !q)} style={stageBtnStyle}>
               {playing ? '停止' : '再開'}
             </button>
-            <button
+            {devMode && <><button
               type="button"
               onClick={() => { audioRef.current?.reset(); resetToStart(); setPlaying(true); }}
               style={stageBtnStyle}
@@ -5799,7 +5800,7 @@ export default function RacePage(): React.JSX.Element {
             <button type="button" onClick={() => toggleViewParam('turn', OTHER_TURN)}
               style={{ ...stageBtnStyle, ...(viewSwitches.mirrored ? { background: 'rgba(92,70,20,0.92)', color: '#ffe98a' } : {}) }}>
               {turn === 'left' ? '左回り' : '右回り'}
-            </button>
+            </button></>}
             <button
               type="button"
               onClick={() => {

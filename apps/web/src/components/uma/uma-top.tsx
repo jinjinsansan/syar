@@ -244,9 +244,13 @@ export default function UmaTop(): React.ReactElement {
             color: 'var(--u-ink-dark)', fontSize: 'clamp(18px,4.1cqw,34px)',
           }}>ログイン</a>
         </div>
-        <div style={{ marginTop: 12, textAlign: 'center', fontSize: 'clamp(12px,3cqw,15px)', color: 'var(--u-ink-light)' }}>
-          登録は無料です
-        </div>
+        <a href="/watch-race" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 44,
+          marginTop: 8, textAlign: 'center', fontSize: 'clamp(12px,3cqw,15px)',
+          color: 'var(--u-ink-light)', textDecoration: 'underline', textUnderlineOffset: 3,
+        }}>
+          登録なしでレース演出を観る
+        </a>
       </div>
 
       {/* ★停止スイッチ（★全ページ常設・資料 §2-9） */}

@@ -130,6 +130,8 @@ export const READONLY = [
    *     ★食い違いが「書き換え」か「版の差」か分けられません（★`F3-RECOMPUTE-NEEDS-VERSION`）。
    */
   'verify-race-recompute.mjs',
+  // 公開レースと確定済み出走を GET で照合する。DB を書き換えない。
+  'verify-race-replay-read.mjs',
   'verify-c6-owner-exposure.mjs',
   /**
    * ★AL-6（裁定 REVIEW_CONSULT_ARCADE_LOOP_ANSWER_20260918）の測定器 2 本。
