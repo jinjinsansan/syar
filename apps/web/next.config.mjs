@@ -24,7 +24,29 @@
  */
 const BUILD_STAMP = new Date().toISOString().slice(11, 19);
 
+/**
+ * 🔴 ★**門のビルドは、★別の出力先へ**（★2026-09-21・レビュー側の裁定）。
+ *
+ * 【★なぜ要るか】
+ *   ★2026-09-21、★`/stable` に `export const revalidate = 0` を残したまま push し、
+ *   ★★**Vercel のビルドが落ち続けて、★本番が 31 コミット 古い版を配信していました。**
+ *   ★型検査は通ります（★型としては正しい `number`）。★門にも `build:web` が在りませんでした。
+ *   → ★★**門が緑で、★本番だけが作り直せない**（★正典 **R-28** そのもの）。
+ *   → ★門に `build:web` を入れます。
+ *
+ * 【⚠️ ★入れられなかった理由と、★その解き方】
+ *   ★`next dev` と `next build` は ★**同じ `.next` を奪い合います**。
+ *   ★オーナーが開発サーバーを見ている最中に門を流すと、★★**画面が落ちます**。
+ *   → ★**出力先を分けます。** ★`STAR_NEXT_DIST_DIR` が在ればそこへ、★無ければ `.next`。
+ *
+ * ⚠️ ★**既定を変えていません。** ★Vercel はこの環境変数を設定しないので `.next` のままです
+ *    （★`vercel.json` の `outputDirectory: apps/web/.next` と合っています）。
+ *    ★★**本番の作り方を、★門の都合で変えない。**
+ */
+const DIST_DIR = process.env['STAR_NEXT_DIST_DIR'] ?? '.next';
+
 export default {
+  distDir: DIST_DIR,
   env: { NEXT_PUBLIC_BUILD_STAMP: BUILD_STAMP },
   reactStrictMode: true,
   transpilePackages: ['@star/betting', '@star/scheduler', '@star/race-engine', '@star/render', '@star/sim-engine'],

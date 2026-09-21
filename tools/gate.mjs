@@ -26,9 +26,11 @@ import { spawnSync } from 'node:child_process';
  * ★**`npx` を使いません。** ★Windows で `spawnSync npx.cmd EINVAL` になります
  *   （★`tools/verify-known-red.mjs` で踏んだのと同じ）。
  */
-function run(label, args) {
+function run(label, args, extraEnv = {}) {
   process.stdout.write(`\n=== ${label} ===\n`);
-  const r = spawnSync(process.execPath, args, { stdio: 'inherit' });
+  const r = spawnSync(process.execPath, args, {
+    stdio: 'inherit', env: { ...process.env, ...extraEnv },
+  });
   if (r.error !== undefined && r.error !== null) {
     process.stdout.write(`🔴 ${label}: 起動できません（${r.error.message}）\n`);
     return 1;
@@ -45,14 +47,16 @@ const NPM = process.platform === 'win32'
  * ★`npm run <script>` を、★**npm の JS 本体を直接**動かして呼びます
  *   （★`npm.cmd` を spawn すると Windows で EINVAL になる経路があるため）。
  */
-function npmRun(label, script) {
+function npmRun(label, script, extraEnv = {}) {
   const exec = NPM[0];
   if (typeof exec === 'string' && exec.endsWith('.js')) {
-    return run(label, [exec, 'run', script]);
+    return run(label, [exec, 'run', script], extraEnv);
   }
   // ★`npm_execpath` が無い＝直接叩かれた。★shell 経由に落とす（★ここは判定に影響しない）
   process.stdout.write(`\n=== ${label} ===\n`);
-  const r = spawnSync(exec ?? 'npm', ['run', script], { stdio: 'inherit', shell: true });
+  const r = spawnSync(exec ?? 'npm', ['run', script], {
+    stdio: 'inherit', shell: true, env: { ...process.env, ...extraEnv },
+  });
   return r.status === null ? 1 : r.status;
 }
 
@@ -78,6 +82,30 @@ function npmRun(label, script) {
 const results = [
   ['★配る物を作る（dist/worker.cjs・D-043）', npmRun('★配る物を作る（dist/worker.cjs・D-043）', 'build:worker')],
   ['★型検査（tsc・strict）', npmRun('★型検査（tsc・strict）', 'typecheck')],
+  /**
+   * 🔴 ★**画面も作る**（★2026-09-21・レビュー側の裁定・★**R-28**）。
+   *
+   * 【★何が起きたか — ★数時間を誤診に使いました】
+   *   ★`/stable` を `'use client'` にしたとき `export const revalidate = 0` を残しました。
+   *   ★`npm run build:web` が落ちます。★★**Vercel は push のたびに作り直しを試み、**
+   *   ★★**落ちるので最後に成功した版を配信し続けました**（★31 コミット 前・1 時間半）。
+   *   ★オーナーの目には ★**「古いデザイン」**として出ました。
+   *   🔴 ★型検査は通ります（★`revalidate = 0` は型として正しい `number`）。
+   *   🔴 ★門にも `build:web` が在りませんでした。
+   *   → ★★**門が緑で、★本番だけが作り直せない。** ★これは門の存在意義に関わります。
+   *
+   * 【⚠️ ★なぜ今まで入れなかったか、★どう解いたか】
+   *   ★理由は ★**`next dev` と `.next` を奪い合う**ことでした（★オーナーの画面が落ちる）。
+   *   ✅ ★**出力先を分けて解きました**: ★`STAR_NEXT_DIST_DIR=.next-gate`。
+   *     ★`apps/web/next.config.mjs` が読みます。★**既定（`.next`）は変えていません** —
+   *     ★Vercel はこの環境変数を設定しないので、★**本番の作り方は 1 文字も変わりません**。
+   *
+   * ⚠️ ★**静的な網（`client-page-segment-config.test.ts`）は残します。**
+   *    ★網は ★**秒で落ちて原因を名指し**します。★ビルドは ★**2 分かかるが漏れません**。
+   *    ★★どちらも要ります（★網が先に落ちれば、★2 分 待たずに原因が分かります）。
+   */
+  ['★画面を作る（build:web・R-28）',
+    npmRun('★画面を作る（build:web・R-28）', 'build:web', { STAR_NEXT_DIST_DIR: '.next-gate' })],
   ['★検査と赤の照合（vitest ＋ 登録簿）', npmRun('★検査と赤の照合（vitest ＋ 登録簿）', 'verify:red')],
   /**
    * 🔴 ★**まだ直っていない指摘の期限**（★**NT-3**・2026-09-19）。
