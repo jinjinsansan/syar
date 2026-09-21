@@ -12,6 +12,7 @@ export * from './balance.js';
 export * from './genetics.js';
 export * from './phenotype.js';
 export * from './inbreeding.js';
+export * from './stable-order.js';
 export * from './nicks.js';
 export * from './breeding.js';
 export * from './founders.js';

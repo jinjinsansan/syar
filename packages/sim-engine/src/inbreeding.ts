@@ -10,6 +10,7 @@
  */
 
 import type { HorseId, HorseLookup, HorseRecord, PedigreeCache } from './types.js';
+import { compareIds } from './stable-order.js';
 
 /**
  * 親の血統キャッシュから子の血統キャッシュを作る。
@@ -179,7 +180,7 @@ export function calcInbreedCoefficient(
   contributions.sort((a, b) =>
     b.contribution !== a.contribution
       ? b.contribution - a.contribution
-      : a.ancestorId.localeCompare(b.ancestorId),
+      : compareIds(a.ancestorId, b.ancestorId),
   );
 
   return {

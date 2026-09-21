@@ -8,7 +8,7 @@
  *     ★世界は `runPreseed(20260833)` から作ってあるので、★**挙動が変わると再現できなくなります。**
  */
 import type { BalanceConfig, HorseRecord, Stable } from '@star/sim-engine';
-import { calcInbreedCoefficient, canMate } from '@star/sim-engine';
+import { calcInbreedCoefficient, canMate, compareIds } from '@star/sim-engine';
 
 import { SIRE_CHOICE_TOP_K, mateScoreWithInbreeding } from './mate-choice.js';
 
@@ -80,7 +80,7 @@ export function rankSires(p: RankSiresParams): { id: string; score: number }[] {
    *   → ★★**挙動は変えずに移しました。** ★危険は `LOCALE-SORT-IN-MATING` として起票します。
    *   ⚠️ ★**「移す」と「直す」を同じ便でやらない。** ★どちらが効いたか分からなくなります。
    */
-  ranked.sort((a, b) => (b.score !== a.score ? b.score - a.score : a.id.localeCompare(b.id)));
+  ranked.sort((a, b) => (b.score !== a.score ? b.score - a.score : compareIds(a.id, b.id)));
   return ranked;
 }
 

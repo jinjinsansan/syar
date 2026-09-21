@@ -28,6 +28,7 @@ import {
   type NicksTable,
   type NumericTraitKey,
 } from '@star/sim-engine';
+import { compareIds } from '@star/sim-engine';
 import {
   runSeason,
   selectionScore,
@@ -876,7 +877,7 @@ export function runSimulation(
     }
     const ranked = stallions
       .slice()
-      .sort((a, b) => (rankKey(b) !== rankKey(a) ? rankKey(b) - rankKey(a) : a.id.localeCompare(b.id)));
+      .sort((a, b) => (rankKey(b) !== rankKey(a) ? rankKey(b) - rankKey(a) : compareIds(a.id, b.id)));
     const candidateCount = Math.max(1, Math.ceil(ranked.length * opts.stallionTopRatio));
     const candidates = ranked.slice(0, candidateCount);
 

@@ -36,6 +36,7 @@ import {
   type NicksTable,
   type Stable,
 } from '@star/sim-engine';
+import { compareIds } from '@star/sim-engine';
 
 import { ABILITY_KEYS } from '@star/sim-engine';
 import { lineConcentration } from './pedigree-audit.js';
@@ -453,7 +454,7 @@ export function runPreseed(opts: PreseedOptions): PreseedResult {
       return stableScore(h.record, stableOf.get(id) ?? (stables[0] as Stable));
     };
     const sortByRank = (ids: readonly string[]): string[] =>
-      ids.slice().sort((a, b) => (rank(b) !== rank(a) ? rank(b) - rank(a) : a.localeCompare(b)));
+      ids.slice().sort((a, b) => (rank(b) !== rank(a) ? rank(b) - rank(a) : compareIds(a, b)));
     const ofStable = (ids: readonly string[], stableId: string): string[] =>
       sortByRank(ids.filter((id) => stableOf.get(id)?.id === stableId));
 
