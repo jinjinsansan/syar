@@ -15,6 +15,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ja">
       <body data-theme="arcade">
+        {/* Supabase が未許可の redirectTo を Site URL に戻した場合も、復旧リンクを受け取る。
+            ハッシュはサーバーに送られないため、他のクライアントが読む前に移動する。 */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (() => {
+            if (window.location.pathname !== '/') return;
+            const hash = window.location.hash;
+            if (!hash) return;
+            const params = new URLSearchParams(hash.slice(1));
+            if (params.get('type') !== 'recovery' || !params.has('access_token') || !params.has('refresh_token')) return;
+            window.location.replace('/reset-password' + hash);
+          })();
+        ` }} />
         <StoryShell>{children}</StoryShell>
       </body>
     </html>
