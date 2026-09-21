@@ -184,7 +184,11 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
      ★UI1-8 で **その枠ごと消えました**（★脚質は `horses` に無い）。
      ★残しておくと `mobile-css-anchors.test.ts` が「黙って効かない規則」として落とします。 */
   main [style*="flex:0 0 150px"], main [style*="flex:0 0 196px"],
-  main [style*="flex:0 0 200px"], main [style*="flex:0 0 230px"], main [style*="flex:0 0 250px"],
+  /* ⚠️ ★`250px` を 2026-09-21 に外しました — ★`/setup` の勝負服のプレビュー枠が
+     ★唯一の使い手で、★**既存の部品で組み直したときに消えました**（★オーナー判断「B」）。
+     ★残しておくと `mobile-css-anchors.test.ts` が「黙って効かない規則」として落とします。
+     ★★実際、その検査が拾いました。 */
+  main [style*="flex:0 0 200px"], main [style*="flex:0 0 230px"],
   main [style*="flex:0 0 252px"], main [style*="flex:0 0 280px"], main [style*="flex:0 0 290px"],
   main [style*="flex:0 0 330px"], main [style*="flex:0 0 334px"], main [style*="flex:0 0 340px"],
   main [style*="flex:0 0 352px"], main [style*="flex:0 0 186px"] {

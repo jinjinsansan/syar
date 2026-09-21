@@ -61,14 +61,15 @@ const OWN_HEADER = [
    *   ★★**世代の混在ではありません。** ★`/login` は新しい部品で描かれているのに、
    *   ★**上に 1 つ古い帯が載っていた**だけです。
    *
-   * ⚠️ ★`/setup` は ★**まだ自前バーを持っていません**（★実測）。★だから ★**ここに入れません**。
-   *   ★新しい世代へ載せ替えるのは ★**デザイナーの仕事**です（★簿 `SETUP-STILL-OLD-DESIGN`）。
+   * ✅ ★`/setup` も入れました（★2026-09-21・★オーナーの判断「**B**」）。
+   *   ★**既存の部品で組み直した**ので（★`/login` `/signup` と同じ `uma-parts`）、
+   *   ★自前バーを持つようになりました。★**新しい意匠は 1 つも作っていません。**
    *
    * ✅ ★**入れ忘れを網で止めます**: `apps/cli/test/own-header-coverage.test.ts`
    *   ★（★`uma-parts` を使う面が ★`OWN_HEADER` に在ること）。★4 度目は起きません。
    */
   '/home', '/howto', '/earn', '/watch-race', '/odds', '/exchange', '/mypage', '/vote', '/train',
-  '/login', '/signup',
+  '/login', '/signup', '/setup',
   /** ★デザイン確認の一覧（★2026-09-17）。★自前の見出しを持つので帯を足さない */
   '/design-check',
 ];
