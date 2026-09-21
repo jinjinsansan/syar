@@ -51,7 +51,7 @@ export default function ForgotPasswordPage(): React.ReactElement {
               </label>
               {error && <p role="alert" style={{ margin: 0, color: '#ffd04d', lineHeight: 1.6 }}>{error}</p>}
               <BigButton tone={canSubmit ? 'gold' : 'disabled'} label={sending ? '送信しています…' : '再設定メールを送る'} grow="0 0 auto" {...(canSubmit ? { onClick: () => { void submit(); } } : {})} />
-              <a href="/login" style={{ alignSelf: 'center', color: 'var(--u-gold)', fontWeight: 900, padding: '8px 12px' }}>ログインに戻る</a>
+              <a href="/login" style={{ alignSelf: 'center', display: 'flex', alignItems: 'center', minHeight: 44, color: 'var(--u-gold)', fontWeight: 900, padding: '8px 12px' }}>ログインに戻る</a>
             </>
           )}
         </div>

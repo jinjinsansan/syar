@@ -148,10 +148,10 @@ export default function LoginPage(): React.ReactElement {
               grow="0 0 auto"
               {...(canSubmit ? { onClick: () => { void submit(); } } : {})}
             />
-            <a href="/forgot-password" style={{ alignSelf: 'center', color: 'var(--u-gold)', fontSize: 15, fontWeight: 900, padding: '9px 12px' }}>
+            <a href="/forgot-password" style={{ alignSelf: 'center', display: 'flex', alignItems: 'center', minHeight: 44, color: 'var(--u-gold)', fontSize: 15, fontWeight: 900, padding: '9px 12px' }}>
               パスワードを忘れた方
             </a>
-            <a href="/signup" style={{ alignSelf: 'center', color: 'var(--u-ink)', fontSize: 15, fontWeight: 900, padding: '9px 12px' }}>
+            <a href="/signup" style={{ alignSelf: 'center', display: 'flex', alignItems: 'center', minHeight: 44, color: 'var(--u-ink)', fontSize: 15, fontWeight: 900, padding: '9px 12px' }}>
               アカウントを作る
             </a>
           </div>
