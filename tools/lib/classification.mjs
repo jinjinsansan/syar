@@ -35,6 +35,9 @@
  *    ★裏取りは **SQL の書き込み文が無いこと**しか見ていないので、★誤って入れても黙って通ります。
  */
 export const READONLY = [
+  // ★門を流した後、★作業ツリーが汚れていないか（★簿 `CI-DIRTY-TREE-UNSEEN`・2026-09-21）。
+  //   ★`git status --porcelain` と `git ls-files` に訊くだけ。★1 行も書きません。★CI から呼びます
+  'verify-clean-tree.mjs',
   /**
    * ★育成の追いつきの所要を測る（★決め C・2026-09-20・`POOL-DRAIN`）。
    *   🔴 ★**DB に繋ぎません** — ★`pg` を import すらしません。
@@ -1079,6 +1082,9 @@ export const COMPONENT = [
   { file: 'lib/args.mjs', why: '★コマンドライン引数の解析。★2026-08-20 に本番へ余計な移行を当てた事故の後、切り出した部品' },
   { file: 'lib/cdp.mjs', why: '★Chrome DevTools Protocol の細口（★映像の撮影の道具が使う）。★単体では走らせない' },
   { file: 'lib/classification.mjs', why: '★この分類簿そのもの。★道具ではなく、道具を分類する表' },
+  { file: 'lib/clean-tree.mjs', why: '★「作業ツリーが汚れていないか」の判定（★純関数・★簿 `CI-DIRTY-TREE-UNSEEN`）。'
+    + '★`verify-clean-tree.mjs` が呼び、★`apps/cli/test/clean-tree.test.ts` が 6 通りを回す。'
+    + '★★CI の中でしか試せない判定にしないために切り出した部品' },
   { file: 'lib/classification.d.mts', why: '★分類簿の型宣言（★`any` を使わないために置く）。★実行されない' },
   { file: 'lib/dress.mjs', why: '★勝負服の配色を描くための部品（★映像の道具が使う）' },
   { file: 'lib/env.mjs', why: '★接続先の選択を 1 か所にまとめた部品。★`--env` 必須の規則はここが持つ' },
