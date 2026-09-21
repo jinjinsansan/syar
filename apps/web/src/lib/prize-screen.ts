@@ -49,6 +49,8 @@ export interface PrizeScreenData {
 export async function loadPrizeScreen(): Promise<PrizeScreenData> {
   const read = readClient();
   const auth = authClient();
+  const { data: sessionData } = await auth.auth.getSession();
+  if (sessionData.session === null) throw new Error('景品交換にはログインしてください。');
 
   const [catalogRes, userRes, historyRes] = await Promise.all([
     /**
@@ -65,6 +67,7 @@ export async function loadPrizeScreen(): Promise<PrizeScreenData> {
   if (catalogRes.error !== null) throw new Error(`prize_catalog_public を読めませんでした: ${catalogRes.error.message}`);
   if (userRes.error !== null) throw new Error(`users を読めませんでした: ${userRes.error.message}`);
   if (historyRes.error !== null) throw new Error(`prize_exchanges を読めませんでした: ${historyRes.error.message}`);
+  if ((userRes.data ?? []).length === 0) throw new Error('利用者情報を取得できませんでした。ログイン状態を確認してください');
 
   const prizes: PrizeView[] = (catalogRes.data ?? []).map((p) => ({
     id: String(p.id),

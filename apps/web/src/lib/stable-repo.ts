@@ -69,16 +69,15 @@ async function currentGameWeek(): Promise<number> {
   return Number(data?.[0]?.game_week ?? 0);
 }
 
-/** ★馬ごとの「獲得賞金」と「前走からの週数」を、★`my_runs` から数える */
+/** ★馬ごとの前走からの週数を、確定済みの `my_runs` から数える。賞金はこのビューに無い。 */
 async function runsByHorse(): Promise<Map<string, { prizePP: number; lastWeek: number | null }>> {
   const { data, error } = await authClient()
-    .from('my_runs').select('horse_id, game_week, prize_pp, finish_pos');
+    .from('my_runs').select('horse_id, game_week, finish_pos');
   if (error !== null) throw new Error(`my_runs を読めませんでした: ${error.message}`);
   const out = new Map<string, { prizePP: number; lastWeek: number | null }>();
   for (const r of data ?? []) {
     const id = String(r.horse_id);
     const cur = out.get(id) ?? { prizePP: 0, lastWeek: null };
-    cur.prizePP += Number(r.prize_pp ?? 0);
     // ★確定した行だけを「走った」と数えます（★登録しただけ・取消は finish_pos が null）
     if (r.finish_pos !== null && r.finish_pos !== undefined) {
       const w = Number(r.game_week);
@@ -116,6 +115,8 @@ function toStableHorse(
 
 export const supabaseStableRepo: StableRepo = {
   async stable(): Promise<StableView> {
+    const { data: sessionData } = await authClient().auth.getSession();
+    if (sessionData.session === null) throw new Error('厩舎を見るにはログインしてください。');
     const [gameWeek, runs, horsesRes, userRes] = await Promise.all([
       currentGameWeek(),
       runsByHorse(),
@@ -125,6 +126,12 @@ export const supabaseStableRepo: StableRepo = {
     // ★失敗を空配列にしない（★「馬が居ない」に見えてしまう）
     if (horsesRes.error !== null) {
       throw new Error(`my_horses を読めませんでした: ${horsesRes.error.message}`);
+    }
+    if (userRes.error !== null) {
+      throw new Error(`users を読めませんでした: ${userRes.error.message}`);
+    }
+    if ((userRes.data ?? []).length === 0) {
+      throw new Error('利用者情報を取得できませんでした。ログイン状態を確認してください');
     }
     const rows = (horsesRes.data ?? []) as unknown as MyHorseRow[];
     const horses = rows

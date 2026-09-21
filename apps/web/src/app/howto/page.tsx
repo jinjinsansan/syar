@@ -16,8 +16,9 @@
  */
 
 import {
-  Backdrop, BigButton, NoticeBar, TopBar, useMotionPaused,
+  Backdrop, BigButton, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
+import { RaceStrip } from '../../components/uma/race-strip';
 
 /** ★4 ステップ（★資料 §8-8 の本文をそのまま） */
 const STEPS = [
@@ -52,12 +53,7 @@ export default function HowToPage(): React.ReactElement {
     >
       <Backdrop />
       <TopBar title="使い方" paused={paused} onToggle={toggle} />
-      <NoticeBar
-        kind="soon"
-        text="レースは数分おきに開催されています。読みながら参加して大丈夫です。"
-        actionLabel="レースを見る"
-        actionHref="/watch-race"
-      />
+      <RaceStrip />
 
       <div style={{
         position: 'relative', flex: '1 1 auto', minHeight: 0, overflow: 'auto',

@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { ArcadeNav } from './nav';
+import { RaceStrip } from './uma/race-strip';
 
 /**
  * ★**新しい画面へ切り替えました**（★2026-09-17・オーナー指示「★また新ルートに切り替えてください」）。
@@ -112,6 +113,7 @@ export function StoryShell({ children }: { children: React.ReactNode }) {
       */}
       <a className="story-watch" href="/watch-race">▷ レースを観る</a>
     </header>
+    {!pathname.startsWith('/design-preview') && <div data-theme="uma"><RaceStrip compact /></div>}
     <main id="story-content" className="story-content">
       <div className="story-breadcrumb"><a href="/">馬物語</a><span aria-hidden="true">／</span><span>あなたの物語のつづき</span></div>
       {children}

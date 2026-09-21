@@ -126,6 +126,7 @@ describe('★自馬のレース（§9.5）', () => {
      *    → ★いまは ★**`race_entries_public.is_mine`**（★サーバーが `auth.uid()` で判定）を読みます。
      */
     expect(LIVE_SCREEN).toContain('ownGates');
+    expect(LIVE_SCREEN, '★本人の枠判定を anon で読んでいる').toMatch(/auth\.from\('race_entries_public'\)/);
     expect(LIVE_SCREEN, '★画面側で §9.5 を判定している').not.toMatch(/9\.5[\s\S]{0,40}return false/);
   });
 });

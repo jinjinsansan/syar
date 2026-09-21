@@ -17,6 +17,7 @@ import { formatDistance, formatOdds, formatRaceTitle, SURFACE_LABEL, CONDITION_L
 import {
   Backdrop, BigButton, NoticeBar, TopBar, useMotionPaused,
 } from './uma-parts';
+import { RaceStrip } from './race-strip';
 
 /** ★枠色 1〜8（★正典 `--f1`〜`--f8` の写し・★変更禁止） */
 const FRAME_COLORS = ['#f5f5f5', '#191919', '#d62828', '#1446b4', '#fad728', '#148c46', '#f08219', '#f596be'] as const;
@@ -70,6 +71,7 @@ export function UmaOddsView({ race, rows }: {
     >
       <Backdrop />
       <TopBar title="オッズ" paused={paused} onToggle={toggle} />
+      <RaceStrip compact />
       <NoticeBar
         kind={race.status === 'closed' ? 'closing' : 'soon'}
         text={race.status === 'closed'

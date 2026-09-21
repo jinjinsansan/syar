@@ -13,30 +13,25 @@
  *   ★停止スイッチを常設（★§2-9）／★下端 34px の安全領域（★アプリ化）
  *   ★`a-*`・`.frame` を使わない（★A-2）
  *
- * ⚠️ ★**いまはデモの値です。** ★EP・PP・持ち馬・通知はサーバーに繋ぐまで見本の値を出します
- *    （★`lib/stable.ts` の `demoStableRepo` と同じ立場）。★画面に式を持ちません。
+ * ★EP・PP・持ち馬は本人の公開可能なデータを読みます。
  */
 
 import { useEffect, useRef, useState } from 'react';
 import {
-  Backdrop, BigButton, ChibiHorse, EpCapsule, NoticeBar, PpCapsule, TopBar, useMotionPaused,
+  Backdrop, BigButton, ChibiHorse, EpCapsule, PpCapsule, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
+import { RaceStrip } from '../../components/uma/race-strip';
+import { useStableView } from '../../components/uma/use-stable-view';
 
 /** ★馬をタップしてから待機に戻るまで（★資料 §9 の 2600ms） */
 const POKE_MS = 2600;
-
-/** ★デモの持ち馬（★矢印で巡回する 3 頭） */
-const DEMO_HORSES = [
-  { name: 'ハルカゼノオト', meta: '3歳 牝・鹿毛', condition: 4 },
-  { name: 'ミドリノトビラ', meta: '4歳 牝・芦毛', condition: 3 },
-  { name: 'ヨアケノランナー', meta: '3歳 牡・栗毛', condition: 5 },
-] as const;
 
 /** ★調子の段の数（★5 分割・資料 §8-2） */
 const CONDITION_STEPS = 5;
 
 export default function HomePage(): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
+  const { view, loading, error, refresh } = useStableView();
   const [index, setIndex] = useState(0);
   const [running, setRunning] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -49,16 +44,10 @@ export default function HomePage(): React.ReactElement {
     timer.current = setTimeout(() => { setRunning(false); }, POKE_MS);
   };
 
-  const horse = DEMO_HORSES[index]!;
-  /**
-   * ★**自馬がそのレースに出走しているか**（★資料 §9 の `ownHorseRuns`）。
-   * ⚠️ ★本番は ★**サーバーの出走登録から**決まります。★画面で判定しません。
-   * ★いまはデモ: ★**選んでいる馬が 1 頭目のときだけ**出走中として、★両方の見え方を確かめられるようにします
-   *   （★片方しか作らないと、★§9.5 の分岐が**画面に一度も出ません**）。
-   */
-  const ownHorseRuns = index === 0;
+  const horses = view?.horses ?? [];
+  const horse = horses[index % horses.length] ?? null;
   const move = (step: number): void => {
-    setIndex((i) => (i + step + DEMO_HORSES.length) % DEMO_HORSES.length);
+    if (horses.length > 0) setIndex((i) => (i + step + horses.length) % horses.length);
   };
 
   return (
@@ -80,54 +69,34 @@ export default function HomePage(): React.ReactElement {
         position: 'relative', flex: '0 0 auto', display: 'flex', gap: 10,
         padding: '10px 14px 0', width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
-        <EpCapsule value={1240} />
-        <PpCapsule value={380} />
+        {view && <><EpCapsule value={view.home.epBalance} /><PpCapsule value={view.home.ppBalance} /></>}
+        {!view && <span>{loading ? '厩舎を読み込み中…' : '厩舎を取得できませんでした'}</span>}
       </div>
 
-      {/* ★中段: 通知 → 馬ステージ → 馬名 */}
+      {error && <div role="alert" style={{ position: 'relative', padding: '6px 14px', fontSize: 12 }}>
+        {error}　<a href="/login">ログイン</a>　<button type="button" onClick={refresh}>再読み込み</button>
+      </div>}
+
+      <RaceStrip />
+
+      {/* ★中段: 馬ステージ → 馬名 */}
       <div style={{
         position: 'relative', flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'flex-end', padding: '76px 14px 0',
+        alignItems: 'center', justifyContent: 'flex-end', padding: '10px 14px 0',
         width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
-        <div style={{ position: 'absolute', left: 14, right: 14, top: 6 }}>
-          {/*
-            ★通知は ★**サーバーのレース状態から決まります**（★資料 §9）。★いまはデモの切り替えです。
-            ⚠️ ★**自馬が出走するときは投票の導線を出しません**（★正典 §9.5）。
-               ★出すのは「レースを見る」だけで、★**理由を省略しません**。
-            ⚠️ ★「レースを見る」は必ず `/watch-race`（案内）を通します（★オーナー判定 B-1）。
-               ★`/race` を直接指すと、★案内 1 枚が飛ばされ、★終了後の戻り先も決まりません。
-          */}
-          {ownHorseRuns ? (
-            <NoticeBar
-              kind="own"
-              text="第12R に自分の馬が出走しています"
-              sub="自分の馬が出るレースは投票できません（レースは観戦できます）"
-              actionLabel="レースを見る"
-              actionHref="/watch-race"
-            />
-          ) : (
-            <NoticeBar
-              kind="soon"
-              text="第12R 発走まで 3:20（芝1600m・12頭）"
-              actionLabel="投票する"
-              actionHref="/vote"
-            />
-          )}
-        </div>
-
         {/* ★馬ステージ（★全幅ブリード） */}
         <div style={{
           flex: '1 1 auto', minHeight: 280, position: 'relative', width: 'calc(100% + 28px)', margin: '0 -14px',
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden',
         }}>
-          <ChibiHorse running={running} onClick={poke} />
+          {horse ? <><ChibiHorse running={running} onClick={poke} />
           <button type="button" onClick={() => { move(-1); }} aria-label="前の馬" style={arrow('left')}>‹</button>
           <button type="button" onClick={() => { move(1); }} aria-label="次の馬" style={arrow('right')}>›</button>
           <span style={{
             position: 'absolute', right: 24, bottom: 8, padding: '6px 10px',
             border: '2px solid var(--u-gold)', borderRadius: 999, background: 'var(--u-panel-strong)', fontSize: 11,
-          }}>タップで動く</span>
+          }}>タップで動く</span></> : view && <a href="/setup">馬がまだいません。最初の1頭を迎える</a>}
         </div>
 
         {/* ★馬名プレート（★名前・属性・調子・現在位置） */}
@@ -137,23 +106,23 @@ export default function HomePage(): React.ReactElement {
         }}>
           <span style={{ minWidth: 0, flex: '1 1 auto' }}>
             <span style={{ display: 'block', fontSize: 16, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {horse.name}
+              {horse?.name ?? (loading ? '読み込み中' : error ? 'ログインして厩舎を見る' : '持ち馬はまだいません')}
             </span>
             <span style={{ display: 'block', marginTop: 2, fontSize: 11, fontWeight: 500, color: 'var(--u-ink-light-3)' }}>
-              {horse.meta}
+              {horse ? `${horse.sexAge}・${horse.classLabel}` : ''}
             </span>
           </span>
           <span style={{ flex: '0 0 auto', textAlign: 'right' }}>
             <span style={{ display: 'block', fontSize: 10, letterSpacing: '.1em', color: 'var(--u-ink-light-3)' }}>調子</span>
             <span style={{ display: 'flex', gap: 3, marginTop: 4, height: 14, alignItems: 'flex-end' }}>
               {Array.from({ length: CONDITION_STEPS }, (_, i) => (
-                <span key={i} style={{ width: 7, height: '100%', background: i < horse.condition ? 'var(--u-ep)' : 'rgba(251,247,236,.25)' }} />
+                <span key={i} style={{ width: 7, height: '100%', background: horse && i < horse.condition ? 'var(--u-ep)' : 'rgba(251,247,236,.25)' }} />
               ))}
             </span>
           </span>
           <span style={{ flex: '0 0 auto', display: 'flex', gap: 4 }}>
-            {DEMO_HORSES.map((h, i) => (
-              <span key={h.name} style={{
+            {horses.map((h, i) => (
+              <span key={h.id} style={{
                 width: 9, height: 9, borderRadius: '50%',
                 background: i === index ? 'var(--u-gold)' : 'rgba(251,247,236,.3)',
               }} />
@@ -172,10 +141,10 @@ export default function HomePage(): React.ReactElement {
           ⚠️ ★行き先は ★**馬物語 UI の新しいルート**です（★`/training`・`/races`・`/stable`・`/prizes` は
              ★arcade 版が生きており、★**同じ URL を奪うと既存が消えます**。★切り替えはオーナー判断・報告 §3）。
         */}
-        <BigButton tone="gold" label="育成モード" sub="調教・休養・体調" href="/train" grow="1 1 150px" />
+        <BigButton tone="gold" label="育成モード" sub="持ち馬の状態を確認" href="/train" grow="1 1 150px" />
         <BigButton tone="blue" label="投票モード" sub="出馬表・マークシート" href="/vote" grow="1 1 150px" />
-        <BigButton tone="ivory" label="マイページ" sub="厩舎・成績・血統" href="/mypage" grow="1 1 150px" />
-        <BigButton tone="ivory" label="ポイントを稼ぐ" sub="動画を見る・オファー" href="/earn" grow="1 1 150px" />
+        <BigButton tone="ivory" label="マイページ" sub="厩舎・持ち馬の状態" href="/mypage" grow="1 1 150px" />
+        <BigButton tone="ivory" label="ポイントを稼ぐ" sub="受け取り機能は準備中" href="/earn" grow="1 1 150px" />
         <BigButton tone="ivory" label="景品交換" sub="賞金ポイントで交換" href="/exchange" grow="1 1 150px" />
         <BigButton tone="ivory" label="使い方" sub="はじめての方へ" href="/howto" grow="1 1 150px" />
       </div>

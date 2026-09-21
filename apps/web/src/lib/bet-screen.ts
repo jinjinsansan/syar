@@ -60,6 +60,7 @@ export function oddsKey(betType: string, selection: readonly number[]): string {
 export interface BetScreenData {
   readonly race: BetRaceView | null;
   readonly epBalance: number;
+  readonly authenticated: boolean;
   /**
    * ★**自分の馬の枠番**（★§9.5: 自馬が出るレースは、自馬を全頭含む買い目しか買えない）。
    * ⚠️ ★**判定は `place_bet` がします**。★ここは ★**「どれが自分の馬か」を見せる**ためだけです。
@@ -119,6 +120,8 @@ const RACE_COLUMNS = 'id, name, grade, class_rank, surface, distance, track_cond
 export async function loadBetScreen(raceId: string | null): Promise<BetScreenData> {
   const read = readClient();
   const auth = authClient();
+  const { data: sessionData } = await auth.auth.getSession();
+  const authenticated = sessionData.session !== null;
 
   const q = read.from('races_public').select(RACE_COLUMNS);
   const racesRes = raceId === null
@@ -127,10 +130,12 @@ export async function loadBetScreen(raceId: string | null): Promise<BetScreenDat
   if (racesRes.error !== null) throw new Error(`races_public を読めませんでした: ${racesRes.error.message}`);
   const r = racesRes.data?.[0];
   if (r === undefined) {
-    const [userRes] = await Promise.all([auth.from('users').select('entry_points').limit(1)]);
+    const userRes = authenticated ? await auth.from('users').select('entry_points').limit(1) : null;
+    if (userRes?.error) throw new Error(`users を読めませんでした: ${userRes.error.message}`);
     return {
       race: null,
-      epBalance: Number(userRes.data?.[0]?.entry_points ?? 0),
+      epBalance: Number(userRes?.data?.[0]?.entry_points ?? 0),
+      authenticated,
       ownGates: [],
     };
   }
@@ -142,15 +147,15 @@ export async function loadBetScreen(raceId: string | null): Promise<BetScreenDat
    *    ★`0044` はここで券種を渡さずに読んでいて、★**誤った数を出していました**。
    */
   const [entriesRes, oddsRes, userRes] = await Promise.all([
-    read.from('race_entries_public')
+    auth.from('race_entries_public')
       .select('gate, horse_name, strategy, weight, popularity, owner_label, is_mine')
       .eq('race_id', id).order('gate', { ascending: true }),
     read.from('race_odds_public').select('bet_type, selection, odds').eq('race_id', id),
-    auth.from('users').select('entry_points, stable_name').limit(1),
+    authenticated ? auth.from('users').select('entry_points, stable_name').limit(1) : Promise.resolve(null),
   ]);
   if (entriesRes.error !== null) throw new Error(`race_entries_public を読めませんでした: ${entriesRes.error.message}`);
   if (oddsRes.error !== null) throw new Error(`race_odds_public を読めませんでした: ${oddsRes.error.message}`);
-  if (userRes.error !== null) throw new Error(`users を読めませんでした: ${userRes.error.message}`);
+  if (userRes?.error) throw new Error(`users を読めませんでした: ${userRes.error.message}`);
 
   const entries: BetEntryView[] = (entriesRes.data ?? []).map((e) => ({
     gate: Number(e.gate),
@@ -188,7 +193,8 @@ export async function loadBetScreen(raceId: string | null): Promise<BetScreenDat
       odds,
       status: String(r.status),
     },
-    epBalance: Number(userRes.data?.[0]?.entry_points ?? 0),
+    epBalance: Number(userRes?.data?.[0]?.entry_points ?? 0),
+    authenticated,
     ownGates,
   };
 }

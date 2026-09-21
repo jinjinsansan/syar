@@ -19,11 +19,11 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import {
-  Backdrop, BigButton, NoticeBar, TopBar, useMotionPaused,
-} from '../../components/uma/uma-parts';
-import { TRAINING_MENUS, DEMO_TRAINING_ABILITY, DEFAULT_TRAINING_ABILITY } from '../../lib/game-demo';
-import { DEMO_HORSES, conditionView, sortStable } from '../../lib/stable';
+import { Backdrop, BigButton, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
+import { RaceStrip } from '../../components/uma/race-strip';
+import { useStableView } from '../../components/uma/use-stable-view';
+import { TRAINING_MENUS } from '../../lib/game-demo';
+import { conditionView, sortStable } from '../../lib/stable';
 
 /** ★実行してから待機に戻るまで（★資料 §9 の 3200ms） */
 const RUN_MS = 3200;
@@ -43,14 +43,13 @@ const CONDITION_STEPS = 5;
 
 export default function TrainPage(): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
+  const { view, loading, error, refresh } = useStableView();
   /** ★選んでいるメニューの id（★名簿の並びから引く・★画面で番号を発明しない） */
   const [menuId, setMenuId] = useState<string>(TRAINING_MENUS[0]!.id);
   const spec = TRAINING_MENUS.find((m) => m.id === menuId) ?? TRAINING_MENUS[0]!;
-  /** ★育てている馬（★1 頭目。★本番は選択に繋ぎます） */
-  const horse = sortStable(DEMO_HORSES)[0]!;
-  const cond = conditionView(horse.condition);
-  /** ★能力は `@star/training` の見せ方に合わせた見本（★素質は渡しません・§5.5） */
-  const ability = DEMO_TRAINING_ABILITY[horse.id] ?? DEFAULT_TRAINING_ABILITY;
+  const [selectedHorse, setSelectedHorse] = useState<string | null>(null);
+  const horses = sortStable(view?.horses ?? []);
+  const horse = horses.find((candidate) => candidate.id === selectedHorse) ?? horses[0] ?? null;
   const [running, setRunning] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => { if (timer.current !== undefined) clearTimeout(timer.current); }, []);
@@ -59,6 +58,15 @@ export default function TrainPage(): React.ReactElement {
     setRunning(true);
     timer.current = setTimeout(() => { setRunning(false); }, RUN_MS);
   };
+
+  if (horse === null) return <div data-theme="uma" style={{ minHeight: '100dvh', background: 'var(--u-navy)' }}>
+    <Backdrop /><TopBar title="育成モード" paused={paused} onToggle={toggle} /><RaceStrip compact />
+    <div role={error ? 'alert' : 'status'} style={{ position: 'relative', padding: 20 }}>
+      {loading ? '厩舎を読み込み中…' : error ?? 'まだ持ち馬がいません。'}
+      <div style={{ display: 'flex', gap: 12, marginTop: 12 }}><a href="/login">ログイン</a><a href="/setup">最初の1頭を迎える</a><button type="button" onClick={refresh}>再読み込み</button></div>
+    </div>
+  </div>;
+  const cond = conditionView(horse.condition);
 
   return (
     <div
@@ -71,18 +79,20 @@ export default function TrainPage(): React.ReactElement {
     >
       <Backdrop />
       <TopBar title="育成モード" paused={paused} onToggle={toggle} />
-      <NoticeBar
-        kind="soon"
-        text="第12R 発走まで 3:20（芝1600m・12頭）"
-        actionLabel="投票する"
-        actionHref="/vote"
-      />
+      <RaceStrip compact />
+      <div role="status" style={{ position: 'relative', padding: '6px 14px', color: 'var(--u-gold)', fontSize: 12 }}>
+        馬の状態は実データです。調教指示の適用は準備中のため、この画面からは保存できません。
+      </div>
 
       <div style={{
         position: 'relative', flex: '1 1 auto', minHeight: 0, display: 'flex', flexWrap: 'wrap',
         alignItems: 'stretch', gap: 12, padding: '12px 14px 0',
         width: '100%', maxWidth: 1220, margin: '0 auto', overflow: 'hidden',
       }}>
+        {horses.length > 1 && <div style={{ width: '100%', display: 'flex', gap: 8, overflowX: 'auto' }}>
+          {horses.map((entry) => <button key={entry.id} type="button" onClick={() => { setSelectedHorse(entry.id); }} aria-pressed={entry.id === horse.id}
+            style={{ minHeight: 44, flex: '0 0 auto', padding: '5px 10px', border: entry.id === horse.id ? '2px solid var(--u-gold)' : '2px solid var(--u-edge-light)', borderRadius: 8, background: 'var(--u-panel)', color: 'var(--u-ink-light)' }}>{entry.name}</button>)}
+        </div>}
         {/* ★調教ステージ */}
         <div style={{
           flex: '1 1 340px', minWidth: 0, minHeight: 226, position: 'relative',
@@ -135,11 +145,11 @@ export default function TrainPage(): React.ReactElement {
             padding: '8px 10px', borderRadius: 10, background: 'rgba(10,35,64,.78)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 62, flex: '0 0 auto', fontSize: 10, letterSpacing: '.08em', color: 'var(--u-ink-light-3)' }}>スタミナ</span>
+              <span style={{ width: 62, flex: '0 0 auto', fontSize: 10, letterSpacing: '.08em', color: 'var(--u-ink-light-3)' }}>疲労</span>
               <span style={{ flex: '1 1 auto', height: 12, background: 'rgba(251,247,236,.18)', borderRadius: 2, overflow: 'hidden' }}>
-                <span style={{ display: 'block', width: `${Math.round((ability.st / 1000) * 100)}%`, height: '100%', background: 'var(--u-gauge)' }} />
+                <span style={{ display: 'block', width: `${Math.max(0, Math.min(100, horse.fatigue))}%`, height: '100%', background: 'var(--u-gauge)' }} />
               </span>
-              <span className="u-num" style={{ flex: '0 0 auto', width: 42, textAlign: 'right', fontSize: 16 }}>{ability.st}</span>
+              <span className="u-num" style={{ flex: '0 0 auto', width: 42, textAlign: 'right', fontSize: 16 }}>{horse.fatigue}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ width: 62, flex: '0 0 auto', fontSize: 10, letterSpacing: '.08em', color: 'var(--u-ink-light-3)' }}>調子</span>
@@ -200,7 +210,7 @@ export default function TrainPage(): React.ReactElement {
         position: 'relative', flex: '0 0 auto', display: 'flex', flexWrap: 'wrap', gap: 10,
         padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
-        <BigButton tone="gold" label="この内容で調教する" sub={`${spec.name}（${spec.ep} EP）`} onClick={run} grow="1.4 1 210px" />
+        <BigButton tone="disabled" label="調教指示は準備中" sub="現在、この画面からの指示は保存されません" grow="1.4 1 210px" />
         <BigButton tone="ivory" label="ダッシュボード" sub="いつでも戻れます" href="/home" grow="1 1 130px" />
       </div>
     </div>

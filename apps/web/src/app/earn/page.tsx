@@ -13,15 +13,16 @@
  */
 
 import {
-  Backdrop, BigButton, NoticeBar, TopBar, useMotionPaused,
+  Backdrop, BigButton, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
+import { RaceStrip } from '../../components/uma/race-strip';
 
 /** ★受け取り方（★資料 §8-7 の 4 つ。★どれも利用者がお金を払わない形） */
 const WAYS = [
-  { icon: '▶', title: '動画を見る', note: '30 秒の動画を最後まで見ると受け取れます', gain: '+10', left: '今日あと 3 回', done: false },
-  { icon: '☑', title: 'アンケートに答える', note: '3〜5 問。答えた時点で受け取れます', gain: '+30', left: '今日あと 1 回', done: false },
-  { icon: '★', title: 'オファーを試す', note: '提供元のアプリやサービスを試すと受け取れます', gain: '+50〜', left: '件数は日替わり', done: false },
-  { icon: '◎', title: '毎日のログイン', note: '1 日 1 回・7 日続くとおまけが付きます', gain: '+5', left: '今日は受け取り済み', done: true },
+  { icon: '▶', title: '動画を見る', note: '提供元の接続を準備中です' },
+  { icon: '☑', title: 'アンケートに答える', note: '提供元の接続を準備中です' },
+  { icon: '★', title: 'オファーを試す', note: '提供元の接続を準備中です' },
+  { icon: '◎', title: '毎日のログイン', note: '受け取り機能を準備中です' },
 ] as const;
 
 export default function EarnPage(): React.ReactElement {
@@ -37,12 +38,10 @@ export default function EarnPage(): React.ReactElement {
     >
       <Backdrop />
       <TopBar title="ポイントを稼ぐ" paused={paused} onToggle={toggle} />
-      <NoticeBar
-        kind="soon"
-        text="第12R 発走まで 3:20。受け取った参加ポイントはすぐ投票に使えます。"
-        actionLabel="投票する"
-        actionHref="/vote"
-      />
+      <RaceStrip />
+      <div role="status" style={{ position: 'relative', padding: '6px 14px', color: 'var(--u-gold)', fontSize: 12 }}>
+        参加ポイントの受け取り機能は準備中です。ここには確定した報酬額を表示していません。
+      </div>
 
       {/* ★EP のカプセル＋常設の注記（★PP は稼げないと明言） */}
       <div style={{
@@ -57,7 +56,7 @@ export default function EarnPage(): React.ReactElement {
             <span style={{ flex: '0 0 auto', width: 11, height: 11, borderRadius: '50%', border: '3px solid var(--u-ep)' }} />
             <span style={{ fontSize: 11, letterSpacing: '.08em', color: 'var(--u-ep-ink)', whiteSpace: 'nowrap' }}>参加ポイント</span>
             <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'baseline', gap: 5 }}>
-              <span className="u-num" style={{ fontSize: 25, color: 'var(--u-ep-num)' }}>1,240</span>
+              <span className="u-num" style={{ fontSize: 18, color: 'var(--u-ep-num)' }}>残高はダッシュボードで確認</span>
               <span style={{ fontSize: 11, color: 'var(--u-ep-ink)' }}>EP</span>
             </span>
           </div>
@@ -89,8 +88,7 @@ export default function EarnPage(): React.ReactElement {
                 <span style={{
                   flex: '0 0 auto', width: 38, height: 38, borderRadius: 8,
                   border: '2px solid var(--u-ink-dark)',
-                  backgroundImage: w.done ? 'linear-gradient(#e4e8ec,#d3dae1)' : 'var(--u-gold-plate)',
-                  backgroundSize: '240% 100%', animation: w.done ? undefined : 'u-sheen 6s linear infinite',
+                  backgroundImage: 'linear-gradient(#e4e8ec,#d3dae1)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 17, color: 'var(--u-ink-dark)',
                 }}>{w.icon}</span>
@@ -102,31 +100,21 @@ export default function EarnPage(): React.ReactElement {
                     {w.note}
                   </span>
                 </span>
-                <span style={{ flex: '0 0 auto', textAlign: 'right' }}>
-                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 3, justifyContent: 'flex-end' }}>
-                    <span className="u-num" style={{ fontSize: 21, color: 'var(--u-green-deep)' }}>{w.gain}</span>
-                    <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--u-green-deep)' }}>EP</span>
-                  </span>
-                  <span style={{
-                    display: 'inline-block', marginTop: 3, padding: '1px 6px', borderRadius: 999, fontSize: 10, fontWeight: 700,
-                    background: w.done ? '#e7e9ec' : '#e4efe7', color: w.done ? 'var(--u-ink-dark-2)' : 'var(--u-green-deep)',
-                  }}>{w.left}</span>
-                </span>
+                <span style={{ fontSize: 11, color: 'var(--u-ink-dark-2)' }}>準備中</span>
               </div>
               {/* ★接続先が未定なので、押しても何も起きません（★`button` で口だけ用意） */}
               <button
                 type="button"
-                disabled={w.done}
-                title="提供元が決まるまで押せません"
+                disabled
+                title="提供元が決まるまで利用できません"
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 44,
-                  marginTop: 8, borderRadius: 8, border: w.done ? '2px solid #c3ccd4' : '2px solid var(--u-navy)',
-                  backgroundImage: w.done ? 'linear-gradient(#e7e9ec,#dfe3e8)' : 'linear-gradient(#5fa9ee 0%,#1a6fd4 46%,#0f56ab 100%)',
-                  color: w.done ? 'var(--u-ink-dark-2)' : '#fff', fontSize: 14,
-                  pointerEvents: w.done ? 'none' : undefined,
+                  marginTop: 8, borderRadius: 8, border: '2px solid #c3ccd4',
+                  backgroundImage: 'linear-gradient(#e7e9ec,#dfe3e8)',
+                  color: 'var(--u-ink-dark-2)', fontSize: 14,
                 }}
               >
-                {w.done ? 'また明日' : 'はじめる'}
+                利用準備中
               </button>
             </div>
           ))}
@@ -137,7 +125,7 @@ export default function EarnPage(): React.ReactElement {
         position: 'relative', flex: '0 0 auto', display: 'flex', flexWrap: 'wrap', gap: 10,
         padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
-        <BigButton tone="green" label="動画を見て +10 EP" sub="30 秒 ／ 今日はあと 3 回" grow="1.4 1 210px" />
+        <BigButton tone="disabled" label="受け取り機能は準備中" sub="提供元が決まるまで利用できません" grow="1.4 1 210px" />
         <BigButton tone="ivory" label="ダッシュボード" sub="いつでも戻れます" href="/home" grow="1 1 130px" />
       </div>
     </div>

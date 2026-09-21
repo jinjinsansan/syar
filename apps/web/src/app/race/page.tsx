@@ -2265,11 +2265,9 @@ export default function RacePage(): React.JSX.Element {
    *      ★遊ぶ人が選ぶものではありません（★レースと競馬場がすでに持っている値です）。
    *      ★人に見せる画面にこれが出ていると、★**ゲームではなく開発ツールに見えます**
    *      （★オーナー評「人はそこから判断する」）。
-   * ★**消しません。** ★`?dev=1` を付けたときだけ出します。★画面の下に戻る口も置いてあります。
+   * ★**消しません。** ★本番では `?dev=1` を付けたときだけ出します。
    */
   const [devMode, setDevMode] = useState(false);
-  /** ★開発卓へ戻る口。★いま付いている `?race=` 等は残したまま `dev=1` を足します */
-  const [devHref, setDevHref] = useState('?dev=1');
   /** ★コースを選ぶ板を開いているか（★遊ぶ人の入口から開きます） */
   const [pickerOpen, setPickerOpen] = useState(false);
   /**
@@ -2328,6 +2326,13 @@ export default function RacePage(): React.JSX.Element {
    */
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const [built, setBuilt] = useState<Built | null>(null);
+  const [loadingSeconds, setLoadingSeconds] = useState(0);
+  useEffect(() => {
+    if (ready && built !== null) return;
+    const started = Date.now();
+    const timer = window.setInterval(() => { setLoadingSeconds(Math.floor((Date.now() - started) / 1000)); }, 1000);
+    return () => { window.clearInterval(timer); };
+  }, [ready, built]);
   const motionTimeline = useMemo(() => built === null ? null : startRampSec === 1.6 ? built
     : buildMotionTimeline(built, built.result[0]!.gate, startRampSec), [built, startRampSec]);
   /**
@@ -2394,8 +2399,6 @@ export default function RacePage(): React.JSX.Element {
     const params = new URLSearchParams(window.location.search);
     setDevMode(params.get('dev') === '1'
       || (process.env.NODE_ENV === 'development' && params.get('dev') !== '0'));
-    params.set('dev', '1');
-    setDevHref(`?${params.toString()}`);
     window.addEventListener('resize', measure);
     window.addEventListener('orientationchange', measure);
     return () => {
@@ -2457,6 +2460,11 @@ export default function RacePage(): React.JSX.Element {
       const loadImg = (src: string): Promise<HTMLImageElement> => {
         const m = /^(.*)\.png(\?.*)?$/.exec(src);
         if (m === null) return loadRaw(src);
+        // この系列の WebP は作業ツリーにだけあり、配信物には PNG だけがある。
+        // 存在しない WebP へのアクセスを省き、追跡済み PNG を直接読む。
+        if (/(?:horse-jockey-diag-front-v4b?-pose|horse-jockey-side-v8b-pose|horse-jockey-side-walk-v1-pose|\/parallax\/backstretch-side-v1\/dirt-(?:far|mid|near)$)/.test(m[1]!)) {
+          return loadRaw(src);
+        }
         return loadRaw(`${m[1]}.webp${m[2] ?? ''}`).catch(() => loadRaw(src));
       };
       /**
@@ -5837,6 +5845,12 @@ export default function RacePage(): React.JSX.Element {
             fontSize: 22, fontWeight: 700, letterSpacing: '.14em', color: '#315c45', textDecoration: 'none',
           }}>馬物語</a>
           <p style={{ margin: 0, color: '#52655c' }}>レースの用意をしています…</p>
+          <progress aria-label="レース素材を読み込み中" style={{ width: 'min(260px, 80vw)' }} />
+          <span style={{ fontSize: 13, color: '#52655c' }}>経過 {loadingSeconds} 秒</span>
+          {loadingSeconds >= 10 && <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <span>このまま待つ</span>
+            <a href="/races" style={{ color: '#42694f', textDecoration: 'underline' }}>結果だけ見る</a>
+          </div>}
           <a href="/" style={{ marginTop: 18, color: '#42694f', fontSize: 14 }}>← もどる</a>
         </div>
       )}
@@ -5942,7 +5956,6 @@ export default function RacePage(): React.JSX.Element {
           )}
           <div className="rm-entry-foot">
             <a href="/races">番組表から他のレースを選ぶ</a>
-            <a href={devHref}>開発用の操作を出す</a>
           </div>
         </div>
       )}
@@ -6224,23 +6237,6 @@ export default function RacePage(): React.JSX.Element {
               background: '#fffef9', color: '#315c45', fontWeight: 700,
             }}
           >もう一度</button>
-          {/* ★見比べの切り替え（★`toggleViewParam` の註記）。★押すと読み直します */}
-          {([
-            ['cinematography', 'v8', viewSwitches.oldScript, '演出：新しい形', '演出：前の形'],
-            ['view', 'intervene', viewSwitches.intervene, '見る人：観戦', '見る人：自馬で介入'],
-            ['seed', '99', viewSwitches.contest, '展開：通常', '展開：接戦'],
-            ['turn', OTHER_TURN, viewSwitches.mirrored,
-              RACE_SETUP.turn === 'left' ? '回り：左' : '回り：右', OTHER_TURN === 'left' ? '回り：左' : '回り：右'],
-          ] as const).map(([key, on, active, offLabel, onLabel]) => (
-            <button
-              key={key} type="button" onClick={() => toggleViewParam(key, on)}
-              style={{
-                padding: '9px 16px', cursor: 'pointer', borderRadius: 6, fontWeight: 700,
-                border: '1px solid #c3cdbc',
-                background: active ? '#5c4614' : '#fffef9', color: active ? '#ffe98a' : '#315c45',
-              }}
-            >{active ? onLabel : offLabel}</button>
-          ))}
         </div>
       )}
       {!smallScreen && (

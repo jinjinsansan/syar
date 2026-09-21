@@ -103,13 +103,15 @@ describe('★馬物語 UI の配線（R-14）', () => {
     }
 
     const vote = strip(read('apps/web/src/app/vote/page.tsx'));
-    expect(vote, '★出馬表を引いていない').toMatch(/DEMO_BET_RACE/);
-    expect(vote, '★騎手の名簿を引いていない').toMatch(/JOCKEYS/);
+    expect(vote, '★本番の出馬表を引いていない').toMatch(/loadBetScreen/);
+    expect(vote, '★公開オッズを引いていない').toMatch(/oddsKey/);
+    expect(vote, '★見本の出馬表が残っている').not.toMatch(/DEMO_BET_RACE/);
     /** ★自馬の判定は出どころから（★画面で真偽値を作らない・§9.5） */
-    expect(vote, '★自馬の枠を引いていない').toMatch(/ownGate/);
+    expect(vote, '★自馬の枠を引いていない').toMatch(/ownGates/);
 
     const mypage = strip(read('apps/web/src/app/mypage/page.tsx'));
-    expect(mypage, '★厩舎を引いていない').toMatch(/DEMO_HORSES/);
+    expect(mypage, '★本人の厩舎を引いていない').toMatch(/useStableView/);
+    expect(mypage, '★見本の持ち馬が残っている').not.toMatch(/DEMO_HORSES/);
   });
 
   /**
