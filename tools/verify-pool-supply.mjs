@@ -371,11 +371,6 @@ for (let w = REFERENCE_WEEK + 1; w <= REFERENCE_WEEK + YEARS * 52; w += 1) {
 console.log(`  ★${series.length} 週 回しました（${((Date.now() - t1) / 1000).toFixed(1)}秒）`);
 
 // ── ④ 判定 ────────────────────────────────────────────
-/**
- * ⚠️ ★**使う前に置く**（★2026-09-20・★同じ間違いを 2 度 しました:
- *   ★`steady` も `last` も、★定義より前で使って `ReferenceError` を出しました）。
- */
-const last = steady[steady.length - 1];
 const fails = [];
 let checked = 0;
 const check = (ok, label, detail) => {
@@ -436,6 +431,11 @@ if (steady.length < MIN_WINDOW) {
   process.exit(2);
 }
 const diffs = steady.map((s) => s.debuted - s.retired);
+/**
+ * ⚠️ ★**使う前に置く**（★2026-09-20・★同じ間違いを 2 度 しました:
+ *   ★`steady` も `last` も、★定義より前で使って `ReferenceError` を出しました）。
+ */
+const last = steady[steady.length - 1];
 const n = steady.length;
 const born = steady.reduce((a, s) => a + s.debuted, 0);
 const gone = steady.reduce((a, s) => a + s.retired, 0);
