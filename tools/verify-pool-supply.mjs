@@ -20,7 +20,21 @@
  *   ★現役の寿命 156 週 ＝ ★**3 年**。★系統の集中は ★**世代を跨いで**効きます（★D-026）。
  *   → ★**最低 2 世代ぶん ＝ 6 年**（★レビュー側の裁定）。★既定は 6 年です。
  *
- * ★使い方: npx tsx tools/verify-pool-supply.mjs [--years 6] [--seed 20260833]
+ * 【🔴 ★設計書の合否欄（`REPORT_POOL_SUPPLY_DESIGN_20260920.md` ⑥）との対応】
+ *   ⚠️ ★**2 つ 言い換えています。★黙って変えません。**
+ *
+ *   ★設計 ① 現役の頭数が単調に減らない
+ *     → ★道具 ② ★**導出した必要数を下回らない**に変えました。
+ *       ✔ ★理由（実測）: ★種の世界は現役 2,400 で、★導出値は 2,028。
+ *         ★世界は ★**2,028 へ正しく縮みます**。★「減らない」を的にすると、
+ *         ★★**正しい収束を不合格と読みます**（★実際 2 回 そう報告しました）。
+ *   ★設計 ② 週あたり 入る − 出る が 0 から 2SE 以内
+ *     → ★道具 ① ★**「入る」を「出走年齢に達した数」**に変えました。
+ *       ✔ ★理由: ★生まれてから走れるまで 2 年 あり、★**生まれた数と現役の増減は同じ週に起きません**。
+ *   ★設計 ③ `birth_week` の種類が 156 → ★道具 ③（★同じ。★2026-09-21 に数え方を直しました）
+ *   ★設計 ④ 有効系統数 ≥ 5 → ★道具 ④（★同じ）
+ *
+ * ★使い方: npx tsx tools/verify-pool-supply.mjs [--years 12] [--policy top] [--seed 20260833]
  */
 import { ALLOW_ALL_NAMES, NPC_STABLES } from '../packages/sim-engine/src/index.ts';
 import { DEFAULT_PRESEED_OPTIONS, preseedNicks, runPreseed } from '../apps/cli/src/preseed.ts';
@@ -457,8 +471,22 @@ check(Math.abs(mean) <= 2 * se || Math.abs(mean) < 0.5,
 check(last.active >= REQUIRED_POOL,
   '② ★現役が★導出した必要数を下回っていない（★初期値とは比べません）',
   `最後 ${last.active} 頭 / 必要 ${REQUIRED_POOL} 頭 / 傾き ${slope.toFixed(4)} 頭/週`);
-const weeks = new Set([...rows.values()].filter((x) => x.retiredAtWeek === null).map((x) => x.birthWeek % 52));
-check(weeks.size >= 50, '③ ★生まれた週が散っている（★B-3 が保たれている）', `${weeks.size} 種類 / 52`);
+/**
+ * 🔴 ★**設計書は「156 種類」と書いていました**（★2026-09-21 の突き合わせで気づきました）。
+   ⚠️ ★私は `birth_week % 52` を数え、★**52 種類 / 52** と出していました。★別の量です。
+ *   ★156 ＝ 出走できる 3 年（★104〜259 週齢）× 52 週。★**絶対の `birth_week` の種類**です。
+ *   → ★★設計の合否欄のとおりに数え直します。
+ */
+const racingWeeks = new Set(
+  [...rows.values()]
+    .filter((x) => x.retiredAtWeek === null
+      && last.week - x.birthWeek >= LIFECYCLE_WEEKS.raceableFrom)
+    .map((x) => x.birthWeek),
+);
+const EXPECT_WEEKS = LIFECYCLE_WEEKS.retireAt - LIFECYCLE_WEEKS.raceableFrom;
+check(racingWeeks.size >= EXPECT_WEEKS,
+  `③ ★現役の birth_week が ${EXPECT_WEEKS} 種類 以上（★B-3 の散らばりが保たれている）`,
+  `${racingWeeks.size} 種類`);
 const lines = lineConcentration(
   [...rows.values()].filter((x) => x.retiredAtWeek === null).map((x) => x.record.sireLine),
 );

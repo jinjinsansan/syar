@@ -159,7 +159,14 @@ export async function runBreedingWeek(
   epochMs: number,
   onAlert: (message: string) => void,
   balance: BalanceConfig = DEFAULT_BALANCE,
-  policy: PromotionPolicy = 'random',
+  /**
+   * ✅ ★**`top` に確定**（★2026-09-21・レビュー側の裁定・★3 通りを 12 年 測った結果）。
+   *   ★random 6.27 ／ weighted 6.16 ／ **top 6.26** — ★**3 通りとも有効系統数 5 以上**。
+   *   ★裁定は「5 以上のうち★成績がいちばん効くもの」→ ★`top`。
+   *   ⚠️ 🔴 ★**測る前の予想は外れました**: ★私は「top がいちばん系統が集中するはず」と
+   *     ★書いていましたが、★`weighted` より**高く**出ました。★理由は測っていません。
+   */
+  policy: PromotionPolicy = 'top',
   /**
    * 🔴 ★**既定を置きません**（★2026-09-20・★私は一度 `= 12` と書いていました）。
    *   ★この数から ★**繁殖牝馬の頭数**が決まります（`requiredBroodmares`）。

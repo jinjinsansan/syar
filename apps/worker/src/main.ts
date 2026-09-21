@@ -700,7 +700,7 @@ async function main(): Promise<void> {
        */
       const b = await runBreedingWeek(client, nowMs, cfg.epochMs,
         (m) => console.error(`[worker] ★${m}`),
-        undefined, 'random', (FIELD_SIZE.MIN + FIELD_SIZE.MAX) / 2);
+        undefined, 'top', (FIELD_SIZE.MIN + FIELD_SIZE.MAX) / 2);
       if (b.born > 0 || b.noSire > 0 || b.yearReset) {
         console.log(
           `[worker] 配合 週=${b.week} 生まれた${b.born}頭 / 相手なし${b.noSire}頭`
