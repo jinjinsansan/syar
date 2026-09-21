@@ -15,7 +15,7 @@ import {
 } from '@star/training';
 import { sortStable, conditionView, DEMO_HORSES, type StableHorse } from '../../lib/stable';
 import { supabaseStableRepo } from '../../lib/stable-repo';
-import { authClient, readClient } from '../../lib/supabase';
+import { authClient } from '../../lib/supabase';
 import { TRAINING_MENUS, trainingMenusOfView, DEMO_TRAINING_ABILITY, DEFAULT_TRAINING_ABILITY, demoFatigueNote } from '../../lib/game-demo';
 import { Capsule, ClassChip, FatigueBar, PageTitle, Pill, StatBar } from '../../components/ui';
 
@@ -49,15 +49,23 @@ function WeekPill({ kind }: { readonly kind: 'todo' | 'done' | 'rest' }): React.
 }
 
 /**
- * ★**指示する週**（★`world_state_public`・★画面で計算しません）。
- *   ⚠️ ★サーバーが「その週は処理済み」と判断したら弾きます（★`0057` の RPC）。
- *     ★画面が締切を判定しません（★2 か所に規則を置かない）。
+ * 🔴 ★**指示する週は、★その馬の `last_processed_week`**（★2026-09-21 に直しました）。
+ *
+ *   ⚠️ ★最初は ★**世界の週**（`world_state_public.game_week`）を書いていました。
+ *     ★しかしワーカーが読むのは ★**その馬の `last_processed_week` の注文**です
+ *     （★`training-runner.ts:306`）。★★馬が遅れていれば、★世界の週の注文は読まれません。
+ *   → ★★**読む側と同じ鍵を書きます。** ★画面で週を計算しません。
  */
-async function currentWeekForOrder(): Promise<number> {
-  const { data, error } = await readClient()
-    .from('world_state_public').select('game_week').limit(1);
-  if (error !== null) throw new Error(`world_state_public を読めませんでした: ${error.message}`);
-  return Number(data?.[0]?.game_week ?? 0);
+async function weekForOrder(horseId: string): Promise<number> {
+  const { data, error } = await authClient()
+    .from('my_horses').select('last_processed_week').eq('id', horseId).limit(1);
+  if (error !== null) throw new Error(`my_horses を読めませんでした: ${error.message}`);
+  const w = data?.[0]?.last_processed_week;
+  if (w === null || w === undefined) {
+    // ★週を持っていない馬に指示は書けません（★既定値で埋めない）
+    throw new Error('この馬はまだ週を持っていません（last_processed_week が空）');
+  }
+  return Number(w);
 }
 
 export default function TrainingPage(): React.ReactElement {
@@ -178,7 +186,7 @@ export default function TrainingPage(): React.ReactElement {
     if (horse === null || menu === null || sending) return;
     setSending(true);
     try {
-      const week = await currentWeekForOrder();
+      const week = await weekForOrder(horse.id);
       const { error } = await authClient().rpc('set_training_order', {
         p_horse_id: horse.id, p_week: week, p_menu: menu.id,
       });
