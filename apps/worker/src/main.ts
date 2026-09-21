@@ -26,6 +26,7 @@ import { announceConditions, buildRace } from './build-race.js';
 import { drawEntryLottery, lotteryScratchReason } from './entry-lottery.js';
 import { scratchEntry, scratchRetiredEntries } from './scratch.js';
 import { FIELD_SIZE } from '../../cli/src/race-field.js';
+import { DEFAULT_PRESEED_OPTIONS } from '../../cli/src/preseed.js';
 import { aggregateDay } from './daily-flow.js';
 // ★日次の枝の結果を行に残す（★DL-2・移行 0052）。★止める仕組みではない
 import { runDailyStep } from './daily-run-log.js';
@@ -700,7 +701,9 @@ async function main(): Promise<void> {
        */
       const b = await runBreedingWeek(client, nowMs, cfg.epochMs,
         (m) => console.error(`[worker] ★${m}`),
-        undefined, 'top', (FIELD_SIZE.MIN + FIELD_SIZE.MAX) / 2);
+        undefined, 'top', (FIELD_SIZE.MIN + FIELD_SIZE.MAX) / 2,
+        // 🔴 ★正典 §10.5 が宣言した数（★導出値は「下限」であって目標ではない）
+        DEFAULT_PRESEED_OPTIONS.mares);
       if (b.born > 0 || b.noSire > 0 || b.yearReset) {
         console.log(
           `[worker] 配合 週=${b.week} 生まれた${b.born}頭 / 相手なし${b.noSire}頭`

@@ -352,7 +352,7 @@ for (let w = REFERENCE_WEEK + 1; w <= REFERENCE_WEEK + YEARS * 52; w += 1) {
   const res = await runBreedingWeek(
     client, (w + 1) * WEEK_MS, 0,
     (m) => { if (!alertSeen.has(m)) { alertSeen.add(m); console.log(`    ⚠️ ${m}`); } },
-    undefined, POLICY, MEAN_FIELD,
+    undefined, POLICY, MEAN_FIELD, DEFAULT_PRESEED_OPTIONS.mares,
   );
   yearNoSire += res.noSire;
   yearDue += res.eligible + res.noSire;
@@ -418,8 +418,11 @@ const check = (ok, label, detail) => {
  */
 const REQUIRED_POOL = requiredActivePool(MEAN_FIELD);
 const REQUIRED_MARES = requiredBroodmares(MEAN_FIELD);
+/** 🔴 ★正典 §10.5 が宣言した数（★目標）。★上は「要る最小」（★下限） */
+const CANON_MARES = DEFAULT_PRESEED_OPTIONS.mares;
 console.log(`  ★導出した必要数: 現役 ${REQUIRED_POOL} 頭 / 繁殖牝馬 ${REQUIRED_MARES} 頭`
   + `（★平均出走頭数 ${MEAN_FIELD}）`);
+console.log(`  ★正典 §10.5 の宣言: 繁殖牝馬 ${CANON_MARES} 頭（★目標）`);
 /**
  * 🔴 ★**立ち上がりをもう 1 期 のばします**（★2026-09-20・★実測が「まだ足りない」と言いました）。
  *

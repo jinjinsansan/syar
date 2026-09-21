@@ -121,7 +121,7 @@ const nowForWeek = (w: number): number => (w + 1) * WEEK_MS;
 describe('🔴 ★POOL-SUPPLY: 定常運転の供給', () => {
   it('① ★その週に配合するのは、★繁殖牝馬のうち 1/52 だけ（★B-3 と同じ層化）', async () => {
     const { client, seen } = fakeClient({ mareCount: 520, mareRowsEmpty: true });
-    await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13);
+    await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
     // ★牝馬の行を取りに行った問い合わせが在る ＝ 対象が 0 ではない
     expect(seen.some((s) => s.includes('any($1::uuid[]) and birth_week is not null')),
       '★その週の対象を読みに行っていない').toBe(true);
@@ -132,7 +132,7 @@ describe('🔴 ★POOL-SUPPLY: 定常運転の供給', () => {
     const { client } = fakeClient({ mareCount: 1 });
     const weeks = [];
     for (let w = 312; w < 312 + 52; w += 1) {
-      weeks.push(await runBreedingWeek(client, nowForWeek(w), EPOCH, () => {}, undefined, 'random', 13));
+      weeks.push(await runBreedingWeek(client, nowForWeek(w), EPOCH, () => {}, undefined, 'random', 13, 800));
     }
     const active = weeks.filter((r) => r.eligible > 0 || r.born > 0).length;
     expect(active, '★1 頭なら 52 週に 1 回だけのはず').toBe(1);
@@ -148,32 +148,32 @@ describe('🔴 ★POOL-SUPPLY: 定常運転の供給', () => {
      */
     // ★種牡馬が 0 頭 ＝ 全頭 相手なし ＝ 供給が止まっている
     const { client } = fakeClient({ mareCount: 52, stallionCount: 0 });
-    await expect(runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13))
+    await expect(runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800))
       .rejects.toThrow(/供給が止まって/);
   });
 
   it('★対照: ★種牡馬が居れば投げない（★番人が常に鳴るのではない）', async () => {
     const { client } = fakeClient({ mareCount: 52, stallionCount: 3 });
-    const r = await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13);
+    const r = await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
     expect(r.born, '★1 頭も生まれていない').toBeGreaterThan(0);
   });
 
   it('★同じ週を二度 処理しても、★増えない（★冪等・`on conflict`）', async () => {
     const { client } = fakeClient({ mareCount: 52, stallionCount: 3, insertConflicts: true });
-    const r = await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13);
+    const r = await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
     expect(r.born, '★二度目で増えた').toBe(0);
     expect(r.alreadyThere, '★「既に居た」を数えていない').toBeGreaterThan(0);
   });
 
   it('🔴 ③ ★年次カウンタの列を選んでいなければ投げる（★G-3・素通りさせない）', async () => {
     const { client } = fakeClient({ mareCount: 52, stallionCount: 3, dropCounterColumn: true });
-    await expect(runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13))
+    await expect(runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800))
       .rejects.toThrow(/bred_this_year/);
   });
 
   it('④ ★年の変わり目に、★年次カウンタを戻す', async () => {
     const { client, seen } = fakeClient({ mareCount: 1, mareRowsEmpty: true });
-    const r = await runBreedingWeek(client, nowForWeek(52 * 7), EPOCH, () => {}, undefined, 'random', 13);
+    const r = await runBreedingWeek(client, nowForWeek(52 * 7), EPOCH, () => {}, undefined, 'random', 13, 800);
     expect(r.yearReset, '★年の変わり目なのに戻していない').toBe(true);
     expect(seen.some((s) => s.startsWith('update horses set bred_this_year = false')),
       '★戻す SQL を投げていない').toBe(true);
@@ -181,7 +181,7 @@ describe('🔴 ★POOL-SUPPLY: 定常運転の供給', () => {
 
   it('★年の途中では、★カウンタを戻さない', async () => {
     const { client } = fakeClient({ mareCount: 1, mareRowsEmpty: true });
-    const r = await runBreedingWeek(client, nowForWeek(52 * 7 + 3), EPOCH, () => {}, undefined, 'random', 13);
+    const r = await runBreedingWeek(client, nowForWeek(52 * 7 + 3), EPOCH, () => {}, undefined, 'random', 13, 800);
     expect(r.yearReset, '★年の途中で戻した').toBe(false);
   });
 });

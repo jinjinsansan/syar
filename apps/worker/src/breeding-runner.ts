@@ -176,6 +176,18 @@ export async function runBreedingWeek(
    *     ★呼ぶ側が ★**そこから渡します**（★`main.ts`）。★ここで決めません。
    */
   meanFieldSize: number,
+  /**
+   * 🔴 ★**繁殖牝馬の目標頭数**（★2026-09-21・★正典に反していたので直しました）。
+   *
+   *   ⚠️ ★私は `requiredBroodmares(meanFieldSize)` を ★**目標**に使っていました（★676 頭）。
+   *   🔴 ★しかし正典 §10.5 は ★**現役 2,500 / 種牡馬 200 / 繁殖牝馬 800** と ★**宣言**しています
+   *     （★コードでは `DEFAULT_PRESEED_OPTIONS.mares`）。
+   *   → ★★**`requiredBroodmares` は「下限」であって「目標」ではありません。**
+   *     ★私の実装は、★世界を ★**正典の 800 から 676 へ縮めていました**
+   *     （★実測: 現役も 2,400 → 2,028 へ）。
+   *   ✅ ★目標は ★**宣言された数**から。★下限は ★**下回っていないかの確認**に使います。
+   */
+  broodmareTarget: number,
 ): Promise<BreedingWeekResult> {
   /** ★「締まった週」。★いまの週はまだ締まっていないので使いません */
   const week = weekIndexAt(nowMs, epochMs) - 1;
@@ -248,7 +260,17 @@ export async function runBreedingWeek(
    *   ★上げる相手は ★**引退した牝馬で、★まだ産める馬**（★功労馬から戻します）。
    *   ⚠️ ★誰を上げるかは `policy`。★**決め打ちせず、★測ってから決めます**（★裁定 ③）。
    */
-  const target = requiredBroodmares(meanFieldSize);
+  const target = broodmareTarget;
+  /**
+   * 🔴 ★**下限を下回っていたら警報**（★目標が小さすぎる ＝ 出走表が埋まらなくなる）。
+   *   ⚠️ ★`requiredBroodmares` は ★**要る最小**です。★目標がそれを下回るなら、
+   *     ★**宣言のほうが間違っている**可能性があります。★黙って進めません。
+   */
+  const floor = requiredBroodmares(meanFieldSize);
+  if (target < floor) {
+    onAlert(`★繁殖牝馬の目標 ${target} が、★要る最小 ${floor} を下回っています`
+      + `（★平均出走頭数 ${meanFieldSize}）`);
+  }
   const haveRow = await client.query<{ n: string }>(
     "select count(*)::text n from horses where retirement_role = 'broodmare'"
       + ' and foal_count < $1',
