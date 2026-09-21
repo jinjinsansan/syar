@@ -93,7 +93,7 @@ console.log(`  ★代数の上限: ${DEPTH}（★\`DEFAULT_BALANCE.PEDIGREE_DEPT
 // ── 読み込み ────────────────────────────────────────────────
 const rows = await q(
   'select id::text as id, sire_id::text as sire_id, dam_id::text as dam_id,'
-  + ' inbreed_coeff::float8 as inbreed_coeff, pedigree_cache from horses order by id',
+  + ' generation, inbreed_coeff::float8 as inbreed_coeff, pedigree_cache from horses order by id',
 );
 console.log(`  ★${rows.length} 頭 読みました`);
 if (rows.length === 0) {
@@ -198,10 +198,29 @@ for (const r of rows) recompute(r.id);
  *   ★これが全頭に広がっていたら、★②はただの素通しになります（★**CK-14**）。
  */
 const DROPPED = new Set();
+/**
+ * 🔴 ★**印は 2 つ 使います。★片方は直すと消えるからです**（★2026-09-21・★2 回 流して気づきました）。
+ *
+ * 【★何が起きたか】
+ *   ★旧: ★保存の写しが言う親の数と、★DB の親の数を比べていました。
+ *   🔴 ★**この道具が直すと、★その差が消えます。** → ★2 回目に流すと ★`DROPPED` が **0 頭**になり、
+ *     ★⑤ が ★**「説明できない 2 頭」で赤**になりました（★直した後だけ赤くなる道具）。
+ *   → ★★**直しても消えない印**が要ります。
+ *
+ * 【★`generation`】★創始馬は `generation = 0`、★それ以外は親を持つはずです。
+ *   ✔ ★実測（staging・repair 後）: ★`generation > 0` かつ親が欠けている ＝ **38 頭**（★repair 前と同じ）。
+ *   ✔ ★対照: ★`generation = 0` で親が在る ＝ **0 頭**（★印そのものが壊れていない）。
+ *
+ * ⚠️ ★**2 つの和を取ります**（★どちらか一方が壊れても気づけるように）。★差は下で印字します。
+ */
+const byGeneration = new Set();
+const byCache = new Set();
 for (const r of rows) {
   const d1 = Object.values(r.pedigree_cache ?? {}).flat().filter((d) => d === 1).length;
   const parents = (r.sire_id !== null ? 1 : 0) + (r.dam_id !== null ? 1 : 0);
-  if (d1 !== parents) DROPPED.add(r.id);
+  if (d1 !== parents) byCache.add(r.id);
+  if (Number(r.generation) > 0 && parents < 2) byGeneration.add(r.id);
+  if (byCache.has(r.id) || byGeneration.has(r.id)) DROPPED.add(r.id);
 }
 /** ★自分か、★`DEPTH + 1` 代以内の祖先が `DROPPED`（★近交係数は親から 5 代ぶん辿ります） */
 const affected = new Set();
@@ -247,6 +266,7 @@ const check = (ok, label, detail) => {
 
 console.log('');
 console.log(`  ★枝刈りの縁（★親が投入されていない馬）: ${DROPPED.size} 頭`
+  + `（★generation で ${byGeneration.size} / ★写しで ${byCache.size}）`
   + ` / ★その影響圏: ${affected.size} 頭（★全 ${rows.length} 頭の`
   + `${(affected.size / rows.length * 100).toFixed(1)}%）`);
 console.log('     ⚠️ ★②はこの影響圏を「説明」に使います。★ここが全頭に広がったら'
