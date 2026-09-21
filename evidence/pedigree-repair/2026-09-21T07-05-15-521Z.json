@@ -1,0 +1,42 @@
+{
+  "phase": "done",
+  "atIso": "2026-09-21T07:05:15.521Z",
+  "environment": "staging",
+  "horses": 7370,
+  "brokenBefore": 0,
+  "pedigreeDepth": 5,
+  "danglingParents": 0,
+  "droppedEdge": 38,
+  "affected": 357,
+  "sigChecked": 6981,
+  "sigMismatch": 0,
+  "sigUnexplained": 0,
+  "invented": 0,
+  "builtEntries": 220666,
+  "badKeys": 0,
+  "fChecked": 6943,
+  "fRounding": 3286,
+  "fMismatch": 2,
+  "fUnexplained": 0,
+  "fHigher": 0,
+  "fMaxDiff": 0.00781,
+  "yesProduction": false,
+  "repairFlag": false,
+  "expectBroken": null,
+  "fixInbreed": true,
+  "inbreedFixed": [
+    {
+      "id": "09e5cda9-0368-4782-98d2-7f0733b992ee",
+      "before": 0.00781,
+      "after": 0
+    },
+    {
+      "id": "df7d4d89-3b6f-4465-881c-bf2f3cf6e1ee",
+      "before": 0.01074,
+      "after": 0.00977
+    }
+  ],
+  "written": 7370,
+  "afterBroken": 0,
+  "afterKeys": 220666
+}

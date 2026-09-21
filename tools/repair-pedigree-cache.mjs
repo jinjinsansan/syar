@@ -69,6 +69,11 @@ const DECIMALS = 5;
 const APPLY = process.argv.includes('--apply');
 const YES_PRODUCTION = process.argv.includes('--yes-production');
 const REPAIR_FLAG = process.argv.includes('--repair-pedigree');
+/**
+ * ★**`inbreed_coeff` も直すか**（★2026-09-21・レビュー側の裁定 ②「上書き」）。
+ * ⚠️ ★**既定は直しません** — ★遊びに効く値を動かすので、★旗を立てたときだけ。
+ */
+const FIX_INBREED = process.argv.includes('--fix-inbreed');
 const EXPECT_BROKEN = (() => {
   const i = process.argv.indexOf('--expect-broken');
   if (i < 0) return null;
@@ -352,6 +357,22 @@ let fUnexplained = 0;
 let fMaxDiff = 0;
 let fHigher = 0;
 const fSample = [];
+/**
+ * ✅ ★**`inbreed_coeff` を直す候補**（★`--fix-inbreed`・★2026-09-21・レビュー側の裁定 ②「上書き」）。
+ *
+ * 【★なぜ上書きするか（★裁定の理由・★そのまま写します）】
+ *   ★① ★**保存値は、★DB の血統から再現できません。** ★再現できない数を残すのは、
+ *     ★今日ずっと潰してきたもの（★出どころ不明の数）と同じ形です。
+ *   ★② ★Wright の式の `1 + F_A` を通じて ★**次の世代に効き続ける** ＝ ★**嘘が増殖する**。
+ *   ★③ ★2 頭・★下がる向きだけ → ★遊びへの影響は無視できる（★近交の罰がわずかに減るだけ）。
+ *
+ * 【⚠️ ★条件 2 つ（★裁定）】
+ *   ★上書き前の値を ★**素性に残す**（★id と 前後の値）。★簿にも「上書きした」と書く。
+ *
+ * 🔴 ★**候補に入れるのは、★説明できて、★下がる向きのものだけ**です。
+ *   ★上がる向き（★`fHigher`）は ★**発明**なので、★1 頭でも在れば ★**何も書きません**。
+ */
+const fFixable = [];
 for (const r of rows) {
   if (r.sire_id === null || r.dam_id === null) continue;
   const sire = fRecord(r.sire_id);
@@ -366,7 +387,13 @@ for (const r of rows) {
   fMismatch += 1;
   if (got > r.inbreed_coeff) fHigher += 1;                 // 🔴 ★増えるのは「発明」側
   fMaxDiff = Math.max(fMaxDiff, Math.abs(got - r.inbreed_coeff));
-  if (affected.has(r.id)) continue;
+  if (affected.has(r.id)) {
+    // ✅ ★説明できて、★**下がる向き**のものだけを、★直す候補にします（★`--fix-inbreed`）
+    if (got < r.inbreed_coeff) {
+      fFixable.push({ id: r.id, before: r.inbreed_coeff, after: Number(got.toFixed(DECIMALS)) });
+    }
+    continue;
+  }
   fUnexplained += 1;
   if (fSample.length < 3) fSample.push(`${r.id}: 保存 ${r.inbreed_coeff} / 再計算 ${got}`);
 }
@@ -396,6 +423,8 @@ console.log(`  ★いま壊れている（uuid でない鍵を持つ）馬: ${br
 const safeToApply = danglingParents === 0 && sigChecked > 0 && sigUnexplained === 0
   && invented === 0 && badKeys === 0 && builtEntries > 0;
 let written = 0;
+/** ★上書きした近交係数の前後（★素性に残します・★裁定の条件） */
+let inbreedFixed = [];
 
 if (APPLY && !safeToApply) {
   console.log('🔴 ★判定 ①〜④ のどれかが落ちたので ★**書きません**（★--apply は付いています）');
@@ -415,6 +444,7 @@ if (APPLY && !safeToApply) {
       sigChecked, sigMismatch, sigUnexplained, invented, builtEntries, badKeys,
       fChecked, fRounding, fMismatch, fUnexplained, fHigher, fMaxDiff,
       yesProduction: YES_PRODUCTION, repairFlag: REPAIR_FLAG, expectBroken: EXPECT_BROKEN,
+      fixInbreed: FIX_INBREED, inbreedFixed,
       ...extra,
     }, null, 2)}\n`, 'utf8');
     return provenancePath;
@@ -436,6 +466,48 @@ if (APPLY && !safeToApply) {
     written += r.rowCount;
   }
   console.log(`  ★${written} 行 書きました`);
+
+  /**
+   * ✅ ★**`inbreed_coeff` の上書き**（★`--fix-inbreed`・★レビュー側の裁定 ②・2026-09-21）。
+   *
+   * 🔴 ★**書くのは、★説明できて ★下がる向きのものだけ**です。
+   *   ★上がる向き（★`fHigher`）が ★**1 頭でも在れば、★何も書きません**（★それは発明）。
+   *   ★説明できないもの（★`fUnexplained`）が在るときも ★**何も書きません**。
+   * ⚠️ ★裁定の条件: ★**上書き前の値を素性に残す**（★下の `inbreedFixed`）。
+   */
+  if (FIX_INBREED) {
+    if (fUnexplained > 0 || fHigher > 0) {
+      console.log('🔴 ★--fix-inbreed は付いていますが ★**近交係数は書きません**'
+        + `（★説明できない ${fUnexplained} 頭 / ★増える向き ${fHigher} 頭）`);
+      fails.push('★--fix-inbreed が付いているのに書けませんでした');
+      checked += 1;
+    } else if (fFixable.length === 0) {
+      console.log('  ✓ ★--fix-inbreed: ★直す対象は 0 頭（★既に血統と一致しています）');
+    } else {
+      const r = await c.query(
+        'update horses h set inbreed_coeff = d.f::numeric'
+        + ' from (select unnest($1::uuid[]) as id, unnest($2::text[]) as f) d'
+        + ' where h.id = d.id',
+        [fFixable.map((x) => x.id), fFixable.map((x) => String(x.after))],
+      );
+      inbreedFixed = fFixable.map((x) => ({ ...x }));
+      console.log(`  ✅ ★近交係数を ${r.rowCount} 頭 上書きしました（★前後の値は素性に残します）`);
+      for (const x of fFixable) console.log(`     ${x.id}: ${x.before} → ${x.after}`);
+      // ⑦ 🔴 ★書いた後に DB で確かめる（★道具の言い分ではなく DB に訊く）
+      const back = await q(
+        'select id::text as id, inbreed_coeff::float8 as f from horses where id = any($1::uuid[])',
+        [fFixable.map((x) => x.id)],
+      );
+      const backMap = new Map(back.map((b) => [b.id, b.f]));
+      const wrong = fFixable.filter((x) => backMap.get(x.id) !== x.after);
+      check(r.rowCount === fFixable.length && wrong.length === 0,
+        '⑦ ★近交係数の上書きが、★DB に届いた（★読み直して確かめました）',
+        `★対象 ${fFixable.length} 頭 / 書いた ${r.rowCount} 行 / 食い違い ${wrong.length} 頭`);
+    }
+  } else if (fFixable.length > 0) {
+    console.log(`  ⚠️ ★近交係数が血統と合わない馬が ${fFixable.length} 頭 います`
+      + '（★`--fix-inbreed` を付けると、★再計算値で上書きします。★簿 `INBREED-COEFF-ABOVE-PEDIGREE`）');
+  }
 
   // ⑥ 🔴 ★**書いた後に DB を読み直す**（★道具の言い分ではなく、★DB に訊く）
   const afterKeys = Number((await q(

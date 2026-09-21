@@ -30,7 +30,26 @@ const GRADE_TONE: Readonly<Record<StableGrade, { readonly bg: string; readonly b
   gold: { bg: '#fff3d6', border: '#a9741a', color: '#4a3105' },
 };
 
-export const revalidate = 0;
+/**
+ * 🔴 ★**`export const revalidate = 0` を取りました**（★2026-09-21・★本番のビルドが落ちていました）。
+ *
+ * 【★何が起きたか】
+ *   ★この面を ★`'use client'` にしたとき、★`revalidate` の宣言を ★**残したままにしました**。
+ *   ★`revalidate` は ★**サーバー側の区分設定**で、★クライアント成分からは宣言できません。
+ *   → ★`npm run build:web` が落ちます:
+ *     `Invalid revalidate value "function(){throw Error(...)}" on "/stable"`
+ *   🔴 ★★**Vercel は push で自動的に作り直しますが、★落ちるので古い版のまま配信を続けます。**
+ *     ★実測: ★`origin/main` は `87c19e6`、★本番が配信していたのは `24af9f2`（★31 コミット 前）。
+ *     ★★**「デプロイが抜けている」ように見えて、★実際は「ビルドが落ちていた」。**
+ *
+ * 【★なぜ要らないか】
+ *   ★`'use client'` の面は ★**そもそも事前生成された HTML を配るだけ**で、
+ *   ★中身は ★**ブラウザで `my_horses` を引いて**描きます（★本人の行だけ・★RLS）。
+ *   → ★再検証の間隔は ★**意味を持ちません。**
+ *
+ * ⚠️ ★**型検査では出ません**（★`revalidate` は型としては正しい `number`）。
+ *    ★★`npm run build:web` を流したときだけ出ます。★門には入っていません。
+ */
 
 /** ⚠️ ★`cls` は ★**格のチップが増えた**ぶん広げました（★132 → 212・2026-09-16・D12-6） */
 // ⚠️ ★`stars` の列は 2026-09-18・D-114 ②・T-10・AL-2 で取りました（★幅は他の列へ分配し直さず、★次走の列が広がります）。
