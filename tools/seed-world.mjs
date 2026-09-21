@@ -563,7 +563,23 @@ for (const h of rows) {
      JSON.stringify(r.stats), r.unlockRate, JSON.stringify(r.surfaceAptitude),
      r.distanceCenter, r.distanceRange, JSON.stringify(r.strategyAptitude), r.heavyAptitude,
      r.growth, r.temper, r.durability, r.frail, JSON.stringify(r.skillGenes),
-     r.inbreedCoeff, r.nicksMultiplier, JSON.stringify(Object.fromEntries(r.pedigreeCache)),
+     r.inbreedCoeff, r.nicksMultiplier,
+     /**
+      * 🔴 ★**血統の鍵を、★DB の id に置き換えます**（★2026-09-21・★本番で壊れているのを見つけました）。
+      *
+      *   ⚠️ ★旧: ★`Object.fromEntries(r.pedigreeCache)` を ★**そのまま**入れていました。
+      *     ★プリシードの鍵は ★`NPC-F00195` の形で、★**DB の id（UUID）ではありません**。
+      *   ✔ ★**実測**（★本番・2026-09-21・読むだけ）: ★鍵 5,000 件のうち
+      *     ★**UUID の形をしているもの … 0 件**。
+      *   → ★★**DB の何も指していない鍵**が 7,370 頭 ぶん 入っていました。
+      *     ★祖先をたどる経路（★近交係数・★5 代血統の表示）が ★**成立しません**。
+      *   🔴 ★これを UUID として問い合わせた私の `breeding-runner` は、
+      *     ★本番で ★**週送りごと落としました**（★`invalid input syntax for type uuid`）。
+      *     ★→ ★配備を戻しました。★★この直しには ★**世界の作り直し**が要ります。
+      */
+     JSON.stringify(Object.fromEntries(
+       [...r.pedigreeCache].map(([ancestorId, v]) => [uuid.get(ancestorId) ?? ancestorId, v]),
+     )),
      r.foalCount, r.g1Wins,
      life.birthWeek, life.lastProcessedWeek,
      life.retiredAtWeek, life.retirementRole, life.retirementReason],

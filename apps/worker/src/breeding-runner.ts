@@ -411,6 +411,24 @@ export async function runBreedingWeek(
   const ancestorIds = new Set<string>();
   for (const m of mares) for (const a of m.record.pedigreeCache.keys()) ancestorIds.add(a);
   for (const s of stallions) for (const a of s.pedigreeCache.keys()) ancestorIds.add(a);
+  /**
+   * 🔴 ★**DB の id でない鍵が来たら、★問い合わせずに投げます**（★2026-09-21）。
+   *
+   *   ✔ ★本番で起きたこと: ★`pedigree_cache` の鍵が ★**プリシードの id**（`NPC-F00195`）で、
+   *     ★それを `uuid[]` として渡し ★**週送りごと落としました**
+   *     （★`invalid input syntax for type uuid`・★配備を戻して復旧）。
+   *   ⚠️ ★**SQL のエラーで落ちると、★原因が読めません。** ★ここで名指しして止めます。
+   *   ★直るのは ★**世界を作り直したとき**です（★`seed-world` は鍵を DB の id に直しました）。
+   */
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const badKeys = [...ancestorIds].filter((x) => !UUID_RE.test(x));
+  if (badKeys.length > 0) {
+    throw new Error(
+      `breeding-runner: ★血統の鍵が DB の id ではありません（例 ${badKeys[0]}・${badKeys.length} 件）。`
+        + '★pedigree_cache にプリシードの id が入っています。'
+        + '★世界を作り直すまで配合できません（★PEDIGREE-CACHE-IDS-NOT-DB-IDS）',
+    );
+  }
   const light = new Map<string, HorseRecord>();
   if (ancestorIds.size > 0) {
     const rows = await client.query(
