@@ -486,6 +486,17 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
 /** 較正定数ではないもの（理由を必ず書く）。理由なしの免除は作らない */
 export const EXEMPT: readonly { key: string; why: string }[] = [
   {
+    key: 'BREEDING_BUDGET_RATIO',
+    why: '★1 周のうち、★配合の追いつきに使ってよい割合（`packages/scheduler/src/cycle.ts`・'
+      + '★簿 `BREEDING-ONLY-ONE-WEEK-PER-CYCLE`・2026-09-21）。'
+      + '🔴 ★**較正定数ではありません** — ★ゲームの挙動（★着順・オッズ・能力・配合の結果）に'
+      + '★**1 ビットも入りません**。★変わるのは ★**1 周で何週ぶん追いつくか**だけで、'
+      + '★どの週も ★**いずれ必ず処理されます**（★残りは次の周へ持ち越し）。'
+      + '⚠️ ★これは ★`MAX_FILLS_PER_CYCLE` と同じ族です（★1 周の作業量の上限）。'
+      + '🔴 ★**足りているかは、★この数ではなく「遅れが縮んでいるか」で判定します** — '
+      + '★`main.ts` が ★N 周 続けて縮まなければ投げます。★だから較正の対象になりません。',
+  },
+  {
     key: 'CANDIDATES',
     why: '★`apps/cli/src/growth-tell-frequency.ts` が振る**閾値の候補**（★**GB-1 ④**・2026-09-19）。'
       + '🔴 ★**較正定数ではありません** — ★これは「どの幅を試すか」という**測定の刻み**で、'

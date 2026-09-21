@@ -34,7 +34,23 @@ import { loadHorsesByIds, loadRaceablePool, loadTrainingStates, loadWinsByHorse 
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
-import { runBreedingWeek } from './breeding-runner.js';
+import { runBreedingCatchUp } from './breeding-runner.js';
+
+/**
+ * 🔴 ★**配合の遅れが縮まないことを、★黙って続けさせない**（★2026-09-21）。
+ *
+ * ⚠️ ★予算（`BREEDING_BUDGET_RATIO`）は ★**実測に基づく見込み**です。
+ *   ★VPS からの往復は測れていません。★見込みが外れれば ★**永久に追いつきません**。
+ * → ★★**予算が正しいかを、★結果（遅れが縮むか）で見ます。**
+ *
+ * ⚠️ ★**メモリに持ちます。★再起動で 0 に戻ります**。
+ *   ★再起動を繰り返す状態だと、★この網は発火しません（★弱い網だと知っておく）。
+ *   ★ちゃんとやるなら DB に持つべきですが、★それは別便にします。
+ */
+let lastBreedingRemaining: number | null = null;
+let breedingStalled = 0;
+/** ★何周 縮まなかったら投げるか。★ 1 週 進むのに `CYCLES_PER_WEEK` 周 かかるので、★それより長く取ります */
+const BREEDING_STALL_LIMIT = CYCLES_PER_WEEK;
 import { recordUnlockDistribution, unlockDrift } from './unlock-flow.js';
 import { formatStoryDay, recordStoryRows } from './story-daily.js';
 import { STORY_EVENT_TYPES } from '@star/training';
@@ -44,7 +60,7 @@ import { freezePendingEntries } from './entry-freeze.js';
 import { runSelfcheck } from './selfcheck.js';
 import { runSchemacheck } from './schemacheck.js';
 import {
-  CANCEL_AFTER_START_MS, CYCLE_MS, classOf, conditionsOf, gradeOf,
+  BREEDING_BUDGET_MS, CANCEL_AFTER_START_MS, CYCLES_PER_WEEK, CYCLE_MS, classOf, conditionsOf, gradeOf,
   weekIndexAt, weekStartMs, dayIndexAt, dayStartMs,
 } from '@star/scheduler';
 // ★投票の上限の正（★2026-09-19・BT-1。★ワーカーが `bet_limits` に書き、RPC はその行を読む）
@@ -699,16 +715,50 @@ async function main(): Promise<void> {
        * ⚠️ ★**平均出走頭数は `FIELD_SIZE` から**渡します（★`build-race.ts` と同じ出どころ）。
        *   ★ここから繁殖牝馬の頭数が決まるので、★**画面にも道具にも書かない**（★D-052）。
        */
-      const b = await runBreedingWeek(client, nowMs, cfg.epochMs,
+      const b = await runBreedingCatchUp(client, nowMs, cfg.epochMs,
         (m) => console.error(`[worker] ★${m}`),
         undefined, 'top', (FIELD_SIZE.MIN + FIELD_SIZE.MAX) / 2,
         // 🔴 ★正典 §10.5 が宣言した数（★導出値は「下限」であって目標ではない）
-        DEFAULT_PRESEED_OPTIONS.mares);
-      if (b.born > 0 || b.noSire > 0 || b.yearReset) {
+        DEFAULT_PRESEED_OPTIONS.mares,
+        { budgetMs: BREEDING_BUDGET_MS, monotonicMs: () => Number(process.hrtime.bigint()) / 1e6 });
+      /**
+       * ★**毎周 出します**（★見えないものは直せません・★R-16）。
+       * ⚠️ ★`remaining` が 0 でない間は、★**遅れを抱えています**。
+       */
+      if (b.weeks.length > 0 || b.remaining > 0) {
         console.log(
-          `[worker] 配合 週=${b.week} 生まれた${b.born}頭 / 相手なし${b.noSire}頭`
-          + ` / 既に居た${b.alreadyThere}頭${b.yearReset ? ' / ★年次カウンタを戻しました' : ''}`,
+          `[worker] 配合 週=${b.weeks.join(',') || 'なし'} 生まれた${b.born}頭`
+          + ` / 相手なし${b.noSire}頭 / 既に居た${b.alreadyThere}頭`
+          + ` / ★残り${b.remaining}週${b.stoppedByBudget ? '（予算切れ）' : ''}`
+          + `${b.yearResets > 0 ? ` / ★年次カウンタを${b.yearResets}回 戻しました` : ''}`
+          + `${b.startedFresh ? ' / ★印が無かったので、★いまの週から始めました' : ''}`,
         );
+      }
+      /**
+       * 🔴 ★**遅れが縮まなければ投げる**（★fail-closed・★レビュー側の裁定・2026-09-21）。
+       *
+       * ⚠️ ★予算（`BREEDING_BUDGET_RATIO`）は ★**いまの実測に基づく見込み**です。
+       *   ★VPS からの往復は測れていません。★足りていなければ ★**永久に追いつきません**。
+       * → ★★**予算が正しいかを、★結果（遅れが縮むか）で見ます。**
+       * ⚠️ ★数えはメモリに持ちます。★**再起動で 0 に戻ります**（★弱い網だと知っておくこと）。
+       */
+      if (b.remaining > 0) {
+        if (lastBreedingRemaining !== null && b.remaining >= lastBreedingRemaining) {
+          breedingStalled += 1;
+        } else {
+          breedingStalled = 0;
+        }
+        lastBreedingRemaining = b.remaining;
+        if (breedingStalled >= BREEDING_STALL_LIMIT) {
+          throw new Error(
+            `[worker] ★配合の遅れが ${breedingStalled} 周 縮みません`
+            + `（★残り ${b.remaining} 週）。★予算が小さすぎるか、★ 1 週の費用が読みを超えています`
+            + '（★`BREEDING_BUDGET_RATIO` を見直してください）',
+          );
+        }
+      } else {
+        lastBreedingRemaining = null;
+        breedingStalled = 0;
       }
       if (t.advanced > 0) {
         console.log(

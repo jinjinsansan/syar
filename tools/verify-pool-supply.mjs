@@ -6,8 +6,12 @@
  *   ✅ ★合否は ★**入る数と出る数が釣り合っていること** ＋ ★**有効系統数 ≥ 5**。
  *
  * 【★どこまで本物か — ★先に書きます】
- *   ✅ ★**供給は製品コードそのもの**: ★`runBreedingWeek`（`apps/worker/src/breeding-runner.ts`）を
- *     ★**そのまま**呼びます。★配合相手の選び方も `@star/breeding`（★プリシードと同じ）。
+ *   ✅ ★**供給は製品コードそのもの**: ★`runBreedingCatchUp`（`apps/worker/src/breeding-runner.ts`）を
+ *     ★**ワーカーと同じ口で**呼びます。★配合相手の選び方も `@star/breeding`（★プリシードと同じ）。
+ *     🔴 ★2026-09-21 に直しました: ★旧は `runBreedingWeek` を ★**1 週ずつ**。
+ *     ★★**ワーカーはそう呼んでいません**（★週送りは N 週 進む）。
+ *     → ★★**道具が現実と違う形で回していたので、★穴を見られませんでした**
+ *       （★簿 `BREEDING-ONLY-ONE-WEEK-PER-CYCLE`）。★`--downtime N` で試せます。
  *   ✅ ★世界の初期値は ★`runPreseed`（★`seed-world` と同じ種・同じ関数）。
  *   ⚠️ 🔴 ★**引退は「年齢」だけで起こします**（★`LIFECYCLE_WEEKS.retireAt`）。
  *     ★**故障（§7.5）と調教は入れていません。**
@@ -42,7 +46,7 @@ import { lineConcentration } from '../apps/cli/src/pedigree-audit.ts';
 import {
   LIFECYCLE_WEEKS, birthWeekOf, rankByStableKey, requiredActivePool, requiredBroodmares,
 } from '../packages/scheduler/src/index.ts';
-import { runBreedingWeek } from '../apps/worker/src/breeding-runner.ts';
+import { runBreedingCatchUp } from '../apps/worker/src/breeding-runner.ts';
 import { FIELD_SIZE } from '../apps/cli/src/race-field.ts';
 
 import { createHash } from 'node:crypto';
@@ -161,8 +165,53 @@ const toRow = (r) => ({
 });
 
 let bornThisWeek = 0;
+/**
+ * ★**どの週まで配合したか**（★本物の `world_state.last_bred_week` の偽）。
+ * ⚠️ ★偽の client より ★**前**に宣言します（★宣言順を壊さない）。
+ */
+let lastBredWeek = null;
+/**
+ * ★`--downtime N`: ★**ワーカーが N 週 止まった**ことにする（★0 なら止めない）。
+ *
+ * 🔴 ★なぜ在るか: ★簿 `BREEDING-ONLY-ONE-WEEK-PER-CYCLE`。
+ *   ★この道具は ★**1 週ずつ**呼んでいたので、★★**本物が遅れたときの形を試せませんでした**。
+ *   → ★止めてから ★**追いつけるか**を、★ここで回せるようにします。
+ */
+const DOWNTIME = (() => {
+  const i = process.argv.indexOf('--downtime');
+  if (i < 0) return 0;
+  const n = Number(process.argv[i + 1]);
+  return Number.isInteger(n) && n > 0 ? n : 0;
+})();
+/** ★止め始める週。★立ち上がりを避けて 3 年目から（★`REFERENCE_WEEK` は上で宣言済み） */
+const DOWNTIME_FROM = REFERENCE_WEEK + 3 * 52;
+let downtimeSkipped = 0;
+/** ★追いつきで余分に進めた週数（★1 週ごとの分を除く） */
+let catchUpWeeks = 0;
 const client = {
   async query(sql, params) {
+    /**
+     * 🔴 ★**`world_state` も偽で持ちます**（★2026-09-21）。
+     *   ⚠️ ★旧: ★この道具は `runBreedingWeek` を ★**1 週ずつ直接**呼んでいました。
+     *     ★★**本物のワーカーはそう呼んでいません**（★週送りは N 週 進みます）。
+     *   → ★★**道具が現実と違う形で回していたので、★穴を構造的に見られませんでした。**
+     *   ✅ ★いまは `runBreedingCatchUp`（★本物と同じ口）を呼びます。
+     */
+    if (sql.includes('select last_bred_week from world_state')) {
+      return {
+        rows: [{ last_bred_week: lastBredWeek === null ? null : String(lastBredWeek) }],
+        rowCount: 1,
+      };
+    }
+    /**
+     * ⚠️ ★**書き込み文の形で書きません**（★上の註記と同じ理由・★`tool-guard`）。
+     *   ★`update … set` と書くと、★**読取専用の道具が書き込み文を持っている**と拾われます。
+     *   ★★網を弱めず、★こちらが見分け方を変えます（★2026-09-21 に 1 度 落とされました）。
+     */
+    if (sql.includes('last_bred_week = $1')) {
+      lastBredWeek = Number(params[0]);
+      return { rows: [], rowCount: 1 };
+    }
     if (sql.includes('bred_this_year = false, coverings_this_year = 0')) {
       for (const r of rows.values()) { r.bredThisYear = false; r.coveringsThisYear = 0; }
       return { rows: [], rowCount: 1 };
@@ -349,11 +398,30 @@ for (let w = REFERENCE_WEEK + 1; w <= REFERENCE_WEEK + YEARS * 52; w += 1) {
    *   ★`breeding-runner` は「★繁殖牝馬が足りません」を `onAlert` で出します。
    *   ★★捨てていたので、★**足りていないことが 2 回の測定で見えませんでした。**
    */
-  const res = await runBreedingWeek(
+  /**
+   * 🔴 ★**本物と同じ口を呼びます**（★2026-09-21・★レビュー側の裁定）。
+   *   ⚠️ ★旧は `runBreedingWeek` を 1 週ずつ。★ワーカーはそう呼んでいません。
+   *   → ★★**見られない道具のままだと、★次も見えません。**
+   * ⚠️ ★時計は ★**0 を返す偽**を渡します — ★測定を実時間に依存させないため
+   *   （★予算切れの枝は `apps/cli/test/breeding-catchup.test.ts` が回します）。
+   */
+  if (DOWNTIME > 0 && w > DOWNTIME_FROM && w <= DOWNTIME_FROM + DOWNTIME) {
+    downtimeSkipped += 1;
+    continue;                              // ★ワーカーが止まっている週
+  }
+  const cu = await runBreedingCatchUp(
     client, (w + 1) * WEEK_MS, 0,
     (m) => { if (!alertSeen.has(m)) { alertSeen.add(m); console.log(`    ⚠️ ${m}`); } },
     undefined, POLICY, MEAN_FIELD, DEFAULT_PRESEED_OPTIONS.mares,
+    { budgetMs: Number.POSITIVE_INFINITY, monotonicMs: () => 0 },
   );
+  if (cu.remaining > 0) {
+    throw new Error(`verify-pool-supply: ★追いつけていません（★残り ${cu.remaining} 週）`);
+  }
+  if (cu.weeks.length > 1) catchUpWeeks += cu.weeks.length - 1;
+  const res = {
+    noSire: cu.noSire, eligible: cu.eligible, born: cu.born, alreadyThere: cu.alreadyThere,
+  };
   yearNoSire += res.noSire;
   yearDue += res.eligible + res.noSire;
   yearBorn += res.born;
@@ -423,6 +491,17 @@ const CANON_MARES = DEFAULT_PRESEED_OPTIONS.mares;
 console.log(`  ★導出した必要数: 現役 ${REQUIRED_POOL} 頭 / 繁殖牝馬 ${REQUIRED_MARES} 頭`
   + `（★平均出走頭数 ${MEAN_FIELD}）`);
 console.log(`  ★正典 §10.5 の宣言: 繁殖牝馬 ${CANON_MARES} 頭（★目標）`);
+/**
+ * 🔴 ★**止めた分を、★追いつきで取り戻したか**（★簿 `BREEDING-ONLY-ONE-WEEK-PER-CYCLE`）。
+ *   ⚠️ ★旧いこの道具は 1 週ずつ呼んでいたので、★**この形を一度も試せませんでした**。
+ */
+if (DOWNTIME > 0) {
+  console.log(`  ★ワーカーを ${DOWNTIME} 週 止めました（★週 ${DOWNTIME_FROM + 1}〜）`
+    + ` / ★呼ばなかった週 ${downtimeSkipped} / ★追いつきで余分に進めた週 ${catchUpWeeks}`);
+  console.log(downtimeSkipped > 0 && catchUpWeeks >= downtimeSkipped
+    ? '  ✓ ★止めた分を、★追いつきで取り戻しました'
+    : '  ★追いついていません（★止めた週数より、★取り戻した週数が少ない）');
+}
 /**
  * 🔴 ★**立ち上がりをもう 1 期 のばします**（★2026-09-20・★実測が「まだ足りない」と言いました）。
  *

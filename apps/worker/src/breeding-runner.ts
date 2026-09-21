@@ -27,7 +27,7 @@ import {
 } from '@star/sim-engine';
 import { buildSireAncestorIndex, pickSire, rankSires } from '@star/breeding';
 import {
-  LIFECYCLE_WEEKS, gameYearOf, requiredBroodmares, weekIndexAt,
+  LIFECYCLE_WEEKS, WEEK_MS, gameYearOf, requiredBroodmares, weekIndexAt,
 } from '@star/scheduler';
 
 import { rowToHorse } from './horse-repo.js';
@@ -420,22 +420,44 @@ export async function runBreedingWeek(
    *   ⚠️ ★**SQL のエラーで落ちると、★原因が読めません。** ★ここで名指しして止めます。
    *   ★直るのは ★**世界を作り直したとき**です（★`seed-world` は鍵を DB の id に直しました）。
    */
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const badKeys = [...ancestorIds].filter((x) => !UUID_RE.test(x));
-  if (badKeys.length > 0) {
-    throw new Error(
-      `breeding-runner: ★血統の鍵が DB の id ではありません（例 ${badKeys[0]}・${badKeys.length} 件）。`
-        + '★pedigree_cache にプリシードの id が入っています。'
-        + '★世界を作り直すまで配合できません（★PEDIGREE-CACHE-IDS-NOT-DB-IDS）',
-    );
-  }
   const light = new Map<string, HorseRecord>();
   if (ancestorIds.size > 0) {
-    const rows = await client.query(
-      'select id, sire_id, dam_id, inbreed_coeff, pedigree_cache, genotype from horses'
-        + ' where id = any($1::uuid[])',
-      [[...ancestorIds]],
-    );
+    /**
+     * 🔴 ★**問い合わせが拒んだときだけ、★理由を話します**（★2026-09-21・★ 3 度目の直し）。
+     *
+     * 【★なぜ「先に形を見る」をやめたか】
+     *   ⚠️ ★第 1 版: ★**「鍵は uuid であるべき」** → 🔴 ★`verify-pool-supply` の
+     *     ★メモリ上の世界（★id が `NPC-24-019835`）を ★**壊れていないのに落としました**。
+     *   ⚠️ ★第 2 版: ★**「鍵と馬の id は同じ家族」** → 🔴 ★その世界は ★**途中から混在します**
+     *     （★先祖はプリシード id、★新しい仔は uuid）。★また落ちました。
+     *   → ★★**形では判定できません。★正しい世界でも形は混ざります。**
+     *
+     * 【✅ ★本当の失敗は 1 つだけ】
+     *   ★**DB が `::uuid[]` へのキャストを拒む**（★`invalid input syntax for type uuid`）。
+     *   ★そのエラーは ★**原因が読めません**（★本番の週送りがこれで毎周 落ちました）。
+     *   → ★**拒まれてから、★説明を添えて投げ直します。**
+     *   ★★**偽陽性が原理的に出ません**（★DB が実際に拒んだときだけ）。
+     */
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let rows;
+    try {
+      rows = await client.query(
+        'select id, sire_id, dam_id, inbreed_coeff, pedigree_cache, genotype from horses'
+          + ' where id = any($1::uuid[])',
+        [[...ancestorIds]],
+      );
+    } catch (e) {
+      const bad = [...ancestorIds].filter((x) => !UUID_RE.test(x));
+      if (bad.length > 0) {
+        throw new Error(
+          `breeding-runner: ★血統の鍵を DB が受け付けません（例 ${bad[0]}・${bad.length} 件）。`
+            + '★`pedigree_cache` にプリシードの id が残っています。'
+            + '★直し方: `npx tsx tools/repair-pedigree-cache.mjs --env <接続先>`'
+            + `（★PEDIGREE-CACHE-IDS-NOT-DB-IDS）。★元のエラー: ${(e as Error).message}`,
+        );
+      }
+      throw e;
+    }
     for (const r of rows.rows) {
       light.set(String(r['id']), pedigreeOnlyRecord(r as Record<string, unknown>));
     }
@@ -463,10 +485,10 @@ export async function runBreedingWeek(
 
   const ancestorIndex = buildSireAncestorIndex(stallions);
   const turnOf = new Map<string, number>();
+  let eligible = 0;
   let born = 0;
   let noSire = 0;
   let alreadyThere = 0;
-  let eligible = 0;
 
   for (const { record: mare, stable } of mares) {
     const ranked = rankSires({
@@ -559,4 +581,135 @@ export async function runBreedingWeek(
     );
   }
   return { week, eligible, born, noSire, alreadyThere, yearReset, retiredFromBreeding, promoted };
+}
+
+/**
+ * 🔴 ★**遅れた週に、★予算の範囲で追いつく**（★簿 `BREEDING-ONLY-ONE-WEEK-PER-CYCLE`・2026-09-21）
+ *
+ * ============================================================================
+ * 【🔴 ★何が壊れていたか】
+ *   ★`main.ts` は ★`advanceTrainingWeeks` で ★**N 週 進め**、
+ *   ★`runBreedingWeek` は ★**1 週だけ**配合していました。
+ *   → ★★**歳は N 週ぶん取るのに、★仔は 1 週ぶんしか生まれません。**
+ *   ✔ ★実際に起きています: ★2026-08-20〜09-02 の ★13 日 停止 ＝ 78 週。
+ *     ★あのとき復旧していたら ★**77 週ぶんの仔が飛んでいました**。
+ *
+ * 【★なぜ「1 周に N 週」と決めないか（★レビュー側の裁定・2026-09-21）】
+ *   ★1 週の費用は一定ではありません（★実測: 20 頭 19.2s ／ 13 頭 13.5s）。
+ *   ★そして ★**VPS からの往復は測れていません**。★費用は環境で変わります。
+ *   → ★★**時間で切ります**（`BREEDING_BUDGET_MS`）。★超えたら止め、★次の周へ持ち越す。
+ *
+ * 【★追いつけることは、★数で言えます】
+ *   ★実時間では ★**`CYCLES_PER_WEEK` 周で 1 週**しか進みません。
+ *   → ★1 周に 2 週 進めば必ず追いつきます。★予算はそれを満たす前提で置いています。
+ *   🔴 ★**満たしているかは、★予算ではなく「遅れが縮んでいるか」で判定します**
+ *     （★`main.ts` が ★N 周 続けて縮まなければ投げます）。
+ *
+ * 【⚠️ ★`startedFresh`（★印が無いとき）】
+ *   🔴 ★`last_bred_week` が `null` ＝ ★**一度も配合していない**（★本番はいまこれ）。
+ *   ★ここで 0 週目に遡ると ★**数百週ぶんが一度に生まれます**。
+ *   → ★★**いまの週だけ**を配合して、★そこから印を始めます。
+ *
+ * 【★時計を注入します（★憲法 4）】
+ *   ★`Date.now()` を呼びません。★経過は `budget.monotonicMs()` から取ります。
+ *   → ★検査で ★**偽の時計**を渡して、★予算切れの枝を回せます。
+ *
+ * 【🔴 ★対照を 1 つ 埋めてあります】
+ *   ★`runBreedingWeek` には ★**週ではなく `nowMs`** を渡す作りなので、
+ *   ★ここで ★`epochMs + (w + 1) * WEEK_MS` を組み立てています。
+ *   → ★★**組み立てがずれたら、★静かに別の週を配合します。**
+ *     ★だから ★**返ってきた `r.week` が頼んだ `w` と同じか**を毎回 確かめ、★違えば投げます。
+ * ============================================================================
+ */
+export interface BreedingCatchUpResult {
+  readonly weeks: readonly number[];
+  readonly target: number;
+  readonly remaining: number;
+  /** ★その週に割り当てられ、かつ相手が見つかった牡馬の合計 */
+  readonly eligible: number;
+  readonly born: number;
+  readonly noSire: number;
+  readonly alreadyThere: number;
+  readonly yearResets: number;
+  readonly stoppedByBudget: boolean;
+  readonly startedFresh: boolean;
+}
+
+export interface BreedingBudget {
+  readonly budgetMs: number;
+  readonly monotonicMs: () => number;
+}
+
+export async function runBreedingCatchUp(
+  client: pg.ClientBase,
+  nowMs: number,
+  epochMs: number,
+  onAlert: (message: string) => void,
+  balance: BalanceConfig | undefined,
+  policy: PromotionPolicy,
+  meanFieldSize: number,
+  broodmareTarget: number,
+  budget: BreedingBudget,
+): Promise<BreedingCatchUpResult> {
+  const target = weekIndexAt(nowMs, epochMs) - 1;
+  const row = (await client.query<{ last_bred_week: string | null }>(
+    'select last_bred_week from world_state where id = true',
+  )).rows[0];
+  if (row === undefined) {
+    throw new Error('breeding-runner: world_state の行がありません（★週を書く側が先に走る前提です）');
+  }
+  const last = row.last_bred_week === null ? null : Number(row.last_bred_week);
+  const startedFresh = last === null;
+  const from = startedFresh ? target : last + 1;
+
+  const weeks: number[] = [];
+  let eligible = 0;
+  let born = 0;
+  let noSire = 0;
+  let alreadyThere = 0;
+  let yearResets = 0;
+  let stoppedByBudget = false;
+
+  const t0 = budget.monotonicMs();
+  for (let w = from; w <= target; w += 1) {
+    if (weeks.length > 0 && budget.monotonicMs() - t0 >= budget.budgetMs) {
+      stoppedByBudget = true;
+      break;
+    }
+    const r = await runBreedingWeek(
+      client, epochMs + (w + 1) * WEEK_MS, epochMs,
+      onAlert, balance, policy, meanFieldSize, broodmareTarget,
+    );
+    if (r.week !== w) {
+      throw new Error(
+        `breeding-runner: ★週の組み立てがずれています（★頼んだ ${w} / 処理された ${r.week}）`,
+      );
+    }
+    weeks.push(w);
+    eligible += r.eligible;
+    born += r.born;
+    noSire += r.noSire;
+    alreadyThere += r.alreadyThere;
+    if (r.yearReset) yearResets += 1;
+  }
+
+  if (weeks.length > 0) {
+    const upd = await client.query(
+      'update world_state set last_bred_week = $1, updated_at = now() where id = true',
+      [weeks[weeks.length - 1]],
+    );
+    if (upd.rowCount !== 1) {
+      throw new Error(
+        `breeding-runner: ★配合した週の印を書けませんでした（★${upd.rowCount} 行）。`
+        + '★次の周が同じ週をやり直します',
+      );
+    }
+  }
+
+  const lastDone = weeks.length > 0 ? (weeks[weeks.length - 1] as number) : last;
+  const remaining = lastDone === null ? 0 : Math.max(0, target - lastDone);
+  return {
+    weeks, target, remaining, eligible, born, noSire, alreadyThere,
+    yearResets, stoppedByBudget, startedFresh,
+  };
 }
