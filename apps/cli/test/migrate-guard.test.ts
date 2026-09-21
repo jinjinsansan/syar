@@ -15,7 +15,7 @@
  */
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error ★`.mjs` の部品（★`.d.mts` を置いていません）
-import { needsYesProduction, productionOptInProblem } from '../../../tools/lib/args.mjs';
+import { needsYesProduction, productionOptInProblem, productionRepairOptInProblem } from '../../../tools/lib/args.mjs';
 
 const needs = needsYesProduction as (
   env: string,
@@ -108,5 +108,102 @@ describe('🔴 ★seed-world: 本番の世界を作り直す関門', () => {
 
   it('✅ ★4 つ 揃って初めて通る', () => {
     expect(optIn(OK), '★揃っているのに止めた').toBeNull();
+  });
+});
+
+/**
+ * 🔴 ★**本番の関門が ★2 つに増えました。★片方だけ緩むのを止めます**（★2026-09-21）。
+ *
+ * 【★なぜ表にして 2 つとも回すか】
+ *   ★`repair-pedigree-cache.mjs` にも同じ形の関門を付けました（★旗 2 つ ＋ 写せない数 1 つ）。
+ *   ⚠️ ★**コードは共有していません**（★要求する数が違うので）。
+ *   🔴 ★共有していないものは ★**片方だけ直されて、★もう片方が置き去りになります。**
+ *     ★★今日それを 2 回 やりました（★`nav.tsx` だけ直した／★`0057` に `assert_setup_complete` を入れ忘れた）。
+ *   → ★★**歩調は、★コードの共有ではなく ★この表が合わせます。**
+ *     ★関門を足したら ★**ここに段を足す。★足し忘れたら、★もう片方で落ちます。**
+ *
+ * 【🔴 ★「写せない数」は、★2 つの道具で ★**違う数でなければ意味がない**】
+ *   ★同じ数（例: 頭数）を要求したら、★★**seed-world の手順書からそのまま写せます。**
+ *   → ★旗の名前と、★数の旗の名前が ★**重なっていないこと**を、★下で検査します。
+ */
+describe('🔴 ★本番の関門（★2 つ）が、★同じ 5 段を課している', () => {
+  interface Gate {
+    name: string;
+    fn: (o: Record<string, unknown>) => string | null;
+    ok: Record<string, unknown>;
+    /** ★2 つ目の旗（★この道具だけの旗）の、★引数名と綴り */
+    second: [string, string];
+    /** ★写せない数の、★引数名（期待値）・引数名（実数）・綴り */
+    number: [string, string, string];
+  }
+
+  const GATES: Gate[] = [
+    {
+      name: 'seed-world（★世界の作り直し）',
+      fn: productionOptInProblem as Gate['fn'],
+      ok: {
+        environment: 'production', yesProduction: true, wipeWorld: true,
+        expectHorses: 7355, actualHorses: 7355,
+      },
+      second: ['wipeWorld', '--wipe-world'],
+      number: ['expectHorses', 'actualHorses', '--expect-horses'],
+    },
+    {
+      name: 'repair-pedigree-cache（★血統の写しの直し）',
+      fn: productionRepairOptInProblem as Gate['fn'],
+      ok: {
+        environment: 'production', yesProduction: true, repairFlag: true,
+        expectBroken: 1234, actualBroken: 1234,
+      },
+      second: ['repairFlag', '--repair-pedigree'],
+      number: ['expectBroken', 'actualBroken', '--expect-broken'],
+    },
+  ];
+
+  for (const g of GATES) {
+    describe(g.name, () => {
+      it('★staging は素通し（★この関門は本番だけのもの）', () => {
+        expect(g.fn({ ...g.ok, environment: 'staging' }), '★staging で止めた').toBeNull();
+      });
+
+      it('★① --yes-production が無いと止まる', () => {
+        expect(g.fn({ ...g.ok, yesProduction: false })).toContain('--yes-production');
+      });
+
+      it(`★② ${g.second[1]} が無いと止まる（★この道具だけの旗）`, () => {
+        const why = g.fn({ ...g.ok, [g.second[0]]: false });
+        expect(why, '🔴 ★2 つ目の旗が効いていない').toContain(g.second[1]);
+      });
+
+      it(`★③ ${g.number[2]} が無いと止まる（★写せない数）`, () => {
+        const why = g.fn({ ...g.ok, [g.number[0]]: null });
+        expect(why, '🔴 ★数を要求していない').toContain(g.number[2]);
+      });
+
+      it('★④ 実数を数えられなければ止まる（★数えられない＝分からない）', () => {
+        expect(g.fn({ ...g.ok, [g.number[1]]: null })).toContain('数えられません');
+      });
+
+      it('★⑤ 打った数が実数と違えば止まり、★正しい数は教えない', () => {
+        const actual = g.ok[g.number[1]] as number;
+        const why = g.fn({ ...g.ok, [g.number[0]]: actual + 1 }) ?? '';
+        expect(why, '🔴 ★違う数で通った').toContain(String(actual + 1));
+        expect(why, '🔴 ★実数を教えている。★写すだけで通ってしまう')
+          .not.toContain(String(actual));
+      });
+
+      it('✅ ★揃って初めて通る', () => {
+        expect(g.fn(g.ok), '★揃っているのに止めた').toBeNull();
+      });
+    });
+  }
+
+  it('🔴 ★2 つの関門の旗が、★重なっていない（★手順書から写せないため）', () => {
+    const flags = GATES.map((g) => g.second[1]);
+    const numbers = GATES.map((g) => g.number[2]);
+    expect(new Set(flags).size, '🔴 ★2 つ目の旗が同じ綴り。★片方の手順書で両方 通ります')
+      .toBe(GATES.length);
+    expect(new Set(numbers).size, '🔴 ★数の旗が同じ綴り。★片方の手順書で両方 通ります')
+      .toBe(GATES.length);
   });
 });

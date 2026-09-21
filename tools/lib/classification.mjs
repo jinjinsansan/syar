@@ -1011,6 +1011,12 @@ export const STATE_CHANGING = [
   'verify-v10-bets.mjs',
   'seed-stables.mjs',
   'seed-world.mjs',
+  // ★血統の写し（`pedigree_cache`）の鍵を、★DB の id に直す（★簿 `PEDIGREE-CACHE-IDS-NOT-DB-IDS`・2026-09-21）。
+  //   ★既定は下見だけ。★`--apply` で書きます（★本番は旗 2 つ ＋ 壊れている頭数）
+  'repair-pedigree-cache.mjs',
+  // ★配合を、★本物の DB で 1 週 走らせて落ちないか見る（★取引の中だけ。★必ず rollback）。
+  //   ★偽の DB で緑になり、★本番を落とした（2026-09-21）ので作りました
+  'verify-breeding-live.mjs',
   'synthetic-bettor.mjs',
   'verify-a2.mjs',
   // ★B-1: 馬の育成状態を書き換え、horse_week_log を作る

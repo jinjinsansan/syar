@@ -27,6 +27,37 @@
  * ⚠️ 🔴 ★**`pending` を「3 つ目の正しい状態」と読まないこと。** ★空にするのが目標です。
  */
 export const TOOL_AFTERMATH = {
+  /**
+   * ★血統の写しの直し（★2026-09-21・簿 `PEDIGREE-CACHE-IDS-NOT-DB-IDS`）。
+   * ⚠️ ★**戻しません。★戻す必要がありません** — ★上書きする前の値は ★**DB の何も指していない鍵**で、
+   *    ★しかも ★`sire_id`/`dam_id` から ★**いつでも作り直せます**（★この道具がやることそのもの）。
+   */
+  'repair-pedigree-cache.mjs': {
+    mode: 'consumes',
+    why: '★消費するもの: ★**`horses.pedigree_cache` の旧い値**（★全頭・★上書き）。'
+      + '★既定は ★**下見だけ**で、★`--apply` を付けたときだけ書きます。'
+      + '✅ ★**書く前に判定 ①〜④ を通します**（★通らなければ `--apply` が付いていても書きません）。'
+      + '✅ ★**書いた後に DB を読み直します**（★判定 ⑥・★道具の言い分ではなく DB に訊く）。'
+      + '✅ ★素性を ★**始める前と後の 2 回** `evidence/pedigree-repair/` に残します。',
+    notRestored: '★**旧い `pedigree_cache`**（★戻しません）。★旧い値は ★**DB に存在しない id を指していた**もので、'
+      + '★保つ価値がありません。★どうしても要るなら、★`evidence/pedigree-repair/` の素性に'
+      + '★件数が残っており、★値そのものは ★**親子の連鎖から再現できます**',
+  },
+  /**
+   * ★配合を本物の DB で 1 週 走らせる（★2026-09-21）。
+   * ✅ ★`runBreedingWeek` が ★**自分で commit しない**ことを確かめたうえで `rollback` します
+   *   （★`grep 'begin\|commit\|rollback' apps/worker/src/breeding-runner.ts` が 0 行）。
+   */
+  'verify-breeding-live.mjs': {
+    mode: 'restores',
+    why: '★`begin` → `runBreedingWeek` → ★**必ず `rollback`**（`finally`）。'
+      + '✅ ★**戻したことを数えます**: ★判定 ③ が ★**頭数の 前後一致**を見ます'
+      + '（★`rollback` を呼んだだけで済ませません・★TL-1 の線はここ）。'
+      + '⚠️ ★内側が commit する関数を包むと ★**外側ごと確定します**（★2026-09-19 の `verify-ds7-cancel`）。'
+      + '★だから ★**包む前に grep で確かめました**。★`breeding-runner` に取引の語は 1 つもありません',
+    // ★AU-7: ★主張には引用を付ける。★この行が変われば、★検査が壊れて落ちます
+    countedBy: 'check(after === before,',
+  },
   'verify-initial-horse-distribution.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'backfill-entry-prize.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'verify-d117-fill.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },

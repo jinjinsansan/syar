@@ -540,10 +540,36 @@ const { randomUUID } = await import('node:crypto');
 for (const h of rows) uuid.set(h.record.id, randomUUID());
 
 const stableId = (sid) => Number(String(sid).replace(/\D/g, ''));
+/** ★親の id を DB の id に置き換える。★投入されない親は `null`（★数えます・下の註記） */
+function mappedParent(parentId) {
+  if (!parentId) return null;
+  const mapped = uuid.get(parentId);
+  if (mapped === undefined) { droppedParents += 1; return null; }
+  return mapped;
+}
 /** ★投入にかかった時間（★運用簿の「作り直し全体に何分か」の内訳） */
 const tInsert = process.hrtime.bigint();
 let n = 0;
 const tally = { active: 0, stallion: 0, broodmare: 0, honored: 0 };
+/**
+ * 🔴 ★**投入されない祖先を、★数えます**（★2026-09-21・簿 `SEED-WORLD-DROPS-PRUNED-ANCESTOR`）。
+ *
+ * 【★なぜ数えるか — ★黙って落ちていました】
+ *   ★`runPreseed` の ★**枝刈り**（`simulator.ts` 手順 8）は、★生きている馬と
+ *   ★**その 5 代血統に出る祖先**だけを残します。
+ *   ⚠️ ★残った祖先の ★**さらに親**は残りません。★正しい枝刈りです（★模擬の結果は同じ）。
+ *   🔴 ★ところが ★**投入はそれを黙って別のものに変えていました**:
+ *     ★`r.damId ? uuid.get(r.damId) ?? null : null` … ★**親が消えて `null`**（★実測 staging 38 頭）
+ *     ★`uuid.get(ancestorId) ?? ancestorId`         … 🔴 ★**プリシードの id がそのまま鍵に残る**
+ *   ★★後者は、★2026-09-21 に直したはずの ★**同じ穴の残り**です（★`52924fd`）。
+ *
+ * 【★どう直したか】
+ *   ★① ★投入されない祖先は ★**写しから落とします**（★`null` の親と辻褄が合う）
+ *   ★② ★**数を出します**。★黙って減らしません。
+ *   ⚠️ ★枝刈りそのものは変えていません（★模擬の同値性はテスト済み・`simulator.ts`）。
+ */
+let droppedParents = 0;
+let droppedAncestors = 0;
 for (const h of rows) {
   const r = h.record;
   const life = lifeColumns(r.id);
@@ -558,7 +584,7 @@ for (const h of rows) {
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,
              $30,$31,$32,$33,$34)`,
     [uuid.get(r.id), stableId(h.stableId), h.name, r.sex, r.birthYear, r.generation,
-     r.sireId ? uuid.get(r.sireId) ?? null : null, r.damId ? uuid.get(r.damId) ?? null : null,
+     mappedParent(r.sireId), mappedParent(r.damId),
      r.sireLine, r.damSireLine, JSON.stringify(r.genotype), JSON.stringify(r.potential),
      JSON.stringify(r.stats), r.unlockRate, JSON.stringify(r.surfaceAptitude),
      r.distanceCenter, r.distanceRange, JSON.stringify(r.strategyAptitude), r.heavyAptitude,
@@ -575,10 +601,18 @@ for (const h of rows) {
       *     ★祖先をたどる経路（★近交係数・★5 代血統の表示）が ★**成立しません**。
       *   🔴 ★これを UUID として問い合わせた私の `breeding-runner` は、
       *     ★本番で ★**週送りごと落としました**（★`invalid input syntax for type uuid`）。
-      *     ★→ ★配備を戻しました。★★この直しには ★**世界の作り直し**が要ります。
+      *     ★→ ★配備を戻しました。
+      *
+      * 🔴 ★**2026-09-21（2 度目）: ★`?? ancestorId` が ★残りの穴でした。**
+      *   ★投入されない祖先（★枝刈りの縁）に当たると、★**プリシードの id が鍵に残ります**。
+      *   → ★**落とします**（★上の `droppedAncestors` で数えます）。
       */
      JSON.stringify(Object.fromEntries(
-       [...r.pedigreeCache].map(([ancestorId, v]) => [uuid.get(ancestorId) ?? ancestorId, v]),
+       [...r.pedigreeCache].flatMap(([ancestorId, v]) => {
+         const mapped = uuid.get(ancestorId);
+         if (mapped === undefined) { droppedAncestors += 1; return []; }
+         return [[mapped, v]];
+       }),
      )),
      r.foalCount, r.g1Wins,
      life.birthWeek, life.lastProcessedWeek,
@@ -589,6 +623,20 @@ for (const h of rows) {
 }
 console.log(`\r  投入 ${n} 頭 完了            `
   + `（${(Number(process.hrtime.bigint() - tInsert) / 1e9).toFixed(1)}秒）`);
+/**
+ * 🔴 ★**枝刈りの縁で落ちたものを、★必ず出します**（★2026-09-21）。
+ *   ⚠️ ★これは ★**不具合ではありません**（★枝刈りは正しい）。★ですが ★**黙って減らさない**。
+ *   ★`droppedParents` … ★その馬の親が投入されない ＝ ★**DB では片親／両親が `null`**
+ *   ★`droppedAncestors` … ★5 代血統の写しから ★**落とした祖先の延べ数**
+ */
+if (droppedParents > 0 || droppedAncestors > 0) {
+  console.log(`  ⚠️ ★枝刈りの縁: ★親が投入されない ${droppedParents} 件 / `
+    + `★写しから落とした祖先 ${droppedAncestors} 件`);
+  console.log('     ★枝刈り（`simulator.ts` 手順 8）は 5 代ぶんだけ残します。'
+    + '★その縁の馬は、★DB では親が `null` になります');
+} else {
+  console.log('  ✓ ★枝刈りの縁で落ちたものは 0 件（★親も祖先も、★すべて投入されています）');
+}
 /**
  * ★**相性表を DB へ転記します**（★発明ではなく転記・★`0054` の `nicks`）。
  *   🔴 ★**種も一緒に記録します** — ★どの種から出た表かが分からなくなると、

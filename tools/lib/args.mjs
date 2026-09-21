@@ -124,3 +124,50 @@ export function productionOptInProblem({
   }
   return null;
 }
+
+/**
+ * 🔴 ★**本番の `pedigree_cache` を直してよいか**（★2026-09-21・簿 `PEDIGREE-CACHE-IDS-NOT-DB-IDS`）。
+ *
+ * 【★`productionOptInProblem` と ★**別の関数にした理由**】
+ *   ★同じ形（★旗 2 つ ＋ 写せない数 1 つ）ですが、★**要求する数が違います**:
+ *     ★`seed-world`  … ★いまの ★**頭数**（★世界を消すので、★世界の大きさを見せる）
+ *     ★この道具      … ★いまの ★**壊れている頭数**（★直す対象の大きさを見せる）
+ *   ⚠️ ★頭数を要求すると、★★**seed-world の手順書からそのまま写せてしまいます**。
+ *     ★★「写せない数」という仕掛けは、★**他の道具と数が同じになった瞬間に死にます。**
+ *
+ * 【★2 つを歩調を合わせるのは ★**コードの共有ではなく検査**です】
+ *   ★`apps/cli/test/migrate-guard.test.ts` が ★**両方の関門**に同じ 5 段を課します。
+ *   ★片方に段を足して、★もう片方に足し忘れたら ★**そこで落ちます**。
+ *
+ * 【★戻り値】★問題があれば ★**理由の文字列**、★無ければ `null`。
+ *   ⚠️ ★呼ぶ側は ★**終了コード 2（判定不能）**で終わること（★1 ではない）。
+ * 🔴 ★**理由の文に、★いまの実数を書かないこと**（★書くと「見る」が起きません）。
+ */
+export function productionRepairOptInProblem({
+  environment, yesProduction = false, repairFlag = false,
+  expectBroken = null, actualBroken = null,
+}) {
+  if (environment !== 'production') return null;   // ★本番以外は、この関門を作らない
+  if (!yesProduction) {
+    return '本番の血統の写しを書き換えるには --yes-production が要ります'
+      + '（★--env を書いただけでは、staging のつもりで production と打った場合を止められません）';
+  }
+  if (!repairFlag) {
+    return '本番では --repair-pedigree も要ります'
+      + '（★migrate や seed-world と同じ指で打てないように、★この道具だけの旗を 1 つ 立てさせます）';
+  }
+  if (!Number.isInteger(expectBroken)) {
+    return '本番では --expect-broken <いまの壊れている頭数> が要ります'
+      + '（★数は手順書から写せません。★その場で数えた人だけが通れます）';
+  }
+  if (!Number.isInteger(actualBroken)) {
+    return 'いまの壊れている頭数を数えられませんでした（★数えられないなら通しません）';
+  }
+  if (expectBroken !== actualBroken) {
+    // 🔴 ★**実数をここに書かないこと**（★2026-09-20・レビュー側の指摘と同じ）
+    return `--expect-broken ${expectBroken} と、いまの実数が違います`
+      + '（★世界が想定と違います。★**間違いではなく「見てから来い」**です。'
+      + '★実数はここには出しません）';
+  }
+  return null;
+}
