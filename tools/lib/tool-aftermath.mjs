@@ -76,6 +76,13 @@ export const TOOL_AFTERMATH = {
     // ★AU-7: ★主張には引用を付ける。★この行が変われば、★検査が壊れて落ちます
     countedBy: 'JSON.stringify(after) === JSON.stringify(before)',
   },
+  'verify-breed-own-mare-live.mjs': {
+    mode: 'restores',
+    why: '★`begin` → 利用者・母の持ち主と役割・`request_breeding`・`confirmBreeding`（★種付料の引き落とし）→ ★**必ず `rollback`**（`finally`）。'
+      + '✅ ★**戻したことを数えます**: ★判定 ⑦ が ★要求・下書き・台帳・馬の行数の 前後一致を見ます。'
+      + '⚠️ ★`confirmBreeding` は取引に触らない（★種付料だけセーブポイント・`player-breeding.test.ts` が釘付け）',
+    countedBy: 'JSON.stringify(before) === JSON.stringify(after)',
+  },
   'verify-role-request-live.mjs': {
     mode: 'restores',
     why: '★`begin` → 利用者・持ち主の付け替え・`request_breeding_role`・`runBreedingWeek`・0025 の購入の一時的な定義 → ★**必ず `rollback`**（`finally`）。'

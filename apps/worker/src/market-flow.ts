@@ -88,11 +88,12 @@ export async function refreshMarketListings(
    *    ★付与（初期馬）と購入が ★**ちょうど補集合**になります。
    * ⚠️ ★`prize_pp` が null の行（★`0049` より前・★埋め戻していない）は ★**0 として数えません** —
    *    ★`sum` が null を飛ばすので、★「まだ書いていない」が「0 稼いだ」に化けません。
+   *    ★数え方は SQL の関数 `horse_total_prize_pp`（★`0071`）の 1 か所。★種付料（`player-breeding.ts`）も同じ関数を呼ぶ
+   *    （★裁定 `REVIEW_BREED_OWN_MARE_VERDICT_20260922.md` §3）。
    */
   const poolRes = await client.query<PoolRow>(
     `select h.id, h.g1_wins,
-            coalesce((select sum(e.prize_pp) from race_entries e
-                       where e.horse_id = h.id and e.prize_pp is not null), 0)::bigint as earnings
+            horse_total_prize_pp(h.id) as earnings
        from horses h
       where ${CANDIDATE_WHERE}
       order by h.id

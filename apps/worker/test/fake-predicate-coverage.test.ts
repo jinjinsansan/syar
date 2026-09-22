@@ -88,10 +88,9 @@ const PAIRINGS: readonly Pairing[] = [
       'h.npc_stable_id is not null': 'asserted',
       'h.retired_at_week is null': 'asserted',
       'e.finish_pos is not null': 'asserted',
-      'e.prize_pp is not null': 'ignores',
     },
-    whyIgnored: '★`e.prize_pp is not null` は**価格の材料**を引く側で、'
-      + '★候補の集合（`CANDIDATE_WHERE`）を決める述語ではない。★MK-1 で数えたのは候補の側。',
+    // ★`e.prize_pp is not null`（★価格の材料）は ★2026-09-22 に SQL の関数 `horse_total_prize_pp`（`0071`）へ移した
+    whyIgnored: '★（無視しているものはありません）',
   },
   {
     fake: 'apps/worker/test/story-flow.test.ts',

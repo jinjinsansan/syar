@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BALANCE, FOUNDERS, createFounder, deriveRng } from '@star/sim-engine';
-import { OWNERSHIP_LIMITS } from '@star/scheduler';
+import { OWNERSHIP_LIMITS, npcStudFee } from '@star/scheduler';
 import {
   PLAYER_BREEDING_MAX_ATTEMPTS, PLAYER_FOAL_KEY_PREFIX, confirmInitialBreeding,
   playerBreedingContext, runPlayerBreeding,
@@ -51,6 +51,14 @@ interface FakeOptions {
   readonly damCandidates?: boolean;
   /** ★下書きの insert で ★この例外を投げる（★一意違反の形を作る） */
   readonly draftInsertError?: unknown;
+  /** ★要求の種類（★既定 'breed_initial'） */
+  readonly kind?: 'breed_initial' | 'breed';
+  /** ★`kind = 'breed'` の「払ってよい上限」 */
+  readonly maxFee?: number;
+  /** ★父の総獲得賞金（★`horse_total_prize_pp`・既定 0） */
+  readonly prize?: number;
+  /** ★種付料の引き落としが EP 不足（★ST001）で落ちる */
+  readonly epShort?: boolean;
 }
 
 /** ★genotype を手で作らない（★`breeding-runner.test.ts` と同じ理由） */
@@ -86,7 +94,7 @@ function fakeClient(o: FakeOptions) {
       }
       if (sql.startsWith("select id, kind from foal_requests where status = 'pending'")) {
         const n = o.pendingCount ?? 1;
-        return { rows: Array.from({ length: n }, () => ({ id: REQ, kind: 'breed_initial' })), rowCount: n };
+        return { rows: Array.from({ length: n }, () => ({ id: REQ, kind: o.kind ?? 'breed_initial' })), rowCount: n };
       }
       if (sql.startsWith('select count(*)::text n, (extract(epoch')) {
         return { rows: [{ n: '0', age: null }], rowCount: 1 };
@@ -97,9 +105,15 @@ function fakeClient(o: FakeOptions) {
       }
       if (sql.startsWith('select min(birth_year')) return { rows: [{ mn: '46', mx: '46' }], rowCount: 1 };
       if (sql.startsWith('select sire_line, dam_sire_line')) return { rows: [], rowCount: 0 };
-      if (sql.startsWith('select id, user_id, sire_id, dam_id, seed_key from foal_requests')) {
+      if (sql.startsWith('select id, user_id, sire_id, dam_id, seed_key, kind, max_fee_ep from foal_requests')) {
         clock += o.costMs ?? 0;          // ★1 件ぶんの所要を、★偽の時計に載せる
-        return { rows: [{ id: REQ, user_id: USER, sire_id: SIRE, dam_id: DAM, seed_key: SEED_KEY }], rowCount: 1 };
+        return {
+          rows: [{
+            id: REQ, user_id: USER, sire_id: SIRE, dam_id: DAM, seed_key: SEED_KEY, kind: o.kind ?? 'breed_initial',
+            max_fee_ep: o.maxFee === undefined ? null : String(o.maxFee),
+          }],
+          rowCount: 1,
+        };
       }
       if (sql.includes('from horses where id = $1 for update')) {
         if (params[0] === DAM) {
@@ -129,7 +143,11 @@ function fakeClient(o: FakeOptions) {
         if (o.failDraftInsert === true) throw new Error('★わざと落とす（★breed() の後）');
         return { rows: [], rowCount: 1 };
       }
-      if (sql.startsWith('select coalesce(sum(prize_pp)')) return { rows: [{ e: '0' }], rowCount: 1 };
+      if (sql.startsWith('select horse_total_prize_pp')) return { rows: [{ e: String(o.prize ?? 0) }], rowCount: 1 };
+      if (sql.startsWith('select spend_stud_fee_ep')) {
+        if (o.epShort === true) throw Object.assign(new Error('EP が不足している'), { code: 'ST001' });
+        return { rows: [{ spend_stud_fee_ep: '0' }], rowCount: 1 };
+      }
       return { rows: [], rowCount: 1 };
     },
   };
@@ -312,5 +330,65 @@ describe('★PLAN I-2: プレイヤーの配合の確定', () => {
     const r = await run(client);
     expect(r.skipped).toBe(true);
     expect(sqls(seen).some((x) => x.includes('from foal_requests'))).toBe(false);
+  });
+});
+
+describe('★自分の繁殖牝馬で配合する（★kind = breed・裁定 REVIEW_BREED_OWN_MARE_VERDICT_20260922.md）', () => {
+  /** ★NPC 種牡馬の式の下限（★G1 0 勝・賞金 0）。★額は `npcStudFee` で出す（★ここで数を書かない） */
+  const baseFee = npcStudFee(0, 0);
+  const own = { kind: 'breed' as const, damOwner: USER, damRole: 'broodmare' };
+
+  it('★成功: ★確定の額を引き・★完了に額を書き・★免除の記帳はしない', async () => {
+    const { client, seen } = fakeClient({ ...own, maxFee: baseFee });
+    const r = await run(client);
+    expect(r).toMatchObject({ done: 1, failed: 0, errors: 0 });
+    const spend = seen.find((x) => x.sql.startsWith('select spend_stud_fee_ep'));
+    expect(spend?.params).toEqual([REQ, baseFee]);
+    const done = seen.find((x) => x.sql.startsWith("update foal_requests set status = 'done'"));
+    expect(done?.sql).toContain('stud_fee_ep');
+    expect(Number(done?.params[2])).toBe(baseFee);
+    expect(seen.some((x) => x.sql.startsWith('insert into ep_ledger')), '★免除の記帳をした（★初回だけのもの）').toBe(false);
+  });
+
+  it('🔴 ★額が上限を超えたら fee_above_max（★引かない・★仔を作らない）', async () => {
+    const { client, seen } = fakeClient({ ...own, maxFee: baseFee, prize: 1_000_000 });
+    expect(npcStudFee(0, 1_000_000)).toBeGreaterThan(baseFee);
+    const r = await run(client);
+    expect(r).toMatchObject({ done: 0, failed: 1 });
+    const failed = seen.find((x) => x.sql.startsWith("update foal_requests set status = 'failed'"));
+    expect(failed?.params[1]).toBe('fee_above_max');
+    expect(seen.some((x) => x.sql.startsWith('select spend_stud_fee_ep'))).toBe(false);
+    expect(seen.some((x) => x.sql.startsWith('insert into foal_drafts'))).toBe(false);
+  });
+
+  it('🔴 ★EP が足りなければ ep_short（★セーブポイントまで戻し・★仔を作らない・★取引は確定する）', async () => {
+    const { client, seen } = fakeClient({ ...own, maxFee: baseFee, epShort: true });
+    const r = await run(client);
+    expect(r).toMatchObject({ done: 0, failed: 1, errors: 0 });
+    const s = sqls(seen);
+    expect(s).toContain('rollback to savepoint stud_fee');
+    const failed = seen.find((x) => x.sql.startsWith("update foal_requests set status = 'failed'"));
+    expect(failed?.params[1]).toBe('ep_short');
+    expect(s.some((x) => x.startsWith('insert into foal_drafts'))).toBe(false);
+    expect(s.lastIndexOf('commit')).toBeGreaterThan(s.indexOf('rollback to savepoint stud_fee'));
+  });
+
+  it('★母が自分の繁殖牝馬でなくなっていたら dam_not_candidate（★確定までに役割が変わりうる）', async () => {
+    for (const o of [{ damRole: 'honored' }, { damOwner: null }]) {
+      const { client, seen } = fakeClient({ ...own, maxFee: baseFee, ...o });
+      await run(client);
+      const failed = seen.find((x) => x.sql.startsWith("update foal_requests set status = 'failed'"));
+      expect(failed?.params[1], JSON.stringify(o)).toBe('dam_not_candidate');
+    }
+  });
+
+  it('★ロックは 利用者 → 母 → 父（★役割の変更・購入と同じ「利用者 → 馬」の順）', async () => {
+    const { client, seen } = fakeClient({ ...own, maxFee: baseFee });
+    await run(client);
+    const s = sqls(seen);
+    const user = s.findIndex((x) => x.startsWith('select 1 from users where id = $1 for update'));
+    const horse = s.findIndex((x) => x.includes('from horses where id = $1 for update'));
+    expect(user).toBeGreaterThan(-1);
+    expect(horse).toBeGreaterThan(user);
   });
 });

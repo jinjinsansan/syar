@@ -90,6 +90,16 @@ const READONLY_FUNCTIONS = [
    *   ★段階は在る行から導く（★書き写さない）。★事実だけ返し、★時間の計算はしない。
    */
   'my_onboarding_state',
+  /**
+   * ★持ち主の居ない種牡馬の事実（`0071`・裁定 REVIEW_BREED_OWN_MARE_VERDICT_20260922.md §2）。`stable` で**状態を変えない**。
+   *   ★残り枠も額も計算しない（★画面が packages/ の関数で出す）。★書き込む側（`request_breeding`）は `assert_setup_complete()` を呼ぶ。
+   */
+  'npc_stallion_facts',
+  /**
+   * ★総獲得賞金（`0071`・裁定 REVIEW_BREED_OWN_MARE_VERDICT_20260922.md §3）。`language sql stable` で**状態を変えない**。
+   *   ★利用者のロールからは実行できない（★revoke）。★`npc_stallion_facts` とワーカーが呼ぶ
+   */
+  'horse_total_prize_pp',
 ];
 
 /**
@@ -110,6 +120,11 @@ const WORKER_ONLY_FUNCTIONS = [
    *    （★照会 `QUESTIONS_UI_SETUP_HORSE_20260918.md` §2 の案 B の穴）。
    */
   'pick_initial_horse',
+  /**
+   * ★種付料の引き落とし（`0071`・裁定 REVIEW_BREED_OWN_MARE_VERDICT_20260922.md §4）。★`spend_training_ep` と同じ作り。
+   *   ★利用者ロールから実行できない（★revoke）・★`auth.uid()` を使わない（★要求の行から利用者を引く）
+   */
+  'spend_stud_fee_ep',
 ];
 
 /**

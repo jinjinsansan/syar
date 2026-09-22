@@ -77,7 +77,11 @@ export type PlayerBreedingFailure =
   /** ★母の候補（★引退した産める NPC 牝馬）が 1 頭もいない（★次の年に戻る・裁定 8a32840 §5・★internal_error とは別の見せ方） */
   | 'no_candidate'
   /** ★`PLAYER_BREEDING_MAX_ATTEMPTS` 回 続けて例外で戻した（★利用者は仔を見ていない） */
-  | 'internal_error';
+  | 'internal_error'
+  /** ★確定のときの種付料が、★依頼の「払ってよい上限」を超えた（★`kind = 'breed'`・裁定 REVIEW_BREED_OWN_MARE_VERDICT_20260922.md B-4） */
+  | 'fee_above_max'
+  /** ★種付料を払う EP が足りない（★待たない・やり直さない・B-2） */
+  | 'ep_short';
 
 export interface PlayerBreedingResult {
   /** ★`foal_requests` が無い（★移行 `0061` の前）ので何もしなかった */
@@ -205,15 +209,40 @@ export async function playerBreedingContext(
  *   （★2026-09-21 に staging を 2 度 汚した形・記憶「rollback は自分で commit する関数を戻さない」）。
  *   ★そうしておけば、★staging の実演（`tools/verify-player-breeding-live.mjs`）が ★**全体を包んで必ず戻せます**。
  */
-export async function confirmInitialBreeding(
+/**
+ * ★**自分の繁殖牝馬の母か**（★`kind = 'breed'`・裁定 `REVIEW_BREED_OWN_MARE_VERDICT_20260922.md`）。
+ *   ★受付の RPC（`request_breeding`・`0071`）も同じ条件を見るが、★確定までに役割や持ち主が変わりうるので、★ここでも見る。
+ */
+function isOwnBroodmare(row: Record<string, unknown>, userId: string): boolean {
+  return row['owner_id'] === userId && row['retirement_role'] === 'broodmare' && row['birth_week'] !== null;
+}
+
+/** ★種付料の引き落としが EP 不足で落ちたか（★`spend_stud_fee_ep` の `ST001`・`spend_training_ep` と同じ） */
+function isEpShort(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && (e as { code?: unknown }).code === 'ST001';
+}
+
+/**
+ * ★**配合の要求 1 件を確定する**（★`kind = 'breed_initial'`・`'breed'` の両方・★経路は 1 本）。
+ *   ★違いは 2 つだけ: ★母の条件（★NPC の功労馬／★自分の繁殖牝馬）と ★種付料（★免除を記帳／★EP から引く）。
+ *
+ * 🔴 ★**この関数は `begin` / `commit` / `rollback` をしません**（★呼ぶ側が 1 件ごとに取引を張る）。
+ *   ★内側で `commit` すると、★包んだ側の `rollback` が効かなくなります
+ *   （★2026-09-21 に staging を 2 度 汚した形・記憶「rollback は自分で commit する関数を戻さない」）。
+ *   ★種付料の引き落としだけは ★**セーブポイント**で包みます（★EP 不足で落ちても、★要求を `failed` にして残すため）。
+ */
+export async function confirmBreeding(
   client: pg.ClientBase,
   requestId: string,
   ctx: PlayerBreedingContext,
 ): Promise<PlayerBreedingOutcome> {
   {
-    const reqRes = await client.query<{ id: string; user_id: string; sire_id: string; dam_id: string; seed_key: string }>(
-      "select id, user_id, sire_id, dam_id, seed_key from foal_requests"
-        + " where id = $1 and status = 'pending' and kind = 'breed_initial' for update skip locked",
+    const reqRes = await client.query<{
+      id: string; user_id: string; sire_id: string; dam_id: string; seed_key: string; kind: string;
+      max_fee_ep: string | null;
+    }>(
+      "select id, user_id, sire_id, dam_id, seed_key, kind, max_fee_ep from foal_requests"
+        + " where id = $1 and status = 'pending' and kind in ('breed_initial', 'breed') for update skip locked",
       [requestId],
     );
     const req = reqRes.rows[0];
@@ -230,12 +259,21 @@ export async function confirmInitialBreeding(
       return 'failed';
     };
 
-    // ★ロックは 母 → 父（★NPC の経路が母の印を先に取るのと同じ順・裁定 §1 条件 3）
+    /**
+     * ★ロックは ★要求 → 利用者 → 母 → 父。
+     *   ★利用者の行を先に取るのは、★役割の変更（`request_breeding_role`）・購入（`buy_horse`）と同じ順にするため
+     *   （★どちらも「利用者 → 馬」。★逆順だと、★同じ母の役割の変更と配合の確定が待ち合って止まる）。
+     *   ★所有上限の数え（★下）も、★購入と取り合わない。
+     */
+    await client.query('select 1 from users where id = $1 for update', [req.user_id]);
+    // ★母 → 父（★NPC の経路が母の印を先に取るのと同じ順・裁定 §1 条件 3）
     const parentSql = `select ${BREEDING_COLS}, owner_id, retirement_role from horses where id = $1 for update`;
     const damRow = (await client.query(parentSql, [req.dam_id])).rows[0] as Record<string, unknown> | undefined;
     const sireRow = (await client.query(parentSql, [req.sire_id])).rows[0] as Record<string, unknown> | undefined;
     if (damRow === undefined || sireRow === undefined) return fail('parent_missing');
-    if (!isInitialParent(damRow, 'honored')) {
+    if (req.kind === 'breed') {
+      if (!isOwnBroodmare(damRow, req.user_id)) return fail('dam_not_candidate');
+    } else if (!isInitialParent(damRow, 'honored')) {
       return fail(await damCandidateExists(client, ctx) ? 'dam_not_candidate' : 'no_candidate');
     }
     if (!isInitialParent(sireRow, 'stallion')) return fail('sire_not_candidate');
@@ -260,6 +298,27 @@ export async function confirmInitialBreeding(
       [req.user_id],
     );
     if (!canOwnMore('active', Number(ownedRes.rows[0]?.n ?? 0))) return fail('owner_limit');
+
+    /**
+     * ★**種付料**（★`kind = 'breed'`・B-1: ★確定のときに引く）。★額は ★確定のときの NPC 種牡馬の式（`npcStudFee`・§10.5）。
+     *   ★上限（`max_fee_ep`）は ★断る理由にしか使わない（★利用者の申告で額が下がる経路は無い・憲法 3・B-4）。
+     *   ★NPC の種牡馬なので ★全額焼却（★利用者の間で EP は動かない）。
+     */
+    let studFee: number | null = null;
+    if (req.kind === 'breed') {
+      const fee = npcStudFee(sire.g1Wins, await totalPrizePP(client, sire.id));
+      if (req.max_fee_ep === null || fee > Number(req.max_fee_ep)) return fail('fee_above_max');
+      await client.query('savepoint stud_fee');
+      try {
+        await client.query('select spend_stud_fee_ep($1, $2)', [req.id, fee]);
+        await client.query('release savepoint stud_fee');
+      } catch (e) {
+        await client.query('rollback to savepoint stud_fee');
+        if (isEpShort(e)) return fail('ep_short');
+        throw e;
+      }
+      studFee = fee;
+    }
 
     // ── ★ここから先は「失敗」にしない（★落ちたら取引ごと戻し、要求は待ちのまま）──
     const light = await loadAncestorLookup(client, [sire, dam]);
@@ -296,18 +355,21 @@ export async function confirmInitialBreeding(
       'update horses set coverings_this_year = coverings_this_year + 1 where id = $1', [sire.id],
     );
 
+    if (req.kind === 'breed') {
+      await client.query(
+        "update foal_requests set status = 'done', result_id = $2, stud_fee_ep = $3, processed_at = now() where id = $1",
+        [req.id, foalId, studFee],
+      );
+      return 'done';
+    }
+
     /**
      * ★**種付料の免除を記帳**（★D-120 ②・黙って 0 にしない）。
      *   ★額は ★確定の時点の NPC 種牡馬の式（`npcStudFee`・§10.5）。★総獲得賞金は `market-flow.ts` と同じ数え方。
      *   ★EP の台帳には ★**増減 0 の `stud_fee` 行**を置き、★要求の行に額を書きます
      *   （★焼却と同じ場所〔`ep_ledger.reason = 'stud_fee'`〕から、★要求 ID で辿れる）。
      */
-    const earnRes = await client.query<{ e: string }>(
-      'select coalesce(sum(prize_pp), 0)::text e from race_entries'
-        + ' where horse_id = $1 and prize_pp is not null',
-      [sire.id],
-    );
-    const waived = npcStudFee(sire.g1Wins, Number(earnRes.rows[0]?.e ?? 0));
+    const waived = npcStudFee(sire.g1Wins, await totalPrizePP(client, sire.id));
     const ledger = await client.query(
       'insert into ep_ledger (user_id, delta, balance_after, reason, ref_id, dedupe_key)'
         + " select id, 0, entry_points, 'stud_fee', $2, $3 from users where id = $1",
@@ -325,11 +387,23 @@ export async function confirmInitialBreeding(
   }
 }
 
+/** ★初回の配合の確定（★`confirmBreeding` の旧名・★既存の道具と試験のために残す・★中身は同じ関数） */
+export const confirmInitialBreeding = confirmBreeding;
+
+/**
+ * ★**総獲得賞金**（★数え方は SQL の関数 `horse_total_prize_pp` の 1 か所・裁定 `REVIEW_BREED_OWN_MARE_VERDICT_20260922.md` §3）。
+ *   ★種付料（★EP の焼却の額）と ★馬の値段（★D-102・`market-flow.ts`）が ★同じ数え方から出る。
+ */
+async function totalPrizePP(client: pg.ClientBase, horseId: string): Promise<number> {
+  const r = await client.query<{ e: string }>('select horse_total_prize_pp($1)::text e', [horseId]);
+  return Number(r.rows[0]?.e ?? 0);
+}
+
 /** ★待っている件数と、★最古の要求の年齢（★DB の `now()` で測る・`Date.now()` を使わない） */
 async function backlogOf(client: pg.ClientBase): Promise<{ backlog: number; oldestPendingMs: number | null }> {
   const r = (await client.query<{ n: string; age: string | null }>(
     "select count(*)::text n, (extract(epoch from (now() - min(created_at))) * 1000)::bigint::text age"
-      + " from foal_requests where status = 'pending' and kind in ('breed_initial', 'name')",
+      + " from foal_requests where status = 'pending' and kind in ('breed_initial', 'breed', 'name')",
   )).rows[0];
   return {
     backlog: Number(r?.n ?? 0),
@@ -361,7 +435,7 @@ export async function runPlayerBreeding(
   } as const;
   if (!(await tableExists(client, 'foal_requests'))) return { skipped: true, ...empty };
   const pending = await client.query<{ id: string; kind: string }>(
-    "select id, kind from foal_requests where status = 'pending' and kind in ('breed_initial', 'name')"
+    "select id, kind from foal_requests where status = 'pending' and kind in ('breed_initial', 'breed', 'name')"
       + ' order by attempts, created_at, id limit $1',
     [limit],
   );
@@ -390,7 +464,7 @@ export async function runPlayerBreeding(
     try {
       const o = kind === 'name'
         ? await confirmFoalName(client, id, namingCtx)
-        : await confirmInitialBreeding(client, id, ctx);
+        : await confirmBreeding(client, id, ctx);
       await client.query('commit');
       if (o === 'done') done += 1;
       else if (o === 'failed') failed += 1;
