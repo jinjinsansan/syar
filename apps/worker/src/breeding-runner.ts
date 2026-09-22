@@ -33,6 +33,13 @@ import {
 } from '@star/scheduler';
 
 import { rowToHorse } from './horse-repo.js';
+import { isNameKeyConflict } from './player-naming.js';
+
+/**
+ * ★**NPC の仔の名前が一意違反で週を戻した回数**（★起動から・★メモリ上・再起動で 0）。
+ *   ★警報の文に「何回目か」を出すため（★裁定 `REVIEW_I3_NAMING_VERDICT_20260922.md` §9）。
+ */
+let nameKeyConflictWeeks = 0;
 
 /**
  * ★**誰を繁殖牝馬に上げるか**（★2026-09-20・裁定 ③ は ★**測ってから**決めます）。
@@ -874,6 +881,16 @@ export async function runBreedingCatchUp(
       await client.query('commit');
     } catch (e) {
       await client.query('rollback');
+      /**
+       * ★**馬名の一意違反で週を戻した**（★移行 `0066`・裁定 `REVIEW_I3_NAMING_VERDICT_20260922.md` §9）。
+       *   ★次の周に使用済みの名前（`loadFoalNaming` の `taken`）を DB から読み直すので、★衝突した名前を避けて引き直す。
+       *   ★セーブポイントの 1 頭の引き直しは入れない代わりに ★**数えて警報**（★黙ってやり直し続けない）。
+       */
+      if (isNameKeyConflict(e)) {
+        nameKeyConflictWeeks += 1;
+        onAlert(`★NPC の仔の名前が馬名の一意違反になり、★週 ${w} を戻しました`
+          + `（★起動から ${nameKeyConflictWeeks} 回目・★次の周に名前を引き直します）`);
+      }
       throw e;
     }
     if (r.week !== w) {

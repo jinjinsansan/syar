@@ -29,6 +29,8 @@ interface FakeOptions {
   lastBredWeek: number | null;
   /** ★`world_state` の行が無い場合 */
   noWorldRow?: boolean;
+  /** ★週の中で ★この例外を投げる（★馬名の一意違反の形を作る） */
+  weekError?: unknown;
   /** ★1 週あたり、偽の時計を何 ms 進めるか */
   weekCostMs?: number;
 }
@@ -56,6 +58,7 @@ function fakeClient(o: FakeOptions) {
        *   → ★★この検査は「どの週を頼んだか」だけを見られます。
        */
       if (sql.includes("retirement_role = 'broodmare' order by id")) {
+        if (o.weekError !== undefined) throw o.weekError;
         clock += cost;                 // ★1 週ぶんの費用を、★偽の時計に載せる
         return { rows: [], rowCount: 0 };
       }
@@ -148,5 +151,27 @@ describe('🔴 ★配合の追いつき（★予算つき）', () => {
      *   → ★1 周に 2 週 以上 進むなら、★必ず縮みます。
      */
     expect(r.weeks.length, '🔴 ★1 周に 2 週 未満 ＝ ★永久に追いつきません').toBeGreaterThanOrEqual(2);
+  });
+
+  it('★馬名の一意違反で週を戻したら ★警報を出して投げ直す（★裁定 f117984 §9）・★印は進めない', async () => {
+    const conflict = Object.assign(new Error('duplicate key'), { code: '23505', constraint: 'horses_name_key_unique' });
+    const f = fakeClient({ lastBredWeek: 299, weekError: conflict });
+    const alerts: string[] = [];
+    await expect(runBreedingCatchUp(
+      f.client, nowForWeek(300), EPOCH, (m) => alerts.push(m), undefined, 'top', 13, 800,
+      { budgetMs: 60_000, monotonicMs: f.monotonicMs },
+    )).rejects.toBe(conflict);
+    expect(alerts.some((m) => m.includes('一意違反') && m.includes('週 300')), '★一意違反を黙った').toBe(true);
+    expect(f.written, '★戻したのに週の印を進めた').toEqual([]);
+  });
+
+  it('★対照: ★別の例外では ★一意違反の警報を出さない', async () => {
+    const f = fakeClient({ lastBredWeek: 299, weekError: new Error('別の失敗') });
+    const alerts: string[] = [];
+    await expect(runBreedingCatchUp(
+      f.client, nowForWeek(300), EPOCH, (m) => alerts.push(m), undefined, 'top', 13, 800,
+      { budgetMs: 60_000, monotonicMs: f.monotonicMs },
+    )).rejects.toThrow('別の失敗');
+    expect(alerts.some((m) => m.includes('一意違反'))).toBe(false);
   });
 });

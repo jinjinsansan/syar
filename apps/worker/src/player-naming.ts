@@ -24,6 +24,20 @@ import { checkPlayerHorseName, normalizeName } from '@star/sim-engine';
 import type { NameBlocklist, PlayerNameRejection } from '@star/sim-engine';
 import { loadNameBlocklist } from '../../cli/src/name-blocklist.js';
 
+/** ★馬名の一意（★移行 `0066`）の制約名 */
+export const NAME_KEY_UNIQUE_CONSTRAINT = 'horses_name_key_unique';
+
+/**
+ * ★**例外が「馬名の一意違反」か**（★NPC の配合・命名の確定で共通・裁定 `REVIEW_I3_NAMING_VERDICT_20260922.md` §9）。
+ *   ★一意違反は ★取引ごと戻り、★次の周に使用済みの名前を読み直してやり直します（★セーブポイントの引き直しは入れない）。
+ *   ★その代わり ★**戻った回数を数えて警報に出します**（★黙ってやり直し続けない）。
+ */
+export function isNameKeyConflict(e: unknown): boolean {
+  const err = e as { code?: unknown; constraint?: unknown } | null;
+  return err !== null && typeof err === 'object'
+    && err.code === '23505' && err.constraint === NAME_KEY_UNIQUE_CONSTRAINT;
+}
+
 /** ★命名の失敗の理由（★画面はこの語を読んで出す・★黙って消さない） */
 export type FoalNameFailure =
   | PlayerNameRejection

@@ -22,6 +22,7 @@ import {
   playerBreedingContext, runPlayerBreeding,
 } from '../../worker/src/player-breeding.js';
 import { idAndSeedFromKey } from '../../worker/src/breeding-runner.js';
+import { isNameKeyConflict } from '../../worker/src/player-naming.js';
 
 const REQ = '11111111-1111-4111-8111-111111111111';
 const USER = '22222222-2222-4222-8222-222222222222';
@@ -46,6 +47,8 @@ interface FakeOptions {
   readonly owned?: number;
   /** ★`breed()` の後（★下書きの insert）で落とす */
   readonly failDraftInsert?: boolean;
+  /** ★下書きの insert で ★この例外を投げる（★一意違反の形を作る） */
+  readonly draftInsertError?: unknown;
 }
 
 /** ★genotype を手で作らない（★`breeding-runner.test.ts` と同じ理由） */
@@ -117,6 +120,7 @@ function fakeClient(o: FakeOptions) {
       }
       if (sql.startsWith('select id, sire_id, dam_id, inbreed_coeff')) return { rows: [], rowCount: 0 };
       if (sql.startsWith('insert into foal_drafts')) {
+        if (o.draftInsertError !== undefined) throw o.draftInsertError;
         if (o.failDraftInsert === true) throw new Error('★わざと落とす（★breed() の後）');
         return { rows: [], rowCount: 1 };
       }
@@ -275,6 +279,25 @@ describe('★PLAN I-2: プレイヤーの配合の確定', () => {
       expect(sqls(seen).filter((s) => /^(begin|commit|rollback)$/i.test(s.trim())),
         '★確定の本体が自分で取引を張った／閉じた').toEqual([]);
     }
+  });
+
+  it('★馬名の一意違反で戻ったら ★数えて警報（★裁定 f117984 §9）・★対照: 別の一意違反は数えない', async () => {
+    const conflict = Object.assign(new Error('duplicate key'), { code: '23505', constraint: 'horses_name_key_unique' });
+    const other = Object.assign(new Error('duplicate key'), { code: '23505', constraint: 'horses_one_foal_per_dam_per_week' });
+    expect(isNameKeyConflict(conflict)).toBe(true);
+    expect(isNameKeyConflict(other), '★母・週の一意を馬名の違反と数えた').toBe(false);
+    expect(isNameKeyConflict(new Error('x'))).toBe(false);
+
+    const alerts: string[] = [];
+    const a = fakeClient({ draftInsertError: conflict });
+    const r = await runPlayerBreeding(a.client, NOW, 0, (m) => alerts.push(m), BIG_BUDGET);
+    expect(r.nameConflicts).toBe(1);
+    expect(alerts.some((m) => m.includes('一意違反')), '★一意違反を黙った').toBe(true);
+
+    const b = fakeClient({ draftInsertError: other });
+    const r2 = await runPlayerBreeding(b.client, NOW, 0, () => {}, BIG_BUDGET);
+    expect(r2.nameConflicts, '★対照: 別の制約の違反は数えない').toBe(0);
+    expect(r2.errors).toBe(1);
   });
 
   it('⑥ ★`foal_requests` が無い DB（★0061 の前）では何もしない', async () => {

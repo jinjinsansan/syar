@@ -834,6 +834,7 @@ async function main(): Promise<void> {
         console.log(
           `[worker] 初回の配合 確定${pb.done}件 / 不成立${pb.failed}件 / ★やり直し${pb.errors}件`
           + `${pb.gaveUp > 0 ? ` / 🔴 ★打ち切り${pb.gaveUp}件` : ''}`
+          + `${pb.nameConflicts > 0 ? ` / ★馬名の一意違反で戻した${pb.nameConflicts}件` : ''}`
           + ` / ★待ち${pb.backlog}件`
           + `${pb.oldestPendingMs !== null ? `（★最古 ${Math.round(pb.oldestPendingMs / 1000)} 秒）` : ''}`
           + `${pb.stoppedByBudget ? '（予算切れ）' : ''}`,

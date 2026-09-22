@@ -30,7 +30,7 @@ import {
   BREEDING_COLS, birthYearOffset, breedingRecordOf, damHasFoalInYearSql, idAndSeedFromKey,
   loadAncestorLookup, loadNicks,
 } from './breeding-runner.js';
-import { confirmFoalName, foalNamingContext } from './player-naming.js';
+import { confirmFoalName, foalNamingContext, isNameKeyConflict } from './player-naming.js';
 
 /**
  * ★**仔の id と種の鍵の接頭辞**（★裁定 §3）。
@@ -86,6 +86,8 @@ export interface PlayerBreedingResult {
   readonly errors: number;
   /** ★続けて落ちたので `internal_error` にした */
   readonly gaveUp: number;
+  /** ★命名が馬名の一意違反（★`horses_name_key_unique`）で戻った件数（★裁定 f117984 §9・★警報に出す） */
+  readonly nameConflicts: number;
   /** ★予算で止めた（★残りは次の周） */
   readonly stoppedByBudget: boolean;
   /** ★この周の終わりに待っている件数（★溜まりを見る・R-16） */
@@ -335,7 +337,7 @@ export async function runPlayerBreeding(
   limit: number = PLAYER_BREEDING_BATCH,
 ): Promise<PlayerBreedingResult> {
   const empty = {
-    done: 0, failed: 0, errors: 0, gaveUp: 0, stoppedByBudget: false, backlog: 0, oldestPendingMs: null,
+    done: 0, failed: 0, errors: 0, gaveUp: 0, nameConflicts: 0, stoppedByBudget: false, backlog: 0, oldestPendingMs: null,
   } as const;
   if (!(await tableExists(client, 'foal_requests'))) return { skipped: true, ...empty };
   const pending = await client.query<{ id: string; kind: string }>(
@@ -353,6 +355,7 @@ export async function runPlayerBreeding(
   let failed = 0;
   let errors = 0;
   let gaveUp = 0;
+  let nameConflicts = 0;
   let stoppedByBudget = false;
   const t0 = budget.monotonicMs();
   let tried = 0;
@@ -374,6 +377,14 @@ export async function runPlayerBreeding(
     } catch (e) {
       await client.query('rollback');
       errors += 1;
+      /**
+       * ★**馬名の一意違反で戻った**（★命名の確定・移行 `0066`）。★次の周に使用済みの名前を読み直して判定し直すので、
+       *   ★やり直しで `name_taken` になる。★セーブポイントの引き直しは入れない代わりに ★**数えて警報**（★裁定 f117984 §9）。
+       */
+      if (isNameKeyConflict(e)) {
+        nameConflicts += 1;
+        onAlert(`★命名が馬名の一意違反で戻りました（要求 ${id}・★この周 ${nameConflicts} 件目・★次の周にやり直します）`);
+      }
       /**
        * 🔴 ★**戻した後、★別の取引で試行回数を数えます**（★裁定 322d603 §3）。
        *   ★K 回 続けて落ちたら `internal_error`（★利用者は仔を一度も見ていない・D-120 ① に反しない）。
@@ -397,5 +408,5 @@ export async function runPlayerBreeding(
       }
     }
   }
-  return { skipped: false, done, failed, errors, gaveUp, stoppedByBudget, ...(await backlogOf(client)) };
+  return { skipped: false, done, failed, errors, gaveUp, nameConflicts, stoppedByBudget, ...(await backlogOf(client)) };
 }
