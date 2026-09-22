@@ -1286,6 +1286,23 @@ export const OPEN_FINDINGS = [
     owner: 'dev',
     until: '2026-10-31',
   },
+  {
+    id: 'RETURNS-TABLE-COLUMN-SHADOW',
+    what: '⚠️ ★**`returns table` の列名が PL/pgSQL の変数になり、★表の列と衝突して ★呼ぶと落ちた**（★2026-09-22・1 回目）。',
+    why: '✔ ★`0061` の `request_initial_breeding` は `returns table (request_id, status, failure_reason, result_id)`。'
+      + '★関数の中の `where … status <> \'failed\'` の `status` が ★表の列か出力の変数か決まらず、'
+      + '★`column reference "status" is ambiguous` で ★**呼ぶと落ちました**。'
+      + '🔴 ★**偽の DB の検査（`player-breeding.test.ts`）では原理的に見えません**（★SQL を実行しないため）。'
+      + '★staging の実演（`tools/verify-player-breeding-live.mjs`）で捕まり、★`0062` で表の列を別名付きで参照する形に直しました。'
+      + '★**決まっていること**（★裁定 `REVIEW_I2_PLAYER_BREEDING_VERDICT_20260922.md` §6・§9）: '
+      + '★**網（静的検査）は、★同じ形の 2 回目が出たら作る**（★1 回目で部品を作らない）。'
+      + '★この行は ★**2 回目に気づくための置き場**です。'
+      + '⚠️ ★`stillOpen` は付けていません — ★`defaultHelpers().grepCount` は `.ts/.tsx/.mjs` しか走査せず、'
+      + '★`db/migrations/*.sql` を数えられないためです（★道具を広げるのはこの便の範囲外）。'
+      + '★期限が来たら ★「済む／塞がれている／やらないと決めた」のどれかに割る（★黙って延ばさない）。',
+    owner: 'dev',
+    until: '2026-10-31',
+  },
 ];
 
 /**
