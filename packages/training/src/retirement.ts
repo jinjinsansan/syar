@@ -55,7 +55,7 @@ export function breedingRoleForSex(sex: Sex): Exclude<RetirementRole, 'honored'>
  * ★`honored`（功労馬）は**選ぶもの**として扱います。
  *   正典はプレイヤー馬が種牡馬・繁殖牝馬に「上がれる条件」を書いていないので、
  *   **成績の閾値は置きません**（裁定 `REVIEW_I1_RETIREMENT_ROLE_VERDICT_20260922.md` §4・暫定。上限だけで絞る）。
- *   持ち主のいる馬の既定は功労馬で、繁殖入りは持ち主が選ぶ（同 §3 Q-1）。⚠️ 呼ぶ側（ワーカー）が持ち主の馬に `preferHonored` を渡すのは I-1 の段 2 で繋ぐ（2026-09-22 時点では未接続）。
+ *   持ち主のいる馬の既定は功労馬で、繁殖入りは持ち主が選ぶ（同 §3 Q-1）。呼ぶ側（ワーカー）は持ち主の馬に `preferHonored` を渡す（I-1 段 2・`training-runner.ts` の `prefersHonored`）。
  *   この関数の既定は**性別に応じた繁殖入り**（NPC の経路）で、`preferHonored` を指定したときだけ功労馬にします。
  *
  * ★致命的故障で引退した馬も**繁殖には上がれます**（§7.5:「繁殖入りは可能」）。
