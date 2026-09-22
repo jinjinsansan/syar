@@ -13,6 +13,10 @@
 | 本番の未適用の移行 | `npx tsx tools/migrate.mjs --env production --plan` | 0060〜0072 が並ぶ。**0059 以前が並んだら止める**（前提が違う） |
 | 本番のワーカーの版 | `/api/healthz`（画面）とは別に、VPS の `/opt/star-current` の sha | `24af9f2`（配合をしない版）。違えば止める |
 
+## ⚠️ 2026-09-23 に 1 度 通した（`86040e0`）
+
+★実績は `REPORT_PROD_DEPLOY_20260923.md`。★次に流すときは、下の各段の「期待」を、その報告の実績と見比べること。
+
 ## ① 血統の鍵を直す（`repair-pedigree-cache`）
 
 ```bash
@@ -81,8 +85,9 @@ bash tools/deploy.sh <0 で控えた sha>
 
 ```bash
 git push origin <0 で控えた sha>:refs/heads/main
-npx tsx tools/verify-deployed-build.mjs --base <本番の URL> --expect <sha>
+npx tsx tools/verify-deployed-build.mjs --base https://star-two-chi.vercel.app --expect $(git rev-parse <sha>)
 ```
+- ⚠️ `--expect` は **完全な 40 桁**で渡す（短い sha を渡すと、中身が同じでも「食い違っています」と出る・2026-09-23 に実際に出た）
 - push は HEAD ではなく**控えた sha を名指し**する（記憶「共有ツリーでの push は HEAD を送る」）。このセッションからは資格情報の窓で止まることがあるので、止まったらオーナーに依頼する。
 
 ## 後で（本番を読むだけ）
