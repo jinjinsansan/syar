@@ -31,7 +31,7 @@ const CONDITION_STEPS = 5;
 
 export default function HomePage(): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
-  const { view, loading, error, refresh } = useStableView();
+  const { view, loading, error, needsSetup, needsLogin, refresh } = useStableView();
   const [index, setIndex] = useState(0);
   const [running, setRunning] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -70,12 +70,8 @@ export default function HomePage(): React.ReactElement {
         padding: '10px 14px 0', width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
         {view && <><EpCapsule value={view.home.epBalance} /><PpCapsule value={view.home.ppBalance} /></>}
-        {!view && <span>{loading ? '厩舎を読み込み中…' : '厩舎を取得できませんでした'}</span>}
+        {!view && loading && <span>厩舎を読み込み中…</span>}
       </div>
-
-      {error && <div role="alert" style={{ position: 'relative', padding: '6px 14px', fontSize: 12 }}>
-        {error}　<a href="/login">ログイン</a>　<button type="button" onClick={refresh}>再読み込み</button>
-      </div>}
 
       <RaceStrip />
 
@@ -88,7 +84,7 @@ export default function HomePage(): React.ReactElement {
         {/* ★馬ステージ（★全幅ブリード） */}
         <div style={{
           flex: '1 1 auto', minHeight: 280, position: 'relative', width: 'calc(100% + 28px)', margin: '0 -14px',
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', overflow: 'hidden',
+          display: 'flex', alignItems: horse ? 'flex-end' : 'center', justifyContent: 'center', overflow: 'hidden',
         }}>
           {horse ? <><ChibiHorse running={running} onClick={poke} />
           <button type="button" onClick={() => { move(-1); }} aria-label="前の馬" style={arrow('left')}>‹</button>
@@ -96,17 +92,33 @@ export default function HomePage(): React.ReactElement {
           <span style={{
             position: 'absolute', right: 24, bottom: 8, padding: '6px 10px',
             border: '2px solid var(--u-gold)', borderRadius: 999, background: 'var(--u-panel-strong)', fontSize: 11,
-          }}>タップで動く</span></> : view && <a href="/setup">馬がまだいません。最初の1頭を迎える</a>}
+          }}>タップで動く</span></> : view ? <span>持ち馬はまだいません</span> : !loading && (
+            <div role={needsSetup || needsLogin ? 'status' : 'alert'} style={{
+              width: '100%', maxWidth: 520, padding: '24px 22px', borderRadius: 16,
+              border: '2px solid var(--u-gold)', background: 'rgba(8,18,8,.84)',
+              color: 'var(--u-ink)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 14,
+            }}>
+              <strong style={{ fontSize: 22, lineHeight: 1.4 }}>
+                {needsSetup ? '牧場をはじめましょう' : needsLogin ? 'ログインして牧場を見る' : '厩舎を読み込めませんでした'}
+              </strong>
+              <span style={{ fontSize: 14, lineHeight: 1.7 }}>
+                {needsSetup ? 'メール確認とログインができました。牧場名を決めて、最初の馬を迎えましょう。' : needsLogin ? 'アカウントにログインすると、持ち馬やポイントを確認できます。' : error}
+              </span>
+              {needsSetup ? <BigButton tone="gold" label="牧場の初回設定へ" href="/setup" grow="0 0 auto" />
+                : needsLogin ? <BigButton tone="gold" label="ログインへ" href="/login" grow="0 0 auto" />
+                  : <button type="button" onClick={refresh} style={{ minHeight: 48, borderRadius: 10, border: '2px solid var(--u-gold)', background: 'var(--u-gold)', color: '#172514', fontSize: 16, fontWeight: 900 }}>もう一度読み込む</button>}
+            </div>
+          )}
         </div>
 
         {/* ★馬名プレート（★名前・属性・調子・現在位置） */}
-        <div style={{
+        {(view || loading) && <div style={{
           display: 'flex', alignItems: 'center', gap: 10, width: '100%', maxWidth: 520, marginTop: 6,
           padding: '7px 12px', border: '2px solid rgba(246,194,28,.5)', borderRadius: 12, background: 'rgba(10,35,64,.82)',
         }}>
           <span style={{ minWidth: 0, flex: '1 1 auto' }}>
             <span style={{ display: 'block', fontSize: 16, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {horse?.name ?? (loading ? '読み込み中' : error ? 'ログインして厩舎を見る' : '持ち馬はまだいません')}
+              {horse?.name ?? (loading ? '読み込み中' : '持ち馬はまだいません')}
             </span>
             <span style={{ display: 'block', marginTop: 2, fontSize: 11, fontWeight: 500, color: 'var(--u-ink-light-3)' }}>
               {horse ? `${horse.sexAge}・${horse.classLabel}` : ''}
@@ -128,7 +140,7 @@ export default function HomePage(): React.ReactElement {
               }} />
             ))}
           </span>
-        </div>
+        </div>}
       </div>
 
       {/* ★6 ボタン（★B-5 の 6 語・390 は 2 列×3 段／1280 は 6 列） */}

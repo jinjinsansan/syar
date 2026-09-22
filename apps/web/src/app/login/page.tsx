@@ -56,15 +56,18 @@ export default function LoginPage(): React.ReactElement {
     setError(null);
     setState('sending');
     try {
-      const { error: e } = await authClient().auth.signInWithPassword({ email, password });
+      const client = authClient();
+      const { data: signedIn, error: e } = await client.auth.signInWithPassword({ email, password });
       if (e !== null) {
         setError(toJa(e.message));
         setState('form');
         return;
       }
       setState('done');
-      // ★入ったらダッシュボードへ（★口座が無ければ RPC 側が /setup へ誘導する・D-080）
-      window.location.href = '/home';
+      // 初回設定前の Auth ユーザーはゲーム用 users 行をまだ持たない。
+      const { data: accounts, error: accountError } = await client
+        .from('users').select('id').eq('id', signedIn.user.id).limit(1);
+      window.location.href = accountError === null && (accounts?.length ?? 0) === 0 ? '/setup' : '/home';
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setState('form');

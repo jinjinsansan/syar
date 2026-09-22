@@ -113,25 +113,34 @@ function toStableHorse(
   };
 }
 
+export class SignInRequiredError extends Error {
+  constructor() { super('厩舎を見るにはログインしてください。'); }
+}
+
+export class SetupRequiredError extends Error {
+  constructor() { super('牧場の初回設定が必要です。'); }
+}
+
 export const supabaseStableRepo: StableRepo = {
   async stable(): Promise<StableView> {
     const { data: sessionData } = await authClient().auth.getSession();
-    if (sessionData.session === null) throw new Error('厩舎を見るにはログインしてください。');
-    const [gameWeek, runs, horsesRes, userRes] = await Promise.all([
-      currentGameWeek(),
-      runsByHorse(),
-      authClient().from('my_horses').select(HORSE_COLUMNS).order('name', { ascending: true }),
-      authClient().from('users').select('entry_points, prize_points, stable_name').limit(1),
-    ]);
-    // ★失敗を空配列にしない（★「馬が居ない」に見えてしまう）
-    if (horsesRes.error !== null) {
-      throw new Error(`my_horses を読めませんでした: ${horsesRes.error.message}`);
-    }
+    if (sessionData.session === null) throw new SignInRequiredError();
+    const userRes = await authClient().from('users')
+      .select('entry_points, prize_points, stable_name').eq('id', sessionData.session.user.id).limit(1);
     if (userRes.error !== null) {
       throw new Error(`users を読めませんでした: ${userRes.error.message}`);
     }
     if ((userRes.data ?? []).length === 0) {
-      throw new Error('利用者情報を取得できませんでした。ログイン状態を確認してください');
+      throw new SetupRequiredError();
+    }
+    const [gameWeek, runs, horsesRes] = await Promise.all([
+      currentGameWeek(),
+      runsByHorse(),
+      authClient().from('my_horses').select(HORSE_COLUMNS).order('name', { ascending: true }),
+    ]);
+    // ★失敗を空配列にしない（★「馬が居ない」に見えてしまう）
+    if (horsesRes.error !== null) {
+      throw new Error(`my_horses を読めませんでした: ${horsesRes.error.message}`);
     }
     const rows = (horsesRes.data ?? []) as unknown as MyHorseRow[];
     const horses = rows
