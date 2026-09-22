@@ -35,7 +35,7 @@ import { loadEnv } from './lib/env.mjs';
 import { assertNotProduction } from './lib/guard.mjs';
 import { productionNameRecheckOptInProblem } from './lib/args.mjs';
 import { exitWithVerdict, verdictOf, VERDICT } from './lib/counted-verdict.mjs';
-import { hitMarkOf, partitionByBlocklist } from './lib/name-recheck.mjs';
+import { hitMarkOf, needsRecheck, needsRecheckSql, partitionByBlocklist } from './lib/name-recheck.mjs';
 import { NAME_LIST_PATHS, loadNameChecks } from '../apps/cli/src/name-blocklist.ts';
 
 const APPLY = process.argv.includes('--apply');
@@ -96,10 +96,11 @@ console.log(`  ★一覧: ${ng.kinds.join(' / ')}・★版 ${ng.version}`);
  *   ★当たりの印（`hit:`）の行は拾わない（★名前を直すのは別の段取り・提案 §2 段 2）。
  *   ★`$v` は版の引数の番号（★問い合わせごとに違う）。
  */
-const notCurrent = (v) => `(name_checked_with is null or (name_checked_with not like 'hit:%' and name_checked_with <> $${v}))`;
-const readUnchecked = async () => q(
-  `select id::text as id, name_key from horses where ${notCurrent(1)}`, [ng.version],
-);
+const notCurrent = needsRecheckSql;
+/** ★当たり以外の行を読み、★検査し直すかは ★`needsRecheck`（★部品の 1 か所）で選ぶ */
+const readUnchecked = async () => (await q(
+  "select id::text as id, name_key, name_checked_with from horses where name_checked_with is null or name_checked_with not like 'hit:%'",
+)).filter((r) => needsRecheck(r.name_checked_with, ng.version));
 await c.query('begin read only');
 const before = await readUnchecked();
 await c.query('rollback');

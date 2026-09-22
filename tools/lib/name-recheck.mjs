@@ -40,3 +40,29 @@ export function hitMarkOf(version) {
 export function isHitMark(mark) {
   return typeof mark === 'string' && mark.startsWith('hit:');
 }
+
+/**
+ * ★**今の一覧の組で、もう一度検査すべき行か**（★道具が読む行を選ぶ判定は ★ここ 1 か所・裁定 REVIEW_BREED_OWN_MARE_VERDICT_20260922.md §6）。
+ *   ★未検査（null）… 検査する
+ *   ★当たりの印（`hit:`）… 検査しない（★名前を直すのは別の段取り）
+ *   ★前の組の版で合格 … 検査する（★一覧が増えた・変わった日に拾い直す）
+ *   ★今の組の版で合格 … 検査しない
+ * @param {string | null} mark ★`name_checked_with` の値
+ * @param {string} version ★今の一覧の組の版
+ * @returns {boolean}
+ */
+export function needsRecheck(mark, version) {
+  if (typeof version !== 'string' || version.length === 0) throw new Error('★今の版がありません');
+  if (mark === null) return true;
+  if (isHitMark(mark)) return false;
+  return mark !== version;
+}
+
+/**
+ * ★書き込みの競合よけ（★読んだ後に別の処理が書いた行を上書きしない）の SQL 断片。★`needsRecheck` と同じ意味。
+ * @param {number} versionParam ★今の版を渡す引数の番号（`$n`）
+ * @returns {string}
+ */
+export function needsRecheckSql(versionParam) {
+  return `(name_checked_with is null or (name_checked_with not like 'hit:%' and name_checked_with <> $${versionParam}))`;
+}
