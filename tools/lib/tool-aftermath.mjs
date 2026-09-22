@@ -67,6 +67,19 @@ export const TOOL_AFTERMATH = {
     notRestored: '★**埋める前の `name_key`**（★戻しません）。★埋める前は ★空（null）か ★`normalizeName(name)` と食い違う値で、'
       + '★保つ価値がありません。★値は ★`name` から ★いつでも作り直せます',
   },
+  'reset-horse-name.mjs': {
+    mode: 'consumes',
+    why: '★消費するもの: ★**1 頭の馬名**（★仮の名前か、★普通の名前に置き換える）。★既定は ★**下見だけ**で、★`--apply` を付けたときだけ書きます。'
+      + '✅ ★読んだ後に名前が変わっていれば書きません。★書いた後に読み直し、★記録が 1 行 増えたことを数えます。★合わなければ戻します。'
+      + '★`--rehearse` は ★同じことをして ★必ず戻します。',
+    notRestored: '★**元の名前**（★戻しません）。★記録（`horse_name_resets`）には ★正規化した名前のハッシュだけを残します（★平文を置かない・裁定 P-3）',
+  },
+  'verify-name-reset-live.mjs': {
+    mode: 'restores',
+    why: '★`begin` → 利用者・持ち主の付け替え・`planNameReset`・`applyNameReset`（★2 頭）→ ★**必ず `rollback`**（`finally`）。'
+      + '✅ ★**戻したことを数えます**: ★判定 ⑤ が ★記録の数と 2 頭の名前の 前後一致を見ます。',
+    countedBy: 'after.resets === before.resets && after.owned === before.owned && after.npc === before.npc',
+  },
   'verify-player-breeding-live.mjs': {
     mode: 'restores',
     why: '★`begin` → 利用者・要求・`confirmInitialBreeding`・`runBreedingWeek` → ★**必ず `rollback`**（`finally`）。'

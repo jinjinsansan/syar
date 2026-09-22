@@ -242,3 +242,29 @@ export function productionNameRecheckOptInProblem({
   }
   return null;
 }
+
+/**
+ * ★**本番で馬名を戻す道具（`tools/reset-horse-name.mjs`）の関門**（★裁定 `REVIEW_NAME_RESET_TOOL_VERDICT_20260922.md` 骨組み）。
+ *   ★旗 2 つ ＋ ★馬の ID を 2 回渡す（★写し間違いの 1 回で ★別の馬を書き換えない）。
+ *   ⚠️ ★1 頭ずつ。★違っていても ★正しい ID は教えない（★打った人が見直す）。
+ */
+export function productionNameResetOptInProblem({
+  environment, yesProduction = false, resetFlag = false, horse = null, expectHorse = null,
+}) {
+  if (environment !== 'production') return null;   // ★本番以外は、この関門を作らない
+  if (!yesProduction) {
+    return '本番の馬名を戻すには --yes-production が要ります'
+      + '（★--env を書いただけでは、staging のつもりで production と打った場合を止められません）';
+  }
+  if (!resetFlag) {
+    return '本番では --reset-name も要ります（★この道具だけの旗を 1 つ 立てさせます）';
+  }
+  if (typeof horse !== 'string' || horse.length === 0) return '--horse <馬の ID> が要ります';
+  if (typeof expectHorse !== 'string' || expectHorse.length === 0) {
+    return '本番では --expect-horse <同じ馬の ID をもう一度> が要ります（★写し間違いの 1 回で別の馬を書き換えないため）';
+  }
+  if (expectHorse !== horse) {
+    return '--horse と --expect-horse が違います（★どちらが正しいかは教えません。★見直してから来てください）';
+  }
+  return null;
+}

@@ -87,6 +87,7 @@ export const NOT_A_REGISTRY = {
   'args.mjs': '★引数の読み取り。★登録するものがない',
   'cdp.mjs': '★ブラウザの探索。★登録するものがない',
   'counted-verdict.mjs': '★合否の数え方（★0/1/2）。★母集団を持たない',
+  'name-reset.mjs': '★馬名を戻す部品（★新しい名前を選ぶ・読む・書く）。★母集団を持たない（★1 頭ずつ・★母集団は DB の `horses` の側）',
   'name-recheck.mjs': '★未検査の馬名を禁止名の判定で分ける純関数（★PLAN I-3）。★母集団を持たない（★母集団は DB の `horses` の側）',
   'name-key-survey.mjs': '★馬名の正規化キーの下見（★渡された行を数える純関数・PLAN I-3 段 2）。★母集団を持たない'
     + '（★母集団は DB の `horses` の側）',

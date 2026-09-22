@@ -10,6 +10,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   checkPlayerHorseName,
+  PROVISIONAL_NAME_PREFIX,
+  provisionalHorseName,
   ALLOW_ALL_NAMES,
   DEFAULT_NAME_SHAPE,
   DISTANCE_BIAS_CENTER,
@@ -183,5 +185,38 @@ describe('🔴 ★sim-engine は Node に依存しない（★裁定 REVIEW_I3_N
     expect(offenders).toEqual([]);
     // ★対照: ★命名の本体（naming.ts）が走査の中に入っている
     expect(readdirSync(dir)).toContain('naming.ts');
+  });
+});
+
+describe('★仮の名前（★裁定 REVIEW_NAME_RESET_TOOL_VERDICT_20260922.md P-1）', () => {
+  const ID = '0f000000-0000-4000-8000-00000000abcd';
+
+  it('★形: 接頭辞 ＋ カタカナ 5 文字 ＝ 9 文字・★同じ ID と回数なら同じ名前', () => {
+    const a = provisionalHorseName(ID, 0);
+    expect(a.startsWith(PROVISIONAL_NAME_PREFIX)).toBe(true);
+    expect([...a]).toHaveLength(9);
+    expect(a).toMatch(/^[ァ-ヺ]+$/u);
+    expect(provisionalHorseName(ID, 0)).toBe(a);
+  });
+
+  it('★回数を進めると ★別の候補になる（★重なったときに引き直せる）', () => {
+    const seen = new Set<string>();
+    for (let k = 0; k < 20; k += 1) seen.add(provisionalHorseName(ID, k));
+    expect(seen.size).toBeGreaterThan(15);
+  });
+
+  it('★ID が uuid でなければ投げる', () => {
+    expect(() => provisionalHorseName('NPC-F00001', 0)).toThrow();
+  });
+
+  it('🔴 ★利用者の命名は ★接頭辞で始まる名前を弾く（★§1 条件 1）', () => {
+    expect(checkPlayerHorseName(provisionalHorseName(ID, 0))).toEqual({ ok: false, reason: 'reserved_prefix' });
+    expect(checkPlayerHorseName(`${PROVISIONAL_NAME_PREFIX}ア`)).toEqual({ ok: false, reason: 'reserved_prefix' });
+    // ★半角で書いても同じ（★NFKC の後で見る）
+    expect(checkPlayerHorseName('ｶﾘﾒｲｱｲｳ')).toEqual({ ok: false, reason: 'reserved_prefix' });
+  });
+
+  it('★対照: ★接頭辞が途中にあるだけの名前は弾かない', () => {
+    expect(checkPlayerHorseName(`ア${PROVISIONAL_NAME_PREFIX}`).ok).toBe(true);
   });
 });

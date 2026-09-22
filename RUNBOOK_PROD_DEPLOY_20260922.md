@@ -10,7 +10,7 @@
 | 確かめること | コマンド | 期待 |
 |---|---|---|
 | 配備する sha | `git log --oneline -1`（検査を通した sha を名指しで控える） | 門（`npm run gate`）を前面で通した sha |
-| 本番の未適用の移行 | `npx tsx tools/migrate.mjs --env production --plan` | 0060〜0071 が並ぶ。**0059 以前が並んだら止める**（前提が違う） |
+| 本番の未適用の移行 | `npx tsx tools/migrate.mjs --env production --plan` | 0060〜0072 が並ぶ。**0059 以前が並んだら止める**（前提が違う） |
 | 本番のワーカーの版 | `/api/healthz`（画面）とは別に、VPS の `/opt/star-current` の sha | `24af9f2`（配合をしない版）。違えば止める |
 
 ## ① 血統の鍵を直す（`repair-pedigree-cache`）
@@ -44,10 +44,10 @@ npx tsx tools/backfill-name-key.mjs --env production --apply \
 ```
 - 期待: 重なり 0・空の名前 0。書いた後に道具が読み直して一致。本番の下見（09-22）では 7,370 頭・正規化して重なり 0。
 
-## ④ 移行 `0066`〜最後（`0067`〜`0071` を含む）
+## ④ 移行 `0066`〜最後（`0067`〜`0072` を含む）
 
 ```bash
-npx tsx tools/migrate.mjs --env production --plan                     # 0066〜0071 の 6 件だけが並ぶこと
+npx tsx tools/migrate.mjs --env production --plan                     # 0066〜0072 の 7 件だけが並ぶこと
 npx tsx tools/migrate.mjs --env production --yes-production
 ```
 - `0066` は直前に `name_key` の空を数え、1 件でもあれば止まる → ③ に戻る。

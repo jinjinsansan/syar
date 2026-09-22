@@ -15,7 +15,7 @@
  */
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error ★`.mjs` の部品（★`.d.mts` を置いていません）
-import { needsYesProduction, productionNameKeyOptInProblem, productionNameRecheckOptInProblem, productionOptInProblem, productionRepairOptInProblem } from '../../../tools/lib/args.mjs';
+import { needsYesProduction, productionNameKeyOptInProblem, productionNameRecheckOptInProblem, productionNameResetOptInProblem, productionOptInProblem, productionRepairOptInProblem } from '../../../tools/lib/args.mjs';
 
 const needs = needsYesProduction as (
   env: string,
@@ -225,5 +225,29 @@ describe('🔴 ★本番の関門（★4 つ）が、★同じ 5 段を課して
       .toBe(GATES.length);
     expect(new Set(numbers).size, '🔴 ★数の旗が同じ綴り。★片方の手順書で両方 通ります')
       .toBe(GATES.length);
+  });
+});
+
+describe('🔴 ★reset-horse-name（★運営が馬名を戻す）の関門 — ★馬の ID を 2 回渡す', () => {
+  const gate = productionNameResetOptInProblem as (o: Record<string, unknown>) => string | null;
+  const H = '0f000000-0000-4000-8000-00000000beef';
+  const ok = { environment: 'production', yesProduction: true, resetFlag: true, horse: H, expectHorse: H };
+
+  it('★staging は素通し', () => expect(gate({ ...ok, environment: 'staging', yesProduction: false })).toBeNull());
+  it('★① --yes-production が無いと止まる', () => expect(gate({ ...ok, yesProduction: false })).toContain('--yes-production'));
+  it('★② --reset-name が無いと止まる', () => expect(gate({ ...ok, resetFlag: false })).toContain('--reset-name'));
+  it('★③ --expect-horse が無いと止まる', () => expect(gate({ ...ok, expectHorse: null })).toContain('--expect-horse'));
+  it('★④ 2 つの ID が違えば止まり、★どちらの ID も教えない', () => {
+    const other = '0f000000-0000-4000-8000-00000000bee0';
+    const why = gate({ ...ok, expectHorse: other }) ?? '';
+    expect(why).toContain('違います');
+    expect(why).not.toContain(H);
+    expect(why).not.toContain(other);
+  });
+  it('✅ ★揃って初めて通る', () => expect(gate(ok)).toBeNull());
+  it('★旗の綴りが ★他の関門と重ならない', () => {
+    for (const f of ['--wipe-world', '--repair-pedigree', '--backfill-name-key', '--recheck-names']) {
+      expect(f).not.toBe('--reset-name');
+    }
   });
 });

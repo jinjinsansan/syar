@@ -912,6 +912,11 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
       + '（★裁定 `REVIEW_I3_NAMING_VERDICT_20260922.md` §4）。★着順・経済に効かない。★変えるのは正典の改訂のときだけ',
   },
   {
+    key: 'PROVISIONAL_SUFFIX_CHARS',
+    why: '★運営が付ける仮の名前の、接頭辞の後ろの文字数（5）。★接頭辞 4 ＋ 5 ＝ 利用者の命名の上限 9 文字に合わせた形の定数'
+      + '（★裁定 `REVIEW_NAME_RESET_TOOL_VERDICT_20260922.md` P-1）。★着順・経済に効かない',
+  },
+  {
     key: 'ALLOW_ALL_NAMES',
     why: '何も禁止しない NG 判定。**テストとプリシードの部分実行専用**。本番経路で使われていないことは ★テストで押さえる',
   },

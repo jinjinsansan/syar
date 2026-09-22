@@ -142,6 +142,10 @@ export const EXPECTED_EXPOSURE = {
   //   ★引退馬の役割の変更の依頼。★書くのは `request_breeding_role` だけ（★結果はその場で返す）。
   //   ★直に読ませない: ★他人が繁殖入りさせた馬の並びが見える必要が無い（★生涯の記録は別に見える・LR-6）。
   role_requests: CLOSED,
+  // ── ★`horse_name_resets`（★`0072`・2026-09-22） ──
+  //   ★運営が馬名を戻した記録（★理由・元の名前のハッシュ）。★書くのは道具だけ。
+  //   ★直に読ませない: ★理由（人名・商標など）を公開しないため（★裁定 REVIEW_NAME_RESET_TOOL_VERDICT_20260922.md P-2）。
+  horse_name_resets: CLOSED,
 };
 
 /** 登録簿に無いものを返す（V-20 ③） */

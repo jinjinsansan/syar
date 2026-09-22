@@ -8,7 +8,7 @@
  *   ④ ★下書きに入れる鍵（`foalDraftRecord`）と ★`horses` に入れる列（`DRAFT_RECORD_COLUMNS`）が一致する
  */
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_BALANCE, FOUNDERS, createFounder, deriveRng, normalizeName } from '@star/sim-engine';
+import { DEFAULT_BALANCE, FOUNDERS, PROVISIONAL_NAME_PREFIX, createFounder, deriveRng, normalizeName } from '@star/sim-engine';
 import { DRAFT_RECORD_COLUMNS, confirmFoalName } from '../../worker/src/player-naming.js';
 import { foalDraftRecord } from '../../worker/src/player-breeding.js';
 
@@ -91,6 +91,7 @@ describe('★PLAN I-3: 仔の命名の確定', () => {
     ['カタカナ以外', { name: 'Star' }, 'invalid_chars'],
     ['長すぎる', { name: 'アイウエオカキクケコ' }, 'length'],
     ['正規化で 1 文字', { name: 'ーア' }, 'too_short_normalized'],
+    ['仮の名前の接頭辞で始まる（★裁定 d7455c5 §1）', { name: `${PROVISIONAL_NAME_PREFIX}アイウ` }, 'reserved_prefix'],
     ['🔴 実在馬名（★NG リスト）', { name: 'キンシメイ' }, 'name_blocked'],
     ['🔴 既に居る馬と重なる（★name_key）', { taken: true }, 'name_taken'],
     ['🔴 既に居る馬と重なる（★name_key が空の行を名前で）', { nullKeyNames: ['ホシノ・ヒカリ'] }, 'name_taken'],

@@ -112,7 +112,9 @@ export type PlayerNameRejection =
   /** ★表示の文字数が 2〜9 の外 */
   | 'length'
   /** ★`normalizeName()` の後で 2 文字未満（★記号だけで重複の判定をすり抜ける形） */
-  | 'too_short_normalized';
+  | 'too_short_normalized'
+  /** ★仮の名前の接頭辞（`PROVISIONAL_NAME_PREFIX`）で始まる（★運営が付ける仮の名前と見分けが付かなくなる・裁定 d7455c5 §1） */
+  | 'reserved_prefix';
 
 export type PlayerNameCheck =
   | { readonly ok: true; readonly display: string; readonly nameKey: string }
@@ -132,7 +134,41 @@ export function checkPlayerHorseName(input: string): PlayerNameCheck {
   if (chars < PLAYER_NAME_MIN_CHARS || chars > PLAYER_NAME_MAX_CHARS) return { ok: false, reason: 'length' };
   const nameKey = normalizeName(display);
   if ([...nameKey].length < PLAYER_NAME_MIN_CHARS) return { ok: false, reason: 'too_short_normalized' };
+  if (nameKey.startsWith(normalizeName(PROVISIONAL_NAME_PREFIX))) return { ok: false, reason: 'reserved_prefix' };
   return { ok: true, display, nameKey };
+}
+
+/**
+ * ★**運営が付ける仮の名前の接頭辞**（★裁定 `REVIEW_NAME_RESET_TOOL_VERDICT_20260922.md` P-1・暫定）。
+ *   ★語そのものの是非はオーナーとデザイナーの判断（★変えるときはここ 1 か所）。
+ *   ★利用者の命名はこの接頭辞で始まる名前を弾く（`checkPlayerHorseName`・§1 条件 1）。
+ */
+export const PROVISIONAL_NAME_PREFIX = 'カリメイ';
+
+/** ★仮の名前の後ろに並べる文字（★小書き・濁点の無い基本のカタカナ 44 字） */
+const PROVISIONAL_KANA = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワ';
+/** ★接頭辞の後ろの文字数（★接頭辞 4 ＋ 5 ＝ 9 文字・★利用者の命名の上限と同じ） */
+const PROVISIONAL_SUFFIX_CHARS = 5;
+
+/**
+ * ★**持ち主のいる馬に付ける仮の名前**（★ID と試行の回数から決まる・★乱数を使わない・憲法 §1-4）。
+ *   ★重なったり一覧に当たったりしたら、★呼ぶ側が `attempt` を 1 つ進めて引き直す（★決定論）。
+ * @param horseId ★馬の ID（uuid）
+ * @param attempt ★何回目の候補か（0 から）
+ */
+export function provisionalHorseName(horseId: string, attempt: number): string {
+  const hex = horseId.replace(/-/g, '').toLowerCase();
+  if (!/^[0-9a-f]{32}$/.test(hex)) throw new Error(`provisionalHorseName: ★ID が uuid ではありません（${horseId}）`);
+  if (!Number.isInteger(attempt) || attempt < 0) throw new Error(`provisionalHorseName: ★試行の回数が不正（${attempt}）`);
+  const kana = [...PROVISIONAL_KANA];
+  let out = PROVISIONAL_NAME_PREFIX;
+  for (let i = 0; i < PROVISIONAL_SUFFIX_CHARS; i += 1) {
+    // ★ID の 16 進を 2 桁ずつ読み、★試行の回数で読む位置と足す値をずらす
+    const at = ((attempt * PROVISIONAL_SUFFIX_CHARS + i) * 2) % 30;
+    const v = parseInt(hex.slice(at, at + 2), 16) + attempt * 7 + i;
+    out += kana[v % kana.length];
+  }
+  return out;
 }
 
 /** 実在競走馬名 NG 判定（注入）。正規化済みの文字列を受け取り、禁止なら true */

@@ -121,7 +121,7 @@ function pedigreeOnlyRecord(row: Record<string, unknown>): HorseRecord {
 }
 
 /** ★`npc_stable_id`（数字）から厩舎を引く。★`seed-world` が数字にしたものを戻します */
-function stableOfNumericId(n: number | null): Stable {
+export function stableOfNumericId(n: number | null): Stable {
   if (n !== null) {
     for (const s of NPC_STABLES) {
       if (Number(String(s.id).replace(/\D/g, '')) === n) return s;
