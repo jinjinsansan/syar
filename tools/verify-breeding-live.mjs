@@ -24,6 +24,8 @@
  *   ★① ★落ちずに走り切る（★これが本題。★本番を落としたのはここ）
  *   ★② ★生まれた仔の ★`sire_id`/`dam_id`/`pedigree_cache` が ★**すべて DB の uuid**
  *   ★③ ★`rollback` の後、★頭数が ★**元に戻っている**（★この道具が世界を動かしていない）
+ *   ★⑤ ★（★`name_key` の列が在る DB で）★仔の `name_key` ＝ 正規化した名前・★既存の馬とも仔どうしとも重ならない
+ *      （★PLAN I-3 段 0・2026-09-22）
  *
  * ★使い方: npx tsx tools/verify-breeding-live.mjs --env staging [--week <週>]
  * ============================================================================
@@ -37,6 +39,7 @@ import { runBreedingWeek } from '../apps/worker/src/breeding-runner.ts';
 import { DEFAULT_PRESEED_OPTIONS } from '../apps/cli/src/preseed.ts';
 import { FIELD_SIZE } from '../apps/cli/src/race-field.ts';
 import { CYCLE_MS } from '../packages/scheduler/src/index.ts';
+import { normalizeName } from '../packages/sim-engine/src/index.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const WEEK_ARG = (() => {
@@ -113,6 +116,33 @@ try {
     check(badRef === 0 && badKey === 0,
       '② ★生まれた仔の参照と血統の鍵が、★すべて DB の uuid',
       `★${foals.length} 頭 / 壊れた参照 ${badRef} 件 / 壊れた鍵 ${badKey} 件`);
+
+    /**
+     * ⑤ ★**仔の名前と `name_key`**（★PLAN I-3 段 0・2026-09-22）。
+     *   ★`name_key`（★移行 0064）が在る DB では、★生まれた仔に ★`normalizeName(name)` が書かれていること。
+     *   ★名前が ★世界の既存の馬とも、★仔どうしとも ★正規化して重ならないこと（★段 3 の一意の前提）。
+     */
+    const hasKey = Number((await q(
+      "select count(*)::int n from information_schema.columns"
+        + " where table_schema = 'public' and table_name = 'horses' and column_name = 'name_key'",
+    ))[0].n) > 0;
+    if (hasKey) {
+      const named = await q(
+        'select id::text as id, name, name_key from horses where birth_week = $1', [result.week],
+      );
+      const wrongKey = named.filter((f) => f.name_key !== normalizeName(f.name)).length;
+      // ★既存の馬の name_key はまだ埋まっていない（★段 2 の前）ので、★名前を TS で正規化して比べる
+      const foalIds = new Set(named.map((f) => f.id));
+      const others = new Set((await q('select id::text as id, name from horses'))
+        .filter((r) => !foalIds.has(r.id)).map((r) => normalizeName(r.name)));
+      const keys = named.map((f) => normalizeName(f.name));
+      const clash = keys.filter((k) => others.has(k)).length + (keys.length - new Set(keys).size);
+      check(wrongKey === 0 && clash === 0,
+        '⑤ ★仔の name_key ＝ 正規化した名前・★既存の馬とも仔どうしとも重ならない',
+        `★${named.length} 頭 / 食い違い ${wrongKey} / 重なり ${clash}（★例: ${named[0]?.name ?? '-'}）`);
+    } else {
+      console.log('  ・ ⑤ ★`name_key` の列が無い DB です（★0064 の前）。★名前の判定はしません');
+    }
   }
 } catch (e) {
   threw = e;

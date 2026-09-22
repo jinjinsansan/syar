@@ -28,7 +28,7 @@
  *   ★この道具は**適用するだけ**です（★D-052: ★正を道具側に置かない）。
  */
 import pg from 'pg';
-import { ALLOW_ALL_NAMES, NPC_STABLES } from '../packages/sim-engine/src/index.ts';
+import { ALLOW_ALL_NAMES, NPC_STABLES, normalizeName } from '../packages/sim-engine/src/index.ts';
 import { loadNameBlocklist } from '../apps/cli/src/name-blocklist.ts';
 import { DEFAULT_PRESEED_OPTIONS, preseedNicks, runPreseed } from '../apps/cli/src/preseed.ts';
 import {
@@ -103,6 +103,11 @@ const env = loadEnv();
  */
 let nameBlocklist;
 let ngSize = 0;
+/**
+ * ★**どの版の NG リストで検査したか**（★`horses.name_checked_with`・PLAN I-3 段 0）。
+ *   ★`--allow-all-names` のときは ★`null`（★「検査していない」を行に残す・裁定 `ff7028c` §4）。
+ */
+let nameVersion = null;
 if (ALLOW_ALL) {
   console.log('');
   console.log('🔴🔴 ★**--allow-all-names: ★実在競走馬名の NG 判定をしません**（★憲法 §0.1 / C-4）');
@@ -115,6 +120,7 @@ if (ALLOW_ALL) {
   const ng = loadNameBlocklist();
   nameBlocklist = ng.blocklist;
   ngSize = ng.size;
+  nameVersion = ng.version;
   console.log(`  ✅ ★実在馬名 NG リスト ${ngSize} 件 を突合します（★憲法 §0.1）`);
 }
 
@@ -570,6 +576,16 @@ const tally = { active: 0, stallion: 0, broodmare: 0, honored: 0 };
  */
 let droppedParents = 0;
 let droppedAncestors = 0;
+/**
+ * ★**`name_key` / `name_checked_with` を書く**（★PLAN I-3 段 0・裁定 `REVIEW_I3_NAMING_VERDICT_20260922.md` §3）。
+ *   ★書かないと、★NG リストの到着後に世界を作り直した日に ★**全頭 `name_key = null`** になり、
+ *   ★段 3 の `not null` が落ちます（★D-119「読む側だけ在って、書く側が無い」の形）。
+ *   ⚠️ ★列（★移行 `0064`）が無い DB では書きません。
+ */
+const writeNameKey = Number((await c.query(
+  "select count(*)::int n from information_schema.columns"
+    + " where table_schema = 'public' and table_name = 'horses' and column_name = 'name_key'",
+)).rows[0].n) > 0;
 for (const h of rows) {
   const r = h.record;
   const life = lifeColumns(r.id);
@@ -580,9 +596,9 @@ for (const h of rows) {
        surface_aptitude, distance_center, distance_range, strategy_aptitude, heavy_aptitude,
        growth, temper, durability, frail, skill_genes, inbreed_coeff, nicks_multiplier,
        pedigree_cache, foal_count, g1_wins,
-       birth_week, last_processed_week, retired_at_week, retirement_role, retirement_reason)
+       birth_week, last_processed_week, retired_at_week, retirement_role, retirement_reason${writeNameKey ? ', name_key, name_checked_with' : ''})
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,
-             $30,$31,$32,$33,$34)`,
+             $30,$31,$32,$33,$34${writeNameKey ? ',$35,$36' : ''})`,
     [uuid.get(r.id), stableId(h.stableId), h.name, r.sex, r.birthYear, r.generation,
      mappedParent(r.sireId), mappedParent(r.damId),
      r.sireLine, r.damSireLine, JSON.stringify(r.genotype), JSON.stringify(r.potential),
@@ -616,7 +632,8 @@ for (const h of rows) {
      )),
      r.foalCount, r.g1Wins,
      life.birthWeek, life.lastProcessedWeek,
-     life.retiredAtWeek, life.retirementRole, life.retirementReason],
+     life.retiredAtWeek, life.retirementRole, life.retirementReason,
+     ...(writeNameKey ? [normalizeName(h.name), nameVersion] : [])],
   );
   n += 1;
   if (n % 2000 === 0) process.stdout.write(`\r  投入 ${n}/${rows.length}`);

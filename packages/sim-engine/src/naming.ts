@@ -94,6 +94,47 @@ export function normalizeName(name: string): string {
     .toUpperCase();
 }
 
+/**
+ * ★**利用者が付ける馬名の文字数**（★正典 D-120「命名の規則（暫定）」・裁定 `REVIEW_I3_NAMING_VERDICT_20260922.md` §4）。
+ *   ★NFKC で正規化した**表示の文字列**で数える。★較正定数ではなく ★**規則の写し**（★ゲームの結果に効かない）。
+ */
+export const PLAYER_NAME_MIN_CHARS = 2;
+export const PLAYER_NAME_MAX_CHARS = 9;
+
+/** ★使える文字: ★カタカナ（ァ〜ヺ）・長音「ー」・中黒「・」だけ（★NFKC の後で判定＝半角カナも受け付ける） */
+const PLAYER_NAME_CHARS = /^[ァ-ヺー・]+$/u;
+
+export type PlayerNameRejection =
+  /** ★空（★前後の空白を除いて 0 文字） */
+  | 'empty'
+  /** ★カタカナ・長音・中黒以外の文字がある */
+  | 'invalid_chars'
+  /** ★表示の文字数が 2〜9 の外 */
+  | 'length'
+  /** ★`normalizeName()` の後で 2 文字未満（★記号だけで重複の判定をすり抜ける形） */
+  | 'too_short_normalized';
+
+export type PlayerNameCheck =
+  | { readonly ok: true; readonly display: string; readonly nameKey: string }
+  | { readonly ok: false; readonly reason: PlayerNameRejection };
+
+/**
+ * ★**利用者が付けた馬名の形を判定する**（★画面とワーカーで共有する 1 か所・裁定 §4-5）。
+ *
+ *   ★保存するのは `display`（★NFKC 後の全角）、★重複の比較に使うのは `nameKey`（`normalizeName`）。
+ *   ⚠️ ★重複・禁止名（実在馬名）は ★ここでは見ません（★DB と注入の NG 判定が要るため・ワーカーの仕事）。
+ */
+export function checkPlayerHorseName(input: string): PlayerNameCheck {
+  const display = input.normalize('NFKC').trim();
+  if (display.length === 0) return { ok: false, reason: 'empty' };
+  if (!PLAYER_NAME_CHARS.test(display)) return { ok: false, reason: 'invalid_chars' };
+  const chars = [...display].length;
+  if (chars < PLAYER_NAME_MIN_CHARS || chars > PLAYER_NAME_MAX_CHARS) return { ok: false, reason: 'length' };
+  const nameKey = normalizeName(display);
+  if ([...nameKey].length < PLAYER_NAME_MIN_CHARS) return { ok: false, reason: 'too_short_normalized' };
+  return { ok: true, display, nameKey };
+}
+
 /** 実在競走馬名 NG 判定（注入）。正規化済みの文字列を受け取り、禁止なら true */
 export type NameBlocklist = (normalized: string) => boolean;
 

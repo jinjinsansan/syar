@@ -1287,6 +1287,17 @@ export const OPEN_FINDINGS = [
     until: '2026-10-31',
   },
   {
+    id: 'PLAYER-NAME-OFFENSIVE-WORDS-UNCHECKED',
+    what: '⚠️ ★**利用者が付ける馬名で、★不快な語・人名・商標を弾く仕組みがありません**（★2026-09-22）。',
+    why: '✔ ★命名の規則（★正典 D-120「命名の規則（暫定）」・裁定 `REVIEW_I3_NAMING_VERDICT_20260922.md` §4）は '
+      + '★カタカナ・長音・中黒・2〜9 文字と、★実在競走馬名の NG リスト（★`NG-NAMES-UNWIRED`）だけです。'
+      + '★カタカナに限っても ★**不快な語・実在の人名・商標は作れます**。'
+      + '★裁定 §4 の持ち越し: ★**利用者が名付ける機能が本番に出るまでに、★弁護士ゲート（L-7）と合わせて決める**。'
+      + '★公開の前に要ります。★いまは利用者の命名は本番に出ていません（★PLAN I-3 は staging まで）。',
+    owner: 'review',
+    until: '2026-10-31',
+  },
+  {
     id: 'RETURNS-TABLE-COLUMN-SHADOW',
     what: '⚠️ ★**`returns table` の列名が PL/pgSQL の変数になり、★表の列と衝突して ★呼ぶと落ちた**（★2026-09-22・1 回目）。',
     why: '✔ ★`0061` の `request_initial_breeding` は `returns table (request_id, status, failure_reason, result_id)`。'

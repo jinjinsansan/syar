@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { assertNotProduction } from './lib/guard.mjs';
 import { loadEnv } from './lib/env.mjs';
+import { normalizeName } from '../packages/sim-engine/src/index.ts';
 const env = loadEnv();
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl:{rejectUnauthorized:false} });
 await c.connect();
@@ -49,7 +50,9 @@ const own=await mkRace('A6-OWN'), other=await mkRace('A6-OTHER');
 const g={}; for(const [k,r] of [['own',own],['other',other]]) { for(const sel of ['[1]','[5]']) await c.query(`insert into race_odds (race_id,bet_type,selection,probability,odds) values ($1,'win',$2::jsonb,0.2,4.1)`,[r,sel]); g[k]=r; }
 
 // 自馬（馬番1）を own レースに出す
-const h=(await c.query(`insert into horses (owner_id,name,sex,birth_year,sire_line,genotype,potential,stats,unlock_rate,surface_aptitude,distance_center,distance_range,strategy_aptitude,heavy_aptitude,growth,temper,durability) values ($1,'ジバウマ','male',2026,'L-1','{}','{}','{}',0.3,'{}',2000,600,'{}',55,'normal',50,700) returning id`,[uid])).rows[0].id;
+// ★PLAN I-3 段 0: ★`name_key`（★移行 0064）が在れば書く。★禁止名の検査はしていないので name_checked_with は null
+const a6NameKey=Number((await c.query(`select count(*)::int n from information_schema.columns where table_schema='public' and table_name='horses' and column_name='name_key'`)).rows[0].n)>0;
+const h=(await c.query(`insert into horses (owner_id,name,sex,birth_year,sire_line,genotype,potential,stats,unlock_rate,surface_aptitude,distance_center,distance_range,strategy_aptitude,heavy_aptitude,growth,temper,durability${a6NameKey?',name_key,name_checked_with':''}) values ($1,'ジバウマ','male',2026,'L-1','{}','{}','{}',0.3,'{}',2000,600,'{}',55,'normal',50,700${a6NameKey?",$2,null":''}) returning id`,a6NameKey?[uid,normalizeName('ジバウマ')]:[uid])).rows[0].id;
 await c.query(`insert into race_entries (race_id,horse_id,gate,weight,strategy) values ($1,$2,1,55.0,'senko')`,[own,h]);
 
 const asUser=async(sql,p)=>{ await c.query(`select set_config('request.jwt.claims', json_build_object('sub',$1::text)::text, true)`,[uid]); return c.query(sql,p); };

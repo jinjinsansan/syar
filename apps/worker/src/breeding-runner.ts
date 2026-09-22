@@ -21,10 +21,12 @@
  *   🔴 ★差が定数でなければ ★**投げます**（★世界が既に混ざっている＝直してから動かす）。 */
 import type pg from 'pg';
 
-import type { BalanceConfig, HorseRecord, Stable } from '@star/sim-engine';
+import type { BalanceConfig, HorseRecord, NameBlocklist, Stable } from '@star/sim-engine';
 import {
-  DEFAULT_BALANCE, NPC_STABLES, applyMatingCounters, breed,
+  DEFAULT_BALANCE, DEFAULT_NAME_SHAPE, NPC_STABLES, Rng, applyMatingCounters, breed,
+  generateHorseName, normalizeName,
 } from '@star/sim-engine';
+import { loadNameBlocklist } from '../../cli/src/name-blocklist.js';
 import { buildSireAncestorIndex, pickSire, rankSires } from '@star/breeding';
 import {
   LIFECYCLE_WEEKS, WEEKS_PER_YEAR, WEEK_MS, gameYearOf, requiredBroodmares, weekIndexAt,
@@ -53,6 +55,8 @@ export interface BreedingWeekResult {
   readonly noSire: number;
   /** ★既に居た（★同じ週を二度 処理した）ぶん */
   readonly alreadyThere: number;
+  /** ★名前を決められず見送った頭数（★`generateHorseName` が上限回数で投げた・PLAN I-3） */
+  readonly nameGaveUp: number;
   /** ★年の変わり目で年次カウンタを戻したか */
   readonly yearReset: boolean;
   /** ★生涯上限に達して繁殖から降ろした頭数 */
@@ -311,6 +315,37 @@ export function damHasFoalInYearSql(
   return parts.length === 0 ? '(false)' : `(${parts.join(' or ')})`;
 }
 
+/**
+ * ★**仔の名付けに要るもの**（★PLAN I-3・裁定 `REVIEW_I3_NAMING_VERDICT_20260922.md` §1・§3 段 0）。
+ *
+ *   ★`taken` … ★**全頭の名前を正規化した集合**（★世界の生成 `preseed.ts` と同じく、★使用済みの名前を避ける）。
+ *     ★`name_key` がまだ埋まっていない行もあるので、★列ではなく ★`name` から `normalizeName` で作る。
+ *   ★`blocked` / `version` … ★禁止名（実在馬名）の判定と、★その版。★ハッシュ表が無ければ素通しで ★`version = null`
+ *     （★「検査していない」を行に残す・裁定 `ff7028c` §4）。
+ *   ★`writeKey` … ★`horses.name_key`（★移行 `0064`）が在るか。★無い DB（★いまの本番）では列を書かない。
+ */
+export interface FoalNaming {
+  readonly taken: Set<string>;
+  readonly blocked: NameBlocklist;
+  readonly version: string | null;
+  readonly writeKey: boolean;
+}
+
+export async function loadFoalNaming(client: pg.ClientBase): Promise<FoalNaming> {
+  const col = await client.query<{ n: string }>(
+    "select count(*)::text n from information_schema.columns"
+      + " where table_schema = 'public' and table_name = 'horses' and column_name = 'name_key'",
+  );
+  const names = await client.query<{ name: string }>('select name from horses');
+  const ng = loadNameBlocklist(undefined, false);
+  return {
+    taken: new Set(names.rows.map((r) => normalizeName(r.name))),
+    blocked: ng.blocklist,
+    version: ng.version,
+    writeKey: Number(col.rows[0]?.n ?? 0) > 0,
+  };
+}
+
 /** ★`foal_drafts`（★移行 `0061`）が在るか */
 export async function hasFoalDrafts(client: pg.ClientBase): Promise<boolean> {
   const r = await client.query<{ t: string | null }>("select to_regclass('public.foal_drafts')::text t");
@@ -485,7 +520,7 @@ export async function runBreedingWeek(
   if (mareIds.length === 0) {
     onAlert('★繁殖牝馬が 1 頭も居ません（★世界がまだ出来ていないか、★役割が付いていない）');
     return {
-      week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, yearReset,
+      week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, nameGaveUp: 0, yearReset,
       retiredFromBreeding, promoted,
     };
   }
@@ -512,7 +547,7 @@ export async function runBreedingWeek(
   }
   if (dueIds.length === 0) {
     return {
-      week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, yearReset,
+      week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, nameGaveUp: 0, yearReset,
       retiredFromBreeding, promoted,
     };
   }
@@ -549,6 +584,9 @@ export async function runBreedingWeek(
   const nicks = await loadNicks(client, onAlert);
   /** ★下書きの表（★`0061`）が在れば、★プレイヤーの配合と母を取り合わない判定に使う */
   const withDrafts = await hasFoalDrafts(client);
+  /** ★仔の名付け（★PLAN I-3 段 0・★使用済みの名前・禁止名・`name_key` の列が在るか） */
+  const naming = await loadFoalNaming(client);
+  let nameGaveUp = 0;
 
   const ancestorIndex = buildSireAncestorIndex(stallions);
   const turnOf = new Map<string, number>();
@@ -590,17 +628,40 @@ export async function runBreedingWeek(
       nicks,
     });
 
+    /**
+     * ★**名前を付ける**（★PLAN I-3・裁定 `REVIEW_I3_NAMING_VERDICT_20260922.md` §1）。
+     *   ★旧: `${stable.prefix}${foalId.slice(0, 6)}` — ★重複も禁止名も検査していなかった。
+     *   ★新: ★世界の生成（`preseed.ts`）と同じ `generateHorseName`（★使用済みの名前・禁止名を避ける）。
+     *   🔴 ★**名前の乱数は、★遺伝の乱数と別の流れ**（★鍵に `|name` を足す・★1 本の `Rng` を共有しない）。
+     *     ★`breed()` の出力（名前以外の全形質）は ★名付けの前と 1 ビットも変わらない（★検査で釘付け）。
+     *   ⚠️ ★上限回数まで引いても決まらなければ投げる関数なので、★**その 1 頭だけ見送って警報**（★週を止めない）。
+     */
+    let foalName: string;
+    try {
+      const { seed: nameSeed } = await idAndSeedFromKey(`${sireId}|${mare.id}|${week}|name`);
+      foalName = generateHorseName(
+        new Rng(nameSeed), { ...DEFAULT_NAME_SHAPE, prefix: stable.prefix }, naming.taken, naming.blocked,
+      ).name;
+    } catch (e) {
+      nameGaveUp += 1;
+      onAlert(`★仔の名前を決められず、★この 1 頭を見送りました（★母 ${mare.id}・週 ${week}）: ${(e as Error).message}`);
+      continue;
+    }
+    /** ★`name_key` / `name_checked_with`（★移行 `0064`）は ★列が在るときだけ書く */
+    const keyCols = naming.writeKey ? ', name_key, name_checked_with' : '';
+    const keyVals = naming.writeKey ? ', $30, $31' : '';
+    const keyParams = naming.writeKey ? [normalizeName(foalName), naming.version] : [];
     const ins = await client.query(
       `insert into horses (id, npc_stable_id, name, sex, birth_year, generation,
          sire_id, dam_id, sire_line, dam_sire_line, genotype, potential, stats, unlock_rate,
          surface_aptitude, distance_center, distance_range, strategy_aptitude, heavy_aptitude,
          growth, temper, durability, frail, skill_genes, inbreed_coeff, nicks_multiplier,
-         pedigree_cache, foal_count, g1_wins, birth_week, last_processed_week)
+         pedigree_cache, foal_count, g1_wins, birth_week, last_processed_week${keyCols})
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
-               $23,$24,$25,$26,$27,0,0,$28,$29)
+               $23,$24,$25,$26,$27,0,0,$28,$29${keyVals})
        on conflict (dam_id, birth_week) do nothing`,
       [
-        foalId, numericStableId(stable), `${stable.prefix}${foalId.slice(0, 6)}`,
+        foalId, numericStableId(stable), foalName,
         foal.sex, year + yearOffset, foal.generation,
         sireId, mare.id, foal.sireLine, foal.damSireLine,
         JSON.stringify(foal.genotype), JSON.stringify(foal.potential), JSON.stringify(foal.stats),
@@ -610,6 +671,7 @@ export async function runBreedingWeek(
         JSON.stringify(foal.skillGenes), foal.inbreedCoeff, foal.nicksMultiplier,
         JSON.stringify(Object.fromEntries(foal.pedigreeCache)),
         week, week + LIFECYCLE_WEEKS.trainableFrom,
+        ...keyParams,
       ],
     );
     if (ins.rowCount === 0) { alreadyThere += 1; continue; }
@@ -661,7 +723,7 @@ export async function runBreedingWeek(
         + ` / 相手なし ${noSire} 頭 / 生まれた 0 頭`,
     );
   }
-  return { week, eligible, born, noSire, alreadyThere, yearReset, retiredFromBreeding, promoted };
+  return { week, eligible, born, noSire, alreadyThere, nameGaveUp, yearReset, retiredFromBreeding, promoted };
 }
 
 /**

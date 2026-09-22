@@ -39,7 +39,16 @@ export const NG_HASH_PATH = 'data/ng-names.hash';
  *    ソルトを付けると、レビュー側が同じリストから同じハッシュを再現できなくなる。
  */
 export function hashName(name: string): string {
-  return createHash('sha256').update(normalizeName(name), 'utf8').digest('hex').slice(0, 16);
+  return hashNormalizedName(normalizeName(name));
+}
+
+/**
+ * ★**正規化済みの名前 1 件のハッシュ**（★ハッシュの式はここ 1 か所・裁定 `REVIEW_I3_NAMING_VERDICT_20260922.md` §2）。
+ *   ⚠️ ★`node:crypto` を使うので ★`packages/sim-engine` には置けない（★依存ゼロ・画面やアプリも読む包み）。
+ *   ★サーバー側（`apps/cli`・`apps/worker`）だけがここを読む。
+ */
+export function hashNormalizedName(normalized: string): string {
+  return createHash('sha256').update(normalized, 'utf8').digest('hex').slice(0, 16);
 }
 
 /** 平文リスト → ハッシュ集合ファイル */
@@ -56,6 +65,12 @@ export function buildBlocklist(plaintextPath = NG_PLAINTEXT_PATH, hashPath = NG_
 export interface BlocklistLoad {
   readonly blocklist: NameBlocklist;
   readonly size: number;
+  /**
+   * ★**どの版のリストで検査したか**（★ハッシュ表の中身のハッシュ・先頭 16 桁）。
+   *   ★馬の行の `name_checked_with` に残す（★裁定 `REVIEW_UNNAMED_FOAL_PLACEMENT_VERDICT_20260922.md` §4）。
+   *   ★表が無く素通しにしたときは ★`null`（★「検査していない」を黙って合格にしない）。
+   */
+  readonly version: string | null;
 }
 
 /**
@@ -73,18 +88,19 @@ export function loadNameBlocklist(hashPath = NG_HASH_PATH, strict = true): Block
           `\n  意図的に NG 判定なしで走らせる場合のみ strict=false を指定してください（本番では禁止）。`,
       );
     }
-    return { blocklist: () => false, size: 0 };
+    return { blocklist: () => false, size: 0, version: null };
   }
+  const text = readFileSync(hashPath, 'utf8');
   const set = new Set(
-    readFileSync(hashPath, 'utf8')
+    text
       .split(/\r?\n/)
       .map((l) => l.trim())
       .filter((l) => l.length > 0),
   );
   // 受け取るのは `normalizeName` 済みの文字列なので、ここで再正規化はしない
   return {
-    blocklist: (normalized: string): boolean =>
-      set.has(createHash('sha256').update(normalized, 'utf8').digest('hex').slice(0, 16)),
+    blocklist: (normalized: string): boolean => set.has(hashNormalizedName(normalized)),
     size: set.size,
+    version: createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16),
   };
 }

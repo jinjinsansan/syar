@@ -124,6 +124,9 @@ const SAFE_REASONS: Readonly<Record<string, string>> = {
   NAME_TAIL_RATE: '★率', composeName: '★組み立て', normalizeName: '★正規化', NameBlocklist: '★禁止語の型',
   ALLOW_ALL_NAMES: '★全許可', NameGenerationResult: '★結果の型', NAME_MAX_ATTEMPTS: '★試行上限',
   generateHorseName: '★馬名の生成',
+  // ★利用者が付ける馬名の形（★D-120「命名の規則（暫定）」・PLAN I-3。★文字列だけを見る・素質に触れない）
+  PLAYER_NAME_MIN_CHARS: '★文字数の下限', PLAYER_NAME_MAX_CHARS: '★文字数の上限',
+  PlayerNameRejection: '★弾いた理由の型', PlayerNameCheck: '★判定の型', checkPlayerHorseName: '★名前の形の判定',
   // ★NPC 厩舎の方針（★素質ではない）
   DistanceBias: '★距離の傾き', SurfaceBias: '★馬場の傾き', GrowthBias: '★成長型の傾き',
   StablePolicy: '★方針の型', Stable: '★厩舎の型', DISTANCE_BIAS_CENTER: '★中心', NPC_STABLES: '★名簿',

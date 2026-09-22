@@ -11,7 +11,7 @@
  *    ★ここが見るのは ★**「誰を選び、いつ止まり、何を書くか」**だけです。
  */
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_BALANCE, FOUNDERS, createFounder, deriveRng } from '@star/sim-engine';
+import { DEFAULT_BALANCE, FOUNDERS, createFounder, deriveRng, normalizeName } from '@star/sim-engine';
 import { runBreedingWeek } from '../../worker/src/breeding-runner.js';
 
 /** ★問い合わせの文面で答えを決める、★偽のクライアント */
@@ -29,6 +29,10 @@ interface FakeOptions {
   readonly draftsTable?: boolean;
   /** ★母の印をプレイヤーの配合が先に取っていたか（★印の取得が 0 行） */
   readonly damClaimedByPlayer?: boolean;
+  /** ★既に使われている馬名（★`select name from horses` が返す） */
+  readonly takenNames?: readonly string[];
+  /** ★`horses.name_key`（★移行 `0064`）が在るか */
+  readonly nameKeyColumn?: boolean;
 }
 
 /**
@@ -110,6 +114,13 @@ function fakeClient(o: FakeOptions) {
       if (sql.startsWith('select id, sire_id, dam_id, inbreed_coeff')) return { rows: [], rowCount: 0 };
       if (sql.includes('insert into horses')) {
         return { rows: [], rowCount: o.insertConflicts === true ? 0 : 1 };
+      }
+      if (sql.startsWith('select name from horses')) {
+        const names = o.takenNames ?? [];
+        return { rows: names.map((name) => ({ name })), rowCount: names.length };
+      }
+      if (sql.includes('information_schema.columns')) {
+        return { rows: [{ n: o.nameKeyColumn === true ? '1' : '0' }], rowCount: 1 };
       }
       if (sql.includes('to_regclass')) {
         return { rows: [{ t: o.draftsTable === true ? 'foal_drafts' : null }], rowCount: 1 };
@@ -228,6 +239,64 @@ describe('🔴 ★POOL-SUPPLY: 定常運転の供給', () => {
       expect(seen.filter((s) => /^(begin|commit|rollback)$/i.test(s.trim())),
         '★runBreedingWeek が自分で取引を張った／閉じた').toEqual([]);
     }
+  });
+
+  describe('★仔の名付け（★PLAN I-3・裁定 REVIEW_I3_NAMING_VERDICT_20260922.md §1）', () => {
+    const inserts = (seen: string[], params: unknown[][]) =>
+      params.filter((_, i) => seen[i]?.includes('insert into horses'));
+    const fakeWithParams = (o: FakeOptions) => {
+      const f = fakeClient(o);
+      const params: unknown[][] = [];
+      const orig = (f.client as unknown as { query: (s: string, p?: unknown[]) => Promise<unknown> }).query;
+      const client = { query: (s: string, p?: unknown[]) => { params.push(p ?? []); return orig(s, p); } };
+      return { client: client as never, seen: f.seen, params };
+    };
+
+    it('🔴 ★名前の乱数は遺伝の乱数と別の流れ: ★違う名前が付いても、★名前以外の全形質が 1 ビットも変わらない', async () => {
+      const a = fakeWithParams({ mareCount: 52, stallionCount: 3 });
+      await runBreedingWeek(a.client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+      const insA = inserts(a.seen, a.params);
+      expect(insA.length, '★仔が生まれていない（★比べられない）').toBeGreaterThan(0);
+      // ★1 回目の名前を全部「使用済み」にして、★2 回目は必ず別の名前を引かせる
+      const b = fakeWithParams({ mareCount: 52, stallionCount: 3, takenNames: insA.map((p) => String(p[2])) });
+      await runBreedingWeek(b.client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+      const insB = inserts(b.seen, b.params);
+      expect(insB.length).toBe(insA.length);
+      for (let i = 0; i < insA.length; i += 1) {
+        const pa = insA[i] as unknown[];
+        const pb = insB[i] as unknown[];
+        expect(pb[2], '★対照: ★名前は違うはず（★使用済みにしたので）').not.toBe(pa[2]);
+        // ★名前（$3）以外の全列（★id・遺伝子・素質・能力・適性・血統…）が一致
+        expect([...pb.slice(0, 2), ...pb.slice(3)]).toEqual([...pa.slice(0, 2), ...pa.slice(3)]);
+      }
+    });
+
+    it('★名前は世界の生成と同じ形（★厩舎の接頭辞 ＋ カタカナの音節）で、★旧来の「接頭辞 ＋ ID の 6 文字」ではない', async () => {
+      const a = fakeWithParams({ mareCount: 52, stallionCount: 3 });
+      await runBreedingWeek(a.client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+      for (const p of inserts(a.seen, a.params)) {
+        const name = String(p[2]);
+        const id = String(p[0]);
+        expect(name.endsWith(id.slice(0, 6)), `★旧来の名前: ${name}`).toBe(false);
+        expect(name).toMatch(/[ァ-ー]/u);
+      }
+    });
+
+    it('★`name_key` の列が在るときだけ書く（★0064 の前の DB で落ちない）', async () => {
+      const without = fakeWithParams({ mareCount: 52, stallionCount: 3, nameKeyColumn: false });
+      await runBreedingWeek(without.client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+      expect(without.seen.some((s) => s.includes('insert into horses') && s.includes('name_key')),
+        '★列が無いのに name_key を書いた').toBe(false);
+      const withCol = fakeWithParams({ mareCount: 52, stallionCount: 3, nameKeyColumn: true });
+      await runBreedingWeek(withCol.client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+      const ins = inserts(withCol.seen, withCol.params);
+      expect(ins.length).toBeGreaterThan(0);
+      for (const p of ins) {
+        // ★$30 ＝ name_key（★正規化した名前）・$31 ＝ name_checked_with（★ハッシュ表が無いので null）
+        expect(p[29]).toBe(normalizeName(String(p[2])));
+        expect(p[30], '★検査していないのに版を書いた').toBeNull();
+      }
+    });
   });
 
   it('★年の途中では、★カウンタを戻さない', async () => {

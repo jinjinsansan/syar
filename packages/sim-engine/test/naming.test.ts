@@ -6,8 +6,10 @@
  *   ここでは**そもそも実在馬名が入り込む経路（NG 判定の無効化）**を塞ぐ。
  */
 
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  checkPlayerHorseName,
   ALLOW_ALL_NAMES,
   DEFAULT_NAME_SHAPE,
   DISTANCE_BIAS_CENTER,
@@ -141,5 +143,45 @@ describe('§10.5 NPC 厩舎の個性', () => {
     const centers = Object.values(DISTANCE_BIAS_CENTER);
     expect(Math.min(...centers)).toBeLessThanOrEqual(1400);
     expect(Math.max(...centers)).toBeGreaterThanOrEqual(2800);
+  });
+});
+
+describe('★利用者が付ける馬名の形（★D-120「命名の規則（暫定）」・裁定 REVIEW_I3_NAMING_VERDICT_20260922.md §4）', () => {
+  const ok = (s: string) => checkPlayerHorseName(s);
+  it('★カタカナ・長音・中黒で 2〜9 文字は通る（★上限ちょうど・下限ちょうど）', () => {
+    expect(ok('アイ')).toMatchObject({ ok: true, display: 'アイ' });
+    expect(ok('アイウエオカキクケ')).toMatchObject({ ok: true });
+    expect(ok('ホシノ・ヒカリ')).toMatchObject({ ok: true, nameKey: 'ホシノヒカリ' });
+  });
+  it('★対照: ★1 文字・10 文字は落ちる', () => {
+    expect(ok('ア')).toEqual({ ok: false, reason: 'length' });
+    expect(ok('アイウエオカキクケコ')).toEqual({ ok: false, reason: 'length' });
+  });
+  it('★半角カナは NFKC で全角にして通す（★保存は全角）', () => {
+    const r = ok('ｱｲｳｰ');
+    expect(r).toMatchObject({ ok: true, display: 'アイウー' });
+  });
+  it('★カタカナ以外（英字・漢字・ひらがな・数字・絵文字）は落ちる', () => {
+    for (const s of ['Star', '星光', 'ほし', 'アイ1', 'アイ🐎']) {
+      expect(ok(s), s).toEqual({ ok: false, reason: 'invalid_chars' });
+    }
+  });
+  it('🔴 ★正規化の後で 2 文字未満になる名前は落ちる（★記号だけで重複の判定をすり抜けない）', () => {
+    expect(ok('ーー')).toEqual({ ok: false, reason: 'too_short_normalized' });
+    expect(ok('・ア')).toEqual({ ok: false, reason: 'too_short_normalized' });
+  });
+  it('★空は落ちる', () => {
+    expect(ok('  ')).toEqual({ ok: false, reason: 'empty' });
+  });
+});
+
+describe('🔴 ★sim-engine は Node に依存しない（★裁定 REVIEW_I3_NAMING_VERDICT_20260922.md §2）', () => {
+  it('★src に `node:` の読み込みが無い（★画面・アプリからも読む包みなので）', () => {
+    const dir = new URL('../src/', import.meta.url);
+    const offenders = readdirSync(dir).filter((f) => f.endsWith('.ts'))
+      .filter((f) => /from\s+['"]node:|require\(\s*['"]node:/.test(readFileSync(new URL(f, dir), 'utf8')));
+    expect(offenders).toEqual([]);
+    // ★対照: ★命名の本体（naming.ts）が走査の中に入っている
+    expect(readdirSync(dir)).toContain('naming.ts');
   });
 });
