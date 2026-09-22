@@ -35,6 +35,7 @@ import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
 import { runBreedingCatchUp } from './breeding-runner.js';
+import { runPlayerBreeding } from './player-breeding.js';
 
 /**
  * 🔴 ★**配合の遅れが縮まないことを、★黙って続けさせない**（★2026-09-21）。
@@ -804,6 +805,31 @@ async function main(): Promise<void> {
     } catch (e) {
       // ★週送りの失敗でループを止めない（A-1 が壊れる）。ただし黙らせない
       console.error('[worker] 週送りに失敗:', (e as Error).message);
+    }
+
+    /**
+     * ── ★プレイヤーの配合の確定（★PLAN I-2・D-120・移行 `0061`）──────────
+     *
+     *   ★**毎周**拾います（★週送りに相乗りさせない — ★誕生まで最大 4 時間 待つことになる・裁定 §1 条件 1）。
+     *   ★要求ごとに自分で取引を張ります（★ここで `begin` しない）。
+     *   ★`foal_requests` が無い DB（★`0061` の前・★いまの本番）では何もしません。
+     *   ★失敗しても周を止めません（A-1）。ただし黙らせません。
+     */
+    try {
+      const nowMs = Number(
+        (await client.query<{ ms: string }>(
+          'select (extract(epoch from now()) * 1000)::bigint as ms',
+        )).rows[0]!.ms,
+      );
+      const pb = await runPlayerBreeding(client, nowMs, cfg.epochMs,
+        (m) => console.error(`[worker] ★${m}`));
+      if (pb.done > 0 || pb.failed > 0 || pb.errors > 0) {
+        console.log(
+          `[worker] 初回の配合 確定${pb.done}件 / 不成立${pb.failed}件 / ★やり直し${pb.errors}件`,
+        );
+      }
+    } catch (e) {
+      console.error('[worker] 初回の配合に失敗:', (e as Error).message);
     }
 
     const elapsed = Date.now() - started;

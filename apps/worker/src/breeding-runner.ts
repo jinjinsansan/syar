@@ -27,7 +27,7 @@ import {
 } from '@star/sim-engine';
 import { buildSireAncestorIndex, pickSire, rankSires } from '@star/breeding';
 import {
-  LIFECYCLE_WEEKS, WEEK_MS, gameYearOf, requiredBroodmares, weekIndexAt,
+  LIFECYCLE_WEEKS, WEEKS_PER_YEAR, WEEK_MS, gameYearOf, requiredBroodmares, weekIndexAt,
 } from '@star/scheduler';
 
 import { rowToHorse } from './horse-repo.js';
@@ -129,8 +129,16 @@ function numericStableId(stable: Stable): number {
 async function foalIdAndSeed(
   sireId: string, damId: string, week: number,
 ): Promise<{ id: string; seed: number }> {
+  return idAndSeedFromKey(`${sireId}|${damId}|${week}`);
+}
+
+/**
+ * ★**鍵の文字列から、仔の id と種を決める**（★NPC の配合・プレイヤーの配合で共通）。
+ *   ★鍵の作り方だけが経路ごとに違います（★NPC は「父・母・週」、★プレイヤーは要求 ID・裁定 §3）。
+ */
+export async function idAndSeedFromKey(key: string): Promise<{ id: string; seed: number }> {
   const { createHash } = await import('node:crypto');
-  const h = createHash('sha256').update(`${sireId}|${damId}|${week}`, 'utf8').digest('hex');
+  const h = createHash('sha256').update(key, 'utf8').digest('hex');
   // ★UUID の形に整えるだけです（★乱数ではありません）
   const variant = ((parseInt(h.slice(16, 17), 16) & 0x3) | 0x8).toString(16);
   const id = [
@@ -147,6 +155,167 @@ const COLS = 'id, sex, generation, birth_year, birth_week, sire_id, dam_id, sire
   + ' distance_center, distance_range, strategy_aptitude, heavy_aptitude, growth, temper,'
   + ' durability, frail, skill_genes, inbreed_coeff, nicks_multiplier, pedigree_cache,'
   + ' foal_count, g1_wins, bred_this_year, coverings_this_year, npc_stable_id';
+
+/** ★配合に要る列（★プレイヤーの配合も同じ列で親を読む） */
+export const BREEDING_COLS = COLS;
+
+/**
+ * 🔴 ★**年次カウンタの列が読めていることを確かめてから、★年齢を `birth_week` から引く**（★G-3・Q-5）。
+ *   ★`rowToHorse` は列が無ければ `0` / `false` に落とします（★他の呼び出し元のため）。
+ *   → ★★**配合でそれを使うと、★判定が素通りします。** ★だから選んだことを確かめます。
+ */
+export function breedingRecordOf(row: Record<string, unknown>): HorseRecord {
+  for (const k of ['bred_this_year', 'coverings_this_year', 'foal_count', 'birth_week']) {
+    if (row[k] === undefined) {
+      throw new Error(
+        `breeding-runner: ${k} を選んでいません。`
+          + '★この列が無いまま配合すると、★年 1 回・種付上限の判定が素通りします（G-3）',
+      );
+    }
+  }
+  return { ...rowToHorse(row), birthYear: gameYearOf(Number(row['birth_week'])) };
+}
+
+/**
+ * 🔴 ★**保存する `birth_year` の尺度を、★世界から測ります**（★Q-5）。
+ *   ★既存の行は ★`gameYearOf(birth_week) + 46` になっていました（★本番の実測）。
+ *   ★**46 を書きません** — ★世界ごとに違いうるので、★**その場で数えます**。
+ *   🔴 ★定数でなければ投げます（★min ≠ max ＝ ★既に混ざっている）。
+ *   ★世界が空なら 0。
+ */
+export async function birthYearOffset(client: pg.ClientBase): Promise<number> {
+  const offRow = (await client.query<{ mn: string | null; mx: string | null }>(
+    'select min(birth_year - floor(birth_week/52.0))::int mn,'
+      + ' max(birth_year - floor(birth_week/52.0))::int mx'
+      + ' from horses where birth_week is not null',
+  )).rows[0];
+  const mn = offRow?.mn === null || offRow?.mn === undefined ? null : Number(offRow.mn);
+  const mx = offRow?.mx === null || offRow?.mx === undefined ? null : Number(offRow.mx);
+  if (mn !== null && mx !== null && mn !== mx) {
+    throw new Error(
+      `breeding-runner: ★birth_year の尺度が既に混ざっています（★差 ${mn}〜${mx}）。`
+        + '★どちらに揃えるかを決めてから動かしてください（★Q-5）',
+    );
+  }
+  return mn ?? 0;
+}
+
+/**
+ * ★**祖先の薄い写し**を読む（★血統をたどるためだけ・`pedigreeOnlyRecord`）。
+ *
+ * 🔴 ★**DB の id でない鍵が来たら、★理由を添えて投げます**（★2026-09-21）。
+ *   ✔ ★本番で起きたこと: ★`pedigree_cache` の鍵が ★**プリシードの id**（`NPC-F00195`）で、
+ *     ★それを `uuid[]` として渡し ★**週送りごと落としました**
+ *     （★`invalid input syntax for type uuid`・★配備を戻して復旧）。
+ *   ★プレイヤーの配合も ★**この関門を通ります**（★裁定 §4・NPC 経路にだけ在る状態にしない）。
+ *
+ * 【★なぜ「先に形を見る」をやめたか】（★2026-09-21・★ 3 度目の直し）
+ *   ⚠️ ★第 1 版: ★**「鍵は uuid であるべき」** → 🔴 ★`verify-pool-supply` の
+ *     ★メモリ上の世界（★id が `NPC-24-019835`）を ★**壊れていないのに落としました**。
+ *   ⚠️ ★第 2 版: ★**「鍵と馬の id は同じ家族」** → 🔴 ★その世界は ★**途中から混在します**
+ *     （★先祖はプリシード id、★新しい仔は uuid）。★また落ちました。
+ *   → ★★**形では判定できません。★正しい世界でも形は混ざります。**
+ *
+ * 【✅ ★本当の失敗は 1 つだけ】
+ *   ★**DB が `::uuid[]` へのキャストを拒む**（★`invalid input syntax for type uuid`）。
+ *   ★そのエラーは ★**原因が読めません**（★本番の週送りがこれで毎周 落ちました）。
+ *   → ★**拒まれてから、★説明を添えて投げ直します。**
+ *   ★★**偽陽性が原理的に出ません**（★DB が実際に拒んだときだけ）。
+ */
+export async function loadAncestorLookup(
+  client: pg.ClientBase, records: readonly HorseRecord[],
+): Promise<Map<string, HorseRecord>> {
+  const ancestorIds = new Set<string>();
+  for (const r of records) for (const a of r.pedigreeCache.keys()) ancestorIds.add(a);
+  const light = new Map<string, HorseRecord>();
+  if (ancestorIds.size === 0) return light;
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let rows;
+  try {
+    rows = await client.query(
+      'select id, sire_id, dam_id, inbreed_coeff, pedigree_cache, genotype from horses'
+        + ' where id = any($1::uuid[])',
+      [[...ancestorIds]],
+    );
+  } catch (e) {
+    const bad = [...ancestorIds].filter((x) => !UUID_RE.test(x));
+    if (bad.length > 0) {
+      throw new Error(
+        `breeding-runner: ★血統の鍵を DB が受け付けません（例 ${bad[0]}・${bad.length} 件）。`
+          + '★`pedigree_cache` にプリシードの id が残っています。'
+          + '★直し方: `npx tsx tools/repair-pedigree-cache.mjs --env <接続先>`'
+          + `（★PEDIGREE-CACHE-IDS-NOT-DB-IDS）。★元のエラー: ${(e as Error).message}`,
+      );
+    }
+    throw e;
+  }
+  for (const r of rows.rows) {
+    light.set(String(r['id']), pedigreeOnlyRecord(r as Record<string, unknown>));
+  }
+  return light;
+}
+
+/**
+ * ★**配合の相性表**（★§6.6・`0054` の `nicks`）。
+ *   ⚠️ ★空でも `getNicksMultiplier` は 1 を返すので動きますが、★**世界の過去と食い違います**
+ *     （★プリシードは表が在る前提で 50 世代 配合しています）。
+ *   → ★`seed-world` が ★**プリシードと同じ表**を転記します。★ここはそれを読むだけです。
+ */
+export async function loadNicks(
+  client: pg.ClientBase, onAlert: (message: string) => void,
+): Promise<Map<string, number>> {
+  const nicksRows = await client.query<{ sire_line: string; dam_sire_line: string; multiplier: string }>(
+    'select sire_line, dam_sire_line, multiplier from nicks',
+  );
+  const nicks = new Map<string, number>(
+    nicksRows.rows.map((r) => [`${r.sire_line}|${r.dam_sire_line}`, Number(r.multiplier)]),
+  );
+  if (nicks.size === 0) {
+    onAlert('★相性表（nicks）が空です。★全組み合わせ 1.00 で配合します（★§6.6 の帯の下端）');
+  }
+  return nicks;
+}
+
+/**
+ * 🔴 ★**その母が、その年にもう仔を持っているか**（★`horses` と ★`foal_drafts` の両方を数える）。
+ *
+ *   ★`bred_this_year` の印だけでは足りません（★2026-09-22・プレイヤーの配合を足すときに見つけました）:
+ *   ★NPC の配合は ★**年の変わり目の週を処理するときに全馬の印を戻します**。
+ *   ★プレイヤーがその週に配合した母の印も戻るので、★**同じ年にもう一度 産めてしまいます**。
+ *   ★`unique (dam_id, birth_week)` は表ごとにしか効かず、★2 つの表をまたげません。
+ *   → ★★**印ではなく、★その年の仔を数えます**（★両方の経路がこの条件を使う）。
+ *   ★SQL の断片（`$damParam` と `$yearStartParam` を受ける）。★年の幅は 52 週（`WEEKS_PER_YEAR`）。
+ *
+ * 🔴 ★`withDrafts` は ★**`foal_drafts` が在るときだけ true** にします（★`hasFoalDrafts`）。
+ *   ★移行 `0061` より前の DB（★いまの本番）で NPC の配合が ★**表が無いと言って落ちない**ためです
+ *   （★0060 の前に配備して週送りを落とした形を繰り返さない）。
+ *   ★表が無ければ下書きの仔も在りえないので、★判定の結果は同じです。
+ */
+export function damHasFoalInYearSql(
+  damParam: string, yearStartParam: string,
+  sources: { readonly horses: boolean; readonly drafts: boolean },
+): string {
+  const parts: string[] = [];
+  /**
+   * ⚠️ ★NPC の経路は ★`horses: false` で呼びます — ★いま入れたばかりの自分の仔を数えてしまうからです。
+   *   ★NPC 同士の二重は、★従来どおり `unique (dam_id, birth_week)` と `bred_this_year` が止めます。
+   */
+  if (sources.horses) {
+    parts.push(`exists (select 1 from horses f where f.dam_id = ${damParam}`
+      + ` and f.birth_week >= ${yearStartParam} and f.birth_week < ${yearStartParam} + ${WEEKS_PER_YEAR})`);
+  }
+  if (sources.drafts) {
+    parts.push(`exists (select 1 from foal_drafts d where d.dam_id = ${damParam}`
+      + ` and d.birth_week >= ${yearStartParam} and d.birth_week < ${yearStartParam} + ${WEEKS_PER_YEAR})`);
+  }
+  return parts.length === 0 ? '(false)' : `(${parts.join(' or ')})`;
+}
+
+/** ★`foal_drafts`（★移行 `0061`）が在るか */
+export async function hasFoalDrafts(client: pg.ClientBase): Promise<boolean> {
+  const r = await client.query<{ t: string | null }>("select to_regclass('public.foal_drafts')::text t");
+  return r.rows[0]?.t !== null && r.rows[0]?.t !== undefined;
+}
 
 /**
  * ★その週の配合を 1 回 走らせる。
@@ -199,27 +368,8 @@ export async function runBreedingWeek(
    *   → ★書かないと ★**2 年目から `canMate` の判定が壊れます**
    *     （★全牝馬が「今年まだ配合していない」ままで、★年に何度でも産めます）。
    */
-  /**
-   * 🔴 ★**保存する `birth_year` の尺度を、★世界から測ります**（★Q-5）。
-   *   ★既存の行は ★`gameYearOf(birth_week) + 46` になっていました（★本番の実測）。
-   *   ★**46 を書きません** — ★世界ごとに違いうるので、★**その場で数えます**。
-   *   🔴 ★定数でなければ投げます（★min ≠ max ＝ ★既に混ざっている）。
-   */
-  const offRow = (await client.query<{ mn: string | null; mx: string | null }>(
-    'select min(birth_year - floor(birth_week/52.0))::int mn,'
-      + ' max(birth_year - floor(birth_week/52.0))::int mx'
-      + ' from horses where birth_week is not null',
-  )).rows[0];
-  const mn = offRow?.mn === null || offRow?.mn === undefined ? null : Number(offRow.mn);
-  const mx = offRow?.mx === null || offRow?.mx === undefined ? null : Number(offRow.mx);
-  if (mn !== null && mx !== null && mn !== mx) {
-    throw new Error(
-      `breeding-runner: ★birth_year の尺度が既に混ざっています（★差 ${mn}〜${mx}）。`
-        + '★どちらに揃えるかを決めてから動かしてください（★Q-5）',
-    );
-  }
-  /** ★保存する年 ＝ ゲームの年 ＋ 既存の行と同じずれ（★世界が空なら 0） */
-  const yearOffset = mn ?? 0;
+  /** ★保存する年 ＝ ゲームの年 ＋ 既存の行と同じずれ（★`birthYearOffset`・Q-5） */
+  const yearOffset = await birthYearOffset(client);
 
   /**
    * 🔴 ★**尽きた牝馬を、★繁殖から降ろします**（★2026-09-20・裁定 ①）。
@@ -367,26 +517,8 @@ export async function runBreedingWeek(
     };
   }
 
-  /**
-   * 🔴 ★**年次カウンタの列が読めていることを、★ここで確かめます**（★G-3）。
-   *   ★`rowToHorse` は列が無ければ `0` / `false` に落とします（★他の呼び出し元のため）。
-   *   → ★★**配合でそれを使うと、★判定が素通りします。** ★だから選んだことを確かめます。
-   */
-  const assertBreedingColumns = (row: Record<string, unknown>): void => {
-    for (const k of ['bred_this_year', 'coverings_this_year', 'foal_count', 'birth_week']) {
-      if (row[k] === undefined) {
-        throw new Error(
-          `breeding-runner: ${k} を選んでいません。`
-            + '★この列が無いまま配合すると、★年 1 回・種付上限の判定が素通りします（G-3）',
-        );
-      }
-    }
-  };
-  /** ★年齢は ★**`birth_week` から**引きます（★上の註記・Q-5） */
-  const withGameYear = (row: Record<string, unknown>): HorseRecord => {
-    assertBreedingColumns(row);
-    return { ...rowToHorse(row), birthYear: gameYearOf(Number(row['birth_week'])) };
-  };
+  /** ★年齢は ★**`birth_week` から**引きます（★`breedingRecordOf`・G-3・Q-5） */
+  const withGameYear = breedingRecordOf;
 
   const mareResult = await client.query(
     `select ${COLS} from horses where id = any($1::uuid[]) and birth_week is not null`,
@@ -407,81 +539,16 @@ export async function runBreedingWeek(
     ]),
   );
 
-  // ★祖先（★血統をたどるためだけの薄い写し）
-  const ancestorIds = new Set<string>();
-  for (const m of mares) for (const a of m.record.pedigreeCache.keys()) ancestorIds.add(a);
-  for (const s of stallions) for (const a of s.pedigreeCache.keys()) ancestorIds.add(a);
-  /**
-   * 🔴 ★**DB の id でない鍵が来たら、★問い合わせずに投げます**（★2026-09-21）。
-   *
-   *   ✔ ★本番で起きたこと: ★`pedigree_cache` の鍵が ★**プリシードの id**（`NPC-F00195`）で、
-   *     ★それを `uuid[]` として渡し ★**週送りごと落としました**
-   *     （★`invalid input syntax for type uuid`・★配備を戻して復旧）。
-   *   ⚠️ ★**SQL のエラーで落ちると、★原因が読めません。** ★ここで名指しして止めます。
-   *   ★直るのは ★**世界を作り直したとき**です（★`seed-world` は鍵を DB の id に直しました）。
-   */
-  const light = new Map<string, HorseRecord>();
-  if (ancestorIds.size > 0) {
-    /**
-     * 🔴 ★**問い合わせが拒んだときだけ、★理由を話します**（★2026-09-21・★ 3 度目の直し）。
-     *
-     * 【★なぜ「先に形を見る」をやめたか】
-     *   ⚠️ ★第 1 版: ★**「鍵は uuid であるべき」** → 🔴 ★`verify-pool-supply` の
-     *     ★メモリ上の世界（★id が `NPC-24-019835`）を ★**壊れていないのに落としました**。
-     *   ⚠️ ★第 2 版: ★**「鍵と馬の id は同じ家族」** → 🔴 ★その世界は ★**途中から混在します**
-     *     （★先祖はプリシード id、★新しい仔は uuid）。★また落ちました。
-     *   → ★★**形では判定できません。★正しい世界でも形は混ざります。**
-     *
-     * 【✅ ★本当の失敗は 1 つだけ】
-     *   ★**DB が `::uuid[]` へのキャストを拒む**（★`invalid input syntax for type uuid`）。
-     *   ★そのエラーは ★**原因が読めません**（★本番の週送りがこれで毎周 落ちました）。
-     *   → ★**拒まれてから、★説明を添えて投げ直します。**
-     *   ★★**偽陽性が原理的に出ません**（★DB が実際に拒んだときだけ）。
-     */
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    let rows;
-    try {
-      rows = await client.query(
-        'select id, sire_id, dam_id, inbreed_coeff, pedigree_cache, genotype from horses'
-          + ' where id = any($1::uuid[])',
-        [[...ancestorIds]],
-      );
-    } catch (e) {
-      const bad = [...ancestorIds].filter((x) => !UUID_RE.test(x));
-      if (bad.length > 0) {
-        throw new Error(
-          `breeding-runner: ★血統の鍵を DB が受け付けません（例 ${bad[0]}・${bad.length} 件）。`
-            + '★`pedigree_cache` にプリシードの id が残っています。'
-            + '★直し方: `npx tsx tools/repair-pedigree-cache.mjs --env <接続先>`'
-            + `（★PEDIGREE-CACHE-IDS-NOT-DB-IDS）。★元のエラー: ${(e as Error).message}`,
-        );
-      }
-      throw e;
-    }
-    for (const r of rows.rows) {
-      light.set(String(r['id']), pedigreeOnlyRecord(r as Record<string, unknown>));
-    }
-  }
+  // ★祖先（★血統をたどるためだけの薄い写し・★鍵の関門は `loadAncestorLookup`）
+  const light = await loadAncestorLookup(client, [...mares.map((m) => m.record), ...stallions]);
   const full = new Map<string, HorseRecord>();
   for (const m of mares) full.set(m.record.id, m.record);
   for (const s of stallions) full.set(s.id, s);
   const lookup = (id: string): HorseRecord | undefined => full.get(id) ?? light.get(id);
 
-  /**
-   * ★**配合の相性表**（★§6.6・`0054` の `nicks`）。
-   *   ⚠️ ★空でも `getNicksMultiplier` は 1 を返すので動きますが、★**世界の過去と食い違います**
-   *     （★プリシードは表が在る前提で 50 世代 配合しています）。
-   *   → ★`seed-world` が ★**プリシードと同じ表**を転記します。★ここはそれを読むだけです。
-   */
-  const nicksRows = await client.query<{ sire_line: string; dam_sire_line: string; multiplier: string }>(
-    'select sire_line, dam_sire_line, multiplier from nicks',
-  );
-  const nicks = new Map<string, number>(
-    nicksRows.rows.map((r) => [`${r.sire_line}|${r.dam_sire_line}`, Number(r.multiplier)]),
-  );
-  if (nicks.size === 0) {
-    onAlert('★相性表（nicks）が空です。★全組み合わせ 1.00 で配合します（★§6.6 の帯の下端）');
-  }
+  const nicks = await loadNicks(client, onAlert);
+  /** ★下書きの表（★`0061`）が在れば、★プレイヤーの配合と母を取り合わない判定に使う */
+  const withDrafts = await hasFoalDrafts(client);
 
   const ancestorIndex = buildSireAncestorIndex(stallions);
   const turnOf = new Map<string, number>();
@@ -546,16 +613,30 @@ export async function runBreedingWeek(
       ],
     );
     if (ins.rowCount === 0) { alreadyThere += 1; continue; }
+
+    /**
+     * 🔴 ★**母の印は「まだ取られていなければ」取ります**（★2026-09-22・プレイヤーの配合と共存するため）。
+     *   ★この関数は母の行をロックせずに読みます（★呼ぶ側が取引を張らない配備）。
+     *   ★読んだ後にプレイヤーの配合が同じ母で確定していたら、★**ここで 0 行になります**。
+     *   → ★いま入れた仔を消して、★「既に居た」と数えます（★母は年 1 回・§6.7）。
+     *   ⚠️ ★母 → 父 の順に書きます（★プレイヤーの配合もロックを 母 → 父 で取る・裁定 §1 条件 3）。
+     */
+    const claim = await client.query(
+      'update horses set bred_this_year = true, foal_count = foal_count + 1'
+        + ` where id = $1 and not bred_this_year and not ${damHasFoalInYearSql('$1', '$2', { horses: false, drafts: withDrafts })}`,
+      [mare.id, year * WEEKS_PER_YEAR],
+    );
+    if (claim.rowCount === 0) {
+      await client.query('delete from horses where id = $1', [foalId]);
+      alreadyThere += 1;
+      continue;
+    }
     born += 1;
 
     // ★年次カウンタ（★G-3。★記録側の規則は `applyMatingCounters` が持っています）
     applyMatingCounters(sire, mare);
     await client.query(
       'update horses set coverings_this_year = coverings_this_year + 1 where id = $1', [sireId],
-    );
-    await client.query(
-      'update horses set bred_this_year = true, foal_count = foal_count + 1 where id = $1',
-      [mare.id],
     );
   }
 

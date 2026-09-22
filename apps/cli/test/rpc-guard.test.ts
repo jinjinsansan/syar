@@ -70,6 +70,16 @@ const READONLY_FUNCTIONS = [
    *    ★書き込む側（`place_bet`）は自分で `assert_setup_complete()` を呼びます。
    */
   'my_bet_allowance',
+  /**
+   * ★本人の初回の配合の状態（`0061`・D-120・PLAN I-2）。`language plpgsql stable` で**状態を変えない**。
+   *   ★書き込む側（`request_initial_breeding`）は自分で `assert_setup_complete()` を呼びます。
+   */
+  'my_initial_breeding',
+  /**
+   * ★本人の命名前の仔（`0061`）。`language plpgsql stable` で**状態を変えない**。
+   *   ★性別・父・母・誕生週だけを返す（★genotype / potential / stats を出さない・D-114）。
+   */
+  'my_foal_drafts',
 ];
 
 /**

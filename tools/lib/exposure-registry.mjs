@@ -131,6 +131,13 @@ export const EXPECTED_EXPOSURE = {
   //   ★利用者が選んだ調教の献立。★読み書きは RPC（`set_training_order`）経由だけ。
   //   ★直に読ませない: ★他人の指示が見えると、★**出走前に相手の仕上げが読めます**。
   training_orders: CLOSED,
+  // ── ★`foal_requests` / `foal_drafts`（★`0061`・2026-09-22・D-120・PLAN I-2） ──
+  //   ★プレイヤーの配合・命名の要求と、命名前の仔。★読み書きは RPC 経由だけ
+  //   （`request_initial_breeding` / `my_initial_breeding` / `my_foal_drafts`）。
+  //   ★直に読ませない: ★他人が選んだ父母が見えると、★候補の父母の枠を先回りして取れます。
+  //   ★下書きは `breed()` の結果を丸ごと持つ（★genotype / potential / stats・D-114 が隠すもの）。
+  foal_requests: CLOSED,
+  foal_drafts: CLOSED,
 };
 
 /** 登録簿に無いものを返す（V-20 ③） */

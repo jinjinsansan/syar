@@ -25,6 +25,10 @@ interface FakeOptions {
   readonly insertConflicts?: boolean;
   /** ★年次カウンタの列を落とす（★G-3 の番人を試す） */
   readonly dropCounterColumn?: boolean;
+  /** ★下書きの表（★`0061`）が在るか（★`to_regclass`） */
+  readonly draftsTable?: boolean;
+  /** ★母の印をプレイヤーの配合が先に取っていたか（★印の取得が 0 行） */
+  readonly damClaimedByPlayer?: boolean;
 }
 
 /**
@@ -107,6 +111,13 @@ function fakeClient(o: FakeOptions) {
       if (sql.includes('insert into horses')) {
         return { rows: [], rowCount: o.insertConflicts === true ? 0 : 1 };
       }
+      if (sql.includes('to_regclass')) {
+        return { rows: [{ t: o.draftsTable === true ? 'foal_drafts' : null }], rowCount: 1 };
+      }
+      // ★母の印の取得（★2026-09-22）。★プレイヤーの配合が先に取っていれば 0 行
+      if (sql.startsWith('update horses set bred_this_year = true')) {
+        return { rows: [], rowCount: o.damClaimedByPlayer === true ? 0 : 1 };
+      }
       return { rows: [], rowCount: 1 };
     },
   };
@@ -177,6 +188,29 @@ describe('🔴 ★POOL-SUPPLY: 定常運転の供給', () => {
     expect(r.yearReset, '★年の変わり目なのに戻していない').toBe(true);
     expect(seen.some((s) => s.startsWith('update horses set bred_this_year = false')),
       '★戻す SQL を投げていない').toBe(true);
+  });
+
+  it('🔴 ⑤ ★母をプレイヤーの配合が先に取っていたら、★入れた仔を消して「既に居た」と数える（★2026-09-22）', async () => {
+    const { client, seen } = fakeClient({
+      mareCount: 52, stallionCount: 3, draftsTable: true, damClaimedByPlayer: true,
+    });
+    const r = await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+    expect(r.born, '★取り合いに負けたのに生まれたと数えた').toBe(0);
+    expect(r.alreadyThere, '★「既に居た」を数えていない').toBeGreaterThan(0);
+    expect(seen.some((s) => s.startsWith('delete from horses where id = $1')),
+      '★入れた仔を消していない（★母が年 2 回 産む）').toBe(true);
+    expect(seen.some((s) => s.startsWith('update horses set coverings_this_year')),
+      '★負けたのに父の種付を数えた').toBe(false);
+    const claim = seen.find((s) => s.startsWith('update horses set bred_this_year = true')) ?? '';
+    expect(claim, '★下書きの表が在るのに数えていない').toContain('foal_drafts');
+  });
+
+  it('★対照: ★下書きの表（★0061）が無い DB では、★表の名前を出さない（★いまの本番で落ちない）', async () => {
+    const { client, seen } = fakeClient({ mareCount: 52, stallionCount: 3, draftsTable: false });
+    const r = await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+    expect(r.born, '★取り合いが無いのに生まれていない').toBeGreaterThan(0);
+    expect(seen.some((s) => s.includes('foal_drafts') && !s.includes('to_regclass')),
+      '★表が無いのに foal_drafts を問い合わせた').toBe(false);
   });
 
   it('★年の途中では、★カウンタを戻さない', async () => {
