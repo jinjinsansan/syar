@@ -1,0 +1,11 @@
+[worker] 起動 env=staging tick=60000ms
+[worker] ⚠️ STAR_SEED_SECRET が未設定です。起動ごとに秘密が変わります
+[worker] 出走可能な馬 2388 頭
+[worker] ★出走資格を広げました cycle=10950 class=win2 広げた段数=2 資格のある馬=2388 頭（★そのクラスの馬が足りていません。★流量を見てください・CL-7）
+[worker] cycle=10948 phase=onSale 公示=[10949,10950,10951,10952] 生成=[10949,10950] 既存=0 確定=[] 周=514.3s(142.9%) mem=91MB heap=29MB fd=? sock=? handles=1
+[worker] 物語 0 行 / 0 頭（前日の記録なし） ★行が 1 つも無い種類 16/16: birth,first-training,debut,first-win,trait-discovered,injury,comeback,graded-win,top-grade-win,jockey-bond,career-high,final-race,retirement,first-offspring,offspring-win,breeding-role-changed
+[worker] 日次集計を更新 date=2026-09-22 / 開放率 平均68.5% SD15.8pt (45/71/87) 週齢平均181 2388頭
+[worker] ★★開放率が P1 のゲートを測ったときの分布からずれています — p10 55.3% → 44.8%（-10.5pt）。V-4/V-5/V-6 はこの分布の上に立っているので、測り直してください（D-053）
+[worker] ★★馬の購入の在庫が下限を割りました（買える NPC の現役馬 0 頭 / 下限 200 頭）。★帯を広げず、NPC の生産の側を見てください（D-102 ⑤）
+[worker] ★★価格の帯が埋まりませんでした（★帯を広げず、そのまま出しています・T11-1 ②）: 帯0（3,000 EP〜）あと 3 口 / 帯1（3,200 EP〜）あと 3 口 / 帯2（3,600 EP〜）あと 3 口 / 帯3（4,200 EP〜）あと 3 口 / 帯4（7,600 EP〜）あと 3 口
+[worker] 出品を更新 在庫0頭 / 下ろし0 / 追加0（目安 15 口） ★在庫が下限を割っています
