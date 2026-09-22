@@ -863,6 +863,12 @@ async function main(): Promise<void> {
     }
 
     const elapsed = Date.now() - started;
+    /**
+     * ★**周の全体の所要**（★2026-09-23・staging の予行で見つけた穴）。
+     *   ★上の `周=…%` は ★レースの段の後で測っており、★**週送りと配合の時間を含みません**。
+     *   ★本番の周に収まるかで ★いちばん重いのはその 2 つなので、★周の終わりで全体を出します（★表示だけ・ふるまいは変えない）。
+     */
+    console.log(`[worker] 周の全体=${(elapsed / 1000).toFixed(1)}s(${((elapsed / CYCLE_MS) * 100).toFixed(1)}%)`);
     await new Promise((r) => setTimeout(r, Math.max(1000, TICK_MS - elapsed)));
   }
 
