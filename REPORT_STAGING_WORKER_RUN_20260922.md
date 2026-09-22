@@ -61,6 +61,7 @@ timeout -k 20 560 node --import tsx --env-file=secrets.staging.env apps/worker/s
 ## §7 run2（2026-09-23 00:12〜00:40・オーナーの端末・`6451f98` 以降）
 
 > 裁定 `REVIEW_PROD_DEPLOY_ORDER_20260922.md` §5 の (a)。ログは `evidence/20260922-staging-worker/run2.log`、読み方と結果は同じフォルダの `analyze-worker-log.mjs`・`run2-analysis.txt`。
+> ⚠️ ログは PowerShell が UTF-16 で書いた。リポジトリの検査（追跡中の文字のファイルに NUL バイトを置かない）に合わせて **UTF-8 に書き直した**（中身は同じ・分析の結果が一字一句同じことを確かめた）。
 > 最初の試みは、PowerShell が stderr の警告を赤い NativeCommandError として出したため、オーナーが数十秒で止めた。ログも文字化けした。
 > `[Console]::OutputEncoding = UTF8` と `cmd /c "npm run worker 2>&1"` で回し直した。止めた後、取り残されたワーカーは 0 件。
 

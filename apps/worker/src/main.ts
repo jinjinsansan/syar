@@ -427,6 +427,10 @@ async function main(): Promise<void> {
           `${out.cancelled.length > 0 ? ` ★中止=[${out.cancelled.join(',')}]` : ''}` +
           `${out.lockBusy ? ' lock=busy' : ''}`,
       );
+      // ★組成が発売開始の後に終わった（★発売の時間が短くなった・手順書 ⑥ で秒数を報告する）。★0 件のときは出さない
+      for (const l of out.salesLate) {
+        console.log(`[worker] ★発売の遅れ cycle=${l.cycleIndex} +${(l.lateMs / 1000).toFixed(1)}s（★発売の時間がそのぶん短くなった）`);
+      }
     } catch (e) {
       failures += 1;
       // ★1周の失敗で終了しない。次の周で回復しうる

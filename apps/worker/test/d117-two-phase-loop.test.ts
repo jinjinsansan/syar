@@ -257,3 +257,28 @@ describe('D-117 ★**DS-6/DS-7** 発売開始までに組成が終わらなか�
     expect(out.fillDeferred).toEqual([]);
   });
 });
+
+describe('★発売の遅れ（★組成が発売開始の後に終わった・裁定 REVIEW_PROD_DEPLOY_ORDER_20260922.md §7）', () => {
+  /** ★締切を少し過ぎた時刻（★cycle 4 は組成できる・発売開始より前） */
+  const start = entryDeadlineMs(4, EPOCH) + 1_000;
+  const salesOpen = cycleStartMs(4, EPOCH) + PHASE_OFFSET_MS.salesOpen;
+
+  it('★組成が発売開始の 30 秒後に終わったら ★salesLate に 30 秒', async () => {
+    const f = fake(start, [4]);
+    // ★1 回目（ループの最初）は start、★組成の後は 発売開始 ＋ 30 秒
+    let calls = 0;
+    (f.store as { serverNowMs: () => Promise<number> }).serverNowMs =
+      async () => (calls++ === 0 ? start : salesOpen + 30_000);
+    const out = await runCycle(f.store, EPOCH, SEEDS, ANNOUNCE, BUILD_KEEPING, NOOP);
+    expect(out.filled).toContain(4);
+    // ★このループでは ★締切を過ぎた他の番号も組成しうる。★cycle 4 の遅れを見る
+    expect(out.salesLate.find((l) => l.cycleIndex === 4)).toEqual({ cycleIndex: 4, lateMs: 30_000 });
+  });
+
+  it('★対照: ★発売開始より前に終われば ★記録しない', async () => {
+    const f = fake(start, [4]);
+    const out = await runCycle(f.store, EPOCH, SEEDS, ANNOUNCE, BUILD_KEEPING, NOOP);
+    expect(out.filled).toContain(4);
+    expect(out.salesLate.find((l) => l.cycleIndex === 4)).toBeUndefined();
+  });
+});

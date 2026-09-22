@@ -232,6 +232,11 @@ export interface CycleOutcome {
   readonly retireCheckSkipped: readonly number[];
   /** ★確定できず開催中止にしたレース（D-037）。★0 でない周は必ず調査対象 */
   readonly cancelled: readonly number[];
+  /**
+   * ★**組成が発売開始の後に終わったレースと、その遅れ [ms]**（★発売の時間がそのぶん短くなった・2026-09-23）。
+   *   ★0 件でない周は ★周の全体が伸びている印（★手順書 ⑥ で秒数を報告する）。
+   */
+  readonly salesLate: readonly { readonly cycleIndex: number; readonly lateMs: number }[];
   /** ロックが取れずに何もしなかった */
   readonly lockBusy: boolean;
 }
@@ -292,7 +297,7 @@ export async function runCycle(
       nowMs, cycleIndex, phase, onSale,
       filled: [], announced: [], fillDeferred: [], fillFailed: [],
       skipped: [], settled: [], cancelled: [], lockBusy: true,
-      scratchedBeforeStart: 0, retireCheckSkipped: [],
+      scratchedBeforeStart: 0, retireCheckSkipped: [], salesLate: [],
     };
   }
 
@@ -306,6 +311,7 @@ export async function runCycle(
   let scratchedBeforeStart = 0;
   const retireCheckSkipped: number[] = [];
   const cancelled: number[] = [];
+  const salesLate: { cycleIndex: number; lateMs: number }[] = [];
   try {
     // --- 1. 確定と払戻（★生成より先に。正典 D-038） ---
     //
@@ -490,6 +496,13 @@ export async function runCycle(
         registered: registered.filter((h) => !built.excluded.includes(h)),
       });
       filled.push(idx);
+      /**
+       * ★**発売が遅れて始まったか**（★2026-09-23・裁定 `REVIEW_PROD_DEPLOY_ORDER_20260922.md` §7）。
+       *   ★「いまの時刻」はループの最初に読んでいるので、★発売開始の直前に始めた組成は ★**発売開始の後に終わりうる**。
+       *   ★そのぶん発売の時間が短くなる。★DB に組成の終わった時刻の列が無いので、★ここで DB の時計を読み直して測る（★表示だけ）。
+       */
+      const lateMs = (await store.serverNowMs()) - (cycleStartMs(idx, epochMs) + PHASE_OFFSET_MS.salesOpen);
+      if (lateMs > 0) salesLate.push({ cycleIndex: idx, lateMs });
     }
   } finally {
     // ★必ず解放する。落ちたままだと次の周が永久にロック待ちになる
@@ -500,6 +513,6 @@ export async function runCycle(
     nowMs, cycleIndex, phase, onSale,
     filled, announced, fillDeferred, fillFailed,
     skipped, settled, cancelled, lockBusy: false,
-    scratchedBeforeStart, retireCheckSkipped,
+    scratchedBeforeStart, retireCheckSkipped, salesLate,
   };
 }
