@@ -14,6 +14,7 @@
  *
  * 【★残すもの】（★M-4）
  *   ★`evidence/d121/<日付>-<接続先>.json` に ★その日の物差し（★NPC 現役の素質の合計・昇順）と結果。★ID と馬名は書かない。
+ *   🔴 ★**このファイルを画面や外部（利用者・SNS・外部の対話 AI など）に出さない**。★素質の数値そのものなので、★画面に出さない決め（D-114・D-116）と同じ扱い（★裁定 §4）。
  *
  * 【★使い方】
  *   npx tsx tools/measure-lineage-plateau.mjs --env staging [--generations 2] [--width 0]
