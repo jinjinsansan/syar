@@ -1298,6 +1298,29 @@ export const OPEN_FINDINGS = [
     until: '2026-10-31',
   },
   {
+    id: 'INBREED-COEFF-ABOVE-PEDIGREE-PROD',
+    what: '⚠️ ★**本番に、★近交係数が血統から再計算した値と合わない馬が 2 頭います**（★2026-09-23・配備の段 ① で判明）。',
+    why: '✔ ★`tools/repair-pedigree-cache.mjs --apply`（本番・`86040e0`）の判定 ⑤: '
+      + '★7,370 頭のうち ★判定 6,943 頭 / 丸めの範囲 3,286 頭 / ★**丸めを超える 2 頭** / ★説明できない 0 頭 / ★最大差 7.81e-3。'
+      + '★`--fix-inbreed` を付けていないので、★行は直していません（★手順書の範囲外）。'
+      + '★**決めること**: ★差の大きさと、★**誕生時に `stats` が決まっている**（★近交の影響は生まれた時点で入っている）ことを測ってから、'
+      + '★上書きするかどうかを決める（★裁定 `REVIEW_PROD_DEPLOY_ORDER_20260922.md` §9）。'
+      + '★上書きすると、★過去の馬の値だけが変わって ★戦績と噛み合わない形になりうる。',
+    owner: 'dev',
+    until: '2026-10-31',
+  },
+  {
+    id: 'VERIFY-DEPLOYED-BUILD-SHORT-SHA',
+    what: '⚠️ ★**`verify-deployed-build.mjs --expect` に短い sha を渡すと、★同じコミットでも「食い違っています」と出ます**（★2026-09-23）。',
+    why: '✔ ★`tools/verify-deployed-build.mjs:81,94` は `sha === expected` の完全一致。'
+      + '★本番の配備（`86040e0`）で ★`--expect 86040e0` を渡し、★本番の sha が `86040e026c38…` でも ★**食い違いと出ました**。'
+      + '★そのときは ★`--expect $(git rev-parse <sha>)` で確かめ直し、★一致を確認しています。'
+      + '★手順書には ★「40 桁で渡す」と注意を書きました（★`RUNBOOK_PROD_DEPLOY_20260922.md` ⑦）。'
+      + '★**直し方**: ★短い方が長い方の先頭（★7 桁以上）なら一致と見る。★試験は ★7 桁・40 桁・別のコミットの 3 通り。',
+    owner: 'dev',
+    until: '2026-10-31',
+  },
+  {
     id: 'RETURNS-TABLE-COLUMN-SHADOW',
     what: '⚠️ ★**`returns table` の列名が PL/pgSQL の変数になり、★表の列と衝突して ★呼ぶと落ちた**（★2026-09-22・1 回目）。',
     why: '✔ ★`0061` の `request_initial_breeding` は `returns table (request_id, status, failure_reason, result_id)`。'
