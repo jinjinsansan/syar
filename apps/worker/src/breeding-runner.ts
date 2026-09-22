@@ -471,7 +471,7 @@ export async function runBreedingWeek(
       + `（★平均出走頭数 ${meanFieldSize}）`);
   }
   const haveRow = await client.query<{ n: string }>(
-    "select count(*)::text n from horses where retirement_role = 'broodmare'"
+    "select count(*)::text n from horses where retirement_role = 'broodmare' and owner_id is null"
       + ' and foal_count < $1',
     [balance.MARE_LIFETIME_FOALS],
   );
@@ -490,7 +490,7 @@ export async function runBreedingWeek(
         : "order by md5(id::text || $3::text)::text, ability desc";
     const cand = await client.query<{ id: string }>(
       'select id, (select sum((value)::numeric) from jsonb_each_text(potential)) ability'
-        + " from horses where retirement_role = 'honored' and sex = 'female'"
+        + " from horses where retirement_role = 'honored' and sex = 'female' and owner_id is null"
         + ' and foal_count < $1 and retirement_reason <> $4'
         /**
          * 🔴 ★**産める年齢の馬だけ上げます**（★2026-09-20・★測って見つけました）。
@@ -527,8 +527,14 @@ export async function runBreedingWeek(
     );
   }
 
+  /**
+   * 🔴 ★**持ち主のいる馬は NPC の配合に使いません**（★裁定 `REVIEW_I1_RETIREMENT_ROLE_VERDICT_20260922.md` §2・Q-4）。
+   *   ★母・種牡馬・補充・枠の数え方の 4 か所に `owner_id is null` を置きます。★どれか 1 つでも欠けると、
+   *   ★**持ち主の馬の仔が、持ち主の居ない NPC 馬として生まれます**（照会 I-1 の F-4〜F-7）。
+   *   ⚠️ ★持ち主の繁殖馬の配合は ★プレイヤーの配合（`player-breeding.ts`）の側で作ります。
+   */
   const mareRows = await client.query<{ id: string }>(
-    "select id from horses where retirement_role = 'broodmare' order by id",
+    "select id from horses where retirement_role = 'broodmare' and owner_id is null order by id",
   );
   const mareIds = mareRows.rows.map((r) => r.id);
   if (mareIds.length === 0) {
@@ -579,7 +585,8 @@ export async function runBreedingWeek(
   }));
 
   const stallionResult = await client.query(
-    `select ${COLS} from horses where retirement_role = 'stallion' and birth_week is not null`,
+    `select ${COLS} from horses where retirement_role = 'stallion' and owner_id is null`
+      + ' and birth_week is not null',
   );
   const stallions = stallionResult.rows.map((r) => withGameYear(r as Record<string, unknown>));
   const stallionStableOf = new Map<string, number | null>(

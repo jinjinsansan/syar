@@ -26,6 +26,7 @@
  *   ★③ ★`rollback` の後、★頭数が ★**元に戻っている**（★この道具が世界を動かしていない）
  *   ★⑤ ★（★`name_key` の列が在る DB で）★仔の `name_key` ＝ 正規化した名前・★既存の馬とも仔どうしとも重ならない
  *      （★PLAN I-3 段 0・2026-09-22）
+ *   ★⑥ ★持ち主のいる母・種牡馬から ★仔が生まれない（★対照: NPC どうしからは生まれる・裁定 I-1 §2・Q-4）
  *
  * ★使い方: npx tsx tools/verify-breeding-live.mjs --env staging [--week <週>]
  * ============================================================================
@@ -38,8 +39,8 @@ import { exitWithVerdict, verdictOf, VERDICT } from './lib/counted-verdict.mjs';
 import { runBreedingWeek } from '../apps/worker/src/breeding-runner.ts';
 import { DEFAULT_PRESEED_OPTIONS } from '../apps/cli/src/preseed.ts';
 import { FIELD_SIZE } from '../apps/cli/src/race-field.ts';
-import { CYCLE_MS } from '../packages/scheduler/src/index.ts';
-import { normalizeName } from '../packages/sim-engine/src/index.ts';
+import { CYCLE_MS, weekIndexAt } from '../packages/scheduler/src/index.ts';
+import { DEFAULT_BALANCE, normalizeName } from '../packages/sim-engine/src/index.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const WEEK_ARG = (() => {
@@ -82,8 +83,41 @@ let result = null;
 let threw = null;
 /** ★配合 1 週の所要（★周の予算と照らします） */
 let elapsedMs = 0;
+/**
+ * ⑥ ★**持ち主のいる馬を NPC の配合に使わない**（★裁定 `REVIEW_I1_RETIREMENT_ROLE_VERDICT_20260922.md` §2・Q-4）。
+ *   ★取引の中で ★「その週に番が来る・産める NPC の繁殖牝馬 1 頭」と ★「種牡馬の半分」に ★仮の持ち主を付けます。
+ *   ★その母から仔が生まれず、★その種牡馬が父にならないこと。★対照: ★残りの NPC の馬からは仔が生まれること。
+ */
+const OWNER = '0f000000-0000-4000-8000-00000000e601';
+let ownedMare = null;
+let ownedSires = [];
+let ownedWeek = null;
 await c.query('begin');
 try {
+  await c.query('insert into auth.users (id, email, email_confirmed_at) values ($1, $2, now())',
+    [OWNER, 'verify-breeding-live+e601@example.invalid']);
+  await c.query("insert into users (id, display_name, stable_name, entry_points) values ($1, '検証', '検証牧場', 0)", [OWNER]);
+  {
+    const { createHash } = await import('node:crypto');
+    // ★ワーカーは「1 つ前の週」を処理します（`runBreedingWeek` の `weekIndexAt(...) - 1`）。★下で result.week と突き合わせます
+    const week = weekIndexAt(nowMs, EPOCH) - 1;
+    ownedWeek = week;
+    const target = ((week % 52) + 52) % 52;
+    const cands = await q(
+      "select id::text as id from horses where retirement_role = 'broodmare' and owner_id is null"
+        + ' and not bred_this_year and foal_count < $1 and (($2::bigint - birth_week) / 52) >= $3 order by id',
+      [DEFAULT_BALANCE.MARE_LIFETIME_FOALS, week, DEFAULT_BALANCE.MIN_BREEDING_AGE_YEARS],
+    );
+    ownedMare = cands.map((r) => r.id).find((id) => parseInt(
+      createHash('sha256').update(`mare-week|${id}`, 'utf8').digest('hex').slice(0, 8), 16,
+    ) % 52 === target) ?? null;
+    if (ownedMare !== null) await c.query('update horses set owner_id = $1, npc_stable_id = null where id = $2', [OWNER, ownedMare]);
+    const sires = await q(
+      "select id::text as id from horses where retirement_role = 'stallion' and owner_id is null order by id",
+    );
+    ownedSires = sires.map((r) => r.id).filter((_, i) => i % 2 === 0);
+    await c.query('update horses set owner_id = $1, npc_stable_id = null where id = any($2::uuid[])', [OWNER, ownedSires]);
+  }
   const t0 = process.hrtime.bigint();
   result = await runBreedingWeek(
     c, nowMs, EPOCH,
@@ -143,6 +177,22 @@ try {
     } else {
       console.log('  ・ ⑤ ★`name_key` の列が無い DB です（★0064 の前）。★名前の判定はしません');
     }
+  }
+
+  // ⑥ ★持ち主のいる馬を NPC の配合に使わない（★上の註記）
+  if (ownedMare === null || ownedSires.length === 0 || ownedWeek !== result.week) {
+    checked += 1;
+    fails.push('⑥ ★判定不能');
+    console.log(`  🔴 ★⑥ を判定できません（★その週に番が来る産める母か、★種牡馬が居ない。★または選んだ週 ${ownedWeek} と処理した週 ${result.week} がずれた）。★合格にしません`);
+  } else {
+    const ownedSet = new Set(ownedSires);
+    const fromOwnedMare = foals.filter((f) => f.dam_id === ownedMare).length;
+    const fromOwnedSire = foals.filter((f) => ownedSet.has(f.sire_id)).length;
+    const fromNpc = foals.filter((f) => f.dam_id !== ownedMare && !ownedSet.has(f.sire_id)).length;
+    check(fromOwnedMare === 0 && fromOwnedSire === 0 && fromNpc > 0,
+      '⑥ ★持ち主の母・種牡馬から仔が生まれない（★対照: NPC の馬からは生まれる）',
+      `★持ち主の母 1 頭 → ${fromOwnedMare} 頭 / 持ち主の種牡馬 ${ownedSires.length} 頭 → ${fromOwnedSire} 頭`
+      + ` / NPC どうし ${fromNpc} 頭`);
   }
 } catch (e) {
   threw = e;

@@ -121,6 +121,7 @@ for (const id of need) {
   rows.set(id, {
     id,
     record: h.record,
+    name: h.name,
     npcStableId: Number(String(h.stableId).replace(/\D/g, '')),
     birthWeek,
     lastProcessedWeek: retired ? birthWeek + LIFECYCLE_WEEKS.retireAt : REFERENCE_WEEK,
@@ -170,6 +171,8 @@ let bornThisWeek = 0;
  * ⚠️ ★偽の client より ★**前**に宣言します（★宣言順を壊さない）。
  */
 let lastBredWeek = null;
+/** ★偽の client が受けた `rollback` の回数（★取引を再現しないので ★1 以上なら判定不能・宣言は偽の client より前） */
+let rolledBack = 0;
 /**
  * ★`--downtime N`: ★**ワーカーが N 週 止まった**ことにする（★0 なら止めない）。
  *
@@ -272,7 +275,8 @@ const client = {
       for (const id of params[0]) { const r = rows.get(id); if (r) r.role = 'broodmare'; }
       return { rows: [], rowCount: params[0].length };
     }
-    if (sql.includes("retirement_role = 'broodmare' order by id")) {
+    // ★持ち主の絞り（`owner_id is null`・裁定 I-1 §2）は ★この世界に持ち主の馬が居ないので ★何も変えません
+    if (sql.includes("retirement_role = 'broodmare'") && sql.includes('order by id')) {
       const ids = [...rows.values()].filter((r) => r.role === 'broodmare').map((r) => r.id).sort();
       return { rows: ids.map((id) => ({ id })), rowCount: ids.length };
     }
@@ -297,7 +301,7 @@ const client = {
     if (sql.includes('from nicks')) return { rows: [], rowCount: 0 };
     if (sql.includes('into horses (id, npc_stable_id')) {
       // ★`unique (dam_id, birth_week)` をここで再現します
-      const [id, npcStableId, , sex, birthYear, generation, sireId, damId, sireLine, damSireLine,
+      const [id, npcStableId, name, sex, birthYear, generation, sireId, damId, sireLine, damSireLine,
         genotype, potential, stats, unlockRate, surface, dc, dr, strat, heavy, growth, temper,
         durability, frail, skills, inbreed, nicksMult, pedigree, week] = params;
       for (const r of rows.values()) {
@@ -317,7 +321,7 @@ const client = {
           foalCount: 0, coveringsThisYear: 0, bredThisYear: false, g1Wins: 0,
           breedingRecord: null,
         },
-        npcStableId, birthWeek: week, lastProcessedWeek: week,
+        name, npcStableId, birthWeek: week, lastProcessedWeek: week,
         retiredAtWeek: null, role: null, bredThisYear: false, coveringsThisYear: 0, foalCount: 0,
       });
       bornThisWeek += 1;
@@ -330,6 +334,28 @@ const client = {
     if (sql.includes('bred_this_year = true')) {
       const r = rows.get(params[0]); if (r) { r.bredThisYear = true; r.foalCount += 1; }
       return { rows: [], rowCount: 1 };
+    }
+    /**
+     * ★追いつきは ★週ごとに取引を張ります（★`fca33da`・2026-09-22）。
+     *   🔴 ★この道具は ★その日から ★`begin` で落ちていました（★誰も流していなかった・2026-09-22 に発見）。
+     *   ⚠️ ★この偽物は ★取引を再現しません。★`rollback` が来たら ★数えておき、★最後に 1 回でもあれば判定不能にします（★書いた分が戻っていない）。
+     */
+    if (sql === 'begin' || sql === 'commit') return { rows: [], rowCount: 0 };
+    /**
+     * ★I-2・I-3（2026-09-22）で足した問い合わせ。★この世界は ★下書きの表（`0061`）も
+     *   ★`name_key` の列（`0064`）も ★**無い DB** として答えます（★0060 までの本番と同じ形）。
+     */
+    if (sql.includes('to_regclass')) return { rows: [{ t: null }], rowCount: 1 };
+    if (sql.includes('information_schema.columns')) return { rows: [{ n: '0' }], rowCount: 1 };
+    // ★NPC の仔の名前（★I-3・`loadFoalNaming`）。★使用済みの名前を返す
+    if (sql.startsWith('select name from horses')) {
+      const out = [...rows.values()].map((r) => ({ name: r.name }));
+      return { rows: out, rowCount: out.length };
+    }
+    if (sql === 'rollback') {
+      // ★投げると ★元の例外が隠れます（★追いつきは rollback の後に元の例外を投げ直す）。★印だけ付けて返します
+      rolledBack += 1;
+      return { rows: [], rowCount: 0 };
     }
     throw new Error(`偽のクライアントが想定していない SQL: ${sql.slice(0, 70)}`);
   },
@@ -576,4 +602,6 @@ check(lines.effective >= 5, '④ 🔴 ★有効系統数 ≥ 5（★D-026）',
   `有効 ${lines.effective.toFixed(2)} / 実数 ${lines.count} / 最大占有 ${(lines.topShare * 100).toFixed(1)}%`);
 
 console.log(`  … 最後の週: 現役 ${last.active} 頭（★初期 ${pre.world.activeIds.length} 頭）`);
+// ★偽の client は取引を再現しません。★週が 1 度でも戻されていたら、★書いた分が残ったまま数えています
+check(rolledBack === 0, '⑤ ★週の取引が 1 度も戻されていない（★偽の client は rollback を再現しない）', `rollback ${rolledBack} 回`);
 exitWithVerdict(verdictOf({ checked, failed: fails.length, label: '★POOL-SUPPLY の釣り合い' }));

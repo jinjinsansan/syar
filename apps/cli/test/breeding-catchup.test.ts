@@ -57,7 +57,7 @@ function fakeClient(o: FakeOptions) {
        *   ★そこは ★**何もせず、★投げずに**終わります（★誰の番でもない週は正常）。
        *   → ★★この検査は「どの週を頼んだか」だけを見られます。
        */
-      if (sql.includes("retirement_role = 'broodmare' order by id")) {
+      if (sql.includes("retirement_role = 'broodmare'") && sql.includes('order by id')) {
         if (o.weekError !== undefined) throw o.weekError;
         clock += cost;                 // ★1 週ぶんの費用を、★偽の時計に載せる
         return { rows: [], rowCount: 0 };

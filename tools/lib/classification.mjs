@@ -37,6 +37,8 @@
 export const READONLY = [
   // ★初回の配合の父母候補の数（★D-120 ⑥ N-1・裁定 f613878 §6）。★`begin read only` で読むだけ
   'diag-initial-parent-pool.mjs',
+  // ★持ち主のいる引退馬の数（★裁定 REVIEW_I1_RETIREMENT_ROLE_VERDICT_20260922.md §2 ③）。★`begin read only` で数を読むだけ
+  'diag-owned-breeders.mjs',
   // ★門を流した後、★作業ツリーが汚れていないか（★簿 `CI-DIRTY-TREE-UNSEEN`・2026-09-21）。
   //   ★`git status --porcelain` と `git ls-files` に訊くだけ。★1 行も書きません。★CI から呼びます
   'verify-clean-tree.mjs',

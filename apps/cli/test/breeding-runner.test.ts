@@ -90,7 +90,7 @@ function fakeClient(o: FakeOptions) {
     async query(sql: string, params?: unknown[]) {
       seen.push(sql);
       if (sql.startsWith('update horses set bred_this_year = false')) return { rows: [], rowCount: 1 };
-      if (sql.includes("retirement_role = 'broodmare' order by id")) {
+      if (sql.includes("retirement_role = 'broodmare'") && sql.includes('order by id')) {
         return {
           rows: Array.from({ length: o.mareCount }, (_, i) => ({
             id: `m-${String(i).padStart(5, '0')}`,
@@ -328,5 +328,32 @@ describe('🔴 ★POOL-SUPPLY: 定常運転の供給', () => {
     const { client } = fakeClient({ mareCount: 1, mareRowsEmpty: true });
     const r = await runBreedingWeek(client, nowForWeek(52 * 7 + 3), EPOCH, () => {}, undefined, 'random', 13, 800);
     expect(r.yearReset, '★年の途中で戻した').toBe(false);
+  });
+});
+
+describe('🔴 ★持ち主のいる馬を NPC の配合に使わない（★裁定 REVIEW_I1_RETIREMENT_ROLE_VERDICT_20260922.md §2・Q-4）', () => {
+  /**
+   * ★偽のクライアントは ★`where` を評価しません。★ここで固定できるのは ★**問い合わせの文面**だけです。
+   *   ★「持ち主の馬は入らず、NPC の馬は入る」は ★staging の予行（`tools/verify-breeding-live.mjs`）で見ます。
+   */
+  const poolSelects = (seen: readonly string[]): string[] => seen.filter((s) => s.startsWith('select')
+    && /retirement_role = '(broodmare|stallion|honored)'/.test(s));
+
+  it('★繁殖の集合を拾う select は ★4 つとも `owner_id is null` を持つ（母・種牡馬・枠の数え方・補充）', async () => {
+    const { client, seen } = fakeClient({ mareCount: 52, stallionCount: 3 });
+    // ★週 312 ＝ 年の変わり目。★枠の数えが 0 なので ★補充の問い合わせも走る
+    await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+    const pool = poolSelects(seen);
+    // ★対照: ★4 つとも走ったこと（★0 個なら下の every は空で緑になる）
+    expect(pool.length, '★繁殖の集合を拾う問い合わせが 4 つ走っていない').toBe(4);
+    for (const s of pool) expect(s, `★持ち主の馬を拾う: ${s}`).toContain('owner_id is null');
+  });
+
+  it('★対照: ★生涯 8 産で降ろす update は ★持ち主の馬にも掛ける（★裁定 §3 Q-3・NPC と同じ規則）', async () => {
+    const { client, seen } = fakeClient({ mareCount: 1, mareRowsEmpty: true });
+    await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+    const demote = seen.filter((s) => s.startsWith("update horses set retirement_role = 'honored'"));
+    expect(demote.length).toBe(1);
+    expect(demote[0]).not.toContain('owner_id');
   });
 });
