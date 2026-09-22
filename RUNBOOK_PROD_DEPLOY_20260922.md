@@ -64,8 +64,11 @@ npx tsx tools/migrate.mjs --env production --yes-production
 ```bash
 npx tsx tools/read-auth-settings.mjs --env production
 ```
-- **`disable_signup = true` でなければ止める。** 移行だけ当たった状態で止まっても害は無い（要求が積まれても、処理するワーカーが居ないので、無償の配合は渡らない）。
-- 閉じ方と招待の段取りは、レビュー側がオーナーに渡している（裁定 `ad2da90`）。
+- 🔴 **2026-09-23 に「関門」から「記録」に変えた**（オーナー判断・「URL は誰も知りません」・D-120 追記）。★**止めない**。
+- 記録するもの: ① `disable_signup` の値 ② 本番の口座の数（`auth.users` と `users`）。
+- ★**口座の数が見込み（オーナーと、オーナーが招待した人だけ）より多ければ、そこで止めて報告する**。
+- ⚠️ **閉じる期限**: 告知・景品交換・一般公開のうち、**いちばん早いものの前**に閉じる（オーナー判断）。
+- 2026-09-23 の実績: `disable_signup = false` ／ `auth.users` 8 件・`users` 1 件（★内訳と確認は `REPORT_PROD_DEPLOY_20260923.md` §1）。
 
 ## ⑥ 新しいワーカーを入れる（`deploy.sh`）
 
