@@ -207,3 +207,38 @@ export function productionNameKeyOptInProblem({
   }
   return null;
 }
+
+/**
+ * 🔴 ★**本番の馬名を禁止名のリストで検査し直してよいか**（★2026-09-22・PLAN I-3・裁定 `ff7028c` §4-2）。
+ *
+ *   ★上の 3 つと同じ形（★旗 2 つ ＋ 写せない数 1 つ）。★要求する数は ★**いま未検査（`name_checked_with` が空）の頭数**
+ *   （★他の道具の手順書から写せないように）。★歩調は `apps/cli/test/migrate-guard.test.ts` が 4 つの関門に同じ 5 段を課して合わせます。
+ */
+export function productionNameRecheckOptInProblem({
+  environment, yesProduction = false, recheckFlag = false,
+  expectUnchecked = null, actualUnchecked = null,
+}) {
+  if (environment !== 'production') return null;   // ★本番以外は、この関門を作らない
+  if (!yesProduction) {
+    return '本番の馬名を検査し直して記録するには --yes-production が要ります'
+      + '（★--env を書いただけでは、staging のつもりで production と打った場合を止められません）';
+  }
+  if (!recheckFlag) {
+    return '本番では --recheck-names も要ります'
+      + '（★migrate や seed-world と同じ指で打てないように、★この道具だけの旗を 1 つ 立てさせます）';
+  }
+  if (!Number.isInteger(expectUnchecked)) {
+    return '本番では --expect-unchecked <いま未検査の頭数> が要ります'
+      + '（★数は手順書から写せません。★その場で数えた人だけが通れます）';
+  }
+  if (!Number.isInteger(actualUnchecked)) {
+    return 'いま未検査の頭数を数えられませんでした（★数えられないなら通しません）';
+  }
+  if (expectUnchecked !== actualUnchecked) {
+    // 🔴 ★**実数をここに書かないこと**
+    return `--expect-unchecked ${expectUnchecked} と、いまの実数が違います`
+      + '（★世界が想定と違います。★**間違いではなく「見てから来い」**です。'
+      + '★実数はここには出しません）';
+  }
+  return null;
+}

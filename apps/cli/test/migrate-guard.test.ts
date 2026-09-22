@@ -15,7 +15,7 @@
  */
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error ★`.mjs` の部品（★`.d.mts` を置いていません）
-import { needsYesProduction, productionNameKeyOptInProblem, productionOptInProblem, productionRepairOptInProblem } from '../../../tools/lib/args.mjs';
+import { needsYesProduction, productionNameKeyOptInProblem, productionNameRecheckOptInProblem, productionOptInProblem, productionRepairOptInProblem } from '../../../tools/lib/args.mjs';
 
 const needs = needsYesProduction as (
   env: string,
@@ -126,7 +126,7 @@ describe('🔴 ★seed-world: 本番の世界を作り直す関門', () => {
  *   ★同じ数（例: 頭数）を要求したら、★★**seed-world の手順書からそのまま写せます。**
  *   → ★旗の名前と、★数の旗の名前が ★**重なっていないこと**を、★下で検査します。
  */
-describe('🔴 ★本番の関門（★3 つ）が、★同じ 5 段を課している', () => {
+describe('🔴 ★本番の関門（★4 つ）が、★同じ 5 段を課している', () => {
   interface Gate {
     name: string;
     fn: (o: Record<string, unknown>) => string | null;
@@ -167,6 +167,16 @@ describe('🔴 ★本番の関門（★3 つ）が、★同じ 5 段を課して
       },
       second: ['backfillFlag', '--backfill-name-key'],
       number: ['expectNull', 'actualNull', '--expect-null'],
+    },
+    {
+      name: 'recheck-name-blocklist（★未検査の馬名を禁止名のリストで検査し直す・PLAN I-3）',
+      fn: productionNameRecheckOptInProblem as Gate['fn'],
+      ok: {
+        environment: 'production', yesProduction: true, recheckFlag: true,
+        expectUnchecked: 2468, actualUnchecked: 2468,
+      },
+      second: ['recheckFlag', '--recheck-names'],
+      number: ['expectUnchecked', 'actualUnchecked', '--expect-unchecked'],
     },
   ];
 

@@ -49,6 +49,15 @@ export const TOOL_AFTERMATH = {
    *   （★2026-09-21 は grep で 0 行。★2026-09-22 から追いつきが週ごとに取引を張るので、
    *    ★`breeding-runner.test.ts` の「runBreedingWeek は取引に触らない」が釘付け）。
    */
+  'recheck-name-blocklist.mjs': {
+    mode: 'consumes',
+    why: '★消費するもの: ★**`horses.name_checked_with` の空（null）**（★未検査の行に ★いまのリストの版を書く）。'
+      + '★既定は ★**下見だけ**。★`--rehearse` は ★書いて数え直してから ★必ず戻す。★`--apply` で書く。'
+      + '✅ ★**当たった行は書かない**（★未検査のまま残す）。★書いた後に取引の中で ★残り ＝ 当たった数・★版の一致を数え、★合わなければ戻す。'
+      + '🔴 ★当たった名前は出力しない（★ID だけ・★実在馬名の可能性・憲法 §0.1）',
+    notRestored: '★**未検査の印（null）**（★戻しません）。★検査した事実を ★版として残すための道具で、'
+      + '★未検査に戻す理由がありません。★戻すなら ★`update horses set name_checked_with = null where name_checked_with = <版>`',
+  },
   'backfill-name-key.mjs': {
     mode: 'consumes',
     why: '★消費するもの: ★**`horses.name_key` の空（null）と食い違い**（★全頭・★`normalizeName(name)` で上書き）。'

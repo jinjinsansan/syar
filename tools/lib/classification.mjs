@@ -1029,6 +1029,8 @@ export const STATE_CHANGING = [
   'verify-player-breeding-live.mjs',
   // ★既存の全頭の `horses.name_key` を埋める（★PLAN I-3 段 2）。★既定は下見・`--apply` で書く・本番は関門
   'backfill-name-key.mjs',
+  // ★未検査の馬名を禁止名のリストで検査し直す（★PLAN I-3）。★既定は下見・--rehearse は必ず戻す・--apply で書く・本番は関門
+  'recheck-name-blocklist.mjs',
   'synthetic-bettor.mjs',
   'verify-a2.mjs',
   // ★B-1: 馬の育成状態を書き換え、horse_week_log を作る
@@ -1089,6 +1091,7 @@ export const PRODUCTION_OPS = [
  */
 export const COMPONENT = [
   { file: 'lib/args.mjs', why: '★コマンドライン引数の解析。★2026-08-20 に本番へ余計な移行を当てた事故の後、切り出した部品' },
+  { file: 'lib/name-recheck.mjs', why: '★未検査の馬名を禁止名の判定で分ける純関数（★`recheck-name-blocklist.mjs` が使う・★単体では走らせない）' },
   { file: 'lib/name-key-survey.mjs', why: '★馬名の正規化キーの下見の純関数（★`backfill-name-key.mjs` が使う・★単体では走らせない）' },
   { file: 'lib/cdp.mjs', why: '★Chrome DevTools Protocol の細口（★映像の撮影の道具が使う）。★単体では走らせない' },
   { file: 'lib/classification.mjs', why: '★この分類簿そのもの。★道具ではなく、道具を分類する表' },
