@@ -13,6 +13,7 @@
  *   ① ★持ち主のいる引退馬の数（★役割ごと: 種牡馬／繁殖牝馬／功労馬）
  *   ② ★持ち主のいる馬を父か母に持つ ★持ち主の居ない馬（★NPC の配合が作った仔）の数
  *   ③ ★対照: ★引退馬の総数（★① が 0 のとき ★「そもそも引退馬を読めていない」と区別するため）
+ *   ④ ★生涯の産駒数に達した繁殖牝馬の数（★持ち主の有無を問わず。★次の年の頭に降ろされる馬。★0069 の前なら、この数が 1 以上で配合の週が落ちる・裁定 REVIEW_PROD_DEPLOY_ORDER_20260922.md §1）
  *
  * 【⚠️ ★本番に向けるとき】
  *   ★本番の読み取りも権限層が止めることがあります。★オーナーに次の 1 行を渡して流してもらいます:
@@ -22,6 +23,7 @@
 import pg from 'pg';
 
 import { loadEnv } from './lib/env.mjs';
+import { DEFAULT_BALANCE } from '../packages/sim-engine/src/index.ts';
 
 const env = loadEnv();
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
@@ -30,7 +32,7 @@ const q = async (s, p) => (await c.query(s, p)).rows;
 
 await c.query('begin read only');
 try {
-  console.log('# ★持ち主のいる引退馬（★読むだけ・★数だけ）');
+  console.log('# ★持ち主のいる引退馬と、生涯の産駒数に達した繁殖牝馬（★読むだけ・★数だけ）');
   const roles = await q(
     'select retirement_role r, count(*)::int n from horses'
       + ' where owner_id is not null and retired_at_week is not null group by 1 order by 1',
@@ -47,6 +49,11 @@ try {
   const retired = (await q('select count(*)::int n from horses where retired_at_week is not null'))[0].n;
   console.log(`  ③ ★対照: ★引退馬の総数 ${retired} 頭（★0 なら ①② は判定できません）`);
   if (retired === 0) process.exitCode = 2;
+  const worn = (await q(
+    "select count(*)::int n from horses where retirement_role = 'broodmare' and foal_count >= $1",
+    [DEFAULT_BALANCE.MARE_LIFETIME_FOALS],
+  ))[0].n;
+  console.log(`  ④ ★生涯 ${DEFAULT_BALANCE.MARE_LIFETIME_FOALS} 産に達した繁殖牝馬: ${worn} 頭（★次の年の頭に降ろされる）`);
 } finally {
   await c.query('rollback');
   await c.end();

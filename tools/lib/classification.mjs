@@ -1029,6 +1029,8 @@ export const STATE_CHANGING = [
   // ★プレイヤーの配合（★PLAN I-2・D-120）を、★本物の DB で通す（★取引の中だけ。★必ず rollback）。
   //   ★試験用の利用者・要求・下書きを作り、★NPC の週次配合と同じ母を取り合わせる
   'verify-player-breeding-live.mjs',
+  // ★引退馬の役割の変更（★I-1 段 3・`0070`）と生涯 8 産の降ろし（★`0069`）を、★本物の DB で通す（★取引の中だけ。★必ず rollback）
+  'verify-role-request-live.mjs',
   // ★既存の全頭の `horses.name_key` を埋める（★PLAN I-3 段 2）。★既定は下見・`--apply` で書く・本番は関門
   'backfill-name-key.mjs',
   // ★未検査の馬名を禁止名のリストで検査し直す（★PLAN I-3）。★既定は下見・--rehearse は必ず戻す・--apply で書く・本番は関門

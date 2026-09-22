@@ -362,6 +362,18 @@ export async function hasFoalDrafts(client: pg.ClientBase): Promise<boolean> {
 }
 
 /**
+ * ★**生涯の記録の種類が、その DB の制約で許されているか**（★移行の前後どちらでも落ちないため）。
+ *   ★制約の定義文に種類の語が在るかを見ます（★`0070` で `breeding-role-changed` が入る）。
+ */
+export async function storyTypeAvailable(client: pg.ClientBase, type: string): Promise<boolean> {
+  const r = await client.query<{ d: string | null }>(
+    "select pg_get_constraintdef(oid) d from pg_constraint where conname = 'horse_story_event_type_known'",
+  );
+  const d = r.rows[0]?.d;
+  return typeof d === 'string' && d.includes(`'${type}'`);
+}
+
+/**
  * ★その週の配合を 1 回 走らせる。
  *
  * ⚠️ ★**呼ぶ側が取引を張ってください**（★途中で落ちたら全部 戻すため）。
@@ -445,13 +457,28 @@ export async function runBreedingWeek(
    *   → ★だから ★**枠の数え方は「まだ産める牝馬」**にします（★下の `have`）。
    */
   const atYearStart = gameYearOf(week - 1) !== year;
-  const demoted = atYearStart ? await client.query(
+  const demoted = atYearStart ? await client.query<{ id: string }>(
     "update horses set retirement_role = 'honored',"
       + " retirement_reason = 'mare_lifetime_foals'"
-      + " where retirement_role = 'broodmare' and foal_count >= $1",
+      + " where retirement_role = 'broodmare' and foal_count >= $1 returning id",
     [balance.MARE_LIFETIME_FOALS],
-  ) : { rowCount: 0 };
+  ) : { rowCount: 0, rows: [] as { id: string }[] };
   const retiredFromBreeding = demoted.rowCount ?? 0;
+  /**
+   * ★**降ろしたことを生涯の記録に残す**（★裁定 `REVIEW_I1_STEP3_ROLE_REQUEST_VERDICT_20260922.md` Q-C）。
+   *   ★持ち主の馬も NPC の馬も書きます（★「その馬に何が起きたか」の帳面・§18）。★持ち主には、これが知らせになります。
+   *   ⚠️ ★種類 `breeding-role-changed`（★移行 `0070`）が DB に無ければ ★書かずに進めます
+   *     （★本番の配備の途中で、★新しいワーカーが古い制約に当たって週ごと落ちないため）。
+   */
+  if (demoted.rows.length > 0 && await storyTypeAvailable(client, 'breeding-role-changed')) {
+    await client.query(
+      'insert into horse_story_event (horse_id, event_type, game_week, detail)'
+        + " select id, 'breeding-role-changed', $2,"
+        + " jsonb_build_object('from', 'broodmare', 'to', 'honored', 'reason', 'lifetime_foals')"
+        + ' from unnest($1::uuid[]) as id',
+      [demoted.rows.map((r) => r.id), week],
+    );
+  }
 
   /**
    * 🔴 ★**空いた枠を埋めます**（★裁定 ②: ★数は導出する。★書かない）。

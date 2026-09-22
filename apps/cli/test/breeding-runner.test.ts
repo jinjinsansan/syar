@@ -33,6 +33,10 @@ interface FakeOptions {
   readonly takenNames?: readonly string[];
   /** ★`horses.name_key`（★移行 `0064`）が在るか */
   readonly nameKeyColumn?: boolean;
+  /** ★生涯 8 産で降ろした馬の id（★年の変わり目の update が返す） */
+  readonly demotedIds?: readonly string[];
+  /** ★生涯の記録の種類の制約に `breeding-role-changed` が在るか（★移行 `0070`） */
+  readonly roleStoryType?: boolean;
 }
 
 /**
@@ -90,6 +94,13 @@ function fakeClient(o: FakeOptions) {
     async query(sql: string, params?: unknown[]) {
       seen.push(sql);
       if (sql.startsWith('update horses set bred_this_year = false')) return { rows: [], rowCount: 1 };
+      if (sql.startsWith("update horses set retirement_role = 'honored'")) {
+        const ids = o.demotedIds ?? [];
+        return { rows: ids.map((id) => ({ id })), rowCount: ids.length };
+      }
+      if (sql.includes('horse_story_event_type_known')) {
+        return { rows: [{ d: o.roleStoryType === true ? "CHECK (event_type IN ('retirement', 'breeding-role-changed'))" : "CHECK (event_type IN ('retirement'))" }], rowCount: 1 };
+      }
       if (sql.includes("retirement_role = 'broodmare'") && sql.includes('order by id')) {
         return {
           rows: Array.from({ length: o.mareCount }, (_, i) => ({
@@ -355,5 +366,33 @@ describe('🔴 ★持ち主のいる馬を NPC の配合に使わない（★裁
     const demote = seen.filter((s) => s.startsWith("update horses set retirement_role = 'honored'"));
     expect(demote.length).toBe(1);
     expect(demote[0]).not.toContain('owner_id');
+  });
+});
+
+describe('★生涯 8 産で降ろしたことを生涯の記録に残す（★裁定 REVIEW_I1_STEP3_ROLE_REQUEST_VERDICT_20260922.md Q-C）', () => {
+  const storyInserts = (seen: readonly string[]): string[] => seen.filter((s) => s.startsWith('insert into horse_story_event'));
+
+  it('★降ろした馬がいて、★種類が許されていれば書く', async () => {
+    const { client, seen } = fakeClient({ mareCount: 1, mareRowsEmpty: true, demotedIds: ['m-a', 'm-b'], roleStoryType: true });
+    const r = await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+    expect(r.retiredFromBreeding).toBe(2);
+    const ins = storyInserts(seen);
+    expect(ins.length).toBe(1);
+    expect(ins[0]).toContain("'breeding-role-changed'");
+    expect(ins[0]).toContain("'lifetime_foals'");
+  });
+
+  it('★対照: ★種類がまだ無い DB（★0070 の前）では書かずに進める', async () => {
+    const { client, seen } = fakeClient({ mareCount: 1, mareRowsEmpty: true, demotedIds: ['m-a'], roleStoryType: false });
+    const r = await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+    expect(r.retiredFromBreeding).toBe(1);
+    expect(storyInserts(seen)).toEqual([]);
+  });
+
+  it('★対照: ★降ろした馬がいなければ、★制約も読まない', async () => {
+    const { client, seen } = fakeClient({ mareCount: 1, mareRowsEmpty: true, roleStoryType: true });
+    await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+    expect(seen.some((s) => s.includes('horse_story_event_type_known'))).toBe(false);
+    expect(storyInserts(seen)).toEqual([]);
   });
 });

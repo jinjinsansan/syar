@@ -138,6 +138,10 @@ export const EXPECTED_EXPOSURE = {
   //   ★下書きは `breed()` の結果を丸ごと持つ（★genotype / potential / stats・D-114 が隠すもの）。
   foal_requests: CLOSED,
   foal_drafts: CLOSED,
+  // ── ★`role_requests`（★`0070`・2026-09-22・I-1 段 3） ──
+  //   ★引退馬の役割の変更の依頼。★書くのは `request_breeding_role` だけ（★結果はその場で返す）。
+  //   ★直に読ませない: ★他人が繁殖入りさせた馬の並びが見える必要が無い（★生涯の記録は別に見える・LR-6）。
+  role_requests: CLOSED,
 };
 
 /** 登録簿に無いものを返す（V-20 ③） */

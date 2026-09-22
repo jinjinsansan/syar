@@ -28,12 +28,13 @@ export type StoryEventType =
   | 'final-race'       // ラストラン
   | 'retirement'       // 引退
   | 'first-offspring'  // 初めての産駒
-  | 'offspring-win';   // 産駒が大きいレースを勝った
+  | 'offspring-win'    // 産駒が大きいレースを勝った
+  | 'breeding-role-changed'; // 引退後の役割が変わった（★I-1 段 3・種牡馬入り／繁殖入り／功労馬）
 
 export const STORY_EVENT_TYPES: readonly StoryEventType[] = [
   'birth', 'first-training', 'debut', 'first-win', 'trait-discovered', 'injury', 'comeback',
   'graded-win', 'top-grade-win', 'jockey-bond', 'career-high', 'final-race', 'retirement',
-  'first-offspring', 'offspring-win',
+  'first-offspring', 'offspring-win', 'breeding-role-changed',
 ];
 
 /**
@@ -55,6 +56,10 @@ export interface StoryEvent {
   readonly traitLabel?: string | undefined;
   /** ★産駒の馬名（★`first-offspring`・`offspring-win` のとき） */
   readonly offspringName?: string | undefined;
+  /** ★変わった後の役割（★`breeding-role-changed` のとき） */
+  readonly roleTo?: 'stallion' | 'broodmare' | 'honored' | undefined;
+  /** ★誰が変えたか（★`owner` ＝ 持ち主・`lifetime_foals` ＝ 生涯の産駒数に達して自動で。★裁定 I-1 段 3 Q-C） */
+  readonly roleReason?: 'owner' | 'lifetime_foals' | undefined;
 }
 
 /**
@@ -83,6 +88,13 @@ export function storyLineOf(event: StoryEvent): string {
     case 'retirement': return `${at}　引退しました。`;
     case 'first-offspring': return `${at}　初めての産駒${event.offspringName === undefined ? '' : `（${event.offspringName}）`}が生まれました。`;
     case 'offspring-win': return `${at}　産駒${event.offspringName === undefined ? '' : `（${event.offspringName}）`}が大きなレースを勝ちました。`;
+    case 'breeding-role-changed':
+      if (event.roleTo === 'stallion') return `${at}　種牡馬になりました。`;
+      if (event.roleTo === 'broodmare') return `${at}　繁殖牝馬になりました。`;
+      if (event.roleTo === 'honored') {
+        return event.roleReason === 'lifetime_foals' ? `${at}　繁殖を終え、功労馬になりました。` : `${at}　功労馬になりました。`;
+      }
+      return `${at}　役割が変わりました。`;
     default: { const never: never = event.type; throw new Error(String(never)); }
   }
 }
@@ -149,6 +161,7 @@ export const STORY_EVENT_LABEL: Readonly<Record<StoryEventType, string>> = {
   retirement: '引退',
   'first-offspring': '初産駒',
   'offspring-win': '産駒の勝利',
+  'breeding-role-changed': '役割の変更',
 };
 
 /**

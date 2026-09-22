@@ -22,6 +22,8 @@
  *   npx tsx tools/migrate.mjs --env staging 0010 # 指定ファイルだけ
  *   npx tsx tools/migrate.mjs --env staging --baseline 0009
  *       ★既に手で当たっている DB に「0009 までは適用済み」と**記録だけ**する（実行しない）
+ *   npx tsx tools/migrate.mjs --env production --yes-production --to 0065
+ *       ★**指定した番号まで**の未適用だけを当てる（★本番の段を分ける口・裁定 REVIEW_PROD_DEPLOY_ORDER_20260922.md §2 条件 1）
  *   npx tsx tools/migrate.mjs --env production --yes-production
  *       ★本番はもう一段の明示が要ります
  */
@@ -48,7 +50,7 @@ import { needsYesProduction, parseArgs } from './lib/args.mjs';
  */
 const argv = process.argv.slice(2);
 // ★値を取るフラグを解析器に教える（真偽値フラグが位置引数を食う事故の再発防止・tools/lib/args.mjs）
-const { flags, switches, positionals } = parseArgs(argv, ['--env', '--baseline']);
+const { flags, switches, positionals } = parseArgs(argv, ['--env', '--baseline', '--to']);
 const flag = (name) => flags[`--${name}`] ?? null;
 const ENV_FILES = { production: 'secrets.production.env', staging: 'secrets.staging.env' };
 const envName = flag('env');
@@ -220,7 +222,21 @@ if (baseline !== null) {
   process.exit(0);
 }
 
-const candidates = only ? files.filter((f) => f.startsWith(only)) : files;
+/**
+ * ★`--to <番号>`: ★**その番号まで**の未適用だけを当てる（★2026-09-22・裁定 REVIEW_PROD_DEPLOY_ORDER_20260922.md §2 条件 1）。
+ *   ★本番の段 ② と段 ④ を分けるため。★`0066` の中の `raise` で止まる形に頼らない（★止まったこと自体が「失敗」と報告されて紛らわしい）。
+ *   ⚠️ ★番号の打ち間違いで ★黙って「全部」や「0 件」にならないよう、★その番号のファイルが在ることを確かめる。
+ */
+const upToFlag = flag('to');
+if (upToFlag !== null) {
+  if (only) throw new Error('--to とファイル指定は同時に使えません');
+  if (!/^\d{4}$/.test(upToFlag)) throw new Error(`--to は 4 桁の番号で指定してください（指定: ${upToFlag}）`);
+  if (!files.some((f) => f.startsWith(upToFlag))) throw new Error(`--to ${upToFlag}: その番号の移行ファイルがありません`);
+}
+const candidates = only
+  ? files.filter((f) => f.startsWith(only))
+  : upToFlag !== null ? files.filter((f) => f.slice(0, 4) <= upToFlag) : files;
+if (upToFlag !== null) console.log(`★--to ${upToFlag}: ${upToFlag} までを対象にします（${files.length - candidates.length} 件は対象外）`);
 if (candidates.length === 0) throw new Error(`適用対象がありません（指定: ${only ?? 'すべて'}）`);
 const target = candidates.filter((f) => !applied.has(f));
 

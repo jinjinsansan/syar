@@ -12,6 +12,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { OWNERSHIP_LIMITS } from '@star/scheduler';
+import { lastFunctionBody } from './lib/sql-source.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const DIR = path.join(ROOT, 'db/migrations');
@@ -20,39 +22,46 @@ const sql = readFileSync(path.join(DIR, MIGRATION), 'utf8');
 /** ★`--` のコメントを空白に（★コメントの中の語を拾わない） */
 const blank = (s: string): string => s.replace(/--[^\n]*/g, (m) => ' '.repeat(m.length));
 const body = blank(sql);
+/**
+ * ★**購入の RPC の本文は「最後の定義」から読む**（★2026-09-22・`0070` で定義し直した・裁定 I-1 段 3 §4）。
+ *   ★`body`（★`0025` の本文）は ★**0025 で起きたこと**（★表・台帳の語・権限）を見るときだけ使う。
+ *   ★RPC の振る舞いは ★`fn` で見る（★名指しの検査が古い定義を見て盲になるのを防ぐ・`pinned-migration-tests.test.ts` ③）。
+ */
+const fn = lastFunctionBody('buy_horse').body;
 
 describe('★馬の購入の移行（0025・D-102）', () => {
   it('① ★価格は出品の行から取る（★利用者が申告する引数が無い）', () => {
     /** ★RPC の引数は「馬」と「冪等キー」の 2 つだけ。★価格・★を受け取らない */
-    expect(body).toMatch(/create or replace function public\.buy_horse\(p_horse_id uuid, p_client_token uuid\)/i);
-    expect(body).not.toMatch(/buy_horse\([^)]*price/i);
+    expect(fn).toMatch(/create or replace function public\.buy_horse\(p_horse_id uuid, p_client_token uuid\)/i);
+    expect(fn).not.toMatch(/buy_horse\([^)]*price/i);
     /** ★払う額は出品の行の値 */
-    expect(body).toMatch(/v_listing\.price_ep/);
+    expect(fn).toMatch(/v_listing\.price_ep/);
     /** ★出品は active のものだけを見る */
-    expect(body).toMatch(/from horse_market_listing[\s\S]{0,80}active/i);
+    expect(fn).toMatch(/from horse_market_listing[\s\S]{0,80}active/i);
   });
 
   it('② ★EP だけで払う（★PP・賞金に触れない）', () => {
-    expect(body).toMatch(/'horse_purchase'/);
-    expect(body).toMatch(/insert into ep_ledger/i);
-    expect(body).not.toMatch(/pp_ledger|prize_points/i);
+    expect(fn).toMatch(/'horse_purchase'/);
+    expect(fn).toMatch(/insert into ep_ledger/i);
+    expect(fn).not.toMatch(/pp_ledger|prize_points/i);
     /** ★台帳の語を閉じた集合に足している（★PP→EP を表す語は足していない） */
     expect(body).toMatch(/reason in \('inflow', 'training', 'entry_fee', 'bet', 'refund', 'stud_fee', 'horse_purchase'\)/);
     expect(body).not.toMatch(/from_pp|pp_to_ep/i);
   });
 
   it('③ ★NPC の馬だけ・引退馬は買えない（D-102 ②）', () => {
-    expect(body).toMatch(/すでに持ち主がいます/);
-    expect(body).toMatch(/NPC の馬ではありません/);
-    expect(body).toMatch(/引退した馬は迎えられません/);
+    expect(fn).toMatch(/すでに持ち主がいます/);
+    expect(fn).toMatch(/NPC の馬ではありません/);
+    expect(fn).toMatch(/引退した馬は迎えられません/);
     /** ★所有の移転は 1 か所（★排他制約に合わせて npc_stable_id を null にする） */
-    expect(body).toMatch(/update horses set owner_id = v_user, npc_stable_id = null/i);
+    expect(fn).toMatch(/update horses set owner_id = v_user, npc_stable_id = null/i);
   });
 
   it('④ ★所有上限（現役 30 頭）を超えて買えない（D-104・§6.7）', () => {
-    expect(body).toMatch(/retired_at_week is null/i);
-    expect(body).toMatch(/v_active\s*>=\s*30/);
-    expect(body).toMatch(/所有上限（30 頭）/);
+    expect(fn).toMatch(/retired_at_week is null/i);
+    /** ★数は TS の定数と突き合わせる（★字面の 30 を固定しない・照会 E-2・`ownership-limits-sql.test.ts`） */
+    expect(fn).toMatch(new RegExp(`v_active\\s*>=\\s*${OWNERSHIP_LIMITS.active}\\b`));
+    expect(fn).toMatch(new RegExp(`所有上限（${OWNERSHIP_LIMITS.active} 頭）`));
   });
 
   it('⑤ ★出品は★と価格だけ（★素質の数値を持たない・§5.5）', () => {
@@ -79,15 +88,16 @@ describe('★馬の購入の移行（0025・D-102）', () => {
     /** ★★の境目（`stars.ts` の閾値）や、★×単価の式が SQL に無いこと */
     for (const leak of ['420', '470', '520', '570', '620', '670', '720', '800', '2000 *', '* 2000']) {
       expect(body, `★算出が SQL に写っている: ${leak}`).not.toContain(leak);
+      expect(fn, `★算出が SQL に写っている（★最後の定義）: ${leak}`).not.toContain(leak);
     }
     /** ★価格は「出品に書かれた値」を読むだけ（★計算していない） */
-    expect(body).not.toMatch(/price_ep\s*:?=\s*[^;]*\*/);
+    expect(fn).not.toMatch(/price_ep\s*:?=\s*[^;]*\*/);
   });
 
   it('⑦ ★D-080 の 1 行と、再定義に伴う権限の置き直しがある', () => {
-    expect(body).toMatch(/assert_setup_complete\(\)/);
-    expect(body).toMatch(/revoke all on function public\.buy_horse\(uuid, uuid\) from public, anon/i);
-    expect(body).toMatch(/grant execute on function public\.buy_horse\(uuid, uuid\) to authenticated/i);
+    expect(fn).toMatch(/assert_setup_complete\(\)/);
+    expect(fn).toMatch(/revoke all on function public\.buy_horse\(uuid, uuid\) from public, anon/i);
+    expect(fn).toMatch(/grant execute on function public\.buy_horse\(uuid, uuid\) to authenticated/i);
   });
 
   it('⑧ ★移行の番号が連番で、1 つの移行で 1 つのことだけ（出走登録と購入を混ぜない）', () => {

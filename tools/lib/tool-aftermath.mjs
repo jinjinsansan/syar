@@ -76,6 +76,13 @@ export const TOOL_AFTERMATH = {
     // ★AU-7: ★主張には引用を付ける。★この行が変われば、★検査が壊れて落ちます
     countedBy: 'JSON.stringify(after) === JSON.stringify(before)',
   },
+  'verify-role-request-live.mjs': {
+    mode: 'restores',
+    why: '★`begin` → 利用者・持ち主の付け替え・`request_breeding_role`・`runBreedingWeek`・0025 の購入の一時的な定義 → ★**必ず `rollback`**（`finally`）。'
+      + '✅ ★**戻したことを数えます**: ★判定 ⑨ が ★馬・依頼・生涯の記録の行数の 前後一致を見ます。'
+      + '⚠️ ★制約と関数の一時的な差し替えは ★セーブポイントの中で行い、★その場で戻します（★DDL も取引の中で戻る）',
+    countedBy: 'JSON.stringify(before) === JSON.stringify(after)',
+  },
   'verify-breeding-live.mjs': {
     mode: 'restores',
     why: '★`begin` → `runBreedingWeek` → ★**必ず `rollback`**（`finally`）。'

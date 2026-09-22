@@ -173,6 +173,8 @@ let bornThisWeek = 0;
 let lastBredWeek = null;
 /** ★偽の client が受けた `rollback` の回数（★取引を再現しないので ★1 以上なら判定不能・宣言は偽の client より前） */
 let rolledBack = 0;
+/** ★生涯 8 産で降ろしたときに書いた生涯の記録の行数（★I-1 段 3・宣言は偽の client より前） */
+let storyRows = 0;
 /**
  * ★`--downtime N`: ★**ワーカーが N 週 止まった**ことにする（★0 なら止めない）。
  *
@@ -229,11 +231,12 @@ const client = {
       return { rows: [{ mn, mx }], rowCount: 1 };
     }
     if (sql.includes("retirement_reason = 'mare_lifetime_foals'")) {
-      let n = 0;
+      const out = [];
       for (const r of rows.values()) {
-        if (r.role === 'broodmare' && r.foalCount >= params[0]) { r.role = 'honored'; n += 1; }
+        if (r.role === 'broodmare' && r.foalCount >= params[0]) { r.role = 'honored'; out.push({ id: r.id }); }
       }
-      return { rows: [], rowCount: n };
+      // ★降ろした馬の id を返す（★製品は `returning id` で受け取り、生涯の記録に書く・I-1 段 3）
+      return { rows: out, rowCount: out.length };
     }
     if (sql.includes("count(*)::text n from horses where retirement_role = 'broodmare'")) {
       // ★数えるのは「まだ産める牝馬」（★尽きた馬は枠に数えない）
@@ -347,6 +350,15 @@ const client = {
      */
     if (sql.includes('to_regclass')) return { rows: [{ t: null }], rowCount: 1 };
     if (sql.includes('information_schema.columns')) return { rows: [{ n: '0' }], rowCount: 1 };
+    // ★生涯の記録（★I-1 段 3）。★種類は許されている DB として答え、★書いた行は数えるだけ
+    if (sql.includes('horse_story_event_type_known')) {
+      return { rows: [{ d: "CHECK (event_type IN ('breeding-role-changed'))" }], rowCount: 1 };
+    }
+    // ★書き込み文の形にならない断片で見分ける（★この道具は読むだけに分類・`tool-guard`）
+    if (sql.includes('horse_story_event (horse_id, event_type')) {
+      storyRows += params[0].length;
+      return { rows: [], rowCount: params[0].length };
+    }
     // ★NPC の仔の名前（★I-3・`loadFoalNaming`）。★使用済みの名前を返す
     if (sql.startsWith('select name from horses')) {
       const out = [...rows.values()].map((r) => ({ name: r.name }));
@@ -603,5 +615,6 @@ check(lines.effective >= 5, '④ 🔴 ★有効系統数 ≥ 5（★D-026）',
 
 console.log(`  … 最後の週: 現役 ${last.active} 頭（★初期 ${pre.world.activeIds.length} 頭）`);
 // ★偽の client は取引を再現しません。★週が 1 度でも戻されていたら、★書いた分が残ったまま数えています
+console.log(`  … 生涯 8 産で降ろして生涯の記録に書いた行: ${storyRows} 行`);
 check(rolledBack === 0, '⑤ ★週の取引が 1 度も戻されていない（★偽の client は rollback を再現しない）', `rollback ${rolledBack} 回`);
 exitWithVerdict(verdictOf({ checked, failed: fails.length, label: '★POOL-SUPPLY の釣り合い' }));

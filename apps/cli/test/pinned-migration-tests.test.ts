@@ -74,7 +74,6 @@ const PINNED: Readonly<Record<string, string>> = {
    *   → ★`pinned`（★本文を読む）で正しく、★③ が後の置き換えを見張ります。
    */
   'growth-tell-wiring.test.ts': '0053_growth_tell_baseline.sql',
-  'horse-market-migration.test.ts': '0025_horse_market.sql',
   'horse-sale-migration.test.ts': '0026_horse_sale.sql',
   'stable-grade-unlock-migration.test.ts': '0027_stable_grade_unlock.sql',
 };
@@ -94,6 +93,18 @@ const CLASSIFIED: Readonly<Record<string, string>> = {
   'pinned-migration-tests.test.ts': '★この分類簿そのもの',
   'my-horses-view.test.ts':
     '★history — ★名指しは註記の中だけ（★2026-09-19 に「最後の定義を探す」形へ直した経緯を残している）',
+  /**
+   * ★history — ★`buy_horse` は `0070` で定義し直した（★2026-09-22・利用者の行を先にロック）。
+   *   ★RPC の振る舞いは ★`lastFunctionBody('buy_horse')`（★最後の定義）で見る。★名指しの `0025` は ★表・台帳の語・権限（★0025 で起きたこと）だけ
+   */
+  'horse-market-migration.test.ts':
+    '★history — ★RPC の本文は lastFunctionBody で最後の定義を読む。★0025 は表・台帳の語・権限だけ',
+  /**
+   * ★history — ★上限の数は ★`lastFunctionBody`（★最後の定義）で読む。★`0025` を名指しするのは ★**対照だけ**
+   *   （★「0025 の定義は数えてからロックしていた」を ★この検査が区別できることを示す）
+   */
+  'ownership-limits-sql.test.ts':
+    '★history — ★本文は lastFunctionBody。★0025 の名指しは「古い定義では落ちる」の対照だけ',
   'rpc-guard.test.ts':
     '★synthetic ＋ history — ★`0001_a.sql` などは検出器を試す作り物。★`0032` は「あのとき閉じた」ことの確認',
 };
