@@ -35,6 +35,8 @@
  *    ★裏取りは **SQL の書き込み文が無いこと**しか見ていないので、★誤って入れても黙って通ります。
  */
 export const READONLY = [
+  // ★初回の配合の父母候補の数（★D-120 ⑥ N-1・裁定 f613878 §6）。★`begin read only` で読むだけ
+  'diag-initial-parent-pool.mjs',
   // ★門を流した後、★作業ツリーが汚れていないか（★簿 `CI-DIRTY-TREE-UNSEEN`・2026-09-21）。
   //   ★`git status --porcelain` と `git ls-files` に訊くだけ。★1 行も書きません。★CI から呼びます
   'verify-clean-tree.mjs',
