@@ -54,6 +54,16 @@ import {
  */
 export const MAX_WEEKS_PER_RUN = 8;
 
+/**
+ * ★**引退したとき功労馬にするか**（★裁定 `REVIEW_I1_RETIREMENT_ROLE_VERDICT_20260922.md` §3 Q-1・I-1 段 2）。
+ *   ★持ち主のいる馬は ★**功労馬が既定**です。★繁殖入りは持ち主が選んだときだけ（★上限の中で・段 3）。
+ *   ★NPC の馬は ★これまでどおり性別に応じて繁殖入りします（★§10.5 の供給・遺伝エンジンは変えない）。
+ *   ⚠️ ★乱数を消費しません（★`decideRetirement` は性別と旗しか見ない）。★着順にも経済にも入りません。
+ */
+export function prefersHonored(ownerId: string | null | undefined): boolean {
+  return ownerId !== null && ownerId !== undefined;
+}
+
 /** ★一括更新の1回あたりの頭数。パラメータ数の上限に当たらない大きさ */
 export const BATCH_SIZE = 2000;
 
@@ -390,6 +400,8 @@ export async function advanceTrainingWeeks(
         // ★B-1 が通す経路と同じ条件（§7.6 のイベントを引く）
         enableEvents: true,
         rngFor: (stream: number): Rng => deriveRng(seed, stream, week),
+        // ★持ち主のいる馬は功労馬が既定（★裁定 I-1 §3 Q-1）
+        preferHonored: prefersHonored(row.owner_id),
       });
       advanced += 1;
       if (out.state.retirement !== null) retired += 1;

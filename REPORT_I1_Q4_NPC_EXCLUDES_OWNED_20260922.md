@@ -58,3 +58,15 @@ staging の結果: ① 持ち主のいる引退馬 0 頭 ／ ② 持ち主の馬
 1. 段 2: 持ち主の馬に `preferHonored = true` を渡す（牡牝 × 持ち主の有無の 4 通りの試験）
 2. 段 3: 別表・RPC・ワーカーの確定・降ろしたことの通知 → staging の予行
 3. 案 B の模擬（`training-career.ts` に開始週の引数を足したところで中断中・この便には含めていない）
+
+---
+
+## §6 段 2（2026-09-22 追記）— 持ち主のいる馬は、引退したら功労馬が既定
+
+- `apps/worker/src/training-runner.ts`: 純関数 `prefersHonored(owner_id)` を出し、週送り（`advanceWeek`）に `preferHonored: prefersHonored(row.owner_id)` を渡す。NPC の馬はこれまでどおり性別に応じて繁殖入りする。乱数は消費しないので、着順・経済・NPC の供給は動かない。
+- `packages/training/src/week.ts`: `preferHonored` の註記「照会中」を閉じた。
+- 試験 `apps/cli/test/retirement-role-owned.test.ts`: 本物の週送りで、牡牝 × 持ち主の有無の 4 通りを引退させる（持ち主あり → 功労馬 ×2、NPC → 種牡馬／繁殖牝馬 ×2）。加えて、ワーカーが渡していることを原文から確かめる。
+  - 変異: 関数を常に false にすると 2 件赤、ワーカーが渡さないと 1 件赤。元に戻して緑。
+- 門: 通過（検査 2,836 件・赤 3/登録 3・前面・終了コード 0）。
+- 取引の境界は**変えていない**（裁定 §6 の新しい決めに従い明記する）。`advanceTrainingWeeks` の呼び出し元（`main.ts`・`scratch.ts`）と偽の DB の照合文字列には影響しない。SQL の文面も変えていない。
+- ⚠️ 既に持ち主のいる引退馬が繁殖入りしている場合、その行は変えていない（staging は 0 頭。本番は §4 の 1 コマンドで数える）。

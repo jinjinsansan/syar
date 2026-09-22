@@ -157,7 +157,7 @@ export interface AdvanceWeekInput {
   readonly rngFor: (stream: number) => Rng;
   /** イベントの選択肢をプレイヤーが選ぶ場合。無ければ既定の選択肢 */
   readonly chooseEvent?: (def: EventDef) => string | undefined;
-  /** 功労馬として引退させるか（§7.1・条件は照会中 Q-P3-18/19） */
+  /** 功労馬として引退させるか（§7.1）。★持ち主のいる馬はワーカーが true を渡す（裁定 I-1 §3 Q-1）。上がる条件は置かない（同 §4・暫定） */
   readonly preferHonored?: boolean;
   /**
    * ★**厩舎の格**（★§6.7・D-103。★既定 `bronze` ＝ 格を入れる前と **1 ビット同じ**）。
