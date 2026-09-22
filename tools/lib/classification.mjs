@@ -39,6 +39,8 @@ export const READONLY = [
   'diag-initial-parent-pool.mjs',
   // ★持ち主のいる引退馬の数（★裁定 REVIEW_I1_RETIREMENT_ROLE_VERDICT_20260922.md §2 ③）。★`begin read only` で数を読むだけ
   'diag-owned-breeders.mjs',
+  // ★D-121 ③ 利用者の血統の伸びを測る（★裁定 REVIEW_D121_MEASURE_TOOL_VERDICT_20260923.md）。★`begin read only`・★結果は日付つきのファイルにだけ残す
+  'measure-lineage-plateau.mjs',
   // ★門を流した後、★作業ツリーが汚れていないか（★簿 `CI-DIRTY-TREE-UNSEEN`・2026-09-21）。
   //   ★`git status --porcelain` と `git ls-files` に訊くだけ。★1 行も書きません。★CI から呼びます
   'verify-clean-tree.mjs',
@@ -1101,6 +1103,7 @@ export const PRODUCTION_OPS = [
  */
 export const COMPONENT = [
   { file: 'lib/args.mjs', why: '★コマンドライン引数の解析。★2026-08-20 に本番へ余計な移行を当てた事故の後、切り出した部品' },
+  { file: 'lib/lineage-measure.mjs', why: '★D-121 ③ の測る部品（★% 点・母系の世代・参考の列の純関数。★`measure-lineage-plateau.mjs` が使う・★単体では走らせない）' },
   { file: 'lib/name-reset.mjs', why: '★馬名を戻す部品（★新しい名前を選ぶ純関数・読む・書く。★`reset-horse-name.mjs` と予行が使う・★単体では走らせない）' },
   { file: 'lib/name-recheck.mjs', why: '★未検査の馬名を禁止名の判定で分ける純関数（★`recheck-name-blocklist.mjs` が使う・★単体では走らせない）' },
   { file: 'lib/name-key-survey.mjs', why: '★馬名の正規化キーの下見の純関数（★`backfill-name-key.mjs` が使う・★単体では走らせない）' },
