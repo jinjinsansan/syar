@@ -6,7 +6,7 @@
  *   ② 🔴 ★失敗は `breed()` の前だけ（★結果を見てから失敗させない・D-120 ①）
  *   ③ 🔴 ★`breed()` の後で落ちたら ★取引ごと戻し、要求は「待ち」のまま（★失敗にしない）
  *   ④ ★ロックは 母 → 父（★NPC の経路と同じ順・裁定 §1 条件 3）
- *   ⑤ ★仔の id と種は ★要求 ID から（★同じ要求なら同じ仔・NPC の「父|母|週」と別の鍵）
+ *   ⑤ ★仔の id と種は ★DB が決めた `seed_key` から（★要求 ID＝クライアントの値からではない・NPC の「父|母|週」と別の鍵）
  *   ⑥ ★`foal_requests` が無い DB（★`0061` の前）では何もしない
  *   ⑦ ★所有上限ちょうど（★30 頭目は通る・31 頭目は通らない・D-120 ③）
  *
@@ -101,7 +101,7 @@ function fakeClient(o: FakeOptions) {
           return {
             rows: [horseRow(DAM, 'female', {
               owner_id: o.damOwner === undefined ? null : o.damOwner,
-              retirement_role: o.damRole === undefined ? 'broodmare' : o.damRole,
+              retirement_role: o.damRole === undefined ? 'honored' : o.damRole,
               bred_this_year: o.damBredThisYear === true,
             })],
             rowCount: 1,
@@ -230,7 +230,8 @@ describe('★PLAN I-2: プレイヤーの配合の確定', () => {
 
   describe('🔴 ② ★失敗は `breed()` の前だけ', () => {
     const cases: [string, FakeOptions, string][] = [
-      ['母が繁殖牝馬でない', { damRole: null }, 'dam_not_candidate'],
+      ['母が引退していない（★現役）', { damRole: null }, 'dam_not_candidate'],
+      ['🔴 母が NPC の繁殖牝馬（★案 A は使わない・N-1 §1）', { damRole: 'broodmare' }, 'dam_not_candidate'],
       ['母に持ち主が居る（★N-1 の暫定: NPC の馬だけ）', { damOwner: USER }, 'dam_not_candidate'],
       ['母が今年もう産んだ（★印）', { damBredThisYear: true }, 'dam_already_bred_this_year'],
       ['🔴 母の印は戻っているが、★その年の仔が 2 つの表のどちらかに在る', { damHasFoalInYear: true }, 'dam_already_bred_this_year'],

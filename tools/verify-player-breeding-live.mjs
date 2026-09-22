@@ -23,7 +23,8 @@
  *   ④ ★仔の ID ＝ ★要求 ID から作った ID（★裁定 §3）
  *   ⑤ ★同じ要求をもう一度 確定しても増えない（★skipped）
  *   ⑥ ★本人の読む口が ★性別・父・母・誕生週だけを返す（★genotype / potential / stats の列が無い）
- *   ⑦ 🔴 ★NPC の週次配合が ★**同じ母で同じ年に産まない**（★年の変わり目で印が戻った形を作って確かめる）
+ *   ⑦ 🔴 ★NPC の週次配合が ★**同じ母で同じ年に産まない**（★案 B の母〔功労馬〕が年の頭に繁殖牝馬へ補充され、
+ *      ★印も戻った形を作って確かめる）
  *      ★対照: ★プレイヤーが触っていない母は ★**普通に産む**（★番人が常に止めるのではない）
  *   ⑧ ★`rollback` の後、★行数が ★元に戻っている
  *
@@ -138,7 +139,12 @@ try {
   }
 
   // ── 親を選ぶ（★NPC の繁殖馬・★ロックの後の判定と同じ canMate で絞る） ──
+  // ★母は ★NPC の功労馬（★引退した産める牝馬・案 B・N-1 §1）。★⑦ の対照のために繁殖牝馬も読む
   const mareRows = await q(
+    `select ${BREEDING_COLS} from horses where retirement_role = 'honored' and sex = 'female' and owner_id is null`
+      + ' and birth_week is not null and not bred_this_year order by id',
+  );
+  const broodmareRows = await q(
     `select ${BREEDING_COLS} from horses where retirement_role = 'broodmare' and owner_id is null`
       + ' and birth_week is not null and not bred_this_year order by id',
   );
@@ -231,9 +237,10 @@ try {
   check(others === 0, '⑥ ★他人の下書きは見えない', `${others} 行`);
 
   // ── ⑦ ★NPC の週次配合と、★同じ母を取り合う ──
-  //   ★年の変わり目の一斉戻しで印が戻った形を作る（★これが 2 つの表で数える理由）
-  await c.query('update horses set bred_this_year = false where id = $1', [dam.id]);
-  const dueMates = mareRows.filter((r) => yearStart + dueOf(r.id) === damDue && r.id !== dam.id).map((r) => r.id);
+  //   ★案 B の母は ★NPC の功労馬。★年の頭に NPC は功労馬から繁殖牝馬を補充し（★素質の高い順）、★その後で全馬の印を戻す。
+  //   ★→ ★プレイヤーが使った母が ★繁殖牝馬に上がり、★印も戻る形を作る（★これが 2 つの表で数える理由）
+  await c.query("update horses set retirement_role = 'broodmare', bred_this_year = false where id = $1", [dam.id]);
+  const dueMates = broodmareRows.filter((r) => yearStart + dueOf(r.id) === damDue && r.id !== dam.id).map((r) => r.id);
   const npc = await runBreedingWeek(
     c, EPOCH + (damDue + 1) * WEEK_MS, EPOCH, () => {}, undefined, 'top',
     (FIELD_SIZE.MIN + FIELD_SIZE.MAX) / 2, DEFAULT_PRESEED_OPTIONS.mares,

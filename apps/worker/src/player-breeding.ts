@@ -15,9 +15,8 @@
  *   （★部分一意 `status <> 'failed'`）、★仔の中身を見てから失敗にできる経路が在ると ★**引き直しが成立します**。
  *   ★`breed()` より後で落ちたら ★**取引ごと戻し、要求は「待ち」のまま**にします（★次の周にやり直す・★同じ種なので同じ仔）。
  *
- * 【⚠️ ★この便で決まっていないもの】
- *   ★父母候補の出どころ（★D-120 ⑥ N-1）。★いまは ★**NPC の種牡馬・繁殖牝馬（持ち主が居ない馬）だけ**を
- *   ★通します（`isInitialParent`）。★N-1 の裁定で置き換えます。
+ * 【★父母候補の出どころ】（★D-120 ⑥ N-1・裁定 f613878 / 7b16fb4）
+ *   ★母は ★NPC の功労馬（引退した産める牝馬）、★父は ★NPC の種牡馬（`isInitialParent`）。★母はレビュー側の暫定決定。
  */
 import type pg from 'pg';
 
@@ -95,9 +94,17 @@ export interface PlayerBreedingResult {
 }
 
 /**
- * ⚠️ ★**暫定**（★N-1 の裁定待ち）: ★初回の配合に使える親は、★持ち主の居ない NPC の繁殖馬だけ。
+ * ★**初回の配合に使える親**（★D-120 ⑥ N-1・裁定 `REVIEW_N1_PARENT_SOURCE_VERDICT_20260922.md` §1・§8）。
+ *
+ *   ★母: ★**持ち主の居ない NPC の功労馬（`honored`）の牝馬**（★案 B）。★産めるか（6 歳以上・生涯 8 産未満・今年未産）は
+ *     ★この後の `canMate` と「その年の仔を 2 つの表で数える」が判定します（★ここで写さない）。
+ *     ★NPC の繁殖牝馬（案 A）は使いません — ★候補が年の中で 800 → 19 頭に減り、★登録の時期で候補が変わるため（★§1 (a)）。
+ *     ★NPC がその年に使っていない馬なので、★NPC の配合と母を取り合う経路も生まれません（★§1 (b)）。
+ *   ★父: ★持ち主の居ない NPC の種牡馬（★§5）。★集中の歯止めは年の上限（§6.7）。
+ *   ⚠️ ★役割の名前は変えません（★§4）。★使った事実は `foal_drafts.dam_id` と母の `foal_count` に残ります。
+ *   ⚠️ ★**レビュー側の暫定決定**（★§8）。★オーナーが「最初から NPC と同じくらいの母」を選んだら、★この述語を作り直します。
  */
-function isInitialParent(row: Record<string, unknown>, role: 'stallion' | 'broodmare'): boolean {
+function isInitialParent(row: Record<string, unknown>, role: 'stallion' | 'honored'): boolean {
   return row['owner_id'] === null && row['retirement_role'] === role && row['birth_week'] !== null;
 }
 
@@ -207,7 +214,7 @@ export async function confirmInitialBreeding(
     const damRow = (await client.query(parentSql, [req.dam_id])).rows[0] as Record<string, unknown> | undefined;
     const sireRow = (await client.query(parentSql, [req.sire_id])).rows[0] as Record<string, unknown> | undefined;
     if (damRow === undefined || sireRow === undefined) return fail('parent_missing');
-    if (!isInitialParent(damRow, 'broodmare')) return fail('dam_not_candidate');
+    if (!isInitialParent(damRow, 'honored')) return fail('dam_not_candidate');
     if (!isInitialParent(sireRow, 'stallion')) return fail('sire_not_candidate');
 
     const dam = breedingRecordOf(damRow);
