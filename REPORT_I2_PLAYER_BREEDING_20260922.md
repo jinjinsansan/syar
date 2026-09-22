@@ -51,6 +51,19 @@ npm run gate                                        # 3aa5604 の時点で 5 段
 - 失敗の理由の語: `canMate` の reason ＋ `parent_missing` / `sire_not_candidate` / `dam_not_candidate` / `owner_limit`
 - 1 周で拾う上限 20 件（`PLAYER_BREEDING_BATCH`）。⚠️ **確定 1 件 2.9 秒 × 20 ＝ 58 秒で周（60 秒）に迫る**。VPS からの所要を測ってから決め直す
 
+## 4b. 裁定 322d603 への対応（2026-09-22・追記）
+
+| 裁定 | 対応 | 確かめたこと |
+|---|---|---|
+| §1 🔴 種がクライアントの値から | `0063`: `foal_requests.seed_key uuid not null default gen_random_uuid()`（一意）。種は `'player-foal|' + seed_key`。受付の RPC は `seed_key` を受け取らない | 検査: 種が要求 ID から作られていない／RPC の引数と insert の列に `seed_key` が無い（構文）。実演 ②④: 再送・別タブの後も `seed_key` は最初の値・仔の ID は `seed_key` 由来で要求 ID 由来と一致しない |
+| §2 🔴 時間の予算が無い | `PLAYER_BREEDING_BUDGET_MS = 15,000`（周 60 秒の 1/4・1 件目は必ず通す）。件数 20 は安全柵として残した。周ごとに待ちの件数と最古の年齢を出し、10 周続けて縮まなければ警報（メモリ上・再起動で 0） | 検査: 1 件 3 秒・予算 10 秒で 4 件で止まる／予算 0 でも 1 件は進む |
+| §3 🔴 先頭の詰まり | `0063`: `attempts`。戻した後に**別の取引で** +1、5 回で `failed`・`internal_error`・警報。拾う順は `attempts, created_at, id` | 検査: 5 回目で打ち切り（戻した取引の後で数えている）／4 回目までは待ちのまま（対照）／拾う順 |
+| §4 ⚠️ NPC の 1 取引 | `runBreedingCatchUp` が週ごとに `begin`/`commit`（`runBreedingWeek` は取引に触らないまま）。週の印はループの後に 1 回（検査 ③ のまま） | 検査: `runBreedingWeek` が取引の語を投げない（旧来の「grep で 0 行」の裏付けは、ファイルに取引の語が入ったので検査に置き換え、註記 3 か所を直した） |
+| §5 ⚠️ `breed()` の中の年齢判定 | 直していない（裁定どおり）。`apps/cli/test/breed-year-scale.test.ts` に赤を 1 本・対照（ゲームの年で渡せば投げる）を緑で 1 本。既知の赤の簿に登録（`owner: dev`・`until: 2026-10-31`） | 赤の落ち方が「投げるはずが投げない」であることを確認 |
+| §6 発見 1 の簿 | ⚠️ **未**。`returns table` の列名の衝突を簿に 1 行書く件（どの簿に書くか〔`open-findings.mjs` か別の簿か〕を指示してください） | — |
+
+staging: `0063` を適用。実演 **23/23 合格**（`seed_key` の判定が 1 件増えた）。確定 1 件 3.1 秒。
+
 ## 5. 未完了・持ち越し（完成と呼ばない）
 
 | | |

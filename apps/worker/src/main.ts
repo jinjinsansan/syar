@@ -35,7 +35,7 @@ import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
 import { runBreedingCatchUp } from './breeding-runner.js';
-import { runPlayerBreeding } from './player-breeding.js';
+import { PLAYER_BREEDING_BUDGET_MS, runPlayerBreeding } from './player-breeding.js';
 
 /**
  * 🔴 ★**配合の遅れが縮まないことを、★黙って続けさせない**（★2026-09-21）。
@@ -50,6 +50,11 @@ import { runPlayerBreeding } from './player-breeding.js';
  */
 let lastBreedingRemaining: number | null = null;
 let breedingStalled = 0;
+/** ★初回の配合の待ち（★裁定 322d603 §2・★メモリ上。再起動で 0） */
+let lastPlayerBacklog: number | null = null;
+let playerBreedingStalled = 0;
+/** ★初回の配合の待ちが、★この周数 続けて縮まなければ警報（★10 周 ＝ 約 10 分） */
+const PLAYER_BREEDING_STALL_LIMIT = 10;
 /** ★何周 縮まなかったら投げるか。★ 1 週 進むのに `CYCLES_PER_WEEK` 周 かかるので、★それより長く取ります */
 const BREEDING_STALL_LIMIT = CYCLES_PER_WEEK;
 import { recordUnlockDistribution, unlockDrift } from './unlock-flow.js';
@@ -822,11 +827,35 @@ async function main(): Promise<void> {
         )).rows[0]!.ms,
       );
       const pb = await runPlayerBreeding(client, nowMs, cfg.epochMs,
-        (m) => console.error(`[worker] ★${m}`));
-      if (pb.done > 0 || pb.failed > 0 || pb.errors > 0) {
+        (m) => console.error(`[worker] ★${m}`),
+        // 🔴 ★時間で切る（★裁定 322d603 §2・周がレースの処理ごと延びないように）
+        { budgetMs: PLAYER_BREEDING_BUDGET_MS, monotonicMs: () => Number(process.hrtime.bigint()) / 1e6 });
+      if (pb.done > 0 || pb.failed > 0 || pb.errors > 0 || pb.backlog > 0) {
         console.log(
-          `[worker] 初回の配合 確定${pb.done}件 / 不成立${pb.failed}件 / ★やり直し${pb.errors}件`,
+          `[worker] 初回の配合 確定${pb.done}件 / 不成立${pb.failed}件 / ★やり直し${pb.errors}件`
+          + `${pb.gaveUp > 0 ? ` / 🔴 ★打ち切り${pb.gaveUp}件` : ''}`
+          + ` / ★待ち${pb.backlog}件`
+          + `${pb.oldestPendingMs !== null ? `（★最古 ${Math.round(pb.oldestPendingMs / 1000)} 秒）` : ''}`
+          + `${pb.stoppedByBudget ? '（予算切れ）' : ''}`,
         );
+      }
+      /**
+       * 🔴 ★**待ちが縮まなければ警報**（★`breedingStalled` と同じ形・裁定 322d603 §2）。
+       * ⚠️ ★数えはメモリに持ちます。★**再起動で 0 に戻ります**（★弱い網だと知っておくこと・`BREEDING-STALL-COUNT-IN-MEMORY` と同じ）。
+       */
+      if (pb.backlog > 0) {
+        playerBreedingStalled = lastPlayerBacklog !== null && pb.backlog >= lastPlayerBacklog
+          ? playerBreedingStalled + 1 : 0;
+        lastPlayerBacklog = pb.backlog;
+        if (playerBreedingStalled >= PLAYER_BREEDING_STALL_LIMIT) {
+          console.error(
+            `[worker] 🔴 ★初回の配合の待ちが ${playerBreedingStalled} 周 縮みません（★待ち ${pb.backlog} 件）。`
+            + '★予算（`PLAYER_BREEDING_BUDGET_MS`）が小さすぎるか、★1 件の所要が読みを超えています',
+          );
+        }
+      } else {
+        lastPlayerBacklog = null;
+        playerBreedingStalled = 0;
       }
     } catch (e) {
       console.error('[worker] 初回の配合に失敗:', (e as Error).message);

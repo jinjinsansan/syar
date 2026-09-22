@@ -12,7 +12,8 @@
  *
  * 【★なぜ `rollback` して構わないか（★確かめました）】
  *   ★`confirmInitialBreeding` と `runBreedingWeek` は ★**自分で `begin`/`commit` しません**
- *   （★`player-breeding.test.ts` の「確定の本体は取引に触らない」と、★`breeding-runner.ts` に取引の語が 0 個）。
+ *   （★`player-breeding.test.ts` の「確定の本体は取引に触らない」と、
+ *    ★`breeding-runner.test.ts` の「runBreedingWeek は取引に触らない」が釘付け）。
  *   ★RPC（`request_initial_breeding`）も ★関数の中で取引を閉じません（★plpgsql の関数は閉じられない）。
  *
  * 【★判定】
@@ -169,6 +170,8 @@ try {
   const call = (u, r) => asUser(u, async () =>
     (await q('select * from request_initial_breeding($1, $2, $3)', [r, sire.id, dam.id]))[0]);
   const a1 = await call(U1, R1);
+  /** ★最初の受付の直後の seed_key（★再送・別タブの後と比べる） */
+  const skFirst = (await q('select seed_key::text sk from foal_requests where id = $1', [R1]))[0]?.sk;
   const a2 = await call(U1, R1);
   const a3 = await call(U1, R2);
   check(a1.status === 'pending' && a1.request_id === R1, '② ★受け付けた（★待ち）', JSON.stringify(a1));
@@ -176,6 +179,10 @@ try {
   check(a3.request_id === R1, '② ★別の要求 ID（★別タブ）→ ★最初の行を返す（★初回は 1 件）', `返った ${a3.request_id}`);
   const nReq = Number((await q('select count(*)::int n from foal_requests where user_id = $1', [U1]))[0].n);
   check(nReq === 1, '② ★要求の行は 1 つだけ', `${nReq} 行`);
+  const skAfterResend = (await q('select seed_key::text sk from foal_requests where id = $1', [R1]))[0]?.sk;
+  check(typeof skFirst === 'string' && skAfterResend === skFirst && skFirst !== R1,
+    '② ★再送・別タブの後も seed_key は最初の値のまま（★DB が決め、★要求 ID とは別の値）',
+    `${String(skFirst).slice(0, 8)}… → ${String(skAfterResend).slice(0, 8)}…`);
   let rejected = false;
   try { await call(U2, R1); } catch (e) { rejected = /使えません/.test(e.message); }
   check(rejected, '② ★他人の要求 ID は拒む（★中身を返さない）');
@@ -203,9 +210,12 @@ try {
   const ep = (await q('select entry_points from users where id = $1', [U1]))[0];
   check(Number(ep.entry_points) === 2000, '③ ★EP は動いていない（★無償・D-120 ②）', `${ep.entry_points}`);
 
-  // ── ④ ★仔の ID ──
-  const want = await idAndSeedFromKey(`${PLAYER_FOAL_KEY_PREFIX}${R1}`);
-  check(draft?.id === want.id && req.rid === want.id, '④ ★仔の ID ＝ 要求 ID から作った ID');
+  // ── ④ ★仔の ID（★DB が決めた seed_key から・裁定 322d603 §1） ──
+  const sk = (await q('select seed_key::text sk from foal_requests where id = $1', [R1]))[0].sk;
+  const want = await idAndSeedFromKey(`${PLAYER_FOAL_KEY_PREFIX}${sk}`);
+  const fromClient = await idAndSeedFromKey(`${PLAYER_FOAL_KEY_PREFIX}${R1}`);
+  check(draft?.id === want.id && req.rid === want.id && draft?.id !== fromClient.id,
+    '④ 🔴 ★仔の ID ＝ DB が決めた seed_key から作った ID（★クライアントの要求 ID からではない）', `seed_key ${sk.slice(0, 8)}…`);
 
   // ── ⑤ ★もう一度 ──
   const o2 = await confirmInitialBreeding(c, R1, ctx);

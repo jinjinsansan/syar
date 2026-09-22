@@ -13,11 +13,13 @@
  * ⚠️ ★**この検査は「同じ母を NPC とプレイヤーが同時に取り合う」を DB で見ていません。**
  *    ★それは staging の実演の仕事です（★裁定 §2・片側の経路だけの検査で緑にしない）。
  */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BALANCE, FOUNDERS, createFounder, deriveRng } from '@star/sim-engine';
 import { OWNERSHIP_LIMITS } from '@star/scheduler';
 import {
-  PLAYER_FOAL_KEY_PREFIX, confirmInitialBreeding, playerBreedingContext, runPlayerBreeding,
+  PLAYER_BREEDING_MAX_ATTEMPTS, PLAYER_FOAL_KEY_PREFIX, confirmInitialBreeding,
+  playerBreedingContext, runPlayerBreeding,
 } from '../../worker/src/player-breeding.js';
 import { idAndSeedFromKey } from '../../worker/src/breeding-runner.js';
 
@@ -26,8 +28,16 @@ const USER = '22222222-2222-4222-8222-222222222222';
 const SIRE = '33333333-3333-4333-8333-333333333333';
 const DAM = '44444444-4444-4444-8444-444444444444';
 
+const SEED_KEY = '55555555-5555-4555-8555-555555555555';
+
 interface FakeOptions {
   readonly noTable?: boolean;
+  /** ★待っている要求の数（★既定 1） */
+  readonly pendingCount?: number;
+  /** ★例外で戻した後、★試行回数を増やした結果（★既定 1 回目） */
+  readonly attemptsAfterBump?: number;
+  /** ★偽の時計の 1 件あたりの所要 [ms] */
+  readonly costMs?: number;
   readonly damRole?: string | null;
   readonly damOwner?: string | null;
   readonly damBredThisYear?: boolean;
@@ -62,6 +72,7 @@ function horseRow(id: string, sex: 'male' | 'female', extra: Record<string, unkn
 
 function fakeClient(o: FakeOptions) {
   const seen: { sql: string; params: unknown[] }[] = [];
+  let clock = 0;
   const client = {
     async query(sql: string, params: unknown[] = []) {
       seen.push({ sql, params });
@@ -69,12 +80,21 @@ function fakeClient(o: FakeOptions) {
         return { rows: [{ t: o.noTable === true ? null : String(params[0]) }], rowCount: 1 };
       }
       if (sql.startsWith("select id from foal_requests where status = 'pending'")) {
-        return { rows: [{ id: REQ }], rowCount: 1 };
+        const n = o.pendingCount ?? 1;
+        return { rows: Array.from({ length: n }, () => ({ id: REQ })), rowCount: n };
+      }
+      if (sql.startsWith('select count(*)::text n, (extract(epoch')) {
+        return { rows: [{ n: '0', age: null }], rowCount: 1 };
+      }
+      if (sql.startsWith('update foal_requests set attempts = attempts + 1')) {
+        const a = o.attemptsAfterBump ?? 1;
+        return { rows: [{ attempts: a, status: a >= 5 ? 'failed' : 'pending' }], rowCount: 1 };
       }
       if (sql.startsWith('select min(birth_year')) return { rows: [{ mn: '46', mx: '46' }], rowCount: 1 };
       if (sql.startsWith('select sire_line, dam_sire_line')) return { rows: [], rowCount: 0 };
-      if (sql.startsWith('select id, user_id, sire_id, dam_id from foal_requests')) {
-        return { rows: [{ id: REQ, user_id: USER, sire_id: SIRE, dam_id: DAM }], rowCount: 1 };
+      if (sql.startsWith('select id, user_id, sire_id, dam_id, seed_key from foal_requests')) {
+        clock += o.costMs ?? 0;          // ★1 件ぶんの所要を、★偽の時計に載せる
+        return { rows: [{ id: REQ, user_id: USER, sire_id: SIRE, dam_id: DAM, seed_key: SEED_KEY }], rowCount: 1 };
       }
       if (sql.includes('from horses where id = $1 for update')) {
         if (params[0] === DAM) {
@@ -104,19 +124,20 @@ function fakeClient(o: FakeOptions) {
       return { rows: [], rowCount: 1 };
     },
   };
-  return { client: client as never, seen };
+  return { client: client as never, seen, monotonicMs: (): number => clock };
 }
 
 const WEEK_MS = 4 * 60 * 60 * 1000;
 const NOW = (52 * 8 + 5) * WEEK_MS;
-const run = (c: never) => runPlayerBreeding(c, NOW, 0, () => {});
+const BIG_BUDGET = { budgetMs: 60_000, monotonicMs: (): number => 0 };
+const run = (c: never) => runPlayerBreeding(c, NOW, 0, () => {}, BIG_BUDGET);
 const sqls = (seen: { sql: string }[]) => seen.map((s) => s.sql);
 
 describe('★PLAN I-2: プレイヤーの配合の確定', () => {
   it('① ★成功: ★下書き・カウンタ・免除・完了を書き、★取引を閉じる', async () => {
     const { client, seen } = fakeClient({});
     const r = await run(client);
-    expect(r).toEqual({ skipped: false, done: 1, failed: 0, errors: 0 });
+    expect(r).toMatchObject({ skipped: false, done: 1, failed: 0, errors: 0, gaveUp: 0, stoppedByBudget: false });
     const s = sqls(seen);
     const at = (p: string) => s.findIndex((x) => x.startsWith(p));
     expect(at('insert into foal_drafts'), '★下書きを書いていない').toBeGreaterThan(-1);
@@ -136,14 +157,65 @@ describe('★PLAN I-2: プレイヤーの配合の確定', () => {
     expect(locks).toEqual([DAM, SIRE]);
   });
 
-  it('⑤ ★仔の id は ★要求 ID から（★NPC の「父|母|週」とは別の鍵）', async () => {
+  it('🔴 ⑤ ★仔の id と種は ★DB が決めた `seed_key` から（★要求 ID＝クライアントの値から作らない・裁定 322d603 §1）', async () => {
     const { client, seen } = fakeClient({});
     await run(client);
     const ins = seen.find((x) => x.sql.startsWith('insert into foal_drafts'));
-    const want = await idAndSeedFromKey(`${PLAYER_FOAL_KEY_PREFIX}${REQ}`);
+    const want = await idAndSeedFromKey(`${PLAYER_FOAL_KEY_PREFIX}${SEED_KEY}`);
     expect(ins?.params[0]).toBe(want.id);
+    const fromRequestId = await idAndSeedFromKey(`${PLAYER_FOAL_KEY_PREFIX}${REQ}`);
+    expect(ins?.params[0], '🔴 ★クライアントが送った要求 ID から種を作っている').not.toBe(fromRequestId.id);
     const npc = await idAndSeedFromKey(`${SIRE}|${DAM}|${52 * 8 + 5}`);
     expect(ins?.params[0], '★NPC と同じ鍵で作っている').not.toBe(npc.id);
+  });
+
+  it('🔴 ★受付の RPC に ★`seed_key` を渡す口が無い（★クライアントが種を選べない・構文で見る）', () => {
+    const src = readFileSync(new URL('../../../db/migrations/0062_request_initial_breeding_fix.sql', import.meta.url), 'utf8');
+    const sig = /create or replace function public\.request_initial_breeding\(([^)]*)\)/i.exec(src)?.[1] ?? '';
+    expect(sig, '★RPC の定義が見つからない').toContain('p_request_id');
+    expect(sig.toLowerCase(), '🔴 ★RPC が種の鍵を受け取っている').not.toMatch(/seed/);
+    const add = readFileSync(new URL('../../../db/migrations/0063_foal_requests_seed_key_attempts.sql', import.meta.url), 'utf8');
+    expect(add, '★seed_key を DB が決めていない').toMatch(/seed_key uuid not null default gen_random_uuid\(\)/);
+    const ins = /insert into foal_requests \(([^)]*)\)/i.exec(src)?.[1] ?? '';
+    expect(ins, '🔴 ★受付が seed_key を書いている（★DB の既定に任せる）').not.toMatch(/seed_key/);
+  });
+
+  it('🔴 ★予算を超えたら止め、★残りは次の周（★1 件目は必ず通す・裁定 322d603 §2）', async () => {
+    // ★1 件 3 秒・予算 10 秒 → 0 → 3 → 6 → 9 → 12 ≥ 10 で止める ＝ 4 件
+    const f = fakeClient({ pendingCount: 20, costMs: 3_000 });
+    const r = await runPlayerBreeding(f.client, NOW, 0, () => {}, { budgetMs: 10_000, monotonicMs: f.monotonicMs });
+    expect(r.stoppedByBudget, '🔴 ★予算で止まっていない').toBe(true);
+    expect(r.done, '★確定した件数').toBe(4);
+    const g = fakeClient({ pendingCount: 3, costMs: 60_000 });
+    const r0 = await runPlayerBreeding(g.client, NOW, 0, () => {}, { budgetMs: 0, monotonicMs: g.monotonicMs });
+    expect(r0.done, '🔴 ★予算 0 で 1 件も進まない（★永久に追いつかない）').toBe(1);
+  });
+
+  it('🔴 ★5 回 続けて落ちたら ★internal_error にして警報（★先頭に居座らせない・裁定 322d603 §3）', async () => {
+    const alerts: string[] = [];
+    const { client, seen } = fakeClient({ failDraftInsert: true, attemptsAfterBump: 5 });
+    const r = await runPlayerBreeding(client, NOW, 0, (m) => alerts.push(m), BIG_BUDGET);
+    expect(r.gaveUp).toBe(1);
+    const bump = seen.find((x) => x.sql.startsWith('update foal_requests set attempts = attempts + 1'));
+    expect(bump?.params[1], '★打ち切りの回数').toBe(PLAYER_BREEDING_MAX_ATTEMPTS);
+    const at = (p: string) => seen.findIndex((x) => x.sql.startsWith(p));
+    expect(at('update foal_requests set attempts'), '★試行回数を戻した取引の中で数えている（★戻って消える）')
+      .toBeGreaterThan(seen.findIndex((x) => x.sql === 'rollback'));
+    expect(alerts.some((m) => m.includes('internal_error')), '★打ち切りを黙った').toBe(true);
+  });
+
+  it('★対照: ★4 回目までは「待ち」のまま（★打ち切らない）', async () => {
+    const { client } = fakeClient({ failDraftInsert: true, attemptsAfterBump: 4 });
+    const r = await run(client);
+    expect(r.gaveUp).toBe(0);
+    expect(r.errors).toBe(1);
+  });
+
+  it('★拾う順は ★試行回数の少ない順 → 古い順（★詰まった要求が他を塞がない）', async () => {
+    const { client, seen } = fakeClient({});
+    await run(client);
+    const pick = seen.find((x) => x.sql.startsWith("select id from foal_requests where status = 'pending'"));
+    expect(pick?.sql).toMatch(/order by attempts, created_at, id/);
   });
 
   it('★同じ要求からは、★何度でも同じ仔（★決定論・憲法 §1-4）', async () => {
@@ -185,8 +257,8 @@ describe('★PLAN I-2: プレイヤーの配合の確定', () => {
   it('🔴 ③ ★`breed()` の後で落ちたら ★戻して「待ち」のまま（★失敗にしない）', async () => {
     const alerts: string[] = [];
     const { client, seen } = fakeClient({ failDraftInsert: true });
-    const r = await runPlayerBreeding(client, NOW, 0, (m) => alerts.push(m));
-    expect(r).toEqual({ skipped: false, done: 0, failed: 0, errors: 1 });
+    const r = await runPlayerBreeding(client, NOW, 0, (m) => alerts.push(m), BIG_BUDGET);
+    expect(r).toMatchObject({ skipped: false, done: 0, failed: 0, errors: 1, gaveUp: 0 });
     expect(sqls(seen)).toContain('rollback');
     expect(sqls(seen).some((x) => x.startsWith("update foal_requests set status = 'failed'")),
       '★結果を計算した後に失敗にした（★引き直しが成立する）').toBe(false);

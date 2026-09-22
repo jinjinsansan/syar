@@ -16,7 +16,9 @@
  *   ✔ ★`runBreedingWeek` は ★**自分で `begin`/`commit` しません**（★`main.ts` が外で張ります）。
  *   ⚠️ ★これは ★**確かめるべきこと**です: ★内側が commit する関数を `rollback` で包むと、
  *     ★★**外側ごと確定します**（★2026-09-21 に staging を 2 度 汚しました）。
- *     → ★`grep -n 'begin\|commit\|rollback' apps/worker/src/breeding-runner.ts` が ★**0 行**。
+ *     → ★2026-09-21 は `grep -n 'begin\|commit\|rollback' apps/worker/src/breeding-runner.ts` が ★**0 行**。
+ *     ★2026-09-22 から ★追いつき（`runBreedingCatchUp`）が週ごとに取引を張るので ★grep は使えません。
+ *     ★`runBreedingWeek` が取引に触らないことは ★`apps/cli/test/breeding-runner.test.ts` が釘付けにしています。
  *
  * 【★判定】
  *   ★① ★落ちずに走り切る（★これが本題。★本番を落としたのはここ）

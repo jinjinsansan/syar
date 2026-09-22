@@ -46,7 +46,8 @@ export const TOOL_AFTERMATH = {
   /**
    * ★配合を本物の DB で 1 週 走らせる（★2026-09-21）。
    * ✅ ★`runBreedingWeek` が ★**自分で commit しない**ことを確かめたうえで `rollback` します
-   *   （★`grep 'begin\|commit\|rollback' apps/worker/src/breeding-runner.ts` が 0 行）。
+   *   （★2026-09-21 は grep で 0 行。★2026-09-22 から追いつきが週ごとに取引を張るので、
+   *    ★`breeding-runner.test.ts` の「runBreedingWeek は取引に触らない」が釘付け）。
    */
   'verify-player-breeding-live.mjs': {
     mode: 'restores',
@@ -63,7 +64,9 @@ export const TOOL_AFTERMATH = {
       + '✅ ★**戻したことを数えます**: ★判定 ③ が ★**頭数の 前後一致**を見ます'
       + '（★`rollback` を呼んだだけで済ませません・★TL-1 の線はここ）。'
       + '⚠️ ★内側が commit する関数を包むと ★**外側ごと確定します**（★2026-09-19 の `verify-ds7-cancel`）。'
-      + '★だから ★**包む前に grep で確かめました**。★`breeding-runner` に取引の語は 1 つもありません',
+      + '★だから ★**包む前に確かめました**。★`runBreedingWeek` は取引に触りません'
+      + '（★2026-09-22 から追いつきが週ごとに取引を張るので、★grep ではなく'
+      + ' `breeding-runner.test.ts` の「runBreedingWeek は取引に触らない」が釘付け）',
     // ★AU-7: ★主張には引用を付ける。★この行が変われば、★検査が壊れて落ちます
     countedBy: 'check(after === before,',
   },

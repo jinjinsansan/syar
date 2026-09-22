@@ -213,6 +213,23 @@ describe('🔴 ★POOL-SUPPLY: 定常運転の供給', () => {
       '★表が無いのに foal_drafts を問い合わせた').toBe(false);
   });
 
+  it('🔴 ★`runBreedingWeek` は ★取引に触らない（★`verify-breeding-live.mjs` が外から包んで必ず戻すため）', async () => {
+    /**
+     * ★2026-09-22 まで、この性質は ★`grep 'begin|commit|rollback' breeding-runner.ts` が 0 行、で裏付けていました。
+     *   ★追いつき（`runBreedingCatchUp`）が週ごとに取引を張るようになり（★裁定 322d603 §4）、★その grep は使えません。
+     *   → ★**関数の振る舞いで**確かめます（★名前ではなく、実際に投げた SQL）。
+     */
+    for (const o of [
+      { mareCount: 52, stallionCount: 3 },
+      { mareCount: 52, stallionCount: 3, draftsTable: true, damClaimedByPlayer: true },
+    ] as FakeOptions[]) {
+      const { client, seen } = fakeClient(o);
+      await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+      expect(seen.filter((s) => /^(begin|commit|rollback)$/i.test(s.trim())),
+        '★runBreedingWeek が自分で取引を張った／閉じた').toEqual([]);
+    }
+  });
+
   it('★年の途中では、★カウンタを戻さない', async () => {
     const { client } = fakeClient({ mareCount: 1, mareRowsEmpty: true });
     const r = await runBreedingWeek(client, nowForWeek(52 * 7 + 3), EPOCH, () => {}, undefined, 'random', 13, 800);

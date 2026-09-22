@@ -38,8 +38,34 @@ import {
  */
 export const PLAYER_FOAL_KEY_PREFIX = 'player-foal|';
 
-/** ★1 周で拾う要求の上限（★60 秒の周に収める。★残りは次の周） */
+/** ★1 周で拾う要求の上限（★安全柵。★本当の上限は時間の予算 `PLAYER_BREEDING_BUDGET_MS`） */
 export const PLAYER_BREEDING_BATCH = 20;
+
+/**
+ * 🔴 ★**1 周のうち、初回の配合の確定に使ってよい時間**（★裁定 322d603 §2・2026-09-22）。
+ *
+ *   ★件数だけで切っていたら、★実測 1 件 2.8〜2.9 秒（★この PC → staging）× 20 件 ＝ ★58 秒で、
+ *   ★ワーカーの周（`TICK_MS` 60 秒）を ★それだけで使い切りました。
+ *   ★周が延びると ★**次の周のレースの処理（締切・発走・確定）が遅れます**（★脇の処理が本体の時刻を押す）。
+ *   → ★NPC の配合の追いつき（`BREEDING_BUDGET_MS`・`b0f364d`）と同じく ★**時間で切ります**。
+ *   ★1 件の確定の前に経過を見て、★予算を超えていたら残りは次の周へ回します（★1 件目は必ず通す）。
+ *   ⚠️ ★15 秒 ＝ 周の 1/4。★実測 2.9 秒なら 1 周 5〜6 件・★1 時間 約 300 件。★VPS からの所要で見直す
+ *   ⚠️ ★較正定数ではありません（★ゲームの結果に効かない。★時間の配分だけ）。
+ */
+export const PLAYER_BREEDING_BUDGET_MS = 15_000;
+
+/**
+ * 🔴 ★**続けて落ちたら `internal_error` にする回数**（★裁定 322d603 §3）。
+ *   ★`breed()` の後で落ちた要求は ★取引を戻して「待ち」のまま次の周にやり直します（★結果を見てから失敗にしない）。
+ *   ★しかし ★毎回同じ理由で落ちる要求は ★永久にやり直され、★後ろの要求を止めます。
+ *   ★戻した取引では ★下書きも残らないので、★利用者は仔を一度も見ていません（★D-120 ① に反しない）。
+ */
+export const PLAYER_BREEDING_MAX_ATTEMPTS = 5;
+
+export interface PlayerBreedingBudget {
+  readonly budgetMs: number;
+  readonly monotonicMs: () => number;
+}
 
 /** ★要求の失敗の理由（★画面はこの語を読んで出す・★黙って消さない・D-111 ⑤） */
 export type PlayerBreedingFailure =
@@ -47,7 +73,9 @@ export type PlayerBreedingFailure =
   | 'parent_missing'
   | 'sire_not_candidate'
   | 'dam_not_candidate'
-  | 'owner_limit';
+  | 'owner_limit'
+  /** ★`PLAYER_BREEDING_MAX_ATTEMPTS` 回 続けて例外で戻した（★利用者は仔を見ていない） */
+  | 'internal_error';
 
 export interface PlayerBreedingResult {
   /** ★`foal_requests` が無い（★移行 `0061` の前）ので何もしなかった */
@@ -56,6 +84,14 @@ export interface PlayerBreedingResult {
   readonly failed: number;
   /** ★例外で戻した（★要求は「待ち」のまま・次の周にやり直す） */
   readonly errors: number;
+  /** ★続けて落ちたので `internal_error` にした */
+  readonly gaveUp: number;
+  /** ★予算で止めた（★残りは次の周） */
+  readonly stoppedByBudget: boolean;
+  /** ★この周の終わりに待っている件数（★溜まりを見る・R-16） */
+  readonly backlog: number;
+  /** ★待っている最古の要求の年齢 [ms]（★待ちが無ければ null） */
+  readonly oldestPendingMs: number | null;
 }
 
 /**
@@ -147,8 +183,8 @@ export async function confirmInitialBreeding(
   ctx: PlayerBreedingContext,
 ): Promise<PlayerBreedingOutcome> {
   {
-    const reqRes = await client.query<{ id: string; user_id: string; sire_id: string; dam_id: string }>(
-      "select id, user_id, sire_id, dam_id from foal_requests"
+    const reqRes = await client.query<{ id: string; user_id: string; sire_id: string; dam_id: string; seed_key: string }>(
+      "select id, user_id, sire_id, dam_id, seed_key from foal_requests"
         + " where id = $1 and status = 'pending' and kind = 'breed_initial' for update skip locked",
       [requestId],
     );
@@ -199,7 +235,11 @@ export async function confirmInitialBreeding(
     const light = await loadAncestorLookup(client, [sire, dam]);
     const full = new Map<string, HorseRecord>([[sire.id, sire], [dam.id, dam]]);
     const lookup = (id: string): HorseRecord | undefined => full.get(id) ?? light.get(id);
-    const { id: foalId, seed } = await idAndSeedFromKey(`${PLAYER_FOAL_KEY_PREFIX}${req.id}`);
+    /**
+     * 🔴 ★種は ★`seed_key`（★行を作るときに DB が決めた値・`0063`）から。★要求 ID（クライアントが送る値）から作らない
+     *   （★裁定 322d603 §1。★要求 ID から作ると、★クライアントが自分の仔の種を選べる）。
+     */
+    const { id: foalId, seed } = await idAndSeedFromKey(`${PLAYER_FOAL_KEY_PREFIX}${req.seed_key}`);
     const birthYear = ctx.year + ctx.yearOffset;
     const foal = breed({
       id: foalId,
@@ -255,37 +295,62 @@ export async function confirmInitialBreeding(
   }
 }
 
+/** ★待っている件数と、★最古の要求の年齢（★DB の `now()` で測る・`Date.now()` を使わない） */
+async function backlogOf(client: pg.ClientBase): Promise<{ backlog: number; oldestPendingMs: number | null }> {
+  const r = (await client.query<{ n: string; age: string | null }>(
+    "select count(*)::text n, (extract(epoch from (now() - min(created_at))) * 1000)::bigint::text age"
+      + " from foal_requests where status = 'pending' and kind = 'breed_initial'",
+  )).rows[0];
+  return {
+    backlog: Number(r?.n ?? 0),
+    oldestPendingMs: r?.age === null || r?.age === undefined ? null : Number(r.age),
+  };
+}
+
 /**
- * ★**待っている初回の配合を、★古い順に確定する**（★毎周・`main.ts`）。
+ * ★**待っている初回の配合を確定する**（★毎周・`main.ts`）。
  *
  * ⚠️ ★**呼ぶ側は取引を張らないこと**（★要求ごとに自分で `begin` / `commit` します）。
  * ⚠️ ★1 件の例外で残りを止めません（★`onAlert` に出し、★その要求は次の周にやり直す）。
+ * 🔴 ★**時間で切ります**（★`budget`・裁定 322d603 §2）。★1 件目は必ず通す（★でないと永久に進まない）。
+ * 🔴 ★拾う順は ★**試行回数の少ない順 → 古い順**（★詰まった要求が他を塞がない・§3）。
  */
 export async function runPlayerBreeding(
   client: pg.ClientBase,
   nowMs: number,
   epochMs: number,
   onAlert: (message: string) => void,
+  budget: PlayerBreedingBudget,
   balance: BalanceConfig = DEFAULT_BALANCE,
   limit: number = PLAYER_BREEDING_BATCH,
 ): Promise<PlayerBreedingResult> {
-  if (!(await tableExists(client, 'foal_requests'))) {
-    return { skipped: true, done: 0, failed: 0, errors: 0 };
-  }
+  const empty = {
+    done: 0, failed: 0, errors: 0, gaveUp: 0, stoppedByBudget: false, backlog: 0, oldestPendingMs: null,
+  } as const;
+  if (!(await tableExists(client, 'foal_requests'))) return { skipped: true, ...empty };
   const pending = await client.query<{ id: string }>(
     "select id from foal_requests where status = 'pending' and kind = 'breed_initial'"
-      + ' order by created_at, id limit $1',
+      + ' order by attempts, created_at, id limit $1',
     [limit],
   );
-  if (pending.rows.length === 0) return { skipped: false, done: 0, failed: 0, errors: 0 };
+  if (pending.rows.length === 0) return { skipped: false, ...empty };
 
   const ctx = await playerBreedingContext(client, nowMs, epochMs, onAlert, balance);
 
   let done = 0;
   let failed = 0;
   let errors = 0;
+  let gaveUp = 0;
+  let stoppedByBudget = false;
+  const t0 = budget.monotonicMs();
+  let tried = 0;
   for (const { id } of pending.rows) {
-    // ★1 件 ＝ 1 取引（★裁定 §1 条件 2・どこで落ちても何も残らない）
+    if (tried > 0 && budget.monotonicMs() - t0 >= budget.budgetMs) {
+      stoppedByBudget = true;
+      break;
+    }
+    tried += 1;
+    // ★1 件 ＝ 1 取引（★裁定 55b2fd4 §1 条件 2・どこで落ちても何も残らない）
     await client.query('begin');
     try {
       const o = await confirmInitialBreeding(client, id, ctx);
@@ -295,8 +360,28 @@ export async function runPlayerBreeding(
     } catch (e) {
       await client.query('rollback');
       errors += 1;
-      onAlert(`★初回の配合を確定できませんでした（要求 ${id}・★次の周にやり直します）: ${(e as Error).message}`);
+      /**
+       * 🔴 ★**戻した後、★別の取引で試行回数を数えます**（★裁定 322d603 §3）。
+       *   ★K 回 続けて落ちたら `internal_error`（★利用者は仔を一度も見ていない・D-120 ① に反しない）。
+       */
+      const bumped = await client.query<{ attempts: number; status: string }>(
+        'update foal_requests set attempts = attempts + 1,'
+          + " status = case when attempts + 1 >= $2 then 'failed' else status end,"
+          + " failure_reason = case when attempts + 1 >= $2 then 'internal_error' else failure_reason end,"
+          + ' processed_at = case when attempts + 1 >= $2 then now() else processed_at end'
+          + " where id = $1 and status = 'pending' returning attempts, status",
+        [id, PLAYER_BREEDING_MAX_ATTEMPTS],
+      );
+      const b = bumped.rows[0];
+      if (b?.status === 'failed') {
+        gaveUp += 1;
+        onAlert(`🔴 ★初回の配合を ${b.attempts} 回 続けて確定できず、★internal_error にしました`
+          + `（要求 ${id}・★利用者の初回の枠は戻ります）: ${(e as Error).message}`);
+      } else {
+        onAlert(`★初回の配合を確定できませんでした（要求 ${id}・★${b?.attempts ?? '?'} 回目・★次の周にやり直します）: `
+          + `${(e as Error).message}`);
+      }
     }
   }
-  return { skipped: false, done, failed, errors };
+  return { skipped: false, done, failed, errors, gaveUp, stoppedByBudget, ...(await backlogOf(client)) };
 }

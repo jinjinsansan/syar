@@ -29,6 +29,16 @@
  */
 export const KNOWN_RED = [
   {
+    test: 'apps/cli/test/breed-year-scale.test.ts > 🔴 ★breed() の年の尺度（★裁定 322d603 §5） 🔴 ★ワーカーと同じ年の渡し方で、★若すぎる父母を breed() に直接渡すと投げる',
+    why: '★`breed()` は内部で `canMate(…, birthYear)` を呼ぶが、★ワーカー（NPC・プレイヤーの両経路）は ★保存する尺度'
+      + '（★ゲームの年 ＋ 46）を渡し、★親の `birthYear` はゲームの年。★→ ★親が 46 歳年上に見え、★「若すぎる」を弾かない。'
+      + '★今は事前の `canMate(…, ゲームの年)` が正しいので実害なし。★安全網が効いていないことを見えるようにした赤。'
+      + '★直すと NPC の世界の結果に触れうるので、★固定の種で前後を比べる便で扱う（★裁定 `REVIEW_I2_PLAYER_BREEDING_VERDICT_20260922.md` §5）。'
+      + '★対照（★ゲームの年で渡せば投げる）は同じファイルで緑',
+    owner: 'dev',
+    until: '2026-10-31',
+  },
+  {
     test: 'packages/render/test/edit-grammar-audit.test.ts > 編集文法の監査 🔴 ⑭ 撮影が、いまの画面より古くない',
     why: '★`out/2d-edit-grammar/race-captures.json` は 2026-08-24 の撮影で、★画面（packages/render/src・apps/web/src）は'
       + '★その後 台本 v6 → v7 → v8 → v9 と変わっている。★⑩「実ブラウザ経路から撮っている」は 26 日前の撮影を見て緑だった。'

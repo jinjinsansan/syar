@@ -757,10 +757,27 @@ export async function runBreedingCatchUp(
       stoppedByBudget = true;
       break;
     }
-    const r = await runBreedingWeek(
-      client, epochMs + (w + 1) * WEEK_MS, epochMs,
-      onAlert, balance, policy, meanFieldSize, broodmareTarget,
-    );
+    /**
+     * 🔴 ★**1 週 ＝ 1 取引**（★2026-09-22・裁定 322d603 §4）。
+     *   ★`runBreedingWeek` の「仔を入れる → 母の印を取る → 取れなければ消す」が ★取引の外だと、
+     *   ★間でワーカーが落ちたとき ★仔だけ残って母の印が立たない（★生涯 8 産の上限が 1 つ緩む）／
+     *   ★プレイヤーの下書きと NPC の仔が同じ母・同じ年に残る、の 2 つの窓がありました。
+     *   ⚠️ ★`runBreedingWeek` 自身は取引に触りません（★`verify-breeding-live.mjs` が外から包んで必ず戻すため）。
+     *   ⚠️ ★週の印（`last_bred_week`）は ★従来どおりループの後に 1 回だけ書きます（★検査 ③）。
+     *     ★週の取引が確定した後・印を書く前に落ちても、★次の周が同じ週をやり直して `on conflict` で増えません。
+     */
+    await client.query('begin');
+    let r: BreedingWeekResult;
+    try {
+      r = await runBreedingWeek(
+        client, epochMs + (w + 1) * WEEK_MS, epochMs,
+        onAlert, balance, policy, meanFieldSize, broodmareTarget,
+      );
+      await client.query('commit');
+    } catch (e) {
+      await client.query('rollback');
+      throw e;
+    }
     if (r.week !== w) {
       throw new Error(
         `breeding-runner: ★週の組み立てがずれています（★頼んだ ${w} / 処理された ${r.week}）`,
