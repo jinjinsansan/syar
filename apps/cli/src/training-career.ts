@@ -114,6 +114,12 @@ export function runCareer(
    * ⚠️ ★**渡しても振る舞いは 1 ビットも変わりません**（★読むだけ・乱数を消費しません）。
    */
   onWeek?: (week: number, stats: Readonly<Record<AbilityKey, number>>) => void,
+  /**
+   * ★**調教を始める週齢**（★任意・★PLAN Q-1 の案 B の模擬・2026-09-22）。
+   *   ★省けば `LIFECYCLE_WEEKS.trainableFrom`（★78）で、★**振る舞いは 1 ビットも変わりません**。
+   *   ⚠️ ★0 を渡しても ★**規則は変わりません**。★「もし 0 週から調教できたら」を測るためだけの入口です。
+   */
+  startWeek: number = LIFECYCLE_WEEKS.trainableFrom,
 ): CareerResult {
   const traits: HorseTraits = {
     sex: horse.sex, growth: horse.growth,
@@ -124,7 +130,7 @@ export function runCareer(
       potential: horse.potential, current: horse.stats,
       durability: horse.durability, temper: horse.temper,
     }),
-    ageWeeks: LIFECYCLE_WEEKS.trainableFrom,
+    ageWeeks: startWeek,
   };
 
   let injuries = 0;
@@ -151,6 +157,8 @@ export function runCareer(
       //   「較正した経路と遊びの経路が別物」に逆戻りします
       enableEvents: true,
       rngFor: (stream: number): Rng => deriveRng(seed, stream, horseIndex * 1000 + week),
+      // ★案 B の模擬だけ（★既定の開始週なら渡さない ＝ 較正した経路と 1 ビット同じ）
+      ...(startWeek === LIFECYCLE_WEEKS.trainableFrom ? {} : { trainableFromForSimulation: startWeek }),
     });
     menuWeeks[r.log.menu] += 1;
     if (r.log.resting) injuryRestWeeks += 1;
@@ -168,7 +176,7 @@ export function runCareer(
   return {
     unlock: sum / ABILITY_KEYS.length,
     injuries, careerEnded: state.careerEnded, epSpent,
-    weeks: state.ageWeeks - LIFECYCLE_WEEKS.trainableFrom,
+    weeks: state.ageWeeks - startWeek,
     menuWeeks, injuryRestWeeks,
     conditionMean: weeksCounted > 0 ? condSum / weeksCounted : 0,
     fatigueMean: weeksCounted > 0 ? fatSum / weeksCounted : 0,

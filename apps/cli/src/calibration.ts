@@ -423,6 +423,12 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
       + '★1 年の実日数と所有上限は ★写さずに `@star/scheduler` から導く（★名前は拾われるが値を持たない）',
   },
   {
+    pattern: 'apps/cli/src/lifecycle-b-sim\.ts',
+    why: '★案 B の模擬（★調教を始める週齢だけを変える・判定を出さない・DB を使わない・PLAN Q-1）。'
+      + '★SEED / HORSES / STARTS / JSON_OUT は ★測り方（★標本・比べる開始週・出力先）で、★通すために動かせる値ではない。'
+      + '★LATE_FROM は ★D-044 の「キャリア後半」の窓（★`LIFECYCLE_WEEKS.trainableFrom` ＋ 104 週）で、★測定条件',
+  },
+  {
     pattern: 'apps/cli/src/diag-topgap\.ts',
     why: '★V-4 が動いた理由を測り直す診断（Q-P3-36）。判定を出さない。SEED / RACES は標本の取り方で、通すために動かせる値ではない',
   },

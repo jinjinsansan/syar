@@ -160,6 +160,12 @@ export interface AdvanceWeekInput {
   /** 功労馬として引退させるか（§7.1）。★持ち主のいる馬はワーカーが true を渡す（裁定 I-1 §3 Q-1）。上がる条件は置かない（同 §4・暫定） */
   readonly preferHonored?: boolean;
   /**
+   * ★**模擬専用: 調教を解禁する週齢の差し替え**（★PLAN Q-1 の案 B を測るため・2026-09-22）。
+   *   ★省けば §7.1 のまま（`canTrain`・78 週）で、★振る舞いは 1 ビットも変わりません。
+   *   🔴 ★**製品（ワーカー・RPC）は渡しません**（`apps/cli/test/lifecycle-b-hook.test.ts` が固定）。★規則を変える口ではありません。
+   */
+  readonly trainableFromForSimulation?: number;
+  /**
    * ★**厩舎の格**（★§6.7・D-103。★既定 `bronze` ＝ 格を入れる前と **1 ビット同じ**）。
    * ★上の格は ★**1 週あたり多く伸びるが、そのぶん調教費も高い** — ★EP あたりの伸びは同じです
    *   （★`gainPerEpRatio(grade) === 1.0`・`grade.test.ts` の対照 ②）。
@@ -231,7 +237,10 @@ export function advanceWeek(input: AdvanceWeekInput): AdvanceWeekResult {
 
   // ── ① 育成可能か（§7.1）────────────────────────────────
   //    ★78週までは放牧場で自動経過。EP も故障も成長もありません。
-  if (!canTrain(week)) {
+  const trainable = input.trainableFromForSimulation === undefined
+    ? canTrain(week)
+    : week >= input.trainableFromForSimulation && week < LIFECYCLE_WEEKS.retireAt;
+  if (!trainable) {
     menu = 'rest';
   } else {
     // ── ② 休養中ならメニューを強制（§7.5）──────────────────
