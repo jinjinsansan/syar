@@ -48,6 +48,15 @@ export const TOOL_AFTERMATH = {
    * ✅ ★`runBreedingWeek` が ★**自分で commit しない**ことを確かめたうえで `rollback` します
    *   （★`grep 'begin\|commit\|rollback' apps/worker/src/breeding-runner.ts` が 0 行）。
    */
+  'verify-player-breeding-live.mjs': {
+    mode: 'restores',
+    why: '★`begin` → 利用者・要求・`confirmInitialBreeding`・`runBreedingWeek` → ★**必ず `rollback`**（`finally`）。'
+      + '✅ ★**戻したことを数えます**: ★判定 ⑧ が ★5 つの表の行数の 前後一致を見ます。'
+      + '⚠️ ★内側が commit する関数を包むと ★**外側ごと確定します** — ★`confirmInitialBreeding` は取引に触らない'
+      + '（★`player-breeding.test.ts` が釘付け）。★取引を張るのは `runPlayerBreeding` だけです',
+    // ★AU-7: ★主張には引用を付ける。★この行が変われば、★検査が壊れて落ちます
+    countedBy: 'JSON.stringify(after) === JSON.stringify(before)',
+  },
   'verify-breeding-live.mjs': {
     mode: 'restores',
     why: '★`begin` → `runBreedingWeek` → ★**必ず `rollback`**（`finally`）。'

@@ -16,7 +16,9 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BALANCE, FOUNDERS, createFounder, deriveRng } from '@star/sim-engine';
 import { OWNERSHIP_LIMITS } from '@star/scheduler';
-import { PLAYER_FOAL_KEY_PREFIX, runPlayerBreeding } from '../../worker/src/player-breeding.js';
+import {
+  PLAYER_FOAL_KEY_PREFIX, confirmInitialBreeding, playerBreedingContext, runPlayerBreeding,
+} from '../../worker/src/player-breeding.js';
 import { idAndSeedFromKey } from '../../worker/src/breeding-runner.js';
 
 const REQ = '11111111-1111-4111-8111-111111111111';
@@ -190,6 +192,16 @@ describe('★PLAN I-2: プレイヤーの配合の確定', () => {
       '★結果を計算した後に失敗にした（★引き直しが成立する）').toBe(false);
     // ★偽の DB は相性表が空なので、★その警報も出る。★数えるのは確定の失敗の警報だけ
     expect(alerts.filter((m) => m.includes('初回の配合を確定できませんでした')).length, '★黙って戻した').toBe(1);
+  });
+
+  it('🔴 ★確定の本体は ★取引に触らない（★包んだ側の rollback が効く＝staging の実演で必ず戻せる）', async () => {
+    for (const o of [{}, { damRole: null }] as FakeOptions[]) {
+      const { client, seen } = fakeClient(o);
+      const ctx = await playerBreedingContext(client, NOW, 0, () => {});
+      await confirmInitialBreeding(client, REQ, ctx);
+      expect(sqls(seen).filter((s) => /^(begin|commit|rollback)$/i.test(s.trim())),
+        '★確定の本体が自分で取引を張った／閉じた').toEqual([]);
+    }
   });
 
   it('⑥ ★`foal_requests` が無い DB（★0061 の前）では何もしない', async () => {

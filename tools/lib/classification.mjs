@@ -1022,6 +1022,9 @@ export const STATE_CHANGING = [
   // ★配合を、★本物の DB で 1 週 走らせて落ちないか見る（★取引の中だけ。★必ず rollback）。
   //   ★偽の DB で緑になり、★本番を落とした（2026-09-21）ので作りました
   'verify-breeding-live.mjs',
+  // ★プレイヤーの配合（★PLAN I-2・D-120）を、★本物の DB で通す（★取引の中だけ。★必ず rollback）。
+  //   ★試験用の利用者・要求・下書きを作り、★NPC の週次配合と同じ母を取り合わせる
+  'verify-player-breeding-live.mjs',
   'synthetic-bettor.mjs',
   'verify-a2.mjs',
   // ★B-1: 馬の育成状態を書き換え、horse_week_log を作る

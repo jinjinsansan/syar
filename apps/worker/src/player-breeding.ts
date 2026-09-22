@@ -107,21 +107,46 @@ async function tableExists(client: pg.ClientBase, name: string): Promise<boolean
   return r.rows[0]?.t !== null && r.rows[0]?.t !== undefined;
 }
 
-type Outcome = 'done' | 'failed' | 'skipped';
+export type PlayerBreedingOutcome = 'done' | 'failed' | 'skipped';
 
-async function processOne(
+/** ★確定に要る、その周の前提（★周に 1 回 読む） */
+export interface PlayerBreedingContext {
+  readonly week: number;
+  readonly year: number;
+  readonly yearOffset: number;
+  readonly nicks: Map<string, number>;
+  readonly balance: BalanceConfig;
+}
+
+export async function playerBreedingContext(
+  client: pg.ClientBase, nowMs: number, epochMs: number,
+  onAlert: (message: string) => void, balance: BalanceConfig = DEFAULT_BALANCE,
+): Promise<PlayerBreedingContext> {
+  /** ★生まれる週 ＝ いまの週（★NPC は締まった週を処理するが、★プレイヤーの仔は「いま」生まれる） */
+  const week = weekIndexAt(nowMs, epochMs);
+  return {
+    week,
+    year: gameYearOf(week),
+    yearOffset: await birthYearOffset(client),
+    nicks: await loadNicks(client, onAlert),
+    balance,
+  };
+}
+
+/**
+ * ★**要求 1 件を確定する**。
+ *
+ * 🔴 ★**この関数は `begin` / `commit` / `rollback` をしません**（★呼ぶ側が 1 件ごとに取引を張る）。
+ *   ★内側で `commit` すると、★包んだ側の `rollback` が効かなくなります
+ *   （★2026-09-21 に staging を 2 度 汚した形・記憶「rollback は自分で commit する関数を戻さない」）。
+ *   ★そうしておけば、★staging の実演（`tools/verify-player-breeding-live.mjs`）が ★**全体を包んで必ず戻せます**。
+ */
+export async function confirmInitialBreeding(
   client: pg.ClientBase,
   requestId: string,
-  ctx: {
-    readonly week: number;
-    readonly year: number;
-    readonly yearOffset: number;
-    readonly nicks: Map<string, number>;
-    readonly balance: BalanceConfig;
-  },
-): Promise<Outcome> {
-  await client.query('begin');
-  try {
+  ctx: PlayerBreedingContext,
+): Promise<PlayerBreedingOutcome> {
+  {
     const reqRes = await client.query<{ id: string; user_id: string; sire_id: string; dam_id: string }>(
       "select id, user_id, sire_id, dam_id from foal_requests"
         + " where id = $1 and status = 'pending' and kind = 'breed_initial' for update skip locked",
@@ -130,16 +155,14 @@ async function processOne(
     const req = reqRes.rows[0];
     if (req === undefined) {
       // ★別の処理が先に取った／既に済んだ
-      await client.query('commit');
       return 'skipped';
     }
 
-    const fail = async (reason: PlayerBreedingFailure): Promise<Outcome> => {
+    const fail = async (reason: PlayerBreedingFailure): Promise<PlayerBreedingOutcome> => {
       await client.query(
         "update foal_requests set status = 'failed', failure_reason = $2, processed_at = now() where id = $1",
         [req.id, reason],
       );
-      await client.query('commit');
       return 'failed';
     };
 
@@ -228,11 +251,7 @@ async function processOne(
         + ' processed_at = now() where id = $1',
       [req.id, foalId, waived],
     );
-    await client.query('commit');
     return 'done';
-  } catch (e) {
-    await client.query('rollback');
-    throw e;
   }
 }
 
@@ -260,25 +279,21 @@ export async function runPlayerBreeding(
   );
   if (pending.rows.length === 0) return { skipped: false, done: 0, failed: 0, errors: 0 };
 
-  /** ★生まれる週 ＝ いまの週（★NPC は締まった週を処理するが、★プレイヤーの仔は「いま」生まれる） */
-  const week = weekIndexAt(nowMs, epochMs);
-  const ctx = {
-    week,
-    year: gameYearOf(week),
-    yearOffset: await birthYearOffset(client),
-    nicks: await loadNicks(client, onAlert),
-    balance,
-  };
+  const ctx = await playerBreedingContext(client, nowMs, epochMs, onAlert, balance);
 
   let done = 0;
   let failed = 0;
   let errors = 0;
   for (const { id } of pending.rows) {
+    // ★1 件 ＝ 1 取引（★裁定 §1 条件 2・どこで落ちても何も残らない）
+    await client.query('begin');
     try {
-      const o = await processOne(client, id, ctx);
+      const o = await confirmInitialBreeding(client, id, ctx);
+      await client.query('commit');
       if (o === 'done') done += 1;
       else if (o === 'failed') failed += 1;
     } catch (e) {
+      await client.query('rollback');
       errors += 1;
       onAlert(`★初回の配合を確定できませんでした（要求 ${id}・★次の周にやり直します）: ${(e as Error).message}`);
     }
