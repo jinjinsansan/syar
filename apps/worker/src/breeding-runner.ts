@@ -55,8 +55,10 @@ export interface BreedingWeekResult {
   readonly noSire: number;
   /** ★既に居た（★同じ週を二度 処理した）ぶん */
   readonly alreadyThere: number;
-  /** ★名前を決められず見送った頭数（★`generateHorseName` が上限回数で投げた・PLAN I-3） */
+  /** ★名前を決められず見送った頭数（★予備の名前も使えなかった・PLAN I-3）。★1 以上なら週ごと投げる */
   readonly nameGaveUp: number;
+  /** ★音節表から名前が決まらず、★予備の名前（接頭辞 ＋ ID の 6 文字）で産ませた頭数（★音節表を広げる合図） */
+  readonly nameFallback: number;
   /** ★年の変わり目で年次カウンタを戻したか */
   readonly yearReset: boolean;
   /** ★生涯上限に達して繁殖から降ろした頭数 */
@@ -392,6 +394,11 @@ export async function runBreedingWeek(
    *   ✅ ★目標は ★**宣言された数**から。★下限は ★**下回っていないかの確認**に使います。
    */
   broodmareTarget: number,
+  /**
+   * ★**名付けに要るものを外から渡す口**（★検査用。★省けば DB と NG リストから読む＝`loadFoalNaming`）。
+   *   ★名前が決まらない場面（★音節表が尽きかけた）を ★検査で作るために置きました（★裁定 f117984 §5）。
+   */
+  namingOverride?: FoalNaming,
 ): Promise<BreedingWeekResult> {
   /** ★「締まった週」。★いまの週はまだ締まっていないので使いません */
   const week = weekIndexAt(nowMs, epochMs) - 1;
@@ -520,7 +527,7 @@ export async function runBreedingWeek(
   if (mareIds.length === 0) {
     onAlert('★繁殖牝馬が 1 頭も居ません（★世界がまだ出来ていないか、★役割が付いていない）');
     return {
-      week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, nameGaveUp: 0, yearReset,
+      week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, nameGaveUp: 0, nameFallback: 0, yearReset,
       retiredFromBreeding, promoted,
     };
   }
@@ -547,7 +554,7 @@ export async function runBreedingWeek(
   }
   if (dueIds.length === 0) {
     return {
-      week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, nameGaveUp: 0, yearReset,
+      week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, nameGaveUp: 0, nameFallback: 0, yearReset,
       retiredFromBreeding, promoted,
     };
   }
@@ -585,8 +592,9 @@ export async function runBreedingWeek(
   /** ★下書きの表（★`0061`）が在れば、★プレイヤーの配合と母を取り合わない判定に使う */
   const withDrafts = await hasFoalDrafts(client);
   /** ★仔の名付け（★PLAN I-3 段 0・★使用済みの名前・禁止名・`name_key` の列が在るか） */
-  const naming = await loadFoalNaming(client);
+  const naming = namingOverride ?? await loadFoalNaming(client);
   let nameGaveUp = 0;
+  let nameFallback = 0;
 
   const ancestorIndex = buildSireAncestorIndex(stallions);
   const turnOf = new Map<string, number>();
@@ -634,7 +642,11 @@ export async function runBreedingWeek(
      *   ★新: ★世界の生成（`preseed.ts`）と同じ `generateHorseName`（★使用済みの名前・禁止名を避ける）。
      *   🔴 ★**名前の乱数は、★遺伝の乱数と別の流れ**（★鍵に `|name` を足す・★1 本の `Rng` を共有しない）。
      *     ★`breed()` の出力（名前以外の全形質）は ★名付けの前と 1 ビットも変わらない（★検査で釘付け）。
-     *   ⚠️ ★上限回数まで引いても決まらなければ投げる関数なので、★**その 1 頭だけ見送って警報**（★週を止めない）。
+     *   🔴 ★上限回数まで引いても決まらなければ投げる関数です（★裁定 f117984 §5）:
+     *     ★**見送らず、★旧来の形（接頭辞 ＋ ID の先頭 6 文字）を予備の名前として試します**。
+     *     ★見送ると ★**その母はその年の仔を失います**（★NPC は各母を年 1 回、番の週にしか配合しない）。
+     *     ★予備も重なった／禁止名に当たったときだけ見送り、★週の終わりで ★**止める側に倒します**（★下の判定）。
+     *     ★予備を使った回数は ★`nameFallback` で数えます（★音節表を広げる合図）。
      */
     let foalName: string;
     try {
@@ -643,9 +655,17 @@ export async function runBreedingWeek(
         new Rng(nameSeed), { ...DEFAULT_NAME_SHAPE, prefix: stable.prefix }, naming.taken, naming.blocked,
       ).name;
     } catch (e) {
-      nameGaveUp += 1;
-      onAlert(`★仔の名前を決められず、★この 1 頭を見送りました（★母 ${mare.id}・週 ${week}）: ${(e as Error).message}`);
-      continue;
+      const spare = `${stable.prefix}${foalId.slice(0, 6)}`;
+      const spareKey = normalizeName(spare);
+      if (naming.taken.has(spareKey) || naming.blocked(spareKey)) {
+        nameGaveUp += 1;
+        onAlert(`🔴 ★仔の名前を決められず、★予備の名前も使えませんでした（★母 ${mare.id}・週 ${week}）: ${(e as Error).message}`);
+        continue;
+      }
+      naming.taken.add(spareKey);
+      foalName = spare;
+      nameFallback += 1;
+      onAlert(`★仔の名前が音節表から決まらず、★予備の名前 ${spare} で産ませました（★母 ${mare.id}・週 ${week}・★音節表を広げる合図）`);
     }
     /** ★`name_key` / `name_checked_with`（★移行 `0064`）は ★列が在るときだけ書く */
     const keyCols = naming.writeKey ? ', name_key, name_checked_with' : '';
@@ -716,6 +736,20 @@ export async function runBreedingWeek(
    *     ★既に居たのでもない**（★＝ 全頭 相手が見つからなかった）。
    *   ⚠️ ★割り当てが 0 頭の週は投げません（★その週は誰の番でもない、が正常）。
    */
+  /**
+   * 🔴 ★**名前が決まらず見送った仔が居たら投げます**（★裁定 f117984 §5 ③・★同じ「止まったら投げる」の場所）。
+   *   ★見送った母は ★その年の仔を失います。★警報だけでは読まれません（★上の註記の 3 日・6,066 レース）。
+   *   ★週の取引ごと戻り（★`runBreedingCatchUp` が週ごとに張る）、★印が進まないので ★遅れの見張りが鳴ります。
+   *   ⚠️ ★予備の名前がある限り、★ここに来るのは ★予備まで重なったときだけです。
+   *   ⚠️ ★下の「供給が止まっています」より ★**先に**判定します（★全頭を見送ると両方が成り立ち、
+   *     ★後ろだけが投げると ★原因が名前だと読めない・★検査で見つけた）。
+   */
+  if (nameGaveUp > 0) {
+    throw new Error(
+      `breeding-runner: ★仔の名前が決まらず ${nameGaveUp} 頭を見送りました（★週 ${week}・★予備の名前も使えず）。`
+        + '★音節表（`NAME_SYLLABLES`）か音節数の上限を広げてください',
+    );
+  }
   if (mares.length > 0 && born === 0 && alreadyThere === 0) {
     throw new Error(
       'breeding-runner: ★供給が止まっています（POOL-SUPPLY）。'
@@ -723,7 +757,9 @@ export async function runBreedingWeek(
         + ` / 相手なし ${noSire} 頭 / 生まれた 0 頭`,
     );
   }
-  return { week, eligible, born, noSire, alreadyThere, nameGaveUp, yearReset, retiredFromBreeding, promoted };
+  return {
+    week, eligible, born, noSire, alreadyThere, nameGaveUp, nameFallback, yearReset, retiredFromBreeding, promoted,
+  };
 }
 
 /**

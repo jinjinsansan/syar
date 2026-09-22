@@ -282,6 +282,31 @@ describe('🔴 ★POOL-SUPPLY: 定常運転の供給', () => {
       }
     });
 
+    it('🔴 ★音節表から名前が決まらなくても、★見送らずに予備の名前で産ませる（★裁定 f117984 §5）', async () => {
+      // ★予備（★接頭辞 ＋ ID の 6 文字 → 正規化で末尾が 16 進 6 桁）以外を全部 禁止名にする
+      const naming = {
+        taken: new Set<string>(), blocked: (k: string) => !/[0-9A-F]{6}$/.test(k), version: null, writeKey: false,
+      };
+      const alerts: string[] = [];
+      const a = fakeWithParams({ mareCount: 52, stallionCount: 3 });
+      const r = await runBreedingWeek(a.client, nowForWeek(312), EPOCH, (m) => alerts.push(m), undefined,
+        'random', 13, 800, naming);
+      expect(r.born, '★見送った（★その母はその年の仔を失う）').toBeGreaterThan(0);
+      expect(r.nameFallback, '★予備を使った回数を数えていない').toBe(r.born);
+      expect(r.nameGaveUp).toBe(0);
+      for (const p of inserts(a.seen, a.params)) {
+        expect(String(p[2]).endsWith(String(p[0]).slice(0, 6)), '★予備の名前ではない').toBe(true);
+      }
+      expect(alerts.some((m) => m.includes('予備の名前')), '★予備を使ったことを黙った').toBe(true);
+    });
+
+    it('🔴 ★対照: ★予備の名前も使えなければ ★週ごと投げる（★見送りを警報だけで済ませない）', async () => {
+      const naming = { taken: new Set<string>(), blocked: () => true, version: null, writeKey: false };
+      const a = fakeWithParams({ mareCount: 52, stallionCount: 3 });
+      await expect(runBreedingWeek(a.client, nowForWeek(312), EPOCH, () => {}, undefined,
+        'random', 13, 800, naming)).rejects.toThrow(/名前が決まらず/);
+    });
+
     it('★`name_key` の列が在るときだけ書く（★0064 の前の DB で落ちない）', async () => {
       const without = fakeWithParams({ mareCount: 52, stallionCount: 3, nameKeyColumn: false });
       await runBreedingWeek(without.client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
