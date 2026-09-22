@@ -57,10 +57,14 @@ const hasCol = Number((await q(
   "select count(*)::int n from information_schema.columns"
     + " where table_schema = 'public' and table_name = 'horses' and column_name = 'name_key'",
 ))[0].n) > 0;
-if (!hasCol) {
+if (!hasCol && APPLY) {
   console.error('🔴 ★`horses.name_key` がありません（★移行 0064 の前）。★先に移行を当ててください');
   await c.end();
   process.exit(VERDICT.UNDECIDABLE);
+}
+if (!hasCol) {
+  // ★下見だけは ★列が無くても名前から数えられる（★段 3 の前に「本番の名前が重ならないか」を知るため）
+  console.log('  ・ ★`horses.name_key` がありません（★移行 0064 の前）。★名前だけで重なりを数えます（★書きません）');
 }
 
 const fails = [];
@@ -73,7 +77,10 @@ const check = (ok, label, detail) => {
 
 /** ★全頭を読み、★正規化の結果と食い違いを数える（★読むだけ・★数えるのは純関数 `surveyNameKeys`） */
 const survey = async () => surveyNameKeys(
-  await q('select id::text as id, name, name_key from horses'), normalizeName,
+  await q(hasCol
+    ? 'select id::text as id, name, name_key from horses'
+    : 'select id::text as id, name, null::text as name_key from horses'),
+  normalizeName,
 );
 
 const dbEnvironment = (await q('select environment from app_environment'))[0]?.environment ?? null;
