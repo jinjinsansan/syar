@@ -104,3 +104,83 @@ export function loadNameBlocklist(hashPath = NG_HASH_PATH, strict = true): Block
     version: createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16),
   };
 }
+
+/**
+ * ★**禁止名の一覧の種類**（★提案 `PROPOSAL_PLAYER_NAME_MODERATION_20260922.md` §2 段 1・§4・2026-09-22）。
+ *   ★`real-horse` … ★実在の競走馬名（★完全一致・★憲法 §0.1・★無ければ既定で止まる）
+ *   ★`offensive-exact` … ★不快な語（★完全一致）
+ *   ★`offensive-contains` … ★不快な語（★名前の中に含まれていれば当たり・★誤検知が増えるので短い一覧に限る）
+ *   ★どの一覧も ★平文を repo に置かず、★正規化した語のハッシュだけを持つ（★`buildBlocklist` と同じ形）。
+ */
+export type NameListKind = 'real-horse' | 'offensive-exact' | 'offensive-contains';
+
+/** ★一覧の置き場所（★不快な語の 2 本は、★オーナーが用意するまで無い） */
+export const NAME_LIST_PATHS: Readonly<Record<NameListKind, string>> = {
+  'real-horse': NG_HASH_PATH,
+  'offensive-exact': 'data/ng-offensive-exact.hash',
+  'offensive-contains': 'data/ng-offensive-contains.hash',
+};
+
+/** ★版を組み立てる順（★同じ一覧の組なら、★いつも同じ文字列になる） */
+const NAME_LIST_ORDER: readonly NameListKind[] = ['real-horse', 'offensive-exact', 'offensive-contains'];
+
+export interface NameChecksLoad {
+  /** ★どれか 1 つの一覧に当たれば true（★どの一覧に当たったかは返さない・★一覧の中身を当てさせない） */
+  readonly blocked: NameBlocklist;
+  /**
+   * ★**どの一覧のどの版で検査したか**（★`name_checked_with` に残す）。★例 `real-horse:<16 桁>+offensive-exact:<16 桁>`。
+   *   ★在る一覧だけを並べる。★1 つも無ければ ★`null`（★「検査していない」を黙って合格にしない）。
+   *   ★後から一覧が増えると ★版の文字列が変わるので、★再検査の道具が ★その行を拾い直せる。
+   */
+  readonly version: string | null;
+  /** ★読めた一覧の種類 */
+  readonly kinds: readonly NameListKind[];
+}
+
+/** ★ハッシュの一覧を読む（★無ければ null） */
+function readHashSet(hashPath: string): { set: ReadonlySet<string>; version: string } | null {
+  if (!existsSync(hashPath)) return null;
+  const text = readFileSync(hashPath, 'utf8');
+  const set = new Set(text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0));
+  return { set, version: createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16) };
+}
+
+/**
+ * ★**禁止名の一覧を全部読んで、★1 つの判定にする**。
+ *
+ * @param paths ★一覧の置き場所（★試験で差し替える）
+ * @param strictRealHorse ★true（既定）なら ★実在馬名の一覧が無いときに投げる（★`loadNameBlocklist` と同じ・憲法 §0.1）。
+ *   ⚠️ ★不快な語の一覧は ★無くても投げない（★まだ用意されていない・提案 §3-1）。★無い一覧は版に入らない。
+ */
+export function loadNameChecks(
+  paths: Readonly<Record<NameListKind, string>> = NAME_LIST_PATHS,
+  strictRealHorse = true,
+): NameChecksLoad {
+  const real = loadNameBlocklist(paths['real-horse'], strictRealHorse);
+  const exact = readHashSet(paths['offensive-exact']);
+  const contains = readHashSet(paths['offensive-contains']);
+  const versions: Partial<Record<NameListKind, string>> = {};
+  if (real.version !== null) versions['real-horse'] = real.version;
+  if (exact !== null) versions['offensive-exact'] = exact.version;
+  if (contains !== null) versions['offensive-contains'] = contains.version;
+  const kinds = NAME_LIST_ORDER.filter((k) => versions[k] !== undefined);
+  const version = kinds.length === 0 ? null : kinds.map((k) => `${k}:${versions[k]}`).join('+');
+  return {
+    blocked: (normalized: string): boolean => {
+      if (real.blocklist(normalized)) return true;
+      if (exact !== null && exact.set.has(hashNormalizedName(normalized))) return true;
+      if (contains !== null) {
+        // ★名前の中の ★連続した部分をすべて調べる（★9 文字なら 45 通り）
+        const chars = [...normalized];
+        for (let i = 0; i < chars.length; i += 1) {
+          for (let j = i + 1; j <= chars.length; j += 1) {
+            if (contains.set.has(hashNormalizedName(chars.slice(i, j).join('')))) return true;
+          }
+        }
+      }
+      return false;
+    },
+    version,
+    kinds,
+  };
+}

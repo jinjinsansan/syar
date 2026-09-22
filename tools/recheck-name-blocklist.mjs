@@ -9,7 +9,7 @@
  *   ★リストが届いたら ★その行を全部 検査し直す（★裁定: ★印を残すだけでは、★リストが届いた後に何も起きない）。
  *
  * 【★何をするか】
- *   ① ★未検査の行（`name_checked_with is null`）を読み、★`name_key` を ★リストで判定する
+ *   ① ★今の一覧の組で検査されていない行（★`null`・★前の組で合格した行。★当たりの印は除く）を読み、★`name_key` を ★全部の一覧で判定する
  *   ② ★当たらなかった行 → ★`name_checked_with = <リストの版>` を書く
  *   ③ ★当たった行 → ★`name_checked_with = 'hit:<リストの版>'`（★未検査の null とも合格の版とも違う印・レビュー側の推奨 2026-09-22）。
  *      ★**件数と馬の ID だけ**出す
@@ -26,6 +26,7 @@
  *   npx tsx tools/recheck-name-blocklist.mjs --env production --apply \
  *       --yes-production --recheck-names --expect-unchecked <いま未検査の頭数>          # ★オーナーの許可が要る
  *   ★`--hash-path <ファイル>` でリストの場所を変えられる（★検証用の小さなリストで試すため・既定 `data/ng-names.hash`）
+ *   ★`--offensive-exact-path` / `--offensive-contains-path` で不快な語の一覧も変えられる（★既定は `data/ng-offensive-*.hash`・★無ければ見ない）
  * ============================================================================
  */
 import pg from 'pg';
@@ -35,7 +36,7 @@ import { assertNotProduction } from './lib/guard.mjs';
 import { productionNameRecheckOptInProblem } from './lib/args.mjs';
 import { exitWithVerdict, verdictOf, VERDICT } from './lib/counted-verdict.mjs';
 import { hitMarkOf, partitionByBlocklist } from './lib/name-recheck.mjs';
-import { NG_HASH_PATH, loadNameBlocklist } from '../apps/cli/src/name-blocklist.ts';
+import { NAME_LIST_PATHS, loadNameChecks } from '../apps/cli/src/name-blocklist.ts';
 
 const APPLY = process.argv.includes('--apply');
 const REHEARSE = process.argv.includes('--rehearse');
@@ -43,14 +44,20 @@ const YES_PRODUCTION = process.argv.includes('--yes-production');
 const RECHECK_FLAG = process.argv.includes('--recheck-names');
 const argValue = (name) => { const i = process.argv.indexOf(name); return i < 0 ? undefined : process.argv[i + 1]; };
 const EXPECT_UNCHECKED = (() => { const n = Number(argValue('--expect-unchecked')); return Number.isInteger(n) ? n : null; })();
-const HASH_PATH = argValue('--hash-path') ?? NG_HASH_PATH;
+/** ★一覧の置き場所（★検証用の小さな一覧で試すために差し替えられる） */
+const PATHS = {
+  'real-horse': argValue('--hash-path') ?? NAME_LIST_PATHS['real-horse'],
+  'offensive-exact': argValue('--offensive-exact-path') ?? NAME_LIST_PATHS['offensive-exact'],
+  'offensive-contains': argValue('--offensive-contains-path') ?? NAME_LIST_PATHS['offensive-contains'],
+};
 
 // ★リストが無ければ ★判定不能（★「検査していない」を黙って合格にしない）
 let ng;
 try {
-  ng = loadNameBlocklist(HASH_PATH, true);
+  // ★実在馬名の一覧は必須（★憲法 §0.1）。★不快な語の 2 本は、在れば一緒に見る（★提案 §4）
+  ng = loadNameChecks(PATHS, true);
 } catch (e) {
-  console.error(`🔴 ★禁止名のリストがありません（${HASH_PATH}）。★検査し直せません: ${e.message.split('\n')[0]}`);
+  console.error(`🔴 ★禁止名のリストがありません（${PATHS['real-horse']}）。★検査し直せません: ${e.message.split('\n')[0]}`);
   process.exit(VERDICT.UNDECIDABLE);
 }
 
@@ -81,13 +88,22 @@ if (!hasCols) {
 const dbEnvironment = (await q('select environment from app_environment'))[0]?.environment ?? null;
 const mode = APPLY ? '書きます' : REHEARSE ? '書いて数え直し、★必ず戻します' : '下見だけ・書きません';
 console.log(`# ★未検査の馬名を禁止名のリストで検査し直す（★${mode}）  接続先の申告: ${dbEnvironment}`);
-console.log(`  ★リスト: ${ng.size} 件・★版 ${ng.version}`);
+console.log(`  ★一覧: ${ng.kinds.join(' / ')}・★版 ${ng.version}`);
 
-const readUnchecked = async () => q('select id::text as id, name_key from horses where name_checked_with is null');
+/**
+ * ★**今の一覧の組で検査されていない行**（★未検査の null と、★前の一覧の組で合格した行）。
+ *   ★一覧が増えると版の文字列が変わるので、★前の組で合格した行も拾い直す（★提案 §4・2026-09-22）。
+ *   ★当たりの印（`hit:`）の行は拾わない（★名前を直すのは別の段取り・提案 §2 段 2）。
+ *   ★`$v` は版の引数の番号（★問い合わせごとに違う）。
+ */
+const notCurrent = (v) => `(name_checked_with is null or (name_checked_with not like 'hit:%' and name_checked_with <> $${v}))`;
+const readUnchecked = async () => q(
+  `select id::text as id, name_key from horses where ${notCurrent(1)}`, [ng.version],
+);
 await c.query('begin read only');
 const before = await readUnchecked();
 await c.query('rollback');
-const part = partitionByBlocklist(before, ng.blocklist);
+const part = partitionByBlocklist(before, ng.blocked);
 console.log(`  ★未検査 ${before.length} 頭 / ★当たった ${part.hits.length} 頭 / ★書く ${part.clean.length} 頭`);
 // 🔴 ★名前は出さない（★実在馬名の可能性・憲法 §0.1）。★ID だけ
 if (part.hits.length > 0) console.log(`  ★当たった馬の ID（★名前は出しません）: ${part.hits.map((h) => h.id).join(', ')}`);
@@ -107,7 +123,7 @@ if (APPLY) {
   if (problem !== null) {
     console.error(`🔴 ★本番には通しません: ${problem}`);
     console.error('   ★通る形: --env production --apply --yes-production --recheck-names --expect-unchecked <いま未検査の頭数>');
-    console.error('   ★数え方（★自分で数えてください）: select count(*) from horses where name_checked_with is null;');
+    console.error(`   ★数え方（★自分で数えてください）: select count(*) from horses where ${notCurrent(1).replace('$1', `'${ng.version}'`)};`);
     await c.end();
     process.exit(VERDICT.UNDECIDABLE);
   }
@@ -123,23 +139,23 @@ await c.query('begin');
 try {
   if (part.clean.length > 0) {
     const r = await c.query(
-      'update horses set name_checked_with = $2 where id = any($1::uuid[]) and name_checked_with is null',
-      [part.clean.map((x) => x.id), ng.version],
+      `update horses set name_checked_with = $2 where id = any($1::uuid[]) and ${notCurrent(3)}`,
+      [part.clean.map((x) => x.id), ng.version, ng.version],
     );
     written = r.rowCount ?? 0;
   }
   // ★当たった行には ★当たりの印（★未検査の null のままにしない・★名前は変えない）
   if (part.hits.length > 0) {
     const r = await c.query(
-      'update horses set name_checked_with = $2 where id = any($1::uuid[]) and name_checked_with is null',
-      [part.hits.map((x) => x.id), hitMarkOf(ng.version)],
+      `update horses set name_checked_with = $2 where id = any($1::uuid[]) and ${notCurrent(3)}`,
+      [part.hits.map((x) => x.id), hitMarkOf(ng.version), ng.version],
     );
     marked = r.rowCount ?? 0;
   }
   const readIds = before.filter((r) => r.name_key !== null).map((r) => r.id);
   // ★読んだ行だけを数える（★この間にワーカーが足した新しい行を混ぜない）
   const remaining = Number((await q(
-    'select count(*)::int n from horses where id = any($1::uuid[]) and name_checked_with is null', [readIds],
+    `select count(*)::int n from horses where id = any($1::uuid[]) and ${notCurrent(2)}`, [readIds, ng.version],
   ))[0].n);
   const countWith = async (ids, mark) => (ids.length === 0 ? 0 : Number((await q(
     'select count(*)::int n from horses where id = any($1::uuid[]) and name_checked_with = $2', [ids, mark],

@@ -182,12 +182,12 @@ const allowAll = [];
 const measureOnly = [];
 for (const f of codeFiles) {
   const srcAll = readFileSync(f, 'utf8');
-  const mentions = /blocklist:\s*ALLOW_ALL_NAMES|loadNameBlocklist\([^)]*,\s*false\s*\)/.test(srcAll);
+  const mentions = /blocklist:\s*ALLOW_ALL_NAMES|load(?:NameBlocklist|NameChecks)\([^)]*,\s*false\s*\)/.test(srcAll);
   if (excluded.has(f)) { if (mentions) staleExclusions.delete(f); continue; }
   const src = srcAll;
   const live = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/[^\n]*/gm, ' ');
   const bypass = /blocklist:\s*ALLOW_ALL_NAMES/.test(live)
-    || /loadNameBlocklist\([^)]*,\s*false\s*\)/.test(live);
+    || /load(?:NameBlocklist|NameChecks)\([^)]*,\s*false\s*\)/.test(live);
   if (!bypass) continue;
   // ★旗を立てないと止まる形なら、★素通しではありません
   const gated = /--allow-all-names/.test(live);

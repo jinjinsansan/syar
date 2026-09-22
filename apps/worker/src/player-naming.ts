@@ -22,7 +22,7 @@ import type pg from 'pg';
 
 import { checkPlayerHorseName, normalizeName } from '@star/sim-engine';
 import type { NameBlocklist, PlayerNameRejection } from '@star/sim-engine';
-import { loadNameBlocklist } from '../../cli/src/name-blocklist.js';
+import { loadNameChecks } from '../../cli/src/name-blocklist.js';
 
 /** ★馬名の一意（★移行 `0066`）の制約名 */
 export const NAME_KEY_UNIQUE_CONSTRAINT = 'horses_name_key_unique';
@@ -60,8 +60,9 @@ export interface FoalNamingContext {
 }
 
 export function foalNamingContext(): FoalNamingContext {
-  const ng = loadNameBlocklist(undefined, false);
-  return { blocked: ng.blocklist, version: ng.version };
+  // ★実在馬名・不快な語（★完全一致・含む）の全部の一覧で見る（★提案 PROPOSAL_PLAYER_NAME_MODERATION_20260922.md §4）
+  const ng = loadNameChecks(undefined, false);
+  return { blocked: ng.blocked, version: ng.version };
 }
 
 /**

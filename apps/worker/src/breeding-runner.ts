@@ -26,7 +26,7 @@ import {
   DEFAULT_BALANCE, DEFAULT_NAME_SHAPE, NPC_STABLES, Rng, applyMatingCounters, breed,
   generateHorseName, normalizeName,
 } from '@star/sim-engine';
-import { loadNameBlocklist } from '../../cli/src/name-blocklist.js';
+import { loadNameChecks } from '../../cli/src/name-blocklist.js';
 import { buildSireAncestorIndex, pickSire, rankSires } from '@star/breeding';
 import {
   LIFECYCLE_WEEKS, WEEKS_PER_YEAR, WEEK_MS, gameYearOf, requiredBroodmares, weekIndexAt,
@@ -346,10 +346,11 @@ export async function loadFoalNaming(client: pg.ClientBase): Promise<FoalNaming>
       + " where table_schema = 'public' and table_name = 'horses' and column_name = 'name_key'",
   );
   const names = await client.query<{ name: string }>('select name from horses');
-  const ng = loadNameBlocklist(undefined, false);
+  // ★NPC の仔の名前も ★利用者の命名と同じ一覧の組で見る（★音節の並びが不快な語を作ることがある）
+  const ng = loadNameChecks(undefined, false);
   return {
     taken: new Set(names.rows.map((r) => normalizeName(r.name))),
-    blocked: ng.blocklist,
+    blocked: ng.blocked,
     version: ng.version,
     writeKey: Number(col.rows[0]?.n ?? 0) > 0,
   };
