@@ -30,6 +30,9 @@
  *   ⑧ ★`rollback` の後、★行数が ★元に戻っている
  *   ⑨ ★命名（★PLAN I-3・0065）: ★受付の再送・★他人の仔を拒む・★確定で本人の持ち馬として horses に入る
  *      ・★本人の my_horses に現れる・★命名済みの仔に 2 つ目の名前を付けられない
+ *   ⑩ ★導入の段階（★0067・裁定 8a32840）: ★本物の `create_account` が `first_horse_v1` を書く（★直に入れた行は既定値で legacy＝対照）
+ *      ・★段階が 父母を選ぶ（候補あり）→ 誕生待ち → 命名 → 準備完了 と進む・★legacy は初回の配合に戻さない
+ *      ・★段階の読む口が非公開の能力値を返さない
  *
  * ★使い方: npx tsx tools/verify-player-breeding-live.mjs --env staging
  * ============================================================================
@@ -134,12 +137,60 @@ try {
     JSON.stringify({ f: priv.f, fa: priv.fa }));
 
   // ── 試験用の利用者（★取引の中だけ） ──
+  //   ★U1 は ★本物の `create_account` で作る（★`onboarding_flow = 'first_horse_v1'` を書くことを固定・裁定 8a32840 §6 ②）。
+  //   ★U2 は ★直に挿入する（★既定値で `'legacy'` になる＝対照）。★列（0067）が無い DB では両方とも直に挿入
+  const hasFlow = Number((await q(
+    "select count(*)::int n from information_schema.columns where table_schema='public' and table_name='users' and column_name='onboarding_flow'",
+  ))[0].n) > 0;
   for (const u of [U1, U2]) {
     await c.query('insert into auth.users (id, email, email_confirmed_at) values ($1, $2, now())',
       [u, `verify-player-breeding+${u.slice(-4)}@example.invalid`]);
+  }
+  if (hasFlow) {
+    await asUser(U1, async () => q(
+      "select create_account('検証', '検証牧場', null, null, null, $1)", ['0f000000-0000-4000-8000-00000000d001'],
+    ));
+  } else {
+    await c.query("insert into users (id, display_name, stable_name, entry_points) values ($1, '検証', '検証牧場', 2000)", [U1]);
+  }
+  await c.query("insert into users (id, display_name, stable_name, entry_points) values ($1, '検証', '検証牧場', 2000)", [U2]);
+  if (hasFlow) {
+    const flows = await q('select id::text, onboarding_flow from users where id = any($1::uuid[])', [[U1, U2]]);
+    const flowOf = (u) => flows.find((r) => r.id === u)?.onboarding_flow;
+    check(flowOf(U1) === 'first_horse_v1' && flowOf(U2) === 'legacy',
+      '⑩ ★create_account は first_horse_v1 を書く・★直に入れた行は既定値で legacy（★対照）',
+      JSON.stringify({ U1: flowOf(U1), U2: flowOf(U2) }));
+  }
+  /** ★導入の段階（★0067 の読む口）。★列が無い DB では null */
+  const stageOf = async (u) => (hasFlow
+    ? (await asUser(u, async () => (await q('select * from my_onboarding_state($1, $2)',
+      [DEFAULT_BALANCE.MIN_BREEDING_AGE_YEARS * WEEKS_PER_YEAR, DEFAULT_BALANCE.MARE_LIFETIME_FOALS]))[0]))
+    : null);
+  const stages = [];
+  const noteStage = async (label) => { const s = await stageOf(U1); if (s !== null) stages.push(`${label}:${s.stage}`); return s; };
+  /**
+   * ★候補の有無は ★いまの週（★`world_state.game_week`・ワーカーが書く）に依る（★0068）。
+   *   ★行が無ければ ★null（★分からない・★false＝候補切れ にしない）。★行が在れば ★true（★staging に候補 1,897 頭）。
+   *   ★staging のワーカーは動いていないので、★行が無ければ ★取引の中で入れて両方を見る（★最後に戻す）
+   */
+  const wsRow = (await q('select game_week from world_state where id = true'))[0];
+  let s0 = null;
+  if (hasFlow && wsRow === undefined) {
+    const sNo = await stageOf(U1);
+    check(sNo.stage === 'choose_parents' && sNo.has_dam_candidate === null,
+      '⑩ ★いまの週が分からない（world_state の行が無い）ときは ★候補の有無を null（★候補切れと言わない）',
+      JSON.stringify({ stage: sNo.stage, has: sNo.has_dam_candidate }));
     await c.query(
-      "insert into users (id, display_name, stable_name, entry_points) values ($1, '検証', '検証牧場', 2000)", [u],
+      'insert into world_state (id, game_week, week_started_at, day_started_at, updated_at)'
+        + ' values (true, $1, now(), now(), now())', [week],
     );
+  }
+  s0 = await noteStage('作成直後');
+  if (s0 !== null) {
+    check(s0.stage === 'choose_parents' && s0.has_dam_candidate === true,
+      '⑩ ★口座を作った直後は「父母を選ぶ」・★母の候補が在る', JSON.stringify({ stage: s0.stage, has: s0.has_dam_candidate }));
+    const l = await stageOf(U2);
+    check(l.stage === 'legacy', '⑩ ★対照: legacy の口座は初回の配合に戻さない', l.stage);
   }
 
   // ── 親を選ぶ（★NPC の繁殖馬・★ロックの後の判定と同じ canMate で絞る） ──
@@ -180,6 +231,8 @@ try {
   const call = (u, r) => asUser(u, async () =>
     (await q('select * from request_initial_breeding($1, $2, $3)', [r, sire.id, dam.id]))[0]);
   const a1 = await call(U1, R1);
+  const s1 = await noteStage('要求の後');
+  if (s1 !== null) check(s1.stage === 'waiting_birth', '⑩ ★要求を出した後は「誕生待ち」', s1.stage);
   /** ★最初の受付の直後の seed_key（★再送・別タブの後と比べる） */
   const skFirst = (await q('select seed_key::text sk from foal_requests where id = $1', [R1]))[0]?.sk;
   const a2 = await call(U1, R1);
@@ -201,6 +254,13 @@ try {
   const ctx = await playerBreedingContext(c, nowMs, EPOCH, () => {});
   const t0 = process.hrtime.bigint();
   const o1 = await confirmInitialBreeding(c, R1, ctx);
+  const s2 = await noteStage('確定の後');
+  if (s2 !== null) {
+    check(s2.stage === 'naming' && s2.draft_id !== null && s2.foal_sex !== null && s2.sire_name !== null,
+      '⑩ ★確定の後は「命名」・★仔の性別と父母の名前を返す', JSON.stringify({ stage: s2.stage, sex: s2.foal_sex }));
+    const leaked = Object.keys(s2).filter((k) => /genotype|potential|stats|record/i.test(k));
+    check(leaked.length === 0, '⑩ ★段階の読む口が非公開の能力値を返さない', Object.keys(s2).join(','));
+  }
   const elapsedMs = Number(process.hrtime.bigint() - t0) / 1e6;
   const req = (await q('select status, result_id::text rid, waived_stud_fee_ep w, failure_reason from foal_requests where id = $1', [R1]))[0];
   const draft = (await q('select id::text, user_id::text, sire_id::text, dam_id::text, sex, birth_week, record from foal_drafts where request_id = $1', [R1]))[0];
@@ -252,6 +312,9 @@ try {
   try { await callName(U2, '0f000000-0000-4000-8000-00000000c002', draft.id, 'ベツノヒト'); } catch (e) { otherRejected = /付けられません/.test(e.message); }
   check(otherRejected, '⑨ ★他人の仔には名前を付けられない');
   const nameOutcome = await confirmFoalName(c, RN1, foalNamingContext());
+  const s3 = await noteStage('命名の後');
+  if (s3 !== null) check(s3.stage === 'ready', '⑩ ★命名の後は「準備完了」', s3.stage);
+  if (stages.length > 0) console.log(`  ★段階の並び: ${stages.join(' → ')}`);
   const named = (await q(
     'select id::text, owner_id::text, npc_stable_id, name, name_key, name_checked_with, birth_week from horses where id = $1',
     [draft.id],

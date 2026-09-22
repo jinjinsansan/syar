@@ -74,6 +74,8 @@ export type PlayerBreedingFailure =
   | 'sire_not_candidate'
   | 'dam_not_candidate'
   | 'owner_limit'
+  /** ★母の候補（★引退した産める NPC 牝馬）が 1 頭もいない（★次の年に戻る・裁定 8a32840 §5・★internal_error とは別の見せ方） */
+  | 'no_candidate'
   /** ★`PLAYER_BREEDING_MAX_ATTEMPTS` 回 続けて例外で戻した（★利用者は仔を見ていない） */
   | 'internal_error';
 
@@ -148,6 +150,22 @@ export function foalDraftRecord(
   };
 }
 
+/**
+ * ★**いま選べる母の候補が 1 頭でも在るか**（★裁定 `REVIEW_ONBOARDING_STATE_VERDICT_20260922.md` §5）。
+ *   ★`isInitialParent` と同じ条件に ★産める条件（★6 歳以上・生涯 8 産未満・今年未産）を足した行の有無。
+ *   ★閾値は ★`BalanceConfig`（★TS）から渡す（★SQL に定数を写さない・D-052）。★週は ★確定の週（`ctx.week`）。
+ *   ⚠️ ★画面の読む口（`my_onboarding_state`・移行 `0067`）も ★同じ条件で数える（★閾値は画面が同じ TS の値を渡す）。
+ */
+async function damCandidateExists(client: pg.ClientBase, ctx: PlayerBreedingContext): Promise<boolean> {
+  const r = await client.query<{ has: boolean }>(
+    "select exists (select 1 from horses h where h.sex = 'female' and h.owner_id is null"
+      + " and h.retirement_role = 'honored' and not h.bred_this_year and h.foal_count < $1"
+      + ' and h.birth_week is not null and $2::bigint - h.birth_week >= $3) as has',
+    [ctx.balance.MARE_LIFETIME_FOALS, ctx.week, ctx.balance.MIN_BREEDING_AGE_YEARS * WEEKS_PER_YEAR],
+  );
+  return r.rows[0]?.has === true;
+}
+
 async function tableExists(client: pg.ClientBase, name: string): Promise<boolean> {
   const r = await client.query<{ t: string | null }>('select to_regclass($1)::text t', [`public.${name}`]);
   return r.rows[0]?.t !== null && r.rows[0]?.t !== undefined;
@@ -217,7 +235,9 @@ export async function confirmInitialBreeding(
     const damRow = (await client.query(parentSql, [req.dam_id])).rows[0] as Record<string, unknown> | undefined;
     const sireRow = (await client.query(parentSql, [req.sire_id])).rows[0] as Record<string, unknown> | undefined;
     if (damRow === undefined || sireRow === undefined) return fail('parent_missing');
-    if (!isInitialParent(damRow, 'honored')) return fail('dam_not_candidate');
+    if (!isInitialParent(damRow, 'honored')) {
+      return fail(await damCandidateExists(client, ctx) ? 'dam_not_candidate' : 'no_candidate');
+    }
     if (!isInitialParent(sireRow, 'stallion')) return fail('sire_not_candidate');
 
     const dam = breedingRecordOf(damRow);

@@ -85,6 +85,11 @@ const READONLY_FUNCTIONS = [
    *   ★書き込む側（`request_initial_breeding` / `request_foal_name`）は自分で `assert_setup_complete()` を呼びます。
    */
   'my_foal_request',
+  /**
+   * ★本人の導入の段階（`0067`・裁定 8a32840）。`language plpgsql stable` で**状態を変えない**。
+   *   ★段階は在る行から導く（★書き写さない）。★事実だけ返し、★時間の計算はしない。
+   */
+  'my_onboarding_state',
 ];
 
 /**

@@ -47,6 +47,8 @@ interface FakeOptions {
   readonly owned?: number;
   /** ★`breed()` の後（★下書きの insert）で落とす */
   readonly failDraftInsert?: boolean;
+  /** ★いま選べる母の候補が在るか（★既定 在る） */
+  readonly damCandidates?: boolean;
   /** ★下書きの insert で ★この例外を投げる（★一意違反の形を作る） */
   readonly draftInsertError?: unknown;
 }
@@ -111,6 +113,9 @@ function fakeClient(o: FakeOptions) {
           };
         }
         return { rows: [horseRow(SIRE, 'male', { owner_id: null, retirement_role: 'stallion' })], rowCount: 1 };
+      }
+      if (sql.startsWith('select exists (select 1 from horses h where h.sex')) {
+        return { rows: [{ has: o.damCandidates !== false }], rowCount: 1 };
       }
       if (sql.startsWith('select (exists')) {
         return { rows: [{ has: o.damHasFoalInYear === true }], rowCount: 1 };
@@ -236,6 +241,8 @@ describe('★PLAN I-2: プレイヤーの配合の確定', () => {
     const cases: [string, FakeOptions, string][] = [
       ['母が引退していない（★現役）', { damRole: null }, 'dam_not_candidate'],
       ['🔴 母が NPC の繁殖牝馬（★案 A は使わない・N-1 §1）', { damRole: 'broodmare' }, 'dam_not_candidate'],
+      ['🔴 母が候補でなく、★いま選べる母が 1 頭もいない（★候補切れ・裁定 8a32840 §5）',
+        { damRole: 'broodmare', damCandidates: false }, 'no_candidate'],
       ['母に持ち主が居る（★N-1 の暫定: NPC の馬だけ）', { damOwner: USER }, 'dam_not_candidate'],
       ['母が今年もう産んだ（★印）', { damBredThisYear: true }, 'dam_already_bred_this_year'],
       ['🔴 母の印は戻っているが、★その年の仔が 2 つの表のどちらかに在る', { damHasFoalInYear: true }, 'dam_already_bred_this_year'],
