@@ -154,7 +154,7 @@ const SAFE_REASONS: Readonly<Record<string, string>> = {
   // ★乱数の流れの登録簿（憲法 4）
   GENETICS_STREAM: '★流れの id', RACE_STREAM: '★同上', VERIFY_RACE_STREAM: '★同上',
   VERIFY_PAYOUT_STREAM: '★同上', PRESEED_STREAM: '★同上', DIAGNOSTIC_STREAM: '★同上',
-  VERIFY_BAND_STREAM: '★同上', ALL_STREAM_TABLES: '★登録簿', duplicateStreamIds: '★重複の検出',
+  VERIFY_BAND_STREAM: '★同上', LINEAGE_SIM_STREAM: '★同上（★Q-2 の模擬）', ALL_STREAM_TABLES: '★登録簿', duplicateStreamIds: '★重複の検出',
   // ★決定論（憲法 §1-4）の部品。★id を符号位置順で比べるだけ
   compareIds: '★文字列を 2 つ 比べて -1/0/1 を返すだけ。★素質も段も触りません'
     + '（★`localeCompare` の代わり。★da-DK / nb-NO が `aa` を `å` として並べ替えるのを防ぐ）',

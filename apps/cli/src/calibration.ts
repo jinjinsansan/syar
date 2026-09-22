@@ -417,6 +417,12 @@ export const EXEMPT_PATTERNS: readonly { pattern: string; why: string }[] = [
     why: '★V-15 の測定ハーネス。SEED / HORSES は標本の取り方。V15_MEASUREMENT は**測定条件**（中盤=169週・方針=balanced・下限50%）で、正典 §13.2 の写しとして固定する — 較正定数ではなく、通すために動かせる値でもない。較正の対象は TEMPER_FLOOR_RATIO のほうで、そちらは CALIBRATION に登録済み',
   },
   {
+    pattern: 'apps/cli/src/lineage-sim\.ts',
+    why: '★Q-2 の模擬（★代を重ねて血統を伸ばせるか・判定を出さない・DB を使わない）。'
+      + '★POLICIES / YEARS / JSON_OUT は ★測り方（★比べる方針・見る年数・出力先）で、★通すために動かせる値ではない。'
+      + '★1 年の実日数と所有上限は ★写さずに `@star/scheduler` から導く（★名前は拾われるが値を持たない）',
+  },
+  {
     pattern: 'apps/cli/src/diag-topgap\.ts',
     why: '★V-4 が動いた理由を測り直す診断（Q-P3-36）。判定を出さない。SEED / RACES は標本の取り方で、通すために動かせる値ではない',
   },
@@ -709,6 +715,10 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   {
     key: 'DIAGNOSTIC_STREAM',
     why: '乱数ストリームの用途ID（切り分け用の診断ツール専用・本番経路では使わない）。同上',
+  },
+  {
+    key: 'LINEAGE_SIM_STREAM',
+    why: '乱数ストリームの用途ID（★Q-2 の模擬 `apps/cli/src/lineage-sim.ts`・★本番経路では使わない）。同上。★81 番台を取っている',
   },
   {
     key: 'VERIFY_BAND_STREAM',

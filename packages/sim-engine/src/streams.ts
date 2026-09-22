@@ -92,6 +92,17 @@ export const VERIFY_BAND_STREAM = {
 } as const;
 
 /**
+ * ★**Q-2 の模擬**（★`apps/cli/src/lineage-sim.ts`・PLAN Q-2・2026-09-22）。★81 番台。
+ *   ★プレイヤーが代を重ねて血統を伸ばせるかを測る模擬。★本番経路では使わない。
+ */
+export const LINEAGE_SIM_STREAM = {
+  /** ★プレイヤーの配合（★初回の母の選び方・種・無作為の方針） */
+  PLAYER: 81,
+  /** ★方針 N の「見える手がかり」の雑音（★馬ごと） */
+  NOISE: 82,
+} as const;
+
+/**
  * 全 ID の一覧。★重複はここで検出する。
  *
  * ⚠️ ID を足したらこの配列にも入れること。入れ忘れると重複検査を素通りするので、
@@ -106,6 +117,7 @@ export const ALL_STREAM_TABLES = {
   PRESEED_STREAM,
   DIAGNOSTIC_STREAM,
   VERIFY_BAND_STREAM,
+  LINEAGE_SIM_STREAM,
 } as const;
 
 /** 重複している ID があれば返す（無ければ空） */
