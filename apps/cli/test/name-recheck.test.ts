@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error ★`.mjs` の部品（★`.d.mts` を置いていません）
-import { partitionByBlocklist } from '../../../tools/lib/name-recheck.mjs';
+import { hitMarkOf, isHitMark, partitionByBlocklist } from '../../../tools/lib/name-recheck.mjs';
 
 const part = partitionByBlocklist as (
   rows: readonly { id: string; name_key: string | null }[], blocked: (k: string) => boolean,
@@ -27,5 +27,27 @@ describe('★未検査の馬名を禁止名の判定で分ける', () => {
   it('★name_key が空の行は ★どちらにも入れない（★判定できないものを検査済みにしない）', () => {
     const r = part([{ id: 'a', name_key: null }], () => false);
     expect(r).toEqual({ hits: [], clean: [] });
+  });
+});
+
+
+describe('★当たった行に書く印（★未検査・合格と区別する）', () => {
+  const mark = hitMarkOf as (v: string) => string;
+  const isHit = isHitMark as (m: string | null) => boolean;
+
+  it('★印は ★未検査（null）とも ★合格（版そのもの）とも違う・★版を含む', () => {
+    const v = 'abc123';
+    expect(mark(v)).not.toBe(v);
+    expect(mark(v)).toContain(v);
+    expect(isHit(mark(v))).toBe(true);
+  });
+
+  it('★対照: ★合格の印（版）と未検査（null）は ★当たりと読まない', () => {
+    expect(isHit('abc123')).toBe(false);
+    expect(isHit(null)).toBe(false);
+  });
+
+  it('★版が無ければ ★印を作らない（★空の印で「検査済み」にしない）', () => {
+    expect(() => mark('')).toThrow();
   });
 });

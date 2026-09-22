@@ -19,3 +19,24 @@ export function partitionByBlocklist(rows, blocked) {
   }
   return { hits, clean };
 }
+
+/**
+ * ★**当たった行に書く印**（★レビュー側の推奨・裁定 `REVIEW_UNNAMED_FOAL_PLACEMENT_VERDICT_20260922.md` §6）。
+ *   ★未検査（null）とも、★当たらなかった行（★リストの版そのもの）とも ★区別できる値にします。
+ *   ★「どの版で当たったか」も残るので、★リストが改まったときに ★当たりだけを選んで検査し直せます。
+ * @param {string} version ★リストの版（★`loadNameBlocklist` の `version`）
+ * @returns {string}
+ */
+export function hitMarkOf(version) {
+  if (typeof version !== 'string' || version.length === 0) throw new Error('★リストの版がありません（★印を作れません）');
+  return `hit:${version}`;
+}
+
+/**
+ * ★その印が「当たり」か。
+ * @param {string | null} mark ★`name_checked_with` の値
+ * @returns {boolean}
+ */
+export function isHitMark(mark) {
+  return typeof mark === 'string' && mark.startsWith('hit:');
+}

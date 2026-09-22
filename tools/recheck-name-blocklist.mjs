@@ -11,12 +11,13 @@
  * 【★何をするか】
  *   ① ★未検査の行（`name_checked_with is null`）を読み、★`name_key` を ★リストで判定する
  *   ② ★当たらなかった行 → ★`name_checked_with = <リストの版>` を書く
- *   ③ ★当たった行 → ★**何も書かない**（★未検査のまま残す）。★**件数と馬の ID だけ**出す
+ *   ③ ★当たった行 → ★`name_checked_with = 'hit:<リストの版>'`（★未検査の null とも合格の版とも違う印・レビュー側の推奨 2026-09-22）。
+ *      ★**件数と馬の ID だけ**出す
  *      ⚠️ ★当たった場合の扱い（★改名を求めるか等）は ★**そのとき決める**（★裁定・★この道具は決めない）
  *   🔴 ★**当たった名前そのものは出力しない** — ★実在の競走馬名の可能性が高い（★憲法 §0.1・★出力にも書かない）
  *
  * 【★書いた後に確かめること】（★取引の中で数え直し、★合わなければ戻す）
- *   ★未検査の残り ＝ ★当たった件数 ／ ★書いた行の版 ＝ ★いまのリストの版
+ *   ★読んだ行のうち未検査の残り ＝ 0 ／ ★合格の行の版 ＝ いまのリストの版 ／ ★当たりの印の行数 ＝ 当たった件数
  *
  * 【★使い方】
  *   npx tsx tools/recheck-name-blocklist.mjs --env staging                              # ★下見
@@ -33,7 +34,7 @@ import { loadEnv } from './lib/env.mjs';
 import { assertNotProduction } from './lib/guard.mjs';
 import { productionNameRecheckOptInProblem } from './lib/args.mjs';
 import { exitWithVerdict, verdictOf, VERDICT } from './lib/counted-verdict.mjs';
-import { partitionByBlocklist } from './lib/name-recheck.mjs';
+import { hitMarkOf, partitionByBlocklist } from './lib/name-recheck.mjs';
 import { NG_HASH_PATH, loadNameBlocklist } from '../apps/cli/src/name-blocklist.ts';
 
 const APPLY = process.argv.includes('--apply');
@@ -117,6 +118,7 @@ if (APPLY) {
 }
 
 let written = 0;
+let marked = 0;
 await c.query('begin');
 try {
   if (part.clean.length > 0) {
@@ -126,15 +128,29 @@ try {
     );
     written = r.rowCount ?? 0;
   }
-  const remaining = await readUnchecked();
-  const versionOk = part.clean.length === 0 ? true : Number((await q(
-    'select count(*)::int n from horses where id = any($1::uuid[]) and name_checked_with = $2',
-    [part.clean.map((x) => x.id), ng.version],
-  ))[0].n) === part.clean.length;
+  // ★当たった行には ★当たりの印（★未検査の null のままにしない・★名前は変えない）
+  if (part.hits.length > 0) {
+    const r = await c.query(
+      'update horses set name_checked_with = $2 where id = any($1::uuid[]) and name_checked_with is null',
+      [part.hits.map((x) => x.id), hitMarkOf(ng.version)],
+    );
+    marked = r.rowCount ?? 0;
+  }
+  const readIds = before.filter((r) => r.name_key !== null).map((r) => r.id);
+  // ★読んだ行だけを数える（★この間にワーカーが足した新しい行を混ぜない）
+  const remaining = Number((await q(
+    'select count(*)::int n from horses where id = any($1::uuid[]) and name_checked_with is null', [readIds],
+  ))[0].n);
+  const countWith = async (ids, mark) => (ids.length === 0 ? 0 : Number((await q(
+    'select count(*)::int n from horses where id = any($1::uuid[]) and name_checked_with = $2', [ids, mark],
+  ))[0].n));
+  const versionOk = await countWith(part.clean.map((x) => x.id), ng.version) === part.clean.length;
+  const hitOk = await countWith(part.hits.map((x) => x.id), hitMarkOf(ng.version)) === part.hits.length;
   check(written === part.clean.length, '② ★書いた行数 ＝ 当たらなかった行数', `${written} / ${part.clean.length}`);
-  check(remaining.length === part.hits.length, '③ ★未検査の残り ＝ 当たった行数（★当たった行は書かない）',
-    `${remaining.length} / ${part.hits.length}`);
-  check(versionOk, '④ ★書いた行の版 ＝ いまのリストの版');
+  check(remaining === 0, '③ ★読んだ行のうち未検査の残り ＝ 0（★当たった行にも印を書く）', `${remaining} 頭`);
+  check(versionOk, '④ ★合格の行の版 ＝ いまのリストの版');
+  check(marked === part.hits.length && hitOk, '⑤ ★当たりの印の行数 ＝ 当たった行数（★未検査とも合格とも違う印）',
+    `${marked} / ${part.hits.length}`);
   if (fails.length > 0 || REHEARSE) {
     await c.query('rollback');
     console.log(REHEARSE ? '  ・ ★--rehearse なので戻しました' : '  🔴 ★判定に落ちたので戻しました');
@@ -148,7 +164,7 @@ try {
 
 if (REHEARSE) {
   const after = await readUnchecked();
-  check(after.length === before.length, '⑤ ★--rehearse の後、★未検査の頭数が元に戻った', `${after.length} / ${before.length}`);
+  check(after.length === before.length, '⑥ ★--rehearse の後、★未検査の頭数が元に戻った', `${after.length} / ${before.length}`);
 }
 await c.end();
 exitWithVerdict(verdictOf({ checked, failed: fails.length, label: '馬名の再検査' }));
