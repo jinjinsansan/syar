@@ -171,3 +171,39 @@ export function productionRepairOptInProblem({
   }
   return null;
 }
+
+/**
+ * 🔴 ★**本番の `horses.name_key` を埋めてよいか**（★2026-09-22・PLAN I-3 段 2・裁定 `REVIEW_I3_NAMING_VERDICT_20260922.md` §3）。
+ *
+ *   ★上の 2 つと同じ形（★旗 2 つ ＋ 写せない数 1 つ）。★要求する数は ★**いま `name_key` が空の頭数**
+ *   （★頭数でも壊れている頭数でもない — ★他の道具の手順書から写せないように）。
+ *   ★歩調は ★`apps/cli/test/migrate-guard.test.ts` が 3 つの関門に同じ 5 段を課して合わせます。
+ */
+export function productionNameKeyOptInProblem({
+  environment, yesProduction = false, backfillFlag = false,
+  expectNull = null, actualNull = null,
+}) {
+  if (environment !== 'production') return null;   // ★本番以外は、この関門を作らない
+  if (!yesProduction) {
+    return '本番の馬名の正規化キーを書くには --yes-production が要ります'
+      + '（★--env を書いただけでは、staging のつもりで production と打った場合を止められません）';
+  }
+  if (!backfillFlag) {
+    return '本番では --backfill-name-key も要ります'
+      + '（★migrate や seed-world と同じ指で打てないように、★この道具だけの旗を 1 つ 立てさせます）';
+  }
+  if (!Number.isInteger(expectNull)) {
+    return '本番では --expect-null <いま name_key が空の頭数> が要ります'
+      + '（★数は手順書から写せません。★その場で数えた人だけが通れます）';
+  }
+  if (!Number.isInteger(actualNull)) {
+    return 'いま name_key が空の頭数を数えられませんでした（★数えられないなら通しません）';
+  }
+  if (expectNull !== actualNull) {
+    // 🔴 ★**実数をここに書かないこと**
+    return `--expect-null ${expectNull} と、いまの実数が違います`
+      + '（★世界が想定と違います。★**間違いではなく「見てから来い」**です。'
+      + '★実数はここには出しません）';
+  }
+  return null;
+}

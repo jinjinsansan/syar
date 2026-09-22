@@ -15,7 +15,7 @@
  */
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error ★`.mjs` の部品（★`.d.mts` を置いていません）
-import { needsYesProduction, productionOptInProblem, productionRepairOptInProblem } from '../../../tools/lib/args.mjs';
+import { needsYesProduction, productionNameKeyOptInProblem, productionOptInProblem, productionRepairOptInProblem } from '../../../tools/lib/args.mjs';
 
 const needs = needsYesProduction as (
   env: string,
@@ -126,7 +126,7 @@ describe('🔴 ★seed-world: 本番の世界を作り直す関門', () => {
  *   ★同じ数（例: 頭数）を要求したら、★★**seed-world の手順書からそのまま写せます。**
  *   → ★旗の名前と、★数の旗の名前が ★**重なっていないこと**を、★下で検査します。
  */
-describe('🔴 ★本番の関門（★2 つ）が、★同じ 5 段を課している', () => {
+describe('🔴 ★本番の関門（★3 つ）が、★同じ 5 段を課している', () => {
   interface Gate {
     name: string;
     fn: (o: Record<string, unknown>) => string | null;
@@ -157,6 +157,16 @@ describe('🔴 ★本番の関門（★2 つ）が、★同じ 5 段を課して
       },
       second: ['repairFlag', '--repair-pedigree'],
       number: ['expectBroken', 'actualBroken', '--expect-broken'],
+    },
+    {
+      name: 'backfill-name-key（★馬名の正規化キーの埋め込み・PLAN I-3 段 2）',
+      fn: productionNameKeyOptInProblem as Gate['fn'],
+      ok: {
+        environment: 'production', yesProduction: true, backfillFlag: true,
+        expectNull: 4321, actualNull: 4321,
+      },
+      second: ['backfillFlag', '--backfill-name-key'],
+      number: ['expectNull', 'actualNull', '--expect-null'],
     },
   ];
 

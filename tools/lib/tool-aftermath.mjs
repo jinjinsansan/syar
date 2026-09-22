@@ -49,6 +49,15 @@ export const TOOL_AFTERMATH = {
    *   （★2026-09-21 は grep で 0 行。★2026-09-22 から追いつきが週ごとに取引を張るので、
    *    ★`breeding-runner.test.ts` の「runBreedingWeek は取引に触らない」が釘付け）。
    */
+  'backfill-name-key.mjs': {
+    mode: 'consumes',
+    why: '★消費するもの: ★**`horses.name_key` の空（null）と食い違い**（★全頭・★`normalizeName(name)` で上書き）。'
+      + '★既定は ★**下見だけ**で、★`--apply` を付けたときだけ書きます。'
+      + '✅ ★**書く前に ①重なり ②空の名前 を数え、★当たれば書きません**。'
+      + '✅ ★**書いた後に取引の中で数え直し、★合わなければ戻します**。★確定の後にもう一度 DB から読みます（④⑤）。',
+    notRestored: '★**埋める前の `name_key`**（★戻しません）。★埋める前は ★空（null）か ★`normalizeName(name)` と食い違う値で、'
+      + '★保つ価値がありません。★値は ★`name` から ★いつでも作り直せます',
+  },
   'verify-player-breeding-live.mjs': {
     mode: 'restores',
     why: '★`begin` → 利用者・要求・`confirmInitialBreeding`・`runBreedingWeek` → ★**必ず `rollback`**（`finally`）。'
