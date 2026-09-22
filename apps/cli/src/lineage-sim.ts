@@ -13,6 +13,7 @@
  *   N  … ★見える手がかり（★素質の合計 ＋ 雑音）で選ぶ。★雑音は NPC 現役の SD の 0.25 / 0.5 / 1.0 倍
  *   O  … ★素質が見えるとして選ぶ（★上限）
  *   O′ … ★O に加えて ★自家の牡馬を種牡馬に残し（上限 5）、★自分の牝馬に付ける（★近交が効く・裁定 §2-2）
+ *   Oa … ★O ＋ ★仔の近交係数が 0.25 を超える相手は選ばない（★伸びのうち近交の上乗せの分を切り分ける・裁定 §4）
  *
  * 【⚠️ 仮定（★報告に書く）】
  *   A: ★NPC の世界は動かさない（★`runPreseed` の最終年の種牡馬・現役を環境として固定）
@@ -29,7 +30,7 @@
  */
 import {
   ABILITY_KEYS, ALLOW_ALL_NAMES, DEFAULT_BALANCE, LINEAGE_SIM_STREAM, NPC_STABLES,
-  breed, canMate, deriveRng, type HorseRecord, type Rng,
+  breed, calcInbreedCoefficient, canMate, deriveRng, type HorseRecord, type Rng,
 } from '@star/sim-engine';
 import { OWNERSHIP_LIMITS, WEEKS_PER_DAY, WEEKS_PER_YEAR } from '@star/scheduler';
 import { writeFileSync } from 'node:fs';
@@ -42,8 +43,9 @@ const REAL_DAYS_PER_YEAR = WEEKS_PER_YEAR / WEEKS_PER_DAY;
 const MAX_BROODMARES = OWNERSHIP_LIMITS.broodmare;
 const MAX_STALLIONS = OWNERSHIP_LIMITS.stallion;
 
-type Policy = 'R' | 'N0.25' | 'N0.5' | 'N1.0' | 'O' | "O'";
-const POLICIES: readonly Policy[] = ['R', 'N0.25', 'N0.5', 'N1.0', 'O', "O'"];
+type Policy = 'R' | 'N0.25' | 'N0.5' | 'N1.0' | 'O' | 'Oa' | "O'";
+/** ★乱数の流れの番号はこの並びの位置で決まる（★Oa は後から足したので最後・★既存の方針の番号を変えない） */
+const ALL_POLICIES: readonly Policy[] = ['R', 'N0.25', 'N0.5', 'N1.0', 'O', "O'", 'Oa'];
 
 const potentialSum = (h: HorseRecord): number => ABILITY_KEYS.reduce((a, k) => a + h.potential[k], 0);
 
@@ -85,7 +87,8 @@ function runPlayer(
   },
   years: number,
 ): { byYear: YearRow[]; byGen: GenRow[] } {
-  const policyIndex = POLICIES.indexOf(policy);
+  // ★絞って流しても同じ乱数になるよう、★全方針の並びの位置を使う（★--policies で番号を変えない）
+  const policyIndex = ALL_POLICIES.indexOf(policy);
   const rng: Rng = deriveRng(seed, LINEAGE_SIM_STREAM.PLAYER, policyIndex);
   const noiseRng: Rng = deriveRng(seed, LINEAGE_SIM_STREAM.NOISE, policyIndex);
   const noiseSd = policy.startsWith('N') ? Number(policy.slice(1)) * env.sdActive : 0;
@@ -137,7 +140,20 @@ function runPlayer(
         sire = ownOk.reduce((a, b) => (potentialSum(b) > potentialSum(a) ? b : a));
       } else if (npcOk.length > 0) {
         if (policy === 'R') sire = npcOk[rng.int(0, npcOk.length - 1)];
-        else {
+        else if (policy === 'Oa') {
+          /**
+           * ★**Oa ＝ O ＋ 近交を避ける**（★裁定 `REVIEW_Q2_LINEAGE_SIM_VERDICT_20260922.md` §4・切り分けの 1 本）。
+           *   ★仔の近交係数が ★虚弱の閾値（`INBREED_DEPRESSION_THRESHOLD` ＝ 0.25）を超える相手は選ばない。
+           *   ★O との差 ＝ ★伸びのうち ★近交の上乗せ（最大 30%）の分。★全員超えるなら、★いちばん F の低い相手
+           */
+          const withF = npcOk.map((s) => ({
+            s, f: calcInbreedCoefficient(s, dam.record, lookup, DEFAULT_BALANCE.PEDIGREE_DEPTH).F,
+          }));
+          const safe = withF.filter((x) => x.f <= DEFAULT_BALANCE.genetics.INBREED_DEPRESSION_THRESHOLD);
+          sire = safe.length > 0
+            ? safe.reduce((a, b) => (potentialSum(b.s) > potentialSum(a.s) ? b : a)).s
+            : withF.reduce((a, b) => (b.f < a.f ? b : a)).s;
+        } else {
           const noisy = npcOk.map((s) => ({ s, v: policy.startsWith('N') ? potentialSum(s) + noiseRng.gaussian(0, noiseSd) : potentialSum(s) }));
           sire = noisy.reduce((a, b) => (b.v > a.v ? b : a)).s;
         }
@@ -194,6 +210,9 @@ const arg = (name: string): string | undefined => {
 const SEEDS = (arg('--seeds') ?? '42,7,11,23').split(',').map(Number);
 const YEARS = Number(arg('--years') ?? 100);
 const JSON_OUT = arg('--json');
+/** ★流す方針（★既定は全部。★切り分けの 1 本だけ流すときは --policies O,Oa） */
+const POLICIES: readonly Policy[] = arg('--policies') === undefined
+  ? ALL_POLICIES : (arg('--policies') as string).split(',') as Policy[];
 
 const out: Record<string, unknown> = { seeds: SEEDS, years: YEARS, realDaysPerYear: REAL_DAYS_PER_YEAR, perSeed: [] };
 for (const seed of SEEDS) {
