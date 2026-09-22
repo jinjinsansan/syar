@@ -79,9 +79,9 @@ function fakeClient(o: FakeOptions) {
       if (sql.startsWith('select to_regclass')) {
         return { rows: [{ t: o.noTable === true ? null : String(params[0]) }], rowCount: 1 };
       }
-      if (sql.startsWith("select id from foal_requests where status = 'pending'")) {
+      if (sql.startsWith("select id, kind from foal_requests where status = 'pending'")) {
         const n = o.pendingCount ?? 1;
-        return { rows: Array.from({ length: n }, () => ({ id: REQ })), rowCount: n };
+        return { rows: Array.from({ length: n }, () => ({ id: REQ, kind: 'breed_initial' })), rowCount: n };
       }
       if (sql.startsWith('select count(*)::text n, (extract(epoch')) {
         return { rows: [{ n: '0', age: null }], rowCount: 1 };
@@ -214,7 +214,7 @@ describe('★PLAN I-2: プレイヤーの配合の確定', () => {
   it('★拾う順は ★試行回数の少ない順 → 古い順（★詰まった要求が他を塞がない）', async () => {
     const { client, seen } = fakeClient({});
     await run(client);
-    const pick = seen.find((x) => x.sql.startsWith("select id from foal_requests where status = 'pending'"));
+    const pick = seen.find((x) => x.sql.startsWith("select id, kind from foal_requests where status = 'pending'"));
     expect(pick?.sql).toMatch(/order by attempts, created_at, id/);
   });
 

@@ -30,6 +30,7 @@ import {
   BREEDING_COLS, birthYearOffset, breedingRecordOf, damHasFoalInYearSql, idAndSeedFromKey,
   loadAncestorLookup, loadNicks,
 } from './breeding-runner.js';
+import { confirmFoalName, foalNamingContext } from './player-naming.js';
 
 /**
  * ★**仔の id と種の鍵の接頭辞**（★裁定 §3）。
@@ -306,7 +307,7 @@ export async function confirmInitialBreeding(
 async function backlogOf(client: pg.ClientBase): Promise<{ backlog: number; oldestPendingMs: number | null }> {
   const r = (await client.query<{ n: string; age: string | null }>(
     "select count(*)::text n, (extract(epoch from (now() - min(created_at))) * 1000)::bigint::text age"
-      + " from foal_requests where status = 'pending' and kind = 'breed_initial'",
+      + " from foal_requests where status = 'pending' and kind in ('breed_initial', 'name')",
   )).rows[0];
   return {
     backlog: Number(r?.n ?? 0),
@@ -315,7 +316,9 @@ async function backlogOf(client: pg.ClientBase): Promise<{ backlog: number; olde
 }
 
 /**
- * ★**待っている初回の配合を確定する**（★毎周・`main.ts`）。
+ * ★**待っている初回の配合と、★仔の命名を確定する**（★毎周・`main.ts`）。
+ *   ★`kind = 'breed_initial'` は `confirmInitialBreeding`、★`kind = 'name'` は `confirmFoalName`（`player-naming.ts`・PLAN I-3）。
+ *   ★時間の予算・試行回数・待ちの数えは ★両方で共有します。
  *
  * ⚠️ ★**呼ぶ側は取引を張らないこと**（★要求ごとに自分で `begin` / `commit` します）。
  * ⚠️ ★1 件の例外で残りを止めません（★`onAlert` に出し、★その要求は次の周にやり直す）。
@@ -335,14 +338,16 @@ export async function runPlayerBreeding(
     done: 0, failed: 0, errors: 0, gaveUp: 0, stoppedByBudget: false, backlog: 0, oldestPendingMs: null,
   } as const;
   if (!(await tableExists(client, 'foal_requests'))) return { skipped: true, ...empty };
-  const pending = await client.query<{ id: string }>(
-    "select id from foal_requests where status = 'pending' and kind = 'breed_initial'"
+  const pending = await client.query<{ id: string; kind: string }>(
+    "select id, kind from foal_requests where status = 'pending' and kind in ('breed_initial', 'name')"
       + ' order by attempts, created_at, id limit $1',
     [limit],
   );
   if (pending.rows.length === 0) return { skipped: false, ...empty };
 
   const ctx = await playerBreedingContext(client, nowMs, epochMs, onAlert, balance);
+  /** ★命名に要るもの（★禁止名のリストと版・PLAN I-3） */
+  const namingCtx = foalNamingContext();
 
   let done = 0;
   let failed = 0;
@@ -351,7 +356,7 @@ export async function runPlayerBreeding(
   let stoppedByBudget = false;
   const t0 = budget.monotonicMs();
   let tried = 0;
-  for (const { id } of pending.rows) {
+  for (const { id, kind } of pending.rows) {
     if (tried > 0 && budget.monotonicMs() - t0 >= budget.budgetMs) {
       stoppedByBudget = true;
       break;
@@ -360,7 +365,9 @@ export async function runPlayerBreeding(
     // ★1 件 ＝ 1 取引（★裁定 55b2fd4 §1 条件 2・どこで落ちても何も残らない）
     await client.query('begin');
     try {
-      const o = await confirmInitialBreeding(client, id, ctx);
+      const o = kind === 'name'
+        ? await confirmFoalName(client, id, namingCtx)
+        : await confirmInitialBreeding(client, id, ctx);
       await client.query('commit');
       if (o === 'done') done += 1;
       else if (o === 'failed') failed += 1;

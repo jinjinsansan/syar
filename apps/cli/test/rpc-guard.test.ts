@@ -80,6 +80,11 @@ const READONLY_FUNCTIONS = [
    *   ★性別・父・母・誕生週だけを返す（★genotype / potential / stats を出さない・D-114）。
    */
   'my_foal_drafts',
+  /**
+   * ★本人の要求 1 件の状態（`0065`・PLAN I-3）。`language plpgsql stable` で**状態を変えない**。
+   *   ★書き込む側（`request_initial_breeding` / `request_foal_name`）は自分で `assert_setup_complete()` を呼びます。
+   */
+  'my_foal_request',
 ];
 
 /**

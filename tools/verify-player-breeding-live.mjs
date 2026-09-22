@@ -26,7 +26,10 @@
  *   ⑦ 🔴 ★NPC の週次配合が ★**同じ母で同じ年に産まない**（★案 B の母〔功労馬〕が年の頭に繁殖牝馬へ補充され、
  *      ★印も戻った形を作って確かめる）
  *      ★対照: ★プレイヤーが触っていない母は ★**普通に産む**（★番人が常に止めるのではない）
+ *      ⚠️ ★⑨ で命名した仔が horses に入った後に走らせる（★命名の後も下書きが残り、★NPC の判定が効くことも見る）
  *   ⑧ ★`rollback` の後、★行数が ★元に戻っている
+ *   ⑨ ★命名（★PLAN I-3・0065）: ★受付の再送・★他人の仔を拒む・★確定で本人の持ち馬として horses に入る
+ *      ・★本人の my_horses に現れる・★命名済みの仔に 2 つ目の名前を付けられない
  *
  * ★使い方: npx tsx tools/verify-player-breeding-live.mjs --env staging
  * ============================================================================
@@ -44,9 +47,10 @@ import {
 import {
   PLAYER_FOAL_KEY_PREFIX, confirmInitialBreeding, playerBreedingContext,
 } from '../apps/worker/src/player-breeding.ts';
+import { confirmFoalName, foalNamingContext } from '../apps/worker/src/player-naming.ts';
 import { DEFAULT_PRESEED_OPTIONS } from '../apps/cli/src/preseed.ts';
 import { FIELD_SIZE } from '../apps/cli/src/race-field.ts';
-import { DEFAULT_BALANCE, canMate } from '../packages/sim-engine/src/index.ts';
+import { DEFAULT_BALANCE, canMate, normalizeName } from '../packages/sim-engine/src/index.ts';
 import { WEEK_MS, WEEKS_PER_YEAR, gameYearOf, weekIndexAt } from '../packages/scheduler/src/index.ts';
 
 const env = loadEnv();
@@ -236,6 +240,36 @@ try {
   const others = await asUser(U2, async () => (await c.query('select * from my_foal_drafts()')).rows.length);
   check(others === 0, '⑥ ★他人の下書きは見えない', `${others} 行`);
 
+  // ── ⑨ ★命名（★PLAN I-3・0065） ──
+  const RN1 = '0f000000-0000-4000-8000-00000000c001';
+  const NAME = 'ケンショウテスト';
+  const callName = (u, r, d, n) => asUser(u, async () =>
+    (await q('select * from request_foal_name($1, $2, $3)', [r, d, n]))[0]);
+  const n1 = await callName(U1, RN1, draft.id, NAME);
+  const n2 = await callName(U1, RN1, draft.id, NAME);
+  check(n1.status === 'pending' && n2.request_id === RN1, '⑨ ★命名を受け付けた・★同じ要求 ID の再送は同じ行');
+  let otherRejected = false;
+  try { await callName(U2, '0f000000-0000-4000-8000-00000000c002', draft.id, 'ベツノヒト'); } catch (e) { otherRejected = /付けられません/.test(e.message); }
+  check(otherRejected, '⑨ ★他人の仔には名前を付けられない');
+  const nameOutcome = await confirmFoalName(c, RN1, foalNamingContext());
+  const named = (await q(
+    'select id::text, owner_id::text, npc_stable_id, name, name_key, name_checked_with, birth_week from horses where id = $1',
+    [draft.id],
+  ))[0];
+  check(nameOutcome === 'done' && named !== undefined && named.owner_id === U1 && named.npc_stable_id === null
+    && named.name === NAME && named.name_key === normalizeName(NAME) && Number(named.birth_week) === week,
+    '⑨ ★確定: ★本人の持ち馬として horses に入った（★名前・name_key・誕生週）',
+    named === undefined ? '★無い' : `${named.name} / 版 ${named.name_checked_with ?? 'null（★未検査）'}`);
+  const draftAfter = (await q('select named_horse_id::text n from foal_drafts where id = $1', [draft.id]))[0];
+  const reqName = await asUser(U1, async () => (await q('select * from my_foal_request($1)', [RN1]))[0]);
+  check(draftAfter.n === draft.id && reqName?.status === 'done' && reqName?.result_id === draft.id,
+    '⑨ ★下書きに印・★本人の読む口で「完了」');
+  const mine2 = await asUser(U1, async () => (await q('select id::text from my_horses where id = $1', [draft.id])).length);
+  check(mine2 === 1, '⑨ ★本人の「自分の馬」に現れる（★my_horses）', `${mine2} 行`);
+  let twiceRejected = false;
+  try { await callName(U1, '0f000000-0000-4000-8000-00000000c003', draft.id, 'ニドメノナマエ'); } catch (e) { twiceRejected = /既に名前/.test(e.message); }
+  check(twiceRejected, '⑨ ★命名済みの仔に 2 つ目の名前は付けられない');
+
   // ── ⑦ ★NPC の週次配合と、★同じ母を取り合う ──
   //   ★案 B の母は ★NPC の功労馬。★年の頭に NPC は功労馬から繁殖牝馬を補充し（★素質の高い順）、★その後で全馬の印を戻す。
   //   ★→ ★プレイヤーが使った母が ★繁殖牝馬に上がり、★印も戻る形を作る（★これが 2 つの表で数える理由）
@@ -245,9 +279,10 @@ try {
     c, EPOCH + (damDue + 1) * WEEK_MS, EPOCH, () => {}, undefined, 'top',
     (FIELD_SIZE.MIN + FIELD_SIZE.MAX) / 2, DEFAULT_PRESEED_OPTIONS.mares,
   );
+  // ★⑨ で命名したプレイヤーの仔（★id ＝ 下書きの id）は ★horses に入っているので、★数えない（★NPC の仔だけ）
   const npcFoalOfDam = Number((await q(
-    'select count(*)::int n from horses where dam_id = $1 and birth_week >= $2 and birth_week < $3',
-    [dam.id, yearStart, yearStart + WEEKS_PER_YEAR],
+    'select count(*)::int n from horses where dam_id = $1 and birth_week >= $2 and birth_week < $3 and id <> $4',
+    [dam.id, yearStart, yearStart + WEEKS_PER_YEAR, draft.id],
   ))[0].n);
   check(npc.week === damDue, '⑦ ★NPC の配合が ★母の番の週を処理した', `★週 ${npc.week} / 生まれた ${npc.born} / 既に居た ${npc.alreadyThere} / 相手なし ${npc.noSire}`);
   check(npcFoalOfDam === 0 && npc.alreadyThere >= 1, '⑦ 🔴 ★同じ母・同じ年に ★NPC は産ませなかった（★印が戻っていても）',

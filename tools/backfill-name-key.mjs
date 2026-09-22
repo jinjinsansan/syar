@@ -133,8 +133,10 @@ try {
     written = res.rowCount ?? 0;
   }
   const inTx = await survey();
-  if (inTx.nullKey !== 0 || inTx.wrongKey !== 0) {
-    throw new Error(`★書いた後も 空 ${inTx.nullKey} / 食い違い ${inTx.wrongKey}（★戻します）`);
+  // ★重なりも数え直す（★書いている間に別の経路が名前を書いた場合も拾う・裁定 922b338 §7 の推奨）
+  if (inTx.nullKey !== 0 || inTx.wrongKey !== 0 || blocksBackfill(inTx)) {
+    throw new Error(`★書いた後も 空 ${inTx.nullKey} / 食い違い ${inTx.wrongKey}`
+      + ` / 重なり ${inTx.collisions} / 正規化で空 ${inTx.empty}（★戻します）`);
   }
   await c.query('commit');
 } catch (e) {
