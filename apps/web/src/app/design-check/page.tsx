@@ -20,7 +20,7 @@
  */
 
 import { useState } from 'react';
-import { COAT_TRANSFORMS, coatOfHorseId, type CoatName, type CoatTransform } from '@star/render';
+import { COAT_TRANSFORMS, coatOfHorseId, coatCssFilter, type CoatName } from '@star/render';
 
 /**
  * ★**毛色は、画面が使うのと同じ CSS の掛け方で出します**（★2026-09-23）。
@@ -32,16 +32,7 @@ import { COAT_TRANSFORMS, coatOfHorseId, type CoatName, type CoatTransform } fro
  *    → ★**ここでは 1 通りだけにします。** ★`COAT_TRANSFORMS` を CSS の `filter` に組み立てて掛けます。
  *      ★近似ではなく、★**画面が実際に掛けるのと同じ式**です。
  */
-const coatFilter = (coat: CoatName): string | undefined => {
-  const t: CoatTransform | undefined = COAT_TRANSFORMS[coat];
-  if (t === undefined) return undefined;
-  const parts: string[] = [];
-  if (t.hueRotate !== undefined) parts.push(`hue-rotate(${t.hueRotate}deg)`);
-  if (t.saturate !== undefined) parts.push(`saturate(${t.saturate})`);
-  if (t.brightness !== undefined) parts.push(`brightness(${t.brightness})`);
-  if (t.contrast !== undefined) parts.push(`contrast(${t.contrast})`);
-  return parts.length === 0 ? undefined : parts.join(' ');
-};
+const coatFilter = coatCssFilter;
 
 /** ★毛色の呼び名（★見出しに出すだけ） */
 const COAT_LABEL: Readonly<Record<CoatName, string>> = {

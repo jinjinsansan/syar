@@ -204,6 +204,25 @@ function unitHashOf(text: string): number {
 }
 
 /**
+ * ★**毛色を CSS の `filter` に組み立てる**（★画面が色の式を持たないため・2026-09-23）。
+ *
+ * ⚠️ ★`COAT_TRANSFORMS` の値は ★**CSS の `filter` と同じ意味**で持っています（★この表の註記）。
+ *    ★だから ★**掛け方も 1 か所**にします。★画面ごとに組み立てると、
+ *    ★`/design-check` で見せた色と `/train` に出る色がずれます。
+ * ⚠️ ★`bay`（鹿毛）は ★**素材そのまま**なので `undefined` を返します（★何も掛けない）。
+ */
+export function coatCssFilter(coat: CoatName): string | undefined {
+  const t: CoatTransform | undefined = COAT_TRANSFORMS[coat];
+  if (t === undefined) return undefined;
+  const parts: string[] = [];
+  if (t.hueRotate !== undefined) parts.push(`hue-rotate(${t.hueRotate}deg)`);
+  if (t.saturate !== undefined) parts.push(`saturate(${t.saturate})`);
+  if (t.brightness !== undefined) parts.push(`brightness(${t.brightness})`);
+  if (t.contrast !== undefined) parts.push(`contrast(${t.contrast})`);
+  return parts.length === 0 ? undefined : parts.join(' ');
+}
+
+/**
  * ★**馬 ID から毛色を引く**。★これが唯一の出どころ。
  * ⚠️ ★枠番を渡さないこと。★枠の色（ゼッケン・`POST`）は別の役割（★その日の枠）。
  */

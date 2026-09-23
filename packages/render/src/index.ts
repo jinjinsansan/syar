@@ -61,7 +61,7 @@ export * from './world-textured.js';
 export * from './pixel-scale.js';
 export * from './minimap.js';
 export { isSkinTone } from './silks-skin.js';
-export { applyCoat, isHorseCoat, COAT_TRANSFORMS, DEFORMED_COAT_TRANSFORMS, isDeformedHorseAsset, coatOfHorseId, COAT_WEIGHTS, type CoatTransform, type CoatName } from './coat.js';
+export { applyCoat, isHorseCoat, COAT_TRANSFORMS, DEFORMED_COAT_TRANSFORMS, isDeformedHorseAsset, coatOfHorseId, COAT_WEIGHTS, coatCssFilter, type CoatTransform, type CoatName } from './coat.js';
 export { SILK_COLORS, SLEEVES, sleeveHex, ownerSilksOf, silksForHorse, type SilkColor, type Sleeve, type Silks } from './silks.js';
 export { typedCount } from './hud-kit.js';
 export { narratorPortrait, narratorExpressionAt, narratorMouthOpenAt, narratorCastForRace, NARRATOR_NAMES, NARRATOR_ROLES, type NarratorSet, type NarratorExpression, type NarratorCast } from './narrator.js';

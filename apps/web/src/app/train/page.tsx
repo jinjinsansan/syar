@@ -26,6 +26,7 @@ import { RaceStrip } from '../../components/uma/race-strip';
 import { useStableView } from '../../components/uma/use-stable-view';
 import { TRAINING_MENUS } from '../../lib/game-demo';
 import { conditionView, sortStable, trainFaceOf } from '../../lib/stable';
+import { coatOfHorseId, coatCssFilter } from '@star/render';
 
 /** ★実行してから待機に戻るまで（★資料 §9 の 3200ms） */
 const RUN_MS = 3200;
@@ -73,6 +74,12 @@ export default function TrainPage(): React.ReactElement {
   const face = trainFaceOf(horse.condition, horse.fatigue);
   /** ★この牧場の勝負服（★読めないうちは出さない） */
   const silks = view?.home.silks;
+  /**
+   * ★**この馬の毛色**（★裁定 `REVIEW_HORSE_IDENTITY_VERDICT_20260923.md` §9・2026-09-23）。
+   *   ★馬 ID から決定的に引く（★枠番からではない）。★同じ馬はいつ見ても同じ毛色。
+   *   ⚠️ ★色の式は `@star/render` が持つ（★画面で組み立てない）。
+   */
+  const coatFilter = coatCssFilter(coatOfHorseId(horse.id));
 
   return (
     <div
@@ -137,6 +144,8 @@ export default function TrainPage(): React.ReactElement {
           <div style={{ position: 'absolute', right: 10, top: 10, width: 96, border: '3px solid var(--u-gold)', borderRadius: 12, background: 'var(--u-panel-strong)', overflow: 'hidden' }}>
             <div style={{
               height: 74, background: `url('/art/uma/train-face-${face}.webp') no-repeat center/cover`,
+              // ★顔も同じ毛色にする（★全身と顔で色が違うと、別の馬に見える）
+              filter: coatFilter,
             }} />
             <div style={{ padding: '4px 6px', textAlign: 'center', fontSize: 11, borderTop: '2px solid rgba(246,194,28,.6)' }}>
               {running ? '張り切っています' : '落ち着いています'}
@@ -159,7 +168,8 @@ export default function TrainPage(): React.ReactElement {
             <span style={{
               position: 'absolute', inset: 0,
               background: `url('/art/uma/train-body-${running ? 'run' : 'idle'}.webp') no-repeat bottom center/contain`,
-              filter: 'drop-shadow(0 8px 12px rgba(8,18,8,.45))',
+              // ⚠️ ★毛色を先に、影を後に掛ける（★逆にすると影まで毛色に染まる）
+              filter: `${coatFilter === undefined ? '' : `${coatFilter} `}drop-shadow(0 8px 12px rgba(8,18,8,.45))`,
             }} />
           </div>
 

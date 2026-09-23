@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { coatOfHorseId, COAT_WEIGHTS, COAT_TRANSFORMS } from '@star/render';
+import { coatOfHorseId, COAT_WEIGHTS, COAT_TRANSFORMS, coatCssFilter } from '@star/render';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const SRC = readFileSync(path.join(ROOT, 'packages/render/src/coat.ts'), 'utf8');
@@ -64,6 +64,22 @@ describe('★毛色は馬 ID から（★裁定 §9）', () => {
     for (let i = 0; i < 500; i += 1) expect(known).toContain(coatOfHorseId(idAt(i)));
     // ★白毛は入れない（★2026-08-28 の註記）
     expect(known).not.toContain('white');
+  });
+
+  it('★CSS の式は 1 か所から出す（★鹿毛は素材そのままなので何も掛けない）', () => {
+    expect(coatCssFilter('bay')).toBe(undefined);
+    expect(coatCssFilter('grey')).toMatch(/saturate\(0\.12\)/);
+    expect(coatCssFilter('chestnut')).toMatch(/hue-rotate\(16deg\)/);
+  });
+
+  it('🔴 ★画面は毛色の式を組み立てない（★育成・確認用の画面とも）', () => {
+    const ROOT2 = path.resolve(__dirname, '../../..');
+    for (const f of ['apps/web/src/app/train/page.tsx', 'apps/web/src/app/design-check/page.tsx']) {
+      const code = readFileSync(path.join(ROOT2, f), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+      expect(code, `★${f} が毛色の式を持っている`).not.toMatch(/hue-rotate\(\$\{/);
+      expect(code, `★${f} が毛色の式を持っている`).not.toMatch(/saturate\(\$\{/);
+    }
   });
 
   it('🔴 ★対照: ★枠番から引く古い規則では、同じ馬の毛色が枠で変わる', () => {
