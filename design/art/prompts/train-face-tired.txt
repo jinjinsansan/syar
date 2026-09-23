@@ -1,32 +1,36 @@
 Generate ONE image (no text, no logos, no watermark).
 
-REFERENCE FILE (read it and pass it as a reference image to the image generation tool)
-- CHARACTER AND STYLE reference — match it EXACTLY:
-  apps/web/public/art/uma/chibi-horse.png
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- CHARACTER reference (WHO this is — the horse that actually runs in this game's races):
+  apps/web/public/art/horse-jockey-side-v8-pose01.png
+- SECOND view of the same horse (three-quarter front):
+  apps/web/public/art/horse-jockey-diag-front-v4-pose01.png
 
-  ★★ HOW TO USE IT
-  This file decides the DESIGN and the DRAWING STYLE. Reproduce that character's head:
-  the same DEFORMED (chibi-proportioned) cartoon horse — big rounded head, very large
-  expressive eye with a visible white and a heavy dark outline, strong angular brow ridge
-  over the eye, short blunt muzzle, big soft nostril, small rounded ears set wide apart,
-  thick glossy mane in chunky locks, THICK DARK OUTLINES around every shape, bold cel
-  shading with strong highlights and saturated colour.
-  Do NOT draw a realistic or anatomically correct horse head. Do NOT copy its pose,
-  its jockey, its bridle or its background.
+  ★★ CRITICAL — HOW TO USE THE REFERENCES
+  They decide the DESIGN. Reproduce that horse's HEAD exactly: the long straight profile,
+  the ALMOND eye with a heavy dark outline and an angular brow above it, the fine tapering muzzle,
+  the pointed ears, the mane as one flowing shape, thick dark outlines, cel shading with soft
+  gradients inside the outlines, saturated palette.
+  ★ This is an ATHLETIC RACEHORSE head — long and fine, NOT a chibi pony head.
+    Do NOT make the head round, do NOT make the eye huge, do NOT shorten the muzzle.
+  Do NOT copy the pose, the jockey, the bridle or the background.
+
+★★ WHAT WENT WRONG BEFORE — DO NOT REPEAT
+  An earlier attempt used a chibi key-art horse as the reference: round head, huge eye, short
+  muzzle. The owner compared it with the race screen and said it looks like a different animal.
+  ★ The training screen shows THE SAME HORSE that runs in the race.
 
 SUBJECT
 A head-and-neck close-up of that same deformed cartoon horse, three-quarter view facing
 slightly to the viewer's right, cropped at the base of the neck. The head fills most of the frame.
-MOOD: 疲れ / WEARY — ears drooping outward and slightly back, the upper eyelid lowered so the big
-eye is HALF CLOSED, brow relaxed and sagging, head carried a little lower than level. Tired but calm
-and healthy — NOT sick, NOT in pain, NOT distressing.
+MOOD: 疲れ / WEARY — ears drooping outward and slightly back, the upper eyelid lowered so the eye is
+HALF CLOSED, brow relaxed, head carried a little lower than level. Tired but calm and healthy.
 
 COLOUR AND LIGHT
 Indoor stable at early morning, soft light from the side, but keep the bold saturated cartoon
 palette of the reference (rich chestnut-bay coat, dark brown-black mane, warm highlights).
 Plain coat with NO white face markings (no blaze, no star, no snip) — the same picture is shown
 for every player's horse, so it must not look like one specific individual.
-★ The reference has a white blaze; DO NOT copy the blaze. Everything else about the head, yes.
 
 BACKGROUND
 Simple, softly blurred stable interior: straw and wooden stall boards, low contrast, so the

@@ -1,52 +1,60 @@
 Generate ONE image (no text, no logos, no watermark).
 
-REFERENCE FILE (read it and pass it as a reference image to the image generation tool)
-- CHARACTER AND STYLE reference — match it EXACTLY:
-  apps/web/public/art/uma/chibi-horse.png
+REFERENCE FILES (read them and pass them as reference images to the image generation tool)
+- CHARACTER reference (WHO this is — the horse that actually runs in this game's races):
+  apps/web/public/art/horse-jockey-side-v8-pose01.png
+- SECOND view of the same horse (three-quarter front):
+  apps/web/public/art/horse-jockey-diag-front-v4-pose01.png
 
-  ★★ HOW TO USE IT
-  This file decides the DESIGN and the DRAWING STYLE. Draw the SAME DEFORMED (chibi-proportioned)
-  cartoon horse: big rounded head, very large expressive eye with a visible white and a heavy dark
-  outline, strong angular brow ridge, short blunt muzzle, big soft nostril, small rounded ears set
-  wide apart, stocky round barrel, SHORT THICK LEGS, chunky rounded hooves, thick glossy mane and
-  tail in chunky locks, THICK DARK OUTLINES around every shape, bold cel shading with strong
-  highlights and saturated colour.
-  ★ Do NOT draw a realistic racehorse. If it looks like the shipped race sprites, it is WRONG.
-  ★ The reference carries a JOCKEY — do NOT draw the jockey, the saddle, the bridle or the reins.
-    This is the horse alone in its stable yard.
-  ★ The reference has a white blaze — do NOT copy the blaze.
-  Do NOT copy the reference's galloping pose.
+  ★★ CRITICAL — HOW TO USE THE REFERENCES
+  They decide the DESIGN and the PROPORTIONS. Reproduce that horse EXACTLY:
+  the head shape and size RELATIVE TO THE BODY, the eye (almond, heavy dark outline, angular brow),
+  the muzzle, the ear shape, the NECK LENGTH AND ARCH, the SLIM DEEP CHEST, the LONG SLENDER LEGS,
+  the fine cannon bones, the hoof shape, the mane and tail.
+  ★ This horse has ATHLETIC RACEHORSE PROPORTIONS — long legs, a deep but narrow chest,
+    a head that is SMALL relative to the body. It is NOT a chibi pony.
+  Do NOT copy the pose. Do NOT draw the jockey, saddle, bridle, reins or number cloth.
+  Do NOT copy any white blaze or white socks — this horse has NO white markings.
+
+★★ WHAT WENT WRONG BEFORE — DO NOT REPEAT
+  Two earlier attempts were rejected by the owner.
+  1. The first was built from a chibi key-art horse: big head, short thick legs, barrel body.
+     ★ WRONG. The owner compared it with the race screen and said it looks like a different animal.
+       ★ The training screen shows THE SAME HORSE that runs in the race, so it must match the race art.
+  2. An attempt drew carved, separated body-builder muscles and a mane made of many small tufts.
+     ★ WRONG. Shading is smooth and wide; the mane is one flowing shape.
 
 SUBJECT
-The horse ALONE, RUNNING at a canter in a training yard, seen from the SIDE and slightly towards
-the camera (a three-quarter side view). This is the "training in progress" pose of the same screen,
-so it must be the SAME horse at the SAME size and the SAME camera angle as the idle pose — only
-the legs, the mane and the expression change.
-★ Legs: the front leg nearest the camera reaches forward, the far hind leg pushes back, the other
-  two are gathered under the body. At least one hoof is off the ground.
+The horse ALONE, CANTERING (working, not flat-out racing), seen from the SIDE and slightly towards
+the camera (three-quarter side view). This is the "training in progress" pose of the same screen,
+so it must be the SAME horse at the SAME size and the SAME camera angle as the standing pose —
+only the legs, the mane and the expression change.
+★ Legs: the leading foreleg reaches forward, the far hind leg pushes back, the other two are
+  gathered under the body. At least one hoof is off the ground.
 ★ Mane and tail stream backwards with the motion.
 ★ Expression: eager and focused, brow down a little, mouth closed. Working hard, not distressed.
 The horse faces to the viewer's RIGHT.
 
-COLOUR AND LIGHT
-Morning light, warm and soft. Keep the bold saturated cartoon palette of the reference
-(rich chestnut-bay coat, dark brown-black mane and tail).
-Plain coat, NO white markings (no blaze, no star, no socks) — the same picture is shown for every
-player's horse, so it must not look like one specific individual.
+STYLE
+Cel-shaded cartoon exactly as in the references: thick dark outlines, flat-ish colour fills with
+soft gradients inside the outlines, saturated palette, no photo texture, no pixel art.
+
+COLOUR
+Plain chestnut-bay coat as in the references, dark brown-black mane and tail.
+NO white markings at all — the same picture is shown for every player's horse.
 
 BACKGROUND
-★ NONE. Put the horse on a FULLY TRANSPARENT background (alpha), with no ground, no shadow,
-  no grass, no fence, no sky. The screen draws its own background and its own shadow under the
-  horse. If transparency is impossible, use a FLAT SOLID MAGENTA (#FF00FF) background with no
-  gradient and no texture, so it can be keyed out.
+★ NONE. Fully TRANSPARENT background (alpha): no ground, no shadow, no grass, no fence, no sky.
+  If transparency is impossible, use a FLAT SOLID MAGENTA (#FF00FF) background with no gradient.
 
 FRAMING
-Portrait, aspect ratio 272 : 290 (very slightly taller than wide). The horse fills the frame with
-a small margin; its hooves sit near the bottom edge, the ears near the top.
+Portrait, aspect ratio 272 : 290. The whole horse fits with a small margin; hooves near the bottom
+edge, ears near the top. Because the legs are long, the horse will read as tall and slim — that is
+correct.
 
 DO NOT INCLUDE
 No jockey, no human figure, no hands, no saddle, no bridle, no reins, no halter, no rug.
 No numbers, stars, text, letters, logos, signage, flags, watermarks.
 
 ANATOMY
-One horse. Four legs, one head, one tail. Both eyes may show at this angle; keep them equal.
+One horse. Four legs, one head, one tail.

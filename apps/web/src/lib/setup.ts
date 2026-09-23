@@ -39,7 +39,15 @@ export interface InitialHorse {
   readonly classLabel: string;
 }
 
-export type SetupError = 'duplicate' | 'ngword' | 'network' | 'other';
+/**
+ * ★`already` … ★**その人は既に登録が済んでいる**（`users_pkey` に当たった）
+ * ⚠️ ★以前ここに `duplicate`（牧場名の重複）がありましたが、★**嘘でした**（2026-09-24・オーナー申告）。
+ *    ✔ 実測: ★`users` の一意な索引は ★**`users_pkey`（id）だけ**で、
+ *      ★`stable_name` にも `display_name` にも一意制約は在りません。
+ *    → ★**牧場名の重複ではエラーになりません。** ★`users_pkey` を「牧場名が使われています」と
+ *      ★読み替えていたので、★**登録済みの人が /setup を開くたびに嘘の理由**が出ていました。
+ */
+export type SetupError = 'already' | 'ngword' | 'network' | 'other';
 export type SetupResult =
   | { readonly ok: true; readonly horse: InitialHorse; readonly grantedEP: number; readonly dailyEP: number }
   | {
@@ -113,8 +121,9 @@ export const supabaseSetupRepo: SetupRepo = {
       if (error !== null) {
         // ★当てはまるものだけ言い換え、★それ以外は原文のまま（UI1-9）
         const m = error.message ?? '';
-        if (m.includes('duplicate key') || m.includes('users_pkey')) {
-          return { ok: false, error: 'duplicate' };
+        // ★その人の行が既に在る ＝ ★登録が済んでいる（★牧場名の重複ではない）
+        if (m.includes('users_pkey')) {
+          return { ok: false, error: 'already' };
         }
         return { ok: false, error: 'other', message: m === '' ? '登録できませんでした（理由が返っていません）' : m };
       }

@@ -90,7 +90,7 @@ function ErrorRow({ error, message, onRetry }: {
   const text = error === 'other'
     ? (message ?? '登録できませんでした（理由が返っていません）')
     : error === 'network' ? '通信に失敗しました'
-      : error === 'duplicate' ? 'この牧場名はすでに使われています'
+      : error === 'already' ? 'すでに登録が済んでいます。ホームからお進みください'
         : '使えない語が含まれています';
   const retryable = error === 'other' || error === 'network';
   return (

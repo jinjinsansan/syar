@@ -64,9 +64,9 @@ describe('★勝負服は持ち主の色で（★裁定 §2）', () => {
     // ★`setup.ts` は再輸出だけ（★16 色の定義が戻っていない）
     expect(SETUP).not.toMatch(/vermilion/);
     expect(SETUP).toMatch(/from '@star\/render'/);
-    // ★育成の画面は `ownerSilksOf` の結果を使うだけで、色の文字列を持たない
+    // 🔴 ★育成の画面に勝負服は出さない（★2026-09-24・オーナー指摘「育成に騎手はいない」）
     expect(TRAIN).not.toMatch(/#1a6fd4/);
-    expect(TRAIN).toMatch(/silks\.bodyHex/);
+    expect(TRAIN).not.toMatch(/silks/);
   });
 
   it('① 🔴 ★読む側が在る（★users から silk_color を読んでいる）', () => {
