@@ -40,6 +40,22 @@ const COAT_LABEL: Readonly<Record<CoatName, string>> = {
   'seal-brown': '青鹿毛', 'blue-black': '青毛', grey: '芦毛',
 };
 
+/**
+ * ★たてがみ・尾の色の候補（★2026-09-23・オーナー案）。
+ * 🔴 ⚠️ ★**この色は捨てます。** ★開発側が仮に置いたもので、★オーナー評「センスが悪いです」。
+ *    ★**色を決めるのはデザイナー**です（★2026-09-15 のオーナー指示「デザインは必ずデザイナーに」）。
+ *    ★ここに残しているのは ★**仕組みが動くことを見せるため**だけ
+ *    （★灰色の層に掛け算で色が載り、★焼き分けなくて済むこと）。
+ *    ★依頼は `DESIGN_REQUEST_HORSE_IDENTITY_20260923.md`。
+ */
+const MANE_COLORS: readonly { readonly key: string; readonly label: string; readonly hex: string }[] = [
+  { key: 'black', label: '黒', hex: '#3a332e' },
+  { key: 'red', label: '赤', hex: '#b8461c' },
+  { key: 'flaxen', label: '亜麻色', hex: '#c39a4c' },
+  { key: 'white', label: '白', hex: '#eceae6' },
+  { key: 'silver', label: '銀', hex: '#aab0b8' },
+];
+
 /** ★本番の馬 ID と同じ形（★出走表の見本を決定論で作る） */
 const idAt = (n: number): string => `0f000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
 
@@ -250,6 +266,44 @@ export default function DesignCheckPage(): React.ReactElement {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* ★たてがみ・尾の色（★灰色の層に、実画面の CSS で色を掛けている・★焼き分けていない） */}
+      <section aria-labelledby="mane" style={{ marginBottom: 22 }}>
+        <h2 id="mane" style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 900, color: '#ffd84a' }}>
+          たてがみ・尾の色（★仕組みの確認だけ・色は仮）
+        </h2>
+        <p style={{ margin: '0 0 8px', fontSize: 11, color: '#9fb6cc', lineHeight: 1.7 }}>
+🔴 この 5 色は開発側が仮に置いたもので、捨てます（色を決めるのはデザイナーです）。
+          ここで見てほしいのは仕組みだけです — たてがみの層は中間の灰色で 1 枚（12 KB）持ち、色は画面で掛けています。
+          毛色ごとに焼き分けていないので、焼いた素材は増えません。
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, background: '#091e37', padding: 10, borderRadius: 10 }}>
+          {MANE_COLORS.map((m) => (
+            <div key={m.key} style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+              <div style={{ position: 'relative', width: 120, height: 128 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/art/uma/train-body-idle.webp" alt="" width={120} height={128}
+                  style={{ position: 'absolute', inset: 0, width: 120, height: 128, objectFit: 'contain' }} />
+                <div
+                  style={{
+                    position: 'absolute', inset: 0,
+                    backgroundColor: m.hex,
+                    backgroundImage: "url('/art/uma/train-body-idle-mane.webp')",
+                    backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center',
+                    backgroundBlendMode: 'multiply',
+                    WebkitMaskImage: "url('/art/uma/train-body-idle-mane.webp')",
+                    maskImage: "url('/art/uma/train-body-idle-mane.webp')",
+                    WebkitMaskSize: 'contain', maskSize: 'contain',
+                    WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+                    WebkitMaskPosition: 'center', maskPosition: 'center',
+                  }}
+                />
+              </div>
+              <span style={{ fontSize: 11 }}>{m.label}</span>
+            </div>
+          ))}
         </div>
       </section>
 
