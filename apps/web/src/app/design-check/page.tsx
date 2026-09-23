@@ -20,6 +20,38 @@
  */
 
 import { useState } from 'react';
+import { COAT_TRANSFORMS, coatOfHorseId, type CoatName, type CoatTransform } from '@star/render';
+
+/**
+ * ★**毛色は、画面が使うのと同じ CSS の掛け方で出します**（★2026-09-23）。
+ *
+ * 🔴 ★はじめ、★**焼いた画像を 2 通りの別の方法で色替えして並べていました**
+ *    （★`dress.mjs` のパレット置換＝日本語 5 色 ／ `sharp` の `modulate`＝近似）。
+ *    ★オーナー指摘「色違いの馬の絵が違う気がします」。
+ *    ✔ ★輪郭を比べると **1 画素も違いません**でした（★絵は同じ・色の付け方が 2 通りだった）。
+ *    → ★**ここでは 1 通りだけにします。** ★`COAT_TRANSFORMS` を CSS の `filter` に組み立てて掛けます。
+ *      ★近似ではなく、★**画面が実際に掛けるのと同じ式**です。
+ */
+const coatFilter = (coat: CoatName): string | undefined => {
+  const t: CoatTransform | undefined = COAT_TRANSFORMS[coat];
+  if (t === undefined) return undefined;
+  const parts: string[] = [];
+  if (t.hueRotate !== undefined) parts.push(`hue-rotate(${t.hueRotate}deg)`);
+  if (t.saturate !== undefined) parts.push(`saturate(${t.saturate})`);
+  if (t.brightness !== undefined) parts.push(`brightness(${t.brightness})`);
+  if (t.contrast !== undefined) parts.push(`contrast(${t.contrast})`);
+  return parts.length === 0 ? undefined : parts.join(' ');
+};
+
+/** ★毛色の呼び名（★見出しに出すだけ） */
+const COAT_LABEL: Readonly<Record<CoatName, string>> = {
+  bay: '鹿毛', 'dark-bay': '黒鹿毛', chestnut: '栗毛', 'liver-chestnut': '栃栗毛',
+  'seal-brown': '青鹿毛', 'blue-black': '青毛', grey: '芦毛',
+};
+
+/** ★本番の馬 ID と同じ形（★出走表の見本を決定論で作る） */
+const idAt = (n: number): string => `0f000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
+
 
 /** ★実装した画面（★馬物語 UI・★R-14 の 9 画面＋TOP） */
 const SCREENS: readonly { readonly path: string; readonly label: string }[] = [
@@ -59,12 +91,6 @@ const ART: readonly { readonly src: string; readonly label: string; readonly w: 
   { src: '/art/uma/intro-birth-cut.webp', label: '誕生カット（仔馬）', w: 360, h: 270 },
   { src: '/art/uma/train-body-idle.webp', label: '調教の全身: 待機', w: 136, h: 145 },
   { src: '/art/uma/train-body-run.webp', label: '調教の全身: 調教中', w: 136, h: 145 },
-  // ★Q-3 の測定（★裁定 REVIEW_HORSE_IDENTITY_VERDICT_20260923.md §3）。
-  //   ★1 枚の絵の色を 5 毛色に置き換えたもの（★焼き直していない）。★判断はオーナーとデザイナー。
-  { src: '/art/uma/coat-test-sheet.png', label: '毛色 5 種の見え方（左から 鹿毛・黒鹿毛・栗毛・芦毛・青毛）', w: 728, h: 161 },
-  // ★裁定 §9 条件 ②。★新しい規則（馬 ID から引く）で 18 頭を枠順に並べたもの。
-  //   ★隣どうしが同じ毛色になる組は 12 頭立てで平均 3.42 組（★古い規則は 1 組）。
-  { src: '/art/uma/coat-field-sheet.png', label: '新しい規則で 18 頭を並べた出走表（馬 ID から毛色を引く）', w: 921, h: 57 },
 ];
 
 /**
@@ -189,6 +215,50 @@ export default function DesignCheckPage(): React.ReactElement {
               <span style={{ fontSize: 10, opacity: 0.7 }}>{a.w}×{a.h}（素材はこの 2 倍）</span>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ★毛色（★同じ 1 枚の絵に、画面と同じ CSS を掛けている・★焼き直していない） */}
+      <section aria-labelledby="coat" style={{ marginBottom: 22 }}>
+        <h2 id="coat" style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 900, color: '#ffd84a' }}>
+          毛色 7 種（同じ絵に色を掛けているだけ）
+        </h2>
+        <p style={{ margin: '0 0 8px', fontSize: 11, color: '#9fb6cc', lineHeight: 1.7 }}>
+          絵は 1 枚（調教の待機）。輪郭は 1 画素も変えていません。色は画面が使うのと同じ式です。
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end', background: '#091e37', padding: 10, borderRadius: 10 }}>
+          {(Object.keys(COAT_TRANSFORMS) as CoatName[]).map((coat) => (
+            <div key={coat} style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/art/uma/train-body-idle.webp" alt={COAT_LABEL[coat]} width={96} height={102}
+                style={{ width: 96, height: 102, objectFit: 'contain', filter: coatFilter(coat) }}
+              />
+              <span style={{ fontSize: 11 }}>{COAT_LABEL[coat]}</span>
+            </div>
+          ))}
+        </div>
+
+        <h2 style={{ margin: '14px 0 4px', fontSize: 15, fontWeight: 900, color: '#ffd84a' }}>
+          新しい規則で 18 頭を枠順に並べた出走表
+        </h2>
+        <p style={{ margin: '0 0 8px', fontSize: 11, color: '#9fb6cc', lineHeight: 1.7 }}>
+          毛色は馬 ID から引いています。隣どうしが同じ毛色になる組は 12 頭立てで平均 3.42 組（古い規則は 1 組）。
+        </p>
+        <div style={{ display: 'flex', gap: 4, overflowX: 'auto', background: '#091e37', padding: 8, borderRadius: 10 }}>
+          {Array.from({ length: 18 }, (_, i) => {
+            const coat = coatOfHorseId(idAt(1000 + i));
+            return (
+              <div key={i} style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/art/uma/train-body-idle.webp" alt={COAT_LABEL[coat]} width={72} height={77}
+                  style={{ width: 72, height: 77, objectFit: 'contain', filter: coatFilter(coat) }}
+                />
+                <span style={{ fontSize: 9, color: '#9fb6cc' }}>{i + 1}枠 {COAT_LABEL[coat]}</span>
+              </div>
+            );
+          })}
         </div>
       </section>
 
