@@ -14,7 +14,6 @@
  *
  * 【⚠️ ★まだ無いので出していないもの】（★報告済み）
  *   ★B-3 の血統表 … ★第 1 便の部品がこの画面にまだありません。
- *   ★B-5 の誕生の絵 … ★素材（`intro-birth-cut.png`）がまだ作られていません。
  *   ★B-5 の主「名前を付ける」 … ★命名の画面がまだありません（★次に作ります）。
  *
  * 【★時計】
@@ -239,6 +238,15 @@ export default function BreedPage(): React.ReactElement {
     return (
       <Shell>
         <div style={{ fontSize: 20, fontWeight: 900, color: '#ffe483' }}>無事に生まれました</div>
+        {/*
+          ★誕生の絵（★360 × 270 の枠・★素材は 720 × 540 ＝ ちょうど 2 倍）。
+          ⚠️ ★**全員に同じ 1 枚**を出します（★毛色のデータが無いため・第 1 便の回答 §8）。
+        */}
+        <div style={{
+          width: '100%', maxWidth: 360, aspectRatio: '360 / 270', borderRadius: 12, overflow: 'hidden',
+          border: '2px solid rgba(251,247,236,.28)',
+          background: "url('/art/uma/intro-birth-cut.webp') no-repeat center/cover",
+        }} />
         <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.8 }}>
           父 {sire?.name ?? ''} × 母 {mare?.name ?? ''}
         </div>
