@@ -136,6 +136,16 @@ export const COAT_TRANSFORMS = {
    *   馬体の画素だけに掛けるこの経路でのみ使えます。
    */
   grey: { saturate: 0.12, brightness: 1.32, contrast: 0.95 },
+  /**
+   * ★**月毛（つきげ）・白毛（しろげ）**（★デザイナー第 3 便・2026-09-23）。
+   *
+   * ⚠️ ★**値はデフォルメの絵で決められたもの**です。★写真系の素材での見え方は**確かめていません**。
+   * 🔴 ★**焼いた素材（`public/art/baked/`）にこの 2 種はありません。**
+   *    ★レースは いま毛色を**枠番**から引く（`COAT_BY_GATE`・7 種）ので、★この 2 種には到達しません。
+   *    ★レースを馬 ID から引くようにする日に、★焼く工程で 2 種を足すこと。
+   */
+  palomino: { saturate: 0.95, brightness: 1.38, hueRotate: 14 },
+  white: { saturate: 0.00, brightness: 1.95, contrast: 0.78 },
 } as const satisfies Record<string, CoatTransform | undefined>;
 
 export type CoatName = keyof typeof COAT_TRANSFORMS;
@@ -161,18 +171,28 @@ export type CoatName = keyof typeof COAT_TRANSFORMS;
  */
 
 /**
- * ★実在の登録頭数のおおよその割合（★`race/page.tsx` の註記と同じ数字）。
- * ⚠️ ★**白毛は入れない** — ★0.1% 未満で、12 頭立てに 1 頭いると「珍しい」ではなく「変」になる
- *    （★`COAT_TRANSFORMS` の註記・2026-08-28）。
+ * ★**毛色の重み**（★デザイナー第 3 便・2026-09-23）。
+ *
+ * 【★2026-08-28 からの変更】
+ *   ★もとは実在の登録頭数の割合そのまま（鹿毛 48% など）で、★**白毛は入れませんでした**
+ *   （★0.1% 未満で「珍しい」ではなく「変」になるため）。
+ *   ★デフォルメのキャラクターには別の物差しを当てる、というオーナーの判断（★2026-09-23）を受け、
+ *   ★デザイナーが ★**9 種・重みを平らに**組み直しました。★白毛と月毛が入っています。
+ *   ★狙いは ★**同じ毛色が隣り合う組を減らすこと**（★鹿毛 48% → 30%）。
+ *
+ * ⚠️ ★合計 100。★白毛の 3% は実在より多い（★12 頭立てで 3 レースに 1 頭くらい）。
+ *    ★「白毛は変」を優先するなら `white` を 1 に下げる、とデザイナーが書いている（★判断はオーナー）。
  */
 export const COAT_WEIGHTS: readonly (readonly [CoatName, number])[] = [
-  ['bay', 48],
-  ['dark-bay', 22],
-  ['chestnut', 15],
-  ['grey', 7],
-  ['seal-brown', 6],
-  ['liver-chestnut', 1.5],
-  ['blue-black', 1],
+  ['bay', 30],
+  ['dark-bay', 16],
+  ['chestnut', 16],
+  ['grey', 10],
+  ['liver-chestnut', 8],
+  ['seal-brown', 8],
+  ['blue-black', 6],
+  ['palomino', 3],
+  ['white', 3],
 ];
 
 /**
@@ -261,6 +281,9 @@ export const DEFORMED_COAT_TRANSFORMS: Readonly<Record<CoatName, CoatTransform>>
   bay: { saturate: 0.60, brightness: 0.82, hueRotate: -5 },
   chestnut: { saturate: 0.80, brightness: 1.02, hueRotate: 5 },
   grey: { saturate: 0.00, brightness: 1.40 },
+  /** ★月毛（★金色）・白毛（★真っ白）。★デザイナー第 3 便の値をそのまま */
+  palomino: { saturate: 0.95, brightness: 1.38, hueRotate: 14 },
+  white: { saturate: 0.00, brightness: 1.95, contrast: 0.78 },
 };
 
 export function isDeformedHorseAsset(prefix: string): boolean {

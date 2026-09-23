@@ -38,6 +38,8 @@ const coatFilter = coatCssFilter;
 const COAT_LABEL: Readonly<Record<CoatName, string>> = {
   bay: '鹿毛', 'dark-bay': '黒鹿毛', chestnut: '栗毛', 'liver-chestnut': '栃栗毛',
   'seal-brown': '青鹿毛', 'blue-black': '青毛', grey: '芦毛',
+  // ★デザイナー第 3 便で足した 2 種（★2026-09-23）
+  palomino: '月毛', white: '白毛',
 };
 
 /**

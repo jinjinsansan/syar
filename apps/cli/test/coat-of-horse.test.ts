@@ -33,25 +33,29 @@ describe('★毛色は馬 ID から（★裁定 §9）', () => {
     expect(SRC).toMatch(/export function coatOfHorseId\(horseId: string\): CoatName/);
   });
 
-  it('② 🔴 ★毛色が散る（★7 種のうち 5 種以上が出る・1 万頭）', () => {
+  it('② 🔴 ★毛色が散る（★9 種すべてが出る・1 万頭）', () => {
     const seen = new Set<string>();
     for (let i = 0; i < 10_000; i += 1) seen.add(coatOfHorseId(idAt(i)));
-    expect(seen.size).toBeGreaterThanOrEqual(5);
+    expect(seen.size).toBe(9);
   });
 
-  it('③ ★実在の割合に近い（★1 万頭で、いちばん多い毛色が 40〜56%）', () => {
+  it('③ ★重みどおりに出る（★1 万頭で、いちばん多い毛色が 26〜34%）', () => {
     const count = new Map<string, number>();
     const N = 10_000;
     for (let i = 0; i < N; i += 1) {
       const c = coatOfHorseId(idAt(i));
       count.set(c, (count.get(c) ?? 0) + 1);
     }
+    // ★重みは デザイナー第 3 便（★鹿毛 30・黒鹿毛 16・栗毛 16 …）
     const bay = (count.get('bay') ?? 0) / N * 100;
-    expect(bay).toBeGreaterThan(40);
-    expect(bay).toBeLessThan(56);
-    // ★重みの順と、実際に出た順が同じ（★1 位から 3 位まで）
+    expect(bay).toBeGreaterThan(26);
+    expect(bay).toBeLessThan(34);
+    // ⚠️ ★2 位と 3 位は重みが同じ（16）なので順は決めない。★集合で見る
     const ranked = [...count.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
-    expect(ranked.slice(0, 3)).toEqual(COAT_WEIGHTS.slice(0, 3).map(([c]) => c));
+    expect(ranked[0]).toBe('bay');
+    expect(new Set(ranked.slice(0, 3))).toEqual(new Set(COAT_WEIGHTS.slice(0, 3).map(([c]) => c)));
+    // ★9 種すべてが出る（★白毛・月毛を足した）
+    expect(count.size).toBe(9);
   });
 
   it('④ ★決定論（★乱数も時刻も使っていない）', () => {
@@ -62,8 +66,9 @@ describe('★毛色は馬 ID から（★裁定 §9）', () => {
   it('★返す名前は、色の表に在るものだけ', () => {
     const known = Object.keys(COAT_TRANSFORMS);
     for (let i = 0; i < 500; i += 1) expect(known).toContain(coatOfHorseId(idAt(i)));
-    // ★白毛は入れない（★2026-08-28 の註記）
-    expect(known).not.toContain('white');
+    // ⚠️ ★白毛は 2026-09-23 に入った（★デフォルメの絵には別の物差し・オーナー判断）
+    expect(known).toContain('white');
+    expect(known).toContain('palomino');
   });
 
   it('★CSS の式は 1 か所から出す（★鹿毛は素材そのままなので何も掛けない）', () => {
