@@ -219,6 +219,25 @@ export function conditionView(c: Condition): { readonly mark: string; readonly l
   ][c - 1]!;
 }
 
+/**
+ * ★**調教画面の顔（3 種）を選ぶ**（★2026-09-23・`design/art/prompts/train-face-*.txt`）
+ *
+ *   ★素材は ★**3 枚しかありません**（上機嫌・平常・疲れ）。★段を増やさないこと。
+ *   ★決め方は ★**疲労が先**です — ★調子が良くても、疲れていれば疲れた顔にします
+ *     （★「休ませる」を促すのがこの画面の役目で、★疲労の色も `fatigueColor` が 60 で赤にします）。
+ *
+ * ⚠️ ★境目は `fatigueColor` と揃えてあります（★60 超で赤 ＝ 疲れた顔）。★別の数を置かないこと。
+ * ⚠️ ★調教中（`running`）は ★**顔を変えません** — ★走っている最中に表情が跳ねると、
+ *    ★「調教の内容で表情が決まった」と誤って読まれます（★実際は調子と疲労で決まります）。
+ */
+export type TrainFace = 'happy' | 'normal' | 'tired';
+export function trainFaceOf(condition: Condition, fatigue: number): TrainFace {
+  if (fatigue > 60) return 'tired';
+  if (condition >= 4) return 'happy';
+  if (condition <= 2) return 'tired';
+  return 'normal';
+}
+
 /** 疲労の色: ≤30 緑・≤60 黄・>60 赤 */
 export function fatigueColor(f: number): string {
   return f <= 30 ? '#1e7a3a' : f <= 60 ? '#8a5a06' : '#a81a13';

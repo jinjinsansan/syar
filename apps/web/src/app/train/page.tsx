@@ -14,8 +14,9 @@
  * ⚠️ ★**週送り・メニューの効果のロジックは既存を流用します**（★資料 §4.3）。
  *    ★この画面はまだ**見た目だけ**で、★`@star/training` には繋いでいません（★次便）。
  *
- * ⚠️ ★**顔アップ枠は仮です** — ★同じ絵を拡大して顔だけ切り出しています。
- *    ★**表情 3 種のアセット**（上機嫌・平常・疲れ）は**未作成**で、★デザイナー待ちです（★資料 §11）。
+ * ★**顔アップ枠は表情 3 種**（上機嫌・平常・疲れ）です（★2026-09-23 に焼いた・
+ *    `design/art/prompts/train-face-*.txt`）。★どれを出すかは `trainFaceOf` が決めます（★画面で決めない）。
+ * ⚠️ ★**全身枠は引き続き仮**です（`chibi-horse.png`）。★調教の動きは未着手。
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -23,7 +24,7 @@ import { Backdrop, BigButton, TopBar, useMotionPaused } from '../../components/u
 import { RaceStrip } from '../../components/uma/race-strip';
 import { useStableView } from '../../components/uma/use-stable-view';
 import { TRAINING_MENUS } from '../../lib/game-demo';
-import { conditionView, sortStable } from '../../lib/stable';
+import { conditionView, sortStable, trainFaceOf } from '../../lib/stable';
 
 /** ★実行してから待機に戻るまで（★資料 §9 の 3200ms） */
 const RUN_MS = 3200;
@@ -67,6 +68,8 @@ export default function TrainPage(): React.ReactElement {
     </div>
   </div>;
   const cond = conditionView(horse.condition);
+  /** ★顔は 3 種。★選ぶ規則は画面に置かない（★`trainFaceOf`・疲労が先） */
+  const face = trainFaceOf(horse.condition, horse.fatigue);
 
   return (
     <div
@@ -109,11 +112,10 @@ export default function TrainPage(): React.ReactElement {
             </span>
           </div>
 
-          {/* ★顔アップ枠（★仮。★表情 3 種は未作成・デザイナー待ち） */}
+          {/* ★顔アップ枠（★表情 3 種・2026-09-23。★どれを出すかは `trainFaceOf` が決める） */}
           <div style={{ position: 'absolute', right: 10, top: 10, width: 96, border: '3px solid var(--u-gold)', borderRadius: 12, background: 'var(--u-panel-strong)', overflow: 'hidden' }}>
             <div style={{
-              height: 74, background: "url('/art/uma/chibi-horse.png') no-repeat",
-              backgroundSize: '330%', backgroundPosition: '84% 36%',
+              height: 74, background: `url('/art/uma/train-face-${face}.webp') no-repeat center/cover`,
             }} />
             <div style={{ padding: '4px 6px', textAlign: 'center', fontSize: 11, borderTop: '2px solid rgba(246,194,28,.6)' }}>
               {running ? '張り切っています' : '落ち着いています'}

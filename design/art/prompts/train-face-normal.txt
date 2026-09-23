@@ -1,0 +1,33 @@
+Generate ONE image (no text, no logos, no watermark).
+
+SUBJECT
+A head-and-neck close-up of a single racehorse, three-quarter view facing slightly to the viewer's
+right, cropped at the base of the neck. The head fills most of the frame.
+MOOD: 平常 / CALM AND NEUTRAL — ears relaxed and pointing forward, eye open and steady,
+head held level. Quietly attentive, neither excited nor tired.
+
+STYLE (this is the project's established look — do not invent a new one)
+Cel-shaded cartoon illustration: thick dark outlines, flat-ish colour fills with soft gradients
+inside the outlines, slightly stylised but believable horse proportions.
+NOT pixel art. NOT photographic. No painterly brush strokes, no canvas texture, no sketch lines.
+
+COLOUR AND LIGHT
+Indoor stable at early morning. Soft, low-contrast light from the side. Restrained saturation:
+muted brown coat, straw ochre, blue-grey shadows. Plain bay/brown coat with NO white markings
+(no blaze, no star, no snip) — the same picture is shown for every player's horse, so it must not
+look like one specific individual.
+
+BACKGROUND
+Soft, out-of-focus stable interior: straw, wooden stall boards. Keep it quiet and low contrast.
+
+FRAMING
+Landscape, aspect ratio 192 : 148 (slightly wider than tall). Leave a small margin around the head
+so the image can be cropped square-ish at the edges without cutting the ears.
+
+DO NOT INCLUDE
+Tack other than a plain leather halter. No jockey, no human figure, no hands. No numbers, stars,
+text, letters, logos, signage, flags, watermarks. No blood, no injury.
+
+ANATOMY
+One head, two ears, one visible eye (the far eye may be hidden by the three-quarter angle),
+a plain halter that follows the shape of the head.
