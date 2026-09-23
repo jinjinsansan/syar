@@ -26,6 +26,19 @@ import { digitPixels, outlinePixels, textWidth, GLYPH_H } from './pixel-font.mjs
  *   `design/art/handoff/palette.json` から役割名で引きます（アートバイブル §6）。
  */
 const PALETTE = JSON.parse(readFileSync('design/art/handoff/palette.json', 'utf8'));
+/**
+ * 🔴 ★**この 5 色は、開発用の `/watch` だけが使う古い経路です**（★2026-09-24・裁定 §9 条件 ③ の調査）。
+ *
+ *   ★この表 → `bake-sprites.mjs` → `apps/web/public/sprites/horse-{枠}.png`
+ *     → `canvas-renderer.ts` → ★**`/watch`（開発用の画面）だけ**。
+ *   ✅ ★**本番のレースはこちらを使いません。** ★`/race` が読む `public/art/baked/` は
+ *      ★`tools/bake-race-frames.mjs` が焼いており、★そちらは ★**`@star/render` の
+ *      ★`COAT_TRANSFORMS`（英語キー・いま 9 種）を直接呼んでいます**（★出どころは既に 1 か所）。
+ *
+ * ⚠️ ★だから「`dress.mjs` も同じ関数を呼ぶ」の書き換えは ★**していません**。
+ *    ★ここは ★**枠ごとに焼く**道具で、★馬 ID を受け取れません（★焼く時点で馬が決まっていない）。
+ *    ★直すなら「この経路を捨てる」が筋です（★`/watch` の要否はオーナー判断）。
+ */
 const COATS = ['kage', 'kurokage', 'kuri', 'ashi', 'ao'];
 const hex2rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 export const coatNameOf = (gate) => COATS[gate % COATS.length];
