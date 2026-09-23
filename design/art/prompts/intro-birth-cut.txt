@@ -1,57 +1,59 @@
-You are working in the repository at the current directory. Use your image generation skill (imagegen) with reference images.
+Generate ONE image (no text, no logos, no watermark).
 
-GOAL
-Create ONE still illustration for the BIRTH CUT in the onboarding flow (screen 6 "誕生" of the intro board):
-a NEWBORN FOAL that has just been born, standing unsteadily on straw in a quiet stable at dawn, with its dam
-(adult mare) lowering her head toward it. Side / three-quarter view. This is the moment the player first meets
-the horse they produced: calm and warm, not triumphant.
+REFERENCE FILE (read it and pass it as a reference image to the image generation tool)
+- CHARACTER AND STYLE reference — match it EXACTLY:
+  apps/web/public/art/uma/chibi-horse.png
 
-ONE IMAGE ONLY (see NOTES for why there are no coat variants).
+  ★★ HOW TO USE IT
+  This file decides the DESIGN and the DRAWING STYLE. Draw DEFORMED (chibi-proportioned)
+  cartoon horses in exactly that style: big rounded head, very large expressive eye with a
+  visible white and a heavy dark outline, strong angular brow ridge, short blunt muzzle, big
+  soft nostril, small rounded ears set wide apart, stocky barrel, SHORT THICK LEGS, chunky
+  rounded hooves, thick glossy mane and tail in chunky locks, THICK DARK OUTLINES around every
+  shape, bold cel shading with strong highlights and saturated colour.
+  ★ Do NOT draw realistic, anatomically correct racehorses. The shipped race sprites are
+    realistic; this picture must NOT look like them — it must look like the reference character.
+  Do NOT copy the reference's pose, its jockey, its bridle, its saddle or its background.
+  ★ The reference has a white blaze; DO NOT copy the blaze.
 
-STYLE — copy the style of the reference images, not a new look
-- Owner decision 2026-09-23 (DESIGN_ART_STYLE_DECISION_20260923.md): the project's style is CEL-SHADED CARTOON.
-  This settles the conflict noted at the bottom of this file — follow the references, not the documents.
-- The project's shipped art is CEL-SHADED CARTOON: thick dark outlines, flat-ish shading with soft gradients
-  inside the outline, slightly stylised proportions, no photo texture, no painterly brush strokes, no pixel-art.
-- The two references below are the style anchor. Match their line weight, shading and colour handling exactly.
-- Mood follows the art bible's "育成 / 週送り" row: indoor, soft early-morning light, straw, low energy,
-  restrained saturation (muted browns, straw ochre, blue-grey dawn light). Saturation is reserved for silks
-  and the decisive moment — this scene is neither.
+SUBJECT — the birth cut of the onboarding / breeding result
+A NEWBORN FOAL that has just been born, standing unsteadily on straw in a quiet stable at dawn,
+with its dam (adult mare) lowering her head toward it. Side / three-quarter view.
+This is the moment the player first meets the horse they produced: calm and warm, not triumphant.
+- The FOAL is drawn even more chibi than the mare: relatively bigger head, bigger eye, long
+  wobbly legs that are still thick and cartoonish, small fuzzy brush of a tail.
+- The MARE is the same deformed design as the reference, standing behind or beside the foal,
+  head lowered toward it, eye soft (not the reference's fierce racing glare).
 
-REFERENCE FILES (read them and pass them as reference images)
-- apps/web/public/art/horse-jockey-side-v8-pose01.png   (style anchor: outlines, cel shading, horse anatomy)
-- design/art/prompts/intro-birth-cut.reference.png      (style anchor from the designer's intro package;
-                                                         copy this file in from the designer ZIP before running)
+COLOUR AND LIGHT
+Stable interior at dawn: straw on the floor, wooden stall, soft light from the side.
+Keep the bold saturated cartoon palette of the reference (rich chestnut-bay coats, dark
+brown-black manes, warm straw ochre). Keep the upper third visually quiet — the UI draws a
+caption over it.
 
-REQUIREMENTS
-- Output size 720 x 540 (4:3). The UI shows it in a 360 x 270 box, so this is exactly 2x (integer scale only —
-  the art bible forbids non-integer scaling). Do not output 1536-wide or any size that is not an integer
-  multiple of 360 x 270.
-- Subject: one newborn foal (long folded unsteady legs, small body, short fuzzy tail) and one adult mare
-  close behind or beside it, head lowered toward the foal.
-- Coat: plain neutral bay/brown for both horses, NO distinctive markings (no blaze, no white socks, no patterns).
-  The same image is shown for every player's foal, so it must not look like one specific individual.
-- Setting: stable interior at dawn. Straw on the floor, wooden stall, soft light from the side.
-  Keep the upper third visually quiet — the UI draws a caption over it.
-- Do NOT include: tack, saddle, jockey, any human figure, numbers, stars, text, logos, watermarks, signage,
-  flags, crowd, finish post.
-- No real racehorse names, no real stable or organisation names, no product names — nothing readable at all.
-- Anatomy: four legs per horse, one head, one tail each.
+COAT
+Plain coat for both horses, NO distinctive markings (no blaze, no star, no white socks, no
+patterns). The same image is shown for every player's foal, so it must not look like one specific
+individual. Keep the colour flat enough that a later hue shift on the horses alone stays possible.
+
+FRAMING
+Landscape, 4:3 (it is used at 720 x 540, shown in a 360 x 270 box — integer scale only).
+
+DO NOT INCLUDE
+No tack, no saddle, no bridle, no halter, no jockey, no human figure. No numbers, stars, text,
+letters, logos, signage, flags, watermarks, crowd, finish post.
+No real racehorse names, no real stable or organisation names, no product names — nothing readable.
+★ Fill the whole frame with the scene. Do NOT leave transparent or noisy edges.
+
+ANATOMY
+Two horses only. Four legs, one head, one tail each.
 
 NOTES
-- Coat variants: the art bible plans 5 coat colours as an individual difference (§5), but a horse has NO coat
-  attribute in the database today (the race renderer derives a colour from the gate number only). Per-horse coat
-  cannot be selected, so produce ONE neutral image. Keep the horses' colour flat enough that a later hue shift
-  on the horses alone stays possible.
-- The designer asked for "4:3, 毛色 3 種ぶん、または着色できる 1 枚"; this is the "着色できる 1 枚" option.
-- ⚠️ The art bible's one-line rule says "pixel" (2026-08-13) and the v8 prompt says "photographic realism",
-  but the shipped assets in apps/web/public/art are cel-shaded cartoon. The references above are the truth;
-  the two documents have not been updated. **Owner decided 2026-09-23 in favour of the shipped style**
-  (DESIGN_ART_STYLE_DECISION_20260923.md); correcting the art bible is the reviewer's job.
-- ⚠️ The reference file intro-birth-cut.reference.png is NOT in the repository. If it is missing, bake from
-  the shipped assets alone (horse-jockey-side-v8-pose01.png and apps/web/public/art/uma/chibi-horse.png).
-  Do not invent a different look because a reference is absent.
-
-OUTPUT
-- Save the image as apps/web/public/art/intro-birth-cut.png
-- Save this prompt next to it as apps/web/public/art/intro-birth-cut.prompt.txt (same convention as the other art files).
+- Coat variants: the art bible plans 5 coat colours, but a horse has NO coat attribute in the
+  database today (the race renderer derives a colour from the gate number only). Per-horse coat
+  cannot be selected, so produce ONE neutral image.
+- Style: owner decision 2026-09-23 (DESIGN_ART_STYLE_DECISION_20260923.md) is to match the shipped
+  art. ⚠️ 2026-09-23, second correction: the shipped art has TWO lines — the realistic race
+  sprites and the DEFORMED character art (chibi-horse.png, the title key art). The character art
+  is the one that belongs here. The first bake used the race sprite and was rejected by the owner
+  as "デフォルメのキャラクターと乖離している".

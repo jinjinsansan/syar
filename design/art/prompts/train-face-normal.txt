@@ -1,33 +1,50 @@
 Generate ONE image (no text, no logos, no watermark).
 
-SUBJECT
-A head-and-neck close-up of a single racehorse, three-quarter view facing slightly to the viewer's
-right, cropped at the base of the neck. The head fills most of the frame.
-MOOD: 平常 / CALM AND NEUTRAL — ears relaxed and pointing forward, eye open and steady,
-head held level. Quietly attentive, neither excited nor tired.
+REFERENCE FILE (read it and pass it as a reference image to the image generation tool)
+- CHARACTER AND STYLE reference — match it EXACTLY:
+  apps/web/public/art/uma/chibi-horse.png
 
-STYLE (this is the project's established look — do not invent a new one)
-Cel-shaded cartoon illustration: thick dark outlines, flat-ish colour fills with soft gradients
-inside the outlines, slightly stylised but believable horse proportions.
-NOT pixel art. NOT photographic. No painterly brush strokes, no canvas texture, no sketch lines.
+  ★★ HOW TO USE IT
+  This file decides the DESIGN and the DRAWING STYLE. Reproduce that character's head:
+  the same DEFORMED (chibi-proportioned) cartoon horse — big rounded head, very large
+  expressive eye with a visible white and a heavy dark outline, strong angular brow ridge
+  over the eye, short blunt muzzle, big soft nostril, small rounded ears set wide apart,
+  thick glossy mane in chunky locks, THICK DARK OUTLINES around every shape, bold cel
+  shading with strong highlights and saturated colour.
+  Do NOT draw a realistic or anatomically correct horse head. Do NOT copy its pose,
+  its jockey, its bridle or its background.
+
+SUBJECT
+A head-and-neck close-up of that same deformed cartoon horse, three-quarter view facing
+slightly to the viewer's right, cropped at the base of the neck. The head fills most of the frame.
+MOOD: 平常 / CALM AND NEUTRAL — ears relaxed and pointing forward, the big eye open and steady
+with a soft highlight, brow neutral, head held level. Quietly attentive, neither excited nor tired.
 
 COLOUR AND LIGHT
-Indoor stable at early morning. Soft, low-contrast light from the side. Restrained saturation:
-muted brown coat, straw ochre, blue-grey shadows. Plain bay/brown coat with NO white markings
-(no blaze, no star, no snip) — the same picture is shown for every player's horse, so it must not
-look like one specific individual.
+Indoor stable at early morning, soft light from the side, but keep the bold saturated cartoon
+palette of the reference (rich chestnut-bay coat, dark brown-black mane, warm highlights).
+Plain coat with NO white face markings (no blaze, no star, no snip) — the same picture is shown
+for every player's horse, so it must not look like one specific individual.
+★ The reference has a white blaze; DO NOT copy the blaze. Everything else about the head, yes.
 
 BACKGROUND
-Soft, out-of-focus stable interior: straw, wooden stall boards. Keep it quiet and low contrast.
+Simple, softly blurred stable interior: straw and wooden stall boards, low contrast, so the
+outlined head reads clearly against it.
 
 FRAMING
-Landscape, aspect ratio 192 : 148 (slightly wider than tall). Leave a small margin around the head
-so the image can be cropped square-ish at the edges without cutting the ears.
+Landscape, aspect ratio 192 : 148 (slightly wider than tall). Leave a small margin around the
+head so nothing is cut at the edges, especially the ears.
+★ It will be shown at 96 pixels wide, so the EYE and the EARS must be large and bold enough
+  to read at that size.
+
+MUST INCLUDE
+★ A plain dark-brown leather halter with small brass buckles, drawn in the same thick-outlined
+  cartoon style. The SAME halter appears in all three moods of this set, so it must be present.
 
 DO NOT INCLUDE
-Tack other than a plain leather halter. No jockey, no human figure, no hands. No numbers, stars,
-text, letters, logos, signage, flags, watermarks. No blood, no injury.
+No jockey, no human figure, no hands. No saddle, no bridle, no reins, no bit — only the halter.
+No numbers, stars, text, letters, logos, signage, flags, watermarks. No blood, no injury.
+★ Fill the whole frame with the scene. Do NOT leave transparent or noisy edges.
 
 ANATOMY
-One head, two ears, one visible eye (the far eye may be hidden by the three-quarter angle),
-a plain halter that follows the shape of the head.
+One head, two ears, one visible eye (the far eye may be hidden by the three-quarter angle).
