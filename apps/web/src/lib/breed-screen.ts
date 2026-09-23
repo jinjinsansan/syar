@@ -195,6 +195,8 @@ export interface BreedRequestState {
   readonly resultId: string | null;
   /** ★依頼した時刻（★経過は画面が出す。★サーバーは秒を数えない） */
   readonly createdAtMs: number;
+  /** ★確定したときに払った種付料 [EP]（★`0076`・★B-5 の帯。★成功したときだけ入る） */
+  readonly studFeeEP: number | null;
 }
 
 /**
@@ -229,6 +231,7 @@ export async function loadBreedRequest(requestId: string): Promise<BreedRequestS
   const row = (Array.isArray(data) ? data[0] : data) as {
     readonly status?: string; readonly failure_reason?: string | null;
     readonly result_id?: string | null; readonly created_at?: string;
+    readonly stud_fee_ep?: number | string | null;
   } | undefined;
   if (row === undefined) return null;
   const status = row.status === 'done' || row.status === 'failed' ? row.status : 'pending';
@@ -237,5 +240,6 @@ export async function loadBreedRequest(requestId: string): Promise<BreedRequestS
     failure: status === 'failed' ? breedFailureOf(row.failure_reason ?? null) : null,
     resultId: row.result_id ?? null,
     createdAtMs: row.created_at === undefined ? 0 : new Date(row.created_at).getTime(),
+    studFeeEP: row.stud_fee_ep === null || row.stud_fee_ep === undefined ? null : Number(row.stud_fee_ep),
   };
 }
