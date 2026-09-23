@@ -1,44 +1,50 @@
-You are working in the repository at the current directory. Use your image generation skill (imagegen).
+You are working in the repository at the current directory. Use your image generation skill (imagegen) with reference images.
 
 GOAL
-Create ONE still illustration for the BIRTH CUT in the onboarding flow of the horse-racing breeding game
-(screen 6 "誕生" of the intro board): a NEWBORN FOAL that has just been born, standing unsteadily on straw
-in a quiet stable at dawn, with its dam (adult mare) beside it, seen from the side/three-quarter.
-This is the moment the player first meets the horse they produced. It must feel calm and warm, not triumphant.
+Create ONE still illustration for the BIRTH CUT in the onboarding flow (screen 6 "誕生" of the intro board):
+a NEWBORN FOAL that has just been born, standing unsteadily on straw in a quiet stable at dawn, with its dam
+(adult mare) lowering her head toward it. Side / three-quarter view. This is the moment the player first meets
+the horse they produced: calm and warm, not triumphant.
 
-ONE IMAGE ONLY. No coat-colour variants (the game does not store coat colour; see NOTES).
+ONE IMAGE ONLY (see NOTES for why there are no coat variants).
 
-STYLE (project art bible: design/art/art-bible.md)
-- One-line rule: "競馬場の渋さを、ピクセルで。派手さは勝負服と「間」だけに許す。"
-  Restraint is the default; saturation is reserved for silks and the decisive moment. This scene is NOT that moment.
-- Mood row "育成 / 週送り": indoor, soft light, straw, early-morning stable, low energy.
-- Painterly, low-saturation palette (muted browns, straw ochre, blue-grey dawn light through a window or doorway).
-  Deep navy shadows are fine (the UI ground is #0a2340). No neon, no strong reds.
-- Depth and light carry the feeling; no icons, no symbols, no sparkles, no motion lines.
+STYLE — copy the style of the reference images, not a new look
+- The project's shipped art is CEL-SHADED CARTOON: thick dark outlines, flat-ish shading with soft gradients
+  inside the outline, slightly stylised proportions, no photo texture, no painterly brush strokes, no pixel-art.
+- The two references below are the style anchor. Match their line weight, shading and colour handling exactly.
+- Mood follows the art bible's "育成 / 週送り" row: indoor, soft early-morning light, straw, low energy,
+  restrained saturation (muted browns, straw ochre, blue-grey dawn light). Saturation is reserved for silks
+  and the decisive moment — this scene is neither.
 
 REFERENCE FILES (read them and pass them as reference images)
-- apps/web/public/art/horse-jockey-side-v8.png            (horse anatomy, painterly rendering, light direction)
-- design/art/art-bible.md                                  (palette and mood; text reference only)
+- apps/web/public/art/horse-jockey-side-v8-pose01.png   (style anchor: outlines, cel shading, horse anatomy)
+- design/art/prompts/intro-birth-cut.reference.png      (style anchor from the designer's intro package;
+                                                         copy this file in from the designer ZIP before running)
 
 REQUIREMENTS
-- Aspect ratio 4:3, output 1536 x 1152. Single still image, PNG.
-- Subject: one newborn foal (legs long and folded/unsteady, small body, short fuzzy tail) and one adult mare
-  standing close behind or beside it, lowering her head toward the foal. Both in side or three-quarter view.
-- Coat: a plain neutral bay/brown for both horses, with NO distinctive markings (no blaze, no white socks,
-  no patterns). The image is shown for every player's foal, so it must not look like one specific individual.
-- Setting: stable interior at dawn. Straw on the floor, wooden stall, soft light entering from the side.
-  Empty space on the upper third for a caption the UI draws on top.
-- No tack, no saddle, no jockey, no human figures, no numbers, no stars, no text, no logo, no watermark,
-  no signage, no flags, no crowd, no finish post.
-- No real racehorse names, no real stable or organisation names, no product names of any kind
-  (nothing readable in the image at all).
-- Anatomy must be correct: four legs per horse, one head, one tail each.
+- Output size 720 x 540 (4:3). The UI shows it in a 360 x 270 box, so this is exactly 2x (integer scale only —
+  the art bible forbids non-integer scaling). Do not output 1536-wide or any size that is not an integer
+  multiple of 360 x 270.
+- Subject: one newborn foal (long folded unsteady legs, small body, short fuzzy tail) and one adult mare
+  close behind or beside it, head lowered toward the foal.
+- Coat: plain neutral bay/brown for both horses, NO distinctive markings (no blaze, no white socks, no patterns).
+  The same image is shown for every player's foal, so it must not look like one specific individual.
+- Setting: stable interior at dawn. Straw on the floor, wooden stall, soft light from the side.
+  Keep the upper third visually quiet — the UI draws a caption over it.
+- Do NOT include: tack, saddle, jockey, any human figure, numbers, stars, text, logos, watermarks, signage,
+  flags, crowd, finish post.
+- No real racehorse names, no real stable or organisation names, no product names — nothing readable at all.
+- Anatomy: four legs per horse, one head, one tail each.
 
-NOTES (why it is one image, not three)
-- The designer's handoff asked for "4:3, 毛色 3 種ぶん、または着色できる 1 枚". The game has no coat-colour
-  attribute on a horse (the race renderer derives a colour from the gate number only), so per-coat variants
-  cannot be selected correctly. Produce ONE neutral image. If recolouring is wanted later, keep the source
-  layered/neutral enough that a hue shift on the horses alone is possible.
+NOTES
+- Coat variants: the art bible plans 5 coat colours as an individual difference (§5), but a horse has NO coat
+  attribute in the database today (the race renderer derives a colour from the gate number only). Per-horse coat
+  cannot be selected, so produce ONE neutral image. Keep the horses' colour flat enough that a later hue shift
+  on the horses alone stays possible.
+- The designer asked for "4:3, 毛色 3 種ぶん、または着色できる 1 枚"; this is the "着色できる 1 枚" option.
+- ⚠️ The art bible's one-line rule says "pixel" (2026-08-13) and the v8 prompt says "photographic realism",
+  but the shipped assets in apps/web/public/art are cel-shaded cartoon. The references above are the truth;
+  the two documents have not been updated. Reported separately — do not follow the documents over the images.
 
 OUTPUT
 - Save the image as apps/web/public/art/intro-birth-cut.png
