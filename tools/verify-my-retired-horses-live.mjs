@@ -88,6 +88,8 @@ const EXPECTED_COLUMNS = [
   'retirement_reason', 'retirement_role', 'foal_count', 'g1_wins', 'wins', 'starts',
   'sire_name', 'dam_name', 'broodmare_count', 'stallion_count',
   'broodmare_limit', 'stallion_limit', 'lifetime_foals', 'broodmare_block', 'stallion_block',
+  // ★0075: ★canMate に渡す事実（★判定はしない）
+  'bred_this_year', 'coverings_this_year',
 ];
 /** ★出てはいけない語（★素質・能力・遺伝子・D-114 / D-116） */
 const FORBIDDEN = [

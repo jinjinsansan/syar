@@ -116,6 +116,11 @@ const SAFE_REASONS: Readonly<Record<string, string>> = {
   // ★配合の可否（★素質を返さない）
   MateRejection: '★断る理由', MateCheck: '★可否', stallionCoveringLimit: '★種付け上限', canMate: '★可否の判定',
   applyMatingCounters: '★回数の更新',
+  // ★相手を決める前の「選べない」（★第 2 便 B-1 / B-2・★2026-09-23）。★**素質は 1 つも含まない**
+  //   ★`MateCandidate` は ★性別・誕生年・産駒数・今年産んだか・今年の種付数・最高格の勝ち数 の 7 つだけ。
+  //   ★これらは ★既に画面に出している事実です（★`my_retired_horses` / `npc_stallion_facts`）。
+  MateCandidate: '★可否を見るのに要る事実だけの型（★素質を含まない）',
+  damBlockOf: '★この母が選べるか', sireBlockOf: '★この父が選べるか',
   // ★ニックス（★相性の倍率。★個体の素質は出ない）
   NicksTable: '★系統の相性表', nicksKey: '★その鍵', getNicksMultiplier: '★倍率', makeLineIds: '★系統 id の生成',
   generateNicksTable: '★表の生成',

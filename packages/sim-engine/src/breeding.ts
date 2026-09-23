@@ -41,14 +41,36 @@ export interface MateCheck {
   reason?: MateRejection;
 }
 
+/**
+ * ★**交配の可否を見るのに要る事実だけ**（★2026-09-23）。
+ *
+ * 【★なぜ切り出したか】
+ *   ★配合の画面は「この母は選べるか」を先に出す（★第 2 便 B-1: 薄く出して選べなくする）。
+ *   ★画面がその条件を書き直すと、★確定するワーカーと**判定が 2 つ**になる（★役割の画面と同じ壊れ方）。
+ *   → ★画面も ★**この `canMate` を呼びます**。★`HorseRecord` は素質や遺伝子まで要るので、
+ *     ★**画面に渡らない**（D-114・D-116）。★だから引数をこの 7 つに狭めました。
+ *
+ * ⚠️ ★`HorseRecord` はこの形を満たすので、★**既存の呼び出しはそのまま通ります**。
+ * ⚠️ ★`birthYear` の尺度は ★**呼ぶ側が揃えること**（★ワーカーは `gameYearOf(birth_week)`）。
+ */
+export interface MateCandidate {
+  readonly id: HorseId;
+  readonly sex: Sex;
+  readonly birthYear: number;
+  readonly foalCount: number;
+  readonly bredThisYear: boolean;
+  readonly coveringsThisYear: number;
+  readonly g1Wins: number;
+}
+
 /** 種牡馬の年間種付上限（正典 §6.7: 20 + G1勝利数 × 10） */
-export function stallionCoveringLimit(sire: HorseRecord, balance: BalanceConfig): number {
+export function stallionCoveringLimit(sire: Pick<MateCandidate, 'g1Wins'>, balance: BalanceConfig): number {
   return balance.STALLION_BASE_COVERINGS + sire.g1Wins * balance.STALLION_COVERINGS_PER_G1;
 }
 
 export function canMate(
-  sire: HorseRecord,
-  dam: HorseRecord,
+  sire: MateCandidate,
+  dam: MateCandidate,
   balance: BalanceConfig,
   year: number,
 ): MateCheck {
@@ -70,6 +92,39 @@ export function canMate(
     return { ok: false, reason: 'sire_coverings_exceeded' };
   }
   return { ok: true };
+}
+
+/**
+ * ★**相手を決める前に「この母（この父）は選べるか」を見る**（★第 2 便 B-1 / B-2・2026-09-23）。
+ *
+ * 【🔴 ★判定を増やさないための作り】
+ *   ★一覧では相手がまだ決まっていない。★だからといって ★**条件を書き写すと判定が 2 つ**になる。
+ *   → ★**「どんな相手でも通る理想の相手」と組ませて `canMate` を呼びます。**
+ *     ★返ってきた理由は ★**必ず見ている側のもの**です（★相手側の条件は理想の相手が満たすため）。
+ *   ⚠️ ★理想の相手は ★**この関数の中だけ**で作ります（★DB にも画面にも出しません）。
+ *   ⚠️ ★`canMate` の条件が増えた日も、★**この 2 つは自動で追随します**（★書き写していないので）。
+ */
+function idealPartner(sex: Sex, year: number, balance: BalanceConfig): MateCandidate {
+  return {
+    id: '__ideal__' as HorseId,
+    sex,
+    // ★十分に年上（★`MIN_BREEDING_AGE_YEARS` を必ず満たす）
+    birthYear: year - balance.MIN_BREEDING_AGE_YEARS,
+    foalCount: 0,
+    bredThisYear: false,
+    coveringsThisYear: 0,
+    g1Wins: 0,
+  };
+}
+
+/** ★この母が選べるか（★選べないなら理由）。★`null` なら選べる */
+export function damBlockOf(dam: MateCandidate, balance: BalanceConfig, year: number): MateRejection | null {
+  return canMate(idealPartner('male', year, balance), dam, balance, year).reason ?? null;
+}
+
+/** ★この父が選べるか（★選べないなら理由）。★`null` なら選べる */
+export function sireBlockOf(sire: MateCandidate, balance: BalanceConfig, year: number): MateRejection | null {
+  return canMate(sire, idealPartner('female', year, balance), balance, year).reason ?? null;
 }
 
 /** 交配成立後の繁殖カウンタ更新（生涯8産・年間種付上限の管理） */
