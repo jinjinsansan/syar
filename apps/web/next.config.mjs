@@ -45,6 +45,21 @@ const BUILD_STAMP = new Date().toISOString().slice(11, 19);
  */
 const DIST_DIR = process.env['STAR_NEXT_DIST_DIR'] ?? '.next';
 
+/**
+ * ★**起動時に、繋ぐ先を 1 行 出します**（★裁定 `REVIEW_HORSE_IDENTITY_VERDICT_20260923.md` §14-2）。
+ *
+ * 🔴 ★この PC の開発サーバーは ★**本番の DB に繋がっていました**。★人が見て確かめられる形にします。
+ * ⚠️ ★**書き換えた名札ではなく**、★クライアントが実際に使う `NEXT_PUBLIC_SUPABASE_URL` から出します。
+ * ⚠️ ★本番の配信（`next build`）でも出ますが、★これは **Vercel のビルドログ**に出るだけで、
+ *    ★利用者の画面には出ません（★帯のほうは `NODE_ENV` で止めています）。
+ */
+{
+  const raw = process.env['NEXT_PUBLIC_SUPABASE_URL'] ?? '';
+  let host = '（未設定）';
+  try { if (raw !== '') host = new URL(raw).host; } catch { host = '（読めません）'; }
+  console.log(`★STAR: 繋ぎ先 ${host} ／ NODE_ENV=${process.env.NODE_ENV ?? '(未設定)'} ／ 出力先 ${DIST_DIR}`);
+}
+
 export default {
   distDir: DIST_DIR,
   env: { NEXT_PUBLIC_BUILD_STAMP: BUILD_STAMP },

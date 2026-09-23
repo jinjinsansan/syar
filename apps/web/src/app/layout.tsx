@@ -1,6 +1,7 @@
 import './globals.css';
 import './story-theme.css';
 import { StoryShell } from '../components/story-shell';
+import { ConnectedBanner } from '../components/connected-banner';
 
 export const metadata = { title: '馬物語', description: '育てる。走る。つながっていく。オンライン競馬育成ゲーム' };
 
@@ -28,6 +29,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           })();
         ` }} />
         <StoryShell>{children}</StoryShell>
+        {/* ★いまどこに繋いでいるかの帯（★本番の配信では出ない・裁定 §14） */}
+        <ConnectedBanner />
       </body>
     </html>
   );
