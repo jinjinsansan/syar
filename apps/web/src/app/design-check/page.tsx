@@ -230,7 +230,7 @@ export default function DesignCheckPage(): React.ReactElement {
       {/* ★毛色（★同じ 1 枚の絵に、画面と同じ CSS を掛けている・★焼き直していない） */}
       <section aria-labelledby="coat" style={{ marginBottom: 22 }}>
         <h2 id="coat" style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 900, color: '#ffd84a' }}>
-          毛色 7 種（同じ絵に色を掛けているだけ）
+          毛色 9 種（同じ絵に色を掛けているだけ）
         </h2>
         <p style={{ margin: '0 0 8px', fontSize: 11, color: '#9fb6cc', lineHeight: 1.7 }}>
           絵は 1 枚（調教の待機）。輪郭は 1 画素も変えていません。色は画面が使うのと同じ式です。
@@ -252,7 +252,7 @@ export default function DesignCheckPage(): React.ReactElement {
           新しい規則で 18 頭を枠順に並べた出走表
         </h2>
         <p style={{ margin: '0 0 8px', fontSize: 11, color: '#9fb6cc', lineHeight: 1.7 }}>
-          毛色は馬 ID から引いています。隣どうしが同じ毛色になる組は 12 頭立てで平均 3.42 組（古い規則は 1 組）。
+          毛色は馬 ID から引いています。隣どうしが同じ毛色になる組は 12 頭立てで平均 1.90 組（第 3 便の 9 種・重み組み直し後の実測）。
         </p>
         <div style={{ display: 'flex', gap: 4, overflowX: 'auto', background: '#091e37', padding: 8, borderRadius: 10 }}>
           {Array.from({ length: 18 }, (_, i) => {
