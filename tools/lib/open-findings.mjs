@@ -1423,6 +1423,25 @@ export const WATCHING = [
     reviewBy: '2026-12-31',
   },
   {
+    id: 'COAT-PALOMINO-WHITE-NOT-BAKED',
+    what: '🔴 ★**月毛（`palomino`）と白毛（`white`）は、★レースでは出せません。**'
+      + '★① `COAT_TRANSFORMS`（★写真系の素材用）に足した値は ★**デフォルメの絵で決めたもの**で、'
+      + '★写真系での見え方を ★**確かめていません**。'
+      + '★② ★**焼いた素材（`apps/web/public/art/baked/`）に 2 種がありません**（★目録の `coats` は 7 種のまま）。'
+      + '★③ ★レースは いま毛色を ★**枠番**から引く（`race/page.tsx` の `COAT_BY_GATE`・7 種）ので、'
+      + '★**この 2 種には到達せず、いま実害は出ていません**',
+    why: '✔ ★デザイナー第 3 便（2026-09-23）の値をそのまま入れた（`3533832`）。'
+      + '★型（`CoatName = keyof typeof COAT_TRANSFORMS`）を通すため、★写真系の表にも足す必要があった。'
+      + '✔ ★焼いた素材の目録を読んで確かめた: ★`sets[].coats` の鍵は '
+      + '★`bay / chestnut / liver-chestnut / dark-bay / seal-brown / blue-black / grey` の 7 つ。'
+      + '⚠️ ★レースを ★**馬 ID から引く**ようにした日に、★この 2 種で `set.coats[coat]` が `undefined` になり、'
+      + '★**その馬だけ描けなくなります**',
+    returnWhen: '★**レースの毛色を馬 ID から引くようにする日**（★Q-4 / 中継を実レースに繋ぐ便と同じ束）。'
+      + '★そのとき ①焼く工程で 2 種を足す ②写真系の値を実画面で確かめる ③目録の鍵を 9 種にする',
+    owner: 'dev',
+    reviewBy: '2026-12-31',
+  },
+  {
     id: 'CATCHUP-TOO-SLOW',
     what: '✅ ★**所要としては閉じました**（★1 分 前後。★私の「3.3〜15 時間」は誤りでした）。'
       + '🔴 ★**残しているのは ①測った数 ②並列化できない理由 ③`AU-26`/`AU-27`** の 3 つ。'
