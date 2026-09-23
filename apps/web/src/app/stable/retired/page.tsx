@@ -38,8 +38,8 @@ const TYPE_TONE: Readonly<Record<StoryEventType, { readonly bg: string; readonly
   injury: { bg: '#ffe4e1', border: '#a81a13', color: '#a81a13' },
   'final-race': { bg: '#ffeadb', border: '#b5651d', color: '#b5651d' },
   retirement: { bg: '#e3e8ec', border: '#4a5a66', color: '#4a5a66' },
-  // ★仮に「引退」と同じ色（★I-1 段 3・画面は kind='breed' の便でデザイナーが決める）
-  'breeding-role-changed': { bg: '#e3e8ec', border: '#4a5a66', color: '#4a5a66' },
+  // ★デザイナー決定（★第 2 便 `design_handoff_breed_v2/README.md` §2・2026-09-23）。★仮の「引退」と同じ色から置き換えた
+  'breeding-role-changed': { bg: '#dcf1ef', border: '#0e7a73', color: '#0e7a73' },
 };
 
 /** ★最初に見せる行数（★30〜40 行でも読めるように畳む・カードの指定） */
