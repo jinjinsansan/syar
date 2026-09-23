@@ -9,6 +9,8 @@ the horse they produced: calm and warm, not triumphant.
 ONE IMAGE ONLY (see NOTES for why there are no coat variants).
 
 STYLE — copy the style of the reference images, not a new look
+- Owner decision 2026-09-23 (DESIGN_ART_STYLE_DECISION_20260923.md): the project's style is CEL-SHADED CARTOON.
+  This settles the conflict noted at the bottom of this file — follow the references, not the documents.
 - The project's shipped art is CEL-SHADED CARTOON: thick dark outlines, flat-ish shading with soft gradients
   inside the outline, slightly stylised proportions, no photo texture, no painterly brush strokes, no pixel-art.
 - The two references below are the style anchor. Match their line weight, shading and colour handling exactly.
@@ -44,7 +46,11 @@ NOTES
 - The designer asked for "4:3, 毛色 3 種ぶん、または着色できる 1 枚"; this is the "着色できる 1 枚" option.
 - ⚠️ The art bible's one-line rule says "pixel" (2026-08-13) and the v8 prompt says "photographic realism",
   but the shipped assets in apps/web/public/art are cel-shaded cartoon. The references above are the truth;
-  the two documents have not been updated. Reported separately — do not follow the documents over the images.
+  the two documents have not been updated. **Owner decided 2026-09-23 in favour of the shipped style**
+  (DESIGN_ART_STYLE_DECISION_20260923.md); correcting the art bible is the reviewer's job.
+- ⚠️ The reference file intro-birth-cut.reference.png is NOT in the repository. If it is missing, bake from
+  the shipped assets alone (horse-jockey-side-v8-pose01.png and apps/web/public/art/uma/chibi-horse.png).
+  Do not invent a different look because a reference is absent.
 
 OUTPUT
 - Save the image as apps/web/public/art/intro-birth-cut.png

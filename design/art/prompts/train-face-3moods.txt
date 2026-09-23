@@ -1,0 +1,57 @@
+You are working in the repository at the current directory. Use your image generation skill (imagegen)
+with reference images.
+
+GOAL
+Create THREE face close-ups of the SAME horse for the training screen's face box (/train).
+They are swapped by the horse's condition, so they must read as the same individual in three moods:
+
+  1. happy   — 上機嫌  (content, alert, ears forward, eye bright, slight lift of the head)
+  2. normal  — 平常    (calm, neutral, ears relaxed forward, steady gaze)
+  3. tired   — 疲れ    (weary, ears slightly back/drooping, eyelid lower, head a little lower)
+
+The difference must be readable at 96 px wide. Change EARS, EYELID and HEAD ANGLE — do not change
+the horse's colour, markings, halter or framing between the three.
+
+STYLE — copy the shipped art, not a new look
+- Owner decision 2026-09-23 (DESIGN_ART_STYLE_DECISION_20260923.md): the project's style is
+  CEL-SHADED CARTOON — thick dark outlines, flat-ish shading with soft gradients inside the outline,
+  slightly stylised proportions. NOT pixel art. NOT photographic. No painterly brush strokes.
+- The art bible still says "pixel" and side-v8.txt says "photographic realism"; both are out of date
+  and are being corrected separately. FOLLOW THE REFERENCE IMAGES, not those documents.
+- Mood follows the art bible's "育成 / 週送り" row: indoor, soft early-morning light, straw,
+  low energy, restrained saturation (muted browns, straw ochre, blue-grey light).
+
+REFERENCE FILES (read them and pass them as reference images)
+- apps/web/public/art/uma/chibi-horse.png        (style + this exact character: the face box currently
+                                                  crops this image, so the new faces must match it)
+- apps/web/public/art/horse-jockey-side-v8-pose01.png  (outlines, cel shading, horse anatomy)
+
+REQUIREMENTS
+- Output size 192 x 148 for EACH image. The UI box is 96 x 74, so this is exactly 2x
+  (integer scale only — see the size rule, which is unchanged by the style decision).
+- Head-and-neck close-up, three-quarter view facing slightly to the viewer's right.
+  The head fills most of the frame; crop at the base of the neck.
+- Same coat as apps/web/public/art/uma/chibi-horse.png (plain, no blaze, no white socks visible).
+  The same three images are shown for every player's horse, so it must not look like one individual
+  with distinctive markings.
+- Background: soft, out-of-focus stable interior (straw, wooden stall). Keep it quiet and low-contrast —
+  the UI draws a gold border around the box and a caption strip under it.
+- Do NOT include: tack beyond a plain halter, jockey, any human figure, numbers, stars, text, logos,
+  watermarks, signage, flags.
+- No real racehorse names, no real stable or organisation names, no product names — nothing readable.
+- Anatomy: one head, two ears, two eyes (one may be hidden by the three-quarter angle).
+
+WHY THREE AND NOT MORE
+The screen shows only three states. Do not produce variants for coat colour: a horse has no coat
+attribute in the database today (the race renderer derives a colour from the gate number only).
+
+OUTPUT
+- apps/web/public/art/uma/train-face-happy.png
+- apps/web/public/art/uma/train-face-normal.png
+- apps/web/public/art/uma/train-face-tired.png
+- Save this prompt next to them as apps/web/public/art/uma/train-face-3moods.prompt.txt
+  (same convention as the other art files).
+
+AFTER BAKING
+Run `git status` and check for stray working files under apps/web/public/art.
+Move duplicates to out/gen/codex-strays/ (this has happened before).
