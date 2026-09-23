@@ -89,6 +89,15 @@ export interface RetiredHorseView {
   readonly sex: string;
   /** ★誕生の週が無ければ `null`（★推測しない） */
   readonly ageYears: number | null;
+  /**
+   * ★誕生の週（★`0075`）。★配合の一覧が ★`canMate` に渡す事実です。
+   * ⚠️ ★年齢の計算をここでやり直さないでください（★`ageYears` が既に出ています）。
+   */
+  readonly birthWeek: number | null;
+  /** ★今年もう産んだか（★`0075`・★B-1 が薄く出す素） */
+  readonly bredThisYear: boolean;
+  /** ★今年の種付数（★`0075`・★牡のとき使う） */
+  readonly coveringsThisYear: number;
   readonly role: RetirementRole;
   readonly foalCount: number;
   readonly g1Wins: number;
@@ -128,6 +137,9 @@ export interface RetiredHorseRow {
   readonly dam_name: string | null;
   readonly broodmare_block: string | null;
   readonly stallion_block: string | null;
+  /** ★`0075` で足した事実（★判定はサーバーでなく `canMate` が持つ・B-1） */
+  readonly bred_this_year: boolean;
+  readonly coverings_this_year: number | string;
 }
 
 function roleOf(value: string): RetirementRole {
@@ -155,6 +167,9 @@ export function toRetiredHorseView(row: RetiredHorseRow, gameWeek: number): Reti
     name: row.horse_name,
     sex: row.horse_sex,
     ageYears: birthWeek === null ? null : Math.max(0, Math.floor((gameWeek - birthWeek) / WEEKS_PER_YEAR)),
+    birthWeek,
+    bredThisYear: row.bred_this_year === true,
+    coveringsThisYear: Number(row.coverings_this_year ?? 0),
     role: roleOf(row.retirement_role),
     foalCount: Number(row.foal_count),
     g1Wins: Number(row.g1_wins),

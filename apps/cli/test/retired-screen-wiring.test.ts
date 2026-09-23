@@ -34,6 +34,9 @@ const row = (over: Partial<RetiredHorseRow> = {}): RetiredHorseRow => ({
   dam_name: 'ハハウマ',
   broodmare_block: null,
   stallion_block: 'sex_mismatch',
+  // ★`0075` で足した事実（★B-1 の「選べない母」を canMate が判定するための素）
+  bred_this_year: false,
+  coverings_this_year: 0,
   ...over,
 });
 
