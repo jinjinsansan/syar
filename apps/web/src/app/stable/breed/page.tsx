@@ -412,7 +412,7 @@ function Head({ text, right }: { readonly text: string; readonly right: string |
 
 function Shell({ children }: { readonly children: React.ReactNode }): React.ReactElement {
   return (
-    <div style={{ minHeight: '100%', background: '#0a2340', color: '#fbf7ec' }}>
+    <div style={{ minHeight: '100dvh', background: '#0a2340', color: '#fbf7ec' }}>
       <div style={{ width: '100%', maxWidth: 1100, margin: '0 auto', padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>配合</div>
         {children}

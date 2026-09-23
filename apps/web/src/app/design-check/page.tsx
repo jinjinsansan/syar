@@ -42,22 +42,6 @@ const COAT_LABEL: Readonly<Record<CoatName, string>> = {
   palomino: '月毛', white: '白毛',
 };
 
-/**
- * ★たてがみ・尾の色の候補（★2026-09-23・オーナー案）。
- * 🔴 ⚠️ ★**この色は捨てます。** ★開発側が仮に置いたもので、★オーナー評「センスが悪いです」。
- *    ★**色を決めるのはデザイナー**です（★2026-09-15 のオーナー指示「デザインは必ずデザイナーに」）。
- *    ★ここに残しているのは ★**仕組みが動くことを見せるため**だけ
- *    （★灰色の層に掛け算で色が載り、★焼き分けなくて済むこと）。
- *    ★依頼は `DESIGN_REQUEST_HORSE_IDENTITY_20260923.md`。
- */
-const MANE_COLORS: readonly { readonly key: string; readonly label: string; readonly hex: string }[] = [
-  { key: 'black', label: '黒', hex: '#3a332e' },
-  { key: 'red', label: '赤', hex: '#b8461c' },
-  { key: 'flaxen', label: '亜麻色', hex: '#c39a4c' },
-  { key: 'white', label: '白', hex: '#eceae6' },
-  { key: 'silver', label: '銀', hex: '#aab0b8' },
-];
-
 /** ★本番の馬 ID と同じ形（★出走表の見本を決定論で作る） */
 const idAt = (n: number): string => `0f000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
 
@@ -272,43 +256,14 @@ export default function DesignCheckPage(): React.ReactElement {
         </div>
       </section>
 
-      {/* ★たてがみ・尾の色（★灰色の層に、実画面の CSS で色を掛けている・★焼き分けていない） */}
-      <section aria-labelledby="mane" style={{ marginBottom: 22 }}>
-        <h2 id="mane" style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 900, color: '#ffd84a' }}>
-          たてがみ・尾の色（★仕組みの確認だけ・色は仮）
-        </h2>
-        <p style={{ margin: '0 0 8px', fontSize: 11, color: '#9fb6cc', lineHeight: 1.7 }}>
-🔴 この 5 色は仮です（デザイナーの第 3 便の値に差し替えます）。層は指定どおり明るい灰（平均 221 / 255）で抜き直し、尾の先まで含めました。
-          ここで見てほしいのは仕組みだけです — たてがみの層は中間の灰色で 1 枚（12 KB）持ち、色は画面で掛けています。
-          毛色ごとに焼き分けていないので、焼いた素材は増えません。
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, background: '#091e37', padding: 10, borderRadius: 10 }}>
-          {MANE_COLORS.map((m) => (
-            <div key={m.key} style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
-              <div style={{ position: 'relative', width: 120, height: 128 }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/art/uma/train-body-idle.webp" alt="" width={120} height={128}
-                  style={{ position: 'absolute', inset: 0, width: 120, height: 128, objectFit: 'contain' }} />
-                <div
-                  style={{
-                    position: 'absolute', inset: 0,
-                    backgroundColor: m.hex,
-                    backgroundImage: "url('/art/uma/train-body-idle-mane.webp')",
-                    backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center',
-                    backgroundBlendMode: 'multiply',
-                    WebkitMaskImage: "url('/art/uma/train-body-idle-mane.webp')",
-                    maskImage: "url('/art/uma/train-body-idle-mane.webp')",
-                    WebkitMaskSize: 'contain', maskSize: 'contain',
-                    WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
-                    WebkitMaskPosition: 'center', maskPosition: 'center',
-                  }}
-                />
-              </div>
-              <span style={{ fontSize: 11 }}>{m.label}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/*
+        🔴 ★**たてがみの色替えは取り下げました**（★2026-09-24・オーナー指摘
+          ★「★今のたてがみの色変えは、馬としての生物から逸脱しており逆に見苦しい」）。
+        ★裁定 `REVIEW_HORSE_LOOK_4POINTS_VERDICT_20260924.md` §2 で取り下げが確定。
+        ★根拠: ★他人の馬が出るのは ★**レースと種牡馬の一覧だけ**で、★レースは勝負服で見分けられ、
+          ★育成・厩舎に出るのは ★**自分の馬だけ**。★だから「見分け」の目的は壊れない。
+        ⚠️ ★層（`train-body-idle-mane.webp`）と抜き出しの道具は残してある（★本番結線の束で再検討）。
+      */}
 
       <section aria-labelledby="impl">
         <h2 id="impl" style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 900, color: '#ffd84a' }}>

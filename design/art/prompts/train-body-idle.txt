@@ -6,23 +6,37 @@ REFERENCE FILES (read them and pass them as reference images to the image genera
 - SECOND view of the same horse (three-quarter front):
   apps/web/public/art/horse-jockey-diag-front-v4-pose01.png
 
-  ★★ CRITICAL — HOW TO USE THE REFERENCES
-  They decide the DESIGN and the PROPORTIONS. Reproduce that horse EXACTLY:
-  the head shape and size RELATIVE TO THE BODY, the eye (almond, heavy dark outline, angular brow),
-  the muzzle, the ear shape, the NECK LENGTH AND ARCH, the SLIM DEEP CHEST, the LONG SLENDER LEGS,
-  the fine cannon bones, the hoof shape, the mane and tail.
-  ★ This horse has ATHLETIC RACEHORSE PROPORTIONS — long legs, a deep but narrow chest,
-    a head that is SMALL relative to the body. It is NOT a chibi pony.
+  ★★ CRITICAL — COPY THE REFERENCE. DO NOT INTERPRET IT.
+  The reference is a CARTOON CHARACTER, not a realistic horse illustration and not a chibi pony.
+  Reproduce it as drawn:
+    ・the LARGE expressive eye with a white, a heavy dark outline and an angular brow above it
+    ・THICK dark outlines around every shape, of the same weight as the reference
+    ・simplified, rounded forms — few shapes, wide soft shading, no anatomical detail,
+      no visible veins, no tendon lines, no realistic muscle definition
+    ・CHUNKY lower legs and BIG rounded hooves, as drawn in the reference
+    ・the mane and tail as thick glossy shapes with pointed tips
+    ・the same head size relative to the body as the reference
+  ★ Do NOT make it slimmer, more elegant or more realistic than the reference.
+  ★ Do NOT make it rounder, shorter-legged or more toy-like than the reference.
+  ★ If your drawing could pass for a real horse photograph traced, it is WRONG.
   Do NOT copy the pose. Do NOT draw the jockey, saddle, bridle, reins or number cloth.
-  Do NOT copy any white blaze or white socks — this horse has NO white markings.
+  Do NOT copy any white blaze or white socks.
 
-★★ WHAT WENT WRONG BEFORE — DO NOT REPEAT
-  Two earlier attempts were rejected by the owner.
-  1. The first was built from a chibi key-art horse: big head, short thick legs, barrel body.
-     ★ WRONG. The owner compared it with the race screen and said it looks like a different animal.
-       ★ The training screen shows THE SAME HORSE that runs in the race, so it must match the race art.
-  2. An attempt drew carved, separated body-builder muscles and a mane made of many small tufts.
-     ★ WRONG. Shading is smooth and wide; the mane is one flowing shape.
+★★ THE THREE THINGS THAT MUST MATCH THE REFERENCE — CHECK THEM BEFORE YOU FINISH
+  1. HEAD LENGTH. The reference's head is SHORT and DEEP — the distance from eye to muzzle is
+     short, the jaw is round and full. My earlier attempts drew a LONG narrow face. Shorten it.
+  2. EYE SIZE. The reference's eye is LARGE relative to the head — it takes a big part of the
+     face, with a visible white, a heavy dark outline and an angular brow. Do not shrink it.
+  3. NECK. The reference's neck is SHORT and THICK where it meets the body, with a strong crest.
+     Do not draw a long slender neck.
+  ★ Put the reference beside your drawing and compare these three before finishing.
+
+★★ TWO EARLIER ATTEMPTS WERE REJECTED — BOTH BECAUSE I ADDED MY OWN INTERPRETATION
+  1. I wrote "deformed chibi pony" → the owner said it looks nothing like the race horses.
+  2. I wrote "athletic racehorse, not a chibi pony" → the owner said
+     「急にスマートになっています。デフォルメのキャラクターではない」
+     (“it suddenly became slim; this is not the deformed character”).
+  ★ So: add nothing. Copy the reference's proportions and line work exactly.
 
 SUBJECT
 The horse ALONE, standing still and relaxed in a training yard, seen from the SIDE and slightly

@@ -294,7 +294,7 @@ const SECONDARY: React.CSSProperties = {
 
 function Shell({ children }: { readonly children: React.ReactNode }): React.ReactElement {
   return (
-    <div style={{ minHeight: '100%', background: '#0a2340', color: '#fbf7ec' }}>
+    <div style={{ minHeight: '100dvh', background: '#0a2340', color: '#fbf7ec' }}>
       <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>名前を付ける</div>
         {children}

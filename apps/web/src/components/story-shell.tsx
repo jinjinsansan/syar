@@ -73,6 +73,16 @@ const OWN_HEADER = [
   '/login', '/signup', '/forgot-password', '/reset-password', '/setup',
   /** ★デザイン確認の一覧（★2026-09-17）。★自前の見出しを持つので帯を足さない */
   '/design-check',
+  /**
+   * 🔴 ★**4 度目の入れ忘れ**（★2026-09-24・オーナー指摘
+   *   ★「★古いデザインはこの外枠の白のエリア全てです」）。
+   *   ★第 2 便の 3 画面（役割・配合・命名）は ★**自前の全画面の枠**を持つのに、
+   *   ★`OWN_HEADER` に入れ忘れたため、★**白い旧い枠の中に収まって**いました。
+   * ⚠️ ★網（`own-header-coverage.test.ts`）は ★**`uma-parts` を使う面**しか見ておらず、
+   *    ★この 3 つは `uma-parts` を使わない（★自前の `Shell`）ので ★**通り抜けました**。
+   *    → ★網を「自前の `Shell` を持つ面」にも広げます。
+   */
+  '/stable/roles', '/stable/breed', '/stable/name',
 ];
 
 /** Presentation boundary: racing canvases, labs and both landing pages keep their own layout. */
