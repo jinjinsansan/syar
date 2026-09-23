@@ -18,6 +18,7 @@
 import { WEEKS_PER_YEAR } from '@star/scheduler';
 import { rankOfWins } from '@star/scheduler';
 
+import { ownerSilksOf } from '@star/render';
 import { authClient, readClient } from './supabase';
 import type { HorseDetail, StableHorse, StableRepo, StableView, WeekPlan } from './stable';
 
@@ -126,7 +127,7 @@ export const supabaseStableRepo: StableRepo = {
     const { data: sessionData } = await authClient().auth.getSession();
     if (sessionData.session === null) throw new SignInRequiredError();
     const userRes = await authClient().from('users')
-      .select('entry_points, prize_points, stable_name').eq('id', sessionData.session.user.id).limit(1);
+      .select('entry_points, prize_points, stable_name, silk_color, silk_sleeve').eq('id', sessionData.session.user.id).limit(1);
     if (userRes.error !== null) {
       throw new Error(`users を読めませんでした: ${userRes.error.message}`);
     }
@@ -163,6 +164,11 @@ export const supabaseStableRepo: StableRepo = {
       home: {
         displayName: String(userRes.data?.[0]?.stable_name ?? ''),
         stableName: String(userRes.data?.[0]?.stable_name ?? ''),
+        // ★勝負服（★裁定 §2・2026-09-23）。★色の出どころは @star/render の 1 か所
+        silks: ownerSilksOf({
+          silkColor: userRes.data?.[0]?.silk_color as string | null | undefined,
+          silkSleeve: userRes.data?.[0]?.silk_sleeve as string | null | undefined,
+        }),
         epBalance: Number(userRes.data?.[0]?.entry_points ?? 0),
         ppBalance: Number(userRes.data?.[0]?.prize_points ?? 0),
         notices: 0,

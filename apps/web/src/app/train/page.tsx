@@ -71,6 +71,8 @@ export default function TrainPage(): React.ReactElement {
   const cond = conditionView(horse.condition);
   /** ★顔は 3 種。★選ぶ規則は画面に置かない（★`trainFaceOf`・疲労が先） */
   const face = trainFaceOf(horse.condition, horse.fatigue);
+  /** ★この牧場の勝負服（★読めないうちは出さない） */
+  const silks = view?.home.silks;
 
   return (
     <div
@@ -111,6 +113,24 @@ export default function TrainPage(): React.ReactElement {
             <span style={{ padding: '5px 9px', border: '2px solid rgba(251,247,236,.35)', borderRadius: 999, background: 'var(--u-panel)', fontSize: 11, fontWeight: 700 }}>
               {running ? '調教中' : `${horse.name}・${cond.label}`}
             </span>
+            {/*
+              ★**この牧場の勝負服**（★裁定 §2・2026-09-23）。★初回設定で選ばせた色を、育成でも出す。
+              ⚠️ ★色は `ownerSilksOf` が決める（★画面に色表を持たない）。★強さは一切含まない（D-114）。
+              ⚠️ ★見せ方は仮。★デザイナーの指示で差し替える。
+            */}
+            {silks !== undefined && (
+              <span
+                title={`${silks.label}の勝負服`}
+                style={{
+                  display: 'inline-flex', width: 34, height: 22, borderRadius: 5, overflow: 'hidden',
+                  border: '2px solid rgba(251,247,236,.55)',
+                }}
+              >
+                <span style={{ flex: 1, background: silks.sleeveHex }} />
+                <span style={{ flex: 1.6, background: silks.bodyHex }} />
+                <span style={{ flex: 1, background: silks.sleeveHex }} />
+              </span>
+            )}
           </div>
 
           {/* ★顔アップ枠（★表情 3 種・2026-09-23。★どれを出すかは `trainFaceOf` が決める） */}

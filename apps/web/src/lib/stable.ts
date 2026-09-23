@@ -9,6 +9,7 @@
  */
 
 import type { StableGrade } from '@star/training';
+import { ownerSilksOf, type Silks } from '@star/render';
 
 export type Condition = 1 | 2 | 3 | 4 | 5;
 export type WeekPlan = { readonly kind: 'done'; readonly menu: string } | { readonly kind: 'todo' } | { readonly kind: 'rest' };
@@ -54,6 +55,12 @@ export interface StableHorse {
 export interface StableHome {
   readonly displayName: string;
   readonly stableName: string;
+  /**
+   * ★**この利用者の勝負服**（★裁定 `REVIEW_HORSE_IDENTITY_VERDICT_20260923.md` §2・2026-09-23）。
+   *   ★初回設定で選ばせて `users.silk_color` に保存していたが、★**読む側が 1 件も無かった**。
+   *   ⚠️ ★色は `@star/render` の `ownerSilksOf` が決める（★画面で色表を持たない）。
+   */
+  readonly silks: Silks;
   readonly epBalance: number;
   readonly ppBalance: number;
   /** お知らせ件数（0 ならピルを出さない） */
@@ -82,6 +89,8 @@ export interface StableView {
   readonly plannedEP: number;
   readonly home: StableHome;
 }
+
+export type { Silks };
 
 export interface StatRow { readonly key: string; readonly label: string; readonly value: number; readonly capRatio: number; readonly delta: number }
 export interface RaceRow { readonly week: number; readonly race: string; readonly grade: string; readonly cond: string; readonly place: number; readonly time: string; readonly prizePP: number }
@@ -194,6 +203,8 @@ export const demoStableRepo: StableRepo = {
       displayName: 'たかせ みのる', stableName: 'サクラ牧場',
       epBalance: 4200, ppBalance: 18600,
       notices: 2, dailyEP: 200, dailyClaimed: true,
+      // ★デモも本物と同じ関数から引く（★画面で色を書かない）
+      silks: ownerSilksOf({ silkColor: 'blue', silkSleeve: 'white' }),
       nextStartAt: '15:40', closesIn: '2:24', liveOpen: true,
       myEntries: 3, pendingBets: 1,
       nextRun: { race: '桜星賞（8/22）', horse: 'サクラブリーズ' },

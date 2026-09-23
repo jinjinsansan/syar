@@ -12,37 +12,14 @@ import { authClient } from './supabase';
  *   ⚠️ EP を金銭で買う・増やす導線をここから絶対に生やさない（憲法 §0.2）。
  */
 
-/** 勝負服の配色（アートバイブル §4 の高彩度 16 色）。自由入力は不可 — 芝・ダートと同化する中間色を除いてある */
-export interface SilkColor { readonly key: string; readonly label: string; readonly hex: string }
-export const SILK_COLORS: readonly SilkColor[] = [
-  { key: 'vermilion', label: '朱', hex: '#d62f26' },
-  { key: 'orange', label: '橙', hex: '#e0561f' },
-  { key: 'amber', label: '山吹', hex: '#f2b012' },
-  { key: 'yellow', label: '黄', hex: '#f6e04b' },
-  { key: 'chartreuse', label: '若草', hex: '#8ec63f' },
-  { key: 'green', label: '緑', hex: '#12a05a' },
-  { key: 'teal', label: '青緑', hex: '#0fb0a6' },
-  { key: 'blue', label: '青', hex: '#1a6fd4' },
-  { key: 'navy', label: '紺', hex: '#1a3fa0' },
-  { key: 'violet', label: '紫', hex: '#6b3fc4' },
-  { key: 'magenta', label: '紅紫', hex: '#b3306e' },
-  { key: 'pink', label: '桃', hex: '#f58fb4' },
-  { key: 'brown', label: '茶', hex: '#7b4a1e' },
-  { key: 'black', label: '黒', hex: '#111318' },
-  { key: 'white', label: '白', hex: '#ffffff' },
-  { key: 'silver', label: '銀', hex: '#c9ced6' },
-];
+/**
+ * ★勝負服の色の定義は ★**`@star/render` の 1 か所**に移しました（★2026-09-23・裁定 §2 条件 2）。
+ *   ★利用者が選んだ色を ★育成・厩舎でも使うため、★画面の中に置いておけなくなりました。
+ * ⚠️ ★ここは ★**再輸出だけ**です。★色を足す・変えるのは `packages/render/src/silks.ts` で。
+ */
+import type { Sleeve } from '@star/render';
 
-/** 袖の 3 択（同じ色／白／黒） */
-export type Sleeve = 'same' | 'white' | 'black';
-export const SLEEVES: readonly { readonly key: Sleeve; readonly label: string }[] = [
-  { key: 'same', label: '同じ色' },
-  { key: 'white', label: '白' },
-  { key: 'black', label: '黒' },
-];
-export function sleeveHex(sleeve: Sleeve, bodyHex: string): string {
-  return sleeve === 'same' ? bodyHex : sleeve === 'white' ? '#ffffff' : '#111318';
-}
+export { SILK_COLORS, SLEEVES, sleeveHex, type SilkColor, type Sleeve } from '@star/render';
 
 /** 名前の最大長（表示名・牧場名とも） */
 export const NAME_MAX = 12;
