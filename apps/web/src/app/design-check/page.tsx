@@ -59,6 +59,9 @@ const ART: readonly { readonly src: string; readonly label: string; readonly w: 
   { src: '/art/uma/intro-birth-cut.webp', label: '誕生カット（仔馬）', w: 360, h: 270 },
   { src: '/art/uma/train-body-idle.webp', label: '調教の全身: 待機', w: 136, h: 145 },
   { src: '/art/uma/train-body-run.webp', label: '調教の全身: 調教中', w: 136, h: 145 },
+  // ★Q-3 の測定（★裁定 REVIEW_HORSE_IDENTITY_VERDICT_20260923.md §3）。
+  //   ★1 枚の絵の色を 5 毛色に置き換えたもの（★焼き直していない）。★判断はオーナーとデザイナー。
+  { src: '/art/uma/coat-test-sheet.png', label: '毛色 5 種の見え方（左から 鹿毛・黒鹿毛・栗毛・芦毛・青毛）', w: 728, h: 161 },
 ];
 
 /**
