@@ -17,30 +17,15 @@
  */
 
 import { useState } from 'react';
-import { storyLinesOf, STORY_EVENT_LABEL, type StoryEventType } from '@star/training';
+import { storyLinesOf, STORY_EVENT_LABEL } from '@star/training';
 import { discoveryStageOf, discoveryLabelOf } from '@star/sim-engine';
 import { DEMO_RETIRED, DEMO_STORY, DEMO_DISCOVERY, MY_STABLE_NAME } from '../../../lib/horse-story-demo';
+import { TYPE_TONE } from '../../../lib/story-tone';
 
-/** ★種類ごとの色（★絵文字を使わず、色分けした角丸ラベル・カードの指定） */
-const TYPE_TONE: Readonly<Record<StoryEventType, { readonly bg: string; readonly border: string; readonly color: string }>> = {
-  birth: { bg: '#eef2f6', border: '#6b7d8c', color: '#6b7d8c' },
-  'first-training': { bg: '#eef2f6', border: '#6b7d8c', color: '#6b7d8c' },
-  debut: { bg: '#e0eefa', border: '#1a6fd4', color: '#1a6fd4' },
-  'jockey-bond': { bg: '#e0eefa', border: '#1a6fd4', color: '#1a6fd4' },
-  'first-win': { bg: '#dff3e4', border: '#1e7a3a', color: '#1e7a3a' },
-  comeback: { bg: '#dff3e4', border: '#1e7a3a', color: '#1e7a3a' },
-  'career-high': { bg: '#dff3e4', border: '#1e7a3a', color: '#1e7a3a' },
-  'offspring-win': { bg: '#dff3e4', border: '#1e7a3a', color: '#1e7a3a' },
-  'trait-discovered': { bg: '#eee5fb', border: '#6b3fc4', color: '#6b3fc4' },
-  'first-offspring': { bg: '#eee5fb', border: '#6b3fc4', color: '#6b3fc4' },
-  'graded-win': { bg: '#fff3d6', border: '#a9741a', color: '#a9741a' },
-  'top-grade-win': { bg: '#ffe9a8', border: '#8a5a06', color: '#8a5a06' },
-  injury: { bg: '#ffe4e1', border: '#a81a13', color: '#a81a13' },
-  'final-race': { bg: '#ffeadb', border: '#b5651d', color: '#b5651d' },
-  retirement: { bg: '#e3e8ec', border: '#4a5a66', color: '#4a5a66' },
-  // ★デザイナー決定（★第 2 便 `design_handoff_breed_v2/README.md` §2・2026-09-23）。★仮の「引退」と同じ色から置き換えた
-  'breeding-role-changed': { bg: '#dcf1ef', border: '#0e7a73', color: '#0e7a73' },
-};
+/**
+ * ★種類ごとの色は ★**`lib/story-tone.ts` の 1 か所**にあります。
+ *   ★`/stable/roles`（第 2 便 A-1）も同じ表を使うので、★片方だけ直せない形にしました。
+ */
 
 /** ★最初に見せる行数（★30〜40 行でも読めるように畳む・カードの指定） */
 const FIRST_LINES = 12;
@@ -64,6 +49,13 @@ export default function RetiredPage(): React.ReactElement {
       {/* ★LR-2: 所有ではないことを最初に言う（★不安にさせない） */}
       <div style={{ padding: '14px 16px 0', fontSize: 11.5, fontWeight: 900, color: 'var(--a-ink-2)', lineHeight: 1.7 }}>
         現役の 30 頭には数えません。記録は消えません。
+      </div>
+
+      {/* ★引退後の役割へ（★第 2 便 A-1・★この画面は見本のデータ、あちらは本人の引退馬） */}
+      <div style={{ padding: '10px 16px 0' }}>
+        <a href="/stable/roles" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 14px', borderRadius: 10, background: '#dcf1ef', border: '2px solid #0e7a73', color: '#0e7a73', fontSize: 12.5, fontWeight: 900, textDecoration: 'none' }}>
+          引退後の役割を選ぶ
+        </a>
       </div>
 
       {/* ★引退馬の一覧（★所有とは別の棚） */}

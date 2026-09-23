@@ -14,7 +14,9 @@
  *   ★年齢に使う「いまの週」は ★呼ぶ側が渡します（`world_state_public`）。
  */
 import { WEEKS_PER_YEAR } from '@star/scheduler';
+import type { StoryEvent, StoryEventType } from '@star/training';
 import { authClient, readClient } from './supabase';
+import { SignInRequiredError } from './stable-repo';
 
 /** ★役割（★`horses.retirement_role`） */
 export type RetirementRole = 'honored' | 'broodmare' | 'stallion';
@@ -166,12 +168,96 @@ export function toRetiredHorseView(row: RetiredHorseRow, gameWeek: number): Reti
 }
 
 /**
+ * ★**1 頭の生涯の記録を読む**（★公開ビュー `horse_story_event_public`・LR-6「他人の馬も見える」）。
+ *
+ * ⚠️ ★**文はここで組み立てません**（★LR-4）。★`@star/training` の `storyLinesOf` が組み立てます。
+ * ⚠️ ★`detail` の鍵は ★**書いた側と同じ名前**です（`story-flow.ts`）。
+ *    ★ただし `breeding-role-changed` だけは ★`{from, to, reason}` で書かれているので（`0070`）、
+ *    ★ここで `roleTo` / `roleReason` に写します。★**写すのはこの 1 か所だけ**。
+ */
+export async function loadHorseStory(horseId: string): Promise<readonly StoryEvent[]> {
+  const res = await readClient().from('horse_story_event_public')
+    .select('event_type, game_week, detail').eq('horse_id', horseId);
+  if (res.error !== null) throw new Error(`生涯の記録を読めませんでした: ${res.error.message}`);
+  return (res.data ?? []).map((row) => {
+    const detail = (row.detail ?? {}) as Record<string, unknown>;
+    const pick = (key: string): string | undefined =>
+      typeof detail[key] === 'string' ? detail[key] : undefined;
+    const type = String(row.event_type) as StoryEventType;
+    return {
+      type,
+      week: Number(row.game_week),
+      ...(pick('raceName') === undefined ? {} : { raceName: pick('raceName') }),
+      ...(typeof detail['finishPosition'] === 'number' ? { finishPosition: detail['finishPosition'] } : {}),
+      ...(pick('jockeyName') === undefined ? {} : { jockeyName: pick('jockeyName') }),
+      ...(pick('traitLabel') === undefined ? {} : { traitLabel: pick('traitLabel') }),
+      ...(pick('offspringName') === undefined ? {} : { offspringName: pick('offspringName') }),
+      // ★役割の変更（`0070` / `breeding-runner.ts` は from / to / reason で書く）
+      ...(pick('to') === undefined ? {} : { roleTo: pick('to') as 'stallion' | 'broodmare' | 'honored' }),
+      ...(pick('reason') === undefined ? {} : { roleReason: pick('reason') as 'owner' | 'lifetime_foals' }),
+    } satisfies StoryEvent;
+  });
+}
+
+/**
+ * ★**この年のうちに、生涯の産駒数に達して自動で功労馬に戻ったか**（★A-7 の告知を出すか）。
+ *
+ *   ★デザイナー決定（§8-5）: ★**その年のあいだ出し続ける**（★「見た」をサーバーに持たない）。
+ *   ★判定は ★**生涯の記録の行**から出します（★新しい列を作らない）。
+ * ⚠️ ★年は ★**ゲームの年**です（★実時刻ではない・憲法 4）。★1 年 ＝ `WEEKS_PER_YEAR` 週。
+ */
+export function autoDemotedThisYear(events: readonly StoryEvent[], gameWeek: number): boolean {
+  const thisYear = Math.floor(gameWeek / WEEKS_PER_YEAR);
+  return events.some((e) => e.type === 'breeding-role-changed'
+    && e.roleReason === 'lifetime_foals'
+    && Math.floor(e.week / WEEKS_PER_YEAR) === thisYear);
+}
+
+/**
+ * ★**役割を変える**（★その場で確定・待ちなし・第 2 便 §3 A）。
+ *
+ * ⚠️ ★`requestId` は ★**押すたびに変えない**（★同じ要求 ID の再送には、サーバーが前の結果を返します）。
+ *    ★成功したら呼ぶ側が新しい ID を作ります（`exchange_prize` と同じ作法）。
+ * ⚠️ ★失敗の語を ★**画面に出さないでください**（★第 2 便 §4）。★見せ方に写すのは `roleVariantOf` です。
+ */
+export async function requestBreedingRole(input: {
+  readonly requestId: string;
+  readonly horseId: string;
+  readonly toRole: RetirementRole;
+}): Promise<
+  | { readonly ok: true; readonly fromRole: string; readonly toRole: string }
+  | { readonly ok: false; readonly block: RoleBlock }
+> {
+  const { data, error } = await authClient().rpc('request_breeding_role', {
+    p_request_id: input.requestId,
+    p_horse_id: input.horseId,
+    p_to_role: input.toRole,
+  });
+  if (error !== null) throw new Error(`役割を変えられませんでした: ${error.message}`);
+  const row = (Array.isArray(data) ? data[0] : data) as {
+    readonly status?: string; readonly failure_reason?: string | null;
+    readonly from_role?: string | null; readonly to_role?: string | null;
+  } | undefined;
+  if (row === undefined) throw new Error('役割を変えられませんでした: 返事がありません');
+  if (row.status === 'done') {
+    return { ok: true, fromRole: String(row.from_role ?? ''), toRole: String(row.to_role ?? input.toRole) };
+  }
+  const block = blockOf(row.failure_reason ?? null);
+  // ★`failed` なのに理由が無いのは、★DB の制約（`role_requests_result_shape`）で起きないはず
+  if (block === null) throw new Error('役割を変えられませんでした: 理由がありません');
+  return { ok: false, block };
+}
+
+/**
  * ★**画面 1 枚ぶんを読む**（★1 往復 ＋ 週の 1 往復）。
  * ⚠️ ★**失敗を空配列にしません**（★「引退馬が居ない」に見えてしまう）。★投げます。
  */
 export async function loadRetiredScreen(): Promise<RetiredScreenData> {
   const auth = authClient();
   const read = readClient();
+  // ★ログインしていなければ、★見本のデータに落とす（★呼ぶ側が見分けられるように型で投げる）
+  const { data: sessionData } = await auth.auth.getSession();
+  if (sessionData.session === null) throw new SignInRequiredError();
   const [rowsRes, weekRes] = await Promise.all([
     auth.rpc('my_retired_horses'),
     read.from('world_state_public').select('game_week').limit(1),

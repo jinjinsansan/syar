@@ -17,6 +17,8 @@ import { STORY_EVENT_TYPES, STORY_EVENT_LABEL } from '@star/training';
 const ROOT = path.resolve(__dirname, '../../..');
 const PAGE = readFileSync(path.join(ROOT, 'apps/web/src/app/stable/retired/page.tsx'), 'utf8');
 const DEMO = readFileSync(path.join(ROOT, 'apps/web/src/lib/horse-story-demo.ts'), 'utf8');
+/** ★色の表（★2026-09-23 に画面から移した。★`/stable/roles` と共用） */
+const TONE = readFileSync(path.join(ROOT, 'apps/web/src/lib/story-tone.ts'), 'utf8');
 /** ★コメントを空白にしてから見る（★註記の語を拾わない） */
 const strip = (s: string): string => s
   .replace(/\/\*[\s\S]*?\*\//g, ' ')
@@ -41,10 +43,20 @@ describe('★馬物語帳の配線（§18・D-108）', () => {
     expect(CODE).not.toMatch(/l\.text\.(includes|indexOf|match)/);
   });
 
+  /**
+   * ⚠️ ★色の表は ★**`apps/web/src/lib/story-tone.ts`** に移りました（★2026-09-23）。
+   *   ★`/stable/roles`（第 2 便 A-1）も同じ表を使うので、★画面ごとに色を持たせないためです。
+   *   ★この検査は ★**移した先**を見ます（★見る先を変えただけで、網は同じ）。
+   */
   it('★15 種すべてに色がある（★足りないと落ちる）', () => {
     for (const t of STORY_EVENT_TYPES) {
-      expect(CODE, `★${t}（${STORY_EVENT_LABEL[t]}）の色が無い`).toContain(`${t.includes('-') ? `'${t}'` : t}:`);
+      expect(TONE, `★${t}（${STORY_EVENT_LABEL[t]}）の色が無い`).toContain(`${t.includes('-') ? `'${t}'` : t}:`);
     }
+  });
+
+  it('★色の表は 1 か所だけ（★画面が自分の表を持たない）', () => {
+    expect(CODE, '★画面に色の表が戻っている（★story-tone.ts の 1 か所にすること）')
+      .not.toMatch(/const\s+TYPE_TONE\s*[:=]/);
   });
 
   it('③ ★発見度の段は `discoveryStageOf` が決める（★画面で刻みを持たない）', () => {
