@@ -16,7 +16,8 @@
  *
  * ★**顔アップ枠は表情 3 種**（上機嫌・平常・疲れ）です（★2026-09-23 に焼いた・
  *    `design/art/prompts/train-face-*.txt`）。★どれを出すかは `trainFaceOf` が決めます（★画面で決めない）。
- * ⚠️ ★**全身枠は引き続き仮**です（`chibi-horse.png`）。★調教の動きは未着手。
+ * ★**全身枠も焼きました**（★待機 `train-body-idle` ／ 調教中 `train-body-run`・騎手なし）。
+ * ⚠️ ★走りは ★**1 枚**です（★連番のアニメではない）。★動きは CSS が付けています。
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -134,9 +135,10 @@ export default function TrainPage(): React.ReactElement {
               animation: running ? 'u-rush .95s ease-in-out infinite' : 'u-idle 3.4s ease-in-out infinite',
             }}
           >
+            {/* ★全身（★待機／調教中の 2 枚・★2026-09-23 に焼いた・騎手は乗っていない） */}
             <span style={{
               position: 'absolute', inset: 0,
-              background: "url('/art/uma/chibi-horse.png') no-repeat bottom center/contain",
+              background: `url('/art/uma/train-body-${running ? 'run' : 'idle'}.webp') no-repeat bottom center/contain`,
               filter: 'drop-shadow(0 8px 12px rgba(8,18,8,.45))',
             }} />
           </div>

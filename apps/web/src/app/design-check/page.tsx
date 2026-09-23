@@ -57,6 +57,8 @@ const ART: readonly { readonly src: string; readonly label: string; readonly w: 
   { src: '/art/uma/train-face-normal.webp', label: '調教の顔: 平常', w: 96, h: 74 },
   { src: '/art/uma/train-face-tired.webp', label: '調教の顔: 疲れ', w: 96, h: 74 },
   { src: '/art/uma/intro-birth-cut.webp', label: '誕生カット（仔馬）', w: 360, h: 270 },
+  { src: '/art/uma/train-body-idle.webp', label: '調教の全身: 待機', w: 136, h: 145 },
+  { src: '/art/uma/train-body-run.webp', label: '調教の全身: 調教中', w: 136, h: 145 },
 ];
 
 /**
@@ -176,7 +178,7 @@ export default function DesignCheckPage(): React.ReactElement {
           {ART.map((a) => (
             <div key={a.src} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <img src={a.src} alt={a.label} width={a.w} height={a.h}
-                style={{ width: a.w, height: a.h, objectFit: 'cover', borderRadius: 8, border: '2px solid rgba(255,216,74,.5)' }} />
+                style={{ width: a.w, height: a.h, objectFit: 'contain', borderRadius: 8, border: '2px solid rgba(255,216,74,.5)' }} />
               <span style={{ fontSize: 11 }}>{a.label}</span>
               <span style={{ fontSize: 10, opacity: 0.7 }}>{a.w}×{a.h}（素材はこの 2 倍）</span>
             </div>

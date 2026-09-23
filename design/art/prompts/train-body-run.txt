@@ -1,0 +1,52 @@
+Generate ONE image (no text, no logos, no watermark).
+
+REFERENCE FILE (read it and pass it as a reference image to the image generation tool)
+- CHARACTER AND STYLE reference — match it EXACTLY:
+  apps/web/public/art/uma/chibi-horse.png
+
+  ★★ HOW TO USE IT
+  This file decides the DESIGN and the DRAWING STYLE. Draw the SAME DEFORMED (chibi-proportioned)
+  cartoon horse: big rounded head, very large expressive eye with a visible white and a heavy dark
+  outline, strong angular brow ridge, short blunt muzzle, big soft nostril, small rounded ears set
+  wide apart, stocky round barrel, SHORT THICK LEGS, chunky rounded hooves, thick glossy mane and
+  tail in chunky locks, THICK DARK OUTLINES around every shape, bold cel shading with strong
+  highlights and saturated colour.
+  ★ Do NOT draw a realistic racehorse. If it looks like the shipped race sprites, it is WRONG.
+  ★ The reference carries a JOCKEY — do NOT draw the jockey, the saddle, the bridle or the reins.
+    This is the horse alone in its stable yard.
+  ★ The reference has a white blaze — do NOT copy the blaze.
+  Do NOT copy the reference's galloping pose.
+
+SUBJECT
+The horse ALONE, RUNNING at a canter in a training yard, seen from the SIDE and slightly towards
+the camera (a three-quarter side view). This is the "training in progress" pose of the same screen,
+so it must be the SAME horse at the SAME size and the SAME camera angle as the idle pose — only
+the legs, the mane and the expression change.
+★ Legs: the front leg nearest the camera reaches forward, the far hind leg pushes back, the other
+  two are gathered under the body. At least one hoof is off the ground.
+★ Mane and tail stream backwards with the motion.
+★ Expression: eager and focused, brow down a little, mouth closed. Working hard, not distressed.
+The horse faces to the viewer's RIGHT.
+
+COLOUR AND LIGHT
+Morning light, warm and soft. Keep the bold saturated cartoon palette of the reference
+(rich chestnut-bay coat, dark brown-black mane and tail).
+Plain coat, NO white markings (no blaze, no star, no socks) — the same picture is shown for every
+player's horse, so it must not look like one specific individual.
+
+BACKGROUND
+★ NONE. Put the horse on a FULLY TRANSPARENT background (alpha), with no ground, no shadow,
+  no grass, no fence, no sky. The screen draws its own background and its own shadow under the
+  horse. If transparency is impossible, use a FLAT SOLID MAGENTA (#FF00FF) background with no
+  gradient and no texture, so it can be keyed out.
+
+FRAMING
+Portrait, aspect ratio 272 : 290 (very slightly taller than wide). The horse fills the frame with
+a small margin; its hooves sit near the bottom edge, the ears near the top.
+
+DO NOT INCLUDE
+No jockey, no human figure, no hands, no saddle, no bridle, no reins, no halter, no rug.
+No numbers, stars, text, letters, logos, signage, flags, watermarks.
+
+ANATOMY
+One horse. Four legs, one head, one tail. Both eyes may show at this angle; keep them equal.
