@@ -39,6 +39,24 @@ const SCREENS: readonly { readonly path: string; readonly label: string }[] = [
   //      ★利用者が TOP から最初に押す 2 か所を、確認の対象から外していた。
   { path: '/signup', label: 'はじめる（登録）' },
   { path: '/login', label: 'ログイン' },
+  // ★デザイナー第 2 便（★2026-09-23）。★どちらもログインが要る画面なので、
+  //   ★ここでは「ログインしてください」の状態が出ます（★枠と配色の確認用）。
+  { path: '/stable/roles', label: '引退後の役割（第 2 便 A）' },
+  { path: '/stable/breed', label: '配合（第 2 便 B）' },
+];
+
+/**
+ * ★**焼いた絵の見本**（★2026-09-23）。
+ *   ★`/train` の顔は ★持ち馬が要り、★誕生カットは ★配合が終わらないと出ません。
+ *   → ★**絵そのものを、表示の寸法で並べます**（★見るだけなら、ここで足ります）。
+ * ⚠️ ★寸法は ★**画面と同じ**にしてあります（★96×74 と 360×270）。★ここで大きく見せない
+ *    （★大きく見せると、★小さいときに読めない絵を「良い」と判断してしまう）。
+ */
+const ART: readonly { readonly src: string; readonly label: string; readonly w: number; readonly h: number }[] = [
+  { src: '/art/uma/train-face-happy.webp', label: '調教の顔: 上機嫌', w: 96, h: 74 },
+  { src: '/art/uma/train-face-normal.webp', label: '調教の顔: 平常', w: 96, h: 74 },
+  { src: '/art/uma/train-face-tired.webp', label: '調教の顔: 疲れ', w: 96, h: 74 },
+  { src: '/art/uma/intro-birth-cut.webp', label: '誕生カット（仔馬）', w: 360, h: 270 },
 ];
 
 /**
@@ -148,6 +166,23 @@ export default function DesignCheckPage(): React.ReactElement {
           ))}
         </div>
       </header>
+
+      {/* ★焼いた絵（★画面と同じ寸法で並べる・★2026-09-23） */}
+      <section aria-labelledby="art" style={{ marginBottom: 22 }}>
+        <h2 id="art" style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 900, color: '#ffd84a' }}>
+          焼いた絵（表示と同じ寸法）
+        </h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end' }}>
+          {ART.map((a) => (
+            <div key={a.src} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <img src={a.src} alt={a.label} width={a.w} height={a.h}
+                style={{ width: a.w, height: a.h, objectFit: 'cover', borderRadius: 8, border: '2px solid rgba(255,216,74,.5)' }} />
+              <span style={{ fontSize: 11 }}>{a.label}</span>
+              <span style={{ fontSize: 10, opacity: 0.7 }}>{a.w}×{a.h}（素材はこの 2 倍）</span>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section aria-labelledby="impl">
         <h2 id="impl" style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 900, color: '#ffd84a' }}>
