@@ -140,6 +140,84 @@ export const COAT_TRANSFORMS = {
 
 export type CoatName = keyof typeof COAT_TRANSFORMS;
 
+/**
+ * ★**毛色の出どころ（1 か所）**（★裁定 `REVIEW_HORSE_IDENTITY_VERDICT_20260923.md` §9・2026-09-23）
+ *
+ * 【★なぜ馬 ID から引くのか】
+ *   ★正典（アートバイブル §3）が「毛色 5 種程度を **馬 ID から決定的に導く**」と書いている。
+ *   ★それまでは ★**枠番から**引いていた（`race/page.tsx` の `COAT_BY_GATE`）ため、
+ *     ★**同じ馬でも枠が変わると毛色が変わり**、見分けるための仕組みが見分けを壊していた。
+ *
+ * 【★2026-08-28 のオーナー要望を、どこまで保つか】
+ *   ★要望は 2 つあった。① 実在の登録頭数の割合に近づける ② 隣どうしが同じ毛色にならないよう散らす。
+ *   ★**① は保つ**（下の重みで引く。★母集団として実在の割合に近づく）。
+ *   ⚠️ ★**② は保てない**（★馬 ID は枠順と無関係なので、隣接は起きる）。★裁定 §9 の判断:
+ *      ★②が生まれたときの「12 頭中 10 頭が同じ茶色」とは状況が違う（★その後 5 種 → 7 種に広げ、
+ *      ★明るさも均等に並べ直した）。★隣接の組数は測って報告する。
+ *
+ * 【★決定論】（憲法 §1-4）
+ *   ★`Math.random()` も `Date.now()` も使わない。★**馬 ID の文字列だけ**から引く。
+ *   ★同じ ID は、いつ・どの画面で引いても同じ毛色になる。
+ */
+
+/**
+ * ★実在の登録頭数のおおよその割合（★`race/page.tsx` の註記と同じ数字）。
+ * ⚠️ ★**白毛は入れない** — ★0.1% 未満で、12 頭立てに 1 頭いると「珍しい」ではなく「変」になる
+ *    （★`COAT_TRANSFORMS` の註記・2026-08-28）。
+ */
+export const COAT_WEIGHTS: readonly (readonly [CoatName, number])[] = [
+  ['bay', 48],
+  ['dark-bay', 22],
+  ['chestnut', 15],
+  ['grey', 7],
+  ['seal-brown', 6],
+  ['liver-chestnut', 1.5],
+  ['blue-black', 1],
+];
+
+/**
+ * ★文字列から 0 以上 1 未満の数を作る（★FNV-1a）。
+ * ⚠️ ★**同じ文字列は必ず同じ数**になる（★決定論）。★短い ID でも散るよう 32 ビットで混ぜる。
+ */
+function unitHashOf(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    // ★FNV の素数 16777619 を掛ける（★32 ビットに収める）
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  /**
+   * 🔴 ★**最後に混ぜる**（★Murmur3 の仕上げ）。★これが無いと欠陥になります。
+   *
+   *   ⚠️ ★FNV は ★**最後に読んだ文字が下位ビットにしか効きません**。★uuid は末尾だけが違うので、
+   *      ★上位ビットがほぼ同じになり、★**続き番号の馬が同じ毛色に固まりました**。
+   *   ✔ ★実測（`tools/measure-coat-distribution.mjs`）: ★12 頭立ての隣接が ★**平均 9.54 組 / 11 組**。
+   *      ★混ぜる工程を足して ★**3.4 組前後**（★独立に引いたときの理論値）になりました。
+   *   ★測らなければ、★分布だけ見て「合っている」と報告していました。
+   */
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b) >>> 0;
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35) >>> 0;
+  h ^= h >>> 16;
+  return (h >>> 0) / 0x100000000;
+}
+
+/**
+ * ★**馬 ID から毛色を引く**。★これが唯一の出どころ。
+ * ⚠️ ★枠番を渡さないこと。★枠の色（ゼッケン・`POST`）は別の役割（★その日の枠）。
+ */
+export function coatOfHorseId(horseId: string): CoatName {
+  const total = COAT_WEIGHTS.reduce((sum, [, w]) => sum + w, 0);
+  let x = unitHashOf(horseId) * total;
+  for (const [name, w] of COAT_WEIGHTS) {
+    x -= w;
+    if (x < 0) return name;
+  }
+  // ★重みの合計との丸め誤差で外れたとき（★いちばん多い毛色に倒す）
+  return COAT_WEIGHTS[0]![0];
+}
+
 /** The character source is orange, unlike the dark bay photographic source.
  * Calibrate each coat from that source; bay must not bypass recoloring.
  * Both native browser frames and baked atlases use this table.

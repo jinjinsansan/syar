@@ -62,6 +62,9 @@ const ART: readonly { readonly src: string; readonly label: string; readonly w: 
   // ★Q-3 の測定（★裁定 REVIEW_HORSE_IDENTITY_VERDICT_20260923.md §3）。
   //   ★1 枚の絵の色を 5 毛色に置き換えたもの（★焼き直していない）。★判断はオーナーとデザイナー。
   { src: '/art/uma/coat-test-sheet.png', label: '毛色 5 種の見え方（左から 鹿毛・黒鹿毛・栗毛・芦毛・青毛）', w: 728, h: 161 },
+  // ★裁定 §9 条件 ②。★新しい規則（馬 ID から引く）で 18 頭を枠順に並べたもの。
+  //   ★隣どうしが同じ毛色になる組は 12 頭立てで平均 3.42 組（★古い規則は 1 組）。
+  { src: '/art/uma/coat-field-sheet.png', label: '新しい規則で 18 頭を並べた出走表（馬 ID から毛色を引く）', w: 921, h: 57 },
 ];
 
 /**
