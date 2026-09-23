@@ -96,6 +96,23 @@ const READONLY_FUNCTIONS = [
    */
   'npc_stallion_facts',
   /**
+   * ★引退後の役割の頭数の上限（`0074`）。`language sql immutable` で**状態を変えない**。
+   *   ★数の置き場所を 1 か所にするためだけの関数（★呼ぶ側が `assert_setup_complete()` を持つ）。
+   */
+  'breeding_role_limit',
+  /** ★繁殖牝馬の生涯の産駒数（`0074`）。`language sql immutable` で**状態を変えない** */
+  'mare_lifetime_foals',
+  /**
+   * ★役割を変えられない理由（`0074`）。`language sql immutable` で**状態を変えない**。
+   *   ★書き込む側（`request_breeding_role`）が自分で `assert_setup_complete()` を呼び、★行もあちらがロックする。
+   */
+  'breeding_role_block',
+  /**
+   * ★本人の引退馬と役割の枠（`0074`・デザイナー第 2 便 §5 A-1）。`language plpgsql stable` で**状態を変えない**。
+   *   ★素質・能力・遺伝子は返さない（D-114・D-116）。★秒数・日数も計算しない。
+   */
+  'my_retired_horses',
+  /**
    * ★総獲得賞金（`0071`・裁定 REVIEW_BREED_OWN_MARE_VERDICT_20260922.md §3）。`language sql stable` で**状態を変えない**。
    *   ★利用者のロールからは実行できない（★revoke）。★`npc_stallion_facts` とワーカーが呼ぶ
    */

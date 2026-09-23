@@ -39,15 +39,42 @@ describe('★SQL の上限と TS の定数（★R-1 (a)）', () => {
     expect(onlyNumber(body, /v_active\s*>=\s*(\d+)/g, 'buy_horse の上限')).toBe(OWNERSHIP_LIMITS.active);
   });
 
-  it('★役割の変更: 種牡馬・繁殖牝馬の上限 ＝ OWNERSHIP_LIMITS（★request_breeding_role の最後の定義）', () => {
-    const { body } = lastFunctionBody('request_breeding_role');
+  /**
+   * ★`0074` で ★**数の置き場所を 1 か所にした**（★`breeding_role_limit` / `mare_lifetime_foals`）。
+   *   ★`request_breeding_role` と ★`my_retired_horses` は ★どちらもこの関数を呼ぶ。
+   *   ★以前は RPC の本文に直に書いてあり、★読む口を足したときに ★**3 か所目**が生まれるところだった。
+   */
+  it('★役割の変更: 種牡馬・繁殖牝馬の上限 ＝ OWNERSHIP_LIMITS（★breeding_role_limit の最後の定義）', () => {
+    const { file, body } = lastFunctionBody('breeding_role_limit');
+    expect(file, '★最後の定義が 0074 ではない（★定義し直しが漏れた）').toBe('0074_my_retired_horses.sql');
     expect(onlyNumber(body, /when\s+'stallion'\s+then\s+(\d+)/gi, '種牡馬の上限')).toBe(OWNERSHIP_LIMITS.stallion);
-    expect(onlyNumber(body, /when\s+'stallion'\s+then\s+\d+\s+else\s+(\d+)/gi, '繁殖牝馬の上限')).toBe(OWNERSHIP_LIMITS.broodmare);
+    expect(onlyNumber(body, /when\s+'broodmare'\s+then\s+(\d+)/gi, '繁殖牝馬の上限')).toBe(OWNERSHIP_LIMITS.broodmare);
   });
 
-  it('★役割の変更: 生涯の産駒数 ＝ DEFAULT_BALANCE.MARE_LIFETIME_FOALS', () => {
-    const { body } = lastFunctionBody('request_breeding_role');
-    expect(onlyNumber(body, /v_foals\s*>=\s*(\d+)/g, '生涯の産駒数')).toBe(DEFAULT_BALANCE.MARE_LIFETIME_FOALS);
+  it('★役割の変更: 生涯の産駒数 ＝ DEFAULT_BALANCE.MARE_LIFETIME_FOALS（★mare_lifetime_foals の最後の定義）', () => {
+    const { body } = lastFunctionBody('mare_lifetime_foals');
+    expect(onlyNumber(body, /select\s+(\d+)/g, '生涯の産駒数')).toBe(DEFAULT_BALANCE.MARE_LIFETIME_FOALS);
+  });
+
+  /**
+   * 🔴 ★**数を書き戻せない網**。★判定の本文（`breeding_role_block`）と ★RPC の本文に
+   *   ★裸の数が現れたら落ちる。★「関数にしたのに、後から直に書いた」を止める。
+   */
+  it('🔴 ★判定と RPC の本文に、上限の数が直に書かれていない（★0074 の後）', () => {
+    for (const name of ['breeding_role_block', 'request_breeding_role'] as const) {
+      const { body } = lastFunctionBody(name);
+      const bare = [...body.matchAll(/>=\s*(\d+)/g)].map((m) => m[1]);
+      expect(bare, `★${name} に裸の上限がある（★breeding_role_limit / mare_lifetime_foals を呼ぶこと）`)
+        .toEqual([]);
+    }
+  });
+
+  it('★対照: ★0070 の定義には裸の数が在った（★この検査が区別できること）', () => {
+    const sql = stripSqlComments(readFileSync(
+      path.resolve(__dirname, '../../../db/migrations/0070_breeding_role_requests.sql'), 'utf8',
+    ));
+    const body = sql.slice(sql.search(/create\s+or\s+replace\s+function\s+public\.request_breeding_role/i));
+    expect([...body.matchAll(/>=\s*(\d+)/g)].map((m) => m[1])).toContain('8');
   });
 
   it('🔴 ★購入: 利用者の行をロックしてから数える（★裁定 §4・最後の定義）', () => {

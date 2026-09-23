@@ -103,6 +103,14 @@ export const TOOL_AFTERMATH = {
       + '⚠️ ★制約と関数の一時的な差し替えは ★セーブポイントの中で行い、★その場で戻します（★DDL も取引の中で戻る）',
     countedBy: 'JSON.stringify(before) === JSON.stringify(after)',
   },
+  'verify-my-retired-horses-live.mjs': {
+    mode: 'restores',
+    why: '★`begin` → 利用者・持ち主の付け替え・`request_breeding_role` → ★**必ず `rollback`**（`finally`）。'
+      + '✅ ★**戻したことを数えます**: ★判定 ⑥ が ★馬・依頼・生涯の記録の行数の 前後一致を見ます。'
+      + '⚠️ ★判定 ⑤ は ★RPC を呼んで比べるので ★1 件ごとにセーブポイントへ戻します（★測っている状態を自分で動かさない）。'
+      + '⚠️ ★未認証の判定（④）は ★落ちた文が取引を壊すため、★1 回ごとにセーブポイントへ戻します',
+    countedBy: 'JSON.stringify(before) === JSON.stringify(after)',
+  },
   'verify-breeding-live.mjs': {
     mode: 'restores',
     why: '★`begin` → `runBreedingWeek` → ★**必ず `rollback`**（`finally`）。'
