@@ -84,6 +84,7 @@ const SCREENS: readonly { readonly path: string; readonly label: string }[] = [
   //   ★ここでは「ログインしてください」の状態が出ます（★枠と配色の確認用）。
   { path: '/stable/roles', label: '引退後の役割（第 2 便 A）' },
   { path: '/stable/breed', label: '配合（第 2 便 B）' },
+  { path: '/stable/name', label: '仔に名前を付ける（PLAN I-3）' },
 ];
 
 /**

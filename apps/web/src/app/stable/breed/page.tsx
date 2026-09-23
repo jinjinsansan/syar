@@ -14,7 +14,6 @@
  *
  * 【⚠️ ★まだ無いので出していないもの】（★報告済み）
  *   ★B-3 の血統表 … ★第 1 便の部品がこの画面にまだありません。
- *   ★B-5 の主「名前を付ける」 … ★命名の画面がまだありません（★次に作ります）。
  *
  * 【★時計】
  *   ★「依頼してから何秒」だけ実時刻を使います（★サーバーが返した `created_at` との差）。
@@ -255,12 +254,13 @@ export default function BreedPage(): React.ReactElement {
             種付料 {request.studFeeEP} EP を使いました（確定したときの額）
           </div>
         )}
-        <Note>
-          ⚠️ 名前を付ける画面は、まだありません。次に作ります。名前を付けるまで、この仔は厩舎に並びません。
-        </Note>
-        <button type="button" onClick={() => { setMareId(null); setSireId(null); retry(); setStep('mares'); }} style={SECONDARY}>
-          配合の画面に戻る
-        </button>
+        <Note>名前を付けるまで、この仔は厩舎に並びません。</Note>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          <button type="button" onClick={() => { setMareId(null); setSireId(null); retry(); setStep('mares'); }} style={SECONDARY}>
+            配合の画面に戻る
+          </button>
+          <a href="/stable/name" style={{ ...PRIMARY, textDecoration: 'none' }}><span>名前を付ける</span></a>
+        </div>
       </Shell>
     );
   }
