@@ -39,7 +39,17 @@ export default function ExchangePage(): React.ReactElement {
   const balance = data?.ppBalance ?? null;
   const enough = item !== null && balance !== null && balance >= item.costPP;
   const submit = async (): Promise<void> => {
-    if (item === null || busy || !enough || !window.confirm(`${item.name}と交換しますか？`)) return;
+    if (item === null || busy || !enough) return;
+    /**
+     * 🔴 ★**「取り消せません」を先に言います**（★2026-09-25・簿 `ONE-WAY-DOORS`）。
+     *   ★交換は ★**性質として戻せません**（★出口に触るので、戻す経路も作りません）。
+     * ⚠️ ★**何を・いくつ・残りいくつ**を出します（★押す前に読める形で）。
+     */
+    if (!window.confirm(
+      `${item.name}\n賞金ポイント ${item.costPP.toLocaleString('ja-JP')} PP`
+      + `\n交換後の残り ${(balance - item.costPP).toLocaleString('ja-JP')} PP\n\n`
+      + '交換は取り消せません。この内容でよろしいですか？',
+    )) return;
     setBusy(true);
     try {
       const result = await exchangePrize({ prizeId: item.id, clientToken });

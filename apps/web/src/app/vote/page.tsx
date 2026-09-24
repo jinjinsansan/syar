@@ -60,7 +60,16 @@ export default function VotePage(): React.ReactElement {
 
   const submit = async (): Promise<void> => {
     if (blocked || race === null || selected === null) return;
-    if (!window.confirm(`${race.raceName}・${selected}番に ${EP_PER_PICK} EP で投票しますか？`)) return;
+    /**
+     * 🔴 ★**「取り消せません」を先に言います**（★2026-09-25・簿 `ONE-WAY-DOORS`）。
+     *   ★投票の取消は ★**作りません**（★現実の作法と揃え、★オッズを見てから引ける形を作らないため）。
+     *   ★取り消す道が無いのだから、★**押す前に**そう言うべきです（★押した後に知らせない）。
+     * ⚠️ ★券種・目・金額を出します（★何に賭けるのかを、★押す前に読める形で）。
+     */
+    if (!window.confirm(
+      `${race.raceName}\n単勝・${selected}番・${EP_PER_PICK} EP\n\n`
+      + '投票は取り消せません。この内容でよろしいですか？',
+    )) return;
     setBusy(true); setMessage(null);
     try {
       const result = await placeBet({ raceId: race.id, betType: 'win', selection: [selected], amount: EP_PER_PICK, clientToken });
