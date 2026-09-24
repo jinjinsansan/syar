@@ -19,8 +19,9 @@
 import pg from 'pg';
 import { loadEnv } from './lib/env.mjs';
 import { assertNotProduction } from './lib/guard.mjs';
+import { beginSandbox, endSandbox } from './lib/sandbox-tx.mjs';
 import { DEFAULT_BALANCE } from '../packages/sim-engine/src/index.ts';
-import { WEEKS_PER_YEAR } from '../packages/scheduler/src/index.ts';
+import { WEEKS_PER_YEAR, gameYearOf } from '../packages/scheduler/src/index.ts';
 
 const env = loadEnv();
 const c = new pg.Client({ connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
@@ -116,6 +117,75 @@ check(leaked.length === 0, '⑥ 素質・能力の列を返していない（★
 /** ★⑤ 件数が効く */
 const few = (await asUser(u1, 'select * from initial_breeding_dams($1,$2,$3)', [MIN_AGE_WEEKS, MAX_FOALS, 3])).rows;
 check(few.length === Math.min(3, Number(rows1[0].total_count)), '⑤ p_limit が効く', `${few.length} 件`);
+
+/**
+ * 🔴 ★**⑦ 年齢の条件が、実際に働くか**（★2026-09-24・レビュー側の条件）。
+ *
+ * 【★なぜ要るか】
+ *   ★実測で、★**年齢の条件はいまどちらの環境でも 1 頭も落としていません**
+ *   （★「年齢を見ない数」＝「候補の数」）。★働いていない条件は ★**間違っていても誰も気づきません**
+ *   （★`u-gallop`（使われない規則）と同じ形）。
+ *
+ * 【★どう確かめるか】
+ *   ★取引の中で ★**年齢だけ足りない牝馬を 1 頭 作り**、★候補に出ないこと・総数が増えないことを見ます。
+ *   ★**対照**: ★年齢の下限を 0 にして呼び直すと ★**その馬が出てくる**（★＝落としていたのは年齢の項）。
+ *   ⚠️ ★`beginSandbox` / `endSandbox` で ★**必ず戻し、戻ったことを数えます**（★SB-3）。
+ */
+if (week === undefined) {
+  check(false, '⑦ 年齢の予行: いまの週が読めないので試せません');
+} else {
+  const tx = await beginSandbox(c);
+  try {
+    await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: u1 })]);
+    const before = Number((await c.query(
+      'select total_count from initial_breeding_dams($1,$2,$3) limit 1', [MIN_AGE_WEEKS, MAX_FOALS, 1],
+    )).rows[0].total_count);
+
+    /**
+     * ★**いま候補に居る 1 頭の「生まれた週」だけを動かします**（★年齢の下限の 1 週 手前へ）。
+     *
+     * 🔴 ★新しく 1 頭 作る形は ★**やめました**。★`horses` は必須列と制約が多く、
+     *    ★`birth_year` → `sire_line` → `horses_processed_after_birth` と ★3 回 落ちました。
+     *    ★列を並べて作ると、★**検査が「馬の作り方」に依存**します（★列が増えるたびに落ちる）。
+     * → ★既に居る 1 頭の ★**1 列だけ**動かせば、★変えたものが 1 つだと言い切れます。
+     * ⚠️ ★年は週から出します（★`gameYearOf` — ★SQL に式を写さない・D-052）。
+     */
+    const born = Number(week) - (MIN_AGE_WEEKS - 1);
+    const source = rows1[0].horse_id;
+    /**
+     * ⚠️ ★**週の列を 3 つ 一緒に動かします**（★`horses_processed_after_birth` などの制約が縛るため）。
+     *    ★`birth_week` だけ動かすと ★`last_processed_week >= birth_week` に当たって落ちます
+     *    （★この馬は種の週が `-1506` で、★生まれを `-38` に上げると追い越します）。
+     * ✔ ★動かす 3 つは ★**候補の述語が 1 つも見ない列**です（★述語が見るのは
+     *    ★`sex` / `owner_id` / `retirement_role` / `bred_this_year` / `foal_count` / `birth_week`）。
+     *    ★つまり ★**効くのは `birth_week` だけ**で、★対照（下限 0）がそれを示します。
+     */
+    await c.query(
+      'update horses set birth_week = $2, birth_year = $3,'
+      + ' last_processed_week = $2, retired_at_week = $2 where id = $1',
+      [source, born, gameYearOf(born)],
+    );
+
+    const after = Number((await c.query(
+      'select total_count from initial_breeding_dams($1,$2,$3) limit 1', [MIN_AGE_WEEKS, MAX_FOALS, 1],
+    )).rows[0].total_count);
+    check(after === before - 1, '⑦ 年齢が足りなくなった牝馬は候補から外れる', `前 ${before} → 後 ${after}`);
+
+    const shown = (await c.query(
+      'select horse_id from initial_breeding_dams($1,$2,$3)', [MIN_AGE_WEEKS, MAX_FOALS, 200],
+    )).rows.some((r) => r.horse_id === source);
+    check(!shown, '⑦ その馬が一覧にも出ない');
+
+    // 🔴 ★対照: ★年齢の下限を 0 にすると戻ってくる（★落としていたのが年齢の項だと分かる）
+    const loose = Number((await c.query(
+      'select total_count from initial_breeding_dams($1,$2,$3) limit 1', [0, MAX_FOALS, 1],
+    )).rows[0].total_count);
+    check(loose === before, '⑦ 対照: 年齢の下限を 0 にすると戻る', `${after} → ${loose}（元 ${before}）`);
+  } finally {
+    const end = await endSandbox(c, tx);
+    check(!end.committed, '⑦ 予行を戻した（★途中の commit なし・SB-3）');
+  }
+}
 
 console.log(`\n${fail === 0 ? '✅ ★合格' : '🔴 ★不合格'}（${pass} 件 通過 / ${fail} 件 失敗）`);
 await c.end();
