@@ -21,6 +21,7 @@ import {
   Backdrop, BigButton, ChibiHorse, EpCapsule, PpCapsule, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
+import { FoalInvite } from '../../components/uma/foal-invite';
 import { useStableView } from '../../components/uma/use-stable-view';
 
 /** ★馬をタップしてから待機に戻るまで（★資料 §9 の 2600ms） */
@@ -74,6 +75,12 @@ export default function HomePage(): React.ReactElement {
       </div>
 
       <RaceStrip />
+
+      {/*
+        ★**まだ無償の 1 頭を受け取っていない人にだけ出す案内**（★2026-09-24・案 A）。
+        ⚠️ ★段階はこの部品が読みます（★玄関は何も知りません）。★該当しなければ何も描きません。
+      */}
+      <FoalInvite />
 
       {/* ★中段: 馬ステージ → 馬名 */}
       <div style={{

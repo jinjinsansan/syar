@@ -325,8 +325,24 @@ export default function SetupPage(): React.ReactElement {
               </span>
             </div>
 
+            {/*
+              🔴 ★**もう 1 頭 受け取れることを、ここで伝えます**（★2026-09-24・案 A・D-120）。
+                 ★案 A は「★付与 1 頭 ＋ ★**無償の生産 1 頭**」です。
+                 ★生産の画面（`/stable/foal`）は在るのに、★**リンクが 1 本もありませんでした**。
+                 ★登録した人は ★**受け取れるはずの馬に辿り着けません**でした。
+              ⚠️ ★ここは ★**新しい口座を作り終えた直後**なので、★必ず新しい流れです
+                 （★`create_account` が `first_horse_v1` を書く）。★段階を読み直しません。
+                 ★古い口座（`legacy`）はこの画面を通らないので、★ここに出しても混ざりません。
+            */}
+            <div style={CARD}>
+              <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--u-ink)', lineHeight: 1.7 }}>
+                もう 1 頭、父と母を選んで生産できます。参加ポイントはかかりません
+              </span>
+            </div>
+
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <BigButton tone="gold" label="調教へ" href="/train" grow="1.2" />
+              <BigButton tone="gold" label="もう 1 頭 生産する" href="/stable/foal" grow="1.4" />
+              <BigButton tone="ivory" label="調教へ" href="/train" />
               <BigButton tone="ivory" label="牧場を見る" href="/mypage" />
             </div>
           </>

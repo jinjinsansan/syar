@@ -1441,6 +1441,25 @@ export const WATCHING = [
     reviewBy: '2026-12-31',
   },
   {
+    id: 'SCREEN-WITHOUT-ENTRANCE',
+    what: '🔴 ★**画面は在るのに、どこからもリンクされていない道が 2 本あります**（★2026-09-24）。'
+      + '★`/odds`（★「次のレースのオッズへ送る」入口・2026-09-17）と '
+      + '★`/stable/market`（★馬を迎える）。★URL を打った人しか辿り着けません',
+    why: '✔ ★機械で走査しました（`apps/cli/test/screen-reachable.test.ts`）。'
+      + '★`app/**/page.tsx` の道と、★`apps/web/src` の `href` を突き合わせた結果です。'
+      + '🔴 ★**今日 3 度目の同じ形**です: ★① `fetchOnboardingState` が書かれていたのに呼ばれていない '
+      + '★② `buy_horse` / `sell_horse` / `unlock_stable_grade` が本番に在るのに画面が呼ばない '
+      + '★③ `/stable/foal` を作って本番に出したのに入口が無い（★これは同日に塞ぎました）。'
+      + '⚠️ ★`/stable/market` は ★**画面まるごと見本**です（★値段は `DEMO_MARKET_PRICES_EP`・'
+      + '★`buy_horse` も出品の一覧も呼んでいない）。★**入口を先に作ってはいけません**（★空の店へ送ることになる）。'
+      + '⚠️ ★`/odds` は中身は在ります（★読み取りだけ・次の 1 本へ送る）。★押す所が無いだけです',
+    returnWhen: '★`/odds` … ★**ダッシュボードか投票に「オッズ」を置くとき**（★小さい）。'
+      + '★`/stable/market` … ★**`buy_horse` を結線するとき**（★報告 §4 の 2 番目）。'
+      + '⚠️ ★検査が ★**件数 2 を釘付け**しています。★増やすならここも直すこと（★黙って増えない）',
+    owner: 'dev',
+    reviewBy: '2026-12-31',
+  },
+  {
     id: 'STAGING-WORKER-LIVENESS-UNSEEN',
     what: '🔴 ★**staging のワーカーが約 40 時間 止まっていたのに、誰も気づきませんでした**（★2026-09-24）。'
       + '★`world_state.game_week` の最終更新が ★**2026-09-22T15:41**（★約 146,000 秒前）。'
