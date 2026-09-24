@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Backdrop, BigButton, ChibiHorse, EpCapsule, PpCapsule, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
+import { SignOutButton } from '../../components/uma/sign-out';
 import { useStableView } from '../../components/uma/use-stable-view';
 import { conditionView, sortStable } from '../../lib/stable';
 
@@ -71,6 +72,13 @@ export default function MyPage(): React.ReactElement {
     <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: 10, padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto' }}>
       <BigButton tone="gold" label="育成モードへ" sub="調教を確認する" href="/train" grow="1.4 1 210px" />
       <BigButton tone="ivory" label="ダッシュボード" sub="いつでも戻れます" href="/home" grow="1 1 130px" />
+      {/*
+        🔴 ★**ログアウトはここ 1 か所です**（★2026-09-25・オーナー指摘「★ログアウトボタンがありません」）。
+           ★これまでサイトのどこにも無く、★**別の口座に切り替えられません**でした。
+        ⚠️ ★置き場所を増やすなら、★この画面（★本人の牧場）から動かすこと。
+           ★毎画面に置くと、★誤って押す事故が増えます。
+      */}
+      <SignOutButton grow="1 1 130px" />
     </div>
   </div>;
 }
