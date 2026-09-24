@@ -86,6 +86,26 @@ bash tools/deploy.sh <0 で控えた sha>
 
 ## ⑦ 画面（main への push）
 
+### 🔴 押す前に: その画面が呼ぶ DB の口が、本番に在るか
+
+> ★**2026-09-24 に順が逆になりました**（★レビュー側の裁定 `REVIEW_0077_AND_SCREEN_ORDER_20260924.md`）。
+> ★`/stable/foal` を `main` に push した時点で、★その画面が呼ぶ `initial_breeding_dams`（`0077`）が
+> ★**本番にありませんでした**。★開くと「候補を読み込めませんでした」になります。
+> ★害が小さかったのは ★**たまたまリンクを 1 本も張っていなかった**からです。
+
+★押す前に、★**画面が呼ぶ関数が本番に在るか**を確かめる:
+
+```bash
+# ★画面が呼ぶ RPC を数える（★`.rpc('…')` を集める）
+# ★その名前が本番に在るかを、読むだけで確かめる
+npx tsx tools/verify-screen-rpcs-live.mjs --env production
+```
+
+- ⚠️ ★**この道具はまだありません**（★次の便で作ります・レビュー側の条件）。
+  ★それまでは ★**目で突き合わせて**ください: ★新しい画面が `rpc('…')` で呼ぶ名前を挙げ、
+  ★`db/migrations` のどの番号で足したかを見て、★その番号が本番に当たっているかを確かめる。
+- ★順番は ★**移行 → 画面**。★逆にすると、★画面だけ在って動かない状態になります。
+
 ```bash
 git push origin <0 で控えた sha>:refs/heads/main
 npx tsx tools/verify-deployed-build.mjs --base https://star-two-chi.vercel.app --expect $(git rev-parse <sha>)

@@ -157,17 +157,26 @@ export default function FirstFoalPage(): React.ReactElement {
   if (state.stage === 'legacy') {
     return <Shell><Note>この牧場は、無償の生産の対象ではありません。<a href="/stable/breed" style={{ color: '#ffd84a' }}>配合の画面へ</a></Note></Shell>;
   }
+  /**
+   * ★父母の名前は ★**生まれてから**しか返りません。
+   * ⚠️ 🔴 ★待っている段で `父 — ／ 母 —` と出していました（★2026-09-24・オーナーの画面で発覚）。
+   *    ★`my_onboarding_state` は、★待ちの段では名前を埋めません（★命名前の仔から取るため）。
+   *    → ★**空の欄を出しません**。★無いものの枠だけ見せない。
+   */
+  const parents = state.sireName === null && state.damName === null ? null
+    : `父 ${state.sireName ?? '—'} ／ 母 ${state.damName ?? '—'}`;
+
   if (state.stage === 'waiting_birth') {
     return <Shell>
       <Note>仔が生まれるのを待っています。この画面を開いたままでかまいません。</Note>
-      <Panel><Note>父 {state.sireName ?? '—'} ／ 母 {state.damName ?? '—'}</Note></Panel>
+      {parents !== null && <Panel><Note>{parents}</Note></Panel>}
     </Shell>;
   }
   if (state.stage === 'naming') {
     return <Shell>
       <Note>仔が生まれました。名前を付けてください。</Note>
       <Panel>
-        <Note>父 {state.sireName ?? '—'} ／ 母 {state.damName ?? '—'}</Note>
+        {parents !== null && <Note>{parents}</Note>}
         <a href="/stable/name" style={{ color: '#ffd84a', fontWeight: 800 }}>名前を付ける</a>
       </Panel>
     </Shell>;
