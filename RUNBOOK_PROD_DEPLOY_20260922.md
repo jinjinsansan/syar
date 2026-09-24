@@ -107,8 +107,20 @@ npx tsx tools/verify-screen-rpcs-live.mjs --env production
 
 ```bash
 git push origin <0 で控えた sha>:refs/heads/main
+
+# 🔴 ★**push できたかは、★終了コードで判定しない**（★下の ⚠️）
+git ls-remote --heads origin main        # ← ★ここの sha が、★控えた sha と一致して初めて「押せた」
+
 npx tsx tools/verify-deployed-build.mjs --base https://star-two-chi.vercel.app --expect $(git rev-parse <sha>)
 ```
+- 🔴 ⚠️ ★**`git push` の終了コードを成功の判定に使わない。** ★`git ls-remote` の sha で確かめる。
+  ★2026-09-24 の実例（★同じ日に 2 度）:
+  ```
+  fatal: unable to access '…': Could not resolve host: github.com   ← ★2 回とも失敗
+  [exited with code 0]                                              ← ★なのに 0
+  ```
+  ★このときリモートは 1 つ前のままで、★「押せた」と読んでいたら ★**本番に出ていないものを出たと報告**していました。
+  ★資格情報の窓で止まる形（★このセッションからは押せない）でも、★終了コードは当てになりません。
 - ⚠️ `--expect` は **完全な 40 桁**で渡す（短い sha を渡すと、中身が同じでも「食い違っています」と出る・2026-09-23 に実際に出た）
 - push は HEAD ではなく**控えた sha を名指し**する（記憶「共有ツリーでの push は HEAD を送る」）。このセッションからは資格情報の窓で止まることがあるので、止まったらオーナーに依頼する。
 

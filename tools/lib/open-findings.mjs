@@ -1441,6 +1441,29 @@ export const WATCHING = [
     reviewBy: '2026-12-31',
   },
   {
+    id: 'ONE-WAY-DOORS',
+    what: '🔴 ★**利用者が「始められる」口は 9 件、★「取り消せる」口は 0 件**です（★2026-09-25）。'
+      + '★正典 D-122 ⑤「入る口を作ったら出る口も作る」を、★ログアウト以外にも当てた結果です',
+    why: '✔ ★機械で走査しました（`out/audit-one-way-doors.mjs`＋`db/migrations` の `grant execute`）。'
+      + '★画面が呼ぶ 9 件: `create_account` `enter_race` `exchange_prize` `place_bet` `request_breeding` '
+      + '`request_breeding_role` `request_foal_name` `request_initial_breeding` `set_training_order`。'
+      + '★`cancel` / `withdraw` / `scratch` / `refund` を含む関数は ★**`authenticated` に 1 つも渡っていません**。'
+      + '⚠️ ★**全部が問題ではありません。** ★仕分けると:\n'
+      + '★  ① ★**同じ口をもう一度呼べば戻る** … `request_breeding_role`（★功労馬へ戻せる・0074）／`set_training_order`（★上書き）\n'
+      + '★  ② ★**性質として戻せない** … `exchange_prize`（交換）／`create_account`／`request_initial_breeding`（★1 回だけ）\n'
+      + '★  ③ ★**裏返しが DB に在るのに画面が呼ばない** … `sell_horse`（★`buy_horse` の裏・簿 `SCREEN-WITHOUT-ENTRANCE` と同じ束）\n'
+      + '★  🔴 ④ ★**どこにも戻る道が無い** … ★`enter_race`（★出走の取消）／`place_bet`（★投票の取消）\n'
+      + '★④ の取消は ★**システム側だけ**在ります（★発走前の引退・開催中止の返還）。★利用者からは押せません。'
+      + '⚠️ ★語で仕分けています。★見落としは在りえます（★道具自身がそう出力します）',
+    returnWhen: '🔴 ★**④ をどうするかは正典とオーナーの判断**です（★開発側では決めません）。'
+      + '★「出走を取り消せるか」「投票を取り消せるか」は ★**ポイントの扱いに直結**します'
+      + '（★登録料の返還・賭けの成立時点）。★弁護士ゲートに触る可能性もあります。'
+      + '★③ は `buy_horse` の結線と同じ便で閉じられます。'
+      + '★①② は ★**いまのままでよい**（★記録として残すだけ）',
+    owner: 'owner',
+    reviewBy: '2026-12-31',
+  },
+  {
     id: 'SCREEN-WITHOUT-ENTRANCE',
     what: '🔴 ★**画面は在るのに、どこからもリンクされていない道が 2 本あります**（★2026-09-24）。'
       + '★`/odds`（★「次のレースのオッズへ送る」入口・2026-09-17）と '
