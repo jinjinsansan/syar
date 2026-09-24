@@ -252,6 +252,20 @@
   60% { transform: translateY(2px) scale(0.995); }
 }
 @keyframes u-idle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+/*
+  ★**育成の馬の歩き**（★2026-09-24）。
+
+  ★オーナー決定「★レースの馬をそのまま見せる」により、★育成の馬は
+  ★`horse-jockey-side-walk-v1`（★パドックの歩き 8 コマ）から ★**騎手だけを消した**ものです。
+  ★8 コマを横に並べた 1 枚（`/art/uma/horse-walk-sheet.webp`）を送ります。
+
+  ⚠️ ★使う所は ★**`background-size: 800% 100%` と対**です（★片方だけ変えるとコマが半分ずれる）。
+  🔴 ★使う所は ★**`steps(8, jump-none)`** です。★`jump-none` を落とすと 0/8〜7/8 で止まり、
+     ★**8 コマ中 7 コマで 2 コマが半分ずつ映ります**（★実ブラウザで実測・差 25〜35／合っていれば 1.0）。
+     ★ここが 0%→100% なのは ★`jump-none` が ★**両端を含む 8 点**（0/7 … 7/7）で止まるからです。
+  ⚠️ ★JS のタイマーを使いません（★`.u-paused` の停止スイッチが、★他の動きと同じ規則で効く）。
+*/
+@keyframes u-walk { from { background-position-x: 0%; } to { background-position-x: 100%; } }
 @keyframes u-dust {
   0% { transform: translate(0, 0) scale(0.45); opacity: 0.9; }
   100% { transform: translate(-96px, -30px) scale(1.8); opacity: 0; }

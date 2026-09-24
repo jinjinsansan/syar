@@ -1,0 +1,33 @@
+IMAGE EDIT TASK — do not generate a new picture. Edit the input image.
+
+INPUT IMAGE (pass it as an actual image input to the image tool; this is the picture to EDIT):
+  apps/web/public/art/uma/horse-face.png
+
+If you cannot attach that file as an image input, STOP and say so. Do not work from the text alone.
+
+WHAT THIS IS
+A side view of a cartoon horse's head. This is the SAME character that runs in the races.
+The input is its NEUTRAL expression. Make one variant: PLEASED / IN HIGH SPIRITS.
+
+CHANGE ONLY THESE FOUR THINGS
+  1. The EAR: rotate it FORWARD (pricked, pointing towards the muzzle). In the input it is neutral.
+  2. The EYE: open it slightly WIDER and raise the upper lid, so more of the white shows.
+     Lift the inner end of the heavy brow so the look becomes bright instead of grumpy.
+  3. The MOUTH LINE: curve the corner of the mouth slightly UPWARD. Keep it subtle — a small curve.
+     Do NOT open the mouth. Do NOT show teeth or a tongue.
+  4. The MANE near the crest: let one or two strands lift slightly. Do not change its length or colour.
+
+KEEP EXACTLY AS IN THE INPUT — DO NOT REDRAW, DO NOT RESTYLE, DO NOT MOVE
+  - the head shape, the muzzle size and roundness, the jaw, the neck
+  - the eye size and the eye position
+  - every colour, the outline weight, the cel shading
+  - the camera angle, the head angle, the position in the frame
+  - the image size and the transparent background
+
+THIS IS AN EXPRESSION CHANGE, NOT A REDESIGN.
+If the head proportions, the muzzle or the line work differ from the input, it is a FAILURE.
+Do not "improve" the drawing. Do not make it more realistic. Do not make it more stylised.
+Do not add a bridle, a halter, reins or any equipment. Do not add white markings.
+
+OUTPUT
+Same dimensions as the input, transparent background, no text, no logos, no watermark.

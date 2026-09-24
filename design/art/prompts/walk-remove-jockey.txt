@@ -1,0 +1,37 @@
+IMAGE EDIT TASK — do not generate a new picture.
+
+INPUT IMAGE (pass it as an actual image input to the image tool; this is the picture to EDIT):
+  apps/web/public/art/horse-jockey-side-walk-v1-pose01.png
+
+WHAT TO DO
+Remove ONLY the rider and the riding equipment. Keep the horse exactly as it is.
+
+REMOVE
+  - the jockey (body, head, helmet, goggles, gloves, boots, silks)
+  - the saddle and the saddle cloth
+  - the girth / straps around the barrel
+  - the bridle, the reins, the bit and the cheek pieces on the head
+  - any buckles and rings that belong to that equipment
+
+★ THE MANE — the most likely thing to go wrong
+  The jockey's arm and the reins overlap the mane in the input. When you remove them,
+  RESTORE the mane behind them. The mane must stay the SAME LENGTH and the SAME SHAPE as in the
+  input — a thick crest between the ears running back along the neck. A previous attempt made the
+  mane SHORTER; that is a FAILURE. If in doubt, draw more mane, not less.
+
+KEEP — DO NOT REDRAW, DO NOT RESTYLE, DO NOT MOVE
+  - every part of the horse: head, eye, ears, muzzle, neck, barrel, legs, hooves, mane, tail
+  - the exact same outline, the exact same colours, the exact same shading
+  - the exact same pose and the exact same position in the frame
+  - the image size and the transparent background
+
+WHERE THE EQUIPMENT WAS, fill in the horse's own coat, matching the surrounding colour,
+shading and outline. For example the back and barrel where the saddle was, and the head
+where the bridle straps were, become plain coat.
+
+THIS IS A REMOVAL, NOT A REDESIGN.
+If the horse's proportions, face or line work differ from the input at all, it is a FAILURE.
+Do not "improve" the horse. Do not make it more realistic. Do not make it more stylised.
+
+OUTPUT
+Same dimensions as the input, transparent background, no text, no logos, no watermark.

@@ -84,14 +84,27 @@ function NameField({ label, value, onChange, placeholder }: {
  * ★失敗の行。★**サーバーの文言をそのまま出します**（★UI1-9）。
  * ⚠️ ★当てはまらないものを言い換えると、★**直すべき所が画面から見えなくなります**（R-16）。
  */
+/**
+ * ★失敗の種類ごとの文言。
+ *
+ * ⚠️ ★**`Record<SetupError, string>` にしてあります**（★2026-09-24）。
+ *    ★ここは `error === 'other' ? … : error === 'network' ? … : …` と書いた ★**最後が既定**でした。
+ *    ★その形だと、★`SetupError` に 5 つ目を足した日、★**型は通り、画面は「使えない語が含まれています」と嘘を言い**ます。
+ *    ★実際に `'duplicate'` → `'already'` の入れ替えで ★**嘘の理由**を出していた画面です（★上の ⚠️）。
+ *    ★`Record` にすると ★**種類を足した時点で型検査が落ちます**。
+ */
+const ERROR_TEXT: Record<SetupError, string> = {
+  other: '登録できませんでした（理由が返っていません）',
+  network: '通信に失敗しました',
+  already: 'すでに登録が済んでいます。ホームからお進みください',
+  ngword: '使えない語が含まれています',
+};
+
 function ErrorRow({ error, message, onRetry }: {
   readonly error: SetupError; readonly message: string | null; readonly onRetry: () => void;
 }): React.ReactElement {
-  const text = error === 'other'
-    ? (message ?? '登録できませんでした（理由が返っていません）')
-    : error === 'network' ? '通信に失敗しました'
-      : error === 'already' ? 'すでに登録が済んでいます。ホームからお進みください'
-        : '使えない語が含まれています';
+  // ★`other` のときだけ、★サーバーの原文を優先します（★推測で言い換えない・UI1-9）
+  const text = error === 'other' ? (message ?? ERROR_TEXT.other) : ERROR_TEXT[error];
   const retryable = error === 'other' || error === 'network';
   return (
     <div style={{

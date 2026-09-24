@@ -1,0 +1,34 @@
+IMAGE EDIT TASK — do not generate a new picture. Edit the input image.
+
+INPUT IMAGE (pass it as an actual image input to the image tool; this is the picture to EDIT):
+  apps/web/public/art/uma/horse-face.png
+
+If you cannot attach that file as an image input, STOP and say so. Do not work from the text alone.
+
+WHAT THIS IS
+A side view of a cartoon horse's head. This is the SAME character that runs in the races.
+The input is its NEUTRAL expression. Make one variant: TIRED / WORN OUT.
+
+CHANGE ONLY THESE FOUR THINGS
+  1. The EAR: rotate it BACKWARD and let it droop outward, lower than in the input.
+  2. The EYE: lower the upper lid so the eye is HALF CLOSED. Less of the white shows.
+     Keep the eye the same SIZE — only the lid moves.
+  3. The MOUTH LINE: let the corner of the mouth droop slightly DOWNWARD. Keep it subtle.
+     Do NOT open the mouth. Do NOT show teeth or a tongue.
+  4. Add a faint darker shading under the eye. Keep it very subtle — no black rings, no cracks.
+
+KEEP EXACTLY AS IN THE INPUT — DO NOT REDRAW, DO NOT RESTYLE, DO NOT MOVE
+  - the head shape, the muzzle size and roundness, the jaw, the neck
+  - the eye size and the eye position
+  - every colour, the outline weight, the cel shading
+  - the camera angle, the head angle, the position in the frame
+  - the image size and the transparent background
+
+THIS IS AN EXPRESSION CHANGE, NOT A REDESIGN.
+If the head proportions, the muzzle or the line work differ from the input, it is a FAILURE.
+Do not "improve" the drawing. Do not make it more realistic. Do not make it more stylised.
+Do not add sweat drops, steam, motion lines, or any comic-book symbols.
+Do not add a bridle, a halter, reins or any equipment. Do not add white markings.
+
+OUTPUT
+Same dimensions as the input, transparent background, no text, no logos, no watermark.

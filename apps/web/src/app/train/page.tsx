@@ -14,10 +14,20 @@
  * ⚠️ ★**週送り・メニューの効果のロジックは既存を流用します**（★資料 §4.3）。
  *    ★この画面はまだ**見た目だけ**で、★`@star/training` には繋いでいません（★次便）。
  *
- * ★**顔アップ枠は表情 3 種**（上機嫌・平常・疲れ）です（★2026-09-23 に焼いた・
- *    `design/art/prompts/train-face-*.txt`）。★どれを出すかは `trainFaceOf` が決めます（★画面で決めない）。
- * ★**全身枠も焼きました**（★待機 `train-body-idle` ／ 調教中 `train-body-run`・騎手なし）。
- * ⚠️ ★走りは ★**1 枚**です（★連番のアニメではない）。★動きは CSS が付けています。
+ * ★**馬の絵は「レースの馬そのもの」です**（★2026-09-24・オーナー決定）。
+ *
+ *   ⚠️ ★2026-09-23 まで、★この画面の馬は ★**別に焼いた**絵（`train-body-idle` / `train-face-*`）でした。
+ *      ★焼くたびに絵柄がずれ、★オーナーから ★**3 回**差し戻されました
+ *      （「★急にスマートになっている」「★デフォルメのキャラクターではない」）。
+ *   ★オーナー決定「★そもそもレースの馬は生成できる。★真横の馬を見せればいい」。
+ *   → ★素材は `horse-jockey-side-walk-v1`（★パドックの歩き 8 コマ）から ★**騎手だけを消した**もの。
+ *     ★体・顔・線・陰影はレースの馬そのものなので、★乖離は原理的に起きません。
+ *     ★作り方は `tools/publish-uma-horse-frames.mjs`（★切り出しの値もそこに在る）。
+ *
+ * ★**待機** … `horse-stand.webp`（★四肢がいちばん体の下に集まっているコマ）＋ ★小さな上下動
+ * ★**調教中** … `horse-walk-sheet.webp` を `steps(8, jump-none)` で送る（★脚が実際に動く）
+ * ★**顔アップ** … ★同じ絵から切り出した頭部。★表情 3 種は ★**その頭部を直した**もの（★別の絵にしない）
+ * ⚠️ ★どの表情を出すかは `trainFaceOf` が決めます（★画面で決めない）。
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -25,7 +35,7 @@ import { Backdrop, BigButton, TopBar, useMotionPaused } from '../../components/u
 import { RaceStrip } from '../../components/uma/race-strip';
 import { useStableView } from '../../components/uma/use-stable-view';
 import { TRAINING_MENUS } from '../../lib/game-demo';
-import { conditionView, sortStable, trainFaceOf } from '../../lib/stable';
+import { conditionView, sortStable, trainFaceOf, type TrainFace } from '../../lib/stable';
 import { coatOfHorseId, coatCssFilter } from '@star/render';
 
 /** ★実行してから待機に戻るまで（★資料 §9 の 3200ms） */
@@ -43,6 +53,16 @@ const RUN_MS = 3200;
  */
 
 const CONDITION_STEPS = 5;
+
+/**
+ * ★顔枠に出す言葉（★`trainFaceOf` の 3 値と 1 対 1）。
+ * ⚠️ ★絵は 1 種しかないので、★**気分を伝えているのはこの言葉だけ**です（★上の 🔴 を読むこと）。
+ */
+const FACE_WORD: Record<TrainFace, string> = {
+  happy: '上機嫌です',
+  normal: '落ち着いています',
+  tired: '疲れています',
+};
 
 export default function TrainPage(): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
@@ -106,7 +126,7 @@ export default function TrainPage(): React.ReactElement {
         </div>}
         {/* ★調教ステージ */}
         <div style={{
-          flex: '1 1 340px', minWidth: 0, minHeight: 226, position: 'relative',
+          flex: '1 1 340px', minWidth: 0, minHeight: 296, position: 'relative',
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
           border: '2px solid rgba(246,194,28,.45)', borderRadius: 14, background: 'rgba(6,18,30,.28)', overflow: 'hidden',
         }}>
@@ -120,34 +140,61 @@ export default function TrainPage(): React.ReactElement {
             </span>
           </div>
 
-          {/* ★顔アップ枠（★表情 3 種・2026-09-23。★どれを出すかは `trainFaceOf` が決める） */}
+          {/* ★顔アップ枠（★表情 3 種。★どれを出すかは `trainFaceOf` が決める） */}
           <div style={{ position: 'absolute', right: 10, top: 10, width: 96, border: '3px solid var(--u-gold)', borderRadius: 12, background: 'var(--u-panel-strong)', overflow: 'hidden' }}>
+            {/*
+              🔴 ★**表情の絵は 1 種しかありません**（★2026-09-24）。
+                 ★平常の頭部を元に「上機嫌」「疲れ」を ★**画像編集で作らせる**のを 2 回試し、
+                 ★2 回とも ★**頭の形と線が引き直されて別キャラになりました**
+                 （★Codex 自身も失敗と報告・`out/gen/uma-face-happy.cand0*.png`）。
+                 ★3 回差し戻された原因と同じなので、★**推測で入れません**。
+                 → ★絵は平常の 1 種、★気分は ★**言葉**で出します。★空き `LOOK-FACE-MOODS-MISSING`。
+            */}
             <div style={{
-              height: 74, background: `url('/art/uma/train-face-${face}.webp') no-repeat center/cover`,
+              // ★240x252 の頭部。★`contain` で入れる（★`cover` だと耳と鼻先が切れる）
+              height: 101, background: "url('/art/uma/horse-face.webp') no-repeat center/contain",
               // ★顔も同じ毛色にする（★全身と顔で色が違うと、別の馬に見える）
               filter: coatFilter,
             }} />
             <div style={{ padding: '4px 6px', textAlign: 'center', fontSize: 11, borderTop: '2px solid rgba(246,194,28,.6)' }}>
-              {running ? '張り切っています' : '落ち着いています'}
+              {FACE_WORD[face]}
             </div>
           </div>
 
           {/* ★馬（★タップでも「この内容で調教する」でも走り出す） */}
-          <span style={{ position: 'absolute', left: '12%', right: '12%', bottom: 16, height: 20, borderRadius: '50%', background: 'rgba(8,18,8,.5)', filter: 'blur(6px)' }} />
+          <span style={{ position: 'absolute', left: '16%', right: '16%', bottom: 74, height: 18, borderRadius: '50%', background: 'rgba(8,18,8,.5)', filter: 'blur(6px)' }} />
           {running && (
-            <span style={{ position: 'absolute', left: '10%', bottom: 14, width: 60, height: 44, borderRadius: '50%', background: 'rgba(228,226,208,.4)', filter: 'blur(8px)', animation: 'u-dust .95s linear infinite' }} />
+            <span style={{ position: 'absolute', left: '12%', bottom: 72, width: 60, height: 44, borderRadius: '50%', background: 'rgba(228,226,208,.4)', filter: 'blur(8px)', animation: 'u-dust .95s linear infinite' }} />
           )}
           <div
             onClick={run}
             style={{
-              position: 'relative', width: 272, maxWidth: '100%', height: 290, cursor: 'pointer',
-              animation: running ? 'u-rush .95s ease-in-out infinite' : 'u-idle 3.4s ease-in-out infinite',
+              position: 'relative', width: 'min(330px, 88%)', aspectRatio: '544 / 312',
+              marginBottom: 80, cursor: 'pointer',
+              /**
+               * ⚠️ ★調教中は ★**CSS で跳ねさせません**（★Codex の助言・
+               *    「★一定周期の CSS の上下動は玩具や UI アイコンに見える」）。
+               *    ★脚は絵の側（8 コマ）が動かします。
+               */
+              animation: running ? undefined : 'u-idle 3.4s ease-in-out infinite',
             }}
           >
-            {/* ★全身（★待機／調教中の 2 枚・★2026-09-23 に焼いた・騎手は乗っていない） */}
             <span style={{
               position: 'absolute', inset: 0,
-              background: `url('/art/uma/train-body-${running ? 'run' : 'idle'}.webp') no-repeat bottom center/contain`,
+              /**
+               * ⚠️ ★`800% 100%` は `@keyframes u-walk`（0%→100%）と ★**対**です。
+               *    ★片方だけ変えるとコマが半分ずれます。
+               */
+              background: running
+                ? "url('/art/uma/horse-walk-sheet.webp') no-repeat 0 0 / 800% 100%"
+                : "url('/art/uma/horse-stand.webp') no-repeat center/contain",
+              /**
+               * 🔴 ★**`jump-none` を落とさないこと**（★2026-09-24・実ブラウザで実測）。
+               *   ★既定の `steps(8)` は 0/8, 1/8 … 7/8 の位置で止まります。★コマの境目は k/7 なので、
+               *   ★**8 コマ中 7 コマで、★2 コマが半分ずつ映ります**（★実測 差 25〜35・★合っていれば 1.0）。
+               *   ★`jump-none` は 0/7, 1/7 … 7/7 で止まります（★両端を含む 8 点）。
+               */
+              animation: running ? 'u-walk .8s steps(8, jump-none) infinite' : undefined,
               // ⚠️ ★毛色を先に、影を後に掛ける（★逆にすると影まで毛色に染まる）
               filter: `${coatFilter === undefined ? '' : `${coatFilter} `}drop-shadow(0 8px 12px rgba(8,18,8,.45))`,
             }} />

@@ -16,7 +16,8 @@
  * 【★釘付けするもの】
  *   ★① ★`supabaseSetupRepo.create` に ★**5 つの引数**を渡している
  *   ★② ★`clientToken` は ★**1 回だけ**作る（★`useState(() => crypto.randomUUID())`）
- *   ★③ ★失敗の 4 種を出し分け、★**サーバーの文言をそのまま**出す枝が在る
+ *   ★③ ★失敗を ★**`SetupError` の全種**だけ出し分け、★**サーバーの文言をそのまま**出す枝が在る
+ *      （★種類は `apps/web/src/lib/setup.ts` から読みます。★テストに書き写しません）
  *   ★④ ★`NAME_MAX` で切っている
  *   ★⑤ ★受け取った EP は ★**実数**を出す（★ハードコードしない）
  *   ★⑥ ★`uma-parts` を使っている（★＝ 自前バーを持つ ＝ 帯が二重にならない）
@@ -58,9 +59,22 @@ describe('🔴 ★`/setup` の組み直しで、機能が落ちていない', ()
       .not.toContain('setClientToken');
   });
 
-  it('🔴 ③ ★失敗の 4 種を出し分け、★サーバーの文言をそのまま出す（★UI1-9）', () => {
-    for (const kind of ['other', 'network', 'duplicate']) {
-      expect(SRC, `🔴 ★失敗 "${kind}" の枝が無い`).toContain(`'${kind}'`);
+  /**
+   * 🔴 ★**種類は `SetupError` から読みます**（★テストに書き写さない・★2026-09-24）。
+   *   ⚠️ ★ここは `'duplicate'` と書き写してありました。★`SetupError` から
+   *      ★`'duplicate'` が消え `'already'` になった日、★**画面は直っているのにテストだけが落ち**ました。
+   *      ★同じ値を 2 か所に持つと、★片方が必ず古びます（★二重帳簿）。
+   */
+  it('🔴 ③ ★`SetupError` の全種を出し分け、★サーバーの文言をそのまま出す（★UI1-9）', () => {
+    const union = readFileSync(path.join(ROOT, 'apps/web/src/lib/setup.ts'), 'utf8')
+      .match(/export type SetupError\s*=\s*([^;]+);/);
+    expect(union, '🔴 ★`SetupError` の宣言が読めない').not.toBeNull();
+    const kinds = [...union![1]!.matchAll(/'([a-z]+)'/g)].map((m) => m[1]!);
+    expect(kinds.length, '🔴 ★種類が拾えていない').toBeGreaterThan(1);
+    /** ★名指しの形は 2 通り（★`=== 'ngword'` と ★`ngword:` の表）。★どちらでも「名指し」です */
+    for (const kind of kinds) {
+      expect(SRC, `🔴 ★失敗 "${kind}" を名指ししていない（★既定の枝に落ちていませんか）`)
+        .toMatch(new RegExp(`'${kind}'|\\b${kind}\\s*:`));
     }
     expect(SRC, '🔴 ★サーバーの文言（message）を出していない').toMatch(/message\s*\?\?/);
     expect(SRC, '🔴 ★失敗を画面に出していない').toContain('ErrorRow');

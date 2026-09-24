@@ -123,6 +123,12 @@ export const TOOL_AFTERMATH = {
     // ★AU-7: ★主張には引用を付ける。★この行が変われば、★検査が壊れて落ちます
     countedBy: 'check(after === before,',
   },
+  /**
+   * ★staging のオーナーへ引退馬を渡す（★2026-09-24）。
+   *   ★書いたものは ★**残すのが目的**です（★オーナーが `/stable/roles` を触るため）。
+   *   ★道具自身が前後の頭数を出力します（★裁定 §13 の条件）。
+   */
+  'grant-retired-horses-staging.mjs': { mode: 'consumes', why: '★書いたまま残す（★オーナーが触るための馬）' },
   'verify-initial-horse-distribution.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'backfill-entry-prize.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'verify-d117-fill.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },

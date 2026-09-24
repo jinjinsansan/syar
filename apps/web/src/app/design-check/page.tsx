@@ -79,12 +79,16 @@ const SCREENS: readonly { readonly path: string; readonly label: string }[] = [
  *    （★大きく見せると、★小さいときに読めない絵を「良い」と判断してしまう）。
  */
 const ART: readonly { readonly src: string; readonly label: string; readonly w: number; readonly h: number }[] = [
-  { src: '/art/uma/train-face-happy.webp', label: '調教の顔: 上機嫌', w: 96, h: 74 },
-  { src: '/art/uma/train-face-normal.webp', label: '調教の顔: 平常', w: 96, h: 74 },
-  { src: '/art/uma/train-face-tired.webp', label: '調教の顔: 疲れ', w: 96, h: 74 },
-  { src: '/art/uma/intro-birth-cut.webp', label: '誕生カット（仔馬）', w: 360, h: 270 },
-  { src: '/art/uma/train-body-idle.webp', label: '調教の全身: 待機', w: 136, h: 145 },
-  { src: '/art/uma/train-body-run.webp', label: '調教の全身: 調教中', w: 136, h: 145 },
+  /*
+    🔴 ★**2026-09-24 に素材を入れ替えました**（★オーナー決定「★レースの馬を見せればいい」）。
+      ★外したもの: `train-face-{happy,normal,tired}.webp` ／ `train-body-{idle,run}.webp`
+      ★理由: ★**別に焼いた絵**で、★レースの馬と絵柄が違い、★3 回差し戻されました。
+      ⚠️ ★ファイルは消していません（★オーナーが「元とどう違うか」を見比べられるように残す）。
+      ★ここに並べないだけです。
+  */
+  { src: '/art/uma/horse-stand.webp', label: '育成の全身: 待機（レースの馬・騎手なし）', w: 272, h: 156 },
+  { src: '/art/uma/horse-face.webp', label: '育成の顔（同じ絵から切り出し）', w: 96, h: 101 },
+  { src: '/art/uma/intro-birth-cut.webp', label: '誕生カット（仔馬・★まだ旧い絵柄）', w: 360, h: 270 },
 ];
 
 /**
@@ -218,15 +222,15 @@ export default function DesignCheckPage(): React.ReactElement {
           毛色 9 種（同じ絵に色を掛けているだけ）
         </h2>
         <p style={{ margin: '0 0 8px', fontSize: 11, color: '#9fb6cc', lineHeight: 1.7 }}>
-          絵は 1 枚（調教の待機）。輪郭は 1 画素も変えていません。色は画面が使うのと同じ式です。
+          絵は 1 枚（★レースの馬・騎手なし）。輪郭は 1 画素も変えていません。色は画面が使うのと同じ式です。
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end', background: '#091e37', padding: 10, borderRadius: 10 }}>
           {(Object.keys(COAT_TRANSFORMS) as CoatName[]).map((coat) => (
             <div key={coat} style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/art/uma/train-body-idle.webp" alt={COAT_LABEL[coat]} width={96} height={102}
-                style={{ width: 96, height: 102, objectFit: 'contain', filter: coatFilter(coat) }}
+                src="/art/uma/horse-stand.webp" alt={COAT_LABEL[coat]} width={136} height={78}
+                style={{ width: 136, height: 78, objectFit: 'contain', filter: coatFilter(coat) }}
               />
               <span style={{ fontSize: 11 }}>{COAT_LABEL[coat]}</span>
             </div>
@@ -246,8 +250,8 @@ export default function DesignCheckPage(): React.ReactElement {
               <div key={i} style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/art/uma/train-body-idle.webp" alt={COAT_LABEL[coat]} width={72} height={77}
-                  style={{ width: 72, height: 77, objectFit: 'contain', filter: coatFilter(coat) }}
+                  src="/art/uma/horse-stand.webp" alt={COAT_LABEL[coat]} width={104} height={60}
+                  style={{ width: 104, height: 60, objectFit: 'contain', filter: coatFilter(coat) }}
                 />
                 <span style={{ fontSize: 9, color: '#9fb6cc' }}>{i + 1}枠 {COAT_LABEL[coat]}</span>
               </div>
