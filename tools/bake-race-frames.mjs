@@ -45,14 +45,24 @@ const FRAMES = 8;
 const p2 = (i) => String(i + 1).padStart(2, '0');
 
 /**
- * ★**可逆 WebP で書き出します。**
- *   ★PNG と ★**画素は 1 つも変わりません**（可逆）。★転送量は実測で 42% 小さくなります
- *   （★真横のアトラス 4.55MB → 2.62MB）。
- * ⚠️ ★**非可逆（`quality`）は使いません。** ★0.87MB まで落ちますが、
- *    ★この便で変えてよい絵は ★**解像度だけ**です（オーナー決定 2026-09-02）。
- *    ★圧縮でもう 1 つ絵を変えると、★何が効いたのか切り分けられなくなります。
+ * ★**非可逆 WebP（q90）で書き出します**（★オーナー決定 2026-09-24）。
+ *
+ * ⚠️ ★**2026-09-02 の「可逆で焼く」という決定を、★オーナーが 2026-09-24 に置き換えました。**
+ *    ★旧: 「この便で変えてよい絵は ★解像度だけ。★圧縮でもう 1 つ絵を変えると切り分けられない」
+ *    ★新: 「★転送量が実機で待てない」（★実測 1 レース 19.4〜24.3MB）
+ *
+ * ★**実測**（★引く 3 役・1 毛色ぶん・`out/try-lossy.mjs`）:
+ *   ★可逆 4.67MB ／ ★**q90 1.19MB（25%）** ／ q82 0.90MB（19%）
+ *   ★1 レース合計では ★**19.4MB → 約 4.9MB**。
+ * ★**絵の差**（★真横のアトラス・可逆 と q90 の画素差）: ★平均 ★**1.41**／255。
+ *   ★画面に出る大きさ（188px）で並べて、★オーナーが「見分けられない」と判断（`out/lossy-x1.png`）。
+ *
+ * ⚠️ 🔴 ★**`quality` を下げるときは、★必ず画面の大きさで並べて見ること。**
+ *    ★アトラスを等倍で見ても分かりません（★1 コマは画面で 188px に縮みます）。
+ * ⚠️ ★`--lossless` を付けると元の焼き方に戻せます（★戻り道を切らない）。
  */
-const WEBP = { lossless: true, effort: 6 };
+const LOSSLESS = process.argv.includes('--lossless');
+const WEBP = LOSSLESS ? { lossless: true, effort: 6 } : { quality: 90, effort: 5 };
 
 /**
  * ★**画面が実際に使う素材**を、★在るものから決めます（`page.tsx` の `??` の並びと同じ）。
@@ -344,5 +354,5 @@ for (const set of SETS_TO_BAKE) {
 
 writeFileSync(join(OUT, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 /** ★枚数は ★**この回に焼いた役**で数えます（★`--only` のとき目録の全役で数えると、焼いていない分まで出る） */
-console.log(`\n★書き出し ${(totalBytes / 1048576).toFixed(1)}MB（★可逆 WebP ${SETS_TO_BAKE.length * COATS.length} 枚 ＋ ★影 ${SETS_TO_BAKE.length} 枚 ＋ manifest.json${ONLY === undefined ? '' : `・★${ONLY} だけ差し替え`}）`);
+console.log(`\n★書き出し ${(totalBytes / 1048576).toFixed(1)}MB（★${LOSSLESS ? '可逆' : `非可逆 q${WEBP.quality}`} WebP ${SETS_TO_BAKE.length * COATS.length} 枚 ＋ ★影 ${SETS_TO_BAKE.length} 枚 ＋ manifest.json${ONLY === undefined ? '' : `・★${ONLY} だけ差し替え`}）`);
 console.log('⚠️ ★これは原版から作った写しです。★原版は 1 枚も変えていません。');
