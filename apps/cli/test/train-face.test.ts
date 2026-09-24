@@ -65,13 +65,33 @@ describe('★調教画面の顔 3 種', () => {
 
   /**
    * 🔴 ★**3 値が画面のどこにも出ていない、を止める**。
-   *   ★絵が 1 種になったので、★気分を伝えているのは ★**言葉だけ**です。
-   *   ★言葉まで消えると ★`trainFaceOf` は「呼ばれているが何も変えない」関数になります。
+   *   ★言葉も部品も消えると ★`trainFaceOf` は「呼ばれているが何も変えない」関数になります。
    */
   it('🔴 ★3 値それぞれに出す言葉が在る', () => {
     const table = PAGE.match(/FACE_WORD[^=]*=\s*\{([\s\S]*?)\}/);
     expect(table, '★FACE_WORD が画面に無い').not.toBeNull();
     for (const f of FACES) expect(table![1], `★${f} の言葉が無い`).toContain(`${f}:`);
+  });
+
+  /**
+   * 🔴 ★**表情の部品が、素材ごと在ること**（★オーナー決定 D-4・2026-09-24）。
+   *   ★`FACE_PART` が `null` でない段には、★`/art/uma/horse-face-part-<名>.webp` が要ります。
+   *   ⚠️ ★**平常は `null`** が正しい（★部品は「平常をどう変えるか」なので）。
+   *      ★3 つとも `null` なら、★絵は 1 種に戻っています。★それも落とします。
+   */
+  it('🔴 ★表情の部品が、素材ごと在る', () => {
+    const table = PAGE.match(/FACE_PART[^=]*=\s*\{([\s\S]*?)\}/);
+    expect(table, '★FACE_PART が画面に無い').not.toBeNull();
+    const parts = new Map(
+      [...table![1]!.matchAll(/(\w+)\s*:\s*(null|'([\w-]+)')/g)].map((m) => [m[1]!, m[3] ?? null]),
+    );
+    for (const f of FACES) expect(parts.has(f), `★${f} の段が FACE_PART に無い`).toBe(true);
+    const named = [...parts.values()].filter((v) => v !== null);
+    expect(named.length, '🔴 ★部品が 1 つも無い（★絵が 1 種に戻っています）').toBeGreaterThan(1);
+    for (const name of named) {
+      const p = path.join(ROOT, `apps/web/public/art/uma/horse-face-part-${name}.webp`);
+      expect(existsSync(p), `★${p} が無い`).toBe(true);
+    }
   });
 
   it('★画面は選ぶ規則を持たない（★trainFaceOf を呼ぶだけ）', () => {

@@ -26,7 +26,8 @@
  *
  * ★**待機** … `horse-stand.webp`（★四肢がいちばん体の下に集まっているコマ）＋ ★小さな上下動
  * ★**調教中** … `horse-walk-sheet.webp` を `steps(8, jump-none)` で送る（★脚が実際に動く）
- * ★**顔アップ** … ★同じ絵から切り出した頭部。★表情 3 種は ★**その頭部を直した**もの（★別の絵にしない）
+ * ★**顔アップ** … ★同じ絵から切り出した頭部 1 枚。★表情は ★**まぶた／眉だけの部品を重ねて**作ります
+ *    （★オーナー決定 D-4・`DECISIONS_HORSE_LOOK_20260924.md`。★頭部は一切描き直さない）
  * ⚠️ ★どの表情を出すかは `trainFaceOf` が決めます（★画面で決めない）。
  */
 
@@ -54,14 +55,22 @@ const RUN_MS = 3200;
 
 const CONDITION_STEPS = 5;
 
-/**
- * ★顔枠に出す言葉（★`trainFaceOf` の 3 値と 1 対 1）。
- * ⚠️ ★絵は 1 種しかないので、★**気分を伝えているのはこの言葉だけ**です（★上の 🔴 を読むこと）。
- */
+/** ★顔枠に出す言葉（★`trainFaceOf` の 3 値と 1 対 1） */
 const FACE_WORD: Record<TrainFace, string> = {
   happy: '上機嫌です',
   normal: '落ち着いています',
   tired: '疲れています',
+};
+
+/**
+ * ★顔に重ねる部品（★`null` ＝ 何も重ねない ＝ 素の頭部）。
+ * ⚠️ ★**平常が `null`** です。★部品は「平常の顔をどう変えるか」なので、★平常に部品はありません。
+ * ⚠️ ★名前は `/art/uma/horse-face-part-<ここ>.webp` に化けます（★`tools/publish-uma-face-parts.mjs`）。
+ */
+const FACE_PART: Record<TrainFace, string | null> = {
+  happy: 'happy',
+  normal: null,
+  tired: 'tired',
 };
 
 export default function TrainPage(): React.ReactElement {
@@ -143,19 +152,31 @@ export default function TrainPage(): React.ReactElement {
           {/* ★顔アップ枠（★表情 3 種。★どれを出すかは `trainFaceOf` が決める） */}
           <div style={{ position: 'absolute', right: 10, top: 10, width: 96, border: '3px solid var(--u-gold)', borderRadius: 12, background: 'var(--u-panel-strong)', overflow: 'hidden' }}>
             {/*
-              🔴 ★**表情の絵は 1 種しかありません**（★2026-09-24）。
-                 ★平常の頭部を元に「上機嫌」「疲れ」を ★**画像編集で作らせる**のを 2 回試し、
-                 ★2 回とも ★**頭の形と線が引き直されて別キャラになりました**
-                 （★Codex 自身も失敗と報告・`out/gen/uma-face-happy.cand0*.png`）。
-                 ★3 回差し戻された原因と同じなので、★**推測で入れません**。
-                 → ★絵は平常の 1 種、★気分は ★**言葉**で出します。★空き `LOOK-FACE-MOODS-MISSING`。
+              ★**表情は「部品」で作ります**（★オーナー決定 D-4・2026-09-24）。
+                ★頭部の絵は ★**1 枚のまま**（`horse-face.webp`）。
+                ★その上に ★**まぶた／眉だけの透過レイヤー**を重ねます。
+              ⚠️ ★2026-09-23 まで、★表情ごとに ★**頭部を焼き直して**いました。
+                 ★「耳・まぶた・口角だけ動かす」と指示しても、★**2 回とも頭の形と線が引き直され**、
+                 ★別キャラになりました（★Codex 自身も失敗と報告）。
+                 ★オーナーに 3 回 差し戻された原因と同じ形です。
+              ⚠️ ★部品は ★**頭部と同じ画布**で作ってあります（`tools/publish-uma-face-parts.mjs` が
+                 ★頭部から目の位置を測って合わせた）。★だから ★**`inset: 0` で重ねるだけ**です。
+                 🔴 ★ここに座標を書かないこと（★頭部を切り直したら画面まで直すことになります）。
             */}
-            <div style={{
-              // ★240x252 の頭部。★`contain` で入れる（★`cover` だと耳と鼻先が切れる）
-              height: 101, background: "url('/art/uma/horse-face.webp') no-repeat center/contain",
-              // ★顔も同じ毛色にする（★全身と顔で色が違うと、別の馬に見える）
-              filter: coatFilter,
-            }} />
+            <div style={{ position: 'relative', height: 101, filter: coatFilter }}>
+              {/* ★顔も同じ毛色にする（★全身と顔で色が違うと、別の馬に見える） */}
+              <span style={{
+                position: 'absolute', inset: 0,
+                // ★240x252 の頭部。★`contain` で入れる（★`cover` だと耳と鼻先が切れる）
+                background: "url('/art/uma/horse-face.webp') no-repeat center/contain",
+              }} />
+              {FACE_PART[face] !== null && (
+                <span style={{
+                  position: 'absolute', inset: 0,
+                  background: `url('/art/uma/horse-face-part-${FACE_PART[face]}.webp') no-repeat center/contain`,
+                }} />
+              )}
+            </div>
             <div style={{ padding: '4px 6px', textAlign: 'center', fontSize: 11, borderTop: '2px solid rgba(246,194,28,.6)' }}>
               {FACE_WORD[face]}
             </div>

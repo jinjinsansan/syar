@@ -216,6 +216,46 @@ export default function DesignCheckPage(): React.ReactElement {
         </div>
       </section>
 
+      {/*
+        ★**表情 3 段**（★オーナー決定 D-4・2026-09-24）。
+        ★頭部は 1 枚のまま。★まぶた／眉だけの透過レイヤーを `inset: 0` で重ねている。
+        ⚠️ ★**画面と同じ 96×101 で並べる**こと（★大きく見せると、
+           ★小さいときに読めない絵を「良い」と判断してしまう）。★右に 3 倍も置く。
+      */}
+      <section aria-labelledby="faces" style={{ marginBottom: 22 }}>
+        <h2 id="faces" style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 900, color: '#ffd84a' }}>
+          調教の表情 3 段（頭部は 1 枚・部品を重ねているだけ）
+        </h2>
+        <p style={{ margin: '0 0 8px', fontSize: 11, color: '#9fb6cc', lineHeight: 1.7 }}>
+          左が画面と同じ大きさ（96×101）。右は 3 倍。平常には部品がありません。
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, background: '#091e37', padding: 10, borderRadius: 10 }}>
+          {([
+            { key: 'tired', label: '疲れ', part: 'tired' },
+            { key: 'normal', label: '平常', part: null },
+            { key: 'happy', label: '上機嫌', part: 'happy' },
+          ] as const).map((f) => (
+            <div key={f.key} style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+              {[1, 3].map((z) => (
+                <div key={z} style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+                  <div style={{ position: 'relative', width: 96 * z, height: 101 * z }}>
+                    <span style={{
+                      position: 'absolute', inset: 0,
+                      background: "url('/art/uma/horse-face.webp') no-repeat center/contain",
+                    }} />
+                    {f.part !== null && <span style={{
+                      position: 'absolute', inset: 0,
+                      background: `url('/art/uma/horse-face-part-${f.part}.webp') no-repeat center/contain`,
+                    }} />}
+                  </div>
+                  <span style={{ fontSize: 10, color: '#9fb6cc' }}>{z === 1 ? f.label : `${f.label}（3倍）`}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* ★毛色（★同じ 1 枚の絵に、画面と同じ CSS を掛けている・★焼き直していない） */}
       <section aria-labelledby="coat" style={{ marginBottom: 22 }}>
         <h2 id="coat" style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 900, color: '#ffd84a' }}>
