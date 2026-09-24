@@ -1,0 +1,35 @@
+IMAGE EDIT TASK — output a TRANSPARENT OVERLAY LAYER, not a horse.
+
+REFERENCE IMAGE (pass it as an actual image input to the image tool):
+  apps/web/public/art/uma/horse-face.png
+
+If you cannot attach that file as an image input, STOP and say so. Do not work from the text alone.
+
+WHAT THE REFERENCE IS
+A side view of a cartoon horse's head with one large open eye. It is FINISHED ARTWORK.
+You must NOT redraw it, NOT restyle it, NOT output it.
+
+WHAT TO OUTPUT
+A single layer, the SAME PIXEL SIZE as the reference, that is FULLY TRANSPARENT EVERYWHERE
+EXCEPT for one small shape: a HALF-CLOSED UPPER EYELID drawn over the reference's eye.
+When this layer is placed on top of the reference at the exact same position, the horse must
+look TIRED, with the eye half closed.
+
+THE SHAPE
+  - It covers the UPPER HALF of the eyeball in the reference, following the eye's own curve.
+  - It is filled with the SAME coat colour as the skin directly above the eye in the reference,
+    with the SAME cel shading.
+  - Its lower edge carries the SAME heavy dark outline as the rest of the drawing, and curves
+    gently downward, like a drooping lid.
+  - It also covers the existing heavy angular brow above the eye, so the grumpy brow disappears.
+  - Above that lid, draw a NEW, gentler brow line: thinner, lower, and less angular.
+  - Nothing else. No ear, no muzzle, no mane, no neck, no outline of the head.
+
+HARD RULES
+  - At least 90% of the output pixels MUST be fully transparent (alpha 0).
+  - Do NOT draw the whole head. Do NOT draw a horse. Do NOT fill the background.
+  - Do NOT move or resize anything: the shape must sit exactly where the eye is in the reference.
+  - Same canvas size as the reference. Same resolution.
+  - No text, letters, numbers, logos or watermarks.
+
+If transparency is impossible, STOP and say so. Do not substitute a solid background.
