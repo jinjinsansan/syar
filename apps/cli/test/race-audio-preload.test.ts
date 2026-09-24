@@ -23,26 +23,45 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { RACE_SOUNDS, type RaceSoundId } from '../../web/src/app/race/race-audio.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const AUDIO_SRC = readFileSync(path.join(ROOT, 'apps/web/src/app/race/race-audio.ts'), 'utf8');
 const PAGE = readFileSync(path.join(ROOT, 'apps/web/src/app/race/page.tsx'), 'utf8');
-const ids = Object.keys(RACE_SOUNDS) as RaceSoundId[];
+
+/**
+ * ⚠️ ★**表は原文から読みます。★`import` しません**（★2026-09-24）。
+ *    ★`race-audio.ts` は `AudioBuffer` / `GainNode` など ★**ブラウザの型**を使います。
+ *    ★ここ（`apps/cli`）の型検査に持ち込むと ★`Cannot find name 'AudioBuffer'` で落ちます
+ *    （★実際に 1 度 落としました）。★この検査が要るのは ★**名前と `early` の旗**だけです。
+ */
+const RACE_SOUNDS: Record<string, { readonly url: string; readonly early: boolean }> = Object.fromEntries(
+  [...AUDIO_SRC.matchAll(/^\s*'?([\w-]+)'?:\s*\{\s*url:\s*'([^']+)'[^}]*early:\s*(true|false)/gm)]
+    .map((m) => [m[1]!, { url: m[2]!, early: m[3] === 'true' }]),
+);
+type RaceSoundId = string;
+const ids: RaceSoundId[] = Object.keys(RACE_SOUNDS);
+/** ★引くと必ず在る（★`ids` から引くので。★`strict` の索引は `undefined` を含むため包む） */
+const spec = (id: RaceSoundId): { readonly url: string; readonly early: boolean } => {
+  const s = RACE_SOUNDS[id];
+  if (s === undefined) throw new Error(`★${id} が表にありません（★走査が壊れています）`);
+  return s;
+};
+const sizeOf = (id: RaceSoundId): number => statSync(path.join(ROOT, 'apps/web/public', spec(id).url)).size;
 /** ★早い側に置いてよい上限（★`gate-open` 0.03MB / `whinny` 0.03MB / `fanfare` 0.26MB） */
 const EARLY_MAX_BYTES = 400 * 1024;
 
 describe('🔴 ★レースの音の先読み', () => {
   it('★音源が実在する（★0 件 通過を合格にしない）', () => {
-    expect(ids.length, '🔴 ★音源の表が空').toBeGreaterThan(3);
+    expect(ids.length, '🔴 ★音源の表が読めていない（★原文の書き方が変わった？）').toBeGreaterThan(3);
+    expect(ids, '🔴 ★`fanfare` が拾えていない ＝ 走査が壊れている').toContain('fanfare');
     for (const id of ids) {
-      const p = path.join(ROOT, 'apps/web/public', RACE_SOUNDS[id].url);
+      const p = path.join(ROOT, 'apps/web/public', spec(id).url);
       expect(existsSync(p), `🔴 ★${p} が無い`).toBe(true);
     }
   });
 
   it('🔴 ★① `early: false` が在るなら、★`preloadRest()` を呼ぶ所が在る', () => {
-    const later = ids.filter((id) => !RACE_SOUNDS[id].early);
+    const later = ids.filter((id) => !spec(id).early);
     if (later.length === 0) return;
     expect(AUDIO_SRC, '🔴 ★`preloadRest` が音の側に無い').toContain('preloadRest');
     expect(
@@ -54,15 +73,14 @@ describe('🔴 ★レースの音の先読み', () => {
 
   it('🔴 ② ★出番が 4.4 秒しかない `fanfare` は早い側', () => {
     expect(
-      RACE_SOUNDS.fanfare.early,
+      RACE_SOUNDS['fanfare']?.early,
       '🔴 ★`fanfare` を後回しにしています。★出番はイントロの 4.4 秒だけで、'
       + '★間に合わなければその回は一度も鳴りません（★2026-09-13 のオーナー評）',
     ).toBe(true);
   });
 
   it('🔴 ③ ★早い側は小さいものだけ（★初回の量を戻さない）', () => {
-    const heavy = ids.filter((id) => RACE_SOUNDS[id].early
-      && statSync(path.join(ROOT, 'apps/web/public', RACE_SOUNDS[id].url)).size > EARLY_MAX_BYTES);
+    const heavy = ids.filter((id) => spec(id).early && sizeOf(id) > EARLY_MAX_BYTES);
     expect(
       heavy,
       `🔴 ★早い側に大きい音源が在ります（★上限 ${Math.round(EARLY_MAX_BYTES / 1024)}KB）。`
@@ -72,9 +90,9 @@ describe('🔴 ★レースの音の先読み', () => {
 
   it('★対照: 後回しにしたぶんが、実際に大きい（★分けた意味が在る）', () => {
     const bytes = (f: (id: RaceSoundId) => boolean): number => ids.filter(f)
-      .reduce((s, id) => s + statSync(path.join(ROOT, 'apps/web/public', RACE_SOUNDS[id].url)).size, 0);
-    const later = bytes((id) => !RACE_SOUNDS[id].early);
-    const early = bytes((id) => RACE_SOUNDS[id].early);
+      .reduce((s, id) => s + sizeOf(id), 0);
+    const later = bytes((id) => !spec(id).early);
+    const early = bytes((id) => spec(id).early);
     expect(later, `🔴 ★後回しが ${later} B しかありません（★早い側 ${early} B）。★分ける意味が無い`)
       .toBeGreaterThan(early);
   });

@@ -96,6 +96,13 @@ const READONLY_FUNCTIONS = [
    */
   'npc_stallion_facts',
   /**
+   * ★初回の配合で選べる母の候補（`0077`・案 A の「無償の生産 1 頭」）。`language plpgsql stable` で**状態を変えない**。
+   *   ★述語は `apps/worker/src/player-breeding.ts` の `damCandidateExists` と同じ（★下見であって、確定の判定はワーカー）。
+   *   ★書き込む側（`request_initial_breeding`）が自分で `assert_setup_complete()` を呼ぶ。
+   *   ★素質・能力は返さない（D-114）。★閾値は渡してもらう（D-052）。
+   */
+  'initial_breeding_dams',
+  /**
    * ★引退後の役割の頭数の上限（`0074`）。`language sql immutable` で**状態を変えない**。
    *   ★数の置き場所を 1 か所にするためだけの関数（★呼ぶ側が `assert_setup_complete()` を持つ）。
    */
