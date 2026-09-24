@@ -80,9 +80,10 @@ const OWN_HEADER = [
    *   ★`OWN_HEADER` に入れ忘れたため、★**白い旧い枠の中に収まって**いました。
    * ⚠️ ★網（`own-header-coverage.test.ts`）は ★**`uma-parts` を使う面**しか見ておらず、
    *    ★この 3 つは `uma-parts` を使わない（★自前の `Shell`）ので ★**通り抜けました**。
-   *    → ★網を「自前の `Shell` を持つ面」にも広げます。
+   *    → ★網を「自前の `Shell` を持つ面」にも広げました（★2026-09-24・`own-header-coverage.test.ts`）。
+   * ✅ ★`/stable/foal`（★最初の 1 頭を無償で生産する・案 A）も同じ形なので、ここに入れます。
    */
-  '/stable/roles', '/stable/breed', '/stable/name',
+  '/stable/roles', '/stable/breed', '/stable/name', '/stable/foal',
 ];
 
 /** Presentation boundary: racing canvases, labs and both landing pages keep their own layout. */

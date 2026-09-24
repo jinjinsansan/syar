@@ -14,6 +14,7 @@ import { DEFAULT_BALANCE } from '@star/sim-engine';
 import { WEEKS_PER_YEAR } from '@star/scheduler';
 
 import { authClient } from './supabase';
+import { SignInRequiredError } from './stable-repo';
 
 /** ★段階（★移行 `0067` の `stage` と同じ語） */
 export type OnboardingStage =
@@ -39,8 +40,17 @@ const STAGES: readonly OnboardingStage[] = [
   'no_account', 'legacy', 'choose_parents', 'waiting_birth', 'naming', 'ready',
 ];
 
-/** ★段階を読む。★知らない語が返ったら ★投げる（★黙って既定の段階に落とさない） */
+/**
+ * ★段階を読む。★知らない語が返ったら ★投げる（★黙って既定の段階に落とさない）。
+ *
+ * 🔴 ★**先に session を見ます**（★2026-09-24）。★この関数は `authenticated` にしか許していないので、
+ *    ★ログインしていないと ★**`permission denied for function my_onboarding_state`** が
+ *    ★そのまま画面に出ます（★実ブラウザで確認しました）。
+ *    ★利用者に DB の文言を見せず、★`SignInRequiredError` にします（★他の読み口と同じ扱い）。
+ */
 export async function fetchOnboardingState(): Promise<OnboardingState> {
+  const { data: sessionData } = await authClient().auth.getSession();
+  if (sessionData.session === null) throw new SignInRequiredError();
   const { data, error } = await authClient().rpc('my_onboarding_state', {
     p_min_breeding_age_weeks: DEFAULT_BALANCE.MIN_BREEDING_AGE_YEARS * WEEKS_PER_YEAR,
     p_max_lifetime_foals: DEFAULT_BALANCE.MARE_LIFETIME_FOALS,
