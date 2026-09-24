@@ -286,8 +286,32 @@ export const DEFORMED_COAT_TRANSFORMS: Readonly<Record<CoatName, CoatTransform>>
   white: { saturate: 0.00, brightness: 1.95, contrast: 0.78 },
 };
 
+/**
+ * ★**デフォルメの絵か**（★＝ `DEFORMED_COAT_TRANSFORMS` を掛ける側か）。
+ *
+ * 🔴 ★**2026-09-24 に直しました。** ★ここは ★**名前の完全一致**を並べていて、
+ *    ★個体タイプ B の素材（`horse-jockey-side-v8b` / `horse-jockey-diag-front-v4b`）が
+ *    ★**抜けていました**（★歩きだけ `-v1b` が書いてあり、★他は書き忘れ）。
+ *    → ★同じデフォルメの絵なのに ★**写真寄りの表**で焼かれていました。
+ *    ★実測（`tools/measure-coat-spread.mjs`・9 色）:
+ *      ★`side-v6`（正しく当たっていた側）★いちばん近い組 24 ✅
+ *      ★`side-v6-b`（抜けていた側）      ★いちばん近い組 ★**10**（★栗毛 ↔ 月毛）🔴
+ *    ⚠️ ★**静かに間違います** — ★`coated()` は表に無い毛色を「素材そのまま」にするだけで、
+ *       ★別の表を引いても何も言いません。
+ *
+ * ⚠️ ★**末尾の型（`b` / `c`）を許す形にしました。** ★完全一致の並びだと、
+ *    ★型を足すたびにここを直す必要があり、★実際に 1 度 忘れています。
+ * ⚠️ ★**版（`v8` / `v4`）は許しません。** ★新しい版はまず別の絵として扱い、
+ *    ★確かめてからここに足します（★勝手に当たって「絵が急に変わった」を避ける）。
+ */
+const DEFORMED_PREFIXES: readonly string[] = [
+  'horse-jockey-side-v8',
+  'horse-jockey-diag-front-v4',
+  /** ★パドックの歩きのコマ（★2026-09-15・同じデフォルメ馬の絵柄・`tools/publish-walk-frames.mjs`） */
+  'horse-jockey-side-walk-v1',
+];
 export function isDeformedHorseAsset(prefix: string): boolean {
-  return prefix === 'horse-jockey-side-v8' || prefix === 'horse-jockey-diag-front-v4'
-    /** ★パドックの歩きのコマ（★2026-09-15・同じデフォルメ馬の絵柄・`tools/publish-walk-frames.mjs`） */
-    || prefix === 'horse-jockey-side-walk-v1' || prefix === 'horse-jockey-side-walk-v1b';
+  return DEFORMED_PREFIXES.some(
+    (base) => prefix.startsWith(base) && /^[b-z]?$/.test(prefix.slice(base.length)),
+  );
 }

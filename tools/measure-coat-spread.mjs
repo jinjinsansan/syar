@@ -1,5 +1,5 @@
 /**
- * ★**毛色 7 色が見分けられるか**を測る（★2026-09-08）
+ * ★**焼いた毛色が見分けられるか**を測る（★2026-09-08）
  *
  * 【★なぜ要るか】
  *   ★オーナー評「★オレンジに偏る」「★暗い 2 色が同じに見える」。
@@ -14,13 +14,20 @@
  *
  * ⚠️ ★合格線は発明しません。★オーナーが「区別できない」と言った組の実測値を下限に使います。
  *
- * ★実行: node tools/measure-coat-spread.mjs [役割]
+ * ⚠️ ★**毛色の一覧は目録から読みます**（★2026-09-24）。
+ *    ★ここには 7 色が ★**書き写して**ありました。★表が 9 色になった日、★この道具だけが
+ *    ★7 色で「合格」と言い続けます（★測っていない色は、測れないのではなく ★**見えない**）。
+ *
+ * ★実行: node tools/measure-coat-spread.mjs [役割] [--dir <焼いた場所>]
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import sharp from 'sharp';
 
-const role = process.argv[2] ?? 'side-v6';
-const DIR = 'apps/web/public/art/baked';
-const COATS = ['bay', 'chestnut', 'liver-chestnut', 'dark-bay', 'seal-brown', 'blue-black', 'grey'];
+const role = process.argv[2] !== undefined && !process.argv[2].startsWith('--') ? process.argv[2] : 'side-v6';
+const dirArg = process.argv.indexOf('--dir');
+const DIR = dirArg < 0 ? 'apps/web/public/art/baked' : process.argv[dirArg + 1];
+const COATS = JSON.parse(readFileSync(join(DIR, 'manifest.json'), 'utf8')).coats;
 
 /** ★見分けやすさ。★明るさの差を重めに見ます（★小さい画面では明暗が先に効くため） */
 function dist(a, b) {

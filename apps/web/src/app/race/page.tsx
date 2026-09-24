@@ -415,7 +415,12 @@ function drawRendererBadge(ctx: CanvasRenderingContext2D, kind: RendererKind, st
 }
 const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
 /** ★素材を足したら必ず上げる。★`manifest.json` の中身を変えたときも（古いものがキャッシュされる） */
-const ASSET_VERSION = '71';
+/**
+ * ★72: ★毛色を ★**9 種**に焼き直した（★オーナー決定 D-1/D-2・2026-09-24）。
+ *   ★あわせて `isDeformedHorseAsset` の書き忘れを直したので、★**型 B の馬の色が変わります**
+ *   （★デフォルメの絵に写真寄りの表が掛かっていた）。★目録も中身も変わるので必ず上げること。
+ */
+const ASSET_VERSION = '72';
 /**
  * ★コマごとの持ち上げ量。**単位は「基準画布（高さ 1536px）での px」**。
  *

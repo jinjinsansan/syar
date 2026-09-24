@@ -7,7 +7,9 @@
     "dark-bay",
     "seal-brown",
     "blue-black",
-    "grey"
+    "grey",
+    "palomino",
+    "white"
   ],
   "sets": [
     {
@@ -175,7 +177,9 @@
         "dark-bay": "side-v6-dark-bay.webp",
         "seal-brown": "side-v6-seal-brown.webp",
         "blue-black": "side-v6-blue-black.webp",
-        "grey": "side-v6-grey.webp"
+        "grey": "side-v6-grey.webp",
+        "palomino": "side-v6-palomino.webp",
+        "white": "side-v6-white.webp"
       },
       "shadow": "side-v6-shadow.webp"
     },
@@ -344,7 +348,9 @@
         "dark-bay": "diag-front-v2-dark-bay.webp",
         "seal-brown": "diag-front-v2-seal-brown.webp",
         "blue-black": "diag-front-v2-blue-black.webp",
-        "grey": "diag-front-v2-grey.webp"
+        "grey": "diag-front-v2-grey.webp",
+        "palomino": "diag-front-v2-palomino.webp",
+        "white": "diag-front-v2-white.webp"
       },
       "shadow": "diag-front-v2-shadow.webp"
     },
@@ -513,7 +519,9 @@
         "dark-bay": "side-v6-b-dark-bay.webp",
         "seal-brown": "side-v6-b-seal-brown.webp",
         "blue-black": "side-v6-b-blue-black.webp",
-        "grey": "side-v6-b-grey.webp"
+        "grey": "side-v6-b-grey.webp",
+        "palomino": "side-v6-b-palomino.webp",
+        "white": "side-v6-b-white.webp"
       },
       "shadow": "side-v6-b-shadow.webp"
     },
@@ -682,7 +690,9 @@
         "dark-bay": "diag-front-v2-b-dark-bay.webp",
         "seal-brown": "diag-front-v2-b-seal-brown.webp",
         "blue-black": "diag-front-v2-b-blue-black.webp",
-        "grey": "diag-front-v2-b-grey.webp"
+        "grey": "diag-front-v2-b-grey.webp",
+        "palomino": "diag-front-v2-b-palomino.webp",
+        "white": "diag-front-v2-b-white.webp"
       },
       "shadow": "diag-front-v2-b-shadow.webp"
     },
@@ -851,7 +861,9 @@
         "dark-bay": "diag-rear-v2-dark-bay.webp",
         "seal-brown": "diag-rear-v2-seal-brown.webp",
         "blue-black": "diag-rear-v2-blue-black.webp",
-        "grey": "diag-rear-v2-grey.webp"
+        "grey": "diag-rear-v2-grey.webp",
+        "palomino": "diag-rear-v2-palomino.webp",
+        "white": "diag-rear-v2-white.webp"
       },
       "shadow": "diag-rear-v2-shadow.webp"
     },
@@ -1020,7 +1032,9 @@
         "dark-bay": "high-diag-v2-dark-bay.webp",
         "seal-brown": "high-diag-v2-seal-brown.webp",
         "blue-black": "high-diag-v2-blue-black.webp",
-        "grey": "high-diag-v2-grey.webp"
+        "grey": "high-diag-v2-grey.webp",
+        "palomino": "high-diag-v2-palomino.webp",
+        "white": "high-diag-v2-white.webp"
       },
       "shadow": "high-diag-v2-shadow.webp"
     },
@@ -1189,7 +1203,9 @@
         "dark-bay": "winner-rear-dark-bay.webp",
         "seal-brown": "winner-rear-seal-brown.webp",
         "blue-black": "winner-rear-blue-black.webp",
-        "grey": "winner-rear-grey.webp"
+        "grey": "winner-rear-grey.webp",
+        "palomino": "winner-rear-palomino.webp",
+        "white": "winner-rear-white.webp"
       },
       "shadow": "winner-rear-shadow.webp"
     },
@@ -1358,7 +1374,9 @@
         "dark-bay": "winner-cycle-dark-bay.webp",
         "seal-brown": "winner-cycle-seal-brown.webp",
         "blue-black": "winner-cycle-blue-black.webp",
-        "grey": "winner-cycle-grey.webp"
+        "grey": "winner-cycle-grey.webp",
+        "palomino": "winner-cycle-palomino.webp",
+        "white": "winner-cycle-white.webp"
       },
       "shadow": "winner-cycle-shadow.webp"
     },
@@ -1527,7 +1545,9 @@
         "dark-bay": "side-walk-dark-bay.webp",
         "seal-brown": "side-walk-seal-brown.webp",
         "blue-black": "side-walk-blue-black.webp",
-        "grey": "side-walk-grey.webp"
+        "grey": "side-walk-grey.webp",
+        "palomino": "side-walk-palomino.webp",
+        "white": "side-walk-white.webp"
       },
       "shadow": "side-walk-shadow.webp"
     }
