@@ -26,7 +26,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { broadcastV2ScriptAssets, coatOfHorseId } from '@star/render';
+import { broadcastV2ScriptAssets, coatOfHorseId, RACE_INTRO_PADDOCK_COUNT } from '@star/render';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ? d : process.argv[i + 1]; };
 const FIELDS = String(arg('fields', '12,18')).split(',').map(Number);
@@ -72,24 +72,53 @@ console.log('=== 1 レースで落ちてくる馬素材 ===');
 console.log(`  焼いてある: ${manifest.sets.length} 役 × ${manifest.coats.length} 毛色`);
 console.log(`  台本 v6 が描く役: ${baseRoles.join(' ')}`);
 console.log(`  使う型: ${typesInUse.join(' ')}（WINNER_POSE=${winnerPose} / WINNER_FOLLOW_REAR=${winnerRear}）`);
+/**
+ * 🔴 ★**パドックの歩きは、台本の一覧に入っていません。**
+ *   ★`race/page.tsx` の `bakedWalk` が ★**別の口**で読みます（★発走前の人気馬の紹介）。
+ *   ★引く毛色は ★**紹介に出る `RACE_INTRO_PADDOCK_COUNT` 頭ぶん ＋ 鹿毛**だけです。
+ *   ⚠️ ★開発側は 1 度この口を数え落とし、★量を少なく報告しました（★2026-09-24・同日に訂正）。
+ *      ★「台本が描く役」だけ数えると、★**台本の外から読む口**が落ちます。
+ *   ⚠️ ★型 A 以外の枠があるときは読みません（★原版経路へ戻る）。
+ */
+const walkRole = typesInUse.every((t) => t === 'a') && setByRole.has('side-walk') ? 'side-walk' : undefined;
 console.log(`  → 実際に引く役: ${rolesInUse.length} 件  ${rolesInUse.join(' ')}`);
-const unused = manifest.sets.map((s) => s.role).filter((r) => !rolesInUse.includes(r));
+console.log(`  ＋ 台本の外から: ${walkRole ?? 'なし'}（★発走前の紹介・毛色は ${RACE_INTRO_PADDOCK_COUNT} 頭ぶん＋鹿毛）`);
+const unused = manifest.sets.map((s) => s.role)
+  .filter((r) => !rolesInUse.includes(r) && r !== walkRole);
 console.log(`  ⚠️ 焼いてあるが引かない役: ${unused.length} 件  ${unused.join(' ')}`);
 
-/** ★毛色の集合 → 落ちてくるバイト（★影は毛色に依らず 1 枚・★鹿毛は必ず要る） */
-function bytesFor(coats) {
+/** ★1 役ぶん（★影は毛色に依らず 1 枚・★鹿毛は必ず要る） */
+function bytesOfRole(role, coats) {
+  const set = setByRole.get(role);
   const need = new Set(['bay', ...coats]);
   let bytes = 0, files = 0;
-  for (const role of rolesInUse) {
-    const set = setByRole.get(role);
-    for (const c of need) {
-      const f = set.coats[c];
-      if (f === undefined) continue;
-      bytes += sizeOf(f); files += 1;
-    }
-    if (set.shadow !== undefined) { bytes += sizeOf(set.shadow); files += 1; }
+  for (const c of need) {
+    const f = set.coats[c];
+    if (f === undefined) continue;
+    bytes += sizeOf(f); files += 1;
   }
-  return { bytes, files, coats: need.size };
+  if (set.shadow !== undefined) { bytes += sizeOf(set.shadow); files += 1; }
+  return { bytes, files };
+}
+
+/**
+ * ★毛色の並び（★枠順ぶん） → 落ちてくるバイト。
+ *   ★走りの役は ★**全枠の毛色**、★パドックは ★**紹介に出る頭ぶん**だけ引きます。
+ */
+function bytesFor(coatsByGate) {
+  const all = new Set(['bay', ...coatsByGate]);
+  let bytes = 0, files = 0;
+  for (const role of rolesInUse) {
+    const r = bytesOfRole(role, all);
+    bytes += r.bytes; files += r.files;
+  }
+  let walk = { bytes: 0, files: 0 };
+  if (walkRole !== undefined) {
+    // ★紹介は 1〜`COUNT` 番人気。★どの枠かは人気で決まるので、★先頭から `COUNT` 頭で代表させます
+    walk = bytesOfRole(walkRole, coatsByGate.slice(0, RACE_INTRO_PADDOCK_COUNT));
+    bytes += walk.bytes; files += walk.files;
+  }
+  return { bytes, files, coats: all.size, walkBytes: walk.bytes };
 }
 const mb = (b) => `${(b / 1048576).toFixed(1)}MB`;
 
@@ -99,13 +128,13 @@ for (const n of FIELDS) {
   /** ★いま: 枠番から引く */
   const nowCoats = Array.from({ length: n }, (_, i) => coatByGate[i % coatByGate.length]);
   const now = bytesFor(nowCoats);
-  console.log(`  いま（枠番から）  毛色 ${now.coats} 種  ${String(now.files).padStart(3)} ファイル  ${mb(now.bytes)}`);
+  console.log(`  いま（枠番から）  毛色 ${now.coats} 種  ${String(now.files).padStart(3)} ファイル  ${mb(now.bytes)}`
+    + `（うち発走前の紹介 ${mb(now.walkBytes)}）`);
 
   /** ★これから: 馬 ID から引く（★毛色の散り方が毎レース変わるので、たくさん試す） */
   const seen = [];
   for (let s = 0; s < SAMPLES; s += 1) {
-    const coats = new Set(Array.from({ length: n }, () => coatOfHorseId(randomUUID())));
-    seen.push(bytesFor([...coats]));
+    seen.push(bytesFor(Array.from({ length: n }, () => coatOfHorseId(randomUUID()))));
   }
   seen.sort((a, b) => a.bytes - b.bytes);
   const at = (p) => seen[Math.min(seen.length - 1, Math.floor(seen.length * p))];

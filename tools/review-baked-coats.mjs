@@ -63,4 +63,4 @@ for (const set of m.sets) {
   }
   console.log(`  ${set.role.padEnd(16)} → ${OUT}/${set.role}-x1.png ／ -x${ZOOM}.png  （${m.coats.join(' ')}）`);
 }
-console.log('\n⚠️ ★合否は ★**等倍（-x1）**で決めること。★3 倍は原因を探すためだけです。');
+console.log(`\n⚠️ ★合否は ★**等倍（-x1）**で決めること。★${ZOOM} 倍は原因を探すためだけです。`);
