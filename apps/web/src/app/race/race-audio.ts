@@ -33,23 +33,46 @@ export type RaceSoundId = 'fanfare' | 'gate-open' | 'whinny' | 'gallop' | 'crowd
  */
 export const RACE_SOUNDS: Readonly<Record<RaceSoundId, {
   readonly url: string; readonly gain: number; readonly loop: boolean;
+  /**
+   * ★**最初の一息で取りに行くか**（★2026-09-24）。
+   *
+   * 🔴 ★以前は ★**5 つ全部**を作った時点で取りに行っていました。★音を出さない人にも
+   *    ★**2.44MB** 落ちます（★実測）。★1 レースで落ちてくる 10.5MB のうちの ★**23%** です。
+   * ★出番の時刻で分けます（★`RACE_INTRO_*` の実測）:
+   *    ★`fanfare` … 空撮（★18 秒）から。★出番が ★**4.4 秒**しかなく、
+   *      ★間に合わないとその回は一度も鳴りません（★2026-09-13 のオーナー評）。→ ★**早い側**
+   *    ★`gate-open` / `whinny` … 31〜32 秒。★どちらも ★**0.03MB** なので早い側に置いても差が出ません
+   *    ★`gallop` … ★**32.4 秒**から（0.61MB）→ ★後
+   *    ★`crowd` … ★ゴール後の着順ボード（★90 秒以降・1.54MB）→ ★後
+   * ⚠️ ★**2026-09-13 の理由は消していません。** ★「押した時に取りに行く」には戻していません。
+   *    ★後の 2 つも ★**画面が描き始めた時点**で取りに行きます（★出番まで 32 秒あります）。
+   */
+  readonly early: boolean;
 }>> = {
   /** ★イントロ（★発走前）。★16.8 秒あり、★イントロ 4.4 秒では最後まで鳴りません */
-  fanfare: { url: '/audio/fanfare.mp3', gain: 0.75, loop: false },
+  fanfare: { url: '/audio/fanfare.mp3', gain: 0.75, loop: false, early: true },
   /** ★ゲートが開く瞬間（★1.8 秒） */
-  'gate-open': { url: '/audio/gate-open.mp3', gain: 0.95, loop: false },
+  'gate-open': { url: '/audio/gate-open.mp3', gain: 0.95, loop: false, early: true },
   /** ★ゲートが開いた直後のいななき（★2.1 秒・★音源名のとおりの使い方） */
-  whinny: { url: '/audio/whinny.mp3', gain: 0.8, loop: false },
+  whinny: { url: '/audio/whinny.mp3', gain: 0.8, loop: false, early: true },
   /** ★走行音（★39.6 秒）。★本編を通して敷きます */
-  gallop: { url: '/audio/gallop.mp3', gain: 0.65, loop: false },
+  gallop: { url: '/audio/gallop.mp3', gain: 0.65, loop: false, early: false },
   /** ★ゴール後の群衆（★100.6 秒）。★着順ボードの間 */
-  crowd: { url: '/audio/crowd.mp3', gain: 0.5, loop: false },
+  crowd: { url: '/audio/crowd.mp3', gain: 0.5, loop: false, early: false },
 };
 
 export interface RaceAudio {
   readonly available: boolean;
   /** ★人の操作から呼ぶ（★ブラウザの解錠）。★戻り値は解錠できたか */
   resume(): Promise<boolean>;
+  /**
+   * ★**出番が後の音源を取りに行く**（★2026-09-24）。
+   *   ★`early: false` のものだけ。★**画面が描き始めてから**呼びます（★出番まで 32 秒あります）。
+   * ⚠️ ★何度呼んでも構いません（★`load` が取得済み・取得中を弾きます）。
+   * 🔴 ★**呼ばないと `gallop` と `crowd` が鳴りません。** ★描く輪から呼ぶこと
+   *    （★「始めた時に 1 回」だと、★自動再生しない経路で呼ばれません）。
+   */
+  preloadRest(): void;
   /**
    * ★**1 回だけ鳴らす**。★同じ札で 2 度呼んでも 2 度は鳴りません。
    *   ★札は「どの場面の音か」。★やり直したら `reset()` で札を捨てます。
@@ -82,6 +105,7 @@ export function createRaceAudio(): RaceAudio {
     return {
       available: false,
       resume: async () => false,
+      preloadRest() { /* ★この端末では鳴らせない */ },
       cue() { /* ★この端末では鳴らせない */ },
       fade() { /* 同上 */ },
       level() { /* 同上 */ },
@@ -124,9 +148,13 @@ export function createRaceAudio(): RaceAudio {
     })();
   };
 
-  /** ★先に全部取りに行く（★場面で待たせない） */
+  /** ★出番が早いものだけ先に取りに行く（★場面で待たせない・★`early` の註記を読むこと） */
   const preload = (): void => {
-    for (const id of Object.keys(RACE_SOUNDS) as RaceSoundId[]) load(id);
+    for (const [id, spec] of Object.entries(RACE_SOUNDS)) if (spec.early) load(id as RaceSoundId);
+  };
+  /** ★出番が後のもの（★画面が描き始めてから） */
+  const preloadRest = (): void => {
+    for (const [id, spec] of Object.entries(RACE_SOUNDS)) if (!spec.early) load(id as RaceSoundId);
   };
   /**
    * ⚠️ ★**作った時点で取りに行きます**（★2026-09-13・オーナー評
@@ -161,6 +189,7 @@ export function createRaceAudio(): RaceAudio {
 
   return {
     available: true,
+    preloadRest,
 
     async resume(): Promise<boolean> {
       try {
