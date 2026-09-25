@@ -143,6 +143,11 @@ export interface EntryScreenData {
   readonly gameWeek: number;
   /** ★世界が最後に書かれてから何秒経ったか（★大きければワーカーが止まっている） */
   readonly staleSeconds: number;
+  /**
+   * ★ログインしているか。★`false` なら ★`horses` と `epBalance` は空です
+   *（★レースの一覧は ★**公開**なので、★ログインしていなくても入っています）。
+   */
+  readonly signedIn: boolean;
 }
 
 const RACE_COLUMNS =
@@ -199,13 +204,28 @@ export async function loadEntryScreen(limit = 40): Promise<EntryScreenData> {
   }));
 
   const ids = raceRows.map((r) => r.id);
+  /**
+   * 🔴 ★**ログインしていないかを、★自分の行を読む前に見ます**（★2026-09-25）。
+   *
+   *   ★旧は ★`my_horses` の失敗をそのまま投げており、★画面には
+   *   ★**`permission denied for view my_horses`** という ★**DB の生の文**が出ていました。
+   *   ★しかも ★**公開のレース一覧まで道連れ**で消え、★「今週は出走できるレースがありません」と
+   *   ★**嘘**が出ていました（★レースは在ります）。
+   * → ★ログインしていなければ ★**レースだけ返します**。★馬と残高は空です。
+   *   ★画面は「馬がいない」ではなく ★**「ログインしてください」**を出せます。
+   */
+  const { data: sessionData } = await auth.auth.getSession();
+  const signedIn = sessionData.session !== null;
+
   const [horsesRes, entriesRes, userRes] = await Promise.all([
-    auth.from('my_horses').select('id, name, sex, condition, fatigue, birth_week, wins, starts').order('name'),
+    signedIn
+      ? auth.from('my_horses').select('id, name, sex, condition, fatigue, birth_week, wins, starts').order('name')
+      : Promise.resolve({ data: [], error: null }),
     // ★出走頭数は ★**公開ビューを数える**（★画面で推測しない）
     ids.length === 0
       ? Promise.resolve({ data: [], error: null })
       : read.from('race_entries_public').select('race_id').in('race_id', ids),
-    auth.from('users').select('entry_points').limit(1),
+    signedIn ? auth.from('users').select('entry_points').limit(1) : Promise.resolve({ data: [], error: null }),
   ]);
   if (horsesRes.error !== null) throw new Error(`my_horses を読めませんでした: ${horsesRes.error.message}`);
   if (entriesRes.error !== null) throw new Error(`race_entries_public を読めませんでした: ${entriesRes.error.message}`);
@@ -235,5 +255,6 @@ export async function loadEntryScreen(limit = 40): Promise<EntryScreenData> {
     epBalance: Number(userRes.data?.[0]?.entry_points ?? 0),
     gameWeek,
     staleSeconds,
+    signedIn,
   };
 }

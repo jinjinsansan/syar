@@ -154,7 +154,18 @@ export default function EntryPage(): React.ReactElement {
       {data === null && loadError === null && (
         <p style={{ margin: '12px 0 0', fontSize: 13, fontWeight: 900, color: 'var(--a-ink-3)' }}>読み込んでいます…</p>
       )}
-      {data !== null && horses.length === 0 && (
+      {/*
+        🔴 ★**ログインしていない人に、★DB の生の文を出していました**（★2026-09-25・オーナー指摘）。
+           ★`permission denied for view my_horses` がそのまま出て、★しかも
+           ★**公開のレース一覧まで道連れ**で消え、★「今週は出走できるレースがありません」と
+           ★**嘘**を出していました（★レースは在ります）。
+      */}
+      {data !== null && !data.signedIn && (
+        <p style={{ margin: '12px 0 0', fontSize: 13, fontWeight: 900, color: 'var(--a-ink-3)' }}>
+          レースの一覧は見られます。登録するには <a href="/login" style={{ color: 'var(--a-num-money)' }}>ログイン</a> してください
+        </p>
+      )}
+      {data !== null && data.signedIn && horses.length === 0 && (
         <p style={{ margin: '12px 0 0', fontSize: 13, fontWeight: 900, color: 'var(--a-ink-3)' }}>出走させられる馬がいません</p>
       )}
 
@@ -227,9 +238,27 @@ export default function EntryPage(): React.ReactElement {
             </div>
           );
         })}
-        {races.every((r) => r.state !== 'ok') && (
+        {/*
+          ⚠️ ★**「出走できるレースがありません」は、★条件を選んで言うこと**（★2026-09-25）。
+             ★ログインしていない・馬がいない ときは ★**資格が判定できない**だけで、
+             ★レースが無いわけではありません。★そこで同じ文を出すと ★**嘘**になります。
+        */}
+        {races.length > 0 && races.every((r) => r.state !== 'ok') && (
           <div style={{ padding: '14px 18px', borderTop: '1px solid var(--a-line)' }}>
-            <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)' }}>今週は出走できるレースがありません</div>
+            <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)' }}>
+              {data === null || !data.signedIn
+                ? 'ログインすると、この馬で出走できるかが分かります'
+                : horse === null
+                  ? '出走させられる馬がいません'
+                  : 'いま、この馬で出走できるレースがありません'}
+            </div>
+          </div>
+        )}
+        {races.length === 0 && data !== null && (
+          <div style={{ padding: '14px 18px', borderTop: '1px solid var(--a-line)' }}>
+            <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)' }}>
+              いま受け付けているレースがありません（次の組が公示されるまでお待ちください）
+            </div>
           </div>
         )}
       </div>
