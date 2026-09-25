@@ -39,7 +39,7 @@ async function fetchNotice(): Promise<NoticeData> {
   let runners: readonly ReplayRunner[] = [];
   if (lastRace !== null) {
     const entries = await client.from('race_entries_public')
-      .select('gate,horse_name,strategy,finish_pos,finish_time')
+      .select('gate,horse_name,strategy,finish_pos,finish_time,horse_id')
       .eq('race_id', lastRace.id).order('gate');
     if (entries.error !== null) throw new Error(entries.error.message);
     runners = parseReplayRunners(((entries.data ?? []) as Record<string, unknown>[])
