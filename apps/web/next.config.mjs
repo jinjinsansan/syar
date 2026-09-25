@@ -60,10 +60,68 @@ const DIST_DIR = process.env['STAR_NEXT_DIST_DIR'] ?? '.next';
   console.log(`★STAR: 繋ぎ先 ${host} ／ NODE_ENV=${process.env.NODE_ENV ?? '(未設定)'} ／ 出力先 ${DIST_DIR}`);
 }
 
+/**
+ * 🔴 ★**同じ役割の画面を 2 つ残さない**（★2026-09-25・裁定 `REVIEW_EP_INFLOW_AND_ENTRY_20260925.md` §3）
+ *
+ * 【★なぜ要るか — ★オーナーの苦情が何度も再発していた】
+ *   ★オーナー: 「★なぜこの白の古いデザインがまだ残っているのですか。★この問題はずっと伝えています」
+ *   ★私はそれまで ★**「帯が二重」だけ**を直しており、★**画面そのものが旧世代である**ことを
+ *   ★見ていませんでした。
+ *   ★`/training` は ★**`/train` が在る**のに残っており、★`/prizes` は ★**`/exchange` が在る**のに残っていました。
+ *   → ★★**どちらを直したか分からなくなるので、必ず再発します。**
+ *
+ * 【★なぜ画面の中で `redirect()` を呼ばないのか】
+ *   ★旧い画面のファイルを「中身が転送だけの殻」にすると、★**画面の数が減りません**。
+ *   ★`screen-reachable` や旧世代の網が ★その殻を数え続けます。
+ *   → ★**ここ（設定）で送り、★ファイルは消します。** ★履歴には git が残します。
+ *
+ * ⚠️ ★`permanent: false`（307）にします。★恒久（308）はブラウザが強く覚えるので、
+ *    ★行き先を変えたときに ★**古い転送が残った端末**が出ます。
+ */
+const SUPERSEDED_SCREENS = [
+  // ★旧: /prizes（222 行・旧世代）→ ★新: /exchange（R-14 の画面）
+  //   ✔ ★`/exchange` は ★**繋がっています**（`exchangePrize` / `loadPrizeScreen` / `setError`）。
+  { source: '/prizes', destination: '/exchange', permanent: false },
+  /**
+   * ★**レース一覧**（★2026-09-25・裁定 `REVIEW_DISCOVERY_AXES_20260925.md` §6 の手順）。
+   *   ★一覧の役割が ★`/vote`（新世代・`/home` から来る）と二重でした。
+   *   ★`/races` の入口は ★旧い画面（`/race`・`/stable`）からだけでした。
+   *   ✔ ★送り先が繋がっていることを確かめた（`bet-screen`）。
+   * ⚠️ ★`/races/[id]`（★1 レース）は ★**残します** — ★`/vote` はレースを指定できません。
+   */
+  { source: '/races', destination: '/vote', permanent: false },
+  /**
+   * ★**1 レースのオッズ**（★同上）。
+   *   ★`/odds/[id]`（新世代・`/vote` から来る）と ★同じ役割でした。
+   *   ✔ ★送り先は DB を引いています（★`odds-demo` は `?demo=1` のときだけ）。
+   * ⚠️ ★引数は ★**`:id`** と書きます（★`[id]` は Next の ★ファイル名の書き方で、★転送の書き方ではない）。
+   */
+  { source: '/races/:id/odds', destination: '/odds/:id', permanent: false },
+  /**
+   * 🔴 ⚠️ ★**`/training` → `/train` は 採りません**（★2026-09-25 に一度入れて、★戻しました）。
+   *
+   * 【★何をしかけたか】
+   *   ★裁定 §3 の「★新版が在るものはまず新版へ送る」に従って転送を入れ、★旧い画面を消しました。
+   *   🔴 ★しかし ★**`/train` は「まだ見た目だけ」**でした（★その画面の註記 15 行目が自分でそう書いている）。
+   *     ★`/train` … ★`rpc(` も `Repo` も ★**呼びません**
+   *     ★`/training` … ★`supabaseStableRepo.stable()` で実データを読み、
+   *                    ★★**`rpc('set_training_order')` を呼んでいました**
+   *   → ★★**転送は「調教の指示を出す唯一の口」を消していました。** ★育成のループが止まります。
+   *
+   * 【★何が捕まえたか】
+   *   ★消したページを見張っていた検査 3 本が ★**読み込めなくなって**落ちました。
+   *   ★そこで「★新しい画面は旧い画面と同じ性質を満たすか」を測り、★繋がっていないことが分かりました。
+   *   → ★網は ★`screen-generations.test.ts` の「★送り先がサーバーを呼んでいる」に入れました。
+   *
+   * ⚠️ ★**新版が「在る」ことと「働く」ことは別です。** ★見た目が揃っただけで送らない。
+   */
+];
+
 export default {
   distDir: DIST_DIR,
   env: { NEXT_PUBLIC_BUILD_STAMP: BUILD_STAMP },
   reactStrictMode: true,
+  redirects: async () => SUPERSEDED_SCREENS,
   transpilePackages: ['@star/betting', '@star/scheduler', '@star/race-engine', '@star/render', '@star/sim-engine'],
   /**
    * ★`packages/` は「純粋 TypeScript をそのまま」置いており（正典 §14）、

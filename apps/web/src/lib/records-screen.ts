@@ -12,6 +12,7 @@
  */
 import { CLASS_LABEL, CONDITION_LABEL, SURFACE_LABEL } from './format';
 import { readClient, authClient } from './supabase';
+import { SignInRequiredError } from './stable-repo';
 
 /**
  * ★**期間**（★`/records` の絞り込み）。
@@ -109,6 +110,26 @@ const label = (map: Readonly<Record<string, string>>, reason: string): string =>
 export async function loadRecordsScreen(period: RecordPeriod): Promise<RecordsScreenData> {
   const read = readClient();
   const auth = authClient();
+
+  /**
+   * 🔴 ★**先にセッションを見ます**（★2026-09-25・裁定 `REVIEW_IDLE_WORK_20260925.md` (A)）
+   *
+   * 【★何が起きていたか — ★`/entry` と ★**同じ欠陥**が ここにも生きていました】
+   *   ★下で ★`my_runs`（★`where h.owner_id = auth.uid()`）を読みます。
+   *   ★未ログインの人が `/records` を開くと（★`/mypage` から来られます）、
+   *   ★★**`permission denied for view my_runs` が そのまま画面に出ます**。
+   *   ✔ ★staging で実測しました:
+   *     ★`anon` … 🔴 `permission denied for view my_runs`
+   *     ★`authenticated`（セッションなし）… ★0 行（★「戦績がありません」と ★**嘘**を出す）
+   *   → ★どちらも駄目です。★前者は ★DB の内部を見せ、★後者は ★**無いと言い切る**。
+   *
+   * ★`/entry` で同じものを 2026-09-25 に直しました（★あちらは ★公開のレース一覧まで
+   *   ★道連れにして「今週は出走できるレースがありません」と嘘を出していました）。
+   * → ★**ログインしていないなら、★DB に触る前に `SignInRequiredError`** にします。
+   * ⚠️ ★網: `apps/cli/test/owner-scoped-needs-session.test.ts`
+   */
+  const { data: sessionData } = await auth.auth.getSession();
+  if (sessionData.session === null) throw new SignInRequiredError();
 
   /**
    * ★「今週」の境目は ★**サーバーが書いた実時刻**です（★`0048`）。

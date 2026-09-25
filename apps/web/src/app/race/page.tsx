@@ -5871,7 +5871,7 @@ export default function RacePage(): React.JSX.Element {
           <span style={{ fontSize: 13, color: '#52655c' }}>経過 {loadingSeconds} 秒</span>
           {loadingSeconds >= 10 && <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
             <span>このまま待つ</span>
-            <a href="/races" style={{ color: '#42694f', textDecoration: 'underline' }}>結果だけ見る</a>
+            <a href="/vote" style={{ color: '#42694f', textDecoration: 'underline' }}>結果だけ見る</a>
           </div>}
           <a href="/" style={{ marginTop: 18, color: '#42694f', fontSize: 14 }}>← もどる</a>
         </div>
@@ -5977,7 +5977,7 @@ export default function RacePage(): React.JSX.Element {
             </div>
           )}
           <div className="rm-entry-foot">
-            <a href="/races">番組表から他のレースを選ぶ</a>
+            <a href="/vote">番組表から他のレースを選ぶ</a>
           </div>
         </div>
       )}

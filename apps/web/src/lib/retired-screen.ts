@@ -301,3 +301,58 @@ export async function loadRetiredScreen(): Promise<RetiredScreenData> {
     gameWeek,
   };
 }
+
+/**
+ * ★**他の牧場の引退馬**（★正典 **LR-6**「他人の馬の物語も見える」）
+ *   ★裁定 `REVIEW_RETIRED_SCREEN_PORTS_20260925.md` §4・移行 `0083_retired_horses_public.sql`
+ *
+ * 【🔴 ★なぜ在るか】
+ *   ★正典は「他人の馬も見える」と決めていたのに、★一覧の口は ★`my_retired_horses()`（自分の分だけ）
+ *   ★しか在りませんでした。★そのため `/stable/retired` は ★**見本のデータ**で埋まっていました。
+ *
+ * 【⚠️ ★出るのは牧場名まで】★`display_name` は ★view が 1 文字も返しません（★LR-6）。
+ * 【⚠️ ★素質・能力・発見度は返りません】（★D-114）。
+ *
+ * ★並び順と件数は ★**決定論**（★裁定 §4 条件 ①）:
+ *   ★引退した週の新しい順 → ★同じ週なら `horse_id` 順。★件数は `PUBLIC_RETIRED_LIMIT`。
+ * ⚠️ ★`order` を 1 つだけにすると、★同じ週の馬の並びが ★**呼ぶたびに変わりえます**。
+ */
+export const PUBLIC_RETIRED_LIMIT = 60;
+
+/** ★公開の一覧の 1 行（★`retired_horses_public` の列。★持ち主の表示名は在りません） */
+export interface PublicRetiredRow {
+  readonly horseId: string;
+  readonly horseName: string;
+  readonly horseSex: string;
+  readonly retiredAtWeek: number | null;
+  readonly wins: number;
+  readonly starts: number;
+  readonly g1Wins: number;
+  readonly sireName: string | null;
+  readonly damName: string | null;
+  /** ★牧場名（★LR-6 の上限。★持ち主がいない馬＝NPC は `null`） */
+  readonly stableName: string | null;
+}
+
+export async function loadPublicRetired(limit = PUBLIC_RETIRED_LIMIT): Promise<readonly PublicRetiredRow[]> {
+  const res = await readClient()
+    .from('retired_horses_public')
+    // ⚠️ ★**1 つの文字列リテラルにすること**（★supabase-js は型の層でこの中身を読みます）
+    .select('horse_id, horse_name, horse_sex, retired_at_week, wins, starts, g1_wins, sire_name, dam_name, stable_name')
+    .order('retired_at_week', { ascending: false })
+    .order('horse_id', { ascending: true })
+    .limit(limit);
+  if (res.error !== null) throw new Error(`引退馬の一覧を読めませんでした: ${res.error.message}`);
+  return (res.data ?? []).map((row) => ({
+    horseId: String(row.horse_id),
+    horseName: String(row.horse_name),
+    horseSex: String(row.horse_sex),
+    retiredAtWeek: row.retired_at_week === null ? null : Number(row.retired_at_week),
+    wins: Number(row.wins),
+    starts: Number(row.starts),
+    g1Wins: Number(row.g1_wins),
+    sireName: row.sire_name === null ? null : String(row.sire_name),
+    damName: row.dam_name === null ? null : String(row.dam_name),
+    stableName: row.stable_name === null ? null : String(row.stable_name),
+  }));
+}

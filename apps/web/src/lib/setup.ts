@@ -18,6 +18,7 @@ import { authClient } from './supabase';
  * ⚠️ ★ここは ★**再輸出だけ**です。★色を足す・変えるのは `packages/render/src/silks.ts` で。
  */
 import type { Sleeve } from '@star/render';
+import { EP_GRANTS } from '@star/betting';
 
 export { SILK_COLORS, SLEEVES, sleeveHex, type SilkColor, type Sleeve } from '@star/render';
 
@@ -76,10 +77,16 @@ export interface SetupRepo {
   create(input: SetupInput): Promise<SetupResult>;
 }
 
-/** ★登録時に受け取る EP（★D-075 の較正定数。★**サーバーが持つ値の写し**で、画面では決めません） */
-export const SETUP_GRANT_EP = 2000;
-/** ★デイリーの EP（★同上） */
-export const SETUP_DAILY_EP = 200;
+/**
+ * ★登録時に受け取る EP ／ ★デイリーの EP（★D-075 の較正定数）。
+ *
+ * 🔴 ★**2026-09-25 まで、ここに数が直に書いてありました**（★`2000` と `200`）。
+ *    ★同じ数が SQL 側にも在り（★`0067:63` ほか）、★**片方だけ直せる 2 か所**でした（★D-052）。
+ *    → ★正は `@star/betting` の `EP_GRANTS` に移し、★`0080` の `ep_grant_amount()` と
+ *      ★`apps/cli/test/ep-grant-sql.test.ts` が突き合わせます。★ここは ★**読むだけ**です。
+ */
+export const SETUP_GRANT_EP = EP_GRANTS.signup;
+export const SETUP_DAILY_EP = EP_GRANTS.daily;
 
 /** デモ: 常に成功し、見本の初期馬を返す */
 export const demoSetupRepo: SetupRepo = {

@@ -19,6 +19,7 @@ import {
   loadRecordsScreen, PERIOD_LABEL,
   type RecordsScreenData, type RecordPeriod, type LedgerRowView,
 } from '../../lib/records-screen';
+import { SignInRequiredError } from '../../lib/stable-repo';
 import { ClassChip, PageTitle, TabButton } from '../../components/ui';
 
 const TABS = [['runs', '戦績'], ['ep', '参加ポイント（EP）'], ['pp', '賞金ポイント（PP）']] as const;
@@ -106,14 +107,27 @@ export default function RecordsView({ tab }: { readonly tab: string }): React.Re
   const [period, setPeriod] = useState<RecordPeriod>('week');
   const [data, setData] = useState<RecordsScreenData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /**
+   * 🔴 ★**未ログインを「読めなかった」と扱わない**（★2026-09-25）。
+   *   ★それまで ★`permission denied for view my_runs` が ★**そのまま画面に出ていました**
+   *   （★`/mypage` から来られます）。★`/entry` と ★**同じ欠陥**でした。
+   */
+  const [needsLogin, setNeedsLogin] = useState(false);
 
   useEffect(() => {
     let alive = true;
     setLoadError(null);
+    setNeedsLogin(false);
     loadRecordsScreen(period)
       .then((d) => { if (alive) setData(d); })
       // 🔴 ★失敗を空にしない（★「記録が無い」に見えてしまう・R-16・UI1-9）
-      .catch((e: unknown) => { if (alive) { setData(null); setLoadError(e instanceof Error ? e.message : String(e)); } });
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setData(null);
+        // ★未ログインは ★**DB の文を出さず**、★そう言います
+        if (e instanceof SignInRequiredError) { setNeedsLogin(true); return; }
+        setLoadError(e instanceof Error ? e.message : String(e));
+      });
     return () => { alive = false; };
   }, [period]);
 
@@ -136,7 +150,8 @@ export default function RecordsView({ tab }: { readonly tab: string }): React.Re
         sub="参加ポイントと賞金ポイントは別々に記録されます"
         right={
           <span style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>
-            <a className="rc-exch" href="/prizes" style={{ fontSize: 13, fontWeight: 900 }}>景品交換 →</a>
+            {/* ★2026-09-25: ★`/prizes` は消して `/exchange` へ送りました（★裁定 §3）。★直接 新版へ */}
+            <a className="rc-exch" href="/exchange" style={{ fontSize: 13, fontWeight: 900 }}>景品交換 →</a>
           </span>
         }
       />
@@ -159,6 +174,11 @@ export default function RecordsView({ tab }: { readonly tab: string }): React.Re
       </div>
 
       {/* 🔴 ★読み込み中と失敗を必ず出す（★UI1-9） */}
+      {needsLogin && (
+        <p role="status" style={{ padding: '14px 16px', fontSize: 12.5, fontWeight: 900, color: 'var(--a-ink-2)' }}>
+          戦績を見るには、<a href="/login">ログイン</a>してください。
+        </p>
+      )}
       {loadError !== null && (
         <div className="a-panel" style={{ marginTop: 14, padding: '14px 16px', fontSize: 14, fontWeight: 900, color: 'var(--a-red-d)' }}>
           記録を読めませんでした: {loadError}

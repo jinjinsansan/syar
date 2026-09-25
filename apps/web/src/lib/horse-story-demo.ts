@@ -73,13 +73,14 @@ export const DEMO_STORY: Readonly<Record<string, readonly StoryEvent[]>> = {
 };
 
 /**
- * ★**発見度のデモ**（★D13-3）。
- * ⚠️ ★**素質の数値は持ちません**（★段だけ・§5.5・§12.4）。
- *    ★段は `@star/sim-engine` の `discoveryStageOf` が「その適性が試された回数」から決めます。
+ * 🔴 ★**`DEMO_DISCOVERY` は消しました**（★2026-09-25・裁定 `REVIEW_DISCOVERY_AXES_20260925.md` §4 条件 4）
+ *
+ * 【★なぜ消したか — ★軸が正典と違っていました】
+ *   ★中身は ★**スピード／スタミナ／パワー／賢さ**（＝**能力** 4 つ）でした。
+ *   ✔ ★正典 **D-116**: 「★**発見**＝**距離・馬場・脚質・気性**の判明（**D-108**）」
+ *   → ★**間違った軸の見本**でした。★残すと ★**次に誰かが写します**（★裁定の言葉）。
+ *
+ * ★本物は ★`apps/web/src/lib/discovery-screen.ts`（★`my_horse_discovery_runs`・`0084`）です。
+ *   ★回数は SQL から、★帯は `DISTANCE_BANDS`、★段は `discoveryStageOf` が決めます。
+ * ⚠️ ★ここに ★**似たものを作り直さないこと**。
  */
-export const DEMO_DISCOVERY: readonly { readonly label: string; readonly runs: number }[] = [
-  { label: 'スピード', runs: 9 },
-  { label: 'スタミナ', runs: 4 },
-  { label: 'パワー', runs: 2 },
-  { label: '賢さ', runs: 0 },
-];

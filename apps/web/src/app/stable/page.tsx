@@ -7,13 +7,23 @@
  *   ★`'use client'` にした理由: ★`my_horses` は ★**ログインした本人の行だけ**を返すので
  *     （★`where owner_id = auth.uid()`）、★セッションを持つ側で読む必要があります。
  *     ★`/entry` も同じ作りです。
- *   🔴 ★**読めなかったら見本に落とします。★ただし黙って落としません** —
- *     ★`view.demo` が true になり、★**画面に「デモデータ」の帯が出ます**（★`CK-14`）。
- *     ★★「帯が出ない＝繋がった」ではなく、★★「帯が出る＝本物が来ていない」を見てください。
+ *
+ * 🔴 ⚠️ ★**2026-09-25: ★見本に落とす経路を外しました**（★裁定 `REVIEW_OWNER_SCOPE_AND_STUD_FEE_20260925.md` §2）。
+ *   ★以前は ★「読めなかったら見本に落とし、★`view.demo` が true になって ★**帯が出る**」形で、
+ *   ★★「帯が出る＝本物が来ていない」を目印にする、と ★ここに書いてありました（★`CK-14`）。
+ *   🔴 ★その目印は ★**もう出ません。** ★`supabaseStableRepo` は ★常に `demo: false` を返し、
+ *     ★`demoStableRepo` は ★この面から ★呼ばれなくなりました。
+ *     → ★**下の `view.demo` の帯は、いまは出ない側です**（★型のために残してあります）。
+ *   ★★いまの目印は ★**「ログインしてください」の字**（★未ログイン）と
+ *     ★**「厩舎を読めませんでした: …」の枠**（★失敗）です。★どちらも ★馬を出しません。
+ *
+ *   ★なぜ変えたか: ★未ログインの人に ★**見本の馬が「あなたの厩舎」として出ていました**（★本番で）。
+ *     ★帯は出ていましたが、★**馬の一覧そのものが嘘**でした（★誰のデータかを偽る）。
  */
 import { useEffect, useState } from 'react';
-import { demoStableRepo, sortStable, conditionView, fatigueColor, type StableHome, type StableHorse, type StableView } from '../../lib/stable';
-import { supabaseStableRepo } from '../../lib/stable-repo';
+/** ⚠️ ★`demoStableRepo` は ★**もう引きません**（★2026-09-25・裁定 §2・★上の註記） */
+import { sortStable, conditionView, fatigueColor, type StableHome, type StableHorse, type StableView } from '../../lib/stable';
+import { supabaseStableRepo, SignInRequiredError } from '../../lib/stable-repo';
 import { ClassChip, FatigueBar, PageTitle } from '../../components/ui';
 import { STABLE_GRADE_LABEL, type StableGrade } from '@star/training';
 import { OWNERSHIP_LIMITS } from '@star/scheduler';
@@ -177,9 +187,9 @@ function HomeCards({ home, ownedCount, todoCount }: { readonly home: StableHome;
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <a className="a-btn a-btn-gold" href="/training" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>調教</a>
           <a className="a-btn" href="/entry" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>出走登録</a>
-          <a className="a-btn" href="/races" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>番組表</a>
+          <a className="a-btn" href="/vote" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>番組表</a>
           <a className="a-btn" href="/records" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>記録</a>
-          <a className="a-btn" href="/prizes" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>景品交換</a>
+          <a className="a-btn" href="/exchange" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>景品交換</a>
         </div>
       </HomeCard>
     </div>
@@ -200,6 +210,10 @@ function StatCard({ label, value, unit, color }: { readonly label: string; reado
 
 export default function StablePage() {
   const [view, setView] = useState<StableView | null>(null);
+  /** 🔴 ★未ログイン（★見本に落とさない・裁定 §2） */
+  const [needsLogin, setNeedsLogin] = useState(false);
+  /** 🔴 ★読めなかった理由（★黙って見本にしない・R-16） */
+  const [loadError, setLoadError] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -207,14 +221,48 @@ export default function StablePage() {
         const real = await supabaseStableRepo.stable();
         if (alive) setView(real);
       } catch (e) {
-        // 🔴 ★黙って見本に落としません。★理由を残し、★帯を出します
-        console.error('[stable] ★本物のデータを読めませんでした（見本に落とします）', e);
-        const demo = await demoStableRepo.stable();
-        if (alive) setView(demo);
+        /**
+         * 🔴 ★**見本に落とすのをやめました**（★2026-09-25・裁定 `REVIEW_OWNER_SCOPE_AND_STUD_FEE_20260925.md` §2）
+         *
+         * 【★何が起きていたか】★`catch` で ★`demoStableRepo.stable()` に落としていました。
+         *   → ★未ログインの人に ★**見本の馬が「あなたの厩舎」として出ていました**（★本番で）。
+         *   ★生の DB の文を出すより ★**悪い形**です（★誰のデータかを偽ります）。
+         *   ⚠️ ★網が見つけました: `apps/cli/test/owner-scoped-needs-session.test.ts`
+         *
+         * → ★`/records` と ★**同じ形**にします。★意匠は作っていません（★既存の字と `a-panel` だけ）。
+         */
+        if (!alive) return;
+        if (e instanceof SignInRequiredError) { setNeedsLogin(true); return; }
+        console.error('[stable] ★本物のデータを読めませんでした', e);
+        setLoadError(e instanceof Error ? e.message : String(e));
       }
     })();
     return () => { alive = false; };
   }, []);
+  /**
+   * 🔴 ★**未ログイン・読めなかったときは、馬を出しません**（★裁定 §2・2026-09-25）。
+   *   ★字も枠も ★`/records` と同じものを使っています（★新しい意匠を作らない）。
+   */
+  if (needsLogin) {
+    return (
+      <div style={{ padding: '22px 0 40px' }}>
+        <PageTitle title="わたしの馬" />
+        <p role="status" style={{ padding: '14px 16px', fontSize: 12.5, fontWeight: 900, color: 'var(--a-ink-2)' }}>
+          厩舎の馬を見るには、<a href="/login">ログイン</a>してください。
+        </p>
+      </div>
+    );
+  }
+  if (loadError !== null) {
+    return (
+      <div style={{ padding: '22px 0 40px' }}>
+        <PageTitle title="わたしの馬" />
+        <div className="a-panel" style={{ marginTop: 14, padding: '14px 16px', fontSize: 14, fontWeight: 900, color: 'var(--a-red-d)' }}>
+          厩舎を読めませんでした: {loadError}
+        </div>
+      </div>
+    );
+  }
   // ★読み込み中に、★新しい見た目を足しません（★デザイナーの領域）
   if (view === null) return null;
   const horses = sortStable(view.horses);

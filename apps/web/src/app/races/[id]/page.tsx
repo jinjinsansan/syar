@@ -101,7 +101,7 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
                   : <span style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>{deadlineText}</span>}
               </div>
             </div>
-            <a className="a-btn" href={`/races/${id}/odds`} style={{ height: 52, padding: '0 20px', fontSize: 16, whiteSpace: 'nowrap' }}>オッズ</a>
+            <a className="a-btn" href={`/odds/${id}`} style={{ height: 52, padding: '0 20px', fontSize: 16, whiteSpace: 'nowrap' }}>オッズ</a>
             {scheduled && <a className="a-btn a-btn-gold" href={`/races/${id}/bet`} style={{ height: 52, padding: '0 24px', fontSize: 17, whiteSpace: 'nowrap' }}>投票する</a>}
           </div>
         </div>

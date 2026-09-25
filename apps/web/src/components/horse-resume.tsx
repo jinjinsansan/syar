@@ -24,7 +24,7 @@ import { JOCKEYS, jockeyBondAfterRides } from '@star/scheduler';
 import { bondLabel } from './jockey-picker';
 import { ClassChip } from './ui';
 import { conditionView, fatigueColor, type HorseDetail } from '../lib/stable';
-import { DEMO_DISCOVERY } from '../lib/horse-story-demo';
+import type { DiscoveryRow } from '../lib/discovery-screen';
 import {
   DEMO_INNATE_INPUT, DEMO_CAREER_RUNS, DEMO_TOP_JOCKEY, DEMO_PEAK_BAND_LABEL,
   DEMO_OFFSPRING, OFFSPRING_GENERATION_LABEL, DEMO_RESUME_STORY, RESUME_TABS, RESUME_STORY_PREVIEW,
@@ -34,7 +34,17 @@ import {
 const STAGES = ['unknown', 'hint', 'narrow', 'known'] as const;
 const STAGE_TONE: readonly string[] = ['#8a95a3', '#6b3fc4', '#1a6fd4', '#1e7a3a'];
 
-export function HorseResume({ horse }: { readonly horse: HorseDetail }): React.ReactElement {
+/**
+ * 🔴 ★**発見の行は、呼ぶ側から渡します**（★2026-09-25・裁定 `REVIEW_DISCOVERY_AXES_20260925.md`）
+ *
+ * ⚠️ ★それまで ★`DEMO_DISCOVERY` を直に読んでいました。★中身は ★**能力 4 つ**で、
+ *    ★正典 **D-116**（「発見＝距離・馬場・脚質・気性」）と ★**軸が違っていました**。
+ * ★本物は `lib/discovery-screen.ts`（★`my_horse_discovery_runs`・`0084`）です。
+ * ⚠️ ★渡されなければ ★**節そのものを出しません**（★間違った軸の見本を出し続けない）。
+ */
+export function HorseResume(
+  { horse, discovery }: { readonly horse: HorseDetail; readonly discovery?: readonly DiscoveryRow[] },
+): React.ReactElement {
   const [tab, setTab] = useState(RESUME_TABS[0]!.key);
   const cond = conditionView(horse.condition);
   /**
@@ -77,17 +87,18 @@ export function HorseResume({ horse }: { readonly horse: HorseDetail }): React.R
         </div>
       </div>
 
-      {/* ★判明した能力（★段だけ・D-108） */}
+      {/* ★分かってきたこと（★段だけ・D-108・軸は D-116） */}
+      {discovery !== undefined && discovery.length > 0 && (
       <div style={{ padding: '18px 14px 0' }}>
-        <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 8 }}>判明した能力</div>
+        <div style={{ fontSize: 14, fontWeight: 900, marginBottom: 8 }}>分かってきたこと</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 14px', borderRadius: 12, background: '#fff', border: '1.5px solid var(--a-line)' }}>
-          {DEMO_DISCOVERY.map((d) => {
+          {discovery.map((d) => {
             /** ★段は回数から `@star/sim-engine` が決めます（★画面で決めない） */
             const stage = discoveryStageOf(d.runs);
             const reached = STAGES.indexOf(stage);
             const tone = STAGE_TONE[reached] ?? STAGE_TONE[0]!;
             return (
-              <div key={d.label} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <div key={`${d.axis}-${d.label}`} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>{d.label}</span>
                   <span style={{ fontSize: 11, fontWeight: 900, color: tone }}>{discoveryLabelOf(stage, '評価: A')}</span>
@@ -102,6 +113,7 @@ export function HorseResume({ horse }: { readonly horse: HorseDetail }): React.R
           })}
         </div>
       </div>
+      )}
 
       {/* ★個性（★先天は灰・後天はシアン。★着順に効かないことを毎回言う） */}
       <div style={{ padding: '18px 14px 0' }}>

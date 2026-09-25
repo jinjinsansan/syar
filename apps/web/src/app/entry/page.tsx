@@ -113,8 +113,14 @@ export default function EntryPage(): React.ReactElement {
     try {
       const result = await supabaseEntryRepo.enter({
         raceId: race.id, horseId: horse.id, strategy,
-        // ⚠️ ★騎手はまだ着順に効きません（★`JockeyPicker` の註記）。★選んだ id だけ凍結します
-        jockeyFrozen: jockeyId === null ? null : { id: jockeyId },
+        /**
+         * 🔴 ★**id だけを送ります**（★2026-09-25・裁定 `REVIEW_JOCKEY_FEE_20260925.md`）。
+         *   ⚠️ ★旧は `{ id: jockeyId }` を ★**凍結の中身として**送っていました。
+         *     ★`enter_race` は `feeEP` を探して見つからず ★**料金 0** になっていました（★D-105 が効かない）。
+         *     ★そして `feeEP: 0` を送れば ★高い騎手が無料になる形でもありました（★憲法 3）。
+         *   → ★料金と凍結は ★サーバーが名簿（`jockeys`）から作ります。
+         */
+        jockeyId,
         clientToken,
       });
       if (result.ok) {

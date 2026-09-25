@@ -6,7 +6,9 @@
  *   ★`races_public`・`race_entries_public`・`race_odds_public` から読みます
  *   （★実体テーブルは revoke 済みで、★anon では読めません）。
  *
- * ⚠️ ★**`/races/[id]/odds`（arcade 版）は生きています。** ★同じ URL を奪っていません。
+ * ✅ ★**2026-09-25: ★`/races/[id]/odds`（arcade 版）は消して、ここへ転送しました**
+ *    （★裁定 `REVIEW_DISCOVERY_AXES_20260925.md` §6 の手順。★同じ役割の画面を 2 つ残さない）。
+ *    ★転送は `next.config.mjs` の `SUPERSEDED_SCREENS`（★`/races/:id/odds` → `/odds/:id`）。
  * ⚠️ ★見せ方は `components/uma/uma-odds-view.tsx`（client）に渡します
  *    — ★停止スイッチが `useState` を使うためです。
  */

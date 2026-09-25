@@ -131,7 +131,16 @@ export interface EntryRepo {
     readonly raceId: string;
     readonly horseId: string;
     readonly strategy: string;
-    readonly jockeyFrozen: unknown;
+    /**
+     * 🔴 ★**騎手の id だけ**（★2026-09-25・裁定 `REVIEW_JOCKEY_FEE_20260925.md` ②③）。
+     *   ⚠️ ★旧は `jockeyFrozen: unknown` で ★**凍結の中身をここから送っていました**。
+     *     ★`enter_race` はその JSON の `feeEP` を料金として読んでいたので、
+     *     ★**利用者が料金を決められる形**でした（★憲法 3）。★しかも画面は `feeEP` を入れておらず、
+     *     ★**誰からも 1 EP も引かれていませんでした**（★D-105）。
+     *   → ★料金と凍結は ★**サーバー（`jockey_frozen_build`）が名簿から作ります**。
+     *   ★`null` は「指名しない」（★料金 0）。
+     */
+    readonly jockeyId: string | null;
     readonly clientToken: string;
   }): Promise<{ readonly ok: true; readonly entryId: string } | { readonly ok: false; readonly failure: EntryFailure }>;
 }
@@ -199,7 +208,8 @@ export const supabaseEntryRepo: EntryRepo = {
       p_race_id: input.raceId,
       p_horse_id: input.horseId,
       p_strategy: input.strategy,
-      p_jockey_frozen: input.jockeyFrozen,
+      // 🔴 ★id だけを渡す（★料金も凍結もサーバーが名簿から作る・裁定 ②③）
+      p_jockey_id: input.jockeyId,
       p_client_token: input.clientToken,
     });
     if (error !== null) return { ok: false, failure: readEntryError(error) };

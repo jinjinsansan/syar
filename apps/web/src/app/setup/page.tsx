@@ -168,6 +168,22 @@ export default function SetupPage(): React.ReactElement {
 
   const submit = async (): Promise<void> => {
     if (!canSubmit) return;
+    /**
+     * 🔴 ★**押す前に言う**（★D-123 ③・裁定 `REVIEW_IDLE_WORK_20260925.md` (a)・2026-09-25）
+     *
+     * 【★なぜ要るか】
+     *   ★牧場をつくるのは ★**1 回きり**で、★あとから戻せません（★`create_account` は冪等で、
+     *   ★同じ `client_token` なら同じ口座を返すだけ ＝ ★**作り直せません**）。
+     *   ★決まるのは ★表示名・牧場名・勝負服（★色と袖）で、★**画面から変える口は在りません**。
+     *   → ★D-123 の作法（★`/vote` と同じ）: ★**取り消せないものは、押す前にそう言う**。
+     * ⚠️ ★文面は ★`/vote` の形を写しました（★何が決まるか → ★空行 → ★戻せないこと → ★問い）。
+     * ⚠️ ★`window.confirm` は ★**既存の部品だけ**で済ませる形です（★新しい意匠を作らない）。
+     *    ★デザイナー便で ★画面の中の確認に差し替える前提です（★そのとき ★**この文面を持っていく**）。
+     */
+    if (!window.confirm(
+      `牧場をつくります\n表示名: ${displayName}\n牧場名: ${stableName}\n\n`
+      + 'あとから変えられません。この内容でよろしいですか？',
+    )) return;
     setBusy(true); setError(null); setErrorText(null);
     try {
       const r = await supabaseSetupRepo.create({ displayName, stableName, colorKey, sleeve, clientToken });

@@ -197,6 +197,22 @@ export default function FirstFoalPage(): React.ReactElement {
 
   const ask = async (): Promise<void> => {
     if (dam === null || sire === null || busy) return;
+    /**
+     * 🔴 ★**押す前に言う**（★D-123 ③・裁定 `REVIEW_IDLE_WORK_20260925.md` (a)・2026-09-25）
+     *
+     * 【★なぜ要るか】
+     *   ★これは ★**無償の生産 1 頭**で、★**1 回きり**です（★案 A・D-120）。
+     *   ★父と母を選び直す口は ★**在りません**（★依頼が通ると仔が生まれ、★やり直せません）。
+     *   → ★D-123 の作法（★`/vote` と同じ）: ★**取り消せないものは、押す前にそう言う**。
+     * ⚠️ ★文面は ★`/vote` の形を写しました（★何が決まるか → ★空行 → ★戻せないこと → ★問い）。
+     * ⚠️ ★`window.confirm` は ★**既存の部品だけ**で済ませる形です（★新しい意匠を作らない）。
+     *    ★デザイナー便（★第 3 便）で ★画面の中の確認に差し替える前提です
+     *    （★そのとき ★**この文面を持っていく**こと）。
+     */
+    if (!window.confirm(
+      `最初の 1 頭を生産します\n母: ${dam.name}\n父: ${sire.name}\n\n`
+      + 'この組み合わせは選び直せません。無償の生産は 1 回だけです。この内容でよろしいですか？',
+    )) return;
     setBusy(true);
     setFailure(null);
     try {

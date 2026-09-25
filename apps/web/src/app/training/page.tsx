@@ -14,7 +14,7 @@ import {
   trainingStreakOf, TRAINING_STREAK_WEEKS,
 } from '@star/training';
 import { sortStable, conditionView, DEMO_HORSES, type StableHorse } from '../../lib/stable';
-import { supabaseStableRepo } from '../../lib/stable-repo';
+import { supabaseStableRepo, SignInRequiredError } from '../../lib/stable-repo';
 import { authClient } from '../../lib/supabase';
 import { TRAINING_MENUS, trainingMenusOfView, DEMO_TRAINING_ABILITY, DEFAULT_TRAINING_ABILITY, demoFatigueNote } from '../../lib/game-demo';
 import { Capsule, ClassChip, FatigueBar, PageTitle, Pill, StatBar } from '../../components/ui';
@@ -83,6 +83,10 @@ export default function TrainingPage(): React.ReactElement {
    *   → ★`TRAINING-INSTRUCTION-NOT-READ` として起票しました。
    */
   const [loaded, setLoaded] = useState<readonly StableHorse[] | null>(null);
+  /** 🔴 ★未ログイン（★見本に落とさない・裁定 §2） */
+  const [needsLogin, setNeedsLogin] = useState(false);
+  /** 🔴 ★読めなかった理由（★黙って見本にしない・R-16） */
+  const [loadError, setLoadError] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -90,9 +94,22 @@ export default function TrainingPage(): React.ReactElement {
         const view = await supabaseStableRepo.stable();
         if (alive) setLoaded(view.horses);
       } catch (e) {
-        // 🔴 ★黙って見本に落としません。★理由を残します
-        console.error('[training] ★本物の馬を読めませんでした（見本に落とします）', e);
-        if (alive) setLoaded(DEMO_HORSES);
+        /**
+         * 🔴 ★**見本に落とすのをやめました**（★2026-09-25・裁定 `REVIEW_OWNER_SCOPE_AND_STUD_FEE_20260925.md` §2）
+         *
+         * 【★何が起きていたか】★`catch` で ★`DEMO_HORSES` に落としていました。
+         *   → ★未ログインの人に ★**見本の馬が「あなたの厩舎」として出ていました**（★本番で）。
+         *   ★これは ★生の DB の文を出すより ★**悪い形**です（★誰のデータかを偽ります）。
+         *   ⚠️ ★網が見つけました: `apps/cli/test/owner-scoped-needs-session.test.ts`
+         *
+         * → ★`/records` と ★**同じ形**にします（★未ログインは そう言う・★失敗は失敗と言う）。
+         * ⚠️ ★意匠は作っていません。★既存の字と `a-panel` だけを使います
+         *    （★旧世代・★R-16 の作り直しでそのまま置き換えられる形）。
+         */
+        if (!alive) return;
+        if (e instanceof SignInRequiredError) { setNeedsLogin(true); return; }
+        console.error('[training] ★本物の馬を読めませんでした', e);
+        setLoadError(e instanceof Error ? e.message : String(e));
       }
     })();
     return () => { alive = false; };
@@ -211,6 +228,33 @@ export default function TrainingPage(): React.ReactElement {
     mq.addEventListener('change', apply);
     return () => { mq.removeEventListener('change', apply); };
   }, []);
+
+  /**
+   * 🔴 ★**未ログイン・読めなかったときは、馬を出しません**（★裁定 §2・2026-09-25）
+   *   ⚠️ ★`horses` は ★`loaded ?? DEMO_HORSES` なので、★ここで止めないと ★見本が出ます。
+   *   ⚠️ ★フックより後に置いています（★早く返すとフックの数が変わります）。
+   *   ★字も枠も ★`/records` と同じものを使っています（★新しい意匠を作らない）。
+   */
+  if (needsLogin) {
+    return (
+      <div style={{ padding: '0 0 28px' }}>
+        <PageTitle title="調教" />
+        <p role="status" style={{ padding: '14px 16px', fontSize: 12.5, fontWeight: 900, color: 'var(--a-ink-2)' }}>
+          厩舎の馬を見るには、<a href="/login">ログイン</a>してください。
+        </p>
+      </div>
+    );
+  }
+  if (loadError !== null) {
+    return (
+      <div style={{ padding: '0 0 28px' }}>
+        <PageTitle title="調教" />
+        <div className="a-panel" style={{ marginTop: 14, padding: '14px 16px', fontSize: 14, fontWeight: 900, color: 'var(--a-red-d)' }}>
+          馬を読めませんでした: {loadError}
+        </div>
+      </div>
+    );
+  }
 
   /**
    * ★**スマホ縦の版**（★デザイナーのカード `components/training-mobile`・D12-1）。
