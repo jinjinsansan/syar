@@ -990,7 +990,22 @@ interface Built {
   readonly pace: 'slow' | 'middle' | 'high';
   readonly result: readonly { place: number; gate: number; margin: string }[];
   /** ★自馬のゲージ（D-072）。**エンジンが出した状態**を読むだけ */
-  readonly gauge: ReturnType<typeof staminaGaugeOf>;
+  /**
+   * ★自馬のゲージ（D-072）。**エンジンが出した状態**を読むだけ。
+   *
+   * 🔴 ★**`null` は「出さない」**（★2026-09-26・裁定 `REVIEW_RACE_WIRING_20260926.md` §7）。
+   *   ★実レースの録画では ★**出しません** — ★`iq`/`gt`/`st`/`condition`/`fatigue` が要るのに、
+   *   ★`race_entries_public` は出さず、★出すべきでもない（★D-108 / D-116「素質を隠す」）。
+   *   ⚠️ ★**公開データから推定して描かないこと**（★人気やタイムからの逆算も不可）。
+   *   ⚠️ ★**`gauge?:`（任意）にしていません。** ★任意だと ★書き忘れても通り、
+   *      ★見本の道で黙って消えても誰も気づきません。★`null` 必須なら ★作る側が毎回決めます
+   *      （★TL-1 の「3 つ目の状態を作らない」と同じ）。★網: `apps/cli/test/replay-gauge.test.ts`
+   *   🔴 ★これは ★**暫定**です。★最終形は ★「自分の馬のときだけサーバーがゲージを返す」（★段 3）。
+   *      ★録画を見る動機の第一は ★**自分の馬が走ったレース**を後から見ることなので
+   *      （★`/records`・`/stable` から辿る）、★「観戦だから自馬はいない」は ★**主な入口で成り立ちません**。
+   *      ★簿 `REPLAY-GAUGE-ABSENT-FOR-REAL-RACE`。
+   */
+  readonly gauge: ReturnType<typeof staminaGaugeOf> | null;
   /** ★確定着順と走破タイム（ゴール後の順位表示に使う） */
   readonly finishPos: ReadonlyMap<number, number>;
   readonly finishSec: ReadonlyMap<number, number>;
@@ -5263,11 +5278,17 @@ export default function RacePage(): React.JSX.Element {
        *    （★帯は y432〜536・★コース図は y321〜530・★名前プレートは y544 付近）。
        */
       const telopActive = cutInActive && !cutInCoversWorld;
-      const hud = cutInCoversWorld ? { ...hudRaw, standings: false }
+      const hudBase = cutInCoversWorld ? { ...hudRaw, standings: false }
         : replay.active || contestFocusHud ? { ...hudRaw, standings: false }
         : raceOver ? { ...hudRaw, gauge: false, standings: false, calls: false } : hudRaw;
-      // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）
-      const g = staminaAt(built.gauge, Math.max(0, metersLeft));
+      /**
+       * 🔴 ★**ゲージが無いときは 枠ごと出しません**（★2026-09-26・裁定 §7 の 3）。
+       *   ⚠️ ★**0 の帯を描かないこと。** ★それは ★「スタミナが尽きた」という ★**嘘**です。
+       *   ★`staminaAt` は ★`null` を通さないので、★**呼ぶ前に分けます**。
+       */
+      const hud = built.gauge === null ? { ...hudBase, gauge: false } : hudBase;
+      // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）。★null のときは読みません
+      const g = built.gauge === null ? null : staminaAt(built.gauge, Math.max(0, metersLeft));
 
       /**
        * ★ゴールした馬は**確定着順**で並べます。
@@ -5501,7 +5522,8 @@ export default function RacePage(): React.JSX.Element {
           }), {
             timeSec: d, lineStartSec: callStartRef.current,
             narratorName: NARRATOR_NAMES[cast], narratorRole: NARRATOR_ROLES[cast],
-            gauge: hud.gauge ? { left: g.left, initial: built.gauge.initial } : undefined,
+            gauge: hud.gauge && g !== null && built.gauge !== null
+              ? { left: g.left, initial: built.gauge.initial } : undefined,
             metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
             sinceSec: raceD - HUD_SETTLE_SEC,
           });
