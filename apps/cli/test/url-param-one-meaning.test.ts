@@ -75,32 +75,77 @@ describe('🔴 ★1 つの口に 2 つの意味を持たせない（/race）', (
    *     ★新しく `*FromParam` を足した日に ★**自動で網にかかります**。
    */
   it('🔴 ★fellBack を返す口を、受ける側が全部 読んでいる', () => {
-    /** ★① ★`fellBack: boolean` を返す関数を ★形で集める */
+    /**
+     * ★① ★`fellBack` を返す口を ★**書き方を問わず**集める。
+     *
+     * 🔴 ⚠️ ★**最初は `export function` の 1 種しか見ていませんでした**（★2026-09-26・裁定 §6 ①）:
+     *    ★`/export\s+function\s+(\w+)\s*\([^)]*\)\s*:\s*\{[^}]*fellBack/`
+     *    ★→ ★`export const weatherFromParam = (raw): { …; fellBack: boolean } => …` は ★**1 件も拾いません**。
+     *    ★→ ★引数に `)` が入る形（★既定値・関数型）も ★`[^)]*` で ★**切れます**。
+     *    🔴 ★★**列挙を「名前」から「構文 1 種」に移しただけ**でした（★R-29 の再演）。
+     * → ★**宣言の形を 2 通り見て、★引数は括弧の対応で飛ばします。**
+     */
     const ports: { readonly fn: string; readonly where: string }[] = [];
+    /** ★`openParen` の対応する `)` の次の位置（★`[^)]*` で切らない） */
+    const afterParens = (src: string, openParen: number): number => {
+      let depth = 0;
+      for (let i = openParen; i < src.length; i += 1) {
+        if (src[i] === '(') depth += 1;
+        else if (src[i] === ')') { depth -= 1; if (depth === 0) return i + 1; }
+      }
+      return -1;
+    };
     for (const pkg of readdirSync(path.join(ROOT, 'packages'))) {
       const dir = `packages/${pkg}/src`;
       let files: string[];
       try { files = readdirSync(path.join(ROOT, dir)); } catch { continue; }
       for (const f of files.filter((x) => x.endsWith('.ts'))) {
         const src = strip(read(`${dir}/${f}`));
-        for (const m of src.matchAll(/export\s+function\s+(\w+)\s*\([^)]*\)\s*:\s*\{[^}]*fellBack\s*:\s*boolean/g)) {
-          ports.push({ fn: m[1]!, where: `${dir}/${f}` });
+        /** ★`export function NAME(` と ★`export const NAME = (`（★`async` も） */
+        const decl = /export\s+(?:function\s+(\w+)\s*\(|const\s+(\w+)\s*(?::[^=]*)?=\s*(?:async\s*)?\()/g;
+        for (const m of src.matchAll(decl)) {
+          const name = m[1] ?? m[2]!;
+          const open = src.indexOf('(', m.index + m[0].length - 1);
+          const afterArgs = afterParens(src, open);
+          if (afterArgs < 0) continue;
+          /**
+           * ★引数の後ろから ★**本体が始まるまで**が返り値の書き方です。
+           *   ★`function` … ★次の `{`（★本体の始まり）／ ★アロー … ★`=>`
+           * ⚠️ ★どちらか先に来る方で切ります（★返り値の型の中の `{` は ★その前に在ります）。
+           */
+          const rest = src.slice(afterArgs, afterArgs + 400);
+          const arrow = rest.indexOf('=>');
+          const retType = arrow >= 0 ? rest.slice(0, arrow) : rest;
+          if (/fellBack/.test(retType)) ports.push({ fn: name, where: `${dir}/${f}` });
         }
       }
     }
     expect(ports.length, '🔴 ★`fellBack` を返す口が 0 件（★走査が壊れている・R-21）').toBeGreaterThan(1);
 
-    /** ★② ★呼んでいる所を全部 見て、★`fellBack` を読んでいるか */
+    /**
+     * ★② ★呼んでいる所を ★**全部**見て、★`fellBack` を読んでいるか。
+     *
+     * ⚠️ 🔴 ★**最初は `apps/web/src` だけ歩いていました**（★2026-09-26・裁定 §6 ②）。
+     *    ★口は ★`packages/` に在るので、★`apps/worker` からも ★`tools/` からも呼べます。
+     *    ★→ ★呼ぶ側を 1 つの場所に決め打つと、★**別の場所で同じ欠陥が静かに増えます**。
+     */
     const consumers: string[] = [];
     const walk = (dir: string): void => {
-      for (const e of readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+      let entries;
+      try { entries = readdirSync(path.join(ROOT, dir), { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
         if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+        /** ⚠️ ★下書き（`tools/_*`）は配られないので見ません（★`.gitignore` の道） */
+        if (e.name.startsWith('_')) continue;
         const rel = `${dir}/${e.name}`;
         if (e.isDirectory()) walk(rel);
-        else if (/\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) consumers.push(rel);
+        else if (/\.(tsx?|mjs)$/.test(e.name) && !/\.test\.(tsx?|mjs)$/.test(e.name)) consumers.push(rel);
       }
     };
     walk('apps/web/src');
+    walk('apps/worker/src');
+    walk('tools');
+    expect(consumers.length, '🔴 ★呼ぶ側の走査が 0 件（★R-21）').toBeGreaterThan(100);
 
     /**
      * ★呼び出しの ★**閉じ括弧の位置**を、括弧の対応で探します。
