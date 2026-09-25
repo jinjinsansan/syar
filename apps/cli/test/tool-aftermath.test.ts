@@ -19,12 +19,34 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { STATE_CHANGING } from '../../../tools/lib/classification.mjs';
+import { STATE_CHANGING, SOURCE_MUTATING } from '../../../tools/lib/classification.mjs';
 import { TOOL_AFTERMATH } from '../../../tools/lib/tool-aftermath.mjs';
 import { OPEN_FINDINGS } from '../../../tools/lib/open-findings.mjs';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const MODES = ['restores', 'consumes', 'pending'] as const;
+
+/**
+ * 🔴 ★**後始末を要求する母集合**（★2026-09-25・裁定 `REVIEW_OWNER_SCOPE_AND_STUD_FEE_20260925.md` §8 ②）
+ *
+ * 【★なぜ ★`SOURCE_MUTATING` も入れるか】
+ *   ★`SOURCE_MUTATING` は ★「★DB には触れないが ★**本番ソースを一時的に書き換える**」道具です。
+ *   ⚠️ ★あの簿は ★**自分でこう書いていました**: ★「★『必ず戻す』ことを検査で固定してはいません。
+ *      ★戻し漏れは ★`git status` が汚れる形で出ます」。
+ *   🔴 ★**それが 2 回 起きました**（★2026-09-21 と 2026-09-25・簿 `NEXT-BUILD-REWRITES-TRACKED-FILES`）。
+ *     ★しかも ★2 回目は ★**未コミット 56 件の山に混ざり**、★人が気づくまで出ませんでした。
+ *   🔴 ★この戻し漏れの行き先は ★**ただの汚れではありません** — ★`tsconfig.json` を commit すると
+ *     ★**Vercel が使う `.next` ではない道を指します**（★本番を壊す形）。
+ *   → ★だから ★**「3 回目が出たら」を前倒し**して、★いま後始末を要求します。
+ *
+ * 【⚠️ ★簿を 2 つに割らない】
+ *   ★第 2 の簿を作ると、★次は ★**「どちらに載せるか」で漏れます**。
+ *   → ★`TOOL_AFTERMATH` ★1 つのまま、★**鍵の母集合だけ**を広げます（★`missing` も `ghosts` も同じ union）。
+ */
+const NEEDS_AFTERMATH: readonly string[] = [
+  ...STATE_CHANGING,
+  ...SOURCE_MUTATING.map((e) => e.file),
+];
 
 describe('TL-1 状態を変える道具の後始末', () => {
   it('★走査が空振りしていない（R-21）', () => {
@@ -34,10 +56,10 @@ describe('TL-1 状態を変える道具の後始末', () => {
 
   it('① 🔴 ★★状態を変える道具は、1 つ残らず分類されている（★黙って足せない）', () => {
     const classified = new Set(Object.keys(TOOL_AFTERMATH));
-    const missing = STATE_CHANGING.filter((f) => !classified.has(f));
+    const missing = NEEDS_AFTERMATH.filter((f) => !classified.has(f));
     expect(missing, `🔴 ★後始末の作法が書かれていません: ${missing.join(' / ')}`).toEqual([]);
     /** ★対照: ★簿に、もう無い道具が残っていない */
-    const live = new Set<string>(STATE_CHANGING);
+    const live = new Set<string>(NEEDS_AFTERMATH);
     const ghosts = Object.keys(TOOL_AFTERMATH).filter((f) => !live.has(f));
     expect(ghosts, `★STATE_CHANGING に無いものが簿に残っています: ${ghosts.join(' / ')}`).toEqual([]);
   });
@@ -67,7 +89,13 @@ describe('TL-1 状態を変える道具の後始末', () => {
        * → ★**語を足すのではなく、★簿の側に ★`countedBy`（★引用）を持たせます**。
        *    ★AU-7 と同じ形: ★**主張には引用を付ける**。★コードが変われば ★**引用が壊れて落ちます**。
        */
+      /**
+       * ★**同格に扱う仕掛け**（★どちらも「戻ったことを数える」ところまで含んでいます）:
+       *   ★`beginSandbox` … ★SB-3 が ★`txid_current` を突き合わせる（★DB 側）
+       *   ★`withNextRewritesRestored` … ★写しと ★`finally` の書き戻し＋★戻した一覧を返す（★ソース側・2026-09-25）
+       */
       const counted = src.includes('beginSandbox')
+        || src.includes('withNextRewritesRestored')
         || (e.countedBy !== undefined && src.includes(e.countedBy));
       expect(
         counted,

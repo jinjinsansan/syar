@@ -65,7 +65,10 @@ secrets.staging.env
 *supabse*
 *supabase情報*
 壊す用*
-tools/_*.mjs
+# ★道具の下書きを置く道（★`_` で始めれば分類簿に載せなくてよい）
+#   ⚠️ ★2026-09-25 に `tools/_*.mjs` から広げました（★下書きが .ts / .sh のときも道が要る）。
+#   ★`tool-guard` は ★無視されていない未追跡も走査するので、★この道だけが「まだ分類しない」を許します
+tools/_*
 
 # ★変異試験の使い捨て作業ツリー（tools/mutation/gates.mjs）
 .mutation-wt/
