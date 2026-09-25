@@ -1,3 +1,4 @@
+// @ts-check
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { loadRaceablePool } from '../apps/worker/src/horse-repo.ts';

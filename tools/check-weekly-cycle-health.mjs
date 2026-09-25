@@ -44,6 +44,23 @@ if (ng > 0) {
 // ② 世界の時計
 const w = (await rows('select game_week, updated_at, extract(epoch from (now() - updated_at))::int stale from world_state where id = true'))[0];
 console.log(`  ② いまの週 ${w?.game_week ?? '不明'} / 最後に書かれてから ${w?.stale ?? '?'} 秒`);
+/**
+ * 🔴 ★**線を引く**（★2026-09-25・裁定 §7 ①）。
+ *   ⚠️ ★ここは以前 ★**秒数を出すだけ**でした。★数字は出るのに ★**誰も合否を言いません**でした。
+ *     ★`day_started_at` が止まると ★`0080` のデイリー EP が ★**誰も受け取れなくなります**。
+ *   ★線は ★**SQL の `day_boundary_stale_after_hours()`（`0081`）が 1 か所で持ちます**。
+ *     ★画面（`my_daily_ep_state`）と ★ここが ★**同じ関数を読みます**（★D-052）。
+ */
+const st = (await rows(
+  'select world_day_stalled() stalled, day_boundary_stale_after_hours() hours,'
+  + ' extract(epoch from (now() - day_started_at))::int / 3600 age_h from world_state where id = true',
+))[0];
+if (st?.stalled === true) {
+  console.log(`  ② 🔴 ★配布が止まっています（1 日の境目が ${st.age_h ?? '?'} 時間前・線 ${st.hours} 時間）`);
+  console.log('       → ★このあいだ デイリー EP は誰も受け取れません。★画面もそう出します（0081）');
+} else {
+  console.log(`  ② ✅ 1 日の境目は新しい（${st?.age_h ?? '?'} 時間前・線 ${st?.hours ?? '?'} 時間）`);
+}
 
 // ③ 直近のレース
 for (const r of await rows(

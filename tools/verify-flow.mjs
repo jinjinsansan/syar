@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * ★日次集計が実データを数えているか、そして**内部口座が別掲されているか**（§4.6・§11.2・0009）
  *
@@ -15,6 +16,7 @@
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { aggregateDay } from '../apps/worker/src/daily-flow.ts';
+import { DAY_MS, dayIndexAt, dayStartMs } from '@star/scheduler';
 
 import { assertNotProduction } from './lib/guard.mjs';
 import { loadEnv } from './lib/env.mjs';
@@ -113,8 +115,30 @@ console.log('投入');
 console.log('  実利用者: EP流入 100,000 / 調教費 2,000 ・ PP賞金 30,000 / 交換 5,000');
 console.log('  内部口座: EP流入  70,000 / 調教費 3,000 ・ PP賞金 11,000 / 交換 4,000');
 
+/**
+ * 🔴 ★**2026-09-25: ★この呼び出しは引数が足りていませんでした。**
+ *   ★`aggregateDay` は ★**BT-6 ②⑤（2026-09-19）**で `date` を
+ *   ★`date`（見出し）＋ `from`/`to`（★境目の瞬間）に分けました。★この道具は ★**直っていませんでした。**
+ *   → ★`from`/`to` が `undefined` のまま渡り、★SQL では `created_at >= null` になって
+ *     ★**1 行も当たらず**、★全項目 0 が出ていました（★「★実データを数えている: FAIL」）。
+ *   ⚠️ ★`.mjs` なので ★**型検査が鳴きません**。★引数の数が減っても静かに通ります。
+ *   → ★以後 ★**位置ではなく名前で確かめる**ため、★境目をここで作って渡します。
+ */
 const today = (await c.query('select current_date::text d')).rows[0].d;
-await aggregateDay(c, today);
+/**
+ * ★その日の境目。★**`world_state` の行ではなく `dayStartMs` から作ります。**
+ *   ⚠️ ★行を読むと ★**ワーカーが止まっている環境では凍った日**が返り（★staging の実測: 09-24）、
+ *     ★いま投入した行（`created_at = now()`）が窓の外に落ちて ★また 0 が出ます。
+ *   ★`daily-flow.ts` 自身が「★正は `dayStartMs`（`@star/scheduler`）」と書いています。
+ *   ★ワーカーは毎周この計算の結果を `world_state` に書くので、★**動いている環境では同じ値**です。
+ */
+const epochMs = Date.parse(env.STAR_EPOCH_ISO ?? '');
+if (!Number.isFinite(epochMs)) throw new Error('STAR_EPOCH_ISO が読めません（★--env を確かめてください）');
+const nowMs = Number((await c.query('select (extract(epoch from now()) * 1000)::bigint::text ms')).rows[0].ms);
+const dayFrom = new Date(dayStartMs(dayIndexAt(nowMs, epochMs), epochMs));
+const dayTo = new Date(dayFrom.getTime() + DAY_MS);
+console.log(`  集計の窓: ${dayFrom.toISOString()} 〜 ${dayTo.toISOString()}`);
+await aggregateDay(c, today, dayFrom.toISOString(), dayTo.toISOString());
 const r = (await c.query('select * from point_flow_daily where date=$1', [today])).rows[0];
 if (!r) {
   console.log('★行が作られていません');
@@ -153,7 +177,7 @@ const ok =
 console.log(`\n★実データを数えている: ${ok ? 'PASS' : 'FAIL'}`);
 
 console.log('★2回目の集計（冪等）...');
-await aggregateDay(c, today);
+await aggregateDay(c, today, dayFrom.toISOString(), dayTo.toISOString());
 const r2 = (await c.query('select pp_issued, pp_issued_internal from point_flow_daily where date=$1', [today])).rows[0];
 const idem = String(r.pp_issued) === String(r2.pp_issued) && String(r.pp_issued_internal) === String(r2.pp_issued_internal);
 console.log(`  PP 発行 ${r.pp_issued}/${r.pp_issued_internal} → ${r2.pp_issued}/${r2.pp_issued_internal}  ${idem ? 'PASS（増えない）' : 'FAIL'}`);

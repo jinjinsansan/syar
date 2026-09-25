@@ -1,0 +1,59 @@
+{
+  "//": [
+    "★道具（tools/*.mjs）に型検査を当てる（★裁定 REVIEW_EP_INFLOW_AND_ENTRY_20260925.md §7 ②・2026-09-25）",
+    "",
+    "【🔴 なぜ要るか — ★門が 6 日間 赤いまま誰も気づかなかった】",
+    "  ★aggregateDay は 2026-09-19（BT-6）に date → date + from/to へ分かれた。",
+    "  ★tools/verify-flow.mjs の呼び出しは ★引数 2 つのまま だった。",
+    "  → ★from/to が undefined で渡り、SQL は created_at >= null になって ★1 行も当たらず、",
+    "    ★全項目 0 ＝『実データを数えている: FAIL』を出し続けていた。",
+    "  ⚠️ ★.mjs なので ★型検査が鳴かない。★引数が減っても静かに通る。",
+    "  ★レビュー側の判断: ★新しい網を作らず、★型検査そのものを当てる。",
+    "",
+    "【★checkJs は false。★// @ts-check を書いたファイルだけ見る】",
+    "  ★tools には .mjs が 443 本あり、★一度に通らない。",
+    "  → ★件数を釘付けして増やす（★apps/cli/test/tools-typecheck-coverage.test.ts）。",
+    "  ★優先は ★門（verify-* / check-*）のうち ★製品の関数を import しているもの（★50 本）。",
+    "    ★そこが今回の事故の形（★製品の関数を、古い呼び方で呼び続ける）だから。",
+    "",
+    "【⚠️ strict を根と同じにしない】",
+    "  ★道具は使い捨てが多く、★noUnusedLocals などで落ちても ★製品の正しさとは関係がない。",
+    "  ★ここで見たいのは ★**呼び方が製品と合っているか**（★引数の数・型）だけ。",
+    "",
+    "  流し方: npm run typecheck:tools"
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"],
+
+    "allowJs": true,
+    "checkJs": false,
+
+    "strict": true,
+    "noImplicitAny": false,
+    "noUncheckedIndexedAccess": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "exactOptionalPropertyTypes": false,
+
+    "allowImportingTsExtensions": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+
+    "paths": {
+      "@star/sim-engine": ["../packages/sim-engine/src/index.ts"],
+      "@star/race-engine": ["../packages/race-engine/src/index.ts"],
+      "@star/scheduler": ["../packages/scheduler/src/index.ts"],
+      "@star/betting": ["../packages/betting/src/index.ts"],
+      "@star/breeding": ["../packages/breeding/src/index.ts"],
+      "@star/render": ["../packages/render/src/index.ts"],
+      "@star/training": ["../packages/training/src/index.ts"]
+    }
+  },
+  "include": ["./**/*.mjs", "./**/*.js"]
+}
