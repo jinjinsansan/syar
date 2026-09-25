@@ -52,8 +52,23 @@ export interface EntryRaceRow {
  * ⚠️ ★**締切の判定は `scheduled_at` から**（★§10.4「発走 60 分前まで」）。
  *    ★画面の時計は信用しません — ★**サーバーから来た時刻**と、★呼ぶ側が渡す「いま」で比べます。
  */
+/**
+ * 🔴 ★**登録を受け付ける段**（★移行 `0051` の `enter_race` と ★**同じ値**）。
+ *
+ * ★2026-09-19 の **D-117** で、★DB 側は ★`announced`（★枠だけ・出走馬もオッズも無い段）を受けるようになりました。
+ *   ★`announced` … 枠だけ（★**登録を受け付ける**）
+ *   ★`scheduled` … 出走表とオッズが入った（★**発売できる** ＝ もう受け付けない）
+ *
+ * 🔴 ★**画面はここを直していませんでした**（★2026-09-25 に発覚）。
+ *    ★一覧も判定も `scheduled` のままだったので、★**受け付けている 3 件は画面に出ず、
+ *    ★出ていた 2 件は RPC が「受付を終えています」で断る**状態でした。
+ *    ✔ ★本番で実測: ★持ち主の居る馬の登録は ★**0 件**（★誰も一度も登録できていない）。
+ * ⚠️ ★段の名前をここ以外に書かないこと（★`apps/cli/test/entry-stage-matches-rpc.test.ts` が突き合わせます）。
+ */
+export const ENTERABLE_RACE_STATUS = 'announced';
+
 export function entryStateOf(race: EntryRaceRow, wins: number, nowMs: number): EntryState {
-  if (race.status !== 'scheduled') return 'closed';
+  if (race.status !== ENTERABLE_RACE_STATUS) return 'closed';
   /**
    * 🔴 ★**締切を画面で計算しません**（★2026-09-19・**ED-1**）。
    *   ★旧: `scheduledAtMs - 60 分`。★これは ★**SQL の `interval '60 minutes'` の写し**でした。
@@ -128,7 +143,11 @@ export const supabaseEntryRepo: EntryRepo = {
       // ⚠️ ★**1 つの文字列リテラルにすること** — ★supabase-js はこの中身を ★**型の層で読んでいます**。
       //    ★連結すると推論が外れ、★`GenericStringError` になって列が全部見えなくなります。
       .select('id, scheduled_at, class_rank, surface, distance, track_condition, course_id, min_wins, max_wins, status, entry_deadline_at, entry_fee_ep, weight_kg, cycle_index')
-      .eq('status', 'scheduled')
+      /**
+       * 🔴 ★**受け付ける段を並べます**（★`ENTERABLE_RACE_STATUS`・★2026-09-25 に直した）。
+       *    ★旧は `'scheduled'` で、★**登録できるレースが 1 件も画面に出ていません**でした。
+       */
+      .eq('status', ENTERABLE_RACE_STATUS)
       .order('scheduled_at', { ascending: true })
       .limit(limit);
     // ★失敗を空配列にしない（★「レースが無い」に見えてしまう・`supabase.ts` の註記と同じ趣旨）

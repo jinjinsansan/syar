@@ -11,7 +11,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import { isEligibleFor, winsRangeFor } from '@star/scheduler';
-import { entryStateOf, readEntryError, type EntryRaceRow } from '../../web/src/lib/entry-repo.js';
+import {
+  ENTERABLE_RACE_STATUS, entryStateOf, readEntryError, type EntryRaceRow,
+} from '../../web/src/lib/entry-repo.js';
 
 const NOW = 1_700_000_000_000;
 /**
@@ -33,7 +35,14 @@ const race = (over: Partial<EntryRaceRow> = {}): EntryRaceRow => ({
   courseId: 'ookawara',
   minWins: 1,
   maxWins: 1,
-  status: 'scheduled',
+  /**
+   * 🔴 ★**受け付ける段を、★画面の定数から取ります**（★2026-09-25）。
+   *    ★旧は `'scheduled'` と書き写してありました。★D-117（`0051`）で DB が `'announced'` に
+   *    ★変わったのに ★**この写しが古いまま**で、★検査は緑のままでした。
+   *    ★本番では ★**誰も一度も登録できていません**でした（★持ち主の居る馬の登録 0 件）。
+   * ⚠️ ★ここに段の名前を書かないこと（★写した瞬間に、また古びます）。
+   */
+  status: ENTERABLE_RACE_STATUS,
   ...over,
 });
 
@@ -78,7 +87,14 @@ describe('UI-1 出走できるかの判定', () => {
     expect(entryStateOf(race({ status: 'cancelled' }), 1, NOW)).toBe('closed');
   });
 
-  it('🔴 ★画面の判定が DB 側（enter_race）と食い違わない', () => {
+  /**
+   * ⚠️ ★**この検査の名前は、★中身より広いことを言っていました**（★2026-09-25 に気づいた）。
+   *    ★見ているのは ★**勝利数の資格だけ**で、★**レースの段は見ていません**。
+   *    ★だから D-117 で段が変わったとき、★この検査は ★**緑のまま**でした。
+   *    → ★段の突き合わせは ★`apps/cli/test/entry-stage-matches-rpc.test.ts` が見ます
+   *      （★移行の原文から段を取り出して比べる）。
+   */
+  it('🔴 ★画面の資格の判定が DB 側（enter_race）と食い違わない（★勝利数のみ）', () => {
     // ★`enter_race` は min_wins / max_wins と比べる。★画面も同じ数で比べているか、
     //   ★段の定義（@star/scheduler）から作った範囲で総当たりして確かめる
     for (const cls of ['maiden', 'win1', 'win2', 'win3', 'open', 'graded'] as const) {

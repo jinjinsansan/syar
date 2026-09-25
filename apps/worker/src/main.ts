@@ -36,6 +36,7 @@ import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
 import { runBreedingCatchUp } from './breeding-runner.js';
 import { PLAYER_BREEDING_BUDGET_MS, runPlayerBreeding } from './player-breeding.js';
+import { runEntryScratch } from './entry-scratch-runner.js';
 
 /**
  * 🔴 ★**配合の遅れが縮まないことを、★黙って続けさせない**（★2026-09-21）。
@@ -864,6 +865,23 @@ async function main(): Promise<void> {
       }
     } catch (e) {
       console.error('[worker] 初回の配合に失敗:', (e as Error).message);
+    }
+
+    /**
+     * ★**利用者が頼んだ出走の取消**（★2026-09-25・D-123・移行 `0079`）。
+     *   ★返すのは既存の経路（`scratchEntry`・D-111 ⑤）。★ここでは呼ぶだけです。
+     * ⚠️ ★1 件の失敗で残りを止めません（★`runEntryScratch` が要求ごとに取引を張ります）。
+     */
+    try {
+      const es = await runEntryScratch(client, (m) => console.error(`[worker] ★${m}`));
+      if (es.done > 0 || es.failed > 0 || es.errors > 0 || es.backlog > 0) {
+        console.log(
+          `[worker] 出走の取消 確定${es.done}件 / 断り${es.failed}件 / ★やり直し${es.errors}件`
+          + ` / 返した ${es.refundedEp.toLocaleString('ja-JP')} EP / ★待ち${es.backlog}件`,
+        );
+      }
+    } catch (e) {
+      console.error('[worker] 出走の取消に失敗:', (e as Error).message);
     }
 
     const elapsed = Date.now() - started;

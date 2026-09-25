@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { ENTRY_FEE_EP } from '@star/scheduler';
 import { formatRemaining, toEntryRaceView, toEntryHorseView } from '../../web/src/lib/entry-screen.js';
+import { ENTERABLE_RACE_STATUS } from '../../web/src/lib/entry-repo.js';
 import type { EntryRaceRow } from '../../web/src/lib/entry-repo.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -39,7 +40,8 @@ const row = (over: Partial<EntryRaceRow> = {}): EntryRaceRow => ({
   courseId: 'ookawara',
   minWins: 1,
   maxWins: 1,
-  status: 'scheduled',
+  /** 🔴 ★受け付ける段は ★画面の定数から（★書き写すと古びる・★2026-09-25 の D-117 の取りこぼし） */
+  status: ENTERABLE_RACE_STATUS,
   entryDeadlineAtMs: NOW + 5 * 60 * 1000,
   entryFeeEP: 200,
   weightKg: 55,
