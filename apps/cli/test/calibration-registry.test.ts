@@ -19,6 +19,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { otherRegistriesHint } from './lib/registries.js';
 import {
   CALIBRATION,
   CALIBRATION_SCAN_DIRS,
@@ -94,7 +95,8 @@ describe('Q-3 較正定数の登録簿（メタテスト）', () => {
     expect(
       unregistered,
       `較正定数の登録漏れ。apps/cli/src/calibration.ts の CALIBRATION に追加するか、` +
-        `較正定数でないなら EXEMPT に理由付きで載せてください:\n  ${unregistered.join('\n  ')}`,
+        `較正定数でないなら EXEMPT に理由付きで載せてください:\n  ${unregistered.join('\n  ')}`
+        + otherRegistriesHint('apps/cli/src/calibration.ts の CALIBRATION / EXEMPT'),
     ).toEqual([]);
   });
 

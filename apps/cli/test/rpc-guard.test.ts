@@ -33,6 +33,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { EP_SHORT_SQLSTATE, classifySpendError } from '../../worker/src/training-runner.js';
+import { otherRegistriesHint } from './lib/registries.js';
 
 const ROOT = new URL('../../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const DIR = `${ROOT}db/migrations`;
@@ -61,6 +62,57 @@ const READONLY_FUNCTIONS = [
    *    ★区分の根拠は★**「状態を変えない」**の方です。
    */
   'bet_allowance',
+  /**
+   * ★EP の額（`0080`・D-075）。★`language plpgsql immutable` で**状態を変えない**。
+   *   ★`claim_daily_ep`（書き込む側）が `assert_setup_complete()` を呼び、★こちらはその中から呼ばれます。
+   */
+  'ep_grant_amount',
+  /**
+   * ★EP の理由の分類（`0080`・裁定 §5 (b)）。★`language plpgsql immutable` で**状態を変えない**。
+   *   ★日次上限の判定と V-11 の監視（`daily-flow.ts`）の両方がこれを読みます。
+   */
+  'ep_reason_class',
+  /**
+   * ★今日 デイリーを受け取れるか（`0080`）。★**読むだけ**で、★可否は `claim_daily_ep` が数え直します。
+   * ⚠️ ★ここが「渡す」ことは ★ありません（★渡すのは `claim_daily_ep` だけ）。
+   */
+  'my_daily_ep_state',
+  /**
+   * ★「1 日」を古いと呼ぶ線（`0081`）。★`language sql immutable` で**状態を変えない**。
+   *   ★画面（`my_daily_ep_state`）と監視（`check-weekly-cycle-health.mjs`）が同じここを読みます。
+   */
+  'day_boundary_stale_after_hours',
+  /**
+   * ★配布が止まっているか（`0081`）。★`language plpgsql stable` で**状態を変えない**。
+   * ⚠️ ★分からないときは ★**止まっている側**に倒します（★R-27）。
+   */
+  'world_day_stalled',
+  /**
+   * ★騎手まわりの定数（`0082`）。★`language plpgsql immutable` で**状態を変えない**。
+   *   ★`JOCKEY_BOND_MAX` / `JOCKEY_EFFECT` の転記（★`jockey-roster-sql.test.ts` が TS と突き合わせる）。
+   */
+  'jockey_const',
+  /**
+   * ★出走登録で凍結する騎手の記録を作る（`0082`）。★`language plpgsql stable` で**状態を変えない**。
+   *   ★`enter_race`（書き込む側）が `assert_setup_complete()` を呼び、★こちらはその中から呼ばれます。
+   * 🔴 ★これを在れさせた理由: ★旧は ★**クライアントが凍結の JSON を送っており**、
+   *    ★そこから料金を読んでいました（★`feeEP: 0` で高い騎手が無料になる形・憲法 3）。
+   */
+  'jockey_frozen_build',
+  /**
+   * ★発見度の素（`0084`）。★`language plpgsql stable` で**状態を変えない**。
+   *   ★返すのは ★**回数だけ**（★段も素質も返さない・D-108 ②・D-114）。
+   * ⚠️ ★**自分の馬だけ**を返します（★`0083` で他人の引退馬が一覧に出るので、
+   *    ★持ち主を見ないと ★他人の馬の手がかりを配ることになります）。
+   */
+  'my_horse_discovery_runs',
+  /**
+   * ★戦績の数え方（`0086`・D-052）。★`language sql stable` で**状態を変えない**。
+   *   ★読む口（`my_horses` / `retired_horses_public` / `horse_market_listing_public` /
+   *   ★`my_retired_horses`）が ★**これを呼びます**。
+   */
+  'horse_starts',
+  'horse_wins',
   /**
    * ★画面が読む「あと何 EP 投票できるか」（`0047`・**BT-5**）。`language plpgsql stable` で**状態を変えない**。
    *   🔴 ★`0044` では ★**ビュー**でした。★ビューは引数を取れず、★券種を渡せないため
@@ -365,6 +417,13 @@ function userRpcViolations(name: string, migrations: readonly Migration[]): stri
   return out;
 }
 
+/**
+ * ★自分の簿（★`otherRegistriesHint` から自分を外すため）。
+ * 🔴 ★2026-09-25: ★新しい SQL の関数を足したとき、★3 つの簿が ★**1 つずつ**落ちて 3 往復しました。
+ *    → ★落ちたときの文に ★**他に要る登録も名指しします**（★裁定 `REVIEW_JOCKEY_FEE_20260925.md` §5）。
+ */
+const SELF = 'apps/cli/test/rpc-guard.test.ts の READONLY_FUNCTIONS / WORKER_ONLY_FUNCTIONS';
+
 describe('D-080 書き込み RPC のセットアップ判定', () => {
   const bodies = latestFunctionBodies();
 
@@ -386,7 +445,8 @@ describe('D-080 書き込み RPC のセットアップ判定', () => {
     expect(
       missing,
       `★assert_setup_complete() を呼んでいない書き込み RPC があります。\n` +
-        `  D-080: 落ち方を RPC ごとにばらけさせない。読み取り専用なら登録簿に明示すること:\n  ${missing.join('\n  ')}`,
+        `  D-080: 落ち方を RPC ごとにばらけさせない。読み取り専用なら登録簿に明示すること:\n  ${missing.join('\n  ')}`
+        + otherRegistriesHint(SELF),
     ).toEqual([]);
   });
 

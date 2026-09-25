@@ -110,8 +110,19 @@ describe('★第 3 便の移行（0024）', () => {
 
   it('★② -b 出走資格を見る（★CL-4・2026-09-18）', () => {
     const def = lastDefinitionOf('enter_race');
-    /** ★レースに保存された範囲と、確定した 1 着の数を比べる */
-    expect(def.body).toMatch(/finish_pos\s*=\s*1/);
+    /**
+     * ★レースに保存された範囲と、★**勝数**を比べる。
+     *
+     * ⚠️ ★2026-09-25 に ★**書き方を変えました**。
+     *    ★旧は ★`finish_pos = 1` が本文に在ることを見ていました。
+     *    ★`0088` で ★数え方を ★`horse_wins()`（`0086`）に寄せたので、★本文に式は在りません。
+     *    → ★**関数を呼んでいること**を見ます。
+     *    ★これは ★**CL-4 そのもの**の担保です（★画面 `my_horses` と ★同じ関数でなければ、
+     *    ★画面が「出られる」と言った馬が ★ここで弾かれます）。
+     *    ★両方が同じ関数を呼んでいることは ★`horse-record-one-place.test.ts` が見ます。
+     */
+    expect(def.body, '★勝数は horse_wins() を呼ぶこと（★0086 に寄せた）')
+      .toMatch(/horse_wins\(p_horse_id\)/);
     expect(def.body).toMatch(/v_race\.min_wins/);
     expect(def.body).toMatch(/v_race\.max_wins/);
     /** 🔴 ★資格の情報が無いレースは**通さない**（★R-27: 分からないなら狭い側） */

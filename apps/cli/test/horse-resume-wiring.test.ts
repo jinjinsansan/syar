@@ -34,7 +34,21 @@ const strip = (s: string): string => s
 const read = (rel: string): string => strip(readFileSync(path.join(ROOT, rel), 'utf8'));
 const CODE = read('apps/web/src/components/horse-resume.tsx');
 const DEMO = read('apps/web/src/lib/horse-resume-demo.ts');
-const PAGE = read('apps/web/src/app/stable/[horseId]/page.tsx');
+/**
+ * ★**殻と中身の両方**を読みます（★2026-09-25）。
+ *
+ * 🔴 ★`/stable/[horseId]` を ★本物のデータへ繋いだとき（★裁定 `REVIEW_DISCOVERY_AXES_20260925.md` §5）、
+ *   ★**殻（`page.tsx`・サーバー部品）**と ★**中身（`horse-detail-view.tsx`・`use client`）**に分けました。
+ *   ★理由: ★`my_horses` は本人の行だけを返すのでセッション側で読む必要があり、
+ *   ★しかし ★`export const revalidate` は ★クライアント部品に書けません
+ *   ★（★2026-09-21 に同じことで Vercel のビルドが 31 コミット止まりました）。
+ * ⚠️ ★このとき ★この網が「★`HorseResume` が差し込まれていない」と落ちました。
+ *    ★**網は正しく、読む先が変わっただけ**です。→ ★両方を繋いで読みます。
+ */
+const PAGE = [
+  read('apps/web/src/app/stable/[horseId]/page.tsx'),
+  read('apps/web/src/app/stable/[horseId]/horse-detail-view.tsx'),
+].join('\n');
 
 describe('★履歴書型の馬詳細の配線（D13-2）', () => {
   it('★★画面が本当に差し込まれている（★部品を作っただけで終わらせない・LR-9）', () => {

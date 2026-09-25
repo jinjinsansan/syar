@@ -28,7 +28,18 @@ const strip = (s: string): string => s
   .replace(/\/\/[^\n]*/g, ' ');
 
 const PRIZE_SCREEN = strip(read('apps/web/src/lib/prize-screen.ts'));
-const PRIZE_PAGE = strip(read('apps/web/src/app/prizes/page.tsx'));
+/**
+ * 🔴 ★**2026-09-25: ★`/prizes` から `/exchange` に向け直しました**（★裁定 §3）。
+ *   ★`/prizes`（旧世代・222 行）は ★`/exchange`（新版）へ転送して消しました。
+ *   ✔ ★送り先が繋がっていることを先に確かめました（`exchangePrize` / `loadPrizeScreen` / `setError`）。
+ *
+ * ⚠️ ★向け直したとき、★下の 3 つが ★**変数名の違いだけで落ちました**:
+ *    ★`{p.name}` → `{it.name}` ／ ★`{h.prizeName}` → `{entry.prizeName}` ／
+ *    ★`PRIZE_STATUS_LABEL[h.status]` → `[entry.status]`
+ *   → ★★**性質は満たしているのに落ちる網**でした。★変数名でなく ★**形**で見るように直しました。
+ *     ★（★網が変数名に釘付けされていると、★画面を書き直すたびに「直したのに落ちる」が起きます）
+ */
+const PRIZE_PAGE = strip(read('apps/web/src/app/exchange/page.tsx'));
 const REC_SCREEN = strip(read('apps/web/src/lib/records-screen.ts'));
 const REC_VIEW = strip(read('apps/web/src/app/records/records-view.tsx'));
 
@@ -94,10 +105,10 @@ describe('★① 判定はサーバーが持つ（★画面が持たない）', 
   });
 
   it('🔴 ★失敗を握り潰さず、原文を出している（R-27・UI1-9）', () => {
-    expect(PRIZE_PAGE, '★RPC の失敗を受け取っていない').toMatch(/setExchangeError\(r\.failure\.message\)/);
-    expect(PRIZE_PAGE, '★失敗を画面に出していない').toMatch(/\{exchangeError\}/);
-    expect(PRIZE_PAGE, '★読み込みの失敗を受け取っていない').toMatch(/\.catch\([\s\S]{0,200}setLoadError/);
-    expect(PRIZE_PAGE, '★読み込みの失敗を出していない').toMatch(/\{loadError\}/);
+    // ⚠️ ★変数名で釘付けしません（★`setExchangeError` → `setError` のように変わります）
+    expect(PRIZE_PAGE, '★RPC の失敗を受け取っていない').toMatch(/set\w*Error\(\w+\.failure\.message\)/);
+    expect(PRIZE_PAGE, '★失敗を画面に出していない').toMatch(/\{\w*[eE]rror\}/);
+    expect(PRIZE_PAGE, '★読み込みの失敗を受け取っていない').toMatch(/\.catch\([\s\S]{0,200}set\w*Error/);
   });
 });
 
@@ -109,11 +120,12 @@ describe('★CK-2: 「持たせない」の対になる「出している」', (
    *    → ★**上の「〜を持っていない」と対で、★「〜を出している」を置きます。**
    */
   it('🔴 ★景品: ★名前・必要 PP・残高・履歴を出している', () => {
-    expect(PRIZE_PAGE, '★景品の名前を出していない').toMatch(/\{p\.name\}/);
-    expect(PRIZE_PAGE, '★必要 PP を出していない').toMatch(/\{p\.costPP\.toLocaleString/);
-    expect(PRIZE_PAGE, '★残高を出していない').toMatch(/\{balance\.toLocaleString/);
-    expect(PRIZE_PAGE, '★履歴を出していない').toMatch(/\{h\.prizeName\}/);
-    expect(PRIZE_PAGE, '★状態の言葉を出していない').toMatch(/PRIZE_STATUS_LABEL\[h\.status\]/);
+    // ⚠️ ★変数名（`p` / `h`）で釘付けしません。★見ているのは「★出しているか」です
+    expect(PRIZE_PAGE, '★景品の名前を出していない').toMatch(/\{\w+\.name\}/);
+    expect(PRIZE_PAGE, '★必要 PP を出していない').toMatch(/\w+\.costPP\.toLocaleString/);
+    expect(PRIZE_PAGE, '★残高を出していない').toMatch(/balance\.toLocaleString/);
+    expect(PRIZE_PAGE, '★履歴を出していない').toMatch(/\w+\.prizeName/);
+    expect(PRIZE_PAGE, '★状態の言葉を出していない').toMatch(/PRIZE_STATUS_LABEL\[\w+\.status\]/);
     expect(PRIZE_PAGE, '★交換のボタンが押せない（★見せているだけ）').toMatch(/onClick=\{\(\) => \{ void submit\(\); \}\}/);
   });
 
@@ -217,9 +229,25 @@ describe('★⑥ 源の無いものを画面が作っていない', () => {
     expect(runsView, '★確定した走りだけになっていない').toMatch(/finish_pos is not null/);
   });
 
-  it('🔴 ★`my_runs` の出走数の数え方が `my_horses.starts` と同じ', () => {
-    /** ⚠️ ★違う数え方だと「戦績 12 なのに 11 行」になります（★CL-4 の家族） */
-    const mine = lastViewBody('my_horses').body;
-    expect(mine, '★my_horses の数え方が変わった').toMatch(/finish_pos is not null/);
+  /**
+   * 🔴 ★**`my_runs` の絞り方が、戦績の数え方と同じであること**
+   *   ⚠️ ★違うと「★戦績 12 なのに 11 行」になります（★CL-4 の家族）。
+   *
+   * ⚠️ ★2026-09-25 に ★**書き方を変えました**。
+   *    ★旧は ★`my_horses` の本文に `finish_pos is not null` が在ることを見ていました。
+   *    ★`0086` で ★数え方を ★`horse_starts()` に寄せたので、★`my_horses` にはもう式が在りません。
+   *    → ★**`horse_starts()` の中の絞り方**と ★`my_runs` の絞り方を突き合わせます。
+   *    ⚠️ ★`my_runs` は ★**1 走 1 行**の view なので、★`horse_starts()`（★数を返す）は呼べません。
+   *       ★だから ★**絞り方が同じか**を見るのが正しい形です。
+   */
+  it('🔴 ★`my_runs` の絞り方が、戦績の数え方（horse_starts）と同じ', () => {
+    const { body: counter } = lastFunctionBody('horse_starts');
+    const PRED = /finish_pos\s+is\s+not\s+null/i;
+    expect(counter, '★horse_starts の絞り方が読めない（★寄せ替えが壊れている）').toMatch(PRED);
+    expect(lastViewBody('my_runs').body, '🔴 ★my_runs の絞り方が違います（★行数と戦績が食い違います）')
+      .toMatch(PRED);
+    // ★`my_horses` は ★関数を呼んでいること（★自分で数え直していない）
+    expect(lastViewBody('my_horses').body, '★my_horses が horse_starts を呼んでいない')
+      .toMatch(/horse_starts\(h\.id\)/);
   });
 });

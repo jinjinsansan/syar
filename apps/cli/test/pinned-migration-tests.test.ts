@@ -24,6 +24,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { otherRegistriesHint } from './lib/registries.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const MIGRATIONS = path.join(ROOT, 'db/migrations');
@@ -107,6 +108,42 @@ const CLASSIFIED: Readonly<Record<string, string>> = {
     '★history — ★本文は lastFunctionBody。★0025 の名指しは「古い定義では落ちる」の対照だけ',
   'rpc-guard.test.ts':
     '★synthetic ＋ history — ★`0001_a.sql` などは検出器を試す作り物。★`0032` は「あのとき閉じた」ことの確認',
+  /**
+   * ★pinned — ★`0080_daily_ep.sql` を名指しするのは ★**1 か所だけ**で、
+   *   ★「`create_account` の ★最後の定義が 0080 であること」を固めています。
+   *   ★額そのものは ★`lastFunctionBody('ep_grant_amount')`（★最後の定義）から読むので、
+   *   ★0081 以降で定義し直しても ★**正しい方を読み続けます**。
+   * ⚠️ ★`create_account` を将来 また定義し直したら ★**この名指しが赤くなります**（★意図どおり）。
+   *    ★そのとき ★「額を直に書き戻していないか」を人が見てから、★番号を進めてください。
+   */
+  'ep-grant-sql.test.ts':
+    '★pinned — ★create_account の最後の定義が 0080 であることだけを固める。★額は lastFunctionBody で読む',
+  /**
+   * ★pinned — ★`0082_jockey_roster_server_side.sql` を名指しするのは ★**2 つの用途**だけです:
+   *   ★① ★名簿の転記（`insert into jockeys ... values`）を ★その移行から読む
+   *      （★転記は ★**その移行にしか無い**ので、★最新の定義を探す意味がありません）
+   *   ★② 🔴 ★**古い `jsonb` の署名を `drop` しているか**を ★その移行の原文で確かめる
+   *      （★`drop` は ★**その移行に書いてあることが要件**です）
+   *   ★`enter_race` の本文は ★`lastFunctionBody`（★最後の定義）で読みます。
+   * ⚠️ ★名簿を後の移行で足したら、★①の切り出しを ★**最後の転記を読む形**に直すこと。
+   */
+  'jockey-roster-sql.test.ts':
+    '★pinned — ★名簿の転記と「古い署名を drop したか」は 0082 の原文で見る。★enter_race の本文は lastFunctionBody',
+  /**
+   * ★pinned — ★`0083` の原文で ★出す列・出さない列を見ます（★LR-6・D-114）。
+   *   ★`0086` の名指しは ★「★戦績の寄せ替えが漏れていないか」を ★1 か所で固めるためです
+   *   （★`lastViewBody('retired_horses_public').file` が `0086` であること）。
+   * ⚠️ ★戦績をまた別の移行で寄せ直したら ★**この名指しが赤くなります**（★意図どおり）。
+   */
+  'retired-public-view.test.ts':
+    '★pinned — ★`0083` の原文で列を見る。★`0086` の名指しは「戦績の寄せ替えが漏れていないか」だけ',
+  'market-public-view.test.ts':
+    '★pinned — ★`0085` の原文で列を見る（★名前と戦績を出し、素質を出していない）。'
+    + '★戦績の呼び出しは `lastViewBody`（最後の定義）で読む',
+  'horse-record-one-place.test.ts':
+    '★history ＋ pinned — ★`0086` は唯一の置き場所なので名指し。'
+    + '★`0051` / `0082` の名指しは ★**除外の簿**（★enter_race はまだ寄せていない）。'
+    + '★本体は `liveFunctionBodies` / `lastViewBody` で ★**いま効いている定義だけ**を見る',
 };
 
 describe('★名指しで固めた検査の分類（★2026-09-19）', () => {
@@ -127,7 +164,11 @@ describe('★名指しで固めた検査の分類（★2026-09-19）', () => {
      *    ★`pinned`（本文を読む）なら ★**③ が後の置き換えを見張ります**。
      *    ★`history`（起きたことを見る）なら ★**いまの状態は別の検査が見ていること**を確かめてください。
      */
-    expect(unclassified, '★分類されていない「名指しの検査」').toEqual([]);
+    expect(
+      unclassified,
+      '★分類されていない「名指しの検査」'
+      + otherRegistriesHint("apps/cli/test/pinned-migration-tests.test.ts の CLASSIFIED"),
+    ).toEqual([]);
   });
 
   it('★分類簿に載っている検査が実在する（★消えた検査を見張り続けない）', () => {
