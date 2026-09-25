@@ -130,6 +130,7 @@ export const TOOL_AFTERMATH = {
    */
   'grant-retired-horses-staging.mjs': { mode: 'consumes', why: '★書いたまま残す（★オーナーが触るための馬）' },
   'verify-initial-breeding-dams.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },
+  'verify-entry-scratch-live.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },
   'verify-initial-horse-distribution.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'backfill-entry-prize.mjs': { mode: 'consumes', why: '書いたまま残す（使い切る）' },
   'verify-d117-fill.mjs': { mode: 'restores', why: 'sandboxTx（SB-3 が途中の確定を見る）' },

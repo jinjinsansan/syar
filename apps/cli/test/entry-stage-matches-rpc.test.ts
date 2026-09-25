@@ -66,6 +66,51 @@ describe('🔴 ★登録を受ける段が、画面と DB で一致する', () =
     ).toBe(m?.[1]);
   });
 
+  /**
+   * 🔴 ★**`races_public` を引く所が、★どこも段を直書きしていない**（★2026-09-25）。
+   *
+   *   ★最初、★`entry-repo.ts` の `listRaces` だけ直して「直った」と報告しました。
+   *   ★**画面が実際に使うのは `entry-screen.ts` の `loadEntryScreen`** で、
+   *   ★そちらにも同じ直書きが在りました。★片方を直しても画面は変わりません。
+   *   → ★**1 か所だけ見る検査**では足りません。★引く所を全部 見ます。
+   */
+  it('🔴 ★出走登録の経路が、段を直書きしていない', () => {
+    /**
+     * ⚠️ ★**見るのは「出走登録の経路」だけ**です。
+     *    ★ほかの画面が別の段を引くのは ★**正しい**ことがあります:
+     *      ★投票（`bet-screen`）は `scheduled`（★`place_bet` がその段を受ける）
+     *      ★結果の帯（`race-strip`）は `settled`
+     *    ★一律に禁じると、★正しいものまで落として ★**網を外す圧力**になります。
+     * ★「出走登録の経路」＝ ★`entryStateOf` か `ENTERABLE_RACE_STATUS` を使っているファイル。
+     */
+    const SRC = path.join(ROOT, 'apps/web/src');
+    const offenders: string[] = [];
+    let scanned = 0;
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, entry.name);
+        if (entry.isDirectory()) { walk(p); continue; }
+        if (!/\.(tsx|ts)$/.test(entry.name)) continue;
+        const raw = readFileSync(p, 'utf8');
+        if (!/entryStateOf|ENTERABLE_RACE_STATUS/.test(raw)) continue;
+        scanned += 1;
+        const text = raw.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+        for (const m of text.matchAll(/\.eq\(\s*'status'\s*,\s*'(\w+)'/g)) {
+          offenders.push(`${p.replace(/\\/g, '/')}: .eq('status','${m[1]}')`);
+        }
+      }
+    };
+    walk(SRC);
+    expect(scanned, '🔴 ★出走登録の経路を 1 つも見つけられていません（★走査が壊れています）').toBeGreaterThan(1);
+    expect(
+      offenders,
+      '🔴 ★出走登録の経路が段を直書きしています。★`ENTERABLE_RACE_STATUS` を使ってください:\n'
+      + `  ${offenders.join('\n  ')}\n`
+      + '  ⚠️ ★2026-09-25: ★`entry-repo.ts` だけ直して「直った」と報告し、'
+      + '★画面が使う `entry-screen.ts` が古いままでした',
+    ).toEqual([]);
+  });
+
   it('🔴 ★段の名前を、画面が 2 か所に持っていない', () => {
     /**
      * ⚠️ ★`ENTERABLE_RACE_STATUS` の宣言そのものを除いて、★`'announced'` / `'scheduled'` を

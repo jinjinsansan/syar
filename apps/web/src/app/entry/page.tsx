@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { conditionView, fatigueColor, type Condition } from '../../lib/stable';
 import { STRATEGY_OPTIONS, DEMO_JOCKEY_RIDES } from '../../lib/game-demo';
 import { loadEntryScreen, toEntryRaceView, type EntryScreenData } from '../../lib/entry-screen';
+import { supabaseEntryRepo } from '../../lib/entry-repo';
 import { Capsule, ClassChip, FatigueBar, PageTitle, Pill, TabButton } from '../../components/ui';
 /** ★騎手を選ぶ（★D12-4・D-105 ④「出走登録で凍結する」） */
 import { JockeyPicker } from '../../components/jockey-picker';
@@ -85,6 +86,49 @@ export default function EntryPage(): React.ReactElement {
   const cond = horse === null ? null : conditionView(condValue);
   const epBalance = data?.epBalance ?? 0;
   const enough = race === null ? false : epBalance >= race.feeEP;
+
+  /**
+   * ★**登録を送る**（★2026-09-25 に繋いだ）。
+   * ⚠️ ★冪等キーは ★**1 回だけ**作ります（★送るたびに作り直すと二重登録になる・V-19 ⑭）。
+   *    ★成功したら次のために作り直します。
+   * ⚠️ ★失敗の文言は ★**サーバーのものをそのまま**出します（★推測で言い換えない・UI1-9）。
+   */
+  const [clientToken, setClientToken] = useState(() => crypto.randomUUID());
+  const [entering, setEntering] = useState(false);
+  const [entryMessage, setEntryMessage] = useState<{ readonly ok: boolean; readonly text: string } | null>(null);
+  const submitEntry = async (): Promise<void> => {
+    if (race === null || horse === null || entering || !enough) return;
+    /**
+     * 🔴 ★**取り消せる範囲を、押す前に言います**（★D-123・簿 `ONE-WAY-DOORS`）。
+     *    ★出走の取消は ★**発売の準備に入る前まで**です。★押した後に知らせない。
+     */
+    if (!window.confirm(
+      `${race.raceNo}　${race.classLabel}　${race.course}\n`
+      + `${horse.name}・${STRATEGY_OPTIONS.find((s) => s.key === strategy)?.label ?? strategy}\n`
+      + `出走料 ${race.feeEP} EP（登録後の残り ${(epBalance - race.feeEP).toLocaleString('ja-JP')} EP）\n\n`
+      + '登録の取消は、発売の準備に入る前までしかできません。この内容でよろしいですか？',
+    )) return;
+    setEntering(true);
+    setEntryMessage(null);
+    try {
+      const result = await supabaseEntryRepo.enter({
+        raceId: race.id, horseId: horse.id, strategy,
+        // ⚠️ ★騎手はまだ着順に効きません（★`JockeyPicker` の註記）。★選んだ id だけ凍結します
+        jockeyFrozen: jockeyId === null ? null : { id: jockeyId },
+        clientToken,
+      });
+      if (result.ok) {
+        setClientToken(crypto.randomUUID());
+        setEntryMessage({ ok: true, text: `登録しました（${race.raceNo}　${horse.name}）` });
+        setRaceId(null);
+        loadEntryScreen().then(setData).catch(() => { /* ★読み直せなくても登録は済んでいる */ });
+      } else {
+        setEntryMessage({ ok: false, text: result.failure.message });
+      }
+    } catch (cause: unknown) {
+      setEntryMessage({ ok: false, text: cause instanceof Error ? cause.message : String(cause) });
+    } finally { setEntering(false); }
+  };
 
   return (
     <div style={{ padding: '22px 0 40px' }}>
@@ -245,8 +289,34 @@ export default function EntryPage(): React.ReactElement {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 44, borderBottom: '1px solid var(--a-line)' }}><span className="a-lbl">登録後の残り</span><span><span className="a-num" style={{ fontSize: 30, color: 'var(--a-num-time)' }}>{(epBalance - race.feeEP).toLocaleString('ja-JP')}</span> <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>EP</span></span></div>
               {/* §9.5 憲法の明示 — 登録前から常時表示し、登録後も残す */}
               <div style={{ marginTop: 12, padding: '11px 13px', borderRadius: 8, background: '#eaf3fb', border: '2px solid #9fc0dc' }}><span style={{ fontSize: 13, fontWeight: 900, color: 'var(--a-ink)', lineHeight: 1.6 }}>自分の馬が出るレースは投票できません</span></div>
-              <span className={`a-btn a-btn-gold${enough ? '' : ' off'}`} style={{ height: 52, marginTop: 12, fontSize: 18, ...(enough ? {} : { opacity: .4 }) }} title="サーバー接続まで押せません">登録する（{race.feeEP} EP）</span>
+              {/*
+                🔴 ★**ここは `<span>` でした**（★2026-09-25 に発覚）。
+                   ★`title="サーバー接続まで押せません"` と書かれたまま、★`onClick` が無く、
+                   ★**押しても何も起きません**でした。★`supabaseEntryRepo.enter` は在るのに、
+                   ★**誰も呼んでいません**でした（★本番の登録実績 0 件）。
+                ⚠️ ★**押す前に「取り消せるか」を言います**（★D-123・簿 `ONE-WAY-DOORS`）。
+                   ★出走の取消は ★**発売の準備に入る前まで**しかできません。
+              */}
+              <button
+                type="button"
+                className={`a-btn a-btn-gold${enough && !entering ? '' : ' off'}`}
+                style={{
+                  height: 52, marginTop: 12, fontSize: 18, width: '100%', fontFamily: 'inherit',
+                  cursor: enough && !entering ? 'pointer' : 'not-allowed',
+                  ...(enough && !entering ? {} : { opacity: .4 }),
+                }}
+                disabled={!enough || entering}
+                onClick={() => { void submitEntry(); }}
+              >{entering ? '登録しています…' : `登録する（${race.feeEP} EP）`}</button>
               {!enough && <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-red-d)', marginTop: 6 }}>参加ポイントが足りません</div>}
+              {entryMessage !== null && (
+                <div role={entryMessage.ok ? 'status' : 'alert'} style={{
+                  marginTop: 8, padding: '10px 12px', borderRadius: 8, fontSize: 13, fontWeight: 900, lineHeight: 1.7,
+                  background: entryMessage.ok ? '#e8f6ec' : '#ffeceb',
+                  border: `2px solid ${entryMessage.ok ? '#3f8f57' : 'var(--a-red-d)'}`,
+                  color: entryMessage.ok ? '#1d5c31' : 'var(--a-red-d)',
+                }}>{entryMessage.text}</div>
+              )}
             </div>
           </div>
         </div>

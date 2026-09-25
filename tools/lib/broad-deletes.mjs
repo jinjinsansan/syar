@@ -33,6 +33,15 @@
  * ★`records` … ★**何をどう残すか。★残さないなら、なぜ要らないか**
  */
 export const BROAD_DELETES = {
+  'verify-entry-scratch-live.mjs': {
+    sites: 1,
+    records: '★**残しません。★予行の中だけで、★必ず戻すからです**（`beginSandbox` / `endSandbox`・SB-3。'
+      + '★`endSandbox` が「途中で確定していないか」を `txid` で数え、★確定していたら検査ごと落ちます）。'
+      + '★消すのは ★**この予行が直前に自分で積んだ依頼**（`entry_scratch_requests`）だけで、'
+      + '★製品の行には当たりません。'
+      + '⚠️ ★なぜ消すか: ★依頼が 2 件 積まれた状態で確定すると、★**1 件ぶんの料金と比べた検査が落ちます**'
+      + '（★実際に落ち、★**製品ではなく検査の算数が誤り**でした）。★確定を 1 件に絞るためです',
+  },
   'cleanup-ds7-leak.mjs': {
     sites: 3,
     records: '✅ ★消す前に `races` / `public.users` / 所有馬 / `auth.users` の**識別子**を '

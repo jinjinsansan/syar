@@ -16,7 +16,9 @@
 import { rankOfWins, slotOfDay } from '@star/scheduler';
 import { CLASS_LABEL, CONDITION_LABEL, SURFACE_LABEL, formatClock } from './format';
 import { authClient, readClient } from './supabase';
-import { entryStateOf, type EntryRaceRow, type EntryState } from './entry-repo';
+import {
+  ENTERABLE_RACE_STATUS, entryStateOf, type EntryRaceRow, type EntryState,
+} from './entry-repo';
 
 /** ★画面に出す 1 レース（★`game-demo.ts` の `EntryRace` と同じ形） */
 export interface EntryRaceView {
@@ -160,7 +162,13 @@ export async function loadEntryScreen(limit = 40): Promise<EntryScreenData> {
 
   const [racesRes, weekRes] = await Promise.all([
     read.from('races_public').select(RACE_COLUMNS)
-      .eq('status', 'scheduled')
+      /**
+       * 🔴 ★**受け付ける段を並べます**（★`ENTERABLE_RACE_STATUS`・★2026-09-25）。
+       *   ★旧は `'scheduled'` の直書きでした。★`entry-repo.ts` にも同じ直書きが在り、
+       *   ★**そちらだけ直して「直った」と報告**しました（★画面が使うのはこちらです）。
+       *   ★同じ値を 2 か所に持つと、★片方を直しても画面は変わりません。
+       */
+      .eq('status', ENTERABLE_RACE_STATUS)
       .order('scheduled_at', { ascending: true })
       .limit(limit),
     read.from('world_state_public').select('game_week, stale_seconds').limit(1),
