@@ -141,6 +141,13 @@ const VENUE_PARAM = QS?.get('venue') ?? null;
 /** ★実レースの ID（★段 2 で使う。★いまは ★**受け取ったら止める**） */
 const REAL_RACE_PARAM = QS?.get('race') ?? null;
 const VENUE_RESOLVED = raceSetupFromParam(VENUE_PARAM);
+/**
+ * ⚠️ ★**ここで解きます**（★`PARAM_ERROR` より前・2026-09-26）。
+ *    ★実体は 100 行ほど下で使いますが、★宣言を下に置くと ★`PARAM_ERROR` から見えません
+ *    （★TDZ は ★**実行時にしか出ません** — ★`tsc` も `node --check` も通ります。
+ *    ★簿 `patch-by-position-breaks-declaration-order` で 1 度 踏んだ形）。
+ */
+const TOD_RESOLVED = timeOfDayFromParam(QS?.get('tod') ?? null);
 const RACE_SETUP = VENUE_RESOLVED.setup;
 
 /**
@@ -151,6 +158,15 @@ const PARAM_ERROR: string | null = (() => {
   if (VENUE_RESOLVED.fellBack) {
     return `知らない鞍です: ?venue=${VENUE_PARAM ?? ''}`
       + '（★桜星賞に落としません。★鞍の一覧は画面下の「レース選択」から選んでください）';
+  }
+  /**
+   * 🔴 ★**双子**（★2026-09-26・裁定 §5）。★`?tod=` も ★同じ形で ★**黙って昼**になっていました。
+   *   ⚠️ ★`?venue=` を直した ★**同じ日・同じファイル・100 行ほど下**に残っていました。
+   *   → ★作法: ★**直した本人の「隣」を見る**。
+   */
+  if (TOD_RESOLVED.fellBack) {
+    return `知らない時間帯です: ?tod=${QS?.get('tod') ?? ''}`
+      + `（★昼に落としません。★使えるのは ${TIME_OF_DAYS.join(' / ')} です）`;
   }
   /**
    * 🔴 ★**段 2 が入るまで、実レースの走行は出せません。**
@@ -220,8 +236,17 @@ const RACE_TURN: 'left' | 'right' = TURN_OVERRIDE ?? RACE_SETUP.turn;
  *   ★本番は ★発走の時刻（`timeOfDayOfScheduledAt`・日本時間）から決めます。★デモには発走の時刻が無いので、この口で切り替えます。
  * ⚠️ ★省くと ★昼（★従来の見た目のまま）。★描画だけに効き、★着順は 1 ビットも変わりません。
  */
-const TIME_OF_DAY = timeOfDayFromParam(typeof window === 'undefined' ? null
-  : new URLSearchParams(window.location.search).get('tod')).timeOfDay;
+/**
+ * 🔴 ★**`?tod=` も `fellBack` を見ます**（★2026-09-26・裁定 `REVIEW_RACE_WIRING_20260926.md` §5）
+ *
+ *   ⚠️ ★同じ日に ★`?venue=` の同じ欠けを直したのに、★**この 100 行下が残っていました**。
+ *     ★`timeOfDayFromParam` も ★`{ timeOfDay, fellBack }` を返し、★註記に
+ *     ★「★知らない値は昼へ落とし、★**落ちたことを返します**（★R-27 の系・
+ *     ★`raceSetupFromParam` と同じ形）」と ★**書いてあります**。
+ *   🔴 ★それを ★`.timeOfDay` だけ取っていたので、★`?tod=midnight` は ★**黙って昼**になりました。
+ *   → ★★**直した本人の「隣」を見る**（★作法・★今日の 2 件は ★同じファイル・同じ型でした）。
+ */
+const TIME_OF_DAY = TOD_RESOLVED.timeOfDay;
 const COURSE_OPTS = { ...COURSE_SPEC, turn: RACE_TURN };
 /**
  * ★**レース選択の中身**（★競馬場ごとの 50 鞍）。

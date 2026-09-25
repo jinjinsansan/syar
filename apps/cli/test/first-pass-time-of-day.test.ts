@@ -131,8 +131,19 @@ describe('★時間帯（★発走の時刻から・日本時間）', () => {
   it('★⑧ 画面は同じ関数から組む（★時間帯の口・色・1 周目のスタンド前）', () => {
     const page = readFileSync(path.resolve(__dirname, '../../web/src/app/race/page.tsx'), 'utf8');
     for (const needle of [
-      "timeOfDayFromParam(typeof window === 'undefined' ? null",
-      ".get('tod')).timeOfDay",
+      /**
+       * ⚠️ 🔴 ★**引数の綴りを釘付けしていました**（★2026-09-26 に直しました）。
+       *    ★旧: ★`"timeOfDayFromParam(typeof window === 'undefined' ? null"` ＋ ★`".get('tod')).timeOfDay"`
+       *    🔴 ★これは ★**呼び方の文字列**を固定していたので、
+       *      ★`?tod=` の ★`fellBack` を読むように直した便で ★**落ちました**
+       *      （★`QS?.get('tod')` に寄せ、★`.timeOfDay` をその場で取らなくなったため）。
+       *    ⚠️ ★この検査の趣旨は ★「★**画面が同じ関数から組む**」ことです。★綴りではありません。
+       *    → ★**関数を呼んでいること**と ★**`?tod=` を読んでいること**を別々に見ます。
+       *    ★`fellBack` を捨てていないかは ★`apps/cli/test/url-param-one-meaning.test.ts` の仕事です
+       *      （★役割を混ぜると両方が甘くなります）。
+       */
+      'timeOfDayFromParam(',
+      "get('tod')",
       'const { startShownM, straightShownM, firstPassSpansM } = sideOnlyShownMetersOf(course);',
       '...(sideOnlyBuild ? { midShownSpansM: firstPassSpansM } : {}),',
       'timeOfDayTintsOf(TIME_OF_DAY,',

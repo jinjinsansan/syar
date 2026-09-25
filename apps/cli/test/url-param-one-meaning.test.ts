@@ -64,17 +64,116 @@ describe('🔴 ★1 つの口に 2 つの意味を持たせない（/race）', (
   });
 
   /**
-   * 🔴 ★**`fellBack` を捨てていない**（★これが 2026-09-26 まで捨てられていた）。
+   * 🔴 ★**`fellBack` を返す口を、★形で全部 集めて、★受ける側が読んでいるかを見る**
+   *   ★裁定 `REVIEW_RACE_WIRING_20260926.md` §5 の決定 2
+   *
+   * 【⚠️ ★なぜ「この 2 つ」で書かないか — ★R-29: ★列挙は必ず漏れる】
+   *   ★2026-09-26、★`?venue=`（`raceSetupFromParam`）の欠けを直した ★**同じ日**に、
+   *   ★`?tod=`（`timeOfDayFromParam`）が ★**同じファイルの 100 行下**に残っていました。
+   *   ★どちらも ★`{ …, fellBack: boolean }` を返す ★**同じ型**です。
+   *   → ★★**名前で列挙せず、★返り値の形で集めます。**
+   *     ★新しく `*FromParam` を足した日に ★**自動で網にかかります**。
    */
-  it('🔴 ★知らない鞍を、黙って既定に落としていない', () => {
+  it('🔴 ★fellBack を返す口を、受ける側が全部 読んでいる', () => {
+    /** ★① ★`fellBack: boolean` を返す関数を ★形で集める */
+    const ports: { readonly fn: string; readonly where: string }[] = [];
+    for (const pkg of readdirSync(path.join(ROOT, 'packages'))) {
+      const dir = `packages/${pkg}/src`;
+      let files: string[];
+      try { files = readdirSync(path.join(ROOT, dir)); } catch { continue; }
+      for (const f of files.filter((x) => x.endsWith('.ts'))) {
+        const src = strip(read(`${dir}/${f}`));
+        for (const m of src.matchAll(/export\s+function\s+(\w+)\s*\([^)]*\)\s*:\s*\{[^}]*fellBack\s*:\s*boolean/g)) {
+          ports.push({ fn: m[1]!, where: `${dir}/${f}` });
+        }
+      }
+    }
+    expect(ports.length, '🔴 ★`fellBack` を返す口が 0 件（★走査が壊れている・R-21）').toBeGreaterThan(1);
+
+    /** ★② ★呼んでいる所を全部 見て、★`fellBack` を読んでいるか */
+    const consumers: string[] = [];
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+        if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+        const rel = `${dir}/${e.name}`;
+        if (e.isDirectory()) walk(rel);
+        else if (/\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) consumers.push(rel);
+      }
+    };
+    walk('apps/web/src');
+
+    /**
+     * ★呼び出しの ★**閉じ括弧の位置**を、括弧の対応で探します。
+     * 🔴 ⚠️ ★**距離（字数）で測りません。** ★2026-09-26 にそれで 1 度 外しました
+     *    （★註記や別の語に `fellBack` が在るだけで通ってしまう）。
+     */
+    const endOfCall = (src: string, openParen: number): number => {
+      let depth = 0;
+      for (let i = openParen; i < src.length; i += 1) {
+        if (src[i] === '(') depth += 1;
+        else if (src[i] === ')') { depth -= 1; if (depth === 0) return i + 1; }
+      }
+      return -1;
+    };
+
+    const bad: string[] = [];
+    for (const rel of consumers) {
+      const src = strip(read(rel));
+      for (const p of ports) {
+        /** ★呼び出しごとに見ます（★同じファイルで 1 回 読んでいれば良い、にしない） */
+        for (const call of src.matchAll(new RegExp(`\\b${p.fn}\\s*\\(`, 'g'))) {
+          const open = src.indexOf('(', call.index);
+          const end = endOfCall(src, open);
+          if (end < 0) continue;
+          const args = src.slice(open, end);
+          /** ⚠️ ★常に既定を渡す呼び出し（★`(null)`）は ★落ちようがないので除きます */
+          if (/^\(\s*null\s*\)$/.test(args.trim())) continue;
+
+          /**
+           * 🔴 ★**欠陥の形はこれ**: ★呼び出しの ★**直後に `.欄` を付けて 1 つだけ取り出す**。
+           *   ★`raceSetupFromParam(x).setup` ／ ★`timeOfDayFromParam(x).timeOfDay`
+           *   → ★★**`fellBack` は その場で捨てられます。**
+           *   ⚠️ ★これを「後ろに `fellBack` の語が在るか」で見ると、
+           *      ★`{ …: fn(x).timeOfDay, fellBack: false }` のような形を ★**通します**
+           *      （★2026-09-26 の対照で実際に通りました）。
+           */
+          const nextChar = src.slice(end).match(/^\s*\.\s*([A-Za-z_$][\w$]*)/);
+          if (nextChar !== null) {
+            if (nextChar[1] === 'fellBack') continue;      // ★診断だけ取るのは可
+            bad.push(`${rel}: ${p.fn}(…).${nextChar[1]!}`
+              + `（🔴 ★その場で 1 欄だけ取り出して ★fellBack を捨てています・${p.where}）`);
+            continue;
+          }
+
+          /** ★変数に受けた形: ★`const X = fn(...)` → ★`X.fellBack` を ★どこかで読んでいるか */
+          const before = src.slice(Math.max(0, call.index - 80), call.index);
+          const assigned = before.match(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*$/);
+          if (assigned !== null) {
+            if (new RegExp(`\\b${assigned[1]!}\\.fellBack\\b`).test(src)) continue;
+            bad.push(`${rel}: const ${assigned[1]!} = ${p.fn}(…)`
+              + `（🔴 ★受けたのに ★${assigned[1]!}.fellBack を ★1 度も読んでいません・${p.where}）`);
+            continue;
+          }
+          /** ★分解して受けた形: ★`const { fellBack } = fn(...)` */
+          if (/\{[^}]*fellBack[^}]*\}\s*=\s*$/.test(before)) continue;
+          bad.push(`${rel}: ${p.fn}(…)（★返り値をどこにも受けていません・${p.where}）`);
+        }
+      }
+    }
+    expect(bad, '🔴 ★**`fellBack` を返す口の返り値を、★受ける側が読んでいません**。\n'
+      + '  ★これは ★**知らない値が 黙って既定になる**形です（★R-27 の系）。\n'
+      + '  ★2026-09-26 の実害: ★`?venue=` は桜星賞へ、★`?tod=` は昼へ ★黙って落ちていました。\n'
+      + '  ★読んだうえで ★**画面に出して止めてください**（★見るだけで捨てたら同じです）'
+      + otherRegistriesHint('apps/cli/test/url-param-one-meaning.test.ts の PARAM_MEANING')).toEqual([]);
+  });
+
+  /** ★読んだうえで ★**画面に出している**こと（★`fellBack` を見るだけで捨てたら同じ） */
+  it('🔴 ★fellBack を見たあと、画面に出して止めている', () => {
     const src = strip(read(RACE_PAGE));
-    expect(/\.fellBack/.test(src),
-      '🔴 ★`raceSetupFromParam` の ★`fellBack` を見ていません。\n'
-      + '  ★知らない `?venue=` が ★**黙って桜星賞**になります（★R-27 の系）。\n'
-      + '  ★`raceSetupFromParam` の註記が ★「黙って落としません」と書いているのに、\n'
-      + '  ★2026-09-26 まで ★**呼ぶ側が 1 度も見ていませんでした**').toBe(true);
-    /** ★見たうえで ★**画面に出して止めている**こと（★見るだけで捨てたら同じ） */
     expect(/PARAM_ERROR/.test(src), '🔴 ★`fellBack` を見ても、★画面に出していません').toBe(true);
+    /** ★止める側（★早期 return）が在ること */
+    expect(/if\s*\(\s*PARAM_ERROR\s*!==\s*null\s*\)/.test(src),
+      '🔴 ★`PARAM_ERROR` を作っても、★走行を止めていません').toBe(true);
   });
 
   /**
