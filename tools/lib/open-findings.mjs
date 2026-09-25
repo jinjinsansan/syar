@@ -1695,6 +1695,42 @@ export const WATCHING = [
     owner: 'review',
     reviewBy: '2026-12-31',
   },
+  {
+    id: 'NEXT-BUILD-REWRITES-TRACKED-FILES',
+    what: '⚠️ ★**`next build` は追跡ファイル 2 つを書き換える。★2026-09-25 に ★2 回目**が出ました'
+      + '（★`apps/web/next-env.d.ts`・`apps/web/tsconfig.json`）。'
+      + '★裁定 `REVIEW_OWNER_SCOPE_AND_STUD_FEE_20260925.md` §7。',
+    why: '✔ ★**1 回目**（2026-09-21・`0dc003d`）: ★門に `build:web` を入れた初回で作業ツリーが汚れ、'
+      + '★`tools/gate.mjs` の中に ★写し＋書き戻しを ★**直に書いて**塞いだ。'
+      + '🔴 ★**2 回目**（2026-09-25・この便）: ★門を通さず ★`npm run build:web` を ★**直で流して**同じことが起きた。'
+      + '★`tsconfig.json` の `include` に ★`.next-gate/types` `.next-staging/types` が積もり、'
+      + '★★**未コミット 56 件の山に混ざった**（★共有ツリーなので特に重い・CLAUDE.md）。'
+      + '🔴 ★**なぜ危ないか**: ★それを commit すると ★**Vercel が使う `.next` ではない道を指す**。'
+      + '★★門を守るために入れたものが、★本番を壊す形。'
+      + '--- ✅ ★**この便でしたこと** ---'
+      + '✔ ★写し＋書き戻しを ★**部品に出した**（`tools/lib/next-rewrites.mjs`）。'
+      + '★門（`gate.mjs`）と ★直で流す道（`tools/build-web.mjs`）の ★**両方が同じ部品を通る**（D-052）。'
+      + '✔ ★`build:web` は ★`tools/build-web.mjs` 経由にし、★素の `next build` は ★`build:web:raw` に残した。'
+      + '✔ ★`finally` で戻す（★1 回目の直しは ★**落ちた場合を通っていなかった** — 戻り値だけを見ていた）。'
+      + '✔ ★`.gitignore` に ★`apps/web/.next-staging/` を足した（★`.next-gate/` だけだった）。'
+      + '✔ ★分類簿に登録: ★`build-web.mjs` は ★**`SOURCE_MUTATING`**（★DB に触れないがソースを一時的に書き換える）、'
+      + '★`lib/next-rewrites.mjs` は ★`COMPONENT`。'
+      + '✔ ★**対照で確かめた**: ★`STAR_NEXT_DIST_DIR=.next-staging npm run build:web` を流すと '
+      + '★「★next build が書き換えたので戻しました: next-env.d.ts / tsconfig.json」と出て、'
+      + '★`git diff` が ★**0 行**（★汚れが再現し、★守りが噛んだ）。'
+      + '--- 🔴 ★**残していること（★ここが この行の本体）** ---'
+      + '🔴 ★**`SOURCE_MUTATING` に「必ず戻す」ことを固定する検査がまだ無い。**'
+      + '★あの簿の註記自身が ★「戻し漏れは `git status` が汚れる形で出ます」と書いており、'
+      + '★★**まさにそれが 2 回 起きた**（★人が気づくまで出ない、が実証された）。'
+      + '★**決めること**: ★`SOURCE_MUTATING` の 4 本に ★**後始末の作法を要求するか**'
+      + '（★`TOOL_AFTERMATH` は ★`STATE_CHANGING` に紐づいており、★そこへ足すと ghost で落ちる）。'
+      + '⚠️ ★**同じ形の 3 回目が出たら、★部品ではなく ★検査（網）にすること。**'
+      + '★2 回目で部品にしたので、★3 回目は ★「部品を通らない道が作れる」ことが原因になる。'
+      + '★→ ★そのときは ★**`next build` を直に呼ぶ経路が無いことを見る網**を作る'
+      + '（★`package.json` と `tools/` を走査し、★`build:web:raw` を呼ぶのが ★部品経由の 2 本だけか）。',
+    owner: 'dev',
+    until: '2026-11-30',
+  },
 ];
 
 export function diffOpenFindings(todayIso, registry = OPEN_FINDINGS, helpers = defaultHelpers()) {

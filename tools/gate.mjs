@@ -21,7 +21,8 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+/** ★`next build` が書き換える追跡ファイルの写し＋書き戻し（★1 か所・D-052） */
+import { withNextRewritesRestored } from './lib/next-rewrites.mjs';
 
 /**
  * ★**`npx` を使いません。** ★Windows で `spawnSync npx.cmd EINVAL` になります
@@ -83,40 +84,24 @@ function npmRun(label, script, extraEnv = {}) {
 /**
  * 🔴 ★**`next build` は、★追跡されているファイルを書き換えます**（★2026-09-21・★入れた直後に出ました）。
  *
- * 【★何が起きたか】
- *   ★門に `build:web` を入れた 1 回目で、★`git status` に 2 件 出ました:
- *     ★`apps/web/next-env.d.ts` … `./.next/types/routes.d.ts` → `./.next-gate/…` に書き換え
- *     ★`apps/web/tsconfig.json` … `include` に `.next-gate/types/**` を追加（★並びも変える）
- *   🔴 ★**門を流すたびに作業ツリーが汚れます。**
- *   🔴 ★しかも ★**それを commit すると、★Vercel（`.next`）が参照できない道を指します。**
- *     ★★門を守るために入れたものが、★本番を壊す形です。
- *   ⚠️ ★共有ツリーなので（★CLAUDE.md）、★**黙って汚さないこと**が特に重い。
+ * ✅ ★**写し＋書き戻しは ★`tools/lib/next-rewrites.mjs` に出しました**
+ *    （★2026-09-25・裁定 `REVIEW_OWNER_SCOPE_AND_STUD_FEE_20260925.md` §7）。
  *
- * 【★どう解くか】
- *   ★**ビルドの前に写しを取り、★後で書き戻します**（★`git checkout` は使いません —
- *   ★人が意図して直した内容まで巻き戻す恐れがあるため。★**写しは「直前の実物」**です）。
- *   ★書き戻したときは ★**必ず言います**（★黙って戻すのも、黙って汚すのと同じ）。
+ * 【🔴 ★なぜ出したか — ★門の中に書いた守りは、★門を通らない道を守らなかった】
+ *   ★1 回目（`0dc003d`）は ★**ここに直に書いて**塞ぎました。
+ *   ★2 回目（2026-09-25）は ★`npm run build:web` を ★**直で流して**同じことが起きました。
+ *   → ★同じ形の 2 回目なので ★部品にし、★`tools/build-web.mjs`（★直で流す道）も ★同じ部品を通します。
+ *   ★詳しい経緯と「なぜ commit すると本番を壊すか」は ★その部品の註記にあります。
  */
-const NEXT_REWRITES = ['apps/web/next-env.d.ts', 'apps/web/tsconfig.json'];
-
 function buildWeb() {
-  const before = new Map();
-  for (const f of NEXT_REWRITES) {
-    if (existsSync(f)) before.set(f, readFileSync(f, 'utf8'));
-  }
-  const code = npmRun('★画面を作る（build:web・R-28）', 'build:web',
-    { STAR_NEXT_DIST_DIR: '.next-gate' });
-  const restored = [];
-  for (const [f, text] of before) {
-    if (!existsSync(f)) continue;
-    if (readFileSync(f, 'utf8') === text) continue;
-    writeFileSync(f, text);
-    restored.push(f);
-  }
-  if (restored.length > 0) {
-    process.stdout.write(`  ⚠️ ★next build が書き換えたので戻しました: ${restored.join(' / ')}\n`);
-    process.stdout.write('     ★（出力先を分けているため。★作業ツリーは汚しません）\n');
-  }
+  /**
+   * ⚠️ ★**`build:web:raw`（素の `next build`）を呼びます。**
+   *    ★`build:web` は ★`tools/build-web.mjs` を経由するので、★ここから呼ぶと ★写し＋戻しが二重になります。
+   */
+  const { code } = withNextRewritesRestored(
+    () => npmRun('★画面を作る（build:web・R-28）', 'build:web:raw',
+      { STAR_NEXT_DIST_DIR: '.next-gate' }),
+  );
   return code;
 }
 

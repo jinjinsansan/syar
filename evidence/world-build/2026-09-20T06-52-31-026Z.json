@@ -1,0 +1,27 @@
+{
+  "builtAtIso": "2026-09-20T06:52:31.026Z",
+  "seed": 20260833,
+  "generations": 50,
+  "referenceWeek": 258,
+  "inserted": 7370,
+  "tally": {
+    "active": 2400,
+    "stallion": 200,
+    "broodmare": 800,
+    "honored": 3970
+  },
+  "catchUp": true,
+  "nameBlocklistSize": 0,
+  "nameCheckSkipped": true,
+  "wipedCounts": {
+    "race_entries": 981,
+    "horse_week_log": 260,
+    "horse_story_event": 77,
+    "horse_market_listing": 15,
+    "bets": 0,
+    "race_odds": 162568,
+    "races": 73,
+    "horses": 7370
+  },
+  "wipedRaces": true
+}

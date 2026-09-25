@@ -170,6 +170,9 @@ apps/web/public/contest-review/
 
 # ★門が作る画面（`STAR_NEXT_DIST_DIR`）。★dev の .next と奪い合わないための別の出力先
 apps/web/.next-gate/
+# ★手で `STAR_NEXT_DIST_DIR=.next-staging` を渡して作った画面（★dev を落とさずに確かめるため）
+#   ⚠️ ★2026-09-25: ★これが無かったので ★未追跡 1 件として ★56 件の山に混ざっていました
+apps/web/.next-staging/
 
 # ★開いている弱点・再現手順・本番の設定の現在値（★公開の枝に置かない・2026-09-23 オーナー判断）
 private/

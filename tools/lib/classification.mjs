@@ -1212,6 +1212,8 @@ export const COMPONENT = [
   { file: 'lib/name-key-survey.mjs', why: '★馬名の正規化キーの下見の純関数（★`backfill-name-key.mjs` が使う・★単体では走らせない）' },
   { file: 'lib/cdp.mjs', why: '★Chrome DevTools Protocol の細口（★映像の撮影の道具が使う）。★単体では走らせない' },
   { file: 'lib/classification.mjs', why: '★この分類簿そのもの。★道具ではなく、道具を分類する表' },
+  { file: 'lib/next-rewrites.mjs', why: '★`next build` が書き換える追跡ファイル（`next-env.d.ts`・`tsconfig.json`）の'
+    + '★写し＋書き戻し（★2026-09-25・★門と `build-web.mjs` の ★**両方**が通る・D-052）。★単体では走らせない' },
   { file: 'lib/clean-tree.mjs', why: '★「作業ツリーが汚れていないか」の判定（★純関数・★簿 `CI-DIRTY-TREE-UNSEEN`）。'
     + '★`verify-clean-tree.mjs` が呼び、★`apps/cli/test/clean-tree.test.ts` が 6 通りを回す。'
     + '★★CI の中でしか試せない判定にしないために切り出した部品' },
@@ -1282,6 +1284,16 @@ export const SOURCE_MUTATING = [
   {
     file: 'mutation/gates.mjs',
     why: '★較正定数を壊して V-ゲートが落ちるかを実測する（Q-P3-42）。★同上（★ソースを一時的に壊して戻す）。★「登録簿とコメントは守っているつもりの記録で、守れているかは壊してみないと分からない」',
+  },
+  {
+    file: 'build-web.mjs',
+    why: '★画面を作る（★`npm run build:web`・2026-09-25・裁定 `REVIEW_OWNER_SCOPE_AND_STUD_FEE_20260925.md` §7）。'
+      + '★DB には触れないが、★**`next build` が `apps/web/next-env.d.ts` と `apps/web/tsconfig.json` を書き換える**ので、'
+      + '★写しを取って ★`finally` で書き戻す（★部品 `lib/next-rewrites.mjs`）。'
+      + '🔴 ★**この簿の註記が言っていた「戻し漏れは git status が汚れる形で出る」が、★実際に出ました** — '
+      + '★2026-09-25、★門を通さず `build:web` を直で流して ★`tsconfig.json` が汚れ、★未コミット 56 件の山に混ざった。'
+      + '★**それを commit すると Vercel が使う `.next` ではない道を指す**（★本番を壊す形）。'
+      + '★だから ★門（`gate.mjs`）と ★この道具の ★**両方**が同じ部品を通る（★簿 `NEXT-BUILD-REWRITES-TRACKED-FILES`）',
   },
 ];
 
