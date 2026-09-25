@@ -1789,6 +1789,34 @@ export const WATCHING = [
     owner: 'review',
     until: '2026-11-30',
   },
+  {
+    id: 'RACE-POSITION-FORMULA-DUPLICATED',
+    what: '⚠️ ★**走行位置を作る式が 2 か所あります**（★常設帯 `components/uma/race-replay.ts` と '
+      + '★本編 `apps/web/src/app/race/page.tsx`）。★裁定 `REVIEW_RACE_WIRING_20260926.md` Q-RACE-2。',
+    why: '✔ ★契約 `DESIGN_LIVE_RACE_DATA_CONTRACT_20260921.md` §実装前の判定 は '
+      + '★「同じレース ID の常設表示と本編の馬番・位置・着順が一致する」を要求しています。'
+      + '--- ⚠️ ★**1 部品に寄せるのは いまやりません**（★裁定 Q-RACE-2）---'
+      + '★本編の映像は ★台本 v9・カメラ・`replayPositionModel` と絡んでおり、'
+      + '★**本番未適用の移行が 11 本（0079〜0089）積まれている最中**にやる大きさではありません。'
+      + '--- ✅ ★**かわりに決めたこと** ---'
+      + '★`/race` は ★**着順を計算せず `finish_pos` を読む**。★馬番も ★`gate` を読む'
+      + '（★`horseId: String(i + 1)` は ★**index を馬番と言い張っていた**ので消す）。'
+      + '→ ★★**着順と馬番を決めないなら、位置の式は「見せ方」に降格する**ので、'
+      + '★2 か所にあっても ★**嘘になりません**（★裁定の言葉）。'
+      + '--- ✅ ★**消す条件** ---'
+      + '★**台本 v9 の作り替え便で、位置の式を 1 部品に寄せたとき**。'
+      + '★それまでは ★「見せ方が 2 通りある」だけなので開いたままにします。'
+      + '--- 🔴 ★**対照の取り方（★これを間違えないこと）** ---'
+      + '⚠️ ★対照は ★**「式が一致するか」ではありません**（★見せ方は違ってよい）。'
+      + '★★**確定済みのレース 1 本を両方の経路に通して、★馬番と着順が一致するか**を見ます。'
+      + '--- ★いまの進み ---'
+      + '✔ ★2026-09-26: ★口を分けた（★`?venue=` が鞍・★`?race=` が実レース）。'
+      + '★知らない鞍と ★実レース ID は ★**画面に出して止めます**（★見本に落とさない）。'
+      + '★網 `apps/cli/test/url-param-one-meaning.test.ts`。'
+      + '🔴 ★**`finish_pos` / `gate` を読む部分は まだ実装していません**（★段 2・`PLAN_RACE_REAL_WIRING_20260926.md`）。',
+    owner: 'dev',
+    until: '2026-11-30',
+  },
 ];
 
 export function diffOpenFindings(todayIso, registry = OPEN_FINDINGS, helpers = defaultHelpers()) {

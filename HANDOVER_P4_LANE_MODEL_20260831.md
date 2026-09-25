@@ -23,10 +23,10 @@ cd V:\dev\Cusor\star\apps\web ; npm run dev      # ★ポート 3210（★別の
 | # | URL | ★何が出るはず |
 |---|---|---|
 | ① | `http://localhost:3210/race` | ★**11R 桜星賞 芝1600m**（★スターパーク・左回り）<br>★**2026-08-31 まで直書きだった 1 鞍**と同じもの |
-| ② | `http://localhost:3210/race?race=g1-soukai` | ★**11R 蒼海賞 ダート1800m**（★白砂・走路が茶色・左回り） |
-| ③ | `http://localhost:3210/race?race=g3-hakko` | ★**11R 白光記念 芝3600m**（★大河原・1周2400m・コース図が大きい） |
-| ④ | `http://localhost:3210/race?race=g2-aone` | ★**11R 青嶺記念 芝2200m**（★青嶺・★**右回り**） |
-| ⑤ | `http://localhost:3210/race?race=g3-shunrai` | ★**11R 春雷カップ 芝1200m**（★月見丘・★**この便で 1周を 1650m に変えた場**） |
+| ② | `http://localhost:3210/race?venue=g1-soukai` | ★**11R 蒼海賞 ダート1800m**（★白砂・走路が茶色・左回り） |
+| ③ | `http://localhost:3210/race?venue=g3-hakko` | ★**11R 白光記念 芝3600m**（★大河原・1周2400m・コース図が大きい） |
+| ④ | `http://localhost:3210/race?venue=g2-aone` | ★**11R 青嶺記念 芝2200m**（★青嶺・★**右回り**） |
+| ⑤ | `http://localhost:3210/race?venue=g3-shunrai` | ★**11R 春雷カップ 芝1200m**（★月見丘・★**この便で 1周を 1650m に変えた場**） |
 
 ★見るところ:
 
@@ -300,3 +300,14 @@ npx tsx tools/_clumpreveal.mjs          # ★reveal を振っても重なりは 
 
 npm test ; npm run typecheck            # ★133 ファイル / 1344 件 / EXIT=0
 ```
+
+---
+
+## ⚠️ 2026-09-26 の追記: `?race=` → `?venue=` に移りました
+
+上の URL は当時 `?race=` でした。**`?race=` は実レースの ID の口になった**ので（裁定
+`REVIEW_RACE_WIRING_20260926.md` Q-RACE-1）、**鞍の見比べは `?venue=`** です。
+
+🔴 いま古い形（`race` の口に鞍の id）を開くと**止まります**（見本の走行に落として「そのレースを見た」と
+嘘をつかないため）。鞍の一覧は画面下の「レース選択」からも選べます。
+網: `apps/cli/test/url-param-one-meaning.test.ts`（この書き換え漏れを実際に捕まえました）。

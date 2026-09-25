@@ -114,9 +114,56 @@ import { createRaceAudio, type RaceAudio } from './race-audio.js';
  * ★`?race=` が無いときは ★**桜星賞**（スターパーク・芝1600m・左回り・幅20m）で、
  *   ★これは 2026-08-31 まで直書きされていた 1 鞍と**完全に同じ**です。
  */
-const RACE_PARAM = typeof window === 'undefined' ? null
-  : new URLSearchParams(window.location.search).get('race');
-const RACE_SETUP = raceSetupFromParam(RACE_PARAM).setup;
+/**
+ * 🔴 ★**口を 2 つに分けました**（★2026-09-26・裁定 `REVIEW_RACE_WIRING_20260926.md` Q-RACE-1）
+ *
+ *   ★`?venue=<鞍の id>` … ★**開発の見比べ**（★50 鞍）。★これまで `?race=` だったもの
+ *   ★`?race=<レースの uuid>` … ★**実レース**（★段 2 で走行を出す。★`PLAN_RACE_REAL_WIRING_20260926.md`）
+ *
+ * 【🔴 ★なぜ分けるか — ★1 つの口に 2 つの意味を持たせない】
+ *   ★`?race=` は ★**鞍の名前**でした。★そこへ実レースの uuid を渡す設計にすると、
+ *   ★**同じ口が 2 つの意味**を持ちます。★`raceSetupFromParam` は知らない id を既定へ落とすので、
+ *   🔴 ★実レースの uuid を渡した人に ★**黙って桜星賞（見本）の走行**が出ます。
+ *   ★★それは「見本の馬」と同じ族です（★誰の何を見ているかを偽る）。
+ *
+ * 【🔴 ★`fellBack` を捨てていました】
+ *   ⚠️ ★`raceSetupFromParam` は ★**`{ setup, fellBack }`** を返し、★その註記は
+ *      ★「★**黙って落としません** — ★落ちたことを呼び出し側が判別できるように返します（R-27 の系）」
+ *      と ★**自分で書いていました**。
+ *   🔴 ★しかし この画面は ★`.setup` だけ取り、★**`fellBack` を 1 度も見ていませんでした**
+ *     （★2026-09-26 に grep で 0 件を確認）。→ ★仕組みは在って ★**誰も繋いでいない**形
+ *     （★簿 `mechanism-exists-nobody-wired-it`）。
+ *   → ★いまは ★**画面に出して止めます**（★下の `PARAM_ERROR`）。
+ */
+const QS = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search);
+/** ★鞍（★開発の見比べ）。★これまでの `?race=` */
+const VENUE_PARAM = QS?.get('venue') ?? null;
+/** ★実レースの ID（★段 2 で使う。★いまは ★**受け取ったら止める**） */
+const REAL_RACE_PARAM = QS?.get('race') ?? null;
+const VENUE_RESOLVED = raceSetupFromParam(VENUE_PARAM);
+const RACE_SETUP = VENUE_RESOLVED.setup;
+
+/**
+ * 🔴 ★**黙って読み替えない**（★裁定 Q-RACE-1 の条件 (a)）。
+ *   ★`null` なら いつもどおり。★文があれば ★**それを出して走行を出しません**。
+ */
+const PARAM_ERROR: string | null = (() => {
+  if (VENUE_RESOLVED.fellBack) {
+    return `知らない鞍です: ?venue=${VENUE_PARAM ?? ''}`
+      + '（★桜星賞に落としません。★鞍の一覧は画面下の「レース選択」から選んでください）';
+  }
+  /**
+   * 🔴 ★**段 2 が入るまで、実レースの走行は出せません。**
+   *   ⚠️ ★ここで既定の鞍に落とすと ★**「そのレースを見た」と嘘になります**。
+   *   → ★出せないことを言います（★D-119 を作らないため、★口の説明と振る舞いを一致させます）。
+   */
+  if (REAL_RACE_PARAM !== null && REAL_RACE_PARAM !== '') {
+    return `この画面はまだ実レースの走行を出せません: ?race=${REAL_RACE_PARAM}`
+      + '（★段 2・`PLAN_RACE_REAL_WIRING_20260926.md`。★見本の走行に落として「そのレース」と'
+      + '言わないために止めています。★鞍の見比べは ?venue= です）';
+  }
+  return null;
+})();
 
 /**
  * ★**中継の出口**（★2026-09-17・オーナー指示「★中継の出口も ★ハンドオフ通りにしてください」）
@@ -2048,6 +2095,26 @@ function buildMotionTimeline(
 }
 
 export default function RacePage(): React.JSX.Element {
+  /**
+   * 🔴 ★**口の値が読めないときは、走行を出しません**（★2026-09-26・裁定 Q-RACE-1 の条件 (a)）。
+   *
+   * ⚠️ ★**フックより前に返しています。** ★`PARAM_ERROR` は ★**モジュール読み込み時の定数**なので、
+   *    ★1 回の読み込みのあいだ ★**値が変わりません**（★フックの数が途中で変わることはありません）。
+   *    ★`?venue=` / `?race=` はどちらもモジュールの先頭で 1 回だけ読む形です。
+   * ⚠️ ★意匠は作っていません（★`/records` と同じ字・`a-panel`）。
+   */
+  if (PARAM_ERROR !== null) {
+    return (
+      <div style={{ padding: '22px 16px 40px' }}>
+        <div className="a-panel" style={{ padding: '14px 16px', fontSize: 14, fontWeight: 900, color: 'var(--a-red-d)' }}>
+          {PARAM_ERROR}
+        </div>
+        <p style={{ marginTop: 14, fontSize: 12.5, fontWeight: 900, color: 'var(--a-ink-2)' }}>
+          <a href="/race">/race</a> を開くと、既定の鞍（桜星賞）を見られます。
+        </p>
+      </div>
+    );
+  }
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   /** ★実況の行（変化したときだけ積む） */
   const callRef = useRef<readonly (readonly CallPart[])[]>([]);
@@ -2293,9 +2360,14 @@ export default function RacePage(): React.JSX.Element {
    *    （★残すと「ダートの鞍を選んだのに芝」が出ます）。★他の口（`seed` / `dev` 等）は残します。
    * ★**この規則を 2 か所に書きません。**（★同じものを 2 か所に持つと必ず離れます）
    */
-  const pickRace = useCallback((raceId: string): void => {
+  /**
+   * ⚠️ 🔴 ★**引数の名前を `venueId` に直しました**（★2026-09-26・裁定 Q-RACE-1）。
+   *    ★`raceId` という名前でしたが ★渡していたのは ★**鞍の id**（`g1-soukai` など）で、
+   *    ★**実レースの uuid ではありません**。★★名前そのものが罠でした。
+   */
+  const pickVenue = useCallback((venueId: string): void => {
     const params = new URLSearchParams(window.location.search);
-    params.set('race', raceId);
+    params.set('venue', venueId);
     params.delete('surface');
     window.location.search = params.toString();
   }, []);
@@ -2306,7 +2378,7 @@ export default function RacePage(): React.JSX.Element {
    *   ★演出 … 新しい形（台本 v9）／ 前の形（`?cinematography=v8`）
    *   ★見る人 … 観戦（既定）／ 自馬で介入（`?view=intervene`）
    *   ★展開 … 通常（seed 42）／ 接戦（`?seed=99`）
-   * ⚠️ ★どれも ★**モジュール読み込み時に URL から読む口**なので、★`pickRace` と同じく
+   * ⚠️ ★どれも ★**モジュール読み込み時に URL から読む口**なので、★`pickVenue` と同じく
    *    ★`location.search` を書いて再読込させます（★別の読み方を作らない）。
    * ⚠️ ★いまの状態は ★**描画の後で**読みます（★`useState` の初期値にすると SSR と食い違う）。
    */
@@ -5965,7 +6037,7 @@ export default function RacePage(): React.JSX.Element {
                     <button
                       key={r.id} type="button"
                       className={`rm-race${r.id === RACE_SETUP.race.id ? ' on' : ''}`}
-                      onClick={() => { pickRace(r.id); }}
+                      onClick={() => { pickVenue(r.id); }}
                     >
                       <span className="rm-race-grade">{r.grade}</span>
                       <span className="rm-race-name">{r.name}</span>
@@ -6094,7 +6166,7 @@ export default function RacePage(): React.JSX.Element {
           レース{' '}
           <select
             value={RACE_SETUP.race.id}
-            onChange={(e) => { pickRace(e.target.value); }}
+            onChange={(e) => { pickVenue(e.target.value); }}
             style={{ maxWidth: 320 }}
           >
             {RACES_BY_VENUE.map(({ venue, races }) => (
