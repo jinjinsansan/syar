@@ -19,7 +19,7 @@
  */
 
 import type pg from 'pg';
-import { scratchEntry } from './scratch.js';
+import { jockeyFeeOfFrozen, scratchEntry } from './scratch.js';
 
 /** ★1 周で拾う件数（★`foal_requests` と同じ考え方。★周を延ばさない） */
 export const ENTRY_SCRATCH_BATCH = 20;
@@ -101,7 +101,7 @@ export async function runEntryScratch(
         entryId: row.entry_id,
         raceId: row.race_id,
         horseId: row.horse_id,
-        jockeyFeeEP: Number(row.jockey_frozen?.feeEP ?? 0),
+        jockeyFeeEP: jockeyFeeOfFrozen(row.jockey_frozen, row.entry_id),
       }, 'owner_request');
 
       await client.query(

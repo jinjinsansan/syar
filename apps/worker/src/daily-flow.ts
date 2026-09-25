@@ -78,21 +78,42 @@ async function collectFlow(
   }
 
   // --- EP の流入と焼却（馬券以外） ---
-  const ep = await client.query<{ reason: string; total: string }>(
-    `select l.reason, sum(l.delta)::text as total from ep_ledger l
+  /**
+   * 🔴 ★**分類は SQL の `ep_reason_class()` から読む**（★`0080`・裁定 §5 (b)・2026-09-25）
+   *
+   * 【★何が間違っていたか】
+   *   ★旧は ★**ここに理由の一覧を持っていました**（`'inflow'` だけを発行とみなす）。
+   *   ★しかし `horse_sale`（`0026:126`）も ★**相手方の引き落としが無い正の delta ＝ 新しい EP** です。
+   *   ★旧の式では `bet`/`refund` 以外なので ★`epBurnedOther += -v` に落ち、
+   *   ★**発行量が過小に・`margin_actual` が過大に**出ていました。
+   *   ★本番の `horse_sale` は 0 件だったので ★数字の被害はまだ出ていません（★式は誤り）。
+   *
+   * 【★なぜ TS に表を書き直さないか】
+   *   ★**日次上限の判定（`claim_daily_ep`）と、ここ（V-11 の監視）が同じ表を読む**ためです。
+   *   ★2 か所に書くと、★片方だけ直した日に ★「上限の数え方」と「監視の数え方」がずれ、
+   *   ★**ずれたことに誰も気づけません**（★D-052）。
+   * ⚠️ ★表に無い理由が来ると ★**この問い合わせ自体が落ちます**（★意図どおり。★黙って捨てない）。
+   */
+  const ep = await client.query<{ klass: string; total: string }>(
+    `select ep_reason_class(l.reason) as klass, sum(l.delta)::text as total from ep_ledger l
        join users u on u.id = l.user_id
       where l.created_at >= $1::timestamptz and l.created_at < $2::timestamptz
         and ${where}
-      group by l.reason`,
+      group by 1`,
     [from, to],
   );
   let epInflow = 0;
   let epBurnedOther = 0;
   for (const r of ep.rows) {
     const v = Number(r.total);
-    if (r.reason === 'inflow') epInflow += v;
-    // ★'bet' は馬券側で数えるのでここでは除く（二重計上を避ける）
-    else if (r.reason !== 'bet' && r.reason !== 'refund') epBurnedOther += -v;
+    // ★**発行**（★`inflow`・`horse_sale`）。★V-11 の純発行量に載る
+    if (r.klass === 'issuance') epInflow += v;
+    // ★**焼却**（★調教・登録料・種付料・馬の購入・厩舎の格）
+    else if (r.klass === 'burn') epBurnedOther += -v;
+    // ★`ticket`（馬券）は `bets` から数える・`refund` は取ったものを返しただけ → ★どちらも数えない
+    else if (r.klass !== 'ticket' && r.klass !== 'refund') {
+      throw new Error(`aggregateDay: 未知の EP の分類 ${r.klass}（★ep_reason_class を見直す）`);
+    }
   }
 
   // --- PP の発行（賞金）と交換 ---

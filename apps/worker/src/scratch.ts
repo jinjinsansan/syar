@@ -29,8 +29,42 @@ export interface ScratchTarget {
   readonly raceId: string;
   /** `horses.id`。★所有者を引くのに使います（★NPC は返金なし） */
   readonly horseId: string;
-  /** ★騎手の料金（`race_entries.jockey_frozen.feeEP`）。★無ければ 0 */
+  /** ★騎手の料金（`race_entries.jockey_frozen.feeEP`）。★取り出しは `jockeyFeeOfFrozen` で */
   readonly jockeyFeeEP: number;
+}
+
+/**
+ * 🔴 ★**凍結から騎手の料金を取り出す**（★2026-09-25・裁定 `REVIEW_JOCKEY_FEE_20260925.md`）
+ *
+ * 【⚠️ ★なぜ `?? 0` をやめたか】
+ *   ★旧は 2 か所（`entry-freeze.ts:174`・`entry-scratch-runner.ts:104`）が
+ *   ★`Number(row.jockey_frozen?.feeEP ?? 0)` と書いていました。
+ *   🔴 ★これは ★**「黙って 0」**です。★`enter_race` が `feeEP` を見つけられずに
+ *     ★料金 0 で引いていたあいだ、★返金も 0 だったので ★**帳簿は合い、誰も気づけませんでした**
+ *     （★D-105「料金は EP」が 1 円も効いていないことが、★どこにも現れなかった）。
+ *   ★レビュー側の指示: ★「返金側は凍結の `feeEP` を読むままで構わないが、
+ *     ★**凍結に `feeEP` が無ければ落とす**」。
+ *
+ * 【★`null` は 0 で正しい】★騎手を指名しない登録です（★`jockey_frozen is null`）。
+ *   ✔ ★2026-09-25 の staging: ★`race_entries` 569 件 ★**全部 `null`**（★旧い形の行は 0 件）。
+ *
+ * ⚠️ ★判定をここ 1 か所に置きます（★2 か所に書くと、★片方だけ `?? 0` に戻ります・D-052）。
+ */
+export function jockeyFeeOfFrozen(
+  frozen: { readonly feeEP?: number } | null | undefined,
+  entryId: string,
+): number {
+  if (frozen === null || frozen === undefined) return 0;   // ★指名しない
+  const fee = frozen.feeEP;
+  if (typeof fee !== 'number' || !Number.isFinite(fee)) {
+    throw new Error(
+      `jockeyFeeOfFrozen: 凍結に feeEP がありません（entry ${entryId}）。`
+      + '★0082 より前の形の行か、★凍結の組み立てが壊れています。'
+      + '★黙って 0 にすると「騎手が無料」がまた見えなくなります',
+    );
+  }
+  if (fee < 0) throw new Error(`jockeyFeeOfFrozen: 騎手の料金が負です（entry ${entryId}・${fee}）`);
+  return fee;
 }
 
 export interface ScratchResult {

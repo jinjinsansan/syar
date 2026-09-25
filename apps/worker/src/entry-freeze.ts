@@ -26,7 +26,7 @@ import { rowToHorse } from './horse-repo.js';
  */
 import { toEntrant } from '../../cli/src/race-field.js';
 // ★取消と返金（★D-111 ③⑤）。★D-117 DS-7 と同じ関数を通します（D-052）
-import { scratchEntry } from './scratch.js';
+import { jockeyFeeOfFrozen, scratchEntry } from './scratch.js';
 
 /**
  * ★乱数の用途 ID（★`toEntrant` が開放率を 1 回引くため）。
@@ -171,7 +171,7 @@ export async function freezePendingEntries(
             entryId: row.entry_id,
             raceId: row.race_id,
             horseId: row.horse_id,
-            jockeyFeeEP: Number(row.jockey_frozen?.feeEP ?? 0),
+            jockeyFeeEP: jockeyFeeOfFrozen(row.jockey_frozen, row.entry_id),
           },
           reason,
         );
