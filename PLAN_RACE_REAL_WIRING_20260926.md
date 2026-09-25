@@ -74,6 +74,43 @@
   ⚠️ ★**網が この書き換え漏れを実際に捕まえました**（★手で探して「無い」と思っていた）
 - ★簿 ★`RACE-POSITION-FORMULA-DUPLICATED`（★消す条件つき）
 
+### ✅ ★継ぎ目が確定しました（★2026-09-26・★現物を読んで）
+
+★`/race` の `build()` は ★こう組んでいます:
+```
+resolveRace(...)            → result（着順・タイム）
+replayOf(result, 脚質, pace) → boundaries      ★`result.order` の `horseId` を ★**馬番として**読む（D-056）
+finalOrderMatches(result, boundaries)          ★映像の着順 ≠ 確定着順 なら ★**投げる**（D-059）
+replayPositionModel(...)    → model（位置）    ★「結果から作られたもの。折れ点＝境界＝真実」
+finishPos / finishSec / finishSpeeds / dustSoil ★すべて上から派生
+```
+
+→ 🔴 ★★**やることは 1 つだけです: ★`result` をサーバーの行から作る。**
+  ★`{ order: [{ horseId: String(gate), finishPosition: finish_pos, timeSec: finish_time }, …] }`
+  ★**下流は 1 行も変えなくて済みます**（★`replayOf` 以降は `result` しか見ていません）。
+  ✅ ★しかも ★`finalOrderMatches` が ★**そのまま D-059 の番人**になります
+    （★映像の着順が確定着順と違えば投げる）。★新しい対照を作る必要がありません。
+
+⚠️ ★`String(i + 1)` は ★**見本では嘘ではありません**（★`gate = index + 1` に作ってある）。
+   ★実レースでは ★`String(gate)` をサーバーから取ります（★D-056 の約束と同じ形）。
+
+### 🔴 ★照会 Q-RACE-3（★これだけ推測で埋められません）
+
+★`Built.gauge` は ★**自馬のスタミナゲージ**（D-072）で、★`staminaGaugeOf` に
+★`iq` / `gt` / `st` / `condition` / `fatigue` を渡して作ります。
+
+🔴 ★**`race_entries_public` はこれらを出しません**（★出すべきでもありません — ★D-108 / D-116
+  ★「素質を隠す」。★他人の馬の能力が見えてしまいます）。
+
+→ ★**確定済みの実レースを「録画」で見るとき、★ゲージは何を出しますか。**
+  ★① ★**出さない**（★観戦なので自馬がいない・★いちばん素直）
+  ★② ★自分の馬が出ているときだけ出す（★`is_mine` は既に在る）。★ただし ★**能力は公開できない**ので、
+    ★サーバーがゲージそのものを作って返す口が要ります（★新しい移行・★段 3 の範囲）
+  ★③ ★別の物を出す（★オーナー判断）
+
+⚠️ ★`Built.gauge` は ★いま ★**必須の欄**です。★①にするなら型を任意にする必要があり、
+   ★その 1 行が ★**見本の道にも効きます**（★勝手に変えません）。
+
 ### 🔴 ★未着手（★段 2 の本体）
 
 - ★`/race` が ★`races_public` / `race_entries_public` を読む
