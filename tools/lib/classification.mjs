@@ -35,6 +35,25 @@
  *    ★裏取りは **SQL の書き込み文が無いこと**しか見ていないので、★誤って入れても黙って通ります。
  */
 export const READONLY = [
+  /**
+   * ── ★**2026-09-25 の便の読むだけの道具 7 本**（★簿 `TOOLS-UNCLASSIFIED-WHILE-UNTRACKED`）───
+   * ⚠️ ★どれも ★`--env` を明示すること（★`loadEnv` の既定は ★**本番**・簿 `star-loadenv-defaults-to-production`）。
+   */
+  // ★他の牧場の引退馬が見えるか（★`0083`・LR-6）。★読むだけ
+  'verify-retired-public.mjs',
+  // ★`entries.jockey_frozen` に何の形が入っているかを数える（★`0082` の前に形を知るため）。★読むだけ
+  'diag-jockey-frozen-shapes.mjs',
+  // ★取引の出品の状態を見る（★`0085`）。★読むだけ
+  'diag-market.mjs',
+  // ★出品の名前の出どころを辿る（★LR-6 の「牧場名まで」）。★読むだけ
+  'diag-market-name.mjs',
+  // ★出品の値の散らばりを見る（★D-102 ④「馬の購入は配合より割高」の材料）。★読むだけ
+  'diag-market-spread.mjs',
+  // ★その環境に未適用の移行を並べる（★本番の配備の前に 1 コマンドで見るため）。★読むだけ
+  'list-unapplied-migrations.mjs',
+  // ★画面が何の RPC / lib を引いているかを ★ソースの静的走査で数える（★`screen-rebuild-pins.ts` の素）。
+  //   ★DB にも触らない（★環境変数も要らない）
+  'measure-screen-deps.mjs',
   // ★初回の配合の父母候補の数（★D-120 ⑥ N-1・裁定 f613878 §6）。★`begin read only` で読むだけ
   'diag-initial-parent-pool.mjs',
   // ★持ち主のいる引退馬の数（★裁定 REVIEW_I1_RETIREMENT_ROLE_VERDICT_20260922.md §2 ③）。★`begin read only` で数を読むだけ
@@ -921,6 +940,25 @@ export const READONLY = [
  */
 export const STATE_CHANGING = [
   /**
+   * ── ★**2026-09-25 の便の予行 4 本**（★裁定 `REVIEW_OWNER_SCOPE_AND_STUD_FEE_20260925.md` §7）───
+   *
+   * 🔴 ★**この 4 本は ★9-25 の朝から在ったのに、★分類されていませんでした。**
+   *   ★`tool-guard`（TG-1）は ★`git ls-files tools` を走査するので、★**未追跡の間は見えません**
+   *   （★`apps/cli/test/tool-guard.test.ts:64` が ★その穴を自分で註記していました）。
+   *   → ★★**コミットした瞬間に 12 件の登録漏れが出ました。** ★簿 `TOOLS-UNCLASSIFIED-WHILE-UNTRACKED`。
+   */
+  // ★デイリー EP の予行（★`0080`）。★`claim_daily_ep` を実際に呼んで ★EP と `ep_ledger` を動かす。
+  //   ★`beginSandbox`/`endSandbox`（SB-3）の中で走り、★最後に rollback する。★必ず `--env staging`
+  'verify-ep-daily.mjs',
+  // ★発見の回数の予行（★`0084`）。★取引の中で出走の行を作って数え、★最後に rollback する（★SB-3）
+  'verify-discovery-runs.mjs',
+  // ★騎手の料金の予行（★`0082`・D-105）。★`enter_race` を実際に呼んで EP を引かせる
+  //   （★登録料 200 ＋ 騎手 400 ＝ 600）。★取引の中で走り rollback する（★SB-3）
+  'verify-jockey-fee.mjs',
+  // ★馬の取引の予行（★`0085`・D-102）。🔴 ★取引で包めない（★`buy_horse` の内側が自分で commit する)
+  //   ★だから作った物を名指しで消し、★消えたことを DB に訊いて数える（★戻り値を信じない）
+  'verify-buy-horse.mjs',
+  /**
    * ★初回の配合で選べる母の候補を読む口（★0077/0078）を実 DB で確かめる（★2026-09-24）。
    *
    * 【★読むだけではありません】
@@ -1298,6 +1336,12 @@ export const SOURCE_MUTATING = [
 ];
 
 export const NOT_A_TOOL = [
+  {
+    file: 'tsconfig.json',
+    why: '★`tools/` を型検査の対象にする設定（★2026-09-25・`allowJs` ＋ `checkJs: false`。'
+      + '★`// @ts-check` を付けたファイルだけ見る）。★実行されないので道具ではない。'
+      + '★付け忘れは `apps/cli/test/tools-typecheck-coverage.test.ts` が落とす',
+  },
   {
     file: 'race-reference-shots.json',
     why: '★参考映像の切り出し位置のデータ（★映像の便）。★実行されません。★読むのは `tools/_*.mjs` の側で、そちらが分類の対象です',

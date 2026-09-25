@@ -1731,6 +1731,35 @@ export const WATCHING = [
     owner: 'dev',
     until: '2026-11-30',
   },
+  {
+    id: 'TOOLS-UNCLASSIFIED-WHILE-UNTRACKED',
+    what: '🔴 ★**道具は `git add` されるまで、★分類簿の網に映りません**（★2026-09-25 に ★12 件 まとめて出ました）。'
+      + '★裁定 `REVIEW_OWNER_SCOPE_AND_STUD_FEE_20260925.md` §7。',
+    why: '✔ ★`apps/cli/test/tool-guard.test.ts:69` は ★`git ls-files tools` を走査します。'
+      + '★→ ★**未追跡のファイルは 1 つも見えません。**'
+      + '⚠️ ★その穴は ★**検査自身が :64 に註記していました**（★「`git add` するまでは分類されなくても通ります」）。'
+      + '🔴 ★**それが実際に起きました**: ★2026-09-25、★予行と診断の道具 ★**12 本**を作って 1 日 使い、'
+      + '★`verify-ep-daily` などは ★**staging に書き込みながら**、★`tool-guard`（TG-1）にも '
+      + '★`TOOL_AFTERMATH`（TL-1）にも ★**載らずに走っていました**。'
+      + '★レビュー側に ★「未コミットを残さないでください」と言われて ★コミットした ★**その瞬間に 12 件 出ました**。'
+      + '→ ★★**コミットそれ自体が検査でした。** ★未コミットで居続けると、★網の外に居られます。'
+      + '--- ✅ ★**この便でしたこと** ---'
+      + '✔ ★12 件を分類: ★`STATE_CHANGING` 4 本（`verify-ep-daily` / `verify-discovery-runs` / '
+      + '`verify-jockey-fee` / `verify-buy-horse`）・★`READONLY` 7 本・★`NOT_A_TOOL` 1 件（`tsconfig.json`）。'
+      + '✔ ★書く 4 本は ★`TOOL_AFTERMATH` にも登録（★3 本は `beginSandbox`＝SB-3、'
+      + '★`verify-buy-horse` は ★`countedBy` に ★片付けを数える行の写し）。'
+      + '⚠️ ★**要素の形を 1 度 間違えました**: ★`READONLY`/`STATE_CHANGING` は ★**文字列＋上のコメント**、'
+      + '★`COMPONENT`/`SOURCE_MUTATING`/`NOT_A_TOOL` は ★`{file, why}`。'
+      + '★混ぜたら ★`[object Object]` を道として開こうとして ★ENOENT で 4 件 落ちました（★簿の側が正しく捕まえた）。'
+      + '--- 🔴 ★**残していること** ---'
+      + '🔴 ★**穴はまだ在ります。** ★次に道具を作る人も、★コミットするまで映りません。'
+      + '★**決めること**: ★`git ls-files` に ★未追跡（`git status --porcelain` の `??`）を足して'
+      + '★**作った時点で落とす**か、★それは煩いので ★「コミット前に 1 回 流す」を作法にするか。'
+      + '⚠️ ★前者にすると ★**書きかけのファイルでも落ちます**（★`tools/` に下書きを置けなくなる）。'
+      + '★どちらが安いかは ★レビュー側の判断を仰ぎたい。',
+    owner: 'review',
+    until: '2026-11-30',
+  },
 ];
 
 export function diffOpenFindings(todayIso, registry = OPEN_FINDINGS, helpers = defaultHelpers()) {

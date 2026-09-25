@@ -235,5 +235,37 @@ export const TOOL_AFTERMATH = {
   'verify-exchange.mjs': { mode: 'consumes', why: '★消すもの: prize_exchanges / pp_ledger / users / prize_catalog（`TEST-%`）。✅ ★**2026-09-19（TL-1）**: ★`lib/leftovers.mjs` の `reportLeftovers` で ★**消した後の残りを数え**、★0 でなければ ★**落ちます**。⚠️ 🔴 ★**実 DB では確かめていない**', notRestored: '★無し（★自分で作った行だけを消す）' },
   'verify-flow.mjs': { mode: 'consumes', why: '★消すもの: bets / ep_ledger / pp_ledger / users / auth.users / point_flow_daily（当日分）。✅ ★**2026-09-19（TL-1）**: ★`lib/leftovers.mjs` の `reportLeftovers` で ★**消した後の残りを数え**、★0 でなければ ★**落ちます**。⚠️ 🔴 ★**実 DB では確かめていない**。★`point_flow_daily` も数えます（★そこだけ `user_id` ではなく `date` で引くので、★見落としやすい）', notRestored: '★無し（★自分で作った行だけを消す）' },
   'verify-overdue.mjs': { mode: 'restores', why: '自前の照合：`残存 ${left} 件` を数え、★`left !== 0` なら exit 1（:101）。⚠️ 2026-09-19 まで pending としていましたが ★**分類の誤り**でした', countedBy: 'left !== 0' },
+  /**
+   * ── ★**2026-09-25 の便の予行 4 本**（★簿 `TOOLS-UNCLASSIFIED-WHILE-UNTRACKED`）───
+   * 🔴 ★**未追跡の間、★`tool-guard` にも この簿にも 載らずに走っていました**
+   *   （★`git ls-files tools` は追跡ファイルしか見ません）。★コミットして初めて出ました。
+   */
+  'verify-ep-daily.mjs': {
+    mode: 'restores',
+    why: '★`beginSandbox`/`endSandbox`（SB-3）の中で ★`claim_daily_ep` を実際に呼び、★最後に rollback する。'
+      + '★SB-3 が ★`txid_current` を突き合わせるので、★**取引の外に出ていないこと**が数えられます。'
+      + '⚠️ ★必ず `--env staging`（★`loadEnv` の既定は ★**本番**）',
+  },
+  'verify-discovery-runs.mjs': {
+    mode: 'restores',
+    why: '★取引の中で出走の行を作って数え、★最後に rollback する（★SB-3・`beginSandbox`）。⚠️ ★必ず `--env staging`',
+  },
+  'verify-jockey-fee.mjs': {
+    mode: 'restores',
+    why: '★取引の中で ★`enter_race` を実際に呼び（★登録料 200 ＋ 騎手 400 ＝ 600 が引かれることを見る）、'
+      + '★最後に rollback する（★SB-3・`beginSandbox`）。⚠️ ★必ず `--env staging`',
+  },
+  'verify-buy-horse.mjs': {
+    mode: 'restores',
+    why: '🔴 ★**取引で包めません** — ★`buy_horse` の内側が ★自分で commit するため'
+      + '（★入れ子の取引は無い・簿 `rollback-does-not-undo-a-callee-that-commits` で 1 度 staging を汚した形）。'
+      + '→ ★**作った物（出品・口座・馬）を名指しで消し、★消えたことを DB に訊いて数えます**'
+      + '（★戻り値を信じない・★`green-for-the-wrong-reason` の「片付けの『消しました』」）。'
+      + '★馬は `owner_id = null` に戻すだけでなく ★**`npc_stable_id` を最小の厩舎へ戻します**'
+      + '（⚠️ ★`horses_owner_xor_npc` があるので両方 null にできません）。'
+      + '🔴 ★ただし ★**元の厩舎番号は控えていません** — ★この道具が作る馬は ★自分で `insert` した馬だけなので、'
+      + '★`STABLE-1-SKEW`（★`verify-prize` が実在の NPC 馬を動かした形）にはなりません。',
+    countedBy: 'if (left.listing + left.users + left.owned > 0)',
+  },
   'verify-prize.mjs': { mode: 'restores', why: '🔴 ★**2026-09-19 まで `pending`。★しかも片付け自体が `STABLE-1-SKEW` を作っていた** — ★`update horses set owner_id=null, npc_stable_id=1 where owner_id=$1` と ★**厩舎 1 を決め打ち**し、★この道具は出走表の**最終枠を除く全頭**（1 回 17 頭 前後）を取るので、★**流すたびに 17 頭が 厩舎 1 へ 一方向に移っていた**（`535db6e` 以来）。✔ ★staging の跡: ★**6 本のレースで「厩舎 1 の頭数 ＝ 出走頭数 − 1」ちょうど**（17/18・12/13・10/11・9/10・9/10・7/8）、★**他の 39 厩舎では 0 本**。★厩舎 1 の余り 92 頭 のうち **66 頭（72%）**を説明する（★`diag-stable1-skew.mjs`・読むだけ）。✅ ★**SB-6** で、★付け替えの**前**に馬ごとの元の厩舎を `tmp/snapshots/verify-prize.json` へ控え、★そこから戻す。★控えが無いのに所有馬が残っていたら ★**決め打ちで 1 に入れず、数えて落ちる**。★戻し方は `lib/tool-restores.mjs` の `RESTORE_PRIZE`。⚠️ 🔴 ★**実 DB では確かめていない**（★偽の client）', countedBy: "check(Number(backHome) === 0 && orphanLeft === 0," },
 };

@@ -85,6 +85,9 @@ export const REGISTRIES = {
  */
 export const NOT_A_REGISTRY = {
   'args.mjs': '★引数の読み取り。★登録するものがない',
+  'next-rewrites.mjs': '★`next build` が書き換える追跡ファイル 2 つを写して戻す部品（★2026-09-25）。'
+    + '★`NEXT_REWRITES` は ★**簿ではなく 2 要素の一覧**で、★外の何かと突き合わせません'
+    + '（★増えたら ★`git status` が汚れる形で出ます・簿 `NEXT-BUILD-REWRITES-TRACKED-FILES`）',
   'cdp.mjs': '★ブラウザの探索。★登録するものがない',
   'counted-verdict.mjs': '★合否の数え方（★0/1/2）。★母集団を持たない',
   'lineage-measure.mjs': '★D-121 ③ の測る純関数（★% 点・母系の世代・参考の列）。★母集団を持たない（★母集団は DB の `horses` の側）',
