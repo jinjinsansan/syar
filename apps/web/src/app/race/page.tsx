@@ -989,7 +989,25 @@ interface Built {
   readonly warp: TimeWarp;
   readonly pace: 'slow' | 'middle' | 'high';
   readonly result: readonly { place: number; gate: number; margin: string }[];
-  /** ★自馬のゲージ（D-072）。**エンジンが出した状態**を読むだけ */
+  /**
+   * ★**このレースの走路**（★2026-09-26・段 2 の A・裁定 `REVIEW_RACE_WIRING_20260926.md`）
+   *
+   * 【★なぜ `Built` に持たせるか】
+   *   ⚠️ ★`DIST` / `COURSE_SPEC` / `RACE_TURN` は ★**モジュール定数**で、
+   *      ★`?venue=`（鞍）から ★**モジュール読み込み時**に決まります（★`:221` 付近）。
+   *   🔴 ★実レースは ★**自前の距離・馬場・競馬場**を持つので、★着順だけ差し替えると
+   *      ★★**実レースの馬を 違うコースで走らせます**（★1600m を 3600m の走路で流す等）。
+   *   → ★走路を ★**レースごとの値**として持ち回れるようにします。
+   *
+   * ⚠️ ★**この段（A）では 振る舞いを変えません。** ★`build()` は ★モジュール定数を
+   *    ★**そのまま詰めるだけ**です（★`distanceM: DIST` 等）。★描画側の置き換えは ★B 以降。
+   *    ★検査 `apps/cli/test/built-course-fields.test.ts` が ★その「そのまま」を固定します。
+   */
+  readonly distanceM: number;
+  /** ★**エンジンへ渡した走路の形**（★着順に効きます・D-071）。★`COURSE_SPEC` と同じもの */
+  readonly spec: typeof COURSE_SPEC;
+  /** ★回り。★**描画層だけ**が使います */
+  readonly turn: 'left' | 'right';
   /**
    * ★自馬のゲージ（D-072）。**エンジンが出した状態**を読むだけ。
    *
@@ -2048,6 +2066,12 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
     model, warp, pace, finishChaseAt, photoFinish,
     result: result.order.map((e, i) => ({ place: i + 1, gate: Number(e.horseId), margin: e.marginLabel })),
     gauge, finishPos, finishSec, finishSpeeds, dustSoil, finishStyle,
+    /**
+     * ⚠️ ★**段 A: ★モジュール定数を そのまま詰めます**（★振る舞いを変えない）。
+     *    ★ここを別の値にすると ★`built_*` と画面の `DIST` が離れます（★台帳 B-6 の形）。
+     *    ★検査が ★この 3 行を引用で固定しています（★`built-course-fields.test.ts`）。
+     */
+    distanceM: DIST, spec: COURSE_SPEC, turn: RACE_TURN,
     /**
      * ⚠️ ★`'short'` 以外は飛ばさないので、★跳びの位置も空にします。
      * ⚠️ ★見出しは ★**跳んだ先の区間名**から作ります（★2026-09-13・オーナー指摘
