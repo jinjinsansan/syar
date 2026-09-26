@@ -3899,7 +3899,7 @@ export default function RacePage(): React.JSX.Element {
        * ★空撮フライオーバー（アーケード参考映像 31 秒）: コースの上を斜めに飛ぶカメラで透視ワールドだけを描く（馬なし）。
        *   時刻 d の関数（決定論）。終わりでタイトルへ暗転で渡す。
        */
-      const course = ovalCourse(DIST, { ...COURSE_SPEC, turn });
+      const course = ovalCourse(built.distanceM, { ...built.spec, turn });
       const t = Math.max(0, Math.min(1, (d - RACE_INTRO_FLYOVER_START_SEC) / (RACE_INTRO_FLYOVER_SEC - RACE_INTRO_FLYOVER_START_SEC)));
       const ease = t * t * (3 - 2 * t);
       const eyeS = -140 + ease * 620;                // 発走の手前上空から向正面の上空へ
@@ -3927,10 +3927,10 @@ export default function RacePage(): React.JSX.Element {
      *   ★背景は空撮と同じ透視ワールドを ★スタンド側の低い位置から芝へ流します。★人気は ★デモのオッズから並べるだけ（★D-098）。
      */
     if (intro.stage === 'entry') {
-      const course = ovalCourse(DIST, { ...COURSE_SPEC, turn });
+      const course = ovalCourse(built.distanceM, { ...built.spec, turn });
       const t = Math.max(0, Math.min(1, intro.sinceSec / (RACE_INTRO_ENTRY_END_SEC - RACE_INTRO_TITLE_END_SEC)));
       const ease = t * t * (3 - 2 * t);
-      const baseS = Math.max(0, DIST - 320 + ease * 200);
+      const baseS = Math.max(0, built.distanceM - 320 + ease * 200);
       const eye = posOf(course, baseS, -38);
       const target = posOf(course, baseS + 90, TRACK_WIDTH_M * (0.2 + ease * 0.6));
       if (renderer === 'v2') {
@@ -3947,7 +3947,7 @@ export default function RacePage(): React.JSX.Element {
           oddsLabel: (DEMO_WIN_ODDS[i] ?? 99.9).toFixed(1), popularity: ranks.get(i + 1), isOwn: i + 1 === ownGate,
         })), {
           raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo,
-          distanceMeter: DIST, surfaceLabel: surface === 'turf' ? '芝' : 'ダート', turnLabel: turn === 'left' ? '左' : '右',
+          distanceMeter: built.distanceM, surfaceLabel: surface === 'turf' ? '芝' : 'ダート', turnLabel: turn === 'left' ? '左' : '右',
           weatherLabel: '晴', conditionLabel: conditionLabel[trackCondition],
         }, frameRoleOf, {
           timeSec: d, sinceSec: intro.sinceSec, secondsToStart: RACE_INTRO_RACE_START_SEC - d,
@@ -3960,7 +3960,7 @@ export default function RacePage(): React.JSX.Element {
     if (intro.stage === 'title' || intro.stage === 'flyover') {
       drawRaceTitleCard(ctx, art.pal as Record<string, string>, vp, FONT, {
         venue: RACE_META.venue, raceName: RACE_META.raceName, raceNo: RACE_META.raceNo,
-        distanceMeter: DIST, surfaceLabel: surface === 'turf' ? '芝' : 'ダート',
+        distanceMeter: built.distanceM, surfaceLabel: surface === 'turf' ? '芝' : 'ダート',
         weatherLabel: '晴', conditionLabel: conditionLabel[trackCondition],
         turnLabel: turn === 'left' ? '左' : '右',
         fieldSize: FIELD,
@@ -4074,7 +4074,7 @@ export default function RacePage(): React.JSX.Element {
       .map((h) => ({ gate: h.gate, s: h.meters, stamina: h.staminaRatio }));
     const lead = sorted[0]!.s;
     const own = at.find((h) => h.gate === ownGate);
-    const metersLeft = DIST - (own === undefined ? lead : own.meters);
+    const metersLeft = built.distanceM - (own === undefined ? lead : own.meters);
 
     /**
      * ★**透視投影で描きます**（据えたカメラ）。
@@ -4093,14 +4093,14 @@ export default function RacePage(): React.JSX.Element {
      * ⚠️ ★最初は走路の**横**に据えました。**丸ごと外していました。**
      *    参考は3枚とも馬群の後ろから見ており、★**空もスタンドも写っていません**。
      */
-    const allFinishedNow = at.every((h) => h.meters >= DIST - 1e-6);
-    const courseSection = raceCourseSectionAt(lead, DIST, allFinishedNow);
+    const allFinishedNow = at.every((h) => h.meters >= built.distanceM - 1e-6);
+    const courseSection = raceCourseSectionAt(lead, built.distanceM, allFinishedNow);
     const shot = raceShotAt({
-      distanceMeter: DIST,
+      distanceMeter: built.distanceM,
       leaderMeters: lead,
       displaySec: raceD,
       displayDurationSec: built.warp.displaySec,
-      phase: phaseOf(DIST - lead),
+      phase: phaseOf(built.distanceM - lead),
       allFinished: allFinishedNow,
     });
     /** ★流しも本編と同じ式。★`sourceD` を渡すだけでリプレイにもそのまま効きます */
@@ -4132,9 +4132,9 @@ export default function RacePage(): React.JSX.Element {
      * ★着順・走破時刻・台帳には触れていません（★描画座標だけ）。
      */
     const visualAt = replay.active
-      ? withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST, 0,
+      ? withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, built.distanceM, 0,
         FINISH_RUNOUT_FALLBACK_MPS, (gate) => built.finishSpeeds.get(gate))
-      : withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, DIST,
+      : withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, built.distanceM,
         Math.max(0, sourceD - runoutFrom) * RUNOUT_SLOW,
         FINISH_RUNOUT_FALLBACK_MPS, (gate) => built.finishSpeeds.get(gate));
     const visualLead = Math.max(...visualAt.map((h) => h.meters));
@@ -4161,7 +4161,7 @@ export default function RacePage(): React.JSX.Element {
      *   （★レビュー側の回答 §4-3 条件 3）。★判定は ★描いている先頭の位置だけ（★未来を読まない）。
      */
     const todTints = timeOfDayTintsOf(TIME_OF_DAY,
-      INTERVENE_VIEW && sideOnlyScript && DIST - visualLead <= DEFAULT_INTERVENTION_BALANCE.EARLY_SPURT_METER);
+      INTERVENE_VIEW && sideOnlyScript && built.distanceM - visualLead <= DEFAULT_INTERVENTION_BALANCE.EARLY_SPURT_METER);
     const splitStraightScript = scriptFromSearch(search) === 'v8' || sideOnlyScript;
     /**
      * ★**表示位置の演出（`climax-choreography`）は既定で使いません**（2026-08-27・オーナー判断）。
@@ -4212,14 +4212,14 @@ export default function RacePage(): React.JSX.Element {
         easedAt0.map((h) => ({
           gate: h.gate, s: h.meters, finishPosition: finishPlaceByGate.get(h.gate) ?? 99,
         })),
-        { seed, distanceM: DIST, disabled: climaxDisabled },
+        { seed, distanceM: built.distanceM, disabled: climaxDisabled },
       );
       return easedAt0.map((h, i) => ({ ...h, meters: posed[i]!.s }));
     })();
     /** ★その時刻に描いている位置の上位 `CLIMAX_LEAD_COUNT` 頭（★上の註記） */
     const stateLeadGates = [...easedAt].sort((a, b) => b.meters - a.meters)
       .slice(0, CLIMAX_LEAD_COUNT).map((h) => h.gate);
-    const winnerFinishedNow = (at.find((horse) => horse.gate === winnerGate)?.meters ?? 0) >= DIST - 1e-6;
+    const winnerFinishedNow = (at.find((horse) => horse.gate === winnerGate)?.meters ?? 0) >= built.distanceM - 1e-6;
     const winnerFinishSec = built.finishSec.get(winnerGate);
     const winnerAfterSec = winnerFinishSec === undefined ? 0 : Math.max(0, sec - winnerFinishSec);
     /**
@@ -4305,12 +4305,12 @@ export default function RacePage(): React.JSX.Element {
      */
     let v2HorseRatio = 0;
     if (renderer === 'v2') {
-      const course = ovalCourse(DIST, { ...COURSE_SPEC, turn });
+      const course = ovalCourse(built.distanceM, { ...built.spec, turn });
       const scene = resolveBroadcastV2Scene(course, easedAt.map((horse) => ({
         gate: horse.gate,
         s: horse.meters,
         w: horse.w ?? TRACK_WIDTH_M / 2,
-        finished: horse.meters >= DIST - 1e-6,
+        finished: horse.meters >= built.distanceM - 1e-6,
       })), { width: W, height: H }, winnerShotNow, {
         /**
          * ⚠️ ★**展開の札（`built.development`）を渡さなくなりました**（★2026-09-14・オーナー確認 O-7）。
@@ -4386,7 +4386,7 @@ export default function RacePage(): React.JSX.Element {
       }
       {
         const basis = cameraBasis(scene.camera);
-        const goalGround = posOf(course, DIST, TRACK_WIDTH_M / 2);
+        const goalGround = posOf(course, built.distanceM, TRACK_WIDTH_M / 2);
         const goalPoint = project(scene.camera, basis, { x: goalGround.x, y: goalGround.y, z: 0 });
         if (goalPoint.depth > 2) v2GoalX = goalPoint.x;
         const f0 = posOf(course, Math.max(0, scene.focusS), scene.focusW);
@@ -4501,7 +4501,7 @@ export default function RacePage(): React.JSX.Element {
            *    ★**消す**ことだけで、★誰が勝つかは音に出ません。
            */
           if (sideOnlyScript && !winnerFinishedNow && !replay.active) {
-            const leftM = DIST - visualLead;
+            const leftM = built.distanceM - visualLead;
             const build = Math.max(0, Math.min(1, 1 - leftM / 400));
             if (raceD >= crossD - 0.15 && raceD < crossD) {
               audio?.level('gallop', 0, 0.02);
@@ -4851,7 +4851,7 @@ export default function RacePage(): React.JSX.Element {
         const cutRank = screenRank(easedAt, () => false, built.finishPos);
         const minimapHorses = v2Minimap.horses;
         const orderOf = (gate: number): number => cutRank.findIndex((h) => h.gate === gate) + 1;
-        const metersLeftNow = Math.max(0, DIST - Math.max(...at.map((h) => h.meters)));
+        const metersLeftNow = Math.max(0, built.distanceM - Math.max(...at.map((h) => h.meters)));
         const nameOf = (gate: number): string => HORSE_NAMES[gate - 1] ?? `スター${gate}`;
         const frameColorOf = (gate: number): string =>
           (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff';
@@ -4891,7 +4891,7 @@ export default function RacePage(): React.JSX.Element {
           label: cutIn?.label ?? jumpAt?.label
             ?? (cornerCoverActive ? (v2SectionLabel ?? 'コーナー') : RACE_CUTIN_AT_START.label),
           raceLabel: `${RACE_META.raceNo}　${RACE_META.raceName}`,
-          metersLeft: sweepLeadM === undefined ? metersLeftNow : Math.max(0, DIST - sweepLeadM),
+          metersLeft: sweepLeadM === undefined ? metersLeftNow : Math.max(0, built.distanceM - sweepLeadM),
         };
         /**
          * ★**テロップ（既定）は、世界を描いたあとに重ねます。**
@@ -5008,7 +5008,7 @@ export default function RacePage(): React.JSX.Element {
             horses: shownHorses,
             focusS: sweepLeadM ?? v2Minimap.focusS,
             frameColorOf,
-            distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${DIST}m`,
+            distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${built.distanceM}m`,
             /** ★コース図の走路と決勝線の色（★競馬場ごと・2026-09-15・計画書 V-9）。★スターパークは従来の色 */
             courseMapColors: VENUE_LOOK.courseMap,
             metersLeft: frame.metersLeft,
@@ -5043,7 +5043,7 @@ export default function RacePage(): React.JSX.Element {
         const startText = 'スタートしました！';
         drawStartCallBand(ctx, art.pal as Record<string, string>, vp, FONT, FIELD, true,
           narratorPortrait(art.raceNarrator, art.narratorSets?.[cast], {
-            metersLeft: DIST, displaySec: d,
+            metersLeft: built.distanceM, displaySec: d,
             speaking: typedCount(startText.length, raceD) < startText.length,
           }), {
             timeSec: d,
@@ -5071,7 +5071,7 @@ export default function RacePage(): React.JSX.Element {
          * ⚠️ ★世界のあと、★HUD の前に塗ります（★HUD は暗くしない）。★画面の中央は暗くしません。
          */
         if (sideOnlyScript && !replay.active && !raceOver) {
-          drawClimaxVignette(ctx, vp, climaxVignetteAlpha(DIST - visualLead));
+          drawClimaxVignette(ctx, vp, climaxVignetteAlpha(built.distanceM - visualLead));
         }
       }
       /** ⚠️ ★全画面のときは帯を重ねません（★デザイナーの絵の上に別の帯が乗ります） */
@@ -5166,7 +5166,7 @@ export default function RacePage(): React.JSX.Element {
           weightKg: built.weightsKg[i], isOwn: i + 1 === ownGate,
         })), {
           raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo,
-          distanceMeter: DIST, surfaceLabel: surface === 'turf' ? '芝' : 'ダート', turnLabel: turn === 'left' ? '左' : '右',
+          distanceMeter: built.distanceM, surfaceLabel: surface === 'turf' ? '芝' : 'ダート', turnLabel: turn === 'left' ? '左' : '右',
           weatherLabel: '晴', conditionLabel: conditionLabel[trackCondition],
         }, frameRoleOf, {
           timeSec: d, sinceSec: d - RACE_INTRO_GATE_HOLD_SEC, secondsToStart: RACE_INTRO_RACE_START_SEC - d,
@@ -5181,7 +5181,7 @@ export default function RacePage(): React.JSX.Element {
       drawStartCallBand(ctx, art.pal as Record<string, string>, vp, FONT, FIELD, intro.stage === 'gate-release',
         // ★口は「文字がまだ増えている間」だけ動かす（喋っている間）
         narratorPortrait(art.raceNarrator, art.narratorSets?.[cast], {
-          metersLeft: DIST, displaySec: d,
+          metersLeft: built.distanceM, displaySec: d,
           speaking: typedCount(startText.length, d - startLineAt) < startText.length,
         }), {
           timeSec: d,
@@ -5213,7 +5213,7 @@ export default function RacePage(): React.JSX.Element {
       // ★ゴール後はライブ HUD（見出し・区間タグ・コース図）を落とす（motion-spec §6: ゴール〜2.4s は勝馬テロップのみ）
       if (!raceOver && !contestFocusHud && !cutInCoversWorld) drawRaceHeadlineChip(ctx, FONT, {
         raceNo: RACE_META.raceNo, raceName: RACE_META.raceName,
-        distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${DIST}m`,
+        distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${built.distanceM}m`,
       }, { timeSec: d, sinceSec: hudSince });
       if (!raceOver && !contestFocusHud && !cutInCoversWorld) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
         { timeSec: d, sinceSec: Math.min(hudSince, d - sectionTagRef.current.sinceSec) });
@@ -5257,12 +5257,12 @@ export default function RacePage(): React.JSX.Element {
         ctx.globalAlpha = miniPrevAlpha * (1 - 0.55 * Math.min(1, miniHide * 3))
           /** ★台本 v9 は ★残り 250→200m で 0.4 まで薄くします（★数は減らさない・デザイナー回答 D-5） */
           * (sideOnlyScript ? climaxHudFade(DIST - visualLead) : 1);
-        drawCourseMinimap(ctx, ovalCourse(DIST, { ...COURSE_SPEC, turn }), art.pal as Record<string, string>, FONT,
+        drawCourseMinimap(ctx, ovalCourse(built.distanceM, { ...built.spec, turn }), art.pal as Record<string, string>, FONT,
           v2Minimap.horses, v2Minimap.focusS, miniBox,
           // ★コース図も HUD・馬体と同じ枠色から引く（3 か所で持たない）
           (gate) => (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff', {
-            distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${DIST}m`,
-            metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
+            distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'} ${built.distanceM}m`,
+            metersLeft: Math.max(0, built.distanceM - Math.max(...at.map((h) => h.meters))),
             timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
           });
       }
@@ -5273,7 +5273,7 @@ export default function RacePage(): React.JSX.Element {
      * ⚠️ ★数字は ★**描いている先頭の残り距離**です（★未来を読まない）。★決勝線を越えたら消えます。
      */
     if (sideOnlyScript && renderer === 'v2' && !raceOver && !cutInCoversWorld && !replay.active) {
-      drawGoalCountdown(ctx, FONT, { viewport: vp, metersLeft: DIST - visualLead });
+      drawGoalCountdown(ctx, FONT, { viewport: vp, metersLeft: built.distanceM - visualLead });
     }
     drawRendererBadge(ctx, renderer, renderer === 'v2' ? v2ShotId ?? 'v2' : `legacy/${courseSection}`);
 
@@ -5324,7 +5324,7 @@ export default function RacePage(): React.JSX.Element {
        *    表示位置で見ると**誰もゴールしていないこと**になります。
        */
       const trueMetersOf = new Map(at.map((h) => [h.gate, h.meters]));
-      const finished = (h: { gate: number }): boolean => (trueMetersOf.get(h.gate) ?? 0) >= DIST - 1e-6;
+      const finished = (h: { gate: number }): boolean => (trueMetersOf.get(h.gate) ?? 0) >= built.distanceM - 1e-6;
       /**
        * ★**並べるのは「画面に描いた位置」です**（`easedAt`）。
        *
@@ -5378,7 +5378,7 @@ export default function RacePage(): React.JSX.Element {
          *    （★レビュー側 §2・§5-2）。
          */
         const momentum = sideOnlyScript && climaxDisabled && !raceOver && !replay.active
-          && DIST - visualLead <= MOMENTUM_FROM_M && DIST - visualLead > 0
+          && built.distanceM - visualLead <= MOMENTUM_FROM_M && built.distanceM - visualLead > 0
           ? momentumLevels(
             easedAt.map((h) => ({ gate: h.gate, meters: h.meters })),
             built.model.at(Math.max(0, sec - MOMENTUM_WINDOW_SEC)).map((h) => ({ gate: h.gate, meters: h.meters })),
@@ -5493,7 +5493,7 @@ export default function RacePage(): React.JSX.Element {
         horses: easedAt.map((h) => ({
           gate: h.gate, name: HORSE_NAMES[h.gate - 1] ?? `スター${h.gate}`, meters: h.meters,
         })),
-        distanceMeter: DIST,
+        distanceMeter: built.distanceM,
         phaseLabel: phaseName,
         ownGate,
         lineIndex: callIndexRef.current,
@@ -5536,7 +5536,7 @@ export default function RacePage(): React.JSX.Element {
         drawCallBand(ctx, art.pal as Record<string, string>, vp, FONT, callRef.current,
           // ★口は最後の一言がまだ出そろっていない間だけ動かす
           narratorPortrait(art.raceNarrator, art.narratorSets?.[cast], {
-            metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
+            metersLeft: Math.max(0, built.distanceM - Math.max(...at.map((h) => h.meters))),
             displaySec: d,
             speaking: (() => {
               const last = callRef.current[callRef.current.length - 1];
@@ -5548,7 +5548,7 @@ export default function RacePage(): React.JSX.Element {
             narratorName: NARRATOR_NAMES[cast], narratorRole: NARRATOR_ROLES[cast],
             gauge: hud.gauge && g !== null && built.gauge !== null
               ? { left: g.left, initial: built.gauge.initial } : undefined,
-            metersLeft: Math.max(0, DIST - Math.max(...at.map((h) => h.meters))),
+            metersLeft: Math.max(0, built.distanceM - Math.max(...at.map((h) => h.meters))),
             sinceSec: raceD - HUD_SETTLE_SEC,
           });
       }
@@ -5583,7 +5583,7 @@ export default function RacePage(): React.JSX.Element {
           })), FIELD, frameRoleOf,
           {
             raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo,
-            distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${DIST}m ${turn === 'left' ? '左' : '右'}`,
+            distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${built.distanceM}m ${turn === 'left' ? '左' : '右'}`,
             conditionLabel: `晴 / ${conditionLabel[trackCondition]}`,
             winTimeSec: built.finishSec.get(winnerGate),
             /** ★リプレイのぶんを差し引く（指摘④で並びを変えたため。抜くと 0:00 のまま出る） */

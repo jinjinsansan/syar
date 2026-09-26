@@ -67,17 +67,40 @@ describe('🔴 ★Built の走路（段 A: モジュール定数と同じもの�
   });
 
   /**
-   * 🔴 ★**A の約束**: ★この段では ★`built.distanceM` 等を ★**まだ読んでいない**こと。
-   *   ⚠️ ★読み始めたら ★それは ★B です。★B に入ったら ★この検査を ★**書き換える**こと
-   *      （★消すのではなく、★「B の範囲だけ置き換わっている」に変える）。
-   *   ★これが無いと ★A と B が混ざり、★**どこまで置き換えたか分からなくなります**。
+   * 🔴 ★**段 B: ★null 判定の内側だけが `built.*` に置き換わっている**（★2026-09-27）
+   *
+   * ⚠️ ★A の段では ★「★`built.*` をまだ読んでいない」を見ていました。★指示どおり ★**消さずに書き換え**ました。
+   *
+   * 【★測ってから置き換えました（★引き算していません）】
+   *   ★`render` の ★`if (… || built === null) return;` より ★**後ろ**にあるものだけを置換:
+   *     ★`DIST` … ★38 件 ／ ★`COURSE_SPEC` … ★4 件 ＝ ★**42 件**
+   *   ★残した（★段 C）: ★`DIST` 1 件（★JSX・`built` が null でも描く所）・★`RACE_TURN` 3 件（★判定より前）
+   *   ✔ ★別名の `built`（★`const built = new Map<…>` が :3005 / :3219）とは ★**衝突 0 件**（★測って確認）。
+   * ✔ ★**型検査が 1 件 捕まえました** — ★`built` が null でも描く JSX で、★そこは戻しました（★守りとして働いた）。
    */
-  it('★A の段では built.distanceM / built.spec / built.turn を読んでいない', () => {
+  it('🔴 ★段 B: null 判定の内側は built.* を読み、外側は読んでいない', () => {
     const src = strip(read(RACE_PAGE));
-    const reads = ['built.distanceM', 'built.spec', 'built.turn']
-      .filter((r) => src.includes(r));
-    expect(reads, '⚠️ ★`built.*` を読み始めています ＝ ★段 B に入っています。\n'
-      + '  ★この検査を ★**書き換えてください**（★消さずに「B の範囲だけ置き換わっている」へ）。\n'
-      + '  ★A と B を混ぜると ★どこまで置き換えたか分からなくなります').toEqual([]);
+    const lines = src.split('\n');
+    const guard = lines.findIndex((l) => /built === null\) return;/.test(l));
+    expect(guard, '🔴 ★`render` の null 判定が見つからない（★走査が壊れている）').toBeGreaterThan(0);
+
+    /** ★① ★内側は ★`built.*` を読んでいる（★置き換えが進んだこと） */
+    const after = lines.slice(guard + 1).join('\n');
+    const reads = (after.match(/built\.(distanceM|spec)\b/g) ?? []).length;
+    expect(reads, '🔴 ★null 判定の内側で ★`built.*` を読んでいません（★B が巻き戻っています）')
+      .toBeGreaterThan(30);
+
+    /**
+     * ★② 🔴 ★**外側では読んでいない**（★これが本命 — ★null を踏む道を作らない）。
+     *   ⚠️ ★型検査も捕まえますが、★網でも見ます（★`?.` や `!` で黙らせる道があるため）。
+     */
+    const before = lines.slice(0, guard + 1).join('\n');
+    const outside = (before.match(/built\.(distanceM|spec|turn)\b/g) ?? []).length;
+    expect(outside, '🔴 ★null 判定の ★**外側**で `built.*` を読んでいます（★null を踏みます）。\n'
+      + '  ★`?.` や `!` で黙らせないこと。★外側は ★段 C（★引数で渡す）で直します').toBe(0);
+
+    /** ★③ ★`build()` は ★モジュール定数を詰めるまま（★A の約束を保つ） */
+    expect(src, '🔴 ★`build()` が ★そのまま詰めるのをやめています')
+      .toContain('distanceM: DIST, spec: COURSE_SPEC, turn: RACE_TURN,');
   });
 });
