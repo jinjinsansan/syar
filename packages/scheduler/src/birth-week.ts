@@ -184,3 +184,20 @@ export function gameYearOf(week: number): number {
 export function isGameYearStart(week: number): boolean {
   return gameYearOf(week) * WEEKS_PER_YEAR === week;
 }
+
+/**
+ * ★**ゲーム内の「月」（1〜12）**（★2026-09-27・正典 **D-124**・裁定 `REVIEW_RACE_REAL_D_AND_CALIBRATION_20260927.md` §3）。
+ *
+ * 【★決まり】
+ *   ★年の中の週（★`gameYearOf` と同じ 52 週で切る）を ★12 等分し、★**年の第 1 週 = 1 月**。
+ *   ★52 週 ÷ 12 なので ★1 か月は 4〜5 週です（★4.33 週）。
+ *
+ * 🔴 ★**見た目にだけ使います**（★季節の地面・景色・粒子 `SEASON_LOOKS`）。
+ *    ★着順・能力・賞金・オッズに ★1 ビットも効かせないこと（★D-124 の条件 ①・D-114 / D-116）。
+ * ⚠️ ★これは ★**実時間の暦月ではありません**（★1 週 = 実 4 時間）。★暦月から取らないこと（★BT-6）。
+ * ⚠️ ★オーナーが「何週目が何月か」を覆すときに動くのは ★**この式だけ**です（★D-124 の条件 ③）。
+ */
+export function gameMonthOf(week: number): number {
+  const weekInYear = week - gameYearOf(week) * WEEKS_PER_YEAR;
+  return Math.floor((weekInYear * 12) / WEEKS_PER_YEAR) + 1;
+}
