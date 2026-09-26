@@ -24,12 +24,67 @@
  *      ★「自馬」と偽ることになるからです（★「見本の馬」と同じ族）。
  *      ★簿 `REPLAY-NEEDS-OWN-HORSE`（★消す条件 = ★観戦の便で `ownGate` を「居ないこともある」形にした日）。
  */
+import { finalOrderMatches, marginLabel } from '@star/race-engine';
 import { slotOfDay } from '@star/scheduler';
 import { parseReplayRunners, type ReplayRunner } from '../components/uma/race-replay';
 import { authClient, readClient } from './supabase';
 
 /** ★読めなかった理由（★画面はこれをそのまま出さず、★言葉に直して出します） */
 export class RaceNotPlayableError extends Error {}
+
+/** ★確定着順の 1 行（★エンジンの `RaceResultEntry` のうち ★録画が読む欄だけ） */
+export interface SettledRow {
+  readonly horseId: string;
+  readonly finishPosition: number;
+  readonly timeSec: number;
+  readonly marginLabel: string;
+}
+
+/**
+ * ★**確定記録 → 録画が読む着順**（★段 2 D・2026-09-27）。★着順・走破タイムは ★1 つも作りません（★憲法 3）。
+ *   ★`horseId` は ★馬番（★D-056・`replayOf` が馬番として読む）。
+ *   ★着差の文字は ★走破タイムの差を ★エンジンと同じ `marginLabel` に通したもの（★簿 `REPLAY-MARGIN-FROM-TIME`）。
+ */
+export function settledResultOf(
+  runners: readonly Pick<ReplayRunner, 'gate' | 'finishPosition' | 'finishSec'>[],
+  distanceM: number,
+): { readonly order: readonly SettledRow[]; readonly conditions: { readonly distance: number } } {
+  const byPlace = [...runners].sort((a, b) => a.finishPosition - b.finishPosition);
+  return {
+    conditions: { distance: distanceM },
+    order: byPlace.map((r, i) => ({
+      horseId: String(r.gate), finishPosition: r.finishPosition, timeSec: r.finishSec,
+      marginLabel: i === 0 ? '' : marginLabel(r.finishSec - byPlace[i - 1]!.finishSec),
+    })),
+  };
+}
+
+/** ★D-059 の番人が鳴いたことを示す誤り（★画面は ★これを受けたら 見本に落とさず止めます） */
+export class ReplayOrderMismatchError extends Error {}
+
+/**
+ * 🔴 ★**D-059 の番人**（★見本・実レースの両方の道が ★ここを通ります）。
+ *   ★映像の境界時刻から並べた順が ★確定着順と ★1 頭でも違えば ★投げます。
+ */
+export function assertReplayOrder(
+  result: { readonly order: readonly Pick<SettledRow, 'horseId'>[] },
+  boundaries: readonly { gate: number; finishSec: number }[],
+): void {
+  if (!finalOrderMatches(result, boundaries)) {
+    throw new ReplayOrderMismatchError('映像の着順が確定着順と違います（D-059）');
+  }
+}
+
+/**
+ * ★**実レースの録画を止めるときの文**（★裁定 Q-RACE-3 の追加条件）。
+ *   ★番人が鳴いたときは ★その旨を、★それ以外の組み立ての失敗は ★その理由を添えて ★「出せません」と言います。
+ */
+export function replayStopMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return error instanceof ReplayOrderMismatchError
+    ? `この録画は出せません（映像の着順が確定した着順と合いませんでした）: ${message}`
+    : `この録画は出せません: ${message}`;
+}
 
 export interface RealRaceData {
   readonly id: string;

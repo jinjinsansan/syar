@@ -105,7 +105,10 @@ import {
   raceSetupFor, gameMonthOf,
   type RaceCourseSpec, type Venue,
 } from '@star/scheduler';
-import { loadRealRace, RaceNotPlayableError, type RealRaceData } from '../../lib/race-real';
+import {
+  loadRealRace, RaceNotPlayableError, settledResultOf, assertReplayOrder, replayStopMessage,
+  type RealRaceData, type SettledRow,
+} from '../../lib/race-real';
 import { FrameBadge } from '../../components/ui';
 import { createRaceAudio, type RaceAudio } from './race-audio.js';
 
@@ -208,6 +211,8 @@ const RETURN_ROUTES: Readonly<Record<string, string>> = {
   '/vote': '投票へ戻る',
   '/odds': 'オッズへ戻る',
   '/mypage': 'わたしの馬へ戻る',
+  /** ★録画の入口（★`/records` の出走の行・★段 2 D）から来たときの出口（★D-122 入口を作ったら出口も） */
+  '/records': '記録へ戻る',
 };
 const RETURN_TO: string | null = (() => {
   if (typeof window === 'undefined') return null;
@@ -1999,25 +2004,18 @@ function build(
    *     ★ペースは ★公開されている脚質から ★エンジンと同じ `decidePace`（★逃げの頭数だけで決まる・§8.4）。
    */
   const result: {
-    readonly order: readonly { readonly horseId: string; readonly finishPosition: number; readonly timeSec: number; readonly marginLabel: string }[];
+    readonly order: readonly SettledRow[];
     readonly conditions: { readonly distance: number };
   } = real === null
     ? resolveRace({ conditions, entrants, seed, balance })
-    : ((): { order: { horseId: string; finishPosition: number; timeSec: number; marginLabel: string }[]; conditions: { distance: number } } => {
-      const byPlace = [...real.runners].sort((a, b) => a.finishPosition - b.finishPosition);
-      return {
-        conditions: { distance: DIST },
-        order: byPlace.map((r, i) => ({
-          horseId: String(r.gate), finishPosition: r.finishPosition, timeSec: r.finishSec,
-          marginLabel: i === 0 ? '' : marginLabel(r.finishSec - byPlace[i - 1]!.finishSec),
-        })),
-      };
-    })();
+    /** ★実レースは ★読む層と同じ部品で組む（★`lib/race-real.ts`・★網 `race-real-replay.test.ts` が同じ部品を試す） */
+    : settledResultOf(real.runners, DIST);
   const pace: Pace = real === null
     ? paceOf(entrants, balance).pace
     : decidePace(real.runners.filter((r) => r.strategy === 'nige').length, DEFAULT_RACE_BALANCE);
   const boundaries = replayOf(result, strategyOfGate, pace);
-  if (!finalOrderMatches(result, boundaries)) throw new Error('映像の着順が確定着順と違います（D-059）');
+  /** 🔴 ★D-059 の番人（★見本・実レースの両方が通る・★鳴いたら `ReplayOrderMismatchError`） */
+  assertReplayOrder(result, boundaries);
   const course = ovalCourse(DIST, COURSE_OPTS);
   /**
    * ⚠️ ★**`straightMetersLeft` は「境界時刻 `straightSec` が指す地点」です。走路の直線の長さではありません。**
@@ -4132,18 +4130,19 @@ function RaceView({ setup, real }: {
 
   useEffect(() => {
     try { setBuilt(build(setup, seed, ownGate, surface, trackCondition, contestGammaFromSearch(typeof window === 'undefined' ? '' : window.location.search), real)); setErr(null); } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
       /**
        * 🔴 ★**実レースで D-059 の番人が鳴いたら ★止めて言う**（★裁定 Q-RACE-3 の追加条件）。
        *   ★見本の走行に ★**落としません**。★黙って飲み込みもしません（★起きたこと自体が ★記録の欠陥）。
-       *   ★簿 `REPLAY-D059-MISMATCH-STOPS`。★コンソールに ★レース ID を残して ★追えるようにします。
+       *   ★文は ★読む層の `replayStopMessage`（★網 `race-real-replay.test.ts` の ③ が ★境界をずらした入力で試す）。
+       *   ★コンソールに ★レース ID を残して ★追えるようにします。
        */
       if (real !== null) {
-        console.error(`[race-replay] この録画は出せません race=${real.raceId}: ${message}`);
+        const stop = replayStopMessage(e);
+        console.error(`[race-replay] race=${real.raceId}: ${stop}`);
         setBuilt(null);
-        setErr(`この録画は出せません（映像の着順が確定した着順と合いませんでした）: ${message}`);
+        setErr(stop);
       } else {
-        setErr(message);
+        setErr(e instanceof Error ? e.message : String(e));
       }
     }
     dRef.current = 0;

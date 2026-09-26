@@ -205,7 +205,14 @@ export default function RecordsView({ tab }: { readonly tab: string }): React.Re
               {/* ⚠️ ★`0046` より前のレースは週が null。★「0 週」と偽らず「—」 */}
               <span className="a-num rc-run-week" style={{ width: RCOL.week, flex: `0 0 ${RCOL.week}px`, fontSize: 14, color: 'var(--a-ink-3)' }}>{r.gameWeek === null ? '—' : `${r.gameWeek}週`}</span>
               <span className="a-num rc-run-date" style={{ width: RCOL.date, flex: `0 0 ${RCOL.date}px`, fontSize: 14, color: 'var(--a-ink-3)' }}>{clock(r.at)}</span>
-              <span className="rc-run-race" style={{ width: RCOL.race, flex: `0 0 ${RCOL.race}px`, fontSize: 15, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.raceName}</span>
+              {/*
+                ★**録画への入口**（★2026-09-27・段 2 D・裁定 Q-RACE-6 / Q-RACE-10）。
+                ★入口は ★**自分の馬の記録からだけ**張ります（★D-122「空の店に客を送らない」）。★ここは `my_runs` ＝ ★自分の馬の確定した出走だけです。
+                ⚠️ ★見た目は作っていません（★既存の字のまま下線だけ）。★見せ方はデザイナーへ（★簿 `REPLAY-FLAT-RACE-QUIET-DEFAULT` と同じ便）。
+              */}
+              <span className="rc-run-race" style={{ width: RCOL.race, flex: `0 0 ${RCOL.race}px`, fontSize: 15, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <a href={`/race?race=${encodeURIComponent(r.raceId)}&return=/records`} style={{ color: 'inherit' }}>{r.raceName}</a>
+              </span>
               <span className="rc-run-cls" style={{ width: RCOL.cls, flex: `0 0 ${RCOL.cls}px` }}><ClassChip label={r.classLabel} classRank={r.classRank} h={24} font={12} /></span>
               <span className="rc-run-horse" style={{ flex: 1, minWidth: RCOL.horseMin, fontSize: 15, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.horseName}</span>
               <span className="rc-run-cond" style={{ width: RCOL.cond, flex: `0 0 ${RCOL.cond}px`, fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)', whiteSpace: 'nowrap' }}>{r.cond}</span>

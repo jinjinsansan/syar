@@ -50,7 +50,10 @@ vi.mock('../../web/src/lib/supabase', () => {
   return { readClient: client, authClient: client };
 });
 
-const { loadRealRace, RaceNotPlayableError } = await import('../../web/src/lib/race-real');
+const {
+  loadRealRace, RaceNotPlayableError, settledResultOf, assertReplayOrder, replayStopMessage, ReplayOrderMismatchError,
+} = await import('../../web/src/lib/race-real');
+const { replayOf } = await import('../../../packages/race-engine/src/index.js');
 
 const RACE_ID = 'r-1';
 const race = (over: Row = {}): Row => ({
@@ -133,13 +136,65 @@ describe('🔴 ★実レースの録画を読む層', () => {
 });
 
 /**
+ * 🔴 ★**③ 番人（D-059）が鳴いたら ★止まる**（★裁定 Q-RACE-10 §9・★機械で確かめる）。
+ *   ★実データでは ★境界時刻も同じ記録から作るので ★食い違いは起きません（★手で開いても鳴らない）。
+ *   → ★**境界時刻をずらした入力**で ★番人が鳴き、★画面の道が ★「出せません」に落ちることを見ます。
+ *   ★画面（`/race`）も ★この 3 つの部品（`settledResultOf` / `assertReplayOrder` / `replayStopMessage`）を通ります（★下の最後の検査）。
+ */
+describe('🔴 ③ 番人が鳴いたら止まる', () => {
+  const STRATEGIES = ['nige', 'senko', 'sashi', 'oikomi'] as const;
+  const runners = Array.from({ length: 8 }, (_, i) => ({
+    gate: i + 1, finishPosition: i + 1, finishSec: 95 + i * 0.3,
+    strategy: STRATEGIES[i % 4] ?? 'senko',
+  }));
+  const result = settledResultOf(runners, 1600);
+  const strategyOf = (g: number): 'nige' | 'senko' | 'sashi' | 'oikomi' => runners[g - 1]!.strategy;
+
+  it('✅ ★対照: 記録どおりの境界時刻は ★番人を通る', () => {
+    const boundaries = replayOf(result, strategyOf, 'middle');
+    expect(() => assertReplayOrder(result, boundaries)).not.toThrow();
+    /** ★着順・馬番・タイムは ★記録のまま（★作っていない） */
+    expect(result.order.map((r) => r.horseId)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
+    expect(result.order[0]!.timeSec).toBe(95);
+  });
+
+  it('🔴 ★1 着と 2 着の境界時刻を入れ替えると ★番人が鳴き、★「出せません」の文になる', () => {
+    const boundaries = replayOf(result, strategyOf, 'middle');
+    const shifted = boundaries.map((b) => (b.gate === 1 ? { ...b, finishSec: boundaries[1]!.finishSec + 0.5 } : b));
+    let caught: unknown;
+    try { assertReplayOrder(result, shifted); } catch (e) { caught = e; }
+    expect(caught, '🔴 ★番人が鳴きません（★ずらした境界を通しています）').toBeInstanceOf(ReplayOrderMismatchError);
+    const text = replayStopMessage(caught);
+    expect(text).toMatch(/^この録画は出せません（映像の着順が確定した着順と合いませんでした）/);
+    /** ★番人以外の失敗も ★「出せません」で止める（★見本に落とさない） */
+    expect(replayStopMessage(new Error('走路を組めません'))).toBe('この録画は出せません: 走路を組めません');
+  });
+
+  it('🔴 ★画面の道: 実レースの失敗は ★replayStopMessage を出して止め、★見本に落とさない', () => {
+    const src = readFileSync(path.resolve(__dirname, '../../web/src/app/race/page.tsx'), 'utf8');
+    expect(src, '★画面が 番人の部品を通っていない').toContain('assertReplayOrder(result, boundaries);');
+    expect(src, '★画面が 実レースの着順を 読む層の部品で組んでいない').toContain(': settledResultOf(real.runners, DIST);');
+    const m = src.match(/if \(real !== null\) \{\s*const stop = replayStopMessage\(e\);[\s\S]*?\n\s*\} else \{/);
+    expect(m, '🔴 ★実レースの失敗を ★`replayStopMessage` で止めていない').not.toBeNull();
+    expect(m![0], '🔴 ★止めたあと ★映像を消していない（★古い映像や見本が残る）').toContain('setBuilt(null);');
+    expect(m![0], '🔴 ★止めた文を ★画面に出していない').toContain('setErr(stop);');
+    expect(/build\(setup, seed, ownGate, surface, trackCondition,[^;]*\breal\)/.test(src),
+      '🔴 ★`build()` に実レースを渡していない（★見本で組んでしまう）').toBe(true);
+  });
+});
+
+/**
  * 🔴 ⑥ ★**入口を作らない**（★裁定 Q-RACE-6 の条件・D-122「空の店に客を送らない」）。
  *   ★録画へのリンクは ★**自分の馬の記録からだけ**張ります。★いまは ★どこにも張っていません（★`ALLOWED` は空）。
  *   ★張るときは ★自分の馬の記録の画面だけを ★`ALLOWED` に足すこと（★他人のレースの一覧を足さない）。
  */
 describe('🔴 ⑥ 録画への入口', () => {
   const ROOT = path.resolve(__dirname, '../..');
-  const ALLOWED: readonly string[] = [];
+  /**
+   * ★2026-09-27（裁定 Q-RACE-10）: ★`/records` の出走の行（★`my_runs` ＝ 自分の馬の確定した出走だけ）を足しました。
+   *   ⚠️ ★他人のレースの一覧（★番組表・結果一覧）は ★足さないこと。
+   */
+  const ALLOWED: readonly string[] = ['web/src/app/records/records-view.tsx'];
   /** ★`/race?race=` と ★`/race?…&race=` を捕まえる（★`?venue=` や `/races` は捕まえない） */
   const LINK = /\/race\?(?:[^'"`\s]*&)?race=/;
 
@@ -164,5 +219,16 @@ describe('🔴 ⑥ 録画への入口', () => {
     expect(files.length, '★走査が空振り').toBeGreaterThan(50);
     const hits = files.filter((f) => !ALLOWED.includes(f) && LINK.test(readFileSync(path.join(ROOT, f), 'utf8')));
     expect(hits, '🔴 ★録画への入口が ★許した画面の外にあります（★自分の馬の記録からだけ張る・裁定 Q-RACE-6）').toEqual([]);
+  });
+
+  /** ★許した画面は ★本当に入口を持ち、★出口（`?return=`）を名簿に載せている（★D-122 入口を作ったら出口も） */
+  it('★許した画面に入口が在り、戻り先が名簿に在る', () => {
+    for (const f of ALLOWED) {
+      expect(LINK.test(readFileSync(path.join(ROOT, f), 'utf8')), `★${f} に入口が無い（★許可だけ残っている）`).toBe(true);
+    }
+    const records = readFileSync(path.join(ROOT, 'web/src/app/records/records-view.tsx'), 'utf8');
+    expect(records, '★入口が `my_runs` の行（`r.raceId`）から張られていない').toContain('/race?race=${encodeURIComponent(r.raceId)}&return=/records');
+    const race = readFileSync(path.join(ROOT, 'web/src/app/race/page.tsx'), 'utf8');
+    expect(race, '★出口の名簿に `/records` が無い（★記録へ戻れない）').toContain("'/records': '記録へ戻る',");
   });
 });
