@@ -26,11 +26,12 @@ import {
   resolveRace, paceOf, replayOf, finalOrderMatches,
   laneAt, laneAtStart, TRACK_WIDTH_M, LANE_MODELS, LANE_MODEL_LEGACY,
   aiProxyPlan, staminaTrackOf, staminaGaugeOf, staminaAt, boundaryTimesOf,
-  marginLabel, PHASE_METERS,
+  marginLabel, PHASE_METERS, decidePace,
 } from '@star/race-engine';
 import { deriveRng } from '@star/sim-engine';
 import type { Strategy } from '@star/sim-engine';
-import type { Surface, TrackCondition } from '@star/race-engine';
+import type { Surface, TrackCondition, Pace } from '@star/race-engine';
+import type { ReplayRunner } from '../../components/uma/race-replay';
 import {
   replayPositionModel, finalOrderOf, withFinishRunOut, finishSpeedsOf, FINISH_RUNOUT_FALLBACK_MPS, knotsFor, DEFAULT_PHASE_RATES,
   type TimeWarp,
@@ -95,14 +96,16 @@ import {
   horseFramePlacement, feetRatioOf, medianAnchorWidth, placementModeFor,
   horseCalibrationFor, LEGACY_HORSE_CALIBRATION, type HorseMaterialCalibration,
   type HorsePlacement, type HorsePlacementFrame, type HorsePlacementSet, type HorsePlacementMode,
-  venueLookOf, sideOnlyShownMetersOf, windOf,
+  venueLookOf, sideOnlyShownMetersOf, windOf, coatOfHorseId,
   SEASON_LOOKS, seasonOf, seasonParticlesFor, rainDropsOf, timeOfDayTintsOf, VENUE_FOG_ALPHA,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
 import {
   raceSetupFromParam, gradedRacesByVenue, timeOfDayFromParam, TIME_OF_DAYS, TIME_OF_DAY_LABELS,
+  raceSetupFor, gameMonthOf,
   type RaceCourseSpec, type Venue,
 } from '@star/scheduler';
+import { loadRealRace, RaceNotPlayableError, type RealRaceData } from '../../lib/race-real';
 import { FrameBadge } from '../../components/ui';
 import { createRaceAudio, type RaceAudio } from './race-audio.js';
 
@@ -172,14 +175,14 @@ const PARAM_ERROR: string | null = (() => {
       + `（★昼に落としません。★使えるのは ${TIME_OF_DAYS.join(' / ')} です）`;
   }
   /**
-   * 🔴 ★**段 2 が入るまで、実レースの走行は出せません。**
-   *   ⚠️ ★ここで既定の鞍に落とすと ★**「そのレースを見た」と嘘になります**。
-   *   → ★出せないことを言います（★D-119 を作らないため、★口の説明と振る舞いを一致させます）。
+   * 🔴 ★**`?race=` と `?venue=` を同時に渡さない**（★段 2 D・2026-09-27・裁定 Q-RACE-1）。
+   *   ★実レースの走路は ★そのレースの場と距離です。★鞍の口で曲げると ★「そのレースを見た」が嘘になります。
+   *   ★どちらを優先するかを ★黙って決めず、★止めて言います。
+   *   ⚠️ ★実レースの ID そのものは ★ここでは確かめません（★取得して ★`RealRaceGate` が止めます）。
    */
-  if (REAL_RACE_PARAM !== null && REAL_RACE_PARAM !== '') {
-    return `この画面はまだ実レースの走行を出せません: ?race=${REAL_RACE_PARAM}`
-      + '（★段 2・`PLAN_RACE_REAL_WIRING_20260926.md`。★見本の走行に落として「そのレース」と'
-      + '言わないために止めています。★鞍の見比べは ?venue= です）';
+  if (REAL_RACE_PARAM !== null && REAL_RACE_PARAM !== '' && VENUE_PARAM !== null) {
+    return `実レース（?race=${REAL_RACE_PARAM}）と鞍（?venue=${VENUE_PARAM}）を同時には開けません`
+      + '（★どちらか一方にしてください。★実レースの走路はそのレースの場と距離です）';
   }
   return null;
 })();
@@ -1016,6 +1019,50 @@ interface PageSetup {
   readonly meta: { readonly venue: string; readonly raceName: string; readonly raceNo: string };
   /** ★レース選択（★開発卓）で ★どの鞍を「選択中」と出すか。★実レースは `null` */
   readonly venueRaceId: string | null;
+}
+
+/**
+ * ★**実レースの確定記録**（★段 2 D・2026-09-27）。★`build()` は ★これがあれば ★**着順を決めずに読むだけ**です（★憲法 3）。
+ *   ★読む層は `lib/race-real.ts`（★確定済み・★自分の馬が出ているものだけ）。
+ */
+interface RealReplay {
+  readonly raceId: string;
+  /** ★馬番の順（★1〜頭数で欠けない・★読む層が検証済み） */
+  readonly runners: readonly ReplayRunner[];
+  readonly weightKgByGate: ReadonlyMap<number, number>;
+  /** ★自分の馬の馬番（★読む層が `is_mine` で確かめた馬・★自馬のいないレースは ここまで来ない） */
+  readonly ownGate: number;
+  /** ★馬場状態（★実物。★`?cond=` の見比べ口で曲げない） */
+  readonly trackCondition: TrackCondition;
+  /**
+   * ★**映像だけに使う種**（★横の位置取り・隊列の揺らぎ）。★レース ID から決まるので ★何度開いても同じ映像です（憲法 4）。
+   * ⚠️ ★着順・タイムには ★1 ビットも効きません（★それはサーバーの行を読むだけ）。
+   */
+  readonly seed: number;
+}
+
+/**
+ * ★**録画であることの札**（★契約 §暫定の録画表示・計画 段 2 の 4「★中継と偽らない」）。
+ * ⚠️ ★意匠は作っていません（★最小の字と地だけ）。★見せ方は ★デザイナーへ（★平場の意匠と同じ便 R-18）。
+ */
+const REPLAY_BADGE_TEXT = '録画・確定した結果から再現';
+const REPLAY_BADGE_STYLE: React.CSSProperties = {
+  position: 'absolute', top: 10, left: 10, padding: '3px 10px', fontSize: 16, fontWeight: 900,
+  background: 'rgba(0, 0, 0, 0.6)', color: '#fff', borderRadius: 3, pointerEvents: 'none',
+};
+
+/**
+ * ★**レース ID → 映像の種**（★決定論・★FNV-1a 32bit）。
+ *   ★`Math.random()` を呼ばない（★憲法 4）。★同じレースは ★誰が何度開いても同じ隊列に見えます。
+ */
+function replaySeedOf(raceId: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < raceId.length; i += 1) {
+    h ^= raceId.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  /** ★見本の `?seed=` と同じく ★正の整数（★0 を避ける） */
+  return (h % 1_000_000) + 1;
 }
 
 /**
@@ -1903,7 +1950,11 @@ interface BakedManifest {
   readonly sets: readonly BakedSet[];
 }
 
-function build(setup: PageSetup, seed: number, ownGate: number, surface: Surface, trackCondition: TrackCondition, contestGamma: number): Built {
+function build(
+  setup: PageSetup, seed: number, ownGate: number, surface: Surface, trackCondition: TrackCondition, contestGamma: number,
+  /** ★実レースの確定記録（★`null` は見本 ＝ ★エンジンがその場で決める） */
+  real: RealReplay | null,
+): Built {
   /**
    * ★**走路と頭数は `setup` から**（★段 2 D・2026-09-27）。
    *   ★名前を残すのは ★下の式を 1 文字も動かさないためです（★見本の道では ★元のモジュール定数と同じ値）。
@@ -1914,13 +1965,20 @@ function build(setup: PageSetup, seed: number, ownGate: number, surface: Surface
   const COURSE_OPTS = { ...COURSE_SPEC, turn: RACE_TURN };
   const FIELD = setup.fieldSize;
   const start = (seed * 13) % Math.max(1, POOL.length - FIELD);
-  const entrants = POOL.slice(start, start + FIELD).map((h, i) => ({
+  /**
+   * ★**見本の出走馬**（★実レースでは空）。
+   * 🔴 ★実レースの能力は ★公開できないので ★読めません（★D-108 / D-116）。★ここで見本の能力を当てはめないこと。
+   */
+  const entrants = real !== null ? [] : POOL.slice(start, start + FIELD).map((h, i) => ({
     horseId: String(i + 1), stats: h.stats, surfaceAptitude: h.surfaceAptitude,
     distanceCenter: h.distanceCenter, distanceRange: h.distanceRange,
     strategyAptitude: h.strategyAptitude, heavyAptitude: h.heavyAptitude,
     strategy: STRATS[(i + seed) % 4]!, condition: 3, fatigue: 20,
     weightKg: 55, gate: i + 1, age: 4, skillGenes: h.skillGenes,
   }));
+  /** ★馬番 → 脚質（★見本はエンジンに渡した値・★実レースは出走表の値） */
+  const strategyOfGate = (g: number): Strategy => (real !== null
+    ? real.runners[g - 1]?.strategy : entrants[g - 1]?.strategy) ?? 'senko';
   const conditions = {
     raceId: `r${seed}-${surface}-${trackCondition}`, distance: DIST, surface,
     /** ⚠️ ★**着順に効く経路**（憲法 3・D-071）。★描画層と同じ `COURSE_SPEC` を使う */
@@ -1931,9 +1989,33 @@ function build(setup: PageSetup, seed: number, ownGate: number, surface: Surface
   const balance = contestGamma === DEFAULT_RACE_BALANCE.TIME_GAP_SHAPE_GAMMA
     ? DEFAULT_RACE_BALANCE
     : { ...DEFAULT_RACE_BALANCE, TIME_GAP_SHAPE_GAMMA: contestGamma };
-  const result = resolveRace({ conditions, entrants, seed, balance });
-  const { pace } = paceOf(entrants, balance);
-  const boundaries = replayOf(result, (g) => entrants[g - 1]!.strategy, pace);
+  /**
+   * 🔴 ★**確定着順の出どころ**（★段 2 D・2026-09-27）。
+   *   ★見本: ★エンジンがその場で決める（★従来どおり）。
+   *   ★実レース: ★**サーバーが確定した行を読むだけ**（★憲法 3）。★着順・走破タイムは ★1 つも作りません。
+   *     ★着差の文字は ★走破タイムの差を ★エンジンと同じ `marginLabel` に通したもの
+   *     （★`race_entries_public` は `margin` を出していない。★DB の丸め 3 桁で ★境目が 1 段ずれうる・簿 `REPLAY-MARGIN-FROM-TIME`）。
+   *     ★ペースは ★公開されている脚質から ★エンジンと同じ `decidePace`（★逃げの頭数だけで決まる・§8.4）。
+   */
+  const result: {
+    readonly order: readonly { readonly horseId: string; readonly finishPosition: number; readonly timeSec: number; readonly marginLabel: string }[];
+    readonly conditions: { readonly distance: number };
+  } = real === null
+    ? resolveRace({ conditions, entrants, seed, balance })
+    : ((): { order: { horseId: string; finishPosition: number; timeSec: number; marginLabel: string }[]; conditions: { distance: number } } => {
+      const byPlace = [...real.runners].sort((a, b) => a.finishPosition - b.finishPosition);
+      return {
+        conditions: { distance: DIST },
+        order: byPlace.map((r, i) => ({
+          horseId: String(r.gate), finishPosition: r.finishPosition, timeSec: r.finishSec,
+          marginLabel: i === 0 ? '' : marginLabel(r.finishSec - byPlace[i - 1]!.finishSec),
+        })),
+      };
+    })();
+  const pace: Pace = real === null
+    ? paceOf(entrants, balance).pace
+    : decidePace(real.runners.filter((r) => r.strategy === 'nige').length, DEFAULT_RACE_BALANCE);
+  const boundaries = replayOf(result, strategyOfGate, pace);
   if (!finalOrderMatches(result, boundaries)) throw new Error('映像の着順が確定着順と違います（D-059）');
   const course = ovalCourse(DIST, COURSE_OPTS);
   /**
@@ -1948,14 +2030,15 @@ function build(setup: PageSetup, seed: number, ownGate: number, surface: Surface
   const rawModel = replayPositionModel({
     distanceMeter: DIST, spurtMetersLeft: 800, straightMetersLeft: PHASE_METERS.STRAIGHT, boundaries,
     // ★道中は脚質から生成する（Q-P4-38）。走破タイムからは作らない
-    strategyOf: (g) => entrants[g - 1]!.strategy,
+    strategyOf: strategyOfGate,
     // エンジンの横位置を希望経路として読み、下の trafficPositionModel で馬間隔を保つ。
     // ★比較用の切替口（`?lane=b|c|d`）。★付けなければ現行のまま
     /**
      * ⚠️ ★**走路の形（`COURSE_SPEC`）を渡します**。
      *    ★渡さないと、★**絵は 1周2000m 前提・着順は venue の形**で食い違います（台帳 B-6）。
      */
-    laneOf: (gate, metersLeft) => laneAt(gate, entrants.length, metersLeft, DIST, seed,
+    /** ★頭数は `FIELD`（★見本では `entrants.length` と同じ値・★実レースは出走表の頭数） */
+    laneOf: (gate, metersLeft) => laneAt(gate, FIELD, metersLeft, DIST, seed,
       COURSE_SPEC.widthM, undefined, COURSE_SPEC, LANE_MODEL_PARAM),
     pace,
     formationSeed: seed * 2654435761,
@@ -1971,17 +2054,26 @@ function build(setup: PageSetup, seed: number, ownGate: number, surface: Surface
    *      一度この層で近似を作って**符号が逆**になりました。
    *   ★乱数は注入します（憲法4）。`Math.random` は呼びません。
    */
-  const own = entrants[ownGate - 1]!;
-  const ownHorse = {
-    iq: own.stats.iq, gt: own.stats.gt, st: own.stats.st,
-    condition: own.condition, fatigue: own.fatigue,
-  };
-  const ownEntry = result.order.find((e) => Number(e.horseId) === ownGate)!;
-  const gauge = staminaGaugeOf(
-    staminaTrackOf(ownHorse, aiProxyPlan(ownHorse, deriveRng(seed, ownGate), DEFAULT_INTERVENTION_BALANCE), DIST, DEFAULT_INTERVENTION_BALANCE),
-    boundaryTimesOf(ownEntry, DIST, ownGate, own.strategy, pace),
-    DIST, own.strategy, pace,
-  );
+  /**
+   * 🔴 ★**実レースの録画では ★ゲージを出しません**（★`null`・裁定 Q-RACE-3）。
+   *   ★能力（`iq`/`gt`/`st`/調子/疲労）は ★公開できないので ★組み立てられません（★D-108 / D-116）。
+   *   ★簿 `REPLAY-GAUGE-ABSENT-FOR-REAL-RACE`。
+   */
+  const gauge = ((): Built['gauge'] => {
+    if (real !== null) return null;
+    /** ⚠️ ★見本の道で ★自馬が居ないのは ★組み立ての誤りです（★黙って `null` にせず ★従来どおり落とす） */
+    const own = entrants[ownGate - 1]!;
+    const ownHorse = {
+      iq: own.stats.iq, gt: own.stats.gt, st: own.stats.st,
+      condition: own.condition, fatigue: own.fatigue,
+    };
+    const ownEntry = result.order.find((e) => Number(e.horseId) === ownGate)!;
+    return staminaGaugeOf(
+      staminaTrackOf(ownHorse, aiProxyPlan(ownHorse, deriveRng(seed, ownGate), DEFAULT_INTERVENTION_BALANCE), DIST, DEFAULT_INTERVENTION_BALANCE),
+      boundaryTimesOf(ownEntry, DIST, ownGate, own.strategy, pace),
+      DIST, own.strategy, pace,
+    );
+  })();
   const finishPos = new Map(result.order.map((e) => [Number(e.horseId), e.finishPosition]));
   const finishSec = new Map(result.order.map((e) => [Number(e.horseId), e.timeSec]));
   /**
@@ -2171,7 +2263,10 @@ function build(setup: PageSetup, seed: number, ownGate: number, surface: Surface
     ...buildMotionTimeline({
       model, warp, finishSec, finishStyle, finishChaseAt, distanceM: DIST, spec: COURSE_SPEC, turn: RACE_TURN,
     }, winnerGate, 1.6),
-    weightsKg: entrants.map((e) => e.weightKg),
+    /** ★斤量（★見本は 55kg・★実レースは出走表の値） */
+    weightsKg: real !== null
+      ? real.runners.map((r) => real.weightKgByGate.get(r.gate) ?? Number.NaN)
+      : entrants.map((e) => e.weightKg),
     /** ★勝馬が決勝線を通る表示秒（★1 レース 1 回・`Built.finishCrossD` の註記） */
     finishCrossD: finishCrossDisplaySec(
       (dd) => model.at(warp.raceSecAt(dd)).find((h) => h.gate === winnerGate)?.meters ?? 0,
@@ -2182,7 +2277,7 @@ function build(setup: PageSetup, seed: number, ownGate: number, surface: Surface
      * ⚠️ ★**ここで作り直しません。** ★出走表に載せた値をそのまま返します
      *    （★`resolveRace` に渡したのと同じ値・★R-30）。
      */
-    strategyOf: (gate: number): string => entrants[gate - 1]?.strategy ?? 'senko',
+    strategyOf: (gate: number): string => strategyOfGate(gate),
   };
 }
 
@@ -2266,7 +2361,98 @@ export default function RacePage(): React.JSX.Element {
       </div>
     );
   }
-  return <RaceView setup={venuePageSetup()} />;
+  /** ★実レース（★確定済み・★自分の馬が出ているものだけ）。★読めるまで 本体を開きません */
+  if (REAL_RACE_PARAM !== null && REAL_RACE_PARAM !== '') return <RealRaceGate raceId={REAL_RACE_PARAM} />;
+  return <RaceView setup={venuePageSetup()} real={null} />;
+}
+
+/**
+ * ★**実レース → `PageSetup` と `RealReplay`**（★段 2 D・2026-09-27）。
+ *   ★走路は ★`raceSetupFor`（★`raceSetupById` と同じ組み立て・★知らない場は投げる）。
+ *   ★毛色は ★`coatOfHorseId(horse_id)`（★唯一の出どころ・★枠番から引かない）。
+ *   ★季節は ★`gameMonthOf(game_week)`（★D-124）。★出走条件の札は ★データに無いので空（★裁定 Q-RACE-7）。
+ */
+function realPageOf(data: RealRaceData): { readonly setup: PageSetup; readonly real: RealReplay } {
+  const rs = raceSetupFor({
+    courseId: data.courseId, distanceM: data.distanceM, surface: data.surface,
+    grade: data.grade, raceName: data.raceName, raceNo: data.raceNo,
+  });
+  return {
+    setup: {
+      venue: rs.venue,
+      distanceM: rs.distanceM,
+      spec: rs.spec,
+      turn: rs.turn,
+      surface: rs.surface,
+      fieldSize: data.runners.length,
+      roster: data.runners.map((r) => ({
+        gate: r.gate,
+        name: r.name,
+        /** ★騎手は公開していない（★`race_entries_public` に無い）。★見本の名簿で埋めない */
+        jockey: '',
+        winOdds: data.winOddsByGate.get(r.gate) ?? null,
+        coat: coatOfHorseId(r.horseId),
+      })),
+      grade: rs.grade,
+      gameMonth: data.gameWeek === null ? null : gameMonthOf(data.gameWeek),
+      conditionChips: [],
+      meta: rs.meta,
+      venueRaceId: null,
+    },
+    real: {
+      raceId: data.id,
+      runners: data.runners,
+      weightKgByGate: data.weightKgByGate,
+      ownGate: data.ownGate,
+      trackCondition: data.trackCondition,
+      seed: replaySeedOf(data.id),
+    },
+  };
+}
+
+/**
+ * ★**実レースの入口**（★段 2 D・2026-09-27）。★読めたら ★`RaceView` を開き、★読めなければ ★理由を出して止めます。
+ * 🔴 ★**見本の走行に落としません**（★「そのレースを見た」が嘘になる）。
+ * ⚠️ ★この画面へのリンクは ★**自分の馬の記録からだけ**張ること（★裁定 Q-RACE-6・D-122「空の店に客を送らない」）。
+ *    ★他人のレースの一覧から ★ここへ飛べる形を作らない。
+ */
+function RealRaceGate({ raceId }: { readonly raceId: string }): React.JSX.Element {
+  const [state, setState] = useState<
+    | { readonly kind: 'loading' }
+    | { readonly kind: 'error'; readonly message: string }
+    | { readonly kind: 'ready'; readonly setup: PageSetup; readonly real: RealReplay }
+  >({ kind: 'loading' });
+  useEffect(() => {
+    let cancelled = false;
+    loadRealRace(raceId).then((data) => {
+      if (cancelled) return;
+      try {
+        setState({ kind: 'ready', ...realPageOf(data) });
+      } catch (e) {
+        setState({ kind: 'error', message: `このレースの走路を組めませんでした: ${e instanceof Error ? e.message : String(e)}` });
+      }
+    }, (e: unknown) => {
+      if (cancelled) return;
+      setState({
+        kind: 'error',
+        message: e instanceof RaceNotPlayableError ? e.message
+          : `レースを読めませんでした: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    });
+    return () => { cancelled = true; };
+  }, [raceId]);
+  if (state.kind === 'ready') return <RaceView setup={state.setup} real={state.real} />;
+  /** ⚠️ ★意匠は作っていません（★`PARAM_ERROR` と同じ字・`a-panel`） */
+  return (
+    <div style={{ padding: '22px 16px 40px' }}>
+      <div className="a-panel" style={{
+        padding: '14px 16px', fontSize: 14, fontWeight: 900,
+        color: state.kind === 'error' ? 'var(--a-red-d)' : 'var(--a-ink-2)',
+      }}>
+        {state.kind === 'error' ? state.message : 'レースの記録を読んでいます…'}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -2274,7 +2460,11 @@ export default function RacePage(): React.JSX.Element {
  *   ★`setup` は ★**開いてから閉じるまで変わりません**（★見本の鞍を替えるときは ★`location.search` を書いて読み直す作り）。
  *   ★だから ★依存 `[]` の素材読み込みが ★`setup` を読んでも ★古びません。
  */
-function RaceView({ setup }: { readonly setup: PageSetup }): React.JSX.Element {
+function RaceView({ setup, real }: {
+  readonly setup: PageSetup;
+  /** ★実レースの確定記録（★`null` は見本）。★`setup` と同じく ★開いてから閉じるまで変わりません */
+  readonly real: RealReplay | null;
+}): React.JSX.Element {
   /**
    * ★**走路・頭数・場の見た目は `setup` から**（★段 2 D）。
    *   ★名前を残すのは ★この本体の 6,000 行を 1 文字も動かさないためです（★見本の道では ★元のモジュール定数と同じ値）。
@@ -2402,7 +2592,10 @@ function RaceView({ setup }: { readonly setup: PageSetup }): React.JSX.Element {
   const dRef = useRef(0);
   const auditSeekAppliedRef = useRef(false);
 
-  const [seed, setSeed] = useState(42);
+  /**
+   * ★実レースは ★レース ID から決めた種（★映像だけ・`replaySeedOf`）。★取得の後にだけ開くので ★初期値で渡せます。
+   */
+  const [seed, setSeed] = useState(real?.seed ?? 42);
   /**
    * ★**`/race?seed=99` で seed を URL から選べるようにします**（2026-08-26・オーナー要求）
    *
@@ -2417,9 +2610,11 @@ function RaceView({ setup }: { readonly setup: PageSetup }): React.JSX.Element {
    * ⚠️ ★`useState` の初期値にしないのは、サーバー側描画と食い違うためです（hydration）。
    */
   useEffect(() => {
+    /** ★実レースは ★見比べの口で曲げない（★`?seed=` を読まない） */
+    if (real !== null) return;
     const v = Number(new URLSearchParams(window.location.search).get('seed'));
     if (Number.isFinite(v) && v > 0) setSeed(Math.floor(v));
-  }, []);
+  }, [real]);
 
   /**
 
@@ -2435,7 +2630,8 @@ function RaceView({ setup }: { readonly setup: PageSetup }): React.JSX.Element {
    *    ★スターパークはシード 42 で選ばれていた人（d）なので、★既定の鞍の実況者は変わりません。
    */
   const cast = VENUE_LOOK.cast;
-  const [ownGate, setOwnGate] = useState(3);
+  /** ★実レースは ★自分の馬の馬番（★読む層が `is_mine` で確かめた馬） */
+  const [ownGate, setOwnGate] = useState(real?.ownGate ?? 3);
   const [playing, setPlaying] = useState(false);
   /**
    * ★**一度でも「観る」を押したか**（★2026-09-13・オーナー指摘）
@@ -2558,6 +2754,8 @@ function RaceView({ setup }: { readonly setup: PageSetup }): React.JSX.Element {
   const pickVenue = useCallback((venueId: string): void => {
     const params = new URLSearchParams(window.location.search);
     params.set('venue', venueId);
+    /** ★鞍を選んだら ★実レースの口は外す（★1 つの URL に 2 つの意味を持たせない・裁定 Q-RACE-1） */
+    params.delete('race');
     params.delete('surface');
     window.location.search = params.toString();
   }, []);
@@ -2637,8 +2835,9 @@ function RaceView({ setup }: { readonly setup: PageSetup }): React.JSX.Element {
   }, [devMode, ready, built, watchStarted, smallScreen]);
   const [err, setErr] = useState<string | null>(null);
   const [clock, setClock] = useState(0);
-  const [surface, setSurface] = useState<Surface>('turf');
-  const [trackCondition, setTrackCondition] = useState<TrackCondition>('good');
+  /** ★実レースは ★取得の後にだけ開くので ★初期値から実物（★1 コマ目から違う馬場で組まない） */
+  const [surface, setSurface] = useState<Surface>(real !== null ? setup.surface : 'turf');
+  const [trackCondition, setTrackCondition] = useState<TrackCondition>(real?.trackCondition ?? 'good');
   /**
    * ★回り。★**初期値はその競馬場の回り**（`venues.ts`「回りは競馬場ごとに固定」）。
    * ⚠️ ★回りは**描画層だけ**に効きます（`ovalSegments` は回りを見ない）。
@@ -2656,9 +2855,18 @@ function RaceView({ setup }: { readonly setup: PageSetup }): React.JSX.Element {
      * ★**`?surface=` があればそれを、無ければそのレースの馬場**を使います。
      *   ⚠️ ★蒼海賞（ダート）を開いて芝が出ると、★**見ているものが違います**。
      */
-    const sp = new URLSearchParams(window.location.search).get('surface');
-    setSurface(sp === null ? setup.surface : surfaceFromSearch(window.location.search));
-    setTrackCondition(conditionFromSearch(window.location.search));
+    /**
+     * 🔴 ★**実レースは ★実物の馬場と馬場状態**（★見比べの口 `?surface=` / 馬場状態の口で曲げない）。
+     *   ★曲げると ★「そのレースを見た」が嘘になります（★見本に落とすのと同じ族）。
+     */
+    if (real !== null) {
+      setSurface(setup.surface);
+      setTrackCondition(real.trackCondition);
+    } else {
+      const sp = new URLSearchParams(window.location.search).get('surface');
+      setSurface(sp === null ? setup.surface : surfaceFromSearch(window.location.search));
+      setTrackCondition(conditionFromSearch(window.location.search));
+    }
     setShowEntryBoard(new URLSearchParams(window.location.search).get('entryBoard') === '1');
   }, []);
   /**
@@ -3922,8 +4130,20 @@ function RaceView({ setup }: { readonly setup: PageSetup }): React.JSX.Element {
   }, []);
 
   useEffect(() => {
-    try { setBuilt(build(setup, seed, ownGate, surface, trackCondition, contestGammaFromSearch(typeof window === 'undefined' ? '' : window.location.search))); setErr(null); } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+    try { setBuilt(build(setup, seed, ownGate, surface, trackCondition, contestGammaFromSearch(typeof window === 'undefined' ? '' : window.location.search), real)); setErr(null); } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      /**
+       * 🔴 ★**実レースで D-059 の番人が鳴いたら ★止めて言う**（★裁定 Q-RACE-3 の追加条件）。
+       *   ★見本の走行に ★**落としません**。★黙って飲み込みもしません（★起きたこと自体が ★記録の欠陥）。
+       *   ★簿 `REPLAY-D059-MISMATCH-STOPS`。★コンソールに ★レース ID を残して ★追えるようにします。
+       */
+      if (real !== null) {
+        console.error(`[race-replay] この録画は出せません race=${real.raceId}: ${message}`);
+        setBuilt(null);
+        setErr(`この録画は出せません（映像の着順が確定した着順と合いませんでした）: ${message}`);
+      } else {
+        setErr(message);
+      }
     }
     dRef.current = 0;
     callRef.current = [];
@@ -5991,6 +6211,7 @@ function RaceView({ setup }: { readonly setup: PageSetup }): React.JSX.Element {
             ref={canvasRef} width={W} height={H}
             style={{ display: 'block', width: W, height: H, background: '#111' }}
           />
+          {real !== null && <div style={REPLAY_BADGE_STYLE}>{REPLAY_BADGE_TEXT}</div>}
           {/*
             ★**③ 確定後**（★デザイン第6便）。★着順を半透明の暗いカードで演出の上に重ね、
             ★「もう一度」と「メニューへ」を出します。
@@ -6216,10 +6437,11 @@ function RaceView({ setup }: { readonly setup: PageSetup }): React.JSX.Element {
               setPlaying(true);
             }}
           >{ready && built !== null ? '観る' : '読み込み中…'}</button>
-          <button
+          {/* ★実レースの録画では ★鞍の見比べを出さない（★見本の走行へ移る口を 同じ画面に置かない） */}
+          {real === null && <button
             type="button" className="a-btn rm-pick"
             onClick={() => { setPickerOpen((v) => !v); }}
-          >{pickerOpen ? 'コースの一覧を閉じる' : 'ほかのコースを観る'}</button>
+          >{pickerOpen ? 'コースの一覧を閉じる' : 'ほかのコースを観る'}</button>}
           {/*
             ★**コースを選ぶ**（★2026-09-02・オーナー決定 A 案）。
             ⚠️ ★`?dev=1` で開発卓を隠したとき、★**コースを見比べる道が 1 本も無くなりました。**
@@ -6537,6 +6759,9 @@ function RaceView({ setup }: { readonly setup: PageSetup }): React.JSX.Element {
             }}
           >もう一度</button>
         </div>
+      )}
+      {!smallScreen && real !== null && (
+        <p style={{ fontSize: 13, fontWeight: 900, margin: '0 0 6px' }}>{REPLAY_BADGE_TEXT}</p>
       )}
       {!smallScreen && (
         <canvas

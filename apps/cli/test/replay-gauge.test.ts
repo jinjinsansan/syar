@@ -54,8 +54,16 @@ describe('🔴 ★録画のゲージ（★出さないのは実レースだけ�
     const m = src.match(/function build\([\s\S]*?\n\}/);
     expect(m, '🔴 ★`build()` が見つからない（★走査が壊れている）').not.toBeNull();
     const body = m![0];
-    expect(/const\s+gauge\s*=\s*staminaGaugeOf\(/.test(body),
+    /**
+     * ⚠️ ★2026-09-27（段 2 D）: ★`build()` が実レースも組むようになり、★ゲージは ★即時関数の中で作ります。
+     *    ★見る中身は同じ — ★**見本の道は `staminaGaugeOf` から作り、★`null` を返すのは実レースの時だけ**。
+     */
+    expect(/return staminaGaugeOf\(/.test(body),
       '🔴 ★`build()` が ★`staminaGaugeOf` からゲージを作っていません').toBe(true);
+    const nullReturns = body.match(/return null;/g) ?? [];
+    expect(nullReturns.length, '🔴 ★ゲージを `null` にする道が ★1 つではありません（★実レースの時だけのはず）').toBe(1);
+    expect(/if \(real !== null\) return null;/.test(body),
+      '🔴 ★ゲージを `null` にする条件が ★「実レースの時」ではありません（★見本へ漏れます）').toBe(true);
     expect(/\bgauge\s*:\s*null\b/.test(body),
       '🔴 ★**見本の道で `gauge: null` にしています**。\n'
       + '  ★「出さない」のは ★実レースの録画だけです（★裁定 §7）。\n'

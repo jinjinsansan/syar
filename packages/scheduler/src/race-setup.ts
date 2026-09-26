@@ -114,11 +114,11 @@ export function raceSetupById(raceId: string = DEFAULT_RACE_ID): RaceSetup {
  *      ★`month` に嘘の月が入り、★**季節の見た目が嘘になります**）。
  *   → ★**走らせるのに要る分だけ**を持つ別の型にしました。
  *
- * 【⚠️ ★季節を持ちません】
- *   ★実レースが持つのは ★`scheduled_at`（★実時刻）だけで、★**ゲーム内の月は正典に在りません**
- *   （★1 週 ＝ 4 時間・D-007。★`records-screen.ts` が ★同じ理由で「今月」を持っていません）。
- *   → ★★**季節は決めません**（★照会 Q-RACE-4・★簿 `REPLAY-SEASON-UNKNOWN-FOR-REAL-RACE`）。
- *   ★描く側が ★**既定の見た目**で描きます。★ここで暦月から推測しないこと。
+ * 【⚠️ ★ここでは季節を決めません】
+ *   ★季節は ★**`game_week` から** ★`gameMonthOf`（`birth-week.ts`）で導きます（★2026-09-27・正典 **D-124**）。
+ *   ★この関数は ★週を受け取らないので ★`gameMonth` は `null` のまま返し、★呼ぶ側（`/race` の `realPageOf`）が
+ *   ★`my_runs.game_week` を `gameMonthOf` に通して詰めます。★週が無い（★`0046` より前の）レースは ★季節の色を重ねません。
+ *   ⚠️ ★暦月（`scheduled_at`）から推測しないこと（★1 週 ＝ 4 時間・D-007・★`records-screen.ts` が避けた BT-6 の形）。
  *
  * ⚠️ ★**着順に効くのは `spec` だけ**です（★`RaceConditions.course`・D-071）。
  *    ★`turn` は描画層だけが使います。

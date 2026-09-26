@@ -31,7 +31,7 @@ import {
   type StaminaTrack,
 } from './intervention.js';
 import type { Strategy } from '@star/sim-engine';
-import type { Pace, RaceResult, RaceResultEntry } from './types.js';
+import type { Pace, RaceResultEntry } from './types.js';
 
 /**
  * §8b の局面（正典 §13）。
@@ -244,7 +244,11 @@ export function secAtMetersLeftOf(
  * ★**走破タイムは動きません**（制約2）。動くのは「途中でどこにいるか」だけです。
  */
 export function boundaryTimesOf(
-  entry: RaceResultEntry,
+  /**
+   * ★読むのは ★走破タイムだけです（★2026-09-27・段 2 D で型を狭めた・★振る舞いは同じ）。
+   *   ★確定済みの実レースは ★公開データ（★`finish_time`）しか持たないので、★偽の `RaceResultEntry` を作らずに渡せます。
+   */
+  entry: Pick<RaceResultEntry, 'timeSec'>,
   distanceMeter: number,
   gate: number,
   strategy: Strategy,
@@ -270,7 +274,11 @@ export function boundaryTimesOf(
  * レース全体の境界時刻。★**馬番で引けるようにする**（D-056 と同じ単位）。
  */
 export function replayOf(
-  result: RaceResult,
+  /** ★読むのは ★馬番・走破タイム・距離だけです（★2026-09-27・段 2 D・★`boundaryTimesOf` と同じ理由） */
+  result: {
+    readonly order: readonly Pick<RaceResultEntry, 'horseId' | 'timeSec'>[];
+    readonly conditions: { readonly distance: number };
+  },
   /** 馬番 → 脚質。★出走表（凍結スナップショット）から取る */
   strategyOf: (gate: number) => Strategy,
   pace: Pace,
@@ -295,7 +303,8 @@ export function replayOf(
  *   ⚠️ 「近い」では通しません。**1頭でも違えば false** です。
  */
 export function finalOrderMatches(
-  result: RaceResult,
+  /** ★読むのは ★確定着順の馬番だけです（★2026-09-27・段 2 D・★実レースの録画でも ★この番人を通すため） */
+  result: { readonly order: readonly Pick<RaceResultEntry, 'horseId'>[] },
   recomputed: readonly { gate: number; finishSec: number }[],
 ): boolean {
   const settled = result.order.map((e) => Number(e.horseId));

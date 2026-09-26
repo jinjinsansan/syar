@@ -61,7 +61,7 @@ describe('🔴 ★Built の走路（段 A: モジュール定数と同じもの�
    */
   it('🔴 ★build() は setup の走路を受け取り、そのまま詰める', () => {
     const src = strip(read(RACE_PAGE));
-    const build = src.match(/function build\(setup: PageSetup,[\s\S]*?\n\}/);
+    const build = src.match(/function build\(\s*setup: PageSetup,[\s\S]*?\n\}/);
     expect(build, '🔴 ★`build(setup: PageSetup, …)` が見つからない').not.toBeNull();
     const body = build![0];
     /** ★① ★走路と頭数は ★`setup` から（★別の出どころを持たない） */
@@ -143,7 +143,7 @@ describe('🔴 ★Built の走路（段 A: モジュール定数と同じもの�
    */
   it('🔴 ★段 C/D: 画面の本体は 走路・頭数・場を setup から受け、モジュールの設定を直に読まない', () => {
     const src = strip(read(RACE_PAGE));
-    const view = src.match(/function RaceView\(\{ setup \}: \{ readonly setup: PageSetup \}\)[\s\S]*?\n\}\n/);
+    const view = src.match(/function RaceView\(\{ setup, real \}: \{[\s\S]*?\n\}\n/);
     expect(view, '🔴 ★`RaceView` の本体が切り出せない（★走査が壊れている）').not.toBeNull();
     const body = view![0];
     expect(body.length, '★`RaceView` が短すぎる（★切り出しが途中で止まっている）').toBeGreaterThan(50000);

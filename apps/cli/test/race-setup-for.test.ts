@@ -54,9 +54,10 @@ describe('🔴 ★実レースの走らせる形（raceSetupFor）', () => {
   });
 
   /**
-   * 🔴 ★**季節を決めない**（★照会 Q-RACE-4・★簿 `REPLAY-SEASON-UNKNOWN-FOR-REAL-RACE`）。
-   *   ★実レースが持つのは ★`scheduled_at`（実時刻）だけで、★ゲーム内の月は ★**正典に在りません**。
-   *   ⚠️ ★暦月から推測すると ★`records-screen.ts` が避けたのと ★同じ穴に落ちます（★BT-6 の形）。
+   * 🔴 ★**`raceSetupFor` は季節を決めない**（★照会 Q-RACE-4 → ★2026-09-27 に ★正典 **D-124** で決着）。
+   *   ★季節は ★**`game_week` から** ★`gameMonthOf`（`birth-week.ts`）で導きます。★`raceSetupFor` は ★週を受け取らないので ★`null` のまま、
+   *   ★呼ぶ側（`/race` の `realPageOf`）が ★`my_runs.game_week` を `gameMonthOf` に通して詰めます。
+   *   ⚠️ ★暦月（`scheduled_at`）から推測すると ★`records-screen.ts` が避けたのと ★同じ穴に落ちます（★BT-6 の形）。
    */
   it('🔴 ★季節（ゲーム内の月）を決めていない', () => {
     const s = raceSetupFor({
