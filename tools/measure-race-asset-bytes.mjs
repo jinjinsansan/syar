@@ -15,7 +15,7 @@
  *   ★役の一覧  … `broadcastV2ScriptAssets`（`@star/render`。★画面と同じ関数）
  *   ★勝馬の 2 役 … `race/page.tsx` の `WINNER_POSE` / `WINNER_FOLLOW_REAR` を ★**原文から**読む
  *   ★型の割当  … 同じく `HORSE_TYPE_BY_GATE` を原文から読む
- *   ★枠番の毛色 … 同じく `COAT_BY_GATE` を原文から読む
+ *   ★見本の毛色 … 同じく `DEMO_COATS` を原文から読む（★2026-09-27 まで `COAT_BY_GATE`）
  *   ★馬 ID の毛色 … `coatOfHorseId`（`@star/render`）
  *   ⚠️ ★読めなかったら ★**止まります**（★既定値で測って「少ない」と言わないため）。
  *
@@ -50,7 +50,11 @@ const winnerPose = fromPage(/const WINNER_POSE:[^=]*=\s*'(\w+)'/, 'WINNER_POSE')
 const winnerRear = fromPage(/const WINNER_FOLLOW_REAR\s*=\s*(true|false)/, 'WINNER_FOLLOW_REAR')[1] === 'true';
 const typesByGate = [...fromPage(/const HORSE_TYPE_BY_GATE[^=]*=\s*\[([\s\S]*?)\]/, 'HORSE_TYPE_BY_GATE')[1]
   .matchAll(/'(\w+)'/g)].map((m) => m[1]);
-const coatByGate = [...fromPage(/const COAT_BY_GATE[^=]*=\s*\[([\s\S]*?)\]/, 'COAT_BY_GATE')[1]
+/**
+ * ★見本（`?venue=`）の毛色（★2026-09-27・段 2 D: ★旧 `COAT_BY_GATE` → ★見本専用 `DEMO_COATS`・重複なしの 8 色）。
+ *   ★実レースは ★この表を読みません（★`coatOfHorseId`）。
+ */
+const demoCoats = [...fromPage(/const DEMO_COATS[^=]*=\s*\[([\s\S]*?)\]/, 'DEMO_COATS')[1]
   .matchAll(/'([\w-]+)'/g)].map((m) => m[1]);
 
 const manifest = JSON.parse(readFileSync(join(BAKED, 'manifest.json'), 'utf8'));
@@ -122,16 +126,19 @@ function bytesFor(coatsByGate) {
 }
 const mb = (b) => `${(b / 1048576).toFixed(1)}MB`;
 
+/**
+ * ★見本（★`DEMO_COATS` の頭数ぶん・★見本は 8 頭立てだけ）。★実レースの比べる相手にします。
+ * ⚠️ ★2026-09-27 まで ★ここは「★いま（枠番から）」で ★頭数ごとに表を回していました（★旧 `COAT_BY_GATE`）。
+ */
+const now = bytesFor(demoCoats);
+console.log(`\n── 見本（?venue=・${demoCoats.length} 頭・DEMO_COATS） ──`);
+console.log(`  毛色 ${now.coats} 種  ${String(now.files).padStart(3)} ファイル  ${mb(now.bytes)}`
+  + `（うち発走前の紹介 ${mb(now.walkBytes)}）`);
+
 for (const n of FIELDS) {
-  console.log(`\n── ${n} 頭立て ──`);
+  console.log(`\n── 実レース ${n} 頭立て ──`);
 
-  /** ★いま: 枠番から引く */
-  const nowCoats = Array.from({ length: n }, (_, i) => coatByGate[i % coatByGate.length]);
-  const now = bytesFor(nowCoats);
-  console.log(`  いま（枠番から）  毛色 ${now.coats} 種  ${String(now.files).padStart(3)} ファイル  ${mb(now.bytes)}`
-    + `（うち発走前の紹介 ${mb(now.walkBytes)}）`);
-
-  /** ★これから: 馬 ID から引く（★毛色の散り方が毎レース変わるので、たくさん試す） */
+  /** ★実レース: 馬 ID から引く（★毛色の散り方が毎レース変わるので、たくさん試す） */
   const seen = [];
   for (let s = 0; s < SAMPLES; s += 1) {
     seen.push(bytesFor(Array.from({ length: n }, () => coatOfHorseId(randomUUID()))));
@@ -140,11 +147,11 @@ for (const n of FIELDS) {
   const at = (p) => seen[Math.min(seen.length - 1, Math.floor(seen.length * p))];
   const mean = seen.reduce((s, x) => s + x.bytes, 0) / seen.length;
   const meanCoats = seen.reduce((s, x) => s + x.coats, 0) / seen.length;
-  console.log(`  これから（馬 ID から・${SAMPLES} 回）`);
+  console.log(`  馬 ID から（coatOfHorseId・${SAMPLES} 回）`);
   console.log(`      平均  毛色 ${meanCoats.toFixed(1)} 種  ${mb(mean)}`);
   console.log(`      p95   毛色 ${at(0.95).coats} 種  ${String(at(0.95).files).padStart(3)} ファイル  ${mb(at(0.95).bytes)}`);
   console.log(`      最大  毛色 ${at(1).coats} 種  ${String(at(1).files).padStart(3)} ファイル  ${mb(at(1).bytes)}`);
-  console.log(`      → いまの ${(mean / now.bytes).toFixed(2)} 倍（最大 ${(at(1).bytes / now.bytes).toFixed(2)} 倍）`);
+  console.log(`      → 見本の ${(mean / now.bytes).toFixed(2)} 倍（最大 ${(at(1).bytes / now.bytes).toFixed(2)} 倍）`);
 }
 
 console.log('\n⚠️ ★これは ★**落ちてくる量**です。★待ちの長さは回線と端末で決まります（★オーナーの目が要ります）。');

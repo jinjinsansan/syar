@@ -738,23 +738,24 @@ const HUD_SETTLE_SEC = 0.8;
  *    → **毛色は減らさず、掛ける範囲を馬体に限る**（`@star/render` の `isHorseCoat`）。
  */
 /**
- * ★**毛色の並び**（2026-08-28・オーナー要望「JRA の登録馬の毛色通りに」）。
+ * ★**見本（`?venue=`）専用の毛色**（★2026-09-27・裁定 `REVIEW_RACE_REAL_D_AND_CALIBRATION_20260927.md` §8・Q-RACE-8 (b)）。
  *
- *   ★実在の登録頭数のおおよその割合: 鹿毛 ~48% / 黒鹿毛 ~22% / 栗毛 ~15% /
- *     芦毛 ~7% / 青鹿毛 ~6% / 栃栗毛 ~1.5% / 青毛 ~1% / 白毛 <0.1%。
- *   ★18 頭ぶん並べ、その割合に近づけています（鹿毛7 / 黒鹿毛4 / 栗毛3 / 芦毛1 /
- *     青鹿毛1 / 栃栗毛1 / 青毛1）。★白毛は入れません（`COAT_TRANSFORMS` の注記）。
+ * 🔴 ★**実レースは ★この表を読みません。** ★毛色は ★`coatOfHorseId(horse_id)`（`@star/render`）が唯一の出どころです。
+ *    ★この表は ★旧名 `COAT_BY_GATE`（★18 枠・実在の割合）でした。★その名前が ★「毛色は枠から引く」に見え、
+ *    ★**それが 月毛・白毛が 1 度も画面に出なかった欠陥の入口**でした。→ ★見本専用の名前にしました。
  *
- * ⚠️ ★**隣どうしが同じ毛色にならないよう散らしています。** 実在の割合どおりに
- *    並べるだけだと鹿毛が固まり、★「同じ馬が並んでいる」に見えます。
- * ⚠️ ★12 頭立てでは先頭 12 個が使われます（鹿毛5 / 黒鹿毛3 / 栗毛2 / 芦毛1 / 青鹿毛1）。
+ * 【★見本は見せ物です（★分布を再現する場所ではない）】
+ *   ★8 頭ぶんを ★**重複なしの 8 色**にし、★**月毛と白毛を必ず入れます**（★9 色焼いたのに 7 色しか出ない、を見本の側でも閉じる）。
+ *   ★外したのは ★青鹿毛（`seal-brown`・★黒鹿毛と青毛に挟まれて見分けにくい）。★明るい色と暗い色を交互に並べています。
+ *   ★重みは使いません（★重みは ★実レースの `coatOfHorseId` の母集団のためのもの）。
+ *   ⚠️ ★2026-09-24 にオーナーは ★隣接を許すと決めています（★隣に同じ毛色 ＝ 欠陥ではない）。★ここは重複なしなので 0 組です。
+ * ⚠️ ★色名は ★`CoatName` 型で受けます（★綴りを誤ると型検査が落とす）。★網 `coat-single-source.test.ts` が
+ *    ★8 色・重複なし・月毛と白毛を含む・実レースの道が読まない、を見ます。
  */
-const COAT_BY_GATE: readonly CoatName[] = [
-  'bay', 'chestnut', 'dark-bay', 'bay', 'grey', 'dark-bay',
-  'chestnut', 'seal-brown', 'bay', 'dark-bay', 'bay', 'bay',
-  'liver-chestnut', 'bay', 'blue-black', 'chestnut', 'dark-bay', 'bay',
+const DEMO_COATS: readonly CoatName[] = [
+  'bay', 'grey', 'dark-bay', 'palomino', 'chestnut', 'blue-black', 'white', 'liver-chestnut',
 ];
-const coatOf = (gate: number): CoatName => COAT_BY_GATE[(gate - 1) % COAT_BY_GATE.length] ?? 'bay';
+const coatOf = (gate: number): CoatName => DEMO_COATS[(gate - 1) % DEMO_COATS.length] ?? 'bay';
 /**
  * ★**個体タイプ**（★2026-09-09・`REPORT_P4_HORSE_TYPES_20260908.md`）
  *

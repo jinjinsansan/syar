@@ -12,9 +12,10 @@
  *   ★② ★毛色名を並べた表が ★**登録簿に無いまま**増えていないか
  *   ★③ ★`coat.ts` 自身が ★**9 色すべて**持っているか（★走査が空振りしていない）
  *
- * ⚠️ ★**`COAT_BY_GATE` を いま消しません。** ★`/race` は ★まだ実レースを読んでいないので
- *    （★`horseId: String(i + 1)` ＝ ★枠番。★`DESIGN_LIVE_RACE_DATA_CONTRACT_20260921.md`）、
- *    ★渡せる馬 ID が在りません。★**登録簿に「見本だけ」として載せ、★期限を付けます。**
+ * ✅ ★**2026-09-27（段 2 D・裁定 Q-RACE-8 (b)）**: ★実レースは ★`coatOfHorseId(horse_id)` を読むようになりました。
+ *    ★見本の表は ★`DEMO_COATS`（★見本専用・★重複なしの 8 色・★月毛と白毛を含む）に作り直し、
+ *    ★★実レースの道がこの表を読まないことを ★下の ④ が見ます。
+ *   ★④ ★見本の表の中身と、★実レースの道が見本の表を読まないこと
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -37,13 +38,15 @@ const strip = (src: string): string => src
  * ⚠️ 🔴 ★足すときは ★**いつ消えるか**を書くこと（★「見本だから」で永久に残さない）。
  */
 const COAT_LIST_EXEMPT: Readonly<Record<string, string>> = {
-  'apps/web/src/app/race/page.tsx: COAT_BY_GATE':
-    '🔴 ★**見本の 18 枠の表**（★月毛・白毛を含まない）。'
-    + '★`/race` は まだ ★**実レースを読んでいません** — ★`horseId: String(i + 1)` は ★枠番そのもので、'
-    + '★`coatOfHorseId` に渡せる馬 ID が在りません（★`DESIGN_LIVE_RACE_DATA_CONTRACT_20260921.md`）。'
-    + '✅ ★**消す条件**: ★`0089` の `horse_id` を読む経路が `/race` に入った日。'
-    + '★そのとき ★`coatOfHorseId(entrant.horseId)` に替え、★この行を消すこと。'
-    + '★簿 `COAT-PALOMINO-WHITE-NOT-BAKED` の ③ が同じことを追っています',
+  /**
+   * ★2026-09-27（★裁定 Q-RACE-8 (b)）: ★旧 `COAT_BY_GATE`。★実レースは `coatOfHorseId(horse_id)` を読む道が入った（段 2 D）。
+   *   ★見本の馬は ID を持たないので ★表を残し、★見本専用の名前・★重複なしの 8 色（★月毛・白毛を含む）に作り直した。
+   */
+  'apps/web/src/app/race/page.tsx: DEMO_COATS':
+    '★**見本（`?venue=`）専用の 8 色**（★重複なし・★月毛と白毛を含む・★重みは使わない）。'
+    + '★見本の馬は ID を持たないので ★`coatOfHorseId` に渡せません（★偽の ID を置くと「その馬」が居るように見える・裁定 (c) 不採用）。'
+    + '🔴 ★実レースの道は ★この表を読みません（★下の網が見ます）。'
+    + '✅ ★**消す条件**: ★**見本の道が無くなった日**（★`/race` が実レースだけを出すようになった日）。★そのとき ★表ごと消すこと',
 };
 
 /** ★毛色名（★`coat.ts` の重みの表から導く。★ここに写さない） */
@@ -141,5 +144,56 @@ describe('🔴 ★毛色の出どころは coat.ts だけ', () => {
     const missing = COAT_NAMES.filter((c) => !files.some((f) => f.includes(`-${c}.`)));
     expect(missing, '🔴 ★焼き済みに無い毛色があります（★`tools/bake-race-frames.mjs` を流してください）')
       .toEqual([]);
+  });
+
+  /**
+   * 🔴 ★④ **見本の表は見本だけ**（★2026-09-27・裁定 Q-RACE-8 (b)）。
+   *   ★中身: ★8 色・★重複なし・★月毛と白毛を含む・★すべて `coat.ts` の毛色。
+   *   ★使い方: ★見本の表（`coatOf`）を読むのは ★`venuePageSetup()` の中だけ。★実レース（`realPageOf`）は ★`coatOfHorseId` だけ。
+   */
+  describe('🔴 ④ 見本の毛色表（DEMO_COATS）', () => {
+    const RACE_PAGE = 'apps/web/src/app/race/page.tsx';
+    const bodyOf = (src: string, head: RegExp): string => {
+      const m = src.match(new RegExp(`${head.source}[\\s\\S]*?\\n\\}\\n`));
+      expect(m, `★${head.source} が切り出せない（★走査が壊れている）`).not.toBeNull();
+      return m![0];
+    };
+    /** ★`coatOf(` を読んでいる所（★定義の行を除く） */
+    const coatOfCalls = (src: string): number => (src.match(/(?<![A-Za-z0-9_])coatOf\(/g) ?? []).length;
+
+    it('★8 色・重複なし・月毛と白毛を含む・すべて coat.ts の毛色', () => {
+      const src = strip(read(RACE_PAGE));
+      const m = src.match(/const DEMO_COATS: readonly CoatName\[\] = \[([\s\S]*?)\];/);
+      expect(m, '🔴 ★`DEMO_COATS` が見つからない').not.toBeNull();
+      const names = [...m![1]!.matchAll(/'([^']+)'/g)].map((x) => x[1]!);
+      expect(names, '★見本は 8 頭').toHaveLength(8);
+      expect(new Set(names).size, '🔴 ★見本の 8 色に重複があります').toBe(8);
+      expect(names, '🔴 ★月毛が入っていません（★焼いたのに出ない色を残さない）').toContain('palomino');
+      expect(names, '🔴 ★白毛が入っていません').toContain('white');
+      expect(names.filter((n) => !COAT_NAMES.includes(n as (typeof COAT_NAMES)[number])), '★`coat.ts` に無い毛色').toEqual([]);
+    });
+
+    it('🔴 ★見本の表を読むのは venuePageSetup だけ・実レースは coatOfHorseId だけ', () => {
+      const src = strip(read(RACE_PAGE));
+      const venue = bodyOf(src, /function venuePageSetup\(\): PageSetup \{/);
+      const real = bodyOf(src, /function realPageOf\(/);
+      /** ★旧名が戻っていない */
+      expect(/\bCOAT_BY_GATE\b/.test(src), '🔴 ★旧名 `COAT_BY_GATE` が戻っています（★「毛色は枠から引く」に見える）').toBe(false);
+      /** ★`DEMO_COATS` を読むのは `coatOf` の定義だけ（★宣言 1 ＋ 定義の中 2） */
+      expect((src.match(/\bDEMO_COATS\b/g) ?? []).length, '🔴 ★`DEMO_COATS` を ★`coatOf` の外で読んでいます').toBe(3);
+      /** ★`coatOf(` の呼び出しは ★すべて見本の組み立ての中 */
+      expect(coatOfCalls(src), '🔴 ★見本の表（`coatOf`）を ★見本の組み立ての外で読んでいます').toBe(coatOfCalls(venue));
+      expect(coatOfCalls(venue), '★走査が空振り（★見本の組み立てが `coatOf` を読んでいない）').toBeGreaterThan(0);
+      /** ★実レースは ★馬 ID から */
+      expect(real, '🔴 ★実レースが `coatOfHorseId(r.horseId)` を読んでいません').toContain('coat: coatOfHorseId(r.horseId),');
+      expect(coatOfCalls(real) + (real.match(/\bDEMO_COATS\b/g) ?? []).length, '🔴 ★実レースが見本の表を読んでいます').toBe(0);
+    });
+
+    it('🔴 ★対照: 見本の組み立ての外で coatOf を読むと 上の判定が落ちる', () => {
+      const venue = 'function venuePageSetup(): PageSetup {\n  coat: coatOf(i + 1),\n}\n';
+      const leaked = `${venue}function realPageOf(d) {\n  coat: coatOf(r.gate),\n}\n`;
+      expect(coatOfCalls(leaked)).not.toBe(coatOfCalls(venue));
+      expect(coatOfCalls('coatOfHorseId(r.horseId)'), '★`coatOfHorseId` を誤って数える').toBe(0);
+    });
   });
 });
