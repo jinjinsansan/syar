@@ -99,7 +99,10 @@ import {
   SEASON_LOOKS, seasonOf, seasonParticlesFor, rainDropsOf, timeOfDayTintsOf, VENUE_FOG_ALPHA,
 } from '@star/render';
 import POOL from '../../lib/watch-pool.json';
-import { raceSetupFromParam, gradedRacesByVenue, timeOfDayFromParam, TIME_OF_DAYS, TIME_OF_DAY_LABELS } from '@star/scheduler';
+import {
+  raceSetupFromParam, gradedRacesByVenue, timeOfDayFromParam, TIME_OF_DAYS, TIME_OF_DAY_LABELS,
+  type RaceCourseSpec, type Venue,
+} from '@star/scheduler';
 import { FrameBadge } from '../../components/ui';
 import { createRaceAudio, type RaceAudio } from './race-audio.js';
 
@@ -211,26 +214,14 @@ const RETURN_TO: string | null = (() => {
 /** ★出口のボタンの文字（★戻り先が決まっていないときは、これまでの「メニューへ」） */
 const RETURN_LABEL = RETURN_TO === null ? 'メニューへ' : RETURN_ROUTES[RETURN_TO]!;
 /**
- * ★**競馬場ごとの見た目**（★ゲート・ゴールの目印・2026-09-15）。
- *   ★監査道具・検査と ★**同じ表**（`@star/render` の `venueLookOf`）から引きます（★R-30）。
- * ⚠️ ★着順には効きません。★スターパーク（既定の鞍）は ★従来の見た目のままです。
- */
-const VENUE_LOOK = venueLookOf(RACE_SETUP.venue.id);
-/** ★格の雰囲気（★観客の入り・勝ち馬の帯の色・イントロの英字・2026-09-15）。★`@star/render` の表から引く */
-const GRADE_LOOK = GRADE_LOOKS[RACE_SETUP.race.grade];
-const DIST = RACE_SETUP.distanceM;
-/** ★走路の形。⚠️ ★エンジンにも描画層にも**これを渡します**（★別々に組まない） */
-const COURSE_SPEC = RACE_SETUP.spec;
-/**
  * ★**回りの向きを見比べる口**（`?turn=left|right`・★2026-09-15・オーナー指示
  *   ★「右回りで馬が左に走りゴールするバージョンのレース演出を作ってください」）。
- * ⚠️ ★**描画だけに効きます。** ★エンジンの走路（`COURSE_SPEC`）は回りを持たないので、★着順は 1 ビットも変わりません
+ * ⚠️ ★**描画だけに効きます。** ★エンジンの走路（`spec`）は回りを持たないので、★着順は 1 ビットも変わりません
  *    （★開発卓の「回り」と同じ扱い）。★省くと鞍の回り（`RACE_SETUP.turn`）です。
- * ⚠️ ★描画の走路はこの向きで組みます（★`COURSE_OPTS` と `turn` の初期値の 2 か所を同じ値から引く・R-30）。
+ * ⚠️ ★**見本の道（`?venue=`）だけ**に効きます。★実レースの回りは ★その場の回りです（★見比べの口で実物を曲げない）。
  */
 const TURN_OVERRIDE: 'left' | 'right' | undefined = typeof window === 'undefined' ? undefined
   : ((v) => (v === 'left' || v === 'right' ? v : undefined))(new URLSearchParams(window.location.search).get('turn'));
-const RACE_TURN: 'left' | 'right' = TURN_OVERRIDE ?? RACE_SETUP.turn;
 /**
  * ★**時間帯を見比べる口**（`?tod=morning|day|dusk|night`・★2026-09-15・計画書 C-1・オーナー決定 2）。
  *   ★本番は ★発走の時刻（`timeOfDayOfScheduledAt`・日本時間）から決めます。★デモには発走の時刻が無いので、この口で切り替えます。
@@ -247,7 +238,6 @@ const RACE_TURN: 'left' | 'right' = TURN_OVERRIDE ?? RACE_SETUP.turn;
  *   → ★★**直した本人の「隣」を見る**（★作法・★今日の 2 件は ★同じファイル・同じ型でした）。
  */
 const TIME_OF_DAY = TOD_RESOLVED.timeOfDay;
-const COURSE_OPTS = { ...COURSE_SPEC, turn: RACE_TURN };
 /**
  * ★**レース選択の中身**（★競馬場ごとの 50 鞍）。
  * ⚠️ ★ここで組み直しません — ★`@star/scheduler` が `VENUES` と `GRADED_RACES` から出します
@@ -264,11 +254,13 @@ const LANE_MODEL_PARAM = typeof window === 'undefined' ? undefined
     ? LANE_MODEL_LEGACY
     : LANE_MODELS[new URLSearchParams(window.location.search).get('lane') ?? ''];
 /**
- * ★**頭数**。★2026-09-15 に 12 → 8（★オーナー指示「次から馬の数を 8 頭にしてください」）。
+ * ★**見本の頭数**。★2026-09-15 に 12 → 8（★オーナー指示「次から馬の数を 8 頭にしてください」）。
  *   ★8 頭立ては ★1 頭 1 枠なので ★帽子（枠色）が全頭違い、★上着は `jacket8-*` の専用 8 色です（`silkRoleOf`）。
  * ⚠️ ★監査道具の既定の頭数（`RACE_DEFAULTS.field`）も同じ値にしてあります（★R-31）。
+ * 🔴 ★**これは見本（`?venue=`）の頭数です**（★2026-09-27・裁定 Q-RACE-5）。★実レースは 8〜18 頭（★`FIELD_SIZE`）で、
+ *    ★画面は ★`PageSetup.fieldSize` を読みます（★この定数を画面の中で直に読まない・網 `built-course-fields.test.ts`）。
  */
-const FIELD = 8;
+const SAMPLE_FIELD = 8;
 /**
  * ★**従来方式へ戻す口**（`?motion=legacy`）。★見比べのために残します。
  * ⚠️ ★この旗が見るのは★**方針の名前まで**です。★送り速さそのものの分岐は
@@ -718,7 +710,6 @@ const silksColorsFor = (pal: Record<string, string>, fieldSize: number): readonl
  *   以前は実在名のプレースホルダーが直書きされていたので架空名に置換した。
  */
 /** ★見出し。★`?race=` が無ければ桜星賞（★直書きだったものと同じ） */
-const RACE_META = RACE_SETUP.meta;
 /** ★馬場の呼び名。★画面の選択肢と同じ並び（★2 か所に別の言葉を持たない） */
 const TRACK_CONDITION_LABEL: Readonly<Record<TrackCondition, string>> = {
   good: '良', yielding: '稍重', soft: '重', bad: '不良',
@@ -976,6 +967,88 @@ const JOCKEY_NAMES = ['田中 守', '佐藤 翼', '山本 誠', '中村 駿', '�
  * ⚠️ ★着順とは無関係です（★人気馬が勝つとは限らない・★ゴールより前に結果を読まない D-098）。
  */
 const DEMO_WIN_ODDS = [17.5, 3.4, 9.4, 8.6, 23.0, 7.7, 43.9, 2.5, 31.2, 12.8, 55.1, 64.0] as const;
+
+/** ★出走表の 1 頭（★馬番の順・★`roster[gate - 1]`） */
+interface RosterEntry {
+  readonly gate: number;
+  readonly name: string;
+  /**
+   * ★騎手名。🔴 ★**実レースでは空文字**です — ★`race_entries_public` は騎手を出していません。
+   *   ★見本の名簿（`JOCKEY_NAMES`）で埋めないこと（★無い名前を作らない）。
+   */
+  readonly jockey: string;
+  /** ★単勝オッズ。★読めなかった馬は `null`（★`99.9` 等で埋めない） */
+  readonly winOdds: number | null;
+  readonly coat: CoatName;
+}
+
+/**
+ * ★**この画面が 1 回の読み込みで走らせる「場・走路・頭数・出走表・札」**（★段 2 D・2026-09-27・
+ *   ★裁定 `REVIEW_RACE_REAL_D_AND_CALIBRATION_20260927.md` §3〜§6）
+ *
+ * 【🔴 ★なぜ 1 つに集めるか】
+ *   ★これまで ★`DIST` / `COURSE_SPEC` / `RACE_TURN` / `FIELD` / `VENUE_LOOK` / `GRADE_LOOK` / `RACE_META` は
+ *   ★**モジュール読み込み時**に ★`?venue=`（鞍）から決まる定数でした。
+ *   ★実レースは ★**取得してから**場・距離・頭数が分かるので、★定数では持てません。
+ *   → ★**決まってから `RaceView` を開き**、★素材の読み込みも `build()` も ★この値で ★1 回だけ走らせます。
+ *   ★見本の道は ★同期で決まるので ★**振る舞いは変わりません**（★`venuePageSetup()` は元の定数と同じ値を詰めるだけ）。
+ *
+ * ⚠️ ★**着順に効くのは `spec` だけ**です（★`RaceConditions.course`・D-071）。★他は見た目です。
+ */
+interface PageSetup {
+  readonly venue: Venue;
+  readonly distanceM: number;
+  readonly spec: RaceCourseSpec;
+  /** ★回り（★見本の道では `?turn=` の見比べを反映した後の値） */
+  readonly turn: 'left' | 'right';
+  readonly surface: Surface;
+  readonly fieldSize: number;
+  readonly roster: readonly RosterEntry[];
+  /**
+   * ★格。🔴 ★**`null` は平場**（★裁定 Q-RACE-7）。★格のイントロ・観客の入り・ファンファーレを ★**出しません**。
+   *   ★G3 を借りないこと（★「格のあるレース」だと嘘をつきます）。
+   */
+  readonly grade: 'G1' | 'G2' | 'G3' | null;
+  /** ★ゲーム内の月（★季節の見た目だけ・D-124）。★`null` は ★季節の色を重ねない */
+  readonly gameMonth: number | null;
+  /** ★出走条件の札（★年齢・牝馬限定・シリーズ）。★実レースは ★データに無いので空（★埋めない・裁定 Q-RACE-7） */
+  readonly conditionChips: readonly string[];
+  readonly meta: { readonly venue: string; readonly raceName: string; readonly raceNo: string };
+  /** ★レース選択（★開発卓）で ★どの鞍を「選択中」と出すか。★実レースは `null` */
+  readonly venueRaceId: string | null;
+}
+
+/**
+ * ★**見本の道（`?venue=`）の `PageSetup`**。★2026-09-26 までのモジュール定数と ★**同じ値**を詰めるだけです。
+ * ⚠️ ★関数にしてあるのは ★宣言順のためです（★呼ぶのは描画の時・★上の表が全部 評価された後）。
+ */
+function venuePageSetup(): PageSetup {
+  const race = RACE_SETUP.race;
+  return {
+    venue: RACE_SETUP.venue,
+    distanceM: RACE_SETUP.distanceM,
+    spec: RACE_SETUP.spec,
+    turn: TURN_OVERRIDE ?? RACE_SETUP.turn,
+    surface: RACE_SETUP.surface,
+    fieldSize: SAMPLE_FIELD,
+    roster: Array.from({ length: SAMPLE_FIELD }, (_, i) => ({
+      gate: i + 1,
+      name: HORSE_NAMES[i] ?? `スター${i + 1}`,
+      jockey: JOCKEY_NAMES[i] ?? 'STAR騎手',
+      winOdds: DEMO_WIN_ODDS[i] ?? 99.9,
+      coat: coatOf(i + 1),
+    })),
+    grade: race.grade,
+    gameMonth: race.month,
+    conditionChips: [
+      race.age === '2' ? '2歳' : race.age === '3' ? '3歳' : '3歳以上',
+      ...(race.fillies ? ['牝馬限定'] : []),
+      ...(race.series === undefined ? [] : [`${race.series.name} 第${race.series.leg}戦`]),
+    ],
+    meta: RACE_SETUP.meta,
+    venueRaceId: race.id,
+  };
+}
 /** ★固定2D中継の基準幅 */
 
 /**
@@ -1005,7 +1078,7 @@ interface Built {
    */
   readonly distanceM: number;
   /** ★**エンジンへ渡した走路の形**（★着順に効きます・D-071）。★`COURSE_SPEC` と同じもの */
-  readonly spec: typeof COURSE_SPEC;
+  readonly spec: RaceCourseSpec;
   /** ★回り。★**描画層だけ**が使います */
   readonly turn: 'left' | 'right';
   /**
@@ -1830,7 +1903,16 @@ interface BakedManifest {
   readonly sets: readonly BakedSet[];
 }
 
-function build(seed: number, ownGate: number, surface: Surface, trackCondition: TrackCondition, contestGamma: number): Built {
+function build(setup: PageSetup, seed: number, ownGate: number, surface: Surface, trackCondition: TrackCondition, contestGamma: number): Built {
+  /**
+   * ★**走路と頭数は `setup` から**（★段 2 D・2026-09-27）。
+   *   ★名前を残すのは ★下の式を 1 文字も動かさないためです（★見本の道では ★元のモジュール定数と同じ値）。
+   */
+  const DIST = setup.distanceM;
+  const COURSE_SPEC = setup.spec;
+  const RACE_TURN = setup.turn;
+  const COURSE_OPTS = { ...COURSE_SPEC, turn: RACE_TURN };
+  const FIELD = setup.fieldSize;
   const start = (seed * 13) % Math.max(1, POOL.length - FIELD);
   const entrants = POOL.slice(start, start + FIELD).map((h, i) => ({
     horseId: String(i + 1), stats: h.stats, surfaceAptitude: h.surfaceAptitude,
@@ -2086,7 +2168,9 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
       }))
       : [],
     development,
-    ...buildMotionTimeline({ model, warp, finishSec, finishStyle, finishChaseAt }, winnerGate, 1.6),
+    ...buildMotionTimeline({
+      model, warp, finishSec, finishStyle, finishChaseAt, distanceM: DIST, spec: COURSE_SPEC, turn: RACE_TURN,
+    }, winnerGate, 1.6),
     weightsKg: entrants.map((e) => e.weightKg),
     /** ★勝馬が決勝線を通る表示秒（★1 レース 1 回・`Built.finishCrossD` の註記） */
     finishCrossD: finishCrossDisplaySec(
@@ -2104,10 +2188,13 @@ function build(seed: number, ownGate: number, surface: Surface, trackCondition: 
 
 /** Rebuild camera/scroll samples for a start adjustment without rebuilding the race result. */
 function buildMotionTimeline(
-  { model, warp, finishSec, finishStyle, finishChaseAt }: Pick<Built, 'model' | 'warp' | 'finishSec' | 'finishStyle' | 'finishChaseAt'>,
+  { model, warp, finishSec, finishStyle, finishChaseAt, distanceM, spec, turn }:
+    Pick<Built, 'model' | 'warp' | 'finishSec' | 'finishStyle' | 'finishChaseAt' | 'distanceM' | 'spec' | 'turn'>,
   winnerGate: number, rampSec: number,
 ): Pick<Built, 'visualScroll' | 'shotChanges'> {
-  const course = ovalCourse(DIST, COURSE_OPTS);
+  /** ★走路は ★引数から（★段 2 D）。★名前を残すのは ★下の式を動かさないため */
+  const DIST = distanceM;
+  const course = ovalCourse(DIST, { ...spec, turn });
   const STEP = 0.05;
   const totalSec = RACE_INTRO_RACE_START_SEC + warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
   const samples: VisualScrollSample[] = [];
@@ -2179,6 +2266,45 @@ export default function RacePage(): React.JSX.Element {
       </div>
     );
   }
+  return <RaceView setup={venuePageSetup()} />;
+}
+
+/**
+ * ★**レースの画面の本体**（★段 2 D・2026-09-27）。
+ *   ★`setup` は ★**開いてから閉じるまで変わりません**（★見本の鞍を替えるときは ★`location.search` を書いて読み直す作り）。
+ *   ★だから ★依存 `[]` の素材読み込みが ★`setup` を読んでも ★古びません。
+ */
+function RaceView({ setup }: { readonly setup: PageSetup }): React.JSX.Element {
+  /**
+   * ★**走路・頭数・場の見た目は `setup` から**（★段 2 D）。
+   *   ★名前を残すのは ★この本体の 6,000 行を 1 文字も動かさないためです（★見本の道では ★元のモジュール定数と同じ値）。
+   * ⚠️ ★ここより下で ★モジュールの `RACE_SETUP` / `SAMPLE_FIELD` を読まないこと（★網 `built-course-fields.test.ts`）。
+   */
+  const DIST = setup.distanceM;
+  const RACE_TURN = setup.turn;
+  const FIELD = setup.fieldSize;
+  const RACE_META = setup.meta;
+  /**
+   * ★**競馬場ごとの見た目**（★ゲート・ゴールの目印・2026-09-15）。
+   *   ★監査道具・検査と ★**同じ表**（`@star/render` の `venueLookOf`）から引きます（★R-30）。
+   * ⚠️ ★着順には効きません。★スターパーク（既定の鞍）は ★従来の見た目のままです。
+   */
+  const VENUE_LOOK = venueLookOf(setup.venue.id);
+  /**
+   * ★格の雰囲気（★観客の入り・勝ち馬の帯の色・イントロの英字・2026-09-15）。★`@star/render` の表から引く。
+   * 🔴 ★**平場は `null`**（★裁定 Q-RACE-7）: ★観客を描き足さない・★ファンファーレを鳴らさない・★格のイントロを出さない。
+   *    ★**G3 を借りないこと**（★音と人の入りは「重さ」を語る。★借りると格のあるレースだと嘘をつく）。
+   */
+  const GRADE_LOOK = setup.grade === null ? null : GRADE_LOOKS[setup.grade];
+  /** ★季節（★D-124）。★`null` は ★季節の色を重ねない・★粒子を出さない */
+  const SEASON_LOOK = setup.gameMonth === null ? null : SEASON_LOOKS[seasonOf(setup.gameMonth)];
+  /** ★出走表（★馬番で引く）。★見本の道では ★`HORSE_NAMES` / `JOCKEY_NAMES` / `DEMO_WIN_ODDS` と同じ値 */
+  const nameOfGate = (gate: number): string => setup.roster[gate - 1]?.name ?? `スター${gate}`;
+  const jockeyOfGate = (gate: number): string => setup.roster[gate - 1]?.jockey ?? '';
+  /** ★人気の並べ替え用。★オッズの無い馬は ★いちばん後ろ（★数を作らない） */
+  const oddsRows = setup.roster.map((r) => ({ gate: r.gate, winOdds: r.winOdds ?? Number.POSITIVE_INFINITY }));
+  const oddsLabelOf = (winOdds: number): string => (Number.isFinite(winOdds) ? winOdds.toFixed(1) : '—');
+  const coatOfGate = (gate: number): CoatName => setup.roster[gate - 1]?.coat ?? 'bay';
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   /** ★実況の行（変化したときだけ積む） */
   const callRef = useRef<readonly (readonly CallPart[])[]>([]);
@@ -2448,7 +2574,7 @@ export default function RacePage(): React.JSX.Element {
    */
   const [viewSwitches, setViewSwitches] = useState({ oldScript: false, intervene: false, contest: false, mirrored: false });
   /** ★鞍の回りと逆の向き（★「回り」のボタンが切り替える先） */
-  const OTHER_TURN: 'left' | 'right' = RACE_SETUP.turn === 'left' ? 'right' : 'left';
+  const OTHER_TURN: 'left' | 'right' = setup.venue.turn === 'left' ? 'right' : 'left';
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     setViewSwitches({
@@ -2531,7 +2657,7 @@ export default function RacePage(): React.JSX.Element {
      *   ⚠️ ★蒼海賞（ダート）を開いて芝が出ると、★**見ているものが違います**。
      */
     const sp = new URLSearchParams(window.location.search).get('surface');
-    setSurface(sp === null ? RACE_SETUP.surface : surfaceFromSearch(window.location.search));
+    setSurface(sp === null ? setup.surface : surfaceFromSearch(window.location.search));
     setTrackCondition(conditionFromSearch(window.location.search));
     setShowEntryBoard(new URLSearchParams(window.location.search).get('entryBoard') === '1');
   }, []);
@@ -2674,9 +2800,12 @@ export default function RacePage(): React.JSX.Element {
           // ★屋根の位置は素材から見つける（数字を手で書くと、素材差し替えで黙って屋根に人が乗る）
           const band = seatBandFromPixels(data, canvas.width, canvas.height);
           /** ★場の差し色と格の入り（★2026-09-15・`VENUE_LOOK.crowdAccents` / `GRADE_LOOK.emptyRatio`） */
-          paintCrowd(cx, canvas.width, canvas.height,
-            seatMaskFromPixels(data, canvas.width, canvas.height, band),
-            { accentColors: VENUE_LOOK.crowdAccents, emptyRatio: GRADE_LOOK.emptyRatio });
+          /** 🔴 ★平場（★`GRADE_LOOK === null`）は ★**人を描き足さない**（★G3 を借りない・裁定 Q-RACE-7） */
+          if (GRADE_LOOK !== null) {
+            paintCrowd(cx, canvas.width, canvas.height,
+              seatMaskFromPixels(data, canvas.width, canvas.height, band),
+              { accentColors: VENUE_LOOK.crowdAccents, emptyRatio: GRADE_LOOK.emptyRatio });
+          }
         } catch {
           return image;   // 画素を読めない環境（CORS 等）では元のまま
         }
@@ -2969,7 +3098,7 @@ export default function RacePage(): React.JSX.Element {
         };
         return silksByGate.map((_, gateIndex) => {
           if (ownsGate !== undefined && !ownsGate(gateIndex + 1)) return [];
-          const baked = bakedFor(coatOf(gateIndex + 1));
+          const baked = bakedFor(coatOfGate(gateIndex + 1));
           return measured.map((frame, frameIndex) => {
             const placed = placementOf(frameIndex);
             return {
@@ -3100,7 +3229,7 @@ export default function RacePage(): React.JSX.Element {
               flightLiftFor(index, set.frames.length) * liftRatio),
           };
         return silksByGate.map((_, gateIndex) => {
-          const atlas = atlasByCoat.get(coatOf(gateIndex + 1)) ?? bay;
+          const atlas = atlasByCoat.get(coatOfGate(gateIndex + 1)) ?? bay;
           return set.frames.map((t, index) => {
             const placed = horseFramePlacement(placementSet, placementFrames[index]!, index);
             return {
@@ -3136,7 +3265,7 @@ export default function RacePage(): React.JSX.Element {
         if (manifest === null) return undefined;
         bakedManifest = manifest;
         /** ★この出走頭数で実際に要る毛色だけ読みます（★12 頭なら 7 色のうち 5 色） */
-        const needed = [...new Set(silksByGate.map((_, index) => coatOf(index + 1)))];
+        const needed = [...new Set(silksByGate.map((_, index) => coatOfGate(index + 1)))];
         /**
          * ★**型ごとに、その型の枠が実際に使う毛色だけ**読みます（★2026-09-09）
          *
@@ -3148,7 +3277,7 @@ export default function RacePage(): React.JSX.Element {
          */
         const neededFor = (t: HorseType): readonly string[] => [...new Set([
           'bay',
-          ...silksByGate.flatMap((_, index) => (typeOf(index + 1) === t ? [coatOf(index + 1) as string] : [])),
+          ...silksByGate.flatMap((_, index) => (typeOf(index + 1) === t ? [coatOfGate(index + 1) as string] : [])),
         ])];
         const setByRole = new Map(manifest.sets.map((set) => [set.role, set]));
         /** ★役ではなく ★**素材の名前**で配置と較正を決めるため、★目録の対応を控えます（★2026-09-10） */
@@ -3634,8 +3763,8 @@ export default function RacePage(): React.JSX.Element {
       const bakedWalk = bakedLibs === undefined || HORSE_TYPES_IN_USE.some((t) => t !== 'a') ? undefined : await (async () => {
         const set = bakedManifest?.sets.find((entry) => entry.role === 'side-walk');
         if (set === undefined) return undefined;
-        const picks = paddockPicksOf(Array.from({ length: FIELD }, (_, i) => ({ gate: i + 1, winOdds: DEMO_WIN_ODDS[i] ?? 99.9 })));
-        const coats = [...new Set(['bay', ...picks.map((p) => coatOf(p.gate) as string)])];
+        const picks = paddockPicksOf(oddsRows);
+        const coats = [...new Set(['bay', ...picks.map((p) => coatOfGate(p.gate) as string)])];
         const pairs = await Promise.all(coats.map(async (coat) => {
           const file = set.coats[coat];
           if (file === undefined) return null;
@@ -3793,7 +3922,7 @@ export default function RacePage(): React.JSX.Element {
   }, []);
 
   useEffect(() => {
-    try { setBuilt(build(seed, ownGate, surface, trackCondition, contestGammaFromSearch(typeof window === 'undefined' ? '' : window.location.search))); setErr(null); } catch (e) {
+    try { setBuilt(build(setup, seed, ownGate, surface, trackCondition, contestGammaFromSearch(typeof window === 'undefined' ? '' : window.location.search))); setErr(null); } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
     dRef.current = 0;
@@ -3855,7 +3984,8 @@ export default function RacePage(): React.JSX.Element {
      */
     audioRef.current?.preloadRest();
     /** ★人気馬の紹介の間は鳴らさず、★空撮から鳴らす（★発走まで約 14 秒・音源は 16.8 秒・2026-09-15） */
-    if (soundOnRef.current && intro.stage !== 'race' && intro.stage !== 'paddock') {
+    /** 🔴 ★平場（★`GRADE_LOOK === null`）は ★**鳴らさない**（★G3 を借りない・裁定 Q-RACE-7） */
+    if (soundOnRef.current && GRADE_LOOK !== null && intro.stage !== 'race' && intro.stage !== 'paddock') {
       audioRef.current?.cue('fanfare', 'intro');
       /** ★格で強さを変える（★G1 は強く・G3 は控えめ・2026-09-15・計画書 R-1）。★毎コマ呼んでよい（`level` の註記） */
       audioRef.current?.level('fanfare', GRADE_LOOK.fanfareGain, 0.05);
@@ -3874,17 +4004,17 @@ export default function RacePage(): React.JSX.Element {
     };
     /**
      * ★**人気馬の紹介**（★3 番人気 → 1 番人気・★2026-09-15・オーナー決定「動画の通り」）。
-     * ⚠️ ★人気は ★デモのオッズ（`DEMO_WIN_ODDS`）から並べるだけです。★結果・着順・能力を読みません（★D-098）。
+     * ⚠️ ★人気は ★出走表のオッズ（★`setup.roster`・★見本の道では `DEMO_WIN_ODDS`）から並べるだけです。★結果・着順・能力を読みません（★D-098）。
      */
     if (intro.stage === 'paddock') {
-      const picks = paddockPicksOf(Array.from({ length: FIELD }, (_, i) => ({ gate: i + 1, winOdds: DEMO_WIN_ODDS[i] ?? 99.9 })));
+      const picks = paddockPicksOf(oddsRows);
       const idx = Math.min(picks.length - 1, intro.paddockIndex ?? 0);
       const pick = picks[idx];
       if (pick !== undefined) {
         drawPaddockIntro(ctx, art.pal as Record<string, string>, vp, FONT, {
-          gate: pick.gate, name: HORSE_NAMES[pick.gate - 1] ?? `スター${pick.gate}`,
-          jockey: JOCKEY_NAMES[pick.gate - 1] ?? 'STAR騎手', frameRole: frameRoleOf(pick.gate, FIELD),
-          oddsLabel: pick.winOdds.toFixed(1), popularity: pick.popularity, order: idx + 1, total: picks.length,
+          gate: pick.gate, name: nameOfGate(pick.gate),
+          jockey: jockeyOfGate(pick.gate), frameRole: frameRoleOf(pick.gate, FIELD),
+          oddsLabel: oddsLabelOf(pick.winOdds), popularity: pick.popularity, order: idx + 1, total: picks.length,
         }, intro.sinceSec,
         /** ★パドックの背景（★無ければタイトルの背景） */
         ((bg) => ({ image: bg, width: bg.width, height: bg.height }))(art.paddockBg ?? art.raceTitle),
@@ -3917,7 +4047,8 @@ export default function RacePage(): React.JSX.Element {
       return;
     }
     /** ★**格の紹介**（★「GRADE I」→「G I」→ 閃光・★英字は `GRADE_LOOKS` から） */
-    if (intro.stage === 'grade') {
+    /** 🔴 ★平場（★`GRADE_LOOK === null`）は ★**格の紹介を出さず**、★その間は ★下のタイトルを先に出します（★裁定 Q-RACE-7） */
+    if (intro.stage === 'grade' && GRADE_LOOK !== null) {
       drawGradeIntro(ctx, vp, FONT, { roman: GRADE_LOOK.roman }, intro.sinceSec, RACE_INTRO_GRADE_END_SEC - RACE_INTRO_FLYOVER_SEC);
       drawRendererBadge(ctx, renderer, 'grade');
       return;
@@ -3940,11 +4071,11 @@ export default function RacePage(): React.JSX.Element {
           fovY: (40 * Math.PI) / 180, width: W, height: H,
         }, art.texturedWorld, { pixelScale });
       } else { ctx.fillStyle = '#0b1210'; ctx.fillRect(0, 0, W, H); }
-      const ranks = popularityRanksOf(Array.from({ length: FIELD }, (_, i) => ({ gate: i + 1, winOdds: DEMO_WIN_ODDS[i] ?? 99.9 })));
+      const ranks = popularityRanksOf(oddsRows);
       drawEntryBoard(ctx, art.pal as Record<string, string>, vp, FONT,
         Array.from({ length: FIELD }, (_, i) => ({
-          gate: i + 1, name: HORSE_NAMES[i] ?? `スター${i + 1}`, jockey: JOCKEY_NAMES[i] ?? 'STAR騎手',
-          oddsLabel: (DEMO_WIN_ODDS[i] ?? 99.9).toFixed(1), popularity: ranks.get(i + 1), isOwn: i + 1 === ownGate,
+          gate: i + 1, name: nameOfGate(i + 1), jockey: jockeyOfGate(i + 1),
+          oddsLabel: oddsLabelOf(oddsRows[i]?.winOdds ?? Number.POSITIVE_INFINITY), popularity: ranks.get(i + 1), isOwn: i + 1 === ownGate,
         })), {
           raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo,
           distanceMeter: built.distanceM, surfaceLabel: surface === 'turf' ? '芝' : 'ダート', turnLabel: turn === 'left' ? '左' : '右',
@@ -3957,7 +4088,7 @@ export default function RacePage(): React.JSX.Element {
       drawRendererBadge(ctx, renderer, 'entry');
       return;
     }
-    if (intro.stage === 'title' || intro.stage === 'flyover') {
+    if (intro.stage === 'title' || intro.stage === 'flyover' || intro.stage === 'grade') {
       drawRaceTitleCard(ctx, art.pal as Record<string, string>, vp, FONT, {
         venue: RACE_META.venue, raceName: RACE_META.raceName, raceNo: RACE_META.raceNo,
         distanceMeter: built.distanceM, surfaceLabel: surface === 'turf' ? '芝' : 'ダート',
@@ -3966,18 +4097,18 @@ export default function RacePage(): React.JSX.Element {
         fieldSize: FIELD,
         /**
          * ★**格・条件・競馬場の紹介**（★2026-09-15・計画書 V-3 / R-2 / R-3）。
-         *   ★数値は `venues.ts`（★`RACE_SETUP.venue`）から、★言葉は `VENUE_LOOK.feature` から。
+         *   ★数値は `venues.ts`（★`setup.venue`）から、★言葉は `VENUE_LOOK.feature` から。
+         * 🔴 ★平場は ★**馬場だけ**の札にします（★`gradeLabel` を省くと ★描く側の既定「GRADE I …」が出るので ★省かない）。
+         *    ★出走条件の札は ★実レースでは空です（★データに無い・★埋めない・裁定 Q-RACE-7）。
          */
-        gradeLabel: `GRADE ${GRADE_LOOK.roman} ・ ${surface === 'turf' ? 'TURF' : 'DIRT'}`,
-        chips: [
-          RACE_SETUP.race.age === '2' ? '2歳' : RACE_SETUP.race.age === '3' ? '3歳' : '3歳以上',
-          ...(RACE_SETUP.race.fillies ? ['牝馬限定'] : []),
-          ...(RACE_SETUP.race.series === undefined ? [] : [`${RACE_SETUP.race.series.name} 第${RACE_SETUP.race.series.leg}戦`]),
-        ],
-        venueFeature: `${turn === 'left' ? '左回り' : '右回り'}　1周${RACE_SETUP.venue.lapM}m・直線${RACE_SETUP.venue.homeStretchM}m　${VENUE_LOOK.feature}`,
+        gradeLabel: GRADE_LOOK === null
+          ? (surface === 'turf' ? 'TURF' : 'DIRT')
+          : `GRADE ${GRADE_LOOK.roman} ・ ${surface === 'turf' ? 'TURF' : 'DIRT'}`,
+        chips: setup.conditionChips,
+        venueFeature: `${turn === 'left' ? '左回り' : '右回り'}　1周${setup.venue.lapM}m・直線${setup.venue.homeStretchM}m　${VENUE_LOOK.feature}`,
         own: {
           gate: ownGate, role: frameRoleOf(ownGate, FIELD),
-          name: HORSE_NAMES[ownGate - 1] ?? `スター${ownGate}`, jockey: JOCKEY_NAMES[ownGate - 1] ?? 'STAR騎手',
+          name: nameOfGate(ownGate), jockey: jockeyOfGate(ownGate),
         },
       }, d, { image: art.raceTitle, width: art.raceTitle.width, height: art.raceTitle.height },
       /**
@@ -3996,7 +4127,7 @@ export default function RacePage(): React.JSX.Element {
        */
       {
         kind: VENUE_LOOK.scenery,
-        tints: [SEASON_LOOKS[seasonOf(RACE_SETUP.race.month)].scenery, ...timeOfDayTintsOf(TIME_OF_DAY).scenery],
+        tints: [...(SEASON_LOOK === null ? [] : [SEASON_LOOK.scenery]), ...timeOfDayTintsOf(TIME_OF_DAY).scenery],
         /** ★紋の図形は距離標の札の文字色（★札の地と必ず対比がある・★帯の色は地と同じ場がある） */
         crest: { ground: VENUE_LOOK.poles.plate, mark: VENUE_LOOK.poles.plateText },
         night: TIME_OF_DAY === 'night',
@@ -4486,7 +4617,7 @@ export default function RacePage(): React.JSX.Element {
            *    ★全部聴かせるならイントロを伸ばす必要があります（★オーナー判断）。
            */
           /** ★格で余韻の長さを変える（★G2 は従来の 1.2 秒・2026-09-15・計画書 R-1） */
-          audio?.fade('fanfare', GRADE_LOOK.fanfareFadeSec);
+          if (GRADE_LOOK !== null) audio?.fade('fanfare', GRADE_LOOK.fanfareFadeSec);
           audio?.cue('gate-open', 'gate');
           audio?.cue('gallop', 'gallop');
           if (raceD >= 0.35) audio?.cue('whinny', 'whinny');
@@ -4709,16 +4840,17 @@ export default function RacePage(): React.JSX.Element {
          *   ★季節はレースの `month`、★雨は馬場状態、★砂の色は場の見た目（ダート戦だけ）、★舞い方は風と表示秒から。
          */
         atmosphere: {
+          /** ★季節は ★`setup.gameMonth` から（★D-124）。★月が無ければ ★季節の色も粒子も ★重ねません */
           groundTints: [
-            SEASON_LOOKS[seasonOf(RACE_SETUP.race.month)].ground,
+            ...(SEASON_LOOK === null ? [] : [SEASON_LOOK.ground]),
             ...(surface === 'dirt' && VENUE_LOOK.dirtTint !== undefined ? [VENUE_LOOK.dirtTint] : []),
             /** ★時間帯（★昼は空・`?tod=`） */
             ...todTints.ground,
           ],
-          sceneryTint: SEASON_LOOKS[seasonOf(RACE_SETUP.race.month)].scenery,
+          sceneryTint: SEASON_LOOK?.scenery,
           sceneryTints: todTints.scenery,
           /** ★舞うのは冬の雪だけ。★雨の日は雨だけ（★オーナー評 2026-09-15・`seasonParticlesFor`） */
-          particles: seasonParticlesFor(RACE_SETUP.race.month, trackCondition),
+          particles: setup.gameMonth === null ? undefined : seasonParticlesFor(setup.gameMonth, trackCondition),
           rainDrops: rainDropsOf(trackCondition),
           /** ★霧（★霧の場だけ・`VenueLook.scenery`） */
           fogAlpha: VENUE_LOOK.scenery === 'fog' ? VENUE_FOG_ALPHA : 0,
@@ -4852,7 +4984,7 @@ export default function RacePage(): React.JSX.Element {
         const minimapHorses = v2Minimap.horses;
         const orderOf = (gate: number): number => cutRank.findIndex((h) => h.gate === gate) + 1;
         const metersLeftNow = Math.max(0, built.distanceM - Math.max(...at.map((h) => h.meters)));
-        const nameOf = (gate: number): string => HORSE_NAMES[gate - 1] ?? `スター${gate}`;
+        const nameOf = (gate: number): string => nameOfGate(gate);
         const frameColorOf = (gate: number): string =>
           (art.pal as Record<string, string>)[frameRoleOf(gate, FIELD)] ?? '#fff';
         const strategyLabelOf = (gate: number): string =>
@@ -4951,7 +5083,7 @@ export default function RacePage(): React.JSX.Element {
           drawOwnHorseCutIn(ctx, FONT, frame, {
             gate: ownGate,
             horseName: nameOf(ownGate),
-            jockeyName: JOCKEY_NAMES[ownGate - 1] ?? '騎手',
+            jockeyName: jockeyOfGate(ownGate),
             strategyLabel: strategyLabelOf(ownGate),
             frameColor: frameColorOf(ownGate),
             order: Math.max(1, orderOf(ownGate)),
@@ -5162,7 +5294,7 @@ export default function RacePage(): React.JSX.Element {
       // ★出馬表オーバーレイ（カウントダウン中だけ）。開扉で自動的に閉じる
       drawEntryBoard(ctx, art.pal as Record<string, string>, vp, FONT,
         Array.from({ length: FIELD }, (_, i) => ({
-          gate: i + 1, name: HORSE_NAMES[i] ?? `スター${i + 1}`, jockey: JOCKEY_NAMES[i] ?? 'STAR騎手',
+          gate: i + 1, name: nameOfGate(i + 1), jockey: jockeyOfGate(i + 1),
           weightKg: built.weightsKg[i], isOwn: i + 1 === ownGate,
         })), {
           raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo,
@@ -5384,7 +5516,7 @@ export default function RacePage(): React.JSX.Element {
             built.model.at(Math.max(0, sec - MOMENTUM_WINDOW_SEC)).map((h) => ({ gate: h.gate, meters: h.meters })),
           )
           : undefined;
-        const plateRows = referenceNamePlateRows(rank, ownGate, (gate) => HORSE_NAMES[gate - 1] ?? `スター${gate}`)
+        const plateRows = referenceNamePlateRows(rank, ownGate, (gate) => nameOfGate(gate))
           .map((row) => (momentum === undefined ? row : { ...row, momentum: momentum.get(row.gate) }));
         /**
          * ★置き場所は**空いているところ**を明示的に渡します。
@@ -5456,7 +5588,7 @@ export default function RacePage(): React.JSX.Element {
         ctx.globalAlpha = prevAlpha * (1 - 0.25 * ease) * (1 - 0.5 * Math.min(1, rankHide * 3));
         drawStandings(ctx, art.pal as Record<string, string>, vp, FONT, rank.map((h) => ({
           gate: h.gate,
-          name: HORSE_NAMES[h.gate - 1] ?? `スター${h.gate}`,
+          name: nameOfGate(h.gate),
           lengths: ((rank[0]?.meters ?? h.meters) - h.meters) / HORSE_LENGTH_M,
           timeSec: allIn ? built.finishSec.get(h.gate) : undefined,
           isOwn: h.gate === ownGate,
@@ -5491,7 +5623,7 @@ export default function RacePage(): React.JSX.Element {
          *      「先頭は 10 番」と実況する**ことになります（順位表と同じ食い違い）。
          */
         horses: easedAt.map((h) => ({
-          gate: h.gate, name: HORSE_NAMES[h.gate - 1] ?? `スター${h.gate}`, meters: h.meters,
+          gate: h.gate, name: nameOfGate(h.gate), meters: h.meters,
         })),
         distanceMeter: built.distanceM,
         phaseLabel: phaseName,
@@ -5517,7 +5649,7 @@ export default function RacePage(): React.JSX.Element {
           const agoSec = built.warp.raceSecAt(
             Math.max(0, Math.min(sourceD, built.warp.displaySec) - RACE_SURGE_WINDOW_SEC));
           const nowRows = built.model.at(nowSec).map((h) => ({
-            gate: h.gate, name: HORSE_NAMES[h.gate - 1] ?? `スター${h.gate}`, meters: h.meters,
+            gate: h.gate, name: nameOfGate(h.gate), meters: h.meters,
           }));
           const agoMap = new Map(built.model.at(agoSec).map((h) => [h.gate, h.meters] as const));
           return raceSurgeGate(nowRows, agoMap);
@@ -5577,8 +5709,8 @@ export default function RacePage(): React.JSX.Element {
         drawResultsBoard(ctx, art.pal as Record<string, string>, vp, FONT,
           built.result.map((row) => ({
             place: row.place, gate: row.gate,
-            horseName: HORSE_NAMES[row.gate - 1] ?? `スター${row.gate}`,
-            jockeyName: JOCKEY_NAMES[row.gate - 1] ?? 'STAR騎手',
+            horseName: nameOfGate(row.gate),
+            jockeyName: jockeyOfGate(row.gate),
             timeSec: built.finishSec.get(row.gate), margin: row.margin, isOwn: row.gate === ownGate,
           })), FIELD, frameRoleOf,
           {
@@ -5599,13 +5731,14 @@ export default function RacePage(): React.JSX.Element {
          */
         if (winnerFinishedNow && !goalHeld && winnerAfterSec < 3.4) {
           drawWinnerLowerThird(ctx, art.pal as Record<string, string>, vp, FONT,
-            winnerGate, HORSE_NAMES[winnerGate - 1] ?? `スター${winnerGate}`,
-            JOCKEY_NAMES[winnerGate - 1] ?? 'STAR騎手', built.finishSec.get(winnerGate),
+            winnerGate, nameOfGate(winnerGate),
+            jockeyOfGate(winnerGate), built.finishSec.get(winnerGate),
             {
               role: frameRoleOf(winnerGate, FIELD), animSec: d, sinceSec: winnerAfterSec,
               /** ★格の色と名札（★ゴールの後の帯・2026-09-15・計画書 R-8） */
-              edgeTint: GRADE_LOOK.edgeTint,
-              raceLabel: `${RACE_SETUP.race.grade} ${RACE_META.raceName}`,
+              /** ★平場は ★格の色を付けず ★名札に格を書かない（★裁定 Q-RACE-7） */
+              edgeTint: GRADE_LOOK?.edgeTint,
+              raceLabel: setup.grade === null ? RACE_META.raceName : `${setup.grade} ${RACE_META.raceName}`,
             });
         }
         if (hud.result) {
@@ -5876,7 +6009,7 @@ export default function RacePage(): React.JSX.Element {
                   <div key={row.gate} style={{ display: 'flex', alignItems: 'center', gap: stagePx(10) }}>
                     <span className="a-num" style={{ width: stagePx(26), fontSize: stagePx(20), color: row.place === 1 ? '#f2b012' : '#fff' }}>{row.place}</span>
                     <FrameBadge gate={row.gate} fieldSize={FIELD} w={stagePx(30)} h={stagePx(24)} font={stagePx(14)} />
-                    <span style={{ fontSize: stagePx(14), fontWeight: 900, color: '#fff' }}>{HORSE_NAMES[row.gate - 1] ?? `スター${row.gate}`}</span>
+                    <span style={{ fontSize: stagePx(14), fontWeight: 900, color: '#fff' }}>{nameOfGate(row.gate)}</span>
                   </div>
                 ))}
               </div>
@@ -6053,7 +6186,7 @@ export default function RacePage(): React.JSX.Element {
       {!devMode && (SHOW_ENTRY || entryRequested) && !watchStarted && (
         <div className="a-panel strong rm-entry" data-theme="arcade">
           <div className="a-band rm-entry-head">
-            <span className="a-chip gold rm-entry-grade">{RACE_SETUP.race.grade}</span>
+            {setup.grade !== null && <span className="a-chip gold rm-entry-grade">{setup.grade}</span>}
             <span className="rm-entry-name">{RACE_META.raceName}</span>
           </div>
           <div className="rm-entry-cut">
@@ -6071,7 +6204,7 @@ export default function RacePage(): React.JSX.Element {
             <div className="rm-entry-own">
               <span className="rm-entry-own-lbl">自馬</span>
               <FrameBadge gate={ownGate} fieldSize={FIELD} w={28} h={24} font={14} />
-              <span className="rm-entry-own-name">{HORSE_NAMES[ownGate - 1] ?? `スター${ownGate}`}</span>
+              <span className="rm-entry-own-name">{nameOfGate(ownGate)}</span>
             </div>
           </div>
           <button
@@ -6108,7 +6241,7 @@ export default function RacePage(): React.JSX.Element {
                   {races.map((r) => (
                     <button
                       key={r.id} type="button"
-                      className={`rm-race${r.id === RACE_SETUP.race.id ? ' on' : ''}`}
+                      className={`rm-race${r.id === setup.venueRaceId ? ' on' : ''}`}
                       onClick={() => { pickVenue(r.id); }}
                     >
                       <span className="rm-race-grade">{r.grade}</span>
@@ -6217,7 +6350,7 @@ export default function RacePage(): React.JSX.Element {
           ['view', 'intervene', viewSwitches.intervene, '観戦', '介入'],
           ['seed', '99', viewSwitches.contest, '展開：通常', '展開：接戦'],
           ['turn', OTHER_TURN, viewSwitches.mirrored,
-            RACE_SETUP.turn === 'left' ? '回り：左' : '回り：右', OTHER_TURN === 'left' ? '回り：左' : '回り：右'],
+            setup.venue.turn === 'left' ? '回り：左' : '回り：右', OTHER_TURN === 'left' ? '回り：左' : '回り：右'],
         ] as const).map(([key, on, active, offLabel, onLabel]) => (
           <button
             key={key} type="button" onClick={() => toggleViewParam(key, on)}
@@ -6237,7 +6370,7 @@ export default function RacePage(): React.JSX.Element {
         <label>
           レース{' '}
           <select
-            value={RACE_SETUP.race.id}
+            value={setup.venueRaceId ?? ''}
             onChange={(e) => { pickVenue(e.target.value); }}
             style={{ maxWidth: 320 }}
           >

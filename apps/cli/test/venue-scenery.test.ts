@@ -147,7 +147,8 @@ describe('★場の景色と紋', () => {
     const page = readFileSync(path.resolve(__dirname, '../../web/src/app/race/page.tsx'), 'utf8');
     for (const needle of [
       'kind: VENUE_LOOK.scenery,',
-      'tints: [SEASON_LOOKS[seasonOf(RACE_SETUP.race.month)].scenery, ...timeOfDayTintsOf(TIME_OF_DAY).scenery],',
+      /** ★2026-09-27（段 2 D・D-124）: ★月の無い実レースは ★季節の色を重ねない */
+      'tints: [...(SEASON_LOOK === null ? [] : [SEASON_LOOK.scenery]), ...timeOfDayTintsOf(TIME_OF_DAY).scenery],',
       "night: TIME_OF_DAY === 'night',",
       "fogAlpha: VENUE_LOOK.scenery === 'fog' ? VENUE_FOG_ALPHA : 0,",
     ]) expect(page, `★画面に ${needle} が無い`).toContain(needle);

@@ -42,7 +42,8 @@ describe('🔴 ★Built の走路（段 A: モジュール定数と同じもの�
     const body = m![0];
     for (const field of [
       'readonly distanceM: number;',
-      'readonly spec: typeof COURSE_SPEC;',
+      /** ★2026-09-27（段 2 D）: ★モジュール定数 `COURSE_SPEC` が無くなったので ★型の名前で */
+      'readonly spec: RaceCourseSpec;',
       "readonly turn: 'left' | 'right';",
     ]) {
       expect(body, `🔴 ★\`Built\` に ${field} がありません`).toContain(field);
@@ -54,16 +55,29 @@ describe('🔴 ★Built の走路（段 A: モジュール定数と同じもの�
    *   ⚠️ ★ここが別の値になると ★`built.spec` と 画面の `COURSE_SPEC` が離れ、
    *      ★**着順に効く値が 2 通り**になります（★台帳 B-6）。
    */
-  it('🔴 ★build() は DIST / COURSE_SPEC / RACE_TURN をそのまま詰める', () => {
+  /**
+   * ⚠️ ★2026-09-27（段 2 D）: ★モジュール定数が無くなり、★`build()` は ★**引数の `setup` から**受け取ります。
+   *    ★見る中身は同じ — ★「★エンジンへ渡す走路」と「★`Built` に詰める走路」が ★**同じ 1 つの値**であること。
+   */
+  it('🔴 ★build() は setup の走路を受け取り、そのまま詰める', () => {
     const src = strip(read(RACE_PAGE));
-    const quote = 'distanceM: DIST, spec: COURSE_SPEC, turn: RACE_TURN,';
-    /** ★① ★引用が 1 か所（★消しても通る形にしない） */
-    const hits = src.split(quote).length - 1;
-    expect(hits, `🔴 ★\`${quote}\` が ${hits} か所（★1 か所であること）`).toBe(1);
-    /** ★② ★その行が `build()` の中に在ること（★別の関数に在っても意味がない） */
-    const build = src.match(/function build\([\s\S]*?\n\}/);
-    expect(build, '🔴 ★`build()` が見つからない').not.toBeNull();
-    expect(build![0], '🔴 ★`build()` の外で詰めています').toContain(quote);
+    const build = src.match(/function build\(setup: PageSetup,[\s\S]*?\n\}/);
+    expect(build, '🔴 ★`build(setup: PageSetup, …)` が見つからない').not.toBeNull();
+    const body = build![0];
+    /** ★① ★走路と頭数は ★`setup` から（★別の出どころを持たない） */
+    for (const line of [
+      'const DIST = setup.distanceM;',
+      'const COURSE_SPEC = setup.spec;',
+      'const RACE_TURN = setup.turn;',
+      'const FIELD = setup.fieldSize;',
+    ]) expect(body, `🔴 ★\`build()\` に ${line} がありません`).toContain(line);
+    /** ★② ★エンジンへ渡す走路（★着順に効く）と ★`Built` に詰める走路が ★同じ名前 */
+    expect(body, '🔴 ★エンジンへ `COURSE_SPEC` を渡していません').toContain('course: COURSE_SPEC,');
+    expect(body, '🔴 ★`Built` に そのまま詰めていません').toContain('distanceM: DIST, spec: COURSE_SPEC, turn: RACE_TURN,');
+    /** ★③ ★モジュールの走路の定数は ★もう在らない（★2 つ目の出どころを作らない） */
+    for (const name of ['DIST', 'COURSE_SPEC', 'RACE_TURN', 'COURSE_OPTS', 'FIELD', 'VENUE_LOOK', 'GRADE_LOOK', 'RACE_META']) {
+      expect(new RegExp(`^const ${name}\\b`, 'm').test(src), `🔴 ★モジュールに \`const ${name}\` が戻っています`).toBe(false);
+    }
   });
 
   /**
@@ -121,33 +135,49 @@ describe('🔴 ★Built の走路（段 A: モジュール定数と同じもの�
    *   ★（★素材読み込みの中の決勝線の位置）在りました。★どれも ★**依存 `[]` の読み込みか state の初期値**で、
    *   ★`built`（★読み込みの後に組む）からは ★**原理的に取れません**。
    *   → ★段 D で ★「走路が決まってから読み込む」形にするまで ★**ここで釘付け**します。
-   *     ★増えたら落ちる（★新しい読み口を作らない）・★減ったら ★この表から消す。
+   *
+   * 【✅ ★2026-09-27（段 2 D の 1）: ★4 か所とも ★`setup` から読む形になりました】
+   *   ★画面の本体を ★`RaceView({ setup })` にし、★`setup` が決まってから開きます（★見本の道は同期で決まる）。
+   *   ★本体の先頭で ★`const DIST = setup.distanceM;` 等と受け直すので、★4 か所の式は ★1 文字も変わっていません。
+   *   → ★網の見るものを ★「既知の 4 か所」から ★**「本体がモジュールの設定を直に読まない」**へ替えました（★消していません）。
    */
-  it('🔴 ★段 C: RacePage の中の走路定数は 既知の 4 か所だけ／出馬札は built を読む', () => {
+  it('🔴 ★段 C/D: 画面の本体は 走路・頭数・場を setup から受け、モジュールの設定を直に読まない', () => {
     const src = strip(read(RACE_PAGE));
-    const page = src.match(/export default function RacePage\([\s\S]*?\n\}\n/);
-    expect(page, '🔴 ★`RacePage` の本体が切り出せない（★走査が壊れている）').not.toBeNull();
-    const body = page![0];
-    expect(body.length, '★`RacePage` が短すぎる（★切り出しが途中で止まっている）').toBeGreaterThan(50000);
+    const view = src.match(/function RaceView\(\{ setup \}: \{ readonly setup: PageSetup \}\)[\s\S]*?\n\}\n/);
+    expect(view, '🔴 ★`RaceView` の本体が切り出せない（★走査が壊れている）').not.toBeNull();
+    const body = view![0];
+    expect(body.length, '★`RaceView` が短すぎる（★切り出しが途中で止まっている）').toBeGreaterThan(50000);
 
-    /** ★註記は `strip` で空白になっているので ★間の空白は幅を問いません */
-    const KNOWN: readonly RegExp[] = [
-      /useState<'left' \| 'right'>\(RACE_TURN\)/g,
-      /worldS: object\.worldS === 'finish' \? DIST : object\.worldS/g,
-      /silksByGate, silksLayout, ownsGate,\s+RACE_TURN === 'right'\)/g,
-      /silksByGate, silksLayout, undefined,\s+RACE_TURN === 'right'\)/g,
-    ];
-    /** ★① ★既知の 4 か所が それぞれ 1 回ずつ在る（★網が空振りしていない） */
-    for (const quote of KNOWN) {
-      const n = (body.match(quote) ?? []).length;
-      expect(n, `🔴 ★既知の読み口 ${String(quote)} が ${n} 回（★1 回であること）。★減ったなら ★KNOWN から消す`).toBe(1);
-    }
-    /** ★② ★それ以外に ★走路のモジュール定数を読む所が無い */
-    const all = (body.match(/\b(DIST|RACE_TURN|COURSE_SPEC|COURSE_OPTS)\b/g) ?? []).length;
-    expect(all, `🔴 ★\`RacePage\` の中で 走路の定数を ${all} か所で読んでいます（★既知は ${KNOWN.length}）。\n`
-      + '  ★`built.*` を読むか、★段 D の「走路が決まってから読み込む」形に乗せること').toBe(KNOWN.length);
+    /** ★① ★本体の先頭で ★`setup` から受け直している（★4 か所の式はこの名前を読む） */
+    for (const line of [
+      'const DIST = setup.distanceM;',
+      'const RACE_TURN = setup.turn;',
+      'const FIELD = setup.fieldSize;',
+      'const RACE_META = setup.meta;',
+      'const VENUE_LOOK = venueLookOf(setup.venue.id);',
+    ]) expect(body, `🔴 ★\`RaceView\` に ${line} がありません`).toContain(line);
 
-    /** ★③ ★出馬札の距離は ★`built` から（★段 C の本体） */
+    /** ★② 🔴 ★本体は ★モジュールの設定（★見本の鞍・見本の頭数・見本の名簿）を ★直に読まない */
+    const leaks = (body.match(/\b(RACE_SETUP|SAMPLE_FIELD|HORSE_NAMES|JOCKEY_NAMES|DEMO_WIN_ODDS|COAT_BY_GATE)\b/g) ?? []);
+    expect(leaks, `🔴 ★\`RaceView\` が モジュールの見本の設定を直に読んでいます: ${leaks.join(', ')}\n`
+      + '  ★実レースでは ★見本の値が混ざります。★`setup` から読むこと').toEqual([]);
+    /** ★③ ★毛色は ★出走表から（★枠番の表から引かない） */
+    expect(/(?<![A-Za-z0-9_])coatOf\(/.test(body), '🔴 ★`RaceView` が ★枠番の毛色表（`coatOf`）を直に読んでいます').toBe(false);
+
+    /** ★④ ★出馬札の距離は ★`built` から（★段 C の本体） */
     expect(body).toContain("{built !== null && <span className=\"a-chip\">{surface === 'turf' ? '芝' : 'ダート'} {built.distanceM}m");
+  });
+
+  /**
+   * 🔴 ★**対照**: ★上の ②③ が ★本当に噛むこと（★「0 件だった」を合格と読ませない）。
+   *   ★本体に 1 行 混ぜた文字列で ★同じ判定が落ちることを確かめます。
+   */
+  it('🔴 ★対照: 見本の設定を 1 つ混ぜると 上の判定が落ちる', () => {
+    const detect = (body: string): string[] => body.match(/\b(RACE_SETUP|SAMPLE_FIELD|HORSE_NAMES|JOCKEY_NAMES|DEMO_WIN_ODDS|COAT_BY_GATE)\b/g) ?? [];
+    for (const probe of ['RACE_SETUP.race.month', 'SAMPLE_FIELD', 'HORSE_NAMES[0]', 'JOCKEY_NAMES[0]', 'DEMO_WIN_ODDS[0]', 'COAT_BY_GATE[0]']) {
+      expect(detect(`const x = ${probe};`).length, `★対照 ${probe} を捕まえない`).toBe(1);
+    }
+    expect(/(?<![A-Za-z0-9_])coatOf\(/.test('const c = coatOf(1);')).toBe(true);
+    expect(/(?<![A-Za-z0-9_])coatOf\(/.test('const c = coatOfGate(1);'), '★`coatOfGate` を誤って捕まえる').toBe(false);
   });
 });

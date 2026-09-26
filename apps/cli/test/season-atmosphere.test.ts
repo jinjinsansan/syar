@@ -139,9 +139,14 @@ describe('★季節と天気の空気', () => {
   it('★④⑥ 画面は季節・雨・砂の色を同じ表から組み、場面は空気を馬より先に描く', () => {
     const page = readFileSync(path.resolve(__dirname, '../../web/src/app/race/page.tsx'), 'utf8');
     for (const needle of [
-      'SEASON_LOOKS[seasonOf(RACE_SETUP.race.month)].ground',
-      'sceneryTint: SEASON_LOOKS[seasonOf(RACE_SETUP.race.month)].scenery,',
-      'particles: seasonParticlesFor(RACE_SETUP.race.month, trackCondition),',
+      /**
+       * ★2026-09-27（段 2 D・D-124）: ★月は ★`setup.gameMonth` から（★見本の道では `RACE_SETUP.race.month`）。
+       *   ★月が無い実レースは ★季節の色も粒子も重ねない（★無い季節を作らない）
+       */
+      'const SEASON_LOOK = setup.gameMonth === null ? null : SEASON_LOOKS[seasonOf(setup.gameMonth)];',
+      '...(SEASON_LOOK === null ? [] : [SEASON_LOOK.ground]),',
+      'sceneryTint: SEASON_LOOK?.scenery,',
+      'particles: setup.gameMonth === null ? undefined : seasonParticlesFor(setup.gameMonth, trackCondition),',
       'rainDrops: rainDropsOf(trackCondition),',
       "surface === 'dirt' && VENUE_LOOK.dirtTint !== undefined ? [VENUE_LOOK.dirtTint] : []",
     ]) expect(page, `★画面に ${needle} が無い`).toContain(needle);

@@ -13,9 +13,12 @@ import path from 'node:path';
 
 const page = readFileSync(path.resolve(__dirname, '../../web/src/app/race/page.tsx'), 'utf8');
 
-/** ★`if (intro.stage === '<stage>')` から、その分岐の最初の `return;` まで */
+/**
+ * ★`if (intro.stage === '<stage>'` から、その分岐の最初の `return;` まで。
+ * ⚠️ ★閉じ括弧までは見ません（★2026-09-27・段 2 D: ★格の分岐は ★`&& GRADE_LOOK !== null` が付いた — ★平場は出さない）。
+ */
 function stageBlock(stage: string): string {
-  const start = page.indexOf(`if (intro.stage === '${stage}')`);
+  const start = page.indexOf(`if (intro.stage === '${stage}'`);
   expect(start, `★画面に ${stage} の分岐が無い`).toBeGreaterThan(0);
   const end = page.indexOf('return;', start);
   return page.slice(start, end);
@@ -31,10 +34,16 @@ describe('★発走前の流れの配線', () => {
     }
   });
 
-  it('★② 人気はデモのオッズ（DEMO_WIN_ODDS）から、描画の関数で並べるだけ', () => {
+  /**
+   * ⚠️ ★2026-09-27（段 2 D）: ★人気の出どころは ★**出走表のオッズ 1 か所**（★`setup.roster` → `oddsRows`）。
+   *    ★見本の道では ★`venuePageSetup()` が ★`DEMO_WIN_ODDS` を詰めます（★値は従来と同じ）。
+   *    ★実レースは ★サーバーのオッズ（★無ければ `null` ＝ 並びの最後・札は「—」）。★画面で作らない点は同じ。
+   */
+  it('★② 人気は出走表のオッズ（見本は DEMO_WIN_ODDS）から、描画の関数で並べるだけ', () => {
     expect(page).toContain('const DEMO_WIN_ODDS = [');
-    expect(stageBlock('paddock')).toContain('paddockPicksOf(');
-    expect(stageBlock('paddock')).toContain('DEMO_WIN_ODDS[i]');
+    expect(page).toContain('winOdds: DEMO_WIN_ODDS[i] ?? 99.9,');
+    expect(page).toContain('const oddsRows = setup.roster.map((r) => ({ gate: r.gate, winOdds: r.winOdds ?? Number.POSITIVE_INFINITY }));');
+    expect(stageBlock('paddock')).toContain('paddockPicksOf(oddsRows)');
     /** ★パドックの背景（★生成した絵・★無ければタイトルの背景） */
     expect(page).toContain('/art/paddock-bg-v1.webp');
     expect(stageBlock('paddock')).toContain('art.paddockBg ?? art.raceTitle');
@@ -49,7 +58,7 @@ describe('★発走前の流れの配線', () => {
     const bake = readFileSync(path.resolve(__dirname, '../../../tools/bake-race-frames.mjs'), 'utf8');
     expect(bake).toContain("{ role: 'side-walk', layout: 'crouch', prefix: pickSet('horse-jockey-side-walk-v1') }");
     expect(stageBlock('entry')).toContain('popularityRanksOf(');
-    expect(stageBlock('entry')).toContain('DEMO_WIN_ODDS[i]');
+    expect(stageBlock('entry')).toContain('popularityRanksOf(oddsRows)');
     /** ★全画面の出馬表は背景の競馬場を透かす（★オーナー「背景には競馬場」） */
     expect(stageBlock('entry')).toContain('scrimAlpha:');
     expect(stageBlock('entry')).toContain('drawTexturedWorld(');
@@ -65,9 +74,10 @@ describe('★発走前の流れの配線', () => {
     for (const needle of [
       "if (intro.stage === 'paddock')",
       "if (intro.stage === 'flyover' && renderer === 'v2')",
-      "if (intro.stage === 'grade')",
+      /** ★平場（★格が無い）は ★格の段でタイトルを先に出す（★2026-09-27・裁定 Q-RACE-7） */
+      "if (intro.stage === 'grade' && GRADE_LOOK !== null)",
       "if (intro.stage === 'entry')",
-      "if (intro.stage === 'title' || intro.stage === 'flyover')",
+      "if (intro.stage === 'title' || intro.stage === 'flyover' || intro.stage === 'grade')",
       "(intro.stage === 'gate-hold' || intro.stage === 'gate-release')",
     ]) expect(page, `★画面に ${needle} が無い`).toContain(needle);
     /** ★ファンファーレは紹介の間は鳴らさない */

@@ -269,7 +269,8 @@ describe('★競馬場ごとの見た目', () => {
   it('★⑤ 画面（/race）は venueLookOf / GRADE_LOOKS から引き、各描画へ渡している', () => {
     const src = readFileSync(path.resolve(__dirname, '../../web/src/app/race/page.tsx'), 'utf8');
     for (const needle of [
-      'const VENUE_LOOK = venueLookOf(RACE_SETUP.venue.id);',
+      /** ★2026-09-27（段 2 D）: ★場は ★`PageSetup` から（★見本の道では `RACE_SETUP.venue` と同じもの） */
+      'const VENUE_LOOK = venueLookOf(setup.venue.id);',
       'style: VENUE_LOOK.gate,',
       'finishPostStyle: VENUE_LOOK.finish.style,',
       "finishPostInSideView: VENUE_LOOK.finish.sideView === 'code',",
