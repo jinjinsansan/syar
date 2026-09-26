@@ -103,4 +103,51 @@ describe('🔴 ★Built の走路（段 A: モジュール定数と同じもの�
     expect(src, '🔴 ★`build()` が ★そのまま詰めるのをやめています')
       .toContain('distanceM: DIST, spec: COURSE_SPEC, turn: RACE_TURN,');
   });
+
+  /**
+   * 🔴 ★**段 C: ★画面の中で走路のモジュール定数を読む所は ★この 4 か所だけ**（★2026-09-27）
+   *
+   * ⚠️ ★上の段 B の網は ★**行の位置**で内外を分けていて、★`render` の外の JSX（★判定より後ろの行）を
+   *    ★「内側」に数えていました。★ここは ★**`RacePage` の本体**を構文で切り出して数えます。
+   *
+   * 【★段 C で直したもの】
+   *   ★出馬札の距離（★JSX）… ★`DIST` → ★`built.distanceM`（★組む前は札ごと出さない）
+   *   🔴 ★**段 B の置き換え漏れ 1 件**（★`render` の内側）… ★`climaxHudFade(DIST - visualLead)`。
+   *     ★行頭が ★`*`（★掛け算の続き）で、★手の grep が ★**註記の行と誤認して外していました**。
+   *     ★この網は ★初回 ★「5 か所（既知 4）」で落ちて ★これを捕まえました。
+   *
+   * 【🔴 ★残した 4 か所 — ★`built` がまだ無い時点で ★1 回だけ決まる所】
+   *   ★引継ぎ書は ★「残り 4 行（DIST 1・RACE_TURN 3）」でしたが、★測ると ★`DIST` がもう 1 つ
+   *   ★（★素材読み込みの中の決勝線の位置）在りました。★どれも ★**依存 `[]` の読み込みか state の初期値**で、
+   *   ★`built`（★読み込みの後に組む）からは ★**原理的に取れません**。
+   *   → ★段 D で ★「走路が決まってから読み込む」形にするまで ★**ここで釘付け**します。
+   *     ★増えたら落ちる（★新しい読み口を作らない）・★減ったら ★この表から消す。
+   */
+  it('🔴 ★段 C: RacePage の中の走路定数は 既知の 4 か所だけ／出馬札は built を読む', () => {
+    const src = strip(read(RACE_PAGE));
+    const page = src.match(/export default function RacePage\([\s\S]*?\n\}\n/);
+    expect(page, '🔴 ★`RacePage` の本体が切り出せない（★走査が壊れている）').not.toBeNull();
+    const body = page![0];
+    expect(body.length, '★`RacePage` が短すぎる（★切り出しが途中で止まっている）').toBeGreaterThan(50000);
+
+    /** ★註記は `strip` で空白になっているので ★間の空白は幅を問いません */
+    const KNOWN: readonly RegExp[] = [
+      /useState<'left' \| 'right'>\(RACE_TURN\)/g,
+      /worldS: object\.worldS === 'finish' \? DIST : object\.worldS/g,
+      /silksByGate, silksLayout, ownsGate,\s+RACE_TURN === 'right'\)/g,
+      /silksByGate, silksLayout, undefined,\s+RACE_TURN === 'right'\)/g,
+    ];
+    /** ★① ★既知の 4 か所が それぞれ 1 回ずつ在る（★網が空振りしていない） */
+    for (const quote of KNOWN) {
+      const n = (body.match(quote) ?? []).length;
+      expect(n, `🔴 ★既知の読み口 ${String(quote)} が ${n} 回（★1 回であること）。★減ったなら ★KNOWN から消す`).toBe(1);
+    }
+    /** ★② ★それ以外に ★走路のモジュール定数を読む所が無い */
+    const all = (body.match(/\b(DIST|RACE_TURN|COURSE_SPEC|COURSE_OPTS)\b/g) ?? []).length;
+    expect(all, `🔴 ★\`RacePage\` の中で 走路の定数を ${all} か所で読んでいます（★既知は ${KNOWN.length}）。\n`
+      + '  ★`built.*` を読むか、★段 D の「走路が決まってから読み込む」形に乗せること').toBe(KNOWN.length);
+
+    /** ★③ ★出馬札の距離は ★`built` から（★段 C の本体） */
+    expect(body).toContain("{built !== null && <span className=\"a-chip\">{surface === 'turf' ? '芝' : 'ダート'} {built.distanceM}m");
+  });
 });

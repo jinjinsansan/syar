@@ -5256,7 +5256,7 @@ export default function RacePage(): React.JSX.Element {
       if (!contestFocusHud) {
         ctx.globalAlpha = miniPrevAlpha * (1 - 0.55 * Math.min(1, miniHide * 3))
           /** ★台本 v9 は ★残り 250→200m で 0.4 まで薄くします（★数は減らさない・デザイナー回答 D-5） */
-          * (sideOnlyScript ? climaxHudFade(DIST - visualLead) : 1);
+          * (sideOnlyScript ? climaxHudFade(built.distanceM - visualLead) : 1);
         drawCourseMinimap(ctx, ovalCourse(built.distanceM, { ...built.spec, turn }), art.pal as Record<string, string>, FONT,
           v2Minimap.horses, v2Minimap.focusS, miniBox,
           // ★コース図も HUD・馬体と同じ枠色から引く（3 か所で持たない）
@@ -6063,7 +6063,8 @@ export default function RacePage(): React.JSX.Element {
           <div className="rm-entry-body">
             <div className="rm-entry-venue">{RACE_META.venue}　{RACE_META.raceNo}</div>
             <div className="rm-entry-chips">
-              <span className="a-chip">{surface === 'turf' ? '芝' : 'ダート'} {DIST}m {turn === 'left' ? '左' : '右'}</span>
+              {/* ★段 2 C: ★距離は `built` から（★組む前は札ごと出さない・★`:6303` と同じ作法） */}
+              {built !== null && <span className="a-chip">{surface === 'turf' ? '芝' : 'ダート'} {built.distanceM}m {turn === 'left' ? '左' : '右'}</span>}
               <span className="a-chip">馬場 {TRACK_CONDITION_LABEL[trackCondition]}</span>
               <span className="a-chip">{FIELD}頭</span>
             </div>
