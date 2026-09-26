@@ -132,7 +132,9 @@ export const SCREENS: readonly ScreenRecord[] = [
   { route: '/stable/name', verdict: 'rebuild', why: '★仔の命名' },
   { route: '/stable/roles', verdict: 'rebuild', why: '★引退後の役割' },
   { route: '/stable/retired', verdict: 'rebuild', why: '★引退馬の一覧' },
-  { route: '/stable/market', verdict: 'rebuild', why: '⚠️ ★中身が見本のまま。★**入口を作らない**（★D-122 ④「空の店へ送らない」）' },
+  { route: '/stable/market', verdict: 'rebuild', why: '✅ ★2026-09-26 に ★**実データへ繋ぎました**（★`market-screen`）。'
+    + '★D-122 ④「空の店へ送らない」は ★満たしました（★出品が 0 のときは そう言います）。'
+    + '🔴 ★**見た目は仮**（★依頼 R-17）— ★値段 14 通り × ほぼ 1 頭で ★旧い「帯 × 3 口」の前提が崩れている' },
   { route: '/records', verdict: 'rebuild', why: '★戦績。★`/mypage` から来る' },
   /**
    * ★以下の 5 枚は ★**裁定の手順（§6）を流して決めました**（2026-09-25）。

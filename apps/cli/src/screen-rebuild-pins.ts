@@ -88,8 +88,13 @@ export const REBUILD_PINS: ReadonlyMap<string, RebuildPin> = new Map([
       + '★戻る条件は ★**D-112 が入ったら**）',
   }],
   ['/stable/market', {
-    rpcs: [], libs: ['game-demo'],
-    note: '🔴 ★**見本だけ**。★D-122 ④「空の店へ送らない」ので ★入口を作っていません',
+    rpcs: [], libs: ['market-screen', 'stable-repo'],
+    note: '✅ ★**2026-09-26 に実データへ繋ぎました**（★オーナー指示）。'
+      + '★`market-screen` が ★`horse_market_listing_public`（`0085`）を読み、★`buy_horse`（`0025`）を呼びます。'
+      + '⚠️ ★旧は ★`lib[game-demo]`（★見本の値段を並べるだけ）でした。'
+      + '★釘は ★`npx tsx tools/measure-screen-deps.mjs` の ★**実測**で更新しています（★引き算していません）。'
+      + '🔴 ★見た目は ★**仮**です（★依頼 R-17）— ★実データは ★値段 14 通り × ほぼ 1 頭で、'
+      + '★旧い「帯 × 3 口」の前提が ★崩れています（★本番で実測）',
   }],
   ['/records', {
     rpcs: [], libs: ['records-screen'],

@@ -62,45 +62,74 @@ describe('★騎手を選ぶ（D12-4・D-105）', () => {
 });
 
 describe('★馬を迎える（D12-5・D-102）', () => {
-  it('③ ★口数・値段・戻り額を画面に直書きしていない', () => {
-    /**
-     * ⚠️ ★2026-09-18・T-10（D-114 ②）で ★**帯（段）を画面に渡さなくなりました**。
-     *    ★旧は `LISTED_BANDS.map` と `priceOfStars(band)` を画面で回していましたが、
-     *    ★**それ自体が「段を画面の層へ渡す口」**です。
-     * ★いまは ★**値段の並び**を回します（見本は `DEMO_MARKET_PRICES_EP`・本番は `price_ep`）。
-     */
-    expect(MARKET).toMatch(/DEMO_MARKET_PRICES_EP\.map/);
+  /**
+   * 🔴 ★**2026-09-26 に ★綴りの釘付けを 要求の水準へ直しました**（★オーナー指示「b で進めて」）。
+   *
+   * 【★なぜ直したか】★この検査は ★**見本の定数そのもの**を要求していました:
+   *   ★`toMatch(/DEMO_MARKET_PRICES_EP\.map/)` ／ `toMatch(/DEMO_MARKET_STOCK_BY_BAND/)`
+   *   ★`toMatch(/length:\s*LISTINGS_PER_TIER/)` ／ `toMatch(/sellBackEP\(/)` ／ `toMatch(/back\.toLocaleString\(\)/)`
+   *   🔴 ★**実データに繋ぐと 原理的に満たせません。**
+   *   ⚠️ ★意図は ★「値段を画面に直書きしない」でした。★実装として ★見本の表を釘付けしていただけです
+   *      （★同じ形を ★`first-pass-time-of-day` ⑧ でも直しました・2026-09-26）。
+   *
+   * 【★実データは 帯に収まりません（★本番で実測・2026-09-26）】
+   *   ★出品 15 頭 ／ 値段の種類 ★**14 通り**（★3,000 EP が 2 頭・他 13 通りは 1 頭ずつ）。
+   *   → ★「同じ値段の中ならどの 1 頭でも同じ」も ★「3 口のうち残り 1」も ★表すものがありません。
+   *   ⚠️ ★帯を作るために 14 通りを 3 つに丸めるのは ★**画面で値付けすること**なのでやりません
+   *      （★下の「値付けしていない」で落とします）。
+   *
+   * 【★残した要求（★正典）】★① 煽らない ★② 数えさせない ★③ 素質を出さない
+   *   ★④「迎える」の語 ★⑤ 戻り額を数字で。★**並べ方と文言は意匠**なので見ません（★R-17）。
+   */
+  it('③ 🔴 ★値段と戻り額を画面で作っていない（★サーバーの値を出すだけ）', () => {
     expect(MARKET, '★段を画面で回している').not.toMatch(/LISTED_BANDS/);
     expect(MARKET, '★画面で値付けしている').not.toMatch(/priceOfStars/);
-    expect(MARKET).toMatch(/sellBackEP\(/);
-    expect(MARKET).toMatch(/LISTINGS_PER_TIER/);
     /**
-     * ⚠️ ★**帯と口数はリテラル一致で見ません**（★2026-09-16 にこれで誤検出しました）。
-     *    ★`LISTED_BANDS[0]` は **2.0**、`LISTINGS_PER_TIER` は **3** で、
-     *    ★`gap: 2`・`borderWidth: 3` のような**見た目の数**と一致します。
-     * ★**値段と戻り額**（4,000〜8,000・800〜1,600）は見た目の数と桁が違うので、★そちらは値で見ます。
+     * 🔴 ★**画面で戻り額を計算していない**こと（★D-052）。
+     *   ★サーバーが書いた `sell_back_ep` を出します（★実測で式と 14/14 一致しますが、
+     *   ★式を画面に置くと ★2 か所になります）。
      */
+    expect(MARKET, '🔴 ★画面で戻り額を計算している（★`sell_back_ep` を読むこと）')
+      .not.toMatch(/sellBackEP\s*\(/);
+    /** 🔴 ★値段・戻り額の ★**数を画面に写していない**（★本番の 14 通りを含む） */
     const literals = num(MARKET);
     for (const price of DEMO_MARKET_PRICES_EP) {
       expect(literals, `★値段が画面に写っている: ${price}`).not.toContain(price);
       expect(literals, `★戻り額が画面に写っている: ${sellBackEP(price)}`).not.toContain(sellBackEP(price));
     }
-    /**
-     * ★帯と口数は「引いているか」で見る（★値では見分けられない）。
-     * ★帯の並びを画面に書いていない／口数を画面の数で回していないことを、★形で見ます。
-     */
-    expect(MARKET).toMatch(/length:\s*LISTINGS_PER_TIER/);
-    /** ★参考: 名簿の側の値（★画面と食い違っていないことの確認） */
+    /** ★実データの層を通していること（★見本に戻っていない） */
+    expect(MARKET, '🔴 ★実データの層を読んでいない').toMatch(/loadMarketScreen/);
+    for (const demo of ['DEMO_MARKET_PRICES_EP', 'DEMO_MARKET_STOCK_BY_BAND', 'game-demo']) {
+      expect(MARKET, `🔴 ★見本に戻っています: ${demo}`).not.toContain(demo);
+    }
+    /** ★参考: 名簿の側の値（★走査が空振りでないことの確認） */
     expect(LISTINGS_PER_TIER).toBeGreaterThan(0);
     expect(DEMO_MARKET_PRICES_EP.length).toBeGreaterThan(1);
+  });
+
+  /** 🔴 ★**買う口を実際に呼んでいる**（★D-119 を作らない） */
+  it('③-2 🔴 ★buy_horse を呼んでいる', () => {
+    expect(MARKET, '🔴 ★画面が買う関数を呼んでいない').toMatch(/buyHorse\(/);
+    const lib = readFileSync(path.join(ROOT, 'apps/web/src/lib/market-screen.ts'), 'utf8');
+    expect(lib, "🔴 ★`rpc('buy_horse'` を呼んでいない").toContain("rpc('buy_horse'");
+    expect(lib, '🔴 ★買う前にセッションを見ていない').toContain('getSession()');
   });
 
   it('④ ★引き直しを煽っていない（★「もう一度探す」を置かない）', () => {
     for (const bad of ['もう一度探す', '引き直', 'リロール', '再抽選', '更新する']) {
       expect(MARKET, `★引き直しの語がある: ${bad}`).not.toContain(bad);
     }
-    /** ★先回りして鎮める一文がある */
-    expect(MARKET).toContain('違う値段は出ません');
+    /**
+     * ⚠️ 🔴 ★**文言そのものは見ません**（★2026-09-26 に釘付けを外しました）。
+     *    ★旧: ★`toContain('違う値段は出ません')`。
+     *    🔴 ★実データでは ★**出品が入れ替わります**（★ワーカーが書く）。★入れ替わりの周期を
+     *      ★**誰も測っていない**ので、★あの文を強制すると ★**画面に嘘を書かせます**。
+     *    → ★見るのは ★**煽る語が無いこと**だけ。★言い換えは ★意匠なので ★R-17 で依頼済みです。
+     * ⚠️ ★**測っていないことを画面に書かせない**（★「時間をおくと入れ替わります」も禁じます）。
+     */
+    for (const bad of ['入れ替わります', '入れ替わり', '補充されます']) {
+      expect(MARKET, `★測っていない約束がある: ${bad}`).not.toContain(bad);
+    }
   });
 
   it('🔴 ⑤ ★素質を一切出していない（★数値も段も・D-114 ②）', () => {
@@ -133,29 +162,27 @@ describe('★馬を迎える（D12-5・D-102）', () => {
 
   it('★手放すと戻る額を数字で出している（★誤って手放す事故を防ぐ）', () => {
     expect(MARKET).toContain('手放すと戻るのは');
-    expect(MARKET).toMatch(/back\.toLocaleString\(\)/);
+    /**
+     * ⚠️ ★旧: ★`toMatch(/back\.toLocaleString\(\)/)` ＝ ★**変数名の釘付け**でした。
+     *    → ★見るのは ★**サーバーの戻り額を数字で出していること**です。
+     */
+    expect(MARKET, '🔴 ★戻り額を数字で出していない').toMatch(/sellBackEP\.toLocaleString\(/);
   });
 
-  it('★★0 口になった枠は静かな空欄（★「残り 0」を出さず、帯も広げない・D-102 ⑤）', () => {
+  it('🔴 ★★残りを数えさせない（★「残り 0」を出さない・D-102 ⑤）', () => {
     /**
-     * ★デザイナーの回答（2026-09-16）:
-     *   ★「残り1」バッジは出す／★0 口の枠は ★**点線グレーの「今は　いません」**に置き換える／
-     *   ★**「残り 0」の数字は出さない**／★帯そのものは広げない・消さない。
+     * 🔴 ★**2026-09-26 に 綴りの釘付けを外しました。**
+     *   ★旧は ★`toContain('いません')` ／ `toMatch(/length:\s*LISTINGS_PER_TIER/)` ／
+     *     ★`toMatch(/DEMO_MARKET_STOCK_BY_BAND/)` ／ `toMatch(/slot\s*>=\s*stock/)` を要求し、
+     *     ★★**帯 × 枠という並べ方そのもの**を固定していました。
+     *   🔴 ★実データは ★値段 14 通り × ほぼ 1 頭なので、★その形に ★**収まりません**（★本番で実測）。
+     *   → ★残す要求は ★**「残りを数えさせない」**（★D-102 ⑤ の趣旨）だけ。
+     *     ★点線グレーの「今は　いません」は ★**その実現方法の 1 つ**なので ★意匠（★R-17）。
      */
-    expect(MARKET).toContain('いません');
-    expect(MARKET).toContain('残り');
     for (const bad of ['残り0', '残り 0', '残り{0}', '売り切れ', '完売', '補充']) {
       expect(MARKET, `★0 を数えさせる語がある: ${bad}`).not.toContain(bad);
     }
-    /**
-     * ★**枠を詰めていない**こと（★枡の数は `LISTINGS_PER_TIER` のまま・帯を広げない）。
-     * ⚠️ ★在庫で `Array.from` の長さを変えると ★**帯が縮みます**（★D-102 ⑤ の「広げない」の裏側）。
-     */
-    expect(MARKET).toMatch(/length:\s*LISTINGS_PER_TIER/);
-    expect(MARKET, '★在庫で枡の数を変えている').not.toMatch(/length:\s*stock/);
-    /** ★在庫は引いてくる（★画面で数えない・本番はサーバーの値） */
-    expect(MARKET).toMatch(/DEMO_MARKET_STOCK_BY_BAND/);
-    /** ★空欄の判定は枠の番号と在庫の比較 1 か所だけ（★別の条件を増やさない） */
-    expect(MARKET).toMatch(/slot\s*>=\s*stock/);
+    /** 🔴 ★出品が無いときに ★**黙らない**こと（★R-16・★空の一覧で「無い」に見せない） */
+    expect(MARKET, '🔴 ★出品 0 のときに何も言っていない').toMatch(/listings\.length === 0/);
   });
 });
