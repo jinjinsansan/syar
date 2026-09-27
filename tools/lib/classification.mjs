@@ -163,6 +163,8 @@ export const READONLY = [
    *   ★1 本ごとに `begin` → `set local role` → `select count(*)` → ★必ず `rollback`。★DB を変えません。
    */
   'verify-user-eyes.mjs',
+  /** ★デイリー EP の額を変える前に 影響を受ける口座を数える（★`select` だけ・★2026-09-27・EP の件 条件 (b)） */
+  'count-daily-ep-accounts.mjs',
   /**
    * ★AL-6（裁定 REVIEW_CONSULT_ARCADE_LOOP_ANSWER_20260918）の測定器 2 本。
    *   ★DB に触りません（★エンジンを回して時間を測るだけ・出力はローカルの JSON とログ）。
