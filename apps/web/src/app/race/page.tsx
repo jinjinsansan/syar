@@ -1061,6 +1061,8 @@ const RACE_BACK_PLATE: React.CSSProperties = {
   border: '3px solid var(--u-navy)', borderRadius: 10, color: 'var(--u-ink-dark)', textDecoration: 'none',
   backgroundImage: 'var(--u-gold-plate)', boxShadow: 'var(--u-shadow-card)',
 };
+/** ★用意に時間が掛かったとき ★3 択を出すまでの秒（★`RACE_NOTICE_HANDOFF.md` §5「★8〜10 秒で選択肢を提示」） */
+const LOADING_CHOICES_SEC = 8;
 const RACE_CONTROL: React.CSSProperties = {
   minHeight: 44, padding: '0 16px', borderRadius: 12, fontSize: 14, cursor: 'pointer',
   border: '3px solid rgba(251,247,236,.5)', background: 'var(--u-panel-strong)', color: 'var(--u-ink-light)',
@@ -2817,6 +2819,8 @@ function RaceView({ setup, real }: {
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const [built, setBuilt] = useState<Built | null>(null);
   const [loadingSeconds, setLoadingSeconds] = useState(0);
+  /** ★「このまま待つ」を押したら ★3 択を畳む（★押した人に 何度も聞かない） */
+  const [loadingChoicesDismissed, setLoadingChoicesDismissed] = useState(false);
   useEffect(() => {
     if (ready && built !== null) return;
     const started = Date.now();
@@ -6369,10 +6373,20 @@ function RaceView({ setup, real }: {
       <span style={{ fontSize: 24, letterSpacing: '.14em', color: 'var(--u-gold)' }}>馬物語</span>
       <p style={{ margin: 0 }}>{real !== null ? '録画の用意をしています…' : 'レースの用意をしています…'}</p>
       <progress aria-label="レース素材を読み込み中" style={{ width: 'min(260px, 60vw)', accentColor: 'var(--u-gold)' }} />
-      {loadingSeconds >= 10 && real === null && <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <span>このまま待つ</span>
-        <a href="/vote" style={{ color: 'var(--u-gold)', textDecoration: 'underline' }}>結果だけ見る</a>
-      </div>}
+      {/* ★経過秒は ★必ず出す（★`RACE_NOTICE_HANDOFF.md` §5「★進捗バー＋経過秒数を必須表示」・★終わらない「用意しています」にしない） */}
+      <span style={{ fontSize: 12, opacity: .8 }}>経過 {loadingSeconds} 秒</span>
+      {/**
+        * ★**8 秒で 3 択**（★2026-09-28・§5・デザイナー R-18 回答・レビュー側の条件）:
+        *   ★① このまま待つ ★② 結果だけ見る（★演出なしで着順へ） ★③ 戻る。★**実レースの録画でも出す**（★それまでは見本だけでした）。
+        *   ★「戻る」を ★上段バー任せにせず ★3 つ目として並べます（★段 B の条件の 1 つ・簿 STRIP-LANDSCAPE-STAGE-B）。
+        */}
+      {loadingSeconds >= LOADING_CHOICES_SEC && !loadingChoicesDismissed && (
+        <div role="group" aria-label="待ち方を選ぶ" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 4 }}>
+          <button type="button" style={RACE_CONTROL} onClick={() => { setLoadingChoicesDismissed(true); }}>このまま待つ</button>
+          <a href={real !== null ? `/races/${encodeURIComponent(real.raceId)}` : '/vote'} style={{ ...RACE_CONTROL, display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>結果だけ見る</a>
+          <a href={RETURN_TO ?? '/home'} style={{ ...RACE_CONTROL, display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>戻る</a>
+        </div>
+      )}
     </div>
   );
 

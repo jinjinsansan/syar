@@ -163,7 +163,11 @@ export default function HomePage(): React.ReactElement {
         <BigButton tone="gold" label="育成モード" sub="今週の調教をする" href="/train" grow="1 1 150px" />
         <BigButton tone="blue" label="投票モード" sub="出馬表・マークシート" href="/vote" grow="1 1 150px" />
         <BigButton tone="ivory" label="マイページ" sub="厩舎と成績" href="/mypage" grow="1 1 150px" />
-        <BigButton tone="ivory" label="ポイントを稼ぐ" sub="受け取り機能は準備中" href="/earn" grow="1 1 150px" />
+        {/*
+          ★副題は ★レビュー側の暫定の語（★2026-09-28）。★「受け取り機能は準備中」は ★嘘でした（★毎日の受け取りは 09-25 に繋いだ・0091 で 2,000 EP）。
+          ★デザイナーが語を返したら差し替える（★簿 HOME-EARN-SUBTITLE-PROVISIONAL）。
+        */}
+        <BigButton tone="ivory" label="ポイントを稼ぐ" sub="毎日の受け取りができます" href="/earn" grow="1 1 150px" />
         <BigButton tone="ivory" label="景品交換" sub="賞金ポイントで交換" href="/exchange" grow="1 1 150px" />
         <BigButton tone="ivory" label="使い方" sub="はじめての方へ" href="/howto" grow="1 1 150px" />
       </div>
