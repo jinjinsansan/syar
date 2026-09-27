@@ -1587,6 +1587,25 @@ export const OPEN_FINDINGS = [
     owner: 'dev',
     until: '2026-11-30',
   },
+  {
+    id: 'VIEW-CALLS-FUNCTION-INVOKER-RIGHTS',
+    what: '🔴🔴 ★**本番で ★ログインするとダッシュボード・厩舎・出走登録が読めません**（★市場・引退馬も ★未ログインでも）'
+      + '— ★「permission denied for table race_entries」（★2026-09-27 にオーナーが実物で確認）。★直しは `0090`（★staging 済み・★本番は未適用）',
+    why: '✔ ★原因: ★`0086` の `horse_wins()` / `horse_starts()` が ★definer でなく、★中で `race_entries` を読む。'
+      + '★それを ★`my_horses`（`0087`）・`retired_horses_public` / `horse_market_listing_public`（`0086`）が呼ぶ。'
+      + '★ビューの持ち主の権限が効くのは ★直に参照する表だけで、★中から呼んだ関数の本体は ★**利用者の権限**で走る。'
+      + '★★**作法: 権限は、通る道のいちばん狭い所で決まる。**'
+      + '✔ ★staging の実測（★`tools/verify-user-eyes.mjs`）: ★`0090` の前 ★読めない 5 本 → ★後 0 本。'
+      + '⚠️ ★最初は ★`count(*)` で測って ★**全部「読めた」と出ました**（★使われない列の関数は呼ばれない）。★`select *` にして 5 本が落ちた。'
+      + '✔ ★網 `apps/cli/test/view-function-invoker-rights.test.ts`（★`0090` を抜くと 3 ビューを名指しで捕まえる対照つき）。'
+      + '✔ ★配備の手順書に ★⑧「利用者の目で読む」を ★止める段として足した。'
+      + '🔴 ★09-26 の本番確認は ★service role で「在る」を見ただけで、★「読める」を見ていなかった（★ここが本体）。'
+      + '⚠️ ★旧い簿 `PROD-OWNER-PAGES-BROKEN`（★ビューが本番に無い）とは ★別の壊れ方です（★ビューは在るが 読めない）。'
+      + '--- ✅ ★**消す条件** --- ★本番に `0090` を当て（★オーナーの承認事項）、'
+      + '★`npx tsx tools/verify-user-eyes.mjs --env production` が ★読めない 0 本になったことを ★報告した日。',
+    owner: 'owner',
+    until: '2026-10-04',
+  },
 ];
 
 /**

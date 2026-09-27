@@ -124,6 +124,28 @@ npx tsx tools/verify-deployed-build.mjs --base https://star-two-chi.vercel.app -
 - ⚠️ `--expect` は **完全な 40 桁**で渡す（短い sha を渡すと、中身が同じでも「食い違っています」と出る・2026-09-23 に実際に出た）
 - push は HEAD ではなく**控えた sha を名指し**する（記憶「共有ツリーでの push は HEAD を送る」）。このセッションからは資格情報の窓で止まることがあるので、止まったらオーナーに依頼する。
 
+## ⑧ 🔴 関門: 利用者の目で、公開ビューを 1 本ずつ読む（★通らなければ配備は未完了）
+
+> ★**2026-09-27 に足しました**（★裁定 `REVIEW_INC_PROD_PERMISSION_20260927.md` §4）。
+> ★09-26 の配備の確認は ★「関数が 7/7 在る」「列が在る」を ★**service role で**見ました。★**利用者が読めるか**は見ていませんでした。
+> ★その結果 ★`my_horses`・`retired_horses_public`・`horse_market_listing_public` が ★本番で
+> ★「permission denied for table race_entries」でした（★`0086` の関数が definer でない・★直しは `0090`）。
+> ★★**権限は、通る道のいちばん狭い所で決まります。** ★「在る」「辿れる」とは別に、★「読める」を見る段です。
+
+```bash
+npx tsx tools/verify-user-eyes.mjs --env production
+```
+
+- ★`anon` と ★`authenticated`（★馬を持つ実在の利用者 1 人の `auth.uid()`）で、★利用者に `select` を与えたビューを ★**全部の列ごと**読みます。
+  ★1 本ごとに ★`rollback` するので ★DB は変わりません。
+- 🔴 ★**`🔴` が 1 本でもあれば ★配備は未完了**。★画面を出さない・★出していたら戻すかを判断する。
+- ⚠️ ★**`count(*)` で確かめないこと** — ★使われない列の関数は ★呼ばれず、★壊れていても「読めた」と出ます
+  （★2026-09-27 に staging で実際にそう出ました。★`select *` にして初めて 5 本が落ちた）。
+- ⚠️ ★**0 行は「判定不能」**です（★行ごとに呼ばれる関数が 1 度も呼ばれていない）。★「通った」と読まない。
+- ✔ ★staging の実測（2026-09-27）: ★`0090` の前 ★**読めない 5 本** → ★後 ★**0 本**（★判定不能 2 本 ＝ `prize_catalog_public` が 0 行）。
+- ⚠️ ★**公開関数（RPC）は ★この道具では読みません**（★引数が要る）。★名前と実行権は ⑦ の `verify-screen-rpcs-live.mjs`、
+  ★「ビューが呼ぶ関数の権限」は ★網 `apps/cli/test/view-function-invoker-rights.test.ts` が原文で見ます。
+
 ## 後で（本番を読むだけ）
 
 ```bash

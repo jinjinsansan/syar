@@ -159,6 +159,11 @@ export const READONLY = [
   'verify-race-replay-read.mjs',
   'verify-c6-owner-exposure.mjs',
   /**
+   * ★利用者の目（`anon` / `authenticated`）で 公開ビューを 1 本ずつ `select`（★2026-09-27・裁定 REVIEW_INC_PROD_PERMISSION §4）。
+   *   ★1 本ごとに `begin` → `set local role` → `select count(*)` → ★必ず `rollback`。★DB を変えません。
+   */
+  'verify-user-eyes.mjs',
+  /**
    * ★AL-6（裁定 REVIEW_CONSULT_ARCADE_LOOP_ANSWER_20260918）の測定器 2 本。
    *   ★DB に触りません（★エンジンを回して時間を測るだけ・出力はローカルの JSON とログ）。
    *   ★レビュー側が独立に再実行できるよう tmp/ から移しました（★tmp/ は gitignore で次の人に残らない）。
