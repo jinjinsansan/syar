@@ -1675,11 +1675,11 @@ export const OPEN_FINDINGS = [
   },
   {
     id: 'STRIP-SIZE-TWO-ROWS-TO-REVISIT',
-    what: '⚠️ ★常設帯の表（`race-strip-sizes.ts`）に ★**見直しの約束が 2 行**あります（★2026-09-27・裁定 `REVIEW_ALWAYS_VISIBLE_RACE_20260927.md` §5-2）',
-    why: '✔ ★`/odds` ＝ hidden は ★いまは可。★ただしこの画面が出るのは ★「発売中が無い」とき（★`odds/page.tsx` で発売中があれば転送）で、'
-      + '★そこは ★次の発走までの残りが ★いちばん役に立つ場面でもあります → ★**入口が付く日（★網 `screen-reachable.test.ts` の `ENTRANCE_MISSING` から外れた日）に text へ見直す**。'
+    what: '⚠️ ★常設帯の表（`race-strip-sizes.ts`）に ★**見直しの約束が 1 行**あります（★`/odds` の行は 2026-09-27 に解いた）（★2026-09-27・裁定 `REVIEW_ALWAYS_VISIBLE_RACE_20260927.md` §5-2）',
+    why: '✔ ★`/odds` ＝ hidden は ★**解きました**（★2026-09-27・裁定 §6-2 の 3）: ★`/odds` は ★入口の要らない転送口で、'
+      + '★網 `screen-reachable.test.ts` の `NO_ENTRANCE` へ移した（★入口は付かない ＝ ★text へ見直す日も来ない）。★利用者は `/vote` → `/odds/<id>`（text）を辿る。'
       + '✔ ★`/watch-race` ＝ big は ★「フォールバック専用に縮小する」裁定（§3 の 1）が控えています → ★**その便で分類を見直す**。'
-      + '--- ✅ ★**消す条件** --- ★2 行とも ★見直して表を直した（★または直さない理由を裁定に書いた）日。',
+      + '--- ✅ ★**消す条件** --- ★`/watch-race` の行を ★見直して表を直した（★または直さない理由を裁定に書いた）日。',
     owner: 'dev',
     until: '2026-12-31',
   },
@@ -1830,25 +1830,6 @@ export const WATCHING = [
       + '★③ は `buy_horse` の結線と同じ便で閉じられます。'
       + '★①② は ★**いまのままでよい**（★記録として残すだけ）',
     owner: 'owner',
-    reviewBy: '2026-12-31',
-  },
-  {
-    id: 'SCREEN-WITHOUT-ENTRANCE',
-    what: '🔴 ★**画面は在るのに、どこからもリンクされていない道が 2 本あります**（★2026-09-24）。'
-      + '★`/odds`（★「次のレースのオッズへ送る」入口・2026-09-17）と '
-      + '★`/stable/market`（★馬を迎える）。★URL を打った人しか辿り着けません',
-    why: '✔ ★機械で走査しました（`apps/cli/test/screen-reachable.test.ts`）。'
-      + '★`app/**/page.tsx` の道と、★`apps/web/src` の `href` を突き合わせた結果です。'
-      + '🔴 ★**今日 3 度目の同じ形**です: ★① `fetchOnboardingState` が書かれていたのに呼ばれていない '
-      + '★② `buy_horse` / `sell_horse` / `unlock_stable_grade` が本番に在るのに画面が呼ばない '
-      + '★③ `/stable/foal` を作って本番に出したのに入口が無い（★これは同日に塞ぎました）。'
-      + '⚠️ ★`/stable/market` は ★**画面まるごと見本**です（★値段は `DEMO_MARKET_PRICES_EP`・'
-      + '★`buy_horse` も出品の一覧も呼んでいない）。★**入口を先に作ってはいけません**（★空の店へ送ることになる）。'
-      + '⚠️ ★`/odds` は中身は在ります（★読み取りだけ・次の 1 本へ送る）。★押す所が無いだけです',
-    returnWhen: '★`/odds` … ★**ダッシュボードか投票に「オッズ」を置くとき**（★小さい）。'
-      + '★`/stable/market` … ★**`buy_horse` を結線するとき**（★報告 §4 の 2 番目）。'
-      + '⚠️ ★検査が ★**件数 2 を釘付け**しています。★増やすならここも直すこと（★黙って増えない）',
-    owner: 'dev',
     reviewBy: '2026-12-31',
   },
   {

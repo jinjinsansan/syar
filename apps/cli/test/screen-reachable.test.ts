@@ -40,11 +40,11 @@ const SRC = path.join(ROOT, 'apps/web/src');
  *    ★ここに書いた理由がそのまま申し送りです。
  */
 const ENTRANCE_MISSING: Readonly<Record<string, string>> = {
-  '/odds': '★「次のレースのオッズへ送る」入口（★2026-09-17）。★押す所が無い。'
-    + '★ダッシュボードか投票に「オッズ」を置くべき（★`/odds/[id]` は別で、そちらは送り先）',
-  '/stable/market': '🔴 ★**画面まるごと見本**（★値段は `DEMO_MARKET_PRICES_EP`）。'
-    + '★`buy_horse` も出品の一覧も呼んでいない（★報告 `REPORT_SERVER_WITHOUT_SCREEN_20260924.md` §2）。'
-    + '★入口を作る前に中身を結線すること（★空の店へ送らない）',
+  /**
+   * ✅ ★2026-09-27 に ★0 件になりました（★裁定 §6-2 の 2・3）。
+   *   ★`/stable/market` … ★2026-09-26 に実データへ結線済み（★見本の値段は消えた）。★`/stable` のショートカットに入口を置いた
+   *   ★`/odds` … ★入口が要らない道だったので ★`NO_ENTRANCE` へ移した（★理由はそちら）
+   */
 };
 
 /**
@@ -62,6 +62,9 @@ const NO_ENTRANCE: Readonly<Record<string, string>> = {
   '/gait-review': '★歩様の見比べ（★同上）',
   '/reset-password': '★メールのリンクから来る（★画面にリンクは置かない）',
   '/forgot-password': '★`/login` から行く。★`/login` 側に在る',
+  '/odds': '★**転送口**（★2026-09-27・裁定 §6-2 の 3）。★発売中があれば ★`/odds/<id>` へ転送し、'
+    + '★無いときは「★いま発売中のレースがありません」を出すだけ（★`odds/page.tsx`）。'
+    + '★利用者が辿る先は ★`/odds/<id>` で、★そこは `/vote` から入口が在る',
 };
 
 /** ★`app/**​/page.tsx` の道（★動的な道と組は除く） */
@@ -142,13 +145,13 @@ describe('🔴 ★画面に辿り着く道が在る', () => {
    *   ⚠️ ★この検査は ★**数を釘付け**します。★足すときは数も一緒に上げ、★簿にも載せること。
    *      ★減らすのは自由です（★入口を作った ＝ 良いこと）。
    */
-  it('🔴 ★入口待ちの画面が増えていない（★いま 2 件）', () => {
+  it('🔴 ★入口待ちの画面が増えていない（★いま 0 件・2026-09-27）', () => {
     const waiting = Object.keys(ENTRANCE_MISSING).filter((r) => !linked.has(r));
     expect(
       waiting.length,
-      '🔴 ★入口待ちが増えています。★簿 `SCREEN-WITHOUT-ENTRANCE` にも載せてください:\n'
+      '🔴 ★入口待ちが増えています。★簿に `SCREEN-WITHOUT-ENTRANCE` を載せ直してください（★2026-09-27 に 0 件で閉じた）:\n'
       + `  ${waiting.join('\n  ')}`,
-    ).toBeLessThanOrEqual(2);
+    ).toBeLessThanOrEqual(0);
   });
 
   it('⚠️ ★簿に、★もう無い画面が残っていない（★見張り続けない・R-19）', () => {

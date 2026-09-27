@@ -250,6 +250,14 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
    *      ★そこでブラウザが「収まらない」と判断すると、★**あとで縮んでも版面は戻りません。**
    */
   main select, main input, main textarea, main button, main label { max-width: 100%; }
+  /*
+   * ★枠の外の画面の本体にも ★**はみ出さない下限だけ**届かせます（★2026-09-27・裁定 §6-2 の 1）。
+   * ⚠️ ★上の `flex-wrap: wrap` と下の `height: auto !important` は ★**届かせません**。
+   *    ★馬物語の画面は ★390px 幅で組まれた inline の flex を多く持ち、★折り返しや高さを変えると ★見た目が動きます（★意匠に触る）。
+   *    ★固定幅の解除（`flex:0 0 150px` など）と ★画像の `max-width` も ★9 面には ★対象が 0 でした
+   *    ★（★2026-09-27 に grep で実測・★画像は `/watch-race` の 1 枚で既に 100%）ので足していません。
+   */
+  [data-page-body] select, [data-page-body] input, [data-page-body] textarea, [data-page-body] button, [data-page-body] label { max-width: 100%; }
 
   /*
    * ★横並びの行の「高さ」を内容に合わせる。
@@ -1088,14 +1096,25 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
    *   ★`max-width: 720px` … ★狭い画面（★`pointer` を持たない環境・★計測の担保）
    *   ★どちらか一方だけだと漏れます: ★幅だけ → 横向きで戻る／★coarse だけ → 検証できない
    */
+  /*
+   * ★`[data-page-body]` … ★**自前の上段バーを持つ画面の本体**（★`<main>` を持たない画面・2026-09-27・裁定 §6-2 の 1）。
+   *   ★この規則は 2026-09-01 に ★全画面が枠の `<main>` の中に居た頃に書かれ、★後から枠の外へ出た画面
+   *   ★（`/home` `/train` `/login` など 9 面）には ★**黙って届いていませんでした**（★除外した理由は原文にありません）。
+   *   ★網 `page-body-safety-net.test.ts` が ★「`<main>` か `data-page-body` のどちらかを持つ」を見ます。
+   */
   main button, main select, main [role="button"],
   main input[type="button"], main input[type="submit"],
-  main input[type="checkbox"], main input[type="radio"] {
+  main input[type="checkbox"], main input[type="radio"],
+  [data-page-body] button, [data-page-body] select, [data-page-body] [role="button"],
+  [data-page-body] input[type="button"], [data-page-body] input[type="submit"],
+  [data-page-body] input[type="checkbox"], [data-page-body] input[type="radio"] {
     min-height: 44px;
     min-width: 44px;
   }
   /* ★文字を打つ欄は高さだけ（★幅の下限は要りません） */
-  main input[type="text"], main input[type="number"], main textarea { min-height: 44px; }
+  main input[type="text"], main input[type="number"], main textarea,
+  [data-page-body] input[type="text"], [data-page-body] input[type="email"], [data-page-body] input[type="password"],
+  [data-page-body] input[type="number"], [data-page-body] textarea { min-height: 44px; }
   /*
    * ★見た目がボタンのリンク（`<a class="a-btn">` など）も同じ大きさに。
    *   ⚠️ ★`<a>` を一律に 44px にはしません。★本文中の文字リンクまで太らせてしまいます。

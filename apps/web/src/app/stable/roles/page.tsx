@@ -331,7 +331,7 @@ function SlotCard({ label, count, limit }: { readonly label: string; readonly co
 
 function Shell({ children }: { readonly children: React.ReactNode }): React.ReactElement {
   return (
-    <div style={{ minHeight: '100dvh', background: '#0a2340', color: '#fbf7ec' }}>
+    <div data-page-body style={{ minHeight: '100dvh', background: '#0a2340', color: '#fbf7ec' }}>
       <div style={{ width: '100%', maxWidth: 1100, margin: '0 auto', padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>引退後の役割</div>
         {/* ★常設レース表示（★フォームの画面 ＝ 極小・大きさは表 `race-strip-sizes.ts` が決める・裁定 ⑤） */}

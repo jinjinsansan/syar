@@ -114,7 +114,7 @@ export default function TrainPage(): React.ReactElement {
     }
   };
 
-  if (horse === null) return <div data-theme="uma" style={{ minHeight: '100dvh', background: 'var(--u-navy)' }}>
+  if (horse === null) return <div data-theme="uma" data-page-body style={{ minHeight: '100dvh', background: 'var(--u-navy)' }}>
     <Backdrop /><TopBar title="育成モード" paused={paused} onToggle={toggle} /><RaceStrip />
     <div role={error ? 'alert' : 'status'} style={{ position: 'relative', padding: 20 }}>
       {loading ? '厩舎を読み込み中…' : error ?? 'まだ持ち馬がいません。'}
@@ -133,7 +133,7 @@ export default function TrainPage(): React.ReactElement {
 
   return (
     <div
-      data-theme="uma"
+      data-theme="uma" data-page-body
       className={paused ? 'u-paused' : undefined}
       style={{
         position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden',

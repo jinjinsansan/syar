@@ -190,6 +190,8 @@ function HomeCards({ home, ownedCount, todoCount }: { readonly home: StableHome;
           <a className="a-btn" href="/vote" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>番組表</a>
           <a className="a-btn" href="/records" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>記録</a>
           <a className="a-btn" href="/exchange" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>景品交換</a>
+          {/* ★馬の売り買い（★2026-09-27・裁定 §6-2 の 2）。★既存の部品（`a-btn`）で 1 つ置くだけ。★名前は画面の見出しのまま */}
+          <a className="a-btn" href="/stable/market" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>馬を迎える</a>
         </div>
       </HomeCard>
     </div>

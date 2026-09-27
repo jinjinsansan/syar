@@ -37,7 +37,7 @@ export default async function OddsEntryPage() {
 
   /** ★見つからないときは黙って空にしない（★R-21） */
   return (
-    <div data-theme="uma" style={{
+    <div data-theme="uma" data-page-body style={{
       minHeight: '100dvh', background: 'var(--u-navy)', color: 'var(--u-ink-light)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
       fontFamily: "'M PLUS Rounded 1c', system-ui, sans-serif", fontWeight: 800,

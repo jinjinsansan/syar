@@ -63,7 +63,7 @@ export default function SignupPage(): React.ReactElement {
 
   return (
     <div
-      data-theme="uma"
+      data-theme="uma" data-page-body
       className={paused ? 'u-paused' : undefined}
       style={{
         position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden',
