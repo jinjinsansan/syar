@@ -17,15 +17,7 @@ const STRIP = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/race-str
 const CSS = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/uma-theme.css'), 'utf8');
 const LIVE = STRIP.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ').replace(/\/\/[^\n]*/g, ' ');
 
-/** ★`race-strip.tsx` は css を読むので ★ここでは読み込まず ★同じ式を写して比べます（★下の「写しが同じ」で縛る） */
-const RUN_VIEW_M = 60;
-function runCamera(positions: readonly number[], distance: number): { left: number; right: number } {
-  const d = Number.isFinite(distance) && distance > 0 ? distance : 1600;
-  const view = Math.min(1, RUN_VIEW_M / d);
-  const lead = positions.length === 0 ? 0 : Math.max(...positions);
-  const right = Math.min(1 + 6 / d, Math.max(view, lead + 8 / d));
-  return { left: right - view, right };
-}
+import { RUN_VIEW_M, runCamera } from '../../web/src/components/uma/race-camera.js';
 
 describe('★常設帯の走行（①②）', () => {
   it('🔴 ★本編と同じ side-v8 の 8 コマを読む（★差し戻した horse-gallop に戻らない）', () => {
@@ -40,6 +32,23 @@ describe('★常設帯の走行（①②）', () => {
     expect(LIVE, '★「極小」が馬を描いていない').toMatch(/u-race-run-mini[\s\S]{0,200}<RunningHorse/);
   });
 
+  it('🔴 ★絵を読むのは ★走行が出ている間だけ（★帯のあいだは 0 バイト・裁定 §5 条件 2 (a)）', () => {
+    /** ★8 コマ（★約 450KB）は ★`RunningHorse` の中でしか使わない（★先読みしない） */
+    expect(LIVE.match(/RUN_FRAMES/g)?.length, '★RUN_FRAMES を別の所でも使っている').toBe(2);
+    expect(LIVE, '★先読みしている').not.toMatch(/new Image\(|rel=["']preload/);
+    /** ★`RunningHorse` を描くのは ★「大」（`RaceRun`）と ★「極小」だけ。★どちらも録画の窓の中 */
+    expect(LIVE.match(/<RunningHorse/g)?.length).toBe(2);
+    expect(LIVE.match(/<RaceRun /g)?.length).toBe(2);
+    expect(LIVE, '★「大」が録画の窓の外で出る').toMatch(/const big = replaying && !compact;/);
+    expect(LIVE, '★「極小」が録画の窓の外で出る').toMatch(/replaying && recent && data \? <>[\s\S]{0,300}u-race-run-mini/);
+    expect(LIVE, '★拡大が録画の窓の外で出る').toMatch(/\{expanded && replaying && recent && <div className="u-race-replay-overlay"/);
+  });
+
+  it('🔴 ★.webp を読む（★同名の .png は 1 枚 467KB・裁定 §5 条件 2 (b)）', () => {
+    expect(LIVE).toMatch(/side-v8-pose0\$\{n\}\.webp`/);
+    expect(LIVE, '★.png を読んでいる').not.toMatch(/side-v8-pose0[^`'"]*\.png/);
+  });
+
   it('★寸法は資料の値（★大 150px ／ 極小 22×16px）', () => {
     expect(CSS).toMatch(/\.u-race-run \{[\s\S]{0,120}height: 150px/);
     expect(CSS).toMatch(/\.u-race-run-mini \{[\s\S]{0,80}width: 22px; height: 16px/);
@@ -52,9 +61,10 @@ describe('★常設帯の走行（①②）', () => {
 });
 
 describe('★カメラ（③）', () => {
-  it('★写しが本物と同じ式', () => {
-    expect(STRIP).toContain(`export const RUN_VIEW_M = ${RUN_VIEW_M};`);
-    expect(STRIP).toContain('const right = Math.min(1 + 6 / d, Math.max(view, lead + 8 / d));');
+  it('🔴 ★式は 1 か所（★帯が部品を import している・★写していない。裁定 §5 条件 1・D-052）', () => {
+    expect(LIVE).toContain("from './race-camera'");
+    expect(LIVE, '★帯が式を自分で持っている').not.toMatch(/function runCamera/);
+    expect(RUN_VIEW_M).toBe(60);
   });
 
   it('🔴 ★数馬身の差が ★枠の幅の 1 割以上に開く（★1 枚に収めると 1% 未満）', () => {

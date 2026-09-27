@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { readClient } from '../../lib/supabase';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, type ReplayRunner } from './race-replay';
+import { RUN_VIEW_M, runCamera } from './race-camera';
 import './uma-theme.css';
 
 interface RaceNoticeRow {
@@ -236,21 +237,6 @@ export function RaceRun({ rows, distance, motionReduced, tall = false }: {
       </span>;
     })}
   </div>;
-}
-
-/**
- * ★**カメラ**（★先頭を追う・★中継と同じ考え方）。★枠に映るのは ★`RUN_VIEW_M` メートルぶん。
- *   ⚠️ ★1600m を 1 枚に収めると ★数馬身の差が ★3px にしかならず、★全頭が 1 つの塊に見えました（★2026-09-27 実測）。
- *   ★先頭の少し前を右端にし、★ゴールが近づいたら ★ゴールの少し先で止めます（★ゴールの線が見える）。
- * ★返り値は進行率（0〜1）の区間。
- */
-export const RUN_VIEW_M = 60;
-export function runCamera(positions: readonly number[], distance: number): { readonly left: number; readonly right: number } {
-  const d = Number.isFinite(distance) && distance > 0 ? distance : 1600;
-  const view = Math.min(1, RUN_VIEW_M / d);
-  const lead = positions.length === 0 ? 0 : Math.max(...positions);
-  const right = Math.min(1 + 6 / d, Math.max(view, lead + 8 / d));
-  return { left: right - view, right };
 }
 
 /** ★奥行きの列（★0 が奥・2 が手前）。★枠番で決めるので ★毎回同じ列に居ます */
