@@ -43,6 +43,18 @@ describe('★④ 結果の一時強調', () => {
   });
 });
 
+describe('★④ の札は ★「あなたの馬」と読めない（★裁定 §6-2・帯は誰の馬かを知らない＝自馬の表示は段 3）', () => {
+  it('🔴 ★帯の画面の文字に ★自馬を指す語が無い', () => {
+    /** ★画面に出る文字（★JSX の地の文と文字列）だけを見る。★註記は `LIVE` で除いてある */
+    for (const word of ['あなた', '自分の馬', '自馬', 'わたしの馬', '私の馬', 'あなたの']) {
+      expect(LIVE, `★帯が「${word}」と言っている`).not.toContain(word);
+    }
+    /** ★札は ★「1着」＋馬番・馬名まで */
+    expect(LIVE).toMatch(/<span className="u-race-result-place">1着<\/span>\s*<span className="u-race-result-name">\{winner\.gate\}番 \{winner\.name\}<\/span>/);
+    expect(LIVE).toMatch(/<span>1着 \{winner\.gate\}番 \{winner\.name\}<\/span>/);
+  });
+});
+
 describe('★⑦ 読めなかったとき（★最後の表示を保持し「更新できません」だけ）', () => {
   it('🔴 ★失敗で ★表示を消さない（★data / focus を空にしない）', () => {
     expect(LIVE, '★失敗で表示を消している').not.toMatch(/setData\(null\)|setFocus\(null\)/);
