@@ -12,7 +12,8 @@
  *   （★架空の ID だと ★自分の行が 0 本で ★関数が 1 度も呼ばれず、★**壊れていても通ります**）。
  *
  * 【⚠️ ★0 行は「通った」ではありません】
- *   ★ビューの中の関数は ★行ごとに呼ばれます。★0 行なら ★関数は呼ばれていません → ★「判定不能」と出します。
+ *   ★ビューの中の関数は ★行ごとに呼ばれます。★0 行なら ★関数は呼ばれていません。
+ *   → ★そのビューが呼ぶ関数を ★同じ役で直に呼びます（★呼ばないビューは「対象外」）。★「判定不能」は作りません（★裁定 §5）。
  *
  * ★実行: npx tsx tools/verify-user-eyes.mjs --env staging
  *   ⚠️ ★`--env` は必ず明示（★`loadEnv()` の既定は本番）。
@@ -44,19 +45,16 @@ const owner = (await c.query(
 )).rows[0]?.owner_id ?? (await c.query('select owner_id from horses where owner_id is not null limit 1')).rows[0]?.owner_id;
 
 const results = [];
-async function readAs(role, view) {
+
+/** ★役を切り替えて 1 つ問い合わせる（★1 本ごとに `begin` → `set local role` → ★必ず `rollback`） */
+async function asRole(role, sql) {
   await c.query('begin');
   try {
     if (role === 'authenticated') {
       await c.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: owner, role: 'authenticated' })]);
     }
     await c.query(`set local role ${role}`);
-    /**
-     * 🔴 ★`count(*)` にしないこと（★2026-09-27 に 1 度 踏んだ）。
-     *   ★PostgreSQL は ★使われない列を計算しないので、★`count(*)` だと ★列の中の関数（`horse_wins(h.id)` 等）が ★**1 度も呼ばれず**、
-     *   ★壊れていても ★「読めた」と出ます。★**全部の列を実際に取り出します**（★画面と同じ `select *`）。
-     */
-    const r = await c.query(`select * from public.${c.escapeIdentifier(view)} limit 200`);
+    const r = await c.query(sql);
     return { ok: true, rows: r.rowCount ?? r.rows.length };
   } catch (e) {
     return { ok: false, error: String(e.message ?? e) };
@@ -65,29 +63,78 @@ async function readAs(role, view) {
   }
 }
 
+/**
+ * 🔴 ★`count(*)` にしないこと（★2026-09-27 に 1 度 踏んだ）。
+ *   ★PostgreSQL は ★使われない列を計算しないので、★`count(*)` だと ★列の中の関数（`horse_wins(h.id)` 等）が ★**1 度も呼ばれず**、
+ *   ★壊れていても ★「読めた」と出ます。★**全部の列を実際に取り出します**（★画面と同じ `select *`）。
+ */
+const readView = (role, view) => asRole(role, `select * from public.${c.escapeIdentifier(view)} limit 200`);
+
+/** ★`public` の関数（★名前・引数の型・揮発性）。★ビューの定義に名前が出るものを拾うため */
+const publicFns = (await c.query(
+  `select p.proname as name, p.oid::regprocedure::text as sig, p.provolatile as vol,
+          coalesce(array(select format_type(t, null) from unnest(p.proargtypes::oid[]) t), '{}') as args
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.prokind = 'f'`,
+)).rows;
+
+/** ★仮の引数（★型ごと 1 つ）。★作れない型は `undefined`（★確かめられない ＝ 不合格） */
+const DUMMY = {
+  uuid: 'gen_random_uuid()', integer: '0', bigint: '0', smallint: '0', numeric: '0',
+  text: "''", 'character varying': "''", boolean: 'false',
+};
+
+/**
+ * 🔴 ★**0 行のビュー**（★裁定 §5・★`count(*)` と同じ理屈の双子）。
+ *   ★行が無ければ ★列の式は評価されないので、★`select *` でも ★「読める」は未証明です。
+ *   → ★そのビューが呼ぶ関数を ★**同じ役で直に呼び**、★実行権と ★関数の中の表まで通ることを見ます。
+ *   ★関数を 1 つも呼ばないビューは ★「対象外」と ★機械が言います（★「判定不能」という 3 つ目の状態を作らない・TL-1）。
+ *   ⚠️ ★状態を変えうる関数（`volatile`）は ★直に呼びません → ★確かめられない ＝ ★不合格。
+ */
+async function checkEmptyView(role, view) {
+  const def = (await c.query('select pg_get_viewdef($1::regclass, true) as d', [`public.${view}`])).rows[0].d;
+  const called = publicFns.filter((f) => new RegExp(`\\b${f.name}\\s*\\(`, 'i').test(def));
+  if (called.length === 0) return { verdict: 'na', note: '0 行・★関数を呼ばないので対象外' };
+  const notes = [];
+  for (const f of called) {
+    if (f.vol === 'v') return { verdict: 'fail', note: `0 行・${f.sig} は volatile（★直に呼ばない ＝ 確かめられない）` };
+    const args = f.args.map((t) => DUMMY[t]);
+    if (args.some((a) => a === undefined)) return { verdict: 'fail', note: `0 行・${f.sig} の引数を作れない（★確かめられない）` };
+    const r = await asRole(role, `select public.${c.escapeIdentifier(f.name)}(${args.join(', ')})`);
+    if (!r.ok) return { verdict: 'fail', note: `0 行・${f.sig} を直に呼んで落ちた: ${r.error}` };
+    notes.push(`${f.name}() ✓`);
+  }
+  return { verdict: 'ok', note: `0 行・★呼ぶ関数を直に呼んで通った（${notes.join(' ')}）` };
+}
+
 for (const role of ['anon', 'authenticated']) {
   if (role === 'authenticated' && owner === undefined) {
-    console.log('【authenticated】🔴 ★馬を持つ利用者が居ないので ★判定不能（★架空の ID では関数が呼ばれない）\n');
-    results.push({ role, view: '*', verdict: 'undecidable' });
+    /** ★架空の ID では ★自分の行が 0 本で ★関数が呼ばれない → ★確かめられない ＝ ★不合格（★3 つ目の状態にしない） */
+    console.log('【authenticated】🔴 ★馬を持つ利用者が居ないので ★確かめられません（★不合格として扱います）\n');
+    results.push({ role, view: '*', verdict: 'fail' });
     continue;
   }
   console.log(`【${role}】${role === 'authenticated' ? '（★馬を持つ利用者 1 人の目で）' : ''}`);
   for (const view of await viewsOf(role)) {
-    const r = await readAs(role, view);
-    const verdict = !r.ok ? 'fail' : r.rows === 0 ? 'undecidable' : 'ok';
+    const r = await readView(role, view);
+    let verdict;
+    let note;
+    if (!r.ok) { verdict = 'fail'; note = r.error; }
+    else if (r.rows > 0) { verdict = 'ok'; note = `${r.rows} 行`; }
+    else ({ verdict, note } = await checkEmptyView(role, view));
     results.push({ role, view, verdict });
-    const mark = verdict === 'ok' ? '✓' : verdict === 'fail' ? '🔴' : '⚠️';
-    console.log(`  ${mark} ${view.padEnd(34)} ${r.ok ? `${r.rows} 行${r.rows === 0 ? '（★0 行 ＝ 判定不能）' : ''}` : r.error}`);
+    const mark = verdict === 'ok' ? '✓' : verdict === 'na' ? '－' : '🔴';
+    console.log(`  ${mark} ${view.padEnd(34)} ${note}`);
   }
   console.log('');
 }
 await c.end();
 
 const fails = results.filter((r) => r.verdict === 'fail');
-const undecidable = results.filter((r) => r.verdict === 'undecidable');
-console.log(`★読めない: ${fails.length} 本 ／ ★判定不能（0 行）: ${undecidable.length} 本`);
+const na = results.filter((r) => r.verdict === 'na');
+console.log(`★読めない（確かめられないを含む）: ${fails.length} 本 ／ ★対象外（0 行・関数を呼ばない）: ${na.length} 本`);
 if (fails.length > 0) {
   console.log('🔴 ★利用者の目で読めないビューがあります。★配備は未完了です（★裁定 §4）');
   process.exit(1);
 }
-console.log(undecidable.length > 0 ? '⚠️ ★読めないものは無し。★ただし 0 行のものは確かめられていません' : '✅ ★すべて読めました');
+console.log('✅ ★すべて読めました（★対象外は 関数を呼ばない 0 行のビューだけ）');
