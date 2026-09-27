@@ -77,6 +77,15 @@ describe('★④ の札は ★「あなたの馬」と読めない（★裁定 �
   });
 });
 
+describe('★「いま走っていません」に ★直前の結果 1 行（★R-18 回答 §3-6）', () => {
+  it('★帯が ★記録の 1 着から 1 行を作り ★`/watch-race` が添える', () => {
+    expect(LIVE).toMatch(/const lastWinner = data\?\.runners\.find\(\(runner\) => runner\.finishPosition === 1\) \?\? null;/);
+    expect(LIVE).toMatch(/publishStripState\(\{ replaying, nextAt, lastResult \}\)/);
+    const WATCH = readFileSync(path.join(ROOT, 'apps/web/src/app/watch-race/page.tsx'), 'utf8');
+    expect(WATCH, '★直前の結果を添えていない').toMatch(/直前のレース: \$\{strip\.lastResult\}/);
+  });
+});
+
 describe('★⑦ 読めなかったとき（★最後の表示を保持し「更新できません」だけ）', () => {
   it('🔴 ★失敗で ★表示を消さない（★data / focus を空にしない）', () => {
     expect(LIVE, '★失敗で表示を消している').not.toMatch(/setData\(null\)|setFocus\(null\)/);

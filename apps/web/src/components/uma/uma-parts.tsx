@@ -431,10 +431,14 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
            ★上から足すと ★**二重**になります。
       */}
       {top ? null : (
-        /* ★画面版は文字を載せるので、★背景を沈めます（★TOP は沈めない） */
+        /*
+          ★画面版は文字を載せるので、★背景を沈めます（★TOP は沈めない）。
+          ★下半分は ★2026-09-28 に濃くしました（★.42 → .55・★.78 → .86・★デザイナー R-18 回答 🟡 #7）:
+          ★芝の上で 本文 12px の明度差が 4.5:1 に届かないことがある、ため。★値はデザイナーの指定どおり。
+        */
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'linear-gradient(rgba(10,35,64,.5) 0%,rgba(10,35,64,.28) 26%,rgba(8,20,10,.42) 62%,rgba(8,20,10,.78) 100%)',
+          background: 'linear-gradient(rgba(10,35,64,.5) 0%,rgba(10,35,64,.28) 26%,rgba(8,20,10,.55) 62%,rgba(8,20,10,.86) 100%)',
         }} />
       )}
     </div>

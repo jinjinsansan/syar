@@ -96,7 +96,7 @@ export default function WatchRacePage(): React.ReactElement {
               ? '上の帯は実際の開催情報です。下の映像は演出確認用のデモです。実レースの着順は開催情報の「詳細」から確認できます。'
               : exit.kind === 'expand'
                 ? 'いまレース中です（確定した結果からの録画）。下のボタンか、端末を横にすると大きく見られます。'
-                : `いま走っているレースはありません。${nextClock === null ? '' : `次の発走は ${nextClock} です。`}レース中は上の帯に走行が出ます。`}
+                : `いま走っているレースはありません。${nextClock === null ? '' : `次の発走は ${nextClock} です。`}${strip.lastResult === null ? '' : `直前のレース: ${strip.lastResult}。`}レース中は上の帯に走行が出ます。`}
           </p>
           {/* ★本編の入口でも使う既存の絵。★デモへ送るときだけ出す（★「デモ」と明示） */}
           {exit.kind === 'demo' && <div style={{

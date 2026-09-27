@@ -108,12 +108,14 @@ function raceLabel(row: RaceNoticeRow): string {
 export interface StripState {
   readonly replaying: boolean;
   readonly nextAt: string | null;
+  /** ★直前に確定したレースの 1 行（★「いま走っていません」に添える・R-18 回答 §3-6）。★着順は記録の値 */
+  readonly lastResult: string | null;
 }
-const IDLE_STATE: StripState = { replaying: false, nextAt: null };
+const IDLE_STATE: StripState = { replaying: false, nextAt: null, lastResult: null };
 let stripState: StripState = IDLE_STATE;
 const stripListeners = new Set<() => void>();
 function publishStripState(next: StripState): void {
-  if (next.replaying === stripState.replaying && next.nextAt === stripState.nextAt) return;
+  if (next.replaying === stripState.replaying && next.nextAt === stripState.nextAt && next.lastResult === stripState.lastResult) return;
   stripState = next;
   stripListeners.forEach((listener) => { listener(); });
 }
@@ -262,11 +264,13 @@ export function RaceStrip(): React.ReactElement | null {
   }, [replaying]);
   /** ★状態を画面へ（★走行を出す画面だけ）・★画面からの拡大の頼みを受ける */
   const nextAt = next?.scheduled_at ?? null;
+  const lastWinner = data?.runners.find((runner) => runner.finishPosition === 1) ?? null;
+  const lastResult = recent && lastWinner !== null ? `${recent.name} 1着 ${lastWinner.gate}番 ${lastWinner.name}` : null;
   useEffect(() => {
     if (size !== 'big' && size !== 'mini') return undefined;
-    publishStripState({ replaying, nextAt });
+    publishStripState({ replaying, nextAt, lastResult });
     return undefined;
-  }, [size, replaying, nextAt]);
+  }, [size, replaying, nextAt, lastResult]);
   useEffect(() => {
     if (size !== 'big' && size !== 'mini') return undefined;
     const onExpand = (): void => { if (replayingRef.current) setExpanded(true); };
