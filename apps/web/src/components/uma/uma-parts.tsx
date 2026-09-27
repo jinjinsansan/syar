@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { PLATE_LAYERS, screenOverlayCss } from './backdrop-plate';
 import './uma-theme.css';
 
 /** ★停止の状態。★端末が「動きを減らす」なら**初期から停止**（★資料 §5-7 の 1） */
@@ -141,6 +142,24 @@ export type NoticeKind = 'soon' | 'closing' | 'own' | 'multi' | 'result';
  * ⚠️ ★**中継のルートでは描きません**（★ゲージと仕掛けの合図を隠さない・C-6・V-16）。
  * ⚠️ ★音・バイブ・全画面・煽りは置きません（★L-8）。
  */
+/**
+ * ★**文字を載せる濃紺のパネル**（★2026-09-28・デザイナー R-18 回答 🟡 #7「★本文は必ず濃紺パネルか紙パネルの上」）。
+ *   ★箱の値は ★`NoticeBar` と同じ（★幅・余白・金の縁 2px・角丸 12・`--u-panel-strong`）。★新しい意匠ではありません。
+ *   ★芝の上に ★じかに置いていた案内・誤りの文を ★これに入れます（★道具 `audit-text-on-backdrop.mjs` が洗い出した所）。
+ */
+export function TextPanel({ children, role, style }: {
+  readonly children: React.ReactNode;
+  readonly role?: 'status' | 'alert';
+  readonly style?: React.CSSProperties;
+}): React.ReactElement {
+  return (
+    <div role={role} style={{
+      position: 'relative', width: 'calc(100% - 28px)', maxWidth: 880, margin: '10px auto 0', padding: '8px 12px',
+      border: '2px solid var(--u-gold)', borderRadius: 12, background: 'var(--u-panel-strong)', ...style,
+    }}>{children}</div>
+  );
+}
+
 export function NoticeBar({ kind, text, sub, actionLabel, actionHref, extra }: {
   readonly kind: NoticeKind;
   readonly text: string;
@@ -323,28 +342,7 @@ function ParallaxStrip({ src, top, height, dur, position = 'center', filter, bot
   );
 }
 
-/**
- * ★**中継の板の割合**（★2026-09-17・オーナー指摘
- *   ★「★レース演出そのものの芝にしていないからです」）。
- *
- * ★`/art/parallax/backstretch-side-v1/manifest.json` の板は **941px** で、
- * ★層ごとに `plateY0`〜`plateY1` が決まっています。★その割合をそのまま使います。
- * ⚠️ ★これを守らないと、★`turf-near`（板の 9.6%）を画面の 64% へ ★**5 倍に引き伸ばす**ことになり、
- *    ★ぼやけて白っぽくなります（★「手前が半透明」の正体）。
- *
- * ★`dur` は中継の公式から（★`parallax-plate.ts:14`・★注視点 30m・`turf-near`=1 の比）。
- */
-const PLATE_LAYERS = [
-  { src: 'trees', y: 0, h: 19.98, dur: 5.35 },
-  { src: 'stand', y: 19.98, h: 16.37, dur: 2.82 },
-  { src: 'hedge', y: 36.34, h: 5.95, dur: 1.69 },
-  { src: 'back-rails', y: 42.30, h: 6.38, dur: 1.35 },
-  { src: 'inner-rail', y: 48.67, h: 4.78, dur: 1.13 },
-  { src: 'turf-far', y: 53.45, h: 7.97, dur: 0.93 },
-  { src: 'turf-mid', y: 61.42, h: 9.99, dur: 0.76 },
-  { src: 'turf-near', y: 71.41, h: 9.56, dur: 0.62 },
-  { src: 'front-rail', y: 80.98, h: 19.02, dur: 0.48 },
-] as const;
+/** ★板の割合と暗幕の段は ★`backdrop-plate.ts`（★1 か所・道具と分け合う） */
 
 /**
  * ★**TOP 以外の画面で、芝をゆっくりにする倍率**（★2026-09-17・オーナー指示
@@ -438,7 +436,7 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
         */
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'linear-gradient(rgba(10,35,64,.5) 0%,rgba(10,35,64,.28) 26%,rgba(8,20,10,.55) 62%,rgba(8,20,10,.86) 100%)',
+          background: screenOverlayCss(),
         }} />
       )}
     </div>

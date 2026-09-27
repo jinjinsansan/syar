@@ -17,11 +17,12 @@
  *   AUDIT_BASE=https://star-two-chi.vercel.app npx tsx tools/audit-text-on-backdrop.mjs
  *
  * ⚠️ ★ログインの要る画面は ★ログインしていない姿で測ります。
- * ⚠️ ★暗幕の段の値は ★`uma-parts.tsx` の Backdrop（画面版）の写しです（★下の OVERLAY）。★そちらを変えたら ★ここも直すこと。
+ * ★層の位置と暗幕の段は ★`apps/web/src/components/uma/backdrop-plate.ts`（★Backdrop と同じ 1 か所）から読みます。
  */
 import path from 'node:path';
 import sharp from 'sharp';
 import { launch } from './lib/cdp.mjs';
+import { PLATE_LAYERS, SCREEN_OVERLAY_STOPS } from '../apps/web/src/components/uma/backdrop-plate.ts';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ? d : process.argv[i + 1]; };
 const BASE = process.env.AUDIT_BASE ?? 'http://localhost:3210';
@@ -31,14 +32,9 @@ const PAGES = [
   '/odds/demo?demo=1', '/login', '/signup', '/setup', '/forgot-password', '/reset-password',
 ];
 
-/** ★芝の 9 層（★`uma-parts.tsx` の PLATE_LAYERS・縦の位置は %） */
-const LAYERS = [
-  ['trees', 0, 19.98], ['stand', 19.98, 16.37], ['hedge', 36.34, 5.95], ['back-rails', 42.30, 6.38],
-  ['inner-rail', 48.67, 4.78], ['turf-far', 53.45, 7.97], ['turf-mid', 61.42, 9.99], ['turf-near', 71.41, 9.56],
-  ['front-rail', 80.98, 19.02],
-];
-/** ★暗幕の段（★位置 %・色・不透明度）。★Backdrop の画面版と同じ値 */
-const OVERLAY = [[0, [10, 35, 64], 0.5], [26, [10, 35, 64], 0.28], [62, [8, 20, 10], 0.55], [100, [8, 20, 10], 0.86]];
+/** ★芝の 9 層と暗幕の段は ★Backdrop と同じ 1 か所から読む（★写さない・レビュー側の条件） */
+const LAYERS = PLATE_LAYERS.map((L) => [L.src, L.y, L.h]);
+const OVERLAY = SCREEN_OVERLAY_STOPS.map((st) => [st.pos, [...st.rgb], st.a]);
 const ART = path.resolve('apps/web/public/art/parallax/backstretch-side-v1');
 
 const lin = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };

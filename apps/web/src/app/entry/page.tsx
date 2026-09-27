@@ -18,7 +18,7 @@ import { conditionView, type Condition } from '../../lib/stable';
 import { STRATEGY_OPTIONS, DEMO_JOCKEY_RIDES } from '../../lib/game-demo';
 import { loadEntryScreen, toEntryRaceView, type EntryScreenData } from '../../lib/entry-screen';
 import { supabaseEntryRepo } from '../../lib/entry-repo';
-import { Backdrop, BigButton, EpCapsule, NoticeBar, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
+import { Backdrop, BigButton, EpCapsule, NoticeBar, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 /** ★騎手を選ぶ（★D12-4・D-105 ④「出走登録で凍結する」） */
 import { JockeyPicker } from '../../components/jockey-picker';
@@ -201,9 +201,9 @@ export default function EntryPage(): React.ReactElement {
            ★**嘘**を出していました（★レースは在ります）。
       */}
       {data !== null && !data.signedIn && (
-        <p style={{ margin: 0, fontSize: 13 }}>
+        <TextPanel style={{ margin: 0, width: '100%', fontSize: 13 }}>
           レースの一覧は見られます。登録するには <a href="/login" style={{ color: 'var(--u-gold)', textDecoration: 'underline' }}>ログイン</a> してください
-        </p>
+        </TextPanel>
       )}
       {data !== null && data.signedIn && horses.length === 0 && <p style={{ margin: 0, fontSize: 13 }}>出走させられる馬がいません</p>}
 

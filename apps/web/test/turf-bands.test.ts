@@ -49,7 +49,8 @@ const MANIFEST = JSON.parse(readFileSync(
  *    ★今日 5 度目の同型です。→ ★**始点より後ろだけ**を探します。
  */
 function plateTable(): string {
-  const parts = read('src/components/uma/uma-parts.tsx');
+  /** ★2026-09-28: ★板の割合は ★`backdrop-plate.ts` へ移した（★道具と分け合う・1 か所） */
+  const parts = read('src/components/uma/backdrop-plate.ts');
   const from = parts.indexOf('const PLATE_LAYERS');
   if (from < 0) return '';
   const to = parts.indexOf('] as const', from);

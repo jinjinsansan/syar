@@ -24,7 +24,7 @@ import {
   type RecordsScreenData, type RecordPeriod, type LedgerRowView,
 } from '../../lib/records-screen';
 import { SignInRequiredError } from '../../lib/stable-repo';
-import { Backdrop, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
+import { Backdrop, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 
 const TABS = [['runs', '戦績'], ['ep', '参加ポイント（EP）'], ['pp', '賞金ポイント（PP）']] as const;
@@ -152,10 +152,13 @@ export default function RecordsView({ tab }: { readonly tab: string }): React.Re
     <TopBar title="記録" backHref="/mypage" paused={paused} onToggle={toggle} />
     <RaceStrip />
 
-    <div style={{ ...ROW, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 10 }}>
+    <div style={{ ...ROW, marginTop: 10 }}>
+    {/* ★芝にじかに置かず ★濃紺のパネルへ（★2026-09-28・R-18 回答 🟡 #7・390px で 2.99:1 だった） */}
+    <TextPanel style={{ margin: 0, width: '100%', maxWidth: 'none', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
       <span style={{ fontSize: 12, opacity: .85 }}>参加ポイントと賞金ポイントは別々に記録されます</span>
       {/* ★2026-09-25: ★`/prizes` は消して `/exchange` へ送りました（★裁定 §3）。★直接 新版へ */}
       <a href="/exchange" style={{ marginLeft: 'auto', minHeight: 44, display: 'flex', alignItems: 'center', padding: '0 14px', border: '2px solid var(--u-gold)', borderRadius: 10 }}>景品交換 →</a>
+    </TextPanel>
     </div>
 
     <main style={{ ...ROW, flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: 12, marginTop: 10 }}>

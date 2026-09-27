@@ -32,7 +32,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Backdrop, BigButton, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
+import { Backdrop, BigButton, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { useStableView } from '../../components/uma/use-stable-view';
 import { TRAINING_MENUS } from '../../lib/game-demo';
@@ -116,10 +116,10 @@ export default function TrainPage(): React.ReactElement {
 
   if (horse === null) return <div data-theme="uma" data-page-body style={{ minHeight: '100dvh', background: 'var(--u-navy)' }}>
     <Backdrop /><TopBar title="育成モード" paused={paused} onToggle={toggle} /><RaceStrip />
-    <div role={error ? 'alert' : 'status'} style={{ position: 'relative', padding: 20 }}>
+    <TextPanel role={error ? 'alert' : 'status'} style={{ padding: 16 }}>
       {loading ? '厩舎を読み込み中…' : error ?? 'まだ持ち馬がいません。'}
       <div style={{ display: 'flex', gap: 12, marginTop: 12 }}><a href="/login">ログイン</a><a href="/setup">はじめての 1 頭を迎える</a><button type="button" onClick={refresh}>再読み込み</button></div>
-    </div>
+    </TextPanel>
   </div>;
   const cond = conditionView(horse.condition);
   /** ★顔は 3 種。★選ぶ規則は画面に置かない（★`trainFaceOf`・疲労が先） */

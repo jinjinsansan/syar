@@ -19,7 +19,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Backdrop, BigButton, TopBar, useMotionPaused,
+  Backdrop, BigButton, TextPanel, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import {
@@ -162,9 +162,9 @@ export default function EarnPage(): React.ReactElement {
       <Backdrop />
       <TopBar title="ポイントを稼ぐ" paused={paused} onToggle={toggle} />
       <RaceStrip />
-      <div role="status" style={{ position: 'relative', padding: '6px 14px', color: 'var(--u-gold)', fontSize: 12 }}>
+      <TextPanel role="status" style={{ color: 'var(--u-gold)', fontSize: 12 }}>
         毎日のログインで参加ポイントを受け取れます。動画・アンケート・オファーは提供元の接続を準備中です。
-      </div>
+      </TextPanel>
 
       {/* ★EP のカプセル＋常設の注記（★PP は稼げないと明言） */}
       <div style={{

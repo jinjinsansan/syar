@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { BET_CAP_OWN_RACE_EP, checkOwnRaceSelection, ownRaceReasonText } from '@star/betting';
-import { Backdrop, BigButton, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
+import { Backdrop, BigButton, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { loadBetAllowance, loadBetScreen, oddsKey, placeBet, type BetAllowance, type BetScreenData } from '../../lib/bet-screen';
 
@@ -94,13 +94,13 @@ export default function VotePage(): React.ReactElement {
     <Backdrop />
     <TopBar title="投票モード" paused={paused} onToggle={toggle} />
     <RaceStrip />
-    {error && <div role="alert" style={{ position: 'relative', padding: '8px 14px', color: 'var(--u-red)', fontSize: 12 }}>
+    {error && <TextPanel role="alert" style={{ fontSize: 12 }}>
       {error}　<a href="/login">ログイン</a>　<button type="button" onClick={reload}>再読み込み</button>
-    </div>}
-    {message && <div role="status" style={{ position: 'relative', padding: '8px 14px', color: 'var(--u-gold)' }}>{message}</div>}
-    {data && !data.authenticated && <div style={{ position: 'relative', padding: '8px 14px', fontSize: 13 }}>
+    </TextPanel>}
+    {message && <TextPanel role="status" style={{ color: 'var(--u-gold)' }}>{message}</TextPanel>}
+    {data && !data.authenticated && <TextPanel style={{ fontSize: 13 }}>
       出馬表は閲覧できます。投票するには <a href="/login" style={{ textDecoration: 'underline' }}>ログイン</a> してください。
-    </div>}
+    </TextPanel>}
 
     <main style={{ position: 'relative', flex: '1 1 auto', minHeight: 0, overflow: 'auto', padding: '10px 14px 0', width: '100%', maxWidth: 1220, margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: 12, alignContent: 'flex-start' }}>
       <section aria-label="出馬表" style={{ flex: '2 1 330px', minWidth: 0, border: '2px solid rgba(246,194,28,.45)', borderRadius: 12, background: 'var(--u-paper)', overflow: 'hidden' }}>
