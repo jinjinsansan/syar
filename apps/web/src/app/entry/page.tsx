@@ -85,11 +85,13 @@ export default function EntryPage(): React.ReactElement {
   const races = useMemo(() => {
     if (data === null) return [];
     const wins = horse?.wins ?? 0;
-    const order = { ok: 0, class: 1, closed: 2 } as const;
+    const order = { ok: 0, entered: 1, class: 2, closed: 3 } as const;
     return data.raceRows
-      .map((r) => toEntryRaceView(r, data.headsByRace.get(r.id) ?? 0, wins, nowMs))
+      .map((r) => toEntryRaceView(r, data.headsByRace.get(r.id) ?? 0, wins, nowMs,
+        /** 🔴 ★選んでいる馬が ★このレースに登録済みか（★2026-09-27・★登録後も「登録できます」と出ていた） */
+        horse !== null && (data.enteredHorsesByRace.get(r.id)?.has(horse.id) ?? false)))
       .sort((a, b) => order[a.state] - order[b.state] || a.time.localeCompare(b.time));
-  }, [data, horse?.wins, nowMs]);
+  }, [data, horse, nowMs]);
   const race = races.find((r) => r.id === raceId) ?? null;
   /**
    * ⚠️ ★`condition` は DB では `int` ですが、★画面の `Condition` は 1〜5 のリテラル型です。
@@ -269,10 +271,10 @@ export default function EntryPage(): React.ReactElement {
               <span style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{r.deadline === null ? '—' : `締切 ${r.deadline}`}</span>
               <span style={{
                 ...CHIP,
-                background: sel ? 'var(--u-gold-pale)' : r.state === 'ok' ? '#dff3e5' : '#ddd8c9',
-                borderColor: sel ? 'var(--u-gold-deep)' : r.state === 'ok' ? 'var(--u-green-deep)' : '#9a947f',
+                background: sel ? 'var(--u-gold-pale)' : r.state === 'ok' ? '#dff3e5' : r.state === 'entered' ? '#dbe8f7' : '#ddd8c9',
+                borderColor: sel ? 'var(--u-gold-deep)' : r.state === 'ok' ? 'var(--u-green-deep)' : r.state === 'entered' ? '#1a4f8a' : '#9a947f',
               }}>
-                {sel ? '選択中' : r.state === 'ok' ? '登録できます' : r.state === 'class' ? '格が違います' : '締切後'}
+                {sel ? '選択中' : r.state === 'ok' ? '登録できます' : r.state === 'entered' ? '登録済み' : r.state === 'class' ? '格が違います' : '締切後'}
               </span>
             </button>
           );
@@ -288,7 +290,9 @@ export default function EntryPage(): React.ReactElement {
               ? 'ログインすると、この馬で出走できるかが分かります'
               : horse === null
                 ? '出走させられる馬がいません'
-                : 'いま、この馬で出走できるレースがありません'}
+                : races.some((r) => r.state === 'entered')
+                  ? 'この馬は登録済みです（発走を待っています）'
+                  : 'いま、この馬で出走できるレースがありません'}
           </div>
         )}
         {races.length === 0 && data !== null && (

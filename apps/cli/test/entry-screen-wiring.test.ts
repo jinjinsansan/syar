@@ -153,6 +153,14 @@ describe('★出走できるかの判定は、選んでいる馬ごとに変わ�
     expect(toEntryRaceView(r, 8, 1, NOW).state, '★1 勝なら出られる').toBe('ok');
     expect(toEntryRaceView(r, 8, 0, NOW).state, '★0 勝なら格違い').toBe('class');
     expect(toEntryRaceView(r, 8, 2, NOW).state, '★2 勝なら格違い').toBe('class');
+    /**
+     * 🔴 ★登録済みなら ★「登録済み」（★2026-09-27・オーナー「★登録しても まだ登録できます となります」）。
+     *   ★それまで画面は ★登録済みかを読まず、★登録した後も「登録できます」と出して ★二重登録を誘っていました。
+     */
+    expect(toEntryRaceView(r, 8, 1, NOW, true).state, '🔴 ★登録済みなのに「登録できます」').toBe('entered');
+    expect(toEntryRaceView(r, 8, 1, NOW, false).state, '★対照: 登録していなければ ok').toBe('ok');
+    expect(LIVE_PAGE, '★画面が 登録済みの馬を渡していない').toMatch(/enteredHorsesByRace\.get\(r\.id\)\?\.has\(horse\.id\)/);
+    expect(LIVE_PAGE, '★画面が「登録済み」と言っていない').toContain("'登録済み'");
   });
 
   it('★画面が馬ごとに組み直している（★先頭の馬で固定していない）', () => {

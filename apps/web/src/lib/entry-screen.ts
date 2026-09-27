@@ -62,6 +62,8 @@ export function toEntryRaceView(
   heads: number,
   wins: number,
   nowMs: number,
+  /** ★選んでいる馬が ★このレースに登録済みか（★`enteredHorsesByRace` から・★2026-09-27） */
+  entered = false,
 ): EntryRaceView {
   return {
     id: row.id,
@@ -76,7 +78,8 @@ export function toEntryRaceView(
     // ⚠️ ★出走料は ★**サーバーが行に書いた値**（★EF-3。★画面は定数を持たない）
     feeEP: row.entryFeeEP ?? 0,
     deadline: row.entryDeadlineAtMs === null ? null : formatRemaining(row.entryDeadlineAtMs, nowMs),
-    state: entryStateOf(row, wins, nowMs),
+    /** 🔴 ★登録済みなら ★それを言う（★クラスや締切より先・★「登録できます」と出して二重登録を誘わない） */
+    state: entered ? 'entered' : entryStateOf(row, wins, nowMs),
     weightKg: row.weightKg ?? 0,
   };
 }
@@ -134,6 +137,11 @@ export interface EntryScreenData {
   /** ★生の行（★馬を切り替えたら `toEntryRaceView` で組み直す） */
   readonly raceRows: readonly EntryRaceRow[];
   readonly headsByRace: ReadonlyMap<string, number>;
+  /**
+   * ★**レース → 登録済みの馬 ID**（★公開ビューの `horse_id`・`0089`）。★画面は ★選んでいる馬がここに在るかを見ます。
+   * ⚠️ ★2026-09-27 まで ★読んでいませんでした（★登録した後も「登録できます」と出ていた）。
+   */
+  readonly enteredHorsesByRace: ReadonlyMap<string, ReadonlySet<string>>;
   readonly horses: readonly EntryHorseView[];
   readonly epBalance: number;
   readonly gameWeek: number;
@@ -220,7 +228,7 @@ export async function loadEntryScreen(limit = 40): Promise<EntryScreenData> {
     // ★出走頭数は ★**公開ビューを数える**（★画面で推測しない）
     ids.length === 0
       ? Promise.resolve({ data: [], error: null })
-      : read.from('race_entries_public').select('race_id').in('race_id', ids),
+      : read.from('race_entries_public').select('race_id, horse_id').in('race_id', ids),
     signedIn ? auth.from('users').select('entry_points').limit(1) : Promise.resolve({ data: [], error: null }),
   ]);
   if (horsesRes.error !== null) throw new Error(`my_horses を読めませんでした: ${horsesRes.error.message}`);
@@ -228,9 +236,16 @@ export async function loadEntryScreen(limit = 40): Promise<EntryScreenData> {
   if (userRes.error !== null) throw new Error(`users を読めませんでした: ${userRes.error.message}`);
 
   const headsByRace = new Map<string, number>();
+  const enteredHorsesByRace = new Map<string, Set<string>>();
   for (const e of entriesRes.data ?? []) {
-    const id = String((e as { race_id: unknown }).race_id);
+    const row = e as { race_id: unknown; horse_id?: unknown };
+    const id = String(row.race_id);
     headsByRace.set(id, (headsByRace.get(id) ?? 0) + 1);
+    if (typeof row.horse_id === 'string' && row.horse_id !== '') {
+      const set = enteredHorsesByRace.get(id) ?? new Set<string>();
+      set.add(row.horse_id);
+      enteredHorsesByRace.set(id, set);
+    }
   }
 
   const horses = (horsesRes.data ?? []).map((h) => toEntryHorseView({
@@ -247,6 +262,7 @@ export async function loadEntryScreen(limit = 40): Promise<EntryScreenData> {
   return {
     raceRows,
     headsByRace,
+    enteredHorsesByRace,
     horses,
     epBalance: Number(userRes.data?.[0]?.entry_points ?? 0),
     gameWeek,

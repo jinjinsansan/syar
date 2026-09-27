@@ -15,8 +15,12 @@
  */
 import { authClient, readClient } from './supabase';
 
-/** ★出走登録できるかの状態（★既存の画面の語と同じ 3 値。★増やしていません） */
-export type EntryState = 'ok' | 'class' | 'closed';
+/**
+ * ★出走登録できるかの状態。
+ * 🔴 ★`entered`（★その馬は登録済み）を ★2026-09-27 に足しました（★オーナー「★登録しても まだ登録できます となります」）。
+ *    ★それまで画面は ★登録済みかを読まず ★クラスと締切だけで決めていたので、★登録した後も「登録できます」と出て ★二重登録を誘っていました。
+ */
+export type EntryState = 'ok' | 'class' | 'closed' | 'entered';
 
 /** ★画面に渡す 1 レース（★`EntryRace` と同じ形にする。★素質は 1 つも含みません） */
 export interface EntryRaceRow {

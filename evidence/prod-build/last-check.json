@@ -1,9 +1,9 @@
 {
-  "checkedAt": "2026-09-27T02:27:46.354Z",
+  "checkedAt": "2026-09-27T06:20:45.303Z",
   "base": "https://star-two-chi.vercel.app",
-  "localHead": "eb5480dc72ab647bb6a334542f726bf30aa47d4e",
+  "localHead": "a0a822a6f99814a882856157677f42ffb80f1049",
   "prod": {
-    "sha": "eb5480dc72ab647bb6a334542f726bf30aa47d4e",
+    "sha": "a0a822a6f99814a882856157677f42ffb80f1049",
     "ref": "main",
     "env": "production"
   },
