@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, type ReplayRunner } from './race-replay';
@@ -98,6 +98,36 @@ function clock(iso: string): string {
 function raceLabel(row: RaceNoticeRow): string {
   const surface = row.surface === 'turf' ? '芝' : row.surface === 'dirt' ? 'ダート' : row.surface;
   return `${row.name}・${surface}${row.distance}m`;
+}
+
+/**
+ * ★**帯の状態を 画面と分け合う**（★2026-09-27・裁定 §6-1 の (c)・`/watch-race` の出口）。
+ *   ★画面が ★自分で開催情報を読み直さない（★同じ物を 2 回読まない・★帯と画面で食い違わない）。
+ *   ★帯は ★1 画面に 1 本（★網 `race-strip-sizes.test.ts` ⑥）なので、★状態は 1 つで足ります。
+ */
+export interface StripState {
+  readonly replaying: boolean;
+  readonly nextAt: string | null;
+}
+const IDLE_STATE: StripState = { replaying: false, nextAt: null };
+let stripState: StripState = IDLE_STATE;
+const stripListeners = new Set<() => void>();
+function publishStripState(next: StripState): void {
+  if (next.replaying === stripState.replaying && next.nextAt === stripState.nextAt) return;
+  stripState = next;
+  stripListeners.forEach((listener) => { listener(); });
+}
+export function useStripState(): StripState {
+  return useSyncExternalStore(
+    (listener) => { stripListeners.add(listener); return () => { stripListeners.delete(listener); }; },
+    () => stripState,
+    () => IDLE_STATE,
+  );
+}
+const EXPAND_EVENT = 'race-strip:expand';
+/** ★画面から ★帯の拡大（★段 A）を頼む。★録画の窓の外なら ★何も起きない */
+export function requestStripExpand(): void {
+  window.dispatchEvent(new CustomEvent(EXPAND_EVENT));
 }
 
 /**
@@ -203,6 +233,19 @@ export function RaceStrip(): React.ReactElement | null {
     replayingRef.current = replaying;
     if (!replaying) { setExpanded(false); autoOpenedRef.current = false; }
   }, [replaying]);
+  /** ★状態を画面へ（★走行を出す画面だけ）・★画面からの拡大の頼みを受ける */
+  const nextAt = next?.scheduled_at ?? null;
+  useEffect(() => {
+    if (size !== 'big' && size !== 'mini') return undefined;
+    publishStripState({ replaying, nextAt });
+    return undefined;
+  }, [size, replaying, nextAt]);
+  useEffect(() => {
+    if (size !== 'big' && size !== 'mini') return undefined;
+    const onExpand = (): void => { if (replayingRef.current) setExpanded(true); };
+    window.addEventListener(EXPAND_EVENT, onExpand);
+    return () => { window.removeEventListener(EXPAND_EVENT, onExpand); publishStripState(IDLE_STATE); };
+  }, [size]);
   const replayRows = replaying && recent && data ? data.runners.map((runner) => {
     const raceSec = (motionReduced ? 1 : progress) * Math.max(...data.runners.map((r) => r.finishSec));
     return { runner, position: replayProgress(runner, recent.distance, raceSec) };

@@ -17,6 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { GUEST_DEMO_HREF, watchExitOf } from '../../web/src/lib/watch-exit.js';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const UMA_DIR = path.join(ROOT, 'apps/web/src/components/uma');
@@ -142,7 +143,9 @@ describe('★馬物語 UI の配線（R-14）', () => {
      *    ★**`'/race'` の完全一致では落ちます**（★自分の変更で自分の検査を壊しました）。
      *    → ★**前方一致**で見ます。★出口そのものは下の「★中継の出口」で固定します。
      */
-    expect(wrapper).toMatch(/'\/race(\?[^']*)?'/);
+    /** ★2026-09-27: ★デモの送り先は ★`lib/watch-exit.ts`（★出口の判定）が持ちます。★画面はその判定を通すだけ */
+    expect(GUEST_DEMO_HREF.startsWith('/race?'), '★デモの送り先が /race でない').toBe(true);
+    expect(wrapper).toContain('watchExitOf(');
     /**
      * ★**全画面 API と回転をラッパー側で掛けない**（★`/race` が持っている・A-3）。
      * ★二重に掛けると回転が二重になります。
@@ -162,13 +165,39 @@ describe('★馬物語 UI の配線（R-14）', () => {
    *   ③ ★`/` 始まりの検査だけで受ける → ★`//外部の所` が通り、★**開いた転送口**になります
    */
   it('★★中継の出口が案内の戻り先へ送る（★ハンドオフ B-1）', () => {
+    /**
+     * 🔴 ★**要求の水準で見ます**（★2026-09-27・裁定 §6-1）: ★「★出口は ★走っている物か ★走っていないと言う物の ★どちらかに着く」。
+     *   ★以前は ★`'/race?return=/home'` の ★綴りを釘で留めていました（★綴りが合えば ★デモに送っても緑）。
+     */
+    const cases = [
+      { signedIn: false, replaying: false }, { signedIn: false, replaying: true },
+      { signedIn: true, replaying: false }, { signedIn: true, replaying: true },
+    ];
+    for (const c of cases) {
+      const exit = watchExitOf(c.signedIn, c.replaying, '2026-09-27T09:00:00Z');
+      const where = `未ログイン=${String(!c.signedIn)}・窓=${String(c.replaying)}`;
+      /** ★拡大（★実レースの録画）は ★窓が開いているときだけ（★走っていない物を拡大しに行かない） */
+      if (exit.kind === 'expand') expect(c.replaying, `★${where}: 窓の外で拡大へ送る`).toBe(true);
+      /** ★「いま走っていません」は ★窓の外だけ（★走っているのに走っていないと言わない） */
+      if (exit.kind === 'idle') expect(c.replaying, `★${where}: 走っているのに「走っていません」`).toBe(false);
+      /** ★デモは ★未ログインの人だけ（★ログイン済みで本物が在るのにデモへ送らない） */
+      if (exit.kind === 'demo') expect(c.signedIn, `★${where}: ログイン済みをデモへ送る`).toBe(false);
+    }
+    expect(watchExitOf(true, true, null).kind).toBe('expand');
+    expect(watchExitOf(true, false, null).kind).toBe('idle');
+    /** ★デモの戻り先は ★`/race` の名簿に在る（★無いと黙って無視され ★`/race` の中に取り残される） */
+    const demo = watchExitOf(false, false, null);
+    expect(demo.kind).toBe('demo');
+    const returnTo = demo.kind === 'demo' ? new URL(demo.href, 'https://x').searchParams.get('return') : null;
+    expect(returnTo, '★デモが戻り先を渡していない').not.toBeNull();
+
     const wrapper = strip(read('apps/web/src/app/watch-race/page.tsx'));
-    expect(wrapper, '★案内が戻り先を渡していない（★出口がダッシュボードへ向かない）')
-      .toContain("'/race?return=/home'");
-    expect(wrapper, '★未ログインの観客がログイン必須のダッシュボードへ送られる')
-      .toContain("'/race?return=/watch-race'");
+    expect(wrapper, '★画面が出口の判定を通していない').toMatch(/const exit = watchExitOf\(signedIn, strip\.replaying, strip\.nextAt\);/);
+    expect(wrapper, '★デモへのリンクが デモの場合の外に在る').toMatch(/\{exit\.kind === 'demo' && <BigButton[^\n]*href=\{exit\.href\}/);
+    expect(wrapper, '★画面が ★デモの綴りを直に持っている（★判定を迂回）').not.toMatch(/'\/race\?return=/);
 
     const race = strip(read('apps/web/src/app/race/page.tsx'));
+    expect(race, `★名簿に デモの戻り先 ${String(returnTo)} が無い`).toContain(`'${String(returnTo)}':`);
     expect(race, '★戻り先の名簿が無い').toMatch(/const RETURN_ROUTES/);
     expect(race, '★名簿に `/home` が無い（★渡しても黙って無視される）').toMatch(/'\/home':/);
     expect(race, '★名簿にゲストの観戦入口が無い').toMatch(/'\/watch-race':/);

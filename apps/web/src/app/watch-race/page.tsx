@@ -24,22 +24,26 @@
 
 import { useEffect, useState } from 'react';
 import { Backdrop, BigButton, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
-import { RaceStrip } from '../../components/uma/race-strip';
+import { RaceStrip, requestStripExpand, useStripState } from '../../components/uma/race-strip';
 import { authClient } from '../../lib/supabase';
+import { watchExitOf } from '../../lib/watch-exit';
 
 /**
- * ★接続先（★B-2 の既定）。★変えるときは報告の §2 も直すこと。
- *
- * ★`?return=/home` は ★**出口の指定**です（★2026-09-17・B-1 の「★終了後は必ずダッシュボードへ」）。
- *   ★`/race` 側は ★**完全一致の名簿**でだけ受け取ります（★`race/page.tsx` の `RETURN_ROUTES`）。
- *   ⚠️ ★ここを変えたら ★**名簿にも足す**こと。★名簿に無い行き先は ★**黙って無視**され、
- *      ★これまでどおり `/race` の中のメニューへ戻ります（★出口が消えたように見えます）。
+ * ★**出口は ★状態で分けます**（★2026-09-27・裁定 §6-1 の (c)・`lib/watch-exit.ts`）。
+ *   ★未ログイン → ★デモの中継（★「デモ」と明示）／★ログイン済みで録画の窓 → ★その実レースを帯の拡大で
+ *   ／★窓の外 → ★「いま走っていません」＋次の発走（★デモに送らない）。
+ * ★デモの戻り先 `?return=/watch-race` は ★`/race` の ★完全一致の名簿（`RETURN_ROUTES`）に在ります（★網が見る）。
  */
-const BROADCAST_HREF = '/race?return=/home';
-const GUEST_BROADCAST_HREF = '/race?return=/watch-race';
+function clockOf(iso: string | null): string | null {
+  if (iso === null) return null;
+  const ms = new Date(iso).getTime();
+  return Number.isFinite(ms)
+    ? new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(ms) : null;
+}
 
 export default function WatchRacePage(): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
+  const strip = useStripState();
   /** ★いま縦持ちか（★案内を出すかの判断だけに使う。★JS で回しません） */
   const [portrait, setPortrait] = useState(true);
   const [signedIn, setSignedIn] = useState(false);
@@ -57,6 +61,9 @@ export default function WatchRacePage(): React.ReactElement {
     }).catch(() => { if (active) setSignedIn(false); });
     return () => { active = false; };
   }, []);
+
+  const exit = watchExitOf(signedIn, strip.replaying, strip.nextAt);
+  const nextClock = exit.kind === 'idle' ? clockOf(exit.nextAt) : null;
 
   return (
     <div
@@ -85,11 +92,14 @@ export default function WatchRacePage(): React.ReactElement {
             {portrait ? '端末を横にすると大きく見られます' : '横向きになっています'}
           </div>
           <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 500, lineHeight: 1.7, color: 'var(--u-ink-light-3)' }}>
-            上の帯は実際の開催情報です。全画面の映像は現在、演出確認用のデモです。
-            実レースの着順は開催情報の「詳細」から確認できます。
+            {exit.kind === 'demo'
+              ? '上の帯は実際の開催情報です。下の映像は演出確認用のデモです。実レースの着順は開催情報の「詳細」から確認できます。'
+              : exit.kind === 'expand'
+                ? 'いまレース中です（確定した結果からの録画）。下のボタンか、端末を横にすると大きく見られます。'
+                : `いま走っているレースはありません。${nextClock === null ? '' : `次の発走は ${nextClock} です。`}レース中は上の帯に走行が出ます。`}
           </p>
-          {/* ★本編の入口でも使う既存の絵。映像は次の画面で自動再生する。 */}
-          <div style={{
+          {/* ★本編の入口でも使う既存の絵。★デモへ送るときだけ出す（★「デモ」と明示） */}
+          {exit.kind === 'demo' && <div style={{
             position: 'relative', marginTop: 12, width: '100%', aspectRatio: '16 / 9', borderRadius: 8,
             border: '2px solid rgba(251,247,236,.28)', background: 'var(--u-navy-deep)', overflow: 'hidden',
           }}>
@@ -98,7 +108,7 @@ export default function WatchRacePage(): React.ReactElement {
             <span style={{ position: 'absolute', left: 10, bottom: 10, padding: '5px 9px', borderRadius: 6, background: 'var(--u-panel-strong)', fontSize: 12 }}>
               レース演出 · デモ
             </span>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -106,7 +116,8 @@ export default function WatchRacePage(): React.ReactElement {
         position: 'relative', flex: '0 0 auto', display: 'flex', flexWrap: 'wrap', gap: 10,
         padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
-        <BigButton tone="blue" label="レース演出を観る" sub="ログイン不要・映像はデモ" href={signedIn ? BROADCAST_HREF : GUEST_BROADCAST_HREF} grow="1.4 1 210px" />
+        {exit.kind === 'demo' && <BigButton tone="blue" label="レース演出を観る" sub="ログイン不要・映像はデモ" href={exit.href} grow="1.4 1 210px" />}
+        {exit.kind === 'expand' && <BigButton tone="blue" label="いま走っているレースを見る" sub="録画・結果から再現" onClick={requestStripExpand} grow="1.4 1 210px" />}
         <BigButton tone="ivory" label={signedIn ? 'ダッシュボード' : 'トップへ戻る'} sub="いつでも戻れます" href={signedIn ? '/home' : '/'} grow="1 1 130px" />
       </div>
     </div>
