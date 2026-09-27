@@ -6148,6 +6148,12 @@ function RaceView({ setup, real }: {
    */
   const stagePx = (px: number): number => Math.round(px / Math.max(0.2, stageScale));
   /**
+   * ★**下限は切り上げ**（★2026-09-27・390px の実測で ★ボタン 4 つが ★43.9px）。
+   *   ★`Math.round(44 / 縮尺) × 縮尺` は ★丸めで 44 を ★0.1px 割ることがあります。★44 以上にする意図なので ★下限だけ切り上げます
+   *   ★（★文字や余白の `stagePx` は そのまま＝見た目は動かない）。
+   */
+  const stageMinPx = (px: number): number => Math.ceil(px / Math.max(0.2, stageScale));
+  /**
    * ★全画面のボタンの見た目（★1 か所に置く・★デザイン第6便 ②）。
    *   ★`rgba(4,20,40,.55)` ＋ 1px の縁 … ★**馬体の上でも読める濃さ**（★設計の指定）。
    * ⚠️ ★**常時出します。** ★触れたら出す方式は ★**操作があることに初見で気づけない**ので、
@@ -6161,7 +6167,7 @@ function RaceView({ setup, real }: {
    * ⚠️ ★**消しません。** ★消すと全画面にも音にも入れなくなります（★以前それをやりました）。
    */
   const stageBtnStyle = {
-    minWidth: stagePx(44), minHeight: stagePx(44),
+    minWidth: stageMinPx(44), minHeight: stageMinPx(44),
     padding: `0 ${stagePx(12)}px`, fontSize: stagePx(13),
     borderRadius: stagePx(8), cursor: 'pointer',
     border: `${Math.max(1, stagePx(1))}px solid rgba(255,255,255,0.5)`,

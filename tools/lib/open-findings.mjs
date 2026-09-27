@@ -1684,6 +1684,20 @@ export const OPEN_FINDINGS = [
     until: '2026-12-31',
   },
   {
+    id: 'INLINE-STYLE-SELECTOR-MISSES-CLIENT-RENDER',
+    what: '⚠️ ★**inline style の部分一致で当てる規則は、★クライアント描画では ★空白の差で ★黙って外れます**（★2026-09-27 実測）。'
+      + '★`globals.css` の安全網（`[style*="display:flex"]`・`[style*="flex:0 0 150px"]`・`[style*="min-width:240px"]` など）',
+    why: '✔ ★サーバーで組んだ HTML は React が ★`display:inline-block` と書き、★画面側で後から描いた要素は ★ブラウザが ★`display: inline-block;` に直します。'
+      + '★投票の「オッズの詳細」は ★空白なしの規則を足しても ★計算値 min-height 0px のままでした（★CDP で読んだ）。'
+      + '✔ ★いまの実害は ★測って 0（★390px: 横あふれ 0/37・44px 未満は全画面 0）。★既存の規則は ★触らない（★裁定）。'
+      + '🔴 ★**綴りを増やして直さないこと**（★3 通り目: 並び順・`display : x` の空白違い・別のブラウザの正規化 ＝ ★列挙は必ず漏れる・裁定）。'
+      + '⚠️ ★網 `mobile-css-anchors.test.ts` は ★**原文**（★規則の値が ソースに在るか）しか見られず、★この差は拾えません。'
+      + '→ ★守りの主は ★実測（★手順書 `RUNBOOK_PROD_DEPLOY_20260922.md` ⑨・`verify-mobile-layout.mjs`）。'
+      + '--- ✅ ★**消す条件** --- ★当て方を ★class か data 属性に移した日（★inline style の文字列に頼らない）。',
+    owner: 'dev',
+    until: '2026-12-31',
+  },
+  {
     id: 'STRIP-LANDSCAPE-STAGE-B',
     what: '🔴 ★**横にしたときに ★本編エンジンへ差し替える（段 B）は ★未着手**です（★2026-09-27・裁定 §6・仕様 §4 の読み替え）。'
       + '★いまは ★段 A ＝ ★帯の走行（side-v8・同じ進行率）を ★その場で全画面にするだけ（★録画・結果から再現・無音）',

@@ -149,6 +149,25 @@ npx tsx tools/verify-user-eyes.mjs --env production
 - ⚠️ ★**公開関数（RPC）は ★この道具では読みません**（★引数が要る）。★名前と実行権は ⑦ の `verify-screen-rpcs-live.mjs`、
   ★「ビューが呼ぶ関数の権限」は ★網 `apps/cli/test/view-function-invoker-rights.test.ts` が原文で見ます。
 
+## ⑨ 🔴 関門: スマホ幅で 実物を測る（★横あふれ ／ ★44px 未満の操作）
+
+> ★**2026-09-27 に足しました**（★裁定 `REVIEW_UI_AUDIT_20260927.md` 追記・★守りの主を ★原文の検査から ★実測へ）。
+> ★安全網（`globals.css`）の多くは ★inline style の ★部分一致（`[style*="display:flex"]` など）で当てています。
+> ★画面側で後から描いた要素は ★ブラウザが ★`display: flex;`（★コロンの後に空白）に直すので、★**黙って外れます**
+> ★（★簿 `INLINE-STYLE-SELECTOR-MISSES-CLIENT-RENDER`）。★網 `mobile-css-anchors` は ★原文しか見られません。
+> ★**綴りが外れても、実測なら見つかります。**
+
+```bash
+AUDIT_BASE=https://star-two-chi.vercel.app npx tsx tools/verify-mobile-layout.mjs --widths 390 --taps
+```
+
+- ★**記録する 2 つの数**: ★「★横あふれが出た組み合わせ」の数 ／ ★「★44px 未満の操作」が 0 でない画面とその内訳。
+- ★基準（★2026-09-27・`next start`・390px）: ★横あふれ ★**0 / 37**・★44px 未満 ★**全画面 0**（★`/race` は ★`stageMinPx` の後で 360/390/430 とも 0）。
+- 🔴 ★どちらかが ★基準より増えたら ★配備の報告に ★画面名と内訳を書く（★黙って通さない）。★直すかは ★レビュー側が決める。
+- ⚠️ ★本文の文字リンク（★display が inline の a）は ★数えません。★ボタンの形のリンクは ★数えます（★線引きは道具の註記）。
+- ⚠️ ★Git Bash では ★`--path /race` の `/race` が ★Windows の道に書き換わり ★0 画面になります。★`MSYS_NO_PATHCONV=1` を前に付ける。
+- ⚠️ ★ログインの要る画面は ★ログインしていない姿で測ります（★道具はログインしない）。
+
 ## 後で（本番を読むだけ）
 
 ```bash
