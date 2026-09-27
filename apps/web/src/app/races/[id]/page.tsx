@@ -102,7 +102,11 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
               </div>
             </div>
             <a className="a-btn" href={`/odds/${id}`} style={{ height: 52, padding: '0 20px', fontSize: 16, whiteSpace: 'nowrap' }}>オッズ</a>
-            {scheduled && <a className="a-btn a-btn-gold" href={`/races/${id}/bet`} style={{ height: 52, padding: '0 24px', fontSize: 17, whiteSpace: 'nowrap' }}>投票する</a>}
+            {/*
+              🔴 ★**「投票する」の入口を外しました**（★2026-09-27・裁定 `REVIEW_UI_AUDIT_20260927.md` P0-A）。
+                 ★行き先の `/races/[id]/bet` は ★URL の `[id]` を無視して ★**別のレースに投票し**、★「動きません」と書きながら ★EP を引いていました。
+                 ★残すか `/vote` に畳むかは ★オーナーの判断待ち。★それまで ★入口を張らない（★網 `bet-page-closed.test.ts`）。
+            */}
           </div>
         </div>
       </div>

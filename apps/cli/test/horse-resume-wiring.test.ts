@@ -58,11 +58,23 @@ describe('★履歴書型の馬詳細の配線（D13-2）', () => {
     expect(PAGE).toContain('hide-narrow');
   });
 
-  it('① ★個性は導かれる（★どの個性が付くかを画面もデモも書いていない）', () => {
-    expect(CODE).toMatch(/innateTraitsOf/);
-    expect(CODE).toMatch(/learnedTraitsOf/);
-    expect(CODE).toMatch(/careerInputOf/);
-    expect(CODE).toMatch(/TRAIT_LABEL\[/);
+  /**
+   * 🔴 ★**見本で埋めない**（★2026-09-27・裁定 `REVIEW_UI_AUDIT_20260927.md` P0-B）。
+   *   ★この部品は ★スマホ幅でだけ出て、★**自分の馬の画面に** 見本の個性・主戦騎手・生涯のピーク・物語・子孫を出していました。
+   *   ★`HorseDetail` に ★それらの実データは在りません → ★**出さない**（★出すときは実データの口を先に作る）。
+   *   ⚠️ ★以前の ①③⑤⑥ は ★「見本を通して描く部品が在ること」を求めていました。★要求を ★「実データが無いうちは出さない」へ書き換えました。
+   */
+  it('🔴 ★P0-B: 実データの無い欄（個性・主戦騎手・ピーク・物語・子孫）は出さない', () => {
+    for (const fn of ['innateTraitsOf', 'learnedTraitsOf', 'careerInputOf', 'JOCKEYS.find', 'jockeyBondAfterRides', 'storyLinesOf']) {
+      expect(CODE, `🔴 ★見本から ${fn} で組んで出しています`).not.toContain(fn);
+    }
+    expect(CODE, '🔴 ★生涯のピーク帯を出しています').not.toContain('生涯のピーク　');
+    /** ★タブは ★実データの在る 2 つだけ（★戦績・血統） */
+    expect(CODE).toContain("const REAL_TABS = RESUME_TABS.filter((t) => t.key === 'races' || t.key === 'pedigree');");
+    expect(CODE).not.toMatch(/tab === 'story'|tab === 'offspring'/);
+  });
+
+  it('① ★個性の名前・境目を 画面にもデモにも写していない', () => {
     /** ★個性の名前を画面に写していない（★「繊細」「大舞台経験」等） */
     for (const label of Object.values(TRAIT_LABEL)) {
       expect(CODE, `★個性の名前が画面に写っている: ${label}`).not.toContain(label);
@@ -92,10 +104,7 @@ describe('★履歴書型の馬詳細の配線（D13-2）', () => {
     expect(CODE).not.toMatch(/runs\s*>=/);
   });
 
-  it('③ ★物語の文は `storyLinesOf` から来る（★画面で組み立てない・LR-4）', () => {
-    expect(CODE).toMatch(/storyLinesOf/);
-    expect(CODE).toMatch(/\{l\.text\}/);
-    expect(CODE).toMatch(/STORY_EVENT_LABEL\[l\.type\]/);
+  it('③ ★物語の文を画面で組み立てていない（★LR-4・★物語は P0-B で出さなくなった）', () => {
     /** ★文の中身で分岐していない */
     expect(CODE).not.toMatch(/l\.text\.(includes|indexOf|match)/);
     /** ★デモにも文を書いていない（★種類と値だけ） */
@@ -119,28 +128,22 @@ describe('★履歴書型の馬詳細の配線（D13-2）', () => {
     for (const bad of ['勝率', '得意', '勝ちやすい', '成績', '実績', '上手']) {
       expect(CODE, `★誤読を招く語がある: ${bad}`).not.toContain(bad);
     }
-    /** ★名簿は `@star/scheduler` が正（★名前を画面に書かない） */
-    expect(CODE).toMatch(/JOCKEYS\.find/);
+    /** ★名簿は `@star/scheduler` が正（★名前を画面に書かない）。★主戦騎手は P0-B で出さなくなった */
     for (const j of JOCKEYS) {
       expect(CODE, `★騎手の名前が画面に写っている: ${j.name}`).not.toContain(j.name);
     }
     /** ★抑えの強さ（`calm`）は出さない */
     expect(CODE).not.toContain('calm');
-    /** ★親密度も言葉も引く（★`bondLabel` は騎手の画面と同じ関数） */
-    expect(CODE).toMatch(/jockeyBondAfterRides/);
-    expect(CODE).toMatch(/bondLabel\(/);
   });
 
-  it('⑥ ★個性が着順に効くと読めない（★この便は効果 0）', () => {
-    expect(CODE).toContain('いまは着順に影響しません');
+  it('⑥ ★強さと読める語が無い（★個性の欄は P0-B で出さなくなった）', () => {
     for (const bad of ['強い', '有利', '強化', 'パワーアップ']) {
       expect(CODE, `★強さと読める語がある: ${bad}`).not.toContain(bad);
     }
   });
 
-  it('★子孫は 2 代まで（★空の世代は 1 行だけ・カードの指定）', () => {
+  it('★子孫の見本は 2 代まで（★画面は P0-B で子孫を出さなくなった・★見本の形だけ見る）', () => {
     expect(DEMO).toMatch(/OFFSPRING_GENERATION_LABEL/);
-    expect(CODE).toContain('まだいません');
     /** ★世代の見出しは 2 つ（★画面が深さを決めない） */
     const labels = DEMO.match(/OFFSPRING_GENERATION_LABEL[^=]*=\s*\[([^\]]*)\]/)?.[1] ?? '';
     expect((labels.match(/'/g) ?? []).length / 2, '★世代の見出しが 2 つではない').toBe(2);

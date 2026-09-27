@@ -12,6 +12,16 @@ import { loadBetScreen, loadBetAllowance, placeBet, oddsKey, type BetScreenData,
 import { FrameBadge } from '../../../../components/ui';
 import { formatEntryPoints } from '../../../../lib/format';
 
+/**
+ * 🔴 ★**この口はいま閉じています**（★2026-09-27・裁定 `REVIEW_UI_AUDIT_20260927.md` P0-A）。
+ *   ★この画面は「★デモデータ（動きません）」と書きながら、★実際には `place_bet` が通り ★**EP を引いていました**。
+ *   ★しかも ★`loadBetScreen(null)` なので ★URL の `[id]` を無視し、★**別のレースに投票されていました**。
+ *   ★1 回の上限・みんなの投票状況も ★見本（`DEMO_BET_RACE`）でした。
+ *   → ★入口（`/races/[id]` の金ボタン）を外し、★ここでも ★送らない。★画面は消しません（★`/vote` との重複の経緯を残すため）。
+ *   ★残すか `/vote` に畳むかは ★オーナーの判断待ち（★その答えを待たずに閉じる — ★閉じるのは戻せるが、★EP が消えるのは戻せない）。
+ */
+const BET_PAGE_CLOSED = true;
+
 const AMOUNTS = [100, 500, 1000, 5000];
 const MARK_COL = 70;
 
@@ -99,6 +109,8 @@ export default function BetPage(): React.ReactElement {
 
   /** ★投票する（★判定はすべて `place_bet` が持っています） */
   const submit = async (): Promise<void> => {
+    /** 🔴 ★閉じている間は ★送らない（★P0-A・★URL を直に開いた人も EP を失わない） */
+    if (BET_PAGE_CLOSED) return;
     if (live === null || !complete || busy) return;
     setBusy(true); setBetError(null); setPlaced(null);
     try {
@@ -202,7 +214,10 @@ export default function BetPage(): React.ReactElement {
           <span className="a-num" style={{ fontSize: 30, color: '#fff' }}>{race.deadline}</span>
         </span>
       </div>
-      <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>※ デモデータ（投票はサーバー RPC に接続するまで動きません）</p>
+      {/* 🔴 ★「デモデータ（動きません）」は ★嘘でした（★実際は EP を引いていた・P0-A）。★閉じたことを ★事実どおりに言います */}
+      <p role="status" style={{ margin: '8px 0 0', padding: '10px 12px', borderRadius: 8, fontSize: 13, fontWeight: 900, color: 'var(--a-red-d)', background: '#ffeceb', border: '2px solid var(--a-red-d)' }}>
+        この口はいま使えません。投票は <a href="/vote" style={{ textDecoration: 'underline' }}>投票モード</a> からどうぞ（参加ポイントは引かれません）
+      </p>
 
       {/* 券種タブ */}
       <div className="rc-tabs" style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
@@ -342,12 +357,12 @@ export default function BetPage(): React.ReactElement {
               )}
               <button
                 type="button"
-                className={`a-btn a-btn-gold${complete && enough && !busy && live !== null ? '' : ' off'}`}
+                className={`a-btn a-btn-gold${!BET_PAGE_CLOSED && complete && enough && !busy && live !== null ? '' : ' off'}`}
                 style={{ width: '100%', height: 52, marginTop: 14, fontSize: 17, cursor: 'pointer', fontFamily: 'inherit' }}
                 onClick={() => { void submit(); }}
-                disabled={!complete || !enough || busy || live === null}
+                disabled={BET_PAGE_CLOSED || !complete || !enough || busy || live === null}
               >
-                {busy ? '送っています…' : `${type.label}に ${formatEntryPoints(amount)} を投票する`}
+                {BET_PAGE_CLOSED ? 'この口はいま使えません' : busy ? '送っています…' : `${type.label}に ${formatEntryPoints(amount)} を投票する`}
               </button>
               {!enough && <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-red-d)', marginTop: 6 }}>参加ポイントが足りません</div>}
               {/* 🔴 ★**失敗を握り潰さない**（★UI1-9 と同じ作法。★原文をそのまま出す） */}
