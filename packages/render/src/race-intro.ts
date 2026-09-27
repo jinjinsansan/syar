@@ -186,7 +186,8 @@ export function drawPaddockIntro<TImage>(
   ctx.font = font(54, true); ctx.fillStyle = HUD.paper;
   ctx.fillText(entry.name, bx + 130, by + 74);
   ctx.font = font(20, true); ctx.fillStyle = HUD.paper70;
-  ctx.fillText(`騎手　${entry.jockey}`, bx + 134, by + 110);
+  /** ★騎手名が無い（★実レースは公開していない）ときは ★見出しだけを出さない（★2026-09-27・空の「騎手」が出ていた） */
+  if (entry.jockey !== '') ctx.fillText(`騎手　${entry.jockey}`, bx + 134, by + 110);
   /** ★単勝（★金プレート） */
   drawLabel(ctx as unknown as Ctx2D<unknown>, font, '単勝', bx + bw - 300, by + 46, HUD.paper70);
   ctx.font = font(46, true);
@@ -486,7 +487,8 @@ export function drawRaceTitleCard<TImage>(
     ctx.font = font(26, true); ctx.fillStyle = HUD.paper;
     ctx.fillText(own.name, ox + 14 + 40 + 12, oyy + 38 + 25);
     ctx.font = font(15, true); ctx.fillStyle = 'rgba(246,242,231,.85)';
-    ctx.fillText(`騎手　${own.jockey}`, ox + 14, oyy + oh - 14);
+    /** ★騎手名が無いときは ★見出しだけを出さない（★2026-09-27） */
+    if (own.jockey !== '') ctx.fillText(`騎手　${own.jockey}`, ox + 14, oyy + oh - 14);
     if (own.oddsLabel !== undefined) {
       drawLabel(ctx, font, '単勝', ox + ow - 14, oyy + 38 + 30, HUD.paper70, 'right');
       ctx.textAlign = 'right'; ctx.font = font(34, true);

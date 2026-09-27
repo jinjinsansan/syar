@@ -540,7 +540,10 @@ export function drawWinnerLowerThird(
   ctx.fillStyle = goldPlate(ctx, nx, nw, t);
   ctx.fillText(horseName.slice(0, shownChars), nx, H - 26 - 40 + rise.dy);
   ctx.font = font(20, true); ctx.fillStyle = 'rgba(246,242,231,.85)';
-  ctx.fillText(`騎手　${jockeyName}${opts.stableName === undefined ? '' : `　／　厩舎　${opts.stableName}`}`, nx, H - 26 - 6 + rise.dy);
+  /** ★騎手名が無い（★実レース）ときは ★「騎手」の見出しを出さない（★2026-09-27） */
+  const subLine = [jockeyName === '' ? '' : `騎手　${jockeyName}`, opts.stableName === undefined ? '' : `厩舎　${opts.stableName}`]
+    .filter((s) => s !== '').join('　／　');
+  if (subLine !== '') ctx.fillText(subLine, nx, H - 26 - 6 + rise.dy);
   // TIME 右
   if (timeSec !== undefined) {
     const right = W - 64;

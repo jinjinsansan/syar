@@ -401,7 +401,8 @@ export function drawOwnHorseCutIn<TImage>(
 
   ctx.fillStyle = PAPER70;
   ctx.font = font(Math.round(H * 0.030), true);
-  ctx.fillText(`騎手　${o.jockeyName}`, nameX, top + plate + Math.round(H * 0.045));
+  /** ★騎手名が無い（★実レース）ときは ★見出しを出さない（★2026-09-27） */
+  if (o.jockeyName !== '') ctx.fillText(`騎手　${o.jockeyName}`, nameX, top + plate + Math.round(H * 0.045));
 
   /** ★脚質と現在位置。★2 つだけ */
   const rowY = top + plate + Math.round(H * 0.115);

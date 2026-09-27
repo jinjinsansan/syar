@@ -1052,6 +1052,23 @@ interface RealReplay {
  * ⚠️ ★意匠は作っていません（★最小の字と地だけ）。★見せ方は ★デザイナーへ（★平場の意匠と同じ便 R-18）。
  */
 const REPLAY_BADGE_TEXT = '録画・確定した結果から再現';
+/**
+ * ★**画面の部品の形**（★2026-09-27・引き渡し資料 `design_handoff_uma_monogatari` §5.3 / §5.5 / §5.6 の値）。
+ *   ★新しい意匠は作っていません（★資料の金プレート・副ボタン・カプセルの値をそのまま）。
+ */
+const RACE_BACK_PLATE: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', minHeight: 44, padding: '0 13px', whiteSpace: 'nowrap', fontSize: 13,
+  border: '3px solid var(--u-navy)', borderRadius: 10, color: 'var(--u-ink-dark)', textDecoration: 'none',
+  backgroundImage: 'var(--u-gold-plate)', boxShadow: 'var(--u-shadow-card)',
+};
+const RACE_CONTROL: React.CSSProperties = {
+  minHeight: 44, padding: '0 16px', borderRadius: 12, fontSize: 14, cursor: 'pointer',
+  border: '3px solid rgba(251,247,236,.5)', background: 'var(--u-panel-strong)', color: 'var(--u-ink-light)',
+};
+const RACE_REPLAY_CHIP: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', minHeight: 32, padding: '0 12px', borderRadius: 999, fontSize: 13,
+  border: '2px solid var(--u-gold)', background: 'rgba(30,22,4,.82)', color: '#fff3cd', marginLeft: 'auto',
+};
 const REPLAY_BADGE_STYLE: React.CSSProperties = {
   position: 'absolute', top: 10, left: 10, padding: '3px 10px', fontSize: 16, fontWeight: 900,
   background: 'rgba(0, 0, 0, 0.6)', color: '#fff', borderRadius: 3, pointerEvents: 'none',
@@ -6340,16 +6357,34 @@ function RaceView({ setup, real }: {
   return (
     <main
       className={smallScreen ? 'race-menu' : undefined}
+      {...(devMode ? {} : { 'data-theme': 'uma' })}
       style={devMode
         ? { background: '#14120f', color: '#efe9dc', padding: 14, fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }
         /**
-         * ★**遊ぶ人に出す面は、玄関と同じ色にします**（★2026-09-13・オーナー評
-         *   ★「★TOP は馬物語というグリーンな感じ ／ ★中継を押すとブルーで STAR」）。
+         * ★**遊ぶ人に出す面は ★馬物語 UI の骨格**（★2026-09-27・引き渡し資料 `design_handoff_uma_monogatari` §5.1）。
+         *   🔴 ★それまで ★クリーム色（`#f8f7ef`）の地で、★全体の `main { max-width: 1180px }` と重なり
+         *      ★**水色の地の上にクリームの柱**が立っていました（★オーナー「★背景が白の間違ったデザインのまま」）。
+         *   → ★濃紺の全幅（★`max-width` を外す）・★文字は明るい色。★新しい意匠は作っていません（★資料 §5.1 の値）。
          * ⚠️ ★開発卓（`?dev=1`）は ★**暗いまま**です。★映像の色を見る面なので、
          *    ★背景を明るくすると判断が狂います。
          */
-        : { background: '#f8f7ef', color: '#203b34', padding: 14, fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }}
+        : {
+          background: 'var(--u-navy)', color: 'var(--u-ink-light)', padding: '0 0 var(--u-safe-bottom)',
+          minHeight: '100dvh', maxWidth: 'none', margin: 0, width: '100%',
+        }}
     >
+      {/*
+        ★**上段バー**（★資料 §5.3: 左に「‹ 戻る」の金プレート・中に画面名）。★見ている間（全画面）は出しません。
+        ★戻り先は ★`?return=` の名簿（★記録から来たら「記録へ戻る」）。★無ければ ダッシュボード。
+      */}
+      {!devMode && !stageFull && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', maxWidth: 1280, margin: '0 auto', padding: '12px 14px 0' }}>
+          <a href={RETURN_TO ?? '/home'} style={RACE_BACK_PLATE}>‹ {RETURN_TO === null ? 'ダッシュボードへ' : RETURN_LABEL}</a>
+          <strong style={{ fontSize: 18, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {real !== null ? `録画　${RACE_META.raceNo}　${RACE_META.raceName}` : 'レース'}
+          </strong>
+        </div>
+      )}
       {/**
         * ★**用意している間、白紙にしない**（★2026-09-13）。
         *   ⚠️ ★携帯では、素材が揃うまで ★**20 秒ほど何も出ません**でした。★その間に見えるのは
@@ -6360,17 +6395,15 @@ function RaceView({ setup, real }: {
           minHeight: '60vh', display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: 10, textAlign: 'center',
         }}>
-          <a href="/" style={{
-            fontSize: 22, fontWeight: 700, letterSpacing: '.14em', color: '#315c45', textDecoration: 'none',
-          }}>馬物語</a>
-          <p style={{ margin: 0, color: '#52655c' }}>レースの用意をしています…</p>
-          <progress aria-label="レース素材を読み込み中" style={{ width: 'min(260px, 80vw)' }} />
-          <span style={{ fontSize: 13, color: '#52655c' }}>経過 {loadingSeconds} 秒</span>
-          {loadingSeconds >= 10 && <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+          {/* ★濃紺の地に ★金の題字（★資料 §5・★2026-09-27 に白地から移した） */}
+          <span style={{ fontSize: 24, letterSpacing: '.14em', color: 'var(--u-gold)' }}>馬物語</span>
+          <p style={{ margin: 0 }}>{real !== null ? '録画の用意をしています…' : 'レースの用意をしています…'}</p>
+          <progress aria-label="レース素材を読み込み中" style={{ width: 'min(260px, 80vw)', accentColor: 'var(--u-gold)' }} />
+          <span style={{ fontSize: 13, opacity: .8 }}>経過 {loadingSeconds} 秒</span>
+          {loadingSeconds >= 10 && real === null && <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
             <span>このまま待つ</span>
-            <a href="/vote" style={{ color: '#42694f', textDecoration: 'underline' }}>結果だけ見る</a>
+            <a href="/vote" style={{ color: 'var(--u-gold)', textDecoration: 'underline' }}>結果だけ見る</a>
           </div>}
-          <a href="/" style={{ marginTop: 18, color: '#42694f', fontSize: 14 }}>← もどる</a>
         </div>
       )}
       {/** ⚠️ ★見ている間は見出しも消します（★上と同じ理由） */}
@@ -6732,42 +6765,31 @@ function RaceView({ setup, real }: {
         *    ★ありませんでした。★机の画面で普通に開くと ★**どこにも押す所がなく**、
         *    ★`?sound=1` を手で付けるしか鳴らせませんでした。★私の入れ忘れです。
         */}
+      {/*
+        ★**音・全画面・もう一度 と 録画の札**（★2026-09-27・資料 §5.5 / §5.6 の形へ）。
+        ⚠️ ★それまで ★白い小さなボタンと ★地の文字だけの札でした（★オーナー「★レース録画を出すにしても UI をちゃんとしてください」）。
+      */}
       {!smallScreen && !devMode && (
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '0 0 10px' }}>
-          <button
-            type="button" onClick={() => setSoundOn((q) => !q)}
-            style={{
-              padding: '9px 16px', cursor: 'pointer', border: 0, borderRadius: 6, fontWeight: 700,
-              background: soundOn ? '#2c6b44' : '#dfe3d6', color: soundOn ? '#ffe98a' : '#3a4a40',
-            }}
-          >
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', width: '100%', maxWidth: 1280, margin: '12px auto 10px', padding: '0 14px' }}>
+          <button type="button" onClick={() => setSoundOn((q) => !q)} aria-pressed={soundOn}
+            style={{ ...RACE_CONTROL, ...(soundOn ? { background: 'var(--u-gold-plate)', color: 'var(--u-ink-dark)', borderColor: 'var(--u-navy)' } : {}) }}>
             {soundOn ? '♪ 音 入' : '♪ 音 切'}
           </button>
-          <button
-            type="button" onClick={() => { enterBrowserFullscreen(); }}
-            style={{
-              padding: '9px 16px', cursor: 'pointer', border: '1px solid #c3cdbc', borderRadius: 6,
-              background: '#fffef9', color: '#315c45', fontWeight: 700,
-            }}
-          >全画面</button>
-          <button
-            type="button"
-            onClick={() => { audioRef.current?.reset(); resetToStart(); setPlaying(true); }}
-            style={{
-              padding: '9px 16px', cursor: 'pointer', border: '1px solid #c3cdbc', borderRadius: 6,
-              background: '#fffef9', color: '#315c45', fontWeight: 700,
-            }}
-          >もう一度</button>
+          <button type="button" onClick={() => { enterBrowserFullscreen(); }} style={RACE_CONTROL}>全画面</button>
+          <button type="button" onClick={() => { audioRef.current?.reset(); resetToStart(); setPlaying(true); }} style={RACE_CONTROL}>もう一度</button>
+          {real !== null && <span style={RACE_REPLAY_CHIP}>{REPLAY_BADGE_TEXT}</span>}
         </div>
       )}
-      {!smallScreen && real !== null && (
-        <p style={{ fontSize: 13, fontWeight: 900, margin: '0 0 6px' }}>{REPLAY_BADGE_TEXT}</p>
-      )}
       {!smallScreen && (
-        <canvas
-          ref={canvasRef} width={W} height={H}
-          style={{ width: '100%', maxWidth: W, border: '1px solid #4a453d', imageRendering: 'auto', background: '#111' }}
-        />
+        <div style={{ width: '100%', maxWidth: devMode ? undefined : 1280, margin: '0 auto', padding: devMode ? 0 : '0 14px' }}>
+          <canvas
+            ref={canvasRef} width={W} height={H}
+            style={{
+              display: 'block', width: '100%', maxWidth: W, margin: '0 auto', imageRendering: 'auto', background: '#111',
+              border: devMode ? '1px solid #4a453d' : '3px solid var(--u-gold)', borderRadius: devMode ? 0 : 12,
+            }}
+          />
+        </div>
       )}
       {!smallScreen && devMode && (
       <p style={{ fontSize: 12, opacity: 0.55, marginTop: 10, lineHeight: 1.8 }}>
