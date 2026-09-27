@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
-import { parseReplayRunners, replayDisplayProgress, replayProgress, type ReplayRunner } from './race-replay';
+import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
 import { stripSizeOf } from './race-strip-sizes';
 import './uma-theme.css';
@@ -208,7 +208,14 @@ export function RaceStrip(): React.ReactElement | null {
         loading = false;
       });
     };
-    const onVisible = (): void => { if (document.visibilityState === 'visible') refresh(); };
+    /**
+     * ★⑥ タブ復帰（★仕様 §5）: ★戻った瞬間に ★時計を今に合わせ ★読み直す（★止まっていた時間をそのまま延長しない）。
+     */
+    const onVisible = (): void => {
+      if (document.visibilityState !== 'visible') return;
+      setNowMs(new Date().getTime());
+      refresh();
+    };
     refresh();
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, REFRESH_MS);
     const clockTimer = window.setInterval(() => {
@@ -257,6 +264,13 @@ export function RaceStrip(): React.ReactElement | null {
 
   const leader = leaderOf(replayRows);
   const big = replaying && size === 'big';
+  /**
+   * ★④ **結果の一時強調**（★仕様 §2）: ★録画が終わった直後の 7 秒、★枠を EP 色にして ★1 着を大きく出し、★帯へ戻る。
+   *   ★出すのは ★直近の 1 本だけ（★「同時は最新のみ・積み上げない」）。★着順は ★記録の値（`finishPosition`）。
+   */
+  const winner = data?.runners.find((runner) => runner.finishPosition === 1) ?? null;
+  const resulting = !replaying && recent !== null && recent !== undefined && nowMs !== null && winner !== null
+    && replayResultShowing(recent.scheduled_at, nowMs);
 
   if (size === 'hidden') return null;
   /** ★`text`: ★その画面のレースの 1 行だけ（★走行・拡大・他のレースは出さない） */
@@ -273,11 +287,18 @@ export function RaceStrip(): React.ReactElement | null {
   }
 
   return (
-    <section aria-label="レースの開催情報" className={`u-race-strip${compact ? ' u-race-strip-compact' : ''}${replaying ? ' u-race-strip-replaying' : ''}${big ? ' u-race-strip-big' : ''}${expanded ? ' u-race-strip-expanded' : ''}`}>
+    <section aria-label="レースの開催情報" className={`u-race-strip${compact ? ' u-race-strip-compact' : ''}${replaying ? ' u-race-strip-replaying' : ''}${big || (resulting && size === 'big') ? ' u-race-strip-big' : ''}${resulting ? ' u-race-strip-result' : ''}${expanded ? ' u-race-strip-expanded' : ''}`}>
       {/* ★「大」150px（★一覧・閲覧の画面）。★同じ枠が伸びます（★§2: 別要素への切替ではない） */}
       {big && <RaceRun rows={replayRows} distance={recent?.distance ?? 0} motionReduced={motionReduced} />}
+      {resulting && size === 'big' && winner !== null && <div className="u-race-result-box" role="status">
+        <span className="u-race-result-place">1着</span>
+        <span className="u-race-result-name">{winner.gate}番 {winner.name}</span>
+      </div>}
       <div className="u-race-strip-main">
-        {replaying && recent && data ? <>
+        {resulting && recent && winner !== null ? <>
+          <strong>{recent.name} 確定</strong>
+          <span>1着 {winner.gate}番 {winner.name}</span>
+        </> : replaying && recent && data ? <>
           {/* ★「極小」22×16px（★フォームの画面）。★先頭の馬 1 頭だけ */}
           {compact && <span className="u-race-run-mini" aria-hidden>
             <span className="u-race-run-horse" style={{ inset: 0 }}><RunningHorse phase={0} motionReduced={motionReduced} /></span>

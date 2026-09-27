@@ -71,6 +71,16 @@ export function replayProgress(runner: ReplayRunner, distance: number, raceSec: 
 export const REPLAY_START_DELAY_MS = 75_000;
 export const REPLAY_DISPLAY_MS = 45_000;
 
+/**
+ * ★**結果の一時強調**（★④・仕様 §2「★6〜8 秒後に自動で帯へ戻る」）。★録画が終わった直後の ★7 秒だけ。
+ *   ★時計は録画と同じ（★発走時刻が起点）なので、★ページを移っても ★同じ所から続きます。
+ */
+export const REPLAY_RESULT_MS = 7_000;
+export function replayResultShowing(scheduledAt: string, nowMs: number): boolean {
+  const endMs = new Date(scheduledAt).getTime() + REPLAY_START_DELAY_MS + REPLAY_DISPLAY_MS;
+  return Number.isFinite(endMs) && nowMs >= endMs && nowMs < endMs + REPLAY_RESULT_MS;
+}
+
 /** 開催時刻を共有時計にして、ページ移動でも同じ録画位置へ戻る。 */
 export function replayDisplayProgress(scheduledAt: string, nowMs: number): number | null {
   const startMs = new Date(scheduledAt).getTime() + REPLAY_START_DELAY_MS;

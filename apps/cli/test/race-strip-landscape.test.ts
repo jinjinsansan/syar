@@ -47,7 +47,12 @@ describe('★③ 段 A ── 横にしたら その場で全画面', () => {
 
   it('🔴 ① ★拡大の前後で ★同じ時計・同じ行（★頭出しにならない）', () => {
     /** ★時計は ★`nowMs` 1 本（★`new Date().getTime()` を ★`setNowMs` に入れる 2 か所だけ） */
-    expect(clocksOf(LIVE)).toEqual({ dateNow: 0, perfNow: 0, newDate: 2, setNow: 2 });
+    /** ★⑥ タブ復帰でも ★同じ時計を今に合わせる（★2026-09-27）。★数でなく ★「全部が同じ時計」を見る */
+    const c = clocksOf(LIVE);
+    expect({ dateNow: c.dateNow, perfNow: c.perfNow }).toEqual({ dateNow: 0, perfNow: 0 });
+    expect(c.setNow, '★setNowMs に別の値を入れている').toBe(c.newDate);
+    expect(LIVE.match(/setNowMs\(new Date\(\)\.getTime\(\)\)/g)?.length, '★時計以外を nowMs に入れている').toBe(c.setNow);
+    expect(c.setNow, '★時計が 1 か所も無い').toBeGreaterThan(0);
     /** ★帯と拡大が ★同じ `replayRows` を描く（★拡大が自分で位置を計算し直さない） */
     const runs = [...LIVE.matchAll(/<RaceRun rows=\{([A-Za-z]+)\}/g)].map((m) => m[1]);
     expect(runs, '★帯と拡大が別の行を描いている').toEqual(['replayRows', 'replayRows']);
