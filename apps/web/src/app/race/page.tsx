@@ -6373,8 +6373,12 @@ function RaceView({ setup, real }: {
       <span style={{ fontSize: 24, letterSpacing: '.14em', color: 'var(--u-gold)' }}>馬物語</span>
       <p style={{ margin: 0 }}>{real !== null ? '録画の用意をしています…' : 'レースの用意をしています…'}</p>
       <progress aria-label="レース素材を読み込み中" style={{ width: 'min(260px, 60vw)', accentColor: 'var(--u-gold)' }} />
-      {/* ★経過秒は ★必ず出す（★`RACE_NOTICE_HANDOFF.md` §5「★進捗バー＋経過秒数を必須表示」・★終わらない「用意しています」にしない） */}
-      <span style={{ fontSize: 12, opacity: .8 }}>経過 {loadingSeconds} 秒</span>
+      {/*
+        ★経過秒は ★**遅いときだけ**（★8 秒から・★3 択と一緒に）出します（★2026-09-28・レビュー側の条件）。
+        ★オーナーは f13a07d で常に出る経過秒を「見栄えが悪い」と外しました。★仕様 §5 の目的（★終わらない「用意しています」を作らない）は
+        ★8 秒の 3 択で満たせるので、★普通に読める場合は出さず、★遅いときだけ出します。
+      */}
+      {loadingSeconds >= LOADING_CHOICES_SEC && <span style={{ fontSize: 12, opacity: .8 }}>経過 {loadingSeconds} 秒</span>}
       {/**
         * ★**8 秒で 3 択**（★2026-09-28・§5・デザイナー R-18 回答・レビュー側の条件）:
         *   ★① このまま待つ ★② 結果だけ見る（★演出なしで着順へ） ★③ 戻る。★**実レースの録画でも出す**（★それまでは見本だけでした）。

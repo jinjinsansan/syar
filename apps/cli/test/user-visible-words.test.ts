@@ -69,6 +69,24 @@ describe('★利用者に見える文字の禁止語', () => {
     expect(offenders('購入')).toEqual([]);
   });
 
+  it('🔴 ③ ★「買う」系が無い（★R-18 回答 4-3「★買う」「購入」は使わない・★「迎える」は確定のボタンだけ）', () => {
+    /** ★馬券の「買い目」は ★投票の語なので ★対象外（★買う・買え・買わ・買っ だけ） */
+    expect(offenders('買う')).toEqual([]);
+    expect(offenders('買え')).toEqual([]);
+    expect(offenders('買わ')).toEqual([]);
+    expect(offenders('買っ')).toEqual([]);
+  });
+
+  it('🔴 ④ ★置き換えた語が ★実際に使われている（★消しただけで新しい語が入っていない、を通さない）', () => {
+    /** ★R-18 回答 4-3 の語: ★初回「はじめての 1 頭」・★売り買い「馬市場」・★記録「市場で迎えた馬」 */
+    for (const word of ['はじめての 1 頭', '馬市場', '市場で迎えた馬']) {
+      expect(offenders(word).length, `★「${word}」が画面のどこにも無い`).toBeGreaterThan(0);
+    }
+    /** ★近すぎた 2 つの語は ★もう画面に無い（★「新しい 1 頭を迎える」と「馬を迎える」） */
+    expect(offenders('新しい 1 頭を迎える')).toEqual([]);
+    expect(offenders('>馬を迎える<')).toEqual([]);
+  });
+
   it('★対照: ★走査が ★註記を除いた原文を ★実際に読んでいる', () => {
     /** ★開発用の画面は ★除いている（★rig-lab は「購入リグ」を表示するが 本番は 404） */
     expect(devDirs().some((d) => d.endsWith(`${path.sep}rig-lab`)), '★開発用の画面を除けていない').toBe(true);

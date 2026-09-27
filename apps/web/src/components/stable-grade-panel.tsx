@@ -46,7 +46,7 @@ export function StableGradePanel({ horseName, grade }: {
       </div>
       <div style={{ fontSize: 11.5, fontWeight: 900, color: 'var(--a-ink-2)', lineHeight: 1.75, marginBottom: 12 }}>
         伸びと費用に<b style={{ color: 'var(--a-ink)' }}>同じ倍率</b>がかかります。同じ参加ポイントを注いだときの強さはどの格でも同じ。
-        上の格で買えるのは<b style={{ color: 'var(--a-ink)' }}>速く仕上がること</b>だけです。
+        上の格で得られるのは<b style={{ color: 'var(--a-ink)' }}>速く仕上がること</b>だけです。
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>

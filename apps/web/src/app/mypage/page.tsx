@@ -38,7 +38,7 @@ export default function MyPage(): React.ReactElement {
           <strong>厩舎の馬</strong><span style={{ fontSize: 11 }}>{view ? `${horses.length} 頭` : loading ? '読み込み中' : 'ログイン後に表示'}</span>
         </div>
         {view && horses.length === 0 && <div style={{ padding: 18, color: 'var(--u-ink-dark)' }}>
-          まだ持ち馬がいません。<a href="/setup" style={{ textDecoration: 'underline' }}>最初の1頭を迎える</a>
+          まだ持ち馬がいません。<a href="/setup" style={{ textDecoration: 'underline' }}>はじめての 1 頭を迎える</a>
         </div>}
         {horses.map((entry) => <button key={entry.id} type="button" onClick={() => { setSelected(entry.id); }}
           aria-pressed={entry.id === horse?.id} style={{

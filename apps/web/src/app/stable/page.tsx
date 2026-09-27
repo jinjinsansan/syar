@@ -142,7 +142,7 @@ function HomeCards({ home, ownedCount, todoCount }: { readonly home: StableHome;
         {ownedCount === 0 ? (
           <>
             <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)', lineHeight: 1.7 }}>現役の馬がいません。新しい 1 頭を無償で迎えられます</div>
-            <a className="a-btn a-btn-gold" href="/setup" style={{ width: '100%', height: 40, marginTop: 'auto', fontSize: 13, whiteSpace: 'nowrap' }}>新しい 1 頭を迎える</a>
+            <a className="a-btn a-btn-gold" href="/setup" style={{ width: '100%', height: 40, marginTop: 'auto', fontSize: 13, whiteSpace: 'nowrap' }}>はじめての 1 頭を迎える</a>
           </>
         ) : (
           <>
@@ -191,7 +191,7 @@ function HomeCards({ home, ownedCount, todoCount }: { readonly home: StableHome;
           <a className="a-btn" href="/records" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>記録</a>
           <a className="a-btn" href="/exchange" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>景品交換</a>
           {/* ★馬の売り買い（★2026-09-27・裁定 §6-2 の 2）。★既存の部品（`a-btn`）で 1 つ置くだけ。★名前は画面の見出しのまま */}
-          <a className="a-btn" href="/stable/market" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>馬を迎える</a>
+          <a className="a-btn" href="/stable/market" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>馬市場を見る</a>
         </div>
       </HomeCard>
     </div>
@@ -359,7 +359,7 @@ export default function StablePage() {
         })}
         {/* ★空状態の文言はカードの「セリで…」から改めている: セリは作らない（裁定 Q-WEB-01）。再付与は D-074 */}
         {horses.length === 0 && (
-          <p style={{ color: 'var(--a-ink-2)', fontWeight: 900, padding: '16px 20px', fontSize: 14 }}>まだ所有している馬がいません。新しい 1 頭を無償で迎えると牧場が始まります</p>
+          <p style={{ color: 'var(--a-ink-2)', fontWeight: 900, padding: '16px 20px', fontSize: 14 }}>まだ所有している馬がいません。はじめての 1 頭を無償で迎えると牧場が始まります</p>
         )}
       </div>
 

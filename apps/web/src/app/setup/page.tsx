@@ -339,7 +339,7 @@ export default function SetupPage(): React.ReactElement {
                 ⚠️ ★**無い列を作って埋めません。**
               */}
               <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--u-ink)', lineHeight: 1.7 }}>
-                最初の 1 頭は無償です。どの 1 頭が来ても、できることは変わりません
+                はじめての 1 頭は無償です。どの 1 頭が来ても、できることは変わりません
               </span>
               <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--u-ink)' }}>
                 参加ポイント {granted.grantedEP.toLocaleString('ja-JP')} EP を受け取りました

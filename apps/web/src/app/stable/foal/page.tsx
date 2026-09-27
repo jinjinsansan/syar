@@ -66,7 +66,7 @@ function Shell({ children }: { readonly children: React.ReactNode }): React.Reac
   return (
     <div data-page-body style={{ minHeight: '100dvh', background: '#0a2340', color: '#fbf7ec' }}>
       <div style={{ width: '100%', maxWidth: 1100, margin: '0 auto', padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>最初の 1 頭を生産する</div>
+        <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>はじめての 1 頭を生産する</div>
         {/* ★常設レース表示（★フォームの画面 ＝ 極小・大きさは表 `race-strip-sizes.ts` が決める・裁定 ⑤） */}
         <div data-theme="uma"><RaceStrip /></div>
         {children}
@@ -159,7 +159,7 @@ export default function FirstFoalPage(): React.ReactElement {
   if (state === null) return <Shell><Note>読み込めませんでした{error === null ? '' : `: ${error}`}</Note></Shell>;
 
   if (state.stage === 'no_account') {
-    return <Shell><Note>まず牧場を開いてください。<a href="/setup" style={{ color: '#ffd84a' }}>最初の 1 頭を迎える</a></Note></Shell>;
+    return <Shell><Note>まず牧場を開いてください。<a href="/setup" style={{ color: '#ffd84a' }}>はじめての 1 頭を迎える</a></Note></Shell>;
   }
   if (state.stage === 'legacy') {
     return <Shell><Note>この牧場は、無償の生産の対象ではありません。<a href="/stable/breed" style={{ color: '#ffd84a' }}>配合の画面へ</a></Note></Shell>;
@@ -190,7 +190,7 @@ export default function FirstFoalPage(): React.ReactElement {
   }
   if (state.stage === 'ready') {
     return <Shell>
-      <Note>最初の 1 頭の生産は終わっています。</Note>
+      <Note>はじめての 1 頭の生産は終わっています。</Note>
       <Panel><a href="/train" style={{ color: '#ffd84a', fontWeight: 800 }}>育成へ</a></Panel>
     </Shell>;
   }
@@ -217,7 +217,7 @@ export default function FirstFoalPage(): React.ReactElement {
      *    （★そのとき ★**この文面を持っていく**こと）。
      */
     if (!window.confirm(
-      `最初の 1 頭を生産します\n母: ${dam.name}\n父: ${sire.name}\n\n`
+      `はじめての 1 頭を生産します\n母: ${dam.name}\n父: ${sire.name}\n\n`
       + 'この組み合わせは選び直せません。無償の生産は 1 回だけです。この内容でよろしいですか？',
     )) return;
     setBusy(true);

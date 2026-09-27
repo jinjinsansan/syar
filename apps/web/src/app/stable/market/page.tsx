@@ -97,12 +97,12 @@ export default function MarketPage(): React.ReactElement {
   return (
     <div style={{ padding: '0 0 28px' }}>
       <div className="a-band" style={{ height: 52, padding: '0 16px' }}>
-        <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>馬を迎える</span>
+        <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>馬市場</span>
       </div>
 
       {needsLogin && (
         <p role="status" style={{ padding: '14px 16px', fontSize: 12.5, fontWeight: 900, color: 'var(--a-ink-2)' }}>
-          馬を迎えるには、<a href="/login">ログイン</a>してください。
+          馬市場を見るには、<a href="/login">ログイン</a>してください。
         </p>
       )}
       {loadError !== null && (
@@ -180,7 +180,7 @@ export default function MarketPage(): React.ReactElement {
       {chosen !== null && (
         <div className="a-panel" style={{ margin: '16px 16px 0', borderWidth: 3 }}>
           <div className="a-band" style={{ height: 38, padding: '0 14px' }}>
-            <span style={{ fontSize: 14, fontWeight: 900 }}>迎える確認</span>
+            <span style={{ fontSize: 14, fontWeight: 900 }}>確認</span>
           </div>
           <div style={{ padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

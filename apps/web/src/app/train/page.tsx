@@ -118,7 +118,7 @@ export default function TrainPage(): React.ReactElement {
     <Backdrop /><TopBar title="育成モード" paused={paused} onToggle={toggle} /><RaceStrip />
     <div role={error ? 'alert' : 'status'} style={{ position: 'relative', padding: 20 }}>
       {loading ? '厩舎を読み込み中…' : error ?? 'まだ持ち馬がいません。'}
-      <div style={{ display: 'flex', gap: 12, marginTop: 12 }}><a href="/login">ログイン</a><a href="/setup">最初の1頭を迎える</a><button type="button" onClick={refresh}>再読み込み</button></div>
+      <div style={{ display: 'flex', gap: 12, marginTop: 12 }}><a href="/login">ログイン</a><a href="/setup">はじめての 1 頭を迎える</a><button type="button" onClick={refresh}>再読み込み</button></div>
     </div>
   </div>;
   const cond = conditionView(horse.condition);

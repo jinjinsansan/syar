@@ -90,7 +90,7 @@ function readMarketError(message: string): string {
   if (/EP が不足|insufficient/i.test(message)) return 'EP が足りません';
   if (/所有上限|OWNERSHIP|limit/i.test(message)) return '持てる頭数の上限です';
   if (/出品されていない|not listed|active/i.test(message)) return 'この馬はもう出品されていません';
-  if (/自分の馬|own/i.test(message)) return '自分の馬は買えません';
+  if (/自分の馬|own/i.test(message)) return '自分の馬は迎えられません';
   if (/setup|未セットアップ/i.test(message)) return '先に厩舎の設定を済ませてください';
   return 'いま手続きできませんでした（しばらくしてからお試しください）';
 }

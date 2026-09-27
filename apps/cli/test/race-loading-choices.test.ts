@@ -26,9 +26,13 @@ describe('★/race の用意中', () => {
     expect(PANEL.length).toBeGreaterThan(100);
   });
 
-  it('🔴 ① ★経過秒を出す', () => {
-    expect(PANEL).toMatch(/経過 \{loadingSeconds\} 秒/);
+  it('🔴 ① ★経過秒は ★遅いときだけ（★8 秒から・★3 択と同じ条件）', () => {
     expect(PANEL).toMatch(/<progress /);
+    /** ★8 秒より前は出さない（★オーナーが f13a07d で外した表示）・★8 秒以降は出す */
+    expect(PANEL, '★経過秒を 3 択と同じ秒で出していない').toMatch(/\{loadingSeconds >= LOADING_CHOICES_SEC && <span[^>]*>経過 \{loadingSeconds\} 秒<\/span>\}/);
+    /** ★無条件の経過秒が ★残っていない（★常に出る形に戻らない） */
+    const all = PANEL.match(/経過 \{loadingSeconds\} 秒/g) ?? [];
+    expect(all.length, '★経過秒が 2 か所ある（★条件の無いものが残っている）').toBe(1);
   });
 
   it('🔴 ① ★選択肢は ★8〜10 秒で出る', () => {
