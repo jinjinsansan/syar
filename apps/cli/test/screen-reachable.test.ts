@@ -53,7 +53,6 @@ const ENTRANCE_MISSING: Readonly<Record<string, string>> = {
  */
 const NO_ENTRANCE: Readonly<Record<string, string>> = {
   '/': '★玄関そのもの（★LP）。★リンクされる側',
-  '/lp-preview': '★LP の下見。★開発側が URL を打って見るためのもの',
   '/design-check': '★焼いた絵とデザイナーのカードの一覧。★オーナーと開発側が URL を打って見る',
   '/design-preview/odds': '★意匠の下見（★同上）',
   '/rig-lab': '★素材の実験台。★製品の導線に載せない',
@@ -61,15 +60,7 @@ const NO_ENTRANCE: Readonly<Record<string, string>> = {
   '/rig-lab/blender': '★同上',
   '/rig-lab/compare': '★同上',
   '/rig-lab/rig': '★同上',
-  '/art-lab': '★絵の実験台（★同上）',
-  '/camera': '★画角の実験台（★同上）',
-  '/course': '★コースの下見（★同上）',
   '/gait-review': '★歩様の見比べ（★同上）',
-  '/race-quality-lab': '★映像の品質の実験台（★同上）',
-  '/race-world-lab': '★世界の見え方の実験台（★同上）',
-  '/still': '★1 コマの書き出し（★診断）',
-  '/race-next': '★中継の次版の実験（★`?` で切り替えて見る）',
-  '/watch': '★観戦の実験台',
   '/reset-password': '★メールのリンクから来る（★画面にリンクは置かない）',
   '/forgot-password': '★`/login` から行く。★`/login` 側に在る',
 };
@@ -107,6 +98,18 @@ function corpus(): string {
 }
 
 const ALL = corpus();
+
+/**
+ * ★**本番で塞いだ開発用の画面**（★`apps/web/src/middleware.ts` の `DEV_ONLY_ROUTES` を ★原文から読む・★写しを持たない）。
+ *   ★2026-09-27: ★裁定「オーナー決裁」③ (e)「★塞いだ画面は簿の対象から落とす（★入口が要らない理由が『本番に無い』に変わる）」。
+ */
+const GATED: readonly string[] = (() => {
+  const src = readFileSync(path.join(SRC, 'middleware.ts'), 'utf8');
+  const m = src.match(/export const DEV_ONLY_ROUTES[^=]*=\s*\[([\s\S]*?)\];/);
+  if (m === null) throw new Error('★middleware.ts の DEV_ONLY_ROUTES が読めない（★走査が壊れている）');
+  return [...m[1]!.matchAll(/'([^']+)'/g)].map((x) => x[1]!);
+})();
+const isGated = (r: string): boolean => GATED.some((g) => r === g || r.startsWith(`${g}/`));
 /** ★`href="/x"` / `href={'/x'}` / `href={\`/x\`}` を拾う（★`OWN_HEADER` のような裸の一覧は数えない） */
 const linked = new Set(
   [...ALL.matchAll(/href=(?:"([^"]+)"|\{'([^']+)'\}|\{`([^`]+)`\})/g)]
@@ -123,6 +126,8 @@ describe('🔴 ★画面に辿り着く道が在る', () => {
   it('🔴 ★どこからもリンクされていない画面が無い（★在るなら簿に理由を書く）', () => {
     const orphans = routes()
       .filter((r) => !(r in NO_ENTRANCE) && !(r in ENTRANCE_MISSING))
+      /** ★本番で塞いだ開発用の画面は ★「本番に無い」ので対象外（★2026-09-27・裁定「オーナー決裁」③ (e)） */
+      .filter((r) => !isGated(r))
       .filter((r) => !linked.has(r));
     expect(
       orphans,

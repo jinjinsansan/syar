@@ -1622,6 +1622,21 @@ export const OPEN_FINDINGS = [
     stillOpen: (h) => h.grepCount('const BET_PAGE_CLOSED = true;', { exclude: /open-findings\.mjs$/ }) > 0,
   },
   {
+    id: 'DESIGN-CHECK-GATE-NEEDS-SERVER-SESSION',
+    what: '⚠️ ★`/design-check` は ★本番で ★まだ誰でも開けます（★2026-09-27・裁定「オーナー決裁」③ (d) が満たせない）',
+    why: '✔ ★開発用の 10 本は ★`apps/web/src/middleware.ts` で ★本番では 404 にしました（★`next start` で確認）。'
+      + '🔴 ★`/design-check` だけは ★条件 (d)「★ログイン＋許された利用者（★env の id の一覧）を ★サーバー側で判定」が要ります。'
+      + '★しかし ★この作品のログインは ★ブラウザの保存領域（★`lib/supabase.ts` の `authClient` が `persistSession`）に在り、'
+      + '★**サーバーは誰がログインしているかを知りません**（★cookie を使っていない）。'
+      + '★NODE_ENV だけで塞ぐと ★オーナーが本番で見られなくなる（★裁定が不可とした形）。'
+      + '★選択肢: ★(i) ★`@supabase/ssr` で ★cookie のセッションに替える（★認証の作りの変更・D-113） '
+      + '★(ii) ★ブラウザが持つ access token を ★サーバーの口へ送って確かめてから中身を返す（★最初の応答では判定できない → ★(c) の「存在を明かさない」が崩れる） '
+      + '★(iii) ★当面 ★本番でも塞ぐ（★オーナーは開発サーバーで見る）。'
+      + '--- ✅ ★**消す条件** --- ★レビュー側・オーナーが ★どれにするか決めて、★その形で入れた日。',
+    owner: 'review',
+    until: '2026-10-31',
+  },
+  {
     id: 'EMPTY-VIEW-EVAL-UNPROVEN-ON-REAL-PG',
     what: '⚠️ ★「★0 行のビューは ★列の式（関数）を評価しない」を ★**本物の PostgreSQL では確かめていません**（★2026-09-27・裁定 `REVIEW_INC_PROD_PERMISSION_20260927.md` §5-2）',
     why: '✔ ★`tools/verify-user-eyes.mjs` は ★0 行のビューが呼ぶ関数を ★直に呼んで確かめます（★部品 `tools/lib/user-eyes.mjs`）。'
