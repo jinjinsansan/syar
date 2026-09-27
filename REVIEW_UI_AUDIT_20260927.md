@@ -1,0 +1,83 @@
+# 【STAR】UI 総点検（オーナー指示・8 問）— 2026-09-27
+
+- 案件: **STAR**（馬物語）／レビュー側 Claude
+- 指示: オーナー「今一度 UI を徹底的に調査してください」（8 問）
+- やり方: ★**読むだけ**（★開発側が同じツリーで作業中なので 1 バイトも書いていない）。★5 系統を並行で調査し、★P0 は ★**レビュー側が原文で再確認した**
+- ⚠️ ★**画面を開いていない**ので、見え方と実測の遅れは ★「未確認」と明記する
+
+## 🔴 P0（★本番で利用者に嘘をついている・すぐ止める）
+
+### P0-A `/races/[id]/bet` — ★**「動きません」と書きながら EP を引く**
+✔ [CODE] ★レビュー側が再確認した:
+- `app/races/[id]/bet/page.tsx:205` ★**「※ デモデータ（投票はサーバー RPC に接続するまで動きません）」**
+- ★ところが `:105` は `placeBet(...)` を呼び、★`lib/bet-screen.ts:226` は ★**`rpc('place_bet')`**。★**本当に賭けが成立し EP が引かれる**
+- 🔴 ★★**嘘の向きが最悪**: ★「動かない」と読んだ人が試して、★**実際に EP を失う**
+- 🔴 `:55` ★**`loadBetScreen(null)`** → `lib/bet-screen.ts:126-128` は ★**「いちばん近い `scheduled`」**を読む。★URL の `[id]` は ★**無視される** → ★X のレースの「投票する」を押して ★**Y のレースの出馬表が出て、Y に投票される**
+- 🔴 見本のまま出ている数字: ★`:319` / `:308` 1 回の上限 **5,000**（`game-demo.ts:131`）・★`:372-378` みんなの投票状況（`:126`）
+- ★入口は生きている: `app/races/[id]/page.tsx:105` の金ボタン「投票する」
+
+**決定（すぐ）**: ★**入口を閉じる**（`races/[id]/page.tsx:105` のボタンを外す）。★オーナー待ち ⑤「`bet` を残すか `/vote` に畳むか」の答えを待たずに ★**先に閉じる**（★閉じるのは戻せる・★EP が消えるのは戻せない）。★そのうえで畳むか直すかを決める。
+⚠️ ★**画面を消すのではなく入口を閉じる**（★消すと `/vote` との重複の経緯が消える）。★閉じた理由を画面に 1 行（★「この口はいま使えません」）。
+
+### P0-B 自分の馬の画面が、★**見本の個性・ピーク・主戦騎手**を出す（★スマホのみ）
+- `app/stable/[horseId]/horse-detail-view.tsx:124` が ★`.show-narrow`（★`globals.css:81-84` ＝ **900px 以下**）で `HorseResume` を描く
+- ✔ `components/horse-resume.tsx:54-58` ★`innateTraitsOf(DEMO_INNATE_INPUT)`・`learnedTraitsOf(careerInputOf(DEMO_CAREER_RUNS))`・`DEMO_TOP_JOCKEY`・`:86` ★`生涯のピーク {DEMO_PEAK_BAND_LABEL}帯`
+- 🔴 ★**条件分岐が無い** → ★**スマホで自分の馬を開いた人は、必ず架空の個性と架空の主戦騎手を見る**。★`discovery` だけ実データに直っており（`:76`）、★**他が取り残された**
+- ★PC 幅では出ない ＝ ★**オーナーが PC で見ていたら気づけない形**
+
+**決定**: ★①実データを渡せる欄（`discovery` と同じ形）は渡す ②★**渡せない欄は出さない**（★空欄でよい・★見本で埋めない）③網 1 本: ★**`DEMO_*` を利用者の画面が import していないこと**（★対照つき）。★④`show-narrow` のように ★**幅で出る/出ないが変わる部品は、狭い幅でも検査する**
+
+### P0-C 開発用の画面 ★**11 本が本番で無防備**
+- ✔ 関門があるのは `design-preview/odds`・`gait-review`・`rig-lab/*`・素材 API のみ（★`notFound()` / `NODE_ENV`）
+- 🔴 ★**関門ゼロ**: `/art-lab` `/camera` `/course` `/design-check` `/race-next` `/race-quality-lab` `/race-world-lab` `/still` `/watch` `/lp-preview` `/lp-arcade`。★`middleware.ts` も無い
+- ★`/design-check` は自分で「開発の確認用」と書いてある（★意図と実装の食い違い）
+- **決定**: ★オーナー待ち ④ の答え（★A を推奨済み）を ★**ここで実行に移す**。★`NODE_ENV` ではなく ★**本番でも開けるが関門がある形**にするか、★`notFound()` で塞ぐかは ★オーナーの ④ の答え次第。★どちらにせよ ★**いまの「誰でも開ける」は残さない**
+
+### P0-D `0090`（権限）未適用 — ★既出（`REVIEW_INC_PROD_PERMISSION_20260927.md`）
+- ✔ 影響の広さが分かった: ★`my_horses` は `lib/stable-repo.ts:135`・`entry-screen.ts:218`・`entry-repo.ts:186`・`setup.ts:144`・`training/page.tsx:61` から ★**`/home` `/mypage` `/stable` `/train` `/training` `/entry` `/earn` `/records` `/stable/*` のほぼ全部**に届く
+- → ★★**0090 未適用の間は、ログイン後のほぼ全画面が影響下**。★これが最優先で当たるべき理由
+
+## 🔴 P1（★遊びが成立していない・導線が切れている）
+
+1. **`/train` は読めるが書けない。★書ける `/training` はメニューに無い**
+   - `app/train/page.tsx` に ★`rpc(` が **1 つも無く**、`:295` は ★「調教指示は準備中」
+   - ★`set_training_order` を呼ぶのは ★旧 `/training`（`:215`）だけ。★ナビの「育成」は ★`/train` を指す（`nav.tsx:21`）
+   - → ★★**育成の書き口が、メニューから辿れない**（★D-119 の画面版）。★★これは「遊びの中心」なので P1 の筆頭
+   - ⚠️ ★09-25 に私が「`/training` を `/train` に転送せよ」と言ったのを開発側が止めた件と ★**同じ場所**。★正しい順は ★**`/train` に書き口を付ける**（★`/training` を消すのは最後）
+2. **出走の取消（D-123）が画面から使えない** — ★`request_entry_scratch` / `my_entry_scratch`（`0079`）を ★`apps/web/src` が ★**1 度も呼ばない**。★★**09-25 に決めたものが、決めただけ**
+3. **`/entry` の親密度が見本** — `app/entry/page.tsx:346` ★`rides={DEMO_JOCKEY_RIDES}` → ★騎乗回数と親密度が架空
+4. **`/records` の「通算」が画面側の集計 ＋ `.limit(100)`** — `records-view.tsx:138-143` と `lib/records-screen.ts:154-156`。★101 行目以降を持つ人の通算は ★**黙って少なく出る**。★`horse_total_prize_pp`（`0071`）が在るのに `:236` は「源が未確定」と書いている
+5. **小窓は「レースそのもの」ではない**（オーナーの③）
+   - `components/uma/race-strip.tsx` に ★`canvas`・`drawImage`・スプライトが ★**1 つも無い**。★`:175` は ★**枠番の数字を `left:%` で動かす span**。★走路は CSS の 2px 線
+   - 🔴 compact（★共有シェル経由の全面・`/vote`・`/train`・`/odds`）は ★**22×16px・レーン 1 本・文字サイズ 0**（`uma-theme.css:126-131`）＝ ★**実質 見えない**
+   - ★出ている時間は ★**6 分のうち 45 秒**（`race-replay.ts:71-72` ★発走 +75 秒から 45 秒）。★残りは文字帯
+   - ★**小窓 → 全画面の実レース再生への導線が無い**（★小窓は `/races/{id}` の文字ページへ）。★`/watch-race` の「レースを見る」は ★**ID なし ＝ デモ**（`watch-race/page.tsx:38`）
+6. **小窓が全ページに無い**（オーナーの④） — ★`layout.tsx` に無く、★共有シェル経由は実質 6 面。★残りは ★**各ページが個別に貼る**（★貼り忘れが構造的に起きる）。★無い面: `/`・`/race`・`/login`・`/signup`・`/setup`・`/stable/roles|breed|name|foal` ほか
+7. **芝が全ページではない**（オーナーの⑤）— ★意匠が **4 世代 同居**
+   - 芝＝`uma-parts.tsx:359` の `Backdrop`（★**任意の部品**。★レイアウトの既定ではない）。★呼ぶのは 17 面
+   - 🔴 芝が無い利用者の面（**14**）: ★`/stable/roles|breed|name|foal`（★紺ベタ `#0a2340`）・★`/stable`・`/stable/market`・`/stable/retired`・`/stable/[horseId]`・`/training`・`/races/[id]`・`/races/[id]/bet`（★クリーム `#f8f7ef`）・`/race`・`/odds`（在庫なし時）・`/lp-*`
+   - ★★**いま作ったばかりの中心導線（配合・命名・仔馬・役割）が、芝ではない**
+8. **モバイルの安全網が主要 9 面に効いていない**（オーナーの⑥）
+   - ★**viewport の宣言が 0 件**（`export const viewport` も meta も無い）
+   - ★固定幅とタップ 44px の是正 CSS は ★**`main` 配下限定**（`globals.css:186-223`・`:1084-1108`）。★ところが ★`/home` `/howto` `/earn` `/exchange` `/watch-race` `/train` `/login` `/signup` `/setup` の **9 面に `<main>` が無い** → ★**安全網の外**
+   - ★文字は 8〜11px の指定が多数（★共有部品の既定にも 8px・9px）
+9. **D-058「整数倍のみ」が `/race` で守られていない** — `race/page.tsx:6766-6769`（`width:100%`）・`:6124-6127`（`Math.min(vw/W, vh/H)`・丸めなし）。★`/still:185-186` だけが守っている
+10. **入口の無い画面 2 件 ／ 幅でしか出ない入口 1 件** — ★`/odds`・`/stable/market`（★台帳 `ENTRANCE_MISSING` と一致）。★`/stable/retired` は ★`show-narrow` の中だけ（★**PC では入口が無い**）
+11. **到達性の検査に穴 3 つ** — ★①開発画面からのリンクでも「到達可能」と数える ★②**推移的な到達を見ない**（★`/stable` は `/stable/market`〔孤児〕経由でしか届かないのに緑） ★③条件付き描画のリンクを到達と数える
+
+## ⚠️ P2（★誠実さの問題・小さい）
+- **失敗を「空」に落とす**: `stable/roles/page.tsx:125` `.catch(() => setEvents([]))` → `:271`「まだ記録がありません。」／`stable/retired/page.tsx:155` 同型 → ★**読めなかったのに「無い」と言う**。★他の画面（`/stable`・`/stable/market`・`/entry`・`/records`・`/vote`）は原文を出しており誠実
+- **`?demo=1` は利用者も打てる**（`odds/[id]/page.tsx:39`）。★「見本」と明記されているので誤認は低い
+- `lib/game-demo.ts` の `DEMO_ENTRY_RACES` 等は ★**どの画面も import していない**（★死んだ定義 ＝ 消せる）
+
+## ✅ 守られていたこと（★ここは崩さない）
+- ★**`Math.random()` が利用者の経路に 1 件も無い**。★`Date.now()` は表示だけ（★ゲーム状態に影響しない）
+- ★**client が申告した金額を受ける API が無い**（★書き込みは Supabase RPC 直・`place_bet` は上限・残高・オッズをサーバーで検証）
+- ★**ホバー依存が 0 件**（`onMouseEnter` 等が 1 つも無い）
+- ★API は 2 本だけ（`healthz` は env のみ・`rig-lab` 素材は本番 404 ＋ パストラバーサル防御）
+
+## ★未確認（★画面を開かないと言えない）
+- ⑥ 実機での見え方（★22×16px の小窓が知覚できるか・8px の文字が読めるか）
+- ⑦ 実測の遅れ（★確定が 60 秒の周に間に合っているか。★間に合わなければ ★**その回は一度も出ない**）
+- P0-A が実際に別のレースを出すか（★原文からはそうなる）
+- `/stable/[horseId]` のスマホ実表示
