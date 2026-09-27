@@ -36,6 +36,7 @@ import { Backdrop, BigButton, TopBar, useMotionPaused } from '../../components/u
 import { RaceStrip } from '../../components/uma/race-strip';
 import { useStableView } from '../../components/uma/use-stable-view';
 import { TRAINING_MENUS } from '../../lib/game-demo';
+import { sendTrainingOrder } from '../../lib/training-order';
 import { conditionView, sortStable, trainFaceOf, type TrainFace } from '../../lib/stable';
 import { coatOfHorseId, coatCssFilter } from '@star/render';
 
@@ -90,6 +91,28 @@ export default function TrainPage(): React.ReactElement {
     setRunning(true);
     timer.current = setTimeout(() => { setRunning(false); }, RUN_MS);
   };
+  /**
+   * 🔴 ★**調教の指示を送る**（★2026-09-27・裁定 `REVIEW_UI_AUDIT_20260927.md` P1-1）。
+   *   ★それまで この画面は ★1 つも送れず（★「調教指示は準備中」）、★ナビの「育成」を押した人が ★何もできませんでした。
+   *   ★送る処理は ★`lib/training-order.ts` 1 か所（★旧 `/training` と共有）。★EP は ★ここでは減りません（★調教したときに減る）。
+   *   ★失敗は ★サーバーの文をそのまま出します（★黙って成功に見せない）。
+   */
+  const [sending, setSending] = useState(false);
+  const [orderMessage, setOrderMessage] = useState<{ readonly ok: boolean; readonly text: string } | null>(null);
+  const instruct = async (horseId: string, horseName: string, menuName: string): Promise<void> => {
+    if (sending) return;
+    setSending(true);
+    setOrderMessage(null);
+    try {
+      await sendTrainingOrder(horseId, menuId);
+      setOrderMessage({ ok: true, text: `${horseName} に「${menuName}」を指示しました（参加ポイントは 調教したときに減ります）` });
+      run();
+    } catch (e) {
+      setOrderMessage({ ok: false, text: `指示を保存できませんでした: ${e instanceof Error ? e.message : String(e)}` });
+    } finally {
+      setSending(false);
+    }
+  };
 
   if (horse === null) return <div data-theme="uma" style={{ minHeight: '100dvh', background: 'var(--u-navy)' }}>
     <Backdrop /><TopBar title="育成モード" paused={paused} onToggle={toggle} /><RaceStrip compact />
@@ -120,9 +143,16 @@ export default function TrainPage(): React.ReactElement {
       <Backdrop />
       <TopBar title="育成モード" paused={paused} onToggle={toggle} />
       <RaceStrip compact />
+      {/* ★事実どおりに言う（★2026-09-27 まで「保存できません」と書いていた・P1-1 で送れるようにした） */}
       <div role="status" style={{ position: 'relative', padding: '6px 14px', color: 'var(--u-gold)', fontSize: 12 }}>
-        馬の状態は実データです。調教指示の適用は準備中のため、この画面からは保存できません。
+        馬の状態は実データです。指示はその馬の次の調教に使われ、参加ポイントは調教したときに減ります。
       </div>
+      {orderMessage !== null && (
+        <div role={orderMessage.ok ? 'status' : 'alert'} style={{
+          position: 'relative', margin: '6px 14px 0', padding: '8px 12px', borderRadius: 10, fontSize: 13,
+          border: `2px solid ${orderMessage.ok ? 'var(--u-ep)' : 'var(--u-red)'}`, background: 'var(--u-panel-strong)',
+        }}>{orderMessage.text}</div>
+      )}
 
       <div style={{
         position: 'relative', flex: '1 1 auto', minHeight: 0, display: 'flex', flexWrap: 'wrap',
@@ -292,7 +322,13 @@ export default function TrainPage(): React.ReactElement {
         position: 'relative', flex: '0 0 auto', display: 'flex', flexWrap: 'wrap', gap: 10,
         padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
-        <BigButton tone="disabled" label="調教指示は準備中" sub="現在、この画面からの指示は保存されません" grow="1.4 1 210px" />
+        <BigButton
+          tone={sending ? 'disabled' : 'gold'}
+          label={sending ? '送っています…' : `「${spec.name}」を指示する`}
+          sub={`${horse.name}・消費 ${spec.ep} EP（調教したときに）`}
+          {...(sending ? {} : { onClick: () => { void instruct(horse.id, horse.name, spec.name); } })}
+          grow="1.4 1 210px"
+        />
         <BigButton tone="ivory" label="ダッシュボード" sub="いつでも戻れます" href="/home" grow="1 1 130px" />
       </div>
     </div>

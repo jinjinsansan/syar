@@ -56,10 +56,22 @@ describe('🔴 ★調教の指示: 書く鍵と読む鍵', () => {
     expect(rpc, '★過ぎた週を通しています').toMatch(/p_week\s*<\s*v_processed/);
   });
 
+  /**
+   * ⚠️ ★2026-09-27: ★送る処理を ★`lib/training-order.ts` 1 か所へ移しました（★`/train` と `/training` が共有・P1-1）。
+   *    ★見る先を ★部品に替え、★両方の画面が ★その部品だけを通ることも見ます（★写しを持たない）。
+   */
   it('★画面も、★その馬の `last_processed_week` を書く（★世界の週ではない）', () => {
-    const page = read('apps/web/src/app/training/page.tsx');
-    expect(page, '★世界の週を書いている').not.toContain('currentWeekForOrder');
-    expect(page, '★馬の週を読んでいない').toMatch(/select\('last_processed_week'\)/);
+    const lib = read('apps/web/src/lib/training-order.ts');
+    expect(lib, '★世界の週を書いている').not.toContain('currentWeekForOrder');
+    expect(lib, '★馬の週を読んでいない').toMatch(/select\('last_processed_week'\)/);
+    expect(lib, '★送っていない').toMatch(/rpc\('set_training_order'/);
+    /** ★註記の中の語で判定しない */
+    const code = (s: string): string => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    for (const page of ['apps/web/src/app/train/page.tsx', 'apps/web/src/app/training/page.tsx']) {
+      const src = code(read(page));
+      expect(src, `🔴 ★${page} が 送る部品を通っていない（★育成の書き口が消える）`).toMatch(/sendTrainingOrder\(/);
+      expect(src, `★${page} に 送る処理の写しが残っている`).not.toMatch(/rpc\('set_training_order'/);
+    }
   });
 
   it('★献立の名前は、★DB 側でも閉じている（★任意の文字列を書かせない）', () => {

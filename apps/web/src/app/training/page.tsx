@@ -15,7 +15,7 @@ import {
 } from '@star/training';
 import { sortStable, conditionView, DEMO_HORSES, type StableHorse } from '../../lib/stable';
 import { supabaseStableRepo, SignInRequiredError } from '../../lib/stable-repo';
-import { authClient } from '../../lib/supabase';
+import { sendTrainingOrder } from '../../lib/training-order';
 import { TRAINING_MENUS, trainingMenusOfView, DEMO_TRAINING_ABILITY, DEFAULT_TRAINING_ABILITY, demoFatigueNote } from '../../lib/game-demo';
 import { Capsule, ClassChip, FatigueBar, PageTitle, Pill, StatBar } from '../../components/ui';
 
@@ -48,25 +48,7 @@ function WeekPill({ kind }: { readonly kind: 'todo' | 'done' | 'rest' }): React.
   return <Pill tone="grey">休養中</Pill>;
 }
 
-/**
- * 🔴 ★**指示する週は、★その馬の `last_processed_week`**（★2026-09-21 に直しました）。
- *
- *   ⚠️ ★最初は ★**世界の週**（`world_state_public.game_week`）を書いていました。
- *     ★しかしワーカーが読むのは ★**その馬の `last_processed_week` の注文**です
- *     （★`training-runner.ts:306`）。★★馬が遅れていれば、★世界の週の注文は読まれません。
- *   → ★★**読む側と同じ鍵を書きます。** ★画面で週を計算しません。
- */
-async function weekForOrder(horseId: string): Promise<number> {
-  const { data, error } = await authClient()
-    .from('my_horses').select('last_processed_week').eq('id', horseId).limit(1);
-  if (error !== null) throw new Error(`my_horses を読めませんでした: ${error.message}`);
-  const w = data?.[0]?.last_processed_week;
-  if (w === null || w === undefined) {
-    // ★週を持っていない馬に指示は書けません（★既定値で埋めない）
-    throw new Error('この馬はまだ週を持っていません（last_processed_week が空）');
-  }
-  return Number(w);
-}
+/** ★指示を送る処理と「どの週に書くか」の理由は ★`lib/training-order.ts` 1 か所（★2026-09-27・`/train` と共有・D-052） */
 
 export default function TrainingPage(): React.ReactElement {
   /**
@@ -211,11 +193,8 @@ export default function TrainingPage(): React.ReactElement {
     if (horse === null || menu === null || sending) return;
     setSending(true);
     try {
-      const week = await weekForOrder(horse.id);
-      const { error } = await authClient().rpc('set_training_order', {
-        p_horse_id: horse.id, p_week: week, p_menu: menu.id,
-      });
-      if (error !== null) throw new Error(error.message);
+      /** ★送る処理は ★`lib/training-order.ts` 1 か所（★`/train` と共有・★`rpc('set_training_order')` はその中） */
+      await sendTrainingOrder(horse.id, menu.id);
       setSent(horse.id);
     } catch (e) {
       // 🔴 ★黙って成功に見せません
