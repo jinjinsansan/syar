@@ -10,9 +10,11 @@
  *   (c) ★通らない人には ★**存在しない URL と同じ 404**（★存在を明かさない）
  *   (e) ★塞いだ画面は ★「本番に無い」ので ★入口の簿の対象から落ちる
  *
- * ⚠️ ★`/design-check` は ★**ここに入れていません**（★裁定の条件 (d)「★ログイン＋許された利用者」）。
- *    ★この作品のログインは ★ブラウザの保存領域に在り（★`lib/supabase.ts` の `persistSession`）、
- *    ★**サーバーは誰がログインしているかを知りません** → ★サーバー側で判定できない（★照会中・簿 `DESIGN-CHECK-GATE-NEEDS-SERVER-SESSION`）。
+ * ⚠️ ★`/design-check` も ★**同じ規則で塞ぎます**（★2026-09-27・裁定 追記 `41b34b3`・案 (iii)・★例外を作らない）。
+ *    ★条件 (d)「★ログイン＋許された利用者」は ★サーバーが誰がログインしているかを知らないので満たせません
+ *    （★ログインは ブラウザの保存領域・`lib/supabase.ts` の `persistSession`）。
+ *    ★オーナーは ★手元の開発サーバー（★`.env.local` は本番を向いている）で見ます。
+ *    ★簿 `DESIGN-CHECK-GATE-NEEDS-SERVER-SESSION`（★cookie のセッションが別の理由で入った日に (d) を作り直す）。
  *
  * ⚠️ ★`matcher` は ★**書いた文字どおり**でなければ働きません（★Next.js が静的に読むため・★変数から組めない）。
  *    ★一覧は ★網 `apps/cli/test/dev-routes-gated.test.ts` が ★`DEV_ONLY_ROUTES` と突き合わせます。
@@ -23,7 +25,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 /** ★本番で塞ぐ開発用の画面（★網が `matcher` と 1 対 1 で見る） */
 export const DEV_ONLY_ROUTES: readonly string[] = [
   '/art-lab', '/camera', '/course', '/race-next', '/race-quality-lab', '/race-world-lab',
-  '/still', '/watch', '/lp-preview', '/lp-arcade',
+  '/still', '/watch', '/lp-preview', '/lp-arcade', '/design-check',
 ];
 
 export function middleware(request: NextRequest): NextResponse {
@@ -36,5 +38,6 @@ export const config = {
   matcher: [
     '/art-lab/:path*', '/camera/:path*', '/course/:path*', '/race-next/:path*', '/race-quality-lab/:path*',
     '/race-world-lab/:path*', '/still/:path*', '/watch/:path*', '/lp-preview/:path*', '/lp-arcade/:path*',
+    '/design-check/:path*',
   ],
 };

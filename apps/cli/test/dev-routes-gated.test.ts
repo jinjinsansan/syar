@@ -5,7 +5,7 @@
  *   ① ★`middleware.ts` の `DEV_ONLY_ROUTES` と ★`config.matcher` が ★1 対 1（★`matcher` は文字どおりでないと働かない）
  *   ② ★判定は ★サーバー側（★middleware）で、★本番では ★誰も通さない（★秘密の URL・クエリで通す口が無い）
  *   ③ ★利用者の観戦の入口 `/watch-race` に ★関門が掛からない（★`/watch` と前方一致で取り違えない）
- *   ④ ★`/design-check` は ★まだ入れていない（★条件 (d) はサーバーがログインを知る口が要る・★照会中）
+ *   ④ ★`/design-check` も塞ぐ（★案 (iii)・★条件 (d) はサーバーがログインを知る口が要るので ★当面は例外なく塞ぐ）
  *
  * ⚠️ ★実際に 404 が返ることは ★`next start` で確かめました（★2026-09-27・塞いだ 5 本 404／`/watch-race`・`/`・`/home` 200・
  *    ★404 の中身は存在しない URL と同じ大きさ）。★この網は ★原文の側を釘付けします。
@@ -53,7 +53,9 @@ describe('🔴 ★開発用の画面は 本番で塞がれている', () => {
     expect(MATCHER.some((m) => hits(m, '/watch/x')), '★対照: /watch の下も塞がれている').toBe(true);
   });
 
-  it('⚠️ ④ ★/design-check はまだ入れていない（★照会中・★入れるならこの検査を書き換える）', () => {
-    expect(ROUTES).not.toContain('/design-check');
+  /** ★2026-09-27（裁定 追記 `41b34b3`・案 (iii)）: ★`/design-check` も ★同じ規則で塞ぐ（★例外を作らない） */
+  it('🔴 ④ ★/design-check も塞いでいる（★例外を作らない）', () => {
+    expect(ROUTES).toContain('/design-check');
+    expect(ROUTES.length, '★開発用 11 本').toBe(11);
   });
 });

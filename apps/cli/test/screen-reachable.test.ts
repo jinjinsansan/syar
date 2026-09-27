@@ -53,7 +53,6 @@ const ENTRANCE_MISSING: Readonly<Record<string, string>> = {
  */
 const NO_ENTRANCE: Readonly<Record<string, string>> = {
   '/': '★玄関そのもの（★LP）。★リンクされる側',
-  '/design-check': '★焼いた絵とデザイナーのカードの一覧。★オーナーと開発側が URL を打って見る',
   '/design-preview/odds': '★意匠の下見（★同上）',
   '/rig-lab': '★素材の実験台。★製品の導線に載せない',
   '/rig-lab/sprite': '★同上',
