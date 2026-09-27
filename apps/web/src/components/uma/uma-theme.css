@@ -177,6 +177,15 @@
   [data-theme='uma'] .u-race-replay-overlay { padding-left: max(24px, env(safe-area-inset-left)); padding-right: max(24px, env(safe-area-inset-right)); }
   [data-theme='uma'] .u-race-replay-overlay .u-race-replay { max-width: 960px; margin: auto; }
 }
+/*
+  ★**携帯を横にしたとき**（★③ 段 A・2026-09-27）: ★走行で画面を埋めます（★説明文は隠し、★一覧は下へ送る）。
+  ★高さの低い横向き（★500px 以下）＝ ★携帯の横持ちだけ。★PC の横長の窓には効きません。
+*/
+@media (orientation: landscape) and (max-height: 500px) {
+  [data-theme='uma'] .u-race-replay-overlay { gap: 8px; padding-top: max(8px, env(safe-area-inset-top)); }
+  [data-theme='uma'] .u-race-replay-overlay p { display: none; }
+  [data-theme='uma'] .u-race-replay-overlay .u-race-run-tall { height: calc(100dvh - 72px); flex: 0 0 auto; }
+}
 @media (prefers-reduced-motion: reduce) {
   [data-theme='uma'] .u-race-replay-marker { transition: none; }
 }

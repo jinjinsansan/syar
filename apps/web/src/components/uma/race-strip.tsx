@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, type ReplayRunner } from './race-replay';
@@ -127,6 +127,30 @@ export function RaceStrip(): React.ReactElement | null {
     return () => { media.removeEventListener('change', apply); };
   }, []);
 
+  /**
+   * ★**横にしたら その場で全画面**（★③ 段 A・裁定 §6・仕様 §4 の読み替え）。
+   *   ★同じ録画を ★同じ進行位置のまま ★全画面の重ね表示にします（★ページは移らない ＝ ★入力は残る）。
+   *   ★本編エンジンは起動しません（★段 B・簿 STRIP-LANDSCAPE-STAGE-B）。★音は付けません（★§5: 常設は常に無音）。
+   *   🔴 ★引き金は ★**触る端末で・縦 → 横に変わったとき**だけ（★条件 3）。★PC はいつも横なので ★自動では開きません（★「拡大」で開く）。
+   *   ★縦に戻したら ★自動で開いたものだけ閉じます（★手で開いたものは閉じない）。
+   */
+  const replayingRef = useRef(false);
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (size !== 'big' && size !== 'mini') return undefined;
+    const land = window.matchMedia('(orientation: landscape)');
+    const touch = window.matchMedia('(pointer: coarse)');
+    let wasLandscape = land.matches;
+    const onChange = (): void => {
+      const step = autoExpandOf(wasLandscape, land.matches, touch.matches);
+      wasLandscape = land.matches;
+      if (step === 'open' && replayingRef.current) { autoOpenedRef.current = true; setExpanded(true); }
+      if (step === 'close' && autoOpenedRef.current) { autoOpenedRef.current = false; setExpanded(false); }
+    };
+    land.addEventListener('change', onChange);
+    return () => { land.removeEventListener('change', onChange); };
+  }, [size]);
+
   useEffect(() => {
     if (!expanded) return;
     const onKey = (event: KeyboardEvent): void => { if (event.key === 'Escape') setExpanded(false); };
@@ -176,7 +200,8 @@ export function RaceStrip(): React.ReactElement | null {
     ? replayDisplayProgress(recent.scheduled_at, nowMs) : null;
   const replaying = progress !== null;
   useEffect(() => {
-    if (!replaying) setExpanded(false);
+    replayingRef.current = replaying;
+    if (!replaying) { setExpanded(false); autoOpenedRef.current = false; }
   }, [replaying]);
   const replayRows = replaying && recent && data ? data.runners.map((runner) => {
     const raceSec = (motionReduced ? 1 : progress) * Math.max(...data.runners.map((r) => r.finishSec));
@@ -228,8 +253,9 @@ export function RaceStrip(): React.ReactElement | null {
       {(replaying ? recent : next) && <a href={`/races/${encodeURIComponent((replaying ? recent : next)!.id)}`} aria-label={`${(replaying ? recent : next)!.name}の詳細を見る`}>詳細</a>}
       {expanded && replaying && recent && <div className="u-race-replay-overlay" role="dialog" aria-modal="true" aria-label={`${recent.name}のレース録画`}>
         <div className="u-race-replay-overlay-head">
-          <strong>{recent.name} · レース録画</strong>
-          <button type="button" onClick={() => { setExpanded(false); }} aria-label="レース録画を閉じる">閉じる</button>
+          {/* ★「本編」と名乗らない（★条件 1）。★録画・結果から再現 */}
+          <strong>{recent.name} · 録画・結果から再現</strong>
+          <button type="button" onClick={() => { autoOpenedRef.current = false; setExpanded(false); }} aria-label="レース録画を閉じる">閉じる</button>
         </div>
         <p>確定した走破タイムから途中位置を再現しています。ページを戻っても同じ進行位置で続きます。</p>
         <RaceRun rows={replayRows} distance={recent.distance} motionReduced={motionReduced} tall />
@@ -299,6 +325,15 @@ export function RaceRun({ rows, distance, motionReduced, tall = false }: {
       </span>;
     })}
   </div>;
+}
+
+/**
+ * ★横向きの自動拡大の判定（★③ 段 A・条件 3）。★**縦 → 横** かつ ★**触る端末**でだけ `open`、★**横 → 縦** で `close`。
+ *   ★PC（★触る端末でない）は ★どちらも返さない（★「拡大」を手で押す）。
+ */
+export function autoExpandOf(wasLandscape: boolean, isLandscape: boolean, coarsePointer: boolean): 'open' | 'close' | null {
+  if (!coarsePointer || wasLandscape === isLandscape) return null;
+  return isLandscape ? 'open' : 'close';
 }
 
 /** ★奥行きの列（★0 が奥・2 が手前）。★枠番で決めるので ★毎回同じ列に居ます */
