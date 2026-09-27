@@ -151,7 +151,7 @@ export function ReadError({ message, theme }: {
     return <p style={{ color: 'var(--bad)', padding: '24px 40px' }}>読み取りに失敗しました: {message}</p>;
   }
   return (
-    <div data-theme="uma" style={{
+    <div data-theme="uma" data-page-body style={{
       minHeight: '100dvh', background: 'var(--u-navy)', color: 'var(--u-ink-light)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
       fontFamily: "'M PLUS Rounded 1c', system-ui, sans-serif", fontWeight: 800,

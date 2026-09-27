@@ -1125,4 +1125,25 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   }
   /* ★ヘッダーのリンクも指で押せる大きさに（★ナビ以外の「STAR」「中継」も含む） */
   header a { min-height: 44px; display: inline-flex; align-items: center; }
+  /*
+   * ★**ボタンとして押させるリンク**にも 44px（★2026-09-27・レビュー側の線引き）。
+   *   ★本文の中の文字リンク（★inline）は ★要求しません。★ボタンの形のリンクは ★要求します。
+   *   ★測る側（`tools/verify-mobile-layout.mjs`）も ★同じ線で数えます。
+   *   ① ★旧い枠のナビ（★「交換」32px・「ホーム」42.5px・「レース」43px 幅 ＝ ★高さは 44 だが幅が足りない）
+   *   ② ★inline の style で ★ブロックに組んだリンク（★投票の「オッズの詳細」61.8x36px）
+   */
+  /*
+   * ⚠️ ★**綴りは 2 通り**（★2026-09-27 実測）: ★サーバーで組んだ HTML は `display:inline-block`、
+   *    ★**画面側で後から描いた要素**は ★ブラウザが `display: inline-block;`（★コロンの後に空白）に直します。
+   *    ★「オッズの詳細」は後者で、★空白の無い綴りだけでは ★**当たっていませんでした**（★計算値 min-height 0px）。
+   */
+  header a { min-width: 44px; justify-content: center; }
+  main a[style*="display:inline-block"], main a[style*="display: inline-block"],
+  main a[style*="display:block"], main a[style*="display: block"],
+  main a[style*="display:inline-flex"], main a[style*="display: inline-flex"],
+  main a[style*="display:flex"], main a[style*="display: flex"],
+  [data-page-body] a[style*="display:inline-block"], [data-page-body] a[style*="display: inline-block"],
+  [data-page-body] a[style*="display:block"], [data-page-body] a[style*="display: block"],
+  [data-page-body] a[style*="display:inline-flex"], [data-page-body] a[style*="display: inline-flex"],
+  [data-page-body] a[style*="display:flex"], [data-page-body] a[style*="display: flex"] { min-height: 44px; }
 }

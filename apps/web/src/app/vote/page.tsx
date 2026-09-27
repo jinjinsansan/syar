@@ -87,7 +87,7 @@ export default function VotePage(): React.ReactElement {
     finally { setBusy(false); }
   };
 
-  return <div data-theme="uma" className={paused ? 'u-paused' : undefined} style={{
+  return <div data-theme="uma" data-page-body className={paused ? 'u-paused' : undefined} style={{
     position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden',
     containerType: 'inline-size', background: 'var(--u-navy)', display: 'flex', flexDirection: 'column',
   }}>

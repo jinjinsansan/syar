@@ -60,6 +60,12 @@ const PAGES = [
   ['/race', '★レース（キャンバス）'],
   ['/races', '★レース一覧'],
   ['/stable', '★厩舎'],
+  /** ★本体の印（`data-page-body`）を付けた面（★2026-09-27）。★測らないと「0 でした」が 15 面の話に見える */
+  ['/stable/breed', '★配合'],
+  ['/stable/foal', '★最初の 1 頭'],
+  ['/stable/name', '★命名'],
+  ['/stable/roles', '★引退後の役割'],
+  ['/stable/market', '★馬を迎える'],
   ['/training', '★調教'],
   ['/entry', '★出走登録'],
   ['/records', '★戦績'],
@@ -222,16 +228,36 @@ const MEASURE = (REQW) => `(() => {
   for (const el of document.querySelectorAll('a,button,select,input,textarea,[role=button]')) {
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
+    /**
+     * ★**本文の中の文字リンクは数えません**（★2026-09-27・レビュー側の線引き）。
+     *   ★a 要素のうち ★display が inline のもの ＝ ★文の中の文字リンク（★旧い枠の「ログイン」など）。
+     *   ★ボタンとして押させるリンク（★a-btn・「オッズの詳細」・帯のリンク ＝ ★inline 以外で組まれている）は ★数えます。
+     *   ⚠️ ★ここはページへ送る文字列（★テンプレート文字列）の中です。★註記にバッククォートを書かないこと。
+     *   ⚠️ ★inline でないだけでは足りません: ★flex の子（★旧い枠のパンくず「馬物語」・足元の「ログイン」）は
+     *      ★文字の見た目のまま display が block になります。★そこで ★「ボタンの形をしているか」も見ます:
+     *      ★地の色・枠線・左右か上下の余白 12px 以上・a-btn / a-chip / a-badge のどれか。
+     */
+    if (el.tagName === 'A') {
+      const cs = getComputedStyle(el);
+      if (cs.display === 'inline') continue;
+      const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      const hasBg = cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent';
+      const hasBorder = ['Top', 'Right', 'Bottom', 'Left'].some((s) => parseFloat(cs['border' + s + 'Width']) > 0 && cs['border' + s + 'Style'] !== 'none' && cs['border' + s + 'Color'] !== 'rgba(0, 0, 0, 0)');
+      const cls = typeof el.className === 'string' ? el.className : '';
+      const buttonLike = hasBg || hasBorder || padX >= 12 || padY >= 12 || /\ba-(btn|chip|badge)/.test(cls);
+      if (!buttonLike) continue;
+    }
     taps += 1;
     const m = Math.min(r.width, r.height);
     if (m < smallest) smallest = Math.round(m);
     if (m >= 44) continue;
     small += 1;
     const cls = typeof el.className === 'string' ? el.className : '';
-    const key = el.tagName + '|' + cls.slice(0, 22) + '|' + Math.round(r.width) + 'x' + Math.round(r.height);
+    const key = el.tagName + '|' + cls.slice(0, 22) + '|' + (Math.round(r.width * 10) / 10) + 'x' + (Math.round(r.height * 10) / 10);
     const cur = tapsBad.get(key) ?? {
       t: el.tagName.toLowerCase(), c: cls.slice(0, 22),
-      w: Math.round(r.width), h: Math.round(r.height), n: 0,
+      w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10, n: 0,  /* ★小数 1 桁（★43.98 を 44 と丸めて「44 なのに未満」に見せない） */
       txt: (el.textContent || '').trim().slice(0, 14),
     };
     cur.n += 1;

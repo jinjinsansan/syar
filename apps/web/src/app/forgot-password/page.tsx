@@ -37,7 +37,7 @@ export default function ForgotPasswordPage(): React.ReactElement {
   }
 
   return (
-    <div data-theme="uma" className={paused ? 'u-paused' : undefined} style={{ position: 'relative', minHeight: '100dvh', background: 'var(--u-navy)', display: 'flex', flexDirection: 'column' }}>
+    <div data-theme="uma" data-page-body className={paused ? 'u-paused' : undefined} style={{ position: 'relative', minHeight: '100dvh', background: 'var(--u-navy)', display: 'flex', flexDirection: 'column' }}>
       <Backdrop />
       <TopBar title="パスワード再設定" backHref="/login" paused={paused} onToggle={toggle} />
       <main style={{ position: 'relative', width: '100%', maxWidth: 520, margin: '0 auto', padding: '18px 14px 32px' }}>

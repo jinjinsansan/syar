@@ -143,7 +143,7 @@ export default function RecordsView({ tab }: { readonly tab: string }): React.Re
   const prizeTotal = pp.filter((r) => r.reason === 'prize').reduce((s, r) => s + r.delta, 0);
   const pl = PERIOD_LABEL[period];
 
-  return <div data-theme="uma" className={paused ? 'u-paused' : undefined} style={{
+  return <div data-theme="uma" data-page-body className={paused ? 'u-paused' : undefined} style={{
     position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden',
     containerType: 'inline-size', background: 'var(--u-navy)', color: 'var(--u-ink-light)',
     display: 'flex', flexDirection: 'column', paddingBottom: 'var(--u-safe-bottom)',

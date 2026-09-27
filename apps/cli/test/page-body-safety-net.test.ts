@@ -79,11 +79,52 @@ describe('★安全網が ★枠の外の画面の本体に届く（★裁定 §
     expect(bodyIn('data-page-bodyish'), '★似た属性に当たる').toBe(false);
   });
 
+  /**
+   * 🔴 ★**画面の根で見ます**（★2026-09-27・レビュー側「★網が緑で実物が違う」）。
+   *   ★上の検査は ★「画面のどこかに `<main` が在る」でした。★`/mypage` は ★`<main>` を持つのに、
+   *   ★**エラーの帯（「再読み込み」）が `<main>` の外**に居て、★390px の実測で ★74x22px のままでした。
+   *   → ★馬物語の根（★`data-theme="uma"` を持つ要素）は ★それ自体が ★`<main>` か ★`data-page-body` を持つこと。
+   *   ★例外は ★帯を包むだけの入れ子 `<div data-theme="uma"><RaceStrip /></div>`（★印の付いた根の中に居る）。
+   */
+  it('🔴 ★馬物語の根は ★それ自体が 本体の印を持つ（★画面の一部が網の外に出ない）', () => {
+    const offenders: string[] = [];
+    for (const r of targets) {
+      const file = pageFileOf(r);
+      const files = [file];
+      const src = readFileSync(file, 'utf8');
+      for (const m of src.matchAll(/from\s+'(\.{1,2}\/[^']+)'/g)) {
+        const base = path.resolve(path.dirname(file), m[1]!);
+        const local = ['.tsx', '.ts'].map((ext) => `${base}${ext}`).find((f) => existsSync(f));
+        if (local !== undefined) files.push(local);
+      }
+      for (const f of files) {
+        const text = readFileSync(f, 'utf8');
+        for (const m of text.matchAll(/<(\w+)\s+data-theme="uma"(\s+data-page-body)?(>?)/g)) {
+          if (m[1] === 'main' || m[2] !== undefined) continue;
+          /** ★帯を包むだけの入れ子（★同じファイルに印の付いた根が在ること） */
+          const at = m.index ?? 0;
+          if (text.startsWith('<div data-theme="uma"><RaceStrip />', at) && /\bdata-page-body\b/.test(text)) continue;
+          offenders.push(`${r}: ${path.relative(ROOT, f)}:${text.slice(0, at).split('\n').length}`);
+        }
+      }
+    }
+    expect([...new Set(offenders)]).toEqual([]);
+  });
+
   it('🔴 ★`globals.css` が ★`data-page-body` に ★44px の下限を掛けている', () => {
     const block = /@media \(pointer: coarse\), \(max-width: 720px\) \{([\s\S]*?)\n\}/.exec(CSS);
     expect(block, '★44px の塊が見つからない').not.toBeNull();
     expect(block![1]).toMatch(/\[data-page-body\] button, \[data-page-body\] select/);
     expect(block![1]).toMatch(/min-height: 44px;\s*min-width: 44px;/);
+  });
+
+  it('🔴 ★ボタンの形のリンクの 44px は ★2 通りの綴りで当てる（★画面側で描いた要素は `display: inline-block;`）', () => {
+    for (const d of ['inline-block', 'block', 'inline-flex', 'flex']) {
+      for (const scope of ['main', '[data-page-body]']) {
+        expect(CSS, `★${scope} a の display:${d}（空白なし）が無い`).toContain(`${scope} a[style*="display:${d}"]`);
+        expect(CSS, `★${scope} a の display: ${d}（空白あり）が無い`).toContain(`${scope} a[style*="display: ${d}"]`);
+      }
+    }
   });
 
   it('★`data-page-body` には ★意匠を動かす規則（★折り返し・高さ）を掛けない', () => {

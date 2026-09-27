@@ -151,7 +151,7 @@ export default function EntryPage(): React.ReactElement {
     } finally { setEntering(false); }
   };
 
-  return <div data-theme="uma" className={paused ? 'u-paused' : undefined} style={{
+  return <div data-theme="uma" data-page-body className={paused ? 'u-paused' : undefined} style={{
     position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden',
     containerType: 'inline-size', background: 'var(--u-navy)', color: 'var(--u-ink-light)',
     display: 'flex', flexDirection: 'column', paddingBottom: 'var(--u-safe-bottom)',
