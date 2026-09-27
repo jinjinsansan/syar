@@ -44,7 +44,29 @@ describe('★④ 結果の一時強調', () => {
 });
 
 describe('★④ の札は ★「あなたの馬」と読めない（★裁定 §6-2・帯は誰の馬かを知らない＝自馬の表示は段 3）', () => {
-  it('🔴 ★帯の画面の文字に ★自馬を指す語が無い', () => {
+  /**
+   * 🔴 ★**主は構造側**（★2026-09-27・レビュー側の提案）: ★帯は ★**誰の馬かを知りようがない**。
+   *   ★語の一覧（下）は ★「君の馬」「オーナーの馬」を書いた日に素通りします（★R-29・列挙は必ず漏れる）。
+   *   ★知らないものは ★言いようがないので、★こちらは語が腐っても効きます。
+   */
+  it('🔴 ★帯は ★`is_mine` を読まない・★ログインの口を使わない（★構造として誰の馬かを知らない）', () => {
+    const selects = [...LIVE.matchAll(/\.select\(([^)]*)\)/g)].map((m) => m[1]!);
+    expect(selects.length, '★問い合わせを 1 つも読めていない').toBeGreaterThanOrEqual(3);
+    for (const cols of selects) {
+      expect(cols, '★帯が is_mine を選んでいる').not.toContain('is_mine');
+      expect(cols, '★帯が列を名指ししていない（★`*` は is_mine を連れてくる）').not.toMatch(/['"`]\s*\*\s*['"`]/);
+    }
+    expect(LIVE, '★帯がログインの口を使っている（★自分の馬が引ける）').not.toContain('authClient');
+    expect(LIVE).toContain("import { readClient } from '../../lib/supabase';");
+  });
+
+  it('★対照: ★is_mine を選ぶ変異は ★落ちる', () => {
+    const mutated = LIVE.replace(".select('gate,horse_name,strategy,finish_pos,finish_time,horse_id')", ".select('gate,horse_name,strategy,finish_pos,finish_time,horse_id,is_mine')");
+    expect(mutated).not.toBe(LIVE);
+    expect([...mutated.matchAll(/\.select\(([^)]*)\)/g)].some((m) => m[1]!.includes('is_mine'))).toBe(true);
+  });
+
+  it('★帯の画面の文字に ★自馬を指す語が無い（★従・語の一覧）', () => {
     /** ★画面に出る文字（★JSX の地の文と文字列）だけを見る。★註記は `LIVE` で除いてある */
     for (const word of ['あなた', '自分の馬', '自馬', 'わたしの馬', '私の馬', 'あなたの']) {
       expect(LIVE, `★帯が「${word}」と言っている`).not.toContain(word);
