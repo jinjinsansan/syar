@@ -93,7 +93,7 @@ export default function VotePage(): React.ReactElement {
   }}>
     <Backdrop />
     <TopBar title="投票モード" paused={paused} onToggle={toggle} />
-    <RaceStrip compact />
+    <RaceStrip />
     {error && <div role="alert" style={{ position: 'relative', padding: '8px 14px', color: 'var(--u-red)', fontSize: 12 }}>
       {error}　<a href="/login">ログイン</a>　<button type="button" onClick={reload}>再読み込み</button>
     </div>}

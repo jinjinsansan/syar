@@ -71,7 +71,7 @@ export function UmaOddsView({ race, rows }: {
     >
       <Backdrop />
       <TopBar title="オッズ" paused={paused} onToggle={toggle} />
-      <RaceStrip compact />
+      <RaceStrip />
       <NoticeBar
         kind={race.status === 'closed' ? 'closing' : 'soon'}
         text={race.status === 'closed'

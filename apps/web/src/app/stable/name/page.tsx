@@ -27,6 +27,7 @@ import {
   type FoalDraftView, type NameFailureVariant, type NameRequestState,
 } from '../../../lib/name-screen';
 import { SignInRequiredError } from '../../../lib/stable-repo';
+import { RaceStrip } from '../../../components/uma/race-strip';
 
 /** ★失敗の見せ方（★語は出さない） */
 const FAILURE_VIEW: Readonly<Record<NameFailureVariant, {
@@ -297,6 +298,8 @@ function Shell({ children }: { readonly children: React.ReactNode }): React.Reac
     <div style={{ minHeight: '100dvh', background: '#0a2340', color: '#fbf7ec' }}>
       <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>名前を付ける</div>
+        {/* ★常設レース表示（★フォームの画面 ＝ 極小・大きさは表 `race-strip-sizes.ts` が決める・裁定 ⑤） */}
+        <div data-theme="uma"><RaceStrip /></div>
         {children}
       </div>
     </div>

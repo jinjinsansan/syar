@@ -39,7 +39,7 @@ describe('★常設帯の走行（①②）', () => {
     /** ★`RunningHorse` を描くのは ★「大」（`RaceRun`）と ★「極小」だけ。★どちらも録画の窓の中 */
     expect(LIVE.match(/<RunningHorse/g)?.length).toBe(2);
     expect(LIVE.match(/<RaceRun /g)?.length).toBe(2);
-    expect(LIVE, '★「大」が録画の窓の外で出る').toMatch(/const big = replaying && !compact;/);
+    expect(LIVE, '★「大」が録画の窓の外で出る').toMatch(/const big = replaying && size === 'big';/);
     expect(LIVE, '★「極小」が録画の窓の外で出る').toMatch(/replaying && recent && data \? <>[\s\S]{0,300}u-race-run-mini/);
     expect(LIVE, '★拡大が録画の窓の外で出る').toMatch(/\{expanded && replaying && recent && <div className="u-race-replay-overlay"/);
   });

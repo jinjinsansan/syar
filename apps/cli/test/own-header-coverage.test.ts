@@ -33,7 +33,8 @@ import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const APP = path.join(ROOT, 'apps/web/src/app');
-const SHELL = path.join(ROOT, 'apps/web/src/components/story-shell.tsx');
+/** ★`OWN_HEADER` は 2026-09-27 に `shell-routes.ts` へ移しました（★`story-shell.tsx` が import する） */
+const SHELL = path.join(ROOT, 'apps/web/src/components/shell-routes.ts');
 
 /**
  * ★`OWN_HEADER = [...]` の中の道を読む。
@@ -100,7 +101,7 @@ describe('🔴 ★帯が二重にならない（★自前の帯を持つ面は O
     const own = new Set(ownHeader());
     const missing = ownHeaderPages().filter((p) => !own.has(p));
     expect(missing, `🔴 ★帯が二重になります（★StoryShell の帯 ＋ 自前バー）:\n  ${missing.join('\n  ')}\n`
-      + '  ★`apps/web/src/components/story-shell.tsx` の `OWN_HEADER` に足してください').toEqual([]);
+      + '  ★`apps/web/src/components/shell-routes.ts` の `OWN_HEADER` に足してください').toEqual([]);
   });
 
   it('⚠️ ★`OWN_HEADER` に、★実在しない面が残っていない（★見張り続けない・R-19）', () => {

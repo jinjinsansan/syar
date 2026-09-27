@@ -54,16 +54,24 @@ function nextSource(route: string): string {
  * ⚠️ ★2026-09-27: ★`page.tsx` が ★同じフォルダの本体（★`./records-view` など）を読むだけの画面を ★**見落としていました**。
  *    ★同じフォルダからの読み込みを ★1 段だけたどります。
  */
+/**
+ * ⚠️ ★**常設帯（`components/uma/race-strip`）だけを読むのは ★新世代の印にしません**（★2026-09-27・裁定 ⑤）。
+ *    ★常設帯は ★世代に関わらず ★表（`race-strip-sizes.ts`）どおりに ★全画面に置く部品で、★枠（`story-shell`）も旧い画面に置きます。
+ *    ★これを数えると、★帯を足しただけの旧い画面（`/stable/breed` など 4 枚）が ★「もう新世代」と誤判定されました。
+ */
+const umaImportOf = (src: string): boolean =>
+  [...src.matchAll(/from\s+'([^']*components\/uma\/[^']*)'/g)].some((m) => !m[1]!.endsWith('/race-strip'));
+
 function usesUma(route: string): boolean {
   const rel = route === '/' ? 'page.tsx' : `${route.slice(1)}/page.tsx`;
   const p = path.join(APP, rel);
   if (!existsSync(p)) return false;
   const src = readFileSync(p, 'utf8');
-  if (src.includes('components/uma')) return true;
+  if (umaImportOf(src)) return true;
   const dir = path.dirname(p);
   for (const m of src.matchAll(/from\s+'\.\/([A-Za-z0-9_-]+)'/g)) {
     const local = ['.tsx', '.ts'].map((ext) => path.join(dir, `${m[1]!}${ext}`)).find((f) => existsSync(f));
-    if (local !== undefined && readFileSync(local, 'utf8').includes('components/uma')) return true;
+    if (local !== undefined && umaImportOf(readFileSync(local, 'utf8'))) return true;
   }
   return false;
 }

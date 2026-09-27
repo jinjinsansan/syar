@@ -32,6 +32,7 @@ import {
 } from '../../../lib/initial-breed-screen';
 import { fetchOnboardingState, type OnboardingState } from '../../../lib/onboarding';
 import { SignInRequiredError } from '../../../lib/stable-repo';
+import { RaceStrip } from '../../../components/uma/race-strip';
 
 /** ★状態を見に行く間隔（★`/stable/breed` と同じ） */
 const POLL_MS = 3_000;
@@ -66,6 +67,8 @@ function Shell({ children }: { readonly children: React.ReactNode }): React.Reac
     <div style={{ minHeight: '100dvh', background: '#0a2340', color: '#fbf7ec' }}>
       <div style={{ width: '100%', maxWidth: 1100, margin: '0 auto', padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>最初の 1 頭を生産する</div>
+        {/* ★常設レース表示（★フォームの画面 ＝ 極小・大きさは表 `race-strip-sizes.ts` が決める・裁定 ⑤） */}
+        <div data-theme="uma"><RaceStrip /></div>
         {children}
       </div>
     </div>

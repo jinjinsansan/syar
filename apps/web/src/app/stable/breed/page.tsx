@@ -27,6 +27,7 @@ import {
   type BreedFailureVariant, type BreedRequestState,
 } from '../../../lib/breed-screen';
 import { SignInRequiredError } from '../../../lib/stable-repo';
+import { RaceStrip } from '../../../components/uma/race-strip';
 
 /** ★失敗の 5 通り（★文言と色はデザイナーの表のまま・★理由の語は出さない） */
 const FAILURE_VIEW: Readonly<Record<BreedFailureVariant, {
@@ -415,6 +416,8 @@ function Shell({ children }: { readonly children: React.ReactNode }): React.Reac
     <div style={{ minHeight: '100dvh', background: '#0a2340', color: '#fbf7ec' }}>
       <div style={{ width: '100%', maxWidth: 1100, margin: '0 auto', padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>配合</div>
+        {/* ★常設レース表示（★フォームの画面 ＝ 極小・大きさは表 `race-strip-sizes.ts` が決める・裁定 ⑤） */}
+        <div data-theme="uma"><RaceStrip /></div>
         {children}
       </div>
     </div>

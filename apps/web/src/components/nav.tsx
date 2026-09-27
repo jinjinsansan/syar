@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
  * ★**新しい画面へ切り替えました**（★2026-09-17・オーナー指示「★新ルートに切り替えてください」）。
  *
  * ★ここは ★**アーケード側（旧）の画面にだけ**出るナビです（★馬物語の画面は自前の帯を持ちます
- *   — `components/story-shell.tsx` の `OWN_HEADER`）。★行き先を新しい画面へ向け直すことで、
+ *   — `components/shell-routes.ts` の `OWN_HEADER`）。★行き先を新しい画面へ向け直すことで、
  *   ★旧い画面に着いた人も ★**新しい入口へ出られます**。
  *
  * ⚠️ ★**旧い画面は消していません**（`/races`・`/stable`・`/training`・`/records`）。

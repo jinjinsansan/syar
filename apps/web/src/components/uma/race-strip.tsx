@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
+import { stripSizeOf } from './race-strip-sizes';
 import './uma-theme.css';
 
 interface RaceNoticeRow {
@@ -53,6 +55,40 @@ async function fetchNotice(): Promise<NoticeData> {
   };
 }
 
+interface FocusRow extends RaceNoticeRow {
+  readonly entry_deadline_at: string | null;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * ★**その画面のレース自身**（★`text` の画面: 出馬表・そのレースのオッズ）。
+ *   ★§3「★他レースの通知もこの画面では出さない（集中を切らない）」→ ★このレースの 1 行だけを読みます。
+ */
+async function fetchFocus(raceId: string): Promise<FocusRow | null> {
+  if (!UUID.test(raceId)) return null;
+  const { data, error } = await readClient().from('races_public')
+    .select(`${COLUMNS}, entry_deadline_at`).eq('id', raceId).limit(1);
+  if (error !== null) throw new Error(error.message);
+  return (data?.[0] ?? null) as FocusRow | null;
+}
+
+/** ★`/races/<id>`・`/races/<id>/bet`・`/odds/<id>` の `<id>` */
+function focusRaceIdOf(pathname: string): string | null {
+  const m = /^\/(?:races|odds)\/([^/?#]+)/.exec(pathname);
+  return m === null ? null : decodeURIComponent(m[1]!);
+}
+
+/** ★§3: ★締切だけ ／ ★発走したら「発走しました」の文字だけ（★走行は出さない） */
+function focusLine(row: FocusRow, nowMs: number): string {
+  const startMs = new Date(row.scheduled_at).getTime();
+  if (row.status === 'settled') return 'このレースは結果が確定しました';
+  if (row.status === 'cancelled') return 'このレースは取りやめになりました';
+  if (Number.isFinite(startMs) && nowMs >= startMs) return '発走しました・結果をお待ちください';
+  if (row.status === 'closed') return `締切ました・発走 ${clock(row.scheduled_at)}`;
+  return row.entry_deadline_at === null ? `発走 ${clock(row.scheduled_at)}` : `締切 ${clock(row.entry_deadline_at)}・発走 ${clock(row.scheduled_at)}`;
+}
+
 function clock(iso: string): string {
   const timestamp = new Date(iso).getTime();
   if (!Number.isFinite(timestamp)) return '時刻未取得';
@@ -66,9 +102,17 @@ function raceLabel(row: RaceNoticeRow): string {
 
 /**
  * 公開 DB の開催情報を表示する。★確定したレースの録画の時間帯（★発走 +75 秒から 45 秒）は、
- * ★確定した走破タイムから逆算した進行率で ★馬を走らせる（★「大」150px ／ `compact` は「極小」22×16px）。
+ * ★確定した走破タイムから逆算した進行率で ★馬を走らせる（★「大」150px ／「極小」22×16px）。
+ *
+ * 🔴 ★**大きさは引数で受け取りません。** ★居る画面を ★表（`race-strip-sizes.ts`・★正本）で引きます（★裁定 ⑤）。
+ *   ★画面ごとに `compact` を渡していた頃は、★どの画面が何を出すかが ★各ページに散っていました。
  */
-export function RaceStrip({ compact = false }: { readonly compact?: boolean }): React.ReactElement {
+export function RaceStrip(): React.ReactElement | null {
+  const pathname = usePathname() ?? '/';
+  const size = stripSizeOf(pathname);
+  const compact = size === 'mini';
+  const focusId = size === 'text' ? focusRaceIdOf(pathname) : null;
+  const [focus, setFocus] = useState<FocusRow | null>(null);
   const [data, setData] = useState<NoticeData | null>(null);
   const [error, setError] = useState(false);
   const [nowMs, setNowMs] = useState<number | null>(null);
@@ -91,14 +135,18 @@ export function RaceStrip({ compact = false }: { readonly compact?: boolean }): 
   }, [expanded]);
 
   useEffect(() => {
+    /** ★出さない画面では ★読みにも行きません */
+    if (size === 'hidden') return undefined;
     let active = true;
     let loading = false;
     const refresh = (): void => {
       if (loading) return;
       loading = true;
-      void fetchNotice().then((fresh) => {
+      const job = size === 'text'
+        ? (focusId === null ? Promise.resolve(null) : fetchFocus(focusId)).then((row) => { if (active) setFocus(row); })
+        : fetchNotice().then((fresh) => { if (active) setData(fresh); });
+      void job.then(() => {
         if (!active) return;
-        setData(fresh);
         setError(false);
       }).catch(() => {
         if (active) setError(true);
@@ -120,7 +168,7 @@ export function RaceStrip({ compact = false }: { readonly compact?: boolean }): 
       window.clearInterval(clockTimer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, []);
+  }, [size, focusId]);
 
   const next = data?.next;
   const recent = data?.recent;
@@ -140,7 +188,21 @@ export function RaceStrip({ compact = false }: { readonly compact?: boolean }): 
         : data === null ? '開催情報を読み込み中' : '現在、開催予定のレースはありません';
 
   const leader = leaderOf(replayRows);
-  const big = replaying && !compact;
+  const big = replaying && size === 'big';
+
+  if (size === 'hidden') return null;
+  /** ★`text`: ★その画面のレースの 1 行だけ（★走行・拡大・他のレースは出さない） */
+  if (size === 'text') {
+    if (focus === null && !error) return null;
+    return (
+      <section aria-label="このレースの開催情報" className="u-race-strip u-race-strip-compact">
+        <div className="u-race-strip-main">
+          {focus !== null && <strong>{nowMs === null ? `発走 ${clock(focus.scheduled_at)}` : focusLine(focus, nowMs)}</strong>}
+        </div>
+        {error && <span className="u-race-strip-error">更新できません</span>}
+      </section>
+    );
+  }
 
   return (
     <section aria-label="レースの開催情報" className={`u-race-strip${compact ? ' u-race-strip-compact' : ''}${replaying ? ' u-race-strip-replaying' : ''}${big ? ' u-race-strip-big' : ''}${expanded ? ' u-race-strip-expanded' : ''}`}>

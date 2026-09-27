@@ -28,6 +28,7 @@ import {
 } from '../../../lib/retired-screen';
 import { SignInRequiredError } from '../../../lib/stable-repo';
 import { TYPE_TONE } from '../../../lib/story-tone';
+import { RaceStrip } from '../../../components/uma/race-strip';
 
 /** ★変えられない 4 通り（★A-3〜A-6・★文言と色はデザイナーの表のまま） */
 const BLOCK_VIEW: Readonly<Record<RoleVariant, {
@@ -333,6 +334,8 @@ function Shell({ children }: { readonly children: React.ReactNode }): React.Reac
     <div style={{ minHeight: '100dvh', background: '#0a2340', color: '#fbf7ec' }}>
       <div style={{ width: '100%', maxWidth: 1100, margin: '0 auto', padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>引退後の役割</div>
+        {/* ★常設レース表示（★フォームの画面 ＝ 極小・大きさは表 `race-strip-sizes.ts` が決める・裁定 ⑤） */}
+        <div data-theme="uma"><RaceStrip /></div>
         {children}
       </div>
     </div>

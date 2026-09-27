@@ -115,7 +115,7 @@ export default function TrainPage(): React.ReactElement {
   };
 
   if (horse === null) return <div data-theme="uma" style={{ minHeight: '100dvh', background: 'var(--u-navy)' }}>
-    <Backdrop /><TopBar title="育成モード" paused={paused} onToggle={toggle} /><RaceStrip compact />
+    <Backdrop /><TopBar title="育成モード" paused={paused} onToggle={toggle} /><RaceStrip />
     <div role={error ? 'alert' : 'status'} style={{ position: 'relative', padding: 20 }}>
       {loading ? '厩舎を読み込み中…' : error ?? 'まだ持ち馬がいません。'}
       <div style={{ display: 'flex', gap: 12, marginTop: 12 }}><a href="/login">ログイン</a><a href="/setup">最初の1頭を迎える</a><button type="button" onClick={refresh}>再読み込み</button></div>
@@ -142,7 +142,7 @@ export default function TrainPage(): React.ReactElement {
     >
       <Backdrop />
       <TopBar title="育成モード" paused={paused} onToggle={toggle} />
-      <RaceStrip compact />
+      <RaceStrip />
       {/* ★事実どおりに言う（★2026-09-27 まで「保存できません」と書いていた・P1-1 で送れるようにした） */}
       <div role="status" style={{ position: 'relative', padding: '6px 14px', color: 'var(--u-gold)', fontSize: 12 }}>
         馬の状態は実データです。指示はその馬の次の調教に使われ、参加ポイントは調教したときに減ります。

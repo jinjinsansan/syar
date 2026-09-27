@@ -259,7 +259,8 @@ describe('★馬物語 UI の配線（R-14）', () => {
   });
 
   it('④ ★★共通ヘッダーが二重に載らない（★A-1・`OWN_HEADER` に入れる）', () => {
-    const shell = strip(read('apps/web/src/components/story-shell.tsx'));
+    /** ★`OWN_HEADER` は 2026-09-27 に `shell-routes.ts` へ移しました */
+    const shell = strip(read('apps/web/src/components/shell-routes.ts'));
     /**
      * ★自前の上段バーを持つ画面は、★**すべて** OWN_HEADER 側に入れる。
      * ⚠️ ★2026-09-17: ★`/earn`・`/watch-race` を作ったのに ★**入れ忘れました**
