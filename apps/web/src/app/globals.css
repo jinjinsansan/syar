@@ -566,29 +566,9 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
     white-space: nowrap;
   }
 
-  /*
-   * ★戦績: ★1 段目＝週・日付・レース・格・着／★2 段目＝馬・条件・賞金
-   *
-   * ⚠️ ★**`main ` を付けています。** ★上の「150px 以上の固定幅を解く」規則が
-   *    ★`main [style*="flex:0 0 150px"]` という形で、★**こちらより強い**ためです
-   *    （★属性選択子ぶん詳しさが 1 つ上）。★付けないと ★**レース名が 1 行を占め**ます
-   *    （★実測の絵で確認）。★同じ詳しさなら、★後に書いたこちらが勝ちます。
-   */
-  main .rc-run-week { order: 0; }
-  main .rc-run-date { order: 1; }
-  main .rc-run-race { order: 2; flex: 0 1 auto !important; width: auto !important; }
-  main .rc-run-cls { order: 3; }
-  main .rc-run-place { order: 4; flex: 0 0 auto !important; text-align: right !important; }
-  main .rc-run-horse { order: 5; flex: 0 1 auto !important; min-width: 0 !important; }
-  main .rc-run-cond { order: 6; }
-  main .rc-run-prize { order: 7; flex: 1 0 auto !important; margin-left: auto; }
-
-  /* ★台帳: ★1 段目＝日時・理由・増減／★2 段目＝内容・残高 */
-  main .rc-led-at { order: 0; }
-  main .rc-led-reason { order: 1; }
-  main .rc-led-delta { order: 2; flex: 1 0 auto !important; }
-  main .rc-led-desc { order: 3; flex: 0 1 auto !important; min-width: 0 !important; width: auto !important; }
-  main .rc-led-balance { order: 4; margin-left: auto; }
+  /* ⚠️ ★記録（/records）の `.rc-run-*` / `.rc-led-*` 規則は ★2026-09-27 に外しました — ★`/records` を ★馬物語 UI の骨格へ移し、
+     ★行は ★自前で折り返す（`flex-wrap`）ので ★この読み替えが要らなくなったためです（★使い手は 0）。
+     ★`.rc-tabs` / `.rc-exch` は ★オッズ・馬詳細・投票でも使うので ★残しています。 */
 
   /* ⚠️ ★出走登録（/entry）の `.en-*` 規則は ★2026-09-27 に外しました — ★`/entry` を ★馬物語 UI の骨格へ移し、
      ★行は ★自前で折り返す（`flex-wrap`）ので ★この読み替えが要らなくなったためです（★`.en-*` の使い手は 0）。 */

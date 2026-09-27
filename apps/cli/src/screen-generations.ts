@@ -133,6 +133,7 @@ export const SCREENS: readonly ScreenRecord[] = [
       + '★転送すると ★**調教の指示を出す口が消え、育成のループが止まります**。'
       + '→ ★`/train` を先に繋いでから送ること（★網: `screen-generations.test.ts` の「送り先がサーバーを呼んでいる」）',
   },
+  { route: '/records', verdict: 'rebuilt', why: '★記録。★2026-09-27 に ★引き渡し資料 §5 の骨格（馬物語 UI）へ移した（★読み込み・集計は変えていない）' },
   { route: '/entry', verdict: 'rebuilt', why: '★出走登録。★2026-09-27 に ★引き渡し資料 §5 の骨格（馬物語 UI）へ移した（★登録の処理は変えていない）' },
   { route: '/stable', verdict: 'rebuild', why: '★厩舎の一覧。★`/setup` と `foal-invite` から来る' },
   { route: '/stable/[horseId]', verdict: 'rebuild', why: '★1 頭の詳細' },
@@ -144,7 +145,6 @@ export const SCREENS: readonly ScreenRecord[] = [
   { route: '/stable/market', verdict: 'rebuild', why: '✅ ★2026-09-26 に ★**実データへ繋ぎました**（★`market-screen`）。'
     + '★D-122 ④「空の店へ送らない」は ★満たしました（★出品が 0 のときは そう言います）。'
     + '🔴 ★**見た目は仮**（★依頼 R-17）— ★値段 14 通り × ほぼ 1 頭で ★旧い「帯 × 3 口」の前提が崩れている' },
-  { route: '/records', verdict: 'rebuild', why: '★戦績。★`/mypage` から来る' },
   /**
    * ★以下の 5 枚は ★**裁定の手順（§6）を流して決めました**（2026-09-25）。
    *   ★① 依存を測る → ★② 入口を数える → ★③ 片方が見本なら本物を残して転送

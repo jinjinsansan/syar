@@ -49,11 +49,23 @@ function nextSource(route: string): string {
 }
 
 /** ★その画面が新世代の部品を読んでいるか */
+/**
+ * ★その画面が ★新世代の部品（`components/uma`）を読むか。
+ * ⚠️ ★2026-09-27: ★`page.tsx` が ★同じフォルダの本体（★`./records-view` など）を読むだけの画面を ★**見落としていました**。
+ *    ★同じフォルダからの読み込みを ★1 段だけたどります。
+ */
 function usesUma(route: string): boolean {
   const rel = route === '/' ? 'page.tsx' : `${route.slice(1)}/page.tsx`;
   const p = path.join(APP, rel);
   if (!existsSync(p)) return false;
-  return readFileSync(p, 'utf8').includes('components/uma');
+  const src = readFileSync(p, 'utf8');
+  if (src.includes('components/uma')) return true;
+  const dir = path.dirname(p);
+  for (const m of src.matchAll(/from\s+'\.\/([A-Za-z0-9_-]+)'/g)) {
+    const local = ['.tsx', '.ts'].map((ext) => path.join(dir, `${m[1]!}${ext}`)).find((f) => existsSync(f));
+    if (local !== undefined && readFileSync(local, 'utf8').includes('components/uma')) return true;
+  }
+  return false;
 }
 
 describe('🔴 ★画面の世代と始末（★裁定 §3）', () => {
