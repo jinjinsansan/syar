@@ -32,7 +32,7 @@ import {
 } from '../../../lib/initial-breed-screen';
 import { fetchOnboardingState, type OnboardingState } from '../../../lib/onboarding';
 import { SignInRequiredError } from '../../../lib/stable-repo';
-import { RaceStrip } from '../../../components/uma/race-strip';
+import { RaceStrip, reportOnboardingStage } from '../../../components/uma/race-strip';
 
 /** ★状態を見に行く間隔（★`/stable/breed` と同じ） */
 const POLL_MS = 3_000;
@@ -132,6 +132,8 @@ export default function FirstFoalPage(): React.ReactElement {
     setLoading(true);
     fetchOnboardingState().then(async (fresh) => {
       setState(fresh);
+      /** ★常設帯へ ★サーバーの段階を渡す（★導入中は帯を出さない・R-18 回答 🔴 #2） */
+      reportOnboardingStage(fresh.stage);
       setNeedsLogin(false);
       setError(null);
       // ★父母を選ぶ段だけ、候補を読みます（★他の段では要りません）
@@ -142,6 +144,8 @@ export default function FirstFoalPage(): React.ReactElement {
     }).finally(() => { setLoading(false); });
   }, []);
   useEffect(() => { reload(); }, [reload]);
+  /** ★画面を離れたら ★段階を忘れる（★別の画面へ持ち越さない） */
+  useEffect(() => () => { reportOnboardingStage(null); }, []);
 
   /** ★待っている段のあいだだけ、段階を見に行きます */
   useEffect(() => {

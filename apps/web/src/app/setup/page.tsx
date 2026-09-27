@@ -218,7 +218,7 @@ export default function SetupPage(): React.ReactElement {
       <NoticeBar
         kind="soon"
         text={step === 1 ? '最初の 1 回だけ。あとから変えられます。' : 'あなたの牧場に迎えました。'}
-        actionLabel="中継を観る"
+        actionLabel="レースを見る"
         actionHref="/watch-race"
       />
 

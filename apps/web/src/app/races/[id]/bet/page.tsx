@@ -294,7 +294,7 @@ export default function BetPage(): React.ReactElement {
               <span style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderRadius: 8, backgroundImage: 'linear-gradient(#ffeceb,#ffdcd9)', border: '2px solid var(--a-red-d)', fontSize: 14, fontWeight: 900, color: 'var(--a-red-d)' }}>
                 このレースには自分の馬（{race.ownGate}番 {race.horses[race.ownGate - 1]?.name}）が出走しているため、投票できません
               </span>
-              <a className="a-btn a-btn-blue" href="/race" style={{ marginLeft: 'auto', height: 38, padding: '0 20px', fontSize: 14 }}>中継を観る</a>
+              <a className="a-btn a-btn-blue" href="/race" style={{ marginLeft: 'auto', height: 38, padding: '0 20px', fontSize: 14 }}>レースを見る</a>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, height: 52, padding: '0 16px', backgroundImage: 'var(--a-gloss-gold)', borderTop: '2px solid #8a5a06' }}>

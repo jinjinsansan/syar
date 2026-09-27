@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
-import { stripSizeOf } from './race-strip-sizes';
+import { INTRO_STAGES, stripSizeOf } from './race-strip-sizes';
 import './uma-theme.css';
 
 interface RaceNoticeRow {
@@ -131,6 +131,21 @@ export function requestStripExpand(): void {
 }
 
 /**
+ * ★**導入中か**（★初回導入の道で ★帯を出さないため・R-18 回答 🔴 #2）。
+ *   🔴 ★帯は ★ログインの口を使いません（★誰の馬かを知らない・網 `race-strip-notice.test.ts`）。
+ *   ★そこで ★**画面が** サーバーの段階（`fetchOnboardingState` の stage）を読んで ★ここへ渡します。★帯は推測しません。
+ *   ★渡されるまで（null）は ★導入の道では出しません（`stripSizeOf`）。
+ */
+let introState: boolean | null = null;
+const introListeners = new Set<() => void>();
+export function reportOnboardingStage(stage: string | null): void {
+  const next = stage === null ? null : INTRO_STAGES.includes(stage);
+  if (next === introState) return;
+  introState = next;
+  introListeners.forEach((listener) => { listener(); });
+}
+
+/**
  * 公開 DB の開催情報を表示する。★確定したレースの録画の時間帯（★発走 +75 秒から 45 秒）は、
  * ★確定した走破タイムから逆算した進行率で ★馬を走らせる（★「大」150px ／「極小」22×16px）。
  *
@@ -139,7 +154,12 @@ export function requestStripExpand(): void {
  */
 export function RaceStrip(): React.ReactElement | null {
   const pathname = usePathname() ?? '/';
-  const size = stripSizeOf(pathname);
+  const intro = useSyncExternalStore(
+    (listener) => { introListeners.add(listener); return () => { introListeners.delete(listener); }; },
+    () => introState,
+    () => null,
+  );
+  const size = stripSizeOf(pathname, { intro });
   const compact = size === 'mini';
   const focusId = size === 'text' ? focusRaceIdOf(pathname) : null;
   const [focus, setFocus] = useState<FocusRow | null>(null);
@@ -303,7 +323,9 @@ export function RaceStrip(): React.ReactElement | null {
           {compact && <span className="u-race-run-mini" aria-hidden>
             <span className="u-race-run-horse" style={{ inset: 0 }}><RunningHorse phase={0} motionReduced={motionReduced} /></span>
           </span>}
-          <strong>{recent.name} レース中（録画）</strong>
+          <strong>{recent.name} レース中</strong>
+          {/* ★「（録画）」は ★別の枠にして ★縮めない（★極小でも必ず残す・R-18 回答 🟡 #8・生中継に見せない） */}
+          <span className="u-race-strip-rec">（録画）</span>
           {!compact && <span title={raceLabel(recent)}>{raceLabel(recent)}</span>}
           {!compact && leader !== null && <span className="u-race-strip-recent">先頭 {leader.gate}番 {leader.name}</span>}
         </> : <>

@@ -75,8 +75,8 @@ export default function SignupPage(): React.ReactElement {
       <NoticeBar
         kind="soon"
         text="いまは、お誘いした方だけがご登録いただけます。"
-        sub="登録しなくても、中継・オッズ・記録はご覧いただけます"
-        actionLabel="中継を観る"
+        sub="登録しなくても、レース・オッズ・記録はご覧いただけます"
+        actionLabel="レースを見る"
         actionHref="/watch-race"
       />
 
@@ -100,7 +100,7 @@ export default function SignupPage(): React.ReactElement {
               メールが見当たらないときは、迷惑メールの箱もご確認ください。
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-              <BigButton tone="gold" label="中継を観る" href="/watch-race" />
+              <BigButton tone="gold" label="レースを見る" href="/watch-race" />
               <BigButton tone="ivory" label="ログイン" href="/login" />
             </div>
           </div>

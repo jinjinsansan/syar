@@ -145,8 +145,29 @@ describe('★常設帯の大きさ ── 表と画面の突き合わせ（⑤�
     scan(path.join(ROOT, 'apps/web/src'));
     expect(offenders).toEqual([]);
     const STRIP = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/race-strip.tsx'), 'utf8');
-    expect(STRIP, '★帯が表を引いていない').toMatch(/const size = stripSizeOf\(pathname\);/);
+    expect(STRIP, '★帯が表を引いていない').toMatch(/const size = stripSizeOf\(pathname, \{ intro \}\);/);
     expect(STRIP, '★帯が引数を受け取っている').toMatch(/export function RaceStrip\(\): React\.ReactElement \| null/);
+  });
+
+  it('🔴 ★初回導入の間は ★導入の道に帯を出さない（★R-18 回答 🔴 #2・★段階はサーバーから）', () => {
+    for (const p of ['/stable/foal', '/stable/name']) {
+      expect(stripSizeOf(p, { intro: true }), `★${p}: 導入中に出している`).toBe('hidden');
+      expect(stripSizeOf(p, { intro: null }), `★${p}: 段階が分からない間に出している`).toBe('hidden');
+      expect(stripSizeOf(p, { intro: false }), `★${p}: ★対照: 導入を終えたら 表の値`).toBe(STRIP_SIZE_BY_ROUTE[p]);
+    }
+    /** ★第 2 便の配合は ★導入に関わらず ★表の値（★導入の道ではない） */
+    expect(stripSizeOf('/stable/breed', { intro: true })).toBe('mini');
+    /** ★他の画面は ★導入中でも ★表の値（★ホームなどを巻き込まない） */
+    expect(stripSizeOf('/home', { intro: true })).toBe('big');
+    /** ★段階の出どころは ★画面がサーバーから読んだ値（★帯は推測しない・★ログインの口を使わない） */
+    const STRIP = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/race-strip.tsx'), 'utf8');
+    expect(STRIP).toContain('const size = stripSizeOf(pathname, { intro });');
+    const STRIP_LIVE = STRIP.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+    expect(STRIP_LIVE, '★帯が段階を自分で読んでいる').not.toMatch(/fetchOnboardingState|lib\/onboarding/);
+    const FOAL = readFileSync(path.join(APP, 'stable/foal/page.tsx'), 'utf8');
+    const NAME = readFileSync(path.join(APP, 'stable/name/page.tsx'), 'utf8');
+    expect(FOAL, '★/stable/foal が段階を渡していない').toMatch(/fetchOnboardingState\(\)\.then\(async \(fresh\) => \{[\s\S]{0,200}reportOnboardingStage\(fresh\.stage\);/);
+    expect(NAME, '★/stable/name が段階を渡していない').toMatch(/fetchOnboardingState\(\)\.then\(\(s\) => \{ if \(active\) reportOnboardingStage\(s\.stage\); \}\)/);
   });
 
   it('★道の当て方（★`[id]` は 1 区切り・★表に無い道は hidden）', () => {

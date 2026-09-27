@@ -160,9 +160,9 @@ export default function HomePage(): React.ReactElement {
           ⚠️ ★行き先は ★**馬物語 UI の新しいルート**です（★`/training`・`/races`・`/stable`・`/prizes` は
              ★arcade 版が生きており、★**同じ URL を奪うと既存が消えます**。★切り替えはオーナー判断・報告 §3）。
         */}
-        <BigButton tone="gold" label="育成モード" sub="持ち馬の状態を確認" href="/train" grow="1 1 150px" />
+        <BigButton tone="gold" label="育成モード" sub="今週の調教をする" href="/train" grow="1 1 150px" />
         <BigButton tone="blue" label="投票モード" sub="出馬表・マークシート" href="/vote" grow="1 1 150px" />
-        <BigButton tone="ivory" label="マイページ" sub="厩舎・持ち馬の状態" href="/mypage" grow="1 1 150px" />
+        <BigButton tone="ivory" label="マイページ" sub="厩舎と成績" href="/mypage" grow="1 1 150px" />
         <BigButton tone="ivory" label="ポイントを稼ぐ" sub="受け取り機能は準備中" href="/earn" grow="1 1 150px" />
         <BigButton tone="ivory" label="景品交換" sub="賞金ポイントで交換" href="/exchange" grow="1 1 150px" />
         <BigButton tone="ivory" label="使い方" sub="はじめての方へ" href="/howto" grow="1 1 150px" />

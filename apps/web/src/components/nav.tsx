@@ -75,7 +75,7 @@ export function ArcadeNav(): React.ReactElement {
         ⚠️ ★以前はここから `/race` を直接指していました。★それだと ★**案内が飛ばされ**、
            ★終了後の戻り先も決まりません（★`/race` は「どこから来たか」を知らないため）。
       */}
-      <a href="/watch-race" style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 900, color: 'rgba(255,255,255,.95)' }}>中継（デモ）</a>
+      <a href="/watch-race" style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 900, color: 'rgba(255,255,255,.95)' }}>レースを見る</a>
     </>
   );
 }

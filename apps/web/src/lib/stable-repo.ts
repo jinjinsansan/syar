@@ -32,7 +32,7 @@ const CLASS_LABEL = ['新馬・未勝利', '1勝クラス', '2勝クラス', '3�
 export const MISSING = [
   'nextRace / weeksToNextRace … ★登録済みの未来のレースを、★本人の行として読む口がまだ無い',
   'week.menu … ★その週に何の調教をしたかは `horse_week_log` に在るが、★公開ビューが無い',
-  'home の daily / 次走 / 中継 … ★出どころが無いので 0・null・false（★数を入れると「もらえる」と見える）',
+  'home の daily / 次走 / レースを見る口 … ★出どころが無いので 0・null・false（★数を入れると「もらえる」と見える）',
 ] as const;
 
 interface MyHorseRow {

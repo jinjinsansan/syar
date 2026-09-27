@@ -111,7 +111,7 @@ export function EpCapsule({ value }: { readonly value: number }): React.ReactEle
   );
 }
 
-/** ★**PP のカプセル**。★記号は菱形。★副題は「景品と交換できます」 */
+/** ★**PP のカプセル**。★記号は菱形。★副題は「景品交換に使えます」 */
 export function PpCapsule({ value }: { readonly value: number }): React.ReactElement {
   return (
     <div style={{
@@ -126,7 +126,7 @@ export function PpCapsule({ value }: { readonly value: number }): React.ReactEle
         <span className="u-num" style={{ fontSize: 27, color: '#fff3cd' }}>{value.toLocaleString('ja-JP')}</span>
         <span style={{ fontSize: 11, color: '#f7e6b5' }}>PP</span>
       </div>
-      <div style={{ marginTop: 3, fontSize: 10, fontWeight: 500, color: '#dcc78a' }}>景品と交換できます</div>
+      <div style={{ marginTop: 3, fontSize: 10, fontWeight: 500, color: '#dcc78a' }}>景品交換に使えます</div>
     </div>
   );
 }

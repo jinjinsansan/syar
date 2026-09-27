@@ -98,11 +98,21 @@
   flex-wrap: wrap;
 }
 [data-theme='uma'] .u-race-strip-main strong { white-space: nowrap; }
-[data-theme='uma'] .u-race-strip-main span {
+/*
+  ★**本文は 2 行まで折り返す・★「…」で切らない**（★2026-09-28・デザイナー R-18 回答 🔴 #4・資料 §5.4）。
+  ★それまでは 1 行で `ellipsis` にしており、★390px で理由の文が「…」で切れていました。
+  ★レース名（`strong`）は 1 行のまま（★回答どおり）。★極小の馬の箱（`u-race-run-mini`）は ★文ではないので外す。
+*/
+[data-theme='uma'] .u-race-strip-main > span:not(.u-race-run-mini):not(.u-race-strip-rec) {
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
+/* ★「（録画）」は ★縮めない・★消さない（★極小でも必ず残す・R-18 回答 🟡 #8）。★入らなければ次の行へ回る */
+[data-theme='uma'] .u-race-strip-main > .u-race-strip-rec { flex: 0 0 auto; white-space: nowrap; display: inline; }
 [data-theme='uma'] .u-race-strip-recent { color: var(--u-ink-light-3); }
 [data-theme='uma'] .u-race-strip-error { color: var(--u-red); white-space: nowrap; }
 [data-theme='uma'] .u-race-strip a {

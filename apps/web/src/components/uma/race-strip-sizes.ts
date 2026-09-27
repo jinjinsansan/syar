@@ -70,8 +70,23 @@ export function routeKeyOf(pathname: string): string | null {
   return null;
 }
 
-/** ★表に無い画面は `hidden`（★載せ忘れた画面に ★黙って帯を出さない） */
-export function stripSizeOf(pathname: string): StripSize {
+/**
+ * ★**初回導入（★父母選択・誕生・命名）の間は ★出さない道**（★2026-09-28・デザイナー R-18 回答 🔴 #2・第 1 便の確定）。
+ *   ★同じ道でも ★第 2 便（★自分の繁殖牝馬で配合・★その仔の命名）では ★表の値（mini）のまま。
+ *   ★導入中かは ★**サーバーの段階**（★`my_onboarding_state` の stage）で決めます（★画面は推測しない・レビュー側の条件）。
+ */
+export const HIDDEN_DURING_INTRO: readonly string[] = ['/stable/foal', '/stable/name'];
+/** ★導入中の段階（★移行 `0067` の stage の語）。★`ready` `legacy` は導入を終えた（★または導入の無い）口座 */
+export const INTRO_STAGES: readonly string[] = ['choose_parents', 'waiting_birth', 'naming'];
+
+/**
+ * ★表に無い画面は `hidden`（★載せ忘れた画面に ★黙って帯を出さない）。
+ * ★`intro` … ★導入中か（★サーバーの段階から）。★**分からない間（null）は ★導入の道では出さない**
+ *   （★読み終わる前に 帯が一瞬 出て消えるのを避ける・★導入中に出すほうが 誤り）。
+ */
+export function stripSizeOf(pathname: string, opts: { readonly intro: boolean | null } = { intro: null }): StripSize {
   const key = routeKeyOf(pathname);
-  return key === null ? 'hidden' : STRIP_SIZE_BY_ROUTE[key]!;
+  if (key === null) return 'hidden';
+  if (HIDDEN_DURING_INTRO.includes(key) && opts.intro !== false) return 'hidden';
+  return STRIP_SIZE_BY_ROUTE[key]!;
 }

@@ -6424,7 +6424,7 @@ function RaceView({ setup, real }: {
         レース
         {smallScreen || !devMode ? null : <>
         <span style={{ opacity: 0.6, fontSize: 13, marginLeft: 12 }}>
-          ★本番と同じエンジン → 境界時刻 → 位置モデル → {renderer === 'v2' ? 'Broadcast V2（透視カメラ中継）' : '旧固定2D描画（legacy）'}
+          ★本番と同じエンジン → 境界時刻 → 位置モデル → {renderer === 'v2' ? 'Broadcast V2（透視カメラ）' : '旧固定2D描画（legacy）'}
         </span>
         <span style={{
           marginLeft: 12, padding: '2px 8px', fontSize: 12, fontWeight: 'bold', borderRadius: 3,
@@ -6819,7 +6819,7 @@ function RaceView({ setup, real }: {
       <p style={{ fontSize: 12, opacity: 0.55, marginTop: 10, lineHeight: 1.8 }}>
         ★<b>着順はエンジンが決めたもの</b>です（開始時に D-059 のゲートを通しています）。<br />
         {renderer === 'v2'
-          ? <>★Broadcast V2: コース座標 (s, w) を透視カメラで投影し、区間ごとに中継カメラを切り替えています（旧版は <code>?renderer=legacy</code>）。<br /></>
+          ? <>★Broadcast V2: コース座標 (s, w) を透視カメラで投影し、区間ごとにカメラを切り替えています（旧版は <code>?renderer=legacy</code>）。<br /></>
           : <>★旧固定2Dカメラの前景・中景・後景3帯で、距離差とレーンを表示しています（比較用 legacy）。<br /></>}
         馬同士の間隔を保つよう横の進路を調整しています。着順・走破タイムはレースエンジンの確定結果です。
       </p>

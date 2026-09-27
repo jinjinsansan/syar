@@ -27,7 +27,8 @@ import {
   type FoalDraftView, type NameFailureVariant, type NameRequestState,
 } from '../../../lib/name-screen';
 import { SignInRequiredError } from '../../../lib/stable-repo';
-import { RaceStrip } from '../../../components/uma/race-strip';
+import { fetchOnboardingState } from '../../../lib/onboarding';
+import { RaceStrip, reportOnboardingStage } from '../../../components/uma/race-strip';
 
 /** ★失敗の見せ方（★語は出さない） */
 const FAILURE_VIEW: Readonly<Record<NameFailureVariant, {
@@ -103,6 +104,16 @@ export default function NamePage(): React.ReactElement {
     }).finally(() => { setLoading(false); });
   }, []);
   useEffect(() => { reload(); }, [reload]);
+  /**
+   * ★常設帯へ ★サーバーの段階を渡す（★2026-09-28・R-18 回答 🔴 #2）。
+   *   ★初回の仔の命名（★導入中）は ★帯を出さない／★第 2 便の仔の命名は ★極小のまま。★同じ道なので ★段階で分けます。
+   *   ★読めなかったときは ★渡さない（★帯は「分からない」＝ ★この道では出さない側に倒れる）。★失敗の表示は ★上の読み込みが持つ。
+   */
+  useEffect(() => {
+    let active = true;
+    fetchOnboardingState().then((s) => { if (active) reportOnboardingStage(s.stage); }).catch(() => { /* ★帯は出さない側のまま */ });
+    return () => { active = false; reportOnboardingStage(null); };
+  }, []);
 
   useEffect(() => {
     if (step !== 'wait') return;

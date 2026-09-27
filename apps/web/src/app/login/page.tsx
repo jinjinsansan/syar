@@ -22,7 +22,7 @@
 import { useState } from 'react';
 
 import {
-  Backdrop, BigButton, NoticeBar, TopBar, useMotionPaused,
+  Backdrop, BigButton, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
 import { authClient } from '../../lib/supabase';
 
@@ -85,12 +85,11 @@ export default function LoginPage(): React.ReactElement {
     >
       <Backdrop />
       <TopBar title="ログイン" backHref="/" paused={paused} onToggle={toggle} />
-      <NoticeBar
-        kind="soon"
-        text="登録しなくても、中継・オッズ・記録はご覧いただけます。"
-        actionLabel="中継を観る"
-        actionHref="/watch-race"
-      />
+      {/*
+        ★**通知帯は出しません**（★2026-09-28・デザイナー R-18 回答 🔴 #3）。
+        ★`RACE_NOTICE_HANDOFF.md` §3: ★ログインには ★レースの表示を出さない（★認証は 1 操作に集中させる）。
+        ★レースへの道は ★下の「レースを見る」のボタンに残します。
+      */}
 
       <div style={{
         position: 'relative', flex: '1 1 auto', minHeight: 0, overflow: 'auto',
@@ -161,7 +160,7 @@ export default function LoginPage(): React.ReactElement {
         </div>
 
         <div style={{ flex: '0 0 auto', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <BigButton tone="ivory" label="中継を観る" href="/watch-race" />
+          <BigButton tone="ivory" label="レースを見る" href="/watch-race" />
           <BigButton tone="ivory" label="トップへ戻る" href="/" />
         </div>
       </div>

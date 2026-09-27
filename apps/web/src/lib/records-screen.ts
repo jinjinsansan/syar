@@ -48,7 +48,8 @@ export const EP_REASON_LABEL: Readonly<Record<string, string>> = {
   bet: '投票',
   refund: '返還',
   stud_fee: '種付料',
-  horse_purchase: '馬の購入',
+  /** ★「購入」は使わない（★引き渡し資料 §2-1 の禁止語・★R-18 回答 🔴 #1・語は §4-3「市場で迎えた馬」）。★DB の reason は そのまま */
+  horse_purchase: '市場で迎えた馬',
   horse_sale: '馬の売却',
   stable_grade: '厩舎の格',
 };
