@@ -502,6 +502,7 @@ export const READONLY = [
   'verify-horse-smoothness.mjs',  // 馬 1 頭ごとの画面上の動きが滑らかか（読むだけ）
   'verify-shot-stability.mjs',    // B-2 その秒で撮った 1 コマが繰り返し撮って同じかを測る（読むだけ）
   'verify-mobile-layout.mjs',     // 全ページがモバイル幅で横あふれしないかを実ブラウザで測る（読むだけ）
+  'audit-text-on-backdrop.mjs',   // 芝の上にパネル無しで置かれた文字と明度差を実ブラウザで測る（読むだけ・2026-09-28）
   'slice-narrator.mjs',       // ナレーターのシートを 6 枚に切り、口だけ差し替える（読むだけ）
   'verify-no-real-faces.mjs', // 人物立ち絵に写真が混ざっていないか（読むだけ）
   // ★anon で何が読めるかの全数確認（§8.6 server_seed・§12.4 potential）。select のみ
