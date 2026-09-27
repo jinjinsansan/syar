@@ -1671,6 +1671,16 @@ export const OPEN_FINDINGS = [
     owner: 'dev',
     until: '2026-12-31',
   },
+  {
+    id: 'STRIP-SIZE-TWO-ROWS-TO-REVISIT',
+    what: '⚠️ ★常設帯の表（`race-strip-sizes.ts`）に ★**見直しの約束が 2 行**あります（★2026-09-27・裁定 `REVIEW_ALWAYS_VISIBLE_RACE_20260927.md` §5-2）',
+    why: '✔ ★`/odds` ＝ hidden は ★いまは可。★ただしこの画面が出るのは ★「発売中が無い」とき（★`odds/page.tsx` で発売中があれば転送）で、'
+      + '★そこは ★次の発走までの残りが ★いちばん役に立つ場面でもあります → ★**入口が付く日（★網 `screen-reachable.test.ts` の `ENTRANCE_MISSING` から外れた日）に text へ見直す**。'
+      + '✔ ★`/watch-race` ＝ big は ★「フォールバック専用に縮小する」裁定（§3 の 1）が控えています → ★**その便で分類を見直す**。'
+      + '--- ✅ ★**消す条件** --- ★2 行とも ★見直して表を直した（★または直さない理由を裁定に書いた）日。',
+    owner: 'dev',
+    until: '2026-12-31',
+  },
 ];
 
 /**
