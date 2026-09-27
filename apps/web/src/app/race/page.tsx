@@ -6354,6 +6354,22 @@ function RaceView({ setup, real }: {
     );
   }
 
+  /** ★用意している間の札（★濃紺に金の題字・資料 §5）。★PC は金枠の中、★携帯は面の中ほど */
+  const loadingPanel = (
+    <div style={{
+      minHeight: smallScreen ? '60vh' : undefined, display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center', gap: 10, textAlign: 'center',
+    }}>
+      <span style={{ fontSize: 24, letterSpacing: '.14em', color: 'var(--u-gold)' }}>馬物語</span>
+      <p style={{ margin: 0 }}>{real !== null ? '録画の用意をしています…' : 'レースの用意をしています…'}</p>
+      <progress aria-label="レース素材を読み込み中" style={{ width: 'min(260px, 60vw)', accentColor: 'var(--u-gold)' }} />
+      {loadingSeconds >= 10 && real === null && <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <span>このまま待つ</span>
+        <a href="/vote" style={{ color: 'var(--u-gold)', textDecoration: 'underline' }}>結果だけ見る</a>
+      </div>}
+    </div>
+  );
+
   return (
     <main
       className={smallScreen ? 'race-menu' : undefined}
@@ -6390,22 +6406,12 @@ function RaceView({ setup, real }: {
         *   ⚠️ ★携帯では、素材が揃うまで ★**20 秒ほど何も出ません**でした。★その間に見えるのは
         *      ★旧アーケードの青い帯だけで、★玄関（馬物語）から来た人には別のサイトに見えます。
         */}
-      {!devMode && (built === null || !ready) && (
-        <div style={{
-          minHeight: '60vh', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 10, textAlign: 'center',
-        }}>
-          {/* ★濃紺の地に ★金の題字（★資料 §5・★2026-09-27 に白地から移した） */}
-          <span style={{ fontSize: 24, letterSpacing: '.14em', color: 'var(--u-gold)' }}>馬物語</span>
-          <p style={{ margin: 0 }}>{real !== null ? '録画の用意をしています…' : 'レースの用意をしています…'}</p>
-          <progress aria-label="レース素材を読み込み中" style={{ width: 'min(260px, 80vw)', accentColor: 'var(--u-gold)' }} />
-          <span style={{ fontSize: 13, opacity: .8 }}>経過 {loadingSeconds} 秒</span>
-          {loadingSeconds >= 10 && real === null && <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <span>このまま待つ</span>
-            <a href="/vote" style={{ color: 'var(--u-gold)', textDecoration: 'underline' }}>結果だけ見る</a>
-          </div>}
-        </div>
-      )}
+      {/*
+        🔴 ★PC では ★**映像の金枠の中**に出します（★下の画布の上に重ねる）。★ここに出すのは ★携帯の面だけです。
+           ★2026-09-27 オーナー「★録画の用意をしています というこのような見栄えが悪い方法を取る必要があるのですか？」
+           ★それまで ★空の帯・文言・空の黒い枠が ★縦に 3 段 並んでいました。
+      */}
+      {!devMode && smallScreen && (built === null || !ready) && loadingPanel}
       {/** ⚠️ ★見ている間は見出しも消します（★上と同じ理由） */}
       {!devMode && (watchStarted || !(SHOW_ENTRY || entryRequested)) ? null : (
       <h1 style={{ fontSize: 18, margin: '4px 0 8px' }}>
@@ -6769,8 +6775,12 @@ function RaceView({ setup, real }: {
         ★**音・全画面・もう一度 と 録画の札**（★2026-09-27・資料 §5.5 / §5.6 の形へ）。
         ⚠️ ★それまで ★白い小さなボタンと ★地の文字だけの札でした（★オーナー「★レース録画を出すにしても UI をちゃんとしてください」）。
       */}
+      {/* ★用意ができるまでは ★押しても何も起きないので ★出しません（★場所だけは空けて、出たときに映像が動かないように） */}
       {!smallScreen && !devMode && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', width: '100%', maxWidth: 1280, margin: '12px auto 10px', padding: '0 14px' }}>
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', width: '100%', maxWidth: 1280, margin: '12px auto 10px', padding: '0 14px',
+          visibility: built === null || !ready ? 'hidden' : 'visible',
+        }}>
           <button type="button" onClick={() => setSoundOn((q) => !q)} aria-pressed={soundOn}
             style={{ ...RACE_CONTROL, ...(soundOn ? { background: 'var(--u-gold-plate)', color: 'var(--u-ink-dark)', borderColor: 'var(--u-navy)' } : {}) }}>
             {soundOn ? '♪ 音 入' : '♪ 音 切'}
@@ -6781,7 +6791,15 @@ function RaceView({ setup, real }: {
         </div>
       )}
       {!smallScreen && (
-        <div style={{ width: '100%', maxWidth: devMode ? undefined : 1280, margin: '0 auto', padding: devMode ? 0 : '0 14px' }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: devMode ? undefined : 1280, margin: '0 auto', padding: devMode ? 0 : '0 14px' }}>
+          {!devMode && (built === null || !ready) && (
+            <div style={{
+              position: 'absolute', inset: '0 14px', zIndex: 1, borderRadius: 12, border: '3px solid var(--u-gold)',
+              background: 'var(--u-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {loadingPanel}
+            </div>
+          )}
           <canvas
             ref={canvasRef} width={W} height={H}
             style={{
