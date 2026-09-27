@@ -55,13 +55,28 @@ export function pixelScaleOf(deviceRatio: number): number {
  * ★`?dpr=` の戻し口は ★これまでどおり効きます（★その値で描く）。
  * ⚠️ ★上限は `MAX_PIXEL_SCALE`（★コマ落ち対策）。★上限に当たる大きな画面（★4K で全幅など）だけは ★比が 1 を超えます。
  */
-export function pixelScaleForDisplay(search: string, deviceRatio: number, displayCssWidth: number, drawWidth: number): number {
+export function pixelScaleForDisplay(
+  search: string, deviceRatio: number, displayCssWidth: number, drawWidth: number, supersample = 1,
+): number {
   const v = new URLSearchParams(search).get('dpr');
   if (v !== null && v !== '') return pixelScaleFromSearch(search, deviceRatio);
   if (!Number.isFinite(displayCssWidth) || displayCssWidth <= 0 || !Number.isFinite(drawWidth) || drawWidth <= 0
     || !Number.isFinite(deviceRatio) || deviceRatio <= 0) return pixelScaleOf(deviceRatio);
-  return Math.min(MAX_PIXEL_SCALE, Math.max(MIN_DISPLAY_SCALE, (displayCssWidth * deviceRatio) / drawWidth));
+  const ss = Number.isFinite(supersample) && supersample >= 1 ? supersample : 1;
+  return Math.min(MAX_PIXEL_SCALE, Math.max(MIN_DISPLAY_SCALE, (displayCssWidth * deviceRatio * ss) / drawWidth));
 }
+
+/**
+ * ★**携帯だけ ★裏の画素を 1:1 より多く持つ口**（★2026-09-28・レビュー側の条件・★既定は 1 ＝ 1:1）。
+ *
+ * ⚠️ ★**1:1 にすると 携帯は ★超標本化の分を失います。** ★これまで携帯（390px・dpr 3）は ★裏 2560 を ★画面 1086 物理 px に縮めており、
+ *    ★その縮小が ★超標本化（supersampling）として ★輪郭を滑らかにしていた可能性があります。★1:1 では ★滲みは消えても ★縁がカクつく方向に振れます。
+ *    ★「変わらないはず」とは言えません（★簿 PHONE-SUPERSAMPLE-LOSS）。
+ * ★**見比べ方**: ★`/race?dpr=2` ＝ ★これまでの携帯（★裏 2560）と同じ・★指定なし ＝ 1:1。★見え方はオーナーの目。
+ * ★**開けるのは判断が出てから**: ★オーナーが「前のほうが滑らかだった」と言ったら ★ここを 1.5 などにする（★上限 `MAX_PIXEL_SCALE` の内側）。
+ * ★**コマ落ちの測り方**: ★`tools/measure-race-canvas-ratio.mjs --frames` が ★携帯の真似で 5 秒 ★コマの間隔（p95・33ms 超の数）を測る。★開ける前と後で並べる。
+ */
+export const PHONE_SUPERSAMPLE = 1;
 /** ★見せる寸法から出す倍率の下限（★画布が一瞬 0 幅のとき 極端に小さくしない） */
 export const MIN_DISPLAY_SCALE = 0.25;
 

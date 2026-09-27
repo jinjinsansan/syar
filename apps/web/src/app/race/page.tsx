@@ -60,7 +60,7 @@ import {
   cameraBasis, project, HORSE_HEIGHT_M, setHorseScale,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
-  drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, pixelScaleForDisplay, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
+  drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, pixelScaleForDisplay, PHONE_SUPERSAMPLE, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   // ★発走前の流れ（★2026-09-15・オーナー決定「動画の通り」）
   RACE_INTRO_FLYOVER_START_SEC, RACE_INTRO_GRADE_END_SEC, RACE_INTRO_ENTRY_END_SEC, RACE_INTRO_GATE_HOLD_SEC,
   drawPaddockIntro, drawGradeIntro, paddockPicksOf, popularityRanksOf,
@@ -4205,6 +4205,8 @@ function RaceView({ setup, real }: {
       typeof window === 'undefined' ? 1 : window.devicePixelRatio,
       Math.max(shown.width, shown.height),
       W,
+      /** ★携帯（★触る端末）だけ ★超標本化の口（★既定 1 ＝ 1:1・`PHONE_SUPERSAMPLE` の註記） */
+      typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches ? PHONE_SUPERSAMPLE : 1,
     );
     const bufferW = Math.round(W * pixelScale);
     const bufferH = Math.round(H * pixelScale);

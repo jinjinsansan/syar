@@ -18,7 +18,7 @@
 import { describe, it, expect } from 'vitest';
 import { ovalCourse } from '../src/course.js';
 import { drawTexturedWorld } from '../src/world-textured.js';
-import { pixelScaleOf, pixelScaleFromSearch, pixelScaleForDisplay, MAX_PIXEL_SCALE } from '../src/pixel-scale.js';
+import { pixelScaleOf, pixelScaleFromSearch, pixelScaleForDisplay, MAX_PIXEL_SCALE, PHONE_SUPERSAMPLE } from '../src/pixel-scale.js';
 
 const course = ovalCourse(1600, { widthM: 20, turn: 'left' });
 const CAM = {
@@ -160,5 +160,27 @@ describe('★見せる寸法に合わせた倍率（D-058b）', () => {
       const physical = st[5]! * s;
       expect(Math.abs(physical - Math.round(physical))).toBeLessThan(1e-6);
     }
+  });
+});
+
+describe('★携帯の超標本化の口（★既定は 1:1・レビュー側の条件）', () => {
+  const W = 1280;
+  it('🔴 ★既定は 1（★開けるのは オーナーの判断が出てから）', () => {
+    expect(PHONE_SUPERSAMPLE).toBe(1);
+    expect(pixelScaleForDisplay('', 3, 362, W, PHONE_SUPERSAMPLE)).toBeCloseTo((362 * 3) / W, 6);
+  });
+
+  it('★開けたら ★その倍だけ裏の画素が増える（★上限の内側）', () => {
+    expect(pixelScaleForDisplay('', 3, 362, W, 1.5)).toBeCloseTo((362 * 3 * 1.5) / W, 6);
+    /** ★上限は超えない */
+    expect(pixelScaleForDisplay('', 3, 693.33, W, 1.5)).toBe(MAX_PIXEL_SCALE);
+    /** ★1 未満や数でない値は ★1 として扱う（★口から粗くしない） */
+    expect(pixelScaleForDisplay('', 3, 362, W, 0.5)).toBeCloseTo((362 * 3) / W, 6);
+    expect(pixelScaleForDisplay('', 3, 362, W, Number.NaN)).toBeCloseTo((362 * 3) / W, 6);
+  });
+
+  it('★見比べの口: ★`?dpr=2` は ★これまでの携帯（★裏 2560）と同じ', () => {
+    expect(Math.round(W * pixelScaleForDisplay('?dpr=2', 3, 362, W))).toBe(2560);
+    expect(Math.round(W * pixelScaleOf(3))).toBe(2560);
   });
 });

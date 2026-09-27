@@ -7,11 +7,23 @@
  * 使い方:
  *   AUDIT_BASE=https://star-two-chi.vercel.app npx tsx tools/measure-race-canvas-ratio.mjs
  *   npx tsx tools/measure-race-canvas-ratio.mjs            （★next start ・ただし手元は素材が無く 描き始めないことがある）
+ *   AUDIT_BASE=… npx tsx tools/measure-race-canvas-ratio.mjs --frames              （★コマの間隔も・5 秒）
+ *   AUDIT_BASE=… npx tsx tools/measure-race-canvas-ratio.mjs --query dpr=2 --frames （★これまでの携帯と見比べ）
  * ⚠️ ★素材（約 20MB）が落ちてくるまで待つので ★1 画面 数十秒かかります。
  */
 import { launch } from './lib/cdp.mjs';
 
+const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ? d : process.argv[i + 1]; };
 const BASE = process.env.AUDIT_BASE ?? 'http://localhost:3210';
+/** ★`--query dpr=2` … ★これまでの携帯（★裏 2560）と見比べる（★戻し口） */
+const QUERY = String(arg('query', ''));
+/** ★`--frames` … ★5 秒 ★コマの間隔を測る（★コマ落ちの測り方・超標本化の口を開ける前後で並べる） */
+const FRAMES = process.argv.includes('--frames');
+const FRAME_STATS = `new Promise((done) => { const t = []; let last = performance.now(); const end = last + 5000;
+  const tick = (now) => { t.push(now - last); last = now; if (now < end) requestAnimationFrame(tick); else {
+    t.sort((a, b) => a - b); const p = (q) => t[Math.min(t.length - 1, Math.floor(t.length * q))];
+    done(JSON.stringify({ n: t.length, p50: p(0.5), p95: p(0.95), over33: t.filter((x) => x > 33.4).length })); } };
+  requestAnimationFrame(tick); })`;
 const CASES = [
   { name: 'PC（dpr 1）', width: 1400, height: 900, dpr: 1, mobile: false },
   { name: 'オーナーの画面（dpr 1.5）', width: 1400, height: 900, dpr: 1.5, mobile: false },
@@ -34,11 +46,15 @@ try {
   for (const k of CASES) {
     await b.send('Emulation.setDeviceMetricsOverride', { width: k.width, height: k.height, deviceScaleFactor: k.dpr, mobile: k.mobile });
     await b.goto('about:blank', 'true', { timeoutMs: 20000, settleMs: 100 });
-    const drawn = await b.goto(`${BASE}/race?badge=0&auditSec=20&seed=42`, DRAWN, { timeoutMs: 180000, settleMs: 1500 });
+    const drawn = await b.goto(`${BASE}/race?badge=0&auditSec=20&seed=42${QUERY === '' ? '' : `&${QUERY}`}`, DRAWN, { timeoutMs: 180000, settleMs: 1500 });
     const m = JSON.parse(await b.evaluate(READ));
     if (!m.ok) { console.log(`${k.name}: ★${m.why}`); continue; }
     const ratio = m.backing / m.shownDevice;
     console.log(`${k.name.padEnd(22)} ${drawn ? '' : '★描き始めていない  '}裏 ${m.backing}px ／ 画面 ${m.shownCss.toFixed(1)} CSS px × dpr ${m.dpr} ＝ ${m.shownDevice.toFixed(1)} 物理 px ／ ★比 ${ratio.toFixed(3)}`);
+    if (FRAMES) {
+      const fr = JSON.parse(await b.evaluate(FRAME_STATS));
+      console.log(`${' '.repeat(24)}コマ ${fr.n} 枚／5 秒・間隔 p50 ${fr.p50.toFixed(1)}ms・p95 ${fr.p95.toFixed(1)}ms・33ms 超 ${fr.over33} 回`);
+    }
   }
 } finally {
   await b.close();
