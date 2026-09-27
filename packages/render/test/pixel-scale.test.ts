@@ -18,7 +18,7 @@
 import { describe, it, expect } from 'vitest';
 import { ovalCourse } from '../src/course.js';
 import { drawTexturedWorld } from '../src/world-textured.js';
-import { pixelScaleOf, pixelScaleFromSearch, MAX_PIXEL_SCALE } from '../src/pixel-scale.js';
+import { pixelScaleOf, pixelScaleFromSearch, pixelScaleForDisplay, MAX_PIXEL_SCALE } from '../src/pixel-scale.js';
 
 const course = ovalCourse(1600, { widthM: 20, turn: 'left' });
 const CAM = {
@@ -113,6 +113,51 @@ describe('★②③④ 地面の走査線', () => {
   it('★倍率 1.5 で、貼る先の y が物理画素の整数行に乗る', () => {
     for (const s of groundStrips({ pixelScale: 1.5 })) {
       const physical = s[5]! * 1.5;
+      expect(Math.abs(physical - Math.round(physical))).toBeLessThan(1e-6);
+    }
+  });
+});
+
+/**
+ * ★**見せる寸法に合わせた倍率**（★2026-09-28・正典 D-058b）: ★裏の画素 ＝ ★見せる寸法 × devicePixelRatio（★比 1.000）。
+ * ★合格条件（★レビュー側）: ★PC・★オーナーの dpr 1.5・★携帯 390px で ★比が 1.000。
+ */
+describe('★見せる寸法に合わせた倍率（D-058b）', () => {
+  const W = 1280;
+  /** ★比 ＝ ★裏の画素（★整数に丸めた幅） ÷ ★画面の物理画素 */
+  const ratioOf = (cssW: number, dpr: number): number => Math.round(W * pixelScaleForDisplay('', dpr, cssW, W)) / (cssW * dpr);
+
+  it('🔴 ★3 つの画面で ★比が 1.000（★ブラウザが縮め直さない）', () => {
+    /** ★PC（★入れ物 1252 CSS px・dpr 1） */
+    expect(ratioOf(1252, 1)).toBeCloseTo(1, 3);
+    /** ★オーナーの画面（★dpr 1.5） */
+    expect(ratioOf(1252, 1.5)).toBeCloseTo(1, 3);
+    /** ★携帯 390px の縦の枠（★入れ物 362 CSS px・dpr 3） */
+    expect(ratioOf(362, 3)).toBeCloseTo(1, 3);
+    /** ★携帯を横にした全画面（★844×390 に 16:9 → 693.3 CSS px・dpr 3） */
+    expect(ratioOf(693.33, 3)).toBeCloseTo(1, 3);
+  });
+
+  it('★対照: ★これまでの倍率（★端末の画素比だけ）では ★PC で 0.978 倍に縮め直されていた', () => {
+    expect(Math.round(W * pixelScaleOf(1)) / (1252 * 1)).toBeCloseTo(1.022, 3);
+  });
+
+  it('★上限・★戻し口・★幅が分からないとき', () => {
+    /** ★4K で全幅（3840 物理 px）は ★上限 2 に当たる（★コマ落ち対策・比は 1 を超える） */
+    expect(pixelScaleForDisplay('', 3, 1280, W)).toBe(MAX_PIXEL_SCALE);
+    /** ★`?dpr=1` は ★これまでどおりその値 */
+    expect(pixelScaleForDisplay('?dpr=1', 1.5, 1252, W)).toBe(1);
+    /** ★画布の幅がまだ 0 なら ★端末の画素比だけで決める */
+    expect(pixelScaleForDisplay('', 1.5, 0, W)).toBe(pixelScaleOf(1.5));
+  });
+
+  it('★1 未満の倍率でも ★地面の走査線が物理画素の格子に乗る', () => {
+    const s = pixelScaleForDisplay('', 1, 1252, W);
+    expect(s).toBeLessThan(1);
+    const strips = groundStrips({ pixelScale: s });
+    expect(strips.length).toBeGreaterThan(50);
+    for (const st of strips) {
+      const physical = st[5]! * s;
       expect(Math.abs(physical - Math.round(physical))).toBeLessThan(1e-6);
     }
   });

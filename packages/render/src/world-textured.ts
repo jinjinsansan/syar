@@ -2,6 +2,7 @@ import { posOf, type Course } from './course.js';
 import { drawInfield } from './infield.js';
 import type { Ctx2D } from './oblique-draw.js';
 import { cameraBasis, horizonY, project, type PerspectiveCamera } from './perspective.js';
+import { MIN_DISPLAY_SCALE } from './pixel-scale.js';
 
 /**
  * ★**テクスチャ付き透視ワールド**（コーナー・斜め・後方などカメラが横向きでないショット用）。
@@ -311,7 +312,12 @@ export function drawTexturedWorld<TImage>(
    * ⚠️ ★開始行は ★**物理画素の格子へ丸めます**。★半画素ずれたまま貼ると、
    *    ★ブラウザが縁を混ぜて ★**かえって滲みます**。
    */
-  const pxScale = Math.max(1, opts.pixelScale ?? 1);
+  /**
+   * ⚠️ ★**下限は 1 ではありません**（★2026-09-28・正典 D-058b）。★倍率は ★見せる寸法に合わせるので ★1 未満にもなります
+   *    （★PC の入れ物 1252 CSS px なら 0.978）。★1 で頭打ちにすると ★1 論理行 ＝ 0.978 物理行になり ★格子から外れて滲みます
+   *    （★網 `pixel-scale.test.ts` が捕まえた）。★下限は `MIN_DISPLAY_SCALE` と同じ 0.25。
+   */
+  const pxScale = Math.max(MIN_DISPLAY_SCALE, opts.pixelScale ?? 1);
   const rowStep = 1 / pxScale;
   const yStart = Math.round(Math.max(0, Math.floor(hz) + 1) * pxScale) / pxScale;
   const rowCount = Math.max(0, Math.ceil((H - yStart) * pxScale));

@@ -881,7 +881,8 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
 .race-stage-full {
   position: fixed;
   inset: 0;
-  background: #000;
+  /* ★縦横比の余白は ★濃紺（★2026-09-28・デザイナー R-18 回答 4-2・正典 D-058b）。★映像との境に金の細線（race/page.tsx） */
+  background: #0a2340;
   overflow: hidden;
   z-index: 60;
 }

@@ -60,7 +60,7 @@ import {
   cameraBasis, project, HORSE_HEIGHT_M, setHorseScale,
   buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
-  drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, pixelScaleFromSearch, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
+  drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, pixelScaleForDisplay, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   // ★発走前の流れ（★2026-09-15・オーナー決定「動画の通り」）
   RACE_INTRO_FLYOVER_START_SEC, RACE_INTRO_GRADE_END_SEC, RACE_INTRO_ENTRY_END_SEC, RACE_INTRO_GATE_HOLD_SEC,
   drawPaddockIntro, drawGradeIntro, paddockPicksOf, popularityRanksOf,
@@ -4195,9 +4195,16 @@ function RaceView({ setup, real }: {
      * ⚠️ ★`canvas.width` への代入は ★**文脈の状態（変換・色・書体）を消します**。
      *    ★大きさが変わったときだけ代入し、★変換は毎コマ入れ直します。
      */
-    const pixelScale = pixelScaleFromSearch(
+    /**
+     * ★**見せる寸法に合わせる**（★2026-09-28・正典 D-058b）: ★裏の画素 ＝ ★見せる寸法 × devicePixelRatio（★比 1.000・★ブラウザに縮め直させない）。
+     *   ★見せる寸法は ★画面上の箱（★全画面の拡大縮小と回転を含む）の ★長い辺（★画布は常に横長 16:9）。
+     */
+    const shown = cv.getBoundingClientRect();
+    const pixelScale = pixelScaleForDisplay(
       typeof window === 'undefined' ? '' : window.location.search,
       typeof window === 'undefined' ? 1 : window.devicePixelRatio,
+      Math.max(shown.width, shown.height),
+      W,
     );
     const bufferW = Math.round(W * pixelScale);
     const bufferH = Math.round(H * pixelScale);
@@ -6232,6 +6239,8 @@ function RaceView({ setup, real }: {
             position: 'absolute', top: '50%', left: '50%', width: W, height: H,
             transformOrigin: 'center',
             transform: `translate(-50%, -50%) rotate(${stagePortrait ? 90 : 0}deg) scale(${stageScale})`,
+            /** ★映像と余白の境に ★金の細線 1px（★R-18 回答 4-2）。★箱ごと縮むので ★縮尺で割って 画面で 1px にする */
+            outline: `${1 / Math.max(0.2, stageScale)}px solid rgba(246,194,28,.35)`,
           }}
         >
           <canvas
