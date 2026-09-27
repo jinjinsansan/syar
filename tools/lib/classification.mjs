@@ -1251,6 +1251,7 @@ export const COMPONENT = [
   { file: 'lib/args.mjs', why: '★コマンドライン引数の解析。★2026-08-20 に本番へ余計な移行を当てた事故の後、切り出した部品' },
   { file: 'lib/lineage-measure.mjs', why: '★D-121 ③ の測る部品（★% 点・母系の世代・参考の列の純関数。★`measure-lineage-plateau.mjs` が使う・★単体では走らせない）' },
   { file: 'lib/name-reset.mjs', why: '★馬名を戻す部品（★新しい名前を選ぶ純関数・読む・書く。★`reset-horse-name.mjs` と予行が使う・★単体では走らせない）' },
+  { file: 'lib/user-eyes.mjs', why: '★0 行のビューの判定（★呼ぶ関数を直に呼ぶ・対象外／不合格／ok の純関数。★`verify-user-eyes.mjs` と網 `user-eyes-empty-view.test.ts` が使う・★単体では走らせない・裁定 REVIEW_INC_PROD_PERMISSION §5-1）' },
   { file: 'lib/name-recheck.mjs', why: '★未検査の馬名を禁止名の判定で分ける純関数（★`recheck-name-blocklist.mjs` が使う・★単体では走らせない）' },
   { file: 'lib/name-key-survey.mjs', why: '★馬名の正規化キーの下見の純関数（★`backfill-name-key.mjs` が使う・★単体では走らせない）' },
   { file: 'lib/cdp.mjs', why: '★Chrome DevTools Protocol の細口（★映像の撮影の道具が使う）。★単体では走らせない' },

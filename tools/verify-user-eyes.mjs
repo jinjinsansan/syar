@@ -20,6 +20,7 @@
  */
 import pg from 'pg';
 import { loadEnv } from './lib/env.mjs';
+import { emptyViewVerdict } from './lib/user-eyes.mjs';
 
 if (!process.argv.includes('--env')) {
   console.error('🔴 ★--env を明示してください（★既定は本番です）');
@@ -78,33 +79,10 @@ const publicFns = (await c.query(
     where n.nspname = 'public' and p.prokind = 'f'`,
 )).rows;
 
-/** ★仮の引数（★型ごと 1 つ）。★作れない型は `undefined`（★確かめられない ＝ 不合格） */
-const DUMMY = {
-  uuid: 'gen_random_uuid()', integer: '0', bigint: '0', smallint: '0', numeric: '0',
-  text: "''", 'character varying': "''", boolean: 'false',
-};
-
-/**
- * 🔴 ★**0 行のビュー**（★裁定 §5・★`count(*)` と同じ理屈の双子）。
- *   ★行が無ければ ★列の式は評価されないので、★`select *` でも ★「読める」は未証明です。
- *   → ★そのビューが呼ぶ関数を ★**同じ役で直に呼び**、★実行権と ★関数の中の表まで通ることを見ます。
- *   ★関数を 1 つも呼ばないビューは ★「対象外」と ★機械が言います（★「判定不能」という 3 つ目の状態を作らない・TL-1）。
- *   ⚠️ ★状態を変えうる関数（`volatile`）は ★直に呼びません → ★確かめられない ＝ ★不合格。
- */
+/** ★0 行のビュー（★判定は部品 `lib/user-eyes.mjs` の `emptyViewVerdict`・★網が同じ部品を 落ちる形と通る形で走らせる・裁定 §5-1） */
 async function checkEmptyView(role, view) {
-  const def = (await c.query('select pg_get_viewdef($1::regclass, true) as d', [`public.${view}`])).rows[0].d;
-  const called = publicFns.filter((f) => new RegExp(`\\b${f.name}\\s*\\(`, 'i').test(def));
-  if (called.length === 0) return { verdict: 'na', note: '0 行・★関数を呼ばないので対象外' };
-  const notes = [];
-  for (const f of called) {
-    if (f.vol === 'v') return { verdict: 'fail', note: `0 行・${f.sig} は volatile（★直に呼ばない ＝ 確かめられない）` };
-    const args = f.args.map((t) => DUMMY[t]);
-    if (args.some((a) => a === undefined)) return { verdict: 'fail', note: `0 行・${f.sig} の引数を作れない（★確かめられない）` };
-    const r = await asRole(role, `select public.${c.escapeIdentifier(f.name)}(${args.join(', ')})`);
-    if (!r.ok) return { verdict: 'fail', note: `0 行・${f.sig} を直に呼んで落ちた: ${r.error}` };
-    notes.push(`${f.name}() ✓`);
-  }
-  return { verdict: 'ok', note: `0 行・★呼ぶ関数を直に呼んで通った（${notes.join(' ')}）` };
+  const viewDef = (await c.query('select pg_get_viewdef($1::regclass, true) as d', [`public.${view}`])).rows[0].d;
+  return emptyViewVerdict({ viewDef, publicFns, callAs: (sql) => asRole(role, sql), quote: (n) => c.escapeIdentifier(n) });
 }
 
 for (const role of ['anon', 'authenticated']) {
