@@ -1606,6 +1606,18 @@ export const OPEN_FINDINGS = [
     owner: 'owner',
     until: '2026-10-04',
   },
+  {
+    id: 'EMPTY-VIEW-EVAL-UNPROVEN-ON-REAL-PG',
+    what: '⚠️ ★「★0 行のビューは ★列の式（関数）を評価しない」を ★**本物の PostgreSQL では確かめていません**（★2026-09-27・裁定 `REVIEW_INC_PROD_PERMISSION_20260927.md` §5-2）',
+    why: '✔ ★`tools/verify-user-eyes.mjs` は ★0 行のビューが呼ぶ関数を ★直に呼んで確かめます（★部品 `tools/lib/user-eyes.mjs`）。'
+      + '★その分かれ目は ★網 `apps/cli/test/user-eyes-empty-view.test.ts` が ★**偽の DB** で 4 通り通しました。'
+      + '⚠️ ★偽の DB が真似るのは ★「definer でなく ★revoke した表に触れたら permission denied」だけです。'
+      + '★「0 行なら式を評価しない」は ★`count(*)` の罠（★使われない列の関数は呼ばれない）と同じ土台で、★本物では未確認です。'
+      + '★staging に仮のビューは作りません（★共有の staging を汚す・★書き込みになる）。'
+      + '--- ✅ ★**消す条件** --- ★0 行で関数を呼ぶ公開ビューが ★staging に実在した日に、★そこで `verify-user-eyes --env staging` を流して報告した日。',
+    owner: 'dev',
+    until: '2026-12-31',
+  },
 ];
 
 /**
