@@ -177,7 +177,7 @@ export default function EntryPage(): React.ReactElement {
     )}
     {/*
       ★**参加ポイントが足りないとき、★受け取る場所へ案内します**（★2026-09-27・オーナーが残高 0 で登録できなかった）。
-      ★毎日 200 EP は `/earn` で受け取れます（★D-075・`0080`）。★「購入」への導線ではありません（★憲法 §0.2）。
+      ★毎日のポイントは `/earn` で受け取れます（★D-075・★額は `ep_grant_amount` 1 か所）。★「購入」への導線ではありません（★憲法 §0.2）。
     */}
     {data !== null && data.signedIn && race !== null && !enough && (
       <NoticeBar kind="closing" text={`参加ポイントが足りません（あと ${(race.feeEP - epBalance).toLocaleString('ja-JP')} EP）`}

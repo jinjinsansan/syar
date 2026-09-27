@@ -32,7 +32,7 @@ describe('★EP の額（★D-075）を SQL と TS で 1 つにする', () => {
     expect(onlyNumber(body, /when\s+'signup'\s+then\s+return\s+(\d+)/gi, '登録時')).toBe(EP_GRANTS.signup);
   });
 
-  it('★デイリー 200 ＝ EP_GRANTS.daily', () => {
+  it('★デイリー（★2026-09-27 に 2,000・`0091`）＝ EP_GRANTS.daily', () => {
     const { body } = lastFunctionBody('ep_grant_amount');
     expect(onlyNumber(body, /when\s+'daily'\s+then\s+return\s+(\d+)/gi, 'デイリー')).toBe(EP_GRANTS.daily);
   });

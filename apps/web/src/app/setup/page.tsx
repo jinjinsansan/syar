@@ -40,7 +40,7 @@ import {
   Backdrop, BigButton, NoticeBar, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
 import {
-  NAME_MAX, SILK_COLORS, SLEEVES, sleeveHex, supabaseSetupRepo,
+  NAME_MAX, SILK_COLORS, SLEEVES, sleeveHex, supabaseSetupRepo, SETUP_GRANT_EP, SETUP_DAILY_EP,
   type InitialHorse, type SetupError, type Sleeve,
 } from '../../lib/setup';
 
@@ -294,7 +294,12 @@ export default function SetupPage(): React.ReactElement {
 
             <div style={{ ...CARD, gap: 10 }}>
               <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--u-ink)', lineHeight: 1.7 }}>
-                登録で 2,000 EP、毎日のログインで 200 EP が入ります
+                {/*
+                  🔴 ★額は ★直書きしない（★2026-09-27・裁定 UI 総点検 P1-3）。★ここに「2,000 EP／200 EP」と書いてあり、
+                     ★デイリーを 2,000 に改訂した日に ★**この文だけ嘘になる**ところでした（★額を 2 か所に持つと片方が古びる）。
+                     ★額は ★`EP_GRANTS`（★SQL の `ep_grant_amount` と網で一致）から読みます。
+                */}
+                登録で {SETUP_GRANT_EP.toLocaleString('ja-JP')} EP、毎日のログインで {SETUP_DAILY_EP.toLocaleString('ja-JP')} EP が入ります
               </span>
               <BigButton
                 tone={canSubmit ? 'gold' : 'disabled'}
