@@ -84,6 +84,11 @@ const OWN_HEADER = [
    * ✅ ★`/stable/foal`（★最初の 1 頭を無償で生産する・案 A）も同じ形なので、ここに入れます。
    */
   '/stable/roles', '/stable/breed', '/stable/name', '/stable/foal',
+  /**
+   * ★**白い旧い枠から 馬物語 UI へ移した面**（★2026-09-27・オーナー指摘「★この白の間違っているデザインはいつ辞めるのですか」）。
+   *   ★引き渡し資料 `design_handoff_uma_monogatari` §5（全ページ共通の骨格）で組み直したので ★自前の上段バーを持ちます。
+   */
+  '/entry',
 ];
 
 /** Presentation boundary: racing canvases, labs and both landing pages keep their own layout. */

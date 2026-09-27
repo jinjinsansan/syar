@@ -52,8 +52,17 @@ export type ScreenVerdict =
   | 'new'
   /** ★新版が在る → ★**転送して消した**（★`next.config.mjs` の `SUPERSEDED_SCREENS`） */
   | 'redirected'
-  /** ★要るが旧世代 → ★**デザイナーに作り直しを依頼する**（★開発側で見た目を作らない） */
+  /**
+   * ★要るが旧世代 → ★**引き渡し資料 `design_handoff_uma_monogatari` §5 の骨格へ移す**。
+   * ⚠️ ★2026-09-27 に訂正: ★以前は「★デザイナーに作り直しを依頼する」と書いていました。
+   *    ★資料は §5 に ★全ページ共通の骨格を、★§4.3 に ★旧い面の行き先を ★既に書いていました（★デザイナー待ちは開発側の読み落とし）。
+   */
   | 'rebuild'
+  /**
+   * ★**移し終えた**（★新世代）。★**釘は残します** — ★移した後で ★呼んでいた口が消えても ★気づけるように。
+   *   ★網は ★`rebuild` ＋ `rebuilt` と 釘の一覧を 1 対 1 で見ます。
+   */
+  | 'rebuilt'
   /** ★開発用の下見。★利用者の導線に無い */
   | 'dev-only'
   /** ★旧世代だがデザインの問題ではない（★自前の描画・自前の LP） */
@@ -124,7 +133,7 @@ export const SCREENS: readonly ScreenRecord[] = [
       + '★転送すると ★**調教の指示を出す口が消え、育成のループが止まります**。'
       + '→ ★`/train` を先に繋いでから送ること（★網: `screen-generations.test.ts` の「送り先がサーバーを呼んでいる」）',
   },
-  { route: '/entry', verdict: 'rebuild', why: '★出走登録。★導線に在る（`/mypage` から）。★2026-09-25 に登録が動くようにした' },
+  { route: '/entry', verdict: 'rebuilt', why: '★出走登録。★2026-09-27 に ★引き渡し資料 §5 の骨格（馬物語 UI）へ移した（★登録の処理は変えていない）' },
   { route: '/stable', verdict: 'rebuild', why: '★厩舎の一覧。★`/setup` と `foal-invite` から来る' },
   { route: '/stable/[horseId]', verdict: 'rebuild', why: '★1 頭の詳細' },
   { route: '/stable/breed', verdict: 'rebuild', why: '★配合。★血統ループの本体' },

@@ -95,8 +95,12 @@ describe('★④ 画面が時計を持たない（★正典 §14）', () => {
   });
 
   it('🔴 ★年齢は「いまの週」から出す（★画面が起点を持たない・UI1-10）', () => {
+    /**
+     * 🔴 ★入力は ★DB の実際の値（`male`）にします（★2026-09-27）。
+     *   ★ここは `sex: '牡'` と ★DB に無い値を渡していたため、★画面が `female4` と生の値を出す不具合を ★見逃していました。
+     */
     const h = (birthWeek: number | null, gameWeek: number) => toEntryHorseView(
-      { id: 'h1', name: 'テスト', sex: '牡', condition: 3, fatigue: 0, birthWeek, wins: 0, starts: 0 },
+      { id: 'h1', name: 'テスト', sex: 'male', condition: 3, fatigue: 0, birthWeek, wins: 0, starts: 0 },
       gameWeek,
     );
     expect(h(0, 104).sexAge, '★104 週 ＝ 2 歳').toBe('牡2');

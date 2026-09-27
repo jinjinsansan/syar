@@ -15,10 +15,10 @@
  *   ⚠️ ★**「デモの帯が出ないこと」を合格にしません。** ★繋ぎ忘れても描画に失敗しても帯は出ません。
  *   ✅ ★対照は ★**「本物のデータが届いていること」**: ★頭数が `my_horses` の行数と一致すること。
  */
-import { WEEKS_PER_YEAR } from '@star/scheduler';
 import { rankOfWins } from '@star/scheduler';
 
 import { ownerSilksOf } from '@star/render';
+import { formatSexAge } from './format';
 import { authClient, readClient } from './supabase';
 import type { HorseDetail, StableHorse, StableRepo, StableView, WeekPlan } from './stable';
 
@@ -46,12 +46,6 @@ const HORSE_COLUMNS =
   'id, name, sex, condition, fatigue, stable_grade, birth_week, wins, starts,'
   + ' last_processed_week, rest_until_week, retired_at_week, career_ended';
 
-/** ★性別と年齢（★年齢は「いまの週」から出す・`entry-screen.ts` と同じ規則） */
-function sexAgeOf(sex: string, birthWeek: number | null, gameWeek: number): string {
-  const label = sex === 'male' ? '牡' : sex === 'female' ? '牝' : 'セ';
-  if (birthWeek === null) return label;
-  return `${label}${Math.max(0, Math.floor((gameWeek - birthWeek) / WEEKS_PER_YEAR))}`;
-}
 
 /**
  * ★その週の予定。
@@ -97,7 +91,8 @@ function toStableHorse(
   return {
     id: row.id,
     name: row.name,
-    sexAge: sexAgeOf(row.sex, row.birth_week, gameWeek),
+    /** ★性別と年齢は ★`formatSexAge` 1 か所で（★2026-09-27 に寄せた・D-052） */
+    sexAge: formatSexAge(row.sex, row.birth_week, gameWeek),
     classRank: rank,
     classLabel: CLASS_LABEL[rank - 1] ?? '?',
     condition: Math.min(5, Math.max(1, Number(row.condition))) as StableHorse['condition'],

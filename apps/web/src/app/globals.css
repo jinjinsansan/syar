@@ -191,7 +191,8 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   main [style*="flex:0 0 200px"], main [style*="flex:0 0 230px"],
   main [style*="flex:0 0 252px"], main [style*="flex:0 0 280px"], main [style*="flex:0 0 290px"],
   /* ⚠️ ★`334px` を 2026-09-25 に外しました（★`/prizes` が唯一の使い手・★同上） */
-  main [style*="flex:0 0 330px"], main [style*="flex:0 0 340px"],
+  /* ⚠️ ★`340px` を 2026-09-27 に外しました（★`/entry` が唯一の使い手・★馬物語 UI へ移した） */
+  main [style*="flex:0 0 330px"],
   main [style*="flex:0 0 352px"], main [style*="flex:0 0 186px"] {
     flex: 1 1 100% !important;
     width: auto !important;
@@ -217,8 +218,9 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
      ★`/exchange`（新版）へ送って **消した**ためです（★裁定 §3）。
      ★残しておくと `mobile-css-anchors.test.ts` が「黙って効かない規則」として落とします。
      ★★実際、その検査が拾いました（★`250px` のときと同じ形・2 度目）。 */
+  /* ⚠️ ★`360px` を 2026-09-27 に外しました（★`/entry` が唯一の使い手・★馬物語 UI へ移した） */
   main [style*="min-width:240px"], main [style*="min-width:280px"],
-  main [style*="min-width:360px"], main [style*="min-width:420px"] { min-width: 0 !important; }
+  main [style*="min-width:420px"] { min-width: 0 !important; }
 
   /*
    * ★`/race` のシーク列（★撮影用）。
@@ -588,30 +590,8 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   main .rc-led-desc { order: 3; flex: 0 1 auto !important; min-width: 0 !important; width: auto !important; }
   main .rc-led-balance { order: 4; margin-left: auto; }
 
-  /* =====================================================================
-     ★出走登録（/entry）— ★**デザイン第4便**（`components/race-entry-mobile`）
-
-     ★「発走｜R｜格｜コース｜頭数｜出走料｜締切｜状態」の 8 列表を
-     ★**1 行 ＝ 1 レースのカード**に読み替えます:
-        ★1 段目 発走・R・格 と、右に状態
-        ★2 段目 コースと馬場・頭数
-        ★3 段目 出走料と締切
-     ===================================================================== */
-
-  main .en-row {
-    align-items: flex-start !important;
-    row-gap: 6px !important;
-    padding: 12px 14px !important;
-    min-height: 76px;
-  }
-  main .en-time { order: 0; font-size: 22px !important; }
-  main .en-no { order: 1; }
-  main .en-cls { order: 2; }
-  main .en-state { order: 3; flex: 1 0 auto !important; justify-content: flex-end !important; }
-  main .en-course { order: 4; flex: 0 1 auto !important; width: auto !important; white-space: normal !important; }
-  main .en-heads { order: 5; }
-  main .en-fee { order: 6; text-align: left !important; }
-  main .en-deadline { order: 7; margin-left: auto; }
+  /* ⚠️ ★出走登録（/entry）の `.en-*` 規則は ★2026-09-27 に外しました — ★`/entry` を ★馬物語 UI の骨格へ移し、
+     ★行は ★自前で折り返す（`flex-wrap`）ので ★この読み替えが要らなくなったためです（★`.en-*` の使い手は 0）。 */
 
   /*
    * ★初回セットアップの名前欄（★デザイン第4便）。

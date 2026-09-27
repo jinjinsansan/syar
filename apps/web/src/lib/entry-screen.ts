@@ -14,7 +14,7 @@
  *   ★締切は `races_public.entry_deadline_at`（ED-1）から来ます。★画面では計算しません。
  */
 import { rankOfWins, slotOfDay } from '@star/scheduler';
-import { CLASS_LABEL, CONDITION_LABEL, SURFACE_LABEL, formatClock } from './format';
+import { CLASS_LABEL, CONDITION_LABEL, SURFACE_LABEL, formatClock, formatSexAge } from './format';
 import { authClient, readClient } from './supabase';
 import {
   ENTERABLE_RACE_STATUS, entryStateOf, type EntryRaceRow, type EntryState,
@@ -94,8 +94,6 @@ export interface EntryHorseView {
   readonly starts: number;
 }
 
-/** ★1 年は 52 週 */
-const WEEKS_PER_YEAR = 52;
 
 /**
  * ★**馬の行 → 画面の形**。
@@ -116,14 +114,12 @@ export function toEntryHorseView(
   },
   gameWeek: number,
 ): EntryHorseView {
-  const ageYears = row.birthWeek === null
-    ? null
-    : Math.max(0, Math.floor((gameWeek - row.birthWeek) / WEEKS_PER_YEAR));
   const classRank = rankOfWins(row.wins) + 1;
   return {
     id: row.id,
     name: row.name,
-    sexAge: ageYears === null ? row.sex : `${row.sex}${ageYears}`,
+    /** ★性別と年齢は ★`formatSexAge` 1 か所で（★2026-09-27 まで ここだけ `female4` と生の値を出していた） */
+    sexAge: formatSexAge(row.sex, row.birthWeek, gameWeek),
     classRank,
     classLabel: CLASS_LABEL[classRank - 1] ?? '?',
     condition: row.condition,

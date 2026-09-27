@@ -68,7 +68,7 @@ describe('🔴 ★画面の世代と始末（★裁定 §3）', () => {
     expect(
       missing,
       '🔴 ★簿に無い画面が在ります。★`apps/cli/src/screen-generations.ts` に\n'
-      + '  ★`verdict`（new / redirected / rebuild / dev-only / keep-as-is）と ★`why` を書いてください:\n  '
+      + '  ★`verdict`（new / redirected / rebuild / rebuilt / dev-only / keep-as-is）と ★`why` を書いてください:\n  '
       + missing.join('\n  ')
       + otherRegistriesHint(SELF),
     ).toEqual([]);
@@ -163,7 +163,9 @@ describe('🔴 ★画面の世代と始末（★裁定 §3）', () => {
       if (s.verdict === 'redirected') continue;
       const isNew = usesUma(s.route);
       if (s.verdict === 'new' && !isNew) wrong.push(`${s.route}: new と書いてあるが components/uma を読んでいない`);
-      if (s.verdict === 'rebuild' && isNew) wrong.push(`${s.route}: rebuild と書いてあるが もう新世代（★簿を直す）`);
+      if (s.verdict === 'rebuild' && isNew) wrong.push(`${s.route}: rebuild と書いてあるが もう新世代（★簿を rebuilt に直す）`);
+      /** ★移し終えた面は ★新世代であること（★2026-09-27） */
+      if (s.verdict === 'rebuilt' && !isNew) wrong.push(`${s.route}: rebuilt と書いてあるが components/uma を読んでいない`);
     }
     expect(wrong, '🔴 ★簿と実物が食い違っています').toEqual([]);
   });
@@ -199,8 +201,9 @@ describe('🔴 ★画面の世代と始末（★裁定 §3）', () => {
     ).toEqual([]);
   });
 
-  it('★釘の一覧が、簿の rebuild と 1 対 1（★片方だけ増えない）', () => {
-    const rebuilds = SCREENS.filter((s) => s.verdict === 'rebuild').map((s) => s.route).sort();
+  /** ★移し終えた面（`rebuilt`）も ★釘を残す（★移した後で口が消えたら落ちる・2026-09-27） */
+  it('★釘の一覧が、簿の rebuild ＋ rebuilt と 1 対 1（★片方だけ増えない）', () => {
+    const rebuilds = SCREENS.filter((s) => s.verdict === 'rebuild' || s.verdict === 'rebuilt').map((s) => s.route).sort();
     const pinned = [...REBUILD_PINS.keys()].sort();
     expect(pinned, '★簿の rebuild と釘の一覧が食い違っています').toEqual(rebuilds);
   });

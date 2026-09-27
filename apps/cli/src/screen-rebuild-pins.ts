@@ -33,8 +33,8 @@ export interface RebuildPin {
 }
 
 /**
- * ★`verdict: 'rebuild'` の画面の釘。
- * ⚠️ ★`screen-generations.test.ts` が ★**実測と突き合わせます**。
+ * ★`verdict: 'rebuild'` と ★`'rebuilt'`（★移し終えた・2026-09-27）の画面の釘。
+ * ⚠️ ★`screen-generations.test.ts` が ★**実測と突き合わせます**。★移し終えても ★釘は外しません（★移した後で口が消えても気づけるように）。
  */
 export const REBUILD_PINS: ReadonlyMap<string, RebuildPin> = new Map([
   ['/training', {

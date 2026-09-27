@@ -8,6 +8,22 @@
  *
  *   → EP と PP を**足す関数をここに作りません**。作れてしまうと、いつか使われます。
  */
+import { WEEKS_PER_YEAR } from '@star/scheduler';
+
+/**
+ * ★**性別と年齢**（「牡4」など）。★年齢は「いまの週」と生まれた週から出す（★`WEEKS_PER_YEAR` が唯一の出どころ）。
+ * 🔴 ★2026-09-27: ★`entry-screen.ts` と `stable-repo.ts` に ★同じ規則が 2 か所あり、★出走登録の側だけ
+ *    ★性別の置き換えが抜けて ★`female4` と生の値が出ていました（★オーナーの画面で発覚）。★ここ 1 か所に寄せました（D-052）。
+ */
+export function formatSexAge(sex: string, birthWeek: number | null, gameWeek: number): string {
+  /**
+   * ⚠️ ★DB は `sex in ('male', 'female')` だけ（★`0001:140`）。★知らない値を「セ」（騸馬）にすると ★**居ない馬を作る**ので、
+   *    ★そのまま出します（★旧 `stable-repo.ts` は「セ」に倒していました）。
+   */
+  const label = sex === 'male' ? '牡' : sex === 'female' ? '牝' : sex;
+  if (birthWeek === null) return label;
+  return `${label}${Math.max(0, Math.floor((gameWeek - birthWeek) / WEEKS_PER_YEAR))}`;
+}
 
 /** 参加ポイントの表示。★「購入」「チャージ」等の語を使わない */
 export function formatEntryPoints(v: number): string {

@@ -85,6 +85,7 @@ export const REGISTRIES = {
  */
 export const NOT_A_REGISTRY = {
   'args.mjs': '★引数の読み取り。★登録するものがない',
+  'user-eyes.mjs': '★0 行のビューの判定の純関数（★対象外／不合格／ok）。★母集団を持たない（★ビューの一覧は DB の `information_schema` から毎回引く）',
   'next-rewrites.mjs': '★`next build` が書き換える追跡ファイル 2 つを写して戻す部品（★2026-09-25）。'
     + '★`NEXT_REWRITES` は ★**簿ではなく 2 要素の一覧**で、★外の何かと突き合わせません'
     + '（★増えたら ★`git status` が汚れる形で出ます・簿 `NEXT-BUILD-REWRITES-TRACKED-FILES`）',
