@@ -16,7 +16,7 @@
 
 import { useEffect, useState } from 'react';
 import {
-  Backdrop, BigButton, TextPanel, TopBar, useMotionPaused,
+  Backdrop, BigButton, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { exchangePrize, loadPrizeScreen, PRIZE_STATUS_LABEL, type PrizeScreenData } from '../../lib/prize-screen';
@@ -76,7 +76,7 @@ export default function ExchangePage(): React.ReactElement {
       <TopBar title="景品交換" paused={paused} onToggle={toggle} />
       <RaceStrip />
       {error && <TextPanel role="alert" style={{ fontSize: 12 }}>
-        {error}　<a href="/login">ログイン</a>　<button type="button" onClick={reload}>再読み込み</button>
+        {error}　<a href="/login">ログイン</a>　<button type="button" onClick={reload} style={NOTICE_ACTION}>再読み込み</button>
       </TextPanel>}
 
       {/* ★PP のカプセル＋常設の注記（★EP はこの画面に出さない） */}

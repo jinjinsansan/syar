@@ -143,6 +143,16 @@ export type NoticeKind = 'soon' | 'closing' | 'own' | 'multi' | 'result';
  * ⚠️ ★音・バイブ・全画面・煽りは置きません（★L-8）。
  */
 /**
+ * ★**通知帯・パネルの中の操作子**（★`NoticeBar` の右端のボタンと同じ見た目・1 か所）。
+ *   ★2026-09-28: ★誤りの帯の「再読み込み」が ★ブラウザの素の白いボタンのままだったので ★これを当てます（★レビュー側の指摘・新しい意匠ではない）。
+ */
+export const NOTICE_ACTION: React.CSSProperties = {
+  flex: '0 0 auto', minHeight: 44, display: 'inline-flex', alignItems: 'center', padding: '0 12px',
+  border: '2px solid var(--u-navy)', borderRadius: 8, cursor: 'pointer',
+  backgroundImage: 'linear-gradient(#ffffff,#e6eef6)', color: 'var(--u-ink-dark)', fontSize: 13, fontWeight: 800,
+};
+
+/**
  * ★**文字を載せる濃紺のパネル**（★2026-09-28・デザイナー R-18 回答 🟡 #7「★本文は必ず濃紺パネルか紙パネルの上」）。
  *   ★箱の値は ★`NoticeBar` と同じ（★幅・余白・金の縁 2px・角丸 12・`--u-panel-strong`）。★新しい意匠ではありません。
  *   ★芝の上に ★じかに置いていた案内・誤りの文を ★これに入れます（★道具 `audit-text-on-backdrop.mjs` が洗い出した所）。
@@ -190,11 +200,7 @@ export function NoticeBar({ kind, text, sub, actionLabel, actionHref, extra }: {
           background: 'rgba(246,194,28,.18)', border: '1px solid rgba(246,194,28,.6)',
         }}>他 {extra} 件</span>
       )}
-      <a href={actionHref} style={{
-        flex: '0 0 auto', minHeight: 44, display: 'flex', alignItems: 'center', padding: '0 12px',
-        border: '2px solid var(--u-navy)', borderRadius: 8,
-        backgroundImage: 'linear-gradient(#ffffff,#e6eef6)', color: 'var(--u-ink-dark)', fontSize: 13,
-      }}>{actionLabel}</a>
+      <a href={actionHref} style={NOTICE_ACTION}>{actionLabel}</a>
     </div>
   );
 }

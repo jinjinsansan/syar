@@ -33,6 +33,7 @@ import {
 import { fetchOnboardingState, type OnboardingState } from '../../../lib/onboarding';
 import { SignInRequiredError } from '../../../lib/stable-repo';
 import { RaceStrip, reportOnboardingStage } from '../../../components/uma/race-strip';
+import { Backdrop, TextPanel } from '../../../components/uma/uma-parts';
 
 /** ★状態を見に行く間隔（★`/stable/breed` と同じ） */
 const POLL_MS = 3_000;
@@ -64,8 +65,13 @@ const FAILURE_VIEW: Readonly<Record<BreedFailureVariant, { readonly title: strin
 
 function Shell({ children }: { readonly children: React.ReactNode }): React.ReactElement {
   return (
-    <div data-page-body style={{ minHeight: '100dvh', background: '#0a2340', color: '#fbf7ec' }}>
-      <div style={{ width: '100%', maxWidth: 1100, margin: '0 auto', padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    /* ★芝＋紺（★2026-09-28・デザイナー R-18 回答 4-1「★芝＋紺に一本化」）。★中の組みは変えない */
+    <div data-theme="uma" data-page-body style={{
+      position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden',
+      containerType: 'inline-size', background: 'var(--u-navy)', color: '#fbf7ec',
+    }}>
+      <Backdrop />
+      <div style={{ position: 'relative', width: '100%', maxWidth: 1100, margin: '0 auto', padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>はじめての 1 頭を生産する</div>
         {/* ★常設レース表示（★フォームの画面 ＝ 極小・大きさは表 `race-strip-sizes.ts` が決める・裁定 ⑤） */}
         <div data-theme="uma"><RaceStrip /></div>
@@ -76,7 +82,8 @@ function Shell({ children }: { readonly children: React.ReactNode }): React.Reac
 }
 
 function Note({ children }: { readonly children: React.ReactNode }): React.ReactElement {
-  return <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.8 }}>{children}</div>;
+  /** ★芝にじかに置かず ★濃紺のパネルへ（★R-18 回答 🟡 #7「本文は必ずパネルの上」） */
+  return <TextPanel style={{ margin: '0 auto', fontSize: 13, fontWeight: 500, lineHeight: 1.8 }}>{children}</TextPanel>;
 }
 
 function Panel({ children }: { readonly children: React.ReactNode }): React.ReactElement {

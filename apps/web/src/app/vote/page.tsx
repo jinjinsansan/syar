@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { BET_CAP_OWN_RACE_EP, checkOwnRaceSelection, ownRaceReasonText } from '@star/betting';
-import { Backdrop, BigButton, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
+import { Backdrop, BigButton, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { loadBetAllowance, loadBetScreen, oddsKey, placeBet, type BetAllowance, type BetScreenData } from '../../lib/bet-screen';
 
@@ -95,7 +95,7 @@ export default function VotePage(): React.ReactElement {
     <TopBar title="投票モード" paused={paused} onToggle={toggle} />
     <RaceStrip />
     {error && <TextPanel role="alert" style={{ fontSize: 12 }}>
-      {error}　<a href="/login">ログイン</a>　<button type="button" onClick={reload}>再読み込み</button>
+      {error}　<a href="/login">ログイン</a>　<button type="button" onClick={reload} style={NOTICE_ACTION}>再読み込み</button>
     </TextPanel>}
     {message && <TextPanel role="status" style={{ color: 'var(--u-gold)' }}>{message}</TextPanel>}
     {data && !data.authenticated && <TextPanel style={{ fontSize: 13 }}>

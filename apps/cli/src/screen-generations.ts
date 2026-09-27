@@ -137,10 +137,10 @@ export const SCREENS: readonly ScreenRecord[] = [
   { route: '/entry', verdict: 'rebuilt', why: '★出走登録。★2026-09-27 に ★引き渡し資料 §5 の骨格（馬物語 UI）へ移した（★登録の処理は変えていない）' },
   { route: '/stable', verdict: 'rebuild', why: '★厩舎の一覧。★`/setup` と `foal-invite` から来る' },
   { route: '/stable/[horseId]', verdict: 'rebuild', why: '★1 頭の詳細' },
-  { route: '/stable/breed', verdict: 'rebuild', why: '★配合。★血統ループの本体' },
-  { route: '/stable/foal', verdict: 'rebuild', why: '★最初の 1 頭の生産（★案 A・D-120）' },
-  { route: '/stable/name', verdict: 'rebuild', why: '★仔の命名' },
-  { route: '/stable/roles', verdict: 'rebuild', why: '★引退後の役割' },
+  { route: '/stable/breed', verdict: 'rebuilt', why: '★配合。★血統ループの本体。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
+  { route: '/stable/foal', verdict: 'rebuilt', why: '★はじめての 1 頭の生産（★案 A・D-120）。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
+  { route: '/stable/name', verdict: 'rebuilt', why: '★仔の命名。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
+  { route: '/stable/roles', verdict: 'rebuilt', why: '★引退後の役割。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
   { route: '/stable/retired', verdict: 'rebuild', why: '★引退馬の一覧' },
   { route: '/stable/market', verdict: 'rebuild', why: '✅ ★2026-09-26 に ★**実データへ繋ぎました**（★`market-screen`）。'
     + '★D-122 ④「空の店へ送らない」は ★満たしました（★出品が 0 のときは そう言います）。'
@@ -228,4 +228,5 @@ export const SCREENS: readonly ScreenRecord[] = [
  * 🔴 ★最初 ★引き算で `35` と書いて ★**検査に落ちました**（★実測 36）。
  *    ★**釘の数は測った数にすること。** ★計算で出すと、★測っていない前提が釘になります。
  */
-export const OLD_GENERATION_MAX = 35;
+/** ★2026-09-28: ★35 → ★28（★実測・/stable/breed /roles /foal /name を芝＋紺へ・09-27 の移しの分も含む） */
+export const OLD_GENERATION_MAX = 28;

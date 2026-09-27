@@ -28,6 +28,7 @@ const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ?
 const BASE = process.env.AUDIT_BASE ?? 'http://localhost:3210';
 const WIDTHS = String(arg('widths', '390')).split(',').map((s) => Number(s.trim()));
 const PAGES = [
+  '/stable/breed', '/stable/roles', '/stable/foal', '/stable/name',
   '/home', '/howto', '/earn', '/exchange', '/watch-race', '/train', '/mypage', '/vote', '/entry', '/records',
   '/odds/demo?demo=1', '/login', '/signup', '/setup', '/forgot-password', '/reset-password',
 ];

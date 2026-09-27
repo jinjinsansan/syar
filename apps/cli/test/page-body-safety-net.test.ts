@@ -127,6 +127,17 @@ describe('★安全網が ★枠の外の画面の本体に届く（★裁定 §
     }
   });
 
+  it('🔴 ★誤りの帯の「再読み込み」が ★素の白いボタンでない（★2026-09-28・レビュー側の指摘）', () => {
+    const bare: string[] = [];
+    for (const r of targets) {
+      const src = readFileSync(pageFileOf(r), 'utf8');
+      for (const m of src.matchAll(/<button\b([^>]*)>再読み込み<\/button>/g)) {
+        if (!/style=\{NOTICE_ACTION\}/.test(m[1]!)) bare.push(`${r}: ${m[0].slice(0, 60)}`);
+      }
+    }
+    expect(bare).toEqual([]);
+  });
+
   it('★`data-page-body` には ★意匠を動かす規則（★折り返し・高さ）を掛けない', () => {
     expect(CSS, '★枠の外の画面の flex を折り返している').not.toMatch(/\[data-page-body\] \[style\*="display:flex"\]/);
     expect(CSS, '★枠の外の画面の padding を変えている').not.toMatch(/\[data-page-body\] \{[^}]*padding/);

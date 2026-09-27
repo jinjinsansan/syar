@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Backdrop, BigButton, ChibiHorse, EpCapsule, PpCapsule, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
+import { Backdrop, BigButton, ChibiHorse, EpCapsule, PpCapsule, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { SignOutButton } from '../../components/uma/sign-out';
 import { useStableView } from '../../components/uma/use-stable-view';
@@ -29,7 +29,7 @@ export default function MyPage(): React.ReactElement {
       {!view && <TextPanel style={{ margin: 0, width: '100%' }}>{loading ? '厩舎を読み込み中…' : '厩舎を取得できませんでした'}</TextPanel>}
     </div>
     {error && <TextPanel role="alert" style={{ fontSize: 12 }}>
-      {error}　<a href="/login">ログイン</a>　<button type="button" onClick={refresh}>再読み込み</button>
+      {error}　<a href="/login">ログイン</a>　<button type="button" onClick={refresh} style={NOTICE_ACTION}>再読み込み</button>
     </TextPanel>}
 
     <main style={{ position: 'relative', flex: '1 1 auto', minHeight: 0, overflow: 'auto', padding: '12px 14px 0', width: '100%', maxWidth: 1220, margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: 12, alignContent: 'flex-start' }}>

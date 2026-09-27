@@ -32,7 +32,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Backdrop, BigButton, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
+import { Backdrop, BigButton, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { useStableView } from '../../components/uma/use-stable-view';
 import { TRAINING_MENUS } from '../../lib/game-demo';
@@ -118,7 +118,7 @@ export default function TrainPage(): React.ReactElement {
     <Backdrop /><TopBar title="育成モード" paused={paused} onToggle={toggle} /><RaceStrip />
     <TextPanel role={error ? 'alert' : 'status'} style={{ padding: 16 }}>
       {loading ? '厩舎を読み込み中…' : error ?? 'まだ持ち馬がいません。'}
-      <div style={{ display: 'flex', gap: 12, marginTop: 12 }}><a href="/login">ログイン</a><a href="/setup">はじめての 1 頭を迎える</a><button type="button" onClick={refresh}>再読み込み</button></div>
+      <div style={{ display: 'flex', gap: 12, marginTop: 12 }}><a href="/login">ログイン</a><a href="/setup">はじめての 1 頭を迎える</a><button type="button" onClick={refresh} style={NOTICE_ACTION}>再読み込み</button></div>
     </TextPanel>
   </div>;
   const cond = conditionView(horse.condition);
