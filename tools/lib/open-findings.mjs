@@ -1607,6 +1607,21 @@ export const OPEN_FINDINGS = [
     until: '2026-10-04',
   },
   {
+    id: 'BET-PAGE-REOPEN-CONDITIONS',
+    what: '🔴 ★**`/races/[id]/bet` は ★止血で閉じただけ**です（★2026-09-27・P0-A）。★`BET_PAGE_CLOSED` を `false` に戻すだけでは ★**2 つの欠陥が生き返ります**',
+    why: '✔ ★閉じた理由: ★「動きません」と書きながら ★`place_bet` が通り EP を引いていた（★裁定 `REVIEW_UI_AUDIT_20260927.md` P0-A）。'
+      + '🔴 ★**開けるときの条件（★2 つとも直すまで開けない）**:'
+      + '★① ★`loadBetScreen(null)`（`apps/web/src/app/races/[id]/bet/page.tsx` の読み込み）が ★URL の `[id]` を無視し、'
+      + '★「いちばん近い scheduled」を読む（`lib/bet-screen.ts:126-128`）→ ★**別のレースに投票する**。★`[id]` を渡し、★そのレースでなければ止めること。'
+      + '★② ★`DEMO_BET_RACE` との混成 — ★1 回の上限 5,000・★みんなの投票状況が ★見本。★サーバーの値（`bet_allowance`・`race_odds_public` 等）に替えるか ★出さない。'
+      + '⚠️ ★旗を戻せば直る、と読める状態にしない（★これは止血であって治療ではない）。'
+      + '★残すか `/vote` に畳むかは ★オーナーの判断待ち（★畳むなら ★この 2 つは要らなくなる）。'
+      + '--- ✅ ★**消す条件** --- ★① ② を直して開けた日、★または ★`/vote` に畳んで ★この画面を消した日。',
+    owner: 'owner',
+    until: '2026-11-30',
+    stillOpen: (h) => h.grepCount('const BET_PAGE_CLOSED = true;', { exclude: /open-findings\.mjs$/ }) > 0,
+  },
+  {
     id: 'EMPTY-VIEW-EVAL-UNPROVEN-ON-REAL-PG',
     what: '⚠️ ★「★0 行のビューは ★列の式（関数）を評価しない」を ★**本物の PostgreSQL では確かめていません**（★2026-09-27・裁定 `REVIEW_INC_PROD_PERMISSION_20260927.md` §5-2）',
     why: '✔ ★`tools/verify-user-eyes.mjs` は ★0 行のビューが呼ぶ関数を ★直に呼んで確かめます（★部品 `tools/lib/user-eyes.mjs`）。'

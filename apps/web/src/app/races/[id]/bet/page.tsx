@@ -19,6 +19,9 @@ import { formatEntryPoints } from '../../../../lib/format';
  *   ★1 回の上限・みんなの投票状況も ★見本（`DEMO_BET_RACE`）でした。
  *   → ★入口（`/races/[id]` の金ボタン）を外し、★ここでも ★送らない。★画面は消しません（★`/vote` との重複の経緯を残すため）。
  *   ★残すか `/vote` に畳むかは ★オーナーの判断待ち（★その答えを待たずに閉じる — ★閉じるのは戻せるが、★EP が消えるのは戻せない）。
+ * 🔴 ★**`false` に戻すだけでは ★直りません**（★止血であって治療ではない）。★開ける前に ★簿 `BET-PAGE-REOPEN-CONDITIONS` の 2 つを直すこと:
+ *   ★① ★`loadBetScreen(null)` が ★URL の `[id]` を無視する（★別のレースに投票する）
+ *   ★② ★1 回の上限・みんなの投票状況が ★見本（`DEMO_BET_RACE`）
  */
 const BET_PAGE_CLOSED = true;
 
