@@ -129,6 +129,31 @@
 [data-theme='uma'] .u-race-strip-compact .u-race-replay-name { display: none; }
 [data-theme='uma'] .u-race-strip-compact .u-race-replay-track { margin-right: 3px; }
 [data-theme='uma'] .u-race-strip-compact .u-race-replay-marker { width: 9px; height: 9px; font-size: 0; top: -4px; }
+/*
+  ★**走行（「大」150px ／「極小」22×16px）**（★2026-09-27・`RACE_NOTICE_HANDOFF.md` §2）
+  ★寸法と色は引き渡し資料の値（★芝 `#3f5a3a → #2c4522`・角丸 8px・高さ 150px ／ 極小 22×16px・角丸 3px）。
+  ★馬は本編と同じ side-v8 の 8 コマ（★`race-strip.tsx` の `RUN_FRAMES` の註記）。
+*/
+[data-theme='uma'] .u-race-strip-big { flex-wrap: wrap; }
+[data-theme='uma'] .u-race-run {
+  position: relative; flex: 0 0 100%; width: 100%; height: 150px; overflow: hidden;
+  border-radius: 8px;
+  /* ★芝の縞（★1 枚 ＝ 枠の 1/3 ＝ 20m）。★横位置は `race-strip.tsx` がカメラに合わせて流す */
+  background-image: linear-gradient(90deg, rgba(255,255,255,.05) 0 50%, rgba(0,0,0,0) 50% 100%), linear-gradient(#3f5a3a, #2c4522);
+  background-size: 33.333% 100%, 100% 100%;
+  background-repeat: repeat-x, no-repeat;
+}
+[data-theme='uma'] .u-race-run-tall { height: min(46vh, 360px); flex: 0 0 auto; }
+[data-theme='uma'] .u-race-run-goal { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--u-gold); opacity: .85; }
+[data-theme='uma'] .u-race-run-horse { position: absolute; display: block; }
+[data-theme='uma'] .u-race-run-pose { position: absolute; inset: 0; background: no-repeat bottom center / contain; }
+[data-theme='uma'] .u-race-run-gate {
+  position: absolute; left: 58%; top: -2px; display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 3px;
+  border: 1px solid var(--u-gold); border-radius: 8px; background: var(--u-navy); color: var(--u-ink-light); font-size: 10px; line-height: 1;
+}
+[data-theme='uma'] .u-race-run-mini {
+  position: relative; flex: 0 0 22px; width: 22px; height: 16px; overflow: hidden; border-radius: 3px; background: #2c4522;
+}
 [data-theme='uma'] .u-race-strip-expanded { z-index: 1000; }
 [data-theme='uma'] .u-race-strip-expand { min-width: 44px; min-height: 44px; border: 0; background: none; color: var(--u-gold); text-decoration: underline; }
 [data-theme='uma'] .u-race-replay-overlay {
