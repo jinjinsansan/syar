@@ -183,7 +183,13 @@ export function NoticeBar({ kind, text, sub, actionLabel, actionHref, extra }: {
   const border = kind === 'closing' ? 'var(--u-orange)' : kind === 'result' ? 'var(--u-ep)' : 'var(--u-gold)';
   const dot = kind === 'closing' ? 'var(--u-orange)' : kind === 'own' || kind === 'result' ? 'var(--u-ep)' : 'var(--u-red)';
   return (
+    /*
+      ★`position: relative; z-index: 1`（★2026-09-29）: ★芝（`Backdrop`・position:absolute）より ★上に描く。
+      ★無いと ★位置を持たない帯は ★芝の下に描かれ、★赤い点しか見えなかった（★本番 /signup・/home の古い版の知らせで実測）。
+      ★帯（`.u-race-strip`）と同じ段。
+    */
     <div style={{
+      position: 'relative', zIndex: 1,
       display: 'flex', alignItems: 'center', gap: 8, width: 'calc(100% - 28px)', maxWidth: 880,
       margin: '10px auto 0', padding: '6px 10px', border: `2px solid ${border}`, borderRadius: 12,
       background: 'var(--u-panel-strong)', animation: 'u-notice .35s ease-out',

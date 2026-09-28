@@ -63,6 +63,18 @@ describe('★知らせの出し方', () => {
     expect(NOTICE).toContain('<NoticeBar ');
     expect(NOTICE, '★自前の見た目を持っている').not.toMatch(/style=\{\{/);
   });
+  it('🔴 ⑥ NoticeBar は 芝（Backdrop・absolute）より上に描く（★無いと 赤い点しか見えない・本番で実測）', () => {
+    const PARTS = src('apps/web/src/components/uma/uma-parts.tsx');
+    const at = PARTS.indexOf('export function NoticeBar(');
+    expect(at, '★NoticeBar が見つからない').toBeGreaterThan(0);
+    const body = PARTS.slice(at, PARTS.indexOf('\n}\n', at));
+    expect(body.length).toBeGreaterThan(200);
+    expect(body).toContain("position: 'relative', zIndex: 1,");
+    /** ★芝は absolute（★前提が変わったら この網も見直す） */
+    const bd = PARTS.slice(PARTS.indexOf('export function Backdrop('));
+    expect(bd).toContain("position: 'absolute', inset: 0");
+  });
+
   it('🔴 ⑤ 出すのは 帯の上の 1 か所だけ', () => {
     const users: string[] = [];
     const walk = (dir: string): void => {
