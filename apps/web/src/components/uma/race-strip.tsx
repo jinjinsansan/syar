@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
-import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, type ReplayRunner } from './race-replay';
+import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowOver, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
 import { INTRO_STAGES, stripSizeOf } from './race-strip-sizes';
 import { STRIP_EMBED_GIVE_UP_SEC, isStripEmbedMessage, stripEmbedUrl } from './race-strip-embed';
@@ -289,24 +289,28 @@ export function RaceStrip(): React.ReactElement | null {
 
   /**
    * ★**本編を小窓で流す**（★2026-09-28・オーナー依頼「パドックからリプレイまで」・★約束は `race-strip-embed.ts`）。
-   *   ★「大」の帯で ★新しい確定レースの録画が始まったら ★本編を ★見えない iframe で開き、★`playing` が来たら ★差し替える。
-   *   ★それまでは ★今の走行（side-v8）を出したまま（★「用意しています」で待たせない）。★1 レースにつき 1 回・★頭から（★案 A）。
-   *   ★動きを減らす設定では ★開きません。★`ended` / `error` / ★打ち切り秒 / ★「大」でなくなった で ★閉じます。
+   *   ★「大」の帯で ★新しい確定レースが見えたら ★本編を ★見えない iframe で開き、★`playing` が来たら ★差し替える。
+   *   ★それまでは ★今の帯・今の走行（side-v8）を出したまま（★「用意しています」で待たせない）。★1 レースにつき 1 回・★頭から（★案 A）。
+   *   ⚠️ ★2026-09-28 に直した: ★最初は ★録画の窓（45 秒）が開いてから読み始め、★本編の用意（★実測 24〜27 秒）が ★間に合わず
+   *      ★オーナーの画面では ★簡易版のままでした。★確定は ★窓の 75 秒前から見えるので、★見えた時点で読み始めます。
+   *   ★動きを減らす設定では ★開きません。★`ended` / `error` / ★打ち切り秒 / ★「大」でなくなった / ★窓が閉じても始まらない で ★閉じます。
    */
   const [embed, setEmbed] = useState<{ readonly id: string; readonly live: boolean } | null>(null);
   const embeddedIdRef = useRef<string | null>(null);
   const recentId = recent?.id ?? null;
+  const windowOver = recent === null || recent === undefined || nowMs === null || !data?.runners.length
+    ? true : replayWindowOver(recent.scheduled_at, nowMs);
   useEffect(() => {
     if (size !== 'big' || motionReduced) { setEmbed(null); return; }
-    if (replaying && recentId !== null && embeddedIdRef.current !== recentId) {
+    if (!windowOver && recentId !== null && embeddedIdRef.current !== recentId) {
       embeddedIdRef.current = recentId;
       setEmbed({ id: recentId, live: false });
     }
-  }, [size, motionReduced, replaying, recentId]);
+  }, [size, motionReduced, windowOver, recentId]);
   /** ★録画の窓が閉じても ★まだ始まっていなければ ★やめる（★読み込みが遅い端末で 小窓を待たせない） */
   useEffect(() => {
-    if (!replaying) setEmbed((e) => (e !== null && !e.live ? null : e));
-  }, [replaying]);
+    if (windowOver) setEmbed((e) => (e !== null && !e.live ? null : e));
+  }, [windowOver]);
   const embedId = embed?.id ?? null;
   useEffect(() => {
     if (embedId === null) return undefined;
@@ -350,8 +354,11 @@ export function RaceStrip(): React.ReactElement | null {
   return (
     <section aria-label="レースの開催情報" className={`u-race-strip${compact ? ' u-race-strip-compact' : ''}${replaying ? ' u-race-strip-replaying' : ''}${big || (resulting && size === 'big') ? ' u-race-strip-big' : ''}${resulting ? ' u-race-strip-result' : ''}${expanded ? ' u-race-strip-expanded' : ''}`}>
       {/* ★「大」150px（★一覧・閲覧の画面）。★同じ枠が伸びます（★§2: 別要素への切替ではない） */}
-      {big && <div className="u-race-strip-stage">
-        {!embedLive && <RaceRun rows={replayRows} distance={recent?.distance ?? 0} motionReduced={motionReduced} />}
+      {/*
+        ★同じ箱のまま ★窓の前は画面の外に置く（★箱を差し替えると iframe が作り直され ★読み込みが最初からになる）。
+      */}
+      {size === 'big' && (big || embed !== null) && <div className={`u-race-strip-stage${big ? '' : ' u-race-strip-stage-offscreen'}`}>
+        {big && !embedLive && <RaceRun rows={replayRows} distance={recent?.distance ?? 0} motionReduced={motionReduced} />}
         {/* ★本編（★`playing` まで 見えないまま読み込む・★触れない ＝ ★拡大は帯の「拡大」） */}
         {embed !== null && <iframe className="u-race-strip-embed" data-live={embedLive ? 'true' : 'false'}
           src={stripEmbedUrl(embed.id)} title="レースの録画（確定した結果から再現）" tabIndex={-1} />}

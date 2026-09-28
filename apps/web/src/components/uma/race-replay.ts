@@ -81,6 +81,16 @@ export function replayResultShowing(scheduledAt: string, nowMs: number): boolean
   return Number.isFinite(endMs) && nowMs >= endMs && nowMs < endMs + REPLAY_RESULT_MS;
 }
 
+/**
+ * ★**録画の窓が もう閉じたか**（★2026-09-28・小窓で本編を流す）。
+ *   ★本編の用意は ★実測 24〜27 秒（★本番・ヘッドレス・速い回線）かかり、★窓（45 秒）の中で始めると ★間に合いません。
+ *   ★確定は ★窓の開く 75 秒前から見えるので、★帯は ★確定を見た時点で読み始め、★窓が閉じたら あきらめます。
+ */
+export function replayWindowOver(scheduledAt: string, nowMs: number): boolean {
+  const endMs = new Date(scheduledAt).getTime() + REPLAY_START_DELAY_MS + REPLAY_DISPLAY_MS;
+  return !Number.isFinite(endMs) || nowMs >= endMs;
+}
+
 /** 開催時刻を共有時計にして、ページ移動でも同じ録画位置へ戻る。 */
 export function replayDisplayProgress(scheduledAt: string, nowMs: number): number | null {
   const startMs = new Date(scheduledAt).getTime() + REPLAY_START_DELAY_MS;

@@ -13,12 +13,28 @@ import path from 'node:path';
 import {
   isStripEmbedMessage, stripEmbedMessage, stripEmbedUrl, STRIP_EMBED_PARAM_VALUE,
 } from '../../web/src/components/uma/race-strip-embed';
+import { replayWindowOver, REPLAY_START_DELAY_MS, REPLAY_DISPLAY_MS } from '../../web/src/components/uma/race-replay';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const read = (p: string): string => readFileSync(path.join(ROOT, p), 'utf8');
 const PAGE = read('apps/web/src/app/race/page.tsx');
 const STRIP = read('apps/web/src/components/uma/race-strip.tsx');
 const CSS = read('apps/web/src/components/uma/uma-theme.css');
+
+describe('★読み始める時と あきらめる時', () => {
+  /**
+   * ★2026-09-28: ★窓（45 秒）が開いてから読み始めると ★本編の用意（★実測 24〜27 秒）が間に合わず、★オーナーの画面は簡易版のままだった。
+   *   ★確定が見えたら（★窓の 75 秒前から）読み始め、★窓が閉じたら あきらめる。
+   */
+  it('★窓が閉じるまでは「まだ」・★閉じた瞬間から「もう」・★読めない時刻は「もう」', () => {
+    const at = '2026-09-28T00:00:00Z';
+    const t0 = Date.parse(at);
+    expect(replayWindowOver(at, t0), '★発走の時点（★窓の前）').toBe(false);
+    expect(replayWindowOver(at, t0 + REPLAY_START_DELAY_MS + REPLAY_DISPLAY_MS - 1)).toBe(false);
+    expect(replayWindowOver(at, t0 + REPLAY_START_DELAY_MS + REPLAY_DISPLAY_MS)).toBe(true);
+    expect(replayWindowOver('not a date', t0)).toBe(true);
+  });
+});
 
 describe('★小窓で本編を流す約束', () => {
   it('🔴 ② ★知らせの形を確かめる（★形が違えば無視）', () => {
