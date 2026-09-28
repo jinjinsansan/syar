@@ -1189,6 +1189,8 @@ export const STATE_CHANGING = [
   'verify-role-request-live.mjs',
   // ★自分の繁殖牝馬で配合する経路（★`kind = 'breed'`・`0071`）を、★本物の DB で通す（★取引の中だけ。★必ず rollback）
   'verify-breed-own-mare-live.mjs',
+  // ★投票の締切（★`0096`）を、★本物の DB で通す（★`0096` の本体も取引の中で当てる・★取引の中だけ。★必ず rollback・2026-09-29）
+  'verify-sales-close-live.mjs',
   // ★役割の画面の読む口（★`my_retired_horses`・`0074`）を、★本物の DB で確かめる（★取引の中だけ。★必ず rollback）。
   //   ★読む口の「変えられない理由」と、★実際に RPC を呼んだ理由を突き合わせる（★判定が 2 つに割れていないこと）
   'verify-my-retired-horses-live.mjs',
