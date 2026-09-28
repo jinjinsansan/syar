@@ -235,7 +235,8 @@ export function drawHorseNamePlates(
  */
 export function referenceNamePlateRows(
   ranked: readonly { readonly gate: number }[],
-  ownGate: number,
+  /** ★`undefined` は ★自分の馬が出ていないレース（★「自馬」の行を作らない・2026-09-28） */
+  ownGate: number | undefined,
   nameOf: (gate: number) => string,
   limit = 3,
 ): readonly HorseNamePlateRow[] {

@@ -1036,8 +1036,10 @@ interface RealReplay {
   /** ★馬番の順（★1〜頭数で欠けない・★読む層が検証済み） */
   readonly runners: readonly ReplayRunner[];
   readonly weightKgByGate: ReadonlyMap<number, number>;
-  /** ★自分の馬の馬番（★読む層が `is_mine` で確かめた馬・★自馬のいないレースは ここまで来ない） */
-  readonly ownGate: number;
+  /** ★自分の馬の馬番（★読む層が `is_mine` で確かめた馬）。★**自分の馬が出ていないレースは `null`**（★2026-09-28・観戦） */
+  readonly ownGate: number | null;
+  /** ★カメラの主役（★自分の馬 か ★1 着・`lib/race-real.ts` の `focusGate`） */
+  readonly focusGate: number;
   /** ★馬場状態（★実物。★`?cond=` の見比べ口で曲げない） */
   readonly trackCondition: TrackCondition;
   /**
@@ -2422,6 +2424,7 @@ function realPageOf(data: RealRaceData): { readonly setup: PageSetup; readonly r
       runners: data.runners,
       weightKgByGate: data.weightKgByGate,
       ownGate: data.ownGate,
+      focusGate: data.focusGate,
       trackCondition: data.trackCondition,
       seed: replaySeedOf(data.id),
     },
@@ -2648,8 +2651,13 @@ function RaceView({ setup, real }: {
    *    ★スターパークはシード 42 で選ばれていた人（d）なので、★既定の鞍の実況者は変わりません。
    */
   const cast = VENUE_LOOK.cast;
-  /** ★実レースは ★自分の馬の馬番（★読む層が `is_mine` で確かめた馬） */
-  const [ownGate, setOwnGate] = useState(real?.ownGate ?? 3);
+  /**
+   * ★`ownGate` は ★**カメラの主役**（★位置の組み立て・カメラ・実況が追う馬）。★実レースは ★自分の馬 か ★1 着（`focusGate`）。
+   * ★**「あなたの馬」と描くのは `mineGate` だけ**（★自分の馬が出ていないレースは `undefined` ＝ ★1 つも描かない・2026-09-28）。
+   *   ★網 `race-own-optional.test.ts`。
+   */
+  const [ownGate, setOwnGate] = useState(real?.focusGate ?? 3);
+  const mineGate: number | undefined = real === null ? ownGate : (real.ownGate ?? undefined);
   const [playing, setPlaying] = useState(false);
   /**
    * ★**一度でも「観る」を押したか**（★2026-09-13・オーナー指摘）
@@ -4325,7 +4333,7 @@ function RaceView({ setup, real }: {
       drawEntryBoard(ctx, art.pal as Record<string, string>, vp, FONT,
         Array.from({ length: FIELD }, (_, i) => ({
           gate: i + 1, name: nameOfGate(i + 1), jockey: jockeyOfGate(i + 1),
-          oddsLabel: oddsLabelOf(oddsRows[i]?.winOdds ?? Number.POSITIVE_INFINITY), popularity: ranks.get(i + 1), isOwn: i + 1 === ownGate,
+          oddsLabel: oddsLabelOf(oddsRows[i]?.winOdds ?? Number.POSITIVE_INFINITY), popularity: ranks.get(i + 1), isOwn: i + 1 === mineGate,
         })), {
           raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo,
           distanceMeter: built.distanceM, surfaceLabel: surface === 'turf' ? '芝' : 'ダート', turnLabel: turn === 'left' ? '左' : '右',
@@ -4356,10 +4364,13 @@ function RaceView({ setup, real }: {
           : `GRADE ${GRADE_LOOK.roman} ・ ${surface === 'turf' ? 'TURF' : 'DIRT'}`,
         chips: setup.conditionChips,
         venueFeature: `${turn === 'left' ? '左回り' : '右回り'}　1周${setup.venue.lapM}m・直線${setup.venue.homeStretchM}m　${VENUE_LOOK.feature}`,
-        own: {
-          gate: ownGate, role: frameRoleOf(ownGate, FIELD),
-          name: nameOfGate(ownGate), jockey: jockeyOfGate(ownGate),
-        },
+        /** ★自分の馬が出ていないレースは ★「あなたの馬」の札を出しません（★2026-09-28） */
+        ...(mineGate === undefined ? {} : {
+          own: {
+            gate: mineGate, role: frameRoleOf(mineGate, FIELD),
+            name: nameOfGate(mineGate), jockey: jockeyOfGate(mineGate),
+          },
+        }),
       }, d, { image: art.raceTitle, width: art.raceTitle.width, height: art.raceTitle.height },
       /**
        * ★**イントロに自馬を 1 頭出す**（2026-08-28・オーナー要望）。
@@ -4370,7 +4381,7 @@ function RaceView({ setup, real }: {
        *    ★最初これを `[コマ][馬番]` と取り違え、★**コマを送るたびに別の馬**が出ました
        *    （自馬は 3 番なのにゼッケン 11・ピンクの服が描かれた）。
        */
-      art.sideHighQuality[ownGate - 1],
+      mineGate === undefined ? undefined : art.sideHighQuality[mineGate - 1],
       /**
        * ★**場の遠景と紋・季節と時間帯の色**（★2026-09-15・計画書 V-13 / V-15）。
        *   ★景色が大きく映るのはタイトルカードの背景なので、★場の主題はここに描き足します（`venue-scenery.ts` の註記）。
@@ -5195,8 +5206,9 @@ function RaceView({ setup, real }: {
        * ⚠️ ★参考映像は ★発走の瞬間を ★**見せません**（★実測 5.6→6.0 秒で、踏み出しは 1 コマも無い）。
        *    ★ここはその「間」に、★見る人がいちばん知りたいこと＝★**自分の馬**を置きます。
        */
+      /** ★自分の馬が出ていないレースは ★このカードを出しません（★「あなたの馬」の札・2026-09-28） */
       const startCutInActive = !CUTIN_OFF && renderer === 'v2' && !replay.active
-        && raceD > 0 && raceD < RACE_CUTIN_SEC;
+        && raceD > 0 && raceD < RACE_CUTIN_SEC && mineGate !== undefined;
       /**
        * ★**時計の跳びを覆う 1 枚**（★`?pace=short`・★2026-09-12・オーナー指示）
        *
@@ -5256,7 +5268,7 @@ function RaceView({ setup, real }: {
             const r1 = built.warp.raceSecAt(Math.min(built.warp.displaySec, jumpAt.at + jumpLead));
             const r = raceEditSweepRaceSec(r0, r1, (raceD - (jumpAt.at - jumpLead)) / (jumpLead * 2));
             return built.model.at(r).map((h) => ({
-              gate: h.gate, s: h.meters, w: h.w ?? TRACK_WIDTH_M / 2, own: h.gate === ownGate,
+              gate: h.gate, s: h.meters, w: h.w ?? TRACK_WIDTH_M / 2, own: h.gate === mineGate,
             }));
           })()
           : undefined;
@@ -5305,8 +5317,8 @@ function RaceView({ setup, real }: {
             /** ⚠️ ★関数に包んだので `v2Minimap` の絞り込みが効きません。★ここで控えます */
             drawFormationTelop(ctx, FONT, telopFrame, {
               horses: minimapHorses,
-              ownGate,
-              ownOrder: Math.max(1, orderOf(ownGate)),
+              ownGate: mineGate,
+              ownOrder: Math.max(1, orderOf(mineGate ?? ownGate)),
               leftward: v2TravelsLeft,
             });
           } else if (kind === 'running-style') {
@@ -5316,13 +5328,13 @@ function RaceView({ setup, real }: {
                 gate: h.gate, horseName: nameOf(h.gate),
                 strategyLabel: strategyLabelOf(h.gate),
                 order: Math.max(1, orderOf(h.gate)),
-                frameColor: frameColorOf(h.gate), own: h.gate === ownGate,
+                frameColor: frameColorOf(h.gate), own: h.gate === mineGate,
               })));
           } else {
             const leadM = cutRank[0]?.meters ?? 0;
             const ownM = cutRank.find((h) => h.gate === ownGate)?.meters ?? leadM;
             drawToStraightTelop(ctx, FONT, telopFrame, {
-              gate: ownGate,
+              gate: mineGate,
               frameColor: frameColorOf(ownGate),
               ownOrder: Math.max(1, orderOf(ownGate)),
               ownGapLengths: Math.max(0, (leadM - ownM) / HORSE_LENGTH_M),
@@ -5370,7 +5382,7 @@ function RaceView({ setup, real }: {
               strategyLabel: strategyLabelOf(h.gate),
               order: Math.max(1, orderOf(h.gate)),
               frameColor: frameColorOf(h.gate),
-              own: h.gate === ownGate,
+              own: h.gate === mineGate,
             }));
           drawRunningStyleCutIn(ctx, FONT, frame, rows);
         } else {
@@ -5395,7 +5407,7 @@ function RaceView({ setup, real }: {
             courseMapColors: VENUE_LOOK.courseMap,
             metersLeft: frame.metersLeft,
             timeSec: d,
-            ownGate,
+            ownGate: mineGate,
             ownOrder: ownOrderShown,
             ownGapLengths: Math.max(0, (leadMeters - ownMeters) / HORSE_LENGTH_M),
             fieldSize: FIELD,
@@ -5545,7 +5557,7 @@ function RaceView({ setup, real }: {
       drawEntryBoard(ctx, art.pal as Record<string, string>, vp, FONT,
         Array.from({ length: FIELD }, (_, i) => ({
           gate: i + 1, name: nameOfGate(i + 1), jockey: jockeyOfGate(i + 1),
-          weightKg: built.weightsKg[i], isOwn: i + 1 === ownGate,
+          weightKg: built.weightsKg[i], isOwn: i + 1 === mineGate,
         })), {
           raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo,
           distanceMeter: built.distanceM, surfaceLabel: surface === 'turf' ? '芝' : 'ダート', turnLabel: turn === 'left' ? '左' : '右',
@@ -5748,7 +5760,7 @@ function RaceView({ setup, real }: {
         drawFormationBar(ctx, art.pal as Record<string, string>, FONT,
           /** ★★隊列バーも**画面に描いた位置**で並べます（順位表・実況と同じ・食い違いを作らない） */
           easedAt.map((h) => ({ gate: h.gate, s: h.meters })), FIELD, frameRoleOf,
-          { x: 40, y: 4, width: W - 80, ownGate, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
+          { x: 40, y: 4, width: W - 80, ownGate: mineGate, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC,
             /** ★右回りで馬が左へ走る画では、先頭を左端に（★`v2TravelsLeft` の註記） */
             leftward: v2TravelsLeft });
 
@@ -5766,7 +5778,7 @@ function RaceView({ setup, real }: {
             built.model.at(Math.max(0, sec - MOMENTUM_WINDOW_SEC)).map((h) => ({ gate: h.gate, meters: h.meters })),
           )
           : undefined;
-        const plateRows = referenceNamePlateRows(rank, ownGate, (gate) => nameOfGate(gate))
+        const plateRows = referenceNamePlateRows(rank, mineGate, (gate) => nameOfGate(gate))
           .map((row) => (momentum === undefined ? row : { ...row, momentum: momentum.get(row.gate) }));
         /**
          * ★置き場所は**空いているところ**を明示的に渡します。
@@ -5803,7 +5815,7 @@ function RaceView({ setup, real }: {
        */
       const ownMarkerVisible = hudRaw.standings && !replay.active && !raceOver
         && !cutInCoversWorld;
-      if (ownMarkerVisible && v2OwnHead !== undefined) {
+      if (ownMarkerVisible && v2OwnHead !== undefined && mineGate !== undefined) {
         drawOwnHorseMarker(ctx, FONT, v2OwnHead, ownGate,
           { topLimitY: 40, viewport: { width: W, height: H }, timeSec: d, sinceSec: raceD - HUD_SETTLE_SEC });
       }
@@ -5841,7 +5853,7 @@ function RaceView({ setup, real }: {
           name: nameOfGate(h.gate),
           lengths: ((rank[0]?.meters ?? h.meters) - h.meters) / HORSE_LENGTH_M,
           timeSec: allIn ? built.finishSec.get(h.gate) : undefined,
-          isOwn: h.gate === ownGate,
+          isOwn: h.gate === mineGate,
         })), FIELD, frameRoleOf, {
           animIndexOf: (gate: number) => standingsAnimRef.current.pos.get(gate),
           rightLabel: v2SectionLabel ?? sectionLabel[courseSection],
@@ -5961,7 +5973,7 @@ function RaceView({ setup, real }: {
             place: row.place, gate: row.gate,
             horseName: nameOfGate(row.gate),
             jockeyName: jockeyOfGate(row.gate),
-            timeSec: built.finishSec.get(row.gate), margin: row.margin, isOwn: row.gate === ownGate,
+            timeSec: built.finishSec.get(row.gate), margin: row.margin, isOwn: row.gate === mineGate,
           })), FIELD, frameRoleOf,
           {
             raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo,
@@ -5997,7 +6009,7 @@ function RaceView({ setup, real }: {
         }
       }
     }
-  }, [built, ownGate, surface, trackCondition, turn, renderer, showEntryBoard,
+  }, [built, ownGate, mineGate, surface, trackCondition, turn, renderer, showEntryBoard,
     horseScale, horseBob, strideM, startRampSec, startShake, motionTimeline]);
 
   useEffect(() => {
@@ -6496,11 +6508,12 @@ function RaceView({ setup, real }: {
               <span className="a-chip">馬場 {TRACK_CONDITION_LABEL[trackCondition]}</span>
               <span className="a-chip">{FIELD}頭</span>
             </div>
-            <div className="rm-entry-own">
+            {/* ★自分の馬が出ていないレースは ★「自馬」の欄を出しません（★2026-09-28） */}
+            {mineGate !== undefined && <div className="rm-entry-own">
               <span className="rm-entry-own-lbl">自馬</span>
-              <FrameBadge gate={ownGate} fieldSize={FIELD} w={28} h={24} font={14} />
-              <span className="rm-entry-own-name">{nameOfGate(ownGate)}</span>
-            </div>
+              <FrameBadge gate={mineGate} fieldSize={FIELD} w={28} h={24} font={14} />
+              <span className="rm-entry-own-name">{nameOfGate(mineGate)}</span>
+            </div>}
           </div>
           <button
             type="button" className="a-btn a-btn-gold rm-watch"

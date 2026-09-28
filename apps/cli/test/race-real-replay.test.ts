@@ -4,7 +4,7 @@
  *
  * 【★見ている壊れ方】
  *   ① ★確定前のレースを走らせる（★「そのレースを見た」が嘘になる・契約 §表示段階）
- *   ② ★自分の馬が出ていないレースを走らせる（★どれかの馬を「自馬」と偽る・裁定 Q-RACE-6）
+ *   ② ★自分の馬が出ていないレースで ★どれかの馬を「自馬」と偽る（★裁定 Q-RACE-6。★2026-09-28 から ★出すが `ownGate` は `null`）
  *   ③ ★取消で欠けた枠を詰めて並べる（★馬番の嘘）
  *   ④ ★知らない格・条件を既定へ落とす（★R-27）
  *   ⑤ ★ログインしていないのに `is_mine` を読んだことにする（★`readClient` では常に偽）
@@ -88,6 +88,7 @@ describe('🔴 ★実レースの録画を読む層', () => {
     const data = await loadRealRace(RACE_ID);
     expect(data.runners.map((r) => r.gate)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(data.ownGate, '★自馬は `is_mine` の馬').toBe(3);
+    expect(data.focusGate, '★自馬が居れば ★主役も自馬（★1 着ではない）').toBe(3);
     expect(data.gameWeek, '★週は `my_runs` から').toBe(60);
     expect(data.raceNo, '★R 番号は `slotOfDay(cycle_index) + 1`').toMatch(/^\d+R$/);
     expect(data.grade, '★格が無ければ平場（null）').toBeNull();
@@ -108,9 +109,18 @@ describe('🔴 ★実レースの録画を読む層', () => {
     await expect(loadRealRace(RACE_ID)).rejects.toThrow(/まだ確定していません/);
   });
 
-  it('🔴 ② 自分の馬が出ていないレースは止める（★どれかの馬を自馬と偽らない）', async () => {
-    state.tables['race_entries_public'] = entries(8, () => ({ is_mine: false }));
-    await expect(loadRealRace(RACE_ID)).rejects.toThrow(/自分の馬が出ていないレース/);
+  /**
+   * ★2026-09-28（観戦・オーナー許可）: ★自分の馬が出ていないレースも ★出します。
+   *   ★ただし ★`ownGate` は `null`（★どれかの馬を自馬と偽らない）・★カメラの主役は ★1 着。
+   *   ★1 着を ★8 番にして ★「既定の 1 番がたまたま 1 着」で通らないようにしています。
+   */
+  it('🔴 ② 自分の馬が出ていないレースは ★自馬なし・★主役は 1 着（★どれかの馬を自馬と偽らない）', async () => {
+    state.tables['race_entries_public'] = entries(8, (i) => ({
+      is_mine: false, finish_pos: 8 - i, finish_time: 95 + (7 - i) * 0.3,
+    }));
+    const data = await loadRealRace(RACE_ID);
+    expect(data.ownGate).toBeNull();
+    expect(data.focusGate, '★主役は 1 着の馬').toBe(8);
   });
 
   it('🔴 ③ 取消で欠けた枠があるレースは止める（★詰めて並べない）', async () => {

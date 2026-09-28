@@ -18,11 +18,12 @@
  *   ⚠️ ★位置の式（★見せ方）は ★2 か所のままです（★簿 `RACE-POSITION-FORMULA-DUPLICATED`・
  *      ★裁定「着順と馬番を決めないなら、位置の式は見せ方に降格する」）。
  *
- * 【⚠️ ★確定済みだけ・★自分の馬が出ているものだけ】
+ * 【⚠️ ★確定済みだけ・★ログインしている人だけ】
  *   ★走行は ★**`settled` のときだけ**出します（★契約 §暫定の録画表示）。
- *   🔴 ★**自分の馬が出ていないレースは出しません**（★裁定 Q-RACE-6・★暫定）。★どれかの馬を
- *      ★「自馬」と偽ることになるからです（★「見本の馬」と同じ族）。
- *      ★簿 `REPLAY-NEEDS-OWN-HORSE`（★消す条件 = ★観戦の便で `ownGate` を「居ないこともある」形にした日）。
+ *   ★2026-09-28（観戦・オーナー許可）: ★自分の馬が出ていないレースも出します。★そのとき `ownGate` は `null`、
+ *      ★カメラの主役 `focusGate` は ★1 着の馬。★画面は `ownGate === null` のとき ★「あなたの馬」を描きません
+ *      （★どれかの馬を自馬と偽らない ＝ ★裁定 Q-RACE-6 が止めていた理由）。
+ *   ⚠️ ★ログインしていない人には ★まだ出しません（★別の判断・今回は変えない）。
  */
 import { finalOrderMatches, marginLabel } from '@star/race-engine';
 import { slotOfDay } from '@star/scheduler';
@@ -108,8 +109,16 @@ export interface RealRaceData {
   readonly weightKgByGate: ReadonlyMap<number, number>;
   /** ★単勝オッズ（★馬番 → 倍率）。★無い馬は入っていません（★埋めない） */
   readonly winOddsByGate: ReadonlyMap<number, number>;
-  /** ★自分の馬の馬番（★2 頭いれば小さいほう） */
-  readonly ownGate: number;
+  /**
+   * ★自分の馬の馬番（★2 頭いれば小さいほう）。★**自分の馬が出ていないレースは `null`**（★2026-09-28・観戦・オーナー許可）。
+   *   ★`null` のとき ★画面は「あなたの馬」を ★1 つも描きません（★どれかの馬を自馬と偽らない）。
+   */
+  readonly ownGate: number | null;
+  /**
+   * ★**カメラの主役**（★位置の組み立て・カメラ・実況が追う馬）。★自分の馬が居れば その馬、★居なければ ★1 着の馬。
+   *   ★1 着にしたのは ★暫定（★録画なので結果は確定済み）。
+   */
+  readonly focusGate: number;
 }
 
 const SURFACES = ['turf', 'dirt'] as const;
@@ -209,16 +218,19 @@ export async function loadRealRace(raceId: string): Promise<RealRaceData> {
     );
   }
 
-  /** 🔴 ★**自分の馬が出ていないレースは出しません**（★裁定 Q-RACE-6・★暫定） */
+  /**
+   * ★**自分の馬**（★居なければ `null`）と ★**カメラの主役**（★自分の馬 か ★1 着）。
+   *   ★2026-09-28: ★自分の馬が出ていないレースも出します（★オーナー許可・簿 `REPLAY-NEEDS-OWN-HORSE` を閉じる便）。
+   */
   const mineGates = allRows
     .filter((r) => r['is_mine'] === true)
     .map((r) => Number(r['gate']))
     .filter((g) => Number.isInteger(g) && g >= 1)
     .sort((a, b) => a - b);
-  const ownGate = mineGates[0];
-  if (ownGate === undefined) {
-    throw new RaceNotPlayableError('自分の馬が出ていないレースの録画は、まだ出せません');
-  }
+  const ownGate = mineGates[0] ?? null;
+  const winnerGate = runners.find((r) => r.finishPosition === 1)?.gate;
+  if (winnerGate === undefined) throw new RaceNotPlayableError('1 着の馬が読めません');
+  const focusGate = ownGate ?? winnerGate;
 
   const weightKgByGate = new Map<number, number>();
   for (const r of allRows) {
@@ -257,5 +269,6 @@ export async function loadRealRace(raceId: string): Promise<RealRaceData> {
     weightKgByGate,
     winOddsByGate,
     ownGate,
+    focusGate,
   };
 }

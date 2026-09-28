@@ -427,4 +427,29 @@ describe('★テロップ（★下三分の一）', () => {
     expect(mk(3)).toContain('1.8馬身');
     expect(mk(1), '★先頭に「差」は無い').toContain('先頭');
   });
+
+  /**
+   * 🔴 ★**自分の馬が出ていないレース**（★2026-09-28・観戦）: ★「あなた」も ★番手も ★1 文字も出さない。
+   *   ★対照（★同じ入力で ownGate だけ在る）が ★「あなた＝」を出すことも ★同じ所で見ます。
+   */
+  it('🔴 ★自分の馬が居なければ ★隊列は「あなた」を出さない（★両端の目印は出す）', () => {
+    const horses = Array.from({ length: 12 }, (_, i) => ({ gate: i + 1, s: 300 - i * 3, w: 8 }));
+    const none = recorder();
+    drawFormationTelop(none.ctx, FONT, telopAt(0.5), { horses, ownGate: undefined, ownOrder: 1 });
+    const said = none.texts.map((x) => x.t);
+    expect(said.filter((t) => t.includes('あなた'))).toEqual([]);
+    expect(said).toContain('先頭');
+    const own = recorder();
+    drawFormationTelop(own.ctx, FONT, telopAt(0.5), { horses, ownGate: 3, ownOrder: 3 });
+    expect(own.texts.map((x) => x.t), '★対照').toContain('あなた＝3番手');
+  });
+
+  it('🔴 ★自分の馬が居なければ ★直線テロップは番手と差を出さない', () => {
+    const r = recorder();
+    drawToStraightTelop(r.ctx, FONT, telopAt(0.5), {
+      gate: undefined, frameColor: '#e33', ownOrder: 1, ownGapLengths: 0,
+    });
+    const said = r.texts.map((x) => x.t);
+    expect(said.filter((t) => /番手|馬身|先頭との差/.test(t))).toEqual([]);
+  });
 });

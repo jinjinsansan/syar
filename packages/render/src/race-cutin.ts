@@ -600,7 +600,8 @@ export interface ToStraightCutInOptions {
   readonly metersLeft: number;
   /** ★光沢の時刻（秒） */
   readonly timeSec: number;
-  readonly ownGate: number;
+  /** ★自分の馬。★`undefined` は ★自分の馬が出ていないレース（★「あなたの馬」の欄を描かない・2026-09-28） */
+  readonly ownGate: number | undefined;
   readonly ownOrder: number;
   /**
    * ★先頭との差（★**馬身**）。★順位表（`drawStandings`）が出しているのと ★**同じ単位・同じ値**。
@@ -657,6 +658,8 @@ export function drawToStraightCutIn<TImage>(
   /** ★右に「自馬がいま何番手で、先頭とどれだけ差があるか」 */
   const rx = box.x + mapW + Math.round(box.width * 0.06);
   let y = box.y + Math.round(box.height * 0.20);
+  /** ★自分の馬が出ていないレースは ★この欄を丸ごと描きません（★どれかの馬を自馬と偽らない・2026-09-28） */
+  if (o.ownGate !== undefined) {
   ctx.fillStyle = GOLD;
   ctx.font = font(Math.round(H * 0.026), true);
   ctx.fillText('あなたの馬', rx, y);
@@ -689,6 +692,7 @@ export function drawToStraightCutIn<TImage>(
     ctx.fillStyle = PAPER;
     ctx.font = font(Math.round(H * 0.052), true);
     ctx.fillText(o.ownStrategyLabel, rx, y);
+  }
   }
 
   /**
@@ -927,7 +931,9 @@ export function drawOwnHorseTelop<TImage>(
 export function drawFormationTelop<TImage>(
   ctx: Ctx2D<TImage>, font: FontOf, f: RaceTelopFrame,
   o: {
-    readonly horses: readonly MinimapHorse[]; readonly ownGate: number; readonly ownOrder: number;
+    readonly horses: readonly MinimapHorse[];
+    /** ★`undefined` は ★自分の馬が出ていないレース（★「あなた＝」を描かない・2026-09-28） */
+    readonly ownGate: number | undefined; readonly ownOrder: number;
     /** ★馬が画面の左へ走る版か（★2026-09-15・右回り）。★真なら先頭を左端に */
     readonly leftward?: boolean | undefined;
   },
@@ -944,8 +950,10 @@ export function drawFormationTelop<TImage>(
   ctx.textAlign = 'right';
   ctx.fillText(leftward ? '後方' : '先頭', box.x + box.width, labelY);
   ctx.textAlign = 'center';
-  ctx.fillStyle = TELOP_OWN;
-  ctx.fillText(`あなた＝${o.ownOrder}番手`, box.x + box.width / 2, labelY);
+  if (o.ownGate !== undefined) {
+    ctx.fillStyle = TELOP_OWN;
+    ctx.fillText(`あなた＝${o.ownOrder}番手`, box.x + box.width / 2, labelY);
+  }
   ctx.textAlign = 'left';
 
   /** ★バー */
@@ -1016,11 +1024,12 @@ export function drawRunningStyleTelop<TImage>(
  */
 export function drawToStraightTelop<TImage>(
   ctx: Ctx2D<TImage>, font: FontOf, f: RaceTelopFrame,
-  o: { readonly gate: number; readonly frameColor: string;
+  /** ★`gate` が `undefined` は ★自分の馬が出ていないレース（★帯と見出しだけ描く・2026-09-28） */
+  o: { readonly gate: number | undefined; readonly frameColor: string;
     readonly ownOrder: number; readonly ownGapLengths: number },
 ): void {
   const box = drawRaceTelopBand(ctx, font, f);
-  if (box === undefined) return;
+  if (box === undefined || o.gate === undefined) return;
   const H = f.viewport.height;
   const plate = Math.round(H * (72 / 720));
   const py = box.y + Math.round((box.height - plate) / 2);
