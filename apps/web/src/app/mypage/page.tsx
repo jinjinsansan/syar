@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Backdrop, BigButton, ChibiHorse, EpCapsule, PpCapsule, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
+import { Backdrop, BigButton, EpCapsule, OwnHorseFigure, PpCapsule, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { SignOutButton } from '../../components/uma/sign-out';
 import { useStableView } from '../../components/uma/use-stable-view';
@@ -54,7 +54,8 @@ export default function MyPage(): React.ReactElement {
       {horse && <section aria-label={`${horse.name}の情報`} style={{ flex: '1 1 290px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ minHeight: 210, position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', border: '2px solid rgba(251,247,236,.28)', borderRadius: 12, background: 'var(--u-panel)', overflow: 'hidden' }}>
           <strong style={{ position: 'absolute', top: 10, left: 12 }}>{horse.name}</strong>
-          <ChibiHorse running={false} width={230} height={186} />
+          {/* ★**その馬の姿**（★育成・レースと同じ毛色・★見本の絵ではない・2026-09-28） */}
+          <OwnHorseFigure horseId={horse.id} running={false} style={{ width: 230, maxWidth: '100%', margin: '28px auto 0' }} />
         </div>
         <div style={{ padding: 12, border: '2px solid rgba(251,247,236,.28)', borderRadius: 12, background: 'var(--u-panel)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>調子</span><strong>{conditionView(horse.condition).label}</strong></div>

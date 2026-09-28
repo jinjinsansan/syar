@@ -32,7 +32,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Backdrop, BigButton, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
+import { Backdrop, BigButton, NOTICE_ACTION, OwnHorseFigure, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { useStableView } from '../../components/uma/use-stable-view';
 import { TRAINING_MENUS } from '../../lib/game-demo';
@@ -217,39 +217,8 @@ export default function TrainPage(): React.ReactElement {
           {running && (
             <span style={{ position: 'absolute', left: '12%', bottom: 72, width: 60, height: 44, borderRadius: '50%', background: 'rgba(228,226,208,.4)', filter: 'blur(8px)', animation: 'u-dust .95s linear infinite' }} />
           )}
-          <div
-            onClick={run}
-            style={{
-              position: 'relative', width: 'min(330px, 88%)', aspectRatio: '544 / 312',
-              marginBottom: 80, cursor: 'pointer',
-              /**
-               * ⚠️ ★調教中は ★**CSS で跳ねさせません**（★Codex の助言・
-               *    「★一定周期の CSS の上下動は玩具や UI アイコンに見える」）。
-               *    ★脚は絵の側（8 コマ）が動かします。
-               */
-              animation: running ? undefined : 'u-idle 3.4s ease-in-out infinite',
-            }}
-          >
-            <span style={{
-              position: 'absolute', inset: 0,
-              /**
-               * ⚠️ ★`800% 100%` は `@keyframes u-walk`（0%→100%）と ★**対**です。
-               *    ★片方だけ変えるとコマが半分ずれます。
-               */
-              background: running
-                ? "url('/art/uma/horse-walk-sheet.webp') no-repeat 0 0 / 800% 100%"
-                : "url('/art/uma/horse-stand.webp') no-repeat center/contain",
-              /**
-               * 🔴 ★**`jump-none` を落とさないこと**（★2026-09-24・実ブラウザで実測）。
-               *   ★既定の `steps(8)` は 0/8, 1/8 … 7/8 の位置で止まります。★コマの境目は k/7 なので、
-               *   ★**8 コマ中 7 コマで、★2 コマが半分ずつ映ります**（★実測 差 25〜35・★合っていれば 1.0）。
-               *   ★`jump-none` は 0/7, 1/7 … 7/7 で止まります（★両端を含む 8 点）。
-               */
-              animation: running ? 'u-walk .8s steps(8, jump-none) infinite' : undefined,
-              // ⚠️ ★毛色を先に、影を後に掛ける（★逆にすると影まで毛色に染まる）
-              filter: `${coatFilter === undefined ? '' : `${coatFilter} `}drop-shadow(0 8px 12px rgba(8,18,8,.45))`,
-            }} />
-          </div>
+          {/* ★その馬の姿（★`/home`・`/mypage` と 同じ部品・★毛色は馬 ID から・2026-09-28） */}
+          <OwnHorseFigure horseId={horse.id} running={running} onClick={run} style={{ marginBottom: 80 }} />
 
           {/* ★ゲージ（★スタミナ・調子。★これ以外に機械的な表示を増やさない） */}
           <div style={{

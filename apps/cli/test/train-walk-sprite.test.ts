@@ -30,7 +30,12 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../../..');
-const PAGE = readFileSync(path.join(ROOT, 'apps/web/src/app/train/page.tsx'), 'utf8');
+/**
+ * ★歩きの表の送り方は ★2026-09-28 から ★共通の部品 `OwnHorseFigure`（`uma-parts.tsx`）にあります
+ *   （★`/train`・`/home`・`/mypage` が同じ馬の姿を使う・オーナー指示・レビュー側の裁定）。★育成の画面は それを使うだけ。
+ */
+const PAGE = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/uma-parts.tsx'), 'utf8')
+  + readFileSync(path.join(ROOT, 'apps/web/src/app/train/page.tsx'), 'utf8');
 const CSS = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/uma-theme.css'), 'utf8');
 const ART = path.join(ROOT, 'apps/web/public/art/uma');
 

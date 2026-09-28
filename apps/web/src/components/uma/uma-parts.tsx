@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { coatCssFilter, coatOfHorseId } from '@star/render';
 import { PLATE_LAYERS, screenOverlayCss } from './backdrop-plate';
 import './uma-theme.css';
 
@@ -450,7 +451,58 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
 }
 
 /**
- * ★**デフォルメの馬**（★TOP・ダッシュボード・調教で使う 1 枚絵）。
+ * ★**自分の馬の姿**（★2026-09-28・オーナー「自分の馬は 仔馬の誕生から育成からレース発走まで一環として同じ馬に」・
+ *   レビュー側の裁定「騎手なしの立ち姿でよい・先に直す」）。
+ *   ★`/train`・`/home`・`/mypage` が ★**この 1 つ**を使う（★写さない・D-052）。
+ *   ★毛色は ★`coatOfHorseId(馬の ID)`（`@star/render`・★唯一の出どころ・★レースの走りと同じ）。★同じ馬は どの画面でも同じ毛色。
+ *   ★立ち姿 `horse-stand.webp`・★`running` の間は 歩きの 8 コマ `horse-walk-sheet.webp`（★`u-walk` と対）。
+ *   ⚠️ ★見本の `chibi-horse.png` を ★持ち馬の欄に使わないこと（★見本を自分の馬として見せる ＝ P0-B と同じ族・★網 `own-horse-figure.test.ts`）。
+ */
+export function OwnHorseFigure({ horseId, running, onClick, style }: {
+  readonly horseId: string;
+  readonly running: boolean;
+  readonly onClick?: () => void;
+  /** ★置く場所の余白などだけ（★絵と毛色は変えない） */
+  readonly style?: React.CSSProperties;
+}): React.ReactElement {
+  const coatFilter = coatCssFilter(coatOfHorseId(horseId));
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        position: 'relative', width: 'min(330px, 88%)', aspectRatio: '544 / 312',
+        cursor: onClick === undefined ? undefined : 'pointer',
+        /**
+         * ⚠️ ★歩いている間は ★CSS で跳ねさせません（★Codex の助言・
+         *    「★一定周期の CSS の上下動は玩具や UI アイコンに見える」）。★脚は絵の側（8 コマ）が動かします。
+         */
+        animation: running ? undefined : 'u-idle 3.4s ease-in-out infinite',
+        ...style,
+      }}
+    >
+      <span style={{
+        position: 'absolute', inset: 0,
+        /**
+         * ⚠️ ★`800% 100%` は `@keyframes u-walk`（0%→100%）と ★**対**です。★片方だけ変えるとコマが半分ずれます。
+         */
+        background: running
+          ? "url('/art/uma/horse-walk-sheet.webp') no-repeat 0 0 / 800% 100%"
+          : "url('/art/uma/horse-stand.webp') no-repeat center/contain",
+        /**
+         * 🔴 ★**`jump-none` を落とさないこと**（★2026-09-24・実ブラウザで実測）。
+         *   ★既定の `steps(8)` は 0/8, 1/8 … 7/8 の位置で止まり、★8 コマ中 7 コマで 2 コマが半分ずつ映ります。
+         */
+        animation: running ? 'u-walk .8s steps(8, jump-none) infinite' : undefined,
+        // ⚠️ ★毛色を先に、影を後に掛ける（★逆にすると影まで毛色に染まる）
+        filter: `${coatFilter === undefined ? '' : `${coatFilter} `}drop-shadow(0 8px 12px rgba(8,18,8,.45))`,
+      }} />
+    </div>
+  );
+}
+
+/**
+ * ★**デフォルメの馬**（★TOP の看板で使う 1 枚絵・★見本）。
+ * ⚠️ ★**持ち馬の欄には使いません**（★2026-09-28 から ★`OwnHorseFigure`）。★TOP の看板は別扱い（★簿 LOOK-CHIBI-VS-SIDE-V8）。
  * ⚠️ ★**中継の真横スプライトとは役割が別**です（★資料 §4.4「混ぜないこと」）。
  * ★`running` が真なら跳ねと砂煙、偽なら静かな待機。
  */

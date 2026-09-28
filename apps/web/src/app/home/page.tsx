@@ -18,7 +18,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import {
-  Backdrop, BigButton, ChibiHorse, EpCapsule, PpCapsule, TopBar, useMotionPaused,
+  Backdrop, BigButton, EpCapsule, OwnHorseFigure, PpCapsule, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { FoalInvite } from '../../components/uma/foal-invite';
@@ -93,7 +93,8 @@ export default function HomePage(): React.ReactElement {
           flex: '1 1 auto', minHeight: 280, position: 'relative', width: 'calc(100% + 28px)', margin: '0 -14px',
           display: 'flex', alignItems: horse ? 'flex-end' : 'center', justifyContent: 'center', overflow: 'hidden',
         }}>
-          {horse ? <><ChibiHorse running={running} onClick={poke} />
+          {/* ★**その馬の姿**（★育成・レースと同じ毛色・★見本の絵ではない・2026-09-28 オーナー指示） */}
+          {horse ? <><OwnHorseFigure horseId={horse.id} running={running} onClick={poke} style={{ marginBottom: 36 }} />
           <button type="button" onClick={() => { move(-1); }} aria-label="前の馬" style={arrow('left')}>‹</button>
           <button type="button" onClick={() => { move(1); }} aria-label="次の馬" style={arrow('right')}>›</button>
           <span style={{
