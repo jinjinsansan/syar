@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowOver, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
 import { INTRO_STAGES, stripSizeOf } from './race-strip-sizes';
 import { STRIP_EMBED_GIVE_UP_SEC, isStripEmbedMessage, stripEmbedNote, stripEmbedUrl } from './race-strip-embed';
-import { tickerItems, tickerShowsField, type TickerRunner } from './race-strip-ticker';
+import { BOARD_ITEM_SEC, tickerBoard, tickerShowsField, type BoardItem, type TickerRunner } from './race-strip-ticker';
 import './uma-theme.css';
 
 interface RaceNoticeRow {
@@ -132,27 +132,52 @@ function clock(iso: string): string {
 }
 
 /**
- * ★流れる 1 行の全文（★末尾にも区切りを付け、★2 つ並べたときの継ぎ目を同じ見た目にする）。
- *   ★録画中は ★頭に ★そのレースと先頭（`leaderLine`）を置く。
+ * ★電光掲示板の全部の札（★録画中は ★頭に ★そのレースと先頭 `leaderLine`・★最後に 直近確定）。
  */
-function tickerText(
+function boardItemsOf(
   next: NonNullable<NoticeData['next']>, data: NoticeData, recent: RaceNoticeRow | null | undefined, nowMs: number,
   leaderLine: string | null,
-): string {
-  const items = [
-    ...(leaderLine === null ? [] : [leaderLine]),
-    ...tickerItems(next, data.nextField, nowMs, clock),
-    ...(recent ? [`直近確定 ${raceLabel(recent)}`] : []),
+): readonly BoardItem[] {
+  return [
+    ...(leaderLine === null ? [] : [{ text: leaderLine, tone: 'plain' as const, badge: null }]),
+    ...tickerBoard(next, data.nextField, nowMs, clock),
+    ...(recent ? [{ text: `直近確定 ${raceLabel(recent)}`, tone: 'plain' as const, badge: null }] : []),
   ];
-  return `${items.join(' ／ ')} ／ `;
 }
 
 /**
- * ★流す秒（★**頭数だけ**で決める）。★文の長さで決めると ★「あと N 分」や先頭の馬が変わるたびに ★速さが変わって跳ぶ
- *   （★2026-09-28・オーナー「ずっと動いているように」）。★変わるのは ★締切で出走表が来た 1 回だけ。
+ * ★**電光掲示板**（★2026-09-28・オーナー選択 A＋C＋D）。★1 枚ずつ ★右から滑り込み・★止まって読ませ・★左へ抜ける。
+ *   ★札を ★`step` で数え、★`key` を変えて ★CSS の動きを 1 枚ごとに頭から（★同じ要素の中で・★帯は差し替えない）。
+ *   ★停止スイッチ（`.u-paused`）・「動きを減らす」の間は ★札を送らない（★資料 §5-7・★いまの札のまま止める）。
+ *   ★読み上げは ★全部の札の文を 1 つにして渡す（★送るたびに読み上げない）。
  */
-export function tickerSecOf(fieldSize: number): number {
-  return 20 + 5 * Math.max(0, fieldSize);
+function StripBoard({ items, label }: { readonly items: readonly BoardItem[]; readonly label: string }): React.ReactElement {
+  const [step, setStep] = useState(0);
+  const hostRef = useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const timer = window.setInterval(() => {
+      if (reduce.matches || hostRef.current?.closest('.u-paused') != null || document.visibilityState !== 'visible') return;
+      setStep((s) => s + 1);
+    }, BOARD_ITEM_SEC * 1000);
+    return () => { window.clearInterval(timer); };
+  }, []);
+  const item = items.length === 0 ? null : items[step % items.length]!;
+  /** ★長い札は ★止まっている間に ★はみ出したぶんだけ左へ送る（★最後まで読ませる・★「…」で切らない） */
+  const itemRef = useRef<HTMLSpanElement | null>(null);
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    const el = itemRef.current;
+    if (host === null || el === null) return;
+    el.style.setProperty('--board-shift', `${Math.max(0, el.scrollWidth - (host.clientWidth - 16))}px`);
+  }, [step, item?.text]);
+  return <span ref={hostRef} className="u-race-strip-board" aria-label={`${label}: ${items.map((i) => i.text).join('、')}`}>
+    {item !== null && <span key={step} ref={itemRef} className={`u-race-strip-board-item u-board-${item.tone}`} aria-hidden
+      style={{ '--board-sec': `${BOARD_ITEM_SEC}s` } as React.CSSProperties}>
+      {item.badge !== null && <b className={`u-board-badge${item.badge === '大穴' ? ' u-board-badge-longshot' : ''}`}>{item.badge}</b>}
+      {item.text}
+    </span>}
+  </span>;
 }
 
 function raceLabel(row: RaceNoticeRow): string {
@@ -473,11 +498,8 @@ export function RaceStrip(): React.ReactElement | null {
           ★同じ文を 2 つ並べて ★切れ目なく繰り返す。★流す秒は ★頭数だけで決める（★数字の変化で速さが揺れて跳ばない）。
           ★停止スイッチ・「動きを減らす」では ★流さない（★CSS・資料 §5-7）。
         */}
-        {tickerOn && next && data && nowMs !== null && <span className="u-race-strip-ticker" aria-label={`${next.name} ${status}`}>
-          <span className="u-race-strip-ticker-track" aria-hidden style={{ animationDuration: `${tickerSecOf(data.nextField.length)}s` }}>
-            <span>{tickerText(next, data, recent, nowMs, leaderLine)}</span><span>{tickerText(next, data, recent, nowMs, leaderLine)}</span>
-          </span>
-        </span>}
+        {tickerOn && next && data && nowMs !== null
+          && <StripBoard items={boardItemsOf(next, data, recent, nowMs, leaderLine)} label={`${next.name} ${status}`} />}
       </div>
       {error && <span className="u-race-strip-error">更新できません</span>}
       {/* ★録画を出せなかった理由（★黙って簡易版に戻らない） */}

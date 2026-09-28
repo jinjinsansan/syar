@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { tickerCountdown, tickerItems, tickerShowsField, type TickerRace } from '../../web/src/components/uma/race-strip-ticker';
+import { BOARD_ITEM_SEC, LONGSHOT_ODDS, tickerBoard, tickerCountdown, tickerItems, tickerShowsField, type TickerRace } from '../../web/src/components/uma/race-strip-ticker';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const STRIP = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/race-strip.tsx'), 'utf8');
@@ -54,25 +54,46 @@ describe('★流れる 1 行', () => {
     expect(tickerCountdown('x', T, clock)).toBe('発走時刻を読み込み中');
   });
 
-  it('🔴 ④ ★停止スイッチと「動きを減らす」で ★止め、★2 行まで読ませる', () => {
-    expect(CSS).toMatch(/\[data-theme='uma'\]\.u-paused \.u-race-strip-ticker-track[^{]*\{[^}]*animation: none;/);
-    expect(CSS).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]{0,200}\.u-race-strip-ticker-track \{[^}]*animation: none;/);
-    /** ★2 行に折る規則（R-18 #4）は ★流れる 1 行だけ外す（★外さないと流れない） */
-    expect(CSS).toContain(".u-race-strip-main > span:not(.u-race-run-mini):not(.u-race-strip-rec):not(.u-race-strip-ticker) {");
+  it('🔴 ④ ★停止スイッチと「動きを減らす」で ★止め、★札を送らず、★折り返して読ませる', () => {
+    expect(CSS).toMatch(/\[data-theme='uma'\] \.u-paused \.u-race-strip-board-item \{[^}]*animation: none;[^}]*white-space: normal;/);
+    expect(CSS).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]{0,200}\.u-race-strip-board-item \{[^}]*animation: none;/);
+    /** ★札を送る時計も ★止める（★CSS だけ止めると ★札が 2.9 秒ごとに替わって 動いて見える） */
+    expect(STRIP).toContain("if (reduce.matches || hostRef.current?.closest('.u-paused') != null || document.visibilityState !== 'visible') return;");
+    /** ★2 行に折る規則（R-18 #4）は ★電光掲示板だけ外す */
+    expect(CSS).toContain('.u-race-strip-main > span:not(.u-race-run-mini):not(.u-race-strip-rec):not(.u-race-strip-board) {');
   });
 
   /**
-   * 🔴 ⑤ ★**ずっと動いている**（★2026-09-28・オーナー「流れる文字はずっと動いているようにできませんか？」）:
-   *   ★最初は ★待ち時間だけ流し、★録画・結果の強調で ★消えて 別の文に替わっていた。★文の長さで秒を決めていたので ★数字が変わるたびに跳んだ。
-   *   → ★「大」では ★いつも ★同じ要素（★分岐の外・★文字の行の最後）で流し、★秒は ★頭数だけで決める。
+   * 🔴 ⑤ ★**ずっと動いている**（★2026-09-28・オーナー「ずっと動いているように」→「流れて止まる 電光掲示板・飽きさせない」A＋C＋D）:
+   *   ★「大」では ★いつも ★同じ要素（★分岐の外・★文字の行の最後）に ★電光掲示板を 1 つ。★1 枚の秒は ★TS と CSS で同じ。
    */
-  it('🔴 ⑤ ★「大」では ★いつも同じ要素で流し続け、★秒は頭数だけで決める', () => {
-    expect(STRIP).toContain('const tickerOn = size === \'big\' && next !== null && next !== undefined && data !== null && nowMs !== null;');
-    /** ★分岐（待ち・録画・結果）の外に ★1 つだけ */
-    expect(STRIP).toMatch(/<\/>\}\s*\{\/\*[\s\S]{0,600}\*\/\}\s*\{tickerOn && next && data && nowMs !== null && <span className="u-race-strip-ticker"/);
-    expect(STRIP.match(/className="u-race-strip-ticker"/g)?.length, '★流れる行が 2 か所にある（★替わるたびに頭から流れ直す）').toBe(1);
-    expect(STRIP).toContain('style={{ animationDuration: `${tickerSecOf(data.nextField.length)}s` }}');
-    expect(STRIP).toContain('export function tickerSecOf(fieldSize: number): number {');
+  it('🔴 ⑤ ★「大」では ★いつも同じ所で ★1 枚ずつ送り続ける（★秒は TS と CSS で同じ）', () => {
+    expect(STRIP).toContain("const tickerOn = size === 'big' && next !== null && next !== undefined && data !== null && nowMs !== null;");
+    expect(STRIP).toMatch(/<\/>\}\s*\{\/\*[\s\S]{0,600}\*\/\}\s*\{tickerOn && next && data && nowMs !== null\s*&& <StripBoard /);
+    expect(STRIP.match(/<StripBoard /g)?.length, '★掲示板が 2 か所にある（★替わるたびに頭から送り直す）').toBe(1);
+    expect(BOARD_ITEM_SEC).toBe(2.9);
+    expect(CSS).toContain('animation: u-board-slide var(--board-sec, 2.9s) both;');
     expect(STRIP).toContain('nextField: nextRace !== null && tickerShowsField(nextRace.status) ? await fetchField(nextRace.id) : [],');
   });
+
+  /** 🔴 ⑥ ★盛り上げ（C）: ★発走 1 分前は金で点滅・★締切 1 分前は赤・★「1番人気」は 1 頭だけ・★「大穴」は 50 倍から */
+  it('🔴 ⑥ ★発走・締切の直前と ★人気・大穴の札', () => {
+    const hot = tickerBoard(race('scheduled'), field, T - 30_000, clock);
+    expect(hot[1]).toEqual({ text: 'まもなく発走（05:12）', tone: 'hot', badge: null });
+    expect(tickerBoard(race('scheduled'), field, T - 90_000, clock)[1]!.tone, '★1 分より前は普通').toBe('plain');
+    const closing = tickerBoard(race('announced'), field, Date.parse('2026-09-28T04:53:30Z'), clock);
+    expect(closing[2]).toEqual({ text: '出走登録受付中・まもなく締切（04:54）', tone: 'alert', badge: null });
+    const board = tickerBoard(race('scheduled'), field, T - 120_000, clock);
+    expect(board.filter((b) => b.badge === '1番人気').map((b) => b.text)).toEqual(['2番 ウマB 単勝 1.8倍']);
+    expect(board.filter((b) => b.badge === '大穴').map((b) => b.text)).toEqual(['3番 ウマC 単勝 150.0倍（上限）']);
+    expect(LONGSHOT_ODDS).toBe(50);
+    /** ★同じ倍率なら ★馬番の小さい 1 頭だけ */
+    const tie = tickerBoard(race('scheduled'), [
+      { gate: 1, name: 'ウマA', winOdds: 2, capped: false }, { gate: 2, name: 'ウマB', winOdds: 2, capped: false },
+    ], T - 120_000, clock);
+    expect(tie.filter((b) => b.badge === '1番人気').length).toBe(1);
+    /** ★オッズが無い段（受付中）は ★札を付けない */
+    expect(tickerBoard(race('announced'), field, T - 300_000, clock).some((b) => b.badge !== null)).toBe(false);
+  });
 });
+

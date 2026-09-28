@@ -103,7 +103,7 @@
   ★それまでは 1 行で `ellipsis` にしており、★390px で理由の文が「…」で切れていました。
   ★レース名（`strong`）は 1 行のまま（★回答どおり）。★極小の馬の箱（`u-race-run-mini`）は ★文ではないので外す。
 */
-[data-theme='uma'] .u-race-strip-main > span:not(.u-race-run-mini):not(.u-race-strip-rec):not(.u-race-strip-ticker) {
+[data-theme='uma'] .u-race-strip-main > span:not(.u-race-run-mini):not(.u-race-strip-rec):not(.u-race-strip-board) {
   overflow: hidden;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -115,21 +115,52 @@
 [data-theme='uma'] .u-race-strip-main > .u-race-strip-rec { flex: 0 0 auto; white-space: nowrap; display: inline; }
 [data-theme='uma'] .u-race-strip-recent { color: var(--u-ink-light-3); }
 /*
-  ★**流れる 1 行**（★2026-09-28・オーナー指示・`race-strip-ticker.ts`）。★同じ文を 2 つ並べ、★半分ずらして ★切れ目なく繰り返す。
-  ★停止スイッチ（`.u-paused`）と「動きを減らす」では ★止めて、★2 行まで折り返して読ませる（★「…」で切らない・R-18 #4）。
+  ★**電光掲示板**（★2026-09-28・オーナー選択 A＋C＋D・`race-strip.tsx` の `StripBoard`・★文は `race-strip-ticker.ts`）。
+  ★A: ★1 枚ずつ ★右から滑り込み（★0.35 秒）→ ★止まって読ませ → ★左へ抜ける。★長い札は ★止まっている間に ★少しずつ左へ送って ★最後まで見せる（`--board-shift`）。
+  ★C: ★発走 1 分前は ★金で点滅（`u-board-hot`）・★締切 1 分前は ★赤（`u-board-alert`）・★「1番人気」「大穴」の札。
+  ★D: ★黒地に ★橙の光る文字 ＋ ★細かい点の網（★LED の粒に見せる・★字体は増やさない）。★D だけやめるときは ★この塊の「D」の行を消す。
+  ★停止スイッチ（`.u-paused`）と「動きを減らす」では ★動かさず ★札を送らない（★資料 §5-7）。
   ⚠️ ★見た目はデザイナー未確認（★R-19 Q6）。
 */
-[data-theme='uma'] .u-race-strip-main > .u-race-strip-ticker { flex: 1 1 100%; min-width: 0; overflow: hidden; white-space: nowrap; }
-[data-theme='uma'] .u-race-strip-ticker-track { display: inline-flex; animation: u-race-strip-ticker linear infinite; }
-[data-theme='uma'] .u-race-strip-ticker-track > span { flex: 0 0 auto; padding-right: 1em; }
-@keyframes u-race-strip-ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-[data-theme='uma'].u-paused .u-race-strip-ticker, [data-theme='uma'] .u-paused .u-race-strip-ticker { white-space: normal; }
-[data-theme='uma'].u-paused .u-race-strip-ticker-track, [data-theme='uma'] .u-paused .u-race-strip-ticker-track { animation: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-[data-theme='uma'].u-paused .u-race-strip-ticker-track > span + span, [data-theme='uma'] .u-paused .u-race-strip-ticker-track > span + span { display: none; }
+[data-theme='uma'] .u-race-strip-main > .u-race-strip-board {
+  flex: 1 1 100%; min-width: 0; position: relative; overflow: hidden; height: 30px; border-radius: 4px;
+  /* D */ background: #0b0906; border: 1px solid #2a2418; box-shadow: inset 0 0 8px rgba(0, 0, 0, .85);
+}
+/* D: ★LED の粒（★文字の上に 3px の点の網） */
+[data-theme='uma'] .u-race-strip-board::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(rgba(0, 0, 0, .5) 32%, transparent 34%); background-size: 3px 3px;
+}
+[data-theme='uma'] .u-race-strip-board-item {
+  position: absolute; left: 8px; top: 50%; white-space: nowrap; font-weight: 900; letter-spacing: .06em;
+  transform: translate(110%, -50%);
+  animation: u-board-slide var(--board-sec, 2.9s) both;
+  /* D */ color: #ffb52e; text-shadow: 0 0 4px rgba(255, 170, 40, .85), 0 0 10px rgba(255, 140, 0, .45);
+}
+@keyframes u-board-slide {
+  0% { transform: translate(110vw, -50%); animation-timing-function: cubic-bezier(.2, .8, .3, 1); }
+  12% { transform: translate(0, -50%); animation-timing-function: linear; }
+  80% { transform: translate(calc(-1 * var(--board-shift, 0px)), -50%); }
+  88% { transform: translate(calc(-1 * var(--board-shift, 0px)), -50%); animation-timing-function: cubic-bezier(.7, 0, .8, .2); }
+  100% { transform: translate(calc(-1 * var(--board-shift, 0px) - 110vw), -50%); }
+}
+/* C */
+[data-theme='uma'] .u-board-hot { color: #ffe066; animation: u-board-slide var(--board-sec, 2.9s) both, u-board-blink .6s steps(1) infinite; }
+@keyframes u-board-blink { 50% { opacity: .25; } }
+[data-theme='uma'] .u-board-alert { color: #ff5a4a; text-shadow: 0 0 4px rgba(255, 70, 50, .9), 0 0 10px rgba(255, 40, 20, .5); }
+[data-theme='uma'] .u-board-badge {
+  display: inline-block; margin-right: .5em; padding: 0 .4em; border-radius: 3px; font-size: .85em;
+  background: #ffd84a; color: #1a1200; text-shadow: none;
+}
+[data-theme='uma'] .u-board-badge-longshot { background: #ff5a4a; color: #fff; }
+/* ★止める（★停止スイッチ・「動きを減らす」）: ★いまの札を ★その場に置き ★折り返して読ませる */
+[data-theme='uma'].u-paused .u-race-strip-board, [data-theme='uma'] .u-paused .u-race-strip-board { height: auto; min-height: 30px; }
+[data-theme='uma'].u-paused .u-race-strip-board-item, [data-theme='uma'] .u-paused .u-race-strip-board-item {
+  position: static; display: block; padding: 4px 8px; transform: none; animation: none; white-space: normal;
+}
 @media (prefers-reduced-motion: reduce) {
-  [data-theme='uma'] .u-race-strip-ticker { white-space: normal; }
-  [data-theme='uma'] .u-race-strip-ticker-track { animation: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  [data-theme='uma'] .u-race-strip-ticker-track > span + span { display: none; }
+  [data-theme='uma'] .u-race-strip-board { height: auto; min-height: 30px; }
+  [data-theme='uma'] .u-race-strip-board-item { position: static; display: block; padding: 4px 8px; transform: none; animation: none; white-space: normal; }
 }
 [data-theme='uma'] .u-race-strip-error { color: var(--u-red); white-space: nowrap; }
 [data-theme='uma'] .u-race-strip a {
