@@ -51,6 +51,11 @@ export const EXPECTED_EXPOSURE = {
   horse_market_listing_public: PUBLIC_VIEW,
   stable_grade_price_public: PUBLIC_VIEW,
   horse_story_event_public: PUBLIC_VIEW,
+  // ★引退馬の公開の一覧（★`0083`・正典 LR-6）。★2026-09-28 に ★本番の列を 1 つずつ見て登録（★V-20 ③ の登録漏れ）:
+  //   horse_id・horse_name・horse_sex・horse_birth_week・retired_at_week・retirement_role・foal_count・g1_wins・wins・starts・
+  //   sire_name・dam_name・stable_name。★持ち主は ★牧場名（stable_name）まで（★LR-6 の上限・0083 の註記）。
+  //   ★表示名・メール・user_id は ★無い。★NPC の馬は stable_name が null
+  retired_horses_public: PUBLIC_VIEW,
 
   // ── 本人スコープ（RLS のポリシーで自分の行だけ。select のみ） ──
   // ★users は revoke all にしない（S-2: revoke が勝ってポリシーが打ち消され、
@@ -151,6 +156,10 @@ export const EXPECTED_EXPOSURE = {
   //   ★周の重さ（cycle_pct）と起動時刻は ★「いつ止まっているか」を外から読める値で、★要る人がいない。
   //   ★公開するのは ★`worker_heartbeat()` が返す ★release_sha と last_cycle_at の 2 つだけ（★下の関数の登録）
   worker_status: CLOSED,
+  // ── ★`entry_scratch_requests`（★`0079`・D-123 の出走取消の要求） ──
+  //   ★2026-09-28 に登録（★V-20 ③ の登録漏れ）。★本番の実測: ★anon / authenticated に付与 0（★anon は permission denied）。
+  //   ★書くのは `request_entry_scratch`・★読むのは `my_entry_scratch`（★自分の分だけ）。★画面はまだ無いので ★閉じたまま
+  entry_scratch_requests: CLOSED,
 };
 
 /** 登録簿に無いものを返す（V-20 ③） */
@@ -272,7 +281,8 @@ export const EXPECTED_FUNCTION_EXECUTE = {
   'place_bet(uuid,text,jsonb,integer,uuid)': { anon: false, authenticated: true },
   // ★出走登録（`0024`・D-104 の「同じレースに 1 人 2 頭まで」と D-105 の騎手の凍結）。
   //   利用者が呼ぶ RPC なので authenticated だけ（`0024` で public・anon を剥がしている）
-  'enter_race(uuid,uuid,text,jsonb,uuid)': { anon: false, authenticated: true },
+  // ★2026-09-28: ★署名を今の版に直した（★`0088` で 4 つ目を jsonb → text・★騎手の料金をサーバーの名簿から引く）
+  'enter_race(uuid,uuid,text,text,uuid)': { anon: false, authenticated: true },
   // ★馬の購入（`0025`・D-102）。★価格は出品の行から取り、利用者は申告できない（憲法 3）。
   //   利用者が呼ぶ RPC なので authenticated だけ（`0025` で public・anon を剥がしている）
   'buy_horse(uuid,uuid)': { anon: false, authenticated: true },
@@ -289,6 +299,41 @@ export const EXPECTED_FUNCTION_EXECUTE = {
   //   ★healthz は誰でも開ける URL なので ★外から読める範囲は同じ。★周の重さ・その他の列は返さない。
   //   ★security definer ＋ search_path 固定 ＋ public から剥がして anon / authenticated にだけ execute
   'worker_heartbeat()': { anon: true, authenticated: true },
+  // ── ★2026-09-28 に登録（★V-20 ④ の登録漏れ・★本番の実測の姿をそのまま・`verify-anon-exposure --env production`） ──
+  //   ★先に確かめたこと（★レビュー側の着手順 ①）: ★anon に execute が開いている関数は ★8 つで、★どれも状態を変えない
+  //   （★immutable か stable・★書き込み文 0: day_boundary_stale_after_hours・ep_grant_amount・ep_reason_class・horse_starts・horse_wins・
+  //   jockey_const・jockey_frozen_build・world_day_stalled）。★状態を変える関数（claim_daily_ep・enter_race・request_*・set_training_order ほか）は ★anon に開いていない。
+  //   ★authenticated も false の 2 つ（horse_total_prize_pp・spend_stud_fee_ep）は ★ワーカー／ビューの内側でだけ使う
+  'breeding_role_block(boolean,text,bigint,text,integer,text,bigint)': { anon: false, authenticated: true },
+  'breeding_role_limit(text)': { anon: false, authenticated: true },
+  'claim_daily_ep()': { anon: false, authenticated: true },
+  'day_boundary_stale_after_hours()': { anon: true, authenticated: true },
+  'ep_grant_amount(text)': { anon: true, authenticated: true },
+  'ep_reason_class(text)': { anon: true, authenticated: true },
+  'horse_starts(uuid)': { anon: true, authenticated: true },
+  'horse_total_prize_pp(uuid)': { anon: false, authenticated: false },
+  'horse_wins(uuid)': { anon: true, authenticated: true },
+  'initial_breeding_dams(integer,integer,integer)': { anon: false, authenticated: true },
+  'jockey_const(text)': { anon: true, authenticated: true },
+  'jockey_frozen_build(text,uuid)': { anon: true, authenticated: true },
+  'mare_lifetime_foals()': { anon: false, authenticated: true },
+  'my_daily_ep_state()': { anon: false, authenticated: true },
+  'my_entry_scratch(uuid)': { anon: false, authenticated: true },
+  'my_foal_drafts()': { anon: false, authenticated: true },
+  'my_foal_request(uuid)': { anon: false, authenticated: true },
+  'my_horse_discovery_runs(uuid)': { anon: false, authenticated: true },
+  'my_initial_breeding()': { anon: false, authenticated: true },
+  'my_onboarding_state(integer,integer)': { anon: false, authenticated: true },
+  'my_retired_horses()': { anon: false, authenticated: true },
+  'npc_stallion_facts()': { anon: false, authenticated: true },
+  'request_breeding_role(uuid,uuid,text)': { anon: false, authenticated: true },
+  'request_breeding(uuid,uuid,uuid,bigint)': { anon: false, authenticated: true },
+  'request_entry_scratch(uuid,uuid)': { anon: false, authenticated: true },
+  'request_foal_name(uuid,uuid,text)': { anon: false, authenticated: true },
+  'request_initial_breeding(uuid,uuid,uuid)': { anon: false, authenticated: true },
+  'set_training_order(uuid,bigint,text)': { anon: false, authenticated: true },
+  'spend_stud_fee_ep(uuid,bigint)': { anon: false, authenticated: false },
+  'world_day_stalled()': { anon: true, authenticated: true },
 };
 
 /** 登録簿に無い関数を返す（V-20 ④） */
