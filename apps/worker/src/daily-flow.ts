@@ -106,10 +106,16 @@ async function collectFlow(
   let epBurnedOther = 0;
   for (const r of ep.rows) {
     const v = Number(r.total);
-    // ★**発行**（★`inflow`・`horse_sale`）。★V-11 の純発行量に載る
+    // ★**発行**（★`inflow` ＝ デイリー・登録時）。★V-11 の純発行量に載る
     if (r.klass === 'issuance') epInflow += v;
     // ★**焼却**（★調教・登録料・種付料・馬の購入・厩舎の格）
     else if (r.klass === 'burn') epBurnedOther += -v;
+    /**
+     * ★**購入の一部返却**（★`horse_sale`・★2026-09-28 `0094` から。★旧 issuance）。
+     *   ★購入を全額 焼却で数えているので ★戻った分を ★焼却から引く（★発行には入れない ＝ 日次上限も数えない）。
+     *   ⚠️ ★この分類を知らないワーカーは 下の else で落ちる → ★**このワーカーを配備してから `0094` を当てる**。
+     */
+    else if (r.klass === 'rebate') epBurnedOther -= v;
     // ★`ticket`（馬券）は `bets` から数える・`refund` は取ったものを返しただけ → ★どちらも数えない
     else if (r.klass !== 'ticket' && r.klass !== 'refund') {
       throw new Error(`aggregateDay: 未知の EP の分類 ${r.klass}（★ep_reason_class を見直す）`);

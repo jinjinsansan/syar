@@ -28,7 +28,7 @@
  */
 import { EP_GRANTS } from '@star/betting';
 import {
-  STUD_FEE_BASE_EP, STUD_FEE_EARNINGS_DIVISOR, STUD_FEE_PER_G1_EP,
+  SELL_BACK_RATE, STUD_FEE_BASE_EP, STUD_FEE_EARNINGS_DIVISOR, STUD_FEE_PER_G1_EP,
   WEEKS_PER_DAY, WEEKS_PER_YEAR,
 } from '@star/scheduler';
 import { MENUS, type MenuId } from '@star/training';
@@ -124,7 +124,10 @@ const capOverDaily = EP_GRANTS.daily_cap / EP_GRANTS.daily;
 say('  ── 🔴 ★日次上限（★D-075 追補 2026-09-28）──');
 say(`    ★日次上限 ${EP_GRANTS.daily_cap.toLocaleString('ja-JP')} EP ＝ ★デイリー ${EP_GRANTS.daily.toLocaleString('ja-JP')} の ★**${capOverDaily.toFixed(1)} 回ぶん**`
   + '（★バグで デイリーが何度も付いたときの 1 日の被害の天井）');
-say('    ⚠️ ★上限は ★`inflow` と `horse_sale` を数えます（★`ep_reason_class()`）。★馬の売却（買値の 20%）を 1 日に何頭もすると ★正直な遊びでも触れえます');
+say('    ★上限が数えるのは ★新規発行（★`inflow` ＝ デイリー・登録時）だけ（★`ep_reason_class()`・`0094`）。★馬の売却は ★購入の一部返却（`rebate`）で 数えない');
+say(`    → ★正直な遊びで 1 日に入る発行は ★デイリー ${EP_GRANTS.daily.toLocaleString('ja-JP')} だけ ＝ ★上限まで ★${(EP_GRANTS.daily_cap - EP_GRANTS.daily).toLocaleString('ja-JP')} EP の余裕（★触れる道が無い）`);
+say(`    ★買い戻しの輪で得ができない根拠: ★売値 ＝ 買値 × SELL_BACK_RATE（${SELL_BACK_RATE}・horse-market.ts）＜ 買値`
+  + '・★`sell_horse` が「戻る額 ≥ 払った額」を例外で止める（`0026_horse_sale.sql:111`）');
 say('    ★EP の入り口を増やす日（広告・アンケート等）に ★上限も一緒に見直す（★正典の条件）。');
 say();
 say(`  ★参考: 種付料の式 = ${STUD_FEE_BASE_EP.toLocaleString('ja-JP')}`

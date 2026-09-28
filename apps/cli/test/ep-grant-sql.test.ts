@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { EP_GRANTS } from '@star/betting';
-import { DAY_BOUNDARY_STALE_AFTER_HOURS } from '@star/scheduler';
+import { DAY_BOUNDARY_STALE_AFTER_HOURS, SELL_BACK_RATE, sellBackEP } from '@star/scheduler';
 import { lastFunctionBody, stripSqlComments } from './lib/sql-source.js';
 
 const MIGRATIONS = path.resolve(__dirname, '../../../db/migrations');
@@ -135,13 +135,31 @@ describe('🔴 ★EP の理由の分類表（★裁定 §5 (b)）', () => {
       + '★**静かに見落とします**。★ep_reason_class（0080）に足してください').toEqual([]);
   });
 
-  it('🔴 ★horse_sale を「発行」として数える（★相手方の引き落としが無い正の delta）', () => {
+  /**
+   * 🔴 ★**上限（と V-11 の発行）が数えるのは ★新規発行だけ**（★2026-09-28・`0094`・レビュー側の決定）。
+   *   ★旧: `horse_sale` を issuance（★0026:126 で新しい EP が出る、と数えた）。★その結果 ★最高値の馬を 1 日に 3 頭 手放すと
+   *   ★正直な遊びが 6,000 の上限に触れた。★`horse_sale` は ★買値の 20% の ★**購入の一部返却**で、★売れば必ず損（★売値 ＜ 買値）。
+   *   → ★`rebate`（★発行ではない・監視では焼却の戻し）。★`issuance` は ★`inflow`（デイリー・登録時）だけ。
+   */
+  it('🔴 ★issuance は inflow だけ・★horse_sale は rebate・★refund は数えない', () => {
     const { body } = lastFunctionBody('ep_reason_class');
-    expect(body, "★horse_sale は issuance であること（★0026:126 で新しい EP が出る）")
-      .toMatch(/when\s+'horse_sale'\s+then\s+return\s+'issuance'/i);
-    expect(body, "★inflow は issuance であること").toMatch(/when\s+'inflow'\s+then\s+return\s+'issuance'/i);
+    const issuance = [...body.matchAll(/when\s+'([a-z_]+)'\s+then\s+return\s+'issuance'/gi)].map((m) => m[1]);
+    expect(issuance, '★上限が数える理由は 新規発行（inflow）だけ').toEqual(['inflow']);
+    expect(body).toMatch(/when\s+'horse_sale'\s+then\s+return\s+'rebate'/i);
     expect(body, "★refund を発行に数えない（★取ったものを返しているだけ）")
       .toMatch(/when\s+'refund'\s+then\s+return\s+'refund'/i);
+  });
+
+  it('🔴 ★買い戻しの輪で得ができない（★売値 ＜ 買値 ＝ 上限から外す前提）', () => {
+    expect(SELL_BACK_RATE).toBeLessThan(1);
+    expect(sellBackEP(7600)).toBeLessThan(7600);
+    const sale = readFileSync(path.join(MIGRATIONS, '0026_horse_sale.sql'), 'utf8');
+    expect(sale, '★sell_horse が「戻る額 ≥ 払った額」を止めていない').toMatch(/if v_back >= v_paid then\s+raise exception/);
+  });
+
+  it('🔴 ★監視（daily-flow.ts）は rebate を知っている（★知らないワーカーは落ちる ＝ 配備してから 0094）', () => {
+    const flow = readFileSync(path.resolve(__dirname, '../../worker/src/daily-flow.ts'), 'utf8');
+    expect(flow).toContain("else if (r.klass === 'rebate') epBurnedOther -= v;");
   });
 
   it('🔴 ★知らない理由が来たら止まる（★黙って「発行でない」にしない）', () => {

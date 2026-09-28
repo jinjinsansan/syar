@@ -35,7 +35,7 @@ export type EpGrantKind = 'signup' | 'daily' | 'daily_cap';
  *      ★（★数えると「大きく当てた人が受け取れない」になる ＝ 裁定 §5 (b)）。
  *      ★目的は honest play を縛ることではなく ★**バグ・エクスプロイトの被害を上限で止める**こと。
  *      ★何を「発行」と数えるかは ★**SQL の `ep_reason_class()` が 1 か所で持ちます**
- *      ★（★いまは `inflow` と `horse_sale`。★TS 側に同じ表を作らない ＝ D-052）。
+ *      ★（★2026-09-28 `0094` から ★`inflow` だけ ＝ 新規発行。★`horse_sale` は 購入の一部返却 `rebate` で数えない。★TS 側に同じ表を作らない ＝ D-052）。
  */
 export const EP_GRANTS: Readonly<Record<EpGrantKind, number>> = {
   signup: 2000,
