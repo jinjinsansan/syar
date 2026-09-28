@@ -64,12 +64,13 @@ describe('★帯の掲示板', () => {
     /** ★見出しの明暗・録画の点も止める（★R-20 Q3） */
     expect(CSS).toMatch(/\.u-paused \.u-board-kind,[\s\S]{0,200}\{ animation: none; \}/);
     expect(STRIP).toContain("if (reduce.matches || hostRef.current?.closest('.u-paused') != null || document.visibilityState !== 'visible') return;");
-    expect(CSS).toContain('.u-race-strip-main > span:not(.u-race-run-mini):not(.u-race-strip-rec):not(.u-race-strip-board):not(.u-race-strip-recbadge) {');
+    expect(CSS).toContain('.u-race-strip-main > span:not(.u-race-run-mini):not(.u-race-strip-rec):not(.u-race-strip-board):not(.u-race-strip-recbadge):not(.u-race-strip-nextchip) {');
   });
 
   it('🔴 ⑤ ★「大」では ★いつも同じ所で ★1 枚ずつ送り続ける（★秒は TS と CSS で同じ）', () => {
     expect(STRIP).toContain("const tickerOn = size === 'big' && next !== null && next !== undefined && data !== null && nowMs !== null;");
-    expect(STRIP).toMatch(/<\/>\}\s*\{\/\*[\s\S]{0,600}\*\/\}\s*\{tickerOn && next && data && nowMs !== null\s*&& <StripBoard /);
+    /** ★分岐（待ち・録画・結果）の外（★間に ★次のレースの札 ⑧ が入る） */
+    expect(STRIP).toMatch(/<\/>\}\s*\{\/\*[\s\S]{0,1600}\{tickerOn && next && data && nowMs !== null\s*&& <StripBoard /);
     expect(STRIP.match(/<StripBoard /g)?.length, '★掲示板が 2 か所にある').toBe(1);
     expect(BOARD_ITEM_SEC).toBe(3);
     expect(CSS).toContain('animation: u-board-slide var(--board-sec, 3s) cubic-bezier(.2, .8, .2, 1) both;');
@@ -107,5 +108,17 @@ describe('★帯の掲示板', () => {
     expect(bracketOrNull(3, 0), '★頭数が分からなければ 色を付けない').toBeNull();
     expect(STRIP).toContain('{ background: `var(--f${item.bracket})`, color: [1, 5, 8].includes(item.bracket) ? \'#111\' : \'#fff\' }');
     expect(STRIP).toContain('{tickerOn && <span className="u-race-strip-recbadge"><i aria-hidden />録画</span>}');
+  });
+
+  /**
+   * 🔴 ⑧ ★**次のレースの名前と発走時刻は いつも出す**（★2026-09-28・オーナー「次のレースが何のタイトルのレースか？何時発走なのか？は常に出るように」）。
+   *   ★掲示板は流れるので ★見たい時に無いことがあった。★掲示板の左に ★動かない札を 1 つ（★分岐の外・★待ち時間も録画中も）。
+   */
+  it('🔴 ⑧ ★次のレースの名前と発走時刻を ★動かない札で いつも出す', () => {
+    expect(STRIP).toMatch(/\{tickerOn && next && <span className="u-race-strip-nextchip">\s*<span className="u-race-strip-nextchip-name">\{next\.name\}<\/span>\s*<span className="u-race-strip-nextchip-time">\{clock\(next\.scheduled_at\)\}<\/span>/);
+    /** ★掲示板のすぐ前（★同じ所・★分岐の外） */
+    expect(STRIP).toMatch(/<\/span>\}\s*\{tickerOn && next && data && nowMs !== null\s*&& <StripBoard /);
+    expect(CSS).toMatch(/\.u-race-strip-main > \.u-race-strip-nextchip \{[^}]*flex: 0 0 auto;/);
+    expect(CSS, '★札が動く').not.toMatch(/\.u-race-strip-nextchip[^{]*\{[^}]*animation:/);
   });
 });

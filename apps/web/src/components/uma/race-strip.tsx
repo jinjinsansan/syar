@@ -553,6 +553,15 @@ export function RaceStrip(): React.ReactElement | null {
           ★同じ文を 2 つ並べて ★切れ目なく繰り返す。★流す秒は ★頭数だけで決める（★数字の変化で速さが揺れて跳ばない）。
           ★停止スイッチ・「動きを減らす」では ★流さない（★CSS・資料 §5-7）。
         */}
+        {/*
+          ★**次のレースの名前と発走時刻は ★いつも出す**（★2026-09-28・オーナー「次のレースが何のタイトルのレースか？何時発走なのか？は常に出るように」）。
+          ★掲示板の左に ★止まった札（★「● 録画」札と同じ形・★動かさない）。★掲示板は流れるので ★見たい時に無いことがあった。
+        */}
+        {tickerOn && next && <span className="u-race-strip-nextchip">
+          <span className="u-race-strip-nextchip-name">{next.name}</span>
+          <span className="u-race-strip-nextchip-time">{clock(next.scheduled_at)}</span>
+          <span className="u-race-strip-nextchip-unit">発走</span>
+        </span>}
         {tickerOn && next && data && nowMs !== null
           && <StripBoard items={boardItemsOf(next, data, recent, nowMs, leaderCard)} label={`${next.name} ${status}`} />}
       </div>

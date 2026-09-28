@@ -103,7 +103,7 @@
   ★それまでは 1 行で `ellipsis` にしており、★390px で理由の文が「…」で切れていました。
   ★レース名（`strong`）は 1 行のまま（★回答どおり）。★極小の馬の箱（`u-race-run-mini`）は ★文ではないので外す。
 */
-[data-theme='uma'] .u-race-strip-main > span:not(.u-race-run-mini):not(.u-race-strip-rec):not(.u-race-strip-board):not(.u-race-strip-recbadge) {
+[data-theme='uma'] .u-race-strip-main > span:not(.u-race-run-mini):not(.u-race-strip-rec):not(.u-race-strip-board):not(.u-race-strip-recbadge):not(.u-race-strip-nextchip) {
   overflow: hidden;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -167,6 +167,17 @@
   flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; height: 32px; box-sizing: border-box; padding: 0 8px;
   background: #061a33; border: 1px solid rgba(246, 194, 28, .45); border-radius: 6px; font-size: 11px; color: #fbf7ec; white-space: nowrap;
 }
+/*
+  ★**次のレースの札**（★いつも出す・★動かさない・★2026-09-28 オーナー指示）。★形は「● 録画」札と同じ（★濃紺・金の縁・32px）。
+  ★名前は白・★時刻は掲示板の数字と同じ金（Saira）。⚠️ ★デザイナー未確認（★R-20 の返答で知らせる）。
+*/
+[data-theme='uma'] .u-race-strip-main > .u-race-strip-nextchip {
+  flex: 0 0 auto; display: inline-flex; align-items: baseline; gap: 4px; height: 32px; box-sizing: border-box; padding: 0 8px;
+  background: #061a33; border: 1px solid rgba(246, 194, 28, .45); border-radius: 6px; white-space: nowrap; line-height: 30px;
+}
+[data-theme='uma'] .u-race-strip-nextchip-name { font-size: 12px; font-weight: 800; color: #fbf7ec; }
+[data-theme='uma'] .u-race-strip-nextchip-time { font-family: 'Saira Condensed', system-ui, sans-serif; font-size: 16px; color: #ffe483; font-variant-numeric: tabular-nums; }
+[data-theme='uma'] .u-race-strip-nextchip-unit { font-size: 10px; color: #cfe0ee; }
 [data-theme='uma'] .u-race-strip-recbadge > i { width: 7px; height: 7px; border-radius: 50%; background: #f06a5f; animation: u-board-rec 2s ease-in-out infinite; }
 @keyframes u-board-rec { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 /* ★止める（★停止スイッチ・「動きを減らす」）: ★いまの札を ★その場に置き ★折り返して読ませる */
