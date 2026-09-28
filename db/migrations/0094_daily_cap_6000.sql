@@ -54,6 +54,8 @@ end $$;
 --   → ★返却・払い戻しの性質で ★発行に混ざっていたのは ★`horse_sale` だけ。
 -- 【★監視（V-11・`apps/worker/src/daily-flow.ts`）では】
 --   ★`rebate` は ★**焼却の戻し**（★購入を全額 焼却で数えているので、★戻った 20% を焼却から引く）。
+-- ⚠️ ★**`point_flow_daily` の意味が この移行を当てた日から変わる**（★`ep_inflow` に horse_sale が入らない）。★過去の行は ★書いた当時の分類のまま（★作り直さない）。
+--   ★2026-09-28 の時点で ★horse_sale は staging・本番とも 0 件（★段差は 0）。
 -- 🔴 ★**順番**: ★`rebate` を知らないワーカーは ★`aggregateDay` が「未知の分類」で落ちる。
 --   ★**新しいワーカーを配備してから ★この移行を当てる**（★逆にしない）。
 create or replace function public.ep_reason_class(p_reason text)
