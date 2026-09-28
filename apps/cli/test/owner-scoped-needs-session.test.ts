@@ -101,7 +101,8 @@ function ownerScopedReaders(): { readonly all: Hit[]; readonly unguarded: Hit[] 
       const where = `${f}: ${m[1]!}`;
       all.push({ where, port: [...new Set(ports)].join(' ') });
       if (NO_SESSION_NEEDED[where] !== undefined) continue;
-      if (!/getSession\(\)|SignInRequiredError/.test(part)) {
+      /** ★`canPlayRealRace()` は ★中で `getSession()` を見る 1 か所（★2026-09-28・下の検査で中身を見る） */
+      if (!/getSession\(\)|SignInRequiredError|canPlayRealRace\(\)/.test(part)) {
         unguarded.push({ where, port: [...new Set(ports)].join(' ') });
       }
     }
@@ -178,6 +179,14 @@ describe('🔴 ★本人スコープの口は、セッションを見てから�
       .toBeGreaterThan(3);
     expect(throwerLibs().length, '🔴 ★`SignInRequiredError` を投げる lib が 0 件（★走査が壊れている）')
       .toBeGreaterThan(3);
+  });
+
+  it('★`canPlayRealRace` を門と数えてよい根拠: ★中で `getSession()` を見て ★無ければ偽', () => {
+    const acc = strip(readFileSync(path.join(LIB, 'race-real-access.ts'), 'utf8'));
+    const body = acc.slice(acc.indexOf('export async function canPlayRealRace'));
+    expect(body.length, '★canPlayRealRace が見つからない').toBeGreaterThan(40);
+    expect(body).toContain('getSession()');
+    expect(body).toContain('session.data.session !== null');
   });
 
   /** 🔴 ★**本命**。★これが ★`/records` を見つけました。 */

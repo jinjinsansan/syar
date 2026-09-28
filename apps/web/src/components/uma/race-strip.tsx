@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
+import { canPlayRealRace } from '../../lib/race-real-access';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowNear, replayWindowOver, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
 import { INTRO_STAGES, stripEmbedsOn, stripSizeOf } from './race-strip-sizes';
@@ -392,6 +393,18 @@ export function RaceStrip(): React.ReactElement | null {
    */
   const [embed, setEmbed] = useState<{ readonly id: string; readonly live: boolean; readonly sinceMs: number } | null>(null);
   /**
+   * ★**この人に本編を出せるか**（★2026-09-28・レビュー側の決定 (b)）。★`null` は まだ分からない（★分かるまで開かない）。
+   *   🔴 ★未ログインは ★本編が「ログインしてください」で止まると ★先に分かっている → ★開かない（★文字の帯だけ・★エラーを出さない）。
+   *   ★判定は 本編の読む層と ★同じ 1 か所（`canPlayRealRace`）。★画面を移るたびに 読み直す（★ログインは画面を移って戻る）。
+   */
+  const [canPlay, setCanPlay] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!embedsHere) return undefined;
+    let cancelled = false;
+    canPlayRealRace().then((ok) => { if (!cancelled) setCanPlay(ok); }, () => { if (!cancelled) setCanPlay(false); });
+    return () => { cancelled = true; };
+  }, [embedsHere, pathname]);
+  /**
    * ★**出せなかった理由の 1 行**（★2026-09-28）。★黙って簡易版に戻ると ★原因を誰も見られない（★オーナーの画面で実際にそうなった）。
    *   ★本編の知らせた理由 か ★「間に合わなかった（N 秒）」を ★次のレースを読み始めるまで出します。
    */
@@ -410,13 +423,13 @@ export function RaceStrip(): React.ReactElement | null {
     && replayWindowNear(recent.scheduled_at, nowMs, STRIP_EMBED_LEAD_SEC * 1000);
   useEffect(() => {
     /** ★本編を読むのは ★表で決めた面だけ（★それ以外の「大」は簡易版の走行・「極小」「文字」は読まない） */
-    if (!embedsHere || motionReduced) { setEmbed(null); return; }
+    if (!embedsHere || motionReduced || canPlay !== true) { setEmbed(null); return; }
     if (openSoon && recentId !== null && embeddedIdRef.current !== recentId) {
       embeddedIdRef.current = recentId;
       setEmbedNote(null);
       setEmbed({ id: recentId, live: false, sinceMs: nowRef.current ?? 0 });
     }
-  }, [embedsHere, motionReduced, openSoon, recentId]);
+  }, [embedsHere, motionReduced, canPlay, openSoon, recentId]);
   /** ★録画の窓が閉じても ★まだ始まっていなければ ★やめる（★読み込みが遅い端末で 小窓を待たせない） */
   useEffect(() => {
     const e = embedRef.current;

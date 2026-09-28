@@ -93,7 +93,7 @@ describe('★③ 段 A ── 横にしたら その場で全画面', () => {
    *   ★「動きを減らす」では ★本編を開かない（★拡大の口も出ない）・★停止スイッチは ★本編へ「止めて」を知らせる。
    */
   it('⑤ ★動きを止める設定が ★拡大後にも効く（★本編を開かない・★本編も止める）', () => {
-    expect(LIVE).toContain('if (!embedsHere || motionReduced) { setEmbed(null); return; }');
+    expect(LIVE).toContain('if (!embedsHere || motionReduced || canPlay !== true) { setEmbed(null); return; }');
     expect(LIVE).toContain('const watchable = embed !== null && (replaying || embedLive);');
     expect(LIVE).toContain("iframeRef.current?.contentWindow?.postMessage(stripControlMessage(sitePaused ? 'pause' : 'resume'), window.origin);");
     expect(LIVE).toContain("useEffect(() => { setSitePaused(sectionRef.current?.closest('.u-paused') != null); }, [nowMs]);");

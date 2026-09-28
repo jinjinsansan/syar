@@ -10,6 +10,18 @@
  */
 export const WORKER_READ_TIMEOUT_MS = 1500;
 
+/**
+ * ★**この画面の版**（★Vercel が自動で入れる値だけ・★人が設定しない）。★healthz と ★画面の印（`layout.tsx` の `star-build`）が ★この 1 か所を読む。
+ *   ★2026-09-28: ★オーナーの画面写しが 現行と違い、★配信物の束を読んで「古いタブ」と確かめるまで 推測で止まった。★印があれば 画面から版が読める。
+ */
+export function buildStampOf(env: Readonly<Record<string, string | undefined>>): { readonly sha: string | null; readonly ref: string | null; readonly env: string | null } {
+  return {
+    sha: env['VERCEL_GIT_COMMIT_SHA'] ?? null,
+    ref: env['VERCEL_GIT_COMMIT_REF'] ?? null,
+    env: env['VERCEL_ENV'] ?? null,
+  };
+}
+
 export interface WorkerBeat {
   readonly sha: string;
   readonly lastCycleAt: string;

@@ -2,8 +2,17 @@ import './globals.css';
 import './story-theme.css';
 import { StoryShell } from '../components/story-shell';
 import { ConnectedBanner } from '../components/connected-banner';
+import { buildStampOf } from '../lib/healthz';
 
-export const metadata = { title: '馬物語', description: '育てる。走る。つながっていく。オンライン競馬育成ゲーム' };
+/**
+ * ★`star-build` ＝ ★この HTML を作った版（★healthz と同じ出どころ `buildStampOf`・2026-09-28・レビュー側）。
+ *   ★古いタブを開いたままの人は ★古い印のまま。★healthz の sha と比べれば ★どの版を見ているかが分かる。
+ */
+export const metadata = {
+  title: '馬物語',
+  description: '育てる。走る。つながっていく。オンライン競馬育成ゲーム',
+  other: { 'star-build': buildStampOf(process.env).sha ?? 'unknown' },
+};
 
 /**
  * ★**viewport を明示します**（★2026-09-27・裁定 `REVIEW_UI_AUDIT_20260927.md` 追記）。

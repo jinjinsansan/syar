@@ -29,6 +29,7 @@ import { finalOrderMatches, marginLabel } from '@star/race-engine';
 import { slotOfDay } from '@star/scheduler';
 import { parseReplayRunners, type ReplayRunner } from '../components/uma/race-replay';
 import { authClient, readClient } from './supabase';
+import { REAL_RACE_SIGN_IN_MESSAGE, canPlayRealRace } from './race-real-access';
 
 /** ★読めなかった理由（★画面はこれをそのまま出さず、★言葉に直して出します） */
 export class RaceNotPlayableError extends Error {}
@@ -171,10 +172,8 @@ export async function loadRealRace(raceId: string): Promise<RealRaceData> {
    *   ★だから ★セッションを持つ `authClient()` で読みます（★`readClient()` では ★常に偽になります）。
    */
   const auth = authClient();
-  const session = await auth.auth.getSession();
-  if (session.data.session === null) {
-    throw new RaceNotPlayableError('ログインしてください（★いまは ★自分の馬が出たレースの録画だけを出しています）');
-  }
+  /** ★出せる人の判定は ★帯と同じ 1 か所（`race-real-access.ts`） */
+  if (!(await canPlayRealRace())) throw new RaceNotPlayableError(REAL_RACE_SIGN_IN_MESSAGE);
 
   const [entRes, runsRes, oddsRes] = await Promise.all([
     auth.from('race_entries_public')

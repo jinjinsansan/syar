@@ -25,7 +25,7 @@
  * 確かめ方: `npx tsx tools/verify-deployed-build.mjs --base <本番URL>`
  */
 
-import { healthBody } from '../../../lib/healthz';
+import { buildStampOf, healthBody } from '../../../lib/healthz';
 
 /** ★毎回作り直す（★キャッシュされた古い SHA を返しては意味がありません） */
 export const dynamic = 'force-dynamic';
@@ -33,11 +33,7 @@ export const revalidate = 0;
 
 export async function GET(): Promise<Response> {
   const body = await healthBody(
-    {
-      sha: process.env['VERCEL_GIT_COMMIT_SHA'] ?? null,
-      ref: process.env['VERCEL_GIT_COMMIT_REF'] ?? null,
-      env: process.env['VERCEL_ENV'] ?? null,
-    },
+    buildStampOf(process.env),
     new Date(),
     async (signal) => {
       const url = process.env['NEXT_PUBLIC_SUPABASE_URL'];
