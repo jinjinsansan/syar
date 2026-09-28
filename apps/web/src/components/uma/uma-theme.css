@@ -173,6 +173,8 @@
   flex: 0 0 auto; display: inline-flex; align-items: baseline; gap: 4px; height: 32px; box-sizing: border-box; padding: 0 8px;
   background: #061a33; border: 1px solid rgba(246, 194, 28, .45); border-radius: 6px; white-space: nowrap; line-height: 30px;
 }
+/* ★札の頭（★「いま:」「次:」・★2 つの札で同じ形）。★R-20 の見出しの札より小さく・淡く */
+[data-theme='uma'] .u-race-strip-chiphead { font-size: 10px; color: #cfe0ee; margin-right: 2px; }
 [data-theme='uma'] .u-race-strip-nextchip-name { font-size: 12px; font-weight: 800; color: #fbf7ec; }
 [data-theme='uma'] .u-race-strip-nextchip-time { font-family: 'Saira Condensed', system-ui, sans-serif; font-size: 16px; color: #ffe483; font-variant-numeric: tabular-nums; }
 [data-theme='uma'] .u-race-strip-nextchip-unit { font-size: 10px; color: #cfe0ee; }

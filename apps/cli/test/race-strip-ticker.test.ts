@@ -108,7 +108,9 @@ describe('★帯の掲示板', () => {
     expect(bracketOrNull(16, 16)).toBe(8);
     expect(bracketOrNull(3, 0), '★頭数が分からなければ 色を付けない').toBeNull();
     expect(STRIP).toContain('{ background: `var(--f${item.bracket})`, color: [1, 5, 8].includes(item.bracket) ? \'#111\' : \'#fff\' }');
-    expect(STRIP).toContain('{tickerOn && <span className="u-race-strip-recbadge"><i aria-hidden />録画</span>}');
+    expect(STRIP).toContain('{tickerOn && <span className="u-race-strip-recbadge"><span className="u-race-strip-chiphead">いま:</span><i aria-hidden />録画</span>}');
+    /** ★2 つの札の頭の語を揃える（★片方だけ「次」だと もう片方が何か曖昧・レビュー側） */
+    expect(STRIP).toContain('<span className="u-race-strip-chiphead">次:</span>');
   });
 
   /**
@@ -116,7 +118,7 @@ describe('★帯の掲示板', () => {
    *   ★掲示板は流れるので ★見たい時に無いことがあった。★掲示板の左に ★動かない札を 1 つ（★分岐の外・★待ち時間も録画中も）。
    */
   it('🔴 ⑧ ★次のレースの名前と発走時刻を ★動かない札で いつも出す', () => {
-    expect(STRIP).toMatch(/\{tickerOn && next && <span className="u-race-strip-nextchip">\s*<span className="u-race-strip-nextchip-name">\{next\.name\}<\/span>\s*<span className="u-race-strip-nextchip-time">\{clock\(next\.scheduled_at\)\}<\/span>/);
+    expect(STRIP).toMatch(/\{tickerOn && next && <span className="u-race-strip-nextchip">\s*<span className="u-race-strip-chiphead">次:<\/span>\s*<span className="u-race-strip-nextchip-name">\{next\.name\}<\/span>\s*<span className="u-race-strip-nextchip-time">\{clock\(next\.scheduled_at\)\}<\/span>/);
     /** ★掲示板のすぐ前（★同じ所・★分岐の外） */
     expect(STRIP).toMatch(/<\/span>\}\s*\{tickerOn && next && data && nowMs !== null\s*&& <StripBoard /);
     expect(CSS).toMatch(/\.u-race-strip-main > \.u-race-strip-nextchip \{[^}]*flex: 0 0 auto;/);

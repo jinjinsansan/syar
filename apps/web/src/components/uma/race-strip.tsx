@@ -552,7 +552,8 @@ export function RaceStrip(): React.ReactElement | null {
             ★「大」（★掲示板のある帯）は ★左端に「● 録画」の札を 1 つ（★動かさない・★R-20 Q1・★R-18 回答 🟡 #8 の「（録画）」をこの札で満たす）。
             ★レース名は ★掲示板の札が持つ。★「極小」は いまどおり「レース中（録画）」。
           */}
-          {tickerOn && <span className="u-race-strip-recbadge"><i aria-hidden />録画</span>}
+          {/* ★頭の語は 次のレースの札と揃える（★「いま:」／「次:」・2026-09-28 オーナー「録画 19:18 発走というのは？」・レビュー側「両方に頭を」） */}
+          {tickerOn && <span className="u-race-strip-recbadge"><span className="u-race-strip-chiphead">いま:</span><i aria-hidden />録画</span>}
           {!tickerOn && <strong>{recent.name} レース中</strong>}
           {/* ★「（録画）」は ★別の枠にして ★縮めない（★極小でも必ず残す・R-18 回答 🟡 #8・生中継に見せない） */}
           {!tickerOn && <span className="u-race-strip-rec">（録画）</span>}
@@ -575,6 +576,7 @@ export function RaceStrip(): React.ReactElement | null {
           ★掲示板の左に ★止まった札（★「● 録画」札と同じ形・★動かさない）。★掲示板は流れるので ★見たい時に無いことがあった。
         */}
         {tickerOn && next && <span className="u-race-strip-nextchip">
+          <span className="u-race-strip-chiphead">次:</span>
           <span className="u-race-strip-nextchip-name">{next.name}</span>
           <span className="u-race-strip-nextchip-time">{clock(next.scheduled_at)}</span>
           <span className="u-race-strip-nextchip-unit">発走</span>
