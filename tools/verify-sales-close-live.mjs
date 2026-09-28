@@ -36,7 +36,7 @@ const MIGRATION = readFileSync('db/migrations/0096_sales_close_before_start.sql'
   .split('\n').filter((l) => !/^\s*(begin|commit)\s*;\s*$/i.test(l)).join('\n');
 
 /**
- * ★発走を `now() + secs` 秒にしたレースで 10 EP 投票してみる（★savepoint で包み 結果だけ返す）
+ * ★発走を `now() + secs` 秒にしたレースで 100 EP 投票してみる（★bets_amount_range は 100 以上・100 刻み）（★savepoint で包み 結果だけ返す）
  * @param {string} uid @param {string} raceId @param {unknown} selection @param {number} secs
  * @returns {Promise<{ ok: boolean, message: string }>}
  */
@@ -45,7 +45,7 @@ async function tryBet(uid, raceId, selection, secs) {
   try {
     await c.query(`update races set status = 'scheduled', scheduled_at = now() + make_interval(secs => $2) where id = $1`, [raceId, secs]);
     await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: uid, role: 'authenticated' })]);
-    await c.query('select public.place_bet($1, $2, $3::jsonb, $4, $5)', [raceId, 'win', JSON.stringify(selection), 10, randomUUID()]);
+    await c.query('select public.place_bet($1, $2, $3::jsonb, $4, $5)', [raceId, 'win', JSON.stringify(selection), 100, randomUUID()]);
     await c.query('rollback to savepoint try_bet');
     return { ok: true, message: '' };
   } catch (e) {
@@ -58,7 +58,10 @@ try {
   await c.query('begin');
   /** ★単勝の目が在るレースを 1 つ（★自馬の制限に当たらないよう ★新しい口座で買う） */
   const race = (await c.query(
-    `select o.race_id, o.selection from race_odds o where o.bet_type = 'win' order by o.race_id desc limit 1`,
+    /** ★まだ確定していないレース（★確定済みは seed を公開しているので 発走前に戻すと 制約 races_reveal_only_after_close に当たる） */
+    `select o.race_id, o.selection from race_odds o join races r on r.id = o.race_id
+      where o.bet_type = 'win' and r.status = 'scheduled' and r.seed_reveal is null
+      order by r.scheduled_at desc limit 1`,
   )).rows[0];
   if (race === undefined) throw new Error('★単勝のオッズが 1 行も無い（★staging にレースが無い）');
   const uid = randomUUID();
