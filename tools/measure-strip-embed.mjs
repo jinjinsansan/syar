@@ -4,6 +4,7 @@
  *   npx tsx tools/measure-strip-embed.mjs                   … 本番・本編（見本のレース）の追加転送と コマ間隔・止める確認
  *   npx tsx tools/measure-strip-embed.mjs --simple /howto   … ＋ 簡易版の走行（★録画の窓を最大 8 分待つ）
  *   npx tsx tools/measure-strip-embed.mjs --base http://localhost:3210
+ *   npx tsx tools/measure-strip-embed.mjs --second          … ★キャッシュ有効で 本編を 2 回開き ★2 回目の転送（★2 周目・その端末で 2 レース目）を並べる
  *
  * 【★測り方】 ★390px・dpr 3・★キャッシュ無効（★冷えた初回）。★帯と同じ置き方の iframe（`/race?embed=strip`・362×204）を
  *   ★観戦の面（`/watch-race`）に差し込み、★`playing` までと ★その後 20 秒の `encodedDataLength` を足す。
@@ -20,6 +21,7 @@ const arg = (name, fallback) => {
 };
 const BASE = arg('--base', 'https://star-two-chi.vercel.app');
 const SIMPLE = arg('--simple', null);
+const SECOND = process.argv.includes('--second');
 const BUDGET_MB = 5;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const FRAMES = (win) => `new Promise((done) => { const w = ${win}; const t = []; let last = w.performance.now(); const end = last + 5000;
@@ -38,7 +40,8 @@ let failed = false;
 try {
   await b.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true });
   await b.send('Network.enable', {});
-  await b.send('Network.setCacheDisabled', { cacheDisabled: true });
+  /** ★`--second` のときだけ キャッシュを使う（★新しい作業フォルダなので 1 回目は冷えたまま・★2 回目がキャッシュに乗るかを見る） */
+  await b.send('Network.setCacheDisabled', { cacheDisabled: !SECOND });
   b.on('Network.responseReceived', (p) => { urls.set(p.requestId, p.response.url); });
   b.on('Network.loadingFinished', (p) => { log.push({ t: Date.now(), url: urls.get(p.requestId) ?? '', n: p.encodedDataLength ?? 0 }); });
   const sum = (a) => a.reduce((s, x) => s + x.n, 0);
@@ -55,7 +58,7 @@ try {
   const before = log.filter((x) => x.t >= t0 && x.t <= tPlay);
   const after = log.filter((x) => x.t > tPlay);
   const mb = sum(before) / 1048576;
-  console.log('# 帯の本編（★見本のレース・390px dpr3・キャッシュ無効）');
+  console.log(`# 帯の本編（★見本のレース・390px dpr3・${SECOND ? 'キャッシュ有効・1 回目は冷えた初回' : 'キャッシュ無効'}）`);
   console.log(`  playing まで ${playing ? `${((tPlay - t0) / 1000).toFixed(1)} 秒` : '★来ない'}・追加転送 ★${mb.toFixed(2)} MB（${before.length} 件）・その後 20 秒 ${(sum(after) / 1048576).toFixed(2)} MB`);
   const byKind = new Map();
   for (const x of before) byKind.set(kindOf(x.url), (byKind.get(kindOf(x.url)) ?? 0) + x.n);
@@ -79,6 +82,22 @@ try {
   const pauseOk = m0 && !m1 && m2;
   console.log(`  親から止める: ${m0 ? '動く' : '★止まっている'} → pause ${m1 ? '★動いている' : '止まった'} → resume ${m2 ? '動く' : '★止まったまま'} ${pauseOk ? '✅' : '🔴'}`);
   if (!pauseOk) failed = true;
+
+  if (SECOND) {
+    /** ★2 周目: ★同じ画面に留まって もう一度 開く（★その端末で 2 レース目を見るとき） */
+    await b.evaluate(`(() => { document.getElementById('__f').remove(); window.__m = [];
+      const f = document.createElement('iframe'); f.id = '__f'; f.src = '/race?embed=strip';
+      f.setAttribute('style', 'position:absolute;left:0;top:0;width:362px;height:204px;border:0'); document.body.appendChild(f); return 1; })()`);
+    const s0 = Date.now();
+    let again = false;
+    for (let i = 0; i < 120 && !again; i++) { await sleep(1000); again = (await b.evaluate('JSON.stringify(window.__m)')).includes('playing'); }
+    const s1 = Date.now();
+    const second = log.filter((x) => x.t >= s0 && x.t <= s1);
+    console.log(`# 2 周目（★キャッシュ有効・同じ画面でもう一度開く）: playing ${again ? `${((s1 - s0) / 1000).toFixed(1)} 秒` : '★来ない'}・追加転送 ★${(sum(second) / 1048576).toFixed(2)} MB（${second.length} 件）`);
+    const big = [...second].sort((x, y) => y.n - x.n).slice(0, 5);
+    for (const x of big) console.log(`    ${(x.n / 1024).toFixed(0).padStart(6)} KB  ${x.url.slice(0, 110)}`);
+    if (!again) failed = true;
+  }
 
   if (SIMPLE !== null) {
     await b.goto('about:blank', 'true', { timeoutMs: 10000, settleMs: 100 });
