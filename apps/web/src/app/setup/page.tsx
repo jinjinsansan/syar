@@ -58,6 +58,13 @@ const INPUT: React.CSSProperties = {
 };
 const LABEL: React.CSSProperties = { fontSize: 14, fontWeight: 900, color: 'var(--u-ink)' };
 
+/**
+ * ★**あとから変えられない**（★表示名・牧場名・勝負服を 画面から変える口は無い・★`create_account` は作り直せない）。
+ * ★上の帯と ★押す前の確認が ★同じ 1 つを使う（★2026-09-29）。
+ *   ★それまで ★帯だけ「あとから変えられます」と ★事実に反していた。★帯が芝の下に沈んで見えていなかった間 ★誰も気づかなかった。
+ */
+const NO_CHANGE_LATER = 'あとから変えられません。';
+
 /** ★名前の入力（★`NAME_MAX` で切るのは ★**旧と同じ**） */
 function NameField({ label, value, onChange, placeholder }: {
   readonly label: string; readonly value: string;
@@ -182,7 +189,7 @@ export default function SetupPage(): React.ReactElement {
      */
     if (!window.confirm(
       `牧場をつくります\n表示名: ${displayName}\n牧場名: ${stableName}\n\n`
-      + 'あとから変えられません。この内容でよろしいですか？',
+      + `${NO_CHANGE_LATER}この内容でよろしいですか？`,
     )) return;
     setBusy(true); setError(null); setErrorText(null);
     try {
@@ -217,7 +224,7 @@ export default function SetupPage(): React.ReactElement {
       */}
       <NoticeBar
         kind="soon"
-        text={step === 1 ? '最初の 1 回だけ。あとから変えられます。' : 'あなたの牧場に迎えました。'}
+        text={step === 1 ? `最初の 1 回だけ。${NO_CHANGE_LATER}` : 'あなたの牧場に迎えました。'}
         actionLabel="レースを見る"
         actionHref="/watch-race"
       />
