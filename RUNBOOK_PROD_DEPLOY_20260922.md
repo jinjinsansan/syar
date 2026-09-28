@@ -174,6 +174,21 @@ npx tsx tools/verify-user-eyes.mjs --env production
 - ⚠️ ★**公開関数（RPC）は ★この道具では読みません**（★引数が要る）。★名前と実行権は ⑦ の `verify-screen-rpcs-live.mjs`、
   ★「ビューが呼ぶ関数の権限」は ★網 `apps/cli/test/view-function-invoker-rights.test.ts` が原文で見ます。
 
+### ⑧b 🔴 関門: 騎手の名簿（★画面の料金 ＝ サーバーが引く料金）
+
+> ★**2026-09-28 に足しました**（★レビュー側の依頼・`0093` と同じ便）。
+> ★画面は TS の `JOCKEYS` で料金を出し、★出走登録は ★DB の `jockeys.fee_ep` を引きます。
+> ★網 `jockey-roster-sql.test.ts` は ★移行 `0082` の原文しか見ないので、★**生きている行が動いたら見えません**。
+
+```bash
+npx tsx tools/verify-jockey-roster-live.mjs --env production
+```
+
+- ★id・name・fee_ep・calm と ★人数を突き合わせます。★ずれが 1 件でもあれば ★非ゼロで終わる。★**DB が 0 人でも不合格**（★R-21）。
+- ★`select` だけ（★分類簿は READONLY）。★service role で読むので ★`0093` で表を閉じた後も読めます。
+- ✔ ★実測（2026-09-28）: ★staging・本番とも ★6 人・ずれ 0。
+  ★変異（★写しの問い合わせだけ変えて staging で）: ★料金 +100 → ★exit 1（`j-aoi: 料金 TS 200 / DB 300`）／ ★0 行 → ★exit 1。
+
 ## ⑨ 🔴 関門: スマホ幅で 実物を測る（★横あふれ ／ ★44px 未満の操作）
 
 > ★**2026-09-27 に足しました**（★裁定 `REVIEW_UI_AUDIT_20260927.md` 追記・★守りの主を ★原文の検査から ★実測へ）。

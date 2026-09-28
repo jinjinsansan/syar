@@ -39,10 +39,18 @@ describe('★jockeys は利用者から閉じる', () => {
     expect(EXPECTED_EXPOSURE['jockeys']).toBe(CLOSED);
   });
 
+  /**
+   * ★例外は ★service role で読む点検の道具だけ（★名指し・理由つき）。
+   * ★`verify-jockey-roster-live.mjs` … ★TS と生きている行の突き合わせ（★読むだけ・手順書 ⑧b）
+   */
+  const SERVICE_ROLE_CHECKERS = ['tools/verify-jockey-roster-live.mjs'];
+
   it('🔴 ② ★画面・ワーカー・道具が ★元の表を直に読まない', () => {
+    for (const f of SERVICE_ROLE_CHECKERS) expect(readFileSync(path.join(ROOT, f), 'utf8')).toMatch(/from jockeys\b/);
     const offenders: string[] = [];
     for (const dir of ['apps/web/src', 'apps/worker/src', 'packages', 'tools']) {
       for (const f of filesUnder(path.join(ROOT, dir))) {
+        if (SERVICE_ROLE_CHECKERS.includes(path.relative(ROOT, f).replace(/\\/g, '/'))) continue;
         const s = readFileSync(f, 'utf8');
         if (/\.from\(\s*['"`]jockeys['"`]\s*\)|from\s+(public\.)?jockeys\b/i.test(s)) offenders.push(path.relative(ROOT, f));
       }
