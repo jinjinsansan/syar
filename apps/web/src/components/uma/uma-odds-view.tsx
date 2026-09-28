@@ -76,7 +76,7 @@ export function UmaOddsView({ race, rows }: {
       <NoticeBar
         kind={race.status === 'closed' ? 'closing' : 'soon'}
         text={race.status === 'closed'
-          ? '投票は締め切りました。最終の数字です。'
+          ? '投票は締め切りました。'
           : `${CLAIM_ODDS_FIXED}。`}
         actionLabel="投票する"
         actionHref="/vote"

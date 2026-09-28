@@ -110,5 +110,7 @@ describe('★仕組みの説明の文は 出どころに縛る', () => {
     expect(all).not.toContain('締切まで変わります');
     expect(all).not.toContain('締切で確定します');
     expect(all).not.toContain('レース・オッズ・記録はご覧いただけます');
+    /** ★固定オッズに「最終の」は ★前に別の数字が在った含み（★2026-09-29 に落とした） */
+    expect(all).not.toContain('最終の数字です');
   });
 });
