@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  isStripEmbedMessage, stripEmbedMessage, stripEmbedNote, stripEmbedUrl, STRIP_EMBED_PARAM_VALUE,
+  isStripControlMessage, isStripEmbedMessage, stripControlMessage, stripEmbedMessage, stripEmbedNote, stripEmbedUrl, STRIP_EMBED_PARAM_VALUE,
 } from '../../web/src/components/uma/race-strip-embed';
 import { replayWindowOver, REPLAY_START_DELAY_MS, REPLAY_DISPLAY_MS } from '../../web/src/components/uma/race-replay';
 
@@ -89,6 +89,17 @@ describe('★小窓で本編を流す約束', () => {
    * 🔴 ⑤ ★**出せなかったら 理由を 1 行出す**（★2026-09-28）。★黙って簡易版に戻ると ★原因を誰も見られない
    *   （★オーナーの画面で 本編が出ないまま「何も変わっていない」になり、★理由を取る手が無かった）。
    */
+  /** 🔴 ⑥ ★帯の停止スイッチで ★本編も止まる（★資料 §5-7）。★知らせは ★親から・★同じ origin だけ受ける */
+  it('🔴 ⑥ ★停止スイッチ → 本編へ「止めて」／「続けて」（★帯が止めたものだけ再開）', () => {
+    expect(isStripControlMessage(stripControlMessage('pause'))).toBe(true);
+    expect(isStripControlMessage(stripControlMessage('resume'))).toBe(true);
+    expect(isStripControlMessage({ source: 'star-race', type: 'pause' }), '★向きの違う知らせ').toBe(false);
+    expect(isStripControlMessage({ source: 'star-strip', type: 'stop' })).toBe(false);
+    expect(PAGE).toContain('if (event.source !== window.parent || event.origin !== window.location.origin || !isStripControlMessage(event.data)) return;');
+    expect(PAGE).toContain('setPlaying((p) => { if (p) stripPausedRef.current = true; return false; });');
+    expect(PAGE).toMatch(/\} else if \(stripPausedRef\.current\) \{\s*stripPausedRef\.current = false;\s*setPlaying\(true\);/);
+  });
+
   it('🔴 ⑤ ★出せなかった理由を ★帯に出す（★本編の理由・★間に合わなかった秒）', () => {
     expect(stripEmbedNote('error', 'ログインしてください（★いまは…）', 0)).toBe('録画を出せませんでした: ログインしてください（★いまは…）');
     expect(stripEmbedNote('error', null, 0)).toBe('録画を出せませんでした: 理由不明');

@@ -213,6 +213,25 @@
   ★引き伸ばさない（★R-18 4-2）。★箱の形を映像に合わせるので ★余白の濃紺が消える。★PC の広い帯では ★高さを画面の半分までにする（★そのときだけ左右に余白）。
 */
 [data-theme='uma'] .u-race-strip-stage-live { height: auto; aspect-ratio: 16 / 9; max-height: 50vh; }
+/*
+  ★**「拡大」＝ 同じ箱を画面いっぱいに**（★2026-09-28・★簡易版の拡大をやめた）。★iframe を作り直さないので ★同じ進行位置のまま続く。
+  ★映像は 16:9 のまま ★画面に収まる大きさ（★引き伸ばさない・余白は濃紺・R-18 4-2）。★上に題と「閉じる」。
+*/
+[data-theme='uma'] .u-race-strip-stage.u-race-strip-stage-full {
+  position: fixed; inset: 0; z-index: 80; width: auto; height: auto; max-height: none; aspect-ratio: auto;
+  background: #0a2340; display: flex; align-items: center; justify-content: center;
+}
+[data-theme='uma'] .u-race-strip-stage-full .u-race-strip-embed {
+  position: relative; inset: auto; width: min(100vw, calc((100dvh - 64px) * 16 / 9)); height: auto; aspect-ratio: 16 / 9; border-radius: 0;
+}
+[data-theme='uma'] .u-race-strip-stage-head {
+  position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: max(8px, env(safe-area-inset-top)) 14px 8px; color: var(--u-ink-light);
+}
+[data-theme='uma'] .u-race-strip-stage-head button {
+  min-width: 64px; min-height: 44px; border: 2px solid var(--u-gold); border-radius: 999px; background: var(--u-panel-strong); color: var(--u-ink-light);
+}
+[data-theme='uma'] .u-race-strip-stage-wait { position: absolute; margin: 0; color: var(--u-ink-light); font-size: 14px; }
 /* ★窓の前の読み込み中は ★画面の外（★寸法は同じにして 本編が小窓の大きさで組まれるように） */
 [data-theme='uma'] .u-race-strip-stage-offscreen { position: absolute; left: -10000px; top: 0; pointer-events: none; }
 [data-theme='uma'] .u-race-strip-embed {

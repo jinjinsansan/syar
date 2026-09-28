@@ -53,18 +53,18 @@ describe('★③ 段 A ── 横にしたら その場で全画面', () => {
     expect(c.setNow, '★setNowMs に別の値を入れている').toBe(c.newDate);
     expect(LIVE.match(/setNowMs\(new Date\(\)\.getTime\(\)\)/g)?.length, '★時計以外を nowMs に入れている').toBe(c.setNow);
     expect(c.setNow, '★時計が 1 か所も無い').toBeGreaterThan(0);
-    /** ★帯と拡大が ★同じ `replayRows` を描く（★拡大が自分で位置を計算し直さない） */
-    const runs = [...LIVE.matchAll(/<RaceRun rows=\{([A-Za-z]+)\}/g)].map((m) => m[1]);
-    expect(runs, '★帯と拡大が別の行を描いている').toEqual(['replayRows', 'replayRows']);
-    expect(LIVE.match(/const replayRows = /g)?.length, '★進行位置の計算が 2 つある').toBe(1);
+    /**
+     * ★2026-09-28: ★拡大は ★帯の中の ★同じ iframe（本編）を ★画面いっぱいに広げるだけ（★読み直さない ＝ ★同じ進行位置のまま）。
+     *   ★iframe は ★帯に 1 つだけ・★拡大の印は ★その iframe を持つ箱の class（★別の箱・別の映像を作らない）。
+     */
+    expect(LIVE.match(/<iframe /g)?.length, '★拡大が 別の iframe を作っている（★頭出しになる）').toBe(1);
+    expect(LIVE).toMatch(/\$\{expanded \? ' u-race-strip-stage-full' : ''\}`\}[\s\S]{0,200}<iframe ref=\{iframeRef\}/);
   });
 
-  it('★対照 ①: ★別の時計を使う変異は ★落ちる', () => {
-    const mutated = LIVE.replace('<RaceRun rows={replayRows} distance={recent.distance}',
-      '<RaceRun rows={rowsAt(Date.now())} distance={recent.distance}');
+  it('★対照 ①: ★拡大で 別の iframe を作る変異は ★落ちる', () => {
+    const mutated = LIVE.replace('{watchable && <button', '{expanded && <iframe src="/race" />}{watchable && <button');
     expect(mutated, '★変異が当たっていない').not.toBe(LIVE);
-    expect(clocksOf(mutated).dateNow).toBeGreaterThan(0);
-    expect([...mutated.matchAll(/<RaceRun rows=\{([A-Za-z]+)\}/g)].map((m) => m[1])).not.toEqual(['replayRows', 'replayRows']);
+    expect(mutated.match(/<iframe /g)?.length).toBe(2);
   });
 
   it('🔴 ② ★拡大で ページを移らない（★入力が残る）', () => {
@@ -73,7 +73,7 @@ describe('★③ 段 A ── 横にしたら その場で全画面', () => {
     }
     /** ★開くのは ★状態だけ（★同じ React の木の中の重ね表示） */
     expect(LIVE).toMatch(/if \(step === 'open' && replayingRef\.current\) \{ autoOpenedRef\.current = true; setExpanded\(true\); \}/);
-    expect(LIVE).toMatch(/\{expanded && replaying && recent && <div className="u-race-replay-overlay"/);
+    expect(LIVE).toContain("{embed !== null && <div className={`u-race-strip-stage${big || expanded ? '' : ' u-race-strip-stage-offscreen'}");
   });
 
   it('★対照 ②: ★ページを移る変異は ★落ちる', () => {
@@ -88,8 +88,14 @@ describe('★③ 段 A ── 横にしたら その場で全画面', () => {
     expect(LIVE, '★音を鳴らしている').not.toMatch(/new Audio|AudioContext|\.play\(/);
   });
 
-  it('⑤ ★動きを止める設定が ★拡大後にも効く（★1 コマ目で止まる）', () => {
-    expect(LIVE).toMatch(/<RaceRun rows=\{replayRows\} distance=\{recent\.distance\} motionReduced=\{motionReduced\} tall \/>/);
-    expect(LIVE).toMatch(/animation: motionReduced \? 'none'/);
+  /**
+   * ⑤ ★動きを止める設定が ★拡大後にも効く（★2026-09-28・本編を拡大する形に変えた）:
+   *   ★「動きを減らす」では ★本編を開かない（★拡大の口も出ない）・★停止スイッチは ★本編へ「止めて」を知らせる。
+   */
+  it('⑤ ★動きを止める設定が ★拡大後にも効く（★本編を開かない・★本編も止める）', () => {
+    expect(LIVE).toContain("if ((size !== 'big' && size !== 'mini') || motionReduced) { setEmbed(null); return; }");
+    expect(LIVE).toContain('const watchable = embed !== null && (replaying || embedLive);');
+    expect(LIVE).toContain("iframeRef.current?.contentWindow?.postMessage(stripControlMessage(sitePaused ? 'pause' : 'resume'), window.origin);");
+    expect(LIVE).toContain("useEffect(() => { setSitePaused(sectionRef.current?.closest('.u-paused') != null); }, [nowMs]);");
   });
 });

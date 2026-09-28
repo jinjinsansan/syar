@@ -32,7 +32,7 @@ import { deriveRng } from '@star/sim-engine';
 import type { Strategy } from '@star/sim-engine';
 import type { Surface, TrackCondition, Pace } from '@star/race-engine';
 import type { ReplayRunner } from '../../components/uma/race-replay';
-import { STRIP_EMBED_PARAM_VALUE, stripEmbedMessage, type StripEmbedEvent } from '../../components/uma/race-strip-embed';
+import { STRIP_EMBED_PARAM_VALUE, isStripControlMessage, stripEmbedMessage, type StripEmbedEvent } from '../../components/uma/race-strip-embed';
 import {
   replayPositionModel, finalOrderOf, withFinishRunOut, finishSpeedsOf, FINISH_RUNOUT_FALLBACK_MPS, knotsFor, DEFAULT_PHASE_RATES,
   type TimeWarp,
@@ -6237,6 +6237,25 @@ function RaceView({ setup, real }: {
   /** ★レースが終わったか（★③ 確定後のカードを出す条件） */
   const stageFinished = built !== null && !playing
     && dRef.current >= RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC - 0.01;
+  /**
+   * ★小窓の中: ★帯の停止スイッチで ★止め、★戻したら ★続ける（★帯が止めたものだけ再開する・★流し終えた後は再開しない）。
+   *   ★知らせは ★親（帯）から・★同じ origin だけ受ける。
+   */
+  const stripPausedRef = useRef(false);
+  useEffect(() => {
+    if (!EMBED_STRIP) return undefined;
+    const onMessage = (event: MessageEvent): void => {
+      if (event.source !== window.parent || event.origin !== window.location.origin || !isStripControlMessage(event.data)) return;
+      if (event.data.type === 'pause') {
+        setPlaying((p) => { if (p) stripPausedRef.current = true; return false; });
+      } else if (stripPausedRef.current) {
+        stripPausedRef.current = false;
+        setPlaying(true);
+      }
+    };
+    window.addEventListener('message', onMessage);
+    return () => { window.removeEventListener('message', onMessage); };
+  }, []);
   /** ★小窓の中: ★流し終えたら・★組めなかったら ★帯へ知らせる（★帯が iframe を閉じる） */
   useEffect(() => { if (stageFinished) tellStrip('ended', real?.raceId ?? null); }, [stageFinished, real]);
   useEffect(() => { if (err !== null) tellStrip('error', real?.raceId ?? null, err); }, [err, real]);

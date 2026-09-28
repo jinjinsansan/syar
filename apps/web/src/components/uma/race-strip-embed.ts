@@ -48,6 +48,25 @@ export function isStripEmbedMessage(value: unknown): value is StripEmbedMessage 
     && (v['detail'] === null || typeof v['detail'] === 'string');
 }
 
+/**
+ * ★**帯 → 本編の知らせ**（★2026-09-28）: ★停止スイッチ（`.u-paused`）で ★本編も止める・★戻したら続ける（★資料 §5-7「動きを全部止める」）。
+ *   ⚠️ ★最初は ★帯の文字だけ止まり、★iframe の本編は流れ続けていました。
+ */
+export interface StripControlMessage {
+  readonly source: 'star-strip';
+  readonly type: 'pause' | 'resume';
+}
+
+export function stripControlMessage(type: StripControlMessage['type']): StripControlMessage {
+  return { source: 'star-strip', type };
+}
+
+export function isStripControlMessage(value: unknown): value is StripControlMessage {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return v['source'] === 'star-strip' && (v['type'] === 'pause' || v['type'] === 'resume');
+}
+
 /** ★帯に出す 1 行（★長い理由は切る・★「本編」とは名乗らない） */
 export function stripEmbedNote(kind: 'error' | 'late', detail: string | null, waitedSec: number): string {
   if (kind === 'late') return `録画の用意が間に合いませんでした（${waitedSec} 秒）`;

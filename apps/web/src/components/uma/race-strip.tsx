@@ -6,7 +6,7 @@ import { readClient } from '../../lib/supabase';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowOver, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
 import { INTRO_STAGES, stripSizeOf } from './race-strip-sizes';
-import { STRIP_EMBED_GIVE_UP_SEC, isStripEmbedMessage, stripEmbedNote, stripEmbedUrl } from './race-strip-embed';
+import { STRIP_EMBED_GIVE_UP_SEC, isStripEmbedMessage, stripControlMessage, stripEmbedNote, stripEmbedUrl } from './race-strip-embed';
 import { BOARD_ITEM_SEC, tickerBoard, tickerShowsField, type BoardItem, type TickerRunner } from './race-strip-ticker';
 import './uma-theme.css';
 
@@ -343,10 +343,6 @@ export function RaceStrip(): React.ReactElement | null {
   const progress = recent && nowMs !== null && data?.runners.length
     ? replayDisplayProgress(recent.scheduled_at, nowMs) : null;
   const replaying = progress !== null;
-  useEffect(() => {
-    replayingRef.current = replaying;
-    if (!replaying) { setExpanded(false); autoOpenedRef.current = false; }
-  }, [replaying]);
   /** ★状態を画面へ（★走行を出す画面だけ）・★画面からの拡大の頼みを受ける */
   const nextAt = next?.scheduled_at ?? null;
   const lastWinner = data?.runners.find((runner) => runner.finishPosition === 1) ?? null;
@@ -395,7 +391,8 @@ export function RaceStrip(): React.ReactElement | null {
   const windowOver = recent === null || recent === undefined || nowMs === null || !data?.runners.length
     ? true : replayWindowOver(recent.scheduled_at, nowMs);
   useEffect(() => {
-    if (size !== 'big' || motionReduced) { setEmbed(null); return; }
+    /** ★「極小」でも裏で読む（★小窓には出さず ★「拡大」で画面いっぱいに出すため・2026-09-28） */
+    if ((size !== 'big' && size !== 'mini') || motionReduced) { setEmbed(null); return; }
     if (!windowOver && recentId !== null && embeddedIdRef.current !== recentId) {
       embeddedIdRef.current = recentId;
       setEmbedNote(null);
@@ -424,9 +421,31 @@ export function RaceStrip(): React.ReactElement | null {
     return () => { window.removeEventListener('message', onMessage); window.clearTimeout(giveUp); };
   }, [embedId]);
   const embedLive = embed?.live === true;
+  /**
+   * ★**「拡大」で見られるか**（★本編を読み込み中 か 流れている間・★録画の窓の中 か 本編が流れている間）。
+   *   ★見られなくなったら ★拡大を閉じる（★横向きで自動で開いたものも）。
+   */
+  const watchable = embed !== null && (replaying || embedLive);
+  /**
+   * ★**停止スイッチで ★本編も止める**（★資料 §5-7・2026-09-28）。★停止は ★画面の状態（`.u-paused`）なので ★帯は DOM で見る。
+   *   ★帯の時計（`nowMs`・250ms）ごとに見て、★変わったときだけ ★iframe へ知らせる。
+   */
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [sitePaused, setSitePaused] = useState(false);
+  useEffect(() => { setSitePaused(sectionRef.current?.closest('.u-paused') != null); }, [nowMs]);
+  useEffect(() => {
+    if (!embedLive) return;
+    iframeRef.current?.contentWindow?.postMessage(stripControlMessage(sitePaused ? 'pause' : 'resume'), window.origin);
+  }, [sitePaused, embedLive]);
+  useEffect(() => {
+    replayingRef.current = watchable;
+    if (!watchable) { setExpanded(false); autoOpenedRef.current = false; }
+  }, [watchable]);
 
   const leader = leaderOf(replayRows);
-  const big = (replaying || embedLive) && size === 'big';
+  /** ★「大」の箱を出すのは ★本編が流れている間だけ（★簡易版の走行は出さない・2026-09-28） */
+  const big = embedLive && size === 'big';
   /**
    * ★④ **結果の一時強調**（★仕様 §2）: ★録画が終わった直後の 7 秒、★枠を EP 色にして ★1 着を大きく出し、★帯へ戻る。
    *   ★出すのは ★直近の 1 本だけ（★「同時は最新のみ・積み上げない」）。★着順は ★記録の値（`finishPosition`）。
@@ -457,16 +476,27 @@ export function RaceStrip(): React.ReactElement | null {
   }
 
   return (
-    <section aria-label="レースの開催情報" className={`u-race-strip${compact ? ' u-race-strip-compact' : ''}${replaying ? ' u-race-strip-replaying' : ''}${big || (resulting && size === 'big') ? ' u-race-strip-big' : ''}${resulting ? ' u-race-strip-result' : ''}${expanded ? ' u-race-strip-expanded' : ''}`}>
+    <section ref={sectionRef} aria-label="レースの開催情報" className={`u-race-strip${compact ? ' u-race-strip-compact' : ''}${replaying ? ' u-race-strip-replaying' : ''}${big || (resulting && size === 'big') ? ' u-race-strip-big' : ''}${resulting ? ' u-race-strip-result' : ''}${expanded ? ' u-race-strip-expanded' : ''}`}>
       {/* ★「大」150px（★一覧・閲覧の画面）。★同じ枠が伸びます（★§2: 別要素への切替ではない） */}
       {/*
         ★同じ箱のまま ★窓の前は画面の外に置く（★箱を差し替えると iframe が作り直され ★読み込みが最初からになる）。
       */}
-      {size === 'big' && (big || embed !== null) && <div className={`u-race-strip-stage${big ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}`}>
-        {big && !embedLive && <RaceRun rows={replayRows} distance={recent?.distance ?? 0} motionReduced={motionReduced} />}
-        {/* ★本編（★`playing` まで 見えないまま読み込む・★触れない ＝ ★拡大は帯の「拡大」） */}
-        {embed !== null && <iframe className="u-race-strip-embed" data-live={embedLive ? 'true' : 'false'}
-          src={stripEmbedUrl(embed.id)} title="レースの録画（確定した結果から再現）" tabIndex={-1} />}
+      {/*
+        ★**簡易版の走行（side-v8 の横並び）は 出しません**（★2026-09-28・オーナー「間違っているレース映像が未だに流れています」）。
+        ★本編の用意ができるまでは ★箱を出さず（★文字の行と電光掲示板だけ）、★できたら ★本編だけを出す。
+        ★「拡大」は ★同じ iframe を ★画面いっぱいに広げる（★読み直さない・★同じ進行位置のまま・★ページは移らない）。
+      */}
+      {embed !== null && <div className={`u-race-strip-stage${big || expanded ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}${expanded ? ' u-race-strip-stage-full' : ''}`}
+        {...(expanded && recent ? { role: 'dialog', 'aria-modal': true, 'aria-label': `${recent.name}のレース録画` } : {})}>
+        {/* ★本編（★`playing` まで 見えないまま読み込む・★触れない） */}
+        <iframe ref={iframeRef} className="u-race-strip-embed" data-live={embedLive ? 'true' : 'false'}
+          src={stripEmbedUrl(embed.id)} title="レースの録画（確定した結果から再現）" tabIndex={-1} />
+        {expanded && <div className="u-race-strip-stage-head">
+          {/* ★「本編」と名乗らない（★条件 1）。★録画・結果から再現 */}
+          <strong>{recent?.name ?? ''} · 録画・結果から再現</strong>
+          <button type="button" onClick={() => { autoOpenedRef.current = false; setExpanded(false); }} aria-label="レース録画を閉じる">閉じる</button>
+        </div>}
+        {expanded && !embedLive && <p className="u-race-strip-stage-wait" role="status">録画の用意をしています…</p>}
       </div>}
       {resulting && size === 'big' && winner !== null && <div className="u-race-result-box" role="status">
         <span className="u-race-result-place">1着</span>
@@ -504,19 +534,8 @@ export function RaceStrip(): React.ReactElement | null {
       {error && <span className="u-race-strip-error">更新できません</span>}
       {/* ★録画を出せなかった理由（★黙って簡易版に戻らない） */}
       {size === 'big' && embedNote !== null && <span className="u-race-strip-error" role="status">{embedNote}</span>}
-      {replaying && <button type="button" className="u-race-strip-expand" onClick={() => { setExpanded(true); }}>拡大</button>}
+      {watchable && <button type="button" className="u-race-strip-expand" onClick={() => { setExpanded(true); }}>拡大</button>}
       {(replaying ? recent : next) && <a href={`/races/${encodeURIComponent((replaying ? recent : next)!.id)}`} aria-label={`${(replaying ? recent : next)!.name}の詳細を見る`}>詳細</a>}
-      {expanded && replaying && recent && <div className="u-race-replay-overlay" role="dialog" aria-modal="true" aria-label={`${recent.name}のレース録画`}>
-        <div className="u-race-replay-overlay-head">
-          {/* ★「本編」と名乗らない（★条件 1）。★録画・結果から再現 */}
-          <strong>{recent.name} · 録画・結果から再現</strong>
-          <button type="button" onClick={() => { autoOpenedRef.current = false; setExpanded(false); }} aria-label="レース録画を閉じる">閉じる</button>
-        </div>
-        <p>確定した走破タイムから途中位置を再現しています。ページを戻っても同じ進行位置で続きます。</p>
-        <RaceRun rows={replayRows} distance={recent.distance} motionReduced={motionReduced} tall />
-        <ReplayLanes raceName={recent.name} rows={replayRows} />
-        <a href={`/races/${encodeURIComponent(recent.id)}`}>確定結果を見る</a>
-      </div>}
     </section>
   );
 }
@@ -604,18 +623,4 @@ function leaderOf(rows: readonly { readonly runner: ReplayRunner; readonly posit
       || (row.position === best.position && row.runner.finishPosition < best.runner.finishPosition)) best = row;
   }
   return best?.runner ?? null;
-}
-
-function ReplayLanes({ raceName, rows }: {
-  readonly raceName: string;
-  readonly rows: readonly { readonly runner: ReplayRunner; readonly position: number }[];
-}): React.ReactElement {
-  return <div className="u-race-replay" role="img" aria-label={`${raceName}の確定結果から補間した走行映像`}>
-    {rows.map(({ runner, position }) => <div key={runner.gate} className="u-race-replay-lane">
-      <span className="u-race-replay-name">{runner.gate} {runner.name}</span>
-      <span className="u-race-replay-track">
-        <span className="u-race-replay-marker" style={{ left: `${position * 100}%` }}>{runner.gate}</span>
-      </span>
-    </div>)}
-  </div>;
 }

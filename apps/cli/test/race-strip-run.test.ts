@@ -26,34 +26,34 @@ describe('★常設帯の走行（①②）', () => {
     expect(LIVE, '🔴 ★差し戻した絵に戻っている').not.toContain('horse-gallop');
   });
 
-  it('🔴 ★走行は ★確定タイムから逆算した進行率（★作り物の動きではない）', () => {
-    expect(LIVE).toMatch(/replayProgress\(runner, recent\.distance, raceSec\)/);
-    /** ★2026-09-28: ★本編を小窓で流す間（`embedLive`）だけ ★走行を下げる（★それまでは走行を出したまま） */
-    expect(LIVE, '★「大」が走行を描いていない').toMatch(/\{big && !embedLive && <RaceRun rows=\{replayRows\}/);
+  /**
+   * 🔴 ★**簡易版の走行（side-v8 の横並び）は 帯に出さない**（★2026-09-28・オーナー「この間違っているレース映像が未だに流れています」）。
+   *   ★本編の用意ができるまでは ★箱を出さず、★できたら ★本編だけ。★拡大も ★本編（★同じ iframe）だけ。
+   *   ★「極小」の 22×16px の馬は ★映像ではなく印なので 残す。
+   */
+  it('🔴 ★簡易版の走行を 帯にも拡大にも出さない（★本編だけ）', () => {
+    expect(LIVE.match(/<RaceRun /g)?.length ?? 0, '★簡易版の走行を描いている').toBe(0);
+    expect(LIVE, '★「大」の箱を 本編の前に出している').toContain("const big = embedLive && size === 'big';");
     expect(LIVE, '★「極小」が馬を描いていない').toMatch(/u-race-run-mini[\s\S]{0,200}<RunningHorse/);
   });
 
-  it('🔴 ★絵を読むのは ★走行が出ている間だけ（★帯のあいだは 0 バイト・裁定 §5 条件 2 (a)）', () => {
+  it('🔴 ★絵を読むのは ★極小の馬だけ・★本編は 確定を見てから 窓が閉じるまでに読み始める', () => {
     /** ★8 コマ（★約 450KB）は ★`RunningHorse` の中でしか使わない（★先読みしない） */
     expect(LIVE.match(/RUN_FRAMES/g)?.length, '★RUN_FRAMES を別の所でも使っている').toBe(2);
     expect(LIVE, '★先読みしている').not.toMatch(/new Image\(|rel=["']preload/);
-    /** ★`RunningHorse` を描くのは ★「大」（`RaceRun`）と ★「極小」だけ。★どちらも録画の窓の中 */
-    expect(LIVE.match(/<RunningHorse/g)?.length).toBe(2);
-    expect(LIVE.match(/<RaceRun /g)?.length).toBe(2);
     /**
-     * ★2026-09-28（★オーナー依頼・承知の上で 1 レース約 4MB）: ★「大」は ★録画の窓 か ★本編が流れている間。
-     *   ★本編を ★読み始めるのは ★確定が見えてから ★窓が閉じるまで（★窓の 75 秒前から・★本編の用意が 24〜27 秒かかるため）・
-     *   ★「大」の帯だけ・★動きを減らす設定でないときだけ。★窓が閉じても ★まだ流れ始めていなければ ★やめる。
+     * ★2026-09-28（★オーナー依頼・承知の上で 1 レース約 4MB）: ★本編を ★読み始めるのは ★確定が見えてから ★窓が閉じるまで
+     *   （★窓の 75 秒前から・★本編の用意が 24〜27 秒かかるため）・★「大」と「極小」（★極小は拡大のためだけ）・★動きを減らす設定でないときだけ。
+     *   ★窓が閉じても ★まだ流れ始めていなければ ★やめる。
      */
-    expect(LIVE, '★「大」が録画の窓の外で出る').toMatch(/const big = \(replaying \|\| embedLive\) && size === 'big';/);
-    expect(LIVE, '★本編を 窓の後・「大」以外で開く').toMatch(/if \(size !== 'big' \|\| motionReduced\) \{ setEmbed\(null\); return; \}\s*if \(!windowOver && recentId !== null && embeddedIdRef\.current !== recentId\)/);
+    expect(LIVE, '★本編を 窓の後・帯以外で開く').toMatch(/if \(\(size !== 'big' && size !== 'mini'\) \|\| motionReduced\) \{ setEmbed\(null\); return; \}\s*if \(!windowOver && recentId !== null && embeddedIdRef\.current !== recentId\)/);
     expect(LIVE, '★窓が閉じても 始まっていない本編を読み続ける').toMatch(/if \(!windowOver \|\| e === null \|\| e\.live\) return;[\s\S]{0,200}setEmbed\(null\);/);
-    /** ★窓の前は ★同じ箱を画面の外へ（★箱を差し替えると 読み込みが最初からになる） */
-    expect(LIVE).toContain("{size === 'big' && (big || embed !== null) && <div className={`u-race-strip-stage${big ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}`}>");
+    /** ★同じ箱のまま ★窓の前・極小は画面の外・★拡大で画面いっぱい（★箱を差し替えると 読み込みが最初からになる） */
+    expect(LIVE).toContain("{embed !== null && <div className={`u-race-strip-stage${big || expanded ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}${expanded ? ' u-race-strip-stage-full' : ''}`}");
     /** ★本編が流れている間は ★箱を 16:9 に（★枠いっぱい・★引き伸ばさない・2026-09-28 オーナー指示） */
     expect(CSS).toMatch(/\.u-race-strip-stage-live \{[^}]*aspect-ratio: 16 \/ 9;/);
     expect(LIVE, '★「極小」が録画の窓の外で出る').toMatch(/\(replaying \|\| embedLive\) && recent && data \? <>[\s\S]{0,300}u-race-run-mini/);
-    expect(LIVE, '★拡大が録画の窓の外で出る').toMatch(/\{expanded && replaying && recent && <div className="u-race-replay-overlay"/);
+    expect(LIVE, '★拡大の口が 本編の無いときに出る').toContain('{watchable && <button type="button" className="u-race-strip-expand"');
   });
 
   it('🔴 ★.webp を読む（★同名の .png は 1 枚 467KB・裁定 §5 条件 2 (b)）', () => {
