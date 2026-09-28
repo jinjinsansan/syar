@@ -80,12 +80,20 @@ try {
   await c.query(`insert into users (id, display_name, stable_name, entry_points) values ($1, $2, '検査厩舎', 100000)`, [uid, `検査 ${uid.slice(0, 8)}`]);
   console.log(`★レース ${String(race.race_id).slice(0, 8)}・目 ${JSON.stringify(race.selection)}・★取引の中の口座 ${uid.slice(0, 8)}`);
 
-  console.log('\n★対照（★0096 の前）');
-  const before59 = await tryBet(uid, race.race_id, race.selection, 59);
-  must(before59.ok, `★発走の 59 秒前（＝締切の 1 秒後）でも 通る（★直す理由）${before59.ok ? '' : `: ${before59.message}`}`);
-
-  await c.query(MIGRATION);
-  console.log('\n★0096 を 取引の中で当てた後');
+  /**
+   * ★0096 が ★既に当たっている DB（★適用の後の確かめ）では ★対照（0096 の前）は取れない → ★取れないと出して 飛ばす（★黙って緑にしない）。
+   *   ★当たっていれば ★当てた姿のまま ①② を見る（★取引の中で 当て直さない）。
+   */
+  const applied = before.fn > 0;
+  if (applied) {
+    console.log('\n★0096 は ★この DB に既に当たっている → ★対照（0096 の前）は取れない。★当たっている姿のまま 確かめる');
+  } else {
+    console.log('\n★対照（★0096 の前）');
+    const before59 = await tryBet(uid, race.race_id, race.selection, 59);
+    must(before59.ok, `★発走の 59 秒前（＝締切の 1 秒後）でも 通る（★直す理由）${before59.ok ? '' : `: ${before59.message}`}`);
+    await c.query(MIGRATION);
+  }
+  console.log(applied ? '\n★当たっている 0096 で' : '\n★0096 を 取引の中で当てた後');
   const lead = Number((await c.query('select public.sales_close_lead_seconds() as s')).rows[0].s);
   must(lead === 60, `★sales_close_lead_seconds() = ${lead}（★60）`);
   const at61 = await tryBet(uid, race.race_id, race.selection, 61);
