@@ -48,6 +48,18 @@ interface UnknownEpClass { readonly klass: string; readonly total: number }
  */
 export class UnknownEpClassError extends Error {}
 
+/** ★`point_flow_daily.ep_unclassified` の形（★`{"player":{分類:額},"internal":{…}}`・★無い区分は出さない） */
+export function unclassifiedOf(player: readonly UnknownEpClass[], internal: readonly UnknownEpClass[]): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {};
+  const put = (scope: string, rows: readonly UnknownEpClass[]): void => {
+    if (rows.length === 0) return;
+    out[scope] = Object.fromEntries(rows.map((r) => [r.klass, r.total]));
+  };
+  put('player', player);
+  put('internal', internal);
+  return out;
+}
+
 /**
  * 1日ぶんの資金フローを、口座の区分ごとに集める。
  *
@@ -240,8 +252,8 @@ export async function aggregateDay(
     `insert into point_flow_daily (
        date, ep_inflow, ep_burned, pp_issued, pp_exchanged, margin_actual,
        ep_inflow_internal, ep_burned_internal, pp_issued_internal, pp_exchanged_internal,
-       margin_actual_internal)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       margin_actual_internal, ep_unclassified)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)
      on conflict (date) do update set
        ep_inflow = excluded.ep_inflow, ep_burned = excluded.ep_burned,
        pp_issued = excluded.pp_issued, pp_exchanged = excluded.pp_exchanged,
@@ -250,12 +262,15 @@ export async function aggregateDay(
        ep_burned_internal = excluded.ep_burned_internal,
        pp_issued_internal = excluded.pp_issued_internal,
        pp_exchanged_internal = excluded.pp_exchanged_internal,
-       margin_actual_internal = excluded.margin_actual_internal`,
+       margin_actual_internal = excluded.margin_actual_internal,
+       ep_unclassified = excluded.ep_unclassified`,
     [
       date,
       player.epInflow, player.epBurned, player.ppIssued, player.ppExchanged, player.marginActualOverall,
       internal.epInflow, internal.epBurned, internal.ppIssued, internal.ppExchanged,
       internal.marginActualOverall,
+      /** ★未分類の額を ★行に残す（★後から DB に問える・`0095`）。★無い日は {} */
+      JSON.stringify(unclassifiedOf(playerFlow.unknownEp, internalFlow.unknownEp)),
     ],
   );
   /**

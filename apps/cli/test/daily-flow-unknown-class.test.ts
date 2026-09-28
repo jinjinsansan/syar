@@ -9,6 +9,10 @@
  * 【★見ている壊れ方】
  *   ① 🔴 ★知らない分類で ★行を書く前に落ちる（★DB が先に進むたびに 記録が消える）
  *   ② 🔴 ★知らない分類を ★黙って捨てる（★発行や焼却に紛れる・★誰も気づかない）
+ *   ③ 🔴 ★未分類の額が ★ログにしか残らない（★その日は数え直されないので ★後から DB に問えない・`0095` の `ep_unclassified`）
+ *
+ * ⚠️ ★**生きたワーカーでは確かめていません**（★未知の理由を作るには 理由の集合を変える移行が要るため・レビュー側の判断）。
+ *    ★確かめたのは ★原文の構造（`main.ts` の日次の枠）と ★偽の DB で `aggregateDay` を実際に走らせたことです。
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -45,12 +49,15 @@ describe('★知らない EP の分類（★DB が先に進んだとき）', () 
     expect(inserts.length, '★行を書く前に落ちた').toBe(1);
     /** ★発行（ep_inflow）に ★知らない分類を混ぜていない */
     expect(inserts[0]![1]).toBe(2000);
+    /** ★③ 未分類の額を ★行に残す（★`ep_unclassified`・12 番目の引数） */
+    expect(JSON.parse(String(inserts[0]![11]))).toEqual({ player: { mystery: 150 } });
   });
 
   it('★対照: ★知っている分類だけなら 落ちない', async () => {
     const { client, inserts } = fakeClient([{ klass: 'issuance', total: '2000' }, { klass: 'rebate', total: '600' }]);
     await expect(aggregateDay(client, '2026-09-28', '2026-09-28T00:00:00Z', '2026-09-29T00:00:00Z')).resolves.toBeUndefined();
     expect(inserts.length).toBe(1);
+    expect(JSON.parse(String(inserts[0]![11])), '★未分類が無い日は {}').toEqual({});
   });
 });
 
