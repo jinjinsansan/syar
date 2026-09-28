@@ -103,3 +103,30 @@
 - ⚠️ ★**残る限界**（★自己申告どおり）: ★偽の DB が真似るのは ★「definer でなく revoke した表に触れたら permission denied」だけ。★★**本物の PostgreSQL で「0 行のビューは列の式を評価しない」ことは、まだ本物で確かめていない**
   - → ★これは ★**今日いちばん効いた発見（`count(*)` の罠）の土台**なので、★簿に 1 行（★消す条件 = ★**0 行で関数を呼ぶ公開ビューが staging に実在した日に、そこで流す**）
   - ★いま仮のビューを staging に作るのは ★**書き込み**になるので作らない、という判断は正しい（★共有の staging を汚さない）
+
+## 6. 追記（2026-09-28）— 本番の V-20（anon の露出）が 5/11 不合格 ／ ワーカーの版（`0092`）の支度
+
+### ✅ `0092`（ワーカーの版を SSH なしで見る）は条件どおり
+- ✔ `worker_status` は ★**閉じたまま**（RLS・anon/authenticated から剥がす・公開ビューを作らない）
+- ✔ `worker_heartbeat()` は ★**definer ＋ `search_path` 固定 ＋ `revoke all … from public` → `grant execute … to anon, authenticated`**（★`0086` の穴と `0073` の権限落ちを両方 避けた形）。★返すのは ★**2 値だけ**
+- ✔ `healthz` は ★**投げる・1.5 秒・形違い → `worker: null` で必ず 200**。★service role を使わない
+- ✔ `verify-deployed-build --expect-worker` は ★**公開の 2 値だけ**で「2 周（12 分）以内」を見る。★渡さなければ表示だけ
+- ✔ `exposure-registry` と ★`rpc-guard` の読み取り専用の登録簿にも入れた（★入れないと D-080 の網が落ちる ＝ ★**登録簿が対になっている**ことを踏んで直した）
+- → ★**オーナー承認待ち**（移行・ワーカー・画面の 3 つ）
+
+### 🔴 V-20 の 5 件 — ★**大半は「登録簿のずれ」。ただし 2 件は本当の露出の判定が要る**
+✔ 事実（`verify-anon-exposure --env production`・読むだけ・`--record` なし）:
+1. ★登録簿に無い表・ビュー: `entry_scratch_requests`・`jockeys`・`retired_horses_public`
+2. ★登録簿に無い関数: `breeding_role_block`・`breeding_role_limit`・`claim_daily_ep`・`day_boundary_stale_after_hours`・`enter_race(uuid,uuid,text,text,…)` ほか
+3. 🔴 ★**anon から 1 行 読める**: `jockeys`・`retired_horses_public`
+4. ★登録簿の `enter_race(uuid,uuid,text,jsonb,uuid)` が ★**本番に無い**（★`0088` で憲法 3 の穴を塞いだときに落とした版）
+
+**判定**:
+- ★**3 の 2 件は、たぶん「公開でよいもの」**。★`retired_horses_public` は ★**`0083` で LR-6 のために作った公開ビューそのもの**（★名前どおり）。★`jockeys` は ★**騎手名簿を画面に出している**（★本番で 6 人を確認済み・`0086` 系）。→ ★**登録簿に「公開」として載せるのが直し**（★露出を止めるのではない）。★ただし ★**列を 1 つずつ見て、出してよいものだけか**を確かめてから載せる
+- ★**4 は、直したのに登録簿が追いついていない**形（★良い変更が網を赤にした）。★登録簿を ★**いまの署名**に直す
+- ★**2 の関数は 1 つずつ**。★見るのは ★「登録簿に在るか」ではなく ★**実際の grant**。★🔴 ★**状態を変える関数が anon に開いていたら、それは本当の露出**（★`claim_daily_ep` が anon で叩けたら EP が配れる）。★まず ★**grant を読んで表にする**
+- ★**着手順**: ★①`claim_daily_ep`・`enter_race`・`breeding_role_*` など ★**状態を変える関数の grant を読む**（★anon に開いていないことの確認・★開いていたら即 塞ぐ） → ★②`jockeys`・`retired_horses_public` を列ごと見て公開として登録 → ★③残りの登録簿のずれ（★`entry_scratch_requests` は ★**D-123 の出走取消の表**。★画面が無いので閉じたままが正しい） → ★④`enter_race` の署名を直す
+
+### 🔴 `o7-production`（pending・期限 2026-09-27）
+- ★**`--record` を今 流さない**判断は正しい（★5 件 赤の状態に「流した日」だけ新しく付くと、★**赤を緑に見せる記録**になる）
+- **決定**: ★**期限を 2026-10-05 に伸ばし、理由を書く** — 「★V-20 が本番で 5 件 不合格（★内訳は `REVIEW_INC_PROD_PERMISSION_20260927.md` §6）。★**緑にしてから記録する**」。★★**黙って伸ばさない**（★私が `PROD-NEVER-AGED` で採った形と同じ）
