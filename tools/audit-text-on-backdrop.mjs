@@ -171,6 +171,7 @@ console.log('\n=== ★芝の下に沈んだ文字（★elementFromPoint が芝�
 for (const r of buriedRows) console.log(`  🔴 ${r.p.padEnd(20)} ${String(r.w).padStart(4)}px  <${r.tag}>「${r.text}」`);
 const measured = new Set(rows.filter((r) => !r.note).map((r) => `${r.p}@${r.w}`)).size;
 console.log(`\n★沈んだ文字: ★${buriedRows.length} 件（★測れた画面 ${PAGES.length * WIDTHS.length} 面のうち ★文字を拾えた ${measured} 面・★芝の上にじかの文字が無い面は数えていない）`);
+console.log(`  ★射程: ★${WIDTHS.join('・')}px・★未ログイン・★${PAGES.length} 画面で測った数。★ログインが要る中身と ★測っていない幅は ★含まない`);
 if (FAKE_STALE && !sawNotice) {
   console.log('  ⚠️ ★--fake-stale なのに ★知らせの文を 1 件も拾っていません（★知らせが出ていない・★この実行は知らせを測れていない）');
 }

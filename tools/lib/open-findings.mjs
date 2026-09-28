@@ -1715,6 +1715,7 @@ export const OPEN_FINDINGS = [
     why: '✔ ★原因: ★NoticeBar が position を持たず ★absolute の芝の下に描かれた。★直し: 外枠に position: relative; z-index: 1（725f2a0）。'
       + '✔ ★網: ★`audit-text-on-backdrop.mjs` に ★「沈んだ文字」（★elementFromPoint が芝の中を返す・★1 件でも終了コード 1）。'
       + '★対照: ★直す前の本番（dafb83e）・390px・--fake-stale で ★29 件（★すべて NoticeBar・★ほかの形は 0）。'
+      + '★内訳: ★/signup 3・★/setup 2（★初回設定の案内）・★オッズ 2・★帯の上の知らせ 11 画面 × 2。★射程は 390px・未ログイン・20 画面（★ログインの要る中身と 1280 幅は含まない）。'
       + '--- ✅ ★**消す条件** --- ★上の網が入った日（★レビュー側）。★開発側は ★直しを配備して ★本番で 0 件を見るまで残す。',
     owner: 'dev',
     until: '2026-12-31',
