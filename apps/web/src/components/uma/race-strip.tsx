@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import { usePathname } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
 import { canPlayRealRace } from '../../lib/race-real-access';
+import { StaleBuildNotice } from './stale-build-notice';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowNear, replayWindowOver, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
 import { INTRO_STAGES, stripEmbedsOn, stripSizeOf } from './race-strip-sizes';
@@ -252,6 +253,11 @@ export function reportOnboardingStage(stage: string | null): void {
  *   ★画面ごとに `compact` を渡していた頃は、★どの画面が何を出すかが ★各ページに散っていました。
  */
 export function RaceStrip(): React.ReactElement | null {
+  /** ★古い版の知らせは ★帯の上の 1 か所だけ（★全画面に散らさない・`stale-build.ts`・2026-09-28） */
+  return <><StaleBuildNotice /><RaceStripBody /></>;
+}
+
+function RaceStripBody(): React.ReactElement | null {
   const pathname = usePathname() ?? '/';
   const intro = useSyncExternalStore(
     (listener) => { introListeners.add(listener); return () => { introListeners.delete(listener); }; },
