@@ -110,6 +110,7 @@ export default async function UmaOddsPage({ params, searchParams }: {
         distance: Number(r['distance']),
         trackCondition: String(r['track_condition']),
         status: String(r['status']),
+        scheduledAt: typeof r['scheduled_at'] === 'string' ? r['scheduled_at'] : null,
       }}
       rows={rows}
     />

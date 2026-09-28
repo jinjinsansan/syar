@@ -27,9 +27,14 @@ function jaDuration(ms: number): string {
 /**
  * ★出馬表の公開（★scheduler cycle.ts: 公開は周の `publish`・発走は周の終わり `CYCLE_MS`）。
  *   ★2026-09-29: ★「発走 10 分前に確定します」は 10 分の周だった頃の名残り（★いまは 6 分）。
- *   ⚠️ ★締切の時刻は ★まだ書かない（★cycle.ts の salesClose は発走 1 分前だが ★place_bet は発走まで受ける＝食い違い・照会中）。
  */
 export const CLAIM_CARD_PUBLISH = `出馬表は発走の ${jaDuration(CYCLE_MS - PHASE_OFFSET_MS.publish)}前に公開されます`;
+
+/**
+ * ★投票の締切（★正典 §9.6: 締切は発走より前・★cycle.ts の salesClose）。
+ *   ★2026-09-29: ★place_bet は ★発走の瞬間まで受けていた → ★`0096` で ★`sales_close_lead_seconds()` に合わせた（★網 sales-close-sql）。
+ */
+export const CLAIM_SALES_CLOSE = `投票は発走の ${jaDuration(CYCLE_MS - PHASE_OFFSET_MS.salesClose)}前に締め切ります`;
 
 /**
  * ★自馬出走レースの投票（★`place_bet` 0045:163-183 ＝ 自馬を全頭含む買い目だけ・★上限は `BET_CAP_OWN_RACE_EP`＝limits.ts）。

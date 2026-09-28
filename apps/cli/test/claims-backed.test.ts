@@ -14,7 +14,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { stripComments } from './lib/ts-blocks.js';
 import {
-  CLAIM_CARD_PUBLISH, CLAIM_ENTRY_NO_CANCEL, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
+  CLAIM_CARD_PUBLISH, CLAIM_ENTRY_NO_CANCEL, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
 } from '../../web/src/lib/claims';
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -147,6 +147,19 @@ const CLAIMS: readonly Claim[] = [
     backedBy: () => {
       const claims = stripComments(read('apps/web/src/lib/claims.ts'));
       return claims.includes('jaDuration(CYCLE_MS - PHASE_OFFSET_MS.publish)') ? [] : ['★公開の時刻を cycle.ts から導いていない'];
+    },
+  },
+  {
+    id: '⑨投票は 発走の（周の長さ − 締切の位置）前に締め切る',
+    text: CLAIM_SALES_CLOSE, name: 'CLAIM_SALES_CLOSE',
+    usedBy: ['apps/web/src/app/races/[id]/page.tsx'],
+    backedBy: () => {
+      const why: string[] = [];
+      if (!stripComments(read('apps/web/src/lib/claims.ts')).includes('jaDuration(CYCLE_MS - PHASE_OFFSET_MS.salesClose)')) why.push('★締切の時刻を cycle.ts から導いていない');
+      const d = latestDefinition('place_bet');
+      if (d === null || !/sales_close_lead_seconds\(\)/.test(d.body)) why.push(`★place_bet（${d?.rel ?? '無し'}）が締切の余裕を見ていない（★発走まで受ける）`);
+      /** ★余裕の値の一致は sales-close-sql.test.ts が見る */
+      return why;
     },
   },
 ];

@@ -18,6 +18,7 @@ import {
   Backdrop, BigButton, NoticeBar, TopBar, useMotionPaused,
 } from './uma-parts';
 import { RaceStrip } from './race-strip';
+import { useSalesClosed } from '../clock';
 import { CLAIM_ODDS_FIXED } from '../../lib/claims';
 
 /** ★枠色 1〜8（★正典 `--f1`〜`--f8` の写し・★変更禁止） */
@@ -33,6 +34,8 @@ export interface OddsViewRace {
   readonly distance: number;
   readonly trackCondition: string;
   readonly status: string;
+  /** ★発走の時刻（★締め切ったかを時刻から出す・★見本は null ＝ 締め切らない） */
+  readonly scheduledAt: string | null;
 }
 
 export interface OddsViewRow {
@@ -58,6 +61,12 @@ export function UmaOddsView({ race, rows }: {
   readonly rows: readonly OddsViewRow[];
 }): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
+  /**
+   * ★締め切ったか（★2026-09-29）: ★ワーカーは status に 'closed' を書かない（★scheduled → settled）ので ★発走の時刻から出す。
+   *   ★締切は ★発走 − `SALES_CLOSE_LEAD_MS`（★place_bet の `sales_close_lead_seconds()` と網で一致）。★拒むのはサーバー。
+   */
+  const salesClosed = useSalesClosed(race.scheduledAt);
+  const closed = race.status === 'closed' || salesClosed;
   const fieldSize = rows.length;
   const title = formatRaceTitle(race.classRank, race.grade);
 
@@ -74,8 +83,8 @@ export function UmaOddsView({ race, rows }: {
       <TopBar title="オッズ" paused={paused} onToggle={toggle} />
       <RaceStrip />
       <NoticeBar
-        kind={race.status === 'closed' ? 'closing' : 'soon'}
-        text={race.status === 'closed'
+        kind={closed ? 'closing' : 'soon'}
+        text={closed
           ? '投票は締め切りました。'
           : `${CLAIM_ODDS_FIXED}。`}
         actionLabel="投票する"

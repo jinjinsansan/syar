@@ -76,4 +76,5 @@ export const DEMO_ODDS_RACE = {
   distance: 1600,
   trackCondition: 'good',
   status: 'scheduled',
+  scheduledAt: null,
 };

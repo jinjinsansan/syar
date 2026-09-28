@@ -68,6 +68,11 @@ const READONLY_FUNCTIONS = [
    */
   'ep_grant_amount',
   /**
+   * ★発走の何秒前に発売を締め切るか（`0096`・正典 §9.6）。★`language sql immutable` で**状態を変えない**。
+   *   ★`place_bet`（書き込む側）が `assert_setup_complete()` を呼び、★こちらはその中から呼ばれます。
+   */
+  'sales_close_lead_seconds',
+  /**
    * ★EP の理由の分類（`0080`・裁定 §5 (b)）。★`language plpgsql immutable` で**状態を変えない**。
    *   ★日次上限の判定と V-11 の監視（`daily-flow.ts`）の両方がこれを読みます。
    */
