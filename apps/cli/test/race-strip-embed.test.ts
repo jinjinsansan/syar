@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  isStripEmbedMessage, stripEmbedMessage, stripEmbedUrl, STRIP_EMBED_PARAM_VALUE,
+  isStripEmbedMessage, stripEmbedMessage, stripEmbedNote, stripEmbedUrl, STRIP_EMBED_PARAM_VALUE,
 } from '../../web/src/components/uma/race-strip-embed';
 import { replayWindowOver, REPLAY_START_DELAY_MS, REPLAY_DISPLAY_MS } from '../../web/src/components/uma/race-replay';
 
@@ -60,7 +60,7 @@ describe('★小窓で本編を流す約束', () => {
     expect(STRIP).toContain('if (event.origin !== window.origin || !isStripEmbedMessage(event.data)) return;');
     expect(STRIP).toContain('if (event.data.raceId !== embedId) return;');
     /** ★本編は ★同じ origin にだけ送る（★`*` に送らない） */
-    expect(PAGE).toContain('window.parent.postMessage(stripEmbedMessage(type, raceId), window.location.origin);');
+    expect(PAGE).toContain('window.parent.postMessage(stripEmbedMessage(type, raceId, detail), window.location.origin);');
     expect(PAGE).not.toMatch(/postMessage\([^)]*'\*'\)/);
   });
 
@@ -77,11 +77,27 @@ describe('★小窓で本編を流す約束', () => {
   it('🔴 ④ ★本編は ★流し始め・流し終え・失敗を ★帯へ知らせる（★帯は ★打ち切り秒でも閉じる）', () => {
     expect(PAGE).toContain("tellStrip('playing', real?.raceId ?? null);");
     expect(PAGE).toContain("if (stageFinished) tellStrip('ended', real?.raceId ?? null);");
-    expect(PAGE).toContain("if (err !== null) tellStrip('error', real?.raceId ?? null);");
+    expect(PAGE).toContain("if (err !== null) tellStrip('error', real?.raceId ?? null, err);");
     /** ★読む層で止まったとき（★未ログイン・欠けた枠 等） */
-    expect(PAGE.match(/tellStrip\('error', raceId\);/g)?.length).toBe(2);
+    expect(PAGE.match(/tellStrip\('error', raceId, message\);/g)?.length).toBe(2);
     expect(STRIP).toContain('window.setTimeout(() => { setEmbed(null); }, STRIP_EMBED_GIVE_UP_SEC * 1000);');
     /** ★流れ始めたら見せ、★それ以外の知らせで閉じる */
-    expect(STRIP).toContain("if (event.data.type === 'playing') setEmbed({ id: embedId, live: true });");
+    expect(STRIP).toContain("if (event.data.type === 'playing') { setEmbed((e) => (e === null ? e : { ...e, live: true })); return; }");
+  });
+
+  /**
+   * 🔴 ⑤ ★**出せなかったら 理由を 1 行出す**（★2026-09-28）。★黙って簡易版に戻ると ★原因を誰も見られない
+   *   （★オーナーの画面で 本編が出ないまま「何も変わっていない」になり、★理由を取る手が無かった）。
+   */
+  it('🔴 ⑤ ★出せなかった理由を ★帯に出す（★本編の理由・★間に合わなかった秒）', () => {
+    expect(stripEmbedNote('error', 'ログインしてください（★いまは…）', 0)).toBe('録画を出せませんでした: ログインしてください（★いまは…）');
+    expect(stripEmbedNote('error', null, 0)).toBe('録画を出せませんでした: 理由不明');
+    expect(stripEmbedNote('late', null, 118)).toBe('録画の用意が間に合いませんでした（118 秒）');
+    expect(stripEmbedNote('error', 'あ'.repeat(200), 0).length, '★長い理由は切る').toBeLessThanOrEqual('録画を出せませんでした: '.length + 60);
+    expect(isStripEmbedMessage(stripEmbedMessage('error', 'r1', '理由'))).toBe(true);
+    expect(isStripEmbedMessage({ source: 'star-race', type: 'error', raceId: 'r1', detail: 3 })).toBe(false);
+    expect(STRIP).toContain("if (event.data.type === 'error') setEmbedNote(stripEmbedNote('error', event.data.detail, 0));");
+    expect(STRIP).toContain("{size === 'big' && embedNote !== null && <span className=\"u-race-strip-error\" role=\"status\">{embedNote}</span>}");
+    expect(STRIP).toContain("setEmbedNote(stripEmbedNote('late', null,");
   });
 });

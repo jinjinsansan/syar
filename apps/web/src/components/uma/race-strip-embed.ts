@@ -22,6 +22,11 @@ export interface StripEmbedMessage {
   readonly source: 'star-race';
   readonly type: StripEmbedEvent;
   readonly raceId: string | null;
+  /**
+   * ★`error` の理由（★本編が画面に出す文と同じ）。★帯は ★これを 1 行で出します（★黙って簡易版に戻らない・2026-09-28）。
+   *   ⚠️ ★最初は理由を運ばず、★オーナーの画面で本編が出ない原因を ★誰も見られませんでした。
+   */
+  readonly detail: string | null;
 }
 
 /** ★帯が開く本編の URL（★確定済みの実レースだけ） */
@@ -29,8 +34,8 @@ export function stripEmbedUrl(raceId: string): string {
   return `/race?race=${encodeURIComponent(raceId)}&embed=${STRIP_EMBED_PARAM_VALUE}`;
 }
 
-export function stripEmbedMessage(type: StripEmbedEvent, raceId: string | null): StripEmbedMessage {
-  return { source: 'star-race', type, raceId };
+export function stripEmbedMessage(type: StripEmbedEvent, raceId: string | null, detail: string | null = null): StripEmbedMessage {
+  return { source: 'star-race', type, raceId, detail };
 }
 
 /** ★受けた知らせが ★この約束の形か（★形が違えば 無視する） */
@@ -39,7 +44,15 @@ export function isStripEmbedMessage(value: unknown): value is StripEmbedMessage 
   const v = value as Record<string, unknown>;
   return v['source'] === 'star-race'
     && (v['type'] === 'playing' || v['type'] === 'ended' || v['type'] === 'error')
-    && (v['raceId'] === null || typeof v['raceId'] === 'string');
+    && (v['raceId'] === null || typeof v['raceId'] === 'string')
+    && (v['detail'] === null || typeof v['detail'] === 'string');
+}
+
+/** ★帯に出す 1 行（★長い理由は切る・★「本編」とは名乗らない） */
+export function stripEmbedNote(kind: 'error' | 'late', detail: string | null, waitedSec: number): string {
+  if (kind === 'late') return `録画の用意が間に合いませんでした（${waitedSec} 秒）`;
+  const why = (detail ?? '理由不明').replace(/\s+/g, ' ').slice(0, 60);
+  return `録画を出せませんでした: ${why}`;
 }
 
 /**

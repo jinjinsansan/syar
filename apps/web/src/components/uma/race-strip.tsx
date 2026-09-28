@@ -6,7 +6,7 @@ import { readClient } from '../../lib/supabase';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowOver, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
 import { INTRO_STAGES, stripSizeOf } from './race-strip-sizes';
-import { STRIP_EMBED_GIVE_UP_SEC, isStripEmbedMessage, stripEmbedUrl } from './race-strip-embed';
+import { STRIP_EMBED_GIVE_UP_SEC, isStripEmbedMessage, stripEmbedNote, stripEmbedUrl } from './race-strip-embed';
 import './uma-theme.css';
 
 interface RaceNoticeRow {
@@ -295,7 +295,17 @@ export function RaceStrip(): React.ReactElement | null {
    *      ★オーナーの画面では ★簡易版のままでした。★確定は ★窓の 75 秒前から見えるので、★見えた時点で読み始めます。
    *   ★動きを減らす設定では ★開きません。★`ended` / `error` / ★打ち切り秒 / ★「大」でなくなった / ★窓が閉じても始まらない で ★閉じます。
    */
-  const [embed, setEmbed] = useState<{ readonly id: string; readonly live: boolean } | null>(null);
+  const [embed, setEmbed] = useState<{ readonly id: string; readonly live: boolean; readonly sinceMs: number } | null>(null);
+  /**
+   * ★**出せなかった理由の 1 行**（★2026-09-28）。★黙って簡易版に戻ると ★原因を誰も見られない（★オーナーの画面で実際にそうなった）。
+   *   ★本編の知らせた理由 か ★「間に合わなかった（N 秒）」を ★次のレースを読み始めるまで出します。
+   */
+  const [embedNote, setEmbedNote] = useState<string | null>(null);
+  const embedRef = useRef(embed);
+  embedRef.current = embed;
+  /** ★待った秒は ★帯の時計（`nowMs`）で測る（★時計を 2 つ持たない） */
+  const nowRef = useRef(nowMs);
+  nowRef.current = nowMs;
   const embeddedIdRef = useRef<string | null>(null);
   const recentId = recent?.id ?? null;
   const windowOver = recent === null || recent === undefined || nowMs === null || !data?.runners.length
@@ -304,12 +314,16 @@ export function RaceStrip(): React.ReactElement | null {
     if (size !== 'big' || motionReduced) { setEmbed(null); return; }
     if (!windowOver && recentId !== null && embeddedIdRef.current !== recentId) {
       embeddedIdRef.current = recentId;
-      setEmbed({ id: recentId, live: false });
+      setEmbedNote(null);
+      setEmbed({ id: recentId, live: false, sinceMs: nowRef.current ?? 0 });
     }
   }, [size, motionReduced, windowOver, recentId]);
   /** ★録画の窓が閉じても ★まだ始まっていなければ ★やめる（★読み込みが遅い端末で 小窓を待たせない） */
   useEffect(() => {
-    if (windowOver) setEmbed((e) => (e !== null && !e.live ? null : e));
+    const e = embedRef.current;
+    if (!windowOver || e === null || e.live) return;
+    setEmbedNote(stripEmbedNote('late', null, Math.round(((nowRef.current ?? e.sinceMs) - e.sinceMs) / 1000)));
+    setEmbed(null);
   }, [windowOver]);
   const embedId = embed?.id ?? null;
   useEffect(() => {
@@ -317,8 +331,9 @@ export function RaceStrip(): React.ReactElement | null {
     const onMessage = (event: MessageEvent): void => {
       if (event.origin !== window.origin || !isStripEmbedMessage(event.data)) return;
       if (event.data.raceId !== embedId) return;
-      if (event.data.type === 'playing') setEmbed({ id: embedId, live: true });
-      else setEmbed(null);
+      if (event.data.type === 'playing') { setEmbed((e) => (e === null ? e : { ...e, live: true })); return; }
+      if (event.data.type === 'error') setEmbedNote(stripEmbedNote('error', event.data.detail, 0));
+      setEmbed(null);
     };
     window.addEventListener('message', onMessage);
     const giveUp = window.setTimeout(() => { setEmbed(null); }, STRIP_EMBED_GIVE_UP_SEC * 1000);
@@ -388,6 +403,8 @@ export function RaceStrip(): React.ReactElement | null {
         </>}
       </div>
       {error && <span className="u-race-strip-error">更新できません</span>}
+      {/* ★録画を出せなかった理由（★黙って簡易版に戻らない） */}
+      {size === 'big' && embedNote !== null && <span className="u-race-strip-error" role="status">{embedNote}</span>}
       {replaying && <button type="button" className="u-race-strip-expand" onClick={() => { setExpanded(true); }}>拡大</button>}
       {(replaying ? recent : next) && <a href={`/races/${encodeURIComponent((replaying ? recent : next)!.id)}`} aria-label={`${(replaying ? recent : next)!.name}の詳細を見る`}>詳細</a>}
       {expanded && replaying && recent && <div className="u-race-replay-overlay" role="dialog" aria-modal="true" aria-label={`${recent.name}のレース録画`}>

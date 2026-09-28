@@ -311,9 +311,9 @@ const LEGACY_MOTION = typeof window !== 'undefined'
  *   ★帯へ ★`playing` / `ended` / `error` を知らせます（★約束は `components/uma/race-strip-embed.ts`）。
  */
 const EMBED_STRIP = QS?.get('embed') === STRIP_EMBED_PARAM_VALUE;
-function tellStrip(type: StripEmbedEvent, raceId: string | null): void {
+function tellStrip(type: StripEmbedEvent, raceId: string | null, detail: string | null = null): void {
   if (!EMBED_STRIP || typeof window === 'undefined' || window.parent === window) return;
-  window.parent.postMessage(stripEmbedMessage(type, raceId), window.location.origin);
+  window.parent.postMessage(stripEmbedMessage(type, raceId, detail), window.location.origin);
 }
 const SOUND_ON_AT_START = typeof window !== 'undefined' && !EMBED_STRIP
   && new URLSearchParams(window.location.search).get('sound') === '1';
@@ -2461,17 +2461,16 @@ function RealRaceGate({ raceId }: { readonly raceId: string }): React.JSX.Elemen
       try {
         setState({ kind: 'ready', ...realPageOf(data) });
       } catch (e) {
-        tellStrip('error', raceId);
-        setState({ kind: 'error', message: `このレースの走路を組めませんでした: ${e instanceof Error ? e.message : String(e)}` });
+        const message = `このレースの走路を組めませんでした: ${e instanceof Error ? e.message : String(e)}`;
+        tellStrip('error', raceId, message);
+        setState({ kind: 'error', message });
       }
     }, (e: unknown) => {
       if (cancelled) return;
-      tellStrip('error', raceId);
-      setState({
-        kind: 'error',
-        message: e instanceof RaceNotPlayableError ? e.message
-          : `レースを読めませんでした: ${e instanceof Error ? e.message : String(e)}`,
-      });
+      const message = e instanceof RaceNotPlayableError ? e.message
+        : `レースを読めませんでした: ${e instanceof Error ? e.message : String(e)}`;
+      tellStrip('error', raceId, message);
+      setState({ kind: 'error', message });
     });
     return () => { cancelled = true; };
   }, [raceId]);
@@ -6240,7 +6239,7 @@ function RaceView({ setup, real }: {
     && dRef.current >= RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC - 0.01;
   /** ★小窓の中: ★流し終えたら・★組めなかったら ★帯へ知らせる（★帯が iframe を閉じる） */
   useEffect(() => { if (stageFinished) tellStrip('ended', real?.raceId ?? null); }, [stageFinished, real]);
-  useEffect(() => { if (err !== null) tellStrip('error', real?.raceId ?? null); }, [err, real]);
+  useEffect(() => { if (err !== null) tellStrip('error', real?.raceId ?? null, err); }, [err, real]);
 
   /**
    * ★**携帯では、演出を出す前にメニューを見せます**（★2026-09-02・オーナー要望②）。
