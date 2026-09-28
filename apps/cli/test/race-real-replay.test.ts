@@ -204,7 +204,12 @@ describe('🔴 ⑥ 録画への入口', () => {
    * ★2026-09-27（裁定 Q-RACE-10）: ★`/records` の出走の行（★`my_runs` ＝ 自分の馬の確定した出走だけ）を足しました。
    *   ⚠️ ★他人のレースの一覧（★番組表・結果一覧）は ★足さないこと。
    */
-  const ALLOWED: readonly string[] = ['web/src/app/records/records-view.tsx'];
+  /**
+   * ★2026-09-28（★オーナー許可・小窓でパドックからリプレイまで）: ★帯が本編を iframe で開く URL の ★出どころ 1 つを足しました。
+   *   ★リンク（★人を送る入口）ではなく ★帯の中で流すだけ。★自分の馬が出ていないレースも ★「あなたの馬」を描かずに開けるようになった
+   *   （★網 `race-own-optional.test.ts`）ので ★「空の店に客を送る」にはなりません。★帯は ★`stripEmbedUrl` だけを使う（★網 `race-strip-embed.test.ts`）。
+   */
+  const ALLOWED: readonly string[] = ['web/src/app/records/records-view.tsx', 'web/src/components/uma/race-strip-embed.ts'];
   /** ★`/race?race=` と ★`/race?…&race=` を捕まえる（★`?venue=` や `/races` は捕まえない） */
   const LINK = /\/race\?(?:[^'"`\s]*&)?race=/;
 

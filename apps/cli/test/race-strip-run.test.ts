@@ -28,7 +28,8 @@ describe('★常設帯の走行（①②）', () => {
 
   it('🔴 ★走行は ★確定タイムから逆算した進行率（★作り物の動きではない）', () => {
     expect(LIVE).toMatch(/replayProgress\(runner, recent\.distance, raceSec\)/);
-    expect(LIVE, '★「大」が走行を描いていない').toMatch(/\{big && <RaceRun rows=\{replayRows\}/);
+    /** ★2026-09-28: ★本編を小窓で流す間（`embedLive`）だけ ★走行を下げる（★それまでは走行を出したまま） */
+    expect(LIVE, '★「大」が走行を描いていない').toMatch(/\{big && <div className="u-race-strip-stage">\s*\{!embedLive && <RaceRun rows=\{replayRows\}/);
     expect(LIVE, '★「極小」が馬を描いていない').toMatch(/u-race-run-mini[\s\S]{0,200}<RunningHorse/);
   });
 
@@ -39,8 +40,15 @@ describe('★常設帯の走行（①②）', () => {
     /** ★`RunningHorse` を描くのは ★「大」（`RaceRun`）と ★「極小」だけ。★どちらも録画の窓の中 */
     expect(LIVE.match(/<RunningHorse/g)?.length).toBe(2);
     expect(LIVE.match(/<RaceRun /g)?.length).toBe(2);
-    expect(LIVE, '★「大」が録画の窓の外で出る').toMatch(/const big = replaying && size === 'big';/);
-    expect(LIVE, '★「極小」が録画の窓の外で出る').toMatch(/replaying && recent && data \? <>[\s\S]{0,300}u-race-run-mini/);
+    /**
+     * ★2026-09-28（★オーナー依頼・承知の上で 1 レース約 4MB）: ★「大」は ★録画の窓 か ★本編が流れている間。
+     *   ★本編を ★開くのは ★録画の窓の中だけ・★「大」の帯だけ・★動きを減らす設定でないときだけ。
+     *   ★窓が閉じても ★まだ流れ始めていなければ ★やめる（★窓の外で 読み込みを始めない・続けない）。
+     */
+    expect(LIVE, '★「大」が録画の窓の外で出る').toMatch(/const big = \(replaying \|\| embedLive\) && size === 'big';/);
+    expect(LIVE, '★本編を 窓の外・「大」以外で開く').toMatch(/if \(size !== 'big' \|\| motionReduced\) \{ setEmbed\(null\); return; \}\s*if \(replaying && recentId !== null && embeddedIdRef\.current !== recentId\)/);
+    expect(LIVE, '★窓が閉じても 始まっていない本編を読み続ける').toContain('if (!replaying) setEmbed((e) => (e !== null && !e.live ? null : e));');
+    expect(LIVE, '★「極小」が録画の窓の外で出る').toMatch(/\(replaying \|\| embedLive\) && recent && data \? <>[\s\S]{0,300}u-race-run-mini/);
     expect(LIVE, '★拡大が録画の窓の外で出る').toMatch(/\{expanded && replaying && recent && <div className="u-race-replay-overlay"/);
   });
 

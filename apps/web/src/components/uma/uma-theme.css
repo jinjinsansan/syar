@@ -154,6 +154,17 @@
   background-repeat: repeat-x, no-repeat;
 }
 [data-theme='uma'] .u-race-run-tall { height: min(46vh, 360px); flex: 0 0 auto; }
+/*
+  ★**本編を小窓で流す箱**（★2026-09-28・オーナー依頼・`race-strip-embed.ts`）。★寸法は ★走行と同じ（★幅いっぱい・高さ 150px・角丸 8px）。
+  ★本編は ★`playing` が来るまで ★透明で読み込み、★来たら ★走行の上に出る。★余白の濃紺と金の細線は ★本編のステージが描く（★R-18 回答 4-2）。
+  ⚠️ ★見た目はデザイナー未確認（★依頼 R-19）。
+*/
+[data-theme='uma'] .u-race-strip-stage { position: relative; flex: 0 0 100%; width: 100%; height: 150px; }
+[data-theme='uma'] .u-race-strip-embed {
+  position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: 8px;
+  background: #0a2340; opacity: 0; pointer-events: none; transition: opacity .4s ease;
+}
+[data-theme='uma'] .u-race-strip-embed[data-live='true'] { opacity: 1; }
 [data-theme='uma'] .u-race-run-goal { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--u-gold); opacity: .85; }
 [data-theme='uma'] .u-race-run-horse { position: absolute; display: block; }
 [data-theme='uma'] .u-race-run-pose { position: absolute; inset: 0; background: no-repeat bottom center / contain; }

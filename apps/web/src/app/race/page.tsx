@@ -32,6 +32,7 @@ import { deriveRng } from '@star/sim-engine';
 import type { Strategy } from '@star/sim-engine';
 import type { Surface, TrackCondition, Pace } from '@star/race-engine';
 import type { ReplayRunner } from '../../components/uma/race-replay';
+import { STRIP_EMBED_PARAM_VALUE, stripEmbedMessage, type StripEmbedEvent } from '../../components/uma/race-strip-embed';
 import {
   replayPositionModel, finalOrderOf, withFinishRunOut, finishSpeedsOf, FINISH_RUNOUT_FALLBACK_MPS, knotsFor, DEFAULT_PHASE_RATES,
   type TimeWarp,
@@ -304,7 +305,17 @@ const LEGACY_MOTION = typeof window !== 'undefined'
  * ⚠️ ★**既定は切**です（★R-27）。★`?sound=1` か、★画面の「音」ボタンで入れます。
  *    ★ブラウザは人の操作なしに音を出させないので、★ボタンの押下が解錠を兼ねます。
  */
-const SOUND_ON_AT_START = typeof window !== 'undefined'
+/**
+ * ★**小窓（常設の帯）の中で流す口**（`?embed=strip`・★2026-09-28・オーナー依頼「小窓でパドックからリプレイまで」）。
+ *   ★ステージ（★画布だけ）で ★自動で流し、★ボタン・確定カード・音を ★出しません（★§5: 常設は常に無音）。
+ *   ★帯へ ★`playing` / `ended` / `error` を知らせます（★約束は `components/uma/race-strip-embed.ts`）。
+ */
+const EMBED_STRIP = QS?.get('embed') === STRIP_EMBED_PARAM_VALUE;
+function tellStrip(type: StripEmbedEvent, raceId: string | null): void {
+  if (!EMBED_STRIP || typeof window === 'undefined' || window.parent === window) return;
+  window.parent.postMessage(stripEmbedMessage(type, raceId), window.location.origin);
+}
+const SOUND_ON_AT_START = typeof window !== 'undefined' && !EMBED_STRIP
   && new URLSearchParams(window.location.search).get('sound') === '1';
 const SHOW_ENTRY = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('entry') === '1';
@@ -2381,7 +2392,7 @@ export default function RacePage(): React.JSX.Element {
       </div>
     );
   }
-  /** ★実レース（★確定済み・★自分の馬が出ているものだけ）。★読めるまで 本体を開きません */
+  /** ★実レース（★確定済み・★ログインしている人）。★読めるまで 本体を開きません */
   if (REAL_RACE_PARAM !== null && REAL_RACE_PARAM !== '') return <RealRaceGate raceId={REAL_RACE_PARAM} />;
   return <RaceView setup={venuePageSetup()} real={null} />;
 }
@@ -2434,8 +2445,8 @@ function realPageOf(data: RealRaceData): { readonly setup: PageSetup; readonly r
 /**
  * ★**実レースの入口**（★段 2 D・2026-09-27）。★読めたら ★`RaceView` を開き、★読めなければ ★理由を出して止めます。
  * 🔴 ★**見本の走行に落としません**（★「そのレースを見た」が嘘になる）。
- * ⚠️ ★この画面へのリンクは ★**自分の馬の記録からだけ**張ること（★裁定 Q-RACE-6・D-122「空の店に客を送らない」）。
- *    ★他人のレースの一覧から ★ここへ飛べる形を作らない。
+ * ⚠️ ★2026-09-28 から ★自分の馬が出ていないレースも開きます（★小窓・オーナー許可）。★そのとき「あなたの馬」は描きません（`mineGate`）。
+ *    ★ログインしていない人は ★まだ止まります（★読む層 `lib/race-real.ts`）。
  */
 function RealRaceGate({ raceId }: { readonly raceId: string }): React.JSX.Element {
   const [state, setState] = useState<
@@ -2450,10 +2461,12 @@ function RealRaceGate({ raceId }: { readonly raceId: string }): React.JSX.Elemen
       try {
         setState({ kind: 'ready', ...realPageOf(data) });
       } catch (e) {
+        tellStrip('error', raceId);
         setState({ kind: 'error', message: `このレースの走路を組めませんでした: ${e instanceof Error ? e.message : String(e)}` });
       }
     }, (e: unknown) => {
       if (cancelled) return;
+      tellStrip('error', raceId);
       setState({
         kind: 'error',
         message: e instanceof RaceNotPlayableError ? e.message
@@ -2857,10 +2870,12 @@ function RaceView({ setup, real }: {
      *    ★ブラウザの本当の全画面（`enterBrowserFullscreen`）は ★**人の操作が要る**ので、
      *    ★ステージの「全画面」ボタンから入ります。
      */
-    if (smallScreen) setStageFull(true);
+    /** ★小窓の中は ★いつもステージ（★画布だけ・`EMBED_STRIP`） */
+    if (smallScreen || EMBED_STRIP) setStageFull(true);
     setWatchStarted(true);
     setPlaying(true);
-  }, [devMode, ready, built, watchStarted, smallScreen]);
+    tellStrip('playing', real?.raceId ?? null);
+  }, [devMode, ready, built, watchStarted, smallScreen, real]);
   const [err, setErr] = useState<string | null>(null);
   const [clock, setClock] = useState(0);
   /** ★実レースは ★取得の後にだけ開くので ★初期値から実物（★1 コマ目から違う馬場で組まない） */
@@ -6223,6 +6238,9 @@ function RaceView({ setup, real }: {
   /** ★レースが終わったか（★③ 確定後のカードを出す条件） */
   const stageFinished = built !== null && !playing
     && dRef.current >= RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC - 0.01;
+  /** ★小窓の中: ★流し終えたら・★組めなかったら ★帯へ知らせる（★帯が iframe を閉じる） */
+  useEffect(() => { if (stageFinished) tellStrip('ended', real?.raceId ?? null); }, [stageFinished, real]);
+  useEffect(() => { if (err !== null) tellStrip('error', real?.raceId ?? null); }, [err, real]);
 
   /**
    * ★**携帯では、演出を出す前にメニューを見せます**（★2026-09-02・オーナー要望②）。
@@ -6236,6 +6254,8 @@ function RaceView({ setup, real }: {
       <div
         className="race-stage-full"
         onPointerDown={() => {
+          /** ★小窓の中では ★全画面へ入らない（★触っても何も起きない・★帯の「拡大」は帯が持つ） */
+          if (EMBED_STRIP) return;
           /**
            * ★**最初に触れた所で、★ブラウザの本当の全画面へ入ります**（★2026-09-13・オーナー評
            *   ★「★ブラウザの URL バーも全て全画面表示にしたい。★今はブラウザのバーが残ってしまう」）。
@@ -6267,7 +6287,7 @@ function RaceView({ setup, real }: {
             ★「もう一度」と「メニューへ」を出します。
             ⚠️ ★**演出を消しません。** ★最後のコマの上に重ねます（★設計の指定）。
           */}
-          {stageFinished && (
+          {stageFinished && !EMBED_STRIP && (
             <div className="rs-result" style={{
               position: 'absolute', left: stagePx(16), right: stagePx(16), top: '50%',
               transform: 'translateY(-50%)', padding: `${stagePx(18)}px ${stagePx(16)}px`,
@@ -6310,7 +6330,8 @@ function RaceView({ setup, real }: {
               </div>
             </div>
           )}
-          <div
+          {/* ★小窓の中は ★ボタンを 1 つも出さない（★音・停止・全画面・メニュー） */}
+          {!EMBED_STRIP && <div
             style={{
               position: 'absolute', top: stagePx(10), right: stagePx(10), display: 'flex', gap: stagePx(8),
               opacity: controlsShown ? 1 : 0,
@@ -6381,7 +6402,7 @@ function RaceView({ setup, real }: {
             >
               {RETURN_TO === null ? 'メニュー' : RETURN_LABEL}
             </button>
-          </div>
+          </div>}
         </div>
       </div>
     );
