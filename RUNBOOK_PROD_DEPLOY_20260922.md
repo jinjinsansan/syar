@@ -84,6 +84,21 @@ bash tools/deploy.sh <0 で控えた sha>
   | 4 | `失敗` の行が 0 | 止めて報告 |
   | 5 | ★**最初の週送りの周の `[worker] 周の全体=…s(…%)`** を記録する（`6451f98` で足した行・週送りと配合を含む） | ★**100% を超えたら止めて報告**（裁定 `REVIEW_PROD_DEPLOY_ORDER_20260922.md` §6）。超えたときの振る舞いは `REPORT_STAGING_WORKER_RUN_20260922.md` §8。★**超えたら、`[worker] ★発売の遅れ cycle=… +…s` の行の秒数も報告**（発売の時間がそのぶん短くなった・裁定 §7） |
 
+### ⑥ の記録: ★本番のワーカーが main より後ろにいる（★2026-09-28・効く変更は 0）
+
+★本番のワーカー ＝ ★`b583ce2`（★2026-09-27 00:05 JST に配備・`/var/log/star-deploy.log`）／★main ＝ ★`71e7d9c`（★2026-09-28 push）。
+★`b583ce2..71e7d9c`（79 コミット）のうち ★ワーカーが読む所（★`apps/worker` と `@star/betting` `breeding` `race-engine` `scheduler` `sim-engine` `training`・★package-lock）に触るのは 3 本で、★**どれもワーカーに効かない**:
+
+| コミット | 触った所 | 効かない理由（★検算の仕方） |
+|---|---|---|
+| `a77bca9` | `packages/betting/src/ep-grants.ts`（daily 200 → 2000） | ★ワーカーは ep-grants を読まない（★`grep -rn "ep-grants\|EP_GRANT\|dailyEp" apps/worker/src` が 0）。★額は SQL の `ep_grant_amount`（`0091`・適用済み）が持つ |
+| `8e13ab9` | `packages/race-engine/src/watch.ts`・`packages/scheduler/src/race-setup.ts` | ★引数の型を狭めただけ（振る舞いは同じ）。★ワーカーは `replayOf` `boundaryTimesOf` `finalOrderMatches` `raceSetupFor` を使わない（★`grep -rn "raceSetupFor\|replayOf\|boundaryTimesOf\|finalOrderMatches" apps/worker/src` が 0） |
+| `bb7278e` | `packages/scheduler/src/birth-week.ts` | ★`gameMonthOf` を足しただけ（★`git show --stat bb7278e` で ＋17・−0） |
+
+★範囲の数え方: `git log --oneline b583ce2..71e7d9c -- apps/worker packages/betting packages/breeding packages/race-engine packages/scheduler packages/sim-engine packages/training package-lock.json`
+⚠️ ★`race-engine` の package.json は `@star/render` を挙げるが ★ソースは読まない（★`grep -rn "from '@star/render'" packages/race-engine/src` が 0）。★render の変更は ★ワーカーに届かない。
+⚠️ ★次にワーカーの読む所へ触るコミットが main に入ったら ★この表は古くなる。★その日は ★`deploy.sh` で入れ替えるか ★この表に足すこと。
+
 ## ⑦ 画面（main への push）
 
 ### 🔴 押す前に: その画面が呼ぶ DB の口が、本番に在るか
