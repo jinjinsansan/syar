@@ -112,6 +112,13 @@ bash tools/deploy.sh <0 で控えた sha>
 ⚠️ ★`race-engine` の package.json は `@star/render` を挙げるが ★ソースは読まない（★`grep -rn "from '@star/render'" packages/race-engine/src` が 0）。★render の変更は ★ワーカーに届かない。
 ⚠️ ★次にワーカーの読む所へ触るコミットが main に入ったら ★この表は古くなる。★その日は ★`deploy.sh` で入れ替えるか ★この表に足すこと。
 
+#### ⑥ の記録（追記・★2026-09-29）: ★ワーカー `5643601`・★画面 `9d9689d` ── ★後ろだが効く変更は 0
+
+★healthz（★2026-09-29 16:55Z 頃）: ★web `9d9689d`・★worker `5643601`（★2026-09-28 の配備）。
+★`git log --oneline 5643601..9d9689d -- apps/worker packages/betting packages/breeding packages/race-engine packages/scheduler packages/sim-engine packages/training` → ★**0 件**（★範囲は 10 コミット・すべて画面・網・簿・道具）。
+★`git diff --stat 5643601..9d9689d -- package.json package-lock.json db/ tools/deploy.sh` → ★**空**（★依存・移行・配備の道具も動いていない）。
+→ ★入れ替えは要らない。★上の表（`b583ce2..71e7d9c`）は ★それより前の範囲の記録として残す。
+
 ## ⑦ 画面（main への push）
 
 ### 🔴 押す前に: その画面が呼ぶ DB の口が、本番に在るか
