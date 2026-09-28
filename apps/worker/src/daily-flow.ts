@@ -1,6 +1,10 @@
 /**
  * 日次の資金フロー集計（正典 §4.6・§11.2）
  *
+ * 🔴 ★**作法: 移行が新しい分類を足す便では、ワーカーは知らない分類を受け取る。★落ちない・黙らない、の両方を満たす**
+ *   （★2026-09-28・レビュー側）。★`deploy.sh` は ★移行を先に強制するので ★ワーカーは「DB が自分より新しい」状態で 必ず一度は動く。
+ *   ★知らない分類は ★袋に数えて ★その日の行は書き、★その後で ★`daily_run_log` に失敗と名前を残す（★網 `daily-flow-unknown-class.test.ts`）。
+ *
  * 【★これが「監視が無いより悪い」状態を防ぐ】
  *   §11.2 は「1日の純発行量をダッシュボードで毎日確認する」と定めています。
  *   集計が無ければ確認できず、**数字が出ないので気づけません**。
@@ -35,6 +39,9 @@ const SCOPE_SQL: Readonly<Record<FlowScope, string>> = {
   internal: `u.account_type = 'internal'`,
 };
 
+/** ★ワーカーが知らない EP の分類（★DB が先に進んだとき）。★数えずに ★名前と額だけ持つ */
+interface UnknownEpClass { readonly klass: string; readonly total: number }
+
 /**
  * 1日ぶんの資金フローを、口座の区分ごとに集める。
  *
@@ -53,7 +60,7 @@ async function collectFlow(
   /** ★その日の終わり [ISO]（★`from + DAY_MS`。★次の日の始まり） */
   to: string,
   scope: FlowScope,
-): Promise<PointFlowInput> {
+): Promise<PointFlowInput & { readonly unknownEp: readonly UnknownEpClass[] }> {
   const where = SCOPE_SQL[scope];
 
   // --- 券種別の売上と払戻（★実際の馬券から数える） ---
@@ -104,6 +111,7 @@ async function collectFlow(
   );
   let epInflow = 0;
   let epBurnedOther = 0;
+  const unknownEp: UnknownEpClass[] = [];
   for (const r of ep.rows) {
     const v = Number(r.total);
     // ★**発行**（★`inflow` ＝ デイリー・登録時）。★V-11 の純発行量に載る
@@ -113,7 +121,9 @@ async function collectFlow(
     /**
      * ★**購入の一部返却**（★`horse_sale`・★2026-09-28 `0094` から。★旧 issuance）。
      *   ★購入を全額 焼却で数えているので ★戻った分を ★焼却から引く（★発行には入れない ＝ 日次上限も数えない）。
-     *   ⚠️ ★この分類を知らないワーカーは 下の else で落ちる → ★**このワーカーを配備してから `0094` を当てる**。
+     *   ⚠️ ★**順番の事実**（★2026-09-28・実測）: ★`deploy.sh` は ★**移行を先に強制します**（★リリースに含まれる移行が DB に未適用なら ★配備を中止）。
+     *      ★だから ★**移行 → ワーカー**の順になります（★79b5bf6 を先に配備しようとして中止・リンクは張り替えず停止時間 0・/var/log/star-deploy.log）。
+     *      ★`0094` の見出しの「ワーカー → 移行」は誤り（★適用済みの移行は チェックサムで守られているので ★ここで正す）。
      *   ⚠️ ★**`point_flow_daily` の意味が変わる日**: ★`0094` を当てた日から ★`ep_inflow` に `horse_sale` が入らない（★焼却から引く）。
      *      ★それより前の行は ★書いた当時の分類のまま（★作り直さない・★この関数は その日だけを書く）。
      *      ★2026-09-28 の時点で ★`horse_sale` は staging・本番とも 0 件（★段差は 0）。★時系列の段差を欠陥と読み違えないこと。
@@ -121,7 +131,13 @@ async function collectFlow(
     else if (r.klass === 'rebate') epBurnedOther -= v;
     // ★`ticket`（馬券）は `bets` から数える・`refund` は取ったものを返しただけ → ★どちらも数えない
     else if (r.klass !== 'ticket' && r.klass !== 'refund') {
-      throw new Error(`aggregateDay: 未知の EP の分類 ${r.klass}（★ep_reason_class を見直す）`);
+      /**
+       * 🔴 ★**知らない分類は ★unknown の袋に数えて 続ける**（★落とさない・★黙らない・2026-09-28・レビュー側）。
+       *   ★`deploy.sh` が移行を先にする以上、★ワーカーは ★「DB が自分より新しい」状態で ★必ず一度は動く。
+       *   ★ここで投げると ★DB が先に進むたびに ★その日の記録が 1 行も残らない。
+       *   → ★発行にも焼却にも入れず ★袋に数え、★`aggregateDay` が ★行を書いた後で ★大きく言う（★日次の記録に「失敗」を残す）。
+       */
+      unknownEp.push({ klass: r.klass, total: v });
     }
   }
 
@@ -143,7 +159,7 @@ async function collectFlow(
     // ★'payout' は馬券側で数える（二重計上を避ける）
   }
 
-  return { byKind, epInflow, epBurnedOther, ppPrize, ppExchanged };
+  return { byKind, epInflow, epBurnedOther, ppPrize, ppExchanged, unknownEp };
 }
 
 /**
@@ -175,8 +191,11 @@ export async function aggregateDay(
   from: string,
   to: string,
 ): Promise<void> {
-  const player = summarizeDay(await collectFlow(client, from, to, 'player'));
-  const internal = summarizeDay(await collectFlow(client, from, to, 'internal'));
+  const playerFlow = await collectFlow(client, from, to, 'player');
+  const internalFlow = await collectFlow(client, from, to, 'internal');
+  const player = summarizeDay(playerFlow);
+  const internal = summarizeDay(internalFlow);
+  const unknown = [...playerFlow.unknownEp, ...internalFlow.unknownEp];
 
   // ★R-21: 区分の合計が全体と一致することを確かめる。
   //   `users` に結合できない行があると**黙って両方から漏れます**。
@@ -233,4 +252,14 @@ export async function aggregateDay(
       internal.marginActualOverall,
     ],
   );
+  /**
+   * 🔴 ★**知らない分類が在った日は ★行を書いた後で 大きく言う**（★落とさない・★黙らない）。
+   *   ★ここで投げると ★`runDailyStep` が ★`daily_run_log` に「失敗」と理由を残す（★DB に問える）。★他の日次の段は続く。
+   *   ★その日の行は ★知らない分類を 発行にも焼却にも入れずに ★書いてある（★ワーカーを更新して 読み直すこと）。
+   */
+  if (unknown.length > 0) {
+    const detail = unknown.map((u) => `${u.klass}=${u.total}`).join(', ');
+    console.error(`[daily-flow] 🔴 ★ワーカーが知らない EP の分類: ${detail}（★数えずに保存した・★ワーカーを更新すること）`);
+    throw new Error(`aggregateDay: ★知らない EP の分類を数えずに保存しました: ${detail}（★ワーカーを更新して ep_reason_class の新しい分類を知らせること）`);
+  }
 }

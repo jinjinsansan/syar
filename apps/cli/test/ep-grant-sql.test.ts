@@ -157,7 +157,12 @@ describe('🔴 ★EP の理由の分類表（★裁定 §5 (b)）', () => {
     expect(sale, '★sell_horse が「戻る額 ≥ 払った額」を止めていない').toMatch(/if v_back >= v_paid then\s+raise exception/);
   });
 
-  it('🔴 ★監視（daily-flow.ts）は rebate を知っている（★知らないワーカーは落ちる ＝ 配備してから 0094）', () => {
+  /**
+   * ★順番の事実（★2026-09-28）: ★`deploy.sh` は ★移行を先に強制する（★未適用の移行を含むリリースは 配備を中止）→ ★移行 → ワーカー。
+   *   ★`0094` の見出しの「ワーカー → 移行」は誤り（★適用済みの移行はチェックサムで守られているので ★ここと daily-flow.ts で正す）。
+   *   ★知らない分類が来ても ★落ちない・黙らない（★網 `daily-flow-unknown-class.test.ts`）。
+   */
+  it('🔴 ★監視（daily-flow.ts）は rebate を知っている（★移行 → ワーカーの順でも 知らない間の記録は落ちない）', () => {
     const flow = readFileSync(path.resolve(__dirname, '../../worker/src/daily-flow.ts'), 'utf8');
     expect(flow).toContain("else if (r.klass === 'rebate') epBurnedOther -= v;");
   });
