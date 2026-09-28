@@ -311,6 +311,11 @@ const LEGACY_MOTION = typeof window !== 'undefined'
  *   ★帯へ ★`playing` / `ended` / `error` を知らせます（★約束は `components/uma/race-strip-embed.ts`）。
  */
 const EMBED_STRIP = QS?.get('embed') === STRIP_EMBED_PARAM_VALUE;
+/**
+ * ★**小窓では 斜め前の馬を読まない**（★2026-09-28・レビュー側の決定・★実測 1.72MB）。★150px の小窓では 正面寄りのショットも ★真横の素材で描く
+ *   （★`?directional=side` と同じ扱い・★カットの数と画角は変わらない）。
+ */
+const EMBED_SKIP_ROLES: ReadonlySet<string> = new Set(EMBED_STRIP ? ['diag-front-v2'] : []);
 function tellStrip(type: StripEmbedEvent, raceId: string | null, detail: string | null = null): void {
   if (!EMBED_STRIP || typeof window === 'undefined' || window.parent === window) return;
   window.parent.postMessage(stripEmbedMessage(type, raceId, detail), window.location.origin);
@@ -2996,7 +3001,8 @@ function RaceView({ setup, real }: {
         if (m === null) return loadRaw(src);
         // この系列の WebP は作業ツリーにだけあり、配信物には PNG だけがある。
         // 存在しない WebP へのアクセスを省き、追跡済み PNG を直接読む。
-        if (/(?:horse-jockey-diag-front-v4b?-pose|horse-jockey-side-v8b-pose|horse-jockey-side-walk-v1-pose|\/parallax\/backstretch-side-v1\/dirt-(?:far|mid|near)$)/.test(m[1]!)) {
+        // ★2026-09-28: ★ダートの 3 層（dirt-far/mid/near）は WebP を作って追跡したので ★除外から外した（★PNG 64 万 B → WebP 10.8 万 B・★帯の小窓の重さ・レビュー側の決定）。
+        if (/(?:horse-jockey-diag-front-v4b?-pose|horse-jockey-side-v8b-pose|horse-jockey-side-walk-v1-pose)/.test(m[1]!)) {
           return loadRaw(src);
         }
         return loadRaw(`${m[1]}.webp${m[2] ?? ''}`).catch(() => loadRaw(src));
@@ -3544,7 +3550,7 @@ function RaceView({ setup, real }: {
          * ⚠️ ★**描く組だけ読みます。** ★焼いてあっても、★描画側に経路が無ければ読みません
          *    （★原版側と同じ規則にします — ★片方だけ読むと、★何が効いているのか分からなくなります）。
          */
-        const baseRoles = [...neededAssets,
+        const baseRoles = [...neededAssets.filter((role) => !EMBED_SKIP_ROLES.has(role)),
           ...(WINNER_FOLLOW_REAR ? ['winner-rear'] : []),
           ...(WINNER_POSE === 'celebrate' ? ['winner-cycle'] : [])];
         /**
@@ -3641,7 +3647,7 @@ function RaceView({ setup, real }: {
          */
         const out: Partial<Record<string, readonly (readonly HighQualityHorseFrame[])[]>> = {
           ...Object.fromEntries(neededAssets
-            .filter((role) => setByRole.has(role))
+            .filter((role) => setByRole.has(role) && !EMBED_SKIP_ROLES.has(role))
             .map((role) => [role, of(role)])),
           ...(WINNER_FOLLOW_REAR ? { 'winner-rear': of('winner-rear') } : {}),
           ...(WINNER_POSE === 'celebrate' ? { 'winner-cycle': of('winner-cycle', winnerOverride) } : {}),
@@ -3925,7 +3931,7 @@ function RaceView({ setup, real }: {
       const frontSetName = frontOverride !== null && /^[a-z0-9-]+$/.test(frontOverride)
         ? `horse-jockey-${frontOverride}`
         : 'horse-jockey-diag-front-v4';
-      const frontV3 = await loadNativeSet(frontSetName, 'horse-jockey-diag-front-v3');
+      const frontV3 = EMBED_STRIP ? undefined : await loadNativeSet(frontSetName, 'horse-jockey-diag-front-v3');
       /**
        * ★**個体タイプ B・C の原版**（★2026-09-09）。★PC の既定はこちらの経路です（R-15）。
        * ⚠️ ★焼いた素材だけ差し替えて満足した失敗を 2026-09-08 にやっています。★両方直します。
@@ -3958,7 +3964,7 @@ function RaceView({ setup, real }: {
         return out;
       };
       const sideByType = await loadByType(wantSideTypes, (t) => `horse-jockey-side-v8${t}`);
-      const frontByType = await loadByType(wantFrontTypes, (t) => `horse-jockey-diag-front-v4${t}`);
+      const frontByType = await loadByType(wantFrontTypes && !EMBED_STRIP, (t) => `horse-jockey-diag-front-v4${t}`);
       // ★俯瞰は v2（271×724 の低解像度・一度も作り直していない）のままで、
       //   オーナー評「ここで一気にクオリティが下がる」の当のカットだった（2026-08-20）。
       //   真横 v7 を参照に作り直した v3 が揃えばそれを使う。
@@ -4045,7 +4051,8 @@ function RaceView({ setup, real }: {
       const sideWalkHighQuality = bakedWalk !== undefined && bakedWalk.length > 0 ? bakedWalk : walkUsable && walkA !== undefined
         ? buildFramesByType({ a: walkA, ...(walkB !== undefined ? { b: walkB } : {}) }, undefined, SILKS_LAYOUT_CROUCH, sideMode)
         : undefined;
-      const diagFrontHighQuality = bakedLibs?.['diag-front-v2'] ?? (frontV3 !== undefined
+      /** ★小窓では 空（★描くときは 真横の素材に回る `libraryOr`・★代わりの v2 も読まない） */
+      const diagFrontHighQuality = EMBED_STRIP ? [] : bakedLibs?.['diag-front-v2'] ?? (frontV3 !== undefined
         ? buildFramesByType({ a: frontV3, ...frontByType }, undefined, SILKS_LAYOUT_FRONT, frontMode)
         : buildFrames(await fallbackSet('horse-jockey-diag-front-v2')));
       /**
@@ -4150,6 +4157,7 @@ function RaceView({ setup, real }: {
          * ⚠️ ★**既定では効きません。** ★製品の見え方は 1 画素も変えていません。
          */
         directionalReady: SIDE_ONLY ? { rear: false, front: false }
+          : EMBED_STRIP ? { rear: bakedLibs !== undefined || rearV4 !== undefined, front: false }
           : bakedLibs !== undefined
             ? { rear: true, front: true }
             : { rear: rearV4 !== undefined, front: frontV3 !== undefined },
@@ -4842,7 +4850,7 @@ function RaceView({ setup, real }: {
         library(frames.length > 0 ? frames : art.sideHighQuality);
       const libraries: BroadcastV2FrameLibraries<CanvasImageSource> = {
         'side-v6': library(art.sideHighQuality),
-        'diag-front-v2': library(art.diagFrontHighQuality),
+        'diag-front-v2': libraryOr(art.diagFrontHighQuality),
         'diag-rear-v2': libraryOr(art.diagRearHighQuality),
         'high-diag-v2': libraryOr(art.highDiagHighQuality),
         /**

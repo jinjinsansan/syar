@@ -8,7 +8,7 @@
  *   ④ 🔴 ★本編が ★流し始め・流し終え・失敗を ★帯へ知らせない（★「終わらない小窓」）
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   STRIP_EMBED_FAILED_NOTE, STRIP_EMBED_LEAD_SEC, isStripControlMessage, isStripEmbedMessage, stripControlMessage, stripEmbedLog, stripEmbedMessage, stripEmbedUrl, STRIP_EMBED_PARAM_VALUE,
@@ -168,5 +168,28 @@ describe('★小窓の本編の重さと時間', () => {
     expect(isStripEmbedMessage(stripEmbedMessage('declined', 'r1'))).toBe(true);
     /** ★declined は ★「出せませんでした」を出さない（★error のときだけ） */
     expect(STRIP).toMatch(/if \(event\.data\.type === 'error'\) \{[\s\S]{0,200}setEmbedNote\(STRIP_EMBED_FAILED_NOTE\);\s*\}\s*setEmbed\(null\);/);
+  });
+});
+
+/**
+ * 🔴 ★**小窓の本編の安い削り 2 つ**（★2026-09-28・レビュー側の決定・★実測 6.19MB → 目安 5MB）。
+ *   ① ★斜め前の馬（diag-front・1.72MB）は ★小窓では読まず ★真横の素材で描く（★`?directional=side` と同じ・カット数は変わらない）
+ *   ② ★ダートの 3 層（dirt-far/mid/near・PNG 64 万 B）は ★WebP を作って追跡し ★読み込みの除外から外す
+ */
+describe('★小窓の本編の削り', () => {
+  it('🔴 ① ★小窓では 斜め前の馬を 焼いた経路でも原版でも読まない（★欠けた扱いで全部落ちない）', () => {
+    expect(PAGE).toContain("const EMBED_SKIP_ROLES: ReadonlySet<string> = new Set(EMBED_STRIP ? ['diag-front-v2'] : []);");
+    expect(PAGE).toContain('const baseRoles = [...neededAssets.filter((role) => !EMBED_SKIP_ROLES.has(role)),');
+    expect(PAGE, '★焼いた経路の「全部そろったか」から外さないと 原版に落ちて もっと重くなる').toContain('.filter((role) => setByRole.has(role) && !EMBED_SKIP_ROLES.has(role))');
+    expect(PAGE).toContain("const frontV3 = EMBED_STRIP ? undefined : await loadNativeSet(frontSetName, 'horse-jockey-diag-front-v3');");
+    expect(PAGE).toContain('const diagFrontHighQuality = EMBED_STRIP ? [] : ');
+    expect(PAGE, '★空のときは 真横に回る').toContain("'diag-front-v2': libraryOr(art.diagFrontHighQuality),");
+    expect(PAGE).toContain('EMBED_STRIP ? { rear: bakedLibs !== undefined || rearV4 !== undefined, front: false }');
+  });
+
+  it('🔴 ② ★ダートの 3 層は WebP が在り、★読み込みの除外に入っていない', () => {
+    const dir = path.join(ROOT, 'apps/web/public/art/parallax/backstretch-side-v1');
+    for (const n of ['dirt-far', 'dirt-mid', 'dirt-near']) expect(existsSync(path.join(dir, `${n}.webp`)), `★${n}.webp が無い`).toBe(true);
+    expect(PAGE, '★ダートがまだ除外に入っている（★PNG を直に読む）').not.toMatch(/dirt-\(\?:far\|mid\|near\)/);
   });
 });
