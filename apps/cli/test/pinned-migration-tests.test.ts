@@ -77,6 +77,10 @@ const PINNED: Readonly<Record<string, string>> = {
   'growth-tell-wiring.test.ts': '0053_growth_tell_baseline.sql',
   'horse-sale-migration.test.ts': '0026_horse_sale.sql',
   'stable-grade-unlock-migration.test.ts': '0027_stable_grade_unlock.sql',
+  /** ★ワーカーの版の口（★2026-09-28）。★`worker_heartbeat()` の本文（★返す 2 列・definer）を読む。★後で置き換えたら ③ が見張る */
+  'worker-heartbeat.test.ts': '0092_worker_heartbeat.sql',
+  /** ★騎手の名簿の表を閉じる（★2026-09-28）。★revoke を読み、★0093 より後の移行が開け直していないかも見る */
+  'jockeys-closed.test.ts': '0093_close_jockeys_table.sql',
 };
 
 const CLASSIFIED: Readonly<Record<string, string>> = {
