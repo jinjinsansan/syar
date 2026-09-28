@@ -1566,6 +1566,21 @@ export const OPEN_FINDINGS = [
     until: '2026-12-31',
   },
   {
+    id: 'HORSE-WEEK-LOG-NO-WRITER',
+    what: '🔴 ★**本番の `horse_week_log` が 0 行**です（★2026-09-28・`diag-worker-alive --env production` ④b）。'
+      + '★そして ★**ワーカーに ★この表へ書く道が ★どの版にもありません**（★本番の b583ce2 にも ★いまの HEAD にも）',
+    why: '✔ ★本番の 5 つ（★2026-09-28 01:28 UTC）: ★全馬 7,878／birth_week 有り 7,878／last_processed_week 有り 7,878／引退 5,683／★horse_week_log 0 行。'
+      + '✔ ★確かめたこと（★レビュー側が挙げた確かめ方）: ★`git grep horse_week_log` を ★HEAD と b583ce2 の apps/packages/db で見た — ★insert する行は 0。'
+      + '★`insert into horse_week_log` が現れるのは ★`tools/verify-b1.mjs`（★P3 B-1 の確かめの道具・b7cff50）だけ。'
+      + '★ワーカー（`apps/worker/src/training-runner.ts`）には ★「週ごとの記録は所有馬だけ」という ★**註記だけ**が残り、★書く行は無い（★eb6fee6 から）。'
+      + '→ ★仮説「★古いワーカーが週の記録を書かない版」は ★**当たらない**（★書く版が 1 つも無い）。★「★仕組み（表）は在る、誰も繋がなかった」の族。'
+      + '⚠️ ★これは ★コードに書く道が無いことの確認で、★「0 行の理由の全部」とは まだ言えません（★所有馬の数・週送りがどこを通るか は見ていない）。'
+      + '✔ ★関連: ★簿 STABLE の MISSING「★week.menu … horse_week_log に在るが公開ビューが無い」（`apps/web/src/lib/stable-repo.ts`）。★書く道も 読む口も無い。'
+      + '--- ✅ ★**消す条件** --- ★書く道を ★所有馬だけに作って（★正典 Q-P3-21 の範囲）★本番で行が増えることを確かめた日 ／ ★または ★この表を使わないと決めて ★正典と簿を直した日。',
+    owner: 'dev',
+    until: '2026-12-31',
+  },
+  {
     id: 'RACE-FRAME-DROPS-UNSPLIT',
     what: '⚠️ ★**`/race` のコマ落ちが ★5 秒に 20 回前後**（★33.4ms 超・2026-09-28 本番 71e7d9c）。★今回の変更で増えてはいないが ★**土台の切り分けができていない**',
     why: '✔ ★`tools/measure-race-canvas-ratio.mjs --frames`（★requestAnimationFrame の間隔を 5 秒）: '
