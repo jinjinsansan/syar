@@ -1,0 +1,10 @@
+{
+  "checkedAt": "2026-09-28T03:04:33.491Z",
+  "what": "o7-production",
+  "env": "production",
+  "ok": true,
+  "detail": {
+    "checked": 11,
+    "failed": 0
+  }
+}
