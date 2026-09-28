@@ -18,6 +18,7 @@ import {
   Backdrop, BigButton, NoticeBar, TopBar, useMotionPaused,
 } from './uma-parts';
 import { RaceStrip } from './race-strip';
+import { CLAIM_ODDS_FIXED } from '../../lib/claims';
 
 /** ★枠色 1〜8（★正典 `--f1`〜`--f8` の写し・★変更禁止） */
 const FRAME_COLORS = ['#f5f5f5', '#191919', '#d62828', '#1446b4', '#fad728', '#148c46', '#f08219', '#f596be'] as const;
@@ -76,7 +77,7 @@ export function UmaOddsView({ race, rows }: {
         kind={race.status === 'closed' ? 'closing' : 'soon'}
         text={race.status === 'closed'
           ? '投票は締め切りました。最終の数字です。'
-          : 'オッズは締切まで変わります。最終の数字は発走時に確定します。'}
+          : `${CLAIM_ODDS_FIXED}。`}
         actionLabel="投票する"
         actionHref="/vote"
       />

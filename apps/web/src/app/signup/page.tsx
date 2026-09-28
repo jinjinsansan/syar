@@ -27,6 +27,7 @@ import {
   Backdrop, BigButton, NoticeBar, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
 import { authClient } from '../../lib/supabase';
+import { CLAIM_GUEST_CAN_SEE } from '../../lib/claims';
 
 /** ★パスワードの最低要件（V-19 E-7）。★サーバー側でも弾かれるが、先に画面で伝える */
 const PW_MIN = 8;
@@ -75,7 +76,7 @@ export default function SignupPage(): React.ReactElement {
       <NoticeBar
         kind="soon"
         text="いまは、お誘いした方だけがご登録いただけます。"
-        sub="登録しなくても、レース・オッズ・記録はご覧いただけます"
+        sub={CLAIM_GUEST_CAN_SEE}
         actionLabel="レースを見る"
         actionHref="/watch-race"
       />

@@ -19,7 +19,8 @@ const SETUP = stripComments(readFileSync(path.resolve(__dirname, '../../..', 'ap
 
 describe('★初回設定: あとから変えられない', () => {
   it('🔴 ① 帯と確認は 同じ定数を使う', () => {
-    expect(SETUP).toContain("const NO_CHANGE_LATER = 'あとから変えられません。';");
+    /** ★文そのものは `lib/claims.ts`（★裏づけの照合は claims-backed.test.ts） */
+    expect(SETUP).toContain('const NO_CHANGE_LATER = CLAIM_NO_CHANGE_LATER;');
     expect(SETUP).toContain('`最初の 1 回だけ。${NO_CHANGE_LATER}`');
     expect(SETUP).toContain('`${NO_CHANGE_LATER}この内容でよろしいですか？`');
   });

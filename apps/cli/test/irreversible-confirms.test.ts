@@ -21,6 +21,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { CLAIM_NO_CHANGE_LATER } from '../../web/src/lib/claims';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const read = (p: string): string => readFileSync(path.join(ROOT, p), 'utf8');
@@ -51,6 +52,8 @@ const IRREVERSIBLE: readonly {
   /** ★文面に必ず入る言葉（★「戻せない」の言い方） */
   readonly says: string;
   readonly why: string;
+  /** ★文を `lib/claims.ts` の定数から読む画面（★2026-09-29）: ★その定数名を画面が読み、★定数の値が `says` を含むこと */
+  readonly saysFrom?: { readonly name: string; readonly value: string };
 }[] = [
   {
     file: 'apps/web/src/app/vote/page.tsx',
@@ -68,6 +71,7 @@ const IRREVERSIBLE: readonly {
     file: 'apps/web/src/app/setup/page.tsx',
     action: 'supabaseSetupRepo.create(',
     says: 'あとから変えられません',
+    saysFrom: { name: 'CLAIM_NO_CHANGE_LATER', value: CLAIM_NO_CHANGE_LATER },
     why: '🔴 ★牧場をつくるのは 1 回きり（★表示名・牧場名・勝負服を画面から変える口が無い）',
   },
   {
@@ -115,7 +119,8 @@ describe('🔴 ★戻せない操作は押す前に言う（★D-123 ③）', ()
 
   it('🔴 ★文面が「戻せない」ことを言っている', () => {
     const silent = IRREVERSIBLE
-      .filter((r) => !read(r.file).includes(r.says))
+      .filter((r) => !read(r.file).includes(r.says)
+        && !(r.saysFrom !== undefined && read(r.file).includes(r.saysFrom.name) && r.saysFrom.value.includes(r.says)))
       .map((r) => `${r.file}: 「${r.says}」が文面に在りません`);
     expect(
       silent,

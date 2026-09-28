@@ -35,6 +35,7 @@
  */
 
 import { useState } from 'react';
+import { CLAIM_NO_CHANGE_LATER } from '../../lib/claims';
 
 import {
   Backdrop, BigButton, NoticeBar, TopBar, useMotionPaused,
@@ -63,7 +64,7 @@ const LABEL: React.CSSProperties = { fontSize: 14, fontWeight: 900, color: 'var(
  * ★上の帯と ★押す前の確認が ★同じ 1 つを使う（★2026-09-29）。
  *   ★それまで ★帯だけ「あとから変えられます」と ★事実に反していた。★帯が芝の下に沈んで見えていなかった間 ★誰も気づかなかった。
  */
-const NO_CHANGE_LATER = 'あとから変えられません。';
+const NO_CHANGE_LATER = CLAIM_NO_CHANGE_LATER;
 
 /** ★名前の入力（★`NAME_MAX` で切るのは ★**旧と同じ**） */
 function NameField({ label, value, onChange, placeholder }: {

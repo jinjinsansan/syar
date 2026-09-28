@@ -2,6 +2,7 @@ import type React from 'react';
 import { BET_TYPE_LABEL, formatDistance, formatOdds, formatRaceTitle, SURFACE_LABEL } from '../lib/format';
 import { FrameBadge, PageTitle, StatusBadge, TabButton } from './ui';
 import { Countdown } from './clock';
+import { CLAIM_ODDS_FIXED } from '../lib/claims';
 
 
 export type OddsRow = Record<string, string | number | boolean | null | number[]>;
@@ -158,7 +159,7 @@ export function OddsBoard({ race, entries, odds, type, oddsPath }: {
             })}
             {win.length === 0 && <p style={{ margin: 0, padding: '14px 18px', borderTop: '1px solid var(--a-line)', color: 'var(--a-ink-2)', fontSize: 14, fontWeight: 900 }}>オッズ算出中です</p>}
             <div style={{ display: 'flex', alignItems: 'center', gap: 20, height: 42, padding: '0 18px', borderTop: '2px solid var(--a-line)', background: 'var(--a-ivory)', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>
-              <span>締切で確定します</span><span>バーは 1 番人気を 100% とした相対の目安</span><span>上限に達したオッズは「（上限）」と表示</span>
+              <span>{CLAIM_ODDS_FIXED}</span><span>バーは 1 番人気を 100% とした相対の目安</span><span>上限に達したオッズは「（上限）」と表示</span>
             </div>
           </div>
 
@@ -186,7 +187,7 @@ export function OddsBoard({ race, entries, odds, type, oddsPath }: {
             </div>
             <ComboGrid list={comboRows} joiner={sep} empty="この券種のオッズはまだ出ていません（オッズ算出中です）" />
             <div style={{ display: 'flex', alignItems: 'center', gap: 20, height: 42, padding: '0 18px', borderTop: '2px solid var(--a-line)', background: 'var(--a-ivory)', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>
-              <span>締切で確定します</span><span>オッズ昇順（単勝表と同じ規則）で左→右→下に並びます</span><span>上限に達したオッズは「（上限）」と表示</span>
+              <span>{CLAIM_ODDS_FIXED}</span><span>オッズ昇順（単勝表と同じ規則）で左→右→下に並びます</span><span>上限に達したオッズは「（上限）」と表示</span>
             </div>
           </div>
           <Guide />
