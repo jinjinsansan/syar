@@ -14,7 +14,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { stripComments } from './lib/ts-blocks.js';
 import {
-  BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_CARD_PUBLISH, CLAIM_ENTRY_NO_CANCEL, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
+  BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_CARD_PUBLISH, CLAIM_DAILY_ONCE, CLAIM_ENTRY_NO_CANCEL, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
 } from '../../web/src/lib/claims';
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -78,6 +78,22 @@ function betAmountPasses(amount: number): { readonly ok: boolean; readonly rule:
 
 const CLAIMS: readonly Claim[] = [
   {
+    id: '⑪デイリーは 1 日 1 回（★その日の始まりで鍵を作り ★台帳の一意で担保）',
+    text: CLAIM_DAILY_ONCE, name: 'CLAIM_DAILY_ONCE',
+    usedBy: ['apps/web/src/app/earn/page.tsx'],
+    backedBy: () => {
+      const why: string[] = [];
+      const d = latestDefinition('claim_daily_ep');
+      if (d === null) return ['★claim_daily_ep の定義が見つからない'];
+      if (!/'daily:'\s*\|\|\s*v_user::text\s*\|\|\s*':'\s*\|\|\s*v_day_from::text/.test(d.body)) why.push(`★${d.rel}: 鍵が「利用者 × その日」でない`);
+      if (!/day_started_at/.test(d.body)) why.push(`★${d.rel}: 「その日」を world_state.day_started_at から取っていない`);
+      const all = SRC.filter((f) => f.rel.startsWith('db/migrations/')).map((f) => f.text).join('\n');
+      if (!/create\s+unique\s+index\s+if\s+not\s+exists\s+ep_ledger_dedupe_key_uniq/i.test(all)) why.push('★台帳の鍵の一意（ep_ledger_dedupe_key_uniq）が無い');
+      if (/drop\s+index\s+(if\s+exists\s+)?ep_ledger_dedupe_key_uniq/i.test(all)) why.push('★台帳の鍵の一意が 落とされている');
+      return why;
+    },
+  },
+  {
     id: '⑩投票の 1 口の額は DB の制約を通る（★2026-09-29 まで 10 EP で 必ず落ちていた）',
     text: CLAIM_BET_PER_PICK, name: 'CLAIM_BET_PER_PICK',
     usedBy: ['apps/web/src/app/vote/page.tsx'],
@@ -136,6 +152,13 @@ const CLAIMS: readonly Claim[] = [
       if (!/not\s*\(\s*p_selection\s*@>\s*to_jsonb\(e\.gate\)\s*\)/.test(d.body)) why.push(`★${d.rel}: 自馬を全頭含む の判定が無い`);
       if (!/owner_id\s*=\s*v_user/.test(d.body)) why.push(`★${d.rel}: 自馬の判定が無い`);
       if (!read('apps/web/src/lib/claims.ts').includes('BET_CAP_OWN_RACE_EP.toLocaleString')) why.push('★上限を定数から出していない');
+      /** ★SQL の側（bet_limits.own_race_ep）は ★ワーカーが毎周 TS の値を書く（★4 番目の列 ← 4 番目の引数） */
+      const main = stripComments(read('apps/worker/src/main.ts'));
+      if (!/insert into bet_limits \(id, per_kind_ep, per_race_ep, per_day_ep, own_race_ep, updated_at\)/.test(main)
+        || !/\[BET_CAP_PER_KIND_EP, BET_CAP_PER_RACE_EP, BET_CAP_PER_DAY_EP, BET_CAP_OWN_RACE_EP\]/.test(main)) why.push('★ワーカーが own_race_ep に BET_CAP_OWN_RACE_EP を書いていない');
+      /** ★bet_allowance は 自馬出走なら own_race_ep を使う */
+      const alw = latestDefinition('bet_allowance');
+      if (alw === null || !/when\s+v_own\s+then\s+v_lim\.own_race_ep/i.test(alw.body)) why.push(`★bet_allowance（${alw?.rel ?? '無し'}）が 自馬出走で own_race_ep を使っていない`);
       return why;
     },
   },
@@ -176,7 +199,16 @@ const CLAIMS: readonly Claim[] = [
     usedBy: ['apps/web/src/app/races/[id]/page.tsx'],
     backedBy: () => {
       const claims = stripComments(read('apps/web/src/lib/claims.ts'));
-      return claims.includes('jaDuration(CYCLE_MS - PHASE_OFFSET_MS.publish)') ? [] : ['★公開の時刻を cycle.ts から導いていない'];
+      const why: string[] = [];
+      /** ★文の数は ★組成のきっかけ（登録の締切）から導く（★表の publish ではない・2026-09-29 に一度 取り違えた） */
+      if (!claims.includes('- entryDeadlineMs(10, 0)') || claims.includes('PHASE_OFFSET_MS.publish)}')) why.push('★公開の時刻を 登録の締切から導いていない');
+      /** ★ワーカーが ★登録の締切を過ぎるまで組成しない（＝それまで 出馬表は出ない） */
+      const runner = stripComments(read('apps/worker/src/cycle-runner.ts'));
+      if (!/if\s*\(\s*nowMs\s*<\s*entryDeadlineMs\(\s*idx\s*,\s*epochMs\s*\)\s*\)\s*continue;/.test(runner)) why.push('★ワーカーの組成が 登録の締切を待っていない');
+      /** ★組成前（announced）は 馬番を隠す */
+      const view = SRC.filter((f) => f.rel.startsWith('db/migrations/') && /create\s+or\s+replace\s+view\s+race_entries_public/i.test(f.text)).sort((a, b) => a.rel.localeCompare(b.rel)).at(-1);
+      if (view === undefined || !/when\s+r\.status\s*=\s*'announced'\s+then\s+null\s+else\s+e\.gate/i.test(view.text)) why.push('★組成前の馬番を隠していない');
+      return why;
     },
   },
   {

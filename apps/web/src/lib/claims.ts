@@ -22,7 +22,7 @@ import { BET_CAP_OWN_RACE_EP, MIN_STAKE } from '@star/betting';
  */
 export const BET_PER_PICK_EP = MIN_STAKE;
 export const CLAIM_BET_PER_PICK = `使う参加ポイント: ${BET_PER_PICK_EP.toLocaleString('ja-JP')} EP`;
-import { CYCLE_MS, PHASE_OFFSET_MS } from '@star/scheduler';
+import { CYCLE_MS, PHASE_OFFSET_MS, cycleStartMs, entryDeadlineMs } from '@star/scheduler';
 
 /** ★ミリ秒を「5 分 30 秒」の形に（★画面に数字を直書きしない・cycle.ts から導く） */
 function jaDuration(ms: number): string {
@@ -33,10 +33,15 @@ function jaDuration(ms: number): string {
 }
 
 /**
- * ★出馬表の公開（★scheduler cycle.ts: 公開は周の `publish`・発走は周の終わり `CYCLE_MS`）。
- *   ★2026-09-29: ★「発走 10 分前に確定します」は 10 分の周だった頃の名残り（★いまは 6 分）。
+ * ★出馬表の公開（★ワーカーは ★出走登録の締切 `entryDeadlineMs()`（★`cycleStart(N−2)`）を過ぎてから組成し ★`scheduled` にする＝
+ *   cycle-runner.ts の `nowMs < entryDeadlineMs(...)` ・★組成前（`announced`）は `race_entries_public` が馬番を隠す）。
+ *   ★発走は `cycleStart(N) + PHASE_OFFSET_MS.start`。★その差が「発走の何分前」。
+ *   ★2026-09-29: ★「発走 10 分前に確定します」は嘘。★同じ日に 一度「5 分 30 秒前」（★表の `publish`）と書いたが
+ *   ★**それも嘘**（★表の publish は 組成のきっかけではない・★LOOKAHEAD で 2 周先を組成する）→ ★組成のきっかけから導く。
+ *   ★「後に」: ★ワーカーの周（約 1 分）と ★1 周で組成する本数の上限（DS-9）のぶん 遅れうる。
  */
-export const CLAIM_CARD_PUBLISH = `出馬表は発走の ${jaDuration(CYCLE_MS - PHASE_OFFSET_MS.publish)}前に公開されます`;
+const CARD_LEAD_MS = (cycleStartMs(10, 0) + PHASE_OFFSET_MS.start) - entryDeadlineMs(10, 0);
+export const CLAIM_CARD_PUBLISH = `出馬表は 出走登録の締切（発走の ${jaDuration(CARD_LEAD_MS)}前）の後に公開されます`;
 
 /**
  * ★投票の締切（★正典 §9.6: 締切は発走より前・★cycle.ts の salesClose）。
@@ -55,6 +60,11 @@ export const CLAIM_STRATEGY = '脚質は今回のレースにだけ適用され�
 
 /** ★参加ポイントの受け取り（★いま発行するのは signup と daily だけ＝`ep_grant_amount`・★使えない口を並べない・将来の約束を書かない） */
 export const CLAIM_EP_FREE_ONLY = '無償でのみ受け取れます（いまは毎日のログイン）';
+
+/**
+ * ★デイリーの受け取り（★`claim_daily_ep` の dedupe_key ＝ 'daily:' || 利用者 || ':' || その日の始まり・★`ep_ledger_dedupe_key_uniq`（0013）が DB で担保）。
+ */
+export const CLAIM_DAILY_ONCE = '1 日 1 回 受け取れます';
 
 /** ★出走の取消（★口 0079 は在るが ★画面から呼ぶ所が 0 件 ＝ 画面からは取り消せない・★オーナー判断待ち） */
 export const CLAIM_ENTRY_NO_CANCEL = '登録は、画面から取り消せません。';

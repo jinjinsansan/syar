@@ -27,6 +27,7 @@ import {
   claimDailyEp, fetchDailyEpState, type DailyEpState,
 } from '../../lib/daily-ep';
 import { SignInRequiredError } from '../../lib/stable-repo';
+import { CLAIM_DAILY_ONCE } from '../../lib/claims';
 
 /** ★提供元が決まっていない受け取り方（★資料 §8-7。★どれも利用者がお金を払わない形） */
 const WAYS = [
@@ -103,7 +104,7 @@ function DailyLogin(): React.ReactElement {
           <span style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--u-ink-dark-2)', lineHeight: 1.5 }}>
             {state?.distributionStalled === true
               ? `${DAILY_EP_STALLED_NOTE}。復旧すると また受け取れます。`
-              : `1 日 1 回 受け取れます。${DAILY_EP_NO_CARRYOVER_NOTE}。`}
+              : `${CLAIM_DAILY_ONCE}。${DAILY_EP_NO_CARRYOVER_NOTE}。`}
           </span>
         </span>
         {amount !== null && (
