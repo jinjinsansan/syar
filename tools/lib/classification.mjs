@@ -505,6 +505,7 @@ export const READONLY = [
   'audit-text-on-backdrop.mjs',   // 芝の上にパネル無しで置かれた文字と明度差を実ブラウザで測る（読むだけ・2026-09-28）
   'measure-race-canvas-ratio.mjs', // レースの画布の裏の画素 ÷ 画面の物理画素を測る（読むだけ・D-058b・2026-09-28）
   'verify-jockey-roster-live.mjs', // 騎手の名簿を TS と 生きている DB で突き合わせる（読むだけ・金額・2026-09-28）
+  'measure-strip-embed.mjs', // 帯で流す本編の追加転送・コマ間隔・止める確認をヘッドレスで測る（読むだけ・2026-09-28）
   'slice-narrator.mjs',       // ナレーターのシートを 6 枚に切り、口だけ差し替える（読むだけ）
   'verify-no-real-faces.mjs', // 人物立ち絵に写真が混ざっていないか（読むだけ）
   // ★anon で何が読めるかの全数確認（§8.6 server_seed・§12.4 potential）。select のみ

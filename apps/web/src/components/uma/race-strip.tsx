@@ -3,10 +3,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
-import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowOver, type ReplayRunner } from './race-replay';
+import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowNear, replayWindowOver, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
 import { INTRO_STAGES, stripEmbedsOn, stripSizeOf } from './race-strip-sizes';
-import { STRIP_EMBED_FAILED_NOTE, STRIP_EMBED_GIVE_UP_SEC, isStripEmbedMessage, stripControlMessage, stripEmbedLog, stripEmbedUrl } from './race-strip-embed';
+import { STRIP_EMBED_FAILED_NOTE, STRIP_EMBED_GIVE_UP_SEC, STRIP_EMBED_LEAD_SEC, isStripEmbedMessage, stripControlMessage, stripEmbedLog, stripEmbedUrl } from './race-strip-embed';
 import { BOARD_ITEM_SEC, boardText, bracketOrNull, raceLine, tickerBoard, tickerShowsField, type BoardItem, type TickerRunner } from './race-strip-ticker';
 import './uma-theme.css';
 
@@ -403,15 +403,18 @@ export function RaceStrip(): React.ReactElement | null {
   const recentId = recent?.id ?? null;
   const windowOver = recent === null || recent === undefined || nowMs === null || !data?.runners.length
     ? true : replayWindowOver(recent.scheduled_at, nowMs);
+  /** ★本編を開いてよい時間（★窓が開く 40 秒前から 窓が閉じるまで・★レビュー側の決定 4） */
+  const openSoon = !windowOver && recent !== null && recent !== undefined && nowMs !== null
+    && replayWindowNear(recent.scheduled_at, nowMs, STRIP_EMBED_LEAD_SEC * 1000);
   useEffect(() => {
     /** ★本編を読むのは ★表で決めた面だけ（★それ以外の「大」は簡易版の走行・「極小」「文字」は読まない） */
     if (!embedsHere || motionReduced) { setEmbed(null); return; }
-    if (!windowOver && recentId !== null && embeddedIdRef.current !== recentId) {
+    if (openSoon && recentId !== null && embeddedIdRef.current !== recentId) {
       embeddedIdRef.current = recentId;
       setEmbedNote(null);
       setEmbed({ id: recentId, live: false, sinceMs: nowRef.current ?? 0 });
     }
-  }, [embedsHere, motionReduced, windowOver, recentId]);
+  }, [embedsHere, motionReduced, openSoon, recentId]);
   /** ★録画の窓が閉じても ★まだ始まっていなければ ★やめる（★読み込みが遅い端末で 小窓を待たせない） */
   useEffect(() => {
     const e = embedRef.current;

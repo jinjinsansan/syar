@@ -91,6 +91,15 @@ export function replayWindowOver(scheduledAt: string, nowMs: number): boolean {
   return !Number.isFinite(endMs) || nowMs >= endMs;
 }
 
+/**
+ * ★**本編を開いてよい時間か**（★2026-09-28・レビュー側の決定 4「録画の窓が開く少し前まで・窓の外で開いたままにしない」）。
+ *   ★窓が開く `leadMs` 前から ★窓が閉じるまで。★確定を見た時点（★窓の 75 秒前）で開くと ★その間ずっと重さを抱える。
+ */
+export function replayWindowNear(scheduledAt: string, nowMs: number, leadMs: number): boolean {
+  const startMs = new Date(scheduledAt).getTime() + REPLAY_START_DELAY_MS;
+  return Number.isFinite(startMs) && nowMs >= startMs - leadMs && nowMs < startMs + REPLAY_DISPLAY_MS;
+}
+
 /** 開催時刻を共有時計にして、ページ移動でも同じ録画位置へ戻る。 */
 export function replayDisplayProgress(scheduledAt: string, nowMs: number): number | null {
   const startMs = new Date(scheduledAt).getTime() + REPLAY_START_DELAY_MS;

@@ -11,9 +11,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  STRIP_EMBED_FAILED_NOTE, isStripControlMessage, isStripEmbedMessage, stripControlMessage, stripEmbedLog, stripEmbedMessage, stripEmbedUrl, STRIP_EMBED_PARAM_VALUE,
+  STRIP_EMBED_FAILED_NOTE, STRIP_EMBED_LEAD_SEC, isStripControlMessage, isStripEmbedMessage, stripControlMessage, stripEmbedLog, stripEmbedMessage, stripEmbedUrl, STRIP_EMBED_PARAM_VALUE,
 } from '../../web/src/components/uma/race-strip-embed';
-import { replayWindowOver, REPLAY_START_DELAY_MS, REPLAY_DISPLAY_MS } from '../../web/src/components/uma/race-replay';
+import { replayWindowNear, replayWindowOver, REPLAY_START_DELAY_MS, REPLAY_DISPLAY_MS } from '../../web/src/components/uma/race-replay';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const read = (p: string): string => readFileSync(path.join(ROOT, p), 'utf8');
@@ -134,5 +134,39 @@ describe('★小窓で本編を流す約束', () => {
     expect(STRIP).not.toMatch(/setEmbedNote\((?!STRIP_EMBED_FAILED_NOTE|null)/);
     expect(STRIP.match(/console\.warn\(`\[race-strip\] \$\{stripEmbedLog\(/g)?.length).toBe(2);
     expect(STRIP).toContain("{size === 'big' && embedNote !== null && <span className=\"u-race-strip-error\" role=\"status\">{embedNote}</span>}");
+  });
+});
+
+/**
+ * 🔴 ★**小窓の本編を軽くする・★開く時間を窓の近くに・★子でも「動きを減らす」**（★2026-09-28・レビュー側の決定 1〜5）。
+ *   ★実測（本番・390px・キャッシュ無効・見本のレース）: ★playing まで 17.29MB のうち ★歩きのコマ 10.17MB・★音 0.93MB（★流れてから +1.54MB）。
+ */
+describe('★小窓の本編の重さと時間', () => {
+  it('🔴 ★小窓では 歩きのコマと音を読まない（★パドックは走りのコマに戻って 場面は残る）', () => {
+    expect(PAGE).toContain("const walkA = bakedLibs === undefined && !EMBED_STRIP ? await loadNativeSet('horse-jockey-side-walk-v1') : undefined;");
+    expect(PAGE).toContain('const bakedWalk = EMBED_STRIP || bakedLibs === undefined');
+    expect(PAGE).toMatch(/if \(EMBED_STRIP\) return undefined;\s*audioRef\.current = createRaceAudio\(\);/);
+    /** ★パドックは ★歩きが無ければ 走りのコマで描く（★場面を消さない） */
+    expect(PAGE).toContain('art.sideWalkHighQuality?.[pick.gate - 1] ?? art.sideHighQuality[pick.gate - 1]');
+  });
+
+  it('🔴 ★本編を開くのは ★窓が開く 40 秒前から 窓が閉じるまで', () => {
+    const at = '2026-09-28T00:00:00Z';
+    const start = Date.parse(at) + REPLAY_START_DELAY_MS;
+    const lead = STRIP_EMBED_LEAD_SEC * 1000;
+    expect(STRIP_EMBED_LEAD_SEC).toBe(40);
+    expect(replayWindowNear(at, start - lead - 1, lead), '★確定を見ただけ（★窓の 75 秒前）では開かない').toBe(false);
+    expect(replayWindowNear(at, start - lead, lead)).toBe(true);
+    expect(replayWindowNear(at, start + REPLAY_DISPLAY_MS - 1, lead)).toBe(true);
+    expect(replayWindowNear(at, start + REPLAY_DISPLAY_MS, lead), '★窓の外で開かない').toBe(false);
+    expect(STRIP).toContain('if (openSoon && recentId !== null && embeddedIdRef.current !== recentId) {');
+  });
+
+  it('🔴 ★子（本編）でも「動きを減らす」を守り、★帯は 黙って閉じる（★経路が違っても同じ結果）', () => {
+    expect(PAGE).toContain("if (EMBED_STRIP && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { tellStrip('declined', real?.raceId ?? null); return; }");
+    expect(PAGE).toContain("const onChange = (): void => { if (reduce.matches) { setPlaying(false); tellStrip('declined', real?.raceId ?? null); } };");
+    expect(isStripEmbedMessage(stripEmbedMessage('declined', 'r1'))).toBe(true);
+    /** ★declined は ★「出せませんでした」を出さない（★error のときだけ） */
+    expect(STRIP).toMatch(/if \(event\.data\.type === 'error'\) \{[\s\S]{0,200}setEmbedNote\(STRIP_EMBED_FAILED_NOTE\);\s*\}\s*setEmbed\(null\);/);
   });
 });

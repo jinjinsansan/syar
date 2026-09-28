@@ -16,7 +16,10 @@
 /** ★`?embed=` の値 */
 export const STRIP_EMBED_PARAM_VALUE = 'strip';
 
-export type StripEmbedEvent = 'playing' | 'ended' | 'error';
+/**
+ * ★`declined` … ★本編が ★「動きを減らす」設定を見て ★流さなかった（★2026-09-28・レビュー側の条件 5）。★帯は ★黙って閉じる（★「出せませんでした」を出さない）。
+ */
+export type StripEmbedEvent = 'playing' | 'ended' | 'error' | 'declined';
 
 export interface StripEmbedMessage {
   readonly source: 'star-race';
@@ -43,7 +46,7 @@ export function isStripEmbedMessage(value: unknown): value is StripEmbedMessage 
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   return v['source'] === 'star-race'
-    && (v['type'] === 'playing' || v['type'] === 'ended' || v['type'] === 'error')
+    && (v['type'] === 'playing' || v['type'] === 'ended' || v['type'] === 'error' || v['type'] === 'declined')
     && (v['raceId'] === null || typeof v['raceId'] === 'string')
     && (v['detail'] === null || typeof v['detail'] === 'string');
 }
@@ -86,3 +89,9 @@ export function stripEmbedLog(kind: 'error' | 'late', detail: string | null, wai
  *   ★長めにとり、★「終わらない小窓」だけを防ぎます。
  */
 export const STRIP_EMBED_GIVE_UP_SEC = 360;
+
+/**
+ * ★**本編を開くのは 録画の窓が開く この秒数前から**（★2026-09-28・レビュー側の決定 4）。
+ *   ★本編の用意は ★実測 27.8 秒（★小窓で歩きのコマと音を落とす前・本番・ヘッドレス）。★窓（45 秒）を食い潰さない範囲で前に出す。
+ */
+export const STRIP_EMBED_LEAD_SEC = 40;

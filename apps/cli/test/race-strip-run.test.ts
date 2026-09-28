@@ -50,7 +50,7 @@ describe('★常設帯の走行（①②）', () => {
      *   （★窓の 75 秒前から・★本編の用意が 24〜27 秒かかるため）・★「大」と「極小」（★極小は拡大のためだけ）・★動きを減らす設定でないときだけ。
      *   ★窓が閉じても ★まだ流れ始めていなければ ★やめる。
      */
-    expect(LIVE, '★本編を 窓の後・表の面以外で開く').toMatch(/if \(!embedsHere \|\| motionReduced\) \{ setEmbed\(null\); return; \}\s*if \(!windowOver && recentId !== null && embeddedIdRef\.current !== recentId\)/);
+    expect(LIVE, '★本編を 窓の後・表の面以外で開く').toMatch(/if \(!embedsHere \|\| motionReduced\) \{ setEmbed\(null\); return; \}\s*if \(openSoon && recentId !== null && embeddedIdRef\.current !== recentId\)/);
     expect(LIVE, '★窓が閉じても 始まっていない本編を読み続ける').toMatch(/if \(!windowOver \|\| e === null \|\| e\.live\) return;[\s\S]{0,200}setEmbed\(null\);/);
     /** ★同じ箱のまま ★窓の前・極小は画面の外・★拡大で画面いっぱい（★箱を差し替えると 読み込みが最初からになる） */
     expect(LIVE).toContain("{embed !== null && <div className={`u-race-strip-stage${big || expanded ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}${expanded ? ' u-race-strip-stage-full' : ''}`}");

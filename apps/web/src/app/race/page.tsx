@@ -2544,6 +2544,8 @@ function RaceView({ setup, real }: {
   const [soundOn, setSoundOn] = useState(SOUND_ON_AT_START);
   const soundOnRef = useRef(soundOn);
   useEffect(() => {
+    /** ★小窓では 音を作らない（★鳴らさないのに 約 2.5MB 読んでいた・★レビュー側の決定 2026-09-28） */
+    if (EMBED_STRIP) return undefined;
     audioRef.current = createRaceAudio();
     return () => { audioRef.current?.dispose(); audioRef.current = null; };
   }, []);
@@ -2861,6 +2863,11 @@ function RaceView({ setup, real }: {
    */
   useEffect(() => {
     if (devMode || SHOW_ENTRY) return;
+    /**
+     * ★小窓の中でも ★「動きを減らす」を守る（★2026-09-28・レビュー側の条件 5「経路が違っても同じ結果」）。
+     *   ★帯は その設定では本編を開かないが、★開いた後に設定が変わる・★別の経路で開く ときも ★ここで流さない。
+     */
+    if (EMBED_STRIP && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { tellStrip('declined', real?.raceId ?? null); return; }
     if (!ready || built === null || watchStarted) return;
     /**
      * ⚠️ ★**小さい画面はステージも開きます**（★2026-09-13）。
@@ -4011,7 +4018,11 @@ function RaceView({ setup, real }: {
        * ⚠️ ★読めなくても ★**他の役を巻き込みません**（★紹介は走りのコマに戻る・★R-27 の「欠けたら全部落ちる」は歩きに掛けない）。
        * ⚠️ ★型 A 以外の枠があるときは使いません（★原版経路と同じ規則・★紹介だけ別の馬に見えるので）。
        */
-      const bakedWalk = bakedLibs === undefined || HORSE_TYPES_IN_USE.some((t) => t !== 'a') ? undefined : await (async () => {
+      /**
+       * ★**小窓では 歩きのコマを読まない**（★2026-09-28・レビュー側の決定・★実測 10.17MB ＝ 小窓の読み込みの 6 割）。
+       *   ★パドックは ★走りのコマに戻って ★場面は残る（★オーナー依頼「パドックからリプレイまで」）。
+       */
+      const bakedWalk = EMBED_STRIP || bakedLibs === undefined || HORSE_TYPES_IN_USE.some((t) => t !== 'a') ? undefined : await (async () => {
         const set = bakedManifest?.sets.find((entry) => entry.role === 'side-walk');
         if (set === undefined) return undefined;
         const picks = paddockPicksOf(oddsRows);
@@ -4028,7 +4039,7 @@ function RaceView({ setup, real }: {
           : await loadImg(`/art/baked/${set.shadow}?v=${ASSET_VERSION}`).catch(() => null);
         return buildFramesFromBaked(set, new Map(ok), SILKS_LAYOUT_CROUCH, undefined, shadow ?? undefined);
       })();
-      const walkA = bakedLibs === undefined ? await loadNativeSet('horse-jockey-side-walk-v1') : undefined;
+      const walkA = bakedLibs === undefined && !EMBED_STRIP ? await loadNativeSet('horse-jockey-side-walk-v1') : undefined;
       const walkB = walkA !== undefined && sideByType.b !== undefined ? await loadNativeSet('horse-jockey-side-walk-v1b') : undefined;
       const walkUsable = walkA !== undefined && Object.keys(sideByType).every((t) => t === 'b' && walkB !== undefined);
       const sideWalkHighQuality = bakedWalk !== undefined && bakedWalk.length > 0 ? bakedWalk : walkUsable && walkA !== undefined
@@ -6263,6 +6274,14 @@ function RaceView({ setup, real }: {
     window.addEventListener('message', onMessage);
     return () => { window.removeEventListener('message', onMessage); };
   }, []);
+  /** ★小窓の中: ★流している途中で「動きを減らす」に変わったら ★止めて 帯へ知らせる（★帯が閉じる） */
+  useEffect(() => {
+    if (!EMBED_STRIP) return undefined;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = (): void => { if (reduce.matches) { setPlaying(false); tellStrip('declined', real?.raceId ?? null); } };
+    reduce.addEventListener('change', onChange);
+    return () => { reduce.removeEventListener('change', onChange); };
+  }, [real]);
   /** ★小窓の中: ★流し終えたら・★組めなかったら ★帯へ知らせる（★帯が iframe を閉じる） */
   useEffect(() => { if (stageFinished) tellStrip('ended', real?.raceId ?? null); }, [stageFinished, real]);
   useEffect(() => { if (err !== null) tellStrip('error', real?.raceId ?? null, err); }, [err, real]);
