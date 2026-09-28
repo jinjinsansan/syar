@@ -19,6 +19,7 @@ import {
   Backdrop, BigButton, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
+import { CLAIM_EP_FREE_ONLY, CLAIM_OWN_RACE_BET } from '../../lib/claims';
 
 /** ★4 ステップ（★資料 §8-8 の本文をそのまま） */
 const STEPS = [
@@ -28,7 +29,7 @@ const STEPS = [
   },
   {
     n: 2, title: 'レースに投票する',
-    body: '出馬表から馬を選んでマークシートに印を付けます。使うのは参加ポイントだけ。自分の馬が出るレースには投票できません。',
+    body: `出馬表から馬を選んでマークシートに印を付けます。使うのは参加ポイントだけ。${CLAIM_OWN_RACE_BET}。`,
   },
   {
     n: 3, title: 'レースを見る',
@@ -97,7 +98,7 @@ export default function HowToPage(): React.ReactElement {
                 <span style={{ fontSize: 14, color: 'var(--u-ink-dark)' }}>参加ポイント（EP）</span>
               </div>
               <p style={{ margin: '5px 0 0', fontSize: 12, fontWeight: 500, lineHeight: 1.7, color: 'var(--u-ink-dark-3)' }}>
-                投票・出走登録などゲーム内のやりとり全部に使います。<b>無償でのみ受け取れます</b>（動画・アンケート・オファー・毎日のログイン）。
+                投票・出走登録などゲーム内のやりとり全部に使います。<b>{CLAIM_EP_FREE_ONLY}</b>。
               </p>
             </div>
             <div style={{ flex: '1 1 200px', minWidth: 0, padding: 10 }}>

@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { readClient } from '../../lib/supabase';
+import { CLAIM_OWN_RACE_BET } from '../../lib/claims';
 
 /** ★毎回サーバーで取り直す（ボタン先の「最新の確定レース」「次のレース」が変わるため） */
 export const revalidate = 0;
@@ -28,7 +29,7 @@ const VEIL = 'linear-gradient(180deg, rgba(26,111,212,.55) 0%, rgba(15,86,171,.4
 const POINTS: ReadonlyArray<{ n: string; title: string; img: string; alt: string; body: string }> = [
   { n: '01', title: '育てる', img: '/lp/pt-training.jpg', alt: '調教の画面', body: '週に 1 回、8 つのメニューから指示します。素質★と 5 つの現在値が伸びていくのを見ながら、疲労と調子を管理します。' },
   { n: '02', title: '走らせる', img: '/lp/pt-race.jpg', alt: '中継 HUD', body: 'レースは 10 分ごとに発走。出走登録して、実況つきの中継を観ます。格が上がるほど賞金ポイントも大きくなります。' },
-  { n: '03', title: '投票する', img: '/lp/pt-bet.jpg', alt: '投票の画面', body: '参加ポイントで投票して、的中すると賞金ポイントで払戻。自分の馬が出るレースには投票できません。' },
+  { n: '03', title: '投票する', img: '/lp/pt-bet.jpg', alt: '投票の画面', body: `参加ポイントで投票して、的中すると賞金ポイントで払戻。${CLAIM_OWN_RACE_BET}。` },
   { n: '04', title: 'つなぐ', img: '/lp/pt-pedigree.jpg', alt: '馬詳細の血統表', body: '引退した馬は配合して次の世代へ。5 代の血統表でクロスを確かめながら、自分の血統を作ります。' },
 ];
 

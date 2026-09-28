@@ -22,6 +22,7 @@ import { Backdrop, BigButton, EpCapsule, NoticeBar, TextPanel, TopBar, useMotion
 import { RaceStrip } from '../../components/uma/race-strip';
 /** ★騎手を選ぶ（★D12-4・D-105 ④「出走登録で凍結する」） */
 import { JockeyPicker } from '../../components/jockey-picker';
+import { CLAIM_ENTRY_NO_CANCEL, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY } from '../../lib/claims';
 
 /** ★紙パネル（★資料 §5.6: 紙 ＋ 見出し帯は濃紺・下に金 3px） */
 const PAPER: React.CSSProperties = {
@@ -121,7 +122,7 @@ export default function EntryPage(): React.ReactElement {
       `${race.raceNo}　${race.classLabel}　${race.course}\n`
       + `${horse.name}・${STRATEGY_OPTIONS.find((s) => s.key === strategy)?.label ?? strategy}\n`
       + `出走料 ${race.feeEP} EP（登録後の残り ${(epBalance - race.feeEP).toLocaleString('ja-JP')} EP）\n\n`
-      + '登録の取消は、発売の準備に入る前までしかできません。この内容でよろしいですか？',
+      + `${CLAIM_ENTRY_NO_CANCEL}この内容でよろしいですか？`,
     )) return;
     setEntering(true);
     setEntryMessage(null);
@@ -331,7 +332,7 @@ export default function EntryPage(): React.ReactElement {
                   );
                 })}
               </div>
-              <div style={{ fontSize: 12, marginTop: 10, lineHeight: 1.7, opacity: .8 }}>脚質は今回のレースにだけ適用されます。馬の適性から外れた指示は道中で崩れやすくなります</div>
+              <div style={{ fontSize: 12, marginTop: 10, lineHeight: 1.7, opacity: .8 }}>{CLAIM_STRATEGY}</div>
             </div>
             <div style={{ flex: '1 1 300px', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 44, borderBottom: '1px solid var(--u-rule)' }}>
@@ -358,7 +359,7 @@ export default function EntryPage(): React.ReactElement {
                 <span style={{ fontSize: 13 }}>登録後の残り</span><span><strong style={{ fontSize: 26, color: enough ? 'var(--u-ink-dark)' : '#c0392b' }}>{(epBalance - race.feeEP).toLocaleString('ja-JP')}</strong> EP</span>
               </div>
               {/* §9.5 憲法の明示 — 登録前から常時表示し、登録後も残す */}
-              <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: '#eaf3fb', border: '2px solid #9fc0dc', fontSize: 13, lineHeight: 1.6 }}>自分の馬が出るレースは投票できません</div>
+              <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: '#eaf3fb', border: '2px solid #9fc0dc', fontSize: 13, lineHeight: 1.6 }}>{CLAIM_OWN_RACE_BET}</div>
               {/*
                 🔴 ★**ここは `<span>` でした**（★2026-09-25 に発覚）。
                    ★`title="サーバー接続まで押せません"` と書かれたまま、★`onClick` が無く、
@@ -371,7 +372,7 @@ export default function EntryPage(): React.ReactElement {
                 <BigButton
                   tone={enough && !entering ? 'gold' : 'disabled'}
                   label={entering ? '登録しています…' : `登録する（${race.feeEP} EP）`}
-                  sub={enough ? '取消は発売の準備に入る前まで' : '参加ポイントが足りません'}
+                  sub={enough ? CLAIM_ENTRY_NO_CANCEL : '参加ポイントが足りません'}
                   {...(enough && !entering ? { onClick: () => { void submitEntry(); } } : {})}
                 />
               </div>

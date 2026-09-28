@@ -13,7 +13,9 @@ import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { stripComments } from './lib/ts-blocks.js';
-import { CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED } from '../../web/src/lib/claims';
+import {
+  CLAIM_CARD_PUBLISH, CLAIM_ENTRY_NO_CANCEL, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
+} from '../../web/src/lib/claims';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const read = (rel: string): string => readFileSync(path.join(ROOT, rel), 'utf8');
@@ -34,6 +36,17 @@ function sources(): { readonly rel: string; readonly text: string }[] {
 }
 const SRC = sources();
 const hits = (re: RegExp): string[] => SRC.filter((f) => re.test(f.text)).map((f) => f.rel);
+/** ★関数の ★最後の定義（★移行は後の `create or replace` が勝つ） */
+function latestDefinition(fn: string): { readonly rel: string; readonly body: string } | null {
+  const re = new RegExp(`create\\s+or\\s+replace\\s+function\\s+(public\\.)?${fn}\\s*\\(`, 'i');
+  const files = SRC.filter((f) => f.rel.startsWith('db/migrations/') && re.test(f.text)).sort((a, b) => a.rel.localeCompare(b.rel));
+  const last = files.at(-1);
+  if (last === undefined) return null;
+  const at = last.text.search(re);
+  /** ★本体は ★次の関数の定義まで（★ドル記号の札は $$・$fn$・$function$ と揃っていない） */
+  const next = last.text.slice(at + 1).search(/create\s+or\s+replace\s+function/i);
+  return { rel: last.rel, body: next < 0 ? last.text.slice(at) : last.text.slice(at, at + 1 + next) };
+}
 
 interface Claim {
   readonly id: string;
@@ -82,6 +95,60 @@ const CLAIMS: readonly Claim[] = [
       return why;
     },
   },
+  {
+    id: '④自馬出走レースは 自馬を全頭含む買い目だけ・上限まで 投票できる',
+    text: CLAIM_OWN_RACE_BET, name: 'CLAIM_OWN_RACE_BET',
+    usedBy: ['apps/web/src/app/entry/page.tsx', 'apps/web/src/app/howto/page.tsx', 'apps/web/src/app/vote/page.tsx'],
+    backedBy: () => {
+      const d = latestDefinition('place_bet');
+      if (d === null) return ['★place_bet の定義が見つからない'];
+      const why: string[] = [];
+      if (!/not\s*\(\s*p_selection\s*@>\s*to_jsonb\(e\.gate\)\s*\)/.test(d.body)) why.push(`★${d.rel}: 自馬を全頭含む の判定が無い`);
+      if (!/owner_id\s*=\s*v_user/.test(d.body)) why.push(`★${d.rel}: 自馬の判定が無い`);
+      if (!read('apps/web/src/lib/claims.ts').includes('BET_CAP_OWN_RACE_EP.toLocaleString')) why.push('★上限を定数から出していない');
+      return why;
+    },
+  },
+  {
+    id: '⑤脚質は今回だけ・適性から外れると走り全体が鈍る（★道中で崩れる仕組みは無い）',
+    text: CLAIM_STRATEGY, name: 'CLAIM_STRATEGY',
+    usedBy: ['apps/web/src/app/entry/page.tsx'],
+    backedBy: () => {
+      const bal = stripComments(read('packages/race-engine/src/balance.ts'));
+      const min = Number(/STRATEGY_APT_COEF_MIN:\s*([0-9.]+)/.exec(bal)?.[1]);
+      const co = stripComments(read('packages/race-engine/src/coefficients.ts'));
+      const why: string[] = [];
+      if (!(min < 1)) why.push(`★適性の下限が 1 未満でない（${String(min)}）→ 鈍らない`);
+      if (!/strategyAptitude\[strategy\]/.test(co)) why.push('★strategyCoef が適性を見ていない');
+      return why;
+    },
+  },
+  {
+    id: '⑥参加ポイントは無償でのみ・いまは毎日のログイン',
+    text: CLAIM_EP_FREE_ONLY, name: 'CLAIM_EP_FREE_ONLY',
+    usedBy: ['apps/web/src/app/howto/page.tsx'],
+    backedBy: () => {
+      const d = latestDefinition('ep_grant_amount');
+      if (d === null) return ['★ep_grant_amount の定義が見つからない'];
+      const kinds = [...d.body.matchAll(/when\s+'([a-z_]+)'\s+then/g)].map((m) => m[1]).filter((k) => k !== 'daily_cap').sort();
+      return kinds.join(',') === 'daily,signup' ? [] : [`★${d.rel}: 発行の種類が signup・daily だけでない（${kinds.join(',')}）→ 文の「いまは毎日のログイン」を見直す`];
+    },
+  },
+  {
+    id: '⑦出走の登録は 画面から取り消せない（★口は在るが 画面が呼ばない）',
+    text: CLAIM_ENTRY_NO_CANCEL, name: 'CLAIM_ENTRY_NO_CANCEL',
+    usedBy: ['apps/web/src/app/entry/page.tsx'],
+    backedBy: () => hits(/request_entry_scratch/).filter((f) => f.startsWith('apps/web/')).map((f) => `★画面が取消を呼んでいる: ${f} → 文を書き直す`),
+  },
+  {
+    id: '⑧出馬表は 発走の（周の長さ − 公開の位置）前に公開される',
+    text: CLAIM_CARD_PUBLISH, name: 'CLAIM_CARD_PUBLISH',
+    usedBy: ['apps/web/src/app/races/[id]/page.tsx'],
+    backedBy: () => {
+      const claims = stripComments(read('apps/web/src/lib/claims.ts'));
+      return claims.includes('jaDuration(CYCLE_MS - PHASE_OFFSET_MS.publish)') ? [] : ['★公開の時刻を cycle.ts から導いていない'];
+    },
+  },
 ];
 
 describe('★仕組みの説明の文は 出どころに縛る', () => {
@@ -105,12 +172,17 @@ describe('★仕組みの説明の文は 出どころに縛る', () => {
   });
 
   it('🔴 ★今日 見つかった嘘が 戻らない', () => {
-    const all = SRC.map((f) => f.text).join('\n');
+    /** ★画面とコードだけ（★移行の SQL 註記は 過去の経緯を書くので 除く） */
+    const all = SRC.filter((f) => !f.rel.endsWith('.sql')).map((f) => f.text).join('\n');
     expect(all).not.toContain('あとから変えられます');
     expect(all).not.toContain('締切まで変わります');
     expect(all).not.toContain('締切で確定します');
     expect(all).not.toContain('レース・オッズ・記録はご覧いただけます');
     /** ★固定オッズに「最終の」は ★前に別の数字が在った含み（★2026-09-29 に落とした） */
     expect(all).not.toContain('最終の数字です');
+    /** ★2026-09-29 の 2 便目（★沈んでいなかった文から） */
+    for (const lie of ['自分の馬が出るレースは投票できません', '自分の馬が出るレースには投票できません', '発走 10 分前に確定', '99.9（上限）', '発走 3 分前から観られます', '道中で崩れやすく', '動画・アンケート・オファー・毎日のログイン', '取消は発売の準備に入る前まで', '発売の準備に入る前までしかできません']) {
+      expect(all, lie).not.toContain(lie);
+    }
   });
 });

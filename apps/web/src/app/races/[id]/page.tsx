@@ -6,7 +6,7 @@ import {
 import { readClient } from '../../../lib/supabase';
 import { FrameBadge, GradeBadge, ReadError, StatusBadge, StyleChip } from '../../../components/ui';
 import { Countdown } from '../../../components/clock';
-import { CLAIM_ODDS_FIXED } from '../../../lib/claims';
+import { CLAIM_CARD_PUBLISH, CLAIM_ODDS_FIXED } from '../../../lib/claims';
 
 export const revalidate = 0;
 
@@ -157,10 +157,10 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
           );
         })}
         {rows.length === 0 && (
-          <p style={{ margin: 0, padding: '16px 18px', fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)', borderTop: '1px solid var(--a-line)' }}>出馬表は発走 10 分前に確定します</p>
+          <p style={{ margin: 0, padding: '16px 18px', fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)', borderTop: '1px solid var(--a-line)' }}>{CLAIM_CARD_PUBLISH}</p>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, height: 42, padding: '0 18px', borderTop: '2px solid var(--a-line)', background: 'var(--a-ivory)', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-2)' }}>
-          <span>{CLAIM_ODDS_FIXED}</span><span>上限に達した場合は「99.9（上限）」と表示</span>
+          <span>{CLAIM_ODDS_FIXED}</span>
           {winner !== undefined && <span style={{ marginLeft: 'auto', color: 'var(--a-ink)' }}>1着 {String(winner['horse_name'])}</span>}
         </div>
       </div>

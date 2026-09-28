@@ -1,16 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { BET_CAP_OWN_RACE_EP, checkOwnRaceSelection, ownRaceReasonText } from '@star/betting';
+import { checkOwnRaceSelection, ownRaceReasonText } from '@star/betting';
 import { Backdrop, BigButton, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
+import { CLAIM_OWN_RACE_BET } from '../../lib/claims';
 import { loadBetAllowance, loadBetScreen, oddsKey, placeBet, type BetAllowance, type BetScreenData } from '../../lib/bet-screen';
 
 const FRAME_COLORS = ['#f5f5f5', '#191919', '#d62828', '#1446b4', '#fad728', '#148c46', '#f08219', '#f596be'] as const;
 const DARK_TEXT_FRAMES = new Set([1, 5, 8]);
 const EP_PER_PICK = 10;
 const REFRESH_MS = 1000 * 15;
-const OWN_RACE_CAP_LABEL = BET_CAP_OWN_RACE_EP.toLocaleString('en-US');
 
 function frameOf(gate: number, fieldSize: number): number {
   return Math.min(8, Math.ceil(gate / Math.ceil(fieldSize / 8)));
@@ -127,7 +127,7 @@ export default function VotePage(): React.ReactElement {
         <p>{selected === null ? '馬を1頭選んでください。' : `${selected}番を選択中`}</p>
         <p>使う参加ポイント: {EP_PER_PICK} EP</p>
         <p>現在の残高: {data ? data.authenticated ? `${data.epBalance.toLocaleString('ja-JP')} EP` : 'ログイン後に表示' : '読み込み中'}</p>
-        {ownGates.length > 0 && <p>自馬出走レースの上限は {OWN_RACE_CAP_LABEL} EP。</p>}
+        {ownGates.length > 0 && <p>{CLAIM_OWN_RACE_BET}。</p>}
         {!check.ok && <p role="alert">{ownRaceReasonText(check)}</p>}
         {allowance && <p>この券種であと {allowance.remainingEP.toLocaleString('ja-JP')} EP 投票できます。</p>}
         {race && <a href={`/odds/${encodeURIComponent(race.id)}`} style={{ display: 'inline-block', padding: '10px 0', textDecoration: 'underline' }}>オッズの詳細</a>}

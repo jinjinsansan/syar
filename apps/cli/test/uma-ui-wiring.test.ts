@@ -347,6 +347,8 @@ describe('★馬物語 UI の配線（R-14）', () => {
      */
     const entry = strip(read('apps/web/src/app/entry/page.tsx'));
     expect(entry, '★entry の画面に「馬券」が残っている').not.toContain('馬券');
-    expect(entry).toContain('自分の馬が出るレースは投票できません');
+    /** ★2026-09-29: ★「投票できません」は嘘だった（★自馬を全頭含む買い目なら投票できる）→ ★文は claims.ts の 1 か所から */
+    expect(entry).toContain('CLAIM_OWN_RACE_BET');
+    expect(entry).not.toContain('自分の馬が出るレースは投票できません');
   });
 });

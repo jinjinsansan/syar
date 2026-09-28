@@ -50,7 +50,9 @@ describe('VT-1 ① /vote が §9.5 を自分で持たない', () => {
 
   it('③ ★★5,000 を画面に数で書いていない（★D-052）', () => {
     expect(PAGE, '🔴 ★上限を画面に数で書いている').not.toMatch(/5[,_]?000/);
-    expect(PAGE, '★上限を `@star/betting` から引いていない').toContain('BET_CAP_OWN_RACE_EP');
+    /** ★2026-09-29 から ★文は `lib/claims.ts` の `CLAIM_OWN_RACE_BET`（★上限は そこで `BET_CAP_OWN_RACE_EP` から引く） */
+    expect(PAGE, '★上限の文を claims.ts から引いていない').toContain('CLAIM_OWN_RACE_BET');
+    expect(readFileSync(path.join(ROOT, 'apps/web/src/lib/claims.ts'), 'utf8'), '★claims.ts が上限を `@star/betting` から引いていない').toContain('BET_CAP_OWN_RACE_EP.toLocaleString');
   });
 
   it('④ ★★自馬の行も押せる（★正典は「選べない」ではなく「含めること」）', () => {

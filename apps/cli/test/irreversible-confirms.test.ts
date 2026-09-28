@@ -21,7 +21,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { CLAIM_NO_CHANGE_LATER } from '../../web/src/lib/claims';
+import { CLAIM_ENTRY_NO_CANCEL, CLAIM_NO_CHANGE_LATER } from '../../web/src/lib/claims';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const read = (p: string): string => readFileSync(path.join(ROOT, p), 'utf8');
@@ -64,8 +64,9 @@ const IRREVERSIBLE: readonly {
   {
     file: 'apps/web/src/app/entry/page.tsx',
     action: 'supabaseEntryRepo.enter(',
-    says: '登録の取消は、発売の準備に入る前までしかできません',
-    why: '★発売の準備に入ると取消できない（★D-123）',
+    says: '取り消せません',
+    saysFrom: { name: 'CLAIM_ENTRY_NO_CANCEL', value: CLAIM_ENTRY_NO_CANCEL },
+    why: '★画面から取り消す口が無い（★0079 の口は在るが 画面が呼ばない・2026-09-29・オーナー判断待ち）',
   },
   {
     file: 'apps/web/src/app/setup/page.tsx',
