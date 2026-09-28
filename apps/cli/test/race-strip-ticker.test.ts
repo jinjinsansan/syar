@@ -61,8 +61,18 @@ describe('★流れる 1 行', () => {
     expect(CSS).toContain(".u-race-strip-main > span:not(.u-race-run-mini):not(.u-race-strip-rec):not(.u-race-strip-ticker) {");
   });
 
-  it('★帯は「大」の待ち時間だけ流し、★締切の後だけ出走表を読む', () => {
-    expect(STRIP).toContain("</> : size === 'big' && next && data && nowMs !== null ? <>");
+  /**
+   * 🔴 ⑤ ★**ずっと動いている**（★2026-09-28・オーナー「流れる文字はずっと動いているようにできませんか？」）:
+   *   ★最初は ★待ち時間だけ流し、★録画・結果の強調で ★消えて 別の文に替わっていた。★文の長さで秒を決めていたので ★数字が変わるたびに跳んだ。
+   *   → ★「大」では ★いつも ★同じ要素（★分岐の外・★文字の行の最後）で流し、★秒は ★頭数だけで決める。
+   */
+  it('🔴 ⑤ ★「大」では ★いつも同じ要素で流し続け、★秒は頭数だけで決める', () => {
+    expect(STRIP).toContain('const tickerOn = size === \'big\' && next !== null && next !== undefined && data !== null && nowMs !== null;');
+    /** ★分岐（待ち・録画・結果）の外に ★1 つだけ */
+    expect(STRIP).toMatch(/<\/>\}\s*\{\/\*[\s\S]{0,600}\*\/\}\s*\{tickerOn && next && data && nowMs !== null && <span className="u-race-strip-ticker"/);
+    expect(STRIP.match(/className="u-race-strip-ticker"/g)?.length, '★流れる行が 2 か所にある（★替わるたびに頭から流れ直す）').toBe(1);
+    expect(STRIP).toContain('style={{ animationDuration: `${tickerSecOf(data.nextField.length)}s` }}');
+    expect(STRIP).toContain('export function tickerSecOf(fieldSize: number): number {');
     expect(STRIP).toContain('nextField: nextRace !== null && tickerShowsField(nextRace.status) ? await fetchField(nextRace.id) : [],');
   });
 });

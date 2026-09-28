@@ -131,15 +131,28 @@ function clock(iso: string): string {
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(timestamp);
 }
 
-/** ★流れる 1 行の全文（★末尾にも区切りを付け、★2 つ並べたときの継ぎ目を同じ見た目にする） */
-function tickerText(next: NonNullable<NoticeData['next']>, data: NoticeData, recent: RaceNoticeRow | null | undefined, nowMs: number): string {
-  const items = [...tickerItems(next, data.nextField, nowMs, clock), ...(recent ? [`直近確定 ${raceLabel(recent)}`] : [])];
+/**
+ * ★流れる 1 行の全文（★末尾にも区切りを付け、★2 つ並べたときの継ぎ目を同じ見た目にする）。
+ *   ★録画中は ★頭に ★そのレースと先頭（`leaderLine`）を置く。
+ */
+function tickerText(
+  next: NonNullable<NoticeData['next']>, data: NoticeData, recent: RaceNoticeRow | null | undefined, nowMs: number,
+  leaderLine: string | null,
+): string {
+  const items = [
+    ...(leaderLine === null ? [] : [leaderLine]),
+    ...tickerItems(next, data.nextField, nowMs, clock),
+    ...(recent ? [`直近確定 ${raceLabel(recent)}`] : []),
+  ];
   return `${items.join(' ／ ')} ／ `;
 }
 
-/** ★流す秒（★文の長さに比例・★20 字ごとに段にして ★毎秒の数字の変化で速さが揺れないように） */
-export function tickerSecOf(text: string): number {
-  return Math.max(14, Math.ceil(text.length / 20) * 20 * 0.28);
+/**
+ * ★流す秒（★**頭数だけ**で決める）。★文の長さで決めると ★「あと N 分」や先頭の馬が変わるたびに ★速さが変わって跳ぶ
+ *   （★2026-09-28・オーナー「ずっと動いているように」）。★変わるのは ★締切で出走表が来た 1 回だけ。
+ */
+export function tickerSecOf(fieldSize: number): number {
+  return 20 + 5 * Math.max(0, fieldSize);
 }
 
 function raceLabel(row: RaceNoticeRow): string {
@@ -398,6 +411,12 @@ export function RaceStrip(): React.ReactElement | null {
   const resulting = !replaying && !embedLive && recent !== null && recent !== undefined && nowMs !== null && winner !== null
     && replayResultShowing(recent.scheduled_at, nowMs);
 
+  /** ★流れる 1 行を出すか（★「大」で ★次のレースが読めていれば ★いつも）・★録画中に頭へ置く 1 項目 */
+  const tickerOn = size === 'big' && next !== null && next !== undefined && data !== null && nowMs !== null;
+  /** ★先頭は ★簡易版の走行の位置から（★本編が流れている間は ★映像と食い違うので出さない） */
+  const leaderLine = (replaying || embedLive) && recent
+    ? `${raceLabel(recent)}${!embedLive && leader !== null ? `・先頭 ${leader.gate}番 ${leader.name}` : ''}` : null;
+
   if (size === 'hidden') return null;
   /** ★`text`: ★その画面のレースの 1 行だけ（★走行・拡大・他のレースは出さない） */
   if (size === 'text') {
@@ -440,23 +459,25 @@ export function RaceStrip(): React.ReactElement | null {
           <strong>{recent.name} レース中</strong>
           {/* ★「（録画）」は ★別の枠にして ★縮めない（★極小でも必ず残す・R-18 回答 🟡 #8・生中継に見せない） */}
           <span className="u-race-strip-rec">（録画）</span>
-          {!compact && <span title={raceLabel(recent)}>{raceLabel(recent)}</span>}
-          {!compact && leader !== null && <span className="u-race-strip-recent">先頭 {leader.gate}番 {leader.name}</span>}
-        </> : size === 'big' && next && data && nowMs !== null ? <>
-          {/*
-            ★**流れる 1 行**（★2026-09-28・オーナー指示・★中身は暫定 `race-strip-ticker.ts`）。★同じ文を 2 つ並べて ★切れ目なく繰り返す。
-            ★停止スイッチ・「動きを減らす」では ★流さない（★CSS・資料 §5-7）。
-          */}
-          <span className="u-race-strip-ticker" aria-label={`${next.name} ${status}`}>
-            <span className="u-race-strip-ticker-track" aria-hidden style={{ animationDuration: `${tickerSecOf(tickerText(next, data, recent, nowMs))}s` }}>
-              <span>{tickerText(next, data, recent, nowMs)}</span><span>{tickerText(next, data, recent, nowMs)}</span>
-            </span>
-          </span>
-        </> : <>
+          {/* ★「大」は ★レース名と先頭を ★流れる 1 行に入れる（★下）。★ここに並べると 1 行に入らない */}
+          {!compact && !tickerOn && <span title={raceLabel(recent)}>{raceLabel(recent)}</span>}
+          {!compact && !tickerOn && leader !== null && <span className="u-race-strip-recent">先頭 {leader.gate}番 {leader.name}</span>}
+        </> : tickerOn ? null : <>
           <strong>{next ? `${clock(next.scheduled_at)} ${status}` : status}</strong>
           {next && <span title={raceLabel(next)}>{raceLabel(next)}</span>}
           {recent && !compact && <span className="u-race-strip-recent">直近確定: {raceLabel(recent)}</span>}
         </>}
+        {/*
+          ★**流れる 1 行**（★2026-09-28・オーナー指示「ずっと動いているように」・★中身は暫定 `race-strip-ticker.ts`）。
+          ★「大」の帯では ★待ち時間も・録画中も・結果の強調中も ★**同じ要素のまま**流し続けます（★差し替えると頭から流れ直す）。
+          ★同じ文を 2 つ並べて ★切れ目なく繰り返す。★流す秒は ★頭数だけで決める（★数字の変化で速さが揺れて跳ばない）。
+          ★停止スイッチ・「動きを減らす」では ★流さない（★CSS・資料 §5-7）。
+        */}
+        {tickerOn && next && data && nowMs !== null && <span className="u-race-strip-ticker" aria-label={`${next.name} ${status}`}>
+          <span className="u-race-strip-ticker-track" aria-hidden style={{ animationDuration: `${tickerSecOf(data.nextField.length)}s` }}>
+            <span>{tickerText(next, data, recent, nowMs, leaderLine)}</span><span>{tickerText(next, data, recent, nowMs, leaderLine)}</span>
+          </span>
+        </span>}
       </div>
       {error && <span className="u-race-strip-error">更新できません</span>}
       {/* ★録画を出せなかった理由（★黙って簡易版に戻らない） */}
