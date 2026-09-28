@@ -8,7 +8,7 @@
  *   ここ 1 か所に閉じ込め、他の場所からは呼ばない（テストは `now` を注入した純関数 `formatCountdown` を叩く）。
  */
 import { useEffect, useState } from 'react';
-import { CYCLE_MS, PHASE_OFFSET_MS } from '@star/scheduler';
+import { salesClosedAt } from '../lib/sales-close';
 
 /** 残り時間の表記（m:ss）。0 以下は "0:00" */
 export function formatCountdown(untilMs: number, nowMs: number): string {
@@ -23,17 +23,6 @@ export function countdownPhase(untilMs: number, nowMs: number, closeBeforeMs: nu
   if (left <= 0) return 'live';
   if (left <= closeBeforeMs) return 'soon';
   return 'open';
-}
-
-/**
- * ★発売の締切は ★発走の何ミリ秒前か（★cycle.ts の表・★SQL の `sales_close_lead_seconds()` と網 sales-close-sql で一致）。
- */
-export const SALES_CLOSE_LEAD_MS = CYCLE_MS - PHASE_OFFSET_MS.salesClose;
-
-/** ★締め切ったか（★表示だけ・★拒むのはサーバーの place_bet）。★発走の時刻が分からなければ 偽 */
-export function salesClosedAt(scheduledAtMs: number | null, nowMs: number | null): boolean {
-  if (scheduledAtMs === null || nowMs === null || !Number.isFinite(scheduledAtMs)) return false;
-  return nowMs >= scheduledAtMs - SALES_CLOSE_LEAD_MS;
 }
 
 /** ★締め切ったか（★表示用の壁時計で 1 秒ごとに見る） */

@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import { checkOwnRaceSelection, ownRaceReasonText } from '@star/betting';
 import { Backdrop, BigButton, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
-import { CLAIM_OWN_RACE_BET } from '../../lib/claims';
+import { BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_OWN_RACE_BET } from '../../lib/claims';
 import { loadBetAllowance, loadBetScreen, oddsKey, placeBet, type BetAllowance, type BetScreenData } from '../../lib/bet-screen';
 
 const FRAME_COLORS = ['#f5f5f5', '#191919', '#d62828', '#1446b4', '#fad728', '#148c46', '#f08219', '#f596be'] as const;
 const DARK_TEXT_FRAMES = new Set([1, 5, 8]);
-const EP_PER_PICK = 10;
+/** ★1 口の額は claims.ts の 1 か所（★DB の制約 bets_amount_range と網で一致・2026-09-29 まで 10 で 必ず落ちていた） */
+const EP_PER_PICK = BET_PER_PICK_EP;
 const REFRESH_MS = 1000 * 15;
 
 function frameOf(gate: number, fieldSize: number): number {
@@ -125,7 +126,7 @@ export default function VotePage(): React.ReactElement {
       <section aria-label="投票内容" style={{ flex: '1 1 250px', minWidth: 0, maxWidth: 420, padding: 12, alignSelf: 'flex-start', border: '2px solid rgba(251,247,236,.28)', borderRadius: 12, background: 'var(--u-panel)', fontSize: 12 }}>
         <strong>マークシート</strong>
         <p>{selected === null ? '馬を1頭選んでください。' : `${selected}番を選択中`}</p>
-        <p>使う参加ポイント: {EP_PER_PICK} EP</p>
+        <p>{CLAIM_BET_PER_PICK}</p>
         <p>現在の残高: {data ? data.authenticated ? `${data.epBalance.toLocaleString('ja-JP')} EP` : 'ログイン後に表示' : '読み込み中'}</p>
         {ownGates.length > 0 && <p>{CLAIM_OWN_RACE_BET}。</p>}
         {!check.ok && <p role="alert">{ownRaceReasonText(check)}</p>}

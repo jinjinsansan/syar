@@ -89,6 +89,12 @@ export const TOOL_AFTERMATH = {
     // ★AU-7: ★主張には引用を付ける。★この行が変われば、★検査が壊れて落ちます
     countedBy: 'JSON.stringify(after) === JSON.stringify(before)',
   },
+  'verify-sales-close-live.mjs': {
+    mode: 'restores',
+    why: '★`begin` → 利用者・レースの発走時刻・`0096` の本体（★begin/commit を外して）・`place_bet` → ★**必ず `rollback`**（`finally`・2026-09-29）。'
+      + '✅ ★**戻したことを数えます**: ★投票・口座の行数と ★`sales_close_lead_seconds` の有無の 前後一致を見ます。',
+    countedBy: 'must(JSON.stringify(after) === JSON.stringify(before),',
+  },
   'verify-breed-own-mare-live.mjs': {
     mode: 'restores',
     why: '★`begin` → 利用者・母の持ち主と役割・`request_breeding`・`confirmBreeding`（★種付料の引き落とし）→ ★**必ず `rollback`**（`finally`）。'

@@ -14,7 +14,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { stripComments } from './lib/ts-blocks.js';
 import {
-  CLAIM_CARD_PUBLISH, CLAIM_ENTRY_NO_CANCEL, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
+  BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_CARD_PUBLISH, CLAIM_ENTRY_NO_CANCEL, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
 } from '../../web/src/lib/claims';
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -58,7 +58,37 @@ interface Claim {
   readonly backedBy: () => string[];
 }
 
+/**
+ * ★投票額の制約 `bets_amount_range` の ★最後の定義を読み、★その額が通るかを返す（★2026-09-29・レビュー側「値を持つ文は その値が通るかまで見る」）。
+ *   ★読めない形なら 投げる（★読めないを「通る」にしない）。
+ */
+function betAmountPasses(amount: number): { readonly ok: boolean; readonly rule: string } {
+  const defs = SRC.filter((f) => f.rel.startsWith('db/migrations/'))
+    .flatMap((f) => [...f.text.matchAll(/constraint\s+bets_amount_range\s+check\s*\(([^;]*?)\)\s*[,)]/gi)].map((m) => ({ rel: f.rel, rule: m[1]! })))
+    .sort((a, b) => a.rel.localeCompare(b.rel));
+  const rule = defs.at(-1)?.rule;
+  if (rule === undefined) throw new Error('★bets_amount_range の定義が見つからない');
+  const min = /amount\s*>=\s*(\d+)/.exec(rule);
+  const max = /amount\s*<=\s*(\d+)/.exec(rule);
+  const step = /amount\s*%\s*(\d+)\s*=\s*0/.exec(rule);
+  if (min === null || max === null || step === null) throw new Error(`★bets_amount_range を読めない形: ${rule}`);
+  const ok = amount >= Number(min[1]) && amount <= Number(max[1]) && amount % Number(step[1]) === 0;
+  return { ok, rule: rule.replace(/\s+/g, ' ') };
+}
+
 const CLAIMS: readonly Claim[] = [
+  {
+    id: '⑩投票の 1 口の額は DB の制約を通る（★2026-09-29 まで 10 EP で 必ず落ちていた）',
+    text: CLAIM_BET_PER_PICK, name: 'CLAIM_BET_PER_PICK',
+    usedBy: ['apps/web/src/app/vote/page.tsx'],
+    backedBy: () => {
+      const { ok, rule } = betAmountPasses(BET_PER_PICK_EP);
+      const why = ok ? [] : [`★${BET_PER_PICK_EP} EP は bets_amount_range（${rule}）を通らない`];
+      const vote = stripComments(read('apps/web/src/app/vote/page.tsx'));
+      if (!vote.includes('amount: EP_PER_PICK') || !vote.includes('const EP_PER_PICK = BET_PER_PICK_EP;')) why.push('★/vote が 送る額を BET_PER_PICK_EP から取っていない');
+      return why;
+    },
+  },
   {
     id: '①名前・牧場名・勝負服は あとから変えられない',
     text: CLAIM_NO_CHANGE_LATER, name: 'CLAIM_NO_CHANGE_LATER',

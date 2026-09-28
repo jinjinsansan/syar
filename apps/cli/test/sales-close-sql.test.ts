@@ -14,7 +14,7 @@
 import { describe, expect, it } from 'vitest';
 import { CYCLE_MS, PHASE_OFFSET_MS } from '@star/scheduler';
 import { lastFunctionBody, stripSqlComments } from './lib/sql-source.js';
-import { SALES_CLOSE_LEAD_MS, salesClosedAt } from '../../web/src/components/clock';
+import { SALES_CLOSE_LEAD_MS, salesClosedAt } from '../../web/src/lib/sales-close';
 
 describe('★投票の締切を SQL と TS で 1 つにする', () => {
   it('🔴 ① sales_close_lead_seconds() ＝ CYCLE_MS − PHASE_OFFSET_MS.salesClose（秒）', () => {

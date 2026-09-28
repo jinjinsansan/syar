@@ -13,7 +13,15 @@
  *   ★言わなくてよいことを言わない（★「最終の数字です」は ★前に別の数字が在った含みで誤解させる・2026-09-29 に落とした）。
  */
 
-import { BET_CAP_OWN_RACE_EP } from '@star/betting';
+import { BET_CAP_OWN_RACE_EP, MIN_STAKE } from '@star/betting';
+
+/**
+ * ★1 口の額（★正典 §9.1: 全券種 100 EP・★`MIN_STAKE`）。★DB の制約 `bets_amount_range`（0001・100 以上・100 刻み・10,000 以下）が ★通す額。
+ *   ★2026-09-29: ★/vote は 10 EP を送っていて ★制約で必ず落ち、★投票が 1 件も成立していなかった。
+ *   ★網 claims-backed は ★制約の定義を読んで ★この額が通るかを見る（★文字列の一致ではなく）。
+ */
+export const BET_PER_PICK_EP = MIN_STAKE;
+export const CLAIM_BET_PER_PICK = `使う参加ポイント: ${BET_PER_PICK_EP.toLocaleString('ja-JP')} EP`;
 import { CYCLE_MS, PHASE_OFFSET_MS } from '@star/scheduler';
 
 /** ★ミリ秒を「5 分 30 秒」の形に（★画面に数字を直書きしない・cycle.ts から導く） */

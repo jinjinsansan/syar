@@ -21,6 +21,8 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { loadEnv } from './lib/env.mjs';
 import { assertNotProduction } from './lib/guard.mjs';
+/** ★/vote が実際に送る 1 口の額（★ここも同じ 1 か所から・★2026-09-29 まで 10 で 制約に必ず落ちていた） */
+import { BET_PER_PICK_EP } from '../apps/web/src/lib/claims.ts';
 
 const env = loadEnv();
 console.log('接続先:', env.STAR_ENV);
@@ -36,7 +38,7 @@ const MIGRATION = readFileSync('db/migrations/0096_sales_close_before_start.sql'
   .split('\n').filter((l) => !/^\s*(begin|commit)\s*;\s*$/i.test(l)).join('\n');
 
 /**
- * ★発走を `now() + secs` 秒にしたレースで 100 EP 投票してみる（★bets_amount_range は 100 以上・100 刻み）（★savepoint で包み 結果だけ返す）
+ * ★発走を `now() + secs` 秒にしたレースで ★/vote と同じ額（`BET_PER_PICK_EP`）を投票してみる（★bets_amount_range は 100 以上・100 刻み）（★savepoint で包み 結果だけ返す）
  * @param {string} uid @param {string} raceId @param {unknown} selection @param {number} secs
  * @returns {Promise<{ ok: boolean, message: string }>}
  */
@@ -45,7 +47,7 @@ async function tryBet(uid, raceId, selection, secs) {
   try {
     await c.query(`update races set status = 'scheduled', scheduled_at = now() + make_interval(secs => $2) where id = $1`, [raceId, secs]);
     await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: uid, role: 'authenticated' })]);
-    await c.query('select public.place_bet($1, $2, $3::jsonb, $4, $5)', [raceId, 'win', JSON.stringify(selection), 100, randomUUID()]);
+    await c.query('select public.place_bet($1, $2, $3::jsonb, $4, $5)', [raceId, 'win', JSON.stringify(selection), BET_PER_PICK_EP, randomUUID()]);
     await c.query('rollback to savepoint try_bet');
     return { ok: true, message: '' };
   } catch (e) {
@@ -53,6 +55,11 @@ async function tryBet(uid, raceId, selection, secs) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) };
   }
 }
+
+/** ★戻したことを数えるため ★取引の前の姿を覚える */
+const snap = async () => (await c.query(`select (select count(*) from bets)::int as bets, (select count(*) from users)::int as users,
+  (select count(*) from pg_proc where proname = 'sales_close_lead_seconds')::int as fn`)).rows[0];
+const before = await snap();
 
 try {
   await c.query('begin');
@@ -87,8 +94,12 @@ try {
   must(!at59.ok && /発売時間外/.test(at59.message), `★② 発走の 59 秒前（＝締切の 1 秒後）は「発売時間外」で拒まれる（${at59.ok ? '★通った' : at59.message}）`);
 } finally {
   await c.query('rollback').catch(() => undefined);
-  await c.end();
 }
-console.log('\n★取引は rollback（★0096 の本体・口座・レースの書き換えは 何も残っていない）');
+/** ★戻したことを数える（★取引の前と後で 同じか） */
+const after = await snap();
+await c.end();
+console.log('');
+must(JSON.stringify(after) === JSON.stringify(before),
+  `★rollback で戻った: 投票 ${before.bets}→${after.bets}・口座 ${before.users}→${after.users}・締切の関数 ${before.fn}→${after.fn}（★前後で同じ）`);
 console.log(failed === 0 ? '✅ ★合格' : `🔴 ★不合格 ${failed} 件`);
 process.exit(failed === 0 ? 0 : 1);
