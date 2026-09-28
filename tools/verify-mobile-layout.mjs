@@ -89,16 +89,27 @@ const PAGES = [
  *   ★id は `/races` `/stable` の href から拾えます（★直書きしないこと）。
  */
 const RID = arg('rid', '');
-const HID = arg('hid', 'h1');
+/**
+ * ★馬の id に ★既定を持たせない（★2026-09-28・レビュー側: 測れていない所を 数に入れない）。
+ *   ★旧既定 'h1' は ★実在しない馬で、★`--rid` だけ渡すと ★無い馬の画面を測って「0/N」に数えていました。
+ */
+const HID = arg('hid', '');
 /** ★折り返した結果を目で見るための撮影（★out/_mobile/） */
 const SHOTS = process.argv.includes('--shots');
 /** ★44px 未満の内訳を出す */
 const TAPS = process.argv.includes('--taps');
-const DYNAMIC = RID === '' ? [] : [
-  [`/races/${RID}`, '★レース詳細'],
-  [`/races/${RID}/bet`, '★投票'],
-  [`/races/${RID}/odds`, '★オッズ'],
-  [`/stable/${HID}`, '★馬の詳細'],
+const DYNAMIC = [
+  ...(RID === '' ? [] : [
+    [`/races/${RID}`, '★レース詳細'],
+    [`/races/${RID}/bet`, '★投票'],
+    [`/races/${RID}/odds`, '★オッズ'],
+  ]),
+  ...(HID === '' ? [] : [[`/stable/${HID}`, '★馬の詳細']]),
+];
+/** ★測っていない動的な経路（★「N / M」の M に入れず ★名前で出す） */
+const UNCHECKED = [
+  ...(RID === '' ? ['レース詳細 /races/[id]', '投票 /races/[id]/bet', 'オッズ /races/[id]/odds'] : []),
+  ...(HID === '' ? ['馬の詳細 /stable/[horseId]'] : []),
 ];
 
 const READY = "(()=>document.readyState==='complete' && document.body && document.body.children.length>0)()";
@@ -446,5 +457,5 @@ for (const r of rows) {
 
 console.log('');
 console.log(`★横あふれが出た組み合わせ: ★**${broken} / ${checked}**`);
-if (DYNAMIC.length === 0) console.log('⚠️ ★動的な経路 4 本（レース詳細 / 投票 / オッズ / 馬の詳細）は調べていません。★--rid <id> で実在の id を渡してください');
+if (UNCHECKED.length > 0) console.log(`⚠️ ★測っていない動的な経路 ${UNCHECKED.length} 本（★上の数に入っていません）: ${UNCHECKED.join(' ／ ')}。★--rid <レース id> / --hid <馬 id> で実在の id を渡してください`);
 console.log('⚠️ ★合否は出しません（★どこまで許すかは正典・オーナーの判断）。★この道具は測るだけです。');
