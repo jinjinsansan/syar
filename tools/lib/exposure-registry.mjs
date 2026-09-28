@@ -146,6 +146,11 @@ export const EXPECTED_EXPOSURE = {
   //   ★運営が馬名を戻した記録（★理由・元の名前のハッシュ）。★書くのは道具だけ。
   //   ★直に読ませない: ★理由（人名・商標など）を公開しないため（★裁定 REVIEW_NAME_RESET_TOOL_VERDICT_20260922.md P-2）。
   horse_name_resets: CLOSED,
+  // ── ★`worker_status`（★`0092`・2026-09-28・レビュー側の決定 (ii)） ──
+  //   ★ワーカーの版と周の記録（★1 行）。★書くのはワーカーだけ。★直に読ませない:
+  //   ★周の重さ（cycle_pct）と起動時刻は ★「いつ止まっているか」を外から読める値で、★要る人がいない。
+  //   ★公開するのは ★`worker_heartbeat()` が返す ★release_sha と last_cycle_at の 2 つだけ（★下の関数の登録）
+  worker_status: CLOSED,
 };
 
 /** 登録簿に無いものを返す（V-20 ③） */
@@ -279,6 +284,11 @@ export const EXPECTED_FUNCTION_EXECUTE = {
   'unlock_stable_grade(uuid,uuid)': { anon: false, authenticated: true },
   // ★ワーカー専用（`0021`・D-095 候補）。利用者のロールには実行させない（監査 H-4）
   'spend_training_ep(uuid,bigint,integer)': { anon: false, authenticated: false },
+  // ★ワーカーの版と最後の周の時刻（`0092`・2026-09-28）。★`/api/healthz` が anon で呼ぶ。
+  //   ★**healthz と worker_heartbeat() が ★release_sha と last_cycle_at を公開する**（★レビュー側の条件 5）。
+  //   ★healthz は誰でも開ける URL なので ★外から読める範囲は同じ。★周の重さ・その他の列は返さない。
+  //   ★security definer ＋ search_path 固定 ＋ public から剥がして anon / authenticated にだけ execute
+  'worker_heartbeat()': { anon: true, authenticated: true },
 };
 
 /** 登録簿に無い関数を返す（V-20 ④） */

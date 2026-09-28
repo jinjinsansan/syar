@@ -84,6 +84,16 @@ bash tools/deploy.sh <0 で控えた sha>
   | 4 | `失敗` の行が 0 | 止めて報告 |
   | 5 | ★**最初の週送りの周の `[worker] 周の全体=…s(…%)`** を記録する（`6451f98` で足した行・週送りと配合を含む） | ★**100% を超えたら止めて報告**（裁定 `REVIEW_PROD_DEPLOY_ORDER_20260922.md` §6）。超えたときの振る舞いは `REPORT_STAGING_WORKER_RUN_20260922.md` §8。★**超えたら、`[worker] ★発売の遅れ cycle=… +…s` の行の秒数も報告**（発売の時間がそのぶん短くなった・裁定 §7） |
 
+- ★**ワーカーの版を DB 側から確かめる（★SSH は使わない）**（★移行 `0092` を当てた後・★2026-09-28）:
+  ```bash
+  npx tsx tools/verify-deployed-build.mjs --base https://star-two-chi.vercel.app --expect <画面の sha> --expect-worker <deploy.sh に渡した sha（40 桁）>
+  ```
+  | # | 見るもの | 出なければ |
+  |---|---|---|
+  | 6 | ★`★ワーカー : <sha>（最後の周 … 秒前）` が ★期待の版と一致し、★最後の周が 12 分（2 周）以内 | ★読めない（`worker: null`）なら ★`0092` が当たっていないか ★ワーカーが古い。★食い違いなら ★deploy.sh がまだ（★git push ではワーカーは入れ替わらない） |
+  ⚠️ ★healthz は ★DB が読めなくても 200 で画面の sha を返します（★worker だけ null）。★画面の確認は ★それで止まりません。
+  ⚠️ ★版は ★`/opt/star-current` の実体の末尾から読みます。★40 桁でなければ `unknown` と書きます（★その場合は ★deploy.sh 以外の入れ方をした疑い）。
+
 ### ⑥ の記録: ★本番のワーカーが main より後ろにいる（★2026-09-28・効く変更は 0）
 
 ★本番のワーカー ＝ ★`b583ce2`（★2026-09-27 00:05 JST に配備・`/var/log/star-deploy.log`）／★main ＝ ★`71e7d9c`（★2026-09-28 push）。

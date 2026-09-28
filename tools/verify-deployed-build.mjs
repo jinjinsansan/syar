@@ -19,8 +19,10 @@
  * 使い方:
  *   npx tsx tools/verify-deployed-build.mjs --base https://star-two-chi.vercel.app
  *   npx tsx tools/verify-deployed-build.mjs --base <URL> --expect <SHA>
+ *   npx tsx tools/verify-deployed-build.mjs --base <URL> --expect <SHA> --expect-worker <ワーカーの SHA>   （★ワーカーも・移行 0092 の後）
  */
 import { execFileSync } from 'node:child_process';
+import { CYCLE_MS } from '../packages/scheduler/src/cycle.ts';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ? d : process.argv[i + 1]; };
 const BASE = arg('base', process.env.AUDIT_BASE ?? '');
@@ -81,6 +83,39 @@ if (process.argv.includes('--record')) {
     matched: sha === expected,
   }, null, 2)}\n`, 'utf8');
   console.log('★記録しました: evidence/prod-build/last-check.json');
+}
+
+/**
+ * ★**ワーカーの版と、止まっていないか**（★2026-09-28・移行 `0092`・healthz の `worker`）。
+ *   ★判定は ★公開の 2 つ（★release_sha と last_cycle_at）だけで行います（★周の重さに依らない・レビュー側の条件 6）。
+ *   ★`--expect-worker <sha>` を渡したときだけ ★合否に入れます（★渡さなければ 表示だけ）。
+ *   ⚠️ ★読めない（`worker: null`）は ★判定不能 ＝ ★通しません（★R-3）。
+ */
+const expectWorker = arg('expect-worker', '');
+const worker = body.worker ?? null;
+const STALE_MS = 2 * CYCLE_MS;
+let workerAgeMs = null;
+if (worker !== null && typeof worker.lastCycleAt === 'string') {
+  workerAgeMs = Date.now() - new Date(worker.lastCycleAt).getTime();
+  console.log(`★ワーカー      : ${worker.sha}　（最後の周 ${worker.lastCycleAt}・${Math.round(workerAgeMs / 1000)} 秒前）`);
+} else {
+  console.log('★ワーカー      : （読めません — healthz の worker が null）');
+}
+if (expectWorker !== '') {
+  if (worker === null || typeof worker.sha !== 'string') {
+    console.error('\n★★ワーカーの版が読めません。★判定できないので、通しません');
+    process.exit(1);
+  }
+  if (worker.sha !== expectWorker) {
+    console.error(`\n★★ワーカーが食い違っています。★期待 ${expectWorker.slice(0, 12)} ／ ★本番 ${worker.sha.slice(0, 12)}`);
+    console.error('   ★deploy.sh がまだか、★別の版を入れたか（★git push ではワーカーは入れ替わりません）');
+    process.exit(1);
+  }
+  if (workerAgeMs === null || !Number.isFinite(workerAgeMs) || workerAgeMs > STALE_MS) {
+    console.error(`\n★★ワーカーが止まっている疑いがあります（★最後の周が ${STALE_MS / 60000} 分より前）`);
+    process.exit(1);
+  }
+  console.log('★ワーカーは期待の版で、止まっていません');
 }
 
 /**

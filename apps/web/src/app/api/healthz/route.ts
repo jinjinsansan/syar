@@ -18,25 +18,39 @@
  *   → ★**Vercel が自動で入れる値だけ**を読みます。★人が設定する手順を挟みません。
  *      ★`VERCEL_GIT_COMMIT_SHA` は Vercel が必ず入れます。
  *
- * 【★DB に触りません】★読むだけです。★秘密を出しません（★SHA と枝の名前と環境名だけ）。
+ * 【★DB には ★1 つだけ触ります（★2026-09-28・移行 `0092`）】★`worker_heartbeat()` を anon で呼び、★ワーカーの版と最後の周の時刻を足します。
+ *   ★**best-effort**: ★読めなければ `worker: null`。★既存の項と 200 は ★必ず返します（★`lib/healthz.ts`）。
+ *   ★秘密を出しません（★SHA・枝の名前・環境名・ワーカーの SHA と最後の周の時刻だけ・★exposure-registry に登録）。
  *
  * 確かめ方: `npx tsx tools/verify-deployed-build.mjs --base <本番URL>`
  */
+
+import { healthBody } from '../../../lib/healthz';
 
 /** ★毎回作り直す（★キャッシュされた古い SHA を返しては意味がありません） */
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export function GET(): Response {
-  /**
-   * ⚠️ ★**無いときは `null` を返します。** ★`'unknown'` のような文字を返すと、
-   *    ★照合の道具が「文字列としては取れた」と読んで通してしまいます（R-3・判定不能は FAIL へ）。
-   */
-  const sha = process.env['VERCEL_GIT_COMMIT_SHA'] ?? null;
-  const ref = process.env['VERCEL_GIT_COMMIT_REF'] ?? null;
-  const env = process.env['VERCEL_ENV'] ?? null;
-  return Response.json(
-    { sha, ref, env, at: new Date().toISOString() },
-    { headers: { 'cache-control': 'no-store' } },
+export async function GET(): Promise<Response> {
+  const body = await healthBody(
+    {
+      sha: process.env['VERCEL_GIT_COMMIT_SHA'] ?? null,
+      ref: process.env['VERCEL_GIT_COMMIT_REF'] ?? null,
+      env: process.env['VERCEL_ENV'] ?? null,
+    },
+    new Date(),
+    async (signal) => {
+      const url = process.env['NEXT_PUBLIC_SUPABASE_URL'];
+      const key = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'];
+      if (!url || !key) throw new Error('supabase env missing');
+      const res = await fetch(`${url}/rest/v1/rpc/worker_heartbeat`, {
+        method: 'POST', signal, cache: 'no-store',
+        headers: { apikey: key, authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+        body: '{}',
+      });
+      if (!res.ok) throw new Error(`worker_heartbeat ${res.status}`);
+      return res.json();
+    },
   );
+  return Response.json(body, { status: 200, headers: { 'cache-control': 'no-store' } });
 }

@@ -37,6 +37,7 @@ import { advanceTrainingWeeks } from './training-runner.js';
 import { runBreedingCatchUp } from './breeding-runner.js';
 import { PLAYER_BREEDING_BUDGET_MS, runPlayerBreeding } from './player-breeding.js';
 import { runEntryScratch } from './entry-scratch-runner.js';
+import { recordWorkerStatus, releaseShaOf } from './worker-status.js';
 
 /**
  * 🔴 ★**配合の遅れが縮まないことを、★黙って続けさせない**（★2026-09-21）。
@@ -188,6 +189,14 @@ async function main(): Promise<void> {
       stopping = true;
     });
   }
+
+  /**
+   * ★**自分の版と起動時刻**（★2026-09-28・移行 `0092`）。★周の終わりに `worker_status` へ書き、★`/api/healthz` が読む。
+   *   ★版は ★作業フォルダの実体（★`/opt/star-releases/<sha>`）の末尾（★`worker-status.ts`）。
+   */
+  const releaseSha = releaseShaOf(process.cwd());
+  const startedAtIso = new Date().toISOString();
+  console.log(`[worker] 版=${releaseSha}`);
 
   while (!stopping) {
     const started = Date.now();
@@ -895,6 +904,12 @@ async function main(): Promise<void> {
      *   ★本番の周に収まるかで ★いちばん重いのはその 2 つなので、★周の終わりで全体を出します（★表示だけ・ふるまいは変えない）。
      */
     console.log(`[worker] 周の全体=${(elapsed / 1000).toFixed(1)}s(${((elapsed / CYCLE_MS) * 100).toFixed(1)}%)`);
+    /** ★版と周の記録（★書けなくても周は止めない・`worker-status.ts`） */
+    try {
+      await recordWorkerStatus(client, { releaseSha, startedAtIso, cycleMs: elapsed, cyclePct: (elapsed / CYCLE_MS) * 100 });
+    } catch (e) {
+      console.error('[worker] 版と周の記録に失敗:', (e as Error).message);
+    }
     await new Promise((r) => setTimeout(r, Math.max(1000, TICK_MS - elapsed)));
   }
 
