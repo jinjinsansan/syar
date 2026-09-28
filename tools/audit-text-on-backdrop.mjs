@@ -16,6 +16,12 @@
  *   npx tsx tools/audit-text-on-backdrop.mjs --widths 390,1280
  *   AUDIT_BASE=https://star-two-chi.vercel.app npx tsx tools/audit-text-on-backdrop.mjs
  *
+ * 【★もう 1 つ ★見えているか（★重ね順・2026-09-29・レビュー側）】
+ *   ★明度（★読めるか）とは別に、★文字の葉の位置で ★`elementFromPoint` が ★芝（Backdrop）の中を返したら ★「芝の下に沈んでいる」。
+ *   ★2026-09-29 の実害: ★`NoticeBar` が position を持たず ★芝（absolute）の下に描かれ、★本番 /signup の登録の説明が ★赤い点しか見えていなかった。
+ *   ★沈んだ文字が 1 件でもあれば ★終了コード 1（★明度と違い ★直すかの判断は要らない・★見えていないのは欠陥）。
+ *   ★`--fake-stale`: ★`/api/healthz` の sha だけを別の値に差し替え、★帯の上の「新しい版があります」を出した姿でも測る。
+ *
  * ⚠️ ★ログインの要る画面は ★ログインしていない姿で測ります。
  * ★層の位置と暗幕の段は ★`apps/web/src/components/uma/backdrop-plate.ts`（★Backdrop と同じ 1 か所）から読みます。
  */
@@ -72,7 +78,6 @@ const COLLECT = `(() => {
   if (!root) return JSON.stringify({ root: false });
   const backdrop = root.firstElementChild && root.firstElementChild.getAttribute('aria-hidden') !== null ? root.firstElementChild : null;
   if (!backdrop) return JSON.stringify({ root: true, backdrop: false });
-  const rr = root.getBoundingClientRect();
   const out = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
@@ -84,6 +89,8 @@ const COLLECT = `(() => {
     if (cs.visibility === 'hidden' || cs.display === 'none') continue;
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
+    /** ★縦の位置は ★いまの根の位置で出す（★下で 1 件ずつ画面に寄せるので ★最初の根の位置は古くなる） */
+    const rr = root.getBoundingClientRect();
     let panel = null;
     for (let a = el; a && a !== root; a = a.parentElement) {
       const s = getComputedStyle(a);
@@ -91,7 +98,12 @@ const COLLECT = `(() => {
       if ((bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') || (s.backgroundImage && s.backgroundImage !== 'none')) { panel = a.tagName.toLowerCase(); break; }
     }
     const m = cs.color.match(/[0-9.]+/g) || ['0', '0', '0'];
+    el.scrollIntoView({ block: 'center', inline: 'nearest' });
+    const v = el.getBoundingClientRect();
+    const hit = document.elementFromPoint(v.left + Math.min(v.width / 2, 8), v.top + v.height / 2);
+    const buried = hit !== null && backdrop.contains(hit);
     out.push({
+      buried,
       text: text.slice(0, 24), tag: el.tagName.toLowerCase(), panel,
       y: ((r.top + r.height / 2 - rr.top) / rr.height) * 100,
       color: [Number(m[0]), Number(m[1]), Number(m[2])], size: parseFloat(cs.fontSize), weight: Number(cs.fontWeight) || 400,
@@ -101,8 +113,22 @@ const COLLECT = `(() => {
 })()`;
 
 const rows = [];
+const buriedRows = [];
+let sawNotice = false;
+const FAKE_STALE = process.argv.includes('--fake-stale');
 const browser = await launch({ width: WIDTHS[0], height: 844 });
 try {
+  if (FAKE_STALE) {
+    await browser.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/healthz*', requestStage: 'Request' }] });
+    browser.on('Fetch.requestPaused', (ev) => {
+      const body = Buffer.from(JSON.stringify({ sha: '0'.repeat(40), ref: null, env: null, at: '', worker: null })).toString('base64');
+      browser.send('Fetch.fulfillRequest', {
+        requestId: ev.requestId, responseCode: 200, body,
+        responseHeaders: [{ name: 'content-type', value: 'application/json' }, { name: 'cache-control', value: 'no-store' }],
+      }).catch(() => undefined);
+    });
+    console.log('★--fake-stale: /api/healthz の sha を 0000… に差し替えています（★帯の上の知らせを出した姿）');
+  }
   for (const w of WIDTHS) {
     await browser.send('Emulation.setDeviceMetricsOverride', { width: w, height: 844, deviceScaleFactor: 2, mobile: w < 800 });
     for (const p of PAGES) {
@@ -113,6 +139,8 @@ try {
       if (!res.root) { rows.push({ p, w, note: '★馬物語の根が無い' }); continue; }
       if (!res.backdrop) { rows.push({ p, w, note: '★芝（Backdrop）が無い' }); continue; }
       for (const it of res.items) {
+        if (it.buried) buriedRows.push({ p, w, text: it.text, tag: it.tag });
+        if (it.text.startsWith('新しい版があります')) sawNotice = true;
         if (it.panel !== null) continue;
         const pos = Math.max(0, Math.min(100, it.y));
         const layer = layerAt(pos);
@@ -137,4 +165,13 @@ for (const r of rows) {
 }
 const direct = rows.filter((r) => !r.note);
 console.log(`\n★じかの文字: ★${direct.length} 件 ／ ★基準に届かない: ★${direct.filter((r) => !r.pass).length} 件`);
-console.log('⚠️ ★合否で止めません（★直すかはレビュー側・デザイナーが決める）。★この道具は測るだけです。');
+console.log('⚠️ ★明度は合否で止めません（★直すかはレビュー側・デザイナーが決める）。★この道具は測るだけです。');
+
+console.log('\n=== ★芝の下に沈んだ文字（★elementFromPoint が芝の中を返す・★見えていない）===');
+for (const r of buriedRows) console.log(`  🔴 ${r.p.padEnd(20)} ${String(r.w).padStart(4)}px  <${r.tag}>「${r.text}」`);
+const measured = new Set(rows.filter((r) => !r.note).map((r) => `${r.p}@${r.w}`)).size;
+console.log(`\n★沈んだ文字: ★${buriedRows.length} 件（★測れた画面 ${PAGES.length * WIDTHS.length} 面のうち ★文字を拾えた ${measured} 面・★芝の上にじかの文字が無い面は数えていない）`);
+if (FAKE_STALE && !sawNotice) {
+  console.log('  ⚠️ ★--fake-stale なのに ★知らせの文を 1 件も拾っていません（★知らせが出ていない・★この実行は知らせを測れていない）');
+}
+if (buriedRows.length > 0) process.exitCode = 1;
