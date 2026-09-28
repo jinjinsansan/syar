@@ -49,7 +49,9 @@ describe('★常設帯の走行（①②）', () => {
     expect(LIVE, '★本編を 窓の後・「大」以外で開く').toMatch(/if \(size !== 'big' \|\| motionReduced\) \{ setEmbed\(null\); return; \}\s*if \(!windowOver && recentId !== null && embeddedIdRef\.current !== recentId\)/);
     expect(LIVE, '★窓が閉じても 始まっていない本編を読み続ける').toMatch(/if \(!windowOver \|\| e === null \|\| e\.live\) return;[\s\S]{0,200}setEmbed\(null\);/);
     /** ★窓の前は ★同じ箱を画面の外へ（★箱を差し替えると 読み込みが最初からになる） */
-    expect(LIVE).toContain("{size === 'big' && (big || embed !== null) && <div className={`u-race-strip-stage${big ? '' : ' u-race-strip-stage-offscreen'}`}>");
+    expect(LIVE).toContain("{size === 'big' && (big || embed !== null) && <div className={`u-race-strip-stage${big ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}`}>");
+    /** ★本編が流れている間は ★箱を 16:9 に（★枠いっぱい・★引き伸ばさない・2026-09-28 オーナー指示） */
+    expect(CSS).toMatch(/\.u-race-strip-stage-live \{[^}]*aspect-ratio: 16 \/ 9;/);
     expect(LIVE, '★「極小」が録画の窓の外で出る').toMatch(/\(replaying \|\| embedLive\) && recent && data \? <>[\s\S]{0,300}u-race-run-mini/);
     expect(LIVE, '★拡大が録画の窓の外で出る').toMatch(/\{expanded && replaying && recent && <div className="u-race-replay-overlay"/);
   });

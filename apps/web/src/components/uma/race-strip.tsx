@@ -372,7 +372,7 @@ export function RaceStrip(): React.ReactElement | null {
       {/*
         ★同じ箱のまま ★窓の前は画面の外に置く（★箱を差し替えると iframe が作り直され ★読み込みが最初からになる）。
       */}
-      {size === 'big' && (big || embed !== null) && <div className={`u-race-strip-stage${big ? '' : ' u-race-strip-stage-offscreen'}`}>
+      {size === 'big' && (big || embed !== null) && <div className={`u-race-strip-stage${big ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}`}>
         {big && !embedLive && <RaceRun rows={replayRows} distance={recent?.distance ?? 0} motionReduced={motionReduced} />}
         {/* ★本編（★`playing` まで 見えないまま読み込む・★触れない ＝ ★拡大は帯の「拡大」） */}
         {embed !== null && <iframe className="u-race-strip-embed" data-live={embedLive ? 'true' : 'false'}
