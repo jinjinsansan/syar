@@ -401,6 +401,15 @@ export const SCAN_EXCLUDED_FILES: readonly { file: string; why: string }[] = [
       + '★`MENU_COSTS` は ★`MENUS` から並べ替えた**派生の一覧**で、★較正の対象ではありません。'
       + '⚠️ ★ここに数を書かないこと（★書いたらこの除外を外して登録簿に載せる）',
   },
+  {
+    file: 'apps/cli/src/v11-budget.ts',
+    why: '★V-11（PP の純発行量）を 1 人・1 実日で見積もって印刷するだけの道具（★2026-09-28・レビュー側の決定 2）。'
+      + '🔴 ★**自前の数を 1 つも持ちません** — ★margin・判定は `MARGIN` / `ppNetHealth`（`@star/betting`）、'
+      + '★賞金・出走料・騎手料・種付料・週は `PRIZE_TABLE` / `ENTRY_FEE_EP` / `JOCKEYS` / `STUD_FEE_BASE_EP` / `WEEKS_*`（`@star/scheduler`）、'
+      + '★調教は `MENUS`（`@star/training`）から引きます。★X・出走回数・格・頭数は ★**引数**（★既定を持たない・網 `v11-budget.test.ts`）。'
+      + '★トップレベルの const は ★引数か 定数からの**派生**で、★較正の対象ではありません。'
+      + '⚠️ ★ここに数を書かないこと（★書いたらこの除外を外して登録簿に載せる）',
+  },
 ];
 
 /**
