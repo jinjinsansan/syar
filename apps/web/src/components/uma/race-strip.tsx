@@ -7,6 +7,7 @@ import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResult
 import { RUN_VIEW_M, runCamera } from './race-camera';
 import { INTRO_STAGES, stripSizeOf } from './race-strip-sizes';
 import { STRIP_EMBED_GIVE_UP_SEC, isStripEmbedMessage, stripEmbedNote, stripEmbedUrl } from './race-strip-embed';
+import { tickerItems, tickerShowsField, type TickerRunner } from './race-strip-ticker';
 import './uma-theme.css';
 
 interface RaceNoticeRow {
@@ -19,9 +20,11 @@ interface RaceNoticeRow {
 }
 
 interface NoticeData {
-  readonly next: RaceNoticeRow | null;
+  readonly next: (RaceNoticeRow & { readonly entry_deadline_at: string | null }) | null;
   readonly recent: RaceNoticeRow | null;
   readonly runners: readonly ReplayRunner[];
+  /** ★次のレースの出走馬と単勝（★締切の後だけ読む・★流れる 1 行 `race-strip-ticker.ts`） */
+  readonly nextField: readonly TickerRunner[];
 }
 
 const COLUMNS = 'id, name, surface, distance, scheduled_at, status';
@@ -30,7 +33,7 @@ const REFRESH_MS = 15_000;
 async function fetchNotice(): Promise<NoticeData> {
   const client = readClient();
   const [next, recent] = await Promise.all([
-    client.from('races_public').select(COLUMNS)
+    client.from('races_public').select(`${COLUMNS}, entry_deadline_at`)
       .in('status', ['announced', 'scheduled', 'closed'])
       .order('scheduled_at', { ascending: true }).limit(1),
     client.from('races_public').select(COLUMNS)
@@ -49,11 +52,43 @@ async function fetchNotice(): Promise<NoticeData> {
     runners = parseReplayRunners(((entries.data ?? []) as Record<string, unknown>[])
       .filter((row) => row['finish_pos'] !== null && row['finish_pos'] !== undefined));
   }
+  const nextRace = (next.data?.[0] ?? null) as NoticeData['next'];
   return {
-    next: (next.data?.[0] ?? null) as RaceNoticeRow | null,
+    next: nextRace,
     recent: lastRace,
     runners,
+    nextField: nextRace !== null && tickerShowsField(nextRace.status) ? await fetchField(nextRace.id) : [],
   };
+}
+
+/**
+ * ★**次のレースの出走馬と単勝**（★締切の後だけ・★流れる 1 行）。★馬名か馬番が欠けた行は ★流さない（★埋めない）。
+ *   ★単勝が無い馬は `null`（★「—」で埋めず ★オッズの欄ごと出さない）。
+ */
+async function fetchField(raceId: string): Promise<readonly TickerRunner[]> {
+  const client = readClient();
+  const [entries, odds] = await Promise.all([
+    client.from('race_entries_public').select('gate,horse_name').eq('race_id', raceId).order('gate'),
+    client.from('race_odds_public').select('selection, odds, capped').eq('race_id', raceId).eq('bet_type', 'win'),
+  ]);
+  if (entries.error !== null) throw new Error(entries.error.message);
+  if (odds.error !== null) throw new Error(odds.error.message);
+  const winByGate = new Map<number, { readonly odds: number; readonly capped: boolean }>();
+  for (const o of (odds.data ?? []) as Record<string, unknown>[]) {
+    const sel = Array.isArray(o['selection']) ? (o['selection'] as unknown[]) : [];
+    const g = Number(sel[0]);
+    const v = Number(o['odds']);
+    if (sel.length === 1 && Number.isInteger(g) && Number.isFinite(v) && v > 0) winByGate.set(g, { odds: v, capped: o['capped'] === true });
+  }
+  const field: TickerRunner[] = [];
+  for (const e of (entries.data ?? []) as Record<string, unknown>[]) {
+    const gate = Number(e['gate']);
+    const name = typeof e['horse_name'] === 'string' ? e['horse_name'] : '';
+    if (!Number.isInteger(gate) || gate < 1 || name === '') continue;
+    const w = winByGate.get(gate);
+    field.push({ gate, name, winOdds: w?.odds ?? null, capped: w?.capped ?? false });
+  }
+  return field;
 }
 
 interface FocusRow extends RaceNoticeRow {
@@ -94,6 +129,17 @@ function clock(iso: string): string {
   const timestamp = new Date(iso).getTime();
   if (!Number.isFinite(timestamp)) return '時刻未取得';
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(timestamp);
+}
+
+/** ★流れる 1 行の全文（★末尾にも区切りを付け、★2 つ並べたときの継ぎ目を同じ見た目にする） */
+function tickerText(next: NonNullable<NoticeData['next']>, data: NoticeData, recent: RaceNoticeRow | null | undefined, nowMs: number): string {
+  const items = [...tickerItems(next, data.nextField, nowMs, clock), ...(recent ? [`直近確定 ${raceLabel(recent)}`] : [])];
+  return `${items.join(' ／ ')} ／ `;
+}
+
+/** ★流す秒（★文の長さに比例・★20 字ごとに段にして ★毎秒の数字の変化で速さが揺れないように） */
+export function tickerSecOf(text: string): number {
+  return Math.max(14, Math.ceil(text.length / 20) * 20 * 0.28);
 }
 
 function raceLabel(row: RaceNoticeRow): string {
@@ -396,6 +442,16 @@ export function RaceStrip(): React.ReactElement | null {
           <span className="u-race-strip-rec">（録画）</span>
           {!compact && <span title={raceLabel(recent)}>{raceLabel(recent)}</span>}
           {!compact && leader !== null && <span className="u-race-strip-recent">先頭 {leader.gate}番 {leader.name}</span>}
+        </> : size === 'big' && next && data && nowMs !== null ? <>
+          {/*
+            ★**流れる 1 行**（★2026-09-28・オーナー指示・★中身は暫定 `race-strip-ticker.ts`）。★同じ文を 2 つ並べて ★切れ目なく繰り返す。
+            ★停止スイッチ・「動きを減らす」では ★流さない（★CSS・資料 §5-7）。
+          */}
+          <span className="u-race-strip-ticker" aria-label={`${next.name} ${status}`}>
+            <span className="u-race-strip-ticker-track" aria-hidden style={{ animationDuration: `${tickerSecOf(tickerText(next, data, recent, nowMs))}s` }}>
+              <span>{tickerText(next, data, recent, nowMs)}</span><span>{tickerText(next, data, recent, nowMs)}</span>
+            </span>
+          </span>
         </> : <>
           <strong>{next ? `${clock(next.scheduled_at)} ${status}` : status}</strong>
           {next && <span title={raceLabel(next)}>{raceLabel(next)}</span>}
