@@ -71,6 +71,21 @@ const tr = await one(
 console.log('');
 console.log(`  ④ 育成: last_processed_week ${tr.minw}〜${tr.maxw}（${tr.kinds} 種類 / 現役 ${tr.n} 頭）`);
 
+/**
+ * ★**④b 馬は育っているか（★5 つの数）**（★2026-09-28・簿 PROD-NEVER-AGED を ★開けた道具で閉じるため）。
+ *   ★開いたときの値（★2026-09-2x 本番）: ★全馬 7,355 ／ birth_week 有り 0 ／ last_processed_week 有り 0 ／ 引退 0 ／ horse_week_log 0 行。
+ *   ★④ は ★現役の週の範囲しか出さず、★この 5 つを数えていなかったので ★足しました（★select だけ）。
+ */
+const aged = await one(
+  `select count(*)::int as total,
+          count(*) filter (where birth_week is not null)::int as with_birth,
+          count(*) filter (where last_processed_week is not null)::int as with_processed,
+          count(*) filter (where retired_at_week is not null)::int as retired
+     from horses`,
+);
+const logRows = await one(`select count(*)::bigint::text as n from horse_week_log`);
+console.log(`  ④b 馬は育っているか: 全馬 ${aged.total} ／ birth_week 有り ${aged.with_birth} ／ last_processed_week 有り ${aged.with_processed} ／ 引退 ${aged.retired} ／ horse_week_log ${logRows.n} 行`);
+
 // ── ⑤ 助言ロック（★掴まれていれば「動いているが進めない」） ──
 /**
  * ⚠️ ★`pg_locks` は ★**いまこの瞬間**しか見えません。
