@@ -27,7 +27,7 @@ import { drawEntryLottery, lotteryScratchReason } from './entry-lottery.js';
 import { scratchEntry, scratchRetiredEntries } from './scratch.js';
 import { FIELD_SIZE } from '../../cli/src/race-field.js';
 import { DEFAULT_PRESEED_OPTIONS } from '../../cli/src/preseed.js';
-import { aggregateDay } from './daily-flow.js';
+import { aggregateDay, UnknownEpClassError } from './daily-flow.js';
 // ★日次の枝の結果を行に残す（★DL-2・移行 0052）。★止める仕組みではない
 import { runDailyStep } from './daily-run-log.js';
 import { loadHorsesByIds, loadRaceablePool, loadTrainingStates, loadWinsByHorse } from './horse-repo.js';
@@ -499,10 +499,24 @@ async function main(): Promise<void> {
          *     （✔ `point_flow_daily` 0 行／`story_daily` 0 行／`unlock_daily` は 08-13 が最後）。
          * ⚠️ ★**止める仕組みではありません。** ★後から DB に問えるようにするだけです。
          */
-        await runDailyStep(client, dayIdx, 'aggregate', async () => {
-          await aggregateDay(client, today, new Date(dayFromMs).toISOString(), new Date(dayToMs).toISOString());
-        });
-        lastAggregated = today;
+        /**
+         * ⚠️ ★**お金の集計は 独自の try/catch で囲みます**（★2026-09-28・レビュー側「他の日次の段を止めない」を実物で確かめて直した）。
+         *    ★囲まないと ★ここで投げた瞬間に ★この後ろの開放率・生涯の記録まで ★その日は止まり、
+         *    ★`lastAggregated` も置かれず ★**毎周（約 10 分ごと）やり直して 毎周 失敗します**。
+         *    ★知らない分類（`UnknownEpClassError`）は ★行を書いた後の失敗なので ★「済んだ」と読む（★記録は `daily_run_log` に 1 日 1 行）。
+         *    ★それ以外（★DB の一時的な失敗 等）は ★次の周にやり直す（★従来どおり）が、★他の段は止めない。
+         */
+        let aggregated = false;
+        try {
+          await runDailyStep(client, dayIdx, 'aggregate', async () => {
+            await aggregateDay(client, today, new Date(dayFromMs).toISOString(), new Date(dayToMs).toISOString());
+          });
+          aggregated = true;
+        } catch (e) {
+          if (e instanceof UnknownEpClassError) aggregated = true;
+          console.error(`[worker] ★日次のお金の集計: ${(e as Error).message}（★他の日次の処理は続けます）`);
+        }
+        if (aggregated) lastAggregated = today;
         /**
          * ★開放率の分布も毎日残す（レビュー側裁定 2026-08-12）。
          *   P1 のゲートはこの分布の上に立っているので、

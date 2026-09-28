@@ -43,6 +43,12 @@ const SCOPE_SQL: Readonly<Record<FlowScope, string>> = {
 interface UnknownEpClass { readonly klass: string; readonly total: number }
 
 /**
+ * ★**知らない分類を数えずに ★行は書いた**ことを示す例外（★2026-09-28）。
+ *   ★呼ぶ側（`main.ts`）は ★これを ★「その日の集計は済んだ（★記録に失敗を残した）」と読み、★他の日次の段を止めない・★毎周やり直さない。
+ */
+export class UnknownEpClassError extends Error {}
+
+/**
  * 1日ぶんの資金フローを、口座の区分ごとに集める。
  *
  * ★`users` を内部結合します。結合できない行があると**黙って集計から消える**ので、
@@ -260,6 +266,6 @@ export async function aggregateDay(
   if (unknown.length > 0) {
     const detail = unknown.map((u) => `${u.klass}=${u.total}`).join(', ');
     console.error(`[daily-flow] 🔴 ★ワーカーが知らない EP の分類: ${detail}（★数えずに保存した・★ワーカーを更新すること）`);
-    throw new Error(`aggregateDay: ★知らない EP の分類を数えずに保存しました: ${detail}（★ワーカーを更新して ep_reason_class の新しい分類を知らせること）`);
+    throw new UnknownEpClassError(`aggregateDay: ★知らない EP の分類を数えずに保存しました: ${detail}（★ワーカーを更新して ep_reason_class の新しい分類を知らせること）`);
   }
 }
