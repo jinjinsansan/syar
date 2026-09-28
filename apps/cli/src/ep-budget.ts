@@ -86,6 +86,8 @@ say('       ★EP に入る `refund` は ★取ったものを返しているだ
 say();
 
 say('  ── 出（★1 ゲーム年）──');
+/** ★数えていないものを 数えたように見せない（★レビュー側 2026-09-28）: ★出走料（登録料 200 ＋ 騎手 200〜400 × 回数）と ★投票は ★この表に入っていません */
+say('    ⚠️ ★出走料（400〜600 EP × 回数）と ★投票は ★数えていません（★下の「余り」から払う形）');
 const rows: { readonly label: string; readonly ep: number }[] = [
   { label: `調教「${MENU.label}」${MENU.ep} × ${WEEKS_PER_YEAR} 週 × ${HORSES} 頭`, ep: MENU.ep * WEEKS_PER_YEAR * HORSES },
   { label: `種付料（★最低・G1 0 勝・賞金 0）`, ep: STUD_FEE_BASE_EP },
@@ -113,23 +115,17 @@ if (total <= incomeYear) {
 }
 say();
 /**
- * 🔴 ★**正典の中だけで比べる**（★外から数を持ち込まない）。
- *   ★D-075 は ★日次上限を ★**「能動的なプレイヤーの必要量の約 5 倍」**と書いています。
- *   → ★つまり ★正典が見込んでいた ★**必要量 = 上限 ÷ 5**。
- *   → ★それと ★いまのデイリーの額を比べれば、★**D-075 の中で閉じた比較**になります。
- * ⚠️ ★「5 倍」は ★D-075 の本文の言葉です（★私が決めた数ではありません）。
+ * 🔴 ★**日次上限とデイリーの関係**（★2026-09-28・正典 D-075 追補・移行 `0094`）。
+ *   ★旧 D-075 は 上限 10,000 を「能動的なプレイヤーの必要量の約 5 倍」と書き、★ここで「必要量 = 上限 ÷ 5」を出していました。
+ *   ★デイリーを 2,000 にし（`0091`）、★上限を デイリーの 3 倍（6,000）に下げた（`0094`）ので ★その読み方は使えません。
+ *   → ★いまは ★「上限は デイリー何回ぶんか」（＝ バグで デイリーが何度も付いたときの被害の天井）を出します。
  */
-const CAP_OVER_NEED = 5;
-const impliedNeed = EP_GRANTS.daily_cap / CAP_OVER_NEED;
-say('  ── 🔴 ★正典の中で比べる（★D-075 の言葉だけを使います）──');
-say(`    ★日次上限 ${EP_GRANTS.daily_cap.toLocaleString('ja-JP')} EP は`
-  + ` ★D-075 の言葉で「★能動的なプレイヤーの必要量の ★**約 ${CAP_OVER_NEED} 倍**」`);
-say(`    → ★正典が見込んでいた必要量 = ${EP_GRANTS.daily_cap.toLocaleString('ja-JP')} ÷ ${CAP_OVER_NEED}`
-  + ` = ★**${impliedNeed.toLocaleString('ja-JP')} EP/実日**`);
-say(`    → ★いまのデイリー ${EP_GRANTS.daily} EP は ★その **${(EP_GRANTS.daily / impliedNeed * 100).toFixed(0)}%**`
-  + `（★**${(impliedNeed / EP_GRANTS.daily).toFixed(0)} 分の 1**）`);
-say(`    ⚠️ ★差の ${(impliedNeed - EP_GRANTS.daily).toLocaleString('ja-JP')} EP/日 は、`
-  + '★広告・アンケート・オファーから入る前提だったと読めます（★正典 §3.2 / D1 は ★保留のまま）。');
+const capOverDaily = EP_GRANTS.daily_cap / EP_GRANTS.daily;
+say('  ── 🔴 ★日次上限（★D-075 追補 2026-09-28）──');
+say(`    ★日次上限 ${EP_GRANTS.daily_cap.toLocaleString('ja-JP')} EP ＝ ★デイリー ${EP_GRANTS.daily.toLocaleString('ja-JP')} の ★**${capOverDaily.toFixed(1)} 回ぶん**`
+  + '（★バグで デイリーが何度も付いたときの 1 日の被害の天井）');
+say('    ⚠️ ★上限は ★`inflow` と `horse_sale` を数えます（★`ep_reason_class()`）。★馬の売却（買値の 20%）を 1 日に何頭もすると ★正直な遊びでも触れえます');
+say('    ★EP の入り口を増やす日（広告・アンケート等）に ★上限も一緒に見直す（★正典の条件）。');
 say();
 say(`  ★参考: 種付料の式 = ${STUD_FEE_BASE_EP.toLocaleString('ja-JP')}`
   + ` ＋ G1 勝利数 × ${STUD_FEE_PER_G1_EP.toLocaleString('ja-JP')}`

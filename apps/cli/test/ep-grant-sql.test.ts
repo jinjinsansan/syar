@@ -37,7 +37,7 @@ describe('★EP の額（★D-075）を SQL と TS で 1 つにする', () => {
     expect(onlyNumber(body, /when\s+'daily'\s+then\s+return\s+(\d+)/gi, 'デイリー')).toBe(EP_GRANTS.daily);
   });
 
-  it('★日次上限 10,000 ＝ EP_GRANTS.daily_cap', () => {
+  it('★日次上限（★2026-09-28 に 6,000・`0094`）＝ EP_GRANTS.daily_cap', () => {
     const { body } = lastFunctionBody('ep_grant_amount');
     expect(onlyNumber(body, /when\s+'daily_cap'\s+then\s+return\s+(\d+)/gi, '日次上限')).toBe(EP_GRANTS.daily_cap);
   });
