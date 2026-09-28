@@ -75,6 +75,20 @@ export function routeKeyOf(pathname: string): string | null {
  *   ★同じ道でも ★第 2 便（★自分の繁殖牝馬で配合・★その仔の命名）では ★表の値（mini）のまま。
  *   ★導入中かは ★**サーバーの段階**（★`my_onboarding_state` の stage）で決めます（★画面は推測しない・レビュー側の条件）。
  */
+/**
+ * ★**本編（`/race` の iframe）を帯で流す面**（★2026-09-28・オーナー決裁 ④「本物の映像は /home と観戦の面だけ。他は文字帯＋『観る』リンク」
+ *   ・レビュー側の決定「面の条件は この表の 1 か所に持たせる・帯のコードで面を判定しない」）。
+ *   ★ここに無い「大」の面は ★簡易版の走行（side-v8・約 450KB）。★「極小」「文字」は ★本編を読まない。
+ *   ⚠️ ★一度 ★「大」の 10 面すべてと「極小」でも本編（1 レース 約 4MB）を読む形にしていた（★決裁と食い違い・レビュー側が原文で指摘）。
+ */
+export const STRIP_EMBED_ROUTES: readonly string[] = ['/home', '/watch-race'];
+
+/** ★この面の帯で 本編を流すか（★表が正本） */
+export function stripEmbedsOn(pathname: string): boolean {
+  const key = routeKeyOf(pathname);
+  return key !== null && STRIP_EMBED_ROUTES.includes(key) && STRIP_SIZE_BY_ROUTE[key] === 'big';
+}
+
 export const HIDDEN_DURING_INTRO: readonly string[] = ['/stable/foal', '/stable/name'];
 /** ★導入中の段階（★移行 `0067` の stage の語）。★`ready` `legacy` は導入を終えた（★または導入の無い）口座 */
 export const INTRO_STAGES: readonly string[] = ['choose_parents', 'waiting_birth', 'naming'];

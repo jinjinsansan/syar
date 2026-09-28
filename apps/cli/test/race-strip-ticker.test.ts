@@ -14,12 +14,13 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  BOARD_ITEM_SEC, LONGSHOT_ODDS, bracketOrNull, tickerBoard, tickerCountdown, tickerItems, tickerShowsField, type TickerRace,
+  BOARD_ITEM_SEC, bracketOrNull, tickerBoard, tickerCountdown, tickerItems, tickerShowsField, type TickerRace,
 } from '../../web/src/components/uma/race-strip-ticker';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const STRIP = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/race-strip.tsx'), 'utf8');
 const CSS = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/uma-theme.css'), 'utf8');
+const TICKER = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/race-strip-ticker.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ');
 const clock = (iso: string): string => iso.slice(11, 16);
 const AT = '2026-09-28T05:12:00Z';
 const T = Date.parse(AT);
@@ -43,7 +44,7 @@ describe('★帯の掲示板', () => {
   it('🔴 ② ★締切の後は ★馬番順に ★単勝つき（★人気順にしない・★上限は明示・★無い馬は作らない）', () => {
     expect(tickerItems(race('scheduled'), field, T - 2 * 60_000, clock)).toEqual([
       '次のレース R12291 ・ 芝1600m', '発走 あと 2分（05:12）', '出走 3頭',
-      '単勝 1番 ウマA 12.4倍', '単勝 2番 ウマB 1.8倍 1番人気', '単勝 3番 ウマC 150.0倍（上限） 大穴',
+      '単勝 1番 ウマA 12.4倍', '単勝 2番 ウマB 1.8倍 1番人気', '単勝 3番 ウマC 150.0倍（上限）',
     ]);
     expect(tickerItems(race('closed'), [{ gate: 1, name: 'ウマA', winOdds: null, capped: false }], T - 120_000, clock))
       .toContain('単勝 1番 ウマA');
@@ -85,8 +86,10 @@ describe('★帯の掲示板', () => {
     expect(closing[2]).toMatchObject({ kind: '締切', tone: 'alert', text: '出走登録の締切まで', num: '0:30' });
     const board = tickerBoard(race('scheduled'), field, T - 120_000, clock);
     expect(board.filter((b) => b.badge === '1番人気').map((b) => b.no)).toEqual([2]);
-    expect(board.filter((b) => b.badge === '大穴').map((b) => b.no)).toEqual([3]);
-    expect(LONGSHOT_ODDS).toBe(50);
+    /** ★2026-09-28 レビュー側の裁定: ★「大穴」は出さない（★「当たれば大きい」の煽り・D-102 ③）。★「1番人気」は事実なので残す */
+    expect(STRIP + TICKER, '★大穴の札が残っている').not.toContain('大穴');
+    /** ★帯に 賭けの入口（★投票・マークシートの画面へのリンク）を置かない（★帯は全ページに出る・レビュー側の裁定） */
+    expect(STRIP, '★帯から投票の画面へ送っている').not.toMatch(/href=\{?[`'"][^`'"]*\/(bet|vote|odds)/);
     const tie = tickerBoard(race('scheduled'), [
       { gate: 1, name: 'ウマA', winOdds: 2, capped: false }, { gate: 2, name: 'ウマB', winOdds: 2, capped: false },
     ], T - 120_000, clock);
@@ -95,9 +98,7 @@ describe('★帯の掲示板', () => {
     /** ★R-20 Q3: 1 秒に 3 回以上の明滅は使わない・★見出しだけ 1.6 秒で明暗 */
     expect(CSS, '★速い点滅').not.toMatch(/steps\(1\) infinite/);
     expect(CSS).toMatch(/\.u-board-kind\.u-board-hot \{[^}]*animation: u-board-hot 1\.6s ease-in-out infinite;/);
-    /** ★R-20 Q2: 大穴は 濃紺に金の縁（★赤 #ff5a4a は使わない） */
-    expect(CSS).toMatch(/\.u-board-badge-longshot \{ background: #0a2340; border: 1px solid #f6c21c; color: #ffe483; \}/);
-    expect(CSS, '★赤の大穴').not.toContain('#ff5a4a');
+    expect(CSS, '★大穴の札の見た目が残っている').not.toContain('u-board-badge-longshot');
   });
 
   it('🔴 ⑦ ★着順掲示板の見た目（★LED 風に戻らない・★馬番の札は枠の色・★左端に「● 録画」）', () => {

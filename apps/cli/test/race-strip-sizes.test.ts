@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { STRIP_SIZE_BY_ROUTE, routeKeyOf, stripSizeOf, type StripSize } from '../../web/src/components/uma/race-strip-sizes.js';
+import { STRIP_EMBED_ROUTES, STRIP_SIZE_BY_ROUTE, routeKeyOf, stripEmbedsOn, stripSizeOf, type StripSize } from '../../web/src/components/uma/race-strip-sizes.js';
 import { shellPlacesStripOn } from '../../web/src/components/shell-routes.js';
 import { DEV_ONLY_ROUTES } from '../../web/src/middleware.js';
 
@@ -179,5 +179,29 @@ describe('★常設帯の大きさ ── 表と画面の突き合わせ（⑤�
     expect(stripSizeOf('/races/abc')).toBe('text');
     expect(stripSizeOf('/no-such-screen'), '★表に無い道に ★黙って帯を出さない').toBe('hidden');
     expect(stripSizeOf('/'), '★TOP は出さない（§3）').toBe('hidden');
+  });
+});
+
+/**
+ * 🔴 ★**本編（/race の iframe）を流す面は 表で決めた 2 面だけ**（★2026-09-28・オーナー決裁 ④・レビュー側の決定）。
+ *   ★一度 ★「大」の 10 面すべてと「極小」で 本編（1 レース 約 4MB）を読む形にしていた。★対照は両方向。
+ */
+describe('★本編を流す面（表が正本）', () => {
+  it('🔴 ★/home と /watch-race だけ・★他の「大」「極小」「文字」は流さない', () => {
+    expect([...STRIP_EMBED_ROUTES].sort()).toEqual(['/home', '/watch-race']);
+    expect(stripEmbedsOn('/home')).toBe(true);
+    expect(stripEmbedsOn('/watch-race')).toBe(true);
+    for (const r of ['/records', '/stable', '/stable/abc', '/exchange', '/howto', '/earn', '/mypage', '/stable/retired']) {
+      expect(stripEmbedsOn(r), `★${r} で本編を流している`).toBe(false);
+    }
+    expect(stripEmbedsOn('/train'), '★極小').toBe(false);
+    expect(stripEmbedsOn('/races/abc'), '★文字').toBe(false);
+    expect(stripEmbedsOn('/race'), '★本編そのもの').toBe(false);
+  });
+
+  it('🔴 ★帯は 面を自分で判定しない（★表の `stripEmbedsOn` だけを見る）', () => {
+    const strip = readFileSync(path.resolve(__dirname, '../../web/src/components/uma/race-strip.tsx'), 'utf8');
+    expect(strip).toContain('const embedsHere = stripEmbedsOn(pathname);');
+    expect(strip, '★帯が面の名前を書いている').not.toMatch(/['"]\/home['"]|['"]\/records['"]/);
   });
 });

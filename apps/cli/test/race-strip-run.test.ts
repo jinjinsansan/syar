@@ -31,9 +31,13 @@ describe('★常設帯の走行（①②）', () => {
    *   ★本編の用意ができるまでは ★箱を出さず、★できたら ★本編だけ。★拡大も ★本編（★同じ iframe）だけ。
    *   ★「極小」の 22×16px の馬は ★映像ではなく印なので 残す。
    */
-  it('🔴 ★簡易版の走行を 帯にも拡大にも出さない（★本編だけ）', () => {
-    expect(LIVE.match(/<RaceRun /g)?.length ?? 0, '★簡易版の走行を描いている').toBe(0);
-    expect(LIVE, '★「大」の箱を 本編の前に出している').toContain("const big = embedLive && size === 'big';");
+  /**
+   * ★2026-09-28（★レビュー側の決定・決裁 ④）: ★本編を流す面（表 `STRIP_EMBED_ROUTES`）では ★簡易版を出さず、★それ以外の「大」は ★簡易版の走行に戻す。
+   */
+  it('🔴 ★本編の面では 簡易版を出さず、★それ以外の「大」は 簡易版の走行（★1 か所だけ）', () => {
+    expect(LIVE.match(/<RaceRun /g)?.length, '★簡易版の走行は 1 か所だけ').toBe(1);
+    expect(LIVE).toMatch(/\{big && !embedsHere && <div className="u-race-strip-stage">\s*<RaceRun rows=\{replayRows\}/);
+    expect(LIVE).toContain("const big = size === 'big' && (embedsHere ? embedLive : replaying);");
     expect(LIVE, '★「極小」が馬を描いていない').toMatch(/u-race-run-mini[\s\S]{0,200}<RunningHorse/);
   });
 
@@ -46,7 +50,7 @@ describe('★常設帯の走行（①②）', () => {
      *   （★窓の 75 秒前から・★本編の用意が 24〜27 秒かかるため）・★「大」と「極小」（★極小は拡大のためだけ）・★動きを減らす設定でないときだけ。
      *   ★窓が閉じても ★まだ流れ始めていなければ ★やめる。
      */
-    expect(LIVE, '★本編を 窓の後・帯以外で開く').toMatch(/if \(\(size !== 'big' && size !== 'mini'\) \|\| motionReduced\) \{ setEmbed\(null\); return; \}\s*if \(!windowOver && recentId !== null && embeddedIdRef\.current !== recentId\)/);
+    expect(LIVE, '★本編を 窓の後・表の面以外で開く').toMatch(/if \(!embedsHere \|\| motionReduced\) \{ setEmbed\(null\); return; \}\s*if \(!windowOver && recentId !== null && embeddedIdRef\.current !== recentId\)/);
     expect(LIVE, '★窓が閉じても 始まっていない本編を読み続ける').toMatch(/if \(!windowOver \|\| e === null \|\| e\.live\) return;[\s\S]{0,200}setEmbed\(null\);/);
     /** ★同じ箱のまま ★窓の前・極小は画面の外・★拡大で画面いっぱい（★箱を差し替えると 読み込みが最初からになる） */
     expect(LIVE).toContain("{embed !== null && <div className={`u-race-strip-stage${big || expanded ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}${expanded ? ' u-race-strip-stage-full' : ''}`}");

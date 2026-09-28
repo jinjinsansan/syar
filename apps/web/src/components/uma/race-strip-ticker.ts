@@ -52,7 +52,7 @@ export function tickerCountdown(scheduledAt: string, nowMs: number, clock: (iso:
  * ★**掲示板の 1 枚**（★R-20）。
  *   ★`kind` 見出し ／ ★`bracket` 枠（1〜8・★馬番の札の色）と ★`no` 馬番 ／ ★`text` 文 ／ ★`num` 強調する数字 ＋ ★`tail` 単位
  *   ★`tone`: ★`hot` ＝ 発走 1 分前（★見出しだけ金でゆっくり明暗）・★`alert` ＝ 締切 1 分前（★見出しを橙・動きなし）
- *   ★`badge`: ★単勝の最も低い 1 頭に「1番人気」・★単勝 `LONGSHOT_ODDS` 倍以上に「大穴」（★締切の後だけ・★オッズが在る馬だけ）
+ *   ★`badge`: ★単勝の最も低い 1 頭に「1番人気」（★事実なので出す）。★「大穴」は ★出さない（★2026-09-28 レビュー側の裁定: 「当たれば大きい」の煽り・D-102 ③ と同じ筋）
  */
 export interface BoardItem {
   readonly kind: string;
@@ -62,11 +62,8 @@ export interface BoardItem {
   readonly num: string | null;
   readonly tail: string | null;
   readonly tone: 'plain' | 'hot' | 'alert';
-  readonly badge: '1番人気' | '大穴' | null;
+  readonly badge: '1番人気' | null;
 }
-
-/** ★「大穴」の札を付ける単勝（倍）。★暫定（★デザイナー R-20 は形だけ決めた・値はレビュー側） */
-export const LONGSHOT_ODDS = 50;
 
 /** ★1 枚の秒（★R-20 Q4: 入る 0.32 秒 ＋ 止まる 2.36 秒 ＋ 抜ける 0.32 秒） */
 export const BOARD_ITEM_SEC = 3;
@@ -119,7 +116,7 @@ export function tickerBoard(
   const favGate = priced.length === 0 ? null
     : priced.reduce((best, r) => ((r.winOdds as number) < (best.winOdds as number) ? r : best)).gate;
   for (const r of byGate) {
-    const badge = r.gate === favGate ? '1番人気' : r.winOdds !== null && r.winOdds >= LONGSHOT_ODDS ? '大穴' : null;
+    const badge = r.gate === favGate ? '1番人気' : null;
     items.push(card('単勝', {
       bracket: bracketOrNull(r.gate, field), no: r.gate, text: r.name,
       /** ★上限なら「157.7 倍（上限）」（★§9.4・`formatOdds` と同じ桁） */

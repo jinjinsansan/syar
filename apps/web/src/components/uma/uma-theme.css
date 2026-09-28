@@ -160,8 +160,6 @@
   flex: 0 0 auto; font-size: 10px; padding: 1px 6px; border-radius: 4px; white-space: nowrap; color: #10243a;
   background-image: linear-gradient(100deg, #fff6b0 0%, #f3cf34 30%, #d99f14 48%, #ffe483 62%, #fff6b0 100%);
 }
-/* ★大穴: ★濃紺に金の縁（★赤はやめた・倍率を煽って見せない・§17.1 L-8） */
-[data-theme='uma'] .u-board-badge-longshot { background: #0a2340; border: 1px solid #f6c21c; color: #ffe483; }
 /* ★左端の「● 録画」札（★動かさない・★点だけ 2 秒でゆっくり明暗） */
 [data-theme='uma'] .u-race-strip-main > .u-race-strip-recbadge {
   flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; height: 32px; box-sizing: border-box; padding: 0 8px;
