@@ -68,10 +68,16 @@ export function isStripControlMessage(value: unknown): value is StripControlMess
 }
 
 /** ★帯に出す 1 行（★長い理由は切る・★「本編」とは名乗らない） */
-export function stripEmbedNote(kind: 'error' | 'late', detail: string | null, waitedSec: number): string {
-  if (kind === 'late') return `録画の用意が間に合いませんでした（${waitedSec} 秒）`;
-  const why = (detail ?? '理由不明').replace(/\s+/g, ' ').slice(0, 60);
-  return `録画を出せませんでした: ${why}`;
+/**
+ * ★**出せなかったときの 1 行は 1 通り**（★2026-09-28・デザイナー R-19 回答 Q5）。★理由は ★画面に出さず ★ログにだけ残す（`stripEmbedLog`）。
+ *   ⚠️ ★デザイナーの文は「録画を出せませんでした。簡易表示にしています」だが、★簡易版はオーナーの指示で ★帯から外した（★同じ日）ので
+ *      ★後半は嘘になる。★前半だけにする（★デザイナーへ返答済み・`R-20-R-19-answer-20260928-dev-reply.md`）。
+ */
+export const STRIP_EMBED_FAILED_NOTE = '録画を出せませんでした';
+
+/** ★ログに残す 1 行（★理由・★待った秒）。★画面には出さない */
+export function stripEmbedLog(kind: 'error' | 'late', detail: string | null, waitedSec: number): string {
+  return kind === 'late' ? `録画の用意が間に合いませんでした（${waitedSec} 秒）` : `録画を出せませんでした: ${detail ?? '理由不明'}`;
 }
 
 /**

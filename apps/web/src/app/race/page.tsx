@@ -386,8 +386,9 @@ const TELOP_ALPHA: number | undefined = (() => {
   const v = Number(new URLSearchParams(window.location.search).get('telop'));
   return Number.isFinite(v) && v > 0 && v <= 1 ? v : undefined;
 })();
-const CUTIN_OFF = typeof window !== 'undefined'
-  && new URLSearchParams(window.location.search).get('cutin') === 'off';
+/** ★小窓（`?embed=strip`）でも出さない（★字幕・2 割の大きさでは読めない・★デザイナー R-19 回答 Q1） */
+const CUTIN_OFF = (typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('cutin') === 'off') || EMBED_STRIP;
 const SIDE_ONLY = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('directional') === 'side';
 const PLACEMENT_OVERRIDE: HorsePlacementMode | undefined = typeof window !== 'undefined'
@@ -4291,7 +4292,9 @@ function RaceView({ setup, real }: {
         /** ★パドックの背景（★無ければタイトルの背景） */
         ((bg) => ({ image: bg, width: bg.width, height: bg.height }))(art.paddockBg ?? art.raceTitle),
         /** ★歩きのコマ（★無ければ走りのコマ） */
-        art.sideWalkHighQuality?.[pick.gate - 1] ?? art.sideHighQuality[pick.gate - 1]);
+        art.sideWalkHighQuality?.[pick.gate - 1] ?? art.sideHighQuality[pick.gate - 1],
+        /** ★小窓では ★札を描かない（★背景と馬だけ・★R-19 回答 Q1） */
+        { cards: !EMBED_STRIP });
       }
       drawRendererBadge(ctx, renderer, 'paddock');
       return;
@@ -4344,7 +4347,8 @@ function RaceView({ setup, real }: {
         }, art.texturedWorld, { pixelScale });
       } else { ctx.fillStyle = '#0b1210'; ctx.fillRect(0, 0, W, H); }
       const ranks = popularityRanksOf(oddsRows);
-      drawEntryBoard(ctx, art.pal as Record<string, string>, vp, FONT,
+      /** ★小窓では ★出馬表を重ねない（★背景の景色だけ・★R-19 回答 Q1） */
+      if (!EMBED_STRIP) drawEntryBoard(ctx, art.pal as Record<string, string>, vp, FONT,
         Array.from({ length: FIELD }, (_, i) => ({
           gate: i + 1, name: nameOfGate(i + 1), jockey: jockeyOfGate(i + 1),
           oddsLabel: oddsLabelOf(oddsRows[i]?.winOdds ?? Number.POSITIVE_INFINITY), popularity: ranks.get(i + 1), isOwn: i + 1 === mineGate,
@@ -4772,7 +4776,7 @@ function RaceView({ setup, real }: {
       v2SectionLabel = broadcastV2SectionLabel(course, visualLead, scene.shot.id);
       v2Minimap = {
         focusS: scene.focusS,
-        horses: easedAt.map((horse) => ({ gate: horse.gate, s: horse.meters, w: horse.w ?? TRACK_WIDTH_M / 2, own: horse.gate === ownGate })),
+        horses: easedAt.map((horse) => ({ gate: horse.gate, s: horse.meters, w: horse.w ?? TRACK_WIDTH_M / 2, own: horse.gate === mineGate })),
       };
       {
         const basis = cameraBasis(scene.camera);
@@ -5566,7 +5570,7 @@ function RaceView({ setup, real }: {
     });
     }
 
-    if (v2StartHold && showEntryBoard && intro.stage === 'gate-hold') {
+    if (v2StartHold && showEntryBoard && intro.stage === 'gate-hold' && !EMBED_STRIP) {
       // ★出馬表オーバーレイ（カウントダウン中だけ）。開扉で自動的に閉じる
       drawEntryBoard(ctx, art.pal as Record<string, string>, vp, FONT,
         Array.from({ length: FIELD }, (_, i) => ({
@@ -5619,11 +5623,11 @@ function RaceView({ setup, real }: {
       if (sectionTagRef.current.label !== label) sectionTagRef.current = { label, sinceSec: sectionTagRef.current.label === '' ? d - 1 : d };
       const hudSince = raceD - HUD_SETTLE_SEC;
       // ★ゴール後はライブ HUD（見出し・区間タグ・コース図）を落とす（motion-spec §6: ゴール〜2.4s は勝馬テロップのみ）
-      if (!raceOver && !contestFocusHud && !cutInCoversWorld) drawRaceHeadlineChip(ctx, FONT, {
+      if (!raceOver && !contestFocusHud && !cutInCoversWorld && !EMBED_STRIP) drawRaceHeadlineChip(ctx, FONT, {
         raceNo: RACE_META.raceNo, raceName: RACE_META.raceName,
         distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${built.distanceM}m`,
       }, { timeSec: d, sinceSec: hudSince });
-      if (!raceOver && !contestFocusHud && !cutInCoversWorld) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
+      if (!raceOver && !contestFocusHud && !cutInCoversWorld && !EMBED_STRIP) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
         { timeSec: d, sinceSec: Math.min(hudSince, d - sectionTagRef.current.sinceSec) });
     }
     /**
@@ -5631,7 +5635,7 @@ function RaceView({ setup, real }: {
      *   > リプレイ中にリプレイと表示されていないのでリプレイかどうかわからない
      *   ⚠️ ★HUD の描画がひととおり終わったあとに出します（順位表などに隠れないため）。
      */
-    if (replay.active) {
+    if (replay.active && !EMBED_STRIP) {
       const pal = art.pal as Record<string, string>;
       drawFinishReplayBadge(ctx, vp, FONT, replay.progress, {
         /** ★色は `palette.json` から引きます。この層で色を作りません（アートバイブル） */
@@ -5645,7 +5649,7 @@ function RaceView({ setup, real }: {
      *   描画に使った位置をそのまま点にする（順位計算はしない）。
      */
     /** ★リプレイ中はコース図も下ろします（馬に重なるため・上の `hud` の注記と同じ理由） */
-    if (v2Minimap !== undefined && !raceOver && !replay.active && !cutInActive) {
+    if (v2Minimap !== undefined && !raceOver && !replay.active && !cutInActive && !EMBED_STRIP) {
       /**
        * ★**馬にかかるときだけ薄くします**（★2026-09-09・オーナー判断）。
        *   ★HUD は画面の 36% を覆っています（★実況の帯 20%・順位表 7.5%・コース図 6.3%・実測）。
@@ -5680,7 +5684,7 @@ function RaceView({ setup, real }: {
      * ★**残り距離のカウントダウン**（★台本 v9・★残り 200m から・★デザイナー回答 D-6）。
      * ⚠️ ★数字は ★**描いている先頭の残り距離**です（★未来を読まない）。★決勝線を越えたら消えます。
      */
-    if (sideOnlyScript && renderer === 'v2' && !raceOver && !cutInCoversWorld && !replay.active) {
+    if (sideOnlyScript && renderer === 'v2' && !raceOver && !cutInCoversWorld && !replay.active && !EMBED_STRIP) {
       drawGoalCountdown(ctx, FONT, { viewport: vp, metersLeft: built.distanceM - visualLead });
     }
     drawRendererBadge(ctx, renderer, renderer === 'v2' ? v2ShotId ?? 'v2' : `legacy/${courseSection}`);
@@ -5718,7 +5722,9 @@ function RaceView({ setup, real }: {
        *   ⚠️ ★**0 の帯を描かないこと。** ★それは ★「スタミナが尽きた」という ★**嘘**です。
        *   ★`staminaAt` は ★`null` を通さないので、★**呼ぶ前に分けます**。
        */
-      const hud = built.gauge === null ? { ...hudBase, gauge: false } : hudBase;
+      /** ★小窓では ★HUD を全部下ろす（★順位表・馬名プレート・ゲージ・実況・結果・★デザイナー R-19 回答 Q1） */
+      const hud = EMBED_STRIP ? { gauge: false, standings: false, calls: false, result: false }
+        : built.gauge === null ? { ...hudBase, gauge: false } : hudBase;
       // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）。★null のときは読みません
       const g = built.gauge === null ? null : staminaAt(built.gauge, Math.max(0, metersLeft));
 
@@ -5903,7 +5909,8 @@ function RaceView({ setup, real }: {
         })),
         distanceMeter: built.distanceM,
         phaseLabel: phaseName,
-        ownGate,
+        /** ★自分の馬が出ていないレースは ★「◯◯は N 番手」の番を作らない（★主役＝1 着を 先に明かさない・R-19 回答 Q3） */
+        ownGate: mineGate ?? 0,
         lineIndex: callIndexRef.current,
         frameRoleOf: (gate: number) => frameRoleOf(gate, FIELD),
         /**
@@ -6299,7 +6306,8 @@ function RaceView({ setup, real }: {
             ref={canvasRef} width={W} height={H}
             style={{ display: 'block', width: W, height: H, background: '#111' }}
           />
-          {real !== null && <div style={REPLAY_BADGE_STYLE}>{REPLAY_BADGE_TEXT}</div>}
+          {/* ★小窓では ★帯が「録画」札を重ねる（★この長い札は 2 割の大きさでは読めない・★R-19 回答 Q1） */}
+          {real !== null && !EMBED_STRIP && <div style={REPLAY_BADGE_STYLE}>{REPLAY_BADGE_TEXT}</div>}
           {/*
             ★**③ 確定後**（★デザイン第6便）。★着順を半透明の暗いカードで演出の上に重ね、
             ★「もう一度」と「メニューへ」を出します。

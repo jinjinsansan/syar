@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  isStripControlMessage, isStripEmbedMessage, stripControlMessage, stripEmbedMessage, stripEmbedNote, stripEmbedUrl, STRIP_EMBED_PARAM_VALUE,
+  STRIP_EMBED_FAILED_NOTE, isStripControlMessage, isStripEmbedMessage, stripControlMessage, stripEmbedLog, stripEmbedMessage, stripEmbedUrl, STRIP_EMBED_PARAM_VALUE,
 } from '../../web/src/components/uma/race-strip-embed';
 import { replayWindowOver, REPLAY_START_DELAY_MS, REPLAY_DISPLAY_MS } from '../../web/src/components/uma/race-replay';
 
@@ -100,15 +100,39 @@ describe('★小窓で本編を流す約束', () => {
     expect(PAGE).toMatch(/\} else if \(stripPausedRef\.current\) \{\s*stripPausedRef\.current = false;\s*setPlaying\(true\);/);
   });
 
-  it('🔴 ⑤ ★出せなかった理由を ★帯に出す（★本編の理由・★間に合わなかった秒）', () => {
-    expect(stripEmbedNote('error', 'ログインしてください（★いまは…）', 0)).toBe('録画を出せませんでした: ログインしてください（★いまは…）');
-    expect(stripEmbedNote('error', null, 0)).toBe('録画を出せませんでした: 理由不明');
-    expect(stripEmbedNote('late', null, 118)).toBe('録画の用意が間に合いませんでした（118 秒）');
-    expect(stripEmbedNote('error', 'あ'.repeat(200), 0).length, '★長い理由は切る').toBeLessThanOrEqual('録画を出せませんでした: '.length + 60);
+  /**
+   * ★2026-09-28 デザイナー R-19 回答 Q5: ★1 行は 1 通り・★理由は画面に出さず ★ログにだけ（★利用者には意味が無く ★開発用の語が漏れる）。
+   *   ★「簡易表示にしています」は ★簡易版を帯から外したので ★付けない（★嘘になる）。
+   */
+  /**
+   * 🔴 ⑦ ★小窓では ★文字を消す（★2026-09-28・デザイナー R-19 回答 Q1「字幕・順位表・馬名プレート・パドックの札・オッズ・着順ボードは消す」）。
+   *   ★2 割の大きさでは読めない。★代わりに ★帯が映像の左上に「録画」札を 1 つ重ねる。
+   */
+  it('🔴 ⑦ ★小窓では 字幕・HUD・パドックの札・出馬表・長い録画札を ★出さない（★帯が「録画」札を重ねる）', () => {
+    expect(PAGE).toContain("get('cutin') === 'off') || EMBED_STRIP;");
+    expect(PAGE).toContain('const hud = EMBED_STRIP ? { gauge: false, standings: false, calls: false, result: false }');
+    expect(PAGE).toContain('{ cards: !EMBED_STRIP });');
+    expect(PAGE).toContain('drawRaceHeadlineChip(ctx, FONT, {'.replace('drawRaceHeadlineChip', '!EMBED_STRIP) drawRaceHeadlineChip'));
+    expect(PAGE).toContain('!EMBED_STRIP) drawCourseSectionTag(');
+    expect(PAGE).toContain('!replay.active && !cutInActive && !EMBED_STRIP) {');
+    expect(PAGE).toContain("intro.stage === 'gate-hold' && !EMBED_STRIP) {");
+    expect(PAGE).toContain('if (!EMBED_STRIP) drawEntryBoard(');
+    expect(PAGE).toContain('if (replay.active && !EMBED_STRIP) {');
+    expect(PAGE).toContain('{real !== null && !EMBED_STRIP && <div style={REPLAY_BADGE_STYLE}>');
+    expect(STRIP).toContain('{big && embedLive && !expanded && <span className="u-race-strip-stage-rec" aria-hidden>録画</span>}');
+  });
+
+  it('🔴 ⑤ ★出せなかったら ★1 通りの 1 行を出し、★理由はログにだけ', () => {
+    expect(STRIP_EMBED_FAILED_NOTE).toBe('録画を出せませんでした');
+    expect(STRIP_EMBED_FAILED_NOTE, '★簡易版は出していない').not.toContain('簡易');
+    expect(stripEmbedLog('error', 'ログインしてください', 0)).toBe('録画を出せませんでした: ログインしてください');
+    expect(stripEmbedLog('late', null, 118)).toBe('録画の用意が間に合いませんでした（118 秒）');
     expect(isStripEmbedMessage(stripEmbedMessage('error', 'r1', '理由'))).toBe(true);
     expect(isStripEmbedMessage({ source: 'star-race', type: 'error', raceId: 'r1', detail: 3 })).toBe(false);
-    expect(STRIP).toContain("if (event.data.type === 'error') setEmbedNote(stripEmbedNote('error', event.data.detail, 0));");
+    /** ★画面に出すのは 定数だけ（★理由の文を出さない） */
+    expect(STRIP.match(/setEmbedNote\(STRIP_EMBED_FAILED_NOTE\);/g)?.length).toBe(2);
+    expect(STRIP).not.toMatch(/setEmbedNote\((?!STRIP_EMBED_FAILED_NOTE|null)/);
+    expect(STRIP.match(/console\.warn\(`\[race-strip\] \$\{stripEmbedLog\(/g)?.length).toBe(2);
     expect(STRIP).toContain("{size === 'big' && embedNote !== null && <span className=\"u-race-strip-error\" role=\"status\">{embedNote}</span>}");
-    expect(STRIP).toContain("setEmbedNote(stripEmbedNote('late', null,");
   });
 });

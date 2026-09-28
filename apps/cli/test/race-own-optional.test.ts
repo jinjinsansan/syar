@@ -30,9 +30,14 @@ describe('★自分の馬が出ていないレースで「あなたの馬」を�
   it('🔴 ① ★強調（`isOwn`）と ★金の点（`own:`）は ★`mineGate` を読む', () => {
     expect(live.match(/isOwn:[^,\n]*===\s*ownGate\b/g) ?? [], '★isOwn が主役を読んでいる').toEqual([]);
     expect(live.match(/isOwn:[^,\n]*===\s*mineGate\b/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
-    /** ★カメラの監督へ渡す `own` だけは ★主役（★カメラが追う馬・★文字は描かない） */
+    /**
+     * ★2026-09-28（★デザイナー R-19 回答 Q3「1 着を最初から追うと結果を先に見せる」）: ★隊列のカットインの小さな地図も ★`mineGate`。
+     *   ★それまでは ★主役（★自馬が居なければ 1 着）を ★金で強調していた。★`own:` は ★1 つも 主役を読まない。
+     */
     const ownFlags = live.match(/own:\s*(h|horse)\.gate\s*===\s*ownGate\b/g) ?? [];
-    expect(ownFlags).toEqual(['own: horse.gate === ownGate']);
+    expect(ownFlags).toEqual([]);
+    /** ★実況の「◯◯は N 番手」も ★自馬が居なければ作らない（★`race-call.ts` は 見つからない馬番では話さない） */
+    expect(live).toContain('ownGate: mineGate ?? 0,');
   });
 
   it('🔴 ① ★自馬の欄・テロップ・馬名プレート・隊列バーは ★`mineGate` を渡す', () => {

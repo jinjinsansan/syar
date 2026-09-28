@@ -137,6 +137,11 @@ export function drawPaddockIntro<TImage>(
   entry: PaddockIntroEntry, sinceSec: number,
   background?: { readonly image: TImage; readonly width: number; readonly height: number },
   frames?: readonly RaceIntroHorseFrame<TImage>[],
+  /**
+   * ★`cards: false` … ★「出走馬紹介」と馬の札（名前・騎手・単勝・人気）を描かない（★背景と馬だけ）。
+   *   ★小窓（2 割の大きさ）では読めないので消す（★2026-09-28・デザイナー R-19 回答 Q1）。★省けば従来どおり。
+   */
+  options?: { readonly cards?: boolean },
 ): void {
   const W = vp.width, H = vp.height;
   const each = RACE_INTRO_PADDOCK_EACH_SEC;
@@ -168,6 +173,7 @@ export function drawPaddockIntro<TImage>(
     }
   }
   /** ★左上の見出し「出走馬紹介 1 / 3」 */
+  if (options?.cards !== false) {
   const tag = riseAt(sinceSec, 0.1);
   ctx.globalAlpha = base * tag.alpha;
   fillSlant(ctx, 40, 36 + tag.dy, 300, 44, HUD.glass);
@@ -202,6 +208,7 @@ export function drawPaddockIntro<TImage>(
   ctx.font = font(40, true); ctx.fillStyle = HUD.paper; ctx.fillText(String(entry.popularity), mx, my + 8);
   ctx.font = font(15, true); ctx.fillStyle = HUD.gold; ctx.fillText('番人気', mx, my + 34);
   ctx.textAlign = 'left';
+  }
   ctx.globalAlpha = base;
   /** ★入りと抜け（★0.35 秒の暗転） */
   const fade = Math.max(0, 1 - sinceSec / 0.35, 1 - (each - sinceSec) / 0.35);

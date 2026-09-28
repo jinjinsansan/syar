@@ -104,6 +104,15 @@ describe('★紹介と格の描画', () => {
     /** ★対照: ★入りの途中（0.2 秒）は帯の位置が違う（★秒の関数で動いている） */
     expect(draw(0.2)).not.toEqual(a);
   });
+  /** 🔴 ★小窓（`cards: false`）では ★札の文字を 1 つも描かない（★2026-09-28・デザイナー R-19 回答 Q1）。★対照は上の既定 */
+  it('🔴 ★`cards: false` は ★札の文字を 1 つも描かない（★背景と馬と暗転だけ）', () => {
+    const { ctx, ops } = recorder();
+    drawPaddockIntro(ctx as never, {}, VP, FONT, entry, 2, undefined, undefined, { cards: false });
+    expect(ops.filter((o) => o.startsWith('T:'))).toEqual([]);
+    const def = recorder();
+    drawPaddockIntro(def.ctx as never, {}, VP, FONT, entry, 2, undefined, undefined, { cards: true });
+    expect(def.ops.filter((o) => o.startsWith('T:')).length, '★対照: cards: true は描く').toBeGreaterThan(3);
+  });
   it('★格の紹介は渡された英字を描く（★G1 と G3 で違う）', () => {
     const texts = (roman: string): string[] => { const { ctx, ops } = recorder(); drawGradeIntro(ctx as never, VP, FONT, { roman }, 1.2, 2.6); return ops.filter((o) => o.startsWith('T:')); };
     expect(texts('I')).toContain('T:GI');

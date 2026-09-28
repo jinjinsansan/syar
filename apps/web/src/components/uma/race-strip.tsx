@@ -6,8 +6,8 @@ import { readClient } from '../../lib/supabase';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowOver, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
 import { INTRO_STAGES, stripSizeOf } from './race-strip-sizes';
-import { STRIP_EMBED_GIVE_UP_SEC, isStripEmbedMessage, stripControlMessage, stripEmbedNote, stripEmbedUrl } from './race-strip-embed';
-import { BOARD_ITEM_SEC, tickerBoard, tickerShowsField, type BoardItem, type TickerRunner } from './race-strip-ticker';
+import { STRIP_EMBED_FAILED_NOTE, STRIP_EMBED_GIVE_UP_SEC, isStripEmbedMessage, stripControlMessage, stripEmbedLog, stripEmbedUrl } from './race-strip-embed';
+import { BOARD_ITEM_SEC, boardText, bracketOrNull, raceLine, tickerBoard, tickerShowsField, type BoardItem, type TickerRunner } from './race-strip-ticker';
 import './uma-theme.css';
 
 interface RaceNoticeRow {
@@ -132,22 +132,27 @@ function clock(iso: string): string {
 }
 
 /**
- * ★電光掲示板の全部の札（★録画中は ★頭に ★そのレースと先頭 `leaderLine`・★最後に 直近確定）。
+ * ★掲示板の全部の札（★録画中は ★頭に ★先頭の札・★最後に 直近確定）。
  */
 function boardItemsOf(
   next: NonNullable<NoticeData['next']>, data: NoticeData, recent: RaceNoticeRow | null | undefined, nowMs: number,
-  leaderLine: string | null,
+  leaderCard: BoardItem | null,
 ): readonly BoardItem[] {
   return [
-    ...(leaderLine === null ? [] : [{ text: leaderLine, tone: 'plain' as const, badge: null }]),
+    ...(leaderCard === null ? [] : [leaderCard]),
     ...tickerBoard(next, data.nextField, nowMs, clock),
-    ...(recent ? [{ text: `直近確定 ${raceLabel(recent)}`, tone: 'plain' as const, badge: null }] : []),
+    ...(recent ? [boardCard('確定', raceLine(recent))] : []),
   ];
 }
 
+function boardCard(kind: string, text: string, rest: Partial<BoardItem> = {}): BoardItem {
+  return { kind, bracket: null, no: null, text, num: null, tail: null, tone: 'plain', badge: null, ...rest };
+}
+
 /**
- * ★**電光掲示板**（★2026-09-28・オーナー選択 A＋C＋D）。★1 枚ずつ ★右から滑り込み・★止まって読ませ・★左へ抜ける。
- *   ★札を ★`step` で数え、★`key` を変えて ★CSS の動きを 1 枚ごとに頭から（★同じ要素の中で・★帯は差し替えない）。
+ * ★**掲示板**（★2026-09-28・オーナー選択 A＋C → ★デザイナー回答 R-20「着順掲示板の見た目」）。
+ *   ★［見出し］は ★動かさず 語だけ入れ替え、★本文だけが ★右から入って止まり 左へ抜ける（★1 枚 3 秒）。
+ *   ★札を ★`step` で数え、★本文の `key` を変えて ★CSS の動きを 1 枚ごとに頭から（★同じ要素の中で・★帯は差し替えない）。
  *   ★停止スイッチ（`.u-paused`）・「動きを減らす」の間は ★札を送らない（★資料 §5-7・★いまの札のまま止める）。
  *   ★読み上げは ★全部の札の文を 1 つにして渡す（★送るたびに読み上げない）。
  */
@@ -163,20 +168,26 @@ function StripBoard({ items, label }: { readonly items: readonly BoardItem[]; re
     return () => { window.clearInterval(timer); };
   }, []);
   const item = items.length === 0 ? null : items[step % items.length]!;
-  /** ★長い札は ★止まっている間に ★はみ出したぶんだけ左へ送る（★最後まで読ませる・★「…」で切らない） */
-  const itemRef = useRef<HTMLSpanElement | null>(null);
+  /** ★長い札は ★止まっている間に ★はみ出したぶんだけ左へ送る（★最後まで読ませる・★「…」で切らない・R-20 Q4） */
+  const bodyRef = useRef<HTMLSpanElement | null>(null);
+  const itemKey = item === null ? '' : boardText(item);
   useLayoutEffect(() => {
-    const host = hostRef.current;
-    const el = itemRef.current;
-    if (host === null || el === null) return;
-    el.style.setProperty('--board-shift', `${Math.max(0, el.scrollWidth - (host.clientWidth - 16))}px`);
-  }, [step, item?.text]);
-  return <span ref={hostRef} className="u-race-strip-board" aria-label={`${label}: ${items.map((i) => i.text).join('、')}`}>
-    {item !== null && <span key={step} ref={itemRef} className={`u-race-strip-board-item u-board-${item.tone}`} aria-hidden
-      style={{ '--board-sec': `${BOARD_ITEM_SEC}s` } as React.CSSProperties}>
-      {item.badge !== null && <b className={`u-board-badge${item.badge === '大穴' ? ' u-board-badge-longshot' : ''}`}>{item.badge}</b>}
-      {item.text}
-    </span>}
+    const el = bodyRef.current;
+    if (el === null) return;
+    el.style.setProperty('--board-shift', `${Math.max(0, el.scrollWidth - el.clientWidth)}px`);
+  }, [step, itemKey]);
+  return <span ref={hostRef} className="u-race-strip-board" aria-label={`${label}: ${items.map(boardText).join('、')}`}>
+    {item !== null && <>
+      <span className={`u-board-kind u-board-${item.tone}`} aria-hidden>{item.kind}</span>
+      <span key={step} ref={bodyRef} className="u-race-strip-board-item" aria-hidden
+        style={{ '--board-sec': `${BOARD_ITEM_SEC}s` } as React.CSSProperties}>
+        {item.no !== null && <b className="u-board-gate" style={item.bracket === null ? undefined : { background: `var(--f${item.bracket})`, color: [1, 5, 8].includes(item.bracket) ? '#111' : '#fff' }}>{item.no}</b>}
+        {item.text !== null && <span className="u-board-text">{item.text}</span>}
+        {item.num !== null && <span className="u-board-numset"><span className="u-board-num">{item.num}</span>{item.tail !== null && <span className="u-board-unit">{item.tail}</span>}</span>}
+        {item.num === null && item.tail !== null && <span className="u-board-unit">{item.tail}</span>}
+        {item.badge !== null && <b className={`u-board-badge${item.badge === '大穴' ? ' u-board-badge-longshot' : ''}`}>{item.badge}</b>}
+      </span>
+    </>}
   </span>;
 }
 
@@ -403,7 +414,8 @@ export function RaceStrip(): React.ReactElement | null {
   useEffect(() => {
     const e = embedRef.current;
     if (!windowOver || e === null || e.live) return;
-    setEmbedNote(stripEmbedNote('late', null, Math.round(((nowRef.current ?? e.sinceMs) - e.sinceMs) / 1000)));
+    console.warn(`[race-strip] ${stripEmbedLog('late', null, Math.round(((nowRef.current ?? e.sinceMs) - e.sinceMs) / 1000))}`);
+    setEmbedNote(STRIP_EMBED_FAILED_NOTE);
     setEmbed(null);
   }, [windowOver]);
   const embedId = embed?.id ?? null;
@@ -413,7 +425,10 @@ export function RaceStrip(): React.ReactElement | null {
       if (event.origin !== window.origin || !isStripEmbedMessage(event.data)) return;
       if (event.data.raceId !== embedId) return;
       if (event.data.type === 'playing') { setEmbed((e) => (e === null ? e : { ...e, live: true })); return; }
-      if (event.data.type === 'error') setEmbedNote(stripEmbedNote('error', event.data.detail, 0));
+      if (event.data.type === 'error') {
+        console.warn(`[race-strip] ${stripEmbedLog('error', event.data.detail, 0)}`);
+        setEmbedNote(STRIP_EMBED_FAILED_NOTE);
+      }
       setEmbed(null);
     };
     window.addEventListener('message', onMessage);
@@ -457,9 +472,12 @@ export function RaceStrip(): React.ReactElement | null {
 
   /** ★流れる 1 行を出すか（★「大」で ★次のレースが読めていれば ★いつも）・★録画中に頭へ置く 1 項目 */
   const tickerOn = size === 'big' && next !== null && next !== undefined && data !== null && nowMs !== null;
-  /** ★先頭は ★簡易版の走行の位置から（★本編が流れている間は ★映像と食い違うので出さない） */
-  const leaderLine = (replaying || embedLive) && recent
-    ? `${raceLabel(recent)}${!embedLive && leader !== null ? `・先頭 ${leader.gate}番 ${leader.name}` : ''}` : null;
+  /**
+   * ★［先頭］の札（★R-20「(13) R12290 ・ ○○」）。★確定タイムから逆算した位置の先頭（★本編が流れている間は ★映像と食い違うので出さない）。
+   */
+  const leaderCard = replaying && !embedLive && recent && data && leader !== null
+    ? boardCard('先頭', `${recent.name} ・ ${leader.name}`, { no: leader.gate, bracket: bracketOrNull(leader.gate, data.runners.length) })
+    : null;
 
   if (size === 'hidden') return null;
   /** ★`text`: ★その画面のレースの 1 行だけ（★走行・拡大・他のレースは出さない） */
@@ -491,6 +509,8 @@ export function RaceStrip(): React.ReactElement | null {
         {/* ★本編（★`playing` まで 見えないまま読み込む・★触れない） */}
         <iframe ref={iframeRef} className="u-race-strip-embed" data-live={embedLive ? 'true' : 'false'}
           src={stripEmbedUrl(embed.id)} title="レースの録画（確定した結果から再現）" tabIndex={-1} />
+        {/* ★映像の左上に「録画」札を 1 つ（★DOM・★本編の長い札は小窓では消した・★R-19 回答 Q1） */}
+        {big && embedLive && !expanded && <span className="u-race-strip-stage-rec" aria-hidden>録画</span>}
         {expanded && <div className="u-race-strip-stage-head">
           {/* ★「本編」と名乗らない（★条件 1）。★録画・結果から再現 */}
           <strong>{recent?.name ?? ''} · 録画・結果から再現</strong>
@@ -511,9 +531,14 @@ export function RaceStrip(): React.ReactElement | null {
           {compact && <span className="u-race-run-mini" aria-hidden>
             <span className="u-race-run-horse" style={{ inset: 0 }}><RunningHorse phase={0} motionReduced={motionReduced} /></span>
           </span>}
-          <strong>{recent.name} レース中</strong>
+          {/*
+            ★「大」（★掲示板のある帯）は ★左端に「● 録画」の札を 1 つ（★動かさない・★R-20 Q1・★R-18 回答 🟡 #8 の「（録画）」をこの札で満たす）。
+            ★レース名は ★掲示板の札が持つ。★「極小」は いまどおり「レース中（録画）」。
+          */}
+          {tickerOn && <span className="u-race-strip-recbadge"><i aria-hidden />録画</span>}
+          {!tickerOn && <strong>{recent.name} レース中</strong>}
           {/* ★「（録画）」は ★別の枠にして ★縮めない（★極小でも必ず残す・R-18 回答 🟡 #8・生中継に見せない） */}
-          <span className="u-race-strip-rec">（録画）</span>
+          {!tickerOn && <span className="u-race-strip-rec">（録画）</span>}
           {/* ★「大」は ★レース名と先頭を ★流れる 1 行に入れる（★下）。★ここに並べると 1 行に入らない */}
           {!compact && !tickerOn && <span title={raceLabel(recent)}>{raceLabel(recent)}</span>}
           {!compact && !tickerOn && leader !== null && <span className="u-race-strip-recent">先頭 {leader.gate}番 {leader.name}</span>}
@@ -529,7 +554,7 @@ export function RaceStrip(): React.ReactElement | null {
           ★停止スイッチ・「動きを減らす」では ★流さない（★CSS・資料 §5-7）。
         */}
         {tickerOn && next && data && nowMs !== null
-          && <StripBoard items={boardItemsOf(next, data, recent, nowMs, leaderLine)} label={`${next.name} ${status}`} />}
+          && <StripBoard items={boardItemsOf(next, data, recent, nowMs, leaderCard)} label={`${next.name} ${status}`} />}
       </div>
       {error && <span className="u-race-strip-error">更新できません</span>}
       {/* ★録画を出せなかった理由（★黙って簡易版に戻らない） */}
