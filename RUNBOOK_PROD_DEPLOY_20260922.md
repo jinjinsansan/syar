@@ -112,6 +112,10 @@ bash tools/deploy.sh <0 で控えた sha>
 ⚠️ ★`race-engine` の package.json は `@star/render` を挙げるが ★ソースは読まない（★`grep -rn "from '@star/render'" packages/race-engine/src` が 0）。★render の変更は ★ワーカーに届かない。
 ⚠️ ★次にワーカーの読む所へ触るコミットが main に入ったら ★この表は古くなる。★その日は ★`deploy.sh` で入れ替えるか ★この表に足すこと。
 
+#### ⑥ ★押した後に流す（★2026-09-29 から・記録を手で書かない）
+
+`git fetch origin && node tools/verify-worker-lag.mjs --base https://star-two-chi.vercel.app` → ★終了コード 0 = 効く変更 0 ／ 1 = 要判断 ／ 2 = 分からない。★下の手書きの記録は ★検算のために残す。
+
 #### ⑥ の記録（追記・★2026-09-29）: ★ワーカー `5643601`・★画面 `9d9689d` ── ★後ろだが効く変更は 0
 
 ★healthz（★2026-09-29 16:55Z 頃）: ★web `9d9689d`・★worker `5643601`（★2026-09-28 の配備）。

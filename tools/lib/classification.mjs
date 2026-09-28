@@ -510,6 +510,7 @@ export const READONLY = [
   'measure-race-canvas-ratio.mjs', // レースの画布の裏の画素 ÷ 画面の物理画素を測る（読むだけ・D-058b・2026-09-28）
   'verify-jockey-roster-live.mjs', // 騎手の名簿を TS と 生きている DB で突き合わせる（読むだけ・金額・2026-09-28）
   'measure-strip-embed.mjs', // 帯で流す本編の追加転送・コマ間隔・止める確認をヘッドレスで測る（読むだけ・2026-09-28）
+  'verify-worker-lag.mjs',   // 本番のワーカーが画面より後ろのとき、その差にワーカーに効く変更が在るかを数える（読むだけ・healthz と git・2026-09-29）
   'slice-narrator.mjs',       // ナレーターのシートを 6 枚に切り、口だけ差し替える（読むだけ）
   'verify-no-real-faces.mjs', // 人物立ち絵に写真が混ざっていないか（読むだけ）
   // ★anon で何が読めるかの全数確認（§8.6 server_seed・§12.4 potential）。select のみ
@@ -1258,6 +1259,7 @@ export const PRODUCTION_OPS = [
  *      READONLY / STATE_CHANGING / PRODUCTION_OPS のどれかです。
  */
 export const COMPONENT = [
+  { file: 'lib/worker-lag.mjs', why: '★ワーカーの遅れを数える純関数（★ワーカーが読む所を package.json の依存から作り import で絞る・範囲を数える。★`verify-worker-lag.mjs` が使う・★網 worker-lag.test.ts・2026-09-29）' },
   { file: 'lib/args.mjs', why: '★コマンドライン引数の解析。★2026-08-20 に本番へ余計な移行を当てた事故の後、切り出した部品' },
   { file: 'lib/lineage-measure.mjs', why: '★D-121 ③ の測る部品（★% 点・母系の世代・参考の列の純関数。★`measure-lineage-plateau.mjs` が使う・★単体では走らせない）' },
   { file: 'lib/name-reset.mjs', why: '★馬名を戻す部品（★新しい名前を選ぶ純関数・読む・書く。★`reset-horse-name.mjs` と予行が使う・★単体では走らせない）' },
