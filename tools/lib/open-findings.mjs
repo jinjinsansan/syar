@@ -1419,7 +1419,8 @@ export const OPEN_FINDINGS = [
       + '--- ✅ ★**消す条件** --- ★画面が ★欠けた枠を ★空のまま描ける形になった日（★頭数と最大の馬番を分けて持つ）。',
     owner: 'dev',
     until: '2026-12-31',
-    stillOpen: (h) => h.grepCount('取消で欠けた枠があるレースの録画は、まだ出せません', { exclude: /open-findings\.mjs$/ }) > 0,
+    /** ★2026-09-30: ★文言（録画 → 中継）でなく ★出さない判定そのものを見る（★語を変えた日に 述語だけが外れた） */
+    stillOpen: (h) => h.grepCount('runners\\.some\\(\\(r, i\\) => r\\.gate !== i \\+ 1\\)', { exclude: /open-findings\.mjs$/ }) > 0,
   },
   {
     id: 'REPLAY-MARGIN-FROM-TIME',
