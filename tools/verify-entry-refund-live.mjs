@@ -82,6 +82,35 @@ try {
   must(bal1 - bal0 === expected, `③ 残高 ${bal0} → ${bal1}（+${bal1 - bal0} EP・★出走料＋騎手の料金 ${expected} EP と一致・scratchEntry は ${r.refundedEp} EP と報告）`);
   const pp1 = Number((await c.query('select count(*)::int as n from pp_ledger')).rows[0].n);
   must(pp1 === pp0, `⑤ PP の台帳は増えない（${pp0} → ${pp1}）`);
+
+  /**
+   * ★⑥ **騎手つきの往復**（★2026-09-29・レビュー側の条件「在ることと 正しい額が戻ることは別」）。
+   *   ★料金のある騎手で ★`enter_race` から登録（★出走料＋騎手の料金が引かれる）→ ★runner と同じ形で `scratchEntry` →
+   *   ★残高が ★登録の前に戻ること・★戻った額が 出走料＋騎手の料金 であることを見る。
+   *   ★場は この取引の中で作る（★別のレースを announced・締切 1 時間後・資格 0〜99 に倒し、★残高を足す）。
+   */
+  const jockey = (await c.query('select id, fee_ep from jockeys where fee_ep > 0 order by fee_ep desc limit 1')).rows[0];
+  if (jockey === undefined) throw new Error('★料金のある騎手が名簿に居ない（★騎手つきの返金を測れない）');
+  const r2 = (await c.query(`select r.id from races r where r.id <> $1
+      and not exists (select 1 from race_entries e where e.race_id = r.id and e.horse_id = $2)
+     order by r.scheduled_at desc limit 1`, [t.race_id, t.horse_id])).rows[0];
+  if (r2 === undefined) throw new Error('★登録に使えるレースが無い');
+  await c.query(`update races set status = 'announced', entry_deadline_at = now() + interval '1 hour',
+      min_wins = 0, max_wins = 99, entry_fee_ep = coalesce(entry_fee_ep, 200), weight_kg = coalesce(weight_kg, 55) where id = $1`, [r2.id]);
+  await c.query('update users set entry_points = entry_points + 10000 where id = $1', [t.owner_id]);
+  const fee2 = Number((await c.query('select entry_fee_ep from races where id = $1', [r2.id])).rows[0].entry_fee_ep);
+  const b0 = await bal();
+  await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: t.owner_id, role: 'authenticated' })]);
+  await c.query('set local role authenticated');
+  const entryId = (await c.query('select public.enter_race($1, $2, $3, $4, $5) as id', [r2.id, t.horse_id, 'sashi', jockey.id, randomUUID()])).rows[0].id;
+  await c.query('reset role');
+  const b1 = await bal();
+  const row = (await c.query('select jockey_frozen from race_entries where id = $1', [entryId])).rows[0];
+  const jfee = jockeyFeeOfFrozen(row.jockey_frozen, entryId);
+  must(b0 - b1 === fee2 + Number(jockey.fee_ep), `⑥ 登録で 出走料 ${fee2} ＋ 騎手 ${jockey.fee_ep}（${jockey.id}）を引いた（${b0} → ${b1}・−${b0 - b1} EP）`);
+  const r6 = await scratchEntry(c, { entryId, raceId: r2.id, horseId: t.horse_id, jockeyFeeEP: jfee }, 'owner_request');
+  const b2 = await bal();
+  must(b2 === b0 && b2 - b1 === fee2 + Number(jockey.fee_ep), `⑥ 取消で 出走料＋騎手の料金が戻った（${b1} → ${b2}・+${b2 - b1} EP・scratchEntry は ${r6.refundedEp} EP と報告・登録の前 ${b0} に一致）`);
 } catch (e) {
   must(false, `★途中で落ちました: ${e instanceof Error ? e.message : String(e)}`);
 } finally {
