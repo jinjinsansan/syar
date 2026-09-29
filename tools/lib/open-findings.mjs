@@ -1768,7 +1768,9 @@ export const OPEN_FINDINGS = [
       + '★書き込みの規則はサーバー（★いまの place_bet・制約・締切）が持つので ★通る買い方は本番と同じだが、★古い画面の説明のまま 本番の EP が動きうる。'
       + '★直し方の候補（★オーナーの操作）: ①Preview の環境変数を staging に向ける ②Preview の配備を止める ③Preview に Vercel の保護（認証）を掛ける。'
       + '★①を採れば ★ログインした姿の測定は Preview で流せる（★手元の dev が要らない・簿 LAYOUT-AUDIT-LOGGED-OUT-ONLY）。'
-      + '--- ✅ ★**消す条件** --- ★Preview が本番の DB を向かなくなった（または開けなくなった）ことを 束のホストか 開けないことで確かめた日。',
+      + '--- ✅ ★**消す条件** --- ★Preview が本番の DB を向かなくなった（または開けなくなった）ことを 束のホストか 開けないことで確かめた日。'
+      + '⚠️ ★①（環境変数を staging に向ける）は ★**これから作られる Preview にだけ効く**（★NEXT_PUBLIC_* は 束を作るときに焼き込まれる）。★**過去の 20 件は 本番の DB を向いたまま残る** → ★オーナーに「古い Preview を消す」も頼む（★レビュー側と開発側で理解が一致）。'
+      + '✔ ★確かめる道具: `node tools/verify-deployed-db-host.mjs --base <Preview の URL> --env staging`（★束のホスト ＝ staging なら 0・違えば 1・読めなければ 2）。★いまの最新 Preview で 1 を確認（対照）。',
     owner: 'review',
     until: '2026-10-15',
   },
