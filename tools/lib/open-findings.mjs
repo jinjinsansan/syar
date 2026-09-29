@@ -1743,7 +1743,7 @@ export const OPEN_FINDINGS = [
     what: '⚠️ ★**当たりの経路（PP の払戻）は、まだ本番で通っていません**（★2026-09-29・レビュー側）。'
       + '★本番の初めての投票（R12518・単勝 [4]・100 EP・16.9 倍）は lost（★1 着は 7 番）。★外れの経路と EP 側の一方通行（戻る行 0）は確かめた。',
     why: '✔ ★確かめること: ★won に変わり ★`odds_at_purchase × 金額`（例 100 × 16.9 ＝ 1,690）が pp_ledger（reason payout）に入り ★EP の台帳に戻る行が無いこと。'
-      + '★待つだけにしない: ★staging で 確定済みのレースに払戻の関数だけを取引の中で走らせ rollback できるか 見る（★未着手）。'
+      + '✔ ★staging では通した（2026-09-29・tools/verify-win-payout-live.mjs・取引の中・rollback）: ★1 着の単勝 100 EP × 16.9 → won・payout 1,690・pp_ledger payout 1,690 が 1 行・EP の台帳 0 行・対照の 2 着は lost。★本番の 1 件は まだ。'
       + '--- ✅ ★**消す条件** --- ★当たった 1 件で PP の行を読んだ日。',
     owner: 'dev',
     until: '2026-12-31',

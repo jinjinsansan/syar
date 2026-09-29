@@ -89,6 +89,12 @@ export const TOOL_AFTERMATH = {
     // ★AU-7: ★主張には引用を付ける。★この行が変われば、★検査が壊れて落ちます
     countedBy: 'JSON.stringify(after) === JSON.stringify(before)',
   },
+  'verify-win-payout-live.mjs': {
+    mode: 'restores',
+    why: '★`begin` → 利用者・pending の馬券 2 枚・`settlePayouts`（★commit しない）→ ★**必ず `rollback`**（`finally`・2026-09-29）。'
+      + '✅ ★**戻したことを数えます**: ★投票・PP 台帳・EP 台帳・口座の行数の 前後一致を見ます。',
+    countedBy: 'must(JSON.stringify(after) === JSON.stringify(before),',
+  },
   'verify-sales-close-live.mjs': {
     mode: 'restores',
     why: '★`begin` → 利用者・レースの発走時刻・`0096` の本体（★begin/commit を外して）・`place_bet` → ★**必ず `rollback`**（`finally`・2026-09-29）。'
