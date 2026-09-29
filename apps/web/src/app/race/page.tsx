@@ -1081,6 +1081,12 @@ interface RealReplay {
  */
 const REPLAY_BADGE_TEXT = '中継';
 /**
+ * ★**走っているレース ＝ 中継 ／ 終わったレースを後から ＝ 過去のレース**（★2026-09-30・オーナー「録画はそもそも不要」・レビュー側「場面で語を分ける」）。
+ *   ★発走から ON_AIR_MS の間に開いたら ★中継（★時計の位置から流す）。★それより後は ★過去のレース（★頭から見直す）。
+ */
+const PAST_RACE_BADGE_TEXT = '過去のレース';
+const ON_AIR_MS = 5 * 60 * 1000;
+/**
  * ★**画面の部品の形**（★2026-09-27・引き渡し資料 `design_handoff_uma_monogatari` §5.3 / §5.5 / §5.6 の値）。
  *   ★新しい意匠は作っていません（★資料の金プレート・副ボタン・カプセルの値をそのまま）。
  */
@@ -2529,6 +2535,9 @@ function RaceView({ setup, real }: {
   /** ★実レースの確定記録（★`null` は見本）。★`setup` と同じく ★開いてから閉じるまで変わりません */
   readonly real: RealReplay | null;
 }): React.JSX.Element {
+  /** ★走っている間に開いたか（★札の語を分ける・開いた時に 1 回だけ決める） */
+  const [onAir] = useState(() => real !== null && Number.isFinite(real.scheduledAtMs) && new Date().getTime() - real.scheduledAtMs < ON_AIR_MS);
+  const liveLabel = onAir ? REPLAY_BADGE_TEXT : PAST_RACE_BADGE_TEXT;
   /**
    * ★**走路・頭数・場の見た目は `setup` から**（★段 2 D）。
    *   ★名前を残すのは ★この本体の 6,000 行を 1 文字も動かさないためです（★見本の道では ★元のモジュール定数と同じ値）。
@@ -6413,7 +6422,7 @@ function RaceView({ setup, real }: {
             style={{ display: 'block', width: W, height: H, background: '#111' }}
           />
           {/* ★小窓では ★帯が「録画」札を重ねる（★この長い札は 2 割の大きさでは読めない・★R-19 回答 Q1） */}
-          {real !== null && !EMBED_STRIP && <div style={REPLAY_BADGE_STYLE}>{REPLAY_BADGE_TEXT}</div>}
+          {real !== null && !EMBED_STRIP && <div style={REPLAY_BADGE_STYLE}>{liveLabel}</div>}
           {/*
             ★**③ 確定後**（★デザイン第6便）。★着順を半透明の暗いカードで演出の上に重ね、
             ★「もう一度」と「メニューへ」を出します。
@@ -6547,7 +6556,7 @@ function RaceView({ setup, real }: {
       alignItems: 'center', justifyContent: 'center', gap: 10, textAlign: 'center',
     }}>
       <span style={{ fontSize: 24, letterSpacing: '.14em', color: 'var(--u-gold)' }}>馬物語</span>
-      <p style={{ margin: 0 }}>{real !== null ? '中継の用意をしています…' : 'レースの用意をしています…'}</p>
+      <p style={{ margin: 0 }}>{real !== null ? `${liveLabel}の用意をしています…` : 'レースの用意をしています…'}</p>
       <progress aria-label="レース素材を読み込み中" style={{ width: 'min(260px, 60vw)', accentColor: 'var(--u-gold)' }} />
       {/*
         ★経過秒は ★**遅いときだけ**（★8 秒から・★3 択と一緒に）出します（★2026-09-28・レビュー側の条件）。
@@ -6597,7 +6606,7 @@ function RaceView({ setup, real }: {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', maxWidth: 1280, margin: '0 auto', padding: '12px 14px 0' }}>
           <a href={RETURN_TO ?? '/home'} style={RACE_BACK_PLATE}>‹ {RETURN_TO === null ? 'ダッシュボードへ' : RETURN_LABEL}</a>
           <strong style={{ fontSize: 18, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {real !== null ? `中継　${RACE_META.raceNo}　${RACE_META.raceName}` : 'レース'}
+            {real !== null ? `${liveLabel}　${RACE_META.raceNo}　${RACE_META.raceName}` : 'レース'}
           </strong>
         </div>
       )}
@@ -6988,7 +6997,7 @@ function RaceView({ setup, real }: {
           </button>
           <button type="button" onClick={() => { enterBrowserFullscreen(); }} style={RACE_CONTROL}>全画面</button>
           <button type="button" onClick={() => { audioRef.current?.reset(); resetToStart(); setPlaying(true); }} style={RACE_CONTROL}>もう一度</button>
-          {real !== null && <span style={RACE_REPLAY_CHIP}>{REPLAY_BADGE_TEXT}</span>}
+          {real !== null && <span style={RACE_REPLAY_CHIP}>{liveLabel}</span>}
         </div>
       )}
       {!smallScreen && (
