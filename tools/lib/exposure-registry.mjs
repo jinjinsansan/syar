@@ -160,6 +160,9 @@ export const EXPECTED_EXPOSURE = {
   //   ★2026-09-28 に登録（★V-20 ③ の登録漏れ）。★本番の実測: ★anon / authenticated に付与 0（★anon は permission denied）。
   //   ★書くのは `request_entry_scratch`・★読むのは `my_entry_scratch`（★自分の分だけ）。★画面はまだ無いので ★閉じたまま
   entry_scratch_requests: CLOSED,
+  // ── ★`race_live_results`（★`0098`・① 決めた着順・2026-09-29） ──
+  //   ★書くのはワーカーだけ。★読ませるのは race_entries_public の式だけ（★確定前は 発走時刻を過ぎてから）。★直に読ませると 発走前に結果が見える
+  race_live_results: CLOSED,
   // ── ★`jockeys`（★`0082` で開けた・`0093` で閉じた・2026-09-28・V-20 ②③） ──
   //   ★元の表が anon に開いていると ★列を足した日に黙って公開になる（★§14.3・レビュー側の裁定 (a)）。
   //   ★読むのは enter_race（definer）の中の jockey_frozen_build だけ。★画面は TS の JOCKEYS から出すので ★公開ビューは作らない

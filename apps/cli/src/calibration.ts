@@ -536,6 +536,11 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
       + '★作り直しで口が静かに消えないよう、★**実測して書き留めた**もの（★手で数えていない）',
   },
   {
+    key: 'SETTLE_AFTER_START_MS',
+    why: '★② 締める（確定・払戻）を 発走から遅らせる時間（`packages/scheduler/src/cycle.ts`・2026-09-29・0098・レビュー側 B）。★映像が終わってから払戻を出すための待ち。'
+      + '🔴 ★**較正定数ではありません** — ★着順・オッズ・能力・賞金の額には 1 ビットも入らず、★払戻の時刻だけが動きます。',
+  },
+  {
     key: 'GRADED_CALENDAR',
     why: '★重賞の暦（`packages/scheduler/src/programme.ts`・2026-09-29・レビュー側の裁定）。★52 週それぞれの鞍の並び（★GRADED_RACES.month と gameMonthOf から作る表）。'
       + '🔴 ★**較正定数ではありません** — ★数は持たず、★鞍の月から導く表です。★重賞の本数（年 50）は 鞍の表の長さで決まります。',

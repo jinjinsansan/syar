@@ -105,7 +105,7 @@ export default async function LandingPage(): Promise<React.ReactElement> {
     const c = readClient();
     const [{ data: settled }, { data: open }] = await Promise.all([
       c.from('races_public').select('id').eq('status', 'settled').order('scheduled_at', { ascending: false }).limit(1),
-      c.from('races_public').select('id').eq('status', 'scheduled').order('scheduled_at', { ascending: true }).limit(1),
+      c.from('races_public').select('id').eq('status', 'scheduled').gt('scheduled_at', new Date().toISOString()).order('scheduled_at', { ascending: true }).limit(1),
     ]);
     const s = settled?.[0] as { id?: string } | undefined;
     const o = open?.[0] as { id?: string } | undefined;

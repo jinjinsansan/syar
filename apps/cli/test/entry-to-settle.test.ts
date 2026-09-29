@@ -216,6 +216,8 @@ function fakeDb(entries: Entry[], opts: { readonly honorScratch?: boolean } = {}
         return { rows: [{ ms: '0' }], rowCount: 1 };
       }
       if (s.includes('prize') || s.includes('award')) return { rows: [], rowCount: 0 };
+      /** ★① 決めた着順（★0098）: ★この検査では ① を回さないので 0 行（★② の番人は突き合わせを飛ばす） */
+      if (s.includes('from race_live_results')) return { rows: [], rowCount: 0 };
       throw new Error(`偽の DB が想定していない SQL: ${s.slice(0, 70)}`);
     },
   };

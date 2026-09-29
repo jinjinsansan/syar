@@ -220,6 +220,8 @@ describe('FK-4 手で写している述語の分類簿', () => {
   const STUBBED: Readonly<Record<string, string>> = {
     pendingSettlements: '★D-117 の 2 段ループの検査では確定を回さない（★`[]` 固定）。★確定は `settle.test.ts` が実 DB で見る',
     settleRace: '★同上。★偽物は呼ばれたことだけ数える',
+    pendingResolutions: '★① 決める（0098）。★2 段ループの検査では回さない（★`[]` 固定）。★本物の述語（締切の後・① の行が無い）は staging の通しと verify-live-results が実 DB で見る',
+    resolveRace: '★同上。★偽物は何もしない',
     overdueRaces: '★中止の期限は `overdueBefore()`（純関数）が持ち、★`cycle.test.ts` が両側を押さえる（R-2）',
   };
 

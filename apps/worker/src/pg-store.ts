@@ -21,7 +21,7 @@ import { awardPrizes } from './prize-award.js';
 import { settlePayouts } from './payout.js';
 import { settleRace as settleRaceFair } from './settle.js';
 import type { AnnounceSpec, AnnouncedRace, CycleStore, FillSpec, RaceSpec } from './cycle-runner.js';
-import { ENTRY_FEE_EP, overdueBefore, raceNameOf, weekIndexAt, winsRangeFor } from '@star/scheduler';
+import { ENTRY_FEE_EP, SETTLE_AFTER_START_MS, overdueBefore, raceNameOf, weekIndexAt, winsRangeFor } from '@star/scheduler';
 import { cancelRace as cancelRaceImpl } from './cancel.js';
 // ★生涯の記録（正典 §18・移行 `0024`）。★確定の中から呼びます（LR-7「レースが終わった後」）
 import { writeRaceStory } from './story-flow.js';
@@ -51,6 +51,18 @@ export class UnfrozenRaceError extends Error {
         + '確定せず開催中止にします（D-056）',
     );
     this.name = 'UnfrozenRaceError';
+  }
+}
+
+/**
+ * ★**① で決めた着順と ② の計算が食い違った**（★2026-09-29・0098・レビュー側 B 条件 2）。
+ *   ★同じ種・同じ計算なので ★起きないはずのこと。★起きたら ★確定しない（★払戻を出さない）。
+ *   ★利用者には 帯が「確定を確認中」と出し、★ワーカーは知らせる（★ログだけにしない）。
+ */
+export class LiveResultMismatchError extends Error {
+  constructor(readonly cycleIndex: number) {
+    super(`cycle=${cycleIndex}: ★① で決めた着順と ② の計算が食い違いました。★確定しません（★払戻を出さない・人が見る）`);
+    this.name = 'LiveResultMismatchError';
   }
 }
 
@@ -111,6 +123,179 @@ export function createPgStore(
     );
   });
   let courseNotFrozenCount = 0;
+  /** ★確定に使う行（★settleRace・resolveRace の 2 か所が同じ計算を通る・2026-09-29） */
+  interface OutcomeRace {
+    id: string; server_seed: string; distance: number; surface: string; track_condition: string;
+    course_id: string; class_rank: number; grade: string | null; name: string; course_frozen: unknown;
+  }
+  /**
+   * ★**着順を計算する 1 か所**（★2026-09-29・0098）。★① 決める（resolveRace）と ② 締める（settleRace）が ★同じ関数を通る
+   *   （★同じ種・決定論 ＝ 同じ着順）。★呼ぶ側が取引を張る（★失敗時の rollback はここでも行う＝旧 settleRace のまま）。
+   */
+  const outcomeOf = async (cycleIndex: number, r: OutcomeRace): Promise<{
+    finished: { gate: number; finishPosition: number; timeSec: number }[];
+    capByGate: Map<number, unknown>;
+    es: pg.QueryResult<Record<string, unknown>>;
+    frozenRaw: unknown;
+  }> => {
+
+        /**
+         * --- 出走表を読んで着順を計算 ---
+         *
+         * ★**`horses` と結合しません**（D-056）。読むのは**凍結だけ**です。
+         *   結合を残すと「一部だけ最新値で上書き」が書けてしまい、
+         *   2回読む構造に戻れます。**読む対象を1つにして、戻れなくします。**
+         */
+        /**
+         * ⚠️ ★`e.horse_id` と `e.jockey_frozen` は ★**`race_entries` 自身の列**です。
+         *    ★`horses` との結合ではないので、D-056 の「凍結だけを読む」に触れません。
+         *    ★生涯の記録（§18）を馬ごとに残すのに要ります（★着順の計算には使いません）。
+         */
+        const es = await client.query<Record<string, unknown>>(
+          /**
+           * ⚠️ ★**取消（除外）の行を外します**（★2026-09-16・GE-1・正典 **D-111 ③**）。
+           *
+           * ★取消にしても `entrant_snapshot` は **null のまま**です。
+           * ★この 1 行が無いと、★**取消の行まで「凍結が無い」と数えて**しまい、
+           * ★下の `unfrozen > 0` で ★**レースごと開催中止**になります
+           * — ★D-111 で直したはずの結末に、そのまま戻ります。
+           * ★レビュー側の指摘（`REVIEW_GAME_BODY_5_VERDICT_20260916.md` §8-1）。
+           */
+          `select e.gate, e.weight, e.strategy, e.entrant_snapshot, e.horse_id, e.jockey_frozen
+             from race_entries e
+            where e.race_id = $1 and e.scratched_at is null
+            order by e.gate`,
+          [r.id],
+        );
+        if (es.rowCount === 0) {
+          // ★出走表が無いレースは確定できない。黙って settled にしない
+          throw new Error(`settleRace: cycle=${cycleIndex} に出走表がありません`);
+        }
+
+        /**
+         * ★**凍結が無いレースは確定せず、開催中止にします**（D-056・正典 D-037 の経路）。
+         *
+         * 【なぜ「昔の経路に落ちる」ではいけないか】
+         *   旧経路（`horses` を読み直す）こそが D-055 で閉じた欠陥そのものです。
+         *   フォールバックを残すと、**「凍結が無いとき」だけ閉じたはずの穴が既定で開きます。**
+         *   ★警告を出しても、開いていることに変わりはありません。
+         *
+         * 【移行の猶予は終わっています】
+         *   レースは生成2周先 → 10分程度で確定するので、
+         *   0016 適用から1時間もあれば全レースが凍結を持ちます。
+         *
+         * ★中止なら返還・冪等・アラートが実装済みで、**新しい仕組みは要りません**。
+         *   将来この書き込みが壊れても、静かに劣化せず**目に見える形で止まります**。
+         */
+        const unfrozen = es.rows.filter(
+          (row) => row['entrant_snapshot'] === null || row['entrant_snapshot'] === undefined,
+        ).length;
+        if (unfrozen > 0) {
+          // ★中止は**別トランザクション**（cancelRace が自分で begin する）。
+          //   ここでは確定を巻き戻してから抜け、呼び出し側の中止経路に載せます。
+          await client.query('rollback');
+          throw new UnfrozenRaceError(cycleIndex, unfrozen, es.rowCount ?? 0);
+        }
+
+        // ★着順は §8.6 の final_seed から決める（settle.ts）。
+        //   ここで独自の乱数を使うと、seed_reveal を公開しても検証できません。
+        const entrants: RaceEntrant[] = es.rows.map((row) => ({
+          // ★凍結された出走馬を**そのまま**使う（D-056）。
+          //   ⚠️ ここに DB の最新値を混ぜないこと。混ぜた瞬間に2回読む構造に戻ります。
+          ...(row['entrant_snapshot'] as unknown as RaceEntrant),
+          // ★着順の同定は馬番で行う（凍結側は元の馬の UUID を持っている）
+          horseId: String(row['gate']),
+        }));
+        /**
+         * ★**走路の形は凍結を読みます**（★2026-09-15・`0023`・指示書 VW §5-2）。
+         *
+         * 【何が起きていたか】
+         *   ★ここは `courseShape: 'oval'` を**直書き**し、★`course` を渡していませんでした（`DEFAULT_OVAL`）。
+         *   ★オッズ側は 1400m 以下の 20% を直線で計算していたので、★その分は**別の模型で着順を出して**いました。
+         *
+         * ★条件はオッズと**同じ関数**（`conditionsFromFrozen`）で作ります。
+         * ★`course_frozen` が null（0023 より前）… ★実際に `DEFAULT_OVAL`・`'oval'` で確定されてきた形で確定し、
+         *   ★**件数を通報します**（★黙って落とさない）。
+         * ★凍結があるのに不正 … ★確定せず `InvalidFrozenCourseError` を投げ、★開催中止・返還の経路へ。
+         */
+        const frozenRaw = r.course_frozen;
+        let conditions: RaceConditions;
+        try {
+          let frozen: FrozenCourse | null = null;
+          if (frozenRaw !== null && frozenRaw !== undefined) {
+            frozen = parseFrozenCourse(frozenRaw);
+            // ★凍結と course_id が別の場を指していたら、どちらが正しいか決まらない
+            if (frozen.venueId !== r.course_id) {
+              throw new InvalidFrozenCourseError(`venueId=${frozen.venueId} が course_id=${r.course_id} と食い違います`);
+            }
+          }
+          conditions = conditionsFromFrozen(frozen, {
+            raceId: r.id,
+            distance: r.distance,
+            surface: r.surface as 'turf' | 'dirt',
+            trackCondition: r.track_condition as 'good' | 'yielding' | 'soft' | 'bad',
+          });
+        } catch (e) {
+          if (e instanceof InvalidFrozenCourseError) {
+            await client.query('rollback');
+            throw new InvalidFrozenCourseError(`cycle=${cycleIndex}: ${e.why}`);
+          }
+          throw e;
+        }
+        const res = settleRaceFair(
+          {
+            conditions,
+            entrants,
+            serverSeed: r.server_seed,
+          },
+          hash,
+        );
+        const finished = res.order.map((o) => ({
+          gate: Number(o.horseId),
+          finishPosition: o.finishPosition,
+          timeSec: o.timeSec,
+        }));
+        /**
+         * 🔴 ★**着順は 1 度しか書きません**（★正典 §17.3 **F-3**・2026-09-20）。
+         *
+         * 【★なぜ `and finish_pos is null` を足すか】
+         *   ✔ ★**二度 確定できないことは、既に守られています** — ★上の
+         *     ★`update races set status = 'settled' … where status = 'scheduled'` が 0 行なら
+         *     ★`rollback` して戻ります。★**ここは多層防御の 2 枚目**です。
+         *   🔴 ★しかし ★**`finish_pos` の変更を記録する引金も表も 0 件**でした
+         *     （★`F3-NO-RESULT-AUDIT`）。★**列の側には何の守りもありませんでした。**
+         *   → ★**製品の経路が結果を上書きできない**ことだけは、★1 行で閉じられます。
+         *   ⚠️ ★**手で流す SQL は、これでは止まりません。** ★そちらは再計算で示します（★F-1/F-2 と同じ作法）。
+         *
+         * 【★0 行だったら投げる理由】
+         *   ★状態遷移が守っているので、★ここが 0 行になるのは
+         *   ★**① 出走表の行が無い ② 既に着順が入っている** のどちらかです。
+         *   ★どちらも ★**結果が記録されないまま確定する**ことを意味します。
+         *   → ★**投げます**（★この取引は巻き戻るので、★確定しないほうが安全・**R-27**）。
+         */
+        /**
+         * 🔴 ★**範囲外入力の記録を、★捨てずに残します**（★2026-09-20・`CAP-VIOLATIONS-DISCARDED`）。
+         *
+         * 【★何が起きていたか】
+         *   ✔ ★`packages/race-engine/src/race.ts:254` は
+         *     ★**「クランプは黙って行わず `capViolations` に記録する（★不正の兆候かもしれないため）」**
+         *     と書き、★`:342` で ★**戻り値に入れて返して**いました。
+         *   🔴 ★しかし ★**受け取る側が 0 件**。★`race_entries.cap_violations`（`0001_init.sql:204`）は
+         *     ★**列が在るのに、★誰も書きませんでした**。
+         *   → ★★**作って、返して、捨てていた。** ★他の 4 件（★値が入らない）より悪い形です。
+         *
+         * 【★なぜ「後で」にしないか】
+         *   ✔ ★介入は ★**まだ 1 度も使われていません**（★本番 79,859 行 で 0 件）。
+         *   → ★★**いま繋げば、★「最初の介入の日」から残ります。★後だと最初の何回かが永久に欠けます。**
+         *
+         * ⚠️ ★**この便は「残す」までです。** ★**警報は鳴らしません** —
+         *    ★鳴らして何をするかが決まっていないので（★別項）。
+         */
+        const capByGate = new Map(
+          res.capViolations.map((v) => [Number(v.horseId), v] as const),
+        );
+    return { finished, capByGate, es, frozenRaw };
+  };
   /**
    * ⚠️ ★**名前を付けて返します**（★2026-09-19・D-117）。
    *    ★`createRace` が `announceRace` / `fillRace` を呼ぶので、★`this` に頼らないためです
@@ -500,10 +685,11 @@ export function createPgStore(
 
     async pendingSettlements(nowMs: number): Promise<number[]> {
       const r = await client.query<{ cycle_index: number }>(
+        /** ★② 締めるのは ★発走から SETTLE_AFTER_START_MS 後（★映像が終わってから・0098） */
         `select cycle_index from races
-          where status = 'scheduled' and scheduled_at <= to_timestamp($1 / 1000.0)
+          where status = 'scheduled' and scheduled_at <= to_timestamp(($1 - $2) / 1000.0)
           order by cycle_index`,
-        [nowMs],
+        [nowMs, SETTLE_AFTER_START_MS],
       );
       return toCycleIndexes(r.rows);
     },
@@ -592,6 +778,43 @@ export function createPgStore(
         return { scratched: out.scratched, refundedEp: out.refundedEp, skipped: false };
       } catch (e) { await client.query('rollback'); throw e; }
     },
+    /**
+     * ★**① 決める**（★2026-09-29・0098）: ★発売締切の後・発走の前に ★着順を計算して ★race_live_results にだけ書く。
+     *   ★races.status は scheduled のまま。★race_entries・seed_reveal・bets・PP には触れない。★冪等（★2 度目は書かない）。
+     */
+    async pendingResolutions(nowMs: number): Promise<number[]> {
+      const r = await client.query<{ cycle_index: number }>(
+        `select r.cycle_index from races r
+          where r.status = 'scheduled'
+            and r.scheduled_at - make_interval(secs => sales_close_lead_seconds()) <= to_timestamp($1 / 1000.0)
+            and not exists (select 1 from race_live_results lr where lr.race_id = r.id)
+          order by r.cycle_index`,
+        [nowMs],
+      );
+      return toCycleIndexes(r.rows);
+    },
+    async resolveRace(cycleIndex: number): Promise<void> {
+      await client.query('begin');
+      try {
+        const race = await client.query<OutcomeRace>(
+          `select id, server_seed, distance, surface, track_condition, course_id, class_rank, grade, name, course_frozen
+             from races where cycle_index = $1 and status = 'scheduled' for update`,
+          [cycleIndex],
+        );
+        if (race.rowCount === 0) { await client.query('rollback'); return; }
+        const r = race.rows[0]!;
+        const { finished } = await outcomeOf(cycleIndex, r);
+        for (const f of finished) {
+          await client.query(
+            `insert into race_live_results (race_id, gate, finish_pos, finish_time) values ($1, $2, $3, $4)
+             on conflict (race_id, gate) do nothing`,
+            /** ★時刻は race_entries.finish_time（numeric(7,3)）と同じ桁に丸める（★確定の前後で 画面の時刻が同じ） */
+            [r.id, f.gate, f.finishPosition, Math.round(f.timeSec * 1000) / 1000],
+          );
+        }
+        await client.query('commit');
+      } catch (e) { await client.query('rollback').catch(() => undefined); throw e; }
+    },
     async settleRace(cycleIndex: number): Promise<void> {
       await client.query('begin');
       try {
@@ -617,162 +840,26 @@ export function createPgStore(
           return;
         }
         const r = race.rows[0]!;
-
+        const { finished, capByGate, es, frozenRaw } = await outcomeOf(cycleIndex, r);
         /**
-         * --- 出走表を読んで着順を計算 ---
-         *
-         * ★**`horses` と結合しません**（D-056）。読むのは**凍結だけ**です。
-         *   結合を残すと「一部だけ最新値で上書き」が書けてしまい、
-         *   2回読む構造に戻れます。**読む対象を1つにして、戻れなくします。**
+         * ★**決定論の番人**（★2026-09-29・0098・レビュー側 B）: ★① で決めた着順（race_live_results）があれば ★いまの計算と突き合わせる。
+         *   ★食い違えば ★確定しない（★利用者には帯が「確定を確認中」・ワーカーは知らせる）。
          */
-        /**
-         * ⚠️ ★`e.horse_id` と `e.jockey_frozen` は ★**`race_entries` 自身の列**です。
-         *    ★`horses` との結合ではないので、D-056 の「凍結だけを読む」に触れません。
-         *    ★生涯の記録（§18）を馬ごとに残すのに要ります（★着順の計算には使いません）。
-         */
-        const es = await client.query<Record<string, unknown>>(
-          /**
-           * ⚠️ ★**取消（除外）の行を外します**（★2026-09-16・GE-1・正典 **D-111 ③**）。
-           *
-           * ★取消にしても `entrant_snapshot` は **null のまま**です。
-           * ★この 1 行が無いと、★**取消の行まで「凍結が無い」と数えて**しまい、
-           * ★下の `unfrozen > 0` で ★**レースごと開催中止**になります
-           * — ★D-111 で直したはずの結末に、そのまま戻ります。
-           * ★レビュー側の指摘（`REVIEW_GAME_BODY_5_VERDICT_20260916.md` §8-1）。
-           */
-          `select e.gate, e.weight, e.strategy, e.entrant_snapshot, e.horse_id, e.jockey_frozen
-             from race_entries e
-            where e.race_id = $1 and e.scratched_at is null
-            order by e.gate`,
-          [r.id],
+        const live = await client.query<{ gate: number; finish_pos: number; finish_time: string }>(
+          'select gate, finish_pos, finish_time from race_live_results where race_id = $1 order by gate', [r.id],
         );
-        if (es.rowCount === 0) {
-          // ★出走表が無いレースは確定できない。黙って settled にしない
-          throw new Error(`settleRace: cycle=${cycleIndex} に出走表がありません`);
-        }
-
-        /**
-         * ★**凍結が無いレースは確定せず、開催中止にします**（D-056・正典 D-037 の経路）。
-         *
-         * 【なぜ「昔の経路に落ちる」ではいけないか】
-         *   旧経路（`horses` を読み直す）こそが D-055 で閉じた欠陥そのものです。
-         *   フォールバックを残すと、**「凍結が無いとき」だけ閉じたはずの穴が既定で開きます。**
-         *   ★警告を出しても、開いていることに変わりはありません。
-         *
-         * 【移行の猶予は終わっています】
-         *   レースは生成2周先 → 10分程度で確定するので、
-         *   0016 適用から1時間もあれば全レースが凍結を持ちます。
-         *
-         * ★中止なら返還・冪等・アラートが実装済みで、**新しい仕組みは要りません**。
-         *   将来この書き込みが壊れても、静かに劣化せず**目に見える形で止まります**。
-         */
-        const unfrozen = es.rows.filter(
-          (row) => row['entrant_snapshot'] === null || row['entrant_snapshot'] === undefined,
-        ).length;
-        if (unfrozen > 0) {
-          // ★中止は**別トランザクション**（cancelRace が自分で begin する）。
-          //   ここでは確定を巻き戻してから抜け、呼び出し側の中止経路に載せます。
-          await client.query('rollback');
-          throw new UnfrozenRaceError(cycleIndex, unfrozen, es.rowCount ?? 0);
-        }
-
-        // ★着順は §8.6 の final_seed から決める（settle.ts）。
-        //   ここで独自の乱数を使うと、seed_reveal を公開しても検証できません。
-        const entrants: RaceEntrant[] = es.rows.map((row) => ({
-          // ★凍結された出走馬を**そのまま**使う（D-056）。
-          //   ⚠️ ここに DB の最新値を混ぜないこと。混ぜた瞬間に2回読む構造に戻ります。
-          ...(row['entrant_snapshot'] as unknown as RaceEntrant),
-          // ★着順の同定は馬番で行う（凍結側は元の馬の UUID を持っている）
-          horseId: String(row['gate']),
-        }));
-        /**
-         * ★**走路の形は凍結を読みます**（★2026-09-15・`0023`・指示書 VW §5-2）。
-         *
-         * 【何が起きていたか】
-         *   ★ここは `courseShape: 'oval'` を**直書き**し、★`course` を渡していませんでした（`DEFAULT_OVAL`）。
-         *   ★オッズ側は 1400m 以下の 20% を直線で計算していたので、★その分は**別の模型で着順を出して**いました。
-         *
-         * ★条件はオッズと**同じ関数**（`conditionsFromFrozen`）で作ります。
-         * ★`course_frozen` が null（0023 より前）… ★実際に `DEFAULT_OVAL`・`'oval'` で確定されてきた形で確定し、
-         *   ★**件数を通報します**（★黙って落とさない）。
-         * ★凍結があるのに不正 … ★確定せず `InvalidFrozenCourseError` を投げ、★開催中止・返還の経路へ。
-         */
-        const frozenRaw = r.course_frozen;
-        let conditions: RaceConditions;
-        try {
-          let frozen: FrozenCourse | null = null;
-          if (frozenRaw !== null && frozenRaw !== undefined) {
-            frozen = parseFrozenCourse(frozenRaw);
-            // ★凍結と course_id が別の場を指していたら、どちらが正しいか決まらない
-            if (frozen.venueId !== r.course_id) {
-              throw new InvalidFrozenCourseError(`venueId=${frozen.venueId} が course_id=${r.course_id} と食い違います`);
-            }
-          }
-          conditions = conditionsFromFrozen(frozen, {
-            raceId: r.id,
-            distance: r.distance,
-            surface: r.surface as 'turf' | 'dirt',
-            trackCondition: r.track_condition as 'good' | 'yielding' | 'soft' | 'bad',
+        if ((live.rowCount ?? 0) > 0) {
+          const byGate = new Map(finished.map((f) => [f.gate, f] as const));
+          const same = live.rows.length === finished.length && live.rows.every((row) => {
+            const f = byGate.get(Number(row.gate));
+            /** ★① は 3 桁に丸めて書く（numeric(7,3) と同じ）→ ★丸めの幅まで許す */
+            return f !== undefined && f.finishPosition === Number(row.finish_pos) && Math.abs(f.timeSec - Number(row.finish_time)) <= 5e-4 + 1e-9;
           });
-        } catch (e) {
-          if (e instanceof InvalidFrozenCourseError) {
+          if (!same) {
             await client.query('rollback');
-            throw new InvalidFrozenCourseError(`cycle=${cycleIndex}: ${e.why}`);
+            throw new LiveResultMismatchError(cycleIndex);
           }
-          throw e;
         }
-        const res = settleRaceFair(
-          {
-            conditions,
-            entrants,
-            serverSeed: r.server_seed,
-          },
-          hash,
-        );
-        const finished = res.order.map((o) => ({
-          gate: Number(o.horseId),
-          finishPosition: o.finishPosition,
-          timeSec: o.timeSec,
-        }));
-        /**
-         * 🔴 ★**着順は 1 度しか書きません**（★正典 §17.3 **F-3**・2026-09-20）。
-         *
-         * 【★なぜ `and finish_pos is null` を足すか】
-         *   ✔ ★**二度 確定できないことは、既に守られています** — ★上の
-         *     ★`update races set status = 'settled' … where status = 'scheduled'` が 0 行なら
-         *     ★`rollback` して戻ります。★**ここは多層防御の 2 枚目**です。
-         *   🔴 ★しかし ★**`finish_pos` の変更を記録する引金も表も 0 件**でした
-         *     （★`F3-NO-RESULT-AUDIT`）。★**列の側には何の守りもありませんでした。**
-         *   → ★**製品の経路が結果を上書きできない**ことだけは、★1 行で閉じられます。
-         *   ⚠️ ★**手で流す SQL は、これでは止まりません。** ★そちらは再計算で示します（★F-1/F-2 と同じ作法）。
-         *
-         * 【★0 行だったら投げる理由】
-         *   ★状態遷移が守っているので、★ここが 0 行になるのは
-         *   ★**① 出走表の行が無い ② 既に着順が入っている** のどちらかです。
-         *   ★どちらも ★**結果が記録されないまま確定する**ことを意味します。
-         *   → ★**投げます**（★この取引は巻き戻るので、★確定しないほうが安全・**R-27**）。
-         */
-        /**
-         * 🔴 ★**範囲外入力の記録を、★捨てずに残します**（★2026-09-20・`CAP-VIOLATIONS-DISCARDED`）。
-         *
-         * 【★何が起きていたか】
-         *   ✔ ★`packages/race-engine/src/race.ts:254` は
-         *     ★**「クランプは黙って行わず `capViolations` に記録する（★不正の兆候かもしれないため）」**
-         *     と書き、★`:342` で ★**戻り値に入れて返して**いました。
-         *   🔴 ★しかし ★**受け取る側が 0 件**。★`race_entries.cap_violations`（`0001_init.sql:204`）は
-         *     ★**列が在るのに、★誰も書きませんでした**。
-         *   → ★★**作って、返して、捨てていた。** ★他の 4 件（★値が入らない）より悪い形です。
-         *
-         * 【★なぜ「後で」にしないか】
-         *   ✔ ★介入は ★**まだ 1 度も使われていません**（★本番 79,859 行 で 0 件）。
-         *   → ★★**いま繋げば、★「最初の介入の日」から残ります。★後だと最初の何回かが永久に欠けます。**
-         *
-         * ⚠️ ★**この便は「残す」までです。** ★**警報は鳴らしません** —
-         *    ★鳴らして何をするかが決まっていないので（★別項）。
-         */
-        const capByGate = new Map(
-          res.capViolations.map((v) => [Number(v.horseId), v] as const),
-        );
         for (const f of finished) {
           const cap = capByGate.get(f.gate) ?? null;
           const wrote = await client.query(

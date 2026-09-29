@@ -69,6 +69,8 @@ function definitionsByFunction(): Map<string, string[]> {
  */
 const PINNED: Readonly<Record<string, string>> = {
   'entry-scratch-migration.test.ts': '0028_entry_scratch.sql',
+  /** ★① の表の RLS と revoke（★2026-09-29・0098）。★表を作る移行の本文を読む。★公開の式は ★最新の定義を読む（★名指しではない） */
+  'live-results-sql.test.ts': '0098_race_live_results.sql',
   /**
    * ★**GB-1 ④⑤⑥ の配線**（★2026-09-19）。★`0053` は ★**列を足すだけ**の移行で、
    *   ★`create or replace function` を持たないので ★**後から置き換えられません**。

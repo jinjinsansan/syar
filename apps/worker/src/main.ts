@@ -418,6 +418,8 @@ async function main(): Promise<void> {
           // ★★遅れ（DS-8）と間に合わなかったレース（DS-7）。★0 でない周は調査対象
           (out.fillDeferred.length > 0 ? `★組成待ち=[${out.fillDeferred.join(',')}] ` : '') +
           (out.fillFailed.length > 0 ? `🔴組成間に合わず中止=[${out.fillFailed.join(',')}] ` : '') +
+          /** ★① 決めた（★着順を race_live_results に・0098）。★0 件のときは出さない */
+          (out.resolved.length > 0 ? `決め=[${out.resolved.join(',')}] ` : '') +
           `確定=[${out.settled.join(',')}] ` +
           /**
            * ★**発走の前に引退していて取消にした頭数**（★**DS-5 ④**・D-111 ③⑥）。
@@ -437,6 +439,13 @@ async function main(): Promise<void> {
           `${out.cancelled.length > 0 ? ` ★中止=[${out.cancelled.join(',')}]` : ''}` +
           `${out.lockBusy ? ' lock=busy' : ''}`,
       );
+      /**
+       * 🔴 ★**① と ② の着順が食い違い 確定しなかった**（★0098・レビュー側 B 条件 2）。★払戻が出ていない。★ログだけにしない:
+       *   ★利用者の画面は ★発走から SETTLE_AFTER_START_MS を過ぎても確定しないレースを「確定を確認中」と出す（`race-strip`）。
+       */
+      if (out.liveMismatch.length > 0) {
+        console.error(`[worker] 🔴 ① と ② の着順が食い違い 確定しませんでした cycle=[${out.liveMismatch.join(',')}]（★払戻は出ていません・人が見る）`);
+      }
       // ★組成が発売開始の後に終わった（★発売の時間が短くなった・手順書 ⑥ で秒数を報告する）。★0 件のときは出さない
       for (const l of out.salesLate) {
         console.log(`[worker] ★発売の遅れ cycle=${l.cycleIndex} +${(l.lateMs / 1000).toFixed(1)}s（★発売の時間がそのぶん短くなった）`);

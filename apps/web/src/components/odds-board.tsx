@@ -88,7 +88,8 @@ export function OddsBoard({ race, entries, odds, type, oddsPath }: {
     </div>
   );
 
-  const headerRight = r['status'] === 'scheduled'
+  /** ★2026-09-29（★0098）: ★走っている間も scheduled のまま → ★発走時刻を過ぎたら 締切の数えを出さない */
+  const headerRight = r['status'] === 'scheduled' && new Date(String(r['scheduled_at'])).getTime() > new Date().getTime()
     ? (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, height: 44, padding: '0 18px', borderRadius: 10, backgroundImage: 'var(--a-gloss-red)', border: '2px solid var(--a-red-d)', boxShadow: 'var(--a-shadow-sm)' }}>
         <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '.1em', color: '#fff' }}>締切まで</span>

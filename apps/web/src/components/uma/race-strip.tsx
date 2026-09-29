@@ -6,7 +6,8 @@ import { readClient } from '../../lib/supabase';
 import { canPlayRealRace } from '../../lib/race-real-access';
 import { StaleBuildNotice } from './stale-build-notice';
 import { LABEL_ENTRY_CLOSE, LABEL_SALES_CLOSE, salesCloseAtMs, salesClosedAt, salesLeftText } from '../../lib/sales-close';
-import { CLAIM_SALES_CLOSED } from '../../lib/claims';
+import { CLAIM_LIVE_PENDING, CLAIM_SALES_CLOSED, CLAIM_SETTLE_CHECKING } from '../../lib/claims';
+import { SETTLE_AFTER_START_MS } from '@star/scheduler';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowNear, replayWindowOver, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
 import { INTRO_STAGES, stripEmbedsOn, stripSizeOf } from './race-strip-sizes';
@@ -32,16 +33,25 @@ interface NoticeData {
 }
 
 const COLUMNS = 'id, name, surface, distance, scheduled_at, status';
+/** ★② 締めるが遅れていると見なすまでの余裕（★SETTLE_AFTER_START_MS の後・ワーカーの見回りの間隔ぶん・0098） */
+const SETTLE_CHECK_GRACE_MS = 60_000;
 const REFRESH_MS = 15_000;
 
 async function fetchNotice(): Promise<NoticeData> {
   const client = readClient();
+  /**
+   * ★2026-09-29（★0098・レビュー側 B 条件 1）: ★走っている間も status は scheduled のまま（★② 締めるまで）。
+   *   → ★「次」は ★発走時刻がまだ先のもの・★「直近」は ★発走時刻を過ぎたもの（★settled か scheduled）を ★時刻で分ける。
+   */
+  const nowIso = new Date().toISOString();
   const [next, recent] = await Promise.all([
     client.from('races_public').select(`${COLUMNS}, entry_deadline_at`)
       .in('status', ['announced', 'scheduled', 'closed'])
+      .gt('scheduled_at', nowIso)
       .order('scheduled_at', { ascending: true }).limit(1),
     client.from('races_public').select(COLUMNS)
-      .eq('status', 'settled')
+      .in('status', ['settled', 'scheduled'])
+      .lte('scheduled_at', nowIso)
       .order('scheduled_at', { ascending: false }).limit(1),
   ]);
   if (next.error !== null) throw new Error(next.error.message);
@@ -378,7 +388,10 @@ function RaceStripBody(): React.ReactElement | null {
   const replaying = progress !== null;
   /** ★状態を画面へ（★走行を出す画面だけ）・★画面からの拡大の頼みを受ける */
   const nextAt = next?.scheduled_at ?? null;
-  const lastWinner = data?.runners.find((runner) => runner.finishPosition === 1) ?? null;
+  /**
+   * ★1 着の 1 行は ★確定してから（★2026-09-29・0098）: ★発走時刻から着順が見えるので ★映像より先に勝ち馬を出さない（★ネタバレ）。
+   */
+  const lastWinner = recent?.status === 'settled' ? data?.runners.find((runner) => runner.finishPosition === 1) ?? null : null;
   const lastResult = recent && lastWinner !== null ? `${recent.name} 1着 ${lastWinner.gate}番 ${lastWinner.name}` : null;
   useEffect(() => {
     if (size !== 'big' && size !== 'mini') return undefined;
@@ -395,7 +408,18 @@ function RaceStripBody(): React.ReactElement | null {
     const raceSec = (motionReduced ? 1 : progress) * Math.max(...data.runners.map((r) => r.finishSec));
     return { runner, position: replayProgress(runner, recent.distance, raceSec) };
   }) : [];
-  const status = next?.status === 'announced' ? '出走登録受付中'
+  /**
+   * ★待ちの 2 つ（★0098・条件 4・条件 2）: ★発走を過ぎたのに着順が見えない（① の遅れ）／★確定が遅れている（② の遅れ・食い違い）。
+   *   ★エラーにしない。★待っていると分かる・止まったと分かる言い方（`claims.ts`）。
+   */
+  const recentStartMs = recent ? new Date(recent.scheduled_at).getTime() : Number.NaN;
+  const livePending = recent?.status === 'scheduled' && nowMs !== null && Number.isFinite(recentStartMs)
+    && nowMs >= recentStartMs && !data?.runners.length;
+  const settleChecking = recent?.status === 'scheduled' && nowMs !== null && Number.isFinite(recentStartMs)
+    && nowMs >= recentStartMs + SETTLE_AFTER_START_MS + SETTLE_CHECK_GRACE_MS;
+  const status = settleChecking ? CLAIM_SETTLE_CHECKING
+    : livePending ? CLAIM_LIVE_PENDING
+    : next?.status === 'announced' ? '出走登録受付中'
     : next?.status === 'scheduled' ? '開催予定'
       : next?.status === 'closed' ? '受付終了・結果待ち'
         : data === null ? '開催情報を読み込み中' : '現在、開催予定のレースはありません';

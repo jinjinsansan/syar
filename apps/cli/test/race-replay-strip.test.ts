@@ -47,7 +47,9 @@ describe('確定した実レースの録画表示', () => {
   it('共通の開催時刻から再生位置を決め、開催前や再生後は走らせない', () => {
     const scheduledAt = '2026-09-21T12:00:00.000Z';
     const scheduledMs = new Date(scheduledAt).getTime();
-    expect(replayDisplayProgress(scheduledAt, scheduledMs)).toBeNull();
+    /** ★2026-09-29（★0098）: ★発走時刻から流す（★REPLAY_START_DELAY_MS = 0・旧 75 秒）。★発走前は走らせない */
+    expect(REPLAY_START_DELAY_MS).toBe(0);
+    expect(replayDisplayProgress(scheduledAt, scheduledMs - 1)).toBeNull();
     expect(replayDisplayProgress(scheduledAt, scheduledMs + REPLAY_START_DELAY_MS)).toBe(0);
     expect(replayDisplayProgress(scheduledAt, scheduledMs + REPLAY_START_DELAY_MS + REPLAY_DISPLAY_MS / 2)).toBe(0.5);
     expect(replayDisplayProgress(scheduledAt, scheduledMs + REPLAY_START_DELAY_MS + REPLAY_DISPLAY_MS)).toBeNull();

@@ -149,8 +149,14 @@ export async function loadRealRace(raceId: string): Promise<RealRaceData> {
    * 🔴 ★**確定前は走行を出しません**（★契約 §表示段階）。
    *   ⚠️ ★ここで見本の走行に落とすと ★**「そのレースを見た」と嘘になります**。
    */
-  if (status !== 'settled') {
-    throw new RaceNotPlayableError(`このレースはまだ確定していません（いまの状態: ${status}）`);
+  /**
+   * ★2026-09-29（★0098）: ★確定前でも ★発走時刻を過ぎていれば ① 決めた着順が見える → ★走行を出す（★着順が揃わなければ下で止まる）。
+   *   ★発走前・中止・公示は ★出さない（★ビューも出さないが ★ここでも段と時刻で見る）。
+   */
+  const startedMs = new Date(String(race.scheduled_at)).getTime();
+  const liveNow = status === 'scheduled' && Number.isFinite(startedMs) && Date.now() >= startedMs;
+  if (status !== 'settled' && !liveNow) {
+    throw new RaceNotPlayableError(`このレースはまだ発走していません（いまの状態: ${status}）`);
   }
   /** ★条件は ★知らない値を既定に落とさず ★投げます（★R-27） */
   const surface = oneOf(SURFACES, race.surface);

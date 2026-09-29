@@ -29,6 +29,14 @@ export const CLAIM_REPEAT_BET_PLANNED = '予定どおり、このレースも同
 export const CLAIM_REPEAT_BET_SHORT = '参加ポイントが足りないため、次のレースへの続けて投票はできません';
 export const CLAIM_REPEAT_BET_LIMIT = `続けて投票は ${REPEAT_BET_MAX} 回までです。馬と券種を選んで投票してください`;
 
+/**
+ * ★**発走時刻からの映像の 待ちの 2 つ**（★2026-09-29・0098・レビュー側 B 条件 4・条件 2）。
+ *   ★① 決めるが遅れて ★発走を過ぎても着順が見えない間（★エラーにしない・待っていると分かる）。
+ *   ★② 締めるが ★発走から SETTLE_AFTER_START_MS ＋ 余裕 を過ぎても来ない間（★止まったと分かる・払戻はまだと言う）。
+ */
+export const CLAIM_LIVE_PENDING = 'まもなく発走の映像が始まります';
+export const CLAIM_SETTLE_CHECKING = '結果の確定を確認中です（払戻はまだです）';
+
 export const BET_TYPE_LABEL = { win: '単勝', place: '複勝' } as const;
 export type VoteBetType = keyof typeof BET_TYPE_LABEL;
 export const CLAIM_BET_TYPE_RULE: Readonly<Record<VoteBetType, string>> = {

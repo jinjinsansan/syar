@@ -79,7 +79,8 @@ describe('★④ の札は ★「あなたの馬」と読めない（★裁定 �
 
 describe('★「いま走っていません」に ★直前の結果 1 行（★R-18 回答 §3-6）', () => {
   it('★帯が ★記録の 1 着から 1 行を作り ★`/watch-race` が添える', () => {
-    expect(LIVE).toMatch(/const lastWinner = data\?\.runners\.find\(\(runner\) => runner\.finishPosition === 1\) \?\? null;/);
+    /** ★2026-09-29（★0098）: ★1 着の 1 行は ★確定してから（★発走時刻から着順が見えるので 映像より先に勝ち馬を出さない） */
+    expect(LIVE).toContain("const lastWinner = recent?.status === 'settled' ? data?.runners.find((runner) => runner.finishPosition === 1) ?? null : null;");
     expect(LIVE).toMatch(/publishStripState\(\{ replaying, nextAt, lastResult \}\)/);
     const WATCH = readFileSync(path.join(ROOT, 'apps/web/src/app/watch-race/page.tsx'), 'utf8');
     expect(WATCH, '★直前の結果を添えていない').toMatch(/直前のレース: \$\{strip\.lastResult\}/);

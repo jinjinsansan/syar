@@ -70,6 +70,10 @@ export interface CycleStore {
    */
   fillRace(cycleIndex: number, spec: FillSpec): Promise<void>;
   /** 確定していない、発走時刻を過ぎたレースの番号 */
+  /** ★① 決める（★発売締切の後・発走の前）べきレース（★2026-09-29・0098） */
+  pendingResolutions(nowMs: number): Promise<number[]>;
+  /** ★① 着順を計算して race_live_results にだけ書く（★status・払戻には触れない・冪等） */
+  resolveRace(cycleIndex: number): Promise<void>;
   pendingSettlements(nowMs: number): Promise<number[]>;
   /**
    * 🔴 ★**発走の前に引退していた馬を取消にする**（★**DS-5 ④**・正典 **D-111 ③⑥**・2026-09-19）。
@@ -220,6 +224,13 @@ export interface CycleOutcome {
   /** 既にあったので作らなかったレース */
   readonly skipped: readonly number[];
   readonly settled: readonly number[];
+  /** ★① 決めた（★着順を race_live_results に書いた）レース（★2026-09-29・0098） */
+  readonly resolved: readonly number[];
+  /**
+   * 🔴 ★**① と ② の着順が食い違い 確定しなかった**レース（★LiveResultMismatchError・0098）。
+   *   ★0 でない周は ★払戻が出ていない。★main が ★知らせる（★ログだけにしない）。
+   */
+  readonly liveMismatch: readonly number[];
   /**
    * ★**発走の前に引退していて取消にした頭数**（★**DS-5 ④**・D-111 ③⑥）。
    *   ⚠️ ★**0 でない周は、その馬を含む馬券が §9.1 で返っています。★黙って通さないこと。**
@@ -296,7 +307,7 @@ export async function runCycle(
     return {
       nowMs, cycleIndex, phase, onSale,
       filled: [], announced: [], fillDeferred: [], fillFailed: [],
-      skipped: [], settled: [], cancelled: [], lockBusy: true,
+      skipped: [], settled: [], resolved: [], liveMismatch: [], cancelled: [], lockBusy: true,
       scratchedBeforeStart: 0, retireCheckSkipped: [], salesLate: [],
     };
   }
@@ -307,6 +318,8 @@ export async function runCycle(
   const fillFailed: number[] = [];
   const skipped: number[] = [];
   const settled: number[] = [];
+  const resolved: number[] = [];
+  const liveMismatch: number[] = [];
   /** ★DS-5 ④: 発走の前に引退していて取消にした頭数と、見送ったレース */
   let scratchedBeforeStart = 0;
   const retireCheckSkipped: number[] = [];
@@ -327,6 +340,29 @@ export async function runCycle(
     //   生成が確定の結果を読むことはありません（確認済み）。
     //   ⚠️ §7 の成長や §10.3 のクラス昇級を入れて確定が馬の状態を書くようになったら、
     //      この順序は**速度ではなく正しさ**の問題になります。そのときに読み直すこと。
+    /**
+     * ★**① 決める**（★2026-09-29・0098・レビュー側 B）: ★発売締切の後に着順を計算し ★race_live_results にだけ書く。
+     *   ★発走時刻から 小窓と /race が映像を流す（★公開は race_entries_public の「段と時刻」の式）。
+     *   ★発走前の引退の取消を ★先に当てる（★取り消した馬を ① の着順に入れない・② の番人と食い違わせない）。
+     *   ★凍結が無い・走路が不正なら ★② と同じく中止に載せる。
+     */
+    for (const idx of await store.pendingResolutions(nowMs)) {
+      try {
+        const ret = await store.scratchRetiredBeforeStart(idx);
+        if (ret.skipped) retireCheckSkipped.push(idx);
+        scratchedBeforeStart += ret.scratched;
+        await store.resolveRace(idx);
+        resolved.push(idx);
+      } catch (e) {
+        if (e instanceof Error && (e.name === 'UnfrozenRaceError' || e.name === 'InvalidFrozenCourseError')) {
+          const r = await store.cancelRace(idx);
+          cancelled.push(idx);
+          onAlert({ cycleIndex: idx, refundedBets: r.refundedBets, refundedEp: r.refundedEp });
+          continue;
+        }
+        throw e;
+      }
+    }
     for (const idx of await store.pendingSettlements(nowMs)) {
       try {
         /**
@@ -346,6 +382,11 @@ export async function runCycle(
         await store.settleRace(idx);
         settled.push(idx);
       } catch (e) {
+        /** ★① と ② が食い違った: ★確定しない（★払戻を出さない）・★周は止めない・★main が知らせる（0098） */
+        if (e instanceof Error && e.name === 'LiveResultMismatchError') {
+          liveMismatch.push(idx);
+          continue;
+        }
         /**
          * ★凍結（0016）が無いレースは**確定せず開催中止**にします（D-056）。
          *
@@ -512,7 +553,7 @@ export async function runCycle(
   return {
     nowMs, cycleIndex, phase, onSale,
     filled, announced, fillDeferred, fillFailed,
-    skipped, settled, cancelled, lockBusy: false,
+    skipped, settled, resolved, liveMismatch, cancelled, lockBusy: false,
     scratchedBeforeStart, retireCheckSkipped, salesLate,
   };
 }

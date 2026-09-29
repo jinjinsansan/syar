@@ -68,7 +68,12 @@ export function replayProgress(runner: ReplayRunner, distance: number, raceSec: 
   return Math.max(0, Math.min(1, (low + high) / (2 * distance)));
 }
 
-export const REPLAY_START_DELAY_MS = 75_000;
+/**
+ * ★発走から 映像を流し始めるまで（★2026-09-29・0098 で 75 秒 → 0）。
+ *   ★旧は ★確定（発走の後の周の頭）を待ってから 本編を用意する猶予だった（★+75 秒から「録画」）。
+ *   ★いまは ★① 決めた着順が ★発走時刻から見えるので ★発走時刻から流す（★本編は用意でき次第 差し替わる）。
+ */
+export const REPLAY_START_DELAY_MS = 0;
 export const REPLAY_DISPLAY_MS = 45_000;
 
 /**

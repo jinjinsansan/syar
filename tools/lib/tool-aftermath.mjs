@@ -106,6 +106,7 @@ export const TOOL_AFTERMATH = {
       + '✅ ★**戻したことを数えます**: ★投票・PP 台帳・EP 台帳・口座の行数の 前後一致を見ます。',
     countedBy: 'must(JSON.stringify(after) === JSON.stringify(before),',
   },
+  'verify-live-results.mjs': { mode: 'restores', why: 'beginSandbox ＋ sandboxTx（★resolveRace・settleRace の commit を横取り・SB-3 が途中の確定を見る・2026-09-29）' },
   'verify-entry-refund-live.mjs': {
     mode: 'restores',
     why: '★`begin` → `0097` の本体（★begin/commit を外して）・レースの段・`request_entry_scratch`・`scratchEntry`（★返金）→ ★**必ず `rollback`**（`finally`・2026-09-29）。'

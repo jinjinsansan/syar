@@ -68,6 +68,9 @@ function fake(nowMs: number, alreadyAnnounced: readonly number[] = []): Fake {
       announcedSet.delete(i);
       done.add(i);
     },
+    /** ★① 決める（★0098）: ★既定は無し（★検査が差し替える） */
+    pendingResolutions: async () => [],
+    resolveRace: async () => {},
     pendingSettlements: async () => [],
     /**
      * ★**確定するレースが無いので、ここは呼ばれません**（★FK-5）。

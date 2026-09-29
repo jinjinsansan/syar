@@ -34,7 +34,9 @@ export default async function OddsEntryPage() {
 
   const races = (data ?? []) as Row[];
   /** ★発売中か締切済みの最も近い 1 本（★確定したレースのオッズは「次」ではない） */
-  const next = races.find((r) => r['status'] === 'scheduled' || r['status'] === 'closed');
+  /** ★2026-09-29（★0098）: ★走っている間も scheduled のまま → ★発走時刻がまだ先のものだけ */
+  const nowMs = new Date().getTime();
+  const next = races.find((r) => (r['status'] === 'scheduled' || r['status'] === 'closed') && new Date(String(r['scheduled_at'])).getTime() > nowMs);
   if (next !== undefined) redirect(`/odds/${String(next['id'])}`);
 
   /** ★見つからないときは黙って空にしない（★R-21） */

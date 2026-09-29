@@ -1195,6 +1195,8 @@ export const STATE_CHANGING = [
   'verify-sales-close-live.mjs',
   // ★出走の取消の返金（★D-123 ①・`0097` の本体も取引の中で当てる・既存の scratchEntry で出走料＋騎手の料金が EP で戻る数）を、★本物の DB で通す（★取引の中だけ。★必ず rollback・2026-09-29）
   'verify-entry-refund-live.mjs',
+  // ★発走時刻からの着順（★0098）を、★確定済みのレースを予行の中で発走前に戻して 本物の resolveRace / settleRace で通す（★sandboxTx・必ず戻す・2026-09-29）
+  'verify-live-results.mjs',
   // ★当たりの経路（★settlePayouts・PP の払戻と EP の一方通行）を、★本物の DB で通す（★取引の中だけ。★必ず rollback・2026-09-29）
   'verify-win-payout-live.mjs',
   // ★staging の測定用の口座（measure-390@star-staging.test）を作る／使い回し、★はじめの設定まで通し ★セッションを外へ書く（★ログインした姿を測るため・2026-09-29）

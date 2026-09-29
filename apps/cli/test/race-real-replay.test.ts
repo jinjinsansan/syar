@@ -103,10 +103,19 @@ describe('🔴 ★実レースの録画を読む層', () => {
     expect(data.runners).toHaveLength(18);
   });
 
-  it('🔴 ① 確定前は止める', async () => {
+  /** ★2026-09-29（★0098）: ★止めるのは ★発走前（★確定前でも 発走時刻を過ぎた scheduled は ① の着順で走らせる） */
+  it('🔴 ① 発走前は止める（★締切後の closed・★発走前の scheduled）', async () => {
     state.tables['races_public'] = [race({ status: 'closed' })];
     await expect(loadRealRace(RACE_ID)).rejects.toThrow(RaceNotPlayableError);
-    await expect(loadRealRace(RACE_ID)).rejects.toThrow(/まだ確定していません/);
+    await expect(loadRealRace(RACE_ID)).rejects.toThrow(/まだ発走していません/);
+    state.tables['races_public'] = [race({ status: 'scheduled', scheduled_at: new Date(Date.now() + 60_000).toISOString() })];
+    await expect(loadRealRace(RACE_ID)).rejects.toThrow(/まだ発走していません/);
+  });
+
+  it('✅ ①′ 確定前でも 発走時刻を過ぎた scheduled は 走らせる（★① 決めた着順・0098）', async () => {
+    state.tables['races_public'] = [race({ status: 'scheduled', scheduled_at: new Date(Date.now() - 5_000).toISOString() })];
+    const data = await loadRealRace(RACE_ID);
+    expect(data.runners.length).toBeGreaterThan(0);
   });
 
   /**

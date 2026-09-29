@@ -107,6 +107,8 @@ function fakeDb() {
        */
       if (s.startsWith('select gate from race_entries')) return { rows: [], rowCount: 0 };
       if (s.startsWith('update race_entries')) return { rows: [], rowCount: 1 };
+      /** ★① 決めた着順（★0098）: ★この偽の DB では ① を回さないので 0 行（★② の番人は突き合わせを飛ばす） */
+      if (s.startsWith('select gate, finish_pos, finish_time from race_live_results')) return { rows: [], rowCount: 0 };
       throw new Error(`偽の DB が知らない SQL: ${s.slice(0, 60)}`);
     },
   };

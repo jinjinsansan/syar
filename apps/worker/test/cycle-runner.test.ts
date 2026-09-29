@@ -136,6 +136,9 @@ function makeStore(nowMs: number) {
       announcedSet.delete(i);
       races.add(i);
     },
+    /** ★① 決める（★0098）: ★既定は無し（★検査が差し替える） */
+    pendingResolutions: async () => [],
+    resolveRace: async () => {},
     pendingSettlements: async () => [],
     /**
      * ★**本物の述語を写します**（★**FK-5**・DS-5 ④）。
@@ -482,5 +485,39 @@ describe('★D-037 確定できないレースを期限で中止し EP を返す
     await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
     await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
     expect(store.cancelLog).toEqual([21]);
+  });
+});
+
+/**
+ * ★**① 決める → ② 締める**（★2026-09-29・移行 0098・レビュー側 B）
+ *   ★① は ★② より先・★発走前の引退の取消の後。★② の番人（★① と食い違い）は ★周を止めず ★確定しない。
+ */
+describe('★① 決める（0098）', () => {
+  it('★① は 引退の取消の後・② より先に回り、決めた番号を返す', async () => {
+    const store = makeStore(IN_FIRST_CYCLE);
+    store.pendingResolutions = async () => [8];
+    store.resolveRace = async () => { store.order.push('resolve'); };
+    store.pendingSettlements = async () => [7];
+    const out = await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
+    expect(out.resolved).toEqual([8]);
+    const at = (k: string): number => store.order.indexOf(k);
+    expect(at('resolve')).toBeGreaterThan(-1);
+    expect(at('resolve')).toBeLessThan(at('settle'));
+    expect(store.order.slice(0, at('resolve'))).toContain('retire-check');
+  });
+
+  it('★② が ① と食い違ったら 確定しない・周は止めない・食い違いの番号を返す', async () => {
+    const store = makeStore(IN_FIRST_CYCLE);
+    store.pendingSettlements = async () => [7];
+    store.settleRace = async () => {
+      const e = new Error('mismatch');
+      e.name = 'LiveResultMismatchError';
+      throw e;
+    };
+    const out = await runCycle(store, EPOCH, SEEDS, ANNOUNCE, BUILD, ALERT);
+    expect(out.liveMismatch).toEqual([7]);
+    expect(out.settled).toEqual([]);
+    /** ★周は続く（★公示・組成まで進む） */
+    expect(store.order).toContain('announce');
   });
 });

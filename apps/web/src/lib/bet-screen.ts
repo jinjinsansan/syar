@@ -127,7 +127,8 @@ export async function loadBetScreen(raceId: string | null, betTypes: readonly st
 
   const q = read.from('races_public').select(RACE_COLUMNS);
   const racesRes = raceId === null
-    ? await q.eq('status', 'scheduled').order('scheduled_at', { ascending: true }).limit(1)
+    /** ★2026-09-29（★0098）: ★走っている間も scheduled のまま → ★発走時刻がまだ先のものだけを「いまのレース」にする */
+    ? await q.eq('status', 'scheduled').gt('scheduled_at', new Date().toISOString()).order('scheduled_at', { ascending: true }).limit(1)
     : await q.eq('id', raceId).limit(1);
   if (racesRes.error !== null) throw new Error(`races_public を読めませんでした: ${racesRes.error.message}`);
   const r = racesRes.data?.[0];
