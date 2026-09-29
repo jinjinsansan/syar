@@ -82,6 +82,9 @@ describe('★投票の締切を SQL と TS で 1 つにする', () => {
     const vote = stripComments(readFileSync(path.join(ROOT, 'apps/web/src/app/vote/page.tsx'), 'utf8'));
     expect(vote).toContain('const salesClosed = useSalesClosed(race?.scheduledAt ?? null);');
     expect(vote, '★締切後も押せる').toMatch(/const blocked = salesClosed \|\|/);
+    /** ★ボタンの小さい文も ★押せない理由を先に（★オーナーの画面: 締め切った・残高 0 なのに「100 EP を使います」） */
+    expect(vote, '★締め切ったのに 小さい文が押せると読める').toContain('sub={salesClosed ? CLAIM_SALES_CLOSED');
+    expect(vote, '★残高が足りないのに 小さい文が押せると読める').toContain("data.epBalance < EP_PER_PICK ? '参加ポイントが足りません'");
   });
 
   it('★対照: 表の締切は 発走より前（★0 以下なら この網の前提が崩れている）', () => {

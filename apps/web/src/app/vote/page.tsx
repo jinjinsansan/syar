@@ -5,7 +5,7 @@ import { checkOwnRaceSelection, ownRaceReasonText } from '@star/betting';
 import { Backdrop, BigButton, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { useSalesClosed } from '../../components/clock';
-import { BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_OWN_RACE_BET } from '../../lib/claims';
+import { BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_OWN_RACE_BET, CLAIM_SALES_CLOSED } from '../../lib/claims';
 import { loadBetAllowance, loadBetScreen, oddsKey, placeBet, type BetAllowance, type BetScreenData } from '../../lib/bet-screen';
 
 const FRAME_COLORS = ['#f5f5f5', '#191919', '#d62828', '#1446b4', '#fad728', '#148c46', '#f08219', '#f596be'] as const;
@@ -140,7 +140,18 @@ export default function VotePage(): React.ReactElement {
 
     <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: 10, padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto' }}>
       <BigButton tone={blocked ? 'disabled' : 'blue'} label={busy ? '送信中…' : '投票する'}
-        sub={!check.ok ? ownRaceReasonText(check) : race === null ? '受付中のレースをお待ちください' : selected === null ? '馬を選んでください' : `${EP_PER_PICK} EP を使います`}
+        /*
+          ★押せない理由を先に言う（★2026-09-29・オーナーの画面: 締め切った・残高 0 なのに「100 EP を使います」と出ていた＝押せると読める）。
+          ★順: 締め切った → レースが無い → ログイン → 自馬の制限 → 馬を選ぶ → 残高 → 上限 → 押せる
+        */
+        sub={salesClosed ? CLAIM_SALES_CLOSED
+          : race === null ? '受付中のレースをお待ちください'
+            : !data?.authenticated ? 'ログインしてください'
+              : !check.ok ? ownRaceReasonText(check)
+                : selected === null ? '馬を選んでください'
+                  : data.epBalance < EP_PER_PICK ? '参加ポイントが足りません'
+                    : allowance !== null && allowance.remainingEP < EP_PER_PICK ? '上限に達しています'
+                      : `${EP_PER_PICK} EP を使います`}
         onClick={() => { void submit(); }} grow="1.4 1 210px" />
       <BigButton tone="ivory" label="レースを見る" sub="演出デモを見る" href="/watch-race" grow="1 1 130px" />
     </div>
