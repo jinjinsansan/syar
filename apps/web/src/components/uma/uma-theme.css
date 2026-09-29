@@ -254,6 +254,16 @@
 [data-theme='uma'] .u-race-strip-stage-full .u-race-strip-embed {
   position: relative; inset: auto; width: min(100vw, calc((100dvh - 64px) * 16 / 9)); height: auto; aspect-ratio: 16 / 9; border-radius: 0;
 }
+/*
+  ★縦持ちのスマホで「拡大」しても ★16:9 の映像が 画面の幅に合わせて 中央に小さく出ていた（★2026-09-29・オーナー）。
+  ★縦のときは ★映像を 90 度回して ★画面の縦いっぱいに使う（★横に持ち替えなくても 大きく見える）。
+  ★回したあとの見た目の大きさ: 縦 ＝ 幅（W）・横 ＝ W × 9/16。★W は ★画面の高さ（見出しの 64px を引く）と ★画面の幅 × 16/9 の小さい方。
+*/
+@media (orientation: portrait) {
+  [data-theme='uma'] .u-race-strip-stage-full .u-race-strip-embed {
+    width: min(calc(100dvh - 64px), calc(100vw * 16 / 9)); max-width: none; transform: rotate(90deg);
+  }
+}
 [data-theme='uma'] .u-race-strip-stage-head {
   position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: max(8px, env(safe-area-inset-top)) 14px 8px; color: var(--u-ink-light);
