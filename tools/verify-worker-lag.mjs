@@ -13,7 +13,7 @@
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { EXIT_MEANING, lagReport, workerPackageDirs } from './lib/worker-lag.mjs';
+import { EXIT_MEANING, lagReport, readShasWithRetry, workerPackageDirs } from './lib/worker-lag.mjs';
 
 const i = process.argv.indexOf('--base');
 const BASE = i < 0 ? null : process.argv[i + 1];
@@ -53,25 +53,13 @@ const fsIo = {
  *   🔴 ★黙って再試行しない: ★「1 回目 null・2 回目 …」を ★両方 出す（★本当に止まりかけているときに気づけるように）。
  */
 const RETRY_WAIT_MS = 3000;
-const readShas = async () => {
-  try {
-    const res = await fetch(new URL('/api/healthz', BASE), { cache: 'no-store' });
-    const body = await res.json();
-    return { web: typeof body?.sha === 'string' ? body.sha : null, worker: typeof body?.worker?.sha === 'string' ? body.worker.sha : null };
-  } catch (e) {
-    console.log(`★healthz を読めませんでした: ${e instanceof Error ? e.message : String(e)}`);
-    return { web: null, worker: null };
-  }
-};
-let shas = await readShas();
-if (shas.worker === null) {
-  console.log(`★1 回目: healthz の worker が null（★設計上ありうる）→ ${RETRY_WAIT_MS / 1000} 秒おいて 1 度だけ読み直します`);
-  await new Promise((r) => setTimeout(r, RETRY_WAIT_MS));
-  shas = await readShas();
-  console.log(shas.worker === null
-    ? '★2 回目: また null（★2 回とも null ＝ 分からない・ワーカーが止まりかけていないか見ること）'
-    : `★2 回目: OK（worker ${shas.worker.slice(0, 7)}）`);
-}
+/** ★判定は `lib/worker-lag.mjs` の `readShasWithRetry`（★網 worker-lag ⑤ が 偽の healthz で本物を通す） */
+const shas = await readShasWithRetry(
+  async () => (await fetch(new URL('/api/healthz', BASE), { cache: 'no-store' })).json(),
+  (ms) => new Promise((r) => setTimeout(r, ms)),
+  (line) => console.log(line),
+  RETRY_WAIT_MS,
+);
 
 const dirs = workerPackageDirs(fsIo);
 const report = lagReport(shas, {

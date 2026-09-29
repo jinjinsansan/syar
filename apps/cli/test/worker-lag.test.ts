@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 // @ts-expect-error ★道具の .mjs（型なし）
-import { lagReport, workerPackageDirs, EXIT_MEANING } from '../../../tools/lib/worker-lag.mjs';
+import { lagReport, workerPackageDirs, EXIT_MEANING, readShasWithRetry } from '../../../tools/lib/worker-lag.mjs';
 
 type Git = { has: (s: string) => boolean; isAncestor: (a: string, b: string) => boolean; log: (range: string, paths: string[]) => string[] };
 /** ★偽の git: ★コミットごとに触った所を持つ */
@@ -84,16 +84,54 @@ describe('★ワーカーが読む所（workerPackageDirs）', () => {
 
 /**
  * ⑤ ★healthz の worker は ★設計上 null になりうる（★1.5 秒で読めなければ null）→ ★1 度だけ読み直す（★2026-09-30・レビュー側）。
- *   🔴 ★黙って再試行しない（★1 回目と 2 回目を ★両方 出す）。★2 回とも null は 分からない（★lagReport の ① がそのまま効く）。
+ *   ★偽の healthz を渡して ★本物の `readShasWithRetry` を通す（★待ちは 0）。
  */
 describe('★worker: null は 1 度だけ読み直す（★両方を出す）', () => {
-  it('🔴 ⑤ 読み直しは 1 回だけ・1 回目と 2 回目を出力に書く', async () => {
-    const { readFileSync } = await import('node:fs');
-    const src = readFileSync(new URL('../../../tools/verify-worker-lag.mjs', import.meta.url), 'utf8');
-    expect(src).toContain('let shas = await readShas();');
-    expect(src.match(/await readShas\(\)/g)?.length, '★読み直しは 1 回だけ（★ループにしない）').toBe(2);
-    expect(src).toContain('★1 回目: healthz の worker が null');
-    expect(src).toContain('★2 回目: また null');
-    expect(src).toContain('★2 回目: OK');
+  type Shas = { web: string | null; worker: string | null };
+  const run = async (bodies: unknown[]): Promise<{ shas: Shas; reads: number; sleeps: number[]; lines: string[] }> => {
+    let reads = 0;
+    const sleeps: number[] = [];
+    const lines: string[] = [];
+    const shas = await readShasWithRetry(
+      async () => { const b = bodies[Math.min(reads, bodies.length - 1)]; reads += 1; if (b instanceof Error) throw b; return b; },
+      async (ms: number) => { sleeps.push(ms); },
+      (line: string) => { lines.push(line); },
+      0,
+    ) as Shas;
+    return { shas, reads, sleeps, lines };
+  };
+  const WEB = 'a'.repeat(40);
+  const WORKER = 'b'.repeat(40);
+
+  it('🔴 ⑤-1 1 回目 null・2 回目 sha → 読み直しは 1 回・両方の行を出す・sha を返す', async () => {
+    const r = await run([{ sha: WEB, worker: null }, { sha: WEB, worker: { sha: WORKER } }]);
+    expect(r.reads).toBe(2);
+    expect(r.sleeps).toEqual([0]);
+    expect(r.shas).toEqual({ web: WEB, worker: WORKER });
+    expect(r.lines.some((l) => l.startsWith('★1 回目: healthz の worker が null'))).toBe(true);
+    expect(r.lines.some((l) => l.startsWith('★2 回目: OK（worker bbbbbbb）'))).toBe(true);
+  });
+
+  it('🔴 ⑤-2 2 回とも null → 読み直しは 1 回だけ（★3 回目を読まない）・lagReport は 分からない（2）', async () => {
+    const r = await run([{ sha: WEB, worker: null }, { sha: WEB, worker: null }, { sha: WEB, worker: { sha: WORKER } }]);
+    expect(r.reads, '★読み直しは 1 回だけ').toBe(2);
+    expect(r.shas.worker).toBeNull();
+    expect(r.lines.some((l) => l.startsWith('★2 回目: また null'))).toBe(true);
+    const report = lagReport(r.shas, { has: () => true, isAncestor: () => true, log: () => [] }, []);
+    expect(report.code).toBe(2);
+  });
+
+  it('🔴 ⑤-3 1 回目で読めたら 読み直さない・何も出さない（★対照）', async () => {
+    const r = await run([{ sha: WEB, worker: { sha: WORKER } }]);
+    expect(r.reads).toBe(1);
+    expect(r.sleeps).toEqual([]);
+    expect(r.lines).toEqual([]);
+  });
+
+  it('🔴 ⑤-4 healthz が投げたら その旨を出し 1 度だけ読み直す', async () => {
+    const r = await run([new Error('boom'), { sha: WEB, worker: { sha: WORKER } }]);
+    expect(r.reads).toBe(2);
+    expect(r.lines[0]).toContain('boom');
+    expect(r.shas.worker).toBe(WORKER);
   });
 });

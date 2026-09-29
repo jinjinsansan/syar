@@ -60,3 +60,34 @@ export function lagReport(shas, git, workerDirs) {
   const code = worker.length === 0 && migrations.length === 0 && deploy.length === 0 ? 0 : 1;
   return { code, why: code === 0 ? '★後ろだが 効く変更は 0' : '★配備の要否を判断', range, total, worker, migrations, deploy };
 }
+
+/**
+ * ★healthz から 画面とワーカーの sha を読む。★`worker` が null なら ★1 度だけ `waitMs` おいて読み直す（★2026-09-30・レビュー側）。
+ *   ★healthz の `worker` は ★設計上 null になりうる（★1.5 秒で読めなければ null）。★2 回とも null は そのまま返す（★lagReport が 分からない＝2 にする）。
+ *   🔴 ★黙って再試行しない: ★1 回目・2 回目を ★`log` に ★両方 出す。
+ * @param {() => Promise<unknown>} readHealthz ★healthz の本文を返す（★投げたら 両方 null）
+ * @param {(ms: number) => Promise<void>} sleep
+ * @param {(line: string) => void} log
+ * @param {number} waitMs ★試すときは 0
+ * @returns {Promise<{ web: string|null, worker: string|null }>}
+ */
+export async function readShasWithRetry(readHealthz, sleep, log, waitMs) {
+  const once = async () => {
+    try {
+      const body = /** @type {{ sha?: unknown, worker?: { sha?: unknown } | null } | null} */ (await readHealthz());
+      return { web: typeof body?.sha === 'string' ? body.sha : null, worker: typeof body?.worker?.sha === 'string' ? body.worker.sha : null };
+    } catch (e) {
+      log(`★healthz を読めませんでした: ${e instanceof Error ? e.message : String(e)}`);
+      return { web: null, worker: null };
+    }
+  };
+  const first = await once();
+  if (first.worker !== null) return first;
+  log(`★1 回目: healthz の worker が null（★設計上ありうる）→ ${waitMs / 1000} 秒おいて 1 度だけ読み直します`);
+  await sleep(waitMs);
+  const second = await once();
+  log(second.worker === null
+    ? '★2 回目: また null（★2 回とも null ＝ 分からない・ワーカーが止まりかけていないか見ること）'
+    : `★2 回目: OK（worker ${second.worker.slice(0, 7)}）`);
+  return second;
+}
