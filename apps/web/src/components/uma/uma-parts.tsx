@@ -501,7 +501,11 @@ export function OwnHorseFigure({ horseId, running, onClick, style }: {
          * 🔴 ★**`jump-none` を落とさないこと**（★2026-09-24・実ブラウザで実測）。
          *   ★既定の `steps(8)` は 0/8, 1/8 … 7/8 の位置で止まり、★8 コマ中 7 コマで 2 コマが半分ずつ映ります。
          */
-        animation: running ? 'u-walk .8s steps(8, jump-none) infinite' : undefined,
+        /**
+         * ★1 周 1.6 秒（★2026-09-30・オーナー「タップダンスみたいな足の動き」）。
+         *   ★旧 0.8 秒 ＝ 1 秒に 10 コマ。★その場で歩く大きな絵では ★脚だけが せわしなく入れ替わって見えた。
+         */
+        animation: running ? 'u-walk 1.6s steps(8, jump-none) infinite' : undefined,
         // ⚠️ ★毛色を先に、影を後に掛ける（★逆にすると影まで毛色に染まる）
         filter: `${coatFilter === undefined ? '' : `${coatFilter} `}drop-shadow(0 8px 12px rgba(8,18,8,.45))`,
       }} />

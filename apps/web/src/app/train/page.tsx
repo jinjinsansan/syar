@@ -228,8 +228,8 @@ export default function TrainPage(): React.ReactElement {
           {running && (
             <span style={{ position: 'absolute', left: '12%', bottom: 72, width: 60, height: 44, borderRadius: '50%', background: 'rgba(228,226,208,.4)', filter: 'blur(8px)', animation: 'u-dust .95s linear infinite' }} />
           )}
-          {/* ★その馬の姿（★`/home`・`/mypage` と 同じ部品・★毛色は馬 ID から・2026-09-28） */}
-          <OwnHorseFigure horseId={horse.id} running={running} onClick={run} style={{ marginBottom: 80 }} />
+          {/* ★その馬の姿（★`/home`・`/mypage` と 同じ部品・★毛色は馬 ID から・2026-09-28）。★2026-09-30 オーナー「ダッシュボードと同じく歩くように」→ ★いつも歩く */}
+          <OwnHorseFigure horseId={horse.id} running onClick={run} style={{ marginBottom: 80 }} />
 
           {/* ★ゲージ（★スタミナ・調子。★これ以外に機械的な表示を増やさない） */}
           <div style={{
@@ -265,18 +265,24 @@ export default function TrainPage(): React.ReactElement {
                   key={m.id}
                   type="button"
                   onClick={() => { setMenuId(m.id); }}
+                  aria-pressed={on}
                   style={{
                     minHeight: 52, borderRadius: 10, padding: '6px 8px',
                     border: on ? '3px solid var(--u-gold)' : '3px solid rgba(251,247,236,.3)',
-                    backgroundImage: on ? 'linear-gradient(#3c6d99,#123f6b)' : undefined,
-                    background: on ? undefined : 'var(--u-panel)',
+                    /**
+                     * ⚠️ ★`background` 1 つで書く（★2026-09-30・オーナー「ボタンの文字が白背景で見えない」）。
+                     *   ★旧: 選んだ側だけ `backgroundImage`・他は `background` と ★省略形と個別を混ぜていた →
+                     *   ★選び直すと React が `background` を空にして ★グラデーションまで消え、★ブラウザ既定の白地に白い字が残った。
+                     */
+                    background: on ? 'linear-gradient(#f6c21c,#d99a06)' : 'var(--u-panel-strong)',
                     boxShadow: on ? '0 4px 0 var(--u-navy-deep)' : undefined,
-                    color: 'var(--u-ink-light)',
+                    color: on ? 'var(--u-navy-deep)' : 'var(--u-ink-light)',
+                    fontWeight: 800,
                   }}
                 >
                   <span style={{ display: 'block', fontSize: 14 }}>{m.name}</span>
                   {/* ★疲労も EP も名簿から（★画面に数を書かない・D-052） */}
-                  <span style={{ display: 'block', fontSize: 10, fontWeight: 500, color: 'var(--u-ink-light-3)' }}>
+                  <span style={{ display: 'block', fontSize: 10, fontWeight: 600, color: on ? 'var(--u-navy-deep)' : 'var(--u-ink-light-3)' }}>
                     疲労 {m.fatigueDelta > 0 ? `+${m.fatigueDelta}` : `−${Math.abs(m.fatigueDelta)}`}
                   </span>
                 </button>
@@ -309,6 +315,8 @@ export default function TrainPage(): React.ReactElement {
           {...(sending ? {} : { onClick: () => { void instruct(horse.id, horse.name, spec.name); } })}
           grow="1.4 1 210px"
         />
+        {/* ★2026-09-30 オーナー「自分の馬を出走させるボタンはどこ？ 育成モードから出走登録をします」（★それまで入口は /mypage の小さなリンクだけ） */}
+        <BigButton tone="blue" label="出走登録" sub="自分の馬をレースに出す" href="/entry" grow="1 1 130px" />
         <BigButton tone="ivory" label="ダッシュボード" sub="いつでも戻れます" href="/home" grow="1 1 130px" />
       </div>
     </div>

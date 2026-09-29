@@ -175,7 +175,8 @@ describe('★常設帯の大きさ ── 表と画面の突き合わせ（⑤�
     expect(routeKeyOf('/races/abc/bet')).toBe('/races/[id]/bet');
     expect(routeKeyOf('/home/')).toBe('/home');
     expect(stripSizeOf('/stable/abc')).toBe('big');
-    expect(stripSizeOf('/train')).toBe('mini');
+    expect(stripSizeOf('/train'), '★2026-09-30 オーナー「育成モード画面でも小窓を」').toBe('big');
+    expect(stripSizeOf('/vote')).toBe('mini');
     expect(stripSizeOf('/races/abc')).toBe('text');
     expect(stripSizeOf('/no-such-screen'), '★表に無い道に ★黙って帯を出さない').toBe('hidden');
     expect(stripSizeOf('/'), '★TOP は出さない（§3）').toBe('hidden');
@@ -192,10 +193,10 @@ describe('★本編を流す面（表が正本）', () => {
    *   ★「大」の面は すべて本編（★簡易版の走行は消した）。★「極小」「文字」・本編そのものは 流さない。
    */
   it('🔴 ★「大」の面は すべて本編・★「極小」「文字」は流さない（★旧「/home と /watch-race だけ」は決裁 ④ の前提）', () => {
-    for (const r of ['/home', '/watch-race', '/records', '/stable', '/stable/abc', '/exchange', '/howto', '/earn', '/mypage', '/stable/retired']) {
+    for (const r of ['/home', '/watch-race', '/records', '/stable', '/stable/abc', '/exchange', '/howto', '/earn', '/mypage', '/stable/retired', '/train']) {
       expect(stripEmbedsOn(r), `★${r} で本編を流していない`).toBe(true);
     }
-    expect(stripEmbedsOn('/train'), '★極小').toBe(false);
+    expect(stripEmbedsOn('/vote'), '★極小').toBe(false);
     expect(stripEmbedsOn('/races/abc'), '★文字').toBe(false);
     expect(stripEmbedsOn('/race'), '★本編そのもの').toBe(false);
   });

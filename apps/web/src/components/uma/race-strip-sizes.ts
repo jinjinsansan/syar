@@ -24,7 +24,8 @@ export const STRIP_SIZE_BY_ROUTE: Readonly<Record<string, StripSize>> = {
   /** ★§3 に名前のある画面 */
   '/home': 'big',
   '/mypage': 'big',
-  '/train': 'mini',
+  /** ★2026-09-30 ★極小 → 大（★オーナー「この育成モード画面でも小窓はつけてください」） */
+  '/train': 'big',
   '/training': 'mini',
   '/vote': 'mini',
   /**
