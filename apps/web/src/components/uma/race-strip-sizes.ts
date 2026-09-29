@@ -27,8 +27,11 @@ export const STRIP_SIZE_BY_ROUTE: Readonly<Record<string, StripSize>> = {
   '/train': 'mini',
   '/training': 'mini',
   '/vote': 'mini',
-  /** ★`/odds` は ★次のレースの `/odds/<id>` へ転送するだけの入口（★見つからないときの 1 行だけ・帯は出さない） */
-  '/odds': 'hidden',
+  /**
+   * ★`/odds` は ★次のレースの `/odds/<id>` へ転送する入口。★見つからないときの 1 枚に ★文字の帯を出す
+   *   （★2026-09-29・オーナー「全てのページで小窓を」・レビュー側: ★レースの画面なのに帯が無いのは不自然 → text）。
+   */
+  '/odds': 'text',
   '/races/[id]': 'text',
   '/races/[id]/bet': 'text',
   '/odds/[id]': 'text',

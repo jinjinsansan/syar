@@ -16,6 +16,7 @@ import { redirect } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
 import { ReadError } from '../../components/ui';
 import { Backdrop } from '../../components/uma/uma-parts';
+import { RaceStrip } from '../../components/uma/race-strip';
 
 export const revalidate = 0;
 
@@ -41,11 +42,14 @@ export default async function OddsEntryPage() {
     <div data-theme="uma" data-page-body style={{
       position: 'relative', overflow: 'hidden',
       minHeight: '100dvh', background: 'var(--u-navy)', color: 'var(--u-ink-light)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      display: 'flex', flexDirection: 'column',
       fontFamily: "'M PLUS Rounded 1c', system-ui, sans-serif", fontWeight: 800,
     }}>
       {/* ★芝＋紺（★2026-09-29・裁定 6・既存の部品）。★文は板（`--u-panel`）の上 */}
       <Backdrop />
+      {/* ★文字の帯（★2026-09-29・レビュー側: レースの画面なのに帯が無いのは不自然・`race-strip-sizes` で text） */}
+      <RaceStrip />
+      <div style={{ flex: '1 1 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ position: 'relative', textAlign: 'center', padding: '18px 20px', borderRadius: 14, background: 'var(--u-panel)' }}>
         <p style={{ margin: 0, fontSize: 16 }}>いま発売中のレースがありません。</p>
         <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 500, color: 'var(--u-ink-light-3)' }}>
@@ -56,6 +60,7 @@ export default async function OddsEntryPage() {
           marginTop: 16, padding: '0 18px', borderRadius: 10, border: '3px solid var(--u-navy)',
           backgroundImage: 'linear-gradient(#ffffff,#e6eef6)', color: 'var(--u-ink-dark)', fontSize: 14,
         }}>ダッシュボードへ</a>
+      </div>
       </div>
     </div>
   );
