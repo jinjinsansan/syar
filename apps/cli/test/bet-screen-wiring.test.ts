@@ -69,7 +69,8 @@ describe('★① 判定はサーバーが持つ（★画面が持たない）', 
 
 describe('★② オッズを画面で計算しない（§9.2）', () => {
   it('🔴 ★`race_odds_public` を読むだけ', () => {
-    expect(LIVE_SCREEN, '★オッズの公開ビューを読んでいない').toContain('race_odds_public');
+    /** ★2026-09-29 から ★オッズは `lib/odds-read.ts` の 1 か所で読む（★券種で絞り 読み切れなければ投げる）→ ★その関数を呼ぶこと */
+    expect(LIVE_SCREEN, '★オッズの公開ビューを 読む 1 か所から読んでいない').toContain('readRaceOdds(');
     for (const bad of ['montecarlo', 'MC_TRIALS', 'Math.random', 'winRate']) {
       expect(LIVE_SCREEN, `★画面側で計算しようとしている: ${bad}`).not.toContain(bad);
     }

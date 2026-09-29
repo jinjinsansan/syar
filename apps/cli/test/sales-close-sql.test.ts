@@ -14,7 +14,12 @@
 import { describe, expect, it } from 'vitest';
 import { CYCLE_MS, PHASE_OFFSET_MS } from '@star/scheduler';
 import { lastFunctionBody, stripSqlComments } from './lib/sql-source.js';
-import { SALES_CLOSE_LEAD_MS, salesClosedAt } from '../../web/src/lib/sales-close';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { stripComments } from './lib/ts-blocks.js';
+import { SALES_CLOSE_LEAD_MS, salesCloseAtMs, salesClosedAt } from '../../web/src/lib/sales-close';
+
+const ROOT = path.resolve(__dirname, '../../..');
 
 describe('★投票の締切を SQL と TS で 1 つにする', () => {
   it('🔴 ① sales_close_lead_seconds() ＝ CYCLE_MS − PHASE_OFFSET_MS.salesClose（秒）', () => {
@@ -41,6 +46,24 @@ describe('★投票の締切を SQL と TS で 1 つにする', () => {
     expect(salesClosedAt(start, close + 1000), '★締切の 1 秒後').toBe(true);
     expect(salesClosedAt(null, close + 1000), '★発走が分からない').toBe(false);
     expect(salesClosedAt(start, null), '★時計がまだ無い').toBe(false);
+  });
+
+  it('🔴 ★画面は「登録締切」と「発売締切」を分けて出し、★発売締切の時刻は salesCloseAtMs から（★2026-09-29・「締切 03:06」を読み違えた）', () => {
+    const start = Date.parse('2026-09-29T12:00:00Z');
+    expect(salesCloseAtMs(start)).toBe(start - SALES_CLOSE_LEAD_MS);
+    const strip = stripComments(readFileSync(path.join(ROOT, 'apps/web/src/components/uma/race-strip.tsx'), 'utf8'));
+    const at = strip.indexOf('function focusLine(');
+    expect(at, '★focusLine が見つからない').toBeGreaterThan(0);
+    const focus = strip.slice(at, strip.indexOf('\n}\n', at));
+    expect(focus.length).toBeGreaterThan(200);
+    expect(focus).toContain('salesCloseAtMs(startMs)');
+    expect(focus).toContain('${LABEL_SALES_CLOSE} ${clock(salesClose)}');
+    expect(focus).toContain('${LABEL_ENTRY_CLOSE} ${clock(row.entry_deadline_at)}');
+    expect(focus, '★登録の締切を ただの「締切」と出している').not.toMatch(/`締切 \$\{clock\(row\.entry_deadline_at\)\}/);
+    const detail = stripComments(readFileSync(path.join(ROOT, 'apps/web/src/app/races/[id]/page.tsx'), 'utf8'));
+    expect(detail, '★レース詳細の「発売締切まで」が 発売の締切へ数えていない').toContain("<Countdown untilIso={new Date(salesCloseAtMs(Date.parse(String(r['scheduled_at'])))).toISOString()}");
+    expect(detail).toContain('{LABEL_SALES_CLOSE}まで');
+    expect(detail, '★「締切まで」が 発走へ数えている旧の形').not.toContain("<Countdown untilIso={String(r['scheduled_at'])}");
   });
 
   it('★対照: 表の締切は 発走より前（★0 以下なら この網の前提が崩れている）', () => {

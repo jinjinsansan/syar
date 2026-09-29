@@ -7,6 +7,7 @@ import { readClient } from '../../../lib/supabase';
 import { FrameBadge, GradeBadge, ReadError, StatusBadge, StyleChip } from '../../../components/ui';
 import { Countdown } from '../../../components/clock';
 import { CLAIM_CARD_PUBLISH, CLAIM_ODDS_FIXED, CLAIM_SALES_CLOSE } from '../../../lib/claims';
+import { LABEL_SALES_CLOSE, salesCloseAtMs } from '../../../lib/sales-close';
 
 export const revalidate = 0;
 
@@ -95,10 +96,10 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
               <div><span className="a-num" style={{ fontSize: 32, color: '#4a3105' }}>{Number(r['purse']).toLocaleString('ja-JP')}</span> <span style={{ fontSize: 12, fontWeight: 900, color: '#4a3105' }}>PP</span></div>
             </div>
             <div style={{ textAlign: 'center', padding: '8px 16px', borderRadius: 10, backgroundImage: 'var(--a-gloss-red)', border: '2px solid var(--a-red-d)', boxShadow: 'var(--a-shadow-sm)', minWidth: 110 }}>
-              <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.1em', color: '#fff' }}>締切まで</div>
+              <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.1em', color: '#fff' }}>{LABEL_SALES_CLOSE}まで</div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 32 }}>
                 {scheduled
-                  ? <Countdown untilIso={String(r['scheduled_at'])} after="まもなく発走" size={32} color="#fff" />
+                  ? <Countdown untilIso={new Date(salesCloseAtMs(Date.parse(String(r['scheduled_at'])))).toISOString()} after="締め切りました" size={32} color="#fff" />
                   : <span style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>{deadlineText}</span>}
               </div>
             </div>

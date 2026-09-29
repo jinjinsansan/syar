@@ -41,12 +41,10 @@ export interface RaceEntryRow {
   readonly finish_pos: number | null;
 }
 
-export interface OddsRow {
-  readonly bet_type: string;
-  readonly selection: number[];
-  readonly odds: number;
-  readonly capped: boolean;
-}
+/*
+ * ★オッズは ★ここでは読みません（★2026-09-29）。★`raceOdds` は呼ぶ所が 0 件で、★券種で絞らずに読んでいた（★1,000 行で切れる）。
+ *   ★オッズを読む 1 か所は `odds-read.ts`（★券種で絞り、★読み切れなければ投げる）。
+ */
 
 /** Supabase クライアントの最小インターフェース（注入する。ここで作らない） */
 export interface ReadClient {
@@ -81,7 +79,3 @@ export function raceEntries(client: ReadClient, raceId: string): Promise<RaceEnt
   );
 }
 
-/** オッズ */
-export function raceOdds(client: ReadClient, raceId: string): Promise<OddsRow[]> {
-  return unwrap<OddsRow>(client.from('race_odds_public').select('*').eq('race_id', raceId));
-}

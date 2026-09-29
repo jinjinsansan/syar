@@ -13,6 +13,7 @@
  *    — ★停止スイッチが `useState` を使うためです。
  */
 import { readClient } from '../../../lib/supabase';
+import { readRaceOdds, type OddsReadRow } from '../../../lib/odds-read';
 import { ReadError } from '../../../components/ui';
 import { UmaOddsView, type OddsViewRow } from '../../../components/uma/uma-odds-view';
 import { DEMO_ODDS_RACE, demoOddsRows } from '../../../lib/odds-demo';
@@ -48,7 +49,8 @@ export default async function UmaOddsPage({ params, searchParams }: {
   const [race, entries, odds] = await Promise.all([
     c.from('races_public').select('*').eq('id', id).single(),
     c.from('race_entries_public').select('*').eq('race_id', id).order('gate'),
-    c.from('race_odds_public').select('*').eq('race_id', id),
+    /** ★単勝と複勝だけ（★絞らずに読むと 1,000 行で切れ 単勝が全部「—」になった・2026-09-29）。★読み切れなければ 投げる */
+    readRaceOdds(id, ['win', 'place']).then((rows) => ({ rows, error: null }), (e: unknown) => ({ rows: [] as readonly OddsReadRow[], error: { message: e instanceof Error ? e.message : String(e) } })),
   ]);
   /** ★読み取りの失敗を黙って空にしない（★「レースが無い」に見えてしまう・R-21） */
   /**
@@ -62,7 +64,7 @@ export default async function UmaOddsPage({ params, searchParams }: {
 
   const r = race.data as Row;
   const entryRows = (entries.data ?? []) as Row[];
-  const oddsRows = (odds.data ?? []) as Row[];
+  const oddsRows = odds.rows as unknown as Row[];
 
   /**
    * ★券種ごとに馬番で引けるようにします。

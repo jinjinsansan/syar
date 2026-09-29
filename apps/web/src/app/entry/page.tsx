@@ -23,6 +23,7 @@ import { RaceStrip } from '../../components/uma/race-strip';
 /** ★騎手を選ぶ（★D12-4・D-105 ④「出走登録で凍結する」） */
 import { JockeyPicker } from '../../components/jockey-picker';
 import { CLAIM_ENTRY_NO_CANCEL, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY } from '../../lib/claims';
+import { LABEL_ENTRY_CLOSE } from '../../lib/sales-close';
 
 /** ★紙パネル（★資料 §5.6: 紙 ＋ 見出し帯は濃紺・下に金 3px） */
 const PAPER: React.CSSProperties = {
@@ -269,7 +270,7 @@ export default function EntryPage(): React.ReactElement {
               <span style={{ flex: '1 1 180px', fontSize: 15 }}>{r.course}<span style={{ marginLeft: 10, fontSize: 12, opacity: .7 }}>馬場 {r.going}</span></span>
               <span style={{ fontSize: 13 }}>{r.heads}頭</span>
               <span style={{ fontSize: 13 }}><strong style={{ fontSize: 18 }}>{r.feeEP}</strong> EP</span>
-              <span style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{r.deadline === null ? '—' : `締切 ${r.deadline}`}</span>
+              <span style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{r.deadline === null ? '—' : `${LABEL_ENTRY_CLOSE} ${r.deadline}`}</span>
               <span style={{
                 ...CHIP,
                 background: sel ? 'var(--u-gold-pale)' : r.state === 'ok' ? '#dff3e5' : r.state === 'entered' ? '#dbe8f7' : '#ddd8c9',

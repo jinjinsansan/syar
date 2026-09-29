@@ -16,6 +16,7 @@
  */
 import { CLASS_LABEL, CONDITION_LABEL, SURFACE_LABEL, formatClock } from './format';
 import { authClient, readClient } from './supabase';
+import { readRaceOdds } from './odds-read';
 
 /** ★出馬表の 1 頭（★`race_entries_public` が返す列だけ） */
 export interface BetEntryView {
@@ -117,7 +118,7 @@ const RACE_COLUMNS = 'id, name, grade, class_rank, surface, distance, track_cond
  * ⚠️ ★`raceId` が null なら ★**いちばん近い受付中のレース**を選びます
  *    （★`/vote` は 1 鞍だけを見せる画面なので）。
  */
-export async function loadBetScreen(raceId: string | null): Promise<BetScreenData> {
+export async function loadBetScreen(raceId: string | null, betTypes: readonly string[] = ['win']): Promise<BetScreenData> {
   const read = readClient();
   const auth = authClient();
   const { data: sessionData } = await auth.auth.getSession();
@@ -150,11 +151,11 @@ export async function loadBetScreen(raceId: string | null): Promise<BetScreenDat
     auth.from('race_entries_public')
       .select('gate, horse_name, strategy, weight, popularity, owner_label, is_mine')
       .eq('race_id', id).order('gate', { ascending: true }),
-    read.from('race_odds_public').select('bet_type, selection, odds').eq('race_id', id),
+    /** ★画面が要る券種だけ（★絞らずに読むと 1,000 行で切れる・★読み切れなければ 投げる＝`odds-read.ts`） */
+    readRaceOdds(id, betTypes),
     authenticated ? auth.from('users').select('entry_points, stable_name').limit(1) : Promise.resolve(null),
   ]);
   if (entriesRes.error !== null) throw new Error(`race_entries_public を読めませんでした: ${entriesRes.error.message}`);
-  if (oddsRes.error !== null) throw new Error(`race_odds_public を読めませんでした: ${oddsRes.error.message}`);
   if (userRes?.error) throw new Error(`users を読めませんでした: ${userRes.error.message}`);
 
   const entries: BetEntryView[] = (entriesRes.data ?? []).map((e) => ({
@@ -168,7 +169,7 @@ export async function loadBetScreen(raceId: string | null): Promise<BetScreenDat
   }));
 
   const odds = new Map<string, number>();
-  for (const o of oddsRes.data ?? []) {
+  for (const o of oddsRes) {
     const sel = Array.isArray(o.selection) ? (o.selection as number[]) : [];
     odds.set(oddsKey(String(o.bet_type), sel), Number(o.odds));
   }

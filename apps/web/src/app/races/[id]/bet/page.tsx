@@ -65,7 +65,7 @@ export default function BetPage(): React.ReactElement {
 
   useEffect(() => {
     let alive = true;
-    loadBetScreen(null)
+    loadBetScreen(null, BET_TYPES.map((t) => t.key))
       .then((d) => { if (alive) setData(d); })
       .catch((e: unknown) => { if (alive) setLoadError(e instanceof Error ? e.message : String(e)); });
     return () => { alive = false; };

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
 import { canPlayRealRace } from '../../lib/race-real-access';
 import { StaleBuildNotice } from './stale-build-notice';
+import { LABEL_ENTRY_CLOSE, LABEL_SALES_CLOSE, salesCloseAtMs, salesClosedAt } from '../../lib/sales-close';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowNear, replayWindowOver, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
 import { INTRO_STAGES, stripEmbedsOn, stripSizeOf } from './race-strip-sizes';
@@ -123,8 +124,17 @@ function focusLine(row: FocusRow, nowMs: number): string {
   if (row.status === 'settled') return 'このレースは結果が確定しました';
   if (row.status === 'cancelled') return 'このレースは取りやめになりました';
   if (Number.isFinite(startMs) && nowMs >= startMs) return '発走しました・結果をお待ちください';
-  if (row.status === 'closed') return `締切ました・発走 ${clock(row.scheduled_at)}`;
-  return row.entry_deadline_at === null ? `発走 ${clock(row.scheduled_at)}` : `締切 ${clock(row.entry_deadline_at)}・発走 ${clock(row.scheduled_at)}`;
+  /**
+   * ★2026-09-29: ★「締切 03:06」は ★出走登録の締切（発走 18 分前）で、★投票の締切（発走 1 分前）と読み違えた（★レビュー側）。
+   *   ★登録の締切までは ★両方を出し、★過ぎたら ★発売の締切だけ（★投票の画面で知りたいのは いつまで買えるか）。★時刻は `sales-close.ts` の 1 か所から。
+   */
+  const salesClose = Number.isFinite(startMs) ? new Date(salesCloseAtMs(startMs)).toISOString() : null;
+  if (row.status === 'closed' || (salesClose !== null && salesClosedAt(startMs, nowMs))) return `投票は締め切りました・発走 ${clock(row.scheduled_at)}`;
+  const sales = salesClose === null ? '' : `${LABEL_SALES_CLOSE} ${clock(salesClose)}・`;
+  const entryOpen = row.entry_deadline_at !== null && nowMs < new Date(row.entry_deadline_at).getTime();
+  return entryOpen && row.entry_deadline_at !== null
+    ? `${LABEL_ENTRY_CLOSE} ${clock(row.entry_deadline_at)}・${sales}発走 ${clock(row.scheduled_at)}`
+    : `${sales}発走 ${clock(row.scheduled_at)}`;
 }
 
 function clock(iso: string): string {

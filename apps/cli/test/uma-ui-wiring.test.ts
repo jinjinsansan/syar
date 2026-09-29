@@ -126,7 +126,8 @@ describe('★馬物語 UI の配線（R-14）', () => {
     /** ★公開ビューから読む（★実体テーブルは anon では読めない） */
     expect(page).toMatch(/races_public/);
     expect(page).toMatch(/race_entries_public/);
-    expect(page).toMatch(/race_odds_public/);
+    /** ★オッズは `lib/odds-read.ts`（★race_odds_public を券種で絞って読む 1 か所・2026-09-29） */
+    expect(page).toMatch(/readRaceOdds\(/);
     /** ★読み取りの失敗を黙って空にしない（★R-21） */
     expect(page).toMatch(/ReadError/);
     /** ★オッズを画面で作らない（★確率から計算する式を持たない） */
