@@ -16,16 +16,13 @@
  * ★EP・PP・持ち馬は本人の公開可能なデータを読みます。
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   Backdrop, BigButton, EpCapsule, OwnHorseFigure, PpCapsule, TopBar, useMotionPaused,
 } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { FoalInvite } from '../../components/uma/foal-invite';
 import { useStableView } from '../../components/uma/use-stable-view';
-
-/** ★馬をタップしてから待機に戻るまで（★資料 §9 の 2600ms） */
-const POKE_MS = 2600;
 
 /** ★調子の段の数（★5 分割・資料 §8-2） */
 const CONDITION_STEPS = 5;
@@ -34,16 +31,7 @@ export default function HomePage(): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
   const { view, loading, error, needsSetup, needsLogin, refresh } = useStableView();
   const [index, setIndex] = useState(0);
-  const [running, setRunning] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  /** ★タップで 2.6 秒だけ動く（★終わると待機に戻る） */
-  useEffect(() => () => { if (timer.current !== undefined) clearTimeout(timer.current); }, []);
-  const poke = (): void => {
-    if (timer.current !== undefined) clearTimeout(timer.current);
-    setRunning(true);
-    timer.current = setTimeout(() => { setRunning(false); }, POKE_MS);
-  };
+  /** ★ダッシュボードの馬は ★ずっと歩く（★2026-09-29・オーナー「常時表示される馬はずっと歩いているように」・★旧はタップで 2.6 秒だけ）。★止めるのは 停止スイッチと「動きを減らす」（CSS） */
 
   const horses = view?.horses ?? [];
   const horse = horses[index % horses.length] ?? null;
@@ -94,13 +82,12 @@ export default function HomePage(): React.ReactElement {
           display: 'flex', alignItems: horse ? 'flex-end' : 'center', justifyContent: 'center', overflow: 'hidden',
         }}>
           {/* ★**その馬の姿**（★育成・レースと同じ毛色・★見本の絵ではない・2026-09-28 オーナー指示） */}
-          {horse ? <><OwnHorseFigure horseId={horse.id} running={running} onClick={poke} style={{ marginBottom: 36 }} />
-          <button type="button" onClick={() => { move(-1); }} aria-label="前の馬" style={arrow('left')}>‹</button>
-          <button type="button" onClick={() => { move(1); }} aria-label="次の馬" style={arrow('right')}>›</button>
-          <span style={{
-            position: 'absolute', right: 24, bottom: 8, padding: '6px 10px',
-            border: '2px solid var(--u-gold)', borderRadius: 999, background: 'var(--u-panel-strong)', fontSize: 11,
-          }}>タップで動く</span></> : view ? <span>持ち馬はまだいません</span> : !loading && (
+          {horse ? <><OwnHorseFigure horseId={horse.id} running style={{ marginBottom: 36 }} />
+          {/* ★馬を替える矢印は ★2 頭以上の時だけ・★下の角に置いて 馬に被せない（★2026-09-29・オーナー「モバイルで△が馬に被る・1 頭の時は不要」） */}
+          {horses.length > 1 && <>
+            <button type="button" onClick={() => { move(-1); }} aria-label="前の馬" style={arrow('left')}>‹</button>
+            <button type="button" onClick={() => { move(1); }} aria-label="次の馬" style={arrow('right')}>›</button>
+          </>}</> : view ? <span>持ち馬はまだいません</span> : !loading && (
             <div role={needsSetup || needsLogin ? 'status' : 'alert'} style={{
               width: '100%', maxWidth: 520, padding: '24px 22px', borderRadius: 16,
               border: '2px solid var(--u-gold)', background: 'rgba(8,18,8,.84)',
@@ -179,7 +166,7 @@ export default function HomePage(): React.ReactElement {
 /** ★持ち馬を巡る矢印（★48×48・当たりは 44px 以上） */
 function arrow(side: 'left' | 'right'): React.CSSProperties {
   return {
-    position: 'absolute', [side]: 32, bottom: 104, width: 48, height: 48,
+    position: 'absolute', [side]: 10, bottom: 6, width: 48, height: 48,
     border: '3px solid var(--u-gold)', borderRadius: '50%', background: 'rgba(10,35,64,.86)',
     color: 'var(--u-ink-light)', fontSize: 20, fontWeight: 800,
   } as React.CSSProperties;
