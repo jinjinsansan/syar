@@ -185,6 +185,12 @@ for (const r of buriedRows) console.log(`  🔴 ${r.p.padEnd(20)} ${String(r.w).
 const measured = new Set(rows.filter((r) => !r.note).map((r) => `${r.p}@${r.w}`)).size;
 console.log(`\n★沈んだ文字: ★${buriedRows.length} 件（★測れた画面 ${PAGES.length * WIDTHS.length} 面のうち ★文字を拾えた ${measured} 面・★芝の上にじかの文字が無い面は数えていない）`);
 console.log(`  ★射程: ★${WIDTHS.join('・')}px・${scopeLine(SESSION)}・★${PAGES.length} 画面で測った数。${SESSION === null ? '★ログインが要る中身と ' : ''}★測っていない幅は ★含まない`);
+/**
+ * ★**測れなかった面を 数の横に必ず出す**（★2026-09-29・レビュー側・簿 AUDIT-TEXT-BACKDROP-ONLY）。
+ *   ★この道具は ★芝（Backdrop）を持つ画面しか測れない。★旧世代（/stable 系・/training・/races/[id] 等）は ★「0」ではなく「測れない」。
+ */
+const unmeasurable = rows.filter((r) => r.note !== undefined);
+console.log(`  ⚠️ ★測れない面: ★${unmeasurable.length} 面（★芝が無い＝沈み・明度を測っていない・★0 と読まない）${unmeasurable.length > 0 ? `: ${unmeasurable.map((r) => `${r.p}（${r.note.replace(/★/g, '')}）`).join('・')}` : ''}`);
 if (FAKE_STALE && !sawNotice) {
   console.log('  ⚠️ ★--fake-stale なのに ★知らせの文を 1 件も拾っていません（★知らせが出ていない・★この実行は知らせを測れていない）');
 }
