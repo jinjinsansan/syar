@@ -91,6 +91,10 @@ const CLAIMS: readonly Claim[] = [
       const train = stripComments(read('apps/web/src/app/train/page.tsx'));
       if (!train.includes('const cost = gradeEpCost(spec.id as MenuId, horse.stableGrade);')) why.push('★/train が 実際に引かれる額（格の倍率つき）で比べていない');
       if (!/actionHref="\/earn"/.test(train)) why.push('★/train の警告に 受け取りへの道が無い');
+      /** ★旧 /training も ★実際の額（★2026-09-29・レビュー側「ほかの画面にも素の額が残っていないか」→ 3 か所 在った） */
+      const old = stripComments(read('apps/web/src/app/training/page.tsx'));
+      if (!old.includes('gradeEpCost(menu.id as MenuId, horse.stableGrade)')) why.push('★/training が 実際に引かれる額で出していない');
+      if (/\{menu\.ep\}|\$\{menu\.ep\}|\{spec\.ep\}|\$\{spec\.ep\}/.test(old + train)) why.push('★調教の画面が 素の額（menu.ep / spec.ep）を そのまま出している');
       return why;
     },
   },

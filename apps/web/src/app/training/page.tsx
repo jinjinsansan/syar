@@ -14,6 +14,7 @@ import {
   trainingStreakOf, TRAINING_STREAK_WEEKS,
 } from '@star/training';
 import { sortStable, conditionView, DEMO_HORSES, type StableHorse } from '../../lib/stable';
+import { gradeEpCost, type MenuId } from '@star/training';
 import { supabaseStableRepo, SignInRequiredError } from '../../lib/stable-repo';
 import { sendTrainingOrder } from '../../lib/training-order';
 import { TRAINING_MENUS, trainingMenusOfView, DEMO_TRAINING_ABILITY, DEFAULT_TRAINING_ABILITY, demoFatigueNote } from '../../lib/game-demo';
@@ -115,6 +116,8 @@ export default function TrainingPage(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<string | null>('hill');
   const horse = horses.find((h) => h.id === selectedHorse) ?? null;
   const menu = TRAINING_MENUS.find((m) => m.id === selectedMenu) ?? null;
+  /** ★実際に引かれる額（★ワーカーと同じ `gradeEpCost`・★格の倍率つき・2026-09-29 まで素の額を出していた） */
+  const menuCost = horse !== null && menu !== null ? gradeEpCost(menu.id as MenuId, horse.stableGrade) : null;
   const todo = horses.filter((h) => h.week.kind === 'todo');
   const allDone = todo.length === 0;
   /**
@@ -443,7 +446,7 @@ export default function TrainingPage(): React.ReactElement {
                 </span>
               </div>
               <span className="a-btn a-btn-gold" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 50, fontSize: 16 }} title="サーバー接続まで押せません">
-                この馬に指示する（{menu.ep} EP）
+                この馬に指示する（{menuCost ?? menu.ep} EP）
               </span>
             </>
           ) : (
@@ -627,7 +630,7 @@ export default function TrainingPage(): React.ReactElement {
                   <div style={{ flex: '0 0 auto' }}><span className="a-lbl" style={{ display: 'block' }}>指示の内容</span><span style={{ fontSize: 19, fontWeight: 900, whiteSpace: 'nowrap' }}>{horse.name}　—　{menu.name}</span></div>
                   <div style={{ display: 'flex', gap: 22, fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)', whiteSpace: 'nowrap' }}>
                     <span>疲労 <span className="a-num" style={{ fontSize: 22, color: '#a9741a' }}>{horse.fatigue} → {Math.max(0, horse.fatigue + menu.fatigueDelta)}</span></span>
-                    <span>消費 <span className="a-num" style={{ fontSize: 22, color: 'var(--a-num-money)' }}>{menu.ep}</span> EP</span>
+                    <span>消費 <span className="a-num" style={{ fontSize: 22, color: 'var(--a-num-money)' }}>{menuCost ?? menu.ep}</span> EP</span>
                   </div>
                 </>
               ) : (
@@ -640,7 +643,7 @@ export default function TrainingPage(): React.ReactElement {
                   title="指示しない週は、既定の献立で調教されます"
                   onClick={() => { void instruct(); }}
                 >
-                  {sent === horse?.id ? '指示しました' : horse?.week.kind === 'done' ? '指示を変更する' : 'この馬に指示する'}{menu !== null ? `（${menu.ep} EP）` : ''}
+                  {sent === horse?.id ? '指示しました' : horse?.week.kind === 'done' ? '指示を変更する' : 'この馬に指示する'}{menuCost !== null ? `（${menuCost} EP）` : ''}
                 </span>
                 <span className={allDone ? 'a-btn' : 'a-btn off'} style={{ height: 48, padding: '0 18px', fontSize: 15, whiteSpace: 'nowrap' }} title={allDone ? 'サーバー接続まで押せません' : '全頭に指示すると押せます'}>週を進める</span>
               </div>
