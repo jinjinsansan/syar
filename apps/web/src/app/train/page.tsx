@@ -39,6 +39,9 @@ import { TRAINING_MENUS } from '../../lib/game-demo';
 import { sendTrainingOrder } from '../../lib/training-order';
 import { conditionView, sortStable, trainFaceOf, type TrainFace } from '../../lib/stable';
 import { coatOfHorseId, coatCssFilter } from '@star/render';
+import { gradeEpCost, type MenuId } from '@star/training';
+import { NoticeBar } from '../../components/uma/uma-parts';
+import { CLAIM_TRAIN_EP_SHORT } from '../../lib/claims';
 
 /** ★実行してから待機に戻るまで（★資料 §9 の 3200ms） */
 const RUN_MS = 3200;
@@ -130,6 +133,13 @@ export default function TrainPage(): React.ReactElement {
    *   ⚠️ ★色の式は `@star/render` が持つ（★画面で組み立てない）。
    */
   const coatFilter = coatCssFilter(coatOfHorseId(horse.id));
+  /**
+   * ★実際に引かれる額（★ワーカーと同じ `gradeEpCost(献立, その馬の厩舎の格)`・2026-09-29）。
+   *   ★それまで 画面は ★献立の素の額（★銅＝1.0 倍）を出し、★銀 1.25・金 1.5 倍の馬で ★少なく見せていた。
+   */
+  const cost = gradeEpCost(spec.id as MenuId, horse.stableGrade);
+  /** ★残高が足りなければ ★その週は無料の休養に落ちる（★ST001・training-runner）→ ★前もって言う・★受け取りへの道を並べる */
+  const epShort = view !== null && !view.demo && view.home.epBalance < cost;
 
   return (
     <div
@@ -143,6 +153,7 @@ export default function TrainPage(): React.ReactElement {
       <Backdrop />
       <TopBar title="育成モード" paused={paused} onToggle={toggle} />
       <RaceStrip />
+      {epShort && <NoticeBar kind="closing" text={CLAIM_TRAIN_EP_SHORT} sub={`残高 ${view!.home.epBalance.toLocaleString('ja-JP')} EP ／ この献立 ${cost.toLocaleString('ja-JP')} EP`} actionLabel="受け取る" actionHref="/earn" />}
       {/* ★事実どおりに言う（★2026-09-27 まで「保存できません」と書いていた・P1-1 で送れるようにした） */}
       <div role="status" style={{ position: 'relative', padding: '6px 14px', color: 'var(--u-gold)', fontSize: 12 }}>
         馬の状態は実データです。指示はその馬の次の調教に使われ、参加ポイントは調教したときに減ります。
@@ -277,7 +288,7 @@ export default function TrainPage(): React.ReactElement {
             padding: '8px 11px', border: '2px solid rgba(251,247,236,.28)', borderRadius: 12,
             background: 'var(--u-panel)', fontSize: 12, fontWeight: 500, lineHeight: 1.6,
           }}>
-            {spec.main}　／　副効果 {spec.sub}　／　消費 {spec.ep} EP
+            {spec.main}　／　副効果 {spec.sub}　／　消費 {cost} EP
             {spec.banner !== undefined && (
               <span style={{ display: 'block', marginTop: 4, color: spec.banner.kind === 'bad' ? '#f06a5f' : 'var(--u-gold)' }}>
                 {spec.banner.text}
@@ -294,7 +305,7 @@ export default function TrainPage(): React.ReactElement {
         <BigButton
           tone={sending ? 'disabled' : 'gold'}
           label={sending ? '送っています…' : `「${spec.name}」を指示する`}
-          sub={`${horse.name}・消費 ${spec.ep} EP（調教したときに）`}
+          sub={`${horse.name}・消費 ${cost} EP（調教したときに）`}
           {...(sending ? {} : { onClick: () => { void instruct(horse.id, horse.name, spec.name); } })}
           grow="1.4 1 210px"
         />

@@ -14,7 +14,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { stripComments } from './lib/ts-blocks.js';
 import {
-  BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_CARD_PUBLISH, CLAIM_DAILY_ONCE, CLAIM_ENTRY_NO_CANCEL, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
+  BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_CARD_PUBLISH, CLAIM_DAILY_ONCE, CLAIM_TRAIN_EP_SHORT, CLAIM_ENTRY_NO_CANCEL, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
 } from '../../web/src/lib/claims';
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -77,6 +77,23 @@ function betAmountPasses(amount: number): { readonly ok: boolean; readonly rule:
 }
 
 const CLAIMS: readonly Claim[] = [
+  {
+    id: '⑫調教の費用が残高に足りなければ 次の週は休養（★ST001 → rest・★画面は実際に引かれる額で比べ /earn へ導く）',
+    text: CLAIM_TRAIN_EP_SHORT, name: 'CLAIM_TRAIN_EP_SHORT',
+    usedBy: ['apps/web/src/app/train/page.tsx'],
+    backedBy: () => {
+      const why: string[] = [];
+      const runner = stripComments(read('apps/worker/src/training-runner.ts'));
+      if (!/export const EP_SHORT_SQLSTATE = 'ST001';/.test(runner)) why.push('★ワーカーの EP 不足の SQLSTATE が ST001 でない');
+      if (!/if \(classifySpendError\(e\) === 'ep_short'\) \{[\s\S]{0,80}menu = 'rest';/.test(runner)) why.push('★ワーカーが EP 不足で 休養に落としていない（★文が嘘になる）');
+      const d = latestDefinition('spend_training_ep');
+      if (d === null || !/errcode\s*=\s*'ST001'/i.test(d.body)) why.push(`★spend_training_ep（${d?.rel ?? '無し'}）が 不足で ST001 を出していない`);
+      const train = stripComments(read('apps/web/src/app/train/page.tsx'));
+      if (!train.includes('const cost = gradeEpCost(spec.id as MenuId, horse.stableGrade);')) why.push('★/train が 実際に引かれる額（格の倍率つき）で比べていない');
+      if (!/actionHref="\/earn"/.test(train)) why.push('★/train の警告に 受け取りへの道が無い');
+      return why;
+    },
+  },
   {
     id: '⑪デイリーは 1 日 1 回（★その日の始まりで鍵を作り ★台帳の一意で担保）',
     text: CLAIM_DAILY_ONCE, name: 'CLAIM_DAILY_ONCE',

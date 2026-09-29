@@ -69,6 +69,13 @@ export const CLAIM_DAILY_ONCE = '1 日 1 回 受け取れます';
 /** ★発売の締切を過ぎた（★/odds・帯・/vote が同じ語を出す・★締切の時刻は `sales-close.ts` の salesCloseAtMs） */
 export const CLAIM_SALES_CLOSED = '投票は締め切りました';
 
+/**
+ * ★調教の費用が残高に足りないとき（★ワーカーは `spend_training_ep` の ST001 で その週を ★無料の休養に落とす＝training-runner.ts）。
+ *   ★2026-09-29: ★落ちたことは ワーカーのログにしか出ず、★オーナーの馬が 約 30 時間 毎週休養になっていた（★利用者に届いていなかった）。
+ *   ★裁定 `REVIEW_EP_BUDGET_20260925.md` 09-29 追記: ★休養に落とすのは確定・★まず前向きの警告。
+ */
+export const CLAIM_TRAIN_EP_SHORT = 'このままだと次の週は休養になります（参加ポイントが足りません）';
+
 /** ★出走の取消（★口 0079 は在るが ★画面から呼ぶ所が 0 件 ＝ 画面からは取り消せない・★オーナー判断待ち） */
 export const CLAIM_ENTRY_NO_CANCEL = '登録は、画面から取り消せません。';
 

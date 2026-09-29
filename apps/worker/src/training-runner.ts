@@ -20,7 +20,7 @@
  *   - **メニューの選択**（Q-P3-24）。プレイヤーが選ぶ UI がまだありません。
  *     → V-7 / V-14 / V-15 / B-6 の錨と**同じバランス型**を使います。
  *       ★ここで別の方針を作ると、較正した世界と本番が別物になります。
- *   - **EP が足りないとき**（Q-P3-23）。→ 例外を握りつぶさず、
+ *   - **EP が足りないとき**（★裁定 `REVIEW_EP_BUDGET_20260925.md` 09-29 追記で確定・旧 Q-P3-23）。→ 例外を握りつぶさず、
  *     **休養に落として警告を出します**（週送りを止めるほうが害が大きいため）。
  *     ★黙って休養にしません。件数を必ず返します。
  *     ★**休養に落とすのは EP 不足（SQLSTATE `EP_SHORT_SQLSTATE`）だけ**です（監査 H-3・2026-09-14）。
@@ -124,7 +124,7 @@ export interface TrainingWeekResult {
   readonly retired: number;
   /** 消費した EP の合計（プレイヤー馬のみ） */
   readonly epSpent: number;
-  /** ★EP が足りず休養に落とした頭数（Q-P3-23。黙って落とさない） */
+  /** ★EP が足りず休養に落とした頭数（★裁定 REVIEW_EP_BUDGET 09-29 で確定。★利用者には /train の前向きの警告で言う・★ログは開発側の耳でしかない） */
   readonly epShort: number;
   /**
    * ★EP 不足**以外**の理由で引き落としが失敗し、その週を進めなかった頭数（監査 H-3）。
@@ -370,7 +370,7 @@ export async function advanceTrainingWeeks(
           if (res.rows[0]?.bal !== null) epSpent += cost;
         } catch (e) {
           if (classifySpendError(e) === 'ep_short') {
-            // ★足りないときは休養に落とす（Q-P3-23）。★黙って落とさない
+            // ★足りないときは休養に落とす（★裁定 REVIEW_EP_BUDGET 09-29 で確定）。★利用者へは /train の前向きの警告（CLAIM_TRAIN_EP_SHORT）
             epShort += 1;
             menu = 'rest';
           } else {
@@ -535,7 +535,7 @@ export async function advanceTrainingWeeks(
   }
   if (epShort > 0) {
     // ★黙って休養に落とさない。件数を目に付く形で出す（D-037 と同じ考え方）
-    onAlert(`★EP 不足で ${epShort} 頭を休養に落としました（Q-P3-23 の裁定待ち）`);
+    onAlert(`★EP 不足で ${epShort} 頭を休養に落としました（★REVIEW_EP_BUDGET 09-29 で確定・★利用者へは /train の警告）`);
   }
   // ★incomplete: 上限に当たった、または失敗で週を進めなかった馬がいる（`TrainingWeekResult` の註記・AUDIT_FIX2 BF-1）
   return { weeks, advanced, retired, epSpent, epShort, spendErrors, incomplete: hitCap || spendErrors > 0 };
