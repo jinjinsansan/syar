@@ -75,6 +75,11 @@ npx tsx tools/read-auth-settings.mjs --env production
 ```bash
 bash tools/deploy.sh <0 で控えた sha>
 ```
+- 🔴 ★**`deploy.sh` は ★配備するコミットのものを使う**（★2026-09-29 の実例: ★VPS の `/opt/star` の checkout は `67b2971a` のままで、★置いてある `deploy.sh` は古い手順だった）。★置いてあるものを流すと ★**古い手順で新しい版を配る**ことになる。
+  ```bash
+  ssh -i ~/.ssh/pax_vps root@162.43.29.102 "cd /opt/star && git fetch origin --quiet && git show <sha>:tools/deploy.sh > /tmp/deploy-<sha>.sh && bash /tmp/deploy-<sha>.sh <sha>"
+  ```
+- ⚠️ ★配備の直前の周に ★旧プロセスが公示したレースは ★旧い版で作られる（★2026-09-29: 12609 は起動の 1 秒前に公示され R 番号のまま・★新しい版の効きは ★起動より後に公示されたレースで見る）。
 - 🔴 ★**順番は ★移行 → ワーカー**（★`deploy.sh` が強制する・2026-09-28 に実測）: ★リリースに含まれる移行が DB に未適用なら ★スキーマ照合で ★配備を中止します（★リンクは張り替えず 停止時間 0・`/var/log/star-deploy.log`）。
   ★だから ★ワーカーは ★「DB が自分より新しい」状態で 必ず一度は動きます。★移行が新しい分類を足す便では ★ワーカーが知らない分類を受け取っても ★落ちない・黙らない作りにしておくこと（★`apps/worker/src/daily-flow.ts` の見出し）。
   ⚠️ ★`0094` の見出しの「ワーカー → 移行」は誤りです（★適用済みの移行はチェックサムで守られているので書き換えず、★ここと `daily-flow.ts` で正しています）。
