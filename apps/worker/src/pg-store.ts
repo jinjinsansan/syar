@@ -687,7 +687,7 @@ export function createPgStore(
       const r = await client.query<{ cycle_index: number }>(
         /** ★② 締めるのは ★発走から SETTLE_AFTER_START_MS 後（★映像が終わってから・0098） */
         `select cycle_index from races
-          where status = 'scheduled' and scheduled_at <= to_timestamp(($1 - $2) / 1000.0)
+          where status = 'scheduled' and scheduled_at <= to_timestamp(($1::bigint - $2::bigint) / 1000.0)
           order by cycle_index`,
         [nowMs, SETTLE_AFTER_START_MS],
       );
