@@ -81,7 +81,8 @@ export function TopBar({ title, backHref, home = false, paused, onToggle }: {
           ‹ 戻る
         </a>
       )}
-      <span style={{ flex: '0 0 auto', fontSize: 18, whiteSpace: 'nowrap' }}>{title}</span>
+      {/* ★画面名は 19px ＋ うすい紺の影（★2026-09-29・デザイナー回答 R-22 §3・芝の上で 3.84〜3.93:1 → 大きい文字の扱い 3:1） */}
+      <span style={{ flex: '0 0 auto', fontSize: 19, whiteSpace: 'nowrap', textShadow: '0 2px 0 rgba(10,35,64,.6)' }}>{title}</span>
       <span style={{ marginLeft: 'auto' }}><MotionToggle paused={paused} onToggle={onToggle} /></span>
     </div>
   );

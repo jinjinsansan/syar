@@ -340,7 +340,7 @@ function Shell({ children }: { readonly children: React.ReactNode }): React.Reac
     }}>
       <Backdrop />
       <div style={{ position: 'relative', width: '100%', maxWidth: 1100, margin: '0 auto', padding: '12px 14px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '.06em' }}>引退後の役割</div>
+        <div style={{ fontSize: 19, fontWeight: 900, letterSpacing: '.06em', textShadow: '0 2px 0 rgba(10,35,64,.6)' }}>引退後の役割</div>
         {/* ★常設レース表示（★フォームの画面 ＝ 極小・大きさは表 `race-strip-sizes.ts` が決める・裁定 ⑤） */}
         <div data-theme="uma"><RaceStrip /></div>
         {children}
