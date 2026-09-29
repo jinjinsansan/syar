@@ -5,7 +5,10 @@ import { checkOwnRaceSelection, ownRaceReasonText } from '@star/betting';
 import { Backdrop, BigButton, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { useSalesClosed } from '../../components/clock';
-import { BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_OWN_RACE_BET, CLAIM_SALES_CLOSED } from '../../lib/claims';
+import { BET_PER_PICK_EP, BET_TYPE_LABEL, CLAIM_BET_PER_PICK, CLAIM_BET_TYPE_RULE, CLAIM_OWN_RACE_BET, CLAIM_SALES_CLOSED, type VoteBetType } from '../../lib/claims';
+
+/** ★いま出す券種（★オーナー 2026-09-29「まずは単勝・複勝」） */
+const VOTE_BET_TYPES: readonly VoteBetType[] = ['win', 'place'];
 import { loadBetAllowance, loadBetScreen, oddsKey, placeBet, type BetAllowance, type BetScreenData } from '../../lib/bet-screen';
 
 const FRAME_COLORS = ['#f5f5f5', '#191919', '#d62828', '#1446b4', '#fad728', '#148c46', '#f08219', '#f596be'] as const;
@@ -24,6 +27,8 @@ export default function VotePage(): React.ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [picks, setPicks] = useState<readonly number[]>([]);
+  /** ★券種（★2026-09-29・単勝と複勝・馬券の流れ＝券種→馬番→金額→確認・デザイナーの bet-sheet の順） */
+  const [betType, setBetType] = useState<VoteBetType>('win');
   const [allowance, setAllowance] = useState<BetAllowance | null>(null);
   const [busy, setBusy] = useState(false);
   const [clientToken, setClientToken] = useState(() => crypto.randomUUID());
@@ -31,7 +36,7 @@ export default function VotePage(): React.ReactElement {
 
   const reload = (): void => {
     setError(null);
-    void loadBetScreen(null).then((fresh) => {
+    void loadBetScreen(null, VOTE_BET_TYPES).then((fresh) => {
       const nextRaceId = fresh.race?.id ?? null;
       if (currentRaceId.current !== nextRaceId) setPicks([]);
       currentRaceId.current = nextRaceId;
@@ -48,15 +53,16 @@ export default function VotePage(): React.ReactElement {
   useEffect(() => {
     if (race === null) { setAllowance(null); return; }
     let active = true;
-    void loadBetAllowance(race.id, 'win').then((value) => { if (active) setAllowance(value); })
+    setAllowance(null);
+    void loadBetAllowance(race.id, betType).then((value) => { if (active) setAllowance(value); })
       .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : String(cause)); });
     return () => { active = false; };
-  }, [race?.id]);
+  }, [race?.id, betType]);
 
   const ownGates = data?.ownGates ?? [];
   const check = checkOwnRaceSelection(picks, ownGates, EP_PER_PICK);
   const selected = picks[0] ?? null;
-  const selectedOdds = race && selected !== null ? race.odds.get(oddsKey('win', [selected])) ?? null : null;
+  const selectedOdds = race && selected !== null ? race.odds.get(oddsKey(betType, [selected])) ?? null : null;
   /** ★発売締切を過ぎたら 押せない（★締め切ったのに買えると読める姿を残さない・2026-09-29） */
   const salesClosed = useSalesClosed(race?.scheduledAt ?? null);
   const blocked = salesClosed || !data?.authenticated || race === null || selected === null || selectedOdds === null || !check.ok
@@ -71,12 +77,12 @@ export default function VotePage(): React.ReactElement {
      * ⚠️ ★券種・目・金額を出します（★何に賭けるのかを、★押す前に読める形で）。
      */
     if (!window.confirm(
-      `${race.raceName}\n単勝・${selected}番・${EP_PER_PICK} EP\n\n`
+      `${race.raceName}\n${BET_TYPE_LABEL[betType]}・${selected}番・${EP_PER_PICK} EP（${CLAIM_BET_TYPE_RULE[betType]}）\n\n`
       + '投票は取り消せません。この内容でよろしいですか？',
     )) return;
     setBusy(true); setMessage(null);
     try {
-      const result = await placeBet({ raceId: race.id, betType: 'win', selection: [selected], amount: EP_PER_PICK, clientToken });
+      const result = await placeBet({ raceId: race.id, betType, selection: [selected], amount: EP_PER_PICK, clientToken });
       if (!result.ok) setError(result.failure.message);
       else {
         setClientToken(crypto.randomUUID());
@@ -84,7 +90,7 @@ export default function VotePage(): React.ReactElement {
         setPicks([]);
         reload();
         setAllowance(null);
-        void loadBetAllowance(race.id, 'win').then(setAllowance)
+        void loadBetAllowance(race.id, betType).then(setAllowance)
           .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); });
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
@@ -114,7 +120,7 @@ export default function VotePage(): React.ReactElement {
         {race?.entries.map((entry) => {
           const frame = frameOf(entry.gate, race.fieldSize);
           const on = selected === entry.gate;
-          const odds = race.odds.get(oddsKey('win', [entry.gate]));
+          const odds = race.odds.get(oddsKey(betType, [entry.gate]));
           return <button key={entry.gate} type="button" aria-pressed={on} onClick={() => { setPicks(on ? [] : [entry.gate]); setMessage(null); }}
             style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 50, padding: '5px 10px', textAlign: 'left', border: 0, borderBottom: '1px solid var(--u-rule)', background: on ? '#fff4cf' : 'var(--u-paper)', color: 'var(--u-ink-dark)' }}>
             <span style={{ width: 26, height: 24, display: 'grid', placeItems: 'center', background: FRAME_COLORS[frame - 1], color: DARK_TEXT_FRAMES.has(frame) ? '#111' : '#fff', border: '1px solid var(--u-ink-dark)' }}>{frame}</span>
@@ -128,7 +134,14 @@ export default function VotePage(): React.ReactElement {
 
       <section aria-label="投票内容" style={{ flex: '1 1 250px', minWidth: 0, maxWidth: 420, padding: 12, alignSelf: 'flex-start', border: '2px solid rgba(251,247,236,.28)', borderRadius: 12, background: 'var(--u-panel)', fontSize: 12 }}>
         <strong>マークシート</strong>
-        <p>{selected === null ? '馬を1頭選んでください。' : `${selected}番を選択中`}</p>
+        {/* ★① 券種（★選ぶと 出馬表のオッズ・あと何 EP・確認の文が その券種に変わる） */}
+        <div role="tablist" aria-label="券種" style={{ display: 'flex', gap: 6, margin: '8px 0' }}>
+          {VOTE_BET_TYPES.map((t) => <button key={t} type="button" role="tab" aria-selected={betType === t}
+            onClick={() => { setBetType(t); setMessage(null); }}
+            style={{ flex: 1, minHeight: 44, borderRadius: 10, fontSize: 15, fontWeight: 900, border: '2px solid var(--u-gold)', background: betType === t ? 'var(--u-gold)' : 'transparent', color: betType === t ? 'var(--u-ink-dark)' : 'var(--u-ink)' }}>{BET_TYPE_LABEL[t]}</button>)}
+        </div>
+        <p>{CLAIM_BET_TYPE_RULE[betType]}</p>
+        <p>{selected === null ? '② 馬を1頭選んでください。' : `② ${selected}番を選択中（${BET_TYPE_LABEL[betType]}${selectedOdds === null ? '' : ` ${selectedOdds.toFixed(1)} 倍`}）`}</p>
         <p>{CLAIM_BET_PER_PICK}</p>
         <p>現在の残高: {data ? data.authenticated ? `${data.epBalance.toLocaleString('ja-JP')} EP` : 'ログイン後に表示' : '読み込み中'}</p>
         {ownGates.length > 0 && <p>{CLAIM_OWN_RACE_BET}。</p>}

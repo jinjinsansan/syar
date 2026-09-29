@@ -17,7 +17,7 @@ import {
   CLAIM_PP_FROM_RACES_ONLY, CLAIM_BREED_RETRY_SAME_YEAR, CLAIM_BREED_TEMP_NO_EP, CLAIM_BREED_PAY_AT_CONFIRM, CLAIM_NAME_NO_SELF_CHANGE,
   CLAIM_NAME_DUP_AFTER_SEND, CLAIM_BROODMARE_FEMALE_ONLY, CLAIM_ROLE_AFTER_RETIRE, CLAIM_ROLE_IMMEDIATE, CLAIM_POTENTIAL_CAP,
   CLAIM_DEFAULT_MENU, CLAIM_POINTS_SEPARATE,
-  BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_CARD_PUBLISH, CLAIM_DAILY_ONCE, CLAIM_TRAIN_EP_SHORT, CLAIM_ENTRY_NO_CANCEL, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
+  BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_BET_TYPE_RULE, CLAIM_CARD_PUBLISH, CLAIM_DAILY_ONCE, CLAIM_TRAIN_EP_SHORT, CLAIM_ENTRY_NO_CANCEL, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
 } from '../../web/src/lib/claims';
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -187,6 +187,19 @@ const MOVED: readonly Claim[] = [
 
 const CLAIMS: readonly Claim[] = [
   ...MOVED,
+  {
+    id: '㉕単勝は 1 着・複勝は 3 着以内（7 頭以下は 2 着以内）', text: CLAIM_BET_TYPE_RULE.place, name: 'CLAIM_BET_TYPE_RULE',
+    usedBy: ['apps/web/src/app/vote/page.tsx'],
+    backedBy: () => {
+      const bal = stripComments(read('packages/betting/src/balance.ts'));
+      const why: string[] = [];
+      if (!/return fieldSize >= PLACE_THREE_MIN_FIELD \? 3 : 2;/.test(bal)) why.push('★placeDepth が「8 頭以上で 3・それ未満で 2」でない');
+      if (!/export const PLACE_THREE_MIN_FIELD = 8;/.test(bal)) why.push('★PLACE_THREE_MIN_FIELD が 8 でない（★文の「7 頭以下」とずれる）');
+      if (!stripComments(read('apps/web/src/lib/claims.ts')).includes('${PLACE_THREE_MIN_FIELD - 1} 頭以下')) why.push('★文の頭数を 定数から出していない');
+      if (!CLAIM_BET_TYPE_RULE.win.includes('1 着')) why.push('★単勝の文が 1 着と言っていない');
+      return why;
+    },
+  },
   {
     id: '⑫調教の費用が残高に足りなければ 次の週は休養（★ST001 → rest・★画面は実際に引かれる額で比べ /earn へ導く）',
     text: CLAIM_TRAIN_EP_SHORT, name: 'CLAIM_TRAIN_EP_SHORT',

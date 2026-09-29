@@ -13,7 +13,17 @@
  *   ★言わなくてよいことを言わない（★「最終の数字です」は ★前に別の数字が在った含みで誤解させる・2026-09-29 に落とした）。
  */
 
-import { BET_CAP_OWN_RACE_EP, MIN_STAKE } from '@star/betting';
+import { BET_CAP_OWN_RACE_EP, MIN_STAKE, PLACE_THREE_MIN_FIELD } from '@star/betting';
+
+/**
+ * ★投票の券種（★2026-09-29・オーナー「まずは単勝・複勝」）と ★的中の説明（★settle.ts・balance.ts の placeDepth から）。
+ */
+export const BET_TYPE_LABEL = { win: '単勝', place: '複勝' } as const;
+export type VoteBetType = keyof typeof BET_TYPE_LABEL;
+export const CLAIM_BET_TYPE_RULE: Readonly<Record<VoteBetType, string>> = {
+  win: '選んだ馬が 1 着なら的中',
+  place: `選んだ馬が 3 着以内なら的中（${PLACE_THREE_MIN_FIELD - 1} 頭以下のレースは 2 着以内）`,
+};
 
 /**
  * ★1 口の額（★正典 §9.1: 全券種 100 EP・★`MIN_STAKE`）。★DB の制約 `bets_amount_range`（0001・100 以上・100 刻み・10,000 以下）が ★通す額。
