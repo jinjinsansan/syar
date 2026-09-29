@@ -89,6 +89,17 @@ export const TOOL_AFTERMATH = {
     // ★AU-7: ★主張には引用を付ける。★この行が変われば、★検査が壊れて落ちます
     countedBy: 'JSON.stringify(after) === JSON.stringify(before)',
   },
+  'dev-web-staging.mjs': {
+    mode: 'restores',
+    why: '★`next dev` が書き換える追跡ファイル 2 つ（tsconfig.json・next-env.d.ts）を ★立てる前に写し、★止めたとき（exit・SIGINT・SIGTERM）に 違っていれば書き戻す（2026-09-29）。'
+      + '✅ ★戻したかを ★中身を比べて決める（★違うときだけ書き・★「戻した」と出す）。',
+    countedBy: "if (readFileSync(f, 'utf8') !== text) { writeFileSync(f, text);",
+  },
+  'staging-measure-account.mjs': {
+    mode: 'consumes',
+    why: '★消費するもの: ★**staging の 測定用の口座 1 つ**（measure-390@star-staging.test・★はじめの設定で 初回の 1 頭と 2,000 EP が付く）。'
+      + '★測定のために ★わざと残す（★毎回 使い回し ★パスワードだけ付け直す）。★作った記録は 簿 LAYOUT-AUDIT-LOGGED-OUT-ONLY と この道具の見出し。★本番には作らない（assertNotProduction）',
+  },
   'verify-win-payout-live.mjs': {
     mode: 'restores',
     why: '★`begin` → 利用者・pending の馬券 2 枚・`settlePayouts`（★commit しない）→ ★**必ず `rollback`**（`finally`・2026-09-29）。'

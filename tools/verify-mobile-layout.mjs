@@ -26,6 +26,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { launch } from './lib/cdp.mjs';
+import { injectSession, readSessionArg, scopeLine } from './lib/login-session.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ? d : process.argv[i + 1]; };
 const BASE = process.env.AUDIT_BASE ?? 'http://localhost:3210';
@@ -339,10 +340,13 @@ console.log('\n=== ★モバイル幅での崩れ（実ブラウザ・読取専�
 console.log(`  ★${BASE} / ★幅 ${WIDTHS.join(', ')}px`);
 console.log('  ★横あふれ = documentElement.scrollWidth − innerWidth（★0 より大きい＝横スクロールが出る）\n');
 
+/** ★ログインした姿（★--session・staging の測定用の口座・`tools/staging-measure-account.mjs`）。★無ければ 未ログインの姿 */
+const SESSION = readSessionArg();
 const browser = await launch({ width: 500, height: 900 });
 const rows = [];
 try {
   await browser.goto('about:blank', 'true', { timeoutMs: 20000, settleMs: 200 });
+  if (SESSION !== null) { await injectSession(browser, BASE, SESSION); console.log(`★${scopeLine(SESSION)} で測ります`); }
   for (const [path, label] of pages) {
     for (const w of WIDTHS) {
       /**
@@ -458,6 +462,8 @@ for (const r of rows) {
 console.log('');
 console.log(`★横あふれが出た組み合わせ: ★**${broken} / ${checked}**`);
 /** ★数の射程（★2026-09-28・レビュー側: 測った範囲を広く見せない） */
-console.log('⚠️ ★この数は ★**未ログインの姿**で測ったもの。★ログインが要る画面の中身（★投票の中身・馬の詳細・厩舎 等）は ★含みません（★案内だけを測っています）。★ログイン後の姿を測る道は ★まだありません');
+console.log(SESSION === null
+  ? '⚠️ ★この数は ★**未ログインの姿**で測ったもの。★ログインが要る画面の中身（★投票の中身・馬の詳細・厩舎 等）は ★含みません（★ログインした姿は --session で測れます）'
+  : `★この数は ${scopeLine(SESSION)} で測ったもの（★staging の画面・★本番の画面ではない）`);
 if (UNCHECKED.length > 0) console.log(`⚠️ ★測っていない動的な経路 ${UNCHECKED.length} 本（★上の数に入っていません）: ${UNCHECKED.join(' ／ ')}。★--rid <レース id> / --hid <馬 id> で実在の id を渡してください`);
 console.log('⚠️ ★合否は出しません（★どこまで許すかは正典・オーナーの判断）。★この道具は測るだけです。');

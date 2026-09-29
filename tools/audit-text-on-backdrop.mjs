@@ -28,6 +28,7 @@
 import path from 'node:path';
 import sharp from 'sharp';
 import { launch } from './lib/cdp.mjs';
+import { injectSession, readSessionArg, scopeLine } from './lib/login-session.mjs';
 import { PLATE_LAYERS, SCREEN_OVERLAY_STOPS } from '../apps/web/src/components/uma/backdrop-plate.ts';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ? d : process.argv[i + 1]; };
@@ -116,8 +117,12 @@ const rows = [];
 const buriedRows = [];
 let sawNotice = false;
 const FAKE_STALE = process.argv.includes('--fake-stale');
+const SESSION = readSessionArg();
+const EXTRA = String(arg('extra-pages', '')).split(',').map((x) => x.trim()).filter((x) => x !== '');
+for (const x of EXTRA) if (!PAGES.includes(x)) PAGES.push(x);
 const browser = await launch({ width: WIDTHS[0], height: 844 });
 try {
+  if (SESSION !== null) { await injectSession(browser, BASE, SESSION); console.log(`★${scopeLine(SESSION)} で測ります`); }
   if (FAKE_STALE) {
     await browser.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/healthz*', requestStage: 'Request' }] });
     browser.on('Fetch.requestPaused', (ev) => {
@@ -171,7 +176,7 @@ console.log('\n=== ★芝の下に沈んだ文字（★elementFromPoint が芝�
 for (const r of buriedRows) console.log(`  🔴 ${r.p.padEnd(20)} ${String(r.w).padStart(4)}px  <${r.tag}>「${r.text}」`);
 const measured = new Set(rows.filter((r) => !r.note).map((r) => `${r.p}@${r.w}`)).size;
 console.log(`\n★沈んだ文字: ★${buriedRows.length} 件（★測れた画面 ${PAGES.length * WIDTHS.length} 面のうち ★文字を拾えた ${measured} 面・★芝の上にじかの文字が無い面は数えていない）`);
-console.log(`  ★射程: ★${WIDTHS.join('・')}px・★未ログイン・★${PAGES.length} 画面で測った数。★ログインが要る中身と ★測っていない幅は ★含まない`);
+console.log(`  ★射程: ★${WIDTHS.join('・')}px・${scopeLine(SESSION)}・★${PAGES.length} 画面で測った数。${SESSION === null ? '★ログインが要る中身と ' : ''}★測っていない幅は ★含まない`);
 if (FAKE_STALE && !sawNotice) {
   console.log('  ⚠️ ★--fake-stale なのに ★知らせの文を 1 件も拾っていません（★知らせが出ていない・★この実行は知らせを測れていない）');
 }

@@ -1194,6 +1194,8 @@ export const STATE_CHANGING = [
   'verify-sales-close-live.mjs',
   // ★当たりの経路（★settlePayouts・PP の払戻と EP の一方通行）を、★本物の DB で通す（★取引の中だけ。★必ず rollback・2026-09-29）
   'verify-win-payout-live.mjs',
+  // ★staging の測定用の口座（measure-390@star-staging.test）を作る／使い回し、★はじめの設定まで通し ★セッションを外へ書く（★ログインした姿を測るため・2026-09-29）
+  'staging-measure-account.mjs',
   // ★役割の画面の読む口（★`my_retired_horses`・`0074`）を、★本物の DB で確かめる（★取引の中だけ。★必ず rollback）。
   //   ★読む口の「変えられない理由」と、★実際に RPC を呼んだ理由を突き合わせる（★判定が 2 つに割れていないこと）
   'verify-my-retired-horses-live.mjs',
@@ -1264,6 +1266,7 @@ export const PRODUCTION_OPS = [
  *      READONLY / STATE_CHANGING / PRODUCTION_OPS のどれかです。
  */
 export const COMPONENT = [
+  { file: 'lib/login-session.mjs', why: '★ログインした姿で測る部品（★セッションを localStorage に入れる・射程の 1 行。★audit-text-on-backdrop と verify-mobile-layout が使う・2026-09-29）' },
   { file: 'lib/worker-lag.mjs', why: '★ワーカーの遅れを数える純関数（★ワーカーが読む所を package.json の依存から作り import で絞る・範囲を数える。★`verify-worker-lag.mjs` が使う・★網 worker-lag.test.ts・2026-09-29）' },
   { file: 'lib/args.mjs', why: '★コマンドライン引数の解析。★2026-08-20 に本番へ余計な移行を当てた事故の後、切り出した部品' },
   { file: 'lib/lineage-measure.mjs', why: '★D-121 ③ の測る部品（★% 点・母系の世代・参考の列の純関数。★`measure-lineage-plateau.mjs` が使う・★単体では走らせない）' },
@@ -1355,6 +1358,11 @@ export const SOURCE_MUTATING = [
       + '★2026-09-25、★門を通さず `build:web` を直で流して ★`tsconfig.json` が汚れ、★未コミット 56 件の山に混ざった。'
       + '★**それを commit すると Vercel が使う `.next` ではない道を指す**（★本番を壊す形）。'
       + '★だから ★門（`gate.mjs`）と ★この道具の ★**両方**が同じ部品を通る（★簿 `NEXT-BUILD-REWRITES-TRACKED-FILES`）',
+  },  {
+    file: 'dev-web-staging.mjs',
+    why: '★staging の DB に繋いだ画面を 3211 で立てる（★ログインした姿を測るため・2026-09-29）。★DB には触れないが、'
+      + '★**`next dev` が `apps/web/tsconfig.json` と `next-env.d.ts` を書き換える**ので、★写しを取り ★止めたときに書き戻す（★部品 `lib/next-rewrites.mjs` の NEXT_REWRITES）。'
+      + '★dev の間に戻すと next が見張っていて書き換え直すので ★止めるときに戻す',
   },
 ];
 

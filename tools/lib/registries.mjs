@@ -85,6 +85,7 @@ export const REGISTRIES = {
  */
 export const NOT_A_REGISTRY = {
   'args.mjs': '★引数の読み取り。★登録するものがない',
+  'login-session.mjs': '★ログインした姿で測る部品（★2026-09-29）。★登録するものがない（★セッションはファイルから読む）',
   'worker-lag.mjs': '★ワーカーの遅れを数える純関数（★2026-09-29）。★ワーカーが読む所は ★package.json と import から毎回作る（★一覧を持たない）',
   'user-eyes.mjs': '★0 行のビューの判定の純関数（★対象外／不合格／ok）。★母集団を持たない（★ビューの一覧は DB の `information_schema` から毎回引く）',
   'next-rewrites.mjs': '★`next build` が書き換える追跡ファイル 2 つを写して戻す部品（★2026-09-25）。'
