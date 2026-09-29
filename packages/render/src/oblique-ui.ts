@@ -340,6 +340,17 @@ export function drawCallBand<TImage>(
   // ON AIR x206 y594 h22 ＋ 音声レベル ＋「実況中」
   const afterLevel = drawOnAir(ctx, font, 206, H - 126 + oy, t, speaking);
   drawLabel(ctx, font, '実況中', afterLevel, H - 126 + oy + 15, HUD.paper70);
+  /**
+   * ★実況の行は ★右の余力ゲージ（x W-330）の手前で終える（★2026-09-29・オーナー「実況の文字が右端の 1190m に被る」）。
+   *   ★行ぜんぶ（★打ち終わりの長さ）で測って ★収まらなければ 字を縮める（★最小 0.6 倍・★打っている途中で大きさが変わらない）。
+   */
+  const captionRight = W - 346;
+  const fitScale = (parts: readonly CallPart[], base: (numbered: boolean) => number): number => {
+    let w = 0;
+    for (const part of parts) { ctx.font = font(base(part.role !== undefined), true); w += ctx.measureText(part.text).width; }
+    const room = captionRight - 206;
+    return w > room ? Math.max(0.6, room / w) : 1;
+  };
   // 直前の発言 x206 y627 19px/27（不透明 60%・上へ押し上げ）
   if (shown.length >= 2) {
     const prev = shown[0]!;
@@ -347,7 +358,8 @@ export function drawCallBand<TImage>(
     const sinceCur = currentStart === undefined ? 1 : t - currentStart;
     const push = Math.max(0, Math.min(1, sinceCur / 0.18));
     ctx.globalAlpha = baseAlpha * rise.alpha * 0.6 * push;
-    ctx.font = font(19, true);
+    const prevScale = fitScale(prev, () => 19);
+    ctx.font = font(Math.round(19 * prevScale), true);
     let cx = 206;
     const prevText = prev.map((p) => p.text).join('');
     const prevChars = prevStart === undefined ? prevText.length : typedCount(prevText.length, t - prevStart);
@@ -365,6 +377,7 @@ export function drawCallBand<TImage>(
   }
   // 現在の発言 x206 y658 28px/40（馬番は 34–36px・枠色）
   if (current !== undefined) {
+    const curScale = fitScale(current, (numbered) => (numbered ? 34 : 28));
     let cx = 206;
     let consumed = 0;
     for (const part of current) {
@@ -373,7 +386,7 @@ export function drawCallBand<TImage>(
       if (take <= 0) continue;
       const seg = part.text.slice(0, take);
       const numbered = part.role !== undefined;
-      ctx.font = font(numbered ? 34 : 28, true);
+      ctx.font = font(Math.round((numbered ? 34 : 28) * curScale), true);
       ctx.fillStyle = numbered ? (pal[part.role ?? ''] ?? HUD.paper) : HUD.paper;
       ctx.fillText(seg, cx, H - 62 + oy + 30);
       cx += ctx.measureText(seg).width;
