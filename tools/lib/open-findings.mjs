@@ -1759,6 +1759,19 @@ export const OPEN_FINDINGS = [
     owner: 'dev',
     until: '2026-12-31',
   },
+  {
+    id: 'PREVIEW-DEPLOYS-USE-PRODUCTION-DB',
+    what: '🔴 ★**Vercel の Preview（20 件）が 本番の DB を向いています**（★2026-09-29・開発側が読むだけで確認・レビュー側が起票を指示）。'
+      + '★古いコード ＋ 本番のデータの組み合わせが ★URL を知っている人に開ける。',
+    why: '✔ ★確かめたこと（★読むだけ・押していない）: ★いちばん新しい Preview（star-5my5yinrz-…vercel.app・85e4da9・09-26）の束の Supabase のホストは hfvvxwoulrjqznperici ＝ ★本番の束と同じ（★staging は pezntijq…）。'
+      + '★/api/healthz の env は preview。★その版は ★投票の口を閉じる前（6cf2c4c を含まない）で ★/races/[id]/bet が 200（★開く）・★開発用の /art-lab・/design-check・/lp-arcade が 200（★本番は 404）・/rig-lab は 404。★今日の直し（/vote の 100 EP 等）も含まない。'
+      + '★書き込みの規則はサーバー（★いまの place_bet・制約・締切）が持つので ★通る買い方は本番と同じだが、★古い画面の説明のまま 本番の EP が動きうる。'
+      + '★直し方の候補（★オーナーの操作）: ①Preview の環境変数を staging に向ける ②Preview の配備を止める ③Preview に Vercel の保護（認証）を掛ける。'
+      + '★①を採れば ★ログインした姿の測定は Preview で流せる（★手元の dev が要らない・簿 LAYOUT-AUDIT-LOGGED-OUT-ONLY）。'
+      + '--- ✅ ★**消す条件** --- ★Preview が本番の DB を向かなくなった（または開けなくなった）ことを 束のホストか 開けないことで確かめた日。',
+    owner: 'review',
+    until: '2026-10-15',
+  },
 ];
 
 /**
