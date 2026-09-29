@@ -108,25 +108,39 @@ describe('★小窓で本編を流す約束', () => {
    * 🔴 ⑦ ★小窓では ★文字を消す（★2026-09-28・デザイナー R-19 回答 Q1「字幕・順位表・馬名プレート・パドックの札・オッズ・着順ボードは消す」）。
    *   ★2 割の大きさでは読めない。★代わりに ★帯が映像の左上に「録画」札を 1 つ重ねる。
    */
-  it('🔴 ⑦ ★小窓では 字幕・HUD・パドックの札・出馬表・長い録画札を ★出さない（★帯が「録画」札を重ねる）', () => {
-    expect(PAGE).toContain("get('cutin') === 'off') || EMBED_STRIP;");
-    expect(PAGE).toContain('const hud = EMBED_STRIP ? { gauge: false, standings: false, calls: false, result: false }');
+  /**
+   * ★2026-09-30 書き換え（★オーナー「小窓と拡大を押して見れますが ①実況中継がないものがある」）:
+   *   ★下ろすのは ★**小さいままの間だけ**（`stripQuiet()`）。★拡大したら ★全画面の /race と同じ（★実況・HUD・カットイン）。
+   */
+  it('🔴 ⑦ ★小さいままの小窓では 字幕・HUD・パドックの札・出馬表を ★出さない・★拡大したら出す（★実況も）', () => {
+    expect(PAGE).toContain('function stripQuiet(): boolean { return EMBED_STRIP && !stripExpanded; }');
+    expect(PAGE, '★小窓を 定数で カットインなしにしない（★拡大しても出なくなる）').not.toContain("get('cutin') === 'off') || EMBED_STRIP;");
+    expect(PAGE).toContain('const hud = stripQuiet() ? { gauge: false, standings: false, calls: false, result: false }');
+    expect(PAGE).toContain('const cutIn = CUTIN_OFF || stripQuiet() || cutChange === undefined');
+    expect(PAGE).toContain('const startCutInActive = !CUTIN_OFF && !stripQuiet() && renderer');
     /** ★2026-09-29: ★拡大の間は 札を描く（★帯から expand が届く） */
     expect(PAGE).toContain('{ cards: !EMBED_STRIP || stripExpanded });');
-    expect(PAGE).toContain('drawRaceHeadlineChip(ctx, FONT, {'.replace('drawRaceHeadlineChip', '!EMBED_STRIP) drawRaceHeadlineChip'));
-    expect(PAGE).toContain('!EMBED_STRIP) drawCourseSectionTag(');
-    expect(PAGE).toContain('!replay.active && !cutInActive && !EMBED_STRIP) {');
-    expect(PAGE).toContain("intro.stage === 'gate-hold' && !EMBED_STRIP) {");
+    expect(PAGE).toContain('!stripQuiet()) drawRaceHeadlineChip(ctx, FONT, {');
+    expect(PAGE).toContain('!stripQuiet()) drawCourseSectionTag(');
+    expect(PAGE).toContain('!replay.active && !cutInActive && !stripQuiet()) {');
+    expect(PAGE).toContain("intro.stage === 'gate-hold' && !stripQuiet()) {");
     expect(PAGE).toContain('if (!EMBED_STRIP) drawEntryBoard(');
-    expect(PAGE).toContain('if (replay.active && !EMBED_STRIP) {');
+    expect(PAGE).toContain('if (replay.active && !stripQuiet()) {');
+    /** ★描く判定に ★`!EMBED_STRIP` を戻さない（★戻すと 拡大しても下ろしたまま＝①） */
+    expect(PAGE).not.toMatch(/&& !EMBED_STRIP\) (?:drawRaceHeadlineChip|drawCourseSectionTag)/);
     expect(PAGE).toContain('{real !== null && !EMBED_STRIP && <div style={REPLAY_BADGE_STYLE}>');
     expect(STRIP).toContain('{big && embedLive && !expanded && <span className="u-race-strip-stage-rec" aria-hidden>中継</span>}');
   });
 
-  /** 🔴 ⑧ ★2026-09-29 オーナー「あり得ないスピード」: ★小窓は跳びを覆うカットインが無いので、★暗転で覆う */
-  it('🔴 ⑧ ★小窓では 時計の跳び（editJumps）の前後を暗転で覆う（★真ん中は真っ暗）', () => {
-    expect(PAGE).toContain('if (EMBED_STRIP && renderer === \'v2\' && !replay.active && jumpAt !== undefined) {');
-    expect(PAGE).toContain('const fade = Math.min(1, 2 * (1 - Math.abs(raceD - jumpAt.at) / jumpLead));');
+  /**
+   * 🔴 ⑧ ★時計の跳びは ★小窓でも ★全画面と同じ コース図の 1 枚で覆う（★2026-09-30 書き換え）。
+   *   ★09-29 は 小窓だけ暗転で覆った → ★オーナー「②途中で真っ黒の瞬間 ③ラストスパートで異常なスピード」（★暗転の縁で 跳びの前後が見えた）。
+   */
+  it('🔴 ⑧ ★時計の跳び（editJumps）は 小窓でも コース図で覆う（★暗転は無い）', () => {
+    expect(PAGE, '★暗転が戻った').not.toContain('const fade = Math.min(1, 2 * (1 - Math.abs(raceD - jumpAt.at) / jumpLead));');
+    expect(PAGE).not.toMatch(/if \(EMBED_STRIP && renderer === 'v2' && !replay\.active && jumpAt !== undefined\)/);
+    /** ★跳びを覆う 1 枚は ★小窓で下ろさない（`stripQuiet` を掛けない） */
+    expect(PAGE).toContain("const jumpCutInActive = !CUTIN_OFF && renderer === 'v2' && !replay.active && jumpAt !== undefined;");
     /** ★跳びの窓は カットインと同じ 1 か所（★片方だけ直すと覆えない跳びが出る・R-30） */
     expect(PAGE).toContain('const jumpAt = built.editJumps.find((j) => raceD >= j.at - jumpLead && raceD < j.at + jumpLead);');
     /** ★芝は跳びの区間で注視点の進みに合わせる（★`visual-scroll.ts`・後退しない） */

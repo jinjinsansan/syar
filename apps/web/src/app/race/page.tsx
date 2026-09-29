@@ -317,6 +317,13 @@ const EMBED_STRIP = QS?.get('embed') === STRIP_EMBED_PARAM_VALUE;
 /** ★小窓の本編が 帯で「拡大」されているか（★帯から expand / shrink が届く・★拡大の間だけ パドックの札を描く・2026-09-29） */
 let stripExpanded = false;
 /**
+ * ★**小窓が小さいままか**（★拡大していない小窓だけ ★字幕・実況・HUD を下ろす・★デザイナー R-19 回答 Q1）。
+ *   ★2026-09-30 オーナー「小窓と拡大を押して見れますが ①実況中継がないものがある ②途中で真っ黒の瞬間 ③ラストスパートで異常なスピード」:
+ *   ★それまで 小窓は ★拡大しても 実況・カットインを ★ずっと下ろし（①）、★時計の跳びを ★コース図でなく暗転で覆っていた（②③）。
+ *   → ★拡大したら ★全画面の /race と同じ（★実況・HUD・カットイン）。★時計の跳びは ★小さいままでも ★全画面と同じコース図で覆う。
+ */
+function stripQuiet(): boolean { return EMBED_STRIP && !stripExpanded; }
+/**
  * ★**小窓では 斜め前の馬を読まない**（★2026-09-28・レビュー側の決定・★実測 1.72MB）。★150px の小窓では 正面寄りのショットも ★真横の素材で描く
  *   （★`?directional=side` と同じ扱い・★カットの数と画角は変わらない）。
  */
@@ -396,9 +403,11 @@ const TELOP_ALPHA: number | undefined = (() => {
   const v = Number(new URLSearchParams(window.location.search).get('telop'));
   return Number.isFinite(v) && v > 0 && v <= 1 ? v : undefined;
 })();
-/** ★小窓（`?embed=strip`）でも出さない（★字幕・2 割の大きさでは読めない・★デザイナー R-19 回答 Q1） */
-const CUTIN_OFF = (typeof window !== 'undefined'
-  && new URLSearchParams(window.location.search).get('cutin') === 'off') || EMBED_STRIP;
+/**
+ * ★`?cutin=off` だけ。★小窓は ★`stripQuiet()` で コマごとに見る（★2026-09-30・下の註記）。
+ */
+const CUTIN_OFF = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('cutin') === 'off';
 const SIDE_ONLY = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('directional') === 'side';
 const PLACEMENT_OVERRIDE: HorsePlacementMode | undefined = typeof window !== 'undefined'
@@ -5299,7 +5308,7 @@ function RaceView({ setup, real }: {
        * ⚠️ ★短縮でない台本（★v6 / v8 の既定）は ★**1 ビットも変えていません**。
        *    ★あちらは直線を飛ばさないので、★コーナーを覆うのはカットインだけです。
        */
-      const cutIn = CUTIN_OFF || cutChange === undefined || sinceCutSec < 0
+      const cutIn = CUTIN_OFF || stripQuiet() || cutChange === undefined || sinceCutSec < 0
         || sinceCutSec >= cutInSpanSec || PACE_SHORT
         ? undefined : raceCutInAt(cutChange.from, cutChange.to,
           /** ★見出しは ★**画面が出している区間名**から作ります（★カメラ名で断定しない・★R-30） */
@@ -5310,7 +5319,7 @@ function RaceView({ setup, real }: {
        *    ★ここはその「間」に、★見る人がいちばん知りたいこと＝★**自分の馬**を置きます。
        */
       /** ★自分の馬が出ていないレースは ★このカードを出しません（★「あなたの馬」の札・2026-09-28） */
-      const startCutInActive = !CUTIN_OFF && renderer === 'v2' && !replay.active
+      const startCutInActive = !CUTIN_OFF && !stripQuiet() && renderer === 'v2' && !replay.active
         && raceD > 0 && raceD < RACE_CUTIN_SEC && mineGate !== undefined;
       /**
        * ★**時計の跳びを覆う 1 枚**（★`?pace=short`・★2026-09-12・オーナー指示）
@@ -5574,20 +5583,9 @@ function RaceView({ setup, real }: {
       /** ⚠️ ★全画面のときは帯を重ねません（★デザイナーの絵の上に別の帯が乗ります） */
       if (!cutInCoversWorld) paintTelop?.();
       /**
-       * ★**小窓は時計の跳びを暗転で覆う**（★2026-09-29・オーナー「あり得ないスピード」）。
-       *   ★小窓はカットインを出さない（★R-19 Q1）ので、★跳びが裸で見え、馬群が 1 コマで 1,000m 飛んでいた。
-       *   ★字は出さず、★跳びの前後だけ暗くする（★真ん中は真っ暗）。
+       * ⚠️ ★2026-09-29〜30 は ★小窓だけ 時計の跳びを ★暗転で覆っていた → ★オーナー「途中で真っ黒の瞬間」。
+       *   ★いまは ★全画面と同じ コース図の 1 枚（`jumpCutInActive`）で覆う（★`stripQuiet` の註記）。
        */
-      if (EMBED_STRIP && renderer === 'v2' && !replay.active && jumpAt !== undefined) {
-        const fade = Math.min(1, 2 * (1 - Math.abs(raceD - jumpAt.at) / jumpLead));
-        if (fade > 0) {
-          ctx.save();
-          ctx.globalAlpha = fade;
-          ctx.fillStyle = '#000';
-          ctx.fillRect(0, 0, W, H);
-          ctx.restore();
-        }
-      }
       /**
        * ⚠️ ★**カットインが覆う境目では、白い閃光を出しません**（★2026-09-11）。
        *    ★閃光はこのあとに ★**上から**塗るので、★出したままだとカットインが
@@ -5670,7 +5668,7 @@ function RaceView({ setup, real }: {
     });
     }
 
-    if (v2StartHold && showEntryBoard && intro.stage === 'gate-hold' && !EMBED_STRIP) {
+    if (v2StartHold && showEntryBoard && intro.stage === 'gate-hold' && !stripQuiet()) {
       // ★出馬表オーバーレイ（カウントダウン中だけ）。開扉で自動的に閉じる
       drawEntryBoard(ctx, art.pal as Record<string, string>, vp, FONT,
         Array.from({ length: FIELD }, (_, i) => ({
@@ -5723,11 +5721,11 @@ function RaceView({ setup, real }: {
       if (sectionTagRef.current.label !== label) sectionTagRef.current = { label, sinceSec: sectionTagRef.current.label === '' ? d - 1 : d };
       const hudSince = raceD - HUD_SETTLE_SEC;
       // ★ゴール後はライブ HUD（見出し・区間タグ・コース図）を落とす（motion-spec §6: ゴール〜2.4s は勝馬テロップのみ）
-      if (!raceOver && !contestFocusHud && !cutInCoversWorld && !EMBED_STRIP) drawRaceHeadlineChip(ctx, FONT, {
+      if (!raceOver && !contestFocusHud && !cutInCoversWorld && !stripQuiet()) drawRaceHeadlineChip(ctx, FONT, {
         raceNo: RACE_META.raceNo, raceName: RACE_META.raceName,
         distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${built.distanceM}m`,
       }, { timeSec: d, sinceSec: hudSince });
-      if (!raceOver && !contestFocusHud && !cutInCoversWorld && !EMBED_STRIP) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
+      if (!raceOver && !contestFocusHud && !cutInCoversWorld && !stripQuiet()) drawCourseSectionTag(ctx, art.pal as Record<string, string>, FONT, label,
         { timeSec: d, sinceSec: Math.min(hudSince, d - sectionTagRef.current.sinceSec) });
     }
     /**
@@ -5735,7 +5733,7 @@ function RaceView({ setup, real }: {
      *   > リプレイ中にリプレイと表示されていないのでリプレイかどうかわからない
      *   ⚠️ ★HUD の描画がひととおり終わったあとに出します（順位表などに隠れないため）。
      */
-    if (replay.active && !EMBED_STRIP) {
+    if (replay.active && !stripQuiet()) {
       const pal = art.pal as Record<string, string>;
       drawFinishReplayBadge(ctx, vp, FONT, replay.progress, {
         /** ★色は `palette.json` から引きます。この層で色を作りません（アートバイブル） */
@@ -5749,7 +5747,7 @@ function RaceView({ setup, real }: {
      *   描画に使った位置をそのまま点にする（順位計算はしない）。
      */
     /** ★リプレイ中はコース図も下ろします（馬に重なるため・上の `hud` の注記と同じ理由） */
-    if (v2Minimap !== undefined && !raceOver && !replay.active && !cutInActive && !EMBED_STRIP) {
+    if (v2Minimap !== undefined && !raceOver && !replay.active && !cutInActive && !stripQuiet()) {
       /**
        * ★**馬にかかるときだけ薄くします**（★2026-09-09・オーナー判断）。
        *   ★HUD は画面の 36% を覆っています（★実況の帯 20%・順位表 7.5%・コース図 6.3%・実測）。
@@ -5784,7 +5782,7 @@ function RaceView({ setup, real }: {
      * ★**残り距離のカウントダウン**（★台本 v9・★残り 200m から・★デザイナー回答 D-6）。
      * ⚠️ ★数字は ★**描いている先頭の残り距離**です（★未来を読まない）。★決勝線を越えたら消えます。
      */
-    if (sideOnlyScript && renderer === 'v2' && !raceOver && !cutInCoversWorld && !replay.active && !EMBED_STRIP) {
+    if (sideOnlyScript && renderer === 'v2' && !raceOver && !cutInCoversWorld && !replay.active && !stripQuiet()) {
       drawGoalCountdown(ctx, FONT, { viewport: vp, metersLeft: built.distanceM - visualLead });
     }
     drawRendererBadge(ctx, renderer, renderer === 'v2' ? v2ShotId ?? 'v2' : `legacy/${courseSection}`);
@@ -5823,7 +5821,7 @@ function RaceView({ setup, real }: {
        *   ★`staminaAt` は ★`null` を通さないので、★**呼ぶ前に分けます**。
        */
       /** ★小窓では ★HUD を全部下ろす（★順位表・馬名プレート・ゲージ・実況・結果・★デザイナー R-19 回答 Q1） */
-      const hud = EMBED_STRIP ? { gauge: false, standings: false, calls: false, result: false }
+      const hud = stripQuiet() ? { gauge: false, standings: false, calls: false, result: false }
         : built.gauge === null ? { ...hudBase, gauge: false } : hudBase;
       // ★ゲージはエンジンの staminaAt() を読むだけ（D-072）。★null のときは読みません
       const g = built.gauge === null ? null : staminaAt(built.gauge, Math.max(0, metersLeft));
