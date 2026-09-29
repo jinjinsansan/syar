@@ -75,9 +75,13 @@ const layerAt = (pos) => (LAYERS.find(([, y, h]) => pos >= y && pos < y + h) ?? 
 
 /** ★ページの中で ★じかの文字を集める（★ここはページへ送る文字列。★註記にバッククォートを書かない） */
 const COLLECT = `(() => {
-  const root = [...document.querySelectorAll('[data-theme="uma"]')].find((el) => !el.parentElement || !el.parentElement.closest('[data-theme="uma"]'));
+  /** ★旧い画面は 殻（.story-shell）が 固定の芝（.story-backdrop）を敷く（★2026-09-29・裁定 6）。★根は殻・芝はその層 */
+  const shell = document.querySelector('.story-shell');
+  const shellBackdrop = shell ? shell.querySelector(':scope > .story-backdrop') : null;
+  const fixed = shellBackdrop !== null;
+  const root = fixed ? shell : [...document.querySelectorAll('[data-theme="uma"]')].find((el) => !el.parentElement || !el.parentElement.closest('[data-theme="uma"]'));
   if (!root) return JSON.stringify({ root: false });
-  const backdrop = root.firstElementChild && root.firstElementChild.getAttribute('aria-hidden') !== null ? root.firstElementChild : null;
+  const backdrop = fixed ? shellBackdrop : root.firstElementChild && root.firstElementChild.getAttribute('aria-hidden') !== null ? root.firstElementChild : null;
   if (!backdrop) return JSON.stringify({ root: true, backdrop: false });
   const out = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -104,7 +108,7 @@ const COLLECT = `(() => {
     const hit = document.elementFromPoint(v.left + Math.min(v.width / 2, 8), v.top + v.height / 2);
     const buried = hit !== null && backdrop.contains(hit);
     out.push({
-      buried,
+      buried, fixed,
       text: text.slice(0, 24), tag: el.tagName.toLowerCase(), panel,
       y: ((r.top + r.height / 2 - rr.top) / rr.height) * 100,
       color: [Number(m[0]), Number(m[1]), Number(m[2])], size: parseFloat(cs.fontSize), weight: Number(cs.fontWeight) || 400,
@@ -115,6 +119,7 @@ const COLLECT = `(() => {
 
 const rows = [];
 const buriedRows = [];
+const picked = [];
 let sawNotice = false;
 const FAKE_STALE = process.argv.includes('--fake-stale');
 const SESSION = readSessionArg();
@@ -151,15 +156,26 @@ try {
       const res = JSON.parse(await browser.evaluate(COLLECT));
       if (!res.root) { rows.push({ p, w, note: '★馬物語の根が無い' }); continue; }
       if (!res.backdrop) { rows.push({ p, w, note: '★芝（Backdrop）が無い' }); continue; }
+      /** ★拾った文字の数（★板の上も含む）。★じかの文字が 0 件の面が「拾えずに 0」でないことの対照 */
+      picked.push(`${p}@${w}: ${res.items.length} 件（板の上 ${res.items.filter((x) => x.panel !== null).length}・殻 ${res.items.some((x) => x.fixed) ? 'あり' : 'なし'}）`);
       for (const it of res.items) {
         if (it.buried) buriedRows.push({ p, w, text: it.text, tag: it.tag });
         if (it.text.startsWith('新しい版があります')) sawNotice = true;
         if (it.panel !== null) continue;
-        const pos = Math.max(0, Math.min(100, it.y));
-        const layer = layerAt(pos);
-        const o = overlayAt(pos);
-        const bg = over(o.rgb, o.a, BRIGHT.get(layer));
-        const cr = ratio(it.color, bg);
+        /**
+         * ★固定の芝（★殻）は ★画面を送ると文字の下の層が変わる → ★どの高さに来ても読めるか＝★いちばん悪い高さで判定する。
+         *   ★高さは 0〜100% を 1% 刻みで見る（★層の境目を飛ばさない）。
+         */
+        const judgeAt = (at) => {
+          const o = overlayAt(at);
+          return { at, layer: layerAt(at), cr: ratio(it.color, over(o.rgb, o.a, BRIGHT.get(layerAt(at)))) };
+        };
+        const worst = it.fixed
+          ? Array.from({ length: 101 }, (_, k) => judgeAt(k)).reduce((a, b) => (b.cr < a.cr ? b : a))
+          : judgeAt(Math.max(0, Math.min(100, it.y)));
+        const pos = worst.at;
+        const layer = worst.layer;
+        const cr = worst.cr;
         const large = it.size >= 24 || (it.size >= 18.66 && it.weight >= 700);
         const need = large ? 3 : 4.5;
         rows.push({ p, w, text: it.text, tag: it.tag, y: pos.toFixed(0), layer, size: it.size, weight: it.weight, cr: cr.toFixed(2), need, pass: cr >= need });
@@ -191,6 +207,8 @@ console.log(`  ★射程: ★${WIDTHS.join('・')}px・${scopeLine(SESSION)}・�
  */
 const unmeasurable = rows.filter((r) => r.note !== undefined);
 console.log(`  ⚠️ ★測れない面: ★${unmeasurable.length} 面（★芝が無い＝沈み・明度を測っていない・★0 と読まない）${unmeasurable.length > 0 ? `: ${unmeasurable.map((r) => `${r.p}（${r.note.replace(/★/g, '')}）`).join('・')}` : ''}`);
+console.log('\n=== ★拾った文字の数（★対照）===');
+for (const line of picked) console.log(`  ${line}`);
 if (FAKE_STALE && !sawNotice) {
   console.log('  ⚠️ ★--fake-stale なのに ★知らせの文を 1 件も拾っていません（★知らせが出ていない・★この実行は知らせを測れていない）');
 }

@@ -81,6 +81,13 @@ export interface ScreenRecord {
  *    ★`screen-generations.test.ts` が ★`app/**\/page.tsx` の実物と突き合わせます
  *    （★簿に無い画面が在ったら落ちます ＝ ★黙って画面を増やせません）。
  */
+/**
+ * ★2026-09-29: ★殻（story-shell）が芝＋紺を敷いた面（★裁定 6・最小限の着せ替え）。
+ *   ★**中は旧部品のまま**（★components/uma を読まない）なので ★verdict は rebuild のまま。★見た目の作り直しはデザイナー待ち。
+ *   ⚠️ ★デザイナー便 R-21 の添付は ★この着せ替えの前の姿（★次の便の冒頭で伝える）。
+ */
+const RESKIN_0929 = '★2026-09-29 殻で芝＋紺・本文は板・10px 以上（★最小限・中は旧部品）。';
+
 export const SCREENS: readonly ScreenRecord[] = [
   // ── 新世代（R-14・`components/uma`）────────────────────────────
   { route: '/', verdict: 'new', why: '★玄関の LP（★馬物語）' },
@@ -127,7 +134,7 @@ export const SCREENS: readonly ScreenRecord[] = [
   {
     route: '/training',
     verdict: 'rebuild',
-    why: '🔴 ⚠️ ★**`/train` へ転送してはいけません**（★2026-09-25 に一度やって戻しました）。'
+    why: RESKIN_0929 + '🔴 ⚠️ ★**`/train` へ転送してはいけません**（★2026-09-25 に一度やって戻しました）。'
       + '★`/train` は「まだ見た目だけ」で（★その画面の註記が自分でそう書いている）、'
       + '★`rpc(` も `Repo` も呼びません。★一方 ここは ★**`rpc(\'set_training_order\')` を呼ぶ唯一の画面**です。'
       + '★転送すると ★**調教の指示を出す口が消え、育成のループが止まります**。'
@@ -135,14 +142,14 @@ export const SCREENS: readonly ScreenRecord[] = [
   },
   { route: '/records', verdict: 'rebuilt', why: '★記録。★2026-09-27 に ★引き渡し資料 §5 の骨格（馬物語 UI）へ移した（★読み込み・集計は変えていない）' },
   { route: '/entry', verdict: 'rebuilt', why: '★出走登録。★2026-09-27 に ★引き渡し資料 §5 の骨格（馬物語 UI）へ移した（★登録の処理は変えていない）' },
-  { route: '/stable', verdict: 'rebuild', why: '★厩舎の一覧。★`/setup` と `foal-invite` から来る' },
-  { route: '/stable/[horseId]', verdict: 'rebuild', why: '★1 頭の詳細' },
+  { route: '/stable', verdict: 'rebuild', why: RESKIN_0929 + '★厩舎の一覧。★`/setup` と `foal-invite` から来る' },
+  { route: '/stable/[horseId]', verdict: 'rebuild', why: RESKIN_0929 + '★1 頭の詳細' },
   { route: '/stable/breed', verdict: 'rebuilt', why: '★配合。★血統ループの本体。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
   { route: '/stable/foal', verdict: 'rebuilt', why: '★はじめての 1 頭の生産（★案 A・D-120）。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
   { route: '/stable/name', verdict: 'rebuilt', why: '★仔の命名。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
   { route: '/stable/roles', verdict: 'rebuilt', why: '★引退後の役割。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
-  { route: '/stable/retired', verdict: 'rebuild', why: '★引退馬の一覧' },
-  { route: '/stable/market', verdict: 'rebuild', why: '✅ ★2026-09-26 に ★**実データへ繋ぎました**（★`market-screen`）。'
+  { route: '/stable/retired', verdict: 'rebuild', why: RESKIN_0929 + '★引退馬の一覧' },
+  { route: '/stable/market', verdict: 'rebuild', why: RESKIN_0929 + '✅ ★2026-09-26 に ★**実データへ繋ぎました**（★`market-screen`）。'
     + '★D-122 ④「空の店へ送らない」は ★満たしました（★出品が 0 のときは そう言います）。'
     + '🔴 ★**見た目は仮**（★依頼 R-17）— ★値段 14 通り × ほぼ 1 頭で ★旧い「帯 × 3 口」の前提が崩れている' },
   /**
@@ -169,7 +176,7 @@ export const SCREENS: readonly ScreenRecord[] = [
   {
     route: '/races/[id]',
     verdict: 'rebuild',
-    why: '🔴 ★**新版がありません**（`/vote` はレースを指定できない — ★いま売っているレースを読む）。'
+    why: RESKIN_0929 + '🔴 ★**新版がありません**（`/vote` はレースを指定できない — ★いま売っているレースを読む）。'
       + '⚠️ ★**新世代の `race-strip` がここを指している**ので、★作り直しの優先度が高い。'
       + '🔴 ★**`/odds/[id]` へ転送してはいけません**（★2026-09-25 に比べました）: ★重なるのは'
       + '★枠・人気・オッズだけで、★**着順・照合（Provably Fair）・締切まで**は ★新版に在りません。'

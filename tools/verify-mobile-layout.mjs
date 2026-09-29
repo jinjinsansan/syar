@@ -69,6 +69,8 @@ const PAGES = [
   ['/stable/name', '★命名'],
   ['/stable/roles', '★引退後の役割'],
   ['/stable/market', '★馬を迎える'],
+  /** ★2026-09-29: ★殻の着せ替え（裁定 6）の 7 面に入るのに 一覧に無く、★--path で 0/0 と出た */
+  ['/stable/retired', '★引退馬'],
   ['/training', '★調教'],
   ['/entry', '★出走登録'],
   ['/records', '★戦績'],
