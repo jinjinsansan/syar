@@ -70,6 +70,8 @@ import {
   withPhasePrefix,
   narratorPortrait,
   narratorCastForRace,
+  narratorCastForRaceNo,
+  ACTIVE_NARRATOR_CASTS,
   NARRATOR_NAMES,
   NARRATOR_ROLES,
   type NarratorCast,
@@ -1066,6 +1068,8 @@ interface RealReplay {
    * ⚠️ ★着順・タイムには ★1 ビットも効きません（★それはサーバーの行を読むだけ）。
    */
   readonly seed: number;
+  /** ★その日の何 R か（★`slotOfDay + 1`・★実況の写真の版とイラストの版を交互に出す） */
+  readonly raceNoOfDay: number;
 }
 
 /**
@@ -2446,6 +2450,8 @@ function realPageOf(data: RealRaceData): { readonly setup: PageSetup; readonly r
       focusGate: data.focusGate,
       trackCondition: data.trackCondition,
       seed: replaySeedOf(data.id),
+      /** ★その日の何 R か（★実況の 2 版を交互に出す鍵・2026-09-29） */
+      raceNoOfDay: Number.parseInt(data.raceNo, 10),
     },
   };
 }
@@ -2582,7 +2588,7 @@ function RaceView({ setup, real }: {
      * ★口パク用の立ち絵（4 名 × 表情 3 × 口 2 ＝ 24 枚）。
      *   揃わなければ undefined で従来の 1 枚に落とす（読み込み失敗で演出を止めない）。
      */
-    narratorSets?: Record<NarratorCast, NarratorSet<HTMLImageElement>>;
+    narratorSets?: Partial<Record<NarratorCast, NarratorSet<HTMLImageElement>>>;
     startingGate: HTMLImageElement;
     raceBackstretch: HTMLImageElement;
     raceCornerExit: HTMLImageElement;
@@ -2672,7 +2678,8 @@ function RaceView({ setup, real }: {
    * ⚠️ ★以前はシードで 4 名を回していました（★オーナー指示 2026-08-22「1 レースで 1 人」は守ったまま）。
    *    ★スターパークはシード 42 で選ばれていた人（d）なので、★既定の鞍の実況者は変わりません。
    */
-  const cast = VENUE_LOOK.cast;
+  /** ★2026-09-29: ★実況は 川崎 タカシ（写真の版とイラストの版を ★レースごとに交互・`narrator.ts`）。★見本の道は写真の版 */
+  const cast = narratorCastForRaceNo(real !== null ? real.raceNoOfDay : 1);
   /**
    * ★`ownGate` は ★**カメラの主役**（★位置の組み立て・カメラ・実況が追う馬）。★実レースは ★自分の馬 か ★1 着（`focusGate`）。
    * ★**「あなたの馬」と描くのは `mineGate` だけ**（★自分の馬が出ていないレースは `undefined` ＝ ★1 つも描かない・2026-09-28）。
@@ -3216,7 +3223,8 @@ function RaceView({ setup, real }: {
        */
       const loaded = await Promise.all([
         loadImg(`/art/race-title-spring-v1.png?v=${ASSET_VERSION}`),
-        loadImg(`/art/race-narrator-v1.png?v=${ASSET_VERSION}`),
+        /** ★立ち絵が揃わないときの 1 枚も 川崎 タカシ（★旧の人物を出さない・2026-09-29） */
+        loadImg(`/art/narrator-tp-closed.webp?v=${ASSET_VERSION}`),
         loadImg(`/art/starting-gate-side-v1.png?v=${ASSET_VERSION}`),
         loadImg(`/art/race-backstretch-side-v1.png?v=${ASSET_VERSION}`),
         loadImg(`/art/race-corner-exit-side-v1.png?v=${ASSET_VERSION}`),
@@ -3249,12 +3257,13 @@ function RaceView({ setup, real }: {
        */
       const narratorSets = await (async () => {
         const exprs = ['normal', 'hot', 'shout'] as const;
-        const casts = ['a', 'b', 'c', 'd'] as const;
+        /** ★2026-09-29: ★読むのは 川崎 タカシ の 2 版だけ（★閉じた口は 3 表情で 1 枚を分け合う・WebP） */
+        const casts = ACTIVE_NARRATOR_CASTS;
         const loadCast = async (cast: typeof casts[number]) => {
           const pairs = await Promise.all(exprs.map(async (expr) => {
             const [closed, open] = await Promise.all([
-              loadImg(`/art/narrator-${cast}-${expr}-closed.png?v=${ASSET_VERSION}`).catch(() => null),
-              loadImg(`/art/narrator-${cast}-${expr}-open.png?v=${ASSET_VERSION}`).catch(() => null),
+              loadImg(`/art/narrator-${cast}-closed.webp?v=${ASSET_VERSION}`).catch(() => null),
+              loadImg(`/art/narrator-${cast}-${expr}-open.webp?v=${ASSET_VERSION}`).catch(() => null),
             ]);
             return closed === null || open === null ? undefined : { closed, open };
           }));

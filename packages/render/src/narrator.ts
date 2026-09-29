@@ -20,14 +20,26 @@ export type NarratorExpression = 'normal' | 'hot' | 'shout';
  *   C 進行 遠山 かなえ … 発走前の紹介・着順確定の締め
  *   D 現地 南 ひかる   … パドック・ゲート入り
  */
-export type NarratorCast = 'a' | 'b' | 'c' | 'd';
+export type NarratorCast = 'a' | 'b' | 'c' | 'd' | 'tp' | 'ti';
 
 export const NARRATOR_NAMES: Readonly<Record<NarratorCast, string>> = {
-  a: '星野 亮太', b: '大鷹 源三', c: '遠山 かなえ', d: '南 ひかる',
+  a: '星野 亮太', b: '大鷹 源三', c: '遠山 かなえ', d: '南 ひかる', tp: '川崎 タカシ', ti: '川崎 タカシ',
 };
 export const NARRATOR_ROLES: Readonly<Record<NarratorCast, string>> = {
-  a: '実況', b: '解説', c: '進行', d: '現地',
+  a: '実況', b: '解説', c: '進行', d: '現地', tp: '実況', ti: '実況',
 };
+
+/**
+ * ★**実況は 川崎 タカシ**（★2026-09-29・オーナー「今使っているキャラクターを全て却下し、川崎タカシという人物にします」
+ *   「写真をそのまま使い口パクをつける＆その写真を元にイラスト化 この 2 種類を作って、交互に実況中継させればいいです」）。
+ *   ★`tp` … 写真の版 ／ ★`ti` … イラストの版（★どちらも素材はオーナー提供・口の開きは閉じた絵に口の中だけを描き足したもの）。
+ *   ★**レースごとに交互**（★その日の何 R かの偶奇・★レース中は替えない＝「1 レースに 1 人」も守る）。
+ *   ⚠️ ★旧 4 名（a〜d）の絵はもう読みません（★型と名前は ★競馬場の見た目 `venue-look.ts` が参照するため残す）。
+ */
+export const ACTIVE_NARRATOR_CASTS = ['tp', 'ti'] as const satisfies readonly NarratorCast[];
+export function narratorCastForRaceNo(raceNo: number): NarratorCast {
+  return Number.isInteger(raceNo) && Math.abs(raceNo) % 2 === 0 ? 'ti' : 'tp';
+}
 
 /**
  * ★**1 レースに 1 人**（オーナー指示 2026-08-22「ナレーターは 1 レースで 1 人でいいです」）。

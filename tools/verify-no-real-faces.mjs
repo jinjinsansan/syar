@@ -47,8 +47,34 @@ const PORTRAIT_ASSETS = (() => {
       }
     }
   }
+  /** ★2026-09-29: ★実況 川崎 タカシ（★写真の版 tp・イラストの版 ti・閉じた口 1 枚 ＋ 開いた口 3 表情） */
+  for (const [id, who] of [['tp', '実況 川崎 タカシ（写真の版）'], ['ti', '実況 川崎 タカシ（イラストの版）']]) {
+    out.push({ file: `apps/web/public/art/narrator-${id}-closed.webp`, label: `${who} 口閉` });
+    for (const [e, ja] of exprs) out.push({ file: `apps/web/public/art/narrator-${id}-${e}-open.webp`, label: `${who} ${ja}・口開` });
+  }
   return out;
 })();
+
+/**
+ * ★**写真でも通す 名指しの除外**（★網は緩めない・★1 件ずつ・★消す条件つき）。
+ *
+ * 【川崎 タカシ（写真の版）】
+ *   ★根拠は ★**オーナーの申告**です。★2026-09-29、オーナーがこの作業の窓で書いた原文（★要約しない）:
+ *     > 川崎タカシさんの写真はＡＩです　インターネット上のキャラクターです　その管理者はこの馬物語のオーナーである　kusanokiyoshi1@gmail.con　というユーザーです　つまり全く問題ありません
+ *   ⚠️ ★**開発側・レビュー側は、写真が AI 生成であること・実在の人物でないことを確かめていません**（★確かめる手段が無い）。
+ *      ★「検証済み」と読まないこと。★裁定 7（実在の人物なら 本人・書面の同意・加工の範囲）の前提が外れる、という ★申告に基づく除外です。
+ *   ★素材: `V:/dev/Cusor/kawasakiclub/assets/takashi.jpg`（★口の開きは 閉じた絵に口の中だけを描き足した）。
+ *   ✅ ★**消す条件**: ★素材を差し替えた日 ／ ★オーナーの申告が変わった日。
+ *
+ * 【同じ人物の イラストの版（ti）】
+ *   ★素材はオーナーの広告画像（`V:/dev/Cusor/kawasakiclub/素材３.jpg`）の顔だけを切り出したもの（★文字は入れていない）。
+ *   ★グラデーション塗りの絵なので ★上位 8 色 21% で 40% に届かない（★写真の版 8.9%・セル塗りの旧 4 名 62〜69% の間・2026-09-29 実測）。
+ *   ★同じオーナーの申告の範囲（★写真を元にしたイラスト）として ★同じ除外に入れる。★線（40%）は動かさない。
+ */
+const PHOTO_EXEMPT = new Set(['tp', 'ti'].flatMap((id) => [
+  `apps/web/public/art/narrator-${id}-closed.webp`,
+  ...['normal', 'hot', 'shout'].map((e) => `apps/web/public/art/narrator-${id}-${e}-open.webp`),
+]));
 
 /** 肌色らしさ（ごく緩い判定。どの画素を調べるかを決めるだけ） */
 function skinLike(r, g, b) {
@@ -115,9 +141,10 @@ for (const entry of PORTRAIT_ASSETS) {
     console.log(`✅ ${entry.label}: 肌色の画素がほとんどありません（${skin}）— 影絵など`);
     continue;
   }
-  const ok = flat >= FLAT_LIMIT;
+  const exempt = PHOTO_EXEMPT.has(entry.file);
+  const ok = flat >= FLAT_LIMIT || exempt;
   if (!ok) failed += 1;
-  console.log(`${ok ? '✅' : '🔴'} ${entry.label}`);
+  console.log(`${ok ? '✅' : '🔴'} ${entry.label}${exempt && flat < FLAT_LIMIT ? '（★名指しの除外＝オーナーの申告・未検証）' : ''}`);
   console.log(`     肌の画素 ${skin.toLocaleString()} / 上位 8 色が占める割合 ${flat.toFixed(1)}%（下限 ${FLAT_LIMIT}%）`);
 }
 

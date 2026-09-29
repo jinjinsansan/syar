@@ -9,7 +9,9 @@
  *    撮影用シークで時刻を戻しても同じ絵になること。
  */
 import { describe, it, expect } from 'vitest';
-import { narratorPortrait, narratorCastForRace, NARRATOR_NAMES, NARRATOR_ROLES } from '@star/render';
+import { narratorPortrait, narratorCastForRace, narratorCastForRaceNo, ACTIVE_NARRATOR_CASTS, NARRATOR_NAMES, NARRATOR_ROLES } from '@star/render';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 
 const img = (tag: string) => ({ tag, width: 300, height: 344 });
 const SET = {
@@ -83,5 +85,27 @@ describe('★話者の割り当て（1 レースに 1 人）', () => {
     }
     expect(NARRATOR_NAMES.a).toBe('星野 亮太');
     expect(NARRATOR_ROLES.b).toBe('解説');
+  });
+});
+
+/**
+ * ★**実況は 川崎 タカシ**（★2026-09-29・オーナー「写真をそのまま使い口パクをつける＆その写真を元にイラスト化 この 2 種類を作って、交互に実況中継させればいいです」）
+ */
+describe('★実況 川崎 タカシ（写真の版とイラストの版を交互）', () => {
+  it('★その日の何 R かで 交互に替わり、どちらも 川崎 タカシ', () => {
+    const seq = [1, 2, 3, 4, 5, 6].map((n) => narratorCastForRaceNo(n));
+    expect(seq).toEqual(['tp', 'ti', 'tp', 'ti', 'tp', 'ti']);
+    for (const c of ACTIVE_NARRATOR_CASTS) expect(NARRATOR_NAMES[c]).toBe('川崎 タカシ');
+  });
+
+  it('★画面は この 2 版だけを読み、★素材が揃っている（閉じた口 1 枚 ＋ 開いた口 3 表情）', () => {
+    const page = readFileSync(path.resolve(__dirname, '../../web/src/app/race/page.tsx'), 'utf8');
+    expect(page).toContain('const casts = ACTIVE_NARRATOR_CASTS;');
+    expect(page).not.toContain("const casts = ['a', 'b', 'c', 'd'] as const;");
+    for (const c of ACTIVE_NARRATOR_CASTS) {
+      for (const f of ['closed', 'normal-open', 'hot-open', 'shout-open']) {
+        expect(existsSync(path.resolve(__dirname, `../../web/public/art/narrator-${c}-${f}.webp`)), `${c}-${f}`).toBe(true);
+      }
+    }
   });
 });

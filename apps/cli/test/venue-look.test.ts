@@ -279,7 +279,11 @@ describe('★競馬場ごとの見た目', () => {
       'mowStyle: VENUE_LOOK.mow,',
       'accentColors: VENUE_LOOK.crowdAccents',
       'emptyRatio: GRADE_LOOK.emptyRatio',
-      'const cast = VENUE_LOOK.cast;',
+      /**
+       * ★2026-09-29: ★実況は 競馬場ごとの人（VENUE_LOOK.cast）ではなく ★川崎 タカシ の 2 版をレースごとに交互
+       *   （★オーナー「今使っているキャラクターを全て却下し、川崎タカシという人物にします」・`narrator.ts`）。
+       */
+      'const cast = narratorCastForRaceNo(real !== null ? real.raceNoOfDay : 1);',
       'venueFeature:',
     ]) expect(src, `★画面に ${needle} が無い`).toContain(needle);
   });
