@@ -172,7 +172,9 @@ describe('★小窓の本編の重さと時間', () => {
     expect(replayWindowNear(at, start - lead, lead)).toBe(true);
     expect(replayWindowNear(at, start + REPLAY_DISPLAY_MS - 1, lead)).toBe(true);
     expect(replayWindowNear(at, start + REPLAY_DISPLAY_MS, lead), '★窓の外で開かない').toBe(false);
-    expect(STRIP).toContain('if (openSoon && recentId !== null && embeddedIdRef.current !== recentId) {');
+    /** ★2026-09-29: ★直近のレースは窓で・★次のレースは 発走の 40 秒前から先読み（race-strip-run.test ③） */
+    expect(STRIP).toContain(': openSoon && recentId !== null && recent ? { id: recentId, startAt: recent.scheduled_at } : null;');
+    expect(STRIP).toContain('if (target !== null && embeddedIdRef.current !== target.id) {');
   });
 
   it('🔴 ★子（本編）でも「動きを減らす」を守り、★帯は 黙って閉じる（★経路が違っても同じ結果）', () => {

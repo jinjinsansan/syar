@@ -65,7 +65,7 @@ describe('★帯の掲示板', () => {
     /** ★見出しの明暗・録画の点も止める（★R-20 Q3） */
     expect(CSS).toMatch(/\.u-paused \.u-board-kind,[\s\S]{0,200}\{ animation: none; \}/);
     expect(STRIP).toContain("if (reduce.matches || hostRef.current?.closest('.u-paused') != null || document.visibilityState !== 'visible') return;");
-    expect(CSS).toContain('.u-race-strip-main > span:not(.u-race-run-mini):not(.u-race-strip-rec):not(.u-race-strip-board):not(.u-race-strip-recbadge):not(.u-race-strip-nextchip) {');
+    expect(CSS).toContain('.u-race-strip-main > span:not(.u-race-strip-rec):not(.u-race-strip-board):not(.u-race-strip-recbadge):not(.u-race-strip-nextchip) {');
   });
 
   it('🔴 ⑤ ★「大」では ★いつも同じ所で ★1 枚ずつ送り続ける（★秒は TS と CSS で同じ）', () => {

@@ -33,6 +33,13 @@ import { REAL_RACE_SIGN_IN_MESSAGE, canPlayRealRace } from './race-real-access';
 
 /** ★読めなかった理由（★画面はこれをそのまま出さず、★言葉に直して出します） */
 export class RaceNotPlayableError extends Error {}
+/**
+ * ★**まだ発走していない**（★2026-09-29・0098・オーナー「発走時刻に 小窓も本格的な画面も 同じものが流れないとおかしい」）。
+ *   ★待てば見られる（★エラーではない）。★本編は 1 秒おきに読み直し、★発走時刻に着順が見えたら流す。
+ */
+export class RaceNotStartedError extends RaceNotPlayableError {
+  constructor(message: string, readonly scheduledAtMs: number) { super(message); }
+}
 
 /** ★確定着順の 1 行（★エンジンの `RaceResultEntry` のうち ★録画が読む欄だけ） */
 export interface SettledRow {
@@ -156,7 +163,10 @@ export async function loadRealRace(raceId: string): Promise<RealRaceData> {
   const startedMs = new Date(String(race.scheduled_at)).getTime();
   const liveNow = status === 'scheduled' && Number.isFinite(startedMs) && Date.now() >= startedMs;
   if (status !== 'settled' && !liveNow) {
-    throw new RaceNotPlayableError(`このレースはまだ発走していません（いまの状態: ${status}）`);
+    const msg = `このレースはまだ発走していません（いまの状態: ${status}）`;
+    /** ★発走待ち（★発売中・締切後の scheduled）は ★待てる形で投げる（★中止・公示は待っても始まらない） */
+    if (status === 'scheduled' && Number.isFinite(startedMs)) throw new RaceNotStartedError(msg, startedMs);
+    throw new RaceNotPlayableError(msg);
   }
   /** ★条件は ★知らない値を既定に落とさず ★投げます（★R-27） */
   const surface = oneOf(SURFACES, race.surface);

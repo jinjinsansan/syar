@@ -109,9 +109,10 @@ import {
   type RaceCourseSpec, type Venue,
 } from '@star/scheduler';
 import {
-  loadRealRace, RaceNotPlayableError, settledResultOf, assertReplayOrder, replayStopMessage,
+  loadRealRace, RaceNotPlayableError, RaceNotStartedError, settledResultOf, assertReplayOrder, replayStopMessage,
   type RealRaceData, type SettledRow,
 } from '../../lib/race-real';
+import { CLAIM_WAIT_START } from '../../lib/claims';
 import { FrameBadge } from '../../components/ui';
 import { createRaceAudio, type RaceAudio } from './race-audio.js';
 
@@ -1070,6 +1071,8 @@ interface RealReplay {
   readonly seed: number;
   /** ★その日の何 R か（★`slotOfDay + 1`・★実況の写真の版とイラストの版を交互に出す） */
   readonly raceNoOfDay: number;
+  /** ★発走時刻（★時計を 1 本に: 流している間は「いま − 発走時刻」の場面から・0098） */
+  readonly scheduledAtMs: number;
 }
 
 /**
@@ -2452,6 +2455,7 @@ function realPageOf(data: RealRaceData): { readonly setup: PageSetup; readonly r
       seed: replaySeedOf(data.id),
       /** ★その日の何 R か（★実況の 2 版を交互に出す鍵・2026-09-29） */
       raceNoOfDay: Number.parseInt(data.raceNo, 10),
+      scheduledAtMs: new Date(data.scheduledAt).getTime(),
     },
   };
 }
@@ -2465,12 +2469,18 @@ function realPageOf(data: RealRaceData): { readonly setup: PageSetup; readonly r
 function RealRaceGate({ raceId }: { readonly raceId: string }): React.JSX.Element {
   const [state, setState] = useState<
     | { readonly kind: 'loading' }
+    | { readonly kind: 'waiting' }
     | { readonly kind: 'error'; readonly message: string }
     | { readonly kind: 'ready'; readonly setup: PageSetup; readonly real: RealReplay }
   >({ kind: 'loading' });
   useEffect(() => {
     let cancelled = false;
-    loadRealRace(raceId).then((data) => {
+    let retry: number | undefined;
+    /**
+     * ★**発走前に開いたら 待つ**（★2026-09-29・0098・オーナー「発走時刻に 小窓も本格的な画面も 同じものが流れないとおかしい」）。
+     *   ★まだ発走していない（RaceNotStartedError）は ★エラーにしない。★発走の 60 秒前からは 1 秒おき・それより前は 10 秒おきに読み直す。
+     */
+    const attempt = (): void => { loadRealRace(raceId).then((data) => {
       if (cancelled) return;
       try {
         setState({ kind: 'ready', ...realPageOf(data) });
@@ -2481,12 +2491,19 @@ function RealRaceGate({ raceId }: { readonly raceId: string }): React.JSX.Elemen
       }
     }, (e: unknown) => {
       if (cancelled) return;
+      if (e instanceof RaceNotStartedError) {
+        setState({ kind: 'waiting' });
+        const left = e.scheduledAtMs - new Date().getTime();
+        retry = window.setTimeout(attempt, left <= 60_000 ? 1_000 : 10_000);
+        return;
+      }
       const message = e instanceof RaceNotPlayableError ? e.message
         : `レースを読めませんでした: ${e instanceof Error ? e.message : String(e)}`;
       tellStrip('error', raceId, message);
       setState({ kind: 'error', message });
-    });
-    return () => { cancelled = true; };
+    }); };
+    attempt();
+    return () => { cancelled = true; if (retry !== undefined) window.clearTimeout(retry); };
   }, [raceId]);
   if (state.kind === 'ready') return <RaceView setup={state.setup} real={state.real} />;
   /** ⚠️ ★意匠は作っていません（★`PARAM_ERROR` と同じ字・`a-panel`） */
@@ -2496,7 +2513,7 @@ function RealRaceGate({ raceId }: { readonly raceId: string }): React.JSX.Elemen
         padding: '14px 16px', fontSize: 14, fontWeight: 900,
         color: state.kind === 'error' ? 'var(--a-red-d)' : 'var(--a-ink-2)',
       }}>
-        {state.kind === 'error' ? state.message : 'レースの記録を読んでいます…'}
+        {state.kind === 'error' ? state.message : state.kind === 'waiting' ? CLAIM_WAIT_START : 'レースの記録を読んでいます…'}
       </div>
     </div>
   );
@@ -2894,6 +2911,16 @@ function RaceView({ setup, real }: {
     /** ★小窓の中は ★いつもステージ（★画布だけ・`EMBED_STRIP`） */
     if (smallScreen || EMBED_STRIP) setStageFull(true);
     setWatchStarted(true);
+    /**
+     * ★**時計を 1 本に**（★2026-09-29・オーナー「発走時刻に 小窓も本格的な画面も 同じものが流れないとおかしい」）。
+     *   ★流している間（★発走から 映像の長さまで）は ★「いま − 発走時刻」の場面から始める ＝ ★小窓でも全画面でも 同じ場面。
+     *   ★それより後に開いたら ★頭から（★録画として見直す）。
+     */
+    if (real !== null && Number.isFinite(real.scheduledAtMs)) {
+      const elapsed = (new Date().getTime() - real.scheduledAtMs) / 1000;
+      const total = RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
+      if (elapsed > 0 && elapsed < total) dRef.current = elapsed;
+    }
     setPlaying(true);
     tellStrip('playing', real?.raceId ?? null);
   }, [devMode, ready, built, watchStarted, smallScreen, real]);

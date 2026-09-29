@@ -36,6 +36,8 @@ export const CLAIM_REPEAT_BET_LIMIT = `続けて投票は ${REPEAT_BET_MAX} 回�
  */
 export const CLAIM_LIVE_PENDING = 'まもなく発走の映像が始まります';
 export const CLAIM_SETTLE_CHECKING = '結果の確定を確認中です（払戻はまだです）';
+/** ★発走前に開いた本編（★発走時刻に 小窓と同じ場面から始まる・0098） */
+export const CLAIM_WAIT_START = '発走時刻になると、ここでレースが始まります';
 
 export const BET_TYPE_LABEL = { win: '単勝', place: '複勝' } as const;
 export type VoteBetType = keyof typeof BET_TYPE_LABEL;

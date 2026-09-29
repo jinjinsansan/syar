@@ -49,7 +49,7 @@ describe('★帯: 出せない人には 本編を開かない', () => {
   const STRIP = src('apps/web/src/components/uma/race-strip.tsx');
   /** ★本編を開く effect の 頭の門 */
   const gateAt = STRIP.indexOf('if (!embedsHere || motionReduced');
-  const openAt = STRIP.indexOf('setEmbed({ id: recentId');
+  const openAt = STRIP.indexOf('setEmbed({ ...target, live: false');
 
   it('🔴 ① 本編を開く前の門に `canPlay !== true`（★分からない間も開かない）', () => {
     expect(gateAt, '★門が見つからない').toBeGreaterThan(0);

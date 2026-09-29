@@ -9,7 +9,6 @@ import { LABEL_ENTRY_CLOSE, LABEL_SALES_CLOSE, salesCloseAtMs, salesClosedAt, sa
 import { CLAIM_LIVE_PENDING, CLAIM_SALES_CLOSED, CLAIM_SETTLE_CHECKING } from '../../lib/claims';
 import { SETTLE_AFTER_START_MS } from '@star/scheduler';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowNear, replayWindowOver, type ReplayRunner } from './race-replay';
-import { RUN_VIEW_M, runCamera } from './race-camera';
 import { INTRO_STAGES, stripEmbedsOn, stripSizeOf } from './race-strip-sizes';
 import { STRIP_EMBED_FAILED_NOTE, STRIP_EMBED_GIVE_UP_SEC, STRIP_EMBED_LEAD_SEC, isStripEmbedMessage, stripControlMessage, stripEmbedLog, stripEmbedUrl } from './race-strip-embed';
 import { BOARD_ITEM_SEC, boardText, bracketOrNull, raceLine, tickerBoard, tickerShowsField, type BoardItem, type TickerRunner } from './race-strip-ticker';
@@ -432,7 +431,7 @@ function RaceStripBody(): React.ReactElement | null {
    *      ★オーナーの画面では ★簡易版のままでした。★確定は ★窓の 75 秒前から見えるので、★見えた時点で読み始めます。
    *   ★動きを減らす設定では ★開きません。★`ended` / `error` / ★打ち切り秒 / ★「大」でなくなった / ★窓が閉じても始まらない で ★閉じます。
    */
-  const [embed, setEmbed] = useState<{ readonly id: string; readonly live: boolean; readonly sinceMs: number } | null>(null);
+  const [embed, setEmbed] = useState<{ readonly id: string; readonly startAt: string; readonly live: boolean; readonly sinceMs: number } | null>(null);
   /**
    * ★**この人に本編を出せるか**（★2026-09-28・レビュー側の決定 (b)）。★`null` は まだ分からない（★分かるまで開かない）。
    *   🔴 ★未ログインは ★本編が「ログインしてください」で止まると ★先に分かっている → ★開かない（★文字の帯だけ・★エラーを出さない）。
@@ -462,23 +461,35 @@ function RaceStripBody(): React.ReactElement | null {
   /** ★本編を開いてよい時間（★窓が開く 40 秒前から 窓が閉じるまで・★レビュー側の決定 4） */
   const openSoon = !windowOver && recent !== null && recent !== undefined && nowMs !== null
     && replayWindowNear(recent.scheduled_at, nowMs, STRIP_EMBED_LEAD_SEC * 1000);
+  /**
+   * ★**先読み**（★2026-09-29・0098・オーナー「発走時刻に 小窓も本格的な画面も 同じものが流れないとおかしい」）:
+   *   ★次のレースの発走 STRIP_EMBED_LEAD_SEC 秒前から ★本編を開く（★本編は発走まで待ち・★発走時刻に着順が見えたら 時計の位置から流す）。
+   */
+  const nextId = next?.id ?? null;
+  const nextStartAt = next?.scheduled_at ?? null;
+  const nextStartMs = nextStartAt === null ? Number.NaN : new Date(nextStartAt).getTime();
+  const preOpen = nextId !== null && nowMs !== null && Number.isFinite(nextStartMs)
+    && nextStartMs > nowMs && nextStartMs - nowMs <= STRIP_EMBED_LEAD_SEC * 1000;
   useEffect(() => {
-    /** ★本編を読むのは ★表で決めた面だけ（★それ以外の「大」は簡易版の走行・「極小」「文字」は読まない） */
+    /** ★本編を読むのは ★表で決めた面だけ（★「大」の面・★「極小」「文字」は読まない） */
     if (!embedsHere || motionReduced || canPlay !== true) { setEmbed(null); return; }
-    if (openSoon && recentId !== null && embeddedIdRef.current !== recentId) {
-      embeddedIdRef.current = recentId;
+    const target = preOpen && nextId !== null && nextStartAt !== null ? { id: nextId, startAt: nextStartAt }
+      : openSoon && recentId !== null && recent ? { id: recentId, startAt: recent.scheduled_at } : null;
+    if (target !== null && embeddedIdRef.current !== target.id) {
+      embeddedIdRef.current = target.id;
       setEmbedNote(null);
-      setEmbed({ id: recentId, live: false, sinceMs: nowRef.current ?? 0 });
+      setEmbed({ ...target, live: false, sinceMs: nowRef.current ?? 0 });
     }
-  }, [embedsHere, motionReduced, canPlay, openSoon, recentId]);
-  /** ★録画の窓が閉じても ★まだ始まっていなければ ★やめる（★読み込みが遅い端末で 小窓を待たせない） */
+  }, [embedsHere, motionReduced, canPlay, openSoon, recentId, preOpen, nextId, nextStartAt]);
+  /** ★開いたレースの窓が閉じても ★まだ始まっていなければ ★やめる（★先読みしたレースは まだ窓の前なので 閉じない） */
+  const embedWindowOver = embed === null || nowMs === null ? false : replayWindowOver(embed.startAt, nowMs);
   useEffect(() => {
     const e = embedRef.current;
-    if (!windowOver || e === null || e.live) return;
+    if (!embedWindowOver || e === null || e.live) return;
     console.warn(`[race-strip] ${stripEmbedLog('late', null, Math.round(((nowRef.current ?? e.sinceMs) - e.sinceMs) / 1000))}`);
     setEmbedNote(STRIP_EMBED_FAILED_NOTE);
     setEmbed(null);
-  }, [windowOver]);
+  }, [embedWindowOver]);
   const embedId = embed?.id ?? null;
   useEffect(() => {
     if (embedId === null) return undefined;
@@ -529,7 +540,8 @@ function RaceStripBody(): React.ReactElement | null {
    * ★「大」の箱: ★本編を流す面（/home・観戦）は ★本編が流れている間だけ・★それ以外の「大」は ★録画の窓の間 簡易版の走行
    *   （★決裁 ④・レビュー側の決定 2026-09-28。★オーナーは /home で簡易版を「間違っているレース映像」と言ったので ★/home では出さない）。
    */
-  const big = size === 'big' && (embedsHere ? embedLive : replaying);
+  /** ★「大」の箱は ★本編が流れているときだけ（★簡易版の走行は出さない・2026-09-29） */
+  const big = size === 'big' && embedsHere && embedLive;
   /**
    * ★④ **結果の一時強調**（★仕様 §2）: ★録画が終わった直後の 7 秒、★枠を EP 色にして ★1 着を大きく出し、★帯へ戻る。
    *   ★出すのは ★直近の 1 本だけ（★「同時は最新のみ・積み上げない」）。★着順は ★記録の値（`finishPosition`）。
@@ -577,9 +589,6 @@ function RaceStripBody(): React.ReactElement | null {
         ★**本編を流さない「大」の面は 簡易版の走行**（★side-v8・確定タイムから逆算した進行率・約 450KB・★決裁 ④）。
         ★本編の箱（下）とは ★別の要素（★1 つの面では どちらか一方しか出ない）。
       */}
-      {big && !embedsHere && <div className="u-race-strip-stage">
-        <RaceRun rows={replayRows} distance={recent?.distance ?? 0} motionReduced={motionReduced} />
-      </div>}
       {embed !== null && <div className={`u-race-strip-stage${big || expanded ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}${expanded ? ' u-race-strip-stage-full' : ''}`}
         {...(expanded && recent ? { role: 'dialog', 'aria-modal': true, 'aria-label': `${recent.name}のレース録画` } : {})}>
         {/* ★本編（★`playing` まで 見えないまま読み込む・★触れない） */}
@@ -604,9 +613,6 @@ function RaceStripBody(): React.ReactElement | null {
           <span>1着 {winner.gate}番 {winner.name}</span>
         </> : (replaying || embedLive) && recent && data ? <>
           {/* ★「極小」22×16px（★フォームの画面）。★先頭の馬 1 頭だけ */}
-          {compact && <span className="u-race-run-mini" aria-hidden>
-            <span className="u-race-run-horse" style={{ inset: 0 }}><RunningHorse phase={0} motionReduced={motionReduced} /></span>
-          </span>}
           {/*
             ★「大」（★掲示板のある帯）は ★左端に「● 録画」の札を 1 つ（★動かさない・★R-20 Q1・★R-18 回答 🟡 #8 の「（録画）」をこの札で満たす）。
             ★レース名は ★掲示板の札が持つ。★「極小」は いまどおり「レース中（録画）」。
@@ -658,67 +664,6 @@ function RaceStripBody(): React.ReactElement | null {
 }
 
 /**
- * ★**走る馬の絵**（★2026-09-27・裁定 `REVIEW_ALWAYS_VISIBLE_RACE_20260927.md` ①②）
- *
- * 🔴 ★**`horse-gallop.webp` ではなく、本編と TOP と同じ `horse-jockey-side-v8-pose01〜08` を使います。**
- *   ★確定仕様（`RACE_NOTICE_HANDOFF.md` §2）は `horse-gallop.webp` を指していますが、★その絵は
- *   ★2026-09-17 に TOP で試して ★オーナーが「★絵柄が別系統」と差し戻したものです。
- *   ★2026-09-27 にオーナーへ尋ね、★**side-v8（本編と同じ）**に決まりました。
- * ★コマの送り方は TOP と同じ（★8 枚を重ね、★`u-frame` で 1 枚ずつ見せる）。
- *   ★止めると（`.u-paused` / 動きを減らす設定）★1 枚目だけが残ります（★濁らない）。
- */
-export const RUN_FRAMES = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `/art/horse-jockey-side-v8-pose0${n}.webp`);
-const GALLOP_SEC = 0.62;
-
-function RunningHorse({ phase, motionReduced }: { readonly phase: number; readonly motionReduced: boolean }): React.ReactElement {
-  return <>
-    {RUN_FRAMES.map((src, i) => <span key={src} className="u-race-run-pose" style={{
-      backgroundImage: `url('${src}')`,
-      opacity: i === 0 ? 1 : 0,
-      animation: motionReduced ? 'none' : `u-frame ${GALLOP_SEC}s steps(1,end) ${(i * GALLOP_SEC) / 8 - phase * GALLOP_SEC}s infinite`,
-    }} />)}
-  </>;
-}
-
-/**
- * ★**「大」150px**（★§2）。★芝の上を ★**進行率どおりに**左から右へ走ります（★ゴールは右端の金の線）。
- *   ★奥行きは 3 列（★枠番で振り分け）。★手前ほど大きく・上に重ねます。★馬の上に枠番の札。
- *   ★位置は ★**確定した走破タイムから逆算した進行率**（★`replayProgress`・本編と同じ入口）。★作り物の動きはありません。
- */
-export function RaceRun({ rows, distance, motionReduced, tall = false }: {
-  readonly rows: readonly { readonly runner: ReplayRunner; readonly position: number }[];
-  readonly distance: number;
-  readonly motionReduced: boolean;
-  readonly tall?: boolean;
-}): React.ReactElement {
-  const horseH = tall ? 120 : 72;
-  const cam = runCamera(rows.map((r) => r.position), distance);
-  const span = cam.right - cam.left;
-  /** ★芝の縞（★20m ごと）を ★カメラと一緒に流す（★速さが分かる）。★縞 1 枚 ＝ 枠の 1/3 */
-  const stripe = ((cam.left * distance) / (RUN_VIEW_M / 3)) % 1;
-  const goalX = (1 - cam.left) / span;
-  return <div className={`u-race-run${tall ? ' u-race-run-tall' : ''}`} role="img"
-    aria-label={`走行（${rows.length}頭・確定した結果から再現）`}
-    style={{ backgroundPositionX: `${(-stripe * 50).toFixed(3)}%, 0` }}>
-    {goalX <= 1 && <span className="u-race-run-goal" style={{ left: `calc((100% - 8px) * ${goalX.toFixed(4)})` }} />}
-    {[...rows].sort((a, b) => depthOf(a.runner.gate) - depthOf(b.runner.gate)).map(({ runner, position }) => {
-      const depth = depthOf(runner.gate);
-      const h = Math.round(horseH * (0.78 + depth * 0.11));
-      const w = Math.round((h * 970) / 576);
-      /** ★鼻先（★絵の右端）が進行率の位置。★枠より後ろの馬は ★半分だけ見せて左端に残す（★消さない） */
-      const x = (position - cam.left) / span;
-      return <span key={runner.gate} className="u-race-run-horse" style={{
-        width: w, height: h, bottom: `${(2 - depth) * 12 + 2}%`, zIndex: 1 + depth,
-        left: `max(${-Math.round(w / 2)}px, calc((100% - 8px) * ${x.toFixed(4)} - ${w}px))`,
-      }}>
-        <RunningHorse phase={(runner.gate * 0.37) % 1} motionReduced={motionReduced} />
-        <b className="u-race-run-gate">{runner.gate}</b>
-      </span>;
-    })}
-  </div>;
-}
-
-/**
  * ★横向きの自動拡大の判定（★③ 段 A・条件 3）。★**縦 → 横** かつ ★**触る端末**でだけ `open`、★**横 → 縦** で `close`。
  *   ★PC（★触る端末でない）は ★どちらも返さない（★「拡大」を手で押す）。
  */
@@ -727,10 +672,6 @@ export function autoExpandOf(wasLandscape: boolean, isLandscape: boolean, coarse
   return isLandscape ? 'open' : 'close';
 }
 
-/** ★奥行きの列（★0 が奥・2 が手前）。★枠番で決めるので ★毎回同じ列に居ます */
-function depthOf(gate: number): number {
-  return (gate - 1) % 3;
-}
 
 /** ★先頭の馬（★進行率が最大・同じなら着順が上） */
 function leaderOf(rows: readonly { readonly runner: ReplayRunner; readonly position: number }[]): ReplayRunner | null {

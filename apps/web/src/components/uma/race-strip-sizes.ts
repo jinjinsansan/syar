@@ -84,7 +84,14 @@ export function routeKeyOf(pathname: string): string | null {
  *   ★ここに無い「大」の面は ★簡易版の走行（side-v8・約 450KB）。★「極小」「文字」は ★本編を読まない。
  *   ⚠️ ★一度 ★「大」の 10 面すべてと「極小」でも本編（1 レース 約 4MB）を読む形にしていた（★決裁と食い違い・レビュー側が原文で指摘）。
  */
-export const STRIP_EMBED_ROUTES: readonly string[] = ['/home', '/watch-race'];
+/**
+ * ★**2026-09-29 に広げた**（★オーナー「他の全てのページでも小窓を」「発走時刻に 小窓も本格的な画面も 両方とも同じものが流れないとおかしい」
+ *   ・レビュー側が受理）。★決裁 ④（本編は /home と観戦だけ）を ★オーナー自身が差し替えた。
+ *   → ★「大」の面は ★すべて本編（★同じ時計・同じ場面）。★簡易版の走行（side-v8）は ★どの面でも出さない（★中身が面ごとに違う歪みを無くす）。
+ *   ★「極小」「文字」は ★本編を読まない（★フォームの画面の邪魔をしない・文字の帯だけ）。
+ */
+export const STRIP_EMBED_ROUTES: readonly string[] = Object.entries(STRIP_SIZE_BY_ROUTE)
+  .filter(([, size]) => size === 'big').map(([route]) => route);
 
 /** ★この面の帯で 本編を流すか（★表が正本） */
 export function stripEmbedsOn(pathname: string): boolean {

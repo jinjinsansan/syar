@@ -187,12 +187,13 @@ describe('★常設帯の大きさ ── 表と画面の突き合わせ（⑤�
  *   ★一度 ★「大」の 10 面すべてと「極小」で 本編（1 レース 約 4MB）を読む形にしていた。★対照は両方向。
  */
 describe('★本編を流す面（表が正本）', () => {
-  it('🔴 ★/home と /watch-race だけ・★他の「大」「極小」「文字」は流さない', () => {
-    expect([...STRIP_EMBED_ROUTES].sort()).toEqual(['/home', '/watch-race']);
-    expect(stripEmbedsOn('/home')).toBe(true);
-    expect(stripEmbedsOn('/watch-race')).toBe(true);
-    for (const r of ['/records', '/stable', '/stable/abc', '/exchange', '/howto', '/earn', '/mypage', '/stable/retired']) {
-      expect(stripEmbedsOn(r), `★${r} で本編を流している`).toBe(false);
+  /**
+   * ★2026-09-29 に書き換え（★オーナー「他の全てのページでも小窓を」「発走時刻に 小窓も本格的な画面も 同じものが流れないとおかしい」・決裁 ④ をオーナーが差し替え）:
+   *   ★「大」の面は すべて本編（★簡易版の走行は消した）。★「極小」「文字」・本編そのものは 流さない。
+   */
+  it('🔴 ★「大」の面は すべて本編・★「極小」「文字」は流さない（★旧「/home と /watch-race だけ」は決裁 ④ の前提）', () => {
+    for (const r of ['/home', '/watch-race', '/records', '/stable', '/stable/abc', '/exchange', '/howto', '/earn', '/mypage', '/stable/retired']) {
+      expect(stripEmbedsOn(r), `★${r} で本編を流していない`).toBe(true);
     }
     expect(stripEmbedsOn('/train'), '★極小').toBe(false);
     expect(stripEmbedsOn('/races/abc'), '★文字').toBe(false);
