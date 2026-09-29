@@ -510,6 +510,7 @@ export const READONLY = [
   'measure-race-canvas-ratio.mjs', // レースの画布の裏の画素 ÷ 画面の物理画素を測る（読むだけ・D-058b・2026-09-28）
   'verify-jockey-roster-live.mjs', // 騎手の名簿を TS と 生きている DB で突き合わせる（読むだけ・金額・2026-09-28）
   'measure-strip-embed.mjs', // 帯で流す本編の追加転送・コマ間隔・止める確認をヘッドレスで測る（読むだけ・2026-09-28）
+  'verify-first-daily-and-bet.mjs', // 本番で初めての毎日の受け取りと投票が通ったかを台帳と bets で読む（読むだけ・begin read only・2026-09-29）
   'verify-worker-lag.mjs',   // 本番のワーカーが画面より後ろのとき、その差にワーカーに効く変更が在るかを数える（読むだけ・healthz と git・2026-09-29）
   'slice-narrator.mjs',       // ナレーターのシートを 6 枚に切り、口だけ差し替える（読むだけ）
   'verify-no-real-faces.mjs', // 人物立ち絵に写真が混ざっていないか（読むだけ）
