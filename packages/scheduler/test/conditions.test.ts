@@ -124,6 +124,22 @@ describe('★VW-2 競馬場の割り当て', () => {
   });
 
   /**
+   * ★**結果の側**（★利用者から見える「レースが 10 場に散っている」・★2026-09-29 レビュー側の条件）。
+   *   ★差 3 は ★重賞が鞍の場で走るぶん。★暦の前は ≤ 1 だった。★4 を超えたら ★暦か鞍の場の置き方が変わったということ（★人が見る）。
+   */
+  it('★実際に走る場も 10 場に散っている（1 週で最多 − 最少 ≤ 4・★暦の前は ≤ 1・差 3 は重賞が鞍の場で走るぶん）', () => {
+    const counts = new Map<string, number>();
+    for (let i = 0; i < WEEK; i += 1) {
+      const c = conditionsOf(i, classOf(i), gradeOf(i));
+      counts.set(`${c.surface}/${c.courseId}`, (counts.get(`${c.surface}/${c.courseId}`) ?? 0) + 1);
+    }
+    for (const surface of ['turf', 'dirt'] as const) {
+      const ns = VENUES.filter((v) => v.surfaces.includes(surface)).map((v) => counts.get(`${surface}/${v.id}`) ?? 0);
+      expect(Math.max(...ns) - Math.min(...ns), `★${surface}: ${ns.join(',')}`).toBeLessThanOrEqual(4);
+    }
+  });
+
+  /**
    * ★**クラスが場に偏らない**（★番組表はクラスを枠で決めるため）。
    *   ⚠️ ★芝は 1 日 90 本で 10 で割り切れ、★通し番号だけだと同じ枠に毎日同じ場が来ました
    *   （★初版の実測 1 週: 新馬が潮風 69 本・スターパーク 12 本）。
