@@ -23,6 +23,7 @@ import { readFileSync } from 'node:fs';
 import { loadEnv } from './lib/env.mjs';
 import { assertNotProduction } from './lib/guard.mjs';
 import { scratchEntry, jockeyFeeOfFrozen } from '../apps/worker/src/scratch.ts';
+import { JOCKEYS } from '../packages/scheduler/src/jockeys.ts';
 
 const env = loadEnv();
 console.log('接続先:', env.STAR_ENV);
@@ -89,7 +90,9 @@ try {
    *   ★残高が ★登録の前に戻ること・★戻った額が 出走料＋騎手の料金 であることを見る。
    *   ★場は この取引の中で作る（★別のレースを announced・締切 1 時間後・資格 0〜99 に倒し、★残高を足す）。
    */
-  const jockey = (await c.query('select id, fee_ep from jockeys where fee_ep > 0 order by fee_ep desc limit 1')).rows[0];
+  /** ★騎手は TS の名簿（正）から取る（★jockeys の表は利用者から閉じていて、道具も直に読まない・jockeys-closed ②） */
+  const top = [...JOCKEYS].sort((x, y) => y.feeEP - x.feeEP)[0];
+  const jockey = top === undefined || top.feeEP <= 0 ? undefined : { id: top.id, fee_ep: top.feeEP };
   if (jockey === undefined) throw new Error('★料金のある騎手が名簿に居ない（★騎手つきの返金を測れない）');
   const r2 = (await c.query(`select r.id from races r where r.id <> $1
       and not exists (select 1 from race_entries e where e.race_id = r.id and e.horse_id = $2)

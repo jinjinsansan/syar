@@ -21,7 +21,7 @@ import { awardPrizes } from './prize-award.js';
 import { settlePayouts } from './payout.js';
 import { settleRace as settleRaceFair } from './settle.js';
 import type { AnnounceSpec, AnnouncedRace, CycleStore, FillSpec, RaceSpec } from './cycle-runner.js';
-import { ENTRY_FEE_EP, overdueBefore, weekIndexAt, winsRangeFor } from '@star/scheduler';
+import { ENTRY_FEE_EP, overdueBefore, raceNameOf, weekIndexAt, winsRangeFor } from '@star/scheduler';
 import { cancelRace as cancelRaceImpl } from './cancel.js';
 // ★生涯の記録（正典 §18・移行 `0024`）。★確定の中から呼びます（LR-7「レースが終わった後」）
 import { writeRaceStory } from './story-flow.js';
@@ -197,7 +197,14 @@ export function createPgStore(
          on conflict (cycle_index) do nothing`,
         [
           spec.cycleIndex,
-          `R${spec.cycleIndex}`,
+          /**
+           * ★レース名（★2026-09-29・オーナー「R12345 のようなおかしなレース名」・レビュー側 規則 3）。
+           *   ★重賞は架空 50 鞍・★平場は「場の名 ＋ クラス ＋ 距離」（`race-name.ts`）。★番号は cycle_index に残る。
+           */
+          raceNameOf({
+            cycleIndex: spec.cycleIndex, raceClass: spec.raceClass, grade: spec.grade,
+            venueId: spec.conditions.courseId, surface: spec.conditions.surface, distanceM: spec.conditions.distance,
+          }),
           classRankOf(spec.raceClass),
           spec.grade,
           spec.scheduledAtMs,
