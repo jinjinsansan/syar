@@ -1082,10 +1082,12 @@ interface RealReplay {
 const REPLAY_BADGE_TEXT = '中継';
 /**
  * ★**走っているレース ＝ 中継 ／ 終わったレースを後から ＝ 過去のレース**（★2026-09-30・オーナー「録画はそもそも不要」・レビュー側「場面で語を分ける」）。
- *   ★発走から ON_AIR_MS の間に開いたら ★中継（★時計の位置から流す）。★それより後は ★過去のレース（★頭から見直す）。
+ *   ★境目は ★**映像の長さそのもの**（★時計の位置から流す条件 `elapsed < total` と同じ 1 か所・レビュー側「境目は映像の長さ・同じ 1 か所から」）。
+ *   ★発走 〜 映像が終わるまでに開いたら ★中継（★時計の位置から）／★それより後は ★過去のレース（★頭から）。
  */
 const PAST_RACE_BADGE_TEXT = '過去のレース';
-const ON_AIR_MS = 5 * 60 * 1000;
+/** ★中継か過去か まだ決まっていない間（★映像を組み立てる前）の中立の語 */
+const UNDECIDED_BADGE_TEXT = 'レース';
 /**
  * ★**画面の部品の形**（★2026-09-27・引き渡し資料 `design_handoff_uma_monogatari` §5.3 / §5.5 / §5.6 の値）。
  *   ★新しい意匠は作っていません（★資料の金プレート・副ボタン・カプセルの値をそのまま）。
@@ -2535,9 +2537,11 @@ function RaceView({ setup, real }: {
   /** ★実レースの確定記録（★`null` は見本）。★`setup` と同じく ★開いてから閉じるまで変わりません */
   readonly real: RealReplay | null;
 }): React.JSX.Element {
-  /** ★走っている間に開いたか（★札の語を分ける・開いた時に 1 回だけ決める） */
-  const [onAir] = useState(() => real !== null && Number.isFinite(real.scheduledAtMs) && new Date().getTime() - real.scheduledAtMs < ON_AIR_MS);
-  const liveLabel = onAir ? REPLAY_BADGE_TEXT : PAST_RACE_BADGE_TEXT;
+  /**
+   * ★走っている間に開いたか（★札の語を分ける）。★自動再生で 時計の位置から流すと決めた所で ★同じ条件で決める（★null は まだ）。
+   */
+  const [onAir, setOnAir] = useState<boolean | null>(null);
+  const liveLabel = onAir === null ? UNDECIDED_BADGE_TEXT : onAir ? REPLAY_BADGE_TEXT : PAST_RACE_BADGE_TEXT;
   /**
    * ★**走路・頭数・場の見た目は `setup` から**（★段 2 D）。
    *   ★名前を残すのは ★この本体の 6,000 行を 1 文字も動かさないためです（★見本の道では ★元のモジュール定数と同じ値）。
@@ -2928,7 +2932,10 @@ function RaceView({ setup, real }: {
     if (real !== null && Number.isFinite(real.scheduledAtMs)) {
       const elapsed = (new Date().getTime() - real.scheduledAtMs) / 1000;
       const total = RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
-      if (elapsed > 0 && elapsed < total) dRef.current = elapsed;
+      const live = elapsed > 0 && elapsed < total;
+      if (live) dRef.current = elapsed;
+      /** ★札の境目も ★この条件 1 つ（★映像の長さ） */
+      setOnAir(live);
     }
     setPlaying(true);
     tellStrip('playing', real?.raceId ?? null);

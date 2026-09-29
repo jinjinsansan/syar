@@ -48,12 +48,19 @@ describe('★小窓は 本編だけ（同じ時計・同じ場面）', () => {
   /** ★2026-09-30: ★走っているレースだけを「中継」・★終わったレースは「過去のレース」（★逆向きの嘘を作らない・レビュー側） */
   it('🔴 ⑥ 札は 走っている間だけ「中継」・後から開いたら「過去のレース」', () => {
     expect(PAGE).toContain("const PAST_RACE_BADGE_TEXT = '過去のレース';");
-    expect(PAGE).toContain('const liveLabel = onAir ? REPLAY_BADGE_TEXT : PAST_RACE_BADGE_TEXT;');
+    expect(PAGE).toContain('const liveLabel = onAir === null ? UNDECIDED_BADGE_TEXT : onAir ? REPLAY_BADGE_TEXT : PAST_RACE_BADGE_TEXT;');
+    /** ★境目は 映像の長さ ＝ 時計の位置から流す条件と ★同じ 1 つ（★片方だけ変えたら落ちる） */
+    const liveAt = PAGE.indexOf('const live = elapsed > 0 && elapsed < total;');
+    expect(liveAt).toBeGreaterThan(-1);
+    expect(PAGE.indexOf('if (live) dRef.current = elapsed;', liveAt)).toBeGreaterThan(liveAt);
+    expect(PAGE.indexOf('setOnAir(live);', liveAt)).toBeGreaterThan(liveAt);
+    expect(PAGE.match(/setOnAir\(/g)?.length).toBe(1);
     expect(PAGE).not.toContain('{REPLAY_BADGE_TEXT}</');
   });
 
   it('🔴 ⑤ 本編は 流している間 「いま − 発走時刻」の場面から（★時計を 1 本に）', () => {
     expect(PAGE).toContain('const elapsed = (new Date().getTime() - real.scheduledAtMs) / 1000;');
-    expect(PAGE).toContain('if (elapsed > 0 && elapsed < total) dRef.current = elapsed;');
+    expect(PAGE).toContain('const live = elapsed > 0 && elapsed < total;');
+    expect(PAGE).toContain('if (live) dRef.current = elapsed;');
   });
 });
