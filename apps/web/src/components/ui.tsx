@@ -27,7 +27,7 @@ export function StatusBadge({ status }: { readonly status: string }): React.Reac
 const STYLE_COLOR: Readonly<Record<string, readonly [string, string]>> = {
   nige: ['#a81a13', '#ffe9e7'], senko: ['#a35a04', '#fff1de'], sashi: ['#0c5f9f', '#e0eefa'], oikomi: ['#4a4fa8', '#e8e9fb'],
 };
-const STYLE_LABEL: Readonly<Record<string, string>> = {
+export const STYLE_LABEL: Readonly<Record<string, string>> = {
   nige: '逃げ', senko: '先行', sashi: '差し', oikomi: '追込',
 };
 export function StyleChip({ strategy, h = 26, font = 12 }: { readonly strategy: string; readonly h?: number; readonly font?: number }): React.ReactElement {

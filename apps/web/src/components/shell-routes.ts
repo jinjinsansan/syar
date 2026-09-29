@@ -66,6 +66,8 @@ export const OWN_HEADER: readonly string[] = [
    *   ★引き渡し資料 `design_handoff_uma_monogatari` §5（全ページ共通の骨格）で組み直したので ★自前の上段バーを持ちます。
    */
   '/entry', '/records',
+  /** ★2026-09-30: ★レース詳細を uma の画面に作り直した（★デザイナー R-21・自前の上段バー） */
+  '/races',
 ];
 
 /**

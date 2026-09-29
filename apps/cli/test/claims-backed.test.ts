@@ -287,7 +287,7 @@ const CLAIMS: readonly Claim[] = [
   {
     id: '②オッズは発売のときに決まり 変わらない（固定オッズ）',
     text: CLAIM_ODDS_FIXED, name: 'CLAIM_ODDS_FIXED',
-    usedBy: ['apps/web/src/components/uma/uma-odds-view.tsx', 'apps/web/src/app/races/[id]/page.tsx', 'apps/web/src/components/odds-board.tsx'],
+    usedBy: ['apps/web/src/components/uma/uma-odds-view.tsx', 'apps/web/src/app/races/[id]/race-detail-view.tsx', 'apps/web/src/components/odds-board.tsx'],
     backedBy: () => [
       ...hits(/update\s+(public\.)?race_odds\b/i).map((f) => `★race_odds を update: ${f}`),
       ...hits(/delete\s+from\s+(public\.)?race_odds\b/i).map((f) => `★race_odds を delete: ${f}`),
@@ -390,7 +390,7 @@ const CLAIMS: readonly Claim[] = [
   {
     id: '⑧出馬表は 発走の（周の長さ − 公開の位置）前に公開される',
     text: CLAIM_CARD_PUBLISH, name: 'CLAIM_CARD_PUBLISH',
-    usedBy: ['apps/web/src/app/races/[id]/page.tsx'],
+    usedBy: ['apps/web/src/app/races/[id]/race-detail-view.tsx'],
     backedBy: () => {
       const claims = stripComments(read('apps/web/src/lib/claims.ts'));
       const why: string[] = [];
@@ -408,7 +408,7 @@ const CLAIMS: readonly Claim[] = [
   {
     id: '⑨投票は 発走の（周の長さ − 締切の位置）前に締め切る',
     text: CLAIM_SALES_CLOSE, name: 'CLAIM_SALES_CLOSE',
-    usedBy: ['apps/web/src/app/races/[id]/page.tsx'],
+    usedBy: ['apps/web/src/app/races/[id]/race-detail-view.tsx'],
     backedBy: () => {
       const why: string[] = [];
       if (!stripComments(read('apps/web/src/lib/claims.ts')).includes('jaDuration(CYCLE_MS - PHASE_OFFSET_MS.salesClose)')) why.push('★締切の時刻を cycle.ts から導いていない');

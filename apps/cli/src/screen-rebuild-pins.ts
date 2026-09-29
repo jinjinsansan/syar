@@ -104,6 +104,7 @@ export const REBUILD_PINS: ReadonlyMap<string, RebuildPin> = new Map([
   // ⚠ ★`/races`（一覧）と `/races/[id]/odds` は ★2026-09-25 に転送して消しました（★釘から外した）
   ['/races/[id]', {
     rpcs: [], libs: ['format', 'supabase'],
+    /** ★2026-09-30: ★見た目は `race-detail-view.tsx`（★デザイナー R-21）。★読み込み・照合は page.tsx のまま */
     note: '🔴 ⚠️ ★**`/odds/[id]` へ転送してはいけません**（★2026-09-25 に比べて確かめました）。'
       + '★重なるのは ★枠・人気・オッズだけで、★ここには ★**新版に無いもの**が在ります:'
       + '★**着順**（確定した結果）・★**照合**（Provably Fair の突き合わせ）・★**締切まで**・★厩舎・★発走。'

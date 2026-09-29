@@ -107,7 +107,14 @@ describe('🔴 ★帯が二重にならない（★自前の帯を持つ面は O
   it('⚠️ ★`OWN_HEADER` に、★実在しない面が残っていない（★見張り続けない・R-19）', () => {
     const ghosts = ownHeader().filter((p) => {
       if (p === '/') return false;                       // ★LP は `app/page.tsx`
-      return !existsSync(path.join(APP, p.replace(/^\//, ''), 'page.tsx'));
+      /**
+       * ★`OWN_HEADER` は ★前方一致（`shell-routes.ts`）なので、★その下に 1 枚でも面が在れば 生きている。
+       *   ★2026-09-30: `/races` は 直下に面が無く ★`/races/[id]` だけ（★デザイナー R-21 で uma に作り直した）。
+       */
+      const dir = path.join(APP, p.replace(/^\//, ''));
+      const hasPageBelow = (d: string): boolean => existsSync(path.join(d, 'page.tsx'))
+        || (existsSync(d) && readdirSync(d, { withFileTypes: true }).some((e) => e.isDirectory() && hasPageBelow(path.join(d, e.name))));
+      return !hasPageBelow(dir);
     });
     expect(ghosts, `⚠️ ★`+`OWN_HEADER に、もう無い面が残っています:\n  ${ghosts.join('\n  ')}`)
       .toEqual([]);

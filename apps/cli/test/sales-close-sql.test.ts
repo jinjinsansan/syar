@@ -61,10 +61,11 @@ describe('★投票の締切を SQL と TS で 1 つにする', () => {
     expect(focus).toContain('${LABEL_SALES_CLOSE} ${clock(salesClose)}');
     expect(focus).toContain('${LABEL_ENTRY_CLOSE} ${clock(row.entry_deadline_at)}');
     expect(focus, '★登録の締切を ただの「締切」と出している').not.toMatch(/`締切 \$\{clock\(row\.entry_deadline_at\)\}/);
-    const detail = stripComments(readFileSync(path.join(ROOT, 'apps/web/src/app/races/[id]/page.tsx'), 'utf8'));
-    expect(detail, '★レース詳細の「発売締切まで」が 発売の締切へ数えていない').toContain("<Countdown untilIso={new Date(salesCloseAtMs(Date.parse(String(r['scheduled_at'])))).toISOString()}");
-    expect(detail).toContain('{LABEL_SALES_CLOSE}まで');
-    expect(detail, '★「締切まで」が 発走へ数えている旧の形').not.toContain("<Countdown untilIso={String(r['scheduled_at'])}");
+    /** ★2026-09-30: ★見た目は race-detail-view.tsx へ（★デザイナー R-21） */
+    const detail = stripComments(readFileSync(path.join(ROOT, 'apps/web/src/app/races/[id]/race-detail-view.tsx'), 'utf8'));
+    expect(detail, '★レース詳細の「発売締切まで」が 発売の締切へ数えていない').toContain('<Countdown untilIso={new Date(salesCloseAtMs(Date.parse(p.scheduledAtIso))).toISOString()}');
+    expect(detail).toContain('`${LABEL_SALES_CLOSE}まで`');
+    expect(detail, '★「締切まで」が 発走へ数えている旧の形').not.toContain('<Countdown untilIso={p.scheduledAtIso}');
   });
 
   it('🔴 ★極小の帯（/vote）に ★発売締切までの残り・★過ぎたら「投票は締め切りました」・★/vote は締切後に押せない（★2026-09-29）', () => {

@@ -34,7 +34,11 @@ export const STRIP_SIZE_BY_ROUTE: Readonly<Record<string, StripSize>> = {
    */
   '/odds': 'text',
   '/races/[id]': 'text',
-  '/races/[id]/bet': 'text',
+  /**
+   * ★閉じている画面（★`BET_PAGE_CLOSED`・入口なし）。★2026-09-30 に `/races` を自前の上段バー（OWN_HEADER）にしたので
+   *   ★枠が帯を置かなくなった → ★閉じた画面に帯は要らないので hidden（★開けるときに text に戻す）。
+   */
+  '/races/[id]/bet': 'hidden',
   '/odds/[id]': 'text',
   '/exchange': 'big',
   '/howto': 'big',
