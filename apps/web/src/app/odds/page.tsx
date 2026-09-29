@@ -15,6 +15,7 @@
 import { redirect } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
 import { ReadError } from '../../components/ui';
+import { Backdrop } from '../../components/uma/uma-parts';
 
 export const revalidate = 0;
 
@@ -38,11 +39,14 @@ export default async function OddsEntryPage() {
   /** ★見つからないときは黙って空にしない（★R-21） */
   return (
     <div data-theme="uma" data-page-body style={{
+      position: 'relative', overflow: 'hidden',
       minHeight: '100dvh', background: 'var(--u-navy)', color: 'var(--u-ink-light)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
       fontFamily: "'M PLUS Rounded 1c', system-ui, sans-serif", fontWeight: 800,
     }}>
-      <div style={{ textAlign: 'center' }}>
+      {/* ★芝＋紺（★2026-09-29・裁定 6・既存の部品）。★文は板（`--u-panel`）の上 */}
+      <Backdrop />
+      <div style={{ position: 'relative', textAlign: 'center', padding: '18px 20px', borderRadius: 14, background: 'var(--u-panel)' }}>
         <p style={{ margin: 0, fontSize: 16 }}>いま発売中のレースがありません。</p>
         <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 500, color: 'var(--u-ink-light-3)' }}>
           次の番組を編成中です。数分おきに開催されます。

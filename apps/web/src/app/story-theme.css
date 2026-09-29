@@ -126,3 +126,22 @@ html:has(.story-shell), body:has(.story-shell) { background: #f8f7ef; }
   .story-app-footer { padding: 28px 16px; gap: 20px; flex-wrap: wrap; }.story-app-footer p { font-size: 10px; }.story-app-footer>a:not(.story-brand) { margin-left: 0; }.story-app-footer small { margin-left: auto; }
 }
 @media (prefers-reduced-motion: reduce) { .story-shell *, .story-shell *::before, .story-shell *::after { animation: none !important; transition: none !important; } }
+
+/* ★旧い画面の最小限の着せ替え（★2026-09-29・オーナー「旧デザインも早く仕上げて」・レビュー側 裁定 6）
+   ★背景は芝＋紺（★既存の部品 `Backdrop`・新しい意匠は作らない）・★本文は板（淡い地）の上・★字は 10px 以上・★並びは変えない。
+   ⚠️ ★芝は `story-shell.tsx` の `.story-backdrop`（★画面に固定・長い画面で引き伸ばさない）。 */
+html:has(.story-shell), body:has(.story-shell) { background: #0a2340; }
+.story-shell { background: transparent; position: relative; z-index: 0; }
+/* ★z-index は -1 だけ（★兄弟に z-index を配ると、帯の全画面（z 80）が本文の下に潜る） */
+.story-shell .story-backdrop { position: fixed; inset: 0; z-index: -1; background: #0a2340; pointer-events: none; }
+.story-shell .story-header { background: rgba(10, 35, 64, .92); border-bottom-color: rgba(251, 247, 236, .18); }
+.story-shell .story-header .story-brand { color: #fbf7ec; }
+.story-shell .story-header .story-navigation a { color: rgba(251, 247, 236, .82); }
+.story-shell .story-header .story-navigation a[aria-current=page] { color: #ffd84a; border-color: #ffd84a; }
+.story-shell .story-header .story-watch { color: #fbf7ec; border-color: rgba(251, 247, 236, .5); }
+.story-shell .story-content { background: var(--a-bg); border-radius: 12px; margin-top: 12px; margin-bottom: 16px; }
+.story-shell .story-app-footer { background: rgba(10, 35, 64, .92); border-top-color: rgba(251, 247, 236, .18); }
+.story-shell .story-app-footer .story-brand, .story-shell .story-app-footer a { color: #fbf7ec; }
+.story-shell .story-app-footer p, .story-shell .story-app-footer small { color: rgba(251, 247, 236, .75); }
+.story-shell .story-brand span { font-size: 10px; }
+.story-shell .story-breadcrumb { font-size: 10px; }

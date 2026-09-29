@@ -416,7 +416,7 @@ export default function TrainingPage(): React.ReactElement {
                             }}
                           >
                             {warn && (
-                              <span style={{ position: 'absolute', right: 8, top: 8, display: 'flex', alignItems: 'center', height: 18, padding: '0 7px', borderRadius: 5, backgroundImage: 'linear-gradient(#ffe270,#f6c21c 52%,#d99f06)', border: '1px solid #a9741a', fontSize: 9.5, fontWeight: 900, color: '#4a3105' }}>
+                              <span style={{ position: 'absolute', right: 8, top: 8, display: 'flex', alignItems: 'center', height: 18, padding: '0 7px', borderRadius: 5, backgroundImage: 'linear-gradient(#ffe270,#f6c21c 52%,#d99f06)', border: '1px solid #a9741a', fontSize: 10, fontWeight: 900, color: '#4a3105' }}>
                                 注意
                               </span>
                             )}

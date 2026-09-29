@@ -113,3 +113,19 @@ describe('🔴 ★帯が二重にならない（★自前の帯を持つ面は O
       .toEqual([]);
   });
 });
+
+/**
+ * 🔴 ★旧い画面の着せ替え（★2026-09-29・裁定 6）: ★芝＋紺は 殻（`story-shell.tsx`）が 1 か所で敷く。
+ *   ⚠️ ★芝の層は z-index -1 だけ。★兄弟（帯・本文）に z-index を配ると、★帯の全画面（z 80）が本文の下に潜る。
+ */
+describe('🔴 ★旧い画面は 殻が芝＋紺を敷く（★全画面の帯を潜らせない）', () => {
+  const shell = readFileSync(path.join(ROOT, 'apps/web/src/components/story-shell.tsx'), 'utf8');
+  const css = readFileSync(path.join(ROOT, 'apps/web/src/app/story-theme.css'), 'utf8');
+  it('★殻が Backdrop を 固定の層に敷き、★その層だけが z-index -1', () => {
+    expect(shell).toContain('<div className="story-backdrop" data-theme="uma" aria-hidden><Backdrop /></div>');
+    expect(css).toContain('.story-shell .story-backdrop { position: fixed; inset: 0; z-index: -1;');
+    expect(css).toContain('.story-shell { background: transparent; position: relative; z-index: 0; }');
+    /** ★殻の子に z-index を配らない（★`> *` や `> :not(` で一括に付けない） */
+    expect(css).not.toMatch(/\.story-shell\s*>\s*[^{]*\{[^}]*z-index/);
+  });
+});

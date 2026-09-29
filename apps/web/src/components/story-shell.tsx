@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { ArcadeNav } from './nav';
 import { RaceStrip } from './uma/race-strip';
+import { Backdrop } from './uma/uma-parts';
 import { INTERIOR, OWN_HEADER } from './shell-routes';
 
 /**
@@ -53,6 +54,11 @@ export function StoryShell({ children }: { children: React.ReactNode }) {
     <main>{children}</main>
   </>;
   return <div className="story-shell">
+    {/*
+      ★**芝＋紺の背景**（★2026-09-29・レビュー側 裁定 6「旧い画面は最小限の着せ替え」）。
+      ★新しい画面と同じ部品 `Backdrop` を ★画面に固定して敷きます（★`story-theme.css` の `.story-backdrop`）。
+    */}
+    <div className="story-backdrop" data-theme="uma" aria-hidden><Backdrop /></div>
     <a className="story-skip" href="#story-content">本文へ移動</a>
     <header className="story-header">
       <a href="/" className="story-brand">馬物語<span>UMA MONOGATARI</span></a>
