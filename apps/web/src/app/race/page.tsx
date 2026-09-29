@@ -311,6 +311,8 @@ const LEGACY_MOTION = typeof window !== 'undefined'
  *   ★帯へ ★`playing` / `ended` / `error` を知らせます（★約束は `components/uma/race-strip-embed.ts`）。
  */
 const EMBED_STRIP = QS?.get('embed') === STRIP_EMBED_PARAM_VALUE;
+/** ★小窓の本編が 帯で「拡大」されているか（★帯から expand / shrink が届く・★拡大の間だけ パドックの札を描く・2026-09-29） */
+let stripExpanded = false;
 /**
  * ★**小窓では 斜め前の馬を読まない**（★2026-09-28・レビュー側の決定・★実測 1.72MB）。★150px の小窓では 正面寄りのショットも ★真横の素材で描く
  *   （★`?directional=side` と同じ扱い・★カットの数と画角は変わらない）。
@@ -4028,7 +4030,7 @@ function RaceView({ setup, real }: {
        * ★**小窓では 歩きのコマを読まない**（★2026-09-28・レビュー側の決定・★実測 10.17MB ＝ 小窓の読み込みの 6 割）。
        *   ★パドックは ★走りのコマに戻って ★場面は残る（★オーナー依頼「パドックからリプレイまで」）。
        */
-      const bakedWalk = EMBED_STRIP || bakedLibs === undefined || HORSE_TYPES_IN_USE.some((t) => t !== 'a') ? undefined : await (async () => {
+      const bakedWalk = bakedLibs === undefined || HORSE_TYPES_IN_USE.some((t) => t !== 'a') ? undefined : await (async () => {
         const set = bakedManifest?.sets.find((entry) => entry.role === 'side-walk');
         if (set === undefined) return undefined;
         const picks = paddockPicksOf(oddsRows);
@@ -4045,7 +4047,8 @@ function RaceView({ setup, real }: {
           : await loadImg(`/art/baked/${set.shadow}?v=${ASSET_VERSION}`).catch(() => null);
         return buildFramesFromBaked(set, new Map(ok), SILKS_LAYOUT_CROUCH, undefined, shadow ?? undefined);
       })();
-      const walkA = bakedLibs === undefined && !EMBED_STRIP ? await loadNativeSet('horse-jockey-side-walk-v1') : undefined;
+      /** ★2026-09-29: ★小窓でも 歩きを読む（★オーナー「パドックが勝手に軽い走りになった」・★小窓の読み込みは 約 10MB 増える） */
+      const walkA = bakedLibs === undefined ? await loadNativeSet('horse-jockey-side-walk-v1') : undefined;
       const walkB = walkA !== undefined && sideByType.b !== undefined ? await loadNativeSet('horse-jockey-side-walk-v1b') : undefined;
       const walkUsable = walkA !== undefined && Object.keys(sideByType).every((t) => t === 'b' && walkB !== undefined);
       const sideWalkHighQuality = bakedWalk !== undefined && bakedWalk.length > 0 ? bakedWalk : walkUsable && walkA !== undefined
@@ -4310,10 +4313,13 @@ function RaceView({ setup, real }: {
         }, intro.sinceSec,
         /** ★パドックの背景（★無ければタイトルの背景） */
         ((bg) => ({ image: bg, width: bg.width, height: bg.height }))(art.paddockBg ?? art.raceTitle),
-        /** ★歩きのコマ（★無ければ走りのコマ） */
-        art.sideWalkHighQuality?.[pick.gate - 1] ?? art.sideHighQuality[pick.gate - 1],
-        /** ★小窓では ★札を描かない（★背景と馬だけ・★R-19 回答 Q1） */
-        { cards: !EMBED_STRIP });
+        /**
+         * ★3 頭を「歩く → 軽く走る → 歩く」で見せる（★2026-09-29・オーナー「歩く・軽く走るの 2 つを使い分け」）。
+         *   ★歩きのコマが無ければ ★3 頭とも 走りのコマ（★軽く走る）。
+         */
+        (idx % 2 === 0 ? art.sideWalkHighQuality?.[pick.gate - 1] : undefined) ?? art.sideHighQuality[pick.gate - 1],
+        /** ★小窓では ★札を描かない（★R-19 回答 Q1）・★拡大したら描く（★テロップ・2026-09-29 オーナー） */
+        { cards: !EMBED_STRIP || stripExpanded });
       }
       drawRendererBadge(ctx, renderer, 'paddock');
       return;
@@ -6272,6 +6278,7 @@ function RaceView({ setup, real }: {
     if (!EMBED_STRIP) return undefined;
     const onMessage = (event: MessageEvent): void => {
       if (event.source !== window.parent || event.origin !== window.location.origin || !isStripControlMessage(event.data)) return;
+      if (event.data.type === 'expand' || event.data.type === 'shrink') { stripExpanded = event.data.type === 'expand'; return; }
       if (event.data.type === 'pause') {
         setPlaying((p) => { if (p) stripPausedRef.current = true; return false; });
       } else if (stripPausedRef.current) {

@@ -48,7 +48,8 @@ describe('★発走前の流れの配線', () => {
     expect(page).toContain('/art/paddock-bg-v1.webp');
     expect(stageBlock('paddock')).toContain('art.paddockBg ?? art.raceTitle');
     /** ★歩きのコマ（★無ければ走りのコマ）・★走りと同じ組み立て（勝負服・毛色・配置）を通す */
-    expect(stageBlock('paddock')).toContain('art.sideWalkHighQuality?.[pick.gate - 1] ?? art.sideHighQuality[pick.gate - 1]');
+    /** ★2026-09-29: ★3 頭を 歩く → 軽く走る → 歩く（★オーナー）・★歩きが無ければ走り */
+    expect(stageBlock('paddock')).toContain('(idx % 2 === 0 ? art.sideWalkHighQuality?.[pick.gate - 1] : undefined) ?? art.sideHighQuality[pick.gate - 1]');
     expect(page).toContain("loadNativeSet('horse-jockey-side-walk-v1')");
     expect(page).toMatch(/buildFramesByType\(\{ a: walkA, /);
     /** ★携帯（焼いた経路）の歩き: ★目録の役 `side-walk` を読み、★走りと同じ `buildFramesFromBaked` を通す */

@@ -57,7 +57,8 @@ export function isStripEmbedMessage(value: unknown): value is StripEmbedMessage 
  */
 export interface StripControlMessage {
   readonly source: 'star-strip';
-  readonly type: 'pause' | 'resume';
+  /** ★expand / shrink（★2026-09-29）: ★拡大したら 本編が札・テロップを出す（★小さいままでは出さない・R-19 回答 Q1） */
+  readonly type: 'pause' | 'resume' | 'expand' | 'shrink';
 }
 
 export function stripControlMessage(type: StripControlMessage['type']): StripControlMessage {
@@ -67,7 +68,7 @@ export function stripControlMessage(type: StripControlMessage['type']): StripCon
 export function isStripControlMessage(value: unknown): value is StripControlMessage {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
-  return v['source'] === 'star-strip' && (v['type'] === 'pause' || v['type'] === 'resume');
+  return v['source'] === 'star-strip' && (v['type'] === 'pause' || v['type'] === 'resume' || v['type'] === 'expand' || v['type'] === 'shrink');
 }
 
 /** ★帯に出す 1 行（★長い理由は切る・★「本編」とは名乗らない） */

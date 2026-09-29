@@ -111,7 +111,8 @@ describe('★小窓で本編を流す約束', () => {
   it('🔴 ⑦ ★小窓では 字幕・HUD・パドックの札・出馬表・長い録画札を ★出さない（★帯が「録画」札を重ねる）', () => {
     expect(PAGE).toContain("get('cutin') === 'off') || EMBED_STRIP;");
     expect(PAGE).toContain('const hud = EMBED_STRIP ? { gauge: false, standings: false, calls: false, result: false }');
-    expect(PAGE).toContain('{ cards: !EMBED_STRIP });');
+    /** ★2026-09-29: ★拡大の間は 札を描く（★帯から expand が届く） */
+    expect(PAGE).toContain('{ cards: !EMBED_STRIP || stripExpanded });');
     expect(PAGE).toContain('drawRaceHeadlineChip(ctx, FONT, {'.replace('drawRaceHeadlineChip', '!EMBED_STRIP) drawRaceHeadlineChip'));
     expect(PAGE).toContain('!EMBED_STRIP) drawCourseSectionTag(');
     expect(PAGE).toContain('!replay.active && !cutInActive && !EMBED_STRIP) {');
@@ -142,12 +143,13 @@ describe('★小窓で本編を流す約束', () => {
  *   ★実測（本番・390px・キャッシュ無効・見本のレース）: ★playing まで 17.29MB のうち ★歩きのコマ 10.17MB・★音 0.93MB（★流れてから +1.54MB）。
  */
 describe('★小窓の本編の重さと時間', () => {
-  it('🔴 ★小窓では 歩きのコマと音を読まない（★パドックは走りのコマに戻って 場面は残る）', () => {
-    expect(PAGE).toContain("const walkA = bakedLibs === undefined && !EMBED_STRIP ? await loadNativeSet('horse-jockey-side-walk-v1') : undefined;");
-    expect(PAGE).toContain('const bakedWalk = EMBED_STRIP || bakedLibs === undefined');
+  it('🔴 ★小窓では 音を読まない・★歩きのコマは読む（★2026-09-29 オーナー「パドックが勝手に軽い走りになった」→ 小窓でも歩く）', () => {
+    expect(PAGE).toContain("const walkA = bakedLibs === undefined ? await loadNativeSet('horse-jockey-side-walk-v1') : undefined;");
+    expect(PAGE).toContain('const bakedWalk = bakedLibs === undefined');
     expect(PAGE).toMatch(/if \(EMBED_STRIP\) return undefined;\s*audioRef\.current = createRaceAudio\(\);/);
     /** ★パドックは ★歩きが無ければ 走りのコマで描く（★場面を消さない） */
-    expect(PAGE).toContain('art.sideWalkHighQuality?.[pick.gate - 1] ?? art.sideHighQuality[pick.gate - 1]');
+    /** ★3 頭を 歩く → 軽く走る → 歩く（★歩きが無ければ走り） */
+    expect(PAGE).toContain('(idx % 2 === 0 ? art.sideWalkHighQuality?.[pick.gate - 1] : undefined) ?? art.sideHighQuality[pick.gate - 1]');
   });
 
   it('🔴 ★本編を開くのは ★窓が開く 40 秒前から 窓が閉じるまで', () => {

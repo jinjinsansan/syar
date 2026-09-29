@@ -490,6 +490,11 @@ function RaceStripBody(): React.ReactElement | null {
     if (!embedLive) return;
     iframeRef.current?.contentWindow?.postMessage(stripControlMessage(sitePaused ? 'pause' : 'resume'), window.origin);
   }, [sitePaused, embedLive]);
+  /** ★拡大したら 本編に知らせる（★札・テロップを出す・★小さいままでは出さない） */
+  useEffect(() => {
+    if (embed === null) return;
+    iframeRef.current?.contentWindow?.postMessage(stripControlMessage(expanded ? 'expand' : 'shrink'), window.origin);
+  }, [expanded, embedLive, embed]);
   useEffect(() => {
     replayingRef.current = watchable;
     if (!watchable) { setExpanded(false); autoOpenedRef.current = false; }
