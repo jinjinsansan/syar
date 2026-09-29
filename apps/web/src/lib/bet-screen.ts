@@ -45,6 +45,7 @@ export interface BetRaceView {
   readonly cond: string;
   readonly classLabel: string;
   readonly time: string;
+  readonly scheduledAt: string;
   readonly fieldSize: number;
   readonly entries: readonly BetEntryView[];
   /** ★券種と選択 → オッズ（★`race_odds_public` の写し。★画面では計算しない） */
@@ -189,6 +190,8 @@ export async function loadBetScreen(raceId: string | null, betTypes: readonly st
       cond: `${SURFACE_LABEL[String(r.surface)] ?? String(r.surface)}${Number(r.distance).toLocaleString('ja-JP')}m ${CONDITION_LABEL[String(r.track_condition)] ?? String(r.track_condition)}`,
       classLabel: String(r.grade ?? '') !== '' ? String(r.grade) : (CLASS_LABEL[Number(r.class_rank) - 1] ?? '?'),
       time: formatClock(new Date(String(r.scheduled_at)).toISOString()),
+      /** ★発走の時刻（★発売締切を過ぎたら 画面が押せなくする・★拒むのはサーバー） */
+      scheduledAt: String(r.scheduled_at),
       fieldSize: entries.length,
       entries,
       odds,

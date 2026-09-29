@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { checkOwnRaceSelection, ownRaceReasonText } from '@star/betting';
 import { Backdrop, BigButton, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
+import { useSalesClosed } from '../../components/clock';
 import { BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_OWN_RACE_BET } from '../../lib/claims';
 import { loadBetAllowance, loadBetScreen, oddsKey, placeBet, type BetAllowance, type BetScreenData } from '../../lib/bet-screen';
 
@@ -56,7 +57,9 @@ export default function VotePage(): React.ReactElement {
   const check = checkOwnRaceSelection(picks, ownGates, EP_PER_PICK);
   const selected = picks[0] ?? null;
   const selectedOdds = race && selected !== null ? race.odds.get(oddsKey('win', [selected])) ?? null : null;
-  const blocked = !data?.authenticated || race === null || selected === null || selectedOdds === null || !check.ok
+  /** ★発売締切を過ぎたら 押せない（★締め切ったのに買えると読める姿を残さない・2026-09-29） */
+  const salesClosed = useSalesClosed(race?.scheduledAt ?? null);
+  const blocked = salesClosed || !data?.authenticated || race === null || selected === null || selectedOdds === null || !check.ok
     || allowance === null || allowance.remainingEP < EP_PER_PICK || data === null || data.epBalance < EP_PER_PICK || busy;
 
   const submit = async (): Promise<void> => {

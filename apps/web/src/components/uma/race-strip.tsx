@@ -5,7 +5,8 @@ import { usePathname } from 'next/navigation';
 import { readClient } from '../../lib/supabase';
 import { canPlayRealRace } from '../../lib/race-real-access';
 import { StaleBuildNotice } from './stale-build-notice';
-import { LABEL_ENTRY_CLOSE, LABEL_SALES_CLOSE, salesCloseAtMs, salesClosedAt } from '../../lib/sales-close';
+import { LABEL_ENTRY_CLOSE, LABEL_SALES_CLOSE, salesCloseAtMs, salesClosedAt, salesLeftText } from '../../lib/sales-close';
+import { CLAIM_SALES_CLOSED } from '../../lib/claims';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowNear, replayWindowOver, type ReplayRunner } from './race-replay';
 import { RUN_VIEW_M, runCamera } from './race-camera';
 import { INTRO_STAGES, stripEmbedsOn, stripSizeOf } from './race-strip-sizes';
@@ -129,7 +130,7 @@ function focusLine(row: FocusRow, nowMs: number): string {
    *   ★登録の締切までは ★両方を出し、★過ぎたら ★発売の締切だけ（★投票の画面で知りたいのは いつまで買えるか）。★時刻は `sales-close.ts` の 1 か所から。
    */
   const salesClose = Number.isFinite(startMs) ? new Date(salesCloseAtMs(startMs)).toISOString() : null;
-  if (row.status === 'closed' || (salesClose !== null && salesClosedAt(startMs, nowMs))) return `投票は締め切りました・発走 ${clock(row.scheduled_at)}`;
+  if (row.status === 'closed' || (salesClose !== null && salesClosedAt(startMs, nowMs))) return `${CLAIM_SALES_CLOSED}・発走 ${clock(row.scheduled_at)}`;
   const sales = salesClose === null ? '' : `${LABEL_SALES_CLOSE} ${clock(salesClose)}・`;
   const entryOpen = row.entry_deadline_at !== null && nowMs < new Date(row.entry_deadline_at).getTime();
   return entryOpen && row.entry_deadline_at !== null
@@ -591,6 +592,9 @@ function RaceStripBody(): React.ReactElement | null {
           {!compact && !tickerOn && leader !== null && <span className="u-race-strip-recent">先頭 {leader.gate}番 {leader.name}</span>}
         </> : tickerOn ? null : <>
           <strong>{next ? `${clock(next.scheduled_at)} ${status}` : status}</strong>
+          {/* ★発売締切までの残り（★極小の「残り時間」・★発売中のレースだけ・★過ぎたら「投票は締め切りました」・2026-09-29） */}
+          {next && next.status === 'scheduled' && nowMs !== null && salesLeftText(next.scheduled_at, nowMs) !== null
+            && <span className="u-race-strip-recent">{salesLeftText(next.scheduled_at, nowMs)}</span>}
           {next && <span title={raceLabel(next)}>{raceLabel(next)}</span>}
           {recent && !compact && <span className="u-race-strip-recent">直近確定: {raceLabel(recent)}</span>}
         </>}

@@ -66,6 +66,9 @@ export const CLAIM_EP_FREE_ONLY = '無償でのみ受け取れます（いまは
  */
 export const CLAIM_DAILY_ONCE = '1 日 1 回 受け取れます';
 
+/** ★発売の締切を過ぎた（★/odds・帯・/vote が同じ語を出す・★締切の時刻は `sales-close.ts` の salesCloseAtMs） */
+export const CLAIM_SALES_CLOSED = '投票は締め切りました';
+
 /** ★出走の取消（★口 0079 は在るが ★画面から呼ぶ所が 0 件 ＝ 画面からは取り消せない・★オーナー判断待ち） */
 export const CLAIM_ENTRY_NO_CANCEL = '登録は、画面から取り消せません。';
 

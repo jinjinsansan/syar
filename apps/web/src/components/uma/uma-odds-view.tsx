@@ -19,6 +19,7 @@ import {
 } from './uma-parts';
 import { RaceStrip } from './race-strip';
 import { useSalesClosed } from '../clock';
+import { CLAIM_SALES_CLOSED } from '../../lib/claims';
 import { CLAIM_ODDS_FIXED } from '../../lib/claims';
 
 /** ★枠色 1〜8（★正典 `--f1`〜`--f8` の写し・★変更禁止） */
@@ -85,7 +86,7 @@ export function UmaOddsView({ race, rows }: {
       <NoticeBar
         kind={closed ? 'closing' : 'soon'}
         text={closed
-          ? '投票は締め切りました。'
+          ? `${CLAIM_SALES_CLOSED}。`
           : `${CLAIM_ODDS_FIXED}。`}
         actionLabel="投票する"
         actionHref="/vote"

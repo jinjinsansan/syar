@@ -17,7 +17,8 @@ import { lastFunctionBody, stripSqlComments } from './lib/sql-source.js';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { stripComments } from './lib/ts-blocks.js';
-import { SALES_CLOSE_LEAD_MS, salesCloseAtMs, salesClosedAt } from '../../web/src/lib/sales-close';
+import { SALES_CLOSE_LEAD_MS, salesCloseAtMs, salesClosedAt, salesLeftText } from '../../web/src/lib/sales-close';
+import { CLAIM_SALES_CLOSED } from '../../web/src/lib/claims';
 
 const ROOT = path.resolve(__dirname, '../../..');
 
@@ -64,6 +65,23 @@ describe('★投票の締切を SQL と TS で 1 つにする', () => {
     expect(detail, '★レース詳細の「発売締切まで」が 発売の締切へ数えていない').toContain("<Countdown untilIso={new Date(salesCloseAtMs(Date.parse(String(r['scheduled_at'])))).toISOString()}");
     expect(detail).toContain('{LABEL_SALES_CLOSE}まで');
     expect(detail, '★「締切まで」が 発走へ数えている旧の形').not.toContain("<Countdown untilIso={String(r['scheduled_at'])}");
+  });
+
+  it('🔴 ★極小の帯（/vote）に ★発売締切までの残り・★過ぎたら「投票は締め切りました」・★/vote は締切後に押せない（★2026-09-29）', () => {
+    const start = Date.parse('2026-09-29T12:00:00Z');
+    const close = salesCloseAtMs(start);
+    expect(salesLeftText('2026-09-29T12:00:00Z', close - 125_000)).toBe('発売締切まで 2:05');
+    expect(salesLeftText('2026-09-29T12:00:00Z', close - 500)).toBe('発売締切まで 0:00');
+    expect(salesLeftText('2026-09-29T12:00:00Z', close), '★締切ちょうど').toBe(CLAIM_SALES_CLOSED);
+    expect(salesLeftText('not-a-date', close), '★発走が読めない').toBeNull();
+    const strip = stripComments(readFileSync(path.join(ROOT, 'apps/web/src/components/uma/race-strip.tsx'), 'utf8'));
+    const at = strip.indexOf("<strong>{next ? `${clock(next.scheduled_at)} ${status}` : status}</strong>");
+    expect(at, '★極小の行が見つからない').toBeGreaterThan(0);
+    /** ★描く要素そのものを見る（★条件の中の呼び出しだけでは 描いていなくても通る・2026-09-29 に変異で気づいた） */
+    expect(strip.slice(at, at + 500), '★極小の行に 残り時間を描いていない').toContain('<span className="u-race-strip-recent">{salesLeftText(next.scheduled_at, nowMs)}</span>');
+    const vote = stripComments(readFileSync(path.join(ROOT, 'apps/web/src/app/vote/page.tsx'), 'utf8'));
+    expect(vote).toContain('const salesClosed = useSalesClosed(race?.scheduledAt ?? null);');
+    expect(vote, '★締切後も押せる').toMatch(/const blocked = salesClosed \|\|/);
   });
 
   it('★対照: 表の締切は 発走より前（★0 以下なら この網の前提が崩れている）', () => {
