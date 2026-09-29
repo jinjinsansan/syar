@@ -143,9 +143,10 @@ describe('★小窓で本編を流す約束', () => {
  *   ★実測（本番・390px・キャッシュ無効・見本のレース）: ★playing まで 17.29MB のうち ★歩きのコマ 10.17MB・★音 0.93MB（★流れてから +1.54MB）。
  */
 describe('★小窓の本編の重さと時間', () => {
-  it('🔴 ★小窓では 音を読まない・★歩きのコマは読む（★2026-09-29 オーナー「パドックが勝手に軽い走りになった」→ 小窓でも歩く）', () => {
-    expect(PAGE).toContain("const walkA = bakedLibs === undefined ? await loadNativeSet('horse-jockey-side-walk-v1') : undefined;");
-    expect(PAGE).toContain('const bakedWalk = bakedLibs === undefined');
+  it('🔴 ★小窓では 音を読まない・★歩きのコマは 最初は読まず「拡大」で 1 度だけ読む（★2026-09-29 レビュー側の差し戻し・3.92MB を保つ）', () => {
+    expect(PAGE).toContain('const sideWalkHighQuality = EMBED_STRIP ? undefined : await computeWalk();');
+    expect(PAGE).toContain('if (EMBED_STRIP) walkLoaderRef.current = computeWalk;');
+    expect(PAGE).toMatch(/if \(stripExpanded && load !== null\) \{\s*walkLoaderRef\.current = null;/);
     expect(PAGE).toMatch(/if \(EMBED_STRIP\) return undefined;\s*audioRef\.current = createRaceAudio\(\);/);
     /** ★パドックは ★歩きが無ければ 走りのコマで描く（★場面を消さない） */
     /** ★3 頭を 歩く → 軽く走る → 歩く（★歩きが無ければ走り） */

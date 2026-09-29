@@ -4030,6 +4030,11 @@ function RaceView({ setup, real }: {
        * ★**小窓では 歩きのコマを読まない**（★2026-09-28・レビュー側の決定・★実測 10.17MB ＝ 小窓の読み込みの 6 割）。
        *   ★パドックは ★走りのコマに戻って ★場面は残る（★オーナー依頼「パドックからリプレイまで」）。
        */
+      /**
+       * ★2026-09-29（レビュー側の差し戻し）: ★小窓では 最初は読まない（★3.92MB を保つ）。★「拡大」が届いたら 1 度だけ読む（`walkLoaderRef`）。
+       *   ★小窓以外（/race・/watch-race）は ★これまでどおり 最初に読む。
+       */
+      const computeWalk = async (): Promise<readonly (readonly HighQualityHorseFrame[])[] | undefined> => {
       const bakedWalk = bakedLibs === undefined || HORSE_TYPES_IN_USE.some((t) => t !== 'a') ? undefined : await (async () => {
         const set = bakedManifest?.sets.find((entry) => entry.role === 'side-walk');
         if (set === undefined) return undefined;
@@ -4047,13 +4052,15 @@ function RaceView({ setup, real }: {
           : await loadImg(`/art/baked/${set.shadow}?v=${ASSET_VERSION}`).catch(() => null);
         return buildFramesFromBaked(set, new Map(ok), SILKS_LAYOUT_CROUCH, undefined, shadow ?? undefined);
       })();
-      /** ★2026-09-29: ★小窓でも 歩きを読む（★オーナー「パドックが勝手に軽い走りになった」・★小窓の読み込みは 約 10MB 増える） */
       const walkA = bakedLibs === undefined ? await loadNativeSet('horse-jockey-side-walk-v1') : undefined;
       const walkB = walkA !== undefined && sideByType.b !== undefined ? await loadNativeSet('horse-jockey-side-walk-v1b') : undefined;
       const walkUsable = walkA !== undefined && Object.keys(sideByType).every((t) => t === 'b' && walkB !== undefined);
-      const sideWalkHighQuality = bakedWalk !== undefined && bakedWalk.length > 0 ? bakedWalk : walkUsable && walkA !== undefined
+      return bakedWalk !== undefined && bakedWalk.length > 0 ? bakedWalk : walkUsable && walkA !== undefined
         ? buildFramesByType({ a: walkA, ...(walkB !== undefined ? { b: walkB } : {}) }, undefined, SILKS_LAYOUT_CROUCH, sideMode)
         : undefined;
+      };
+      const sideWalkHighQuality = EMBED_STRIP ? undefined : await computeWalk();
+      if (EMBED_STRIP) walkLoaderRef.current = computeWalk;
       /** ★小窓では 空（★描くときは 真横の素材に回る `libraryOr`・★代わりの v2 も読まない） */
       const diagFrontHighQuality = EMBED_STRIP ? [] : bakedLibs?.['diag-front-v2'] ?? (frontV3 !== undefined
         ? buildFramesByType({ a: frontV3, ...frontByType }, undefined, SILKS_LAYOUT_FRONT, frontMode)
@@ -6274,11 +6281,24 @@ function RaceView({ setup, real }: {
    *   ★知らせは ★親（帯）から・★同じ origin だけ受ける。
    */
   const stripPausedRef = useRef(false);
+  /** ★小窓: ★歩きのコマを「拡大」で 1 度だけ読む口（★読み込みの中で置かれる・2026-09-29） */
+  const walkLoaderRef = useRef<(() => Promise<readonly (readonly HighQualityHorseFrame[])[] | undefined>) | null>(null);
   useEffect(() => {
     if (!EMBED_STRIP) return undefined;
     const onMessage = (event: MessageEvent): void => {
       if (event.source !== window.parent || event.origin !== window.location.origin || !isStripControlMessage(event.data)) return;
-      if (event.data.type === 'expand' || event.data.type === 'shrink') { stripExpanded = event.data.type === 'expand'; return; }
+      if (event.data.type === 'expand' || event.data.type === 'shrink') {
+        stripExpanded = event.data.type === 'expand';
+        /** ★拡大したら 歩きのコマを 1 度だけ読む（★小窓のままでは読まない・3.92MB を保つ） */
+        const load = walkLoaderRef.current;
+        if (stripExpanded && load !== null) {
+          walkLoaderRef.current = null;
+          void load().then((walk) => {
+            if (walk !== undefined && artRef.current !== null) artRef.current = { ...artRef.current, sideWalkHighQuality: walk };
+          }, () => undefined);
+        }
+        return;
+      }
       if (event.data.type === 'pause') {
         setPlaying((p) => { if (p) stripPausedRef.current = true; return false; });
       } else if (stripPausedRef.current) {

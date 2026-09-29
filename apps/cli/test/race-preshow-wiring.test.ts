@@ -55,7 +55,8 @@ describe('★発走前の流れの配線', () => {
     /** ★携帯（焼いた経路）の歩き: ★目録の役 `side-walk` を読み、★走りと同じ `buildFramesFromBaked` を通す */
     expect(page).toContain("entry.role === 'side-walk'");
     expect(page).toMatch(/return buildFramesFromBaked\(set, new Map\(ok\), SILKS_LAYOUT_CROUCH/);
-    expect(page).toContain('const sideWalkHighQuality = bakedWalk !== undefined && bakedWalk.length > 0 ? bakedWalk :');
+    /** ★2026-09-29: ★歩きは `computeWalk` の中（★小窓は「拡大」で読む） */
+    expect(page).toContain('return bakedWalk !== undefined && bakedWalk.length > 0 ? bakedWalk :');
     const bake = readFileSync(path.resolve(__dirname, '../../../tools/bake-race-frames.mjs'), 'utf8');
     expect(bake).toContain("{ role: 'side-walk', layout: 'crouch', prefix: pickSet('horse-jockey-side-walk-v1') }");
     expect(stageBlock('entry')).toContain('popularityRanksOf(');
