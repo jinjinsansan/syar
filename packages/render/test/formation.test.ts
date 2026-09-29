@@ -9,8 +9,10 @@
  *   ⑤ ★**横位置 `w` も同じ生成器から出る**（Q-P4-29）
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import {
-  replayPositionModel, finalOrderOf, slotOf, packSpreadM, convergeAt,
+  replayPositionModel, finalOrderOf, slotOf, packSpreadM, convergeAt, FORM_PULL_CAP_M, FORM_PULL_RAMP_M,
   type FormStrategy,
 } from '../src/index.js';
 
@@ -164,5 +166,89 @@ describe('★隊列の生成', () => {
     expect(convergeAt(1600)).toBeCloseTo(1, 5);
     expect(convergeAt(200)).toBeCloseTo(0, 5);
     expect(convergeAt(0)).toBeCloseTo(0, 5);
+  });
+});
+
+/**
+ * ★**大差のレース**（★2026-09-29・オーナー「あり得ないスピード」・レビュー側 ③ 案 A）
+ *
+ *   ★隊列の中心は全馬の平均なので、★勝ち馬から何十秒も離れた馬がいると ★中心が何百 m も後ろに残り、
+ *   ★先頭が中心へ引き戻されたまま ★`finishSec` で真の位置へ跳んでいた（★直す前の実測 1 コマ最大 970 m/秒）。
+ *   → ★寄せる量を `FORM_PULL_CAP_M` で丸め、★自分の残り距離で 0 へ細らせる。
+ */
+describe('★大差のレースでも あり得ない速さを出さない', () => {
+  /** ★利用者から見た「直った」の線: 実馬は 17〜18 m/秒 */
+  const MAX_FRAME_MPS = 20;
+  const DT = 1 / 60;
+  const fieldOf = (gaps: readonly number[], dist: number) => {
+    const win = dist / 15.72;
+    return gaps.map((g, i) => {
+      const finish = win + g;
+      /** ★区間は走破タイムの按分（★真の速さは一定＝実馬の範囲・★丸めが足した速さだけが上に出る） */
+      return { gate: i + 1, startSec: 0, spurtSec: finish * (dist - 800) / dist, straightSec: finish * (dist - 400) / dist, finishSec: finish };
+    });
+  };
+  const modelOf = (gaps: readonly number[], dist: number, over?: Record<string, unknown>) => replayPositionModel({
+    distanceMeter: dist, spurtMetersLeft: 800, straightMetersLeft: 400, boundaries: fieldOf(gaps, dist),
+    strategyOf: (g) => STRAT[(g - 1) % 4]!, pace: 'middle', formationSeed: 4242, ...over,
+  });
+  const LARGE: readonly (readonly number[])[] = [
+    [0, 0.3, 0.6, 1, 1.5, 2, 3, 5, 8, 12, 20, 30],
+    [0, 4, 8, 12, 16, 20, 24, 28],
+    [0, 0.2, 0.4, 25, 26, 27, 40, 41, 42, 43],
+  ];
+
+  it('★① どのコマでも 1 コマあたりの速さが 20 m/秒を超えない（★1/60 秒ごと・大差 × 距離）', () => {
+    let worst = 0;
+    for (const gaps of LARGE) for (const dist of [1200, 2400]) {
+      const m = modelOf(gaps, dist);
+      const end = dist / 15.72 + gaps[gaps.length - 1]! + 1;
+      let prev = m.at(0).map((h) => h.meters);
+      for (let i = 1; i * DT <= end; i++) {
+        const now = m.at(i * DT).map((h) => h.meters);
+        now.forEach((v, j) => {
+          const mps = (v - prev[j]!) / DT;
+          worst = Math.max(worst, mps);
+          expect(mps, `dist=${dist} gaps=${gaps.join(',')} t=${(i * DT).toFixed(2)} gate=${j + 1}`).toBeLessThanOrEqual(MAX_FRAME_MPS);
+          expect(mps).toBeGreaterThanOrEqual(-1e-6);
+        });
+        prev = now;
+      }
+    }
+    expect(worst).toBeGreaterThan(10);
+  });
+
+  it('★② 着順は丸めの後も動かない（D-059）', () => {
+    for (const gaps of LARGE) for (const dist of [1200, 3200]) {
+      expect(finalOrderOf(modelOf(gaps, dist))).toEqual(finalOrderOf(modelOf(gaps, dist, { formation: 0 })));
+    }
+  });
+
+  /**
+   * ★③ 通常のレース（★上の 12 頭・0.5 秒刻み）では ★丸めが 1 度も効かない ＝ ★直す前と同じ位置。
+   *   ★効いていないことは「寄せた量 < 上限」で確かめる（★上限に当たった所だけが丸めで変わる）。
+   */
+  it('★③ 通常のレースでは 丸めが 1 度も効かない（寄せた量は どのコマでも上限より小さい）', () => {
+    const m = mk();
+    const truth = mk({ formation: 0 });
+    let maxPull = 0;
+    for (let t = 0; t <= 102; t += DT) {
+      const shown = m.at(t);
+      const real = truth.at(t);
+      shown.forEach((h, j) => {
+        const pull = Math.abs(h.meters - real[j]!.meters);
+        maxPull = Math.max(maxPull, pull);
+        const cap = FORM_PULL_CAP_M * Math.min(1, Math.max(0, 1600 - real[j]!.meters) / FORM_PULL_RAMP_M);
+        expect(pull, `t=${t.toFixed(2)} gate=${h.gate}`).toBeLessThan(Math.max(cap, 1e-9));
+      });
+    }
+    expect(maxPull).toBeGreaterThan(1);
+  });
+
+  /** ★④ `a`（寄せる強さ）は全馬共通のまま（Q-P4-38）。★中心と強さだけから作り、馬ごとの値を読まない */
+  it('★④ 寄せる強さ a は 隊列の中心と強さだけから作る（Q-P4-38）', () => {
+    const src = readFileSync(path.resolve(__dirname, '../src/replay-model.ts'), 'utf8');
+    expect(src).toMatch(/const a = convergeAt\(distanceMeter - centre\)\s*\n\s*\* formStartRamp\(centre\)\s*\n\s*\* Math\.max\(0, Math\.min\(1, strength\)\);/);
+    expect(src).toContain('const pull = Math.max(-cap, Math.min(cap, a * (form - truth)));');
   });
 });

@@ -135,6 +135,11 @@ function alongPath(
   return fallback;
 }
 
+/** ★隊列へ寄せる量の上限（m）。★`replayPositionModel` の【単調性】が置いていた前提の値 */
+export const FORM_PULL_CAP_M = 30;
+/** ★上限を 0 へ細らせる残り距離（m）。★細る速さは 30/800 × 馬速 ≒ 0.7 m/秒（★400 では大差で 20.08 m/秒・800 で 19.19・通常のレースはどちらも 1 ビットも変わらない） */
+export const FORM_PULL_RAMP_M = 800;
+
 /**
  * 境界時刻から位置モデルを作る。
  *
@@ -192,6 +197,8 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
    *   `a` は**全馬で共通**（隊列の中心の残り距離で決まる）なので、
    *   `d/dt = (1−a)·真の速度 + a·中心の速度 + a'·(隊列−真)` の第3項だけが負になり得ます。
    *   `|a'| ≒ 0.02/s`・`|隊列−真| ≤ 30m` で **0.6 m/s** 程度、馬速 17m/s に対して十分小さい。
+   *   ⚠️ ★`≤ 30m` は ★**前提ではなく、下の丸め（`FORM_PULL_CAP_M`）で守っています**（★2026-09-29）。
+   *      ★以前は前提として書いてあるだけで、★大差のレースでは何百 m 離れていました（★1 コマ 970 m/秒）。
    *   ⚠️ **それでも検査で押さえます**（以前ここで「馬が後ろに下がる」を出しました）。
    */
   const centreOf = (sec: number): number => {
@@ -216,7 +223,17 @@ export function replayPositionModel(input: ReplayInput): PositionModel {
     const slot = slots.get(b.gate) ?? 0.5;
     // ★スロット 0 = 先頭寄り → 中心より前
     const form = centre + spread * (0.5 - slot);
-    return Math.max(0, Math.min(distanceMeter, truth + a * (form - truth)));
+    /**
+     * ★**隊列へ寄せる量は丸めて守ります**（★2026-09-29・レビュー側 ③ 案 A）。
+     *   ★上の【単調性】の `|隊列−真| ≤ 30m` は ★前提ではなく、★ここで強制しています。
+     *   ⚠️ ★大差（勝ち馬から平均 13 秒超）では中心が何百 m も後ろにあり、★先頭が中心へ引き戻されたまま
+     *      ★`finishSec` で真の位置へ跳んでいました（★1 コマ 970 m/秒・オーナー「あり得ないスピード」）。
+     *   ★上限は ★自分の残り距離で 0 へ細らせます（★決勝線で真の位置に着く＝跳ばない・D-059）。
+     *   ★`a` は全馬共通のまま（★Q-P4-38）。★丸めは見せ方だけで、★着順・時刻には触れません。
+     */
+    const cap = FORM_PULL_CAP_M * Math.min(1, Math.max(0, distanceMeter - truth) / FORM_PULL_RAMP_M);
+    const pull = Math.max(-cap, Math.min(cap, a * (form - truth)));
+    return Math.max(0, Math.min(distanceMeter, truth + pull));
   };
 
   /**
