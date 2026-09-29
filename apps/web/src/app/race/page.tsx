@@ -4904,7 +4904,8 @@ function RaceView({ setup, real }: {
        *   背景の流れと脚の周期を常に実馬の速さにする。ゴール前は Δ=0（決勝線と馬が一致）。
        */
       const visualScroll = (motionTimeline ?? built).visualScroll;
-      const visualDelta = visualScroll.deltaAt(d);
+      /** ★注視点も渡す（★跳びの区間で芝が戻らない・`visual-scroll.ts`） */
+      const visualDelta = visualScroll.deltaAt(d, scene.focusS);
       const gaitDelta = visualDelta - visualScroll.deltaAt(RACE_INTRO_RACE_START_SEC);
       const metersByGate = new Map(easedAt.map((horse) => [horse.gate, horse.meters]));
       /**
@@ -5520,6 +5521,21 @@ function RaceView({ setup, real }: {
       }
       /** ⚠️ ★全画面のときは帯を重ねません（★デザイナーの絵の上に別の帯が乗ります） */
       if (!cutInCoversWorld) paintTelop?.();
+      /**
+       * ★**小窓は時計の跳びを暗転で覆う**（★2026-09-29・オーナー「あり得ないスピード」）。
+       *   ★小窓はカットインを出さない（★R-19 Q1）ので、★跳びが裸で見え、馬群が 1 コマで 1,000m 飛んでいた。
+       *   ★字は出さず、★跳びの前後だけ暗くする（★真ん中は真っ暗）。
+       */
+      if (EMBED_STRIP && renderer === 'v2' && !replay.active && jumpAt !== undefined) {
+        const fade = Math.min(1, 2 * (1 - Math.abs(raceD - jumpAt.at) / jumpLead));
+        if (fade > 0) {
+          ctx.save();
+          ctx.globalAlpha = fade;
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, W, H);
+          ctx.restore();
+        }
+      }
       /**
        * ⚠️ ★**カットインが覆う境目では、白い閃光を出しません**（★2026-09-11）。
        *    ★閃光はこのあとに ★**上から**塗るので、★出したままだとカットインが

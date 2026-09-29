@@ -25,14 +25,24 @@ export interface VisualScrollSample {
 }
 
 export interface VisualScroll {
-  /** 補正 Δ（m）。見た目の進行距離 = focusS + Δ */
-  deltaAt(displaySec: number): number;
+  /**
+   * 補正 Δ（m）。見た目の進行距離 = focusS + Δ
+   * ★`focusS`（そのコマの注視点）を渡すと、注視点が跳んだ区間では Δ を時間でなく注視点の進みで補間する。
+   *   時間で補間すると、区間の途中で注視点だけ先に跳び Δ が遅れて付いてくるため、
+   *   芝が 1 コマ前へ飛んで数コマで 1,000m 戻る（2026-09-29 オーナー「芝が後退していく」）。
+   */
+  deltaAt(displaySec: number, focusS?: number): number;
 }
+
+/** ★1 区間（表示 0.05 秒）で注視点がこれより動いたら「跳び」とみなす（★実馬の 20m/秒でも 1m） */
+export const VISUAL_SCROLL_JUMP_M = 30;
 
 export function buildVisualScroll(samples: readonly VisualScrollSample[]): VisualScroll {
   if (samples.length === 0) return { deltaAt: () => 0 };
   const times = new Float64Array(samples.length);
   const deltas = new Float64Array(samples.length);
+  const focuses = new Float64Array(samples.length);
+  for (let i = 0; i < samples.length; i++) focuses[i] = samples[i]!.focusS;
   times[0] = samples[0]!.displaySec;
   deltas[0] = 0;
   for (let i = 1; i < samples.length; i++) {
@@ -50,13 +60,16 @@ export function buildVisualScroll(samples: readonly VisualScrollSample[]): Visua
   const base = anchorIndex >= 0 ? deltas[anchorIndex]! : 0;
   for (let i = 0; i < deltas.length; i++) deltas[i] = deltas[i]! - base;
   return {
-    deltaAt(displaySec: number): number {
+    deltaAt(displaySec: number, focusS?: number): number {
       if (displaySec <= times[0]!) return deltas[0]!;
       const last = times.length - 1;
       if (displaySec >= times[last]!) return deltas[last]!;
       let lo = 0, hi = last;
       while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (times[mid]! <= displaySec) lo = mid; else hi = mid; }
-      const t = (displaySec - times[lo]!) / (times[hi]! - times[lo]!);
+      const jump = focuses[hi]! - focuses[lo]!;
+      const t = focusS !== undefined && Number.isFinite(focusS) && Math.abs(jump) > VISUAL_SCROLL_JUMP_M
+        ? Math.max(0, Math.min(1, (focusS - focuses[lo]!) / jump))
+        : (displaySec - times[lo]!) / (times[hi]! - times[lo]!);
       return deltas[lo]! + (deltas[hi]! - deltas[lo]!) * t;
     },
   };

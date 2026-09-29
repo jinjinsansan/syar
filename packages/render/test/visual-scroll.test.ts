@@ -28,6 +28,28 @@ describe('visual scroll (見た目の速度を時間圧縮から切り離す)', 
     expect(buildVisualScroll(samples).deltaAt(7.3)).toBe(vs.deltaAt(7.3));
   });
 
+  /**
+   * ★2026-09-29 オーナー「芝が後退していく」: 表の刻み（0.05 秒）の途中で注視点が 1,150m 跳ぶと、
+   *   時間で補間した Δ が数コマ遅れて付いてきて、芝が前へ飛んでから 1,000m 戻っていた。
+   */
+  it('注視点が表の刻みの途中で跳んでも、画面の毎コマで芝は後ろへ戻らない', () => {
+    const JUMP_AT = 1.02;
+    const focusAt = (d: number): number => d * 30 + (d >= JUMP_AT ? 1150 : 0);
+    const samples = Array.from({ length: 61 }, (_, i) => ({
+      displaySec: i * 0.05, focusS: focusAt(i * 0.05), rate: i === 21 ? 40 : 1.8, anchorWeight: 0,
+    }));
+    const vs = buildVisualScroll(samples);
+    let prev = Number.NEGATIVE_INFINITY;
+    for (let d = 0; d <= 3; d += 1 / 60) {
+      const f = focusAt(d);
+      const visual = f + vs.deltaAt(d, f);
+      expect(visual, `d=${d.toFixed(3)}`).toBeGreaterThanOrEqual(prev - 1e-6);
+      prev = visual;
+    }
+    // ★跳ばない区間は従来と同じ（★注視点を渡しても渡さなくても同じ値）
+    expect(vs.deltaAt(0.52, focusAt(0.52))).toBeCloseTo(vs.deltaAt(0.52), 9);
+  });
+
   it('anchor weight はゴール前 80m で 1、その手前 80m でなだらかに 0→1', () => {
     const course = ovalCourse(1600, { turn: 'left' });
     expect(broadcastV2AnchorWeight(course, 'finish-line', 1550)).toBe(1);

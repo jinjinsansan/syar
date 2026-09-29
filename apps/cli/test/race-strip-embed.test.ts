@@ -123,6 +123,16 @@ describe('★小窓で本編を流す約束', () => {
     expect(STRIP).toContain('{big && embedLive && !expanded && <span className="u-race-strip-stage-rec" aria-hidden>録画</span>}');
   });
 
+  /** 🔴 ⑧ ★2026-09-29 オーナー「あり得ないスピード」: ★小窓は跳びを覆うカットインが無いので、★暗転で覆う */
+  it('🔴 ⑧ ★小窓では 時計の跳び（editJumps）の前後を暗転で覆う（★真ん中は真っ暗）', () => {
+    expect(PAGE).toContain('if (EMBED_STRIP && renderer === \'v2\' && !replay.active && jumpAt !== undefined) {');
+    expect(PAGE).toContain('const fade = Math.min(1, 2 * (1 - Math.abs(raceD - jumpAt.at) / jumpLead));');
+    /** ★跳びの窓は カットインと同じ 1 か所（★片方だけ直すと覆えない跳びが出る・R-30） */
+    expect(PAGE).toContain('const jumpAt = built.editJumps.find((j) => raceD >= j.at - jumpLead && raceD < j.at + jumpLead);');
+    /** ★芝は跳びの区間で注視点の進みに合わせる（★`visual-scroll.ts`・後退しない） */
+    expect(PAGE).toContain('visualScroll.deltaAt(d, scene.focusS);');
+  });
+
   it('🔴 ⑤ ★出せなかったら ★1 通りの 1 行を出し、★理由はログにだけ', () => {
     expect(STRIP_EMBED_FAILED_NOTE).toBe('録画を出せませんでした');
     expect(STRIP_EMBED_FAILED_NOTE, '★簡易版は出していない').not.toContain('簡易');
