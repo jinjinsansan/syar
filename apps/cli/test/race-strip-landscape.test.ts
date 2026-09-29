@@ -83,7 +83,8 @@ describe('★③ 段 A ── 横にしたら その場で全画面', () => {
   });
 
   it('④ ★本編と名乗らない・★音を付けない', () => {
-    expect(LIVE, '★録画であることを言っていない').toContain('録画・結果から再現');
+    /** ★2026-09-30: ★「録画」→「中継」（★オーナー「録画はそもそも不要ですよね？全て生中継であるべきです。なので中継という言葉にしてください」） */
+    expect(LIVE, '★中継であることを言っていない').toContain(' · 中継</strong>');
     expect(LIVE, '★本編と名乗っている').not.toMatch(/本編/);
     expect(LIVE, '★音を鳴らしている').not.toMatch(/new Audio|AudioContext|\.play\(/);
   });

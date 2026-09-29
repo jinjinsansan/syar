@@ -108,7 +108,7 @@ describe('★帯の掲示板', () => {
     expect(bracketOrNull(16, 16)).toBe(8);
     expect(bracketOrNull(3, 0), '★頭数が分からなければ 色を付けない').toBeNull();
     expect(STRIP).toContain('{ background: `var(--f${item.bracket})`, color: [1, 5, 8].includes(item.bracket) ? \'#111\' : \'#fff\' }');
-    expect(STRIP).toContain('{tickerOn && <span className="u-race-strip-recbadge"><span className="u-race-strip-chiphead">いま:</span><i aria-hidden />録画</span>}');
+    expect(STRIP).toContain('{tickerOn && <span className="u-race-strip-recbadge"><span className="u-race-strip-chiphead">いま:</span><i aria-hidden />中継</span>}');
     /** ★2 つの札の頭の語を揃える（★片方だけ「次」だと もう片方が何か曖昧・レビュー側） */
     expect(STRIP).toContain('<span className="u-race-strip-chiphead">次:</span>');
   });

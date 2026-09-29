@@ -9,7 +9,7 @@
  */
 import { authClient } from './supabase';
 
-export const REAL_RACE_SIGN_IN_MESSAGE = 'ログインしてください（★いまは ★自分の馬が出たレースの録画だけを出しています）';
+export const REAL_RACE_SIGN_IN_MESSAGE = 'ログインしてください（★いまは ★自分の馬が出たレースの中継だけを出しています）';
 
 export async function canPlayRealRace(): Promise<boolean> {
   const session = await authClient().auth.getSession();

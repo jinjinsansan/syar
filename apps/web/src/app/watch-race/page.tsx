@@ -95,7 +95,7 @@ export default function WatchRacePage(): React.ReactElement {
             {exit.kind === 'demo'
               ? '上の帯は実際の開催情報です。下の映像は演出確認用のデモです。実レースの着順は開催情報の「詳細」から確認できます。'
               : exit.kind === 'expand'
-                ? 'いまレース中です（確定した結果からの録画）。下のボタンか、端末を横にすると大きく見られます。'
+                ? 'いまレース中です（中継）。下のボタンか、端末を横にすると大きく見られます。'
                 : `いま走っているレースはありません。${nextClock === null ? '' : `次の発走は ${nextClock} です。`}${strip.lastResult === null ? '' : `直前のレース: ${strip.lastResult}。`}レース中は上の帯に走行が出ます。`}
           </p>
           {/* ★本編の入口でも使う既存の絵。★デモへ送るときだけ出す（★「デモ」と明示） */}
@@ -117,7 +117,7 @@ export default function WatchRacePage(): React.ReactElement {
         padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
         {exit.kind === 'demo' && <BigButton tone="blue" label="レース演出を観る" sub="ログイン不要・映像はデモ" href={exit.href} grow="1.4 1 210px" />}
-        {exit.kind === 'expand' && <BigButton tone="blue" label="いま走っているレースを見る" sub="録画・結果から再現" onClick={requestStripExpand} grow="1.4 1 210px" />}
+        {exit.kind === 'expand' && <BigButton tone="blue" label="いま走っているレースを見る" sub="中継" onClick={requestStripExpand} grow="1.4 1 210px" />}
         <BigButton tone="ivory" label={signedIn ? 'ダッシュボード' : 'トップへ戻る'} sub="いつでも戻れます" href={signedIn ? '/home' : '/'} grow="1 1 130px" />
       </div>
     </div>

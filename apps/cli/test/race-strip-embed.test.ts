@@ -120,7 +120,7 @@ describe('★小窓で本編を流す約束', () => {
     expect(PAGE).toContain('if (!EMBED_STRIP) drawEntryBoard(');
     expect(PAGE).toContain('if (replay.active && !EMBED_STRIP) {');
     expect(PAGE).toContain('{real !== null && !EMBED_STRIP && <div style={REPLAY_BADGE_STYLE}>');
-    expect(STRIP).toContain('{big && embedLive && !expanded && <span className="u-race-strip-stage-rec" aria-hidden>録画</span>}');
+    expect(STRIP).toContain('{big && embedLive && !expanded && <span className="u-race-strip-stage-rec" aria-hidden>中継</span>}');
   });
 
   /** 🔴 ⑧ ★2026-09-29 オーナー「あり得ないスピード」: ★小窓は跳びを覆うカットインが無いので、★暗転で覆う */
@@ -134,10 +134,10 @@ describe('★小窓で本編を流す約束', () => {
   });
 
   it('🔴 ⑤ ★出せなかったら ★1 通りの 1 行を出し、★理由はログにだけ', () => {
-    expect(STRIP_EMBED_FAILED_NOTE).toBe('録画を出せませんでした');
+    expect(STRIP_EMBED_FAILED_NOTE).toBe('中継を出せませんでした');
     expect(STRIP_EMBED_FAILED_NOTE, '★簡易版は出していない').not.toContain('簡易');
-    expect(stripEmbedLog('error', 'ログインしてください', 0)).toBe('録画を出せませんでした: ログインしてください');
-    expect(stripEmbedLog('late', null, 118)).toBe('録画の用意が間に合いませんでした（118 秒）');
+    expect(stripEmbedLog('error', 'ログインしてください', 0)).toBe('中継を出せませんでした: ログインしてください');
+    expect(stripEmbedLog('late', null, 118)).toBe('中継の用意が間に合いませんでした（118 秒）');
     expect(isStripEmbedMessage(stripEmbedMessage('error', 'r1', '理由'))).toBe(true);
     expect(isStripEmbedMessage({ source: 'star-race', type: 'error', raceId: 'r1', detail: 3 })).toBe(false);
     /** ★画面に出すのは 定数だけ（★理由の文を出さない） */

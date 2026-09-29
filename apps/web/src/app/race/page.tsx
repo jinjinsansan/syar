@@ -1079,7 +1079,7 @@ interface RealReplay {
  * ★**録画であることの札**（★契約 §暫定の録画表示・計画 段 2 の 4「★中継と偽らない」）。
  * ⚠️ ★意匠は作っていません（★最小の字と地だけ）。★見せ方は ★デザイナーへ（★平場の意匠と同じ便 R-18）。
  */
-const REPLAY_BADGE_TEXT = '録画・確定した結果から再現';
+const REPLAY_BADGE_TEXT = '中継';
 /**
  * ★**画面の部品の形**（★2026-09-27・引き渡し資料 `design_handoff_uma_monogatari` §5.3 / §5.5 / §5.6 の値）。
  *   ★新しい意匠は作っていません（★資料の金プレート・副ボタン・カプセルの値をそのまま）。
@@ -6547,7 +6547,7 @@ function RaceView({ setup, real }: {
       alignItems: 'center', justifyContent: 'center', gap: 10, textAlign: 'center',
     }}>
       <span style={{ fontSize: 24, letterSpacing: '.14em', color: 'var(--u-gold)' }}>馬物語</span>
-      <p style={{ margin: 0 }}>{real !== null ? '録画の用意をしています…' : 'レースの用意をしています…'}</p>
+      <p style={{ margin: 0 }}>{real !== null ? '中継の用意をしています…' : 'レースの用意をしています…'}</p>
       <progress aria-label="レース素材を読み込み中" style={{ width: 'min(260px, 60vw)', accentColor: 'var(--u-gold)' }} />
       {/*
         ★経過秒は ★**遅いときだけ**（★8 秒から・★3 択と一緒に）出します（★2026-09-28・レビュー側の条件）。
@@ -6597,7 +6597,7 @@ function RaceView({ setup, real }: {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', maxWidth: 1280, margin: '0 auto', padding: '12px 14px 0' }}>
           <a href={RETURN_TO ?? '/home'} style={RACE_BACK_PLATE}>‹ {RETURN_TO === null ? 'ダッシュボードへ' : RETURN_LABEL}</a>
           <strong style={{ fontSize: 18, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {real !== null ? `録画　${RACE_META.raceNo}　${RACE_META.raceName}` : 'レース'}
+            {real !== null ? `中継　${RACE_META.raceNo}　${RACE_META.raceName}` : 'レース'}
           </strong>
         </div>
       )}

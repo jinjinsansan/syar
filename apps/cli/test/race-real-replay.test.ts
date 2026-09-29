@@ -184,9 +184,9 @@ describe('🔴 ③ 番人が鳴いたら止まる', () => {
     try { assertReplayOrder(result, shifted); } catch (e) { caught = e; }
     expect(caught, '🔴 ★番人が鳴きません（★ずらした境界を通しています）').toBeInstanceOf(ReplayOrderMismatchError);
     const text = replayStopMessage(caught);
-    expect(text).toMatch(/^この録画は出せません（映像の着順が確定した着順と合いませんでした）/);
+    expect(text).toMatch(/^この中継は出せません（映像の着順が確定した着順と合いませんでした）/);
     /** ★番人以外の失敗も ★「出せません」で止める（★見本に落とさない） */
-    expect(replayStopMessage(new Error('走路を組めません'))).toBe('この録画は出せません: 走路を組めません');
+    expect(replayStopMessage(new Error('走路を組めません'))).toBe('この中継は出せません: 走路を組めません');
   });
 
   it('🔴 ★画面の道: 実レースの失敗は ★replayStopMessage を出して止め、★見本に落とさない', () => {

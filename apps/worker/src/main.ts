@@ -20,7 +20,7 @@ import pg from 'pg';
 import { assertPgTypesConfigured } from './pg-types.js';
 import { DB_SSL, assertSslModeDoesNotWeaken } from './db-ssl.js';
 import { APPLICATION_NAME, formatResources, sampleResources } from './resources.js';
-import { runCycle } from './cycle-runner.js';
+import { resolveDueRaces, runCycle } from './cycle-runner.js';
 import { assertEnvironmentMatches, loadConfig } from './env.js';
 import { announceConditions, buildRace } from './build-race.js';
 import { drawEntryLottery, lotteryScratchReason } from './entry-lottery.js';
@@ -78,6 +78,8 @@ import {
 
 /** 1周の間隔。★サイクル長より短くする（1サイクルを取りこぼさないため） */
 export const TICK_MS = 60_000;
+/** ★① 決める の見回りの間隔（★周と周の間・発売締切から数秒で ① を書く・0098） */
+export const RESOLVE_POLL_MS = 5_000;
 
 /** 連続で失敗した回数がこれを超えたら、異常として終了する（systemd が再起動する） */
 export const MAX_CONSECUTIVE_FAILURES = 10;
@@ -933,7 +935,24 @@ async function main(): Promise<void> {
     } catch (e) {
       console.error('[worker] 版と周の記録に失敗:', (e as Error).message);
     }
-    await new Promise((r) => setTimeout(r, Math.max(1000, TICK_MS - elapsed)));
+    /**
+     * ★**周と周の間の短い見回り**（★2026-09-29・0098・オーナー「遅延が 1 分発生するなら…なぜそういうユーザーによって違和感がある方向へ開発する？」）。
+     *   ★① 決める（発売締切の後に着順を書く）を ★周（1 分おき）だけに任せると ★締切から 0〜60 秒遅れ ★最悪で発走ちょうどになる。
+     *   → ★待ちの間 ★RESOLVE_POLL_MS おきに ★① だけを見る（★軽い: 拾う問い合わせ 1 本・該当が無ければ何もしない）。★発走時刻の 1 分前の締切から 数秒で ① が済む。
+     *   ⚠️ ★ほかの仕事（週送り・配合・確定…）は ★周のまま（★重い仕事を増やさない）。★resolveRace は冪等。
+     */
+    const waitUntil = Date.now() + Math.max(1000, TICK_MS - elapsed);
+    while (Date.now() < waitUntil) {
+      await new Promise((r) => setTimeout(r, Math.max(0, Math.min(RESOLVE_POLL_MS, waitUntil - Date.now()))));
+      if (Date.now() >= waitUntil) break;
+      try {
+        const r1 = await resolveDueRaces(store, await store.serverNowMs(), (a) =>
+          console.error(`[worker] ★★開催中止 cycle=${a.cycleIndex} 返還 ${a.refundedBets}枚 / ${a.refundedEp} EP — ① の凍結が無い・走路が不正`));
+        if (r1.resolved.length > 0) console.log(`[worker] 決め=[${r1.resolved.join(',')}]（★見回り）`);
+      } catch (e) {
+        console.error('[worker] ① の見回りに失敗（★周で やり直す）:', (e as Error).message);
+      }
+    }
   }
 
   await client.end();

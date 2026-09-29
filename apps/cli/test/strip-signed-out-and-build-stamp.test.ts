@@ -72,7 +72,7 @@ describe('★帯: 出せない人には 本編を開かない', () => {
     expect(REAL).toContain('canPlayRealRace()');
     expect(REAL).toContain('REAL_RACE_SIGN_IN_MESSAGE');
     expect(REAL, '★読む層が自前で session を判定している').not.toMatch(/session\.data\.session === null/);
-    expect(REAL, '★止める文言が写されている').not.toContain('自分の馬が出たレースの録画だけを出しています');
+    expect(REAL, '★止める文言が写されている').not.toContain('自分の馬が出たレースの中継だけを出しています');
   });
 });
 

@@ -91,8 +91,8 @@ export function assertReplayOrder(
 export function replayStopMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return error instanceof ReplayOrderMismatchError
-    ? `この録画は出せません（映像の着順が確定した着順と合いませんでした）: ${message}`
-    : `この録画は出せません: ${message}`;
+    ? `この中継は出せません（映像の着順が確定した着順と合いませんでした）: ${message}`
+    : `この中継は出せません: ${message}`;
 }
 
 export interface RealRaceData {
@@ -229,7 +229,7 @@ export async function loadRealRace(raceId: string): Promise<RealRaceData> {
    */
   if (runners.length !== allRows.length || runners.some((r, i) => r.gate !== i + 1)) {
     throw new RaceNotPlayableError(
-      `取消で欠けた枠があるレースの録画は、まだ出せません（出走 ${allRows.length} 頭のうち 確定 ${runners.length} 頭）`,
+      `取消で欠けた枠があるレースの中継は、まだ出せません（出走 ${allRows.length} 頭のうち 確定 ${runners.length} 頭）`,
     );
   }
 

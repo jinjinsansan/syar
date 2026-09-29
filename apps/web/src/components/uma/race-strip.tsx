@@ -590,18 +590,18 @@ function RaceStripBody(): React.ReactElement | null {
         ★本編の箱（下）とは ★別の要素（★1 つの面では どちらか一方しか出ない）。
       */}
       {embed !== null && <div className={`u-race-strip-stage${big || expanded ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}${expanded ? ' u-race-strip-stage-full' : ''}`}
-        {...(expanded && recent ? { role: 'dialog', 'aria-modal': true, 'aria-label': `${recent.name}のレース録画` } : {})}>
+        {...(expanded && recent ? { role: 'dialog', 'aria-modal': true, 'aria-label': `${recent.name}のレース中継` } : {})}>
         {/* ★本編（★`playing` まで 見えないまま読み込む・★触れない） */}
         <iframe ref={iframeRef} className="u-race-strip-embed" data-live={embedLive ? 'true' : 'false'}
-          src={stripEmbedUrl(embed.id)} title="レースの録画（確定した結果から再現）" tabIndex={-1} />
+          src={stripEmbedUrl(embed.id)} title="レースの中継" tabIndex={-1} />
         {/* ★映像の左上に「録画」札を 1 つ（★DOM・★本編の長い札は小窓では消した・★R-19 回答 Q1） */}
-        {big && embedLive && !expanded && <span className="u-race-strip-stage-rec" aria-hidden>録画</span>}
+        {big && embedLive && !expanded && <span className="u-race-strip-stage-rec" aria-hidden>中継</span>}
         {expanded && <div className="u-race-strip-stage-head">
           {/* ★「本編」と名乗らない（★条件 1）。★録画・結果から再現 */}
-          <strong>{recent?.name ?? ''} · 録画・結果から再現</strong>
-          <button type="button" onClick={() => { autoOpenedRef.current = false; setExpanded(false); }} aria-label="レース録画を閉じる">閉じる</button>
+          <strong>{recent?.name ?? ''} · 中継</strong>
+          <button type="button" onClick={() => { autoOpenedRef.current = false; setExpanded(false); }} aria-label="レース中継を閉じる">閉じる</button>
         </div>}
-        {expanded && !embedLive && <p className="u-race-strip-stage-wait" role="status">録画の用意をしています…</p>}
+        {expanded && !embedLive && <p className="u-race-strip-stage-wait" role="status">中継の用意をしています…</p>}
       </div>}
       {resulting && size === 'big' && winner !== null && <div className="u-race-result-box" role="status">
         <span className="u-race-result-place">1着</span>
@@ -618,10 +618,10 @@ function RaceStripBody(): React.ReactElement | null {
             ★レース名は ★掲示板の札が持つ。★「極小」は いまどおり「レース中（録画）」。
           */}
           {/* ★頭の語は 次のレースの札と揃える（★「いま:」／「次:」・2026-09-28 オーナー「録画 19:18 発走というのは？」・レビュー側「両方に頭を」） */}
-          {tickerOn && <span className="u-race-strip-recbadge"><span className="u-race-strip-chiphead">いま:</span><i aria-hidden />録画</span>}
+          {tickerOn && <span className="u-race-strip-recbadge"><span className="u-race-strip-chiphead">いま:</span><i aria-hidden />中継</span>}
           {!tickerOn && <strong>{recent.name} レース中</strong>}
           {/* ★「（録画）」は ★別の枠にして ★縮めない（★極小でも必ず残す・R-18 回答 🟡 #8・生中継に見せない） */}
-          {!tickerOn && <span className="u-race-strip-rec">（録画）</span>}
+          {!tickerOn && <span className="u-race-strip-rec">（中継）</span>}
           {/* ★「大」は ★レース名と先頭を ★流れる 1 行に入れる（★下）。★ここに並べると 1 行に入らない */}
           {!compact && !tickerOn && <span title={raceLabel(recent)}>{raceLabel(recent)}</span>}
           {!compact && !tickerOn && leader !== null && <span className="u-race-strip-recent">先頭 {leader.gate}番 {leader.name}</span>}

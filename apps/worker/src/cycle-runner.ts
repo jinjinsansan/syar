@@ -259,6 +259,37 @@ export interface CycleOutcome {
  *    ロックが取れないのは正常系なので `lockBusy` で返します
  *    （例外にすると再起動ループになり、A-1 の24時間稼働が壊れます）。
  */
+/**
+ * ★**① 決める の 1 か所**（★2026-09-29・0098・オーナー「遅延が 1 分発生するなら…なぜそういうユーザーによって違和感がある方向へ開発する？」）。
+ *   ★周（1 分おき）の中と、★周と周の間の短い見回り（`main.ts` の RESOLVE_POLL_MS）の ★2 か所から呼ぶ（★締切から数秒で ① を書く＝発走時刻に映像が始まる）。
+ *   ★発走前の引退の取消を ★先に当てる。★凍結が無い・走路が不正なら 中止に載せる。★resolveRace は冪等（★2 か所から呼んでも 2 度書かない）。
+ */
+export async function resolveDueRaces(
+  store: CycleStore,
+  nowMs: number,
+  onAlert: (a: { cycleIndex: number; refundedBets: number; refundedEp: number }) => void,
+): Promise<{ resolved: number[]; cancelled: number[]; retireCheckSkipped: number[]; scratched: number }> {
+  const out = { resolved: [] as number[], cancelled: [] as number[], retireCheckSkipped: [] as number[], scratched: 0 };
+  for (const idx of await store.pendingResolutions(nowMs)) {
+    try {
+      const ret = await store.scratchRetiredBeforeStart(idx);
+      if (ret.skipped) out.retireCheckSkipped.push(idx);
+      out.scratched += ret.scratched;
+      await store.resolveRace(idx);
+      out.resolved.push(idx);
+    } catch (e) {
+      if (e instanceof Error && (e.name === 'UnfrozenRaceError' || e.name === 'InvalidFrozenCourseError')) {
+        const r = await store.cancelRace(idx);
+        out.cancelled.push(idx);
+        onAlert({ cycleIndex: idx, refundedBets: r.refundedBets, refundedEp: r.refundedEp });
+        continue;
+      }
+      throw e;
+    }
+  }
+  return out;
+}
+
 export async function runCycle(
   store: CycleStore,
   epochMs: number,
@@ -346,22 +377,12 @@ export async function runCycle(
      *   ★発走前の引退の取消を ★先に当てる（★取り消した馬を ① の着順に入れない・② の番人と食い違わせない）。
      *   ★凍結が無い・走路が不正なら ★② と同じく中止に載せる。
      */
-    for (const idx of await store.pendingResolutions(nowMs)) {
-      try {
-        const ret = await store.scratchRetiredBeforeStart(idx);
-        if (ret.skipped) retireCheckSkipped.push(idx);
-        scratchedBeforeStart += ret.scratched;
-        await store.resolveRace(idx);
-        resolved.push(idx);
-      } catch (e) {
-        if (e instanceof Error && (e.name === 'UnfrozenRaceError' || e.name === 'InvalidFrozenCourseError')) {
-          const r = await store.cancelRace(idx);
-          cancelled.push(idx);
-          onAlert({ cycleIndex: idx, refundedBets: r.refundedBets, refundedEp: r.refundedEp });
-          continue;
-        }
-        throw e;
-      }
+    {
+      const r1 = await resolveDueRaces(store, nowMs, onAlert);
+      resolved.push(...r1.resolved);
+      cancelled.push(...r1.cancelled);
+      retireCheckSkipped.push(...r1.retireCheckSkipped);
+      scratchedBeforeStart += r1.scratched;
     }
     for (const idx of await store.pendingSettlements(nowMs)) {
       try {

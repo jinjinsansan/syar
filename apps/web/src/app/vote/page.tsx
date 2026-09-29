@@ -277,7 +277,7 @@ export default function VotePage(): React.ReactElement {
                       : `${EP_PER_PICK} EP を使います`}
         onClick={submit} grow="1.4 1 210px" />
       {/* ★「演出デモ」とは書かない（★R-18 🔴#3・R-22 §1-5） */}
-      <BigButton tone="ivory" label="レースを見る" sub="録画で見る" href="/watch-race" grow="1 1 130px" />
+      <BigButton tone="ivory" label="レースを見る" sub="中継を見る" href="/watch-race" grow="1 1 130px" />
     </div>
 
     {/* ★確認のシート（★R-22 §4）。★背後のタップ・Esc・［戻る］で閉じる。★選んだ券種と馬は残す */}
