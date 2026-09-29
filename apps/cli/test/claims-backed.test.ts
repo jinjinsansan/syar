@@ -188,14 +188,18 @@ const MOVED: readonly Claim[] = [
 const CLAIMS: readonly Claim[] = [
   ...MOVED,
   {
-    id: '㉖続けて投票は 同じ券種・同じ額・馬は選び直す・参加ポイントのみ・続けて 3 回まで（★当たり外れを言わない）',
+    id: '㉖続けて投票は 受け付けた直後だけ・同じ券種・同じ額・馬は次のレースで選ぶ・参加ポイントのみ・続けて 3 回まで（★結果を読まない）',
     text: CLAIM_REPEAT_BET, name: 'CLAIM_REPEAT_BET',
     usedBy: ['apps/web/src/app/vote/page.tsx'],
     backedBy: () => {
       const why: string[] = [];
       const rb = stripComments(read('apps/web/src/lib/repeat-bet.ts'));
       if (!/if \(input\.streak >= REPEAT_BET_MAX\) return \{ kind: 'limit' \};/.test(rb)) why.push('★続けた回数の上限が効いていない');
-      if (!/last\.amount !== input\.stakeEP\) return \{ kind: 'none' \}/.test(rb)) why.push('★前と別の額でも「同じ額」と出す');
+      const vote0 = stripComments(read('apps/web/src/app/vote/page.tsx'));
+      /** ★同じ額: ★案内も 次のレースの投票も ★この画面の 1 口（EP_PER_PICK）だけ */
+      if (!vote0.includes('betType: justPlaced.betType, amount: EP_PER_PICK,')) why.push('★案内の額が この画面の 1 口でない（★「同じ額」と言えない）');
+      /** ★受け付けた直後だけ（★結果の後に出さない・デザイナー R-22・レビュー側裁定） */
+      if (/loadLastBet|settled/.test(vote0) || /settled|payout/.test(rb)) why.push('★結果を読んでいる（★「結果を見て、もう一度」の流れになる）');
       if (!/export const REPEAT_BET_MAX = 3;/.test(stripComments(read('apps/web/src/lib/claims.ts')))) why.push('★上限が 3 でない（★文の「3 回」とずれる）');
       const vote = stripComments(read('apps/web/src/app/vote/page.tsx'));
       if ((vote.match(/placeBet\(/g) ?? []).length !== 1) why.push('★/vote が「投票する」以外でも買っている（★自動で買わない・馬は選び直す）');

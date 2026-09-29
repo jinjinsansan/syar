@@ -1,61 +1,71 @@
 /**
- * ★**続けて投票**（★2026-09-29・オーナー「毎回たずねる」・レビュー側の裁定）
+ * ★**続けて投票**（★2026-09-29・オーナー「毎回たずねる」・レビュー側の裁定・デザイナー R-22 の指摘で出すときを差し替え）
  *
- * ★前のレースの投票が確定したら、★**同じ券種・同じ額で このレースにも投票できる**ことを出します。
- * ★馬は ★**本人が選び直します**（★自動では 1 EP も使わない）。
+ * 🔴 【★出すのは ★投票を受け付けた直後だけ（★結果の後には出さない）】
+ *   ★結果が決まった後に出すと、★当たり外れで見た目を同じにしても ★「結果を見て、もう一度」の流れが残る（★追い賭け）。
+ *   ★受け付けた直後なら ★**結果を見る前の決め**。→ ★この仕組みは ★結果（当たり外れ・払戻・確定したか）を ★一切読まない。
  *
- * 🔴 【★中立にする（★裁定）】
- *   ★当たったときだけ出すと ★追い賭けの誘導になる → ★**確定したら 当たり外れに関係なく 同じ強さで**出す。
- *   → ★この層は ★当たり外れを ★**受け取りません**（`LastBet.settled` は「確定したか」だけ）。
- *   ★回数の上限は ★当たりの連続ではなく ★**続けて投票した回数**。
+ * 【★流れ】
+ *   ① 投票を受け付けた直後に「次のレースも同じ券種・同じ額で投票できます」［次のレースも］［やめる］
+ *   ② ［次のレースも］→ ★予定（券種と どのレースの後か）を この窓に置く（★EP は 1 も使わない）
+ *   ③ 次のレースが発売になったら ★券種だけ予定どおりにして「馬を選んで『投票する』を押してください」
+ *   ④ ★馬は本人が選び、★「投票する」を押すまで買わない（★自動では買わない）
+ *   ★続けて 3 回まで（★続けて投票した回数・★自分で選び直して買えば 0）。★参加ポイントが足りなければ「足りない」と出す。
  *
  * ⚠️ ★PP には触れません（★払戻を次の賭けに回さない・憲法の第 3 原則）。★使うのは参加ポイント（EP）だけ。
  */
 import { REPEAT_BET_MAX } from './claims';
 
-/** ★前の投票（★確定したかだけ・★当たり外れは持たない） */
-export interface LastBet {
-  readonly id: string;
-  readonly raceId: string;
-  readonly betType: string;
-  readonly amount: number;
-  readonly settled: boolean;
-}
-
-export type RepeatOffer =
-  | { readonly kind: 'none' }
+/** ★受け付けた直後に何を出すか */
+export type AfterAcceptOffer =
   | { readonly kind: 'offer'; readonly betType: string; readonly amount: number }
   | { readonly kind: 'short'; readonly amount: number }
   | { readonly kind: 'limit' };
 
-export function repeatOfferOf(input: {
-  readonly last: LastBet | null;
+export function offerAfterAccept(input: {
+  /** ★いま受け付けた投票の券種と額 */
+  readonly betType: string;
+  readonly amount: number;
+  /** ★受け付けた後の残高（★次も同じ額を払えるか） */
+  readonly epBalance: number;
+  /** ★受け付けた投票を数えた後の 続けた回数 */
+  readonly streak: number;
+}): AfterAcceptOffer {
+  if (input.streak >= REPEAT_BET_MAX) return { kind: 'limit' };
+  if (input.epBalance < input.amount) return { kind: 'short', amount: input.amount };
+  return { kind: 'offer', betType: input.betType, amount: input.amount };
+}
+
+/** ★予定（★［次のレースも］を押したとき・★どのレースの後か と 券種） */
+export interface RepeatPlan {
+  readonly afterRaceId: string;
+  readonly betType: string;
+}
+
+/** ★いま発売中のレースに 予定を当ててよいか（★予定を作ったレースの次・★締切前・★画面にある券種） */
+export function planAppliesTo(plan: RepeatPlan | null, input: {
   readonly currentRaceId: string | null;
   readonly salesClosed: boolean;
-  readonly epBalance: number;
-  /** ★いま続けて投票した回数（★`readRepeatStreak`） */
-  readonly streak: number;
-  /** ★この画面で出せる券種（★それ以外の券種の続きは出さない） */
   readonly betTypes: readonly string[];
-  /** ★この画面の 1 口の額（★前の投票が別の額なら「同じ額」と言えないので出さない） */
-  readonly stakeEP: number;
-}): RepeatOffer {
-  const { last, currentRaceId } = input;
-  if (last === null || currentRaceId === null || !last.settled || last.raceId === currentRaceId) return { kind: 'none' };
-  if (input.salesClosed || !input.betTypes.includes(last.betType) || last.amount !== input.stakeEP) return { kind: 'none' };
-  if (input.streak >= REPEAT_BET_MAX) return { kind: 'limit' };
-  if (input.epBalance < last.amount) return { kind: 'short', amount: last.amount };
-  return { kind: 'offer', betType: last.betType, amount: last.amount };
+}): boolean {
+  return plan !== null && input.currentRaceId !== null && plan.afterRaceId !== input.currentRaceId
+    && !input.salesClosed && input.betTypes.includes(plan.betType);
+}
+
+/** ★予定どおりに買えたら +1、★自分で選び直して買ったら 0 に戻す */
+export function nextRepeatStreak(current: number, viaPlan: boolean): number {
+  return viaPlan ? current + 1 : 0;
 }
 
 /**
- * ★続けて投票した回数は ★その端末のその窓だけで数えます（★sessionStorage）。
+ * ★続けた回数と予定は ★その端末のその窓だけに置きます（★sessionStorage）。
  * ⚠️ ★これは ★押しやすさの上限で、★お金の上限ではありません（★1 レースの上限は サーバーの `my_bet_allowance`）。
- *    ★読めない・書けない環境では 0 から数えます（★上限が効かない側に倒れるが、★自動で使う EP は無い）。
+ *    ★読めない・書けない環境では 0 から数え、予定も無し（★自動で使う EP は無い）。
  */
 const STREAK_KEY = 'star.vote.repeatStreak';
+const PLAN_KEY = 'star.vote.repeatPlan';
 /** ★DOM の型に頼らない（★網がこのファイルを Node の型検査で読む） */
-interface SessionStore { getItem(key: string): string | null; setItem(key: string, value: string): void }
+interface SessionStore { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem(key: string): void }
 const store = (): SessionStore | undefined => (globalThis as { sessionStorage?: SessionStore }).sessionStorage;
 
 export function readRepeatStreak(): number {
@@ -65,11 +75,22 @@ export function readRepeatStreak(): number {
   } catch { return 0; }
 }
 
-/** ★続けて投票で買えたら +1、★自分で選び直して買ったら 0 に戻す */
-export function nextRepeatStreak(current: number, viaRepeat: boolean): number {
-  return viaRepeat ? current + 1 : 0;
-}
-
 export function writeRepeatStreak(n: number): void {
   try { store()?.setItem(STREAK_KEY, String(n)); } catch { /* ★書けない環境では数えない */ }
+}
+
+export function readRepeatPlan(): RepeatPlan | null {
+  try {
+    const raw = store()?.getItem(PLAN_KEY);
+    if (raw === null || raw === undefined) return null;
+    const v = JSON.parse(raw) as Partial<RepeatPlan>;
+    return typeof v.afterRaceId === 'string' && typeof v.betType === 'string' ? { afterRaceId: v.afterRaceId, betType: v.betType } : null;
+  } catch { return null; }
+}
+
+export function writeRepeatPlan(plan: RepeatPlan | null): void {
+  try {
+    if (plan === null) store()?.removeItem(PLAN_KEY);
+    else store()?.setItem(PLAN_KEY, JSON.stringify(plan));
+  } catch { /* ★書けない環境では予定を置かない */ }
 }

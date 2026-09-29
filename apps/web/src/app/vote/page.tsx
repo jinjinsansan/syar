@@ -5,12 +5,12 @@ import { checkOwnRaceSelection, ownRaceReasonText } from '@star/betting';
 import { Backdrop, BigButton, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { useSalesClosed } from '../../components/clock';
-import { BET_PER_PICK_EP, BET_TYPE_LABEL, CLAIM_BET_PER_PICK, CLAIM_BET_TYPE_RULE, CLAIM_OWN_RACE_BET, CLAIM_REPEAT_BET, CLAIM_REPEAT_BET_LIMIT, CLAIM_REPEAT_BET_SHORT, CLAIM_SALES_CLOSED, type VoteBetType } from '../../lib/claims';
-import { nextRepeatStreak, readRepeatStreak, repeatOfferOf, writeRepeatStreak, type LastBet } from '../../lib/repeat-bet';
+import { BET_PER_PICK_EP, BET_TYPE_LABEL, CLAIM_BET_PER_PICK, CLAIM_BET_TYPE_RULE, CLAIM_OWN_RACE_BET, CLAIM_REPEAT_BET, CLAIM_REPEAT_BET_LIMIT, CLAIM_REPEAT_BET_PLANNED, CLAIM_REPEAT_BET_SHORT, CLAIM_SALES_CLOSED, type VoteBetType } from '../../lib/claims';
+import { nextRepeatStreak, offerAfterAccept, planAppliesTo, readRepeatPlan, readRepeatStreak, writeRepeatPlan, writeRepeatStreak, type RepeatPlan } from '../../lib/repeat-bet';
 
 /** ★いま出す券種（★オーナー 2026-09-29「まずは単勝・複勝」） */
 const VOTE_BET_TYPES: readonly VoteBetType[] = ['win', 'place'];
-import { loadBetAllowance, loadBetScreen, loadLastBet, oddsKey, placeBet, type BetAllowance, type BetScreenData } from '../../lib/bet-screen';
+import { loadBetAllowance, loadBetScreen, oddsKey, placeBet, type BetAllowance, type BetScreenData } from '../../lib/bet-screen';
 
 const FRAME_COLORS = ['#f5f5f5', '#191919', '#d62828', '#1446b4', '#fad728', '#148c46', '#f08219', '#f596be'] as const;
 const DARK_TEXT_FRAMES = new Set([1, 5, 8]);
@@ -35,12 +35,11 @@ export default function VotePage(): React.ReactElement {
   const [clientToken, setClientToken] = useState(() => crypto.randomUUID());
   const currentRaceId = useRef<string | null>(null);
   /**
-   * ★続けて投票（★`lib/repeat-bet.ts`）。★前の投票が確定していれば ★当たり外れに関係なく同じ強さで出す（★中立）。
-   *   ★押すと 券種だけ前と同じにする（★馬は本人が選ぶ・★自動では買わない）。★買えたら 続けた回数を +1。
+   * ★続けて投票（★`lib/repeat-bet.ts`）。★出すのは ★投票を受け付けた直後だけ（★結果の後には出さない・★結果を読まない）。
+   *   ★［次のレースも］で予定を置き、★次のレースが発売になったら 券種だけ揃える（★馬は本人が選ぶ・★自動では買わない）。
    */
-  const [lastBet, setLastBet] = useState<LastBet | null>(null);
-  const [repeatArmed, setRepeatArmed] = useState(false);
-  const [repeatDismissedFor, setRepeatDismissedFor] = useState<string | null>(null);
+  const [justPlaced, setJustPlaced] = useState<{ readonly raceId: string; readonly betType: VoteBetType; readonly streak: number } | null>(null);
+  const [plan, setPlan] = useState<RepeatPlan | null>(null);
   const [repeatStreak, setRepeatStreak] = useState(0);
 
   const reload = (): void => {
@@ -50,12 +49,12 @@ export default function VotePage(): React.ReactElement {
       if (currentRaceId.current !== nextRaceId) setPicks([]);
       currentRaceId.current = nextRaceId;
       setData(fresh);
-      if (fresh.authenticated) void loadLastBet().then(setLastBet).catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); });
     })
       .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); });
   };
   useEffect(() => {
     setRepeatStreak(readRepeatStreak());
+    setPlan(readRepeatPlan());
     reload();
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') reload(); }, REFRESH_MS);
     return () => { window.clearInterval(timer); };
@@ -76,11 +75,19 @@ export default function VotePage(): React.ReactElement {
   const selectedOdds = race && selected !== null ? race.odds.get(oddsKey(betType, [selected])) ?? null : null;
   /** ★発売締切を過ぎたら 押せない（★締め切ったのに買えると読める姿を残さない・2026-09-29） */
   const salesClosed = useSalesClosed(race?.scheduledAt ?? null);
-  const repeat = repeatOfferOf({
-    last: lastBet, currentRaceId: race?.id ?? null, salesClosed, epBalance: data?.epBalance ?? 0,
-    streak: repeatStreak, betTypes: VOTE_BET_TYPES, stakeEP: EP_PER_PICK,
+  /** ★予定が このレースに当たるか（★予定を作ったレースの次・締切前） */
+  const planned = data?.authenticated === true && planAppliesTo(plan, { currentRaceId: race?.id ?? null, salesClosed, betTypes: VOTE_BET_TYPES });
+  /** ★予定が当たったら 券種を予定どおりに（★1 レースで 1 回だけ） */
+  const appliedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!planned || plan === null || race === null || appliedFor.current === race.id) return;
+    appliedFor.current = race.id;
+    setBetType(plan.betType as VoteBetType);
+  }, [planned, race?.id]);
+  /** ★受け付けた直後の案内（★いま受け付けた投票の券種・額・受け付けた後の残高・続けた回数だけから） */
+  const afterAccept = justPlaced === null ? null : offerAfterAccept({
+    betType: justPlaced.betType, amount: EP_PER_PICK, epBalance: data?.epBalance ?? 0, streak: justPlaced.streak,
   });
-  const showRepeat = data?.authenticated === true && race !== null && repeatDismissedFor !== race.id && repeat.kind !== 'none';
   const blocked = salesClosed || !data?.authenticated || race === null || selected === null || selectedOdds === null || !check.ok
     || allowance === null || allowance.remainingEP < EP_PER_PICK || data === null || data.epBalance < EP_PER_PICK || busy;
 
@@ -102,8 +109,11 @@ export default function VotePage(): React.ReactElement {
       if (!result.ok) setError(result.failure.message);
       else {
         setClientToken(crypto.randomUUID());
-        const streak = nextRepeatStreak(repeatStreak, repeatArmed);
-        setRepeatStreak(streak); writeRepeatStreak(streak); setRepeatArmed(false);
+        /** ★予定どおりに買えたら +1・★自分で選び直して買ったら 0（★どちらでも予定は使い切る） */
+        const streak = nextRepeatStreak(repeatStreak, planned && plan !== null && plan.betType === betType);
+        setRepeatStreak(streak); writeRepeatStreak(streak);
+        setPlan(null); writeRepeatPlan(null);
+        setJustPlaced({ raceId: race.id, betType, streak });
         setMessage('投票を受け付けました。');
         setPicks([]);
         reload();
@@ -126,17 +136,28 @@ export default function VotePage(): React.ReactElement {
       {error}　<a href="/login">ログイン</a>　<button type="button" onClick={reload} style={NOTICE_ACTION}>再読み込み</button>
     </TextPanel>}
     {message && <TextPanel role="status" style={{ color: 'var(--u-gold)' }}>{message}</TextPanel>}
-    {showRepeat && <TextPanel role="status" style={{ fontSize: 13 }}>
-      {repeat.kind === 'offer' ? <>
+    {/* ★① 受け付けた直後だけ（★結果の後には出さない） */}
+    {afterAccept !== null && justPlaced !== null && <TextPanel role="status" style={{ fontSize: 13 }}>
+      {afterAccept.kind === 'offer' ? <>
         {CLAIM_REPEAT_BET}
-        {repeatArmed ? <p style={{ margin: '6px 0 0' }}>券種を{BET_TYPE_LABEL[repeat.betType as VoteBetType]}にしました。馬を選んで「投票する」を押してください。</p>
-          : <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-            <button type="button" style={NOTICE_ACTION} onClick={() => { setBetType(repeat.betType as VoteBetType); setRepeatArmed(true); setMessage(null); }}>
-              同じ券種・{repeat.amount} EP で投票する
-            </button>
-            <button type="button" style={NOTICE_ACTION} onClick={() => { setRepeatDismissedFor(race?.id ?? null); setRepeatArmed(false); }}>やめる</button>
-          </span>}
-      </> : repeat.kind === 'short' ? CLAIM_REPEAT_BET_SHORT : CLAIM_REPEAT_BET_LIMIT}
+        <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+          <button type="button" style={NOTICE_ACTION} onClick={() => {
+            const next = { afterRaceId: justPlaced.raceId, betType: justPlaced.betType };
+            setPlan(next); writeRepeatPlan(next); setJustPlaced(null);
+            setMessage(`次のレースが発売になったら、券種を${BET_TYPE_LABEL[justPlaced.betType]}にしてお知らせします。`);
+          }}>
+            次のレースも {BET_TYPE_LABEL[justPlaced.betType]}・{afterAccept.amount} EP で投票する
+          </button>
+          <button type="button" style={NOTICE_ACTION} onClick={() => { setJustPlaced(null); }}>やめる</button>
+        </span>
+      </> : afterAccept.kind === 'short' ? CLAIM_REPEAT_BET_SHORT : CLAIM_REPEAT_BET_LIMIT}
+    </TextPanel>}
+    {/* ★② 予定どおり 次のレースが発売になったとき（★券種だけ揃えた・★馬は本人が選ぶ） */}
+    {planned && plan !== null && justPlaced === null && <TextPanel role="status" style={{ fontSize: 13 }}>
+      {CLAIM_REPEAT_BET_PLANNED}（{BET_TYPE_LABEL[plan.betType as VoteBetType]}・{EP_PER_PICK} EP）
+      <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+        <button type="button" style={NOTICE_ACTION} onClick={() => { setPlan(null); writeRepeatPlan(null); }}>やめる</button>
+      </span>
     </TextPanel>}
     {data && !data.authenticated && <TextPanel style={{ fontSize: 13 }}>
       出馬表は閲覧できます。投票するには <a href="/login" style={{ textDecoration: 'underline' }}>ログイン</a> してください。
@@ -167,7 +188,7 @@ export default function VotePage(): React.ReactElement {
         {/* ★① 券種（★選ぶと 出馬表のオッズ・あと何 EP・確認の文が その券種に変わる） */}
         <div role="tablist" aria-label="券種" style={{ display: 'flex', gap: 6, margin: '8px 0' }}>
           {VOTE_BET_TYPES.map((t) => <button key={t} type="button" role="tab" aria-selected={betType === t}
-            onClick={() => { setBetType(t); setMessage(null); setRepeatArmed(false); }}
+            onClick={() => { setBetType(t); setMessage(null); }}
             style={{ flex: 1, minHeight: 44, borderRadius: 10, fontSize: 15, fontWeight: 900, border: '2px solid var(--u-gold)', background: betType === t ? 'var(--u-gold)' : 'transparent', color: betType === t ? 'var(--u-ink-dark)' : 'var(--u-ink)' }}>{BET_TYPE_LABEL[t]}</button>)}
         </div>
         <p>{CLAIM_BET_TYPE_RULE[betType]}</p>

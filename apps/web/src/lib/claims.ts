@@ -19,12 +19,14 @@ import { BET_CAP_OWN_RACE_EP, MIN_STAKE, PLACE_THREE_MIN_FIELD } from '@star/bet
  * ★投票の券種（★2026-09-29・オーナー「まずは単勝・複勝」）と ★的中の説明（★settle.ts・balance.ts の placeDepth から）。
  */
 /**
- * ★**続けて投票**（★2026-09-29・`lib/repeat-bet.ts`）。★当たり外れを言わない（★中立・レビュー側裁定）。
+ * ★**続けて投票**（★2026-09-29・`lib/repeat-bet.ts`）。★出すのは投票を受け付けた直後だけ（★結果の後には出さない・デザイナー R-22 の指摘・レビュー側裁定）。
  *   ★馬は選び直す・★参加ポイントだけ・★続けて 3 回まで。
  */
 export const REPEAT_BET_MAX = 3;
-export const CLAIM_REPEAT_BET = `前のレースと同じ券種・同じ額で、このレースにも投票できます（馬は選び直します・参加ポイントのみ・続けて ${REPEAT_BET_MAX} 回まで）`;
-export const CLAIM_REPEAT_BET_SHORT = '参加ポイントが足りないため、続けて投票はできません';
+export const CLAIM_REPEAT_BET = `次のレースも 同じ券種・同じ額で投票できます（馬は次のレースで選びます・参加ポイントのみ・続けて ${REPEAT_BET_MAX} 回まで）`;
+/** ★予定どおり 次のレースが発売になったとき（★券種だけ揃える・★馬は本人が選ぶ） */
+export const CLAIM_REPEAT_BET_PLANNED = '予定どおり、このレースも同じ券種・同じ額で投票できます。馬を選んで「投票する」を押してください';
+export const CLAIM_REPEAT_BET_SHORT = '参加ポイントが足りないため、次のレースへの続けて投票はできません';
 export const CLAIM_REPEAT_BET_LIMIT = `続けて投票は ${REPEAT_BET_MAX} 回までです。馬と券種を選んで投票してください`;
 
 export const BET_TYPE_LABEL = { win: '単勝', place: '複勝' } as const;
