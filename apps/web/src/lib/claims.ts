@@ -76,6 +76,46 @@ export const CLAIM_SALES_CLOSED = '投票は締め切りました';
  */
 export const CLAIM_TRAIN_EP_SHORT = 'このままだと次の週は休養になります（参加ポイントが足りません）';
 
+/*
+ * ─── ★2026-09-29 の点検で「合っている」と判定した文を ★ここへ移した（★1 文ずつ 裏づけを claims-backed ⑬〜㉔ に）───
+ */
+
+/** ★賞金ポイントが増えるのは レースの結果（払戻・着順の賞金）だけ（★prize_points を足すのは payout.ts と prize-award.ts だけ） */
+export const CLAIM_PP_FROM_RACES_ONLY = 'レースの結果だけで増えます';
+
+/** ★配合の依頼が失敗したら 同じ母で同じ年にもう一度頼める（★一意の索引が failed を除く・0071） */
+export const CLAIM_BREED_RETRY_SAME_YEAR = 'この母は、今年のうちにもう一度依頼できます。';
+
+/** ★処理の途中で落ちたら 取引ごと戻す（★種付料も戻る・player-breeding） */
+export const CLAIM_BREED_TEMP_NO_EP = '参加ポイントは引かれていません。';
+
+/** ★種付料は 確定のときの式で決まり、★依頼の上限を超えたら生産しない（player-breeding の fee_above_max） */
+export const CLAIM_BREED_PAY_AT_CONFIRM = '確定したときの額を払います。上限を超えたら生産しません。';
+
+/** ★馬の名前を 利用者が変える口は無い（★horses.name を書き換える行が 0 件） */
+export const CLAIM_NAME_NO_SELF_CHANGE = 'ご自身では変更できません';
+
+/** ★同じ名前の判定は ★送った後にワーカーが行う（player-naming の name_taken） */
+export const CLAIM_NAME_DUP_AFTER_SEND = '送ってから分かります';
+
+/** ★繁殖入りは牝馬だけ・牡馬は種牡馬（breeding_role_block の sex_mismatch） */
+export const CLAIM_BROODMARE_FEMALE_ONLY = '繁殖入りは牝馬だけです。牡馬は「種牡馬入り」を選べます。';
+
+/** ★役割を選べるのは 引退した馬だけ（breeding_role_block の not_retired） */
+export const CLAIM_ROLE_AFTER_RETIRE = '役割を選べるのは、引退して功労馬になってからです。';
+
+/** ★役割は 頼んだ取引の中で変わる（request_breeding_role が horses.retirement_role を書く） */
+export const CLAIM_ROLE_IMMEDIATE = 'その場で変わります';
+
+/** ★現在値は 素質（potential）を超えない（growth.ts の grow が potential で止める） */
+export const CLAIM_POTENTIAL_CAP = '現在値は素質による上限まで伸びます';
+
+/** ★指示の無い週は 既定の献立（training-runner の `ordered ?? defaultMenu(...)`） */
+export const CLAIM_DEFAULT_MENU = '指示しない週は、既定の献立で調教されます';
+
+/** ★参加ポイントと賞金ポイントは 別の台帳（ep_ledger と pp_ledger） */
+export const CLAIM_POINTS_SEPARATE = '参加ポイントと賞金ポイントは別々に記録されます';
+
 /** ★出走の取消（★口 0079 は在るが ★画面から呼ぶ所が 0 件 ＝ 画面からは取り消せない・★オーナー判断待ち） */
 export const CLAIM_ENTRY_NO_CANCEL = '登録は、画面から取り消せません。';
 

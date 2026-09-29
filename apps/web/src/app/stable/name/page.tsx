@@ -30,6 +30,7 @@ import { SignInRequiredError } from '../../../lib/stable-repo';
 import { fetchOnboardingState } from '../../../lib/onboarding';
 import { RaceStrip, reportOnboardingStage } from '../../../components/uma/race-strip';
 import { Backdrop, TextPanel } from '../../../components/uma/uma-parts';
+import { CLAIM_NAME_DUP_AFTER_SEND, CLAIM_NAME_NO_SELF_CHANGE } from '../../../lib/claims';
 
 /** ★失敗の見せ方（★語は出さない） */
 const FAILURE_VIEW: Readonly<Record<NameFailureVariant, {
@@ -208,8 +209,8 @@ export default function NamePage(): React.ReactElement {
         </label>
         <div style={{ fontSize: 11.5, fontWeight: 500, lineHeight: 1.8 }}>
           カタカナ（長音「ー」と中黒「・」を含む）で、{PLAYER_NAME_MIN_CHARS}〜{PLAYER_NAME_MAX_CHARS} 文字。<br />
-          一度付けた名前は、<b>ご自身では変更できません</b>。<br />
-          同じ名前の馬がいるかどうかは、<b>送ってから分かります</b>。
+          一度付けた名前は、<b>{CLAIM_NAME_NO_SELF_CHANGE}</b>。<br />
+          同じ名前の馬がいるかどうかは、<b>{CLAIM_NAME_DUP_AFTER_SEND}</b>。
         </div>
         {name.trim().length > 0 && !shape.ok && (
           <div style={{ fontSize: 12, fontWeight: 900, color: '#ffd84a' }}>

@@ -74,14 +74,15 @@ describe('★仔の命名の結線', () => {
   it('③ 🔴 ★「使えます」と出さない（★重複は送るまで分からない）', () => {
     const live = strip(PAGE);
     expect(live).not.toMatch(/使えます/);
-    expect(live).toMatch(/送ってから分かります/);
+    /** ★2026-09-29 から 文は claims.ts（★裏づけは claims-backed ⑱） */
+    expect(live).toMatch(/CLAIM_NAME_DUP_AFTER_SEND/);
   });
 
   it('④ 🔴 ★「あとから変えられません」と書かない（★第 1 便の回答 §11）', () => {
     const live = strip(PAGE);
     expect(live).not.toMatch(/永久/);
     expect(live).not.toMatch(/あとから変え/);
-    expect(live).toMatch(/ご自身では変更できません/);
+    expect(live).toMatch(/CLAIM_NAME_NO_SELF_CHANGE/);
   });
 
   it('★文字数の案内は、エンジンの定数から出す（★画面に数を書かない）', () => {

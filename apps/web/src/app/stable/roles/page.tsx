@@ -30,6 +30,7 @@ import { SignInRequiredError } from '../../../lib/stable-repo';
 import { TYPE_TONE } from '../../../lib/story-tone';
 import { RaceStrip } from '../../../components/uma/race-strip';
 import { Backdrop, TextPanel } from '../../../components/uma/uma-parts';
+import { CLAIM_BROODMARE_FEMALE_ONLY, CLAIM_ROLE_AFTER_RETIRE, CLAIM_ROLE_IMMEDIATE } from '../../../lib/claims';
 
 /** ★変えられない 4 通り（★A-3〜A-6・★文言と色はデザイナーの表のまま） */
 const BLOCK_VIEW: Readonly<Record<RoleVariant, {
@@ -49,14 +50,14 @@ const BLOCK_VIEW: Readonly<Record<RoleVariant, {
   sex: {
     icon: '牡', border: '#1a6fd4', bg: '#e0eefa',
     title: 'この馬は繁殖入りできません',
-    text: () => '繁殖入りは牝馬だけです。牡馬は「種牡馬入り」を選べます。',
+    text: () => CLAIM_BROODMARE_FEMALE_ONLY,
     primarySub: '',
     secondary: null,
   },
   active: {
     icon: '現', border: '#4a5a66', bg: '#e3e8ec',
     title: 'まだ引退していません',
-    text: () => '役割を選べるのは、引退して功労馬になってからです。',
+    text: () => CLAIM_ROLE_AFTER_RETIRE,
     primarySub: '引退してから選べます',
     secondary: { label: '厩舎へ戻る', href: '/stable' },
   },
@@ -235,7 +236,7 @@ export default function RolesPage(): React.ReactElement {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 14, border: '2px solid rgba(251,247,236,.28)', borderRadius: 12, background: 'rgba(10,35,64,.72)' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
               <div style={{ fontSize: 15, fontWeight: 900 }}>引退後の役割</div>
-              <div style={{ fontSize: 11, fontWeight: 500, color: '#8fa6b8' }}>その場で変わります</div>
+              <div style={{ fontSize: 11, fontWeight: 500, color: '#8fa6b8' }}>{CLAIM_ROLE_IMMEDIATE}</div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 8 }}>
               <SlotCard label="繁殖牝馬" count={data.broodmareCount} limit={data.broodmareLimit} />
@@ -291,7 +292,7 @@ export default function RolesPage(): React.ReactElement {
               <span>{horse.sex === 'female' ? '繁殖入りする' : '種牡馬入りする'}</span>
               <span style={{ fontSize: 11 }}>
                 {block === null
-                  ? (horse.sex === 'female' ? 'その場で変わります' : `種牡馬 ${data.stallionCount} / ${data.stallionLimit} 頭`)
+                  ? (horse.sex === 'female' ? CLAIM_ROLE_IMMEDIATE : `種牡馬 ${data.stallionCount} / ${data.stallionLimit} 頭`)
                   : block.primarySub}
               </span>
             </button>

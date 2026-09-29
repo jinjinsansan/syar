@@ -29,6 +29,7 @@ import {
 import { SignInRequiredError } from '../../../lib/stable-repo';
 import { RaceStrip } from '../../../components/uma/race-strip';
 import { Backdrop, TextPanel } from '../../../components/uma/uma-parts';
+import { CLAIM_BREED_PAY_AT_CONFIRM, CLAIM_BREED_RETRY_SAME_YEAR, CLAIM_BREED_TEMP_NO_EP } from '../../../lib/claims';
 
 /** ★失敗の 5 通り（★文言と色はデザイナーの表のまま・★理由の語は出さない） */
 const FAILURE_VIEW: Readonly<Record<BreedFailureVariant, {
@@ -40,20 +41,20 @@ const FAILURE_VIEW: Readonly<Record<BreedFailureVariant, {
     icon: '↑', ink: '#b5651d', bg: '#ffeadb',
     title: '種付料が上がりました',
     text: '確定するときの種付料が、依頼したときの上限を超えたので、生産しませんでした。'
-      + '参加ポイントは引かれていません。確認の画面で新しい見積もりを出し直して、もう一度依頼できます。',
+      + `${CLAIM_BREED_TEMP_NO_EP}確認の画面で新しい見積もりを出し直して、もう一度依頼できます。`,
     primary: '新しい見積もりで出し直す', secondary: '父を選び直す',
   },
   noep: {
     icon: 'EP', ink: '#57c8a8', bg: '#123a33',
     title: '参加ポイントが足りません',
     text: '種付料に、参加ポイントが足りませんでした。生産はしていません。'
-      + 'この母は、今年のうちにもう一度依頼できます。',
+      + CLAIM_BREED_RETRY_SAME_YEAR,
     primary: '配合の画面に戻る', secondary: null,
   },
   invalid: {
     icon: '×', ink: '#a81a13', bg: '#ffeceb',
     title: 'この組合せは選べません',
-    text: '父か母を選び直してください。参加ポイントは引かれていません。',
+    text: `父か母を選び直してください。${CLAIM_BREED_TEMP_NO_EP}`,
     primary: '父母を選び直す', secondary: null,
   },
   full: {
@@ -66,7 +67,7 @@ const FAILURE_VIEW: Readonly<Record<BreedFailureVariant, {
     icon: '↻', ink: '#a9741a', bg: '#fff6d6',
     title: 'いま生産を確定できませんでした',
     text: 'こちらの処理が混み合っています。少し時間をおいて、もう一度お試しください。'
-      + '選んだ父母はそのままです。参加ポイントは引かれていません。',
+      + `選んだ父母はそのままです。${CLAIM_BREED_TEMP_NO_EP}`,
     primary: 'もう一度試す', secondary: null,
   },
 };
@@ -198,7 +199,7 @@ export default function BreedPage(): React.ReactElement {
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           <EpCard label="種付料の見積もり（払ってよい上限）" value={sire.feeEP} border="#f6c21c"
-            note="確定したときの額を払います。上限を超えたら生産しません。" />
+            note={CLAIM_BREED_PAY_AT_CONFIRM} />
           <EpCard label="いまの参加ポイント" value={data.epBalance} border="#57c8a8" note={null} />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>

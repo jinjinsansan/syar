@@ -19,6 +19,7 @@ import { supabaseStableRepo, SignInRequiredError } from '../../lib/stable-repo';
 import { sendTrainingOrder } from '../../lib/training-order';
 import { TRAINING_MENUS, trainingMenusOfView, DEMO_TRAINING_ABILITY, DEFAULT_TRAINING_ABILITY, demoFatigueNote } from '../../lib/game-demo';
 import { Capsule, ClassChip, FatigueBar, PageTitle, Pill, StatBar } from '../../components/ui';
+import { CLAIM_DEFAULT_MENU, CLAIM_POTENTIAL_CAP } from '../../lib/claims';
 
 const WEEK_NO = 32;
 
@@ -506,7 +507,7 @@ export default function TrainingPage(): React.ReactElement {
           <div className="a-panel strong">
             <div className="a-band" style={{ height: 38, padding: '0 16px', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 15, fontWeight: 900, letterSpacing: '.1em' }}>選択中の馬</span>
-              <span style={{ fontSize: 12, fontWeight: 900 }}>現在値は素質による上限まで伸びます</span>
+              <span style={{ fontSize: 12, fontWeight: 900 }}>{CLAIM_POTENTIAL_CAP}</span>
             </div>
             {horse !== null && cond !== null ? (
               <div style={{ display: 'flex', gap: 22, padding: '16px 20px', backgroundImage: 'linear-gradient(#ffffff,#eef6fd)', flexWrap: 'wrap' }}>
@@ -640,7 +641,7 @@ export default function TrainingPage(): React.ReactElement {
                 <span
                   className={canInstruct && !sending ? 'a-btn a-btn-gold' : 'a-btn a-btn-gold off'}
                   style={{ height: 48, padding: '0 22px', fontSize: 17, whiteSpace: 'nowrap', cursor: canInstruct ? 'pointer' : undefined }}
-                  title="指示しない週は、既定の献立で調教されます"
+                  title={CLAIM_DEFAULT_MENU}
                   onClick={() => { void instruct(); }}
                 >
                   {sent === horse?.id ? '指示しました' : horse?.week.kind === 'done' ? '指示を変更する' : 'この馬に指示する'}{menuCost !== null ? `（${menuCost} EP）` : ''}

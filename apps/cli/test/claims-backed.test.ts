@@ -14,6 +14,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { stripComments } from './lib/ts-blocks.js';
 import {
+  CLAIM_PP_FROM_RACES_ONLY, CLAIM_BREED_RETRY_SAME_YEAR, CLAIM_BREED_TEMP_NO_EP, CLAIM_BREED_PAY_AT_CONFIRM, CLAIM_NAME_NO_SELF_CHANGE,
+  CLAIM_NAME_DUP_AFTER_SEND, CLAIM_BROODMARE_FEMALE_ONLY, CLAIM_ROLE_AFTER_RETIRE, CLAIM_ROLE_IMMEDIATE, CLAIM_POTENTIAL_CAP,
+  CLAIM_DEFAULT_MENU, CLAIM_POINTS_SEPARATE,
   BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_CARD_PUBLISH, CLAIM_DAILY_ONCE, CLAIM_TRAIN_EP_SHORT, CLAIM_ENTRY_NO_CANCEL, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
 } from '../../web/src/lib/claims';
 
@@ -76,7 +79,114 @@ function betAmountPasses(amount: number): { readonly ok: boolean; readonly rule:
   return { ok, rule: rule.replace(/\s+/g, ' ') };
 }
 
+/** ★ある関数の最後の定義の本体が 形を含むか（★移し替えの 12 文で使う） */
+const defHas = (fn: string, re: RegExp): string[] => {
+  const d = latestDefinition(fn);
+  return d !== null && re.test(d.body) ? [] : [`★${fn}（${d?.rel ?? '無し'}）に ${String(re)} が無い`];
+};
+const srcHas = (rel: string, needle: string): string[] =>
+  stripComments(read(rel)).includes(needle) ? [] : [`★${rel} に「${needle}」が無い`];
+
+/** ★2026-09-29 の点検で「合っている」と判定した 12 文（★移した数と 裏づけの数を 下の網で数える） */
+const MOVED: readonly Claim[] = [
+  {
+    id: '⑬賞金ポイントは レースの結果だけで増える', text: CLAIM_PP_FROM_RACES_ONLY, name: 'CLAIM_PP_FROM_RACES_ONLY',
+    usedBy: ['apps/web/src/app/earn/page.tsx'],
+    backedBy: () => {
+      const adds = hits(/prize_points\s*=\s*prize_points\s*\+/);
+      const allowed = ['apps/worker/src/payout.ts', 'apps/worker/src/prize-award.ts'];
+      return adds.filter((f) => !allowed.includes(f)).map((f) => `★賞金ポイントを足す所が レース以外に在る: ${f}`)
+        .concat(allowed.filter((f) => !adds.includes(f)).map((f) => `★対照: ${f} が賞金ポイントを足していない（★走査が空振り）`));
+    },
+  },
+  {
+    id: '⑭配合の失敗は 同じ年にもう一度頼める', text: CLAIM_BREED_RETRY_SAME_YEAR, name: 'CLAIM_BREED_RETRY_SAME_YEAR',
+    usedBy: ['apps/web/src/app/stable/breed/page.tsx'],
+    backedBy: () => {
+      const all = SRC.filter((f) => f.rel.startsWith('db/migrations/')).map((f) => f.text).join('\n');
+      const why: string[] = [];
+      if (!/foal_requests_one_breed_per_dam_year\s+on\s+foal_requests\s*\(dam_id,\s*breed_year\)\s+where\s+kind\s*=\s*'breed'\s+and\s+status\s*<>\s*'failed'/i.test(all)) why.push('★一意の索引が failed を除いていない');
+      if (/drop\s+index\s+(if\s+exists\s+)?foal_requests_one_breed_per_dam_year/i.test(all)) why.push('★一意の索引が落とされた');
+      return why;
+    },
+  },
+  {
+    id: '⑮処理の途中で落ちたら 参加ポイントは引かれない', text: CLAIM_BREED_TEMP_NO_EP, name: 'CLAIM_BREED_TEMP_NO_EP',
+    usedBy: ['apps/web/src/app/stable/breed/page.tsx', 'apps/web/src/app/stable/foal/page.tsx'],
+    backedBy: () => [
+      ...srcHas('apps/worker/src/player-breeding.ts', "await client.query('rollback to savepoint stud_fee');"),
+      /** ★最初の 1 頭（/stable/foal）は 無償: ★種付料を引くのは kind = 'breed' のときだけ */
+      ...srcHas('apps/worker/src/player-breeding.ts', "if (req.kind === 'breed') {"),
+      /** ★確定の後で落ちたら ★呼ぶ側が取引ごと戻す（★この関数は commit しない） */
+      ...(/\bcommit\b/.test(stripComments(read('apps/worker/src/player-breeding.ts')).replace(/'[^']*'/g, '')) ? ['★player-breeding が 自分で commit している（★取引ごと戻らない）'] : []),
+    ],
+  },
+  {
+    id: '⑯種付料は 確定のときの額・上限を超えたら生産しない', text: CLAIM_BREED_PAY_AT_CONFIRM, name: 'CLAIM_BREED_PAY_AT_CONFIRM',
+    usedBy: ['apps/web/src/app/stable/breed/page.tsx'],
+    backedBy: () => [
+      ...srcHas('apps/worker/src/player-breeding.ts', 'const fee = npcStudFee(sire.g1Wins, await totalPrizePP(client, sire.id));'),
+      ...srcHas('apps/worker/src/player-breeding.ts', "if (req.max_fee_ep === null || fee > Number(req.max_fee_ep)) return fail('fee_above_max');"),
+    ],
+  },
+  {
+    id: '⑰馬の名前は 利用者が変えられない', text: CLAIM_NAME_NO_SELF_CHANGE, name: 'CLAIM_NAME_NO_SELF_CHANGE',
+    usedBy: ['apps/web/src/app/stable/name/page.tsx'],
+    backedBy: () => [
+      ...hits(/update\s+horses\s+set[^;]*\bname\s*=/i).map((f) => `★horses.name を書き換える行: ${f}`),
+      ...hits(/from\(\s*'horses'\s*\)\s*\.update\(/).map((f) => `★画面から horses を update: ${f}`),
+    ],
+  },
+  {
+    id: '⑱同じ名前かは 送った後に分かる', text: CLAIM_NAME_DUP_AFTER_SEND, name: 'CLAIM_NAME_DUP_AFTER_SEND',
+    usedBy: ['apps/web/src/app/stable/name/page.tsx'],
+    backedBy: () => srcHas('apps/worker/src/player-naming.ts', "if (await nameTaken(client, shape.nameKey)) return fail('name_taken');"),
+  },
+  {
+    id: '⑲繁殖入りは牝馬だけ・牡馬は種牡馬', text: CLAIM_BROODMARE_FEMALE_ONLY, name: 'CLAIM_BROODMARE_FEMALE_ONLY',
+    usedBy: ['apps/web/src/app/stable/roles/page.tsx'],
+    backedBy: () => defHas('breeding_role_block', /\(p_to_role\s*=\s*'stallion'\s+and\s+p_sex\s*<>\s*'male'\)\s*or\s*\(p_to_role\s*=\s*'broodmare'\s+and\s+p_sex\s*<>\s*'female'\)\s*then\s*'sex_mismatch'/i),
+  },
+  {
+    id: '⑳役割を選べるのは 引退してから', text: CLAIM_ROLE_AFTER_RETIRE, name: 'CLAIM_ROLE_AFTER_RETIRE',
+    usedBy: ['apps/web/src/app/stable/roles/page.tsx'],
+    backedBy: () => defHas('breeding_role_block', /when\s+p_retired_at_week\s+is\s+null\s+then\s+'not_retired'/i),
+  },
+  {
+    id: '㉑役割は その場で変わる', text: CLAIM_ROLE_IMMEDIATE, name: 'CLAIM_ROLE_IMMEDIATE',
+    usedBy: ['apps/web/src/app/stable/roles/page.tsx'],
+    backedBy: () => defHas('request_breeding_role', /update\s+horses\s+h\s+set\s+retirement_role\s*=\s*p_to_role\s+where\s+h\.id\s*=\s*p_horse_id/i),
+  },
+  {
+    id: '㉒現在値は 素質を超えない', text: CLAIM_POTENTIAL_CAP, name: 'CLAIM_POTENTIAL_CAP',
+    usedBy: ['apps/web/src/app/training/page.tsx'],
+    backedBy: () => srcHas('packages/training/src/growth.ts', 'out[key] = next >= pot ? pot : next;'),
+  },
+  {
+    id: '㉓指示の無い週は 既定の献立', text: CLAIM_DEFAULT_MENU, name: 'CLAIM_DEFAULT_MENU',
+    usedBy: ['apps/web/src/app/training/page.tsx'],
+    backedBy: () => srcHas('apps/worker/src/training-runner.ts', 'let menu = (ordered ?? defaultMenu(age, state.fatigue))'),
+  },
+  {
+    id: '㉔参加ポイントと賞金ポイントは 別の台帳', text: CLAIM_POINTS_SEPARATE, name: 'CLAIM_POINTS_SEPARATE',
+    usedBy: ['apps/web/src/app/records/records-view.tsx'],
+    backedBy: () => {
+      const all = SRC.filter((f) => f.rel.startsWith('db/migrations/')).map((f) => f.text).join('\n');
+      const why: string[] = [];
+      for (const t of ['ep_ledger', 'pp_ledger']) if (!new RegExp(`create\\s+table\\s+(if\\s+not\\s+exists\\s+)?${t}\\b`, 'i').test(all)) why.push(`★${t} の表が無い`);
+      /** ★払戻は PP の台帳へ（★EP の台帳へ書かない・憲法 §0.2 の一方通行） */
+      const payout = stripComments(read('apps/worker/src/payout.ts'));
+      /** ★当たりは PP の台帳（payout）・★中止の返還だけが EP の台帳（refund） */
+      if (!/insert into pp_ledger[\s\S]{0,120}'payout'/.test(payout)) why.push('★当たりを PP の台帳に書いていない');
+      const epReasons = [...payout.matchAll(/insert into ep_ledger[\s\S]{0,160}?'([a-z_]+)'/g)].map((m) => m[1]);
+      if (epReasons.some((r) => r !== 'refund')) why.push(`★払戻の処理が EP の台帳に 返還以外を書いている: ${epReasons.join(',')}`);
+      return why;
+    },
+  },
+];
+
 const CLAIMS: readonly Claim[] = [
+  ...MOVED,
   {
     id: '⑫調教の費用が残高に足りなければ 次の週は休養（★ST001 → rest・★画面は実際に引かれる額で比べ /earn へ導く）',
     text: CLAIM_TRAIN_EP_SHORT, name: 'CLAIM_TRAIN_EP_SHORT',
@@ -248,6 +358,12 @@ const CLAIMS: readonly Claim[] = [
 ];
 
 describe('★仕組みの説明の文は 出どころに縛る', () => {
+  it('★移し替え（2026-09-29）: 移した文の数 ＝ 裏づけの数 ＝ 12', () => {
+    expect(MOVED.length).toBe(12);
+    expect(MOVED.filter((c) => typeof c.backedBy === 'function').length).toBe(12);
+    expect(new Set(MOVED.map((c) => c.name)).size, '★同じ定数を 2 度数えている').toBe(12);
+  });
+
   for (const c of CLAIMS) {
     it(`🔴 ${c.id}: ★裏づけが崩れていない`, () => {
       expect(c.backedBy(), `★「${c.text}」の裏づけが崩れた → ★文を書き直すか 仕組みを戻す`).toEqual([]);

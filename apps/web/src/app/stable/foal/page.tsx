@@ -34,6 +34,7 @@ import { fetchOnboardingState, type OnboardingState } from '../../../lib/onboard
 import { SignInRequiredError } from '../../../lib/stable-repo';
 import { RaceStrip, reportOnboardingStage } from '../../../components/uma/race-strip';
 import { Backdrop, TextPanel } from '../../../components/uma/uma-parts';
+import { CLAIM_BREED_TEMP_NO_EP } from '../../../lib/claims';
 
 /** ★状態を見に行く間隔（★`/stable/breed` と同じ） */
 const POLL_MS = 3_000;
@@ -42,15 +43,15 @@ const POLL_MS = 3_000;
 const FAILURE_VIEW: Readonly<Record<BreedFailureVariant, { readonly title: string; readonly text: string }>> = {
   feeup: {
     title: 'いま生産できませんでした',
-    text: '少し時間をおいて、もう一度お試しください。参加ポイントは引かれていません。',
+    text: `少し時間をおいて、もう一度お試しください。${CLAIM_BREED_TEMP_NO_EP}`,
   },
   noep: {
     title: 'いま生産できませんでした',
-    text: '少し時間をおいて、もう一度お試しください。参加ポイントは引かれていません。',
+    text: `少し時間をおいて、もう一度お試しください。${CLAIM_BREED_TEMP_NO_EP}`,
   },
   invalid: {
     title: 'この組合せは選べません',
-    text: '父か母を選び直してください。参加ポイントは引かれていません。',
+    text: `父か母を選び直してください。${CLAIM_BREED_TEMP_NO_EP}`,
   },
   full: {
     title: '持てる頭数がいっぱいです',

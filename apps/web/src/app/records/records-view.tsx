@@ -26,6 +26,7 @@ import {
 import { SignInRequiredError } from '../../lib/stable-repo';
 import { Backdrop, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
+import { CLAIM_POINTS_SEPARATE } from '../../lib/claims';
 
 const TABS = [['runs', '戦績'], ['ep', '参加ポイント（EP）'], ['pp', '賞金ポイント（PP）']] as const;
 const PERIODS: readonly RecordPeriod[] = ['week', 'all'];
@@ -155,7 +156,7 @@ export default function RecordsView({ tab }: { readonly tab: string }): React.Re
     <div style={{ ...ROW, marginTop: 10 }}>
     {/* ★芝にじかに置かず ★濃紺のパネルへ（★2026-09-28・R-18 回答 🟡 #7・390px で 2.99:1 だった） */}
     <TextPanel style={{ margin: 0, width: '100%', maxWidth: 'none', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-      <span style={{ fontSize: 12, opacity: .85 }}>参加ポイントと賞金ポイントは別々に記録されます</span>
+      <span style={{ fontSize: 12, opacity: .85 }}>{CLAIM_POINTS_SEPARATE}</span>
       {/* ★2026-09-25: ★`/prizes` は消して `/exchange` へ送りました（★裁定 §3）。★直接 新版へ */}
       <a href="/exchange" style={{ marginLeft: 'auto', minHeight: 44, display: 'flex', alignItems: 'center', padding: '0 14px', border: '2px solid var(--u-gold)', borderRadius: 10 }}>景品交換 →</a>
     </TextPanel>

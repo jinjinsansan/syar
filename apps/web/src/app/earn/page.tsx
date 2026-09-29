@@ -27,7 +27,7 @@ import {
   claimDailyEp, fetchDailyEpState, type DailyEpState,
 } from '../../lib/daily-ep';
 import { SignInRequiredError } from '../../lib/stable-repo';
-import { CLAIM_DAILY_ONCE } from '../../lib/claims';
+import { CLAIM_DAILY_ONCE, CLAIM_PP_FROM_RACES_ONLY } from '../../lib/claims';
 
 /** ★提供元が決まっていない受け取り方（★資料 §8-7。★どれも利用者がお金を払わない形） */
 const WAYS = [
@@ -193,7 +193,7 @@ export default function EarnPage(): React.ReactElement {
           border: '2px solid rgba(251,247,236,.28)', borderRadius: 12, background: 'var(--u-panel)',
           fontSize: 11, fontWeight: 500, lineHeight: 1.55, color: '#e6edf3',
         }}>
-          ここで受け取れるのは<b>参加ポイントだけ</b>です。<b>賞金ポイントは稼げません</b>（レースの結果だけで増えます）。
+          ここで受け取れるのは<b>参加ポイントだけ</b>です。<b>賞金ポイントは稼げません</b>（{CLAIM_PP_FROM_RACES_ONLY}）。
         </div>
       </div>
 
