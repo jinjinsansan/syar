@@ -23,9 +23,10 @@ import { BET_CAP_OWN_RACE_EP, MIN_STAKE, PLACE_THREE_MIN_FIELD } from '@star/bet
  *   ★馬は選び直す・★参加ポイントだけ・★続けて 3 回まで。
  */
 export const REPEAT_BET_MAX = 3;
-export const CLAIM_REPEAT_BET = `次のレースも 同じ券種・同じ額で投票できます（馬は次のレースで選びます・参加ポイントのみ・続けて ${REPEAT_BET_MAX} 回まで）`;
+/** ★受け付けた直後の補足（★R-22 §5・デザイナーの文）。★案内の 1 行（券種・額）は画面が組む */
+export const CLAIM_REPEAT_BET = '発売になったら券種だけそろえます。馬はご自身で選んでください。自動では投票しません。';
 /** ★予定どおり 次のレースが発売になったとき（★券種だけ揃える・★馬は本人が選ぶ） */
-export const CLAIM_REPEAT_BET_PLANNED = '予定どおり、このレースも同じ券種・同じ額で投票できます。馬を選んで「投票する」を押してください';
+export const CLAIM_REPEAT_BET_PLANNED = '馬を選んで「投票する」を押してください。';
 export const CLAIM_REPEAT_BET_SHORT = '参加ポイントが足りないため、次のレースへの続けて投票はできません';
 export const CLAIM_REPEAT_BET_LIMIT = `続けて投票は ${REPEAT_BET_MAX} 回までです。馬と券種を選んで投票してください`;
 
@@ -38,6 +39,9 @@ export const CLAIM_LIVE_PENDING = 'まもなく発走の映像が始まります
 export const CLAIM_SETTLE_CHECKING = '結果の確定を確認中です（払戻はまだです）';
 /** ★発走前に開いた本編（★発走時刻に 小窓と同じ場面から始まる・0098） */
 export const CLAIM_WAIT_START = '発走時刻になると、ここでレースが始まります';
+
+/** ★投票の確認のシートの注記（★R-22 §4・取り消せないことを 押す前に言う） */
+export const CLAIM_VOTE_NO_CANCEL = '投票は取り消せません。締め切り（発走の 1 分前）までに確かめてください。';
 
 export const BET_TYPE_LABEL = { win: '単勝', place: '複勝' } as const;
 export type VoteBetType = keyof typeof BET_TYPE_LABEL;

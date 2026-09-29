@@ -21,7 +21,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { CLAIM_ENTRY_CANCEL_WINDOW, CLAIM_ENTRY_SCRATCH_CONFIRM, CLAIM_NO_CHANGE_LATER } from '../../web/src/lib/claims';
+import { CLAIM_ENTRY_CANCEL_WINDOW, CLAIM_ENTRY_SCRATCH_CONFIRM, CLAIM_NO_CHANGE_LATER, CLAIM_VOTE_NO_CANCEL } from '../../web/src/lib/claims';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const read = (p: string): string => readFileSync(path.join(ROOT, p), 'utf8');
@@ -54,12 +54,19 @@ const IRREVERSIBLE: readonly {
   readonly why: string;
   /** ★文を `lib/claims.ts` の定数から読む画面（★2026-09-29）: ★その定数名を画面が読み、★定数の値が `says` を含むこと */
   readonly saysFrom?: { readonly name: string; readonly value: string };
+  /**
+   * ★**画面の中の確認のシート**（★2026-09-29・デザイナー R-22 §4 で `window.confirm` から差し替え）。
+   *   ★`runner` … 確認のシートの［確定］だけが呼ぶ関数（★その中で `action` を呼ぶ）。★`sheet` … シートの印（★`role="alertdialog"`）。
+   */
+  readonly sheet?: { readonly runner: string; readonly callSite: string };
 }[] = [
   {
     file: 'apps/web/src/app/vote/page.tsx',
     action: 'placeBet(',
     says: '投票は取り消せません',
+    saysFrom: { name: 'CLAIM_VOTE_NO_CANCEL', value: CLAIM_VOTE_NO_CANCEL },
     why: '★投票の取消は作らない（★オッズを見てから引ける形を作らないため）',
+    sheet: { runner: 'const confirmVote = async', callSite: 'onClick={() => { void confirmVote(); }}' },
   },
   {
     file: 'apps/web/src/app/entry/page.tsx',
@@ -99,7 +106,7 @@ describe('🔴 ★戻せない操作は押す前に言う（★D-123 ③）', ()
 
   it('🔴 ★どれも window.confirm を持っている', () => {
     const missing = IRREVERSIBLE
-      .filter((r) => !read(r.file).includes('window.confirm'))
+      .filter((r) => (r.sheet === undefined ? !read(r.file).includes('window.confirm') : !read(r.file).includes('role="alertdialog"')))
       .map((r) => `${r.file}（${r.why}）`);
     expect(
       missing,
@@ -117,9 +124,23 @@ describe('🔴 ★戻せない操作は押す前に言う（★D-123 ③）', ()
     for (const r of IRREVERSIBLE) {
       // ⚠️ ★註記を空白に置き換えてから位置を見ます（★行の位置は保たれます）
       const src = stripComments(read(r.file));
-      const c = src.indexOf('window.confirm');
       const a = src.indexOf(r.action);
       if (a < 0) { wrong.push(`${r.file}: ★呼び出し ${r.action} が見つかりません（★簿が古い）`); continue; }
+      if (r.sheet !== undefined) {
+        /**
+         * ★シート: ★`action` は ★確定の関数（runner）の中だけ・★runner を呼ぶのは ★シートの［確定］1 か所だけ・★その 1 か所はシートの中
+         *   （★押す前にシートが「取り消せません」を言う）。
+         */
+        const runnerAt = src.indexOf(r.sheet.runner);
+        const calls = src.split(r.sheet.callSite).length - 1;
+        const sheetAt = src.indexOf('role="alertdialog"');
+        const callAt = src.indexOf(r.sheet.callSite);
+        if (runnerAt < 0 || a < runnerAt) wrong.push(`${r.file}: ★${r.action} が確定の関数の外に在ります`);
+        if (src.split(r.action).length - 1 !== 1) wrong.push(`${r.file}: ★${r.action} が 1 か所でありません`);
+        if (calls !== 1 || sheetAt < 0 || callAt < sheetAt) wrong.push(`${r.file}: ★確定の関数を シートの外からも呼んでいます`);
+        continue;
+      }
+      const c = src.indexOf('window.confirm');
       if (c < 0 || c > a) wrong.push(`${r.file}: ★確認が ${r.action} より後に在ります`);
     }
     expect(wrong, '🔴 ★押した後に知らせる形になっています（★D-123 ③ は「押す前」）').toEqual([]);

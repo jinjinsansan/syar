@@ -253,7 +253,7 @@ const TONE: Readonly<Record<ButtonTone, React.CSSProperties>> = {
  * ★**大きなボタン**（★資料 §5-5）。★当たりは **88px**。
  * ★`href` があれば `<a>`、無ければ `<button>`。★無効は `disabled` の色で、★押せません。
  */
-export function BigButton({ tone, label, sub, href, onClick, grow }: {
+export function BigButton({ tone, label, sub, href, onClick, grow, autoFocus = false }: {
   readonly tone: ButtonTone;
   readonly label: string;
   readonly sub?: string;
@@ -261,6 +261,8 @@ export function BigButton({ tone, label, sub, href, onClick, grow }: {
   readonly onClick?: () => void;
   /** ★`flex` の伸び（★主ボタンを少し大きく） */
   readonly grow?: string;
+  /** ★開いたら焦点を置く（★確認のシートの［戻る］・誤って確定しないため・R-22 §4） */
+  readonly autoFocus?: boolean;
 }): React.ReactElement {
   const style: React.CSSProperties = {
     ...TONE[tone],
@@ -275,7 +277,7 @@ export function BigButton({ tone, label, sub, href, onClick, grow }: {
     </>
   );
   if (href !== undefined && tone !== 'disabled') return <a href={href} style={style}>{inner}</a>;
-  return <button type="button" onClick={onClick} style={style} disabled={tone === 'disabled'}>{inner}</button>;
+  return <button type="button" onClick={onClick} style={style} disabled={tone === 'disabled'} autoFocus={autoFocus}>{inner}</button>;
 }
 
 /**

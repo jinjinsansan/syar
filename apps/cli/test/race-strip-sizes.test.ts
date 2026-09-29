@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { STRIP_EMBED_ROUTES, STRIP_SIZE_BY_ROUTE, routeKeyOf, stripEmbedsOn, stripSizeOf, type StripSize } from '../../web/src/components/uma/race-strip-sizes.js';
+import { STRIP_SIZE_BY_ROUTE, routeKeyOf, stripEmbedsOn, stripSizeOf, type StripSize } from '../../web/src/components/uma/race-strip-sizes.js';
 import { shellPlacesStripOn } from '../../web/src/components/shell-routes.js';
 import { DEV_ONLY_ROUTES } from '../../web/src/middleware.js';
 
