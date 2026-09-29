@@ -118,7 +118,15 @@ const buriedRows = [];
 let sawNotice = false;
 const FAKE_STALE = process.argv.includes('--fake-stale');
 const SESSION = readSessionArg();
-const EXTRA = String(arg('extra-pages', '')).split(',').map((x) => x.trim()).filter((x) => x !== '');
+/**
+ * ★足す画面（★先頭の / は省いてよい）。
+ * ⚠️ ★Git Bash は ★先頭が / の引数を ★Windows の道（`C:/Program Files/Git/stable`）に書き換える（★2026-09-29 に これで落ちた）。
+ *   → ★先頭の / を省いて渡す（`--extra-pages stable,training`）。★書き換えられた形が来たら ★理由を言って止める。
+ */
+const EXTRA = String(arg('extra-pages', '')).split(',').map((x) => x.trim()).filter((x) => x !== '').map((x) => {
+  if (/^[A-Za-z]:[\\/]/.test(x)) throw new Error(`★--extra-pages が Windows の道に書き換えられています（${x}）。★先頭の / を省いて渡すか MSYS_NO_PATHCONV=1`);
+  return x.startsWith('/') ? x : `/${x}`;
+});
 for (const x of EXTRA) if (!PAGES.includes(x)) PAGES.push(x);
 const browser = await launch({ width: WIDTHS[0], height: 844 });
 try {

@@ -31,6 +31,8 @@ import { injectSession, readSessionArg, scopeLine } from './lib/login-session.mj
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ? d : process.argv[i + 1]; };
 const BASE = process.env.AUDIT_BASE ?? 'http://localhost:3210';
 const ONLY = arg('path', '');
+/** ⚠️ ★Git Bash は 先頭が / の引数を Windows の道に書き換える（★2026-09-29）。★書き換えられた形なら 理由を言って止める */
+if (/^[A-Za-z]:[\\/]/.test(ONLY)) throw new Error(`★--path が Windows の道に書き換えられています（${ONLY}）。★MSYS_NO_PATHCONV=1 を付けて渡す`);
 /** ★360 = 小さめの Android ／ ★390 = iPhone 14 ／ ★430 = iPhone Pro Max */
 const WIDTHS = String(arg('widths', '360,390')).split(',').map((s) => Number(s.trim()));
 
