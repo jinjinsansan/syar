@@ -1230,6 +1230,11 @@ export const STATE_CHANGING = [
 /** 本番に向けることが目的のもの。★理由を必ず書く（空欄で登録できない） */
 export const PRODUCTION_OPS = [
   {
+    file: 'admin-grant-ep.mjs',
+    why: '★管理者のデバッグ用の EP 付与（★2026-09-29・オーナー指示「今の利用者に大量のポイント」・本番の全員に 100,000 EP）。★本番に向けることが目的。'
+      + '★既定は下見（rollback）・★--apply と --yes-production で書く・★鍵 admin-debug:<日>:<利用者> で 同じ日に 2 度入らない・★reason inflow（発行に数える）',
+  },
+  {
     file: 'deploy.sh',
     why: '★VPS への配備そのもの（★正典 §14/§15・`/opt/star-current` のリンクを張り替える）。★本番に向けられなければ意味がない。⚠️ ★**Git の push では入れ替わりません** — ★このスクリプトを走らせない限り古いワーカーが動き続けます（★監査 `REPORT_AUDIT_20260914.md:142` と裁定 `REVIEW_AUTH_EMAIL_PASSWORD_VERDICT_20260918.md` §4 で 2 度誤報された篇所）',
   },
