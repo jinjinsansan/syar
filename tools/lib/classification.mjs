@@ -513,6 +513,7 @@ export const READONLY = [
   'verify-first-daily-and-bet.mjs', // 本番で初めての毎日の受け取りと投票が通ったかを台帳と bets で読む（読むだけ・begin read only・2026-09-29）
   'verify-deployed-db-host.mjs', // 配備された画面の束から DB のホストを読み、--env のホストと比べる（読むだけ・秘密は出さない・2026-09-29）
   'verify-worker-lag.mjs',   // 本番のワーカーが画面より後ろのとき、その差にワーカーに効く変更が在るかを数える（読むだけ・healthz と git・2026-09-29）
+  'verify-worker-queries.mjs',   // ワーカーの拾う問い合わせ（pendingResolutions・pendingSettlements ほか）を staging の実 DB に投げる smoke（読むだけ・2026-09-29 の型の事故）
   'slice-narrator.mjs',       // ナレーターのシートを 6 枚に切り、口だけ差し替える（読むだけ）
   'verify-no-real-faces.mjs', // 人物立ち絵に写真が混ざっていないか（読むだけ）
   // ★anon で何が読めるかの全数確認（§8.6 server_seed・§12.4 potential）。select のみ

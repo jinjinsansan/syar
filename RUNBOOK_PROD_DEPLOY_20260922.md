@@ -75,6 +75,7 @@ npx tsx tools/read-auth-settings.mjs --env production
 ```bash
 bash tools/deploy.sh <0 で控えた sha>
 ```
+- 🔴 ★**配備の前に `npx tsx tools/verify-worker-queries.mjs --env staging`**（★ワーカーの拾う問い合わせを staging の実 DB に投げる・★2026-09-29 に `pendingSettlements` の型の誤りで本番が 3 分止まった・偽の DB の網では出ない）。★exit 1 なら配備しない。
 - 🔴 ★**`deploy.sh` は ★配備するコミットのものを使う**（★2026-09-29 の実例: ★VPS の `/opt/star` の checkout は `67b2971a` のままで、★置いてある `deploy.sh` は古い手順だった）。★置いてあるものを流すと ★**古い手順で新しい版を配る**ことになる。
   ```bash
   ssh -i ~/.ssh/pax_vps root@162.43.29.102 "cd /opt/star && git fetch origin --quiet && git show <sha>:tools/deploy.sh > /tmp/deploy-<sha>.sh && bash /tmp/deploy-<sha>.sh <sha>"
