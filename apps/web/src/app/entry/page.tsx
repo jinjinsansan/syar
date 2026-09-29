@@ -18,11 +18,12 @@ import { conditionView, type Condition } from '../../lib/stable';
 import { STRATEGY_OPTIONS, DEMO_JOCKEY_RIDES } from '../../lib/game-demo';
 import { loadEntryScreen, toEntryRaceView, type EntryScreenData } from '../../lib/entry-screen';
 import { supabaseEntryRepo } from '../../lib/entry-repo';
-import { Backdrop, BigButton, EpCapsule, NoticeBar, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
+import { Backdrop, BigButton, EpCapsule, NOTICE_ACTION, NoticeBar, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 /** ★騎手を選ぶ（★D12-4・D-105 ④「出走登録で凍結する」） */
 import { JockeyPicker } from '../../components/jockey-picker';
-import { CLAIM_ENTRY_NO_CANCEL, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY } from '../../lib/claims';
+import { CLAIM_ENTRY_CANCEL_SHORT, CLAIM_ENTRY_CANCEL_WINDOW, CLAIM_ENTRY_SCRATCH_CONFIRM, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY } from '../../lib/claims';
+import { loadMyOpenEntries, readEntryScratch, requestEntryScratch, SCRATCHABLE_RACE_STATUS, type OpenEntry } from '../../lib/entry-scratch';
 import { LABEL_ENTRY_CLOSE } from '../../lib/sales-close';
 
 /** ★紙パネル（★資料 §5.6: 紙 ＋ 見出し帯は濃紺・下に金 3px） */
@@ -110,6 +111,52 @@ export default function EntryPage(): React.ReactElement {
    *    ★成功したら次のために作り直します。
    * ⚠️ ★失敗の文言は ★**サーバーのものをそのまま**出します（★推測で言い換えない・UI1-9）。
    */
+  /**
+   * ★**出走の取消**（★2026-09-29・D-123 ①・`lib/entry-scratch.ts`）。
+   *   ★取り消せるかは ★サーバーの段（`announced`）で決まる（★画面は時刻で判定しない）。★押す前に「止められない」と言う。
+   *   ★確定はワーカー（`scratchEntry`・★返金は既存の経路）なので、★結果を `my_entry_scratch` で数秒おきに見る。
+   */
+  const [openEntries, setOpenEntries] = useState<readonly OpenEntry[]>([]);
+  const [scratching, setScratching] = useState<string | null>(null);
+  const [scratchMessage, setScratchMessage] = useState<{ readonly ok: boolean; readonly text: string } | null>(null);
+  const reloadOpenEntries = (): void => {
+    loadMyOpenEntries().then(setOpenEntries)
+      .catch((e: unknown) => { setScratchMessage({ ok: false, text: e instanceof Error ? e.message : String(e) }); });
+  };
+  useEffect(() => { if (data?.signedIn === true) reloadOpenEntries(); }, [data?.signedIn]);
+  const labelOfRace = (id: string): string => {
+    const r = races.find((x) => x.id === id);
+    return r === undefined ? '出走表が出たレース' : `${r.raceNo}　${r.classLabel}　${r.course}`;
+  };
+  const nameOfHorse = (id: string): string => horses.find((h) => h.id === id)?.name ?? '自分の馬';
+  const scratch = async (entry: OpenEntry): Promise<void> => {
+    if (scratching !== null || entry.raceStatus !== SCRATCHABLE_RACE_STATUS) return;
+    if (!window.confirm(`${labelOfRace(entry.raceId)}\n${nameOfHorse(entry.horseId)} の登録を取り消します。\n\n${CLAIM_ENTRY_CANCEL_WINDOW}${CLAIM_ENTRY_SCRATCH_CONFIRM}よろしいですか？`)) return;
+    const requestId = crypto.randomUUID();
+    setScratching(entry.entryId);
+    setScratchMessage(null);
+    try {
+      const sent = await requestEntryScratch(requestId, entry.entryId);
+      if (!sent.ok) { setScratchMessage({ ok: false, text: sent.message }); return; }
+      /** ★ワーカーが拾うまで待つ（★約 1 分まで・★それを過ぎたら「受け付けた」と言って 読み直しに任せる） */
+      for (let i = 0; i < 20; i++) {
+        const now = await readEntryScratch(requestId);
+        if (now?.status === 'done') {
+          setScratchMessage({ ok: true, text: '取り消しました。出走料と騎手の料金を参加ポイントで戻しました。' });
+          loadEntryScreen().then(setData).catch(() => { /* ★読み直せなくても取消は済んでいる */ });
+          reloadOpenEntries();
+          return;
+        }
+        if (now?.status === 'failed') { setScratchMessage({ ok: false, text: now.failureReason ?? '取り消せませんでした' }); reloadOpenEntries(); return; }
+        await new Promise((resolve) => { window.setTimeout(resolve, 3000); });
+      }
+      setScratchMessage({ ok: true, text: '取消を受け付けました。反映まで少しかかります。' });
+      reloadOpenEntries();
+    } catch (e: unknown) {
+      setScratchMessage({ ok: false, text: e instanceof Error ? e.message : String(e) });
+    } finally { setScratching(null); }
+  };
+
   const [clientToken, setClientToken] = useState(() => crypto.randomUUID());
   const [entering, setEntering] = useState(false);
   const [entryMessage, setEntryMessage] = useState<{ readonly ok: boolean; readonly text: string } | null>(null);
@@ -123,7 +170,7 @@ export default function EntryPage(): React.ReactElement {
       `${race.raceNo}　${race.classLabel}　${race.course}\n`
       + `${horse.name}・${STRATEGY_OPTIONS.find((s) => s.key === strategy)?.label ?? strategy}\n`
       + `出走料 ${race.feeEP} EP（登録後の残り ${(epBalance - race.feeEP).toLocaleString('ja-JP')} EP）\n\n`
-      + `${CLAIM_ENTRY_NO_CANCEL}この内容でよろしいですか？`,
+      + `${CLAIM_ENTRY_CANCEL_WINDOW}この内容でよろしいですか？`,
     )) return;
     setEntering(true);
     setEntryMessage(null);
@@ -145,6 +192,7 @@ export default function EntryPage(): React.ReactElement {
         setEntryMessage({ ok: true, text: `登録しました（${race.raceNo}　${horse.name}）` });
         setRaceId(null);
         loadEntryScreen().then(setData).catch(() => { /* ★読み直せなくても登録は済んでいる */ });
+        reloadOpenEntries();
       } else {
         setEntryMessage({ ok: false, text: result.failure.message });
       }
@@ -196,6 +244,25 @@ export default function EntryPage(): React.ReactElement {
         </div>
       )}
       {data === null && loadError === null && <p style={{ margin: 0, fontSize: 13 }}>読み込んでいます…</p>}
+      {/* ★**登録済みの出走と 取消**（★2026-09-29・D-123 ①）。★見た目は既存の板と通知の釦だけ */}
+      {(openEntries.length > 0 || scratchMessage !== null) && (
+        <section aria-label="登録済みの出走" style={{ padding: '10px 13px', borderRadius: 12, border: '2px solid rgba(251,247,236,.28)', background: 'var(--u-panel)', fontSize: 13, lineHeight: 1.7 }}>
+          <strong>登録済みの出走</strong>
+          <p style={{ margin: '4px 0 8px', fontSize: 12 }}>{CLAIM_ENTRY_CANCEL_WINDOW}</p>
+          {scratchMessage !== null && <p role={scratchMessage.ok ? 'status' : 'alert'} style={{ margin: '0 0 8px', color: scratchMessage.ok ? 'var(--u-gold)' : 'var(--u-red)' }}>{scratchMessage.text}</p>}
+          {openEntries.map((entry) => {
+            const can = entry.raceStatus === SCRATCHABLE_RACE_STATUS;
+            return <div key={entry.entryId} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '6px 0', borderTop: '1px solid rgba(251,247,236,.18)' }}>
+              <span style={{ flex: '1 1 180px', minWidth: 0 }}>{labelOfRace(entry.raceId)}<br />{nameOfHorse(entry.horseId)}</span>
+              {can
+                ? <button type="button" style={NOTICE_ACTION} disabled={scratching !== null} onClick={() => { void scratch(entry); }}>
+                  {scratching === entry.entryId ? '取り消しています…' : '登録を取り消す'}
+                </button>
+                : <span style={{ fontSize: 12, opacity: .85 }}>出走表が出たため取り消せません</span>}
+            </div>;
+          })}
+        </section>
+      )}
       {/*
         🔴 ★**ログインしていない人に、★DB の生の文を出していました**（★2026-09-25・オーナー指摘）。
            ★`permission denied for view my_horses` がそのまま出て、★しかも
@@ -373,7 +440,7 @@ export default function EntryPage(): React.ReactElement {
                 <BigButton
                   tone={enough && !entering ? 'gold' : 'disabled'}
                   label={entering ? '登録しています…' : `登録する（${race.feeEP} EP）`}
-                  sub={enough ? CLAIM_ENTRY_NO_CANCEL : '参加ポイントが足りません'}
+                  sub={enough ? CLAIM_ENTRY_CANCEL_SHORT : '参加ポイントが足りません'}
                   {...(enough && !entering ? { onClick: () => { void submitEntry(); } } : {})}
                 />
               </div>

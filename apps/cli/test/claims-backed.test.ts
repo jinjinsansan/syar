@@ -17,7 +17,7 @@ import {
   CLAIM_PP_FROM_RACES_ONLY, CLAIM_BREED_RETRY_SAME_YEAR, CLAIM_BREED_TEMP_NO_EP, CLAIM_BREED_PAY_AT_CONFIRM, CLAIM_NAME_NO_SELF_CHANGE,
   CLAIM_NAME_DUP_AFTER_SEND, CLAIM_BROODMARE_FEMALE_ONLY, CLAIM_ROLE_AFTER_RETIRE, CLAIM_ROLE_IMMEDIATE, CLAIM_POTENTIAL_CAP,
   CLAIM_DEFAULT_MENU, CLAIM_POINTS_SEPARATE,
-  BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_BET_TYPE_RULE, CLAIM_REPEAT_BET, CLAIM_CARD_PUBLISH, CLAIM_DAILY_ONCE, CLAIM_TRAIN_EP_SHORT, CLAIM_ENTRY_NO_CANCEL, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
+  BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_BET_TYPE_RULE, CLAIM_REPEAT_BET, CLAIM_CARD_PUBLISH, CLAIM_DAILY_ONCE, CLAIM_TRAIN_EP_SHORT, CLAIM_ENTRY_CANCEL_WINDOW, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
 } from '../../web/src/lib/claims';
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -354,10 +354,34 @@ const CLAIMS: readonly Claim[] = [
     },
   },
   {
-    id: '⑦出走の登録は 画面から取り消せない（★口は在るが 画面が呼ばない）',
-    text: CLAIM_ENTRY_NO_CANCEL, name: 'CLAIM_ENTRY_NO_CANCEL',
+    /**
+     * ★2026-09-29: ★旧文「登録は、画面から取り消せません。」→ ★取消の画面を作った（D-123 ①）ので ★事実に合わせて書き換えた。
+     *   ★旧い網は「画面が request_entry_scratch を呼んだら落ちる」だった（★狙いどおり落ちて 書き直しを求めた）。
+     */
+    id: '⑦出走の登録は 出走表が出る前（announced）まで取り消せ、出走料と騎手の料金は EP で戻る',
+    text: CLAIM_ENTRY_CANCEL_WINDOW, name: 'CLAIM_ENTRY_CANCEL_WINDOW',
     usedBy: ['apps/web/src/app/entry/page.tsx'],
-    backedBy: () => hits(/request_entry_scratch/).filter((f) => f.startsWith('apps/web/')).map((f) => `★画面が取消を呼んでいる: ${f} → 文を書き直す`),
+    backedBy: () => {
+      const why: string[] = [];
+      /** ★受けるのは announced の間だけ（★段で判定・D-123） */
+      const req = latestDefinition('request_entry_scratch');
+      if (req === null || !/if v_race_status <> 'announced' then/.test(req.body)) why.push(`★request_entry_scratch（${req?.rel ?? '無し'}）が announced の間だけに絞っていない`);
+      /** ★画面が口を呼び、★押せるかをサーバーの段で見る */
+      const page = stripComments(read('apps/web/src/app/entry/page.tsx'));
+      if (!page.includes('requestEntryScratch(requestId, entry.entryId)')) why.push('★/entry が 取消の口を呼んでいない（★文が嘘になる）');
+      if (!page.includes('entry.raceStatus === SCRATCHABLE_RACE_STATUS')) why.push('★/entry が 押せるかを サーバーの段で見ていない');
+      if (!/export const SCRATCHABLE_RACE_STATUS = 'announced';/.test(stripComments(read('apps/web/src/lib/entry-scratch.ts')))) why.push('★画面の下見が announced でない');
+      if (latestDefinition('my_open_entries') === null) why.push('★登録の id を画面へ渡す口 my_open_entries が無い');
+      /** ★確定はワーカー: ★依頼を拾って ★既存の scratchEntry を呼ぶ（★返し方を 2 通りにしない） */
+      const runner = stripComments(read('apps/worker/src/entry-scratch-runner.ts'));
+      if (!/scratchEntry\(/.test(runner)) why.push('★ワーカーの取消の依頼が scratchEntry を呼んでいない');
+      /** ★返すのは 出走料（行の値）＋ 騎手の料金・★EP で */
+      const sc = stripComments(read('apps/worker/src/scratch.ts'));
+      if (!/entry_fee_ep/.test(sc)) why.push('★返金が 出走料を行（races.entry_fee_ep）から読んでいない');
+      if (!/jockeyFeeEP/.test(sc)) why.push('★返金に 騎手の料金が入っていない');
+      if (!/ep_ledger/.test(sc) || /pp_ledger/.test(sc)) why.push('★返金が EP の台帳でない（★PP で返すと EP→PP の経路ができる）');
+      return why;
+    },
   },
   {
     id: '⑧出馬表は 発走の（周の長さ − 公開の位置）前に公開される',

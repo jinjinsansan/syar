@@ -1193,6 +1193,8 @@ export const STATE_CHANGING = [
   'verify-breed-own-mare-live.mjs',
   // ★投票の締切（★`0096`）を、★本物の DB で通す（★`0096` の本体も取引の中で当てる・★取引の中だけ。★必ず rollback・2026-09-29）
   'verify-sales-close-live.mjs',
+  // ★出走の取消の返金（★D-123 ①・`0097` の本体も取引の中で当てる・既存の scratchEntry で出走料＋騎手の料金が EP で戻る数）を、★本物の DB で通す（★取引の中だけ。★必ず rollback・2026-09-29）
+  'verify-entry-refund-live.mjs',
   // ★当たりの経路（★settlePayouts・PP の払戻と EP の一方通行）を、★本物の DB で通す（★取引の中だけ。★必ず rollback・2026-09-29）
   'verify-win-payout-live.mjs',
   // ★staging の測定用の口座（measure-390@star-staging.test）を作る／使い回し、★はじめの設定まで通し ★セッションを外へ書く（★ログインした姿を測るため・2026-09-29）

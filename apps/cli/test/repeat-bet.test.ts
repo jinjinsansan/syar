@@ -28,7 +28,11 @@ describe('★続けて投票', () => {
     const src = readFileSync(path.resolve(__dirname, '../../web/src/lib/repeat-bet.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
     expect(src).not.toMatch(/\bwon\b|\blost\b|payout|status/);
     const loader = readFileSync(path.resolve(__dirname, '../../web/src/lib/bet-screen.ts'), 'utf8');
-    const body = loader.slice(loader.indexOf('export async function loadLastBet'), loader.indexOf('const RACE_COLUMNS'));
+    const from = loader.indexOf('export async function loadLastBet');
+    expect(from, '★loadLastBet が見つからない').toBeGreaterThan(-1);
+    const body = loader.slice(from, loader.indexOf('const RACE_COLUMNS'));
+    /** ★番人: ★切り出しが空なら「含まない」が素通りする */
+    expect(body.length).toBeGreaterThan(200);
     expect(body).toContain("settled: row.status !== 'pending',");
     expect(body).not.toMatch(/payout|'won'|'lost'/);
   });

@@ -106,6 +106,12 @@ export const TOOL_AFTERMATH = {
       + '✅ ★**戻したことを数えます**: ★投票・PP 台帳・EP 台帳・口座の行数の 前後一致を見ます。',
     countedBy: 'must(JSON.stringify(after) === JSON.stringify(before),',
   },
+  'verify-entry-refund-live.mjs': {
+    mode: 'restores',
+    why: '★`begin` → `0097` の本体（★begin/commit を外して）・レースの段・`request_entry_scratch`・`scratchEntry`（★返金）→ ★**必ず `rollback`**（`finally`・2026-09-29）。'
+      + '✅ ★**戻したことを数えます**: ★EP 台帳・PP 台帳・取消の依頼・取消済みの登録の行数の 前後一致を見ます。',
+    countedBy: 'must(JSON.stringify(before) === JSON.stringify(after),',
+  },
   'verify-sales-close-live.mjs': {
     mode: 'restores',
     why: '★`begin` → 利用者・レースの発走時刻・`0096` の本体（★begin/commit を外して）・`place_bet` → ★**必ず `rollback`**（`finally`・2026-09-29）。'

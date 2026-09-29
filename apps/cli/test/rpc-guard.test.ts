@@ -170,6 +170,11 @@ const READONLY_FUNCTIONS = [
    */
   'my_entry_scratch',
   /**
+   * ★本人の馬の まだ取消になっていない登録（`0097`・D-123 ①）。`language plpgsql stable` で**状態を変えない**。
+   *   ★取消の口 `request_entry_scratch` が取る登録 id を画面へ渡すだけ。★書き込む側が `assert_setup_complete()` を呼ぶ。
+   */
+  'my_open_entries',
+  /**
    * ★引退後の役割の頭数の上限（`0074`）。`language sql immutable` で**状態を変えない**。
    *   ★数の置き場所を 1 か所にするためだけの関数（★呼ぶ側が `assert_setup_complete()` を持つ）。
    */

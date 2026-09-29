@@ -135,8 +135,17 @@ export const CLAIM_DEFAULT_MENU = '指示しない週は、既定の献立で調
 /** ★参加ポイントと賞金ポイントは 別の台帳（ep_ledger と pp_ledger） */
 export const CLAIM_POINTS_SEPARATE = '参加ポイントと賞金ポイントは別々に記録されます';
 
-/** ★出走の取消（★口 0079 は在るが ★画面から呼ぶ所が 0 件 ＝ 画面からは取り消せない・★オーナー判断待ち） */
-export const CLAIM_ENTRY_NO_CANCEL = '登録は、画面から取り消せません。';
+/**
+ * ★出走の取消（★2026-09-29・D-123 ①・`lib/entry-scratch.ts`）。
+ *   ★受けるのは ★レースの段が `announced`（★出走表が出る前）の間だけ（★判定は `request_entry_scratch`・0079）。
+ *   ★返すのは ★既存の経路（★ワーカーの `scratchEntry`: 登録料は `races.entry_fee_ep` の行・騎手の料金は凍結から・EP で）。
+ *   ⚠️ ★旧文「登録は、画面から取り消せません。」は ★画面が口を呼んでいなかった間の事実（★網 claims-backed ⑦）。
+ */
+export const CLAIM_ENTRY_CANCEL_WINDOW = '登録は、出走表が出る前（発売の準備に入る前）まで取り消せます。取り消すと、出走料と騎手の料金は参加ポイントで戻ります。';
+/** ★取消は 依頼を積んだ時点で止められない（★request_entry_scratch に取り下げの口は無い） */
+export const CLAIM_ENTRY_SCRATCH_CONFIRM = '取消は、押したあとで止められません。';
+/** ★登録ボタンの下の 1 行（★同じ事実の短い形） */
+export const CLAIM_ENTRY_CANCEL_SHORT = '出走表が出る前まで取り消せます';
 
 /** ★表示名・牧場名・勝負服は ★あとから変えられない（★変える口が 0 件・`create_account` は作り直せない） */
 export const CLAIM_NO_CHANGE_LATER = 'あとから変えられません。';
