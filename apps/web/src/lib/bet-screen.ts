@@ -17,6 +17,7 @@
 import { CLASS_LABEL, CONDITION_LABEL, SURFACE_LABEL, formatClock } from './format';
 import { authClient, readClient } from './supabase';
 import { readRaceOdds } from './odds-read';
+import type { LastBet } from './repeat-bet';
 
 /** ★出馬表の 1 頭（★`race_entries_public` が返す列だけ） */
 export interface BetEntryView {
@@ -107,6 +108,26 @@ export async function loadBetAllowance(raceId: string, betType: string): Promise
     remainingEP: Number(row.remaining_ep),
     binding: String(row.binding),
     bindingLabel: String(row.binding_label),
+  };
+}
+
+/**
+ * ★**自分の いちばん新しい投票**（★続けて投票・`repeat-bet.ts`）。
+ * ⚠️ ★当たり外れは ★**返しません**（★「確定したか」だけ・★中立の裁定）。★`status` は ★pending かどうかにしか使わない。
+ * ⚠️ ★ログインしていなければ null（★RLS `bets_own` で ★自分の行しか読めない）。★失敗は投げる（★「前の投票が無い」に見せない）。
+ */
+export async function loadLastBet(): Promise<LastBet | null> {
+  const auth = authClient();
+  const { data: sess } = await auth.auth.getSession();
+  if (sess.session === null) return null;
+  const { data, error } = await auth.from('bets').select('id, race_id, bet_type, amount, status')
+    .order('created_at', { ascending: false }).limit(1);
+  if (error !== null) throw new Error(`前の投票を読めませんでした: ${error.message}`);
+  const row = data?.[0];
+  if (row === undefined) return null;
+  return {
+    id: String(row.id), raceId: String(row.race_id), betType: String(row.bet_type),
+    amount: Number(row.amount), settled: row.status !== 'pending',
   };
 }
 

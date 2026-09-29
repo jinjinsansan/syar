@@ -536,6 +536,11 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
       + '★作り直しで口が静かに消えないよう、★**実測して書き留めた**もの（★手で数えていない）',
   },
   {
+    key: 'RESKIN_0929',
+    why: '★簿（`apps/cli/src/screen-generations.ts`）の説明の文（★2026-09-29・殻で芝＋紺を敷いた旧 6 面に共通の一文）。'
+      + '🔴 ★**較正定数ではありません** — ★数でもなく ★ゲームの挙動に 1 ビットも入りません。',
+  },
+  {
     key: 'OLD_GENERATION_MAX',
     why: '★旧世代の画面の枚数の上限（`apps/cli/src/screen-generations.ts`・裁定 '
       + '`REVIEW_EP_INFLOW_AND_ENTRY_20260925.md` §3・2026-09-25）。'

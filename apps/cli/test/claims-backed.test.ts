@@ -17,7 +17,7 @@ import {
   CLAIM_PP_FROM_RACES_ONLY, CLAIM_BREED_RETRY_SAME_YEAR, CLAIM_BREED_TEMP_NO_EP, CLAIM_BREED_PAY_AT_CONFIRM, CLAIM_NAME_NO_SELF_CHANGE,
   CLAIM_NAME_DUP_AFTER_SEND, CLAIM_BROODMARE_FEMALE_ONLY, CLAIM_ROLE_AFTER_RETIRE, CLAIM_ROLE_IMMEDIATE, CLAIM_POTENTIAL_CAP,
   CLAIM_DEFAULT_MENU, CLAIM_POINTS_SEPARATE,
-  BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_BET_TYPE_RULE, CLAIM_CARD_PUBLISH, CLAIM_DAILY_ONCE, CLAIM_TRAIN_EP_SHORT, CLAIM_ENTRY_NO_CANCEL, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
+  BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_BET_TYPE_RULE, CLAIM_REPEAT_BET, CLAIM_CARD_PUBLISH, CLAIM_DAILY_ONCE, CLAIM_TRAIN_EP_SHORT, CLAIM_ENTRY_NO_CANCEL, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
 } from '../../web/src/lib/claims';
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -187,6 +187,28 @@ const MOVED: readonly Claim[] = [
 
 const CLAIMS: readonly Claim[] = [
   ...MOVED,
+  {
+    id: '㉖続けて投票は 同じ券種・同じ額・馬は選び直す・参加ポイントのみ・続けて 3 回まで（★当たり外れを言わない）',
+    text: CLAIM_REPEAT_BET, name: 'CLAIM_REPEAT_BET',
+    usedBy: ['apps/web/src/app/vote/page.tsx'],
+    backedBy: () => {
+      const why: string[] = [];
+      const rb = stripComments(read('apps/web/src/lib/repeat-bet.ts'));
+      if (!/if \(input\.streak >= REPEAT_BET_MAX\) return \{ kind: 'limit' \};/.test(rb)) why.push('★続けた回数の上限が効いていない');
+      if (!/last\.amount !== input\.stakeEP\) return \{ kind: 'none' \}/.test(rb)) why.push('★前と別の額でも「同じ額」と出す');
+      if (!/export const REPEAT_BET_MAX = 3;/.test(stripComments(read('apps/web/src/lib/claims.ts')))) why.push('★上限が 3 でない（★文の「3 回」とずれる）');
+      const vote = stripComments(read('apps/web/src/app/vote/page.tsx'));
+      if ((vote.match(/placeBet\(/g) ?? []).length !== 1) why.push('★/vote が「投票する」以外でも買っている（★自動で買わない・馬は選び直す）');
+      /** ★参加ポイントのみ: ★買う口 place_bet は EP の台帳だけを引く（★PP に触れない） */
+      const d = latestDefinition('place_bet');
+      if (d === null) why.push('★place_bet の定義が見つからない');
+      else {
+        if (!/ep_ledger/.test(d.body)) why.push(`★${d.rel}: place_bet が EP の台帳を引いていない`);
+        if (/pp_ledger/.test(d.body)) why.push(`★${d.rel}: place_bet が PP の台帳に触れている`);
+      }
+      return why;
+    },
+  },
   {
     id: '㉕単勝は 1 着・複勝は 3 着以内（7 頭以下は 2 着以内）', text: CLAIM_BET_TYPE_RULE.place, name: 'CLAIM_BET_TYPE_RULE',
     usedBy: ['apps/web/src/app/vote/page.tsx'],

@@ -5,11 +5,12 @@ import { checkOwnRaceSelection, ownRaceReasonText } from '@star/betting';
 import { Backdrop, BigButton, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { useSalesClosed } from '../../components/clock';
-import { BET_PER_PICK_EP, BET_TYPE_LABEL, CLAIM_BET_PER_PICK, CLAIM_BET_TYPE_RULE, CLAIM_OWN_RACE_BET, CLAIM_SALES_CLOSED, type VoteBetType } from '../../lib/claims';
+import { BET_PER_PICK_EP, BET_TYPE_LABEL, CLAIM_BET_PER_PICK, CLAIM_BET_TYPE_RULE, CLAIM_OWN_RACE_BET, CLAIM_REPEAT_BET, CLAIM_REPEAT_BET_LIMIT, CLAIM_REPEAT_BET_SHORT, CLAIM_SALES_CLOSED, type VoteBetType } from '../../lib/claims';
+import { nextRepeatStreak, readRepeatStreak, repeatOfferOf, writeRepeatStreak, type LastBet } from '../../lib/repeat-bet';
 
 /** ★いま出す券種（★オーナー 2026-09-29「まずは単勝・複勝」） */
 const VOTE_BET_TYPES: readonly VoteBetType[] = ['win', 'place'];
-import { loadBetAllowance, loadBetScreen, oddsKey, placeBet, type BetAllowance, type BetScreenData } from '../../lib/bet-screen';
+import { loadBetAllowance, loadBetScreen, loadLastBet, oddsKey, placeBet, type BetAllowance, type BetScreenData } from '../../lib/bet-screen';
 
 const FRAME_COLORS = ['#f5f5f5', '#191919', '#d62828', '#1446b4', '#fad728', '#148c46', '#f08219', '#f596be'] as const;
 const DARK_TEXT_FRAMES = new Set([1, 5, 8]);
@@ -33,6 +34,14 @@ export default function VotePage(): React.ReactElement {
   const [busy, setBusy] = useState(false);
   const [clientToken, setClientToken] = useState(() => crypto.randomUUID());
   const currentRaceId = useRef<string | null>(null);
+  /**
+   * ★続けて投票（★`lib/repeat-bet.ts`）。★前の投票が確定していれば ★当たり外れに関係なく同じ強さで出す（★中立）。
+   *   ★押すと 券種だけ前と同じにする（★馬は本人が選ぶ・★自動では買わない）。★買えたら 続けた回数を +1。
+   */
+  const [lastBet, setLastBet] = useState<LastBet | null>(null);
+  const [repeatArmed, setRepeatArmed] = useState(false);
+  const [repeatDismissedFor, setRepeatDismissedFor] = useState<string | null>(null);
+  const [repeatStreak, setRepeatStreak] = useState(0);
 
   const reload = (): void => {
     setError(null);
@@ -41,10 +50,12 @@ export default function VotePage(): React.ReactElement {
       if (currentRaceId.current !== nextRaceId) setPicks([]);
       currentRaceId.current = nextRaceId;
       setData(fresh);
+      if (fresh.authenticated) void loadLastBet().then(setLastBet).catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); });
     })
       .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); });
   };
   useEffect(() => {
+    setRepeatStreak(readRepeatStreak());
     reload();
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') reload(); }, REFRESH_MS);
     return () => { window.clearInterval(timer); };
@@ -65,6 +76,11 @@ export default function VotePage(): React.ReactElement {
   const selectedOdds = race && selected !== null ? race.odds.get(oddsKey(betType, [selected])) ?? null : null;
   /** ★発売締切を過ぎたら 押せない（★締め切ったのに買えると読める姿を残さない・2026-09-29） */
   const salesClosed = useSalesClosed(race?.scheduledAt ?? null);
+  const repeat = repeatOfferOf({
+    last: lastBet, currentRaceId: race?.id ?? null, salesClosed, epBalance: data?.epBalance ?? 0,
+    streak: repeatStreak, betTypes: VOTE_BET_TYPES, stakeEP: EP_PER_PICK,
+  });
+  const showRepeat = data?.authenticated === true && race !== null && repeatDismissedFor !== race.id && repeat.kind !== 'none';
   const blocked = salesClosed || !data?.authenticated || race === null || selected === null || selectedOdds === null || !check.ok
     || allowance === null || allowance.remainingEP < EP_PER_PICK || data === null || data.epBalance < EP_PER_PICK || busy;
 
@@ -86,6 +102,8 @@ export default function VotePage(): React.ReactElement {
       if (!result.ok) setError(result.failure.message);
       else {
         setClientToken(crypto.randomUUID());
+        const streak = nextRepeatStreak(repeatStreak, repeatArmed);
+        setRepeatStreak(streak); writeRepeatStreak(streak); setRepeatArmed(false);
         setMessage('投票を受け付けました。');
         setPicks([]);
         reload();
@@ -108,6 +126,18 @@ export default function VotePage(): React.ReactElement {
       {error}　<a href="/login">ログイン</a>　<button type="button" onClick={reload} style={NOTICE_ACTION}>再読み込み</button>
     </TextPanel>}
     {message && <TextPanel role="status" style={{ color: 'var(--u-gold)' }}>{message}</TextPanel>}
+    {showRepeat && <TextPanel role="status" style={{ fontSize: 13 }}>
+      {repeat.kind === 'offer' ? <>
+        {CLAIM_REPEAT_BET}
+        {repeatArmed ? <p style={{ margin: '6px 0 0' }}>券種を{BET_TYPE_LABEL[repeat.betType as VoteBetType]}にしました。馬を選んで「投票する」を押してください。</p>
+          : <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            <button type="button" style={NOTICE_ACTION} onClick={() => { setBetType(repeat.betType as VoteBetType); setRepeatArmed(true); setMessage(null); }}>
+              同じ券種・{repeat.amount} EP で投票する
+            </button>
+            <button type="button" style={NOTICE_ACTION} onClick={() => { setRepeatDismissedFor(race?.id ?? null); setRepeatArmed(false); }}>やめる</button>
+          </span>}
+      </> : repeat.kind === 'short' ? CLAIM_REPEAT_BET_SHORT : CLAIM_REPEAT_BET_LIMIT}
+    </TextPanel>}
     {data && !data.authenticated && <TextPanel style={{ fontSize: 13 }}>
       出馬表は閲覧できます。投票するには <a href="/login" style={{ textDecoration: 'underline' }}>ログイン</a> してください。
     </TextPanel>}
@@ -137,7 +167,7 @@ export default function VotePage(): React.ReactElement {
         {/* ★① 券種（★選ぶと 出馬表のオッズ・あと何 EP・確認の文が その券種に変わる） */}
         <div role="tablist" aria-label="券種" style={{ display: 'flex', gap: 6, margin: '8px 0' }}>
           {VOTE_BET_TYPES.map((t) => <button key={t} type="button" role="tab" aria-selected={betType === t}
-            onClick={() => { setBetType(t); setMessage(null); }}
+            onClick={() => { setBetType(t); setMessage(null); setRepeatArmed(false); }}
             style={{ flex: 1, minHeight: 44, borderRadius: 10, fontSize: 15, fontWeight: 900, border: '2px solid var(--u-gold)', background: betType === t ? 'var(--u-gold)' : 'transparent', color: betType === t ? 'var(--u-ink-dark)' : 'var(--u-ink)' }}>{BET_TYPE_LABEL[t]}</button>)}
         </div>
         <p>{CLAIM_BET_TYPE_RULE[betType]}</p>
