@@ -1738,17 +1738,6 @@ export const OPEN_FINDINGS = [
     owner: 'dev',
     until: '2026-12-31',
   },
-  {
-    id: 'VOTE-NEVER-SUCCEEDED',
-    what: '🔴 ★**/vote からの投票は これまで 1 件も成立していません**（★2026-09-29 発見・★投票の輪は 本番で 1 度も通っていない見込み）。'
-      + '★/vote は 1 口 10 EP を送り、★DB の制約 bets_amount_range（0001・100 以上・100 刻み・10,000 以下＝正典 §9.1）で ★必ず落ちていた。★staging の bets は 0 行。',
-    why: '✔ ★直し: 1 口を `BET_PER_PICK_EP`（＝`MIN_STAKE` 100）に（lib/claims.ts）。★網 claims-backed ⑩ が ★制約の定義を読んで その額が通るかを見る（★変異 10 で落ちる）。'
-      + '✔ ★staging の取引の中で ★その額の place_bet が 通ることを確かめた（tools/verify-sales-close-live.mjs・rollback）。'
-      + '★V-11 の「馬券 0」も これで説明が付く。★本番は 読んでいない（★権限層）。'
-      + '--- ✅ ★**消す条件** --- ★本番で 1 件 通ったことを確かめた日。',
-    owner: 'dev',
-    until: '2026-12-31',
-  },
 ];
 
 /**
