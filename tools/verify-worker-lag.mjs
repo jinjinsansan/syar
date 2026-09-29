@@ -47,13 +47,30 @@ const fsIo = {
   importsOf,
 };
 
-let shas = { web: null, worker: null };
-try {
-  const res = await fetch(new URL('/api/healthz', BASE), { cache: 'no-store' });
-  const body = await res.json();
-  shas = { web: typeof body?.sha === 'string' ? body.sha : null, worker: typeof body?.worker?.sha === 'string' ? body.worker.sha : null };
-} catch (e) {
-  console.log(`★healthz を読めませんでした: ${e instanceof Error ? e.message : String(e)}`);
+/**
+ * ★healthz の `worker` は ★**設計上 null になりうる**（★1.5 秒で読めなければ null・DB のせいで healthz を落とさない）。
+ *   → ★null なら ★1 度だけ数秒おいて読み直す（★2026-09-30・レビュー側）。★2 回とも null は ★分からない（2）。
+ *   🔴 ★黙って再試行しない: ★「1 回目 null・2 回目 …」を ★両方 出す（★本当に止まりかけているときに気づけるように）。
+ */
+const RETRY_WAIT_MS = 3000;
+const readShas = async () => {
+  try {
+    const res = await fetch(new URL('/api/healthz', BASE), { cache: 'no-store' });
+    const body = await res.json();
+    return { web: typeof body?.sha === 'string' ? body.sha : null, worker: typeof body?.worker?.sha === 'string' ? body.worker.sha : null };
+  } catch (e) {
+    console.log(`★healthz を読めませんでした: ${e instanceof Error ? e.message : String(e)}`);
+    return { web: null, worker: null };
+  }
+};
+let shas = await readShas();
+if (shas.worker === null) {
+  console.log(`★1 回目: healthz の worker が null（★設計上ありうる）→ ${RETRY_WAIT_MS / 1000} 秒おいて 1 度だけ読み直します`);
+  await new Promise((r) => setTimeout(r, RETRY_WAIT_MS));
+  shas = await readShas();
+  console.log(shas.worker === null
+    ? '★2 回目: また null（★2 回とも null ＝ 分からない・ワーカーが止まりかけていないか見ること）'
+    : `★2 回目: OK（worker ${shas.worker.slice(0, 7)}）`);
 }
 
 const dirs = workerPackageDirs(fsIo);

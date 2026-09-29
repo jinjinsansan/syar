@@ -2215,6 +2215,15 @@ export const WATCHING = [
     owner: 'review',
     reviewBy: '2026-12-31',
   },
+  {
+    id: 'HEALTHZ-WORKER-NULL-BY-DESIGN',
+    what: 'ℹ️ ★**healthz の `worker` は 設計上 null になりうる**（★1.5 秒で読めなければ null・★DB のせいで healthz を落とさないため）。',
+    why: '★2026-09-30 に 1 度だけ `worker: null` が返り、★`verify-worker-lag` が exit 2 を出した（★直後の 5 回は da157aa・ワーカーは毎分の周を続けていた）。'
+      + '★道具は ★1 度だけ 3 秒おいて読み直す（★1 回目・2 回目を ★両方 出す・★黙って隠さない）。★2 回とも null は ★分からない（exit 2）。★網 worker-lag.test.ts ⑤。',
+    returnWhen: '★2 回とも null が出た日（★ワーカーか heartbeat の読み取りが止まりかけていないか見る）',
+    owner: 'dev',
+    reviewBy: '2026-12-31',
+  },
 ];
 
 export function diffOpenFindings(todayIso, registry = OPEN_FINDINGS, helpers = defaultHelpers()) {

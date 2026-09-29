@@ -81,3 +81,19 @@ describe('★ワーカーが読む所（workerPackageDirs）', () => {
     expect(dirs).toEqual(['packages/race-engine', 'packages/sim-engine']);
   });
 });
+
+/**
+ * ⑤ ★healthz の worker は ★設計上 null になりうる（★1.5 秒で読めなければ null）→ ★1 度だけ読み直す（★2026-09-30・レビュー側）。
+ *   🔴 ★黙って再試行しない（★1 回目と 2 回目を ★両方 出す）。★2 回とも null は 分からない（★lagReport の ① がそのまま効く）。
+ */
+describe('★worker: null は 1 度だけ読み直す（★両方を出す）', () => {
+  it('🔴 ⑤ 読み直しは 1 回だけ・1 回目と 2 回目を出力に書く', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('../../../tools/verify-worker-lag.mjs', import.meta.url), 'utf8');
+    expect(src).toContain('let shas = await readShas();');
+    expect(src.match(/await readShas\(\)/g)?.length, '★読み直しは 1 回だけ（★ループにしない）').toBe(2);
+    expect(src).toContain('★1 回目: healthz の worker が null');
+    expect(src).toContain('★2 回目: また null');
+    expect(src).toContain('★2 回目: OK');
+  });
+});
