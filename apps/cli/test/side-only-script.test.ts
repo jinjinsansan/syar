@@ -22,7 +22,8 @@ import {
 import { DEFAULT_INTERVENTION_BALANCE } from '@star/race-engine';
 
 /** ★1 周目のスタンド前を見せる鞍（★レビュー側の回答 §0-1 の計算・★明示の一覧で持つ） */
-const FIRST_PASS_RACES: readonly string[] = ['g1-ginga', 'g3-hokkyokusei', 'g2-ookawara', 'g3-hakko'];
+/** ★2026-09-29: ★大河原記念・白光記念 は 3000 に寄せた（裁定 C）ので 1 周目のスタンド前に来ない → ★2 鞍（★first-pass-time-of-day ① と同じ） */
+const FIRST_PASS_RACES: readonly string[] = ['g1-ginga', 'g3-hokkyokusei'];
 
 /** ★合成の位置（★毎秒 16m の等速）。★見る区間の境目だけを確かめるので、速さは何でもよい */
 const MPS = 16;

@@ -7,7 +7,8 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  G1_DAYS,
+  CYCLES_PER_WEEK,
+  WEEKS_PER_YEAR,
   G1_SLOTS,
   GRADED_PER_WEEK,
   RACES_BY_CLASS,
@@ -46,10 +47,14 @@ describe('§10.3 正典との一致', () => {
     expect(GRADED_PER_WEEK.G3).toBe(20);
   });
 
-  it('★G1 は週にちょうど3回（毎日3枠にすると週21回になる）', () => {
+  /**
+   * ★2026-09-29 に書き換え（★緩めたのではなく ★設計が変わったから）: 旧「G1 は実時間の週にちょうど 3 回」は ★重賞の暦の前だけの前提。
+   *   ★重賞の暦（レビュー側の裁定）では ★G1 は ★1 ゲーム年に 9 回（★9 鞍が暦の月に 1 回ずつ）。
+   */
+  it('★G1 は 1 ゲーム年にちょうど 9 回（★重賞の暦・旧「実時間の週 3 回」は暦の前の前提）', () => {
     let n = 0;
-    for (let i = 0; i < RACES_PER_DAY * 7; i += 1) if (gradeOf(i) === 'G1') n += 1;
-    expect(n).toBe(GRADED_PER_WEEK.G1);
+    for (let i = 0; i < CYCLES_PER_WEEK * WEEKS_PER_YEAR; i += 1) if (gradeOf(i) === 'G1') n += 1;
+    expect(n).toBe(9);
   });
 });
 
@@ -109,10 +114,21 @@ describe('§10.3 サイクル番号からの引き当て', () => {
     expect(gradeOf(nonGraded)).toBeNull();
   });
 
-  it('★指定した曜日・枠が G1 になる', () => {
-    for (const g of G1_DAYS) {
-      expect(gradeOf(g.dayOfWeek * RACES_PER_DAY + g.slot)).toBe('G1');
+  /**
+   * ★2026-09-29 に書き換え（★設計が変わったから）: 旧「G1_DAYS の曜日・枠が G1」は ★暦の前の前提。
+   *   ★いまは ★G1 は暦の週に置かれ、★その週の中では ★G1 の時刻の枠（G1_SLOTS）を先に使う。
+   */
+  it('★G1 は その週に G1 の時刻の枠があれば そこで走る（★重賞の暦・旧「指定した曜日・枠」は暦の前の前提）', () => {
+    let checked = 0;
+    for (let i = 0; i < CYCLES_PER_WEEK * WEEKS_PER_YEAR; i += 1) {
+      if (gradeOf(i) !== 'G1') continue;
+      const week = Math.floor(i / CYCLES_PER_WEEK);
+      const g1SlotInWeek = Array.from({ length: CYCLES_PER_WEEK }, (_, k) => week * CYCLES_PER_WEEK + k)
+        .some((c) => G1_SLOTS.includes(slotOfDay(c)) && dailyProgramme()[slotOfDay(c)] === 'graded');
+      if (g1SlotInWeek) { expect(G1_SLOTS).toContain(slotOfDay(i)); checked += 1; }
     }
+    /** ★実測（2026-09-29）: 年 9 回のうち 4 回の週に G1 の時刻の枠がある */
+    expect(checked).toBe(4);
   });
 
   it('★非G1の重賞は G2 と G3 の両方が現れる', () => {

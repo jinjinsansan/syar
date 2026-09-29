@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DISTANCE_MENU, RACES_PER_DAY, VENUES, classOf, conditionsOf, frozenCourseOf, gradeOf, productionRaceOf,
-  venueById,
+  venueById, CYCLES_PER_WEEK, WEEKS_PER_YEAR, GRADED_RACES, dailyProgramme, slotOfDay,
 } from '../src/index.js';
 
 const WEEK = RACES_PER_DAY * 7;
@@ -43,17 +43,23 @@ describe('§10.4 レース条件', () => {
     expect(ds.size).toBe(DISTANCE_MENU.length);
   });
 
-  it('★重賞は短距離に寄らない（格上が1200mばかりにならない）', () => {
+  /**
+   * ★2026-09-29 に書き換え（★設計が変わったから）: 旧「重賞は 1600m 未満 0」は ★番組が重賞の距離を決めていた頃の前提。
+   *   ★重賞の暦では ★重賞は ★鞍の距離で走る（★涼風ステークス は 短距離の鞍）。★狙い「格上が短距離ばかりにならない」は ★鞍の表で見る。
+   *   ⚠️ ★最初は「短距離の重賞は 1 割未満」も足したが ★**私の思い込みだった**（★表は 13/50 ＝ 26%）。★表の本数と一致することだけを見る。
+   */
+  it('★重賞は 鞍の距離で走り、短距離（1600m 未満）の重賞は 鞍の表の本数だけ（★旧「0 本」は暦の前の前提）', () => {
+    const YEAR = CYCLES_PER_WEEK * WEEKS_PER_YEAR;
     let short = 0;
     let graded = 0;
-    for (let i = 0; i < RACES_PER_DAY * 7; i += 1) {
+    for (let i = 0; i < YEAR; i += 1) {
       const g = gradeOf(i);
       if (g === null) continue;
       graded += 1;
       if (conditionsOf(i, classOf(i), g).distance < 1600) short += 1;
     }
-    expect(graded).toBeGreaterThan(0);
-    expect(short).toBe(0);
+    expect(graded).toBe(GRADED_RACES.length);
+    expect(short).toBe(GRADED_RACES.filter((r) => r.distanceM < 1600).length);
   });
 
   it('負のサイクル番号でも壊れない', () => {
@@ -98,10 +104,15 @@ describe('★VW-2 競馬場の割り当て', () => {
    * ★4 場ごとの回数（★Q-2 の判断材料。★報告書に表で出す）。
    *   ★ここでは「均等に回している」ことだけを固定します — ★馬場ごとに最多と最少の差が 1 以内。
    */
-  it('★4 馬場ごとに 10 場へ均等に配る（1 週で最多 − 最少 ≤ 1）', () => {
+  /** ★2026-09-29: ★重賞は鞍の場で走る（★重賞の暦・緩めたのではなく 設計が変わった） */
+  /**
+   * ★見ているのは ★場の回し方（★通し番号で 10 場を回す）そのもの。★重賞は その上から鞍の場で上書きされる。
+   *   → ★全枠を ★重賞でないとして（grade = null）回し方の場を引き、★均等を見る（★回し方は 暦の前と 1 ビットも同じ）。
+   */
+  it('★4 馬場ごとに 10 場へ均等に配る（1 週で最多 − 最少 ≤ 1・★回し方の場・重賞は鞍の場で上書き）', () => {
     const counts = new Map<string, number>();
     for (let i = 0; i < WEEK; i += 1) {
-      const c = conditionsOf(i, classOf(i), gradeOf(i));
+      const c = conditionsOf(i, classOf(i), null);
       const key = `${c.surface}/${c.courseId}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
@@ -118,10 +129,16 @@ describe('★VW-2 競馬場の割り当て', () => {
    *   （★初版の実測 1 週: 新馬が潮風 69 本・スターパーク 12 本）。
    *   ★1 日 3 場ずつずらすので、★**10 日で芝の各枠が 10 場を 1 回ずつ**回る ＝ ★クラスごとの芝の本数が場の間で完全に等しい。
    */
-  it('★10 日で、クラスごとの芝の本数が 10 場で等しい（枠が場に張り付かない）', () => {
+  /**
+   * ★2026-09-29: ★重賞の枠のうち 暦に鞍が無い枠は オープンになり、★重賞は鞍の場で走る（★重賞の暦）。
+   *   ★番組の枠（dailyProgramme）で見て ★重賞の枠は除く（★緩めたのではなく 設計が変わった）。
+   */
+  it('★10 日で、番組のクラスごとの芝の本数が 10 場で等しい（枠が場に張り付かない・★重賞の枠は除く）', () => {
     const DAYS = 10;
+    const programme = dailyProgramme();
     const counts = new Map<string, Map<string, number>>();
     for (let i = 0; i < RACES_PER_DAY * DAYS; i += 1) {
+      if (programme[slotOfDay(i)] === 'graded') continue;
       const c = conditionsOf(i, classOf(i), gradeOf(i));
       if (c.surface !== 'turf') continue;
       const byVenue = counts.get(classOf(i)) ?? new Map<string, number>();

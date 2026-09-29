@@ -76,7 +76,8 @@ describe('★突き合わせの対象（★この検査が何場を見ている�
     }));
     expect(new Set(CASES.map((c) => c.key))).toEqual(expected);
     // ★下限。★1 場だけを見て緑だった過去に戻らないための歯止め
-    expect(CASES.length).toBeGreaterThanOrEqual(40);
+    // ★2026-09-29: ★40 → 38（★裁定 C で 9 鞍の距離を番組の 7 距離に寄せ、★(場, 距離) の組が重なった・★緩めたのではなく 組の数が減った）
+    expect(CASES.length).toBeGreaterThanOrEqual(38);
   });
 
   it('★形が実際にばらけている（★同じ形を 44 回見ても 1 通り分の意味しかない）', () => {

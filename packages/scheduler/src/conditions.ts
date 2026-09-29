@@ -14,7 +14,7 @@
  *    （2つ目の置き場を作ると片方だけ更新される・L-2）。
  */
 
-import { RACES_PER_DAY, classOf, gradeOf, type Grade, type RaceClass } from './programme.js';
+import { RACES_PER_DAY, classOf, gradeOf, gradedRaceAt, type Grade, type RaceClass } from './programme.js';
 import { VENUES, venueById } from './venues.js';
 
 export type Surface = 'turf' | 'dirt';
@@ -98,6 +98,15 @@ export function conditionsOf(cycleIndex: number, raceClass: RaceClass, grade: Gr
    * ★**距離・馬場をクラスで寄せる規定は正典にありません**（★`grade` で距離を長めに寄せるのは §10.3 にあります）。
    *   ★寄せるなら正典の根拠が要ります（★開発側では決めません）。
    */
+  void raceClass;
+  /**
+   * ★**重賞は 暦の鞍の条件で走る**（★2026-09-29・重賞の暦）。★名前が「天河記念」なら ★天河の芝で その距離。
+   *   ★場・馬場・距離を 鞍から取る（★別の競馬場で重賞名を名乗らない）。
+   */
+  if (grade !== null) {
+    const race = gradedRaceAt(cycleIndex);
+    if (race !== null) return { surface: race.surface, distance: race.distanceM, courseId: race.venueId };
+  }
   void raceClass;
   const i = ((cycleIndex % 1_000_000) + 1_000_000) % 1_000_000;
 

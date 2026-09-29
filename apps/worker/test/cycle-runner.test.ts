@@ -306,9 +306,13 @@ describe('★D-038 確定を生成より先に処理する', () => {
      *   ★**並びは変わっていません**（retire-check → settle → cancel → announce… → fill）。
      * ⚠️ ★**数を緩めません**（★`toContain` などにすると、★並びの見張りが死にます）。
      */
+    /**
+     * ⚠️ ★2026-09-29・★重賞の暦: ★`announce` が **5 本 → 4 本**（★cycle 20 は 暦に鞍が無くオープンになり、★重賞の窓に入らない）。
+     *   ★並びは変わっていません。★数も緩めていません（★重賞の窓は d117-two-phase-loop ① が cycle 180 → 200 の G2 で見る）。
+     */
     expect(store.order).toEqual([
       'retire-check', 'settle', 'cancel',
-      'announce', 'announce', 'announce', 'announce', 'announce',
+      'announce', 'announce', 'announce', 'announce',
       'fill', 'fill',
     ]);
   });

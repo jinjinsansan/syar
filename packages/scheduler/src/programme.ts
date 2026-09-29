@@ -7,6 +7,9 @@
  */
 
 import { CYCLE_MS } from './cycle.js';
+import { CYCLES_PER_WEEK } from './week.js';
+import { WEEKS_PER_YEAR, gameMonthOf } from './birth-week.js';
+import { GRADED_RACES, type GradedRace } from './graded-races.js';
 
 /** クラス（正典 §10.3） */
 export type RaceClass = 'maiden' | 'win1' | 'win2' | 'win3' | 'open' | 'graded';
@@ -227,36 +230,62 @@ export function dailyProgramme(
   return out;
 }
 
-/** そのサイクルのクラス */
+/**
+ * ★**重賞の暦**（★2026-09-29・レビュー側の裁定「重賞は暦で組んでください」）。
+ *
+ *   ★1 ゲーム年（52 週）に ★**50 鞍がそれぞれ 1 回ずつ**。★鞍の月（`GRADED_RACES.month`）と ★週の月（`gameMonthOf`）で週に置く。
+ *   ★その月の鞍を ★その月の週に 等間隔で配る（★月の週より鞍が多ければ 1 週に 2 鞍）。
+ *   ★週の中では ★番組表の重賞の枠（`dailyProgramme` の 'graded'）を 前から使い、★G1 は ★G1 の時刻の枠を先に使う。
+ *   ★**余った重賞の枠は オープン**（★1 日 240R と 6 分の周は変えない・★較正 V-4/5/6 に触らない）。
+ *
+ * ⚠️ ★旧は ★1 日 15 枠すべてが重賞で ★1 ゲーム年 130 鞍（★同じ名前が年に最大 8 回・G1 は実時間の週 3 回で 年 3 回）。
+ * ★決定論: ★サイクル番号だけから決まる（★A-2・憲法 4）。
+ */
+const GRADED_CALENDAR: readonly (readonly GradedRace[])[] = (() => {
+  const weeks: GradedRace[][] = Array.from({ length: WEEKS_PER_YEAR }, () => []);
+  for (let month = 1; month <= 12; month += 1) {
+    const ws = weeks.map((_, w) => w).filter((w) => gameMonthOf(w) === month);
+    const rs = GRADED_RACES.filter((r) => r.month === month);
+    if (rs.length > 0 && ws.length === 0) throw new Error(`重賞の暦: ${month} 月の週がありません`);
+    rs.forEach((r, i) => { weeks[ws[Math.floor((i * ws.length) / rs.length)]!]!.push(r); });
+  }
+  /** ★G1 を先に（★G1 の時刻の枠へ寄せるため） */
+  for (const w of weeks) w.sort((a, b) => (a.grade === 'G1' ? 0 : 1) - (b.grade === 'G1' ? 0 : 1));
+  return weeks;
+})();
+
+/** ★その週の 重賞の枠（★番組表の 'graded'）を ★G1 の時刻の枠 → 前から の順に並べたサイクル番号 */
+function gradedSlotsOfWeek(week: number, programme: readonly RaceClass[]): number[] {
+  const out: number[] = [];
+  for (let c = week * CYCLES_PER_WEEK; c < (week + 1) * CYCLES_PER_WEEK; c += 1) {
+    if (programme[slotOfDay(c)] === 'graded') out.push(c);
+  }
+  return out.sort((a, b) => (G1_SLOTS.includes(slotOfDay(a)) ? 0 : 1) - (G1_SLOTS.includes(slotOfDay(b)) ? 0 : 1) || a - b);
+}
+
+/** ★そのサイクルで走る重賞（★暦に無ければ null） */
+export function gradedRaceAt(cycleIndex: number, programme: readonly RaceClass[] = dailyProgramme()): GradedRace | null {
+  if (programme[slotOfDay(cycleIndex)] !== 'graded') return null;
+  const week = Math.floor(cycleIndex / CYCLES_PER_WEEK);
+  const races = GRADED_CALENDAR[((week % WEEKS_PER_YEAR) + WEEKS_PER_YEAR) % WEEKS_PER_YEAR]!;
+  const slots = gradedSlotsOfWeek(week, programme);
+  if (races.length > slots.length) throw new Error(`重賞の暦: 週 ${week} の鞍 ${races.length} に 重賞の枠が ${slots.length} しかありません`);
+  const k = slots.indexOf(cycleIndex);
+  return k >= 0 && k < races.length ? races[k]! : null;
+}
+
+/** そのサイクルのクラス（★重賞の枠でも 暦の鞍が無ければ オープン） */
 export function classOf(cycleIndex: number, programme = dailyProgramme()): RaceClass {
-  return programme[slotOfDay(cycleIndex)]!;
+  const base = programme[slotOfDay(cycleIndex)]!;
+  if (base !== 'graded') return base;
+  return gradedRaceAt(cycleIndex, programme) === null ? 'open' : 'graded';
 }
 
 /**
- * そのサイクルが重賞なら格を返す（重賞でなければ null）。
- *
- * ⚠️ **正典に不整合があります。** 重賞は1日9R × 7日 = **週63枠**ですが、
- *    §10.3 の週次頻度は G1=3 + G2=8 + G3=20 = **31** で、倍以上合いません。
- *    ここでは「63枠のうち31枠に格が付き、残りは格付けのない重賞相当」とは解釈せず、
- *    **G2:G3 = 8:20 の比で全枠に格を割り当てて**います（G1 のみ週3回で固定）。
- *    どちらが正典の意図かは照会に出します。
- * ★週内の通し番号で決めるので、**同じ週の同じ位置は必ず同じ格**になります
- *   （再起動しても変わらない = A-2 の前提）。
+ * そのサイクルが重賞なら格を返す（重賞でなければ null）。★格は ★暦の鞍の格（`GRADED_RACES`）。
+ * ⚠️ ★旧は G1 を実時間の週 3 回に固定し、★残りを G2:G3 ＝ 8:20 の比で全枠に割っていた（★2026-09-29 に暦へ）。
  */
 export function gradeOf(cycleIndex: number, programme = dailyProgramme()): Grade | null {
-  if (classOf(cycleIndex, programme) !== 'graded') return null;
-  const day = dayIndex(cycleIndex);
-  const dayOfWeek = ((day % 7) + 7) % 7;
-  const slot = slotOfDay(cycleIndex);
-  // ★週3回だけ G1（毎日3枠を G1 にすると週21回になり §10.3 と合わない）
-  if (G1_DAYS.some((g) => g.dayOfWeek === dayOfWeek && g.slot === slot)) return 'G1';
-  const gradedSlots = programme
-    .map((c, i) => (c === 'graded' && !G1_SLOTS.includes(i) ? i : -1))
-    .filter((i) => i >= 0);
-  const withinDay = gradedSlots.indexOf(slot);
-  const nth = dayOfWeek * gradedSlots.length + withinDay;
-
-  // 週の非G1重賞枠を G2:G3 = 8:20 で割る
-  const total = GRADED_PER_WEEK.G2 + GRADED_PER_WEEK.G3;
-  return nth % total < GRADED_PER_WEEK.G2 ? 'G2' : 'G3';
+  return gradedRaceAt(cycleIndex, programme)?.grade ?? null;
 }
+

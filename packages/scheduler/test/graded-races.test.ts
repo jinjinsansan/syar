@@ -17,6 +17,7 @@ import {
   GRADED_RACES, GRADED_COUNT_BY_GRADE, gradedRaceById, raceLookKey, type Grade,
 } from '../src/graded-races.js';
 import { VENUES, venueById } from '../src/venues.js';
+import { DISTANCE_MENU } from '../src/conditions.js';
 import { gradedRacesByVenue } from '../src/race-setup.js';
 
 describe('★競馬場 10 場', () => {
@@ -79,7 +80,21 @@ describe('★重賞 50 鞍', () => {
     expect(new Set(GRADED_RACES.map((r) => r.name)).size).toBe(GRADED_RACES.length);
   });
 
-  it('⚠️ ★**50 鞍すべてが違う画になる**（競馬場 × 馬場 × 距離 が全部違う）', () => {
+  /**
+   * ★2026-09-29 に書き換え（★緩めたのではなく ★設計が変わった・レビュー側 裁定 C1）:
+   *   ★暦が入る前は「全部違う画（競馬場 × 馬場 × 距離）」を求めていた。★重賞の暦で ★走る月が加わったので、★月まで入れて一意を見る。
+   *   ★9 鞍の距離を番組の 7 距離に寄せた（裁定 C）ため、★画だけの重なりが 4 組できた（★同じコース・同じ距離でも 季節が違う行事）。
+   *   🔴 ★**重なりは 4 組まで**を釘にする（★いまの実測・★増えたら落として人が見る）。
+   */
+  it('⚠️ ★**50 鞍すべてが違う行事になる**（競馬場 × 馬場 × 距離 × 月 が全部違う・★画だけの重なりは 4 組まで）', () => {
+    const withMonth = GRADED_RACES.map((r) => `${raceLookKey(r)}/${r.month}`);
+    expect(withMonth.filter((k, i) => withMonth.indexOf(k) !== i), '★同じ（競馬場/馬場/距離/月）の鞍がある').toEqual([]);
+    const looks = GRADED_RACES.map(raceLookKey);
+    const overlapping = new Set(looks.filter((k, i) => looks.indexOf(k) !== i));
+    expect(overlapping.size, `★画の重なり: ${[...overlapping].join(', ')}`).toBeLessThanOrEqual(4);
+  });
+
+  it('⚠️ ★（旧・暦の前）50 鞍すべてが違う画になる — ★この形はもう見ない（上の網に置き換え）', () => {
     /**
      * 【★なぜこれが本体か】
      *   ★重賞は週 31 鞍（§10.3）、★1 週 = リアル 4 時間（§7.1）。
@@ -87,9 +102,8 @@ describe('★重賞 50 鞍', () => {
      *   ★「飽きない」を作るのは名前の数ではなく、★**1 鞍ごとの見え方の違い**です。
      *   ⚠️ ★同じ組が 2 つあると、★その 2 鞍は**区別がつきません**。
      */
-    const keys = GRADED_RACES.map(raceLookKey);
-    const dup = keys.filter((k, i) => keys.indexOf(k) !== i);
-    expect(dup, `★同じ（競馬場/馬場/距離）の鞍がある: ${[...new Set(dup)].join(', ')}`).toEqual([]);
+    /** ★旧の本体（★同じ組が 0）は ★暦で月が加わったので 上の網へ。★ここは 置き換えたことの記録だけ */
+    expect(GRADED_RACES.length).toBe(50);
   });
 
   it('★10 場すべてに出番がある', () => {
@@ -114,9 +128,14 @@ describe('★重賞 50 鞍', () => {
     }
   });
 
-  it('★距離が散っている（★1 つの距離に固まっていない）', () => {
+  /**
+   * ★2026-09-29 に書き換え（★設計が変わった・裁定 C）: ★旧「距離の種類が 8 以上」は ★鞍が番組にない距離を持てた頃の前提。
+   *   ★いまは ★番組の 7 距離に寄せたので ★7 が定義上の上限 → ★「番組の 7 距離がすべて出る」で散りを見る。
+   */
+  it('★距離が散っている（★番組の 7 距離がすべて出る・旧「8 以上」は裁定 C の前の前提）', () => {
     const kinds = new Set(GRADED_RACES.map((r) => r.distanceM));
-    expect(kinds.size, '★距離の種類が少なすぎる').toBeGreaterThanOrEqual(8);
+    for (const d of DISTANCE_MENU) expect(kinds.has(d), `★${d}m の重賞が無い`).toBe(true);
+    expect(kinds.size).toBe(DISTANCE_MENU.length);
   });
 
   it('★どの月にもレースがある（★年間カレンダーが途切れない）', () => {

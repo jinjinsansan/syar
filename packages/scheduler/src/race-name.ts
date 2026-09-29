@@ -3,14 +3,13 @@
  *
  * 【★決まり】
  *   ★重賞 … ★既存の架空の 50 鞍（`GRADED_RACES`）の名前を使う。
- *     ★選び方: ★同じ格・同じ競馬場・同じ馬場 → ★同じ格・同じ競馬場 の順に探し、★サイクル番号で 1 つに決める（★決定論・憲法 4）。
- *     ★どちらも無ければ ★平場と同じ組み立てに格を添える（★別の競馬場の重賞名を ここで名乗らない）。
+ *     ★どの鞍かは ★重賞の暦（`programme.ts` の `gradedRaceAt`・★1 ゲーム年に 50 鞍が 1 回ずつ）が決める。
  *   ★平場 … ★「場の名 ＋ クラス ＋ 距離」（例「スターパーク 1勝クラス 芝1600m」）。
  *   ★`R12345` は ★内部の番号（`cycle_index`）として残す。★名前には入れない。
  *
  * ⚠️ ★名前は ★架空の競馬場名・重賞名からだけ作る（★§0.1・実在の名前を ここで書かない）。
  */
-import { GRADED_RACES } from './graded-races.js';
+import { gradedRaceAt } from './programme.js';
 import { venueById, type VenueSurface } from './venues.js';
 import type { Grade, RaceClass } from './programme.js';
 
@@ -35,12 +34,10 @@ export function raceNameOf(input: {
 }): string {
   const { cycleIndex, grade, venueId, surface, distanceM } = input;
   const course = `${SURFACE_NAME[surface]}${distanceM}m`;
-  const at = (n: number): number => ((cycleIndex % n) + n) % n;
   if (grade !== null) {
-    const sameVenue = GRADED_RACES.filter((r) => r.grade === grade && r.venueId === venueId);
-    const exact = sameVenue.filter((r) => r.surface === surface);
-    const pool = exact.length > 0 ? exact : sameVenue;
-    if (pool.length > 0) return pool[at(pool.length)]!.name;
+    /** ★重賞は ★暦の鞍の名前（★2026-09-29・1 ゲーム年に 50 鞍が 1 回ずつ・`programme.ts` の gradedRaceAt） */
+    const race = gradedRaceAt(cycleIndex);
+    if (race !== null) return race.name;
     return `${venueShortName(venueId)} ${grade} ${course}`;
   }
   const cls = input.raceClass === 'graded' ? 'オープン' : CLASS_NAME[input.raceClass];

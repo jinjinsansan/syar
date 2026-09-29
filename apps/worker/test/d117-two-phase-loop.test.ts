@@ -13,7 +13,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ANNOUNCE_AHEAD_RACES, CYCLE_MS, MAX_FILLS_PER_CYCLE, PHASE_OFFSET_MS,
-  cycleStartMs, entryDeadlineMs, frozenCourseOf,
+  cycleStartMs, entryDeadlineMs, frozenCourseOf, gradeOf,
 } from '@star/scheduler';
 import { runCycle, type CycleStore, type RaceSpec } from '../src/cycle-runner.js';
 
@@ -112,7 +112,11 @@ const NOOP = (): void => {};
 
 describe('D-117 ① 公示', () => {
   it(`★重賞以外は ${ANNOUNCE_AHEAD_RACES} レース先まで、★重賞はその格の窓まで枠だけ作る`, async () => {
-    const f = fake(EPOCH + Math.floor(CYCLE_MS * 0.4));
+    /**
+     * ★2026-09-29: ★重賞の暦で ★cycle 20 はオープンになった（★暦に鞍の無い重賞の枠）。
+     *   ★同じ形（★20 先に G2・その手前に重賞なし）を ★暦の上で探して ★cycle 180 から見る（★200 が G2 月の鞍）。
+     */
+    const f = fake(EPOCH + CYCLE_MS * 180 + Math.floor(CYCLE_MS * 0.4));
     const out = await runCycle(f.store, EPOCH, SEEDS, ANNOUNCE, BUILD_KEEPING, NOOP);
     /**
      * ⚠️ ★2026-09-20・**`ANNOUNCE-G2-G3`**: ★**cycle 20（G2）が増えました**。
@@ -120,8 +124,9 @@ describe('D-117 ① 公示', () => {
      *   ★cycle 0 から見て ★**20 先の G2 が告知の範囲に入ります**。
      *   ★重賞以外の 1〜4 は据え置きです（★延ばしたのは重賞だけ）。
      */
-    expect(out.announced).toEqual([1, 2, 3, 4, 20]);
-    /** ★重賞以外 4 本 ＋ ★窓に入った重賞 1 本（cycle 20 の G2） */
+    expect(out.announced).toEqual([181, 182, 183, 184, 200]);
+    expect(gradeOf(200)).toBe('G2');
+    /** ★重賞以外 4 本 ＋ ★窓に入った重賞 1 本（cycle 200 の G2） */
     expect(out.announced.length).toBe(ANNOUNCE_AHEAD_RACES + 1);
   });
 
@@ -162,7 +167,9 @@ describe('D-117 ② 組成', () => {
      *   ★cycle 0 から見て ★**20 先の G2 が告知の範囲に入ります**。
      *   ★重賞以外の 1〜4 は据え置きです（★延ばしたのは重賞だけ）。
      */
-    expect([...f.announcedSet].sort((a, b) => a - b)).toEqual([3, 4, 20]);
+    /** ★2026-09-29: ★重賞の暦で cycle 20 はオープン → ★窓に入る重賞は無い（★重賞の窓は ① が cycle 180 → 200 で見る） */
+    expect(gradeOf(20)).toBeNull();
+    expect([...f.announcedSet].sort((a, b) => a - b)).toEqual([3, 4]);
   });
 
   it('★**DS-2** 登録した馬は出走表に入る', async () => {

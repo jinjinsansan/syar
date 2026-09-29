@@ -32,9 +32,13 @@ const courseOf = (id: string): Course => {
 };
 
 describe('★1 周目のスタンド前（★長距離の 3 幕）', () => {
-  it('★① 出るのは 銀河賞・北極星カップ・大河原記念・白光記念 の 4 鞍だけ（★全鞍）', () => {
+  /**
+   * ★2026-09-29 に書き換え（★設計が変わった・レビュー側 裁定 C）: ★大河原記念（元 3200）・白光記念（元 3600）を ★3000 に寄せた。
+   *   ★大河原は 1 周 2400m なので ★3000m では 1 周目のスタンド前に来ない → ★長距離の 3 幕は 2 鞍になる（★元の距離に戻す日は簿 GRADED-DISTANCE-SNAPPED-TO-V18）。
+   */
+  it('★① 出るのは 銀河賞・北極星カップ の 2 鞍だけ（★全鞍・旧 4 鞍は 距離を寄せる前）', () => {
     const withFirstPass = GRADED_RACES.filter((r) => firstPassStraightsMOf(courseOf(r.id)).length > 0).map((r) => r.id).sort();
-    expect(withFirstPass).toEqual(['g1-ginga', 'g2-ookawara', 'g3-hakko', 'g3-hokkyokusei']);
+    expect(withFirstPass).toEqual(['g1-ginga', 'g3-hokkyokusei']);
     /** ★区間は ★ゴールの 1 周前の決勝線で終わる（★回答 §0-1: 残り [1 周, 1 周 ＋ 直線]） */
     for (const id of withFirstPass) {
       const s = raceSetupFromParam(id).setup;
