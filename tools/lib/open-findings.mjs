@@ -1770,7 +1770,8 @@ export const OPEN_FINDINGS = [
       + '★①を採れば ★ログインした姿の測定は Preview で流せる（★手元の dev が要らない・簿 LAYOUT-AUDIT-LOGGED-OUT-ONLY）。'
       + '--- ✅ ★**消す条件** --- ★Preview が本番の DB を向かなくなった（または開けなくなった）ことを 束のホストか 開けないことで確かめた日。'
       + '⚠️ ★①（環境変数を staging に向ける）は ★**これから作られる Preview にだけ効く**（★NEXT_PUBLIC_* は 束を作るときに焼き込まれる）。★**過去の 20 件は 本番の DB を向いたまま残る** → ★オーナーに「古い Preview を消す」も頼む（★レビュー側と開発側で理解が一致）。'
-      + '✔ ★確かめる道具: `node tools/verify-deployed-db-host.mjs --base <Preview の URL> --env staging`（★束のホスト ＝ staging なら 0・違えば 1・読めなければ 2）。★いまの最新 Preview で 1 を確認（対照）。',
+      + '✔ ★確かめる道具: `node tools/verify-deployed-db-host.mjs --base <Preview の URL> --env staging`（★束のホスト ＝ staging なら 0・違えば 1・読めなければ 2）。★いまの最新 Preview で 1 を確認（対照）。'
+      + '✔ ★**オーナー判断（2026-09-29）**: ★「まだ誰も URL を知らないし利用者もいない。余計な作業は省いて 完成を仕上げる」→ ★いまは直さない。★**公開（利用者を迎える）前に 必ず片づける**（★①Preview を staging へ・②古い Preview を消す）。',
     owner: 'review',
     until: '2026-10-15',
   },
