@@ -4,7 +4,7 @@
 - 出した人: 開発側（Claude Code）／依頼主: オーナー
 - 対象の画面: `/race`（レース演出。小窓・拡大・全画面のすべて）
 - 本番: https://www.umamonogatari.com （レースの小窓 →「拡大」で見られます）
-- ソース: https://github.com/jinjinsansan/syar （`main` = `11dfd15`）
+- ソース: https://github.com/jinjinsansan/syar （`main` = `51ab770`・レース演出は apps/web/src/app/race/page.tsx と packages/render/src/）
 
 ## オーナーの言葉（そのまま）
 
