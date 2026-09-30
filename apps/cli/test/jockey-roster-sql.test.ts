@@ -76,8 +76,9 @@ describe('🔴 ★料金と凍結をサーバーが作る（★憲法 3）', () 
      *    → ★そのとき ★**下の 2 つ（`jsonb` を受けない・`jockey_frozen_build` を呼ぶ）が
      *      ★まだ成り立っているか**を人が見てから、★番号を進めてください。
      */
-    expect(file, '★enter_race の最後の定義が 0088 ではない（★定義し直しが漏れた）')
-      .toBe('0088_enter_race_record_one_place.sql');
+    /** ★2026-09-30: ★0099（齢の門）で 定義し直した。★jsonb を受けない・jockey_frozen_build を呼ぶ を人が確かめた（★0088 の本文を写し 齢の判定だけ足した） */
+    expect(file, '★enter_race の最後の定義が 0099 ではない（★定義し直しが漏れた）')
+      .toBe('0099_race_age_gate.sql');
     expect(body.slice(0, 300), '🔴 ★まだクライアントの JSON を受けています')
       .not.toMatch(/p_jockey_frozen\s+jsonb/);
     expect(body.slice(0, 300), '★p_jockey_id text を取ること').toMatch(/p_jockey_id\s+text/);

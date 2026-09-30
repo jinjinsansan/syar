@@ -157,8 +157,9 @@ describe('🔴 ★戦績の数え方は 1 か所（★D-052）', () => {
       expect(body, `🔴 ★${label} が自分で数えに戻っています`)
         .not.toMatch(/count\(\*\)[\s\S]{0,60}race_entries[\s\S]{0,80}finish_pos\s*=\s*1/i);
     }
-    expect(rpc.file, '★enter_race の最後の定義が 0088 ではない（★寄せ替えが漏れた）')
-      .toBe('0088_enter_race_record_one_place.sql');
+    /** ★2026-09-30: ★0099（齢の門）で 定義し直した。★0088 の本文を機械で写し 齢の判定だけ足した */
+    expect(rpc.file, '★enter_race の最後の定義が 0099 ではない（★寄せ替えが漏れた）')
+      .toBe('0099_race_age_gate.sql');
   });
 
   it('★除外簿の理由が空でない', () => {

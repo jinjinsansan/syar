@@ -14,6 +14,7 @@
 
 import type pg from 'pg';
 import type { HorseRecord } from '@star/sim-engine';
+import { LIFECYCLE_WEEKS } from '@star/scheduler';
 
 /** DB 行 → HorseRecord。★1列でも欠けたら例外（黙って既定値で埋めない） */
 export function rowToHorse(row: Record<string, unknown>): HorseRecord {
@@ -123,8 +124,19 @@ export const RACEABLE_WHERE = `generation >= (select max(generation) - 2 from ho
  *    🔴 ★そのため ★**「一度も走らない馬」は 1,389 頭（32%）→ 4,333 頭（59%）に増えました**（★PO-8）。
  *      ★これは上限の問題ではなく ★**母数の帳簿の問題**です（★7,333 は §10.5 の設計値 2,500 の 2.9 倍）。
  */
+/**
+ * 🔴 ★**齢の門**（★2026-09-30・正典 §7.1「出走できるのは 104〜260 週」・オーナー許可・裁定 `REVIEW_POOL_DRAIN_20260930.md`）。
+ *   ★それまで ★この述語は 齢を 1 度も見ておらず、★配合で生まれた 104 週未満の仔（★齢 0 週・未調教を含む）も 出走表に載りえた。
+ *   ★上の註記の「`birth_week` は全頭 −160」（★全頭同じ齢）は ★配合が仔を産み始めた日に 当たらなくなった。
+ *   ★104 は `LIFECYCLE_WEEKS.raceableFrom`（★`@star/scheduler`）から引く（★ここに数を書かない・D-052）。
+ *   ⚠️ ★登録の側（`enter_race`）も 同じ門を持つ（★移行 `0099`）。
+ */
+export const RACEABLE_AGE_WHERE = `birth_week is not null
+        and birth_week <= (select game_week from world_state where id) - ${LIFECYCLE_WEEKS.raceableFrom}`;
+
 export const ACTIVE_WHERE = `retired_at_week is null
-        and owner_id is null`;
+        and owner_id is null
+        and ${RACEABLE_AGE_WHERE}`;
 
 /**
  * ★**1 回に読む上限**。
