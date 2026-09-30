@@ -507,8 +507,13 @@ export function drawRaceTitleCard<TImage>(
     y += bh + 14;
   }
   // レース名（★従来 96px 金プレート・★格があれば 格の大きさと色）（ワイプ 0.7s）
-  const namePx = look?.namePx ?? 96;
+  let namePx = look?.namePx ?? 96;
   ctx.font = font(namePx, true);
+  /** ★格があるとき: ★長い名前（★平場の「府中 3勝クラス 芝1600m」など）は 板に収まるまで字を小さく（★最小 48px） */
+  if (look !== undefined) {
+    const maxW = px + pw - ix - 40;
+    while (namePx > 48 && ctx.measureText(meta.raceName).width > maxW) { namePx -= 2; ctx.font = font(namePx, true); }
+  }
   const nw = ctx.measureText(meta.raceName).width;
   const wipe = wipeAt(local, 0, 0.7);
   const shown = Math.max(0, Math.min(meta.raceName.length, Math.round(meta.raceName.length * wipe)));

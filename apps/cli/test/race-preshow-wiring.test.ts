@@ -61,8 +61,8 @@ describe('★発走前の流れの配線', () => {
     expect(bake).toContain("{ role: 'side-walk', layout: 'crouch', prefix: pickSet('horse-jockey-side-walk-v1') }");
     expect(stageBlock('entry')).toContain('popularityRanksOf(');
     expect(stageBlock('entry')).toContain('popularityRanksOf(oddsRows)');
-    /** ★全画面の出馬表は背景の競馬場を透かす（★オーナー「背景には競馬場」） */
-    expect(stageBlock('entry')).toContain('scrimAlpha:');
+    /** ★全画面の出馬表は背景の競馬場を透かす（★オーナー「背景には競馬場」）。★2026-09-30: R-25 D25-3 の表（★暗幕 .62 は部品の中） */
+    expect(stageBlock('entry')).toContain('drawEntryBoardR25(');
     expect(stageBlock('entry')).toContain('drawTexturedWorld(');
   });
 

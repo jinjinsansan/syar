@@ -65,6 +65,7 @@ import {
   // ★発走前の流れ（★2026-09-15・オーナー決定「動画の通り」）
   RACE_INTRO_FLYOVER_START_SEC, RACE_INTRO_GRADE_END_SEC, RACE_INTRO_ENTRY_END_SEC, RACE_INTRO_GATE_HOLD_SEC,
   drawPaddockIntro, drawGradeIntro, paddockPicksOf, popularityRanksOf, titleTierOf, drawEntryBoardR25,
+  drawPayoutBoardR25, drawOrderBoardR25, formatRaceTime,
   typedCount,
   raceCallAt, raceSurgeGate, RACE_SURGE_WINDOW_SEC,
   withPhasePrefix,
@@ -113,6 +114,7 @@ import {
   loadRealRace, RaceNotPlayableError, RaceNotStartedError, settledResultOf, assertReplayOrder, replayStopMessage,
   type RealRaceData, type SettledRow,
 } from '../../lib/race-real';
+import { loadRacePayouts, PAYOUT_KIND_LABEL, type PayoutLine } from '../../lib/race-payouts';
 import { CLAIM_WAIT_START } from '../../lib/claims';
 import { FrameBadge } from '../../components/ui';
 import { createRaceAudio, type RaceAudio } from './race-audio.js';
@@ -600,7 +602,12 @@ const WINNER_POSE: 'run' | 'celebrate' = 'run';
 const WINNER_FOLLOW_REAR = false;
 /** ★その後の着順ボード（参考映像 124〜134s）: 6 秒 */
 /** ★**6 → 3 秒**（★2026-09-13・オーナー指示「詰めましょう」）。★着順は 5 行なので 3 秒で読めます */
-const RESULTS_BOARD_SEC = 3;
+/**
+ * ★**2026-09-30（R-25 D25-4・オーナー「まず単勝、複勝…その後全体」）: 払戻 8 秒 → 0.4 秒 → 全体の着順 4 秒 ＝ 12.4 秒**。
+ *   ★払戻が無いレース（★見本の道）は ★この間ずっと 着順。
+ */
+const RESULTS_PAYOUT_SEC = 8;
+const RESULTS_BOARD_SEC = RESULTS_PAYOUT_SEC + 0.4 + 4;
 const POST_RACE_SEC = WINNER_FOLLOW_SEC + RESULTS_BOARD_SEC;
 /**
  * ★4 角を「奥からこちらへ向かってくる」固定カメラにするか（build 時のショット列挙にも使うので定数）。
@@ -2551,6 +2558,30 @@ function RaceView({ setup, real }: {
    * ★走っている間に開いたか（★札の語を分ける）。★自動再生で 時計の位置から流すと決めた所で ★同じ条件で決める（★null は まだ）。
    */
   const [onAir, setOnAir] = useState<boolean | null>(null);
+  /**
+   * ★**レース後の払戻**（★R-25 D25-4）。★実レースだけ（★見本の道はオッズが単勝だけなので 払戻の枚を出さない）。
+   * ⚠️ ★読めなければ 払戻の枚を飛ばして 着順だけを出す（★場面を消さない・★理由は console に）。
+   */
+  const payoutsRef = useRef<readonly PayoutLine[] | null>(null);
+  useEffect(() => {
+    payoutsRef.current = null;
+    if (real === null) return undefined;
+    let cancelled = false;
+    const order = [...real.runners].sort((a, b) => a.finishPosition - b.finishPosition).map((r) => r.gate);
+    loadRacePayouts(real.raceId, order, real.runners.length).then(
+      (lines) => { if (!cancelled) payoutsRef.current = lines; },
+      (e: unknown) => { console.warn(`[race] 払戻を読めませんでした: ${e instanceof Error ? e.message : String(e)}`); },
+    );
+    return () => { cancelled = true; };
+  }, [real]);
+  /** ★結果の 2 枚を タップで入れ替えた（★押したら自動の送りを止める・R-25 D25-4）。★null は自動 */
+  const resultsPageRef = useRef<0 | 1 | null>(null);
+  const resultsShownRef = useRef(false);
+  const flipResultsPage = (): boolean => {
+    if (!resultsShownRef.current || payoutsRef.current === null) return false;
+    resultsPageRef.current = resultsPageRef.current === 0 ? 1 : resultsPageRef.current === 1 ? 0 : 1;
+    return true;
+  };
   const liveLabel = onAir === null ? UNDECIDED_BADGE_TEXT : onAir ? REPLAY_BADGE_TEXT : PAST_RACE_BADGE_TEXT;
   /**
    * ★**走路・頭数・場の見た目は `setup` から**（★段 2 D）。
@@ -6114,25 +6145,44 @@ function RaceView({ setup, real }: {
        *      ★**両方で守ります。** 片方だけだと、将来どちらかを動かしたときに黙って被ります
        *      （実際、順序が逆だったときはボードが画面のほぼ全面を覆っていました）。
        */
+      resultsShownRef.current = resultsT >= 0 && !replay.active;
+      /** ★結果が出ていない間は ★タップの入れ替えを戻す（★次に結果が出たら また自動で送る） */
+      if (!resultsShownRef.current) resultsPageRef.current = null;
       if (resultsT >= 0 && !replay.active) {
-        // ★着順ボード（全頭）。勝馬追従の後、レースの締め
-        drawResultsBoard(ctx, art.pal as Record<string, string>, vp, FONT,
-          built.result.map((row) => ({
-            place: row.place, gate: row.gate,
-            horseName: nameOfGate(row.gate),
-            jockeyName: jockeyOfGate(row.gate),
-            timeSec: built.finishSec.get(row.gate), margin: row.margin, isOwn: row.gate === mineGate,
-          })), FIELD, frameRoleOf,
-          {
-            raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo,
-            distanceLabel: `${surface === 'turf' ? '芝' : 'ダート'}${built.distanceM}m ${turn === 'left' ? '左' : '右'}`,
-            conditionLabel: `晴 / ${conditionLabel[trackCondition]}`,
-            winTimeSec: built.finishSec.get(winnerGate),
-            /** ★リプレイのぶんを差し引く（指摘④で並びを変えたため。抜くと 0:00 のまま出る） */
-            secondsToNext: Math.max(0,
-              RESULTS_BOARD_SEC - (afterRaceSec - WINNER_FOLLOW_SEC - FINISH_REPLAY_DISPLAY_SEC)),
-          },
-          Math.min(1, resultsT * 1.6), d);
+        /**
+         * ★**まず払戻（8 秒）→ 0.4 秒で 全体の着順**（★R-25 D25-4・オーナー「まず最初に単勝、複勝、などを見せるべき」）。
+         *   ★タップで 2 枚を行き来（★押したら自動の送りは止める）。★払戻が読めていなければ 着順だけ。
+         */
+        const sinceResults = afterRaceSec - WINNER_FOLLOW_SEC - FINISH_REPLAY_DISPLAY_SEC;
+        const payouts = payoutsRef.current;
+        const tierNow = titleTierOf(setup.grade, RACE_META.raceName);
+        const boardMeta = { raceName: RACE_META.raceName, venue: RACE_META.venue, raceNo: RACE_META.raceNo, tier: tierNow };
+        const fadeIn = Math.min(1, sinceResults / 0.3);
+        /** ★0 ＝ 払戻・1 ＝ 着順（★自動: 8 秒で入れ替え・0.4 秒の重ね） */
+        const autoOrderK = payouts === null ? 1 : Math.max(0, Math.min(1, (sinceResults - RESULTS_PAYOUT_SEC) / 0.4));
+        const orderK = resultsPageRef.current === null ? autoOrderK : resultsPageRef.current;
+        if (payouts !== null && orderK < 1) {
+          drawPayoutBoardR25(ctx, art.pal as Record<string, string>, vp, FONT,
+            payouts.map((p) => ({
+              label: PAYOUT_KIND_LABEL[p.kind],
+              column: (p.kind === 'win' || p.kind === 'place' || p.kind === 'quinella' ? 0 : 1) as 0 | 1,
+              horses: p.horses, ordered: p.ordered, payoutPer100: p.payoutPer100, popularity: p.popularity,
+            })), boardMeta, frameRoleOf, FIELD,
+            { alpha: fadeIn * (1 - orderK), remain: resultsPageRef.current === null ? 1 - sinceResults / RESULTS_PAYOUT_SEC : null });
+        }
+        if (orderK > 0) {
+          drawOrderBoardR25(ctx, art.pal as Record<string, string>, vp, FONT,
+            built.result.map((row) => {
+              const sec = built.finishSec.get(row.gate);
+              return {
+                place: row.place, gate: row.gate, name: nameOfGate(row.gate), margin: row.margin,
+                timeLabel: sec === undefined ? '—' : formatRaceTime(sec),
+                oddsLabel: oddsLabelOf(oddsRows[row.gate - 1]?.winOdds ?? Number.POSITIVE_INFINITY),
+                isOwn: row.gate === mineGate,
+              };
+            }), boardMeta, frameRoleOf,
+            { alpha: fadeIn * orderK, hasPayout: payouts !== null, remain: null });
+        }
       } else {
         /**
          * ⚠️ ★**通過を見せ終わるまで 1 着案内を出しません**（★2026-09-12・オーナー指摘②）。
@@ -6428,6 +6478,8 @@ function RaceView({ setup, real }: {
       <div
         className="race-stage-full"
         onPointerDown={() => {
+          /** ★結果の 2 枚（払戻 ↔ 着順）を入れ替える（★R-25 D25-4・★結果が出ている間だけ） */
+          flipResultsPage();
           /** ★小窓の中では ★全画面へ入らない（★触っても何も起きない・★帯の「拡大」は帯が持つ） */
           if (EMBED_STRIP) return;
           /**
@@ -7046,6 +7098,7 @@ function RaceView({ setup, real }: {
           )}
           <canvas
             ref={canvasRef} width={W} height={H}
+            onPointerDown={() => { flipResultsPage(); }}
             style={{
               display: 'block', width: '100%', maxWidth: W, margin: '0 auto', imageRendering: 'auto', background: '#111',
               border: devMode ? '1px solid #4a453d' : '3px solid var(--u-gold)', borderRadius: devMode ? 0 : 12,
