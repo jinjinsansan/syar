@@ -24,11 +24,17 @@ type Row = Record<string, string | number | null>;
 
 export default async function OddsEntryPage() {
   const c = readClient();
+  /**
+   * 🔴 ★**発走がまだ先のレースだけを 近い順に読む**（★2026-09-30）。
+   *   ★旧: 絞らずに `scheduled_at` の古い順から 48 件 → ★レースが 48 本を超えた日から ★**大昔の 48 本しか読めず**、
+   *   ★発売中のレースがあっても ★「いま発売中のレースがありません」と出ていた（★本番で確認）。
+   */
   const { data, error } = await c
     .from('races_public')
     .select('*')
+    .gt('scheduled_at', new Date().toISOString())
     .order('scheduled_at', { ascending: true })
-    .limit(48);
+    .limit(8);
   /** ⚠️ ★`theme="uma"` を渡す（★渡さないとアーケードの帯の中に裸の 1 行が出ます・2026-09-17） */
   if (error) return <ReadError message={error.message} theme="uma" />;
 
