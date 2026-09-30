@@ -124,8 +124,15 @@ export function phaseOfMetersLeft(metersLeft: number): Phase {
  *   ⚠️ **着順は変わりません。** ここが決めるのは「**いつ境界を通るか**」だけで、
  *      `finishSec`（＝走破タイム）には触れていません。
  */
+/**
+ * ★**2026-10-01（オーナー「最後の直線はもう先頭の馬がほとんど 1 着。なぜせめぎ合いや差し・追込が無いのか」）**:
+ *   ★実測（2,000 レース）: ★画面の「最後の直線」の入り口で先頭だった馬が勝つ割合 ★79.4%。
+ *   ★エンジンでは差し 31%・追込 29% が勝っているのに、★旧い形（山が τ=0.5）では ★勝つ差し・追込が直線の前に先頭へ出ていた。
+ *   → ★ずれの山を後ろへ（`sin(π τ²)`・山 τ≈0.71・直線の入り口でも 7〜8 割残る）＋ ★幅を 1.5 倍。★入り口の先頭が勝つ割合 ≒ 5 割。
+ *   ★隊列の広がりは 山で (0.009 + 0.009) × 距離 ＝ 1600m で 29m（≒ 12 馬身）。★着順・走破タイムは 1 ミリも動かない（x(1)=1）。
+ */
 const STRATEGY_BIAS: Record<Strategy, number> = {
-  nige: 0.006, senko: 0.003, sashi: -0.003, oikomi: -0.006,
+  nige: 0.009, senko: 0.0045, sashi: -0.0045, oikomi: -0.009,
 };
 
 /** ★速度の振れの上限（実測に基づく。超えたら起動時に止める） */
@@ -168,7 +175,8 @@ const PACE_GAIN: Record<Pace, number> = { high: 1.3, middle: 1.0, slow: 0.7 };
  *
  * ⚠️ **単調性**: 速度が正であるには `aπ + d < 1`。**構造で確かめます。**
  */
-const RACE_RHYTHM = 0.085;
+/** ★2026-10-01: 0.085 → 0.06（★脚質のずれを後ろへ寄せて大きくした分、★速度の振れの上限 0.14 に収める） */
+const RACE_RHYTHM = 0.06;
 
 /** ★速度の振れの上限（実測に基づく。超えたら起動時に止める） */
 export const MAX_SPEED_SWING_TOTAL = 0.14;
@@ -176,7 +184,8 @@ export const MAX_SPEED_SWING_TOTAL = 0.14;
 export function paceShape(strategy: Strategy, pace: Pace): (tau: number) => number {
   const a = STRATEGY_BIAS[strategy] * PACE_GAIN[pace];
   const d = RACE_RHYTHM;
-  const swing = Math.abs(a) * Math.PI + Math.abs(d);
+  /** ★`sin(π τ²)` の傾きの最大は 2π（τ=1） */
+  const swing = Math.abs(a) * 2 * Math.PI + Math.abs(d);
   if (swing > MAX_SPEED_SWING_TOTAL + 1e-9) {
     throw new Error(
       `ペース配分の係数が大きすぎます（速度の振れが ±${(swing * 100).toFixed(0)}%）`
@@ -187,7 +196,7 @@ export function paceShape(strategy: Strategy, pace: Pace): (tau: number) => numb
   if (swing >= 1) throw new Error('速度が負になりえます');
   return (tau: number): number => {
     const t = Math.max(0, Math.min(1, tau));
-    const x = t + a * Math.sin(Math.PI * t) + (d / (2 * Math.PI)) * Math.sin(2 * Math.PI * t);
+    const x = t + a * Math.sin(Math.PI * t * t) + (d / (2 * Math.PI)) * Math.sin(2 * Math.PI * t);
     return Math.max(0, Math.min(1, x));
   };
 }
