@@ -86,6 +86,8 @@ export interface Ctx2D<TImage = unknown> {
   ): { addColorStop(offset: number, color: string): void };
   save?(): void;
   restore?(): void;
+  /** ★任意。★直前の道で切り抜く（★タイトルの板の模様・R-25）。★無い環境では模様を描かない */
+  clip?(): void;
   /**
    * ★任意（★両環境にある）。★**絵をその場で回す**ために使う（★2026-09-11）。
    *

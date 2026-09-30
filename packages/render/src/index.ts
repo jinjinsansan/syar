@@ -12,6 +12,7 @@ export * from './oblique-ui.js';
 export * from './hud-kit.js';
 export * from './entry-board.js';
 export * from './race-intro.js';
+export * from './title-tier.js';
 export * from './perspective.js';
 export * from './perspective-draw.js';
 export * from './dust-exposure.js';

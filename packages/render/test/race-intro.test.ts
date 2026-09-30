@@ -162,3 +162,18 @@ describe('startHorseVisualAt', () => {
     expect(Math.max(...horses.map((horse) => horse.centerX))).toBeLessThanOrEqual(443);
   });
 });
+
+describe('★タイトルの格ごとの見た目（★R-25 D25-1）', () => {
+  it('★格の札の字と段: G1 は「G I」・平場は級の言葉・オープンは「オープン」', async () => {
+    const { titleTierOf, titleTierBadgeText, TITLE_TIER_LOOKS } = await import('../src/index.js');
+    expect(titleTierOf('G1', '有馬グランプリ')).toBe('G1');
+    expect(titleTierOf(null, '府中 オープン 芝1600m')).toBe('OP');
+    expect(titleTierOf(null, '府中 3勝クラス 芝1600m')).toBe('FLAT');
+    expect(titleTierBadgeText('FLAT', '府中 3勝クラス 芝1600m')).toBe('3勝クラス');
+    expect(titleTierBadgeText('G2', 'x')).toBe('G II');
+    /** ★格が上がるほど 縁が太く・名前が大きい（★平場がいちばん控えめ） */
+    const order = (['FLAT', 'OP', 'G3', 'G2', 'G1'] as const).map((t) => TITLE_TIER_LOOKS[t].namePx);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(TITLE_TIER_LOOKS.FLAT.tint).toBeNull();
+  });
+});

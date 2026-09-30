@@ -64,7 +64,7 @@ import {
   drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, pixelScaleForDisplay, PHONE_SUPERSAMPLE, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   // ★発走前の流れ（★2026-09-15・オーナー決定「動画の通り」）
   RACE_INTRO_FLYOVER_START_SEC, RACE_INTRO_GRADE_END_SEC, RACE_INTRO_ENTRY_END_SEC, RACE_INTRO_GATE_HOLD_SEC,
-  drawPaddockIntro, drawGradeIntro, paddockPicksOf, popularityRanksOf,
+  drawPaddockIntro, drawGradeIntro, paddockPicksOf, popularityRanksOf, titleTierOf,
   typedCount,
   raceCallAt, raceSurgeGate, RACE_SURGE_WINDOW_SEC,
   withPhasePrefix,
@@ -2623,6 +2623,8 @@ function RaceView({ setup, real }: {
     raceTitle: HTMLImageElement;
     /** ★パドックの背景（★人気馬の紹介・★無ければタイトルの背景を使う） */
     paddockBg?: HTMLImageElement | undefined;
+    /** ★格の札（★R-25 D25-2・英字 → 絵。★そのレースの格の 1 枚だけ読む） */
+    gradeMedals?: Readonly<Record<string, HTMLImageElement>> | undefined;
     raceNarrator: HTMLImageElement;
     /**
      * ★口パク用の立ち絵（4 名 × 表情 3 × 口 2 ＝ 24 枚）。
@@ -3289,10 +3291,13 @@ function RaceView({ setup, real }: {
          * ⚠️ ★読めなければタイトルの背景に戻します（★画面を壊さない側へ・R-27）。
          */
         loadImg(`/art/paddock-bg-v1.webp?v=${ASSET_VERSION}`).catch(() => null),
+        /** ★格の札（★R-25 D25-2・★平場は読まない・★読めなければ英字で描く） */
+        GRADE_LOOK === null ? Promise.resolve(null)
+          : loadImg(`/art/grade-card-g${GRADE_LOOK.roman.length}.png?v=${ASSET_VERSION}`).catch(() => null),
       ]);
       if (cancelled) return;
       const [raceTitle, raceNarrator, startingGate, raceBackstretch, raceCornerExit, raceFinish,
-        raceCornerRear, raceCornerHigh, paddockBg] = loaded;
+        raceCornerRear, raceCornerHigh, paddockBg, gradeMedal] = loaded;
       /**
        * **代替素材を、要るときだけ読む。**
        *   ?? は左が undefined のときしか右を評価しないので、
@@ -4204,6 +4209,7 @@ function RaceView({ setup, real }: {
         },
         pal, raceTitle: raceTitle!, raceNarrator: raceNarrator!, startingGate: startingGate!,
         ...(paddockBg ? { paddockBg } : {}),
+        ...(gradeMedal && GRADE_LOOK !== null ? { gradeMedals: { [GRADE_LOOK.roman]: gradeMedal } } : {}),
         ...(narratorSets !== undefined ? { narratorSets } : {}),
         raceBackstretch: raceBackstretch!, raceCornerExit: raceCornerExit!, raceFinish: raceFinish!,
         raceCornerRear: raceCornerRear!, raceCornerHigh: raceCornerHigh!,
@@ -4420,11 +4426,7 @@ function RaceView({ setup, real }: {
     }
     /** ★**格の紹介**（★「GRADE I」→「G I」→ 閃光・★英字は `GRADE_LOOKS` から） */
     /** 🔴 ★平場（★`GRADE_LOOK === null`）は ★**格の紹介を出さず**、★その間は ★下のタイトルを先に出します（★裁定 Q-RACE-7） */
-    if (intro.stage === 'grade' && GRADE_LOOK !== null) {
-      drawGradeIntro(ctx, vp, FONT, { roman: GRADE_LOOK.roman }, intro.sinceSec, RACE_INTRO_GRADE_END_SEC - RACE_INTRO_FLYOVER_SEC);
-      drawRendererBadge(ctx, renderer, 'grade');
-      return;
-    }
+    /** ★2026-09-30（R-25 D25-2）: ★札は映像の上に重ねる → ★下のタイトルの段で 背景を描いてから札を描く */
     /**
      * ★**出馬表（全画面）**（★背景は競馬場・★2026-09-15・オーナー「出馬表（背景には競馬場）」）。
      *   ★背景は空撮と同じ透視ワールドを ★スタンド側の低い位置から芝へ流します。★人気は ★デモのオッズから並べるだけ（★D-098）。
@@ -4478,6 +4480,8 @@ function RaceView({ setup, real }: {
           ? (surface === 'turf' ? 'TURF' : 'DIRT')
           : `GRADE ${GRADE_LOOK.roman} ・ ${surface === 'turf' ? 'TURF' : 'DIRT'}`,
         chips: setup.conditionChips,
+        /** ★格ごとの見た目（★R-25 D25-1・G1/G2/G3/オープン/平場） */
+        tier: titleTierOf(setup.grade, RACE_META.raceName),
         venueFeature: `${turn === 'left' ? '左回り' : '右回り'}　1周${setup.venue.lapM}m・直線${setup.venue.homeStretchM}m　${VENUE_LOOK.feature}`,
         /** ★自分の馬が出ていないレースは ★「あなたの馬」の札を出しません（★2026-09-28） */
         ...(mineGate === undefined ? {} : {
@@ -4508,6 +4512,18 @@ function RaceView({ setup, real }: {
         crest: { ground: VENUE_LOOK.poles.plate, mark: VENUE_LOOK.poles.plateText },
         night: TIME_OF_DAY === 'night',
       });
+      /**
+       * ★**格の札**（★R-25 D25-2・1.6 秒）。★上のタイトルは ★この段ではまだ板を出さない（★`fade` が負）ので ★背景だけが見えている。
+       * 🔴 ★平場（★`GRADE_LOOK === null`）は ★**札を出さない**（★裁定 Q-RACE-7）。
+       */
+      if (intro.stage === 'grade' && GRADE_LOOK !== null) {
+        const medal = art.gradeMedals?.[GRADE_LOOK.roman];
+        drawGradeIntro(ctx, vp, FONT, { roman: GRADE_LOOK.roman }, intro.sinceSec, RACE_INTRO_GRADE_END_SEC - RACE_INTRO_FLYOVER_SEC,
+          medal === undefined ? undefined : { image: medal, width: medal.width, height: medal.height },
+          { reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches });
+        drawRendererBadge(ctx, renderer, 'grade');
+        return;
+      }
       drawRendererBadge(ctx, renderer, 'title');
       return;
     }

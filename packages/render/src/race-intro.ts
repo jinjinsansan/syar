@@ -2,8 +2,9 @@ import type { Ctx2D, FontOf, Palette, SheetSpec, Viewport2D } from './oblique-dr
 import { drawVenueCrest, drawVenueScenery, titleSceneryBand, type TitleSceneryOptions } from './venue-scenery.js';
 import {
   HUD, goldPlate, drawGoldEdge, fillSlant, strokeSlant, drawFrameBadge, drawLabel, drawSpacedText,
-  riseAt, wipeAt, drawOnAir, typedCount, drawNarratorFrame, drawGoldChip,
+  riseAt, wipeAt, drawOnAir, typedCount, drawNarratorFrame, drawGoldChip, slantPath,
 } from './hud-kit.js';
+import { TITLE_TIER_LOOKS, titleTierBadgeText, metalFill, type TitleTier } from './title-tier.js';
 
 /**
  * ★**発走前の時間割**（★2026-09-15・オーナー決定「★動画の通りにします」）
@@ -33,9 +34,10 @@ export const RACE_INTRO_PADDOCK_END_SEC = RACE_INTRO_PADDOCK_EACH_SEC * RACE_INT
 export const RACE_INTRO_FLYOVER_START_SEC = RACE_INTRO_PADDOCK_END_SEC;
 /** ★空撮の終わり（★名前は従来のまま・★意味は「空撮が終わる表示秒」） */
 export const RACE_INTRO_FLYOVER_SEC = RACE_INTRO_FLYOVER_START_SEC + 1.6;
-export const RACE_INTRO_GRADE_END_SEC = RACE_INTRO_FLYOVER_SEC + 2.6;
+/** ★2026-09-30・デザイナー R-25 D25-2: 格の札は 1.6 秒（★旧 2.6）。★空いた 1.0 秒はタイトルへ（★発走の時刻は変えない） */
+export const RACE_INTRO_GRADE_END_SEC = RACE_INTRO_FLYOVER_SEC + 1.6;
 export const RACE_INTRO_TITLE_START_SEC = RACE_INTRO_GRADE_END_SEC;
-export const RACE_INTRO_TITLE_END_SEC = RACE_INTRO_TITLE_START_SEC + 3;
+export const RACE_INTRO_TITLE_END_SEC = RACE_INTRO_TITLE_START_SEC + 4;
 export const RACE_INTRO_ENTRY_END_SEC = RACE_INTRO_TITLE_END_SEC + 6;
 /** ★ゲート待機の始まり（＝出馬表の終わり） */
 export const RACE_INTRO_GATE_HOLD_SEC = RACE_INTRO_ENTRY_END_SEC;
@@ -215,52 +217,76 @@ export function drawPaddockIntro<TImage>(
   if (fade > 0) { ctx.globalAlpha = base * Math.min(1, fade); ctx.fillStyle = '#05080a'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = base; }
 }
 
+/** ★格の札の光の色と強さ（★R-25 D25-2・★G2/G3 の色は `GRADE_LOOKS.edgeTint` と同じ） */
+const GRADE_CARD_GLOW: Readonly<Record<string, { readonly rgb: string; readonly alpha: number }>> = {
+  I: { rgb: '240,204,74', alpha: 0.34 },
+  II: { rgb: '201,209,217', alpha: 0.28 },
+  III: { rgb: '192,138,90', alpha: 0.28 },
+};
+
 /**
- * ★**格の紹介**（★「GRADE I」→ 大きな「G I」→ 白い閃光）。
+ * ★**格の紹介**（★2026-09-30・デザイナー R-25 D25-2「丸いメダルにリボンの札」・1.6 秒のカットイン）。
+ *   ★映像の上に `rgba(6,16,28,.72)` ＋ 中心から格の色の光 → ★札（400×400・x440 y150）。
+ *   ★0〜0.35 秒: 大きさ 1.35 → 1.0・不透明度 0 → 1（ease-out 3 乗）／0.35〜0.9 秒: リボンの上を白 40% の帯が左→右 1 回／
+ *   ★1.3 秒まで止める／1.3〜1.6 秒: 1.0 → 0.96・不透明度 → 0。★回る光と白い閃光はやめた。
+ *   ★`reducedMotion`: 0.2 秒で出し・止め・0.2 秒で消す（大きさの変化と光の帯なし）。
  * ⚠️ ★英字は ★`GRADE_LOOKS` の `roman` を渡すこと（★格の表を 2 か所に持たない）。
+ * ⚠️ ★背景（映像）は呼ぶ側が先に描く。★札の絵が無いときは ★英字「G I」を金で描く（★場面を消さない）。
  */
 export function drawGradeIntro<TImage>(
   ctx: Ctx2D<TImage>, vp: Viewport2D, font: FontOf, grade: { readonly roman: string }, sinceSec: number, durSec: number,
+  medal?: { readonly image: TImage; readonly width: number; readonly height: number },
+  options?: { readonly reducedMotion?: boolean },
 ): void {
   const W = vp.width, H = vp.height;
   const u = ctx as unknown as Ctx2D<unknown>;
-  ctx.fillStyle = '#06101c'; ctx.fillRect(0, 0, W, H);
   const base = ctx.globalAlpha;
-  /** ★放射の光（★ゆっくり回る） */
-  const cx = W / 2, cy = H * 0.46, R = Math.hypot(W, H);
-  for (let i = 0; i < 24; i += 1) {
-    const a = (i / 24) * Math.PI * 2 + sinceSec * 0.25;
-    ctx.globalAlpha = base * (i % 2 === 0 ? 0.1 : 0.05);
-    ctx.fillStyle = HUD.gold;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.cos(a - 0.05) * R, cy + Math.sin(a - 0.05) * R);
-    ctx.lineTo(cx + Math.cos(a + 0.05) * R, cy + Math.sin(a + 0.05) * R);
-    ctx.closePath(); ctx.fill();
+  const reduced = options?.reducedMotion === true;
+  const out = Math.max(0, durSec - (reduced ? 0.2 : 0.3));
+  const ease3 = (x: number): number => 1 - Math.pow(1 - Math.max(0, Math.min(1, x)), 3);
+  /** ★出る・止める・消える */
+  const inK = reduced ? Math.min(1, sinceSec / 0.2) : ease3(sinceSec / 0.35);
+  const outK = Math.max(0, Math.min(1, (sinceSec - out) / Math.max(0.01, durSec - out)));
+  const alpha = Math.max(0, inK * (1 - outK));
+  const scale = reduced ? 1 : (sinceSec < 0.35 ? 1.35 - 0.35 * inK : 1 - 0.04 * outK);
+  /** ★幕（★映像を透かす）と中心の光 */
+  ctx.globalAlpha = base * (1 - outK);
+  ctx.fillStyle = 'rgba(6,16,28,.72)'; ctx.fillRect(0, 0, W, H);
+  const glow = GRADE_CARD_GLOW[grade.roman] ?? GRADE_CARD_GLOW['I']!;
+  const cx = W / 2, cy = 150 + 200;
+  if (typeof ctx.createRadialGradient === 'function') {
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.hypot(W, H) * 0.38) as ReturnType<NonNullable<typeof ctx.createRadialGradient>> | undefined;
+    if (g !== undefined && g !== null) {
+      g.addColorStop(0, `rgba(${glow.rgb},${glow.alpha})`); g.addColorStop(1, `rgba(${glow.rgb},0)`);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
   }
-  /** ★「GRADE I」（★左下・最初に出る） */
-  const lead = riseAt(sinceSec, 0);
-  ctx.globalAlpha = base * lead.alpha;
-  ctx.font = font(34, true); ctx.fillStyle = HUD.paper;
-  drawSpacedText(u, `GRADE ${grade.roman}`, 72, H - 88 + lead.dy, 34 * 0.3);
-  /** ★大きな「G I」（★大きく出てから収まる） */
-  const k = Math.max(0, Math.min(1, (sinceSec - 0.45) / 0.5));
-  const e = 1 - Math.pow(1 - k, 3);
-  if (k > 0) {
-    const px = Math.round(260 * (1.6 - 0.6 * e));
-    ctx.globalAlpha = base * e;
+  ctx.globalAlpha = base * alpha;
+  const size = 400 * scale;
+  const dx = cx - size / 2, dy = cy - size / 2;
+  if (medal !== undefined) {
+    ctx.drawImage(medal.image, 0, 0, medal.width, medal.height, dx, dy, size, size);
+    /** ★リボンの上を 白 40% の帯が 1 回（★絵の 800px で y 520〜645 ＝ 札の 65%〜81%） */
+    const sheen = (sinceSec - 0.35) / 0.55;
+    if (!reduced && sheen > 0 && sheen < 1) {
+      const ry = dy + size * 0.65, rh = size * 0.16, rx = dx + size * 0.09, rw = size * 0.82;
+      const bx = rx + (rw + 60) * sheen - 60;
+      ctx.globalAlpha = base * alpha * 0.4; ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(Math.max(rx, bx), ry); ctx.lineTo(Math.min(rx + rw, bx + 36), ry);
+      ctx.lineTo(Math.min(rx + rw, bx + 24), ry + rh); ctx.lineTo(Math.max(rx, bx - 12), ry + rh);
+      ctx.closePath(); ctx.fill();
+    }
+  } else {
+    const px = Math.round(220 * scale);
     ctx.font = font(px, true);
     ctx.textAlign = 'center';
     const text = `G${grade.roman}`;
     const tw = ctx.measureText(text).width;
-    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillText(text, cx + 8, cy + px * 0.36 + 8);
     ctx.fillStyle = goldPlate(u, cx - tw / 2, tw, sinceSec) as string;
     ctx.fillText(text, cx, cy + px * 0.36);
     ctx.textAlign = 'left';
   }
-  /** ★白い閃光（★最後の 0.35 秒でレース名のカードへ） */
-  const flash = Math.max(0, Math.min(1, (sinceSec - (durSec - 0.35)) / 0.35));
-  if (flash > 0) { ctx.globalAlpha = base * flash * 0.9; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H); }
   ctx.globalAlpha = base;
 }
 
@@ -286,6 +312,8 @@ export interface RaceIntroMeta {
   readonly chips?: readonly string[] | undefined;
   /** ★**競馬場の紹介 1 行**（★例「左回り　1周2200m・直線620m　10場でいちばん長い直線」）。★省くと出さない */
   readonly venueFeature?: string | undefined;
+  /** ★格の段（★R-25 D25-1・★省けば従来の 1 種類の板）。★`titleTierOf` で作る */
+  readonly tier?: TitleTier | undefined;
   /** 自馬（右下の「あなたの馬」パネル）。無ければ出さない */
   readonly own?: {
     readonly gate: number; readonly role: string; readonly name: string; readonly jockey: string;
@@ -402,30 +430,97 @@ export function drawRaceTitleCard<TImage>(
   }
   const baseAlpha = ctx.globalAlpha;
   const rise = riseAt(local, 0, 0.55);
-  ctx.globalAlpha = baseAlpha * Math.max(0, fade) * rise.alpha;
   const t = displaySec;
+  /** ★格ごとの見た目（★R-25 D25-1）。★省けば従来の 1 種類の板 */
+  const look = meta.tier === undefined ? undefined : TITLE_TIER_LOOKS[meta.tier];
+  /** ★画面全体の色（★格の色を薄く） */
+  if (look?.tint != null) {
+    ctx.globalAlpha = baseAlpha * Math.max(0, fade) * look.tint.alpha;
+    ctx.fillStyle = `rgb(${look.tint.rgb})`; ctx.fillRect(0, 0, W, H);
+  }
+  ctx.globalAlpha = baseAlpha * Math.max(0, fade) * rise.alpha;
   // 板 left-40 top150 w820（斜度 -9°）。高さは中身なり（≒ 388）。★場の紹介 1 行があるときは 1 行ぶん伸ばす
-  const px = -40, py = 150 + rise.dy, pw = 820, ph = meta.venueFeature === undefined ? 388 : 424;
-  fillSlant(ctx, px, py, pw, ph, HUD.glass);
-  ctx.fillStyle = HUD.goldHair;
+  const px = -40, py = 150 + rise.dy, pw = look === undefined ? 820 : 880;
+  const ph = (meta.venueFeature === undefined ? 388 : 424) + (look === undefined ? 0 : 40);
   const k = HUD.skew * ph * 0.5;
-  ctx.fillRect(px + k, py, pw, 1); ctx.fillRect(px - k, py + ph - 1, pw, 1);
+  if (look === undefined) {
+    fillSlant(ctx, px, py, pw, ph, HUD.glass);
+    ctx.fillStyle = HUD.goldHair;
+    ctx.fillRect(px + k, py, pw, 1); ctx.fillRect(px - k, py + ph - 1, pw, 1);
+  } else {
+    const u = ctx as unknown as Ctx2D<unknown>;
+    const plateFill = look.plate[0] === look.plate[1] || typeof ctx.createLinearGradient !== 'function'
+      ? look.plate[0]
+      : ((g) => { if (g === undefined || g === null) return look.plate[0]; g.addColorStop(0, look.plate[0]); g.addColorStop(1, look.plate[1]); return g; })(ctx.createLinearGradient(px, 0, px + pw, 0));
+    fillSlant(u, px, py, pw, ph, plateFill);
+    /** ★模様（★板の形で切り抜く・★切り抜けない環境では描かない） */
+    if (look.pattern !== null && ctx.save !== undefined && ctx.restore !== undefined && ctx.clip !== undefined) {
+      ctx.save();
+      slantPath(u, px, py, pw, ph); ctx.clip();
+      ctx.fillStyle = look.patternColor;
+      if (look.pattern === 'stripe') {
+        /** ★斜め 135° の縞 3px／16px */
+        for (let sx = px - ph; sx < px + pw + ph; sx += 16) {
+          ctx.beginPath(); ctx.moveTo(sx, py); ctx.lineTo(sx + 3, py); ctx.lineTo(sx + 3 + ph, py + ph); ctx.lineTo(sx + ph, py + ph); ctx.closePath(); ctx.fill();
+        }
+      } else if (look.pattern === 'rule') {
+        for (let ry = py; ry < py + ph; ry += 10) ctx.fillRect(px - k, ry, pw + 2 * k, 2);
+      } else {
+        for (let ry = py + 7; ry < py + ph; ry += 14) {
+          for (let rx = px - k + 7; rx < px + pw + k; rx += 14) { ctx.beginPath(); ctx.ellipse(rx, ry, 2, 2, 0, 0, Math.PI * 2); ctx.fill(); }
+        }
+      }
+      ctx.restore();
+    }
+    ctx.fillStyle = look.edge.color;
+    ctx.fillRect(px + k, py, pw, look.edge.px); ctx.fillRect(px - k, py + ph - look.edge.px, pw, look.edge.px);
+    /** ★G1 だけ: ★四隅の金の L と ★右の大きな「I」の透かし */
+    if (meta.tier === 'G1') {
+      ctx.fillStyle = look.edge.color;
+      ctx.fillRect(70, py + 18, 40, 6); ctx.fillRect(70, py + 18, 6, 40);
+      ctx.fillRect(760, py + 18, 40, 6); ctx.fillRect(794, py + 18, 6, 40);
+      const prevA = ctx.globalAlpha;
+      ctx.globalAlpha = prevA * 0.09; ctx.fillStyle = '#f0cc4a';
+      ctx.font = font(420, true); ctx.textAlign = 'center';
+      ctx.fillText('I', 710, py + ph / 2 + 150);
+      ctx.textAlign = 'left'; ctx.globalAlpha = prevA;
+    }
+  }
   const ix = 90;                       // 板の内側 x90+
   let y = py + 34;
-  drawLabel(ctx, font, `${meta.venue}　${meta.raceNo}`, ix, y + 12, HUD.paper70);
-  y += 12 + 10;
-  // レース名 96px 金プレート（ワイプ 0.7s）
-  ctx.font = font(96, true);
+  if (look === undefined) {
+    drawLabel(ctx, font, `${meta.venue}　${meta.raceNo}`, ix, y + 12, HUD.paper70);
+    y += 12 + 10;
+  } else {
+    /** ★格の札（高さ 46・角丸 8・縁 2px・影 4px）＋ 場と R */
+    const u = ctx as unknown as Ctx2D<unknown>;
+    const text = titleTierBadgeText(meta.tier!, meta.raceName);
+    ctx.font = font(look.badge.px, true);
+    const bw = ctx.measureText(text).width + 32, bh = 46;
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(ix, y + 4, bw, bh);
+    ctx.fillStyle = metalFill(u, ix, y, bw, bh, look.badge.metal, look.badge.fill); ctx.fillRect(ix, y, bw, bh);
+    ctx.strokeStyle = look.badge.border; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(ix + 1, y + 1); ctx.lineTo(ix + bw - 1, y + 1); ctx.lineTo(ix + bw - 1, y + bh - 1); ctx.lineTo(ix + 1, y + bh - 1); ctx.closePath(); ctx.stroke();
+    ctx.fillStyle = look.badge.ink; ctx.fillText(text, ix + 16, y + bh / 2 + look.badge.px * 0.36);
+    ctx.font = font(22, true); ctx.fillStyle = 'rgba(246,242,231,.8)';
+    ctx.fillText(`${meta.venue}　${meta.raceNo}`, ix + bw + 14, y + bh / 2 + 8);
+    y += bh + 14;
+  }
+  // レース名（★従来 96px 金プレート・★格があれば 格の大きさと色）（ワイプ 0.7s）
+  const namePx = look?.namePx ?? 96;
+  ctx.font = font(namePx, true);
   const nw = ctx.measureText(meta.raceName).width;
   const wipe = wipeAt(local, 0, 0.7);
   const shown = Math.max(0, Math.min(meta.raceName.length, Math.round(meta.raceName.length * wipe)));
-  ctx.fillStyle = goldPlate(ctx, ix, nw, t);
-  ctx.fillText(meta.raceName.slice(0, shown), ix, y + 96 * 0.86);
-  y += 96 + 18;
-  // 金の下線 高5 幅520（0.2s 遅れて 0.6s でワイプ）
-  ctx.fillStyle = goldPlate(ctx, ix, 520, t);
-  ctx.fillRect(ix, y, Math.round(520 * wipeAt(local, 0.2, 0.6)), 5);
-  y += 5 + 26;
+  if (look?.nameShadow != null) { ctx.fillStyle = look.nameShadow; ctx.fillText(meta.raceName.slice(0, shown), ix, y + namePx * 0.86 + 5); }
+  ctx.fillStyle = look === undefined ? goldPlate(ctx, ix, nw, t) : look.nameColor;
+  ctx.fillText(meta.raceName.slice(0, shown), ix, y + namePx * 0.86);
+  y += namePx + 18;
+  // 下線（★従来 金 高5 幅520・★格があれば 格の色と太さ・幅 540）（0.2s 遅れて 0.6s でワイプ）
+  const ulW = look === undefined ? 520 : 540, ulH = look?.underline.px ?? 5;
+  ctx.fillStyle = look === undefined ? goldPlate(ctx, ix, 520, t) : look.underline.color;
+  ctx.fillRect(ix, y, Math.round(ulW * wipeAt(local, 0.2, 0.6)), ulH);
+  y += ulH + 26;
   // 距離 64px ＋「m　芝・左」26px を下端揃え
   ctx.font = font(64, true); ctx.fillStyle = HUD.paper;
   const dText = String(meta.distanceMeter);
