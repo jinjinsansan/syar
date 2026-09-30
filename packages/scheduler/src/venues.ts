@@ -67,15 +67,22 @@ export interface Venue {
  * ★**10 場**。★1 周・直線・幅・回りを**全部ばらして**あります。
  *   ⚠️ ★同じ形の場を 2 つ作らないこと。★作った瞬間、その 2 場は「同じ画」になります。
  */
+/**
+ * ★**場の名前は 実在の競馬場を連想できる呼び名**（★2026-09-30・オーナー決定 D-125「3 種類とも規則で変える・この近さでいい」）。
+ *   ★規則: ★競馬ファンの呼び名・すぐ思い浮かぶ土地の名前（★実在の地方競馬場の名前は使わない）。
+ *   ★どの場をどれに当てたかは ★走路の形（1 周・直線・回り）がいちばん近いもの。★回りが合わない 3 場（五稜郭・会津・北九州）は形を変えていない。
+ *   ★id は変えない（★保存済みのレースは id で場を引く ＝ ★過去のレースの場の名前も 新しい名前で出る・裁定 §7）。
+ *   ⚠️ ★一対一に近い名前は ★公開前に L-9（弁護士）で確認する（★正典 D-125 ②）。
+ */
 export const VENUES: readonly Venue[] = [
   /** ★既存のデモがこの場です（`RACE_META.venue`）。★基準として動かしません */
-  { id: 'star-park', name: 'スターパーク競馬場', lapM: 2000, homeStretchM: 400, widthM: 20, turn: 'left', surfaces: ['turf', 'dirt'] },
+  { id: 'star-park', name: '五稜郭競馬場', lapM: 2000, homeStretchM: 400, widthM: 20, turn: 'left', surfaces: ['turf', 'dirt'] },
   /** ★いちばん長い直線（620m）＋**小さいコーナー**。★直線勝負の場 */
-  { id: 'tenga', name: '天河競馬場', lapM: 2200, homeStretchM: 620, widthM: 22, turn: 'left', surfaces: ['turf', 'dirt'] },
-  { id: 'aone', name: '青嶺競馬場', lapM: 1800, homeStretchM: 330, widthM: 18, turn: 'right', surfaces: ['turf', 'dirt'] },
+  { id: 'tenga', name: '越後競馬場', lapM: 2200, homeStretchM: 620, widthM: 22, turn: 'left', surfaces: ['turf', 'dirt'] },
+  { id: 'aone', name: '淀競馬場', lapM: 1800, homeStretchM: 330, widthM: 18, turn: 'right', surfaces: ['turf', 'dirt'] },
   /** ★ダートの本場。★芝も 1 本だけ持つ */
-  { id: 'shirasuna', name: '白砂競馬場', lapM: 1700, homeStretchM: 290, widthM: 18, turn: 'left', surfaces: ['dirt', 'turf'] },
-  { id: 'shiokaze', name: '潮風競馬場', lapM: 1900, homeStretchM: 310, widthM: 20, turn: 'right', surfaces: ['turf', 'dirt'] },
+  { id: 'shirasuna', name: '北九州競馬場', lapM: 1700, homeStretchM: 290, widthM: 18, turn: 'left', surfaces: ['dirt', 'turf'] },
+  { id: 'shiokaze', name: '幕張競馬場', lapM: 1900, homeStretchM: 310, widthM: 20, turn: 'right', surfaces: ['turf', 'dirt'] },
   /**
    * ⚠️ ★**いちばん小さい**（1 周 1650m・次は白砂 1700m）。★コーナーの半径 151m。
    *
@@ -95,12 +102,12 @@ export const VENUES: readonly Venue[] = [
    * ★半径 151m は 10 場で**2 番目に深い**（★最深は陽光台 141.6m）ので、
    * ★「小回りの場」という性格は保っています。
    */
-  { id: 'tsukimi', name: '月見丘競馬場', lapM: 1650, homeStretchM: 350, widthM: 17, turn: 'right', surfaces: ['turf', 'dirt'] },
-  { id: 'ginrei', name: '銀嶺競馬場', lapM: 2100, homeStretchM: 380, widthM: 21, turn: 'left', surfaces: ['turf', 'dirt'] },
-  { id: 'youkou', name: '陽光台競馬場', lapM: 1750, homeStretchM: 430, widthM: 19, turn: 'left', surfaces: ['turf', 'dirt'] },
-  { id: 'kirigahara', name: '霧ヶ原競馬場', lapM: 2000, homeStretchM: 470, widthM: 20, turn: 'right', surfaces: ['turf', 'dirt'] },
+  { id: 'tsukimi', name: '石狩競馬場', lapM: 1650, homeStretchM: 350, widthM: 17, turn: 'right', surfaces: ['turf', 'dirt'] },
+  { id: 'ginrei', name: '会津競馬場', lapM: 2100, homeStretchM: 380, widthM: 21, turn: 'left', surfaces: ['turf', 'dirt'] },
+  { id: 'youkou', name: '尾張競馬場', lapM: 1750, homeStretchM: 430, widthM: 19, turn: 'left', surfaces: ['turf', 'dirt'] },
+  { id: 'kirigahara', name: '仁川競馬場', lapM: 2000, homeStretchM: 470, widthM: 20, turn: 'right', surfaces: ['turf', 'dirt'] },
   /** ⚠️ ★**いちばん大きい**（1 周 2400m）。★コーナーの半径 210m — ★大きく回る長距離の舞台 */
-  { id: 'ookawara', name: '大河原競馬場', lapM: 2400, homeStretchM: 540, widthM: 23, turn: 'left', surfaces: ['turf', 'dirt'] },
+  { id: 'ookawara', name: '府中競馬場', lapM: 2400, homeStretchM: 540, widthM: 23, turn: 'left', surfaces: ['turf', 'dirt'] },
 ];
 
 /** ★id から引く。★無ければ投げます（黙って既定の場へ落とさない・R-27） */

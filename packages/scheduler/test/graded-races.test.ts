@@ -54,7 +54,8 @@ describe('★競馬場 10 場', () => {
 
   it('★知らない id は投げる（★黙って既定の場へ落とさない・R-27）', () => {
     expect(() => venueById('banana')).toThrow();
-    expect(venueById('star-park').name).toBe('スターパーク競馬場');
+    /** ★2026-09-30: ★場の名前を 実在を連想できる呼び名に（★D-125） */
+    expect(venueById('star-park').name).toBe('五稜郭競馬場');
   });
 });
 

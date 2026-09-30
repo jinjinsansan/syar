@@ -200,7 +200,7 @@ describe('★1 鞍を開いた形が、エンジンと描画層で同じ走路�
 
   it('★★既定の 1 鞍は、直書きされていた画面と同じ（★配線しても画面が変わらない）', () => {
     const s = raceSetupById();
-    expect(s.meta.venue).toBe('スターパーク競馬場');
+    expect(s.meta.venue).toBe('五稜郭競馬場');
     expect(s.meta.raceName).toBe('桜星賞');
     expect(s.distanceM).toBe(1600);
     expect(s.surface).toBe('turf');
