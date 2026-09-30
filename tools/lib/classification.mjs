@@ -514,6 +514,7 @@ export const READONLY = [
   'verify-deployed-db-host.mjs', // 配備された画面の束から DB のホストを読み、--env のホストと比べる（読むだけ・秘密は出さない・2026-09-29）
   'verify-worker-lag.mjs',   // 本番のワーカーが画面より後ろのとき、その差にワーカーに効く変更が在るかを数える（読むだけ・healthz と git・2026-09-29）
   'verify-worker-queries.mjs',   // ワーカーの拾う問い合わせ（pendingResolutions・pendingSettlements ほか）を staging の実 DB に投げる smoke（読むだけ・2026-09-29 の型の事故）
+  'verify-entry-conditions-sql.mjs',   // 重賞の出走条件（年齢の帯・牝馬限定）の判定を TS と enter_race の SQL で突き合わせる（読むだけ・read only・境目の週を含む・2026-09-30）
   'slice-narrator.mjs',       // ナレーターのシートを 6 枚に切り、口だけ差し替える（読むだけ）
   'verify-no-real-faces.mjs', // 人物立ち絵に写真が混ざっていないか（読むだけ）
   // ★anon で何が読めるかの全数確認（§8.6 server_seed・§12.4 potential）。select のみ

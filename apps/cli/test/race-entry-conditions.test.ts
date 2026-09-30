@@ -25,7 +25,7 @@ describe('★重賞の出走条件', () => {
     expect(entryConditionsOf(null), '★重賞でない鞍は 出走できる齢から').toEqual({ minAgeWeeks: two, maxAgeWeeks: null, filliesOnly: false });
   });
 
-  it('🔴 ① 条件つきの鞍に 条件に合わない馬が 1 頭も入らない（★合成の母集団 400 頭で数える）', () => {
+  it('🔴 ① 条件つきの鞍に 条件に合わない馬が 1 頭も入らない（★50 鞍 × 合成の母集団 400 頭 ＝ 延べ 20,000 頭を見て 0 頭）', () => {
     /** ★齢 90〜259 週・牡牝半々の 合成の母集団（★乱数を使わない決定論） */
     const pool = Array.from({ length: 400 }, (_, i) => ({ sex: (i % 2 === 0 ? 'male' : 'female') as 'male' | 'female', ageWeeks: 90 + (i * 37) % 170 }));
     const report: string[] = [];
@@ -47,6 +47,8 @@ describe('★重賞の出走条件', () => {
     const fuchu2 = entryConditionsOf(gradedRaceById('g2-fuchu-2yo'));
     expect(fuchu2.maxAgeWeeks, '★府中2歳ステークスは 2 歳だけ').toBe(LIFECYCLE_WEEKS.raceableFrom + WEEKS_PER_YEAR);
     expect(report.length).toBe(50);
+    /** ★分母を出す（★見た頭数が 0 でも「合わない馬 0 頭」になる罠・裁定 §11 ②）: ★50 鞍 × 400 頭 ＝ 延べ 20,000 頭を見た */
+    expect(GRADED_RACES.length * pool.length).toBe(20000);
   });
 
   it('🔴 ③ 選抜（worker）と 登録（enter_race）が 同じ値: ワーカーが行に書き・enter_race が行の値で判定する', () => {
@@ -62,7 +64,9 @@ describe('★重賞の出走条件', () => {
     expect(body).toContain('v_race.max_age_weeks');
     expect(body).toContain("coalesce(v_race.fillies_only, false) and exists (");
     /** ★段（数）を SQL に書き写さない（★104・156・208 を直書きしない） */
+    expect(body.indexOf('重賞の出走条件'), '★切り出しの始まりが見つからない').toBeGreaterThan(-1);
     const added = body.slice(body.indexOf('重賞の出走条件'), body.indexOf('このレースは牝馬限定です'));
+    expect(added.length, '★切り出した断片が空').toBeGreaterThan(100);
     expect(added).not.toMatch(/\b(156|208)\b/);
   });
 });
