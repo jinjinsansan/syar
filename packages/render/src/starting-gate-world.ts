@@ -234,7 +234,11 @@ export function drawStartingGateWorld(
      * ⚠️ ★番号は ★**コードで描き直します**（★絵に焼くと、角度を変えたとき裏返ります）。
      *    ★2026-08-27 のオーナー指摘①と同じ理由です。
      */
-    ctx.font = opts.font(Math.max(7, Math.round(h * 0.78)), true);
+    let px = Math.max(7, Math.round(h * 0.78));
+    ctx.font = opts.font(px, true);
+    /** ★板の幅にも収める（★2026-10-01・18 頭では板が細く 2 桁が隣の番号に食い込んでいた） */
+    const plateW = Math.abs(b.x - a.x) * 0.92;
+    while (px > 7 && ctx.measureText(String(i + 1)).width > plateW) { px -= 1; ctx.font = opts.font(px, true); }
     ctx.textAlign = 'center';
     ctx.fillStyle = C.plateText;
     ctx.fillText(String(i + 1), (a.x + b.x) / 2, (a.y + b.y) / 2 - h * 0.16);

@@ -88,8 +88,18 @@ describe('参考映像の HUD 3 点', () => {
       ]);
       const byGate = new Map(badges.map((b) => [b.gate, b.x]));
       expect(byGate.get(1)!).toBeGreaterThan(byGate.get(2)!);
-      // 範囲外の馬は範囲ちょうどの馬と同じ位置（左端）で止まる
-      expect(byGate.get(3)!).toBeCloseTo(byGate.get(2)!, 6);
+      /**
+       * ★2026-10-01: 範囲外の馬も ★左端の側に止まるが、★馬番が読めるよう 20px 以上離す（★オーナー「文字が被っている」）。
+       *   ★旧: 範囲ちょうどの馬と同じ位置に重ねていた（★数字が重なって読めない）。
+       */
+      expect(byGate.get(2)! - byGate.get(3)!).toBeGreaterThanOrEqual(20 - 1e-9);
+      expect(byGate.get(3)!).toBeLessThan(byGate.get(2)!);
+    });
+
+    it('★固まった馬群でも 馬番の数字どうしは 20px 以上離れ、並びは変わらない', () => {
+      const badges = barBadges([1, 2, 3, 4, 5, 6].map((gate) => ({ gate, s: 1000 - gate * 0.1 })));
+      const xs = [...badges].sort((a, b) => a.gate - b.gate).map((b) => b.x);
+      for (let i = 1; i < xs.length; i += 1) expect(xs[i - 1]! - xs[i]!, `${i}`).toBeGreaterThanOrEqual(20 - 1e-9);
     });
 
     /**

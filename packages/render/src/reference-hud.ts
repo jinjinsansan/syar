@@ -87,8 +87,31 @@ export function drawFormationBar(
 
   // ★後ろの馬から描く（前の馬が手前に重なる）
   const ordered = [...horses].sort((a, b) => a.s - b.s);
+  /**
+   * ★**馬番の数字が重ならない最小の間隔**（★2026-10-01・オーナー「実況中継のテロップの文字が被っている」）。
+   *   ★距離のままだと 馬群が固まったとき ★数字どうしが重なって読めなかった（★手元の全コマ調査で 71 コマ）。
+   *   ★並びは変えずに ★先頭から順に `MIN_GAP` だけ離す（★帽子は少し重なったまま＝固まって見える）。★入り切らなければ等間隔。
+   */
+  const MIN_GAP = 20;
+  const lo = opts.x + BADGE_W / 2, hi = opts.x + opts.width - BADGE_W / 2;
+  const dir = opts.leftward === true ? 1 : -1;           // ★先頭から後ろへ進む向き
+  const front = [...ordered].reverse();                  // ★先頭から
+  const xs = front.map((h) => xOf(h.s));
+  const gap = front.length <= 1 ? MIN_GAP : Math.min(MIN_GAP, (hi - lo) / (front.length - 1));
+  for (let i = 1; i < xs.length; i += 1) {
+    xs[i] = dir < 0 ? Math.min(xs[i]!, xs[i - 1]! - gap) : Math.max(xs[i]!, xs[i - 1]! + gap);
+  }
+  /** ★端を越えたら ★全体を戻して もう一度 前から詰める */
+  const overflow = dir < 0 ? lo - xs[xs.length - 1]! : xs[xs.length - 1]! - hi;
+  if (overflow > 0) {
+    for (let i = 0; i < xs.length; i += 1) xs[i] = xs[i]! - dir * overflow;
+    for (let i = xs.length - 2; i >= 0; i -= 1) {
+      xs[i] = dir < 0 ? Math.max(xs[i]!, xs[i + 1]! + gap) : Math.min(xs[i]!, xs[i + 1]! - gap);
+    }
+  }
+  const xByGate = new Map(front.map((h, i) => [h.gate, xs[i]!]));
   for (const h of ordered) {
-    const cx = xOf(h.s);
+    const cx = xByGate.get(h.gate) ?? xOf(h.s);
     const role = frameRoleOf(h.gate, fieldSize);
     const color = pal[role] ?? '#fff';
     /**

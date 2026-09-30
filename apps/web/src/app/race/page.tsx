@@ -275,7 +275,12 @@ const LANE_MODEL_PARAM = typeof window === 'undefined' ? undefined
  * 🔴 ★**これは見本（`?venue=`）の頭数です**（★2026-09-27・裁定 Q-RACE-5）。★実レースは 8〜18 頭（★`FIELD_SIZE`）で、
  *    ★画面は ★`PageSetup.fieldSize` を読みます（★この定数を画面の中で直に読まない・網 `built-course-fields.test.ts`）。
  */
-const SAMPLE_FIELD = 8;
+/**
+ * ★**開発の口 `?dev=1&field=N`**（★2026-10-01・8〜18）。★実レースの頭数（最大 18）で 文字の重なりを手元で調べるため（★オーナー「テロップの文字が被っている」）。
+ *   ★`dev=1` が無ければ 常に 8（★見本の既定は変えない）。
+ */
+const SAMPLE_FIELD = QS?.get('dev') === '1' && QS.get('field') !== null
+  ? Math.min(18, Math.max(8, Math.round(Number(QS.get('field')) || 8))) : 8;
 /**
  * ★**従来方式へ戻す口**（`?motion=legacy`）。★見比べのために残します。
  * ⚠️ ★この旗が見るのは★**方針の名前まで**です。★送り速さそのものの分岐は
@@ -1158,7 +1163,7 @@ function venuePageSetup(): PageSetup {
     fieldSize: SAMPLE_FIELD,
     roster: Array.from({ length: SAMPLE_FIELD }, (_, i) => ({
       gate: i + 1,
-      name: HORSE_NAMES[i] ?? `スター${i + 1}`,
+      name: HORSE_NAMES[i] ?? `${HORSE_NAMES[i % HORSE_NAMES.length]}ダッシュ`,
       jockey: JOCKEY_NAMES[i] ?? 'STAR騎手',
       winOdds: DEMO_WIN_ODDS[i] ?? 99.9,
       coat: coatOf(i + 1),

@@ -291,6 +291,19 @@ export interface CallBandOptions {
   readonly sinceSec?: number | undefined;
 }
 
+/**
+ * ★**暗い枠の色（黒・濃い青）の馬名は 白に寄せた色で塗る**（★2026-10-01）。
+ *   ★実況の帯は暗いガラスなので、★2 枠（黒 #191919）・4 枠（青 #1446b4）の馬名が ★帯に溶けて見えなかった
+ *   （★18 頭立ての 3 番＝2 枠で「は 4 番手…」と 途中から始まるように見えた）。★それ以外の色はそのまま。
+ */
+export function readableOnDark(color: string): string {
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return color;
+  const r = parseInt(color.slice(1, 3), 16), g = parseInt(color.slice(3, 5), 16), b = parseInt(color.slice(5, 7), 16);
+  if (0.299 * r + 0.587 * g + 0.114 * b >= 80) return color;
+  const mix = (v: number): string => Math.round(v + (235 - v) * 0.7).toString(16).padStart(2, '0');
+  return `#${mix(r)}${mix(g)}${mix(b)}`;
+}
+
 export function drawCallBand<TImage>(
   ctx: Ctx2D<TImage>, pal: Palette, vp: Viewport2D, font: FontOf,
   lines: readonly (readonly CallPart[])[],
@@ -371,7 +384,7 @@ export function drawCallBand<TImage>(
       consumed += part.text.length;
       if (take <= 0) continue;
       const seg = part.text.slice(0, take);
-      ctx.fillStyle = part.role === undefined ? HUD.paper : (pal[part.role] ?? HUD.paper);
+      ctx.fillStyle = part.role === undefined ? HUD.paper : readableOnDark(pal[part.role] ?? HUD.paper);
       ctx.fillText(seg, cx, H - 93 + oy + 20 + (1 - push) * 12);
       cx += ctx.measureText(seg).width;
     }
@@ -389,7 +402,7 @@ export function drawCallBand<TImage>(
       const seg = part.text.slice(0, take);
       const numbered = part.role !== undefined;
       ctx.font = font(Math.round((numbered ? 34 : 28) * curScale), true);
-      ctx.fillStyle = numbered ? (pal[part.role ?? ''] ?? HUD.paper) : HUD.paper;
+      ctx.fillStyle = numbered ? readableOnDark(pal[part.role ?? ''] ?? HUD.paper) : HUD.paper;
       ctx.fillText(seg, cx, H - 62 + oy + 30);
       cx += ctx.measureText(seg).width;
     }
@@ -536,7 +549,12 @@ export function drawWinnerLowerThird(
   }
   // 左ブロック（bottom 26）
   const bx = 70;
-  drawLabel(ctx, font, opts.raceLabel === undefined ? 'WINNER' : `WINNER　${opts.raceLabel}`, bx, H - 26 - 64 - 6 + rise.dy);
+  /**
+   * ★名札は ★馬名（56px・字の頭 ≒ H-114）より上に置く（★2026-10-01・「G1 有馬グランプリ」が馬名に食い込んでいた）。
+   *   ★名札の無い従来（WINNER だけ）は 元の高さのまま。
+   */
+  drawLabel(ctx, font, opts.raceLabel === undefined ? 'WINNER' : `WINNER　${opts.raceLabel}`, bx,
+    (opts.raceLabel === undefined ? H - 26 - 64 - 6 : H - 26 - 40 - 56 - 8) + rise.dy);
   ctx.font = font(64, true);
   const w1 = ctx.measureText('1').width;
   ctx.fillStyle = goldPlate(ctx, bx, w1, t);
