@@ -39,7 +39,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import {
-  classOf, gradeOf, winsRangeFor, prizeFor, npcStudFee, dailyProgramme, RACES_BY_CLASS,
+  classOf, gradeOf, gradedRaceAt, GRADED_RACES, winsRangeFor, prizeFor, npcStudFee, dailyProgramme, RACES_BY_CLASS,
   PRICE_TIERS_EP, LISTINGS_PER_TIER, priceTierOf, CAREER_RACE_LIMIT, RACES_PER_DAY,
   type RaceClass, type PrizeTier,
 } from '@star/scheduler';
@@ -47,7 +47,7 @@ import {
   CALIBRATED_RACE_RANDOM_K, DEFAULT_RACE_BALANCE, resolveRace,
 } from '@star/race-engine';
 import {
-  createFounder, deriveRng, DEFAULT_BALANCE, FOUNDERS,
+  createFounder, deriveRng, DEFAULT_BALANCE, FOUNDERS, stallionCoveringLimit,
   type HorseId, type HorseRecord, type AbilityKey,
 } from '@star/sim-engine';
 import { generateRace, sortPoolByClass, type GenerateRaceOptions } from './race-field.js';
@@ -110,6 +110,58 @@ export interface Distribution {
   readonly upperMin: number;
   /** ★引退して入れ替わった頭数（★世代交代が動いている証拠） */
   readonly retired: number;
+  /** ★**④ 種牡馬の偏り**（★裁定 `REVIEW_GRADED_CALENDAR_50_20260930.md` §12-2 (c)・★合否は出さない） */
+  readonly sireConcentration: SireConcentration;
+}
+
+/**
+ * ★**④ 年の仔のうち 上位 5 頭の種牡馬が占める割合**（★軽い版・★向きだけを見る）。
+ *
+ * 【★G1 が偏りに効く経路は 1 本】
+ *   ★種付の上限 `stallionCoveringLimit` ＝ 20 ＋ G1 勝利数 × 10（★正典 §6.7）。
+ *   ★NPC の相手選び（`rankSires`）は ★素質 × 厩舎の方針で、★G1 を見ない。★上位 1 頭（`SIRE_CHOICE_TOP_K = 1`）を取る。
+ *   → ★素質の高い種牡馬が G1 を勝っていれば、★その上限の分だけ 仔が集まる。
+ * 【★この近似が落としているもの】（★出力にも印字する）
+ *   ★厩舎の方針（★全牝馬が同じ順で選ぶ ＝ ★偏りの上側）・近交の割引・繁殖の齢・牝馬と種牡馬の頭数の比（★走った牡牝をそのまま使う）。
+ *   ★G1 の勝ちは ★このハーネスのレースが配る（★配り方を新しく決めない・§12-1）。
+ */
+export interface SireConcentration {
+  readonly stallions: number;
+  readonly mares: number;
+  readonly foals: number;
+  readonly top5Foals: number;
+  /** ★上位 5 頭のうち G1 を勝っている頭数 */
+  readonly top5WithG1: number;
+  /** ★G1 を勝った種牡馬の仔（★上位 5 頭の外でも G1 の上限が効いた分） */
+  readonly g1SireFoals: number;
+  /** ★G1 を勝った種牡馬のうち 素質の順で いちばん上の順位（★1 始まり・★居なければ null） */
+  readonly bestG1SireRank: number | null;
+}
+
+export function sireConcentrationOf(
+  horses: readonly { readonly rec: HorseRecord; readonly g1Wins: number }[],
+): SireConcentration {
+  const score = (r: HorseRecord): number => Object.values(r.potential).reduce((a, b) => a + b, 0);
+  const sires = horses.filter((h) => h.rec.sex === 'male')
+    .map((h) => ({ id: h.rec.id, g1Wins: h.g1Wins, s: score(h.rec), foals: 0 }))
+    .sort((a, b) => b.s - a.s || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const mares = horses.filter((h) => h.rec.sex === 'female').length;
+  let at = 0;
+  let foals = 0;
+  for (let m = 0; m < mares; m += 1) {
+    while (at < sires.length && sires[at]!.foals >= stallionCoveringLimit({ g1Wins: sires[at]!.g1Wins }, DEFAULT_BALANCE)) at += 1;
+    if (at >= sires.length) break;
+    sires[at]!.foals += 1;
+    foals += 1;
+  }
+  const top = [...sires].sort((a, b) => b.foals - a.foals).slice(0, 5);
+  return {
+    stallions: sires.length, mares, foals,
+    top5Foals: top.reduce((a, b) => a + b.foals, 0),
+    top5WithG1: top.filter((x) => x.g1Wins > 0).length,
+    g1SireFoals: sires.filter((x) => x.g1Wins > 0).reduce((a, b) => a + b.foals, 0),
+    bestG1SireRank: ((k) => (k < 0 ? null : k + 1))(sires.findIndex((x) => x.g1Wins > 0)),
+  };
 }
 
 /**
@@ -164,7 +216,15 @@ export function runCohort(
    * ⚠️ ★頭数は ★**渡された配列の長さ**になります（★`poolSize` は無視されます）。
    */
   poolOverride: readonly HorseRecord[] | null = null,
+  /**
+   * ★**G1 を年に何本 開くか**（★測定専用・★§12-2 (c)）。★null は暦のまま（★年 24）。
+   *   ★数を渡すと ★暦の G1 の先頭 N 鞍だけを G1 とし、★残りの G1 は G2 として走らせる（★どの鞍かではなく本数を見る）。
+   */
+  g1PerYear: number | null = null,
 ): Distribution {
+  const keptG1 = g1PerYear === null ? null
+    : new Set(GRADED_RACES.filter((r) => r.grade === 'G1').slice(0, g1PerYear).map((r) => r.id));
+  if (keptG1 !== null && keptG1.size !== g1PerYear) throw new Error(`--g1-per-year ${g1PerYear}: 暦の G1 は ${keptG1.size} 鞍しかありません`);
   /**
    * ★番組表は ★**1 回だけ**作ります。
    * ⚠️ ★`classOf(idx)` を引数無しで呼ぶと ★**毎回番組表を組み直します**（★既定引数）。
@@ -228,6 +288,8 @@ export function runCohort(
    *   （★本番: 3,000 頭 × 26 日 → 1 頭 約 28 走）。
    */
   const races = days * RACES_PER_DAY;
+  /** ★入れ替わった馬も含めた全頭（★④ の種牡馬と牝馬） */
+  const everyone = new Map<HorseId, HorseRecord>(pool.map((h) => [h.id, h]));
   let held = 0;
   let starts = 0;
   /** ⚠️ ★`poolSize` ではなく **実際の頭数** から続き番号を振る（★`--pool-file` で長さが変わる） */
@@ -253,7 +315,8 @@ export function runCohort(
     }
     const raceClass = classOf(idx, programme);
     const grade = gradeOf(idx, programme);
-    const tier = tierOf(raceClass, grade);
+    const tier0 = tierOf(raceClass, grade);
+    const tier: PrizeTier = tier0 === 'G1' && keptG1 !== null && !keptG1.has(gradedRaceAt(idx, programme)!.id) ? 'G2' : tier0;
     const range = winsRangeFor(raceClass);
     /**
      * ★**資格で絞る**（★本番のワーカーと同じ・`build-race.ts` の `selectEligible`）。
@@ -312,6 +375,7 @@ export function runCohort(
             balance: DEFAULT_BALANCE,
             founders: FOUNDERS,
           });
+          everyone.set(fresh.id, fresh);
           pool[at] = fresh;
           if (train) trained.set(fresh.id, runCareer(fresh, APPROPRIATE_POLICY, nextId, seed).stats);
           retiredCount += 1;
@@ -342,7 +406,10 @@ export function runCohort(
   }
   return { pool: pool.length, races: held, ran, prices: prices.sort((a, b) => a - b), g1Winners, totalStarts, heldByTier, skippedByTier,
     meanFieldSize: held === 0 ? 0 : starts / held, upperEligibleByDay, upperMin,
-    retired: retiredCount };
+    retired: retiredCount,
+    sireConcentration: sireConcentrationOf([...careers.entries()]
+      .filter(([, c]) => c.starts > 0)
+      .map(([id, c]) => ({ rec: everyone.get(id)!, g1Wins: c.g1Wins }))) };
 }
 
 /** ★コマンドとして流したとき */
@@ -406,7 +473,16 @@ if (isMain) {
     console.log('     ⚠️ ★乱数の引き方が合成と違う（★初代を作らない）ので、★**1 対 1 では引き算できません**（AB-1）。');
   }
 
-  const d = runCohort(poolSize, seed, maxStarts, days, train, openMin, mix, poolOverride);
+  const g1PerYear = process.argv.includes('--g1-per-year') ? arg('g1-per-year', 24) : null;
+  const d = runCohort(poolSize, seed, maxStarts, days, train, openMin, mix, poolOverride, g1PerYear);
+  {
+    const sc = d.sireConcentration;
+    console.log(`\n  ★④ 種牡馬の偏り（★軽い版・★合否は出さない・裁定 §12-2 (c)）: G1 ${g1PerYear === null ? '暦のまま（年 24）' : `年 ${g1PerYear}`}`);
+    console.log(`    ★上位 5 頭の種牡馬の仔 ${sc.top5Foals} / 仔 ${sc.foals} ＝ ${((sc.top5Foals / Math.max(1, sc.foals)) * 100).toFixed(1)}%`
+      + `（★種牡馬 ${sc.stallions} 頭・牝馬 ${sc.mares} 頭・★上位 5 頭のうち G1 を勝った ${sc.top5WithG1} 頭）`);
+    console.log(`    ★G1 を勝った種牡馬の仔 ${sc.g1SireFoals} 頭 / ★G1 を勝った種牡馬の 素質の順位（最上位）${sc.bestG1SireRank ?? 'なし'}`);
+    console.log('    ⚠️ ★近似: 全牝馬が素質の合計の順で選ぶ（★厩舎の方針・近交・齢・頭数の比を落とす ＝ ★偏りの上側）。★G1 の勝ちはこのハーネスのレースが配る');
+  }
   console.log(`\n  開催 ${d.races} レース / 走った馬 ${d.ran} 頭 / ★G1 を勝った馬 ${d.g1Winners} 頭`
     + `（${((d.g1Winners / Math.max(1, d.ran)) * 100).toFixed(1)}%）`);
   console.log(`  ★平均頭数 ${d.meanFieldSize.toFixed(2)}`
