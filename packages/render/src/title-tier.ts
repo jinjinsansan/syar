@@ -101,3 +101,25 @@ export function metalFill(ctx: Ctx2D<unknown>, x: number, y: number, w: number, 
   stops.forEach((c, i) => g.addColorStop(at[i] ?? 1, c));
   return g;
 }
+
+/**
+ * ★格の札（★R-25: タイトル・出馬表の見出し・払戻の見出しで同じ形）。★戻り値は札の幅。
+ *   ★高さ `h`・縁 2px・影 4px。★字は `titleTierBadgeText`。
+ */
+export function drawTierBadge(
+  ctx: Ctx2D<unknown>, font: (px: number, bold?: boolean) => string,
+  tier: TitleTier, raceName: string, x: number, y: number, h: number,
+): number {
+  const look = TITLE_TIER_LOOKS[tier];
+  const text = titleTierBadgeText(tier, raceName);
+  const px = Math.round(look.badge.px * (h / 46));
+  ctx.font = font(px, true);
+  const w = ctx.measureText(text).width + Math.round(32 * (h / 46));
+  ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x, y + 4, w, h);
+  ctx.fillStyle = metalFill(ctx, x, y, w, h, look.badge.metal, look.badge.fill); ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = look.badge.border; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x + 1, y + 1); ctx.lineTo(x + w - 1, y + 1); ctx.lineTo(x + w - 1, y + h - 1); ctx.lineTo(x + 1, y + h - 1); ctx.closePath(); ctx.stroke();
+  ctx.fillStyle = look.badge.ink; ctx.textAlign = 'left';
+  ctx.fillText(text, x + (w - ctx.measureText(text).width) / 2, y + h / 2 + px * 0.36);
+  return w;
+}

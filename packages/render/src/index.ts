@@ -11,6 +11,7 @@ export * from './oblique-draw.js';
 export * from './oblique-ui.js';
 export * from './hud-kit.js';
 export * from './entry-board.js';
+export * from './entry-board-r25.js';
 export * from './race-intro.js';
 export * from './title-tier.js';
 export * from './perspective.js';

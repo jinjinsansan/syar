@@ -64,7 +64,7 @@ import {
   drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, pixelScaleForDisplay, PHONE_SUPERSAMPLE, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   // ★発走前の流れ（★2026-09-15・オーナー決定「動画の通り」）
   RACE_INTRO_FLYOVER_START_SEC, RACE_INTRO_GRADE_END_SEC, RACE_INTRO_ENTRY_END_SEC, RACE_INTRO_GATE_HOLD_SEC,
-  drawPaddockIntro, drawGradeIntro, paddockPicksOf, popularityRanksOf, titleTierOf,
+  drawPaddockIntro, drawGradeIntro, paddockPicksOf, popularityRanksOf, titleTierOf, drawEntryBoardR25,
   typedCount,
   raceCallAt, raceSurgeGate, RACE_SURGE_WINDOW_SEC,
   withPhasePrefix,
@@ -4447,7 +4447,8 @@ function RaceView({ setup, real }: {
       } else { ctx.fillStyle = '#0b1210'; ctx.fillRect(0, 0, W, H); }
       const ranks = popularityRanksOf(oddsRows);
       /** ★小窓では ★出馬表を重ねない（★背景の景色だけ・★R-19 回答 Q1） */
-      if (!EMBED_STRIP) drawEntryBoard(ctx, art.pal as Record<string, string>, vp, FONT,
+      /** ★2026-09-30（R-25 D25-3）: ★横書き 2 列の出馬表（★オーナー「デザインが悪い見にくい」） */
+      if (!EMBED_STRIP) drawEntryBoardR25(ctx, art.pal as Record<string, string>, vp, FONT,
         Array.from({ length: FIELD }, (_, i) => ({
           gate: i + 1, name: nameOfGate(i + 1), jockey: jockeyOfGate(i + 1),
           oddsLabel: oddsLabelOf(oddsRows[i]?.winOdds ?? Number.POSITIVE_INFINITY), popularity: ranks.get(i + 1), isOwn: i + 1 === mineGate,
@@ -4457,8 +4458,8 @@ function RaceView({ setup, real }: {
           weatherLabel: '晴', conditionLabel: conditionLabel[trackCondition],
         }, frameRoleOf, {
           timeSec: d, sinceSec: intro.sinceSec, secondsToStart: RACE_INTRO_RACE_START_SEC - d,
-          /** ★背景の競馬場を透かす（★仮置き・オーナーの目で決める） */
-          scrimAlpha: 0.18, boardAlpha: 0.55,
+          tier: titleTierOf(setup.grade, RACE_META.raceName),
+          reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
         });
       drawRendererBadge(ctx, renderer, 'entry');
       return;

@@ -124,7 +124,7 @@ describe('★小窓で本編を流す約束', () => {
     expect(PAGE).toContain('!stripQuiet()) drawCourseSectionTag(');
     expect(PAGE).toContain('!replay.active && !cutInActive && !stripQuiet()) {');
     expect(PAGE).toContain("intro.stage === 'gate-hold' && !stripQuiet()) {");
-    expect(PAGE).toContain('if (!EMBED_STRIP) drawEntryBoard(');
+    expect(PAGE).toContain('if (!EMBED_STRIP) drawEntryBoardR25(');
     expect(PAGE).toContain('if (replay.active && !stripQuiet()) {');
     /** ★描く判定に ★`!EMBED_STRIP` を戻さない（★戻すと 拡大しても下ろしたまま＝①） */
     expect(PAGE).not.toMatch(/&& !EMBED_STRIP\) (?:drawRaceHeadlineChip|drawCourseSectionTag)/);
