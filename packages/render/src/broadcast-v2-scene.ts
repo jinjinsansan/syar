@@ -407,12 +407,13 @@ export function resolveBroadcastV2Scene(
    */
   const focusW = ((): number => {
     if (focus.length === 0) return course.widthM / 2;
-    if (shot.target === 'leader' || shot.target === 'winner') {
-      return focus.reduce((sum, horse) => sum + horse.w, 0) / focus.length;
-    }
     const top = leaders[0]?.s ?? 0;
-    /** 先頭から `FALLOFF_M` 離れるまでに重みが 1→0 へなだらかに落ちる */
-    const FALLOFF_M = shot.target === 'contenders' ? 24 : 60;
+    /**
+     * 先頭から `FALLOFF_M` 離れるまでに重みが 1→0 へなだらかに落ちる。
+     * ★先頭を追うカット（★leader／winner）も ★6m で重みを落とす（★2026-10-01）。
+     *   ★旧: 先頭 1 頭の横位置そのまま → ★先頭が入れ替わった 1 コマで カメラが横に 2.5m 飛んでいた（★リプレイ・尾張 1200m 実測）。
+     */
+    const FALLOFF_M = shot.target === 'leader' || shot.target === 'winner' ? 6 : shot.target === 'contenders' ? 24 : 60;
     let sum = 0, weight = 0;
     for (const horse of packed) {
       const u = Math.max(0, Math.min(1, (top - horse.s) / FALLOFF_M));
@@ -1076,6 +1077,9 @@ export function drawBroadcastV2Scene<TImage>(
     lastDiag = {
       shot: scene.shot.id,
       shotViewDeg: shotView.viewDeg,
+      /** ★カメラの位置と追う距離（★2026-10-01・芝の動きが急に遅くなる所を 数で探すため・★描画には使わない） */
+      focusS: scene.focusS,
+      eye: { x: scene.camera.eye.x, y: scene.camera.eye.y, z: scene.camera.eye.z },
       asset: assetKey,
       flip: shotView.forwardDx < 0,
       /** ★素材の素性（★読めた名前・配置・較正・予備落ち）。★描画には使いません */
@@ -1092,6 +1096,8 @@ export function drawBroadcastV2Scene<TImage>(
           / ((Math.hypot(fx, fy) || 1) * (Math.hypot(vx, vy) || 1))));
         return {
           gate: h.gate,
+          /** ★走路の上の位置（★s ＝ 進んだ距離・w ＝ 内ラチからの横の距離・★柵の上を走る所を探すため） */
+          s: h.s, w: h.w,
           x0: qa.x, y0: qa.y, x1: qb.x, y1: qb.y,
           ownViewDeg: (Math.acos(cos) * 180) / Math.PI,
           /** ★実際に描いたコマ番号と位相（★指示書 B-1・★脚の連続を追うため） */

@@ -564,6 +564,22 @@ const CORNER_CUT_M_WEB = 400;
 /** ★ゴール後の勝馬追従: 走り抜けを 0.6 倍のスローで見せ、6.5 秒（アーケード参考映像 114〜123s は約 9 秒） */
 const RUNOUT_SLOW = 0.6;
 /**
+ * ★**スローへの入り方**（★2026-10-01・オーナー「芝の動きが急に遅くなる」）。
+ *   ★旧: 勝馬が線を越えた 1 コマで ★速さが 1.0 → 0.6 倍に落ちていた（★実測 17.4 → 10.5 m/秒）。
+ *   ★新: ★`RUNOUT_EASE_SEC` かけて なめらかに 0.6 倍へ（★smoothstep の積分・★位置は連続・速さも連続）。
+ * @param u ★勝馬の通過からの表示秒
+ * @returns ★ゴール後の流しに使う秒（★旧 `u × RUNOUT_SLOW` の代わり）
+ */
+const RUNOUT_EASE_SEC = 0.8;
+function runoutSec(u: number): number {
+  const x = Math.max(0, u);
+  const T = RUNOUT_EASE_SEC;
+  /** ★∫₀ˣ smoothstep(t/T) dt */
+  const k = Math.min(x, T) / T;
+  const ramp = T * (k * k * k - 0.5 * k * k * k * k) + Math.max(0, x - T);
+  return x - (1 - RUNOUT_SLOW) * ramp;
+}
+/**
  * ★勝馬を映す長さ（秒）。6.5 → 4.2（2026-08-22・オーナー評「騎手が喜ぶ時間が長い」）。
  */
 /** ★**2.4 → 1.6 秒**（★2026-09-13・オーナー指示「詰めましょう」） */
@@ -2377,7 +2393,7 @@ function buildMotionTimeline(
     const clampedD = Math.min(raceD, warp.displaySec);
     const sec = warp.raceSecAt(clampedD);
     const at = model.at(sec);
-    const visual = withFinishRunOut(at, (g) => finishSec.get(g), sec, DIST, Math.max(0, raceD - warp.displaySec) * RUNOUT_SLOW);
+    const visual = withFinishRunOut(at, (g) => finishSec.get(g), sec, DIST, runoutSec(raceD - warp.displaySec));
     const winnerDone = (at.find((h) => h.gate === winnerGate)?.meters ?? 0) >= DIST - 1e-6;
     const scene = resolveBroadcastV2Scene(course, visual.map((h) => ({
       gate: h.gate, s: startShownMeters(h.meters, raceD, rampSec), w: h.w ?? TRACK_WIDTH_M / 2, finished: h.meters >= DIST - 1e-6,
@@ -4695,7 +4711,7 @@ function RaceView({ setup, real }: {
       ? withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, built.distanceM, 0,
         FINISH_RUNOUT_FALLBACK_MPS, (gate) => built.finishSpeeds.get(gate))
       : withFinishRunOut(at, (gate) => built.finishSec.get(gate), sec, built.distanceM,
-        Math.max(0, sourceD - runoutFrom) * RUNOUT_SLOW,
+        runoutSec(sourceD - runoutFrom),
         FINISH_RUNOUT_FALLBACK_MPS, (gate) => built.finishSpeeds.get(gate));
     const visualLead = Math.max(...visualAt.map((h) => h.meters));
     const winnerGate = built.result[0]!.gate;
