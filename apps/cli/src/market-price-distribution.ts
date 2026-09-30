@@ -145,6 +145,8 @@ export interface SireConcentration {
   /** ★G1 を勝った牡の数 と ★そのうち 父として使われた数（★裁定 §13-3 の「1 つの数」） */
   readonly g1Sires: number;
   readonly g1SiresUsed: number;
+  /** ★G1 を勝った牡の 素質の順位（★1 始まり・昇順・★裁定 §14 の中央値と四分位） */
+  readonly g1SireRanks: readonly number[];
 }
 
 export function sireConcentrationOf(
@@ -175,6 +177,7 @@ export function sireConcentrationOf(
     saturatedSires: sires.filter((x) => x.foals > 0 && x.foals >= stallionCoveringLimit({ g1Wins: x.g1Wins }, DEFAULT_BALANCE)).length,
     g1Sires: sires.filter((x) => x.g1Wins > 0).length,
     g1SiresUsed: sires.filter((x) => x.g1Wins > 0 && x.foals > 0).length,
+    g1SireRanks: sires.flatMap((x, k) => (x.g1Wins > 0 ? [k + 1] : [])),
   };
 }
 
@@ -498,6 +501,15 @@ if (isMain) {
     console.log(`    ★G1 を勝った牡 ${sc.g1Sires} 頭のうち 父として使われた ${sc.g1SiresUsed} 頭（★§13-3 の 1 つの数）`
       + ` / ★使われた父 ${sc.usedSires} 頭・有効な父 ${sc.effectiveSires.toFixed(1)} 頭・上限に張り付いた父 ${sc.saturatedSires} 頭`
       + `（★母数: この実行の走った牝馬 ${sc.mares} 頭・牡 ${sc.stallions} 頭）`);
+    {
+      const r = sc.g1SireRanks;
+      const at = (p: number): string => {
+        if (r.length === 0) return 'なし';
+        const v = r[Math.min(r.length - 1, Math.floor(r.length * p))]!;
+        return `${v} 位（上位 ${((v / sc.stallions) * 100).toFixed(0)}%）`;
+      };
+      console.log(`    ★G1 を勝った牡 ${r.length} 頭の 素質の順位（★牡 ${sc.stallions} 頭中）: 25% ${at(0.25)} / 中央値 ${at(0.5)} / 75% ${at(0.75)}`);
+    }
     console.log('    ⚠️ ★近似: 全牝馬が素質の合計の順で選ぶ（★厩舎の方針・近交・齢・頭数の比を落とす ＝ ★偏りの上側）。★G1 の勝ちはこのハーネスのレースが配る');
   }
   console.log(`\n  開催 ${d.races} レース / 走った馬 ${d.ran} 頭 / ★G1 を勝った馬 ${d.g1Winners} 頭`
