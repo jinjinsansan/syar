@@ -26,10 +26,15 @@ const last = files.filter((f) => /create\s+or\s+replace\s+function\s+public\.ent
 const body = readFileSync(path.join(MIG, last), 'utf8');
 
 /** ★本文から「拒む」条件を切り出す（★書き写さない） */
+/**
+ * ★**切り出せなかったら 大声で落ちる**（★裁定 §12・★「0 行を比べて全一致」で緑にしない）。
+ *   ★各式は 本文の中に ★ちょうど 1 回 在ること（★見つけた数を出し、1 でなければ落ちる）。
+ */
 const pick = (re, label) => {
-  const m = body.match(re);
-  if (m === null) throw new Error(`★${last} から ${label} を切り出せません（★本文の形が変わった？）`);
-  return m[1];
+  const all = [...body.matchAll(new RegExp(re.source, 'g'))];
+  console.log(`  ★切り出し ${label}: ${all.length} か所（★期待 1）`);
+  if (all.length !== 1) throw new Error(`★${last} から ${label} を ちょうど 1 か所 切り出せません（${all.length} か所）。★本文の形が変わった？`);
+  return all[0][1];
 };
 const WEEK = 'coalesce(v_race.game_week, (select game_week from world_state where id))';
 const baseReject = pick(/and \(h\.birth_week is null\s+or (coalesce\(v_race\.game_week, \(select game_week from world_state where id\)\) - h\.birth_week < 104)\)/, '齢の門');
@@ -67,6 +72,8 @@ try {
     from (values ${values}) as t(i, race_week, birth_week, sex, min_age, max_age, fillies)
     order by t.i`;
   const r = await client.query(q);
+  /** ★比べた行数が 表の行数と同じであること（★0 行で全一致にしない） */
+  if (r.rows.length !== rows.length || rows.length === 0) throw new Error(`★比べた行数 ${r.rows.length} が 表の ${rows.length} 行と違う`);
   for (const row of r.rows) {
     const x = rows[row.i];
     const ts = meetsEntryConditions(x.c, { sex: x.sex, ageWeeks: x.a });

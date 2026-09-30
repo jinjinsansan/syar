@@ -583,6 +583,20 @@ async function main(): Promise<void> {
             `（★移行 0029 が当たっていない可能性。★他の日次の処理は続けます・§18 LR-10）`,
           );
         }
+        /**
+         * ★**G1 を勝った種牡馬の頭数**（★2026-09-30・裁定 `REVIEW_GRADED_CALENDAR_50_20260930.md` §12・D-129）。
+         *   ★G1 9 → 24 で 種付上限（20 ＋ G1 勝 × 10）が 本番で効き始める。★効くのは ★G1 馬が引退して種牡馬になってから（★最大 約 26 実日後）。
+         *   ★**0 でなくなった日が ④（上位 5 頭の種牡馬が 年の仔に占める割合）を数える日**（★引き金を条件で書く・D-030 が 53 日 測られなかった形を繰り返さない）。
+         *   ★読むだけ・★失敗しても日次の他の処理は止めない。
+         */
+        try {
+          const g1s = await client.query<{ n: string }>(
+            "select count(*)::text as n from horses where g1_wins > 0 and retirement_role = 'stallion'",
+          );
+          console.log(`[worker] G1 を勝った種牡馬 ${g1s.rows[0]?.n ?? '?'} 頭（★0 でなくなった日に 種牡馬の偏り ④ を数える）`);
+        } catch (e) {
+          console.error(`[worker] ★G1 を勝った種牡馬の頭数を読めませんでした: ${(e as Error).message}`);
+        }
         console.log(
           `[worker] 日次集計を更新 date=${today}` +
           (u === null ? ' / 開放率: 対象0頭'

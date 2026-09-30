@@ -57,6 +57,21 @@ export function totalStartsPerDay(meanFieldSize: number): number {
 }
 
 /**
+ * ★**1 キャリアの出走数**（★本番の実際・2026-09-30・正典 D-128 ③②）。
+ *   ★本番には 出走数の上限が無い（★`CAREER_RACE_LIMIT` は較正だけの前提）。★1 頭が一生に走る数は ★番組の量 ÷ 頭数 × 現役の日数で決まる。
+ *   ★`RACES_PER_DAY × meanFieldSize ÷ poolSize × CAREER_DAYS`。
+ *   🔴 ★既定値を置かない（★どこで測った数かを渡させる）。★55 のような数を書き写さない — ★プールは動く（★2026-09-30 に 34% 動いた）。
+ * @param meanFieldSize ★平均出走頭数（★実測）
+ * @param poolSize ★出走できる馬の頭数（★実測・門の後）
+ */
+export function startsPerCareerOf(input: { readonly meanFieldSize: number; readonly poolSize: number }): number {
+  if (!Number.isFinite(input.poolSize) || input.poolSize <= 0) {
+    throw new Error(`pool-size: 頭数が正の有限値ではありません（poolSize=${input.poolSize}）。★既定値は置いていません`);
+  }
+  return (totalStartsPerDay(input.meanFieldSize) / input.poolSize) * CAREER_DAYS;
+}
+
+/**
  * ★**要る現役頭数**（★見積もり・切り上げ）。
  *
  * @param meanFieldSize ★平均出走頭数。★**実測値を渡すこと**（★§10.4 は 8〜18 としか書いていない）
