@@ -30,7 +30,7 @@ import { DEFAULT_PRESEED_OPTIONS } from '../../cli/src/preseed.js';
 import { aggregateDay, UnknownEpClassError } from './daily-flow.js';
 // ★日次の枝の結果を行に残す（★DL-2・移行 0052）。★止める仕組みではない
 import { runDailyStep } from './daily-run-log.js';
-import { loadHorsesByIds, loadRaceablePool, loadTrainingStates, loadWinsByHorse } from './horse-repo.js';
+import { loadBirthWeeksByHorse, loadHorsesByIds, loadRaceablePool, loadTrainingStates, loadWinsByHorse } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
@@ -69,6 +69,7 @@ import { runSelfcheck } from './selfcheck.js';
 import { runSchemacheck } from './schemacheck.js';
 import {
   BREEDING_BUDGET_MS, CANCEL_AFTER_START_MS, CYCLES_PER_WEEK, CYCLE_MS, classOf, conditionsOf, gradeOf,
+  entryConditionsOf, gradedRaceAt, meetsEntryConditions, cycleStartMs, PHASE_OFFSET_MS,
   weekIndexAt, weekStartMs, dayIndexAt, dayStartMs,
 } from '@star/scheduler';
 // ★投票の上限の正（★2026-09-19・BT-1。★ワーカーが `bet_limits` に書き、RPC はその行を読む）
@@ -250,6 +251,8 @@ async function main(): Promise<void> {
        *   ⚠️ ★`horses` に勝利数の列は無いので `race_entries` から数えます（`finish_pos = 1`）。
        */
       const winsByHorse = await loadWinsByHorse(client);
+      /** ★重賞の年齢条件に使う 生まれた週（★D-129 ①・周に 1 回） */
+      const birthWeekByHorse = await loadBirthWeeksByHorse(client);
       const out = await runCycle(
         store,
         cfg.epochMs,
@@ -352,7 +355,19 @@ async function main(): Promise<void> {
               courseFrozen: conditions.courseFrozen,
             },
             // ★資格の層（★CL-3）。★選抜（能力の帯）はこの下でそのまま働きます
-            { raceClass, winsOf: (h) => winsByHorse.get(h.id) ?? 0 },
+            {
+              raceClass,
+              winsOf: (h) => winsByHorse.get(h.id) ?? 0,
+              /**
+               * ★**重賞の出走条件**（★年齢・牝馬限定・D-129 ①）。★齢は ★そのレースの週（★公示が `races.game_week` に書くのと同じ `weekIndexAt(発走時刻)`・★サイクル番号を割らない・D-052）で数える。
+               *   ★生まれた週が読めない馬は 入れない（★狭い側へ・R-27）。
+               */
+              conditionsOk: (h) => {
+                const born = birthWeekByHorse.get(h.id);
+                if (born === undefined) return false;
+                return meetsEntryConditions(entryConditionsOf(gradedRaceAt(i)), { sex: h.sex, ageWeeks: weekIndexAt(cycleStartMs(i, cfg.epochMs) + PHASE_OFFSET_MS.start, cfg.epochMs) - born });
+              },
+            },
             /**
              * ★**登録した馬を必ず入れる**（★2026-09-19・**D-117 DS-2**）。
              * ⚠️ ★`pool` は `owner_id is null` で絞っているので、★登録馬はそこにいません。

@@ -26,6 +26,8 @@
  */
 
 import type { RaceClass } from './programme.js';
+import { LIFECYCLE_WEEKS } from './week.js';
+import { WEEKS_PER_YEAR } from './birth-week.js';
 
 /**
  * ★**勝利数 → 段**（★添字がそのまま勝利数）。
@@ -142,4 +144,44 @@ export function winsRangeFor(raceClass: RaceClass): WinsRange {
   const min = CLASS_BY_WINS.indexOf(raceClass);
   if (min < 0) throw new Error(`winsRangeFor: 未知のクラス（${raceClass}）`);
   return { min, max: min };
+}
+
+/**
+ * ★**重賞の出走条件（年齢・牝馬限定）**（★2026-09-30・正典 D-129 ①・オーナー「完成品にすること」）。
+ *
+ * 【★なぜ要るか】
+ *   ★重賞の暦（`graded-races.ts`）は ★`age`（2 歳／3 歳／3 歳以上）と ★`fillies`（牝馬限定）を持つが、
+ *   ★**選抜はそれを 1 度も見ていなかった**（★読んでいたのは見本の画面だけ）。
+ *   ★名前を実在に寄せた（D-125）ので ★「桜花杯」「府中2歳ステークス」は ★**名前そのものが条件を言う**。
+ *   → ★名前が言うことを ★仕組みが裏付ける（★ここ 1 か所・D-052。★選抜〔worker〕と登録〔enter_race の行の数〕が同じ値を使う）。
+ *
+ * ★齢の帯は ★`LIFECYCLE_WEEKS.raceableFrom`（2 歳の始まり）と ★`WEEKS_PER_YEAR` から導く（★数を書き写さない）。
+ *   ★2 歳 ＝ [raceableFrom, raceableFrom + 1 年) ／ ★3 歳 ＝ [＋1 年, ＋2 年) ／ ★3 歳以上 ＝ [＋1 年, 上限なし)。
+ *   ★重賞でない鞍は ★出走できる齢（raceableFrom）以上だけ。
+ */
+export interface RaceEntryConditions {
+  /** ★その週の齢（週）の下限（★含む） */
+  readonly minAgeWeeks: number;
+  /** ★上限（★含まない）。★null は上限なし */
+  readonly maxAgeWeeks: number | null;
+  /** ★牝馬限定 */
+  readonly filliesOnly: boolean;
+}
+
+export function entryConditionsOf(race: { readonly age: '2' | '3' | '3+'; readonly fillies: boolean } | null): RaceEntryConditions {
+  const two = LIFECYCLE_WEEKS.raceableFrom;
+  const three = two + WEEKS_PER_YEAR;
+  if (race === null) return { minAgeWeeks: two, maxAgeWeeks: null, filliesOnly: false };
+  const band = race.age === '2' ? { minAgeWeeks: two, maxAgeWeeks: three }
+    : race.age === '3' ? { minAgeWeeks: three, maxAgeWeeks: three + WEEKS_PER_YEAR }
+      : { minAgeWeeks: three, maxAgeWeeks: null };
+  return { ...band, filliesOnly: race.fillies };
+}
+
+/** ★その馬が条件を満たすか（★齢はその週の齢・週） */
+export function meetsEntryConditions(c: RaceEntryConditions, horse: { readonly sex: 'male' | 'female'; readonly ageWeeks: number }): boolean {
+  if (horse.ageWeeks < c.minAgeWeeks) return false;
+  if (c.maxAgeWeeks !== null && horse.ageWeeks >= c.maxAgeWeeks) return false;
+  if (c.filliesOnly && horse.sex !== 'female') return false;
+  return true;
 }

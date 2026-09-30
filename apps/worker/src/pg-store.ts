@@ -21,7 +21,7 @@ import { awardPrizes } from './prize-award.js';
 import { settlePayouts } from './payout.js';
 import { settleRace as settleRaceFair } from './settle.js';
 import type { AnnounceSpec, AnnouncedRace, CycleStore, FillSpec, RaceSpec } from './cycle-runner.js';
-import { ENTRY_FEE_EP, SETTLE_AFTER_START_MS, overdueBefore, raceNameOf, weekIndexAt, winsRangeFor } from '@star/scheduler';
+import { ENTRY_FEE_EP, SETTLE_AFTER_START_MS, entryConditionsOf, gradedRaceAt, overdueBefore, raceNameOf, weekIndexAt, winsRangeFor } from '@star/scheduler';
 import { cancelRace as cancelRaceImpl } from './cancel.js';
 // ★生涯の記録（正典 §18・移行 `0024`）。★確定の中から呼びます（LR-7「レースが終わった後」）
 import { writeRaceStory } from './story-flow.js';
@@ -375,10 +375,10 @@ export function createPgStore(
         `insert into races (cycle_index, name, class_rank, grade, surface, distance,
                             track_condition, course_id, scheduled_at, seed_commit, server_seed, purse, status,
                             course_frozen, min_wins, max_wins, entry_fee_ep, weight_kg,
-                            entry_deadline_at, game_week)
+                            entry_deadline_at, game_week, min_age_weeks, max_age_weeks, fillies_only)
          values ($1, $2, $3, $4, $8, $9, $12, $10,
                  to_timestamp($5 / 1000.0), $6, $7, $11, 'announced',
-                 $13::jsonb, $14, $15, $16, $17, to_timestamp($18 / 1000.0), $19)
+                 $13::jsonb, $14, $15, $16, $17, to_timestamp($18 / 1000.0), $19, $20, $21, $22)
          on conflict (cycle_index) do nothing`,
         [
           spec.cycleIndex,
@@ -434,6 +434,13 @@ export function createPgStore(
            * ⚠️ 🔴 ★**SQL 側で `cycle_index` から割り出さないこと**（★2 通りの導き方・D-052）。
            */
           spec.gameWeek,
+          /**
+           * ★**出走条件（年齢の帯・牝馬限定）**（★2026-09-30・D-129 ①・移行 `0100`）。★正は TS の `entryConditionsOf()`。
+           *   ★選抜（main.ts の `conditionsOk`）と ★登録（`enter_race`）が ★同じ値を使う（D-052）。
+           */
+          entryConditionsOf(gradedRaceAt(spec.cycleIndex)).minAgeWeeks,
+          entryConditionsOf(gradedRaceAt(spec.cycleIndex)).maxAgeWeeks,
+          entryConditionsOf(gradedRaceAt(spec.cycleIndex)).filliesOnly,
         ],
       );
     },

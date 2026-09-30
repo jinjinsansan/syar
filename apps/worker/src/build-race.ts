@@ -135,7 +135,15 @@ export function buildRace(
    * ⚠️ ★**選抜（`sortPoolByClass` の並べ替えと `classBand` の窓）には触りません** —
    *    ★ここは**その手前に資格の層を足すだけ**です（★D-018・V-4 を守る）。
    */
-  eligibility?: { readonly raceClass: RaceClass; readonly winsOf: (h: HorseRecord) => number },
+  eligibility?: {
+    readonly raceClass: RaceClass;
+    readonly winsOf: (h: HorseRecord) => number;
+    /**
+     * ★**重賞の出走条件（年齢・牝馬限定）**（★2026-09-30・D-129 ①）。★判定は `@star/scheduler` の `meetsEntryConditions`。
+     *   ★資格の段より先に 絞る（★条件を満たさない馬は 段を下へ広げても入れない）。★渡さなければ従来どおり。
+     */
+    readonly conditionsOk?: (h: HorseRecord) => boolean;
+  },
   /**
    * ★**必ず出走させる馬**（★2026-09-19・**D-117 DS-2**）。
    *   ★プレイヤーが登録した馬です。★`pool` に無くてもかまいません
@@ -165,7 +173,11 @@ export function buildRace(
   const selection =
     eligibility === undefined
       ? null
-      : selectEligible(eligibility.raceClass, pool, eligibility.winsOf, FIELD_SIZE.MIN);
+      : selectEligible(
+        eligibility.raceClass,
+        eligibility.conditionsOk === undefined ? pool : pool.filter(eligibility.conditionsOk),
+        eligibility.winsOf, FIELD_SIZE.MIN,
+      );
   const eligiblePool = selection === null ? pool : selection.pool;
   const sorted = sortPoolByClass(eligiblePool);
   const race = generateRace(

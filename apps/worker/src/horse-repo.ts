@@ -333,6 +333,19 @@ export async function loadTrainingStates(
  * ⚠️ ★**重ければ列にする**、と指示書にあります。★いまは 1 レースあたり 1 回の集計で足ります
  *    （★周に 1 回だけ読み、その周のすべてのレース生成で使い回します）。
  */
+/**
+ * ★**生まれた週**（★2026-09-30・重賞の年齢条件・D-129 ①）。★周に 1 回だけ読み、その周の全レースで使い回す（★`loadWinsByHorse` と同じ形）。
+ *   ★出走プールと同じ述語（`ACTIVE_WHERE`）の馬だけ。
+ */
+export async function loadBirthWeeksByHorse(
+  client: pg.Client | pg.PoolClient,
+): Promise<Map<string, number>> {
+  const r = await client.query<{ id: string; birth_week: number }>(`select id, birth_week from horses where ${ACTIVE_WHERE}`);
+  const out = new Map<string, number>();
+  for (const row of r.rows) out.set(row.id, Number(row.birth_week));
+  return out;
+}
+
 export async function loadWinsByHorse(
   client: pg.Client | pg.PoolClient,
 ): Promise<Map<string, number>> {
