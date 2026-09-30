@@ -65,12 +65,9 @@ async function unwrap<T>(p: PromiseLike<{ data: unknown[] | null; error: { messa
   return (r.data ?? []) as T[];
 }
 
-/** 発売中・発走待ちのレース一覧 */
-export function upcomingRaces(client: ReadClient, limit = 12): Promise<PublicRace[]> {
-  return unwrap<PublicRace>(
-    client.from('races_public').select('*').order('scheduled_at', { ascending: true }).limit(limit),
-  );
-}
+/**
+ * ⚠️ ★`upcomingRaces` は 2026-09-30 に消した（★呼び手 0 件・★時刻の条件が無く いちばん古い過去のレースを返していた・網 races-list-time-bound）。
+ */
 
 /** 出馬表 */
 export function raceEntries(client: ReadClient, raceId: string): Promise<RaceEntryRow[]> {
