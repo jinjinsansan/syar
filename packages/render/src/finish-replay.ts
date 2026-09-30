@@ -184,6 +184,12 @@ export function drawFinishReplayBadge<TImage>(
   ctx.fillStyle = colors.text;
   ctx.textAlign = 'center';
   ctx.fillText(label, x + bar + (w - bar) / 2, y + h / 2 + px * 0.36);
+  /**
+   * 🔴 ★**左寄せに戻す**（★2026-09-30・オーナー「実況中継の文字があちこち被っている」）。
+   *   ★戻さずに返していたので、★リプレイの間 ★後から描く実況の帯が 中央寄せのまま描かれ、
+   *   ★文字が 川崎タカシの顔の上へずれ、★名札の「実況」が消えていた。
+   */
+  ctx.textAlign = 'left';
 
   ctx.globalAlpha = baseAlpha;
 }

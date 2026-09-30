@@ -64,7 +64,7 @@ export { isSkinTone } from './silks-skin.js';
 export { applyCoat, isHorseCoat, COAT_TRANSFORMS, DEFORMED_COAT_TRANSFORMS, isDeformedHorseAsset, coatOfHorseId, COAT_WEIGHTS, coatCssFilter, type CoatTransform, type CoatName } from './coat.js';
 export { SILK_COLORS, SLEEVES, sleeveHex, ownerSilksOf, silksForHorse, type SilkColor, type Sleeve, type Silks } from './silks.js';
 export { typedCount } from './hud-kit.js';
-export { narratorPortrait, narratorExpressionAt, narratorMouthOpenAt, narratorCastForRace, narratorCastForRaceNo, ACTIVE_NARRATOR_CASTS, NARRATOR_NAMES, NARRATOR_ROLES, type NarratorSet, type NarratorExpression, type NarratorCast } from './narrator.js';
+export { narratorPortrait, narratorExpressionAt, narratorMouthOpenAt, narratorSpeakingAt, narratorCastForRace, narratorCastForRaceNo, ACTIVE_NARRATOR_CASTS, NARRATOR_NAMES, NARRATOR_ROLES, type NarratorSet, type NarratorExpression, type NarratorCast } from './narrator.js';
 export { silksPaintable, SILKS_PAINT } from './silks-pixel.js';
 export { raceCallAt, withPhasePrefix, raceSurgeGate, RACE_SURGE_WINDOW_SEC, RACE_SURGE_MIN_GAIN_M, type RaceCallPart, type RaceCallHorse, type RaceCallContext, type RaceCallLine } from './race-call.js';
 /**

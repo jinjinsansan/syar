@@ -109,3 +109,26 @@ describe('★実況 川崎 タカシ（写真の版とイラストの版を交�
     }
   });
 });
+
+/**
+ * ★**口パクは 言い終えるまで**（★2026-09-30・オーナー「川崎タカシの口パクが少ない」）。
+ *   ★旧: 文字が打たれている間（★毎秒 20 字）だけ・★しかも実況の行では ★部品の数（3〜5）を文字数として渡していた → ★0.2 秒ほど。
+ */
+describe('★口パクの長さ', () => {
+  it('🔴 20 字の発言は 2.5 秒ほど口が動く（★毎秒 7 字）・短い発言も 1.5 秒は動く', async () => {
+    const { narratorSpeakingAt } = await import('@star/render');
+    expect(narratorSpeakingAt(20, 2.5)).toBe(true);
+    expect(narratorSpeakingAt(20, 3.0)).toBe(false);
+    expect(narratorSpeakingAt(5, 1.4)).toBe(true);
+    expect(narratorSpeakingAt(5, 1.6)).toBe(false);
+    expect(narratorSpeakingAt(20, -0.1), '★言い出す前').toBe(false);
+  });
+
+  it('🔴 画面は 実況の行の ★文字数を渡す（★部品の数を渡さない）・3 か所とも narratorSpeakingAt', () => {
+    const page = readFileSync(path.resolve(__dirname, '../../web/src/app/race/page.tsx'), 'utf8');
+    expect(page).toContain('narratorSpeakingAt(last.map((p) => p.text).join(\'\').length, d - at0)');
+    expect(page).not.toContain('narratorSpeakingAt(last.length');
+    expect(page.match(/speaking: narratorSpeakingAt\(|narratorSpeakingAt\(last\.map/g)?.length).toBe(3);
+    expect(page, '★旧い「打っている間だけ」').not.toMatch(/speaking: typedCount\(/);
+  });
+});

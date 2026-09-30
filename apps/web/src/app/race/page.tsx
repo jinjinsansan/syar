@@ -69,6 +69,7 @@ import {
   raceCallAt, raceSurgeGate, RACE_SURGE_WINDOW_SEC,
   withPhasePrefix,
   narratorPortrait,
+  narratorSpeakingAt,
   narratorCastForRace,
   narratorCastForRaceNo,
   ACTIVE_NARRATOR_CASTS,
@@ -5550,7 +5551,7 @@ function RaceView({ setup, real }: {
         drawStartCallBand(ctx, art.pal as Record<string, string>, vp, FONT, FIELD, true,
           narratorPortrait(art.raceNarrator, art.narratorSets?.[cast], {
             metersLeft: built.distanceM, displaySec: d,
-            speaking: typedCount(startText.length, raceD) < startText.length,
+            speaking: narratorSpeakingAt(startText.length, raceD),
           }), {
             timeSec: d,
             lineStartSec: RACE_INTRO_RACE_START_SEC,
@@ -5692,7 +5693,7 @@ function RaceView({ setup, real }: {
         // ★口は「文字がまだ増えている間」だけ動かす（喋っている間）
         narratorPortrait(art.raceNarrator, art.narratorSets?.[cast], {
           metersLeft: built.distanceM, displaySec: d,
-          speaking: typedCount(startText.length, d - startLineAt) < startText.length,
+          speaking: narratorSpeakingAt(startText.length, d - startLineAt),
         }), {
           timeSec: d,
           lineStartSec: startLineAt,
@@ -5764,7 +5765,11 @@ function RaceView({ setup, real }: {
       const miniHide = horseOverlapRatio(miniBox);
       const miniPrevAlpha = ctx.globalAlpha;
       if (!contestFocusHud) {
-        ctx.globalAlpha = miniPrevAlpha * (1 - 0.55 * Math.min(1, miniHide * 3))
+        /**
+         * ★馬が箱に乗ったら ★**消す**（★2026-09-30・オーナー「実況中継の文字があちこち被っていて見栄えが悪い」）。
+         *   ★旧: 45% まで薄くするだけ → ★「COURSE 芝1600m／残り ○m」の字が ★走っている馬の上に 透けて重なっていた。
+         */
+        ctx.globalAlpha = miniPrevAlpha * (1 - Math.min(1, miniHide * 3))
           /** ★台本 v9 は ★残り 250→200m で 0.4 まで薄くします（★数は減らさない・デザイナー回答 D-5） */
           * (sideOnlyScript ? climaxHudFade(built.distanceM - visualLead) : 1);
         drawCourseMinimap(ctx, ovalCourse(built.distanceM, { ...built.spec, turn }), art.pal as Record<string, string>, FONT,
@@ -6047,14 +6052,18 @@ function RaceView({ setup, real }: {
       }
       if (hud.calls) {
         drawCallBand(ctx, art.pal as Record<string, string>, vp, FONT, callRef.current,
-          // ★口は最後の一言がまだ出そろっていない間だけ動かす
+          /**
+           * ★口は ★最後の一言を 言い終えるまで 動かす（★`narratorSpeakingAt`・2026-09-30 オーナー「口パクが少ない」）。
+           * 🔴 ★長さは ★**文字数**で渡す。★2026-09-30 まで ★`last.length`（★発言の部品の数 ＝ 3〜5）を渡しており、
+           *   ★口が 0.2 秒ほどしか動いていなかった。
+           */
           narratorPortrait(art.raceNarrator, art.narratorSets?.[cast], {
             metersLeft: Math.max(0, built.distanceM - Math.max(...at.map((h) => h.meters))),
             displaySec: d,
             speaking: (() => {
               const last = callRef.current[callRef.current.length - 1];
               const at0 = callStartRef.current[callStartRef.current.length - 1];
-              return last !== undefined && at0 !== undefined && typedCount(last.length, d - at0) < last.length;
+              return last !== undefined && at0 !== undefined && narratorSpeakingAt(last.map((p) => p.text).join('').length, d - at0);
             })(),
           }), {
             timeSec: d, lineStartSec: callStartRef.current,

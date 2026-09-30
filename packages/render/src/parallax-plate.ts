@@ -172,6 +172,8 @@ export function drawWorldBillboards<TImage>(
         ctx.textAlign = 'center';
         // ★`textBaseline` は Ctx2D に無いので、ベースラインを自分で置く
         ctx.fillText(String(i + 1), cx, cy + px * 0.36);
+        /** ★寄せを戻す（★2026-09-30・中央寄せを残すと 後から描く帯の文字がずれる） */
+        ctx.textAlign = 'left';
       }
     }
     ctx.globalAlpha = 1;

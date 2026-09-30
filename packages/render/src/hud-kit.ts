@@ -232,6 +232,8 @@ export function drawNarratorFrame<TImage>(
   roleLabel: string, name: string,
 ): void {
   const w = 150, h = 172;
+  /** ★名札は左寄せで位置を計算するので ★寄せを揃えてから描く（★2026-09-30・中央寄せが残って「実況」が消えた） */
+  ctx.textAlign = 'left';
   ctx.fillStyle = '#1b241d'; ctx.fillRect(x, y, w, h);
   if (portrait !== undefined) {
     /**

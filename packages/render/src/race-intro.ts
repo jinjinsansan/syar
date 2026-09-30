@@ -583,6 +583,8 @@ export function drawStartCallBand<TImage>(
   void pal;
   const t = opts.timeSec ?? 0;
   const W = vp.width, H = vp.height;
+  /** ★前に描いた部品の寄せが残っていても ★左寄せで描く（★2026-09-30） */
+  ctx.textAlign = 'left';
   const rise = riseAt(opts.sinceSec ?? 1, 0, 0.5);
   const baseAlpha = ctx.globalAlpha;
   ctx.globalAlpha = baseAlpha * rise.alpha;

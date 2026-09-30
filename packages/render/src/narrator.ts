@@ -76,6 +76,18 @@ export function narratorExpressionAt(metersLeft: number): NarratorExpression {
   return 'normal';
 }
 
+/**
+ * ★**喋っている間**（★2026-09-30・オーナー「川崎タカシの口パクが少ない」）。
+ *   ★それまで ★「文字がまだ増えている間」（★毎秒 20 字）だけ口を動かしていた → ★15 字の発言で 0.75 秒しか動かなかった。
+ *   ★人が読み上げる速さ（★毎秒 7 字・★最短 1.5 秒）で ★その発言を言い終えるまで 口を動かす。
+ */
+export const NARRATOR_SPEAK_CHARS_PER_SEC = 7;
+export const NARRATOR_SPEAK_MIN_SEC = 1.5;
+export function narratorSpeakingAt(textLength: number, sinceSec: number): boolean {
+  if (!(sinceSec >= 0)) return false;
+  return sinceSec < Math.max(NARRATOR_SPEAK_MIN_SEC, textLength / NARRATOR_SPEAK_CHARS_PER_SEC);
+}
+
 /** ★口の開閉。1 秒に 4 往復（喋りの速さ）。喋っていないときは閉じたまま */
 export function narratorMouthOpenAt(displaySec: number, speaking: boolean): boolean {
   return speaking && Math.floor(displaySec * 8) % 2 === 0;
