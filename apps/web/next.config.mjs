@@ -114,7 +114,12 @@ const SUPERSEDED_SCREENS = [
    *   → ★網は ★`screen-generations.test.ts` の「★送り先がサーバーを呼んでいる」に入れました。
    *
    * ⚠️ ★**新版が「在る」ことと「働く」ことは別です。** ★見た目が揃っただけで送らない。
+   *
+   * ✅ ★**2026-09-30 に 転送しました**（★オーナー「1 つにまとめる」・デザイナー R-21 の /training の中身を /train に取り込んだ）。
+   *   ★いまの `/train` は ★`sendTrainingOrder`（★中で `rpc('set_training_order')`）を呼び、★`useStableView` で実データを読む。
+   *   ★上の 09-25 の理由（★送り先が見た目だけ）は ★もう当たらない（★網 screen-generations「送り先がサーバーを呼んでいる」が見る）。
    */
+  { source: '/training', destination: '/train', permanent: false },
 ];
 
 export default {

@@ -37,13 +37,6 @@ export interface RebuildPin {
  * ⚠️ ★`screen-generations.test.ts` が ★**実測と突き合わせます**。★移し終えても ★釘は外しません（★移した後で口が消えても気づけるように）。
  */
 export const REBUILD_PINS: ReadonlyMap<string, RebuildPin> = new Map([
-  ['/training', {
-    rpcs: [],
-    libs: ['game-demo', 'stable', 'stable-repo', 'training-order'],
-    note: '🔴 ★**調教の指示を送る**（★`set_training_order`）。★これを落とすと育成のループが止まります。'
-      + '★2026-09-25 に転送で一度 落としました（★戻しました）。'
-      + '★2026-09-27: ★送る処理は ★`lib/training-order.ts` 1 か所へ（★`/train` と共有・P1-1）。★釘は ★その部品を読むこと',
-  }],
   ['/entry', {
     rpcs: [],
     libs: ['entry-repo', 'entry-screen', 'game-demo', 'stable'],

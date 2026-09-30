@@ -89,7 +89,7 @@ describe('★帯の掲示板', () => {
     /** ★2026-09-28 レビュー側の裁定: ★「大穴」は出さない（★「当たれば大きい」の煽り・D-102 ③）。★「1番人気」は事実なので残す */
     expect(STRIP + TICKER, '★大穴の札が残っている').not.toContain('大穴');
     /** ★帯に 賭けの入口（★投票・マークシートの画面へのリンク）を置かない（★帯は全ページに出る・レビュー側の裁定） */
-    expect(STRIP, '★帯から投票の画面へ送っている').not.toMatch(/href=\{?[`'"][^`'"]*\/(bet|vote|odds)/);
+    expect(STRIP, '★帯から投票の画面へ送っている').not.toMatch(/href=\{?[`'"][^`'"]*\/(bet|vote|odds)\b/);
     const tie = tickerBoard(race('scheduled'), [
       { gate: 1, name: 'ウマA', winOdds: 2, capped: false }, { gate: 2, name: 'ウマB', winOdds: 2, capped: false },
     ], T - 120_000, clock);

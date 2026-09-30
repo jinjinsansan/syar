@@ -189,7 +189,8 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
      ★残しておくと `mobile-css-anchors.test.ts` が「黙って効かない規則」として落とします。
      ★★実際、その検査が拾いました。 */
   main [style*="flex:0 0 200px"], main [style*="flex:0 0 230px"],
-  main [style*="flex:0 0 252px"], main [style*="flex:0 0 280px"], main [style*="flex:0 0 290px"],
+  main [style*="flex:0 0 252px"],
+  /* ⚠️ ★`280px`・`290px` を 2026-09-30 に外しました（★旧 `/training` が唯一の使い手・★`/train` へ畳んだ） */
   /* ⚠️ ★`334px` を 2026-09-25 に外しました（★`/prizes` が唯一の使い手・★同上） */
   /* ⚠️ ★`340px` を 2026-09-27 に外しました（★`/entry` が唯一の使い手・★馬物語 UI へ移した） */
   main [style*="flex:0 0 330px"],
@@ -219,7 +220,8 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
      ★残しておくと `mobile-css-anchors.test.ts` が「黙って効かない規則」として落とします。
      ★★実際、その検査が拾いました（★`250px` のときと同じ形・2 度目）。 */
   /* ⚠️ ★`360px` を 2026-09-27 に外しました（★`/entry` が唯一の使い手・★馬物語 UI へ移した） */
-  main [style*="min-width:240px"], main [style*="min-width:280px"],
+  /* ⚠️ ★`min-width:280px` を 2026-09-30 に外しました（★旧 `/training` が唯一の使い手） */
+  main [style*="min-width:240px"],
   main [style*="min-width:420px"] { min-width: 0 !important; }
 
   /*

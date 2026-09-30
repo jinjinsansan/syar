@@ -133,8 +133,10 @@ export const SCREENS: readonly ScreenRecord[] = [
   // ⚠️ ★**開発側で見た目を作りません**（★2026-09-15 オーナー指示）。★依頼は `requests/` へ。
   {
     route: '/training',
-    verdict: 'rebuild',
-    why: RESKIN_0929 + '🔴 ⚠️ ★**`/train` へ転送してはいけません**（★2026-09-25 に一度やって戻しました）。'
+    verdict: 'redirected',
+    why: '✅ ★2026-09-30 に `/train` へ転送（★オーナー「1 つにまとめる」・デザイナー R-21 の中身を `/train` に取り込んだ）。'
+      + '✔ ★送り先は `sendTrainingOrder`（★中で `set_training_order` の RPC）と `useStableView` を呼ぶ。--- ★以下は転送する前の記録 --- '
+      + RESKIN_0929 + '🔴 ⚠️ ★**`/train` へ転送してはいけません**（★2026-09-25 に一度やって戻しました）。'
       + '★`/train` は「まだ見た目だけ」で（★その画面の註記が自分でそう書いている）、'
       + '★`rpc(` も `Repo` も呼びません。★一方 ここは ★**`rpc(\'set_training_order\')` を呼ぶ唯一の画面**です。'
       + '★転送すると ★**調教の指示を出す口が消え、育成のループが止まります**。'

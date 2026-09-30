@@ -258,3 +258,11 @@ export function trainFaceOf(condition: Condition, fatigue: number): TrainFace {
 export function fatigueColor(f: number): string {
   return f <= 30 ? '#1e7a3a' : f <= 60 ? '#8a5a06' : '#a81a13';
 }
+
+/**
+ * ★**疲れの 3 段と言葉**（★2026-09-30・デザイナー R-21 §3-2「疲れ 3 段・数字なしのゲージと言葉」）。
+ * ⚠️ ★境目は `fatigueColor`・`trainFaceOf` と同じ 30／60（★別の数を置かない）。★画面に数字は出さない。
+ */
+export function fatigueStepOf(f: number): { readonly steps: 1 | 2 | 3; readonly word: string } {
+  return f <= 30 ? { steps: 1, word: 'すっきり' } : f <= 60 ? { steps: 2, word: '少し残る' } : { steps: 3, word: 'たまっている' };
+}

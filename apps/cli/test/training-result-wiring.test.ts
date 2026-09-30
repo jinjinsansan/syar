@@ -1,12 +1,18 @@
 /**
- * ★**調教の結果の演出の配線**（★D12-2・2026-09-16・デザイナーのカード `components/training-result`）
+ * ★**調教の画面の配線**（★D12-2・2026-09-16・デザイナーのカード `components/training-result`）
+ *
+ * ★2026-09-30 書き換え: ★旧 `/training` を `/train` へ畳んだ（★オーナー「1 つにまとめる」・デザイナー R-21）。
+ *   ★旧 `/training` の「結果の段」のカードは ★**見本の値（DEMO_JITTERS）だけ**で動いていたので ★持ってこなかった
+ *   （★週送りの実データを画面に繋ぐ便が来たら ★その画面で `trainingResultTierOf` を引く）。
+ *   ★週の印は ★「今週の一言」として `raceWeekMarkOf` から出す（★バッジの色は使わない・資料 §3-2）。
  *
  * 【★見ている壊れ方】
  *   ① ★**段の境目（1.13 / 1.10）が画面にも書かれる**（★D-052・二重帳簿。★片方だけ直すと食い違う）
  *   ② ★画面が**伸び幅から段を逆算**する（★`BASE_GAIN` などを画面で再計算する形）
  *   ③ ★**新しい抽選**を画面側で引く（★正典 D-101「既存の乱数の上側を見せるだけ」）
  *   ④ ★「もう一度」「引き直す」に当たるものが置かれる（★射幸性の禁止事項）
- *   ⑤ ★週の印が **1 色に固定**される（★4 値のうち区別が消える）
+ *   ⑤ ★出走の前後の判定を ★画面が自前で持つ（★`raceWeekMarkOf` を通さない）
+ *   ⑥ ★能力・素質の数値やバーが画面に戻る（★資料 §3-5 ①・正典 §5.5）
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -16,27 +22,19 @@ import {
 } from '@star/training';
 
 const ROOT = path.resolve(__dirname, '../../..');
-const PAGE = readFileSync(path.join(ROOT, 'apps/web/src/app/training/page.tsx'), 'utf8');
+const PAGE = readFileSync(path.join(ROOT, 'apps/web/src/app/train/page.tsx'), 'utf8');
 /** ★コメントを空白にしてから見る（★註記の数字を拾わない） */
 const CODE = PAGE.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ').replace(/\/\/[^\n]*/g, ' ');
 
-describe('★調教の結果の演出の配線（D12-2）', () => {
+describe('★調教の画面の配線（D12-2・R-21）', () => {
   it('① ★段の境目を画面に書いていない', () => {
-    /**
-     * ⚠️ ★**部分一致で書かないこと**（★2026-09-16 にこれで誤検出しました）。
-     *    ★`String(1.10)` は **`"1.1"`** になり、★デモ値 `1.142` の一部に当たって落ちました。
-     *    ★**実装は正しく、検査の書き方が雑**でした。
-     * → ★画面の**数値リテラルを拾って、値として**比べます。
-     */
+    /** ★数値リテラルを拾って ★値として比べる（★部分一致だと `1.1` が `1.142` に当たる・2026-09-16） */
     const literals = new Set(
       (CODE.match(/(?<![\w.])\d+\.\d+(?![\w.])/g) ?? []).map((s) => Number(s)),
     );
     for (const t of Object.values(TRAINING_RESULT_THRESHOLDS)) {
       expect([...literals], `★境目が画面に写っている: ${t}`).not.toContain(t);
     }
-    /** ★段は純関数から引く */
-    expect(CODE).toMatch(/trainingResultTierOf/);
-    expect(CODE).toMatch(/TRAINING_RESULT_LABEL/);
   });
 
   it('② ★伸び幅から逆算していない（★成長式の項が画面に無い）', () => {
@@ -56,15 +54,16 @@ describe('★調教の結果の演出の配線（D12-2）', () => {
     }
   });
 
-  it('⑤ ★週の印は 4 値それぞれに色がある（★1 色固定にしない）', () => {
-    expect(CODE).toMatch(/RACE_MARK_STYLE/);
-    /** ★3 つの印に別の見た目（★`none` はバッジを置かずテキスト） */
-    expect(CODE).toMatch(/'race-week':/);
-    expect(CODE).toMatch(/'before-race':/);
-    expect(CODE).toMatch(/'after-race':/);
-    expect(CODE).toMatch(/今週の指示に印はありません/);
-    /** ★以前の「どの印でも金」に戻していない */
-    expect(CODE).not.toMatch(/raceMarkLabel[^\n]*Pill tone="gold"/);
+  it('⑤ ★出走の前後は `raceWeekMarkOf` から（★画面で週数を比べない）', () => {
+    expect(CODE).toMatch(/raceWeekMarkOf\(h\.weeksToNextRace, h\.weeksSinceLastRace\)/);
+    expect(CODE, '★画面が 週数で 印を決めている').not.toMatch(/weeksToNextRace\s*[=<>!]=?\s*\d/);
+  });
+
+  it('🔴 ⑥ ★能力・素質の数値やバーを出さない（★調子と疲れの段と言葉だけ）', () => {
+    for (const bad of ['trainingBarsOf', 'DEMO_TRAINING_ABILITY', 'potential', 'StatBar', '{horse.fatigue}']) {
+      expect(CODE, `★能力・数値が画面に戻った: ${bad}`).not.toContain(bad);
+    }
+    expect(CODE).toContain('fatigueStepOf(horse.fatigue)');
   });
 
   it('★段の判定そのものは純関数の側（★ここで再実装していない）', () => {

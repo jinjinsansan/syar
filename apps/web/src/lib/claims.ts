@@ -147,9 +147,6 @@ export const CLAIM_ROLE_AFTER_RETIRE = '役割を選べるのは、引退して�
 /** ★役割は 頼んだ取引の中で変わる（request_breeding_role が horses.retirement_role を書く） */
 export const CLAIM_ROLE_IMMEDIATE = 'その場で変わります';
 
-/** ★現在値は 素質（potential）を超えない（growth.ts の grow が potential で止める） */
-export const CLAIM_POTENTIAL_CAP = '現在値は素質による上限まで伸びます';
-
 /** ★指示の無い週は 既定の献立（training-runner の `ordered ?? defaultMenu(...)`） */
 export const CLAIM_DEFAULT_MENU = '指示しない週は、既定の献立で調教されます';
 

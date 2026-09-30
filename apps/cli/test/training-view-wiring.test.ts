@@ -21,7 +21,8 @@ import path from 'node:path';
 import ts from 'typescript';
 
 const ROOT = path.resolve(__dirname, '../../..');
-const PAGE = 'apps/web/src/app/training/page.tsx';
+/** ★2026-09-30: ★旧 `/training` を `/train` へ畳んだ（★オーナー「1 つにまとめる」・デザイナー R-21） */
+const PAGE = 'apps/web/src/app/train/page.tsx';
 const MODEL = 'apps/web/src/lib/game-demo.ts';
 const readSrc = (rel: string): string => readFileSync(path.join(ROOT, rel), 'utf8');
 
@@ -73,25 +74,15 @@ function violationsOf(pageSrc: string, modelSrc: string): string[] {
   const model = parse(modelSrc, 'game-demo.ts');
   const bad: string[] = [];
 
-  // ① 取り込み
-  const pageImports = importedFrom(page, '@star/training');
-  for (const name of ['TRAINING_AXES', 'TRAINING_INTENSITIES', 'trainingBarsOf']) {
-    if (!pageImports.includes(name)) bad.push(`★画面が @star/training から ${name} を引いていません`);
-  }
+  // ① 取り込み — ★画面は ★献立を `game-demo` の `TRAINING_MENUS`（★`@star/training` の名簿から作る）から引く
+  if (!importedFrom(page, '../../lib/game-demo').includes('TRAINING_MENUS')) bad.push('★画面が 献立を TRAINING_MENUS から引いていません');
   const modelImports = importedFrom(model, '@star/training');
   for (const name of ['MENUS', 'MENU_IDS', 'menuViewOf', 'menusOfView']) {
     if (!modelImports.includes(name)) bad.push(`★表示モデルが @star/training から ${name} を引いていません`);
   }
 
-  // ② バーは trainingBarsOf の戻り値そのもの（★別の式で作っていない）
-  const barCalls = callsOf(page, 'trainingBarsOf');
-  if (barCalls.length === 0) bad.push('★画面が trainingBarsOf を呼んでいません');
-  for (const call of barCalls) {
-    // ④ 引数は 2 つ（★素質・上限までの割合を渡す口を作らない）
-    if (call.arguments.length !== 2) bad.push(`★trainingBarsOf の引数が 2 つではありません: ${call.arguments.length}`);
-    const text = call.getText(page);
-    if (/potential|capRatio/i.test(text)) bad.push(`★バーに素質・上限までの割合を渡しています: ${text.slice(0, 60)}`);
-  }
+  // ② ★能力のバーを出さない（★2026-09-30・デザイナー R-21 §3-5 ①「能力のバーを外す」・正典 §5.5）
+  if (callsOf(page, 'trainingBarsOf').length > 0) bad.push('★画面が 能力のバー（trainingBarsOf）を出しています');
 
   // ③ 画面側に写像の表が無い
   for (const t of [...localViewTables(page), ...localViewTables(model)]) {
@@ -110,23 +101,22 @@ describe('★調教の見せ方の接続（構文木で見る・GB-1）', () => 
     const model = (): string => readSrc(MODEL);
 
     it('★① 画面が写像を自前の表で持つ（複製）', () => {
-      const injected = page().replace('const WEEK_NO = 32;',
-        "const WEEK_NO = 32;\nconst LOCAL_VIEW = { hill: { axis: 'body', intensity: 'mid' } } as const;");
+      const from = 'const RUN_MS = 3200;';
+      expect(page(), '変異のもとが見つかりません').toContain(from);
+      const injected = page().replace(from, `${from}
+const LOCAL_VIEW = { hill: { axis: 'body', intensity: 'mid' } } as const;`);
       expect(violationsOf(injected, model()).length).toBeGreaterThan(0);
     });
 
-    it('★② 画面がバーを自前で組む（trainingBarsOf を呼ばない）', () => {
-      const src = page();
-      expect(src).toContain('trainingBarsOf(');
-      expect(violationsOf(src.replace(/trainingBarsOf\(/g, 'localBarsOf('), model()).length).toBeGreaterThan(0);
+    it('★② 画面が 能力のバーを戻す（trainingBarsOf を呼ぶ）', () => {
+      const from = 'const cond = conditionView(horse.condition);';
+      expect(page(), '変異のもとが見つかりません').toContain(from);
+      expect(violationsOf(page().replace(from, `${from}
+  const bars = trainingBarsOf(stats, horse.condition);`), model()).length).toBeGreaterThan(0);
     });
 
-    it('★③ バーに「上限までの割合」を渡す（素質が復元できる形）', () => {
-      const src = page();
-      const from = 'trainingBarsOf(DEMO_TRAINING_ABILITY[horse.id] ?? DEFAULT_TRAINING_ABILITY, horse.condition)';
-      expect(src, '変異のもとが見つかりません').toContain(from);
-      const to = 'trainingBarsOf(DEMO_TRAINING_ABILITY[horse.id] ?? DEFAULT_TRAINING_ABILITY, horse.condition, capRatio)';
-      expect(violationsOf(src.replace(from, to), model()).length).toBeGreaterThan(0);
+    it('★③ 画面が 献立を 名簿から引かない', () => {
+      expect(violationsOf(page().replace(/TRAINING_MENUS/g, 'LOCAL_MENUS'), model()).length).toBeGreaterThan(0);
     });
 
     it('★④ 表示モデルが 8 メニューの表を自前に戻す', () => {

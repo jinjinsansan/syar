@@ -15,7 +15,7 @@ import path from 'node:path';
 import { stripComments } from './lib/ts-blocks.js';
 import {
   CLAIM_PP_FROM_RACES_ONLY, CLAIM_BREED_RETRY_SAME_YEAR, CLAIM_BREED_TEMP_NO_EP, CLAIM_BREED_PAY_AT_CONFIRM, CLAIM_NAME_NO_SELF_CHANGE,
-  CLAIM_NAME_DUP_AFTER_SEND, CLAIM_BROODMARE_FEMALE_ONLY, CLAIM_ROLE_AFTER_RETIRE, CLAIM_ROLE_IMMEDIATE, CLAIM_POTENTIAL_CAP,
+  CLAIM_NAME_DUP_AFTER_SEND, CLAIM_BROODMARE_FEMALE_ONLY, CLAIM_ROLE_AFTER_RETIRE, CLAIM_ROLE_IMMEDIATE,
   CLAIM_DEFAULT_MENU, CLAIM_POINTS_SEPARATE,
   BET_PER_PICK_EP, CLAIM_BET_PER_PICK, CLAIM_BET_TYPE_RULE, CLAIM_REPEAT_BET, CLAIM_CARD_PUBLISH, CLAIM_DAILY_ONCE, CLAIM_TRAIN_EP_SHORT, CLAIM_ENTRY_CANCEL_WINDOW, CLAIM_SALES_CLOSE, CLAIM_EP_FREE_ONLY, CLAIM_GUEST_CAN_SEE, CLAIM_NO_CHANGE_LATER, CLAIM_ODDS_FIXED, CLAIM_OWN_RACE_BET, CLAIM_STRATEGY,
 } from '../../web/src/lib/claims';
@@ -158,13 +158,8 @@ const MOVED: readonly Claim[] = [
     backedBy: () => defHas('request_breeding_role', /update\s+horses\s+h\s+set\s+retirement_role\s*=\s*p_to_role\s+where\s+h\.id\s*=\s*p_horse_id/i),
   },
   {
-    id: '㉒現在値は 素質を超えない', text: CLAIM_POTENTIAL_CAP, name: 'CLAIM_POTENTIAL_CAP',
-    usedBy: ['apps/web/src/app/training/page.tsx'],
-    backedBy: () => srcHas('packages/training/src/growth.ts', 'out[key] = next >= pot ? pot : next;'),
-  },
-  {
     id: '㉓指示の無い週は 既定の献立', text: CLAIM_DEFAULT_MENU, name: 'CLAIM_DEFAULT_MENU',
-    usedBy: ['apps/web/src/app/training/page.tsx'],
+    usedBy: ['apps/web/src/app/train/page.tsx'],
     backedBy: () => srcHas('apps/worker/src/training-runner.ts', 'let menu = (ordered ?? defaultMenu(age, state.fatigue))'),
   },
   {
@@ -199,7 +194,7 @@ const CLAIMS: readonly Claim[] = [
       /** ★同じ額: ★案内も 次のレースの投票も ★この画面の 1 口（EP_PER_PICK）だけ */
       if (!vote0.includes('betType: justPlaced.betType, amount: EP_PER_PICK,')) why.push('★案内の額が この画面の 1 口でない（★「同じ額」と言えない）');
       /** ★受け付けた直後だけ（★結果の後に出さない・デザイナー R-22・レビュー側裁定） */
-      if (/loadLastBet|settled/.test(vote0) || /settled|payout/.test(rb)) why.push('★結果を読んでいる（★「結果を見て、もう一度」の流れになる）');
+      if (/loadLastBet|\bsettled\b/.test(vote0) || /\bsettled\b|payout/.test(rb)) why.push('★結果を読んでいる（★「結果を見て、もう一度」の流れになる）');
       if (!/export const REPEAT_BET_MAX = 3;/.test(stripComments(read('apps/web/src/lib/claims.ts')))) why.push('★上限が 3 でない（★文の「3 回」とずれる）');
       const vote = stripComments(read('apps/web/src/app/vote/page.tsx'));
       if ((vote.match(/placeBet\(/g) ?? []).length !== 1) why.push('★/vote が「投票する」以外でも買っている（★自動で買わない・馬は選び直す）');
@@ -240,10 +235,9 @@ const CLAIMS: readonly Claim[] = [
       const train = stripComments(read('apps/web/src/app/train/page.tsx'));
       if (!train.includes('const cost = gradeEpCost(spec.id as MenuId, horse.stableGrade);')) why.push('★/train が 実際に引かれる額（格の倍率つき）で比べていない');
       if (!/actionHref="\/earn"/.test(train)) why.push('★/train の警告に 受け取りへの道が無い');
-      /** ★旧 /training も ★実際の額（★2026-09-29・レビュー側「ほかの画面にも素の額が残っていないか」→ 3 か所 在った） */
-      const old = stripComments(read('apps/web/src/app/training/page.tsx'));
-      if (!old.includes('gradeEpCost(menu.id as MenuId, horse.stableGrade)')) why.push('★/training が 実際に引かれる額で出していない');
-      if (/\{menu\.ep\}|\$\{menu\.ep\}|\{spec\.ep\}|\$\{spec\.ep\}/.test(old + train)) why.push('★調教の画面が 素の額（menu.ep / spec.ep）を そのまま出している');
+      /** ★献立のカードも ★実際の額（★旧 /training は 2026-09-30 に /train へ畳んだ） */
+      if (!train.includes('gradeEpCost(m.id as MenuId, horse.stableGrade)')) why.push('★/train の献立のカードが 実際に引かれる額で出していない');
+      if (/\{menu\.ep\}|\$\{menu\.ep\}|\{spec\.ep\}|\$\{spec\.ep\}|\{m\.ep\}/.test(train)) why.push('★調教の画面が 素の額（menu.ep / spec.ep / m.ep）を そのまま出している');
       return why;
     },
   },
@@ -421,10 +415,11 @@ const CLAIMS: readonly Claim[] = [
 ];
 
 describe('★仕組みの説明の文は 出どころに縛る', () => {
-  it('★移し替え（2026-09-29）: 移した文の数 ＝ 裏づけの数 ＝ 12', () => {
-    expect(MOVED.length).toBe(12);
-    expect(MOVED.filter((c) => typeof c.backedBy === 'function').length).toBe(12);
-    expect(new Set(MOVED.map((c) => c.name)).size, '★同じ定数を 2 度数えている').toBe(12);
+  /** ★2026-09-30: ㉒（素質の上限）を外した — ★文を出していた旧 `/training` を `/train` へ畳み、★能力の数値を出さなくなった（★デザイナー R-21 §3-5 ①） */
+  it('★移し替え（2026-09-29）: 移した文の数 ＝ 裏づけの数 ＝ 11', () => {
+    expect(MOVED.length).toBe(11);
+    expect(MOVED.filter((c) => typeof c.backedBy === 'function').length).toBe(11);
+    expect(new Set(MOVED.map((c) => c.name)).size, '★同じ定数を 2 度数えている').toBe(11);
   });
 
   for (const c of CLAIMS) {

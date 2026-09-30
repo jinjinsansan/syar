@@ -185,7 +185,7 @@ function HomeCards({ home, ownedCount, todoCount }: { readonly home: StableHome;
       {/* ④ ショートカット（先頭「調教」だけ金＝毎日の起点） */}
       <HomeCard title="ショートカット">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <a className="a-btn a-btn-gold" href="/training" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>調教</a>
+          <a className="a-btn a-btn-gold" href="/train" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>調教</a>
           <a className="a-btn" href="/entry" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>出走登録</a>
           <a className="a-btn" href="/vote" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>番組表</a>
           <a className="a-btn" href="/records" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>記録</a>
@@ -304,7 +304,7 @@ export default function StablePage() {
           <StatCard label="出走登録" value={String(view.entries)} unit="頭" color="var(--a-num-time)" />
           <StatCard label="今週の消費予定" value={view.plannedEP.toLocaleString('ja-JP')} unit="EP" color="var(--a-num-money)" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginLeft: 'auto' }}>
-            <a className="a-btn a-btn-gold" href="/training" style={{ height: 48, padding: '0 26px', fontSize: 18 }}>調教を指示する</a>
+            <a className="a-btn a-btn-gold" href="/train" style={{ height: 48, padding: '0 26px', fontSize: 18 }}>調教を指示する</a>
             <span className={`a-btn${allDone ? '' : ' off'}`} style={{ height: 40, padding: '0 26px', fontSize: 15 }} title={allDone ? '' : '全頭に指示すると押せます'}>週を進める</span>
           </div>
         </div>

@@ -48,10 +48,6 @@ const KNOWN: Readonly<Record<string, { readonly names: readonly string[]; readon
     names: ['DEMO_JOCKEY_RIDES'],
     why: '⚠️ ★騎手の騎乗回数（親密度）が見本（★裁定 P1-5）。★`race_entries.jockey_frozen` を数える口が無い。★消す条件: ★騎乗回数をサーバーが返す口ができた日',
   },
-  'app/training/page.tsx': {
-    names: ['DEMO_HORSES', 'DEMO_JITTERS', 'DEMO_TRAINING_ABILITY'],
-    why: '⚠️ ★旧 `/training`（★裁定 P1-1 / P1-7）。★読み取り失敗の側に見本が残る疑い。★消す条件: ★`/train` に書き口を付けて `/training` を畳んだ日',
-  },
 };
 
 const files = (): string[] => {

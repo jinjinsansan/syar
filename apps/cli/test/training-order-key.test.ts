@@ -67,7 +67,8 @@ describe('🔴 ★調教の指示: 書く鍵と読む鍵', () => {
     expect(lib, '★送っていない').toMatch(/rpc\('set_training_order'/);
     /** ★註記の中の語で判定しない */
     const code = (s: string): string => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-    for (const page of ['apps/web/src/app/train/page.tsx', 'apps/web/src/app/training/page.tsx']) {
+    /** ★旧 `/training` は 2026-09-30 に `/train` へ畳んだ（★next.config の転送） */
+    for (const page of ['apps/web/src/app/train/page.tsx']) {
       const src = code(read(page));
       expect(src, `🔴 ★${page} が 送る部品を通っていない（★育成の書き口が消える）`).toMatch(/sendTrainingOrder\(/);
       expect(src, `★${page} に 送る処理の写しが残っている`).not.toMatch(/rpc\('set_training_order'/);
