@@ -69,80 +69,76 @@ export interface GradedRace {
  * ⚠️ ★`(競馬場, 馬場, 距離)` の組は **50 通りすべて違います**（検査で固定）。
  *    ★これが「種類豊富」の実体です — ★同じ組が 2 つあると、★その 2 鞍は**同じ画**になります。
  */
+/**
+ * ★**2026-09-30 に 実在の年間日程へ作り直した**（★オーナー「G3 以上を 50 レース・お正月の金杯から」「ＯＫです」・正典 D-125/D-126）。
+ *   ★1 月の金杯から 12 月の有馬まで ★実在の中央競馬の重賞 50 鞍（★G1 24・G2 20・G3 6）を ★名前の規則（D-125）で置き換えた。
+ *   ★場は ★実在の場を置き換えた場（`venues.ts`）・★距離は 番組の 7 距離に寄せた・★「4 歳以上」は「3 歳以上」に寄せた。
+ *   ⚠️ ★オーナー承認で変わったこと: ★G1 9 → 24（★旧 B案）／★同じ（場・馬場・距離）の鞍が重なる（★旧「50 通りすべて違う」）。
+ *   ⚠️ ★実在の名前との対応表は 公開しない（`private/research/`）。★一対一に近い名前は 公開前に L-9 で確認（D-125 ②）。
+ */
 export const GRADED_RACES: readonly GradedRace[] = [
-  // ── G1（9 鞍）─────────────────────────────────────────────
-  /** ★既存のデモがこのレースです。★名前を動かしません */
-  { id: 'g1-ousei', name: '桜星賞', venueId: 'star-park', grade: 'G1', surface: 'turf', distanceM: 1600, month: 4, age: '3', fillies: false },
-  /** ★三冠 ①（皐月の位置） */
-  { id: 'g1-seikan', name: '星冠賞', venueId: 'kirigahara', grade: 'G1', surface: 'turf', distanceM: 2000, month: 4, age: '3', fillies: false, series: { name: '三冠', leg: 1 } },
-  /** ★三冠 ②（ダービーの位置） */
-  { id: 'g1-tenkyu', name: '天穹賞', venueId: 'tenga', grade: 'G1', surface: 'turf', distanceM: 2400, month: 5, age: '3', fillies: false, series: { name: '三冠', leg: 2 } },
-  /** ★三冠 ③（菊花の位置・最長） */
-  { id: 'g1-ginga', name: '銀河賞', venueId: 'ginrei', grade: 'G1', surface: 'turf', distanceM: 3000, month: 10, age: '3', fillies: false, series: { name: '三冠', leg: 3 } },
-  { id: 'g1-ryusei', name: '流星大賞典', venueId: 'tenga', grade: 'G1', surface: 'turf', distanceM: 2000, month: 10, age: '3+', fillies: false },
-    /** ★元 2500m。★V-18 が 1200〜3000 で較正されているため 番組の 7 距離の 2400 に寄せた（2026-09-29・レビュー側 裁定 C）。★2600 が無いので いちばん近い 2400 */
-  { id: 'g1-kyokko', name: '極光賞', venueId: 'ookawara', grade: 'G1', surface: 'turf', distanceM: 2400, month: 12, age: '3+', fillies: false },
-  { id: 'g1-suisei', name: '彗星スプリント', venueId: 'shiokaze', grade: 'G1', surface: 'turf', distanceM: 1200, month: 9, age: '3+', fillies: false },
-  /** ★ダート路線の頂点 */
-  { id: 'g1-soukai', name: '蒼海賞', venueId: 'shirasuna', grade: 'G1', surface: 'dirt', distanceM: 1800, month: 12, age: '3+', fillies: false },
-  { id: 'g1-gekko', name: '月虹賞', venueId: 'youkou', grade: 'G1', surface: 'turf', distanceM: 1800, month: 11, age: '3+', fillies: true },
-
-  // ── G2（14 鞍）────────────────────────────────────────────
-  { id: 'g2-shinsei', name: '新星賞', venueId: 'tsukimi', grade: 'G2', surface: 'turf', distanceM: 1600, month: 11, age: '2', fillies: false },
-  { id: 'g2-gyoko', name: '暁光賞', venueId: 'aone', grade: 'G2', surface: 'turf', distanceM: 1800, month: 3, age: '3', fillies: false },
-  { id: 'g2-hoshikuzu', name: '星屑ステークス', venueId: 'ginrei', grade: 'G2', surface: 'turf', distanceM: 1400, month: 5, age: '3+', fillies: false },
-  { id: 'g2-hakuro', name: '白露賞', venueId: 'shirasuna', grade: 'G2', surface: 'dirt', distanceM: 1600, month: 9, age: '3+', fillies: false },
-    /** ★元 2200m。★V-18 が 1200〜3000 で較正されているため 番組の 7 距離の 2000 に寄せた（2026-09-29・レビュー側 裁定 C）。★2000 と 2400 から同じだけ近い → ★中距離の鞍のまま（2000） */
-  { id: 'g2-aone', name: '青嶺記念', venueId: 'aone', grade: 'G2', surface: 'turf', distanceM: 2000, month: 6, age: '3+', fillies: false },
-  { id: 'g2-shiokaze', name: '潮風カップ', venueId: 'shiokaze', grade: 'G2', surface: 'turf', distanceM: 1600, month: 4, age: '3+', fillies: false },
-    /** ★元 2500m。★V-18 が 1200〜3000 で較正されているため 番組の 7 距離の 2400 に寄せた（2026-09-29・レビュー側 裁定 C）。★2600 が無いので いちばん近い 2400 */
-  { id: 'g2-tenga', name: '天河記念', venueId: 'tenga', grade: 'G2', surface: 'turf', distanceM: 2400, month: 3, age: '3+', fillies: false },
-  { id: 'g2-ginrei', name: '銀嶺記念', venueId: 'ginrei', grade: 'G2', surface: 'dirt', distanceM: 2000, month: 2, age: '3+', fillies: false },
-  { id: 'g2-youkou', name: '陽光賞', venueId: 'youkou', grade: 'G2', surface: 'turf', distanceM: 2000, month: 7, age: '3+', fillies: false },
-  { id: 'g2-kirigahara', name: '霧ヶ原記念', venueId: 'kirigahara', grade: 'G2', surface: 'turf', distanceM: 1800, month: 8, age: '3+', fillies: false },
-  { id: 'g2-tsukimi', name: '月見丘カップ', venueId: 'tsukimi', grade: 'G2', surface: 'dirt', distanceM: 1400, month: 1, age: '3+', fillies: false },
-    /** ★元 3200m。★V-18 が 1200〜3000 で較正されているため 番組の 7 距離の 3000 に寄せた（2026-09-29・レビュー側 裁定 C）。★いちばん近い 3000（★番組の最長） */
-  { id: 'g2-ookawara', name: '大河原記念', venueId: 'ookawara', grade: 'G2', surface: 'turf', distanceM: 3000, month: 5, age: '3+', fillies: false },
-    /** ★元 1900m。★V-18 が 1200〜3000 で較正されているため 番組の 7 距離の 2000 に寄せた（2026-09-29・レビュー側 裁定 C）。★1800 と 2000 から同じだけ近い → ★「大賞典」の長めの性格を残す（2000） */
-  { id: 'g2-shirasuna', name: '白砂大賞典', venueId: 'shirasuna', grade: 'G2', surface: 'dirt', distanceM: 2000, month: 6, age: '3', fillies: false },
-  { id: 'g2-seiga', name: '星河賞', venueId: 'star-park', grade: 'G2', surface: 'turf', distanceM: 2000, month: 6, age: '3+', fillies: true },
-
-  // ── G3（27 鞍）────────────────────────────────────────────
-  { id: 'g3-mebuki', name: '芽吹賞', venueId: 'star-park', grade: 'G3', surface: 'turf', distanceM: 1400, month: 2, age: '3', fillies: false },
-  { id: 'g3-shunrai', name: '春雷カップ', venueId: 'tsukimi', grade: 'G3', surface: 'turf', distanceM: 1200, month: 3, age: '3+', fillies: false },
-  { id: 'g3-sanae', name: '早苗賞', venueId: 'shirasuna', grade: 'G3', surface: 'turf', distanceM: 1800, month: 4, age: '3', fillies: false },
-    /** ★元 1000m。★V-18 が 1200〜3000 で較正されているため 番組の 7 距離の 1200 に寄せた（2026-09-29・レビュー側 裁定 C）。★いちばん近い 1200（★番組の最短） */
-  { id: 'g3-ryofu', name: '涼風ステークス', venueId: 'shiokaze', grade: 'G3', surface: 'turf', distanceM: 1200, month: 7, age: '3+', fillies: false },
-  { id: 'g3-semishigure', name: '蝉時雨賞', venueId: 'shirasuna', grade: 'G3', surface: 'dirt', distanceM: 1200, month: 7, age: '3+', fillies: false },
-    /** ★元 1700m。★V-18 が 1200〜3000 で較正されているため 番組の 7 距離の 1800 に寄せた（2026-09-29・レビュー側 裁定 C）。★1600 と 1800 から同じだけ近い → ★ダートの中距離の性格を残す（1800） */
-  { id: 'g3-touka', name: '灯火賞', venueId: 'kirigahara', grade: 'G3', surface: 'dirt', distanceM: 1800, month: 11, age: '3+', fillies: false },
-  { id: 'g3-kouyou', name: '紅葉賞', venueId: 'ginrei', grade: 'G3', surface: 'turf', distanceM: 2000, month: 10, age: '3+', fillies: false },
-  { id: 'g3-kogarashi', name: '木枯賞', venueId: 'aone', grade: 'G3', surface: 'turf', distanceM: 1600, month: 11, age: '3+', fillies: false },
-  { id: 'g3-hatsushimo', name: '初霜カップ', venueId: 'ookawara', grade: 'G3', surface: 'dirt', distanceM: 1800, month: 12, age: '3+', fillies: false },
-  { id: 'g3-kantsubaki', name: '寒椿賞', venueId: 'tenga', grade: 'G3', surface: 'turf', distanceM: 1400, month: 1, age: '3+', fillies: false },
-  { id: 'g3-awayuki', name: '淡雪ステークス', venueId: 'aone', grade: 'G3', surface: 'dirt', distanceM: 1400, month: 2, age: '3+', fillies: false },
-  { id: 'g3-kagerou', name: '陽炎カップ', venueId: 'youkou', grade: 'G3', surface: 'dirt', distanceM: 1600, month: 8, age: '3+', fillies: false },
-  { id: 'g3-hoshimatsuri', name: '星祭賞', venueId: 'kirigahara', grade: 'G3', surface: 'turf', distanceM: 2400, month: 8, age: '3+', fillies: false },
-  { id: 'g3-tencho', name: '天頂記念', venueId: 'shiokaze', grade: 'G3', surface: 'turf', distanceM: 2000, month: 9, age: '3+', fillies: false },
-  { id: 'g3-hokuten', name: '北天賞', venueId: 'ookawara', grade: 'G3', surface: 'dirt', distanceM: 2400, month: 3, age: '3+', fillies: false },
-  { id: 'g3-mutsuraboshi', name: '六連星カップ', venueId: 'ginrei', grade: 'G3', surface: 'turf', distanceM: 1200, month: 9, age: '2', fillies: false },
-  { id: 'g3-orihime', name: '織姫賞', venueId: 'shiokaze', grade: 'G3', surface: 'dirt', distanceM: 1400, month: 7, age: '3+', fillies: true },
-  { id: 'g3-natsuboshi', name: '夏星賞', venueId: 'star-park', grade: 'G3', surface: 'turf', distanceM: 1800, month: 8, age: '3+', fillies: false },
-    /** ★元 3600m。★V-18 が 1200〜3000 で較正されているため 番組の 7 距離の 3000 に寄せた（2026-09-29・レビュー側 裁定 C）。★いちばん近い 3000（★番組の最長・長距離の鞍を これ以上短くしない） */
-  { id: 'g3-hakko', name: '白光記念', venueId: 'ookawara', grade: 'G3', surface: 'turf', distanceM: 3000, month: 6, age: '3+', fillies: false },
-  { id: 'g3-futagoboshi', name: '双子星ステークス', venueId: 'tsukimi', grade: 'G3', surface: 'dirt', distanceM: 1200, month: 10, age: '2', fillies: false },
-    /** ★元 2200m。★V-18 が 1200〜3000 で較正されているため 番組の 7 距離の 2000 に寄せた（2026-09-29・レビュー側 裁定 C）。★2000 と 2400 から同じだけ近い → ★中距離の鞍のまま（2000） */
-  { id: 'g3-minamijuji', name: '南十字賞', venueId: 'kirigahara', grade: 'G3', surface: 'turf', distanceM: 2000, month: 5, age: '3', fillies: false },
-  { id: 'g3-hokkyokusei', name: '北極星カップ', venueId: 'ginrei', grade: 'G3', surface: 'dirt', distanceM: 3000, month: 1, age: '3+', fillies: false },
-  { id: 'g3-yoiyami', name: '宵闇賞', venueId: 'youkou', grade: 'G3', surface: 'dirt', distanceM: 1800, month: 12, age: '3+', fillies: false },
-  { id: 'g3-reimei', name: '黎明ステークス', venueId: 'tsukimi', grade: 'G3', surface: 'turf', distanceM: 1800, month: 5, age: '3+', fillies: false },
-  { id: 'g3-gunjo', name: '群青カップ', venueId: 'shiokaze', grade: 'G3', surface: 'dirt', distanceM: 2000, month: 2, age: '3+', fillies: false },
-  { id: 'g3-shisui', name: '紫水賞', venueId: 'star-park', grade: 'G3', surface: 'turf', distanceM: 1200, month: 9, age: '3+', fillies: true },
-  { id: 'g3-moegi', name: '萌黄賞', venueId: 'tenga', grade: 'G3', surface: 'dirt', distanceM: 1600, month: 12, age: '2', fillies: false },
+  { id: 'g3-maku-kinpai', name: '幕張金杯', venueId: 'shiokaze', grade: 'G3', surface: 'turf', distanceM: 2000, month: 1, age: '3+', fillies: false },
+  { id: 'g3-yodo-kinpai', name: '淀金杯', venueId: 'aone', grade: 'G3', surface: 'turf', distanceM: 1600, month: 1, age: '3+', fillies: false },
+  { id: 'g2-shinshun', name: '新春ステークス', venueId: 'aone', grade: 'G2', surface: 'turf', distanceM: 2400, month: 1, age: '3+', fillies: false },
+  /** ★元 2200m。★番組の 7 距離（V-18 の較正範囲）の 2000 に寄せた（★2026-09-30・オーナー承認・距離の寄せ方は 2026-09-29 裁定 C と同じ） */
+  { id: 'g2-maku-jc', name: '幕張ジョッキークラブ杯', venueId: 'shiokaze', grade: 'G2', surface: 'turf', distanceM: 2000, month: 1, age: '3+', fillies: false },
+  { id: 'g3-negishi', name: '根岸杯', venueId: 'ookawara', grade: 'G3', surface: 'dirt', distanceM: 1400, month: 2, age: '3+', fillies: false },
+  { id: 'g3-soushun', name: '早春杯', venueId: 'ookawara', grade: 'G3', surface: 'turf', distanceM: 1800, month: 2, age: '3', fillies: false },
+  /** ★元 2200m。★番組の 7 距離（V-18 の較正範囲）の 2000 に寄せた（★2026-09-30・オーナー承認・距離の寄せ方は 2026-09-29 裁定 C と同じ） */
+  { id: 'g2-yodo-kinen', name: '淀記念', venueId: 'aone', grade: 'G2', surface: 'turf', distanceM: 2000, month: 2, age: '3+', fillies: false },
+  { id: 'g1-february', name: 'フェブラリー杯', venueId: 'ookawara', grade: 'G1', surface: 'dirt', distanceM: 1600, month: 2, age: '3+', fillies: false },
+  { id: 'g2-maku-kinen', name: '幕張記念', venueId: 'shiokaze', grade: 'G2', surface: 'turf', distanceM: 1800, month: 3, age: '3+', fillies: false },
+  { id: 'g2-tulip', name: 'チューリップ杯', venueId: 'star-park', grade: 'G2', surface: 'turf', distanceM: 1600, month: 3, age: '3', fillies: true },
+  { id: 'g2-yayoi', name: '弥生杯', venueId: 'shiokaze', grade: 'G2', surface: 'turf', distanceM: 2000, month: 3, age: '3', fillies: false },
+  { id: 'g2-spring', name: 'スプリング杯', venueId: 'shiokaze', grade: 'G2', surface: 'turf', distanceM: 1800, month: 3, age: '3', fillies: false },
+  { id: 'g2-kinshachi', name: '金鯱杯', venueId: 'youkou', grade: 'G2', surface: 'turf', distanceM: 2000, month: 3, age: '3+', fillies: false },
+  { id: 'g2-nigawa-daishoten', name: '仁川大賞典', venueId: 'star-park', grade: 'G2', surface: 'turf', distanceM: 3000, month: 3, age: '3+', fillies: false },
+  { id: 'g1-spring-sprint', name: '春のスプリント杯', venueId: 'youkou', grade: 'G1', surface: 'turf', distanceM: 1200, month: 3, age: '3+', fillies: false },
+  { id: 'g1-naniwa', name: '浪速杯', venueId: 'star-park', grade: 'G1', surface: 'turf', distanceM: 2000, month: 4, age: '3+', fillies: false },
+  { id: 'g2-nz', name: 'ニュージーランド杯', venueId: 'shiokaze', grade: 'G2', surface: 'turf', distanceM: 1600, month: 4, age: '3', fillies: false },
+  { id: 'g1-ousei', name: '桜花杯', venueId: 'star-park', grade: 'G1', surface: 'turf', distanceM: 1600, month: 4, age: '3', fillies: true, series: { name: '牝馬三冠', leg: 1 } },
+  { id: 'g1-satsuki', name: '皐月杯', venueId: 'shiokaze', grade: 'G1', surface: 'turf', distanceM: 2000, month: 4, age: '3', fillies: false, series: { name: '三冠', leg: 1 } },
+  { id: 'g2-aoba', name: '青葉杯', venueId: 'ookawara', grade: 'G2', surface: 'turf', distanceM: 2400, month: 4, age: '3', fillies: false },
+  { id: 'g2-flora', name: 'フローラ杯', venueId: 'ookawara', grade: 'G2', surface: 'turf', distanceM: 2000, month: 4, age: '3', fillies: true },
+  /** ★元 3200m。★番組の 7 距離（V-18 の較正範囲）の 3000 に寄せた（★2026-09-30・オーナー承認・距離の寄せ方は 2026-09-29 裁定 C と同じ） */
+  { id: 'g1-spring-emperor', name: '春の皇帝杯', venueId: 'aone', grade: 'G1', surface: 'turf', distanceM: 3000, month: 5, age: '3+', fillies: false },
+  { id: 'g1-wakakoma-mile', name: '若駒マイル杯', venueId: 'ookawara', grade: 'G1', surface: 'turf', distanceM: 1600, month: 5, age: '3', fillies: false },
+  { id: 'g1-victoria', name: 'ヴィクトリア杯', venueId: 'ookawara', grade: 'G1', surface: 'turf', distanceM: 1600, month: 5, age: '3+', fillies: true },
+  { id: 'g1-fuchu-oaks', name: '府中オークス', venueId: 'ookawara', grade: 'G1', surface: 'turf', distanceM: 2400, month: 5, age: '3', fillies: true, series: { name: '牝馬三冠', leg: 2 } },
+  { id: 'g1-fuchu-derby', name: '府中ダービー', venueId: 'ookawara', grade: 'G1', surface: 'turf', distanceM: 2400, month: 5, age: '3', fillies: false, series: { name: '三冠', leg: 2 } },
+  { id: 'g1-shoka-mile', name: '初夏のマイル杯', venueId: 'ookawara', grade: 'G1', surface: 'turf', distanceM: 1600, month: 6, age: '3+', fillies: false },
+  /** ★元 2200m。★番組の 7 距離（V-18 の較正範囲）の 2000 に寄せた（★2026-09-30・オーナー承認・距離の寄せ方は 2026-09-29 裁定 C と同じ） */
+  { id: 'g1-takarazuka', name: '宝塚グランプリ', venueId: 'star-park', grade: 'G1', surface: 'turf', distanceM: 2000, month: 6, age: '3+', fillies: false },
+  { id: 'g3-tanabata', name: '七夕杯', venueId: 'ginrei', grade: 'G3', surface: 'turf', distanceM: 2000, month: 7, age: '3+', fillies: false },
+  { id: 'g2-ishikari', name: '石狩記念', venueId: 'tsukimi', grade: 'G2', surface: 'turf', distanceM: 2000, month: 8, age: '3+', fillies: false },
+  { id: 'g3-echigo', name: '越後記念', venueId: 'tenga', grade: 'G3', surface: 'turf', distanceM: 2000, month: 8, age: '3+', fillies: false },
+  /** ★元 2200m。★番組の 7 距離（V-18 の較正範囲）の 2000 に寄せた（★2026-09-30・オーナー承認・距離の寄せ方は 2026-09-29 裁定 C と同じ） */
+  { id: 'g2-stlite', name: 'セントライト杯', venueId: 'shiokaze', grade: 'G2', surface: 'turf', distanceM: 2000, month: 9, age: '3', fillies: false },
+  { id: 'g2-rose', name: 'ローズ杯', venueId: 'star-park', grade: 'G2', surface: 'turf', distanceM: 1800, month: 9, age: '3', fillies: true },
+  { id: 'g2-kobe', name: '神戸杯', venueId: 'star-park', grade: 'G2', surface: 'turf', distanceM: 2400, month: 9, age: '3', fillies: false },
+  { id: 'g1-sprinters', name: 'スプリンターズ杯', venueId: 'shiokaze', grade: 'G1', surface: 'turf', distanceM: 1200, month: 9, age: '3+', fillies: false },
+  { id: 'g2-autumn-crown', name: '秋の王冠', venueId: 'ookawara', grade: 'G2', surface: 'turf', distanceM: 1800, month: 10, age: '3+', fillies: false },
+  { id: 'g2-yodo-daishoten', name: '淀大賞典', venueId: 'aone', grade: 'G2', surface: 'turf', distanceM: 2400, month: 10, age: '3+', fillies: false },
+  { id: 'g1-shuka', name: '秋華杯', venueId: 'aone', grade: 'G1', surface: 'turf', distanceM: 2000, month: 10, age: '3', fillies: true, series: { name: '牝馬三冠', leg: 3 } },
+  { id: 'g1-kikka', name: '菊花杯', venueId: 'aone', grade: 'G1', surface: 'turf', distanceM: 3000, month: 10, age: '3', fillies: false, series: { name: '三冠', leg: 3 } },
+  { id: 'g1-autumn-emperor', name: '秋の皇帝杯', venueId: 'ookawara', grade: 'G1', surface: 'turf', distanceM: 2000, month: 11, age: '3+', fillies: false },
+  /** ★元 2500m。★番組の 7 距離（V-18 の較正範囲）の 2400 に寄せた（★2026-09-30・オーナー承認・距離の寄せ方は 2026-09-29 裁定 C と同じ） */
+  { id: 'g2-argentina', name: 'アルゼンチン杯', venueId: 'ookawara', grade: 'G2', surface: 'turf', distanceM: 2400, month: 11, age: '3+', fillies: false },
+  /** ★元 2200m。★番組の 7 距離（V-18 の較正範囲）の 2000 に寄せた（★2026-09-30・オーナー承認・距離の寄せ方は 2026-09-29 裁定 C と同じ） */
+  { id: 'g1-autumn-queen', name: '秋の女王杯', venueId: 'aone', grade: 'G1', surface: 'turf', distanceM: 2000, month: 11, age: '3+', fillies: true },
+  { id: 'g1-mile-champion', name: 'マイルチャンピオン杯', venueId: 'aone', grade: 'G1', surface: 'turf', distanceM: 1600, month: 11, age: '3+', fillies: false },
+  { id: 'g2-fuchu-2yo', name: '府中2歳ステークス', venueId: 'ookawara', grade: 'G2', surface: 'turf', distanceM: 1800, month: 11, age: '2', fillies: false },
+  { id: 'g1-japan-intl', name: 'ジャパン国際杯', venueId: 'ookawara', grade: 'G1', surface: 'turf', distanceM: 2400, month: 11, age: '3+', fillies: false },
+  { id: 'g1-champions', name: 'チャンピオンズ杯', venueId: 'youkou', grade: 'G1', surface: 'dirt', distanceM: 1800, month: 12, age: '3+', fillies: false },
+  { id: 'g1-nigawa-juvenile', name: '仁川ジュベナイル', venueId: 'star-park', grade: 'G1', surface: 'turf', distanceM: 1600, month: 12, age: '2', fillies: true },
+  { id: 'g1-nigawa-futurity', name: '仁川フューチュリティ', venueId: 'star-park', grade: 'G1', surface: 'turf', distanceM: 1600, month: 12, age: '2', fillies: false },
+  { id: 'g1-hopeful', name: 'ホープフル杯', venueId: 'shiokaze', grade: 'G1', surface: 'turf', distanceM: 2000, month: 12, age: '2', fillies: false },
+  /** ★元 2500m。★番組の 7 距離（V-18 の較正範囲）の 2400 に寄せた（★2026-09-30・オーナー承認・距離の寄せ方は 2026-09-29 裁定 C と同じ） */
+  { id: 'g1-arima', name: '有馬グランプリ', venueId: 'shiokaze', grade: 'G1', surface: 'turf', distanceM: 2400, month: 12, age: '3+', fillies: false },
 ];
 
 /** ★格ごとの鞍数（B案）。★検査が `GRADED_RACES` と突き合わせます */
-export const GRADED_COUNT_BY_GRADE: Readonly<Record<Grade, number>> = { G1: 9, G2: 14, G3: 27 };
+export const GRADED_COUNT_BY_GRADE: Readonly<Record<Grade, number>> = { G1: 24, G2: 20, G3: 6 };
 
 /** ★id から引く。★無ければ投げます（黙って既定へ落とさない・R-27） */
 export function gradedRaceById(id: string): GradedRace {

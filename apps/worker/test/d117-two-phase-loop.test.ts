@@ -119,7 +119,7 @@ describe('D-117 ① 公示', () => {
      * ★2026-09-29: ★重賞の暦で ★cycle 20 はオープンになった（★暦に鞍の無い重賞の枠）。
      *   ★同じ形（★20 先に G2・その手前に重賞なし）を ★暦の上で探して ★cycle 180 から見る（★200 が G2 月の鞍）。
      */
-    const f = fake(EPOCH + CYCLE_MS * 180 + Math.floor(CYCLE_MS * 0.4));
+    const f = fake(EPOCH + CYCLE_MS * 70 + Math.floor(CYCLE_MS * 0.4));
     const out = await runCycle(f.store, EPOCH, SEEDS, ANNOUNCE, BUILD_KEEPING, NOOP);
     /**
      * ⚠️ ★2026-09-20・**`ANNOUNCE-G2-G3`**: ★**cycle 20（G2）が増えました**。
@@ -127,9 +127,10 @@ describe('D-117 ① 公示', () => {
      *   ★cycle 0 から見て ★**20 先の G2 が告知の範囲に入ります**。
      *   ★重賞以外の 1〜4 は据え置きです（★延ばしたのは重賞だけ）。
      */
-    expect(out.announced).toEqual([181, 182, 183, 184, 200]);
-    expect(gradeOf(200)).toBe('G2');
-    /** ★重賞以外 4 本 ＋ ★窓に入った重賞 1 本（cycle 200 の G2） */
+    /** ★2026-09-30: ★重賞を実在の年間日程にした（★G1 24 鞍）ので ★同じ形を 暦の上で探し直した（★cycle 70 から見て 90 が G2） */
+    expect(out.announced).toEqual([71, 72, 73, 74, 90]);
+    expect(gradeOf(90)).toBe('G2');
+    /** ★重賞以外 4 本 ＋ ★窓に入った重賞 1 本（cycle 90 の G2） */
     expect(out.announced.length).toBe(ANNOUNCE_AHEAD_RACES + 1);
   });
 

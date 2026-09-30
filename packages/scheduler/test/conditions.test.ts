@@ -127,7 +127,8 @@ describe('★VW-2 競馬場の割り当て', () => {
    * ★**結果の側**（★利用者から見える「レースが 10 場に散っている」・★2026-09-29 レビュー側の条件）。
    *   ★差 3 は ★重賞が鞍の場で走るぶん。★暦の前は ≤ 1 だった。★4 を超えたら ★暦か鞍の場の置き方が変わったということ（★人が見る）。
    */
-  it('★実際に走る場も 10 場に散っている（1 週で最多 − 最少 ≤ 4・★暦の前は ≤ 1・差 3 は重賞が鞍の場で走るぶん）', () => {
+  /** ★2026-09-30: ★実在の年間日程（★府中・幕張・仁川・淀に重賞が集まる・オーナー承認）で 差 9（★旧 3）。★9 を超えたら 人が見る */
+  it('★実際に走る場も 10 場に散っている（1 週で最多 − 最少 ≤ 9・★暦の前は ≤ 1・差は重賞が鞍の場で走るぶん）', () => {
     const counts = new Map<string, number>();
     for (let i = 0; i < WEEK; i += 1) {
       const c = conditionsOf(i, classOf(i), gradeOf(i));
@@ -135,7 +136,7 @@ describe('★VW-2 競馬場の割り当て', () => {
     }
     for (const surface of ['turf', 'dirt'] as const) {
       const ns = VENUES.filter((v) => v.surfaces.includes(surface)).map((v) => counts.get(`${surface}/${v.id}`) ?? 0);
-      expect(Math.max(...ns) - Math.min(...ns), `★${surface}: ${ns.join(',')}`).toBeLessThanOrEqual(4);
+      expect(Math.max(...ns) - Math.min(...ns), `★${surface}: ${ns.join(',')}`).toBeLessThanOrEqual(9);
     }
   });
 

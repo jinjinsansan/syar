@@ -29,7 +29,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { ovalCourse, laneExtraMeters } from '@star/render';
-import { GRADED_RACES, raceSetupById, VENUES } from '@star/scheduler';
+import { DISTANCE_MENU, GRADED_RACES, raceSetupById, raceSetupFor, VENUES } from '@star/scheduler';
 import {
   laneAt, laneExtraM, ovalSegments, DEFAULT_OVAL, TRACK_WIDTH_M,
   ovalCornerPlan, ovalSpecFromCornerRadii,
@@ -47,13 +47,20 @@ interface Case {
  * ★**10 場 × 実距離**。★同じ (競馬場, 距離) は芝とダートで 2 鞍あることがあるので畳みます
  *   （★幾何は馬場に依りません）。★件数は**数えて出します** — ★直書きしません。
  */
+/**
+ * ★2026-09-30: ★重賞の鞍だけでなく ★**番組が組む (場, 距離) すべて**（★10 場 × `DISTANCE_MENU`）を見る。
+ *   ★重賞を実在の年間日程にしたら ★重賞の無い場（五稜郭・北九州）が出た。★重賞だけから組むと ★その 2 場の平場が見られなくなる。
+ */
 const CASES: readonly Case[] = (() => {
   const seen = new Map<string, Case>();
-  for (const race of GRADED_RACES) {
-    const s = raceSetupById(race.id);
+  const add = (s: { venue: { id: string; name: string }; distanceM: number; spec: Case['spec']; turn: Case['turn'] }): void => {
     const key = `${s.venue.id}/${s.distanceM}`;
-    if (seen.has(key)) continue;
+    if (seen.has(key)) return;
     seen.set(key, { key, label: `${s.venue.name} ${s.distanceM}m`, d: s.distanceM, spec: s.spec, turn: s.turn });
+  };
+  for (const race of GRADED_RACES) add(raceSetupById(race.id));
+  for (const v of VENUES) {
+    for (const d of DISTANCE_MENU) add(raceSetupFor({ courseId: v.id, distanceM: d, surface: v.surfaces[0]!, grade: null, raceName: '', raceNo: '' }));
   }
   return [...seen.values()];
 })();
@@ -74,10 +81,12 @@ describe('★突き合わせの対象（★この検査が何場を見ている�
       const s = raceSetupById(r.id);
       return `${s.venue.id}/${s.distanceM}`;
     }));
-    expect(new Set(CASES.map((c) => c.key))).toEqual(expected);
+    const seen = new Set(CASES.map((c) => c.key));
+    for (const k of expected) expect(seen.has(k), `★重賞の (場, 距離) ${k} を見ていない`).toBe(true);
     // ★下限。★1 場だけを見て緑だった過去に戻らないための歯止め
     // ★2026-09-29: ★40 → 38（★裁定 C で 9 鞍の距離を番組の 7 距離に寄せ、★(場, 距離) の組が重なった・★緩めたのではなく 組の数が減った）
-    expect(CASES.length).toBeGreaterThanOrEqual(38);
+    // ★2026-09-30: ★10 場 × 7 距離 ＝ 70（★重賞の鞍は すべてこの中に在る）
+    expect(CASES.length).toBe(VENUES.length * DISTANCE_MENU.length);
   });
 
   it('★形が実際にばらけている（★同じ形を 44 回見ても 1 通り分の意味しかない）', () => {

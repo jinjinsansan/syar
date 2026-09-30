@@ -171,7 +171,7 @@ const RACE_SETUP = VENUE_RESOLVED.setup;
 const PARAM_ERROR: string | null = (() => {
   if (VENUE_RESOLVED.fellBack) {
     return `知らない鞍です: ?venue=${VENUE_PARAM ?? ''}`
-      + '（★桜星賞に落としません。★鞍の一覧は画面下の「レース選択」から選んでください）';
+      + '（★見本のレースに落としません。★鞍の一覧は画面下の「レース選択」から選んでください）';
   }
   /**
    * 🔴 ★**双子**（★2026-09-26・裁定 §5）。★`?tod=` も ★同じ形で ★**黙って昼**になっていました。

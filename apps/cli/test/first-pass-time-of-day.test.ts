@@ -36,9 +36,12 @@ describe('★1 周目のスタンド前（★長距離の 3 幕）', () => {
    * ★2026-09-29 に書き換え（★設計が変わった・レビュー側 裁定 C）: ★大河原記念（元 3200）・白光記念（元 3600）を ★3000 に寄せた。
    *   ★大河原は 1 周 2400m なので ★3000m では 1 周目のスタンド前に来ない → ★長距離の 3 幕は 2 鞍になる（★元の距離に戻す日は簿 GRADED-DISTANCE-SNAPPED-TO-V18）。
    */
-  it('★① 出るのは 銀河賞・北極星カップ の 2 鞍だけ（★全鞍・旧 4 鞍は 距離を寄せる前）', () => {
+  /**
+   * ★2026-09-30: ★重賞を実在の年間日程にした（★オーナー承認）。★1 周 1800m の淀で 2400・3000、1 周 2000m の仁川で 3000 → ★5 鞍。
+   */
+  it('★① 出るのは 淀の 2400・3000 の 4 鞍と 仁川大賞典 の 5 鞍（★全鞍）', () => {
     const withFirstPass = GRADED_RACES.filter((r) => firstPassStraightsMOf(courseOf(r.id)).length > 0).map((r) => r.id).sort();
-    expect(withFirstPass).toEqual(['g1-ginga', 'g3-hokkyokusei']);
+    expect(withFirstPass).toEqual(['g1-kikka', 'g1-spring-emperor', 'g2-nigawa-daishoten', 'g2-shinshun', 'g2-yodo-daishoten']);
     /** ★区間は ★ゴールの 1 周前の決勝線で終わる（★回答 §0-1: 残り [1 周, 1 周 ＋ 直線]） */
     for (const id of withFirstPass) {
       const s = raceSetupFromParam(id).setup;
@@ -64,7 +67,7 @@ describe('★1 周目のスタンド前（★長距離の 3 幕）', () => {
   });
 
   it('★③ 道中の直線を渡さなければ跳びは 1 か所のまま／渡すと 2 か所で、間に 200m を見せる（★対照）', () => {
-    const course = courseOf('g1-ginga');
+    const course = courseOf('g1-kikka');
     const MPS = 16;
     const d = course.distance;
     const knots: PhaseKnots = { startSec: 0, spurtSec: (d - 800) / MPS, straightSec: (d - 400) / MPS, startRealSec: 1, goalSec: (d - 100) / MPS, finishSec: d / MPS };
@@ -80,14 +83,16 @@ describe('★1 周目のスタンド前（★長距離の 3 幕）', () => {
   });
 
   it('★④ 区間名: 発走の直線は「スタート後」・1 周目は「スタンド前」・最後だけ「最後の直線」', () => {
-    const ginga = courseOf('g1-ginga');
-    expect(broadcastV2SectionLabel(ginga, 700, 'side-drive')).toBe('スタンド前');
-    expect(broadcastV2SectionLabel(ginga, 2800, 'side-drive')).toBe('最後の直線');
-    /** ★天穹賞は発走が直線の中（直線[0-200]） */
-    const tenkyu = courseOf('g1-tenkyu');
+    const kikka = courseOf('g1-kikka');
+    /** ★1 周目のスタンド前の真ん中（★走路の形から導く・2026-09-30 に 菊花杯へ） */
+    const [fp] = firstPassStraightsMOf(kikka);
+    expect(broadcastV2SectionLabel(kikka, (fp!.fromM + fp!.toM) / 2, 'side-drive')).toBe('スタンド前');
+    expect(broadcastV2SectionLabel(kikka, 2800, 'side-drive')).toBe('最後の直線');
+    /** ★府中ダービーは発走が直線の中 */
+    const tenkyu = courseOf('g1-fuchu-derby');
     expect(broadcastV2SectionLabel(tenkyu, 100, 'side-drive')).toBe('スタート後');
     expect(broadcastV2SectionLabel(tenkyu, 2000, 'side-drive')).toBe('最後の直線');
-    /** ★対照: 桜星賞は変わらない */
+    /** ★対照: デモの桜花杯（★旧 桜星賞と同じ場・距離）は変わらない */
     const ousei = courseOf('g1-ousei');
     expect(broadcastV2SectionLabel(ousei, 1500, 'side-drive')).toBe('最後の直線');
     expect(broadcastV2SectionLabel(ousei, 100, 'side-drive')).toBe('スタート後');

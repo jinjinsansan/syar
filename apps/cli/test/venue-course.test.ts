@@ -133,7 +133,8 @@ describe('★競馬場の形を通してもエンジンと描画層の幾何が�
     for (const v of VENUES) {
       const spec = { lapM: v.lapM, homeStretchM: v.homeStretchM, widthM: v.widthM };
       const opts = { ...spec, turn: v.turn };
-      const d = GRADED_RACES.find((r) => r.venueId === v.id)!.distanceM;
+      /** ★2026-09-30: ★重賞の無い場（五稜郭・北九州）は 平場の 1600（★番組の 7 距離の真ん中） */
+      const d = GRADED_RACES.find((r) => r.venueId === v.id)?.distanceM ?? 1600;
       const course = ovalCourse(d, opts);
       for (const gate of [1, 6, 12]) {
         const seed = gate * 7919 + d;
@@ -200,8 +201,8 @@ describe('★1 鞍を開いた形が、エンジンと描画層で同じ走路�
 
   it('★★既定の 1 鞍は、直書きされていた画面と同じ（★配線しても画面が変わらない）', () => {
     const s = raceSetupById();
-    expect(s.meta.venue).toBe('五稜郭競馬場');
-    expect(s.meta.raceName).toBe('桜星賞');
+    expect(s.meta.venue).toBe('仁川競馬場');
+    expect(s.meta.raceName).toBe('桜花杯');
     expect(s.distanceM).toBe(1600);
     expect(s.surface).toBe('turf');
     expect(s.turn).toBe('left');
@@ -213,6 +214,6 @@ describe('★1 鞍を開いた形が、エンジンと描画層で同じ走路�
     expect(raceSetupFromParam('banana').fellBack).toBe(true);
     expect(raceSetupFromParam('banana').setup.race.id).toBe(DEFAULT_RACE_ID);
     expect(raceSetupFromParam(null).fellBack).toBe(false);
-    expect(raceSetupFromParam('g1-ginga').setup.race.name).toBe('銀河賞');
+    expect(raceSetupFromParam('g1-kikka').setup.race.name).toBe('菊花杯');
   });
 });

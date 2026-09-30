@@ -260,7 +260,7 @@ describe('★台本 v6 の切り替え地点', () => {
    * ★**旧台本は割合のまま**（★切り戻しの道を動かさない・`script-v6.test.ts`）
    */
   it('★v5 は割合のままで、走路の形に依らない', () => {
-    const entry = courses.find((c) => c.id === 'g1-tenkyu');
+    const entry = courses.find((c) => c.id === 'g1-fuchu-derby');
     const { course } = entry!;
     const v5 = broadcastV2ScriptBoundariesM(course, 'v5');
     for (const b of v5) {

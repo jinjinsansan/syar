@@ -19,7 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { cameraBasis, posOf, project, HORSE_HEIGHT_M } from '@star/render';
-import { raceSetupById } from '@star/scheduler';
+import { raceSetupFor } from '@star/scheduler';
 import { buildAuditRace, auditClock, auditSceneAt, auditTotalDisplaySec, RACE_DEFAULTS } from '../../../tools/lib/race-audit-build.mjs';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -30,7 +30,18 @@ const VIEWPORT = { width: 1280, height: 720 };
  * ★**実測で最も大きく映った 6 鞍**（`tools/audit-draw-scale.mjs --seeds 42,332,474,14`）。
  * ⚠️ ★ここを「短い距離だから」で選ばないこと。★**測った結果**から選んでいます。
  */
-const WORST_RACES = ['g3-ryofu', 'g3-shunrai', 'g3-semishigure', 'g3-futagoboshi', 'g2-tsukimi', 'g1-suisei'];
+/**
+ * ★2026-09-30: ★重賞を実在の年間日程にして ★旧の 6 鞍（涼風S・春雷C・蝉時雨賞・双子星S・月見丘C・彗星スプリント）が消えた。
+ *   ★大きさは ★鞍ではなく ★（場・馬場・距離）で決まるので、★同じ組を 平場として開いて見る（★平場は 10 場 × 7 距離で今も走る）。
+ */
+const WORST_RACES: readonly { readonly courseId: string; readonly surface: 'turf' | 'dirt'; readonly distanceM: number }[] = [
+  { courseId: 'shiokaze', surface: 'turf', distanceM: 1200 },
+  { courseId: 'tsukimi', surface: 'turf', distanceM: 1200 },
+  { courseId: 'shirasuna', surface: 'dirt', distanceM: 1200 },
+  { courseId: 'tsukimi', surface: 'dirt', distanceM: 1200 },
+  { courseId: 'tsukimi', surface: 'dirt', distanceM: 1400 },
+  { courseId: 'shiokaze', surface: 'turf', distanceM: 1200 },
+];
 /** ★実測の最大 512px を出したシード */
 const SEED = 14;
 const STEP = 0.2;
@@ -107,8 +118,8 @@ describe('★焼いた馬コマ（`tools/bake-race-frames.mjs`）', () => {
    */
   it('★画面上の馬が、焼いた高さを超えない（★超えたら引き伸ばしになる）', () => {
     let worst = { px: 0, race: '', shot: '' };
-    for (const raceId of WORST_RACES) {
-      const setup = raceSetupById(raceId);
+    for (const w of WORST_RACES) {
+      const setup = raceSetupFor({ ...w, grade: null, raceName: '', raceNo: '' });
       const built = buildAuditRace({
         seed: SEED, distance: setup.distanceM, surface: setup.surface,
         field: RACE_DEFAULTS.field, spec: setup.spec, turn: setup.turn,
@@ -129,11 +140,11 @@ describe('★焼いた馬コマ（`tools/bake-race-frames.mjs`）', () => {
             && p.y > -margin && p.y < cam.height + margin * 2)) continue;
           frames += 1;
           const hpx = HORSE_HEIGHT_M * p.pxPerM;
-          if (hpx > worst.px) worst = { px: hpx, race: raceId, shot: r.scene.shot.id };
+          if (hpx > worst.px) worst = { px: hpx, race: `${w.courseId}/${w.surface}/${w.distanceM}`, shot: r.scene.shot.id };
         }
       }
       /** ★1 頭も描かれなかったなら「異常なし」ではありません（R-3 / R-21） */
-      expect(frames, `${raceId}: 1 頭も描かれていない。測れていないだけかもしれません`).toBeGreaterThan(100);
+      expect(frames, `${w.courseId}/${w.surface}/${w.distanceM}: 1 頭も描かれていない。測れていないだけかもしれません`).toBeGreaterThan(100);
     }
     expect(
       worst.px,

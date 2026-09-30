@@ -23,7 +23,8 @@ import { DEFAULT_INTERVENTION_BALANCE } from '@star/race-engine';
 
 /** ★1 周目のスタンド前を見せる鞍（★レビュー側の回答 §0-1 の計算・★明示の一覧で持つ） */
 /** ★2026-09-29: ★大河原記念・白光記念 は 3000 に寄せた（裁定 C）ので 1 周目のスタンド前に来ない → ★2 鞍（★first-pass-time-of-day ① と同じ） */
-const FIRST_PASS_RACES: readonly string[] = ['g1-ginga', 'g3-hokkyokusei'];
+/** ★2026-09-30: ★実在の年間日程へ（★first-pass-time-of-day ① と同じ 5 鞍） */
+const FIRST_PASS_RACES: readonly string[] = ['g1-kikka', 'g1-spring-emperor', 'g2-nigawa-daishoten', 'g2-shinshun', 'g2-yodo-daishoten'];
 
 /** ★合成の位置（★毎秒 16m の等速）。★見る区間の境目だけを確かめるので、速さは何でもよい */
 const MPS = 16;
@@ -159,7 +160,8 @@ describe('★真横の直線だけ（台本 v9）', () => {
       return ovalCourse(s.distanceM, { ...s.spec, turn: s.turn });
     };
     expect(sideOnlyShownMetersOf(courseOf('g1-ousei'))).toEqual({ startShownM: 200, straightShownM: 250, firstPassSpansM: [] });
-    const ryusei = courseOf('g1-ryusei');
+    /** ★2026-09-30: ★旧 流星大賞典（越後＝旧天河の 2000）→ ★同じ場・同じ距離の 越後記念 */
+    const ryusei = courseOf('g3-echigo');
     expect(ryusei.segments[0]!.length, '★対照: 以前の決め方では 40m').toBe(40);
     expect(sideOnlyShownMetersOf(ryusei).startShownM).toBeCloseTo(250, 6);
     expect(sideOnlyShownMetersOf(ryusei).straightShownM).toBeCloseTo(312.5, 6);

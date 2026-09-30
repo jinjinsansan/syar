@@ -36,9 +36,9 @@ describe('★レース名', () => {
     expect(n).toBeGreaterThan(60);
   });
 
-  it('★平場は「場の名 ＋ クラス ＋ 距離」（★例: 五稜郭 1勝クラス 芝1600m）', () => {
+  it('★平場は「場の名 ＋ クラス ＋ 距離」（★例: 仁川 1勝クラス 芝1600m）', () => {
     expect(raceNameOf({ cycleIndex: 1, raceClass: 'win1', grade: null, venueId: 'star-park', surface: 'turf', distanceM: 1600 }))
-      .toBe('五稜郭 1勝クラス 芝1600m');
+      .toBe('仁川 1勝クラス 芝1600m');
     expect(raceNameOf({ cycleIndex: 1, raceClass: 'maiden', grade: null, venueId: 'shirasuna', surface: 'dirt', distanceM: 1200 }))
       .toBe('北九州 未勝利 ダート1200m');
     const shorts = VENUES.map((v) => v.name.replace(/競馬場$/, ''));

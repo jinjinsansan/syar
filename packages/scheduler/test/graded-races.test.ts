@@ -55,7 +55,7 @@ describe('★競馬場 10 場', () => {
   it('★知らない id は投げる（★黙って既定の場へ落とさない・R-27）', () => {
     expect(() => venueById('banana')).toThrow();
     /** ★2026-09-30: ★場の名前を 実在を連想できる呼び名に（★D-125） */
-    expect(venueById('star-park').name).toBe('五稜郭競馬場');
+    expect(venueById('star-park').name).toBe('仁川競馬場');
   });
 });
 
@@ -64,7 +64,8 @@ describe('★重賞 50 鞍', () => {
     expect(GRADED_RACES.length).toBe(50);
   });
 
-  it('★格の内訳は B案（G1 9 / G2 14 / G3 27）', () => {
+  /** ★2026-09-30: ★実在の年間日程へ（★G1 24 / G2 20 / G3 6・オーナー承認「ＯＫです」・旧 B案 9/14/27） */
+  it('★格の内訳は 実在の日程（G1 24 / G2 20 / G3 6）', () => {
     /**
      * ⚠️ ★正典 §10.3 の**週次頻度**（G1=3/G2=8/G3=20）とは別の量です。
      *    ★あれは「枠が週に何本あるか」、★こちらは「名前つきのレースが何鞍あるか」。
@@ -87,12 +88,17 @@ describe('★重賞 50 鞍', () => {
    *   ★9 鞍の距離を番組の 7 距離に寄せた（裁定 C）ため、★画だけの重なりが 4 組できた（★同じコース・同じ距離でも 季節が違う行事）。
    *   🔴 ★**重なりは 4 組まで**を釘にする（★いまの実測・★増えたら落として人が見る）。
    */
-  it('⚠️ ★**50 鞍すべてが違う行事になる**（競馬場 × 馬場 × 距離 × 月 が全部違う・★画だけの重なりは 4 組まで）', () => {
+  /**
+   * ★2026-09-30 に書き換え（★設計が変わった・オーナー承認）: ★実在の日程では 同じコースで何鞍も走る（★例: 府中の芝 2400 ＝ ダービー・オークス・国際杯・青葉杯）。
+   *   ★「全部違う画」はもう求めない。★代わりに ★いまの重なりの数を釘にする（★増えたら落として人が見る・★知らずに重なりが増えるのを止める）。
+   */
+  it('⚠️ ★同じコースの重なりは 実在の日程のぶんだけ（★月まで同じ 6 組・コースだけ同じ 12 組）', () => {
     const withMonth = GRADED_RACES.map((r) => `${raceLookKey(r)}/${r.month}`);
-    expect(withMonth.filter((k, i) => withMonth.indexOf(k) !== i), '★同じ（競馬場/馬場/距離/月）の鞍がある').toEqual([]);
+    const sameMonth = new Set(withMonth.filter((k, i) => withMonth.indexOf(k) !== i));
+    expect(sameMonth.size, `★同じ（競馬場/馬場/距離/月）: ${[...sameMonth].join(', ')}`).toBe(6);
     const looks = GRADED_RACES.map(raceLookKey);
     const overlapping = new Set(looks.filter((k, i) => looks.indexOf(k) !== i));
-    expect(overlapping.size, `★画の重なり: ${[...overlapping].join(', ')}`).toBeLessThanOrEqual(4);
+    expect(overlapping.size, `★画の重なり: ${[...overlapping].join(', ')}`).toBe(12);
   });
 
   it('⚠️ ★（旧・暦の前）50 鞍すべてが違う画になる — ★この形はもう見ない（上の網に置き換え）', () => {
@@ -107,11 +113,11 @@ describe('★重賞 50 鞍', () => {
     expect(GRADED_RACES.length).toBe(50);
   });
 
-  it('★10 場すべてに出番がある', () => {
+  /** ★2026-09-30: ★実在の日程の 50 鞍には ★五稜郭（函館）・北九州（小倉）の重賞が入らない（★五稜郭は霧ヶ原の場 id）（★2 場は平場だけ走る・オーナー承認） */
+  it('★重賞の無い場は 五稜郭・北九州の 2 場だけ', () => {
     const used = new Set(GRADED_RACES.map((r) => r.venueId));
-    for (const v of VENUES) {
-      expect(used.has(v.id), `★${v.name} に 1 鞍も無い`).toBe(true);
-    }
+    const unused = VENUES.filter((v) => !used.has(v.id)).map((v) => v.id).sort();
+    expect(unused).toEqual(['kirigahara', 'shirasuna']);
   });
 
   it('★その競馬場に在る馬場でしか組まれていない', () => {
@@ -163,7 +169,7 @@ describe('★重賞 50 鞍', () => {
 
   it('★三冠が 3 歳・芝で、距離が伸びていく', () => {
     /** ★クラシック三冠（正典 §10.3 が名指しで挙げている路線） */
-    const crown = ['g1-seikan', 'g1-tenkyu', 'g1-ginga'].map(gradedRaceById);
+    const crown = ['g1-satsuki', 'g1-fuchu-derby', 'g1-kikka'].map(gradedRaceById);
     for (const r of crown) {
       expect(r.age).toBe('3');
       expect(r.surface).toBe('turf');
@@ -182,12 +188,13 @@ describe('★重賞 50 鞍', () => {
 
   it('★知らない id は投げる（R-27）', () => {
     expect(() => gradedRaceById('banana')).toThrow();
-    expect(gradedRaceById('g1-ousei').name).toBe('桜星賞');
+    expect(gradedRaceById('g1-ousei').name).toBe('桜花杯');
   });
 
-  it('★既存のデモのレースが残っている（★桜星賞は動かさない）', () => {
+  /** ★2026-09-30: ★デモのレース（`DEFAULT_RACE_ID`）は 桜花杯・仁川の芝 1600（★場は 旧と同じ star-park ＝ 承認済みのデモの映像を動かさない） */
+  it('★既存のデモのレースが残っている（★id は動かさない）', () => {
     const ousei = gradedRaceById('g1-ousei');
-    expect(ousei.name).toBe('桜星賞');
+    expect(ousei.name).toBe('桜花杯');
     expect(ousei.venueId).toBe('star-park');
     expect(ousei.distanceM).toBe(1600);
   });
