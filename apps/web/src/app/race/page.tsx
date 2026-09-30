@@ -4121,8 +4121,11 @@ function RaceView({ setup, real }: {
         ? buildFramesByType({ a: walkA, ...(walkB !== undefined ? { b: walkB } : {}) }, undefined, SILKS_LAYOUT_CROUCH, sideMode)
         : undefined;
       };
-      const sideWalkHighQuality = EMBED_STRIP ? undefined : await computeWalk();
-      if (EMBED_STRIP) walkLoaderRef.current = computeWalk;
+      /**
+       * ★2026-09-30（オーナー「必ず 3 頭をパドックに・ゆっくり歩く と 走る を交互に」）: ★小窓でも最初から読む。
+       *   ★小窓で読まないと ★拡大した頃には紹介が終わっていて、★3 頭とも走りのコマをゆっくり送る代わりの絵になっていた。
+       */
+      const sideWalkHighQuality = await computeWalk();
       /** ★小窓では 空（★描くときは 真横の素材に回る `libraryOr`・★代わりの v2 も読まない） */
       const diagFrontHighQuality = EMBED_STRIP ? [] : bakedLibs?.['diag-front-v2'] ?? (frontV3 !== undefined
         ? buildFramesByType({ a: frontV3, ...frontByType }, undefined, SILKS_LAYOUT_FRONT, frontMode)
