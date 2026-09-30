@@ -164,7 +164,13 @@ const VENUE_RESOLVED = raceSetupFromParam(VENUE_PARAM);
  *    ★簿 `patch-by-position-breaks-declaration-order` で 1 度 踏んだ形）。
  */
 const TOD_RESOLVED = timeOfDayFromParam(QS?.get('tod') ?? null);
-const RACE_SETUP = VENUE_RESOLVED.setup;
+/**
+ * ★**開発の口 `?dev=1&dist=N`**（★2026-10-01・1200〜3000）。★重賞に無い距離（★仁川の 1200m など）を手元で流して
+ *   ★芝の流れ・時間割を調べるため（★オーナー「仁川の未勝利で芝が逆に動いた」）。★`dev=1` が無ければ 効かない。
+ */
+const DIST_OVERRIDE = QS?.get('dev') === '1' && QS.get('dist') !== null ? Number(QS.get('dist')) : null;
+const RACE_SETUP = DIST_OVERRIDE !== null && Number.isFinite(DIST_OVERRIDE) && DIST_OVERRIDE >= 1000 && DIST_OVERRIDE <= 3600
+  ? { ...VENUE_RESOLVED.setup, distanceM: DIST_OVERRIDE } : VENUE_RESOLVED.setup;
 
 /**
  * 🔴 ★**黙って読み替えない**（★裁定 Q-RACE-1 の条件 (a)）。
@@ -5041,6 +5047,8 @@ function RaceView({ setup, real }: {
       /** ★注視点も渡す（★跳びの区間で芝が戻らない・`visual-scroll.ts`） */
       const visualDelta = visualScroll.deltaAt(d, scene.focusS);
       const gaitDelta = visualDelta - visualScroll.deltaAt(RACE_INTRO_RACE_START_SEC);
+      /** ★調べるため（★2026-10-01・オーナー「芝が逆に動いた」）: 芝の模様の位置 ＝ 注視点 ＋ Δ。★描画には使わない */
+      (globalThis as { __raceGround?: unknown }).__raceGround = { d, focusS: scene.focusS, visualDelta };
       const metersByGate = new Map(easedAt.map((horse) => [horse.gate, horse.meters]));
       /**
        * ★**レースの音**（★2026-09-13・オーナー支給の音源）。
