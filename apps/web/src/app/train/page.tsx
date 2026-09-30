@@ -34,6 +34,8 @@ import { coatOfHorseId, coatCssFilter } from '@star/render';
 import { gradeEpCost, raceWeekMarkOf, type MenuId } from '@star/training';
 import { NoticeBar } from '../../components/uma/uma-parts';
 import { CLAIM_DEFAULT_MENU, CLAIM_TRAIN_EP_SHORT } from '../../lib/claims';
+import { loadTrainProfile, type TrainProfile } from '../../lib/train-profile';
+import { SignInRequiredError } from '../../lib/stable-repo';
 
 /** ★実行してから待機に戻るまで（★資料 §9 の 3200ms） */
 const RUN_MS = 3200;
@@ -99,6 +101,25 @@ export default function TrainPage(): React.ReactElement {
   const horse = horses.find((candidate) => candidate.id === selectedHorse)
     ?? horses.find((h) => h.week.kind === 'todo') ?? horses.find((h) => h.week.kind !== 'rest') ?? horses[0] ?? null;
   const todoCount = horses.filter((h) => h.week.kind === 'todo').length;
+  /**
+   * ★**この馬の実力**（★2026-09-30・オーナー「馬の実力を表すものを 育成ページで 全て一目で」）。
+   *   ★戦績・最近の着順・条件ごとの経験（★`lib/train-profile.ts`）。★能力の数値は出さない（★D-114）。
+   */
+  const [profile, setProfile] = useState<{ readonly id: string; readonly data: TrainProfile | null; readonly error: string | null } | null>(null);
+  const profileHorseId = horse?.id ?? null;
+  useEffect(() => {
+    if (profileHorseId === null || (view !== null && view.demo)) return;
+    let alive = true;
+    loadTrainProfile(profileHorseId)
+      .then((data) => { if (alive) setProfile({ id: profileHorseId, data, error: null }); })
+      .catch((e: unknown) => {
+        if (!alive) return;
+        /** ★未ログインは そう言う（★見本に落とさない・網 owner-scoped-needs-session） */
+        if (e instanceof SignInRequiredError) { setProfile({ id: profileHorseId, data: null, error: 'ログインすると見られます' }); return; }
+        setProfile({ id: profileHorseId, data: null, error: e instanceof Error ? e.message : String(e) });
+      });
+    return () => { alive = false; };
+  }, [profileHorseId, view]);
   const [running, setRunning] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => { if (timer.current !== undefined) clearTimeout(timer.current); }, []);
@@ -293,9 +314,7 @@ export default function TrainPage(): React.ReactElement {
             </span>
             <span style={GAUGE_WORD}>{fat.word}</span>
           </div>
-          <div style={{ fontSize: 11, lineHeight: 1.6, color: '#cfe0ee' }}>
-            この馬の力は、数字ではなく <a href="/mypage" style={{ color: '#ffe483' }}>記録と血統表</a> で見られます（マイページ）。
-          </div>
+          <AbilityPanel profile={profile !== null && profile.id === horse.id ? profile : null} />
         </section>
 
         {/* ★今週の調教（§3-3・1 つ選ぶ）。★名前・疲労・EP は名簿から（★画面に数を書かない・D-052） */}
@@ -359,6 +378,72 @@ export default function TrainPage(): React.ReactElement {
         {/* ★2026-09-30 オーナー「自分の馬を出走させるボタンはどこ？ 育成モードから出走登録をします」 */}
         <BigButton tone="blue" label="出走登録" sub="自分の馬をレースに出す" href="/entry" grow="1 1 130px" />
         <BigButton tone="ivory" label="ダッシュボード" sub="いつでも戻れます" href="/home" grow="1 1 130px" />
+      </div>
+    </div>
+  );
+}
+
+/** ★条件ごとの経験の軸（★`DiscoveryRow.axis`）と見出し */
+const AXIS_LABEL = { distance: '距離', surface: '馬場', condition: '馬場', strategy: '脚質' } as const;
+
+/**
+ * ★**この馬の実力**（★戦績・最近の着順・条件ごとの経験）。
+ * 🔴 ★能力・素質の数値は出さない（★正典 §5.5・§12.4・D-114「強さの手がかりは オッズと戦績だけ」）。
+ * ⚠️ ★経験は ★「走った回数」だけ（★得意・不得意の評価はまだ出せる値が無い・★回数から「得意」と言わない）。
+ */
+function AbilityPanel({ profile }: {
+  readonly profile: { readonly data: TrainProfile | null; readonly error: string | null } | null;
+}): React.ReactElement {
+  const head = <strong style={{ fontSize: 13, color: '#ffe483' }}>この馬の実力</strong>;
+  if (profile === null) return <div style={{ fontSize: 11, color: '#cfe0ee' }}>{head}　読み込み中…</div>;
+  if (profile.data === null) return <div role="alert" style={{ fontSize: 11, color: '#f6ddd9' }}>{head}　読めませんでした: {profile.error}</div>;
+  const p = profile.data;
+  const groups = (['distance', 'surface', 'strategy'] as const).map((axis) => ({
+    title: AXIS_LABEL[axis],
+    rows: p.discovery.filter((d) => d.axis === axis || (axis === 'surface' && d.axis === 'condition')),
+  }));
+  const cell: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, padding: '4px 0', borderRadius: 6, background: '#061a33' };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {head}
+      {/* ★戦績（★出走・1〜3 着・G1） */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4 }}>
+        {([['出走', p.starts], ['1着', p.wins], ['2着', p.seconds], ['3着', p.thirds], ['G1勝', p.gradedWins]] as const).map(([k, v]) => (
+          <span key={k} style={cell}>
+            <span style={{ fontSize: 10, color: '#cfe0ee' }}>{k}</span>
+            <span className="u-num" style={{ fontSize: 17 }}>{v}</span>
+          </span>
+        ))}
+      </div>
+      {/* ★最近の着順（★新しい順） */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <span style={{ fontSize: 11, color: '#cfe0ee' }}>最近の着順</span>
+        {p.recent.length === 0
+          ? <span style={{ fontSize: 12, color: '#e6eef6' }}>まだレースに出ていません</span>
+          : p.recent.map((r, i) => (
+            <span key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 12 }}>
+              <span className="u-num" style={{ width: 44, flex: '0 0 44px', color: r.finishPos <= 3 ? '#ffe483' : '#e6eef6' }}>{r.finishPos}着</span>
+              <span style={{ fontSize: 10, color: '#cfe0ee', flex: '0 0 auto' }}>／{r.fieldSize}頭</span>
+              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.raceName}</span>
+            </span>
+          ))}
+      </div>
+      {/* ★条件ごとの経験（★走った回数だけ） */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontSize: 11, color: '#cfe0ee' }}>走った経験（回数）</span>
+        {groups.map((g) => (
+          <div key={g.title} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 30, flex: '0 0 30px', fontSize: 10, color: '#cfe0ee' }}>{g.title}</span>
+            {g.rows.map((d) => (
+              <span key={`${d.axis}-${d.label}`} style={{
+                fontSize: 10, padding: '2px 6px', borderRadius: 5,
+                background: d.runs > 0 ? 'rgba(87,200,168,.18)' : 'rgba(251,247,236,.08)',
+                border: `1px solid ${d.runs > 0 ? 'rgba(87,200,168,.6)' : 'rgba(251,247,236,.2)'}`,
+                color: d.runs > 0 ? '#e6eef6' : '#9fb0bd',
+              }}>{d.label} {d.runs}</span>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   );
