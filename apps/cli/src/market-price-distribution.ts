@@ -136,6 +136,15 @@ export interface SireConcentration {
   readonly g1SireFoals: number;
   /** ★G1 を勝った種牡馬のうち 素質の順で いちばん上の順位（★1 始まり・★居なければ null） */
   readonly bestG1SireRank: number | null;
+  /** ★年に使われた父の数（★裁定 §13-2・★天井が無い。★減るのが集中） */
+  readonly usedSires: number;
+  /** ★有効な父の数 1 / Σ pᵢ²（★pᵢ ＝ 父 i の仔の割合） */
+  readonly effectiveSires: number;
+  /** ★上限に張り付いた父の数（★上限が実際に縛っているか） */
+  readonly saturatedSires: number;
+  /** ★G1 を勝った牡の数 と ★そのうち 父として使われた数（★裁定 §13-3 の「1 つの数」） */
+  readonly g1Sires: number;
+  readonly g1SiresUsed: number;
 }
 
 export function sireConcentrationOf(
@@ -161,6 +170,11 @@ export function sireConcentrationOf(
     top5WithG1: top.filter((x) => x.g1Wins > 0).length,
     g1SireFoals: sires.filter((x) => x.g1Wins > 0).reduce((a, b) => a + b.foals, 0),
     bestG1SireRank: ((k) => (k < 0 ? null : k + 1))(sires.findIndex((x) => x.g1Wins > 0)),
+    usedSires: sires.filter((x) => x.foals > 0).length,
+    effectiveSires: foals === 0 ? 0 : 1 / sires.reduce((a, x) => a + (x.foals / foals) ** 2, 0),
+    saturatedSires: sires.filter((x) => x.foals > 0 && x.foals >= stallionCoveringLimit({ g1Wins: x.g1Wins }, DEFAULT_BALANCE)).length,
+    g1Sires: sires.filter((x) => x.g1Wins > 0).length,
+    g1SiresUsed: sires.filter((x) => x.g1Wins > 0 && x.foals > 0).length,
   };
 }
 
@@ -481,6 +495,9 @@ if (isMain) {
     console.log(`    ★上位 5 頭の種牡馬の仔 ${sc.top5Foals} / 仔 ${sc.foals} ＝ ${((sc.top5Foals / Math.max(1, sc.foals)) * 100).toFixed(1)}%`
       + `（★種牡馬 ${sc.stallions} 頭・牝馬 ${sc.mares} 頭・★上位 5 頭のうち G1 を勝った ${sc.top5WithG1} 頭）`);
     console.log(`    ★G1 を勝った種牡馬の仔 ${sc.g1SireFoals} 頭 / ★G1 を勝った種牡馬の 素質の順位（最上位）${sc.bestG1SireRank ?? 'なし'}`);
+    console.log(`    ★G1 を勝った牡 ${sc.g1Sires} 頭のうち 父として使われた ${sc.g1SiresUsed} 頭（★§13-3 の 1 つの数）`
+      + ` / ★使われた父 ${sc.usedSires} 頭・有効な父 ${sc.effectiveSires.toFixed(1)} 頭・上限に張り付いた父 ${sc.saturatedSires} 頭`
+      + `（★母数: この実行の走った牝馬 ${sc.mares} 頭・牡 ${sc.stallions} 頭）`);
     console.log('    ⚠️ ★近似: 全牝馬が素質の合計の順で選ぶ（★厩舎の方針・近交・齢・頭数の比を落とす ＝ ★偏りの上側）。★G1 の勝ちはこのハーネスのレースが配る');
   }
   console.log(`\n  開催 ${d.races} レース / 走った馬 ${d.ran} 頭 / ★G1 を勝った馬 ${d.g1Winners} 頭`
