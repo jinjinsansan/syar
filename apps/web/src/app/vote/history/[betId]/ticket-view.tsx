@@ -99,6 +99,9 @@ function Ticket({ t }: { readonly t: VoteItem }): React.ReactElement {
   );
 }
 
+/** ★結果待ちの読み直しの間隔（★帯の `REFRESH_MS` と同じ 15 秒） */
+const VOTE_REFRESH_MS = 15_000;
+
 export function VoteTicketView({ betId }: { readonly betId: string }): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
   /** ★undefined = 読み込み中・null = 見つからない */
@@ -120,6 +123,22 @@ export function VoteTicketView({ betId }: { readonly betId: string }): React.Rea
       });
     return () => { active = false; };
   }, [betId]);
+  /**
+   * ★**結果待ちの間は 読み直す**（★2026-10-01・オーナー「既に結果は出ているのに 結果待ち」）。
+   *   ★映像では発走の時点で着順が見えるが、★馬券を確定するのは ワーカーの確定の処理（★発走から 3 分以降・`SETTLE_AFTER_START_MS`）。
+   *   ★この画面は 開いたときに 1 回読むだけだったので ★確定しても 読み込み直すまで「結果待ち」のままだった。
+   *   ★帯と同じ 15 秒ごと・★画面が見えている間だけ。★確定したら止める。
+   */
+  const waiting = ticket !== undefined && ticket !== null && ticket.state === 'wait';
+  useEffect(() => {
+    if (!waiting) return undefined;
+    let active = true;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      loadVoteTicket(betId).then((t) => { if (active && t !== null) setTicket(t); }, () => undefined);
+    }, VOTE_REFRESH_MS);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [waiting, betId]);
 
   return (
     <div data-theme="uma" data-page-body className={paused ? 'u-paused' : undefined} style={{

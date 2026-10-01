@@ -104,6 +104,21 @@ export default function VoteHistoryPage(): React.ReactElement {
         console.warn('[vote-history] 投票の履歴を読めませんでした', e);
       });
   }, [nowMs, loadedFor]);
+  /**
+   * ★**結果待ちが残っている間は 読み直す**（★2026-10-01・オーナー「既に結果は出ているのに 結果待ち」・控えの画面と同じ）。
+   *   ★15 秒ごと・★画面が見えている間だけ。★結果待ちが 0 になったら止める。
+   */
+  const anyWaiting = (data?.items ?? []).some((i) => i.state === 'wait');
+  useEffect(() => {
+    if (!anyWaiting || nowMs === null) return undefined;
+    let active = true;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      /** ★基準の時刻は 壁時計の 1 か所（`useNow`）から（★直に時計を読まない） */
+      loadVoteHistory(nowMs).then((d) => { if (active) setData(d); }, () => undefined);
+    }, 15_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [anyWaiting, nowMs]);
 
   const counts = useMemo(() => {
     const items = data?.items ?? [];
