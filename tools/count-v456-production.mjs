@@ -176,6 +176,22 @@ try {
     const label = r.active === null ? 'すべて（絞らない）' : r.active ? '現役' : '引退';
     console.log(`  ${label.padEnd(10)}  誕生週の種類 ${String(r.kinds).padStart(4)}  位相 0/1/2/3 ＝ ${r.p0} / ${r.p1} / ${r.p2} / ${r.p3}`);
   }
+  /**
+   * ★**崖**（★簿 POOL-CLIFF）: ★種類の数では山が見えない（★144 種類でも 1 週に偏れば崖）。
+   *   ★現役のうち ★いちばん多い誕生週の頭数と割合・★上位 5 週の合計の割合。★線は ★最大の 1 週が 現役の 10% 未満。
+   */
+  const peaks = (await c.query(`
+    select birth_week, count(*)::int as n
+      from horses where retired_at_week is null
+     group by birth_week order by n desc, birth_week`)).rows;
+  const activeN = peaks.reduce((a, r) => a + r.n, 0);
+  if (activeN > 0) {
+    const top = peaks[0];
+    const top5 = peaks.slice(0, 5).reduce((a, r) => a + r.n, 0);
+    const share = top.n / activeN;
+    console.log(`  現役の最大の山: 誕生週 ${top.birth_week} に ${top.n} 頭（${(share * 100).toFixed(2)}%）／上位 5 週の合計 ${top5} 頭（${((top5 / activeN) * 100).toFixed(2)}%）・現役 ${activeN} 頭`);
+    console.log(share < 0.10 ? '  ✔ ★最大の 1 週は 10% 未満（★崖は無い・POOL-CLIFF の線）' : '  🔴 ★最大の 1 週が 10% 以上（★まだ崖がある）');
+  }
 
   console.log('');
   if (total.races < 2000) console.log(`  ⚠️ ★まだ ${total.races} レース（★2,000 未満）。★線（28.5%）での判定は まだしない（★裁定）。`);
