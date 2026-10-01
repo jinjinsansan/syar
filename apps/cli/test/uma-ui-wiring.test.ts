@@ -331,6 +331,38 @@ describe('★馬物語 UI の配線（R-14）', () => {
     expect(parts).toContain('ゲーム内で使う（無償でのみ受け取れます）');
   });
 
+  /**
+   * 🔴 ★**副題を隠してよいのは スマホの /home の上段の 1 か所だけ**（★2026-10-01・オーナー決定「省きましょう 1 行でいいです」・裁定 R28 第 1 段 §3）。
+   *   ★副題は ★「参加ポイントは無償でのみ受け取れる」を画面で言う役目（★二種ポイントの 5 原則・弁護士ゲート）。★ほかの画面で消えたら落とす。
+   */
+  const subHidingSelectors = (css: string): string[] => {
+    const out: string[] = [];
+    for (const m of css.replace(/\/\*[\s\S]*?\*\//g, ' ').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const body = m[2]!;
+      if (!/display\s*:\s*none|visibility\s*:\s*hidden/.test(body)) continue;
+      for (const sel of m[1]!.split(',')) if (sel.includes('u-cap-sub')) out.push(sel.trim());
+    }
+    return out;
+  };
+  const UMA_CSS = ['apps/web/src/components/uma/uma-theme.css', 'apps/web/src/components/uma/channel-tv.css', 'apps/web/src/app/globals.css'];
+  const HOME_ONLY = "[data-theme='uma'].u-home .u-topbar-points .u-cap-sub";
+
+  it('🔴 ⑥b ★EP の副題を隠す規則は スマホの /home の上段の 1 か所だけ', () => {
+    const found = UMA_CSS.flatMap((f) => subHidingSelectors(read(f)).map((s) => `${f}: ${s}`));
+    expect(found.length, '★副題を隠す規則が 1 つも見つからない（★走査が壊れている）').toBeGreaterThan(0);
+    expect(found, '★副題を隠してよいのは /home の上段だけ').toEqual([`apps/web/src/components/uma/channel-tv.css: ${HOME_ONLY}`]);
+    /** ★その 1 か所は ★スマホの幅だけ（★PC は 副題を 2 段で出す） */
+    const tv = read('apps/web/src/components/uma/channel-tv.css');
+    const at = tv.indexOf(HOME_ONLY);
+    expect(at, '★/home の規則が見つからない').toBeGreaterThan(-1);
+    expect(tv.lastIndexOf('@media (max-width: 1023px)', at), '★スマホの幅の外で隠している').toBeGreaterThan(-1);
+  });
+
+  it('★対照 ⑥b: ★ほかの場所で副題を隠す変異は ★落ちる', () => {
+    const mutated = `${read('apps/web/src/components/uma/uma-theme.css')}\n[data-theme='uma'] .u-cap-sub { display: none; }`;
+    expect(subHidingSelectors(mutated)).toContain("[data-theme='uma'] .u-cap-sub");
+  });
+
   it('★停止しても情報が欠けない（★速度線は 0% から不透明・資料 §5-7 の 4）', () => {
     const css = read('apps/web/src/components/uma/uma-theme.css');
     /** ★`animation-play-state` ではなく `animation:none` で止める（★途中の姿で固まらない） */
