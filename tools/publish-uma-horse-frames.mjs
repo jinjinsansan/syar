@@ -29,8 +29,14 @@ import sharp from 'sharp';
 
 const SRC = 'out/gen/walk-aligned';
 const OUT = 'apps/web/public/art/uma';
-/** ★画面での表示幅 272px の 2 倍（★高解像度の端末で滲まない最小） */
-const OUT_W = 544;
+/**
+ * ★画面での表示幅 272px の 2 倍（★高解像度の端末で滲まない最小）。
+ * ★`--hires`（★2026-10-01・オーナー「PC 表示だと B 級品感」）: ★PC のホームは 横 約 670px で出すので ★幅 1088 の表と立ち姿を
+ *   ★**別名**（`horse-walk-sheet-2x.*`・`horse-stand-2x.*`）で書く。★1 倍の既存ファイル・顔・1 コマずつの絵は ★書かない。
+ */
+const HIRES = process.argv.includes('--hires');
+const OUT_W = HIRES ? 1088 : 544;
+const SUFFIX = HIRES ? '-2x' : '';
 /** ★外接矩形に足す余白（★幅に対する割合。★drop-shadow が切れないように） */
 const PAD = 0.015;
 /** ★立ち姿を選ぶときに見る「足元の帯」（★被写体高に対する割合） */
@@ -98,7 +104,7 @@ console.log(`  共通の切り出し: ${width}x${height} @(${left},${top})  → 
 console.log('  コマ  足元の帯の横幅');
 
 mkdirSync(OUT, { recursive: true });
-for (let i = 0; i < 8; i += 1) {
+for (let i = 0; i < 8 && !HIRES; i += 1) {
   const base = sharp(`${SRC}/${nn(i)}.png`).extract({ left, top, width, height })
     .resize(OUT_W, outH, { fit: 'fill', kernel: 'lanczos3' });
   await base.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/horse-walk-${nn(i)}.png`);
@@ -110,8 +116,8 @@ for (let i = 0; i < 8; i += 1) {
 const stand = m.reduce((best, s, i) => (s.footSpan < m[best].footSpan ? i : best), 0);
 const standSrc = sharp(`${SRC}/${nn(stand)}.png`).extract({ left, top, width, height })
   .resize(OUT_W, outH, { fit: 'fill', kernel: 'lanczos3' });
-await standSrc.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/horse-stand.png`);
-await standSrc.clone().webp({ quality: 90 }).toFile(`${OUT}/horse-stand.webp`);
+await standSrc.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/horse-stand${SUFFIX}.png`);
+await standSrc.clone().webp({ quality: 90 }).toFile(`${OUT}/horse-stand${SUFFIX}.webp`);
 console.log(`\n★立ち姿 = コマ ${nn(stand)}（足元 ${m[stand].footSpan}px・いちばん狭い） → ${OUT}/horse-stand.webp`);
 console.log(`★歩き 8 コマ → ${OUT}/horse-walk-01..08.webp`);
 
@@ -124,8 +130,10 @@ const headRect = {
 };
 const headH = Math.round((headRect.height / headRect.width) * HEAD_W);
 const head = sharp(`${SRC}/${nn(stand)}.png`).extract(headRect).resize(HEAD_W, headH, { kernel: 'lanczos3' });
-await head.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/horse-face.png`);
-await head.clone().webp({ quality: 92 }).toFile(`${OUT}/horse-face.webp`);
+if (!HIRES) {
+  await head.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/horse-face.png`);
+  await head.clone().webp({ quality: 92 }).toFile(`${OUT}/horse-face.webp`);
+}
 console.log(`★顔アップ（コマ ${nn(stand)} から切り出し・焼いていない） → ${OUT}/horse-face.webp  ${HEAD_W}x${headH}`);
 
 /**
@@ -141,6 +149,6 @@ const sheet = sharp({
   left: OUT_W * i,
   top: 0,
 }))));
-await sheet.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/horse-walk-sheet.png`);
-await sheet.clone().webp({ quality: 90 }).toFile(`${OUT}/horse-walk-sheet.webp`);
+await sheet.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/horse-walk-sheet${SUFFIX}.png`);
+await sheet.clone().webp({ quality: 90 }).toFile(`${OUT}/horse-walk-sheet${SUFFIX}.webp`);
 console.log(`★スプライト表 → ${OUT}/horse-walk-sheet.webp  ${OUT_W * 8}x${outH}（★画面は background-size: 800% 100%）`);

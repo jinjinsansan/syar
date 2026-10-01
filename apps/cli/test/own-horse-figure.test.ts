@@ -40,7 +40,8 @@ describe('★自分の馬は 同じ 1 頭の姿', () => {
   it('③ ★毛色は ★馬 ID から（★`coatOfHorseId`・★レースの走りと同じ出どころ）', () => {
     /** ★2026-10-01: ★毛色は ★馬体の画素だけに焼く（`coated-image.ts`）。★毛色は馬 ID から */
     expect(PARTS).toContain('const coat = coatOfHorseId(horseId);');
-    expect(PARTS).toMatch(/useCoatedImage\('\/art\/uma\/horse-walk-sheet\.webp', coat\)/);
+    /** ★2026-10-01: ★PC は 2 倍の表（`-2x`）・★スマホは 1 倍。★どちらも 同じ毛色（`coat`） */
+    expect(PARTS).toMatch(/useCoatedImage\(hires === null \? null : hires \? '\/art\/uma\/horse-walk-sheet-2x\.webp' : '\/art\/uma\/horse-walk-sheet\.webp', coat\)/);
   });
 
   /**

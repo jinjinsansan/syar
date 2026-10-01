@@ -474,6 +474,19 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
  *   ★立ち姿 `horse-stand.webp`・★`running` の間は 歩きの 8 コマ `horse-walk-sheet.webp`（★`u-walk` と対）。
  *   ⚠️ ★見本の `chibi-horse.png` を ★持ち馬の欄に使わないこと（★見本を自分の馬として見せる ＝ P0-B と同じ族・★網 `own-horse-figure.test.ts`）。
  */
+/** ★PC の幅か（★`(min-width: 1024px)`・★CSS の `@media` と同じ境目）。★分かるまでは `null` */
+function useWideFigure(): boolean | null {
+  const [wide, setWide] = useState<boolean | null>(null);
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    const apply = (): void => { setWide(media.matches); };
+    apply();
+    media.addEventListener('change', apply);
+    return () => { media.removeEventListener('change', apply); };
+  }, []);
+  return wide;
+}
+
 export function OwnHorseFigure({ horseId, running, onClick, style, className }: {
   readonly horseId: string;
   readonly running: boolean;
@@ -488,8 +501,15 @@ export function OwnHorseFigure({ horseId, running, onClick, style, className }: 
    *   🔴 ★旧: ★CSS の filter を絵全体に掛け、★目・輪郭・白斑まで暗くなって ★黒い膜を被せたように見えた（オーナー指摘）。
    */
   const coat = coatOfHorseId(horseId);
-  const walkUrl = useCoatedImage('/art/uma/horse-walk-sheet.webp', coat);
-  const standUrl = useCoatedImage('/art/uma/horse-stand.webp', coat);
+  /**
+   * ★**PC は 2 倍の絵**（★2026-10-01・オーナー「PC 表示だと拡大されるのか 雑感・きめ細かさがない・B 級品感」）。
+   *   ★1 倍の表は 1 コマ 544px。★PC のホームは 横 約 670px（★× 端末の倍率）で出すので ★引き伸ばされていた。
+   *   ★幅 1024px 以上だけ ★1088px の表（`-2x`・元の 1430px から縮めたもの）。★スマホは 1 倍のまま（★合格・通信量を増やさない）。
+   *   ★幅が分かるまでは 読まない（★1 倍と 2 倍を 両方読まない）。
+   */
+  const hires = useWideFigure();
+  const walkUrl = useCoatedImage(hires === null ? null : hires ? '/art/uma/horse-walk-sheet-2x.webp' : '/art/uma/horse-walk-sheet.webp', coat);
+  const standUrl = useCoatedImage(hires === null ? null : hires ? '/art/uma/horse-stand-2x.webp' : '/art/uma/horse-stand.webp', coat);
   const sheet = running ? walkUrl : standUrl;
   return (
     <div

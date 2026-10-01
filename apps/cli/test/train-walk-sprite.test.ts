@@ -60,7 +60,17 @@ describe('🔴 ★育成の歩き（スプライト表）', () => {
 
   it('🔴 ★`background-size` の横幅が ★コマ数 × 100% になっている', () => {
     /** ★2026-10-01: ★表は 毛色を焼いた URL（`useCoatedImage('/art/uma/horse-walk-sheet.webp', …)`）で渡し、★背景は `url('${sheet}') … / N% 100%` */
-    expect(PAGE).toContain("useCoatedImage('/art/uma/horse-walk-sheet.webp'");
+    expect(PAGE).toContain("'/art/uma/horse-walk-sheet.webp', coat)");
+    /** ★PC の 2 倍の表（★2026-10-01）も ★同じコマ数（★幅 ÷ 高さが 1 倍の表と同じ ＝ 横 8 コマ） */
+    const webpSize = (file: string): { readonly w: number; readonly h: number } => {
+      const b = readFileSync(file);
+      expect(b.toString('ascii', 12, 16), `★${file} が VP8X でない`).toBe('VP8X');
+      return { w: 1 + b.readUIntLE(24, 3), h: 1 + b.readUIntLE(27, 3) };
+    };
+    const x1 = webpSize(path.join(ART, 'horse-walk-sheet.webp'));
+    const x2 = webpSize(path.join(ART, 'horse-walk-sheet-2x.webp'));
+    expect(x2.w, '★2 倍の表の幅').toBe(x1.w * 2);
+    expect(x2.h, '★2 倍の表の高さ').toBe(x1.h * 2);
     const m = PAGE.match(/url\('\$\{sheet\}'\) no-repeat 0 0 \/\s*(\d+)%\s*100%/);
     expect(m, '🔴 ★歩きの表に `/ <幅>% 100%` が付いていない').not.toBeNull();
     expect(Number(m![1]), `🔴 ★${FRAMES} コマなら ${FRAMES * 100}% です`).toBe(FRAMES * 100);
