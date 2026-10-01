@@ -41,6 +41,38 @@ describe('★本編は 小窓テレビより上（★重なり順）', () => {
     expect(zIndexOf(CSS, SP_STAGE)).toBeGreaterThan(zIndexOf(CSS, SP_TV));
   });
 
+  /**
+   * ★**本編の段は 位置を持つ**（★レビュー側の依頼・2026-10-01）。★z-index は ★position が static だと効かない
+   *   （★ただし grid・flex の子は static でも効く — ★PC のビジョンは grid。★それでも 位置を持たせて 両方で効くようにしておく）。
+   *   ★PC: ★本編の段の元の規則（`uma-theme.css` の `.u-race-strip-stage`）が `position: relative`。
+   *   ★スマホ: ★テレビの升の中の規則が `position: absolute`。
+   */
+  const THEME = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/uma-theme.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const positionOf = (css: string, selector: string): string | null => {
+    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!m[1]!.split(',').map((s) => s.trim()).includes(selector)) continue;
+      const p = /(?:^|;|\s)position\s*:\s*(static|relative|absolute|fixed|sticky)/.exec(m[2]!);
+      if (p !== null) return p[1]!;
+    }
+    return null;
+  };
+  const STAGE_BASE = "[data-theme='uma'] .u-race-strip-stage";
+  const positioned = (p: string | null): boolean => p === 'relative' || p === 'absolute' || p === 'fixed' || p === 'sticky';
+
+  it('🔴 ★本編の段は 位置を持つ（★PC は元の規則・スマホは升の中の規則）', () => {
+    expect(positioned(positionOf(THEME, STAGE_BASE)), '★本編の段の元の規則に position が無い').toBe(true);
+    expect(positioned(positionOf(CSS, SP_STAGE)), '★スマホの本編の段に position が無い').toBe(true);
+  });
+
+  it('★対照: ★本編の段の position を外す変異は ★落ちる', () => {
+    const baseMut = THEME.replace(/(\[data-theme='uma'\] \.u-race-strip-stage \{ )position: relative; /, '$1');
+    expect(baseMut).not.toBe(THEME);
+    expect(positioned(positionOf(baseMut, STAGE_BASE))).toBe(false);
+    const spMut = CSS.replace(/(\.u-tvstrip-screen > \.u-race-strip-stage:not\(\.u-race-strip-stage-offscreen\):not\(\.u-race-strip-stage-full\) \{\s*)position: absolute; /, '$1');
+    expect(spMut).not.toBe(CSS);
+    expect(positioned(positionOf(spMut, SP_STAGE))).toBe(false);
+  });
+
   it('★対照: ★本編の段の z-index を外す変異は ★落ちる', () => {
     const strip = (css: string, sel: string): string => css.replace(new RegExp(`(${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{[^}]*?)z-index\\s*:\\s*-?\\d+;?`), '$1');
     const pcMut = strip(CSS, PC_STAGE);
