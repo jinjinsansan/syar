@@ -758,7 +758,7 @@ function RaceStripBody(): React.ReactElement | null {
         recentRunners={data?.runners ?? []} recentId={recent?.id ?? null} field={data?.nextField ?? []}
         myGates={myGates !== null && myGates.key === mineKey ? myGates.set : null}
         profiles={profiles !== null && profiles.id === nextId ? profiles.map : null}
-        reducedMotion={motionReduced} onAir={false} />
+        reducedMotion={motionReduced} onAir={false} hires />
     </div>
   </div> : null;
   const channelEl = tvMode !== null && nowMs !== null ? <StripChannel

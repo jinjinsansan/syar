@@ -1,0 +1,9 @@
+Edit the illustration at out/gen/narrator-ti-fix/closed.png (a 300x344 anime-style head-and-shoulders portrait of a race commentator: stocky man, short dark hair, goatee stubble, black shirt, dark swirling background).
+
+Produce ONE new image, same size 300x344, that is IDENTICAL to the input in every way — same man, same face, same art style and line weight, same colors, same hair, same stubble, same shirt, same background, same framing, same head position and angle — EXCEPT the mouth.
+
+Change only the mouth: mouth wide open shouting (about 22 pixels), upper and lower teeth visible, tongue faintly visible. Draw it in the SAME anime illustration style as the rest of the face: clean dark outline for the lips, the inside of the mouth a dark red-brown with soft cel shading (NOT a flat black shape), teeth off-white. The stubble around the mouth stays as in the input. The jaw drops only very slightly.
+
+Do not move, scale, rotate or recrop the head. Do not change the eyes, nose, eyebrows, hair or anything outside the lower face. No text, no watermark.
+
+Save the result as a PNG image.

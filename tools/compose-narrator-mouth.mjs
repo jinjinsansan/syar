@@ -15,16 +15,26 @@
  *   入力: `out/gen/narrator-tp-fix/closed.png`・`open-normal.png`・`open-hot.png`・`open-shout.png`（★生成は大きいので 300×344 に縮める）
  *   出力: `apps/web/public/art/narrator-tp-{normal,hot,shout}-open.webp`（★既存を置き換える・★閉じた絵は触らない）
  *
- * 実行: node tools/compose-narrator-mouth.mjs
+ * ★2026-10-02: ★イラストの版 `ti` にも使う（★オーナー「小窓の中に出る川崎タカシのアニメの唇がおかしい」: ★`ti` の開けた口も ★平たい黒い塊だった）。
+ *   ★`--cast ti` で 入力 `out/gen/narrator-ti-fix/`・出力 `narrator-ti-*-open.webp`・★口の楕円は ti の座標。
+ *
+ * 実行: node tools/compose-narrator-mouth.mjs [--cast tp|ti]
  */
 import { existsSync } from 'node:fs';
 import sharp from 'sharp';
 
-const SRC = 'out/gen/narrator-tp-fix';
+const castArg = process.argv.indexOf('--cast');
+const CAST = castArg >= 0 ? process.argv[castArg + 1] : 'tp';
+if (CAST !== 'tp' && CAST !== 'ti') throw new Error(`★--cast は tp か ti（${CAST}）`);
+const SRC = `out/gen/narrator-${CAST}-fix`;
 const OUT = 'apps/web/public/art';
 const W = 300, H = 344;
-/** ★口のまわりの楕円（★300×344 の座標・★2026-10-01 に 閉じた写真と開けた写真の差から測った: 中心 x140 y231・範囲 x119〜156 y216〜263・★名札＝下 60px より上・網 `narrator-frame-fit`） */
-const MOUTH = { cx: 142, cy: 226, rx: 46, ry: 40, feather: 14 };
+/**
+ * ★口のまわりの楕円（★300×344 の座標）。
+ *   tp: ★2026-10-01 に 閉じた写真と開けた写真の差から測った: 中心 x140 y231・範囲 x119〜156 y216〜263・★名札＝下 60px より上・網 `narrator-frame-fit`
+ *   ti: ★2026-10-02 に 生成した開けた口（1171×1343）から測った: 中心 x145 y211（★無精ひげの外まで広げない）
+ */
+const MOUTH = CAST === 'tp' ? { cx: 142, cy: 226, rx: 46, ry: 40, feather: 14 } : { cx: 146, cy: 211, rx: 40, ry: 28, feather: 10 };
 
 const raw = async (file) => (await sharp(file).resize(W, H, { fit: 'fill', kernel: 'lanczos3' }).removeAlpha().raw().toBuffer());
 
@@ -56,6 +66,6 @@ for (const [name, file] of [['normal', 'open-normal.png'], ['hot', 'open-hot.png
       for (let c = 0; c < 3; c += 1) out[i + c] = Math.round(base[i + c] * (1 - a) + open[i + c] * a);
     }
   }
-  await sharp(out, { raw: { width: W, height: H, channels: 3 } }).webp({ quality: 90 }).toFile(`${OUT}/narrator-tp-${name}-open.webp`);
-  console.log(`  ${name}: 口のまわりを貼った → ${OUT}/narrator-tp-${name}-open.webp（★楕円の外の差 平均 ${(outsideDiff / outsideN).toFixed(1)}／255）`);
+  await sharp(out, { raw: { width: W, height: H, channels: 3 } }).webp({ quality: 90 }).toFile(`${OUT}/narrator-${CAST}-${name}-open.webp`);
+  console.log(`  ${name}: 口のまわりを貼った → ${OUT}/narrator-${CAST}-${name}-open.webp（★楕円の外の差 平均 ${(outsideDiff / outsideN).toFixed(1)}／255）`);
 }

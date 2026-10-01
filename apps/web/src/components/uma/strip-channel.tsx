@@ -46,6 +46,11 @@ export interface StripChannelProps {
   readonly reducedMotion: boolean;
   /** ★本編が この箱の上に重なっている（★上の帯に「● 中継」） */
   readonly onAir: boolean;
+  /**
+   * ★**拡大したテレビ**（★PC の大きさで描いて 画面いっぱいへ拡げる）では ★馬の絵を 2 倍の表に（★2026-10-02 オーナー
+   *   「拡大した時の馬の紹介の馬が 引き伸ばした感じで 小窓よりクオリティが悪い」: ★1 倍の絵（1 コマ 544px）を 2〜4 倍に引き伸ばしていた）。
+   */
+  readonly hires?: boolean;
 }
 
 const hhmm = (ms: number): string => {
@@ -116,5 +121,6 @@ export function StripChannel(p: StripChannelProps): React.ReactElement {
     footL={footL} footM={footM} footR={footR} toStart={left === null ? '' : mss(left)}
     wipe={wipeKey > 0 && !p.reducedMotion && now.sinceSec < 0.45}
     onAir={p.onAir}
+    hires={p.hires === true}
   />;
 }

@@ -65,6 +65,8 @@ export interface ChannelTvProps {
   readonly wipe: boolean;
   /** ★本編が この箱の上に重なっているか（★上の帯に「● 中継」） */
   readonly onAir: boolean;
+  /** ★拡大したテレビ（★馬の絵を 2 倍の表に） */
+  readonly hires?: boolean;
 }
 
 export function ChannelTv(p: ChannelTvProps): React.ReactElement {
@@ -85,9 +87,9 @@ export function ChannelTv(p: ChannelTvProps): React.ReactElement {
         {(show === 'odds' || show === 'card') && p.race !== null
           && <Table kind={show} size={p.size} now={p.now} runners={p.runners} odds={p.odds} race={p.race} />}
         {show === 'paddock' && p.now.horseIndex !== null && p.order[p.now.horseIndex] !== undefined
-          && <Paddock horse={p.order[p.now.horseIndex]!} index={p.now.horseIndex} field={field} />}
+          && <Paddock horse={p.order[p.now.horseIndex]!} index={p.now.horseIndex} field={field} hires={p.hires === true} />}
         {show === 'horse' && p.now.horseIndex !== null && p.order[p.now.horseIndex] !== undefined
-          && <HorseCard horse={p.order[p.now.horseIndex]!} field={field} />}
+          && <HorseCard horse={p.order[p.now.horseIndex]!} field={field} hires={p.hires === true} />}
         {show === 'narr' && <Narr text={p.narration} />}
         {show === 'venue' && p.venue !== null && <VenueShow venue={p.venue} />}
         {show === 'course' && p.venue !== null && p.race !== null && <CourseShow venue={p.venue} race={p.race} />}
@@ -173,8 +175,8 @@ function Table({ kind, size, now, runners, odds, race }: {
  * ★立ち姿 1 枚（★毛色は 馬体の画素だけ・★歩きの 8 コマは使わない・§6）。
  * 🔴 ★2026-10-01: ★見本の `train-body-idle`（★細身の別の絵柄）は ★ホームの馬と違う馬に見えた（オーナー指摘）→ ★ホーム・育成と同じ立ち姿 `horse-stand`。
  */
-function StandingHorse({ horseId, className }: { readonly horseId: string | null; readonly className: string }): React.ReactElement {
-  const url = useCoatedImage('/art/uma/horse-stand.webp', coatOfHorseId(horseId ?? 'unknown'));
+function StandingHorse({ horseId, className, hires }: { readonly horseId: string | null; readonly className: string; readonly hires: boolean }): React.ReactElement {
+  const url = useCoatedImage(hires ? '/art/uma/horse-stand-2x.webp' : '/art/uma/horse-stand.webp', coatOfHorseId(horseId ?? 'unknown'));
   return <div className={className} style={url === null ? undefined : { backgroundImage: `url('${url}')` }} />;
 }
 
@@ -184,9 +186,9 @@ function StandingHorse({ horseId, className }: { readonly horseId: string | null
  *   ★馬番は ★胴に乗せない（★ゼッケンに見えない札だった）→ ★左上に ★枠の色の札 ＋ 馬名。★斤量は右下に小さく。
  *   ★停止スイッチ・「動きを減らす」では ★立ち姿で止める（★CSS で歩きを隠す）。
  */
-function Paddock({ horse, index, field }: { readonly horse: ChannelRunner; readonly index: number; readonly field: number }): React.ReactElement {
+function Paddock({ horse, index, field, hires }: { readonly horse: ChannelRunner; readonly index: number; readonly field: number; readonly hires: boolean }): React.ReactElement {
   return <div className="u-tv-paddock">
-    <WalkingHorse horseId={horse.horseId} />
+    <WalkingHorse horseId={horse.horseId} hires={hires} />
     <div className="u-tv-paddock-id">
       <span className="u-tv-paddock-gate u-num" style={gateStyle(horse.gate, field)}>{horse.gate}</span>
       <span className="u-tv-l">{horse.name}</span>
@@ -197,10 +199,10 @@ function Paddock({ horse, index, field }: { readonly horse: ChannelRunner; reado
 }
 
 /** ★歩く馬（★歩きの 8 コマ ＋ 止めるとき用の立ち姿。★どちらを見せるかは CSS） */
-function WalkingHorse({ horseId }: { readonly horseId: string | null }): React.ReactElement {
+function WalkingHorse({ horseId, hires }: { readonly horseId: string | null; readonly hires: boolean }): React.ReactElement {
   const coat = coatOfHorseId(horseId ?? 'unknown');
-  const walk = useCoatedImage('/art/uma/horse-walk-sheet.webp', coat);
-  const stand = useCoatedImage('/art/uma/horse-stand.webp', coat);
+  const walk = useCoatedImage(hires ? '/art/uma/horse-walk-sheet-2x.webp' : '/art/uma/horse-walk-sheet.webp', coat);
+  const stand = useCoatedImage(hires ? '/art/uma/horse-stand-2x.webp' : '/art/uma/horse-stand.webp', coat);
   return <div className="u-tv-paddock-horse">
     {/* ⚠️ ★`800% 100%` と ★`u-walk` ＋ `steps(8, jump-none)` は ★対（★ホームの OwnHorseFigure と同じ） */}
     <span className="u-tv-paddock-walk" style={walk === null ? undefined : { backgroundImage: `url('${walk}')` }} />
@@ -208,11 +210,11 @@ function WalkingHorse({ horseId }: { readonly horseId: string | null }): React.R
   </div>;
 }
 
-function HorseCard({ horse, field }: { readonly horse: ChannelRunner; readonly field: number }): React.ReactElement {
+function HorseCard({ horse, field, hires }: { readonly horse: ChannelRunner; readonly field: number; readonly hires: boolean }): React.ReactElement {
   const strategy = strategyLabel(horse.strategy);
   return <div className="u-tv-horse">
     <div className="u-tv-horse-thumb">
-      <StandingHorse horseId={horse.horseId} className="u-tv-horse-art" />
+      <StandingHorse horseId={horse.horseId} className="u-tv-horse-art" hires={hires} />
       <span className="u-tv-gate u-num u-tv-horse-gate" style={gateStyle(horse.gate, field)}>{horse.gate}</span>
     </div>
     <div className="u-tv-horse-info">
@@ -235,7 +237,8 @@ function HorseCard({ horse, field }: { readonly horse: ChannelRunner; readonly f
 function Narr({ text }: { readonly text: string }): React.ReactElement {
   return <div className="u-tv-narr">
     <div className="u-tv-narr-who">
-      <div className="u-tv-narr-face" aria-hidden />
+      {/* ★口パク（★2026-10-02 オーナー「アニメの唇がおかしい」）: ★閉じた顔の上に ★開けた口の顔を 点滅させる（★止める設定では 閉じたまま） */}
+      <div className="u-tv-narr-face" aria-hidden><span className="u-tv-narr-mouth" /></div>
       <div className="u-tv-narr-name">実況 川崎 タカシ</div>
     </div>
     <div className="u-tv-narr-bubble"><div className="u-tv-narr-text">{text}</div></div>
