@@ -78,8 +78,7 @@ import {
   NARRATOR_ROLES,
   type NarratorCast,
   type NarratorSet,
-  applyCoat,
-  isHorseCoat,
+  recolorCoatPixels,
   COAT_TRANSFORMS,
   DEFORMED_COAT_TRANSFORMS, isDeformedHorseAsset,
   type CoatName,
@@ -951,14 +950,8 @@ function bakeCoat(image: FrameImage, coat: CoatName): FrameImage {
   for (let y = 0; y < h; y += STRIP_ROWS) {
     const rows = Math.min(STRIP_ROWS, h - y);
     const data = ctx.getImageData(0, y, w, rows);
-    const d = data.data;
-    for (let i = 0; i < d.length; i += 4) {
-      if (d[i + 3]! < 8) continue;
-      const r = d[i]!, g = d[i + 1]!, b = d[i + 2]!;
-      if (!isHorseCoat(r, g, b)) continue;
-      const [R, G, B] = applyCoat(r, g, b, t);
-      d[i] = R; d[i + 1] = G; d[i + 2] = B;
-    }
+    /** ★画素の規則は 1 か所（★ホーム・育成の `coated-image.ts` と同じ関数・2026-10-01） */
+    recolorCoatPixels(data.data, t);
     ctx.putImageData(data, 0, y);
   }
   return canvas;
