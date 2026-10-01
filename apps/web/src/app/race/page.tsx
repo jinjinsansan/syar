@@ -350,6 +350,17 @@ function stripQuiet(): boolean { return EMBED_STRIP && !stripExpanded; }
  *   ★描画には何も足さない（★読むだけ）。★同じ種類は 0.5 秒に 1 行まで。★console の検索欄に `race-ground` で拾える（★小窓の中の本編の行も出る）。
  *   ⚠️ ★壁時計（performance.now）は ★コマ落ちの記録にだけ使う（★描く位置・着順には使わない・憲法 4）。
  */
+/** ★発走前の場面の コマ落ち（★`[race-ground] コマ落ち`・★同じ書き方・★描画には何も足さない） */
+let introPrev: { readonly d: number; readonly wall: number; readonly stage: string } | null = null;
+function noteIntroFrameGap(d: number, stage: string, raceId: string | null): void {
+  const wall = performance.now();
+  const prev = introPrev;
+  introPrev = { d, wall, stage };
+  if (prev === null || prev.stage !== stage || !(d - prev.d >= 0.1) || d - prev.d > 0.5 || wall - prev.wall < 120) return;
+  if (d - (groundLastWarn.get(`コマ落ち:${stage}`) ?? -Infinity) < 0.5) return;
+  groundLastWarn.set(`コマ落ち:${stage}`, d);
+  console.warn(`[race-ground] コマ落ち race=${raceId ?? 'demo'} d=${d.toFixed(2)} 場面=${stage}（発走前） 描き直しの間=${Math.round(wall - prev.wall)}ms`);
+}
 let groundPrev: { readonly d: number; readonly shot: string; readonly x: number; readonly f: number; readonly v: number; readonly speed: number | null; readonly wall: number } | null = null;
 const groundLastWarn = new Map<string, number>();
 function noteGroundJump(d: number, shot: string, focusS: number, visualDelta: number, raceId: string | null): void {
@@ -4439,6 +4450,8 @@ function RaceView({ setup, real }: {
     if (ctx.imageSmoothingQuality !== smoothing) ctx.imageSmoothingQuality = smoothing;
 
     const intro = raceIntroAt(d);
+    /** ★発走前の場面（★空撮など）の コマ落ちも残す（★2026-10-01・レビュー側: flyover の詰まりは 芝の補正とは別の原因） */
+    if (intro.stage !== 'race') noteIntroFrameGap(d, intro.stage, real?.raceId ?? null);
     /**
      * ★**ファンファーレ**（★2026-09-13・オーナー支給の音源）。
      *
