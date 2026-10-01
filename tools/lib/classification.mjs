@@ -556,6 +556,8 @@ export const READONLY = [
   //    ⚠️ ★能力は `baseScore(stats, distance)` で採る（★R-30: ★レースに渡された値）。
   //    ⚠️ ★本番に限っては、★馬が一度も育っていないので ** 今の stats ＝ 当時の stats**。
   'diag-field-dispersion.mjs',
+  // ★本番の V-4/V-5/V-6 を数える（★2026-10-01・裁定 REVIEW_V456_PRODUCTION_VERDICT・読むだけ・人気は race_entries.popularity・能力は entrant_snapshot）
+  'count-v456-production.mjs',
   'diag-worker-alive.mjs',
   'diag-stable-census.mjs',
   'diag-printed-only-counts.mjs',
