@@ -6,12 +6,27 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
+/**
+ * ★**ブラウザでは 1 つを使い回す**（★2026-10-01・オーナーの PC の console に
+ *   「Multiple GoTrueClient instances detected」が ★305 個まで出ていた）。
+ *   ★呼ぶたびに `createClient` していたので ★帯の 15 秒ごとの読み直しなどで 開いている間 増え続けた
+ *   （★1 つずつ ログインの保存領域を見張り・更新の時計を持つ ＝ ★重くなる・★更新がぶつかりうる）。
+ *   ★作り方（★引数）は 変えない（★読む結果は同じ）。★サーバー側（`window` が無い）では 従来どおり 毎回作る。
+ */
+const makeReadClient = (url: string, key: string) => createClient(url, key);
+let browserReadClient: ReturnType<typeof makeReadClient> | null = null;
+let browserAuthClient: ReturnType<typeof makeAuthClient> | null = null;
+const inBrowser = (): boolean => typeof window !== 'undefined';
+
 export function readClient() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL'];
   const key = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'];
   // ★未設定を黙って空データで進めない。設定漏れが「レースが無い」に見えてしまう
   if (!url || !key) throw new Error('NEXT_PUBLIC_SUPABASE_URL / ANON_KEY が未設定です');
-  return createClient(url, key);
+  if (inBrowser() && browserReadClient !== null) return browserReadClient;
+  const client = makeReadClient(url, key);
+  if (inBrowser()) browserReadClient = client;
+  return client;
 }
 
 /**
@@ -43,6 +58,14 @@ export function authClient() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL'];
   const key = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'];
   if (!url || !key) throw new Error('NEXT_PUBLIC_SUPABASE_URL / ANON_KEY が未設定です');
+  if (inBrowser() && browserAuthClient !== null) return browserAuthClient;
+  const client = makeAuthClient(url, key);
+  if (inBrowser()) browserAuthClient = client;
+  return client;
+}
+
+/** ★セッションを持つ器の作り方（★`authClient` だけが呼ぶ・★ブラウザでは 1 回だけ） */
+function makeAuthClient(url: string, key: string) {
   return createClient(url, key, {
     auth: {
       // ★ブラウザの保存領域にセッションを置く（再読み込みで消えない）

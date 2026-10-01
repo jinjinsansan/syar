@@ -116,9 +116,10 @@
 /* ★パドック（★立ち姿 1 枚・高さ 96%・評価の言葉なし） */
 [data-theme='uma'] .u-tv-paddock { flex: 1 1 auto; position: relative; min-height: 0; }
 [data-theme='uma'] .u-tv-paddock-horse {
-  position: absolute; left: 4%; bottom: 0; height: 96%; aspect-ratio: 544 / 580; background: no-repeat bottom center / contain; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .4));
+  /* ★絵は ホームと同じ立ち姿（★横長 544×312） */
+  position: absolute; left: 2%; bottom: 0; height: 82%; aspect-ratio: 544 / 312; background: no-repeat bottom center / contain; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .4));
 }
-[data-theme='uma'] .u-tv[data-size='pc'] .u-tv-paddock-horse { left: 6%; }
+[data-theme='uma'] .u-tv[data-size='pc'] .u-tv-paddock-horse { left: 3%; }
 [data-theme='uma'] .u-tv-paddock-cloth {
   position: absolute; left: 22%; bottom: 30%; width: 26px; height: 22px; border-radius: 3px; border: 2px solid #10243a; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center; font-size: 14px; background: #cfe0ee; color: #111;
@@ -134,7 +135,7 @@
 /* ★出走馬の紹介（★素質の数値・星・強さを断定する言葉は出さない） */
 [data-theme='uma'] .u-tv-horse { flex: 1 1 auto; display: flex; gap: 10px; min-height: 0; }
 [data-theme='uma'] .u-tv-horse-thumb { flex: 0 0 var(--tv-thumb); position: relative; border-radius: 8px; overflow: hidden; background: url('/art/uma/turf-near.webp') repeat 0 0 / 500px 30px; }
-[data-theme='uma'] .u-tv-horse-art { position: absolute; inset: 0; background: no-repeat 30% 100% / 120% auto; }
+[data-theme='uma'] .u-tv-horse-art { position: absolute; inset: 0; background: no-repeat 40% 85% / 115% auto; }
 [data-theme='uma'] .u-tv-horse-gate { position: absolute; left: 4px; top: 4px; width: 24px; height: 20px; }
 [data-theme='uma'] .u-tv-horse-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 [data-theme='uma'] .u-tv-chips { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -260,9 +261,13 @@
 */
 @media (max-width: 1023px) {
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-stage { padding-top: 4px; }
-  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-field { flex: 1 1 auto; min-height: 120px; max-height: 230px; align-items: flex-end; }
+  /*
+    🔴 ★2026-10-01: ★舞台の高さを決めずに 馬を「舞台の 100%」にしていて ★高さ 0 ＝ 馬が消えた（オーナー指摘）。
+    ★舞台の高さを 指定どおり 230px（★縦が短い端末は 150px）に固定し、★馬はその高さに合わせる。
+  */
+  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-field { flex: 0 0 auto; height: 230px; min-height: 0; align-items: flex-end; }
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-horse {
-    width: auto !important; height: 100%; max-height: 230px; margin-bottom: 0 !important;
+    width: auto !important; height: 100%; max-width: 100%; margin-bottom: 0 !important;
   }
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-plate { margin-top: 2px; padding: 5px 12px; }
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck { grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px 14px 14px; box-sizing: border-box; }
@@ -292,6 +297,7 @@
   [data-theme='uma'].u-home .u-topbar-end { margin-left: 0; }
 }
 @media (max-width: 1023px) and (max-height: 759px) {
+  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-field { height: 150px; }
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > * { min-height: 48px !important; }
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > :nth-child(-n + 2) { min-height: 60px !important; }
 }

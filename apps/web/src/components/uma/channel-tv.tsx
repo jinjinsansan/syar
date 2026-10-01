@@ -169,9 +169,12 @@ function Table({ kind, size, now, runners, odds, race }: {
   </>;
 }
 
-/** ★立ち姿 1 枚（★毛色は 馬体の画素だけ・★歩きの 8 コマは使わない・§6） */
+/**
+ * ★立ち姿 1 枚（★毛色は 馬体の画素だけ・★歩きの 8 コマは使わない・§6）。
+ * 🔴 ★2026-10-01: ★見本の `train-body-idle`（★細身の別の絵柄）は ★ホームの馬と違う馬に見えた（オーナー指摘）→ ★ホーム・育成と同じ立ち姿 `horse-stand`。
+ */
 function StandingHorse({ horseId, className }: { readonly horseId: string | null; readonly className: string }): React.ReactElement {
-  const url = useCoatedImage('/art/uma/train-body-idle.webp', coatOfHorseId(horseId ?? 'unknown'));
+  const url = useCoatedImage('/art/uma/horse-stand.webp', coatOfHorseId(horseId ?? 'unknown'));
   return <div className={className} style={url === null ? undefined : { backgroundImage: `url('${url}')` }} />;
 }
 
