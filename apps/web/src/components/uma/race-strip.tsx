@@ -652,6 +652,14 @@ function RaceStripBody(): React.ReactElement | null {
    */
   const watchable = embed !== null && (replaying || embedLive);
   /**
+   * ★**拡大で 本編の箱を全画面にするのは ★本編が流れているときだけ**（★テレビのある面）。
+   *   🔴 ★2026-10-02 オーナー「小窓では本馬場入場カウントダウンなのに 拡大すると『中継の準備をしています』」:
+   *   ★発走前に本編を先読みしている間（`embed` は在るが まだ流れていない）に拡大すると ★空の本編の箱が全画面になっていた。
+   *   ★テレビのある面は ★本編が流れ出すまで ★拡大したテレビ（`channelFullEl`）を出す。★流れ出したら ★同じ iframe の箱が全画面へ（★読み直さない）。
+   *   ★テレビの無い面は 従来どおり（★本編の箱 ＋「用意をしています」）。
+   */
+  const stageFull = expanded && (embedLive || tvMode === null);
+  /**
    * ★**停止スイッチで ★本編も止める**（★資料 §5-7・2026-09-28）。★停止は ★画面の状態（`.u-paused`）なので ★帯は DOM で見る。
    *   ★帯の時計（`nowMs`・250ms）ごとに見て、★変わったときだけ ★iframe へ知らせる。
    */
@@ -666,8 +674,8 @@ function RaceStripBody(): React.ReactElement | null {
   /** ★拡大したら 本編に知らせる（★札・テロップを出す・★小さいままでは出さない） */
   useEffect(() => {
     if (embed === null) return;
-    iframeRef.current?.contentWindow?.postMessage(stripControlMessage(expanded ? 'expand' : 'shrink'), window.origin);
-  }, [expanded, embedLive, embed]);
+    iframeRef.current?.contentWindow?.postMessage(stripControlMessage(stageFull ? 'expand' : 'shrink'), window.origin);
+  }, [stageFull, embedLive, embed]);
   useEffect(() => {
     replayingRef.current = watchable;
     /**
@@ -738,7 +746,7 @@ function RaceStripBody(): React.ReactElement | null {
    * ★**拡大したテレビ**（★本編が無い間・★2026-10-01）: ★同じ番組を ★PC の大きさで描いて 画面いっぱいに拡げる。
    *   ★本編がある間は ★本編の箱（`stageEl`）が全画面になる（★こちらは出さない）。
    */
-  const channelFullEl = expanded && embed === null && tvMode !== null && nowMs !== null ? <div className={`u-tv-full${fullTv.land ? ' u-tv-full-land' : ''}`} role="dialog" aria-modal aria-label="中継番組">
+  const channelFullEl = expanded && !stageFull && tvMode !== null && nowMs !== null ? <div className={`u-tv-full${fullTv.land ? ' u-tv-full-land' : ''}`} role="dialog" aria-modal aria-label="中継番組">
     <div className="u-tv-full-head">
       <strong>馬物語ch</strong>
       <button type="button" onClick={closeExpanded} aria-label="小窓に戻す">小窓に戻す</button>
@@ -761,19 +769,19 @@ function RaceStripBody(): React.ReactElement | null {
     profiles={profiles !== null && profiles.id === nextId ? profiles.map : null}
     reducedMotion={motionReduced} onAir={big} /> : null;
   /** ★本編の箱（★1 つだけ作る・★ビジョンでも スマホのテレビでも 同じ要素） */
-  const stageEl = <>{embed !== null && <div className={`u-race-strip-stage${big || expanded ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}${expanded ? ' u-race-strip-stage-full' : ''}`}
-        {...(expanded && recent ? { role: 'dialog', 'aria-modal': true, 'aria-label': `${recent.name}のレース中継` } : {})}>
+  const stageEl = <>{embed !== null && <div className={`u-race-strip-stage${big || stageFull ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}${stageFull ? ' u-race-strip-stage-full' : ''}`}
+        {...(stageFull && recent ? { role: 'dialog', 'aria-modal': true, 'aria-label': `${recent.name}のレース中継` } : {})}>
         {/* ★本編（★`playing` まで 見えないまま読み込む・★触れない） */}
         <iframe ref={iframeRef} className="u-race-strip-embed" data-live={embedLive ? 'true' : 'false'}
           src={stripEmbedUrl(embed.id)} title="レースの中継" tabIndex={-1} />
         {/* ★映像の左上に「録画」札を 1 つ（★DOM・★本編の長い札は小窓では消した・★R-19 回答 Q1） */}
-        {big && embedLive && !expanded && <span className="u-race-strip-stage-rec" aria-hidden>中継</span>}
-        {expanded && <div className="u-race-strip-stage-head">
+        {big && embedLive && !stageFull && <span className="u-race-strip-stage-rec" aria-hidden>中継</span>}
+        {stageFull && <div className="u-race-strip-stage-head">
           {/* ★「本編」と名乗らない（★条件 1）。★録画・結果から再現 */}
           <strong>{recent?.name ?? ''} · 中継</strong>
           <button type="button" onClick={closeExpanded} aria-label="小窓に戻す">小窓に戻す</button>
         </div>}
-        {expanded && !embedLive && <p className="u-race-strip-stage-wait" role="status">中継の用意をしています…</p>}
+        {stageFull && !embedLive && <p className="u-race-strip-stage-wait" role="status">中継の用意をしています…</p>}
       </div>}</>;
   if (size === 'hidden') return null;
   /** ★`text`: ★その画面のレースの 1 行だけ（★走行・拡大・他のレースは出さない） */

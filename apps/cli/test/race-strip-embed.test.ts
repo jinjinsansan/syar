@@ -129,7 +129,7 @@ describe('★小窓で本編を流す約束', () => {
     /** ★描く判定に ★`!EMBED_STRIP` を戻さない（★戻すと 拡大しても下ろしたまま＝①） */
     expect(PAGE).not.toMatch(/&& !EMBED_STRIP\) (?:drawRaceHeadlineChip|drawCourseSectionTag)/);
     expect(PAGE).toContain('{real !== null && !EMBED_STRIP && <div style={REPLAY_BADGE_STYLE}>');
-    expect(STRIP).toContain('{big && embedLive && !expanded && <span className="u-race-strip-stage-rec" aria-hidden>中継</span>}');
+    expect(STRIP).toContain('{big && embedLive && !stageFull && <span className="u-race-strip-stage-rec" aria-hidden>中継</span>}');
   });
 
   /**

@@ -47,6 +47,21 @@ describe('★小窓 ⇄ 拡大', () => {
     expect(LIVE).toContain('{!expanded && <button type="button" className="u-tvstrip-expand"');
   });
 
+  /**
+   * ⑤ ★2026-10-02 オーナー「小窓では本馬場入場カウントダウンなのに 拡大すると『中継の準備をしています』」:
+   *   ★テレビのある面は ★本編が流れ出すまで ★拡大したテレビを出す（★先読み中の空の本編の箱を全画面にしない）。
+   */
+  it('🔴 ⑤ ★テレビのある面で 本編が流れていない間の拡大は ★テレビ（★「準備中」の箱を全画面にしない）', () => {
+    expect(LIVE).toContain('const stageFull = expanded && (embedLive || tvMode === null);');
+    expect(LIVE).toContain('const channelFullEl = expanded && !stageFull && tvMode !== null');
+    expect(LIVE).toContain("${stageFull ? ' u-race-strip-stage-full' : ''}");
+    expect(LIVE).toContain('{stageFull && !embedLive && <p className="u-race-strip-stage-wait"');
+    /** ★対照: ★旧い形（★本編が在れば テレビを出さない）は ★落ちる */
+    const old = LIVE.replace('const channelFullEl = expanded && !stageFull && tvMode !== null', 'const channelFullEl = expanded && embed === null && tvMode !== null');
+    expect(old).not.toBe(LIVE);
+    expect(old).not.toContain('const channelFullEl = expanded && !stageFull && tvMode !== null');
+  });
+
   it('★対照: ★出入口の外で setExpanded(true) を足す変異は ★落ちる', () => {
     const mutated = LIVE.replace('onClick={openExpanded}>拡大</button>', 'onClick={() => { setExpanded(true); }}>拡大</button>');
     expect(mutated).not.toBe(LIVE);
