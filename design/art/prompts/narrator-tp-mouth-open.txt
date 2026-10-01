@@ -1,0 +1,9 @@
+Edit the photo at out/gen/narrator-tp-fix/closed.png (a 300x344 head-and-shoulders portrait of a race commentator).
+
+Produce ONE new image, same size 300x344, that is IDENTICAL to the input in every way — same man, same face, same hair, same skin, same suit and tie, same background, same lighting, same camera position, same framing, same head position and angle — EXCEPT the mouth.
+
+Change only the mouth: he is speaking a commentary sentence, mouth naturally open about 8 pixels, lips parted, the upper teeth slightly visible, the inside of the mouth a natural dark red-brown with soft shading (not flat black). The moustache stays above the upper lip exactly as in the input. The jaw drops very slightly and naturally. Keep it photorealistic, matching the photo's grain and sharpness.
+
+Do not move, scale, rotate or recrop the head. Do not change the eyes, nose, eyebrows, hair or anything outside the lower face. No text, no watermark.
+
+Save the result as a PNG image.

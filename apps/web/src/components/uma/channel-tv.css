@@ -5,14 +5,14 @@
 [data-theme='uma'] .u-tv {
   --tv-hdr: 20px; --tv-ftr: 18px; --tv-top: 24px; --tv-bottom: 22px; --tv-pad: 8px;
   --tv-s: 11px; --tv-m: 13px; --tv-l: 16px; --tv-xl: 20px; --tv-huge: 40px; --tv-narr: 14px;
-  --tv-row: 20px; --tv-face: 72px; --tv-thumb: 120px; --tv-oval-w: 150px; --tv-oval-h: 84px; --tv-going: 34px; --tv-cols: 1;
+  --tv-row: 20px; --tv-face: 72px; --tv-thumb: 54%; --tv-oval-w: 150px; --tv-oval-h: 84px; --tv-going: 34px; --tv-cols: 1;
   position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 4px; background: #0a2340;
   font-family: 'M PLUS Rounded 1c', system-ui, sans-serif; font-weight: 800; color: #fbf7ec; line-height: 1.3;
 }
 [data-theme='uma'] .u-tv[data-size='pc'] {
   --tv-hdr: 22px; --tv-ftr: 20px; --tv-top: 27px; --tv-bottom: 24px; --tv-pad: 10px;
   --tv-l: 17px; --tv-xl: 22px; --tv-huge: 46px; --tv-narr: 15px;
-  --tv-row: 24px; --tv-face: 84px; --tv-thumb: 140px; --tv-oval-w: 170px; --tv-oval-h: 96px; --tv-going: 40px; --tv-cols: 2;
+  --tv-row: 24px; --tv-face: 84px; --tv-thumb: 54%; --tv-oval-w: 170px; --tv-oval-h: 96px; --tv-going: 40px; --tv-cols: 2;
 }
 [data-theme='uma'] .u-tv .u-num { font-family: 'Saira Condensed', system-ui, sans-serif; font-weight: 700; font-variant-numeric: tabular-nums; }
 [data-theme='uma'] .u-tv-s { font-size: var(--tv-s); }
@@ -136,7 +136,8 @@
 [data-theme='uma'] .u-tv-horse { flex: 1 1 auto; display: flex; gap: 10px; min-height: 0; }
 [data-theme='uma'] .u-tv-horse-thumb { flex: 0 0 var(--tv-thumb); position: relative; border-radius: 8px; overflow: hidden; background: url('/art/uma/turf-near.webp') repeat 0 0 / 500px 30px; }
 /* ★顔が切れない（★2026-10-01 オーナー指摘「馬の顔が切れています」・★旧 115% で右端の顔がはみ出した）→ ★枠の幅に収める */
-[data-theme='uma'] .u-tv-horse-art { position: absolute; inset: 22px 4px 4px; background: no-repeat center bottom / contain; }
+/* ★2026-10-01 オーナー「右に余白があるのだから 馬を小さくしなくても余白を使えばいい」→ ★枠を 54% に広げ（★旧 120/140px）、★馬を枠いっぱいに */
+[data-theme='uma'] .u-tv-horse-art { position: absolute; inset: 20px 2px 2px; background: no-repeat center bottom / contain; }
 [data-theme='uma'] .u-tv-horse-gate { position: absolute; left: 4px; top: 4px; width: 24px; height: 20px; }
 [data-theme='uma'] .u-tv-horse-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 [data-theme='uma'] .u-tv-chips { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -230,7 +231,12 @@
    ★**置き場**（★README §2）
    ════════════════════════════════════════════════════════════════════════ */
 /* ★PC の大型ビジョン: ★テレビは 画面の升（2 段目）に。★「次」と掲示板の段は テレビの下の帯へ移したので 畳む */
-[data-theme='uma'] .u-race-strip-vision > .u-vision-tv { grid-row: 2; grid-column: 1; width: 100%; min-width: 0; }
+[data-theme='uma'] .u-race-strip-vision > .u-vision-tv { grid-row: 2; grid-column: 1; width: 100%; min-width: 0; z-index: 0; }
+/*
+  🔴 ★本編は テレビの上（★2026-10-01 オーナー「小窓ではレースが映らない。ずっと芝だけ。拡大すると走っている」）:
+  ★同じ升に重ねていて ★後に置いたテレビが 本編の iframe を覆っていた。
+*/
+[data-theme='uma'] .u-race-strip-vision > .u-race-strip-stage:not(.u-race-strip-stage-offscreen):not(.u-race-strip-stage-full) { z-index: 1; }
 [data-theme='uma'] .u-race-strip-vision:has(> .u-vision-tv) > .u-race-strip-main { display: none; }
 
 /* ★スマホ（★帯の枠・背景は使わない・★テレビの枠だけ） */
