@@ -68,6 +68,10 @@ export default function MyPage(): React.ReactElement {
           <a href="/entry" style={{ minHeight: 44, padding: '12px', border: '2px solid var(--u-gold)', borderRadius: 8 }}>出走登録</a>
         </div>
       </section>}
+      {/* ★投票の履歴への入口（★2026-10-01・デザイナー引き渡し ② §2-2・★持ち馬が無くても出す） */}
+      <div style={{ flex: '1 1 100%', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <a href="/vote/history" style={{ minHeight: 44, padding: '12px', border: '2px solid var(--u-gold)', borderRadius: 8 }}>投票の履歴</a>
+      </div>
     </main>
 
     <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: 10, padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto' }}>

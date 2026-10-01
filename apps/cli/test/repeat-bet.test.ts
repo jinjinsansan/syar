@@ -29,7 +29,7 @@ describe('★続けて投票（受け付けた直後だけ）', () => {
     expect(LIB).not.toMatch(/\bwon\b|\blost\b|payout|status|settled/);
     expect(strip(VOTE)).not.toMatch(/loadLastBet|from\('bets'\)|\bsettled\b|\bpayout\b/);
     /** ★案内（受け付けた直後）は ★投票を受け付けた所でだけ作られる */
-    const setAt = VOTE.indexOf('setJustPlaced({ raceId: race.id, betType, streak, gate: selected, raceNo: race.raceNo });');
+    const setAt = VOTE.indexOf('setJustPlaced({ raceId: race.id, betType, streak, gate: selected, raceNo: race.raceNo, betId: result.betId });');
     expect(setAt, '★受け付けた所で 案内を作っていない').toBeGreaterThan(-1);
     expect(VOTE.lastIndexOf('const result = await placeBet(', setAt)).toBeGreaterThan(-1);
     expect(VOTE.match(/setJustPlaced\(\{/g)?.length).toBe(1);

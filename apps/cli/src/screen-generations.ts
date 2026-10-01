@@ -94,6 +94,8 @@ export const SCREENS: readonly ScreenRecord[] = [
   { route: '/home', verdict: 'new', why: '★ダッシュボード' },
   { route: '/mypage', verdict: 'new', why: '★わたしの馬。⚠️ ★ここから `/records`・`/entry`（旧）へ出ます' },
   { route: '/vote', verdict: 'new', why: '★レースと投票' },
+  { route: '/vote/history', verdict: 'new', why: '★投票の履歴（★2026-10-01・デザイナー引き渡し ② §2-3・`lib/vote-history`）' },
+  { route: '/vote/history/[betId]', verdict: 'new', why: '★投票の控え 1 枚（★2026-10-01・デザイナー引き渡し ② §2-4・★映像へは行かない）' },
   { route: '/odds/[id]', verdict: 'new', why: '★1 レースのオッズ' },
   { route: '/train', verdict: 'new', why: '★育てる（★`/training` の新版）' },
   { route: '/exchange', verdict: 'new', why: '★交換（★`/prizes` の新版）' },

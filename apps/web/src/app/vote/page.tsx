@@ -50,7 +50,7 @@ export default function VotePage(): React.ReactElement {
    * ★続けて投票（★`lib/repeat-bet.ts`）。★出すのは ★投票を受け付けた直後だけ（★結果の後には出さない・★結果を読まない）。
    *   ★［次のレースも］で予定を置き、★次のレースが発売になったら 券種だけ揃える（★馬は本人が選ぶ・★自動では買わない）。
    */
-  const [justPlaced, setJustPlaced] = useState<{ readonly raceId: string; readonly betType: VoteBetType; readonly streak: number; readonly gate: number; readonly raceNo: string } | null>(null);
+  const [justPlaced, setJustPlaced] = useState<{ readonly raceId: string; readonly betType: VoteBetType; readonly streak: number; readonly gate: number; readonly raceNo: string; readonly betId: string } | null>(null);
   const [plan, setPlan] = useState<RepeatPlan | null>(null);
   const [repeatStreak, setRepeatStreak] = useState(0);
 
@@ -131,7 +131,7 @@ export default function VotePage(): React.ReactElement {
         const streak = nextRepeatStreak(repeatStreak, planned && plan !== null && plan.betType === betType);
         setRepeatStreak(streak); writeRepeatStreak(streak);
         setPlan(null); writeRepeatPlan(null);
-        setJustPlaced({ raceId: race.id, betType, streak, gate: selected, raceNo: race.raceNo });
+        setJustPlaced({ raceId: race.id, betType, streak, gate: selected, raceNo: race.raceNo, betId: result.betId });
         setConfirmOpen(false);
         setPicks([]);
         reload();
@@ -148,7 +148,9 @@ export default function VotePage(): React.ReactElement {
     containerType: 'inline-size', background: 'var(--u-navy)', display: 'flex', flexDirection: 'column',
   }}>
     <Backdrop />
-    <TopBar title="投票モード" paused={paused} onToggle={toggle} />
+    <TopBar title="投票モード" paused={paused} onToggle={toggle}
+      /* ★投票の履歴への入口（★2026-10-01・デザイナー引き渡し ② §2-2「投票モードの上段に『履歴』」） */
+      extra={<a href="/vote/history" style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center', padding: '0 12px', border: '2px solid var(--u-gold)', borderRadius: 999, background: 'var(--u-panel-strong)', color: 'var(--u-ink-light)', fontSize: 13, whiteSpace: 'nowrap', textDecoration: 'none' }}>履歴</a>} />
     <RaceStrip />
     {error && <TextPanel role="alert" style={{ fontSize: 12 }}>
       {error}　<a href="/login">ログイン</a>　<button type="button" onClick={reload} style={NOTICE_ACTION}>再読み込み</button>
@@ -164,6 +166,8 @@ export default function VotePage(): React.ReactElement {
         投票を受け付けました
       </div>
       <div style={{ fontSize: 12, color: '#cfe0ee', marginTop: 4 }}>{justPlaced.raceNo} ・ {BET_TYPE_LABEL[justPlaced.betType]} ・ {justPlaced.gate}番 ・ {EP_PER_PICK} EP</div>
+      {/* ★受け付けた投票の控えへ（★2026-10-01・引き渡し ② §2-2） */}
+      <a href={`/vote/history/${encodeURIComponent(justPlaced.betId)}`} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, fontSize: 13, color: 'var(--u-ink-light)', textDecoration: 'underline' }}>控えを見る</a>
       <div style={{ borderTop: '1px solid rgba(251,247,236,.18)', margin: '10px 0' }} />
       {afterAccept.kind === 'offer' ? <>
         <p style={{ margin: 0, fontSize: 13 }}>次のレースも、同じ券種（{BET_TYPE_LABEL[justPlaced.betType]}）・同じ額（{afterAccept.amount} EP）で投票できます。</p>

@@ -27,6 +27,9 @@ export const STRIP_SIZE_BY_ROUTE: Readonly<Record<string, StripSize>> = {
   /** ★2026-09-30 ★極小 → 大（★オーナー「この育成モード画面でも小窓はつけてください」） */
   '/train': 'big',
   '/vote': 'mini',
+  /** ★2026-10-01: ★投票の履歴（★一覧を眺める・引き渡し ② §2-3「RaceStrip（big）」）と ★控え 1 枚（★眺めるだけ） */
+  '/vote/history': 'big',
+  '/vote/history/[betId]': 'big',
   /**
    * ★`/odds` は ★次のレースの `/odds/<id>` へ転送する入口。★見つからないときの 1 枚に ★文字の帯を出す
    *   （★2026-09-29・オーナー「全てのページで小窓を」・レビュー側: ★レースの画面なのに帯が無いのは不自然 → text）。

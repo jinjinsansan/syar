@@ -31,7 +31,8 @@ export function useSalesClosed(scheduledAtIso: string | null): boolean {
   return salesClosedAt(scheduledAtIso === null ? null : Date.parse(scheduledAtIso), now);
 }
 
-function useNow(tickMs: number): number | null {
+/** ★表示用の壁時計（★「今日」「今月」の見出しにも使う・★この 1 か所から） */
+export function useNow(tickMs: number): number | null {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
     // ★表示用の壁時計はこの 1 か所だけ

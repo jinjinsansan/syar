@@ -59,12 +59,14 @@ const PLATE: React.CSSProperties = {
  * ★**上段バー**（★左＝戻る／中＝画面名／右＝停止スイッチ・資料 §5-3）。
  * ★`home` を真にすると、左が**金プレートのロゴ**になります（★ダッシュボード用）。
  */
-export function TopBar({ title, backHref, home = false, paused, onToggle }: {
+export function TopBar({ title, backHref, home = false, paused, onToggle, extra }: {
   readonly title: string;
   readonly backHref?: string;
   readonly home?: boolean;
   readonly paused: boolean;
   readonly onToggle: () => void;
+  /** ★停止スイッチの左に置く小さな入口（★2026-10-01・/vote の「履歴」）。★無ければ何も出さない */
+  readonly extra?: React.ReactNode;
 }): React.ReactElement {
   return (
     <div style={{
@@ -83,7 +85,7 @@ export function TopBar({ title, backHref, home = false, paused, onToggle }: {
       )}
       {/* ★画面名は 19px ＋ うすい紺の影（★2026-09-29・デザイナー回答 R-22 §3・芝の上で 3.84〜3.93:1 → 大きい文字の扱い 3:1） */}
       <span style={{ flex: '0 0 auto', fontSize: 19, whiteSpace: 'nowrap', textShadow: '0 2px 0 rgba(10,35,64,.6)' }}>{title}</span>
-      <span style={{ marginLeft: 'auto' }}><MotionToggle paused={paused} onToggle={onToggle} /></span>
+      <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>{extra}<MotionToggle paused={paused} onToggle={onToggle} /></span>
     </div>
   );
 }
