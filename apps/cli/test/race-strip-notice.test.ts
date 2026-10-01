@@ -96,7 +96,8 @@ describe('★⑦ 読めなかったとき（★最後の表示を保持し「更
   });
 
   it('★注記を出す（★黙らない）', () => {
-    expect(LIVE.match(/\{error && <span className="u-race-strip-error">更新できません<\/span>\}/g)?.length, '★帯と 1 行の両方').toBe(2);
+    /** ★2026-10-01: ★スマホの小窓テレビ（R-28）にも 1 つ（★帯・1 行・テレビの 3 か所） */
+    expect(LIVE.match(/\{error && <span className="u-race-strip-error">更新できません<\/span>\}/g)?.length, '★帯・1 行・スマホのテレビ').toBe(3);
   });
 });
 

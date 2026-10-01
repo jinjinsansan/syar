@@ -9,9 +9,11 @@ import { LABEL_ENTRY_CLOSE, LABEL_SALES_CLOSE, salesCloseAtMs, salesClosedAt, sa
 import { CLAIM_LIVE_PENDING, CLAIM_SALES_CLOSED, CLAIM_SETTLE_CHECKING } from '../../lib/claims';
 import { SETTLE_AFTER_START_MS } from '@star/scheduler';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowNear, replayWindowOver, type ReplayRunner } from './race-replay';
-import { INTRO_STAGES, stripEmbedsOn, stripSizeOf, stripVisionOn } from './race-strip-sizes';
+import { INTRO_STAGES, stripEmbedsOn, stripSizeOf, stripTvModeOf, stripVisionOn } from './race-strip-sizes';
 import { STRIP_EMBED_FAILED_NOTE, STRIP_EMBED_GIVE_UP_SEC, STRIP_EMBED_LEAD_SEC, isStripEmbedMessage, stripControlMessage, stripEmbedLog, stripEmbedUrl } from './race-strip-embed';
 import { BOARD_ITEM_SEC, boardText, bracketOrNull, raceLine, tickerBoard, tickerShowsField, type BoardItem, type TickerRunner } from './race-strip-ticker';
+import { StripChannel } from './strip-channel';
+import { fetchFieldProfiles, type FieldProfile } from './channel-feed';
 import './uma-theme.css';
 
 interface RaceNoticeRow {
@@ -24,11 +26,14 @@ interface RaceNoticeRow {
 }
 
 interface NoticeData {
-  readonly next: (RaceNoticeRow & { readonly entry_deadline_at: string | null }) | null;
+  /** ★`track_condition`・`course_id` は ★小窓テレビの番組（★馬場状態・競馬場・R-28） */
+  readonly next: (RaceNoticeRow & { readonly entry_deadline_at: string | null; readonly track_condition: string | null; readonly course_id: string | null }) | null;
   readonly recent: RaceNoticeRow | null;
   readonly runners: readonly ReplayRunner[];
   /** ★次のレースの出走馬と単勝（★締切の後だけ読む・★流れる 1 行 `race-strip-ticker.ts`） */
   readonly nextField: readonly TickerRunner[];
+  /** ★直前のレースに 自分の馬が出ていれば その着順（★確定してから・★小窓テレビの結果の 1 行・R-28 §3） */
+  readonly ownRecent: { readonly gate: number; readonly name: string; readonly pos: number } | null;
 }
 
 const COLUMNS = 'id, name, surface, distance, scheduled_at, status';
@@ -44,7 +49,7 @@ async function fetchNotice(): Promise<NoticeData> {
    */
   const nowIso = new Date().toISOString();
   const [next, recent] = await Promise.all([
-    client.from('races_public').select(`${COLUMNS}, entry_deadline_at`)
+    client.from('races_public').select(`${COLUMNS}, entry_deadline_at, track_condition, course_id`)
       .in('status', ['announced', 'scheduled', 'closed'])
       .gt('scheduled_at', nowIso)
       .order('scheduled_at', { ascending: true }).limit(1),
@@ -57,13 +62,19 @@ async function fetchNotice(): Promise<NoticeData> {
   if (recent.error !== null) throw new Error(recent.error.message);
   const lastRace = (recent.data?.[0] ?? null) as RaceNoticeRow | null;
   let runners: readonly ReplayRunner[] = [];
+  const ownRecent: NoticeData['ownRecent'] = null;
   if (lastRace !== null) {
     const entries = await client.from('race_entries_public')
       .select('gate,horse_name,strategy,finish_pos,finish_time,horse_id')
       .eq('race_id', lastRace.id).order('gate');
     if (entries.error !== null) throw new Error(entries.error.message);
-    runners = parseReplayRunners(((entries.data ?? []) as Record<string, unknown>[])
-      .filter((row) => row['finish_pos'] !== null && row['finish_pos'] !== undefined));
+    const rows = ((entries.data ?? []) as Record<string, unknown>[])
+      .filter((row) => row['finish_pos'] !== null && row['finish_pos'] !== undefined);
+    runners = parseReplayRunners(rows);
+    /**
+     * ⚠️ ★自分の馬の着順（★R-28 §3）は ★まだ読まない: ★帯は ★誰の馬かを知らない（★裁定 §6-2・自馬の表示は段 3・網 `race-strip-notice`）。
+     *   ★レビュー側に 段 3 をいま開けるか 照会中（★2026-10-01）。★開けるまで `ownRecent` は いつも null。
+     */
   }
   const nextRace = (next.data?.[0] ?? null) as NoticeData['next'];
   return {
@@ -71,6 +82,7 @@ async function fetchNotice(): Promise<NoticeData> {
     recent: lastRace,
     runners,
     nextField: nextRace !== null && tickerShowsField(nextRace.status) ? await fetchField(nextRace.id) : [],
+    ownRecent,
   };
 }
 
@@ -538,6 +550,21 @@ function RaceStripBody(): React.ReactElement | null {
   const nextStartMs = nextStartAt === null ? Number.NaN : new Date(nextStartAt).getTime();
   const preOpen = nextId !== null && nowMs !== null && Number.isFinite(nextStartMs)
     && nextStartMs > nowMs && nextStartMs - nowMs <= STRIP_EMBED_LEAD_SEC * 1000;
+  /**
+   * ★**小窓テレビ**（★2026-10-01・R-28）: ★PC の大型ビジョン（`pc`）・★スマホのホーム（`full`・幅いっぱいの 16:9）・★スマホのほかの画面（`s`・S 型 98px）。
+   *   ★帯を単独では出さない（★「次」と掲示板は テレビの上下の帯へ・README §1）。★`text` の画面（★そのレースの 1 行）は 従来どおり。
+   */
+  const tvMode = stripTvModeOf(pathname, { intro, wide });
+  /** ★出走馬の詳しい形（★1 レースにつき 1 回だけ読む・★締切の後＝出走馬が決まってから） */
+  const [profiles, setProfiles] = useState<{ readonly id: string; readonly map: ReadonlyMap<number, FieldProfile> } | null>(null);
+  const fieldReady = (data?.nextField.length ?? 0) > 0;
+  const profilesId = profiles?.id ?? null;
+  useEffect(() => {
+    if (tvMode === null || nextId === null || !fieldReady || profilesId === nextId) return undefined;
+    let cancelled = false;
+    fetchFieldProfiles(nextId).then((map) => { if (!cancelled) setProfiles({ id: nextId, map }); }, () => undefined);
+    return () => { cancelled = true; };
+  }, [tvMode, nextId, fieldReady, profilesId]);
   useEffect(() => {
     /** ★本編を読むのは ★表で決めた面だけ（★「大」の面・★「極小」「文字」は読まない） */
     if (!embedsHere || motionReduced || canPlay !== true) { setEmbed(null); return; }
@@ -633,6 +660,28 @@ function RaceStripBody(): React.ReactElement | null {
     ? (embed.id === next?.id ? next : embed.id === recent?.id ? recent ?? null : null)
     : replaying && recent ? recent : null;
 
+  /** ★小窓テレビの中身（★時計は帯の `nowMs`・★本編が上に重なっている間は 上の帯に「● 中継」） */
+  const channelEl = tvMode !== null && nowMs !== null ? <StripChannel
+    size={tvMode === 'pc' ? 'pc' : 'sp'} nowMs={nowMs} next={next ?? null}
+    recent={recent ? { name: recent.name, status: recent.status } : null}
+    recentRunners={data?.runners ?? []} ownRecent={data?.ownRecent ?? null} field={data?.nextField ?? []}
+    profiles={profiles !== null && profiles.id === nextId ? profiles.map : null}
+    reducedMotion={motionReduced} onAir={big} /> : null;
+  /** ★本編の箱（★1 つだけ作る・★ビジョンでも スマホのテレビでも 同じ要素） */
+  const stageEl = <>{embed !== null && <div className={`u-race-strip-stage${big || expanded ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}${expanded ? ' u-race-strip-stage-full' : ''}`}
+        {...(expanded && recent ? { role: 'dialog', 'aria-modal': true, 'aria-label': `${recent.name}のレース中継` } : {})}>
+        {/* ★本編（★`playing` まで 見えないまま読み込む・★触れない） */}
+        <iframe ref={iframeRef} className="u-race-strip-embed" data-live={embedLive ? 'true' : 'false'}
+          src={stripEmbedUrl(embed.id)} title="レースの中継" tabIndex={-1} />
+        {/* ★映像の左上に「録画」札を 1 つ（★DOM・★本編の長い札は小窓では消した・★R-19 回答 Q1） */}
+        {big && embedLive && !expanded && <span className="u-race-strip-stage-rec" aria-hidden>中継</span>}
+        {expanded && <div className="u-race-strip-stage-head">
+          {/* ★「本編」と名乗らない（★条件 1）。★録画・結果から再現 */}
+          <strong>{recent?.name ?? ''} · 中継</strong>
+          <button type="button" onClick={() => { autoOpenedRef.current = false; setExpanded(false); }} aria-label="レース中継を閉じる">閉じる</button>
+        </div>}
+        {expanded && !embedLive && <p className="u-race-strip-stage-wait" role="status">中継の用意をしています…</p>}
+      </div>}</>;
   if (size === 'hidden') return null;
   /** ★`text`: ★その画面のレースの 1 行だけ（★走行・拡大・他のレースは出さない） */
   if (size === 'text') {
@@ -647,13 +696,39 @@ function RaceStripBody(): React.ReactElement | null {
     );
   }
 
+  /**
+   * ★**スマホの小窓テレビ**（★R-28 D28-1・README §2）: ★ホームは 幅いっぱいの 16:9・★ほかの画面は S 型（★160×90 ＋ 右に 3 行・98px）。
+   *   ★閉じる・小さくする口は 作らない（★出し入れしない）。★本編が流れていれば ★押すと全画面（★いまの「拡大」と同じ）。
+   */
+  if (tvMode === 'full' || tvMode === 's') {
+    const sideLeft = next && nowMs !== null && next.status === 'scheduled' ? salesLeftText(next.scheduled_at, nowMs) : null;
+    return (
+      <section ref={sectionRef} aria-label="レースの開催情報" className={`u-race-strip u-tvstrip u-tvstrip-${tvMode}${expanded ? ' u-race-strip-expanded' : ''}`}>
+        <div className="u-tvstrip-screen"
+          {...(watchable ? { role: 'button', tabIndex: 0, 'aria-label': 'レース中継を全画面で観る', onClick: () => { setExpanded(true); },
+            onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') setExpanded(true); } } : {})}>
+          {channelEl}
+          {stageEl}
+        </div>
+        {tvMode === 's' && <div className="u-tvstrip-side">
+          <span className="u-tvstrip-side-title">{replaying || embedLive ? '中継' : status}</span>
+          {next && <b className="u-tvstrip-side-race">{next.name}</b>}
+          {sideLeft !== null && <span className="u-tvstrip-side-left u-num">{sideLeft}</span>}
+        </div>}
+        {error && <span className="u-race-strip-error">更新できません</span>}
+        {size === 'big' && embedNote !== null && <span className="u-race-strip-error" role="status">{embedNote}</span>}
+        {(replaying ? recent : next) && <a href={`/races/${encodeURIComponent((replaying ? recent : next)!.id)}`} aria-label={`${(replaying ? recent : next)!.name}の詳細を見る`}>詳細</a>}
+      </section>
+    );
+  }
+
   return (
     <section ref={sectionRef} aria-label="レースの開催情報" className={`u-race-strip${compact ? ' u-race-strip-compact' : ''}${replaying ? ' u-race-strip-replaying' : ''}${big || (resulting && size === 'big') ? ' u-race-strip-big' : ''}${resulting ? ' u-race-strip-result' : ''}${expanded ? ' u-race-strip-expanded' : ''}${vision ? ' u-race-strip-vision' : ''}`}>
       {/*
         ★**大型ビジョンの 1 段目**（★PC だけ・§1-4「赤い点 ＋ 中継 ＋ 条件」）。★中身は ★帯が もう持っている値だけ（★新しい読み込みは無い）。
         ⚠️ ★見本の右端「残り 600m」は ★出さない: ★帯が持つ進み具合は ★確定タイムからの逆算で、★流れている本編の位置と食い違う（★先頭の札を本編の間は出さないのと同じ理由）。
       */}
-      {vision && <VisionHead air={airRace} next={next ?? null} status={status}
+      {vision && channelEl === null && <VisionHead air={airRace} next={next ?? null} status={status}
         runners={airRace !== null && airRace.id === recent?.id ? data?.runners.length ?? 0 : 0}
         left={next && next.status === 'scheduled' && nowMs !== null ? salesLeftText(next.scheduled_at, nowMs) : null} />}
       {/* ★「大」150px（★一覧・閲覧の画面）。★同じ枠が伸びます（★§2: 別要素への切替ではない） */}
@@ -669,21 +744,8 @@ function RaceStripBody(): React.ReactElement | null {
         ★**本編を流さない「大」の面は 簡易版の走行**（★side-v8・確定タイムから逆算した進行率・約 450KB・★決裁 ④）。
         ★本編の箱（下）とは ★別の要素（★1 つの面では どちらか一方しか出ない）。
       */}
-      {embed !== null && <div className={`u-race-strip-stage${big || expanded ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}${expanded ? ' u-race-strip-stage-full' : ''}`}
-        {...(expanded && recent ? { role: 'dialog', 'aria-modal': true, 'aria-label': `${recent.name}のレース中継` } : {})}>
-        {/* ★本編（★`playing` まで 見えないまま読み込む・★触れない） */}
-        <iframe ref={iframeRef} className="u-race-strip-embed" data-live={embedLive ? 'true' : 'false'}
-          src={stripEmbedUrl(embed.id)} title="レースの中継" tabIndex={-1} />
-        {/* ★映像の左上に「録画」札を 1 つ（★DOM・★本編の長い札は小窓では消した・★R-19 回答 Q1） */}
-        {big && embedLive && !expanded && <span className="u-race-strip-stage-rec" aria-hidden>中継</span>}
-        {expanded && <div className="u-race-strip-stage-head">
-          {/* ★「本編」と名乗らない（★条件 1）。★録画・結果から再現 */}
-          <strong>{recent?.name ?? ''} · 中継</strong>
-          <button type="button" onClick={() => { autoOpenedRef.current = false; setExpanded(false); }} aria-label="レース中継を閉じる">閉じる</button>
-        </div>}
-        {expanded && !embedLive && <p className="u-race-strip-stage-wait" role="status">中継の用意をしています…</p>}
-      </div>}
-      {resulting && size === 'big' && winner !== null && <div className="u-race-result-box" role="status">
+      {stageEl}
+      {resulting && size === 'big' && winner !== null && channelEl === null && <div className="u-race-result-box" role="status">
         <span className="u-race-result-place">1着</span>
         <span className="u-race-result-name">{winner.gate}番 {winner.name}</span>
       </div>}
@@ -691,7 +753,9 @@ function RaceStripBody(): React.ReactElement | null {
         ★**ビジョンの待ち時間**（★PC だけ・§1-4「画面の中に、直前の結果と次の発走」）。★本編が流れていない間 ★16:9 の画面を空けない。
         ★直前の結果は ★確定してから（★`lastResult`・★映像より先に勝ち馬を出さない）。★字は小窓の決まり（★11〜14px）。
       */}
-      {vision && !big && !(resulting && winner !== null) && <div className="u-vision-wait">
+      {/* ★**小窓テレビ**（★R-28・PC）: ★待ち時間の画面を ★中継番組に。★本編は この上に重なる（★同じ升） */}
+      {vision && channelEl !== null && <div className="u-vision-tv">{channelEl}</div>}
+      {vision && channelEl === null && !big && !(resulting && winner !== null) && <div className="u-vision-wait">
         {(replaying || embedLive) && recent
           ? <span className="u-vision-wait-row"><small>いま</small><b>{recent.name} レース中</b></span>
           : lastResult !== null && <span className="u-vision-wait-row"><small>直前の結果</small><b>{lastResult}</b></span>}

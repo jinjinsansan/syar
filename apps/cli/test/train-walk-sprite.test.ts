@@ -59,7 +59,9 @@ describe('🔴 ★育成の歩き（スプライト表）', () => {
   });
 
   it('🔴 ★`background-size` の横幅が ★コマ数 × 100% になっている', () => {
-    const m = PAGE.match(/horse-walk-sheet\.webp[^;\n]*?\/\s*(\d+)%\s*100%/);
+    /** ★2026-10-01: ★表は 毛色を焼いた URL（`useCoatedImage('/art/uma/horse-walk-sheet.webp', …)`）で渡し、★背景は `url('${sheet}') … / N% 100%` */
+    expect(PAGE).toContain("useCoatedImage('/art/uma/horse-walk-sheet.webp'");
+    const m = PAGE.match(/url\('\$\{sheet\}'\) no-repeat 0 0 \/\s*(\d+)%\s*100%/);
     expect(m, '🔴 ★歩きの表に `/ <幅>% 100%` が付いていない').not.toBeNull();
     expect(Number(m![1]), `🔴 ★${FRAMES} コマなら ${FRAMES * 100}% です`).toBe(FRAMES * 100);
   });

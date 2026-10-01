@@ -26,6 +26,7 @@ import { DISTANCE_BANDS, distanceBandOf, type DistanceBand } from '@star/race-en
 import type { Strategy } from '@star/sim-engine';
 import { authClient } from './supabase';
 import { SignInRequiredError } from './stable-repo';
+import { STRATEGY_LABEL } from './strategy-label';
 
 /** ★口が返す 1 行（★生の条件ごとの回数） */
 interface RunRow {
@@ -58,10 +59,7 @@ const BAND_LABEL: Readonly<Record<DistanceBand, string>> = {
 /** ★馬場の種類（★DB の値 → 画面の言葉） */
 const SURFACE_LABEL: Readonly<Record<string, string>> = { turf: '芝', dirt: 'ダート' };
 
-/** ★脚質（★DB の値 → 画面の言葉） */
-const STRATEGY_LABEL: Readonly<Record<Strategy, string>> = {
-  nige: '逃げ', senko: '先行', sashi: '差し', oikomi: '追い込み',
-};
+/** ★脚質（★DB の値 → 画面の言葉・★表は `strategy-label.ts` の 1 か所） */
 
 /**
  * 🔴 ★**「道悪」は good 以外**。

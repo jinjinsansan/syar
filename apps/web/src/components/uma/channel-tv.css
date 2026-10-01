@@ -1,0 +1,290 @@
+/* ════════════════════════════════════════════════════════════════════════
+   ★**小窓テレビ**（★2026-10-01・デザイナー引き渡し R-28・README §1・§4・§5 の確定値）
+   ★スマホの小窓 `sp` と PC の大型ビジョン `pc` は ★同じ部品・★寸法の変数だけが違う。
+   ════════════════════════════════════════════════════════════════════════ */
+[data-theme='uma'] .u-tv {
+  --tv-hdr: 20px; --tv-ftr: 18px; --tv-top: 24px; --tv-bottom: 22px; --tv-pad: 8px;
+  --tv-s: 11px; --tv-m: 13px; --tv-l: 16px; --tv-xl: 20px; --tv-huge: 40px; --tv-narr: 14px;
+  --tv-row: 20px; --tv-face: 72px; --tv-thumb: 120px; --tv-oval-w: 150px; --tv-oval-h: 84px; --tv-going: 34px; --tv-cols: 1;
+  position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 4px; background: #0a2340;
+  font-family: 'M PLUS Rounded 1c', system-ui, sans-serif; font-weight: 800; color: #fbf7ec; line-height: 1.3;
+}
+[data-theme='uma'] .u-tv[data-size='pc'] {
+  --tv-hdr: 22px; --tv-ftr: 20px; --tv-top: 27px; --tv-bottom: 24px; --tv-pad: 10px;
+  --tv-l: 17px; --tv-xl: 22px; --tv-huge: 46px; --tv-narr: 15px;
+  --tv-row: 24px; --tv-face: 84px; --tv-thumb: 140px; --tv-oval-w: 170px; --tv-oval-h: 96px; --tv-going: 40px; --tv-cols: 2;
+}
+[data-theme='uma'] .u-tv .u-num { font-family: 'Saira Condensed', system-ui, sans-serif; font-weight: 700; font-variant-numeric: tabular-nums; }
+[data-theme='uma'] .u-tv-s { font-size: var(--tv-s); }
+[data-theme='uma'] .u-tv-m { font-size: var(--tv-m); }
+[data-theme='uma'] .u-tv-l { font-size: var(--tv-l); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-theme='uma'] .u-tv-sub { color: #cfe0ee; }
+[data-theme='uma'] .u-tv-grow { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #cfe0ee; }
+
+/* ★背景（★芝の番組: パノラマ 42% ＋ 芝・暗幕 .55／★それ以外: 濃紺の斜めの面 ＋ 24px の細線） */
+[data-theme='uma'] .u-tv-bg-turf { position: absolute; inset: 0; background: url('/art/uma/turf-near.webp') repeat 0 0 / 700px 42px; }
+[data-theme='uma'] .u-tv-bg-pano { position: absolute; left: 0; right: 0; top: 0; height: 42%; background: url('/art/uma/world-panorama.webp') repeat-x bottom / auto 100%; }
+[data-theme='uma'] .u-tv-bg-dim { position: absolute; inset: 0; background: rgba(10, 35, 64, .55); }
+[data-theme='uma'] .u-tv-bg-navy {
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 24px), linear-gradient(160deg, #123f6b 0%, #0a2340 55%, #061a33 100%);
+}
+[data-theme='uma'] .u-tv-body {
+  position: absolute; left: var(--tv-pad); right: var(--tv-pad); top: var(--tv-top); bottom: var(--tv-bottom);
+  display: flex; flex-direction: column; min-height: 0;
+}
+
+/* ★上の帯（★局の札・番組名・● 中継・時刻） */
+[data-theme='uma'] .u-tv-head {
+  position: absolute; left: 0; right: 0; top: 0; height: var(--tv-hdr); display: flex; align-items: center; gap: 6px; padding: 0 6px; box-sizing: border-box;
+  background: linear-gradient(rgba(6, 26, 51, .92), rgba(6, 26, 51, .7)); z-index: 2;
+}
+[data-theme='uma'] .u-tv-logo {
+  flex: 0 0 auto; padding: 0 6px; height: 16px; display: flex; align-items: center; border-radius: 3px; font-size: 10px; white-space: nowrap; color: #10243a;
+  background-image: linear-gradient(100deg, #fff6b0 0%, #f3cf34 40%, #d99f14 70%, #ffe483 100%);
+}
+[data-theme='uma'] .u-tv-title { flex: 1 1 auto; min-width: 0; font-size: var(--tv-s); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-theme='uma'] .u-tv-onair { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; font-size: 10px; white-space: nowrap; }
+[data-theme='uma'] .u-tv-onair i { width: 7px; height: 7px; border-radius: 50%; background: #f06a5f; }
+[data-theme='uma'] .u-tv-clock { flex: 0 0 auto; font-size: 14px; }
+
+/* ★下の帯（★段・次のレース・残り時間） */
+[data-theme='uma'] .u-tv-foot {
+  position: absolute; left: 0; right: 0; bottom: 0; height: var(--tv-ftr); display: flex; align-items: center; gap: 6px; padding: 0 6px; box-sizing: border-box;
+  background: rgba(6, 26, 51, .9); border-top: 1px solid rgba(246, 194, 28, .55); z-index: 2;
+}
+[data-theme='uma'] .u-tv-foot-l { flex: 0 0 auto; font-size: 10px; color: #cfe0ee; white-space: nowrap; }
+[data-theme='uma'] .u-tv-foot-m { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 10px; white-space: nowrap; }
+[data-theme='uma'] .u-tv-foot-r { flex: 0 0 auto; font-size: 13px; color: #ffe483; white-space: nowrap; }
+
+/* ★切り替えの帯（★0.45 秒・1 回・§5） */
+[data-theme='uma'] .u-tv-wipe {
+  position: absolute; top: 0; bottom: 0; left: -50%; width: 42%; z-index: 3; transform: skewX(-18deg);
+  background: linear-gradient(90deg, #f6c21c 0 10%, #0a2340 10% 90%, #f6c21c 90%); animation: u-tv-wipe .45s ease-out both;
+}
+@keyframes u-tv-wipe { from { left: -50%; } to { left: 110%; } }
+
+/* ★札・行の共通 */
+[data-theme='uma'] .u-tv-rowhead { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; white-space: nowrap; min-width: 0; }
+[data-theme='uma'] .u-tv-tag { flex: 0 0 auto; padding: 1px 8px; border-radius: 4px; background: #cfe0ee; color: #10243a; font-size: var(--tv-s); }
+[data-theme='uma'] .u-tv-tag-settled { background: #57c8a8; color: #061a33; }
+[data-theme='uma'] .u-tv-tag-closed { background: #f08219; color: #10243a; }
+[data-theme='uma'] .u-tv-page { flex: 0 0 auto; font-size: var(--tv-m); color: #ffe483; }
+[data-theme='uma'] .u-tv-gate {
+  flex: 0 0 auto; width: 22px; height: 18px; border-radius: 3px; border: 2px solid #10243a; box-sizing: border-box; background: #cfe0ee; color: #111;
+  display: flex; align-items: center; justify-content: center; font-size: 12px;
+}
+[data-theme='uma'] .u-tv-name { flex: 1 1 auto; min-width: 0; font-size: var(--tv-m); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ★つなぎ */
+[data-theme='uma'] .u-tv-ident { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-width: 0; }
+[data-theme='uma'] .u-tv-ident-plate {
+  padding: 6px 16px 8px; border: 3px solid #061a33; border-radius: 10px; color: #10243a; box-shadow: 0 4px 0 #061a33; white-space: nowrap; font-size: var(--tv-xl);
+  background-image: linear-gradient(100deg, #fff6b0 0%, #f3cf34 30%, #d99f14 48%, #ffe483 62%, #fff6b0 100%);
+}
+[data-theme='uma'] .u-tv-ident-sub { font-size: var(--tv-s); letter-spacing: .24em; color: #cfe0ee; white-space: nowrap; }
+[data-theme='uma'] .u-tv-ident-next {
+  display: flex; align-items: center; gap: 8px; max-width: 100%; padding: 4px 12px; border-radius: 999px; background: rgba(6, 26, 51, .9);
+  border: 1px solid rgba(246, 194, 28, .6); font-size: var(--tv-m); white-space: nowrap; overflow: hidden; box-sizing: border-box;
+}
+[data-theme='uma'] .u-tv-ident-next span { color: #ffe483; overflow: hidden; text-overflow: ellipsis; }
+
+/* ★直前の結果（★着順・タイムだけ・★払戻は出さない） */
+[data-theme='uma'] .u-tv-podium { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 5px; min-height: 0; }
+[data-theme='uma'] .u-tv-podium-row { display: flex; align-items: center; gap: 8px; height: calc(var(--tv-row) + 2px); padding: 0 10px; border-radius: 6px; background: #fbf7ec; color: #10243a; }
+[data-theme='uma'] .u-tv-podium-first { background: #fff4cf; }
+[data-theme='uma'] .u-tv-pos { width: 30px; flex: 0 0 auto; font-size: var(--tv-l); color: #10243a; }
+[data-theme='uma'] .u-tv-podium-first .u-tv-pos { color: #a9741a; }
+[data-theme='uma'] .u-tv-pos small { font-size: 10px; }
+[data-theme='uma'] .u-tv-time { flex: 0 0 auto; font-size: var(--tv-m); color: #4a6178; }
+[data-theme='uma'] .u-tv-ownline { font-size: var(--tv-s); color: #ffe483; text-align: center; }
+
+/* ★オッズ表・出馬表（★スマホ 1 列 6 行・PC 2 列 12 行・★ページ送りは 0.2 秒の溶け込み） */
+[data-theme='uma'] .u-tv-table {
+  flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(var(--tv-cols), minmax(0, 1fr)); grid-auto-rows: var(--tv-row);
+  column-gap: 6px; row-gap: 2px; align-content: start;
+  /* ⚠️ ★`both` にしない: ★アニメーションが止まっている（裏のタブ・撮影）と ★透明のまま残り 表が空に見えた（2026-10-01 の撮影） */
+  animation: u-tv-fade .2s ease-out;
+}
+@keyframes u-tv-fade { from { opacity: 0; } to { opacity: 1; } }
+[data-theme='uma'] .u-tv-trow { display: flex; align-items: center; gap: 6px; padding: 0 6px; border-radius: 4px; background: #fbf7ec; color: #10243a; min-width: 0; }
+[data-theme='uma'] .u-tv-trow-alt { background: #f4f1e6; }
+[data-theme='uma'] .u-tv-fav { flex: 0 0 auto; padding: 0 5px; border-radius: 3px; font-size: 9px; white-space: nowrap; background-image: linear-gradient(100deg, #fff6b0, #f3cf34 40%, #d99f14); }
+[data-theme='uma'] .u-tv-c1 { flex: 0 0 auto; font-size: 10px; font-weight: 700; color: #4a6178; white-space: nowrap; }
+[data-theme='uma'] .u-tv-c2 { flex: 0 0 auto; min-width: 34px; text-align: right; font-size: var(--tv-m); color: #25384a; white-space: nowrap; }
+
+/* ★パドック（★立ち姿 1 枚・高さ 96%・評価の言葉なし） */
+[data-theme='uma'] .u-tv-paddock { flex: 1 1 auto; position: relative; min-height: 0; }
+[data-theme='uma'] .u-tv-paddock-horse {
+  position: absolute; left: 4%; bottom: 0; height: 96%; aspect-ratio: 544 / 580; background: no-repeat bottom center / contain; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .4));
+}
+[data-theme='uma'] .u-tv[data-size='pc'] .u-tv-paddock-horse { left: 6%; }
+[data-theme='uma'] .u-tv-paddock-cloth {
+  position: absolute; left: 22%; bottom: 30%; width: 26px; height: 22px; border-radius: 3px; border: 2px solid #10243a; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; font-size: 14px; background: #cfe0ee; color: #111;
+}
+[data-theme='uma'] .u-tv[data-size='pc'] .u-tv-paddock-cloth { left: 24%; }
+[data-theme='uma'] .u-tv-paddock-count {
+  position: absolute; right: 0; top: 4px; padding: 1px 8px; border-radius: 4px; background: rgba(6, 26, 51, .9); border: 1px solid #f6c21c; font-size: var(--tv-s); white-space: nowrap;
+}
+[data-theme='uma'] .u-tv-paddock-name {
+  position: absolute; right: 0; bottom: 0; max-width: 60%; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding: 6px 10px; border-radius: 8px; background: rgba(6, 26, 51, .88);
+}
+
+/* ★出走馬の紹介（★素質の数値・星・強さを断定する言葉は出さない） */
+[data-theme='uma'] .u-tv-horse { flex: 1 1 auto; display: flex; gap: 10px; min-height: 0; }
+[data-theme='uma'] .u-tv-horse-thumb { flex: 0 0 var(--tv-thumb); position: relative; border-radius: 8px; overflow: hidden; background: url('/art/uma/turf-near.webp') repeat 0 0 / 500px 30px; }
+[data-theme='uma'] .u-tv-horse-art { position: absolute; inset: 0; background: no-repeat 30% 100% / 120% auto; }
+[data-theme='uma'] .u-tv-horse-gate { position: absolute; left: 4px; top: 4px; width: 24px; height: 20px; }
+[data-theme='uma'] .u-tv-horse-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+[data-theme='uma'] .u-tv-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+[data-theme='uma'] .u-tv-chip { padding: 0 6px; border-radius: 3px; background: #cfe0ee; color: #10243a; font-size: 10px; white-space: nowrap; }
+[data-theme='uma'] .u-tv-chip-own { background: #ffe483; }
+[data-theme='uma'] .u-tv-chip-new { background: #57c8a8; color: #061a33; }
+[data-theme='uma'] .u-tv-record { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+[data-theme='uma'] .u-tv-record small, [data-theme='uma'] .u-tv-recent small { font-size: 10px; color: #cfe0ee; }
+[data-theme='uma'] .u-tv-record b { font-size: var(--tv-l); }
+[data-theme='uma'] .u-tv-recent { display: flex; align-items: center; gap: 4px; }
+[data-theme='uma'] .u-tv-recent-box {
+  width: 20px; height: 20px; border-radius: 4px; background: rgba(251, 247, 236, .9); color: #10243a;
+  display: flex; align-items: center; justify-content: center; font-size: 13px;
+}
+[data-theme='uma'] .u-tv-recent-win { background: #f6c21c; }
+
+/* ★実況席から（★顔は いまの実況・川崎タカシ） */
+[data-theme='uma'] .u-tv-narr { flex: 1 1 auto; display: flex; align-items: center; gap: 10px; min-height: 0; }
+[data-theme='uma'] .u-tv-narr-who { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+[data-theme='uma'] .u-tv-narr-face {
+  width: var(--tv-face); height: var(--tv-face); border-radius: 50%; border: 3px solid #f6c21c; box-sizing: border-box;
+  box-shadow: inset 0 0 0 2px #0a2340, 0 2px 0 rgba(10, 35, 64, .6); background: #0a2340 url('/art/narrator-ti-normal-open.webp') no-repeat center 20% / 115%;
+}
+[data-theme='uma'] .u-tv-narr-name { font-size: 10px; white-space: nowrap; color: #cfe0ee; }
+[data-theme='uma'] .u-tv-narr-bubble {
+  position: relative; flex: 1 1 auto; min-width: 0; padding: 8px 12px; border-radius: 12px; background: #fbf7ec; color: #10243a; font-size: var(--tv-narr); line-height: 1.5;
+}
+[data-theme='uma'] .u-tv-narr-bubble::before {
+  content: ''; position: absolute; left: -8px; top: 50%; margin-top: -8px; width: 0; height: 0;
+  border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-right: 9px solid #fbf7ec;
+}
+[data-theme='uma'] .u-tv-narr-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ★今日の競馬場（★数字の札 3 つ ＋ 数字だけの 1 文） */
+[data-theme='uma'] .u-tv-venue-stats { flex: 1 1 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; align-content: center; min-height: 0; }
+[data-theme='uma'] .u-tv-venue-stat {
+  display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 2px; border-radius: 8px; background: rgba(6, 26, 51, .88); border: 1px solid rgba(246, 194, 28, .5);
+}
+[data-theme='uma'] .u-tv-venue-stat small { font-size: 10px; color: #cfe0ee; white-space: nowrap; }
+[data-theme='uma'] .u-tv-venue-stat span { display: flex; align-items: baseline; gap: 2px; font-size: 10px; white-space: nowrap; }
+[data-theme='uma'] .u-tv-venue-stat b { font-size: var(--tv-xl); color: #ffe483; }
+[data-theme='uma'] .u-tv-venue-line { flex: 0 0 auto; padding: 4px 10px; border-radius: 6px; background: rgba(6, 26, 51, .88); line-height: 1.45; }
+
+/* ★コースの説明（★楕円・スタート・ゴール） */
+[data-theme='uma'] .u-tv-course { flex: 1 1 auto; display: flex; gap: 10px; align-items: center; min-height: 0; }
+[data-theme='uma'] .u-tv-oval { position: relative; flex: 0 0 var(--tv-oval-w); height: var(--tv-oval-h); border: 7px solid #b88a55; border-radius: 999px; box-sizing: border-box; }
+[data-theme='uma'] .u-tv-oval::after { content: ''; position: absolute; inset: 0; border: 1px solid rgba(251, 247, 236, .6); border-radius: 999px; }
+[data-theme='uma'] .u-tv-oval-goal { position: absolute; left: 58%; bottom: -13px; width: 3px; height: 19px; background: #f6c21c; }
+[data-theme='uma'] .u-tv-oval-goal-l { position: absolute; left: 52%; bottom: -27px; font-size: 9px; color: #ffe483; white-space: nowrap; }
+[data-theme='uma'] .u-tv-oval-start {
+  position: absolute; left: 30%; top: -12px; width: 12px; height: 12px; border-radius: 50%; background: #f06a5f; border: 2px solid #fbf7ec; box-sizing: border-box;
+}
+[data-theme='uma'] .u-tv-oval-start-l { position: absolute; left: 18%; top: -26px; font-size: 9px; color: #fbf7ec; white-space: nowrap; }
+[data-theme='uma'] .u-tv-oval-turn { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #cfe0ee; white-space: nowrap; }
+[data-theme='uma'] .u-tv-course-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+[data-theme='uma'] .u-tv-course-line { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+[data-theme='uma'] .u-tv-course-line i { width: 6px; height: 6px; border-radius: 50%; background: #f6c21c; flex: 0 0 auto; }
+
+/* ★馬場状態（★天気の札を左に足す枠を空けておく） */
+[data-theme='uma'] .u-tv-going { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 14px; }
+[data-theme='uma'] .u-tv-going-big { display: flex; flex-direction: column; align-items: center; }
+[data-theme='uma'] .u-tv-going-big small { font-size: 10px; color: #cfe0ee; }
+[data-theme='uma'] .u-tv-going-big b { font-size: var(--tv-huge); line-height: 1.1; color: #ffe483; }
+[data-theme='uma'] .u-tv-going-steps { display: flex; gap: 4px; }
+[data-theme='uma'] .u-tv-going-step { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+[data-theme='uma'] .u-tv-going-step i { width: var(--tv-going); height: 8px; border-radius: 2px; background: rgba(251, 247, 236, .25); }
+[data-theme='uma'] .u-tv-going-step small { font-size: 10px; color: #cfe0ee; white-space: nowrap; }
+[data-theme='uma'] .u-tv-going-on i { background: #ffe483; }
+[data-theme='uma'] .u-tv-going-on small { color: #ffe483; }
+
+/* ★本馬場入場（★締切の 1 分） */
+[data-theme='uma'] .u-tv-closing { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; }
+[data-theme='uma'] .u-tv-closing-left { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+[data-theme='uma'] .u-tv-closing-left small { font-size: var(--tv-s); }
+[data-theme='uma'] .u-tv-closing-left b { font-size: var(--tv-huge); line-height: 1; color: #ffe483; }
+[data-theme='uma'] .u-tv-gates { flex: 0 0 auto; display: flex; gap: 3px; overflow: hidden; }
+[data-theme='uma'] .u-tv-gates span {
+  flex: 1 1 0; min-width: 0; height: 18px; border-radius: 3px; border: 1px solid #10243a; box-sizing: border-box; background: #cfe0ee; color: #111;
+  display: flex; align-items: center; justify-content: center; font-size: 11px;
+}
+
+/* ★「動きを減らす」・停止スイッチ: ★ワイプ・溶け込みは止め ★その場で差し替え（§5） */
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='uma'] .u-tv-wipe { display: none; }
+  [data-theme='uma'] .u-tv-table { animation: none; }
+}
+[data-theme='uma'] .u-paused .u-tv-wipe { display: none; }
+[data-theme='uma'] .u-paused .u-tv-table { animation: none; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   ★**置き場**（★README §2）
+   ════════════════════════════════════════════════════════════════════════ */
+/* ★PC の大型ビジョン: ★テレビは 画面の升（2 段目）に。★「次」と掲示板の段は テレビの下の帯へ移したので 畳む */
+[data-theme='uma'] .u-race-strip-vision > .u-vision-tv { grid-row: 2; grid-column: 1; width: 100%; min-width: 0; }
+[data-theme='uma'] .u-race-strip-vision:has(> .u-vision-tv) > .u-race-strip-main { display: none; }
+
+/* ★スマホ（★帯の枠・背景は使わない・★テレビの枠だけ） */
+[data-theme='uma'] .u-race-strip.u-tvstrip {
+  display: flex; align-items: stretch; gap: 10px; min-height: 0; padding: 0; border: 0; background: none; border-radius: 0;
+}
+[data-theme='uma'] .u-tvstrip-screen {
+  position: relative; overflow: hidden; border-radius: 6px; background: #061a33;
+  box-shadow: 0 0 0 2px #f6c21c, 0 6px 14px rgba(0, 0, 0, .4);
+}
+[data-theme='uma'] .u-tvstrip-screen[role='button'] { cursor: pointer; }
+/* ★本編は テレビの升に重ねる（★同じ大きさ・★全画面のときは従来どおり） */
+[data-theme='uma'] .u-tvstrip-screen > .u-race-strip-stage:not(.u-race-strip-stage-offscreen):not(.u-race-strip-stage-full) {
+  position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; aspect-ratio: auto; z-index: 4;
+}
+[data-theme='uma'] .u-tvstrip-screen > .u-race-strip-stage:not(.u-race-strip-stage-full) .u-race-strip-embed { width: 100%; height: 100%; border-radius: 6px; }
+
+/* ★ホーム: 幅いっぱいの 16:9（★390 で 346×195・★枠は 余白 5px・濃紺の縁 3px・金の輪 2px） */
+[data-theme='uma'] .u-race-strip.u-tvstrip-full {
+  width: calc(100% - 28px); max-width: 540px; margin: 8px auto 0; padding: 5px; box-sizing: border-box;
+  border: 3px solid #061a33; border-radius: 10px; background: #0b1622; box-shadow: 0 0 0 2px #f6c21c, 0 10px 18px rgba(0, 0, 0, .4);
+}
+[data-theme='uma'] .u-tvstrip-full .u-tvstrip-screen { flex: 1 1 auto; border-radius: 4px; box-shadow: none; }
+[data-theme='uma'] .u-tvstrip-full > a { display: none; }
+
+/*
+  ★ホームの縦の配分（★README §2）: ★テレビは削らない。★先に馬の舞台を縮める（230 → 最小 120px）、★次にボタン。
+  ⚠️ ★上段（EP/PP の副題）は ★オーナー判定 B-3 の文言なので ★1 行にまとめず残す（★デザイナーへ照会・R-28 の返答）。
+*/
+@media (max-width: 1023px) {
+  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-stage { padding-top: 4px; }
+  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-field { flex: 1 1 auto; min-height: 120px; max-height: 230px; align-items: flex-end; }
+  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-horse {
+    width: auto !important; height: 100%; max-height: 230px; margin-bottom: 0 !important;
+  }
+  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-plate { margin-top: 2px; padding: 5px 12px; }
+  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck { grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px 14px 14px; box-sizing: border-box; }
+  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > * { min-height: 54px !important; }
+  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > :nth-child(-n + 2) { min-height: 68px !important; }
+}
+@media (max-width: 1023px) and (max-height: 759px) {
+  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > * { min-height: 48px !important; }
+  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > :nth-child(-n + 2) { min-height: 60px !important; }
+}
+
+/* ★ほかの画面: S 型（★160×90 のテレビ ＋ 右に 番組名・レース・残り時間・★高さ 98px） */
+[data-theme='uma'] .u-race-strip.u-tvstrip-s {
+  width: calc(100% - 28px); max-width: 880px; height: 98px; margin: 8px auto 0; padding: 4px; box-sizing: border-box; align-items: center;
+  border: 2px solid var(--u-gold); border-radius: 12px; background: var(--u-panel-strong);
+}
+[data-theme='uma'] .u-tvstrip-s .u-tvstrip-screen { flex: 0 0 160px; width: 160px; height: 90px; border-radius: 4px; box-shadow: none; }
+/* ★中身は スマホの小窓の寸法（362×204）で描いて ★縮める（★文字の大きさの決まりは崩さない） */
+[data-theme='uma'] .u-tvstrip-s .u-tvstrip-screen > .u-tv { width: 362px; transform: scale(calc(160 / 362)); transform-origin: top left; }
+[data-theme='uma'] .u-tvstrip-side { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+[data-theme='uma'] .u-tvstrip-side-title { font-size: 11px; color: #cfe0ee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-theme='uma'] .u-tvstrip-side-race { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-theme='uma'] .u-tvstrip-side-left { font-size: 13px; color: #ffe483; }
+[data-theme='uma'] .u-tvstrip-s > a { align-self: center; font-size: 12px; }
+[data-theme='uma'] .u-tvstrip > .u-race-strip-error { position: absolute; left: 6px; bottom: -18px; font-size: 11px; }
