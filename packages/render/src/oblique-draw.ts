@@ -97,6 +97,12 @@ export interface Ctx2D<TImage = unknown> {
   translate?(x: number, y: number): void;
   rotate?(angle: number): void;
   transform?(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  /**
+   * ★任意。★変換を `save`/`restore` を使わずに置き直す（★2026-10-01・ゲートの場面で 1 コマ数百回の `restore` が重かった）。
+   *   ★無い環境では `save`/`transform`/`restore` に戻る。
+   */
+  getTransform?(): { readonly a: number; readonly b: number; readonly c: number; readonly d: number; readonly e: number; readonly f: number };
+  setTransform?(a: number, b: number, c: number, d: number, e: number, f: number): void;
   /** ★任意。毛色バリエーション（馬体の色相・明度・彩度）に使う CSS filter。無い環境では無視 */
   filter?: string;
   /** ★任意。HUD の金プレート（グラデーション 1 本だけ許可・MOTION_HANDOFF §0）。無い環境では単色の金 */

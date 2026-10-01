@@ -517,17 +517,27 @@ export function drawTexturedWorld<TImage>(
   const strip = (tex: WorldStripTexture<TImage>, w: number, heightM: number, sFrom: number, sTo: number, stepM: number, alpha = 1, minDepth = 14): void => {
     ctx.globalAlpha = alpha;
     const slices: { readonly depth: number; readonly draw: () => void }[] = [];
+    /**
+     * ★**`save`/`restore` を使わずに変換を置き直す**（★2026-10-01・オーナー「芝の動きが停止したり ぎこちない」）。
+     *   ★本番の実時間の計測（GPU あり）で、★ゲートの場面（カメラが低く 生垣・スタンドが長く近くに映る）は 1 コマ 0.08〜0.27 秒。
+     *   ★CPU の内訳の最大が ★この短冊の `restore`（★1 コマ数百回）と ★位置の計算だった。
+     *   → ★元の変換を 1 度だけ読み、★短冊ごとに `setTransform`（★元 × 短冊）で置く。★最後に元へ戻す。★描く絵は同じ。
+     */
+    const base = ctx.getTransform !== undefined && ctx.setTransform !== undefined ? ctx.getTransform() : null;
     let s0 = sFrom;
     while (s0 < sTo) {
       // ★近いほど細かく刻む（階段状に見えない）。極端に近い帯（カメラ脇）は描かない
-      const probe = P(s0, w, 0);
-      const step = probe.depth > 1.5 ? Math.max(0.35, Math.min(stepM, probe.depth / 60)) : stepM;
+      // ★`b0` は刻み幅を決める点と同じ（★同じ点を 2 度 計算しない・★上端の 2 点は 捨てる短冊では計算しない）
+      const b0 = P(s0, w, 0);
+      const step = b0.depth > 1.5 ? Math.max(0.35, Math.min(stepM, b0.depth / 60)) : stepM;
       const s1 = Math.min(sTo, s0 + step);
-      const b0 = P(s0, w, 0), b1 = P(s1, w, 0), t0 = P(s0, w, heightM), t1 = P(s1, w, heightM);
+      const b1 = P(s1, w, 0);
+      const sStart = s0;
       s0 = s1;
       if (b0.depth <= minDepth || b1.depth <= minDepth) continue;
       const xl = Math.min(b0.x, b1.x), xr = Math.max(b0.x, b1.x);
       if (xr < -4 || xl > W + 4) continue;
+      const t0 = P(sStart, w, heightM), t1 = P(s1, w, heightM);
       const top = (t0.y + t1.y) / 2, bottom = (b0.y + b1.y) / 2;
       const dh = bottom - top;
       if (dh < 0.5 || dh > H * 0.9) continue;   // 極端に近い（画面いっぱいの）帯は描かない
@@ -560,6 +570,17 @@ export function drawTexturedWorld<TImage>(
         const kx = dxPx / sw;
         const ky = ((botL - topL) + (botR - topR)) / 2 / tex.height;
         const skew = (topR - topL) / sw;             // 元画像 1px あたりの縦のずれ
+        const tx = xl - sx * kx, ty = topL - sx * skew;
+        if (base !== null) {
+          // ★元 × 短冊（★`transform(kx, skew, 0, ky, tx, ty)` を積んだのと同じ行列）
+          ctx.setTransform!(
+            base.a * kx + base.c * skew, base.b * kx + base.d * skew,
+            base.c * ky, base.d * ky,
+            base.a * tx + base.c * ty + base.e, base.b * tx + base.d * ty + base.f,
+          );
+          ctx.drawImage(tex.image, sx, 0, sw, tex.height, sx, 0, sw, tex.height);
+          return;
+        }
         // ★`transform` は現在の変換に**積む**ので、`save`/`restore` で挟む
         ctx.save!();
         ctx.transform!(kx, skew, 0, ky, xl - sx * kx, topL - sx * skew);
@@ -570,6 +591,7 @@ export function drawTexturedWorld<TImage>(
     // 遠い順に描く（近い帯が手前に重なる）
     slices.sort((a, b) => b.depth - a.depth);
     for (const slice of slices) slice.draw();
+    if (base !== null) ctx.setTransform!(base.a, base.b, base.c, base.d, base.e, base.f);
     ctx.globalAlpha = 1;
   };
   const scenery = assets.scenery;

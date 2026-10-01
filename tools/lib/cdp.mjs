@@ -79,6 +79,8 @@ export async function launch(opts = {}) {
      */
     '--disable-features=CalculateNativeWinOcclusion',
     `--window-size=${opts.width ?? 1400},${opts.height ?? 1000}`,
+    /** ★道具ごとの追加（★例: GPU で描かせる `--enable-gpu`・2026-10-01 コマの詰まりの測定） */
+    ...(opts.extraArgs ?? []),
     'about:blank',
   ];
   const proc = target === null ? spawn(exe, args, { stdio: 'ignore', detached: false }) : undefined;
