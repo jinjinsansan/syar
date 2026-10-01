@@ -93,7 +93,12 @@ export interface StableView {
 export type { Silks };
 
 export interface StatRow { readonly key: string; readonly label: string; readonly value: number; readonly capRatio: number; readonly delta: number }
-export interface RaceRow { readonly week: number; readonly race: string; readonly grade: string; readonly cond: string; readonly place: number; readonly time: string; readonly prizePP: number }
+/**
+ * ★戦績の 1 行。
+ * ⚠️ ★`week` は ★`0046` より前のレースで null（★0 週と偽らない・`records-screen.ts` と同じ）。
+ * ⚠️ ★`prizePP` は ★1 走の賞金の読む口が無い間 null（★0 にすると「賞金なし」に見える・PR-1）。
+ */
+export interface RaceRow { readonly week: number | null; readonly race: string; readonly grade: string; readonly cond: string; readonly place: number; readonly time: string; readonly prizePP: number | null }
 export interface TrainingRow { readonly week: number; readonly menu: string; readonly effect: string; readonly fatigueDelta: number; readonly note: string }
 export interface Cross { readonly name: string; readonly label: string; readonly color: string }
 

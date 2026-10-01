@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { STABLE_GRADE_LABEL } from '@star/training';
 import { conditionView, fatigueStepOf, type HorseDetail, type RaceRow, type TrainingRow } from '../../../lib/stable';
-import { SetupRequiredError, SignInRequiredError, supabaseStableRepo } from '../../../lib/stable-repo';
+import { SetupRequiredError, SignInRequiredError, UNKNOWN_NAME, supabaseStableRepo } from '../../../lib/stable-repo';
 import { loadDiscovery, type DiscoveryRow } from '../../../lib/discovery-screen';
 import { Backdrop, BigButton, TextPanel, TopBar, useMotionPaused } from '../../../components/uma/uma-parts';
 import { RaceStrip } from '../../../components/uma/race-strip';
@@ -196,12 +196,15 @@ function RaceLine({ r, odd }: { readonly r: RaceRow; readonly odd: boolean }): R
             background: top ? 'var(--u-gold-pale)' : '#e8eef3', color: top ? '#4a3105' : 'var(--u-ink-dark-3)',
           }}>{r.grade}</span>
         </div>
-        <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--u-ink-dark-2)' }}>{r.week}週 ・ {r.cond} ・ {r.time}</span>
+        <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--u-ink-dark-2)' }}>{r.week ?? '—'}週 ・ {r.cond} ・ {r.time}</span>
       </div>
-      <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'baseline', gap: 2 }}>
-        <span className="u-num" style={{ fontSize: 16, color: r.prizePP > 0 ? 'var(--u-ink-dark)' : '#9fb0bd' }}>{r.prizePP.toLocaleString('ja-JP')}</span>
-        <span style={{ fontSize: 9, color: 'var(--u-ink-dark-2)' }}>PP</span>
-      </div>
+      {/* ⚠️ ★1 走の賞金が読めない間（`null`）は ★欄ごと出さない（★0 PP と書くと「賞金なし」に見える・PR-1） */}
+      {r.prizePP !== null && (
+        <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'baseline', gap: 2 }}>
+          <span className="u-num" style={{ fontSize: 16, color: r.prizePP > 0 ? 'var(--u-ink-dark)' : '#9fb0bd' }}>{r.prizePP.toLocaleString('ja-JP')}</span>
+          <span style={{ fontSize: 9, color: 'var(--u-ink-dark-2)' }}>PP</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -289,9 +292,14 @@ export function HorseDetailView({ horseId }: { readonly horseId: string }): Reac
 
   const cond = conditionView(h.condition);
   const fat = fatigueStepOf(h.fatigue);
-  const sire = h.pedigree[0]?.[0];
+  /** ★父の名前が読めなかった枠（`UNKNOWN_NAME`）は ★札にしない（★「父 —」を出さない） */
+  const sireRaw = h.pedigree[0]?.[0];
+  const sire = sireRaw === UNKNOWN_NAME ? undefined : sireRaw;
   /** ★新しい順（★週の大きい順） */
-  const races = [...h.races].sort((a, b) => b.week - a.week);
+  /** ★週の無い行（★`0046` より前）は末尾へ（★`sort` は安定なので ★データ層の新しい順を保つ） */
+  const races = [...h.races].sort((a, b) => (b.week ?? -1) - (a.week ?? -1));
+  /** ★5 代の表は ★3 代より先が在るときだけ開ける（★本物は 2 代まで・`pedigreeRowsOf`） */
+  const hasPed5 = h.pedigree.length > 2;
   const shownRaces = allRaces ? races : races.slice(0, RECENT_ROWS);
   const training = [...h.training].sort((a, b) => b.week - a.week).slice(0, RECENT_ROWS);
 
@@ -321,13 +329,17 @@ export function HorseDetailView({ horseId }: { readonly horseId: string }): Reac
           <h1 style={{ margin: 0, fontSize: 26, lineHeight: 1.2, fontWeight: 800, overflowWrap: 'anywhere' }}>{h.name}</h1>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {/* ★厩舎の格（★`StableGradePanel` を移した・R-26 D26-3 ① 🔴 4）。★名前は `@star/training` から */}
-            {[h.sexAge, h.coat, h.stableName, `厩舎の格 ${STABLE_GRADE_LABEL[h.stableGrade]}`, ...(sire !== undefined ? [`父 ${sire}`] : [])].map((t) => (
+            {[h.sexAge, h.coat, h.stableName, `厩舎の格 ${STABLE_GRADE_LABEL[h.stableGrade]}`, ...(sire !== undefined ? [`父 ${sire}`] : [])].filter((t) => t !== '').map((t) => (
               <span key={t} style={CHIP}>{t}</span>
             ))}
           </div>
           {/* ⚠️ ★素質の行は 2026-09-18 に取りました（★D-114 ②）。★勝率も出しません（★R-26 🔴 6） */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <div style={{
+            {/**
+              * ★獲得賞金は ★0 のとき出さない（★2026-10-01）。★賞金の合計を読む口が まだ無く（★`horse_total_prize_pp` は閉じている）
+              *   ★常に 0 が来るので、★全頭に「0 PP」と出ていた（★事実と違う）。★読めるようになれば 賞金のある馬にだけ出る。
+              */}
+            {h.prizePP > 0 && <div style={{
               flex: '1 1 140px', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10,
               border: '2px solid var(--u-gold)', background: 'rgba(30,22,4,.82)',
             }}>
@@ -335,7 +347,7 @@ export function HorseDetailView({ horseId }: { readonly horseId: string }): Reac
               <span style={{ flex: '1 1 auto', fontSize: 11, color: '#fff3cd' }}>獲得賞金</span>
               <span className="u-num" style={{ fontSize: 22, color: '#fff3cd' }}>{h.prizePP.toLocaleString('ja-JP')}</span>
               <span style={{ fontSize: 10, color: '#fff3cd' }}>PP</span>
-            </div>
+            </div>}
             <div style={{
               flex: '1 1 140px', display: 'flex', alignItems: 'baseline', gap: 4, padding: '8px 10px', borderRadius: 10,
               background: 'var(--u-navy-deep)', border: '1px solid rgba(251,247,236,.22)', flexWrap: 'wrap',
@@ -390,29 +402,37 @@ export function HorseDetailView({ horseId }: { readonly horseId: string }): Reac
       <section style={PAPER}>
         <div style={PAPER_HEAD}>
           <span style={{ fontSize: 14 }}>血統表</span>
-          <span style={PAPER_HEAD_SUB}>{ped5 ? '5 代' : '2 代まで ・ 5 代は「すべて見る」'}</span>
+          <span style={PAPER_HEAD_SUB}>{ped5 && hasPed5 ? '5 代' : hasPed5 ? '2 代まで ・ 5 代は「すべて見る」' : '2 代まで'}</span>
         </div>
         {h.pedigree.length === 0 ? (
           <p style={{ margin: 0, padding: '12px', fontSize: 13 }}>血統情報が登録されていません</p>
         ) : (
           <>
-            {ped5 ? <Pedigree5 horse={h} /> : <Pedigree2 horse={h} />}
-            <button type="button" onClick={() => { setPed5((v) => !v); }} aria-expanded={ped5} style={MORE}>
-              {ped5 ? '2 代の表にもどす' : '5 代の血統表を見る'}
-            </button>
+            {ped5 && hasPed5 ? <Pedigree5 horse={h} /> : <Pedigree2 horse={h} />}
+            {/* ⚠️ ★3 代より先が無いのに 5 代の表を開くと ★2 列だけの表になる（★押せるのに中身が無い）→ ★出さない */}
+            {hasPed5 && (
+              <button type="button" onClick={() => { setPed5((v) => !v); }} aria-expanded={ped5} style={MORE}>
+                {ped5 ? '2 代の表にもどす' : '5 代の血統表を見る'}
+              </button>
+            )}
           </>
         )}
       </section>
 
-      {/* ★調教の記録（★直近 4 週・★疲れは札の言葉） */}
-      <section style={PAPER}>
-        <div style={PAPER_HEAD}>
-          <span style={{ fontSize: 14 }}>調教の記録</span>
-          <span style={PAPER_HEAD_SUB}>直近 4 週</span>
-        </div>
-        {training.map((t, i) => <TrainingLine key={`${t.week}-${i}`} t={t} />)}
-        {training.length === 0 && <p style={{ margin: 0, padding: '12px', fontSize: 13 }}>今週が最初の週です</p>}
-      </section>
+      {/*
+        ★調教の記録（★直近 4 週・★疲れは札の言葉）。
+        ⚠️ ★行が無いときは ★節ごと出しません（★2026-10-01）。★本物の詳細は ★調教の記録を読む口が無く ★いつも空で、
+           ★「今週が最初の週です」と出すと ★**調教してきた馬にも嘘**になります（★`stable-repo.ts` の `MISSING`）。
+      */}
+      {training.length > 0 && (
+        <section style={PAPER}>
+          <div style={PAPER_HEAD}>
+            <span style={{ fontSize: 14 }}>調教の記録</span>
+            <span style={PAPER_HEAD_SUB}>直近 4 週</span>
+          </div>
+          {training.map((t, i) => <TrainingLine key={`${t.week}-${i}`} t={t} />)}
+        </section>
+      )}
 
       {/*
         ★厩舎の格（★`/stable` から移した・R-26 D26-3 ① 🔴 4）。

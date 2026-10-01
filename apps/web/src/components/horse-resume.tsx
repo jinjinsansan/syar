@@ -140,7 +140,7 @@ export function HorseResume(
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {horse.races.map((r, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 0', borderTop: '1px solid var(--a-line)' }}>
-                  <span className="a-num" style={{ width: 40, flex: '0 0 40px', fontSize: 12.5, color: 'var(--a-ink-3)' }}>{r.week}週</span>
+                  <span className="a-num" style={{ width: 40, flex: '0 0 40px', fontSize: 12.5, color: 'var(--a-ink-3)' }}>{r.week ?? '—'}週</span>
                   <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.race}</span>
                   <span className="a-num" style={{ width: 30, flex: '0 0 30px', textAlign: 'center', fontSize: r.place === 1 ? 22 : 17, color: r.place === 1 ? 'var(--a-num-rank)' : 'var(--a-ink)' }}>{r.place}</span>
                   <span className="a-num" style={{ width: 62, flex: '0 0 62px', textAlign: 'right', fontSize: 15, color: 'var(--a-ink-2)' }}>{r.time}</span>
