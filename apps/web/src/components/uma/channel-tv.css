@@ -113,23 +113,46 @@
 [data-theme='uma'] .u-tv-c1 { flex: 0 0 auto; font-size: 10px; font-weight: 700; color: #4a6178; white-space: nowrap; }
 [data-theme='uma'] .u-tv-c2 { flex: 0 0 auto; min-width: 34px; text-align: right; font-size: var(--tv-m); color: #25384a; white-space: nowrap; }
 
-/* ★パドック（★立ち姿 1 枚・高さ 96%・評価の言葉なし） */
+/*
+  ★パドック（★2026-10-02 案 A・評価の言葉なし）: ★歩きの 8 コマで ★その場で歩き、★芝が左へ流れる（★馬は右向き）。
+  ★馬番は ★左上の枠色の札（★胴には乗せない）・★頭数は右上・★斤量は右下。
+*/
+[data-theme='uma'] .u-tv[data-show='paddock'] .u-tv-bg-turf { animation: u-tv-paddock-turf 8s linear infinite; }
+[data-theme='uma'] .u-tv[data-show='paddock'] .u-tv-bg-pano { animation: u-tv-paddock-pano 60s linear infinite; }
+@keyframes u-tv-paddock-turf { from { background-position-x: 0; } to { background-position-x: -700px; } }
+@keyframes u-tv-paddock-pano { from { background-position-x: 0; } to { background-position-x: -1000px; } }
 [data-theme='uma'] .u-tv-paddock { flex: 1 1 auto; position: relative; min-height: 0; }
 [data-theme='uma'] .u-tv-paddock-horse {
-  /* ★絵は ホームと同じ立ち姿（★横長 544×312） */
-  position: absolute; left: 2%; bottom: 0; height: 82%; aspect-ratio: 544 / 312; background: no-repeat bottom center / contain; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .4));
+  /* ★絵は ホームと同じ（★1 コマ 544×312） */
+  position: absolute; left: 50%; bottom: 0; height: 74%; aspect-ratio: 544 / 312; transform: translateX(-50%);
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .4));
 }
-[data-theme='uma'] .u-tv[data-size='pc'] .u-tv-paddock-horse { left: 3%; }
-[data-theme='uma'] .u-tv-paddock-cloth {
-  position: absolute; left: 22%; bottom: 30%; width: 26px; height: 22px; border-radius: 3px; border: 2px solid #10243a; box-sizing: border-box;
-  display: flex; align-items: center; justify-content: center; font-size: 14px; background: #cfe0ee; color: #111;
+[data-theme='uma'] .u-tv-paddock-walk { position: absolute; inset: 0; background: no-repeat 0 0 / 800% 100%; animation: u-walk 1.6s steps(8, jump-none) infinite; }
+[data-theme='uma'] .u-tv-paddock-stand { position: absolute; inset: 0; display: none; background: no-repeat bottom center / contain; }
+[data-theme='uma'] .u-tv-paddock-id {
+  position: absolute; left: 0; top: 4px; max-width: 64%; display: flex; align-items: center; gap: 6px;
+  padding: 3px 10px 3px 4px; border-radius: 6px; background: rgba(6, 26, 51, .88); border: 1px solid rgba(246, 194, 28, .6);
 }
-[data-theme='uma'] .u-tv[data-size='pc'] .u-tv-paddock-cloth { left: 24%; }
+[data-theme='uma'] .u-tv-paddock-gate {
+  flex: 0 0 auto; min-width: 30px; height: 26px; padding: 0 4px; border-radius: 4px; border: 2px solid #10243a; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; font-size: 20px; background: #cfe0ee; color: #111;
+}
 [data-theme='uma'] .u-tv-paddock-count {
   position: absolute; right: 0; top: 4px; padding: 1px 8px; border-radius: 4px; background: rgba(6, 26, 51, .9); border: 1px solid #f6c21c; font-size: var(--tv-s); white-space: nowrap;
 }
-[data-theme='uma'] .u-tv-paddock-name {
-  position: absolute; right: 0; bottom: 0; max-width: 60%; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding: 6px 10px; border-radius: 8px; background: rgba(6, 26, 51, .88);
+[data-theme='uma'] .u-tv-paddock-weight {
+  position: absolute; right: 0; bottom: 0; padding: 2px 8px; border-radius: 4px; background: rgba(6, 26, 51, .88); color: #cfe0ee; white-space: nowrap;
+}
+/* ★止める（★停止スイッチ・「動きを減らす」）: ★立ち姿・★芝も止める */
+[data-theme='uma'].u-paused .u-tv-paddock-walk, [data-theme='uma'] .u-paused .u-tv-paddock-walk { display: none; }
+[data-theme='uma'].u-paused .u-tv-paddock-stand, [data-theme='uma'] .u-paused .u-tv-paddock-stand { display: block; }
+[data-theme='uma'].u-paused .u-tv[data-show='paddock'] .u-tv-bg-turf, [data-theme='uma'] .u-paused .u-tv[data-show='paddock'] .u-tv-bg-turf,
+[data-theme='uma'].u-paused .u-tv[data-show='paddock'] .u-tv-bg-pano, [data-theme='uma'] .u-paused .u-tv[data-show='paddock'] .u-tv-bg-pano { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='uma'] .u-tv-paddock-walk { display: none; }
+  [data-theme='uma'] .u-tv-paddock-stand { display: block; }
+  [data-theme='uma'] .u-tv[data-show='paddock'] .u-tv-bg-turf,
+  [data-theme='uma'] .u-tv[data-show='paddock'] .u-tv-bg-pano { animation: none; }
 }
 
 /* ★出走馬の紹介（★素質の数値・星・強さを断定する言葉は出さない） */

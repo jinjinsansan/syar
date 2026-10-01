@@ -660,11 +660,12 @@
   [data-theme='uma'] .u-vision-wait-row b { font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
   [data-theme='uma'] .u-vision-wait-time { font-size: 18px; color: #ffe483; margin-right: 4px; }
   /*
-    ★「拡大」は ★画面の外・★画面の下の段の右（★2026-10-02 オーナー「拡大ボタンが色々な文字の上に被っています」）。
-    ★段は決めない（★自動で ★空いている段へ: テレビの間は 3 段目・掲示板が出る間は その下）。★画面には重ねない。
+    ★「拡大」は ★画面の外・★1 段目の右（★「詳細」の左）（★2026-10-02 オーナー「拡大ボタンが色々な文字の上に被っています」）。
+    ★画面に重ねると 番組の文字に被り、★画面の下へ段を足すと ★ビジョンが伸びて ★下のページの文字に被った（★同日 2 回目の指摘）。
+    ★1 段目は テレビの間 ★「詳細」しか無い（★`VisionHead` はテレビが無いときだけ）ので ★高さを変えずに置ける（★「詳細」と同じく 上下を負の余白で吸う）。
   */
   [data-theme='uma'] .u-race-strip-vision > .u-race-strip-expand {
-    grid-column: 1; justify-self: end; min-height: 26px; height: 26px; line-height: 22px; margin: 0; padding: 0 14px;
+    grid-row: 1; grid-column: 1; justify-self: end; align-self: center; min-height: 26px; height: 26px; line-height: 22px; margin: -4px 52px -4px 0; padding: 0 14px;
     border: 2px solid var(--u-gold); border-radius: 999px; background: rgba(6, 26, 51, .85); color: var(--u-ink-light); text-decoration: none; font-size: 13px;
   }
   /* ★3 段目 ＝「次」の札 ＋ 掲示板（★30px） */

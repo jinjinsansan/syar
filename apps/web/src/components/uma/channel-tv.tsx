@@ -178,15 +178,33 @@ function StandingHorse({ horseId, className }: { readonly horseId: string | null
   return <div className={className} style={url === null ? undefined : { backgroundImage: `url('${url}')` }} />;
 }
 
+/**
+ * ★**パドック**（★2026-10-02 オーナー「馬番の数字がゼッケンではないのにボディにあるため違和感」「パドックの時は馬を歩かせたい」・案 A）。
+ *   ★馬は ★ホームと同じ 歩きの 8 コマ（★毛色は絵に焼く）・★その場で歩き ★芝が後ろへ流れる（★馬は右向き → 芝は左へ）。
+ *   ★馬番は ★胴に乗せない（★ゼッケンに見えない札だった）→ ★左上に ★枠の色の札 ＋ 馬名。★斤量は右下に小さく。
+ *   ★停止スイッチ・「動きを減らす」では ★立ち姿で止める（★CSS で歩きを隠す）。
+ */
 function Paddock({ horse, index, field }: { readonly horse: ChannelRunner; readonly index: number; readonly field: number }): React.ReactElement {
   return <div className="u-tv-paddock">
-    <StandingHorse horseId={horse.horseId} className="u-tv-paddock-horse" />
-    <span className="u-tv-paddock-cloth u-num" style={gateStyle(horse.gate, field)}>{horse.gate}</span>
-    <span className="u-tv-paddock-count">パドック {index + 1} / {field}</span>
-    <div className="u-tv-paddock-name">
-      <div className="u-tv-l">{horse.name}</div>
-      {horse.weight !== null && <div className="u-tv-s u-tv-sub">斤量 {horse.weight.toFixed(1)}</div>}
+    <WalkingHorse horseId={horse.horseId} />
+    <div className="u-tv-paddock-id">
+      <span className="u-tv-paddock-gate u-num" style={gateStyle(horse.gate, field)}>{horse.gate}</span>
+      <span className="u-tv-l">{horse.name}</span>
     </div>
+    <span className="u-tv-paddock-count">パドック {index + 1} / {field}</span>
+    {horse.weight !== null && <span className="u-tv-paddock-weight u-tv-s">斤量 {horse.weight.toFixed(1)}</span>}
+  </div>;
+}
+
+/** ★歩く馬（★歩きの 8 コマ ＋ 止めるとき用の立ち姿。★どちらを見せるかは CSS） */
+function WalkingHorse({ horseId }: { readonly horseId: string | null }): React.ReactElement {
+  const coat = coatOfHorseId(horseId ?? 'unknown');
+  const walk = useCoatedImage('/art/uma/horse-walk-sheet.webp', coat);
+  const stand = useCoatedImage('/art/uma/horse-stand.webp', coat);
+  return <div className="u-tv-paddock-horse">
+    {/* ⚠️ ★`800% 100%` と ★`u-walk` ＋ `steps(8, jump-none)` は ★対（★ホームの OwnHorseFigure と同じ） */}
+    <span className="u-tv-paddock-walk" style={walk === null ? undefined : { backgroundImage: `url('${walk}')` }} />
+    <span className="u-tv-paddock-stand" style={stand === null ? undefined : { backgroundImage: `url('${stand}')` }} />
   </div>;
 }
 
