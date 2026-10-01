@@ -13,7 +13,7 @@
  *   ★「いま」は ★**呼ぶ側が渡します**。★週は `world_state_public`（UI1-10）、
  *   ★締切は `races_public.entry_deadline_at`（ED-1）から来ます。★画面では計算しません。
  */
-import { rankOfWins, slotOfDay } from '@star/scheduler';
+import { entryCostEP, freezeJockey, jockeyById, rankOfWins, slotOfDay } from '@star/scheduler';
 import { CLASS_LABEL, CONDITION_LABEL, SURFACE_LABEL, formatClock, formatSexAge } from './format';
 import { authClient, readClient } from './supabase';
 import {
@@ -269,4 +269,16 @@ export async function loadEntryScreen(limit = 40): Promise<EntryScreenData> {
     staleSeconds,
     signedIn,
   };
+}
+
+/**
+ * ★**出走 1 回に引かれる額**（★登録料 ＋ 選んだ騎手の料金・2026-10-01・裁定 D-130 §4）。
+ *   ★サーバーの `enter_race`（`0100`）は ★`v_fee + v_jockey_fee` を引きます。★画面は ★同じ式（`entryCostEP`）で 1 か所から出します。
+ *   ⚠️ ★旧は 登録料だけを出していました（★騎手 400 で「200 EP」と言い、600 EP 引かれていた）。
+ *   ★騎手なし（`null`）・名簿に無い id は ★登録料だけ（★サーバーも名簿に無ければ受けない）。
+ */
+export function entryTotalEP(entryFeeEP: number, jockeyId: string | null): number {
+  if (jockeyId === null || jockeyById(jockeyId) === undefined) return entryCostEP(entryFeeEP, null);
+  /** ★親密度は額に効かないので 0 で凍結する（★額だけを見る） */
+  return entryCostEP(entryFeeEP, freezeJockey(jockeyId, 0));
 }

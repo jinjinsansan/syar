@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { conditionView, type Condition } from '../../lib/stable';
 import { STRATEGY_OPTIONS, DEMO_JOCKEY_RIDES } from '../../lib/game-demo';
-import { loadEntryScreen, toEntryRaceView, type EntryScreenData } from '../../lib/entry-screen';
+import { entryTotalEP, loadEntryScreen, toEntryRaceView, type EntryScreenData } from '../../lib/entry-screen';
 import { supabaseEntryRepo } from '../../lib/entry-repo';
 import { Backdrop, BigButton, EpCapsule, NOTICE_ACTION, NoticeBar, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
@@ -103,7 +103,9 @@ export default function EntryPage(): React.ReactElement {
   const condValue = Math.min(5, Math.max(1, Math.round(horse?.condition ?? 3))) as Condition;
   const cond = horse === null ? null : conditionView(condValue);
   const epBalance = data?.epBalance ?? 0;
-  const enough = race === null ? false : epBalance >= race.feeEP;
+  /** ★引かれる額（★登録料 ＋ 騎手の料金・`enter_race` と同じ式）。★足りるか・確認の文・残り・ボタンはすべてこれを使う */
+  const totalEP = race === null ? 0 : entryTotalEP(race.feeEP, jockeyId);
+  const enough = race === null ? false : epBalance >= totalEP;
 
   /**
    * ★**登録を送る**（★2026-09-25 に繋いだ）。
@@ -169,7 +171,7 @@ export default function EntryPage(): React.ReactElement {
     if (!window.confirm(
       `${race.raceNo}　${race.classLabel}　${race.course}\n`
       + `${horse.name}・${STRATEGY_OPTIONS.find((s) => s.key === strategy)?.label ?? strategy}\n`
-      + `出走料 ${race.feeEP} EP（登録後の残り ${(epBalance - race.feeEP).toLocaleString('ja-JP')} EP）\n\n`
+      + `出走料 ${totalEP} EP（登録後の残り ${(epBalance - totalEP).toLocaleString('ja-JP')} EP）\n\n`
       + `${CLAIM_ENTRY_CANCEL_WINDOW}この内容でよろしいですか？`,
     )) return;
     setEntering(true);
@@ -232,7 +234,7 @@ export default function EntryPage(): React.ReactElement {
       ★毎日のポイントは `/earn` で受け取れます（★D-075・★額は `ep_grant_amount` 1 か所）。★「購入」への導線ではありません（★憲法 §0.2）。
     */}
     {data !== null && data.signedIn && race !== null && !enough && (
-      <NoticeBar kind="closing" text={`参加ポイントが足りません（あと ${(race.feeEP - epBalance).toLocaleString('ja-JP')} EP）`}
+      <NoticeBar kind="closing" text={`参加ポイントが足りません（あと ${(totalEP - epBalance).toLocaleString('ja-JP')} EP）`}
         sub="毎日のポイントを受け取れます" actionLabel="受け取る" actionHref="/earn" />
     )}
 
@@ -421,10 +423,10 @@ export default function EntryPage(): React.ReactElement {
                 onSelect={setJockeyId}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 44, borderBottom: '1px solid var(--u-rule)' }}>
-                <span style={{ fontSize: 13 }}>出走料</span><span><strong style={{ fontSize: 26 }}>{race.feeEP}</strong> EP</span>
+                <span style={{ fontSize: 13 }}>出走料</span><span><strong style={{ fontSize: 26 }}>{totalEP}</strong> EP</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 44, borderBottom: '1px solid var(--u-rule)' }}>
-                <span style={{ fontSize: 13 }}>登録後の残り</span><span><strong style={{ fontSize: 26, color: enough ? 'var(--u-ink-dark)' : '#c0392b' }}>{(epBalance - race.feeEP).toLocaleString('ja-JP')}</strong> EP</span>
+                <span style={{ fontSize: 13 }}>登録後の残り</span><span><strong style={{ fontSize: 26, color: enough ? 'var(--u-ink-dark)' : '#c0392b' }}>{(epBalance - totalEP).toLocaleString('ja-JP')}</strong> EP</span>
               </div>
               {/* §9.5 憲法の明示 — 登録前から常時表示し、登録後も残す */}
               <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: '#eaf3fb', border: '2px solid #9fc0dc', fontSize: 13, lineHeight: 1.6 }}>{CLAIM_OWN_RACE_BET}</div>
@@ -439,7 +441,7 @@ export default function EntryPage(): React.ReactElement {
               <div style={{ display: 'flex', marginTop: 12 }}>
                 <BigButton
                   tone={enough && !entering ? 'gold' : 'disabled'}
-                  label={entering ? '登録しています…' : `登録する（${race.feeEP} EP）`}
+                  label={entering ? '登録しています…' : `登録する（${totalEP} EP）`}
                   sub={enough ? CLAIM_ENTRY_CANCEL_SHORT : '参加ポイントが足りません'}
                   {...(enough && !entering ? { onClick: () => { void submitEntry(); } } : {})}
                 />
