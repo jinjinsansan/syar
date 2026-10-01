@@ -21,10 +21,12 @@ export default function MyPage(): React.ReactElement {
     containerType: 'inline-size', background: 'var(--u-navy)', display: 'flex', flexDirection: 'column',
   }}>
     <Backdrop />
-    <TopBar title="マイページ" paused={paused} onToggle={toggle} />
+    {/* ★PC（1024px 以上）は ★EP / PP を ★上の段に（★§1-3・★下の段は PC では隠す） */}
+    <TopBar title="マイページ" paused={paused} onToggle={toggle}
+      {...(view ? { points: <><EpCapsule value={view.home.epBalance} /><PpCapsule value={view.home.ppBalance} /></> } : {})} />
     <RaceStrip />
 
-    <div style={{ position: 'relative', display: 'flex', gap: 10, padding: '10px 14px 0', width: '100%', maxWidth: 1220, margin: '0 auto' }}>
+    <div className={view ? 'u-points-row' : undefined} style={{ position: 'relative', display: 'flex', gap: 10, padding: '10px 14px 0', width: '100%', maxWidth: 1220, margin: '0 auto' }}>
       {view && <><EpCapsule value={view.home.epBalance} /><PpCapsule value={view.home.ppBalance} /></>}
       {!view && <TextPanel style={{ margin: 0, width: '100%' }}>{loading ? '厩舎を読み込み中…' : '厩舎を取得できませんでした'}</TextPanel>}
     </div>
@@ -74,7 +76,8 @@ export default function MyPage(): React.ReactElement {
       </div>
     </main>
 
-    <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: 10, padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto' }}>
+    {/* ★PC は ★ビジョンの下に縦に積む（★`.u-pc-actions`・§1-6） */}
+    <div className="u-pc-actions" style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: 10, padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto' }}>
       <BigButton tone="gold" label="育成モードへ" sub="調教を確認する" href="/train" grow="1.4 1 210px" />
       <BigButton tone="ivory" label="ダッシュボード" sub="いつでも戻れます" href="/home" grow="1 1 130px" />
       {/*

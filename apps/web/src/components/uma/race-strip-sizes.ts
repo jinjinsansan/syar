@@ -100,9 +100,25 @@ export function routeKeyOf(pathname: string): string | null {
 export const STRIP_EMBED_ROUTES: readonly string[] = Object.entries(STRIP_SIZE_BY_ROUTE)
   .filter(([, size]) => size === 'big').map(([route]) => route);
 
+/**
+ * ★**PC（幅 1024px 以上）で「大型ビジョン」にする「極小」の面**（★2026-10-01・デザイナー引き渡し「PC 表示 大型ビジョン案 2a」§1-4・§1-6）。
+ *   ★PC では ★ビジョンが画面の右上に立つので ★フォームの邪魔をしない。★見本は投票モード（`PcAlt screen="vote"`）と ★馬市場（§1-6）。
+ *   ★スマホ（1024px 未満）は ★表の値のまま（★「極小」）。
+ *   ⚠️ ★ここに無い「極小」の面（★出走登録・配合・命名・仔馬・役割）は ★PC でも「極小」（★画面が自分の枠の中に帯を置いている）。
+ *   🔴 ★ビジョンは ★「大」と同じ本編を流す（★オーナー決定: 小窓・ビジョン・全画面は ★同じ物）。★別の録画・別のレースは出さない。
+ */
+export const PC_VISION_ROUTES: readonly string[] = ['/vote', '/stable/market'];
+
+/** ★PC の幅か（★画面の幅の判定は 1 か所・`race-strip.tsx` が `matchMedia` で渡す） */
+export interface StripWidth {
+  /** ★幅 1024px 以上（★`(min-width: 1024px)`） */
+  readonly wide?: boolean;
+}
+
 /** ★この面の帯で 本編を流すか（★表が正本） */
-export function stripEmbedsOn(pathname: string): boolean {
+export function stripEmbedsOn(pathname: string, opts: StripWidth = {}): boolean {
   const key = routeKeyOf(pathname);
+  if (key !== null && opts.wide === true && PC_VISION_ROUTES.includes(key)) return true;
   return key !== null && STRIP_EMBED_ROUTES.includes(key) && STRIP_SIZE_BY_ROUTE[key] === 'big';
 }
 
@@ -115,9 +131,19 @@ export const INTRO_STAGES: readonly string[] = ['choose_parents', 'waiting_birth
  * ★`intro` … ★導入中か（★サーバーの段階から）。★**分からない間（null）は ★導入の道では出さない**
  *   （★読み終わる前に 帯が一瞬 出て消えるのを避ける・★導入中に出すほうが 誤り）。
  */
-export function stripSizeOf(pathname: string, opts: { readonly intro: boolean | null } = { intro: null }): StripSize {
+export function stripSizeOf(pathname: string, opts: { readonly intro: boolean | null } & StripWidth = { intro: null }): StripSize {
   const key = routeKeyOf(pathname);
   if (key === null) return 'hidden';
   if (HIDDEN_DURING_INTRO.includes(key) && opts.intro !== false) return 'hidden';
+  /** ★PC では ★ビジョンの面の「極小」を「大」に（★上の `PC_VISION_ROUTES`） */
+  if (opts.wide === true && PC_VISION_ROUTES.includes(key) && STRIP_SIZE_BY_ROUTE[key] === 'mini') return 'big';
   return STRIP_SIZE_BY_ROUTE[key]!;
+}
+
+/**
+ * ★**PC の「大型ビジョン」で出すか**（★幅 1024px 以上 ＆ ★「大」になる面）。
+ *   ★「文字」（★出馬表・そのレースの画面）は ★ビジョンにしない（★「出馬表と走行を同時に出さない」§3）。
+ */
+export function stripVisionOn(pathname: string, opts: { readonly intro: boolean | null } & StripWidth): boolean {
+  return opts.wide === true && stripSizeOf(pathname, opts) === 'big';
 }

@@ -43,7 +43,7 @@ export default function HomePage(): React.ReactElement {
   return (
     <div
       data-theme="uma" data-page-body
-      className={paused ? 'u-paused' : undefined}
+      className={`u-home${paused ? ' u-paused' : ''}`}
       style={{
         position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden',
         containerType: 'inline-size', background: 'var(--u-navy)',
@@ -52,10 +52,12 @@ export default function HomePage(): React.ReactElement {
     >
       <Backdrop />
 
-      <TopBar title="" home paused={paused} onToggle={toggle} />
+      {/* ★PC（1024px 以上）は ★EP / PP を ★上の段に横長で並べる（★§1-3・★下の段は PC では隠す） */}
+      <TopBar title="" home paused={paused} onToggle={toggle}
+        {...(view ? { points: <><EpCapsule value={view.home.epBalance} /><PpCapsule value={view.home.ppBalance} /></> } : {})} />
 
       {/* ★EP / PP（★別のカプセル・合算しない） */}
-      <div style={{
+      <div className="u-points-row" style={{
         position: 'relative', flex: '0 0 auto', display: 'flex', gap: 10,
         padding: '10px 14px 0', width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>
@@ -71,23 +73,16 @@ export default function HomePage(): React.ReactElement {
       */}
       <FoalInvite />
 
-      {/* ★中段: 馬ステージ → 馬名 */}
-      <div style={{
-        position: 'relative', flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'flex-end', padding: '10px 14px 0',
-        width: '100%', maxWidth: 1220, margin: '0 auto',
-      }}>
+      {/* ★中段: 馬ステージ → 馬名（★寸法は `uma-theme.css` の `.u-home-*`・★PC は左の舞台 §1-5） */}
+      <div className="u-home-stage">
         {/* ★馬ステージ（★全幅ブリード） */}
-        <div style={{
-          flex: '1 1 auto', minHeight: 280, position: 'relative', width: 'calc(100% + 28px)', margin: '0 -14px',
-          display: 'flex', alignItems: horse ? 'flex-end' : 'center', justifyContent: 'center', overflow: 'hidden',
-        }}>
+        <div className="u-home-field" style={{ alignItems: horse ? 'flex-end' : 'center' }}>
           {/* ★**その馬の姿**（★育成・レースと同じ毛色・★見本の絵ではない・2026-09-28 オーナー指示） */}
-          {horse ? <><OwnHorseFigure horseId={horse.id} running style={{ marginBottom: 36 }} />
+          {horse ? <><OwnHorseFigure horseId={horse.id} running className="u-home-horse" style={{ marginBottom: 36 }} />
           {/* ★馬を替える矢印は ★2 頭以上の時だけ・★下の角に置いて 馬に被せない（★2026-09-29・オーナー「モバイルで△が馬に被る・1 頭の時は不要」） */}
           {horses.length > 1 && <>
-            <button type="button" onClick={() => { move(-1); }} aria-label="前の馬" style={arrow('left')}>‹</button>
-            <button type="button" onClick={() => { move(1); }} aria-label="次の馬" style={arrow('right')}>›</button>
+            <button type="button" onClick={() => { move(-1); }} aria-label="前の馬" className="u-home-arrow u-home-arrow-left">‹</button>
+            <button type="button" onClick={() => { move(1); }} aria-label="次の馬" className="u-home-arrow u-home-arrow-right">›</button>
           </>}</> : !loading && (
             /** ★馬がいない・入れない（★2026-10-01・オーナー「馬がいない状態を UI で工夫して」）。★育成モードと同じカード */
             <NoHorseCard needsLogin={needsLogin} needsSetup={needsSetup} error={view === null ? error : null} onRetry={refresh} />
@@ -96,10 +91,7 @@ export default function HomePage(): React.ReactElement {
 
         {/* ★馬名プレート（★名前・属性・調子・現在位置） */}
         {/* ★馬がいないときは 名前の板を出さない（★旧: 真ん中と 2 か所に「持ち馬はまだいません」） */}
-        {(horse !== null || loading) && <div style={{
-          display: 'flex', alignItems: 'center', gap: 10, width: '100%', maxWidth: 520, marginTop: 6,
-          padding: '7px 12px', border: '2px solid rgba(246,194,28,.5)', borderRadius: 12, background: 'rgba(10,35,64,.82)',
-        }}>
+        {(horse !== null || loading) && <div className="u-home-plate">
           <span style={{ minWidth: 0, flex: '1 1 auto' }}>
             <span style={{ display: 'block', fontSize: 16, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {horse?.name ?? (loading ? '読み込み中' : '持ち馬はまだいません')}
@@ -128,11 +120,8 @@ export default function HomePage(): React.ReactElement {
       </div>
 
       {/* ★6 ボタン（★B-5 の 6 語・390 は 2 列×3 段／1280 は 6 列） */}
-      <div style={{
-        position: 'relative', flex: '0 0 auto', display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10,
-        padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto',
-      }}>
+      {/* ★PC は ★操作デッキ（★1.5fr 1.5fr 1fr 1fr 1fr 1fr・★育成と投票が大きい・§1-5） */}
+      <div className="u-home-deck" style={{ padding: '10px 14px var(--u-safe-bottom)' }}>
         {/*
           ⚠️ ★行き先は ★**馬物語 UI の新しいルート**です（★`/training`・`/races`・`/stable`・`/prizes` は
              ★arcade 版が生きており、★**同じ URL を奪うと既存が消えます**。★切り替えはオーナー判断・報告 §3）。
@@ -152,11 +141,4 @@ export default function HomePage(): React.ReactElement {
   );
 }
 
-/** ★持ち馬を巡る矢印（★48×48・当たりは 44px 以上） */
-function arrow(side: 'left' | 'right'): React.CSSProperties {
-  return {
-    position: 'absolute', [side]: 10, bottom: 6, width: 48, height: 48,
-    border: '3px solid var(--u-gold)', borderRadius: '50%', background: 'rgba(10,35,64,.86)',
-    color: 'var(--u-ink-light)', fontSize: 20, fontWeight: 800,
-  } as React.CSSProperties;
-}
+/* ★持ち馬を巡る矢印は ★`uma-theme.css` の `.u-home-arrow`（★48×48・当たりは 44px 以上・★PC は 56px の丸） */

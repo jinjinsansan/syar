@@ -485,3 +485,231 @@
 [data-theme='uma'] .u-no-horse-bob { animation: u-no-horse-bob 3.6s ease-in-out infinite; }
 [data-theme='uma'].u-paused .u-no-horse-bob, [data-theme='uma'] .u-paused .u-no-horse-bob { animation: none; }
 @media (prefers-reduced-motion: reduce) { [data-theme='uma'] .u-no-horse-bob { animation: none; } }
+
+/* ─────────────────────────────────────────────────────────
+   ★**上段バーと EP/PP のカプセル**（★2026-10-01・`uma-parts.tsx` の書き込みから移した）。
+   ★値は ★移す前の書き込みと 同じ（★スマホの見た目を変えない）。★PC の値は 下の `@media (min-width: 1024px)`。
+   ───────────────────────────────────────────────────────── */
+[data-theme='uma'] .u-topbar {
+  position: relative; flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px 0; width: 100%; max-width: 1220px; margin: 0 auto;
+}
+[data-theme='uma'] .u-topbar-logo { display: flex; align-items: baseline; gap: 8px; padding: 7px 12px; }
+[data-theme='uma'] .u-topbar-logo-name { font-size: 19px; letter-spacing: .04em; }
+[data-theme='uma'] .u-topbar-logo-sub { font-size: 10px; letter-spacing: .16em; color: #6b4d06; }
+[data-theme='uma'] .u-topbar-back { display: flex; align-items: center; min-height: 44px; padding: 0 13px; font-size: 13px; white-space: nowrap; }
+[data-theme='uma'] .u-topbar-title { flex: 0 0 auto; font-size: 19px; white-space: nowrap; text-shadow: 0 2px 0 rgba(10, 35, 64, .6); }
+[data-theme='uma'] .u-topbar-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+/* ★上段のカプセルは ★PC だけ（★スマホは 画面の いつもの段 `.u-points-row`） */
+[data-theme='uma'] .u-topbar-points { display: none; }
+
+/* ★EP / PP（★別々の部品・★合算しない・憲法 §0.2） */
+[data-theme='uma'] .u-cap { flex: 1 1 220px; min-width: 0; max-width: 430px; padding: 7px 12px; border: 2px solid; border-radius: 12px; }
+[data-theme='uma'] .u-cap-ep { border-color: var(--u-ep); background: rgba(8, 26, 22, .82); }
+[data-theme='uma'] .u-cap-pp { border-color: var(--u-gold); background: rgba(30, 22, 4, .82); }
+[data-theme='uma'] .u-cap-row { display: flex; align-items: center; gap: 6px; }
+[data-theme='uma'] .u-cap-row.u-cap-value { align-items: baseline; margin-top: 2px; }
+[data-theme='uma'] .u-cap-icon { width: 11px; height: 11px; border: 3px solid; }
+[data-theme='uma'] .u-cap-ep .u-cap-icon { border-color: var(--u-ep); border-radius: 50%; }
+[data-theme='uma'] .u-cap-pp .u-cap-icon { border-color: var(--u-gold); transform: rotate(45deg); }
+[data-theme='uma'] .u-cap-label { font-size: 11px; letter-spacing: .08em; }
+[data-theme='uma'] .u-cap-num { font-size: 27px; }
+[data-theme='uma'] .u-cap-unit { font-size: 11px; }
+[data-theme='uma'] .u-cap-sub { margin-top: 3px; font-size: 10px; font-weight: 500; }
+[data-theme='uma'] .u-cap-ep .u-cap-label, [data-theme='uma'] .u-cap-ep .u-cap-unit { color: var(--u-ep-ink); }
+[data-theme='uma'] .u-cap-ep .u-cap-num { color: var(--u-ep-num); }
+[data-theme='uma'] .u-cap-ep .u-cap-sub { color: #a9d8cb; }
+[data-theme='uma'] .u-cap-pp .u-cap-label, [data-theme='uma'] .u-cap-pp .u-cap-unit { color: #f7e6b5; }
+[data-theme='uma'] .u-cap-pp .u-cap-num { color: #fff3cd; }
+[data-theme='uma'] .u-cap-pp .u-cap-sub { color: #dcc78a; }
+
+/* ★ホーム（`/home`）の組み（★値は 移す前の書き込みと同じ・★PC は下） */
+[data-theme='uma'] .u-home-stage {
+  position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end; padding: 10px 14px 0; width: 100%; max-width: 1220px; margin: 0 auto;
+}
+[data-theme='uma'] .u-home-field {
+  flex: 1 1 auto; min-height: 280px; position: relative; width: calc(100% + 28px); margin: 0 -14px;
+  display: flex; justify-content: center; overflow: hidden;
+}
+[data-theme='uma'] .u-home-plate {
+  display: flex; align-items: center; gap: 10px; width: 100%; max-width: 520px; margin-top: 6px;
+  padding: 7px 12px; border: 2px solid rgba(246, 194, 28, .5); border-radius: 12px; background: rgba(10, 35, 64, .82);
+}
+/* ★持ち馬を巡る矢印（★48×48・当たりは 44px 以上） */
+[data-theme='uma'] .u-home-arrow {
+  position: absolute; bottom: 6px; width: 48px; height: 48px;
+  border: 3px solid var(--u-gold); border-radius: 50%; background: rgba(10, 35, 64, .86);
+  color: var(--u-ink-light); font-size: 20px; font-weight: 800;
+}
+[data-theme='uma'] .u-home-arrow-left { left: 10px; }
+[data-theme='uma'] .u-home-arrow-right { right: 10px; }
+[data-theme='uma'] .u-home-deck {
+  position: relative; flex: 0 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;
+  width: 100%; max-width: 1220px; margin: 0 auto;
+}
+
+/* ─────────────────────────────────────────────────────────
+   ★**PC 表示「大型ビジョン案 2a」**（★2026-10-01・デザイナー引き渡し `design_handoff_pc_vision_votehistory` ①）
+   ★**幅 1024px 以上だけ**。★それ未満は ★上の値のまま（★部品は同じ・★スマホの見た目を変えない）。
+
+   【★枠】 ★中身は ★`max-width: 1240px`・左右 20px の枠（§1-1）。★上の段・中身・下の段の ★左右の端を この枠にそろえる。
+     ★`--u-frame-side` … ★枠の外の余白（★画面が 1240px より広いときだけ）。
+     ★`--u-vision-w`   … ★大型ビジョンの幅（★420px・1024〜1279px は 360px・§1-4）。
+   【★ビジョンの在る画面】 ★本体（`[data-page-body]`）の左右の内側の余白で ★中身を「左 20px ／ 右 ビジョン＋40px」に収める（§1-6）。
+     ★中身の段は もともと ★左右 14px の余白を持つので ★本体の余白は ★その分を引いた値（★6px・ビジョン＋26px）。
+     ★上の段とホームの操作デッキは ★枠いっぱい（★負の外側の余白で 本体の余白を戻す）。
+   ⚠️ ★`!important` は ★画面の部品が ★書き込み（style 属性）で持つ値を ★PC の時だけ上書きする所にだけ使う（★書き込みは CSS より強いため）。
+   ───────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  [data-theme='uma'] { --u-vision-w: 420px; --u-frame-side: max(0px, (100% - 1240px) / 2); }
+
+  /* ★上の段（★HUD・1 本・§1-3） */
+  [data-theme='uma'] .u-topbar { max-width: 1240px; padding: 12px 20px 0; }
+  [data-theme='uma'] .u-topbar-logo { min-height: 48px; padding: 7px 14px; }
+  [data-theme='uma'] .u-topbar-logo-name { font-size: 20px; }
+  [data-theme='uma'] .u-topbar-back { min-height: 48px; padding: 0 14px; font-size: 14px; }
+  [data-theme='uma'] .u-topbar-title { font-size: 22px; }
+  [data-theme='uma'] .u-topbar-points { display: flex; align-items: center; gap: 10px; flex: 0 1 auto; min-width: 0; }
+  [data-theme='uma'] .u-points-row { display: none !important; }
+  /* ★横長のカプセル（★48px・記号｜「参加ポイント」と副題の 2 段｜数字 Saira 26px｜単位） */
+  [data-theme='uma'] .u-topbar-points .u-cap {
+    flex: 0 0 auto; max-width: none; height: 48px; padding: 0 14px; display: grid; align-items: center; column-gap: 8px;
+    grid-template-columns: auto auto auto auto; grid-template-areas: 'icon label num unit' 'icon sub num unit'; white-space: nowrap;
+  }
+  [data-theme='uma'] .u-topbar-points .u-cap-ep { background: rgba(8, 26, 22, .86); }
+  [data-theme='uma'] .u-topbar-points .u-cap-pp { background: rgba(30, 22, 4, .86); }
+  [data-theme='uma'] .u-topbar-points .u-cap-row { display: contents; }
+  [data-theme='uma'] .u-topbar-points .u-cap-icon { grid-area: icon; }
+  [data-theme='uma'] .u-topbar-points .u-cap-label { grid-area: label; align-self: end; font-size: 10px; letter-spacing: 0; }
+  [data-theme='uma'] .u-topbar-points .u-cap-sub { grid-area: sub; align-self: start; margin: 0; font-size: 9px; }
+  [data-theme='uma'] .u-topbar-points .u-cap-num { grid-area: num; font-size: 26px; }
+  [data-theme='uma'] .u-topbar-points .u-cap-unit { grid-area: unit; font-size: 10px; }
+  [data-theme='uma'] .u-topbar-points .u-cap-ep .u-cap-sub { color: var(--u-ep-ink); }
+  [data-theme='uma'] .u-topbar-points .u-cap-pp .u-cap-sub { color: #fff3cd; }
+
+  /* ★ビジョンの在る画面: ★中身は 左の列（§1-6 `left:20px; right:460px`） */
+  [data-theme='uma'][data-page-body]:has(> .u-race-strip-vision) {
+    padding-left: calc(var(--u-frame-side) + 6px);
+    padding-right: calc(var(--u-frame-side) + var(--u-vision-w) + 26px);
+    padding-bottom: 18px;
+  }
+  [data-theme='uma'][data-page-body]:has(> .u-race-strip-vision) > .u-topbar,
+  [data-theme='uma'][data-page-body]:has(> .u-race-strip-vision) > .u-home-deck {
+    width: auto; max-width: none; margin-left: -6px; margin-right: calc(-1 * (var(--u-vision-w) + 26px));
+  }
+
+  /* ★**大型ビジョン**（§1-4）。★帯（`RaceStrip`）そのもの・★枠の右上・★全ページで同じ位置 */
+  [data-theme='uma'] .u-race-strip.u-race-strip-vision {
+    position: absolute; z-index: 2; top: 72px; right: calc(var(--u-frame-side) + 20px);
+    width: var(--u-vision-w); max-width: none; min-height: 0; margin: 0;
+    display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 6px; align-items: stretch;
+    padding: 7px; border: 4px solid #061a33; border-radius: 10px; background: #0b1622;
+    box-shadow: 0 0 0 2px #f6c21c, 0 16px 26px rgba(0, 0, 0, .45);
+  }
+  [data-theme='uma'] .u-race-strip.u-race-strip-vision.u-race-strip-result { box-shadow: 0 0 0 2px var(--u-ep), 0 16px 26px rgba(0, 0, 0, .45); }
+  [data-theme='uma'] .u-race-strip.u-race-strip-vision.u-race-strip-expanded { z-index: 1000; }
+  /* ★柱 2 本（★CSS の図形・★新しい絵は 0 枚）。★枠の下へ はみ出す */
+  [data-theme='uma'] .u-race-strip-vision::before,
+  [data-theme='uma'] .u-race-strip-vision::after {
+    content: ''; position: absolute; z-index: -1; top: calc(100% + 6px); width: 14px; height: 36px;
+    background: linear-gradient(90deg, #3c6d99, #123f6b); border: 2px solid #061a33; border-top: 0;
+  }
+  [data-theme='uma'] .u-race-strip-vision::before { left: 16%; }
+  [data-theme='uma'] .u-race-strip-vision::after { right: 16%; }
+  /* ★1 段目 */
+  [data-theme='uma'] .u-vision-head {
+    grid-row: 1; grid-column: 1; display: flex; align-items: center; gap: 8px; min-width: 0;
+    padding: 0 40px 0 2px; font-size: 12px; line-height: 18px; white-space: nowrap;
+  }
+  [data-theme='uma'] .u-vision-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: #6b7f92; }
+  [data-theme='uma'] .u-vision-dot-live { background: #f06a5f; }
+  [data-theme='uma'] .u-vision-label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  [data-theme='uma'] .u-vision-cond { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; font-weight: 500; color: #cfe0ee; }
+  [data-theme='uma'] .u-vision-left { flex: 0 0 auto; font-family: 'Saira Condensed', system-ui, sans-serif; font-size: 15px; color: #ffe483; font-variant-numeric: tabular-nums; }
+  /* ★「詳細」は 1 段目の右端（★見た目は小さく・★当たりは 44px のまま） */
+  [data-theme='uma'] .u-race-strip-vision > a { grid-row: 1; grid-column: 1; justify-self: end; align-self: center; margin: -13px 0; font-size: 12px; }
+  /* ★2 段目 ＝ 画面（★16:9・角丸 4px）。★本編・結果・待ち時間は ★同じ升に重ねる */
+  [data-theme='uma'] .u-race-strip-vision > .u-race-strip-stage:not(.u-race-strip-stage-offscreen):not(.u-race-strip-stage-full),
+  [data-theme='uma'] .u-race-strip-vision > .u-race-result-box,
+  [data-theme='uma'] .u-race-strip-vision > .u-vision-wait {
+    grid-row: 2; grid-column: 1; width: 100%; height: auto; aspect-ratio: 16 / 9; max-height: none; border-radius: 4px;
+  }
+  [data-theme='uma'] .u-race-strip-vision > .u-race-strip-stage:not(.u-race-strip-stage-full) .u-race-strip-embed { border-radius: 4px; }
+  [data-theme='uma'] .u-vision-wait {
+    display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 12px 16px; overflow: hidden;
+    background: linear-gradient(180deg, #123f6b 0%, #0a2340 60%, #061a33 100%); box-shadow: inset 0 0 0 1px rgba(246, 194, 28, .25);
+  }
+  [data-theme='uma'] .u-vision-wait-row { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  [data-theme='uma'] .u-vision-wait-row small { font-size: 11px; font-weight: 700; color: #cfe0ee; }
+  [data-theme='uma'] .u-vision-wait-row b { font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+  [data-theme='uma'] .u-vision-wait-time { font-size: 18px; color: #ffe483; margin-right: 4px; }
+  /* ★「拡大」は ★画面の右下に重ねる */
+  [data-theme='uma'] .u-race-strip-vision > .u-race-strip-expand {
+    grid-row: 2; grid-column: 1; justify-self: end; align-self: end; z-index: 2; margin: 6px; padding: 0 14px;
+    border: 2px solid var(--u-gold); border-radius: 999px; background: rgba(6, 26, 51, .85); color: var(--u-ink-light); text-decoration: none; font-size: 13px;
+  }
+  /* ★3 段目 ＝「次」の札 ＋ 掲示板（★30px） */
+  [data-theme='uma'] .u-race-strip-vision > .u-race-strip-main { grid-row: 3; grid-column: 1; flex-wrap: nowrap; gap: 6px; }
+  /* ★次のレースが無い間（★札も掲示板も無い）: ★状態の 1 行は ★1 段目と画面が もう出しているので ★3 段目は畳む（★同じ文を 3 回 並べない） */
+  [data-theme='uma'] .u-race-strip-vision > .u-race-strip-main:not(:has(.u-race-strip-nextchip)) { display: none; }
+  [data-theme='uma'] .u-race-strip-vision .u-race-strip-main > .u-race-strip-recbadge { display: none; }
+  [data-theme='uma'] .u-race-strip-vision .u-race-strip-main > .u-race-strip-nextchip { height: 30px; line-height: 28px; gap: 5px; padding: 0 8px; border-radius: 5px; border-color: rgba(246, 194, 28, .5); }
+  [data-theme='uma'] .u-race-strip-vision .u-race-strip-nextchip-name { font-size: 11px; }
+  [data-theme='uma'] .u-race-strip-vision .u-race-strip-nextchip-time { font-size: 15px; }
+  [data-theme='uma'] .u-race-strip-vision .u-race-strip-nextchip-unit { display: none; }
+  [data-theme='uma'] .u-race-strip-vision .u-race-strip-main > .u-race-strip-board { flex: 1 1 auto; height: 30px; border-radius: 5px; }
+  /* ★見出しは ★本文より上に描く（★長い本文を左へ送ったとき ★見出しの下へ潜らせる・★見出しに字が重ならない） */
+  [data-theme='uma'] .u-race-strip-vision .u-board-kind { position: relative; z-index: 1; padding: 0 6px; font-size: 10px; }
+  [data-theme='uma'] .u-race-strip-vision .u-race-strip-board-item { gap: 5px; padding: 0 6px; font-size: 12px; }
+  [data-theme='uma'] .u-race-strip-vision > .u-race-strip-error { grid-column: 1; font-size: 11px; white-space: normal; }
+
+  /* ★ビジョンの在る画面の主ボタン（§1-6）: ★ビジョンの下に 縦に積む（★主 92px ／ 副 60px・2 列） */
+  [data-theme='uma'][data-page-body]:has(> .u-race-strip-vision) > .u-pc-actions {
+    position: absolute !important; z-index: 3; top: 410px; right: calc(var(--u-frame-side) + 20px);
+    width: var(--u-vision-w) !important; max-width: none !important; margin: 0 !important; padding: 0 !important;
+    display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  [data-theme='uma'][data-page-body]:has(> .u-race-strip-vision) > .u-pc-actions > :first-child { grid-column: 1 / -1; min-height: 92px !important; }
+  [data-theme='uma'][data-page-body]:has(> .u-race-strip-vision) > .u-pc-actions > :nth-child(2):last-child { grid-column: 1 / -1; }
+  [data-theme='uma'][data-page-body]:has(> .u-race-strip-vision) > .u-pc-actions > :not(:first-child) { min-height: 60px !important; border-width: 3px !important; }
+  [data-theme='uma'][data-page-body]:has(> .u-race-strip-vision) > .u-pc-actions > :not(:first-child) > span:first-child { font-size: 15px !important; }
+
+  /* ★**ホーム**（§1-5）: ★暗幕なし・★馬は左の舞台・★操作デッキは枠いっぱい */
+  [data-theme='uma'].u-home .u-backdrop-dim { display: none; }
+  [data-theme='uma'].u-home .u-home-stage {
+    position: absolute; z-index: 0; top: 76px; bottom: 128px;
+    left: calc(var(--u-frame-side) + 40px); right: calc(var(--u-frame-side) + var(--u-vision-w) + 60px);
+    width: auto; max-width: none; margin: 0; padding: 0; pointer-events: none;
+  }
+  [data-theme='uma'].u-home .u-home-field { width: 100%; margin: 0; min-height: 0; overflow: visible; pointer-events: none; }
+  [data-theme='uma'].u-home .u-home-field > *, [data-theme='uma'].u-home .u-home-plate { pointer-events: auto; }
+  /* ★馬: ★高さ clamp(280px, 舞台の 60%, 400px)・★縦横の比は素材のまま。★舞台の幅に入らなければ 幅で抑える（★歩きの 8 コマは 比が崩れると歪む） */
+  [data-theme='uma'].u-home .u-home-horse {
+    z-index: 0; margin-bottom: 0 !important; width: auto !important;
+    height: min(clamp(280px, calc((100dvh - 204px) * .6), 400px), calc((min(100vw, 1240px) - var(--u-vision-w) - 100px) * 312 / 544));
+  }
+  [data-theme='uma'].u-home .u-home-plate { position: relative; z-index: 1; width: min(480px, 92%); max-width: none; margin-top: 4px; padding: 9px 14px; gap: 12px; background: rgba(10, 35, 64, .92); border-color: rgba(246, 194, 28, .6); }
+  [data-theme='uma'].u-home .u-home-arrow { top: 58%; bottom: auto; width: 56px; height: 56px; font-size: 24px; }
+  [data-theme='uma'].u-home .u-home-arrow-left { left: 0; }
+  [data-theme='uma'].u-home .u-home-arrow-right { right: 0; }
+  /* ★操作デッキ（★1.5fr 1.5fr 1fr 1fr 1fr 1fr・★育成と投票は 108px・ほかの 4 つは 76px） */
+  [data-theme='uma'].u-home .u-home-deck {
+    margin-top: auto; grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr; align-items: end; padding: 0 20px !important;
+  }
+  [data-theme='uma'].u-home { padding-bottom: 18px; }
+  [data-theme='uma'].u-home .u-home-deck > :nth-child(-n + 2) {
+    min-height: 108px !important; border-radius: 16px !important;
+    box-shadow: 0 7px 0 #0a2340, 0 14px 22px rgba(0, 0, 0, .35), inset 0 3px 0 rgba(255, 255, 255, .6) !important;
+  }
+  [data-theme='uma'].u-home .u-home-deck > :nth-child(-n + 2) > span:first-child { font-size: 24px !important; }
+  [data-theme='uma'].u-home .u-home-deck > :nth-child(n + 3) {
+    min-height: 76px !important; padding: 0 6px !important; border-width: 3px !important; border-radius: 16px !important;
+    box-shadow: 0 5px 0 rgba(10, 35, 64, .85), 0 10px 16px rgba(0, 0, 0, .3) !important;
+  }
+  [data-theme='uma'].u-home .u-home-deck > :nth-child(n + 3) > span:first-child { font-size: 16px !important; }
+  [data-theme='uma'].u-home .u-home-deck > * > span { white-space: nowrap; }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  [data-theme='uma'] { --u-vision-w: 360px; }
+}

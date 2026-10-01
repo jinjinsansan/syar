@@ -366,7 +366,8 @@ export default function TrainPage(): React.ReactElement {
         </section>
       </div>
 
-      <div style={{
+      {/* ★PC は ★ビジョンの下に縦に積む（★`.u-pc-actions`・§1-6） */}
+      <div className="u-pc-actions" style={{
         position: 'relative', flex: '0 0 auto', display: 'flex', flexWrap: 'wrap', gap: 10,
         padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto',
       }}>

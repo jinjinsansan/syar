@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { checkOwnRaceSelection, ownRaceReasonText } from '@star/betting';
-import { Backdrop, BigButton, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
+import { Backdrop, BigButton, EpCapsule, NOTICE_ACTION, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { useSalesClosed } from '../../components/clock';
 import { BET_PER_PICK_EP, BET_TYPE_LABEL, CLAIM_BET_PER_PICK, CLAIM_BET_TYPE_RULE, CLAIM_OWN_RACE_BET, CLAIM_REPEAT_BET, CLAIM_REPEAT_BET_LIMIT, CLAIM_REPEAT_BET_PLANNED, CLAIM_REPEAT_BET_SHORT, CLAIM_SALES_CLOSED, CLAIM_VOTE_NO_CANCEL, REPEAT_BET_MAX, type VoteBetType } from '../../lib/claims';
@@ -149,6 +149,8 @@ export default function VotePage(): React.ReactElement {
   }}>
     <Backdrop />
     <TopBar title="投票モード" paused={paused} onToggle={toggle}
+      /* ★PC の上の段は ★EP だけ（★§1-3「投票の画面では EP だけ」・★スマホは出さない＝今のまま） */
+      {...(data?.authenticated === true ? { points: <EpCapsule value={data.epBalance} /> } : {})}
       /* ★投票の履歴への入口（★2026-10-01・デザイナー引き渡し ② §2-2「投票モードの上段に『履歴』」） */
       extra={<a href="/vote/history" style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center', padding: '0 12px', border: '2px solid var(--u-gold)', borderRadius: 999, background: 'var(--u-panel-strong)', color: 'var(--u-ink-light)', fontSize: 13, whiteSpace: 'nowrap', textDecoration: 'none' }}>履歴</a>} />
     <RaceStrip />
@@ -265,7 +267,8 @@ export default function VotePage(): React.ReactElement {
       </section>
     </main>
 
-    <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: 10, padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto' }}>
+    {/* ★PC は ★主ボタンを ★ビジョンの下に（★`.u-pc-actions`・§1-6・見本 `PcAlt screen="vote"`） */}
+    <div className="u-pc-actions" style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: 10, padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto' }}>
       <BigButton tone={blocked ? 'disabled' : 'blue'} label={busy ? '送信中…' : '投票する'}
         /*
           ★押せない理由を先に言う（★2026-09-29・オーナーの画面: 締め切った・残高 0 なのに「100 EP を使います」と出ていた＝押せると読める）。

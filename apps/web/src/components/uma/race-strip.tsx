@@ -9,7 +9,7 @@ import { LABEL_ENTRY_CLOSE, LABEL_SALES_CLOSE, salesCloseAtMs, salesClosedAt, sa
 import { CLAIM_LIVE_PENDING, CLAIM_SALES_CLOSED, CLAIM_SETTLE_CHECKING } from '../../lib/claims';
 import { SETTLE_AFTER_START_MS } from '@star/scheduler';
 import { parseReplayRunners, replayDisplayProgress, replayProgress, replayResultShowing, replayWindowNear, replayWindowOver, type ReplayRunner } from './race-replay';
-import { INTRO_STAGES, stripEmbedsOn, stripSizeOf } from './race-strip-sizes';
+import { INTRO_STAGES, stripEmbedsOn, stripSizeOf, stripVisionOn } from './race-strip-sizes';
 import { STRIP_EMBED_FAILED_NOTE, STRIP_EMBED_GIVE_UP_SEC, STRIP_EMBED_LEAD_SEC, isStripEmbedMessage, stripControlMessage, stripEmbedLog, stripEmbedUrl } from './race-strip-embed';
 import { BOARD_ITEM_SEC, boardText, bracketOrNull, raceLine, tickerBoard, tickerShowsField, type BoardItem, type TickerRunner } from './race-strip-ticker';
 import './uma-theme.css';
@@ -181,14 +181,35 @@ function boardCard(kind: string, text: string, rest: Partial<BoardItem> = {}): B
 function StripBoard({ items, label }: { readonly items: readonly BoardItem[]; readonly label: string }): React.ReactElement {
   const [step, setStep] = useState(0);
   const hostRef = useRef<HTMLSpanElement | null>(null);
-  useEffect(() => {
+  /**
+   * 🔴 ★**次の札へは ★本文の動きが終わった時に送る**（★2026-10-01・デザイナー引き渡し「PC 表示 大型ビジョン案」§1-4 🔴「掲示板の欄が空」）。
+   *   ★旧: ★`setInterval(3 秒)` で送り、★本文は ★CSS の 3 秒（`both`）で ★最後の姿 ＝ ★左へ抜けて透明 のまま止まる。
+   *   ★2 つの時計が別々なので、★タイマーが遅れると（★重い処理・★別の iframe の読み込み・★タブの間引き）
+   *   ★次の札が来るまで ★見出しだけ残って ★本文が空になる（★オーナーのスクリーンショット「単勝 ＋ 空」）。
+   *   → ★本文の `animationend` で送る（★時計は CSS の 1 つだけ・★遅れても空のまま待たない）。
+   *   ★停止スイッチ・「動きを減らす」の間は ★動きが無い（`animation: none`）ので ★送らない（★旧と同じ）。
+   *   ★隠れたタブで終わったら ★見えた時に 1 枚送る（★旧はタブ復帰で そのまま次の刻みを待った）。
+   */
+  const advance = (): void => {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const timer = window.setInterval(() => {
-      if (reduce.matches || hostRef.current?.closest('.u-paused') != null || document.visibilityState !== 'visible') return;
+    if (reduce.matches || hostRef.current?.closest('.u-paused') != null || document.visibilityState !== 'visible') return;
+    setStep((s) => s + 1);
+  };
+  const missedRef = useRef(false);
+  useEffect(() => {
+    const onBoardVisible = (): void => {
+      if (document.visibilityState !== 'visible' || !missedRef.current) return;
+      missedRef.current = false;
       setStep((s) => s + 1);
-    }, BOARD_ITEM_SEC * 1000);
-    return () => { window.clearInterval(timer); };
+    };
+    document.addEventListener('visibilitychange', onBoardVisible);
+    return () => { document.removeEventListener('visibilitychange', onBoardVisible); };
   }, []);
+  const onItemEnd = (event: React.AnimationEvent<HTMLSpanElement>): void => {
+    if (event.animationName !== 'u-board-slide' || event.target !== event.currentTarget) return;
+    if (document.visibilityState !== 'visible') { missedRef.current = true; return; }
+    advance();
+  };
   const item = items.length === 0 ? null : items[step % items.length]!;
   /** ★長い札は ★止まっている間に ★はみ出したぶんだけ左へ送る（★最後まで読ませる・★「…」で切らない・R-20 Q4） */
   const bodyRef = useRef<HTMLSpanElement | null>(null);
@@ -201,7 +222,7 @@ function StripBoard({ items, label }: { readonly items: readonly BoardItem[]; re
   return <span ref={hostRef} className="u-race-strip-board" aria-label={`${label}: ${items.map(boardText).join('、')}`}>
     {item !== null && <>
       <span className={`u-board-kind u-board-${item.tone}`} aria-hidden>{item.kind}</span>
-      <span key={step} ref={bodyRef} className="u-race-strip-board-item" aria-hidden
+      <span key={step} ref={bodyRef} className="u-race-strip-board-item" aria-hidden onAnimationEnd={onItemEnd}
         style={{ '--board-sec': `${BOARD_ITEM_SEC}s` } as React.CSSProperties}>
         {item.no !== null && <b className="u-board-gate" style={item.bracket === null ? undefined : { background: `var(--f${item.bracket})`, color: [1, 5, 8].includes(item.bracket) ? '#111' : '#fff' }}>{item.no}</b>}
         {item.text !== null && <span className="u-board-text">{item.text}</span>}
@@ -211,6 +232,29 @@ function StripBoard({ items, label }: { readonly items: readonly BoardItem[]; re
       </span>
     </>}
   </span>;
+}
+
+/**
+ * ★**大型ビジョンの 1 段目**（★PC・§1-4）。★本編が流れている（★録画の窓の）間は ★赤い点 ＋「中継 レース名」＋ 条件、
+ *   ★それ以外は ★灰色の点 ＋ ★帯の状態の語（★「開催予定」など）＋ ★右端に 発売締切までの残り（★帯の `salesLeftText`）。
+ *   ★赤い点を ★待ち時間に出さない（★流れていないのに 中継中に見せない）。
+ */
+function VisionHead({ air, next, status, runners, left }: {
+  readonly air: RaceNoticeRow | null;
+  readonly next: RaceNoticeRow | null;
+  readonly status: string;
+  readonly runners: number;
+  readonly left: string | null;
+}): React.ReactElement {
+  const surface = (row: RaceNoticeRow): string => (row.surface === 'turf' ? '芝' : row.surface === 'dirt' ? 'ダート' : row.surface);
+  return <div className="u-vision-head">
+    <i className={`u-vision-dot${air !== null ? ' u-vision-dot-live' : ''}`} aria-hidden />
+    <span className="u-vision-label">{air !== null ? `中継 ${air.name}` : status}</span>
+    <span className="u-vision-cond">
+      {air !== null ? `${surface(air)}${air.distance}m${runners > 0 ? ` ・ ${runners}頭` : ''}` : next !== null ? `次 ${surface(next)}${next.distance}m` : ''}
+    </span>
+    {air === null && left !== null && <span className="u-vision-left">{left}</span>}
+  </div>;
 }
 
 function raceLabel(row: RaceNoticeRow): string {
@@ -266,6 +310,23 @@ export function reportOnboardingStage(stage: string | null): void {
 }
 
 /**
+ * ★**PC の幅か**（★`(min-width: 1024px)`・★CSS の `@media` と同じ境目）。
+ *   ★サーバーと 最初の描画は ★偽（★スマホの形）→ ★描いた後に ★幅を見て ビジョンへ（★スマホの見た目は 1 画素も変えない）。
+ */
+const WIDE_QUERY = '(min-width: 1024px)';
+function useWideScreen(): boolean {
+  return useSyncExternalStore(
+    (listener) => {
+      const media = window.matchMedia(WIDE_QUERY);
+      media.addEventListener('change', listener);
+      return () => { media.removeEventListener('change', listener); };
+    },
+    () => window.matchMedia(WIDE_QUERY).matches,
+    () => false,
+  );
+}
+
+/**
  * 公開 DB の開催情報を表示する。★確定したレースの録画の時間帯（★発走 +75 秒から 45 秒）は、
  * ★確定した走破タイムから逆算した進行率で ★馬を走らせる（★「大」150px ／「極小」22×16px）。
  *
@@ -284,9 +345,16 @@ function RaceStripBody(): React.ReactElement | null {
     () => introState,
     () => null,
   );
-  const size = stripSizeOf(pathname, { intro });
+  /** ★PC の幅か（★1024px 以上で ★大型ビジョン・デザイナー引き渡し「PC 表示 大型ビジョン案 2a」§1-1） */
+  const wide = useWideScreen();
+  const size = stripSizeOf(pathname, { intro, wide });
   /** ★この面で 本編を流すか（★表 `race-strip-sizes.ts` が正本・★決裁 ④: /home と観戦の面だけ） */
-  const embedsHere = stripEmbedsOn(pathname);
+  const embedsHere = stripEmbedsOn(pathname, { wide });
+  /**
+   * ★**大型ビジョン**（★PC・§1-4）: ★同じ帯（★同じデータ・★同じ本編の iframe）を ★枠・柱・見出しの行・16:9 の画面で囲むだけ。
+   *   🔴 ★中身は ★小窓・全画面と ★同じ物（★オーナー決定）。★別の録画・別のレースは出さない。★新しい読み込みは無い。
+   */
+  const vision = stripVisionOn(pathname, { intro, wide });
   const compact = size === 'mini';
   const focusId = size === 'text' ? focusRaceIdOf(pathname) : null;
   const [focus, setFocus] = useState<FocusRow | null>(null);
@@ -560,6 +628,11 @@ function RaceStripBody(): React.ReactElement | null {
     ? boardCard('先頭', `${recent.name} ・ ${leader.name}`, { no: leader.gate, bracket: bracketOrNull(leader.gate, data.runners.length) })
     : null;
 
+  /** ★ビジョンの 1 段目に出す ★いま流れているレース（★本編の iframe の レース ID で引く・★先読みした次のレースも） */
+  const airRace: RaceNoticeRow | null = embedLive && embed !== null
+    ? (embed.id === next?.id ? next : embed.id === recent?.id ? recent ?? null : null)
+    : replaying && recent ? recent : null;
+
   if (size === 'hidden') return null;
   /** ★`text`: ★その画面のレースの 1 行だけ（★走行・拡大・他のレースは出さない） */
   if (size === 'text') {
@@ -575,7 +648,14 @@ function RaceStripBody(): React.ReactElement | null {
   }
 
   return (
-    <section ref={sectionRef} aria-label="レースの開催情報" className={`u-race-strip${compact ? ' u-race-strip-compact' : ''}${replaying ? ' u-race-strip-replaying' : ''}${big || (resulting && size === 'big') ? ' u-race-strip-big' : ''}${resulting ? ' u-race-strip-result' : ''}${expanded ? ' u-race-strip-expanded' : ''}`}>
+    <section ref={sectionRef} aria-label="レースの開催情報" className={`u-race-strip${compact ? ' u-race-strip-compact' : ''}${replaying ? ' u-race-strip-replaying' : ''}${big || (resulting && size === 'big') ? ' u-race-strip-big' : ''}${resulting ? ' u-race-strip-result' : ''}${expanded ? ' u-race-strip-expanded' : ''}${vision ? ' u-race-strip-vision' : ''}`}>
+      {/*
+        ★**大型ビジョンの 1 段目**（★PC だけ・§1-4「赤い点 ＋ 中継 ＋ 条件」）。★中身は ★帯が もう持っている値だけ（★新しい読み込みは無い）。
+        ⚠️ ★見本の右端「残り 600m」は ★出さない: ★帯が持つ進み具合は ★確定タイムからの逆算で、★流れている本編の位置と食い違う（★先頭の札を本編の間は出さないのと同じ理由）。
+      */}
+      {vision && <VisionHead air={airRace} next={next ?? null} status={status}
+        runners={airRace !== null && airRace.id === recent?.id ? data?.runners.length ?? 0 : 0}
+        left={next && next.status === 'scheduled' && nowMs !== null ? salesLeftText(next.scheduled_at, nowMs) : null} />}
       {/* ★「大」150px（★一覧・閲覧の画面）。★同じ枠が伸びます（★§2: 別要素への切替ではない） */}
       {/*
         ★同じ箱のまま ★窓の前は画面の外に置く（★箱を差し替えると iframe が作り直され ★読み込みが最初からになる）。
@@ -606,6 +686,18 @@ function RaceStripBody(): React.ReactElement | null {
       {resulting && size === 'big' && winner !== null && <div className="u-race-result-box" role="status">
         <span className="u-race-result-place">1着</span>
         <span className="u-race-result-name">{winner.gate}番 {winner.name}</span>
+      </div>}
+      {/*
+        ★**ビジョンの待ち時間**（★PC だけ・§1-4「画面の中に、直前の結果と次の発走」）。★本編が流れていない間 ★16:9 の画面を空けない。
+        ★直前の結果は ★確定してから（★`lastResult`・★映像より先に勝ち馬を出さない）。★字は小窓の決まり（★11〜14px）。
+      */}
+      {vision && !big && !(resulting && winner !== null) && <div className="u-vision-wait">
+        {(replaying || embedLive) && recent
+          ? <span className="u-vision-wait-row"><small>いま</small><b>{recent.name} レース中</b></span>
+          : lastResult !== null && <span className="u-vision-wait-row"><small>直前の結果</small><b>{lastResult}</b></span>}
+        {next
+          ? <span className="u-vision-wait-row"><small>次の発走</small><b><span className="u-num u-vision-wait-time">{clock(next.scheduled_at)}</span> {next.name}</b></span>
+          : <span className="u-vision-wait-row"><b>{status}</b></span>}
       </div>}
       <div className="u-race-strip-main">
         {resulting && recent && winner !== null ? <>

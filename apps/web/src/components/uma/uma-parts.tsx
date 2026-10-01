@@ -59,7 +59,7 @@ const PLATE: React.CSSProperties = {
  * ★**上段バー**（★左＝戻る／中＝画面名／右＝停止スイッチ・資料 §5-3）。
  * ★`home` を真にすると、左が**金プレートのロゴ**になります（★ダッシュボード用）。
  */
-export function TopBar({ title, backHref, home = false, paused, onToggle, extra }: {
+export function TopBar({ title, backHref, home = false, paused, onToggle, extra, points }: {
   readonly title: string;
   readonly backHref?: string;
   readonly home?: boolean;
@@ -67,25 +67,30 @@ export function TopBar({ title, backHref, home = false, paused, onToggle, extra 
   readonly onToggle: () => void;
   /** ★停止スイッチの左に置く小さな入口（★2026-10-01・/vote の「履歴」）。★無ければ何も出さない */
   readonly extra?: React.ReactNode;
+  /**
+   * ★**PC の上の段に並べる EP / PP のカプセル**（★2026-10-01・引き渡し「PC 表示 大型ビジョン案 2a」§1-3）。
+   *   ★幅 1024px 以上でだけ見える（★CSS `.u-topbar-points`）。★スマホは ★画面が いつもの段に置いたまま（★`.u-points-row`）。
+   *   ⚠️ ★EP と PP は ★別々のカプセルを並べるだけ（★合計は出さない・憲法 §0.2）。★どちらを出すかは ★画面が決める（★景品交換は PP だけ・投票は EP だけ）。
+   */
+  readonly points?: React.ReactNode;
 }): React.ReactElement {
+  /* ★寸法は ★`uma-theme.css` の `.u-topbar*`（★スマホの値は旧の書き込みと同じ・★PC だけ §1-3 の値） */
   return (
-    <div style={{
-      position: 'relative', flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 10,
-      padding: '12px 14px 0', width: '100%', maxWidth: 1220, margin: '0 auto',
-    }}>
+    <div className="u-topbar">
       {home ? (
-        <div style={{ ...PLATE, display: 'flex', alignItems: 'baseline', gap: 8, padding: '7px 12px' }}>
-          <span style={{ fontSize: 19, letterSpacing: '.04em' }}>馬物語</span>
-          <span style={{ fontSize: 10, letterSpacing: '.16em', color: '#6b4d06' }}>HOME</span>
+        <div className="u-topbar-logo" style={PLATE}>
+          <span className="u-topbar-logo-name">馬物語</span>
+          <span className="u-topbar-logo-sub">HOME</span>
         </div>
       ) : (
-        <a href={backHref ?? '/home'} style={{ ...PLATE, display: 'flex', alignItems: 'center', minHeight: 44, padding: '0 13px', fontSize: 13, whiteSpace: 'nowrap' }}>
+        <a href={backHref ?? '/home'} className="u-topbar-back" style={PLATE}>
           ‹ 戻る
         </a>
       )}
       {/* ★画面名は 19px ＋ うすい紺の影（★2026-09-29・デザイナー回答 R-22 §3・芝の上で 3.84〜3.93:1 → 大きい文字の扱い 3:1） */}
-      <span style={{ flex: '0 0 auto', fontSize: 19, whiteSpace: 'nowrap', textShadow: '0 2px 0 rgba(10,35,64,.6)' }}>{title}</span>
-      <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>{extra}<MotionToggle paused={paused} onToggle={onToggle} /></span>
+      <span className="u-topbar-title">{title}</span>
+      {points !== undefined && <span className="u-topbar-points">{points}</span>}
+      <span className="u-topbar-end">{extra}<MotionToggle paused={paused} onToggle={onToggle} /></span>
     </div>
   );
 }
@@ -95,21 +100,23 @@ export function TopBar({ title, backHref, home = false, paused, onToggle, extra 
  * ⚠️ ★副題は ★**「ゲーム内で使う（無償でのみ受け取れます）」**（★オーナー判定 B-3）。
  * ⚠️ ★**PP と合算しません**（★憲法 §0.2）。★合計を出す口をこの部品に作りません。
  */
+/*
+  ★**カプセルの寸法は `uma-theme.css` の `.u-cap*`**（★2026-10-01）。★スマホの値は ★旧の書き込みと同じ（★縦 3 段）。
+  ★PC の上の段（`.u-topbar-points`）では ★同じ部品を ★横長 48px に組み替える（★§1-3・★記号｜2 段の語｜数字｜単位）。
+  ★色だけは ★部品ごとに ここで渡す（★EP は青緑・PP は金・★別の部品のまま）。
+*/
 export function EpCapsule({ value }: { readonly value: number }): React.ReactElement {
   return (
-    <div style={{
-      flex: '1 1 220px', minWidth: 0, maxWidth: 430, padding: '7px 12px',
-      border: '2px solid var(--u-ep)', borderRadius: 12, background: 'rgba(8,26,22,.82)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ width: 11, height: 11, borderRadius: '50%', border: '3px solid var(--u-ep)' }} />
-        <span style={{ fontSize: 11, letterSpacing: '.08em', color: 'var(--u-ep-ink)' }}>参加ポイント</span>
+    <div className="u-cap u-cap-ep">
+      <div className="u-cap-row">
+        <span className="u-cap-icon" />
+        <span className="u-cap-label">参加ポイント</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-        <span className="u-num" style={{ fontSize: 27, color: 'var(--u-ep-num)' }}>{value.toLocaleString('ja-JP')}</span>
-        <span style={{ fontSize: 11, color: 'var(--u-ep-ink)' }}>EP</span>
+      <div className="u-cap-row u-cap-value">
+        <span className="u-num u-cap-num">{value.toLocaleString('ja-JP')}</span>
+        <span className="u-cap-unit">EP</span>
       </div>
-      <div style={{ marginTop: 3, fontSize: 10, fontWeight: 500, color: '#a9d8cb' }}>
+      <div className="u-cap-sub">
         ゲーム内で使う（無償でのみ受け取れます）
       </div>
     </div>
@@ -119,19 +126,16 @@ export function EpCapsule({ value }: { readonly value: number }): React.ReactEle
 /** ★**PP のカプセル**。★記号は菱形。★副題は「景品交換に使えます」 */
 export function PpCapsule({ value }: { readonly value: number }): React.ReactElement {
   return (
-    <div style={{
-      flex: '1 1 220px', minWidth: 0, maxWidth: 430, padding: '7px 12px',
-      border: '2px solid var(--u-gold)', borderRadius: 12, background: 'rgba(30,22,4,.82)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ width: 11, height: 11, border: '3px solid var(--u-gold)', transform: 'rotate(45deg)' }} />
-        <span style={{ fontSize: 11, letterSpacing: '.08em', color: '#f7e6b5' }}>賞金ポイント</span>
+    <div className="u-cap u-cap-pp">
+      <div className="u-cap-row">
+        <span className="u-cap-icon" />
+        <span className="u-cap-label">賞金ポイント</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-        <span className="u-num" style={{ fontSize: 27, color: '#fff3cd' }}>{value.toLocaleString('ja-JP')}</span>
-        <span style={{ fontSize: 11, color: '#f7e6b5' }}>PP</span>
+      <div className="u-cap-row u-cap-value">
+        <span className="u-num u-cap-num">{value.toLocaleString('ja-JP')}</span>
+        <span className="u-cap-unit">PP</span>
       </div>
-      <div style={{ marginTop: 3, fontSize: 10, fontWeight: 500, color: '#dcc78a' }}>景品交換に使えます</div>
+      <div className="u-cap-sub">景品交換に使えます</div>
     </div>
   );
 }
@@ -452,7 +456,7 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
           ★下半分は ★2026-09-28 に濃くしました（★.42 → .55・★.78 → .86・★デザイナー R-18 回答 🟡 #7）:
           ★芝の上で 本文 12px の明度差が 4.5:1 に届かないことがある、ため。★値はデザイナーの指定どおり。
         */
-        <div style={{
+        <div className="u-backdrop-dim" style={{
           position: 'absolute', inset: 0,
           background: screenOverlayCss(),
         }} />
@@ -469,16 +473,19 @@ export function Backdrop({ variant = 'screen' }: { readonly variant?: 'screen' |
  *   ★立ち姿 `horse-stand.webp`・★`running` の間は 歩きの 8 コマ `horse-walk-sheet.webp`（★`u-walk` と対）。
  *   ⚠️ ★見本の `chibi-horse.png` を ★持ち馬の欄に使わないこと（★見本を自分の馬として見せる ＝ P0-B と同じ族・★網 `own-horse-figure.test.ts`）。
  */
-export function OwnHorseFigure({ horseId, running, onClick, style }: {
+export function OwnHorseFigure({ horseId, running, onClick, style, className }: {
   readonly horseId: string;
   readonly running: boolean;
   readonly onClick?: () => void;
   /** ★置く場所の余白などだけ（★絵と毛色は変えない） */
   readonly style?: React.CSSProperties;
+  /** ★置く場所の大きさを ★CSS の幅の段で変えるとき（★2026-10-01・/home の PC の舞台）。★絵と毛色は変えない */
+  readonly className?: string;
 }): React.ReactElement {
   const coatFilter = deformedCoatCssFilter(coatOfHorseId(horseId));
   return (
     <div
+      className={className}
       onClick={onClick}
       style={{
         position: 'relative', width: 'min(330px, 88%)', aspectRatio: '544 / 312',

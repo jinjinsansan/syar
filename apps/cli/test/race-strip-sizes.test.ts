@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { STRIP_SIZE_BY_ROUTE, routeKeyOf, stripEmbedsOn, stripSizeOf, type StripSize } from '../../web/src/components/uma/race-strip-sizes.js';
+import { PC_VISION_ROUTES, STRIP_SIZE_BY_ROUTE, routeKeyOf, stripEmbedsOn, stripSizeOf, stripVisionOn, type StripSize } from '../../web/src/components/uma/race-strip-sizes.js';
 import { shellPlacesStripOn } from '../../web/src/components/shell-routes.js';
 import { DEV_ONLY_ROUTES } from '../../web/src/middleware.js';
 
@@ -145,7 +145,7 @@ describe('★常設帯の大きさ ── 表と画面の突き合わせ（⑤�
     scan(path.join(ROOT, 'apps/web/src'));
     expect(offenders).toEqual([]);
     const STRIP = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/race-strip.tsx'), 'utf8');
-    expect(STRIP, '★帯が表を引いていない').toMatch(/const size = stripSizeOf\(pathname, \{ intro \}\);/);
+    expect(STRIP, '★帯が表を引いていない').toMatch(/const size = stripSizeOf\(pathname, \{ intro, wide \}\);/);
     expect(STRIP, '★帯が引数を受け取っている').toMatch(/export function RaceStrip\(\): React\.ReactElement \| null/);
   });
 
@@ -161,7 +161,7 @@ describe('★常設帯の大きさ ── 表と画面の突き合わせ（⑤�
     expect(stripSizeOf('/home', { intro: true })).toBe('big');
     /** ★段階の出どころは ★画面がサーバーから読んだ値（★帯は推測しない・★ログインの口を使わない） */
     const STRIP = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/race-strip.tsx'), 'utf8');
-    expect(STRIP).toContain('const size = stripSizeOf(pathname, { intro });');
+    expect(STRIP).toContain('const size = stripSizeOf(pathname, { intro, wide });');
     const STRIP_LIVE = STRIP.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
     expect(STRIP_LIVE, '★帯が段階を自分で読んでいる').not.toMatch(/fetchOnboardingState|lib\/onboarding/);
     const FOAL = readFileSync(path.join(APP, 'stable/foal/page.tsx'), 'utf8');
@@ -180,6 +180,33 @@ describe('★常設帯の大きさ ── 表と画面の突き合わせ（⑤�
     expect(stripSizeOf('/races/abc')).toBe('text');
     expect(stripSizeOf('/no-such-screen'), '★表に無い道に ★黙って帯を出さない').toBe('hidden');
     expect(stripSizeOf('/'), '★TOP は出さない（§3）').toBe('hidden');
+  });
+});
+
+/**
+ * ★**PC の「大型ビジョン」**（★2026-10-01・デザイナー引き渡し「PC 表示 大型ビジョン案 2a」§1-4・§1-6）。
+ *   ★幅 1024px 以上だけ ★表の「極小」の一部（★投票・馬市場）を「大」にして ★ビジョンで出す。★スマホは表の値のまま。
+ *   ★「文字」（★出馬表・そのレースの画面）と ★出さない画面は ★PC でも そのまま。
+ */
+describe('★PC の大型ビジョン（★表が正本・★幅は引数）', () => {
+  it('★PC のビジョンの面は「大」・★本編を流す ／ ★スマホは表の値（★対照）', () => {
+    for (const r of PC_VISION_ROUTES) {
+      expect(STRIP_SIZE_BY_ROUTE[r], `★${r} は表では「極小」`).toBe('mini');
+      expect(stripSizeOf(r, { intro: false, wide: true }), `★${r}: PC で「大」になっていない`).toBe('big');
+      expect(stripEmbedsOn(r, { wide: true }), `★${r}: PC で本編を流していない`).toBe(true);
+      expect(stripSizeOf(r, { intro: false }), `★${r}: スマホの大きさが変わった`).toBe('mini');
+      expect(stripEmbedsOn(r), `★${r}: スマホで本編を流している`).toBe(false);
+    }
+  });
+  it('★ビジョンは「大」の面だけ・★「文字」「出さない」「ほかの極小」は PC でも変えない', () => {
+    expect(stripVisionOn('/home', { intro: null, wide: true })).toBe(true);
+    expect(stripVisionOn('/home', { intro: null, wide: false }), '★スマホはビジョンにしない').toBe(false);
+    expect(stripVisionOn('/races/abc', { intro: null, wide: true }), '★出馬表と走行を同時に出さない（§3）').toBe(false);
+    expect(stripSizeOf('/races/abc', { intro: null, wide: true })).toBe('text');
+    expect(stripVisionOn('/login', { intro: null, wide: true })).toBe(false);
+    expect(stripVisionOn('/race', { intro: null, wide: true }), '★全画面の本編に重ねない').toBe(false);
+    expect(stripSizeOf('/entry', { intro: null, wide: true }), '★ビジョンの面に無い「極小」は PC でも「極小」').toBe('mini');
+    expect(stripSizeOf('/stable/foal', { intro: true, wide: true }), '★導入中は PC でも出さない').toBe('hidden');
   });
 });
 
@@ -203,7 +230,7 @@ describe('★本編を流す面（表が正本）', () => {
 
   it('🔴 ★帯は 面を自分で判定しない（★表の `stripEmbedsOn` だけを見る）', () => {
     const strip = readFileSync(path.resolve(__dirname, '../../web/src/components/uma/race-strip.tsx'), 'utf8');
-    expect(strip).toContain('const embedsHere = stripEmbedsOn(pathname);');
+    expect(strip).toContain('const embedsHere = stripEmbedsOn(pathname, { wide });');
     expect(strip, '★帯が面の名前を書いている').not.toMatch(/['"]\/home['"]|['"]\/records['"]/);
   });
 });
