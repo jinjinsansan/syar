@@ -36,6 +36,8 @@ export interface VisualScroll {
 
 /** ★1 区間（表示 0.05 秒）で注視点がこれより動いたら「跳び」とみなす（★実馬の 20m/秒でも 1m） */
 export const VISUAL_SCROLL_JUMP_M = 30;
+/** ★これより速い時間の圧縮（★dレース時計/d表示時計）は ★区間を飛ばしている刻み（★ふだんは 0.7〜1.8） */
+export const VISUAL_SCROLL_SKIP_RATE = 5;
 
 export function buildVisualScroll(samples: readonly VisualScrollSample[]): VisualScroll {
   if (samples.length === 0) return { deltaAt: () => 0 };
@@ -59,7 +61,11 @@ export function buildVisualScroll(samples: readonly VisualScrollSample[]): Visua
      *   ★旧: ★`(k − 1)·df` のまま。★跳びの刻みの rate は極端（★表示 0.05 秒で 1,150m）なので ★芝が その刻みで 毎秒 30m 前後に跳ねた。
      *   ★新: ★Δ の変化を「跳んだ分を打ち消し ＋ 前の区間の見た目の速さ × 刻みの秒」にする（★芝の速さが 跳びの前後で つながる）。
      */
-    if (Math.abs(df) > VISUAL_SCROLL_JUMP_M && i >= 2) {
+    /**
+     * ★跳びの隣の刻みも同じ扱い（★2026-10-01 の測り直し: ★跳びの後の刻みは rate が極端（★表示 1 秒あたり レース数十秒）で
+     *   ★k ≈ 0 → ★芝が 約 0.1 秒 止まった）。★ふだんの rate は 0.7〜1.8 なので ★`VISUAL_SCROLL_SKIP_RATE` を超えたら 跳びと同じ。
+     */
+    if ((Math.abs(df) > VISUAL_SCROLL_JUMP_M || rate > VISUAL_SCROLL_SKIP_RATE) && i >= 2) {
       const prevVisual = (focuses[i - 1]! + deltas[i - 1]!) - (focuses[i - 2]! + deltas[i - 2]!);
       const prevDt = times[i - 1]! - times[i - 2]!;
       const dt = cur.displaySec - prev.displaySec;

@@ -58,8 +58,9 @@ describe('visual scroll (見た目の速度を時間圧縮から切り離す)', 
   it('注視点が跳ぶ前後で、芝は止まらず 跳ねない（★毎コマの速さが ふだんの 0.5〜1.5 倍）', () => {
     const JUMP_AT = 1.02;
     const focusAt = (d: number): number => d * 30 + (d >= JUMP_AT ? 1150 : 0);
+    /** ★跳びの刻み（21）と ★その隣（22）の rate が極端（★本番の実測の形: 跳びの後も 約 0.1 秒 止まった） */
     const samples = Array.from({ length: 61 }, (_, i) => ({
-      displaySec: i * 0.05, focusS: focusAt(i * 0.05), rate: i === 21 ? 40 : 1.8, anchorWeight: 0,
+      displaySec: i * 0.05, focusS: focusAt(i * 0.05), rate: i === 21 || i === 22 ? 40 : 1.8, anchorWeight: 0,
     }));
     const vs = buildVisualScroll(samples);
     const normal = 30 / 1.8;
