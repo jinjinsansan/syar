@@ -4396,6 +4396,16 @@ function RaceView({ setup, real }: {
       cv.height = bufferH;
     }
     ctx.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
+    /**
+     * ★**大きく縮めて描くとき（★PC の小窓など）は 絵の縮小を高品質に**（★2026-10-01・オーナー「PC の小窓で 最後の直線の芝が逆に動いた」）。
+     *   ★既定（low）の縮小は ★細かい芝の模様を 4〜5 分の 1 に間引き、★流れと逆向きに這う縞（モアレ）を作る。
+     *   ★`high` は 縮小を平均して描く。★全画面（縮みが小さい）は 従来どおり low（★速さ優先）。
+     */
+    /** ★見比べの口 `?smooth=low|high`（★既定は 縮みで決める） */
+    const smoothParam = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('smooth');
+    const smoothing: ImageSmoothingQuality = smoothParam === 'low' || smoothParam === 'high' ? smoothParam : pixelScale < 0.75 ? 'high' : 'low';
+    ctx.imageSmoothingEnabled = true;
+    if (ctx.imageSmoothingQuality !== smoothing) ctx.imageSmoothingQuality = smoothing;
 
     const intro = raceIntroAt(d);
     /**
