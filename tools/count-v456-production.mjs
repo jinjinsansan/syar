@@ -156,6 +156,27 @@ try {
     console.log(`  ${d}  ${String(vs.length).padStart(6)}  ${meanPct(vs).padStart(8)}  ${meanPct(days.get(d)?.cvs ?? []).padStart(8)}`);
   }
 
+  /**
+   * ★⑦ **誕生週の散らばり**（★2026-10-01・簿 SEED-LOCKSTEP の閉じる条件）: ★育成の位相（齢 % 4）が揃っていれば
+   *   ★「1 つの位相で V-4 を測った」ことになる。★齢の差は誕生週の差なので ★`birth_week % 4` の件数で見る（★同じ並びを ずらしただけ）。
+   *   ★現役（`retired_at_week is null`）と ★絞らない版の 2 通り（★絞り込みが例外を隠したことがある）。
+   */
+  const phase = (await c.query(`
+    select (retired_at_week is null) as active,
+           count(distinct birth_week)::int as kinds,
+           count(*) filter (where ((birth_week % 4) + 4) % 4 = 0)::int as p0,
+           count(*) filter (where ((birth_week % 4) + 4) % 4 = 1)::int as p1,
+           count(*) filter (where ((birth_week % 4) + 4) % 4 = 2)::int as p2,
+           count(*) filter (where ((birth_week % 4) + 4) % 4 = 3)::int as p3
+      from horses
+     group by rollup ((retired_at_week is null))`)).rows;
+  console.log('');
+  console.log('【⑦ 誕生週の散らばり】★SEED-LOCKSTEP（★位相が 4 つに散っていれば 本番ぶんは外す）');
+  for (const r of phase) {
+    const label = r.active === null ? 'すべて（絞らない）' : r.active ? '現役' : '引退';
+    console.log(`  ${label.padEnd(10)}  誕生週の種類 ${String(r.kinds).padStart(4)}  位相 0/1/2/3 ＝ ${r.p0} / ${r.p1} / ${r.p2} / ${r.p3}`);
+  }
+
   console.log('');
   if (total.races < 2000) console.log(`  ⚠️ ★まだ ${total.races} レース（★2,000 未満）。★線（28.5%）での判定は まだしない（★裁定）。`);
   else console.log(p >= 0.285 ? '  ✔ ★V-4 は 28.5% 以上（★模型のずれは余裕の中・裁定の線）' : '  🔴 ★V-4 が 28.5% 未満（★世界が下限を割っている → 較正の見直し・オーナーへ）');
