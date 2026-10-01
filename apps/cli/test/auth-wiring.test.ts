@@ -111,6 +111,28 @@ describe('★V-19 ⑪ 本番経路で固定すること', () => {
     return m !== null && /persistSession:\s*false/.test(m[1]!) && /autoRefreshToken:\s*false/.test(m[1]!);
   };
 
+  /**
+   * ★**読み取りの器の保存領域の名前は ★authClient の既定と違う**（★2026-10-01・裁定 `REVIEW_READCLIENT_SESSION_VERDICT_20261001.md` §3）。
+   *   ★同じ名前だと ★セッションを持たない器でも「Multiple GoTrueClient instances」が 1 件 出た（★本番のオーナーの PC）。
+   */
+  const readKeyPassed = (src: string): boolean => {
+    const m = /const makeReadClient = \(url: string, key: string\) => createClient\(url, key, \{([\s\S]*?)\}\);/.exec(src);
+    return m !== null && /storageKey:\s*readStorageKey\(url\)/.test(m[1]!);
+  };
+  it('★readClient の storageKey は authClient の既定（sb-<ref>-auth-token）と違う', async () => {
+    expect(readKeyPassed(supabaseTs()), '★makeReadClient が storageKey を渡していない').toBe(true);
+    const { readStorageKey } = await import('../../web/src/lib/supabase.js');
+    const url = 'https://abcdefghijk.supabase.co';
+    expect(readStorageKey(url)).toBe('sb-abcdefghijk-read');
+    expect(readStorageKey(url), '★authClient の既定のキーと同じ').not.toBe('sb-abcdefghijk-auth-token');
+  });
+  it('★対照: ★storageKey を外す変異は ★落ちる', () => {
+    const src = supabaseTs();
+    const mutated = src.replace(', storageKey: readStorageKey(url) }', ' }');
+    expect(mutated).not.toBe(src);
+    expect(readKeyPassed(mutated)).toBe(false);
+  });
+
   it('★対照: ★readClient の器を 既定値に戻す変異は ★落ちる', () => {
     const src = supabaseTs();
     expect(readClientSessionless(src)).toBe(true);

@@ -135,7 +135,8 @@
 /* ★出走馬の紹介（★素質の数値・星・強さを断定する言葉は出さない） */
 [data-theme='uma'] .u-tv-horse { flex: 1 1 auto; display: flex; gap: 10px; min-height: 0; }
 [data-theme='uma'] .u-tv-horse-thumb { flex: 0 0 var(--tv-thumb); position: relative; border-radius: 8px; overflow: hidden; background: url('/art/uma/turf-near.webp') repeat 0 0 / 500px 30px; }
-[data-theme='uma'] .u-tv-horse-art { position: absolute; inset: 0; background: no-repeat 40% 85% / 115% auto; }
+/* ★顔が切れない（★2026-10-01 オーナー指摘「馬の顔が切れています」・★旧 115% で右端の顔がはみ出した）→ ★枠の幅に収める */
+[data-theme='uma'] .u-tv-horse-art { position: absolute; inset: 22px 4px 4px; background: no-repeat center bottom / contain; }
 [data-theme='uma'] .u-tv-horse-gate { position: absolute; left: 4px; top: 4px; width: 24px; height: 20px; }
 [data-theme='uma'] .u-tv-horse-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 [data-theme='uma'] .u-tv-chips { display: flex; gap: 4px; flex-wrap: wrap; }

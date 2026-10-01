@@ -20,8 +20,16 @@ import { createClient } from '@supabase/supabase-js';
  *   ★先に洗った（★2026-10-01）: ★`readClient` で読むのは ★anon に許可された公開ビュー 8 つと `horse_starts`/`horse_wins` だけ
  *     （★`users`・`my_*`・台帳は ★すべて `authClient`）→ ★セッションを外しても 黙って空になる画面は無い。
  */
+/**
+ * ★**読み取りの器の保存領域の名前**（★2026-10-01・裁定 §3）。★既定は `sb-<ref>-auth-token`（★`authClient` と同じ）で、
+ *   ★セッションを持たない設定にしても ★「Multiple GoTrueClient instances … under the same storage key」が 1 件 残った。
+ *   ★名前を分けて ★2 つの器を 名前の上でも別物にする。
+ */
+export function readStorageKey(url: string): string {
+  return `sb-${new URL(url).hostname.split('.')[0]}-read`;
+}
 const makeReadClient = (url: string, key: string) => createClient(url, key, {
-  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: readStorageKey(url) },
 });
 let browserReadClient: ReturnType<typeof makeReadClient> | null = null;
 let browserAuthClient: ReturnType<typeof makeAuthClient> | null = null;
