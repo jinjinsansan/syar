@@ -43,27 +43,87 @@ describe('★④ 結果の一時強調', () => {
   });
 });
 
-describe('★④ の札は ★「あなたの馬」と読めない（★裁定 §6-2・帯は誰の馬かを知らない＝自馬の表示は段 3）', () => {
+describe('★④ ★誤った「あなたの馬」を言わない（★09-27 §6-2 の目的・★2026-10-01 から 段 3 を開けて「正しい口からしか読まない」）', () => {
   /**
    * 🔴 ★**主は構造側**（★2026-09-27・レビュー側の提案）: ★帯は ★**誰の馬かを知りようがない**。
    *   ★語の一覧（下）は ★「君の馬」「オーナーの馬」を書いた日に素通りします（★R-29・列挙は必ず漏れる）。
    *   ★知らないものは ★言いようがないので、★こちらは語が腐っても効きます。
    */
-  it('🔴 ★帯は ★`is_mine` を読まない・★ログインの口を使わない（★構造として誰の馬かを知らない）', () => {
+  /**
+   * 🔴 ★**2026-10-01 に書き換えた**（★オーナー決定「あなたの馬が出走します は絶対に必要」・裁定 `REVIEW_R28_STAGE1_QUERIES_VERDICT_20261001.md` §1）。
+   *   ★旧: 「帯は `is_mine` を読まない」（★09-27 §6-2）。★守っていた目的は ★**誤った「あなたの馬」を言わない**こと（★読まないのは その手段）。
+   *   ★新: ★`is_mine` を読むのは ★`channel-feed.ts` の `fetchMyGates` **1 か所**で ★ログインの口を通す／★未ログインの口は `is_mine` も `*` も選ばない／
+   *        ★自分の馬の言葉は ★`isMine`（★`myGates`）が真のときだけ出る。★目的は ★この 3 つが引き継ぐ。
+   */
+  const FEED = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/channel-feed.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+  const CHANNEL = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/strip-channel.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ').replace(/\/\/[^\n]*/g, ' ');
+  /** ★`is_mine` を選ぶ `.select(...)` の数（★帯・番組の部品・出走馬の口 すべて） */
+  const isMineSelects = (src: string): number => [...src.matchAll(/\.select\(([^)]*)\)/g)].filter((m) => m[1]!.includes('is_mine')).length;
+  /** ★`readClient` の問い合わせ（★`readClient()` から次の `;` まで）が `is_mine` か `*` を選んでいるか */
+  const readClientSelectsMine = (src: string): boolean => {
+    for (const m of src.matchAll(/readClient\(\)[\s\S]*?;/g)) {
+      if (/\.select\([^)]*is_mine/.test(m[0]) || /\.select\(\s*['"`]\s*\*\s*['"`]/.test(m[0])) return true;
+    }
+    return [...src.matchAll(/\bclient\.from\([^)]*\)\s*\.select\(([^)]*)\)/g)].some((x) => x[1]!.includes('is_mine') || /['"`]\s*\*\s*['"`]/.test(x[1]!))
+      && !/authClient\(\)/.test(src.slice(0, src.indexOf('is_mine')));
+  };
+
+  it('🔴 ★帯そのものは ★ログインの口を使わず ★`is_mine` を選ばない（★未ログインの経路）', () => {
     const selects = [...LIVE.matchAll(/\.select\(([^)]*)\)/g)].map((m) => m[1]!);
     expect(selects.length, '★問い合わせを 1 つも読めていない').toBeGreaterThanOrEqual(3);
     for (const cols of selects) {
       expect(cols, '★帯が is_mine を選んでいる').not.toContain('is_mine');
       expect(cols, '★帯が列を名指ししていない（★`*` は is_mine を連れてくる）').not.toMatch(/['"`]\s*\*\s*['"`]/);
     }
-    expect(LIVE, '★帯がログインの口を使っている（★自分の馬が引ける）').not.toContain('authClient');
+    expect(LIVE, '★帯がログインの口を使っている').not.toContain('authClient');
     expect(LIVE).toContain("import { readClient } from '../../lib/supabase';");
   });
 
-  it('★対照: ★is_mine を選ぶ変異は ★落ちる', () => {
+  it('🔴 ★`is_mine` を読むのは `fetchMyGates` の 1 か所・★ログインの口・★未ログインは空', () => {
+    expect(isMineSelects(LIVE) + isMineSelects(FEED) + isMineSelects(CHANNEL), '★is_mine を読む口が 1 か所でない').toBe(1);
+    expect(FEED.indexOf('export async function fetchMyGates'), '★fetchMyGates が見つからない').toBeGreaterThan(-1);
+    const fn = FEED.slice(FEED.indexOf('export async function fetchMyGates'));
+    expect(fn).toMatch(/const client = authClient\(\);/);
+    expect(fn, '★セッションが無いのに読んでいる').toMatch(/if \(session\.session === null\) return new Set\(\);/);
+    expect(fn).toMatch(/\.select\('race_id,gate,is_mine'\)/);
+    /** ★出走馬の詳しい形（★未ログインの口）は ★is_mine を選ばない */
+    expect(FEED.indexOf('export async function fetchFieldProfiles'), '★出走馬の口が見つからない').toBeGreaterThan(-1);
+    const profiles = FEED.slice(FEED.indexOf('export async function fetchFieldProfiles'), FEED.indexOf('export async function fetchMyGates'));
+    expect(profiles.length, '★切り出せていない').toBeGreaterThan(0);
+    expect(profiles).toContain(".select('gate,strategy,weight,popularity,horse_id')");
+    expect(profiles).not.toContain('is_mine');
+    expect(profiles).not.toContain('authClient');
+  });
+
+  it('🔴 ★自分の馬の言葉は `myGates` が在って その馬番が入っているときだけ（★わからなければ出さない）', async () => {
+    const { ownRecentLine } = await import('../../web/src/components/uma/strip-channel.js');
+    const runners = [
+      { gate: 3, name: 'ウマC', strategy: 'senko' as const, finishSec: 96, finishPosition: 2, horseId: 'h3' },
+      { gate: 5, name: 'ウマE', strategy: 'sashi' as const, finishSec: 95, finishPosition: 1, horseId: 'h5' },
+    ];
+    expect(ownRecentLine(runners, 'R1', null), '★わからないのに言っている').toBeNull();
+    expect(ownRecentLine(runners, 'R1', new Set()), '★出ていないのに言っている').toBeNull();
+    expect(ownRecentLine(runners, 'R1', new Set(['R2:3'])), '★別のレースの馬番で言っている').toBeNull();
+    expect(ownRecentLine(runners, 'R1', new Set(['R1:3']))).toBe('あなたの馬 3番 ウマC は 2着');
+    /** ★番組の「あなたの馬」は ★`isMine` から（★`myGates` で作る） */
+    expect(CHANNEL).toMatch(/isMine: next !== null && p\.myGates\?\.has\(`\$\{next\.id\}:\$\{r\.gate\}`\) === true/);
+  });
+
+  it('★対照 ①: ★未ログインの口に is_mine を足す変異は ★落ちる', () => {
     const mutated = LIVE.replace(".select('gate,horse_name,strategy,finish_pos,finish_time,horse_id')", ".select('gate,horse_name,strategy,finish_pos,finish_time,horse_id,is_mine')");
     expect(mutated).not.toBe(LIVE);
-    expect([...mutated.matchAll(/\.select\(([^)]*)\)/g)].some((m) => m[1]!.includes('is_mine'))).toBe(true);
+    expect(isMineSelects(mutated) + isMineSelects(FEED) + isMineSelects(CHANNEL)).toBe(2);
+    const feedMut = FEED.replace(".select('gate,strategy,weight,popularity,horse_id')", ".select('gate,strategy,weight,popularity,horse_id,is_mine')");
+    expect(feedMut).not.toBe(FEED);
+    expect(readClientSelectsMine(feedMut) || isMineSelects(feedMut) === 2).toBe(true);
+  });
+
+  it('★対照 ②: ★isMine を見ずに「あなたの馬」を出す変異は ★落ちる', () => {
+    const mutated = CHANNEL.replace('isMine: next !== null && p.myGates?.has(`${next.id}:${r.gate}`) === true', 'isMine: true');
+    expect(mutated).not.toBe(CHANNEL);
+    expect(mutated).not.toMatch(/isMine: next !== null && p\.myGates\?\.has\(`\$\{next\.id\}:\$\{r\.gate\}`\) === true/);
   });
 
   it('★帯の画面の文字に ★自馬を指す語が無い（★従・語の一覧）', () => {

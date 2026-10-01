@@ -13,7 +13,7 @@ import { INTRO_STAGES, stripEmbedsOn, stripSizeOf, stripTvModeOf, stripVisionOn 
 import { STRIP_EMBED_FAILED_NOTE, STRIP_EMBED_GIVE_UP_SEC, STRIP_EMBED_LEAD_SEC, isStripEmbedMessage, stripControlMessage, stripEmbedLog, stripEmbedUrl } from './race-strip-embed';
 import { BOARD_ITEM_SEC, boardText, bracketOrNull, raceLine, tickerBoard, tickerShowsField, type BoardItem, type TickerRunner } from './race-strip-ticker';
 import { StripChannel } from './strip-channel';
-import { fetchFieldProfiles, type FieldProfile } from './channel-feed';
+import { fetchFieldProfiles, fetchMyGates, type FieldProfile } from './channel-feed';
 import './uma-theme.css';
 
 interface RaceNoticeRow {
@@ -32,8 +32,6 @@ interface NoticeData {
   readonly runners: readonly ReplayRunner[];
   /** ★次のレースの出走馬と単勝（★締切の後だけ読む・★流れる 1 行 `race-strip-ticker.ts`） */
   readonly nextField: readonly TickerRunner[];
-  /** ★直前のレースに 自分の馬が出ていれば その着順（★確定してから・★小窓テレビの結果の 1 行・R-28 §3） */
-  readonly ownRecent: { readonly gate: number; readonly name: string; readonly pos: number } | null;
 }
 
 const COLUMNS = 'id, name, surface, distance, scheduled_at, status';
@@ -62,7 +60,6 @@ async function fetchNotice(): Promise<NoticeData> {
   if (recent.error !== null) throw new Error(recent.error.message);
   const lastRace = (recent.data?.[0] ?? null) as RaceNoticeRow | null;
   let runners: readonly ReplayRunner[] = [];
-  const ownRecent: NoticeData['ownRecent'] = null;
   if (lastRace !== null) {
     const entries = await client.from('race_entries_public')
       .select('gate,horse_name,strategy,finish_pos,finish_time,horse_id')
@@ -71,10 +68,6 @@ async function fetchNotice(): Promise<NoticeData> {
     const rows = ((entries.data ?? []) as Record<string, unknown>[])
       .filter((row) => row['finish_pos'] !== null && row['finish_pos'] !== undefined);
     runners = parseReplayRunners(rows);
-    /**
-     * ⚠️ ★自分の馬の着順（★R-28 §3）は ★まだ読まない: ★帯は ★誰の馬かを知らない（★裁定 §6-2・自馬の表示は段 3・網 `race-strip-notice`）。
-     *   ★レビュー側に 段 3 をいま開けるか 照会中（★2026-10-01）。★開けるまで `ownRecent` は いつも null。
-     */
   }
   const nextRace = (next.data?.[0] ?? null) as NoticeData['next'];
   return {
@@ -82,7 +75,6 @@ async function fetchNotice(): Promise<NoticeData> {
     recent: lastRace,
     runners,
     nextField: nextRace !== null && tickerShowsField(nextRace.status) ? await fetchField(nextRace.id) : [],
-    ownRecent,
   };
 }
 
@@ -565,6 +557,19 @@ function RaceStripBody(): React.ReactElement | null {
     fetchFieldProfiles(nextId).then((map) => { if (!cancelled) setProfiles({ id: nextId, map }); }, () => undefined);
     return () => { cancelled = true; };
   }, [tvMode, nextId, fieldReady, profilesId]);
+  /**
+   * ★**自分の馬の馬番**（★次と直前のレース・★2026-10-01 オーナー決定・裁定 R28 第 1 段 §1）。★帯は ログインの口に触れない（★`fetchMyGates` の 1 か所）。
+   *   ★わからない間は 空（★自分の馬の言葉を出さない）。
+   */
+  const [myGates, setMyGates] = useState<{ readonly key: string; readonly set: ReadonlySet<string> } | null>(null);
+  const recentIdForMine = recent?.id ?? null;
+  const mineKey = `${nextId ?? ''}|${recentIdForMine ?? ''}|${fieldReady ? 1 : 0}`;
+  useEffect(() => {
+    if (tvMode === null) return undefined;
+    let cancelled = false;
+    fetchMyGates([nextId ?? '', recentIdForMine ?? '']).then((set) => { if (!cancelled) setMyGates({ key: mineKey, set }); }, () => undefined);
+    return () => { cancelled = true; };
+  }, [tvMode, mineKey, nextId, recentIdForMine]);
   useEffect(() => {
     /** ★本編を読むのは ★表で決めた面だけ（★「大」の面・★「極小」「文字」は読まない） */
     if (!embedsHere || motionReduced || canPlay !== true) { setEmbed(null); return; }
@@ -664,7 +669,8 @@ function RaceStripBody(): React.ReactElement | null {
   const channelEl = tvMode !== null && nowMs !== null ? <StripChannel
     size={tvMode === 'pc' ? 'pc' : 'sp'} nowMs={nowMs} next={next ?? null}
     recent={recent ? { name: recent.name, status: recent.status } : null}
-    recentRunners={data?.runners ?? []} ownRecent={data?.ownRecent ?? null} field={data?.nextField ?? []}
+    recentRunners={data?.runners ?? []} recentId={recent?.id ?? null} field={data?.nextField ?? []}
+    myGates={myGates !== null && myGates.key === mineKey ? myGates.set : null}
     profiles={profiles !== null && profiles.id === nextId ? profiles.map : null}
     reducedMotion={motionReduced} onAir={big} /> : null;
   /** ★本編の箱（★1 つだけ作る・★ビジョンでも スマホのテレビでも 同じ要素） */

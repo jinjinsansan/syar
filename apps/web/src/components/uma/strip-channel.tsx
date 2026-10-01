@@ -35,7 +35,12 @@ export interface StripChannelProps {
   readonly recent: { readonly name: string; readonly status: string } | null;
   /** ★直前のレースの着順（★確定してから・`race-strip.tsx` の `lastWinner` と同じ条件） */
   readonly recentRunners: readonly ReplayRunner[];
-  readonly ownRecent: { readonly gate: number; readonly name: string; readonly pos: number } | null;
+  readonly recentId: string | null;
+  /**
+   * ★自分の馬の馬番（★`<レース ID>:<馬番>`・`fetchMyGates` の 1 か所から・★わからなければ null）。
+   *   ★自分の馬の言葉は ★ここに在るときだけ出す（★条件 3）。
+   */
+  readonly myGates: ReadonlySet<string> | null;
   readonly field: readonly TickerRunner[];
   readonly profiles: ReadonlyMap<number, FieldProfile> | null;
   readonly reducedMotion: boolean;
@@ -66,7 +71,7 @@ export function StripChannel(p: StripChannelProps): React.ReactElement {
     return {
       ...r,
       horseId: pr?.horseId ?? null, strategy: pr?.strategy ?? null, weight: pr?.weight ?? null, popularity: pr?.popularity ?? null,
-      isMine: pr?.isMine ?? false, starts: pr?.starts ?? null, wins: pr?.wins ?? null, recent: pr?.recent ?? null,
+      isMine: next !== null && p.myGates?.has(`${next.id}:${r.gate}`) === true, starts: pr?.starts ?? null, wins: pr?.wins ?? null, recent: pr?.recent ?? null,
     };
   });
   const order = horseOrder(runners);
@@ -90,7 +95,7 @@ export function StripChannel(p: StripChannelProps): React.ReactElement {
   const result = settled && p.recent !== null ? {
     raceName: p.recent.name,
     rows: top3.map((r): ChannelResultRow => ({ pos: r.finishPosition, gate: r.gate, name: r.name, time: r.finishPosition === 1 ? formatRaceTime(r.finishSec) : null })),
-    ownLine: p.ownRecent === null ? null : `あなたの馬 ${p.ownRecent.gate}番 ${p.ownRecent.name} は ${p.ownRecent.pos}着`,
+    ownLine: ownRecentLine(p.recentRunners, p.recentId, p.myGates),
   } : null;
   const narration = next === null ? '' : narrationFor(now.narr ?? 'field', { race: raceForTv!, venue, going, runners });
   const left = Number.isFinite(startMs) ? Math.max(0, (startMs - p.nowMs) / 1000) : null;
@@ -112,4 +117,14 @@ export function StripChannel(p: StripChannelProps): React.ReactElement {
     wipe={wipeKey > 0 && !p.reducedMotion && now.sinceSec < 0.45}
     onAir={p.onAir}
   />;
+}
+
+/**
+ * ★**直前の結果に 自分の馬の着順を 1 行**（★R-28 §3・★着順は記録の `finishPosition`・★自分の馬かは `myGates` だけ）。
+ *   ★わからない（`null`）・出ていないなら ★出さない。★複数頭なら いちばん上の着順。
+ */
+export function ownRecentLine(runners: readonly ReplayRunner[], recentId: string | null, myGates: ReadonlySet<string> | null): string | null {
+  if (recentId === null || myGates === null) return null;
+  const mine = runners.filter((r) => myGates.has(`${recentId}:${r.gate}`)).sort((a, b) => a.finishPosition - b.finishPosition)[0];
+  return mine === undefined ? null : `あなたの馬 ${mine.gate}番 ${mine.name} は ${mine.finishPosition}着`;
 }

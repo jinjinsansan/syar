@@ -269,6 +269,28 @@
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > * { min-height: 54px !important; }
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > :nth-child(-n + 2) { min-height: 68px !important; }
 }
+/*
+  ★**スマホのホームの上段は 1 行**（★ロゴ・EP・PP・停止・★README §2）。★2026-10-01 オーナー決定「省きましょう 1 行でいいです」:
+  ★ホームのこの段だけ ★EP の副題（B-3 の文）を出さない（★ほかの画面・PC は 副題のまま）。
+*/
+@media (max-width: 1023px) {
+  [data-theme='uma'].u-home .u-points-row { display: none !important; }
+  [data-theme='uma'].u-home .u-topbar { gap: 6px; padding: 8px 14px 0; }
+  [data-theme='uma'].u-home .u-topbar-logo { min-height: 44px; padding: 0 10px; align-items: center; }
+  [data-theme='uma'].u-home .u-topbar-logo-name { font-size: 15px; }
+  [data-theme='uma'].u-home .u-topbar-logo-sub { display: none; }
+  [data-theme='uma'].u-home .u-topbar-points { display: flex; flex: 1 1 auto; min-width: 0; justify-content: flex-end; gap: 4px; }
+  [data-theme='uma'].u-home .u-topbar-points .u-cap {
+    flex: 0 1 auto; min-width: 0; height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 4px; box-sizing: border-box; border-radius: 10px; white-space: nowrap;
+  }
+  [data-theme='uma'].u-home .u-topbar-points .u-cap-row { display: contents; }
+  [data-theme='uma'].u-home .u-topbar-points .u-cap-label,
+  [data-theme='uma'].u-home .u-topbar-points .u-cap-sub { display: none; }
+  [data-theme='uma'].u-home .u-topbar-points .u-cap-icon { width: 9px; height: 9px; flex: 0 0 auto; }
+  [data-theme='uma'].u-home .u-topbar-points .u-cap-num { font-size: 19px; }
+  [data-theme='uma'].u-home .u-topbar-points .u-cap-unit { font-size: 9px; }
+  [data-theme='uma'].u-home .u-topbar-end { margin-left: 0; }
+}
 @media (max-width: 1023px) and (max-height: 759px) {
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > * { min-height: 48px !important; }
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > :nth-child(-n + 2) { min-height: 60px !important; }

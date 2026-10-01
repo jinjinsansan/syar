@@ -6,8 +6,9 @@
  *   ★最近の着順は ★確定した出走の着順を ★新しい順に 5 つ並べるだけ。
  *   ⚠️ ★1 レースにつき 1 回だけ読む（★帯の 15 秒ごとの読み直しでは読まない・`race-strip.tsx` が レース ID で覚える）。
  *   ⚠️ ★性齢・騎手・父母は ★公開のビューに無い（★他人の馬）→ ★読まない・出さない。
+ *   ★自分の馬かどうかは ★ここでは読まない（★`fetchMyGates` の 1 か所・裁定 `REVIEW_R28_STAGE1_QUERIES_VERDICT_20261001.md` §1）。
  */
-import { readClient } from '../../lib/supabase';
+import { authClient, readClient } from '../../lib/supabase';
 
 export interface FieldProfile {
   readonly gate: number;
@@ -15,7 +16,6 @@ export interface FieldProfile {
   readonly strategy: string | null;
   readonly weight: number | null;
   readonly popularity: number | null;
-  readonly isMine: boolean;
   readonly starts: number | null;
   readonly wins: number | null;
   readonly recent: readonly number[] | null;
@@ -43,9 +43,7 @@ export async function fetchFieldProfiles(raceId: string, client = readClient()):
       strategy: typeof e['strategy'] === 'string' ? e['strategy'] : null,
       weight: num(e['weight']),
       popularity: num(e['popularity']),
-      /** ⚠️ ★誰の馬かは読まない（★裁定 §6-2・段 3 は照会中） */
-      isMine: false,
-    }))
+        }))
     .filter((e) => Number.isInteger(e.gate) && e.gate >= 1);
   const ids = rows.map((r) => r.horseId).filter((id): id is string => id !== null);
   const [record, recent] = await Promise.all([fetchRecords(client, ids), fetchRecent(client, ids, raceId)]);
@@ -109,4 +107,29 @@ async function fetchRecent(client: ReturnType<typeof readClient>, ids: readonly 
   }
   for (const [id, list] of byHorse) out.set(id, list.sort((a, b) => b.t - a.t).slice(0, RECENT_MAX).map((x) => x.pos));
   return out;
+}
+
+/**
+ * ★**自分の馬の馬番**（★2026-10-01・オーナー決定「あなたの馬が出走します は絶対に必要」・裁定 R28 第 1 段 §1 の 5 条件）。
+ *   ★`is_mine` を読むのは ★**この 1 か所だけ**（★条件 2）。★サーバーが `auth.uid()` から作る列（`0044`）で決める（★条件 1・名前や ID で照らさない）。
+ *   ★ログインの口（`authClient`）を通す。★未ログイン・読めないときは ★空（★条件 3: わからないときは自分の馬の言葉を出さない）。
+ *   ★返すのは `<レース ID>:<馬番>` の集合。
+ */
+export async function fetchMyGates(raceIds: readonly string[]): Promise<ReadonlySet<string>> {
+  const ids = raceIds.filter((id) => id !== '');
+  if (ids.length === 0) return new Set();
+  try {
+    const client = authClient();
+    const { data: session } = await client.auth.getSession();
+    if (session.session === null) return new Set();
+    const res = await client.from('race_entries_public').select('race_id,gate,is_mine').in('race_id', ids).eq('is_mine', true);
+    if (res.error !== null) return new Set();
+    const out = new Set<string>();
+    for (const r of (res.data ?? []) as Record<string, unknown>[]) {
+      if (r['is_mine'] === true && Number.isInteger(Number(r['gate']))) out.add(`${String(r['race_id'])}:${Number(r['gate'])}`);
+    }
+    return out;
+  } catch {
+    return new Set();
+  }
 }
