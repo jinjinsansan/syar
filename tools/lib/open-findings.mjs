@@ -1947,6 +1947,17 @@ owner: 'review',
     owner: 'dev',
     until: '2026-10-15',
   },
+  {
+    id: 'READCLIENT-HELD-SESSION',
+    what: '🔴 ★**`readClient()` は「セッションを持たない」と書かれていたが 既定値で作っていて セッションを持っていた**（★2026-10-01・裁定 `REVIEW_READCLIENT_SESSION_VERDICT_20261001.md`）。'
+      + '★supabase-js の既定は persistSession/autoRefreshToken が真 → ★`authClient` と 2 つの器が 同じセッションを見張り・更新しあう。★しかも呼ぶたびに作っていて ★オーナーの PC の console に「Multiple GoTrueClient instances」が 305 個。',
+    why: '★トークンの更新がぶつかると ★「突然ログアウト」に見える。★読み取りが ログインの有無で変わりうる（★註記が避けたかった形）。'
+      + '★直し（2026-10-01）: ★器をブラウザで 1 つに（`e3e5014`）・★`makeReadClient` に persistSession/autoRefreshToken/detectSessionInUrl を false。'
+      + '★先に洗った: ★readClient で読むのは anon に許可された公開ビュー 8 つと horse_starts/horse_wins だけ（★users・my_*・台帳は すべて authClient）。★網 auth-wiring（★対照: 既定値に戻すと落ちる）。'
+      + '--- ✅ ★**消す条件** --- ★本番で ★ログインした状態の console に ★「Multiple GoTrueClient instances」が ★0 件（★オーナーの PC で 1 回 確かめた日）。',
+    owner: 'dev',
+    until: '2026-10-15',
+  },
 ];
 
 /**

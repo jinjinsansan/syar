@@ -13,7 +13,16 @@ import { createClient } from '@supabase/supabase-js';
  *   （★1 つずつ ログインの保存領域を見張り・更新の時計を持つ ＝ ★重くなる・★更新がぶつかりうる）。
  *   ★作り方（★引数）は 変えない（★読む結果は同じ）。★サーバー側（`window` が無い）では 従来どおり 毎回作る。
  */
-const makeReadClient = (url: string, key: string) => createClient(url, key);
+/**
+ * ★**読み取りの器は セッションを持たない**（★2026-10-01・裁定 `REVIEW_READCLIENT_SESSION_VERDICT_20261001.md`）。
+ *   🔴 ★それまで ★既定値（★supabase-js の既定は `persistSession: true`・`autoRefreshToken: true`）で作っていて、
+ *     ★註記の「セッションを持たない」は ★実装では守られていなかった（★2 つの器が 同じセッションを見張り・更新しあう）。
+ *   ★先に洗った（★2026-10-01）: ★`readClient` で読むのは ★anon に許可された公開ビュー 8 つと `horse_starts`/`horse_wins` だけ
+ *     （★`users`・`my_*`・台帳は ★すべて `authClient`）→ ★セッションを外しても 黙って空になる画面は無い。
+ */
+const makeReadClient = (url: string, key: string) => createClient(url, key, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+});
 let browserReadClient: ReturnType<typeof makeReadClient> | null = null;
 let browserAuthClient: ReturnType<typeof makeAuthClient> | null = null;
 const inBrowser = (): boolean => typeof window !== 'undefined';

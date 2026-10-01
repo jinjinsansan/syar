@@ -95,7 +95,28 @@ describe('★V-19 ⑪ 本番経路で固定すること', () => {
     expect(to, '★authClient の宣言が readClient より後に無い').toBeGreaterThan(from);
     const readBody = src.slice(from, to);
     expect(readBody.length, '★切り出しが空（★否定の表明が素通しになる）').toBeGreaterThan(20);
-    expect(readBody, '★readClient に persistSession が入っています').not.toMatch(/persistSession/);
+    /**
+     * 🔴 ★**2026-10-01 に書き換えた**（★裁定 `REVIEW_READCLIENT_SESSION_VERDICT_20261001.md` §2-3）。
+     *   ★旧: 「readClient の本文に `persistSession` という語が無い」。★既定値（★persistSession: true）で作っても ★緑だった
+     *     （★語が無いことを見ていて ★セッションを持たないことを見ていなかった）。
+     *   ★新: ★器の作り方 `makeReadClient` が ★`persistSession: false` と `autoRefreshToken: false` を ★渡していること。
+     */
+    expect(readBody, '★readClient が makeReadClient で作っていない').toMatch(/makeReadClient\(url, key\)/);
+    expect(readClientSessionless(src), '★readClient の器が セッションを持つ（★既定値）').toBe(true);
+  });
+
+  /** ★`makeReadClient` の定義が ★セッションを持たない設定を渡しているか */
+  const readClientSessionless = (src: string): boolean => {
+    const m = /const makeReadClient = \(url: string, key: string\) => createClient\(url, key, \{([\s\S]*?)\}\);/.exec(src);
+    return m !== null && /persistSession:\s*false/.test(m[1]!) && /autoRefreshToken:\s*false/.test(m[1]!);
+  };
+
+  it('★対照: ★readClient の器を 既定値に戻す変異は ★落ちる', () => {
+    const src = supabaseTs();
+    expect(readClientSessionless(src)).toBe(true);
+    const mutated = src.replace(/const makeReadClient = \(url: string, key: string\) => createClient\(url, key, \{[\s\S]*?\}\);/, 'const makeReadClient = (url: string, key: string) => createClient(url, key);');
+    expect(mutated).not.toBe(src);
+    expect(readClientSessionless(mutated)).toBe(false);
   });
 
   it('★authClient は寿命管理をライブラリに任せる（D-113 ②・自前で抱えない）', () => {
