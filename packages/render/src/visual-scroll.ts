@@ -53,7 +53,20 @@ export function buildVisualScroll(samples: readonly VisualScrollSample[]): Visua
     const w = Math.max(0, Math.min(1, cur.anchorWeight));
     const k = w + (1 - w) / rate;
     times[i] = cur.displaySec;
-    deltas[i] = deltas[i - 1]! + (k - 1) * (cur.focusS - prev.focusS);
+    const df = cur.focusS - prev.focusS;
+    /**
+     * 🔴 ★**跳び（区間を飛ばす）の区間は 見た目の速さを 前の区間のまま保つ**（★2026-10-01・オーナー「最後の直線で 芝が逆に動く・急に超高速・急に超スロー」）。
+     *   ★旧: ★`(k − 1)·df` のまま。★跳びの刻みの rate は極端（★表示 0.05 秒で 1,150m）なので ★芝が その刻みで 毎秒 30m 前後に跳ねた。
+     *   ★新: ★Δ の変化を「跳んだ分を打ち消し ＋ 前の区間の見た目の速さ × 刻みの秒」にする（★芝の速さが 跳びの前後で つながる）。
+     */
+    if (Math.abs(df) > VISUAL_SCROLL_JUMP_M && i >= 2) {
+      const prevVisual = (focuses[i - 1]! + deltas[i - 1]!) - (focuses[i - 2]! + deltas[i - 2]!);
+      const prevDt = times[i - 1]! - times[i - 2]!;
+      const dt = cur.displaySec - prev.displaySec;
+      deltas[i] = deltas[i - 1]! - df + (prevDt > 0 ? (prevVisual / prevDt) * dt : 0);
+    } else {
+      deltas[i] = deltas[i - 1]! + (k - 1) * df;
+    }
   }
   // ★固定物体の区間で Δ=0 になるよう正規化（最初に w=1 になった点を基準にする）
   const anchorIndex = samples.findIndex((sample) => sample.anchorWeight >= 0.999);
@@ -67,9 +80,18 @@ export function buildVisualScroll(samples: readonly VisualScrollSample[]): Visua
       let lo = 0, hi = last;
       while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (times[mid]! <= displaySec) lo = mid; else hi = mid; }
       const jump = focuses[hi]! - focuses[lo]!;
-      const t = focusS !== undefined && Number.isFinite(focusS) && Math.abs(jump) > VISUAL_SCROLL_JUMP_M
-        ? Math.max(0, Math.min(1, (focusS - focuses[lo]!) / jump))
-        : (displaySec - times[lo]!) / (times[hi]! - times[lo]!);
+      const t = (displaySec - times[lo]!) / (times[hi]! - times[lo]!);
+      /**
+       * 🔴 ★**跳びの刻みの中は ★芝の位置そのものを 時間で補間する**（★2026-10-01）。★Δ ＝ その位置 − 注視点。
+       *   ★旧（2026-09-29）: ★Δ を ★注視点の進みで補間 → ★注視点が跳ぶ前のコマで Δ だけが少しずつ下がり、
+       *     ★芝が 3 コマ止まって 跳んだコマで 毎秒 95m 相当に跳ねた（★本番の見本のレースで実測 d≈44.6）。
+       *   ★新: ★芝の位置は 刻みの両端を まっすぐ結ぶ → ★注視点が どのコマで跳んでも 芝は止まらず 跳ねない（★09-29 の「1,000m 戻る」も起きない）。
+       */
+      if (focusS !== undefined && Number.isFinite(focusS) && Math.abs(jump) > VISUAL_SCROLL_JUMP_M) {
+        const xLo = focuses[lo]! + deltas[lo]!;
+        const xHi = focuses[hi]! + deltas[hi]!;
+        return xLo + (xHi - xLo) * t - focusS;
+      }
       return deltas[lo]! + (deltas[hi]! - deltas[lo]!) * t;
     },
   };

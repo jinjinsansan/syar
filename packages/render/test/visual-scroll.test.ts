@@ -50,6 +50,36 @@ describe('visual scroll (見た目の速度を時間圧縮から切り離す)', 
     expect(vs.deltaAt(0.52, focusAt(0.52))).toBeCloseTo(vs.deltaAt(0.52), 9);
   });
 
+  /**
+   * ★2026-10-01 オーナー「最後の直線で 芝が逆に動く・急に超高速・急に超スロー」:
+   *   ★上の網は「後ろへ戻らない（≧）」しか見ず、★跳びの直前に 芝が 3 コマ止まり 跳んだコマで 6 倍に跳ねるのを 素通りしていた
+   *   （★本番の見本のレースで実測: d≈44.6・止まって 1.6m/コマ）。★跳びの前後で ★芝の速さが ふだんの 0.5〜1.5 倍に収まること。
+   */
+  it('注視点が跳ぶ前後で、芝は止まらず 跳ねない（★毎コマの速さが ふだんの 0.5〜1.5 倍）', () => {
+    const JUMP_AT = 1.02;
+    const focusAt = (d: number): number => d * 30 + (d >= JUMP_AT ? 1150 : 0);
+    const samples = Array.from({ length: 61 }, (_, i) => ({
+      displaySec: i * 0.05, focusS: focusAt(i * 0.05), rate: i === 21 ? 40 : 1.8, anchorWeight: 0,
+    }));
+    const vs = buildVisualScroll(samples);
+    const normal = 30 / 1.8;
+    const step = 1 / 60;
+    let prev: number | null = null;
+    let checked = 0;
+    for (let d = 0.6; d <= 1.6; d += step) {
+      const f = focusAt(d);
+      const visual = f + vs.deltaAt(d, f);
+      if (prev !== null) {
+        const speed = (visual - prev) / step;
+        expect(speed, `d=${d.toFixed(3)} の芝の速さ`).toBeGreaterThan(normal * 0.5);
+        expect(speed, `d=${d.toFixed(3)} の芝の速さ`).toBeLessThan(normal * 1.5);
+        checked += 1;
+      }
+      prev = visual;
+    }
+    expect(checked, '★コマを 1 つも見ていない').toBeGreaterThan(30);
+  });
+
   it('anchor weight はゴール前 80m で 1、その手前 80m でなだらかに 0→1', () => {
     const course = ovalCourse(1600, { turn: 'left' });
     expect(broadcastV2AnchorWeight(course, 'finish-line', 1550)).toBe(1);
