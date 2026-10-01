@@ -81,6 +81,41 @@ describe('visual scroll (見た目の速度を時間圧縮から切り離す)', 
     expect(checked, '★コマを 1 つも見ていない').toBeGreaterThan(30);
   });
 
+  /**
+   * ★2026-10-02 本番 d=51.75 homestretch-side「急変」（★芝 -0.9m/秒・前のコマ 15.3m/秒）:
+   *   ★カメラの切り替わりで 注視点が 8m 跳ぶ（★30m 未満）→ ★Δ が刻みの中で 跳んだ分を打ち消し ★切り替わった後のコマで芝が止まった。
+   */
+  it('カメラの切り替わりで注視点が数 m 跳んでも、切り替わった後のコマで芝は止まらない（★毎コマ ふだんの 0.5〜1.5 倍）', () => {
+    const CUT_AT = 1.02;
+    const focusAt = (d: number): number => d * 16 + (d >= CUT_AT ? 8 : 0);
+    const make = (withCut: boolean) => buildVisualScroll(Array.from({ length: 61 }, (_, i) => ({
+      displaySec: i * 0.05, focusS: focusAt(i * 0.05), rate: 1.09, anchorWeight: 0,
+      cut: withCut && i === 21,
+    })));
+    const speeds = (vs: ReturnType<typeof buildVisualScroll>): number[] => {
+      const out: number[] = [];
+      const step = 1 / 60;
+      let prev: number | null = null;
+      for (let d = 0.6; d <= 1.6; d += step) {
+        const f = focusAt(d);
+        const visual = f + vs.deltaAt(d, f);
+        /** ★切り替わったコマ（★画面が変わるので 芝のつながりは見えない）は除く */
+        if (prev !== null && !(d - step < CUT_AT && d >= CUT_AT)) out.push((visual - prev) / step);
+        prev = visual;
+      }
+      return out;
+    };
+    const normal = 16 / 1.09;
+    const fixed = speeds(make(true));
+    expect(fixed.length, '★コマを見ていない').toBeGreaterThan(30);
+    for (const v of fixed) {
+      expect(v).toBeGreaterThan(normal * 0.5);
+      expect(v).toBeLessThan(normal * 1.5);
+    }
+    /** ★対照: ★切り替わりを知らせないと ★切り替わった後のコマで 芝が止まる（★本番の形） */
+    expect(Math.min(...speeds(make(false)))).toBeLessThan(normal * 0.5);
+  });
+
   it('anchor weight はゴール前 80m で 1、その手前 80m でなだらかに 0→1', () => {
     const course = ovalCourse(1600, { turn: 'left' });
     expect(broadcastV2AnchorWeight(course, 'finish-line', 1550)).toBe(1);

@@ -22,6 +22,14 @@ export interface VisualScrollSample {
   readonly rate: number;
   /** 0=見た目の速度で流す, 1=真の位置に一致させる（`broadcastV2AnchorWeight`） */
   readonly anchorWeight: number;
+  /**
+   * ★このサンプルで ★カメラが切り替わった（★前のサンプルと別のショット）。
+   *   ★切り替わりでは 注視点が ★数 m 跳ぶ（★ショットごとに構図が違う）。★30m 未満なので「跳び」と見なされず、
+   *   ★Δ がその刻みの中で 跳んだ分を少しずつ打ち消し、★切り替わった直後のコマで ★芝が止まる・わずかに逆へ動いた
+   *   （★2026-10-02 オーナー「今さっきのレースの芝の動きがおかしかった」・本番 d=51.75 homestretch-side「急変」-0.9m/秒）。
+   *   ★切り替わりの刻みは ★跳びと同じ扱い（★見た目の速さを保ち・★刻みの中は芝の位置そのものを補間）。
+   */
+  readonly cut?: boolean;
 }
 
 export interface VisualScroll {
@@ -44,6 +52,8 @@ export function buildVisualScroll(samples: readonly VisualScrollSample[]): Visua
   const times = new Float64Array(samples.length);
   const deltas = new Float64Array(samples.length);
   const focuses = new Float64Array(samples.length);
+  /** ★刻み（i−1→i）が「跳び」か（★注視点が 30m 超・★カメラの切り替わり） */
+  const jumpy = new Uint8Array(samples.length);
   for (let i = 0; i < samples.length; i++) focuses[i] = samples[i]!.focusS;
   times[0] = samples[0]!.displaySec;
   deltas[0] = 0;
@@ -65,7 +75,9 @@ export function buildVisualScroll(samples: readonly VisualScrollSample[]): Visua
      * ★跳びの隣の刻みも同じ扱い（★2026-10-01 の測り直し: ★跳びの後の刻みは rate が極端（★表示 1 秒あたり レース数十秒）で
      *   ★k ≈ 0 → ★芝が 約 0.1 秒 止まった）。★ふだんの rate は 0.7〜1.8 なので ★`VISUAL_SCROLL_SKIP_RATE` を超えたら 跳びと同じ。
      */
-    if ((Math.abs(df) > VISUAL_SCROLL_JUMP_M || rate > VISUAL_SCROLL_SKIP_RATE) && i >= 2) {
+    const cutHere = cur.cut === true && df !== 0;
+    if (Math.abs(df) > VISUAL_SCROLL_JUMP_M || cutHere) jumpy[i] = 1;
+    if ((Math.abs(df) > VISUAL_SCROLL_JUMP_M || cutHere || rate > VISUAL_SCROLL_SKIP_RATE) && i >= 2) {
       const prevVisual = (focuses[i - 1]! + deltas[i - 1]!) - (focuses[i - 2]! + deltas[i - 2]!);
       const prevDt = times[i - 1]! - times[i - 2]!;
       const dt = cur.displaySec - prev.displaySec;
@@ -93,7 +105,7 @@ export function buildVisualScroll(samples: readonly VisualScrollSample[]): Visua
        *     ★芝が 3 コマ止まって 跳んだコマで 毎秒 95m 相当に跳ねた（★本番の見本のレースで実測 d≈44.6）。
        *   ★新: ★芝の位置は 刻みの両端を まっすぐ結ぶ → ★注視点が どのコマで跳んでも 芝は止まらず 跳ねない（★09-29 の「1,000m 戻る」も起きない）。
        */
-      if (focusS !== undefined && Number.isFinite(focusS) && Math.abs(jump) > VISUAL_SCROLL_JUMP_M) {
+      if (focusS !== undefined && Number.isFinite(focusS) && (Math.abs(jump) > VISUAL_SCROLL_JUMP_M || jumpy[hi] === 1)) {
         const xLo = focuses[lo]! + deltas[lo]!;
         const xHi = focuses[hi]! + deltas[hi]!;
         return xLo + (xHi - xLo) * t - focusS;

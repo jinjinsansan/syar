@@ -2470,6 +2470,8 @@ function buildMotionTimeline(
     samples.push({
       displaySec: d, focusS: scene.focusS, rate: rate > 0 ? rate : 1,
       anchorWeight: broadcastV2AnchorWeight(course, scene.shot.id, scene.focusS),
+      /** ★カメラの切り替わり（★注視点が数 m 跳ぶ → ★跳びと同じ扱い・`visual-scroll.ts`） */
+      cut: lastShot !== undefined && lastShot !== scene.shot.id,
     });
     if (lastShot !== undefined && lastShot !== scene.shot.id) shotChanges.push({ displaySec: d, from: lastShot, to: scene.shot.id });
     lastShot = scene.shot.id;
