@@ -257,9 +257,9 @@ function VisionHead({ air, next, status, runners, left }: {
   </div>;
 }
 
+/** ★名前に距離が入っているときは足さない（★`raceLine` と同じ 1 か所で決める） */
 function raceLabel(row: RaceNoticeRow): string {
-  const surface = row.surface === 'turf' ? '芝' : row.surface === 'dirt' ? 'ダート' : row.surface;
-  return `${row.name}・${surface}${row.distance}m`;
+  return raceLine(row, '・');
 }
 
 /**

@@ -72,10 +72,15 @@ const card = (kind: string, rest: Partial<Omit<BoardItem, 'kind'>> = {}): BoardI
   kind, bracket: null, no: null, text: null, num: null, tail: null, tone: 'plain', badge: null, ...rest,
 });
 
-/** ★レース名 ・ 馬場距離（★R-20 の表「R12291 ・ 芝1600m」） */
-export function raceLine(race: Pick<TickerRace, 'name' | 'surface' | 'distance'>): string {
+/**
+ * ★レース名 ・ 馬場距離（★R-20 の表「R12291 ・ 芝1600m」）。
+ *   ⚠️ ★平場の名前は 2026-09-29 から ★距離を含む（`raceNameOf`「スターパーク 未勝利 芝1600m」）。
+ *     ★名前が距離で終わるときは ★足さない（★「芝3000m ・ 芝3000m」と二重に出ていた）。★重賞の名前には距離が無いので足す。
+ */
+export function raceLine(race: Pick<TickerRace, 'name' | 'surface' | 'distance'>, sep = ' ・ '): string {
   const surface = race.surface === 'turf' ? '芝' : race.surface === 'dirt' ? 'ダート' : race.surface;
-  return `${race.name} ・ ${surface}${race.distance}m`;
+  const course = `${surface}${race.distance}m`;
+  return race.name.endsWith(course) ? race.name : `${race.name}${sep}${course}`;
 }
 
 /** ★残り秒を「0:48」の形に（★1 分未満の札だけ） */

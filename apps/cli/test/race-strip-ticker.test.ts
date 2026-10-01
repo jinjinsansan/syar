@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  BOARD_ITEM_SEC, bracketOrNull, tickerBoard, tickerCountdown, tickerItems, tickerShowsField, type TickerRace,
+  BOARD_ITEM_SEC, bracketOrNull, raceLine, tickerBoard, tickerCountdown, tickerItems, tickerShowsField, type TickerRace,
 } from '../../web/src/components/uma/race-strip-ticker';
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -123,5 +123,22 @@ describe('★帯の掲示板', () => {
     expect(STRIP).toMatch(/<\/span>\}\s*\{tickerOn && next && data && nowMs !== null\s*&& <StripBoard /);
     expect(CSS).toMatch(/\.u-race-strip-main > \.u-race-strip-nextchip \{[^}]*flex: 0 0 auto;/);
     expect(CSS, '★札が動く').not.toMatch(/\.u-race-strip-nextchip[^{]*\{[^}]*animation:/);
+  });
+});
+
+describe('★レース名と距離を二重に出さない（★2026-10-01）', () => {
+  it('① ★平場の名前は距離で終わる（raceNameOf）→ ★足さない ／ ★重賞・旧い番号の名前 → ★足す', () => {
+    expect(raceLine({ name: 'スターパーク 未勝利 芝3000m', surface: 'turf', distance: 3000 })).toBe('スターパーク 未勝利 芝3000m');
+    expect(raceLine({ name: 'スターパーク 1勝クラス ダート1800m', surface: 'dirt', distance: 1800 }, '・')).toBe('スターパーク 1勝クラス ダート1800m');
+    expect(raceLine({ name: '星河賞', surface: 'turf', distance: 2400 })).toBe('星河賞 ・ 芝2400m');
+    expect(raceLine({ name: 'R12291', surface: 'turf', distance: 1600 })).toBe('R12291 ・ 芝1600m');
+  });
+
+  it('② ★名前の距離と馬場が違うときは足す（★取り違えを隠さない）', () => {
+    expect(raceLine({ name: 'スターパーク 未勝利 芝1600m', surface: 'turf', distance: 2000 })).toBe('スターパーク 未勝利 芝1600m ・ 芝2000m');
+  });
+
+  it('③ ★帯の「確定」の札も同じ 1 か所（raceLine）を通る', () => {
+    expect(STRIP).toMatch(/function raceLabel[^{]*\{\s*return raceLine\(/);
   });
 });
