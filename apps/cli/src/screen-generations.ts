@@ -151,9 +151,9 @@ export const SCREENS: readonly ScreenRecord[] = [
   { route: '/stable/name', verdict: 'rebuilt', why: '★仔の命名。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
   { route: '/stable/roles', verdict: 'rebuilt', why: '★引退後の役割。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
   { route: '/stable/retired', verdict: 'rebuild', why: RESKIN_0929 + '★引退馬の一覧' },
-  { route: '/stable/market', verdict: 'rebuild', why: RESKIN_0929 + '✅ ★2026-09-26 に ★**実データへ繋ぎました**（★`market-screen`）。'
-    + '★D-122 ④「空の店へ送らない」は ★満たしました（★出品が 0 のときは そう言います）。'
-    + '🔴 ★**見た目は仮**（★依頼 R-17）— ★値段 14 通り × ほぼ 1 頭で ★旧い「帯 × 3 口」の前提が崩れている' },
+  { route: '/stable/market', verdict: 'rebuilt', why: '★馬市場。★2026-09-26 に実データへ繋いだ（★`market-screen`）。'
+    + '★2026-10-01 に ★馬物語の部品（Backdrop・TopBar・RaceStrip・金枠の板・BigButton）へ移した（★オーナー「馬を買うと古いデザイン」・★新しい意匠なし・★買う処理は変えていない）。'
+    + '★戻り額の赤い帯・★戦績だけ・★煽らない は そのまま。★デザイナーの正式な見た目は ★依頼 R-17' },
   /**
    * ★以下の 5 枚は ★**裁定の手順（§6）を流して決めました**（2026-09-25）。
    *   ★① 依存を測る → ★② 入口を数える → ★③ 片方が見本なら本物を残して転送
