@@ -107,6 +107,55 @@ try {
   console.log('  ③ 頭数の分布:');
   for (const [k, v] of [...total.fields].sort((a, b) => a[0] - b[0])) console.log(`     ${String(k).padStart(2)} 頭  ${String(v).padStart(5)} レース（${pct(v, total.races)}）`);
   console.log(`     ★8 頭立て: ${total.fields.get(8) ?? 0} レース`);
+  /**
+   * ★⑤ **8 頭未満のレース**（★2026-10-01・裁定 §8）: ★取消で減ったのか（★仕様どおり）・★組んだ時点から少ないのか（★欠陥）。
+   *   ★取消の出走は `finish_pos` が空のまま残る → ★登録の数（取消を含む）と 走った数を並べる。
+   */
+  const small = (await c.query(`
+    select r.id::text as race_id, r.scheduled_at, count(*)::int as entered, count(e.finish_pos)::int as ran
+      from races r join race_entries e on e.race_id = r.id
+     where r.status = 'settled'
+     group by r.id, r.scheduled_at
+    having count(e.finish_pos) < 8
+     order by r.scheduled_at`)).rows;
+  console.log('');
+  console.log(`【⑤ 走った頭数が 8 未満のレース】${small.length} 件（★期間を問わず）`);
+  for (const s of small) {
+    console.log(`  ${jstDay(new Date(s.scheduled_at))} ${s.race_id.slice(0, 8)}  登録 ${s.entered} 頭・走った ${s.ran} 頭 → ${s.entered >= 8 ? '★取消で減った（仕様どおり）' : '🔴 組んだ時点から 8 頭未満'}`);
+  }
+
+  /**
+   * ★⑥ **素質（potential）のレース内 CV**（★裁定 §8: ★能力の CV が「どこで止まるか」）。
+   *   ★素質は `horses.potential`（★いまの値。★素質は故障でしか下がらないので ★当時とほぼ同じ）。★能力と同じ `baseScore(・, 距離)`。
+   *   ★表示には出さない値（D-114）。★ここは開発側の測定だけ。
+   */
+  const pot = (await c.query(`
+    select r.id::text as race_id, r.scheduled_at, r.distance, h.potential
+      from races r
+      join race_entries e on e.race_id = r.id
+      join horses h on h.id = e.horse_id
+     where r.status = 'settled' and e.finish_pos is not null`)).rows;
+  const potByRace = new Map();
+  for (const r of pot) {
+    let x = potByRace.get(r.race_id);
+    if (x === undefined) { x = { at: new Date(r.scheduled_at), dist: Number(r.distance), scores: [] }; potByRace.set(r.race_id, x); }
+    if (r.potential !== null && typeof r.potential === 'object') x.scores.push(baseScore(r.potential, x.dist));
+  }
+  const potDays = new Map();
+  for (const x of potByRace.values()) {
+    const v = cv(x.scores);
+    if (v === null) continue;
+    const d = jstDay(x.at);
+    if (!potDays.has(d)) potDays.set(d, []);
+    potDays.get(d).push(v);
+  }
+  console.log('');
+  console.log('【⑥ 素質（potential）のレース内 CV】★能力の CV が向かう先（★7.5〜8% なら底・★6% 以下ならまだ下がる＝裁定 §8）');
+  console.log('  日付        レース  素質のCV   能力のCV（上の表と同じ）');
+  for (const [d, vs] of [...potDays].sort()) {
+    console.log(`  ${d}  ${String(vs.length).padStart(6)}  ${meanPct(vs).padStart(8)}  ${meanPct(days.get(d)?.cvs ?? []).padStart(8)}`);
+  }
+
   console.log('');
   if (total.races < 2000) console.log(`  ⚠️ ★まだ ${total.races} レース（★2,000 未満）。★線（28.5%）での判定は まだしない（★裁定）。`);
   else console.log(p >= 0.285 ? '  ✔ ★V-4 は 28.5% 以上（★模型のずれは余裕の中・裁定の線）' : '  🔴 ★V-4 が 28.5% 未満（★世界が下限を割っている → 較正の見直し・オーナーへ）');
