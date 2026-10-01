@@ -794,8 +794,9 @@ function RaceStripBody(): React.ReactElement | null {
             onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') openExpanded(); } } : {})}>
           {channelEl}
           {stageEl}
-          {!expanded && <button type="button" className="u-tvstrip-expand" onClick={(e) => { e.stopPropagation(); openExpanded(); }}>拡大</button>}
         </div>
+        {/* ★「拡大」は ★画面の外（★下の段の右）。★画面に重ねると 番組の文字に被る（★2026-10-02 オーナー「拡大ボタンが色々な文字の上に被っています」） */}
+        {!expanded && <button type="button" className="u-tvstrip-expand" onClick={(e) => { e.stopPropagation(); openExpanded(); }}>拡大</button>}
         {channelFullEl}
         {error && <span className="u-race-strip-error">更新できません</span>}
         {size === 'big' && embedNote !== null && <span className="u-race-strip-error" role="status">{embedNote}</span>}

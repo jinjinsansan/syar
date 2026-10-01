@@ -98,7 +98,7 @@ describe('★④ ★誤った「あなたの馬」を言わない（★09-27 §6
   });
 
   it('🔴 ★自分の馬の言葉は `myGates` が在って その馬番が入っているときだけ（★わからなければ出さない）', async () => {
-    const { ownRecentLine } = await import('../../web/src/components/uma/strip-channel.js');
+    const { ownRecentLine } = await import('../../web/src/components/uma/broadcast-program.js');
     const runners = [
       { gate: 3, name: 'ウマC', strategy: 'senko' as const, finishSec: 96, finishPosition: 2, horseId: 'h3' },
       { gate: 5, name: 'ウマE', strategy: 'sashi' as const, finishSec: 95, finishPosition: 1, horseId: 'h5' },

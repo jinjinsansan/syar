@@ -33,7 +33,7 @@ const makeReadClient = (url: string, key: string) => createClient(url, key, {
 });
 let browserReadClient: ReturnType<typeof makeReadClient> | null = null;
 let browserAuthClient: ReturnType<typeof makeAuthClient> | null = null;
-const inBrowser = (): boolean => typeof window !== 'undefined';
+const inBrowser = (): boolean => 'window' in globalThis;
 
 export function readClient() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL'];

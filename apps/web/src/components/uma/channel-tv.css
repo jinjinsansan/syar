@@ -272,7 +272,8 @@
     🔴 ★2026-10-01: ★舞台の高さを決めずに 馬を「舞台の 100%」にしていて ★高さ 0 ＝ 馬が消えた（オーナー指摘）。
     ★舞台の高さを 指定どおり 230px（★縦が短い端末は 150px）に固定し、★馬はその高さに合わせる。
   */
-  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-field { flex: 0 0 auto; height: 230px; min-height: 0; align-items: flex-end; }
+  /* ★2026-10-02: ★「拡大」を画面の下の段へ出した分（★30px）だけ ★舞台を縮める（230 → 200・★短い端末は 150 → 120 ＝ README の最小） */
+  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-field { flex: 0 0 auto; height: 200px; min-height: 0; align-items: flex-end; }
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-horse {
     width: auto !important; height: 100%; max-width: 100%; margin-bottom: 0 !important;
   }
@@ -304,18 +305,20 @@
   [data-theme='uma'].u-home .u-topbar-end { margin-left: 0; }
 }
 @media (max-width: 1023px) and (max-height: 759px) {
-  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-field { height: 150px; }
+  [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-field { height: 120px; }
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > * { min-height: 48px !important; }
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > :nth-child(-n + 2) { min-height: 60px !important; }
 }
 
-/* ★スマホの「拡大」（★テレビの右下・下の帯の上・★当たりは 44px） */
+/*
+  ★スマホの「拡大」は ★画面の外・★枠の下の段の右（★2026-10-02 オーナー「拡大ボタンが色々な文字の上に被っています」）。
+  ★画面に重ねると ★番組（出馬表・オッズ・紹介）の文字にも ★本編の文字にも被る。★高さ 26px・★横は 44px 以上。
+*/
+[data-theme='uma'] .u-race-strip.u-tvstrip-full { flex-direction: column; gap: 4px; }
 [data-theme='uma'] .u-tvstrip-expand {
-  position: absolute; right: 6px; bottom: 24px; z-index: 5; min-width: 44px; min-height: 30px; padding: 0 12px;
+  align-self: flex-end; flex: 0 0 auto; min-width: 64px; height: 26px; padding: 0 12px; line-height: 22px;
   border: 2px solid var(--u-gold); border-radius: 999px; background: rgba(6, 26, 51, .85); color: var(--u-ink-light); font-size: 12px;
 }
-/* ★PC の「拡大」は ★テレビの右下（★下の帯にかからない） */
-[data-theme='uma'] .u-race-strip-vision > .u-race-strip-expand { margin-bottom: 28px !important; }
 
 /*
   ★**拡大したテレビ**（★本編が無い間・★2026-10-01）: ★PC の大きさ（406×228）で描いて ★画面いっぱいへ拡げる。

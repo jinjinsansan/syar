@@ -306,3 +306,13 @@ export function resolveShow(now: ChannelNow, d: ShowData): ChannelNow {
   if (now.show === 'result' && d.venue) return { ...now, show: 'venue', key: `${now.key}:venue` };
   return { ...now, show: d.fieldReady ? 'narr' : 'ident', narr: d.fieldReady ? 'field' : null, key: `${now.key}:alt` };
 }
+
+/**
+ * ★**直前の結果に 自分の馬の着順を 1 行**（★R-28 §3・★着順は記録の `finishPosition`・★自分の馬かは `myGates` だけ）。
+ *   ★わからない（`null`）・出ていないなら ★出さない。★複数頭なら いちばん上の着順。
+ */
+export function ownRecentLine(runners: readonly { readonly gate: number; readonly name: string; readonly finishPosition: number }[], recentId: string | null, myGates: ReadonlySet<string> | null): string | null {
+  if (recentId === null || myGates === null) return null;
+  const mine = runners.filter((r) => myGates.has(`${recentId}:${r.gate}`)).sort((a, b) => a.finishPosition - b.finishPosition)[0];
+  return mine === undefined ? null : `あなたの馬 ${mine.gate}番 ${mine.name} は ${mine.finishPosition}着`;
+}
