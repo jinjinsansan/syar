@@ -255,6 +255,20 @@
     width: min(calc(100dvh - 64px), calc(100vw * 16 / 9)); max-width: none; transform: rotate(90deg);
   }
 }
+/*
+  ★**横に持った携帯は 見出しの 64px を取らない**（★2026-10-02 オーナー「iPhone 実機で 拡大して横向きにしても 画面中央で横向きになるだけ」）。
+  ★iPhone は 全画面（Fullscreen API）に入れず、★横では高さが 330px 前後 → ★64px を引くと 映像が 6 割の大きさで真ん中に出ていた。
+  ★高さを全部 映像に使い、★見出しは ★映像の上に重ねる（★題は隠し ★「小窓に戻す」だけ右上）。
+*/
+@media (orientation: landscape) and (pointer: coarse) {
+  [data-theme='uma'] .u-race-strip-stage-full .u-race-strip-embed { width: min(100vw, calc(100dvh * 16 / 9)); }
+  [data-theme='uma'] .u-race-strip-stage-full .u-race-strip-stage-head {
+    z-index: 2; justify-content: flex-end; pointer-events: none;
+    padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 0 10px;
+  }
+  [data-theme='uma'] .u-race-strip-stage-full .u-race-strip-stage-head > :not(button) { display: none; }
+  [data-theme='uma'] .u-race-strip-stage-full .u-race-strip-stage-head button { pointer-events: auto; min-height: 36px; }
+}
 [data-theme='uma'] .u-race-strip-stage-head {
   position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: max(8px, env(safe-area-inset-top)) 14px 8px; color: var(--u-ink-light);
@@ -494,10 +508,11 @@
   position: relative; flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
   padding: 12px 14px 0; width: 100%; max-width: 1220px; margin: 0 auto;
 }
-[data-theme='uma'] .u-topbar-logo { display: flex; align-items: baseline; gap: 8px; padding: 7px 12px; }
+/* ★ロゴの板は ★縮めず 折り返さない（★2026-10-02 オーナー「馬物語の金色の板の改行がおかしい・端末によって」: ★幅の狭い端末で板が縮み「馬物語」が 2 行に割れていた） */
+[data-theme='uma'] .u-topbar-logo { display: flex; flex: 0 0 auto; align-items: baseline; gap: 8px; padding: 7px 12px; white-space: nowrap; }
 [data-theme='uma'] .u-topbar-logo-name { font-size: 19px; letter-spacing: .04em; }
 [data-theme='uma'] .u-topbar-logo-sub { font-size: 10px; letter-spacing: .16em; color: #6b4d06; }
-[data-theme='uma'] .u-topbar-back { display: flex; align-items: center; min-height: 44px; padding: 0 13px; font-size: 13px; white-space: nowrap; }
+[data-theme='uma'] .u-topbar-back { display: flex; flex: 0 0 auto; align-items: center; min-height: 44px; padding: 0 13px; font-size: 13px; white-space: nowrap; }
 [data-theme='uma'] .u-topbar-title { flex: 0 0 auto; font-size: 19px; white-space: nowrap; text-shadow: 0 2px 0 rgba(10, 35, 64, .6); }
 [data-theme='uma'] .u-topbar-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 /* ★上段のカプセルは ★PC だけ（★スマホは 画面の いつもの段 `.u-points-row`） */

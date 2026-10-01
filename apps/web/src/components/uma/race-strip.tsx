@@ -683,13 +683,20 @@ function RaceStripBody(): React.ReactElement | null {
     return () => { document.removeEventListener('fullscreenchange', onChange); };
   }, []);
   /** ★拡大した全画面のテレビの倍率（★画面の大きさから・★縦持ちで全画面に入れない端末は 90 度回す） */
-  const [fullTv, setFullTv] = useState<{ readonly scale: number; readonly rotate: boolean }>({ scale: 1, rotate: false });
+  const [fullTv, setFullTv] = useState<{ readonly scale: number; readonly rotate: boolean; readonly land: boolean }>({ scale: 1, rotate: false, land: false });
   useEffect(() => {
     if (!expanded) return undefined;
     const fit = (): void => {
-      const vw = window.innerWidth, vh = window.innerHeight - 64;
-      const rotate = vh > vw && window.matchMedia('(pointer: coarse)').matches;
-      setFullTv({ rotate, scale: rotate ? Math.min(vh / 406, vw / 228) : Math.min(vw / 406, vh / 228) });
+      const coarse = window.matchMedia('(pointer: coarse)').matches;
+      /**
+       * ★**横に持った携帯は 見出しの 64px を取らない**（★2026-10-02 オーナー「iPhone 実機で 拡大して横向きにしても 画面中央で横向きになるだけ」）。
+       *   ★iPhone は ★全画面（Fullscreen API）に入れない ＋ ★横では高さが 330px 前後しか無い → ★64px を引くと 6 割の大きさで真ん中に出ていた。
+       *   ★横の携帯は ★高さを全部使い、★「小窓に戻す」は ★映像の上に重ねる（★CSS `.u-tv-full-land`）。
+       */
+      const land = coarse && window.innerWidth > window.innerHeight;
+      const vw = window.innerWidth, vh = window.innerHeight - (land ? 0 : 64);
+      const rotate = vh > vw && coarse;
+      setFullTv({ land, rotate, scale: rotate ? Math.min(vh / 406, vw / 228) : Math.min(vw / 406, vh / 228) });
     };
     fit();
     window.addEventListener('resize', fit);
@@ -731,7 +738,7 @@ function RaceStripBody(): React.ReactElement | null {
    * ★**拡大したテレビ**（★本編が無い間・★2026-10-01）: ★同じ番組を ★PC の大きさで描いて 画面いっぱいに拡げる。
    *   ★本編がある間は ★本編の箱（`stageEl`）が全画面になる（★こちらは出さない）。
    */
-  const channelFullEl = expanded && embed === null && tvMode !== null && nowMs !== null ? <div className="u-tv-full" role="dialog" aria-modal aria-label="中継番組">
+  const channelFullEl = expanded && embed === null && tvMode !== null && nowMs !== null ? <div className={`u-tv-full${fullTv.land ? ' u-tv-full-land' : ''}`} role="dialog" aria-modal aria-label="中継番組">
     <div className="u-tv-full-head">
       <strong>馬物語ch</strong>
       <button type="button" onClick={closeExpanded} aria-label="小窓に戻す">小窓に戻す</button>

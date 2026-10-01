@@ -337,5 +337,10 @@
 [data-theme='uma'] .u-tv-full-screen { width: 406px; height: 228px; flex: 0 0 auto; margin-top: 32px; transform: scale(var(--tv-full-scale, 1)); }
 [data-theme='uma'] .u-tv-full-screen.u-tv-full-rotate { margin-top: 0; transform: rotate(90deg) scale(var(--tv-full-scale, 1)); }
 [data-theme='uma'] .u-tv-full-screen > .u-tv { width: 406px; }
+/* ★横に持った携帯（★2026-10-02）: ★高さを全部 映像に・★見出しは ★映像の上に重ねる（★題は隠し ★「小窓に戻す」だけ右上に） */
+[data-theme='uma'] .u-tv-full-land .u-tv-full-screen { margin-top: 0; }
+[data-theme='uma'] .u-tv-full-land .u-tv-full-head { padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 0 10px; justify-content: flex-end; pointer-events: none; }
+[data-theme='uma'] .u-tv-full-land .u-tv-full-head > strong { display: none; }
+[data-theme='uma'] .u-tv-full-land .u-tv-full-head button { pointer-events: auto; background: rgba(6, 26, 51, .8); }
 
 [data-theme='uma'] .u-tvstrip > .u-race-strip-error { position: absolute; left: 6px; bottom: -18px; font-size: 11px; }
