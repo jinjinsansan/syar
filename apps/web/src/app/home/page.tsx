@@ -23,6 +23,7 @@ import {
 import { RaceStrip } from '../../components/uma/race-strip';
 import { FoalInvite } from '../../components/uma/foal-invite';
 import { useStableView } from '../../components/uma/use-stable-view';
+import { NoHorseCard } from '../../components/uma/no-horse-card';
 
 /** ★調子の段の数（★5 分割・資料 §8-2） */
 const CONDITION_STEPS = 5;
@@ -87,27 +88,15 @@ export default function HomePage(): React.ReactElement {
           {horses.length > 1 && <>
             <button type="button" onClick={() => { move(-1); }} aria-label="前の馬" style={arrow('left')}>‹</button>
             <button type="button" onClick={() => { move(1); }} aria-label="次の馬" style={arrow('right')}>›</button>
-          </>}</> : view ? <span>持ち馬はまだいません</span> : !loading && (
-            <div role={needsSetup || needsLogin ? 'status' : 'alert'} style={{
-              width: '100%', maxWidth: 520, padding: '24px 22px', borderRadius: 16,
-              border: '2px solid var(--u-gold)', background: 'rgba(8,18,8,.84)',
-              color: 'var(--u-ink)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 14,
-            }}>
-              <strong style={{ fontSize: 22, lineHeight: 1.4 }}>
-                {needsSetup ? '牧場をはじめましょう' : needsLogin ? 'ログインして牧場を見る' : '厩舎を読み込めませんでした'}
-              </strong>
-              <span style={{ fontSize: 14, lineHeight: 1.7 }}>
-                {needsSetup ? 'メール確認とログインができました。牧場名を決めて、最初の馬を迎えましょう。' : needsLogin ? 'アカウントにログインすると、持ち馬やポイントを確認できます。' : error}
-              </span>
-              {needsSetup ? <BigButton tone="gold" label="牧場の初回設定へ" href="/setup" grow="0 0 auto" />
-                : needsLogin ? <BigButton tone="gold" label="ログインへ" href="/login" grow="0 0 auto" />
-                  : <button type="button" onClick={refresh} style={{ minHeight: 48, borderRadius: 10, border: '2px solid var(--u-gold)', background: 'var(--u-gold)', color: '#172514', fontSize: 16, fontWeight: 900 }}>もう一度読み込む</button>}
-            </div>
+          </>}</> : !loading && (
+            /** ★馬がいない・入れない（★2026-10-01・オーナー「馬がいない状態を UI で工夫して」）。★育成モードと同じカード */
+            <NoHorseCard needsLogin={needsLogin} needsSetup={needsSetup} error={view === null ? error : null} onRetry={refresh} />
           )}
         </div>
 
         {/* ★馬名プレート（★名前・属性・調子・現在位置） */}
-        {(view || loading) && <div style={{
+        {/* ★馬がいないときは 名前の板を出さない（★旧: 真ん中と 2 か所に「持ち馬はまだいません」） */}
+        {(horse !== null || loading) && <div style={{
           display: 'flex', alignItems: 'center', gap: 10, width: '100%', maxWidth: 520, marginTop: 6,
           padding: '7px 12px', border: '2px solid rgba(246,194,28,.5)', borderRadius: 12, background: 'rgba(10,35,64,.82)',
         }}>

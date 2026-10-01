@@ -27,6 +27,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Backdrop, BigButton, NOTICE_ACTION, OwnHorseFigure, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
 import { RaceStrip } from '../../components/uma/race-strip';
 import { useStableView } from '../../components/uma/use-stable-view';
+import { NoHorseCard } from '../../components/uma/no-horse-card';
 import { TRAINING_MENUS } from '../../lib/game-demo';
 import { sendTrainingOrder } from '../../lib/training-order';
 import { conditionView, fatigueStepOf, sortStable, trainFaceOf, type StableHorse, type TrainFace } from '../../lib/stable';
@@ -91,7 +92,7 @@ const GAUGE_WORD: React.CSSProperties = { fontSize: 12, color: '#e6eef6', whiteS
 
 export default function TrainPage(): React.ReactElement {
   const [paused, toggle] = useMotionPaused();
-  const { view, loading, error, refresh } = useStableView();
+  const { view, loading, error, needsSetup, needsLogin, refresh } = useStableView();
   /** ★選んでいるメニューの id（★名簿の並びから引く・★画面で番号を発明しない） */
   const [menuId, setMenuId] = useState<string>(TRAINING_MENUS[0]!.id);
   const spec = TRAINING_MENUS.find((m) => m.id === menuId) ?? TRAINING_MENUS[0]!;
@@ -155,10 +156,11 @@ export default function TrainPage(): React.ReactElement {
 
   if (horse === null) return <div data-theme="uma" data-page-body style={{ minHeight: '100dvh', background: 'var(--u-navy)' }}>
     <Backdrop /><TopBar title="育成モード" paused={paused} onToggle={toggle} /><RaceStrip />
-    <TextPanel role={error ? 'alert' : 'status'} style={{ padding: 16 }}>
-      {loading ? '厩舎を読み込み中…' : error ?? 'まだ持ち馬がいません。'}
-      <div style={{ display: 'flex', gap: 12, marginTop: 12 }}><a href="/login">ログイン</a><a href="/setup">はじめての 1 頭を迎える</a><button type="button" onClick={refresh} style={NOTICE_ACTION}>再読み込み</button></div>
-    </TextPanel>
+    {/* ★馬がいない・入れない（★2026-10-01・オーナー「ログインしているのにログインがあるのはおかしい」）。★ホームと同じカード */}
+    {loading ? <TextPanel role="status" style={{ padding: 16 }}>厩舎を読み込み中…</TextPanel>
+      : <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 14px' }}>
+        <NoHorseCard needsLogin={needsLogin} needsSetup={needsSetup} error={view === null ? error : null} onRetry={refresh} />
+      </div>}
   </div>;
   const cond = conditionView(horse.condition);
   const fat = fatigueStepOf(horse.fatigue);
