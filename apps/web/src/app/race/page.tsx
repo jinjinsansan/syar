@@ -338,24 +338,41 @@ let stripExpanded = false;
 function stripQuiet(): boolean { return EMBED_STRIP && !stripExpanded; }
 
 /**
- * ★**芝が後ろへ動いた／速さが跳んだ瞬間を console に残す**（★2026-10-01・オーナー「最後の直線で 芝が逆に動く・異常に速く・急に遅く」）。
+ * ★**芝の動きの違和感を console に残す**（★2026-10-01・オーナー「最後の直線で 芝が逆に動く・異常に速く・急に遅く」
+ *   「逆だけでなく 急に超高速・急に超スロー・急に違和感がある なども全てチェック」）。
  *   ★いつ起きるか分からないので ★手で記録を始められない（★オーナー指摘）→ ★画面が 自分で見つけて 1 行ずつ残す。
- *   ★芝の模様の位置 ＝ 注視点（focusS）＋ 補正（visualDelta）。★同じ場面の中で ★前のコマより後ろ（−0.05m より）か ★毎秒 40m を超えたら。
- *   ★場面が切り替わった瞬間（★リプレイ等）は 数えない。★描画には何も足さない（★読むだけ）。★同じ場面では 0.5 秒に 1 行まで。
- *   ★console の検索欄に `race-ground` で拾える（★小窓の中の本編の行も出る）。
+ *   ★芝の模様の位置 ＝ 注視点（focusS）＋ 補正（visualDelta）。★見つけるもの（★同じ場面の中だけ・★場面の切り替わりは数えない）:
+ *     ★逆走 … 前のコマより後ろ（−0.05m より）
+ *     ★超高速 … 毎秒 30m を超える（★ふだんは 10〜20m）
+ *     ★超スロー … それまで毎秒 8m 以上で流れていたのに 毎秒 4m 未満
+ *     ★急変 … 1 コマで 速さが前のコマから 半分以上（★かつ 5m 以上）変わる
+ *     ★コマ落ち … 描き直しの間が 120ms 以上（★レースが 0.1 秒以上 進んだときだけ・★一時停止から戻った直後は数えない）
+ *   ★描画には何も足さない（★読むだけ）。★同じ種類は 0.5 秒に 1 行まで。★console の検索欄に `race-ground` で拾える（★小窓の中の本編の行も出る）。
+ *   ⚠️ ★壁時計（performance.now）は ★コマ落ちの記録にだけ使う（★描く位置・着順には使わない・憲法 4）。
  */
-let groundPrev: { readonly d: number; readonly shot: string; readonly x: number; readonly f: number; readonly v: number } | null = null;
-let groundLastWarnD = -Infinity;
+let groundPrev: { readonly d: number; readonly shot: string; readonly x: number; readonly f: number; readonly v: number; readonly speed: number | null; readonly wall: number } | null = null;
+const groundLastWarn = new Map<string, number>();
 function noteGroundJump(d: number, shot: string, focusS: number, visualDelta: number, raceId: string | null): void {
   const x = focusS + visualDelta;
+  const wall = performance.now();
   const prev = groundPrev;
-  groundPrev = { d, shot, x, f: focusS, v: visualDelta };
-  if (prev === null || prev.shot !== shot || !(d > prev.d) || d - prev.d > 0.5) return;
+  const dd = prev === null ? 0 : d - prev.d;
+  const sameShot = prev !== null && prev.shot === shot && dd > 0 && dd <= 0.5;
+  const speed = sameShot && dd >= 0.005 ? (x - prev.x) / dd : null;
+  groundPrev = { d, shot, x, f: focusS, v: visualDelta, speed, wall };
+  if (prev === null || !sameShot) return;
   const dx = x - prev.x;
-  const speed = dx / (d - prev.d);
-  if (!(dx < -0.05 || Math.abs(speed) > 40) || d - groundLastWarnD < 0.5) return;
-  groundLastWarnD = d;
-  console.warn(`[race-ground] race=${raceId ?? 'demo'} d=${d.toFixed(2)} 場面=${shot} 芝の動き=${dx.toFixed(2)}m（毎秒 ${speed.toFixed(1)}m） 注視点=${(focusS - prev.f).toFixed(2)} 補正=${(visualDelta - prev.v).toFixed(2)}`);
+  const kinds: string[] = [];
+  if (dx < -0.05) kinds.push('逆走');
+  if (speed !== null && speed > 30) kinds.push('超高速');
+  if (speed !== null && prev.speed !== null && prev.speed >= 8 && speed < 4 && speed >= 0) kinds.push('超スロー');
+  if (speed !== null && prev.speed !== null && Math.abs(speed - prev.speed) > Math.max(5, Math.abs(prev.speed) * 0.5)) kinds.push('急変');
+  if (dd >= 0.1 && wall - prev.wall >= 120) kinds.push('コマ落ち');
+  for (const kind of kinds) {
+    if (d - (groundLastWarn.get(kind) ?? -Infinity) < 0.5) continue;
+    groundLastWarn.set(kind, d);
+    console.warn(`[race-ground] ${kind} race=${raceId ?? 'demo'} d=${d.toFixed(2)} 場面=${shot} 芝の動き=${dx.toFixed(2)}m（毎秒 ${speed === null ? '—' : speed.toFixed(1)}m・前のコマ 毎秒 ${prev.speed === null ? '—' : prev.speed.toFixed(1)}m） 注視点=${(focusS - prev.f).toFixed(2)} 補正=${(visualDelta - prev.v).toFixed(2)} 描き直しの間=${Math.round(wall - prev.wall)}ms`);
+  }
 }
 /**
  * ★**小窓では 斜め前の馬を読まない**（★2026-09-28・レビュー側の決定・★実測 1.72MB）。★150px の小窓では 正面寄りのショットも ★真横の素材で描く
