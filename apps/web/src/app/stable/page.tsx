@@ -1,38 +1,43 @@
 'use client';
 
 /**
- * 🔴 ★**2026-09-20: ★本物のデータに繋ぎました**（★オーナー指示「データ繋ぐのは OK です」）。
+ * ★**わたしの馬**（★持ち馬の一覧）— ★引き渡し資料 R-26 **D26-3 ①**（`out/r26/design_handoff_r26/README.md`・見本 `R26Screen.dc.html` の `stable`）
  *
- *   ⚠️ ★**見た目は 1 行も変えていません。** ★変えたのは ★**どこからデータを取るか**だけです。
- *   ★`'use client'` にした理由: ★`my_horses` は ★**ログインした本人の行だけ**を返すので
- *     （★`where owner_id = auth.uid()`）、★セッションを持つ側で読む必要があります。
- *     ★`/entry` も同じ作りです。
+ * 【★2026-10-01: ★馬物語の部品で組み直しました】（★R-26）
+ *   ★`Backdrop`・`TopBar`（‹ 戻る → `/home`）・`RaceStrip`・★紙のカード・★下段の `BigButton`。
+ *   ★`shell-routes.ts` の `OWN_HEADER` に入れて ★白い旧い枠を外しました。
+ *   ★外したもの（★🔴 直すこと）:
+ *     ① ★4 枚のカード（★アカウント・わたしの牧場・開催状況・ショートカット）— ★ホームと重なる
+ *     ② ★「週を進める」（★R-24）
+ *     ③ ★疲労のバーと ★「今週の消費予定 n EP」 → ★疲れは 3 段の言葉
+ *     ④ ★厩舎の格の板（`StableGradePanel`）→ ★1 頭の詳細へ移す（★この画面からは外すだけ）
+ *   ★変えていないもの: ★読み込み（`supabaseStableRepo.stable()`・★`useStableView` 経由）・★`sortStable` の並び・★行き先。
  *
- * 🔴 ⚠️ ★**2026-09-25: ★見本に落とす経路を外しました**（★裁定 `REVIEW_OWNER_SCOPE_AND_STUD_FEE_20260925.md` §2）。
- *   ★以前は ★「読めなかったら見本に落とし、★`view.demo` が true になって ★**帯が出る**」形で、
- *   ★★「帯が出る＝本物が来ていない」を目印にする、と ★ここに書いてありました（★`CK-14`）。
- *   🔴 ★その目印は ★**もう出ません。** ★`supabaseStableRepo` は ★常に `demo: false` を返し、
- *     ★`demoStableRepo` は ★この面から ★呼ばれなくなりました。
- *     → ★**下の `view.demo` の帯は、いまは出ない側です**（★型のために残してあります）。
- *   ★★いまの目印は ★**「ログインしてください」の字**（★未ログイン）と
- *     ★**「厩舎を読めませんでした: …」の枠**（★失敗）です。★どちらも ★馬を出しません。
+ * 🔴 ★**見本に落とさない**（★2026-09-25・裁定 `REVIEW_OWNER_SCOPE_AND_STUD_FEE_20260925.md` §2）。
+ *   ★未ログイン・牧場がまだ・読めなかった・0 頭は ★`NoHorseCard`（★D26-2・ホームと育成モードと同じ）。★馬は出しません。
  *
- *   ★なぜ変えたか: ★未ログインの人に ★**見本の馬が「あなたの厩舎」として出ていました**（★本番で）。
- *     ★帯は出ていましたが、★**馬の一覧そのものが嘘**でした（★誰のデータかを偽る）。
+ * 【★この画面が持たないもの】
+ *   ⚠️ ★**素質・能力・上限・★の数を出しません**（★D-114）。★調子は 5 段・疲れは 3 段の言葉だけ（★数字なし）。
+ *   ⚠️ ★所有上限は `OWNERSHIP_LIMITS.active`（★画面に数を直書きしない・D-052）。
+ *   ⚠️ ★毛色は `@star/render` の `coatOfHorseId` / `coatCssFilter`（★画面で色表を持たない）。
+ *   ⚠️ ★`Date.now()` / `Math.random()` を使いません（★憲法 4）。
  */
+import type React from 'react';
 import { useEffect, useState } from 'react';
-/** ⚠️ ★`demoStableRepo` は ★**もう引きません**（★2026-09-25・裁定 §2・★上の註記） */
-import { sortStable, conditionView, fatigueColor, type StableHome, type StableHorse, type StableView } from '../../lib/stable';
-import { supabaseStableRepo, SignInRequiredError } from '../../lib/stable-repo';
-import { ClassChip, FatigueBar, PageTitle } from '../../components/ui';
+import { conditionView, fatigueStepOf, sortStable, type StableHorse } from '../../lib/stable';
+import { loadRetiredScreen } from '../../lib/retired-screen';
+import { SignInRequiredError } from '../../lib/stable-repo';
 import { STABLE_GRADE_LABEL, type StableGrade } from '@star/training';
 import { OWNERSHIP_LIMITS } from '@star/scheduler';
-import { StableGradePanel } from '../../components/stable-grade-panel';
+import { coatCssFilter, coatOfHorseId } from '@star/render';
+import { Backdrop, BigButton, TextPanel, TopBar, useMotionPaused } from '../../components/uma/uma-parts';
+import { RaceStrip } from '../../components/uma/race-strip';
+import { useStableView } from '../../components/uma/use-stable-view';
+import { NoHorseCard } from '../../components/uma/no-horse-card';
 
 /**
- * ★**格ごとの色**（★D12-6・デザイナーのカード `components/stable-roster`）。
+ * ★**格ごとの色**（★D12-6・デザイナーのカード `components/stable-roster`・★R-26 でも「今の `GRADE_TONE`」）。
  * ⚠️ ★**名前（ブロンズ等）は持ちません** — ★`STABLE_GRADE_LABEL` から引きます（★D-052）。
- *    ★ここにあるのは見た目だけです。
  */
 const GRADE_TONE: Readonly<Record<StableGrade, { readonly bg: string; readonly border: string; readonly color: string }>> = {
   bronze: { bg: '#f3e9dd', border: '#8a6a4a', color: '#5a4326' },
@@ -40,336 +45,161 @@ const GRADE_TONE: Readonly<Record<StableGrade, { readonly bg: string; readonly b
   gold: { bg: '#fff3d6', border: '#a9741a', color: '#4a3105' },
 };
 
-/**
- * 🔴 ★**`export const revalidate = 0` を取りました**（★2026-09-21・★本番のビルドが落ちていました）。
- *
- * 【★何が起きたか】
- *   ★この面を ★`'use client'` にしたとき、★`revalidate` の宣言を ★**残したままにしました**。
- *   ★`revalidate` は ★**サーバー側の区分設定**で、★クライアント成分からは宣言できません。
- *   → ★`npm run build:web` が落ちます:
- *     `Invalid revalidate value "function(){throw Error(...)}" on "/stable"`
- *   🔴 ★★**Vercel は push で自動的に作り直しますが、★落ちるので古い版のまま配信を続けます。**
- *     ★実測: ★`origin/main` は `87c19e6`、★本番が配信していたのは `24af9f2`（★31 コミット 前）。
- *     ★★**「デプロイが抜けている」ように見えて、★実際は「ビルドが落ちていた」。**
- *
- * 【★なぜ要らないか】
- *   ★`'use client'` の面は ★**そもそも事前生成された HTML を配るだけ**で、
- *   ★中身は ★**ブラウザで `my_horses` を引いて**描きます（★本人の行だけ・★RLS）。
- *   → ★再検証の間隔は ★**意味を持ちません。**
- *
- * ⚠️ ★**型検査では出ません**（★`revalidate` は型としては正しい `number`）。
- *    ★★`npm run build:web` を流したときだけ出ます。★門には入っていません。
- */
 
-/** ⚠️ ★`cls` は ★**格のチップが増えた**ぶん広げました（★132 → 212・2026-09-16・D12-6） */
-// ⚠️ ★`stars` の列は 2026-09-18・D-114 ②・T-10・AL-2 で取りました（★幅は他の列へ分配し直さず、★次走の列が広がります）。
-//    ★代わりに何を出すかはデザイナー便で決めます。2026-09-15 オーナー指示。
-const COL = { name: 230, cls: 212, cond: 118, fatigue: 132, week: 104 } as const;
-
-/**
- * ★牧場ホーム（わたしの馬）— 正本 design/hud-ds/components/stable-home［アーケード］
- *   所有馬一覧＋今週の予定。未指示の行は黄色い地＋左 5px の黄帯。全頭に指示すると「週を進める」が押せる。
- *   ⚠️ 今はデモデータ（ログインと「自分の馬」ビューの導入まで）。画面は `StableRepo` だけを見る。
- */
-function WeekBadge({ horse }: { readonly horse: StableHorse }): React.ReactElement {
-  const w = horse.week;
-  if (w.kind === 'done') return <span className="a-badge open">指示済み</span>;
-  if (w.kind === 'todo') return <span className="a-badge soon">未指示</span>;
-  return <span className="a-badge done">休養中</span>;
+/** ★今週の札（★未指示 ／ 指示済み ・ 献立 ／ 休養中） */
+function weekPill(h: StableHorse): { readonly text: string; readonly bg: string; readonly ink: string } {
+  if (h.week.kind === 'done') return { text: `指示済み ・ ${h.week.menu}`, bg: '#e4efe7', ink: '#1e7a3a' };
+  if (h.week.kind === 'rest') return { text: '休養中', bg: '#e7e9ec', ink: '#4a5a66' };
+  return { text: '未指示', bg: 'var(--u-gold-pale)', ink: 'var(--u-ink-dark)' };
 }
 
-/** 4 カード共通の外枠（白地・2px 縁・青グロス帯 h38。馬と調教が主役のまま、カードは補助 — R-4） */
-function HomeCard({ title, badge, children }: { readonly title: string; readonly badge?: React.ReactNode; readonly children: React.ReactNode }): React.ReactElement {
+/** ★上の丸札（★紺の地・`padding:7px 12px; border-radius:999px`） */
+const PILL: React.CSSProperties = {
+  display: 'flex', alignItems: 'baseline', gap: 5, padding: '7px 12px', borderRadius: 999,
+  background: 'var(--u-panel-strong)',
+};
+
+/** ★1 頭のカード（★押すと 1 頭の詳細へ） */
+function HorseCard({ horse: h }: { readonly horse: StableHorse }): React.ReactElement {
+  const todo = h.week.kind === 'todo';
+  const rest = h.week.kind === 'rest';
+  const pill = weekPill(h);
+  const tone = GRADE_TONE[h.stableGrade];
+  /** ★毛色の丸: ★地は鹿毛（★素材そのもの）・★毛色の差は `coatCssFilter` が掛ける（★`/train` の馬と同じ式） */
+  const coatFilter = coatCssFilter(coatOfHorseId(h.id));
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', borderRadius: 10, overflow: 'hidden', background: '#fff', border: '2px solid var(--a-edge)', boxShadow: 'var(--a-shadow-sm)' }}>
-      <div className="a-band" style={{ height: 38, padding: '0 14px', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 15, fontWeight: 900, letterSpacing: '.08em' }}>{title}</span>
-        {badge}
-      </div>
-      <div style={{ padding: '12px 14px 14px', flex: 1, display: 'flex', flexDirection: 'column' }}>{children}</div>
-    </div>
+    <a href={`/stable/${h.id}`} style={{
+      display: 'flex', gap: 10, alignItems: 'stretch', padding: '10px 12px', borderRadius: 12,
+      background: 'var(--u-paper)', color: 'var(--u-ink-dark)',
+      border: todo ? '3px solid var(--u-gold)' : '3px solid rgba(251,247,236,.22)',
+      boxShadow: todo ? '0 4px 0 var(--u-gold-ink)' : 'var(--u-shadow-card)',
+      opacity: rest ? 0.75 : 1,
+    }}>
+      <span aria-hidden style={{ flex: '0 0 auto', width: 44, height: 44, borderRadius: '50%', border: '3px solid var(--u-ink-dark)', overflow: 'hidden' }}>
+        <span style={{ display: 'block', width: '100%', height: '100%', background: '#86502f', ...(coatFilter === undefined ? {} : { filter: coatFilter }) }} />
+      </span>
+      <span style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          {/* ★名前は省略記号で切らない（★2 行まで折り返す） */}
+          <span style={{ fontSize: 16, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{h.name}</span>
+          <span style={{ padding: '1px 7px', borderRadius: 4, background: 'var(--u-navy)', color: 'var(--u-gold-pale)', fontSize: 10, whiteSpace: 'nowrap' }}>{h.classLabel}</span>
+          {/* ★厩舎の格（★D12-6）。★名前は `@star/training` から引く（★画面に表を持たない） */}
+          <span style={{ padding: '1px 7px', borderRadius: 4, background: tone.bg, border: `1px solid ${tone.border}`, color: tone.color, fontSize: 10, whiteSpace: 'nowrap' }}>
+            {STABLE_GRADE_LABEL[h.stableGrade]}
+          </span>
+        </span>
+        {/* ★調子は 5 段・疲れは 3 段の言葉だけ（★数字は出さない・D-114・R-24） */}
+        <span style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', fontSize: 11, fontWeight: 700, color: 'var(--u-ink-dark-2)' }}>
+          <span>{h.sexAge}</span>
+          <span>調子 <span style={{ color: 'var(--u-ink-dark)' }}>{conditionView(h.condition).label}</span></span>
+          <span>疲れ <span style={{ color: 'var(--u-ink-dark)' }}>{fatigueStepOf(h.fatigue).word}</span></span>
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--u-ink-dark-2)' }}>
+          次走 <span style={{ color: 'var(--u-ink-dark)' }}>{h.nextRace ?? (h.classLabel === '新馬' ? 'デビュー戦 未定' : '未定')}</span>
+        </span>
+      </span>
+      <span style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'space-between', gap: 6 }}>
+        <span style={{ padding: '2px 7px', borderRadius: 4, fontSize: 10, whiteSpace: 'nowrap', background: pill.bg, color: pill.ink }}>{pill.text}</span>
+        <span aria-hidden style={{ fontSize: 18, color: 'var(--u-ink-dark-2)' }}>›</span>
+      </span>
+    </a>
   );
 }
 
-/** カード内の小さな数値マス（ラベル 10px＋数値） */
-function MiniStat({ label, value, unit, color, size = 26 }: { readonly label: string; readonly value: number; readonly unit: string; readonly color: string; readonly size?: number }): React.ReactElement {
-  return (
-    <span style={{ flex: 1, textAlign: 'center', padding: '8px 6px', borderRadius: 8, background: '#fff', border: '2px solid var(--a-edge)' }}>
-      <span style={{ display: 'block', fontSize: 10, fontWeight: 900, color: 'var(--a-ink-2)' }}>{label}</span>
-      <span className="a-num" style={{ fontSize: size, color }}>{value}</span> <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--a-ink-2)' }}>{unit}</span>
-    </span>
-  );
-}
-
-/**
- * ★会員ホームの 4 カード（R-4・裁定 Q-WEB-03）— 「今週の予定」板の上。着地は /stable のまま（着地＝何のゲームかの宣言）。
- *   EP と PP は別カプセル（合算しない・憲法 §0.2）。デイリー額は D-075 の較正定数＝サーバー値をそのまま表示。
- */
-function HomeCards({ home, ownedCount, todoCount }: { readonly home: StableHome; readonly ownedCount: number; readonly todoCount: number }): React.ReactElement {
-  return (
-    <div className="a-cards" style={{ marginTop: 14 }}>
-      {/* ① アカウント */}
-      <HomeCard
-        title="アカウント"
-        badge={home.notices > 0 ? (
-          <span style={{ display: 'flex', alignItems: 'center', height: 22, padding: '0 9px', borderRadius: 6, backgroundImage: 'var(--a-gloss-red)', border: '2px solid var(--a-red-d)', fontSize: 11, fontWeight: 900 }}>お知らせ {home.notices}</span>
-        ) : undefined}
-      >
-        <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--a-ink)' }}>{home.stableName}</div>
-        <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)', marginTop: 3 }}>{home.displayName}</div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, padding: '7px 10px', borderRadius: 8, background: '#fff', border: '2px solid var(--a-edge)' }}>
-            <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: '.06em', color: 'var(--a-ink-2)' }}>参加ポイント</span>
-            <span><span className="a-num" style={{ fontSize: 22, color: 'var(--a-blue-d)' }}>{home.epBalance.toLocaleString('ja-JP')}</span> <span style={{ fontSize: 10, fontWeight: 900, color: 'var(--a-ink-2)' }}>EP</span></span>
-          </span>
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, padding: '7px 10px', borderRadius: 8, backgroundImage: 'var(--a-gloss-gold)', border: '2px solid #8a5a06' }}>
-            <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: '.06em', color: '#4a3105' }}>賞金ポイント</span>
-            <span><span className="a-num" style={{ fontSize: 22, color: '#4a3105' }}>{home.ppBalance.toLocaleString('ja-JP')}</span> <span style={{ fontSize: 10, fontWeight: 900, color: '#4a3105' }}>PP</span></span>
-          </span>
-        </div>
-        {home.dailyClaimed ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 12, padding: '9px 11px', borderRadius: 8, background: '#eefaf1', border: '2px solid var(--a-green-d)' }}>
-            <span style={{ width: 22, height: 22, borderRadius: 5, backgroundImage: 'var(--a-gloss-green)', border: '2px solid var(--a-green-d)', color: '#fff', fontSize: 12, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</span>
-            <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-green-d)' }}>今日の {home.dailyEP} EP 受取済み</span>
-          </div>
-        ) : (
-          <span className="a-btn a-btn-gold" style={{ width: '100%', height: 38, marginTop: 12, fontSize: 13, whiteSpace: 'nowrap' }}>今日の {home.dailyEP} EP を受け取る</span>
-        )}
-      </HomeCard>
-
-      {/* ② わたしの牧場（現役 0 頭なら再付与ボタンに切り替え — D-074） */}
-      <HomeCard title="わたしの牧場">
-        {ownedCount === 0 ? (
-          <>
-            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--a-ink-2)', lineHeight: 1.7 }}>現役の馬がいません。新しい 1 頭を無償で迎えられます</div>
-            <a className="a-btn a-btn-gold" href="/setup" style={{ width: '100%', height: 40, marginTop: 'auto', fontSize: 13, whiteSpace: 'nowrap' }}>はじめての 1 頭を迎える</a>
-          </>
-        ) : (
-          <>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <MiniStat label="所有" value={ownedCount} unit="頭" color="var(--a-ink)" />
-              <MiniStat label="今週の未指示" value={todoCount} unit="頭" color={todoCount > 0 ? 'var(--a-num-rank)' : 'var(--a-ink)'} />
-            </div>
-            <div style={{ marginTop: 12, padding: '9px 11px', borderRadius: 8, background: 'var(--a-ivory)', border: '2px solid var(--a-line)' }}>
-              <span style={{ display: 'block', fontSize: 10, fontWeight: 900, letterSpacing: '.06em', color: 'var(--a-ink-2)' }}>次走</span>
-              {home.nextRun !== null ? (
-                <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink)' }}>{home.nextRun.race}　{home.nextRun.horse}</span>
-              ) : (
-                <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink-3)' }}>出走予定はありません</span>
-              )}
-            </div>
-            <a className="a-btn" href="#horses" style={{ width: '100%', height: 40, marginTop: 12, fontSize: 13, whiteSpace: 'nowrap' }}>わたしの馬を見る</a>
-          </>
-        )}
-      </HomeCard>
-
-      {/* ③ 開催状況（数字は青／締切は赤。0 件でも欄を消さない） */}
-      <HomeCard title="開催状況">
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
-          <span>
-            <span style={{ display: 'block', fontSize: 10, fontWeight: 900, letterSpacing: '.06em', color: 'var(--a-ink-2)' }}>次の発走</span>
-            <span className="a-num" style={{ fontSize: 34, color: 'var(--a-num-time)' }}>{home.nextStartAt ?? '—'}</span>
-          </span>
-          <span style={{ marginLeft: 'auto', textAlign: 'right' }}>
-            <span style={{ display: 'block', fontSize: 10, fontWeight: 900, letterSpacing: '.06em', color: 'var(--a-ink-2)' }}>締切まで</span>
-            <span className="a-num" style={{ fontSize: 26, color: 'var(--a-num-rank)' }}>{home.closesIn ?? '—'}</span>
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <MiniStat label="自馬の出走予定" value={home.myEntries} unit="件" color={home.myEntries > 0 ? 'var(--a-num-time)' : 'var(--a-ink-3)'} size={24} />
-          <MiniStat label="投票中" value={home.pendingBets} unit="件" color={home.pendingBets > 0 ? 'var(--a-num-time)' : 'var(--a-ink-3)'} size={24} />
-        </div>
-        <a className={`a-btn a-btn-blue${home.liveOpen ? '' : ' off'}`} href="/race" style={{ width: '100%', height: 40, marginTop: 12, fontSize: 13, whiteSpace: 'nowrap' }}>レースを見る</a>
-      </HomeCard>
-
-      {/* ④ ショートカット（先頭「調教」だけ金＝毎日の起点） */}
-      <HomeCard title="ショートカット">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <a className="a-btn a-btn-gold" href="/train" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>調教</a>
-          <a className="a-btn" href="/entry" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>出走登録</a>
-          <a className="a-btn" href="/vote" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>番組表</a>
-          <a className="a-btn" href="/records" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>記録</a>
-          <a className="a-btn" href="/exchange" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>景品交換</a>
-          {/* ★馬の売り買い（★2026-09-27・裁定 §6-2 の 2）。★既存の部品（`a-btn`）で 1 つ置くだけ。★名前は画面の見出しのまま */}
-          <a className="a-btn" href="/stable/market" style={{ width: '100%', height: 38, fontSize: 14, whiteSpace: 'nowrap' }}>馬市場を見る</a>
-        </div>
-      </HomeCard>
-    </div>
-  );
-}
-
-function StatCard({ label, value, unit, color }: { readonly label: string; readonly value: string; readonly unit: string; readonly color: string }): React.ReactElement {
-  return (
-    <div style={{ minWidth: 170, padding: '10px 18px', borderRadius: 10, background: '#fff', border: '2px solid var(--a-edge)', boxShadow: 'var(--a-shadow-sm)' }}>
-      <div className="a-lbl">{label}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
-        <span className="a-num" style={{ fontSize: 40, color }}>{value}</span>
-        <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink-2)' }}>{unit}</span>
-      </div>
-    </div>
-  );
-}
-
-export default function StablePage() {
-  const [view, setView] = useState<StableView | null>(null);
-  /** 🔴 ★未ログイン（★見本に落とさない・裁定 §2） */
-  const [needsLogin, setNeedsLogin] = useState(false);
-  /** 🔴 ★読めなかった理由（★黙って見本にしない・R-16） */
-  const [loadError, setLoadError] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      try {
-        const real = await supabaseStableRepo.stable();
-        if (alive) setView(real);
-      } catch (e) {
-        /**
-         * 🔴 ★**見本に落とすのをやめました**（★2026-09-25・裁定 `REVIEW_OWNER_SCOPE_AND_STUD_FEE_20260925.md` §2）
-         *
-         * 【★何が起きていたか】★`catch` で ★`demoStableRepo.stable()` に落としていました。
-         *   → ★未ログインの人に ★**見本の馬が「あなたの厩舎」として出ていました**（★本番で）。
-         *   ★生の DB の文を出すより ★**悪い形**です（★誰のデータかを偽ります）。
-         *   ⚠️ ★網が見つけました: `apps/cli/test/owner-scoped-needs-session.test.ts`
-         *
-         * → ★`/records` と ★**同じ形**にします。★意匠は作っていません（★既存の字と `a-panel` だけ）。
-         */
-        if (!alive) return;
-        if (e instanceof SignInRequiredError) { setNeedsLogin(true); return; }
-        console.error('[stable] ★本物のデータを読めませんでした', e);
-        setLoadError(e instanceof Error ? e.message : String(e));
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
+export default function StablePage(): React.ReactElement {
+  const [paused, toggle] = useMotionPaused();
+  const { view, loading, error, needsSetup, needsLogin, refresh } = useStableView();
   /**
-   * 🔴 ★**未ログイン・読めなかったときは、馬を出しません**（★裁定 §2・2026-09-25）。
-   *   ★字も枠も ★`/records` と同じものを使っています（★新しい意匠を作らない）。
+   * ★**引退した馬の頭数**（★馬物語帳への行・`my_retired_horses()`）。
+   * ⚠️ ★読めなかったら ★数を出しません（★「0 頭」と嘘をつかない・R-16）。★行そのものは出します。
    */
-  if (needsLogin) {
-    return (
-      <div style={{ padding: '22px 0 40px' }}>
-        <PageTitle title="わたしの馬" />
-        <p role="status" style={{ padding: '14px 16px', fontSize: 12.5, fontWeight: 900, color: 'var(--a-ink-2)' }}>
-          厩舎の馬を見るには、<a href="/login">ログイン</a>してください。
-        </p>
-      </div>
+  const [retiredCount, setRetiredCount] = useState<number | null>(null);
+  const hasHorses = view !== null && view.horses.length > 0;
+  useEffect(() => {
+    if (!hasHorses) return undefined;
+    let alive = true;
+    loadRetiredScreen().then(
+      (d) => { if (alive) setRetiredCount(d.horses.length); },
+      (e: unknown) => {
+        // ★未ログインは 誤りではない（★数を出さないだけ・★上の `useStableView` が案内を出す）
+        if (e instanceof SignInRequiredError) return;
+        console.error('[stable] 引退した馬の頭数を読めませんでした', e);
+      },
     );
-  }
-  if (loadError !== null) {
-    return (
-      <div style={{ padding: '22px 0 40px' }}>
-        <PageTitle title="わたしの馬" />
-        <div className="a-panel" style={{ marginTop: 14, padding: '14px 16px', fontSize: 14, fontWeight: 900, color: 'var(--a-red-d)' }}>
-          厩舎を読めませんでした: {loadError}
-        </div>
-      </div>
-    );
-  }
-  // ★読み込み中に、★新しい見た目を足しません（★デザイナーの領域）
-  if (view === null) return null;
-  const horses = sortStable(view.horses);
-  const todo = horses.filter((h) => h.week.kind === 'todo');
-  const allDone = todo.length === 0;
+    return () => { alive = false; };
+  }, [hasHorses]);
 
-  return (
-    <div style={{ padding: '22px 0 40px' }}>
-      <PageTitle
-        title="わたしの馬"
-        /**
-         * ★**現役の所有上限**（★D-104・§6.7）。★上限の数は `@star/scheduler` から引きます
-         *   （★画面に 30 を直書きしない・D-052）。
-         */
-        sub={`${view.horses.length} / ${OWNERSHIP_LIMITS.active} 頭　残り ${Math.max(0, OWNERSHIP_LIMITS.active - view.horses.length)} 頭`}
-        right={(
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 40, padding: '0 16px', borderRadius: 10, background: '#fff', border: '2px solid var(--a-edge)', boxShadow: 'var(--a-shadow-sm)' }}>
-            <span className="a-lbl">第</span><span className="a-num" style={{ fontSize: 26, color: 'var(--a-num-time)' }}>{view.weekNo}</span><span className="a-lbl">週</span>
-          </span>
-        )}
-      />
-      {view.demo && (
-        <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>※ デモデータ（ログインと「自分の馬」の読み取りビューが入るまで、デザインどおりの見本を表示しています）</p>
-      )}
-
-      {/* 会員ホームの 4 カード（R-4）— 馬と調教が主役のまま、カードは補助 */}
-      <HomeCards home={view.home} ownedCount={view.horses.length} todoCount={todo.length} />
-
-      {/* 今週の予定 */}
-      <div className="a-panel strong rise" style={{ marginTop: 14 }}>
-        <div className="a-band" style={{ height: 40, padding: '0 18px', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 16, fontWeight: 900, letterSpacing: '.14em' }}>今週の予定</span>
-          <span style={{ fontSize: 13, fontWeight: 900 }}>{view.weekRange}　次の週送りで調教が反映されます</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '18px 22px', backgroundImage: 'linear-gradient(#ffffff,#eef6fd)', flexWrap: 'wrap' }}>
-          <StatCard label="調教の指示" value={`${todo.length} / ${view.horses.length}`} unit="頭 未指示" color={allDone ? 'var(--a-ink)' : 'var(--a-num-rank)'} />
-          <StatCard label="出走登録" value={String(view.entries)} unit="頭" color="var(--a-num-time)" />
-          <StatCard label="今週の消費予定" value={view.plannedEP.toLocaleString('ja-JP')} unit="EP" color="var(--a-num-money)" />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginLeft: 'auto' }}>
-            <a className="a-btn a-btn-gold" href="/train" style={{ height: 48, padding: '0 26px', fontSize: 18 }}>調教を指示する</a>
-            <span className={`a-btn${allDone ? '' : ' off'}`} style={{ height: 40, padding: '0 26px', fontSize: 15 }} title={allDone ? '' : '全頭に指示すると押せます'}>週を進める</span>
-          </div>
-        </div>
-        {allDone ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 44, padding: '0 18px', backgroundImage: 'linear-gradient(#eefaf1,#dcf3e3)', borderTop: '2px solid #9fd3ae' }}>
-            <span className="a-badge open">全頭指示済み</span>
-            <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink)' }}>全頭の指示が完了しました</span>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 44, padding: '0 18px', backgroundImage: 'linear-gradient(#fffbe8,#fff2c8)', borderTop: '2px solid #e6c979' }}>
-            <span className="a-badge soon">未指示あり</span>
-            <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--a-ink)' }}>{todo.map((h) => h.name).join('・')} の調教が未指示です。全頭に指示すると「週を進める」が押せます</span>
-          </div>
-        )}
-      </div>
-
-      {/* 所有馬一覧 */}
-      <div id="horses" className="a-panel strong" style={{ marginTop: 18 }}>
-        <div className="a-band hide-narrow" style={{ height: 38, padding: '0 18px', gap: 14 }}>
-          <span className="a-lbl" style={{ width: COL.name, flex: `0 0 ${COL.name}px`, color: '#fff' }}>馬名</span>
-          <span className="a-lbl" style={{ width: COL.cls, flex: `0 0 ${COL.cls}px`, color: '#fff' }}>格</span>
-          <span className="a-lbl" style={{ width: COL.cond, flex: `0 0 ${COL.cond}px`, color: '#fff' }}>調子</span>
-          <span className="a-lbl" style={{ width: COL.fatigue, flex: `0 0 ${COL.fatigue}px`, color: '#fff' }}>疲労</span>
-          <span className="a-lbl" style={{ flex: 1, minWidth: 150, color: '#fff' }}>次走</span>
-          <span className="a-lbl" style={{ width: COL.week, flex: `0 0 ${COL.week}px`, textAlign: 'right', color: '#fff' }}>今週</span>
-        </div>
-        {horses.map((h) => {
-          const cond = conditionView(h.condition);
-          const todoRow = h.week.kind === 'todo';
-          const rest = h.week.kind === 'rest';
-          const rowStyle: React.CSSProperties = { height: 70 };
-          if (todoRow) { rowStyle.backgroundImage = 'linear-gradient(#fffbe8,#fff5cf)'; rowStyle.boxShadow = 'inset 5px 0 0 #f6c21c'; }
-          return (
-            <a key={h.id} href={`/stable/${h.id}`} className={`a-row sh-row${rest ? ' done' : ''}`} style={rowStyle}>
-              <span className="sh-name" style={{ width: COL.name, flex: `0 0 ${COL.name}px`, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <span style={{ fontSize: 19, fontWeight: 900, color: 'var(--a-ink)' }}>{h.name}</span>
-                <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--a-ink-3)' }}>{h.sexAge}　{h.week.kind === 'done' ? `今週 ${h.week.menu}` : rest ? '今週 休養' : '今週の指示なし'}</span>
-              </span>
-              <span className="sh-cls" style={{ width: COL.cls, flex: `0 0 ${COL.cls}px`, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <ClassChip label={h.classLabel} classRank={h.classRank} />
-                {/* ★厩舎の格（★D12-6）。★名前は `@star/training` から引く（★画面に表を持たない） */}
-                <span style={{ display: 'flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 6, background: GRADE_TONE[h.stableGrade].bg, border: `1.5px solid ${GRADE_TONE[h.stableGrade].border}`, fontSize: 10.5, fontWeight: 900, color: GRADE_TONE[h.stableGrade].color, whiteSpace: 'nowrap' }}>
-                  {STABLE_GRADE_LABEL[h.stableGrade]}
-                </span>
-              </span>
-              <span className="sh-cond" style={{ width: COL.cond, flex: `0 0 ${COL.cond}px` }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 900, color: cond.color }}><span style={{ fontSize: 16 }}>{cond.mark}</span>{cond.label}</span></span>
-              <span className="sh-fatigue" style={{ width: COL.fatigue, flex: `0 0 ${COL.fatigue}px` }}><FatigueBar value={h.fatigue} color={fatigueColor(h.fatigue)} /></span>
-              <span className="sh-next" style={{ flex: 1, minWidth: 150, fontSize: 14, fontWeight: 900, color: h.nextRace === null ? 'var(--a-ink-3)' : 'var(--a-ink)' }}>{h.nextRace ?? (h.classLabel === '新馬' ? 'デビュー戦 未定' : '未定')}</span>
-              <span className="sh-week" style={{ width: COL.week, flex: `0 0 ${COL.week}px`, display: 'flex', justifyContent: 'flex-end' }}><WeekBadge horse={h} /></span>
-            </a>
-          );
-        })}
-        {/* ★空状態の文言はカードの「セリで…」から改めている: セリは作らない（裁定 Q-WEB-01）。再付与は D-074 */}
-        {horses.length === 0 && (
-          <p style={{ color: 'var(--a-ink-2)', fontWeight: 900, padding: '16px 20px', fontSize: 14 }}>まだ所有している馬がいません。はじめての 1 頭を無償で迎えると牧場が始まります</p>
-        )}
-      </div>
-
-      {/*
-        ★**厩舎の格**（★D12-6・D-103）。★押せる部分なのでクライアント部品に切り出しています。
-        ⚠️ ★倍率も値段も部品が `@star/training` から引きます（★この画面に表を持たない）。
-      */}
-      {horses[0] !== undefined && (
-        <StableGradePanel horseName={horses[0].name} grade={horses[0].stableGrade} />
-      )}
+  const shell = (children: React.ReactNode): React.ReactElement => (
+    <div data-theme="uma" data-page-body className={paused ? 'u-paused' : undefined} style={{
+      position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden',
+      background: 'var(--u-navy)', display: 'flex', flexDirection: 'column',
+    }}>
+      <Backdrop />
+      <TopBar title="わたしの馬" backHref="/home" paused={paused} onToggle={toggle} />
+      <RaceStrip />
+      {children}
     </div>
   );
+
+  // ★馬がいない・入れない（★D26-2 の案内・★ホームと育成モードと同じカード）
+  if (view === null || view.horses.length === 0) {
+    return shell(loading
+      ? <TextPanel role="status" style={{ padding: 16 }}>厩舎を読み込み中…</TextPanel>
+      : <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', padding: '24px 14px' }}>
+        <NoHorseCard needsLogin={needsLogin} needsSetup={needsSetup} error={view === null ? error : null} onRetry={refresh} />
+      </div>);
+  }
+
+  const horses = sortStable(view.horses);
+  const todoCount = horses.filter((h) => h.week.kind === 'todo').length;
+
+  return shell(<>
+    <main style={{
+      position: 'relative', flex: '1 1 auto', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 12,
+      padding: '10px 14px 0', width: '100%', maxWidth: 1220, margin: '0 auto',
+    }}>
+      {/* ★上の札 2 つ（★上限は `OWNERSHIP_LIMITS.active`・D-104） */}
+      <div style={{ flex: '0 0 auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ ...PILL, border: '2px solid rgba(251,247,236,.28)' }}>
+          <span style={{ fontSize: 11, color: 'var(--u-ink-light-3)' }}>現役</span>
+          <span className="u-num" style={{ fontSize: 18 }}>{view.horses.length}</span>
+          <span style={{ fontSize: 11, color: 'var(--u-ink-light-3)' }}>/ {OWNERSHIP_LIMITS.active} 頭</span>
+        </span>
+        <span style={{ ...PILL, border: '2px solid var(--u-gold)' }}>
+          <span style={{ fontSize: 11, color: 'var(--u-ink-light-3)' }}>まだ指示していない</span>
+          <span className="u-num" style={{ fontSize: 18, color: 'var(--u-gold-pale)' }}>{todoCount}</span>
+          <span style={{ fontSize: 11 }}>頭</span>
+        </span>
+      </div>
+
+      {/* ★一覧（★並びは `sortStable` のまま: 未指示 → 指示済み → 休養中） */}
+      <div style={{ flex: '0 0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))', gap: 8 }}>
+        {horses.map((h) => <HorseCard key={h.id} horse={h} />)}
+      </div>
+
+      {/* ★馬物語帳への行（★引退した馬・記録は消えない） */}
+      <a href="/stable/retired" style={{
+        flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 10, minHeight: 52, padding: '0 14px',
+        borderRadius: 12, background: 'var(--u-panel-strong)', border: '2px solid rgba(251,247,236,.28)',
+      }}>
+        <span style={{ fontSize: 14 }}>引退した馬（馬物語帳）</span>
+        <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--u-ink-light-3)' }}>
+          {retiredCount === null ? '記録は消えません' : `${retiredCount} 頭 ・ 記録は消えません`}
+        </span>
+        <span aria-hidden style={{ marginLeft: 'auto', fontSize: 18, color: 'var(--u-gold-pale)' }}>›</span>
+      </a>
+    </main>
+
+    {/* ★下段（★育成モードへ 金 ／ 馬市場を見る ivory） */}
+    <div style={{
+      position: 'relative', flex: '0 0 auto', display: 'flex', flexWrap: 'wrap', gap: 10,
+      padding: '10px 14px var(--u-safe-bottom)', width: '100%', maxWidth: 1220, margin: '0 auto',
+    }}>
+      <BigButton
+        tone="gold" label="育成モードへ" href="/train" grow="1.4 1 210px"
+        sub={todoCount > 0 ? `あと ${todoCount} 頭に指示する` : '今週の指示を見る'}
+      />
+      <BigButton tone="ivory" label="馬市場を見る" sub="馬を迎える" href="/stable/market" grow="1 1 140px" />
+    </div>
+  </>);
 }

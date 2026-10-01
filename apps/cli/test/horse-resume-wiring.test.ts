@@ -51,11 +51,34 @@ const PAGE = [
 ].join('\n');
 
 describe('★履歴書型の馬詳細の配線（D13-2）', () => {
-  it('★★画面が本当に差し込まれている（★部品を作っただけで終わらせない・LR-9）', () => {
-    expect(PAGE).toMatch(/HorseResume/);
-    /** ★スマホ縦にだけ出す（★PC 版は残す） */
-    expect(PAGE).toContain('show-narrow');
-    expect(PAGE).toContain('hide-narrow');
+  /**
+   * ★R-26（★2026-10-01・引き渡し資料 D26-3 ②「スマホの履歴書型と PC の表を分けず、1 つの作りで並びだけ変える」）。
+   *   ★以前はここで ★`HorseResume` と `show-narrow` / `hide-narrow` の出し分けを求めていました。
+   *   ★1 つの作りになったので ★出し分けが無いことを求め、★「分かってきたこと」が ★共通の部品から
+   *   ★`discoveryStageOf` を通って出ること（★部品を作っただけで終わらせない・LR-9）を見ます。
+   */
+  it('★★画面が本当に差し込まれている（★R-26: 1 つの作り・★分かってきたことは共通の部品）', () => {
+    expect(PAGE, '★スマホと PC の出し分けが戻っている（★R-26 で 1 つの作りに）').not.toMatch(/show-narrow|hide-narrow/);
+    expect(PAGE).toMatch(/<HorseDetailDiscovery\b/);
+    const DISC = read('apps/web/src/components/uma/horse-detail-discovery.tsx');
+    expect(DISC).toMatch(/discoveryStageOf/);
+    expect(DISC).toMatch(/discoveryLabelOf/);
+    expect(DISC).not.toMatch(/DISCOVERY_STEPS/);
+    expect(DISC).not.toMatch(/runs\s*>=/);
+  });
+
+  /**
+   * 🔴 ★R-26 🔴 1〜6（★2026-10-01）: ★1 頭の詳細に ★素質・能力の手がかりを出さない（★D-114 / D-116）。
+   */
+  it('🔴 ★R-26: 1 頭の詳細に 能力のバー・上限・合計・適性の記号・インブリード係数・勝率が無い', () => {
+    for (const bad of ['StatBar', 'capRatio', 'statCapTotal', '.stats', '.aptitude', 'inbreedCoeff', '上限', '合計', '勝率', '素質', 'potential', '<Stars']) {
+      expect(PAGE, `🔴 ★1 頭の詳細に出している: ${bad}`).not.toContain(bad);
+    }
+    /** ★疲れは言葉（★「疲労 +12」の数値を出さない） */
+    expect(PAGE).not.toMatch(/疲労\s*\{|fatigueDelta\}/);
+    /** ★準備中のボタンでなく ★`/train`・`/entry` へ繋ぐ */
+    expect(PAGE).toMatch(/href="\/train"/);
+    expect(PAGE).toMatch(/href="\/entry"/);
   });
 
   /**

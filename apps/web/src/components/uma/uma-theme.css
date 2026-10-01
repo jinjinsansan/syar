@@ -479,3 +479,9 @@
 @media (prefers-reduced-motion: reduce) {
   [data-theme='uma'] * { animation: none !important; transition: none !important; }
 }
+
+/* ★馬がいないときの影絵（★R-26 D26-2・待機の上下 3.6s・4px だけ）。★停止スイッチと「動きを減らす」では止める */
+@keyframes u-no-horse-bob { 0%, 100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-4px); } }
+[data-theme='uma'] .u-no-horse-bob { animation: u-no-horse-bob 3.6s ease-in-out infinite; }
+[data-theme='uma'].u-paused .u-no-horse-bob, [data-theme='uma'] .u-paused .u-no-horse-bob { animation: none; }
+@media (prefers-reduced-motion: reduce) { [data-theme='uma'] .u-no-horse-bob { animation: none; } }

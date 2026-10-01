@@ -144,13 +144,14 @@ export const SCREENS: readonly ScreenRecord[] = [
   },
   { route: '/records', verdict: 'rebuilt', why: '★記録。★2026-09-27 に ★引き渡し資料 §5 の骨格（馬物語 UI）へ移した（★読み込み・集計は変えていない）' },
   { route: '/entry', verdict: 'rebuilt', why: '★出走登録。★2026-09-27 に ★引き渡し資料 §5 の骨格（馬物語 UI）へ移した（★登録の処理は変えていない）' },
-  { route: '/stable', verdict: 'rebuild', why: RESKIN_0929 + '★厩舎の一覧。★`/setup` と `foal-invite` から来る' },
-  { route: '/stable/[horseId]', verdict: 'rebuild', why: RESKIN_0929 + '★1 頭の詳細' },
+  { route: '/stable', verdict: 'rebuilt', why: '★厩舎の一覧。★`/setup` と `foal-invite` から来る。★2026-10-01 R-26 で馬物語の部品（Backdrop・TopBar・RaceStrip・紙のカード・BigButton）へ移した（★読み込み・`sortStable` の並びは変えていない）' },
+  { route: '/stable/[horseId]', verdict: 'rebuilt', why: '★1 頭の詳細。★2026-10-01 に ★馬物語の部品（Backdrop・TopBar・RaceStrip・紙と紺のパネル・BigButton）へ作り直した（★デザイナー R-26 D26-3 ②）。'
+    + '★能力のバー・上限・合計・適性の記号・インブリード係数・勝率を外し、★「分かってきたこと」は共通の部品・★調教/出走登録は `/train`・`/entry` へ繋いだ' },
   { route: '/stable/breed', verdict: 'rebuilt', why: '★配合。★血統ループの本体。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
   { route: '/stable/foal', verdict: 'rebuilt', why: '★はじめての 1 頭の生産（★案 A・D-120）。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
   { route: '/stable/name', verdict: 'rebuilt', why: '★仔の命名。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
   { route: '/stable/roles', verdict: 'rebuilt', why: '★引退後の役割。★2026-09-28 に ★芝＋紺（Backdrop）と本文のパネルへ（★デザイナー R-18 回答 4-1・中の組みは変えていない）' },
-  { route: '/stable/retired', verdict: 'rebuild', why: RESKIN_0929 + '★引退馬の一覧' },
+  { route: '/stable/retired', verdict: 'rebuilt', why: '★引退馬の一覧（馬物語帳）。★2026-10-01 R-26 D26-3 ③ で馬物語の部品（Backdrop・TopBar・RaceStrip・紺の板・紙のパネル・BigButton）へ移した（★読み込み・`storyLinesOf`・発見度の段は変えていない）' },
   { route: '/stable/market', verdict: 'rebuilt', why: '★馬市場。★2026-09-26 に実データへ繋いだ（★`market-screen`）。'
     + '★2026-10-01 に ★馬物語の部品（Backdrop・TopBar・RaceStrip・金枠の板・BigButton）へ移した（★オーナー「馬を買うと古いデザイン」・★新しい意匠なし・★買う処理は変えていない）。'
     + '★戻り額の赤い帯・★戦績だけ・★煽らない は そのまま。★デザイナーの正式な見た目は ★依頼 R-17' },

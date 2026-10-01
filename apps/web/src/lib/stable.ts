@@ -264,5 +264,6 @@ export function fatigueColor(f: number): string {
  * ⚠️ ★境目は `fatigueColor`・`trainFaceOf` と同じ 30／60（★別の数を置かない）。★画面に数字は出さない。
  */
 export function fatigueStepOf(f: number): { readonly steps: 1 | 2 | 3; readonly word: string } {
-  return f <= 30 ? { steps: 1, word: 'すっきり' } : f <= 60 ? { steps: 2, word: '少し残る' } : { steps: 3, word: 'たまっている' };
+  /** ★言葉は R-24・R-26 §0（★2026-10-01・デザイナー「疲れなし／少し残る／疲れがたまっている」） */
+  return f <= 30 ? { steps: 1, word: '疲れなし' } : f <= 60 ? { steps: 2, word: '少し残る' } : { steps: 3, word: '疲れがたまっている' };
 }

@@ -34,17 +34,21 @@ import {
   loadMarketScreen, buyHorse, type MarketListingView, type MarketScreenData,
 } from '../../../lib/market-screen';
 import { SignInRequiredError } from '../../../lib/stable-repo';
-import { Backdrop, BigButton, TextPanel, TopBar, useMotionPaused } from '../../../components/uma/uma-parts';
+import { Backdrop, BigButton, NoticeBar, TextPanel, TopBar, useMotionPaused } from '../../../components/uma/uma-parts';
 import { RaceStrip } from '../../../components/uma/race-strip';
 
 /** ★年齢（★週から。★画面で 1 年の長さを持たない・D-052 は `@star/scheduler` 側） */
 const WEEKS_PER_YEAR_DISPLAY = 52;
 
-/** ★1 頭の板（★ホームの馬名の板と同じ地） */
+/** ★1 頭の板（★R-26 D26-1・紙の地・値段は濃紺） */
 const CARD: React.CSSProperties = {
-  display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
-  background: 'rgba(10,35,64,.86)', color: 'var(--u-ink)', textAlign: 'left', font: 'inherit',
+  display: 'flex', flexDirection: 'column', gap: 8, padding: '11px 12px', minHeight: 84, boxSizing: 'border-box', borderRadius: 12,
+  cursor: 'pointer', color: '#10243a', textAlign: 'left', font: 'inherit',
 };
+/** ★戦績の札（★R-26 D26-1） */
+const TAG: React.CSSProperties = { padding: '2px 8px', borderRadius: 5, background: '#e8eef3', color: '#25384a', fontSize: 11 };
+/** ★金のグロス（★G1 勝ちの札だけ） */
+const GOLD_GLOSS = 'linear-gradient(100deg,#fff6b0 0%,#f3cf34 30%,#d99f14 48%,#ffe483 62%,#fff6b0 100%)';
 
 export default function MarketPage(): React.ReactElement {
   const [data, setData] = useState<MarketScreenData | null>(null);
@@ -78,6 +82,7 @@ export default function MarketPage(): React.ReactElement {
       .catch((e: unknown) => {
         setData(null);
         setLoadError(e instanceof Error ? e.message : String(e));
+        console.warn('[market] 出品を読めませんでした', e);
       });
   }, []);
   useEffect(() => { reload(); }, [reload]);
@@ -105,7 +110,7 @@ export default function MarketPage(): React.ReactElement {
   return (
     <div data-theme="uma" data-page-body className={paused ? 'u-paused' : undefined} style={{
       position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden', background: 'var(--u-navy)',
-      display: 'flex', flexDirection: 'column', paddingBottom: 28,
+      display: 'flex', flexDirection: 'column',
     }}>
       <Backdrop />
       <TopBar title="馬市場" backHref="/home" paused={paused} onToggle={toggle} />
@@ -116,105 +121,145 @@ export default function MarketPage(): React.ReactElement {
           馬市場を見るには、<a href="/login" style={{ color: 'var(--u-gold)' }}>ログイン</a>してください。
         </TextPanel>
       )}
-      {loadError !== null && (
-        <TextPanel role="alert" style={{ padding: 14 }}>出品を読めませんでした: {loadError}</TextPanel>
-      )}
-      {data === null && loadError === null && !needsLogin && (
-        <TextPanel role="status" style={{ padding: 14 }}>読み込んでいます…</TextPanel>
-      )}
+      {/* ★読めなかった: ★生の文は出さず ★誤りの帯（★R-26 🔴3・R-21 §3）。★理由は console に */}
+      {loadError !== null && <NoticeBar kind="soon" text="出品を読めませんでした" actionLabel="再読み込み" actionHref="/stable/market" />}
 
-      {/**
-        * 🔴 ★**出品が 0 のときは そう言います**（★空の一覧で黙らない・R-16）。
-        * ⚠️ ★**「もう一度探す」を置きません**（★引き直しを煽らない・D-102 ③）。
-        * ⚠️ 🔴 ★**「時間をおくと入れ替わります」と書きません。**
-        *    ★入れ替わりの周期を ★**測っていません**。★測っていないことを画面に書くと、
-        *    ★それは ★**待たせる約束**になります（★煽りの裏返し）。
-        * ⚠️ ★**数えさせる語を出しません**（★「残り 0」「売り切れ」「完売」「補充」・D-102 ⑤）。
-        */}
-      {data !== null && data.listings.length === 0 && (
-        <TextPanel role="status" style={{ padding: 14 }}>いまは出品がありません</TextPanel>
-      )}
-
-      {data !== null && data.listings.length > 0 && (
-        <div style={{ position: 'relative', width: 'calc(100% - 28px)', maxWidth: 880, margin: '10px auto 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: 13, color: 'var(--u-ink)', lineHeight: 1.7, textShadow: '0 1px 2px rgba(0,0,0,.6)' }}>
-            いま {data.listings.length} 頭が出ています。<b style={{ color: 'var(--u-gold)' }}>手がかりは 戦績だけ</b>です。
+      <main style={{
+        position: 'relative', flex: '1 1 auto', minHeight: 0, overflow: 'auto', padding: '10px 14px 0',
+        width: '100%', maxWidth: 1220, margin: '0 auto', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 12,
+      }}>
+        {data === null && loadError === null && !needsLogin && (
+          <TextPanel role="status" style={{ padding: 14 }}>読み込んでいます…</TextPanel>
+        )}
+        {data !== null && (
+          <div style={{
+            flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 12px', borderRadius: 12,
+            background: 'rgba(10,35,64,.9)', border: '2px solid rgba(251,247,236,.28)',
+          }}>
+            <span style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+              <span style={{ fontSize: 11, color: '#cfe0ee' }}>いま</span>
+              <span style={{ fontSize: 22 }}>{data.listings.length}</span>
+              <span style={{ fontSize: 11, color: '#cfe0ee' }}>頭が出ています</span>
+            </span>
+            <span style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 999, background: '#061a33', border: '1px solid #f6c21c', color: '#ffe483', fontSize: 11 }}>
+              手がかりは 戦績だけ
+            </span>
           </div>
-          {data.listings.map((l) => {
-            const sel = picked === l.horseId;
-            /** ★年齢（★世界の週との差。★画面で週の長さを決めない） */
-            const ageY = Math.max(0, Math.floor((data.gameWeek - l.birthWeek) / WEEKS_PER_YEAR_DISPLAY));
-            return (
-              <button
-                type="button"
-                key={l.horseId}
-                onClick={() => { setPicked(sel ? null : l.horseId); setActionError(null); }}
-                aria-pressed={sel}
-                style={{ ...CARD, border: sel ? '3px solid var(--u-gold)' : '2px solid rgba(246,194,28,.45)' }}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                  <span style={{ fontSize: 17, fontWeight: 900 }}>{l.horseName}</span>
-                  <span>
-                    <span style={{ fontSize: 22, fontWeight: 900, color: 'var(--u-gold)' }}>{l.priceEP.toLocaleString('ja-JP')}</span>
-                    <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--u-ink-light-3)' }}> EP</span>
-                  </span>
-                </span>
-                {/* ★手がかりは戦績だけ（★素質・能力・発見度は出さない・D-114） */}
-                <span style={{ display: 'flex', gap: 12, fontSize: 12.5, fontWeight: 700, color: 'var(--u-ink-light-3)' }}>
-                  {/* ⚠️ ★性別は出しません — ★共有の表が無く、★ここで 2 つ目を作らない（D-052）。
-                      ★D-114 の「手がかり」は ★戦績なので、★正典上も要りません */}
-                  <span>{ageY} 歳</span>
-                  <span>{l.starts} 戦 {l.wins} 勝</span>
-                  {l.g1Wins > 0 && <span style={{ color: 'var(--u-gold)' }}>G1 {l.g1Wins} 勝</span>}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+        )}
 
-      {/* ★迎える確認（★戻る額を必ず数字で出す・★画面の下に留める） */}
+        {/**
+          * 🔴 ★**出品が 0 のときは そう言います**（★空の一覧で黙らない・R-16）。
+          * ⚠️ ★**「もう一度探す」を置きません**（★引き直しを煽らない・D-102 ③）。
+          * ⚠️ 🔴 ★**「時間をおくと入れ替わります」と書きません。**
+          *    ★入れ替わりの周期を ★**測っていません**。★測っていないことを画面に書くと、
+          *    ★それは ★**待たせる約束**になります（★煽りの裏返し）。
+          * ⚠️ ★**数えさせる語を出しません**（★「残り 0」「売り切れ」「完売」「補充」・D-102 ⑤）。
+          */}
+        {data !== null && data.listings.length === 0 && (
+          <div style={{
+            flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '30px 16px', borderRadius: 12,
+            background: 'rgba(10,35,64,.9)', border: '2px dashed rgba(251,247,236,.35)', textAlign: 'center',
+          }}>
+            <span style={{ fontSize: 17 }}>いまは出品がありません</span>
+          </div>
+        )}
+
+        {data !== null && data.listings.length > 0 && (
+          <div style={{ flex: '0 0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
+            {data.listings.map((l) => {
+              const sel = picked === l.horseId;
+              /** ★年齢（★世界の週との差。★画面で週の長さを決めない） */
+              const ageY = Math.max(0, Math.floor((data.gameWeek - l.birthWeek) / WEEKS_PER_YEAR_DISPLAY));
+              return (
+                <button
+                  type="button"
+                  key={l.horseId}
+                  onClick={() => { setPicked(sel ? null : l.horseId); setActionError(null); setDone(null); }}
+                  aria-pressed={sel}
+                  style={{
+                    ...CARD,
+                    background: sel ? '#fff4cf' : '#fbf7ec',
+                    border: sel ? '3px solid #f6c21c' : '3px solid rgba(251,247,236,.22)',
+                    boxShadow: sel ? '0 4px 0 #a9741a' : '0 3px 0 rgba(10,35,64,.5)',
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                    <span style={{ flex: '1 1 auto', minWidth: 0, fontSize: 16, lineHeight: 1.3 }}>{l.horseName}</span>
+                    {/* ★値段は濃紺（★色で煽らない・R-26 🔴1） */}
+                    <span style={{ flex: '0 0 auto', display: 'flex', alignItems: 'baseline', gap: 3 }}>
+                      <span style={{ fontSize: 22, color: '#10243a' }}>{l.priceEP.toLocaleString('ja-JP')}</span>
+                      <span style={{ fontSize: 10, color: '#4a6178' }}>EP</span>
+                    </span>
+                  </span>
+                  {/* ★手がかりは戦績だけ（★素質・能力・発見度は出さない・D-114） */}
+                  <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {/* ⚠️ ★性別は出しません — ★共有の表が無く、★ここで 2 つ目を作らない（D-052）。
+                        ★D-114 の「手がかり」は ★戦績なので、★正典上も要りません */}
+                    <span style={TAG}>{ageY} 歳</span>
+                    <span style={TAG}>{l.starts} 戦 {l.wins} 勝</span>
+                    {l.g1Wins > 0 && <span style={{ ...TAG, backgroundImage: GOLD_GLOSS, border: '1px solid #a9741a', color: '#10243a' }}>G1 {l.g1Wins} 勝</span>}
+                    {sel && <span style={{ marginLeft: 'auto', fontSize: 11, color: '#a9741a' }}>選んでいます</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div style={{ flex: '0 0 auto', height: 8 }} />
+      </main>
+
+      {/* ★迎える確認（★下段の直上に留める・★戻る額を必ず数字で出す） */}
       {chosen !== null && (
         <div style={{
-          position: 'sticky', bottom: 0, width: 'calc(100% - 28px)', maxWidth: 880, margin: '16px auto 0', padding: '14px 14px 16px',
-          border: '3px solid var(--u-gold)', borderRadius: 14, background: 'var(--u-panel-strong)', color: 'var(--u-ink)',
-          display: 'flex', flexDirection: 'column', gap: 10, zIndex: 2,
+          position: 'sticky', bottom: 0, width: 'calc(100% - 28px)', maxWidth: 880, margin: '10px auto 0', padding: '12px 14px 14px',
+          border: '3px solid #f6c21c', borderRadius: 14, background: 'rgba(6,26,51,.97)', color: '#fbf7ec',
+          boxShadow: '0 -8px 20px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column', gap: 10, zIndex: 2,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 12, letterSpacing: '.1em', color: 'var(--u-ink-light-3)' }}>確認</span>
-            <span style={{ fontSize: 16, fontWeight: 900 }}>{chosen.horseName}</span>
-            <span style={{ marginLeft: 'auto' }}>
-              <span style={{ fontSize: 22, fontWeight: 900, color: 'var(--u-gold)' }}>{chosen.priceEP.toLocaleString('ja-JP')}</span>
-              <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--u-ink-light-3)' }}> EP</span>
-            </span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <span style={{ fontSize: 11, color: '#cfe0ee' }}>確認</span>
+            <span style={{ fontSize: 16 }}>{chosen.horseName}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 22, color: '#ffe483' }}>{chosen.priceEP.toLocaleString('ja-JP')}<span style={{ fontSize: 10, color: '#cfe0ee' }}> EP</span></span>
           </div>
           {/**
             * ⚠️ ★戻る額は ★**サーバーが書いた値**です（★`sell_back_ep`）。
             *    ★旧は画面で `sellBackEP(price)` を計算していました（★式が 2 か所になる・D-052）。
             * 🔴 ★赤い帯は ★落とさない（★R-17・D-102）。
             */}
-          <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(168,26,19,.22)', border: '2px solid var(--u-red)' }}>
-            <span style={{ fontSize: 13, fontWeight: 900, lineHeight: 1.65 }}>
-              この馬を手放すと戻るのは<span style={{ fontSize: 16 }}> {chosen.sellBackEP.toLocaleString('ja-JP')} EP</span> です
-            </span>
+          <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(168,26,19,.24)', border: '2px solid #d62f26', fontSize: 13, lineHeight: 1.6 }}>
+            この馬を手放すと戻るのは<span style={{ fontSize: 19 }}> {chosen.sellBackEP.toLocaleString('ja-JP')} </span>EP です
           </div>
           {actionError !== null && (
-            <span role="status" style={{ fontSize: 13, fontWeight: 900, color: 'var(--u-red)' }}>{actionError}</span>
+            <span role="status" style={{ fontSize: 13, color: 'var(--u-red)' }}>{actionError}</span>
           )}
-          <BigButton
-            tone={sending ? 'disabled' : 'gold'}
-            label={sending ? '手続きしています…' : `この馬を迎える（${chosen.priceEP.toLocaleString('ja-JP')} EP）`}
-            {...(sending ? {} : { onClick: () => { onBuy(chosen.horseId); } })}
-            grow="0 0 auto"
-          />
         </div>
       )}
 
-      {done !== null && (
-        <TextPanel role="status" style={{ padding: 14 }}>
-          迎えました。<a href="/train" style={{ color: 'var(--u-gold)' }}>育成モード</a>で調教できます。
-        </TextPanel>
+      {/* ★迎えた後（★確認の板の位置に 緑の縁の板） */}
+      {done !== null && chosen === null && (
+        <div role="status" style={{
+          width: 'calc(100% - 28px)', maxWidth: 880, margin: '10px auto 0', padding: '12px 14px', borderRadius: 14,
+          border: '3px solid var(--u-ep)', background: 'rgba(6,26,51,.97)', color: '#fbf7ec', fontSize: 14, lineHeight: 1.6,
+        }}>
+          迎えました。育成モードで調教できます。
+        </div>
       )}
+
+      {/* ★下段の大きいボタン（★選ぶ前は ダッシュボードへ／選んだら 迎える／迎えた後は 育成モードへ） */}
+      <div style={{ position: 'relative', display: 'flex', gap: 10, width: '100%', maxWidth: 880, margin: '10px auto 0', padding: '0 14px 34px', boxSizing: 'border-box' }}>
+        {chosen !== null ? (
+          <BigButton
+            tone={sending ? 'disabled' : 'gold'}
+            label={sending ? '手続きしています…' : 'この馬を迎える'}
+            sub={`${chosen.priceEP.toLocaleString('ja-JP')} EP を使います`}
+            {...(sending ? {} : { onClick: () => { onBuy(chosen.horseId); } })}
+            grow="1 1 100%"
+          />
+        ) : done !== null ? (
+          <BigButton tone="gold" label="育成モードへ" sub="今週の調教をする" href="/train" grow="1 1 100%" />
+        ) : (
+          <BigButton tone="ivory" label="ダッシュボード" sub="ホームへ戻る" href="/home" grow="1 1 100%" />
+        )}
+      </div>
     </div>
   );
 }
