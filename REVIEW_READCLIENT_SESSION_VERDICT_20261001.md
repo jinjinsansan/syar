@@ -31,3 +31,13 @@
 5. 簿に起票する。★閉じる条件は「`readClient` がセッションを持たず、ログインした状態で警告が 0 件」（★目的で書く）
 
 ★優先: ★「中継を出せませんでした」の原因調べと**同じ便でよい**（★どちらもオーナーの PC の console に出ている話）
+
+---
+
+## §3 追記（同日）— 本番の console に 1 件残った
+
+- `87694cf` を本番に入れた後、オーナーの PC（ログイン済み）で ★`GoTrueClient@sb-hfvvxwoulrjqznperici-auth-token:1 … Multiple GoTrueClient instances detected … under the same storage key` が ★**1 件だけ**（修正前は `:303〜:305`）
+- ★私の §2-4 の読み「警告は消えるはず」は ★**外れた**。★supabase-js は `persistSession: false` でも ★**storageKey が同じ**なら警告を出す。★増殖は止まっている
+- ★裁定: ★**閉じる線（警告 0 件）は動かさない**。★`makeReadClient` に ★**別の `storageKey`**（例 `sb-<ref>-read`）を渡し、★2 つの器が名前の上でも別物になる形にする。★安く、警告の言う「同じキーでの同時使用」を構造で無くせる
+- ★網: `auth-wiring` に「`makeReadClient` の `storageKey` が `authClient` の既定のキーと違う」を足す（★対照: 外すと落ちる）
+- ★本番に入れた後、もう一度ログイン状態の console で 0 件を確かめてから簿を閉じる
