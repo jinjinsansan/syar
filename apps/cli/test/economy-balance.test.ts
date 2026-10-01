@@ -8,8 +8,14 @@
  */
 import { describe, it, expect } from 'vitest';
 import { MENUS, MENU_IDS, STABLE_GRADES, gradeEpCost } from '@star/training';
-import { JOCKEYS, npcStudFee, sellBackEP } from '@star/scheduler';
-import { careerBalance, meanWeeklyTrainingEP, meanJockeyFeeEP, CAREER_ASSUMPTION } from '../src/economy-balance.js';
+import {
+  CAREER_DAYS, CAREER_RACE_LIMIT, ENTRY_FEE_EP, JOCKEYS, WEEKS_PER_DAY, npcStudFee, sellBackEP,
+} from '@star/scheduler';
+import { EP_GRANTS } from '@star/betting';
+import { defaultMenu } from '../../worker/src/training-runner.js';
+import {
+  careerBalance, dailyBudget, defaultRotationSessionEP, meanWeeklyTrainingEP, meanJockeyFeeEP, CAREER_ASSUMPTION,
+} from '../src/economy-balance.js';
 
 describe('★1 キャリアの収支（GB-6）', () => {
   it('① ★額は実装の 1 か所から引く（★道具に数を書き写していない）', () => {
@@ -66,5 +72,25 @@ describe('★1 キャリアの収支（GB-6）', () => {
     }
     /** ★G1 の方が重い（★8,000 EP 対 総獲得賞金/20） */
     expect(npcStudFee(1, 0)).toBeGreaterThan(npcStudFee(0, 100_000));
+  });
+});
+
+describe('★1 実日の収支（D-130 の合格線）', () => {
+  it('① ★額は実装から引く（★既定の献立・登録料・デイリー・出走の頻度）', () => {
+    const want = [0, 1, 2, 3].reduce((a, w) => a + gradeEpCost(defaultMenu(w, 0), 'bronze'), 0) / 4;
+    expect(defaultRotationSessionEP('bronze')).toBeCloseTo(want, 10);
+    const d = dailyBudget('bronze', 300, 1);
+    expect(d.inflowEP).toBe(EP_GRANTS.daily);
+    expect(d.trainingEP).toBeCloseTo(want * WEEKS_PER_DAY, 10);
+    expect(d.startsPerDay).toBeCloseTo(CAREER_RACE_LIMIT / CAREER_DAYS, 10);
+    expect(d.raceEP).toBeCloseTo((ENTRY_FEE_EP + 300) * d.startsPerDay, 10);
+    expect(d.remainderEP).toBeCloseTo(d.inflowEP - d.trainingEP - d.raceEP, 10);
+  });
+
+  it('② ★頭数は調教と出走の両方に掛かる（★片方だけに掛けたら落ちる）', () => {
+    const one = dailyBudget('bronze', 200, 1);
+    const two = dailyBudget('bronze', 200, 2);
+    expect(two.trainingEP).toBeCloseTo(one.trainingEP * 2, 10);
+    expect(two.raceEP).toBeCloseTo(one.raceEP * 2, 10);
   });
 });

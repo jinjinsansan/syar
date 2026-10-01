@@ -78,17 +78,18 @@ export interface MenuSpec {
 /**
  * ★正典 §7.2 の表をそのまま写したもの（`main` / `fatigue` / `epCost` / `temperDelta`）と、
  *   §7.5 の menuIntensity。**係数だけが上の較正定数**です。
+ * ★`epCost` は 2026-10-01 に一律 0.6 倍（★D-130・§7.2 の表の改訂の写し。旧 300/300/400/200/500/800/100/0）。
  */
 export const MENUS: Readonly<Record<MenuId, MenuSpec>> = {
-  hill:    { id: 'hill',    label: '坂路',         main: ['sp', 'pw'], flatCoef: null, fatigue:  18, epCost: 300, temperDelta:  0, intensity: 1.3 },
-  wood:    { id: 'wood',    label: 'ウッドチップ', main: ['st', 'gt'], flatCoef: null, fatigue:  15, epCost: 300, temperDelta:  0, intensity: 1.0 },
+  hill:    { id: 'hill',    label: '坂路',         main: ['sp', 'pw'], flatCoef: null, fatigue:  18, epCost: 180, temperDelta:  0, intensity: 1.3 },
+  wood:    { id: 'wood',    label: 'ウッドチップ', main: ['st', 'gt'], flatCoef: null, fatigue:  15, epCost: 180, temperDelta:  0, intensity: 1.0 },
   // ★プールの「疲労-5（相殺）」は、正典の表の +6 に既に含まれた表記と読みます。
   //   二重に引くと休養より疲労が減るメニューになるため、+6 をそのまま使います。
-  pool:    { id: 'pool',    label: 'プール',       main: ['st'],       flatCoef: null, fatigue:   6, epCost: 400, temperDelta:  0, intensity: 0.5 },
-  gate:    { id: 'gate',    label: 'ゲート練習',   main: ['iq'],       flatCoef: null, fatigue:   8, epCost: 200, temperDelta:  0, intensity: 1.0 },
-  partner: { id: 'partner', label: '併せ馬',       main: ['gt', 'iq'], flatCoef: null, fatigue:  20, epCost: 500, temperDelta: -2, intensity: 1.0 },
-  hard:    { id: 'hard',    label: '追い切り',     main: [],           flatCoef: 1.6,  fatigue:  32, epCost: 800, temperDelta:  0, intensity: 2.2 },
-  light:   { id: 'light',   label: '軽め調整',     main: [],           flatCoef: 0.3,  fatigue:   4, epCost: 100, temperDelta:  0, intensity: 1.0 },
+  pool:    { id: 'pool',    label: 'プール',       main: ['st'],       flatCoef: null, fatigue:   6, epCost: 240, temperDelta:  0, intensity: 0.5 },
+  gate:    { id: 'gate',    label: 'ゲート練習',   main: ['iq'],       flatCoef: null, fatigue:   8, epCost: 120, temperDelta:  0, intensity: 1.0 },
+  partner: { id: 'partner', label: '併せ馬',       main: ['gt', 'iq'], flatCoef: null, fatigue:  20, epCost: 300, temperDelta: -2, intensity: 1.0 },
+  hard:    { id: 'hard',    label: '追い切り',     main: [],           flatCoef: 1.6,  fatigue:  32, epCost: 480, temperDelta:  0, intensity: 2.2 },
+  light:   { id: 'light',   label: '軽め調整',     main: [],           flatCoef: 0.3,  fatigue:   4, epCost:  60, temperDelta:  0, intensity: 1.0 },
   rest:    { id: 'rest',    label: '休養',         main: [],           flatCoef: 0,    fatigue: -35, epCost:   0, temperDelta: -5, intensity: 0 },
 };
 

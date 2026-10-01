@@ -52,8 +52,9 @@ describe('★調教の見せ方の写像（GB-1）', () => {
   it('④ ★見せ方を足しても、メニューの値（疲労・EP・係数・故障率）は 1 つも変わっていない', () => {
     /** ★正典 §7.2 の表の写し（★この検査は「見せ方の追加で式に触れていない」ことの錨） */
     const want: Readonly<Record<MenuId, readonly [number, number, number]>> = {
-      hill: [18, 300, 1.3], wood: [15, 300, 1.0], pool: [6, 400, 0.5], gate: [8, 200, 1.0],
-      partner: [20, 500, 1.0], hard: [32, 800, 2.2], light: [4, 100, 1.0], rest: [-35, 0, 0],
+      // ★EP は D-130（2026-10-01・一律 0.6 倍）の改訂後の表
+      hill: [18, 180, 1.3], wood: [15, 180, 1.0], pool: [6, 240, 0.5], gate: [8, 120, 1.0],
+      partner: [20, 300, 1.0], hard: [32, 480, 2.2], light: [4, 60, 1.0], rest: [-35, 0, 0],
     };
     for (const id of MENU_IDS) {
       const m = MENUS[id];

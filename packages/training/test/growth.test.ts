@@ -142,8 +142,9 @@ describe('§7.2/§7.3 の写しが正典と一致する', () => {
     expect(fatigueDelta('hill')).toBe(18);
     expect(fatigueDelta('hard')).toBe(32);
     expect(fatigueDelta('rest')).toBe(-35);
-    expect(epCost('hard')).toBe(800);
-    expect(epCost('light')).toBe(100);
+    // ★D-130（2026-10-01）: 一律 0.6 倍（旧 800 / 100）
+    expect(epCost('hard')).toBe(480);
+    expect(epCost('light')).toBe(60);
     expect(epCost('rest')).toBe(0);
   });
 

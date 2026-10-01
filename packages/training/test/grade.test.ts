@@ -48,7 +48,8 @@ describe('★厩舎の格（GB-5・D-103）', () => {
     expect(gradeGainMult('gold')).toBeGreaterThan(gradeGainMult('bronze'));
     expect(gradeEpCost('hard', 'gold')).toBeGreaterThan(gradeEpCost('hard', 'bronze'));
     /** ★何週で同じ EP を使い切るか: 上の格ほど少ない週数（＝時間が早い） */
-    const budget = 24_000;
+    /** ★両方の格の額で割り切れる予算（★D-130 で 480 / 720 になり、24,000 では切り捨てで 0.5 ずれた） */
+    const budget = 28_800;
     const weeksBronze = Math.floor(budget / gradeEpCost('hard', 'bronze'));
     const weeksGold = Math.floor(budget / gradeEpCost('hard', 'gold'));
     expect(weeksGold).toBeLessThan(weeksBronze);

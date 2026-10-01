@@ -14,7 +14,11 @@
  * 実行: `npx tsx apps/cli/src/economy-balance.ts [--g1 0] [--earnings 0]`（★T-11 で `--stars` を廃止）
  */
 import { MENUS, MENU_IDS, STABLE_GRADES, gradeEpCost, type StableGrade, type MenuId } from '@star/training';
-import { CAREER_RACE_LIMIT, JOCKEYS, npcStudFee, sellBackEP, MIN_PRICE_EP } from '@star/scheduler';
+import {
+  CAREER_DAYS, CAREER_RACE_LIMIT, ENTRY_FEE_EP, JOCKEYS, npcStudFee, sellBackEP, MIN_PRICE_EP, WEEKS_PER_DAY,
+} from '@star/scheduler';
+import { EP_GRANTS } from '@star/betting';
+import { defaultMenu } from '../../worker/src/training-runner.js';
 
 /**
  * ★**キャリアの想定**（★正典 §3.4 の表の前提の写し）。
@@ -103,6 +107,50 @@ export function careerBalance(grade: StableGrade, purchaseEP: number): CareerBal
   };
 }
 
+/**
+ * ★**1 実日の収支**（★D-130 ③ ① の合格線・2026-10-01）。
+ *   ★「付与 1 頭が、受け取り（デイリー）だけで、設計の頻度で走り、毎週 調教できる」かを見ます。
+ *   ★調教は ★ワーカーの既定の献立（`defaultMenu` の 4 週の輪・疲労が 70 未満のとき）の平均で数えます。
+ *   ★出走は ★`CAREER_RACE_LIMIT ÷ CAREER_DAYS`（★設計の頻度・D-128 の本番の実測とは別）。
+ *   ⚠️ ★投票は数えません（★余りから払う形）。
+ */
+export interface DailyBudget {
+  readonly grade: StableGrade;
+  readonly horses: number;
+  readonly jockeyFeeEP: number;
+  /** ★受け取り [EP/実日] */
+  readonly inflowEP: number;
+  /** ★調教 1 回の平均 [EP]（★既定の献立の輪） */
+  readonly trainingPerSessionEP: number;
+  /** ★調教 [EP/実日]（★WEEKS_PER_DAY 回 × 頭数） */
+  readonly trainingEP: number;
+  /** ★1 頭の出走 [回/実日] */
+  readonly startsPerDay: number;
+  /** ★出走 [EP/実日]（★(登録料 ＋ 騎手) × 回数 × 頭数） */
+  readonly raceEP: number;
+  /** ★余り [EP/実日]（★0 以上なら合格線を満たす） */
+  readonly remainderEP: number;
+}
+
+/** ★既定の献立の輪（★`defaultMenu` を年齢 0〜3 週・疲労 0 で引いたもの）の 1 回の平均 [EP] */
+export function defaultRotationSessionEP(grade: StableGrade): number {
+  let sum = 0;
+  for (let w = 0; w < 4; w += 1) sum += gradeEpCost(defaultMenu(w, 0), grade);
+  return sum / 4;
+}
+
+export function dailyBudget(grade: StableGrade, jockeyFeeEP: number, horses = 1): DailyBudget {
+  const inflowEP = EP_GRANTS.daily;
+  const trainingPerSessionEP = defaultRotationSessionEP(grade);
+  const trainingEP = trainingPerSessionEP * WEEKS_PER_DAY * horses;
+  const startsPerDay = CAREER_RACE_LIMIT / CAREER_DAYS;
+  const raceEP = (ENTRY_FEE_EP + jockeyFeeEP) * startsPerDay * horses;
+  return {
+    grade, horses, jockeyFeeEP, inflowEP, trainingPerSessionEP, trainingEP, startsPerDay, raceEP,
+    remainderEP: inflowEP - trainingEP - raceEP,
+  };
+}
+
 /** ★コマンドとして流したとき（★import されたときは何も出しません） */
 const isMain = process.argv[1] !== undefined && process.argv[1].endsWith('economy-balance.ts');
 if (isMain) {
@@ -148,4 +196,28 @@ if (isMain) {
   }
   const menus = MENU_IDS.map((id: MenuId) => `${MENUS[id].label} ${MENUS[id].epCost}`).join(' / ');
   console.log(`  調教費の内訳（ブロンズ・§7.2 の表）: ${menus}`);
+
+  console.log('');
+  console.log('# ★1 実日の収支（★D-130 の合格線: 付与 1 頭がデイリーだけで、設計の頻度で走り、毎週 調教できる）');
+  const fees = JOCKEYS.map((j) => j.feeEP);
+  const jockeyCases: readonly [string, number][] = [
+    ['最安', Math.min(...fees)], ['平均', meanJockeyFeeEP()], ['最高', Math.max(...fees)],
+  ];
+  const b0 = dailyBudget('bronze', 0);
+  console.log(`  受け取り ${b0.inflowEP.toLocaleString()} EP/実日 ／ 調教 ${WEEKS_PER_DAY} 回/実日（既定の献立の輪）`
+    + ` ／ 出走 ${b0.startsPerDay.toFixed(2)} 回/実日（${CAREER_RACE_LIMIT} 戦 ÷ ${CAREER_DAYS} 実日）・登録料 ${ENTRY_FEE_EP}`);
+  console.log('  格       頭数 騎手        調教1回   調教/日   出走/日    余り/日');
+  for (const g of STABLE_GRADES) {
+    for (const horses of [1, 2]) {
+      for (const [name, fee] of jockeyCases) {
+        const d = dailyBudget(g, fee, horses);
+        console.log(
+          `  ${g.padEnd(8)} ${String(horses).padStart(3)}  ${name} ${fee.toFixed(0).padStart(4)}`
+          + ` ${d.trainingPerSessionEP.toFixed(0).padStart(9)} ${d.trainingEP.toFixed(0).padStart(9)}`
+          + ` ${d.raceEP.toFixed(0).padStart(9)} ${d.remainderEP.toFixed(0).padStart(10)}`
+          + (d.remainderEP >= 0 ? '  ✔' : '  ✘'),
+        );
+      }
+    }
+  }
 }
