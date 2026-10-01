@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { coatOfHorseId, COAT_WEIGHTS, COAT_TRANSFORMS, coatCssFilter } from '@star/render';
+import { coatOfHorseId, COAT_WEIGHTS, COAT_TRANSFORMS, coatCssFilter, deformedCoatCssFilter } from '@star/render';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const SRC = readFileSync(path.join(ROOT, 'packages/render/src/coat.ts'), 'utf8');
@@ -75,6 +75,18 @@ describe('★毛色は馬 ID から（★裁定 §9）', () => {
     expect(coatCssFilter('bay')).toBe(undefined);
     expect(coatCssFilter('grey')).toMatch(/saturate\(0\.12\)/);
     expect(coatCssFilter('chestnut')).toMatch(/hue-rotate\(16deg\)/);
+  });
+
+  /**
+   * 🔴 ★**デフォルメの絵（★ホーム・育成の歩く馬）は デフォルメ用の表**（★2026-10-01・オーナー「全て同じ馬になっていませんか？」）。
+   *   ★写真向けの表では ★鹿毛（素材そのまま）・栗毛・栃栗毛・月毛が ★ほぼ同じオレンジ（★約 6 割）。
+   *   ★デフォルメ用の表は ★9 色とも何か掛け（★鹿毛も素材のままにしない）・★どの 2 色も同じ式にならない。
+   */
+  it('🔴 ★デフォルメの絵の毛色は 9 色とも別の式（★鹿毛も素材のままにしない）', () => {
+    const filters = COAT_WEIGHTS.map(([c]) => deformedCoatCssFilter(c));
+    expect(filters.every((f) => f !== undefined)).toBe(true);
+    expect(new Set(filters).size).toBe(COAT_WEIGHTS.length);
+    expect(deformedCoatCssFilter('bay')).not.toBe(deformedCoatCssFilter('chestnut'));
   });
 
   it('🔴 ★画面は毛色の式を組み立てない（★育成・確認用の画面とも）', () => {

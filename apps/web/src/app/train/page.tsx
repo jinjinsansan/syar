@@ -31,7 +31,7 @@ import { NoHorseCard } from '../../components/uma/no-horse-card';
 import { TRAINING_MENUS } from '../../lib/game-demo';
 import { sendTrainingOrder } from '../../lib/training-order';
 import { conditionView, fatigueStepOf, sortStable, trainFaceOf, type StableHorse, type TrainFace } from '../../lib/stable';
-import { coatOfHorseId, coatCssFilter } from '@star/render';
+import { coatOfHorseId, deformedCoatCssFilter } from '@star/render';
 import { gradeEpCost, raceWeekMarkOf, type MenuId } from '@star/training';
 import { NoticeBar } from '../../components/uma/uma-parts';
 import { CLAIM_DEFAULT_MENU, CLAIM_TRAIN_EP_SHORT } from '../../lib/claims';
@@ -170,7 +170,7 @@ export default function TrainPage(): React.ReactElement {
    * ★**この馬の毛色**（★裁定 `REVIEW_HORSE_IDENTITY_VERDICT_20260923.md` §9・2026-09-23）。
    *   ★馬 ID から決定的に引く。⚠️ ★色の式は `@star/render` が持つ（★画面で組み立てない）。
    */
-  const coatFilter = coatCssFilter(coatOfHorseId(horse.id));
+  const coatFilter = deformedCoatCssFilter(coatOfHorseId(horse.id));
   /** ★実際に引かれる額（★ワーカーと同じ `gradeEpCost(献立, その馬の厩舎の格)`・2026-09-29） */
   const cost = gradeEpCost(spec.id as MenuId, horse.stableGrade);
   /** ★残高が足りなければ ★その週は無料の休養に落ちる（★ST001・training-runner）→ ★前もって言う・★受け取りへの道を並べる */

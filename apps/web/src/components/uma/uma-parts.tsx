@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { coatCssFilter, coatOfHorseId } from '@star/render';
+import { deformedCoatCssFilter, coatOfHorseId } from '@star/render';
 import { PLATE_LAYERS, screenOverlayCss } from './backdrop-plate';
 import './uma-theme.css';
 
@@ -474,7 +474,7 @@ export function OwnHorseFigure({ horseId, running, onClick, style }: {
   /** ★置く場所の余白などだけ（★絵と毛色は変えない） */
   readonly style?: React.CSSProperties;
 }): React.ReactElement {
-  const coatFilter = coatCssFilter(coatOfHorseId(horseId));
+  const coatFilter = deformedCoatCssFilter(coatOfHorseId(horseId));
   return (
     <div
       onClick={onClick}

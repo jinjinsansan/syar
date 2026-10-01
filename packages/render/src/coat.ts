@@ -232,7 +232,21 @@ function unitHashOf(text: string): number {
  * ⚠️ ★`bay`（鹿毛）は ★**素材そのまま**なので `undefined` を返します（★何も掛けない）。
  */
 export function coatCssFilter(coat: CoatName): string | undefined {
-  const t: CoatTransform | undefined = COAT_TRANSFORMS[coat];
+  return cssFilterOf(COAT_TRANSFORMS[coat]);
+}
+
+/**
+ * ★**デフォルメの馬の絵（★ホーム・育成モードの歩く馬）に掛ける CSS の `filter`**（★2026-10-01）。
+ *   🔴 ★旧: ★写真寄りの表（`coatCssFilter`）を掛けていた。★デフォルメの絵は ★素材がオレンジなので
+ *     ★鹿毛（★30%・素材そのまま）・栗毛・栃栗毛・月毛が ★**ほぼ同じオレンジ**に見え、★約 6 割の馬が同じ見た目だった
+ *     （★オーナー「全て同じ馬になっていませんか？」）。
+ *   ★レースの絵と同じ ★`DEFORMED_COAT_TRANSFORMS` を掛ける（★鹿毛も素材のままにしない）。
+ */
+export function deformedCoatCssFilter(coat: CoatName): string | undefined {
+  return cssFilterOf(DEFORMED_COAT_TRANSFORMS[coat]);
+}
+
+function cssFilterOf(t: CoatTransform | undefined): string | undefined {
   if (t === undefined) return undefined;
   const parts: string[] = [];
   if (t.hueRotate !== undefined) parts.push(`hue-rotate(${t.hueRotate}deg)`);

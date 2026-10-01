@@ -38,7 +38,8 @@ describe('★自分の馬は 同じ 1 頭の姿', () => {
   });
 
   it('③ ★毛色は ★馬 ID から（★`coatOfHorseId`・★レースの走りと同じ出どころ）', () => {
-    expect(PARTS).toContain('const coatFilter = coatCssFilter(coatOfHorseId(horseId));');
+    /** ★2026-10-01: ★デフォルメの絵なので デフォルメ用の表（★旧の写真向けの表では 約 6 割が同じオレンジだった） */
+    expect(PARTS).toContain('const coatFilter = deformedCoatCssFilter(coatOfHorseId(horseId));');
   });
 
   it('🔴 ① ★利用者の画面が ★見本の `chibi-horse` を ★「その馬」として出さない（★TOP の看板は別扱い）', () => {
