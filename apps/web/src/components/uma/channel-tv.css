@@ -331,9 +331,17 @@
   [data-theme='uma'].u-home .u-topbar-points .u-cap-label,
   [data-theme='uma'].u-home .u-topbar-points .u-cap-sub { display: none; }
   [data-theme='uma'].u-home .u-topbar-points .u-cap-icon { width: 9px; height: 9px; flex: 0 0 auto; }
-  [data-theme='uma'].u-home .u-topbar-points .u-cap-num { font-size: 19px; }
+  /*
+    ★数字は 画面の幅に合わせて縮める（★2026-10-02 iPhone 実機: ★左上の板を縮めなくした分 ★EP/PP の単位が はみ出した）。
+    ★390px で 16px・★430px 以上で 19px。★停止は 狭い幅では 記号だけ（★下）。
+  */
+  [data-theme='uma'].u-home .u-topbar-points .u-cap-num { font-size: clamp(13px, 4.2vw, 19px); }
   [data-theme='uma'].u-home .u-topbar-points .u-cap-unit { font-size: 9px; }
   [data-theme='uma'].u-home .u-topbar-end { margin-left: 0; }
+  [data-theme='uma'].u-home .u-topbar-logo { padding: 0 8px; }
+  [data-theme='uma'].u-home .u-topbar-points .u-cap { padding: 0 6px; gap: 3px; }
+  /* ★停止は 書き込みの寸法なので ★!important で 少し詰める（★当たりは 44px のまま） */
+  [data-theme='uma'].u-home .u-topbar-end > button { padding: 0 9px !important; font-size: 13px !important; }
 }
 @media (max-width: 1023px) and (max-height: 759px) {
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-field { height: 120px; }
@@ -366,7 +374,13 @@
   min-width: 64px; min-height: 44px; border: 2px solid var(--u-gold); border-radius: 999px; background: var(--u-panel-strong); color: var(--u-ink-light);
 }
 [data-theme='uma'] .u-tv-full-screen { width: 406px; height: 228px; flex: 0 0 auto; margin-top: 32px; transform: scale(var(--tv-full-scale, 1)); }
-[data-theme='uma'] .u-tv-full-screen.u-tv-full-rotate { margin-top: 0; transform: rotate(90deg) scale(var(--tv-full-scale, 1)); }
+/*
+  ★縦持ちで 90 度回す: ★上の見出し（64px）の下から始める（★2026-10-02 iPhone 実機: ★回したテレビが 見出しの下まで入り「小窓に戻す」が被った）。
+  ★回しても 箱の寸法は回す前のまま → ★margin-top 64px で 中心を 32px 下げる ＝ ★見た目の上端が 64px。★題「馬物語ch」は テレビの中にもあるので 出さない。
+*/
+[data-theme='uma'] .u-tv-full-screen.u-tv-full-rotate { margin-top: 64px; transform: rotate(90deg) scale(var(--tv-full-scale, 1)); }
+[data-theme='uma'] .u-tv-full-rot .u-tv-full-head { justify-content: flex-end; }
+[data-theme='uma'] .u-tv-full-rot .u-tv-full-head > strong { display: none; }
 [data-theme='uma'] .u-tv-full-screen > .u-tv { width: 406px; }
 /* ★横に持った携帯（★2026-10-02）: ★高さを全部 映像に・★見出しは ★映像の上に重ねる（★題は隠し ★「小窓に戻す」だけ右上に） */
 [data-theme='uma'] .u-tv-full-land .u-tv-full-screen { margin-top: 0; }

@@ -691,7 +691,7 @@ function RaceStripBody(): React.ReactElement | null {
     return () => { document.removeEventListener('fullscreenchange', onChange); };
   }, []);
   /** ★拡大した全画面のテレビの倍率（★画面の大きさから・★縦持ちで全画面に入れない端末は 90 度回す） */
-  const [fullTv, setFullTv] = useState<{ readonly scale: number; readonly rotate: boolean; readonly land: boolean }>({ scale: 1, rotate: false, land: false });
+  const [fullTv, setFullTv] = useState<{ readonly scale: number; readonly rotate: boolean; readonly land: boolean; readonly stageW: number | null; readonly portrait: boolean }>({ scale: 1, rotate: false, land: false, stageW: null, portrait: false });
   useEffect(() => {
     if (!expanded) return undefined;
     const fit = (): void => {
@@ -704,7 +704,17 @@ function RaceStripBody(): React.ReactElement | null {
       const land = coarse && window.innerWidth > window.innerHeight;
       const vw = window.innerWidth, vh = window.innerHeight - (land ? 0 : 64);
       const rotate = vh > vw && coarse;
-      setFullTv({ land, rotate, scale: rotate ? Math.min(vh / 406, vw / 228) : Math.min(vw / 406, vh / 228) });
+      /**
+       * ★**拡大した本編の横幅も ここで決める**（★2026-10-02 オーナー iPhone 実機「拡大画面でレース前の TV は画面いっぱい・レースが始まると急に小さくなる」）。
+       *   ★旧: ★CSS の `100dvh` で決めていた → ★`dvh` を知らない Safari では ★宣言ごと無効になり ★幅 100%（約 300px）に落ちた。
+       *   ★テレビ（上の `scale`）は JS で決めていたので 大きいままだった。★本編も JS で決める（★CSS の値は 予備として残す）。
+       *   ★縦（高さ ≧ 幅）では ★CSS が 90 度回すので ★幅は 高さ側で決める（★CSS の `orientation: portrait` と同じ境目）。
+       */
+      const H = window.innerHeight, W = window.innerWidth, head = land ? 0 : 64;
+      /** ★回すかも ★ここで決める（★幅と回転を 同じ判定で・★CSS は `u-stage-rot` を見る） */
+      const portrait = H >= W;
+      const stageW = portrait ? Math.min(H - head, W * 16 / 9) : Math.min(W, (H - head) * 16 / 9);
+      setFullTv({ land, rotate, portrait, scale: rotate ? Math.min(vh / 406, vw / 228) : Math.min(vw / 406, vh / 228), stageW: Math.floor(stageW) });
     };
     fit();
     window.addEventListener('resize', fit);
@@ -746,7 +756,7 @@ function RaceStripBody(): React.ReactElement | null {
    * ★**拡大したテレビ**（★本編が無い間・★2026-10-01）: ★同じ番組を ★PC の大きさで描いて 画面いっぱいに拡げる。
    *   ★本編がある間は ★本編の箱（`stageEl`）が全画面になる（★こちらは出さない）。
    */
-  const channelFullEl = expanded && !stageFull && tvMode !== null && nowMs !== null ? <div className={`u-tv-full${fullTv.land ? ' u-tv-full-land' : ''}`} role="dialog" aria-modal aria-label="中継番組">
+  const channelFullEl = expanded && !stageFull && tvMode !== null && nowMs !== null ? <div className={`u-tv-full${fullTv.land ? ' u-tv-full-land' : ''}${fullTv.rotate ? ' u-tv-full-rot' : ''}`} role="dialog" aria-modal aria-label="中継番組">
     <div className="u-tv-full-head">
       <strong>馬物語ch</strong>
       <button type="button" onClick={closeExpanded} aria-label="小窓に戻す">小窓に戻す</button>
@@ -769,8 +779,9 @@ function RaceStripBody(): React.ReactElement | null {
     profiles={profiles !== null && profiles.id === nextId ? profiles.map : null}
     reducedMotion={motionReduced} onAir={big} /> : null;
   /** ★本編の箱（★1 つだけ作る・★ビジョンでも スマホのテレビでも 同じ要素） */
-  const stageEl = <>{embed !== null && <div className={`u-race-strip-stage${big || stageFull ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}${stageFull ? ' u-race-strip-stage-full' : ''}`}
-        {...(stageFull && recent ? { role: 'dialog', 'aria-modal': true, 'aria-label': `${recent.name}のレース中継` } : {})}>
+  const stageEl = <>{embed !== null && <div className={`u-race-strip-stage${big || stageFull ? '' : ' u-race-strip-stage-offscreen'}${embedLive ? ' u-race-strip-stage-live' : ''}${stageFull && fullTv.stageW !== null ? (fullTv.portrait ? ' u-stage-js u-stage-rot' : ' u-stage-js') : ''}${stageFull ? ' u-race-strip-stage-full' : ''}`}
+        {...(stageFull && recent ? { role: 'dialog', 'aria-modal': true, 'aria-label': `${recent.name}のレース中継` } : {})}
+        style={stageFull && fullTv.stageW !== null ? { '--stage-w': `${fullTv.stageW}px` } as React.CSSProperties : undefined}>
         {/* ★本編（★`playing` まで 見えないまま読み込む・★触れない） */}
         <iframe ref={iframeRef} className="u-race-strip-embed" data-live={embedLive ? 'true' : 'false'}
           src={stripEmbedUrl(embed.id)} title="レースの中継" tabIndex={-1} />

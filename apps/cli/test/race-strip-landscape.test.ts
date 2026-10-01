@@ -58,7 +58,7 @@ describe('★③ 段 A ── 横にしたら その場で全画面', () => {
      *   ★iframe は ★帯に 1 つだけ・★拡大の印は ★その iframe を持つ箱の class（★別の箱・別の映像を作らない）。
      */
     expect(LIVE.match(/<iframe /g)?.length, '★拡大が 別の iframe を作っている（★頭出しになる）').toBe(1);
-    expect(LIVE).toMatch(/\$\{stageFull \? ' u-race-strip-stage-full' : ''\}`\}[\s\S]{0,200}<iframe ref=\{iframeRef\}/);
+    expect(LIVE).toMatch(/\$\{stageFull \? ' u-race-strip-stage-full' : ''\}`\}[\s\S]{0,600}<iframe ref=\{iframeRef\}/);
   });
 
   it('★対照 ①: ★拡大で 別の iframe を作る変異は ★落ちる', () => {
