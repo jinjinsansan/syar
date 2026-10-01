@@ -100,6 +100,22 @@ export function applyCoat(
 }
 
 /**
+ * ★**画素の並び（RGBA）の馬体だけに毛色を掛ける**（★2026-10-01・ホーム・育成の歩く馬）。
+ *   ★レースの `bakeCoat`（`race/page.tsx`）と同じ規則: ★透明は飛ばし ★`isHorseCoat` の画素だけ変える
+ *   （★たてがみ・目・輪郭・白斑・馬具は触らない）。
+ *   ⚠️ ★CSS の `filter` は ★**絵全体**に掛かり、★暗い毛色で 目や輪郭まで沈んで ★黒い膜を被せたように見えた。
+ */
+export function recolorCoatPixels(d: Uint8ClampedArray, t: CoatTransform): void {
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3]! < 8) continue;
+    const r = d[i]!, g = d[i + 1]!, b = d[i + 2]!;
+    if (!isHorseCoat(r, g, b)) continue;
+    const [R, G, B] = applyCoat(r, g, b, t);
+    d[i] = R; d[i + 1] = G; d[i + 2] = B;
+  }
+}
+
+/**
  * ★毛色の定義。**`ctx.filter` の文字列と同じ意味**を係数で持ちます。
  *   ⚠️ 文字列のまま `ctx.filter` に渡すと**素材全体**に掛かります。ここは
  *     「馬体の画素だけに掛ける」ために係数で持ちます。

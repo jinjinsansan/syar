@@ -38,8 +38,23 @@ describe('★自分の馬は 同じ 1 頭の姿', () => {
   });
 
   it('③ ★毛色は ★馬 ID から（★`coatOfHorseId`・★レースの走りと同じ出どころ）', () => {
-    /** ★2026-10-01: ★デフォルメの絵なので デフォルメ用の表（★旧の写真向けの表では 約 6 割が同じオレンジだった） */
-    expect(PARTS).toContain('const coatFilter = deformedCoatCssFilter(coatOfHorseId(horseId));');
+    /** ★2026-10-01: ★毛色は ★馬体の画素だけに焼く（`coated-image.ts`）。★毛色は馬 ID から */
+    expect(PARTS).toContain('const coat = coatOfHorseId(horseId);');
+    expect(PARTS).toMatch(/useCoatedImage\('\/art\/uma\/horse-walk-sheet\.webp', coat\)/);
+  });
+
+  /**
+   * 🔴 ★**馬の絵全体に CSS の filter を掛けない**（★2026-10-01・オーナー「馬の上に黒っぽくオーバーレイがあり薄暗い」）。
+   *   ★絵全体の brightness / saturate が ★膜を被せたように見えた。★掛けてよいのは影（drop-shadow）だけ。
+   */
+  it('🔴 ④ ★ホーム・育成の馬に 毛色の CSS filter が残っていない（★鹿毛は素材のまま）', () => {
+    const TRAIN = readFileSync(path.join(ROOT, 'apps/web/src/app/train/page.tsx'), 'utf8');
+    for (const [name, code] of [['uma-parts', PARTS], ['train', TRAIN]] as const) {
+      expect(code, name).not.toMatch(/deformedCoatCssFilter|coatCssFilter/);
+    }
+    const HOOK = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/coated-image.ts'), 'utf8');
+    expect(HOOK).toMatch(/if \(coat === 'bay'\) \{ setUrl\(\{ key, url: src \}\); return; \}/);
+    expect(HOOK).toContain('recolorCoatPixels(');
   });
 
   it('🔴 ① ★利用者の画面が ★見本の `chibi-horse` を ★「その馬」として出さない（★TOP の看板は別扱い）', () => {

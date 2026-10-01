@@ -31,7 +31,8 @@ import { NoHorseCard } from '../../components/uma/no-horse-card';
 import { TRAINING_MENUS } from '../../lib/game-demo';
 import { sendTrainingOrder } from '../../lib/training-order';
 import { conditionView, fatigueStepOf, sortStable, trainFaceOf, type StableHorse, type TrainFace } from '../../lib/stable';
-import { coatOfHorseId, deformedCoatCssFilter } from '@star/render';
+import { coatOfHorseId } from '@star/render';
+import { useCoatedImage } from '../../components/uma/coated-image';
 import { gradeEpCost, raceWeekMarkOf, type MenuId } from '@star/training';
 import { NoticeBar } from '../../components/uma/uma-parts';
 import { CLAIM_DEFAULT_MENU, CLAIM_TRAIN_EP_SHORT } from '../../lib/claims';
@@ -70,6 +71,34 @@ const FACE_PART: Record<TrainFace, string | null> = {
 };
 
 /** ★馬の札の状態（★資料 §3-1） */
+/**
+ * ★**顔アップ**（★全身と同じ毛色・★2026-10-01 から馬体の画素だけに焼く `coated-image.ts`）。
+ *   ★毛色は ★馬 ID から決定的に引く（★裁定 `REVIEW_HORSE_IDENTITY_VERDICT_20260923.md` §9）。
+ *   🔴 ★旧: ★CSS の filter を顔と表情の部品の全体に掛け、★目まで暗くなっていた。
+ */
+function CoatedFace({ horseId, face }: { readonly horseId: string; readonly face: TrainFace }): React.ReactElement {
+  const coat = coatOfHorseId(horseId);
+  const base = useCoatedImage('/art/uma/horse-face.webp', coat);
+  const part = FACE_PART[face];
+  const partUrl = useCoatedImage(part === null ? null : `/art/uma/horse-face-part-${part}.webp`, coat);
+  return (
+    <div style={{ position: 'relative', height: 101 }}>
+      {/* ★顔も同じ毛色にする（★全身と顔で色が違うと、別の馬に見える） */}
+      {base !== null && <span style={{
+        position: 'absolute', inset: 0,
+        // ★240x252 の頭部。★`contain` で入れる（★`cover` だと耳と鼻先が切れる）
+        background: `url('${base}') no-repeat center/contain`,
+      }} />}
+      {part !== null && partUrl !== null && (
+        <span style={{
+          position: 'absolute', inset: 0,
+          background: `url('${partUrl}') no-repeat center/contain`,
+        }} />
+      )}
+    </div>
+  );
+}
+
 function weekChip(h: StableHorse): { readonly text: string; readonly bg: string; readonly ink: string } {
   if (h.week.kind === 'todo') return { text: '未指示', bg: '#ffe483', ink: '#10243a' };
   if (h.week.kind === 'done') return { text: `指示済み ・ ${h.week.menu}`, bg: '#e4efe7', ink: '#1e7a3a' };
@@ -166,11 +195,6 @@ export default function TrainPage(): React.ReactElement {
   const fat = fatigueStepOf(horse.fatigue);
   /** ★顔は 3 種。★選ぶ規則は画面に置かない（★`trainFaceOf`・疲労が先） */
   const face = trainFaceOf(horse.condition, horse.fatigue);
-  /**
-   * ★**この馬の毛色**（★裁定 `REVIEW_HORSE_IDENTITY_VERDICT_20260923.md` §9・2026-09-23）。
-   *   ★馬 ID から決定的に引く。⚠️ ★色の式は `@star/render` が持つ（★画面で組み立てない）。
-   */
-  const coatFilter = deformedCoatCssFilter(coatOfHorseId(horse.id));
   /** ★実際に引かれる額（★ワーカーと同じ `gradeEpCost(献立, その馬の厩舎の格)`・2026-09-29） */
   const cost = gradeEpCost(spec.id as MenuId, horse.stableGrade);
   /** ★残高が足りなければ ★その週は無料の休養に落ちる（★ST001・training-runner）→ ★前もって言う・★受け取りへの道を並べる */
@@ -261,20 +285,7 @@ export default function TrainPage(): React.ReactElement {
               ⚠️ ★部品は ★**頭部と同じ画布**で作ってあります。★だから ★**`inset: 0` で重ねるだけ**です。
                  🔴 ★ここに座標を書かないこと（★頭部を切り直したら画面まで直すことになります）。
             */}
-            <div style={{ position: 'relative', height: 101, filter: coatFilter }}>
-              {/* ★顔も同じ毛色にする（★全身と顔で色が違うと、別の馬に見える） */}
-              <span style={{
-                position: 'absolute', inset: 0,
-                // ★240x252 の頭部。★`contain` で入れる（★`cover` だと耳と鼻先が切れる）
-                background: "url('/art/uma/horse-face.webp') no-repeat center/contain",
-              }} />
-              {FACE_PART[face] !== null && (
-                <span style={{
-                  position: 'absolute', inset: 0,
-                  background: `url('/art/uma/horse-face-part-${FACE_PART[face]}.webp') no-repeat center/contain`,
-                }} />
-              )}
-            </div>
+            <CoatedFace horseId={horse.id} face={face} />
             <div style={{ padding: '4px 6px', textAlign: 'center', fontSize: 11, borderTop: '2px solid rgba(246,194,28,.6)' }}>
               {FACE_WORD[face]}
             </div>

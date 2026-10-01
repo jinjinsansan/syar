@@ -16,7 +16,8 @@
  */
 
 import { useEffect, useState } from 'react';
-import { deformedCoatCssFilter, coatOfHorseId } from '@star/render';
+import { coatOfHorseId } from '@star/render';
+import { useCoatedImage } from './coated-image';
 import { PLATE_LAYERS, screenOverlayCss } from './backdrop-plate';
 import './uma-theme.css';
 
@@ -482,7 +483,14 @@ export function OwnHorseFigure({ horseId, running, onClick, style, className }: 
   /** ★置く場所の大きさを ★CSS の幅の段で変えるとき（★2026-10-01・/home の PC の舞台）。★絵と毛色は変えない */
   readonly className?: string;
 }): React.ReactElement {
-  const coatFilter = deformedCoatCssFilter(coatOfHorseId(horseId));
+  /**
+   * ★毛色は ★馬体の画素だけに焼く（★2026-10-01・`coated-image.ts`）。
+   *   🔴 ★旧: ★CSS の filter を絵全体に掛け、★目・輪郭・白斑まで暗くなって ★黒い膜を被せたように見えた（オーナー指摘）。
+   */
+  const coat = coatOfHorseId(horseId);
+  const walkUrl = useCoatedImage('/art/uma/horse-walk-sheet.webp', coat);
+  const standUrl = useCoatedImage('/art/uma/horse-stand.webp', coat);
+  const sheet = running ? walkUrl : standUrl;
   return (
     <div
       className={className}
@@ -503,9 +511,9 @@ export function OwnHorseFigure({ horseId, running, onClick, style, className }: 
         /**
          * ⚠️ ★`800% 100%` は `@keyframes u-walk`（0%→100%）と ★**対**です。★片方だけ変えるとコマが半分ずれます。
          */
-        background: running
-          ? "url('/art/uma/horse-walk-sheet.webp') no-repeat 0 0 / 800% 100%"
-          : "url('/art/uma/horse-stand.webp') no-repeat center/contain",
+        background: sheet === null ? undefined : running
+          ? `url('${sheet}') no-repeat 0 0 / 800% 100%`
+          : `url('${sheet}') no-repeat center/contain`,
         /**
          * 🔴 ★**`jump-none` を落とさないこと**（★2026-09-24・実ブラウザで実測）。
          *   ★既定の `steps(8)` は 0/8, 1/8 … 7/8 の位置で止まり、★8 コマ中 7 コマで 2 コマが半分ずつ映ります。
@@ -515,8 +523,8 @@ export function OwnHorseFigure({ horseId, running, onClick, style, className }: 
          *   ★旧 0.8 秒 ＝ 1 秒に 10 コマ。★その場で歩く大きな絵では ★脚だけが せわしなく入れ替わって見えた。
          */
         animation: running ? 'u-walk 1.6s steps(8, jump-none) infinite' : undefined,
-        // ⚠️ ★毛色を先に、影を後に掛ける（★逆にすると影まで毛色に染まる）
-        filter: `${coatFilter === undefined ? '' : `${coatFilter} `}drop-shadow(0 8px 12px rgba(8,18,8,.45))`,
+        // ★毛色は絵に焼いてあるので ★ここは影だけ
+        filter: 'drop-shadow(0 8px 12px rgba(8,18,8,.45))',
       }} />
     </div>
   );
