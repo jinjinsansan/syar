@@ -78,7 +78,7 @@ export default function HomePage(): React.ReactElement {
         {/* ★馬ステージ（★全幅ブリード） */}
         <div className="u-home-field" style={{ alignItems: horse ? 'flex-end' : 'center' }}>
           {/* ★**その馬の姿**（★育成・レースと同じ毛色・★見本の絵ではない・2026-09-28 オーナー指示） */}
-          {horse ? <><OwnHorseFigure horseId={horse.id} running className="u-home-horse" style={{ marginBottom: 36 }} />
+          {horse ? <><OwnHorseFigure horseId={horse.id} sex={horse.sex} running className="u-home-horse" style={{ marginBottom: 36 }} />
           {/* ★馬を替える矢印は ★2 頭以上の時だけ・★下の角に置いて 馬に被せない（★2026-09-29・オーナー「モバイルで△が馬に被る・1 頭の時は不要」） */}
           {horses.length > 1 && <>
             <button type="button" onClick={() => { move(-1); }} aria-label="前の馬" className="u-home-arrow u-home-arrow-left">‹</button>

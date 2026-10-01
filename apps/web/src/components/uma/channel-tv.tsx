@@ -15,6 +15,7 @@ import type { CSSProperties } from 'react';
 import type { Venue } from '@star/scheduler';
 import { coatOfHorseId } from '@star/render';
 import { useCoatedImage } from './coated-image';
+import { horseArt } from './uma-parts';
 import { bracketOrNull } from './race-strip-ticker';
 import {
   GOING_STEPS, courseLines, goingLabel, surfaceLabel, venueFacts,
@@ -175,8 +176,8 @@ function Table({ kind, size, now, runners, odds, race }: {
  * ★立ち姿 1 枚（★毛色は 馬体の画素だけ・★歩きの 8 コマは使わない・§6）。
  * 🔴 ★2026-10-01: ★見本の `train-body-idle`（★細身の別の絵柄）は ★ホームの馬と違う馬に見えた（オーナー指摘）→ ★ホーム・育成と同じ立ち姿 `horse-stand`。
  */
-function StandingHorse({ horseId, className, hires }: { readonly horseId: string | null; readonly className: string; readonly hires: boolean }): React.ReactElement {
-  const url = useCoatedImage(hires ? '/art/uma/horse-stand-2x.webp' : '/art/uma/horse-stand.webp', coatOfHorseId(horseId ?? 'unknown'));
+function StandingHorse({ horseId, sex, className, hires }: { readonly horseId: string | null; readonly sex: 'male' | 'female'; readonly className: string; readonly hires: boolean }): React.ReactElement {
+  const url = useCoatedImage(horseArt(sex, 'stand', hires), coatOfHorseId(horseId ?? 'unknown'));
   return <div className={className} style={url === null ? undefined : { backgroundImage: `url('${url}')` }} />;
 }
 
@@ -188,7 +189,7 @@ function StandingHorse({ horseId, className, hires }: { readonly horseId: string
  */
 function Paddock({ horse, index, field, hires }: { readonly horse: ChannelRunner; readonly index: number; readonly field: number; readonly hires: boolean }): React.ReactElement {
   return <div className="u-tv-paddock">
-    <WalkingHorse horseId={horse.horseId} hires={hires} />
+    <WalkingHorse horseId={horse.horseId} sex={horse.sex === 'female' ? 'female' : 'male'} hires={hires} />
     <div className="u-tv-paddock-id">
       <span className="u-tv-paddock-gate u-num" style={gateStyle(horse.gate, field)}>{horse.gate}</span>
       <span className="u-tv-l">{horse.name}</span>
@@ -199,10 +200,10 @@ function Paddock({ horse, index, field, hires }: { readonly horse: ChannelRunner
 }
 
 /** ★歩く馬（★歩きの 8 コマ ＋ 止めるとき用の立ち姿。★どちらを見せるかは CSS） */
-function WalkingHorse({ horseId, hires }: { readonly horseId: string | null; readonly hires: boolean }): React.ReactElement {
+function WalkingHorse({ horseId, sex, hires }: { readonly horseId: string | null; readonly sex: 'male' | 'female'; readonly hires: boolean }): React.ReactElement {
   const coat = coatOfHorseId(horseId ?? 'unknown');
-  const walk = useCoatedImage(hires ? '/art/uma/horse-walk-sheet-2x.webp' : '/art/uma/horse-walk-sheet.webp', coat);
-  const stand = useCoatedImage(hires ? '/art/uma/horse-stand-2x.webp' : '/art/uma/horse-stand.webp', coat);
+  const walk = useCoatedImage(horseArt(sex, 'walk', hires), coat);
+  const stand = useCoatedImage(horseArt(sex, 'stand', hires), coat);
   return <div className="u-tv-paddock-horse">
     {/* ⚠️ ★`800% 100%` と ★`u-walk` ＋ `steps(8, jump-none)` は ★対（★ホームの OwnHorseFigure と同じ） */}
     <span className="u-tv-paddock-walk" style={walk === null ? undefined : { backgroundImage: `url('${walk}')` }} />
@@ -214,7 +215,7 @@ function HorseCard({ horse, field, hires }: { readonly horse: ChannelRunner; rea
   const strategy = strategyLabel(horse.strategy);
   return <div className="u-tv-horse">
     <div className="u-tv-horse-thumb">
-      <StandingHorse horseId={horse.horseId} className="u-tv-horse-art" hires={hires} />
+      <StandingHorse horseId={horse.horseId} sex={horse.sex === 'female' ? 'female' : 'male'} className="u-tv-horse-art" hires={hires} />
       <span className="u-tv-gate u-num u-tv-horse-gate" style={gateStyle(horse.gate, field)}>{horse.gate}</span>
     </div>
     <div className="u-tv-horse-info">

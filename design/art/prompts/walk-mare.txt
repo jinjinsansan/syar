@@ -1,0 +1,26 @@
+IMAGE EDIT TASK — do not generate a new picture from scratch.
+
+INPUT IMAGE (pass it as an actual image input to the image tool; this is the picture to EDIT):
+  out/gen/walk-aligned/{NN}.png
+{REF}
+WHAT TO DO
+Turn this stallion into a MARE (a female racehorse) of the SAME breed, in the SAME pose, in the SAME cartoon art style.
+This is one frame of an 8-frame side-view walk cycle, so the legs, hooves and tail must stay exactly where they are.
+
+MAKE IT READ AS A MARE (clear but natural — not a pony, not a foal, not a unicorn):
+  - a finer, slightly smaller and more refined head; a straighter, softer face profile
+  - a gentle, calm eye (not the angry frown of the stallion), with a few long dark eyelashes
+  - a slimmer neck with a lower, less arched crest
+  - a slightly lighter, more elegant barrel and chest; the body a little less muscular
+  - the legs slightly finer at the cannon bones (same length, same positions)
+  - the mane a little finer and smoother, the same dark colour, the same length
+  - NO accessories: no ribbons, no flowers, no makeup, no bow
+
+KEEP — DO NOT CHANGE
+  - the exact same coat colour (the same bay/orange-brown body, the same black mane, tail and lower legs) and the same shading style and line weight
+  - the exact same pose: every leg and hoof in the same place, the tail in the same place, the head facing right at the same height
+  - the same overall size in the frame (the mare may be up to about 5% slimmer, never bigger)
+  - the image size and the transparent background (no ground, no shadow, no background)
+  - no saddle, no bridle, no jockey (the input has none — do not add any)
+
+Save the result as a PNG image with a transparent background.

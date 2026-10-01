@@ -487,8 +487,25 @@ function useWideFigure(): boolean | null {
   return wide;
 }
 
-export function OwnHorseFigure({ horseId, running, onClick, style, className }: {
+/**
+ * ★**馬の絵の名前**（★性別 × 立ち姿／歩きの 8 コマ × 1 倍／2 倍）。★絵の名前は ★ここ 1 か所（★テレビも使う）。
+ *   ★牝馬（★2026-10-02）: ★牡馬の歩き 8 コマを Codex で牝馬に描き直したもの（★仔馬誕生の母馬を手本・`tools/publish-uma-horse-frames.mjs --variant mare`）。
+ */
+/**
+ * ★牝馬の絵が 置いてあるか（★絵が揃う前に 出し分けの配線だけ先に出すため）。
+ *   ★false の間は 牝馬も 牡馬の絵（★404 で 絵が消えない）。★絵を置いたら true にする（★網 own-horse-figure ④）。
+ */
+export const MARE_ART_READY = true;
+
+export function horseArt(sex: 'male' | 'female', kind: 'stand' | 'walk', hires: boolean): string {
+  const base = sex === 'female' && MARE_ART_READY ? '/art/uma/horse-mare' : '/art/uma/horse';
+  return `${base}-${kind === 'walk' ? 'walk-sheet' : 'stand'}${hires ? '-2x' : ''}.webp`;
+}
+
+export function OwnHorseFigure({ horseId, sex, running, onClick, style, className }: {
   readonly horseId: string;
+  /** ★牝馬は ★牝馬の絵（★2026-10-02 オーナー「牝馬戦では さすがにメスの馬の絵が必要」・`horseArt`） */
+  readonly sex: 'male' | 'female';
   readonly running: boolean;
   readonly onClick?: () => void;
   /** ★置く場所の余白などだけ（★絵と毛色は変えない） */
@@ -508,8 +525,8 @@ export function OwnHorseFigure({ horseId, running, onClick, style, className }: 
    *   ★幅が分かるまでは 読まない（★1 倍と 2 倍を 両方読まない）。
    */
   const hires = useWideFigure();
-  const walkUrl = useCoatedImage(hires === null ? null : hires ? '/art/uma/horse-walk-sheet-2x.webp' : '/art/uma/horse-walk-sheet.webp', coat);
-  const standUrl = useCoatedImage(hires === null ? null : hires ? '/art/uma/horse-stand-2x.webp' : '/art/uma/horse-stand.webp', coat);
+  const walkUrl = useCoatedImage(hires === null ? null : horseArt(sex, 'walk', hires), coat);
+  const standUrl = useCoatedImage(hires === null ? null : horseArt(sex, 'stand', hires), coat);
   const sheet = running ? walkUrl : standUrl;
   return (
     <div

@@ -297,7 +297,7 @@ export default function TrainPage(): React.ReactElement {
             <span style={{ position: 'absolute', left: '12%', bottom: 16, width: 60, height: 44, borderRadius: '50%', background: 'rgba(228,226,208,.4)', filter: 'blur(8px)', animation: 'u-dust .95s linear infinite' }} />
           )}
           {/* ★その馬の姿（★`/home`・`/mypage` と 同じ部品・★毛色は馬 ID から・2026-09-28）。★2026-09-30 オーナー「ダッシュボードと同じく歩くように」→ ★いつも歩く */}
-          <OwnHorseFigure horseId={horse.id} running onClick={run} style={{ marginBottom: 24 }} />
+          <OwnHorseFigure horseId={horse.id} sex={horse.sex} running onClick={run} style={{ marginBottom: 24 }} />
         </div>
 
         {/* ★馬の様子（§3-2・濃紺パネル）。★数字は出さない（★段と言葉だけ） */}

@@ -22,12 +22,20 @@
  * ⚠️ ★DB に触れません（★画像を書くだけ）。★入力が 8 コマ揃っていなければ ★**何も置きません**。
  * ⚠️ ★毛色は焼き込みません（★画面が `coatCssFilter` で掛けます・★裁定 20260923 §9）。
  *
- * ★実行: node tools/publish-uma-horse-frames.mjs
+ * ★`--variant mare`（★2026-10-02・オーナー「牝馬戦では さすがにメスの馬の絵が必要」「仔馬誕生の母馬を手本に」）:
+ *   ★入力 `out/gen/walk-mare-aligned/`（★上の ③ の出力を ★`design/art/prompts/walk-mare.txt` で Codex に牝馬へ描き直させ、
+ *   ★01 を手本に 02〜08 を揃え、★`align-pose-set.mjs` で揃えたもの）→ ★`horse-mare-walk-sheet*`・`horse-mare-stand*`・`horse-mare-face`。
+ *   ★1 コマずつの絵（`horse-walk-NN`）は 牝馬では書かない（★画面は表しか読まない）。
+ *
+ * ★実行: node tools/publish-uma-horse-frames.mjs [--hires] [--variant mare]
  */
 import { existsSync, mkdirSync } from 'node:fs';
 import sharp from 'sharp';
 
-const SRC = 'out/gen/walk-aligned';
+const MARE = process.argv.includes('--variant') && process.argv[process.argv.indexOf('--variant') + 1] === 'mare';
+const SRC = MARE ? 'out/gen/walk-mare-aligned' : 'out/gen/walk-aligned';
+/** ★書き出す名前の頭（★牡馬 `horse`・★牝馬 `horse-mare`） */
+const NAME = MARE ? 'horse-mare' : 'horse';
 const OUT = 'apps/web/public/art/uma';
 /**
  * ★画面での表示幅 272px の 2 倍（★高解像度の端末で滲まない最小）。
@@ -104,7 +112,7 @@ console.log(`  共通の切り出し: ${width}x${height} @(${left},${top})  → 
 console.log('  コマ  足元の帯の横幅');
 
 mkdirSync(OUT, { recursive: true });
-for (let i = 0; i < 8 && !HIRES; i += 1) {
+for (let i = 0; i < 8 && !HIRES && !MARE; i += 1) {
   const base = sharp(`${SRC}/${nn(i)}.png`).extract({ left, top, width, height })
     .resize(OUT_W, outH, { fit: 'fill', kernel: 'lanczos3' });
   await base.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/horse-walk-${nn(i)}.png`);
@@ -116,10 +124,10 @@ for (let i = 0; i < 8 && !HIRES; i += 1) {
 const stand = m.reduce((best, s, i) => (s.footSpan < m[best].footSpan ? i : best), 0);
 const standSrc = sharp(`${SRC}/${nn(stand)}.png`).extract({ left, top, width, height })
   .resize(OUT_W, outH, { fit: 'fill', kernel: 'lanczos3' });
-await standSrc.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/horse-stand${SUFFIX}.png`);
-await standSrc.clone().webp({ quality: 90 }).toFile(`${OUT}/horse-stand${SUFFIX}.webp`);
-console.log(`\n★立ち姿 = コマ ${nn(stand)}（足元 ${m[stand].footSpan}px・いちばん狭い） → ${OUT}/horse-stand.webp`);
-console.log(`★歩き 8 コマ → ${OUT}/horse-walk-01..08.webp`);
+await standSrc.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/${NAME}-stand${SUFFIX}.png`);
+await standSrc.clone().webp({ quality: 90 }).toFile(`${OUT}/${NAME}-stand${SUFFIX}.webp`);
+console.log(`\n★立ち姿 = コマ ${nn(stand)}（足元 ${m[stand].footSpan}px・いちばん狭い） → ${OUT}/${NAME}-stand${SUFFIX}.webp`);
+if (!MARE && !HIRES) console.log(`★歩き 8 コマ → ${OUT}/horse-walk-01..08.webp`);
 
 /** ★顔アップ（★立ち姿と同じコマから切る） */
 const headRect = {
@@ -131,10 +139,10 @@ const headRect = {
 const headH = Math.round((headRect.height / headRect.width) * HEAD_W);
 const head = sharp(`${SRC}/${nn(stand)}.png`).extract(headRect).resize(HEAD_W, headH, { kernel: 'lanczos3' });
 if (!HIRES) {
-  await head.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/horse-face.png`);
-  await head.clone().webp({ quality: 92 }).toFile(`${OUT}/horse-face.webp`);
+  await head.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/${NAME}-face.png`);
+  await head.clone().webp({ quality: 92 }).toFile(`${OUT}/${NAME}-face.webp`);
 }
-console.log(`★顔アップ（コマ ${nn(stand)} から切り出し・焼いていない） → ${OUT}/horse-face.webp  ${HEAD_W}x${headH}`);
+console.log(`★顔アップ（コマ ${nn(stand)} から切り出し・焼いていない） → ${OUT}/${NAME}-face.webp  ${HEAD_W}x${headH}`);
 
 /**
  * ★横並びのスプライト表（★8 コマを 1 枚に）。
@@ -149,6 +157,6 @@ const sheet = sharp({
   left: OUT_W * i,
   top: 0,
 }))));
-await sheet.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/horse-walk-sheet${SUFFIX}.png`);
-await sheet.clone().webp({ quality: 90 }).toFile(`${OUT}/horse-walk-sheet${SUFFIX}.webp`);
-console.log(`★スプライト表 → ${OUT}/horse-walk-sheet.webp  ${OUT_W * 8}x${outH}（★画面は background-size: 800% 100%）`);
+await sheet.clone().png({ compressionLevel: 9 }).toFile(`${OUT}/${NAME}-walk-sheet${SUFFIX}.png`);
+await sheet.clone().webp({ quality: 90 }).toFile(`${OUT}/${NAME}-walk-sheet${SUFFIX}.webp`);
+console.log(`★スプライト表 → ${OUT}/${NAME}-walk-sheet${SUFFIX}.webp  ${OUT_W * 8}x${outH}（★画面は background-size: 800% 100%）`);

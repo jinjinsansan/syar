@@ -19,6 +19,8 @@ export interface FieldProfile {
   readonly starts: number | null;
   readonly wins: number | null;
   readonly recent: readonly number[] | null;
+  /** ★性別（★牝馬の絵・`0101`）。★読めなければ null（★牡馬の絵） */
+  readonly sex: 'male' | 'female' | null;
 }
 
 const RECENT_MAX = 5;
@@ -46,7 +48,7 @@ export async function fetchFieldProfiles(raceId: string, client = readClient()):
         }))
     .filter((e) => Number.isInteger(e.gate) && e.gate >= 1);
   const ids = rows.map((r) => r.horseId).filter((id): id is string => id !== null);
-  const [record, recent] = await Promise.all([fetchRecords(client, ids), fetchRecent(client, ids, raceId)]);
+  const [record, recent, sexes] = await Promise.all([fetchRecords(client, ids), fetchRecent(client, ids, raceId), fetchSexes(client, raceId)]);
   const out = new Map<number, FieldProfile>();
   for (const r of rows) {
     const rec = r.horseId === null ? null : record.get(r.horseId) ?? null;
@@ -55,7 +57,23 @@ export async function fetchFieldProfiles(raceId: string, client = readClient()):
       starts: rec?.starts ?? null,
       wins: rec?.wins ?? null,
       recent: r.horseId === null ? null : recent.get(r.horseId) ?? [],
+      sex: sexes.get(r.gate) ?? null,
     });
+  }
+  return out;
+}
+
+/**
+ * ★**性別**（★`0101` で公開ビューに足した列）。★別の読み込みにする:
+ *   ★移行の適用前は この列が無く ★読み込みが失敗する → ★空（★みな牡馬の絵）で続け、★ほかの項目を巻き込まない。
+ */
+async function fetchSexes(client: ReturnType<typeof readClient>, raceId: string): Promise<ReadonlyMap<number, 'male' | 'female'>> {
+  const out = new Map<number, 'male' | 'female'>();
+  const res = await client.from('race_entries_public').select('gate,sex').eq('race_id', raceId);
+  if (res.error !== null) return out;
+  for (const e of (res.data ?? []) as Record<string, unknown>[]) {
+    const gate = Number(e['gate']);
+    if (Number.isInteger(gate) && (e['sex'] === 'male' || e['sex'] === 'female')) out.set(gate, e['sex']);
   }
   return out;
 }

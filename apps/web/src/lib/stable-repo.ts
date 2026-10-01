@@ -110,6 +110,7 @@ function toStableHorse(row: MyHorseRow, gameWeek: number, runs: RunSummary): Sta
     name: row.name,
     /** ★性別と年齢は ★`formatSexAge` 1 か所で（★2026-09-27 に寄せた・D-052） */
     sexAge: formatSexAge(row.sex, row.birth_week, gameWeek),
+    sex: row.sex === 'female' ? 'female' : 'male',
     classRank: rank,
     classLabel: CLASS_LABEL[rank - 1] ?? '?',
     condition: Math.min(5, Math.max(1, Number(row.condition))) as StableHorse['condition'],

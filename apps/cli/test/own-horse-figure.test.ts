@@ -8,7 +8,7 @@
  *   ③ ★毛色が ★馬 ID でなく 別の物（枠番・並び順）から決まる
  */
 import { describe, it, expect } from 'vitest';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -41,7 +41,37 @@ describe('★自分の馬は 同じ 1 頭の姿', () => {
     /** ★2026-10-01: ★毛色は ★馬体の画素だけに焼く（`coated-image.ts`）。★毛色は馬 ID から */
     expect(PARTS).toContain('const coat = coatOfHorseId(horseId);');
     /** ★2026-10-01: ★PC は 2 倍の表（`-2x`）・★スマホは 1 倍。★どちらも 同じ毛色（`coat`） */
-    expect(PARTS).toMatch(/useCoatedImage\(hires === null \? null : hires \? '\/art\/uma\/horse-walk-sheet-2x\.webp' : '\/art\/uma\/horse-walk-sheet\.webp', coat\)/);
+    /** ★2026-10-02: ★絵の名前は ★`horseArt`（★性別 × 立ち姿／歩き × 1 倍／2 倍）。★どれも 同じ毛色（`coat`） */
+    expect(PARTS).toContain("const walkUrl = useCoatedImage(hires === null ? null : horseArt(sex, 'walk', hires), coat);");
+    expect(PARTS).toContain("const standUrl = useCoatedImage(hires === null ? null : horseArt(sex, 'stand', hires), coat);");
+  });
+
+  /** ★牝馬は 牝馬の絵（★2026-10-02 オーナー「牝馬戦では さすがにメスの馬の絵が必要」） */
+  it('④ ★絵の名前は 性別 × 立ち姿／歩き × 1 倍／2 倍（★牝馬は horse-mare-*）・★画面は その馬の性別を渡す', () => {
+    /** ★JSX の部品は ここでは読み込めないので ★原文から関数を取り出して ★そのまま動かす（★写さない） */
+    const m = /export function horseArt\(([^)]*)\)[^{]*\{([\s\S]*?)\n\}/.exec(PARTS);
+    expect(m, '★horseArt が無い').not.toBeNull();
+    const params = m![1]!.split(',').map((p) => p.split(':')[0]!.trim());
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    /** ★`MARE_ART_READY` は ★原文の値を そのまま渡す（★絵を置く前は false ＝ 牝馬も牡馬の絵） */
+    const ready = /export const MARE_ART_READY = (true|false);/.exec(PARTS);
+    expect(ready, '★MARE_ART_READY が無い').not.toBeNull();
+    const f = new Function('MARE_ART_READY', ...params, m![2]!).bind(null, ready![1] === 'true') as (s: string, k: string, h: boolean) => string;
+    expect(f('male', 'walk', false)).toBe('/art/uma/horse-walk-sheet.webp');
+    expect(f('male', 'stand', true)).toBe('/art/uma/horse-stand-2x.webp');
+    if (ready![1] === 'true') {
+      expect(f('female', 'walk', true)).toBe('/art/uma/horse-mare-walk-sheet-2x.webp');
+      expect(f('female', 'stand', false)).toBe('/art/uma/horse-mare-stand.webp');
+      /** ★置いたと言うなら ★本当に置いてある（★404 で 絵が消えない） */
+      for (const f2 of ['horse-mare-walk-sheet.webp', 'horse-mare-walk-sheet-2x.webp', 'horse-mare-stand.webp', 'horse-mare-stand-2x.webp']) {
+        expect(existsSync(path.join(ROOT, 'apps/web/public/art/uma', f2)), `★${f2} が無い`).toBe(true);
+      }
+    } else {
+      expect(f('female', 'walk', true), '★絵を置く前に 牝馬の名前を出している（★404）').toBe('/art/uma/horse-walk-sheet-2x.webp');
+    }
+    for (const page of ['apps/web/src/app/train/page.tsx', 'apps/web/src/app/home/page.tsx', 'apps/web/src/app/mypage/page.tsx']) {
+      expect(live(read(page)), `★${page} が 性別を渡していない`).toMatch(/<OwnHorseFigure horseId=\{horse\.id\} sex=\{horse\.sex\}/);
+    }
   });
 
   /**

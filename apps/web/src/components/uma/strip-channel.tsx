@@ -75,7 +75,7 @@ export function StripChannel(p: StripChannelProps): React.ReactElement {
     const pr = p.profiles?.get(r.gate) ?? null;
     return {
       ...r,
-      horseId: pr?.horseId ?? null, strategy: pr?.strategy ?? null, weight: pr?.weight ?? null, popularity: pr?.popularity ?? null,
+      horseId: pr?.horseId ?? null, sex: pr?.sex ?? null, strategy: pr?.strategy ?? null, weight: pr?.weight ?? null, popularity: pr?.popularity ?? null,
       isMine: next !== null && p.myGates?.has(`${next.id}:${r.gate}`) === true, starts: pr?.starts ?? null, wins: pr?.wins ?? null, recent: pr?.recent ?? null,
     };
   });

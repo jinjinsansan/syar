@@ -57,7 +57,7 @@ export default function MyPage(): React.ReactElement {
         <div style={{ minHeight: 210, position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', border: '2px solid rgba(251,247,236,.28)', borderRadius: 12, background: 'var(--u-panel)', overflow: 'hidden' }}>
           <strong style={{ position: 'absolute', top: 10, left: 12 }}>{horse.name}</strong>
           {/* ★**その馬の姿**（★育成・レースと同じ毛色・★見本の絵ではない・2026-09-28） */}
-          <OwnHorseFigure horseId={horse.id} running={false} style={{ width: 230, maxWidth: '100%', margin: '28px auto 0' }} />
+          <OwnHorseFigure horseId={horse.id} sex={horse.sex} running={false} style={{ width: 230, maxWidth: '100%', margin: '28px auto 0' }} />
         </div>
         <div style={{ padding: 12, border: '2px solid rgba(251,247,236,.28)', borderRadius: 12, background: 'var(--u-panel)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>調子</span><strong>{conditionView(horse.condition).label}</strong></div>

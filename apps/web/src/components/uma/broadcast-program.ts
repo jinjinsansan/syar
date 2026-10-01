@@ -134,6 +134,8 @@ export function cycleSecOf(nowMs: number, scheduledAtMs: number): number | null 
 /** ★出走馬（★番組が使う形）。★読めない項目は `null`（★埋めない） */
 export interface ChannelRunner extends TickerRunner {
   readonly horseId: string | null;
+  /** ★性別（★牝馬の絵・★わからなければ null ＝ 牡馬の絵） */
+  readonly sex?: 'male' | 'female' | null;
   /** ★脚質（★DB の値 `nige` など・★言葉は画面の側の表） */
   readonly strategy: string | null;
   readonly weight: number | null;

@@ -60,7 +60,8 @@ describe('🔴 ★育成の歩き（スプライト表）', () => {
 
   it('🔴 ★`background-size` の横幅が ★コマ数 × 100% になっている', () => {
     /** ★2026-10-01: ★表は 毛色を焼いた URL（`useCoatedImage('/art/uma/horse-walk-sheet.webp', …)`）で渡し、★背景は `url('${sheet}') … / N% 100%` */
-    expect(PAGE).toContain("'/art/uma/horse-walk-sheet.webp', coat)");
+    /** ★2026-10-02: ★絵の名前は `horseArt`（★性別 × 1 倍／2 倍・牝馬は horse-mare-*）。★名前の決まりは own-horse-figure ④ */
+    expect(PAGE).toContain("horseArt(sex, 'walk', hires), coat)");
     /** ★PC の 2 倍の表（★2026-10-01）も ★同じコマ数（★幅 ÷ 高さが 1 倍の表と同じ ＝ 横 8 コマ） */
     const webpSize = (file: string): { readonly w: number; readonly h: number } => {
       const b = readFileSync(file);
@@ -71,6 +72,11 @@ describe('🔴 ★育成の歩き（スプライト表）', () => {
     const x2 = webpSize(path.join(ART, 'horse-walk-sheet-2x.webp'));
     expect(x2.w, '★2 倍の表の幅').toBe(x1.w * 2);
     expect(x2.h, '★2 倍の表の高さ').toBe(x1.h * 2);
+    /** ★牝馬の表も ★同じコマ数（★幅 ÷ 高さ が 牡馬の表と 1% 以内・★同じ 800% 100% で送る） */
+    for (const [a, b] of [['horse-mare-walk-sheet.webp', x1], ['horse-mare-walk-sheet-2x.webp', x2]] as const) {
+      const s = webpSize(path.join(ART, a));
+      expect(Math.abs(s.w / s.h - b.w / b.h) / (b.w / b.h), `★${a} のコマ数が 牡馬と違う`).toBeLessThan(0.01);
+    }
     const m = PAGE.match(/url\('\$\{sheet\}'\) no-repeat 0 0 \/\s*(\d+)%\s*100%/);
     expect(m, '🔴 ★歩きの表に `/ <幅>% 100%` が付いていない').not.toBeNull();
     expect(Number(m![1]), `🔴 ★${FRAMES} コマなら ${FRAMES * 100}% です`).toBe(FRAMES * 100);
