@@ -309,4 +309,30 @@
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > :nth-child(-n + 2) { min-height: 60px !important; }
 }
 
+/* ★スマホの「拡大」（★テレビの右下・下の帯の上・★当たりは 44px） */
+[data-theme='uma'] .u-tvstrip-expand {
+  position: absolute; right: 6px; bottom: 24px; z-index: 5; min-width: 44px; min-height: 30px; padding: 0 12px;
+  border: 2px solid var(--u-gold); border-radius: 999px; background: rgba(6, 26, 51, .85); color: var(--u-ink-light); font-size: 12px;
+}
+/* ★PC の「拡大」は ★テレビの右下（★下の帯にかからない） */
+[data-theme='uma'] .u-race-strip-vision > .u-race-strip-expand { margin-bottom: 28px !important; }
+
+/*
+  ★**拡大したテレビ**（★本編が無い間・★2026-10-01）: ★PC の大きさ（406×228）で描いて ★画面いっぱいへ拡げる。
+  ★縦持ちで 全画面・横向き固定に入れない端末は ★90 度回す（★本編の拡大と同じ考え方）。
+*/
+[data-theme='uma'] .u-tv-full {
+  position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: #0a2340; overflow: hidden;
+}
+[data-theme='uma'] .u-tv-full-head {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: max(8px, env(safe-area-inset-top)) 14px 8px; color: var(--u-ink-light);
+}
+[data-theme='uma'] .u-tv-full-head button {
+  min-width: 64px; min-height: 44px; border: 2px solid var(--u-gold); border-radius: 999px; background: var(--u-panel-strong); color: var(--u-ink-light);
+}
+[data-theme='uma'] .u-tv-full-screen { width: 406px; height: 228px; flex: 0 0 auto; margin-top: 32px; transform: scale(var(--tv-full-scale, 1)); }
+[data-theme='uma'] .u-tv-full-screen.u-tv-full-rotate { margin-top: 0; transform: rotate(90deg) scale(var(--tv-full-scale, 1)); }
+[data-theme='uma'] .u-tv-full-screen > .u-tv { width: 406px; }
+
 [data-theme='uma'] .u-tvstrip > .u-race-strip-error { position: absolute; left: 6px; bottom: -18px; font-size: 11px; }

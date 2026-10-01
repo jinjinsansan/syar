@@ -62,7 +62,8 @@ describe('★③ 段 A ── 横にしたら その場で全画面', () => {
   });
 
   it('★対照 ①: ★拡大で 別の iframe を作る変異は ★落ちる', () => {
-    const mutated = LIVE.replace('{watchable && <button', '{expanded && <iframe src="/race" />}{watchable && <button');
+    /** ★2026-10-01: ★「拡大」は テレビがあれば いつも出す（★`(watchable || tvMode !== null) && !expanded`） */
+    const mutated = LIVE.replace('{(watchable || tvMode !== null) && !expanded && <button', '{expanded && <iframe src="/race" />}{(watchable || tvMode !== null) && !expanded && <button');
     expect(mutated, '★変異が当たっていない').not.toBe(LIVE);
     expect(mutated.match(/<iframe /g)?.length).toBe(2);
   });
@@ -72,7 +73,7 @@ describe('★③ 段 A ── 横にしたら その場で全画面', () => {
       expect(LIVE, `★拡大の部品が ${nav} を使っている`).not.toContain(nav);
     }
     /** ★開くのは ★状態だけ（★同じ React の木の中の重ね表示） */
-    expect(LIVE).toMatch(/if \(step === 'open' && replayingRef\.current\) \{ autoOpenedRef\.current = true; setExpanded\(true\); \}/);
+    expect(LIVE).toMatch(/if \(step === 'open' && replayingRef\.current && !expandedRef\.current\) \{ autoOpenedRef\.current = true; setExpanded\(true\); \}/);
     expect(LIVE).toContain("{embed !== null && <div className={`u-race-strip-stage${big || expanded ? '' : ' u-race-strip-stage-offscreen'}");
   });
 

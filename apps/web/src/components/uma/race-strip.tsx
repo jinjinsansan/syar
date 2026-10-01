@@ -372,6 +372,39 @@ function RaceStripBody(): React.ReactElement | null {
   const [nowMs, setNowMs] = useState<number | null>(null);
   const [motionReduced, setMotionReduced] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  /**
+   * ★**拡大・小窓に戻す の出入口は ここ 1 か所**（★2026-10-01・オーナー「スマホで拡大したら 横向きの全画面に・小窓に戻すボタン・バグが出ないように」）。
+   *   ★拡大: ★ブラウザの全画面（★`requestFullscreen`）＋ ★触る端末は 横向きに固定（★`screen.orientation.lock`）。
+   *     ★使えない端末（★iPhone の Safari など）は ★従来どおり 画面いっぱいの重ね表示（★縦なら 90 度回す・CSS）。
+   *     ★全画面の要求は ★押した操作の中で呼ぶ（★ブラウザの決まり）。★iframe は作り直さない（★同じ箱を広げるだけ）。
+   *   ★戻す: ★全画面と向きの固定を外してから 小窓へ。★全画面を外から抜けたとき（`fullscreenchange`）も ★ここを通る。
+   */
+  const enteredFullscreenRef = useRef(false);
+  const expandedRef = useRef(false);
+  expandedRef.current = expanded;
+  const openExpanded = (): void => {
+    setExpanded(true);
+    const root = document.documentElement;
+    if (typeof root.requestFullscreen !== 'function' || document.fullscreenElement !== null) return;
+    root.requestFullscreen().then(() => {
+      enteredFullscreenRef.current = true;
+      const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+      if (window.matchMedia('(pointer: coarse)').matches && typeof orientation.lock === 'function') {
+        orientation.lock('landscape').catch(() => undefined);
+      }
+    }, () => undefined);
+  };
+  const closeExpanded = (): void => {
+    autoOpenedRef.current = false;
+    setExpanded(false);
+    if (enteredFullscreenRef.current || document.fullscreenElement !== null) {
+      enteredFullscreenRef.current = false;
+      try { screen.orientation.unlock(); } catch { /* ★固定していない端末 */ }
+      if (document.fullscreenElement !== null) document.exitFullscreen().catch(() => undefined);
+    }
+  };
+  const closeExpandedRef = useRef(closeExpanded);
+  closeExpandedRef.current = closeExpanded;
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -400,7 +433,8 @@ function RaceStripBody(): React.ReactElement | null {
     const onChange = (): void => {
       const step = autoExpandOf(wasLandscape, land.matches, touch.matches);
       wasLandscape = land.matches;
-      if (step === 'open' && replayingRef.current) { autoOpenedRef.current = true; setExpanded(true); }
+      /** ★すでに拡大していれば 記録しない（★「拡大」→ 横向きの固定 → 回転、で 自動で開いたものと取り違えない・2026-10-01） */
+      if (step === 'open' && replayingRef.current && !expandedRef.current) { autoOpenedRef.current = true; setExpanded(true); }
       if (step === 'close' && autoOpenedRef.current) { autoOpenedRef.current = false; setExpanded(false); }
     };
     land.addEventListener('change', onChange);
@@ -409,7 +443,7 @@ function RaceStripBody(): React.ReactElement | null {
 
   useEffect(() => {
     if (!expanded) return;
-    const onKey = (event: KeyboardEvent): void => { if (event.key === 'Escape') setExpanded(false); };
+    const onKey = (event: KeyboardEvent): void => { if (event.key === 'Escape') closeExpandedRef.current(); };
     window.addEventListener('keydown', onKey);
     return () => { window.removeEventListener('keydown', onKey); };
   }, [expanded]);
@@ -636,8 +670,31 @@ function RaceStripBody(): React.ReactElement | null {
   }, [expanded, embedLive, embed]);
   useEffect(() => {
     replayingRef.current = watchable;
-    if (!watchable) { setExpanded(false); autoOpenedRef.current = false; }
+    /**
+     * ★2026-10-01: ★レースが終わっても ★手で開いた拡大は閉じない（★本編が無くなったら ★テレビの番組を全画面で出す）。
+     *   ★横向きで自動で開いたものだけ 閉じる（★条件 3）。
+     */
+    if (!watchable && autoOpenedRef.current) { autoOpenedRef.current = false; closeExpandedRef.current(); }
   }, [watchable]);
+  /** ★全画面を抜けたら（★端末の戻る・Esc・ブラウザの操作）★小窓に戻す（★状態をずらさない） */
+  useEffect(() => {
+    const onChange = (): void => { if (document.fullscreenElement === null && enteredFullscreenRef.current) { enteredFullscreenRef.current = false; closeExpandedRef.current(); } };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => { document.removeEventListener('fullscreenchange', onChange); };
+  }, []);
+  /** ★拡大した全画面のテレビの倍率（★画面の大きさから・★縦持ちで全画面に入れない端末は 90 度回す） */
+  const [fullTv, setFullTv] = useState<{ readonly scale: number; readonly rotate: boolean }>({ scale: 1, rotate: false });
+  useEffect(() => {
+    if (!expanded) return undefined;
+    const fit = (): void => {
+      const vw = window.innerWidth, vh = window.innerHeight - 64;
+      const rotate = vh > vw && window.matchMedia('(pointer: coarse)').matches;
+      setFullTv({ rotate, scale: rotate ? Math.min(vh / 406, vw / 228) : Math.min(vw / 406, vh / 228) });
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => { window.removeEventListener('resize', fit); };
+  }, [expanded]);
 
   const leader = leaderOf(replayRows);
   /**
@@ -670,6 +727,25 @@ function RaceStripBody(): React.ReactElement | null {
     : replaying && recent ? recent : null;
 
   /** ★小窓テレビの中身（★時計は帯の `nowMs`・★本編が上に重なっている間は 上の帯に「● 中継」） */
+  /**
+   * ★**拡大したテレビ**（★本編が無い間・★2026-10-01）: ★同じ番組を ★PC の大きさで描いて 画面いっぱいに拡げる。
+   *   ★本編がある間は ★本編の箱（`stageEl`）が全画面になる（★こちらは出さない）。
+   */
+  const channelFullEl = expanded && embed === null && tvMode !== null && nowMs !== null ? <div className="u-tv-full" role="dialog" aria-modal aria-label="中継番組">
+    <div className="u-tv-full-head">
+      <strong>馬物語ch</strong>
+      <button type="button" onClick={closeExpanded} aria-label="小窓に戻す">小窓に戻す</button>
+    </div>
+    <div className={`u-tv-full-screen${fullTv.rotate ? ' u-tv-full-rotate' : ''}`} style={{ '--tv-full-scale': String(fullTv.scale) } as React.CSSProperties}>
+      <StripChannel
+        size="pc" nowMs={nowMs} next={next ?? null}
+        recent={recent ? { name: recent.name, status: recent.status } : null}
+        recentRunners={data?.runners ?? []} recentId={recent?.id ?? null} field={data?.nextField ?? []}
+        myGates={myGates !== null && myGates.key === mineKey ? myGates.set : null}
+        profiles={profiles !== null && profiles.id === nextId ? profiles.map : null}
+        reducedMotion={motionReduced} onAir={false} />
+    </div>
+  </div> : null;
   const channelEl = tvMode !== null && nowMs !== null ? <StripChannel
     size={tvMode === 'pc' ? 'pc' : 'sp'} nowMs={nowMs} next={next ?? null}
     recent={recent ? { name: recent.name, status: recent.status } : null}
@@ -688,7 +764,7 @@ function RaceStripBody(): React.ReactElement | null {
         {expanded && <div className="u-race-strip-stage-head">
           {/* ★「本編」と名乗らない（★条件 1）。★録画・結果から再現 */}
           <strong>{recent?.name ?? ''} · 中継</strong>
-          <button type="button" onClick={() => { autoOpenedRef.current = false; setExpanded(false); }} aria-label="レース中継を閉じる">閉じる</button>
+          <button type="button" onClick={closeExpanded} aria-label="小窓に戻す">小窓に戻す</button>
         </div>}
         {expanded && !embedLive && <p className="u-race-strip-stage-wait" role="status">中継の用意をしています…</p>}
       </div>}</>;
@@ -714,11 +790,13 @@ function RaceStripBody(): React.ReactElement | null {
     return (
       <section ref={sectionRef} aria-label="レースの開催情報" className={`u-race-strip u-tvstrip u-tvstrip-${tvMode}${expanded ? ' u-race-strip-expanded' : ''}`}>
         <div className="u-tvstrip-screen"
-          {...(watchable ? { role: 'button', tabIndex: 0, 'aria-label': 'レース中継を全画面で観る', onClick: () => { setExpanded(true); },
-            onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') setExpanded(true); } } : {})}>
+          {...(!expanded ? { role: 'button', tabIndex: 0, 'aria-label': '小窓を全画面で観る', onClick: openExpanded,
+            onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') openExpanded(); } } : {})}>
           {channelEl}
           {stageEl}
+          {!expanded && <button type="button" className="u-tvstrip-expand" onClick={(e) => { e.stopPropagation(); openExpanded(); }}>拡大</button>}
         </div>
+        {channelFullEl}
         {error && <span className="u-race-strip-error">更新できません</span>}
         {size === 'big' && embedNote !== null && <span className="u-race-strip-error" role="status">{embedNote}</span>}
         {(replaying ? recent : next) && <a href={`/races/${encodeURIComponent((replaying ? recent : next)!.id)}`} aria-label={`${(replaying ? recent : next)!.name}の詳細を見る`}>詳細</a>}
@@ -815,7 +893,8 @@ function RaceStripBody(): React.ReactElement | null {
       {error && <span className="u-race-strip-error">更新できません</span>}
       {/* ★録画を出せなかった理由（★黙って簡易版に戻らない） */}
       {size === 'big' && embedNote !== null && <span className="u-race-strip-error" role="status">{embedNote}</span>}
-      {watchable && <button type="button" className="u-race-strip-expand" onClick={() => { setExpanded(true); }}>拡大</button>}
+      {(watchable || tvMode !== null) && !expanded && <button type="button" className="u-race-strip-expand" onClick={openExpanded}>拡大</button>}
+      {channelFullEl}
       {/* ★本編を流さない面は ★録画の間「観る」で 観戦の面へ（★決裁 ④「文字帯＋『観る』リンク」・★賭けの入口ではない） */}
       {replaying && !embedsHere && <a href="/watch-race" aria-label="いま走っているレースを観戦の画面で観る">観る</a>}
       {(replaying ? recent : next) && <a href={`/races/${encodeURIComponent((replaying ? recent : next)!.id)}`} aria-label={`${(replaying ? recent : next)!.name}の詳細を見る`}>詳細</a>}
