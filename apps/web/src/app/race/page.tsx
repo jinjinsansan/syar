@@ -336,6 +336,27 @@ let stripExpanded = false;
  *   → ★拡大したら ★全画面の /race と同じ（★実況・HUD・カットイン）。★時計の跳びは ★小さいままでも ★全画面と同じコース図で覆う。
  */
 function stripQuiet(): boolean { return EMBED_STRIP && !stripExpanded; }
+
+/**
+ * ★**芝が後ろへ動いた／速さが跳んだ瞬間を console に残す**（★2026-10-01・オーナー「最後の直線で 芝が逆に動く・異常に速く・急に遅く」）。
+ *   ★いつ起きるか分からないので ★手で記録を始められない（★オーナー指摘）→ ★画面が 自分で見つけて 1 行ずつ残す。
+ *   ★芝の模様の位置 ＝ 注視点（focusS）＋ 補正（visualDelta）。★同じ場面の中で ★前のコマより後ろ（−0.05m より）か ★毎秒 40m を超えたら。
+ *   ★場面が切り替わった瞬間（★リプレイ等）は 数えない。★描画には何も足さない（★読むだけ）。★同じ場面では 0.5 秒に 1 行まで。
+ *   ★console の検索欄に `race-ground` で拾える（★小窓の中の本編の行も出る）。
+ */
+let groundPrev: { readonly d: number; readonly shot: string; readonly x: number; readonly f: number; readonly v: number } | null = null;
+let groundLastWarnD = -Infinity;
+function noteGroundJump(d: number, shot: string, focusS: number, visualDelta: number, raceId: string | null): void {
+  const x = focusS + visualDelta;
+  const prev = groundPrev;
+  groundPrev = { d, shot, x, f: focusS, v: visualDelta };
+  if (prev === null || prev.shot !== shot || !(d > prev.d) || d - prev.d > 0.5) return;
+  const dx = x - prev.x;
+  const speed = dx / (d - prev.d);
+  if (!(dx < -0.05 || Math.abs(speed) > 40) || d - groundLastWarnD < 0.5) return;
+  groundLastWarnD = d;
+  console.warn(`[race-ground] race=${raceId ?? 'demo'} d=${d.toFixed(2)} 場面=${shot} 芝の動き=${dx.toFixed(2)}m（毎秒 ${speed.toFixed(1)}m） 注視点=${(focusS - prev.f).toFixed(2)} 補正=${(visualDelta - prev.v).toFixed(2)}`);
+}
 /**
  * ★**小窓では 斜め前の馬を読まない**（★2026-09-28・レビュー側の決定・★実測 1.72MB）。★150px の小窓では 正面寄りのショットも ★真横の素材で描く
  *   （★`?directional=side` と同じ扱い・★カットの数と画角は変わらない）。
@@ -5052,6 +5073,7 @@ function RaceView({ setup, real }: {
       const gaitDelta = visualDelta - visualScroll.deltaAt(RACE_INTRO_RACE_START_SEC);
       /** ★調べるため（★2026-10-01・オーナー「芝が逆に動いた」）: 芝の模様の位置 ＝ 注視点 ＋ Δ。★描画には使わない */
       (globalThis as { __raceGround?: unknown }).__raceGround = { d, focusS: scene.focusS, visualDelta };
+      noteGroundJump(d, scene.shot.id, scene.focusS, visualDelta, real?.raceId ?? null);
       const metersByGate = new Map(easedAt.map((horse) => [horse.gate, horse.meters]));
       /**
        * ★**レースの音**（★2026-09-13・オーナー支給の音源）。
@@ -6240,7 +6262,7 @@ function RaceView({ setup, real }: {
       }
     }
   }, [built, ownGate, mineGate, surface, trackCondition, turn, renderer, showEntryBoard,
-    horseScale, horseBob, strideM, startRampSec, startShake, motionTimeline]);
+    horseScale, horseBob, strideM, startRampSec, startShake, motionTimeline, real]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
