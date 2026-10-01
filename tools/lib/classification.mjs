@@ -811,6 +811,12 @@ export const READONLY = [
    */
   'publish-uma-horse-frames.mjs',
   /**
+   * ★実況（写真の版 `tp`）の口パクを作る（★2026-10-01・オーナー「川崎タカシの実写の口パクが壊れています」）。
+   *   ★DB を見ない。★閉じた写真を土台に ★口のまわりの楕円だけを 開けた写真（Codex で作った `out/gen/narrator-tp-fix/`）から貼る。
+   *   ★書くのは `/art/narrator-tp-{normal,hot,shout}-open.webp` だけ（★閉じた絵は触らない）。
+   */
+  'compose-narrator-mouth.mjs',
+  /**
    * ★育成の歩き（スプライト表）が ★**コマの境目で止まっているか**を実ブラウザで測る（★2026-09-24）。
    *   ★DB を見ない。★書くのは `out/walk-steps/` の確認用 png だけ。
    *   ★ブラウザは `headless`（★人の画面に窓を開かない）。★dev サーバーが要ります。

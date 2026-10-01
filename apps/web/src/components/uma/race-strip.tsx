@@ -359,8 +359,13 @@ function RaceStripBody(): React.ReactElement | null {
    *   🔴 ★中身は ★小窓・全画面と ★同じ物（★オーナー決定）。★別の録画・別のレースは出さない。★新しい読み込みは無い。
    */
   const vision = stripVisionOn(pathname, { intro, wide });
+  /**
+   * ★**小窓テレビ**（★2026-10-01・R-28）: ★PC の大型ビジョン（`pc`）・★スマホ（`full`・幅いっぱいの 16:9・★全ての画面で同じ大きさ）。
+   *   ★帯を単独では出さない（★「次」と掲示板は テレビの上下の帯へ・README §1）。★表 `race-strip-sizes.ts` が正本。
+   */
+  const tvMode = stripTvModeOf(pathname, { intro, wide });
   const compact = size === 'mini';
-  const focusId = size === 'text' ? focusRaceIdOf(pathname) : null;
+  const focusId = size === 'text' && tvMode === null ? focusRaceIdOf(pathname) : null;
   const [focus, setFocus] = useState<FocusRow | null>(null);
   const [data, setData] = useState<NoticeData | null>(null);
   const [error, setError] = useState(false);
@@ -417,7 +422,7 @@ function RaceStripBody(): React.ReactElement | null {
     const refresh = (): void => {
       if (loading) return;
       loading = true;
-      const job = size === 'text'
+      const job = size === 'text' && tvMode === null
         ? (focusId === null ? Promise.resolve(null) : fetchFocus(focusId)).then((row) => { if (active) setFocus(row); })
         : fetchNotice().then((fresh) => { if (active) setData(fresh); });
       void job.then(() => {
@@ -546,7 +551,6 @@ function RaceStripBody(): React.ReactElement | null {
    * ★**小窓テレビ**（★2026-10-01・R-28）: ★PC の大型ビジョン（`pc`）・★スマホのホーム（`full`・幅いっぱいの 16:9）・★スマホのほかの画面（`s`・S 型 98px）。
    *   ★帯を単独では出さない（★「次」と掲示板は テレビの上下の帯へ・README §1）。★`text` の画面（★そのレースの 1 行）は 従来どおり。
    */
-  const tvMode = stripTvModeOf(pathname, { intro, wide });
   /** ★出走馬の詳しい形（★1 レースにつき 1 回だけ読む・★締切の後＝出走馬が決まってから） */
   const [profiles, setProfiles] = useState<{ readonly id: string; readonly map: ReadonlyMap<number, FieldProfile> } | null>(null);
   const fieldReady = (data?.nextField.length ?? 0) > 0;
@@ -690,7 +694,7 @@ function RaceStripBody(): React.ReactElement | null {
       </div>}</>;
   if (size === 'hidden') return null;
   /** ★`text`: ★その画面のレースの 1 行だけ（★走行・拡大・他のレースは出さない） */
-  if (size === 'text') {
+  if (size === 'text' && tvMode === null) {
     if (focus === null && !error) return null;
     return (
       <section aria-label="このレースの開催情報" className="u-race-strip u-race-strip-compact">
@@ -703,11 +707,10 @@ function RaceStripBody(): React.ReactElement | null {
   }
 
   /**
-   * ★**スマホの小窓テレビ**（★R-28 D28-1・README §2）: ★ホームは 幅いっぱいの 16:9・★ほかの画面は S 型（★160×90 ＋ 右に 3 行・98px）。
+   * ★**スマホの小窓テレビ**（★R-28 D28-1・README §2）: ★全ての画面で 幅いっぱいの 16:9（★2026-10-01 オーナー「全てのページで同じサイズに」・★S 型はやめた）。
    *   ★閉じる・小さくする口は 作らない（★出し入れしない）。★本編が流れていれば ★押すと全画面（★いまの「拡大」と同じ）。
    */
-  if (tvMode === 'full' || tvMode === 's') {
-    const sideLeft = next && nowMs !== null && next.status === 'scheduled' ? salesLeftText(next.scheduled_at, nowMs) : null;
+  if (tvMode === 'full') {
     return (
       <section ref={sectionRef} aria-label="レースの開催情報" className={`u-race-strip u-tvstrip u-tvstrip-${tvMode}${expanded ? ' u-race-strip-expanded' : ''}`}>
         <div className="u-tvstrip-screen"
@@ -716,11 +719,6 @@ function RaceStripBody(): React.ReactElement | null {
           {channelEl}
           {stageEl}
         </div>
-        {tvMode === 's' && <div className="u-tvstrip-side">
-          <span className="u-tvstrip-side-title">{replaying || embedLive ? '中継' : status}</span>
-          {next && <b className="u-tvstrip-side-race">{next.name}</b>}
-          {sideLeft !== null && <span className="u-tvstrip-side-left u-num">{sideLeft}</span>}
-        </div>}
         {error && <span className="u-race-strip-error">更新できません</span>}
         {size === 'big' && embedNote !== null && <span className="u-race-strip-error" role="status">{embedNote}</span>}
         {(replaying ? recent : next) && <a href={`/races/${encodeURIComponent((replaying ? recent : next)!.id)}`} aria-label={`${(replaying ? recent : next)!.name}の詳細を見る`}>詳細</a>}

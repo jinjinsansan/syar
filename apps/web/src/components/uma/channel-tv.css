@@ -309,17 +309,4 @@
   [data-theme='uma'].u-home:has(.u-tvstrip-full) .u-home-deck > :nth-child(-n + 2) { min-height: 60px !important; }
 }
 
-/* ★ほかの画面: S 型（★160×90 のテレビ ＋ 右に 番組名・レース・残り時間・★高さ 98px） */
-[data-theme='uma'] .u-race-strip.u-tvstrip-s {
-  width: calc(100% - 28px); max-width: 880px; height: 98px; margin: 8px auto 0; padding: 4px; box-sizing: border-box; align-items: center;
-  border: 2px solid var(--u-gold); border-radius: 12px; background: var(--u-panel-strong);
-}
-[data-theme='uma'] .u-tvstrip-s .u-tvstrip-screen { flex: 0 0 160px; width: 160px; height: 90px; border-radius: 4px; box-shadow: none; }
-/* ★中身は スマホの小窓の寸法（362×204）で描いて ★縮める（★文字の大きさの決まりは崩さない） */
-[data-theme='uma'] .u-tvstrip-s .u-tvstrip-screen > .u-tv { width: 362px; transform: scale(calc(160 / 362)); transform-origin: top left; }
-[data-theme='uma'] .u-tvstrip-side { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-[data-theme='uma'] .u-tvstrip-side-title { font-size: 11px; color: #cfe0ee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-[data-theme='uma'] .u-tvstrip-side-race { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-[data-theme='uma'] .u-tvstrip-side-left { font-size: 13px; color: #ffe483; }
-[data-theme='uma'] .u-tvstrip-s > a { align-self: center; font-size: 12px; }
 [data-theme='uma'] .u-tvstrip > .u-race-strip-error { position: absolute; left: 6px; bottom: -18px; font-size: 11px; }

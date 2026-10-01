@@ -151,16 +151,13 @@ export function stripVisionOn(pathname: string, opts: { readonly intro: boolean 
 /**
  * ★**小窓テレビの形**（★2026-10-01・デザイナー引き渡し R-28 README §2）。★帯は ★面を自分で判定しない（★この表が正本）。
  *   ★`pc` … PC の大型ビジョン（★`stripVisionOn` と同じ面）
- *   ★`full` … スマホのホーム（★幅いっぱいの 16:9）
- *   ★`s` … スマホの そのほかの「大」「極小」の面（★S 型 160×90・98px）
- *   ★`null` … テレビを出さない（★`text`・`hidden`、★PC で ビジョンでない面）
+ *   ★`full` … スマホの 幅いっぱいの 16:9（★ホームと同じ大きさ）
+ *   ★`null` … テレビを出さない（★`hidden` の面・★PC で ビジョンでない面）
+ *   🔴 ★2026-10-01 オーナー「全てのページで小窓が見れて、なおかつ同じサイズに」→ ★スマホは `hidden` 以外 すべて `full`
+ *     （★旧: ホームだけ `full`・ほかは S 型 160×90・★`text` の面は テレビなし）。
  */
-export const STRIP_TV_FULL_ROUTES: readonly string[] = ['/home'];
-export function stripTvModeOf(pathname: string, opts: { readonly intro: boolean | null } & StripWidth): 'pc' | 'full' | 's' | null {
+export function stripTvModeOf(pathname: string, opts: { readonly intro: boolean | null } & StripWidth): 'pc' | 'full' | null {
   if (stripVisionOn(pathname, opts)) return 'pc';
   if (opts.wide === true) return null;
-  const size = stripSizeOf(pathname, opts);
-  if (size !== 'big' && size !== 'mini') return null;
-  const key = routeKeyOf(pathname);
-  return key !== null && STRIP_TV_FULL_ROUTES.includes(key) ? 'full' : 's';
+  return stripSizeOf(pathname, opts) === 'hidden' ? null : 'full';
 }
