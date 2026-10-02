@@ -26,13 +26,15 @@ const port = Number(arg('--port', '9460'));
 const url = `${base}/race?audit=ground${query === '' ? '' : `&${query}`}`;
 
 const b = await launch({ width: Number(arg('--w', '640')), height: Number(arg('--h', '360')), port });
+let data = null;
 const errors = [];
+try {
 b.on('Runtime.exceptionThrown', (p) => errors.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text));
 await b.send('Runtime.enable');
 await b.send('Page.enable');
 await b.send('Page.navigate', { url });
 const t0 = Date.now();
-let data = null, lastP = -1;
+let lastP = -1;
 while (Date.now() - t0 < 30 * 60 * 1000) {
   await new Promise((r) => setTimeout(r, 2000));
   data = await b.evaluate('globalThis.__raceAuditGround ?? null').catch(() => null);
@@ -41,7 +43,11 @@ while (Date.now() - t0 < 30 * 60 * 1000) {
   if (p !== null && Math.floor(p * 10) !== lastP) { lastP = Math.floor(p * 10); process.stderr.write(`  ${Math.round(p * 100)}%`); }
   if (errors.length > 0 && Date.now() - t0 > 60000 && p === null) break;
 }
-await b.close();
+} finally {
+  /** ★必ず閉じる（★止まった計測が 画面の裏の Edge を残して メモリを食った・2026-10-02） */
+  await b.close().catch(() => undefined);
+}
+
 if (data === null) { console.error(`\n★記録が取れませんでした ${url}\n${errors.slice(0, 3).join('\n')}`); process.exit(1); }
 mkdirSync(path.dirname(out), { recursive: true });
 writeFileSync(out, JSON.stringify({ url, ...data }));

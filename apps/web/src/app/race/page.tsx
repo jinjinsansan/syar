@@ -60,7 +60,7 @@ import {
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
   paintCrowd, seatMaskFromPixels, seatBandFromPixels,
   cameraBasis, project, HORSE_HEIGHT_M, setHorseScale,
-  buildVisualScroll, createGroundSmoother, type GroundSmoother, type VisualScroll, type VisualScrollSample,
+  buildVisualScroll, createGroundSmoother, nextShownTime, type GroundSmoother, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, pixelScaleForDisplay, PHONE_SUPERSAMPLE, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   // ★発走前の流れ（★2026-09-15・オーナー決定「動画の通り」）
@@ -2573,6 +2573,40 @@ function buildMotionTimeline(
 }
 
 /**
+ * ★**開発の口 `?dev=1&asReal=1`**（★2026-10-03・オーナー「どのレースで不具合が起きるか 見続けることはできない」）。
+ *   ★見本のエンジンで決めた結果を ★実レースの記録の形（`RealReplay`）に変え、★**実レースと同じ経路**（`settledResultOf` → 再生）で描く。
+ *   ★手元で 競馬場・距離・頭数・種を変えた実レースを何本でも作り、★`?audit=ground` で 1 コマずつ監査するため（`tools/audit-race-ground.mjs`）。
+ *   ★`dev=1` が無ければ効かない。★DB に触れない（★見本の結果を その場で決めるだけ）。
+ */
+const DEV_AS_REAL = QS?.get('dev') === '1' && QS.get('asReal') === '1';
+let devAsRealCache: { readonly setup: PageSetup; readonly real: RealReplay } | null = null;
+function devAsRealPage(): { readonly setup: PageSetup; readonly real: RealReplay } {
+  if (devAsRealCache !== null) return devAsRealCache;
+  const setup = venuePageSetup();
+  const seedRaw = Number(QS?.get('seed') ?? 42);
+  const seed = Number.isInteger(seedRaw) ? seedRaw : 42;
+  const demo = build(setup, seed, 1, setup.surface, 'good', contestGammaFromSearch(''), null);
+  const placeOf = new Map(demo.result.map((r) => [r.gate, r.place]));
+  const winner = demo.result.find((r) => r.place === 1)?.gate ?? 1;
+  const runners: ReplayRunner[] = setup.roster.map((r) => ({
+    gate: r.gate, name: r.name,
+    strategy: demo.strategyOf(r.gate) as ReplayRunner['strategy'],
+    finishSec: demo.finishSec.get(r.gate) ?? Number.NaN,
+    finishPosition: placeOf.get(r.gate) ?? setup.fieldSize,
+    horseId: `dev-${seed}-${r.gate}`,
+  }));
+  devAsRealCache = {
+    setup,
+    real: {
+      raceId: `dev-${QS?.get('venue') ?? 'default'}-${setup.distanceM}-${setup.fieldSize}-${seed}`,
+      runners, weightKgByGate: new Map(runners.map((r) => [r.gate, 55])),
+      ownGate: null, focusGate: winner, trackCondition: 'good', seed, raceNoOfDay: 1, scheduledAtMs: Number.NaN,
+    },
+  };
+  return devAsRealCache;
+}
+
+/**
  * ★**芝とカメラの見張りの記録を 画面に出す**（★`/race?groundlog=1`・★2026-10-02・オーナー「PC もスマホも」）。
  *   ★iPhone の Safari には コンソールが無い → ★一覧を 文字のまま出し ★「コピー」で そのまま貼れるようにする。
  *   ⚠️ ★確かめるための画面（★意匠は作らない・★`PARAM_ERROR` と同じ字と枠）。★記録は この端末のブラウザの中だけ（`race-audit.ts`）。
@@ -2620,6 +2654,10 @@ export default function RacePage(): React.JSX.Element {
   }
   /** ★実レース（★確定済み・★ログインしている人）。★読めるまで 本体を開きません */
   if (REAL_RACE_PARAM !== null && REAL_RACE_PARAM !== '') return <RealRaceGate raceId={REAL_RACE_PARAM} />;
+  if (DEV_AS_REAL) {
+    const dev = devAsRealPage();
+    return <RaceView setup={dev.setup} real={dev.real} />;
+  }
   return <RaceView setup={venuePageSetup()} real={null} />;
 }
 
@@ -6541,8 +6579,18 @@ function RaceView({ setup, real }: {
     if (AUDIT_GROUND || !playing || built === null) return;
     const fromSec = dRef.current;
     t0Ref.current = performance.now();
+    /**
+     * ★**画面の時刻は 1 コマで大きく飛ばさない**（★2026-10-03・`nextShownTime`）。★コマ落ちの後は 1/30 秒ずつ進めて 2 割増しで取り戻す。
+     *   ★旧: ★壁の時計どおり → ★コマ落ち 0.2〜0.4 秒で 芝が 1 コマ 3〜6m 進み、★刈り目の縞が逆に流れて見えた（★オーナー「逆回転・超高速」）。
+     */
+    let shownD = fromSec;
+    let lastWall = t0Ref.current;
     const loop = (): void => {
-      const d = fromSec + (performance.now() - t0Ref.current) / 1000 * playbackRate;
+      const now = performance.now();
+      const target = fromSec + (now - t0Ref.current) / 1000 * playbackRate;
+      shownD = nextShownTime(shownD, target, (now - lastWall) / 1000 * playbackRate);
+      lastWall = now;
+      const d = shownD;
       // ゴール後はランアウト→勝者紹介→正式着順まで5.2秒確保する。
       const totalDisplaySec = RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
       if (d >= totalDisplaySec) {
@@ -6557,7 +6605,6 @@ function RaceView({ setup, real }: {
        * 描画はここで毎フレーム行う。一方でスライダーと時計の state 更新まで毎フレーム行うと、
        * UI 全体の再描画が Canvas の通常再生を止める。表示は 10fps で追随させる。
        */
-      const now = performance.now();
       if (now - lastPlaybackUiSyncRef.current >= 100) {
         lastPlaybackUiSyncRef.current = now;
         setSeekPos(d);
