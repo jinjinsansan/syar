@@ -32,7 +32,8 @@ export function demoNamesOf(src: string): string[] {
  */
 const KNOWN: Readonly<Record<string, { readonly names: readonly string[]; readonly why: string }>> = {
   'app/race/page.tsx': {
-    names: ['DEMO_COATS', 'DEMO_CONTEST_GAMMA', 'DEMO_WIN_ODDS'],
+    /** ★`DEMO_FEMALE_GATES`（★2026-10-02）: ★見本の `?female=1,4`（★牝馬の絵を見比べる口）。★実レースは 出走表の性別 */
+    names: ['DEMO_COATS', 'DEMO_CONTEST_GAMMA', 'DEMO_FEMALE_GATES', 'DEMO_WIN_ODDS'],
     why: '★見本の道（`?venue=`）だけで使う（★`venuePageSetup()`）。★実レース（`?race=`）は通らない（★網 `built-course-fields` / `coat-single-source`）。'
       + '★消す条件: ★見本の道が無くなった日',
   },

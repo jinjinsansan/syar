@@ -127,6 +127,11 @@ export interface RealRaceData {
    *   ★1 着にしたのは ★暫定（★録画なので結果は確定済み）。
    */
   readonly focusGate: number;
+  /**
+   * ★**牝馬の馬番**（★2026-10-02・オーナー「パドックは牝馬なのに レース演出はオスでは辻褄が合わない」）。
+   *   ★`race_entries_public.sex`（★移行 0101）。★読めない環境では空（★全頭 牡馬の絵・★レースは止めない）。
+   */
+  readonly femaleGates: ReadonlySet<number>;
 }
 
 const SURFACES = ['turf', 'dirt'] as const;
@@ -191,12 +196,14 @@ export async function loadRealRace(raceId: string): Promise<RealRaceData> {
   /** ★出せる人の判定は ★帯と同じ 1 か所（`race-real-access.ts`） */
   if (!(await canPlayRealRace())) throw new RaceNotPlayableError(REAL_RACE_SIGN_IN_MESSAGE);
 
-  const [entRes, runsRes, oddsRes] = await Promise.all([
+  const [entRes, runsRes, oddsRes, sexRes] = await Promise.all([
     auth.from('race_entries_public')
       .select('gate,horse_name,strategy,weight,finish_pos,finish_time,horse_id,is_mine')
       .eq('race_id', raceId).order('gate'),
     auth.from('my_runs').select('gate, game_week').eq('race_id', raceId),
     read.from('race_odds_public').select('bet_type, selection, odds').eq('race_id', raceId).eq('bet_type', 'win'),
+    /** ★性別は 別に読む（★0101 が無い環境で 出走表ごと落とさない・`channel-feed.ts` の `fetchSexes` と同じ考え方） */
+    auth.from('race_entries_public').select('gate,sex').eq('race_id', raceId),
   ]);
   if (entRes.error !== null) {
     throw new RaceNotPlayableError(`出走表を読めませんでした: ${entRes.error.message}`);
@@ -264,6 +271,13 @@ export async function loadRealRace(raceId: string): Promise<RealRaceData> {
     const odds = Number(o['odds']);
     if (sel.length === 1 && Number.isInteger(g) && Number.isFinite(odds) && odds > 0) winOddsByGate.set(g, odds);
   }
+  const femaleGates = new Set<number>();
+  if (sexRes.error === null) {
+    for (const r of (sexRes.data ?? []) as Record<string, unknown>[]) {
+      const g = Number(r['gate']);
+      if (r['sex'] === 'female' && Number.isInteger(g)) femaleGates.add(g);
+    }
+  }
   /** ★週は ★自分の記録（`my_runs`）から。★`races_public` は `game_week` を出していません */
   const weekRaw = ((runsRes.data ?? []) as Record<string, unknown>[])[0]?.['game_week'];
   const gameWeek = weekRaw === null || weekRaw === undefined || !Number.isInteger(Number(weekRaw)) ? null : Number(weekRaw);
@@ -285,5 +299,6 @@ export async function loadRealRace(raceId: string): Promise<RealRaceData> {
     winOddsByGate,
     ownGate,
     focusGate,
+    femaleGates,
   };
 }

@@ -46,6 +46,8 @@ export type HorsePlacementMode = 'measured-ground' | 'legacy-table';
 export const MEASURED_GROUND_PREFIXES: readonly string[] = [
   'horse-jockey-side-v8', 'horse-jockey-side-v8b', 'horse-jockey-side-v8c',
   'horse-jockey-diag-front-v4', 'horse-jockey-diag-front-v4b', 'horse-jockey-diag-front-v4c',
+  /** ★牝馬（★型 m・★2026-10-02・★牡馬の各コマを Codex で描き直し `tools/fit-to-frame.mjs` で元の枠へ重ねた → ★元の組と同じ配置） */
+  'horse-jockey-side-v8m', 'horse-jockey-diag-front-v4m', 'horse-jockey-high-diag-v4m',
   /**
    * ★**高所斜め**（★2026-09-10 に追加）。
    *   ⚠️ ★台本 v6 が使っていなかったため、★対象から漏れていました。★4 角を引きで見せる案で

@@ -661,6 +661,15 @@ export const READONLY = [
    *   ★解像度は `tools/audit-draw-scale.mjs` の実測から決めます（★オーナー決定 560px・2026-09-02）。
    */
   'bake-race-frames.mjs',
+  /**
+   * ★牝馬のレースの絵（★2026-10-02）: ★Codex で描き直し（`gen-race-mare`）→ ★元の枠へ重ね（`fit-to-frame`）→ ★`/art/` へ置く（`publish-race-mare`）。
+   *   ★画像を読み書きするだけ・DB に触れない。
+   */
+  'gen-race-mare.mjs',
+  'fit-to-frame.mjs',
+  'publish-race-mare.mjs',
+  // ★芝とカメラの監査（★手元の /race?audit=ground を画面の裏で開いて読むだけ・DB に触れない）
+  'audit-race-ground.mjs',
   // ★ダートの地面タイルを焼く（画像を書くだけ・DB に触れない）
   'bake-dirt-tile.mjs',
   // ★横からの画のダート版を焼く（芝の板は読むだけ）

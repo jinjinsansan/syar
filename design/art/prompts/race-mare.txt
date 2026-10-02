@@ -1,0 +1,24 @@
+IMAGE EDIT TASK — do not generate a new picture from scratch.
+
+INPUT IMAGE (pass it as an actual image input to the image tool; this is the picture to EDIT):
+  {INPUT}
+
+STYLE REFERENCE FOR THE MARE (pass it as a second image input; use it ONLY for how a mare's head and face look in this game):
+  apps/web/public/art/uma/horse-mare-stand-2x.webp
+
+WHAT TO DO
+The input is one frame of a racing animation: a cartoon racehorse with a jockey on its back, {VIEW}.
+Turn the HORSE into a MARE (a female racehorse) of the SAME breed, in the SAME pose, in the SAME cartoon art style.
+The mare's face must look like the reference mare: a gentle, calm eye with a few long dark eyelashes (not the angry frown of the stallion), a finer and slightly smaller head with a straighter, softer face profile, a slimmer neck with a lower crest, a finer and smoother mane.
+She is racing, so her expression is focused and determined, but still clearly gentle and feminine — never angry.
+
+KEEP — DO NOT CHANGE (this matters more than anything else)
+  - the JOCKEY must stay EXACTLY the same, pixel for pixel: helmet, goggles, face, white silks, arms, hands, boots, position and size
+  - the saddle, the white saddle cloth, the girth and buckle, the bridle, the reins and the bit stay exactly where they are, same shape and colour
+  - the exact same pose: every leg and hoof in the same place, the tail in the same place, the head at the same position and angle
+  - the exact same coat colour (the same bay/orange-brown body, the same black mane, tail and lower legs), the same shading style and line weight
+  - the same overall size in the frame (the mare may be up to about 5% slimmer, never bigger)
+  - the image size and the transparent background (no ground, no shadow, no background, no motion lines)
+  - NO accessories: no ribbons, no flowers, no makeup, no bow
+
+Save the result as a PNG image with a transparent background, the same size as the input.

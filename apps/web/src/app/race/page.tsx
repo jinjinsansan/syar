@@ -19,6 +19,7 @@
  */
 'use client';
 
+import { analyzeAuditGround, auditGroundText, type AuditGroundFrame } from './race-audit';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -396,6 +397,54 @@ function noteGroundJump(d: number, shot: string, focusS: number, visualDelta: nu
   }
 }
 /**
+ * ★**芝とカメラの監査**（★`/race?audit=ground`・★2026-10-02・オーナー「芝・ダートが 逆回転・超高速」「最後の直線で カメラがどんどん離れていく」）。
+ *   ★時計を ★1/60 秒ずつ 仮想で進め（★実機のコマ落ちに左右されない・決定論）、★コマごとに ★**画面に描いた芝**の見かけの速さを残す。
+ *   ⚠️ ★`[race-ground]` は「注視点 ＋ 補正」を測るが、★透視の場面（コーナー・俯瞰・斜め前）の芝は ★カメラで描き 補正を通らない
+ *      → ★ここでは ★足元の地面の 1 点を 前後 2 コマのカメラで投影し、★画面での動きを 走る向きの m/秒 に直す（★板の場面は 流した量）。
+ *   ★描画には使わない（★記録だけ）。
+ */
+const AUDIT_GROUND = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('audit') === 'ground';
+/** ★記録の形と集計は `race-audit.ts`（★1 か所） */
+const auditGround: AuditGroundFrame[] = [];
+let auditPrev: {
+  readonly d: number; readonly shot: string; readonly persp: boolean; readonly scroll: number;
+  readonly cam: Parameters<typeof cameraBasis>[0]; readonly focusS: number; readonly focusW: number;
+  readonly lead: number; readonly sec: number;
+} | null = null;
+function noteAuditGround(
+  course: Parameters<typeof posOf>[0], d: number, scene: { readonly shot: { readonly id: string; readonly view: string; readonly perspectiveWorld?: boolean }; readonly camera: Parameters<typeof cameraBasis>[0]; readonly focusS: number; readonly focusW: number },
+  visualDelta: number, lead: number, sec: number, horseRatio: number,
+): void {
+  if (!AUDIT_GROUND) return;
+  const persp = !(scene.shot.view === 'side' && scene.shot.perspectiveWorld !== true);
+  const scroll = scene.focusS + visualDelta;
+  const prev = auditPrev;
+  const basis = cameraBasis(scene.camera);
+  const f0 = posOf(course, Math.max(0, scene.focusS), scene.focusW);
+  const eye = scene.camera.eye;
+  const camDistM = Math.hypot(eye.x - f0.x, eye.y - f0.y, eye.z);
+  let groundMps: number | null = null, trueMps: number | null = null, shownMps: number | null = null;
+  if (prev !== null && prev.shot === scene.shot.id && d > prev.d) {
+    const dt = d - prev.d;
+    shownMps = (lead - prev.lead) / dt;
+    trueMps = sec > prev.sec ? (lead - prev.lead) / (sec - prev.sec) : null;
+    if (!persp) groundMps = (scroll - prev.scroll) / dt;
+    else {
+      /** ★前のコマの注視点の地面 G を 2 つのカメラで投影し、★走る向き（今のカメラで 注視点 → 1m 先）へ射影 */
+      const g = posOf(course, Math.max(0, prev.focusS), prev.focusW);
+      const a = project(prev.cam, cameraBasis(prev.cam), { x: g.x, y: g.y, z: 0 });
+      const b = project(scene.camera, basis, { x: g.x, y: g.y, z: 0 });
+      const q0 = project(scene.camera, basis, { x: f0.x, y: f0.y, z: 0 });
+      const f1 = posOf(course, Math.max(0, scene.focusS) + 1, scene.focusW);
+      const q1 = project(scene.camera, basis, { x: f1.x, y: f1.y, z: 0 });
+      const dx = q1.x - q0.x, dy = q1.y - q0.y, len = Math.hypot(dx, dy);
+      if (a.depth > 1 && b.depth > 1 && len > 1e-6) groundMps = -(((b.x - a.x) * dx + (b.y - a.y) * dy) / len) / len / dt;
+    }
+  }
+  auditGround.push({ d, shot: scene.shot.id, persp, groundMps, trueMps, shownMps, horseRatio, camDistM });
+  auditPrev = { d, shot: scene.shot.id, persp, scroll, cam: scene.camera, focusS: scene.focusS, focusW: scene.focusW, lead, sec };
+}
+/**
  * ★**小窓では 斜め前の馬を読まない**（★2026-09-28・レビュー側の決定・★実測 1.72MB）。★150px の小窓では 正面寄りのショットも ★真横の素材で描く
  *   （★`?directional=side` と同じ扱い・★カットの数と画角は変わらない）。
  */
@@ -603,7 +652,7 @@ const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
  *   ★理由は転送量（★実測 1 レース 19.4MB → ★**4.19MB**・★線を通った実量）。
  *   ★絵の差は画素の平均 1.41／255 で、★画面の大きさ（188px）では見分けられないことをオーナーが確認。
  */
-const ASSET_VERSION = '73';
+const ASSET_VERSION = '74';
 /**
  * ★コマごとの持ち上げ量。**単位は「基準画布（高さ 1536px）での px」**。
  *
@@ -925,8 +974,12 @@ const coatOf = (gate: number): CoatName => DEMO_COATS[(gate - 1) % DEMO_COATS.le
  *    ★繁殖で見た目を継ぐ機能は ★**別の仕様判断**です（★継承規則・既存馬への割当・
  *    ★データ移行・乱数ストリーム分離・再プリシードと再検証が要ります）。
  */
-type HorseType = 'a' | 'b' | 'c';
-const HORSE_TYPES: readonly HorseType[] = ['a', 'b', 'c'];
+/**
+ * ★型 `m` ＝ **牝馬**（★2026-10-02・オーナー「パドックは牝馬なのに レース演出はオスでは辻褄が合わない」）。
+ *   ★表 `HORSE_TYPE_BY_GATE` では選ばず ★出走表の性別で選ぶ（`RaceView` の `typeOf`）。★素材は 牡馬の各コマを Codex で牝馬へ描き直したもの（`tools/gen-race-mare.mjs`）。
+ */
+type HorseType = 'a' | 'b' | 'c' | 'm';
+const HORSE_TYPES: readonly HorseType[] = ['a', 'b', 'c', 'm'];
 /**
  * ⚠️ ★**型 C は、いまは出しません**（★2026-09-09・実測で判明）
  *
@@ -968,14 +1021,13 @@ const HORSE_TYPE_BY_GATE: readonly HorseType[] = [
   'a', 'a', 'a', 'a', 'a', 'a',
   'a', 'a', 'a', 'a', 'a', 'a',
 ];
-const typeOf = (gate: number): HorseType => HORSE_TYPE_BY_GATE[(gate - 1) % HORSE_TYPE_BY_GATE.length] ?? 'a';
-/**
- * ★**表に出てくる型だけ**を読みます（★2026-09-09）。
- * ⚠️ ★使わない型まで読むと、★キャンバスと復号後の絵がそのぶん増えます。
- *    ★実測で ★**画面が真っ黒**になったのはこれが積み上がったときです。
- */
-const HORSE_TYPES_IN_USE: readonly HorseType[] = HORSE_TYPES.filter(
-  (t) => HORSE_TYPE_BY_GATE.includes(t));
+/** ★表だけで決まる型（★牝馬は `RaceView` の `typeOf` が 出走表から上書き） */
+const tableTypeOf = (gate: number): HorseType => HORSE_TYPE_BY_GATE[(gate - 1) % HORSE_TYPE_BY_GATE.length] ?? 'a';
+/** ★焼いた素材の役名の末尾から型を取り出す（★型 A は接尾なし・★`-b` `-c` `-m` で終わる役名を他に作らないこと） */
+const typeOfRoleName = (role: string): HorseType => {
+  const m = /-([bcm])$/.exec(role);
+  return m === null ? 'a' : m[1] as HorseType;
+};
 /**
  * ★焼いた素材の役名の接尾。
  * ⚠️ ★**型 A は接尾なし**です。★変えると `pickSet` と目録の戻り道が切れます。
@@ -1094,6 +1146,11 @@ const JOCKEY_NAMES = ['田中 守', '佐藤 翼', '山本 誠', '中村 駿', '�
  * ⚠️ ★着順とは無関係です（★人気馬が勝つとは限らない・★ゴールより前に結果を読まない D-098）。
  */
 const DEMO_WIN_ODDS = [17.5, 3.4, 9.4, 8.6, 23.0, 7.7, 43.9, 2.5, 31.2, 12.8, 55.1, 64.0] as const;
+/** ★見本の牝馬（★`?female=1,4`・★牝馬の絵を見比べる口・★実レースは出走表の性別） */
+const DEMO_FEMALE_GATES: ReadonlySet<number> = new Set(
+  (typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('female') ?? '')
+    .split(',').map(Number).filter((g) => Number.isInteger(g) && g >= 1),
+);
 
 /** ★出走表の 1 頭（★馬番の順・★`roster[gate - 1]`） */
 interface RosterEntry {
@@ -1107,6 +1164,8 @@ interface RosterEntry {
   /** ★単勝オッズ。★読めなかった馬は `null`（★`99.9` 等で埋めない） */
   readonly winOdds: number | null;
   readonly coat: CoatName;
+  /** ★牝馬（★型 m の絵で描く・★2026-10-02）。★見本は 牝馬限定戦か `?female=1,4` の馬番 */
+  readonly female: boolean;
 }
 
 /**
@@ -1241,6 +1300,7 @@ function venuePageSetup(): PageSetup {
       jockey: JOCKEY_NAMES[i] ?? 'STAR騎手',
       winOdds: DEMO_WIN_ODDS[i] ?? 99.9,
       coat: coatOf(i + 1),
+      female: race.fillies || DEMO_FEMALE_GATES.has(i + 1),
     })),
     grade: race.grade,
     gameMonth: race.month,
@@ -2544,6 +2604,8 @@ function realPageOf(data: RealRaceData): { readonly setup: PageSetup; readonly r
         jockey: '',
         winOdds: data.winOddsByGate.get(r.gate) ?? null,
         coat: coatOfHorseId(r.horseId),
+        /** ★性別は ★`race_entries_public.sex`（★0101）。★読めなければ 牡馬の絵（`race-real.ts`） */
+        female: data.femaleGates.has(r.gate),
       })),
       grade: rs.grade,
       gameMonth: data.gameWeek === null ? null : gameMonthOf(data.gameWeek),
@@ -2694,6 +2756,18 @@ function RaceView({ setup, real }: {
   const oddsRows = setup.roster.map((r) => ({ gate: r.gate, winOdds: r.winOdds ?? Number.POSITIVE_INFINITY }));
   const oddsLabelOf = (winOdds: number): string => (Number.isFinite(winOdds) ? winOdds.toFixed(1) : '—');
   const coatOfGate = (gate: number): CoatName => setup.roster[gate - 1]?.coat ?? 'bay';
+  /**
+   * ★**枠ごとの馬の型**（★牝馬は 型 m・★2026-10-02）。★それ以外は 表 `HORSE_TYPE_BY_GATE`。
+   *   ★`setup` は 画面を開いている間 変わらない（★読み込みの effect から引いてよい）。
+   */
+  const typeOf = (gate: number): HorseType => (setup.roster[gate - 1]?.female === true ? 'm' : tableTypeOf(gate));
+  /**
+   * ★**このレースに出てくる型だけ**を読みます（★2026-09-09）。
+   * ⚠️ ★使わない型まで読むと、★キャンバスと復号後の絵がそのぶん増えます。
+   *    ★実測で ★**画面が真っ黒**になったのはこれが積み上がったときです。
+   */
+  const HORSE_TYPES_IN_USE: readonly HorseType[] = HORSE_TYPES.filter(
+    (t) => Array.from({ length: FIELD }, (_, i) => typeOf(i + 1)).includes(t));
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   /** ★実況の行（変化したときだけ積む） */
   const callRef = useRef<readonly (readonly CallPart[])[]>([]);
@@ -3586,7 +3660,7 @@ function RaceView({ setup, real }: {
           const images = byType[t];
           if (images === undefined || images.length === 0) continue;
           /** ★型が 1 つしか無いときは全枠を受け持ちます（★型を使わない構成へ戻せるように） */
-          const only = byType.b === undefined && byType.c === undefined;
+          const only = Object.keys(byType).every((k) => k === 'a');
           built.set(t, buildFrames(images, referenceHeightOverride, silksLayout, undefined,
             only ? undefined : (gate) => typeOf(gate) === t, placementMode));
         }
@@ -3747,18 +3821,17 @@ function RaceView({ setup, real }: {
         const wantedRoles = [...new Set(baseRoles.flatMap((role) => (
           HORSE_TYPES_IN_USE.map((t) => `${role}${roleSuffixOf(t)}`).filter((r) => setByRole.has(r))
         )))];
-        /** ★役名の末尾から型を取り出す（★型 A は接尾なし） */
-        const typeOfRole = (role: string): HorseType => (
-          role.endsWith('-b') ? 'b' : role.endsWith('-c') ? 'c' : 'a');
+        /** ★役名の末尾から型を取り出す（★型 A は接尾なし・★1 か所 `typeOfRoleName`） */
+        const typeOfRole = typeOfRoleName;
         const atlases = new Map<string, ReadonlyMap<string, HTMLImageElement>>();
         const shadowAtlases = new Map<string, HTMLImageElement>();
         for (const set of manifest.sets.filter((entry) => wantedRoles.includes(entry.role))) {
           /**
            * ★型に分かれている役は ★**その型の枠の毛色だけ**。
            * ⚠️ ★型に分かれていない役（★勝馬コマなど）は ★**全枠が使う**ので全色要ります。
-           * ⚠️ ★接尾で型を見分けています。★`-b` / `-c` で終わる役名を他に作らないこと。
+           * ⚠️ ★接尾で型を見分けています。★`-b` / `-c` / `-m` で終わる役名を他に作らないこと。
            */
-          const baseRole = set.role.replace(/-[bc]$/, '');
+          const baseRole = set.role.replace(/-[bcm]$/, '');
           const hasVariants = HORSE_TYPES_IN_USE.some((t) => t !== 'a' && setByRole.has(`${baseRole}${roleSuffixOf(t)}`));
           const wantedCoats = hasVariants ? neededFor(typeOfRole(set.role)) : needed;
           const pairs = await Promise.all(wantedCoats.map(async (coat) => {
@@ -4151,6 +4224,12 @@ function RaceView({ setup, real }: {
       };
       const sideByType = await loadByType(wantSideTypes, (t) => `horse-jockey-side-v8${t}`);
       const frontByType = await loadByType(wantFrontTypes && !EMBED_STRIP, (t) => `horse-jockey-diag-front-v4${t}`);
+      /**
+       * ★**後ろ斜め・高い斜めも 型を混ぜる**（★2026-10-02・牝馬 m・★それまで この 2 組は 全枠 同じ絵）。
+       *   ★台本が描かない組は 読まない（★下の `neededAssets` と同じ条件）。
+       */
+      const rearByType = await loadByType(wantTypes && neededAssets.includes('diag-rear-v2'), (t) => `horse-jockey-diag-rear-v5${t}`);
+      const highByType = await loadByType(wantTypes && neededAssets.includes('high-diag-v2'), (t) => `horse-jockey-high-diag-v4${t}`);
       // ★俯瞰は v2（271×724 の低解像度・一度も作り直していない）のままで、
       //   オーナー評「ここで一気にクオリティが下がる」の当のカットだった（2026-08-20）。
       //   真横 v7 を参照に作り直した v3 が揃えばそれを使う。
@@ -4219,28 +4298,44 @@ function RaceView({ setup, real }: {
        *   ★小窓以外（/race・/watch-race）は ★これまでどおり 最初に読む。
        */
       const computeWalk = async (): Promise<readonly (readonly HighQualityHorseFrame[])[] | undefined> => {
-      const bakedWalk = bakedLibs === undefined || HORSE_TYPES_IN_USE.some((t) => t !== 'a') ? undefined : await (async () => {
-        const set = bakedManifest?.sets.find((entry) => entry.role === 'side-walk');
-        if (set === undefined) return undefined;
+      /**
+       * ★**型ごとの歩き**（★2026-10-02・牝馬 m）: ★レースに出る型 それぞれの役 `side-walk` ＋ 接尾（`side-walk-m`）を読み、★枠ごとに混ぜる。
+       * ⚠️ ★1 つの型でも 歩きの役が無ければ ★全部 使わない（★紹介は走りのコマに戻る・★紹介だけ別の馬に見えるので）。
+       */
+      const bakedWalk = bakedLibs === undefined ? undefined : await (async () => {
         const picks = paddockPicksOf(oddsRows);
-        const coats = [...new Set(['bay', ...picks.map((p) => coatOfGate(p.gate) as string)])];
-        const pairs = await Promise.all(coats.map(async (coat) => {
-          const file = set.coats[coat];
-          if (file === undefined) return null;
-          const image = await loadImg(`/art/baked/${file}?v=${ASSET_VERSION}`).catch(() => null);
-          return image === null ? null : [coat, image] as const;
-        }));
-        const ok = pairs.filter((e): e is readonly [string, HTMLImageElement] => e !== null);
-        if (ok.length !== coats.length) return undefined;
-        const shadow = set.shadow === undefined ? null
-          : await loadImg(`/art/baked/${set.shadow}?v=${ASSET_VERSION}`).catch(() => null);
-        return buildFramesFromBaked(set, new Map(ok), SILKS_LAYOUT_CROUCH, undefined, shadow ?? undefined);
+        const byType = new Map<HorseType, readonly (readonly HighQualityHorseFrame[])[]>();
+        for (const t of HORSE_TYPES_IN_USE) {
+          const set = bakedManifest?.sets.find((entry) => entry.role === `side-walk${roleSuffixOf(t)}`);
+          if (set === undefined) return undefined;
+          const coats = [...new Set(['bay', ...picks.filter((p) => typeOf(p.gate) === t).map((p) => coatOfGate(p.gate) as string)])];
+          const pairs = await Promise.all(coats.map(async (coat) => {
+            const file = set.coats[coat];
+            if (file === undefined) return null;
+            const image = await loadImg(`/art/baked/${file}?v=${ASSET_VERSION}`).catch(() => null);
+            return image === null ? null : [coat, image] as const;
+          }));
+          const ok = pairs.filter((e): e is readonly [string, HTMLImageElement] => e !== null);
+          if (ok.length !== coats.length) return undefined;
+          const shadow = set.shadow === undefined ? null
+            : await loadImg(`/art/baked/${set.shadow}?v=${ASSET_VERSION}`).catch(() => null);
+          byType.set(t, buildFramesFromBaked(set, new Map(ok), SILKS_LAYOUT_CROUCH, undefined, shadow ?? undefined));
+        }
+        const fallback = byType.get('a') ?? [...byType.values()][0];
+        if (fallback === undefined) return undefined;
+        return silksByGate.map((_, gateIndex) => (byType.get(typeOf(gateIndex + 1)) ?? fallback)[gateIndex] ?? []);
       })();
       const walkA = bakedLibs === undefined ? await loadNativeSet('horse-jockey-side-walk-v1') : undefined;
-      const walkB = walkA !== undefined && sideByType.b !== undefined ? await loadNativeSet('horse-jockey-side-walk-v1b') : undefined;
-      const walkUsable = walkA !== undefined && Object.keys(sideByType).every((t) => t === 'b' && walkB !== undefined);
+      /** ★型ごとの歩き（★`horse-jockey-side-walk-v1b` / `-v1m`）。★走りの型（`sideByType`）と同じ型が揃うときだけ使う */
+      const walkByType: Partial<Record<HorseType, readonly FrameImage[]>> = {};
+      for (const t of Object.keys(sideByType) as HorseType[]) {
+        if (walkA === undefined) break;
+        const got = await loadNativeSet(`horse-jockey-side-walk-v1${t}`);
+        if (got !== undefined) walkByType[t] = got;
+      }
+      const walkUsable = walkA !== undefined && Object.keys(sideByType).every((t) => walkByType[t as HorseType] !== undefined);
       return bakedWalk !== undefined && bakedWalk.length > 0 ? bakedWalk : walkUsable && walkA !== undefined
-        ? buildFramesByType({ a: walkA, ...(walkB !== undefined ? { b: walkB } : {}) }, undefined, SILKS_LAYOUT_CROUCH, sideMode)
+        ? buildFramesByType({ a: walkA, ...walkByType }, undefined, SILKS_LAYOUT_CROUCH, sideMode)
         : undefined;
       };
       /**
@@ -4266,17 +4361,17 @@ function RaceView({ setup, real }: {
        */
       const diagRearHighQuality = !neededAssets.includes('diag-rear-v2') ? []
         : bakedLibs?.['diag-rear-v2'] ?? (rearV4 !== undefined
-          ? buildFrames(rearV4, undefined, SILKS_LAYOUT_REAR)
+          ? buildFramesByType({ a: rearV4, ...rearByType }, undefined, SILKS_LAYOUT_REAR)
           : composedRear !== undefined
             ? buildFrames(composedRear.frames, undefined, SILKS_LAYOUT_REAR, composedRear.anchors)
             : buildFrames(await fallbackSet('horse-jockey-diag-rear-v2')));
       /** ★高所斜めも ★**実際に読めた素材の名前**で配置を決めます（★2026-09-10・★他の 2 組と同じ規則） */
       const highMode = bakedLibs !== undefined
         ? placementModeFor(bakedPrefixByRole.get('high-diag-v2'))
-        : nativePlacementMode('horse-jockey-high-diag-v4');
+        : nativePlacementMode('horse-jockey-high-diag-v4', ...Object.keys(highByType).map((t) => `horse-jockey-high-diag-v4${t}`));
       const highDiagHighQuality = !neededAssets.includes('high-diag-v2') ? []
         : bakedLibs?.['high-diag-v2'] ?? (highDiagV3 !== undefined
-          ? buildFrames(highDiagV3, undefined, SILKS_LAYOUT_REAR, undefined, undefined, highMode)
+          ? buildFramesByType({ a: highDiagV3, ...highByType }, undefined, SILKS_LAYOUT_REAR, highMode)
           : buildFrames(await fallbackSet('horse-jockey-high-diag-v2')));
       if (bakedLibs === undefined) builtPlacementByRole.set('high-diag-v2', highMode);
       artRef.current = {
@@ -5122,6 +5217,7 @@ function RaceView({ setup, real }: {
       /** ★調べるため（★2026-10-01・オーナー「芝が逆に動いた」）: 芝の模様の位置 ＝ 注視点 ＋ Δ。★描画には使わない */
       (globalThis as { __raceGround?: unknown }).__raceGround = { d, focusS: scene.focusS, visualDelta };
       noteGroundJump(d, scene.shot.id, scene.focusS, visualDelta, real?.raceId ?? null);
+      noteAuditGround(course, d, scene, visualDelta, lead, sec, v2HorseRatio);
       const metersByGate = new Map(easedAt.map((horse) => [horse.gate, horse.meters]));
       /**
        * ★**レースの音**（★2026-09-13・オーナー支給の音源）。
@@ -6361,8 +6457,43 @@ function RaceView({ setup, real }: {
     setClock(0); setSeekPos(0); setPlaying(false); render(0);
   }, [render]);
 
+  /**
+   * ★**芝とカメラの監査の駆動**（★`?audit=ground`・`noteAuditGround`）: ★素材が揃ったら ★1/60 秒ずつ `render` を最後まで呼ぶ。
+   *   ★終わったら `globalThis.__raceAuditGround` に全コマ（★`out/gen` の道具が読む）。★通常の再生は 走らせない（★下の effect）。
+   */
+  /** ⚠️ ★`render` は 状態が変わるたびに作り直される → ★effect の鍵にすると 監査が途中でやり直しになる（★実測: 1 秒ぶんしか残らなかった） */
+  const auditRenderRef = useRef(render);
+  auditRenderRef.current = render;
   useEffect(() => {
-    if (!playing || built === null) return;
+    if (!AUDIT_GROUND || built === null) return;
+    let alive = true;
+    void (async () => {
+      while (alive && artRef.current === null) await new Promise((r) => { setTimeout(r, 200); });
+      const total = RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
+      auditGround.length = 0;
+      auditPrev = null;
+      /** ★前置き（パドック・空撮・ゲート）は飛ばし ★発走の 2 秒前から（★`?auditFrom=秒` で変えられる） */
+      const fromSec = Number(new URLSearchParams(window.location.search).get('auditFrom') ?? (RACE_INTRO_RACE_START_SEC - 2));
+      for (let f = Math.max(0, Math.round(fromSec * 60)); alive && f / 60 <= total; f += 1) {
+        auditRenderRef.current(f / 60);
+        if (f % 30 === 0) {
+          (globalThis as { __raceAuditProgress?: number }).__raceAuditProgress = f / 60 / total;
+          await new Promise((r) => { setTimeout(r, 0); });
+        }
+      }
+      if (!alive) return;
+      const summary = analyzeAuditGround(auditGround, RACE_INTRO_RACE_START_SEC);
+      (globalThis as { __raceAuditGround?: unknown }).__raceAuditGround = {
+        total, raceStart: RACE_INTRO_RACE_START_SEC, displaySec: built.warp.displaySec, distanceM: built.distanceM, frames: auditGround, summary,
+      };
+      /** ★オーナーの画面で実レースを監査したとき ★そのまま貼れる文（★`[race-audit]` で絞る） */
+      console.log(auditGroundText(window.location.href, summary));
+    })();
+    return () => { alive = false; };
+  }, [built]);
+
+  useEffect(() => {
+    if (AUDIT_GROUND || !playing || built === null) return;
     const fromSec = dRef.current;
     t0Ref.current = performance.now();
     const loop = (): void => {

@@ -107,6 +107,16 @@ const SETS = [
    * ⚠️ ★画面は ★この役が無くても動きます（★紹介は走りのコマに戻る・★他の役のように「欠けたら全部落ちる」にしない）。
    */
   { role: 'side-walk', layout: 'crouch', prefix: pickSet('horse-jockey-side-walk-v1') },
+  /**
+   * ★**牝馬（型 m）**（★2026-10-02・オーナー「パドックは牝馬なのに レース演出はオスでは辻褄が合わない」）。
+   *   ★牡馬の 5 組を Codex で牝馬へ描き直し（`tools/gen-race-mare.mjs`）、★元の枠へ重ねたもの（`tools/fit-to-frame.mjs`）。
+   *   ★画面は 出走表の性別で ★牝馬の枠だけ この役を引く（★無ければ 牡馬の絵に落ちる）。
+   */
+  { role: 'side-v6-m', layout: 'crouch', prefix: pickSet('horse-jockey-side-v8m') },
+  { role: 'diag-front-v2-m', layout: 'front', prefix: pickSet('horse-jockey-diag-front-v4m') },
+  { role: 'diag-rear-v2-m', layout: 'rear', prefix: pickSet('horse-jockey-diag-rear-v5m') },
+  { role: 'high-diag-v2-m', layout: 'rear', prefix: pickSet('horse-jockey-high-diag-v4m') },
+  { role: 'side-walk-m', layout: 'crouch', prefix: pickSet('horse-jockey-side-walk-v1m') },
 ];
 
 /**

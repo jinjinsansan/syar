@@ -43,8 +43,8 @@ interface BakedSet {
 }
 
 const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8')) as { readonly sets: readonly BakedSet[] };
-/** ★今回の対象＝デフォルメ馬の整形済み素材（★真横 A / B・★斜め前 A / B） */
-const TARGET_ROLES = ['side-v6', 'side-v6-b', 'diag-front-v2', 'diag-front-v2-b'] as const;
+/** ★今回の対象＝デフォルメ馬の整形済み素材（★真横 A / B / 牝馬 m・★斜め前 A / B / 牝馬 m） */
+const TARGET_ROLES = ['side-v6', 'side-v6-b', 'diag-front-v2', 'diag-front-v2-b', 'side-v6-m', 'diag-front-v2-m'] as const;
 
 const framesOf = (set: BakedSet): HorsePlacementFrame[] => set.frames.map((t) => ({
   frameHeightSourcePx: t.h,
