@@ -1545,11 +1545,28 @@ interface SilksLayout {
   readonly jacket: readonly [number, number, number, number];    // nx0, nx1, ny0, ny1
   readonly saddlecloth: readonly [number, number, number, number];
   readonly number: readonly [number, number];
+  /**
+   * ★**窓を 画布に固定する**（★2026-10-03・オーナーの録画「パドックで 騎手の服の色がちらつく・騎手の顔がちらつく」）。
+   *   ★既定（偽）は 窓を ★そのコマの外接矩形（★脚・尾で毎コマ変わる）の割合で置く。★歩きは 脚の開きで矩形が毎コマ大きく変わり、
+   *   ★窓が騎手の上を滑って ★上着の白いまだら・★ゴーグルが兜の色に塗られる が コマごとに変わった。
+   *   ★真のとき 窓は ★画布（★歩きは 8 コマとも騎手が同じ位置に揃えてある）の割合。★数字の大きさは 従来どおり外接矩形から。
+   */
+  readonly canvasFixed?: boolean;
 }
 /** 騎手が低く伏せる走行コマ（side-v6 など） */
 const SILKS_LAYOUT_CROUCH: SilksLayout = {
   cropX: 0.24, cropW: 0.44, cropH: 0.60,
   helmet: [0.30, 0.72, 0.23], jacket: [0.31, 0.59, 0.08, 0.39], saddlecloth: [0.27, 0.59, 0.34, 0.58], number: [0.47, 0.49],
+};
+/**
+ * ★**パドックの歩き**（`horse-jockey-side-walk-v1`・★画布 1536×1024 の割合・★2026-10-03 に 8 コマの絵を方眼で測った）。
+ *   ★兜は 殻だけ（★ゴーグルの帯 y 0.09 より上・★ゴーグルの硝子は 薄い灰で 塗れる判定に入るので 外す）。
+ *   ★上着は 胴と腕（★目のゴーグル x 0.585〜 は外す）。★鞍布は 白い敷き布。★番号は 鞍布の左（★長靴の手前）。
+ */
+const SILKS_LAYOUT_WALK: SilksLayout = {
+  canvasFixed: true,
+  cropX: 0.30, cropW: 0.40, cropH: 0.62,
+  helmet: [0.515, 0.675, 0.09], jacket: [0.415, 0.585, 0.165, 0.36], saddlecloth: [0.31, 0.535, 0.37, 0.55], number: [0.378, 0.47],
 };
 /** 騎手なしの馬（horse-only）: 鞍布の検出窓だけ広く取る（白い騎手のズボンが無いので誤検出しない） */
 const SILKS_LAYOUT_HORSE_ONLY: SilksLayout = {
@@ -1620,7 +1637,12 @@ function silksOverlays(
    * ⚠️ ★回りは ★URL の口（`?turn=`）で決まり、★切り替えは読み直します。★読み直さずに回りだけ変えると番号の向きがずれます。
    */
   mirrorNumber = false,
+  /** ★`layout.canvasFixed` のとき 窓を置く 画布の矩形（★その絵の座標）。★無ければ外接矩形のまま */
+  canvasRect?: HighQualityHorseFrame['source'],
 ): readonly (NonNullable<HighQualityHorseFrame['overlay']> | undefined)[] {
+  /** ★数字の大きさは 外接矩形から（★画布に固定しても 馬の大きさに合わせる） */
+  const bounds = source;
+  source = layout.canvasFixed === true && canvasRect !== undefined ? canvasRect : source;
   const x0 = Math.round(source.x + source.width * layout.cropX);
   const y0 = Math.round(source.y);
   const width = Math.round(source.width * layout.cropW);
@@ -1782,8 +1804,8 @@ function silksOverlays(
    *    ★測り損ねても ★**その広い箱がそのまま残る**だけです（R-27・狭い側へ倒さない）。
    */
   const drawsNumber = layout.number[0] >= 0;
-  const numberFont = Math.max(42, Math.round(source.height * 0.068));
-  const numberLine = Math.max(4, source.height * 0.006);
+  const numberFont = Math.max(42, Math.round(bounds.height * 0.068));
+  const numberLine = Math.max(4, bounds.height * 0.006);
   if (drawsNumber) {
     const pad = Math.ceil(numberFont * 1.4 + numberLine + 4);
     const cx = source.x + source.width * layout.number[0] - x0;
@@ -1987,8 +2009,10 @@ const imgW = (image: FrameImage): number => (image instanceof HTMLCanvasElement 
 const imgH = (image: FrameImage): number => (image instanceof HTMLCanvasElement ? image.height : image.naturalHeight);
 
 function saddleReference(
-  image: FrameImage, bounds: HighQualityHorseFrame['source'], layout: SilksLayout,
+  image: FrameImage, frameBounds: HighQualityHorseFrame['source'], layout: SilksLayout,
 ): { x: number; y: number; width: number } | undefined {
+  /** ★画布に固定した窓（`SILKS_LAYOUT_WALK`）は 画布の割合で探す */
+  const bounds = layout.canvasFixed === true ? { x: 0, y: 0, width: imgW(image), height: imgH(image) } : frameBounds;
   const scratch = document.createElement('canvas');
   scratch.width = imgW(image); scratch.height = imgH(image);
   const ctx = scratch.getContext('2d', { willReadFrequently: true });
@@ -2176,6 +2200,8 @@ interface BakedSet {
   readonly referenceHeight: number;
   /** ★原版の画布の高さ（★浮きの量を 1536 基準から直すのに使います） */
   readonly nativeCanvasHeight: number;
+  /** ★原版の画布の幅（★2026-10-03 から焼く・★画布に固定した勝負服の窓に使う・★古い目録には無い） */
+  readonly nativeCanvasWidth?: number;
   readonly atlas: { readonly width: number; readonly height: number };
   readonly frames: readonly BakedTile[];
   readonly coats: Readonly<Record<string, string>>;
@@ -3652,7 +3678,9 @@ function RaceView({ setup, real }: {
         const referenceHeight = referenceHeightOverride ?? Math.max(...measured.map((frame) => frame.source.height));
         const overlays = images.map((image, index) => silksOverlays(image, measured[index]!.source, silksByGate, silksLayout, ownsGate,
           /** ★右回りは馬が左へ走り鏡像で描かれるので、番号を先に裏返す（★`silksOverlays` の `mirrorNumber`） */
-          RACE_TURN === 'right'));
+          RACE_TURN === 'right',
+          /** ★画布に固定した窓（`SILKS_LAYOUT_WALK`）は 原版の画布そのもの */
+          { x: 0, y: 0, width: imgW(image), height: imgH(image) }));
         /**
          * ★配置と縮尺の基準は鞍布（剛体）。
          *   - 基準点 = 鞍布中心（無ければ胴体重心）
@@ -3784,8 +3812,19 @@ function RaceView({ setup, real }: {
         if (bay === undefined) return [];
         const sources = set.frames.map((t) => ({ x: t.x, y: t.y, width: t.w, height: t.h }));
         /** ★右回りは番号を先に裏返す（★原版の経路 `buildFrames` と同じ規則・★`silksOverlays` の `mirrorNumber`） */
-        const overlays = sources.map((src) => silksOverlays(bay, src, silksByGate, silksLayout, undefined,
-          RACE_TURN === 'right'));
+        /**
+         * ★画布に固定した窓（`SILKS_LAYOUT_WALK`）: ★焼いたコマ＝原版の外接矩形（`nativeBounds`）× 縮尺 → ★原版の画布を 焼いた絵の座標へ写す。
+         *   ★目録に画布の幅が無い（★焼き直す前）なら 外接矩形のまま（★従来どおり）。
+         */
+        const canvasRectOf = (i: number): HighQualityHorseFrame['source'] | undefined => {
+          const t = set.frames[i]!;
+          return set.nativeCanvasWidth === undefined ? undefined : {
+            x: t.x - t.nativeBounds.x * set.scale, y: t.y - t.nativeBounds.y * set.scale,
+            width: set.nativeCanvasWidth * set.scale, height: set.nativeCanvasHeight * set.scale,
+          };
+        };
+        const overlays = sources.map((src, i) => silksOverlays(bay, src, silksByGate, silksLayout, undefined,
+          RACE_TURN === 'right', canvasRectOf(i)));
         /**
          * ★**接地影**（★2026-09-03・オーナー判断 A「原寸のまま焼く」）。
          *
@@ -4407,7 +4446,7 @@ function RaceView({ setup, real }: {
           if (ok.length !== coats.length) return undefined;
           const shadow = set.shadow === undefined ? null
             : await loadImg(`/art/baked/${set.shadow}?v=${ASSET_VERSION}`).catch(() => null);
-          byType.set(t, buildFramesFromBaked(set, new Map(ok), SILKS_LAYOUT_CROUCH, undefined, shadow ?? undefined));
+          byType.set(t, buildFramesFromBaked(set, new Map(ok), SILKS_LAYOUT_WALK, undefined, shadow ?? undefined));
         }
         const fallback = byType.get('a') ?? [...byType.values()][0];
         if (fallback === undefined) return undefined;
@@ -4423,7 +4462,7 @@ function RaceView({ setup, real }: {
       }
       const walkUsable = walkA !== undefined && Object.keys(sideByType).every((t) => walkByType[t as HorseType] !== undefined);
       return bakedWalk !== undefined && bakedWalk.length > 0 ? bakedWalk : walkUsable && walkA !== undefined
-        ? buildFramesByType({ a: walkA, ...walkByType }, undefined, SILKS_LAYOUT_CROUCH, sideMode)
+        ? buildFramesByType({ a: walkA, ...walkByType }, undefined, SILKS_LAYOUT_WALK, sideMode)
         : undefined;
       };
       /**

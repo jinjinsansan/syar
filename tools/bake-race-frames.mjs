@@ -348,6 +348,8 @@ for (const set of SETS_TO_BAKE) {
     referenceHeight: Math.max(...tiles.map((t) => t.h)),
     /** ★原版の画布の高さ。★`page.tsx` が `HORSE_GROUND_LIFTS` を比例させるのに使います */
     nativeCanvasHeight: natives[0].h,
+    /** ★原版の画布の幅（★2026-10-03・画布に固定した勝負服の窓 `SILKS_LAYOUT_WALK` を 焼いた絵の座標へ写すため） */
+    nativeCanvasWidth: natives[0].w,
     atlas: { width: atlasW, height: atlasH },
     frames, coats: coatFiles,
     /**

@@ -41,7 +41,7 @@ describe('★レースの牝馬', () => {
   it('🔴 ③ ★後ろ斜め・高い斜め・歩きも 型を混ぜる', () => {
     expect(PAGE).toContain('buildFramesByType({ a: rearV4, ...rearByType }, undefined, SILKS_LAYOUT_REAR)');
     expect(PAGE).toContain('buildFramesByType({ a: highDiagV3, ...highByType }, undefined, SILKS_LAYOUT_REAR, highMode)');
-    expect(PAGE).toContain('buildFramesByType({ a: walkA, ...walkByType }, undefined, SILKS_LAYOUT_CROUCH, sideMode)');
+    expect(PAGE).toContain('buildFramesByType({ a: walkA, ...walkByType }, undefined, SILKS_LAYOUT_WALK, sideMode)');
     expect(PAGE).toContain('const got = await loadNativeSet(`horse-jockey-side-walk-v1${t}`);');
     expect(PAGE).toContain('entry.role === `side-walk${roleSuffixOf(t)}`');
   });

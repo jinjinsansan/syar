@@ -55,7 +55,7 @@ describe('★発走前の流れの配線', () => {
     /** ★携帯（焼いた経路）の歩き: ★目録の役 `side-walk` を読み、★走りと同じ `buildFramesFromBaked` を通す */
     /** ★2026-10-02: ★型ごとの役（★型 A は接尾なし ＝ `side-walk`・★牝馬は `side-walk-m`） */
     expect(page).toContain('entry.role === `side-walk${roleSuffixOf(t)}`');
-    expect(page).toMatch(/byType\.set\(t, buildFramesFromBaked\(set, new Map\(ok\), SILKS_LAYOUT_CROUCH/);
+    expect(page).toMatch(/byType\.set\(t, buildFramesFromBaked\(set, new Map\(ok\), SILKS_LAYOUT_WALK/);
     /** ★2026-09-29: ★歩きは `computeWalk` の中（★小窓は「拡大」で読む） */
     expect(page).toContain('return bakedWalk !== undefined && bakedWalk.length > 0 ? bakedWalk :');
     const bake = readFileSync(path.resolve(__dirname, '../../../tools/bake-race-frames.mjs'), 'utf8');
