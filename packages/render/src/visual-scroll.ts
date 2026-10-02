@@ -138,6 +138,9 @@ const GROUND_JUMP_RATIO = 0.5;
 const GROUND_JUMP_MIN = 5;
 /** ★これより長く続く変化は 本当の変化（★秒） */
 const GROUND_ACCEPT_SEC = 0.4;
+/** ★切り替わりの後 ★新しい速さを すぐ受け入れる長さ（秒）と ★その上限（★実馬は 毎秒 20m 前後・★表の跳ねは 37〜91m） */
+const GROUND_CUT_SETTLE_SEC = 0.25;
+const GROUND_CUT_MAX_MPS = 30;
 
 export function createGroundSmoother(): GroundSmoother {
   let prevD: number | null = null;
@@ -145,6 +148,12 @@ export function createGroundSmoother(): GroundSmoother {
   let prevSpeed: number | null = null;
   let offset = 0;
   let oddSec = 0;
+  /**
+   * ★**カメラが切り替わってからの秒**（★2026-10-02・本番の見本 リプレイの頭: ★芝 毎秒 9.8 → 0.4 秒後に 15.2 へ 1 コマで跳ねた）。
+   *   ★切り替わった直後は ★速さが変わっても目に見えない（★別の画）→ ★`GROUND_CUT_SETTLE_SEC` の間は
+   *   ★ありうる速さ（★0〜`GROUND_CUT_MAX_MPS`）を ★新しい速さとして すぐ受け入れる。★跳ね（★表の切り替わりの 1 刻みのずれ・毎秒 37〜91m）と逆向きは これまでどおり退ける。
+   */
+  let sinceCut = Infinity;
   return {
     step(d: number, raw: number, cut: boolean): number {
       if (prevD === null || !(d > prevD) || d - prevD > 0.5) {
@@ -153,6 +162,11 @@ export function createGroundSmoother(): GroundSmoother {
       }
       const dt = d - prevD;
       const rawSpeed = (raw - prevRaw) / dt;
+      sinceCut = cut ? 0 : sinceCut + dt;
+      if (!cut && sinceCut <= GROUND_CUT_SETTLE_SEC && rawSpeed >= 0 && rawSpeed <= GROUND_CUT_MAX_MPS) {
+        prevSpeed = rawSpeed; oddSec = 0; prevD = d; prevRaw = raw;
+        return raw + offset;
+      }
       const odd = cut || rawSpeed < 0
         || (prevSpeed !== null && Math.abs(rawSpeed - prevSpeed) > Math.max(GROUND_JUMP_MIN, Math.abs(prevSpeed) * GROUND_JUMP_RATIO));
       oddSec = odd ? oddSec + dt : 0;

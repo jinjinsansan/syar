@@ -64,4 +64,18 @@ describe('芝の最後の安全網', () => {
     expect(Number.isFinite(s.step(0.2, 3, false))).toBe(true);
     expect(run((d) => d * 16 + (d >= 1.5 ? 1.25 : 0))).toEqual(run((d) => d * 16 + (d >= 1.5 ? 1.25 : 0)));
   });
+
+  it('🔴 ★切り替わりで速さが変わる（★リプレイの頭 9.8 → 15.2 m/秒）は ★切り替わりの直後に移り ★0.4 秒後に跳ねない', () => {
+    const raw = (d: number): number => (d < 1 ? d * 9.8 : 9.8 + (d - 1) * 15.2 + 30);
+    const isCut = (d: number): boolean => d >= 1 && d < 1 + STEP;
+    const v = run(raw, isCut, 0, 2);
+    /** ★切り替わりより前は 9.8・★切り替わりの次のコマから 15.2（★旧: 0.4 秒 9.8 のまま → 1.4 秒の所で 1 コマで跳ねた） */
+    const cutIdx = Math.round(1 / STEP);
+    expect(v.slice(0, cutIdx - 1).every((s) => Math.abs(s - 9.8) < 0.01)).toBe(true);
+    expect(v.slice(cutIdx + 1).every((s) => Math.abs(s - 15.2) < 0.01)).toBe(true);
+    /** ★表の跳ね（★毎秒 30m 超）は 切り替わりの直後でも 受け入れない */
+    const spike = (d: number): number => d * 15 + (d >= 1.1 ? 3 : 0);
+    const w = run(spike, (d) => d >= 1 && d < 1 + STEP, 0, 2);
+    expect(Math.max(...w.slice(Math.round(1.05 / STEP)))).toBeLessThan(31);
+  });
 });
