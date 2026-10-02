@@ -3164,7 +3164,12 @@ function RaceView({ setup, real }: {
       const loadRaw = (src: string): Promise<HTMLImageElement> =>
         new Promise((res, rej) => {
           const im = new Image();
-          im.onload = () => res(im);
+          /**
+           * ★読み込みの間に ★展開（decode）まで済ませる（★2026-10-02・パドックの最初のコマ 325ms）。
+           *   ★しないと ★最初に描くコマでブラウザがその場で展開して止まる（★本番の見本で 展開を先にすると消えた）。
+           *   ★展開に失敗しても 絵は使える（★従来どおり描くときに展開）→ ★読み込みは成功で返す。
+           */
+          im.onload = () => { void im.decode().catch(() => undefined).then(() => res(im)); };
           im.onerror = () => rej(new Error(`スプライトを読み込めません: ${src}`));
           im.src = src;
         });
