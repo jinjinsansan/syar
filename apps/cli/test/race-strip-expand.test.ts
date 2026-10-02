@@ -62,6 +62,22 @@ describe('★小窓 ⇄ 拡大', () => {
     expect(old).not.toContain('const channelFullEl = expanded && !stageFull && tvMode !== null');
   });
 
+  /**
+   * ⑥ ★2026-10-02 オーナー iPhone「拡大でレースそのものが画面いっぱいにならない・小さく横画面」:
+   *   ★外の箱は flex（中央寄せ）→ ★本編の iframe は 既定で 箱の幅まで縮む → ★縦の携帯で 596px が 390px に縮み 回すと小さかった。
+   *   ★本番の CSS に 同じ class の箱を差し込んで再現（`out/gen/check-expand2.mjs`: 直す前 219×390 → 直した後 335×596）。
+   */
+  it('🔴 ⑥ ★拡大した本編の iframe は ★flex で縮めない（★縦の携帯で 回す前の幅を保つ）', () => {
+    const CSS = readFileSync(path.join(ROOT, 'apps/web/src/components/uma/uma-theme.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ');
+    const rule = /\[data-theme='uma'\] \.u-race-strip-stage-full \.u-race-strip-embed \{([^}]*)\}/.exec(CSS);
+    expect(rule, '★拡大した本編の規則が無い').not.toBeNull();
+    expect(rule![1]).toContain('flex: 0 0 auto;');
+    expect(rule![1], '★幅は JS の --stage-w').toContain('width: var(--stage-w,');
+    /** ★対照: ★縮めない指定を外すと ★落ちる */
+    const mutated = rule![1]!.replace('flex: 0 0 auto;', '');
+    expect(mutated).not.toContain('flex: 0 0 auto;');
+  });
+
   it('★対照: ★出入口の外で setExpanded(true) を足す変異は ★落ちる', () => {
     const mutated = LIVE.replace('onClick={openExpanded}>拡大</button>', 'onClick={() => { setExpanded(true); }}>拡大</button>');
     expect(mutated).not.toBe(LIVE);

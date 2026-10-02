@@ -245,6 +245,13 @@
 [data-theme='uma'] .u-race-strip-stage-full .u-race-strip-embed {
   /* ★横幅は ★JS が決めた `--stage-w`（★`dvh` を知らない端末で 小さく落ちない・race-strip.tsx の fit）。★無いときだけ CSS の式 */
   position: relative; inset: auto; width: var(--stage-w, min(100vw, calc((100dvh - 64px) * 16 / 9))); height: auto; aspect-ratio: 16 / 9; border-radius: 0;
+  /*
+    🔴 ★**縮めない**（★2026-10-02 オーナー iPhone「拡大でレースそのものが画面いっぱいにならない・小さく横画面」）:
+    ★外の箱は flex（中央寄せ）で ★中身は ★既定で 箱の幅まで縮む（flex-shrink: 1）→ ★縦の携帯では 回す前の幅 596px が ★390px に縮められ、
+    ★回すと 390×219 の小ささだった（★本番の CSS で再現・`out/gen/check-expand2.mjs`）。★幅は 上の式どおりに保つ。
+    ★見出し（64px）の下から始める: ★箱は中央寄せなので ★margin-top 64px で 中心を 32px 下げる（★回しても同じ）。
+  */
+  flex: 0 0 auto; margin-top: 64px;
 }
 /*
   ★縦持ちのスマホで「拡大」しても ★16:9 の映像が 画面の幅に合わせて 中央に小さく出ていた（★2026-09-29・オーナー）。
@@ -264,7 +271,7 @@
   ★高さを全部 映像に使い、★見出しは ★映像の上に重ねる（★題は隠し ★「小窓に戻す」だけ右上）。
 */
 @media (orientation: landscape) and (pointer: coarse) {
-  [data-theme='uma'] .u-race-strip-stage-full .u-race-strip-embed { width: var(--stage-w, min(100vw, calc(100dvh * 16 / 9))); }
+  [data-theme='uma'] .u-race-strip-stage-full .u-race-strip-embed { width: var(--stage-w, min(100vw, calc(100dvh * 16 / 9))); margin-top: 0; }
   [data-theme='uma'] .u-race-strip-stage-full .u-race-strip-stage-head {
     z-index: 2; justify-content: flex-end; pointer-events: none;
     padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 0 10px;
