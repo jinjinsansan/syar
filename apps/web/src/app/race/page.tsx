@@ -59,7 +59,7 @@ import {
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
   paintCrowd, seatMaskFromPixels, seatBandFromPixels,
   cameraBasis, project, HORSE_HEIGHT_M, setHorseScale,
-  buildVisualScroll, type VisualScroll, type VisualScrollSample,
+  buildVisualScroll, createGroundSmoother, type GroundSmoother, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, pixelScaleForDisplay, PHONE_SUPERSAMPLE, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   // ★発走前の流れ（★2026-09-15・オーナー決定「動画の通り」）
@@ -363,6 +363,16 @@ function noteIntroFrameGap(d: number, stage: string, raceId: string | null): voi
 }
 let groundPrev: { readonly d: number; readonly shot: string; readonly x: number; readonly f: number; readonly v: number; readonly speed: number | null; readonly wall: number } | null = null;
 const groundLastWarn = new Map<string, number>();
+/**
+ * ★**芝の最後の安全網**（★2026-10-02・`createGroundSmoother`）。★レースが変わったら 作り直す。★カメラの切り替わりは 前のコマのショットと比べる。
+ */
+let groundSmooth: { readonly key: string; readonly smoother: GroundSmoother; shot: string | null } | null = null;
+function smoothGround(d: number, shot: string, focusS: number, visualDelta: number, raceKey: string): number {
+  if (groundSmooth === null || groundSmooth.key !== raceKey) groundSmooth = { key: raceKey, smoother: createGroundSmoother(), shot: null };
+  const cut = groundSmooth.shot !== null && groundSmooth.shot !== shot;
+  groundSmooth.shot = shot;
+  return groundSmooth.smoother.step(d, focusS + visualDelta, cut) - focusS;
+}
 function noteGroundJump(d: number, shot: string, focusS: number, visualDelta: number, raceId: string | null): void {
   const x = focusS + visualDelta;
   const wall = performance.now();
@@ -5101,7 +5111,8 @@ function RaceView({ setup, real }: {
        */
       const visualScroll = (motionTimeline ?? built).visualScroll;
       /** ★注視点も渡す（★跳びの区間で芝が戻らない・`visual-scroll.ts`） */
-      const visualDelta = visualScroll.deltaAt(d, scene.focusS);
+      /** ★芝の最後の安全網を通す（★1 コマで跳ねない・止まらない・戻らない・`createGroundSmoother`） */
+      const visualDelta = smoothGround(d, scene.shot.id, scene.focusS, visualScroll.deltaAt(d, scene.focusS), `${real?.raceId ?? 'demo'}:${seed}`);
       const gaitDelta = visualDelta - visualScroll.deltaAt(RACE_INTRO_RACE_START_SEC);
       /** ★調べるため（★2026-10-01・オーナー「芝が逆に動いた」）: 芝の模様の位置 ＝ 注視点 ＋ Δ。★描画には使わない */
       (globalThis as { __raceGround?: unknown }).__raceGround = { d, focusS: scene.focusS, visualDelta };
