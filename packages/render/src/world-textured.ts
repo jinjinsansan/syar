@@ -118,9 +118,39 @@ export interface TexturedWorldOptions {
    * ★省略時は 1。★**1 のときは 1 画素も変わりません**（★刻み・開始行・貼る高さがすべて元の式に戻る）。
    */
   readonly pixelScale?: number;
+  /**
+   * ★**地面の行を 模様で 1 回に塗る**（★2026-10-02・既定で入れる。`false` で これまでの drawImage の刻みに戻す）。
+   *   ⚠️ ★遠い行ほど 1 行に タイルが何百枚も並び、★drawImage を ★タイルの数だけ呼んでいました
+   *      （★本番の見本: 空撮 1 コマ 23,000〜30,000 回・ゲート 3,500 回 → ★コマ落ち 150〜300ms）。
+   *   ★網 `ground-pattern.test.ts` が ★2 つの塗り方の画素を比べます。
+   */
+  readonly groundPattern?: boolean;
 }
 
 const wrap = (a: number, n: number): number => ((a % n) + n) % n;
+
+/** ★地面の行を塗る模様（★`self` を fillStyle に置き・★行ごとに `setTransform` で合わせる） */
+interface TurfPattern {
+  readonly self: unknown;
+  setTransform(m: { a: number; b: number; c: number; d: number; e: number; f: number }): void;
+}
+/** ★画布 × 絵 ごとに 1 つ作って使い回す（★毎コマ作らない） */
+const turfPatterns = new WeakMap<object, WeakMap<object, TurfPattern | null>>();
+
+function turfPatternOf<TImage>(ctx: Ctx2D<TImage>, image: TImage): TurfPattern | null {
+  if (ctx.createPattern === undefined || typeof image !== 'object' || image === null) return null;
+  let byImage = turfPatterns.get(ctx);
+  if (byImage === undefined) { byImage = new WeakMap(); turfPatterns.set(ctx, byImage); }
+  const hit = byImage.get(image);
+  if (hit !== undefined) return hit;
+  /** ⚠️ ★記録用の張りぼての ctx は 何でも undefined を返す（★網 `track-gloss`）→ ★null と同じく刻む塗り方へ */
+  const p = ctx.createPattern(image, 'repeat') as ReturnType<NonNullable<Ctx2D<TImage>['createPattern']>> | undefined;
+  const made: TurfPattern | null = p === null || p === undefined || typeof p.setTransform !== 'function'
+    ? null
+    : { self: p, setTransform: (m) => { p.setTransform!(m); } };
+  byImage.set(image, made);
+  return made;
+}
 
 /**
  * ★**濡れた馬場の層の濃さ**（0 = 良＝何も重ねない）。
@@ -321,6 +351,7 @@ export function drawTexturedWorld<TImage>(
   const rowStep = 1 / pxScale;
   const yStart = Math.round(Math.max(0, Math.floor(hz) + 1) * pxScale) / pxScale;
   const rowCount = Math.max(0, Math.ceil((H - yStart) * pxScale));
+  const pattern = opts.groundPattern === false ? null : turfPatternOf(ctx, turf.image);
   for (let r = 0; r < rowCount; r += 1) {
     const y = yStart + r * rowStep;
     // 画面中央列の視線が地面に当たる距離
@@ -339,6 +370,13 @@ export function drawTexturedWorld<TImage>(
     const sy = wrap(v * turf.height, turf.height);
     // 左端のテクスチャ x
     let u0px = wrap((uC - (W / 2) * kTile) * turf.width, turf.width);
+    if (pattern !== null) {
+      /** ★画面の x ↔ 元画像の u0px + x × srcPerPx・★画面の y〜y+rowStep ↔ 元画像の sy〜sy+1（★下の drawImage と同じ対応） */
+      pattern.setTransform({ a: 1 / srcPerPx, b: 0, c: 0, d: rowStep, e: -u0px / srcPerPx, f: y - sy * rowStep });
+      ctx.fillStyle = pattern.self;
+      ctx.fillRect(0, y, W, rowStep);
+      continue;
+    }
     let x = 0;
     // ★遠い行ほど 1px に多くの元画素が入る。sw を刻んで複数回描く（タイル境界で分割）
     while (x < W) {

@@ -103,6 +103,13 @@ export interface Ctx2D<TImage = unknown> {
    */
   getTransform?(): { readonly a: number; readonly b: number; readonly c: number; readonly d: number; readonly e: number; readonly f: number };
   setTransform?(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  /**
+   * ★任意（★両環境にある）。★**地面の 1 行を 1 回で塗る**（★2026-10-02・空撮の 1 コマで drawImage 3 万回・ゲートで 3,500 回）。
+   *   ★無い環境・★`setTransform` の無い模様では ★これまでどおり drawImage で刻む。
+   */
+  createPattern?(image: TImage, repetition: 'repeat'): {
+    setTransform?(m: { a: number; b: number; c: number; d: number; e: number; f: number }): void;
+  } | null;
   /** ★任意。毛色バリエーション（馬体の色相・明度・彩度）に使う CSS filter。無い環境では無視 */
   filter?: string;
   /** ★任意。HUD の金プレート（グラデーション 1 本だけ許可・MOTION_HANDOFF §0）。無い環境では単色の金 */
