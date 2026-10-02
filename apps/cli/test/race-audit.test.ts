@@ -2,8 +2,8 @@
  * ★**芝とカメラの監査の集計**（`apps/web/src/app/race/race-audit.ts`・★2026-10-02）。
  *   ★普通のレース（★対照）は 0 件・★逆回転・超高速・急変・離れるを 1 件ずつ見つける・★据え置きのゲートは 超スローに数えない。
  */
-import { describe, it, expect } from 'vitest';
-import { analyzeAuditGround, type AuditGroundFrame } from '../../web/src/app/race/race-audit';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { analyzeAuditGround, RaceGroundWatch, readGroundLog, groundLogText, GROUND_LOG_KEY, type AuditGroundFrame } from '../../web/src/app/race/race-audit';
 
 const frame = (d: number, shot: string, groundMps: number | null, opts: Partial<AuditGroundFrame> = {}): AuditGroundFrame => ({
   d, shot, persp: false, groundMps, trueMps: 16, shownMps: 40, horseRatio: 0.25, camDistM: 44, ...opts,
@@ -36,5 +36,41 @@ describe('★芝とカメラの監査の集計', () => {
   it('★据え置きのゲートで 芝が止まるのは 正しい（★超スローに数えない）・★対照: 追うカメラなら数える', () => {
     expect(analyzeAuditGround(run('start-gate-side', 33, 60, () => 0.1), 33).findings).toEqual([]);
     expect(analyzeAuditGround(run('side-drive', 33, 60, () => 0.1), 33).findings.map((f) => f.kind)).toContain('超スロー');
+  });
+
+  describe('★普段の見張り（★観戦中に この端末へ書き残す）', () => {
+    const store = new Map<string, string>();
+    beforeEach(() => {
+      store.clear();
+      vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } });
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    });
+    const feed = (w: RaceGroundWatch, fr: readonly AuditGroundFrame[], gap = 1 / 60): void => { for (const f of fr) w.step(f, gap); w.flush(); };
+
+    it('★対照: ★普通のレースは 何も残さない', () => {
+      feed(new RaceGroundWatch('r1', 33), run('side-drive', 34, 120, () => 16));
+      expect(readGroundLog()).toEqual([]);
+      expect(groundLogText(readGroundLog())).toContain('記録はまだありません');
+    });
+
+    it('🔴 ★逆回転を レース ID つきで 1 件に束ねて残す・★後で まとめて読める', () => {
+      feed(new RaceGroundWatch('abc', 33), run('homestretch-side', 50, 120, (i) => (i >= 40 && i < 46 ? -3 : 16)));
+      const log = readGroundLog();
+      expect(log.filter((e) => e.kind === '逆回転')).toEqual([expect.objectContaining({ race: 'abc', frames: 6, shot: 'homestretch-side', raceSec: 17.67 })]);
+      expect(store.get(GROUND_LOG_KEY)).toContain('"race":"abc"');
+      expect(groundLogText(log)).toContain('race=abc 逆回転');
+    });
+
+    it('★コマ落ちのコマ（★間 0.1 秒超）の急変は数えない・★超高速は数える', () => {
+      const fr = run('side-drive', 34, 60, (i) => (i === 30 ? 40 : 16));
+      feed(new RaceGroundWatch('r2', 33), fr, 0.2);
+      expect(readGroundLog().map((e) => e.kind)).toEqual(['超高速']);
+    });
+
+    it('🔴 ★場面の中で 馬が 6 割より小さくなったら ★離れる（★場面が変わった所で残す）', () => {
+      const w = new RaceGroundWatch('r3', 33);
+      feed(w, [...run('finish-line', 50, 180, () => 16, (i) => ({ horseRatio: 0.27 * (1 - i / 300) })), ...run('winner-follow', 53, 10, () => 16)]);
+      expect(readGroundLog().map((e) => e.kind)).toContain('離れる');
+    });
   });
 });

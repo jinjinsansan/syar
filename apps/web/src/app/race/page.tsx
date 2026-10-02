@@ -19,7 +19,7 @@
  */
 'use client';
 
-import { analyzeAuditGround, auditGroundText, type AuditGroundFrame } from './race-audit';
+import { analyzeAuditGround, auditGroundText, groundLogText, readGroundLog, RaceGroundWatch, type AuditGroundFrame } from './race-audit';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -404,6 +404,25 @@ function noteGroundJump(d: number, shot: string, focusS: number, visualDelta: nu
  *   ★描画には使わない（★記録だけ）。
  */
 const AUDIT_GROUND = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('audit') === 'ground';
+/**
+ * ★**普段の見張り**（★2026-10-02・オーナー「どのレースかなんて その時でないと分からない」）: ★監査と同じ 1 コマの値を ★観戦中も作り、
+ *   ★`RaceGroundWatch` が 見つけたものを この端末に書き残す（★`/race?groundlog=1` で まとめて出す）。★描画には使わない。
+ */
+let groundWatch: { readonly key: string; readonly watch: RaceGroundWatch; lastWall: number; lastFlush: number } | null = null;
+function watchGround(frame: AuditGroundFrame, raceKey: string): void {
+  const wall = performance.now();
+  if (groundWatch === null || groundWatch.key !== raceKey) {
+    groundWatch?.watch.flush();
+    groundWatch = { key: raceKey, watch: new RaceGroundWatch(raceKey, RACE_INTRO_RACE_START_SEC), lastWall: wall, lastFlush: wall };
+  }
+  groundWatch.watch.step(frame, (wall - groundWatch.lastWall) / 1000);
+  groundWatch.lastWall = wall;
+  if (wall - groundWatch.lastFlush > 3000) { groundWatch.watch.flush(); groundWatch.lastFlush = wall; }
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => { groundWatch?.watch.flush(); });
+  if (new URLSearchParams(window.location.search).get('groundlog') === '1') console.log(groundLogText(readGroundLog()));
+}
 /** ★記録の形と集計は `race-audit.ts`（★1 か所） */
 const auditGround: AuditGroundFrame[] = [];
 let auditPrev: {
@@ -413,9 +432,8 @@ let auditPrev: {
 } | null = null;
 function noteAuditGround(
   course: Parameters<typeof posOf>[0], d: number, scene: { readonly shot: { readonly id: string; readonly view: string; readonly perspectiveWorld?: boolean }; readonly camera: Parameters<typeof cameraBasis>[0]; readonly focusS: number; readonly focusW: number },
-  visualDelta: number, lead: number, sec: number, horseRatio: number,
+  visualDelta: number, lead: number, sec: number, horseRatio: number, raceKey: string,
 ): void {
-  if (!AUDIT_GROUND) return;
   const persp = !(scene.shot.view === 'side' && scene.shot.perspectiveWorld !== true);
   const scroll = scene.focusS + visualDelta;
   const prev = auditPrev;
@@ -441,7 +459,9 @@ function noteAuditGround(
       if (a.depth > 1 && b.depth > 1 && len > 1e-6) groundMps = -(((b.x - a.x) * dx + (b.y - a.y) * dy) / len) / len / dt;
     }
   }
-  auditGround.push({ d, shot: scene.shot.id, persp, groundMps, trueMps, shownMps, horseRatio, camDistM });
+  const frame: AuditGroundFrame = { d, shot: scene.shot.id, persp, groundMps, trueMps, shownMps, horseRatio, camDistM };
+  if (AUDIT_GROUND) auditGround.push(frame);
+  else watchGround(frame, raceKey);
   auditPrev = { d, shot: scene.shot.id, persp, scroll, cam: scene.camera, focusS: scene.focusS, focusW: scene.focusW, lead, sec };
 }
 /**
@@ -5217,7 +5237,7 @@ function RaceView({ setup, real }: {
       /** ★調べるため（★2026-10-01・オーナー「芝が逆に動いた」）: 芝の模様の位置 ＝ 注視点 ＋ Δ。★描画には使わない */
       (globalThis as { __raceGround?: unknown }).__raceGround = { d, focusS: scene.focusS, visualDelta };
       noteGroundJump(d, scene.shot.id, scene.focusS, visualDelta, real?.raceId ?? null);
-      noteAuditGround(course, d, scene, visualDelta, lead, sec, v2HorseRatio);
+      noteAuditGround(course, d, scene, visualDelta, lead, sec, v2HorseRatio, real?.raceId ?? 'demo');
       const metersByGate = new Map(easedAt.map((horse) => [horse.gate, horse.meters]));
       /**
        * ★**レースの音**（★2026-09-13・オーナー支給の音源）。

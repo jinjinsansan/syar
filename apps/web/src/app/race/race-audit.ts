@@ -35,22 +35,30 @@ const FIXED_CAMERA_SHOTS = /^start-gate/;
 
 const r2 = (v: number): number => Math.round(v * 100) / 100;
 
+/**
+ * ★**1 コマの判定**（★監査と 普段の見張り `RaceGroundWatch` の ★両方がここを通る・★式は 1 か所）。
+ *   ★同じ場面の 前のコマ `p` と 今のコマ `f` から。★止まっている馬（★発走前・ゴール後）は見ない。
+ */
+export function groundFrameKinds(p: AuditGroundFrame, f: AuditGroundFrame): { readonly kind: AuditFinding['kind']; readonly detail: string }[] {
+  if (f.groundMps === null || f.trueMps === null || f.shot !== p.shot) return [];
+  const v = f.groundMps, t = f.trueMps;
+  if (t < 3) return [];
+  const out: { kind: AuditFinding['kind']; detail: string }[] = [];
+  if (v < -0.5) out.push({ kind: '逆回転', detail: `芝 ${v.toFixed(1)} m/秒・馬 ${t.toFixed(1)}` });
+  else if (v > t * 1.6) out.push({ kind: '超高速', detail: `芝 ${v.toFixed(1)} m/秒・馬 ${t.toFixed(1)}（${(v / t).toFixed(2)} 倍）` });
+  else if (v < t * 0.4 && !FIXED_CAMERA_SHOTS.test(f.shot)) out.push({ kind: '超スロー', detail: `芝 ${v.toFixed(1)} m/秒・馬 ${t.toFixed(1)}（${(v / t).toFixed(2)} 倍）` });
+  if (p.groundMps !== null && Math.abs(v - p.groundMps) > Math.max(5, Math.abs(p.groundMps) * 0.5)) {
+    out.push({ kind: '急変', detail: `芝 ${p.groundMps.toFixed(1)} → ${v.toFixed(1)} m/秒` });
+  }
+  return out;
+}
+
 export function analyzeAuditGround(frames: readonly AuditGroundFrame[], raceStart: number): {
   readonly shots: readonly AuditShotSummary[]; readonly findings: readonly AuditFinding[];
 } {
   const raw: { kind: AuditFinding['kind']; f: AuditGroundFrame; detail: string }[] = [];
   for (let i = 1; i < frames.length; i += 1) {
-    const f = frames[i]!, p = frames[i - 1]!;
-    if (f.groundMps === null || f.trueMps === null || f.shot !== p.shot) continue;
-    const v = f.groundMps, t = f.trueMps;
-    /** ★止まっている（★発走前・ゴール後）は見ない */
-    if (t < 3) continue;
-    if (v < -0.5) raw.push({ kind: '逆回転', f, detail: `芝 ${v.toFixed(1)} m/秒・馬 ${t.toFixed(1)}` });
-    else if (v > t * 1.6) raw.push({ kind: '超高速', f, detail: `芝 ${v.toFixed(1)} m/秒・馬 ${t.toFixed(1)}（${(v / t).toFixed(2)} 倍）` });
-    else if (v < t * 0.4 && !FIXED_CAMERA_SHOTS.test(f.shot)) raw.push({ kind: '超スロー', f, detail: `芝 ${v.toFixed(1)} m/秒・馬 ${t.toFixed(1)}（${(v / t).toFixed(2)} 倍）` });
-    if (p.groundMps !== null && Math.abs(v - p.groundMps) > Math.max(5, Math.abs(p.groundMps) * 0.5)) {
-      raw.push({ kind: '急変', f, detail: `芝 ${p.groundMps.toFixed(1)} → ${v.toFixed(1)} m/秒` });
-    }
+    for (const k of groundFrameKinds(frames[i - 1]!, frames[i]!)) raw.push({ ...k, f: frames[i]! });
   }
   const shots: AuditShotSummary[] = [];
   for (let i = 0; i < frames.length;) {
@@ -103,4 +111,81 @@ export function auditGroundText(url: string, summary: ReturnType<typeof analyzeA
     lines.push(`[race-audit] ${f.kind} レース ${f.raceSec}〜${f.raceSecTo}秒（${f.frames} コマ） ${f.persp ? '透' : '板'} ${f.shot}: ${f.detail}`);
   }
   return lines.join('\n');
+}
+
+/**
+ * ★**普段の見張り**（★2026-10-02・オーナー「どのレースかなんて その時でないと分からない」）。
+ *   ★本番の観戦（★小窓の中継も）で ★毎コマ `groundFrameKinds` を当て、★見つけたら ★この端末に書き残す（★直近 `GROUND_LOG_MAX` 件）。
+ *   ★後で `/race?groundlog=1` を開くと ★コンソールに まとめて出る（`[race-ground-log]`）→ ★そのレース ID を `?race=<id>&audit=ground` で調べる。
+ *   ⚠️ ★実時間のコマ（★コマ落ちあり）なので ★急変は コマの間が 0.1 秒を超えるコマでは数えない（★コマ落ちそのものは `[race-ground]` が別に出す）。
+ *   ⚠️ ★端末の保存領域が使えない（★非公開の窓など）ときは ★黙って残さない（★画面は止めない）。
+ */
+export const GROUND_LOG_KEY = 'star.raceGroundLog';
+export const GROUND_LOG_MAX = 300;
+export interface GroundLogEntry {
+  readonly race: string; readonly kind: AuditFinding['kind']; readonly raceSec: number; readonly raceSecTo: number;
+  readonly frames: number; readonly shot: string; readonly persp: boolean; readonly detail: string;
+}
+export function readGroundLog(): GroundLogEntry[] {
+  try {
+    const raw = globalThis.localStorage?.getItem(GROUND_LOG_KEY);
+    const v: unknown = raw === null || raw === undefined ? [] : JSON.parse(raw);
+    return Array.isArray(v) ? v as GroundLogEntry[] : [];
+  } catch { return []; }
+}
+function writeGroundLog(list: readonly GroundLogEntry[]): void {
+  try { globalThis.localStorage?.setItem(GROUND_LOG_KEY, JSON.stringify(list.slice(-GROUND_LOG_MAX))); } catch { /* ★残せない端末では残さない */ }
+}
+export class RaceGroundWatch {
+  private prev: AuditGroundFrame | null = null;
+  private shotStart: AuditGroundFrame | null = null;
+  private shotMinHorse = Infinity;
+  private pending: GroundLogEntry[] = [];
+  constructor(private readonly race: string, private readonly raceStart: number) {}
+  /** ★1 コマ。★`gapSec` は 実時間のコマの間（★コマ落ちの判定） */
+  step(f: AuditGroundFrame, gapSec: number): void {
+    const p = this.prev;
+    this.prev = f;
+    if (p === null || p.shot !== f.shot || f.d < p.d) { this.endShot(p); this.shotStart = f; this.shotMinHorse = f.horseRatio; return; }
+    this.shotMinHorse = Math.min(this.shotMinHorse, f.horseRatio);
+    for (const k of groundFrameKinds(p, f)) {
+      if (k.kind === '急変' && gapSec > 0.1) continue;
+      this.note(k.kind, f, k.detail);
+    }
+  }
+  /** ★場面の終わり: ★馬が 始めの 6 割より小さくなったら ★離れる */
+  private endShot(last: AuditGroundFrame | null): void {
+    const s = this.shotStart;
+    if (s !== null && last !== null && s.horseRatio > 0.02 && this.shotMinHorse < s.horseRatio * 0.6) {
+      this.note('離れる', last, `馬の大きさ ${s.horseRatio.toFixed(3)} → 最小 ${this.shotMinHorse.toFixed(3)}・カメラ ${s.camDistM.toFixed(0)}m → ${last.camDistM.toFixed(0)}m`);
+    }
+    this.shotStart = null;
+  }
+  private note(kind: AuditFinding['kind'], f: AuditGroundFrame, detail: string): void {
+    const sec = r2(f.d - this.raceStart);
+    let i = this.pending.length - 1;
+    while (i >= 0 && this.pending[i]!.kind !== kind) i -= 1;
+    const last = i >= 0 ? this.pending[i] : undefined;
+    if (last !== undefined && last.shot === f.shot && sec - last.raceSecTo < 0.5) {
+      this.pending[i] = { ...last, raceSecTo: sec, frames: last.frames + 1 };
+    } else {
+      this.pending.push({ race: this.race, kind, raceSec: sec, raceSecTo: sec, frames: 1, shot: f.shot, persp: f.persp, detail });
+      console.warn(`[race-ground-log] ${kind} race=${this.race} レース ${sec}秒 ${f.persp ? '透' : '板'} ${f.shot}: ${detail}`);
+    }
+  }
+  /** ★書き残す（★数秒に 1 回・★ページを離れるとき） */
+  flush(): void {
+    if (this.pending.length === 0) return;
+    writeGroundLog([...readGroundLog(), ...this.pending]);
+    this.pending = [];
+  }
+}
+/** ★`/race?groundlog=1` で出す文 */
+export function groundLogText(list: readonly GroundLogEntry[]): string {
+  if (list.length === 0) return '[race-ground-log] 記録はまだありません（★この端末で見たレースだけが残ります）';
+  const races = [...new Set(list.map((e) => e.race))];
+  return [
+    `[race-ground-log] ${list.length} 件・レース ${races.length} 本（★新しい順）`,
+    ...[...list].reverse().map((e) => `[race-ground-log] race=${e.race} ${e.kind} レース ${e.raceSec}〜${e.raceSecTo}秒（${e.frames} コマ） ${e.persp ? '透' : '板'} ${e.shot}: ${e.detail}`),
+  ].join('\n');
 }
