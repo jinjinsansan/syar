@@ -19,7 +19,10 @@ const MANIFEST = JSON.parse(readFileSync(path.join(ROOT, 'apps/web/public/art/ba
 
 describe('★パドックの歩きの勝負服', () => {
   it('🔴 ★歩きは 画布に固定した窓（★原版の経路も 焼いた経路も）', () => {
-    expect(PAGE).toMatch(/const SILKS_LAYOUT_WALK: SilksLayout = \{\s*canvasFixed: true,/);
+    expect(PAGE).toMatch(/const SILKS_LAYOUT_WALK: SilksLayout = \{\s*canvasFixed: true,\s*components: true,/);
+    /** ★塊で決める（★矩形が兜・腿を切らない）: ★画素の窓の判定は 塊の決定を優先 */
+    expect(PAGE).toContain('const helmet = cc >= 0 ? cc === 1 : nx >= layout.helmet[0]');
+    expect(PAGE).toContain('if (cls !== 0) for (const k of memb) compClass[k] = cls;');
     expect(PAGE).toContain('buildFramesByType({ a: walkA, ...walkByType }, undefined, SILKS_LAYOUT_WALK, sideMode)');
     expect(PAGE).toContain('byType.set(t, buildFramesFromBaked(set, new Map(ok), SILKS_LAYOUT_WALK, undefined, shadow ?? undefined));');
     /** ★窓を置く矩形は 画布（★外接矩形でない）・★数字の大きさは外接矩形のまま */
@@ -30,10 +33,9 @@ describe('★パドックの歩きの勝負服', () => {
     expect(PAGE).not.toMatch(/const SILKS_LAYOUT_CROUCH: SilksLayout = \{\s*canvasFixed/);
   });
 
-  it('🔴 ★兜の窓は ゴーグルの帯より上だけ（★硝子は薄い灰で 塗れる判定に入る）', () => {
-    const m = /const SILKS_LAYOUT_WALK: SilksLayout = \{[\s\S]*?helmet: \[([\d.]+), ([\d.]+), ([\d.]+)\]/.exec(PAGE);
-    expect(m).not.toBeNull();
-    expect(Number(m![3])).toBeLessThanOrEqual(0.09);
+  it('🔴 ★小さい塊（★ゴーグルの硝子・目の白）は塗らない', () => {
+    expect(PAGE).toContain('const minArea = Math.max(40, width * height * 0.0015);');
+    expect(PAGE).toContain('if (memb.length < minArea) continue;');
   });
 
   it('★焼いた歩きは 画布の幅を持つ（★無いと 外接矩形の窓に戻る）', () => {

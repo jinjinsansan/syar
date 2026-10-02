@@ -1552,6 +1552,13 @@ interface SilksLayout {
    *   ★真のとき 窓は ★画布（★歩きは 8 コマとも騎手が同じ位置に揃えてある）の割合。★数字の大きさは 従来どおり外接矩形から。
    */
   readonly canvasFixed?: boolean;
+  /**
+   * ★**塊で決める**（★2026-10-03・オーナー「治っていません」・本番の撮影で 兜が上の帯だけ緑・腿の白いまだらが コマで出たり消えたり）。
+   *   ★画布に固定しても 歩きでは ★騎手が歩幅で上下するので ★矩形の縁が 兜や腿を コマごとに違う所で切った。
+   *   ★真のとき: ★騎手の範囲（`crop`）の 塗れる画素を ★つながった塊に分け、★塊の中心が どの窓にあるかで ★塊ごと 兜・上着・鞍布に決める
+   *   （★矩形が塊を切らない・★小さい塊＝ゴーグルの硝子・目の白は塗らない）。★窓は「中心を探す範囲」になる。
+   */
+  readonly components?: boolean;
 }
 /** 騎手が低く伏せる走行コマ（side-v6 など） */
 const SILKS_LAYOUT_CROUCH: SilksLayout = {
@@ -1565,8 +1572,10 @@ const SILKS_LAYOUT_CROUCH: SilksLayout = {
  */
 const SILKS_LAYOUT_WALK: SilksLayout = {
   canvasFixed: true,
+  components: true,
   cropX: 0.30, cropW: 0.40, cropH: 0.62,
-  helmet: [0.515, 0.675, 0.09], jacket: [0.415, 0.585, 0.165, 0.36], saddlecloth: [0.31, 0.535, 0.37, 0.55], number: [0.378, 0.47],
+  /** ★塊の中心を探す範囲（★`components`）。★兜の殻 ／ ★胴・腕・腿 ／ ★鞍の下の敷き布 */
+  helmet: [0.50, 0.69, 0.13], jacket: [0.38, 0.62, 0.14, 0.42], saddlecloth: [0.29, 0.55, 0.40, 0.60], number: [0.378, 0.47],
 };
 /** 騎手なしの馬（horse-only）: 鞍布の検出窓だけ広く取る（白い騎手のズボンが無いので誤検出しない） */
 const SILKS_LAYOUT_HORSE_ONLY: SilksLayout = {
@@ -1691,14 +1700,54 @@ function silksOverlays(
    * ★実測: ★窓は 前から 285×90px ／ 真横 250×148px。★塗る画素の外接矩形は別の形です。
    */
   let jacketX0 = width; let jacketY0 = height; let jacketX1 = -1; let jacketY1 = -1;
+  /**
+   * ★**塊で決める**（`layout.components`）: ★画素ごとの 0 = 塗らない ／ 1 = 兜 ／ 2 = 上着 ／ 3 = 鞍布。
+   *   ★塗れるか（★肌の判定なし＝鞍布の陰を穴にしない）で つなぎ、★塊の中心で決める。★上着・兜の肌は 下のループで外す。
+   */
+  let compClass: Uint8Array | null = null;
+  if (layout.components === true) {
+    const P = new Uint8Array(width * height);
+    for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+      const i4 = (y * width + x) * 4;
+      const ny = (y + y0 - source.y) / source.height;
+      if (silksPaintable(input[i4] ?? 0, input[i4 + 1] ?? 0, input[i4 + 2] ?? 0, input[i4 + 3] ?? 0, ny <= layout.helmet[2], false)) P[y * width + x] = 1;
+    }
+    compClass = new Uint8Array(width * height);
+    const seenC = new Uint8Array(width * height);
+    const minArea = Math.max(40, width * height * 0.0015);
+    const stackC: number[] = []; const memb: number[] = [];
+    for (let st = 0; st < P.length; st += 1) {
+      if (P[st] === 0 || seenC[st] === 1) continue;
+      memb.length = 0; stackC.length = 0; stackC.push(st); seenC[st] = 1;
+      let sx = 0; let sy = 0;
+      while (stackC.length > 0) {
+        const k = stackC.pop()!; memb.push(k);
+        const kx = k % width, ky = (k - kx) / width; sx += kx; sy += ky;
+        for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) {
+          const nx2 = kx + dx, ny2 = ky + dy;
+          if (nx2 < 0 || ny2 < 0 || nx2 >= width || ny2 >= height) continue;
+          const nk = ny2 * width + nx2;
+          if (P[nk] === 1 && seenC[nk] === 0) { seenC[nk] = 1; stackC.push(nk); }
+        }
+      }
+      if (memb.length < minArea) continue;
+      const cnx = (sx / memb.length + x0 - source.x) / source.width;
+      const cny = (sy / memb.length + y0 - source.y) / source.height;
+      const cls = cnx >= layout.helmet[0] && cnx <= layout.helmet[1] && cny <= layout.helmet[2] ? 1
+        : cnx >= layout.jacket[0] && cnx <= layout.jacket[1] && cny >= layout.jacket[2] && cny <= layout.jacket[3] ? 2
+          : cnx >= layout.saddlecloth[0] && cnx <= layout.saddlecloth[1] && cny >= layout.saddlecloth[2] && cny <= layout.saddlecloth[3] ? 3 : 0;
+      if (cls !== 0) for (const k of memb) compClass[k] = cls;
+    }
+  }
   for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
     const index = (y * width + x) * 4;
     const r = input[index] ?? 0; const g = input[index + 1] ?? 0; const b = input[index + 2] ?? 0; const a = input[index + 3] ?? 0;
     const nx = (x + x0 - source.x) / source.width;
     const ny = (y + y0 - source.y) / source.height;
-    const helmet = nx >= layout.helmet[0] && nx <= layout.helmet[1] && ny <= layout.helmet[2];
-    const jacket = nx >= layout.jacket[0] && nx <= layout.jacket[1] && ny >= layout.jacket[2] && ny <= layout.jacket[3];
-    const saddlecloth = nx >= layout.saddlecloth[0] && nx <= layout.saddlecloth[1]
+    const cc = compClass === null ? -1 : compClass[y * width + x]!;
+    const helmet = cc >= 0 ? cc === 1 : nx >= layout.helmet[0] && nx <= layout.helmet[1] && ny <= layout.helmet[2];
+    const jacket = cc >= 0 ? cc === 2 : nx >= layout.jacket[0] && nx <= layout.jacket[1] && ny >= layout.jacket[2] && ny <= layout.jacket[3];
+    const saddlecloth = cc >= 0 ? cc === 3 : nx >= layout.saddlecloth[0] && nx <= layout.saddlecloth[1]
       && ny >= layout.saddlecloth[2] && ny <= layout.saddlecloth[3];
     if (!helmet && !jacket && !saddlecloth) continue;
     /**
