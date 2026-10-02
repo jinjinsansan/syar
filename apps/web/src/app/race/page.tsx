@@ -6615,9 +6615,14 @@ function RaceView({ setup, real }: {
         setSeekPos(d);
         setClock(Math.min(raceIntroAt(d).raceDisplaySec, built.warp.displaySec));
       }
+      const r0 = performance.now();
       render(d);
+      /** ★コマ落ちを 見張りに残す（★止まりの長さ・このコマの描画処理の時間・`RaceGroundWatch.stall`） */
+      groundWatch?.watch.stall(d, now - prevFrameWall, performance.now() - r0);
+      prevFrameWall = now;
       rafRef.current = requestAnimationFrame(loop);
     };
+    let prevFrameWall = performance.now();
     rafRef.current = requestAnimationFrame(loop);
     return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
   }, [playing, built, render, playbackRate]);

@@ -22,7 +22,7 @@ export interface AuditShotSummary {
   readonly camStart: number; readonly camEnd: number;
 }
 export interface AuditFinding {
-  readonly kind: '逆回転' | '超高速' | '超スロー' | '急変' | '離れる';
+  readonly kind: '逆回転' | '超高速' | '超スロー' | '急変' | '離れる' | 'コマ落ち';
   readonly raceSec: number; readonly raceSecTo: number; readonly frames: number;
   readonly shot: string; readonly persp: boolean; readonly detail: string;
 }
@@ -172,6 +172,20 @@ export class RaceGroundWatch {
       this.pending.push({ race: this.race, kind, raceSec: sec, raceSecTo: sec, frames: 1, shot: f.shot, persp: f.persp, detail });
       console.warn(`[race-ground-log] ${kind} race=${this.race} レース ${sec}秒 ${f.persp ? '透' : '板'} ${f.shot}: ${detail}`);
     }
+  }
+  /**
+   * ★**コマ落ち**（★2026-10-03・オーナー「最後の直線で カクつく・縞が逆に見える」・手元では再現しない）: ★`gapMs` 止まったコマを ★場面つきで残す。
+   *   ★`renderMs` は そのコマの こちらの描画処理の時間。★短いのに長く止まったなら ★ブラウザ側（★絵の展開・メモリの片付け・描画の転送）。
+   */
+  stall(raceDisplaySec: number, gapMs: number, renderMs: number): void {
+    if (gapMs <= 100) return;
+    const shot = this.prev?.shot ?? '?';
+    const sec = r2(raceDisplaySec - this.raceStart);
+    this.pending.push({
+      race: this.race, kind: 'コマ落ち', raceSec: sec, raceSecTo: sec, frames: 1, shot, persp: this.prev?.persp ?? false,
+      detail: `止まり ${Math.round(gapMs)}ms・描画処理 ${Math.round(renderMs)}ms${renderMs < gapMs * 0.5 ? '（★ブラウザ側）' : '（★描画が重い）'}`,
+    });
+    console.warn(`[race-ground-log] コマ落ち race=${this.race} レース ${sec}秒 ${shot}: 止まり ${Math.round(gapMs)}ms・描画処理 ${Math.round(renderMs)}ms`);
   }
   /** ★書き残す（★数秒に 1 回・★ページを離れるとき） */
   flush(): void {

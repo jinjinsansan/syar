@@ -67,6 +67,18 @@ describe('★芝とカメラの監査の集計', () => {
       expect(readGroundLog().map((e) => e.kind)).toEqual(['超高速']);
     });
 
+    it('🔴 ★コマ落ち（★100ms 超）を 場面つきで残し ★ブラウザ側か 描画が重いかを分ける・★対照: 100ms 以下は残さない', () => {
+      const w = new RaceGroundWatch('r4', 33);
+      for (const f of run('homestretch-side', 50, 10, () => 16)) w.step(f, 1 / 60);
+      w.stall(50.2, 80, 5);
+      w.stall(50.3, 240, 6);
+      w.stall(50.4, 180, 150);
+      w.flush();
+      const log = readGroundLog().filter((e) => e.kind === 'コマ落ち');
+      expect(log.map((e) => e.detail)).toEqual(['止まり 240ms・描画処理 6ms（★ブラウザ側）', '止まり 180ms・描画処理 150ms（★描画が重い）']);
+      expect(log[0]).toEqual(expect.objectContaining({ shot: 'homestretch-side', raceSec: 17.3 }));
+    });
+
     it('🔴 ★場面の中で 馬が 6 割より小さくなったら ★離れる（★場面が変わった所で残す）', () => {
       const w = new RaceGroundWatch('r3', 33);
       feed(w, [...run('finish-line', 50, 180, () => 16, (i) => ({ horseRatio: 0.27 * (1 - i / 300) })), ...run('winner-follow', 53, 10, () => 16)]);
