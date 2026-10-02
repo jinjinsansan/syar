@@ -624,7 +624,14 @@ export function drawRaceTitleCard<TImage>(
        *    > ★最初の画面の自分馬が左がはみ出ている　サイズをもう少し小さく
        */
       const targetH = H * 0.34;
-      const scale = targetH / fr.referenceHeight;
+      /**
+       * ★**帯に入らなければ 縮める**（★2026-10-03・オーナー「またタイトル画面で馬が右側切れています」）。
+       *   ⚠️ ★09-30 の題字の板（R-25）で板が広がり、★板の右の帯が 馬の幅より狭くなった。★下の「帯の中央に置く」だけでは
+       *      ★馬が帯からはみ出し ★鼻先が画面外・★尻が板に食い込んだ。★帯の幅に合わせて縮める（★大きくはしない）。
+       */
+      const bandW = W - 10 - (px + pw + Math.abs(k) + 18);
+      const fit = Math.min(1, bandW / Math.max(1, fr.source.width * (targetH / fr.referenceHeight)));
+      const scale = (targetH / fr.referenceHeight) * fit;
       const dw = fr.source.width * scale, dh = fr.source.height * scale;
       /**
        * ★**題字の板に食い込ませません**（★2026-09-11・オーナー指摘「左がはみ出ている」）。
