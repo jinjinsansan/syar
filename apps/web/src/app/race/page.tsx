@@ -2572,7 +2572,32 @@ function buildMotionTimeline(
   };
 }
 
+/**
+ * ★**芝とカメラの見張りの記録を 画面に出す**（★`/race?groundlog=1`・★2026-10-02・オーナー「PC もスマホも」）。
+ *   ★iPhone の Safari には コンソールが無い → ★一覧を 文字のまま出し ★「コピー」で そのまま貼れるようにする。
+ *   ⚠️ ★確かめるための画面（★意匠は作らない・★`PARAM_ERROR` と同じ字と枠）。★記録は この端末のブラウザの中だけ（`race-audit.ts`）。
+ */
+const GROUND_LOG_VIEW = QS?.get('groundlog') === '1';
+function GroundLogView(): React.JSX.Element {
+  const [text, setText] = useState<string>('');
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { setText(groundLogText(readGroundLog())); }, []);
+  const copy = (): void => {
+    void navigator.clipboard?.writeText(text).then(() => { setCopied(true); }).catch(() => undefined);
+  };
+  return (
+    <div style={{ padding: '22px 16px 40px' }}>
+      <div className="a-panel" style={{ padding: '14px 16px', fontSize: 13 }}>
+        <p style={{ margin: '0 0 10px', fontWeight: 900 }}>芝とカメラの見張りの記録（この端末で見たレース）</p>
+        <button type="button" onClick={copy} style={{ minHeight: 44, padding: '0 16px', fontWeight: 900 }}>{copied ? 'コピーしました' : 'コピー'}</button>
+        <pre style={{ margin: '12px 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12, lineHeight: 1.5 }}>{text.replaceAll('[race-ground-log] ', '')}</pre>
+      </div>
+    </div>
+  );
+}
+
 export default function RacePage(): React.JSX.Element {
+  if (GROUND_LOG_VIEW) return <GroundLogView />;
   /**
    * 🔴 ★**口の値が読めないときは、走行を出しません**（★2026-09-26・裁定 Q-RACE-1 の条件 (a)）。
    *

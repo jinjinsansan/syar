@@ -73,4 +73,13 @@ describe('★芝とカメラの監査の集計', () => {
       expect(readGroundLog().map((e) => e.kind)).toContain('離れる');
     });
   });
+
+  it('🔴 ★スマホ（★コンソールの無い iPhone）でも読める: ★`?groundlog=1` は 記録を画面に出し コピーできる', async () => {
+    const { readFileSync } = await import('node:fs');
+    const page = readFileSync(new URL('../../web/src/app/race/page.tsx', import.meta.url), 'utf8');
+    expect(page).toContain("const GROUND_LOG_VIEW = QS?.get('groundlog') === '1';");
+    expect(page).toContain('if (GROUND_LOG_VIEW) return <GroundLogView />;');
+    expect(page).toContain('useEffect(() => { setText(groundLogText(readGroundLog())); }, []);');
+    expect(page).toContain('navigator.clipboard?.writeText(text)');
+  });
 });
