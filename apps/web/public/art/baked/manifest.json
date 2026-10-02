@@ -1552,177 +1552,6 @@
       "shadow": "side-walk-shadow.webp"
     },
     {
-      "role": "side-v6-m",
-      "prefix": "horse-jockey-side-v8m",
-      "layout": "crouch",
-      "scale": 1,
-      "nativeReferenceHeight": 506,
-      "referenceHeight": 506,
-      "nativeCanvasHeight": 576,
-      "atlas": {
-        "width": 7176,
-        "height": 506
-      },
-      "frames": [
-        {
-          "x": 0,
-          "y": 0,
-          "w": 881,
-          "h": 481,
-          "anchor": {
-            "x": 398,
-            "y": 220.5,
-            "width": 185
-          },
-          "anchorKind": "saddle",
-          "nativeBounds": {
-            "x": 52,
-            "y": 23,
-            "width": 881,
-            "height": 481
-          }
-        },
-        {
-          "x": 881,
-          "y": 0,
-          "w": 898,
-          "h": 503,
-          "anchor": {
-            "x": 399.5,
-            "y": 230,
-            "width": 168
-          },
-          "anchorKind": "saddle",
-          "nativeBounds": {
-            "x": 29,
-            "y": 29,
-            "width": 898,
-            "height": 503
-          }
-        },
-        {
-          "x": 1779,
-          "y": 0,
-          "w": 891,
-          "h": 488,
-          "anchor": {
-            "x": 400.5,
-            "y": 224,
-            "width": 188
-          },
-          "anchorKind": "saddle",
-          "nativeBounds": {
-            "x": 42,
-            "y": 35,
-            "width": 891,
-            "height": 488
-          }
-        },
-        {
-          "x": 2670,
-          "y": 0,
-          "w": 908,
-          "h": 506,
-          "anchor": {
-            "x": 434,
-            "y": 232.5,
-            "width": 203
-          },
-          "anchorKind": "saddle",
-          "nativeBounds": {
-            "x": 15,
-            "y": 27,
-            "width": 908,
-            "height": 506
-          }
-        },
-        {
-          "x": 3578,
-          "y": 0,
-          "w": 909,
-          "h": 468,
-          "anchor": {
-            "x": 427,
-            "y": 215,
-            "width": 201
-          },
-          "anchorKind": "saddle",
-          "nativeBounds": {
-            "x": 21,
-            "y": 25,
-            "width": 909,
-            "height": 468
-          }
-        },
-        {
-          "x": 4487,
-          "y": 0,
-          "w": 894,
-          "h": 504,
-          "anchor": {
-            "x": 403.5,
-            "y": 223.5,
-            "width": 164
-          },
-          "anchorKind": "saddle",
-          "nativeBounds": {
-            "x": 44,
-            "y": 26,
-            "width": 894,
-            "height": 504
-          }
-        },
-        {
-          "x": 5381,
-          "y": 0,
-          "w": 904,
-          "h": 492,
-          "anchor": {
-            "x": 417.5,
-            "y": 223.5,
-            "width": 210
-          },
-          "anchorKind": "saddle",
-          "nativeBounds": {
-            "x": 31,
-            "y": 39,
-            "width": 904,
-            "height": 492
-          }
-        },
-        {
-          "x": 6285,
-          "y": 0,
-          "w": 891,
-          "h": 468,
-          "anchor": {
-            "x": 412,
-            "y": 215,
-            "width": 201
-          },
-          "anchorKind": "saddle",
-          "nativeBounds": {
-            "x": 39,
-            "y": 33,
-            "width": 891,
-            "height": 468
-          }
-        }
-      ],
-      "coats": {
-        "bay": "side-v6-m-bay.webp",
-        "chestnut": "side-v6-m-chestnut.webp",
-        "liver-chestnut": "side-v6-m-liver-chestnut.webp",
-        "dark-bay": "side-v6-m-dark-bay.webp",
-        "seal-brown": "side-v6-m-seal-brown.webp",
-        "blue-black": "side-v6-m-blue-black.webp",
-        "grey": "side-v6-m-grey.webp",
-        "palomino": "side-v6-m-palomino.webp",
-        "white": "side-v6-m-white.webp"
-      },
-      "shadow": "side-v6-m-shadow.webp"
-    },
-    {
       "role": "diag-front-v2-m",
       "prefix": "horse-jockey-diag-front-v4m",
       "layout": "front",
@@ -2236,6 +2065,177 @@
       "shadow": "high-diag-v2-m-shadow.webp"
     },
     {
+      "role": "side-v6-m",
+      "prefix": "horse-jockey-side-v8m",
+      "layout": "crouch",
+      "scale": 1,
+      "nativeReferenceHeight": 506,
+      "referenceHeight": 506,
+      "nativeCanvasHeight": 576,
+      "atlas": {
+        "width": 7181,
+        "height": 506
+      },
+      "frames": [
+        {
+          "x": 0,
+          "y": 0,
+          "w": 881,
+          "h": 481,
+          "anchor": {
+            "x": 398,
+            "y": 220.5,
+            "width": 185
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 52,
+            "y": 23,
+            "width": 881,
+            "height": 481
+          }
+        },
+        {
+          "x": 881,
+          "y": 0,
+          "w": 907,
+          "h": 503,
+          "anchor": {
+            "x": 399.5,
+            "y": 230,
+            "width": 168
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 29,
+            "y": 29,
+            "width": 907,
+            "height": 503
+          }
+        },
+        {
+          "x": 1788,
+          "y": 0,
+          "w": 892,
+          "h": 488,
+          "anchor": {
+            "x": 400.5,
+            "y": 224,
+            "width": 188
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 42,
+            "y": 35,
+            "width": 892,
+            "height": 488
+          }
+        },
+        {
+          "x": 2680,
+          "y": 0,
+          "w": 908,
+          "h": 506,
+          "anchor": {
+            "x": 434,
+            "y": 232.5,
+            "width": 203
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 15,
+            "y": 27,
+            "width": 908,
+            "height": 506
+          }
+        },
+        {
+          "x": 3588,
+          "y": 0,
+          "w": 910,
+          "h": 468,
+          "anchor": {
+            "x": 427,
+            "y": 215,
+            "width": 201
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 21,
+            "y": 25,
+            "width": 910,
+            "height": 468
+          }
+        },
+        {
+          "x": 4498,
+          "y": 0,
+          "w": 891,
+          "h": 504,
+          "anchor": {
+            "x": 403.5,
+            "y": 223.5,
+            "width": 164
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 44,
+            "y": 26,
+            "width": 891,
+            "height": 504
+          }
+        },
+        {
+          "x": 5389,
+          "y": 0,
+          "w": 903,
+          "h": 492,
+          "anchor": {
+            "x": 417.5,
+            "y": 223.5,
+            "width": 210
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 31,
+            "y": 39,
+            "width": 903,
+            "height": 492
+          }
+        },
+        {
+          "x": 6292,
+          "y": 0,
+          "w": 889,
+          "h": 468,
+          "anchor": {
+            "x": 412,
+            "y": 215,
+            "width": 201
+          },
+          "anchorKind": "saddle",
+          "nativeBounds": {
+            "x": 39,
+            "y": 33,
+            "width": 889,
+            "height": 468
+          }
+        }
+      ],
+      "coats": {
+        "bay": "side-v6-m-bay.webp",
+        "chestnut": "side-v6-m-chestnut.webp",
+        "liver-chestnut": "side-v6-m-liver-chestnut.webp",
+        "dark-bay": "side-v6-m-dark-bay.webp",
+        "seal-brown": "side-v6-m-seal-brown.webp",
+        "blue-black": "side-v6-m-blue-black.webp",
+        "grey": "side-v6-m-grey.webp",
+        "palomino": "side-v6-m-palomino.webp",
+        "white": "side-v6-m-white.webp"
+      },
+      "shadow": "side-v6-m-shadow.webp"
+    },
+    {
       "role": "side-walk-m",
       "prefix": "horse-jockey-side-walk-v1m",
       "layout": "crouch",
@@ -2244,7 +2244,7 @@
       "referenceHeight": 560,
       "nativeCanvasHeight": 1024,
       "atlas": {
-        "width": 6440,
+        "width": 6442,
         "height": 560
       },
       "frames": [
@@ -2359,7 +2359,7 @@
         {
           "x": 4837,
           "y": 0,
-          "w": 797,
+          "w": 799,
           "h": 559,
           "anchor": {
             "x": 368.4210526315789,
@@ -2370,12 +2370,12 @@
           "nativeBounds": {
             "x": 96,
             "y": 22,
-            "width": 1352,
+            "width": 1356,
             "height": 949
           }
         },
         {
-          "x": 5634,
+          "x": 5636,
           "y": 0,
           "w": 806,
           "h": 554,

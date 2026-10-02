@@ -668,6 +668,8 @@ export const READONLY = [
   'gen-race-mare.mjs',
   'fit-to-frame.mjs',
   'publish-race-mare.mjs',
+  // ★牝馬の顔を 8 コマで同じにする（★お手本の顔を 牡馬の頭の動きに合わせて貼る・画像を書くだけ）
+  'stabilize-mare-head.mjs',
   // ★芝とカメラの監査（★手元の /race?audit=ground を画面の裏で開いて読むだけ・DB に触れない）
   'audit-race-ground.mjs',
   // ★ダートの地面タイルを焼く（画像を書くだけ・DB に触れない）
