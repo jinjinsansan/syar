@@ -10,7 +10,14 @@
  *   ★頭の動きは ★牡馬の元のコマどうしの 頭の領域を合わせて測る（★お手本のコマ → そのコマ・±40px・±8°）。
  *   ★貼る範囲は 頭（`--head` の楕円）を ★縁 `--feather` px でなめらかに混ぜる。★首から後ろ・騎手は そのコマのまま。
  *
- * 実行: node tools/stabilize-mare-head.mjs --fam side-v8 [--master 1] [--head "cx,cy,rx,ry"] [--feather 18]
+ * 【★2026-10-03 やり直し（★オーナー「鼻のパーツが切れたりするように絵が破綻」）】
+ *   ⚠️ ★最初の版は ★頭を楕円で切り抜いて貼った。★楕円の右端が鼻先にかかり、★頭がずれるコマで鼻先が楕円の外に出て
+ *      ★貼った鼻と元の鼻が混ざった（★歩き 8 コマ中 5 コマ）。
+ *   → ★貼る範囲は ★**首の切れ目の線より前 全部**（`--cut`・★頭・鼻・顎・まわりの背景まで丸ごと お手本で置き換える）。
+ *     ★元の顔は 1 画素も残らない。★混ぜるのは 首の切れ目の線の近く（`--feather`）だけ。
+ *
+ * 実行: node tools/stabilize-mare-head.mjs --fam side-v8 [--master 1] --head "cx,cy,rx,ry" --cut "x1,y1,x2,y2" --ybounds "y0,y1" [--feather 14]
+ *   ★`--head` は 頭の動きを測る範囲（楕円）。★`--cut` は 首の切れ目（★画布の割合の 2 点・★右＝頭の側を置き換える）。
  *   ★書き出しは `apps/web/public/art/horse-jockey-<組>m-poseNN.png` と `.webp`（★上書き・★元は git にある）
  */
 import sharp from 'sharp';
@@ -19,7 +26,17 @@ const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? proce
 const fam = arg('--fam', 'side-v8');
 const master = Number(arg('--master', '1'));
 const [hcx, hcy, hrx, hry] = arg('--head', '0.875,0.33,0.13,0.2').split(',').map(Number);
-const feather = Number(arg('--feather', '18'));
+const feather = Number(arg('--feather', '14'));
+const cutArg = arg('--cut', null);
+if (cutArg === null) throw new Error('★--cut が要ります（★首の切れ目・楕円で切ると鼻先が切れる）');
+const [c1x, c1y, c2x, c2y] = cutArg.split(',').map(Number);
+const [yb0, yb1] = arg('--ybounds', '0,1').split(',').map(Number);
+/**
+ * ★`--floor "x1,y1,x2,y2"`（★任意）: ★この線より下は置き換えない（★顎の下に沿わせる）。
+ *   ★走りは 前脚が頭の下まで伸びるので、★`--cut` の右を全部置き換えると ★前脚の欠片が混ざった（★2026-10-03 撮って確認）。
+ */
+const floorArg = arg('--floor', null);
+const floor = floorArg === null ? null : floorArg.split(',').map(Number);
 const nn = (i) => String(i).padStart(2, '0');
 const ART = 'apps/web/public/art';
 
@@ -86,17 +103,27 @@ for (let i = 1; i <= 8; i += 1) {
   const c = Math.cos(-t.rot), s = Math.sin(-t.rot);
   const out = Buffer.from(mare.data);
   const ecx = cx + t.dx, ecy = cy + t.dy;
+  /** ★首の切れ目の線（★お手本の座標・★画素）と ★頭の側の向き（★右） */
+  const ax = c1x * mare.w, ay = c1y * mare.h, bx = c2x * mare.w, by = c2y * mare.h;
+  let nxv = by - ay, nyv = -(bx - ax);
+  const nl = Math.hypot(nxv, nyv); nxv /= nl; nyv /= nl;
+  if (nxv < 0) { nxv = -nxv; nyv = -nyv; }
   for (let y = 0; y < mare.h; y += 1) for (let x = 0; x < mare.w; x += 1) {
-    /** ★そのコマでの 頭の楕円（★お手本の楕円を 動かしたもの）の内側か */
+    /** ★そのコマの画素 → お手本の点（★頭の動きの逆） */
     const ux = x - ecx, uy = y - ecy;
     const mx = cx + ux * c - uy * s, my = cy + ux * s + uy * c;
-    const dn = Math.sqrt(((mx - cx) / rx) ** 2 + ((my - cy) / ry) ** 2);
-    const edge = feather / Math.min(rx, ry);
-    const a = dn <= 1 - edge ? 1 : dn >= 1 ? 0 : (1 - dn) / edge;
-    if (a === 0) continue;
+    if (my < yb0 * mare.h || my > yb1 * mare.h) continue;
+    if (floor !== null) {
+      const fx1 = floor[0] * mare.w, fy1 = floor[1] * mare.h, fx2 = floor[2] * mare.w, fy2 = floor[3] * mare.h;
+      const fyAt = fy1 + ((mx - fx1) / (fx2 - fx1)) * (fy2 - fy1);
+      if (my > fyAt) continue;
+    }
+    /** ★首の切れ目の線から 頭の側へ どれだけ入っているか（px） */
+    const dist = (mx - ax) * nxv + (my - ay) * nyv;
+    if (dist <= -feather) continue;
+    const a = dist >= feather ? 1 : (dist + feather) / (2 * feather);
     const p = sample(mareM, mx, my);
     const k = (y * mare.w + x) * 4;
-    /** ★透明どうしの混ぜで 縁が黒ずまないよう ★不透明度で重みを付けて混ぜる */
     const aSrc = (p[3] / 255) * a, aDst = (mare.data[k + 3] / 255) * (1 - a);
     const aOut = aSrc + aDst;
     for (let ch = 0; ch < 3; ch += 1) out[k + ch] = aOut === 0 ? 0 : Math.round((p[ch] * aSrc + mare.data[k + ch] * aDst) / aOut);

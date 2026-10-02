@@ -677,7 +677,7 @@ const STRATS: readonly Strategy[] = ['nige', 'senko', 'sashi', 'oikomi'];
  *   ★理由は転送量（★実測 1 レース 19.4MB → ★**4.19MB**・★線を通った実量）。
  *   ★絵の差は画素の平均 1.41／255 で、★画面の大きさ（188px）では見分けられないことをオーナーが確認。
  */
-const ASSET_VERSION = '76';
+const ASSET_VERSION = '77';
 /**
  * ★コマごとの持ち上げ量。**単位は「基準画布（高さ 1536px）での px」**。
  *

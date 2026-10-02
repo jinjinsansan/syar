@@ -304,16 +304,10 @@ export const DEFORMED_COAT_TRANSFORMS: Readonly<Record<CoatName, CoatTransform>>
    * ⚠️ ★手で 1 つずつ動かすと ★**押した所が別の所で戻ります**（★実測で 3 回起きました）。
    *    ★`dark-bay ↔ seal-brown` を離すと `seal-brown ↔ blue-black` が近づく、の繰り返しです。
    */
-  /**
-   * ★**暗い 4 色を持ち上げました**（★2026-10-03・オーナーの録画「パドックで 馬の鼻がずれて動いて破綻」・★明るくするのはオーナー了承）。
-   *   ★青毛は 0.10 で ★顔の線と陰影が全部黒に潰れ、★鼻が黒い塊になって ★くつわの輪と手綱だけが動いて見えた。
-   *   ★明るい側（鹿毛・栗毛・芦毛）は固定し、★暗い 4 色だけ `tools/tune-coat-spread.mjs` と同じ探し方で ★青毛 0.20〜0.24 を下限に探した
-   *   （★いちばん近い組 青毛 ↔ 青鹿毛 ＝ 20・★以前の線 20 を割らない）。★0.28 まで上げると 17 に下がり 見分けにくくなる。
-   */
-  'blue-black': { saturate: 0.30, brightness: 0.20, hueRotate: 180 },
-  'seal-brown': { saturate: 0.55, brightness: 0.34, hueRotate: -10 },
-  'dark-bay': { saturate: 0.60, brightness: 0.52, hueRotate: 10 },
-  'liver-chestnut': { saturate: 0.50, brightness: 0.66, hueRotate: -10 },
+  'blue-black': { saturate: 0.30, brightness: 0.10, hueRotate: 180 },
+  'seal-brown': { saturate: 0.30, brightness: 0.28, hueRotate: -18 },
+  'dark-bay': { saturate: 0.70, brightness: 0.44, hueRotate: -9 },
+  'liver-chestnut': { saturate: 0.65, brightness: 0.62, hueRotate: -10 },
   bay: { saturate: 0.60, brightness: 0.82, hueRotate: -5 },
   chestnut: { saturate: 0.80, brightness: 1.02, hueRotate: 5 },
   grey: { saturate: 0.00, brightness: 1.40 },
