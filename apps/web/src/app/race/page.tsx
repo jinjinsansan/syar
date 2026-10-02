@@ -445,7 +445,12 @@ function noteAuditGround(
   if (prev !== null && prev.shot === scene.shot.id && d > prev.d) {
     const dt = d - prev.d;
     shownMps = (lead - prev.lead) / dt;
-    trueMps = sec > prev.sec ? (lead - prev.lead) / (sec - prev.sec) : null;
+    /**
+     * ⚠️ ★先頭が決勝線を越えたコマは 測らない（★2026-10-03・見張りの記録 7 件中 6 件がこれ）: ★記録の上では 先頭の位置が決勝線で止まり
+     *    ★本当の速さが 毎秒 3m 前後に落ちるので、★普通に流れている芝（毎秒 15m）を「超高速 5 倍」と誤って数えた。
+     */
+    const finished = lead >= course.distance - 0.5 || prev.lead >= course.distance - 0.5;
+    trueMps = sec > prev.sec && !finished ? (lead - prev.lead) / (sec - prev.sec) : null;
     if (!persp) groundMps = (scroll - prev.scroll) / dt;
     else {
       /** ★前のコマの注視点の地面 G を 2 つのカメラで投影し、★走る向き（今のカメラで 注視点 → 1m 先）へ射影 */
