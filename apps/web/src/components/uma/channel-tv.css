@@ -129,6 +129,10 @@
 }
 [data-theme='uma'] .u-tv-paddock-walk { position: absolute; inset: 0; background: no-repeat 0 0 / 800% 100%; animation: u-walk 1.6s steps(8, jump-none) infinite; }
 [data-theme='uma'] .u-tv-paddock-stand { position: absolute; inset: 0; display: none; background: no-repeat bottom center / contain; }
+/* ★拡大したテレビの歩き（★1 コマずつ 8 枚を重ね ★0.2 秒ずつ順に見せる・★1 周 1.6 秒は u-walk と同じ）・★2026-10-02 */
+[data-theme='uma'] .u-tv-paddock-walk-hd { position: absolute; inset: 0; }
+[data-theme='uma'] .u-tv-paddock-walk-hd > span { position: absolute; inset: 0; background: no-repeat 0 0 / 100% 100%; visibility: hidden; animation: u-walk-frame 1.6s linear infinite; }
+@keyframes u-walk-frame { 0% { visibility: visible; } 12.5% { visibility: hidden; } 100% { visibility: hidden; } }
 [data-theme='uma'] .u-tv-paddock-id {
   position: absolute; left: 0; top: 4px; max-width: 64%; display: flex; align-items: center; gap: 6px;
   padding: 3px 10px 3px 4px; border-radius: 6px; background: rgba(6, 26, 51, .88); border: 1px solid rgba(246, 194, 28, .6);
@@ -144,12 +148,13 @@
   position: absolute; right: 0; bottom: 0; padding: 2px 8px; border-radius: 4px; background: rgba(6, 26, 51, .88); color: #cfe0ee; white-space: nowrap;
 }
 /* ★止める（★停止スイッチ・「動きを減らす」）: ★立ち姿・★芝も止める */
-[data-theme='uma'].u-paused .u-tv-paddock-walk, [data-theme='uma'] .u-paused .u-tv-paddock-walk { display: none; }
+[data-theme='uma'].u-paused .u-tv-paddock-walk, [data-theme='uma'] .u-paused .u-tv-paddock-walk,
+[data-theme='uma'].u-paused .u-tv-paddock-walk-hd, [data-theme='uma'] .u-paused .u-tv-paddock-walk-hd { display: none; }
 [data-theme='uma'].u-paused .u-tv-paddock-stand, [data-theme='uma'] .u-paused .u-tv-paddock-stand { display: block; }
 [data-theme='uma'].u-paused .u-tv[data-show='paddock'] .u-tv-bg-turf, [data-theme='uma'] .u-paused .u-tv[data-show='paddock'] .u-tv-bg-turf,
 [data-theme='uma'].u-paused .u-tv[data-show='paddock'] .u-tv-bg-pano, [data-theme='uma'] .u-paused .u-tv[data-show='paddock'] .u-tv-bg-pano { animation: none; }
 @media (prefers-reduced-motion: reduce) {
-  [data-theme='uma'] .u-tv-paddock-walk { display: none; }
+  [data-theme='uma'] .u-tv-paddock-walk, [data-theme='uma'] .u-tv-paddock-walk-hd { display: none; }
   [data-theme='uma'] .u-tv-paddock-stand { display: block; }
   [data-theme='uma'] .u-tv[data-show='paddock'] .u-tv-bg-turf,
   [data-theme='uma'] .u-tv[data-show='paddock'] .u-tv-bg-pano { animation: none; }

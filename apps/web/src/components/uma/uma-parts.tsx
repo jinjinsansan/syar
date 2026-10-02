@@ -502,6 +502,19 @@ export function horseArt(sex: 'male' | 'female', kind: 'stand' | 'walk', hires: 
   return `${base}-${kind === 'walk' ? 'walk-sheet' : 'stand'}${hires ? '-2x' : ''}.webp`;
 }
 
+/**
+ * ★**拡大したテレビの絵**（★2026-10-02・オーナー「拡大したテレビで 馬の絵・歩く絵が 薄く引き伸ばされ 色あせている」）。
+ *   ★拡大したテレビは 馬の幅を ★iPhone で 約 1,510 画素で出す → ★2 倍版（1088）は 1.4 倍に引き伸ばされていた。
+ *   ★元の切り出し（★幅 約 1,430・縮めない）。★歩きは ★1 コマずつ 8 枚（`publish-uma-horse-frames.mjs --hd`）。
+ */
+export function horseStandHd(sex: 'male' | 'female'): string {
+  return `${sex === 'female' && MARE_ART_READY ? '/art/uma/horse-mare' : '/art/uma/horse'}-stand-hd.webp`;
+}
+export function horseWalkFramesHd(sex: 'male' | 'female'): readonly string[] {
+  const base = sex === 'female' && MARE_ART_READY ? '/art/uma/horse-mare' : '/art/uma/horse';
+  return Array.from({ length: 8 }, (_, i) => `${base}-walk-hd-0${i + 1}.webp`);
+}
+
 export function OwnHorseFigure({ horseId, sex, running, onClick, style, className }: {
   readonly horseId: string;
   /** ★牝馬は ★牝馬の絵（★2026-10-02 オーナー「牝馬戦では さすがにメスの馬の絵が必要」・`horseArt`） */

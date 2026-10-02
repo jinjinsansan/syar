@@ -42,9 +42,14 @@ const OUT = 'apps/web/public/art/uma';
  * ★`--hires`（★2026-10-01・オーナー「PC 表示だと B 級品感」）: ★PC のホームは 横 約 670px で出すので ★幅 1088 の表と立ち姿を
  *   ★**別名**（`horse-walk-sheet-2x.*`・`horse-stand-2x.*`）で書く。★1 倍の既存ファイル・顔・1 コマずつの絵は ★書かない。
  */
-const HIRES = process.argv.includes('--hires');
-const OUT_W = HIRES ? 1088 : 544;
-const SUFFIX = HIRES ? '-2x' : '';
+/**
+ * ★`--hd`（★2026-10-02・オーナー「拡大したテレビで 馬の絵・歩く絵が 薄く引き伸ばされ 色あせている」）:
+ *   ★拡大したテレビ（★iPhone で 拡大 1.71 × 画素比 3）は 馬の幅を ★約 1,510 画素で出す → ★2 倍版（1088）は 1.4 倍に引き伸ばされていた。
+ *   ★元の絵の切り出し（★幅 約 1,430）を ★縮めずに書く（`-hd`）。★歩きは ★1 コマずつ（`-walk-hd-01..08`・★横 8 コマの 1 枚は 幅 1 万画素を超える）。
+ */
+const HD = process.argv.includes('--hd');
+const HIRES = process.argv.includes('--hires') || HD;
+const SUFFIX = HD ? '-hd' : HIRES ? '-2x' : '';
 /** ★外接矩形に足す余白（★幅に対する割合。★drop-shadow が切れないように） */
 const PAD = 0.015;
 /** ★立ち姿を選ぶときに見る「足元の帯」（★被写体高に対する割合） */
@@ -105,6 +110,7 @@ const left = Math.max(0, uni.l - pad);
 const top = Math.max(0, uni.t - pad);
 const width = Math.min(m[0].w - left, uni.r - uni.l + pad * 2);
 const height = Math.min(m[0].h - top, uni.b - uni.t + pad * 2);
+const OUT_W = HD ? width : HIRES ? 1088 : 544;
 const outH = Math.round((height / width) * OUT_W);
 
 console.log('=== 騎手なし 真横 歩き 8 コマ ===');
@@ -143,6 +149,14 @@ if (!HIRES) {
   await head.clone().webp({ quality: 92 }).toFile(`${OUT}/${NAME}-face.webp`);
 }
 console.log(`★顔アップ（コマ ${nn(stand)} から切り出し・焼いていない） → ${OUT}/${NAME}-face.webp  ${HEAD_W}x${headH}`);
+
+if (HD) {
+  for (let i = 0; i < 8; i += 1) {
+    await sharp(`${SRC}/${nn(i)}.png`).extract({ left, top, width, height }).webp({ quality: 90 }).toFile(`${OUT}/${NAME}-walk-hd-${nn(i)}.webp`);
+  }
+  console.log(`★歩き 1 コマずつ（縮めない） → ${OUT}/${NAME}-walk-hd-01..08.webp  ${OUT_W}x${outH}`);
+  process.exit(0);
+}
 
 /**
  * ★横並びのスプライト表（★8 コマを 1 枚に）。

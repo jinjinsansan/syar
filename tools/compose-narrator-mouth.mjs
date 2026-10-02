@@ -28,17 +28,30 @@ const CAST = castArg >= 0 ? process.argv[castArg + 1] : 'tp';
 if (CAST !== 'tp' && CAST !== 'ti') throw new Error(`★--cast は tp か ti（${CAST}）`);
 const SRC = `out/gen/narrator-${CAST}-fix`;
 const OUT = 'apps/web/public/art';
-const W = 300, H = 344;
+/**
+ * ★`--hd`（★2026-10-02・オーナー「拡大したテレビで 川崎タカシの顔が 薄く引き伸ばされ 色あせている」）:
+ *   ★拡大したテレビの顔は ★iPhone で 約 495 画素 → ★300 の絵は 1.65 倍に引き伸ばされていた。
+ *   ★倍の 600×688 で書く。★閉じた顔は ★開けた口の絵（1171×1343）から Codex で口を閉じさせた `closed-hires.png`（★元の閉じた顔は 300 しか無い）。
+ *   ★閉じた顔も ここで書く（`narrator-<cast>-closed.webp`）。
+ */
+const HD = process.argv.includes('--hd');
+const K = HD ? 2 : 1;
+const W = 300 * K, H = 344 * K;
 /**
  * ★口のまわりの楕円（★300×344 の座標）。
  *   tp: ★2026-10-01 に 閉じた写真と開けた写真の差から測った: 中心 x140 y231・範囲 x119〜156 y216〜263・★名札＝下 60px より上・網 `narrator-frame-fit`
  *   ti: ★2026-10-02 に 生成した開けた口（1171×1343）から測った: 中心 x145 y211（★無精ひげの外まで広げない）
  */
-const MOUTH = CAST === 'tp' ? { cx: 142, cy: 226, rx: 46, ry: 40, feather: 14 } : { cx: 146, cy: 211, rx: 40, ry: 28, feather: 10 };
+const MOUTH0 = CAST === 'tp' ? { cx: 142, cy: 226, rx: 46, ry: 40, feather: 14 } : { cx: 146, cy: 211, rx: 40, ry: 28, feather: 10 };
+const MOUTH = { cx: MOUTH0.cx * K, cy: MOUTH0.cy * K, rx: MOUTH0.rx * K, ry: MOUTH0.ry * K, feather: MOUTH0.feather * K };
 
 const raw = async (file) => (await sharp(file).resize(W, H, { fit: 'fill', kernel: 'lanczos3' }).removeAlpha().raw().toBuffer());
 
-const base = await raw(`${SRC}/closed.png`);
+const base = await raw(`${SRC}/${HD ? 'closed-hires.png' : 'closed.png'}`);
+if (HD) {
+  await sharp(base, { raw: { width: W, height: H, channels: 3 } }).webp({ quality: 90 }).toFile(`${OUT}/narrator-${CAST}-closed.webp`);
+  console.log(`  closed: ${W}x${H} → ${OUT}/narrator-${CAST}-closed.webp`);
+}
 /** ★開けた写真を使う割合（★楕円の内側 1 → 外側 0・★縁 `feather` px でなめらかに） */
 const alphaAt = (x, y) => {
   const d = Math.hypot((x - MOUTH.cx) / MOUTH.rx, (y - MOUTH.cy) / MOUTH.ry);
@@ -60,7 +73,7 @@ for (const [name, file] of [['normal', 'open-normal.png'], ['hot', 'open-hot.png
       const i = (y * W + x) * 3;
       const a = alphaAt(x, y);
       if (a === 0) {
-        if (y < H - 60) { outsideDiff += Math.abs(open[i] - base[i]) + Math.abs(open[i + 1] - base[i + 1]) + Math.abs(open[i + 2] - base[i + 2]); outsideN += 3; }
+        if (y < H - 60 * K) { outsideDiff += Math.abs(open[i] - base[i]) + Math.abs(open[i + 1] - base[i + 1]) + Math.abs(open[i + 2] - base[i + 2]); outsideN += 3; }
         continue;
       }
       for (let c = 0; c < 3; c += 1) out[i + c] = Math.round(base[i + c] * (1 - a) + open[i + c] * a);

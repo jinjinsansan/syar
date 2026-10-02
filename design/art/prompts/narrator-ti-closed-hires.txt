@@ -1,0 +1,16 @@
+IMAGE EDIT TASK — do not generate a new picture from scratch.
+
+INPUT IMAGE (pass it as an actual image input to the image tool; this is the picture to EDIT):
+  out/gen/narrator-ti-fix/open-normal.png
+
+WHAT TO DO
+This is a cartoon TV race announcer, talking with his mouth open.
+Close his mouth: lips gently closed in a calm, slight smile, as if between two words. Nothing else changes.
+
+KEEP — DO NOT CHANGE
+  - the face, eyes, eyebrows, nose, ears, hair, stubble, skin tone, headset, microphone, clothes, name plate and background exactly as they are
+  - the exact same head position, size and angle (the closed mouth is drawn in the same place as the open mouth)
+  - the same art style, line weight and colours
+  - the image size (1171 x 1343) and the framing
+
+Save the result as a PNG image.

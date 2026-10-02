@@ -44,6 +44,30 @@ async function bake(src: string, coat: CoatName): Promise<string> {
   return blob === null ? src : URL.createObjectURL(blob);
 }
 
+/**
+ * ★**何枚かを まとめて**（★拡大したテレビの 歩き 1 コマずつ 8 枚・★2026-10-02）。
+ *   ★全部できるまで `null`（★歩き出しのコマが抜けない・★1 枚の表と同じ見え方）。
+ */
+export function useCoatedImages(srcs: readonly string[] | null, coat: CoatName): readonly string[] | null {
+  const key = srcs === null ? null : `${srcs.join(',')}|${coat}`;
+  const [urls, setUrls] = useState<{ key: string; urls: readonly string[] } | null>(null);
+  /** ⚠️ ★呼ぶ側は 毎回 新しい配列を渡す → ★依存は key だけ（★配列で依存すると 毎回走って 止まらない）・★絵の一覧は key から戻す */
+  useEffect(() => {
+    if (key === null) return;
+    const list = key.slice(0, key.lastIndexOf('|')).split(',');
+    if (coat === 'bay') { setUrls({ key, urls: list }); return; }
+    let alive = true;
+    void Promise.all(list.map((src) => {
+      const k = `${src}|${coat}`;
+      let p = cache.get(k);
+      if (p === undefined) { p = bake(src, coat).catch(() => src); cache.set(k, p); }
+      return p;
+    })).then((u) => { if (alive) setUrls({ key, urls: u }); });
+    return () => { alive = false; };
+  }, [key, coat]);
+  return urls !== null && key !== null && urls.key === key ? urls.urls : null;
+}
+
 /** ★デフォルメの馬の絵 `src` に、毛色 `coat` を馬体だけに掛けた URL（★作るまで `null`） */
 export function useCoatedImage(src: string | null, coat: CoatName): string | null {
   const key = src === null ? null : `${src}|${coat}`;

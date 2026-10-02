@@ -12,13 +12,20 @@ import sharp from 'sharp';
 import { ACTIVE_NARRATOR_CASTS } from '@star/render';
 
 const ART = path.resolve(__dirname, '../../web/public/art');
-const W = 300, H = 344;
-/** ★名札が重なる帯（★素材の座標・`drawNarratorFrame` の下 30px × 2 倍） */
-const PLATE_TOP = H - 60;
+/**
+ * ★素材は 300×344 か ★その整数倍（★2026-10-02 ti は 600×688・拡大したテレビで 引き伸ばさない）。
+ *   ★`drawNarratorFrame` は 素材の寸法から縮める（★枠幅 150 に合わせる）ので ★倍でも同じ見え方。★名札・口の幅も 倍で見る。
+ */
+let W = 300, H = 344, K = 1;
+/** ★名札が重なる帯（★素材の座標・`drawNarratorFrame` の下 30px × 素材の倍率 2K） */
+const plateTop = (): number => H - 60 * K;
 
 async function rgb(file: string): Promise<Buffer> {
   const { data, info } = await sharp(path.join(ART, file)).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-  expect([info.width, info.height], file).toEqual([W, H]);
+  K = info.width / 300;
+  expect(Number.isInteger(K) && K >= 1, `${file}: 幅 ${info.width} は 300 の整数倍でない`).toBe(true);
+  expect([info.width, info.height], file).toEqual([300 * K, 344 * K]);
+  W = info.width; H = info.height;
   return data;
 }
 
@@ -36,10 +43,10 @@ describe('★実況の立ち絵が 枠に収まる', () => {
             const i = (y * W + x) * 3;
             if (Math.abs(open[i]! - closed[i]!) + Math.abs(open[i + 1]! - closed[i + 1]!) + Math.abs(open[i + 2]! - closed[i + 2]!) > 60) changed += 1;
           }
-          if (changed >= 10) lowest = y;
+          if (changed >= 10 * K) lowest = y;
         }
         expect(lowest, `★${cast}-${expr}: 口パクの差分が無い`).toBeGreaterThan(0);
-        expect(lowest, `★${cast}-${expr}: 口が 名札（y ${PLATE_TOP}〜）の下に入る`).toBeLessThan(PLATE_TOP - 10);
+        expect(lowest, `★${cast}-${expr}: 口が 名札（y ${plateTop()}〜）の下に入る`).toBeLessThan(plateTop() - 10 * K);
       }
     });
   }

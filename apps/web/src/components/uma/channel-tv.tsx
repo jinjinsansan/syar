@@ -14,8 +14,8 @@
 import type { CSSProperties } from 'react';
 import type { Venue } from '@star/scheduler';
 import { coatOfHorseId } from '@star/render';
-import { useCoatedImage } from './coated-image';
-import { horseArt } from './uma-parts';
+import { useCoatedImage, useCoatedImages } from './coated-image';
+import { horseArt, horseStandHd, horseWalkFramesHd } from './uma-parts';
 import { bracketOrNull } from './race-strip-ticker';
 import {
   GOING_STEPS, courseLines, goingLabel, surfaceLabel, venueFacts,
@@ -177,7 +177,8 @@ function Table({ kind, size, now, runners, odds, race }: {
  * 🔴 ★2026-10-01: ★見本の `train-body-idle`（★細身の別の絵柄）は ★ホームの馬と違う馬に見えた（オーナー指摘）→ ★ホーム・育成と同じ立ち姿 `horse-stand`。
  */
 function StandingHorse({ horseId, sex, className, hires }: { readonly horseId: string | null; readonly sex: 'male' | 'female'; readonly className: string; readonly hires: boolean }): React.ReactElement {
-  const url = useCoatedImage(horseArt(sex, 'stand', hires), coatOfHorseId(horseId ?? 'unknown'));
+  /** ★拡大したテレビ（`hires`）は ★縮めない元の解像度（`horseStandHd`・★2026-10-02 オーナー「拡大で 薄く引き伸ばされ 色あせ」） */
+  const url = useCoatedImage(hires ? horseStandHd(sex) : horseArt(sex, 'stand', false), coatOfHorseId(horseId ?? 'unknown'));
   return <div className={className} style={url === null ? undefined : { backgroundImage: `url('${url}')` }} />;
 }
 
@@ -202,12 +203,22 @@ function Paddock({ horse, index, field, hires }: { readonly horse: ChannelRunner
 /** ★歩く馬（★歩きの 8 コマ ＋ 止めるとき用の立ち姿。★どちらを見せるかは CSS） */
 function WalkingHorse({ horseId, sex, hires }: { readonly horseId: string | null; readonly sex: 'male' | 'female'; readonly hires: boolean }): React.ReactElement {
   const coat = coatOfHorseId(horseId ?? 'unknown');
-  const walk = useCoatedImage(horseArt(sex, 'walk', hires), coat);
-  const stand = useCoatedImage(horseArt(sex, 'stand', hires), coat);
+  /**
+   * ★拡大したテレビ（`hires`）は ★縮めない元の解像度の ★1 コマずつ 8 枚（★横 8 コマの 1 枚は 幅 1 万画素を超える）。
+   *   ★小窓は 1 倍の表 1 枚（★これまでどおり）。
+   */
+  const walk = useCoatedImage(hires ? null : horseArt(sex, 'walk', false), coat);
+  const frames = useCoatedImages(hires ? horseWalkFramesHd(sex) : null, coat);
+  const stand = useCoatedImage(hires ? horseStandHd(sex) : horseArt(sex, 'stand', false), coat);
   return <div className="u-tv-paddock-horse">
     {/* ⚠️ ★`800% 100%` と ★`u-walk` ＋ `steps(8, jump-none)` は ★対（★ホームの OwnHorseFigure と同じ） */}
-    <span className="u-tv-paddock-walk" style={walk === null ? undefined : { backgroundImage: `url('${walk}')` }} />
-    <span className="u-tv-paddock-stand" style={stand === null ? undefined : { backgroundImage: `url('${stand}')` }} />
+    {!hires && <span className="u-tv-paddock-walk" style={walk === null ? undefined : { backgroundImage: `url('${walk}')` }} />}
+    {/* ★1 コマずつ: ★8 枚を重ね ★`u-walk-frame` で 0.2 秒ずつ順に見せる（★遅れ −0.2 秒 × 番号） */}
+    {hires && frames !== null && <span className="u-tv-paddock-walk-hd">
+      {frames.map((f, i) => <span key={i} style={{ backgroundImage: `url('${f}')`, animationDelay: `${-0.2 * (8 - i)}s` }} />)}
+    </span>}
+    {/* ★1 コマずつの 8 枚が揃うまでは 立ち姿（★何も無い間を作らない） */}
+    <span className="u-tv-paddock-stand" style={stand === null ? undefined : { backgroundImage: `url('${stand}')`, ...(hires && frames === null ? { display: 'block' } : {}) }} />
   </div>;
 }
 
