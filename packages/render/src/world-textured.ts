@@ -127,6 +127,8 @@ export interface TexturedWorldOptions {
   readonly groundPattern?: boolean;
   /** ★コース沿いの帯の短冊を まとめる 画面の幅（px）。★既定 `MIN_SLICE_PX`・★0 で まとめない（★2026-10-02 までの描き方・網の対照） */
   readonly minSlicePx?: number;
+  /** ★どの描画に何 ms（★`drawBroadcastV2Scene` の `timing` と同じもの・★描画には使わない） */
+  readonly timing?: { readonly now: () => number; last: number; readonly out: Record<string, number> } | undefined;
 }
 
 const wrap = (a: number, n: number): number => ((a % n) + n) % n;
@@ -399,6 +401,9 @@ export function drawTexturedWorld<TImage>(
    *   芝を敷いたあと、走路の**内側**にもう 1 周（ダート）と内馬場を重ねる。
    *   ⚠️ 走路の幾何（`laneExtraM`・着順）には触れていません。**描く帯だけ**です。
    */
+  const tmw = opts.timing;
+  const markW = (k: string): void => { if (tmw === undefined) return; const t = tmw.now(); tmw.out[k] = (tmw.out[k] ?? 0) + (t - tmw.last); tmw.last = t; };
+  markW('地面');
   if (opts.infield !== false) {
     const groundOf = (s: number, w: number): { x: number; y: number; depth: number } => {
       const p = posOf(course, s, w);
@@ -648,6 +653,7 @@ export function drawTexturedWorld<TImage>(
     if (base !== null) ctx.setTransform!(base.a, base.b, base.c, base.d, base.e, base.f);
     ctx.globalAlpha = 1;
   };
+  markW('走路の帯');
   const scenery = assets.scenery;
   if (scenery !== undefined) {
     const sFrom = NEAR, sTo = FAR;
@@ -669,6 +675,7 @@ export function drawTexturedWorld<TImage>(
     }
   }
 
+  markW('生垣・木・スタンド');
   // ── ラチ: 白い横木 2 本と緑の支柱（プレートの意匠に合わせる） ─────────────
   /**
    * ★ラチを**区間ごとに、馬より手前か奥かで振り分けて**描きます。

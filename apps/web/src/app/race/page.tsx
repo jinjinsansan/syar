@@ -401,6 +401,11 @@ const AUDIT_GROUND = typeof window !== 'undefined' && new URLSearchParams(window
  *   ★`RaceGroundWatch` が 見つけたものを この端末に書き残す（★`/race?groundlog=1` で まとめて出す）。★描画には使わない。
  */
 let groundWatch: { readonly key: string; readonly watch: RaceGroundWatch; lastWall: number; lastFlush: number } | null = null;
+/**
+ * ★**そのコマの描画の内訳**（★2026-10-03・オーナーの記録「ゲートの場面で 1 コマ 70〜180ms」・手元では 10ms）。
+ *   ★`drawBroadcastV2Scene` と `drawTexturedWorld` が区間ごとの ms を足す。★描画ループが毎コマ空にし、★コマ落ちのとき 記録に添える。
+ */
+const frameTiming: { readonly now: () => number; last: number; readonly out: Record<string, number> } = { now: () => performance.now(), last: 0, out: {} };
 function watchGround(frame: AuditGroundFrame, raceKey: string): void {
   const wall = performance.now();
   if (groundWatch === null || groundWatch.key !== raceKey) {
@@ -5605,6 +5610,8 @@ function RaceView({ setup, real }: {
       const change = (motionTimeline ?? built).shotChanges.find((c) => c.displaySec <= d && d - c.displaySec < 0.3
         && c.to === scene.shot.id);
       const drawScene = (target: CanvasRenderingContext2D, sceneToDraw: typeof scene): void => drawBroadcastV2Scene(target, course, sceneToDraw, {
+        /** ★どの描画に何 ms（★コマ落ちの記録の内訳・`frameTiming`） */
+        timing: frameTiming,
         palette: art.pal as Record<string, string>,
         libraries,
         fieldSize: FIELD,
@@ -6806,9 +6813,10 @@ function RaceView({ setup, real }: {
         setClock(Math.min(raceIntroAt(d).raceDisplaySec, built.warp.displaySec));
       }
       const r0 = performance.now();
+      for (const k of Object.keys(frameTiming.out)) delete frameTiming.out[k];
       render(d);
-      /** ★コマ落ちを 見張りに残す（★止まりの長さ・このコマの描画処理の時間・`RaceGroundWatch.stall`） */
-      groundWatch?.watch.stall(d, now - prevFrameWall, performance.now() - r0);
+      /** ★コマ落ちを 見張りに残す（★止まりの長さ・このコマの描画処理の時間・その内訳・`RaceGroundWatch.stall`） */
+      groundWatch?.watch.stall(d, now - prevFrameWall, performance.now() - r0, frameTiming.out);
       prevFrameWall = now;
       rafRef.current = requestAnimationFrame(loop);
     };

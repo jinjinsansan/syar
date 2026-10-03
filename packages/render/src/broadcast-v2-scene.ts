@@ -795,8 +795,19 @@ export function drawBroadcastV2Scene<TImage>(
       readonly samples: number;
       readonly speedMpsOf: (gate: number) => number;
     } | undefined;
+    /**
+     * ★**どの描画に何 ms かかったか**（★2026-10-03・オーナーの記録「ゲートの場面で 1 コマ 70〜180ms」・手元では 10ms で再現しない）。
+     *   ★時計は 呼ぶ側が渡す（★この層は時刻を読まない）。★`out` に 区間ごとの ms を足していく。★描画は 1 画素も変わらない。
+     */
+    readonly timing?: { readonly now: () => number; last: number; readonly out: Record<string, number> } | undefined;
   },
 ): void {
+  const tm = opts.timing;
+  const mark = (k: string): void => {
+    if (tm === undefined) return;
+    const t = tm.now(); tm.out[k] = (tm.out[k] ?? 0) + (t - tm.last); tm.last = t;
+  };
+  if (tm !== undefined) tm.last = tm.now();
   const basisForObjects = cameraBasis(scene.camera);
   const projectGround = (s: number, w: number): { readonly x: number; readonly y: number; readonly depth: number } => {
     const p = posOf(course, s, w);
@@ -818,6 +829,7 @@ export function drawBroadcastV2Scene<TImage>(
    *    ★照会を出す前に測って正解でした。
    */
   let nearRail: (() => void) | undefined;
+  mark('前置き');
   if (opts.texturedWorld !== undefined) {
     /**
      * ★**馬場を地面へ渡す**（2026-08-28）。
@@ -826,6 +838,7 @@ export function drawBroadcastV2Scene<TImage>(
      *   ★走路の幾何には触れません（裁定 §6-3）。
      */
     nearRail = drawTexturedWorld(ctx, course, scene.camera, opts.texturedWorld, {
+      ...(tm === undefined ? {} : { timing: tm }),
       focusS: scene.focusS,
       focusW: scene.focusW,
       surface: opts.surface,
@@ -1119,6 +1132,7 @@ export function drawBroadcastV2Scene<TImage>(
       (globalThis as { __raceDiag?: unknown }).__raceDiag = lastDiag;
     }
   }
+  mark('背景');
   drawPerspectiveHorses(ctx, course, scene.camera, scene.visibleHorses, {
     ...library,
     /**
@@ -1228,6 +1242,7 @@ export function drawBroadcastV2Scene<TImage>(
     lastDiag = { ...lastDiag, boxes: getDrawnHorseBoxes().map((b) => ({ ...b })) };
     (globalThis as { __raceDiag?: unknown }).__raceDiag = lastDiag;
   }
+  mark('馬');
   // ★手前側のラチ（馬の脚が突き抜けないように、馬のあとで描く）
   nearRail?.();
   if (opts.distancePoles !== false) {
@@ -1246,4 +1261,5 @@ export function drawBroadcastV2Scene<TImage>(
     drawStartingGateWorldFront(ctx, course, scene.camera, { ...opts.startingGate, focusS: scene.focusS });
   }
   if (opts.worldBillboards !== undefined) drawWorldBillboards(ctx, opts.worldBillboards, projectGround, 'front', scene.camera.width);
+  mark('手前');
 }
