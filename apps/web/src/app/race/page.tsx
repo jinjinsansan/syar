@@ -3624,8 +3624,28 @@ function RaceView({ setup, real }: {
           ? Promise.resolve(null)
           : loadImg(`/art/parallax/backstretch-side-v1/${file}?v=${ASSET_VERSION}`).catch(() => null);
       }));
-      const parallaxImages: FrameImage[] = parallaxRaw.map((image, index) =>
-        parallaxManifest.layers[index]?.name === 'stand' ? bakeCrowd(image) : image);
+      /**
+       * ★**焼いた画布を 普通の画像にして読み直す**（★2026-10-04・オーナーの端末の記録）。
+       *   ★スタンドだけ 1 コマ 50〜150ms（★74 枚・面積 3.8 万 px）、★生垣は 327 枚で 1〜2ms（★普通の画像）。★1 枚あたり 約 200 倍。
+       *   ★画布（★読まない新しい画布でも・ac66974）を絵として描くと ★描くたびに GPU へ送り直していたと見る（★1 枚 0.6〜2ms ≒ 1450×154 の送り直し）。
+       *   → ★PNG にして `<img>` として読み直し、★生垣と同じ道で描く（★描く絵は同じ）。★できなければ 画布のまま（★画面を止めない）。
+       */
+      const asImage = (image: FrameImage): Promise<FrameImage> => {
+        if (!(image instanceof HTMLCanvasElement)) return Promise.resolve(image);
+        return new Promise<FrameImage>((resolve) => {
+          image.toBlob((blob) => {
+            if (blob === null) { resolve(image); return; }
+            const url = URL.createObjectURL(blob);
+            const img = new Image();
+            /** ★展開まで済ませる（★`loadRaw` と同じ・最初に描くコマで止まらない） */
+            img.onload = () => { void img.decode().catch(() => undefined).then(() => { URL.revokeObjectURL(url); resolve(img); }); };
+            img.onerror = () => { URL.revokeObjectURL(url); resolve(image); };
+            img.src = url;
+          }, 'image/png');
+        });
+      };
+      const parallaxImages: FrameImage[] = await Promise.all(parallaxRaw.map((image, index) =>
+        parallaxManifest.layers[index]?.name === 'stand' ? asImage(bakeCrowd(image)) : Promise.resolve(image)));
       const objectImages = await Promise.all(parallaxManifest.objects.map((object) =>
         loadImg(`/art/parallax/backstretch-side-v1/${object.file}?v=${ASSET_VERSION}`)));
       const [worldTurfImg, worldPanoImg, worldTreesImg, worldDirtImg] = await Promise.all([

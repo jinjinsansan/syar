@@ -39,4 +39,21 @@ describe('★bakeCoat の返す画布', () => {
     /** ★対照: ★読んだ画布を返す形（旧）は 最後の return に無い */
     expect(body).not.toMatch(/return image;\s*\/\/[^\n]*\n\s*\}\s*return canvas;/);
   });
+
+  /**
+   * ★**画布のまま描かない**（★2026-10-04・ac66974 の後のオーナーの記録で スタンドは 56〜149ms のまま＝画布を写すだけでは効かなかった）。
+   *   ★PNG にして `<img>` で読み直し（`asImage`）、★生垣と同じ道で描く。
+   */
+  it('🔴 ★スタンドの層は 焼いたあと 画像として読み直す（★画布のまま 帯の短冊に渡さない）', () => {
+    expect(PAGE).toContain("parallaxManifest.layers[index]?.name === 'stand' ? asImage(bakeCrowd(image)) : Promise.resolve(image)));");
+    const at = PAGE.indexOf('const asImage = (image: FrameImage): Promise<FrameImage> => {');
+    expect(at, '★切り出せない').toBeGreaterThan(-1);
+    const end = PAGE.indexOf('const parallaxImages', at);
+    expect(end, '★終わりが見つからない').toBeGreaterThan(at);
+    const body = PAGE.slice(at, end);
+    expect(body).toContain("}, 'image/png');");
+    expect(body).toContain('img.decode()');
+    /** ★対照: ★画布をそのまま渡す旧い形は無い */
+    expect(PAGE).not.toContain("parallaxManifest.layers[index]?.name === 'stand' ? bakeCrowd(image) : image);");
+  });
 });
