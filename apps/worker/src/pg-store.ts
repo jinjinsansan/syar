@@ -623,6 +623,24 @@ export function createPgStore(
         }
 
         /**
+         * ★**ライバル枠で入れた NPC に印**（★D-131・移行 `0104`・裁定 §4 ②）。★後から辿れる・★V-4 の数えから外せる。
+         *   ★入れた数と 書けた数が合わなければ 進めない（★R-21）。
+         */
+        const viaRival = spec.viaRival ?? [];
+        if (viaRival.length > 0) {
+          const vr = await client.query(
+            'update race_entries set via_rival = true where race_id = $1 and horse_id = any($2::uuid[])',
+            [raceId, viaRival],
+          );
+          if (vr.rowCount !== viaRival.length) {
+            await client.query('rollback');
+            throw new Error(
+              `cycle=${cycleIndex}: ライバル枠の ${viaRival.length} 頭のうち ${vr.rowCount ?? 0} 頭にしか印を書けません（D-131）`,
+            );
+          }
+        }
+
+        /**
          * ★**出走表が出走表と一致しているか**（★D-117・R-30）。
          *   ★締切のあとに `enter_race` が滑り込んでいれば、★ここで数が合いません。
          *   ★合わないまま `scheduled` にすると、★**オッズの付いていない馬が走ります**。

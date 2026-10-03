@@ -6,10 +6,10 @@
  *   ここで組み直すと出走頭数分布（§10.4）が崩れ、V-4/V-6 に波及します。
  */
 
-import { Rng, deriveRng, type HorseRecord } from '@star/sim-engine';
+import { RIVAL_STREAM, Rng, deriveRng, type HorseRecord } from '@star/sim-engine';
 import { DEFAULT_RACE_BALANCE, conditionsFromFrozen, lanePlanForRace, resolveRace, type RaceEntrant } from '@star/race-engine';
 import { TICKET_KINDS, placeDepth, type TicketKind } from '@star/betting';
-import { frozenCourseOf, selectEligible, type FrozenCourseRecord, type RaceClass } from '@star/scheduler';
+import { frozenCourseOf, rivalPaceLimit, rivalSlotFires, selectEligible, type FrozenCourseRecord, type RaceClass } from '@star/scheduler';
 import { FIELD_SIZE, announcedTrackCondition, generateRace, sortPoolByClass } from '../../cli/src/race-field.js';
 import { ODDS_MC_TRIALS, buildOddsRows, winningKeys } from './odds.js';
 import type { OddsSpec, RaceEntrantSpec } from './cycle-runner.js';
@@ -50,6 +50,21 @@ export interface BuiltRace {
     /** ★下へ広げた段数（0 ＝ 広げていない） */
     readonly widenedSteps: number;
   } | null;
+  /** ★ライバル枠（D-131）で入れた NPC の id（★`race_entries.via_rival` に書く・★働かなければ空） */
+  readonly viaRival: readonly string[];
+}
+
+/**
+ * ★**ライバル枠に渡す 1 組**（★正典 D-131・`@star/scheduler` の `rivalSlotFires`）。
+ *   ★利用者の馬（★`mustInclude` に居る）と ★その馬が誕生のとき選んだ看板馬。
+ */
+export interface RivalPair {
+  readonly userHorseId: string;
+  readonly rival: HorseRecord;
+  /** ★ライバルの これまでの出走数 */
+  readonly rivalStarts: number;
+  /** ★ライバルが 現役になってからの週数 */
+  readonly rivalActiveWeeks: number;
 }
 
 /**
@@ -155,6 +170,13 @@ export function buildRace(
    * ⚠️ ★渡さなければ 1 ビットも変わりません（★乱数の消費も同じ）。
    */
   mustInclude?: readonly HorseRecord[],
+  /**
+   * ★**ライバル枠**（★2026-10-03・正典 D-131・裁定 `REVIEW_D126_D131_MINIMAL_VERDICT_20261003.md` §4・§8・§9）。
+   *   ★利用者の馬のライバルが ★このレースの窓（★出走条件 ＋ 勝利数の段・★広げない）に居れば、★確率 p で NPC の枠に入れる。
+   *   ★乱数は ★別の流れ（`RIVAL_STREAM.SLOT`）。★働かなければ `mustInclude` は変わらず ★出走表は 1 ビットも変わらない。
+   *   ★利用者の登録を押し出さない（★席が `FIELD_SIZE.MAX` に届いていれば入れない）。★着順には効かない（★出走表を選ぶだけ）。
+   */
+  rivals?: { readonly pairs: readonly RivalPair[]; readonly startsPerCareer: number },
 ): BuiltRace {
   /**
    * ★**走路の形はここで 1 回だけ作ります**（★2026-09-15・指示書 VW §5-2）。
@@ -180,6 +202,26 @@ export function buildRace(
       );
   const eligiblePool = selection === null ? pool : selection.pool;
   const sorted = sortPoolByClass(eligiblePool);
+  const viaRival: string[] = [];
+  const forced: HorseRecord[] = [...(mustInclude ?? [])];
+  if (rivals !== undefined && rivals.pairs.length > 0 && eligibility !== undefined) {
+    const slotRng = deriveRng(seed, RIVAL_STREAM.SLOT, cycleIndex);
+    /** ★利用者の馬の id 順（★決定論・★DB の返す順に依らない） */
+    const pairs = [...rivals.pairs].sort((a, b) => (a.userHorseId < b.userHorseId ? -1 : a.userHorseId > b.userHorseId ? 1 : 0));
+    for (const pair of pairs) {
+      if (!forced.some((h) => h.id === pair.userHorseId)) continue;
+      if (forced.some((h) => h.id === pair.rival.id)) continue;
+      if (forced.length >= FIELD_SIZE.MAX) break;
+      const inWindow = (eligibility.conditionsOk?.(pair.rival) ?? true)
+        && selectEligible(eligibility.raceClass, [pair.rival], eligibility.winsOf, 0).pool.length === 1;
+      if (!inWindow) continue;
+      const paceLimit = rivalPaceLimit({ activeWeeks: pair.rivalActiveWeeks, startsPerCareer: rivals.startsPerCareer });
+      if (rivalSlotFires({ eligible: true, rivalStarts: pair.rivalStarts, paceLimit, u: slotRng.float() })) {
+        forced.push(pair.rival);
+        viaRival.push(pair.rival.id);
+      }
+    }
+  }
   const race = generateRace(
     sorted, cycleIndex, deriveRng(seed, STREAM.FIELD, cycleIndex),
     undefined, undefined, undefined,
@@ -202,7 +244,7 @@ export function buildRace(
        */
       abilityOf: (h: HorseRecord) => h.stats,
       // ★D-117 DS-2: ★登録した馬を先に席に着ける（★渡されなければ従来どおり）
-      ...(mustInclude === undefined || mustInclude.length === 0 ? {} : { mustInclude }),
+      ...(forced.length === 0 ? {} : { mustInclude: forced }),
       ...(trainingStates === undefined ? {} : { trainingStateOf: (h: HorseRecord) => trainingStates.get(h.id) }),
       ...(programme === undefined || programmeFrozen === undefined
         ? {}
@@ -303,5 +345,6 @@ export function buildRace(
       selection === null || eligibility === undefined
         ? null
         : { raceClass: eligibility.raceClass, poolSize: selection.pool.length, widenedSteps: selection.widenedSteps },
+    viaRival,
   };
 }

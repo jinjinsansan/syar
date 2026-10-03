@@ -164,6 +164,8 @@ export interface FillSpec {
    * ⚠️ ★`entrants` に必ず含まれていること — ★含まれていなければ `fillRace` が投げます。
    */
   readonly registered: readonly string[];
+  /** ★ライバル枠（D-131）で入れた NPC の id（★`race_entries.via_rival`・★無ければ空と同じ） */
+  readonly viaRival?: readonly string[];
 }
 
 export interface RaceEntrantSpec {
@@ -320,6 +322,8 @@ export async function runCycle(
      *    ★ここは「出走しない」ことを `fillRace` に伝えるだけです。
      */
     readonly excluded: readonly string[];
+    /** ★ライバル枠（D-131）で入れた NPC の id（★`fillRace` へ渡す） */
+    readonly viaRival?: readonly string[];
   }>,
   /**
    * ★開催中止が起きたときの通報（正典 D-037）。
@@ -556,6 +560,7 @@ export async function runCycle(
          *   ★ここで引かないと `fillRace` が「登録したのに出走表にない」で投げます。
          */
         registered: registered.filter((h) => !built.excluded.includes(h)),
+        ...(built.viaRival === undefined || built.viaRival.length === 0 ? {} : { viaRival: built.viaRival }),
       });
       filled.push(idx);
       /**

@@ -359,3 +359,58 @@ export async function loadWinsByHorse(
   for (const row of r.rows) out.set(row.horse_id, Number(row.wins));
   return out;
 }
+
+/**
+ * ★**ライバル枠の材料**（★2026-10-03・正典 D-131・`build-race.ts` の `RivalPair`）。
+ *   ★利用者の馬のうち ライバルを選んだ馬と ★そのライバル（★現役の NPC だけ・★齢の門を通ったもの）。
+ *   ★ライバルの出走数は ★確定した出走（`finish_pos is not null`）を数える。
+ */
+export async function loadRivalPairs(
+  client: pg.Client | pg.PoolClient,
+  userHorseIds: readonly string[],
+): Promise<{ readonly userHorseId: string; readonly rival: HorseRecord; readonly rivalStarts: number }[]> {
+  if (userHorseIds.length === 0) return [];
+  const pairs = await client.query<{ id: string; rival_horse_id: string }>(
+    'select id, rival_horse_id from horses where id = any($1::uuid[]) and rival_horse_id is not null',
+    [userHorseIds],
+  );
+  if (pairs.rows.length === 0) return [];
+  const rivalIds = [...new Set(pairs.rows.map((r) => r.rival_horse_id))];
+  const rivals = await client.query<Record<string, unknown>>(
+    `select * from horses where id = any($1::uuid[]) and ${ACTIVE_WHERE}`,
+    [rivalIds],
+  );
+  const rivalById = new Map(rivals.rows.map((r) => [String(r['id']), rowToHorse(r)]));
+  const starts = await client.query<{ horse_id: string; n: string }>(
+    'select horse_id, count(*)::text n from race_entries where horse_id = any($1::uuid[]) and finish_pos is not null group by horse_id',
+    [rivalIds],
+  );
+  const startsById = new Map(starts.rows.map((r) => [r.horse_id, Number(r.n)]));
+  const out: { userHorseId: string; rival: HorseRecord; rivalStarts: number }[] = [];
+  for (const row of pairs.rows) {
+    const rival = rivalById.get(row.rival_horse_id);
+    // ★引退した・まだ出走できない齢のライバルは 入れない（★出走表と同じ門）
+    if (rival === undefined) continue;
+    out.push({ userHorseId: row.id, rival, rivalStarts: startsById.get(row.rival_horse_id) ?? 0 });
+  }
+  return out;
+}
+
+/**
+ * ★**平均出走頭数の実測**（★`startsPerCareerOf` に渡す・正典 D-128「数を書かず 実測から導く」）。
+ *   ★確定した直近 `limit` レースの 1 レースあたりの出走数。★確定したレースが無ければ null（★呼ぶ側が枠を働かせない）。
+ */
+export async function loadMeanFieldSize(
+  client: pg.Client | pg.PoolClient,
+  limit: number,
+): Promise<number | null> {
+  const r = await client.query<{ m: string | null }>(
+    `select avg(n)::text m from (
+       select count(*) n from race_entries e join races r on r.id = e.race_id
+        where r.status = 'settled' and e.finish_pos is not null
+        group by r.id, r.cycle_index order by r.cycle_index desc limit $1) t`,
+    [limit],
+  );
+  const m = r.rows[0]?.m;
+  return m === null || m === undefined ? null : Number(m);
+}

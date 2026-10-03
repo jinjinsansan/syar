@@ -30,7 +30,7 @@ import { DEFAULT_PRESEED_OPTIONS } from '../../cli/src/preseed.js';
 import { aggregateDay, UnknownEpClassError } from './daily-flow.js';
 // ★日次の枝の結果を行に残す（★DL-2・移行 0052）。★止める仕組みではない
 import { runDailyStep } from './daily-run-log.js';
-import { loadBirthWeeksByHorse, loadHorsesByIds, loadRaceablePool, loadTrainingStates, loadWinsByHorse } from './horse-repo.js';
+import { loadBirthWeeksByHorse, loadHorsesByIds, loadMeanFieldSize, loadRaceablePool, loadRivalPairs, loadTrainingStates, loadWinsByHorse } from './horse-repo.js';
 import { createPgStore, readDbEnvironment } from './pg-store.js';
 import { seedCommitFor, serverSeedFor } from './seeding.js';
 import { advanceTrainingWeeks } from './training-runner.js';
@@ -70,7 +70,7 @@ import { runSchemacheck } from './schemacheck.js';
 import {
   BREEDING_BUDGET_MS, CANCEL_AFTER_START_MS, CYCLES_PER_WEEK, CYCLE_MS, classOf, conditionsOf, gradeOf,
   entryConditionsOf, gradedRaceAt, meetsEntryConditions, cycleStartMs, PHASE_OFFSET_MS,
-  weekIndexAt, weekStartMs, dayIndexAt, dayStartMs,
+  weekIndexAt, weekStartMs, dayIndexAt, dayStartMs, LIFECYCLE_WEEKS, RACES_PER_DAY, startsPerCareerOf,
 } from '@star/scheduler';
 // ★投票の上限の正（★2026-09-19・BT-1。★ワーカーが `bet_limits` に書き、RPC はその行を読む）
 import {
@@ -253,6 +253,11 @@ async function main(): Promise<void> {
       const winsByHorse = await loadWinsByHorse(client);
       /** ★重賞の年齢条件に使う 生まれた週（★D-129 ①・周に 1 回） */
       const birthWeekByHorse = await loadBirthWeeksByHorse(client);
+      /**
+       * ★**ライバル枠のペースに使う 平均出走頭数**（★D-131・D-128「数を書かず 実測から導く」・周に 1 回）。
+       *   ★直近 1 日ぶん（`RACES_PER_DAY`）の確定したレース。★無ければ null で ★枠を働かせない。
+       */
+      const meanFieldSize = await loadMeanFieldSize(client, RACES_PER_DAY);
       const out = await runCycle(
         store,
         cfg.epochMs,
@@ -343,6 +348,20 @@ async function main(): Promise<void> {
             );
           }
           const registeredHorses = await loadHorsesByIds(client, lot.selected);
+          /**
+           * ★**ライバル枠**（★2026-10-03・正典 D-131・裁定 `REVIEW_D126_D131_MINIMAL_VERDICT_20261003.md` §4・§8・§9）。
+           *   ★登録した馬のうち ライバルを選んだ馬と ★現役のライバル。★判定は `buildRace`（★出走表と同じ窓・別の乱数の流れ）。
+           *   ★1 キャリアの出走数は ★`startsPerCareerOf`（★実測の平均出走頭数 ÷ 齢の門を通った NPC の頭数）。
+           */
+          const rivalRows = meanFieldSize === null ? [] : await loadRivalPairs(client, lot.selected);
+          const raceWeek = weekIndexAt(cycleStartMs(i, cfg.epochMs) + PHASE_OFFSET_MS.start, cfg.epochMs);
+          const rivals = rivalRows.length === 0 || meanFieldSize === null ? undefined : {
+            pairs: rivalRows.map((r) => ({
+              ...r,
+              rivalActiveWeeks: raceWeek - (birthWeekByHorse.get(r.rival.id) ?? raceWeek) - LIFECYCLE_WEEKS.raceableFrom,
+            })),
+            startsPerCareer: startsPerCareerOf({ meanFieldSize, poolSize: birthWeekByHorse.size }),
+          };
           const built = buildRace(pool, i, cfg.epochMs, undefined, trainingStates,
             {
               // ★番組表（§10.3）が距離・馬場・コースを決める（Q-P3-32）
@@ -374,7 +393,8 @@ async function main(): Promise<void> {
              *    ★**別に読みます**（`loadHorsesByIds`）。★読めなければ組成を止めます —
              *    ★黙って落とすと「登録できたのに走らない馬」になります（R-16）。
              */
-            registeredHorses);
+            registeredHorses,
+            rivals);
           /**
            * 🔴 ★**登録した馬が出走表に入っているか**（★D-117 **DS-2**）。
            *   ★`fillRace` も同じことを見ますが、★**ここで先に言います**（★どの段で落ちたか分かるように）。
@@ -396,7 +416,7 @@ async function main(): Promise<void> {
                 `（★そのクラスの馬が足りていません。★流量を見てください・CL-7）`,
             );
           }
-          return { entrants: built.entrants, odds: built.odds, excluded: lot.excluded };
+          return { entrants: built.entrants, odds: built.odds, excluded: lot.excluded, viaRival: built.viaRival };
         },
         // ★開催中止は黙って通さない（正典 D-037）。
         //   静かに返還されると原因が調査されないまま繰り返します。
