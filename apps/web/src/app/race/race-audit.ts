@@ -12,6 +12,8 @@ export interface AuditGroundFrame {
   readonly trueMps: number | null; readonly shownMps: number | null;
   /** ★馬の高さ ÷ 画面の高さ・★カメラから注視点までの距離（m） */
   readonly horseRatio: number; readonly camDistM: number;
+  /** ★板の場面の 芝の画面のずれ（px）と その速さ（px/秒・★場面の最初のコマは null）（★2026-10-03・画面での流れを測る） */
+  readonly platePx?: number; readonly platePxPerSec?: number | null;
 }
 
 export interface AuditShotSummary {

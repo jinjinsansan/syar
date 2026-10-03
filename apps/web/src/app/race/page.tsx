@@ -425,6 +425,7 @@ if (typeof window !== 'undefined') {
 }
 /** ★記録の形と集計は `race-audit.ts`（★1 か所） */
 const auditGround: AuditGroundFrame[] = [];
+let auditPrevPlatePx: number | null = null;
 let auditPrev: {
   readonly d: number; readonly shot: string; readonly persp: boolean; readonly scroll: number;
   readonly cam: Parameters<typeof cameraBasis>[0]; readonly focusS: number; readonly focusW: number;
@@ -464,7 +465,12 @@ function noteAuditGround(
       if (a.depth > 1 && b.depth > 1 && len > 1e-6) groundMps = -(((b.x - a.x) * dx + (b.y - a.y) * dy) / len) / len / dt;
     }
   }
-  const frame: AuditGroundFrame = { d, shot: scene.shot.id, persp, groundMps, trueMps, shownMps, horseRatio, camDistM };
+  /** ★板の場面の 芝のずれ（★`parallax-plate.ts` の式 ＝ scrollM × 注視点の px/m）と ★画面での速さ */
+  const q0 = project(scene.camera, basis, { x: f0.x, y: f0.y, z: 0 });
+  const platePx = scroll * q0.pxPerM;
+  const platePxPerSec = prev !== null && prev.shot === scene.shot.id && d > prev.d && auditPrevPlatePx !== null ? (platePx - auditPrevPlatePx) / (d - prev.d) : null;
+  auditPrevPlatePx = platePx;
+  const frame: AuditGroundFrame = { d, shot: scene.shot.id, persp, groundMps, trueMps, shownMps, horseRatio, camDistM, platePx, platePxPerSec };
   if (AUDIT_GROUND) auditGround.push(frame);
   else watchGround(frame, raceKey);
   auditPrev = { d, shot: scene.shot.id, persp, scroll, cam: scene.camera, focusS: scene.focusS, focusW: scene.focusW, lead, sec };
@@ -1639,6 +1645,46 @@ const SILKS_LAYOUT_WINNER: SilksLayout = {
   helmet: [0.52, 0.76, 0.17], jacket: [0.48, 0.72, 0.12, 0.40], saddlecloth: [0.36, 0.60, 0.48, 0.66], number: [0.47, 0.57],
 };
 
+/**
+ * ★**騎手の服の型の置き場**（★2026-10-03・`tools/build-silks-masks.ts`・素材の名前 → 8 コマ）。★読めなかった素材は 無し（★従来の判定で塗る）。
+ *   ★型は ★原版の画布の画素ごとに 0〜3（★PNG の値 ÷ 80）。
+ */
+interface SilksMask { readonly w: number; readonly h: number; readonly data: Uint8Array }
+const silksMaskCache = new Map<string, readonly SilksMask[] | null>();
+const silksMaskOfImage = new WeakMap<object, SilksMask>();
+async function loadSilksMasks(prefix: string, version: string): Promise<readonly SilksMask[] | null> {
+  const hit = silksMaskCache.get(prefix);
+  if (hit !== undefined) return hit;
+  const one = (i: number): Promise<SilksMask | null> => new Promise((res) => {
+    const im = new Image();
+    im.onload = () => {
+      const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+      const cx = cv.getContext('2d', { willReadFrequently: true });
+      if (cx === null) { res(null); return; }
+      cx.drawImage(im, 0, 0);
+      const px = cx.getImageData(0, 0, cv.width, cv.height).data;
+      const data = new Uint8Array(cv.width * cv.height);
+      for (let k = 0; k < data.length; k += 1) data[k] = Math.round((px[k * 4] ?? 0) / 80);
+      cv.width = 0; cv.height = 0;
+      res({ w: im.naturalWidth, h: im.naturalHeight, data });
+    };
+    im.onerror = () => { res(null); };
+    im.src = `/art/silks-mask/${prefix}-pose${String(i + 1).padStart(2, '0')}.png?v=${version}`;
+  });
+  const got = await Promise.all(Array.from({ length: 8 }, (_, i) => one(i)));
+  const ok = got.every((m): m is SilksMask => m !== null) ? got as SilksMask[] : null;
+  silksMaskCache.set(prefix, ok);
+  return ok;
+}
+/** ★型を引く関数（★原版の画布の座標）。★`map` で 焼いた絵の座標 → 原版の座標 へ写す */
+function silksMaskAt(m: SilksMask, map: (ix: number, iy: number) => readonly [number, number] = (x, y) => [x, y]): (ix: number, iy: number) => number {
+  return (ix, iy) => {
+    const [nx, ny] = map(ix, iy);
+    const x = Math.round(nx), y = Math.round(ny);
+    return x < 0 || y < 0 || x >= m.w || y >= m.h ? 0 : (m.data[y * m.w + x] ?? 0);
+  };
+}
+
 function silksOverlays(
   image: FrameImage, source: HighQualityHorseFrame['source'], colors: readonly SilkColors[],
   layout: SilksLayout = SILKS_LAYOUT_CROUCH,
@@ -1659,6 +1705,11 @@ function silksOverlays(
   mirrorNumber = false,
   /** ★`layout.canvasFixed` のとき 窓を置く 画布の矩形（★その絵の座標）。★無ければ外接矩形のまま */
   canvasRect?: HighQualityHorseFrame['source'],
+  /**
+   * ★**騎手の服の型**（★2026-10-03・3 者会議の結論 B・`tools/build-silks-masks.ts`）。★その絵の座標の画素 → 0 塗らない／1 兜／2 上着／3 鞍布。
+   *   ★渡されたら ★実行時の判定（窓・閾値・肌・塊）を全部使わない。★元の明るさを掛けて塗り ★不透明度は元のまま（★0.94 倍で白が透けて色あせた）。
+   */
+  maskAt?: (ix: number, iy: number) => number,
 ): readonly (NonNullable<HighQualityHorseFrame['overlay']> | undefined)[] {
   /** ★数字の大きさは 外接矩形から（★画布に固定しても 馬の大きさに合わせる） */
   const bounds = source;
@@ -1716,7 +1767,7 @@ function silksOverlays(
    *   ★塗れるか（★肌の判定なし＝鞍布の陰を穴にしない）で つなぎ、★塊の中心で決める。★上着・兜の肌は 下のループで外す。
    */
   let compClass: Uint8Array | null = null;
-  if (layout.components === true) {
+  if (layout.components === true && maskAt === undefined) {
     const P = new Uint8Array(width * height);
     for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
       const i4 = (y * width + x) * 4;
@@ -1755,7 +1806,9 @@ function silksOverlays(
     const r = input[index] ?? 0; const g = input[index + 1] ?? 0; const b = input[index + 2] ?? 0; const a = input[index + 3] ?? 0;
     const nx = (x + x0 - source.x) / source.width;
     const ny = (y + y0 - source.y) / source.height;
-    const cc = compClass === null ? -1 : compClass[y * width + x]!;
+    const mk = maskAt === undefined ? -1 : maskAt(x + x0, y + y0);
+    if (mk === 0) continue;
+    const cc = mk > 0 ? mk : compClass === null ? -1 : compClass[y * width + x]!;
     const helmet = cc >= 0 ? cc === 1 : nx >= layout.helmet[0] && nx <= layout.helmet[1] && ny <= layout.helmet[2];
     const jacket = cc >= 0 ? cc === 2 : nx >= layout.jacket[0] && nx <= layout.jacket[1] && ny >= layout.jacket[2] && ny <= layout.jacket[3];
     const saddlecloth = cc >= 0 ? cc === 3 : nx >= layout.saddlecloth[0] && nx <= layout.saddlecloth[1]
@@ -1770,7 +1823,7 @@ function silksOverlays(
      *   ★鞍布の生地のクリーム色の陰が肌と判定され、★縁が白いまだらに残っていました。
      * ⚠️ ★上着・兜の窓と重なる所は ★従来どおり肌を外します（★首すじ・手）。
      */
-    if (!silksPaintable(r, g, b, a, helmet, !(saddlecloth && !jacket && !helmet))) continue;
+    if (mk < 0 && !silksPaintable(r, g, b, a, helmet, !(saddlecloth && !jacket && !helmet))) continue;
     /**
      * ★**肌は塗りません**（2026-08-21・オーナー評「騎手の肌の色が白いのがいる」）。
      *
@@ -1805,7 +1858,7 @@ function silksOverlays(
       if (y < jacketY0) jacketY0 = y; if (y > jacketY1) jacketY1 = y;
     }
     shadeOf[mask] = 0.30 + luminance * 0.78;
-    alphaOf[mask] = Math.round(a * 0.94);
+    alphaOf[mask] = mk > 0 ? a : Math.round(a * 0.94);
     if (x < minX) minX = x; if (x > maxX) maxX = x;
     if (y < minY) minY = y; if (y > maxY) maxY = y;
   }
@@ -1823,7 +1876,7 @@ function silksOverlays(
    *   ★ヘルメット・上着・鞍布は ★素材の上で黒い線に区切られた別の塊なので、★窓が多少ずれても割れません。
    * ⚠️ ★塗る画素そのもの（★どこを塗るか）は ★1 つも増やしも減らしもしません。★色の割り当てだけです。
    */
-  {
+  if (maskAt === undefined) {
     const seen = new Uint8Array(width * height);
     const stack: number[] = [];
     const members: number[] = [];
@@ -3740,7 +3793,8 @@ function RaceView({ setup, real }: {
           /** ★右回りは馬が左へ走り鏡像で描かれるので、番号を先に裏返す（★`silksOverlays` の `mirrorNumber`） */
           RACE_TURN === 'right',
           /** ★画布に固定した窓（`SILKS_LAYOUT_WALK`）は 原版の画布そのもの */
-          { x: 0, y: 0, width: imgW(image), height: imgH(image) }));
+          { x: 0, y: 0, width: imgW(image), height: imgH(image) },
+          (() => { const m = silksMaskOfImage.get(image); return m === undefined ? undefined : silksMaskAt(m); })()));
         /**
          * ★配置と縮尺の基準は鞍布（剛体）。
          *   - 基準点 = 鞍布中心（無ければ胴体重心）
@@ -3883,8 +3937,15 @@ function RaceView({ setup, real }: {
             width: set.nativeCanvasWidth * set.scale, height: set.nativeCanvasHeight * set.scale,
           };
         };
+        /** ★型: 焼いた絵の座標 → 原版の座標（★外接矩形 nativeBounds と縮尺） */
+        const masks = silksMaskCache.get(set.prefix) ?? null;
+        const maskOf = (i: number): ((ix: number, iy: number) => number) | undefined => {
+          const m = masks?.[i]; const t = set.frames[i]!;
+          return m === undefined ? undefined
+            : silksMaskAt(m, (ix, iy) => [t.nativeBounds.x + (ix - t.x) / set.scale, t.nativeBounds.y + (iy - t.y) / set.scale]);
+        };
         const overlays = sources.map((src, i) => silksOverlays(bay, src, silksByGate, silksLayout, undefined,
-          RACE_TURN === 'right', canvasRectOf(i)));
+          RACE_TURN === 'right', canvasRectOf(i), maskOf(i)));
         /**
          * ★**接地影**（★2026-09-03・オーナー判断 A「原寸のまま焼く」）。
          *
@@ -3975,6 +4036,8 @@ function RaceView({ setup, real }: {
           .catch(() => null);
         if (manifest === null) return undefined;
         bakedManifest = manifest;
+        /** ★騎手の服の型（★焼いた絵は 原版の型を 座標を写して使う） */
+        await Promise.all(manifest.sets.map((set) => loadSilksMasks(set.prefix, ASSET_VERSION)));
         /** ★この出走頭数で実際に要る毛色だけ読みます（★12 頭なら 7 色のうち 5 色） */
         const needed = [...new Set(silksByGate.map((_, index) => coatOfGate(index + 1)))];
         /**
@@ -4290,9 +4353,13 @@ function RaceView({ setup, real }: {
         const images = await Promise.all(Array.from({ length: 8 }, (_, i) =>
           loadImg(`/art/${prefix}-pose${String(i + 1).padStart(2, '0')}.png?v=${ASSET_VERSION}`).catch(() => null)));
         if (!images.every((image): image is HTMLImageElement => image !== null)) return undefined;
-        return images.map((image) => {
+        const masks = await loadSilksMasks(prefix, ASSET_VERSION);
+        return images.map((image, i) => {
           const frame = sharpenForDownscale(image, sharpenSigma, sharpenAmount);
           if (isDeformedHorseAsset(prefix)) deformedFrameImages.add(frame);
+          /** ★型の大きさが絵と同じときだけ（★違えば 従来の判定） */
+          const m = masks?.[i];
+          if (m !== undefined && m.w === imgW(frame) && m.h === imgH(frame)) silksMaskOfImage.set(frame, m);
           return frame;
         });
       };
