@@ -145,7 +145,10 @@ describe('★小窓で本編を流す約束', () => {
     expect(PAGE).toContain('const jumpAt = built.editJumps.find((j) => raceD >= j.at - jumpLead && raceD < j.at + jumpLead);');
     /** ★芝は跳びの区間で注視点の進みに合わせる（★`visual-scroll.ts`・後退しない） */
     /** ★2026-10-02: ★さらに 芝の最後の安全網（`createGroundSmoother`）を通す */
-    expect(PAGE).toContain('smoothGround(d, scene.shot.id, scene.focusS, visualScroll.deltaAt(d, scene.focusS),');
+    expect(PAGE).toContain('const rawDelta = visualScroll.deltaAt(d, scene.focusS);');
+    expect(PAGE).toContain('smoothGround(d, scene.shot.id, scene.focusS, rawDelta,');
+    /** ★脚は 安全網を通す前の値（★2026-10-03・発走で 脚の止まった馬が滑った） */
+    expect(PAGE).toContain('const gaitDelta = rawDelta - visualScroll.deltaAt(RACE_INTRO_RACE_START_SEC);');
   });
 
   it('🔴 ⑤ ★出せなかったら ★1 通りの 1 行を出し、★理由はログにだけ', () => {

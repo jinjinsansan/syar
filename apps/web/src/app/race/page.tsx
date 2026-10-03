@@ -5399,8 +5399,14 @@ function RaceView({ setup, real }: {
       const visualScroll = (motionTimeline ?? built).visualScroll;
       /** ★注視点も渡す（★跳びの区間で芝が戻らない・`visual-scroll.ts`） */
       /** ★芝の最後の安全網を通す（★1 コマで跳ねない・止まらない・戻らない・`createGroundSmoother`） */
-      const visualDelta = smoothGround(d, scene.shot.id, scene.focusS, visualScroll.deltaAt(d, scene.focusS), `${real?.raceId ?? 'demo'}:${seed}`);
-      const gaitDelta = visualDelta - visualScroll.deltaAt(RACE_INTRO_RACE_START_SEC);
+      const rawDelta = visualScroll.deltaAt(d, scene.focusS);
+      const visualDelta = smoothGround(d, scene.shot.id, scene.focusS, rawDelta, `${real?.raceId ?? 'demo'}:${seed}`);
+      /**
+       * ★**脚は 安全網を通す前の値で回す**（★2026-10-03・オーナー「発走の瞬間 馬の足が動かず 静止画の馬が横向きに移動」）。
+       *   ⚠️ ★安全網は 芝が 1 コマで急に速くなると 0.4 秒 前の速さに抑える。★発走で芝が 0 から速くなる所で 芝を止め、
+       *      ★脚まで止めていた（★馬の位置は進むので 脚の止まった馬が滑った）。★安全網は 芝の見た目だけに使う。
+       */
+      const gaitDelta = rawDelta - visualScroll.deltaAt(RACE_INTRO_RACE_START_SEC);
       /** ★調べるため（★2026-10-01・オーナー「芝が逆に動いた」）: 芝の模様の位置 ＝ 注視点 ＋ Δ。★描画には使わない */
       (globalThis as { __raceGround?: unknown }).__raceGround = { d, focusS: scene.focusS, visualDelta };
       noteGroundJump(d, scene.shot.id, scene.focusS, visualDelta, real?.raceId ?? null);

@@ -44,4 +44,10 @@ describe('★画面の時計', () => {
     expect(nextShownTime(10, 12.5, 2.5)).toBe(12.5);
     expect(nextShownTime(10, 4, 0.016)).toBe(4);
   });
+
+  it('🔴 ★0.1 秒までの 少し重いコマ（★60ms）が続いても ゆっくりにならない（★残り 70m のトーンダウン・2026-10-03）', () => {
+    const r = play(Array.from({ length: 60 }, () => 0.06));
+    expect(r.target - r.final).toBeLessThan(1e-9);
+    expect(Math.min(...r.advances)).toBeCloseTo(0.06, 9);
+  });
 });
