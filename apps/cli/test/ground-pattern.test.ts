@@ -41,6 +41,11 @@ function cameras(): Array<[string, PerspectiveCamera]> {
   return [
     ['空撮', { eye: { x: eye.x, y: eye.y, z: 55 }, target: { x: target.x, y: target.y, z: 0 }, fovY: (34 * Math.PI) / 180, width: W, height: H }],
     ['ゲート', { eye: { x: gEye.x, y: gEye.y, z: 4 }, target: { x: gTarget.x, y: gTarget.y, z: 1 }, fovY: (30 * Math.PI) / 180, width: W, height: H }],
+    /**
+     * ★**本物のゲートの場面**（★2026-10-04・`start-gate-side` の発走前のカメラを 監査の経路から読んだ値・桜花杯 seed 7）。
+     *   ★上の「ゲート」は作り物で スタンドが 3 枚しか映らず、★オーナーの端末で重かった スタンドを再現できなかった。
+     */
+    ['本物のゲート', { eye: { x: 26, y: 39.6, z: 5 }, target: { x: 0, y: -4.4, z: 0.8 }, fovY: (18 * Math.PI) / 180, width: W, height: H }],
   ];
 }
 

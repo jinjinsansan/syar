@@ -3593,7 +3593,18 @@ function RaceView({ setup, real }: {
         } catch {
           return image;   // 画素を読めない環境（CORS 等）では元のまま
         }
-        return canvas;
+        /**
+         * ★**画素を読んだ画布を そのまま返さない**（★2026-10-04・オーナーの端末: ゲートの場面で スタンドだけ 1 コマ 45〜94ms・生垣は 1〜2ms）。
+         *   ★上で `getImageData` した画布は ★ブラウザが CPU 側へ移すことがあり、★それを絵として描くと ★描くたびに 画像ごと GPU へ送り直す。
+         *   ★スタンドは 1 コマ 数十枚の短冊で描くので ★その回数ぶん重くなった（★手元の CPU の描画では スタンドは軽い ＝ 枚数でも面積でもない）。
+         *   → ★`bakeCoat` と同じ形: ★一度も読まない新しい画布へ写して返す（★描く絵は同じ）。
+         */
+        const out = document.createElement('canvas');
+        out.width = canvas.width; out.height = canvas.height;
+        const octx = out.getContext('2d');
+        if (octx === null) return canvas;
+        octx.drawImage(canvas, 0, 0);
+        return out;
       };
       const parallaxRaw = await Promise.all(parallaxManifest.layers.map((layer) =>
         loadImg(`/art/parallax/backstretch-side-v1/${layer.file}?v=${ASSET_VERSION}`)));

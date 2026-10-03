@@ -21,4 +21,22 @@ describe('★bakeCoat の返す画布', () => {
     /** ★対照: ★塗った画布を そのまま返す形（旧）は無い */
     expect(body).not.toMatch(/ctx\.putImageData\(data, 0, y\);\s*\}\s*return canvas;/);
   });
+
+  /**
+   * ★**スタンドの観客を焼く `bakeCrowd` も同じ**（★2026-10-04・オーナーの端末: ゲートの場面で スタンドだけ 1 コマ 45〜94ms・生垣は 1〜2ms）。
+   *   ★`getImageData` した画布を そのまま返すと、★短冊ごとに 画像を GPU へ送り直す。
+   */
+  it('🔴 ★bakeCrowd も 画素を読んだ画布を そのまま返さない', () => {
+    const at = PAGE.indexOf('const bakeCrowd = (image: HTMLImageElement): FrameImage => {');
+    expect(at, '★切り出せない').toBeGreaterThan(-1);
+    const end = PAGE.indexOf('const parallaxRaw', at);
+    expect(end, '★終わりが見つからない').toBeGreaterThan(at);
+    const body = PAGE.slice(at, end);
+    expect(body).toContain('cx.getImageData(0, 0, canvas.width, canvas.height)');
+    expect(body).toContain("const octx = out.getContext('2d');");
+    expect(body).toContain('octx.drawImage(canvas, 0, 0);');
+    expect(body).toMatch(/return out;\s*\};/);
+    /** ★対照: ★読んだ画布を返す形（旧）は 最後の return に無い */
+    expect(body).not.toMatch(/return image;\s*\/\/[^\n]*\n\s*\}\s*return canvas;/);
+  });
 });
