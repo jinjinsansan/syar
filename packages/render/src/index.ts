@@ -60,7 +60,6 @@ export * from './race-elision.js';
 export * from './finish-replay.js';
 export * from './reference-hud.js';
 export * from './visual-scroll.js';
-export * from './playback-clock.js';
 export * from './world-textured.js';
 export * from './pixel-scale.js';
 export * from './minimap.js';

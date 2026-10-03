@@ -1672,6 +1672,16 @@ async function loadSilksMasks(prefix: string, version: string): Promise<readonly
   silksMaskCache.set(prefix, ok);
   return ok;
 }
+/**
+ * ★**型が使えないときは console に 1 回残す**（★レビュー側: 黙って従来の判定に戻ると 本番で白い斑が理由なく再発する）。
+ *   ★`[silks-mask] fallback 素材名 理由`。★同じ素材は 1 回だけ。
+ */
+const silksMaskWarned = new Set<string>();
+function warnSilksMaskFallback(prefix: string, reason: string): void {
+  if (silksMaskWarned.has(prefix)) return;
+  silksMaskWarned.add(prefix);
+  console.warn(`[silks-mask] fallback ${prefix} ${reason}（★騎手の服は 従来の判定で塗る＝白い斑が出うる）`);
+}
 /** ★型を引く関数（★原版の画布の座標）。★`map` で 焼いた絵の座標 → 原版の座標 へ写す */
 function silksMaskAt(m: SilksMask, map: (ix: number, iy: number) => readonly [number, number] = (x, y) => [x, y]): (ix: number, iy: number) => number {
   return (ix, iy) => {
@@ -3945,6 +3955,7 @@ function RaceView({ setup, real }: {
         };
         /** ★型: 焼いた絵の座標 → 原版の座標（★外接矩形 nativeBounds と縮尺） */
         const masks = silksMaskCache.get(set.prefix) ?? null;
+        if (masks === null) warnSilksMaskFallback(set.prefix, '型を読めない（焼いた絵）');
         const maskOf = (i: number): ((ix: number, iy: number) => number) | undefined => {
           const m = masks?.[i]; const t = set.frames[i]!;
           return m === undefined ? undefined
@@ -4366,6 +4377,7 @@ function RaceView({ setup, real }: {
           /** ★型の大きさが絵と同じときだけ（★違えば 従来の判定） */
           const m = masks?.[i];
           if (m !== undefined && m.w === imgW(frame) && m.h === imgH(frame)) silksMaskOfImage.set(frame, m);
+          else warnSilksMaskFallback(prefix, m === undefined ? '型を読めない' : `大きさが違う（型 ${m.w}×${m.h}・絵 ${imgW(frame)}×${imgH(frame)}）`);
           return frame;
         });
       };
@@ -5471,7 +5483,6 @@ function RaceView({ setup, real }: {
        */
       const visualScroll = (motionTimeline ?? built).visualScroll;
       /** ★注視点も渡す（★跳びの区間で芝が戻らない・`visual-scroll.ts`） */
-      /** ★芝の最後の安全網を通す（★1 コマで跳ねない・止まらない・戻らない・`createGroundSmoother`） */
       const rawDelta = visualScroll.deltaAt(d, scene.focusS);
       /**
        * ⚠️ ★芝の安全網（★10-02 `createGroundSmoother`）は 外した（★10-03・3 者会議 §3: 本当の動きを書き換え 発走で脚を止めた・トーンダウンの一因）。

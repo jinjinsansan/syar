@@ -151,6 +151,9 @@ describe('★小窓で本編を流す約束', () => {
     expect(PAGE).not.toContain('smoothGround(');
     /** ★画面の時計は 壁の時計どおり（★09-29 オーナー決定） */
     expect(PAGE).not.toContain('nextShownTime(');
+    /** ★部品ごと消した（★レビュー側: 残すと また繋がれる）。★`@star/render` に 戻ってこない */
+    const RENDER = readFileSync(path.join(ROOT, 'packages/render/src/index.ts'), 'utf8') + readFileSync(path.join(ROOT, 'packages/render/src/visual-scroll.ts'), 'utf8');
+    expect(RENDER).not.toMatch(/export function createGroundSmoother|playback-clock/);
     /** ★脚は 安全網を通す前の値（★2026-10-03・発走で 脚の止まった馬が滑った） */
     expect(PAGE).toContain('const gaitDelta = rawDelta - visualScroll.deltaAt(RACE_INTRO_RACE_START_SEC);');
   });

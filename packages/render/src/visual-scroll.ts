@@ -116,71 +116,9 @@ export function buildVisualScroll(samples: readonly VisualScrollSample[]): Visua
 }
 
 /**
- * ★**芝の最後の安全網**（★2026-10-02 オーナー「今のレース 芝がおかしい」・本番 race 344d9140: ★同じカメラのまま 1 コマだけ 毎秒 37m／91m）。
- *
- * 【★なぜ】
- *   ★表（`buildVisualScroll`）は 0.05 秒刻みの注視点から作る。★画面のカメラの切り替わりは ★実際の馬の位置（なめらかにした値）で決まるので、
- *   ★表の切り替わりと ★1 刻みずれることがある → ★同じカメラのコマに ★切り替わりの分の補正が入り、芝が 1 コマだけ跳ねた／止まった。
- *   ★原因を 1 つずつ潰してきたが（09-29・10-01・10-02 の 3 回）、★次の形がまた出る。★見た目の約束（★芝は 1 コマで跳ねない・止まらない・戻らない）を ★ここで直接守る。
- *
- * 【★やること】
- *   ★毎コマ「表どおりの芝の位置」の進みを 前のコマの速さと比べ、★カメラの切り替わり・逆走・急な跳ね／止まり なら ★前のコマの速さで進め、差を ★ずれ（offset）として持ち越す。
- *   ★芝の模様の ★絶対の位置は 画面に意味が無い（★繰り返し模様）ので ★ずれは足したままでよい。★0.4 秒以上続く変化は ★本当の変化として受け入れる。
- *   ★時計が戻った・0.5 秒より跳んだ（★見直し・巻き戻し）ら ★測り直す（★ずれは保つ）。
+ * ⚠️ ★芝の最後の安全網（★10-02 `createGroundSmoother`）は ★消した（★10-03・3 者会議 §3・レビュー側「残すと 次に症状が出たとき また繋がれる経路になる」）。
+ *   ★本当の動きを 0.4 秒前の速さに書き換え、★発走で脚を止め・最後の直線のトーンダウンの一因になった。★根の直しは 下の `buildGroundPhaseTable`。
  */
-export interface GroundSmoother {
-  /** ★このコマの芝の位置（★表どおりの位置 `raw` ＋ ずれ）。★`cut` はカメラが切り替わったコマ */
-  step(displaySec: number, raw: number, cut: boolean): number;
-}
-
-/** ★1 コマの速さの変化が これを超えたら「急変」（★毎秒 m・★前のコマの速さの 50% と 5m/秒 の大きい方・`[race-ground]` と同じ境目） */
-const GROUND_JUMP_RATIO = 0.5;
-const GROUND_JUMP_MIN = 5;
-/** ★これより長く続く変化は 本当の変化（★秒） */
-const GROUND_ACCEPT_SEC = 0.4;
-/** ★切り替わりの後 ★新しい速さを すぐ受け入れる長さ（秒）と ★その上限（★実馬は 毎秒 20m 前後・★表の跳ねは 37〜91m） */
-const GROUND_CUT_SETTLE_SEC = 0.25;
-const GROUND_CUT_MAX_MPS = 30;
-
-export function createGroundSmoother(): GroundSmoother {
-  let prevD: number | null = null;
-  let prevRaw = 0;
-  let prevSpeed: number | null = null;
-  let offset = 0;
-  let oddSec = 0;
-  /**
-   * ★**カメラが切り替わってからの秒**（★2026-10-02・本番の見本 リプレイの頭: ★芝 毎秒 9.8 → 0.4 秒後に 15.2 へ 1 コマで跳ねた）。
-   *   ★切り替わった直後は ★速さが変わっても目に見えない（★別の画）→ ★`GROUND_CUT_SETTLE_SEC` の間は
-   *   ★ありうる速さ（★0〜`GROUND_CUT_MAX_MPS`）を ★新しい速さとして すぐ受け入れる。★跳ね（★表の切り替わりの 1 刻みのずれ・毎秒 37〜91m）と逆向きは これまでどおり退ける。
-   */
-  let sinceCut = Infinity;
-  return {
-    step(d: number, raw: number, cut: boolean): number {
-      if (prevD === null || !(d > prevD) || d - prevD > 0.5) {
-        prevD = d; prevRaw = raw; prevSpeed = null; oddSec = 0;
-        return raw + offset;
-      }
-      const dt = d - prevD;
-      const rawSpeed = (raw - prevRaw) / dt;
-      sinceCut = cut ? 0 : sinceCut + dt;
-      if (!cut && sinceCut <= GROUND_CUT_SETTLE_SEC && rawSpeed >= 0 && rawSpeed <= GROUND_CUT_MAX_MPS) {
-        prevSpeed = rawSpeed; oddSec = 0; prevD = d; prevRaw = raw;
-        return raw + offset;
-      }
-      const odd = cut || rawSpeed < 0
-        || (prevSpeed !== null && Math.abs(rawSpeed - prevSpeed) > Math.max(GROUND_JUMP_MIN, Math.abs(prevSpeed) * GROUND_JUMP_RATIO));
-      oddSec = odd ? oddSec + dt : 0;
-      if (odd && !(oddSec > GROUND_ACCEPT_SEC && !cut) && prevSpeed !== null) {
-        /** ★前のコマの速さで進める（★表どおりとの差は ずれへ） */
-        offset += prevSpeed * dt - (raw - prevRaw);
-      } else {
-        prevSpeed = rawSpeed;
-      }
-      prevD = d; prevRaw = raw;
-      return raw + offset;
-    },
-  };
-}
 
 /**
  * ★**芝の板の送りの表**（★2026-10-03・3 者会議の結論 A・オーナー「最後の直線で 芝が一瞬遅くなって戻る」）。

@@ -49,5 +49,8 @@ describe('★騎手の服の型', () => {
     expect(PAGE).toContain('await Promise.all(manifest.sets.map((set) => loadSilksMasks(set.prefix, ASSET_VERSION)));');
     /** ★型のときは 不透明度を落とさない（★0.94 倍で白が透けて色あせた） */
     expect(PAGE).toContain('alphaOf[mask] = mk > 0 ? a : Math.round(a * 0.94);');
+    /** ★型が使えないときは 黙らない（★`[silks-mask] fallback`・レビュー側） */
+    expect(PAGE).toContain("warnSilksMaskFallback(prefix, m === undefined ? '型を読めない'");
+    expect(PAGE).toContain("if (masks === null) warnSilksMaskFallback(set.prefix, '型を読めない（焼いた絵）');");
   });
 });
