@@ -1090,7 +1090,18 @@ function bakeCoat(image: FrameImage, coat: CoatName): FrameImage {
     recolorCoatPixels(data.data, t);
     ctx.putImageData(data, 0, y);
   }
-  return canvas;
+  /**
+   * ★**描く用の画布へ写してから返す**（★2026-10-03・オーナーの記録「ゲートの場面で 毎コマ 70〜180ms」・Vivaldi は GPU で描画）。
+   *   ⚠️ ★`willReadFrequently` の画布は ★CPU 側に置かれ、★GPU で描く画面に描くたびに ★絵（★1 頭 1536×1024）を送り直す。
+   *      ★毎コマ何頭も大きく映るゲートの場面で重かった（★GPU を使わない手元の測りでは出ない）。★絵は 1 画素も変わらない。
+   */
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  const octx = out.getContext('2d');
+  if (octx === null) return canvas;
+  octx.drawImage(canvas, 0, 0);
+  canvas.width = 0; canvas.height = 0;
+  return out;
 }
 
 /**
