@@ -185,3 +185,37 @@ describe('★直線で「上がってきた馬」を名指しする', () => {
     expect(said).not.toContain('上がってくる');
   });
 });
+
+describe('★宿敵（★D-131 ②「実況で触れる」）', () => {
+  const H = horsesAt([700, 690, 680, 670, 660]);
+  it('★宿敵を渡さなければ 1 文字も変わらない（★16 本ぶん）', () => {
+    for (let i = 0; i < 16; i += 1) {
+      const a = raceCallAt({ ...base, lineIndex: i, horses: H });
+      const b = raceCallAt({ ...base, lineIndex: i, horses: H, rivalGate: undefined });
+      expect(JSON.stringify(b), `${i} 本目`).toBe(JSON.stringify(a));
+    }
+  });
+
+  it('★自馬の番の 2 回に 1 回（★8 本に 1 本）だけ 宿敵の話になる', () => {
+    const said = (i: number) => textOf(raceCallAt({ ...base, lineIndex: i, horses: H, rivalGate: 5 })!.parts);
+    expect(said(7)).toBe('宿敵 エトワール は 5 番手、8.3 馬身 後ろ'); // ★20m ÷ 1 馬身 2.4m
+    expect(said(15)).toContain('宿敵 エトワール');
+    // ★自馬の番の残り半分は 自馬の話のまま
+    expect(said(3)).toContain('コスモス');
+    expect(said(3)).not.toContain('宿敵');
+    for (const i of [0, 1, 2, 4, 5, 6, 8, 9, 10]) expect(said(i), `${i} 本目`).not.toContain('宿敵');
+  });
+
+  it('★宿敵が前でも後ろでも 同じ形で言う', () => {
+    const ahead = textOf(raceCallAt({ ...base, lineIndex: 7, horses: H, rivalGate: 2 })!.parts);
+    expect(ahead).toBe('宿敵 ブライト は 2 番手、4.2 馬身 前'); // ★10m ÷ 2.4m
+    const level = textOf(raceCallAt({ ...base, lineIndex: 7, horses: horsesAt([700, 690, 680, 680.2, 660]), rivalGate: 4 })!.parts);
+    expect(level).toContain('並んでいます');
+  });
+
+  it('★宿敵が出ていなければ（★枠が居ない）自馬の話のまま', () => {
+    const t = textOf(raceCallAt({ ...base, lineIndex: 7, horses: H, rivalGate: 9 })!.parts);
+    expect(t).toContain('コスモス');
+    expect(t).not.toContain('宿敵');
+  });
+});

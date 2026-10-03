@@ -123,6 +123,11 @@ export interface RealRaceData {
    */
   readonly ownGate: number | null;
   /**
+   * ★**宿敵の枠番**（★2026-10-03・正典 D-131 ②・実況で触れる）。★自分の馬の宿敵が このレースに居なければ `null`。
+   *   ★ログインの口（`my_rival_record`・本人の馬だけ）から読む。★未ログイン・自分の馬が居ないレースは 常に `null`。
+   */
+  readonly rivalGate: number | null;
+  /**
    * ★**カメラの主役**（★位置の組み立て・カメラ・実況が追う馬）。★自分の馬が居れば その馬、★居なければ ★1 着の馬。
    *   ★1 着にしたのは ★暫定（★録画なので結果は確定済み）。
    */
@@ -250,6 +255,22 @@ export async function loadRealRace(raceId: string): Promise<RealRaceData> {
     .filter((g) => Number.isInteger(g) && g >= 1)
     .sort((a, b) => a - b);
   const ownGate = mineGates[0] ?? null;
+  /**
+   * ★**宿敵**（★D-131）。★自分の馬の宿敵の id を ★ログインの口で読み、★出走表の馬 id と突き合わせる。
+   * ⚠️ ★読めないとき（★`0105` が無い環境など）は ★宿敵を言わないだけで ★中継は止めない（★実況の 1 行の話）。★黙らず console に残す。
+   */
+  let rivalGate: number | null = null;
+  const ownHorseId = ownGate === null ? undefined : allRows.find((r) => Number(r['gate']) === ownGate)?.['horse_id'];
+  if (typeof ownHorseId === 'string') {
+    const rivalRes = await auth.rpc('my_rival_record', { p_horse_id: ownHorseId });
+    if (rivalRes.error !== null) {
+      console.warn(`[race-real] 宿敵を読めませんでした（★実況で宿敵に触れません）: ${rivalRes.error.message}`);
+    } else {
+      const rivalId = ((rivalRes.data ?? []) as Record<string, unknown>[])[0]?.['rival_horse_id'];
+      const g = allRows.find((r) => typeof rivalId === 'string' && r['horse_id'] === rivalId)?.['gate'];
+      if (g !== undefined && Number.isInteger(Number(g))) rivalGate = Number(g);
+    }
+  }
   const winnerGate = runners.find((r) => r.finishPosition === 1)?.gate;
   if (winnerGate === undefined) throw new RaceNotPlayableError('1 着の馬が読めません');
   const focusGate = ownGate ?? winnerGate;
@@ -298,6 +319,7 @@ export async function loadRealRace(raceId: string): Promise<RealRaceData> {
     weightKgByGate,
     winOddsByGate,
     ownGate,
+    rivalGate,
     focusGate,
     femaleGates,
   };

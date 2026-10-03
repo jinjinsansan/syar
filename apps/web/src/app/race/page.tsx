@@ -1256,6 +1256,8 @@ interface RealReplay {
   readonly weightKgByGate: ReadonlyMap<number, number>;
   /** ★自分の馬の馬番（★読む層が `is_mine` で確かめた馬）。★**自分の馬が出ていないレースは `null`**（★2026-09-28・観戦） */
   readonly ownGate: number | null;
+  /** ★宿敵の枠番（★D-131・`lib/race-real.ts` の `rivalGate`・ログインの口だけ）。★居なければ null */
+  readonly rivalGate: number | null;
   /** ★カメラの主役（★自分の馬 か ★1 着・`lib/race-real.ts` の `focusGate`） */
   readonly focusGate: number;
   /** ★馬場状態（★実物。★`?cond=` の見比べ口で曲げない） */
@@ -2765,7 +2767,7 @@ function devAsRealPage(): { readonly setup: PageSetup; readonly real: RealReplay
     real: {
       raceId: `dev-${QS?.get('venue') ?? 'default'}-${setup.distanceM}-${setup.fieldSize}-${seed}`,
       runners, weightKgByGate: new Map(runners.map((r) => [r.gate, 55])),
-      ownGate: null, focusGate: winner, trackCondition: 'good', seed, raceNoOfDay: 1, scheduledAtMs: Number.NaN,
+      ownGate: null, rivalGate: null, focusGate: winner, trackCondition: 'good', seed, raceNoOfDay: 1, scheduledAtMs: Number.NaN,
     },
   };
   return devAsRealCache;
@@ -2866,6 +2868,7 @@ function realPageOf(data: RealRaceData): { readonly setup: PageSetup; readonly r
       runners: data.runners,
       weightKgByGate: data.weightKgByGate,
       ownGate: data.ownGate,
+      rivalGate: data.rivalGate,
       focusGate: data.focusGate,
       trackCondition: data.trackCondition,
       seed: replaySeedOf(data.id),
@@ -6553,6 +6556,8 @@ function RaceView({ setup, real }: {
         phaseLabel: phaseName,
         /** ★自分の馬が出ていないレースは ★「◯◯は N 番手」の番を作らない（★主役＝1 着を 先に明かさない・R-19 回答 Q3） */
         ownGate: mineGate ?? 0,
+        /** ★宿敵（★D-131 ②）。★ログインの口から来た本番のレースだけ（★見本・未ログインは渡さない） */
+        ...(real === null || real.rivalGate === null || mineGate === undefined ? {} : { rivalGate: real.rivalGate }),
         lineIndex: callIndexRef.current,
         frameRoleOf: (gate: number) => frameRoleOf(gate, FIELD),
         /**

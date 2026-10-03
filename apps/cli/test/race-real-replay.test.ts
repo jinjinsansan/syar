@@ -40,11 +40,14 @@ class FakeQuery implements PromiseLike<Result> {
 const state = vi.hoisted(() => ({
   tables: {} as Record<string, Record<string, unknown>[]>,
   loggedIn: true,
+  /** ★`rpc(関数名)` が返す行（★D-131 `my_rival_record`）。★無ければ空 */
+  rpcs: {} as Record<string, Record<string, unknown>[]>,
 }));
 
 vi.mock('../../web/src/lib/supabase', () => {
   const client = (): unknown => ({
     from: (table: string) => new FakeQuery(state.tables[table] ?? []),
+    rpc: async (fn: string) => ({ data: state.rpcs[fn] ?? [], error: null }),
     auth: { getSession: async () => ({ data: { session: state.loggedIn ? { user: { id: 'u1' } } : null } }) },
   });
   return { readClient: client, authClient: client };
@@ -81,6 +84,7 @@ beforeEach(() => {
       { race_id: RACE_ID, bet_type: 'place', selection: [1], odds: 1.4 },
     ],
   };
+  state.rpcs = {};
 });
 
 describe('🔴 ★実レースの録画を読む層', () => {
@@ -95,6 +99,15 @@ describe('🔴 ★実レースの録画を読む層', () => {
     /** ★単勝だけ・★無い馬は入れない（★埋めない） */
     expect([...data.winOddsByGate.entries()]).toEqual([[1, 3.2], [3, 7.5]]);
     expect(data.weightKgByGate.get(8)).toBe(55);
+    expect(data.rivalGate, '★宿敵が居なければ null').toBeNull();
+  });
+
+  it('★宿敵（D-131）: ★ログインの口（my_rival_record）の id を 出走表の馬 id と突き合わせて 枠を出す', async () => {
+    state.rpcs = { my_rival_record: [{ rival_horse_id: 'h6' }] };
+    expect((await loadRealRace(RACE_ID)).rivalGate).toBe(6);
+    // ★対照: ★宿敵が このレースに居なければ null
+    state.rpcs = { my_rival_record: [{ rival_horse_id: 'h99' }] };
+    expect((await loadRealRace(RACE_ID)).rivalGate).toBeNull();
   });
 
   it('✅ ★対照: 18 頭立ても読める（★頭数で止めない・裁定 Q-RACE-5）', async () => {

@@ -38,6 +38,13 @@ export interface RaceCallContext {
   readonly phaseLabel: string;
   /** 自馬の枠番。ときどき触れる */
   readonly ownGate: number;
+  /**
+   * ★**宿敵の枠番**（★2026-10-03・正典 D-131 ②「実況で触れる」）。★出ていなければ 渡さない。
+   *   ★自馬に触れる番（4 本に 1 本）の ★2 回に 1 回を 宿敵の話にする（★8 本に 1 本）。
+   *   ★**ログインの口からだけ**渡すこと（★`is_mine` と同じ作法・未ログインの画面は宿敵を言わない・D-131 ③）。
+   * ⚠️ ★渡さなければ従来どおりです（★1 文字も変わりません）。
+   */
+  readonly rivalGate?: number | undefined;
   /** 何本目の発言か。★自馬に触れる間隔を決めるのに使う（乱数の代わり） */
   readonly lineIndex: number;
   /** 枠色の役割名を引く */
@@ -195,7 +202,21 @@ export function raceCallAt(ctx: RaceCallContext): RaceCallLine | undefined {
   const own = ctx.horses.find((h) => h.gate === ctx.ownGate);
   const ownRank = own === undefined ? undefined : order.findIndex((h) => h.gate === ctx.ownGate) + 1;
 
-  if (ownTurn && own !== undefined && ownRank !== undefined) {
+  const rival = ctx.rivalGate === undefined || ctx.rivalGate === ctx.ownGate
+    ? undefined : ctx.horses.find((h) => h.gate === ctx.rivalGate);
+  const rivalRank = rival === undefined ? undefined : order.findIndex((h) => h.gate === rival.gate) + 1;
+
+  if (ownTurn && ctx.lineIndex % 8 === 7 && rival !== undefined && rivalRank !== undefined) {
+    // ★宿敵の番（★D-131）。★自馬との前後は ★どちらが先でも同じ形で言う
+    parts.push({ text: '宿敵 ' });
+    parts.push(nameOf(rival));
+    parts.push({ text: ` は ${rivalRank} 番手` });
+    if (own !== undefined) {
+      const d = (rival.meters - own.meters) / HORSE_LENGTH_M;
+      parts.push({ text: Math.abs(d) < 0.4 ? '、並んでいます' : `、${marginWord(Math.abs(d))} ${d > 0 ? '前' : '後ろ'}` });
+    }
+    topic = `rival${rivalRank}`;
+  } else if (ownTurn && own !== undefined && ownRank !== undefined) {
     parts.push(nameOf(own));
     parts.push({ text: ` は ${ownRank} 番手` });
     const ahead = order[ownRank - 2];

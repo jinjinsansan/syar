@@ -153,6 +153,11 @@ const READONLY_FUNCTIONS = [
    */
   'my_rival_candidates',
   /**
+   * ★本人の馬と宿敵の対戦成績（`0105`・D-131）。`language plpgsql stable` で**状態を変えない**。
+   *   ★名前・引退・勝利数・対戦成績だけ（★能力の数は出さない・D-114）。
+   */
+  'my_rival_record',
+  /**
    * ★本人の導入の段階（`0067`・裁定 8a32840）。`language plpgsql stable` で**状態を変えない**。
    *   ★段階は在る行から導く（★書き写さない）。★事実だけ返し、★時間の計算はしない。
    */
