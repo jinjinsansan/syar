@@ -125,9 +125,13 @@ export interface TexturedWorldOptions {
    *   ★網 `ground-pattern.test.ts` が ★2 つの塗り方の画素を比べます。
    */
   readonly groundPattern?: boolean;
+  /** ★コース沿いの帯の短冊を まとめる 画面の幅（px）。★既定 `MIN_SLICE_PX`・★0 で まとめない（★2026-10-02 までの描き方・網の対照） */
+  readonly minSlicePx?: number;
 }
 
 const wrap = (a: number, n: number): number => ((a % n) + n) % n;
+/** ★コース沿いの帯の短冊の 画面での最小の幅（px・`strip`） */
+const MIN_SLICE_PX = 8;
 
 /** ★地面の行を塗る模様（★`self` を fillStyle に置き・★行ごとに `setTransform` で合わせる） */
 interface TurfPattern {
@@ -552,6 +556,7 @@ export function drawTexturedWorld<TImage>(
   }
 
   // ── コース沿いの立体帯（生垣・樹林・スタンド）: 縦の看板状の帯を s 方向に細かく刻んで貼る ───────
+  const minSlicePx = opts.minSlicePx ?? MIN_SLICE_PX;
   const strip = (tex: WorldStripTexture<TImage>, w: number, heightM: number, sFrom: number, sTo: number, stepM: number, alpha = 1, minDepth = 14): void => {
     ctx.globalAlpha = alpha;
     const slices: { readonly depth: number; readonly draw: () => void }[] = [];
@@ -567,9 +572,20 @@ export function drawTexturedWorld<TImage>(
       // ★近いほど細かく刻む（階段状に見えない）。極端に近い帯（カメラ脇）は描かない
       // ★`b0` は刻み幅を決める点と同じ（★同じ点を 2 度 計算しない・★上端の 2 点は 捨てる短冊では計算しない）
       const b0 = P(s0, w, 0);
-      const step = b0.depth > 1.5 ? Math.max(0.35, Math.min(stepM, b0.depth / 60)) : stepM;
-      const s1 = Math.min(sTo, s0 + step);
-      const b1 = P(s1, w, 0);
+      let step = b0.depth > 1.5 ? Math.max(0.35, Math.min(stepM, b0.depth / 60)) : stepM;
+      let s1 = Math.min(sTo, s0 + step);
+      let b1 = P(s1, w, 0);
+      /**
+       * ★**画面で細すぎる短冊はまとめる**（★2026-10-03・オーナーの記録「発走前後のゲートの場面で 毎コマ 70〜180ms」）。
+       *   ★遠い短冊は 画面で 1〜2px しかなく、★それを何百回も drawImage していた（★本番の見本: この関数が 2.8 秒中 0.94 秒）。
+       *   ★画面の幅が `MIN_SLICE_PX` に届くまで 刻みを倍にする（★元の画像の継ぎ目は越えない＝模様を縮めない）。
+       */
+      const texRoomM = (tex.width - wrap(s0 * tex.pxPerM, tex.width)) / tex.pxPerM;
+      while (Math.abs(b1.x - b0.x) < minSlicePx && s1 < sTo && step * 2 <= Math.min(stepM * 32, texRoomM) && b1.depth > minDepth) {
+        step *= 2;
+        s1 = Math.min(sTo, s0 + step);
+        b1 = P(s1, w, 0);
+      }
       const sStart = s0;
       s0 = s1;
       if (b0.depth <= minDepth || b1.depth <= minDepth) continue;

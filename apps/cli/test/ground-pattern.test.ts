@@ -22,9 +22,12 @@ async function assets(): Promise<TexturedWorldAssets<Image>> {
   };
   const turf = await loadImage(path.join(ART, m.world.turf.file));
   const pano = await loadImage(path.join(ART, m.world.panorama.file));
+  /** ★コース沿いの帯（★本番と同じ層・画面と同じ pxPerM） */
+  const layer = async (file: string, pxPerM: number) => { const im = await loadImage(path.join(ART, file)); return { image: im, width: im.width, height: im.height, pxPerM }; };
   return {
     turf: { image: turf, width: turf.width, height: turf.height, pxPerM: m.world.turf.pxPerM },
     panorama: { image: pano, width: pano.width, height: pano.height, horizonY: m.world.panorama.horizonY },
+    scenery: { hedge: await layer('hedge.png', 60), trees: await layer('trees.png', 20), stand: await layer('stand.png', 12) },
   } as TexturedWorldAssets<Image>;
 }
 
@@ -41,7 +44,7 @@ function cameras(): Array<[string, PerspectiveCamera]> {
   ];
 }
 
-function render(a: TexturedWorldAssets<Image>, cam: PerspectiveCamera, groundPattern: boolean): { px: Uint8ClampedArray; draws: number } {
+function render(a: TexturedWorldAssets<Image>, cam: PerspectiveCamera, groundPattern: boolean, minSlicePx?: number): { px: Uint8ClampedArray; draws: number } {
   const canvas = createCanvas(W, H);
   const raw = canvas.getContext('2d');
   let draws = 0;
@@ -55,13 +58,14 @@ function render(a: TexturedWorldAssets<Image>, cam: PerspectiveCamera, groundPat
     set(t, k, v) { return Reflect.set(t, k, v); },
   }) as SKRSContext2D;
   const course = ovalCourse(1600);
-  drawTexturedWorld(ctx as unknown as Ctx2D<Image>, course, cam, a, { groundPattern, infield: false });
+  drawTexturedWorld(ctx as unknown as Ctx2D<Image>, course, cam, a, { groundPattern, infield: false, ...(minSlicePx === undefined ? {} : { minSlicePx }) });
   return { px: raw.getImageData(0, 0, W, H).data, draws };
 }
 
 describe('★地面の行を 模様で 1 回に塗る', () => {
   it('🔴 ① ★drawImage の回数が 行の数より ずっと少ない（★対照: 刻む塗り方は 行の数より多い）', async () => {
-    const a = await assets();
+    /** ★地面だけを数える（★コース沿いの帯の短冊は 下の網） */
+    const { scenery: _scenery, ...a } = await assets();
     for (const [name, cam] of cameras()) {
       const fast = render(a, cam, true);
       const slow = render(a, cam, false);
@@ -102,6 +106,17 @@ describe('★地面の行を 模様で 1 回に塗る', () => {
       const same = blockDiff(render(a, cam, true).px, render(a, cam, false).px);
       console.log(`[ground-pattern] ${name}（芝）: 8×8 の平均の差 ${same.toFixed(2)} 階調`);
       expect(same).toBeLessThan(1);
+    }
+  });
+  it('🔴 ★コース沿いの帯（★生垣・木・スタンド）の 細い短冊をまとめる: ★drawImage が減り 絵は変わらない（★2026-10-03・ゲートの場面 70〜180ms）', async () => {
+    const a = await assets();
+    for (const [name, cam] of cameras()) {
+      const merged = render(a, cam, true);
+      const old = render(a, cam, true, 0);
+      const diff = blockDiff(merged.px, old.px);
+      console.log(`[ground-pattern] ${name}（帯）: drawImage ${old.draws} → ${merged.draws}・8×8 の平均の差 ${diff.toFixed(2)} 階調`);
+      expect(merged.draws, `${name}: 減っていない`).toBeLessThan(old.draws);
+      expect(diff, `${name}: 絵が変わった`).toBeLessThan(1);
     }
   });
 });
