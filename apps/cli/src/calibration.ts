@@ -283,6 +283,18 @@ export const CALIBRATION: readonly CalibrationConstant[] = [
     affects: 'V-4 / V-6（レース内スコア分散の最大要因。K の較正条件・R-7）',
   },
   {
+    key: 'RIVAL_SLOT_P',
+    file: 'packages/scheduler/src/rival-slot.ts',
+    perturbed: 'export const RIVAL_SLOT_P = 0;',
+    affects: '★D-131 ライバル枠（★裁定 REVIEW_D126_D131_MINIMAL_VERDICT §9 の線「同じ窓に居る出走のうち 50% 以上」・rival-slot-sim.ts で 3 seed をプールして 56.6%）。★0 にすると ライバルはほぼ当たらない（自然に 0.5%）',
+  },
+  {
+    key: 'RIVAL_PACE_MARGIN',
+    file: 'packages/scheduler/src/rival-slot.ts',
+    perturbed: 'export const RIVAL_PACE_MARGIN = 0;',
+    affects: '★D-131 ライバル枠のペースの上限（§8・1 頭の看板馬が利用者のレースに偏らない）。★0 にすると 枠が一度も働かない',
+  },
+  {
     key: 'DEFAULT_CLASS_BAND',
     file: 'apps/cli/src/race-field.ts',
     perturbed: 'export const DEFAULT_CLASS_BAND = 1.0;',
@@ -798,6 +810,10 @@ export const EXEMPT: readonly { key: string; why: string }[] = [
   {
     key: 'DIAGNOSTIC_STREAM',
     why: '乱数ストリームの用途ID（切り分け用の診断ツール専用・本番経路では使わない）。同上',
+  },
+  {
+    key: 'RIVAL_STREAM',
+    why: '乱数ストリームの用途ID（★D-131 ライバル枠・本番ワーカーの出走表と rival-slot-sim.ts）。同上。★91 番台を取っている',
   },
   {
     key: 'LINEAGE_SIM_STREAM',

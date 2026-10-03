@@ -103,6 +103,15 @@ export const LINEAGE_SIM_STREAM = {
 } as const;
 
 /**
+ * ★**ライバル枠**（★正典 D-131・2026-10-03）。★91 番台。
+ *   ★本番ワーカーの出走表（`apps/worker/src/build-race.ts`）と 測る模擬（`apps/cli/src/rival-slot-sim.ts`）が同じ値を使う。
+ *   ★出走表の流れ（61）と別にするので、★ライバルが絡まない回は 出走表が 1 ビットも変わらない。
+ */
+export const RIVAL_STREAM = {
+  SLOT: 91,
+} as const;
+
+/**
  * 全 ID の一覧。★重複はここで検出する。
  *
  * ⚠️ ID を足したらこの配列にも入れること。入れ忘れると重複検査を素通りするので、
@@ -118,6 +127,7 @@ export const ALL_STREAM_TABLES = {
   DIAGNOSTIC_STREAM,
   VERIFY_BAND_STREAM,
   LINEAGE_SIM_STREAM,
+  RIVAL_STREAM,
 } as const;
 
 /** 重複している ID があれば返す（無ければ空） */

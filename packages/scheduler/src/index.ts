@@ -24,3 +24,4 @@ export * from './growth-stage.js';
 export * from './birth-week.js';
 export * from './pool-size.js';
 export * from './stud-fee.js';
+export * from './rival-slot.js';
