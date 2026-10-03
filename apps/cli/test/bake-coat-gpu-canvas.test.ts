@@ -11,6 +11,8 @@ const PAGE = readFileSync(path.resolve(__dirname, '../../web/src/app/race/page.t
 
 describe('★bakeCoat の返す画布', () => {
   it('🔴 ★willReadFrequently の画布を そのまま返さない', () => {
+    expect(PAGE.indexOf('function bakeCoat('), '★切り出せない').toBeGreaterThan(-1);
+    expect(PAGE.indexOf('const GATE_BILLBOARD'), '★切り出せない').toBeGreaterThan(-1);
     const body = PAGE.slice(PAGE.indexOf('function bakeCoat('), PAGE.indexOf('const GATE_BILLBOARD'));
     expect(body).toContain("const ctx = canvas.getContext('2d', { willReadFrequently: true });");
     expect(body).toContain("const octx = out.getContext('2d');");

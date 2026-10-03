@@ -318,7 +318,7 @@ for (const seed of SEEDS) {
   if (pool.length === 0) throw new Error(`母集団が空です（seed=${seed}）`);
 
   // --- 育成（2 方針とも 1 回ずつ。★同じ馬・同じ乱数系列） ---
-  const trained: Record<Policy, CareerResult[]> = { neglect: [], balanced: [], hard_only: [] };
+  const trained: Record<Policy, CareerResult[]> = { neglect: [], balanced: [], hard_only: [], feed_only: [] };
   for (const policy of [APPROPRIATE_POLICY, 'neglect'] as const) {
     for (let i = 0; i < pool.length; i += 1) trained[policy].push(runCareer(pool[i]!, policy, i, seed));
   }

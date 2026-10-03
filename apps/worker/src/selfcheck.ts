@@ -72,7 +72,7 @@ export function runSelfcheck(): { ok: boolean; report: string[] } {
   expect(tiers.length === 8, `PRIZE_TABLE の階級が 8 でない（${tiers.length}）`);
   const menuIds = Object.keys(MENUS).sort();
   L.push(`  MENUS=${menuIds.length} [${menuIds.join(',')}]`);
-  expect(menuIds.length === 8, `MENUS が 8 種でない（${menuIds.length}）`);
+  expect(menuIds.length === 9, `MENUS が 9 種でない（${menuIds.length}）`);
   L.push(`  tierFromDb(1,null)=${tierFromDb(1, null)} / tierFromDb(6,null)=${tierFromDb(6, null)} / tierFromDb(1,'G1')=${tierFromDb(1, 'G1')}`);
 
   // ── ③ 決定論 ────────────────────────────────────────

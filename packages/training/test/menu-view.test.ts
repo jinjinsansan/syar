@@ -17,7 +17,7 @@ import {
 
 describe('★調教の見せ方の写像（GB-1）', () => {
   it('① ★8 メニューすべてに枡がある（★全数・落ちがない）', () => {
-    expect(MENU_IDS.length).toBe(8);
+    expect(MENU_IDS.length).toBe(9);
     for (const id of MENU_IDS) {
       const v = menuViewOf(id);
       expect(TRAINING_AXES, `${id} の軸`).toContain(v.axis);
@@ -40,8 +40,8 @@ describe('★調教の見せ方の写像（GB-1）', () => {
     expect([...all].sort()).toEqual([...MENU_IDS].sort());
   });
 
-  it('③ ★正典 §7.2 の註記どおりの並び（体: 軽め → 坂路・ウッド・プール → 追い切り ／ 心: 休養 → ゲート → 併せ馬）', () => {
-    expect(menusOfView('body', 'weak')).toEqual(['light']);
+  it('③ ★正典 §7.2 の註記どおりの並び（体: 軽め・エサ → 坂路・ウッド・プール → 追い切り ／ 心: 休養 → ゲート → 併せ馬）', () => {
+    expect(menusOfView('body', 'weak')).toEqual(['light', 'feed']);
     expect([...menusOfView('body', 'mid')].sort()).toEqual(['hill', 'pool', 'wood']);
     expect(menusOfView('body', 'strong')).toEqual(['hard']);
     expect(menusOfView('mind', 'weak')).toEqual(['rest']);
@@ -55,6 +55,8 @@ describe('★調教の見せ方の写像（GB-1）', () => {
       // ★EP は D-130（2026-10-01・一律 0.6 倍）の改訂後の表
       hill: [18, 180, 1.3], wood: [15, 180, 1.0], pool: [6, 240, 0.5], gate: [8, 120, 1.0],
       partner: [20, 300, 1.0], hard: [32, 480, 2.2], light: [4, 60, 1.0], rest: [-35, 0, 0],
+      /** ★エサ（D-127・2026-10-03） */
+      feed: [-10, 120, 0],
     };
     for (const id of MENU_IDS) {
       const m = MENUS[id];

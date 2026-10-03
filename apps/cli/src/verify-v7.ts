@@ -45,10 +45,12 @@ export const HORSES = num('horses', 500);
  *   故障は調教で起きる（§7.5）ので、**どの方針で測るかで故障率が変わります**。
  *   方針を決めずに「V-7 は何%」とは言えません。
  */
-export type Policy = 'neglect' | 'balanced' | 'hard_only';
+export type Policy = 'neglect' | 'balanced' | 'hard_only' | 'feed_only';
 
 function chooseMenu(policy: Policy, week: number, fatigue: number): MenuId {
   if (policy === 'neglect') return DEFAULT_MENU;
+  /** ★エサだけ（★D-127・正典 §7.2 の註記「故障なしで伸びる抜け道になっていないか」） */
+  if (policy === 'feed_only') return 'feed';
   if (policy === 'hard_only') return fatigue >= 85 ? 'rest' : 'hard';
   if (fatigue >= 70) return 'rest';
   const cycle = week % 4;
@@ -218,11 +220,11 @@ console.log(`    ★競走能力喪失で引退した馬 : ${pct(rs.map((r) => (
 console.log('');
 console.log('  【★D-049 分割後のゲート】基準はバランス型（V-14 の錨と揃える）');
 console.log(`    ${'方針'.padEnd(14)} ${'V-7a 恒久ダメージ'.padStart(18)} ${'V-7b 致命的'.padStart(13)}`);
-for (const policy of ['neglect', 'balanced', 'hard_only'] as const) {
+for (const policy of ['neglect', 'balanced', 'hard_only', 'feed_only'] as const) {
   const xs = pool.map((h, i) => runCareer(h, i, policy));
   const a = xs.map((r) => (r.permanent ? 1 : 0));
   const b = xs.map((r) => (r.careerEnded ? 1 : 0));
-  const label = { neglect: '放置(参考)', balanced: '★バランス型', hard_only: '追い切り偏重(参考)' }[policy];
+  const label = { neglect: '放置(参考)', balanced: '★バランス型', hard_only: '追い切り偏重(参考)', feed_only: 'エサだけ(D-127)' }[policy];
   const okA = mean(a) * 100 >= 20 && mean(a) * 100 <= 40;
   const okB = mean(b) * 100 <= 3;
   console.log(
@@ -245,11 +247,11 @@ console.log('  【★丈夫さの扱い（照会 Q-P3-20）】');
 console.log('');
 console.log('  【候補④】どの育成方針で測るか（★裁定でバランス型に確定）');
 console.log(`    ${'方針'.padEnd(14)} ${'故障した馬の割合'.padStart(16)} ${'件数/頭'.padStart(9)} ${'25〜35%'.padStart(8)}`);
-for (const policy of ['neglect', 'balanced', 'hard_only'] as const) {
+for (const policy of ['neglect', 'balanced', 'hard_only', 'feed_only'] as const) {
   const xs = pool.map((h, i) => runCareer(h, i, policy));
   const any = xs.map((r) => (r.fromTrainable > 0 ? 1 : 0));
   const cnt = xs.map((r) => r.fromTrainable);
-  const label = { neglect: '放置', balanced: 'バランス型', hard_only: '追い切り偏重' }[policy];
+  const label = { neglect: '放置', balanced: 'バランス型', hard_only: '追い切り偏重', feed_only: 'エサだけ' }[policy];
   const rate = mean(any) * 100;
   console.log(
     `    ${label.padEnd(14)} ${(pct(any) + ` (SE ${se(any)})`).padStart(16)} ${mean(cnt).toFixed(3).padStart(9)} ` +

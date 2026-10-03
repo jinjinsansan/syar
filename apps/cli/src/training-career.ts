@@ -28,7 +28,7 @@ import {
 import { LIFECYCLE_WEEKS } from '@star/scheduler';
 
 /** 育成方針 */
-export type Policy = 'neglect' | 'balanced' | 'hard_only';
+export type Policy = 'neglect' | 'balanced' | 'hard_only' | 'feed_only';
 
 /**
  * ★**「適切な育成」の代表方針**（D-079 ④ の下のゲートが言う「適切な育成」）。
@@ -45,6 +45,8 @@ export const APPROPRIATE_POLICY: Policy = 'balanced';
  */
 export function chooseMenu(policy: Policy, week: number, fatigue: number): MenuId {
   if (policy === 'neglect') return DEFAULT_MENU;
+  /** ★エサだけ（★D-127・正典 §7.2 の註記「故障なしで伸びる抜け道になっていないか」） */
+  if (policy === 'feed_only') return 'feed';
   if (policy === 'hard_only') {
     // ★追い切り偏重。疲労が振り切れたら休むしかない（そうしないと確実に故障する）
     return fatigue >= 85 ? 'rest' : 'hard';

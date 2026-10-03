@@ -42,6 +42,8 @@ const MENU_TEXT: Readonly<Record<MenuId, { readonly main: string; readonly sub: 
   hard: { main: '全能力＋　係数 1.6', sub: '故障率 ↑↑', banner: { kind: 'bad', text: '故障リスク 高' } },
   light: { main: '全能力＋　係数 0.3', sub: '—' },
   rest: { main: '疲労 −35', sub: '気性 −5' },
+  /** ★エサ（D-127 ④）: ★何が起きるかを言葉で（★数は出さない・D-114） */
+  feed: { main: '全能力を少しずつ伸ばす', sub: '疲れを少し抜く・故障の心配なし' },
 };
 
 /** 正典 §7.2 の 8 メニュー（★値も枡もエンジン側の 1 か所から） */

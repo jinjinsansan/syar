@@ -77,12 +77,12 @@ console.log(`  ★係数ではなく結果を見る。係数が正しいかは�
 console.log('');
 console.log(`  ${'方針'.padEnd(14)} ${'開放率'.padStart(8)} ${'SD'.padStart(7)} ${'SE'.padStart(7)} ${'故障/頭'.padStart(8)} ${'引退'.padStart(6)} ${'EP/頭'.padStart(10)}`);
 
-const results: Record<Policy, CareerResult[]> = { neglect: [], balanced: [], hard_only: [] };
-for (const policy of ['neglect', 'balanced', 'hard_only'] as const) {
+const results: Record<Policy, CareerResult[]> = { neglect: [], balanced: [], hard_only: [], feed_only: [] };
+for (const policy of ['neglect', 'balanced', 'hard_only', 'feed_only'] as const) {
   for (let i = 0; i < pool.length; i += 1) results[policy].push(runCareer(pool[i]!, policy, i, SEED));
   const rs = results[policy];
   const u = rs.map((r) => r.unlock * 100);
-  const label = { neglect: '放置(軽めのみ)', balanced: 'バランス型', hard_only: '追い切り偏重' }[policy];
+  const label = { neglect: '放置(軽めのみ)', balanced: 'バランス型', hard_only: '追い切り偏重', feed_only: 'エサだけ(D-127)' }[policy];
   console.log(
     `  ${label.padEnd(14)} ${mean(u).toFixed(1).padStart(7)}% ${sd(u).toFixed(2).padStart(7)} ${(sd(u) / Math.sqrt(rs.length)).toFixed(3).padStart(7)} ` +
       `${mean(rs.map((r) => r.injuries)).toFixed(2).padStart(8)} ${((rs.filter((r) => r.careerEnded).length / rs.length) * 100).toFixed(1).padStart(5)}% ` +
@@ -173,18 +173,18 @@ console.log('');
 console.log('# ★分解 — 追い切りの利得を、故障と疲労がどれだけ削っているか');
 console.log('');
 console.log(`  ${'方針'.padEnd(14)} ${MENU_IDS.map((m) => m.slice(0, 4).padStart(8)).join('')}`);
-for (const policy of ['neglect', 'balanced', 'hard_only'] as const) {
+for (const policy of ['neglect', 'balanced', 'hard_only', 'feed_only'] as const) {
   const rs = results[policy];
-  const label = { neglect: '放置', balanced: 'バランス型', hard_only: '追い切り偏重' }[policy];
+  const label = { neglect: '放置', balanced: 'バランス型', hard_only: '追い切り偏重', feed_only: 'エサだけ' }[policy];
   const cells = MENU_IDS.map((m) => mean(rs.map((r) => r.menuWeeks[m])).toFixed(0).padStart(8));
   console.log(`  ${label.padEnd(14)} ${cells.join('')}`);
 }
 console.log('  （メニュー別の平均週数。全体で182週）');
 console.log('');
 console.log(`  ${'方針'.padEnd(14)} ${'実効係数'.padStart(9)} ${'故障休養'.padStart(9)} ${'平均疲労'.padStart(9)} ${'平均調子'.padStart(9)} ${'素質喪失'.padStart(9)}`);
-for (const policy of ['neglect', 'balanced', 'hard_only'] as const) {
+for (const policy of ['neglect', 'balanced', 'hard_only', 'feed_only'] as const) {
   const rs = results[policy];
-  const label = { neglect: '放置', balanced: 'バランス型', hard_only: '追い切り偏重' }[policy];
+  const label = { neglect: '放置', balanced: 'バランス型', hard_only: '追い切り偏重', feed_only: 'エサだけ' }[policy];
   // ★実効係数 = メニュー係数を週数で加重平均（sp で代表）
   const totalW = MENU_IDS.reduce((a, m) => a + mean(rs.map((r) => r.menuWeeks[m])), 0);
   const eff = MENU_IDS.reduce((a, m) => a + menuCoef(m, 'sp') * mean(rs.map((r) => r.menuWeeks[m])), 0) / totalW;

@@ -32,10 +32,11 @@ export type MenuId =
   | 'partner'   // 併せ馬
   | 'hard'      // 追い切り
   | 'light'     // 軽め調整
-  | 'rest';     // 休養（放牧）
+  | 'rest'      // 休養（放牧）
+  | 'feed';     // エサ（飼葉）・★D-127（2026-10-03・9 番目の献立）
 
 export const MENU_IDS: readonly MenuId[] = [
-  'hill', 'wood', 'pool', 'gate', 'partner', 'hard', 'light', 'rest',
+  'hill', 'wood', 'pool', 'gate', 'partner', 'hard', 'light', 'rest', 'feed',
 ];
 
 /**
@@ -91,6 +92,11 @@ export const MENUS: Readonly<Record<MenuId, MenuSpec>> = {
   hard:    { id: 'hard',    label: '追い切り',     main: [],           flatCoef: 1.6,  fatigue:  32, epCost: 480, temperDelta:  0, intensity: 2.2 },
   light:   { id: 'light',   label: '軽め調整',     main: [],           flatCoef: 0.3,  fatigue:   4, epCost:  60, temperDelta:  0, intensity: 1.0 },
   rest:    { id: 'rest',    label: '休養',         main: [],           flatCoef: 0,    fatigue: -35, epCost:   0, temperDelta: -5, intensity: 0 },
+  /**
+   * ★**エサ（飼葉）**（★D-127・正典 §7.2 の註記のレビュー側の暫定値・2026-10-03）。★休養と軽め調整の**間**: ★少し伸ばしながら 少し疲れを抜く。
+   *   ★故障の強度 0（★調教ではない）・★気性は動かさない・★EP は旧 200 × 0.6（D-130）。★値は較正定数（★オーナーが覆せる）。
+   */
+  feed:    { id: 'feed',    label: 'エサ（飼葉）', main: [],           flatCoef: 0.2,  fatigue: -10, epCost: 120, temperDelta:  0, intensity: 0 },
 };
 
 /** ★指示を出さない週の扱い（正典 §7.1: 「軽め調整」扱い） */
@@ -127,11 +133,13 @@ export interface MenuView {
 
 /**
  * ★正典 §7.2 の註記の写し:
- *   ★**体**: 軽め調整（弱）→ 坂路・ウッドチップ・プール（中）→ 追い切り（強）
+ *   ★**体**: 軽め調整・エサ（弱）→ 坂路・ウッドチップ・プール（中）→ 追い切り（強）
  *   ★**心**: 休養（弱）→ ゲート練習（中）→ 併せ馬（強）
+ * ★エサを「体」に置く理由（★正典 §7.2 の註記・レビュー側）: 主効果は全能力の伸びで 気性を動かさない →「心」に置くと「心が落ち着く」と読まれる。
  */
 export const MENU_VIEW: Readonly<Record<MenuId, MenuView>> = {
   light:   { axis: 'body', intensity: 'weak' },
+  feed:    { axis: 'body', intensity: 'weak' },
   hill:    { axis: 'body', intensity: 'mid' },
   wood:    { axis: 'body', intensity: 'mid' },
   pool:    { axis: 'body', intensity: 'mid' },

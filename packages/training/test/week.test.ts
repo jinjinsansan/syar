@@ -260,7 +260,7 @@ describe('★⑦ 決定論（憲法④）', () => {
 
 describe('★⑧ EP は引き落とさず、金額を返すだけ（憲法③・G-6）', () => {
   it('メニューごとの EP が §7.2 の表と一致する', () => {
-    for (const menu of ['hill', 'wood', 'pool', 'gate', 'partner', 'hard', 'light', 'rest'] as MenuId[]) {
+    for (const menu of ['hill', 'wood', 'pool', 'gate', 'partner', 'hard', 'light', 'rest', 'feed'] as MenuId[]) {
       const r = step(start({ ageWeeks: 120 }), menu, { seed: 910 });
       // ★故障した週は成長しないが、EP は既に払っている
       expect(r.log.epSpent, menu).toBe(MENUS[menu].epCost);

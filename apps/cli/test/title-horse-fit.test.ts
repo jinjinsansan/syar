@@ -15,7 +15,11 @@ describe('★タイトルの自馬', () => {
     expect(SRC).toContain('const fit = Math.min(1, bandW / Math.max(1, fr.source.width * (targetH / fr.referenceHeight)));');
     expect(SRC).toContain('const scale = (targetH / fr.referenceHeight) * fit;');
     /** ★対照: ★タイトル（`drawRaceTitleCard`）の中に ★縮めずに置く形（旧）は もう無い（★パドックの紹介は別の関数） */
+    expect(SRC.indexOf('export function drawRaceTitleCard'), '★切り出せない').toBeGreaterThan(-1);
     const title = SRC.slice(SRC.indexOf('export function drawRaceTitleCard'));
-    expect(title.slice(0, title.indexOf('\nexport function', 10))).not.toContain('const scale = targetH / fr.referenceHeight;');
+    expect(title.indexOf('\nexport function', 10), '★関数の終わりが見つからない').toBeGreaterThan(-1);
+    const body = title.slice(0, title.indexOf('\nexport function', 10));
+    expect(body.length).toBeGreaterThan(0);
+    expect(body).not.toContain('const scale = targetH / fr.referenceHeight;');
   });
 });
