@@ -181,3 +181,53 @@ export function createGroundSmoother(): GroundSmoother {
     },
   };
 }
+
+/**
+ * ★**芝の板の送りの表**（★2026-10-03・3 者会議の結論 A・オーナー「最後の直線で 芝が一瞬遅くなって戻る」）。
+ *
+ * 【なぜ】
+ *   ★板の送りは `見た目の進行距離 × いまの注視点の px/m`（`parallax-plate.ts`）。★進行距離は 約 1,500m あるので、
+ *   ★画角や寄せで px/m が 1% 変わるだけで 送りが 15m 分 動き、★画面の芝の速さが 本当の速さと無関係に上下した
+ *   （★手元の見本: ゴール板のカットの直後に 1,793 → 741 → 2,280 px/秒）。
+ * 【どうするか】
+ *   ★送りを ★**積む**: 刻みごとに「★その刻みで進んだ距離 × その刻みの px/m」を足す。★px/m が変わっても 送りの速さは 本当の速さに沿う。
+ *   ★表は ★レースの初めから ★描画と無関係の固定の刻み（`samples` の刻み）で作る（★コマ落ち・途中から観ても同じ・憲法 4・レビュー側の条件）。
+ *   ★1 刻みで 2m を超えて進んだ所（★カメラの切り替わり・跳び）は ★前の刻みの進みで つなぐ（★送りが跳ばない）。
+ */
+export interface GroundPhaseSample {
+  readonly displaySec: number;
+  /** ★その刻みの 見た目の進行距離（m・`focusS + deltaAt`） */
+  readonly scrollM: number;
+  /** ★その刻みの 注視点の px/m（★横の板を描くカメラで） */
+  readonly pxPerM: number;
+}
+export interface GroundPhaseTable { at(displaySec: number): number }
+export const GROUND_PHASE_JUMP_M = 2;
+export function buildGroundPhaseTable(samples: readonly GroundPhaseSample[]): GroundPhaseTable {
+  if (samples.length === 0) return { at: () => 0 };
+  const times = new Float64Array(samples.length);
+  const phase = new Float64Array(samples.length);
+  times[0] = samples[0]!.displaySec;
+  phase[0] = samples[0]!.scrollM * samples[0]!.pxPerM;
+  let prevStep = 0;
+  for (let i = 1; i < samples.length; i += 1) {
+    const a = samples[i - 1]!, b = samples[i]!;
+    times[i] = b.displaySec;
+    let dm = b.scrollM - a.scrollM;
+    if (!Number.isFinite(dm) || Math.abs(dm) > GROUND_PHASE_JUMP_M) dm = prevStep;
+    prevStep = dm;
+    const ppm = (a.pxPerM + b.pxPerM) / 2;
+    phase[i] = phase[i - 1]! + dm * (Number.isFinite(ppm) ? ppm : 0);
+  }
+  return {
+    at(displaySec: number): number {
+      if (displaySec <= times[0]!) return phase[0]!;
+      const last = times.length - 1;
+      if (displaySec >= times[last]!) return phase[last]!;
+      let lo = 0, hi = last;
+      while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (times[mid]! <= displaySec) lo = mid; else hi = mid; }
+      const t = (displaySec - times[lo]!) / (times[hi]! - times[lo]!);
+      return phase[lo]! + (phase[hi]! - phase[lo]!) * t;
+    },
+  };
+}

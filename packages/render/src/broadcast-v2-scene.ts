@@ -723,6 +723,13 @@ export function drawBroadcastV2Scene<TImage>(
       readonly verticalAnchor?: number;
       /** 見た目の進行距離（m）。省略時は注視点の真の位置 `scene.focusS`（`visual-scroll.ts` 参照） */
       readonly scrollM?: number;
+      /**
+       * ★**芝の板の送り（px・注視点の深さで）**（★2026-10-03・3 者会議の結論 A・オーナー「最後の直線で 芝が一瞬遅くなって戻る」）。
+       *   ★渡すと ★送りを `scrollPx ÷ いまの注視点の px/m` にする（★`scrollM` より優先）。
+       *   ⚠️ ★`scrollM × いまの px/m` は ★画角・寄せで px/m が少し変わると ★約 1,500m 倍で送りが動き、★画面の芝の速さが 1/3 まで落ちて戻った。
+       *   ★呼ぶ側は ★レースの初めから 固定の刻みで積んだ表（`groundPhaseTable`）を引く（★決定論・憲法 4）。
+       */
+      readonly scrollPx?: number;
     } | undefined;
     /**
      * ★テクスチャ付き透視ワールド（`world-textured.ts`）。横視点以外（コーナー・斜め・後方）で使う。
@@ -847,7 +854,9 @@ export function drawBroadcastV2Scene<TImage>(
       viewport: { width: scene.camera.width, height: scene.camera.height },
       zoom: opts.parallaxPlate.zoom ?? 1.12,
       verticalAnchor: opts.parallaxPlate.verticalAnchor ?? 0.48,
-      scrollM: opts.parallaxPlate.scrollM ?? scene.focusS,
+      scrollM: opts.parallaxPlate.scrollPx !== undefined && q0.pxPerM > 1e-9
+        ? opts.parallaxPlate.scrollPx / q0.pxPerM
+        : opts.parallaxPlate.scrollM ?? scene.focusS,
       anchorS: scene.focusS,
       projectGround: (s, w) => {
         const p = posOf(course, s, w);

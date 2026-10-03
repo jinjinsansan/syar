@@ -60,7 +60,7 @@ import {
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
   paintCrowd, seatMaskFromPixels, seatBandFromPixels,
   cameraBasis, project, HORSE_HEIGHT_M, setHorseScale,
-  buildVisualScroll, type VisualScroll, type VisualScrollSample,
+  buildVisualScroll, buildGroundPhaseTable, type GroundPhaseTable, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, pixelScaleForDisplay, PHONE_SUPERSAMPLE, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   // ★発走前の流れ（★2026-09-15・オーナー決定「動画の通り」）
@@ -393,6 +393,8 @@ function noteGroundJump(d: number, shot: string, focusS: number, visualDelta: nu
  *      → ★ここでは ★足元の地面の 1 点を 前後 2 コマのカメラで投影し、★画面での動きを 走る向きの m/秒 に直す（★板の場面は 流した量）。
  *   ★描画には使わない（★記録だけ）。
  */
+/** ★見比べの口 `?ground=legacy`: 芝の板の送りを これまでの「進行距離 × いまの px/m」で描く */
+const GROUND_LEGACY = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('ground') === 'legacy';
 const AUDIT_GROUND = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('audit') === 'ground';
 /**
  * ★**普段の見張り**（★2026-10-02・オーナー「どのレースかなんて その時でないと分からない」）: ★監査と同じ 1 コマの値を ★観戦中も作り、
@@ -424,6 +426,8 @@ let auditPrev: {
 function noteAuditGround(
   course: Parameters<typeof posOf>[0], d: number, scene: { readonly shot: { readonly id: string; readonly view: string; readonly perspectiveWorld?: boolean }; readonly camera: Parameters<typeof cameraBasis>[0]; readonly focusS: number; readonly focusW: number },
   visualDelta: number, lead: number, sec: number, horseRatio: number, raceKey: string,
+  /** ★板の送り（px）を表から引いているとき その値（★無ければ 進行距離 × いまの px/m） */
+  plateScrollPx?: number,
 ): void {
   const persp = !(scene.shot.view === 'side' && scene.shot.perspectiveWorld !== true);
   const scroll = scene.focusS + visualDelta;
@@ -457,7 +461,7 @@ function noteAuditGround(
   }
   /** ★板の場面の 芝のずれ（★`parallax-plate.ts` の式 ＝ scrollM × 注視点の px/m）と ★画面での速さ */
   const q0 = project(scene.camera, basis, { x: f0.x, y: f0.y, z: 0 });
-  const platePx = scroll * q0.pxPerM;
+  const platePx = plateScrollPx ?? scroll * q0.pxPerM;
   const platePxPerSec = prev !== null && prev.shot === scene.shot.id && d > prev.d && auditPrevPlatePx !== null ? (platePx - auditPrevPlatePx) / (d - prev.d) : null;
   auditPrevPlatePx = platePx;
   const frame: AuditGroundFrame = { d, shot: scene.shot.id, persp, groundMps, trueMps, shownMps, horseRatio, camDistM, platePx, platePxPerSec };
@@ -1411,6 +1415,8 @@ interface Built {
    *   位置・時刻・着順には触れない（時間圧縮 D-062 はそのまま）。
    */
   readonly visualScroll: VisualScroll;
+  /** ★芝の板の送りの表（★`buildGroundPhaseTable`・3 者会議の結論 A） */
+  readonly groundPhase: GroundPhaseTable;
   /** ★ゴール前のカメラの型（接戦=引く／単独=寄る）。先頭が残り 80m に達した時点の着差から決定論的に決める */
   readonly finishStyle: BroadcastV2FinishStyle;
   /**
@@ -2650,13 +2656,15 @@ function buildMotionTimeline(
   { model, warp, finishSec, finishStyle, finishChaseAt, distanceM, spec, turn }:
     Pick<Built, 'model' | 'warp' | 'finishSec' | 'finishStyle' | 'finishChaseAt' | 'distanceM' | 'spec' | 'turn'>,
   winnerGate: number, rampSec: number,
-): Pick<Built, 'visualScroll' | 'shotChanges'> {
+): Pick<Built, 'visualScroll' | 'shotChanges' | 'groundPhase'> {
   /** ★走路は ★引数から（★段 2 D）。★名前を残すのは ★下の式を動かさないため */
   const DIST = distanceM;
   const course = ovalCourse(DIST, { ...spec, turn });
   const STEP = 0.05;
   const totalSec = RACE_INTRO_RACE_START_SEC + warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
   const samples: VisualScrollSample[] = [];
+  /** ★芝の板の送りの表のための 刻みごとの 注視点の px/m（★横の板を描くのと同じカメラ） */
+  const platePpm: number[] = [];
   const shotChanges: { displaySec: number; from: BroadcastV2ShotId; to: BroadcastV2ShotId }[] = [];
   let lastShot: BroadcastV2ShotId | undefined;
   const timelineScript = scriptFromSearch(typeof window === 'undefined' ? '' : window.location.search);
@@ -2699,10 +2707,18 @@ function buildMotionTimeline(
     });
     if (lastShot !== undefined && lastShot !== scene.shot.id) shotChanges.push({ displaySec: d, from: lastShot, to: scene.shot.id });
     lastShot = scene.shot.id;
+    {
+      const fp = posOf(course, scene.focusS, scene.focusW);
+      platePpm.push(project(scene.camera, cameraBasis(scene.camera), { x: fp.x, y: fp.y, z: 0 }).pxPerM);
+    }
   }
+  const visualScroll = buildVisualScroll(samples);
   return {
-    visualScroll: buildVisualScroll(samples),
+    visualScroll,
     shotChanges,
+    groundPhase: buildGroundPhaseTable(samples.map((sm, i) => ({
+      displaySec: sm.displaySec, scrollM: sm.focusS + visualScroll.deltaAt(sm.displaySec, sm.focusS), pxPerM: platePpm[i] ?? 0,
+    }))),
   };
 }
 
@@ -5470,7 +5486,8 @@ function RaceView({ setup, real }: {
       /** ★調べるため（★2026-10-01・オーナー「芝が逆に動いた」）: 芝の模様の位置 ＝ 注視点 ＋ Δ。★描画には使わない */
       (globalThis as { __raceGround?: unknown }).__raceGround = { d, focusS: scene.focusS, visualDelta };
       noteGroundJump(d, scene.shot.id, scene.focusS, visualDelta, real?.raceId ?? null);
-      noteAuditGround(course, d, scene, visualDelta, lead, sec, v2HorseRatio, real?.raceId ?? 'demo');
+      noteAuditGround(course, d, scene, visualDelta, lead, sec, v2HorseRatio, real?.raceId ?? 'demo',
+        GROUND_LEGACY ? undefined : (motionTimeline ?? built).groundPhase.at(d));
       const metersByGate = new Map(easedAt.map((horse) => [horse.gate, horse.meters]));
       /**
        * ★**レースの音**（★2026-09-13・オーナー支給の音源）。
@@ -5666,6 +5683,8 @@ function RaceView({ setup, real }: {
             /** ★馬場で板を選ぶ（2026-08-28）。★地面の層だけが差し替わります */
             plate: surface === 'dirt' ? art.parallaxBackstretchDirt : art.parallaxBackstretch,
             zoom: 1.14, verticalAnchor: 1.0, scrollM: sceneToDraw.focusS + visualDelta,
+            /** ★送りは 表から（★3 者会議の結論 A・`buildGroundPhaseTable`）。★`?ground=legacy` で これまでの送り（★見比べの口） */
+            ...(GROUND_LEGACY ? {} : { scrollPx: (motionTimeline ?? built).groundPhase.at(d) }),
           }
           : undefined,
         // ★横視点以外（コーナー後方・俯瞰・斜め前）はテクスチャ付き透視ワールド（背景が実際に動く）
