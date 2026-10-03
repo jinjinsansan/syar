@@ -137,11 +137,10 @@ describe('★PLAN I-3: 仔の命名の確定', () => {
       expect(insertedRival(seen)).toBe(SIG_B);
     });
 
-    it('★看板馬が居るのに 選ばない → rival_required・★horses に入れない', async () => {
+    it('★看板馬が居ても 選ばなければ そのまま名付けできる（★必須ではない・裁定 §7）', async () => {
       const { client, seen } = fakeClient({ rival: null, signatures: [SIG_A] });
-      expect(await confirmFoalName(client, REQ, CTX)).toBe('failed');
-      expect(failedWith(seen)).toBe('rival_required');
-      expect(seen.some((x) => x.sql.startsWith('insert into horses'))).toBe(false);
+      expect(await confirmFoalName(client, REQ, CTX)).toBe('done');
+      expect(insertedRival(seen)).toBeNull();
     });
 
     it('★その年の看板馬でない馬 → rival_invalid・★horses に入れない', async () => {

@@ -50,8 +50,6 @@ export type FoalNameFailure =
   | 'already_named'
   /** ★下書きが無い／本人の仔ではない */
   | 'draft_not_found'
-  /** ★その仔の世代に看板馬が居るのに、★ライバルを選んでいない（★D-131・誕生のときに 1 回） */
-  | 'rival_required'
   /** ★選んだ馬が ★仔の誕生のゲーム年の 現役の看板馬ではない */
   | 'rival_invalid';
 
@@ -100,21 +98,21 @@ async function nameTaken(client: pg.ClientBase, nameKey: string): Promise<boolea
 
 /**
  * ★**ライバルを選べるか**（★D-131）。★選べる馬 ＝ ★仔の誕生のゲーム年の看板馬で ★現役（`my_rival_candidates` と同じ条件）。
- *   ★返り値 null ＝ ★その年の看板馬が 0 頭で ★選ばなかった（★null で通す・裁定 §3）。
+ *   ★返り値 null ＝ ★選ばなかった（★候補が居ても null で通す・★選ぶのは必須ではない・裁定 §7）。
+ *   ⚠️ ★必須にしない理由: ★オーナーが決めたのは「選べる」ことで、★必須にすると ★選ぶ画面より先にワーカーが入った間 名付けできなくなる（§7）。
  */
 async function checkRival(
   client: pg.ClientBase,
   birthWeek: number,
   proposed: string | null,
-): Promise<{ readonly ok: true; readonly id: string } | { readonly ok: false; readonly reason: 'rival_required' | 'rival_invalid' } | null> {
+): Promise<{ readonly ok: true; readonly id: string } | { readonly ok: false; readonly reason: 'rival_invalid' } | null> {
+  if (proposed === null) return null;
   if (!Number.isFinite(birthWeek)) throw new Error('player-naming: ★下書きの birth_week が読めません');
   const res = await client.query<{ id: string }>(
     'select id from horses where signature_year = $1 and retired_at_week is null',
     [gameYearOf(birthWeek)],
   );
-  const ids = res.rows.map((r) => r.id);
-  if (proposed === null) return ids.length === 0 ? null : { ok: false, reason: 'rival_required' };
-  return ids.includes(proposed) ? { ok: true, id: proposed } : { ok: false, reason: 'rival_invalid' };
+  return res.rows.some((r) => r.id === proposed) ? { ok: true, id: proposed } : { ok: false, reason: 'rival_invalid' };
 }
 
 /**

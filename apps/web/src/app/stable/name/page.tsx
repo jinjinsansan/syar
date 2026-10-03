@@ -70,8 +70,8 @@ const FAILURE_VIEW: Readonly<Record<NameFailureVariant, {
   /** ★D-131。★選ぶ画面はデザイナーの成果物で入れる（★それまでは この文だけ・★見た目は missing と同じ） */
   rival: {
     icon: '?', ink: '#4a5a66', bg: '#e3e8ec',
-    title: 'ライバルを選んでください',
-    text: 'この仔と同じ年に生まれた馬から、ライバルを 1 頭選んでから名前を付けます。',
+    title: 'その馬はライバルに選べません',
+    text: 'ライバルにできるのは、この仔と同じ年に生まれた馬のうち、いま走っている馬です。選び直してください。',
     primary: '選び直す',
   },
   temp: {
