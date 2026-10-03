@@ -45,7 +45,7 @@ describe('★bakeCoat の返す画布', () => {
    *   ★PNG にして `<img>` で読み直し（`asImage`）、★生垣と同じ道で描く。
    */
   it('🔴 ★スタンドの層は 焼いたあと 画像として読み直す（★画布のまま 帯の短冊に渡さない）', () => {
-    expect(PAGE).toContain("parallaxManifest.layers[index]?.name === 'stand' ? asImage(bakeCrowd(image)) : Promise.resolve(image)));");
+    expect(PAGE).toContain("parallaxManifest.layers[index]?.name === 'stand' && !CROWD_OFF ? asImage(bakeCrowd(image)) : Promise.resolve(image)));");
     const at = PAGE.indexOf('const asImage = (image: FrameImage): Promise<FrameImage> => {');
     expect(at, '★切り出せない').toBeGreaterThan(-1);
     const end = PAGE.indexOf('const parallaxImages', at);

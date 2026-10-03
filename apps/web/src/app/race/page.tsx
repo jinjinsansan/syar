@@ -401,8 +401,11 @@ const AUDIT_GROUND = typeof window !== 'undefined' && new URLSearchParams(window
  *   ★見本は どれも 'demo' だったので、★`look` を付けて 記録を分ける（★`look` が無ければ従来どおり 'demo'）。
  */
 const WATCH_KEY_WITHOUT_RACE = (() => {
-  const look = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('look');
-  return look === null || look === '' ? 'demo' : `demo-look-${look}`;
+  const q = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search);
+  const look = q?.get('look') ?? null;
+  /** ★`?crowd=0`（★スタンドに観客を焼かない見比べ）も 記録を分ける */
+  const crowd = q?.get('crowd') === '0' ? '-crowd0' : '';
+  return look === null || look === '' ? `demo${crowd}` : `demo-look-${look}${crowd}`;
 })();
 /**
  * ★**普段の見張り**（★2026-10-02・オーナー「どのレースかなんて その時でないと分からない」）: ★監査と同じ 1 コマの値を ★観戦中も作り、
@@ -3644,8 +3647,12 @@ function RaceView({ setup, real }: {
           }, 'image/png');
         });
       };
+      /**
+       * ★見比べの口 `?crowd=0`（★2026-10-04・レビュー側: 焼き そのものが重さの原因かを 1 回で切り分ける）: ★スタンドに観客を焼かず 元の `stand.png` のまま描く。
+       */
+      const CROWD_OFF = new URLSearchParams(window.location.search).get('crowd') === '0';
       const parallaxImages: FrameImage[] = await Promise.all(parallaxRaw.map((image, index) =>
-        parallaxManifest.layers[index]?.name === 'stand' ? asImage(bakeCrowd(image)) : Promise.resolve(image)));
+        parallaxManifest.layers[index]?.name === 'stand' && !CROWD_OFF ? asImage(bakeCrowd(image)) : Promise.resolve(image)));
       const objectImages = await Promise.all(parallaxManifest.objects.map((object) =>
         loadImg(`/art/parallax/backstretch-side-v1/${object.file}?v=${ASSET_VERSION}`)));
       const [worldTurfImg, worldPanoImg, worldTreesImg, worldDirtImg] = await Promise.all([
