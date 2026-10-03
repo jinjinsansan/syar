@@ -16,7 +16,7 @@
  *   → ★貼る範囲は ★**首の切れ目の線より前 全部**（`--cut`・★頭・鼻・顎・まわりの背景まで丸ごと お手本で置き換える）。
  *     ★元の顔は 1 画素も残らない。★混ぜるのは 首の切れ目の線の近く（`--feather`）だけ。
  *
- * 実行: node tools/stabilize-mare-head.mjs --fam side-v8 [--master 1] --head "cx,cy,rx,ry" --cut "x1,y1,x2,y2" --ybounds "y0,y1" [--feather 14]
+ * 実行: node tools/stabilize-mare-head.mjs --fam side-v8 [--master 1] --head "cx,cy,rx,ry" --cut "x1,y1,x2,y2" --ybounds "y0,y1" [--feather 14] [--frames "3,4,5"]
  *   ★`--head` は 頭の動きを測る範囲（楕円）。★`--cut` は 首の切れ目（★画布の割合の 2 点・★右＝頭の側を置き換える）。
  *   ★書き出しは `apps/web/public/art/horse-jockey-<組>m-poseNN.png` と `.webp`（★上書き・★元は git にある）
  */
@@ -35,6 +35,12 @@ const [yb0, yb1] = arg('--ybounds', '0,1').split(',').map(Number);
  * ★`--floor "x1,y1,x2,y2"`（★任意）: ★この線より下は置き換えない（★顎の下に沿わせる）。
  *   ★走りは 前脚が頭の下まで伸びるので、★`--cut` の右を全部置き換えると ★前脚の欠片が混ざった（★2026-10-03 撮って確認）。
  */
+/**
+ * ★`--frames "3,4,5"`（★任意）: ★置き換えるコマ（★既定は 8 コマ全部）。
+ *   ★斜め前は ★牡馬の元のコマでも 1・2 コマが横向き・3〜8 コマが正面で ★頭の向きそのものが変わる（★2026-10-03 撮って確認）。
+ *   ★向きの違うコマに お手本の顔を貼ると 向きが壊れるので、★同じ向きのコマだけを 1 組にする。
+ */
+const onlyFrames = arg('--frames', null)?.split(',').map(Number) ?? null;
 const floorArg = arg('--floor', null);
 const floor = floorArg === null ? null : floorArg.split(',').map(Number);
 const nn = (i) => String(i).padStart(2, '0');
@@ -96,6 +102,7 @@ const mareM = await rgba(`${ART}/horse-jockey-${fam}m-pose${nn(master)}.png`);
 const cx = hcx * stallionM.w, cy = hcy * stallionM.h, rx = hrx * stallionM.w, ry = hry * stallionM.h;
 for (let i = 1; i <= 8; i += 1) {
   if (i === master) { console.log(`コマ ${i}: お手本（そのまま）`); continue; }
+  if (onlyFrames !== null && !onlyFrames.includes(i)) { console.log(`コマ ${i}: 対象外（そのまま）`); continue; }
   const stallion = await rgba(`${ART}/horse-jockey-${fam}-pose${nn(i)}.png`);
   const mare = await rgba(`${ART}/horse-jockey-${fam}m-pose${nn(i)}.png`);
   const t = fitHead(stallionM, stallion, cx, cy, rx, ry);
