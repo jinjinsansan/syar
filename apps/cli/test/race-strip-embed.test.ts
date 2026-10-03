@@ -146,7 +146,11 @@ describe('★小窓で本編を流す約束', () => {
     /** ★芝は跳びの区間で注視点の進みに合わせる（★`visual-scroll.ts`・後退しない） */
     /** ★2026-10-02: ★さらに 芝の最後の安全網（`createGroundSmoother`）を通す */
     expect(PAGE).toContain('const rawDelta = visualScroll.deltaAt(d, scene.focusS);');
-    expect(PAGE).toContain('smoothGround(d, scene.shot.id, scene.focusS, rawDelta,');
+    /** ★芝の安全網は外した（★10-03・3 者会議 §3）: ★芝は 表どおり */
+    expect(PAGE).toContain('const visualDelta = rawDelta;');
+    expect(PAGE).not.toContain('smoothGround(');
+    /** ★画面の時計は 壁の時計どおり（★09-29 オーナー決定） */
+    expect(PAGE).not.toContain('nextShownTime(');
     /** ★脚は 安全網を通す前の値（★2026-10-03・発走で 脚の止まった馬が滑った） */
     expect(PAGE).toContain('const gaitDelta = rawDelta - visualScroll.deltaAt(RACE_INTRO_RACE_START_SEC);');
   });

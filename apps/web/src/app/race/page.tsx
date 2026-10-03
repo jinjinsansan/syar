@@ -60,7 +60,7 @@ import {
   drawFormationBar, drawHorseNamePlates, drawOwnHorseMarker, referenceNamePlateRows,
   paintCrowd, seatMaskFromPixels, seatBandFromPixels,
   cameraBasis, project, HORSE_HEIGHT_M, setHorseScale,
-  buildVisualScroll, createGroundSmoother, nextShownTime, type GroundSmoother, type VisualScroll, type VisualScrollSample,
+  buildVisualScroll, type VisualScroll, type VisualScrollSample,
   type BroadcastV2FrameLibraries, type ParallaxPlate, type TexturedWorldAssets, type WorldBillboard,
   drawCourseMinimap, drawTexturedWorld, posOf, horseOverlapRatio, DEFAULT_ALIGN_TO_TRACK, pixelScaleForDisplay, PHONE_SUPERSAMPLE, RACE_INTRO_FLYOVER_SEC, RACE_INTRO_TITLE_END_SEC,
   // ★発走前の流れ（★2026-09-15・オーナー決定「動画の通り」）
@@ -364,16 +364,6 @@ function noteIntroFrameGap(d: number, stage: string, raceId: string | null): voi
 }
 let groundPrev: { readonly d: number; readonly shot: string; readonly x: number; readonly f: number; readonly v: number; readonly speed: number | null; readonly wall: number } | null = null;
 const groundLastWarn = new Map<string, number>();
-/**
- * ★**芝の最後の安全網**（★2026-10-02・`createGroundSmoother`）。★レースが変わったら 作り直す。★カメラの切り替わりは 前のコマのショットと比べる。
- */
-let groundSmooth: { readonly key: string; readonly smoother: GroundSmoother; shot: string | null } | null = null;
-function smoothGround(d: number, shot: string, focusS: number, visualDelta: number, raceKey: string): number {
-  if (groundSmooth === null || groundSmooth.key !== raceKey) groundSmooth = { key: raceKey, smoother: createGroundSmoother(), shot: null };
-  const cut = groundSmooth.shot !== null && groundSmooth.shot !== shot;
-  groundSmooth.shot = shot;
-  return groundSmooth.smoother.step(d, focusS + visualDelta, cut) - focusS;
-}
 function noteGroundJump(d: number, shot: string, focusS: number, visualDelta: number, raceId: string | null): void {
   const x = focusS + visualDelta;
   const wall = performance.now();
@@ -5467,7 +5457,10 @@ function RaceView({ setup, real }: {
       /** ★注視点も渡す（★跳びの区間で芝が戻らない・`visual-scroll.ts`） */
       /** ★芝の最後の安全網を通す（★1 コマで跳ねない・止まらない・戻らない・`createGroundSmoother`） */
       const rawDelta = visualScroll.deltaAt(d, scene.focusS);
-      const visualDelta = smoothGround(d, scene.shot.id, scene.focusS, rawDelta, `${real?.raceId ?? 'demo'}:${seed}`);
+      /**
+       * ⚠️ ★芝の安全網（★10-02 `createGroundSmoother`）は 外した（★10-03・3 者会議 §3: 本当の動きを書き換え 発走で脚を止めた・トーンダウンの一因）。
+       */
+      const visualDelta = rawDelta;
       /**
        * ★**脚は 安全網を通す前の値で回す**（★2026-10-03・オーナー「発走の瞬間 馬の足が動かず 静止画の馬が横向きに移動」）。
        *   ⚠️ ★安全網は 芝が 1 コマで急に速くなると 0.4 秒 前の速さに抑える。★発走で芝が 0 から速くなる所で 芝を止め、
@@ -6757,17 +6750,12 @@ function RaceView({ setup, real }: {
     const fromSec = dRef.current;
     t0Ref.current = performance.now();
     /**
-     * ★**画面の時刻は 1 コマで大きく飛ばさない**（★2026-10-03・`nextShownTime`）。★コマ落ちの後は 1/30 秒ずつ進めて 2 割増しで取り戻す。
-     *   ★旧: ★壁の時計どおり → ★コマ落ち 0.2〜0.4 秒で 芝が 1 コマ 3〜6m 進み、★刈り目の縞が逆に流れて見えた（★オーナー「逆回転・超高速」）。
+     * ★**画面の時刻は 壁の時計どおり**（★09-29 オーナー決定「時計を 1 本に」・10-01 レビュー側「dt に上限を付けない」）。
+     *   ⚠️ ★10-03 に入れた制限（★1 コマ 1/30 秒・1.2 倍で追いつく `nextShownTime`）は 外した（★3 者会議 §3: 急に遅く・速くする それ自体が症状）。
      */
-    let shownD = fromSec;
-    let lastWall = t0Ref.current;
     const loop = (): void => {
       const now = performance.now();
-      const target = fromSec + (now - t0Ref.current) / 1000 * playbackRate;
-      shownD = nextShownTime(shownD, target, (now - lastWall) / 1000 * playbackRate);
-      lastWall = now;
-      const d = shownD;
+      const d = fromSec + (now - t0Ref.current) / 1000 * playbackRate;
       // ゴール後はランアウト→勝者紹介→正式着順まで5.2秒確保する。
       const totalDisplaySec = RACE_INTRO_RACE_START_SEC + built.warp.displaySec + POST_RACE_SEC + FINISH_REPLAY_DISPLAY_SEC;
       if (d >= totalDisplaySec) {
