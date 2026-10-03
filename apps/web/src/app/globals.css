@@ -183,13 +183,13 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
   /* ⚠️ ★`190px` は 2026-09-19 に外しました — ★`/setup` の脚質の枠が唯一の使い手で、
      ★UI1-8 で **その枠ごと消えました**（★脚質は `horses` に無い）。
      ★残しておくと `mobile-css-anchors.test.ts` が「黙って効かない規則」として落とします。 */
-  main [style*="flex:0 0 150px"], main [style*="flex:0 0 196px"],
+  /* ⚠️ ★`150px`・`200px`・`252px` を 2026-10-03 に外しました（★`/stable/<id>` の旧い表が唯一の使い手・★d214f96 R-26 で カードに組み直して 消えました） */
+  main [style*="flex:0 0 196px"],
   /* ⚠️ ★`250px` を 2026-09-21 に外しました — ★`/setup` の勝負服のプレビュー枠が
      ★唯一の使い手で、★**既存の部品で組み直したときに消えました**（★オーナー判断「B」）。
      ★残しておくと `mobile-css-anchors.test.ts` が「黙って効かない規則」として落とします。
      ★★実際、その検査が拾いました。 */
-  main [style*="flex:0 0 200px"], main [style*="flex:0 0 230px"],
-  main [style*="flex:0 0 252px"],
+  main [style*="flex:0 0 230px"],
   /* ⚠️ ★`280px`・`290px` を 2026-09-30 に外しました（★旧 `/training` が唯一の使い手・★`/train` へ畳んだ） */
   /* ⚠️ ★`334px` を 2026-09-25 に外しました（★`/prizes` が唯一の使い手・★同上） */
   /* ⚠️ ★`340px` を 2026-09-27 に外しました（★`/entry` が唯一の使い手・★馬物語 UI へ移した） */
@@ -221,8 +221,8 @@ html:has(> body[data-theme="arcade"]) { overflow-x: hidden; }
      ★★実際、その検査が拾いました（★`250px` のときと同じ形・2 度目）。 */
   /* ⚠️ ★`360px` を 2026-09-27 に外しました（★`/entry` が唯一の使い手・★馬物語 UI へ移した） */
   /* ⚠️ ★`min-width:280px` を 2026-09-30 に外しました（★旧 `/training` が唯一の使い手） */
-  main [style*="min-width:240px"],
-  main [style*="min-width:420px"] { min-width: 0 !important; }
+  /* ⚠️ ★`min-width:420px` を 2026-10-03 に外しました（★`/stable/<id>` が唯一の使い手・★d214f96 R-26 で消えました） */
+  main [style*="min-width:240px"] { min-width: 0 !important; }
 
   /*
    * ★`/race` のシーク列（★撮影用）。
