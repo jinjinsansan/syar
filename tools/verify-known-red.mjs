@@ -14,11 +14,20 @@
  * ⚠️ ★これは ★**状態を変えない道具**です（★分類: READ_ONLY）。
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { KNOWN_RED, diffAgainstRegistry } from './lib/known-red.mjs';
 
+/**
+ * ★**合格した HEAD を記録する**（★2026-10-03・レビュー側 §8-11「同じ失敗の再発は仕組みで止める」）。
+ *   ★全体の検査を流さずにコミットして push したのが 同じ日に 2 回（44acee4・cc2088c）。
+ *   ★合格したときだけ `.git/star-verified-head` に ★検査を始めた時点の HEAD を書く。★`tools/hooks/pre-push` が これと送る先頭を突き合わせる。
+ *   ★HEAD は 検査の前に読む（★検査の途中のコミットを 合格に含めない）。
+ */
+const gitOut = (args) => { const r = spawnSync('git', args, { encoding: 'utf8' }); return r.status === 0 ? r.stdout.trim() : null; };
+const testedHead = gitOut(['rev-parse', 'HEAD']);
+const gitDir = gitOut(['rev-parse', '--git-dir']);
 const dir = mkdtempSync(path.join(tmpdir(), 'star-known-red-'));
 const jsonPath = path.join(dir, 'result.json');
 
@@ -125,3 +134,7 @@ if (bad) {
   process.exit(1);
 }
 console.log('\n✅ ★合格（★赤は登録簿のとおり）');
+if (testedHead !== null && gitDir !== null) {
+  writeFileSync(path.join(gitDir, 'star-verified-head'), `${testedHead}\n`);
+  console.log(`  ★合格した HEAD を記録しました（${testedHead.slice(0, 7)}・push の前の確かめ tools/hooks/pre-push が読む）`);
+}

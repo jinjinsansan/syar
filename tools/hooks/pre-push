@@ -1,0 +1,24 @@
+#!/bin/sh
+# ★push の前に「全体の検査に合格した先頭か」を確かめる（★2026-10-03・レビュー側 §8-11）。
+#   ★全体の検査（npm run verify:red）を流さずにコミットして push したのが 同じ日に 2 回（44acee4・cc2088c）。
+#   ★検査そのものは ここでは流さない（★数分かかり push のたびに待たせる）。
+#   ★`npm run verify:red` が合格したとき `.git/star-verified-head` に書いた HEAD と、★送る先頭を突き合わせるだけ。
+#   ★有効にする: git config core.hooksPath tools/hooks
+#   ★どうしても今 送る（★検査を流せない理由があるとき）: git push --no-verify（★理由を報告に書く）
+git_dir=$(git rev-parse --git-dir) || exit 1
+marker="$git_dir/star-verified-head"
+verified=""
+[ -f "$marker" ] && verified=$(head -n 1 "$marker" | tr -d '\r\n ')
+zero=0000000000000000000000000000000000000000
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # ★消す push（local_sha が 0）は 確かめない
+  [ "$local_sha" = "$zero" ] && continue
+  if [ "$local_sha" != "$verified" ]; then
+    echo "" >&2
+    echo "★push を止めました: 送る先頭 ${local_sha%"${local_sha#???????}"} は 全体の検査に合格していません。" >&2
+    if [ -n "$verified" ]; then echo "  ★最後に合格した先頭: ${verified%"${verified#???????}"}" >&2; else echo "  ★合格の記録がありません。" >&2; fi
+    echo "  → 開発側が npm run verify:red を流して 合格してから、もう一度 push してください。" >&2
+    exit 1
+  fi
+done
+exit 0
