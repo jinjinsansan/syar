@@ -1,0 +1,890 @@
+{
+ "horse-jockey-side-walk-v1": [
+  {
+   "file": "horse-jockey-side-walk-v1-pose01.png",
+   "sha1": "e05f669a53205dd8013006ff953d762462c9eb20",
+   "counts": [
+    11080,
+    33825,
+    21658
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1-pose02.png",
+   "sha1": "9e973515abf522a1e85ed7ffb5ba07260b50143a",
+   "counts": [
+    10989,
+    33368,
+    21952
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1-pose03.png",
+   "sha1": "3e8a4458aeb006976909e6f7b565dc91ec6bbf4c",
+   "counts": [
+    10762,
+    32887,
+    21541
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1-pose04.png",
+   "sha1": "a3e0f8f628be37ddd714f89d634ee98c65f48235",
+   "counts": [
+    10720,
+    33171,
+    21589
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1-pose05.png",
+   "sha1": "fb2102020a3c018017f937bec603877bcf1be97f",
+   "counts": [
+    10720,
+    33069,
+    21478
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1-pose06.png",
+   "sha1": "b483fdf6eb3173da91917601bf95d04d11e51c7c",
+   "counts": [
+    10935,
+    33855,
+    21908
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1-pose07.png",
+   "sha1": "c4983ad22f23bfbf159e936cc49304ba2438b102",
+   "counts": [
+    10799,
+    33346,
+    21458
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1-pose08.png",
+   "sha1": "815ca34fe8dfd2ee379055654887ab2bb2f863f8",
+   "counts": [
+    10722,
+    32450,
+    21254
+   ]
+  }
+ ],
+ "horse-jockey-side-v8": [
+  {
+   "file": "horse-jockey-side-v8-pose01.png",
+   "sha1": "f5a129128ab80e02263acbfd320b39841d3b603b",
+   "counts": [
+    6004,
+    12296,
+    7097
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8-pose02.png",
+   "sha1": "ed3a9c2232373533782e417a1a44b99a1e989550",
+   "counts": [
+    6175,
+    12852,
+    7301
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8-pose03.png",
+   "sha1": "7f650eddad905d731fd4cded05f8f2dfbdd5756f",
+   "counts": [
+    5627,
+    12602,
+    7386
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8-pose04.png",
+   "sha1": "4b1dc4687a515e306cb68552cecc6804a5ed8b30",
+   "counts": [
+    5938,
+    13168,
+    7792
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8-pose05.png",
+   "sha1": "0fba9059185627bee0c61db8008d83d3c2c27f5e",
+   "counts": [
+    5332,
+    11840,
+    6775
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8-pose06.png",
+   "sha1": "1960c92205c5e49423e2aba7aba4bdd7ed14ad01",
+   "counts": [
+    5215,
+    11905,
+    6466
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8-pose07.png",
+   "sha1": "6c8eeaf0dcbd72e666fadf5c9c698175141d309c",
+   "counts": [
+    5240,
+    11762,
+    7585
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8-pose08.png",
+   "sha1": "4ab87dfd0f3664c466ab4d351ca0c7a42353921a",
+   "counts": [
+    5303,
+    12155,
+    7319
+   ]
+  }
+ ],
+ "horse-jockey-side-v8b": [
+  {
+   "file": "horse-jockey-side-v8b-pose01.png",
+   "sha1": "6a244423cc4602007a3b9f8ebb7d8513647c2255",
+   "counts": [
+    5247,
+    10257,
+    5978
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8b-pose02.png",
+   "sha1": "b3fb20f628426dff92809c23b75b1073ee5f542c",
+   "counts": [
+    5899,
+    11878,
+    6652
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8b-pose03.png",
+   "sha1": "630de608e769b30b4a8eb6fb29b013b922aff2c6",
+   "counts": [
+    5482,
+    11748,
+    6664
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8b-pose04.png",
+   "sha1": "653fee3319ee87458545a5726e317dff96ed14d5",
+   "counts": [
+    5092,
+    10876,
+    6307
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8b-pose05.png",
+   "sha1": "8ace82bf01ff042d12ad736ec0fc17773a29ea3d",
+   "counts": [
+    5154,
+    10862,
+    6105
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8b-pose06.png",
+   "sha1": "5059f0393f481ba2674483b993bff6eb9c1b7675",
+   "counts": [
+    5051,
+    10008,
+    6173
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8b-pose07.png",
+   "sha1": "dbc371859c151e4962ff9ee86595e5a27e28a597",
+   "counts": [
+    5894,
+    8610,
+    6685
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8b-pose08.png",
+   "sha1": "d4eb05f41adfcc3c2afa071c224021552afa87a2",
+   "counts": [
+    4682,
+    9674,
+    6243
+   ]
+  }
+ ],
+ "horse-jockey-side-v8m": [
+  {
+   "file": "horse-jockey-side-v8m-pose01.png",
+   "sha1": "cc1cc955af0950e8ef7f6290eb356d97b3401c82",
+   "counts": [
+    5753,
+    12215,
+    7224
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8m-pose02.png",
+   "sha1": "f1bf564c701e23d7f50cdf8ac9e804150a03bd8d",
+   "counts": [
+    5949,
+    12971,
+    7432
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8m-pose03.png",
+   "sha1": "63669455eedec1065b7468940160e186a4422df8",
+   "counts": [
+    5685,
+    12383,
+    7464
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8m-pose04.png",
+   "sha1": "f53459f84d148b06fe69c362071adaa85fcf74e0",
+   "counts": [
+    5898,
+    13305,
+    7919
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8m-pose05.png",
+   "sha1": "be695fc2b1f7a49fbadce748b45e8b568176a664",
+   "counts": [
+    5293,
+    12314,
+    7049
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8m-pose06.png",
+   "sha1": "fb3a95ab025f7d1990dce61226b36a70f8eb6998",
+   "counts": [
+    5273,
+    11995,
+    6571
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8m-pose07.png",
+   "sha1": "f9d4394600740319dc447bd0ce1f84776d960afd",
+   "counts": [
+    5055,
+    11733,
+    7783
+   ]
+  },
+  {
+   "file": "horse-jockey-side-v8m-pose08.png",
+   "sha1": "9eaa0eb2be2d312dd885b9a2bec93f6fe1276c30",
+   "counts": [
+    5544,
+    12473,
+    7455
+   ]
+  }
+ ],
+ "horse-jockey-diag-front-v4": [
+  {
+   "file": "horse-jockey-diag-front-v4-pose01.png",
+   "sha1": "c1a2ba0dcb8575d77e68c931695577e6bed88227",
+   "counts": [
+    3838,
+    5517,
+    3062
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4-pose02.png",
+   "sha1": "e514f87fc4abd3533862c7e06bf59688be6369c5",
+   "counts": [
+    3738,
+    4991,
+    2740
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4-pose03.png",
+   "sha1": "e4c3d7f7cf9e1e2249b492dd02fcd3fb61c0b5c6",
+   "counts": [
+    3539,
+    4358,
+    2629
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4-pose04.png",
+   "sha1": "c8b6717d345c574216eb472e35b6ad6db670866c",
+   "counts": [
+    4139,
+    4367,
+    2713
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4-pose05.png",
+   "sha1": "21d97e2084c94aa68fcde6ae231b05bd35d61c28",
+   "counts": [
+    4133,
+    4483,
+    2489
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4-pose06.png",
+   "sha1": "c6cb8c4d3b2b28de840c6b2048ec579a8a5dd9f3",
+   "counts": [
+    3771,
+    4356,
+    2391
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4-pose07.png",
+   "sha1": "0374e64c66f44c316132b616f42d8b060d57cb5a",
+   "counts": [
+    3945,
+    4676,
+    2759
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4-pose08.png",
+   "sha1": "3325fdb0480571a62f513255c92d4c0c08c84e99",
+   "counts": [
+    3767,
+    4559,
+    2046
+   ]
+  }
+ ],
+ "horse-jockey-diag-front-v4b": [
+  {
+   "file": "horse-jockey-diag-front-v4b-pose01.png",
+   "sha1": "ddbf234bd96fc986655d5ca254b5a5f37ecdd455",
+   "counts": [
+    3204,
+    4146,
+    2160
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4b-pose02.png",
+   "sha1": "90dbc32f9e5c41fc093422023f8c74dba3d4a8c9",
+   "counts": [
+    3808,
+    5177,
+    2505
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4b-pose03.png",
+   "sha1": "9f14699d31099649d99c636ce5e2fe293a7a89c9",
+   "counts": [
+    4037,
+    3902,
+    2136
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4b-pose04.png",
+   "sha1": "e853b544f4e9c853ab8e3ce86e7ac3e4b7ba3e69",
+   "counts": [
+    4252,
+    4162,
+    1862
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4b-pose05.png",
+   "sha1": "6313682b80f8d2d64b456a0731fd4b7dc5973ccc",
+   "counts": [
+    3656,
+    4122,
+    2099
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4b-pose06.png",
+   "sha1": "7a549e7f71cab2b5bae7267b95b10a9bcd686742",
+   "counts": [
+    3434,
+    3132,
+    2165
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4b-pose07.png",
+   "sha1": "0806aebb569f2ff0c10aa1bf8432d6d3513bb858",
+   "counts": [
+    3270,
+    3336,
+    2181
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4b-pose08.png",
+   "sha1": "2ec705f9e0adc0d1648de912912c34882edc5ded",
+   "counts": [
+    3027,
+    3480,
+    1960
+   ]
+  }
+ ],
+ "horse-jockey-diag-front-v4m": [
+  {
+   "file": "horse-jockey-diag-front-v4m-pose01.png",
+   "sha1": "a9269523abda2d8ca8f72525e3ff3d29d53d000a",
+   "counts": [
+    3928,
+    6023,
+    3119
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4m-pose02.png",
+   "sha1": "a3e4116b84a45005bbdbdcdb0d431c290c2ba470",
+   "counts": [
+    3773,
+    5308,
+    2830
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4m-pose03.png",
+   "sha1": "5583045428fb57b0a6fa6762b0446a133890af41",
+   "counts": [
+    3618,
+    4500,
+    2654
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4m-pose04.png",
+   "sha1": "8c51e17043c9aff0e1d63357ed2be7f4bfdfd821",
+   "counts": [
+    4216,
+    4583,
+    2725
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4m-pose05.png",
+   "sha1": "4124621573c51351150424ff0ae26a388953c3f8",
+   "counts": [
+    4101,
+    4601,
+    2522
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4m-pose06.png",
+   "sha1": "1571ff1219a3cb221d74198af30f5e7175c2f0e6",
+   "counts": [
+    3804,
+    4454,
+    2391
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4m-pose07.png",
+   "sha1": "ffe3047c4716ae7840b9e40d4ae46789e00c79f0",
+   "counts": [
+    3896,
+    5090,
+    2810
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-front-v4m-pose08.png",
+   "sha1": "69c51b4f9ff02cbd6e7cdd711f7b4d7c65daaef8",
+   "counts": [
+    3741,
+    4681,
+    2022
+   ]
+  }
+ ],
+ "horse-jockey-diag-rear-v5": [
+  {
+   "file": "horse-jockey-diag-rear-v5-pose01.png",
+   "sha1": "96655cf9ce3a2b2e10bd4fef6751ecc857a2a698",
+   "counts": [
+    615,
+    7201,
+    1164
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5-pose02.png",
+   "sha1": "136877ab97a9a505085719dcae2f82ec1dbfaace",
+   "counts": [
+    589,
+    7467,
+    1259
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5-pose03.png",
+   "sha1": "c2f6581c54fca1e8082c33bf144014166c738b0a",
+   "counts": [
+    606,
+    7039,
+    1220
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5-pose04.png",
+   "sha1": "154f063e97670752c180deb481fb13abee4ebae8",
+   "counts": [
+    585,
+    7167,
+    1072
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5-pose05.png",
+   "sha1": "e0e9744cb346cee6d1a807688df5a26e36abef76",
+   "counts": [
+    645,
+    7666,
+    1134
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5-pose06.png",
+   "sha1": "35bb0fef13847f2b10ba39018d8819c1cd023a41",
+   "counts": [
+    654,
+    7497,
+    958
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5-pose07.png",
+   "sha1": "29534f0baee34060b14123fdac815152f91cef4d",
+   "counts": [
+    593,
+    7266,
+    1113
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5-pose08.png",
+   "sha1": "4ef75765f0c838cf7f00e9d136c5e4c319cf3aa5",
+   "counts": [
+    636,
+    7798,
+    1105
+   ]
+  }
+ ],
+ "horse-jockey-diag-rear-v5m": [
+  {
+   "file": "horse-jockey-diag-rear-v5m-pose01.png",
+   "sha1": "ae1764ae62c3bf8a36c4a797b4b76ab078fd27eb",
+   "counts": [
+    625,
+    7337,
+    1147
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5m-pose02.png",
+   "sha1": "1f30785f3b0c399bd19b9d759db6394b024043c0",
+   "counts": [
+    611,
+    7503,
+    1269
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5m-pose03.png",
+   "sha1": "7232aa577f8a30877d3a21a189e78173db491041",
+   "counts": [
+    653,
+    7025,
+    1186
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5m-pose04.png",
+   "sha1": "2632641e949023a400d2e39aa80a3e63cbf93ba3",
+   "counts": [
+    630,
+    7322,
+    1067
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5m-pose05.png",
+   "sha1": "da6c0172c6c36829da8b797e5e5fb4a735873b53",
+   "counts": [
+    665,
+    7689,
+    1095
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5m-pose06.png",
+   "sha1": "680a2d821a2ad133066801362d427c48d341de6e",
+   "counts": [
+    688,
+    7702,
+    992
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5m-pose07.png",
+   "sha1": "af850f42dbf44e1c7deb59aced117f5b7ab85244",
+   "counts": [
+    631,
+    7245,
+    1070
+   ]
+  },
+  {
+   "file": "horse-jockey-diag-rear-v5m-pose08.png",
+   "sha1": "99becd2537d2d5d3facc3386fa7ef12585baa1c5",
+   "counts": [
+    654,
+    8194,
+    1079
+   ]
+  }
+ ],
+ "horse-jockey-high-diag-v4": [
+  {
+   "file": "horse-jockey-high-diag-v4-pose01.png",
+   "sha1": "0256363d655dd10880f2af67985bf522a896e1c4",
+   "counts": [
+    527,
+    4127,
+    1878
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4-pose02.png",
+   "sha1": "22cef7a8e60a60ff552454ee40f21ee4e87b2b00",
+   "counts": [
+    501,
+    3757,
+    2217
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4-pose03.png",
+   "sha1": "4917ca9d51f60791d6acae6065484cdc08763566",
+   "counts": [
+    519,
+    3892,
+    2224
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4-pose04.png",
+   "sha1": "ad53b704c47a483f3ad164fd93a4c8eca6c0965b",
+   "counts": [
+    511,
+    3830,
+    2229
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4-pose05.png",
+   "sha1": "40d095d0cda4d1468e858e4b5f354d7b50b76007",
+   "counts": [
+    529,
+    4355,
+    1866
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4-pose06.png",
+   "sha1": "5afffffcc0de1c984cb4dc9b91aefe440009c20d",
+   "counts": [
+    518,
+    4514,
+    1880
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4-pose07.png",
+   "sha1": "e12c48a7ddbe797dd8aea3e5bb906338dac7a030",
+   "counts": [
+    474,
+    3943,
+    2339
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4-pose08.png",
+   "sha1": "b30473539fe36dd2cf26d648f62d38dbde2c7e1a",
+   "counts": [
+    506,
+    3959,
+    1865
+   ]
+  }
+ ],
+ "horse-jockey-high-diag-v4m": [
+  {
+   "file": "horse-jockey-high-diag-v4m-pose01.png",
+   "sha1": "d3fc9dbbba32dd51b0bf9aa0521f107586ca18e2",
+   "counts": [
+    361,
+    3762,
+    1771
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4m-pose02.png",
+   "sha1": "fff24e477acf4af85e84e77316b90482c56d6c7e",
+   "counts": [
+    499,
+    3807,
+    1738
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4m-pose03.png",
+   "sha1": "b89c71fc9d541966533f745501e8f2a6e4f8b097",
+   "counts": [
+    546,
+    4326,
+    1867
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4m-pose04.png",
+   "sha1": "2b411aad9d0a1d146954c5a0c376549be8ec9f03",
+   "counts": [
+    344,
+    3760,
+    1965
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4m-pose05.png",
+   "sha1": "9e2013c013de219a6c7eebd539ffe015336249d2",
+   "counts": [
+    374,
+    3872,
+    2038
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4m-pose06.png",
+   "sha1": "3e4696617bee0e90006efd5c2091628220ef701c",
+   "counts": [
+    347,
+    4609,
+    1634
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4m-pose07.png",
+   "sha1": "124ae023a719950c65adcab55b53fd6d0661b8ca",
+   "counts": [
+    458,
+    3977,
+    2140
+   ]
+  },
+  {
+   "file": "horse-jockey-high-diag-v4m-pose08.png",
+   "sha1": "65cccc4bf12b5287e9756d0d3fb33c8faa0b83f4",
+   "counts": [
+    440,
+    4169,
+    1784
+   ]
+  }
+ ],
+ "horse-jockey-side-walk-v1m": [
+  {
+   "file": "horse-jockey-side-walk-v1m-pose01.png",
+   "sha1": "efbbd433f8b48d23129b1fc0aa6e53e65d2d4559",
+   "counts": [
+    10955,
+    33416,
+    21624
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1m-pose02.png",
+   "sha1": "fda942bef14726c8680c231cd31c1f8c6d8dfb8f",
+   "counts": [
+    10807,
+    32865,
+    21851
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1m-pose03.png",
+   "sha1": "fc20a43d22590d4a0a9923c121e13f6805373e88",
+   "counts": [
+    10567,
+    32307,
+    21368
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1m-pose04.png",
+   "sha1": "d3bcdd869c0099ce6fc34aa45c8eafa79f9ea268",
+   "counts": [
+    10638,
+    32413,
+    21366
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1m-pose05.png",
+   "sha1": "9322db9805bad2119245752aed403a428e8bd70e",
+   "counts": [
+    10614,
+    32936,
+    21606
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1m-pose06.png",
+   "sha1": "3279e211b2616cce828b41ef80dad1e0243868d1",
+   "counts": [
+    10880,
+    33096,
+    21932
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1m-pose07.png",
+   "sha1": "dbec27f60f1ff3b309d669691df8ba60b92b180e",
+   "counts": [
+    10772,
+    33336,
+    21462
+   ]
+  },
+  {
+   "file": "horse-jockey-side-walk-v1m-pose08.png",
+   "sha1": "44ee2297a9d1ac8e6b169b95c8b5cb783668e79e",
+   "counts": [
+    10658,
+    32162,
+    21199
+   ]
+  }
+ ]
+}

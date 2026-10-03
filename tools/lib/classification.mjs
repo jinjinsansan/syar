@@ -670,6 +670,8 @@ export const READONLY = [
   'publish-race-mare.mjs',
   // ★牝馬の顔を 8 コマで同じにする（★お手本の顔を 牡馬の頭の動きに合わせて貼る・画像を書くだけ）
   'stabilize-mare-head.mjs',
+  // ★騎手の服の型（マスク）を 素材から 1 度だけ作る（★画像を書くだけ・3 者会議の結論 B）
+  'build-silks-masks.ts',
   // ★芝とカメラの監査（★手元の /race?audit=ground を画面の裏で開いて読むだけ・DB に触れない）
   'audit-race-ground.mjs',
   // ★ダートの地面タイルを焼く（画像を書くだけ・DB に触れない）
