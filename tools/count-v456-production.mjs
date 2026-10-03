@@ -40,9 +40,19 @@ try {
   console.log(`  接続先: app_environment = ${envRow?.env}`);
   console.log(`  ★合計に入れるのは 発走が ${since} 以降のレース（★日ごとの表は すべて出す）`);
 
+  /**
+   * ★**ライバル枠（D-131）で NPC を入れたレース**（★移行 `0104` の `race_entries.via_rival`・裁定 REVIEW_D126_D131_MINIMAL_VERDICT §4 ③）。
+   *   ★V-4/V-5/V-6 を ★**含めた数と 除いた数の両方**で出す（★枠が世界の数を動かしていないかを分けて見る）。
+   *   ★列が無い環境（★0104 の前）では ★全レースが「枠なし」。★そのことを行に出す。
+   */
+  const hasViaRival = (await c.query(
+    "select 1 from information_schema.columns where table_name = 'race_entries' and column_name = 'via_rival'",
+  )).rowCount > 0;
+  console.log(`  ★ライバル枠の列（0104）: ${hasViaRival ? '在る' : '無い（★全レースを 枠なし として数える）'}`);
   const rows = (await c.query(`
     select r.id::text as race_id, r.scheduled_at, r.distance,
-           e.popularity, e.finish_pos, e.entrant_snapshot -> 'stats' as stats
+           e.popularity, e.finish_pos, e.entrant_snapshot -> 'stats' as stats,
+           ${hasViaRival ? 'e.via_rival' : 'false'} as via_rival
       from races r
       join race_entries e on e.race_id = r.id
      where r.status = 'settled' and e.finish_pos is not null
@@ -52,8 +62,9 @@ try {
   const byRace = new Map();
   for (const r of rows) {
     let x = byRace.get(r.race_id);
-    if (x === undefined) { x = { at: new Date(r.scheduled_at), dist: Number(r.distance), entries: [] }; byRace.set(r.race_id, x); }
+    if (x === undefined) { x = { at: new Date(r.scheduled_at), dist: Number(r.distance), entries: [], viaRival: false }; byRace.set(r.race_id, x); }
     x.entries.push({ pop: r.popularity === null ? null : Number(r.popularity), pos: Number(r.finish_pos), stats: r.stats });
+    if (r.via_rival === true) x.viaRival = true;
   }
   const cutoff = Date.parse(since);
   const jstDay = (d) => new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 10);
@@ -65,11 +76,14 @@ try {
   };
   const fresh = () => ({ races: 0, favWin: 0, favPlace: 0, favMissing: 0, lowSlots: 0, lowWins: 0, cvs: [], fields: new Map() });
   const total = fresh();
+  /** ★ライバル枠のレースを除いた合計 */
+  const totalNoRival = fresh();
   const days = new Map();
   for (const x of byRace.values()) {
     const day = jstDay(x.at);
     if (!days.has(day)) days.set(day, fresh());
-    const targets = x.at.getTime() >= cutoff ? [days.get(day), total] : [days.get(day)];
+    const inTotal = x.at.getTime() >= cutoff;
+    const targets = [days.get(day), ...(inTotal ? [total] : []), ...(inTotal && !x.viaRival ? [totalNoRival] : [])];
     const n = x.entries.length;
     const fav = x.entries.find((e) => e.pop === 1);
     const scores = x.entries.filter((e) => e.stats !== null && typeof e.stats === 'object').map((e) => baseScore(e.stats, x.dist));
@@ -98,11 +112,14 @@ try {
   const nFav = total.races - total.favMissing;
   const p = nFav === 0 ? 0 : total.favWin / nFav;
   const se = nFav === 0 ? 0 : Math.sqrt(p * (1 - p) / nFav);
+  const nFavNR = totalNoRival.races - totalNoRival.favMissing;
+  const pNR = nFavNR === 0 ? 0 : totalNoRival.favWin / nFavNR;
   console.log('');
-  console.log(`【合計】★${since} 以降: ${total.races} レース（★1 番人気が読めないレース ${total.favMissing}）`);
-  console.log(`  ① V-4 1番人気の勝率   ${pct(total.favWin, nFav)}（★SE ${(se * 100).toFixed(2)}pp・合格域 30〜34%）`);
-  console.log(`  ① V-5 1番人気の複勝率 ${pct(total.favPlace, nFav)}（★合格域 60〜65%）`);
-  console.log(`  ② V-6 下位3の勝率（1 枠あたり） ${pct(total.lowWins, total.lowSlots)}（★合格域 0.5〜2%）`);
+  console.log(`【合計】★${since} 以降: ${total.races} レース（★1 番人気が読めないレース ${total.favMissing}）・★うち ライバル枠のレース ${total.races - totalNoRival.races}`);
+  console.log('  ★左 ＝ 全レース ／ ★右 ＝ ライバル枠のレースを除く（D-131）');
+  console.log(`  ① V-4 1番人気の勝率   ${pct(total.favWin, nFav)} ／ ${pct(totalNoRival.favWin, nFavNR)}（★SE ${(se * 100).toFixed(2)}pp・合格域 30〜34%）`);
+  console.log(`  ① V-5 1番人気の複勝率 ${pct(total.favPlace, nFav)} ／ ${pct(totalNoRival.favPlace, nFavNR)}（★合格域 60〜65%）`);
+  console.log(`  ② V-6 下位3の勝率（1 枠あたり） ${pct(total.lowWins, total.lowSlots)} ／ ${pct(totalNoRival.lowWins, totalNoRival.lowSlots)}（★合格域 0.5〜2%）`);
   console.log(`  ④ レース内の能力の CV ${meanPct(total.cvs)}（★レースを組んだときの値・${total.cvs.length} レース）`);
   console.log('  ③ 頭数の分布:');
   for (const [k, v] of [...total.fields].sort((a, b) => a[0] - b[0])) console.log(`     ${String(k).padStart(2)} 頭  ${String(v).padStart(5)} レース（${pct(v, total.races)}）`);
@@ -194,8 +211,9 @@ try {
   }
 
   console.log('');
-  if (total.races < 2000) console.log(`  ⚠️ ★まだ ${total.races} レース（★2,000 未満）。★線（28.5%）での判定は まだしない（★裁定）。`);
-  else console.log(p >= 0.285 ? '  ✔ ★V-4 は 28.5% 以上（★模型のずれは余裕の中・裁定の線）' : '  🔴 ★V-4 が 28.5% 未満（★世界が下限を割っている → 較正の見直し・オーナーへ）');
+  // ★判定は ★ライバル枠のレースを除いた数で（★枠は世界の較正の外・D-131）。★全レースの数は上に並べて出してある
+  if (totalNoRival.races < 2000) console.log(`  ⚠️ ★まだ ${totalNoRival.races} レース（★ライバル枠を除いて 2,000 未満）。★線（28.5%）での判定は まだしない（★裁定）。`);
+  else console.log(pNR >= 0.285 ? '  ✔ ★V-4（★ライバル枠を除く）は 28.5% 以上（★模型のずれは余裕の中・裁定の線）' : '  🔴 ★V-4（★ライバル枠を除く）が 28.5% 未満（★世界が下限を割っている → 較正の見直し・オーナーへ）');
 } finally {
   await c.query('rollback');
   await c.end();
