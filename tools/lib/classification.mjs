@@ -1324,6 +1324,7 @@ export const COMPONENT = [
   { file: 'lib/open-findings.d.mts', why: '★`lib/open-findings.mjs` の型（★NT-3・2026-09-19）。★`classification.d.mts` / `guard.d.mts` と同じ作法で、★道具ではなく部品。★中身（一覧）は `.mjs` が持つ（D-052）' },
   { file: 'lib/open-findings.mjs', why: '★まだ直っていない指摘の登録簿（★**NT-3**・2026-09-19）。★`verify-open-findings.mjs` が読む表で、道具ではない。🔴 ★`REPORT_AUDIT_20260914.md` の 22 項目のうち 12 件が 5 日 そのままだったので、★**期限を持たせて門で落とす**形にした。★報告書は期限を持たない' },
   { file: 'lib/known-red.mjs', why: '★いま赤いと分かっている検査の登録簿（★RD-2・2026-09-19）。★verify-known-red.mjs が読む表で、道具ではない' },
+  { file: 'hooks/pre-push', why: '★git の push 前の確かめ（★2026-10-03・レビュー側 §8-11）。★`git config core.hooksPath tools/hooks` で git が呼ぶ。★送る先頭が `npm run verify:red` に合格した HEAD（`.git/star-verified-head`）と同じでなければ止める。★人が流す道具ではなく、★状態も変えない' },
   { file: 'lib/guard.mjs', why: '★`assertNotProduction` の本体。★状態を変える道具が呼ぶ部品' },
   { file: 'lib/sandbox-tx.mjs', why: '★**自分で `begin`/`commit` する関数を、外側の取引に閉じ込める包み**（★2026-09-19）。🔴 ★PostgreSQL に入れ子の取引は無いので、★内側の `commit` は**外側ごと確定**させる。★`verify-ds7-cancel.mjs` がそれで staging を汚した。★検査の道具で、★製品では使わない' },
   { file: 'lib/snapshot-file.d.mts', why: '★`lib/snapshot-file.mjs` の型（★**SB-6**・2026-09-19）。★`classification.d.mts` / `tool-aftermath.d.mts` と同じ作法で、★道具ではなく部品。★中身は写さず、★形だけ（D-052）' },
