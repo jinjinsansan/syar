@@ -397,6 +397,14 @@ function noteGroundJump(d: number, shot: string, focusS: number, visualDelta: nu
 const GROUND_LEGACY = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('ground') === 'legacy';
 const AUDIT_GROUND = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('audit') === 'ground';
 /**
+ * ★**見本のレースの 見張りの鍵**（★2026-10-03・目隠しの見比べ `?look=` の重さを 1:1 と dpr 2 で分けて数える・レビュー側 ③）。
+ *   ★見本は どれも 'demo' だったので、★`look` を付けて 記録を分ける（★`look` が無ければ従来どおり 'demo'）。
+ */
+const DEMO_WATCH_KEY = (() => {
+  const look = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('look');
+  return look === null || look === '' ? 'demo' : `demo-look-${look}`;
+})();
+/**
  * ★**普段の見張り**（★2026-10-02・オーナー「どのレースかなんて その時でないと分からない」）: ★監査と同じ 1 コマの値を ★観戦中も作り、
  *   ★`RaceGroundWatch` が 見つけたものを この端末に書き残す（★`/race?groundlog=1` で まとめて出す）。★描画には使わない。
  */
@@ -5510,7 +5518,7 @@ function RaceView({ setup, real }: {
       /** ★調べるため（★2026-10-01・オーナー「芝が逆に動いた」）: 芝の模様の位置 ＝ 注視点 ＋ Δ。★描画には使わない */
       (globalThis as { __raceGround?: unknown }).__raceGround = { d, focusS: scene.focusS, visualDelta };
       noteGroundJump(d, scene.shot.id, scene.focusS, visualDelta, real?.raceId ?? null);
-      noteAuditGround(course, d, scene, visualDelta, lead, sec, v2HorseRatio, real?.raceId ?? 'demo',
+      noteAuditGround(course, d, scene, visualDelta, lead, sec, v2HorseRatio, real?.raceId ?? DEMO_WATCH_KEY,
         GROUND_LEGACY ? undefined : (motionTimeline ?? built).groundPhase.at(d), v2FocusY);
       const metersByGate = new Map(easedAt.map((horse) => [horse.gate, horse.meters]));
       /**
