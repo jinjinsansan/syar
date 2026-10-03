@@ -144,6 +144,11 @@ export interface GroundLogEntry {
   readonly race: string; readonly kind: AuditFinding['kind']; readonly raceSec: number; readonly raceSecTo: number;
   readonly frames: number; readonly shot: string; readonly persp: boolean; readonly detail: string;
 }
+/** ★記録を消す（★`/race?groundlog=1` の「消す」・★次に見るレースだけを数えるため）。★保存領域が使えなければ 何もしない */
+export function clearGroundLog(): void {
+  try { globalThis.localStorage?.removeItem(GROUND_LOG_KEY); } catch { /* ★画面は止めない */ }
+}
+
 export function readGroundLog(): GroundLogEntry[] {
   try {
     const raw = globalThis.localStorage?.getItem(GROUND_LOG_KEY);
@@ -157,10 +162,13 @@ function writeGroundLog(list: readonly GroundLogEntry[]): void {
 /** ★内訳（★ms の多い順・★残りは「文字・表示など」） */
 function partsText(parts: Readonly<Record<string, number>> | undefined, renderMs: number): string {
   if (parts === undefined) return '';
-  const e = Object.entries(parts).filter(([, v]) => v >= 1);
-  if (e.length === 0) return '';
+  /** ★`#` で始まる鍵は 数（★短冊の枚数・地面の行数）。★ms の合計に入れず 後ろに 「…枚」で出す */
+  const e = Object.entries(parts).filter(([k, v]) => !k.startsWith('#') && v >= 1);
+  const counts = Object.entries(parts).filter(([k, v]) => k.startsWith('#') && v > 0).map(([k, v]) => `${k.slice(1)} ${Math.round(v)}`);
+  if (e.length === 0 && counts.length === 0) return '';
   const rest = renderMs - e.reduce((a, [, v]) => a + v, 0);
-  return `［${[...e, ['文字・表示など', rest] as const].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${Math.round(v)}`).join('・')}］`;
+  const ms = e.length === 0 ? '' : `［${[...e, ['文字・表示など', rest] as const].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${Math.round(v)}`).join('・')}］`;
+  return `${ms}${counts.length === 0 ? '' : `（${counts.join('・')}）`}`;
 }
 export class RaceGroundWatch {
   private prev: AuditGroundFrame | null = null;

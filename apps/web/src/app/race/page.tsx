@@ -19,7 +19,7 @@
  */
 'use client';
 
-import { analyzeAuditGround, auditGroundText, groundLogText, readGroundLog, RaceGroundWatch, type AuditGroundFrame } from './race-audit';
+import { analyzeAuditGround, auditGroundText, clearGroundLog, groundLogText, readGroundLog, RaceGroundWatch, type AuditGroundFrame } from './race-audit';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -400,7 +400,7 @@ const AUDIT_GROUND = typeof window !== 'undefined' && new URLSearchParams(window
  * ★**見本のレースの 見張りの鍵**（★2026-10-03・目隠しの見比べ `?look=` の重さを 1:1 と dpr 2 で分けて数える・レビュー側 ③）。
  *   ★見本は どれも 'demo' だったので、★`look` を付けて 記録を分ける（★`look` が無ければ従来どおり 'demo'）。
  */
-const DEMO_WATCH_KEY = (() => {
+const WATCH_KEY_WITHOUT_RACE = (() => {
   const look = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('look');
   return look === null || look === '' ? 'demo' : `demo-look-${look}`;
 })();
@@ -2797,11 +2797,14 @@ function GroundLogView(): React.JSX.Element {
   const copy = (): void => {
     void navigator.clipboard?.writeText(text).then(() => { setCopied(true); }).catch(() => undefined);
   };
+  /** ★消す（★2026-10-03・前のレースの記録が混ざって 見比べを数えられなかった） */
+  const clear = (): void => { clearGroundLog(); setText(groundLogText(readGroundLog())); setCopied(false); };
   return (
     <div style={{ padding: '22px 16px 40px' }}>
       <div className="a-panel" style={{ padding: '14px 16px', fontSize: 13 }}>
         <p style={{ margin: '0 0 10px', fontWeight: 900 }}>芝とカメラの見張りの記録（この端末で見たレース）</p>
         <button type="button" onClick={copy} style={{ minHeight: 44, padding: '0 16px', fontWeight: 900 }}>{copied ? 'コピーしました' : 'コピー'}</button>
+        <button type="button" onClick={clear} style={{ minHeight: 44, padding: '0 16px', fontWeight: 900, marginLeft: 12 }}>消す</button>
         <pre style={{ margin: '12px 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12, lineHeight: 1.5 }}>{text.replaceAll('[race-ground-log] ', '')}</pre>
       </div>
     </div>
@@ -5518,7 +5521,7 @@ function RaceView({ setup, real }: {
       /** ★調べるため（★2026-10-01・オーナー「芝が逆に動いた」）: 芝の模様の位置 ＝ 注視点 ＋ Δ。★描画には使わない */
       (globalThis as { __raceGround?: unknown }).__raceGround = { d, focusS: scene.focusS, visualDelta };
       noteGroundJump(d, scene.shot.id, scene.focusS, visualDelta, real?.raceId ?? null);
-      noteAuditGround(course, d, scene, visualDelta, lead, sec, v2HorseRatio, real?.raceId ?? DEMO_WATCH_KEY,
+      noteAuditGround(course, d, scene, visualDelta, lead, sec, v2HorseRatio, real?.raceId ?? WATCH_KEY_WITHOUT_RACE,
         GROUND_LEGACY ? undefined : (motionTimeline ?? built).groundPhase.at(d), v2FocusY);
       const metersByGate = new Map(easedAt.map((horse) => [horse.gate, horse.meters]));
       /**

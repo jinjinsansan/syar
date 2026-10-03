@@ -403,6 +403,9 @@ export function drawTexturedWorld<TImage>(
    */
   const tmw = opts.timing;
   const markW = (k: string): void => { if (tmw === undefined) return; const t = tmw.now(); tmw.out[k] = (tmw.out[k] ?? 0) + (t - tmw.last); tmw.last = t; };
+  /** ★数（★鍵は `#` で始める・★ms と混ぜない・記録の側 `partsText` が分けて出す）（★2026-10-03・オーナーの記録で ゲートの場面の 生垣・木・スタンド が 55〜190ms） */
+  const countW = (k: string, n: number): void => { if (tmw === undefined) return; tmw.out[`#${k}`] = (tmw.out[`#${k}`] ?? 0) + n; };
+  countW('地面の行', rowCount);
   markW('地面');
   if (opts.infield !== false) {
     const groundOf = (s: number, w: number): { x: number; y: number; depth: number } => {
@@ -649,6 +652,7 @@ export function drawTexturedWorld<TImage>(
     }
     // 遠い順に描く（近い帯が手前に重なる）
     slices.sort((a, b) => b.depth - a.depth);
+    countW('短冊', slices.length);
     for (const slice of slices) slice.draw();
     if (base !== null) ctx.setTransform!(base.a, base.b, base.c, base.d, base.e, base.f);
     ctx.globalAlpha = 1;
@@ -664,10 +668,12 @@ export function drawTexturedWorld<TImage>(
       strip(scenery.trees, WD + 34, 9, sFrom, sTo, 6, 0.96, 100);
       strip(scenery.trees, -38, 8, sFrom, sTo, 6, 0.96, 100);
     }
+    markW('木');
     // 直線の観客席（外側・ゴール前 450m）
     if (scenery.stand !== undefined) {
       strip(scenery.stand, WD + 16, 9, Math.max(sFrom, course.distance - 480), course.distance + 40, 4, 1, 40);
     }
+    markW('スタンド');
     // 生垣（低い）: 外ラチの外側と内ラチの内側
     if (scenery.hedge !== undefined) {
       strip(scenery.hedge, WD + 3.5, 1.3, sFrom, sTo, 2.5);
@@ -675,7 +681,7 @@ export function drawTexturedWorld<TImage>(
     }
   }
 
-  markW('生垣・木・スタンド');
+  markW('生垣');
   // ── ラチ: 白い横木 2 本と緑の支柱（プレートの意匠に合わせる） ─────────────
   /**
    * ★ラチを**区間ごとに、馬より手前か奥かで振り分けて**描きます。
