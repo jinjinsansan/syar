@@ -27,6 +27,18 @@ describe('★芝とカメラの監査の集計', () => {
     expect(kinds.some((k) => k.startsWith('急変'))).toBe(true);
   });
 
+  it('🔴 ★画面の板が 逆に流れる・急に変わる を見つける（★世界の m/秒は正常でも・ダートの旧い送りの形）', () => {
+    // ★芝の m/秒は 16 のまま（★旧い判定では 0 件）・★画面の板だけ 逆流と 急変
+    const fr = run('side-drive', 34, 120, () => 16, (i) => ({ platePxPerSec: i >= 40 && i < 45 ? -900 : i >= 80 && i < 82 ? 3000 : 1200 }));
+    const findings = analyzeAuditGround(fr, 33).findings;
+    expect(findings.find((f) => f.kind === '逆回転')?.detail).toContain('画面の板');
+    expect(findings.find((f) => f.kind === '逆回転')?.frames).toBe(5);
+    expect(findings.some((f) => f.kind === '急変' && f.detail.includes('画面の板'))).toBe(true);
+    // ★対照: ★なだらかに 1,096 → 1,460 px/秒（★いまの送りの最後の直線の形）は 0 件
+    const smooth = run('side-drive', 34, 120, () => 16, (i) => ({ platePxPerSec: 1096 + i * 3 }));
+    expect(analyzeAuditGround(smooth, 33).findings).toEqual([]);
+  });
+
   it('🔴 ★直線で 馬が どんどん小さくなる（★カメラが離れる）を見つける', () => {
     const fr = run('finish-line', 50, 180, () => 16, (i) => ({ horseRatio: 0.27 * (1 - i / 300), camDistM: 44 + i / 3 }));
     const f = analyzeAuditGround(fr, 33).findings.find((x) => x.kind === '離れる');

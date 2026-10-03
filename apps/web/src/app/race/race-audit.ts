@@ -52,6 +52,20 @@ export function groundFrameKinds(p: AuditGroundFrame, f: AuditGroundFrame): { re
   if (p.groundMps !== null && Math.abs(v - p.groundMps) > Math.max(5, Math.abs(p.groundMps) * 0.5)) {
     out.push({ kind: '急変', detail: `芝 ${p.groundMps.toFixed(1)} → ${v.toFixed(1)} m/秒` });
   }
+  /**
+   * ★**画面の板の速さ**（★2026-10-03・オーナーが見ている量・px/秒）。
+   *   ★上の判定は 世界の m/秒 なので、★板の送りが逆に流れても 見えなかった
+   *   （★ダートの旧い送り `?ground=legacy` は 逆流 99 コマ・最小 −3,756 px/秒 なのに 見つけたもの 0 件だった）。
+   *   ★線: ★逆流 −50 px/秒 未満 ／ ★急変 前のコマとの差が max(300, 前の 50%) 超（★いまの送りは 芝・ダートとも 0 件・前との差は最大 46%）。
+   */
+  const a = p.platePxPerSec, b = f.platePxPerSec;
+  if (typeof b === 'number' && Number.isFinite(b) && b < -50) {
+    out.push({ kind: '逆回転', detail: `画面の板 ${b.toFixed(0)} px/秒` });
+  }
+  if (typeof a === 'number' && typeof b === 'number' && Number.isFinite(a) && Number.isFinite(b)
+    && Math.abs(b - a) > Math.max(300, Math.abs(a) * 0.5)) {
+    out.push({ kind: '急変', detail: `画面の板 ${a.toFixed(0)} → ${b.toFixed(0)} px/秒` });
+  }
   return out;
 }
 
