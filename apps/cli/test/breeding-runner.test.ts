@@ -37,6 +37,8 @@ interface FakeOptions {
   readonly demotedIds?: readonly string[];
   /** ★生涯の記録の種類の制約に `breeding-role-changed` が在るか（★移行 `0070`） */
   readonly roleStoryType?: boolean;
+  /** ★看板馬の母の候補（★年の変わり目の select が返す・D-126） */
+  readonly signatureMares?: readonly string[];
 }
 
 /**
@@ -90,9 +92,15 @@ function horseRow(id: string, sex: 'male' | 'female', o: FakeOptions): Record<st
 
 function fakeClient(o: FakeOptions) {
   const seen: string[] = [];
+  const calls: { sql: string; params: unknown[] }[] = [];
   const client = {
     async query(sql: string, params?: unknown[]) {
       seen.push(sql);
+      calls.push({ sql, params: params ?? [] });
+      if (sql.startsWith('select id from horses h') && sql.includes('signature_year')) {
+        const ids = o.signatureMares ?? [];
+        return { rows: ids.map((id) => ({ id })), rowCount: ids.length };
+      }
       if (sql.startsWith('update horses set bred_this_year = false')) return { rows: [], rowCount: 1 };
       if (sql.startsWith("update horses set retirement_role = 'honored'")) {
         const ids = o.demotedIds ?? [];
@@ -143,7 +151,7 @@ function fakeClient(o: FakeOptions) {
       return { rows: [], rowCount: 1 };
     },
   };
-  return { client: client as never, seen };
+  return { client: client as never, seen, calls };
 }
 
 /** ★基準の週 312（＝ 6 歳）。★`weekIndexAt` は (now - epoch) / 4 時間 */
@@ -350,13 +358,13 @@ describe('🔴 ★持ち主のいる馬を NPC の配合に使わない（★裁
   const poolSelects = (seen: readonly string[]): string[] => seen.filter((s) => s.startsWith('select')
     && /retirement_role = '(broodmare|stallion|honored)'/.test(s));
 
-  it('★繁殖の集合を拾う select は ★4 つとも `owner_id is null` を持つ（母・種牡馬・枠の数え方・補充）', async () => {
+  it('★繁殖の集合を拾う select は ★5 つとも `owner_id is null` を持つ（母・種牡馬・枠の数え方・補充・看板馬の母〔D-126〕）', async () => {
     const { client, seen } = fakeClient({ mareCount: 52, stallionCount: 3 });
     // ★週 312 ＝ 年の変わり目。★枠の数えが 0 なので ★補充の問い合わせも走る
     await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
     const pool = poolSelects(seen);
-    // ★対照: ★4 つとも走ったこと（★0 個なら下の every は空で緑になる）
-    expect(pool.length, '★繁殖の集合を拾う問い合わせが 4 つ走っていない').toBe(4);
+    // ★対照: ★5 つとも走ったこと（★0 個なら下の every は空で緑になる）
+    expect(pool.length, '★繁殖の集合を拾う問い合わせが 5 つ走っていない').toBe(5);
     for (const s of pool) expect(s, `★持ち主の馬を拾う: ${s}`).toContain('owner_id is null');
   });
 
@@ -394,5 +402,45 @@ describe('★生涯 8 産で降ろしたことを生涯の記録に残す（★�
     await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
     expect(seen.some((s) => s.includes('horse_story_event_type_known'))).toBe(false);
     expect(storyInserts(seen)).toEqual([]);
+  });
+});
+
+describe('★看板馬（★正典 D-126 の最小・裁定 REVIEW_D126_D131_MINIMAL_VERDICT_20261003.md §1）', () => {
+  const marks = (calls: readonly { sql: string; params: unknown[] }[]) =>
+    calls.filter((c) => c.sql.startsWith('update horses set signature_year')).map((c) => c.params);
+  const twelve = Array.from({ length: 12 }, (_, i) => `sig-${String(i).padStart(2, '0')}`);
+
+  it('★年の変わり目に 10 頭を産み、★その年と 1〜10 の枠を付ける', async () => {
+    const { client, calls } = fakeClient({ mareCount: 52, stallionCount: 6, signatureMares: twelve });
+    const r = await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+    expect(r.signatureBorn).toBe(10);
+    const m = marks(calls);
+    expect(m.map((p) => p[1])).toEqual(Array(10).fill(6));
+    expect(m.map((p) => p[2])).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  });
+
+  it('★1 頭の父から 2 頭まで（★父 3 頭なら 6 頭で止まり、★届かないことを警報に出す）', async () => {
+    const { client } = fakeClient({ mareCount: 52, stallionCount: 3, signatureMares: twelve });
+    const alerts: string[] = [];
+    const r = await runBreedingWeek(client, nowForWeek(312), EPOCH, (a) => alerts.push(a), undefined, 'random', 13, 800);
+    expect(r.signatureBorn).toBe(6);
+    expect(alerts.some((a) => a.includes('看板馬が 10 頭に届きません'))).toBe(true);
+  });
+
+  it('★前年に看板馬を産んだ母は外す（★問い合わせが 前年を渡す）', async () => {
+    const { client, calls } = fakeClient({ mareCount: 52, stallionCount: 6, signatureMares: twelve });
+    await runBreedingWeek(client, nowForWeek(312), EPOCH, () => {}, undefined, 'random', 13, 800);
+    const sel = calls.find((c) => c.sql.startsWith('select id from horses h') && c.sql.includes('signature_year'));
+    expect(sel, '★看板馬の母を選んでいない').toBeDefined();
+    expect(sel!.sql).toContain('c.signature_year = $2');
+    expect(sel!.sql).toContain('owner_id is null');
+    expect(sel!.params[1]).toBe(5);
+  });
+
+  it('★対照: ★年の途中の週は 看板馬を産まない（★母の候補を探しもしない）', async () => {
+    const { client, calls } = fakeClient({ mareCount: 52, stallionCount: 6, signatureMares: twelve });
+    const r = await runBreedingWeek(client, nowForWeek(313), EPOCH, () => {}, undefined, 'random', 13, 800);
+    expect(r.signatureBorn).toBe(0);
+    expect(calls.some((c) => c.sql.includes('signature_year'))).toBe(false);
   });
 });

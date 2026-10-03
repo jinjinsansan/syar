@@ -39,6 +39,8 @@ export type NameFailureVariant =
   | 'already'
   /** ★仔が見つからない */
   | 'missing'
+  /** ★ライバルを選んでいない／選べない馬（★D-131） */
+  | 'rival'
   /** ★一時的な不具合（★利用者は悪くない） */
   | 'temp';
 
@@ -59,6 +61,7 @@ export function nameFailureOf(reason: string | null): NameFailureVariant {
   if (reason === 'name_blocked') return 'blocked';
   if (reason === 'already_named') return 'already';
   if (reason === 'draft_not_found') return 'missing';
+  if (reason === 'rival_required' || reason === 'rival_invalid') return 'rival';
   return 'temp';
 }
 

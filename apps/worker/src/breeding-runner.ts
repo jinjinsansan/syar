@@ -72,7 +72,20 @@ export interface BreedingWeekResult {
   readonly retiredFromBreeding: number;
   /** ★繁殖に上げた頭数 */
   readonly promoted: number;
+  /** ★産んだ看板馬の頭数（★年の変わり目だけ 0 より大きい・D-126） */
+  readonly signatureBorn: number;
 }
+
+/**
+ * ★**1 世代の看板馬の頭数**（★正典 D-126 の写し・オーナー決定 2026-09-30「10 頭」）。
+ *   ⚠️ ★較正定数ではありません。★移行 `0103` の `signature_slot between 1 and 10` と同じ数。
+ */
+export const SIGNATURE_PER_YEAR = 10;
+/**
+ * ★**1 頭の父から 1 年に産む看板馬の上限**（★裁定 `REVIEW_D126_D131_MINIMAL_VERDICT_20261003.md` §1 ②・D-026 の向き）。
+ *   ★系統を 1 頭の父に集めないため。★較正定数（★値は暫定）。
+ */
+export const SIGNATURE_MAX_PER_SIRE = 2;
 
 /**
  * 🔴 ★**血統をたどるためだけの、★薄い記録**。
@@ -569,7 +582,7 @@ export async function runBreedingWeek(
     onAlert('★繁殖牝馬が 1 頭も居ません（★世界がまだ出来ていないか、★役割が付いていない）');
     return {
       week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, nameGaveUp: 0, nameFallback: 0, yearReset,
-      retiredFromBreeding, promoted,
+      retiredFromBreeding, promoted, signatureBorn: 0,
     };
   }
   /**
@@ -593,10 +606,30 @@ export async function runBreedingWeek(
       if (parseInt(h.slice(0, 8), 16) % 52 === target) dueIds.push(id);
     }
   }
-  if (dueIds.length === 0) {
+  /**
+   * ★**看板馬の母**（★正典 D-126 の最小・D-131・裁定 `REVIEW_D126_D131_MINIMAL_VERDICT_20261003.md` §1）。
+   *   ★年の変わり目（★年の第 1 週）に ★その世代の看板馬 `SIGNATURE_PER_YEAR` 頭を産む。★能力は `breed()` のまま（★寄せない）。
+   *   ★母は ★素質の合計の上位から（★同点は id）。★**前年に看板馬を産んだ母は外す**（★§1 ②・同じ数頭が毎年 母になり続けない）。
+   *   ★母は年 1 回なので（`bred_this_year`）、★看板馬を産んだ母は その年の番の週に産まない
+   *     → ★**年の総数は変わらない**（★10 頭が 第 1 週に寄るだけ・★§1 ③）。
+   *   ★候補は多めに取る（★相手が見つからない母を飛ばすため）。
+   */
+  const signatureIds: string[] = [];
+  if (atYearStart) {
+    const sig = await client.query<{ id: string }>(
+      'select id from horses h'
+        + " where retirement_role = 'broodmare' and owner_id is null and birth_week is not null"
+        + ' and not bred_this_year and foal_count < $1'
+        + ' and not exists (select 1 from horses c where c.dam_id = h.id and c.signature_year = $2)'
+        + ' order by (select sum((value)::numeric) from jsonb_each_text(potential)) desc, id limit $3',
+      [balance.MARE_LIFETIME_FOALS, year - 1, SIGNATURE_PER_YEAR * 3],
+    );
+    signatureIds.push(...sig.rows.map((r) => r.id));
+  }
+  if (dueIds.length === 0 && signatureIds.length === 0) {
     return {
       week, eligible: 0, born: 0, noSire: 0, alreadyThere: 0, nameGaveUp: 0, nameFallback: 0, yearReset,
-      retiredFromBreeding, promoted,
+      retiredFromBreeding, promoted, signatureBorn: 0,
     };
   }
 
@@ -605,7 +638,7 @@ export async function runBreedingWeek(
 
   const mareResult = await client.query(
     `select ${COLS} from horses where id = any($1::uuid[]) and birth_week is not null`,
-    [dueIds],
+    [[...new Set([...signatureIds, ...dueIds])]],
   );
   const mares = mareResult.rows.map((r) => ({
     record: withGameYear(r as Record<string, unknown>),
@@ -645,26 +678,25 @@ export async function runBreedingWeek(
   let noSire = 0;
   let alreadyThere = 0;
 
-  for (const { record: mare, stable } of mares) {
-    const ranked = rankSires({
-      mare,
-      stable,
-      stallions,
-      isHome: (sid) => stallionStableOf.get(sid) === numericStableId(stable),
-      lookup,
-      balance,
-      year,
-      ancestorIndex,
-    });
-    if (ranked.length === 0) { noSire += 1; continue; }
-    eligible += 1;
-    const turn = turnOf.get(stable.id) ?? 0;
-    turnOf.set(stable.id, turn + 1);
-    const sireId = pickSire(ranked, turn);
-    if (sireId === null) { noSire += 1; continue; }
-    const sire = full.get(sireId);
-    if (sire === undefined) { noSire += 1; continue; }
+  const mareById = new Map(mares.map((m) => [m.record.id, m]));
+  const rankFor = (mare: HorseRecord, stable: (typeof mares)[number]['stable']) => rankSires({
+    mare,
+    stable,
+    stallions,
+    isHome: (sid) => stallionStableOf.get(sid) === numericStableId(stable),
+    lookup,
+    balance,
+    year,
+    ancestorIndex,
+  });
 
+  /**
+   * ★**仔を 1 頭 産む**（★番の週の配合と 看板馬で共通）。
+   *   ★返り値: ★産んだ（★仔の id）／★既に居た・母を取られた（already）／★名前を決められず見送った（gaveUp）。
+   */
+  const birthFoal = async (
+    mare: HorseRecord, stable: (typeof mares)[number]['stable'], sireId: string, sire: HorseRecord,
+  ): Promise<{ readonly kind: 'born'; readonly foalId: string } | { readonly kind: 'already' | 'gaveUp' }> => {
     const { id: foalId, seed } = await foalIdAndSeed(sireId, mare.id, week);
     const foal = breed({
       id: foalId,
@@ -702,7 +734,7 @@ export async function runBreedingWeek(
       if (naming.taken.has(spareKey) || naming.blocked(spareKey)) {
         nameGaveUp += 1;
         onAlert(`🔴 ★仔の名前を決められず、★予備の名前も使えませんでした（★母 ${mare.id}・週 ${week}）: ${(e as Error).message}`);
-        continue;
+        return { kind: 'gaveUp' };
       }
       naming.taken.add(spareKey);
       foalName = spare;
@@ -736,7 +768,7 @@ export async function runBreedingWeek(
         ...keyParams,
       ],
     );
-    if (ins.rowCount === 0) { alreadyThere += 1; continue; }
+    if (ins.rowCount === 0) { alreadyThere += 1; return { kind: 'already' }; }
 
     /**
      * 🔴 ★**母の印は「まだ取られていなければ」取ります**（★2026-09-22・プレイヤーの配合と共存するため）。
@@ -753,7 +785,7 @@ export async function runBreedingWeek(
     if (claim.rowCount === 0) {
       await client.query('delete from horses where id = $1', [foalId]);
       alreadyThere += 1;
-      continue;
+      return { kind: 'already' };
     }
     born += 1;
 
@@ -762,6 +794,65 @@ export async function runBreedingWeek(
     await client.query(
       'update horses set coverings_this_year = coverings_this_year + 1 where id = $1', [sireId],
     );
+    return { kind: 'born', foalId };
+  };
+
+  /**
+   * ★**看板馬を先に産む**（★年の変わり目だけ・`signatureIds` は年の初めにしか入らない）。
+   *   ★父は ★その母の順位の上から ★1 頭の父に `SIGNATURE_MAX_PER_SIRE` 頭まで（★系統を 1 頭に集めない・D-026 の向き）。
+   *   ★枠（1〜10）は ★既に居る看板馬の続きから振る（★同じ週を流し直しても 枠が重ならない）。
+   */
+  let signatureBorn = 0;
+  if (signatureIds.length > 0) {
+    const have = await client.query<{ n: string; s: string | null }>(
+      'select count(*)::text n, max(signature_slot)::text s from horses where signature_year = $1',
+      [year],
+    );
+    let slot = Number(have.rows[0]?.s ?? 0);
+    let haveCount = Number(have.rows[0]?.n ?? 0);
+    const sireUse = new Map<string, number>();
+    const usedBySig = await client.query<{ sire_id: string; n: string }>(
+      'select sire_id, count(*)::text n from horses where signature_year = $1 group by sire_id',
+      [year],
+    );
+    for (const r of usedBySig.rows) sireUse.set(r.sire_id, Number(r.n));
+    for (const id of signatureIds) {
+      if (haveCount >= SIGNATURE_PER_YEAR) break;
+      const m = mareById.get(id);
+      if (m === undefined) continue;
+      const sireId = rankFor(m.record, m.stable).find((r) => (sireUse.get(r.id) ?? 0) < SIGNATURE_MAX_PER_SIRE)?.id;
+      if (sireId === undefined) continue;
+      const sire = full.get(sireId);
+      if (sire === undefined) continue;
+      const r = await birthFoal(m.record, m.stable, sireId, sire);
+      if (r.kind !== 'born') continue;
+      slot += 1;
+      haveCount += 1;
+      signatureBorn += 1;
+      sireUse.set(sireId, (sireUse.get(sireId) ?? 0) + 1);
+      await client.query(
+        'update horses set signature_year = $2, signature_slot = $3 where id = $1',
+        [r.foalId, year, slot],
+      );
+    }
+    if (haveCount < SIGNATURE_PER_YEAR) {
+      onAlert(`★看板馬が ${SIGNATURE_PER_YEAR} 頭に届きません（★年 ${year}・${haveCount} 頭・★母の候補 ${signatureIds.length}）`);
+    }
+  }
+
+  const dueSet = new Set(dueIds);
+  for (const { record: mare, stable } of mares) {
+    if (!dueSet.has(mare.id)) continue;
+    const ranked = rankFor(mare, stable);
+    if (ranked.length === 0) { noSire += 1; continue; }
+    eligible += 1;
+    const turn = turnOf.get(stable.id) ?? 0;
+    turnOf.set(stable.id, turn + 1);
+    const sireId = pickSire(ranked, turn);
+    if (sireId === null) { noSire += 1; continue; }
+    const sire = full.get(sireId);
+    if (sire === undefined) { noSire += 1; continue; }
+    await birthFoal(mare, stable, sireId, sire);
   }
 
   /**
@@ -801,6 +892,7 @@ export async function runBreedingWeek(
   }
   return {
     week, eligible, born, noSire, alreadyThere, nameGaveUp, nameFallback, yearReset, retiredFromBreeding, promoted,
+    signatureBorn,
   };
 }
 

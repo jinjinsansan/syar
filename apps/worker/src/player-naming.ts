@@ -20,6 +20,7 @@
  */
 import type pg from 'pg';
 
+import { gameYearOf } from '@star/scheduler';
 import { checkPlayerHorseName, normalizeName } from '@star/sim-engine';
 import type { NameBlocklist, PlayerNameRejection } from '@star/sim-engine';
 import { loadNameChecks } from '../../cli/src/name-blocklist.js';
@@ -48,7 +49,11 @@ export type FoalNameFailure =
   /** ★その仔には既に名前が付いている（★先に通った要求がある） */
   | 'already_named'
   /** ★下書きが無い／本人の仔ではない */
-  | 'draft_not_found';
+  | 'draft_not_found'
+  /** ★その仔の世代に看板馬が居るのに、★ライバルを選んでいない（★D-131・誕生のときに 1 回） */
+  | 'rival_required'
+  /** ★選んだ馬が ★仔の誕生のゲーム年の 現役の看板馬ではない */
+  | 'rival_invalid';
 
 export type FoalNameOutcome = 'done' | 'failed' | 'skipped';
 
@@ -94,6 +99,25 @@ async function nameTaken(client: pg.ClientBase, nameKey: string): Promise<boolea
 }
 
 /**
+ * ★**ライバルを選べるか**（★D-131）。★選べる馬 ＝ ★仔の誕生のゲーム年の看板馬で ★現役（`my_rival_candidates` と同じ条件）。
+ *   ★返り値 null ＝ ★その年の看板馬が 0 頭で ★選ばなかった（★null で通す・裁定 §3）。
+ */
+async function checkRival(
+  client: pg.ClientBase,
+  birthWeek: number,
+  proposed: string | null,
+): Promise<{ readonly ok: true; readonly id: string } | { readonly ok: false; readonly reason: 'rival_required' | 'rival_invalid' } | null> {
+  if (!Number.isFinite(birthWeek)) throw new Error('player-naming: ★下書きの birth_week が読めません');
+  const res = await client.query<{ id: string }>(
+    'select id from horses where signature_year = $1 and retired_at_week is null',
+    [gameYearOf(birthWeek)],
+  );
+  const ids = res.rows.map((r) => r.id);
+  if (proposed === null) return ids.length === 0 ? null : { ok: false, reason: 'rival_required' };
+  return ids.includes(proposed) ? { ok: true, id: proposed } : { ok: false, reason: 'rival_invalid' };
+}
+
+/**
  * ★**命名の要求 1 件を確定する**。
  * 🔴 ★**`begin` / `commit` / `rollback` をしません**（★呼ぶ側が 1 件ごとに張る）。
  */
@@ -102,8 +126,8 @@ export async function confirmFoalName(
   requestId: string,
   ctx: FoalNamingContext,
 ): Promise<FoalNameOutcome> {
-  const reqRes = await client.query<{ id: string; user_id: string; draft_id: string; proposed_name: string }>(
-    "select id, user_id, draft_id, proposed_name from foal_requests"
+  const reqRes = await client.query<{ id: string; user_id: string; draft_id: string; proposed_name: string; proposed_rival_id: string | null }>(
+    "select id, user_id, draft_id, proposed_name, proposed_rival_id from foal_requests"
       + " where id = $1 and status = 'pending' and kind = 'name' for update skip locked",
     [requestId],
   );
@@ -135,6 +159,9 @@ export async function confirmFoalName(
   if (await nameTaken(client, shape.nameKey)) return fail('name_taken');
 
   const rec = draft.record;
+  // ★ライバル（★D-131・裁定 REVIEW_D126_D131_MINIMAL_VERDICT §3）: ★仔の誕生のゲーム年の 現役の看板馬から。★0 頭なら選ばずに通す
+  const rival = await checkRival(client, Number(rec['birth_week']), req.proposed_rival_id ?? null);
+  if (rival !== null && !rival.ok) return fail(rival.reason);
   const cols: string[] = ['id', 'owner_id', 'name', 'name_key', 'name_checked_with'];
   const vals: unknown[] = [draft.id, req.user_id, shape.display, shape.nameKey, ctx.version];
   for (const k of DRAFT_RECORD_COLUMNS) {
@@ -146,6 +173,8 @@ export async function confirmFoalName(
     `insert into horses (${cols.join(', ')}) values (${cols.map((_, i) => `$${i + 1}`).join(', ')})`,
     vals,
   );
+  // ★ライバルは 書く形が見える文で書く（★列の並びを組み立てる挿入は 網 write-never から見えない・D-119）
+  if (rival !== null) await client.query('update horses set rival_horse_id = $2 where id = $1', [draft.id, rival.id]);
   await client.query('update foal_drafts set named_horse_id = $1 where id = $1', [draft.id]);
   await client.query(
     "update foal_requests set status = 'done', result_id = $2, processed_at = now() where id = $1",

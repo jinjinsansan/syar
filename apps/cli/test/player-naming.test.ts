@@ -31,6 +31,10 @@ interface FakeOptions {
   readonly taken?: boolean;
   /** ★name_key が空の行が残っている（★段 2 の前）・★その名前 */
   readonly nullKeyNames?: readonly string[];
+  /** ★要求に載せたライバル（★D-131） */
+  readonly rival?: string | null;
+  /** ★仔の誕生のゲーム年の 現役の看板馬（★既定 0 頭） */
+  readonly signatures?: readonly string[];
 }
 
 function fakeClient(o: FakeOptions) {
@@ -38,8 +42,12 @@ function fakeClient(o: FakeOptions) {
   const client = {
     async query(sql: string, params: unknown[] = []) {
       seen.push({ sql, params });
-      if (sql.startsWith('select id, user_id, draft_id, proposed_name from foal_requests')) {
-        return { rows: [{ id: REQ, user_id: USER, draft_id: DRAFT, proposed_name: o.name ?? 'ホシノヒカリ' }], rowCount: 1 };
+      if (sql.startsWith('select id, user_id, draft_id, proposed_name, proposed_rival_id from foal_requests')) {
+        return { rows: [{ id: REQ, user_id: USER, draft_id: DRAFT, proposed_name: o.name ?? 'ホシノヒカリ', proposed_rival_id: o.rival ?? null }], rowCount: 1 };
+      }
+      if (sql.startsWith('select id from horses where signature_year = $1')) {
+        const ids = o.signatures ?? [];
+        return { rows: ids.map((id) => ({ id })), rowCount: ids.length };
       }
       if (sql.startsWith('select id, user_id, named_horse_id, record from foal_drafts')) {
         return {
@@ -110,6 +118,50 @@ describe('★PLAN I-3: 仔の命名の確定', () => {
   it('★対照: ★name_key が空の行が残っていても、★重ならなければ通る', async () => {
     const { client } = fakeClient({ nullKeyNames: ['ベツノナマエ'] });
     expect(await confirmFoalName(client, REQ, CTX)).toBe('done');
+  });
+
+  describe('★ライバル（★D-131・裁定 REVIEW_D126_D131_MINIMAL_VERDICT §3）', () => {
+    const SIG_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const SIG_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    /** ★書いたライバル（★書いていなければ null） */
+    const insertedRival = (seen: { sql: string; params: unknown[] }[]) => {
+      const ins = seen.findIndex((x) => x.sql.startsWith('insert into horses'));
+      const upd = seen.findIndex((x) => x.sql.startsWith('update horses set rival_horse_id'));
+      if (upd >= 0) expect(upd, '★horses に入れる前に書いた').toBeGreaterThan(ins);
+      return upd < 0 ? null : seen[upd]!.params[1];
+    };
+
+    it('★その年の看板馬から選ぶ → rival_horse_id に入る', async () => {
+      const { client, seen } = fakeClient({ rival: SIG_B, signatures: [SIG_A, SIG_B] });
+      expect(await confirmFoalName(client, REQ, CTX)).toBe('done');
+      expect(insertedRival(seen)).toBe(SIG_B);
+    });
+
+    it('★看板馬が居るのに 選ばない → rival_required・★horses に入れない', async () => {
+      const { client, seen } = fakeClient({ rival: null, signatures: [SIG_A] });
+      expect(await confirmFoalName(client, REQ, CTX)).toBe('failed');
+      expect(failedWith(seen)).toBe('rival_required');
+      expect(seen.some((x) => x.sql.startsWith('insert into horses'))).toBe(false);
+    });
+
+    it('★その年の看板馬でない馬 → rival_invalid・★horses に入れない', async () => {
+      const { client, seen } = fakeClient({ rival: SIG_B, signatures: [SIG_A] });
+      expect(await confirmFoalName(client, REQ, CTX)).toBe('failed');
+      expect(failedWith(seen)).toBe('rival_invalid');
+      expect(seen.some((x) => x.sql.startsWith('insert into horses'))).toBe(false);
+    });
+
+    it('★その年の看板馬が 0 頭 → 選ばずに名付けできる（★rival_horse_id は null）', async () => {
+      const { client, seen } = fakeClient({ rival: null, signatures: [] });
+      expect(await confirmFoalName(client, REQ, CTX)).toBe('done');
+      expect(insertedRival(seen)).toBeNull();
+    });
+
+    it('★看板馬を探す年は ★仔の誕生のゲーム年（★誕生週 270 → 5 年）', async () => {
+      const { client, seen } = fakeClient({ rival: SIG_A, signatures: [SIG_A] });
+      await confirmFoalName(client, REQ, CTX);
+      expect(seen.find((x) => x.sql.startsWith('select id from horses where signature_year = $1'))?.params).toEqual([5]);
+    });
   });
 
   it('③ ★確定の本体は ★取引に触らない', async () => {

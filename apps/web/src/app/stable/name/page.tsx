@@ -67,6 +67,13 @@ const FAILURE_VIEW: Readonly<Record<NameFailureVariant, {
     text: '名前を付ける前の仔の一覧を読み直します。',
     primary: '読み直す',
   },
+  /** ★D-131。★選ぶ画面はデザイナーの成果物で入れる（★それまでは この文だけ・★見た目は missing と同じ） */
+  rival: {
+    icon: '?', ink: '#4a5a66', bg: '#e3e8ec',
+    title: 'ライバルを選んでください',
+    text: 'この仔と同じ年に生まれた馬から、ライバルを 1 頭選んでから名前を付けます。',
+    primary: '選び直す',
+  },
   temp: {
     icon: '↻', ink: '#a9741a', bg: '#fff6d6',
     title: 'いま名前を付けられませんでした',
