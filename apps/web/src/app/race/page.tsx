@@ -433,6 +433,8 @@ function noteAuditGround(
   visualDelta: number, lead: number, sec: number, horseRatio: number, raceKey: string,
   /** ★板の送り（px）を表から引いているとき その値（★無ければ 進行距離 × いまの px/m） */
   plateScrollPx?: number,
+  /** ★注視点の 画面の高さ ÷ H */
+  focusY?: number,
 ): void {
   const persp = !(scene.shot.view === 'side' && scene.shot.perspectiveWorld !== true);
   const scroll = scene.focusS + visualDelta;
@@ -469,7 +471,8 @@ function noteAuditGround(
   const platePx = plateScrollPx ?? scroll * q0.pxPerM;
   const platePxPerSec = prev !== null && prev.shot === scene.shot.id && d > prev.d && auditPrevPlatePx !== null ? (platePx - auditPrevPlatePx) / (d - prev.d) : null;
   auditPrevPlatePx = platePx;
-  const frame: AuditGroundFrame = { d, shot: scene.shot.id, persp, groundMps, trueMps, shownMps, horseRatio, camDistM, platePx, platePxPerSec };
+  const frame: AuditGroundFrame = { d, shot: scene.shot.id, persp, groundMps, trueMps, shownMps, horseRatio, camDistM, platePx, platePxPerSec,
+    ...(focusY === undefined || !Number.isFinite(focusY) ? {} : { focusY }) };
   if (AUDIT_GROUND) auditGround.push(frame);
   else watchGround(frame, raceKey);
   auditPrev = { d, shot: scene.shot.id, persp, scroll, cam: scene.camera, focusS: scene.focusS, focusW: scene.focusW, lead, sec };
@@ -5332,6 +5335,8 @@ function RaceView({ setup, real }: {
      *   **実際の大きさ**から決めます。
      */
     let v2HorseRatio = 0;
+    /** ★注視点の 画面の高さ ÷ H（★監査・オーナー「ゴール前で馬の場所が急に下へおりた」） */
+    let v2FocusY = Number.NaN;
     if (renderer === 'v2') {
       const course = ovalCourse(built.distanceM, { ...built.spec, turn });
       const scene = resolveBroadcastV2Scene(course, easedAt.map((horse) => ({
@@ -5400,7 +5405,7 @@ function RaceView({ setup, real }: {
         const basis = cameraBasis(scene.camera);
         const focusGround = posOf(course, Math.max(0, scene.focusS), scene.focusW);
         const focusPoint = project(scene.camera, basis, { x: focusGround.x, y: focusGround.y, z: 0 });
-        if (focusPoint.depth > 2) v2HorseRatio = (HORSE_HEIGHT_M * focusPoint.pxPerM) / H;
+        if (focusPoint.depth > 2) { v2HorseRatio = (HORSE_HEIGHT_M * focusPoint.pxPerM) / H; v2FocusY = focusPoint.y / H; }
       }
       {
         // ★自馬の頭（設計 1-6）。馬と**同じ `scene.camera`** で投影する
@@ -5506,7 +5511,7 @@ function RaceView({ setup, real }: {
       (globalThis as { __raceGround?: unknown }).__raceGround = { d, focusS: scene.focusS, visualDelta };
       noteGroundJump(d, scene.shot.id, scene.focusS, visualDelta, real?.raceId ?? null);
       noteAuditGround(course, d, scene, visualDelta, lead, sec, v2HorseRatio, real?.raceId ?? 'demo',
-        GROUND_LEGACY ? undefined : (motionTimeline ?? built).groundPhase.at(d));
+        GROUND_LEGACY ? undefined : (motionTimeline ?? built).groundPhase.at(d), v2FocusY);
       const metersByGate = new Map(easedAt.map((horse) => [horse.gate, horse.meters]));
       /**
        * ★**レースの音**（★2026-09-13・オーナー支給の音源）。

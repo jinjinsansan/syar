@@ -14,6 +14,8 @@ export interface AuditGroundFrame {
   readonly horseRatio: number; readonly camDistM: number;
   /** ★板の場面の 芝の画面のずれ（px）と その速さ（px/秒・★場面の最初のコマは null）（★2026-10-03・画面での流れを測る） */
   readonly platePx?: number; readonly platePxPerSec?: number | null;
+  /** ★注視点（★馬の足もとの地面）の 画面の高さ ÷ 画面の高さ（★0 ＝ 上端）（★2026-10-03・オーナー「ゴール前で馬の場所が急に下へおりた」） */
+  readonly focusY?: number;
 }
 
 export interface AuditShotSummary {
