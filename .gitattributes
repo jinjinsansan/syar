@@ -1,1 +1,2 @@
 db/migrations/*.sql text eol=lf
+tools/hooks/* text eol=lf
