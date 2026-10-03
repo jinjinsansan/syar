@@ -55,9 +55,24 @@ export function pixelScaleOf(deviceRatio: number): number {
  * ★`?dpr=` の戻し口は ★これまでどおり効きます（★その値で描く）。
  * ⚠️ ★上限は `MAX_PIXEL_SCALE`（★コマ落ち対策）。★上限に当たる大きな画面（★4K で全幅など）だけは ★比が 1 を超えます。
  */
+/**
+ * ★**目隠しの見比べ**（★2026-10-03・3 者会議 E・裁定 `REVIEW_MEETING_RACE_QUALITY_20261003.md` §4）。
+ *   ★`?look=<符号>` で ★いまの 1:1（null）か ★`dpr=2` のどちらかで描く。★URL からは どちらか分からない。
+ *   ★3 組 × 2 本。★組ごとに どちらが先かを入れ替える（★1 組目 先が dpr 2・2 組目 先が 1:1・3 組目 先が dpr 2）。
+ *   ★3 組とも同じ側を選べば その側に決める（★オーナー）。⚠️ ★答え合わせまで この表をオーナーに見せない。
+ */
+export const BLIND_LOOKS: Readonly<Record<string, string | null>> = {
+  k7: '2', m3: null,
+  p4: null, r9: '2',
+  s2: '2', w5: null,
+};
+
 export function pixelScaleForDisplay(
   search: string, deviceRatio: number, displayCssWidth: number, drawWidth: number, supersample = 1,
 ): number {
+  const look = new URLSearchParams(search).get('look');
+  const blind = look === null ? undefined : BLIND_LOOKS[look];
+  if (blind !== undefined && blind !== null) return pixelScaleOf(Number(blind));
   const v = new URLSearchParams(search).get('dpr');
   if (v !== null && v !== '') return pixelScaleFromSearch(search, deviceRatio);
   if (!Number.isFinite(displayCssWidth) || displayCssWidth <= 0 || !Number.isFinite(drawWidth) || drawWidth <= 0

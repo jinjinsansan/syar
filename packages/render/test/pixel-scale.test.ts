@@ -184,3 +184,25 @@ describe('★携帯の超標本化の口（★既定は 1:1・レビュー側の
     expect(Math.round(W * pixelScaleOf(3))).toBe(2560);
   });
 });
+
+describe('★目隠しの見比べ（?look=・3 者会議 E）', () => {
+  const W = 1280;
+  it('★3 組とも 1:1 と dpr 2 が 1 本ずつ・★先に来る側が組ごとに入れ替わる', async () => {
+    const { BLIND_LOOKS } = await import('../src/pixel-scale.js');
+    const pairs = [['k7', 'm3'], ['p4', 'r9'], ['s2', 'w5']] as const;
+    expect(Object.keys(BLIND_LOOKS).sort()).toEqual(pairs.flat().slice().sort());
+    const firsts = pairs.map(([a, b]) => {
+      expect(new Set([BLIND_LOOKS[a], BLIND_LOOKS[b]])).toEqual(new Set(['2', null]));
+      return BLIND_LOOKS[a];
+    });
+    expect(firsts).toEqual(['2', null, '2']);
+  });
+
+  it('★符号で描き分ける（★1:1 の符号は ?look が無いときと同じ・★dpr 2 の符号は ?dpr=2 と同じ）', () => {
+    // ★PC（入れ物 1252 CSS px・dpr 1.25）
+    expect(pixelScaleForDisplay('?look=m3', 1.25, 1252, W)).toBe(pixelScaleForDisplay('', 1.25, 1252, W));
+    expect(pixelScaleForDisplay('?look=k7', 1.25, 1252, W)).toBe(pixelScaleForDisplay('?dpr=2', 1.25, 1252, W));
+    // ★対照: ★知らない符号は 何もしない
+    expect(pixelScaleForDisplay('?look=zz', 1.25, 1252, W)).toBe(pixelScaleForDisplay('', 1.25, 1252, W));
+  });
+});
